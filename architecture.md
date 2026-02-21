@@ -725,12 +725,3 @@ enterprise-strategy-platform/
     └── docs.txt                                                 # 文档依赖
 
 ```
-
-## 四、核心组件交互详细说明
-
-
-### **1. 事件驱动消息流**
-
-
-### **X. XXX**
-
