@@ -66,7 +66,7 @@
        [4]. 规划生成用例（PlanningGenerationUseCase）
             (1). 支持 SP 规划生成：接收 SP 规划命令，执行 BLM 六阶段状态机（业绩差距分析→市场洞察六子步骤→战略意图与目标→创新焦点→业务设计→执行设计），各阶段触发 Checkpoint 机制，输出 JSON 思维链（Input→<Reflection>→<Tools_Used>→<Constraints_Check>→JSON）
             (2). 支持 BP 规划生成：接收 BP 规划命令，执行战略解码器将 SP 输出映射为 BP 输入，执行 BEM 六阶段状态机，各阶段触发 Checkpoint 机制，输出 JSON 思维链
-            (3). 支持 Checkpoint 交互：接收 Checkpoint 恢复命令，加载检查点实体，支持用户修正关键参数；支持双模式恢复——Replay 模式（修改点后所有状态重新计算，强一致性，适用于假设/逻辑变更）与 Override 模式（仅修改指定状态，后续状态不变，需人工确认一致性风险，适用于拼写/格式调整）；系统自动评估修改影响范围（影响≥3 个后续 Checkpoint 强制 Replay 模式，影响≤1 个推荐 Override 模式）
+            (3). 支持 Checkpoint 交互：接收 Checkpoint 恢复命令，加载检查点实体，支持用户修正关键参数；支持双模式恢复——Replay 模式（修改点后所有状态重新计算，强一致性，适用于假设/逻辑变更）与 Override 模式（仅修改指定状态，后续状态不变，需人工确认一致性风险，适用于拼写/格式调整）；系统自动评估修改影响范围（影响≥2 个后续 Checkpoint 强制 Replay 模式，影响<2 个推荐 Override 模式）
             (4). 支持 Time-travel 两阶段能力：第一阶段单点恢复（从任意 Checkpoint 恢复执行，支持修改中间状态变量并从修改点继续）；第二阶段分支对比（创建分支→在分支上执行恢复→并行维护主线与分支状态→提供差异对比视图→用户确认合并分支或放弃）
        [5]. 系统操作用例（SystemOperationsUseCase）
             (1). 支持用户认证与权限管理：接收登录命令，验证用户凭证，加载 RBAC 权限，生成 JWT 令牌，记录审计日志
@@ -135,7 +135,7 @@
        [5]. 规划生成事件流转
             SP/BP 规划启动 → 发布 PlanningStarted 事件 → 触发 BLM/BEM 状态机用例 → 各阶段完成发布 StageCompleted 事件 → 触发 Checkpoint 创建用例 → 发布 CheckpointReached 事件 → 触发用户反馈用例 → 发布 FeedbackReceived 事件 → 触发 Checkpoint 恢复用例 → 发布 CheckpointRecovered 事件 → 发布 PlanningResumed 事件 → 规划完成发布 PlanningCompleted 事件
        [6]. Checkpoint 恢复事件流转
-            用户修正提交 → 触发修正分级判定用例 → 发布 CorrectionClassified 事件（L0/L1/L2/L3） → 触发影响范围评估用例（识别受影响的后续 Checkpoint） → 恢复模式判定（影响≥3 个强制 Replay，影响≤1 个推荐 Override） → Replay 模式：发布 CheckpointReplayStarted 事件 → 触发重新执行用例 → 发布 CheckpointReplayed 事件 → 更新战略档案库；Override 模式：发布 CheckpointOverridden 事件 → 一致性风险提示 → 用户确认 → 更新战略档案库
+            用户修正提交 → 触发修正分级判定用例 → 发布 CorrectionClassified 事件（L0/L1/L2/L3） → 触发影响范围评估用例（识别受影响的后续 Checkpoint） → 恢复模式判定（影响≥2 个强制 Replay，影响<2 个推荐 Override） → Replay 模式：发布 CheckpointReplayStarted 事件 → 触发重新执行用例 → 发布 CheckpointReplayed 事件 → 更新战略档案库；Override 模式：发布 CheckpointOverridden 事件 → 一致性风险提示 → 用户确认 → 更新战略档案库
        [7]. 路由决策事件流转
             任务创建 → 触发 L1 合规性网关（敏感数据检查/数据驻留检查/白名单检查） → 通过过滤 → 触发 L2 任务复杂度评估（语义匹配/历史成功率/成本效率/任务复杂度四因子评分） → 触发 L3 路由决策执行 → 发布 RoutingDecided 事件 → 路由决策日志存储 → 触发模型调用用例
        [8]. 修正审批事件流转
@@ -403,7 +403,7 @@
     6. 支持 Checkpoint 双模式恢复协议
        [1]. 支持 Replay 重放模式：修改点后所有状态重新计算，强一致性保证，适用于假设/逻辑变更（L2/L3 级修正）；执行流程——加载 Checkpoint 快照→应用用户修正→识别依赖的后续 Checkpoint 列表→拓扑排序重新执行→发布 CheckpointReplayed 事件→旧版本归档至 WORM 存储；幂等性保证（执行缓存：输入哈希→输出映射，TTL 24 小时）
        [2]. 支持 Override 覆盖模式：仅修改指定状态，后续状态不变，最终一致性（需人工确认），适用于拼写/格式调整（L0/L1 级修正）；执行流程——加载 Checkpoint 快照→应用用户修正→标记后续 Checkpoint 为"基于旧版本"→发布 CheckpointOverridden 事件→前端展示一致性风险提示；一致性风险检测（修改变量与后续 Checkpoint 依赖变量重叠分析）
-       [3]. 支持恢复模式自动推荐：系统实时评估修改影响范围（影响≥3 个后续 Checkpoint 强制 Replay 模式，影响 2 个推荐 Replay 模式，影响≤1 个推荐 Override 模式），前端展示预计耗时与成本
+       [3]. 支持恢复模式自动推荐：系统实时评估修改影响范围（影响≥2 个后续 Checkpoint 强制 Replay 模式，影响<2 个推荐 Override 模式），前端展示预计耗时与成本
        [4]. 支持 Time-travel 两阶段能力：第一阶段单点恢复（从任意 Checkpoint 恢复执行，支持修改中间状态变量并从修改点继续）；第二阶段分支对比（创建分支→在分支上执行恢复→并行维护主线与分支状态→提供差异对比视图→用户确认合并分支或放弃）；分支管理（分支 ID、父 Checkpoint ID、分支名称、创建者、状态、合并信息）
     7. 工具箱和 AGENT 协同机制（MCP/A2A 协议标准化）
        [1]. 编排分层原则
@@ -502,7 +502,7 @@
        [4]. 定义隔离切换日志 Schema（AGENT ID、时间戳、原隔离等级、目标隔离等级、触发原因、审批链）
     6. 统一 Checkpoint 恢复协议文档
        [1]. 定义双模式恢复（Replay/Override）的适用场景、执行流程、不变约束
-       [2]. 定义影响范围评估规则（影响≥3 个强制 Replay，影响≤1 个推荐 Override）
+       [2]. 定义影响范围评估规则（影响≥2 个强制 Replay，影响<2 个推荐 Override）
        [3]. 定义 Time-travel 两阶段能力（单点恢复/分支对比）
        [4]. 定义 Checkpoint 恢复日志 Schema（Checkpoint ID、恢复模式、修改内容、影响的后续 Checkpoint、风险等级、延迟、成本）
 
@@ -540,7 +540,7 @@
        [3]. 联合任务完成后 30 分钟无活动，自动恢复至 L4 硬隔离
        [4]. 所有跨 AGENT 数据交换必须记录至公共黑板（MVCC 版本化）与审计日志
     8. Checkpoint 恢复约束
-       [1]. 修改影响≥3 个后续 Checkpoint 强制采用 Replay 模式
+       [1]. 修改影响≥2 个后续 Checkpoint 强制采用 Replay 模式
        [2]. Replay 模式必须保证幂等性（执行缓存：输入哈希→输出映射）
        [3]. Override 模式必须展示一致性风险提示，用户确认后方可执行
        [4]. 旧版本快照必须归档至 WORM 存储，保留期限 7 年
