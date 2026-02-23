@@ -11,6 +11,75 @@ documentStatus: 'complete'
 
 **Author:** Agimtech
 **Date:** 2026-02-22
+**Version:** 1.0.0
+**Status:** Complete
+
+---
+
+## Table of Contents
+
+### 第一部分：产品概述
+- [1. Executive Summary](#executive-summary) - 产品愿景、差异化、目标用户
+- [2. Success Criteria](#success-criteria) - 成功标准（用户/业务/技术）
+- [3. Product Scope](#product-scope) - MVP/V1/V2范围定义
+
+### 第二部分：用户与场景
+- [4. User Journeys](#user-journeys) - 7 个用户旅程叙事
+  - 4.1 CEO 张总 - 战略共识达成旅程
+  - 4.2 李经理（战略） - 数据溯源效率旅程
+  - 4.3 王经理（顾问） - 白标项目交付旅程
+  - 4.4 陈工 - 系统运维监控旅程
+  - 4.5 CFO 王总 - 财务量化决策旅程
+  - 4.6 李经理（投资） - 项目筛选尽调旅程
+  - 4.7 张经理（分析师） - 信贷风险评估旅程
+
+### 第三部分：领域与创新
+- [5. Domain Requirements](#domain-requirements) - 领域特定需求（合规/安全/集成）
+- [6. Innovation Patterns](#innovation-patterns) - 创新焦点与护城河策略
+
+### 第四部分：项目特定需求
+- [7. Project-Type Requirements](#project-type-requirements) - SaaS B2B 特定需求
+  - 7.1 多租户架构
+  - 7.2 订阅模式
+  - 7.3 RBAC 权限矩阵
+  - 7.4 集成列表
+  - 7.5 合规要求
+
+### 第五部分：功能需求（能力契约）
+- [8. Functional Requirements](#functional-requirements) - 122 项功能需求
+  - 8.1 文档与数据管理（DM-01 ~ DM-15）- 15 项
+  - 8.2 智能检索与知识发现（SR-01 ~ SR-15）- 15 项
+  - 8.3 战略工具箱（ST-01 ~ ST-11）- 11 项
+  - 8.4 Agent 协作（AC-01 ~ AC-16）- 16 项
+  - 8.5 战略规划流程（SP-01 ~ SP-12）- 12 项
+  - 8.6 用户交互与报告（UI-01 ~ UI-13）- 13 项
+  - 8.7 系统管理与合规（SC-01 ~ SC-14）- 14 项
+  - 8.8 成本与性能优化（CP-01 ~ CP-12）- 12 项
+  - 8.9 战略档案库与长期记忆（SA-01 ~ SA-10）- 10 项
+  - 8.10 架构约束（AR-01 ~ AR-04）- 4 项
+
+### 第六部分：非功能需求（质量属性）
+- [9. Non-Functional Requirements](#non-functional-requirements) - 39 项 NFR
+  - 9.1 性能（NFR-PERF-01 ~ NFR-PERF-07）- 7 项
+  - 9.2 安全性（NFR-SEC-01 ~ NFR-SEC-07）- 7 项
+  - 9.3 合规性（NFR-COMP-01 ~ NFR-COMP-08）- 8 项
+  - 9.4 可靠性（NFR-REL-01 ~ NFR-REL-06）- 6 项
+  - 9.5 可扩展性（NFR-SCALE-01 ~ NFR-SCALE-04）- 4 项
+  - 9.6 集成性（NFR-INT-01 ~ NFR-INT-05）- 5 项
+  - 9.7 可访问性（NFR-ACC-01 ~ NFR-ACC-02）- 2 项
+
+### 附录
+- [附录 A：FR 溯源矩阵](#功能需求汇总矩阵) - FR 与 or.md 溯源对照
+- [附录 B：NFR 测试覆盖计划](#nfr 测试覆盖计划) - NFR 测试场景与用例数
+- [附录 C：业务规则文档引用](#验收标准与业务规则文档引用) - 算法细节参考文档
+
+---
+
+**文档导航提示：**
+- 点击章节标题可直接跳转到对应章节
+- FR 编号格式：`[能力领域缩写]-[序号]`（如 DM-01、SR-15）
+- NFR 编号格式：`NFR-[类别缩写]-[序号]`（如 NFR-PERF-01、NFR-SEC-05）
+- P0/P1/P2优先级：P0（MVP 必需）、P1（V1 增加）、P2（V2 增加）
 
 ---
 
