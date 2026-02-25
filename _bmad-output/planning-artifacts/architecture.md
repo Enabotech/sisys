@@ -195,7 +195,7 @@ graph TB
         end
 
         subgraph "Agent 编排引擎 (LangGraph)"
-            LangGraphEngine[LangGraph 引擎包装器<br/>0.0.40+]
+            LangGraphEngine[LangGraph 引擎包装器<br/>1.0+]
             AgentGraph[Agent 协作图]
             BLMGraph[BLM 规划图<br/>六阶段状态机]
             BEMGraph[BEM 规划图<br/>六阶段状态机]
@@ -770,8 +770,8 @@ class SemanticCache:
 | | API Gateway | Kong/Traefik | 最新 | ✅ 低 |
 | **应用层** | 编排服务 | 自定义 | - | 🟡 中 |
 | **领域层** | 数据验证 | Pydantic | 2.4+ | ✅ 低 |
-| **基础设施** | 工作流引擎 | Prefect | 3.6+ | 🟠 高 (3.x 不成熟) |
-| | Agent 编排 | LangGraph | 0.0.40+ | 🟠 高 (版本极低) |
+| **基础设施** | 工作流引擎 | Prefect | 3.6+ | 🟡 中 |
+| | Agent 编排 | LangGraph | 1.0.0+ | 🟡 中 |
 | | 消息总线 | Redis+RabbitMQ | 7.0+/3.12+ | ✅ 低 |
 | | 向量数据库 | Qdrant | 1.7+ | ✅ 低 |
 | | 关系数据库 | PostgreSQL | 15+ | ✅ 低 |
@@ -786,7 +786,7 @@ class SemanticCache:
 | 风险技术 | 缓解措施 |
 |---------|---------|
 | **Prefect 3.6+** | MVP 阶段评估 Prefect 2.x 稳定性，准备 Airflow 备选 |
-| **LangGraph 0.0.40+** | 评估 AutoGen/CrewAI 备选，进行 PoC 验证 |
+| **LangGraph 1.0.0+** | 评估 AutoGen/CrewAI 备选，进行 PoC 验证 |
 
 ---
 
@@ -1531,7 +1531,7 @@ requirements/
 
 | 风险 | 概率 | 影响 | 风险等级 | 缓解措施 |
 |------|------|------|---------|---------|
-| **LangGraph 不成熟** | 中 | 高 | 🔴 高 | 评估 AutoGen/CrewAI 备选，PoC 验证 |
+| **LangGraph 不成熟** | 中 | 高 | 🟠 中 | 评估 AutoGen/CrewAI 备选，PoC 验证 |
 | **Prefect 3.x 稳定性** | 中 | 中 | 🟠 中 | 评估 Prefect 2.x，准备 Airflow 备选 |
 | **多租户隔离失效** | 低 | 高 | 🔴 高 | Schema per Tenant + RBAC + 渗透测试 |
 | **AI 幻觉导致错误决策** | 中 | 高 | 🔴 高 | 高保真溯源 + 人工 Checkpoint+AUD AGENT 一致性校验 |
