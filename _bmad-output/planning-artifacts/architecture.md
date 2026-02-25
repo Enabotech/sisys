@@ -1485,6 +1485,216 @@ requirements/
 
 ---
 
+### 13.14 根目录配置文件 (完整列表)
+
+```
+sisys/
+├── .env.example                                           # 环境变量示例
+├── .env                                                   # 本地环境变量（.gitignore）
+├── .gitignore                                             # Git 忽略规则
+├── .pre-commit-config.yaml                                # Pre-commit 钩子配置
+├── .flake8                                                # Flake8 代码检查配置
+├── .mypy.ini                                              # MyPy 类型检查配置
+├── .ruff.toml                                             # Ruff 代码检查配置
+├── pytest.ini                                             # Pytest 测试配置
+├── tox.ini                                                # Tox 测试环境配置
+├── Makefile                                               # Make 命令快捷方式
+├── pyproject.toml                                         # Python 项目元数据 + 构建配置
+├── README.md                                              # 项目说明文档
+├── LICENSE                                                # 开源许可证
+├── CHANGELOG.md                                           # 变更日志（Keep a Changelog 格式）
+├── CODE_OF_CONDUCT.md                                     # 行为准则
+├── CONTRIBUTING.md                                        # 贡献指南
+└── SECURITY.md                                            # 安全政策
+```
+
+---
+
+### 13.15 工具配置文件 (可选但推荐)
+
+```
+sisys/
+├── .vscode/                                               # VS Code 工作区配置
+│   ├── settings.json                                      # 工作区设置
+│   ├── extensions.json                                    # 推荐扩展
+│   └── launch.json                                        # 调试配置
+│
+├── .idea/                                                 # PyCharm 项目配置
+│   ├── misc.xml
+│   ├── modules.xml
+│   └── vcs.xml
+│
+├── notebooks/                                             # Jupyter Notebooks
+│   ├── exploration/                                       # 探索性分析
+│   ├── prototyping/                                       # 原型开发
+│   └── experiments/                                       # 实验记录
+│
+└── logs/                                                  # 日志目录（.gitignore）
+    ├── .gitkeep                                           # 保持目录存在
+    ├── application.log                                    # 应用日志
+    ├── error.log                                          # 错误日志
+    └── audit.log                                          # 审计日志
+```
+
+---
+
+### 13.16 项目结构验证清单
+
+**对比废弃草稿中的完整目录结构，当前架构已包含：**
+
+| 目录/文件 | 废弃草稿 | 当前架构 | 状态 |
+|----------|---------|---------|------|
+| **src/domain/** | ✅ | ✅ | ✅ 完整 |
+| **src/application/** | ✅ | ✅ | ✅ 完整 |
+| **src/infrastructure/** | ✅ | ✅ | ✅ 完整（新增 UDMR/EIP 相关模块） |
+| **src/interfaces/** | ✅ | ✅ | ✅ 完整 |
+| **src/shared/** | ✅ | ✅ | ✅ 完整 |
+| **tests/** | ✅ | ✅ | ✅ 完整（新增集成测试/E2E 测试） |
+| **configs/** | ✅ | ✅ | ✅ 完整 |
+| **scripts/** | ✅ | ✅ | ✅ 完整（新增 tools 子目录） |
+| **docs/** | ✅ | ✅ | ✅ 完整（新增 operations 子目录） |
+| **docker/** | ✅ | ✅ | ✅ 完整（新增 Dockerfile.dev） |
+| **.github/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
+| **requirements/** | ✅ | ✅ | ✅ 完整（新增 test.txt/docs.txt） |
+| **根目录配置** | 🟡 部分 | ✅ | ✅ 已补充完整 |
+| **工具配置** | ❌ 未定义 | ✅ | ✅ 已新增 |
+| **notebooks/** | ✅ | ✅ | ✅ 完整 |
+| **logs/** | ✅ | ✅ | ✅ 完整 |
+
+**新增内容（相比废弃草稿）：**
+
+| 新增项 | 说明 | 优先级 |
+|-------|------|-------|
+| `.ruff.toml` | Ruff 代码检查配置 | 🟡 中 |
+| `CODE_OF_CONDUCT.md` | 行为准则 | 🟢 低 |
+| `CONTRIBUTING.md` | 贡献指南 | 🟢 低 |
+| `SECURITY.md` | 安全政策 | 🔴 高 |
+| `.vscode/` | VS Code 工作区配置 | 🟡 中 |
+| `tox.ini` | Tox 测试环境配置 | 🟢 低 |
+| `Makefile` | Make 命令快捷方式 | 🟡 中 |
+
+---
+
+### 13.17 架构边界定义
+
+#### 13.17.1 API 边界
+
+**外部 API 端点:**
+```
+# 公共 API（通过 API Gateway 暴露）
+GET    /api/v1/plans                    # 获取规划列表
+POST   /api/v1/plans                    # 创建规划
+GET    /api/v1/plans/{plan_id}          # 获取规划详情
+PATCH  /api/v1/plans/{plan_id}          # 更新规划
+DELETE /api/v1/plans/{plan_id}          # 删除规划
+POST   /api/v1/plans/{plan_id}/recover  # 恢复规划
+
+GET    /api/v1/agents                   # 获取 Agent 列表
+POST   /api/v1/agents/{agent_id}/execute # 执行 Agent 任务
+
+GET    /api/v1/routing-decisions        # 获取路由决策日志
+```
+
+**内部服务边界:**
+- Prefect 工作流引擎：内部调用，不直接暴露
+- LangGraph Agent 编排：内部调用，不直接暴露
+- RabbitMQ 事件总线：内部通信，不直接暴露
+
+#### 13.17.2 组件边界
+
+**领域层边界:**
+- 不依赖任何基础设施层代码
+- 通过接口定义与外部交互
+- 所有业务逻辑封装在实体和领域服务中
+
+**应用层边界:**
+- 依赖领域层接口
+- 编排用例执行流程
+- 不直接访问数据库或外部服务
+
+**基础设施层边界:**
+- 实现领域层和应用层定义的接口
+- 处理所有技术细节（数据库、消息队列、外部 API）
+- 通过依赖注入提供给应用层
+
+**接口层边界:**
+- 适配外部请求（CLI、HTTP、事件）
+- 调用应用层用例
+- 格式化响应
+
+#### 13.17.3 数据边界
+
+**数据库边界:**
+```sql
+-- 领域数据（PostgreSQL）
+strategic_plans, business_plans, agents, tools, checkpoints
+routing_decision_logs, isolation_switch_logs
+
+-- 向量数据（Qdrant）
+document_embeddings, strategic_archive_embeddings
+
+-- 图数据（Neo4j）
+knowledge_graph, entity_relationships, dependency_graphs
+
+-- 缓存数据（Redis）
+semantic_cache, agent_state, session_data
+```
+
+**对象存储边界（MinIO）:**
+```
+buckets/
+├── raw-documents/          # 原始文档（WORM 7 年）
+├── processed-documents/    # 处理后的文档
+├── evidence-packages/      # 证据包
+└── audit-archives/         # 审计归档（WORM 7 年）
+```
+
+#### 13.17.4 事件边界
+
+**内部事件（Redis 发布/订阅）:**
+- 实时通知型事件
+- Agent 状态变更事件
+- 临时工作协调事件
+
+**持久化事件（RabbitMQ + Outbox）:**
+- 领域事件（Domain Events）
+- 业务状态变更事件
+- 审计事件
+
+**外部集成事件:**
+- 与外部系统集成的事件
+- 通过事件网关转换格式
+
+---
+
+### 13.18 需求到结构映射
+
+#### 13.18.1 PRD 功能需求映射
+
+| PRD 功能 | 架构组件 | 文件位置 |
+|---------|---------|---------|
+| 多模态文档解析 | DocumentService | `src/domain/services/document_service.py` |
+| RAG 索引构建 | RAGService | `src/domain/services/rag_service.py` |
+| Agent 协作分析 | AgentService | `src/domain/services/agent_service.py` |
+| 战略规划生成 | PlanningService | `src/domain/services/planning_service.py` |
+| UDMR 路由 | RoutingService | `src/domain/services/routing_service.py` |
+| EIP 隔离 | IsolationService | `src/domain/services/isolation_service.py` |
+| Checkpoint 恢复 | CheckpointRecovery | `src/application/services/checkpoint_recovery.py` |
+| Time-Travel | TimeTravelDebugger | `src/application/services/time_travel.py` |
+
+#### 13.18.2 非功能需求映射
+
+| NFR | 架构支撑 | 文件位置 |
+|-----|---------|---------|
+| 检索延迟 P95<800ms | 混合检索 + RRF 融合 | `src/infrastructure/persistence/vector_store.py` |
+| 路由延迟 P95<50ms | UDMR 三层决策 | `src/domain/services/routing_service.py` |
+| 事件可靠性 | Outbox 模式 | `src/infrastructure/messaging/outbox/` |
+| 7 年审计存储 | WORM 对象存储 | `src/infrastructure/external_services/file_storage/minio_adapter.py` |
+| 提示注入检测 | ShieldCortex | `src/infrastructure/security/shield_cortex.py` |
+| 性能监控 | CUSUM 漂移检测 | `src/infrastructure/monitoring/cusum_detector.py` |
+
+---
+
 ## 14. 质量属性设计
 
 ### 15.1 性能设计
