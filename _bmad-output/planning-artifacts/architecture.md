@@ -13,8 +13,8 @@ date: '2026-02-25'
 
 # 企业战略规划管理系统 - 完整架构设计文档
 
-**版本：** 3.3.0  
-**状态：** 排版修复版（章节编号已统一）  
+**版本：** 3.4.0  
+**状态：** 关键交互流程完善版（64 步完整流程）  
 **评审日期：** 2026-02-25  
 **审核依据：** 架构草稿审核评估报告（16 项关键问题）
 
@@ -30,6 +30,7 @@ date: '2026-02-25'
 | 3.1.0 | 2026-02-25 | 增加完整详细的目录结构 | 架构团队 |
 | 3.2.0 | 2026-02-25 | 宗师级核心领域架构设计（数据处理/工具箱/AGENT/战略规划） | 架构团队 |
 | 3.3.0 | 2026-02-25 | 排版修复（统一章节编号，删除重复内容） | 架构团队 |
+| 3.4.0 | 2026-02-25 | 关键交互流程完善（64 步完整流程，含 UDMR/EIP/修正/裁决） | 架构团队 |
 
 ---
 
@@ -224,43 +225,101 @@ graph TB
     end
 
     %% ========== 关键交互流程 ==========
-    AgentUC -- "1. 任务提交" --> UDMR_Service
-    UDMR_Service -- "2. L1 合规性检查" --> UDMR_Service
-    UDMR_Service -- "3. L2 复杂度评估" --> UDMR_Service
-    UDMR_Service -- "4. L3 路由决策" --> UDMR_Service
-    UDMR_Service -- "5. 路由决策日志" --> RoutingLog
-    UDMR_Service -- "6. 路由执行" --> LLM_Router
-    LLM_Router -- "7a. 本地路由 (80%)" --> LLM_Local
-    LLM_Router -- "7b. 云端路由 (20%)" --> LLM_Cloud
-
-    AgentUC -- "8. 协作请求" --> EIP_Manager
-    EIP_Manager -- "9. 隔离等级判定" --> EIP_Manager
-    EIP_Manager -- "10. 隔离切换日志" --> IsolationLog
-    EIP_Manager -- "11. 隔离执行" --> AgentService
-    EIP_Manager -- "12. 发布切换事件" --> Redis_PubSub
-
-    PlanningUC -- "13. 修正提交" --> CorrectionJudge
-    CorrectionJudge -- "14. 五维特征评估" --> CorrectionJudge
-    CorrectionJudge -- "15. 分级判定" --> CorrectionJudge
-    CorrectionJudge -- "16a. L0/L1 自动固化" --> PlanningUC
-    CorrectionJudge -- "16b. L2 专家确认" --> PlanningUC
-    CorrectionJudge -- "16c. L3 委员会审批" --> PlanningUC
-
-    AgentUC -- "17. 仲裁请求" --> SYSArbiter
-    SYSArbiter -- "18. 五维评分" --> SYSArbiter
-    SYSArbiter -- "19. 置信度评估" --> SYSArbiter
-    SYSArbiter -- "20a. 高置信度裁决" --> AgentUC
-    SYSArbiter -- "20b. 低置信度升级" --> PlanningUC
-
-    Redis_PubSub -- "实时事件" --> EventListener
-    RabbitMQ -- "持久化事件" --> Outbox
-    Outbox -- "轮询发布" --> RabbitMQ
-    RabbitMQ -- "死信事件" --> DLQ
-
-    Cache_Storage -.-> Relational_Storage
-    Relational_Storage -.-> Vector_Storage
-    Vector_Storage -.-> Object_Storage
-    Object_Storage -.-> Graph_Storage
+    
+    %% 流程 1-5: 用户发起文档处理（基础流程）
+    CLI -- "1. upload --file docs.zip" --> DocUC
+    DocUC -- "2. ProcessDocumentsCommand" --> CmdHandler
+    CmdHandler -- "3. 调用领域服务" --> RAGService
+    RAGService -- "4. 通过仓储接口" --> DocRepo
+    DocRepo -- "5. 基础设施实现" --> Relational_Storage
+    
+    %% 流程 6-10: 编排服务协调 Prefect 工作流
+    DocUC -- "6. 调用编排服务" --> Orchestrator
+    Orchestrator -- "7. 调用 Prefect 引擎" --> PrefectEngine
+    PrefectEngine -- "8. 执行文档处理流程" --> DocFlow
+    DocFlow -- "9. 调用外部适配器" --> StorageAdapter
+    StorageAdapter -- "10. 写入文件存储" --> Object_Storage
+    
+    %% 流程 11-15: 事件驱动处理完成（增强可靠性）
+    DocFlow -- "11. 完成事件" --> Producer
+    Producer -- "12. 写入事务发件箱" --> Outbox
+    Outbox -- "13. 轮询发布" --> RabbitMQ
+    RabbitMQ -- "14. 事件消息" --> Consumer
+    Consumer -- "15. 事件处理器" --> EventHandler
+    EventHandler -- "15b. 触发下一步处理" --> ToolUC
+    
+    %% 流程 16-21: Agent 协作分析（含 UDMR 路由）
+    AgentUC -- "16. 任务提交" --> UDMR_Service
+    UDMR_Service -- "17. L1 合规性检查" --> UDMR_Service
+    UDMR_Service -- "18. L2 复杂度评估" --> UDMR_Service
+    UDMR_Service -- "19. L3 路由决策" --> UDMR_Service
+    UDMR_Service -- "20. 路由决策日志" --> RoutingLog
+    UDMR_Service -- "21. 路由执行" --> LLM_Router
+    LLM_Router -- "22a. 本地路由 (80%)" --> LLM_Local
+    LLM_Router -- "22b. 云端路由 (20%)" --> LLM_Cloud
+    
+    %% 流程 23-27: 战略规划生成（含 Checkpoint）
+    PlanningUC -- "23. 调用编排服务" --> Orchestrator
+    Orchestrator -- "24. 协调 Prefect+LangGraph" --> LangGraphEngine
+    LangGraphEngine -- "25. 执行 BLM 状态机" --> BLMGraph
+    BLMGraph -- "26. Checkpoint 到达" --> Producer
+    Producer -- "27. Checkpoint 事件" --> Outbox
+    Outbox -- "28. 等待用户反馈" --> EventListener
+    EventListener -- "29. 恢复执行" --> PlanningUC
+    
+    %% 流程 30-34: RAG 混合检索流程（增强）
+    QueryHandler -- "30. 检索请求" --> RAGService
+    RAGService -- "31. Dense 检索" --> Vector_Storage
+    RAGService -- "32. Sparse 检索" --> Vector_Storage
+    RAGService -- "33. Graph 检索" --> Graph_Storage
+    RAGService -- "34. RRF 融合+ 重排序" --> QueryHandler
+    
+    %% 流程 35-38: 结果生成与五层存储协同
+    PlanningUC -- "35. 生成 PDF 报告" --> PrefectEngine
+    PrefectEngine -- "36. 执行报告生成流程" --> ReportFlow
+    ReportFlow -- "37. 元数据保存" --> Relational_Storage
+    ReportFlow -- "38. 证据包保存" --> Object_Storage
+    
+    %% 流程 39-43: EIP 隔离管理流程
+    AgentUC -- "39. 协作请求" --> EIP_Manager
+    EIP_Manager -- "40. 隔离等级判定" --> EIP_Manager
+    EIP_Manager -- "41. 隔离切换日志" --> IsolationLog
+    EIP_Manager -- "42. 隔离执行" --> AgentService
+    EIP_Manager -- "43. 发布切换事件" --> Redis_PubSub
+    
+    %% 流程 44-47: 修正分级判定流程
+    PlanningUC -- "44. 修正提交" --> CorrectionJudge
+    CorrectionJudge -- "45. 五维特征评估" --> CorrectionJudge
+    CorrectionJudge -- "46. 分级判定 (L0-L3)" --> CorrectionJudge
+    CorrectionJudge -- "47a. L0/L1 自动固化" --> PlanningUC
+    CorrectionJudge -- "47b. L2 专家确认" --> PlanningUC
+    CorrectionJudge -- "47c. L3 委员会审批" --> PlanningUC
+    
+    %% 流程 48-51: SYS AGENT 裁决流程
+    AgentUC -- "48. 仲裁请求" --> SYSArbiter
+    SYSArbiter -- "49. 五维评分" --> SYSArbiter
+    SYSArbiter -- "50. 置信度评估" --> SYSArbiter
+    SYSArbiter -- "51a. 高置信度裁决" --> AgentUC
+    SYSArbiter -- "51b. 低置信度升级" --> PlanningUC
+    
+    %% 流程 52-55: 双通道事件总线
+    Redis_PubSub -- "52. 实时事件" --> EventListener
+    RabbitMQ -- "53. 持久化事件" --> Outbox
+    Outbox -- "54. 轮询发布" --> RabbitMQ
+    RabbitMQ -- "55. 死信事件" --> DLQ
+    
+    %% 流程 56-60: 五层存储协同
+    Cache_Storage -. "56. 会话状态" .-> Relational_Storage
+    Relational_Storage -. "57. 元数据引用" .-> Vector_Storage
+    Vector_Storage -. "58. 嵌入向量" .-> Object_Storage
+    Object_Storage -. "59. 原始文档" .-> Graph_Storage
+    Graph_Storage -. "60. 实体关系" .-> Cache_Storage
+    
+    %% 流程 61-64: 性能监控与 CUSUM 漂移检测
+    PrefectEngine -- "61. 工作流监控事件" --> EventBus
+    LangGraphEngine -- "62. Agent 决策监控事件" --> EventBus
+    EventBus -- "63. 聚合到监控系统" --> Producer
+    EventBus -- "64. CUSUM 漂移检测" --> Producer
 ```
 
 ---
@@ -2743,7 +2802,7 @@ class MarketInsight:
             "lead_agent": "CMO",
             "collab_agents": ["COO", "CEO", "CFO"],
             "tools": ["$APPEALS", "价值主张画布"],
-            "output": "客户细分画像 + 需求优先级矩阵"
+            "output": "客户细分画像 + ���求优先级矩阵"
         },
         "2.3_看竞争": {
             "lead_agent": "CEO",
@@ -3090,15 +3149,31 @@ class TimeTravelDebugger:
 
 ---
 
-**架构决策文档 3.3.0 排版修复版**
+**架构决策文档 3.4.0 关键交互流程完善版**
 
-- **总行数：** 3100+ 行
+- **总行数：** 3160+ 行
 - **核心章节：** 19 章（编号已统一）
 - **ADR 决策记录：** 12 项
 - **解决问题：** 21 项
 - **代码示例：** 50+ 个
 - **架构图：** 10+ 个
+- **关键交互流程：** 64 步（11 个完整流程）
 
-**所有审核发现问题已全部解决，核心领域架构设计已完成，排版问题已修复。**
+**关键交互流程清单：**
+1. 用户发起文档处理（5 步）
+2. 编排服务协调 Prefect 工作流（5 步）
+3. 事件驱动处理完成（5 步，含 Outbox 模式）
+4. Agent 协作分析（6 步，含 UDMR 路由）
+5. 战略规划生成（5 步，含 Checkpoint）
+6. RAG 混合检索（5 步，Dense+Sparse+Graph）
+7. 结果生成与五层存储协同（4 步）
+8. EIP 隔离管理（5 步）
+9. 修正分级判定（4 步，L0-L3）
+10. SYS AGENT 裁决（4 步，五维评分）
+11. 双通道事件总线（4 步，Redis+RabbitMQ+Outbox+DLQ）
+12. 五层存储协同（5 步）
+13. 性能监控与 CUSUM 漂移检测（4 步）
+
+**所有审核发现问题已全部解决，核心领域架构设计已完成，关键交互流程已完善。**
 
 下一步：基于此架构设计，开始 MVP 实施计划（2026-02 ~ 2026-04）。
