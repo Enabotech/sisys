@@ -1322,7 +1322,7 @@ tests/
 ├── conftest.py                                            # pytest 配置
 │
 ├── unit/                                                  # 单元测试
-│   �����── __init__.py
+│   ├── __init__.py
 │   ├── domain/                                            # 领域层单元测试
 │   │   ├── models/
 │   │   ├── services/
@@ -2825,7 +2825,7 @@ class SYSArbiter:
                 "strategic_alignment": await self.evaluate_strategic_alignment(party_args)
             }
         
-        # 3. ���算综合得分
+        # 3. 计算综合得分
         party_scores = {}
         for party_id, party_scores in scores.items():
             total = sum(
@@ -2898,6 +2898,175 @@ class DebateEvaluator:
             disagreement_heatmap=heatmap,
             reason=f"增益率{gain_rate:.2%}, 重复率{repetition_rate:.2%}"
         )
+```
+
+#### 17.3.6 Agent 配置格式
+
+**目标：** 定义统一的 Agent 配置格式，支持动态加载和热更新
+
+**配置文件格式 (YAML):**
+```yaml
+# configs/agents/ceo_agent.yaml
+agent:
+  id: "agent_ceo"
+  name: "CEO"
+  display_name: "首席执行官"
+  icon: "👔"
+  version: "1.0.0"
+  
+identity:
+  role: "战略决策者"
+  background: "20 年 + 企业战略管理经验，擅长宏观战略规划和跨部门协调"
+  expertise:
+    - "战略规划"
+    - "业务设计"
+    - "高管协调"
+    - "风险决策"
+  
+capabilities:
+  tools:
+    - "差距分析"
+    - "市场洞察"
+    - "业务设计"
+    - "风险矩阵"
+    - "战略解码"
+  max_context_length: 8192
+  reasoning_mode: "strategic"
+  
+communication:
+  style: "直接、战略性、关注大局"
+  tone: "专业、权威、开放"
+  language: "zh-CN"
+  
+principles:
+  - "战略对齐优先"
+  - "数据驱动决策"
+  - "风险可控"
+  - "长期价值导向"
+
+llm_config:
+  routing_enabled: true
+  preferred_models:
+    - "qwen-max"
+    - "claude-3-opus"
+  fallback_models:
+    - "qwen-plus"
+  temperature: 0.7
+  max_tokens: 2048
+
+eip_config:
+  default_isolation_level: "L4"
+  allowed_levels:
+    - "L4"
+    - "L3"
+    - "L2"
+  collaboration_partners:
+    - "agent_cfo"
+    - "agent_coo"
+    - "agent_cmo"
+
+memory_config:
+  short_term:
+    type: "redis"
+    ttl: 3600
+  long_term:
+    type: "strategic_archive"
+    retention_days: 2555  # 7 年
+
+prompts:
+  system_prompt: "prompts/ceo_system.md"
+  role_prompt: "prompts/ceo_role.md"
+  style_guide: "prompts/ceo_style.md"
+```
+
+**Agent 配置加载器:**
+```python
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
+import yaml
+
+class AgentConfig(BaseModel):
+    """Agent 配置模型"""
+    id: str
+    name: str
+    display_name: str
+    icon: str
+    version: str
+    
+    identity: Dict[str, Any]
+    capabilities: Dict[str, Any]
+    communication: Dict[str, str]
+    principles: List[str]
+    
+    llm_config: Dict[str, Any]
+    eip_config: Dict[str, Any]
+    memory_config: Dict[str, Any]
+    prompts: Dict[str, str]
+    
+    @classmethod
+    def from_yaml(cls, path: str) -> 'AgentConfig':
+        """从 YAML 文件加载配置"""
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return cls(**data['agent'])
+
+# 使用示例
+config = AgentConfig.from_yaml('configs/agents/ceo_agent.yaml')
+```
+
+#### 17.3.7 Agent 间通信协议 (A2A)
+
+**目标：** 定义 Agent 间标准通信协议，确保协作一致性
+
+**消息格式:**
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+from uuid import uuid4, UUID
+from enum import Enum
+
+class MessageType(str, Enum):
+    """消息类型"""
+    REQUEST = "request"           # 请求协助
+    RESPONSE = "response"         # 响应请求
+    NOTIFICATION = "notification" # 通知事件
+    BROADCAST = "broadcast"       # 广播到公共黑板
+    DEBATE = "debate"             # 辩论消息
+
+class MessagePriority(str, Enum):
+    """消息优先级"""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+class A2AMessage(BaseModel):
+    """Agent 间通信消息"""
+    message_id: UUID = Field(default_factory=uuid4)
+    conversation_id: UUID  # 会话 ID，关联同一对话的消息
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    # 发送者和接收者
+    sender_id: str  # 发送 Agent ID
+    receiver_id: str  # 接收 Agent ID，广播时为"broadcast"
+    
+    # 消息类型和优先级
+    message_type: MessageType
+    priority: MessagePriority = MessagePriority.NORMAL
+    
+    # 消息内容
+    subject: str  # 消息主题
+    content: Dict[str, Any]  # 消息内容
+    context: Dict[str, Any] = Field(default_factory=dict)  # 上下文信息
+    
+    # 元数据
+    requires_response: bool = False
+    timeout_seconds: int = 300
+    correlation_id: UUID = None  # 关联请求 ID（响应时填写）
+    
+    # EIP 隔离信息
+    isolation_level: str = "L4"
+    blackboard_visible: bool = False  # 是否对公共黑板可见
 ```
 
 ---
@@ -6671,22 +6840,22 @@ class WorkflowTemplate(ABC):
 ""  
 "---"  
 ""  
-"**�ܹ������ĵ� v6.0.0 - Party Mode ��������������**"  
+"**架构决策文档 v6.0.0 - Party Mode 三轮评审完整版**"  
 ""  
-"- **��������** 6,671 ��"  
-"- **�����½ڣ�** 21 ��"  
-"- **��¼�½ڣ�** 8 ��"  
-"- **ADR ���߼�¼��** 12 ��"  
-"- **������⣺** 32 ��"  
-"- **����ʾ����** 120+ ��"  
-"- **�ܹ�ͼ��** 10+ ��"  
-"- **�ؼ��������̣�** 64 ����11 ���������̣�"  
-"- **��֤���ǣ�** 122 FR 100% / 39 NFR 100% / 30 ���� 100%"  
-"- **�������** 24 ������ + 33 ��������"  
-"- **Makefile ���** 30+ ����������"  
-"- **���ָ�꣺** 15 ��������άָ��"  
-"- **�ܹ�ģʽ��** װ����ģʽ/ģ�巽��ģʽ��ʽ����"  
+"- **总行数：** 6,671 行"  
+"- **核心章节：** 21 章"  
+"- **附录章节：** 8 章"  
+"- **ADR 决策记录：** 12 项"  
+"- **解决问题：** 32 项"  
+"- **代码示例：** 120+ 个"  
+"- **架构图：** 10+ 个"  
+"- **关键交互流程：** 64 步（11 个完整流程）"  
+"- **验证覆盖：** 122 FR 100% / 39 NFR 100% / 30 决策 100%"  
+"- **术语表：** 24 个术语 + 33 个缩略语"  
+"- **Makefile 命令：** 30+ 个开发命令"  
+"- **监控指标：** 15 个核心运维指标"  
+"- **架构模式：** 装饰器模式/模板方法模式显式定义"  
 ""  
-"**������˷���������ȫ���������������ܹ��������ɣ��ؼ��������������ƣ��ܹ���֤ͨ����**"  
+"**所有审核发现问题已全部解决，核心领域架构设计已完成，关键交互流程已完善，架构验证通过。**"  
 ""  
-"��һ�������ڴ˼ܹ���ƣ���ʼ MVP ʵʩ�ƻ���2026-02 ~ 2026-04����" 
+"下一步：基于此架构设计，开始 MVP 实施计划（2026-02 ~ 2026-04）。" 
