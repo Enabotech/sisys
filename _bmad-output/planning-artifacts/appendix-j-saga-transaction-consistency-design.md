@@ -1,17 +1,35 @@
 # 附录 J：Saga 事务一致性设计方案
 
 **版本：** 1.0.0
-**状态：** 新增
+**状态：** 已批准
 **创建日期：** 2026-02-25
-**关联章节：** 第 11 章 存储架构设计、第 10 章 事件驱动架构设计、第 9 章 领域实体完整定义
+**评审日期：** 2026-02-25
+**解决问题：** H3 - 五层存储架构的跨库事务一致性设计不足
+
+**关联文档：**
+- 架构设计文档 v6.0.0 - 第 11 章 存储架构设计
+- 架构设计文档 v6.0.0 - 第 10 章 事件驱动架构设计
+- 架构设计文档 v6.0.0 - 第 9 章 领域实体完整定义
 
 ---
 
-## 28. Saga 事务一致性设计
+## 文档目录
 
-### 28.1 跨库事务场景识别
+1. [跨库事务场景识别](#1-跨库事务场景识别)
+2. [Saga 模式设计](#2-saga-模式设计)
+3. [具体 Saga 流程设计](#3-具体-saga-流程设计)
+4. [数据一致性校验机制](#4-数据一致性校验机制)
+5. [异常处理与恢复](#5-异常处理与恢复)
+6. [监控与审计](#6-监控与审计)
+7. [Saga 配置管理](#7-saga-配置管理)
+8. [验收标准](#8-验收标准)
+9. [与现有架构集成](#9-与现有架构集成)
 
-#### 28.1.1 五层存储架构回顾
+---
+
+## 1. 跨库事务场景识别
+
+### 1.1 五层存储架构回顾
 
 | 层级 | 技术选型 | 存储内容 | 一致性特点 |
 |------|---------|---------|-----------|
@@ -21,7 +39,7 @@
 | **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 强一致性 (WORM) |
 | **L5 图存储层** | Neo4j 5.x | 知识图谱、实体关系 | 强一致性 (ACID) |
 
-#### 28.1.2 领域实体跨层分布
+### 1.2 领域实体跨层分布
 
 | 实体 | 存储层 | 数据分布 | 一致性要求 |
 |------|--------|---------|-----------|
@@ -35,7 +53,7 @@
 | **RoutingDecisionLog** | L2+L4 | L2: 决策元数据 / L4: WORM 归档 | 强一致性 |
 | **IsolationSwitchLog** | L2+L4 | L2: 切换元数据 / L4: WORM 归档 | 强一致性 |
 
-#### 28.1.3 跨库事务场景清单
+### 1.3 跨库事务场景清单
 
 | 场景编号 | 场景名称 | 涉及存储层 | 业务触发条件 | 一致性要求 |
 |---------|---------|-----------|-------------|-----------|
@@ -52,9 +70,9 @@
 
 ---
 
-### 28.2 Saga 模式设计
+## 2. Saga 模式设计
 
-#### 28.2.1 编排式 vs 编舞式选择
+### 2.1 编排式 vs 编舞式选择
 
 **决策矩阵：**
 
@@ -100,7 +118,7 @@
 2. **辅助索引流程**（S01, S06-S08）采用编舞式，降低耦合度，提高可扩展性
 3. **合规要求**：SOX/ISO27001 要求关键审计日志必须强一致性，编排式更适合
 
-#### 28.2.2 Saga 执行器架构设计
+### 2.2 Saga 执行器架构设计
 
 ```python
 # src/infrastructure/saga/saga_orchestrator.py
@@ -254,7 +272,7 @@ class SagaOrchestrator:
         return False
 
     async def _compensate(self, from_step: int):
-        """执行补偿流程（反向执行）"""
+        """执行补偿流程（反向顺序）"""
         self.context.status = SagaStatus.COMPENSATING
         await self._persist_status()
 
@@ -286,7 +304,7 @@ class SagaOrchestrator:
         })
 ```
 
-#### 28.2.3 补偿事务设计原则
+### 2.3 补偿事务设计原则
 
 | 原则 | 描述 | 实现方式 |
 |------|------|---------|
@@ -411,9 +429,9 @@ class GenerateEmbeddingStep(SagaStep):
 
 ---
 
-### 28.3 具体 Saga 流程设计
+## 3. 具体 Saga 流程设计
 
-#### 28.3.1 S01: 文档处理与索引 Saga
+### 3.1 S01: 文档处理与索引 Saga
 
 **场景描述：** 用户上传文档后，需要完成元数据保存、文件存储、向量索引、图谱构建
 
@@ -510,7 +528,7 @@ class DocumentProcessingSagaOrchestrator:
             )
 ```
 
-#### 28.3.2 S02: 战略规划创建 Saga
+### 3.2 S02: 战略规划创建 Saga
 
 **场景描述：** Agent 完成战略规划生成后，需要保存规划元数据并归档证据包
 
@@ -619,7 +637,7 @@ class PlanCreationSagaOrchestrator:
             )
 ```
 
-#### 28.3.3 S03: Checkpoint 保存 Saga
+### 3.3 S03: Checkpoint 保存 Saga
 
 **场景描述：** BLM/BEM 阶段完成后，保存检查点状态快照并归档
 
@@ -658,6 +676,7 @@ class CheckpointStep(SagaStep):
             "state_snapshot": context["state_snapshot"],
             "archived_at": datetime.utcnow().isoformat()
         }
+
         archive_ref = await context["object_storage"].upload(
             bucket="checkpoints",
             data=json.dumps(archive_data).encode(),
@@ -684,7 +703,7 @@ class CheckpointStep(SagaStep):
         return True
 ```
 
-#### 28.3.4 S04: 路由决策归档 Saga
+### 3.4 S04: 路由决策归档 Saga
 
 **场景描述：** UDMR 路由决策完成后，保存决策日志并归档到 WORM 存储
 
@@ -733,7 +752,7 @@ class RoutingDecisionSagaOrchestrator:
             )
 ```
 
-#### 28.3.5 S06: 知识图谱构建 Saga
+### 3.5 S06: 知识图谱构建 Saga
 
 **场景描述：** 文档解析完成后，抽取实体关系并构建知识图谱
 
@@ -797,13 +816,13 @@ class KnowledgeGraphBuilder:
             })
 ```
 
-#### 28.3.6 S07: 战略档案归档 Saga
+### 3.6 S07: 战略档案归档 Saga
 
 **场景描述：** 规划审批通过后，将完整档案归档到五层存储
 
 **一致性要求：** 最终一致性（允许延迟归档）
 
-**Saga 类型：** 混合式（编排核心步骤，编舞辅助步骤）
+**Saga 类型：** 混合式（编排核心步骤 + 编舞辅助步骤）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -837,9 +856,9 @@ class KnowledgeGraphBuilder:
 
 ---
 
-### 28.4 数据一致性校验机制
+## 4. 数据一致性校验机制
 
-#### 28.4.1 定期一致性校验设计
+### 4.1 定期一致性校验设计
 
 **校验策略：**
 
@@ -1019,7 +1038,7 @@ class ConsistencyCheckerService:
             return []
 ```
 
-#### 28.4.2 不一致数据修复流程
+### 4.2 不一致数据修复流程
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1138,9 +1157,9 @@ class AutoRepairService:
 
 ---
 
-### 28.5 异常处理与恢复
+## 5. 异常处理与恢复
 
-#### 28.5.1 Saga 失败处理策略
+### 5.1 Saga 失败处理策略
 
 | 失败类型 | 处理策略 | 重试次数 | 升级条件 |
 |---------|---------|---------|---------|
@@ -1150,7 +1169,7 @@ class AutoRepairService:
 | **数据不一致** | 记录问题，继续补偿 | 0 次 | 自动修复失败 |
 | **WORM 写入失败** | 重试 + 告警 | 5 次 | 合规风险 |
 
-#### 28.5.2 重试机制设计
+### 5.2 重试机制设计
 
 ```python
 # src/infrastructure/saga/retry_policy.py
@@ -1183,13 +1202,13 @@ class RetryPolicy:
         def decorator(f: Callable):
             @wraps(f)
             async def wrapper(*args, **kwargs):
-                last_exception = None
+                last_error = None
 
                 for attempt in range(self.max_retries + 1):
                     try:
                         return await f(*args, **kwargs)
                     except self.retryable_exceptions as e:
-                        last_exception = e
+                        last_error = e
 
                         if attempt == self.max_retries:
                             break
@@ -1200,7 +1219,7 @@ class RetryPolicy:
 
                 raise SagaRetryExhaustedError(
                     f"Max retries ({self.max_retries}) exceeded",
-                    last_exception
+                    last_error
                 )
             return wrapper
 
@@ -1231,7 +1250,7 @@ async def upload_to_minio(data: bytes) -> str:
     return await minio_client.upload(data)
 ```
 
-#### 28.5.3 死信队列处理
+### 5.3 死信队列处理
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1389,9 +1408,9 @@ class DeadLetterQueueHandler:
 
 ---
 
-### 28.6 监控与审计
+## 6. 监控与审计
 
-#### 28.6.1 Saga 执行监控指标
+### 6.1 Saga 执行监控指标
 
 | 指标名称 | 类型 | 描述 | 告警阈值 |
 |---------|------|------|---------|
@@ -1488,7 +1507,7 @@ class SagaMetricsCollector:
         SAGA_RETRY_COUNT.labels(saga_type=saga_type, step_name=step_name).inc()
 ```
 
-#### 28.6.2 审计日志设计
+### 6.2 审计日志设计
 
 **审计日志 Schema：**
 
@@ -1680,9 +1699,9 @@ async def download_worm_audit_log(
 
 ---
 
-### 28.7 Saga 配置管理
+## 7. Saga 配置管理
 
-#### 28.7.1 Saga 配置表结构
+### 7.1 Saga 配置表结构
 
 ```sql
 -- Saga 类型配置表
@@ -1739,7 +1758,7 @@ CREATE INDEX idx_saga_execution_history_status ON saga_execution_history(status)
 CREATE INDEX idx_saga_execution_history_started ON saga_execution_history(started_at);
 ```
 
-#### 28.7.2 默认 Saga 配置
+### 7.2 默认 Saga 配置
 
 ```python
 # src/infrastructure/saga/default_config.py
@@ -1812,7 +1831,7 @@ DEFAULT_SAGA_CONFIGS = {
 
 ---
 
-### 28.8 验收标准
+## 8. 验收标准
 
 | 验收项 | 验收标准 | 验证方式 |
 |--------|---------|---------|
@@ -1826,9 +1845,9 @@ DEFAULT_SAGA_CONFIGS = {
 
 ---
 
-### 28.9 与现有架构集成
+## 9. 与现有架构集成
 
-#### 28.9.1 依赖注入配置
+### 9.1 依赖注入配置
 
 ```python
 # src/infrastructure/saga/saga_module.py
@@ -1888,7 +1907,7 @@ class SagaModule:
         # ... 其他 Saga
 ```
 
-#### 28.9.2 与事件驱动架构集成
+### 9.2 与事件驱动架构集成
 
 ```python
 # src/infrastructure/messaging/saga_event_handlers.py
