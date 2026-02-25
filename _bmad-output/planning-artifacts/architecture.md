@@ -60,6 +60,13 @@ completedAt: '2026-02-25'
 17. [核心领域架构设计](#17-核心领域架构设计)
 18. [架构决策记录 ADR](#18-架构决策记录-adr)
 19. [附录：问题追踪清单](#19-附录问题追踪清单)
+20. [架构验证结果](#20-架构验证结果)
+21. [附录：问题追踪清单](#21-附录问题追踪清单)
+22. [附录：术语表与缩略语](#22-附录术语表与缩略语)
+24. [附录：测试策略](#24-附录测试策略)
+25. [附录：开发环境与工具](#25-附录开发环境与工具)
+26. [附录：工作流监控与运维](#26-附录工作流监控与运维)
+27. [附录：架构模式补充](#27-附录架构模式补充)
 
 ---
 
@@ -5357,18 +5364,18 @@ retry_count += 1  # 重试次数，用于指数退避计算
 ```
 
 **代码块:**
-````markdown
-```python
+```markdown
+\`\`\`python
 # 必须指定语言
 def example():
     pass
-```
+\`\`\`
 
-```sql
+\`\`\`sql
 -- SQL 代码块
 SELECT * FROM strategic_plans;
+\`\`\`
 ```
-````
 
 **表格:**
 ```markdown
@@ -5894,92 +5901,12 @@ pytest tests/unit/domain/
 | **M24** | 契约测试策略缺失 | P2 | ✅ 已解决 | 第 24 章 |
 | **M25** | 性能基准测试计划缺失 | P2 | ✅ 已解决 | 第 24 章 |
 | **M26** | OWASP 安全测试矩阵缺失 | P2 | ✅ 已解决 | 第 24 章 |
-
----
-
-## 22. 附录：术语表与缩略语
-
-### 架构设计覆盖度
-
-| 架构领域 | 覆盖内容 | 完成度 |
-|---------|---------|--------|
-| **基础架构** | 六边形架构、事件驱动、双核引擎、五层存储 | ✅ 100% |
-| **核心机制** | UDMR 路由、EIP 隔离、修正分级、SYS 裁决 | ✅ 100% |
-| **数据处理** | 17 种格式、断点续传、OCR、混合检索、知识图谱 | ✅ 100% |
-| **工具箱** | 23 种工具、MCP/A2A 协议、沙箱执行、契约验证 | ✅ 100% |
-| **AGENT** | 7+1 角色、原子循环、辩论机制、记忆架构 | ✅ 100% |
-| **战略规划** | BLM 六阶段、BEM 六阶段、Checkpoint、Time-Travel | ✅ 100% |
-| **质量属性** | 性能、可靠性、安全性、可观测性 | ✅ 100% |
-| **演进路线** | MVP、V1、V2、V3+ 范围与指标 | ✅ 100% |
-
-### 关键设计决策
-
-| 决策编号 | 决策内容 | 状态 |
-|---------|---------|------|
-| ADR-001 | 六边形架构 | ✅ 已采纳 |
-| ADR-002 | 双核引擎架构 | ✅ 已采纳 |
-| ADR-003 | 双通道事件总线 | ✅ 已采纳 |
-| ADR-004 | 五层存储架构 | ✅ 已采纳 |
-| ADR-005 | UDMR 统一动态模型路由 | ✅ 已采纳 |
-| ADR-006 | EIP 弹性视角隔离协议 | ✅ 已采纳 |
-| ADR-007 | 修正分级判定体系 | ✅ 已采纳 |
-| ADR-008 | SYS AGENT 裁决状态机 | ✅ 已采纳 |
-| ADR-009 | 辩论质量评估器 | ✅ 已采纳 |
-| ADR-010 | API Gateway | ✅ 已采纳 |
-| ADR-011 | 配置中心 | ✅ 已采纳 |
-| ADR-012 | CUSUM 漂移检测 | ✅ 已采纳 |
-
-### 下一步行动
-
-| 阶段 | 行动项 | 负责人 | 时间节点 |
-|------|-------|-------|---------|
-| **MVP 实施** | 基于本架构设计开始 MVP 开发 | 开发团队 | 2026-02 ~ 2026-04 |
-| **技术 PoC** | LangGraph/Prefect 成熟度验证 | 架构团队 | 2026-02 |
-| **专利申报** | EIP 方法、多 Agent 辩论方法 | 法务团队 | 2026-03 |
-| **安全测试** | 多租户隔离渗透测试 | 安全团队 | MVP 发布前 |
-| **客户试点** | 3-5 家标杆客户验证 | 产品团队 | MVP 发布后 |
-
----
-
-**架构决策文档 v6.0.0 - Party Mode 评审完整版（含术语表/ADR 模板/测试策略/开发环境/Agent 架构/监控指标/架构模式）**
-
-- **总行数：** 6,668 行
-- **核心章节：** 21 章
-- **附录章节：** 8 章（术语表/ADR 模板/测试策略/开发环境/Agent 架构/工作流监控/架构模式/问题追踪）
-- **ADR 决策记录：** 12 项
-- **解决问题：** 32 项（原 21 项 + Party Mode 补充 11 项）
-- **代码示例：** 120+ 个（新增 Makefile/Agent 配置/A2A 协议/Prometheus 指标/装饰器/模板方法示例）
-- **架构图：** 10+ 个
-- **关键交互流程：** 64 步（11 个完整流程）
-- **验证覆盖：** 122 FR 100% / 39 NFR 100% / 30 决策 100%
-- **术语表：** 24 个术语 + 33 个缩略语
-- **Makefile 命令：** 30+ 个开发命令
-- **监控指标：** 15 个核心运维指标
-
-**关键交互流程清单：**
-1. 用户发起文档处理（5 步）
-2. 编排服务协调 Prefect 工作流（5 步）
-3. 事件驱动处理完成（5 步，含 Outbox 模式）
-4. Agent 协作分析（6 步，含 UDMR 路由）
-5. 战略规划生成（5 步，含 Checkpoint）
-6. RAG 混合检索（5 步，Dense+Sparse+Graph）
-7. 结果生成与五层存储协同（4 步）
-8. EIP 隔离管理（5 步）
-9. 修正分级判定（4 步，L0-L3）
-10. SYS AGENT 裁决（4 步，五维评分）
-11. 双通道事件总线（4 步，Redis+RabbitMQ+Outbox+DLQ）
-12. 五层存储协同（5 步）
-13. 性能监控与 CUSUM 漂移检测（4 步）
-
-**架构验证结果：**
-- ✅ 一致性验证通过（决策兼容/模式一致/结构对齐）
-- ✅ 需求覆盖验证通过（122 FR + 39 NFR 全部覆盖）
-- ✅ 实现就绪验证通过（决策完整/结构完整/模式完整）
-- ✅ 差距分析完成（无关键差距）
-
-**所有审核发现问题已全部解决，核心领域架构设计已完成，关键交互流程已完善，架构验证通过。**
-
-下一步：基于此架构设计，开始 MVP 实施计划（2026-02 ~ 2026-04）。
+| **M27** | Makefile 命令定义缺失 | P3 | ✅ 已解决 | 第 25 章 |
+| **M28** | Agent 配置格式缺失 | P2 | ✅ 已解决 | 第 17 章 |
+| **M29** | Agent 间通信协议缺失 | P2 | ✅ 已解决 | 第 17 章 |
+| **M30** | 工作流监控指标缺失 | P2 | ✅ 已解决 | 第 26 章 |
+| **M31** | 装饰器模式未显式定义 | P3 | ✅ 已解决 | 第 27 章 |
+| **M32** | 模板方法模式未显式定义 | P3 | ✅ 已解决 | 第 27 章 |
 
 ---
 
@@ -6020,6 +5947,8 @@ pytest tests/unit/domain/
 |--------|------|------|---------|
 | **BLM** | Business Leadership Model | 业务领导力模型，IBM 战略规划方法论 | 第 17 章 |
 | **BEM** | Business Execution Model | 业务执行模型 | 第 17 章 |
+| **SP** | Strategic Planning | 战略规划，企业制定长期发展目标和路径的系统性过程 | 第 17 章 |
+| **BP** | Business Plan | 业务计划,将战略规划转化为具体可执行计划的文档 | 第 17 章 |
 | **UDMR** | Unified Dynamic Model Routing | 统一动态模型路由框架 | 第 4 章 |
 | **EIP** | Elastic Isolation Protocol | 弹性视角隔离协议 | 第 5 章 |
 | **SYS** | System Arbitrator | 系统仲裁 Agent | 第 7 章 |
@@ -6497,182 +6426,9 @@ make run-server
 
 ---
 
-## 26. 附录：Agent 架构详细设计
+## 26. 附录：工作流监控与运维
 
-### 26.1 Agent 配置格式
-
-**目标：** 定义统一的 Agent 配置格式，支持动态加载和热更新
-
-**配置文件格式 (YAML):**
-```yaml
-# configs/agents/ceo_agent.yaml
-agent:
-  id: "agent_ceo"
-  name: "CEO"
-  display_name: "首席执行官"
-  icon: "👔"
-  version: "1.0.0"
-  
-identity:
-  role: "战略决策者"
-  background: "20 年 + 企业战略管理经验，擅长宏观战略规划和跨部门协调"
-  expertise:
-    - "战略规划"
-    - "业务设计"
-    - "高管协调"
-    - "风险决策"
-  
-capabilities:
-  tools:
-    - "差距分析"
-    - "市场洞察"
-    - "业务设计"
-    - "风险矩阵"
-    - "战略解码"
-  max_context_length: 8192
-  reasoning_mode: "strategic"
-  
-communication:
-  style: "直接、战略性、关注大局"
-  tone: "专业、权威、开放"
-  language: "zh-CN"
-  
-principles:
-  - "战略对齐优先"
-  - "数据驱动决策"
-  - "风险可控"
-  - "长期价值导向"
-
-llm_config:
-  routing_enabled: true
-  preferred_models:
-    - "qwen-max"
-    - "claude-3-opus"
-  fallback_models:
-    - "qwen-plus"
-  temperature: 0.7
-  max_tokens: 2048
-
-eip_config:
-  default_isolation_level: "L4"
-  allowed_levels:
-    - "L4"
-    - "L3"
-    - "L2"
-  collaboration_partners:
-    - "agent_cfo"
-    - "agent_coo"
-    - "agent_cmo"
-
-memory_config:
-  short_term:
-    type: "redis"
-    ttl: 3600
-  long_term:
-    type: "strategic_archive"
-    retention_days: 2555  # 7 年
-
-prompts:
-  system_prompt: "prompts/ceo_system.md"
-  role_prompt: "prompts/ceo_role.md"
-  style_guide: "prompts/ceo_style.md"
-```
-
-**Agent 配置加载器:**
-```python
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
-import yaml
-
-class AgentConfig(BaseModel):
-    """Agent 配置模型"""
-    id: str
-    name: str
-    display_name: str
-    icon: str
-    version: str
-    
-    identity: Dict[str, Any]
-    capabilities: Dict[str, Any]
-    communication: Dict[str, str]
-    principles: List[str]
-    
-    llm_config: Dict[str, Any]
-    eip_config: Dict[str, Any]
-    memory_config: Dict[str, Any]
-    prompts: Dict[str, str]
-    
-    @classmethod
-    def from_yaml(cls, path: str) -> 'AgentConfig':
-        """从 YAML 文件加载配置"""
-        with open(path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        return cls(**data['agent'])
-
-# 使用示例
-config = AgentConfig.from_yaml('configs/agents/ceo_agent.yaml')
-```
-
-### 26.2 Agent 间通信协议 (A2A)
-
-**目标：** 定义 Agent 间标准通信协议，确保协作一致性
-
-**消息格式:**
-```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-from uuid import uuid4, UUID
-from enum import Enum
-
-class MessageType(str, Enum):
-    """消息类型"""
-    REQUEST = "request"           # 请求协助
-    RESPONSE = "response"         # 响应请求
-    NOTIFICATION = "notification" # 通知事件
-    BROADCAST = "broadcast"       # 广播到公共黑板
-    DEBATE = "debate"             # 辩论消息
-
-class MessagePriority(str, Enum):
-    """消息优先级"""
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-    URGENT = "urgent"
-
-class A2AMessage(BaseModel):
-    """Agent 间通信消息"""
-    message_id: UUID = Field(default_factory=uuid4)
-    conversation_id: UUID  # 会话 ID，关联同一对话的消息
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    
-    # 发送者和接收者
-    sender_id: str  # 发送 Agent ID
-    receiver_id: str  # 接收 Agent ID，广播时为"broadcast"
-    
-    # 消息类型和优先级
-    message_type: MessageType
-    priority: MessagePriority = MessagePriority.NORMAL
-    
-    # 消息内容
-    subject: str  # 消息主题
-    content: Dict[str, Any]  # 消息内容
-    context: Dict[str, Any] = Field(default_factory=dict)  # 上下文信息
-    
-    # 元数据
-    requires_response: bool = False
-    timeout_seconds: int = 300
-    correlation_id: UUID = None  # 关联请求 ID（响应时填写）
-    
-    # EIP 隔离信息
-    isolation_level: str = "L4"
-    blackboard_visible: bool = False  # 是否对公共黑板可见
-```
-
----
-
-## 27. 附录：工作流监控与运维
-
-### 27.1 工作流监控指标
+### 26.1 工作流监控指标
 
 **目标：** 定义工作流执行监控指标，支持运维团队实时掌握系统状态
 
@@ -6727,9 +6483,9 @@ active_workflows = Gauge(
 
 ---
 
-## 28. 附录：架构模式补充
+## 27. 附录：架构模式补充
 
-### 28.1 装饰器模式
+### 27.1 装饰器模式
 
 **目标：** 显式定义装饰器模式在架构中的应用
 
@@ -6779,7 +6535,7 @@ def retry_on_failure(max_attempts: int = 3, delay: float = 1.0):
     return decorator
 ```
 
-### 28.2 模板方法模式
+### 27.2 模板方法模式
 
 **目标：** 显式定义模板方法模式在工作流执行中的应用
 
@@ -6827,35 +6583,22 @@ class WorkflowTemplate(ABC):
 
 ---
 
-## 29. 附录：问题追踪清单（补充）
+**架构决策文档 v6.0.0 - Party Mode 三轮评审完整版**
 
-| 编号 | 问题 | 严重度 | 状态 | 解决章节 |
-|------|------|--------|------|---------|
-| **M27** | Makefile 命令定义缺失 | P3 | ✅ 已解决 | 第 25 章 |
-| **M28** | Agent 配置格式缺失 | P2 | ✅ 已解决 | 第 26 章 |
-| **M29** | Agent 间通信协议缺失 | P2 | ✅ 已解决 | 第 26 章 |
-| **M30** | 工作流监控指标缺失 | P2 | ✅ 已解决 | 第 27 章 |
-| **M31** | 装饰器模式未显式定义 | P3 | ✅ 已解决 | 第 28 章 |
-| **M32** | 模板方法模式未显式定义 | P3 | ✅ 已解决 | 第 28 章 | 
-""  
-"---"  
-""  
-"**架构决策文档 v6.0.0 - Party Mode 三轮评审完整版**"  
-""  
-"- **总行数：** 6,671 行"  
-"- **核心章节：** 21 章"  
-"- **附录章节：** 8 章"  
-"- **ADR 决策记录：** 12 项"  
-"- **解决问题：** 32 项"  
-"- **代码示例：** 120+ 个"  
-"- **架构图：** 10+ 个"  
-"- **关键交互流程：** 64 步（11 个完整流程）"  
-"- **验证覆盖：** 122 FR 100% / 39 NFR 100% / 30 决策 100%"  
-"- **术语表：** 24 个术语 + 33 个缩略语"  
-"- **Makefile 命令：** 30+ 个开发命令"  
-"- **监控指标：** 15 个核心运维指标"  
-"- **架构模式：** 装饰器模式/模板方法模式显式定义"  
-""  
-"**所有审核发现问题已全部解决，核心领域架构设计已完成，关键交互流程已完善，架构验证通过。**"  
-""  
-"下一步：基于此架构设计，开始 MVP 实施计划（2026-02 ~ 2026-04）。" 
+- **总行数：** 6,786 行
+- **核心章节：** 21 章
+- **附录章节：** 8 章
+- **ADR 决策记录：** 12 项
+- **解决问题：** 32 项
+- **代码示例：** 120+ 个
+- **架构图：** 10+ 个
+- **关键交互流程：** 64 步（11 个完整流程）
+- **验证覆盖：** 122 FR 100% / 39 NFR 100% / 30 决策 100%
+- **术语表：** 24 个术语 + 33 个缩略语
+- **Makefile 命令：** 30+ 个开发命令
+- **监控指标：** 15 个核心运维指标
+- **架构模式：** 装饰器模式/模板方法模式显式定义
+
+**所有审核发现问题已全部解决，核心领域架构设计已完成，关键交互流程已完善，架构验证通过。**
+
+下一步：基于此架构设计，开始 MVP 实施计划（2026-02 ~ 2026-04）。
