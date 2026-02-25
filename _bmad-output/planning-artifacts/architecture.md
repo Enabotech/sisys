@@ -783,8 +783,8 @@ class SemanticCache:
 | | API Gateway | Kong/Traefik | 最新 | ✅ 低 |
 | **应用层** | 编排服务 | 自定义 | - | 🟡 中 |
 | **领域层** | 数据验证 | Pydantic | 2.4+ | ✅ 低 |
-| **基础设施** | 工作流引擎 | Prefect | 3.6+ | 🟡 中 |
-| | Agent 编排 | LangGraph | 1.0.0+ | 🟡 中 |
+| **基础设施** | 工作流引擎 | Prefect | 3.6.16+ | 🟡 中 |
+| | Agent 编排 | LangGraph | 1.0.9+ | 🟡 中 |
 | | 消息总线 | Redis+RabbitMQ | 7.0+/3.12+ | ✅ 低 |
 | | 向量数据库 | Qdrant | 1.7+ | ✅ 低 |
 | | 关系数据库 | PostgreSQL | 15+ | ✅ 低 |
@@ -1754,8 +1754,8 @@ buckets/
 
 | 风险 | 概率 | 影响 | 风险等级 | 缓解措施 |
 |------|------|------|---------|---------|
-| **LangGraph 不成熟** | 中 | 高 | 🟠 中 | 评估 AutoGen/CrewAI 备选，PoC 验证 |
-| **Prefect 3.x 稳定性** | 中 | 中 | 🟠 中 | 评估 Prefect 2.x，准备 Airflow 备选 |
+| **LangGraph 不成熟** | 中 | 高 | 🟠 中 | 评估 AutoGen/CrewAI 备选，PoC 验证；经评估确认目前的 LangGraph 1.0.9+ LangChain 1.2.0+ 成熟度满足本系统要求 |
+| **Prefect 3.x 稳定性** | 中 | 中 | 🟠 中 | 评估 Prefect 2.x，准备 Airflow 备选；经评估确认目前的 Prefect 3.6.16+ 稳定性满足本系统要求 |
 | **多租户隔离失效** | 低 | 高 | 🔴 高 | Schema per Tenant + RBAC + 渗透测试 |
 | **AI 幻觉导致错误决策** | 中 | 高 | 🔴 高 | 高保真溯源 + 人工 Checkpoint+AUD AGENT 一致性校验 |
 | **合规审计失败** | 低 | 高 | 🟠 中 | WORM 存储 + 完整审计日志 + 合规检查清单 |
@@ -5479,8 +5479,8 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | Python | 3.11+ | 所有选定库支持 Python 3.11+ |
 | Pydantic | 2.4+ | 与 FastAPI 0.104+ 兼容 |
 | FastAPI | 0.104+ | 依赖 Pydantic 2.x，已验证兼容 |
-| Prefect | 3.6+ | 依赖 Python 3.9+，兼容 |
-| LangGraph | 1.0+ | 依赖 Python 3.10+，兼容 |
+| Prefect | 3.6.16+ | 依赖 Python 3.9+，兼容 |
+| LangGraph | 1.0.9+ | 依赖 Python 3.10+，兼容 |
 | PostgreSQL | 15+ | pgvector 扩展支持，兼容 |
 | Qdrant | 1.7+ | Python client 支持，兼容 |
 | Neo4j | 5.x | Python driver 支持，兼容 |
