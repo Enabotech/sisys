@@ -2802,7 +2802,7 @@ class MarketInsight:
             "lead_agent": "CMO",
             "collab_agents": ["COO", "CEO", "CFO"],
             "tools": ["$APPEALS", "价值主张画布"],
-            "output": "客户细分画像 + ���求优先级矩阵"
+            "output": "客户细分画像 + 需求优先级矩阵"
         },
         "2.3_看竞争": {
             "lead_agent": "CEO",
