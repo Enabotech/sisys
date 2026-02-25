@@ -15,10 +15,10 @@ completedAt: '2026-02-25'
 
 # 企业战略规划管理系统 - 完整架构设计文档
 
-**版本：** 5.0.0
-**状态：** Party Mode 评审完整版（含术语表/ADR 模板/测试策略）
+**版本：** 6.0.0
+**状态：** Party Mode 评审完整版（含开发环境/Agent 架构/监控指标/架构模式）
 **评审日期：** 2026-02-25
-**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审
+**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）
 
 ---
 
@@ -35,6 +35,7 @@ completedAt: '2026-02-25'
 | 3.4.0 | 2026-02-25 | 关键交互流程完善（64 步完整流程，含 UDMR/EIP/修正/裁决） | 架构团队 |
 | 4.0.0 | 2026-02-25 | Party Mode 评审完整版（Step 5-7 完整验证） | 架构团队 |
 | 5.0.0 | 2026-02-25 | Party Mode 二轮评审（补充术语表/ADR 模板/测试策略） | 架构团队 |
+| 6.0.0 | 2026-02-25 | Party Mode 三轮评审（补充开发环境/Agent 架构/监控指标/架构模式） | 架构团队 |
 
 ---
 
@@ -1321,7 +1322,7 @@ tests/
 ├── conftest.py                                            # pytest 配置
 │
 ├── unit/                                                  # 单元测试
-│   ���── __init__.py
+│   �����── __init__.py
 │   ├── domain/                                            # 领域层单元测试
 │   │   ├── models/
 │   │   ├── services/
@@ -5771,18 +5772,20 @@ pytest tests/unit/domain/
 
 ---
 
-**架构决策文档 v5.0.0 - Party Mode 评审完整版（含术语表/ADR 模板/测试策略）**
+**架构决策文档 v6.0.0 - Party Mode 评审完整版（含术语表/ADR 模板/测试策略/开发环境/Agent 架构/监控指标/架构模式）**
 
-- **总行数：** 6,131 行
+- **总行数：** 6,668 行
 - **核心章节：** 21 章
-- **附录章节：** 4 章（术语表/ADR 模板/测试策略/问题追踪）
+- **附录章节：** 8 章（术语表/ADR 模板/测试策略/开发环境/Agent 架构/工作流监控/架构模式/问题追踪）
 - **ADR 决策记录：** 12 项
-- **解决问题：** 24 项（原 21 项 + Party Mode 补充 3 项）
-- **代码示例：** 110+ 个（新增契约测试/性能测试/提示注入测试示例）
+- **解决问题：** 32 项（原 21 项 + Party Mode 补充 11 项）
+- **代码示例：** 120+ 个（新增 Makefile/Agent 配置/A2A 协议/Prometheus 指标/装饰器/模板方法示例）
 - **架构图：** 10+ 个
 - **关键交互流程：** 64 步（11 个完整流程）
 - **验证覆盖：** 122 FR 100% / 39 NFR 100% / 30 决策 100%
 - **术语表：** 24 个术语 + 33 个缩略语
+- **Makefile 命令：** 30+ 个开发命令
+- **监控指标：** 15 个核心运维指标
 
 **关键交互流程清单：**
 1. 用户发起文档处理（5 步）
@@ -6134,3 +6137,556 @@ pytest --cov=src --cov-report=term-missing:skip-covered
 # 生成 XML 报告 (CI/CD)
 pytest --cov=src --cov-report=xml
 ```
+
+---
+
+## 25. 附录：开发环境与工具
+
+### 25.1 Makefile 命令定义
+
+**目标：** 提供统一的开发环境命令入口，简化日常开发操作
+
+```makefile
+# =============================================================================
+# sisys Makefile - 开发环境命令入口
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 变量定义
+# -----------------------------------------------------------------------------
+PYTHON := python3
+PIP := pip
+PYTEST := pytest
+MYPY := mypy
+RUFF := ruff
+ALEMBIC := alembic
+DOCKER := docker
+DOCKER_COMPOSE := docker-compose
+
+# -----------------------------------------------------------------------------
+# 开发环境设置
+# -----------------------------------------------------------------------------
+.PHONY: venv install dev setup
+
+venv:
+	$(PYTHON) -m venv venv
+	source venv/bin/activate
+
+install:
+	$(PIP) install -r requirements/dev.txt
+
+dev:
+	$(PIP) install -e ".[dev]"
+	pre-commit install
+
+setup: venv install dev
+	@echo "开发环境设置完成！"
+
+# -----------------------------------------------------------------------------
+# 代码质量
+# -----------------------------------------------------------------------------
+.PHONY: lint format type-check check
+
+lint:
+	$(RUFF) check src/ tests/
+
+format:
+	$(RUFF) format src/ tests/
+
+type-check:
+	$(MYPY) src/
+
+check: lint type-check
+
+# -----------------------------------------------------------------------------
+# 测试
+# -----------------------------------------------------------------------------
+.PHONY: test test-cov test-cov-html test-unit test-integration test-e2e
+
+test:
+	$(PYTEST) tests/
+
+test-cov:
+	$(PYTEST) --cov=src --cov-report=term-missing
+
+test-cov-html:
+	$(PYTEST) --cov=src --cov-report=html
+	@echo "覆盖率报告已生成：htmlcov/index.html"
+
+test-unit:
+	$(PYTEST) tests/unit/
+
+test-integration:
+	$(PYTEST) tests/integration/
+
+test-e2e:
+	$(PYTEST) tests/e2e/
+
+# -----------------------------------------------------------------------------
+# 数据库
+# -----------------------------------------------------------------------------
+.PHONY: db-migrate db-downgrade db-upgrade db-head db-revision
+
+db-migrate:
+	$(ALEMBIC) upgrade head
+
+db-downgrade:
+	$(ALEMBIC) downgrade -1
+
+db-upgrade:
+	$(ALEMBIC) upgrade $(revision)
+
+db-head:
+	$(ALEMBIC) heads
+
+db-revision:
+	$(ALEMBIC) revision -m "$(message)"
+
+# -----------------------------------------------------------------------------
+# Docker 环境
+# -----------------------------------------------------------------------------
+.PHONY: docker-up docker-down docker-build docker-logs
+
+docker-up:
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml up -d
+
+docker-down:
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down
+
+docker-build:
+	$(DOCKER) build -f docker/Dockerfile.dev -t sisys:dev .
+
+docker-logs:
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml logs -f
+
+# -----------------------------------------------------------------------------
+# 服务管理
+# -----------------------------------------------------------------------------
+.PHONY: run-server run-worker run-scheduler
+
+run-server:
+	uvicorn src.interfaces.api.main:app --reload --host 0.0.0.0 --port 8000
+
+run-worker:
+	python -m src.infrastructure.workflow.prefect_agent
+
+run-scheduler:
+	python -m src.infrastructure.workflow.scheduler
+
+# -----------------------------------------------------------------------------
+# 文档
+# -----------------------------------------------------------------------------
+.PHONY: docs docs-serve
+
+docs:
+	mkdocs build
+
+docs-serve:
+	mkdocs serve
+
+# -----------------------------------------------------------------------------
+# 清理
+# -----------------------------------------------------------------------------
+.PHONY: clean clean-pyc clean-build clean-test
+
+clean: clean-pyc clean-build clean-test
+
+clean-pyc:
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name *.pyc -delete
+	find . -type f -name *.pyo -delete
+	find . -type f -name *.pyd -delete
+
+clean-build:
+	rm -rf build/ dist/ .eggs/
+
+clean-test:
+	rm -rf .pytest_cache/ .coverage htmlcov/
+```
+
+**Makefile 使用示例:**
+```bash
+# 设置开发环境
+make setup
+
+# 运行代码检查
+make lint
+make type-check
+
+# 运行测试
+make test
+make test-cov-html
+
+# 数据库迁移
+make db-migrate
+make db-revision message="create_users_table"
+
+# 启动开发服务
+make docker-up
+make run-server
+```
+
+---
+
+## 26. 附录：Agent 架构详细设计
+
+### 26.1 Agent 配置格式
+
+**目标：** 定义统一的 Agent 配置格式，支持动态加载和热更新
+
+**配置文件格式 (YAML):**
+```yaml
+# configs/agents/ceo_agent.yaml
+agent:
+  id: "agent_ceo"
+  name: "CEO"
+  display_name: "首席执行官"
+  icon: "👔"
+  version: "1.0.0"
+  
+identity:
+  role: "战略决策者"
+  background: "20 年 + 企业战略管理经验，擅长宏观战略规划和跨部门协调"
+  expertise:
+    - "战略规划"
+    - "业务设计"
+    - "高管协调"
+    - "风险决策"
+  
+capabilities:
+  tools:
+    - "差距分析"
+    - "市场洞察"
+    - "业务设计"
+    - "风险矩阵"
+    - "战略解码"
+  max_context_length: 8192
+  reasoning_mode: "strategic"
+  
+communication:
+  style: "直接、战略性、关注大局"
+  tone: "专业、权威、开放"
+  language: "zh-CN"
+  
+principles:
+  - "战略对齐优先"
+  - "数据驱动决策"
+  - "风险可控"
+  - "长期价值导向"
+
+llm_config:
+  routing_enabled: true
+  preferred_models:
+    - "qwen-max"
+    - "claude-3-opus"
+  fallback_models:
+    - "qwen-plus"
+  temperature: 0.7
+  max_tokens: 2048
+
+eip_config:
+  default_isolation_level: "L4"
+  allowed_levels:
+    - "L4"
+    - "L3"
+    - "L2"
+  collaboration_partners:
+    - "agent_cfo"
+    - "agent_coo"
+    - "agent_cmo"
+
+memory_config:
+  short_term:
+    type: "redis"
+    ttl: 3600
+  long_term:
+    type: "strategic_archive"
+    retention_days: 2555  # 7 年
+
+prompts:
+  system_prompt: "prompts/ceo_system.md"
+  role_prompt: "prompts/ceo_role.md"
+  style_guide: "prompts/ceo_style.md"
+```
+
+**Agent 配置加载器:**
+```python
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
+import yaml
+
+class AgentConfig(BaseModel):
+    """Agent 配置模型"""
+    id: str
+    name: str
+    display_name: str
+    icon: str
+    version: str
+    
+    identity: Dict[str, Any]
+    capabilities: Dict[str, Any]
+    communication: Dict[str, str]
+    principles: List[str]
+    
+    llm_config: Dict[str, Any]
+    eip_config: Dict[str, Any]
+    memory_config: Dict[str, Any]
+    prompts: Dict[str, str]
+    
+    @classmethod
+    def from_yaml(cls, path: str) -> 'AgentConfig':
+        """从 YAML 文件加载配置"""
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return cls(**data['agent'])
+
+# 使用示例
+config = AgentConfig.from_yaml('configs/agents/ceo_agent.yaml')
+```
+
+### 26.2 Agent 间通信协议 (A2A)
+
+**目标：** 定义 Agent 间标准通信协议，确保协作一致性
+
+**消息格式:**
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+from uuid import uuid4, UUID
+from enum import Enum
+
+class MessageType(str, Enum):
+    """消息类型"""
+    REQUEST = "request"           # 请求协助
+    RESPONSE = "response"         # 响应请求
+    NOTIFICATION = "notification" # 通知事件
+    BROADCAST = "broadcast"       # 广播到公共黑板
+    DEBATE = "debate"             # 辩论消息
+
+class MessagePriority(str, Enum):
+    """消息优先级"""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+class A2AMessage(BaseModel):
+    """Agent 间通信消息"""
+    message_id: UUID = Field(default_factory=uuid4)
+    conversation_id: UUID  # 会话 ID，关联同一对话的消息
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    # 发送者和接收者
+    sender_id: str  # 发送 Agent ID
+    receiver_id: str  # 接收 Agent ID，广播时为"broadcast"
+    
+    # 消息类型和优先级
+    message_type: MessageType
+    priority: MessagePriority = MessagePriority.NORMAL
+    
+    # 消息内容
+    subject: str  # 消息主题
+    content: Dict[str, Any]  # 消息内容
+    context: Dict[str, Any] = Field(default_factory=dict)  # 上下文信息
+    
+    # 元数据
+    requires_response: bool = False
+    timeout_seconds: int = 300
+    correlation_id: UUID = None  # 关联请求 ID（响应时填写）
+    
+    # EIP 隔离信息
+    isolation_level: str = "L4"
+    blackboard_visible: bool = False  # 是否对公共黑板可见
+```
+
+---
+
+## 27. 附录：工作流监控与运维
+
+### 27.1 工作流监控指标
+
+**目标：** 定义工作流执行监控指标，支持运维团队实时掌握系统状态
+
+**核心监控指标:**
+
+| 指标类别 | 指标名称 | 定义 | 目标值 | 告警阈值 |
+|---------|---------|------|--------|---------|
+| **可用性** | 工作流成功率 | 成功完成数/总执行数 | ≥95% | <90% |
+| | 服务可用性 | 正常运行时间/总时间 | ≥99% | <98% |
+| **性能** | 平均执行时间 | 工作流从开始到完成的时间 | 依类型 | >2x 基线 |
+| | P95 执行时间 | 95% 工作流的执行时间 | 依类型 | >3x 基线 |
+| | 队列等待时间 | 任务在队列中等待的时间 | <30s | >60s |
+| **质量** | 重试率 | 需要重试的执行比例 | <10% | >20% |
+| | Checkpoint 恢复成功率 | 从 Checkpoint 恢复成功的比例 | ≥90% | <80% |
+| | 数据完整性 | 无数据丢失的执行比例 | 100% | <100% |
+| **资源** | CPU 使用率 | 工作流执行 CPU 占用 | <70% | >85% |
+| | 内存使用率 | 工作流执行内存占用 | <70% | >85% |
+| | 并发执行数 | 同时执行的工作流数量 | 依配置 | >上限 |
+
+**Prometheus 指标定义:**
+```python
+from prometheus_client import Counter, Histogram, Gauge, Summary
+
+# 计数器
+workflow_started = Counter(
+    'workflow_started_total',
+    '工作流启动次数',
+    ['workflow_type', 'version']
+)
+
+workflow_completed = Counter(
+    'workflow_completed_total',
+    '工作流完成次数',
+    ['workflow_type', 'status']  # status: success/failure/retried
+)
+
+# 直方图 - 执行时间
+workflow_duration = Histogram(
+    'workflow_duration_seconds',
+    '工作流执行时间',
+    ['workflow_type'],
+    buckets=[1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600]
+)
+
+# 仪表盘 - 并发执行数
+active_workflows = Gauge(
+    'active_workflows',
+    '活跃工作流数量',
+    ['workflow_type']
+)
+```
+
+---
+
+## 28. 附录：架构模式补充
+
+### 28.1 装饰器模式
+
+**目标：** 显式定义装饰器模式在架构中的应用
+
+**应用场景:**
+- API 认证和授权
+- 日志记录和审计
+- 性能监控和指标收集
+- 缓存和重试逻辑
+- 事务管理
+
+**装饰器定义:**
+```python
+from functools import wraps
+from typing import Callable, Any
+import time
+
+def log_execution(func: Callable) -> Callable:
+    """日志记录装饰器"""
+    @wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        logger.info(f"开始执行：{func.__name__}")
+        start_time = time.time()
+        try:
+            result = func(*args, **kwargs)
+            logger.info(f"执行完成：{func.__name__}, 耗时：{time.time() - start_time:.2f}s")
+            return result
+        except Exception as e:
+            logger.error(f"执行失败：{func.__name__}, 错误：{str(e)}")
+            raise
+    return wrapper
+
+def retry_on_failure(max_attempts: int = 3, delay: float = 1.0):
+    """重试装饰器"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except (DatabaseError, ExternalServiceError) as e:
+                    last_exception = e
+                    logger.warning(f"尝试 {attempt + 1}/{max_attempts} 失败：{str(e)}")
+                    await asyncio.sleep(delay * (2 ** attempt))
+            raise last_exception
+        return wrapper
+    return decorator
+```
+
+### 28.2 模板方法模式
+
+**目标：** 显式定义模板方法模式在工作流执行中的应用
+
+**模板方法基类:**
+```python
+from abc import ABC, abstractmethod
+from typing import Any, Dict
+
+class WorkflowTemplate(ABC):
+    """工作流模板基类"""
+    
+    def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """模板方法 - 定义工作流骨架"""
+        self.validate_input(input_data)
+        context = self.prepare_context(input_data)
+        self.before_execute(context)
+        results = self.execute_steps(context)
+        self.after_execute(context, results)
+        self.create_checkpoint(context, results)
+        return self.format_output(results)
+    
+    @abstractmethod
+    def validate_input(self, input_data: Dict[str, Any]) -> None:
+        """验证输入（子类实现）"""
+        pass
+    
+    @abstractmethod
+    def prepare_context(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """准备上下文（子类实现）"""
+        pass
+    
+    @abstractmethod
+    def execute_steps(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """执行核心步骤（子类实现）"""
+        pass
+    
+    def before_execute(self, context: Dict[str, Any]) -> None:
+        """前置钩子（可选覆盖）"""
+        pass
+    
+    def after_execute(self, context: Dict[str, Any], results: Dict[str, Any]) -> None:
+        """后置钩子（可选覆盖）"""
+        pass
+```
+
+---
+
+## 29. 附录：问题追踪清单（补充）
+
+| 编号 | 问题 | 严重度 | 状态 | 解决章节 |
+|------|------|--------|------|---------|
+| **M27** | Makefile 命令定义缺失 | P3 | ✅ 已解决 | 第 25 章 |
+| **M28** | Agent 配置格式缺失 | P2 | ✅ 已解决 | 第 26 章 |
+| **M29** | Agent 间通信协议缺失 | P2 | ✅ 已解决 | 第 26 章 |
+| **M30** | 工作流监控指标缺失 | P2 | ✅ 已解决 | 第 27 章 |
+| **M31** | 装饰器模式未显式定义 | P3 | ✅ 已解决 | 第 28 章 |
+| **M32** | 模板方法模式未显式定义 | P3 | ✅ 已解决 | 第 28 章 | 
+""  
+"---"  
+""  
+"**�ܹ������ĵ� v6.0.0 - Party Mode ��������������**"  
+""  
+"- **��������** 6,671 ��"  
+"- **�����½ڣ�** 21 ��"  
+"- **��¼�½ڣ�** 8 ��"  
+"- **ADR ���߼�¼��** 12 ��"  
+"- **������⣺** 32 ��"  
+"- **����ʾ����** 120+ ��"  
+"- **�ܹ�ͼ��** 10+ ��"  
+"- **�ؼ��������̣�** 64 ����11 ���������̣�"  
+"- **��֤���ǣ�** 122 FR 100% / 39 NFR 100% / 30 ���� 100%"  
+"- **�������** 24 ������ + 33 ��������"  
+"- **Makefile ���** 30+ ����������"  
+"- **���ָ�꣺** 15 ��������άָ��"  
+"- **�ܹ�ģʽ��** װ����ģʽ/ģ�巽��ģʽ��ʽ����"  
+""  
+"**������˷���������ȫ���������������ܹ��������ɣ��ؼ��������������ƣ��ܹ���֤ͨ����**"  
+""  
+"��һ�������ڴ˼ܹ���ƣ���ʼ MVP ʵʩ�ƻ���2026-02 ~ 2026-04����" 
