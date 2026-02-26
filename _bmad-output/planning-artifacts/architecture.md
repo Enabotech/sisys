@@ -3,7 +3,6 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/ux-design-specification.md
-  - _bmad-output/planning-artifacts/research/架构草稿.md
   - or.md
 workflowType: 'architecture'
 project_name: 'sisys'
