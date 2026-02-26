@@ -14,10 +14,10 @@ completedAt: '2026-02-26'
 
 # 企业战略规划管理系统 - 完整架构设计文档
 
-**版本：** 8.2.0
-**状态：** Party Mode 宗师级评审 P0 问题修复版（辩论终止逻辑边界条件完整修复 + 重复内容合并）
+**版本：** 8.3.0
+**状态：** Party Mode 宗师级评审 P0 问题修复版（辩论终止逻辑边界条件完整修复 + 重复内容合并 + 架构一致性修复）
 **评审日期：** 2026-02-26
-**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）+ P0 问题修正 + Party Mode 宗师级评审（48 项问题）+ 重复内容合并
+**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）+ P0 问题修正 + Party Mode 宗师级评审（48 项问题）+ 重复内容合并 + 架构一致性修复（领域层零依赖/存储循环依赖/Override 同步机制）
 
 ---
 
@@ -39,6 +39,7 @@ completedAt: '2026-02-26'
 | 8.0.0 | 2026-02-26 | **P0 问题修正**：①辩论终止条件逻辑 bug 修复 ②Checkpoint 实现细节补充 ③分支合并策略完善 | 架构团队 |
 | 8.1.0 | 2026-02-26 | **Party Mode 宗师级评审 P0 问题修复**：①辩论终止逻辑边界条件完整修复（第 1 轮增益率计算/空参数列表重复率/超时清理）②两处 DebateEvaluator 实现统一 | 架构团队 |
 | 8.2.0 | 2026-02-26 | **重复内容合并**：删除第 17.3.5 节重复的 DebateEvaluator 实现，保留第 7.3 节作为唯一实现，17.3.5 改为描述集成方式 | 架构团队 |
+| 8.3.0 | 2026-02-26 | **架构一致性修复**：①领域层零依赖原则修复（HybridRetriever 移至基础设施层）②存储层循环依赖修复（单向依赖链 + 异步缓存更新）③Override 模式同步机制完善（双触发策略 + 惰性同步） | 架构团队 |
 
 ---
 
@@ -328,20 +329,27 @@ graph TB
     RabbitMQ -- "53. 持久化事件" --> Outbox
     Outbox -- "54. 轮询发布" --> RabbitMQ
     RabbitMQ -- "55. 死信事件" --> DLQ
-    
-    %% 流程 56-60: 五层存储协同
+
+    %% 流程 56-61: 五层存储协同（单向依赖链 + 异步缓存更新）
     Cache_Storage -. "56. 会话状态" .-> Relational_Storage
     Relational_Storage -. "57. 元数据引用" .-> Vector_Storage
-    Vector_Storage -. "58. 嵌入向量" .-> Object_Storage
+    Vector_Storage -. "58. 嵌入向量 payload" .-> Object_Storage
     Object_Storage -. "59. 原始文档" .-> Graph_Storage
-    Graph_Storage -. "60. 实体关系" .-> Cache_Storage
-    
-    %% 流程 61-64: 性能监控与 CUSUM 漂移检测
-    PrefectEngine -- "61. 工作流监控事件" --> EventBus
-    LangGraphEngine -- "62. Agent 决策监控事件" --> EventBus
-    EventBus -- "63. 聚合到监控系统" --> Producer
-    EventBus -- "64. CUSUM 漂移检测" --> Producer
+    Graph_Storage -. "60. 图遍历结果 (异步事件)" .-> EventBus
+    EventBus -. "61. 缓存更新事件" .-> Cache_Storage
+
+    %% 流程 62-65: 性能监控与 CUSUM 漂移检测
+    PrefectEngine -- "62. 工作流监控事件" --> EventBus
+    LangGraphEngine -- "63. Agent 决策监控事件" --> EventBus
+    EventBus -- "64. 聚合到监控系统" --> Producer
+​    EventBus -- "65. CUSUM 漂移检测" --> Producer
 ```
+
+**五层存储依赖说明**：
+- ✅ **单向依赖链**：Cache → Relational → Vector → Object → Graph（无循环）
+- ✅ **异步缓存更新**：Graph 存储通过事件总线异步更新缓存，打破循环依赖
+- ✅ **流程 60**：Graph 存储的图遍历结果通过事件总线发布，不直接依赖 Cache
+- ✅ **流程 61**：缓存监听器订阅事件总线的缓存更新事件，异步刷新 Cache
 
 ---
 
@@ -900,26 +908,26 @@ async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modifi
     """Override 模式 - 需人工确认"""
     # 1. 影响范围评估
     affected_checkpoints = await self.assess_impact(checkpoint.id)
-    
+
     # 2. 生成影响评估报告
     impact_report = await self.generate_impact_report(
         checkpoint_id=checkpoint.id,
         modifications=modifications,
         affected_checkpoints=affected_checkpoints
     )
-    
+
     # 3. 等待人工确认
     confirmation = await self.wait_for_human_confirmation(impact_report)
     if not confirmation:
         return OverrideResult(status='cancelled', reason='user_rejected')
-    
+
     # 4. 应用修改（仅修改指定状态，不重新计算）
     modified_state = await self.apply_modifications(checkpoint.state, modifications)
-    
+
     # 5. 标记后续 Checkpoint 为"待同步"状态
     for cp_id in affected_checkpoints:
         await self.checkpoint_repo.mark_pending_sync(cp_id)
-    
+
     # 6. 记录审计日志
     override_log = OverrideLog(
         checkpoint_id=checkpoint.id,
@@ -929,7 +937,22 @@ async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modifi
         confirmed_at=datetime.now()
     )
     await self.override_log_repo.save(override_log)
+
+    # 7. 触发同步机制（双触发策略）
+    # 7.1 事件驱动触发：发布同步事件
+    await self.event_bus.publish(CheckpointOverrideCompleted(
+        checkpoint_id=checkpoint.id,
+        affected_checkpoints=affected_checkpoints,
+        timestamp=datetime.now()
+    ))
     
+    # 7.2 定时任务触发：注册后台同步任务（延迟 5 分钟执行）
+    await self.scheduler.schedule(
+        task=self.sync_pending_checkpoints,
+        args=[affected_checkpoints],
+        run_at=datetime.now() + timedelta(minutes=5)
+    )
+
     return OverrideResult(
         mode="Override",
         modified_state=modified_state,
@@ -937,7 +960,83 @@ async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modifi
         pending_sync=True,
         override_log_id=override_log.id
     )
+
+async def sync_pending_checkpoints(self, affected_checkpoints: List[UUID]) -> SyncResult:
+    """
+    同步待同步 Checkpoint（后台惰性同步）
+    
+    同步策略：
+    1. 惰性同步：仅在用户访问时同步（减少不必要的计算）
+    2. 后台批量同步：定时任务批量处理待同步 Checkpoint
+    3. 用户访问触发：用户访问某个 Checkpoint 时触发同步
+    """
+    sync_results = []
+    
+    for cp_id in affected_checkpoints:
+        # 1. 检查 Checkpoint 是否仍为"待同步"状态
+        cp = await self.checkpoint_repo.get(cp_id)
+        if cp.status != 'pending_sync':
+            continue  # 已被其他操作同步
+        
+        # 2. 惰性同步策略：检查是否被用户访问
+        if not await self.is_checkpoint_accessed(cp_id):
+            # 未被访问：跳过，等待下次定时任务或用户访问触发
+            sync_results.append(SyncResult(checkpoint_id=cp_id, status='skipped'))
+            continue
+        
+        # 3. 用户已访问：执行同步（基于 Override 模式的差异应用）
+        # 3.1 计算差异（修改点 vs 当前状态）
+        diff = await self.calculate_diff(cp)
+        
+        # 3.2 应用差异到 Checkpoint 状态
+        synced_state = await self.apply_diff(cp.state, diff)
+        
+        # 3.3 更新 Checkpoint 状态
+        await self.checkpoint_repo.update(cp_id, synced_state, status='synced')
+        
+        # 3.4 记录同步日志
+        sync_log = SyncLog(
+            checkpoint_id=cp_id,
+            sync_type='override_lazy',
+            synced_at=datetime.now(),
+            diff_applied=diff
+        )
+        await self.sync_log_repo.save(sync_log)
+        
+        sync_results.append(SyncResult(checkpoint_id=cp_id, status='synced'))
+    
+    return SyncResult(
+        total=len(affected_checkpoints),
+        synced=sum(1 for r in sync_results if r.status == 'synced'),
+        skipped=sum(1 for r in sync_results if r.status == 'skipped'),
+        results=sync_results
+    )
+
+async def on_checkpoint_access(self, checkpoint_id: UUID) -> None:
+    """
+    用户访问 Checkpoint 时的触发器
+    
+    如果 Checkpoint 为"待同步"状态，立即触发同步
+    """
+    cp = await self.checkpoint_repo.get(checkpoint_id)
+    if cp.status == 'pending_sync':
+        # 立即触发同步（用户访问触发）
+        await self.sync_pending_checkpoints([checkpoint_id])
 ```
+
+**同步机制说明**：
+
+| 触发方式 | 触发条件 | 同步时机 | 适用场景 |
+|---------|---------|---------|---------|
+| **事件驱动触发** | Override 完成事件 | 立即发布同步事件 | 通知监听器准备同步 |
+| **定时任务触发** | 后台调度器 | 延迟 5 分钟执行 | 批量处理待同步 Checkpoint |
+| **用户访问触发** | 用户访问 Checkpoint | 访问时立即同步 | 惰性同步，减少不必要计算 |
+
+**同步策略**：
+- ✅ **惰性同步**：仅在用户访问时同步，减少后台计算开销
+- ✅ **批量同步**：定时任务批量处理多个待同步 Checkpoint
+- ✅ **优先级同步**：用户访问的 Checkpoint 优先同步
+- ✅ **审计追踪**：所有同步操作记录至 `SyncLog` 并归档至 WORM 存储
 
 ### 8.3 Time-Travel 两阶段能力
 
@@ -2725,12 +2824,55 @@ class DataQualityAssessor:
 
 #### 17.1.5 向量化与检索层（混合检索架构）
 
-**Dense + Sparse + Graph 三路召回：**
+**领域层接口定义（零外部依赖）：**
 
 ```python
-class HybridRetriever:
-    """混合检索器 - 三路召回 + RRF 融合"""
-    
+class RAGService(Protocol):
+    """RAG 服务接口 - 领域层定义（零外部依赖）"""
+
+    async def retrieve(self, query: str, top_k: int = 100) -> List[Document]:
+        """
+        混合检索接口
+        
+        Args:
+            query: 检索查询
+            top_k: 返回文档数量
+            
+        Returns:
+            相关文档列表（按相关性排序）
+        """
+        ...
+
+    async def index(self, document: ParsedDocument) -> None:
+        """索引文档到向量存储"""
+        ...
+```
+
+**基础设施层实现（第 13.4.3 节）：**
+
+> **注意**：`HybridRetriever` 具体实现已移至基础设施层（`src/infrastructure/retrieval/hybrid_retriever.py`），遵循领域层零外部依赖原则。
+
+基础设施层实现摘要：
+
+```python
+# 文件位置：src/infrastructure/retrieval/hybrid_retriever.py
+# 依赖：qdrant-client, neo4j, colbert
+
+class HybridRetriever(RAGService):
+    """混合检索器基础设施实现 - 三路召回 + RRF 融合"""
+
+    def __init__(
+        self,
+        qdrant_client: QdrantClient,      # 基础设施依赖
+        neo4j_driver: neo4j.Driver,        # 基础设施依赖
+        embedding_model: EmbeddingModel,   # 基础设施依赖
+        colbert_reranker: ColBERTReranker  # 基础设施依赖
+    ):
+        self.qdrant = qdrant_client
+        self.neo4j = neo4j_driver
+        self.embedding_model = embedding_model
+        self.colbert_reranker = colbert_reranker
+
     async def retrieve(self, query: str, top_k: int = 100) -> List[Document]:
         # 1. Dense 检索（BGE-M3 稠密向量）
         query_embedding = await self.embedding_model.encode(query)
@@ -2739,40 +2881,45 @@ class HybridRetriever:
             query_vector=query_embedding,
             limit=top_k
         )
-        
+
         # 2. Sparse 检索（BM25 关键词）
         sparse_results = await self.qdrant.search(
             collection="documents",
             query_text=query,  # BM25
             limit=top_k
         )
-        
+
         # 3. Graph 检索（知识图谱关联）
         entities = await self.extract_entities(query)
         graph_results = await self.neo4j.search_related(entities, limit=top_k)
-        
+
         # 4. RRF 融合排序（Reciprocal Rank Fusion）
         fused_results = self.rrf_fusion(
             [dense_results, sparse_results, graph_results],
             k=60  # RRF 参数
         )
-        
+
         # 5. ColBERT-v2 重排序（Top-100 → Top-20）
-        reranked = await self.colbert_rerank(query, fused_results[:100])
-        
+        reranked = await self.colbert_reranker.rerank(query, fused_results[:100])
+
         return reranked[:20]
-    
+
     def rrf_fusion(self, result_lists: List[List[Document]], k: int = 60) -> List[Document]:
         """RRF 融合排序"""
         scores = defaultdict(float)
-        
+
         for results in result_lists:
             for rank, doc in enumerate(results):
                 scores[doc.id] += 1.0 / (k + rank)
-        
+
         sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         return [self.get_doc(doc_id) for doc_id, _ in sorted_docs]
 ```
+
+**架构说明**：
+- ✅ **领域层**：`RAGService` 接口定义（零外部依赖）
+- ✅ **基础设施层**：`HybridRetriever` 实现（依赖 Qdrant/Neo4j/ColBERT）
+- ✅ **依赖注入**：应用层通过依赖注入容器将基础设施实现注入到领域服务
 
 #### 17.1.6 知识图谱层（GraphRAG 增强）
 
