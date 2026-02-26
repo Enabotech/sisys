@@ -1754,7 +1754,7 @@ src/interfaces/
 │   │       ├── __init__.py
 │   │       ├── auth_middleware.py
 │   │       ├── logging_middleware.py
-│   ���       └── error_middleware.py
+│   │       └── error_middleware.py
 │   └── dependencies/                                      # FastAPI 依赖
 │       ├── __init__.py
 │       ├── auth_deps.py
@@ -2822,9 +2822,9 @@ class CitationTracer:
 | **商业模式** | 价值主张画布 | 客户痛点数据 | 价值主张地图 | P0 |
 | | 商业模式画布 | 商业模式数据 | 九宫格画布 | P0 |
 | | 破坏性创新模型 | 技术/市场数据 | 创新类型判断 | P1 |
-| **执行管理** | BSC ���衡计分卡 | 战略目标 | 四维度指标 | P0 |
+| **执行管理** | BSC 平衡计分卡 | 战略目标 | 四维度指标 | P0 |
 | | 战略地图 | BSC 指标 | 战略可视化图 | P1 |
-| | 组织设计框架 | 组织架构数据 | ��织匹配建议 | P1 |
+| | 组织设计框架 | 组织架构数据 | 组织匹配建议 | P1 |
 | | 依赖关系图 | 任务列表 | 依赖关系网络 | P1 |
 | | RACI 矩阵 | 角色任务数据 | 职责分配矩阵 | P1 |
 | | 甘特图 | 项目计划 | 进度可视化图 | P1 |
@@ -4628,7 +4628,7 @@ class AgentState:
 
 # 使用示例
 state = AgentState(agent_id="ceo", role="CEO", status="idle")
-new_state = state.with_task("task_001")  # ���建新对象
+new_state = state.with_task("task_001")  # 创建新对象
 # state 保持不变，new_state 是新对象
 ```
 
@@ -6468,10 +6468,10 @@ pytest tests/unit/domain/
 | **SP** | Strategic Planning | 战略规划，企业制定长期发展目标和路径的系统性过程 | 第 17 章 |
 | **BP** | Business Plan | 业务计划,将战略规划转化为具体可执行计划的文档 | 第 17 章 |
 | **UDMR** | Unified Dynamic Model Routing | 统一动态模型路由框架 | 第 4 章 |
-| **EIP** | Elastic Isolation Protocol | 弹性视角隔离���议 | 第 5 章 |
+| **EIP** | Elastic Isolation Protocol | 弹性视角隔离协议 | 第 5 章 |
 | **SYS** | System Arbitrator | 系统仲裁 Agent | 第 7 章 |
 | **AUD** | Auditor | 审计 Agent | 第 7 章 |
-| **RAG** | Retrieval-Augmented Generation | 检索增强生成 | �� 4 章 |
+| **RAG** | Retrieval-Augmented Generation | 检索增强生成 | 第 4 章 |
 | **RRF** | Reciprocal Rank Fusion | 倒数排名融合，混合检索结果融合算法 | 第 4 章 |
 | **MCP** | Model Context Protocol | 模型上下文协议，Agent 工具调用协议 | 第 17 章 |
 | **A2A** | Agent-to-Agent | Agent 间通信协议 | 第 7 章 |
@@ -8207,7 +8207,7 @@ class TenantRole(BaseModel):
     id: UUID
     tenant_id: UUID                    # 租户隔离
     name: str                          # 角色名称
-    code: str                          # 角���代码
+    code: str                          # 角色代码
     description: Optional[str]
     is_system_role: bool               # 是否系统预置角色
     permissions: List[Permission] = [] # 权限列表
@@ -13490,7 +13490,7 @@ EXECUTION_METRICS = {
 │  │  - 采集频率：1 秒                                        ││
 │  │  - 上报频率：10 秒                                       ││
 │  │  - 目标：Prometheus + Jaeger                            ││
-│  └────────────────────────────────────────────────────��────┘│
+│  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
 ```
 
