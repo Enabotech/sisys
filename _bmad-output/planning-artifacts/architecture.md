@@ -3057,7 +3057,7 @@ class PromptOptimizer:
 
 ### 17.3 AGENT 架构设计
 
-**设计哲学：** 7 类高管角色 Agent（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ SYS 仲裁 Agent，通过弹性视角隔离协议（EIP）实现安全协作。
+**设计哲学：** 7 类高管角色 Agent（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ SYS AGENT，通过弹性视角隔离协议（EIP）实现安全协作。
 
 #### 17.3.1 Agent 身份档案（7+1 角色）
 
@@ -3240,7 +3240,7 @@ class EIPExecutor:
         },
         "L1": {
             "name": "融合态",
-            "prompt_isolation": False,   # 共享上下文（SYS Agent 监督）
+            "prompt_isolation": False,   # 共享上下文（SYS AGENT 监督）
             "tool_isolation": False,     # 完全共享
             "data_isolation": "full_shared",  # 完全共享
             "emergency_mode": True,
@@ -6112,7 +6112,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 | 用户旅程 | 关键场景 | 架构支撑 | 状态 |
 |---------|---------|---------|------|
-| **CEO 张总** - 战略共识达成 | 多 Agent 辩论，风险全景视图 | 7+1 角色，辩论机制，SYS 裁决 | ✅ 支撑 |
+| **CEO 张总** - 战略共识达成 | 多 Agent 辩论，风险全景视图 | 7+1 角色，辩论机制，SYS AGENT 裁决 | ✅ 支撑 |
 | **李经理** - 数据溯源 | 高保真溯源，Bounding Box 跳转 | Citation 值对象，坐标存储 | ✅ 支撑 |
 | **王经理** - 白标交付 | 报告定制，品牌模板 | Prefect 报告生成，模板引擎 | ✅ 支撑 |
 | **陈工** - 运维监控 | 性能监控，健康检查 | Prometheus+Grafana, CUSUM 检测 | ✅ 支撑 |
@@ -6314,7 +6314,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 #### 20.7.2 关键优势
 
 1. **需求覆盖完整** - 122 项 FR 和 39 项 NFR 全部有架构支撑
-2. **核心机制创新** - UDMR/EIP/修正分级/SYS 裁决等机制行业领先
+2. **核心机制创新** - UDMR/EIP/修正分级/SYS AGENT 裁决等机制行业领先
 3. **合规内建** - 7 年 WORM 存储、审计追踪、数据主权隔离
 4. **实现模式完善** - 9 类实现模式确保多 Agent 协作一致性
 5. **技术栈成熟** - 所有技术选型都是社区成熟方案，风险可控
@@ -6469,7 +6469,7 @@ pytest tests/unit/domain/
 | **BP** | Business Plan | 业务计划,将战略规划转化为具体可执行计划的文档 | 第 17 章 |
 | **UDMR** | Unified Dynamic Model Routing | 统一动态模型路由框架 | 第 4 章 |
 | **EIP** | Elastic Isolation Protocol | 弹性视角隔离协议 | 第 5 章 |
-| **SYS** | System Arbitrator | 系统仲裁 Agent | 第 7 章 |
+| **SYS** | System Arbitrator | 系统仲裁SYS AGENT | 第 7 章 |
 | **AUD** | Auditor | 审计 Agent | 第 7 章 |
 | **RAG** | Retrieval-Augmented Generation | 检索增强生成 | 第 4 章 |
 | **RRF** | Reciprocal Rank Fusion | 倒数排名融合，混合检索结果融合算法 | 第 4 章 |
