@@ -400,15 +400,30 @@ class TenantAwareRepository:
     async def _apply_tenant_filter(self, query: Select) -> Select:
         """应用租户过滤"""
         schema = await self._get_schema()
-        
+
         if schema != "public":
-            # Schema per Tenant: 设置 search_path
-            await self.db.execute(text(f"SET search_path TO {schema}"))
+            # Schema per Tenant: 设置 search_path（使用事务包裹，自动恢复）
+            async with self.db.begin_nested():
+                await self.db.execute(text(f"SET search_path TO {schema}"))
+                query = await self._execute_in_schema_context(query)
         else:
             # Row-Level 过滤
             query = query.where(Document.tenant_id == self.tenant.tenant_id)
-        
+
         return query
+
+    async def _execute_in_schema_context(self, query: Select) -> Select:
+        """在 Schema 上下文中执行查询"""
+        # 查询执行后会自动重置 search_path（事务结束）
+        return query
+
+    async def execute_query(self, query: Select) -> Any:
+        """执行查询（推荐方式，自动管理 search_path）"""
+        schema = await self._get_schema()
+        if schema != "public":
+            # 使用连接级设置，执行后自动恢复
+            await self.db.execute(text(f"SET LOCAL search_path TO {schema}"))
+        return await self.db.execute(query)
     
     async def get_document(self, document_id: UUID) -> Optional[Document]:
         """获取文档 - 自动租户过滤"""

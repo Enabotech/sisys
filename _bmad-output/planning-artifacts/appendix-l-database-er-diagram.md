@@ -699,9 +699,31 @@ CREATE INDEX idx_tool_execution_log_tool ON tool_execution_log(tool_id);
 CREATE INDEX idx_tool_execution_log_status ON tool_execution_log(status);
 CREATE INDEX idx_tool_execution_log_started ON tool_execution_log(started_at);
 
--- 分区表（按月分区）
+-- 分区表：2026 年 2 月 -2027 年 1 月（12 个月）
 CREATE TABLE tool_execution_log_2026_02 PARTITION OF tool_execution_log
     FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+CREATE TABLE tool_execution_log_2026_03 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+CREATE TABLE tool_execution_log_2026_04 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
+CREATE TABLE tool_execution_log_2026_05 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE tool_execution_log_2026_06 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE tool_execution_log_2026_07 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+CREATE TABLE tool_execution_log_2026_08 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-08-01') TO ('2026-09-01');
+CREATE TABLE tool_execution_log_2026_09 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-09-01') TO ('2026-10-01');
+CREATE TABLE tool_execution_log_2026_10 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
+CREATE TABLE tool_execution_log_2026_11 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
+CREATE TABLE tool_execution_log_2026_12 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2026-12-01') TO ('2027-01-01');
+CREATE TABLE tool_execution_log_2027_01 PARTITION OF tool_execution_log
+    FOR VALUES FROM ('2027-01-01') TO ('2027-02-01');
 ```
 
 ### 4.5 审计日志表
@@ -774,9 +796,31 @@ CREATE INDEX idx_saga_audit_saga ON saga_audit_log(saga_id);
 CREATE INDEX idx_saga_audit_type ON saga_audit_log(saga_type);
 CREATE INDEX idx_saga_audit_started ON saga_audit_log(started_at);
 
--- 分区表（按月分区）
+-- 分区表：2026 年 2 月 -2027 年 1 月（12 个月）
 CREATE TABLE saga_audit_log_2026_02 PARTITION OF saga_audit_log
     FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+CREATE TABLE saga_audit_log_2026_03 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+CREATE TABLE saga_audit_log_2026_04 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
+CREATE TABLE saga_audit_log_2026_05 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE saga_audit_log_2026_06 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE saga_audit_log_2026_07 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+CREATE TABLE saga_audit_log_2026_08 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-08-01') TO ('2026-09-01');
+CREATE TABLE saga_audit_log_2026_09 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-09-01') TO ('2026-10-01');
+CREATE TABLE saga_audit_log_2026_10 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
+CREATE TABLE saga_audit_log_2026_11 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
+CREATE TABLE saga_audit_log_2026_12 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2026-12-01') TO ('2027-01-01');
+CREATE TABLE saga_audit_log_2027_01 PARTITION OF saga_audit_log
+    FOR VALUES FROM ('2027-01-01') TO ('2027-02-01');
 ```
 
 ### 4.6 Saga 配置表

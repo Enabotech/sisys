@@ -164,6 +164,11 @@ class SagaStep(ABC):
 class SagaContext:
     """Saga 执行上下文"""
 
+    __slots__ = [
+        'saga_id', 'saga_type', 'status', 'current_step',
+        'steps_data', 'errors', 'created_at', 'updated_at', 'completed_at'
+    ]
+
     def __init__(self, saga_id: UUID, saga_type: str):
         self.saga_id = saga_id
         self.saga_type = saga_type
@@ -1379,7 +1384,7 @@ class DeadLetterQueueHandler:
 
     async def _handle_manual(self, dlq_event: Dict):
         """需人工干预事件处理"""
-        # 创建工单
+        # 创建��单
         ticket_id = await self._create_support_ticket(dlq_event)
 
         # 发送告警通知

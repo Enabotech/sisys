@@ -360,6 +360,8 @@ spec:
 | `kexec_load` | 🔴 高 | 加载新内核 |
 | `personality` | 🟠 中 | 修改进程执行环境 |
 | `setns` | 🟠 中 | 加入命名空间，可能突破隔离 |
+| `fork`/`vfork` | 🟠 中 | 创建子进程，可能导致 fork bomb |
+| `clone` | 🟠 中 | 创建进程/线程，需限制标志 |
 
 ---
 
