@@ -86,7 +86,58 @@ completedAt: '2026-02-26'
 
 本系统采用**领域驱动六边形架构**为骨架，以**事件驱动总线**为血液，将复杂战略规划过程解构为**数据密集型管道**与**认知密集型决策**两大异构计算域，并通过**统一编排层**实现双向赋能。
 
-### 1.2 核心架构原则
+### 1.2 系统公理（核心抽象基础）
+
+本系统基于两个核心抽象作为设计与实现基础，所有架构决策均源自这两条系统公理：
+
+#### 系统公理一：自主调用（Autonomous Invocation）
+
+**定义：** 系统基于 `trigger(事件)→route(路由)→execute(执行)` 的自主调用循环构建
+
+| 阶段 | 触发源 | 路由机制 | 执行环境 | 状态管理 |
+|------|--------|---------|---------|---------|
+| **trigger** | 领域事件 / 周期性心跳事件 | session_id 哈希 / 语义路由 | - | - |
+| **route** | - | UDMR 三层决策（L1 合规→L2 评估→L3 执行） | - | 路由决策日志（WORM 归档） |
+| **execute** | - | - | 会话命名空间（Docker/gVisor 沙箱） | 状态快照→Redis（TTL 24h-30d） |
+
+**实现章节：**
+- trigger：第 10 章 事件驱动架构设计（10 种领域事件 + 双通道总线）
+- route：第 4 章 统一动态模型路由框架（UDMR 三层决策）
+- execute：第 8 章 Checkpoint 机制（状态持久化与中断恢复）、第 17.3.2 节 Agent 标准工作流
+
+**验收标准：**
+- 路由决策延迟 P95<50ms
+- 状态快照序列化至 Redis Hash（支持主从复制与故障转移）
+- Checkpoint 双模式恢复（Replay/Override）+ Time-Travel 能力
+
+---
+
+#### 系统公理二：外部化记忆（Externalized Memory）
+
+**定义：** 系统遵循 `LLM 上下文=缓存`、`磁盘记忆=真相源` 的记忆分离原则
+
+| 存储层 | 技术选型 | 存储内容 | TTL | 容量规划 |
+|--------|---------|---------|-----|---------|
+| **L1 高速缓存层** | Redis 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d | 10GB |
+| **L2 关系存储层** | PostgreSQL 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 | 100GB |
+| **L3 向量存储层** | Qdrant 1.7+ | 嵌入向量、混合检索 payload | 永久 | 500GB |
+| **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 7 年 | 10TB |
+| **L5 图存储层** | Neo4j 5.x | 知识图谱、实体关系、依赖图 | 永久 | 50GB |
+
+**关键机制：**
+- **战略档案库**：第 9 章 StrategicArchive 实体（五层存储协同）
+- **上下文压缩**：LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
+- **检索 - 压缩循环**：第 17.1.5 节 混合检索（Dense+Sparse+Graph→RRF 融合→ColBERT 重排序）
+- **持久化笔记**：压缩前必须执行持久化（第 8.2.1 节 CheckpointSnapshot 序列化）
+
+**验收标准：**
+- 上下文压缩率≥70%
+- 检索延迟 P95<800ms（MVP）→<300ms（V2）
+- 事件溯源 100% 覆盖 + WORM 存储 7 年归档（SOX/ISO27001 合规）
+
+---
+
+### 1.3 核心架构原则
 
 | 原则 | 描述 | 实现方式 | 验收标准 |
 |------|------|---------|---------|
@@ -98,7 +149,7 @@ completedAt: '2026-02-26'
 | **弹性隔离** | 四级隔离等级动态调整，合规内建 | EIP 协议 | 隔离切换审计 100% |
 | **可追溯决策** | 所有决策可追溯至原始数据和假设 | 事件溯源 + WORM 存储 | 7 年审计追踪 |
 
-### 1.3 关键架构指标
+### 1.4 关键架构指标
 
 | 指标类别 | 指标 | MVP 目标 | V1 目标 | V2 目标 | 测量方式 |
 |---------|------|---------|--------|--------|---------|
@@ -787,25 +838,37 @@ class DebateEvaluator:
 
 ```python
 class CheckpointSnapshot:
-    """检查点状态快照"""
+    """检查点状态快照 - 遵循系统公理二（外部化记忆）"""
     checkpoint_id: UUID
     stage_id: str              # BLM/BEM 阶段标识
     stage_number: int          # 阶段序号
     timestamp: datetime
     state_version: str         # 快照版本号
-    
+
     # 核心状态数据
     state_data: Dict[str, Any]       # 业务状态变量
-    context_window: List[Message]    # LLM 上下文窗口
-    working_memory: Dict[str, Any]   # 工作记忆
+    context_window: List[Message]    # LLM 上下文窗口（已压缩，~2K tokens）
+    working_memory: Dict[str, Any]   # 工作记忆（关键变量）
     tool_outputs: List[ToolResult]   # 工具执行结果
-    
+
     # 元数据
     metadata: SnapshotMetadata
     checksum: str                    # SHA-256 校验和
-    
+    persistent_note_ref: Optional[UUID]  # 关联的持久化笔记引用（压缩前必须持久化）
+
     def serialize(self) -> bytes:
-        """序列化为字节流（用于 Redis 存储）"""
+        """
+        序列化为字节流（用于 Redis 存储）
+        
+        前置条件：
+        1. 已执行持久化笔记步骤（persistent_note_ref 不为空）
+        2. context_window 已压缩（压缩率≥70%）
+        3. 质量评分≥0.7
+        """
+        # 验证持久化已完成（系统公理二：压缩前必须持久化）
+        if not self.persistent_note_ref:
+            raise SnapshotError("序列化前必须执行持久化笔记步骤")
+        
         return msgpack.packb({
             'checkpoint_id': str(self.checkpoint_id),
             'stage_id': self.stage_id,
@@ -814,9 +877,10 @@ class CheckpointSnapshot:
             'working_memory': self.working_memory,
             'tool_outputs': [t.dict() for t in self.tool_outputs],
             'metadata': self.metadata.dict(),
-            'checksum': self.checksum
+            'checksum': self.checksum,
+            'persistent_note_ref': str(self.persistent_note_ref)  # 持久化笔记引用
         }, use_bin_type=True)
-    
+
     @classmethod
     def deserialize(cls, data: bytes) -> 'CheckpointSnapshot':
         """从字节流反序列化"""
@@ -829,9 +893,143 @@ class CheckpointSnapshot:
             working_memory=obj['working_memory'],
             tool_outputs=[ToolResult(**t) for t in obj['tool_outputs']],
             metadata=SnapshotMetadata(**obj['metadata']),
-            checksum=obj['checksum']
+            checksum=obj['checksum'],
+            persistent_note_ref=UUID(obj['persistent_note_ref']) if obj.get('persistent_note_ref') else None
         )
+
+    async def create_with_persistent_note(
+        cls,
+        checkpoint_id: UUID,
+        stage_id: str,
+        state_data: Dict[str, Any],
+        raw_context: List[Message],  # 原始上下文（未压缩）
+        working_memory: Dict[str, Any],
+        tool_outputs: List[ToolResult],
+        query: str,
+        user_id: str,
+        session_id: str
+    ) -> 'CheckpointSnapshot':
+        """
+        工厂方法：创建 CheckpointSnapshot 并执行持久化笔记步骤
+        
+        流程：
+        1. 持久化笔记（提取实体→生成摘要→记录血缘）
+        2. 压缩上下文（基于持久化笔记）
+        3. 验证压缩质量
+        4. 创建快照
+        
+        遵循系统公理二：压缩前必须持久化
+        """
+        # 步骤 1：持久化笔记（压缩前必须执行）
+        note_taker = PersistentNoteTaker()
+        persistent_note = await note_taker.take_notes(
+            query=query,
+            retrieved_docs=raw_context,  # 将原始上下文视为检索结果
+            user_id=user_id,
+            session_id=session_id
+        )
+        
+        # 步骤 2：压缩上下文（基于持久化笔记）
+        compressor = ContextCompressor()
+        compressed_context = await compressor.compress(
+            retrieved_docs=raw_context,
+            query=query,
+            persistent_note=persistent_note
+        )
+        
+        # 步骤 3：验证压缩质量
+        if compressed_context.quality_score < 0.7:
+            raise SnapshotError(f"压缩质量不足：{compressed_context.quality_score}")
+        
+        # 步骤 4：创建快照
+        snapshot = cls(
+            checkpoint_id=checkpoint_id,
+            stage_id=stage_id,
+            state_data=state_data,
+            context_window=compressed_context.context,  # 使用压缩后的上下文
+            working_memory=working_memory,
+            tool_outputs=tool_outputs,
+            metadata=SnapshotMetadata(
+                compression_ratio=compressed_context.compression_ratio,
+                quality_score=compressed_context.quality_score,
+                token_count=compressed_context.token_count
+            ),
+            checksum="",  # 将在创建后计算
+            persistent_note_ref=persistent_note.note_id  # 关联持久化笔记
+        )
+        
+        # 计算校验和
+        snapshot.checksum = snapshot._calculate_checksum()
+        
+        return snapshot
+
+    def _calculate_checksum(self) -> str:
+        """计算快照校验和（SHA-256）"""
+        import hashlib
+        data = f"{self.checkpoint_id}:{self.stage_id}:{self.state_version}:{self.persistent_note_ref}"
+        return hashlib.sha256(data.encode()).hexdigest()
+
+    def verify_integrity(self) -> bool:
+        """验证快照完整性（包括持久化笔记引用）"""
+        if not self.persistent_note_ref:
+            raise SnapshotIntegrityError("缺少持久化笔记引用")
+        
+        expected_checksum = self._calculate_checksum()
+        if self.checksum != expected_checksum:
+            raise SnapshotIntegrityError("校验和不匹配")
+        
+        return True
 ```
+
+**持久化笔记与 Checkpoint 关联流程：**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              Checkpoint 创建流程（压缩前持久化）                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. BLM/BEM 阶段完成                                                     │
+│     │  输出：state_data, raw_context (LLM 原始上下文，~50K tokens)      │
+│     ▼                                                                   │
+│  2. 持久化笔记步骤 ← 压缩前必须执行！                                    │
+│     │  2.1 提取关键实体（Top-20）→ StrategicArchive（L1-L5）            │
+│     │  2.2 生成结构化摘要 → PostgreSQL（L2）                            │
+│     │  2.3 记录血缘 → 审计日志 + WORM 归档（L2+L4）                      │
+│     │  输出：PersistentNote (note_id, entities, summary, lineage)       │
+│     ▼                                                                   │
+│  3. 上下文压缩                                                           │
+│     │  输入：raw_context + persistent_note                              │
+│     │  算法：LLM 摘要生成（Temperature=0.3）+ 关键信息抽取              │
+│     │  目标：50K tokens → ~2K tokens（压缩率≥70%）                       │
+│     │  验证：质量评分≥0.7（信息熵 + 实体覆盖率）                         │
+│     ▼                                                                   │
+│  4. CheckpointSnapshot 创建                                              │
+│     │  字段：                                                           │
+│     │    - context_window: 压缩后的上下文（~2K tokens）                 │
+│     │    - persistent_note_ref: 关联持久化笔记 ID（UUID）               │
+│     │    - metadata.compression_ratio: 压缩率                           │
+│     │    - metadata.quality_score: 质量评分                             │
+│     │  序列化：msgpack → Redis Hash（TTL 30 天）                          │
+│     ▼                                                                   │
+│  5. 完整性验证                                                           │
+│     │  检查：persistent_note_ref 不为空                                 │
+│     │  检查：checksum 匹配                                              │
+│     │  失败 → 抛出 SnapshotIntegrityError                               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**验收标准：**
+
+| 检查项 | 验收标准 | 验证方式 |
+|--------|---------|---------|
+| **持久化笔记引用** | 100% Checkpoint 有关联 persistent_note_ref | 数据库查询 |
+| **压缩率** | ≥70% | metadata.compression_ratio |
+| **质量评分** | ≥0.7 | metadata.quality_score |
+| **完整性验证** | 100% 通过 verify_integrity() | 单元测试 |
+| **压缩前持久化** | 0 次违规（无 persistent_note_ref 不允许序列化） | 审计日志 |
+
+---
 
 #### 8.2.2 Replay 模式详细实现
 
@@ -2920,6 +3118,262 @@ class HybridRetriever(RAGService):
 - ✅ **领域层**：`RAGService` 接口定义（零外部依赖）
 - ✅ **基础设施层**：`HybridRetriever` 实现（依赖 Qdrant/Neo4j/ColBERT）
 - ✅ **依赖注入**：应用层通过依赖注入容器将基础设施实现注入到领域服务
+
+#### 17.1.5.1 检索 - 压缩循环机制（Retrieval-Compression Loop）
+
+**设计哲学：** 遵循系统公理二"外部化记忆"，LLM 上下文=缓存，磁盘记忆=真相源。检索后必须执行压缩，压缩前必须持久化，防止信息丢失。
+
+**循环流程：**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      检索 - 压缩循环（Retrieval-Compression Loop）       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. 检索（Retrieval）                                                    │
+│     │  输入：用户查询 query                                             │
+│     │  输出：Top-100 候选文档（Dense+Sparse+Graph 三路召回）             │
+│     │  延迟预算：P95<500ms（初检 200ms+ 融合 50ms+ 精排 250ms）           │
+│     ▼                                                                   │
+│  2. 持久化笔记（Persistent Note-Taking）← 压缩前必须执行！               │
+│     │  步骤：                                                           │
+│     │  2.1 提取关键实体与关系 → 写入 StrategicArchive                   │
+│     │  2.2 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL           │
+│     │  2.3 记录检索血缘（query/top_k/时间戳/用户 ID）→ 审计日志          │
+│     │  验收标准：持久化完成后才允许压缩                                 │
+│     ▼                                                                   │
+│  3. 压缩（Compression）                                                  │
+│     │  输入：Top-100 候选文档 + 用户查询                                │
+│     │  算法：LLM 摘要生成（Temperature=0.3） + 关键信息抽取             │
+│     │  压缩目标：100 文档（~50K tokens）→ 压缩至 5-10 个关键段落（~2K tokens）│
+│     │  压缩率：≥70%（验收标准）                                         │
+│     │  质量评估：信息熵 + 关键实体覆盖率（评分<0.7 触发二次生成）        │
+│     ▼                                                                   │
+│  4. LLM 上下文注入（Context Injection）                                  │
+│     │  输入：压缩后的关键段落（~2K tokens）                             │
+│     │  操作：注入至 LLM 上下文窗口（仅保留当前任务必需信息）             │
+│     │  防止：上下文爆炸（>128K tokens 时性能下降）                       │
+│     ▼                                                                   │
+│  5. 生成与验证（Generation & Validation）                                │
+│     │  LLM 基于压缩上下文生成答案                                       │
+│     │  Auditor 验证事实一致性（引用源可追溯）                           │
+│     │  验证失败 → 返回步骤 1 重新检索（扩展查询/放宽阈值）               │
+│     ▼                                                                   │
+│  6. 反馈与演进（Feedback & Evolution）                                   │
+│     │  用户修正 → 修正分级判定（L0-L3）                                 │
+│     │  高频修正模式 → Few-Shot 样本 → Prompt 优化                       │
+│     └──────────────────────────────────────────→ 返回步骤 1（循环）      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**持久化笔记详细实现（压缩前必须执行）：**
+
+```python
+class PersistentNoteTaker:
+    """持久化笔记记录器 - 压缩前必须调用"""
+
+    async def take_notes(
+        self,
+        query: str,
+        retrieved_docs: List[Document],
+        user_id: str,
+        session_id: str
+    ) -> PersistentNote:
+        """
+        执行持久化笔记步骤
+
+        步骤：
+        1. 提取关键实体与关系 → 写入 StrategicArchive
+        2. 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL
+        3. 记录检索血缘 → 审计日志
+
+        验收标准：持久化完成后才允许压缩
+        """
+        note = PersistentNote(
+            note_id=uuid4(),
+            query=query,
+            session_id=session_id,
+            user_id=user_id,
+            timestamp=datetime.utcnow()
+        )
+
+        # 1. 提取关键实体与关系 → 写入 StrategicArchive（L1-L5 五层存储）
+        entities = await self.entity_extractor.extract(retrieved_docs)
+        note.entities = entities
+        await self.strategic_archive.save_entities(entities)
+
+        # 2. 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL（L2 关系存储）
+        summary = await self.summary_generator.generate(
+            retrieved_docs,
+            schema=RetrievalSummarySchema  # Pydantic V2 强制
+        )
+        note.summary = summary
+        await self.postgres_repo.save_summary(summary)
+
+        # 3. 记录检索血缘 → 审计日志（L2+L4 双存储）
+        lineage = RetrievalLineage(
+            query=query,
+            top_k=len(retrieved_docs),
+            document_ids=[doc.id for doc in retrieved_docs],
+            user_id=user_id,
+            session_id=session_id,
+            timestamp=datetime.utcnow()
+        )
+        note.lineage = lineage
+        await self.audit_log.save(lineage)
+        await self.worm_storage.archive(lineage)  # WORM 归档 7 年
+
+        # 4. 持久化完成标记
+        note.persisted = True
+        note.persisted_at = datetime.utcnow()
+
+        # 5. 持久化笔记序列化至 Redis（L1 高速缓存，TTL 30 天）
+        await self.redis.setex(
+            f"note:{note.note_id}",
+            ttl=30 * 24 * 3600,  # 30 天
+            value=note.serialize()
+        )
+
+        return note
+
+    def verify_persisted(self, note: PersistentNote) -> bool:
+        """验证持久化是否完成（压缩前检查）"""
+        if not note.persisted:
+            raise CompressionError("压缩前必须执行持久化笔记步骤")
+        if not note.entities or not note.summary or not note.lineage:
+            raise CompressionError("持久化笔记内容不完整")
+        return True
+```
+
+**压缩算法详细实现：**
+
+```python
+class ContextCompressor:
+    """上下文压缩器 - 遵循系统公理二"""
+
+    COMPRESSION_RATIO_TARGET = 0.70  # 压缩率≥70%
+    CONTEXT_SIZE_LIMIT = 2000  # 压缩后~2K tokens
+
+    async def compress(
+        self,
+        retrieved_docs: List[Document],
+        query: str,
+        persistent_note: PersistentNote
+    ) -> CompressedContext:
+        """
+        压缩检索结果至 LLM 上下文
+
+        前置条件：persistent_note 已验证（压缩前必须持久化）
+        """
+        # 0. 验证持久化已完成
+        if not self.note_taker.verify_persisted(persistent_note):
+            raise CompressionError("压缩前必须执行持久化笔记步骤")
+
+        # 1. 提取关键信息（基于持久化笔记中的实体）
+        key_entities = persistent_note.entities[:20]  # Top-20 关键实体
+
+        # 2. LLM 摘要生成（Temperature=0.3 低温度保证稳定性）
+        prompt = self._build_compress_prompt(
+            retrieved_docs=retrieved_docs,
+            query=query,
+            key_entities=key_entities,
+            max_tokens=2500
+        )
+        summary = await self.llm.generate(
+            prompt=prompt,
+            temperature=0.3,
+            max_tokens=2500
+        )
+
+        # 3. 关键信息抽取（结构化 JSON Schema 强制）
+        extracted_info = await self.info_extractor.extract(
+            summary,
+            schema=CompressedContextSchema  # Pydantic V2 强制
+        )
+
+        # 4. 压缩率验证
+        original_tokens = sum(len(doc.tokens) for doc in retrieved_docs)
+        compressed_tokens = len(extracted_info.tokens)
+        compression_ratio = 1 - (compressed_tokens / original_tokens)
+
+        if compression_ratio < self.COMPRESSION_RATIO_TARGET:
+            # 压缩率不足，触发二次压缩
+            extracted_info = await self._recompress(extracted_info, query)
+
+        # 5. 质量评估（信息熵 + 关键实体覆盖率）
+        quality_score = await self.quality_evaluator.evaluate(
+            compressed_context=extracted_info,
+            original_docs=retrieved_docs,
+            key_entities=key_entities
+        )
+
+        if quality_score < 0.7:
+            # 质量不足，触发二次生成
+            extracted_info = await self._regenerate(extracted_info, query)
+
+        return CompressedContext(
+            context=extracted_info,
+            compression_ratio=compression_ratio,
+            quality_score=quality_score,
+            token_count=compressed_tokens,
+            persistent_note_ref=persistent_note.note_id
+        )
+```
+
+**质量评估器（压缩后验证）：**
+
+```python
+class CompressionQualityEvaluator:
+    """压缩质量评估器 - 信息熵 + 关键实体覆盖率"""
+
+    async def evaluate(
+        self,
+        compressed_context: CompressedContext,
+        original_docs: List[Document],
+        key_entities: List[Entity]
+    ) -> float:
+        """
+        评估压缩质量
+
+        评分维度：
+        1. 信息熵（40%）：压缩后信息密度
+        2. 关键实体覆盖率（40%）：Top-20 关键实体保留比例
+        3. 冗余度（20%）：重复内容比例
+        """
+        # 1. 信息熵评分
+        entropy_score = self._calculate_entropy(compressed_context.context)
+
+        # 2. 关键实体覆盖率
+        covered_entities = sum(
+            1 for entity in key_entities
+            if entity.name in compressed_context.context
+        )
+        coverage_score = covered_entities / len(key_entities)
+
+        # 3. 冗余度评分
+        redundancy_score = 1.0 - self._calculate_redundancy(compressed_context.context)
+
+        # 4. 综合评分
+        total_score = (
+            0.40 * entropy_score +
+            0.40 * coverage_score +
+            0.20 * redundancy_score
+        )
+
+        return total_score
+```
+
+**验收标准：**
+
+| 指标 | MVP 目标 | V1 目标 | V2 目标 | 测量方式 |
+|------|---------|--------|--------|---------|
+| **压缩率** | ≥70% | ≥75% | ≥80% | Prometheus |
+| **质量评分** | ≥0.7 | ≥0.75 | ≥0.8 | 信息熵 + 实体覆盖率 |
+| **持久化完成率** | 100% | 100% | 100% | 审计日志 |
+| **循环延迟 P95** | <2s | <1.5s | <1s | 链路追踪 |
+
+---
 
 #### 17.1.6 知识图谱层（GraphRAG 增强）
 
@@ -16616,7 +17070,7 @@ $$ LANGUAGE plpgsql;
 
 | 项目 | 数值 |
 |------|------|
-| **总行数** | 约 16,000 行 |
+| **总行数** | 约 17,000 行 |
 | **核心章节** | 27 章 |
 | **附录章节** | 5 章（H-L） |
 | **总章节数** | 32 章 |
