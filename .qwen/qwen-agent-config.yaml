@@ -1,0 +1,288 @@
+# Qwen Code Agent 配置 - sisys 企业战略规划管理系统
+# 版本：1.0.0
+# 基于 MVP 实施计划 (mvp-implementation-plan.md)
+
+# ==================== 全局配置 ====================
+global:
+  communication_language: "Chinese"  # 输出语言：中文
+  project_root: "."
+  max_context_tokens: 128000
+  temperature: 0.7
+  top_p: 0.9
+
+# ==================== Agent 角色配置 ====================
+agents:
+  # ========== 领域层 Agent ==========
+  domain_agent_1:
+    role: "领域层开发专家"
+    description: "负责 DDD 领域建模、实体设计、六边形架构实现"
+    skills:
+      - "DDD"
+      - "Python"
+      - "领域建模"
+      - "六边形架构"
+      - "Pydantic"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/domain/models/*.py"
+      - "src/domain/services/*.py"
+      - "src/domain/repositories/*.py"
+      - "src/domain/events/*.py"
+
+  domain_agent_2:
+    role: "领域服务专家"
+    description: "负责领域服务、领域事件、业务逻辑验证"
+    skills:
+      - "领域服务"
+      - "领域事件"
+      - "业务逻辑"
+      - "事件溯源"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/domain/services/*.py"
+      - "src/domain/events/*.py"
+
+  # ========== 基础设施层 Agent ==========
+  infrastructure_agent_1:
+    role: "数据库专家"
+    description: "负责 PostgreSQL/Redis 存储层实现、SQL 优化"
+    skills:
+      - "PostgreSQL"
+      - "Redis"
+      - "SQL 优化"
+      - "索引设计"
+      - "Alembic"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/storage/postgresql.py"
+      - "src/infrastructure/storage/redis.py"
+      - "migrations/*.py"
+
+  infrastructure_agent_2:
+    role: "消息队列专家"
+    description: "负责 RabbitMQ 事件总线、消息持久化、Outbox 模式"
+    skills:
+      - "RabbitMQ"
+      - "事件驱动"
+      - "消息持久化"
+      - "aio-pika"
+      - "Outbox 模式"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/messaging/rabbitmq.py"
+      - "src/infrastructure/messaging/redis_pubsub.py"
+      - "src/infrastructure/messaging/outbox.py"
+
+  infrastructure_agent_3:
+    role: "向量/图存储专家"
+    description: "负责 Qdrant 向量库、Neo4j 图数据库实现"
+    skills:
+      - "Qdrant"
+      - "Neo4j"
+      - "向量检索"
+      - "图遍历"
+      - "混合检索"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/storage/qdrant.py"
+      - "src/infrastructure/storage/neo4j.py"
+
+  # ========== 工作流引擎 Agent ==========
+  workflow_agent_1:
+    role: "Prefect 工作流专家"
+    description: "负责 Prefect 数据管道、文档处理流程"
+    skills:
+      - "Prefect"
+      - "数据管道"
+      - "工作流编排"
+      - "异步 Python"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/workflows/prefect/*.py"
+
+  workflow_agent_2:
+    role: "LangGraph Agent 编排专家"
+    description: "负责 LangGraph 状态机、Agent 协作图"
+    skills:
+      - "LangGraph"
+      - "状态机"
+      - "Agent 编排"
+      - "BLM/BEM 模型"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/workflows/langgraph/*.py"
+
+  # ========== AI/ML Agent ==========
+  ai_agent_1:
+    role: "LLM 路由专家"
+    description: "负责 UDMR 路由框架、LiteLLM 集成、本地/云端路由"
+    skills:
+      - "LiteLLM"
+      - "UDMR"
+      - "模型路由"
+      - "Ollama"
+      - "Qwen"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/ai/llm_router.py"
+      - "src/infrastructure/ai/udmr/*.py"
+
+  ai_agent_2:
+    role: "RAG 专家"
+    description: "负责 RAG 检索、BGE-M3 嵌入、混合检索"
+    skills:
+      - "RAG"
+      - "BGE-M3"
+      - "混合检索"
+      - "RRF 融合"
+      - "重排序"
+    max_concurrent_tasks: 2
+    output_review_required: true
+    preferred_files:
+      - "src/infrastructure/ai/rag_service.py"
+      - "src/infrastructure/ai/embedding.py"
+
+  # ========== 测试 Agent ==========
+  test_agent_1:
+    role: "单元测试专家"
+    description: "负责 pytest 单元测试、Mock、覆盖率"
+    skills:
+      - "pytest"
+      - "单元测试"
+      - "Mock"
+      - "测试覆盖率"
+    max_concurrent_tasks: 3
+    output_review_required: false  # 测试代码可自动合并
+    preferred_files:
+      - "tests/unit/**/*.py"
+
+  test_agent_2:
+    role: "集成测试专家"
+    description: "负责集成测试、E2E 测试、性能测试"
+    skills:
+      - "集成测试"
+      - "端到端测试"
+      - "性能测试"
+      - "负载测试"
+      - "Playwright"
+    max_concurrent_tasks: 2
+    output_review_required: false
+    preferred_files:
+      - "tests/integration/**/*.py"
+      - "tests/e2e/**/*.py"
+
+  # ========== 文档 Agent ==========
+  doc_agent:
+    role: "技术文档专家"
+    description: "负责 Markdown 文档、API 文档、代码注释"
+    skills:
+      - "Markdown"
+      - "API 文档"
+      - "用户手册"
+      - "代码注释"
+      - "OpenAPI"
+    max_concurrent_tasks: 3
+    output_review_required: false  # 文档可自动合并
+    preferred_files:
+      - "docs/**/*.md"
+      - "**/README.md"
+      - "**/*.py"  # 代码注释
+
+  # ========== 审查 Agent ==========
+  review_agent:
+    role: "代码审查专家"
+    description: "负责代码审查、安全扫描、性能分析、规范检查"
+    skills:
+      - "代码审查"
+      - "安全扫描"
+      - "性能分析"
+      - "规范检查"
+      - "mypy"
+      - "ruff"
+    max_concurrent_tasks: 1
+    output_review_required: false  # 审查结果供人类参考
+    preferred_files:
+      - "src/**/*.py"
+
+  # ========== BMAD 专用 Agent ==========
+  bmad_master_agent:
+    role: "BMAD Master Agent"
+    description: "负责 BMAD 工作流协调、Party Mode 评审"
+    skills:
+      - "BMAD"
+      - "Party Mode"
+      - "多 Agent 协作"
+      - "架构评审"
+    max_concurrent_tasks: 1
+    output_review_required: true
+    preferred_files:
+      - "_bmad/**/*.md"
+      - "_bmad-output/**/*.md"
+
+# ==================== 并行度管理 ====================
+parallelism:
+  max_concurrent_agents: 6  # 最佳并行数，超过 8 个会导致上下文冲突
+  task_queue_enabled: true
+  conflict_detection_enabled: true
+  context_isolation: true
+
+# ==================== 任务队列配置 ====================
+task_queue:
+  priority_levels:
+    - "P0"  # 关键路径任务
+    - "P1"  # 重要任务
+    - "P2"  # 可延后任务
+  default_priority: "P1"
+  auto_assign: true  # 根据 Agent 技能自动分配
+
+# ==================== 代码审查配置 ====================
+code_review:
+  auto_review_enabled: true
+  review_agents:
+    - "review_agent"
+  checks:
+    - "type_check"  # mypy
+    - "lint"  # ruff
+    - "security"  # 安全扫描
+    - "performance"  # 性能分析
+  merge_strategy: "human_approval"  # 人类最终审批
+
+# ==================== 输出规范 ====================
+output:
+  language: "Chinese"  # 中文输出
+  code_comments: "Chinese"  # 代码注释语言
+  commit_messages: "Chinese"  # 提交信息语言
+  preserve_technical_terms: true  # 保留技术术语（不翻译）
+
+# ==================== 项目特定配置 ====================
+project:
+  name: "sisys"
+  type: "企业战略规划管理系统"
+  architecture: "六边形架构 + 事件驱动"
+  core_technologies:
+    - "Python 3.11+"
+    - "FastAPI"
+    - "Prefect 3.6+"
+    - "LangGraph 1.0+"
+    - "PostgreSQL 15+"
+    - "Redis 7.0+"
+    - "RabbitMQ 3.12+"
+    - "Qdrant 1.7+"
+    - "Neo4j 5.x"
+  mvp_scope:
+    - "领域层核心实体"
+    - "基础设施层持久化"
+    - "消息总线"
+    - "核心应用用例"
+  compliance:
+    - "SOX"
+    - "ISO27001"
+    - "WORM 7 年存储"
