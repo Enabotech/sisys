@@ -14,10 +14,10 @@ completedAt: '2026-02-26'
 
 # 企业战略规划管理系统 - 完整架构设计文档
 
-**版本：** 8.0.0
-**状态：** P0 问题修正版（辩论终止逻辑修复 + Checkpoint 实现细节 + 分支合并策略）
+**版本：** 8.2.0
+**状态：** Party Mode 宗师级评审 P0 问题修复版（辩论终止逻辑边界条件完整修复 + 重复内容合并）
 **评审日期：** 2026-02-26
-**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）+ P0 问题修正
+**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）+ P0 问题修正 + Party Mode 宗师级评审（48 项问题）+ 重复内容合并
 
 ---
 
@@ -37,6 +37,8 @@ completedAt: '2026-02-26'
 | 6.0.0 | 2026-02-25 | Party Mode 三轮评审（补充开发环境/Agent 架构/监控指标/架构模式） | 架构团队 |
 | 7.0.0 | 2026-02-26 | 合并附录 H~L（多租户/CUSUM/Saga/沙箱/数据库设计） | 架构团队 |
 | 8.0.0 | 2026-02-26 | **P0 问题修正**：①辩论终止条件逻辑 bug 修复 ②Checkpoint 实现细节补充 ③分支合并策略完善 | 架构团队 |
+| 8.1.0 | 2026-02-26 | **Party Mode 宗师级评审 P0 问题修复**：①辩论终止逻辑边界条件完整修复（第 1 轮增益率计算/空参数列表重复率/超时清理）②两处 DebateEvaluator 实现统一 | 架构团队 |
+| 8.2.0 | 2026-02-26 | **重复内容合并**：删除第 17.3.5 节重复的 DebateEvaluator 实现，保留第 7.3 节作为唯一实现，17.3.5 改为描述集成方式 | 架构团队 |
 
 ---
 
@@ -596,6 +598,11 @@ class RoutingDecisionLog:
 | **可逆性** | 15% | 完全可逆 (1.0) / 部分可逆 (0.6) / 不可逆 (0.2) |
 | **领域关键度** | 10% | 非核心 (1.0) / 次核心 (0.6) / 核心战略 (0.3) |
 
+阈值设定依据：
+- 阈值校准方法：基于历史修正数据 ROC 曲线分析
+- 目标平衡点：误判率<5% vs 人工干预率<30%
+- 校准周期：每季度回溯优化一次
+
 ### 6.2 级别映射
 
 ```
@@ -639,35 +646,69 @@ class DebateEvaluator:
     ROUND_TIMEOUT = 30          # 单轮超时（秒）
 
     async def evaluate_round(self, round_data: DebateRound) -> DebateEvaluation:
-        gain_rate = len(new_info) / (len(previous_info) + 1)
-        repetition_rate = len(repeated_content) / len(round_data.arguments)
+        """
+        评估单轮辩论质量
+        
+        边界条件处理：
+        - 第 1 轮辩论：previous_info 为空，gain_rate 默认为 1.0（100% 新信息）
+        - 空参数列表：repetition_rate 默认为 0.0
+        - 超时检查：独立于质量评估，优先判断
+        """
+        # 1. 计算新信息增益率（处理第 1 轮边界条件）
+        new_info = round_data.new_information
+        previous_info = round_data.previous_information
+        if len(previous_info) == 0:
+            gain_rate = 1.0  # 第 1 轮默认增益率为 1（100% 新信息）
+        else:
+            gain_rate = len(new_info) / (len(previous_info) + 1)
 
-        # 任一条件满足即终止（增益不足 或 重复过高）
-        should_terminate = (
-            gain_rate < self.GAIN_THRESHOLD or
-            repetition_rate > self.REPETITION_THRESHOLD
-        )
+        # 2. 计算重复率（处理空参数列表边界条件）
+        repeated_content = self.find_repeated_content(round_data.arguments)
+        if not round_data.arguments:
+            repetition_rate = 0.0  # 空参数列表重复率为 0
+        else:
+            repetition_rate = len(repeated_content) / len(round_data.arguments)
 
-        # 硬约束：最大轮次强制终止
+        # 3. 超时检查（优先级最高，独立于质量评估）
+        if round_data.elapsed_time > self.ROUND_TIMEOUT:
+            return DebateEvaluation(
+                gain_rate=gain_rate,
+                repetition_rate=repetition_rate,
+                should_terminate=True,
+                termination_reason="单轮超时",
+                elapsed_time=round_data.elapsed_time,
+                timeout_threshold=self.ROUND_TIMEOUT
+            )
+
+        # 4. 判定是否终止（优先级：轮次 > 增益 > 重复）
+        should_terminate = False
+        termination_reason = "未终止"
+
         if round_data.round_number >= self.MAX_ROUNDS:
             should_terminate = True
+            termination_reason = "达到最大辩论轮次"
+        elif gain_rate < self.GAIN_THRESHOLD:
+            should_terminate = True
+            termination_reason = "增益率低于阈值（新信息不足）"
+        elif repetition_rate > self.REPETITION_THRESHOLD:
+            should_terminate = True
+            termination_reason = "重复率高于阈值（论点重复）"
 
         return DebateEvaluation(
             gain_rate=gain_rate,
             repetition_rate=repetition_rate,
             should_terminate=should_terminate,
-            termination_reason=self._get_termination_reason(
-                gain_rate, repetition_rate, round_data.round_number
-            )
+            termination_reason=termination_reason,
+            reason=f"增益率{gain_rate:.2%}, 重复率{repetition_rate:.2%}, 轮次{round_data.round_number}/{self.MAX_ROUNDS}"
         )
 
     def _get_termination_reason(
-        self, 
-        gain_rate: float, 
-        repetition_rate: float, 
+        self,
+        gain_rate: float,
+        repetition_rate: float,
         round_number: int
     ) -> str:
-        """获取终止原因"""
+        """获取终止原因（辅助方法，用于日志记录）"""
         if round_number >= self.MAX_ROUNDS:
             return "达到最大辩论轮次"
         if gain_rate < self.GAIN_THRESHOLD:
@@ -675,6 +716,39 @@ class DebateEvaluator:
         if repetition_rate > self.REPETITION_THRESHOLD:
             return "重复率高于阈值（论点重复）"
         return "未终止"
+
+    async def cleanup_on_timeout(self, round_data: DebateRound) -> TimeoutCleanupResult:
+        """
+        超时状态清理
+        
+        清理内容：
+        - 释放 Agent 资源（取消 LLM 调用）
+        - 记录超时日志（用于审计和优化）
+        - 清理临时状态（工作记忆、上下文）
+        """
+        # 1. 取消所有进行中的 LLM 调用
+        for agent_id in round_data.active_agents:
+            await self.llm_client.cancel_request(agent_id)
+
+        # 2. 记录超时日志
+        timeout_log = TimeoutLog(
+            round_id=round_data.id,
+            round_number=round_data.round_number,
+            elapsed_time=round_data.elapsed_time,
+            timeout_threshold=self.ROUND_TIMEOUT,
+            active_agents=round_data.active_agents,
+            timestamp=datetime.now()
+        )
+        await self.timeout_log_repo.save(timeout_log)
+
+        # 3. 清理临时状态
+        await self.session_cache.delete(f"debate:{round_data.id}:working_memory")
+
+        return TimeoutCleanupResult(
+            success=True,
+            cleaned_agents=round_data.active_agents,
+            cleanup_time_ms=time.time() - start_time
+        )
 ```
 
 **补充说明：**
@@ -682,6 +756,11 @@ class DebateEvaluator:
 - ✅ **新增硬约束**：`MAX_ROUNDS=5` 防止无限辩论
 - ✅ **新增超时约束**：`ROUND_TIMEOUT=30s` 防止长尾延迟
 - ✅ **新增终止原因追踪**：便于审计和优化
+- ✅ **修复 P0 边界条件漏洞**：
+  - 第 1 轮辩论 `previous_info` 为空时，`gain_rate` 默认为 1.0
+  - 空参数列表时，`repetition_rate` 默认为 0.0
+  - 超时检查优先级最高，独立于质量评估
+  - 新增 `cleanup_on_timeout` 方法处理超时状态清理
 
 ---
 
@@ -2314,9 +2393,9 @@ buckets/
 
 | 功能模块 | 功能描述 | 优先级 |
 |---------|---------|-------|
-| **完整多 Agent 协作** | 7 种高管角色（CEO/CFO/CMO/CTO/COO/CHO/AUD） | P0 |
+| **完整多 Agent 协作** | 7 种高管角色（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ 1 SYS AGENT | P0 |
 | **完整 BLM 六阶段** | 业绩差距→市场洞察→战略意图→创新焦点→业务设计→执行设计 | P0 |
-| **红蓝辩论机制** | 激进派 vs 保守派结构化辩论（最多 7 轮） | P1 |
+| **红蓝辩论机制** | 激进派 vs 保守派结构化辩论（5 轮） | P1 |
 | **企业战略与市场 Agent** | 战略管理专家/商业分析师/市场分析师/投资经理 | P0 |
 | **外部企业数据整合** | 工商/税务/诉讼/专利等数据源接入 | P0 |
 | **高管简化视图** | 仪表盘 + 审批中心 + 审计摘要 | P0 |
@@ -2779,7 +2858,7 @@ class CitationTracer:
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    MCP/A2A 协议层                                │   │
 │  │   - 工具注册表暴露  │  输入/输出 Schema  │  版本/可靠性评分       │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
+│  └────────────────────────────────────────────────── ─────────────┘   │
 │                                    │                                    │
 │         ┌──────────────────────────┼──────────────────────────┐        │
 │         │                          │                          │        │
@@ -3056,7 +3135,7 @@ class PromptOptimizer:
 
 ### 17.3 AGENT 架构设计
 
-**设计哲学：** 7 类高管角色 Agent（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ SYS AGENT，通过弹性视角隔离协议（EIP）实现安全协作。
+**设计哲学：** 7 类高管角色 Agent（CEO/CFO/CMO/CTO/COO/CHO/AUD）+ 1 SYS AGENT，通过弹性视角隔离协议（EIP）实现安全协作。
 
 #### 17.3.1 Agent 身份档案（7+1 角色）
 
@@ -3353,76 +3432,51 @@ class SYSArbiter:
 
 #### 17.3.5 辩论质量评估器
 
+> **说明：** 辩论质量评估器详细实现见 [第 7.3 节 辩论质量评估器](#73-辩论质量评估器)
+>
+> 本节描述辩论质量评估器在 SYS AGENT 裁决流程中的集成方式。
+
+**集成方式：**
+
 ```python
-class DebateEvaluator:
-    """辩论质量评估器 - 增益率 + 重复率检测 + 硬约束"""
+class SYSArbiter:
+    """SYS AGENT 裁决器 - 五维评分状态机"""
 
-    GAIN_THRESHOLD = 0.10       # 增益率<10% 强制终止
-    REPETITION_THRESHOLD = 0.50 # 重复率>50% 强制终止
-    MAX_ROUNDS = 5              # 最大辩论轮次（硬约束）
-    ROUND_TIMEOUT = 30          # 单轮超时（秒）
+    def __init__(self):
+        self.debate_evaluator = DebateEvaluator()  # 复用第 7.3 节定义
 
-    async def evaluate_round(self, round_data: DebateRound) -> DebateEvaluation:
-        """评估单轮辩论质量"""
-        # 1. 计算新信息增益率
-        new_info = round_data.new_information
-        previous_info = round_data.previous_information
-        gain_rate = len(new_info) / (len(previous_info) + 1)
+    async def arbitrate(self, debate_result: DebateResult) -> ArbitrationDecision:
+        """
+        执行裁决
+        
+        流程：
+        1. 使用 DebateEvaluator 评估辩论质量
+        2. 基于辩论质量计算置信度
+        3. 根据置信度决定裁决方式（自动执行/人工复核）
+        """
+        # 1. 评估辩论质量（复用第 7.3 节 DebateEvaluator）
+        debate_quality = await self.debate_evaluator.evaluate_round(debate_result.final_round)
 
-        # 2. 计算重复率
-        repeated_content = self.find_repeated_content(round_data.arguments)
-        repetition_rate = len(repeated_content) / len(round_data.arguments)
-
-        # 3. 判定是否终止（任一条件满足即终止）
-        should_terminate = (
-            gain_rate < self.GAIN_THRESHOLD or
-            repetition_rate > self.REPETITION_THRESHOLD or
-            round_data.round_number >= self.MAX_ROUNDS
+        # 2. 计算置信度
+        confidence = self.calculate_confidence(
+            debate_quality.gain_rate,
+            debate_quality.repetition_rate,
+            debate_quality.contributions
         )
 
-        # 4. 计算各 Agent 贡献度（Shapley 值）
-        contributions = self.calculate_shapley_values(round_data)
-
-        # 5. 生成分歧点热力图
-        分歧_points = self.identify_disagreement_points(round_data)
-        heatmap = self.generate_heatmap(分歧_points)
-
-        # 6. 终止原因
-        termination_reason = self._get_termination_reason(
-            gain_rate, repetition_rate, round_data.round_number
-        )
-
-        return DebateEvaluation(
-            gain_rate=gain_rate,
-            repetition_rate=repetition_rate,
-            should_terminate=should_terminate,
-            contributions=contributions,
-            disagreement_heatmap=heatmap,
-            termination_reason=termination_reason,
-            reason=f"增益率{gain_rate:.2%}, 重复率{repetition_rate:.2%}, 轮次{round_data.round_number}/{self.MAX_ROUNDS}"
-        )
-
-    def _get_termination_reason(
-        self, 
-        gain_rate: float, 
-        repetition_rate: float, 
-        round_number: int
-    ) -> str:
-        """获取终止原因"""
-        if round_number >= self.MAX_ROUNDS:
-            return "达到最大辩论轮次"
-        if gain_rate < self.GAIN_THRESHOLD:
-            return "增益率低于阈值（新信息不足）"
-        if repetition_rate > self.REPETITION_THRESHOLD:
-            return "重复率高于阈值（论点重复）"
-        return "未终止"
+        # 3. 决定裁决方式
+        if confidence >= 0.6:
+            return await self.auto_arbitrate(debate_result)
+        elif confidence >= 0.4:
+            return await self.manual_review_arbitrate(debate_result)
+        else:
+            return await self.escalate_arbitrate(debate_result)
 ```
 
-**修正说明：**
-- ✅ **修正逻辑 bug**：`and` → `or`，任一条件满足即终止
-- ✅ **统一 MAX_ROUNDS**：从 7 改为 5（与第 7.3 节一致）
-- ✅ **新增 ROUND_TIMEOUT**：单轮 30 秒超时约束
-- ✅ **新增终止原因追踪**：便于审计和优化
+**与第 7.3 节的关系：**
+- 第 7.3 节定义 `DebateEvaluator` 核心实现
+- 本节描述 `DebateEvaluator` 在 SYS AGENT 裁决流程中的集成使用
+- 所有参数和阈值与第 7.3 节保持一致
 
 #### 17.3.6 Agent 配置格式
 
@@ -6070,7 +6124,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | DM-01 | 支持 17 种文档格式 | `DocumentService`, `UnstructuredAdapter` | `src/domain/services/document_service.py` |
 | SR-03 | 混合检索 (Dense+Sparse+Graph) | `RAGService`, `Qdrant`, `Neo4j` | `src/domain/services/rag_service.py` |
 | SR-07 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/models/citation.py` |
-| AC-02 | 7 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD` | `src/infrastructure/agent_orchestration/agents/` |
+| AC-02 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orchestration/agents/` |
 | AC-09 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
 | SP-01 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orchestration/graphs/` |
 | SP-08 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
@@ -9846,7 +9900,7 @@ class QualityDetector:
 │                    指标采集架构                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
 │  │ 应用层埋点    │    │ 基础设施监控  │    │ 业务层指标    │      │
 │  │ (OpenTelemetry)│   │ (Prometheus) │    │ (自定义)     │      │
 │  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
@@ -9870,8 +9924,8 @@ class QualityDetector:
 │                                   │ 告警中心      │             │
 │                                   │ (AlertCenter)│             │
 │                                   └──────────────┘             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 
@@ -13018,11 +13072,11 @@ class SagaEventHandler:
 │  └───────────────────────────────────────────────────────────┘  │
 │                              │                                   │
 │         ┌────────────────────┼────────────────────┐             │
-│         ▼                    ▼                    ▼             │
+│         ▼                    ▼                    ▼            │
 │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
 │  │ gVisor      │     │ gVisor      │     │ gVisor      │       │
-│  │ 容器 A      │     │ 容器 B      │     │ 容器 C      │       │
-│  │ (数值计算)  │     │ (统计分析)  │     │ (图表渲染)  │       │
+│  │ 容器 A      │     │ 容器 B      │      │ 容器 C      │       │
+│  │ (数值计算)  │      │ (统计分析)  │      │ (图表渲染)  │       │
 │  │ CPU:2/Mem:2G│     │ CPU:4/Mem:4G│     │ CPU:2/Mem:4G│       │
 │  └─────────────┘     └─────────────┘     └─────────────┘       │
 │         │                    │                    │             │
