@@ -8,17 +8,17 @@ inputDocuments:
 workflowType: 'architecture'
 project_name: 'sisys'
 user_name: 'Agimtech'
-date: '2026-02-25'
+date: '2026-02-26'
 status: 'complete'
-completedAt: '2026-02-25'
+completedAt: '2026-02-26'
 ---
 
 # 企业战略规划管理系统 - 完整架构设计文档
 
-**版本：** 6.0.0
-**状态：** Party Mode 评审完整版（含开发环境/Agent 架构/监控指标/架构模式）
-**评审日期：** 2026-02-25
-**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）
+**版本：** 8.0.0
+**状态：** P0 问题修正版（辩论终止逻辑修复 + Checkpoint 实现细节 + 分支合并策略）
+**评审日期：** 2026-02-26
+**审核依据：** 架构草稿审核评估报告（16 项关键问题）+ Party Mode 多 Agent 评审（两轮）+ P0 问题修正
 
 ---
 
@@ -37,6 +37,7 @@ completedAt: '2026-02-25'
 | 5.0.0 | 2026-02-25 | Party Mode 二轮评审（补充术语表/ADR 模板/测试策略） | 架构团队 |
 | 6.0.0 | 2026-02-25 | Party Mode 三轮评审（补充开发环境/Agent 架构/监控指标/架构模式） | 架构团队 |
 | 7.0.0 | 2026-02-26 | 合并附录 H~L（多租户/CUSUM/Saga/沙箱/数据库设计） | 架构团队 |
+| 8.0.0 | 2026-02-26 | **P0 问题修正**：①辩论终止条件逻辑 bug 修复 ②Checkpoint 实现细节补充 ③分支合并策略完善 | 架构团队 |
 
 ---
 
@@ -633,24 +634,55 @@ class RoutingDecisionLog:
 
 ```python
 class DebateEvaluator:
-    GAIN_THRESHOLD = 0.10      # 增益率<10% 强制终止
-    REPETITION_THRESHOLD = 0.50  # 重复率>50% 强制终止
-    
+    GAIN_THRESHOLD = 0.10       # 增益率<10% 强制终止
+    REPETITION_THRESHOLD = 0.50 # 重复率>50% 强制终止
+    MAX_ROUNDS = 5              # 最大辩论轮次（硬约束）
+    ROUND_TIMEOUT = 30          # 单轮超时（秒）
+
     async def evaluate_round(self, round_data: DebateRound) -> DebateEvaluation:
         gain_rate = len(new_info) / (len(previous_info) + 1)
         repetition_rate = len(repeated_content) / len(round_data.arguments)
-        
+
+        # 任一条件满足即终止（增益不足 或 重复过高）
         should_terminate = (
-            gain_rate < self.GAIN_THRESHOLD and 
+            gain_rate < self.GAIN_THRESHOLD or
             repetition_rate > self.REPETITION_THRESHOLD
         )
-        
+
+        # 硬约束：最大轮次强制终止
+        if round_data.round_number >= self.MAX_ROUNDS:
+            should_terminate = True
+
         return DebateEvaluation(
             gain_rate=gain_rate,
             repetition_rate=repetition_rate,
-            should_terminate=should_terminate
+            should_terminate=should_terminate,
+            termination_reason=self._get_termination_reason(
+                gain_rate, repetition_rate, round_data.round_number
+            )
         )
+
+    def _get_termination_reason(
+        self, 
+        gain_rate: float, 
+        repetition_rate: float, 
+        round_number: int
+    ) -> str:
+        """获取终止原因"""
+        if round_number >= self.MAX_ROUNDS:
+            return "达到最大辩论轮次"
+        if gain_rate < self.GAIN_THRESHOLD:
+            return "增益率低于阈值（新信息不足）"
+        if repetition_rate > self.REPETITION_THRESHOLD:
+            return "重复率高于阈值（论点重复）"
+        return "未终止"
 ```
+
+**补充说明：**
+- ✅ **修正逻辑 bug**：`and` → `or`，任一条件满足即终止
+- ✅ **新增硬约束**：`MAX_ROUNDS=5` 防止无限辩论
+- ✅ **新增超时约束**：`ROUND_TIMEOUT=30s` 防止长尾延迟
+- ✅ **新增终止原因追踪**：便于审计和优化
 
 ---
 
@@ -663,7 +695,173 @@ class DebateEvaluator:
 | **Replay** | 影响≥2 个后续 Checkpoint | 强一致性 | 高 | 高 |
 | **Override** | 影响<2 个后续 Checkpoint | 需人工确认 | 低 | 低 |
 
-### 8.2 Time-Travel 两阶段能力
+### 8.2 Checkpoint 实现细节
+
+#### 8.2.1 状态快照序列化格式
+
+```python
+class CheckpointSnapshot:
+    """检查点状态快照"""
+    checkpoint_id: UUID
+    stage_id: str              # BLM/BEM 阶段标识
+    stage_number: int          # 阶段序号
+    timestamp: datetime
+    state_version: str         # 快照版本号
+    
+    # 核心状态数据
+    state_data: Dict[str, Any]       # 业务状态变量
+    context_window: List[Message]    # LLM 上下文窗口
+    working_memory: Dict[str, Any]   # 工作记忆
+    tool_outputs: List[ToolResult]   # 工具执行结果
+    
+    # 元数据
+    metadata: SnapshotMetadata
+    checksum: str                    # SHA-256 校验和
+    
+    def serialize(self) -> bytes:
+        """序列化为字节流（用于 Redis 存储）"""
+        return msgpack.packb({
+            'checkpoint_id': str(self.checkpoint_id),
+            'stage_id': self.stage_id,
+            'state_data': self.state_data,
+            'context_window': [m.dict() for m in self.context_window],
+            'working_memory': self.working_memory,
+            'tool_outputs': [t.dict() for t in self.tool_outputs],
+            'metadata': self.metadata.dict(),
+            'checksum': self.checksum
+        }, use_bin_type=True)
+    
+    @classmethod
+    def deserialize(cls, data: bytes) -> 'CheckpointSnapshot':
+        """从字节流反序列化"""
+        obj = msgpack.unpackb(data, raw=False)
+        return cls(
+            checkpoint_id=UUID(obj['checkpoint_id']),
+            stage_id=obj['stage_id'],
+            state_data=obj['state_data'],
+            context_window=[Message(**m) for m in obj['context_window']],
+            working_memory=obj['working_memory'],
+            tool_outputs=[ToolResult(**t) for t in obj['tool_outputs']],
+            metadata=SnapshotMetadata(**obj['metadata']),
+            checksum=obj['checksum']
+        )
+```
+
+#### 8.2.2 Replay 模式详细实现
+
+```python
+async def replay_mode(self, checkpoint: Checkpoint, modifications: List[Modification]) -> ReplayResult:
+    """Replay 模式 - 强一致性保证"""
+    # 1. 应用修改到检查点状态
+    modified_state = await self.apply_modifications(checkpoint.state, modifications)
+    
+    # 2. 获取后续所有阶段
+    current_stage = checkpoint.stage
+    subsequent_stages = self.get_subsequent_stages(current_stage)
+    
+    # 3. 记录重放日志（用于审计）
+    replay_log = ReplayLog(
+        checkpoint_id=checkpoint.id,
+        modifications=modifications,
+        subsequent_stages=subsequent_stages,
+        start_time=datetime.now()
+    )
+    
+    # 4. 从修改点重新执行后续所有阶段
+    execution_log = []
+    for stage in subsequent_stages:
+        try:
+            # 4.1 加载阶段定义
+            stage_def = await self.stage_repo.get(stage)
+            
+            # 4.2 执行阶段（调用 LangGraph/Prefect）
+            result = await self.execute_stage(stage_def, modified_state)
+            
+            # 4.3 记录执行日志
+            execution_log.append(StageExecutionLog(
+                stage_id=stage,
+                status='success',
+                output=result.state,
+                execution_time=result.execution_time
+            ))
+            
+            # 4.4 更新状态
+            modified_state = result.state
+            
+            # 4.5 更新 Checkpoint（持久化）
+            await self.checkpoint_repo.update(stage, modified_state)
+            
+        except Exception as e:
+            # 4.6 执行失败：记录错误并回滚
+            await self.rollback(checkpoint.id)
+            raise ReplayError(f"Stage {stage} replay failed: {str(e)}")
+    
+    # 5. 更新所有受影响的 Checkpoint
+    for stage in subsequent_stages:
+        await self.checkpoint_repo.update(stage, modified_state)
+    
+    # 6. 完成重放，记录审计日志
+    replay_log.end_time = datetime.now()
+    replay_log.status = 'completed'
+    await self.replay_log_repo.save(replay_log)
+    
+    return ReplayResult(
+        mode="Replay",
+        modified_state=modified_state,
+        execution_time=replay_log.end_time - replay_log.start_time,
+        cost=self.calculate_cost(subsequent_stages),
+        affected_checkpoints=subsequent_stages,
+        replay_log_id=replay_log.id
+    )
+```
+
+#### 8.2.3 Override 模式详细实现
+
+```python
+async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modification]) -> OverrideResult:
+    """Override 模式 - 需人工确认"""
+    # 1. 影响范围评估
+    affected_checkpoints = await self.assess_impact(checkpoint.id)
+    
+    # 2. 生成影响评估报告
+    impact_report = await self.generate_impact_report(
+        checkpoint_id=checkpoint.id,
+        modifications=modifications,
+        affected_checkpoints=affected_checkpoints
+    )
+    
+    # 3. 等待人工确认
+    confirmation = await self.wait_for_human_confirmation(impact_report)
+    if not confirmation:
+        return OverrideResult(status='cancelled', reason='user_rejected')
+    
+    # 4. 应用修改（仅修改指定状态，不重新计算）
+    modified_state = await self.apply_modifications(checkpoint.state, modifications)
+    
+    # 5. 标记后续 Checkpoint 为"待同步"状态
+    for cp_id in affected_checkpoints:
+        await self.checkpoint_repo.mark_pending_sync(cp_id)
+    
+    # 6. 记录审计日志
+    override_log = OverrideLog(
+        checkpoint_id=checkpoint.id,
+        modifications=modifications,
+        affected_checkpoints=affected_checkpoints,
+        confirmed_by=confirmation.user_id,
+        confirmed_at=datetime.now()
+    )
+    await self.override_log_repo.save(override_log)
+    
+    return OverrideResult(
+        mode="Override",
+        modified_state=modified_state,
+        affected_checkpoints=affected_checkpoints,
+        pending_sync=True,
+        override_log_id=override_log.id
+    )
+```
+
+### 8.3 Time-Travel 两阶段能力
 
 **第一阶段：单点恢复**
 - 从任意 Checkpoint 恢复执行
@@ -676,6 +874,290 @@ class DebateEvaluator:
 3. 并行维护：主线与分支状态并行维护
 4. 差异对比视图：表格展示关键变量差异及影响评估
 5. 合并/放弃：用户确认合并分支或放弃
+
+### 8.4 分支合并策略
+
+#### 8.4.1 合并策略矩阵
+
+| 冲突类型 | 检测方式 | 解决策略 | 自动化程度 |
+|---------|---------|---------|-----------|
+| **无冲突** | 变量无重叠 | 自动合并 | ✅ 全自动 |
+| **数据冲突** | 同一变量值不同 | 用户选择（主线/分支/手动编辑） | 🟡 半自动 |
+| **逻辑冲突** | 因果关系矛盾 | 强制人工仲裁（SYS AGENT 裁决） | 🔴 全手动 |
+| **结构冲突** | 阶段顺序变化 | 专家确认 + 影响评估 | 🔴 全手动 |
+
+#### 8.4.2 分支合并实现
+
+```python
+class BranchMerger:
+    """分支合并器 - 三阶段合并策略"""
+
+    async def merge(self, branch_id: UUID, user_decision: str) -> MergeResult:
+        """合并分支到主线"""
+        # 1. 加载分支和主线状态
+        branch_state = await self.get_branch_state(branch_id)
+        main_state = await self.get_main_state()
+        
+        # 2. 冲突检测
+        conflicts = await self.detect_conflicts(branch_state, main_state)
+        
+        # 3. 根据冲突类型选择合并策略
+        if len(conflicts) == 0:
+            # 3.1 无冲突：自动合并
+            return await self.auto_merge(branch_state, main_state)
+        
+        conflict_type = self.classify_conflict_type(conflicts)
+        
+        if conflict_type == "data_conflict":
+            # 3.2 数据冲突：用户选择
+            return await self.user_choice_merge(branch_state, main_state, conflicts)
+        
+        elif conflict_type == "logical_conflict":
+            # 3.3 逻辑冲突：强制人工仲裁
+            return await self.manual_arbitration_merge(branch_state, main_state, conflicts)
+        
+        elif conflict_type == "structural_conflict":
+            # 3.4 结构冲突：专家确认
+            return await self.expert_confirm_merge(branch_state, main_state, conflicts)
+        
+        else:
+            raise MergeError(f"Unknown conflict type: {conflict_type}")
+
+    async def detect_conflicts(self, branch_state: State, main_state: State) -> List[Conflict]:
+        """检测冲突"""
+        conflicts = []
+        
+        # 1. 变量级冲突检测
+        branch_vars = set(branch_state.variables.keys())
+        main_vars = set(main_state.variables.keys())
+        
+        common_vars = branch_vars & main_vars
+        for var in common_vars:
+            if branch_state.variables[var] != main_state.variables[var]:
+                conflicts.append(Conflict(
+                    type='data_conflict',
+                    variable=var,
+                    branch_value=branch_state.variables[var],
+                    main_value=main_state.variables[var],
+                    severity='medium'
+                ))
+        
+        # 2. 因果关系冲突检测（使用规则引擎）
+        causal_conflicts = await self.rule_engine.check_causal_conflicts(
+            branch_state.causal_graph,
+            main_state.causal_graph
+        )
+        conflicts.extend(causal_conflicts)
+        
+        # 3. 阶段顺序冲突检测
+        if branch_state.stage_sequence != main_state.stage_sequence:
+            conflicts.append(Conflict(
+                type='structural_conflict',
+                variable='stage_sequence',
+                branch_value=branch_state.stage_sequence,
+                main_value=main_state.stage_sequence,
+                severity='high'
+            ))
+        
+        return conflicts
+
+    async def user_choice_merge(
+        self, 
+        branch_state: State, 
+        main_state: State, 
+        conflicts: List[Conflict]
+    ) -> MergeResult:
+        """数据冲突：用户选择合并"""
+        # 1. 生成冲突解决 UI
+        conflict_ui = await self.generate_conflict_ui(conflicts)
+        
+        # 2. 等待用户决策
+        user_choices = await self.wait_for_user_choices(conflict_ui)
+        
+        # 3. 应用用户选择
+        merged_state = await self.apply_user_choices(
+            branch_state, main_state, user_choices
+        )
+        
+        # 4. 记录合并日志
+        merge_log = MergeLog(
+            branch_id=branch_state.branch_id,
+            merge_type='user_choice',
+            conflicts=conflicts,
+            user_choices=user_choices,
+            merged_at=datetime.now()
+        )
+        await self.merge_log_repo.save(merge_log)
+        
+        return MergeResult(
+            status='success',
+            merged_state=merged_state,
+            merge_type='user_choice',
+            conflicts_resolved=len(conflicts)
+        )
+
+    async def manual_arbitration_merge(
+        self, 
+        branch_state: State, 
+        main_state: State, 
+        conflicts: List[Conflict]
+    ) -> MergeResult:
+        """逻辑冲突：强制人工仲裁（SYS AGENT 裁决）"""
+        # 1. 提交至 SYS AGENT 裁决器
+        dispute = Dispute(
+            type='logical_conflict',
+            branch_state=branch_state,
+            main_state=main_state,
+            conflicts=conflicts
+        )
+        
+        # 2. 等待裁决结果
+        arbitration_result = await self.sys_arbiter.arbitrate(dispute)
+        
+        # 3. 根据裁决结果合并
+        if arbitration_result.confidence >= 0.6:
+            merged_state = await self.apply_arbitration_decision(
+                branch_state, main_state, arbitration_result
+            )
+            return MergeResult(
+                status='success',
+                merged_state=merged_state,
+                merge_type='arbitration',
+                arbitration_id=arbitration_result.id
+            )
+        else:
+            # 置信度不足：升级至人工专家
+            return MergeResult(
+                status='escalated',
+                reason='low_confidence_arbitration',
+                escalation_target='human_expert'
+            )
+```
+
+#### 8.4.3 差异对比视图
+
+```python
+class DiffViewGenerator:
+    """差异对比视图生成器"""
+
+    async def generate(self, main_state: State, branch_state: State) -> DiffView:
+        """生成差异对比视图"""
+        diff_view = DiffView(
+            main_checkpoint_id=main_state.checkpoint_id,
+            branch_checkpoint_id=branch_state.checkpoint_id,
+            generated_at=datetime.now()
+        )
+        
+        # 1. 关键变量差异对比
+        diff_view.variable_diffs = await self.compare_variables(
+            main_state.variables, branch_state.variables
+        )
+        
+        # 2. 因果图差异对比
+        diff_view.causal_graph_diff = await self.compare_causal_graphs(
+            main_state.causal_graph, branch_state.causal_graph
+        )
+        
+        # 3. 影响评估
+        diff_view.impact_assessment = await self.assess_impact(
+            diff_view.variable_diffs, diff_view.causal_graph_diff
+        )
+        
+        # 4. 建议操作
+        diff_view.recommended_action = await self.recommend_action(diff_view)
+        
+        return diff_view
+
+    async def compare_variables(
+        self, 
+        main_vars: Dict[str, Any], 
+        branch_vars: Dict[str, Any]
+    ) -> List[VariableDiff]:
+        """变量差异对比"""
+        diffs = []
+        all_vars = set(main_vars.keys()) | set(branch_vars.keys())
+        
+        for var in all_vars:
+            main_val = main_vars.get(var, '<不存在>')
+            branch_val = branch_vars.get(var, '<不存在>')
+            
+            if main_val != branch_val:
+                # 计算影响范围
+                impact = await self.calculate_variable_impact(var, main_val, branch_val)
+                
+                diffs.append(VariableDiff(
+                    variable_name=var,
+                    main_value=main_val,
+                    branch_value=branch_val,
+                    change_type=self.classify_change_type(main_val, branch_val),
+                    impact_score=impact.score,
+                    affected_variables=impact.affected_vars
+                ))
+        
+        return sorted(diffs, key=lambda x: x.impact_score, reverse=True)
+```
+
+#### 8.4.4 合并状态机
+
+```python
+class MergeStateMachine:
+    """合并状态机 - 管理分支合并全流程"""
+
+    STATES = ['created', 'executing', 'pending_merge', 'merging', 'merged', 'abandoned']
+    TRANSITIONS = [
+        {'trigger': 'start_execution', 'source': 'created', 'dest': 'executing'},
+        {'trigger': 'execution_complete', 'source': 'executing', 'dest': 'pending_merge'},
+        {'trigger': 'start_merge', 'source': 'pending_merge', 'dest': 'merging'},
+        {'trigger': 'merge_success', 'source': 'merging', 'dest': 'merged'},
+        {'trigger': 'merge_failed', 'source': 'merging', 'dest': 'pending_merge'},
+        {'trigger': 'abandon', 'source': ['created', 'executing', 'pending_merge'], 'dest': 'abandoned'}
+    ]
+
+    def __init__(self, branch_id: UUID):
+        self.branch_id = branch_id
+        self.state = 'created'
+        self.machine = Machine(
+            model=self,
+            states=MergeStateMachine.STATES,
+            transitions=MergeStateMachine.TRANSITIONS,
+            initial='created'
+        )
+```
+
+### 8.5 路由决策日志 WORM 归档时机
+
+| 事件 | 触发条件 | 归档时机 | 存储位置 |
+|------|---------|---------|---------|
+| **RoutingDecided** | 路由决策完成 | 决策后 24 小时内 | MinIO WORM（7 年） |
+| **IsolationLevelSwitched** | 隔离等级切换 | 切换后 24 小时内 | MinIO WORM（7 年） |
+| **CheckpointReached** | 检查点到达 | 阶段完成后 1 小时内 | MinIO WORM（7 年） |
+
+**归档实现：**
+```python
+class WormArchiver:
+    """WORM 归档器 - 合规性存储"""
+
+    async def archive_routing_log(self, routing_log: RoutingDecisionLog):
+        """归档路由决策日志"""
+        # 1. 序列化日志
+        log_data = routing_log.dict().json()
+        
+        # 2. 生成 WORM 对象键
+        object_key = f"audit/routing/{routing_log.id}/{routing_log.timestamp.date()}.json"
+        
+        # 3. 上传至 MinIO（启用 Object Lock COMPLIANCE 模式）
+        await self.minio.put_object(
+            bucket='worm-audit',
+            object_name=object_key,
+            data=log_data.encode('utf-8'),
+            retain_until_date=routing_log.timestamp + timedelta(days=7*365),  # 7 年
+            retention_mode=RetentionMode.COMPLIANCE
+        )
+        
+        # 4. 更新日志记录 WORM 引用
+        routing_log.worm_storage_ref = f"minio://worm-audit/{object_key}"
+        await self.routing_log_repo.update(routing_log)
+```
 
 ---
 
@@ -1272,7 +1754,7 @@ src/interfaces/
 │   │       ├── __init__.py
 │   │       ├── auth_middleware.py
 │   │       ├── logging_middleware.py
-│   │       └── error_middleware.py
+│   ���       └── error_middleware.py
 │   └── dependencies/                                      # FastAPI 依赖
 │       ├── __init__.py
 │       ├── auth_deps.py
@@ -2340,9 +2822,9 @@ class CitationTracer:
 | **商业模式** | 价值主张画布 | 客户痛点数据 | 价值主张地图 | P0 |
 | | 商业模式画布 | 商业模式数据 | 九宫格画布 | P0 |
 | | 破坏性创新模型 | 技术/市场数据 | 创新类型判断 | P1 |
-| **执行管理** | BSC 平衡计分卡 | 战略目标 | 四维度指标 | P0 |
+| **执行管理** | BSC ���衡计分卡 | 战略目标 | 四维度指标 | P0 |
 | | 战略地图 | BSC 指标 | 战略可视化图 | P1 |
-| | 组织设计框架 | 组织架构数据 | 组织匹配建议 | P1 |
+| | 组织设计框架 | 组织架构数据 | ��织匹配建议 | P1 |
 | | 依赖关系图 | 任务列表 | 依赖关系网络 | P1 |
 | | RACI 矩阵 | 角色任务数据 | 职责分配矩阵 | P1 |
 | | 甘特图 | 项目计划 | 进度可视化图 | P1 |
@@ -2874,45 +3356,74 @@ class SYSArbiter:
 
 ```python
 class DebateEvaluator:
-    """辩论质量评估器 - 增益率 + 重复率检测"""
-    
+    """辩论质量评估器 - 增益率 + 重复率检测 + 硬约束"""
+
     GAIN_THRESHOLD = 0.10       # 增益率<10% 强制终止
     REPETITION_THRESHOLD = 0.50 # 重复率>50% 强制终止
-    MAX_ROUNDS = 7              # 上限 7 轮
-    
+    MAX_ROUNDS = 5              # 最大辩论轮次（硬约束）
+    ROUND_TIMEOUT = 30          # 单轮超时（秒）
+
     async def evaluate_round(self, round_data: DebateRound) -> DebateEvaluation:
         """评估单轮辩论质量"""
         # 1. 计算新信息增益率
         new_info = round_data.new_information
         previous_info = round_data.previous_information
         gain_rate = len(new_info) / (len(previous_info) + 1)
-        
+
         # 2. 计算重复率
         repeated_content = self.find_repeated_content(round_data.arguments)
         repetition_rate = len(repeated_content) / len(round_data.arguments)
-        
-        # 3. 判定是否终止
+
+        # 3. 判定是否终止（任一条件满足即终止）
         should_terminate = (
-            gain_rate < self.GAIN_THRESHOLD and
-            repetition_rate > self.REPETITION_THRESHOLD
-        ) or (round_data.round_number >= self.MAX_ROUNDS)
-        
+            gain_rate < self.GAIN_THRESHOLD or
+            repetition_rate > self.REPETITION_THRESHOLD or
+            round_data.round_number >= self.MAX_ROUNDS
+        )
+
         # 4. 计算各 Agent 贡献度（Shapley 值）
         contributions = self.calculate_shapley_values(round_data)
-        
+
         # 5. 生成分歧点热力图
-       分歧_points = self.identify_disagreement_points(round_data)
+        分歧_points = self.identify_disagreement_points(round_data)
         heatmap = self.generate_heatmap(分歧_points)
-        
+
+        # 6. 终止原因
+        termination_reason = self._get_termination_reason(
+            gain_rate, repetition_rate, round_data.round_number
+        )
+
         return DebateEvaluation(
             gain_rate=gain_rate,
             repetition_rate=repetition_rate,
             should_terminate=should_terminate,
             contributions=contributions,
             disagreement_heatmap=heatmap,
-            reason=f"增益率{gain_rate:.2%}, 重复率{repetition_rate:.2%}"
+            termination_reason=termination_reason,
+            reason=f"增益率{gain_rate:.2%}, 重复率{repetition_rate:.2%}, 轮次{round_data.round_number}/{self.MAX_ROUNDS}"
         )
+
+    def _get_termination_reason(
+        self, 
+        gain_rate: float, 
+        repetition_rate: float, 
+        round_number: int
+    ) -> str:
+        """获取终止原因"""
+        if round_number >= self.MAX_ROUNDS:
+            return "达到最大辩论轮次"
+        if gain_rate < self.GAIN_THRESHOLD:
+            return "增益率低于阈值（新信息不足）"
+        if repetition_rate > self.REPETITION_THRESHOLD:
+            return "重复率高于阈值（论点重复）"
+        return "未终止"
 ```
+
+**修正说明：**
+- ✅ **修正逻辑 bug**：`and` → `or`，任一条件满足即终止
+- ✅ **统一 MAX_ROUNDS**：从 7 改为 5（与第 7.3 节一致）
+- ✅ **新增 ROUND_TIMEOUT**：单轮 30 秒超时约束
+- ✅ **新增终止原因追踪**：便于审计和优化
 
 #### 17.3.6 Agent 配置格式
 
@@ -4117,7 +4628,7 @@ class AgentState:
 
 # 使用示例
 state = AgentState(agent_id="ceo", role="CEO", status="idle")
-new_state = state.with_task("task_001")  # 创建新对象
+new_state = state.with_task("task_001")  # ���建新对象
 # state 保持不变，new_state 是新对象
 ```
 
@@ -5957,10 +6468,10 @@ pytest tests/unit/domain/
 | **SP** | Strategic Planning | 战略规划，企业制定长期发展目标和路径的系统性过程 | 第 17 章 |
 | **BP** | Business Plan | 业务计划,将战略规划转化为具体可执行计划的文档 | 第 17 章 |
 | **UDMR** | Unified Dynamic Model Routing | 统一动态模型路由框架 | 第 4 章 |
-| **EIP** | Elastic Isolation Protocol | 弹性视角隔离协议 | 第 5 章 |
+| **EIP** | Elastic Isolation Protocol | 弹性视角隔离���议 | 第 5 章 |
 | **SYS** | System Arbitrator | 系统仲裁 Agent | 第 7 章 |
 | **AUD** | Auditor | 审计 Agent | 第 7 章 |
-| **RAG** | Retrieval-Augmented Generation | 检索增强生成 | 第 4 章 |
+| **RAG** | Retrieval-Augmented Generation | 检索增强生成 | �� 4 章 |
 | **RRF** | Reciprocal Rank Fusion | 倒数排名融合，混合检索结果融合算法 | 第 4 章 |
 | **MCP** | Model Context Protocol | 模型上下文协议，Agent 工具调用协议 | 第 17 章 |
 | **A2A** | Agent-to-Agent | Agent 间通信协议 | 第 7 章 |
@@ -7696,7 +8207,7 @@ class TenantRole(BaseModel):
     id: UUID
     tenant_id: UUID                    # 租户隔离
     name: str                          # 角色名称
-    code: str                          # 角色代码
+    code: str                          # 角���代码
     description: Optional[str]
     is_system_role: bool               # 是否系统预置角色
     permissions: List[Permission] = [] # 权限列表
@@ -12979,7 +13490,7 @@ EXECUTION_METRICS = {
 │  │  - 采集频率：1 秒                                        ││
 │  │  - 上报频率：10 秒                                       ││
 │  │  - 目标：Prometheus + Jaeger                            ││
-│  └─────────────────────────────────────────────────────────┘│
+│  └────────────────────────────────────────────────────��────┘│
 └─────────────────────────────────────────────────────────────┘
 ```
 
