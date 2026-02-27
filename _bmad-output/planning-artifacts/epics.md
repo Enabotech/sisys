@@ -708,28 +708,546 @@ sisys/
 ### Story 1.2: 领域实体定义
 
 As a **领域工程师**,
-I want **定义核心领域实体（Document, Agent, Tool, StrategicPlan, Checkpoint）**,
+I want **定义核心领域实体**,
 So that **领域逻辑有清晰的模型基础**。
 
 **Acceptance Criteria:**
 
-**Given** 领域实体定义
+**Given** 领域实体定义任务
 **When** 创建 `src/domain/models/` 下的实体类
 **Then** 包含以下实体：
-- `Document`（文档实体，17 种格式支持）
-- `Agent`（Agent 实体，7 角色 + SYS+AUD）
-- `Tool`（工具实体，23 种战略工具）
-- `StrategicPlan`（战略规划实体，SP/BP）
-- `Checkpoint`（检查点实体，双模式恢复）
-- `StrategicArchive`（战略档案实体，五层存储）
-- `RoutingDecisionLog`（路由决策日志）
-- `IsolationSwitchLog`（隔离切换日志）
+
+**核心业务实体（6 个）：**
+- `Document`（文档实体，17 种格式支持，属性：id, title, format, version, embedding_ref, blob_ref）
+- `Agent`（Agent 实体，7 角色 + SYS+AUD，属性：id, role, identity, tools, state_snapshot, isolation_level）
+- `Tool`（工具实体，23 种战略工具，属性：id, name, version, input_schema, output_schema, reliability_score）
+- `StrategicPlan`（SP 实体，BLM 六阶段，属性：id, plan_type, blm_stage, checkpoints, evidence_package）
+- `BusinessPlan`（BP 实体，BEM 六阶段，属性：id, sp_ref, bem_stage, checkpoints, evidence_package）
+- `Checkpoint`（检查点实体，双模式恢复，属性：id, stage_id, state_snapshot, recovery_mode, branch_id）
+
+**审计日志实体（3 个）：**
+- `StrategicArchive`（战略档案实体，五层存储，属性：id, metadata, embedding, blob_ref, graph_ref）
+- `RoutingDecisionLog`（路由决策日志，UDMR 审计，属性：id, task_id, l1_result, l2_scores, l3_decision, worm_ref）
+- `IsolationSwitchLog`（隔离切换日志，EIP 审计，属性：id, agent_id, from_level, to_level, trigger, worm_ref）
+
+**值对象（4 个）：**
+- `Embedding`（嵌入向量值对象）
+- `Citation`（引用索引值对象，支持 Bounding Box 溯源）
+- `Confidence`（置信度值对象）
+- `Cost`（成本值对象）
 
 **And** 所有实体通过 mypy 严格类型检查
-**And** 实体包含领域事件发布方法
+**And** 所有实体遵循领域层零外部依赖原则（仅使用 Python 标准库）
+**And** 每个实体包含领域事件发布方法
+**And** 实体文件位于 `src/domain/models/` 目录下
+
+---
 
 ### Story 1.3: 领域服务接口定义
 
 As a **架构师**,
-I want **定义领域服务接口（RAGService, ToolService, AgentService, PlanningService）**,
-So that **领域层不依赖任何外部技术实现，遵循依赖
+I want **定义领域服务接口**,
+So that **领域层不依赖任何外部技术实现，遵循依赖倒置原则**。
+
+**Acceptance Criteria:**
+
+**Given** 领域服务接口定义任务
+**When** 创建 `src/domain/services/` 下的接口
+**Then** 包含以下服务接口（10 个）：
+
+**核心业务服务（7 个）：**
+- `DocumentService`（文档处理服务接口，方法：parse/extract/validate）
+- `RAGService`（RAG 检索服务接口，Dense+Sparse+Graph 混合检索）
+- `ToolService`（工具箱服务接口，MCP/A2A 协议支持）
+- `AgentService`（Agent 协作服务接口，EIP 执行）
+- `PlanningService`（规划服务接口，BLM/BEM 状态机）
+- `EvaluationService`（评估服务接口，五维评估）
+- `VisualizationService`（可视化服务接口，决策过程/溯源树展示）
+
+**架构增强服务（3 个）：**
+- `RoutingService`（UDMR 路由服务接口，三层决策）
+- `IsolationService`（EIP 隔离服务接口，四级隔离等级）
+- `CheckpointService`（Checkpoint 服务接口，双模式恢复）
+
+**And** 所有接口仅依赖 Python 标准库
+**And** 接口定义清晰的输入/输出契约（使用 Pydantic V2）
+**And** 每个接口包含完整的 docstring 文档
+**And** 接口文件位于 `src/domain/services/` 目录下
+
+---
+
+### Story 1.4: 仓储接口定义
+
+As a **架构师**,
+I want **定义仓储接口**,
+So that **领域层通过统一接口访问存储，不依赖具体存储实现**。
+
+**Acceptance Criteria:**
+
+**Given** 仓储接口定义任务
+**When** 创建 `src/domain/repositories/` 下的接口
+**Then** 包含以下仓储接口（9 个）：
+
+**核心业务仓储（7 个）：**
+- `DocumentRepository`（文档仓储接口，CRUD + 版本管理）
+- `AgentRepository`（Agent 仓储接口，CRUD + 状态查询）
+- `ToolRepository`（工具仓储接口，CRUD + 版本控制）
+- `PlanRepository`（规划仓储接口，CRUD + BLM/BEM 阶段查询）
+- `CheckpointRepository`（Checkpoint 仓储接口，CRUD + 恢复模式）
+- `ArchiveRepository`（战略档案仓储接口，CRUD + 时间轴查询）
+- `BusinessPlanRepository`（BP 仓储接口，CRUD + SP 关联查询）
+
+**审计日志仓储（2 个）：**
+- `RoutingLogRepository`（路由日志仓储接口，CRUD + UDMR 审计查询）
+- `IsolationLogRepository`（隔离日志仓储接口，CRUD + EIP 审计查询）
+
+**And** 所有接口仅依赖 Python 标准库
+**And** 接口定义 CRUD 基本操作和领域特定查询
+**And** 接口使用泛型支持类型安全
+**And** 接口文件位于 `src/domain/repositories/` 目录下
+
+---
+
+### Story 1.5: 领域事件定义
+
+As a **领域工程师**,
+I want **定义领域事件**,
+So that **核心业务逻辑通过事件触发，支持事件溯源和审计**。
+
+**Acceptance Criteria:**
+
+**Given** 领域事件定义任务
+**When** 创建 `src/domain/events/` 下的事件类
+**Then** 包含以下领域事件（8 个）：
+
+**核心业务事件（6 个）：**
+- `DocumentProcessed`（文档处理完成事件，payload: document_id, format, status）
+- `ToolExecuted`（工具执行完成事件，payload: tool_id, result, execution_time）
+- `AgentDecided`（Agent 决策完成事件，payload: agent_id, decision, confidence）
+- `CheckpointReached`（检查点到达事件，payload: stage_id, state_snapshot, user_feedback）
+- `CorrectionClassified`（修正分级判定事件，payload: correction_id, level, score）
+- `ArbitrationCompleted`（裁决完成事件，payload: arbitration_id, decision, confidence）
+
+**架构增强事件（2 个）：**
+- `RoutingDecided`（路由决策事件，payload: task_id, l3_decision, cost, latency）
+- `IsolationLevelSwitched`（隔离等级切换事件，payload: agent_id, from_level, to_level, trigger）
+
+**And** 所有事件继承自 `DomainEvent` 基类
+**And** 事件包含标准字段（event_id, timestamp, aggregate_id, aggregate_type, payload, metadata）
+**And** 事件文件位于 `src/domain/events/` 目录下
+
+---
+
+### Story 1.6: 领域异常定义
+
+As a **领域工程师**,
+I want **定义领域异常**,
+So that **领域错误有清晰的分类和处理机制**。
+
+**Acceptance Criteria:**
+
+**Given** 领域异常定义任务
+**When** 创建 `src/domain/exceptions/` 下的异常类
+**Then** 包含以下领域异常：
+
+**基础异常：**
+- `DomainException`（基础领域异常，所有领域异常的基类）
+- `EntityNotFoundException`（实体未找到异常）
+- `InvalidEntityStateException`（实体状态无效异常）
+- `BusinessRuleViolationException`（业务规则违反异常）
+
+**特定异常：**
+- `DocumentParseException`（文档解析异常）
+- `RAGRetrievalException`（RAG 检索异常）
+- `AgentExecutionException`（Agent 执行异常）
+- `CheckpointRecoveryException`（Checkpoint 恢复异常）
+- `RoutingDecisionException`（路由决策异常）
+- `IsolationViolationException`（隔离违规异常）
+
+**And** 所有异常继承自 `DomainException` 基类
+**And** 异常包含清晰的错误消息和错误代码
+**And** 异常文件位于 `src/domain/exceptions/` 目录下
+
+---
+
+### Story 1.7: Docker 开发环境配置
+
+As a **开发工程师**,
+I want **配置 Docker 开发环境**,
+So that **团队可以一键启动五层存储基础设施进行开发**。
+
+**Acceptance Criteria:**
+
+**Given** Docker 开发环境配置任务
+**When** 运行 `make docker-up` 命令
+**Then** 启动以下容器：
+- PostgreSQL 15+（关系存储层，端口 5432）
+- Redis 7.0+（高速缓存层，端口 6379）
+- Qdrant 1.7+（向量存储层，端口 6333）
+- MinIO（对象存储层，端口 9000/9001）
+- Neo4j 5.x（图存储层，端口 7687/7474）
+- RabbitMQ 3.12+（消息总线，端口 5672/15672）
+
+**And** 所有容器健康检查通过
+**And** 可以通过 `docker-compose.dev.yml` 管理环境
+**And** 包含数据卷持久化配置
+**And** 包含 `.env` 环境变量配置示例
+
+---
+
+### Story 1.8: 五层存储基础设施集成
+
+As a **基础设施工程师**,
+I want **实现五层存储的仓储**,
+So that **领域层可以通过仓储接口访问具体存储实现**。
+
+**Acceptance Criteria:**
+
+**Given** 五层存储基础设施集成任务
+**When** 创建 `src/infrastructure/persistence/` 下的仓储实现
+**Then** 实现以下仓储：
+
+**PostgreSQL 仓储实现（L2）：**
+- `PostgreSQLDocumentRepository`（文档仓储实现）
+- `PostgreSQLAgentRepository`（Agent 仓储实现）
+- `PostgreSQLToolRepository`（工具仓储实现）
+- `PostgreSQLPlanRepository`（规划仓储实现）
+- `PostgreSQLCheckpointRepository`（Checkpoint 仓储实现）
+- `PostgreSQLRoutingLogRepository`（路由日志仓储实现）
+- `PostgreSQLIsolationLogRepository`（隔离日志仓储实现）
+
+**Redis 缓存实现（L1）：**
+- `RedisCheckpointRepository`（Checkpoint 缓存实现，TTL 24h-30d）
+- `RedisSemanticCache`（语义缓存实现，相似度>0.9 命中）
+
+**Qdrant 向量存储实现（L3）：**
+- `QdrantArchiveRepository`（战略档案向量存储实现）
+- `QdrantEmbeddingManager`（嵌入向量管理器）
+
+**MinIO 对象存储实现（L4）：**
+- `MinIOStorageAdapter`（对象存储适配器，WORM 7 年）
+- `MinIODocumentBlobStore`（文档 Blob 存储）
+
+**Neo4j 图存储实现（L5）：**
+- `Neo4jGraphRepository`（知识图谱仓储实现）
+- `Neo4jEntityExtractor`（实体抽取器）
+
+**And** 所有实现遵循领域层定义的接口
+**And** 存储依赖链为单向（Cache→Relational→Vector→Object→Graph）
+**And** 缓存更新通过事件总线异步执行
+**And** 包含 Alembic 数据库迁移脚本
+
+---
+
+## Epic 2: 文档管理与数据处理
+
+**目标：** 实现 17 种格式文档的上传、解析、版面保留、表格提取、OCR 解析、版本管理功能，为战略分析提供数据基础。
+
+**架构约束：**
+- 文档解析采用 DocLayNet 标准格式
+- 表格提取输出结构化 JSON（包含表头与列类型）
+- OCR 支持中文/英文，输出置信度标注
+- 文档版本快照记录操作者、时间戳、差异摘要
+
+### Story 2.1: 文档上传功能
+
+As a **企业战略分析师**,
+I want **上传 17 种格式的文档**,
+So that **系统可以解析并构建战略分析数据基础**。
+
+**Acceptance Criteria:**
+
+**Given** 用户需要上传文档
+**When** 通过 CLI 执行 `sisys upload --file docs.zip` 或通过 API POST /documents
+**Then** 系统支持以下格式：
+- 文档格式：PDF, TXT, DOC, DOCX, PPT, PPTX, HTML, Markdown
+- 表格格式：XLS, XLSX, CSV
+- 图像格式：JPEG, PNG, GIF
+- 压缩包格式：ZIP, TAR（自动解压）
+
+**And** 上传后返回文档 ID 和基本信息
+**And** 压缩包自动解压并分别处理每个文件
+**And** 上传失败时返回清晰的错误消息（格式不支持/文件损坏/超大文件）
+
+**业务规则：**
+- 单文件大小限制：≤100MB
+- 压缩包大小限制：≤500MB
+- 批量上传数量限制：≤50 个文件/次
+
+---
+
+### Story 2.2: 文档解析功能
+
+As a **文档处理工程师**,
+I want **解析上传的文档并提取内容**,
+So that **提取文本、表格、图像、公式用于后续分析**。
+
+**Acceptance Criteria:**
+
+**Given** 文档上传成功
+**When** 触发文档处理流程
+**Then** 系统提取以下内容：
+- 文本内容（保留段落结构）
+- 表格内容（行列数据）
+- 图像（提取并存储）
+- 公式（识别并输出 LaTeX/MathML）
+
+**And** 解析结果存储至 PostgreSQL（元数据）和 MinIO（原始内容）
+**And** 发布 `DocumentProcessed` 领域事件
+**And** 解析状态可查询（pending/processing/completed/failed）
+
+**业务规则：**
+- PDF 解析保留页面顺序
+- PPT 提取每页演讲者备注
+- Excel 提取所有工作表
+- 解析超时：单文档≤5 分钟
+
+---
+
+### Story 2.3: 版面保留功能
+
+As a **数据分析师**,
+I want **保留文档版面信息**,
+So that **支持高保真溯源至原始文档坐标点**。
+
+**Acceptance Criteria:**
+
+**Given** 文档解析完成
+**When** 存储版面信息
+**Then** 采用 DocLayNet 标准格式存储：
+```json
+{
+  "page": 1,
+  "bbox": {"x": 100, "y": 200, "width": 300, "height": 50},
+  "label": "text|table|image|formula",
+  "content_id": "uuid"
+}
+```
+
+**And** 每个内容块包含坐标信息（x, y, width, height）
+**And** 支持按页面查询版面信息
+**And** 溯源时可根据坐标高亮显示
+
+**性能要求：**
+- 版面信息存储延迟：P95<100ms
+- 坐标查询响应时间：P95<50ms
+
+---
+
+### Story 2.4: 表格语义提取功能
+
+As a **战略分析师**,
+I want **提取表格的行列语义**,
+So that **表格数据可以结构化分析**。
+
+**Acceptance Criteria:**
+
+**Given** 文档包含表格
+**When** 执行表格提取
+**Then** 输出结构化 JSON：
+```json
+{
+  "table_id": "uuid",
+  "headers": ["指标", "2023 年", "2024 年", "增长率"],
+  "column_types": ["string", "number", "number", "percentage"],
+  "rows": [
+    {"指标": "营收", "2023 年": 1000000, "2024 年": 1200000, "增长率": 0.20}
+  ],
+  "source": {"document_id": "uuid", "page": 5, "bbox": {...}}
+}
+```
+
+**And** 自动识别表头行
+**And** 自动推断列类型（string/number/date/percentage）
+**And** 合并单元格语义还原
+**And** 跨页表格识别并合并
+
+**准确率要求：**
+- 表头识别准确率：≥95%
+- 列类型推断准确率：≥90%
+- 数据提取完整率：≥98%
+
+---
+
+### Story 2.5: OCR 解析功能
+
+As a **文档管理员**,
+I want **对扫描件和图像进行 OCR 解析**,
+So that **扫描文档内容可以被检索和分析**。
+
+**Acceptance Criteria:**
+
+**Given** 上传文档为扫描件或图像
+**When** 触发 OCR 处理
+**Then** 系统支持：
+- 中文 OCR（简体/繁体）
+- 英文 OCR
+- 混合语言识别
+
+**And** 输出置信度标注（每行/每字）：
+```json
+{
+  "text": "识别的文本",
+  "confidence": 0.95,
+  "bbox": {"x": 100, "y": 200, "width": 300, "height": 50}
+}
+```
+
+**And** 置信度<0.7 的文字标注"低置信度"供人工复核
+**And** OCR 结果与原始图像关联存储
+
+**性能要求：**
+- 单页 OCR 处理时间：≤5 秒
+- 中文识别准确率：≥90%
+- 英文识别准确率：≥95%
+
+---
+
+### Story 2.6: 文档版本管理功能
+
+As a **战略经理**,
+I want **创建文档版本快照**,
+So that **可以追溯文档变更历史和差异**。
+
+**Acceptance Criteria:**
+
+**Given** 文档已存在
+**When** 用户上传新版本或修改文档
+**Then** 系统创建版本快照：
+- 版本号：v1, v2, v3...（自动递增）
+- 操作者：用户 ID
+- 时间戳：精确到秒
+- 差异摘要：新增/修改/删除的内容块数量
+
+**And** 版本历史可查询和对比
+**And** 支持回滚到任意历史版本
+**And** 版本冲突检测（同时编辑时）
+
+**业务规则：**
+- 版本保留策略：最近 10 个版本永久保留，其余 30 天后合并
+- 差异计算：基于文本块和版面块的 diff
+- 冲突解决：后提交者收到冲突提示，需手动合并
+
+---
+
+### Story 2.7: 文档元数据校验功能
+
+As a **系统管理员**,
+I want **校验入库文档的元数据**,
+So that **确保文档数据质量和可追溯性**。
+
+**Acceptance Criteria:**
+
+**Given** 文档解析完成准备入库
+**When** 执行元数据校验
+**Then** 校验以下最小元字段集：
+- `creator`：创建者（用户 ID 或系统）
+- `created_at`：创建时间戳
+- `source`：来源（上传/导入/外部数据源）
+- `license`：许可类型（内部/保密/公开）
+- `business_domain`：业务领域（战略/市场/财务/技术）
+
+**And** 元数据缺失时拒绝入库并返回错误
+**And** 元数据校验日志记录
+**And** 支持元数据批量修正
+
+**数据质量要求：**
+- 元数据完整率：100%
+- 校验失败率：<1%
+- 校验延迟：P95<50ms
+
+---
+
+### Story 2.8: 文档溯源功能
+
+As a **战略分析师**,
+I want **追溯数据切片至导入批次和原始文件版本**,
+So that **可以快速验证数据来源和可靠性**。
+
+**Acceptance Criteria:**
+
+**Given** 用户需要验证数据来源
+**When** 点击溯源查询
+**Then** 系统展示完整溯源链：
+```
+数据切片 → 文档版本 (v3) → 导入批次 (2026-02-27 10:30) → 原始文件 (market_report.pdf)
+```
+
+**And** 支持逐层展开溯源树
+**And** 点击原始文件可跳转至版面坐标点
+**And** 显示文档解析置信度
+
+**性能要求：**
+- 溯源查询响应时间：P95<200ms
+- 溯源树展开延迟：P95<100ms
+
+---
+
+### Story 2.9: 文档语义分块功能
+
+As a **RAG 工程师**,
+I want **对文档进行语义分块**,
+So that **检索时可以基于语义边界而非固定字数切片**。
+
+**Acceptance Criteria:**
+
+**Given** 文档解析完成
+**When** 执行语义分块
+**Then** 基于文档语义边界分块：
+- 章节边界（标题/子标题）
+- 段落边界
+- 表格/图像边界
+- 平均块大小：≈300 tokens
+
+**And** 每个块包含语义摘要（用于检索优化）
+**And** 块间重叠：50 tokens（避免边界信息丢失）
+**And** 分块结果存储至 Qdrant（向量）和 PostgreSQL（元数据）
+
+**质量要求：**
+- 分块合理性评分：≥8/10（人工评审）
+- 章节边界识别准确率：≥95%
+- 分块处理速度：≥100 页/分钟
+
+---
+
+## Epic 2 Stories 完成清单
+
+| Story | 标题 | 覆盖 FR | 状态 |
+|-------|------|--------|------|
+| 2.1 | 文档上传功能 | DM-01 | ✅ 完成 |
+| 2.2 | 文档解析功能 | DM-02 | ✅ 完成 |
+| 2.3 | 版面保留功能 | DM-03 | ✅ 完成 |
+| 2.4 | 表格语义提取功能 | DM-04 | ✅ 完成 |
+| 2.5 | OCR 解析功能 | DM-05 | ✅ 完成 |
+| 2.6 | 文档版本管理功能 | DM-06 | ✅ 完成 |
+| 2.7 | 文档元数据校验功能 | DM-07 | ✅ 完成 |
+| 2.8 | 文档溯源功能 | DM-08 | ✅ 完成 |
+| 2.9 | 文档语义分块功能 | DM-09 | ✅ 完成 |
+
+---
+
+**Epic 2 完成！请审核以下内容：**
+
+### 审核清单
+
+1. **FR 覆盖完整性**
+   - [ ] DM-01 ~ DM-09 全部覆盖
+   - [ ] 每个 Story 对应明确的 FR
+
+2. **Story 质量**
+   - [ ] 每个 Story 有清晰的用户价值（So that）
+   - [ ] Acceptance Criteria 使用 Given/When/Then 格式
+   - [ ] 包含业务规则和性能要求
+
+3. **架构一致性**
+   - [ ] 符合 architecture.md 第 13.4 节文档处理设计
+   - [ ] DocLayNet 标准格式
+   - [ ] 五层存储正确使用
+
+4. **Story 范围**
+   - [ ] 每个 Story 可独立交付价值
+   - [ ] Story 范围适合单个开发 Agent 完成
+
+---
+
+**请确认 Epic 2 Stories 是否完整正确，或需要调整哪些内容？**
