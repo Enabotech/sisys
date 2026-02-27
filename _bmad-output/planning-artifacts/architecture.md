@@ -4540,6 +4540,7 @@ GET    /api/v1/routing-decisions/{decision_id} # 获取单个决策
 | 函数/方法 | snake_case | `get_user_by_id()`, `create_plan()`, `assess_complexity()` |
 | 变量 | snake_case | `user_id`, `plan_status`, `routing_scores` |
 | 常量 | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT`, `SIMILARITY_THRESHOLD` |
+| 私有方法/变量 | 前缀下划线 | `_internal_method()`, `_cache` |
 | 私有属性 | 前缀 `_` | `_internal_cache`, `_db_connection`, `_llm_router` |
 | 类型别名 | PascalCase | `PlanId = UUID`, `RoutingScore = float` |
 
@@ -6546,10 +6547,10 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | FR 编号 | FR 描述 | 架构组件 | 文件位置 |
 |--------|--------|---------|---------|
 | DM-01 | 支持 17 种文档格式 | `DocumentService`, `UnstructuredAdapter` | `src/domain/services/document_service.py` |
-| SR-03 | 混合检索 (Dense+Sparse+Graph) | `RAGService`, `Qdrant`, `Neo4j` | `src/domain/services/rag_service.py` |
-| SR-07 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/models/citation.py` |
-| AC-02 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orchestration/agents/` |
-| AC-09 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
+| SR-01 | 混合检索 (Dense+Sparse+Graph) | `RAGService`, `Qdrant`, `Neo4j` | `src/domain/services/rag_service.py` |
+| SR-08 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/models/citation.py` |
+| AC-07 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orchestration/agents/` |
+| AC-11 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
 | SP-01 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orchestration/graphs/` |
 | SP-08 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
 | CP-03 | UDMR 本地优先 80% | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
@@ -6557,31 +6558,42 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 #### 20.2.2 PRD 非功能需求覆盖
 
-**验证方法：** 追踪 PRD 中 39 项 NFR 到架构设计
+**验证方法：** 追踪 PRD 中 40 项 NFR 到架构设计（基于 roadmap.md 阶段化规则修正）
 
-| NFR 类别 | NFR 数量 | 已覆盖 | 覆盖率 | 架构支撑 |
-|---------|---------|--------|--------|---------|
-| **NFR-PERF** 性能 | 7 | 7 | 100% | 混合检索，UDMR 缓存，Neo4j 索引 |
-| **NFR-SEC** 安全性 | 7 | 7 | 100% | OAuth 2.1, RBAC, 加密，沙箱，ShieldCortex |
-| **NFR-COMP** 合规性 | 8 | 8 | 100% | WORM 7 年，审计追踪，数据主权 |
-| **NFR-REL** 可靠性 | 6 | 6 | 100% | Outbox, 死信队列，Checkpoint 恢复 |
-| **NFR-SCALE** 可扩展性 | 4 | 4 | 100% | 分层架构，水平扩展，缓存策略 |
-| **NFR-INT** 集成性 | 5 | 5 | 100% | MCP/A2A 协议，外部适配器 |
-| **NFR-ACC** 可访问性 | 2 | 2 | 100% | CLI+REST API，无障碍设计 |
-| **合计** | **39** | **39** | **100%** | ✅ 全覆盖 |
+| NFR 类别 | P0 (MVP) | P1 (V1) | P2 (V2) | 总计 | 覆盖率 | 架构支撑 |
+|---------|---------|--------|--------|------|--------|---------|
+| **NFR-PERF** 性能 | 5 | 2 | 0 | 7 | 100% | 混合检索，UDMR 缓存，Neo4j 索引 |
+| **NFR-SEC** 安全性 | 7 | 0 | 0 | 7 | 100% | OAuth 2.1, RBAC, 加密，沙箱，ShieldCortex |
+| **NFR-COMP** 合规性 | 5 | 2 | 2 | 9 | 100% | 等保 2.0, WORM 存储，审计追踪，数据主权 |
+| **NFR-REL** 可靠性 | 4 | 2 | 0 | 6 | 100% | Outbox, 死信队列，Checkpoint 恢复 |
+| **NFR-SCALE** 可扩展性 | 1 | 3 | 0 | 4 | 100% | 分层架构，水平扩展，缓存策略 |
+| **NFR-INT** 集成性 | 3 | 2 | 0 | 5 | 100% | MCP/A2A 协议，外部适配器 |
+| **NFR-ACC** 可访问性 | 0 | 2 | 0 | 2 | 100% | CLI+REST API，无障碍设计 |
+| **合计** | **25** | **13** | **2** | **40** | **100%** | ✅ 全覆盖 |
 
-**关键 NFR 架构支撑示例：**
+**阶段化 NFR 架构支撑：**
 
-| NFR 编号 | NFR 描述 | 目标值 | 架构支撑 | 验收方式 |
-|---------|---------|--------|---------|---------|
-| NFR-PERF-01 | 检索延迟 P95 | <800ms | 混合检索 +RRF+ 重排序 | Prometheus 监控 |
-| NFR-PERF-02 | 路由决策延迟 P95 | <50ms | UDMR 三层决策，缓存候选评分 | 链路追踪 |
-| NFR-PERF-03 | 图遍历查询 P95 | <200ms | Neo4j Parent-Child 索引 | Neo4j 监控 |
-| NFR-SEC-01 | 传输加密 | TLS 1.3 | 全链路 HTTPS | 安全扫描 |
-| NFR-SEC-05 | 提示注入检测 | ≥95% 准确率 | ShieldCortex | 对抗测试 |
-| NFR-COMP-01 | 审计存储 | 7 年 WORM | MinIO Object Lock COMPLIANCE | 合规审计 |
-| NFR-REL-01 | 事件可靠性 | 100% 不丢失 | RabbitMQ+Outbox+DLQ | 故障注入测试 |
-| NFR-REL-03 | 系统可用性 | 99% | 健康检查，自动恢复 | Uptime 监控 |
+| 阶段 | NFR 数量 | 关键架构能力 | 验收重点 |
+|------|---------|-------------|---------|
+| **MVP (P0)** | 25 项 | 基础检索/路由/安全/合规/可靠性 | 检索延迟<800ms, 可用性 99%, 等保 2.0 |
+| **V1 (P1)** | 13 项 | 语义缓存/图遍历/CUSUM/成本熔断 | 检索延迟<500ms, 语义缓存>40%, 可用性 99.5% |
+| **V2 (P2)** | 2 项 | 完整审计追踪可视化/银保监会规范 | 审计查询<10 秒，1104/EAST 报表 100% 准确 |
+
+**关键 NFR 架构支撑示例（MVP P0 优先）：**
+
+| NFR 编号 | NFR 描述 | MVP 目标值 | V1 目标值 | V2 目标值 | 架构支撑 | 验收方式 |
+|---------|---------|----------|----------|----------|---------|---------|
+| NFR-PERF-01 | 检索延迟 P95 | <800ms | <500ms | <300ms | 混合检索 +RRF+ 重排序 | Prometheus 监控 |
+| NFR-PERF-02 | 路由决策延迟 P95 | <100ms | <50ms | <30ms | UDMR 三层决策，缓存候选评分 | 链路追踪 |
+| NFR-PERF-06 | 语义缓存命中率 | - | >40% | - | L1 高速缓存层，相似度>0.9 命中 | 缓存命中率监控 |
+| NFR-PERF-07 | 图遍历查询 P95 | - | <200ms (简单) | <100ms (简单) | Neo4j Parent-Child 索引 | Neo4j 监控 |
+| NFR-REL-01 | 系统可用性 | 99% | 99.5% | 99.9% | 健康检查，自动恢复 | Uptime 监控 |
+| NFR-REL-05 | 性能漂移检测 | - | CUSUM 准确率≥85% | - | CUSUM 算法，滑动窗口 7 天 | 漂移检测测试 |
+| NFR-REL-06 | 成本熔断 | - | 触发准确率 100% | - | 三级熔断机制 | 成本熔断测试 |
+| NFR-COMP-02 | 审计日志保留 | PostgreSQL 审计表 | 基础 WORM | 7 年 WORM+ 区块链 | MinIO Object Lock + 区块链哈希链 | 合规审计 |
+| NFR-COMP-09 | 完整审计追踪可视化 | - | - | 审计查询<10 秒 | 审计追踪时间线，可视化组件 | 审计查询测试 |
+| NFR-SEC-01 | 传输加密 | TLS 1.3 | - | - | 全链路 HTTPS | 安全扫描 |
+| NFR-SEC-05 | 提示注入检测 | ≥95% 准确率 | - | - | ShieldCortex | 对抗测试 |
 
 #### 20.2.3 用户旅程支撑验证
 
@@ -6738,7 +6750,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 #### 20.6.1 需求分析 ✅
 
 - [x] 项目上下文分析（PRD 完整读取）
-- [x] 规模和复杂度评估（122 FR + 39 NFR）
+- [x] 规模和复杂度评估（122 FR + 40 NFR，阶段化划分：P0-25/P1-13/P2-2）
 - [x] 技术约束识别（技术栈/合规/集成）
 - [x] 跨领域关注点映射（安全/合规/性能）
 
@@ -6766,7 +6778,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 #### 20.6.5 验证与确认 ✅
 
 - [x] 一致性验证通过（决策兼容/模式一致/结构对齐）
-- [x] 需求覆盖验证通过（122 FR 100% / 39 NFR 100%）
+- [x] 需求覆盖验证通过（122 FR 100% / 40 NFR 100%，阶段化 P0-25/P1-13/P2-2）
 - [x] 实现就绪验证通过（决策完整/结构完整/模式完整）
 - [x] 差距分析完成（无关键差距）
 
@@ -6782,7 +6794,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 | 验证维度 | 得分 | 说明 |
 |---------|------|------|
-| 需求覆盖度 | 100% | 122 FR + 39 NFR 全部覆盖 |
+| 需求覆盖度 | 100% | 122 FR + 40 NFR 全部覆盖（P0-25/P1-13/P2-2） |
 | 决策完整性 | 100% | 30 项关键决策完整记录 |
 | 模式完整性 | 100% | 9 类实现模式完整定义 |
 | 结构完整性 | 100% | 项目结构 100% 完整 |
@@ -6790,7 +6802,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 #### 20.7.2 关键优势
 
-1. **需求覆盖完整** - 122 项 FR 和 39 项 NFR 全部有架构支撑
+1. **需求覆盖完整** - 122 项 FR 和 40 项 NFR 全部有架构支撑，阶段化划分清晰（P0-25/P1-13/P2-2）
 2. **核心机制创新** - UDMR/EIP/修正分级/SYS AGENT 裁决等机制行业领先
 3. **合规内建** - 7 年 WORM 存储、审计追踪、数据主权隔离
 4. **实现模式完善** - 9 类实现模式确保多 Agent 协作一致性
@@ -7145,14 +7157,33 @@ def test_domain_event_contract():
 
 ### 24.3 性能基准测试计划
 
-**测试目标：** 验证 NFR 定义的性能指标
+**测试目标：** 验证 NFR 定义的性能指标（阶段化：MVP/V1/V2）
+
+**MVP (P0) 性能测试：**
+
+| 测试场景 | 指标 | MVP 目标值 | V1 目标值 | V2 目标值 | 工具 |
+|---------|------|----------|----------|----------|------|
+| 检索延迟 P95 | 响应时间 | <800ms | <500ms | <300ms | locust/k6 |
+| 路由决策延迟 P95 | 响应时间 | <100ms | <50ms | <30ms | locust/k6 |
+| 并发 Agent 会话 | 并发数 | ≥10 | ≥50 | ≥200 | locust/k6 |
+| Checkpoint 恢复时间 | 恢复时间 | <60 秒 | <30 秒 | <15 秒 | 手动测试 |
+| 系统可用性 | 可用性百分比 | 99% | 99.5% | 99.9% | Uptime 监控 |
+
+**V1 (P1) 性能测试：**
 
 | 测试场景 | 指标 | 目标值 | 工具 |
 |---------|------|--------|------|
-| 检索延迟 P95 | 响应时间 | <800ms | locust/k6 |
-| 路由决策延迟 P95 | 响应时间 | <50ms | locust/k6 |
-| 图遍历查询 P95 | 响应时间 | <200ms | Neo4j 基准 |
-| 并发 Agent 会话 | 并发数 | ≥10 (MVP) | locust/k6 |
+| 语义缓存命中率 | >40% | 缓存命中率监控 |
+| 图遍历查询 P95 | <200ms (简单), <800ms (复杂) | Neo4j 基准 |
+| 性能漂移检测 | CUSUM 准确率≥85% | 漂移检测测试 |
+| 成本熔断 | 触发准确率 100% | 成本熔断测试 |
+
+**V2 (P2) 性能测试：**
+
+| 测试场景 | 指标 | 目标值 | 工具 |
+|---------|------|--------|------|
+| 审计追踪查询 | <10 秒 | 审计查询测试 |
+| 完整合规认证 | SOX/ISO27001 通过 | 第三方审计 |
 
 **性能测试流程:**
 ```
@@ -7165,11 +7196,11 @@ from locust import HttpUser, task, between
 
 class RetrievalUser(HttpUser):
     wait_time = between(1, 3)
-    
+
     @task(3)
     def search_documents(self):
         self.client.post("/api/v1/search", json={"query": "市场洞察"})
-    
+
     @task(1)
     def get_plan(self):
         self.client.get("/api/v1/plans/plan_001")
