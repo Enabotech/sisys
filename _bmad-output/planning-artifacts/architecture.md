@@ -6551,10 +6551,10 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | SR-08 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/models/citation.py` |
 | AC-07 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orchestration/agents/` |
 | AC-11 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
-| SP-01 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orchestration/graphs/` |
-| SP-08 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
-| CP-03 | UDMR 本地优先 80% | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
-| SA-05 | 7 年 WORM 存储 | `MinIO`, Object Lock COMPLIANCE | `src/infrastructure/external_services/file_storage/minio_adapter.py` |
+| SP-05 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orchestration/graphs/` |
+| SP-07 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
+| CP-05 | UDMR 本地优先 80% | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
+| SA-01 | 7 年 WORM 存储 | `MinIO`, Object Lock COMPLIANCE | `src/infrastructure/external_services/file_storage/minio_adapter.py` |
 
 #### 20.2.2 PRD 非功能需求覆盖
 
