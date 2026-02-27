@@ -1661,8 +1661,8 @@ class SemanticCache:
 
 | 风险技术 | 缓解措施 |
 |---------|---------|
-| **Prefect 3.6+** | MVP 阶段评估 Prefect 2.x 稳定性，准备 Airflow 备选 |
-| **LangGraph 1.0.0+** | 评估 AutoGen/CrewAI 备选，进行 PoC 验证 |
+| **Prefect 3.6+** | MVP 阶段评估 Prefect 2.x 稳定性，准备 Airflow 备选；经评估确认目前的 Prefect 3.6.16+ 稳定性满足本系统要求 |
+| **LangGraph 1.0.0+** | 评估 AutoGen/CrewAI 备选，进行 PoC 验证；经评估确认目前的 LangGraph 1.0.9+ LangChain 1.2.0+ 成熟度满足本系统要求 |
 
 ---
 
