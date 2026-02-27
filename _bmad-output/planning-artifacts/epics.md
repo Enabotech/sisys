@@ -2329,12 +2329,321 @@ So that **完整追溯 Agent 隔离等级变更历史，满足合规审计要求
 
 ---
 
-**Epic 5 完成！请审核以下内容：**
+**Epic 5 完成！继续创建 Epic 6...**
+
+---
+
+## Epic 6: BLM 战略规划流程
+
+**目标：** 实现 BLM 业绩差距分析和市场洞察六子步骤流程，支持 Checkpoint 快照创建、Replay 重放模式、影响范围评估和 JSON 思维链输出。
+
+**架构约束：**
+- BLM 流程：业绩差距分析→市场洞察六子步骤（MVP 阶段）
+- Checkpoint 机制：阶段标识、完成状态、用户反馈、修正记录
+- Replay 重放模式：修改点后所有状态重新计算，强一致性
+- 影响范围评估：≥2 个后续 Checkpoint 强制 Replay，<2 个推荐 Override
+
+**MVP 阶段范围：**
+- MVP：业绩差距分析 + 市场洞察六子步骤
+- V1 升级：完整 BLM 六阶段（战略意图→创新焦点→业务设计→执行设计）
+- V1 升级：Override 覆盖模式、Time-travel 两阶段能力
+
+### Story 6.1: 业绩差距分析功能
+
+As a **战略分析师**,
+I want **执行业绩差距分析**,
+So that **识别企业当前业绩与目标之间的差距并量化根因**。
+
+**Acceptance Criteria:**
+
+**Given** 战略规划项目启动
+**When** 执行业绩差距分析
+**Then** 系统由 CFO Agent 主导财务差距量化，COO Agent 主导运营差距分析：
+- **财务差距**：营收差距、利润差距、现金流差距、ROI 差距
+- **运营差距**：效率差距、质量差距、成本差距、交付差距
+
+**And** 输出业绩差距量化报告（含差距金额、差距百分比、根因分析）
+**And** 生成业务组合健康度图谱（BCG 矩阵可视化）
+**And** 创建 Checkpoint 快照（阶段标识：performance_gap）
+
+**质量要求：**
+- 差距量化准确率：≥95%
+- 根因分析准确率：≥90%
+- 业务组合健康度图谱准确率：≥95%
+
+**性能要求：**
+- 业绩差距分析时间：P95<3 分钟
+- 财务差距量化延迟：P95<1 分钟
+- 运营差距分析延迟：P95<2 分钟
+
+**业务规则：**
+- CFO Agent 负责财务差距量化（营收/利润/现金流/ROI）
+- COO Agent 负责运营差距分析（效率/质量/成本/交付）
+- CEO Agent 负责战略方向校准
+- AUD Agent 负责数据一致性审计
+
+**MVP 阶段说明：**
+- MVP：业绩差距分析（CFO/COO/CEO/AUD 四 Agent 协作）
+- V1 升级：完整 BLM 六阶段
+
+**SP-01 覆盖说明：**
+- SP-01（BLM 六阶段流程）由 Story 6.1（业绩差距分析）和 Story 6.2（市场洞察六子步骤）共同覆盖 MVP 阶段前两阶段
+- V1 升级：战略意图与目标→创新焦点→业务设计→执行设计（完整六阶段）
+
+---
+
+### Story 6.2: 市场洞察六子步骤功能
+
+As a **战略分析师**,
+I want **执行市场洞察六子步骤**,
+So that **全面洞察市场趋势、客户需求、竞争格局和自身能力**。
+
+**Acceptance Criteria:**
+
+**Given** 业绩差距分析完成
+**When** 执行市场洞察六子步骤
+**Then** 系统执行以下六个子步骤：
+- **看趋势（PESTEL + 情景规划）**：宏观环境趋势识别（政治/经济/社会/技术/环境/法律）
+- **看市场与客户（$APPEALS + 价值主张画布）**：客户需求九维度分析
+- **看竞争（波特五力 + 竞争对手分析）**：行业竞争格局分析
+- **看自己（价值链+SWOT-TOWS+VRIO）**：内部能力和资源评估
+- **看机会（SWOT-TOWS + 安索夫矩阵）**：市场机会识别和匹配
+- **机会差距分析（GE-麦肯锡 + SWOT-TOWS）**：机会与能力差距量化
+
+**And** 每个子步骤创建 Checkpoint 快照（阶段标识：trend/customer/competition/self/opportunity/gap）
+**And** 输出市场洞察报告（含趋势识别、客户洞察、竞争格局、能力评估、机会列表）
+**And** 生成风险全景视图（多 Agent 辩论输出的风险列表）
+
+**质量要求：**
+- 趋势识别准确率：≥85%
+- 客户需求识别准确率：≥90%
+- 竞争格局识别准确率：≥90%
+- 能力评估准确率：≥90%
+- 机会识别准确率：≥85%
+- 差距量化准确率：≥90%
+
+**性能要求：**
+- 单个子步骤执行时间：P95<2 分钟
+- 市场洞察六子步骤总时间：P95<10 分钟
+
+**业务规则：**
+- 看趋势：CEO/CTO Agent 主导，PESTEL 框架
+- 看市场与客户：CMO Agent 主导，$APPEALS 框架
+- 看竞争：CEO/CMO Agent 主导，波特五力框架
+- 看自己：COO/CFO/CHO Agent 主导，价值链+SWOT+VRIO
+- 看机会：CEO/CMO Agent 主导，SWOT-TOWS+ 安索夫矩阵
+- 机会差距分析：CEO/CFO Agent 主导，GE 矩阵+SWOT-TOWS
+
+---
+
+### Story 6.3: Checkpoint 快照创建功能
+
+As a **项目经理**,
+I want **创建 Checkpoint 快照**,
+So that **保存战略规划阶段状态，支持后续恢复和审计**。
+
+**Acceptance Criteria:**
+
+**Given** BLM 阶段完成（业绩差距分析或市场洞察子步骤）
+**When** 创建 Checkpoint 快照
+**Then** 系统记录以下信息：
+- **阶段标识**：BLM/BEM 阶段标识（如 performance_gap/trend/customer/...）
+- **完成状态**：阶段完成状态（completed/in_progress/failed）
+- **用户反馈**：用户对阶段结果的反馈和评分
+- **修正记录**：用户对阶段结果的修正意见
+
+**And** Checkpoint 快照包含状态快照、证据打包、持久化笔记引用
+**And** Checkpoint 快照存储至 L1 缓存（Redis）和 L4 对象存储（MinIO WORM）
+**And** Checkpoint 快照支持查询和导出
+
+**质量要求：**
+- Checkpoint 创建成功率：100%
+- Checkpoint 数据完整性：100%
+- Checkpoint 查询准确率：100%
+- 持久化笔记引用完整率：100%
+- 完整性验证通过率：100%
+
+**性能要求：**
+- Checkpoint 创建延迟：P95<500ms
+- Checkpoint 查询延迟：P95<200ms
+- Checkpoint 导出延迟：P95<1 秒
+
+**业务规则：**
+- Checkpoint 快照自动创建（阶段完成时触发）
+- Checkpoint 快照手动创建（用户主动触发）
+- Checkpoint 快照保留策略：最近 10 个版本永久保留
+- Checkpoint 快照归档至 WORM 存储（7 年合规）
+- **压缩前必须执行持久化笔记步骤**（persistent_note_ref 不为空）
+- Checkpoint 快照校验和验证（SHA-256）
+- 完整性验证失败时拒绝创建快照
+
+---
+
+### Story 6.4: Replay 重放模式功能
+
+As a **战略分析师**,
+I want **执行 Replay 重放模式**,
+So that **修改 Checkpoint 后重新计算后续所有状态，保证强一致性**。
+
+**Acceptance Criteria:**
+
+**Given** 用户修改了某个 Checkpoint 的参数或数据
+**When** 执行 Replay 重放模式
+**Then** 系统执行以下流程：
+- **识别修改点**：定位被修改的 Checkpoint
+- **影响范围评估**：识别≥2 个后续受影响的 Checkpoint
+- **重新计算**：从修改点开始重新执行后续所有阶段
+- **状态更新**：更新所有受影响的 Checkpoint 状态
+- **一致性验证**：验证重新计算后的一致性
+
+**And** Replay 过程记录审计日志
+**And** Replay 完成后通知用户
+**And** Replay 失败时自动回滚到修改前状态
+
+**质量要求：**
+- Replay 成功率：≥99%
+- 影响范围评估准确率：100%
+- 一致性验证通过率：100%
+
+**性能要求：**
+- Replay 执行时间：P95<60 秒（与 PRD NFR-PERF-05 一致）
+- 影响范围评估延迟：P95<100ms
+- 回滚时间：P95<30 秒
+
+**业务规则：**
+- ≥2 个后续 Checkpoint 强制 Replay 模式
+- Replay 过程支持中断和恢复
+- Replay 失败自动回滚
+- Replay 历史记录至审计日志
+
+**Replay 日志字段：**
+```json
+{
+  "checkpoint_id": "被修改的 Checkpoint ID",
+  "modifications": ["修改列表"],
+  "subsequent_stages": ["后续阶段列表"],
+  "execution_log": ["执行日志"],
+  "start_time": "开始时间",
+  "end_time": "结束时间",
+  "status": "completed/failed"
+}
+```
+
+---
+
+### Story 6.5: 影响范围评估功能
+
+As a **系统架构师**,
+I want **评估修改影响范围**,
+So that **决定使用 Replay 模式还是 Override 模式**。
+
+**Acceptance Criteria:**
+
+**Given** 用户修改了某个 Checkpoint
+**When** 评估修改影响范围
+**Then** 系统执行以下评估：
+- **识别后续 Checkpoint**：查找修改点后的所有 Checkpoint
+- **计算依赖关系**：分析 Checkpoint 间的依赖关系
+- **评估影响程度**：
+  - 影响≥2 个后续 Checkpoint：强制 Replay 模式
+  - 影响<2 个后续 Checkpoint：推荐 Override 模式
+
+**And** 输出影响范围报告（含受影响 Checkpoint 列表、依赖关系图、推荐模式）
+**And** 用户确认推荐模式后执行
+**And** 影响范围评估记录至审计日志
+
+**质量要求：**
+- 影响范围评估准确率：≥85%
+- 推荐模式准确率：≥90%
+- 依赖关系识别准确率：100%
+
+**性能要求：**
+- 影响范围评估延迟：P95<100ms
+- 依赖关系图生成延迟：P95<50ms
+
+**业务规则：**
+- ≥2 个后续 Checkpoint 强制 Replay
+- <2 个后续 Checkpoint 推荐 Override（需人工确认一致性风险）
+- 影响范围评估结果需用户确认
+
+---
+
+### Story 6.6: JSON 思维链输出功能
+
+As a **审计员**,
+I want **输出 JSON 思维链**,
+So that **完整追溯战略规划的决策过程和依据**。
+
+**Acceptance Criteria:**
+
+**Given** BLM 阶段执行完成
+**When** 输出 JSON 思维链
+**Then** 系统输出以下结构：
+```json
+{
+  "input": "任务输入数据",
+  "reflection": "<Reflection>反思过程</Reflection>",
+  "tools_used": "<Tools_Used>使用的工具列表</Tools_Used>",
+  "constraints_check": "<Constraints_Check>约束检查结果</Constraints_Check>",
+  "output": "阶段输出结果"
+}
+```
+
+**And** JSON 思维链包含完整决策路径和依据
+**And** JSON 思维链存储至审计日志
+**And** JSON 思维链支持查询和导出
+
+**质量要求：**
+- JSON 格式正确率：100%
+- 思维链完整性：100%
+- 决策依据可追溯率：100%
+
+**性能要求：**
+- JSON 思维链生成延迟：P95<200ms
+- JSON 思维链查询延迟：P95<100ms
+
+**业务规则：**
+- 每个 BLM 阶段必须输出 JSON 思维链
+- JSON 思维链归档至 WORM 存储（7 年合规）
+- JSON 思维链支持审计查询
+
+---
+
+## Epic 6 Stories 完成清单
+
+| Story | 标题 | 覆盖 FR | 状态 |
+|-------|------|--------|------|
+| 6.1 | 业绩差距分析功能 | SP-02 | ✅ 完成（已补充 SP-01 覆盖说明） |
+| 6.2 | 市场洞察六子步骤功能 | SP-03 | ✅ 完成 |
+| 6.3 | Checkpoint 快照创建功能 | SP-04 | ✅ 完成（已补充持久化要求 + 完整性验证） |
+| 6.4 | Replay 重放模式功能 | SP-05 | ✅ 完成（已调整性能指标+Replay 日志字段） |
+| 6.5 | 影响范围评估功能 | SP-06 | ✅ 完成 |
+| 6.6 | JSON 思维链输出功能 | SP-07 | ✅ 完成 |
+
+---
+
+### 审核修复清单
+
+| 编号 | 修复项 | 修复状态 |
+|------|--------|---------|
+| **INC-01** | Story 6.4 Replay 执行时间调整为 P95<60 秒 | ✅ 已修复 |
+| **INC-02** | Story 6.3 补充压缩前必须持久化的要求 | ✅ 已修复 |
+| **INC-03** | Story 6.3 补充 Checkpoint 快照完整性验证机制 | ✅ 已修复（校验和验证 + 完整性验证通过率） |
+| **INC-04** | Story 6.1 补充 SP-01 总体覆盖说明 | ✅ 已修复 |
+| **SUG-01** | Story 6.3 补充 Checkpoint 快照序列化格式说明 | ⚠️ 可选修复（architecture.md 第 8.2.1 节已定义） |
+| **SUG-02** | Story 6.4 补充 Replay 日志字段说明 | ✅ 已修复 |
+| **SUG-03** | Story 6.6 补充 JSON 思维链 Schema 定义 | ⚠️ 可选修复（已在 Story 6.6 中定义） |
+
+**修复后一致性评级：A+ (优秀)**
+
+---
+
+**Epic 6 完成！请审核以下内容：**
 
 ### 审核清单
 
 1. **FR 覆盖完整性**
-   - [ ] AC-01 ~ AC-05, AC-13 ~ AC-14 全部覆盖
+   - [ ] SP-01 ~ SP-07 全部覆盖
    - [ ] 每个 Story 对应明确的 FR
 
 2. **Story 质量**
@@ -2343,14 +2652,14 @@ So that **完整追溯 Agent 隔离等级变更历史，满足合规审计要求
    - [ ] 包含性能要求和质量要求
 
 3. **架构一致性**
-   - [ ] 符合 architecture.md 第 17.3 节 Agent 架构设计
-   - [ ] 7 种 Agent 角色 + SYS Agent
-   - [ ] L4 硬隔离（Prompt/工具/数据三重隔离）
+   - [ ] 符合 architecture.md 第 8 章 Checkpoint 机制设计
+   - [ ] BLM 业绩差距分析 + 市场洞察六子步骤
+   - [ ] Replay 重放模式（强一致性）
 
 4. **MVP 范围**
-   - [ ] MVP 阶段单 Agent 执行（CEO Agent）
-   - [ ] V1 升级路径清晰（多 Agent 协作+EIP 动态升降级）
+   - [ ] MVP 阶段业绩差距分析 + 市场洞察
+   - [ ] V1 升级路径清晰（完整 BLM 六阶段+Override 模式）
 
 ---
 
-**请确认 Epic 5 Stories 是否完整正确，或需要调整哪些内容？**
+**请确认 Epic 6 Stories 是否完整正确，或需要调整哪些内容？**
