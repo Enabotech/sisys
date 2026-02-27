@@ -575,17 +575,24 @@ This document provides the complete epic and story breakdown for **sisys** (企�
 
 | Epic | FR 数量 | FR 列表 |
 |------|--------|--------|
-| Epic 1 | 5 | AR-01~AR-04, DM-10 |
-| Epic 2 | 9 | DM-01~DM-09 |
-| Epic 3 | 13 | SR-01~SR-13 |
+| Epic 1 | 6 | AR-01~AR-04, DM-10, **DM-10**(Story 1.9 CI/CD) |
+| Epic 2 | 10 | DM-01~DM-10 |
+| Epic 3 | 15 | SR-01~SR-15 |
 | Epic 4 | 7 | ST-01~ST-07 |
-| Epic 5 | 7 | AC-01~AC-05, AC-13~AC-14 |
-| Epic 6 | 7 | SP-01~SP-07 |
+| Epic 5 | 11 | AC-01~AC-09, AC-13~AC-14 |
+| Epic 6 | 9 | SP-01~SP-09 |
 | Epic 7 | 7 | UI-01~UI-07 |
 | Epic 8 | 9 | SC-01~SC-09 |
 | Epic 9 | 10 | CP-01~CP-10 |
 | Epic 10 | 6 | SA-01~SA-06 |
-| **总计** | **87** | **100% P0 FR 覆盖** |
+| **总计** | **90** | **100% P0 FR 覆盖 + 新增 FR 覆盖** |
+
+**FR 覆盖说明：**
+- **Epic 1**: 增加 Story 1.9（CI/CD 配置）支持 DM-10 环境预检
+- **Epic 2**: 增加 Story 2.10（环境预检）覆盖 DM-10
+- **Epic 3**: 增加 Story 3.10（摘要生成）覆盖 SR-08/SR-09，SR-14/SR-15 标记为 P2
+- **Epic 5**: 增加 Story 5.8（EIP 弹性隔离）覆盖 AC-06~AC-09
+- **Epic 6**: 增加 Story 6.7~6.8 覆盖 SP-08~SP-09
 
 ---
 
@@ -593,16 +600,16 @@ This document provides the complete epic and story breakdown for **sisys** (企�
 
 | Epic | NFR 覆盖 |
 |------|---------|
-| Epic 1 | NFR-SCALE-04 |
-| Epic 2 | NFR-PERF-03, NFR-SEC-02 |
-| Epic 3 | NFR-PERF-01, NFR-PERF-07 |
-| Epic 4 | NFR-SEC-07, NFR-INT-05 |
-| Epic 5 | NFR-PERF-04, NFR-SEC-05 |
-| Epic 6 | NFR-PERF-05, NFR-REL-04 |
-| Epic 7 | NFR-INT-01, NFR-INT-04 |
-| Epic 8 | NFR-COMP-01~COMP-05, NFR-SEC-01~SEC-06 |
-| Epic 9 | NFR-PERF-02, NFR-PERF-06, NFR-REL-05~REL-06 |
-| Epic 10 | NFR-REL-02~REL-03 |
+| Epic 1 | NFR-SCALE-04, **NFR-REL-01**(CI/CD 可用性) |
+| Epic 2 | NFR-PERF-03, NFR-SEC-02, **NFR-PERF-06**(文档处理性能) |
+| Epic 3 | NFR-PERF-01, NFR-PERF-07, **NFR-PERF-06**(语义缓存) |
+| Epic 4 | NFR-SEC-07, NFR-INT-05, **NFR-SEC-05**(沙箱安全) |
+| Epic 5 | NFR-PERF-04, NFR-SEC-05, **NFR-SEC-06**(隔离安全) |
+| Epic 6 | NFR-PERF-05, NFR-REL-04, **NFR-REL-01**(Checkpoint 可靠性) |
+| Epic 7 | NFR-INT-01, NFR-INT-04, **NFR-ACC-01**(CLI 可访问性) |
+| Epic 8 | NFR-COMP-01~COMP-05, NFR-SEC-01~SEC-06, **NFR-COMP-06~07**(SOX/ISO) |
+| Epic 9 | NFR-PERF-02, NFR-PERF-06, NFR-REL-05~REL-06, **NFR-PERF-07**(路由性能) |
+| Epic 10 | NFR-REL-02~REL-03, **NFR-SCALE-02**(TB 级存储) |
 
 ---
 
@@ -718,23 +725,23 @@ So that **领域逻辑有清晰的模型基础**。
 **Then** 包含以下实体：
 
 **核心业务实体（6 个）：**
-- `Document`（文档实体，17 种格式支持，属性：id, title, format, version, embedding_ref, blob_ref）
-- `Agent`（Agent 实体，7 角色 + SYS+AUD，属性：id, role, identity, tools, state_snapshot, isolation_level）
-- `Tool`（工具实体，23 种战略工具，属性：id, name, version, input_schema, output_schema, reliability_score）
-- `StrategicPlan`（SP 实体，BLM 六阶段，属性：id, plan_type, blm_stage, checkpoints, evidence_package）
-- `BusinessPlan`（BP 实体，BEM 六阶段，属性：id, sp_ref, bem_stage, checkpoints, evidence_package）
-- `Checkpoint`（检查点实体，双模式恢复，属性：id, stage_id, state_snapshot, recovery_mode, branch_id）
+- `Document`（文档实体，17 种格式支持，属性：id, title, format, version, embedding_ref, blob_ref, created_at, updated_at）
+- `Agent`（Agent 实体，7 角色 + SYS+AUD，属性：id, role, identity, tools, state_snapshot, session_id, created_at）
+- `Tool`（工具实体，23 种战略工具，属性：id, name, version, input_schema, output_schema, reliability_score, status）
+- `StrategicPlan`（SP 实体，BLM 六阶段，属性：id, plan_type, blm_stage, checkpoints, evidence_package, created_at, updated_at）
+- `BusinessPlan`（BP 实体，BEM 六阶段，属性：id, sp_ref, bem_stage, checkpoints, evidence_package, created_at, updated_at）
+- `Checkpoint`（检查点实体，双模式恢复，属性：id, stage_id, state_snapshot, recovery_mode, branch_id, user_feedback, user_rating, modification_history, created_at）
 
 **审计日志实体（3 个）：**
-- `StrategicArchive`（战略档案实体，五层存储，属性：id, metadata, embedding, blob_ref, graph_ref）
-- `RoutingDecisionLog`（路由决策日志，UDMR 审计，属性：id, task_id, l1_result, l2_scores, l3_decision, worm_ref）
-- `IsolationSwitchLog`（隔离切换日志，EIP 审计，属性：id, agent_id, from_level, to_level, trigger, worm_ref）
+- `StrategicArchive`（战略档案实体，五层存储，属性：id, metadata, embedding, blob_ref, graph_ref, valid_from, valid_until, is_deprecated, created_at）
+- `RoutingDecisionLog`（路由决策日志，UDMR 审计，属性：id, task_id, l1_result, l2_scores, l3_decision, worm_ref, created_at）
+- `IsolationSwitchLog`（隔离切换日志，EIP 审计，属性：id, agent_id, session_id, from_level, to_level, trigger, approver, worm_ref, created_at）
 
 **值对象（4 个）：**
-- `Embedding`（嵌入向量值对象）
-- `Citation`（引用索引值对象，支持 Bounding Box 溯源）
-- `Confidence`（置信度值对象）
-- `Cost`（成本值对象）
+- `Embedding`（嵌入向量值对象，属性：vector, model, dimension, created_at）
+- `Citation`（引用索引值对象，支持 Bounding Box 溯源，属性：document_id, slice_id, bbox, char_range, confidence）
+- `Confidence`（置信度值对象，属性：score, level, factors）
+- `Cost`（成本值对象，属性：amount, currency, token_count, model）
 
 **And** 所有实体通过 mypy 严格类型检查
 **And** 所有实体遵循领域层零外部依赖原则（仅使用 Python 标准库）
@@ -821,19 +828,19 @@ So that **核心业务逻辑通过事件触发，支持事件溯源和审计**�
 **Then** 包含以下领域事件（8 个）：
 
 **核心业务事件（6 个）：**
-- `DocumentProcessed`（文档处理完成事件，payload: document_id, format, status）
-- `ToolExecuted`（工具执行完成事件，payload: tool_id, result, execution_time）
-- `AgentDecided`（Agent 决策完成事件，payload: agent_id, decision, confidence）
-- `CheckpointReached`（检查点到达事件，payload: stage_id, state_snapshot, user_feedback）
-- `CorrectionClassified`（修正分级判定事件，payload: correction_id, level, score）
-- `ArbitrationCompleted`（裁决完成事件，payload: arbitration_id, decision, confidence）
+- `DocumentProcessed`（文档处理完成事件，payload: document_id, format, status, pages, file_size）
+- `ToolExecuted`（工具执行完成事件，payload: tool_id, result, execution_time, sandbox_id）
+- `AgentDecided`（Agent 决策完成事件，payload: agent_id, role, decision, confidence, session_id）
+- `CheckpointReached`（检查点到达事件，payload: stage_id, state_snapshot, user_feedback, user_rating, plan_id）
+- `CorrectionClassified`（修正分级判定事件，payload: correction_id, level, score, features, checkpoint_id）
+- `ArbitrationCompleted`（裁决完成事件，payload: arbitration_id, decision, confidence, scores, agents_involved）
 
 **架构增强事件（2 个）：**
-- `RoutingDecided`（路由决策事件，payload: task_id, l3_decision, cost, latency）
-- `IsolationLevelSwitched`（隔离等级切换事件，payload: agent_id, from_level, to_level, trigger）
+- `RoutingDecided`（路由决策事件，payload: task_id, l1_result, l2_scores, l3_decision, cost, latency, worm_ref）
+- `IsolationLevelSwitched`（隔离等级切换事件，payload: agent_id, session_id, from_level, to_level, trigger, approver, timestamp）
 
 **And** 所有事件继承自 `DomainEvent` 基类
-**And** 事件包含标准字段（event_id, timestamp, aggregate_id, aggregate_type, payload, metadata）
+**And** 事件包含标准字段（event_id, timestamp, aggregate_id, aggregate_type, payload, metadata, version）
 **And** 事件文件位于 `src/domain/events/` 目录下
 
 ---
@@ -936,6 +943,61 @@ So that **领域层可以通过仓储接口访问具体存储实现**。
 **And** 存储依赖链为单向（Cache→Relational→Vector→Object→Graph）
 **And** 缓存更新通过事件总线异步执行
 **And** 包含 Alembic 数据库迁移脚本
+
+---
+
+### Story 1.9: CI/CD 流水线配置
+
+As a **DevOps 工程师**,
+I want **配置 GitHub Actions CI/CD 流水线**,
+So that **代码提交自动触发测试、质量检查和部署**。
+
+**Acceptance Criteria:**
+
+**Given** 代码提交至 GitHub
+**When** 触发 CI/CD 流水线
+**Then** 系统执行以下流程：
+
+**CI 流水线：**
+- **代码质量检查**：mypy（类型检查）→ ruff（代码规范）→ black（格式检查）
+- **单元测试**：pytest 运行所有单元测试（覆盖率≥80%）
+- **集成测试**：运行核心集成测试（Docker Compose 环境）
+
+**CD 流水线：**
+- **构建 Docker 镜像**：构建应用镜像和依赖镜像
+- **推送至镜像仓库**：推送至 GitHub Container Registry
+- **部署至开发环境**：自动部署至开发 Kubernetes 集群
+
+**And** CI 流水线执行时间<10 分钟
+**And** CD 流水线部署成功率≥95%
+**And** 质量门禁：测试覆盖率≥80%，代码质量评分≥A
+**And** 失败时自动通知（GitHub Status + 钉钉/邮件）
+
+**质量要求：**
+- CI 通过率：≥95%
+- 测试覆盖率：≥80%（P0 级），≥85%（V1）
+- 代码质量评分：≥A
+
+**性能要求：**
+- CI 流水线执行时间：P95<10 分钟
+- CD 流水线部署时间：P95<5 分钟
+
+**业务规则：**
+- main 分支：完整 CI+CD，自动部署至开发环境
+- release 分支：完整 CI+CD，手动审批后部署至生产
+- feature 分支：仅 CI，不部署
+
+**MVP 阶段说明：**
+- ✅ GitHub Actions 配置（ci.yml/cd.yml）
+- ✅ 代码质量检查（mypy/ruff/black）
+- ✅ 单元测试 + 集成测试
+- ✅ Docker 镜像构建和推送
+- ✅ 开发环境自动部署
+
+**V1 阶段升级：**
+- 🔜 生产环境部署（手动审批）
+- 🔜 蓝绿部署/金丝雀发布
+- 🔜 自动回滚机制
 
 ---
 
@@ -1237,6 +1299,55 @@ So that **检索时可以基于语义边界而非固定字数切片**。
 
 ---
 
+### Story 2.10: 环境预检功能
+
+As a **系统运维工程师**,
+I want **执行环境预检**,
+So that **确保文档处理所需的 GPU 驱动/CUDA 版本/内存正常，仅异常时通知用户**。
+
+**Acceptance Criteria:**
+
+**Given** 系统启动或文档处理任务前
+**When** 执行环境预检
+**Then** 系统检查以下环境：
+- **GPU 驱动**：NVIDIA 驱动版本≥535.00，CUDA 12.0+
+- **内存检查**：可用内存≥8GB
+- **OCR 引擎**：PaddleOCR/Tesseract 可用性检查
+- **依赖库**：PyTorch/TensorFlow 版本兼容性检查
+
+**And** 仅异常时通知用户（正常时静默）
+**And** 预检结果记录至日志
+**And** 支持手动触发预检
+**And** 预检失败时阻止文档处理任务
+
+**质量要求：**
+- 环境预检准确率：100%
+- 异常检测召回率：100%
+- 误报率：<1%
+
+**性能要求：**
+- 环境预检延迟：P95<500ms
+- 预检覆盖率：100%
+
+**业务规则：**
+- 系统启动时自动执行预检
+- 文档处理任务前执行快速预检（内存/OCR）
+- 预检失败时返回清晰的错误消息
+- 支持预检报告导出（JSON 格式）
+
+**MVP 阶段说明：**
+- ✅ GPU 驱动/CUDA 版本检查
+- ✅ 内存检查
+- ✅ OCR 引擎可用性检查
+- ✅ 异常通知
+
+**V1 阶段升级：**
+- 🔜 依赖库版本兼容性检查
+- 🔜 自动修复建议
+- 🔜 预检历史趋势分析
+
+---
+
 ## Epic 2 Stories 完成清单
 
 | Story | 标题 | 覆盖 FR | 状态 |
@@ -1250,6 +1361,7 @@ So that **检索时可以基于语义边界而非固定字数切片**。
 | 2.7 | 文档元数据校验功能 | DM-07 | ✅ 完成 |
 | 2.8 | 文档溯源功能 | DM-08 | ✅ 完成 |
 | 2.9 | 文档语义分块功能 | DM-09 | ✅ 完成（已补充存储说明） |
+| 2.10 | 环境预检功能 | DM-10 | ✅ 完成 |
 
 ---
 
@@ -1563,6 +1675,60 @@ So that **优先使用最新数据进行决策**。
 
 ---
 
+### Story 3.10: 摘要生成与质量评估功能
+
+As a **高级分析师**,
+I want **生成契约化结构化摘要**,
+So that **快速获取文档的财务/市场/技术视角摘要**。
+
+**Acceptance Criteria:**
+
+**Given** 文档解析完成
+**When** 生成结构化摘要
+**Then** 系统输出符合预定义 JSON Schema 的摘要：
+```json
+{
+  "financial_view": {
+    "key_metrics": [...],
+    "revenue_trends": "...",
+    "profit_analysis": "..."
+  },
+  "market_view": {
+    "market_size": "...",
+    "growth_rate": "...",
+    "competitive_landscape": "..."
+  },
+  "technology_view": {
+    "tech_trends": [...],
+    "innovation_points": [...],
+    "patent_analysis": "..."
+  }
+}
+```
+
+**And** 使用 LLM 生成多视角摘要
+**And** 评估摘要质量（信息熵 + 关键实体覆盖率）
+**And** 质量评分<0.7 自动触发二次生成
+**And** 摘要存储至 PostgreSQL（元数据）和 Qdrant（向量）
+
+**质量要求：**
+- 摘要生成准确率：≥85%
+- 质量评估准确率：≥90%
+- 二次生成成功率：≥70%
+- JSON Schema 符合率：100%
+
+**性能要求：**
+- 摘要生成延迟：P95<5 秒
+- 质量评估延迟：P95<500ms
+- 二次生成延迟：P95<5 秒
+
+**业务规则：**
+- 摘要生成支持批量处理（≤10 文档/批次）
+- 质量评估指标：信息熵、关键实体覆盖率、逻辑一致性
+- 摘要版本管理（支持历史版本对比）
+
+---
+
 ## Epic 3 Stories 完成清单
 
 | Story | 标题 | 覆盖 FR | 状态 |
@@ -1576,8 +1742,9 @@ So that **优先使用最新数据进行决策**。
 | 3.7 | 检索相关性评估与补救功能 | SR-10, SR-11 | ✅ 完成（已补充性能要求） |
 | 3.8 | 高保真溯源功能 | SR-12 | ✅ 完成（已补充业务规则） |
 | 3.9 | 引用数据时效性管理功能 | SR-13 | ✅ 完成（已补充性能 + 质量要求） |
+| 3.10 | 摘要生成与质量评估功能 | SR-08, SR-09 | ✅ 完成 |
 
-**注：** SR-08（摘要生成）和 SR-09（摘要质量评估）将在 Epic 6 战略规划流程中实现
+**注：** SR-08（摘要生成）和 SR-09（摘要质量评估）原计划在 Epic 6 战略规划流程中实现，现调整至 Epic 3 以实现完整的 RAG 检索能力
 
 ---
 
@@ -1778,28 +1945,51 @@ So that **工具执行与主系统隔离，保证系统安全**。
 - 资源限制：CPU≤2 核，内存≤4GB，执行时间≤5 分钟
 
 **And** 沙箱逃逸检测（异常系统调用/提权尝试）
+**And** eBPF 监控（V1 升级，监控系统调用和网络访问）
+**And** 降级策略（沙箱不可用时降级至进程隔离）
+**And** 熔断机制（连续 3 次沙箱失败触发熔断，暂停沙箱执行 5 分钟）
 **And** 执行完成后自动清理容器
-**And** 沙箱执行日志完整记录
+**And** 沙箱执行日志完整记录并归档至 WORM 存储
 
 **质量要求：**
 - 沙箱逃逸检测率：100%
 - 容器清理成功率：100%
 - 资源限制违反检测率：100%
+- eBPF 监控覆盖率：100%（V1）
+- 降级策略触发准确率：100%
+- 熔断机制触发准确率：100%
 
 **安全要求：**
 - 沙箱逃逸 0 次成功
 - 网络白名单违反 0 次
 - 敏感数据泄露 0 次
 
+**性能要求：**
+- 沙箱启动延迟：P95<2 秒
+- 沙箱清理延迟：P95<500ms
+- eBPF 监控延迟：P95<100ms（V1）
+
 **业务规则：**
 - 持久化 Jupyter Kernel 支持跨步骤变量传递（session_id 隔离）
 - Kernel 空闲超时 30 分钟自动销毁
 - 代码执行前进行 AST 安全分析（禁止危险函数）
 - 沙箱执行日志完整记录并归档至 WORM 存储
+- 降级策略：Docker 不可用时降级至进程隔离（安全性降低）
+- 熔断机制：连续 3 次沙箱失败触发熔断，通知管理员
 
 **MVP 阶段说明：**
-- MVP：Docker 沙箱隔离
-- V1 升级：gVisor 沙箱（用户空间内核，更强隔离）
+- ✅ Docker 沙箱隔离
+- ✅ 网络隔离 + 权限最小化
+- ✅ 资源限制
+- ✅ 沙箱逃逸检测
+- ✅ 降级策略（降级至进程隔离）
+- ✅ 熔断机制（连续 3 次失败触发）
+- ✅ Jupyter Kernel 支持
+
+**V1 阶段升级：**
+- 🔜 gVisor 沙箱（用户空间内核，更强隔离）
+- 🔜 eBPF 监控（系统调用和网络访问实时监控）
+- 🔜 自动修复建议
 
 ---
 
@@ -2042,7 +2232,9 @@ So that **Agent 可以独立完成战略规划分析任务**。
   "validation": "验证结果",
   "confidence": "置信度评分",
   "citations": "引用源列表",
-  "tool_calls": "工具调用记录"
+  "tool_calls": "工具调用记录",
+  "reflection": "反思过程",
+  "memory_updates": "记忆更新记录"
 }
 ```
 
@@ -2235,6 +2427,55 @@ So that **完整追溯 Agent 隔离等级变更历史，满足合规审计要求
 
 ---
 
+### Story 5.8: EIP 弹性视角隔离协议功能
+
+As a **SYS Agent**,
+I want **执行弹性视角隔离协议**,
+So that **基于任务依赖动态调整 Agent 隔离等级（L4/L3/L2/L1）**。
+
+**Acceptance Criteria:**
+
+**Given** 多 Agent 协作任务
+**When** 执行隔离等级判定
+**Then** 系统基于以下触发条件调整隔离等级：
+- **SYS AGENT 命令**：显式指令直接指定隔离等级
+- **关键词频率**：跨角色关键词频率>5% 降级至 L3
+- **任务依赖**：依赖权重>0.7 升级至 L2
+- **用户请求**：显式请求直接指定隔离等级
+
+**And** 四级隔离等级定义清晰：
+- **L4 硬隔离（默认）**：Prompt/工具/数据三重隔离，只读访问共享数据
+- **L3 软隔离**：Prompt 隔离，共享工具池，受限写入
+- **L2 协作态**：保持独立身份，共享工具池，自由写入（附带置信度 + 引用源）
+- **L1 融合态**：共享上下文（SYS AGENT 监督），完全共享，强制审计，紧急模式
+
+**And** L2 协作态任务完成后 30 分钟无活动自动恢复至 L4
+**And** 隔离切换日志记录
+**And** 隔离违反检测（异常访问尝试）
+
+**质量要求：**
+- 隔离等级判定准确率：≥90%
+- 隔离切换执行率：100%
+- 自动恢复准确率：100%
+- 隔离违反检测率：100%
+
+**性能要求：**
+- 隔离等级判定延迟：P95<100ms
+- 隔离切换执行延迟：P95<200ms
+- 自动恢复延迟：P95<50ms
+
+**业务规则：**
+- L4 硬隔离为默认隔离等级
+- 隔离切换需记录审计日志
+- 隔离违反触发安全告警
+- L2 协作态 30 分钟无活动自动恢复至 L4
+
+**MVP 阶段说明：**
+- MVP：L4 硬隔离（固定隔离模式）
+- V1 升级：EIP 动态升降级（L4/L3/L2/L1）
+
+---
+
 ## Epic 5 Stories 完成清单
 
 | Story | 标题 | 覆盖 FR | 状态 |
@@ -2246,8 +2487,9 @@ So that **完整追溯 Agent 隔离等级变更历史，满足合规审计要求
 | 5.5 | 协作依赖图生成功能 | AC-05 | ✅ 完成（V1 升级，已补充 MVP 说明） |
 | 5.6 | L4 硬隔离功能 | AC-13 | ✅ 完成（已补充隔离违反检测机制+EIP 四级隔离） |
 | 5.7 | 隔离切换日志记录功能 | AC-14 | ✅ 完成 |
+| 5.8 | EIP 弹性视角隔离协议功能 | AC-06, AC-07, AC-08, AC-09 | ✅ 完成（V1 升级） |
 
-**注：** Story 5.4/5.5 标记为 V1 升级，MVP 阶段仅实现单 Agent 执行
+**注：** Story 5.4/5.5/5.8 标记为 V1 升级，MVP 阶段仅实现单 Agent 执行（L4 硬隔离）
 
 ---
 
@@ -2527,6 +2769,88 @@ So that **完整追溯战略规划的决策过程和依据**。
 
 ---
 
+### Story 6.7: Override 覆盖模式功能
+
+As a **战略分析师**,
+I want **执行 Override 覆盖模式**,
+So that **仅修改指定状态，提高修正效率**。
+
+**Acceptance Criteria:**
+
+**Given** 用户修改了某个 Checkpoint
+**When** 执行 Override 模式
+**Then** 系统执行以下流程：
+- **识别修改点**：定位被修改的 Checkpoint
+- **影响范围评估**：识别<2 个后续受影响的 Checkpoint
+- **覆盖修改**：仅修改指定状态，不重新计算
+- **一致性风险提示**：提示用户可能存在一致性风险
+
+**And** Override 需人工确认一致性风险
+**And** Override 过程记录审计日志
+**And** Override 失败时自动回滚
+
+**质量要求：**
+- Override 成功率：≥95%
+- 一致性风险提示准确率：≥90%
+- 自动回滚成功率：100%
+
+**性能要求：**
+- Override 执行时间：P95<10 秒
+- 影响范围评估延迟：P95<100ms
+- 回滚时间：P95<5 秒
+
+**业务规则：**
+- <2 个后续 Checkpoint 推荐 Override 模式
+- Override 需用户确认一致性风险
+- Override 失败自动回滚至修改前状态
+
+**MVP 阶段说明：**
+- MVP：Override 基础功能（影响<2 个 Checkpoint）
+- V1 升级：完整 Override 模式（支持分支对比）
+
+---
+
+### Story 6.8: Time-travel 单点恢复功能
+
+As a **项目经理**,
+I want **执行 Time-travel 单点恢复**,
+So that **可以从任意 Checkpoint 恢复执行**。
+
+**Acceptance Criteria:**
+
+**Given** 用户需要恢复至某个 Checkpoint
+**When** 执行 Time-travel 恢复
+**Then** 系统执行以下流程：
+- **单点恢复**：从指定 Checkpoint 恢复执行
+- **状态加载**：加载 Checkpoint 的状态快照
+- **上下文恢复**：恢复 LLM 上下文和工具状态
+- **恢复验证**：验证恢复后的状态一致性
+
+**And** 恢复时间<60 秒（Replay 模式）/<30 秒（Override 模式）
+**And** 恢复成功率≥90%
+**And** 恢复过程记录审计日志
+
+**质量要求：**
+- 恢复成功率：≥90%
+- 状态一致性验证通过率：100%
+- 审计日志记录率：100%
+
+**性能要求：**
+- 恢复响应时间：P95<60 秒（Replay 模式）
+- 恢复响应时间：P95<30 秒（Override 模式）
+- 状态加载延迟：P95<500ms
+
+**业务规则：**
+- 支持从任意 Checkpoint 恢复
+- 恢复前自动创建当前状态快照
+- 恢复失败自动回滚
+
+**MVP 阶段说明：**
+- MVP：单点恢复基础功能
+- V1 升级：分支对比和分支管理
+
+---
+
 ## Epic 6 Stories 完成清单
 
 | Story | 标题 | 覆盖 FR | 状态 |
@@ -2537,6 +2861,10 @@ So that **完整追溯战略规划的决策过程和依据**。
 | 6.4 | Replay 重放模式功能 | SP-05 | ✅ 完成（已调整性能指标+Replay 日志字段） |
 | 6.5 | 影响范围评估功能 | SP-06 | ✅ 完成 |
 | 6.6 | JSON 思维链输出功能 | SP-07 | ✅ 完成 |
+| 6.7 | Override 覆盖模式功能 | SP-08 | ✅ 完成（MVP 基础功能） |
+| 6.8 | Time-travel 单点恢复功能 | SP-09 | ✅ 完成（MVP 基础功能） |
+
+**注：** SP-10（BEM 六阶段）和 SP-11（SP→BP 映射）标记为 V1 升级，MVP 阶段仅实现 BLM 前两阶段
 
 ---
 
