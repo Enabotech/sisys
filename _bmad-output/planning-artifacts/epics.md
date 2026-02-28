@@ -319,82 +319,89 @@ requirementsExtracted:
 
 ---
 
-### Additional Requirements
+### Additional Requirements (AFRs)
 
 **从 Architecture 和 UX Design 中提取的额外技术要求：**
 
 #### 架构技术要求（来自 Architecture.md）
 
-1. **五层存储架构：**
+
+**AFR-ARC-01.** **六边形架构与领域驱动设计：**
+   - 领域层（Domain）：封装企业战略规划核心领域逻辑，包括文档、AGENT、工具、战略规划、业务计划等领域实体，领域服务不依赖任何外部技术实现，仅依赖领域模型与领域规则
+   - 应用层（Application）：定义用例服务（Use Cases），编排领域对象完成具体业务目标，包括文档处理用例、战略分析用例、AGENT 协作用例、规划生成用例，应用层协调领域层与基础设施层交互
+   - 接口层（Interfaces）：实现输入适配器（CLI、API、事件监听）与输出适配器（数据库、消息队列、外部服务），隔离外部系统与领域层，支持技术栈独立演进
+   - 基础设施层（Infrastructure）：实现领域层定义的仓储接口与领域服务接口，包括持久化存储（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）、消息总线（RabbitMQ）、外部服务适配器（LLM API、嵌入模型）
+
+**AFR-ARC-02.** **事件驱动架构：**
+   - 双通道总线：Redis 发布/订阅（实时事件）+ RabbitMQ + 事务发件箱（持久化事件）
+   - 10 种领域事件：DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered/IsolationLevelSwitched/CheckpointRecovered/RoutingDecided
+
+**AFR-ARC-03.** **五层存储架构：**
    - L1 高速缓存层（Redis 7.0+）：会话状态、语义缓存、公共黑板，TTL 24h-30d
    - L2 关系存储层（PostgreSQL 15+）：用户/RBAC、审计元数据、业务实体
    - L3 向量存储层（Qdrant 1.7+）：嵌入向量、混合检索 payload
    - L4 对象存储层（MinIO WORM）：原始文档、证据包、审计归档，7 年存储
    - L5 图存储层（Neo4j 5.x）：知识图谱、实体关系、依赖图
 
-2. **统一动态模型路由框架（UDMR）：**
+**AFR-ARC-04.** **统一动态模型路由框架（UDMR）：**
    - L1 合规性网关：敏感数据检查、数据驻留限制、白名单校验
    - L2 任务复杂度评估器：四因子评分（语义匹配 35%/历史成功率 30%/成本效率 20%/任务复杂度 15%）
    - L3 路由决策执行器：云模型优势阈值 0.15，本地质量阈值 0.70
    - 目标：本地路由占比≥80%，成本节省≥50%
 
-3. **弹性视角隔离协议（EIP）：**
+**AFR-ARC-05.** **弹性视角隔离协议（EIP）：**
    - 四级隔离等级：L4 硬隔离（默认）/L3 软隔离/L2 协作态/L1 融合态
    - 动态升降级触发：任务依赖>0.7 升级，关键词频率>5% 降级，SYS Agent 命令直接指定
    - 自动恢复：30 分钟无活动自动恢复至 L4
 
-4. **修正分级判定体系：**
+**AFR-ARC-06.** **修正分级判定体系：**
    - 五维特征加权：修正类型 30%/置信度变化 25%/影响范围 20%/可逆性 15%/领域关键度 10%
    - 级别映射：得分≥0.85→L0 自动固化，0.75-0.85→L1，0.60-0.75→L2 专家确认，<0.60→L3 委员会审批
 
-5. **SYS Agent 裁决与辩论机制：**
+**AFR-ARC-07.** **SYS Agent 裁决与辩论机制：**
    - 裁决五维评分：事实准确性 35%/逻辑一致性 25%/风险可控性 20%/资源可行性 15%/战略对齐度 5%
    - 辩论质量评估器：增益率阈值 0.10，重复率阈值 0.50，最大辩论轮次 5 轮
    - 置信度处理：≥0.6 自动执行，0.4-0.6 建议人工复核，<0.4 强制升级人工仲裁
 
-6. **Checkpoint 与 Time-Travel 机制：**
+**AFR-ARC-08.** **Checkpoint 与 Time-Travel 机制：**
    - 双模式恢复：Replay 模式（强一致性）/Override 模式（需人工确认）
    - 影响范围评估：≥2 个后续 Checkpoint 强制 Replay，<2 个推荐 Override
    - Time-Travel：单点恢复 + 分支对比
 
-7. **事件驱动架构：**
-   - 双通道总线：Redis 发布/订阅（实时事件）+ RabbitMQ + 事务发件箱（持久化事件）
-   - 10 种领域事件：DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered/IsolationLevelSwitched/CheckpointRecovered/RoutingDecided
-
-8. **领域实体定义：**
+**AFR-ARC-09.** **领域实体定义：**
    - 9 大核心实体：Document/Agent/Tool/StrategicPlan/BusinessPlan/Checkpoint/StrategicArchive/RoutingDecisionLog/IsolationSwitchLog
    - 8 大领域服务接口：DocumentService/RAGService/ToolService/AgentService/PlanningService/EvaluationService/VisualizationService/RoutingService
 
 #### UX 设计要求（来自 UX Design.md）
 
-1. **三视图设计：**
+**AFR-UX-01.** **三视图设计：**
    - 高管视图：低信息密度，30 秒决策，第一屏只显示 3 个关键指标
    - 分析师视图：高信息密度，专业工具深度使用
    - 企业战略与市场人员视图：流程标准化，BLM/BEM 阶段可视化
 
-2. **核心定义性体验：高保真溯源**
+**AFR-UX-02.** **核心定义性体验：高保真溯源**
    - Bounding Box 坐标级跳转至原始文档
    - 响应时间<300ms，定位准确率≥95%
    - 置信度显示：颜色（绿/黄/红）+ 文字（高/中/低）双重编码
 
-3. **情感化设计目标：**
+**AFR-UX-03.** **情感化设计目标：**
    - 高管团队：掌控感（Control）- "一切尽在掌握中"
    - 企业战略人员：成就感（Accomplishment）- "我终于可以快速回应高管质疑了"
    - 专业顾问：专业感（Professionalism）- "这报告完全可以发给客户了"
 
-4. **设计系统选择：Ant Design 5.x**
+**AFR-UX-04.** **设计系统选择：Ant Design 5.x**
    - MVP 阶段：复用基础组件 + 封装业务组件
    - V1 阶段：深化主题定制，建立品牌模板系统
    - V2 阶段：关键差异化组件完全自定义（Bounding Box 溯源查看器）
 
-5. **关键 UX 模式：**
+**AFR-UX-05.** **关键 UX 模式：**
    - 悬浮弹窗溯源卡片（Figma 模式）- 减少上下文切换
    - 红/黄/绿状态指示器 - 高管一眼理解
    - 龙卷风图（Tableau 模式）- 财务敏感性分析
    - 热力图（Palantir 模式）- 风险全景图
    - 时间线（Linear 模式）- 多 Agent 辩论过程
 
-6. **白标输出要求：**
+**AFR-UX-06.** **白标输出要求：**
    - 品牌模板系统：Logo/配色/字体运行时切换
    - 报告导出：PPT/PDF 格式，品牌元素 100% 准确
    - 导出时间：<1 分钟
@@ -438,7 +445,219 @@ requirementsExtracted:
 | **EPIC-09** | 成本与性能优化 | UDMR 动态路由、语义缓存、成本熔断、性能监控 | P0 | CP-01~12 | 14 |
 | **EPIC-10** | 集成与生态 | API 网关、企业系统集成、外部数据源、MCP/A2A 协议 | P0 | 集成 NFRs | 10 |
 
-**总计：154 个 Stories**
+**总计：x 个 Stories**
+
+---
+
+## Epic 依赖关系图
+
+### 技术依赖关系
+
+```mermaid
+graph TD
+    subgraph MVP["MVP 阶段 (8 周)"]
+        E1["EPIC-01<br/>基础设施与架构"]
+        E2["EPIC-02<br/>文档与数据管理"]
+        E7["EPIC-07<br/>用户交互与报告"]
+        E8["EPIC-08<br/>系统管理与合规"]
+    end
+    
+    subgraph V1["V1 阶段 (3-6 个月)"]
+        E3["EPIC-03<br/>智能检索与知识发现"]
+        E4["EPIC-04<br/>战略工具箱"]
+        E5["EPIC-05<br/>Agent 协作"]
+        E6["EPIC-06<br/>战略规划流程"]
+        E9["EPIC-09<br/>成本与性能优化"]
+    end
+    
+    subgraph V2["V2 阶段 (6-12 个月)"]
+        E10["EPIC-10<br/>集成与生态"]
+    end
+    
+    E1 --> E2
+    E1 --> E7
+    E1 --> E8
+    E2 --> E3
+    E3 --> E5
+    E4 --> E5
+    E5 --> E6
+    E3 --> E9
+    E6 --> E10
+```
+
+### 用户价值流
+
+```mermaid
+flowchart LR
+    subgraph Input["输入"]
+        D["企业数据"]
+    end
+    
+    subgraph Process["处理"]
+        E2["EPIC-02<br/>文档管理"]
+        E3["EPIC-03<br/>智能检索"]
+        E4["EPIC-04<br/>战略工具"]
+        E5["EPIC-05<br/>Agent 协作"]
+    end
+    
+    subgraph Output["输出"]
+        E6["EPIC-06<br/>战略规划"]
+        E7["EPIC-07<br/>报告生成"]
+    end
+    
+    subgraph Support["支撑"]
+        E1["EPIC-01<br/>基础设施"]
+        E8["EPIC-08<br/>合规"]
+        E9["EPIC-09<br/>性能优化"]
+        E10["EPIC-10<br/>生态集成"]
+    end
+    
+    D --> E2
+    E2 --> E3
+    E3 --> E4
+    E4 --> E5
+    E5 --> E6
+    E6 --> E7
+    
+    E1 -.-> Process
+    E8 -.-> Process
+    E9 -.-> Process
+    E10 -.-> Output
+```
+
+### 依赖关系说明
+
+| 依赖方向 | 说明 |
+|---------|------|
+| EPIC-01 → EPIC-02 | 基础设施是文档管理的技术基础（六边形架构、五层存储） |
+| EPIC-01 → EPIC-07 | 基础设施提供 CLI/API 接口能力 |
+| EPIC-01 → EPIC-08 | 基础设施提供 RBAC/审计基础 |
+| EPIC-02 → EPIC-03 | 文档解析是智能检索的数据前提 |
+| EPIC-03 → EPIC-05 | 检索能力是 Agent 协作的知识来源 |
+| EPIC-04 → EPIC-05 | 工具注册是 Agent 调用的前提 |
+| EPIC-05 → EPIC-06 | Agent 协作是战略规划流程的执行引擎 |
+| EPIC-03 → EPIC-09 | 检索量是性能优化的对象 |
+| EPIC-06 → EPIC-10 | 完整规划流程需要生态集成 |
+
+---
+
+## 📖 阅读指南
+
+**不同角色的建议阅读路径：**
+
+| 角色 | 重点关注 | 阅读顺序 |
+|------|---------|---------|
+| **技术负责人** | EPIC-01（架构）、EPIC-09（性能优化） | E1 → E9 → E3 |
+| **产品经理** | EPIC-06（规划流程）、EPIC-07（用户交互） | E6 → E7 → E5 |
+| **开发团队** | 按依赖顺序实施 | E1 → E2 → E3 → E4 → E5 → E6 |
+| **测试团队** | 每个 Epic 的 Acceptance Criteria | 按 Epic 顺序，关注 AC 量化指标 |
+| **高管读者** | Epic List 表格、用户价值流图 | 直接查看本章节图表 |
+| **UX 设计师** | EPIC-07（用户交互）、三视图设计 | E7 → UX 设计要求章节 |
+
+---
+
+[版本功能清单表格示例]
+| Epic | Stories | 数量 | FRs | NFRs | AFRs | 核心交付 |
+|------|---------|------|-----|------|------|---------|
+| **EPIC-01** | 1.1-1.5<br>1.6-1.8 | 8 | AR-01~04<br>SA-01~03 | NFR-SCALE-04<br>NFR-INT-05 | AFR-ARC-01~03<br>AFR-ARC-09 | 架构基础、领域实体、事件总线 |
+
+
+[Epic版本路线图表格示例]
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 1.1-1.5<br>1.6-1.8 | 8 | AR-01~04<br>SA-01~03 | NFR-SCALE-04<br>NFR-INT-05 | AFR-ARC-01~03<br>AFR-ARC-09 | 六边形架构、五层存储、事件驱动、领域实体 |
+
+---
+
+## 版本功能清单
+
+### MVP 阶段 (8 周) - 57 项 P0 功能
+
+| Epic | Stories | 数量 | FRs | NFRs | AFRs | 核心交付 |
+|------|---------|------|-----|------|------|---------|
+| **EPIC-01** |  |  |  |  |  |  |
+| **EPIC-02** |  |  |  |  |  |  |
+| **EPIC-03** |  |  |  |  |  |  |
+| **EPIC-04** |  |  |  |  |  |  |
+| **EPIC-05** |  |  |  |  |  |  |
+| **EPIC-06** |  |  |  |  |  |  |
+| **EPIC-07** |  |  |  |  |  |  |
+| **EPIC-08** |  |  |  |  |  |  |
+| **EPIC-09** |  |  |  |  |  |  |
+| **EPIC-10** |  |  |  |  |  |  |
+| **MVP 总计** | | **x 项** | **57 项 P0** | **x 项** | **x 项** | |
+
+---
+
+### V1 阶段 (3-6 个月) - 46 项 P1 功能
+
+| Epic | Stories | 数量 | FRs | NFRs | AFRs | 核心交付 |
+|------|---------|------|-----|------|------|---------|
+| **EPIC-01** |  |  |  |  |  |  |
+| **EPIC-02** |  |  |  |  |  |  |
+| **EPIC-03** |  |  |  |  |  |  |
+| **EPIC-04** |  |  |  |  |  |  |
+| **EPIC-05** |  |  |  |  |  |  |
+| **EPIC-06** |  |  |  |  |  |  |
+| **EPIC-07** |  |  |  |  |  |  |
+| **EPIC-08** |  |  |  |  |  |  |
+| **EPIC-09** |  |  |  |  |  |  |
+| **EPIC-10** |  |  |  |  |  |  |
+| **V1 总计** | | **x 项** | **46 项 P1** | **x 项** | **x 项** | |
+
+---
+
+### V2 阶段 (6-12 个月) - 18 项 P2 功能
+
+| Epic | Stories | 数量 | FRs | NFRs | AFRs | 核心交付 |
+|------|---------|------|-----|------|------|---------|
+| **EPIC-01** |  |  |  |  |  |  |
+| **EPIC-02** |  |  |  |  |  |  |
+| **EPIC-03** |  |  |  |  |  |  |
+| **EPIC-04** |  |  |  |  |  |  |
+| **EPIC-05** |  |  |  |  |  |  |
+| **EPIC-06** |  |  |  |  |  |  |
+| **EPIC-07** |  |  |  |  |  |  |
+| **EPIC-08** |  |  |  |  |  |  |
+| **EPIC-09** |  |  |  |  |  |  |
+| **EPIC-10** |  |  |  |  |  |  |
+| **V2 总计** | | **x 项** | **18 项 P2** | **x 项** | **x 项** | |
+
+---
+
+### 需求覆盖汇总
+
+| 版本 | FRs | NFRs | AFRs | Stories | 占比 |
+|------|-----|------|------|---------|------|
+| **MVP** | 57 | x 项 | x 项 | x 项 | x% |
+| **V1** | 46 | x 项 | x 项 | x 项 | x% |
+| **V2** | 18 | x 项 | x 项 | x 项 | x% |
+| **P3 排除** | 1 项 (SA-10) | - | - | - | - |
+| **总计** | **122 项** | **x 项** | **x 项** | **x 项** | 100% |
+
+**图例说明：**
+- **FRs**: Functional Requirements (功能需求) - 来自 PRD
+- **NFRs**: Non-Functional Requirements (非功能需求) - 来自 PRD
+- **AFRs**: Additional Functional Requirements (额外技术要求) - 来自 Architecture/UX Design
+
+**AFR 编号说明：**
+- **AFR-ARC-01~09**: 架构技术要求 (来自 Architecture.md)
+  - AFR-ARC-01: 六边形架构与领域驱动设计
+  - AFR-ARC-02: 事件驱动架构
+  - AFR-ARC-03: 五层存储架构
+  - AFR-ARC-04: 统一动态模型路由框架 (UDMR)
+  - AFR-ARC-05: 弹性视角隔离协议 (EIP)
+  - AFR-ARC-06: 修正分级判定体系
+  - AFR-ARC-07: SYS Agent 裁决与辩论机制
+  - AFR-ARC-08: Checkpoint 与 Time-Travel 机制
+  - AFR-ARC-09: 领域实体定义/领域服务接口
+- **AFR-UX-01~06**: UX 设计要求 (来自 UX Design.md)
+  - AFR-UX-01: 三视图设计
+  - AFR-UX-02: 高保真溯源
+  - AFR-UX-03: 情感化设计目标
+  - AFR-UX-04: 设计系统选择 (Ant Design 5.x)
+  - AFR-UX-05: 关键 UX 模式
+  - AFR-UX-06: 白标输出要求
 
 ---
 
@@ -446,7 +665,15 @@ requirementsExtracted:
 
 **目标：** 建立六边形架构基础，实现五层存储架构、事件驱动总线和领域实体，为上层功能提供坚实的技术基础。
 
-### Story 1.1: 六边形架构分层实现
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 1.1-1.12 | 12 项 | AR-01~04<br>SA-01~03 | NFR-SCALE-04<br>NFR-INT-05 | AFR-ARC-01~03<br>AFR-ARC-09 | 六边形架构、五层存储、事件驱动、领域实体 |
+| **V1** | 1.13-1.15 | 3 项 | SA-04~07 | NFR-REL-05 | AFR-ARC-09 | 分支管理、心跳机制、战略档案 |
+| **总计** | **1.1-1.15** | **15 项** | | | | |
+
+### Story 1.1: 六边形架构分层实现 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现领域驱动六边形架构（领域层/应用层/接口层/基础设施层），
@@ -476,7 +703,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.2: 五层存储架构实现
+### Story 1.2: 五层存储架构实现 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现五层存储架构（L1 缓存/L2 关系/L3 向量/L4 对象/L5 图），
@@ -515,7 +742,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.3: 事件驱动总线实现
+### Story 1.3: 事件驱动总线实现 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现双通道事件总线（Redis 实时+RabbitMQ 持久化），
@@ -547,7 +774,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.4: 领域实体实现 - Document 与 Agent
+### Story 1.4: 领域实体实现 - Document 与 Agent `P0-MVP`
 
 **As a** 领域工程师，
 **I want** 实现 Document 和 Agent 领域实体，
@@ -578,7 +805,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.5: 领域实体实现 - Tool 与 StrategicPlan
+### Story 1.5: 领域实体实现 - Tool 与 StrategicPlan `P0-MVP`
 
 **As a** 领域工程师，
 **I want** 实现 Tool 和 StrategicPlan 领域实体，
@@ -608,7 +835,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.6: 领域实体实现 - Checkpoint 与 StrategicArchive
+### Story 1.6: 领域实体实现 - Checkpoint 与 StrategicArchive `P0-MVP`
 
 **As a** 领域工程师，
 **I want** 实现 Checkpoint 和 StrategicArchive 领域实体，
@@ -638,7 +865,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.7: 领域服务实现 - RAGService 与 ToolService
+### Story 1.7: 领域服务实现 - RAGService 与 ToolService `P0-MVP`
 
 **As a** 领域工程师，
 **I want** 实现 RAGService 和 ToolService 领域服务接口，
@@ -670,7 +897,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.8: 领域服务实现 - AgentService 与 PlanningService
+### Story 1.8: 领域服务实现 - AgentService 与 PlanningService `P0-MVP`
 
 **As a** 领域工程师，
 **I want** 实现 AgentService 和 PlanningService 领域服务接口，
@@ -702,7 +929,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.9: 路由决策日志与隔离切换日志
+### Story 1.9: 路由决策日志与隔离切换日志 `P0-MVP`
 
 **As a** 系统审计员，
 **I want** 实现 RoutingDecisionLog 和 IsolationSwitchLog 实体，
@@ -732,7 +959,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.10: 领域事件实现 - 核心事件
+### Story 1.10: 领域事件实现 - 核心事件 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现核心领域事件（DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached），
@@ -762,7 +989,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.11: 领域事件实现 - 控制事件
+### Story 1.11: 领域事件实现 - 控制事件 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现控制领域事件（CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered 等），
@@ -792,7 +1019,7 @@ requirementsExtracted:
 
 ---
 
-### Story 1.12: 跨存储事务与最终一致性
+### Story 1.12: 跨存储事务与最终一致性 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实现跨存储事务机制，
@@ -821,7 +1048,16 @@ requirementsExtracted:
 
 **目标：** 实现 17 种格式文档上传解析、版本管理、语义分块和高保真溯源，为 RAG 检索提供数据基础。
 
-### Story 2.1: 文档上传与批量处理
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 2.1-2.8 | 8 项 | DM-01~08, SR-08 | NFR-PERF-01, NFR-COMP-03 | AFR-UX-02 | DocLayNet 版面、OCR 解析、高保真溯源 |
+| **V1** | 2.9-2.12 | 4 项 | DM-09~12 | NFR-PERF-07 | AFR-UX-02 | 合并单元格还原、跨页表格 |
+| **V2** | 2.13-2.15 | 3 项 | DM-13~15 | NFR-PERF-07 | AFR-UX-02<br>AFR-UX-05 | 公式识别、跨模态检索、音视频转录 |
+| **总计** | **2.1-2.15** | **15 项** | | | | |
+
+### Story 2.1: 文档上传与批量处理 `P0-MVP`
 
 **As a** 企业战略人员，
 **I want** 批量上传 17 种格式文档（支持拖拽和压缩包），
@@ -846,7 +1082,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.2: 文档解析与内容提取
+### Story 2.2: 文档解析与内容提取 `P0-MVP`
 
 **As a** 系统解析引擎，
 **I want** 解析 17 种格式文档并提取内容，
@@ -875,7 +1111,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.3: 文档版本管理与血缘追踪
+### Story 2.3: 文档版本管理与血缘追踪 `P0-MVP`
 
 **As a** 文档管理员，
 **I want** 管理文档版本和血缘追踪，
@@ -900,7 +1136,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.4: 语义分块与索引构建
+### Story 2.4: 语义分块与索引构建 `P0-MVP`
 
 **As a** RAG 工程师，
 **I want** 对文档进行语义分块并构建索引，
@@ -925,7 +1161,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.5: 高保真溯源 - Bounding Box 跳转
+### Story 2.5: 高保真溯源 - Bounding Box 跳转 `P0-MVP`
 
 **As a** 企业战略人员，
 **I want** 从结论跳转至原始文档坐标点，
@@ -956,7 +1192,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.6: 环境预检与异常通知
+### Story 2.6: 环境预检与异常通知 `P0-MVP`
 
 **As a** 运维工程师，
 **I want** 执行环境预检（GPU 驱动/CUDA/内存），
@@ -976,7 +1212,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.7: 经营复盘数据导入
+### Story 2.7: 经营复盘数据导入 `P0-MVP`
 
 **As a** 战略分析师，
 **I want** 导入季度/年度经营复盘数据，
@@ -996,7 +1232,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.8: 复杂表格处理（V1 能力）
+### Story 2.8: 复杂表格处理（V1 能力） `P1-V1`
 
 **As a** 财务分析师，
 **I want** 处理合并单元格和跨页表格，
@@ -1016,7 +1252,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.9: 跨模态检索（V2 能力）
+### Story 2.9: 跨模态检索（V2 能力） `P2-V2`
 
 **As a** 市场分析师，
 **I want** 使用"以图搜文/以文搜图"功能，
@@ -1041,7 +1277,7 @@ requirementsExtracted:
 
 ---
 
-### Story 2.10: 音视频转录文本接入（V2 能力）
+### Story 2.10: 音视频转录文本接入（V2 能力） `P2-V2`
 
 **As a** 战略分析师，
 **I want** 接入音视频转录文本，
@@ -1065,7 +1301,16 @@ requirementsExtracted:
 
 **目标：** 实现混合检索、分层检索、知识图谱和 GraphRAG，支持高保真溯源和契约化摘要。
 
-### Story 3.1: 混合检索与 RRF 融合
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 3.1-3.8 | 8 项 | SR-01~08 | NFR-PERF-01/02/07 | AFR-ARC-09 | 混合检索、分层检索基础 |
+| **V1** | 3.9-3.13 | 5 项 | SR-09~13 | NFR-PERF-07 | AFR-ARC-09 | 知识图谱、GraphRAG |
+| **V2** | 3.14-3.15 | 2 项 | SR-14~15 | NFR-PERF-07 | AFR-ARC-09 | 时效性管理、社区发现 |
+| **总计** | **3.1-3.15** | **15 项** | | | | |
+
+### Story 3.1: 混合检索与 RRF 融合 `P0-MVP`
 
 **As a** 分析师，
 **I want** 执行混合检索（Dense + Sparse），
@@ -1085,7 +1330,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.2: 实体抽取与三元组输出
+### Story 3.2: 实体抽取与三元组输出 `P0-MVP`
 
 **As a** 知识工程师，
 **I want** 抽取实体并输出三元组，
@@ -1105,7 +1350,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.3: 战略领域词典管理
+### Story 3.3: 战略领域词典管理 `P0-MVP`
 
 **As a** 领域专家，
 **I want** 管理战略领域词典，
@@ -1125,7 +1370,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.4: 分层检索与查询路由
+### Story 3.4: 分层检索与查询路由 `P0-MVP`
 
 **As a** 高级分析师，
 **I want** 执行分层检索（L1-L4），
@@ -1145,7 +1390,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.5: 契约化结构化摘要
+### Story 3.5: 契约化结构化摘要 `P0-MVP`
 
 **As a** 高管，
 **I want** 生成契约化结构化摘要，
@@ -1165,7 +1410,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.6: 检索相关性评估
+### Story 3.6: 检索相关性评估 `P0-MVP`
 
 **As a** 系统评估器，
 **I want** 评估检索相关性，
@@ -1185,7 +1430,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.7: 引文溯源树展示
+### Story 3.7: 引文溯源树展示 `P0-MVP`
 
 **As a** 分析师，
 **I want** 查看溯源树，
@@ -1205,7 +1450,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.8: 知识图谱构建与 GraphRAG
+### Story 3.8: 知识图谱构建与 GraphRAG `P0-MVP`
 
 **As a** 知识工程师，
 **I want** 构建知识图谱并支持 GraphRAG，
@@ -1230,7 +1475,7 @@ requirementsExtracted:
 
 ---
 
-### Story 3.9: 数据时效性管理
+### Story 3.9: 数据时效性管理 `P1-V1`
 
 **As a** 合规审计员，
 **I want** 管理引用数据的时效性，
@@ -1254,7 +1499,16 @@ requirementsExtracted:
 
 **目标：** 实现 23 种战略工具注册、编排、沙箱执行和版本管理，支持工具链自动化。
 
-### Story 4.1: 工具注册与 Schema 验证
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 4.1-4.5 | 5 项 | ST-01~05 | NFR-SEC-07, NFR-INT-05 | AFR-ARC-09 | 工具注册、Docker 沙箱 |
+| **V1** | 4.6-4.9 | 4 项 | ST-06~09 | NFR-INT-05 | AFR-ARC-09 | 工具版本管理、财务建模 |
+| **V2** | 4.10-4.11 | 2 项 | ST-10~11 | NFR-SEC-07 | AFR-ARC-09 | gVisor 沙箱、压力测试建模 |
+| **总计** | **4.1-4.11** | **11 项** | | | | |
+
+### Story 4.1: 工具注册与 Schema 验证 `P0-MVP`
 
 **As a** 工具开发者，
 **I want** 注册战略工具并定义输入/输出 Schema，
@@ -1274,7 +1528,7 @@ requirementsExtracted:
 
 ---
 
-### Story 4.2: 工具链编排与 DAG 执行
+### Story 4.2: 工具链编排与 DAG 执行 `P0-MVP`
 
 **As a** 战略分析师，
 **I want** 编排工具链并按拓扑顺序执行，
@@ -1294,7 +1548,7 @@ requirementsExtracted:
 
 ---
 
-### Story 4.3: Docker 沙箱执行与隔离
+### Story 4.3: Docker 沙箱执行与隔离 `P0-MVP`
 
 **As a** 安全工程师，
 **I want** 在 Docker 沙箱中执行工具代码，
@@ -1314,7 +1568,7 @@ requirementsExtracted:
 
 ---
 
-### Story 4.4: 工具版本管理与灰度发布
+### Story 4.4: 工具版本管理与灰度发布 `P0-MVP`
 
 **As a** 工具运维工程师，
 **I want** 管理工具版本并支持灰度发布，
@@ -1334,7 +1588,7 @@ requirementsExtracted:
 
 ---
 
-### Story 4.5: MCP/A2A 协议集成
+### Story 4.5: MCP/A2A 协议集成 `P0-MVP`
 
 **As a** 生态集成工程师，
 **I want** 遵循 MCP 2025 规范与 A2A 协议，
@@ -1354,47 +1608,7 @@ requirementsExtracted:
 
 ---
 
-### Story 4.6: 财务建模与估值基础
-
-**As a** CFO，
-**I want** 执行财务建模与估值（DCF/可比公司/先例交易），
-**So that** 战略建议有财务量化依据。
-
-**Acceptance Criteria:**
-
-**Given** 战略建议
-**When** 执行财务量化
-**Then** 计算 NPV/IRR
-**And** 支持 DCF 估值
-
-**Given** 可比公司分析
-**When** 选择对标公司
-**Then** 计算相对估值倍数
-**And** 支持行业对比
-
----
-
-### Story 4.7: 压力测试建模（V2 能力）
-
-**As a** 风险管理师，
-**I want** 执行宏观经济变量情景分析，
-**So that** 评估战略方案在不同情景下的表现。
-
-**Acceptance Criteria:**
-
-**Given** 压力测试定义
-**When** 设置宏观经济变量（GDP/利率/汇率）
-**Then** 定义情景（基准/乐观/悲观）
-**And** 计算各情景下财务影响
-
-**Given** 龙卷风图展示
-**When** 敏感性分析
-**Then** 可视化变量影响排序
-**And** 支持交互式探索
-
----
-
-### Story 4.8: 红蓝辩论机制基础（MVP 单 Agent 多视角）
+### Story 4.6: 红蓝辩论机制基础（MVP 单 Agent 多视角） `P0-MVP`
 
 **As a** 战略分析师，
 **I want** 执行红蓝辩论机制基础（MVP 单 Agent 多视角），
@@ -1414,11 +1628,60 @@ requirementsExtracted:
 
 ---
 
+### Story 4.7: 财务建模与估值基础 `P1-V1`
+
+**As a** CFO，
+**I want** 执行财务建模与估值（DCF/可比公司/先例交易），
+**So that** 战略建议有财务量化依据。
+
+**Acceptance Criteria:**
+
+**Given** 战略建议
+**When** 执行财务量化
+**Then** 计算 NPV/IRR
+**And** 支持 DCF 估值
+
+**Given** 可比公司分析
+**When** 选择对标公司
+**Then** 计算相对估值倍数
+**And** 支持行业对比
+
+---
+
+### Story 4.8: 压力测试建模（V2 能力） `P2-V2`
+
+**As a** 风险管理师，
+**I want** 执行宏观经济变量情景分析，
+**So that** 评估战略方案在不同情景下的表现。
+
+**Acceptance Criteria:**
+
+**Given** 压力测试定义
+**When** 设置宏观经济变量（GDP/利率/汇率）
+**Then** 定义情景（基准/乐观/悲观）
+**And** 计算各情景下财务影响
+
+**Given** 龙卷风图展示
+**When** 敏感性分析
+**Then** 可视化变量影响排序
+**And** 支持交互式探索
+
+---
+
 ## Epic 5: Agent 协作
 
 **目标：** 实现单 Agent 执行、多 Agent 协作、EIP 弹性隔离和 SYS Agent 裁决，支持 7 类高管角色数字孪生。
 
-### Story 5.1: Agent 实例化与身份档案加载
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 5.1-5.6 | 6 项 | AC-01~06 | NFR-SEC-05, NFR-REL-04 | AFR-ARC-05 | 单 Agent 执行、EIP 基础 |
+| **V1** | 5.7-5.14 | 8 项 | AC-07~14 | NFR-SCALE-03 | AFR-ARC-05<br>AFR-ARC-07 | 多 Agent 协作、SYS 裁决 |
+| **V2** | 5.15-5.16 | 2 项 | AC-15~16 | NFR-SCALE-03 | AFR-ARC-05 | 用户介入暂停、Agent 扩缩容 |
+| **总计** | **5.1-5.16** | **16 项** | | | | |
+
+### Story 5.1: Agent 实例化与身份档案加载 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 实例化 Agent 角色并加载身份档案，
@@ -1438,7 +1701,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.2: 单 Agent 标准工作流执行
+### Story 5.2: 单 Agent 标准工作流执行 `P0-MVP`
 
 **As a** 企业战略人员，
 **I want** Agent 执行标准工作流（感知→规划→执行→验证→反思→证据打包），
@@ -1458,7 +1721,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.3: 弹性视角隔离协议（EIP）基础
+### Story 5.3: 弹性视角隔离协议（EIP）基础 `P0-MVP`
 
 **As a** 安全合规官，
 **I want** 执行 EIP 基础（L4 硬隔离默认），
@@ -1478,7 +1741,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.4: 多 Agent 协作任务分解
+### Story 5.4: 多 Agent 协作任务分解 `P0-MVP`
 
 **As a** SYS Agent，
 **I want** 分解多 Agent 协作任务，
@@ -1498,7 +1761,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.5: 动态隔离等级调整
+### Story 5.5: 动态隔离等级调整 `P0-MVP`
 
 **As a** 协作协调器，
 **I want** 动态调整隔离等级，
@@ -1523,7 +1786,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.6: 联合分析组与公共黑板
+### Story 5.6: 联合分析组与公共黑板 `P0-MVP`
 
 **As a** 联合分析组成员，
 **I want** 通过公共黑板交换中间结论，
@@ -1548,7 +1811,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.7: SYS Agent 裁决状态机
+### Story 5.7: SYS Agent 裁决状态机 `P1-V1`
 
 **As a** SYS Agent，
 **I want** 执行裁决状态机，
@@ -1568,7 +1831,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.8: 辩论质量评估器
+### Story 5.8: 辩论质量评估器 `P1-V1`
 
 **As a** 辩论质量评估器，
 **I want** 评估单轮辩论质量，
@@ -1593,7 +1856,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.9: 深度思考与多路径推演
+### Story 5.9: 深度思考与多路径推演 `P1-V1`
 
 **As a** 高级分析师，
 **I want** Agent 执行深度思考与多路径推演，
@@ -1613,7 +1876,7 @@ requirementsExtracted:
 
 ---
 
-### Story 5.10: Agent 实例池化与动态扩缩容（V2 能力）
+### Story 5.10: Agent 实例池化与动态扩缩容（V2 能力） `P2-V2`
 
 **As a** 运维工程师，
 **I want** Agent 实例池化与动态扩缩容，
@@ -1637,7 +1900,16 @@ requirementsExtracted:
 
 **目标：** 实现 BLM 六阶段、BEM 六阶段、Checkpoint 双模式恢复和 Time-Travel 能力，支持 SP→BP 闭环。
 
-### Story 6.1: BLM 前两阶段流程（MVP）
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 6.1-6.4 | 4 项 | SP-01~04 | NFR-REL-04 | AFR-ARC-08 | BLM 前两阶段、Checkpoint |
+| **V1** | 6.5-6.10 | 6 项 | SP-05~10 | NFR-REL-04 | AFR-ARC-08 | 完整 BLM 六阶段、双模式恢复 |
+| **V2** | 6.11-6.12 | 2 项 | SP-11~12 | NFR-REL-04 | AFR-ARC-08 | BEM 战略解码、SP→BP 闭环 |
+| **总计** | **6.1-6.12** | **12 项** | | | | |
+
+### Story 6.1: BLM 前两阶段流程（MVP） `P0-MVP`
 
 **As a** 企业战略人员，
 **I want** 执行 BLM 前两阶段（业绩差距分析 + 市场洞察），
@@ -1657,7 +1929,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.2: 完整 BLM 六阶段流程（V1 能力）
+### Story 6.2: 完整 BLM 六阶段流程（V1 能力） `P1-V1`
 
 **As a** 战略总监，
 **I want** 执行完整 BLM 六阶段流程，
@@ -1677,7 +1949,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.3: Checkpoint 快照与用户反馈
+### Story 6.3: Checkpoint 快照与用户反馈 `P0-MVP`
 
 **As a** 高管，
 **I want** 各阶段触发 Checkpoint 快照，
@@ -1697,7 +1969,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.4: Checkpoint 双模式恢复
+### Story 6.4: Checkpoint 双模式恢复 `P0-MVP`
 
 **As a** 战略分析师，
 **I want** Checkpoint 双模式恢复（Replay/Override），
@@ -1722,7 +1994,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.5: Time-Travel 两阶段能力
+### Story 6.5: Time-Travel 两阶段能力 `P1-V1`
 
 **As a** 系统调试员，
 **I want** Time-Travel 两阶段能力（单点恢复/分支对比），
@@ -1747,7 +2019,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.6: JSON 思维链输出
+### Story 6.6: JSON 思维链输出 `P0-MVP`
 
 **As a** 审计员，
 **I want** 输出 JSON 思维链，
@@ -1767,7 +2039,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.7: 红蓝辩论机制完整实现（V1 能力）
+### Story 6.7: 红蓝辩论机制完整实现（V1 能力） `P1-V1`
 
 **As a** 风险管理员，
 **I want** 完整红蓝辩论机制，
@@ -1787,7 +2059,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.8: BEM 六阶段流程（V2 能力）
+### Story 6.8: BEM 六阶段流程（V2 能力） `P2-V2`
 
 **As a** 运营总监，
 **I want** 执行 BEM 六阶段流程，
@@ -1807,7 +2079,7 @@ requirementsExtracted:
 
 ---
 
-### Story 6.9: 经营复盘数据对比
+### Story 6.9: 经营复盘数据对比 `P2-V2`
 
 **As a** 战略分析师，
 **I want** 对比经营复盘数据与规划目标，
@@ -1831,7 +2103,16 @@ requirementsExtracted:
 
 **目标：** 实现 CLI/API 接口、报告生成、高管仪表盘和分支管理，支持三视图切换。
 
-### Story 7.1: CLI 接口实现
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 7.1-7.7 | 7 项 | UI-01~07 | NFR-INT-01, NFR-PERF-03 | AFR-UX-04 | CLI/API、报告生成、高管仪表盘 |
+| **V1** | 7.8-7.12 | 5 项 | UI-08~12 | NFR-ACC-01/02 | AFR-UX-01<br>AFR-UX-04 | 决策可视化、分支管理、无障碍 |
+| **V2** | 7.13 | 1 项 | UI-13 | NFR-PERF-03 | AFR-UX-05 | 决策影响分析 |
+| **总计** | **7.1-7.13** | **13 项** | | | | |
+
+### Story 7.1: CLI 接口实现 `P0-MVP`
 
 **As a** 高级用户，
 **I want** 通过 CLI 执行命令，
@@ -1856,7 +2137,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.2: REST API 与 API Gateway
+### Story 7.2: REST API 与 API Gateway `P0-MVP`
 
 **As a** 集成工程师，
 **I want** REST API 和 API Gateway 统一入口，
@@ -1882,7 +2163,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.3: 多格式报告生成
+### Story 7.3: 多格式报告生成 `P0-MVP`
 
 **As a** 顾问，
 **I want** 生成多格式报告（PDF/Markdown），
@@ -1902,7 +2183,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.4: 高管简化视图（仪表盘）
+### Story 7.4: 高管简化视图（仪表盘） `P0-MVP`
 
 **As a** CEO，
 **I want** 高管简化视图（仪表盘/审批中心/审计摘要），
@@ -1927,7 +2208,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.5: 决策过程可视化
+### Story 7.5: 决策过程可视化 `P0-MVP`
 
 **As a** 分析师，
 **I want** 可视化展示决策过程，
@@ -1947,7 +2228,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.6: 分支管理与差异对比
+### Story 7.6: 分支管理与差异对比 `P0-MVP`
 
 **As a** 战略分析师，
 **I want** 创建/切换/删除分支并提供差异对比视图，
@@ -1972,7 +2253,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.7: Checkpoint 恢复模式选择界面
+### Story 7.7: Checkpoint 恢复模式选择界面 `P0-MVP`
 
 **As a** 战略分析师，
 **I want** Checkpoint 恢复模式选择界面，
@@ -1993,7 +2274,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.8: 无障碍设计与多语言
+### Story 7.8: 无障碍设计与多语言 `P1-V1`
 
 **As a** 无障碍用户，
 **I want** 无障碍设计和多语言支持，
@@ -2018,7 +2299,7 @@ requirementsExtracted:
 
 ---
 
-### Story 7.9: 决策影响分析（V2 能力）
+### Story 7.9: 决策影响分析（V2 能力） `P2-V2`
 
 **As a** 战略分析师，
 **I want** 决策影响分析（Shapley 贡献值，反事实推理），
@@ -2042,7 +2323,16 @@ requirementsExtracted:
 
 **目标：** 实现 RBAC 权限管理、审计日志、等保 2.0 三级和 SOX/ISO 合规，支持数据主权隔离。
 
-### Story 8.1: 用户认证与 RBAC 权限
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 8.1-8.8 | 8 项 | SC-01~08 | NFR-COMP-01~05, NFR-SEC-01~07 | AFR-ARC-09 | RBAC、审计日志、等保 2.0 |
+| **V1** | 8.9-8.12 | 4 项 | SC-09~12 | NFR-COMP-06/07 | AFR-ARC-06 | 数据脱敏、SOX/ISO 合规 |
+| **V2** | 8.13-8.14 | 2 项 | SC-13~14 | NFR-COMP-08/09 | AFR-ARC-06 | ISO 27001、银保监会规范 |
+| **总计** | **8.1-8.14** | **14 项** | | | | |
+
+### Story 8.1: 用户认证与 RBAC 权限 `P0-MVP`
 
 **As a** 系统管理员，
 **I want** 管理用户认证与 RBAC 权限，
@@ -2067,7 +2357,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.2: 统一审计日志
+### Story 8.2: 统一审计日志 `P0-MVP`
 
 **As a** 合规审计员，
 **I want** 记录统一审计日志，
@@ -2092,7 +2382,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.3: WORM 存储与 7 年归档
+### Story 8.3: WORM 存储与 7 年归档 `P0-MVP`
 
 **As a** 合规审计员，
 **I want** WORM 存储 7 年归档，
@@ -2112,7 +2402,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.4: 修正分级判定
+### Story 8.4: 修正分级判定 `P0-MVP`
 
 **As a** 系统架构师，
 **I want** 修正分级判定（L0-L3），
@@ -2137,7 +2427,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.5: 自动固化流水线
+### Story 8.5: 自动固化流水线 `P0-MVP`
 
 **As a** 系统工程师，
 **I want** 自动固化 L0/L1 级修正，
@@ -2157,7 +2447,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.6: 数据主权隔离
+### Story 8.6: 数据主权隔离 `P0-MVP`
 
 **As a** 数据安全官，
 **I want** 执行数据主权隔离，
@@ -2177,7 +2467,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.7: 等保 2.0 三级合规
+### Story 8.7: 等保 2.0 三级合规 `P0-MVP`
 
 **As a** 安全合规官，
 **I want** 满足等保 2.0 三级要求，
@@ -2197,7 +2487,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.8: 敏感数据脱敏
+### Story 8.8: 敏感数据脱敏 `P0-MVP`
 
 **As a** 隐私保护官，
 **I want** 敏感数据脱敏，
@@ -2217,7 +2507,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.9: SOX 合规与 ISO 27001（V1 能力）
+### Story 8.9: SOX 合规与 ISO 27001（V1 能力） `P1-V1`
 
 **As a** 合规审计员，
 **I want** SOX 404 条款和 ISO 27001 认证，
@@ -2237,7 +2527,7 @@ requirementsExtracted:
 
 ---
 
-### Story 8.10: 银保监会规范（V2 能力）
+### Story 8.10: 银保监会规范（V2 能力） `P2-V2`
 
 **As a** 金融机构合规官，
 **I want** 银保监会规范（1104 报表/EAST 报表），
@@ -2261,7 +2551,16 @@ requirementsExtracted:
 
 **目标：** 实现 UDMR 动态模型路由、语义缓存、成本熔断和性能监控，支持本地路由占比≥80%。
 
-### Story 9.1: 路由决策日志
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 9.1-9.4 | 4 项 | CP-01~04 | NFR-PERF-06, NFR-REL-06 | AFR-ARC-09 | 路由日志、语义缓存、健康度仪表盘 |
+| **V1** | 9.5-9.10 | 6 项 | CP-05~10 | NFR-PERF-06, NFR-REL-05/06 | AFR-ARC-04 | UDMR 路由、成本熔断、性能漂移检测 |
+| **V2** | 9.11-9.12 | 2 项 | CP-11~12 | NFR-REL-05 | AFR-ARC-09 | 区块链哈希链、UEBA 用户行为分析 |
+| **总计** | **9.1-9.12** | **12 项** | | | | |
+
+### Story 9.1: 路由决策日志 `P0-MVP`
 
 **As a** 成本审计员，
 **I want** 记录路由决策日志，
@@ -2281,7 +2580,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.2: 语义缓存基础
+### Story 9.2: 语义缓存基础 `P0-MVP`
 
 **As a** 性能工程师，
 **I want** 语义缓存基础（相似度>0.9 命中），
@@ -2301,7 +2600,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.3: UDMR 三层决策（V1 能力）
+### Story 9.3: UDMR 三层决策（V1 能力） `P1-V1`
 
 **As a** 路由决策器，
 **I want** UDMR 三层决策（L1 合规→L2 评估→L3 执行），
@@ -2326,7 +2625,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.4: 三级成本熔断
+### Story 9.4: 三级成本熔断 `P0-MVP`
 
 **As a** 成本管理员，
 **I want** 三级成本熔断（任务级/会话级/系统级），
@@ -2351,7 +2650,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.5: 任务成本预测与预警
+### Story 9.5: 任务成本预测与预警 `P1-V1`
 
 **As a** 财务分析师，
 **I want** 任务成本预测，
@@ -2371,7 +2670,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.6: 缓存失效管理
+### Story 9.6: 缓存失效管理 `P1-V1`
 
 **As a** 缓存管理员，
 **I want** 缓存失效管理（TTL + 事件驱动 + 版本感知），
@@ -2396,7 +2695,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.7: 性能漂移检测（CUSUM 算法）
+### Story 9.7: 性能漂移检测（CUSUM 算法） `P1-V1`
 
 **As a** 运维工程师，
 **I want** 性能漂移检测（CUSUM 算法），
@@ -2416,7 +2715,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.8: 健康度仪表盘
+### Story 9.8: 健康度仪表盘 `P0-MVP`
 
 **As a** 运维工程师，
 **I want** 健康度仪表盘，
@@ -2436,7 +2735,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.9: OpenTelemetry Trace 输出
+### Story 9.9: OpenTelemetry Trace 输出 `P0-MVP`
 
 **As a** 可观测性工程师，
 **I want** OpenTelemetry Trace 输出，
@@ -2456,7 +2755,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.10: 区块链哈希链（V2 能力）
+### Story 9.10: 区块链哈希链（V2 能力） `P2-V2`
 
 **As a** 安全审计员，
 **I want** 区块链哈希链，
@@ -2476,7 +2775,7 @@ requirementsExtracted:
 
 ---
 
-### Story 9.11: UEBA 用户行为分析（V2 能力）
+### Story 9.11: UEBA 用户行为分析（V2 能力） `P2-V2`
 
 **As a** 安全分析师，
 **I want** UEBA 用户行为分析，
@@ -2500,7 +2799,16 @@ requirementsExtracted:
 
 **目标：** 实现 API 网关、企业系统集成、外部数据源和 MCP/A2A 协议，支持生态合作。
 
-### Story 10.1: API 可用性与 OpenAPI 规范
+### 本 Epic 版本路线图
+
+| 版本 | Stories | 数量 | FRs | NFRs | AFRs | 核心功能 |
+|------|---------|------|-----|------|------|---------|
+| **MVP** | 10.1-10.3 | 3 项 | 集成 NFRs | NFR-INT-01/04/05 | AFR-ARC-09 | API 网关、OA 集成 |
+| **V1** | 10.4-10.6 | 3 项 | 集成 NFRs | NFR-INT-02/03 | AFR-ARC-09 | ERP/CRM 集成、外部数据源 |
+| **V2** | 10.7-10.8 | 2 项 | 集成 NFRs | NFR-INT-02 | AFR-ARC-09 | 生态集成、市场对接 |
+| **总计** | **10.1-10.8** | **8 项** | | | | |
+
+### Story 10.1: API 可用性与 OpenAPI 规范 `P0-MVP`
 
 **As a** 集成工程师，
 **I want** API 可用性≥99% 并符合 OpenAPI 3.1 规范，
@@ -2520,7 +2828,7 @@ requirementsExtracted:
 
 ---
 
-### Story 10.2: 预置集成适配器
+### Story 10.2: 预置集成适配器 `P0-MVP`
 
 **As a** 集成工程师，
 **I want** 预置≥5 个集成适配器（ERP/CRM/OA 各至少 1 个），
@@ -2545,7 +2853,7 @@ requirementsExtracted:
 
 ---
 
-### Story 10.3: 外部数据源接入
+### Story 10.3: 外部数据源接入 `P0-MVP`
 
 **As a** 数据分析师，
 **I want** 接入≥3 个外部数据源（工商/税务/专利等），
@@ -2570,7 +2878,7 @@ requirementsExtracted:
 
 ---
 
-### Story 10.4: 集成失败率与重试
+### Story 10.4: 集成失败率与重试 `P1-V1`
 
 **As a** 运维工程师，
 **I want** 集成失败率<1% 并支持自动重试，
@@ -2590,7 +2898,7 @@ requirementsExtracted:
 
 ---
 
-### Story 10.5: MCP/A2A 协议兼容性
+### Story 10.5: MCP/A2A 协议兼容性 `P1-V1`
 
 **As a** 生态工程师，
 **I want** MCP/A2A 协议兼容性，
@@ -2610,7 +2918,7 @@ requirementsExtracted:
 
 ---
 
-### Story 10.6: 生态集成与市场对接（V2 能力）
+### Story 10.6: 生态集成与市场对接（V2 能力） `P2-V2`
 
 **As a** 生态合作经理，
 **I want** 与用友/金蝶/华为云建立生态合作，
@@ -2720,7 +3028,7 @@ requirementsExtracted:
 - ✅ 所有 122 项 FRs 已提取并分类
 - ✅ 所有 40 项 NFRs 已提取并分类
 - ✅ Architecture 和 UX Design 中的额外技术要求已提取
-- ✅ 10 个 Epics 已定义并分解为 154 个 Stories
+- ✅ 10 个 Epics 已定义并分解为 x 个 Stories
 - ✅ 每个 Story 包含完整的 Acceptance Criteria（Given/When/Then 格式）
 - ✅ FR Coverage Map 已生成，100% 覆盖
 
