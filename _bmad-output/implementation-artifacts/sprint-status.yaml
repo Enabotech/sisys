@@ -1,0 +1,163 @@
+# generated: 2026-02-28
+# project: sisys
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: g:\ai\sisys\_bmad-output\implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-02-28
+project: sisys
+project_key: NOKEY
+tracking_system: file-system
+story_location: g:\ai\sisys\_bmad-output\implementation-artifacts
+
+development_status:
+  # Epic 0: Iteration 0
+  epic-0: in-progress
+  0-1-dev-environment-setup: ready-for-dev
+  0-2-ci-cd-pipeline: backlog
+  0-3-test-framework-setup: backlog
+  epic-0-retrospective: optional
+
+  # Epic 1: 企业级架构基础与合规
+  epic-1: backlog
+  1-1-hexagonal-architecture-scaffold: backlog
+  1-2-domain-events-definition: backlog
+  1-3-event-bus-implementation: backlog
+  1-4-redis-cache-layer: backlog
+  1-5-postgresql-relational-layer: backlog
+  1-6-qdrant-vector-layer: backlog
+  1-7-minio-object-layer: backlog
+  1-8-neo4j-graph-layer: backlog
+  1-9-rbac-permission-management: backlog
+  1-10-unified-audit-logging: backlog
+  1-11-data-sovereignty-isolation: backlog
+  1-12-eq20-level3-compliance: backlog
+  1-13-k8s-auto-scaling: backlog
+  1-14a-autonomous-invocation-trigger: backlog
+  1-14b-autonomous-invocation-route: backlog
+  1-14c-autonomous-invocation-execute: backlog
+  1-15a-externalized-memory-context-compression: backlog
+  1-15b-externalized-memory-five-layer-storage: backlog
+  1-16-integration-test-framework: backlog
+  1-17-udmr-basic-routing: backlog
+  1-18a-prefect-workflow-engine: backlog
+  1-18b-langgraph-agent-orchestration: backlog
+  1-19-cost-metrics-basic: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: 文档与数据管理
+  epic-2: backlog
+  2-1-document-upload-17-formats: backlog
+  2-2a-document-parsing-basic-formats: backlog
+  2-2b-document-parsing-extended-formats: backlog
+  2-3-layout-information-preservation: backlog
+  2-4-table-semantic-extraction: backlog
+  2-5-ocr-parsing: backlog
+  2-6-document-version-snapshot: backlog
+  2-7-metadata-validation: backlog
+  2-8-semantic-chunking: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: 智能检索与知识发现
+  epic-3: backlog
+  3-1a-dense-semantic-search: backlog
+  3-1b-bm25-sparse-search-rrf: backlog
+  3-2-entity-extraction: backlog
+  3-3-domain-dictionary-management: backlog
+  3-4-rrf-fusion-ranking: backlog
+  3-5-layered-search: backlog
+  3-6-contract-structured-summary: backlog
+  3-7-relevance-evaluation: backlog
+  3-8-high-fidelity-traceability: backlog
+  3-9-semantic-caching: backlog
+  3-10-strategic-archive-storage: backlog
+  3-11-fact-validity-labels: backlog
+  3-12-data-staleness-marking: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: 战略工具箱
+  epic-4: backlog
+  4-1-strategic-tool-registration: backlog
+  4-2-tool-chain-orchestration: backlog
+  4-3-schema-validation: backlog
+  4-4-docker-sandbox-execution: backlog
+  4-5-red-blue-debate-basic: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Agent 协作系统
+  epic-5: backlog
+  5-1-ceo-agent-instantiation: backlog
+  5-2-agent-identity-loading: backlog
+  5-3-single-agent-workflow: backlog
+  5-4-eip-basic-isolation: backlog
+  5-5-triple-hard-isolation: backlog
+  5-6-isolation-switch-logging: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: 战略规划流程 (BLM 前两阶段)
+  epic-6: backlog
+  6-1-blm-first-two-phases: backlog
+  6-2-market-insight-six-steps: backlog
+  6-3-checkpoint-snapshot-creation: backlog
+  6-4-json-thought-chain-output: backlog
+  6-5a-markdown-report-generation: backlog
+  6-5b-pdf-report-citation-index: backlog
+  6-6-checkpoint-review-recovery: backlog
+  6-7-traceability-tree-display: backlog
+  6-8-executive-dashboard: backlog
+  6-9-analyst-view: backlog
+  6-10-consultant-view: backlog
+  6-11-white-label-report-basic: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: 多触点用户界面与 API 集成
+  epic-7: backlog
+  7-1-cli-command-interface: backlog
+  7-2-rest-api-interface: backlog
+  7-3-api-gateway: backlog
+  7-4-health-dashboard: backlog
+  7-5-accessibility-design: backlog
+  7-6-api-contract-testing: backlog
+  7-7-api-e2e-testing: backlog
+  7-8-skeleton-loading: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: 用户权限管理与审计合规
+  epic-8: backlog
+  8-1-audit-log-multi-search: backlog
+  8-2-correction-classification-basic: backlog
+  8-3-l0-l1-auto-solidification: backlog
+  8-4-data-sovereignty-enforcement: backlog
+  8-5-shieldcortex-prompt-injection: backlog
+  8-6-penetration-testing: backlog
+  epic-8-retrospective: optional
+
+# Summary:
+# Total Epics: 9 (Epic 0-8, MVP phase)
+# Total Stories: 85
+# All stories currently in 'backlog' status (ready for development)
