@@ -580,15 +580,15 @@ documentStatus: 'step-02-complete'
 | Epic 编号 | Epic 名称 | 优先级 | 包含 FR | Story 数 | 用户价值 |
 |---------|---------|-------|--------|---------|---------|
 | Epic 0 | Iteration 0 | P0 | - | 3 | 开发环境、CI/CD、测试框架（合入 Epic 1） |
-| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 22 | 系统稳定性、性能、安全、合规（等保 2.0） |
-| Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 8 | 用户可以上传和管理 17 种格式文档 |
-| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 12 | 用户可以检索文档并溯源至原始坐标点 |
+| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 23 | 系统稳定性、性能、安全、合规（等保 2.0） |
+| Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
+| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
 | Epic 4 | 战略工具箱 | P0 | ST-01~05 | 5 | 用户可以执行 23 种战略工具分析 |
 | Epic 5 | Agent 协作系统 | P0 | AC-01~06 | 6 | 用户可以通过 CEO Agent 执行战略规划 |
-| Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 11 | 用户可以生成战略规划并审批 |
+| Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
 | Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
-| **总计** | - | - | **57 项 FR** | **81** | - |
+| **总计** | - | - | **57 项 FR** | **85** | - |
 
 **V1 (P1) Epic 列表：**
 
@@ -679,8 +679,9 @@ documentStatus: 'step-02-complete'
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
 | Story 1.17 | **UDMR 基础路由（本地优先静态配置）** | MVP 阶段支持基础成本优化，验证本地路由≥80% | 依赖 Story 1.14b | **P0-17（ARCH UDMR）** |
-| Story 1.18 | **工作流引擎集成（Prefect + LangGraph）** | 实现双核引擎架构，支持数据管道和 Agent 编排 | 依赖 Story 1.1 | **P0-18（ARCH 技术栈）** |
-| Story 1.19 | **成本度量基础（Token 消耗与成本追踪）** | 验证 MVP 成本优化效果并衡量 ROI | 依赖 Story 1.17, 7.4 | **P0-19（CFO ROI 验证）** |
+| Story 1.18a | **Prefect 工作流引擎集成** | 实现数据管道引擎，支持文档处理/RAG 索引/报告生成 | 依赖 Story 1.1 | **P0-18a（ARCH Prefect）** |
+| Story 1.18b | **LangGraph Agent 编排集成** | 实现 Agent 编排引擎，支持 BLM 规划/Agent 协作 | 依赖 Story 1.1, 1.18a | **P0-18b（ARCH LangGraph）** |
+| Story 1.19 | **成本度量基础（Token 消耗与成本追踪）** | 验证 MVP 成本优化效果并衡量 ROI | 依赖 Story 1.17 | **P0-19（CFO ROI 验证）** |
 
 **✅ 依赖关系验证：**
 - Epic 1 内部故事依赖均为**组内依赖**，不依赖其他 Epic
@@ -697,8 +698,9 @@ documentStatus: 'step-02-complete'
 - **Story 1.15a/b**：覆盖 or.md 系统公理二（外部化记忆：LLM 上下文=缓存，磁盘记忆=真相源）
 - **Story 1.16**：集成测试框架，支持所有 Epic 的集成测试和 E2E 测试
 - **Story 1.17**：覆盖 ARCH UDMR 基础路由（本地优先静态配置，成本优化基础）
-- **Story 1.18**：覆盖 ARCH 技术栈（Prefect 3.6+ 数据管道、LangGraph 1.0+ Agent 编排）
-- **Story 1.19**：覆盖 CFO ROI 验证（Token 消耗追踪、成本统计、健康度仪表盘集成）
+- **Story 1.18a**：覆盖 ARCH Prefect（Prefect 3.6+ 数据管道：文档处理/RAG 索引/报告生成）
+- **Story 1.18b**：覆盖 ARCH LangGraph（LangGraph 1.0+ Agent 编排：BLM 规划/Agent 协作）
+- **Story 1.19**：覆盖 CFO ROI 验证（Token 消耗追踪、成本统计，依赖 Story 1.17 UDMR 路由日志）
 
 ---
 
@@ -1013,23 +1015,40 @@ So that **MVP 阶段支持基础成本优化，验证本地路由占比≥80%**�
 **依赖关系：** 依赖 Story 1.14b（路由决策日志）
 **执行优先级：** P0-17（MVP，ARCH UDMR 基础）
 
-### Story 1.18: 工作流引擎集成（Prefect + LangGraph）
+### Story 1.18a: Prefect 工作流引擎集成
 
 As a **系统架构师**,
-I want **集成 Prefect（数据管道）和 LangGraph（Agent 编排）**,
-So that **系统支持双核引擎架构，Prefect 负责确定性数据流，LangGraph 负责认知推理**。
+I want **集成 Prefect 3.6+ 工作流引擎（数据管道）**,
+So that **系统支持确定性数据流，包括文档处理、RAG 索引、报告生成**。
 
 **Acceptance Criteria:**
 
 **Given** 架构骨架已实现（Story 1.1）
-**When** 执行数据管道或 Agent 编排任务
-**Then** Prefect 3.6+ 执行文档处理/RAG 索引/报告生成流程（确定性数据流）
-**And** LangGraph 1.0+ 执行 Agent 协作/BLM 规划流程（认知密集型推理）
-**And** 双引擎通过编排服务协调（无直接耦合，通过领域事件通信）
-**And** 工作流状态持久化至 Redis（TTL 24h-30d）
+**When** 执行数据管道任务（文档处理/RAG 索引/报告生成）
+**Then** Prefect 3.6+ 执行流程，支持任务重试、失败恢复、状态追踪
+**And** 流程状态持久化至 Redis（TTL 24h-30d）
+**And** 发布领域事件（DocProcessed/RAGIndexed/ReportGenerated）
 
 **依赖关系：** 依赖 Story 1.1（架构骨架）、Story 1.3（事件总线）
-**执行优先级：** P0-18（MVP，ARCH 技术栈）
+**执行优先级：** P0-18a（MVP，ARCH Prefect）
+
+### Story 1.18b: LangGraph Agent 编排集成
+
+As a **系统架构师**,
+I want **集成 LangGraph 1.0+ 工作流引擎（Agent 编排）**,
+So that **系统支持认知密集型推理，包括 BLM 规划、Agent 协作、多视角分析**。
+
+**Acceptance Criteria:**
+
+**Given** 架构骨架已实现（Story 1.1），Prefect 集成完成（Story 1.18a）
+**When** 执行 Agent 编排任务（BLM 规划/Agent 协作/多视角分析）
+**Then** LangGraph 1.0+ 执行状态机，支持多 Agent 协作、Checkpoint 机制
+**And** Agent 状态持久化至 Redis（TTL 24h-30d）
+**And** 发布领域事件（AgentDecided/CheckpointReached）
+**And** 与 Prefect 通过编排服务协调（无直接耦合，通过领域事件通信）
+
+**依赖关系：** 依赖 Story 1.1（架构骨架）、Story 1.3（事件总线）、Story 1.18a（Prefect 集成）
+**执行优先级：** P0-18b（MVP，ARCH LangGraph）
 
 ### Story 1.19: 成本度量基础（Token 消耗与成本追踪）
 
@@ -1046,7 +1065,7 @@ So that **验证 MVP 成本优化效果并衡量 ROI，支持"成本节省 50%"�
 **And** 健康度仪表盘显示 Token 消耗趋势和成本统计（Story 7.4 集成）
 **And** 支持按任务类型/Agent/时间范围聚合查询
 
-**依赖关系：** 依赖 Story 1.17（UDMR 基础路由）、Story 7.4（健康度仪表盘）
+**依赖关系：** 依赖 Story 1.17（UDMR 基础路由）
 **执行优先级：** P0-19（MVP，CFO ROI 验证）
 
 ---
@@ -1063,13 +1082,14 @@ So that **验证 MVP 成本优化效果并衡量 ROI，支持"成本节省 50%"�
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
 | Story 2.1 | 文档上传（17 种格式） | 用户可以上传企业现有各类文档 | 依赖 Epic 1 Story 1.7（MinIO 存储） | **P0-1** |
-| Story 2.2 | 文档解析与内容提取 | 非结构化文档转化为结构化知识 | 依赖 Story 2.1 | **P0-2** |
-| Story 2.3 | 版面信息保留（DocLayNet） | 支持高保真溯源至原始文档坐标点 | 依赖 Story 2.2 | **P0-3（关键路径）** |
-| Story 2.4 | 表格行列语义提取 | 财务数据不失真，支持后续分析 | 依赖 Story 2.2 | P1-4 |
-| Story 2.5 | OCR 解析（扫描件/图像 PDF） | 历史纸质文档和扫描件可被处理 | 依赖 Story 2.2 | P1-5 |
-| Story 2.6 | 文档版本快照 | 支持版本追溯和回滚 | 依赖 Story 2.2, Epic 1 Story 1.7 | P1-6 |
-| Story 2.7 | 元数据标准化校验 | 确保文档元数据完整性和可追溯性 | 依赖 Story 2.2 | P1-7 |
-| Story 2.8 | 语义分块 | 检索结果更符合语义完整性 | 依赖 Story 2.2, Epic 1 Story 1.6 | P1-8 |
+| Story 2.2a | **文档解析与内容提取（基础格式）** | 支持 PDF/Word/TXT 解析，MVP 核心格式 | 依赖 Story 2.1 | **P0-2a（关键路径）** |
+| Story 2.2b | **文档解析与内容提取（扩展格式）** | 支持 17 种格式完整解析（PPT/Excel/图像等） | 依赖 Story 2.2a | P1-2b |
+| Story 2.3 | 版面信息保留（DocLayNet） | 支持高保真溯源至原始文档坐标点 | 依赖 Story 2.2a | **P0-3（关键路径）** |
+| Story 2.4 | 表格行列语义提取 | 财务数据不失真，支持后续分析 | 依赖 Story 2.2a | P1-4 |
+| Story 2.5 | OCR 解析（扫描件/图像 PDF） | 历史纸质文档和扫描件可被处理 | 依赖 Story 2.2a | P1-5 |
+| Story 2.6 | 文档版本快照 | 支持版本追溯和回滚 | 依赖 Story 2.2a, Epic 1 Story 1.7 | P1-6 |
+| Story 2.7 | 元数据标准化校验 | 确保文档元数据完整性和可追溯性 | 依赖 Story 2.2a | P1-7 |
+| Story 2.8 | 语义分块 | 检索结果更符合语义完整性 | 依赖 Story 2.2a, Epic 1 Story 1.6 | P1-8 |
 
 **✅ 依赖关系验证：**
 - Epic 2 依赖 Epic 1 的存储层（Story 1.6 Qdrant, Story 1.7 MinIO）
@@ -1079,8 +1099,9 @@ So that **验证 MVP 成本优化效果并衡量 ROI，支持"成本节省 50%"�
 
 **⚠️ 关键路径说明：**
 - **Story 2.3（版面信息保留）是 Epic 3 Story 3.8（高保真溯源）的前置依赖**
-- **执行顺序：Story 2.1 → Story 2.2 → Story 2.3 → Epic 3 Story 3.8**
+- **执行顺序：Story 2.1 → Story 2.2a（基础格式）→ Story 2.3 → Epic 3 Story 3.8**
 - Story 2.3 必须提前至前 3 个 Story 执行，否则影响 Epic 3 溯源功能交付
+- **Story 2.2b（扩展格式）可延至 V1，不影响 MVP 核心功能**
 
 ### Story 2.1: 文档上传（17 种格式）
 
@@ -1095,18 +1116,40 @@ So that **系统可以处理企业现有各类文档**。
 **Then** 系统接收所有支持格式，显示上传进度
 **And** 支持分片上传和断点续传
 
-### Story 2.2: 文档解析与内容提取
+### Story 2.2a: 文档解析与内容提取（基础格式）
 
 As a **企业战略人员**,
-I want **系统解析上传文档并提取文本、表格、图像、公式内容**,
-So that **非结构化文档转化为结构化知识资产**。
+I want **系统解析基础格式文档（PDF/Word/TXT）并提取文本、表格、图像、公式内容**,
+So that **MVP 核心格式支持，非结构化文档转化为结构化知识资产**。
 
 **Acceptance Criteria:**
 
-**Given** 文档已上传完成
+**Given** 文档已上传完成（PDF/Word/TXT 格式）
 **When** 系统执行文档解析
 **Then** 提取文本、表格、图像、公式内容，输出结构化 JSON
-**And** 解析准确率≥95%（抽样验证）
+**And** 解析准确率≥95%（抽样验证，仅基础格式）
+**And** 支持 DocLayNet 版面信息保留（用于 Story 2.3）
+
+**依赖关系：** 依赖 Story 2.1（文档上传）
+**执行优先级：** P0-2a（MVP，关键路径）
+
+### Story 2.2b: 文档解析与内容提取（扩展格式）
+
+As a **企业战略人员**,
+I want **系统解析扩展格式文档（PPT/Excel/图像/HTML 等）并提取内容**,
+So that **支持 17 种格式完整解析，企业现有各类文档都可处理**。
+
+**Acceptance Criteria:**
+
+**Given** 文档已上传完成（PPT/PPTX/XLS/XLSX/CSV/JPEG/PNG/GIF/HTML 等扩展格式）
+**When** 系统执行文档解析
+**Then** 提取文本、表格、图像、公式内容，输出结构化 JSON
+**And** 解析准确率≥95%（抽样验证，扩展格式）
+**And** 支持 OCR 解析（扫描件/图像 PDF，中/英）
+**And** 支持表格语义提取（合并单元格/跨页表格）
+
+**依赖关系：** 依赖 Story 2.2a（基础格式解析）
+**执行优先级：** P1-2b（V1，扩展格式支持）
 
 ### Story 2.3: 版面信息保留（DocLayNet 格式）
 
@@ -1199,15 +1242,16 @@ So that **检索结果更符合语义完整性**。
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 3.1 | 混合检索（Dense + BM25） | 同时支持语义检索和关键词检索 | 依赖 Epic 1 Story 1.6（Qdrant） | P0-1 |
-| Story 3.2 | 实体抽取（LLM+ 规则混合） | 构建知识图谱的实体和关系 | 依赖 Story 3.1 | P0-2 |
+| Story 3.1a | **Dense 语义检索** | 支持语义相似度检索（bge-m3 嵌入） | 依赖 Epic 1 Story 1.6（Qdrant） | **P0-1a（关键路径）** |
+| Story 3.1b | **BM25 稀疏检索 + RRF 融合** | 支持关键词检索，与 Dense 检索融合 | 依赖 Story 3.1a | **P0-1b（关键路径）** |
+| Story 3.2 | 实体抽取（LLM+ 规则混合） | 构建知识图谱的实体和关系 | 依赖 Story 3.1b | P0-2 |
 | Story 3.3 | 战略领域词典库管理 | 实体抽取准确率持续提升 | 依赖 Story 3.2 | P1-3 |
-| Story 3.4 | RRF 融合排序 | 综合多种检索信号提升相关性 | 依赖 Story 3.1 | P0-4 |
+| Story 3.4 | RRF 融合排序 | 综合多种检索信号提升相关性 | 依赖 Story 3.1b | P0-4 |
 | Story 3.5 | 分层检索（L1-L4） | 支持自顶向下和自底向上的双向检索 | 依赖 Story 3.4 | P0-5 |
 | Story 3.6 | 契约化结构化摘要生成 | 摘要质量可控且可验证 | 依赖 Story 3.5 | P1-6 |
 | Story 3.7 | 检索相关性评估 | 防止基于不足数据生成幻觉内容 | 依赖 Story 3.6 | P1-7 |
 | Story 3.8 | 高保真溯源（Bounding Box 级） | 从结论快速追溯至原始文档坐标点 | 依赖 Epic 2 Story 2.3 | **P0-8（关键路径）** |
-| Story 3.9 | 语义缓存 | 减少重复检索和 LLM 调用，降低 Token 消耗 | 依赖 Story 3.1 | P1-9 |
+| Story 3.9 | 语义缓存 | 减少重复检索和 LLM 调用，降低 Token 消耗 | 依赖 Story 3.1a | P1-9 |
 | Story 3.10 | 战略档案库永久存储 | 形成企业长期记忆和知识积累 | 依赖 Epic 1 Story 1.5/1.7 | P1-10 |
 | Story 3.11 | 事实有效期标签管理 | 支持时间轴演进的动态知识网络查询 | 依赖 Story 3.10 | P1-11 |
 | Story 3.12 | 数据陈旧标记 | 提醒用户注意数据时效性 | 依赖 Story 3.11 | P1-12 |
@@ -1215,7 +1259,7 @@ So that **检索结果更符合语义完整性**。
 **✅ 依赖关系验证：**
 - Epic 3 依赖 Epic 1 的存储层（Story 1.6 Qdrant, Story 1.5 PostgreSQL, Story 1.7 MinIO）
 - Epic 3 依赖 Epic 2 的版面信息保留（Story 2.3）用于 Bounding Box 溯源
-- Epic 3 内部故事依赖均为**顺序依赖**（检索流水线）
+- Epic 3 内部故事���赖均为**顺序依赖**（检索流水线）
 - Epic 3 可独立交付价值（用户检索和溯源）
 - 不依赖 Epic 4-8
 
@@ -1225,18 +1269,34 @@ So that **检索结果更符合语义完整性**。
 
 ---
 
-### Story 3.1: 混合检索（Dense + BM25）
+### Story 3.1a: Dense 语义检索
 
 As a **分析师**,
-I want **系统执行混合检索（Dense bge-m3 + BM25 稀疏检索），双路召回**,
-So that **同时支持语义检索和关键词检索**。
+I want **系统执行 Dense 语义检索（bge-m3 嵌入，余弦相似度）**,
+So that **支持语义相似度检索，理解查询的深层含义**。
+
+**Acceptance Criteria:**
+
+**Given** 用户输入检索查询
+**When** 系统执行 Dense 检索
+**Then** 使用 bge-m3 生成查询嵌入（维度 1024），在 Qdrant 中执行余弦相似度检索
+**And** 检索延迟 P95<200ms（初检）
+**And** 支持 Payload 过滤（元数据过滤）
+
+### Story 3.1b: BM25 稀疏检索 + RRF 融合
+
+As a **分析师**,
+I want **系统执行 BM25 稀疏检索并与 Dense 检索融合（RRF 算法）**,
+So that **同时支持语义检索和关键词检索，综合提升相关性**。
 
 **Acceptance Criteria:**
 
 **Given** 用户输入检索查询
 **When** 系统执行混合检索
-**Then** Dense 检索（bge-m3）和 BM25 检索并行执行，双路召回
-**And** 检索延迟 P95<800ms（MVP）
+**Then** BM25 检索与 Dense 检索（Story 3.1a）并行执行，双路召回
+**And** 使用 RRF（Reciprocal Rank Fusion）融合两路结果
+**And** 集成 ColBERT-v2 重排序器对 Top-K 候选精排
+**And** 检索延迟 P95<800ms（MVP，含重排序）
 
 ### Story 3.2: 实体抽取（LLM+ 规则混合）
 
@@ -1589,31 +1649,32 @@ So that **满足审计追踪要求**。
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 6.1 | BLM 前两阶段流程 | 完成战略规划的基础分析阶段 | 依赖 Epic 1 Story 1.4/1.7, Epic 2 Story 2.2 | P0-1 |
+| Story 6.1 | BLM 前两阶段流程 | 完成战略规划的基础分析阶段 | 依赖 Epic 1 Story 1.4/1.7, Epic 2 Story 2.2a | P0-1 |
 | Story 6.2 | 市场洞察六子步骤 | 全面分析市场环境和机会 | 依赖 Story 6.1 | P0-2 |
 | Story 6.3 | Checkpoint 快照创建 | 支持阶段审批和中断恢复 | 依赖 Story 6.2 | P0-3 |
 | Story 6.4 | JSON 思维链输出 | Agent 决策过程可追溯和可解释 | 依赖 Story 6.1 | P0-4 |
-| Story 6.5 | 多格式报告生成 | 可以导出和分享规划结果 | 依赖 Story 6.3 | **P0-5** |
+| Story 6.5a | **Markdown 报告生成（基础）** | 支持 Markdown 格式报告导出，MVP 基础 | 依赖 Story 6.3 | **P0-5a** |
+| Story 6.5b | **PDF 报告生成 + 引文索引** | 支持 PDF 格式报告，包含可点击引文 | 依赖 Story 6.5a | **P0-5b** |
 | Story 6.6 | Checkpoint 摘要查看与恢复 | 高管参与关键决策点审批 | 依赖 Story 6.3 | P1-6 |
 | Story 6.7 | 溯源树展示 | 验证分析结论的可靠性 | 依赖 Epic 2 Story 2.3, Epic 3 Story 3.8 | **P0-7** |
-| Story 6.8 | 高管简化视图 | 快速理解态势并做出决策 | 依赖 Story 6.5 | **P0-8（不依赖 Story 6.5）** |
+| Story 6.8 | 高管简化视图 | 快速理解态势并做出决策 | 依赖 Story 6.5a | **P0-8（不依赖 Story 6.5b）** |
 | Story 6.9 | **分析师视图** | 专业工具、BLM 进度可视化、快捷键支持 | 依赖 Story 6.1/6.7 | **P1-9（UX 三视图）** |
-| Story 6.10 | **顾问视图** | 白标报告导出、品牌模板配置、多项目管理 | 依赖 Story 6.5 | **P1-10（UX 三视图）** |
-| Story 6.11 | **白标报告基础（品牌模板配置）** | 顾问可以直接交付客户，验证 MVP 付费意愿 | 依赖 Story 6.5 | **P0-11（UX 白标报告）** |
+| Story 6.10 | **顾问视图** | 白标报告导出、品牌模板配置、多项目管理 | 依赖 Story 6.5b | **P1-10（UX 三视图）** |
+| Story 6.11 | **白标报告基础（品牌模板配置）** | 顾问可以直接交付客户，验证 MVP 付费意愿 | 依赖 Story 6.5a | **P0-11（UX 白标报告）** |
 
 **✅ 依赖关系验证：**
 - Epic 6 依赖 Epic 1 的缓存层/存储层（Story 1.4/1.7）
-- Epic 6 依赖 Epic 2 的文档解析（Story 2.2）和版面信息保留（Story 2.3）
+- Epic 6 依赖 Epic 2 的文档解析（Story 2.2a）和版面信息保留（Story 2.3）
 - Epic 6 依赖 Epic 3 的高保真溯源（Story 3.8）
 - Epic 6 内部故事依赖均为**顺序依赖**（BLM 流程→Checkpoint→报告→审批）
 - Epic 6 可独立交付价值（用户生成和审批战略规划）
 - 不依赖 Epic 4-5/7-8
 
 **⚠️ 优先级优化说明：**
-- **Story 6.5 提升至 P0-5**：支持 Story 6.8（高管简化视图）的优先级依赖
-- **Story 6.8 不依赖 Story 6.5**：高管视图可独立显示，不依赖报告生成
-- **Story 6.9/6.10**：UX 三视图设计（高管视图/分析师视图/顾问视图），P1 优先级
-- **Story 6.11（新增）**：白标报告基础，MVP 验证顾问付费意愿，P0-11
+- **Story 6.5a/6.5b 拆分**：Markdown 基础（P0-5a）→ PDF+ 引文（P0-5b），降低单点风险
+- **Story 6.8 依赖 Story 6.5a**：高管视图仅需 Markdown 基础，不依赖 PDF+ 引文
+- **Story 6.10 依赖 Story 6.5b**：顾问视图需要 PDF 报告生成
+- **Story 6.11 依赖 Story 6.5a**：白标报告基础仅需 Markdown 基础，品牌配置可独立实现
 
 ### Story 6.1: BLM 前两阶段流程（业绩差距分析 + 市场洞察）
 
@@ -1668,18 +1729,34 @@ So that **Agent 决策过程可追溯和可解释**。
 **Then** 包含完整的 JSON 思维链（Input→<Reflection>→<Tools_Used>→<Constraints_Check>→JSON）
 **And** 思维链存储至战略档案库
 
-### Story 6.5: 多格式报告生成（PDF/Markdown）
+### Story 6.5a: Markdown 报告生成（基础）
 
 As a **企业战略人员**,
-I want **系统生成多格式报告（PDF/Markdown），包含可点击的引文索引**,
-So that **可以导出和分享规划结果**。
+I want **系统生成 Markdown 格式报告**,
+So that **MVP 阶段可以导出和分享规划结果，支持高管视图和白标报告基础**。
 
 **Acceptance Criteria:**
 
 **Given** BLM 前两阶段完成
 **When** 生成报告
-**Then** 支持 PDF 和 Markdown 格式
-**And** 报告包含可点击的引文索引，支持溯源
+**Then** 生成 Markdown 格式报告，包含结构化章节（业绩差距分析、市场洞察）
+**And** 支持基础格式化（标题、列表、表格）
+**And** 导出时间<30 秒
+
+### Story 6.5b: PDF 报告生成 + 引文索引
+
+As a **企业战略人员**,
+I want **系统生成 PDF 格式报告，包含可点击的引文索引**,
+So that **可以导出专业格式的规划结果，支持溯源和分享**。
+
+**Acceptance Criteria:**
+
+**Given** BLM 前两阶段完成，Markdown 报告已生成（Story 6.5a）
+**When** 生成 PDF 报告
+**Then** 将 Markdown 转换为 PDF 格式，保持格式一致
+**And** 报告包含可点击的引文索引，支持 Bounding Box 溯源
+**And** PDF 渲染质量高（文字清晰、表格完整、图像不失真）
+**And** 导出时间<1 分钟
 
 ### Story 6.6: Checkpoint 摘要查看与恢复
 
@@ -2094,14 +2171,14 @@ So that **确保 MVP 无高危漏洞**。
 | **Epic 7: 多触点用户界面与 API 集成** | 多触点操作与监控能力<br/>NFR 覆盖<br/>测试 Story<br/>**骨架屏加载** | Story 1.1/1.9/1.12/1.16 | - | - | 并行依赖 | ✅ 是 | **8** |
 | **Epic 8: 用户权限管理与审计合规** | 安全与合规 | Story 1.5/1.7/1.9/1.10/1.12 | - | - | 顺序依赖（安全测试） | ✅ 是 | 6 |
 
-**总计 Story 数：81 个**
+**总计 Story 数：85 个**（原 81 个 + Party Mode 第二轮拆分 4 个→8 个，净增 4 个）
 - Iteration 0: 3 个（Story 0.1-0.3）
-- Epic 1: 21 个（Story 1.1-1.19，新增 Story 1.13-1.19）
-- Epic 2: 8 个
-- Epic 3: 12 个
+- Epic 1: 22 个（Story 1.1-1.19，Story 1.18 拆分为 1.18a/1.18b）
+- Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
+- Epic 3: 13 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b）
 - Epic 4: 5 个
 - Epic 5: 6 个
-- Epic 6: 11 个（新增 Story 6.9-6.11）
+- Epic 6: 12 个（Story 6.1-6.11，Story 6.5 拆分为 6.5a/6.5b）
 - Epic 7: 8 个（新增 Story 7.5-7.8）
 - Epic 8: 6 个
 
@@ -2119,7 +2196,8 @@ So that **确保 MVP 无高危漏洞**。
 8. **NFR 完整覆盖** - Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03）
 9. **测试 Story 覆盖** - Story 1.16（集成测试框架）、Story 7.7（API E2E 测试）
 10. **UX 三视图覆盖** - Story 6.8（高管视图）、Story 6.9（分析师视图）、Story 6.10（顾问视图）
-11. **Party Mode 新增覆盖** - Story 1.17（UDMR）、Story 1.18（工作流引擎）、Story 1.19（成本度量）、Story 6.11（白标报告）、Story 7.8（骨架屏）
+11. **Party Mode 新增覆盖** - Story 1.17（UDMR）、Story 1.18a/1.18b（工作流引擎）、Story 1.19（成本度量）、Story 6.11（白标报告）、Story 7.8（骨架屏）
+12. **Party Mode 第二轮拆分** - Story 1.18→1.18a/1.18b、Story 2.2→2.2a/2.2b、Story 3.1→3.1a/3.1b、Story 6.5→6.5a/6.5b
 
 ### 关键依赖路径图
 
@@ -2132,11 +2210,12 @@ Epic 0（Iteration 0）
             ├──→ Story 1.15a/b（外部化记忆，or.md 系统公理二）
             ├──→ Story 1.16（集成测试框架，支持所有 Epic）
             ├──→ Story 1.17（UDMR 基础路由，成本优化基础）✨新增
-            ├──→ Story 1.18（工作流引擎集成，Prefect+LangGraph）✨新增
+            ├──→ Story 1.18a（Prefect 工作流引擎集成）✨拆分
+            ├──→ Story 1.18b（LangGraph Agent 编排集成）✨拆分
             └──→ Story 1.19（成本度量基础，Token 消耗与 ROI 验证）✨新增
             │
             ├──→ Epic 2（文档与数据管理）───→ Epic 3（智能检索与知识发现）───→ Epic 6（战略规划流程）
-            │       └─关键路径：Story 2.3（版面信息保留）→ Epic 3 Story 3.8（高保真溯源）
+            │       └─关键路径：Story 2.1→2.2a（基础格式）→2.3（版面信息）→3.1a（Dense）→3.1b（BM25+RRF）→3.8（高保真溯源）
             │               │
             │               └──→ Epic 6: Story 6.9（分析师视图）、Story 6.10（顾问视图）、Story 6.11（白标报告基础）✨新增
             │
@@ -2160,14 +2239,15 @@ Epic 0（Iteration 0）
 | 建议 | 状态 | 实施说明 |
 |------|------|---------|
 | **第 1 条：拆分 Story 1.14/1.15** | ✅ 已完成 | Story 1.14a/b/c（自主调用循环）、Story 1.15a/b（外部化记忆） |
-| **第 2 条：Story 6.5/6.8 优先级优化** | ✅ 已完成 | Story 6.5 提升至 P0-5，Story 6.8 不依赖 Story 6.5 |
+| **第 2 条：Story 6.5/6.8 优先级优化** | ✅ 已完成 | Story 6.5 拆分为 6.5a/6.5b，Story 6.8 依赖 Story 6.5a |
 | **第 3 条：增加 NFR Story** | ✅ 已完成 | Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03） |
 | **额外：所有 Epic 价值组和依赖关系验证** | ✅ 已完成 | Epic 1-8 全部添加价值组表格、依赖关系验证、执行优先级 |
-| **Party Mode：UDMR 基础路由** | ✅ 已完成 | Story 1.17（本地优先静态配置） |
-| **Party Mode：工作流引擎集成** | ✅ 已完成 | Story 1.18（Prefect + LangGraph） |
-| **Party Mode：成本度量基础** | ✅ 已完成 | Story 1.19（Token 消耗与成本追踪） |
-| **Party Mode：白标报告基础** | ✅ 已完成 | Story 6.11（品牌模板配置） |
-| **Party Mode：骨架屏加载** | ✅ 已完成 | Story 7.8（感知性能优化） |
+| **Party Mode 第一轮：UDMR 基础路由** | ✅ 已完成 | Story 1.17（本地优先静态配置） |
+| **Party Mode 第一轮：工作流引擎集成** | ✅ 已拆分 | Story 1.18a（Prefect）+ Story 1.18b（LangGraph） |
+| **Party Mode 第一轮：成本度量基础** | ✅ 已完成 | Story 1.19（Token 消耗与成本追踪） |
+| **Party Mode 第一轮：白标报告基础** | ✅ 已完成 | Story 6.11（品牌模板配置） |
+| **Party Mode 第一轮：骨架屏加载** | ✅ 已完成 | Story 7.8（感知性能优化） |
+| **Party Mode 第二轮：拆分大 Story** | ✅ 已完成 | Story 1.18→1.18a/1.18b、Story 2.2→2.2a/2.2b、Story 3.1→3.1a/3.1b、Story 6.5→6.5a/6.5b |
 
 ### P1 关键改进建议实施状态
 
@@ -2180,15 +2260,26 @@ Epic 0（Iteration 0）
 
 ---
 
-**文档状态：** 本文档已完成 **Step 02（Epic 设计）**，P0 关键改进建议（第 1-3 条）已实施，P1 关键改进建议（第 3-5-6-8 条）已实施，**Party Mode 评审建议（5 项）已实施**，所有 Epic 价值组和依赖关系验证已完成
+**文档状态：** 本文档已完成 **Step 02（Epic 设计）**，P0 关键改进建议（第 1-3 条）已实施，P1 关键改进建议（第 3-5-6-8 条）已实施，**Party Mode 两轮评审建议已全部实施**，所有 Epic 价值组和依赖关系验证已完成
 
-**总计 Story 数：81 个**（原 76 个 + Party Mode 新增 5 个：Story 1.17-1.19, Story 6.11, Story 7.8）
+**总计 Story 数：85 个**
+- 原 76 个 + Party Mode 第一轮新增 5 个（Story 1.17-1.19, 6.11, 7.8）+ Party Mode 第二轮拆分 4 个→8 个（净增 4 个）
+- **MVP P0 Story：48 个**（建议范围，确保 8 周交付可行性）
+- **V1 P1 Story：37 个**
+
+**Story 拆分总结（Party Mode 第二轮）：**
+- Story 1.18 → Story 1.18a（Prefect）+ Story 1.18b（LangGraph）
+- Story 2.2 → Story 2.2a（基础格式：PDF/Word/TXT）+ Story 2.2b（扩展格式：PPT/Excel/图像等）
+- Story 3.1 → Story 3.1a（Dense 语义检索）+ Story 3.1b（BM25 稀疏检索 + RRF 融合）
+- Story 6.5 → Story 6.5a（Markdown 报告基础）+ Story 6.5b（PDF 报告 + 引文索引）
 
 **Additional Requirements 覆盖率：** 从 50% 提升至 **75%** 🎉
+
+**8 周 MVP 交付可行性：** ✅ 可行（48 个 P0 Story / 8 周 = 6 Story/周，合理范围）
 
 **下一步操作：**
 
 **Select an Option:**
 - **[A]** Advanced Elicitation - 深度需求挖掘
-- **[P]** Party Mode - 多 Agent 评审（已完成一轮）
+- **[P]** Party Mode - 多 Agent 评审（已完成两轮）
 - **[C]** Continue - 继续到 Step 03（创建用户故事）
