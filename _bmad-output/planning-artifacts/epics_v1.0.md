@@ -345,14 +345,18 @@ documentStatus: 'step-02-complete'
 
 ### FR Coverage Map（双向追溯矩阵）
 
+**完整 FR 总览：122 项功能需求完整映射（P0: 57 项，P1: 46 项，P2: 18 项）**
+
+#### P0 FR 映射（57 项 - MVP）
+
 | FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
 |--------|--------|----------|-----------|-------|
-| **架构约束 (AR)** |
+| **架构约束 (AR) - 4 项** |
 | FR-AR-01 | 领域层零依赖 | Epic 1 | Story 1.1 | P0 |
 | FR-AR-02 | 领域事件发布 | Epic 1 | Story 1.2 | P0 |
 | FR-AR-03 | 跨存储事务 | Epic 1 | Story 1.5 | P0 |
 | FR-AR-04 | 仓储模式 | Epic 1 | Story 1.1 | P0 |
-| **系统管理与合规 (SC)** |
+| **系统管理与合规 (SC) - 8 项** |
 | FR-SC-01 | 用户认证与 RBAC | Epic 1 | Story 1.9 | P0 |
 | FR-SC-02 | 统一审计日志 | Epic 1 | Story 1.10 | P0 |
 | FR-SC-03 | WORM 存储 | Epic 1 | Story 1.7 | P0 |
@@ -361,12 +365,12 @@ documentStatus: 'step-02-complete'
 | FR-SC-06 | L0/L1 自动固化 | Epic 8 | Story 8.3 | P0 |
 | FR-SC-07 | 数据主权隔离 | Epic 1 | Story 1.11 | P0 |
 | FR-SC-08 | 等保 2.0 三级 | Epic 1 | Story 1.12 | P0 |
-| **成本与性能优化 (CP)** |
-| FR-CP-01 | 路由决策日志 | Epic 1 | Story 1.10 | P0 |
+| **成本与性能优化 (CP) - 4 项** |
+| FR-CP-01 | 路由决策日志 | Epic 1 | Story 1.14b | P0 |
 | FR-CP-02 | 语义缓存 | Epic 3 | Story 3.9 | P0 |
-| FR-CP-03 | 健康度仪表盘 | Epic 1 | Story 1.12 | P0 |
-| FR-CP-04 | OpenTelemetry Trace | Epic 1 | Story 1.12 | P0 |
-| **文档与数据管理 (DM)** |
+| FR-CP-03 | 健康度仪表盘 | Epic 7 | Story 7.4 | P0 |
+| FR-CP-04 | OpenTelemetry Trace | Epic 1 | Story 1.16 | P0 |
+| **文档与数据管理 (DM) - 8 项** |
 | FR-DM-01 | 17 种格式上传 | Epic 2 | Story 2.1 | P0 |
 | FR-DM-02 | 文档解析 | Epic 2 | Story 2.2 | P0 |
 | FR-DM-03 | 版面信息保留 | Epic 2 | Story 2.3 | P0 |
@@ -375,7 +379,7 @@ documentStatus: 'step-02-complete'
 | FR-DM-06 | 版本快照 | Epic 2 | Story 2.6 | P0 |
 | FR-DM-07 | 元数据校验 | Epic 2 | Story 2.7 | P0 |
 | FR-DM-08 | 语义分块 | Epic 2 | Story 2.8 | P0 |
-| **智能检索与知识发现 (SR)** |
+| **智能检索与知识发现 (SR) - 8 项** |
 | FR-SR-01 | 混合检索 | Epic 3 | Story 3.1 | P0 |
 | FR-SR-02 | 实体抽取 | Epic 3 | Story 3.2 | P0 |
 | FR-SR-03 | 领域词典管理 | Epic 3 | Story 3.3 | P0 |
@@ -383,37 +387,189 @@ documentStatus: 'step-02-complete'
 | FR-SR-05 | 分层检索 | Epic 3 | Story 3.5 | P0 |
 | FR-SR-06 | 契约化摘要 | Epic 3 | Story 3.6 | P0 |
 | FR-SR-07 | 检索相关性评估 | Epic 3 | Story 3.7 | P0 |
-| FR-SR-08 | Bounding Box 溯源 | Epic 2 | Story 2.3 | P0 |
-| **战略工具箱 (ST)** |
+| FR-SR-08 | Bounding Box 溯源 | Epic 6 | Story 6.7 | P0 |
+| **战略工具箱 (ST) - 5 项** |
 | FR-ST-01 | 23 种工具注册 | Epic 4 | Story 4.1 | P0 |
 | FR-ST-02 | 工具链编排 | Epic 4 | Story 4.2 | P0 |
 | FR-ST-03 | Schema 验证 | Epic 4 | Story 4.3 | P0 |
 | FR-ST-04 | Docker 沙箱 | Epic 4 | Story 4.4 | P0 |
 | FR-ST-05 | 红蓝辩论基础 | Epic 4 | Story 4.5 | P0 |
-| **Agent 协作 (AC)** |
+| **Agent 协作 (AC) - 6 项** |
 | FR-AC-01 | CEO Agent 实例化 | Epic 5 | Story 5.1 | P0 |
 | FR-AC-02 | 身份档案加载 | Epic 5 | Story 5.2 | P0 |
 | FR-AC-03 | 单 Agent 工作流 | Epic 5 | Story 5.3 | P0 |
 | FR-AC-04 | EIP 基础 | Epic 5 | Story 5.4 | P0 |
 | FR-AC-05 | 三重硬隔离 | Epic 5 | Story 5.5 | P0 |
 | FR-AC-06 | 隔离切换日志 | Epic 5 | Story 5.6 | P0 |
-| **战略规划流程 (SP)** |
+| **战略规划流程 (SP) - 4 项** |
 | FR-SP-01 | BLM 前两阶段 | Epic 6 | Story 6.1 | P0 |
 | FR-SP-02 | 市场洞察六子步骤 | Epic 6 | Story 6.2 | P0 |
 | FR-SP-03 | Checkpoint 快照 | Epic 6 | Story 6.3 | P0 |
 | FR-SP-04 | JSON 思维链 | Epic 6 | Story 6.4 | P0 |
-| **用户交互与报告 (UI)** |
+| **用户交互与报告 (UI) - 7 项** |
 | FR-UI-01 | CLI 接口 | Epic 7 | Story 7.1 | P0 |
 | FR-UI-02 | REST API | Epic 7 | Story 7.2 | P0 |
 | FR-UI-03 | API Gateway | Epic 7 | Story 7.3 | P0 |
 | FR-UI-04 | 多格式报告 | Epic 6 | Story 6.5 | P0 |
 | FR-UI-05 | Checkpoint 恢复 | Epic 6 | Story 6.6 | P0 |
 | FR-UI-06 | 溯源树展示 | Epic 6 | Story 6.7 | P0 |
-| FR-UI-07 | 高管简化视图 | Epic 7 | Story 7.4 | P0 |
-| **战略档案库 (SA)** |
-| FR-SA-01 | 永久存储 | Epic 3 | Story 3.10 | P0 |
+| FR-UI-07 | 高管简化视图 | Epic 6 | Story 6.8 | P0 |
+| **战略档案库 (SA) - 3 项** |
+| FR-SA-01 | 永久存储 | Epic 1 | Story 1.15b | P0 |
 | FR-SA-02 | 有效期标签 | Epic 3 | Story 3.11 | P0 |
 | FR-SA-03 | 数据陈旧标记 | Epic 3 | Story 3.12 | P0 |
+
+**P0 FR 覆盖统计：57/57 项 ✅**
+- AR: 4/4 | SC: 8/8 | CP: 4/4 | DM: 8/8 | SR: 8/8 | ST: 5/5 | AC: 6/6 | SP: 4/4 | UI: 7/7 | SA: 3/3
+
+---
+
+#### P1 FR 映射（46 项 - V1）
+
+| FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
+|--------|--------|----------|-----------|-------|
+| **文档与数据管理 (DM) - 4 项** |
+| FR-DM-09 | 追溯数据切片至导入批次 | Epic 2 | Story 2.9 | P1 |
+| FR-DM-10 | 环境预检（GPU/CUDA/内存） | Epic 2 | Story 2.10 | P1 |
+| FR-DM-11 | 经营复盘数据导入 | Epic 2 | Story 2.11 | P1 |
+| FR-DM-12 | 合并单元格语义还原 | Epic 2 | Story 2.12 | P1 |
+| **智能检索与知识发现 (SR) - 5 项** |
+| FR-SR-09 | 实体对齐与消歧 | Epic 3 | Story 3.13 | P1 |
+| FR-SR-10 | 查询路由引擎 | Epic 3 | Story 3.14 | P1 |
+| FR-SR-11 | 摘要质量评估 | Epic 3 | Story 3.15 | P1 |
+| FR-SR-12 | 自动补救机制 | Epic 3 | Story 3.16 | P1 |
+| FR-SR-13 | 知识图谱构建（GraphRAG） | Epic 3 | Story 3.17 | P1 |
+| **战略工具箱 (ST) - 4 项** |
+| FR-ST-06 | 工具版本管理 | Epic 4 | Story 4.6 | P1 |
+| FR-ST-07 | Validation Feedback 闭环 | Epic 4 | Story 4.7 | P1 |
+| FR-ST-08 | MCP/A2A 协议支持 | Epic 4 | Story 4.8 | P1 |
+| FR-ST-09 | 财务建模与估值基础 | Epic 4 | Story 4.9 | P1 |
+| **Agent 协作 (AC) - 8 项** |
+| FR-AC-07 | 多 Agent 任务分解 | Epic 9 | Story 9.1 | P1 |
+| FR-AC-08 | 协作依赖图生成 | Epic 9 | Story 9.2 | P1 |
+| FR-AC-09 | 动态隔离等级调整 | Epic 9 | Story 9.3 | P1 |
+| FR-AC-10 | 联合分析组创建 | Epic 9 | Story 9.4 | P1 |
+| FR-AC-11 | 公共黑板交换中间结论 | Epic 9 | Story 9.5 | P1 |
+| FR-AC-12 | SYS Agent 裁决 | Epic 9 | Story 9.6 | P1 |
+| FR-AC-13 | 三套方案生成 | Epic 9 | Story 9.7 | P1 |
+| FR-AC-14 | 深度思考与多路径推演 | Epic 9 | Story 9.8 | P1 |
+| **战略规划流程 (SP) - 6 项** |
+| FR-SP-05 | 完整 BLM 六阶段流程 | Epic 10 | Story 10.1 | P1 |
+| FR-SP-06 | Replay 重放模式 | Epic 10 | Story 10.2 | P1 |
+| FR-SP-07 | 修改影响范围评估 | Epic 10 | Story 10.3 | P1 |
+| FR-SP-08 | Override 覆盖模式 | Epic 10 | Story 10.4 | P1 |
+| FR-SP-09 | Time-travel 两阶段能力 | Epic 10 | Story 10.5 | P1 |
+| FR-SP-10 | 红蓝辩论机制完整实现 | Epic 10 | Story 10.6 | P1 |
+| **用户交互与报告 (UI) - 5 项** |
+| FR-UI-08 | 决策过程可视化 | Epic 14 | Story 14.1 | P1 |
+| FR-UI-09 | 分支管理 | Epic 14 | Story 14.2 | P1 |
+| FR-UI-10 | Checkpoint 恢复模式选择界面 | Epic 14 | Story 14.3 | P1 |
+| FR-UI-11 | 无障碍设计 | Epic 7 | Story 7.5 | P1 |
+| FR-UI-12 | 多语言界面 | Epic 14 | Story 14.4 | P1 |
+| **系统管理与合规 (SC) - 4 项** |
+| FR-SC-09 | 敏感数据脱敏 | Epic 13 | Story 13.1 | P1 |
+| FR-SC-10 | L2 级修正专家确认 | Epic 13 | Story 13.2 | P1 |
+| FR-SC-11 | L3 级修正委员会审批 | Epic 13 | Story 13.3 | P1 |
+| FR-SC-12 | SOX 合规（404 条款） | Epic 13 | Story 13.4 | P1 |
+| **成本与性能优化 (CP) - 6 项** |
+| FR-CP-05 | UDMR 三层决策 | Epic 11 | Story 11.1 | P1 |
+| FR-CP-06 | 四因子评分路由 | Epic 11 | Story 11.2 | P1 |
+| FR-CP-07 | 三级成本熔断 | Epic 11 | Story 11.3 | P1 |
+| FR-CP-08 | 任务成本预测 | Epic 11 | Story 11.4 | P1 |
+| FR-CP-09 | 缓存失效管理 | Epic 11 | Story 11.5 | P1 |
+| FR-CP-10 | 性能漂移检测（CUSUM） | Epic 11 | Story 11.6 | P1 |
+| **战略档案库 (SA) - 4 项** |
+| FR-SA-04 | 时间轴演进查询 | Epic 13 | Story 13.5 | P1 |
+| FR-SA-05 | 心跳机制 | Epic 13 | Story 13.6 | P1 |
+| FR-SA-06 | 战略偏差预警事件 | Epic 13 | Story 13.7 | P1 |
+| FR-SA-07 | 分支管理（主线/分支对比） | Epic 13 | Story 13.8 | P1 |
+
+**P1 FR 覆盖统计：46/46 项 ✅**
+- DM: 4/4 | SR: 5/5 | ST: 4/4 | AC: 8/8 | SP: 6/6 | UI: 5/5 | SC: 4/4 | CP: 6/6 | SA: 4/4
+
+---
+
+#### P2 FR 映射（18 项 - V2）
+
+| FR 编号 | FR 描述 | 归属 Epic | 归属 Story | 优先级 |
+|--------|--------|----------|-----------|-------|
+| **文档与数据管理 (DM) - 3 项** |
+| FR-DM-13 | 数学公式识别（LaTeX/MathML） | Epic 17 | Story 17.1 | P2 |
+| FR-DM-14 | 图文联合嵌入（跨模态检索） | Epic 17 | Story 17.2 | P2 |
+| FR-DM-15 | 音视频转录文本接入 | Epic 17 | Story 17.3 | P2 |
+| **智能检索与知识发现 (SR) - 2 项** |
+| FR-SR-14 | 引用数据时效性管理 | Epic 17 | Story 17.4 | P2 |
+| FR-SR-15 | 实体关联查询/路径查询/社区发现 | Epic 17 | Story 17.5 | P2 |
+| **战略工具箱 (ST) - 2 项** |
+| FR-ST-10 | gVisor 沙箱执行 | Epic 18 | Story 18.1 | P2 |
+| FR-ST-11 | 压力测试建模 | Epic 18 | Story 18.2 | P2 |
+| **Agent 协作 (AC) - 2 项** |
+| FR-AC-15 | 强制暂停请求用户介入 | Epic 18 | Story 18.3 | P2 |
+| FR-AC-16 | Agent 实例池化与动态扩缩容 | Epic 18 | Story 18.4 | P2 |
+| **战略规划流程 (SP) - 2 项** |
+| FR-SP-11 | BEM 六阶段流程（战略解码） | Epic 15 | Story 15.1 | P2 |
+| FR-SP-12 | SP→BP 结构化映射 | Epic 15 | Story 15.2 | P2 |
+| **用户交互与报告 (UI) - 1 项** |
+| FR-UI-13 | 决策影响分析（Shapley 贡献值） | Epic 19 | Story 19.1 | P2 |
+| **系统管理与合规 (SC) - 2 项** |
+| FR-SC-13 | ISO 27001 认证 | Epic 16 | Story 16.1 | P2 |
+| FR-SC-14 | 银保监会规范（1104/EAST 报表） | Epic 16 | Story 16.2 | P2 |
+| **成本与性能优化 (CP) - 2 项** |
+| FR-CP-11 | 区块链哈希链（审计日志不可篡改） | Epic 16 | Story 16.3 | P2 |
+| FR-CP-12 | UEBA 用户行为分析 | Epic 16 | Story 16.4 | P2 |
+| **战略档案库 (SA) - 2 项** |
+| FR-SA-08 | 知识更新主动推送 | Epic 19 | Story 19.2 | P2 |
+| FR-SA-09 | 预测性战略预警（CUSUM 漂移检测） | Epic 19 | Story 19.3 | P2 |
+
+**P2 FR 覆盖统计：18/18 项 ✅**
+- DM: 3/3 | SR: 2/2 | ST: 2/2 | AC: 2/2 | SP: 2/2 | UI: 1/1 | SC: 2/2 | CP: 2/2 | SA: 2/2
+
+---
+
+### FR 覆盖总览
+
+| FR 类别 | P0 | P1 | P2 | 总计 | 覆盖率 |
+|--------|----|----|----|------|-------|
+| AR（架构约束） | 4 | 0 | 0 | 4 | ✅ 4/4 |
+| SC（系统管理与合规） | 8 | 4 | 2 | 14 | ✅ 14/14 |
+| CP（成本与性能优化） | 4 | 6 | 2 | 12 | ✅ 12/12 |
+| DM（文档与数据管理） | 8 | 4 | 3 | 15 | ✅ 15/15 |
+| SR（智能检索与知识发现） | 8 | 5 | 2 | 15 | ✅ 15/15 |
+| ST（战略工具箱） | 5 | 4 | 2 | 11 | ✅ 11/11 |
+| AC（Agent 协作） | 6 | 8 | 2 | 16 | ✅ 16/16 |
+| SP（战略规划流程） | 4 | 6 | 2 | 12 | ✅ 12/12 |
+| UI（用户交互与报告） | 7 | 5 | 1 | 13 | ✅ 13/13 |
+| SA（战略档案库） | 3 | 4 | 2 | 9 | ✅ 9/9 |
+| **总计** | **57** | **46** | **18** | **121** | ✅ **121/122** |
+
+**注：** FR-SA-10（群体智能，P3）为 V3+ 版本功能，暂不纳入本次 Epic 分解
+
+---
+
+### NFR 与额外 Story 覆盖
+
+**新增 Story 覆盖说明（非 FR 直接映射）：**
+
+| Story | 名称 | 覆盖内容 | 类型 |
+|-------|------|---------|------|
+| Story 0.1-0.3 | Iteration 0（开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
+| Story 1.13 | K8s 动态扩缩容 | NFR-SCALE-03（可扩展性） | NFR Story |
+| Story 1.14a/b/c | 自主调用循环（trigger/route/execute） | or.md 系统公理一 | or.md 追溯 |
+| Story 1.15a/b | 外部化记忆（上下文压缩/五层存储协同） | or.md 系统公理二 | or.md 追溯 |
+| Story 1.16 | 集成测试框架 | 测试基础设施 | 测试 Story |
+| Story 6.9 | 分析师视图 | UX 三视图（分析师） | UX Story |
+| Story 6.10 | 顾问视图 | UX 三视图（顾问） | UX Story |
+| Story 7.5 | 无障碍设计 | NFR-ACC-01（可访问性） | NFR Story |
+| Story 7.6 | API 契约测试 | NFR-INT-05（集成性） | NFR Story |
+| Story 7.7 | API E2E 测试 | 端到端测试 | 测试 Story |
+
+**NFR 覆盖统计：**
+- NFR-PERF（性能）：Story 3.1/3.5（检索延迟）
+- NFR-SEC（安全）：Story 8.5/8.6（ShieldCortex/渗透测试）
+- NFR-COMP（合规）：Story 1.12（等保 2.0）
+- NFR-SCALE（可扩展性）：Story 1.13（K8s 扩缩容）✅
+- NFR-INT（集成性）：Story 7.6（API 契约测试）✅
+- NFR-ACC（可访问性）：Story 7.5（无障碍设计）✅
 
 ---
 
@@ -421,17 +577,18 @@ documentStatus: 'step-02-complete'
 
 **MVP (P0) Epic 列表：**
 
-| Epic 编号 | Epic 名称 | 优先级 | 包含 FR | 故事数 | 用户价值 |
-|---------|---------|-------|--------|-------|---------|
-| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04 | 12 | 系统稳定性、性能、安全、合规（等保 2.0） |
+| Epic 编号 | Epic 名称 | 优先级 | 包含 FR | Story 数 | 用户价值 |
+|---------|---------|-------|--------|---------|---------|
+| Epic 0 | Iteration 0 | P0 | - | 3 | 开发环境、CI/CD、测试框架 |
+| Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 18 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 8 | 用户可以上传和管理 17 种格式文档 |
-| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-01/02/03 | 11 | 用户可以检索文档并溯源至原始坐标点 |
-| Epic 4 | 战略工具箱 | P0 | ST-01~05 | 6 | 用户可以执行 23 种战略工具分析 |
-| Epic 5 | Agent 协作系统 | P0 | AC-01~06 | 8 | 用户可以通过 CEO Agent 执行战略规划 |
+| Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 12 | 用户可以检索文档并溯源至原始坐标点 |
+| Epic 4 | 战略工具箱 | P0 | ST-01~05 | 5 | 用户可以执行 23 种战略工具分析 |
+| Epic 5 | Agent 协作系统 | P0 | AC-01~06 | 6 | 用户可以通过 CEO Agent 执行战略规划 |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 10 | 用户可以生成战略规划并审批 |
-| Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03/07, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
-| Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 4 | 管理员可以管理权限和审计日志 |
-| **总计** | - | - | **57 项 FR** | **67** | - |
+| Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 7 | 用户可以通过 CLI/API/仪表盘操作系统 |
+| Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
+| **总计** | - | - | **57 项 FR** | **85** | - |
 
 **V1 (P1) Epic 列表：**
 
@@ -462,27 +619,41 @@ documentStatus: 'step-02-complete'
 
 **目标：** 建立六边形架构基础、事件驱动机制、五层存储架构和基础合规能力，为后续功能提供技术基础。
 
-**包含 FR：** AR-01, AR-02, AR-03, AR-04, SC-01, SC-02, SC-03, SC-07, SC-08, CP-01, CP-04
+**包含 FR：** AR-01, AR-02, AR-03, AR-04, SC-01, SC-02, SC-03, SC-07, SC-08, CP-01, CP-04, SA-01
 
-**📦 价值组 1: 系统稳定性与性能基础**
-> 为用户提供稳定的系统性能和高可用性保障
+**📦 价值组 1: Iteration 0（开发基础设施）**
+> 为团队提供统一的开发环境、CI/CD 和测试框架
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
 | Story 0.1 | **开发环境搭建** | 提供统一的开发环境和工具链 | 无依赖 | **P0-0（Iteration 0）** |
-| Story 0.2 | **CI/CD 流水线** | 自动化构建、测试和部署 | 依赖 Story 0.1 | **P0-0（Iteration 0，所有 Epic 前置）** |
+| Story 0.2 | **CI/CD 流水线** | 自动化构建、测试和部署 | 依赖 Story 0.1 | **P0-0（所有 Epic 前置）** |
 | Story 0.3 | **测试框架搭建** | 提供单元测试、集成测试框架 | 依赖 Story 0.1 | **P0-0（Iteration 0）** |
+
+**📦 价值组 2: 架构基础与事件驱动**
+> 实现六边形架构、领域事件和事件总线
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
 | Story 1.1 | 六边形架构骨架 | 领域逻辑与技术实现隔离，支持长期演进 | 无依赖（基础） | P0-1 |
 | Story 1.2 | 领域事件定义 | 支持事件驱动架构和事件溯源 | 依赖 Story 1.1 | P0-2 |
 | Story 1.3 | 事件总线实现 | 实时事件低延迟路由，持久化事件可靠传输 | 依赖 Story 1.2 | P0-3 |
+| Story 1.16 | **集成测试框架** | 提供集成测试、E2E 测试框架和测试数据管理 | 依赖 Story 0.3, 1.1 | **P1-16（测试 Story）** |
+
+**📦 价值组 3: 五层存储架构**
+> 实现 Redis/PostgreSQL/Qdrant/MinIO/Neo4j 五层存储
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
 | Story 1.4 | Redis 高速缓存层 | 低延迟会话管理和语义缓存 | 依赖 Story 1.1 | P0-4 |
 | Story 1.5 | PostgreSQL 关系存储层 | 支持 ACID 事务和外键约束 | 依赖 Story 1.1 | P0-5 |
 | Story 1.6 | Qdrant 向量存储层 | 支持混合检索（Dense + Sparse + Payload 过滤） | 依赖 Story 1.1 | P0-6 |
 | Story 1.7 | MinIO 对象存储层 | 支持版本控制和 WORM 存储 | 依赖 Story 1.1 | P0-7 |
 | Story 1.8 | Neo4j 图存储层 | 支持 GraphRAG 增强检索和实体关联查询 | 依赖 Story 1.1 | P0-8 |
+| Story 1.13 | **K8s 动态扩缩容** | 支持基于负载的自动扩缩容 | 依赖 Story 1.4/1.5 | **P1-13（NFR-SCALE-03）** |
 
-**📦 价值组 2: 安全与合规基础**
-> 为用户提供数据安全、权限控制和合规审计能力
+**📦 价值组 4: 安全与合规基础**
+> 实现 RBAC、审计日志、数据主权和等保 2.0
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
@@ -490,19 +661,24 @@ documentStatus: 'step-02-complete'
 | Story 1.10 | 统一审计日志 | 满足等保 2.0 和 SOX 合规要求 | 依赖 Story 1.5 | P0-10 |
 | Story 1.11 | 数据主权隔离 | 满足数据安全法和 PIPL 要求 | 依赖 Story 1.9, 1.10 | P0-11 |
 | Story 1.12 | 等保 2.0 三级基础要求 | 通过公安部指定测评机构测评 | 依赖 Story 1.9, 1.10, 1.11 | P0-12 |
-| Story 1.13 | **K8s 动态扩缩容** | 支持基于负载的自动扩缩容 | 依赖 Story 1.4/1.5 | **P1-13（NFR-SCALE-03）** |
+
+**📦 价值组 5: or.md 系统公理实现**
+> 实现自主调用循环和外部化记忆
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
 | Story 1.14a | **自主调用循环 - trigger** | 实现领域事件/心跳事件触发机制 | 依赖 Story 1.2/1.3 | **P0-14a（or.md 系统公理一）** |
 | Story 1.14b | **自主调用循环 - route** | 实现 session_id 哈希/语义路由 | 依赖 Story 1.14a | **P0-14b（or.md 系统公理一）** |
 | Story 1.14c | **自主调用循环 - execute** | 实现会话命名空间执行与状态快照 | 依赖 Story 1.14b | **P0-14c（or.md 系统公理一）** |
 | Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4 | **P0-15a（or.md 系统公理二）** |
 | Story 1.15b | **外部化记忆 - 五层存储协同** | 会话状态持久化至五层存储，压缩前持久化笔记 | 依赖 Story 1.15a, 1.5-1.8 | **P0-15b（or.md 系统公理二）** |
-| Story 1.16 | **集成测试框架** | 提供集成测试、E2E 测试框架和测试数据管理 | 依赖 Story 0.3, 1.1 | **P1-16（测试 Story）** |
 
 **✅ 依赖关系验证：**
 - Epic 1 内部故事依赖均为**组内依赖**，不依赖其他 Epic
 - Epic 1 是所有其他 Epic 的**基础依赖**，必须首先完成
-- 价值组 1（稳定性与性能）可独立交付
-- 价值组 2（安全与合规）依赖价值组 1 的存储层实现
+- 价值组 1（Iteration 0）→ 价值组 2（架构基础）→ 价值组 3（五层存储）→ 价值组 4（安全合规）→ 价值组 5（or.md 公理）
+- 价值组 1（Iteration 0）可独立交付
+- 价值组 2-5 依赖价值组 1 和 2 的架构基础
 
 **📋 Iteration 0 和 or.md 追溯说明：**
 - **Story 0.1-0.3**：Iteration 0（开发环境、CI/CD、测试框架），必须在 Iteration 1 前完成
@@ -511,6 +687,8 @@ documentStatus: 'step-02-complete'
 - **Story 1.14a/b/c**：覆盖 or.md 系统公理一（自主调用：trigger→route→execute）
 - **Story 1.15a/b**：覆盖 or.md 系统公理二（外部化记忆：LLM 上下文=缓存，磁盘记忆=真相源）
 - **Story 1.16**：集成测试框架，支持所有 Epic 的集成测试和 E2E 测试
+
+---
 
 ### Story 0.1: 开发环境搭建
 
@@ -550,105 +728,7 @@ So that **可以快速编写和执行测试用例**。
 **Given** 项目初始化完成
 **When** 运行 `pytest`
 **Then** 单元测试、集成测试框架可正常运行
-**And** 测试数据管理支持（Fixture、Mock、测试数据库）
-
-### Story 1.13: K8s 动态扩缩容
-
-As a **运维工程师**,
-I want **系统支持基于负载的自动扩缩容**,
-So that **系统可以应对流量高峰并优化资源成本**。
-
-**Acceptance Criteria:**
-
-**Given** 系统部署在 K8s 集群
-**When** 负载增加（CPU>70% 或 请求队列>100）
-**Then** 自动扩容 Pod 数量（响应时间<5 分钟）
-**And** 负载降低后自动缩容
-
-### Story 1.14a: 自主调用循环 - trigger 实现
-
-As a **系统架构师**,
-I want **实现领域事件/心跳事件触发机制**,
-So that **系统可以基于事件或周期性心跳自主启动任务**。
-
-**Acceptance Criteria:**
-
-**Given** 领域事件触发（DocumentProcessed/ToolExecuted/AgentDecided 等）或周期性心跳事件
-**When** trigger 机制检测到事件
-**Then** 解析事件类型，提取 session_id 和任务上下文
-**And** 触发 route 机制（Story 1.14b）
-
-### Story 1.14b: 自主调用循环 - route 实现
-
-As a **系统架构师**,
-I want **实现 session_id 哈希/语义路由机制**,
-So that **任务可以路由至目标 Agent 或工具**。
-
-**Acceptance Criteria:**
-
-**Given** trigger 机制传递的任务上下文
-**When** route 机制执行
-**Then** 基于 session_id 哈希或语义相似度路由至目标 Agent/工具
-**And** 路由决策日志存储（任务 ID、时间戳、L1 结果、L2 评分、选定路由、成本、延迟）
-
-### Story 1.14c: 自主调用循环 - execute 实现
-
-As a **系统架构师**,
-I want **实现会话命名空间执行与状态快照**,
-So that **任务在隔离环境中执行，状态可持久化和恢复**。
-
-**Acceptance Criteria:**
-
-**Given** route 机制传递的目标 Agent/工具
-**When** execute 机制执行
-**Then** 在会话命名空间中执行任务（Docker/gVisor 沙箱）
-**And** 状态快照序列化至 Redis Hash（支持主从复制与故障转移，TTL 24h-30d）
-**And** 执行完成后发布领域事件（DocumentProcessed/ToolExecuted/AgentDecided）
-
-### Story 1.15a: 外部化记忆 - 上下文压缩实现
-
-As a **系统架构师**,
-I want **实现 LLM 上下文压缩机制**,
-So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下文爆炸**。
-
-**Acceptance Criteria:**
-
-**Given** LLM 任务执行需要访问记忆
-**When** 上下文压缩机制执行
-**Then** LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
-**And** 压缩前执行持久化笔记步骤（存储至 Story 1.15b）
-
-### Story 1.15b: 外部化记忆 - 五层存储协同实现
-
-As a **系统架构师**,
-I want **实现会话状态与推理轨迹的五层存储协同**,
-So that **记忆分离原则得到实现，磁盘记忆=真相源**。
-
-**Acceptance Criteria:**
-
-**Given** LLM 任务执行需要持久化记忆
-**When** 五层存储协同机制执行
-**Then** 会话状态与推理轨迹持久化存储至五层存储：
-  - Redis（会话状态、语义缓存，TTL 24h-30d）
-  - PostgreSQL（用户/RBAC、审计元数据、业务实体，永久）
-  - Qdrant（嵌入向量、混合检索 payload，永久）
-  - MinIO（原始文档、证据包、审计归档，7 年 WORM）
-  - Neo4j（知识图谱、实体关系，永久）
-**And** 压缩前执行持久化笔记步骤防止信息丢失
-
-### Story 1.16: 集成测试框架
-
-As a **测试工程师**,
-I want **集成测试、E2E 测试框架和测试数据管理**,
-So that **可以快速编写和执行集成测试和 E2E 测试**。
-
-**Acceptance Criteria:**
-
-**Given** 测试框架搭建完成（Story 0.3）
-**When** 运行集成测试或 E2E 测试
-**Then** 测试框架支持跨组件测试、API 测试、UI 测试
 **And** 测试数据管理支持（Fixture、Mock、测试数据库隔离）
-**And** 所有 Epic 的集成测试和 E2E 测试都通过此框架执行
 
 ### Story 1.1: 六边形架构骨架
 
@@ -805,6 +885,104 @@ So that **通过公安部指定测评机构测评**。
 **When** 执行等保 2.0 测评
 **Then** 无高风险项，中危漏洞<5 个
 **And** 身份鉴别支持双因子认证，访问控制支持细粒度 RBAC
+
+### Story 1.13: K8s 动态扩缩容
+
+As a **运维工程师**,
+I want **系统支持基于负载的自动扩缩容**,
+So that **系统可以应对流量高峰并优化资源成本**。
+
+**Acceptance Criteria:**
+
+**Given** 系统部署在 K8s 集群
+**When** 负载增加（CPU>70% 或 请求队列>100）
+**Then** 自动扩容 Pod 数量（响应时间<5 分钟）
+**And** 负载降低后自动缩容
+
+### Story 1.14a: 自主调用循环 - trigger 实现
+
+As a **系统架构师**,
+I want **实现领域事件/心跳事件触发机制**,
+So that **系统可以基于事件或周期性心跳自主启动任务**。
+
+**Acceptance Criteria:**
+
+**Given** 领域事件触发（DocumentProcessed/ToolExecuted/AgentDecided 等）或周期性心跳事件
+**When** trigger 机制检测到事件
+**Then** 解析事件类型，提取 session_id 和任务上下文
+**And** 触发 route 机制（Story 1.14b）
+
+### Story 1.14b: 自主调用循环 - route 实现
+
+As a **系统架构师**,
+I want **实现 session_id 哈希/语义路由机制**,
+So that **任务可以路由至目标 Agent 或工具**。
+
+**Acceptance Criteria:**
+
+**Given** trigger 机制传递的任务上下文
+**When** route 机制执行
+**Then** 基于 session_id 哈希或语义相似度路由至目标 Agent/工具
+**And** 路由决策日志存储（任务 ID、时间戳、L1 结果、L2 评分、选定路由、成本、延迟）
+
+### Story 1.14c: 自主调用循环 - execute 实现
+
+As a **系统架构师**,
+I want **实现会话命名空间执行与状态快照**,
+So that **任务在隔离环境中执行，状态可持久化和恢复**。
+
+**Acceptance Criteria:**
+
+**Given** route 机制传递的目标 Agent/工具
+**When** execute 机制执行
+**Then** 在会话命名空间中执行任务（Docker/gVisor 沙箱）
+**And** 状态快照序列化至 Redis Hash（支持主从复制与故障转移，TTL 24h-30d）
+**And** 执行完成后发布领域事件（DocumentProcessed/ToolExecuted/AgentDecided）
+
+### Story 1.15a: 外部化记忆 - 上下文压缩实现
+
+As a **系统架构师**,
+I want **实现 LLM 上下文压缩机制**,
+So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下文爆炸**。
+
+**Acceptance Criteria:**
+
+**Given** LLM 任务执行需要访问记忆
+**When** 上下文压缩机制执行
+**Then** LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
+**And** 压缩前执行持久化笔记步骤（存储至 Story 1.15b）
+
+### Story 1.15b: 外部化记忆 - 五层存储协同实现
+
+As a **系统架构师**,
+I want **实现会话状态与推理轨迹的五层存储协同**,
+So that **记忆分离原则得到实现，磁盘记忆=真相源**。
+
+**Acceptance Criteria:**
+
+**Given** LLM 任务执行需要持久化记忆
+**When** 五层存储协同机制执行
+**Then** 会话状态与推理轨迹持久化存储至五层存储：
+  - Redis（会话状态、语义缓存，TTL 24h-30d）
+  - PostgreSQL（用户/RBAC、审计元数据、业务实体，永久）
+  - Qdrant（嵌入向量、混合检索 payload，永久）
+  - MinIO（原始文档、证据包、审计归档，7 年 WORM）
+  - Neo4j（知识图谱、实体关系，永久）
+**And** 压缩前执行持久化笔记步骤防止信息丢失
+
+### Story 1.16: 集成测试框架
+
+As a **测试工程师**,
+I want **集成测试、E2E 测试框架和测试数据管理**,
+So that **可以快速编写和执行集成测试和 E2E 测试**。
+
+**Acceptance Criteria:**
+
+**Given** 测试框架搭建完成（Story 0.3）
+**When** 运行集成测试或 E2E 测试
+**Then** 测试框架支持跨组件测试、API 测试、UI 测试
+**And** 测试数据管理支持（Fixture、Mock、测试数据库隔离）
+**And** 所有 Epic 的集成测试和 E2E 测试都通过此框架执行
 
 ---
 
