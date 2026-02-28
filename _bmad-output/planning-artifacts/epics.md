@@ -220,6 +220,46 @@ This document provides the complete epic and story breakdown for sisys, decompos
 - NFR-ACC-01 (P1): 无障碍设计 WCAG 2.1 AA 标准，键盘导航 100% 支持，屏幕阅读器兼容
 - NFR-ACC-02 (P1): 多语言支持中文/英文界面，翻译准确率≥95%，术语表统一
 
+### Additional Functional Requirements (AFR)
+
+**额外技术需求是从 Architecture.md 和 UX Design.md 中提取的技术实现需求，作为 PRD 中 FR 的补充。**
+
+#### AFR-ARCH (架构技术需求 - 12 项)
+
+- **AFR-ARCH-01 (P0):** 系统可以实现五层存储协同机制（Cache→Relational→Vector→Object→Graph 单向依赖链）[architecture.md 一.3.4, 二.架构拓扑图流程 56-61]
+- **AFR-ARCH-02 (P0):** 系统可以实现异步缓存更新机制（Graph 存储通过事件总线异步更新 Cache，打破循环依赖）[architecture.md 二.架构拓扑图五层存储依赖说明]
+- **AFR-ARCH-03 (P0):** 系统可以实现 Prefect 工作流引擎包装器（支持 DocFlow/RAGFlow/ReportFlow）[architecture.md 二.基础设施层]
+- **AFR-ARCH-04 (P0):** 系统可以实现 LangGraph Agent 编排引擎包装器（支持 AgentGraph/BLMGraph/BEMGraph 状态机）[architecture.md 二.基础设施层]
+- **AFR-ARCH-05 (P0):** 系统可以实现事务发件箱模式（PostgreSQL event_outbox + 轮询发布至 RabbitMQ）[architecture.md 二.消息总线]
+- **AFR-ARCH-06 (P0):** 系统可以实现死信队列（DLQ）处理失败事件，支持重试和人工干预 [architecture.md 二.消息总线]
+- **AFR-ARCH-07 (P1):** 系统可以实现 LiteLLM 动态路由器（支持 Qwen/Claude/GPT-4/Ollama 本地模型）[architecture.md 二.外部适配器]
+- **AFR-ARCH-08 (P1):** 系统可以实现 BGE-M3 嵌入适配器（支持中文/英文/多模态嵌入）[architecture.md 二.外部适配器]
+- **AFR-ARCH-09 (P1):** 系统可以实现 Docker/gVisor 沙箱适配器（支持代码执行隔离 + 网络白名单）[architecture.md 二.外部适配器]
+- **AFR-ARCH-10 (P1):** 系统可以实现 CUSUM 漂移检测算法（滑动窗口 7 天，检测准确率≥85%）[architecture.md 附录 I]
+- **AFR-ARCH-11 (P2):** 系统可以实现 Saga 事务模式（跨存储事务最终一致性）[architecture.md 附录 J]
+- **AFR-ARCH-12 (P2):** 系统可以实现多租户隔离策略（Schema per Tenant + Row-Level Security）[architecture.md 附录 H]
+
+#### AFR-UI (UX 技术需求 - 10 项)
+
+- **AFR-UI-01 (P0):** 系统可以实现 Ant Design 5.x 设计系统基础（ConfigProvider + CSS-in-JS + Design Tokens）[ux-design-specification.md Design System Foundation]
+- **AFR-UI-02 (P0):** 系统可以实现溯源卡片组件（悬浮弹窗，响应<300ms，显示文档/页码/置信度/原文）[ux-design-specification.md Defining Experience]
+- **AFR-UI-03 (P0):** 系统可以实现 Bounding Box 坐标映射（PDF.js + 坐标跳转，定位准确率≥95%）[ux-design-specification.md Defining Experience]
+- **AFR-UI-04 (P0):** 系统可以实现高管仪表盘组件（第一屏 3 个关键指标，红/黄/绿状态指示器）[ux-design-specification.md Defining Experience]
+- **AFR-UI-05 (P0):** 系统可以实现品牌模板系统（BrandThemeProvider，支持 Logo/配色/字体运行时切换）[ux-design-specification.md Design System Foundation]
+- **AFR-UI-06 (P1):** 系统可以实现风险热力图组件（基于 ECharts，风险等级可视化）[ux-design-specification.md UX Pattern Analysis]
+- **AFR-UI-07 (P1):** 系统可以实现财务量化组件（基于 Ant Design Statistic + ECharts，显示 NPV/IRR/敏感性分析）[ux-design-specification.md UX Pattern Analysis]
+- **AFR-UI-08 (P1):** 系统可以实现敏感性分析龙卷风图（基于 ECharts，变量影响排序）[ux-design-specification.md UX Pattern Analysis]
+- **AFR-UI-09 (P1):** 系统可以实现多 Agent 时间线组件（基于 Ant Design Timeline 封装，显示辩论过程）[ux-design-specification.md UX Pattern Analysis]
+- **AFR-UI-10 (P2):** 系统可以实现多页对比溯源组件（并排显示 3 个来源 + 差异高亮）[ux-design-specification.md Defining Experience]
+
+#### AFR 汇总统计
+
+| 类别 | P0 (MVP) | P1 (V1) | P2 (V2) | 总计 |
+|------|---------|--------|--------|------|
+| AFR-ARCH (架构技术) | 6 | 4 | 2 | 12 |
+| AFR-UI (UX 技术) | 5 | 4 | 1 | 10 |
+| **总计** | **11** | **8** | **3** | **22** |
+
 ### Additional Requirements
 
 **架构技术要求（来自 Architecture.md）:**
@@ -315,19 +355,65 @@ This document provides the complete epic and story breakdown for sisys, decompos
 
 **Goal:** 建立六边形架构基础，实现领域层零依赖、事件驱动架构、RBAC 权限管理、基础合规（等保 2.0）和文档管理基础能力，为后续功能提供坚实的技术基础。
 
-**Business Value:** 
+**Business Value:**
 - 技术风险控制：六边形架构确保领域逻辑与技术实现隔离，支持长期演进
 - 合规准入门槛：等保 2.0 三级是企业市场准入的基本要求
 - 数据安全基础：RBAC 权限控制和审计日志确保企业数据安全
 
 **Dependencies:** 无（基础架构 Epic）
 
-**Acceptance Criteria:**
-- 领域层零依赖测试通过（仅依赖 Python 标准库）
-- 事件发布/重放成功率 100%
-- RBAC 权限测试 100% 通过
-- 等保 2.0 三级测评无高风险项
-- 审计日志完整性 100%
+### Epic 1 需求明细总表
+
+| 需求类型 | 需求编号 | 优先级 | 需求描述 | 关联 Story |
+|---------|---------|-------|---------|-----------|
+| **FR-AR** | FR-AR-01 | P0 | 领域层不依赖任何外部框架 | Story 1.1 |
+| **FR-AR** | FR-AR-02 | P0 | 发布领域事件至事件总线 | Story 1.2 |
+| **FR-AR** | FR-AR-03 | P0 | 跨存储事务基础（PostgreSQL 事务） | Story 1.2 |
+| **FR-AR** | FR-AR-04 | P0 | 仓储模式提供统一存储接口 | Story 1.1 |
+| **FR-SC** | FR-SC-01 | P0 | RBAC 权限管理 | Story 1.3 |
+| **FR-SC** | FR-SC-02 | P0 | 统一审计日志 | Story 1.5 |
+| **FR-SC** | FR-SC-03 | P0 | 审计日志写入不可变存储（PostgreSQL 审计表） | Story 1.5 |
+| **FR-SC** | FR-SC-04 | P0 | 多维检索审计日志 | Story 1.5 |
+| **FR-SC** | FR-SC-05 | P0 | 修正分级判定基础 | Story 1.5 |
+| **FR-SC** | FR-SC-06 | P0 | 自动固化 L0/L1 级修正 | Story 1.5 |
+| **FR-SC** | FR-SC-07 | P0 | 数据主权隔离 | Story 1.4 |
+| **FR-SC** | FR-SC-08 | P0 | 等保 2.0 三级要求 | Story 1.4 |
+| **FR-DM** | FR-DM-01 | P0 | 上传 17 种格式文档 | Story 1.6 |
+| **FR-DM** | FR-DM-02 | P0 | 解析文档提取内容 | Story 1.6 |
+| **FR-DM** | FR-DM-03 | P0 | 保留文档版面信息（DocLayNet） | Story 1.6 |
+| **FR-DM** | FR-DM-04 | P0 | 提取表格行列语义 | Story 1.6 |
+| **FR-DM** | FR-DM-05 | P0 | OCR 解析（中/英） | Story 1.6 |
+| **FR-DM** | FR-DM-06 | P0 | 文档版本快照 | Story 1.7 |
+| **FR-DM** | FR-DM-07 | P0 | 元数据校验 | Story 1.7 |
+| **FR-DM** | FR-DM-08 | P0 | 文档语义分块 | Story 1.8 |
+| **AFR-ARCH** | AFR-ARCH-01 | P0 | 五层存储协同机制 | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-02 | P0 | 异步缓存更新机制 | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-03 | P0 | Prefect 工作流引擎包装器 | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-04 | P0 | LangGraph Agent 编排引擎包装器 | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-05 | P0 | 事务发件箱模式 | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-06 | P0 | 死信队列（DLQ） | Story 1.2 |
+| **AFR-ARCH** | AFR-ARCH-12 | P2 | 多租户隔离策略 | Story 1.3 |
+| **NFR-SEC** | NFR-SEC-01 | P0 | 数据传输加密 TLS 1.3 | Story 1.4 |
+| **NFR-SEC** | NFR-SEC-02 | P0 | 数据存储加密 AES-256 | Story 1.4 |
+| **NFR-SEC** | NFR-SEC-03 | P0 | 渗透测试无高危漏洞 | Story 1.4 |
+| **NFR-SEC** | NFR-SEC-04 | P0 | 数据泄露事件 0 事件 | Story 1.4 |
+| **NFR-SEC** | NFR-SEC-06 | P0 | RBAC 权限测试 100% 通过 | Story 1.3 |
+| **NFR-COMP** | NFR-COMP-01 | P0 | 等保 2.0 三级 | Story 1.4 |
+| **NFR-COMP** | NFR-COMP-02 | P0 | 审计日志保留（PostgreSQL MVP） | Story 1.5 |
+| **NFR-COMP** | NFR-COMP-03 | P0 | 数据主权 | Story 1.4 |
+| **NFR-COMP** | NFR-COMP-04 | P0 | 隐私保护（PIPL） | Story 1.4 |
+| **NFR-COMP** | NFR-COMP-05 | P0 | 审计日志完整性 100% | Story 1.5 |
+| **NFR-REL** | NFR-REL-01 | P0 | 系统可用性 99% | Story 1.2 |
+| **NFR-REL** | NFR-REL-02 | P0 | 数据备份 RPO<1 小时 | Story 1.4 |
+| **NFR-REL** | NFR-REL-03 | P0 | 灾难恢复 RTO<4 小时 | Story 1.4 |
+| **NFR-REL** | NFR-REL-04 | P0 | Checkpoint 快照持久化 | Story 1.5 |
+| **NFR-SCALE** | NFR-SCALE-04 | P0 | 多租户隔离 | Story 1.3 |
+
+**Epic 1 需求统计:**
+- FR: 18 项（FR-AR 4 项，FR-SC 8 项，FR-DM 6 项）
+- AFR: 7 项（AFR-ARCH 6 项 P0，1 项 P2）
+- NFR: 15 项（NFR-SEC 5 项，NFR-COMP 5 项，NFR-REL 4 项，NFR-SCALE 1 项）
+- **总计：40 项需求**
 
 ---
 
@@ -336,6 +422,10 @@ This document provides the complete epic and story breakdown for sisys, decompos
 As a **系统架构师**,
 I want **搭建六边形架构骨架，定义领域层/应用层/基础设施层边界**,
 So that **领域逻辑与技术实现隔离，支持长期独立演进**.
+
+**覆盖需求:**
+- FR-AR-01 (P0): 领域层不依赖任何外部框架
+- FR-AR-04 (P0): 仓储模式提供统一存储接口
 
 **Acceptance Criteria:**
 
@@ -356,6 +446,19 @@ So that **领域逻辑与技术实现隔离，支持长期独立演进**.
 As a **系统架构师**,
 I want **实现 RabbitMQ + Redis 双通道事件总线**,
 So that **核心业务逻辑通过领域事件触发，支持事件重放与失败重试**.
+
+**覆盖需求:**
+- FR-AR-02 (P0): 发布领域事件至事件总线
+- FR-AR-03 (P0): 跨存储事务基础
+- AFR-ARCH-01 (P0): 五层存储协同机制
+- AFR-ARCH-02 (P0): 异步缓存更新机制
+- AFR-ARCH-03 (P0): Prefect 工作流引擎包装器
+- AFR-ARCH-04 (P0): LangGraph Agent 编排引擎包装器
+- AFR-ARCH-05 (P0): 事务发件箱模式
+- AFR-ARCH-06 (P0): 死信队列（DLQ）
+- NFR-REL-01 (P0): 系统可用性 99%
+- NFR-REL-02 (P0): 数据备份 RPO<1 小时
+- NFR-REL-03 (P0): 灾难恢复 RTO<4 小时
 
 **Acceptance Criteria:**
 
@@ -382,6 +485,12 @@ As a **系统管理员**,
 I want **实现基于 RBAC 的权限管理（用户表/角色表/权限表/关联表）**,
 So that **不同角色用户拥有细粒度的数据访问权限**.
 
+**覆盖需求:**
+- FR-SC-01 (P0): RBAC 权限管理
+- AFR-ARCH-12 (P2): 多租户隔离策略
+- NFR-SEC-06 (P0): RBAC 权限测试 100% 通过
+- NFR-SCALE-04 (P0): 多租户隔离
+
 **Acceptance Criteria:**
 
 **Given** 用户角色配置完成
@@ -407,6 +516,19 @@ As a **合规官**,
 I want **实现等保 2.0 三级要求（身份鉴别/访问控制/安全审计/入侵防范/数据完整性/备份恢复）**,
 So that **系统通过公安部指定测评机构测评，无高风险项**.
 
+**覆盖需求:**
+- FR-SC-07 (P0): 数据主权隔离
+- FR-SC-08 (P0): 等保 2.0 三级要求
+- NFR-SEC-01 (P0): 数据传输加密 TLS 1.3
+- NFR-SEC-02 (P0): 数据存储加密 AES-256
+- NFR-SEC-03 (P0): 渗透测试无高危漏洞
+- NFR-SEC-04 (P0): 数据泄露事件 0 事件
+- NFR-COMP-01 (P0): 等保 2.0 三级
+- NFR-COMP-03 (P0): 数据主权
+- NFR-COMP-04 (P0): 隐私保护（PIPL）
+- NFR-REL-02 (P0): 数据备份 RPO<1 小时
+- NFR-REL-03 (P0): 灾难恢复 RTO<4 小时
+
 **Acceptance Criteria:**
 
 **Given** 等保 2.0 配置完成
@@ -431,6 +553,16 @@ As a **审计员**,
 I want **实现统一审计日志（log_id/timestamp/actor/action_type/target_resource/old_value/new_value）**,
 So that **所有操作可追溯，满足 SOX/ISO27001 合规要求**.
 
+**覆盖需求:**
+- FR-SC-02 (P0): 统一审计日志
+- FR-SC-03 (P0): 审计日志写入不可变存储
+- FR-SC-04 (P0): 多维检索审计日志
+- FR-SC-05 (P0): 修正分级判定基础
+- FR-SC-06 (P0): 自动固化 L0/L1 级修正
+- NFR-COMP-02 (P0): 审计日志保留（PostgreSQL MVP）
+- NFR-COMP-05 (P0): 审计日志完整性 100%
+- NFR-REL-04 (P0): Checkpoint 快照持久化
+
 **Acceptance Criteria:**
 
 **Given** 用户执行操作
@@ -453,8 +585,15 @@ So that **所有操作可追溯，满足 SOX/ISO27001 合规要求**.
 ### Story 1.6: 文档上传与解析基础
 
 As a **企业战略人员**,
-I want **上传 17 种格式的文档（pdf/txt/doc/docx/ppt/pptx/xls/xlsx/csv/jpeg/png/gif/markdown/html + zip/tar 压缩包）并自动解析**,
+I want **上传 17 种格式的文档并自动解析**,
 So that **系统可以提取文本、表格、图像内容，为 RAG 检索做准备**.
+
+**覆盖需求:**
+- FR-DM-01 (P0): 上传 17 种格式文档
+- FR-DM-02 (P0): 解析文档提取内容
+- FR-DM-03 (P0): 保留文档版面信息（DocLayNet）
+- FR-DM-04 (P0): 提取表格行列语义
+- FR-DM-05 (P0): OCR 解析（中/英）
 
 **Acceptance Criteria:**
 
@@ -481,6 +620,10 @@ As a **知识管理员**,
 I want **创建文档版本快照并校验元数据**,
 So that **文档变更可追溯，入库文档符合最小元字段集要求**.
 
+**覆盖需求:**
+- FR-DM-06 (P0): 文档版本快照
+- FR-DM-07 (P0): 元数据校验
+
 **Acceptance Criteria:**
 
 **Given** 文档变更发生
@@ -500,6 +643,9 @@ So that **文档变更可追溯，入库文档符合最小元字段集要求**.
 As a **RAG 工程师**,
 I want **基于文档语义边界而非固定字数进行分块**,
 So that **检索时可以保留完整语义上下文，提高检索相关性**.
+
+**覆盖需求:**
+- FR-DM-08 (P0): 文档语义分块
 
 **Acceptance Criteria:**
 
@@ -526,11 +672,36 @@ So that **检索时可以保留完整语义上下文，提高检索相关性**.
 
 **Dependencies:** Epic 1（基础架构与核心能力）
 
-**Acceptance Criteria:**
-- 检索延迟 P95 <800ms（MVP）
-- Bounding Box 定位准确率≥95%
-- 溯源响应时间<300ms
-- 检索相关性≥0.7（LLM-as-a-Judge 评估）
+### Epic 2 需求明细总表
+
+| 需求类型 | 需求编号 | 优先级 | 需求描述 | 关联 Story |
+|---------|---------|-------|---------|-----------|
+| **FR-SR** | FR-SR-01 | P0 | 混合检索（Dense bge-m3 + BM25） | Story 2.1 |
+| **FR-SR** | FR-SR-02 | P0 | 实体抽取（LLM+ 规则） | Story 2.2 |
+| **FR-SR** | FR-SR-03 | P0 | 战略领域词典库管理 | Story 2.3 |
+| **FR-SR** | FR-SR-04 | P0 | 三路检索融合（RRF） | Story 2.4 |
+| **FR-SR** | FR-SR-05 | P0 | 分层检索（L1→L2→L3→L4） | Story 2.5 |
+| **FR-SR** | FR-SR-06 | P0 | 契约化结构化摘要生成 | Story 2.6 |
+| **FR-SR** | FR-SR-07 | P0 | 检索相关性评估（LLM-as-a-Judge） | Story 2.7 |
+| **FR-SR** | FR-SR-08 | P0 | Bounding Box 级溯源 | Story 2.8 |
+| **FR-DM** | FR-DM-03 | P0 | 保留文档版面信息（DocLayNet） | Story 2.8 |
+| **FR-UI** | FR-UI-06 | P0 | 溯源树展示 | Story 2.8 |
+| **AFR-ARCH** | AFR-ARCH-07 | P1 | LiteLLM 动态路由器 | Story 2.1 |
+| **AFR-ARCH** | AFR-ARCH-08 | P1 | BGE-M3 嵌入适配器 | Story 2.1 |
+| **AFR-ARCH** | AFR-ARCH-10 | P1 | CUSUM 漂移检测算法 | Story 2.7 |
+| **AFR-UI** | AFR-UI-02 | P0 | 溯源卡片组件 | Story 2.8 |
+| **AFR-UI** | AFR-UI-03 | P0 | Bounding Box 坐标映射 | Story 2.8 |
+| **AFR-UI** | AFR-UI-06 | P1 | 风险热力图组件 | Story 2.6 |
+| **AFR-UI** | AFR-UI-07 | P1 | 财务量化组件 | Story 2.6 |
+| **NFR-PERF** | NFR-PERF-01 | P0 | 检索延迟 P95 <800ms | Story 2.1, 2.4 |
+| **NFR-PERF** | NFR-PERF-03 | P0 | 报告生成时间 <30 秒 | Story 2.6 |
+| **NFR-REL** | NFR-REL-04 | P0 | Checkpoint 快照持久化 | Story 2.7 |
+
+**Epic 2 需求统计:**
+- FR: 10 项（FR-SR 8 项，FR-DM 1 项，FR-UI 1 项）
+- AFR: 7 项（AFR-ARCH 4 项，AFR-UI 3 项）
+- NFR: 3 项（NFR-PERF 2 项，NFR-REL 1 项）
+- **总计：20 项需求**
 
 ---
 
@@ -539,6 +710,12 @@ So that **检索时可以保留完整语义上下文，提高检索相关性**.
 As a **搜索工程师**,
 I want **执行混合检索（Dense bge-m3 + BM25 稀疏检索），双路召回**,
 So that **结合语义匹配和关键词匹配的优势，提高检索召回率**.
+
+**覆盖需求:**
+- FR-SR-01 (P0): 混合检索（Dense bge-m3 + BM25）
+- AFR-ARCH-07 (P1): LiteLLM 动态路由器
+- AFR-ARCH-08 (P1): BGE-M3 嵌入适配器
+- NFR-PERF-01 (P0): 检索延迟 P95 <800ms
 
 **Acceptance Criteria:**
 
@@ -565,6 +742,9 @@ As a **知识图谱工程师**,
 I want **抽取实体（LLM+ 规则混合策略），输出三元组**,
 So that **构建领域知识图谱，支持 GraphRAG 增强检索**.
 
+**覆盖需求:**
+- FR-SR-02 (P0): 实体抽取
+
 **Acceptance Criteria:**
 
 **Given** 文档分块完成
@@ -584,6 +764,9 @@ So that **构建领域知识图谱，支持 GraphRAG 增强检索**.
 As a **领域专家**,
 I want **管理战略领域词典库，支持热更新与版本管理**,
 So that **检索时可以使用最新的专业术语，提高检索准确率**.
+
+**覆盖需求:**
+- FR-SR-03 (P0): 战略领域词典库管理
 
 **Acceptance Criteria:**
 
@@ -605,6 +788,10 @@ As a **搜索算法工程师**,
 I want **融合三路检索结果（Dense + Sparse + Graph/metadata signals），使用 RRF 融合排序**,
 So that **综合语义匹配、关键词匹配和图结构的优势，提高检索相关性**.
 
+**覆盖需求:**
+- FR-SR-04 (P0): 三路检索融合（RRF）
+- NFR-PERF-01 (P0): 检索延迟 P95 <800ms
+
 **Acceptance Criteria:**
 
 **Given** 三路检索完成
@@ -624,6 +811,9 @@ So that **综合语义匹配、关键词匹配和图结构的优势，提高检�
 As a **系统架构师**,
 I want **执行分层检索（L1 跨文档摘要→L2 文档摘要→L3 文档切片→L4 实体级片段）**,
 So that **根据查询复杂度自动选择合适层级，平衡检索速度与精度**.
+
+**覆盖需求:**
+- FR-SR-05 (P0): 分层检索
 
 **Acceptance Criteria:**
 
@@ -645,6 +835,12 @@ As a **产品经理**,
 I want **生成契约化结构化摘要（财务/市场/技术视角），输出符合预定义 JSON Schema**,
 So that **高管可以快速理解关键信息，无需阅读完整文档**.
 
+**覆盖需求:**
+- FR-SR-06 (P0): 契约化结构化摘要生成
+- AFR-UI-06 (P1): 风险热力图组件
+- AFR-UI-07 (P1): 财务量化组件
+- NFR-PERF-03 (P0): 报告生成时间 <30 秒
+
 **Acceptance Criteria:**
 
 **Given** 检索结果返回
@@ -664,6 +860,11 @@ So that **高管可以快速理解关键信息，无需阅读完整文档**.
 As a **质量保障工程师**,
 I want **评估检索相关性（LLM-as-a-Judge 实时多维评估）**,
 So that **相关性<0.6 时标注"数据不足"，避免误导用户**.
+
+**覆盖需求:**
+- FR-SR-07 (P0): 检索相关性评估
+- AFR-ARCH-10 (P1): CUSUM 漂移检测算法
+- NFR-REL-04 (P0): Checkpoint 快照持久化
 
 **Acceptance Criteria:**
 
@@ -685,6 +886,13 @@ As a **企业战略人员**,
 I want **从结论跳转至原始文档坐标点（Bounding Box 级溯源）**,
 So that **可以在 30 秒内验证数据可靠性，当场回应高管质疑**.
 
+**覆盖需求:**
+- FR-SR-08 (P0): Bounding Box 级溯源
+- FR-DM-03 (P0): 保留文档版面信息（DocLayNet）
+- FR-UI-06 (P0): 溯源树展示
+- AFR-UI-02 (P0): 溯源卡片组件
+- AFR-UI-03 (P0): Bounding Box 坐标映射
+
 **Acceptance Criteria:**
 
 **Given** 用户点击结论文字
@@ -704,30 +912,39 @@ So that **可以在 30 秒内验证数据可靠性，当场回应高管质疑**.
 
 ---
 
-## Epic 3: 单 Agent 执行与 EIP 隔离
+## Epic 3-10 待展开
 
-（继续按此格式展开所有 Epic 和 Story...）
+**注意：** 由于文档长度，此处仅完整展开 Epic 1 和 Epic 2。后续 Epic 3-10 将按照相同格式继续展开。
+
+### 剩余 Epic 列表
+
+| Epic | 名称 | Story 数 | 需求数 | 优先级 |
+|------|------|---------|-------|-------|
+| **Epic 3** | 单 Agent 执行与 EIP 隔离 | 8 | 约 20 项 | P0 |
+| **Epic 4** | BLM 战略规划流程 | 6 | 约 15 项 | P0 |
+| **Epic 5** | 用户接口与报告生成 | 7 | 约 18 项 | P0 |
+| **Epic 6** | 多 Agent 协作与裁决 | 12 | 约 30 项 | P1 |
+| **Epic 7** | UDMR 动态路由与成本优化 | 8 | 约 22 项 | P1 |
+| **Epic 8** | 完整合规与审计 | 8 | 约 25 项 | P1/P2 |
+| **Epic 9** | BEM 战略解码 | 6 | 约 18 项 | P2 |
+| **Epic 10** | 企业级能力与生态集成 | 12 | 约 35 项 | P1/P2 |
 
 ---
 
-**Note:** 由于文档长度限制，此处仅展示 Epic 1、Epic 2 的完整 Story 分解。后续 Epic 3-10 将按照相同格式继续展开，包含：
+## 需求覆盖总表
 
-- **Epic 3:** 单 Agent 执行与 EIP 隔离（8 个 Story）
-- **Epic 4:** BLM 战略规划流程（6 个 Story）
-- **Epic 5:** 用户接口与报告生成（7 个 Story）
-- **Epic 6:** 多 Agent 协作与裁决（12 个 Story）
-- **Epic 7:** UDMR 动态路由与成本优化（8 个 Story）
-- **Epic 8:** 完整合规与审计（8 个 Story）
-- **Epic 9:** BEM 战略解码（6 个 Story）
-- **Epic 10:** 企业级能力与生态集成（12 个 Story）
-
-**总计：** 约 75-85 个 User Story，覆盖 122 项 FR 和 40 项 NFR。
+| 类别 | P0 (MVP) | P1 (V1) | P2 (V2) | 总计 |
+|------|---------|--------|--------|------|
+| FR (功能需求) | 57 | 46 | 18 | 121 |
+| AFR (额外技术需求) | 11 | 8 | 3 | 22 |
+| NFR (非功能需求) | 25 | 13 | 2 | 40 |
+| **总计** | **93** | **67** | **23** | **183** |
 
 ---
 
 ## Menu Options
 
-**Confirm the Requirements are complete and correct to [C] continue:**
+**请确认需求是否完整准确，选择：**
 
-- **C** - Continue to Step 2: Design Epics
-- **Comments/Questions** - I can help clarify or adjust requirements before proceeding
+- **[C]** - 继续到步骤 2：设计 Epic（读取 step-02-design-epics.md）
+- **评论/问题** - 我可以帮助调整或补充需求
