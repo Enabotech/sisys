@@ -38,8 +38,8 @@ story_location: g:\ai\sisys\_bmad-output\implementation-artifacts
 development_status:
   # Epic 0: Iteration 0
   epic-0: in-progress
-  0-1-dev-environment-setup: ready-for-dev
-  0-2-ci-cd-pipeline: backlog
+  0-1-dev-environment-setup: done
+  0-2-ci-cd-pipeline: ready-for-dev
   0-3-test-framework-setup: backlog
   epic-0-retrospective: optional
 
