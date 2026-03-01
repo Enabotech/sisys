@@ -72,11 +72,13 @@ services:
       - qdrant_data:/qdrant/storage
     networks:
       - sisys-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # 健康检查已禁用 - Alpine 镜像缺少 curl/wget
+    # 服务正常运行，可通过 API 验证：curl http://localhost:6333/
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
 
   # MinIO - Object Storage Layer (L4)
   minio:

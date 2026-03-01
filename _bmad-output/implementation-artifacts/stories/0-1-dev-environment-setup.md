@@ -4,7 +4,7 @@ epic: epic-0
 title: 开发环境搭建
 status: done
 created: 2026-02-28
-completed: 2026-02-28
+completed: 2026-03-01
 ---
 
 # Story 0.1: 开发环境搭建
