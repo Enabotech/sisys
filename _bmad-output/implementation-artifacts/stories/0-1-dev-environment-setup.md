@@ -37,6 +37,7 @@ So that **团队可以高效协作开发**。
 - [x] 创建健康检查脚本 `scripts/health_check.py` ✅
 - [x] 创建数据库初始化脚本 `scripts/init-db.sql` ✅
 - [x] 创建 src 目录结构（六边形架构） ✅
+- [x] 创建测试目录结构和验收测试 `tests/e2e/test_story_01.py` ✅
 
 ## Technical Notes
 

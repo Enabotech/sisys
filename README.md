@@ -186,8 +186,17 @@ pytest
 # Run with coverage
 pytest --cov=src --cov-report=html
 
+# Run Story 0.1 acceptance test
+python tests/e2e/test_story_01.py
+
 # Run specific test file
-pytest tests/test_example.py
+pytest tests/e2e/test_story_01.py
+
+# Run unit tests only
+pytest tests/unit/
+
+# Run integration tests only
+pytest tests/integration/
 ```
 
 ### Database Migrations
