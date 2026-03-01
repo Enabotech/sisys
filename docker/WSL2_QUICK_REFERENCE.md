@@ -110,24 +110,33 @@ sudo systemctl restart docker
 
 ### Docker Compose 命令
 
+**Docker Desktop 用户:**
 ```bash
-# 启动所有服务
+# 使用 docker compose（无连字符）
+docker compose up -d
+docker compose down
+docker compose ps
+docker compose logs -f
+```
+
+**Docker Engine 用户:**
+```bash
+# 使用 docker-compose（带连字符）或 docker compose
 docker-compose up -d
-
-# 停止所有服务
 docker-compose down
-
-# 查看服务状态
 docker-compose ps
-
-# 查看日志
 docker-compose logs -f
+```
 
-# 重启服务
-docker-compose restart
+**检查安装:**
+```bash
+# Docker Desktop
+docker compose version
 
-# 重建服务
-docker-compose up -d --build
+# Docker Engine
+docker-compose version
+# 或
+docker compose version
 ```
 
 ---
