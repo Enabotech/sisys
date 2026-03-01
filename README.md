@@ -30,11 +30,17 @@ cp .env.example .env
 ### 3. Start Development Services
 
 ```bash
+# Navigate to docker directory
+cd docker
+
 # Start all services (PostgreSQL, Redis, Qdrant, MinIO, Neo4j)
 docker-compose up -d
 
 # Verify all services are running
 docker-compose ps
+
+# View logs (optional)
+docker-compose logs -f
 ```
 
 **Expected Output:**
@@ -137,9 +143,8 @@ sisys/
 │   ├── database/
 │   └── deployment/
 ├── docker/                                                # Docker 配置
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   └── docker-compose.prod.yml
+│   ├── docker-compose.yml                                 # 开发环境 Docker 配置
+│   └── docker-compose.prod.yml                            # 生产环境 Docker 配置
 ├── .github/workflows/                                     # GitHub Actions
 │   ├── ci.yml
 │   └── cd.yml

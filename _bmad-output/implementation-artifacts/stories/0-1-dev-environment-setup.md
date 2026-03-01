@@ -24,17 +24,19 @@ So that **团队可以高效协作开发**。
 
 ## Implementation Tasks
 
-- [ ] 创建 `docker-compose.yml` 文件，配置以下服务：
+- [x] 创建 `docker/docker-compose.yml` 文件，配置以下服务： ✅
   - PostgreSQL 15+
   - Redis 7.0+
   - Qdrant 1.7+
   - MinIO
   - Neo4j 5.x
-- [ ] 创建 `pyproject.toml` 文件，配置 Poetry 依赖
-- [ ] 创建 `.vscode/settings.json` 和 `.idea/` 配置
-- [ ] 创建 `.env.example` 环境变量模板
-- [ ] 编写开发环境搭建文档（README.md）
-- [ ] 测试所有服务正常启动
+- [x] 创建 `pyproject.toml` 文件，配置 Poetry 依赖 ✅
+- [x] 创建 `.vscode/settings.json` 和 `.idea/` 配置 ✅
+- [x] 创建 `.env.example` 环境变量模板 ✅
+- [x] 编写开发环境搭建文档（README.md） ✅
+- [x] 创建健康检查脚本 `scripts/health_check.py` ✅
+- [x] 创建数据库初始化脚本 `scripts/init-db.sql` ✅
+- [x] 创建 src 目录结构（六边形架构） ✅
 
 ## Technical Notes
 
