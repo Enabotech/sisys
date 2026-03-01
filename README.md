@@ -6,9 +6,98 @@ AI-driven strategic planning and decision intelligence platform for enterprises.
 
 ### Prerequisites
 
-- Docker & Docker Compose v2.0+
-- Python 3.11+
-- Poetry 1.7+
+**Choose one of the following Docker environments:**
+
+#### Option 1: Docker Desktop (Recommended for simplicity)
+
+- Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
+- Enable WSL 2 backend in Docker Desktop settings
+- Requirements:
+  - Windows 11 with WSL 2 enabled
+  - 8GB+ RAM (16GB recommended)
+  - Virtualization enabled in BIOS
+
+**Installation:**
+```powershell
+# Install Docker Desktop using winget (optional)
+winget install Docker.DockerDesktop
+
+# Verify installation
+docker --version
+docker-compose --version
+```
+
+#### Option 2: WSL 2 with Ubuntu 22.04 (Recommended for development)
+
+- Install WSL 2 and Ubuntu 22.04 from Microsoft Store
+- Install Docker Engine inside WSL 2
+
+**Installation:**
+```bash
+# Update package list
+sudo apt update
+
+# Install Docker Engine
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Add user to docker group (avoid using sudo)
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo apt install docker-compose-plugin
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+**Additional Tools:**
+
+- Python 3.11+ (will be managed by Poetry)
+- Poetry 1.7+ (installed automatically)
+- Git for version control
+- VSCode or your preferred IDE
+
+---
+
+### 0. WSL 2 Setup (Option 2 only)
+
+If using WSL 2 with Ubuntu 22.04:
+
+**Automated Setup (Recommended):**
+
+```powershell
+# From Windows PowerShell (Administrator)
+cd g:\ai\sisys\docker
+
+# Run WSL 2 setup script
+.\setup-wsl2.ps1
+
+# After restart, open Ubuntu 22.04 and run:
+bash docker/setup-wsl2-docker.sh
+```
+
+**Manual Setup:**
+
+```powershell
+# From Windows PowerShell (run once)
+wsl --install -d Ubuntu-22.04
+wsl --set-default Ubuntu-22.04
+
+# From Ubuntu terminal
+# Clone repository to WSL filesystem (NOT /mnt/c)
+cd ~
+git clone <repository-url>
+cd sisys
+```
+
+**Important:** Always work within the WSL filesystem (`~/sisys`) for best performance, not in `/mnt/c/`.
+
+**Documentation:**
+- **Quick Reference:** `docker/WSL2_QUICK_REFERENCE.md`
+- **Detailed Guide:** `docker/WSL2_SETUP.md`
+- **Setup Scripts:** `docker/setup-wsl2.ps1` (Windows), `docker/setup-wsl2-docker.sh` (Ubuntu)
 
 ### 1. Clone Repository
 

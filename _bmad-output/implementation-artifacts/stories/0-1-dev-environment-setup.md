@@ -38,13 +38,18 @@ So that **团队可以高效协作开发**。
 - [x] 创建数据库初始化脚本 `scripts/init-db.sql` ✅
 - [x] 创建 src 目录结构（六边形架构） ✅
 - [x] 创建测试目录结构和验收测试 `tests/e2e/test_story_01.py` ✅
+- [x] 创建 WSL 2 自动化安装脚本 `docker/setup-wsl2.ps1` 和 `docker/setup-wsl2-docker.sh` ✅
+- [x] 创建 WSL 2 快速参考文档 `docker/WSL2_QUICK_REFERENCE.md` ✅
 
 ## Technical Notes
 
 - Python 版本：3.11+
 - 使用 Poetry 进行依赖管理
-- Docker 容器化开发环境
+- **Docker 环境方案（两种可选）：**
+  - **方案 1**: Docker Desktop on Windows 11（推荐简单性）
+  - **方案 2**: WSL 2 + Ubuntu 22.04 + Docker Engine（推荐开发性能）
 - IDE 配置包括代码规范、调试配置、Git 集成
+- 详细 WSL 2 设置指南：`docker/WSL2_SETUP.md`
 
 ## Definition of Done
 

@@ -1,6 +1,23 @@
 # sisys - Development Environment Docker Compose
 # Version: 1.0.0
 # Description: Local development environment with all required services
+#
+# Supported Environments:
+#   Option 1: Docker Desktop on Windows 11
+#   Option 2: WSL 2 with Ubuntu 22.04
+#
+# Usage:
+#   Option 1 (Docker Desktop):
+#     - Run from PowerShell/CMD: cd docker && docker-compose up -d
+#   
+#   Option 2 (WSL 2):
+#     - Run from WSL terminal: cd docker && docker-compose up -d
+#     - Ensure Docker daemon is running: sudo systemctl start docker
+#
+# Notes:
+#   - All data is stored in Docker volumes (persistent across restarts)
+#   - Services are accessible from both Windows and WSL 2
+#   - Ports are bound to localhost (not exposed to network)
 
 services:
   # PostgreSQL 15+ - Relational Storage Layer (L2)
