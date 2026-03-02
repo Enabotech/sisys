@@ -399,13 +399,18 @@ jobs:
           pattern: coverage-*-xml
           merge-multiple: true
 
+      - name: List coverage files
+        run: |
+          echo "Available coverage files:"
+          ls -la *.xml || echo "No XML files found"
+          find . -name "*.xml" -type f
+
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage-unit.xml,./coverage-integration.xml
           flags: unittests,integration
           name: codecov-sisys
-          fail_ci_if_error: false # Optional: set to true to fail CI if upload fails
+          fail_ci_if_error: false
           verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
