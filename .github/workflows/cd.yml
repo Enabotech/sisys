@@ -12,7 +12,7 @@ name: CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch: # Allow manual trigger
 
 # Cancel redundant workflows
@@ -94,7 +94,6 @@ jobs:
           output: "trivy-production.sarif"
           severity: "CRITICAL,HIGH"
           exit-code: 1
-          ignore-unfixed: true
 
       - name: Upload Trivy scan results
         uses: actions/upload-artifact@v4
@@ -281,7 +280,7 @@ jobs:
 
       - name: Deploy to test environment
         run: |
-          docker compose -f docker-compose.test.yml down --remove-orphans || true
+          docker compose -f docker-compose.test.yml down -v --remove-orphans || true
           docker compose -f docker-compose.test.yml up -d
 
       - name: Wait for services to be healthy
@@ -499,16 +498,18 @@ jobs:
           # Wait for application to be ready
           sleep 15
 
-          # Test health endpoint
+          # Test health endpoint (use environment variable or default)
+          PRODUCTION_URL="${{ vars.PRODUCTION_URL || 'https://sisys.example.com' }}"
           max_retries=30
           for i in $(seq 1 $max_retries); do
-            response=$(curl -s -o /dev/null -w "%{http_code}" https://sisys.example.com/health || echo "000")
+            response=$(curl -s -o /dev/null -w "%{http_code}" "$PRODUCTION_URL/health" || echo "000")
             if [ "$response" -eq 200 ]; then
               echo "✅ Production health check passed (HTTP $response)"
               exit 0
             fi
             if [ $i -eq $max_retries ]; then
               echo "❌ Production health check failed after $max_retries attempts (HTTP $response)"
+              echo "URL: $PRODUCTION_URL/health"
               exit 1
             fi
             echo "Waiting for production to be healthy... ($i/$max_retries)"
@@ -589,6 +590,21 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: Send DingTalk notification (optional)
+        if: always()
+        uses: zcong1993/actions-ding@master
+        with:
+          dingToken: ${{ secrets.DINGTALK_WEBHOOK }}
+          body: |
+            {
+              "msgtype": "markdown",
+              "markdown": {
+                "title": "sisys Production Deployment",
+                "text": "## 🚀 Production Deployment\n\n**Status:** ${{ job.status }}\n**Version:** ${{ steps.git_info.outputs.version }}\n**Commit:** ${{ steps.git_info.outputs.sha }}\n\n[View Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              }
+            }
         continue-on-error: true
 
       - name: Cleanup kubeconfig

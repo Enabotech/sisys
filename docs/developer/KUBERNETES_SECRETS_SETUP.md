@@ -290,6 +290,134 @@ kubectl exec deployment/sisys-app -n production -- \
   ls -la /etc/secrets
 ```
 
+## 🚨 紧急恢复流程
+
+### Secrets 泄露响应
+
+**如果怀疑或确认 Secrets 已泄露，立即执行以下步骤：**
+
+#### 第 1 步：隔离和评估（5 分钟内）
+
+```bash
+# 1. 立即停止相关服务（如确认泄露）
+kubectl scale deployment sisys-app --replicas=0 -n production
+
+# 2. 审计 Secret 访问日志
+kubectl logs -n kube-system kube-apiserver | \
+  grep "sisys-secrets" | \
+  tail -100
+
+# 3. 检查未授权访问
+kubectl get secret sisys-secrets -n production -o jsonpath='{.metadata.annotations}' | \
+  jq '.
+```
+
+#### 第 2 步：Secrets 轮换（30 分钟内）
+
+```bash
+# 1. 生成新的安全密码
+POSTGRES_PASSWORD=$(openssl rand -base64 32)
+MINIO_PASSWORD=$(openssl rand -base64 32)
+NEO4J_PASSWORD=$(openssl rand -base64 32)
+
+# 2. 更新 Kubernetes Secret
+kubectl create secret generic sisys-secrets \
+  --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  --from-literal=MINIO_ROOT_PASSWORD="$MINIO_PASSWORD" \
+  --from-literal=NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+  --namespace=production \
+  --dry-run=client -o yaml | \
+  kubectl replace -f -
+
+# 3. 更新数据库密码（PostgreSQL）
+kubectl run postgres-client --rm -it --image=postgres:15 \
+  --env="PGPASSWORD=$POSTGRES_PASSWORD" \
+  -- psql -h postgres -U sisys_user -d sisys \
+  -c "ALTER USER sisys_user WITH PASSWORD '$POSTGRES_PASSWORD';"
+
+# 4. 更新其他服务密码（参考各服务文档）
+
+# 5. 重启应用以使用新 Secret
+kubectl rollout restart deployment/sisys-app -n production
+
+# 6. 验证服务恢复
+kubectl scale deployment sisys-app --replicas=3 -n production
+kubectl rollout status deployment/sisys-app -n production
+```
+
+#### 第 3 步：更新外部 Secrets（1 小时内）
+
+```bash
+# 1. 更新 GitHub Secrets
+# 访问：https://github.com/<org>/<repo>/settings/secrets/actions
+# 更新：KUBE_CONFIG、POSTGRES_PASSWORD 等
+
+# 2. 更新 Docker Hub/GHCR 凭证
+# 登录 Docker Hub → Account Settings → Security → Access Tokens
+# 生成新 token 并更新 Kubernetes Secret
+
+# 3. 更新云平台凭证（如使用 AWS/GCP/Azure）
+# 访问云平台 IAM 控制台
+# 轮换访问密钥
+```
+
+#### 第 4 步：审计和报告（24 小时内）
+
+```bash
+# 1. 导出审计日志
+kubectl logs -n kube-system kube-apiserver --since=24h > \
+  audit-logs-$(date +%Y%m%d-%H%M%S).txt
+
+# 2. 检查 Secret 访问历史
+kubectl get secret sisys-secrets -n production \
+  -o jsonpath='{.metadata.creationTimestamp}'
+
+# 3. 生成事件报告
+# - 记录泄露时间线
+# - 识别受影响的系统
+# - 评估数据泄露风险
+# - 制定预防措施
+```
+
+### 预防措施
+
+1. **启用 Secret 轮换**
+   ```yaml
+   # 使用 External Secrets Operator 自动轮换
+   apiVersion: external-secrets.io/v1beta1
+   kind: ExternalSecret
+   metadata:
+     name: sisys-auto-rotate
+   spec:
+     refreshInterval: 24h  # 每 24 小时轮换
+   ```
+
+2. **配置 Secret 审计**
+   ```yaml
+   # Kubernetes 审计策略
+   apiVersion: audit.k8s.io/v1
+   kind: Policy
+   rules:
+     - level: Metadata
+       resources:
+         - group: ""
+           resources: ["secrets"]
+   ```
+
+3. **实施最小权限**
+   ```bash
+   # 限制 Secret 访问
+   kubectl create role secret-reader \
+     --verb=get,list \
+     --resource=secrets \
+     --resource-names=sisys-secrets \
+     -n production
+   ```
+
+4. **定期演练**
+   - 每季度执行一次 Secrets 轮换演练
+   - 每年进行至少一次泄露响应演练
+
 ## 参考文档
 
 - [Kubernetes Secrets 官方文档](https://kubernetes.io/docs/concepts/configuration/secret/)

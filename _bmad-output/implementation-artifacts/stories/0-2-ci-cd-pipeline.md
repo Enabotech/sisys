@@ -1,6 +1,6 @@
 # Story 0.2: CI/CD 流水线
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -30,31 +30,31 @@ So that **代码变更可以快速、可靠地发布**。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 GitHub Actions 工作流配置文件 (AC: 1, 2)
-  - [ ] Subtask 1.1: 创建 `.github/workflows/ci.yml` - CI 流水线（代码提交/PR 触发）
-  - [ ] Subtask 1.2: 创建 `.github/workflows/cd.yml` - CD 流水线（main 分支合并触发）
-  - [ ] Subtask 1.3: 配置工作流权限和 secrets 管理
+- [x] Task 1: 创建 GitHub Actions 工作流配置文件 (AC: 1, 2)
+  - [x] Subtask 1.1: 创建 `.github/workflows/ci.yml` - CI 流水线（代码提交/PR 触发）
+  - [x] Subtask 1.2: 创建 `.github/workflows/cd.yml` - CD 流水线（main 分支合并触发）
+  - [x] Subtask 1.3: 配置工作流权限和 secrets 管理
 
-- [ ] Task 2: CI 流水线实现 (AC: 1, 2)
-  - [ ] Subtask 2.1: 设置 Python 3.11+ 环境缓存
-  - [ ] Subtask 2.2: 安装 Poetry 依赖并缓存
-  - [ ] Subtask 2.3: 运行代码规范检查（ruff/black/mypy）
-  - [ ] Subtask 2.4: 运行单元测试（pytest）并生成覆盖率报告
-  - [ ] Subtask 2.5: 运行安全扫描（bandit/safety）
-  - [ ] Subtask 2.6: 上传测试覆盖率报告到 Coveralls/Codecov
+- [x] Task 2: CI 流水线实现 (AC: 1, 2)
+  - [x] Subtask 2.1: 设置 Python 3.11+ 环境缓存
+  - [x] Subtask 2.2: 安装 Poetry 依赖并缓存
+  - [x] Subtask 2.3: 运行代码规范检查（ruff/black/mypy）
+  - [x] Subtask 2.4: 运行单元测试（pytest）并生成覆盖率报告
+  - [x] Subtask 2.5: 运行安全扫描（bandit/safety）
+  - [x] Subtask 2.6: 上传测试覆盖率报告到 Coveralls/Codecov
 
-- [ ] Task 3: CD 流水线实现 (AC: 1, 3)
-  - [ ] Subtask 3.1: 构建 Docker 镜像（多阶段构建优化）
-  - [ ] Subtask 3.2: 推送 Docker 镜像到 GitHub Container Registry (GHCR)
-  - [ ] Subtask 3.3: 部署到测试环境（Docker Compose）
-  - [ ] Subtask 3.4: 运行健康检查验证部署成功
-  - [ ] Subtask 3.5: 发送部署通知（可选：Slack/钉钉）
+- [x] Task 3: CD 流水线实现 (AC: 1, 3)
+  - [x] Subtask 3.1: 构建 Docker 镜像（多阶段构建优化）
+  - [x] Subtask 3.2: 推送 Docker 镜像到 GitHub Container Registry (GHCR)
+  - [x] Subtask 3.3: 部署到测试环境（Docker Compose）
+  - [x] Subtask 3.4: 运行健康检查验证部署成功
+  - [x] Subtask 3.5: 发送部署通知（可选：Slack/钉钉）
 
-- [ ] Task 4: Docker 配置优化 (AC: 1, 3)
-  - [ ] Subtask 4.1: 创建生产环境 Dockerfile（多阶段构建）
-  - [ ] Subtask 4.2: 配置 Docker Compose 生产环境配置文件
-  - [ ] Subtask 4.3: 添加 Docker 健康检查（healthcheck）
-  - [ ] Subtask 4.4: 配置容器资源限制（CPU/内存）
+- [x] Task 4: Docker 配置优化 (AC: 1, 3)
+  - [x] Subtask 4.1: 创建生产环境 Dockerfile（多阶段构建）
+  - [x] Subtask 4.2: 配置 Docker Compose 生产环境配置文件
+  - [x] Subtask 4.3: 添加 Docker 健康检查（healthcheck）
+  - [x] Subtask 4.4: 配置容器资源限制（CPU/内存）
 
 - [x] Task 5: 环境变量与 Secrets 管理 (AC: 1)
   - [x] Subtask 5.1: 配置 GitHub Actions Secrets
@@ -79,9 +79,20 @@ So that **代码变更可以快速、可靠地发布**。
     - ✅ 部署等待和验证（rollout status）
     - ✅ 生产健康检查（HTTP 端点验证）
     - ✅ Slack 部署通知
+    - ✅ 钉钉部署通知
   - [x] Subtask 7.7: 优化 Docker 镜像标签策略 (使用 git SHA 替代 latest)
     - ✅ docker-compose.prod.yml 使用 `${DOCKER_IMAGE_TAG:-latest}` 环境变量
     - ✅ 支持 git SHA、语义化版本等精确版本控制
+
+- [x] Task 8: 二次审查修复 (2026-03-02)
+  - [x] Subtask 8.1: Kubernetes Secret 添加警告注释
+  - [x] Subtask 8.2: CD 流水线添加 master 分支支持
+  - [x] Subtask 8.3: 生产部署添加钉钉通知
+  - [x] Subtask 8.4: Kubernetes 添加 ResourceQuota 和 LimitRange
+  - [x] Subtask 8.5: 测试环境清理添加卷清理 (-v)
+  - [x] Subtask 8.6: 移除 Trivy ignore-unfixed 参数
+  - [x] Subtask 8.7: 生产健康检查 URL 使用环境变量
+  - [x] Subtask 8.8: Secrets 管理文档添加紧急恢复流程
 
 ## Dev Notes
 
@@ -243,10 +254,19 @@ So that **代码变更可以快速、可靠地发布**。
     - Kubernetes 部署集成（kubectl set image）
     - 部署等待和验证（rollout status）
     - 生产健康检查（HTTP 端点验证）
-    - Slack 部署通知
+    - Slack/钉钉部署通知
   - ✅ Docker 镜像标签策略已优化 (Subtask 7.7)
     - docker-compose.prod.yml 使用环境变量控制镜像标签
     - 支持 git SHA、语义化版本等精确版本控制
+- ✅ 二次审查修复 (2026-03-02):
+  - ✅ Kubernetes Secret 添加醒目警告注释
+  - ✅ CD 流水线添加 master 分支支持
+  - ✅ 生产部署添加钉钉通知
+  - ✅ Kubernetes 添加 ResourceQuota 和 LimitRange
+  - ✅ 测试环境清理添加卷清理
+  - ✅ 移除 Trivy ignore-unfixed 参数
+  - ✅ 生产健康检查 URL 使用环境变量
+  - ✅ Secrets 管理文档添加紧急恢复流程
 
 ### File List
 
@@ -276,8 +296,13 @@ So that **代码变更可以快速、可靠地发布**。
 - ✅ 新增 Kubernetes 部署配置支持
 
 **新增文件 (生产部署支持)：**
-- `k8s/production/deployment.yaml` - Kubernetes 生产部署配置
-- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南
+- `k8s/production/deployment.yaml` - Kubernetes 生产部署配置（含 ResourceQuota、LimitRange）
+- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南（含紧急恢复流程）
+
+**二次审查修复 (2026-03-02)：**
+- ✅ `.github/workflows/cd.yml` - master 分支支持、钉钉通知、健康检查 URL 环境变量、测试环境卷清理
+- ✅ `k8s/production/deployment.yaml` - Secret 警告注释、ResourceQuota、LimitRange
+- ✅ `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程、预防措施
 
 ---
 
@@ -285,17 +310,43 @@ So that **代码变更可以快速、可靠地发布**。
 - Story ID: 0.2
 - Story Key: 0-2-ci-cd-pipeline
 - File: `g:\ai\sisys\_bmad-output\implementation-artifacts\stories\0-2-ci-cd-pipeline.md`
-- Status: review
+- Status: done
+
+**Completion Summary:**
+1. ✅ All tasks completed (Task 1-5, 7, 8 completed; Task 6 optional/deferred)
+2. ✅ All acceptance criteria implemented (AC1, AC2, AC3)
+3. ✅ Two rounds of code review completed
+4. ✅ All HIGH, MEDIUM, and LOW issues fixed
+5. ✅ Sprint status synced to "done"
 
 **Next Steps:**
-1. ✅ Story implementation complete
-2. ✅ All AI review follow-ups addressed
-3. Run `code-review` workflow for final validation (recommended: use different LLM)
-4. Optional: If Test Architect module installed, run `/bmad:tea:automate` to expand guardrail tests
+- Story is complete and ready for production use
+- For new features, create follow-up stories
+- Optional: Run `/bmad:tea:automate` if Test Architect module is installed to expand guardrail tests
 
-**The story is now ready for code review!**
+**The story is COMPLETE! 🎉**
 
 ## Change Log
+
+### 2026-03-02 - 二次审查修复完成
+
+**修复内容 (第二次审查):**
+- Kubernetes Secret 添加醒目警告注释和 annotation
+- CD 流水线分支支持添加 master
+- 生产部署添加钉钉通知支持
+- Kubernetes 添加 ResourceQuota 和 LimitRange 配置
+- 测试环境清理添加卷清理 (-v)
+- 移除 Trivy ignore-unfixed 参数
+- 生产健康检查 URL 使用环境变量配置
+- Secrets 管理文档添加紧急恢复流程
+
+**修改文件 (第二次审查):**
+- `.github/workflows/cd.yml` - 5 处修复
+- `k8s/production/deployment.yaml` - 3 处增强
+- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程
+- `_bmad-output/implementation-artifacts/stories/0-2-ci-cd-pipeline.md` - Task 8 完成
+
+**审查状态:** 所有 MEDIUM 和 LOW 问题已修复，Story 准备标记为 "done"
 
 ### 2026-03-02 - AI 审查修复完成
 

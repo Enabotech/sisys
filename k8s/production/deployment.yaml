@@ -42,7 +42,17 @@ data:
 
 ---
 # Secret - Sensitive Configuration (placeholder - use external secrets management)
-# IMPORTANT: In production, use external secrets management (e.g., HashiCorp Vault, AWS Secrets Manager)
+#
+# ⚠️  WARNING: DO NOT USE IN PRODUCTION WITH DEFAULT VALUES!
+# These placeholder values MUST be replaced with secure secrets before deployment.
+#
+# Recommended approaches:
+# 1. Use External Secrets Operator with HashiCorp Vault/AWS Secrets Manager
+# 2. Use Sealed Secrets for GitOps workflows
+# 3. Create secrets manually via kubectl create secret
+#
+# See: docs/developer/KUBERNETES_SECRETS_SETUP.md for detailed instructions
+#
 apiVersion: v1
 kind: Secret
 metadata:
@@ -50,18 +60,22 @@ metadata:
   namespace: production
   labels:
     app: sisys
+  annotations:
+    # This secret contains placeholder values - replace before production use
+    warning: "REPLACE_PLACEHOLDER_VALUES_BEFORE_DEPLOYMENT"
 type: Opaque
 stringData:
-  # These should be populated by your secrets management system
-  POSTGRES_USER: "changeme"
-  POSTGRES_PASSWORD: "changeme"   # pragma: allowlist secret
+  # ⚠️  THESE ARE PLACEHOLDER VALUES - REPLACE WITH SECURE SECRETS
+  # Generate secure passwords: openssl rand -base64 32  # pragma: allowlist secret
+  POSTGRES_USER: "changeme-replace-with-secure-value"
+  POSTGRES_PASSWORD: "changeme-replace-with-secure-value"   # pragma: allowlist secret
   POSTGRES_DB: "sisys"
-  MINIO_ROOT_USER: "changeme"
-  MINIO_ROOT_PASSWORD: "changeme-minio-password"  # pragma: allowlist secret
+  MINIO_ROOT_USER: "changeme-replace-with-secure-value"
+  MINIO_ROOT_PASSWORD: "changeme-replace-with-secure-value"  # pragma: allowlist secret
   NEO4J_USER: "neo4j"
-  NEO4J_PASSWORD: "changeme-neo4j-password"   # pragma: allowlist secret
+  NEO4J_PASSWORD: "changeme-replace-with-secure-value"   # pragma: allowlist secret
   GRAFANA_ADMIN_USER: "admin"
-  GRAFANA_ADMIN_PASSWORD: "changeme-grafana-password"   # pragma: allowlist secret
+  GRAFANA_ADMIN_PASSWORD: "changeme-replace-with-secure-value"   # pragma: allowlist secret
 
 ---
 # Deployment
@@ -320,3 +334,50 @@ metadata:
   namespace: production
   labels:
     app: sisys
+
+---
+# Resource Quota - Namespace level resource limits
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sisys-resource-quota
+  namespace: production
+spec:
+  hard:
+    requests.cpu: "16"
+    requests.memory: 32Gi
+    limits.cpu: "32"
+    limits.memory: 64Gi
+    persistentvolumeclaims: "10"
+    secrets: "20"
+    configmaps: "20"
+    pods: "20"
+    services: "10"
+
+---
+# Limit Range - Default container limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sisys-limit-range
+  namespace: production
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1000m"
+        memory: "1Gi"
+      defaultRequest:
+        cpu: "500m"
+        memory: "512Mi"
+      max:
+        cpu: "4000m"
+        memory: "8Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+    - type: PersistentVolumeClaim
+      max:
+        storage: "100Gi"
+      min:
+        storage: "1Gi"
