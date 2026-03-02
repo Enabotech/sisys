@@ -34,20 +34,12 @@ def docker_services(docker_compose_file):
     import subprocess
 
     # Start services
-    subprocess.run(
-        ["docker-compose", "up", "-d"],
-        cwd=docker_compose_file.parent,
-        check=True
-    )
+    subprocess.run(["docker-compose", "up", "-d"], cwd=docker_compose_file.parent, check=True)
 
     yield
 
     # Stop services
-    subprocess.run(
-        ["docker-compose", "down"],
-        cwd=docker_compose_file.parent,
-        check=True
-    )
+    subprocess.run(["docker-compose", "down"], cwd=docker_compose_file.parent, check=True)
 
 
 @pytest.fixture

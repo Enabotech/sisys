@@ -16,16 +16,19 @@ from pathlib import Path
 # Project root (3 levels up from tests/e2e/)
 ROOT = Path(__file__).parent.parent.parent
 
+
 def print_header(text):
     """Print formatted header."""
     print("\n" + "=" * 60)
     print(f"  {text}")
     print("=" * 60 + "\n")
 
+
 def print_step(text):
     """Print step header."""
     print(f"\n[STEP] {text}")
     print("-" * 40)
+
 
 def run_command(cmd, cwd=None, check=True):
     """Run shell command and return result."""
@@ -36,13 +39,14 @@ def run_command(cmd, cwd=None, check=True):
             cwd=cwd or ROOT,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,  # nosec
         )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return False, "", "Command timed out"
     except Exception as e:
         return False, "", str(e)
+
 
 def test_docker_services():
     """Test: Docker Compose services start correctly."""
@@ -110,6 +114,7 @@ def test_docker_services():
     assert "Up" in stdout or "sisys-" in stdout or success, "Services should be running / startable"
     print("\n[OK] Services are running")
 
+
 def test_poetry_install():
     """Test: Poetry dependencies install successfully."""
     print_header("Test 2: Poetry Installation")
@@ -147,6 +152,7 @@ def test_poetry_install():
     assert success, "Python should be installed"
     print(f"[OK] Python version: {stdout.strip()}")
 
+
 def test_ide_configuration():
     """Test: IDE configuration is present."""
     print_header("Test 3: IDE Configuration")
@@ -164,6 +170,7 @@ def test_ide_configuration():
     print_step("IDE Configuration Summary:")
     try:
         import json
+
         with open(settings_file) as f:
             config = json.load(f)
 
@@ -172,11 +179,12 @@ def test_ide_configuration():
         if "python.formatting.provider" in config:
             print(f"  [OK] Formatter: {config['python.formatting.provider']}")
         if "python.linting.ruffEnabled" in config:
-            status = "enabled" if config['python.linting.ruffEnabled'] else "disabled"
+            status = "enabled" if config["python.linting.ruffEnabled"] else "disabled"
             print(f"  [OK] Linter: Ruff {status}")
 
     except Exception as e:
         print(f"  [WARN] Could not parse settings.json: {e}")
+
 
 def test_environment_template():
     """Test: Environment variables template exists."""
@@ -214,6 +222,7 @@ def test_environment_template():
     except Exception as e:
         print(f"  [WARN] Could not read .env.example: {e}")
 
+
 def test_documentation():
     """Test: Documentation is complete."""
     print_header("Test 5: Documentation")
@@ -226,7 +235,7 @@ def test_documentation():
     # Check README sections
     print_step("README.md Sections:")
     try:
-        with open(readme, encoding='utf-8') as f:
+        with open(readme, encoding="utf-8") as f:
             content = f.read()
 
         required_sections = [
@@ -244,6 +253,7 @@ def test_documentation():
 
     except Exception as e:
         print(f"  [WARN] Could not read README.md: {e}")
+
 
 def main():
     """Run all acceptance tests - for manual execution only."""

@@ -13,8 +13,8 @@ Requirements:
     - python-dotenv (optional, for environment variable checking)
 """
 
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -27,10 +27,7 @@ def get_docker_compose_command():
     try:
         # Try docker compose (v2 - plugin version) first
         result = subprocess.run(
-            ["docker", "compose", "version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["docker", "compose", "version"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             return ["docker", "compose"]
@@ -40,10 +37,7 @@ def get_docker_compose_command():
     try:
         # Try docker-compose (v1 - standalone version)
         result = subprocess.run(
-            ["docker-compose", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["docker-compose", "--version"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             return ["docker-compose"]
@@ -79,22 +73,33 @@ def check_docker_services():
                 capture_output=True,
                 text=True,
                 cwd=docker_dir,
-                timeout=10
+                timeout=10,
             )
 
             if result.returncode == 0 and container_name in result.stdout:
                 # Parse JSON output or check for "Up" status
-                if "running" in result.stdout.lower() or "up" in result.stdout.lower() or "healthy" in result.stdout.lower():
+                if (
+                    "running" in result.stdout.lower()
+                    or "up" in result.stdout.lower()
+                    or "healthy" in result.stdout.lower()
+                ):
                     print(f"  ✓ {service_name}: {container_name} running on port {port}")
                 else:
                     print(f"  ⚠ {service_name}: {container_name} status unknown")
             else:
                 # Fallback: check if container exists via docker ps
                 ps_result = subprocess.run(
-                    ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Status}}"],
+                    [
+                        "docker",
+                        "ps",
+                        "--filter",
+                        f"name={container_name}",
+                        "--format",
+                        "{{.Status}}",
+                    ],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
                 if "Up" in ps_result.stdout:
                     print(f"  ✓ {service_name}: {container_name} running on port {port}")
@@ -119,25 +124,20 @@ def check_python_environment():
     # Check Python version
     print_step("Python version...")
     try:
-        result = subprocess.run(
-            ["python3", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["python3", "--version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             print(f"  ✓ Python: {result.stdout.strip()}")
             # Check if version >= 3.11
             version_str = result.stdout.strip().split()[-1]
             try:
-                major, minor = map(int, version_str.split('.')[:2])
+                major, minor = map(int, version_str.split(".")[:2])
                 if major < 3 or (major == 3 and minor < 11):
                     print(f"  ⚠ Warning: Python 3.11+ required, found {major}.{minor}")
-                    print(f"  → Install Python 3.11+ or use pyenv/conda")
+                    print("  → Install Python 3.11+ or use pyenv/conda")
             except (ValueError, IndexError):
                 pass
         else:
-            print(f"  ✗ Python3 not found")
+            print("  ✗ Python3 not found")
             return False
     except Exception as e:
         print(f"  ✗ Error checking Python: {e}")
@@ -146,20 +146,15 @@ def check_python_environment():
     # Check Poetry installation
     print_step("Poetry installation...")
     try:
-        result = subprocess.run(
-            ["poetry", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["poetry", "--version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             print(f"  ✓ Poetry: {result.stdout.strip()}")
         else:
-            print(f"  ✗ Poetry: Not installed")
-            print(f"  → Install: curl -sSL https://install.python-poetry.org | python3 -")
+            print("  ✗ Poetry: Not installed")
+            print("  → Install: curl -sSL https://install.python-poetry.org | python3 -")
     except FileNotFoundError:
-        print(f"  ✗ Poetry: Not installed")
-        print(f"  → Install: curl -sSL https://install.python-poetry.org | python3 -")
+        print("  ✗ Poetry: Not installed")
+        print("  → Install: curl -sSL https://install.python-poetry.org | python3 -")
     except Exception as e:
         print(f"  ✗ Error checking Poetry: {e}")
 
@@ -169,8 +164,8 @@ def check_python_environment():
     if venv_path.exists():
         print(f"  ✓ Virtual environment: {venv_path}")
     else:
-        print(f"  → Virtual environment not created yet")
-        print(f"  → Run: poetry install")
+        print("  → Virtual environment not created yet")
+        print("  → Run: poetry install")
 
     return True  # Don't fail - user can install later
 
@@ -189,9 +184,9 @@ def check_environment_variables():
     env_file = project_root / ".env"
 
     if not env_file.exists():
-        print(f"  ✗ .env file not found")
-        print(f"  → Please copy .env.example to .env and configure it")
-        print(f"  → Command: cp .env.example .env")
+        print("  ✗ .env file not found")
+        print("  → Please copy .env.example to .env and configure it")
+        print("  → Command: cp .env.example .env")
         return False
 
     print(f"  ✓ .env file found: {env_file}")
@@ -199,17 +194,18 @@ def check_environment_variables():
     # Try to use python-dotenv if available, otherwise parse manually
     try:
         from dotenv import dotenv_values
+
         env_values = dotenv_values(env_file)
     except ImportError:
         # Manual parsing fallback
-        print(f"  → python-dotenv not installed, using manual parsing")
+        print("  → python-dotenv not installed, using manual parsing")
         env_values = {}
         try:
-            with open(env_file, 'r') as f:
+            with open(env_file) as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, _, value = line.partition('=')
+                    if line and not line.startswith("#") and "=" in line:
+                        key, _, value = line.partition("=")
                         env_values[key.strip()] = value.strip()
         except Exception as e:
             print(f"  ✗ Error reading .env file: {e}")
@@ -240,30 +236,30 @@ def main():
     print("=" * 60)
     print("sisys - Development Environment Health Check")
     print("=" * 60)
-    
+
     checks = [
         ("Docker Services", check_docker_services),
         ("Python Environment", check_python_environment),
         ("Environment Variables", check_environment_variables),
     ]
-    
+
     results = []
     for name, check_func in checks:
         results.append((name, check_func()))
-    
+
     print("\n" + "=" * 60)
     print("Summary")
     print("=" * 60)
-    
+
     all_passed = True
     for name, passed in results:
         status = "✓ Passed" if passed else "✗ Failed"
         print(f"{name}: {status}")
         if not passed:
             all_passed = False
-    
+
     print("=" * 60)
-    
+
     if all_passed:
         print("✅ All checks passed! Development environment is ready.")
         return 0
