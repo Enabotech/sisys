@@ -1,0 +1,411 @@
+# CI Pipeline - Continuous Integration
+# Triggered on: Pull Requests and code pushes to main/develop branches
+# 
+# Responsibilities:
+# - Code quality checks (ruff, mypy)
+# - Unit tests with coverage
+# - Integration tests (with Docker containers)
+# - Security scanning (bandit)
+# - Build Docker image (multi-stage)
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch: # Allow manual trigger
+
+# Cancel redundant workflows
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.8.0"
+  DOCKER_IMAGE_NAME: sisys
+
+jobs:
+  # =========================================
+  # Job 1: Code Quality & Linting
+  # =========================================
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev
+
+      - name: Run ruff (linting)
+        run: |
+          poetry run ruff check src/ tests/
+          poetry run ruff format src/ tests/ --check
+
+      - name: Run mypy (type checking)
+        run: poetry run mypy src/ --ignore-missing-imports
+
+      - name: Check domain layer zero-dependency (FR-AR-01)
+        run: |
+          # Verify domain layer only depends on Python standard library
+          python -c "
+          import ast
+          import sys
+          
+          forbidden_imports = {'fastapi', 'pydantic', 'sqlalchemy', 'redis', 'qdrant', 'neo4j', 'minio'}
+          domain_files = [
+              'src/domain/models/__init__.py',
+              'src/domain/services/__init__.py',
+              'src/domain/repositories/__init__.py',
+              'src/domain/events/__init__.py',
+              'src/domain/exceptions/__init__.py',
+          ]
+          
+          violations = []
+          for file_path in domain_files:
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      tree = ast.parse(f.read())
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Import):
+                          for alias in node.names:
+                              if any(f in alias.name for f in forbidden_imports):
+                                  violations.append(f'{file_path}: imports {alias.name}')
+                      elif isinstance(node, ast.ImportFrom):
+                          if node.module and any(f in node.module for f in forbidden_imports):
+                              violations.append(f'{file_path}: imports from {node.module}')
+              except FileNotFoundError:
+                  pass  # File may not exist yet
+          
+          if violations:
+              print('❌ Domain layer zero-dependency violation:')
+              for v in violations:
+                  print(f'  - {v}')
+              sys.exit(1)
+          else:
+              print('✅ Domain layer zero-dependency check passed')
+          "
+
+  # =========================================
+  # Job 2: Unit Tests
+  # =========================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [code-quality]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev,test
+
+      - name: Run unit tests with coverage
+        run: |
+          poetry run pytest tests/unit/ \
+            --cov=src \
+            --cov-report=xml:coverage-unit.xml \
+            --cov-report=html:htmlcov-unit \
+            --cov-fail-under=0 \
+            -v \
+            --tb=short
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: htmlcov-unit/
+          retention-days: 7
+
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit-xml
+          path: coverage-unit.xml
+          retention-days: 7
+
+  # =========================================
+  # Job 3: Integration Tests
+  # =========================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [unit-tests]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev,test
+
+      - name: Start test containers (Qdrant, MinIO, Neo4j)
+        run: |
+          docker run -d --name test-qdrant -p 6333:6333 qdrant/qdrant:v1.7.0
+          docker run -d --name test-minio -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=test_minio \
+            -e MINIO_ROOT_PASSWORD=test_minio_password \
+            minio/minio:latest server /data --console-address ":9001"
+          docker run -d --name test-neo4j -p 7474:7474 -p 7687:7687 \
+            -e NEO4J_AUTH=neo4j/test_neo4j_password \
+            neo4j:5.15
+          
+          # Wait for services to be ready
+          sleep 10
+
+      - name: Run integration tests
+        run: |
+          poetry run pytest tests/integration/ \
+            --cov=src \
+            --cov-report=xml:coverage-integration.xml \
+            --cov-report=html:htmlcov-integration \
+            --cov-append \
+            -v \
+            --tb=short \
+            --timeout=300
+        env:
+          TEST_POSTGRES_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          TEST_REDIS_URL: redis://localhost:6379/0
+          TEST_QDRANT_URL: http://localhost:6333
+          TEST_MINIO_ENDPOINT: localhost:9000
+          TEST_MINIO_ACCESS_KEY: test_minio
+          TEST_MINIO_SECRET_KEY: test_minio_password
+          TEST_NEO4J_URI: bolt://localhost:7687
+          TEST_NEO4J_USER: neo4j
+          TEST_NEO4J_PASSWORD: test_neo4j_password
+
+      - name: Stop test containers
+        if: always()
+        run: |
+          docker stop test-qdrant test-minio test-neo4j || true
+          docker rm test-qdrant test-minio test-neo4j || true
+
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: htmlcov-integration/
+          retention-days: 7
+
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-xml
+          path: coverage-integration.xml
+          retention-days: 7
+
+  # =========================================
+  # Job 4: Security Scanning
+  # =========================================
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install safety and bandit
+        run: |
+          pip install safety bandit
+
+      - name: Run bandit (security linting)
+        run: bandit -r src/ -f json -o bandit-report.json || true
+
+      - name: Run safety (dependency vulnerabilities)
+        run: safety check --json > safety-report.json || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 7
+
+  # =========================================
+  # Job 5: Build Docker Image
+  # =========================================
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [unit-tests, integration-tests]
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get git SHA
+        id: git_sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Generate Docker image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+
+      - name: Build Docker image (multi-stage)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          retention-days: 7
+
+  # =========================================
+  # Job 6: Upload Coverage to Codecov
+  # =========================================
+  upload-coverage:
+    name: Upload Coverage to Codecov
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests, integration-tests]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*-xml
+          merge-multiple: true
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage-unit.xml,./coverage-integration.xml
+          flags: unittests,integration
+          name: codecov-sisys
+          fail_ci_if_error: false # Optional: set to true to fail CI if upload fails
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
