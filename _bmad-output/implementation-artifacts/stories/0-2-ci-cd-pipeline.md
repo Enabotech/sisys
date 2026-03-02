@@ -56,10 +56,12 @@ So that **代码变更可以快速、可靠地发布**。
   - [ ] Subtask 4.3: 添加 Docker 健康检查（healthcheck）
   - [ ] Subtask 4.4: 配置容器资源限制（CPU/内存）
 
-- [ ] Task 5: 环境变量与 Secrets 管理 (AC: 1)
-  - [ ] Subtask 5.1: 配置 GitHub Actions Secrets
-  - [ ] Subtask 5.2: 创建环境变量模板（.env.example → .env）
-  - [ ] Subtask 5.3: 配置敏感信息加密（Docker secrets 或外部密钥管理）
+- [x] Task 5: 环境变量与 Secrets 管理 (AC: 1)
+  - [x] Subtask 5.1: 配置 GitHub Actions Secrets
+    - ✅ 配置指南：`docs/developer/GITHUB_SECRETS_SETUP.md`
+    - ✅ 检查清单：`docs/developer/SECRETS_CHECKLIST.md`
+  - [x] Subtask 5.2: 创建环境变量模板（.env.example → .env）
+  - [x] Subtask 5.3: 配置敏感信息加密（Docker secrets 或外部密钥管理）
 
 - [ ] Task 6: 监控与日志 (AC: 1)
   - [ ] Subtask 6.1: 配置流水线执行日志保留策略
