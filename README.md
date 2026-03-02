@@ -25,6 +25,40 @@ AI-driven strategic planning and decision intelligence platform for enterprises.
 
 ## 🚀 Quick Start
 
+### 2026-03-02 更新：Story 0.2 CI/CD 流水线已完成！ ✅
+
+**新功能：**
+- ✅ GitHub Actions CI/CD 流水线（自动测试、构建、部署）
+- ✅ Docker 多阶段构建（生产优化）
+- ✅ 测试框架（单元/集成/E2E 测试）
+- ✅ Pre-commit 代码质量钩子
+- ✅ 覆盖率报告（Codecov 集成）
+
+**快速开始：**
+```bash
+# 1. 克隆仓库
+git clone <repository-url>
+cd sisys
+
+# 2. 配置环境变量
+cp .env.example .env
+
+# 3. 启动开发服务
+cd docker && docker compose up -d
+
+# 4. 安装依赖
+poetry install
+
+# 5. 运行测试
+./scripts/testing/run_tests.sh --all
+```
+
+**详细文档：**
+- 📖 [5 分钟快速设置](QUICK_SETUP.md)
+- 🔑 [GitHub Secrets 配置](docs/developer/GITHUB_SECRETS_SETUP.md)
+- 📋 [Secrets 检查清单](docs/developer/SECRETS_CHECKLIST.md)
+- 🚀 [CI/CD 快速参考](docs/developer/cicd_quick_reference.md)
+
 ### Prerequisites
 
 **Choose one of the following Docker environments:**
