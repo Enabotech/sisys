@@ -58,17 +58,14 @@ def test_acceptance_criteria_1():
         (ROOT / ".github/workflows/cd.yml", "CD 工作流配置"),
     ]
 
-    passed = all(check_file_exists(path, desc) for path, desc in checks)
+    for path, desc in checks:
+        assert path.exists(), f"{desc} 不存在：{path}"
 
     # 检查 CI 配置关键字
     ci_content = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    if "on:" in ci_content and ("push:" in ci_content or "pull_request:" in ci_content):
-        print("[OK] CI 触发器配置正确")
-    else:
-        print("[FAIL] CI 触发器配置缺失")
-        passed = False
-
-    return passed
+    assert "on:" in ci_content, "CI 缺少 on 字段"
+    assert "push:" in ci_content or "pull_request:" in ci_content, "CI 触发器配置缺失"
+    print("[OK] CI 触发器配置正确")
 
 
 def test_acceptance_criteria_2():
@@ -84,15 +81,9 @@ def test_acceptance_criteria_2():
         ("bandit" in ci_content or "safety" in ci_content or "security" in ci_content, "安全扫描"),
     ]
 
-    passed = True
     for check, name in checks:
-        if check:
-            print(f"[OK] {name} 已配置")
-        else:
-            print(f"[FAIL] {name} 未配置")
-            passed = False
-
-    return passed
+        assert check, f"{name} 未配置"
+        print(f"[OK] {name} 已配置")
 
 
 def test_acceptance_criteria_3():
@@ -109,15 +100,9 @@ def test_acceptance_criteria_3():
         ("health" in cd_content.lower(), "健康检查"),
     ]
 
-    passed = True
     for check, name in checks:
-        if check:
-            print(f"[OK] {name} 已配置")
-        else:
-            print(f"[FAIL] {name} 未配置")
-            passed = False
-
-    return passed
+        assert check, f"{name} 未配置"
+        print(f"[OK] {name} 已配置")
 
 
 def test_task_completion():
@@ -126,8 +111,10 @@ def test_task_completion():
 
     # Task 1: GitHub Actions 配置
     print("\nTask 1: GitHub Actions 工作流配置")
-    task1 = check_file_exists(ROOT / ".github/workflows/ci.yml", "CI 工作流")
-    task1 &= check_file_exists(ROOT / ".github/workflows/cd.yml", "CD 工作流")
+    assert (ROOT / ".github/workflows/ci.yml").exists(), "CI 工作流不存在"
+    assert (ROOT / ".github/workflows/cd.yml").exists(), "CD 工作流不存在"
+    print("  [OK] CI 工作流")
+    print("  [OK] CD 工作流")
 
     # Task 2: CI 流水线实现
     print("\nTask 2: CI 流水线实现")
@@ -137,9 +124,9 @@ def test_task_completion():
         ("poetry" in ci_content.lower(), "Poetry 依赖安装"),
         ("coverage" in ci_content.lower(), "覆盖率报告"),
     ]
-    task2 = all(check for check, _ in task2_checks)
     for check, name in task2_checks:
-        print(f"  [{'OK' if check else 'FAIL'}] {name}")
+        assert check, f"{name} 缺失"
+        print(f"  [OK] {name}")
 
     # Task 3: CD 流水线实现
     print("\nTask 3: CD 流水线实现")
@@ -149,20 +136,23 @@ def test_task_completion():
         ("deploy" in cd_content.lower(), "部署配置"),
         ("health" in cd_content.lower(), "健康检查"),
     ]
-    task3 = all(check for check, _ in task3_checks)
     for check, name in task3_checks:
-        print(f"  [{'OK' if check else 'FAIL'}] {name}")
+        assert check, f"{name} 缺失"
+        print(f"  [OK] {name}")
 
     # Task 4: Docker 配置
     print("\nTask 4: Docker 配置优化")
-    task4 = check_file_exists(ROOT / "docker/Dockerfile.prod", "生产 Dockerfile")
-    task4 &= check_file_exists(ROOT / "docker/docker-compose.prod.yml", "生产 Compose")
-    task4 &= check_file_exists(ROOT / "docker/docker-compose.test.yml", "测试 Compose")
+    assert (ROOT / "docker/Dockerfile.prod").exists(), "生产 Dockerfile 不存在"
+    assert (ROOT / "docker/docker-compose.prod.yml").exists(), "生产 Compose 不存在"
+    assert (ROOT / "docker/docker-compose.test.yml").exists(), "测试 Compose 不存在"
+    print("  [OK] 生产 Dockerfile")
+    print("  [OK] 生产 Compose")
+    print("  [OK] 测试 Compose")
 
     # Task 5: Secrets 管理
     print("\nTask 5: 环境变量与 Secrets 管理")
-    task5 = check_file_exists(ROOT / ".env.example", "环境变量模板")
-    # Secrets 配置在 GitHub 上手动完成
+    assert (ROOT / ".env.example").exists(), "环境变量模板不存在"
+    print("  [OK] 环境变量模板")
 
     # Task 6: 监控与日志
     print("\nTask 6: 监控与日志")
@@ -175,11 +165,9 @@ def test_task_completion():
             "通知配置",
         ),
     ]
-    task6 = all(check for check, _ in task6_checks)
     for check, name in task6_checks:
-        print(f"  [{'OK' if check else 'FAIL'}] {name}")
-
-    return all([task1, task2, task3, task4, task5, task6])
+        assert check, f"{name} 缺失"
+        print(f"  [OK] {name}")
 
 
 def test_supporting_files():
@@ -195,7 +183,9 @@ def test_supporting_files():
         (ROOT / "docs/developer/cicd_quick_reference.md", "CI/CD 参考文档"),
     ]
 
-    return all(check_file_exists(path, desc) for path, desc in files)
+    for path, desc in files:
+        assert path.exists(), f"{desc} 不存在：{path}"
+        print(f"[OK] {desc}: {path}")
 
 
 def main():
@@ -213,8 +203,11 @@ def main():
     results = []
     for name, test_func in tests:
         try:
-            passed = test_func()
-            results.append((name, passed))
+            test_func()  # 不捕获返回值，assert 失败会抛出异常
+            results.append((name, True))
+        except AssertionError as e:
+            print(f"\n[FAIL] 测试 {name} 失败：{e}")
+            results.append((name, False))
         except Exception as e:
             print(f"\n[FAIL] 测试 {name} 异常：{e}")
             results.append((name, False))
@@ -235,7 +228,7 @@ def main():
 
     if passed_count == total_count:
         print("\n[SUCCESS] 所有验收标准通过！")
-        print("\nStory 0.2 状态：READY FOR REVIEW")
+        print("\nStory 0.2 状态：COMPLETE")
         print("\n下一步操作：")
         print("1. 在 GitHub 上配置 Secrets")
         print("2. 推送代码到仓库触发 CI/CD")
@@ -246,5 +239,9 @@ def main():
         return 1
 
 
+# 注：main 函数保留用于直接运行脚本，pytest 使用各个测试函数
+
+
 if __name__ == "__main__":
+    import sys
     sys.exit(main())

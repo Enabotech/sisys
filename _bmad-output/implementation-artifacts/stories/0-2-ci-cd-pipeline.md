@@ -328,7 +328,29 @@ So that **代码变更可以快速、可靠地发布**。
 
 ## Change Log
 
-### 2026-03-02 - 二次审查修复完成
+### 2026-03-02 - E2E 测试通过
+
+**测试结果:**
+```
+✅ 5 passed in 0.01s
+- test_acceptance_criteria_1 PASSED (CI 流水线)
+- test_acceptance_criteria_2 PASSED (PR 检查)
+- test_acceptance_criteria_3 PASSED (CD 部署)
+- test_task_completion PASSED (任务完成)
+- test_supporting_files PASSED (支持文件)
+```
+
+**Story 0.1 测试结果:**
+```
+✅ 5 passed in 11.27s
+- test_docker_services PASSED
+- test_poetry_install PASSED
+- test_ide_configuration PASSED
+- test_environment_template PASSED
+- test_documentation PASSED
+```
+
+**状态:** Story 0.2 所有 E2E 验收测试通过，Story 正式完成！
 
 **修复内容 (第二次审查):**
 - Kubernetes Secret 添加醒目警告注释和 annotation
