@@ -2270,6 +2270,12 @@ scripts/
 │   ├── deploy_k8s.sh                                      # Kubernetes 部署
 │   └── health_check.sh                                    # 健康检查
 │
+├── testing/                                               # 测试脚本（Story 0.2 新增）
+│   ├── __init__.py
+│   ├── run_tests.sh                                       # 运行所有测试
+│   ├── run_coverage.sh                                    # 生成覆盖率报告
+│   └── clean_test_data.py                                 # 清理测试数据
+│
 ├── monitoring/                                            # 监控脚本
 │   ├── __init__.py
 │   ├── collect_metrics.py                                 # 指标收集

@@ -123,7 +123,7 @@ check_poetry() {
 check_venv() {
   if [ ! -d ".venv" ]; then
     print_warning "Virtual environment not found. Installing dependencies..."
-    poetry install --with dev,test
+    poetry install
   fi
 }
 

@@ -208,84 +208,29 @@ print(f'✓ Neo4j: {settings.NEO4J_URI}')
 
 ## 📁 Project Structure
 
+**完整目录结构：** 详见 [architecture.md](architecture.md#13-目录结构) 第 13 章（权威来源）
+
+**快速概览（六边形架构）：**
 ```
 sisys/
-├── src/                                                   # 源代码目录
-│   ├── domain/                                            # 领域层（零外部依赖）
-│   │   ├── models/       # 领域实体
-│   │   ├── services/     # 领域服务接口
-│   │   ├── events/       # 领域事件
-│   │   ├── repositories/ # 仓储接口
-│   │   └── exceptions/   # 领域异常
-│   ├── application/                                       # 应用层（用例编排）
-│   │   ├── services/     # 应用服务
-│   │   ├── use_cases/    # 用例定义
-│   │   ├── commands/     # 命令定义
-│   │   ├── queries/      # 查询定义
-│   │   ├── handlers/     # 处理器
-│   │   └── dtos/         # 数据传输对象
-│   ├── infrastructure/                                    # 基础设施层
-│   │   ├── workflow/              # Prefect 工作流引擎
-│   │   ├── agent_orchestration/   # LangGraph Agent 编排
-│   │   ├── messaging/             # 消息总线（RabbitMQ/Redis）
-│   │   ├── persistence/           # 持久化实现（五层存储）
-│   │   ├── external_services/     # 外部服务适配器
-│   │   ├── security/              # 安全（认证/加密/审计）
-│   │   └── monitoring/            # 监控（性能/CUSUM）
-│   ├── interfaces/                                      # 接口层
-│   │   ├── cli/          # CLI 接口（click）
-│   │   ├── api/          # REST API（FastAPI）
-│   │   ├── event_driven/ # 事件驱动接口
-│   │   └── adapters/     # 适配器
-│   └── shared/                                          # 共享组件
-│       ├── containers.py # 依赖注入容器
-│       ├── config.py     # 共享配置
-│       └── utils.py      # 工具函数
-├── tests/                                                 # 测试目录
-│   ├── unit/              # 单元测试
-│   ├── integration/       # 集成测试
-│   ├── e2e/               # 端到端测试
-│   ├── fixtures/          # 测试固件
-│   └── conftest.py        # pytest 配置
-├── configs/                                               # 配置文件
-│   ├── development.py     # 开发环境
-│   ├── production.py      # 生产环境
-│   └── testing.py         # 测试环境
-├── scripts/                                               # 脚本目录
-│   ├── __init__.py
-│   ├── setup_environment.py                               # 环境设置脚本
-│   ├── database/                                          # 数据库脚本
-│   │   ├── __init__.py
-│   │   ├── init-db.sql                                    # 数据库初始化
-│   │   ├── migrate.py                                     # 迁移脚本
-│   │   └── seed.py                                        # 数据种子
-│   ├── deployment/                                        # 部署脚本
-│   │   ├── __init__.py
-│   │   └── build_docker.sh                                # Docker 构建
-│   ├── monitoring/                                        # 监控脚本
-│   │   ├── __init__.py
-│   │   └── health_check.py                                # 健康检查
-│   └── tools/                                             # 工具脚本
-│       └── __init__.py
-├── docker/                                                # Docker 配置
-│   ├── docker-compose.yml                                 # 开发环境 Docker 配置
-│   └── docker-compose.prod.yml                            # 生产环境 Docker 配置
-├── .github/workflows/                                     # GitHub Actions
-│   ├── ci.yml
-│   └── cd.yml
-├── requirements/                                          # 依赖管理
-│   ├── requirements.txt
-│   ├── dev.txt
-│   └── prod.txt
-├── docs/                                                  # 文档目录
-│   ├── architecture/
-│   ├── api/
-│   └── developer/
-├── pyproject.toml                                         # Python 项目配置
-├── .env.example                                           # 环境变量示例
-├── .pre-commit-config.yaml                                # Pre-commit 配置
-└── README.md                                              # 项目说明
+├── src/                          # 六边形架构核心
+│   ├── domain/                   # 领域层（零外部依赖 - FR-AR-01）
+│   ├── application/              # 应用层（用例编排）
+│   ├── infrastructure/           # 基础设施层（五层存储/消息总线）
+│   └── interfaces/               # 接口层（CLI/REST API）
+├── tests/                        # 测试（unit/integration/e2e）
+├── scripts/                      # 脚本（database/deployment/testing/monitoring）
+├── docker/                       # Docker 配置（dev/prod/test）
+├── .github/workflows/            # GitHub Actions（CI/CD）
+├── configs/                      # 应用配置（base/development/production/testing）
+└── docs/                         # 文档（architecture/api/user_guides/developer）
 ```
+
+**关键架构约束：**
+- ✅ 领域层不依赖任何外部框架（FR-AR-01）
+- ✅ 基础设施层实现领域层接口
+- ✅ 五层存储：Redis → PostgreSQL → Qdrant → MinIO → Neo4j
+- ✅ 事件驱动：RabbitMQ + Redis 双通道总线
 
 ## 🛠️ Development Tools
 

@@ -96,103 +96,25 @@ So that **代码变更可以快速、可靠地发布**。
 
 ### 项目结构说明
 
-**统一项目结构对齐（基于 architecture.md 第 13 章 + README.md）：**
+**完整目录结构：** 遵循 [architecture.md](../../../../_bmad-output/planning-artifacts/architecture.md#13-目录结构) 第 13 章定义（权威来源）
 
-```
-.\
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                      # CI 流水线（PR/代码提交触发）
-│       └── cd.yml                      # CD 流水线（main 分支触发）
-│
-├── docker/
-│   ├── docker-compose.yml              # 开发环境编排（PostgreSQL/Redis/Qdrant/MinIO/Neo4j）
-│   ├── docker-compose.prod.yml         # 生产环境编排
-│   └── Dockerfile                      # 多阶段构建
-│
-├── src/
-│   ├── domain/                         # 领域层（零外部依赖 - FR-AR-01）
-│   │   ├── models/                     # 领域实体（Document/Agent/Tool/Checkpoint 等）
-│   │   ├── services/                   # 领域服务接口（RAG/Tool/Agent/Planning 等）
-│   │   ├── repositories/               # 仓储接口
-│   │   ├── events/                     # 领域事件（DocumentProcessed/ToolExecuted 等）
-│   │   └── exceptions/                 # 领域异常
-│   ├── application/                    # 应用层（用例编排）
-│   │   ├── services/                   # 应用服务（Orchestration/Audit/Cost 等）
-│   │   ├── use_cases/                  # 用例定义
-│   │   ├── commands/                   # 命令定义（CQRS 命令侧）
-│   │   ├── queries/                    # 查询定义（CQRS 查询侧）
-│   │   ├── handlers/                   # 处理器（命令/查询/事件）
-│   │   └── dtos/                       # 数据传输对象
-│   ├── infrastructure/                 # 基础设施层
-│   │   ├── workflow/                   # Prefect 工作流引擎（3.6.16+）
-│   │   ├── agent_orchestration/        # LangGraph Agent 编排（1.0.9+）
-│   │   ├── messaging/                  # 消息总线（RabbitMQ+Redis 双通道）
-│   │   ├── persistence/                # 持久化实现（五层存储架构）
-│   │   ├── external_services/          # 外部服务适配器（LLM/Embedding/Storage）
-│   │   ├── security/                   # 安全（认证/加密/审计/ShieldCortex）
-│   │   └── monitoring/                 # 监控（性能/CUSUM 漂移检测）
-│   ├── interfaces/                     # 接口层
-│   │   ├── cli/                        # CLI 接口（click 8.1+）
-│   │   ├── api/                        # REST API（FastAPI 0.104+）
-│   │   ├── event_driven/               # 事件驱动接口
-│   │   └── adapters/                   # 适配器
-│   └── shared/                         # 共享组件
-│       ├── containers.py               # 依赖注入容器
-│       ├── config.py                   # 共享配置
-│       └── utils.py                    # 工具函数
-│
-├── tests/
-│   ├── unit/                           # 单元测试（按层组织：domain/application/infrastructure）
-│   ├── integration/                    # 集成测试（仓储/消息总线/外部服务）
-│   ├── e2e/                            # E2E 测试（用户旅程/Story 验收）
-│   ├── fixtures/                       # 测试固件（Mock 数据/测试数据库）
-│   └── conftest.py                     # pytest 配置
-│
-├── configs/
-│   ├── development.py                  # 开发环境配置
-│   ├── production.py                   # 生产环境配置
-│   ├── testing.py                      # 测试环境配置
-│   └── base.py                         # 基础配置
-│
-├── scripts/
-│   ├── setup_environment.py            # 环境设置脚本
-│   ├── database/
-│   │   ├── init-db.sql                 # 数据库初始化脚本
-│   │   └── migrate.py                  # 数据库迁移脚本
-│   ├── deployment/                     # 部署脚本
-│   └── monitoring/
-│       └── health_check.py             # 健康检查脚本（Story 0.1 已创建）
-│
-├── docs/
-│   ├── architecture/                   # 架构文档
-│   ├── api/                            # API 文档
-│   ├── user_guides/                    # 用户指南
-│   └── developer/                      # 开发者文档
-│
-├── requirements/                       # 依赖管理
-│   ├── requirements.txt                # 主依赖
-│   ├── dev.txt                         # 开发依赖
-│   └── prod.txt                        # 生产依赖
-│
-├── notebooks/                          # Jupyter Notebooks
-│   ├── exploration/                    # 探索性分析
-│   └── prototyping/                    # 原型开发
-│
-├── logs/                               # 日志目录
-│   ├── application.log
-│   ├── error.log
-│   └── audit.log
-│
-├── .env.example                        # 环境变量模板（Story 0.1 已创建）
-├── .gitignore
-├── .pre-commit-config.yaml             # Pre-commit 配置
-├── pyproject.toml                      # Python 项目配置（Poetry 管理，Story 0.1 已创建）
-├── README.md                           # 项目说明（Story 0.1 已创建）
-└── CHANGELOG.md
-```
+**Story 0.2 新增文件：**
 
-**命名约定（2026 最佳实践）：**
+| 文件 | 用途 | 说明 |
+|------|------|------|
+| `.github/workflows/ci.yml` | CI 流水线 | PR/代码提交触发（6 个 Job） |
+| `.github/workflows/cd.yml` | CD 流水线 | main 分支触发（4 个 Job） |
+| `docker/Dockerfile.prod` | 生产 Dockerfile | 多阶段构建 |
+| `docker/docker-compose.prod.yml` | 生产编排 | 资源限制/健康检查 |
+| `docker/docker-compose.test.yml` | 测试编排 | 自动清理测试数据 |
+| `scripts/testing/run_tests.sh` | 测试运行 | 单元/集成/E2E 测试 |
+| `scripts/testing/run_coverage.sh` | 覆盖率报告 | HTML/XML 生成 |
+| `scripts/testing/clean_test_data.py` | 清理工具 | 五层存储数据清理 |
+| `.pre-commit-config.yaml` | Pre-commit | 代码质量钩子 |
+| `docs/developer/testing_guide.md` | 测试指南 | 使用文档 |
+| `docs/developer/cicd_quick_reference.md` | CI/CD 参考 | 快速参考卡片 |
+
+**命名约定：** 遵循 architecture.md 第 13 章定义。
 - **工作流文件**：`ci.yml`（持续集成）、`cd.yml`（持续部署）
 - **Docker 镜像标签**：`{git_sha}`（精确版本）、`{version}`（语义化版本）、`latest`（最新稳定版）
 - **测试文件**：`test_*.py`（pytest 约定）
