@@ -59,6 +59,17 @@ So that **团队可以高效协作开发**。
 - [ ] IDE 配置测试通过
 - [ ] 文档完整
 
+## Documentation
+
+**设置文档：**
+- [QUICK_SETUP.md](../../../QUICK_SETUP.md) - 5 分钟快速设置（推荐新开发者）
+- [README.md](../../../README.md) - 项目综合说明
+- [docker/WSL2_SETUP.md](../../../docker/WSL2_SETUP.md) - WSL 2 详细设置指南
+- [docker/WSL2_QUICK_REFERENCE.md](../../../docker/WSL2_QUICK_REFERENCE.md) - WSL 2 快速参考卡片
+
+**架构文档：**
+- [_bmad-output/planning-artifacts/architecture.md](../../../_bmad-output/planning-artifacts/architecture.md) - 完整架构设计
+
 ## References
 
 - Epic 0: Iteration 0

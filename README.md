@@ -1,6 +1,27 @@
 # sisys - Enterprise Strategic Planning System
 
+> **🚀 新开发者？5 分钟快速开始：** [阅读 QUICK_SETUP.md](QUICK_SETUP.md)
+
 AI-driven strategic planning and decision intelligence platform for enterprises.
+
+---
+
+## 📋 文档导航
+
+| 文档 | 用途 | 目标读者 | 阅读时间 |
+|------|------|---------|---------|
+| [**QUICK_SETUP.md**](QUICK_SETUP.md) | 5 分钟快速设置（WSL 2） | 新开发者 | 5 分钟 |
+| [**README.md**](README.md) | 项目综合说明 | 所有人员 | 15 分钟 |
+| [**docker/WSL2_SETUP.md**](docker/WSL2_SETUP.md) | WSL 2 详细设置指南 | WSL 2 用户 | 10 分钟 |
+| [**docker/WSL2_QUICK_REFERENCE.md**](docker/WSL2_QUICK_REFERENCE.md) | WSL 2 快速参考卡片 | WSL 2 用户 | 2 分钟 |
+| [_bmad-output/planning-artifacts/architecture.md](architecture.md) | 完整架构设计文档 | 架构师/开发者 | 60 分钟 |
+
+**快速选择：**
+- 🆕 **第一次设置？** → 阅读 [QUICK_SETUP.md](QUICK_SETUP.md)
+- 📖 **了解项目？** → 继续阅读本 README
+- 🐧 **使用 WSL 2？** → 阅读 [docker/WSL2_SETUP.md](docker/WSL2_SETUP.md)
+
+---
 
 ## 🚀 Quick Start
 

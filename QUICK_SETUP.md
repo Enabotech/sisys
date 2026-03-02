@@ -1,6 +1,23 @@
 # sisys - 快速设置指南
 
+> **📖 想了解项目全貌？** [阅读 README.md](README.md) 获取完整介绍
+
 **适用于 WSL 2 (Ubuntu 22.04) 环境**
+
+---
+
+## 📋 本文档用途
+
+- **目标**：5 分钟内完成开发环境设置
+- **适用人群**：新加入的开发工程师
+- **前置条件**：Windows 11 + WSL 2 + Ubuntu 22.04
+
+**其他文档：**
+- [README.md](README.md) - 项目综合说明
+- [docker/WSL2_SETUP.md](docker/WSL2_SETUP.md) - WSL 2 详细设置指南
+- [docker/WSL2_QUICK_REFERENCE.md](docker/WSL2_QUICK_REFERENCE.md) - WSL 2 快速参考卡片
+
+---
 
 ## 🚀 快速开始（5 分钟设置）
 
