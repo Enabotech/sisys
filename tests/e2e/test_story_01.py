@@ -10,7 +10,6 @@ This script tests all acceptance criteria for Story 0.1:
 """
 
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -55,10 +54,10 @@ def test_docker_services():
     compose_file = docker_dir / "docker-compose.yml"
     assert compose_file.exists(), "docker-compose.yml not found"
     print(f"[OK] docker-compose.yml found: {compose_file}")
-    
+
     # Try both docker compose (v2) and docker-compose (v1)
     print_step("Checking Docker Compose availability...")
-    
+
     # Try docker compose (v2 - plugin version)
     success, stdout, stderr = run_command("docker compose version")
     if success:
@@ -75,7 +74,7 @@ def test_docker_services():
             print("  → Install Docker Compose plugin or standalone")
             # Continue anyway - services might already be running
             compose_cmd = "docker compose"
-    
+
     # Check if services are already running
     print_step("Checking if services are running...")
     success, stdout, stderr = run_command(f"{compose_cmd} ps")
@@ -108,8 +107,8 @@ def test_docker_services():
     print(stdout)
 
     # Check if at least some services are Up
-    assert "Up" in stdout or "sisys-" in stdout or success, "Services should be running or startable"
-    print(f"\n[OK] Services are running")
+    assert "Up" in stdout or "sisys-" in stdout or success, "Services should be running / startable"
+    print("\n[OK] Services are running")
 
 def test_poetry_install():
     """Test: Poetry dependencies install successfully."""
@@ -210,7 +209,7 @@ def test_environment_template():
         missing = [var for var in critical_vars if var not in content]
 
         assert not missing, f"Missing critical variables: {missing}"
-        print(f"  [OK] All critical variables present")
+        print("  [OK] All critical variables present")
 
     except Exception as e:
         print(f"  [WARN] Could not read .env.example: {e}")

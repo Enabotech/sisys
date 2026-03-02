@@ -4,8 +4,9 @@ sisys - Pytest Configuration and Fixtures
 This file contains shared fixtures and configuration for pytest tests.
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session")
@@ -24,23 +25,23 @@ def docker_compose_file(project_root):
 def docker_services(docker_compose_file):
     """
     Fixture to start Docker services before tests and stop them after.
-    
+
     Usage:
         def test_something(docker_services):
             # Docker services are running
             pass
     """
     import subprocess
-    
+
     # Start services
     subprocess.run(
         ["docker-compose", "up", "-d"],
         cwd=docker_compose_file.parent,
         check=True
     )
-    
+
     yield
-    
+
     # Stop services
     subprocess.run(
         ["docker-compose", "down"],
