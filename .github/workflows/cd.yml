@@ -1,6 +1,6 @@
 # CD Pipeline - Continuous Deployment
 # Triggered on: Code merged to main branch
-# 
+#
 # Responsibilities:
 # - Build production Docker image (multi-stage)
 # - Push to GitHub Container Registry (GHCR)
@@ -151,7 +151,7 @@ jobs:
         run: |
           cat > docker-compose.test.yml << EOF
           version: '3.8'
-          
+
           services:
             app:
               image: ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }}
@@ -288,7 +288,7 @@ jobs:
         run: |
           echo "Waiting for services to be healthy..."
           sleep 30
-          
+
           # Check each service health
           for i in {1..30}; do
             if docker compose -f docker-compose.test.yml ps | grep -q "sisys-test-app.*healthy"; then
@@ -308,7 +308,7 @@ jobs:
         run: |
           # Wait for application to be ready
           sleep 10
-          
+
           # Test health endpoint
           response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
           if [ "$response" -ne 200 ]; then
@@ -317,7 +317,7 @@ jobs:
             exit 1
           fi
           echo "✅ Health check passed (HTTP $response)"
-          
+
           # Test database connection
           response=$(curl -s http://localhost:8000/health | grep -i "postgres" || true)
           if [ -z "$response" ]; then
@@ -330,7 +330,7 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.test.yml logs > deployment-logs.txt
-          
+
       - name: Upload deployment logs
         uses: actions/upload-artifact@v4
         if: always()
@@ -442,7 +442,7 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [build-production, deploy-test]
     if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy-prod]')
     environment:
@@ -459,24 +459,140 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get git SHA
-        id: git_sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Deploy to production (placeholder)
+      - name: Get git SHA and version
+        id: git_info
         run: |
-          echo "🚀 Deploying to production..."
-          echo "Image: ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }}"
-          # TODO: Add your production deployment steps here
-          # Examples:
-          # - Kubernetes deployment with kubectl/helm
-          # - AWS ECS deployment
-          # - Azure App Service deployment
-          # - Manual deployment script
-          echo "✅ Production deployment complete"
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')" >> $GITHUB_OUTPUT
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl for production cluster
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          echo "✅ kubectl configured"
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Set production image in Kubernetes deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+          kubectl set image deployment/sisys-app \
+            sisys-app=${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_info.outputs.sha }} \
+            -n production
+          echo "✅ Kubernetes deployment updated"
+
+      - name: Wait for rollout to complete
+        run: |
+          export KUBECONFIG=kubeconfig
+          kubectl rollout status deployment/sisys-app -n production --timeout=300s
+          echo "✅ Rollout completed"
 
       - name: Run production health checks
         run: |
           echo "Running production health checks..."
-          # TODO: Add production-specific health checks
-          # curl -f https://sisys.example.com/health
+
+          # Wait for application to be ready
+          sleep 15
+
+          # Test health endpoint
+          max_retries=30
+          for i in $(seq 1 $max_retries); do
+            response=$(curl -s -o /dev/null -w "%{http_code}" https://sisys.example.com/health || echo "000")
+            if [ "$response" -eq 200 ]; then
+              echo "✅ Production health check passed (HTTP $response)"
+              exit 0
+            fi
+            if [ $i -eq $max_retries ]; then
+              echo "❌ Production health check failed after $max_retries attempts (HTTP $response)"
+              exit 1
+            fi
+            echo "Waiting for production to be healthy... ($i/$max_retries)"
+            sleep 10
+          done
+
+      - name: Verify production deployment
+        run: |
+          echo "Verifying production deployment..."
+
+          # Get deployment info
+          export KUBECONFIG=kubeconfig
+          kubectl get deployment sisys-app -n production -o wide
+
+          # Get pod status
+          kubectl get pods -n production -l app=sisys-app
+
+          # Check recent events
+          kubectl get events -n production --sort-by='.lastTimestamp' | tail -20
+
+      - name: Send production deployment notification
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "${{ steps.git_info.outputs.version }} Production Deployment",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🚀 Production Deployment*\nStatus: *${{ job.status }}*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ steps.git_info.outputs.version }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ steps.git_info.outputs.sha }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Environment:* Production\n*URL:* https://sisys.example.com"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Production Dashboard"
+                      },
+                      "url": "https://sisys.example.com/health"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: |
+          rm -f kubeconfig
+          echo "✅ Cleanup complete"
