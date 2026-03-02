@@ -1,6 +1,6 @@
 # Story 0.2: CI/CD 流水线
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -67,6 +67,15 @@ So that **代码变更可以快速、可靠地发布**。
   - [ ] Subtask 6.1: 配置流水线执行日志保留策略
   - [ ] Subtask 6.2: 设置流水线失败通知（邮件/即时通讯）
   - [ ] Subtask 6.3: 添加流水线执行时间监控
+
+- [ ] Task 7: AI 审查跟进 (代码审查修复)
+  - [x] Subtask 7.1: 修复 CI 流水线覆盖率阈值 (0 → 80%)
+  - [x] Subtask 7.2: 修复安全扫描未阻止流水线 (bandit/safety)
+  - [x] Subtask 7.3: 修复 Trivy 扫描未阻止构建 (exit-code: 1)
+  - [x] Subtask 7.4: 优化 Dockerfile 健康检查间隔 (30s → 15s)
+  - [x] Subtask 7.5: 修复 Codecov 集成配置 (fail_ci_if_error: true)
+  - [ ] Subtask 7.6: 实现生产部署具体步骤 (cd.yml deploy-production job)
+  - [ ] Subtask 7.7: 优化 Docker 镜像标签策略 (使用 git SHA 替代 latest)
 
 ## Dev Notes
 
@@ -218,17 +227,41 @@ So that **代码变更可以快速、可靠地发布**。
 - ✅ 2026 CI/CD 最佳实践研究（GitHub Actions、Docker 生产部署）
 - ✅ 项目结构对齐统一项目结构
 - ✅ 状态设置为 ready-for-dev
+- ✅ 代码审查修复 (2026-03-02):
+  - ✅ CI 覆盖率阈值设置为 80%
+  - ✅ 安全扫描配置为失败阻止 (bandit/safety)
+  - ✅ Trivy 容器扫描配置为失败阻止
+  - ✅ Dockerfile 健康检查优化为 15 秒间隔
+  - ✅ Codecov 集成配置为失败阻止
+  - ⏳ 生产部署步骤待实现 (Subtask 7.6)
+  - ⏳ Docker 镜像标签策略待优化 (Subtask 7.7)
 
 ### File List
 
 **创建的文件：**
 - `g:\ai\sisys\_bmad-output\implementation-artifacts\stories\0-2-ci-cd-pipeline.md`
 
-**后续需要创建的文件：**
-- `.github/workflows/ci.yml`
-- `.github/workflows/cd.yml`
-- `docker/Dockerfile.prod`
-- `docker/docker-compose.prod.yml`
+**已实现的文件：**
+- `.github/workflows/ci.yml` - CI 流水线（6 个 Job）
+- `.github/workflows/cd.yml` - CD 流水线（4 个 Job）
+- `docker/Dockerfile.prod` - 生产 Dockerfile（多阶段构建）
+- `docker/docker-compose.prod.yml` - 生产 Docker Compose 配置
+- `docker/docker-compose.test.yml` - 测试环境 Docker Compose 配置
+- `scripts/testing/run_tests.sh` - 测试运行脚本
+- `scripts/testing/run_coverage.sh` - 覆盖率报告脚本
+- `scripts/testing/clean_test_data.py` - 测试数据清理工具
+- `scripts/monitoring/health_check.py` - 健康检查脚本
+- `.pre-commit-config.yaml` - Pre-commit 钩子配置
+- `docs/developer/GITHUB_SECRETS_SETUP.md` - GitHub Secrets 配置指南
+- `docs/developer/cicd_quick_reference.md` - CI/CD 快速参考
+- `docs/developer/testing_guide.md` - 测试指南
+
+**代码审查修复 (2026-03-02)：**
+- ✅ `.github/workflows/ci.yml` - 覆盖率阈值、安全扫描、Trivy、Codecov 修复
+- ✅ `.github/workflows/cd.yml` - Trivy 扫描修复
+- ✅ `docker/Dockerfile.prod` - 健康检查间隔优化
+- ⏳ `docker/docker-compose.prod.yml` - 待优化镜像标签策略
+- ⏳ `.github/workflows/cd.yml` - 待实现生产部署具体步骤
 
 ---
 
