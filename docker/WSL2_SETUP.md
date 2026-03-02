@@ -168,7 +168,7 @@ nano .env
 
 ```bash
 # Run health check
-python scripts/health_check.py
+python scripts/monitoring/health_check.py
 
 # Or run Story 0.1 acceptance test
 python tests/e2e/test_story_01.py

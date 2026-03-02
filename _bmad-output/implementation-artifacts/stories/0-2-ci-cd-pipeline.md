@@ -235,7 +235,7 @@ g:\ai\sisys\
 - Docker Compose 配置了 5 个存储服务（PostgreSQL/Redis/Qdrant/MinIO/Neo4j）
 - Poetry 依赖管理已初始化
 - WSL 2 设置脚本已创建（Windows 开发环境）
-- 健康检查脚本 `scripts/health_check.py` 可复用
+- 健康检查脚本 `scripts/monitoring/health_check.py` 可复用
 
 **CI/CD 需要集成的内容：**
 - Docker Compose 健康检查验证

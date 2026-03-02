@@ -169,7 +169,7 @@ python -c "from src.core.database import get_db; print('Database connected!')"
 
 ```bash
 # Run health check script
-python scripts/health_check.py
+python scripts/monitoring/health_check.py
 
 # Or test manually
 python -c "

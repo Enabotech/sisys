@@ -34,8 +34,8 @@ So that **团队可以高效协作开发**。
 - [x] 创建 `.vscode/settings.json` 和 `.idea/` 配置 ✅
 - [x] 创建 `.env.example` 环境变量模板 ✅
 - [x] 编写开发环境搭建文档（README.md） ✅
-- [x] 创建健康检查脚本 `scripts/health_check.py` ✅
-- [x] 创建数据库初始化脚本 `scripts/init-db.sql` ✅
+- [x] 创建健康检查脚本 `scripts/monitoring/health_check.py` ✅
+- [x] 创建数据库初始化脚本 `scripts/database/init-db.sql` ✅
 - [x] 创建 src 目录结构（六边形架构） ✅
 - [x] 创建测试目录结构和验收测试 `tests/e2e/test_story_01.py` ✅
 - [x] 创建 WSL 2 自动化安装脚本 `docker/setup-wsl2.ps1` 和 `docker/setup-wsl2-docker.sh` ✅
