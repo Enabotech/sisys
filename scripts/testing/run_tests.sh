@@ -130,40 +130,54 @@ check_venv() {
 # Run unit tests
 run_unit_tests() {
   print_header "Running Unit Tests"
-  
+
+  # Check if unit test directory exists and has test files
+  if [ ! -f "tests/unit/test_*.py" ] && [ -z "$(find tests/unit -name 'test_*.py' 2>/dev/null)" ]; then
+    print_warning "No unit tests found in tests/unit/"
+    print_warning "Unit tests will be created in Story 0.3: Test Framework Setup"
+    return 0
+  fi
+
   if [ "$RUN_FAST" = true ]; then
     poetry run pytest tests/unit/ -v --tb=short -m "not slow"
   else
     poetry run pytest tests/unit/ -v --tb=short
   fi
-  
+
   print_success "Unit tests passed"
 }
 
 # Run integration tests
 run_integration_tests() {
   print_header "Running Integration Tests"
-  
+
+  # Check if integration test directory exists and has test files
+  if [ ! -f "tests/integration/test_*.py" ] && [ -z "$(find tests/integration -name 'test_*.py' 2>/dev/null)" ]; then
+    print_warning "No integration tests found in tests/integration/"
+    print_warning "Integration tests will be created in Story 0.3: Test Framework Setup"
+    return 0
+  fi
+
   # Check if Docker is running
   if ! command -v docker &> /dev/null; then
     print_error "Docker is not installed. Integration tests require Docker."
     exit 1
   fi
-  
+
   # Start test containers if needed
   echo "Starting test containers..."
   docker compose -f docker/docker-compose.test.yml up -d || true
-  
+
   # Wait for containers to be ready
   echo "Waiting for test containers to be ready..."
   sleep 10
-  
+
   if [ "$RUN_FAST" = true ]; then
     poetry run pytest tests/integration/ -v --tb=short -m "not slow"
   else
     poetry run pytest tests/integration/ -v --tb=short
   fi
-  
+
   print_success "Integration tests passed"
 }
 
@@ -215,44 +229,54 @@ generate_coverage() {
 # Main execution
 main() {
   print_header "🧪 sisys Test Runner"
-  
+
   check_poetry
   check_venv
-  
+
   # Activate virtual environment
   source .venv/bin/activate 2>/dev/null || true
-  
+
   TESTS_RUN=false
-  
+  TESTS_PASSED=true
+
   if [ "$RUN_ALL" = true ]; then
     TESTS_RUN=true
-    run_unit_tests
-    run_integration_tests
-    run_e2e_tests
+    run_unit_tests || TESTS_PASSED=false
+    run_integration_tests || TESTS_PASSED=false
+    run_e2e_tests || TESTS_PASSED=false
   else
     if [ "$RUN_UNIT" = true ]; then
       TESTS_RUN=true
-      run_unit_tests
+      run_unit_tests || TESTS_PASSED=false
     fi
-    
+
     if [ "$RUN_INTEGRATION" = true ]; then
       TESTS_RUN=true
-      run_integration_tests
+      run_integration_tests || TESTS_PASSED=false
     fi
-    
+
     if [ "$RUN_E2E" = true ]; then
       TESTS_RUN=true
-      run_e2e_tests
+      run_e2e_tests || TESTS_PASSED=false
     fi
   fi
-  
+
   if [ "$RUN_COVERAGE" = true ]; then
     generate_coverage
   fi
-  
+
+  echo ""
   if [ "$TESTS_RUN" = true ]; then
-    echo ""
-    print_success "All tests completed successfully! 🎉"
+    if [ "$TESTS_PASSED" = true ]; then
+      print_success "All tests completed successfully! 🎉"
+      echo ""
+      echo "Next steps:"
+      echo "  - Run 'pytest tests/e2e/' to verify Story 0.1 and 0.2 acceptance criteria"
+      echo "  - Story 0.3 will add unit and integration tests"
+    else
+      print_error "Some tests failed. Please check the output above."
+      exit 1
+    fi
   else
     print_warning "No tests were run. Use --help for usage information."
   fi
