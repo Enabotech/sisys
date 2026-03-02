@@ -251,7 +251,7 @@ sisys/
 │   ├── development.py     # 开发环境
 │   ├── production.py      # 生产环境
 │   └── testing.py         # 测试环境
-├── scripts/                                               # 脚本目录（architecture.md 13.9）
+├── scripts/                                               # 脚本目录
 │   ├── __init__.py
 │   ├── setup_environment.py                               # 环境设置脚本
 │   ├── database/                                          # 数据库脚本

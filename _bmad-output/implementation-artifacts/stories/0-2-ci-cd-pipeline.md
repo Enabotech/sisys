@@ -99,7 +99,7 @@ So that **代码变更可以快速、可靠地发布**。
 **统一项目结构对齐（基于 architecture.md 第 13 章 + README.md）：**
 
 ```
-g:\ai\sisys\
+.\
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                      # CI 流水线（PR/代码提交触发）
