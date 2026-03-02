@@ -227,7 +227,7 @@ def main():
         print("3. 验证流水线执行结果")
         return 0
     else:
-        print("\n[FAIL] 部分验收标准未通过，请检查失败项")
+        print("\n[FAIL] 部分验收标准未通过，请检查失败项目")
         return 1
 
 if __name__ == "__main__":
