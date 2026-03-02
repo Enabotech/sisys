@@ -11,13 +11,16 @@
 # - Health checks are enabled for all services
 # - Data persistence is configured with Docker volumes
 # - Network isolation is enabled
+# - Image tagging strategy: Use specific version tags (git SHA or semver) instead of 'latest'
+#   - DOCKER_IMAGE_TAG environment variable controls the app image tag (default: latest)
+#   - In production, always use specific version tags for reproducibility
 
 services:
   # =========================================
   # Application Service
   # =========================================
   app:
-    image: ghcr.io/sisys/sisys:latest
+    image: ghcr.io/sisys/sisys:${DOCKER_IMAGE_TAG:-latest}
     container_name: sisys-prod-app
     restart: always
     build:
