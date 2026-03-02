@@ -144,13 +144,14 @@ cp .env.example .env
 cd docker
 
 # Start all services (PostgreSQL, Redis, Qdrant, MinIO, Neo4j)
-docker-compose up -d
+# Note: Use 'docker compose' (v2 plugin) - Docker Desktop and Docker Engine both support this
+docker compose up -d
 
 # Verify all services are running
-docker-compose ps
+docker compose ps
 
 # View logs (optional)
-docker-compose logs -f
+docker compose logs -f
 ```
 
 **Expected Output:**
@@ -158,10 +159,12 @@ docker-compose logs -f
 NAME                 STATUS         PORTS
 sisys-postgres       Up (healthy)   0.0.0.0:5432->5432/tcp
 sisys-redis          Up (healthy)   0.0.0.0:6379->6379/tcp
-sisys-qdrant         Up (healthy)   0.0.0.0:6333->6333/tcp
+sisys-qdrant         Up             0.0.0.0:6333->6333/tcp
 sisys-minio          Up (healthy)   0.0.0.0:9000->9000/tcp, 0.0.0.0:9001->9001/tcp
 sisys-neo4j          Up (healthy)   0.0.0.0:7474->7474/tcp, 0.0.0.0:7687->7687/tcp
 ```
+
+**Note:** Qdrant service shows "Up" without "(healthy)" - this is normal as health check is disabled in docker-compose.yml (Alpine image missing curl/wget). Verify Qdrant via API: `curl http://localhost:6333/`
 
 ### 4. Install Python Dependencies
 
@@ -248,10 +251,22 @@ sisys/
 │   ├── development.py     # 开发环境
 │   ├── production.py      # 生产环境
 │   └── testing.py         # 测试环境
-├── scripts/                                               # 脚本目录
-│   ├── setup_environment.py
-│   ├── database/
-│   └── deployment/
+├── scripts/                                               # 脚本目录（architecture.md 13.9）
+│   ├── __init__.py
+│   ├── setup_environment.py                               # 环境设置脚本
+│   ├── database/                                          # 数据库脚本
+│   │   ├── __init__.py
+│   │   ├── init-db.sql                                    # 数据库初始化
+│   │   ├── migrate.py                                     # 迁移脚本
+│   │   └── seed.py                                        # 数据种子
+│   ├── deployment/                                        # 部署脚本
+│   │   ├── __init__.py
+│   │   └── build_docker.sh                                # Docker 构建
+│   ├── monitoring/                                        # 监控脚本
+│   │   ├── __init__.py
+│   │   └── health_check.py                                # 健康检查
+│   └── tools/                                             # 工具脚本
+│       └── __init__.py
 ├── docker/                                                # Docker 配置
 │   ├── docker-compose.yml                                 # 开发环境 Docker 配置
 │   └── docker-compose.prod.yml                            # 生产环境 Docker 配置
@@ -340,12 +355,12 @@ taskkill /PID <PID> /F
 
 ```bash
 # Check Docker logs
-docker-compose logs postgres
-docker-compose logs redis
+docker compose logs postgres
+docker compose logs redis
 
 # Restart services
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ### Poetry Installation Issues
@@ -372,6 +387,15 @@ For issues or questions, please contact the development team.
 
 ---
 
+## 📝 Document Revision History
+
+| Version | Date | Changes | Author |
+|---------|------|---------|--------|
+| 1.0.0 | 2026-02-28 | Initial release | Development Team |
+| 1.1.0 | 2026-03-02 | Consistency updates: docker compose v2, Qdrant health check notes, documentation navigation | AI Architect |
+
+---
+
 **Status**: ✅ Development Environment Ready
 **Version**: 0.1.0
-**Last Updated**: 2026-02-28
+**Last Updated**: 2026-03-02

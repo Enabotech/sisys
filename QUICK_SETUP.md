@@ -43,9 +43,11 @@ curl -sSL https://install.python-poetry.org | python3 -
 # 添加 Poetry 到 PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-# 验证安装
+# 验证安装（需要 Poetry 1.7+）
 poetry --version
 ```
+
+**要求：** Poetry 1.7+（项目 pyproject.toml 要求）
 
 ### 步骤 2：验证 Docker 服务
 
@@ -265,5 +267,15 @@ docker compose restart postgres
 
 ---
 
-**最后更新：** 2026-03-02
+## 📝 文档修订历史
+
+| 版本 | 日期 | 修订内容 | 修订人 |
+|------|------|---------|--------|
+| 1.0.0 | 2026-03-02 | 初始版本（基于 Story 0.1） | 开发团队 |
+| 1.1.0 | 2026-03-02 | 一致性修订：Poetry 版本要求、文档交叉引用 | AI 架构师 |
+
+---
+
+**最后更新：** 2026-03-02  
+**文档版本：** 1.1.0  
 **适用环境：** WSL 2 (Ubuntu 22.04) + Docker Compose v2 + Python 3.11+

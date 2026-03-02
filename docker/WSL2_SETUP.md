@@ -126,14 +126,16 @@ cd sisys
 cd docker
 
 # Verify docker-compose.yml
-docker-compose config
+docker compose config
 
 # Start services
-docker-compose up -d
+docker compose up -d
 
 # Check service status
-docker-compose ps
+docker compose ps
 ```
+
+**Note:** Use `docker compose` (v2 plugin) - both Docker Desktop and Docker Engine support this command.
 
 ### Step 3: Install Python Dependencies
 
@@ -162,6 +164,9 @@ cp .env.example .env
 
 # Edit .env with your values
 nano .env
+
+# IMPORTANT: Development environment can use default values,
+# but MUST change passwords before production deployment!
 ```
 
 ### Step 5: Verify Setup
@@ -298,6 +303,16 @@ After setup:
 
 ---
 
-**Last Updated:** 2026-02-28
-**WSL 2 Version:** 2
+## 📝 Document Revision History
+
+| Version | Date | Changes | Author |
+|---------|------|---------|--------|
+| 1.0.0 | 2026-02-28 | Initial release | Development Team |
+| 1.1.0 | 2026-03-02 | Consistency updates: docker compose v2, security notes, documentation links | AI Architect |
+
+---
+
+**Last Updated:** 2026-03-02  
+**Document Version:** 1.1.0  
+**WSL 2 Version:** 2  
 **Ubuntu Version:** 22.04 LTS

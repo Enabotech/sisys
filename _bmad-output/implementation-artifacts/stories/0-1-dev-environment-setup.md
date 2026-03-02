@@ -18,7 +18,7 @@ So that **团队可以高效协作开发**。
 ## Acceptance Criteria
 
 **Given** 新项目启动
-**When** 运行 `docker-compose up` 和 `poetry install`
+**When** 运行 `docker compose up -d` 和 `poetry install`
 **Then** 所有开发依赖安装完成，开发环境可正常运行
 **And** IDE 配置（.vscode/.idea）提供代码规范、调试配置
 
@@ -50,6 +50,58 @@ So that **团队可以高效协作开发**。
   - **方案 2**: WSL 2 + Ubuntu 22.04 + Docker Engine（推荐开发性能）
 - IDE 配置包括代码规范、调试配置、Git 集成
 - 详细 WSL 2 设置指南：`docker/WSL2_SETUP.md`
+- 快速设置指南：`QUICK_SETUP.md`（2026-03-02 新增）
+- **安全提示：** 开发环境可使用默认密码，生产环境必须修改！
+
+## Known Issues & Solutions
+
+### Issue 1: Qdrant 健康检查显示问题
+
+**现象：** `docker compose ps` 显示 Qdrant 为 "Up" 而非 "Up (healthy)"
+
+**原因：** Qdrant Alpine 镜像缺少 curl/wget，健康检查已禁用
+
+**解决方案：** 通过 API 验证 Qdrant 运行状态
+```bash
+curl http://localhost:6333/
+# 预期返回：{"title":"qdrant - vector search engine"}
+```
+
+### Issue 2: Docker Compose 命令版本
+
+**现象：** 文档中使用 `docker compose`（无连字符），旧教程使用 `docker-compose`（有连字符）
+
+**说明：**
+- `docker compose` = v2 插件版本（推荐，现代标准）
+- `docker-compose` = v1 独立版本（已过时）
+- Docker Desktop 和 Docker Engine 都支持 `docker compose`
+
+### Issue 3: Python 版本不兼容（WSL 2 Ubuntu 22.04）
+
+**问题：** Ubuntu 22.04 默认 Python 3.10，项目要求 3.11+
+
+**解决方案：**
+```bash
+# 安装 Python 3.11
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt install -y python3.11 python3.11-venv python3.11-dev
+```
+
+### Issue 4: 脚本目录结构（architecture.md 规范）
+
+**说明：** 根据 architecture.md 第 13.9 节定义，scripts 目录结构如下：
+
+```
+scripts/
+├── database/              # 数据库脚本
+│   └── init-db.sql        # 数据库初始化脚本
+├── deployment/            # 部署脚本
+├── monitoring/            # 监控脚本
+│   └── health_check.py    # 健康检查脚本
+└── tools/                 # 工具脚本
+```
+
+**注意：** 所有脚本路径应使用完整子目录路径（如 `scripts/database/init-db.sql`）
 
 ## Definition of Done
 
@@ -74,3 +126,13 @@ So that **团队可以高效协作开发**。
 
 - Epic 0: Iteration 0
 - Related: Story 0.2 (CI/CD 流水线), Story 0.3 (测试框架搭建)
+
+## 📝 文档修订历史
+
+| 版本 | 日期 | 修订内容 | 修订人 |
+|------|------|---------|--------|
+| 1.0.0 | 2026-02-28 | 初始版本 | 开发团队 |
+| 1.1.0 | 2026-03-01 | Story 完成，添加 Implementation Tasks | 开发团队 |
+| 1.2.0 | 2026-03-02 | 一致性修订：docker compose 命令、路径修正、Known Issues、安全提示 | AI 架构师 |
+| 1.3.0 | 2026-03-02 | 脚本目录结构对齐 architecture.md 第 13.9 节 | AI 架构师 |
+| 1.4.0 | 2026-03-02 | docker 目录结构对齐 architecture.md 第 13.11 节 | AI 架构师 |
