@@ -1,6 +1,6 @@
 # CI Pipeline - Continuous Integration
 # Triggered on: Pull Requests and code pushes to main/develop branches
-# 
+#
 # Responsibilities:
 # - Code quality checks (ruff, mypy)
 # - Unit tests with coverage
@@ -12,9 +12,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main, master, develop]
   workflow_dispatch: # Allow manual trigger
 
 # Cancel redundant workflows
@@ -77,7 +77,7 @@ jobs:
           python -c "
           import ast
           import sys
-          
+
           forbidden_imports = {'fastapi', 'pydantic', 'sqlalchemy', 'redis', 'qdrant', 'neo4j', 'minio'}
           domain_files = [
               'src/domain/models/__init__.py',
@@ -86,7 +86,7 @@ jobs:
               'src/domain/events/__init__.py',
               'src/domain/exceptions/__init__.py',
           ]
-          
+
           violations = []
           for file_path in domain_files:
               try:
@@ -102,7 +102,7 @@ jobs:
                               violations.append(f'{file_path}: imports from {node.module}')
               except FileNotFoundError:
                   pass  # File may not exist yet
-          
+
           if violations:
               print('❌ Domain layer zero-dependency violation:')
               for v in violations:
@@ -243,7 +243,7 @@ jobs:
           docker run -d --name test-neo4j -p 7474:7474 -p 7687:7687 \
             -e NEO4J_AUTH=neo4j/test_neo4j_password \
             neo4j:5.15
-          
+
           # Wait for services to be ready
           sleep 10
 
