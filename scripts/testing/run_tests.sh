@@ -132,7 +132,8 @@ run_unit_tests() {
   print_header "Running Unit Tests"
 
   # Check if unit test directory exists and has test files
-  if [ ! -f "tests/unit/test_*.py" ] && [ -z "$(find tests/unit -name 'test_*.py' 2>/dev/null)" ]; then
+  if [ ! -f "tests/unit/test_*.py" ] && \
+      [ -z "$(find tests/unit -name 'test_*.py' 2>/dev/null)" ]; then
     print_warning "No unit tests found in tests/unit/"
     print_warning "Unit tests will be created in Story 0.3: Test Framework Setup"
     return 0
@@ -152,7 +153,8 @@ run_integration_tests() {
   print_header "Running Integration Tests"
 
   # Check if integration test directory exists and has test files
-  if [ ! -f "tests/integration/test_*.py" ] && [ -z "$(find tests/integration -name 'test_*.py' 2>/dev/null)" ]; then
+  if [ ! -f "tests/integration/test_*.py" ] && \
+      [ -z "$(find tests/integration -name 'test_*.py' 2>/dev/null)" ]; then
     print_warning "No integration tests found in tests/integration/"
     print_warning "Integration tests will be created in Story 0.3: Test Framework Setup"
     return 0
@@ -184,38 +186,38 @@ run_integration_tests() {
 # Run E2E tests
 run_e2e_tests() {
   print_header "Running E2E Tests"
-  
+
   # Check if Docker is running
   if ! command -v docker &> /dev/null; then
     print_error "Docker is not installed. E2E tests require Docker."
     exit 1
   fi
-  
+
   if [ "$RUN_FAST" = true ]; then
     poetry run pytest tests/e2e/ -v --tb=short -m "not slow"
   else
     poetry run pytest tests/e2e/ -v --tb=short
   fi
-  
+
   print_success "E2E tests passed"
 }
 
 # Generate coverage report
 generate_coverage() {
   print_header "Generating Coverage Report"
-  
+
   poetry run pytest \
     --cov=src \
     --cov-report=html:htmlcov \
     --cov-report=xml:coverage.xml \
     --cov-report=term-missing \
     tests/
-  
+
   echo ""
   print_success "Coverage report generated:"
   echo "  - HTML: htmlcov/index.html"
   echo "  - XML: coverage.xml"
-  
+
   # Open HTML report if on macOS or Windows (WSL)
   if [[ "$OSTYPE" == "darwin"* ]]; then
     open htmlcov/index.html
