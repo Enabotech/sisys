@@ -5,7 +5,6 @@ Story 0.2: CI/CD 流水线验收测试脚本
 验证所有验收标准和任务完成情况
 """
 
-import sys
 from pathlib import Path
 
 # 项目根目录
@@ -244,4 +243,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())
