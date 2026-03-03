@@ -40,7 +40,7 @@ development_status:
   epic-0: in-progress
   0-1-dev-environment-setup: done
   0-2-ci-cd-pipeline: done
-  0-3-test-framework-setup: ready-for-dev
+  0-3-test-framework-setup: review
   epic-0-retrospective: optional
 
   # Epic 1: 企业级架构基础与合规

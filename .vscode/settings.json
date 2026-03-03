@@ -9,7 +9,7 @@
     "source.organizeImports": "explicit"
   },
   "editor.defaultFormatter": "ms-python.black-formatter",
-  "editor.rulers": [100],
+  "editor.rulers": [128],
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true,
