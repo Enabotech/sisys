@@ -1,0 +1,382 @@
+# =============================================================================
+# sisys Makefile - 开发环境命令入口
+# =============================================================================
+# 基于 Story 0.1 验收标准创建
+# 提供统一的开发环境命令入口，简化日常开发操作
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 变量定义
+# -----------------------------------------------------------------------------
+PYTHON := python3
+PIP := pip
+POETRY := poetry
+PYTEST := pytest
+MYPY := mypy
+RUFF := ruff
+ALEMBIC := alembic
+DOCKER := docker
+DOCKER_COMPOSE := docker-compose
+SCHEMATHESIS := schemathesis
+OPENAPI_VALIDATOR := openapi-spec-validator
+
+# -----------------------------------------------------------------------------
+# 开发环境设置（Story 0.1 验收标准）
+# -----------------------------------------------------------------------------
+.PHONY: venv install dev setup clean-env
+
+venv:
+	$(PYTHON) -m venv venv
+	source venv/bin/activate
+
+install:
+	$(POETRY) install
+
+dev:
+	$(POETRY) install --with dev,test
+	pre-commit install
+	@echo "✅ 开发环境设置完成！"
+	@echo "📋 SDD 工具链已安装：pydantic, schemathesis, pytest-bdd, openapi-spec-validator"
+	@echo "🔧 代码质量工具已安装：ruff, mypy, pytest, pytest-cov"
+	@echo "🎯 可用命令：make setup, make lint, make type-check, make test, make dev"
+
+setup: venv install dev
+	@echo "✅ 开发环境设置完成！"
+
+clean-env:
+	rm -rf venv/ .venv/
+	@echo "✅ 虚拟环境已清理"
+
+# -----------------------------------------------------------------------------
+# SDD 工具链验证（Story 0.1 验收标准）
+# -----------------------------------------------------------------------------
+.PHONY: validate-schemas validate-openapi validate-contracts sdd-validate
+
+validate-schemas:
+	@echo "🔍 验证领域事件 Schema..."
+	$(PYTHON) scripts/tools/validate_schemas.py
+	@echo "✅ Schema 验证通过"
+
+validate-openapi:
+	@echo "🔍 验证 OpenAPI 规范..."
+	$(OPENAPI_VALIDATOR) openapi/openapi.yaml
+	@echo "✅ OpenAPI 验证通过"
+
+validate-contracts:
+	@echo "🔍 执行 API 契约测试..."
+	$(SCHEMATHESIS) run http://localhost:8000/openapi.json --checks all
+	@echo "✅ 契约测试通过"
+
+sdd-validate: validate-schemas validate-openapi
+	@echo "✅ SDD 规范验证全部通过"
+
+# -----------------------------------------------------------------------------
+# 代码质量（Story 0.2 验收标准 - 阶段 1）
+# -----------------------------------------------------------------------------
+.PHONY: lint format type-check check code-quality
+
+lint:
+	@echo "🔍 运行 Ruff 代码检查..."
+	$(POETRY) run ruff check src/ tests/
+
+format:
+	@echo "🔧 运行 Ruff 格式化..."
+	$(POETRY) run ruff format src/ tests/
+
+format-check:
+	@echo "🔍 检查代码格式..."
+	$(POETRY) run ruff format src/ tests/ --check
+
+type-check:
+	@echo "🔍 运行 MyPy 类型检查..."
+	$(POETRY) run mypy src/ --ignore-missing-imports --warn-return-any --warn-unused-configs
+
+check: lint type-check
+	@echo "✅ 代码质量检查通过"
+
+code-quality: lint format-check type-check
+	@echo "✅ 所有代码质量检查通过"
+
+# -----------------------------------------------------------------------------
+# 测试（Story 0.2 验收标准 - 阶段 2）
+# -----------------------------------------------------------------------------
+.PHONY: test test-cov test-cov-html test-unit test-integration test-e2e pytest
+
+test: pytest
+
+pytest:
+	@echo "🧪 运行所有测试..."
+	$(POETRY) run pytest tests/
+
+test-cov:
+	@echo "🧪 运行测试并生成覆盖率..."
+	$(POETRY) run pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+
+test-cov-html:
+	@echo "🧪 运行测试并生成 HTML 覆盖率报告..."
+	$(POETRY) run pytest --cov=src --cov-report=html:htmlcov --cov-fail-under=80
+	@echo "📊 覆盖率报告已生成：htmlcov/index.html"
+
+test-unit:
+	@echo "🧪 运行单元测试..."
+	$(POETRY) run pytest tests/unit/ --cov=src --cov-report=term-missing
+
+test-integration:
+	@echo "🧪 运行集成测试..."
+	$(POETRY) run pytest tests/integration/ --cov=src --cov-append
+
+test-e2e:
+	@echo "🧪 运行 E2E 测试..."
+	$(POETRY) run pytest tests/e2e/
+
+# SDD 验收测试（Story 0.1 验收标准）
+test-bdd:
+	@echo "🧪 运行 BDD 验收测试..."
+	$(POETRY) run pytest tests/features/ --bdd-verbose
+
+# -----------------------------------------------------------------------------
+# 安全扫描（Story 0.2 验收标准 - 阶段 4）
+# -----------------------------------------------------------------------------
+.PHONY: security-scan bandit-scan snyk-scan security
+
+security-scan: bandit-scan
+	@echo "✅ 安全扫描完成"
+
+bandit-scan:
+	@echo "🔍 运行 Bandit 代码安全扫描..."
+	$(POETRY) run bandit -r src/ -f json -o bandit-report.json --level high --severity high
+	@echo "📊 Bandit 报告已生成：bandit-report.json"
+
+snyk-scan:
+	@echo "🔍 运行 Snyk 依赖漏洞扫描..."
+	$(POETRY) run snyk test
+	@echo "📊 Snyk 扫描完成"
+
+security: bandit-scan snyk-scan
+	@echo "✅ 所有安全扫描完成"
+
+# -----------------------------------------------------------------------------
+# 数据库
+# -----------------------------------------------------------------------------
+.PHONY: db-migrate db-downgrade db-upgrade db-head db-revision db-init
+
+db-migrate:
+	@echo "🔄 运行数据库迁移..."
+	$(POETRY) run alembic upgrade head
+
+db-downgrade:
+	@echo "⏮️  回滚数据库..."
+	$(POETRY) run alembic downgrade -1
+
+db-upgrade:
+	@echo "⏭️  升级数据库到指定版本..."
+	$(POETRY) run alembic upgrade $(revision)
+
+db-head:
+	@echo "📍 查看当前数据库版本..."
+	$(POETRY) run alembic heads
+
+db-revision:
+	@echo "📝 创建新的数据库迁移..."
+	$(POETRY) run alembic revision -m "$(message)"
+
+db-init: db-migrate
+	@echo "✅ 数据库初始化完成"
+
+# -----------------------------------------------------------------------------
+# Docker 环境
+# -----------------------------------------------------------------------------
+.PHONY: docker-up docker-down docker-build docker-logs docker-clean
+
+docker-up:
+	@echo "🐳 启动 Docker 环境..."
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml up -d
+	@echo "✅ Docker 环境已启动"
+
+docker-down:
+	@echo "🛑 停止 Docker 环境..."
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down
+
+docker-build:
+	@echo "🔨 构建 Docker 镜像..."
+	$(DOCKER) build -f docker/Dockerfile.dev -t sisys:dev .
+	@echo "✅ Docker 镜像构建完成"
+
+docker-logs:
+	@echo "📋 查看 Docker 日志..."
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml logs -f
+
+docker-clean:
+	@echo "🧹 清理 Docker 容器..."
+	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down -v
+	@echo "✅ Docker 环境已清理"
+
+# -----------------------------------------------------------------------------
+# 服务管理
+# -----------------------------------------------------------------------------
+.PHONY: run-server run-worker run-scheduler run-dev
+
+run-server:
+	@echo "🚀 启动开发服务器..."
+	$(POETRY) run uvicorn src.interfaces.api.main:app --reload --host 0.0.0.0 --port 8000
+
+run-worker:
+	@echo "👷 启动工作进程..."
+	$(POETRY) run python -m src.infrastructure.workflow.prefect_agent
+
+run-scheduler:
+	@echo "⏰ 启动调度器..."
+	$(POETRY) run python -m src.infrastructure.workflow.scheduler
+
+run-dev: docker-up run-server
+	@echo "✅ 开发环境已启动"
+
+# -----------------------------------------------------------------------------
+# 文档
+# -----------------------------------------------------------------------------
+.PHONY: docs docs-serve docs-clean
+
+docs:
+	@echo "📚 构建文档..."
+	$(POETRY) run mkdocs build
+
+docs-serve:
+	@echo "📖 启动文档服务器..."
+	$(POETRY) run mkdocs serve
+
+docs-clean:
+	@echo "🧹 清理文档构建文件..."
+	rm -rf site/
+	@echo "✅ 文档已清理"
+
+# -----------------------------------------------------------------------------
+# CI/CD 本地测试（Story 0.2 验收标准）
+# -----------------------------------------------------------------------------
+.PHONY: ci-local ci-quality ci-test ci-security ci-full
+
+ci-local: ci-quality ci-test
+	@echo "✅ CI 本地测试完成"
+
+ci-quality: lint format-check type-check
+	@echo "✅ CI 质量门禁通过"
+
+ci-test: test-unit test-integration
+	@echo "✅ CI 测试通过"
+
+ci-security: bandit-scan
+	@echo "✅ CI 安全扫描通过"
+
+ci-full: ci-quality ci-test ci-security
+	@echo "✅ 完整 CI 流程通过"
+
+# -----------------------------------------------------------------------------
+# 清理
+# -----------------------------------------------------------------------------
+.PHONY: clean clean-pyc clean-build clean-test clean-all
+
+clean: clean-pyc clean-build clean-test
+	@echo "✅ 清理完成"
+
+clean-pyc:
+	@echo "🧹 清理 Python 缓存..."
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name *.pyc -delete
+	find . -type f -name *.pyo -delete
+	find . -type f -name *.pyd -delete
+	find . -type d -name .pytest_cache -exec rm -rf {} +
+	find . -type d -name .mypy_cache -exec rm -rf {} +
+	@echo "✅ Python 缓存已清理"
+
+clean-build:
+	@echo "🧹 清理构建文件..."
+	rm -rf build/ dist/ .eggs/
+	find . -name '*.egg-info' -exec rm -rf {} +
+	@echo "✅ 构建文件已清理"
+
+clean-test:
+	@echo "🧹 清理测试文件..."
+	rm -rf .pytest_cache/ .coverage htmlcov/ *.xml
+	rm -rf htmlcov-unit/ htmlcov-integration/
+	rm -rf coverage-unit.xml coverage-integration.xml
+	@echo "✅ 测试文件已清理"
+
+clean-all: clean clean-env
+	@echo "🧹 清理所有..."
+	rm -rf venv/ .venv/
+	@echo "✅ 所有清理完成"
+
+# -----------------------------------------------------------------------------
+# 帮助
+# -----------------------------------------------------------------------------
+.PHONY: help
+
+help:
+	@echo "sisys 开发环境命令帮助"
+	@echo ""
+	@echo "🚀 开发环境设置:"
+	@echo "  make setup          - 设置开发环境（虚拟环境 + 依赖 + pre-commit）"
+	@echo "  make dev            - 安装开发依赖和 pre-commit 钩子"
+	@echo "  make install        - 安装项目依赖"
+	@echo ""
+	@echo "🔍 SDD 规范验证:"
+	@echo "  make validate-schemas   - 验证领域事件 Schema"
+	@echo "  make validate-openapi   - 验证 OpenAPI 规范"
+	@echo "  make validate-contracts - 执行 API 契约测试"
+	@echo "  make sdd-validate       - 执行所有 SDD 验证"
+	@echo ""
+	@echo "🔧 代码质量:"
+	@echo "  make lint          - Ruff 代码检查"
+	@echo "  make format        - Ruff 代码格式化"
+	@echo "  make format-check  - 检查代码格式（不修改）"
+	@echo "  make type-check    - MyPy 类型检查"
+	@echo "  make check         - 运行所有代码检查（lint + type-check）"
+	@echo "  make code-quality  - 运行所有质量检查（lint + format-check + type-check）"
+	@echo ""
+	@echo "🧪 测试:"
+	@echo "  make test          - 运行所有测试"
+	@echo "  make test-cov      - 运行测试并生成覆盖率（终端）"
+	@echo "  make test-cov-html - 运行测试并生成覆盖率（HTML）"
+	@echo "  make test-unit     - 运行单元测试"
+	@echo "  make test-integration - 运行集成测试"
+	@echo "  make test-e2e      - 运行 E2E 测试"
+	@echo "  make test-bdd      - 运行 BDD 验收测试"
+	@echo ""
+	@echo "🔒 安全:"
+	@echo "  make security-scan - 运行所有安全扫描"
+	@echo "  make bandit-scan   - Bandit 代码安全扫描"
+	@echo "  make snyk-scan     - Snyk 依赖漏洞扫描"
+	@echo ""
+	@echo "🗄️  数据库:"
+	@echo "  make db-migrate    - 运行数据库迁移"
+	@echo "  make db-revision message=\"xxx\" - 创建新迁移"
+	@echo "  make db-upgrade    - 升级到指定版本"
+	@echo "  make db-downgrade  - 回滚数据库"
+	@echo ""
+	@echo "🐳 Docker 环境:"
+	@echo "  make docker-up     - 启动 Docker 环境"
+	@echo "  make docker-down   - 停止 Docker 环境"
+	@echo "  make docker-build  - 构建 Docker 镜像"
+	@echo "  make docker-logs   - 查看 Docker 日志"
+	@echo ""
+	@echo "🚀 服务管理:"
+	@echo "  make run-server    - 启动开发服务器"
+	@echo "  make run-worker    - 启动工作进程"
+	@echo "  make run-scheduler - 启动调度器"
+	@echo ""
+	@echo "📚 文档:"
+	@echo "  make docs          - 构建文档"
+	@echo "  make docs-serve    - 启动文档服务器"
+	@echo ""
+	@echo "🔄 CI/CD 本地测试:"
+	@echo "  make ci-local      - 本地运行 CI 流程"
+	@echo "  make ci-quality    - 本地运行 CI 质量门禁"
+	@echo "  make ci-test       - 本地运行 CI 测试"
+	@echo "  make ci-security   - 本地运行 CI 安全扫描"
+	@echo "  make ci-full       - 本地运行完整 CI 流程"
+	@echo ""
+	@echo "🧹 清理:"
+	@echo "  make clean         - 清理构建/测试文件"
+	@echo "  make clean-all     - 清理所有（包括虚拟环境）"
+	@echo ""
+	@echo "📋 帮助:"
+	@echo "  make help          - 显示此帮助信息"

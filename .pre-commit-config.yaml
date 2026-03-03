@@ -84,6 +84,36 @@ repos:
         args: ['--baseline', '.secrets.baseline']
         exclude: package.lock.json
 
+  # =========================================
+  # SDD 工具链验证（Story 0.1 验收标准）
+  # =========================================
+  - repo: local
+    hooks:
+      - id: validate-schemas
+        name: Validate Domain Event Schemas
+        entry: poetry run python scripts/tools/validate_schemas.py
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+        # 验证领域事件 Schema 符合 Pydantic 模型
+
+      - id: validate-openapi
+        name: Validate OpenAPI Specification
+        entry: poetry run openapi-spec-validator openapi/openapi.yaml
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        # 验证 OpenAPI 3.1 规范符合性
+
+      - id: pytest-bdd
+        name: Run BDD Acceptance Tests
+        entry: poetry run pytest tests/features/ --bdd-verbose
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        # 运行 Gherkin 验收测试
+
 # =========================================
 # CI-specific configuration
 # =========================================
