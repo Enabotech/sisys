@@ -7,7 +7,7 @@ Story 0.1 验收标准：
 - Schema 验证通过（pydantic validate）
 
 使用方法：
-    python scripts/validate_schemas.py
+    python scripts/tools/validate_schemas.py
 """
 
 import sys
