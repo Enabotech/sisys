@@ -59,14 +59,10 @@ class TestDataCleaner:
         self.qdrant_url = qdrant_url or os.getenv("TEST_QDRANT_URL", "http://localhost:6333")
         self.minio_endpoint = minio_endpoint or os.getenv("TEST_MINIO_ENDPOINT", "localhost:9000")
         self.minio_access_key = minio_access_key or os.getenv("TEST_MINIO_ACCESS_KEY", "test_minio")
-        self.minio_secret_key = minio_secret_key or os.getenv(
-            "TEST_MINIO_SECRET_KEY", "test_minio_password"
-        )
+        self.minio_secret_key = minio_secret_key or os.getenv("TEST_MINIO_SECRET_KEY", "test_minio_password")
         self.neo4j_uri = neo4j_uri or os.getenv("TEST_NEO4J_URI", "bolt://localhost:7687")
         self.neo4j_user = neo4j_user or os.getenv("TEST_NEO4J_USER", "neo4j")
-        self.neo4j_password = neo4j_password or os.getenv(
-            "TEST_NEO4J_PASSWORD", "test_neo4j_password"
-        )
+        self.neo4j_password = neo4j_password or os.getenv("TEST_NEO4J_PASSWORD", "test_neo4j_password")
         self.dry_run = dry_run
 
     def clean_postgres(self):
@@ -96,11 +92,7 @@ class TestDataCleaner:
                     print(f"  Would drop table: {table_name}")
                 else:
                     print(f"  Dropping table: {table_name}")
-                    cursor.execute(
-                        sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(
-                            sql.Identifier(table_name)
-                        )
-                    )
+                    cursor.execute(sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(sql.Identifier(table_name)))
 
             if not self.dry_run:
                 conn.commit()
@@ -196,9 +188,7 @@ class TestDataCleaner:
         """Clean Neo4j test database."""
         print("\n🕸️  Cleaning Neo4j test database...")
         try:
-            driver = GraphDatabase.driver(
-                self.neo4j_uri, auth=(self.neo4j_user, self.neo4j_password)
-            )
+            driver = GraphDatabase.driver(self.neo4j_uri, auth=(self.neo4j_user, self.neo4j_password))
 
             with driver.session() as session:
                 if self.dry_run:
