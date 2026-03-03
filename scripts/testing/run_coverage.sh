@@ -107,7 +107,7 @@ else
   echo -e "${YELLOW}⚠️  No unit tests found in tests/unit/${NC}"
   echo -e "${YELLOW}⚠️  Running E2E tests only (coverage will be 0% - this is expected)${NC}"
   echo ""
-  
+
   poetry run pytest \
     tests/e2e/ \
     --cov=src \
@@ -116,7 +116,7 @@ else
     --cov-report=term-missing \
     -v \
     --tb=short || true
-  
+
   echo ""
   echo -e "${YELLOW}⚠️  Coverage is 0% because E2E tests don't execute src/ code${NC}"
   echo -e "${BLUE}💡 Story 0.3 will create unit tests for meaningful coverage${NC}"
@@ -133,7 +133,8 @@ echo ""
 # Check if coverage is above threshold (only if unit tests exist)
 if [ "$FAIL_BELOW_THRESHOLD" = true ] && [ "$UNIT_TESTS_EXIST" = true ]; then
   if [ -f "coverage.xml" ]; then
-    COVERAGE=$(grep -o '"totals": {"percent_covered": [0-9.]*' coverage.xml 2>/dev/null | grep -o '[0-9.]*$' || echo "0")
+    COVERAGE=$(grep -o '"totals": {"percent_covered": [0-9.]*' coverage.xml 2>/dev/null |   \
+                grep -o '[0-9.]*$' || echo "0")
     echo "Current coverage: ${COVERAGE}%"
 
     if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
