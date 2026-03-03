@@ -111,13 +111,13 @@ build-backend = "poetry.core.masonry.api"
 
 # Black Configuration
 [tool.black]
-line-length = 100
+line-length = 128
 target-version = ['py311']
 include = '\.pyi?$'
 
 # Ruff Configuration
 [tool.ruff]
-line-length = 100
+line-length = 128
 target-version = "py311"
 select = ["E", "F", "I", "N", "W", "UP"]
 
@@ -130,16 +130,44 @@ disallow_untyped_defs = false
 
 # Pytest Configuration
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+# 测试发现
 testpaths = ["tests"]
 python_files = "test_*.py"
+python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --tb=short"
+
+# 标记系统
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks integration tests",
-    "e2e: marks end-to-end tests",
-    "unit: marks unit tests",
+    "unit: 单元测试（快速，无外部依赖）",
+    "integration: 集成测试（需要数据库/外部服务）",
+    "e2e: E2E 测试（完整用户旅程）",
+    "slow: 慢速测试（>1 秒）",
+    "database: 需要数据库的测试",
+    "redis: 需要 Redis 的测试",
+    "qdrant: 需要 Qdrant 的测试",
+    "minio: 需要 MinIO 的测试",
+    "neo4j: 需要 Neo4j 的测试",
+    "llm: 需要 LLM API 的测试",
+]
+
+# 插件配置
+asyncio_mode = "auto"
+
+# 默认选项
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=src",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-fail-under=80",
+    "-n", "auto",
+]
+
+# 过滤器
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
 ]
 
 # Coverage Configuration

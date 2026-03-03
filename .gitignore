@@ -1,0 +1,565 @@
+# =============================================================================
+# sisys - 宗师级 .gitignore
+# =============================================================================
+# 项目：AI-driven strategic planning and decision intelligence platform
+# 技术栈：Python 3.11+, FastAPI, PostgreSQL, Redis, Qdrant, MinIO, Neo4j
+# 工具链：Poetry, pytest, pre-commit, Docker, Kubernetes
+# =============================================================================
+
+# =============================================================================
+# 1. Python 核心
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =============================================================================
+# 2. 虚拟环境与 Poetry
+# =============================================================================
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+
+# Poetry
+poetry.lock
+.python-version
+
+# pipenv
+Pipfile
+Pipfile.lock
+
+# =============================================================================
+# 3. 测试与覆盖率
+# =============================================================================
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
+.cache
+coverage.xml
+coverage.json
+coverage/
+*.cover
+*.py,cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# ruff
+.ruff_cache/
+
+# =============================================================================
+# 4. IDE 与编辑器
+# =============================================================================
+
+# VS Code (团队共享配置除外)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+!.vscode/.gitignore
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# PyCharm
+.idea/
+*.iml
+out/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.suo.userprefs
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+*.un~
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+*.sublime-session
+*.sublime-keymap
+*.sublime-mousemap
+*.sublime-menu
+*.sublime-settings
+
+# Atom
+.atom/
+
+# NuGet
+.vs/
+*.user
+*.suo
+*.userosscache
+*.suo.userprefs
+
+# ACE - The Editor
+.ace/
+
+# =============================================================================
+# 5. 环境与密钥
+# =============================================================================
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+!.env.example
+
+# Secrets and credentials
+.secrets
+.secrets.*
+*.secret
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+keystore.jks
+truststore.jks
+
+# AWS
+.aws/credentials
+.aws/config
+
+# GCP
+service-account*.json
+*-service-account.json
+gcloud-service-key.json
+
+# Azure
+*.azurecredentials
+
+# Kubernetes secrets (但保留模板)
+*-secret.yaml
+*-secrets.yaml
+!*-secret.example.yaml
+!*-secrets.example.yaml
+
+# =============================================================================
+# 6. 数据库与存储
+# =============================================================================
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# PostgreSQL
+*.dump
+*.sql.gz
+
+# MySQL
+*.sql
+
+# Redis
+*.rdb
+*.aof
+
+# Qdrant
+qdrant_storage/
+.qdrant/
+
+# Neo4j
+neo4j/data/
+*.neo4j
+
+# MinIO / S3
+minio_data/
+.s3/
+
+# Database logs
+*.log
+
+# =============================================================================
+# 7. Docker 与容器
+# =============================================================================
+
+# Docker
+docker-compose.override.yml
+.docker/
+Dockerfile.local
+
+# Docker volumes
+volumes/
+data/
+
+# Container data
+container_data/
+.tmp/
+
+# =============================================================================
+# 8. Kubernetes
+# =============================================================================
+
+# Generated manifests
+*.generated.yaml
+*.generated.yml
+
+# Kube config
+.kube/
+kubeconfig
+*.kubeconfig
+
+# Minikube
+.minikube/
+
+# Helm
+*.tgz
+.charts/
+
+# =============================================================================
+# 9. 构建与输出
+# =============================================================================
+
+# Build outputs
+_build/
+output/
+outputs/
+artifacts/
+.bmad-output/
+
+# Generated files
+generated/
+gen/
+
+# =============================================================================
+# 10. 文档
+# =============================================================================
+
+# MkDocs
+site/
+
+# Sphinx
+doc/_build/
+docs/_build/
+*.rst~
+*.md~
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+!*.ipynb  # 如果项目使用 notebooks，取消此行注释
+
+# =============================================================================
+# 11. 操作系统
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+@eaDir/
+
+# Linux
+*~
+.fuse_hidden*
+.Trash-*
+.nfs*
+
+# =============================================================================
+# 12. 日志与临时文件
+# =============================================================================
+
+# Logs
+*.log
+logs/
+log/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# =============================================================================
+# 13. Node.js (如果前端需要)
+# =============================================================================
+
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+dist/
+build/
+
+# =============================================================================
+# 14. 特定项目 - sisys
+# =============================================================================
+
+# BMad Framework (保留配置，忽略输出)
+_bmad-output/
+_bmad/.cache/
+_bmad/.tmp/
+
+# Project specific
+*.orig
+*.rej
+PATCHES/
+MERGE_MSG
+
+# Local configuration
+configs/local/
+configs/*.local.*
+
+# Test data
+tests/data/uploads/
+tests/data/temp/
+
+# Upload directories
+uploads/
+downloads/
+storage/
+
+# Cache directories
+.cache/
+*.cache
+
+# =============================================================================
+# 15. 安全与合规
+# =============================================================================
+
+# Security scans
+bandit-report.json
+snyk-report.json
+security-report.json
+*.sarif
+
+# Dependency check
+dependency-check/
+owasp/
+
+# =============================================================================
+# 16. CI/CD
+# =============================================================================
+
+# GitHub Actions
+.github/workflows/*.local.yml
+
+# Local CI scripts
+scripts/local/
+scripts/*.local.*
+
+# =============================================================================
+# 17. 性能分析
+# =============================================================================
+
+# Profiling
+*.prof
+*.pstat
+*.profraw
+*.profdata
+speedscope.json
+
+# Memory
+*.mem
+*.heap
+
+# =============================================================================
+# 18. 机器学习与 AI
+# =============================================================================
+
+# Model files
+*.pth
+*.pt
+*.onnx
+*.pb
+*.h5
+*.pkl
+*.joblib
+
+# Model checkpoints
+checkpoints/
+models/saved/
+
+# TensorBoard
+runs/
+
+# =============================================================================
+# 19. 数据科学
+# =============================================================================
+
+# Jupyter
+.ipynb_checkpoints
+
+# R
+*.Rhistory
+*.RData
+*.Rproj.user
+
+# =============================================================================
+# 20. 其他
+# =============================================================================
+
+# Fuse
+.fuse_hidden*
+
+# rsync
+.rsync
+
+# Vagrant
+.vagrant/
+
+# VIM swap files
+*.un~
+
+# Yarn
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Parcel
+.parcel-cache/
+
+# Rollup
+rollup.config.cache
+
+# =============================================================================
+# 例外规则 - 明确保留的重要文件
+# =============================================================================
+
+# 保留 .gitignore 自身
+!.gitignore
+
+# 保留示例和模板文件
+!.env.example
+!*.example
+!*.template
+!*.sample
+
+# 保留必要的配置文件
+!pyproject.toml
+!poetry.lock
+!Makefile
+!*.yaml
+!*.yml
+!*.json
+!*.toml
+
+# 保留 VS Code 必要配置
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# 保留 GitHub Actions 工作流
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
+
+# 保留 Docker 配置
+!docker/*.yml
+!docker/*.sh
+!docker/Dockerfile*
+
+# 保留文档
+!*.md
+!docs/**/*
+
+# 保留源代码
+!src/**/*.py
+!tests/**/*.py
+!scripts/**/*.py
+
+# 保留配置
+!configs/**/*.yaml
+!configs/**/*.yml
+
+# =============================================================================
+# 结束
+# =============================================================================
+# 此 .gitignore 文件专为 sisys 项目定制
+# 覆盖了 Python 全栈开发、AI/ML、Docker、Kubernetes 等场景
+# 定期审查和更新以适应项目需求变化
+# =============================================================================
