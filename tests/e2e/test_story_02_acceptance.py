@@ -158,9 +158,7 @@ def test_task_completion():
     task6_checks = [
         ("upload-artifact" in ci_content or "upload-artifact" in cd_content, "日志上传"),
         (
-            "notify" in cd_content.lower()
-            or "slack" in cd_content.lower()
-            or "ding" in cd_content.lower(),
+            "notify" in cd_content.lower() or "slack" in cd_content.lower() or "ding" in cd_content.lower(),
             "通知配置",
         ),
     ]

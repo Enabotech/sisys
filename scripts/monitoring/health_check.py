@@ -26,9 +26,7 @@ def get_docker_compose_command():
     """Detect whether to use 'docker compose' (v2) or 'docker-compose' (v1)."""
     try:
         # Try docker compose (v2 - plugin version) first
-        result = subprocess.run(
-            ["docker", "compose", "version"], capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             return ["docker", "compose"]
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -36,9 +34,7 @@ def get_docker_compose_command():
 
     try:
         # Try docker-compose (v1 - standalone version)
-        result = subprocess.run(
-            ["docker-compose", "--version"], capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["docker-compose", "--version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             return ["docker-compose"]
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -78,11 +74,7 @@ def check_docker_services():
 
             if result.returncode == 0 and container_name in result.stdout:
                 # Parse JSON output or check for "Up" status
-                if (
-                    "running" in result.stdout.lower()
-                    or "up" in result.stdout.lower()
-                    or "healthy" in result.stdout.lower()
-                ):
+                if "running" in result.stdout.lower() or "up" in result.stdout.lower() or "healthy" in result.stdout.lower():
                     print(f"  ✓ {service_name}: {container_name} running on port {port}")
                 else:
                     print(f"  ⚠ {service_name}: {container_name} status unknown")
