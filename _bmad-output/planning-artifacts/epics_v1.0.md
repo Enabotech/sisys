@@ -707,15 +707,35 @@ documentStatus: 'step-02-complete'
 ### Story 0.1: 开发环境搭建
 
 As a **开发工程师**,
-I want **统一的开发环境和工具链（Python 3.11+, Poetry, Docker, IDE 配置）**,
-So that **团队可以高效协作开发**。
+I want **统一的开发环境和工具链（Python 3.11+, Poetry, Docker, IDE 配置，SDD 工具链）**,
+So that **团队可以高效协作开发，并遵循规范驱动开发流程**。
 
 **Acceptance Criteria:**
 
 **Given** 新项目启动
 **When** 运行 `docker-compose up` 和 `poetry install`
-**Then** 所有开发依赖安装完成，开发环境可正常运行
-**And** IDE 配置（.vscode/.idea）提供代码规范、调试配置
+**Then** 所有开发依赖安装完成，包括：
+- Python 3.11+、Poetry、Docker
+- SDD 工具链（pydantic、schemathesis、pytest-bdd、openapi-spec-validator）
+- 代码质量工具（ruff、mypy、pytest、pytest-cov）
+**And** IDE 配置（.vscode/.idea）提供代码规范、调试配置、SDD 工作流支持
+**And** Makefile 命令可用（make setup、make lint、make type-check、make test、make dev）
+**And** pre-commit 钩子安装完成（validate-schemas、validate-openapi、pytest-bdd）
+
+**SDD 实施检查清单（开发前）：**
+- [ ] 领域事件 Schema 已定义并评审通过
+- [ ] API 契约（OpenAPI）已定义并验证通过
+- [ ] 测试用例（Gherkin）已编写并业务方确认
+- [ ] 数据模型（SQLAlchemy）已定义并评审通过
+- [ ] Qwen Code Agent 已激活并理解规范
+
+**SDD 实施检查清单（开发后）：**
+- [ ] Schema 验证通过（pydantic validate）
+- [ ] 契约测试通过（Schemathesis）
+- [ ] 验收测试通过（pytest-bdd）
+- [ ] 类型检查通过（mypy）
+- [ ] 代码质量检查通过（ruff）
+- [ ] 测试覆盖率达标（≥80%）
 
 ### Story 0.2: CI/CD 流水线
 
@@ -726,10 +746,51 @@ So that **代码变更可以快速、可靠地发布**。
 **Acceptance Criteria:**
 
 **Given** 代码提交到 Git
-**When** 触发 CI/CD 流水线
-**Then** 自动运行单元测试、集成测试、代码扫描、构建 Docker 镜像
-**And** 测试通过后自动部署到测试环境
+**When** 触发 CI/CD 流水线（GitHub Actions / GitLab CI）
+**Then** 执行以下 5 个阶段：
+
+**阶段 1: 代码质量门禁**
+- 运行 `ruff check src/ tests/`（阻断：严重错误>0）
+- 运行 `mypy src/`（阻断：错误率>5%）
+- 运行 `ruff format --check src/ tests/`（阻断：格式错误>0）
+
+**阶段 2: 单元测试**
+- 运行 `pytest tests/unit/ --cov=src --cov-fail-under=80`
+- 生成覆盖率报告（XML/HTML）
+- 阻断：覆盖率<80% 或测试失败
+
+**阶段 3: 集成测试**
+- 启动 Docker Compose 测试环境
+- 运行 `pytest tests/integration/`
+- 阻断：测试失败
+
+**阶段 4: 安全扫描**
+- 运行 `snyk test`（依赖漏洞扫描）
+- 运行 `bandit -r src/`（代码安全扫描）
+- 阻断：高危漏洞>0
+
+**阶段 5: 构建与部署**
+- 构建 Docker 镜像（`docker build -t sisys:commit_sha .`）
+- 推送镜像到仓库
+- 部署到测试环境（K8s / Docker Swarm）
+- 运行健康检查
+
+**And** 所有门禁检查通过后才允许合并代码
+**And** 失败时发送通知（Slack / 邮件）
 **And** 所有 Epic 的构建和部署都通过此流水线执行
+
+**质量门禁验收标准：**
+
+| 门禁类型 | 工具 | 阈值 | 阻断级别 |
+|---------|------|------|---------|
+| Ruff 代码检查 | ruff check | 严重错误=0 | P0 阻断 |
+| Ruff 格式检查 | ruff format | 格式错误=0 | P0 阻断 |
+| MyPy 类型检查 | mypy | 错误率<5% | P0 阻断 |
+| 单元测试覆盖率 | pytest-cov | 整体≥80% | P0 阻断 |
+| 领域层覆盖率 | pytest-cov | ≥90% | P1 阻断 |
+| 应用层覆盖率 | pytest-cov | ≥85% | P1 阻断 |
+| 安全漏洞扫描 | snyk/bandit | 高危=0 | P0 阻断 |
+| 渗透测试 | OWASP Top 10 | 高危=0, 中危<5 | P0 阻断 |
 
 ### Story 0.3: 测试框架搭建
 
@@ -743,6 +804,22 @@ So that **可以快速编写和执行测试用例**。
 **When** 运行 `pytest`
 **Then** 单元测试、集成测试框架可正常运行
 **And** 测试数据管理支持（Fixture、Mock、测试数据库隔离）
+**And** 覆盖率报告生成（HTML/XML）
+**And** 测试失败时提供详细错误信息和堆栈跟踪
+**And** 支持 pytest-bdd 格式（Given-When-Then）
+**And** 支持测试标记（unit/integration/contract/acceptance）
+
+**测试框架配置：**
+- pytest.ini / pyproject.toml：pytest 配置
+- conftest.py：全局 Fixture 定义
+- tests/fixtures/：测试数据 Fixture
+- tests/conftest.py：数据库隔离、Mock 配置
+
+**测试覆盖率要求：**
+- 整体覆盖率：≥80%
+- 领域层覆盖率：≥90%
+- 应用层覆盖率：≥85%
+- CI/CD 门禁：--cov-fail-under=80 强制执行
 
 ### Story 1.1: 六边形架构骨架
 

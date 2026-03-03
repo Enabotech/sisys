@@ -298,21 +298,21 @@ graph TB
     end
 
     %% ========== 关键交互流程 ==========
-    
+
     %% 流程 1-5: 用户发起文档处理（基础流程）
     CLI -- "1. upload --file docs.zip" --> DocUC
     DocUC -- "2. ProcessDocumentsCommand" --> CmdHandler
     CmdHandler -- "3. 调用领域服务" --> RAGService
     RAGService -- "4. 通过仓储接口" --> DocRepo
     DocRepo -- "5. 基础设施实现" --> Relational_Storage
-    
+
     %% 流程 6-10: 编排服务协调 Prefect 工作流
     DocUC -- "6. 调用编排服务" --> Orchestrator
     Orchestrator -- "7. 调用 Prefect 引擎" --> PrefectEngine
     PrefectEngine -- "8. 执行文档处理流程" --> DocFlow
     DocFlow -- "9. 调用外部适配器" --> StorageAdapter
     StorageAdapter -- "10. 写入文件存储" --> Object_Storage
-    
+
     %% 流程 11-15: 事件驱动处理完成（增强可靠性）
     DocFlow -- "11. 完成事件" --> Producer
     Producer -- "12. 写入事务发件箱" --> Outbox
@@ -320,7 +320,7 @@ graph TB
     RabbitMQ -- "14. 事件消息" --> Consumer
     Consumer -- "15. 事件处理器" --> EventHandler
     EventHandler -- "15b. 触发下一步处理" --> ToolUC
-    
+
     %% 流程 16-21: Agent 协作分析（含 UDMR 路由）
     AgentUC -- "16. 任务提交" --> UDMR_Service
     UDMR_Service -- "17. L1 合规性检查" --> UDMR_Service
@@ -330,7 +330,7 @@ graph TB
     UDMR_Service -- "21. 路由执行" --> LLM_Router
     LLM_Router -- "22a. 本地路由 (80%)" --> LLM_Local
     LLM_Router -- "22b. 云端路由 (20%)" --> LLM_Cloud
-    
+
     %% 流程 23-27: 战略规划生成（含 Checkpoint）
     PlanningUC -- "23. 调用编排服务" --> Orchestrator
     Orchestrator -- "24. 协调 Prefect+LangGraph" --> LangGraphEngine
@@ -339,27 +339,27 @@ graph TB
     Producer -- "27. Checkpoint 事件" --> Outbox
     Outbox -- "28. 等待用户反馈" --> EventListener
     EventListener -- "29. 恢复执行" --> PlanningUC
-    
+
     %% 流程 30-34: RAG 混合检索流程（增强）
     QueryHandler -- "30. 检索请求" --> RAGService
     RAGService -- "31. Dense 检索" --> Vector_Storage
     RAGService -- "32. Sparse 检索" --> Vector_Storage
     RAGService -- "33. Graph 检索" --> Graph_Storage
     RAGService -- "34. RRF 融合+ 重排序" --> QueryHandler
-    
+
     %% 流程 35-38: 结果生成与五层存储协同
     PlanningUC -- "35. 生成 PDF 报告" --> PrefectEngine
     PrefectEngine -- "36. 执行报告生成流程" --> ReportFlow
     ReportFlow -- "37. 元数据保存" --> Relational_Storage
     ReportFlow -- "38. 证据包保存" --> Object_Storage
-    
+
     %% 流程 39-43: EIP 隔离管理流程
     AgentUC -- "39. 协作请求" --> EIP_Manager
     EIP_Manager -- "40. 隔离等级判定" --> EIP_Manager
     EIP_Manager -- "41. 隔离切换日志" --> IsolationLog
     EIP_Manager -- "42. 隔离执行" --> AgentService
     EIP_Manager -- "43. 发布切换事件" --> Redis_PubSub
-    
+
     %% 流程 44-47: 修正分级判定流程
     PlanningUC -- "44. 修正提交" --> CorrectionJudge
     CorrectionJudge -- "45. 五维特征评估" --> CorrectionJudge
@@ -367,14 +367,14 @@ graph TB
     CorrectionJudge -- "47a. L0/L1 自动固化" --> PlanningUC
     CorrectionJudge -- "47b. L2 专家确认" --> PlanningUC
     CorrectionJudge -- "47c. L3 委员会审批" --> PlanningUC
-    
+
     %% 流程 48-51: SYS AGENT 裁决流程
     AgentUC -- "48. 仲裁请求" --> SYSArbiter
     SYSArbiter -- "49. 五维评分" --> SYSArbiter
     SYSArbiter -- "50. 置信度评估" --> SYSArbiter
     SYSArbiter -- "51a. 高置信度裁决" --> AgentUC
     SYSArbiter -- "51b. 低置信度升级" --> PlanningUC
-    
+
     %% 流程 52-55: 双通道事件总线
     Redis_PubSub -- "52. 实时事件" --> EventListener
     RabbitMQ -- "53. 持久化事件" --> Outbox
@@ -528,16 +528,16 @@ class ComplianceGateway:
         sensitive_data = await self.detect_sensitive_data(task.input)
         if sensitive_data.contains_pii or sensitive_data.contains_trade_secret:
             return ComplianceResult(allowed=False, reason="包含敏感数据", forced_local=True)
-        
+
         # 2. 数据驻留检查
         if task.data_residency == "CHINA_DOMESTIC":
             if not self.is_china_model(task.preferred_model):
                 return ComplianceResult(allowed=False, reason="数据境内存储要求", forced_local=True)
-        
+
         # 3. 白名单校验
         if task.preferred_model not in self.allowed_models:
             return ComplianceResult(allowed=False, reason="模型不在白名单中")
-        
+
         return ComplianceResult(allowed=True)
 ```
 
@@ -551,7 +551,7 @@ class ComplexityAssessor:
         "cost_efficiency": 0.20,
         "task_complexity": 0.15
     }
-    
+
     async def assess(self, task: Task, candidate_models: List[Model]) -> List[ModelScore]:
         results = []
         for model in candidate_models:
@@ -559,7 +559,7 @@ class ComplexityAssessor:
             historical_score = await self.get_historical_success_rate(model.id, task.type)
             cost_score = 1.0 / (model.cost_per_1k_tokens + 0.001)
             complexity_score = self.calculate_task_complexity(task)
-            
+
             total_score = (
                 semantic_score * self.WEIGHTS["semantic_match"] +
                 historical_score * self.WEIGHTS["historical_success"] +
@@ -567,7 +567,7 @@ class ComplexityAssessor:
                 complexity_score * self.WEIGHTS["task_complexity"]
             )
             results.append(ModelScore(model=model, total_score=total_score))
-        
+
         return sorted(results, key=lambda x: x.total_score, reverse=True)
 ```
 
@@ -577,21 +577,21 @@ class ComplexityAssessor:
 class RouterExecutor:
     CLOUD_ADVANTAGE_THRESHOLD = 0.15
     LOCAL_QUALITY_THRESHOLD = 0.70
-    
+
     async def decide(self, scored_models: List[ModelScore]) -> RoutingDecision:
         local_models = [m for m in scored_models if m.model.is_local]
         cloud_models = [m for m in scored_models if not m.model.is_local]
-        
+
         best_local = max(local_models, key=lambda x: x.total_score) if local_models else None
         best_cloud = max(cloud_models, key=lambda x: x.total_score) if cloud_models else None
-        
+
         if best_local is None:
             return self._create_decision(best_cloud, "no_local_model")
         if best_cloud is None:
             return self._create_decision(best_local, "no_cloud_model")
         if best_local.total_score < self.LOCAL_QUALITY_THRESHOLD:
             return self._create_decision(best_cloud, "local_quality_below_threshold")
-        
+
         cloud_advantage = best_cloud.total_score - best_local.total_score
         if cloud_advantage > self.CLOUD_ADVANTAGE_THRESHOLD:
             return self._create_decision(best_cloud, "cloud_advantage")
@@ -707,7 +707,7 @@ class DebateEvaluator:
     async def evaluate_round(self, round_data: DebateRound) -> DebateEvaluation:
         """
         评估单轮辩论质量
-        
+
         边界条件处理：
         - 第 1 轮辩论：previous_info 为空，gain_rate 默认为 1.0（100% 新信息）
         - 空参数列表：repetition_rate 默认为 0.0
@@ -779,7 +779,7 @@ class DebateEvaluator:
     async def cleanup_on_timeout(self, round_data: DebateRound) -> TimeoutCleanupResult:
         """
         超时状态清理
-        
+
         清理内容：
         - 释放 Agent 资源（取消 LLM 调用）
         - 记录超时日志（用于审计和优化）
@@ -859,7 +859,7 @@ class CheckpointSnapshot:
     def serialize(self) -> bytes:
         """
         序列化为字节流（用于 Redis 存储）
-        
+
         前置条件：
         1. 已执行持久化笔记步骤（persistent_note_ref 不为空）
         2. context_window 已压缩（压缩率≥70%）
@@ -868,7 +868,7 @@ class CheckpointSnapshot:
         # 验证持久化已完成（系统公理二：压缩前必须持久化）
         if not self.persistent_note_ref:
             raise SnapshotError("序列化前必须执行持久化笔记步骤")
-        
+
         return msgpack.packb({
             'checkpoint_id': str(self.checkpoint_id),
             'stage_id': self.stage_id,
@@ -911,13 +911,13 @@ class CheckpointSnapshot:
     ) -> 'CheckpointSnapshot':
         """
         工厂方法：创建 CheckpointSnapshot 并执行持久化笔记步骤
-        
+
         流程：
         1. 持久化笔记（提取实体→生成摘要→记录血缘）
         2. 压缩上下文（基于持久化笔记）
         3. 验证压缩质量
         4. 创建快照
-        
+
         遵循系统公理二：压缩前必须持久化
         """
         # 步骤 1：持久化笔记（压缩前必须执行）
@@ -928,7 +928,7 @@ class CheckpointSnapshot:
             user_id=user_id,
             session_id=session_id
         )
-        
+
         # 步骤 2：压缩上下文（基于持久化笔记）
         compressor = ContextCompressor()
         compressed_context = await compressor.compress(
@@ -936,11 +936,11 @@ class CheckpointSnapshot:
             query=query,
             persistent_note=persistent_note
         )
-        
+
         # 步骤 3：验证压缩质量
         if compressed_context.quality_score < 0.7:
             raise SnapshotError(f"压缩质量不足：{compressed_context.quality_score}")
-        
+
         # 步骤 4：创建快照
         snapshot = cls(
             checkpoint_id=checkpoint_id,
@@ -957,10 +957,10 @@ class CheckpointSnapshot:
             checksum="",  # 将在创建后计算
             persistent_note_ref=persistent_note.note_id  # 关联持久化笔记
         )
-        
+
         # 计算校验和
         snapshot.checksum = snapshot._calculate_checksum()
-        
+
         return snapshot
 
     def _calculate_checksum(self) -> str:
@@ -973,11 +973,11 @@ class CheckpointSnapshot:
         """验证快照完整性（包括持久化笔记引用）"""
         if not self.persistent_note_ref:
             raise SnapshotIntegrityError("缺少持久化笔记引用")
-        
+
         expected_checksum = self._calculate_checksum()
         if self.checksum != expected_checksum:
             raise SnapshotIntegrityError("校验和不匹配")
-        
+
         return True
 ```
 
@@ -1038,11 +1038,11 @@ async def replay_mode(self, checkpoint: Checkpoint, modifications: List[Modifica
     """Replay 模式 - 强一致性保证"""
     # 1. 应用修改到检查点状态
     modified_state = await self.apply_modifications(checkpoint.state, modifications)
-    
+
     # 2. 获取后续所有阶段
     current_stage = checkpoint.stage
     subsequent_stages = self.get_subsequent_stages(current_stage)
-    
+
     # 3. 记录重放日志（用于审计）
     replay_log = ReplayLog(
         checkpoint_id=checkpoint.id,
@@ -1050,17 +1050,17 @@ async def replay_mode(self, checkpoint: Checkpoint, modifications: List[Modifica
         subsequent_stages=subsequent_stages,
         start_time=datetime.now()
     )
-    
+
     # 4. 从修改点重新执行后续所有阶段
     execution_log = []
     for stage in subsequent_stages:
         try:
             # 4.1 加载阶段定义
             stage_def = await self.stage_repo.get(stage)
-            
+
             # 4.2 执行阶段（调用 LangGraph/Prefect）
             result = await self.execute_stage(stage_def, modified_state)
-            
+
             # 4.3 记录执行日志
             execution_log.append(StageExecutionLog(
                 stage_id=stage,
@@ -1068,27 +1068,27 @@ async def replay_mode(self, checkpoint: Checkpoint, modifications: List[Modifica
                 output=result.state,
                 execution_time=result.execution_time
             ))
-            
+
             # 4.4 更新状态
             modified_state = result.state
-            
+
             # 4.5 更新 Checkpoint（持久化）
             await self.checkpoint_repo.update(stage, modified_state)
-            
+
         except Exception as e:
             # 4.6 执行失败：记录错误并回滚
             await self.rollback(checkpoint.id)
             raise ReplayError(f"Stage {stage} replay failed: {str(e)}")
-    
+
     # 5. 更新所有受影响的 Checkpoint
     for stage in subsequent_stages:
         await self.checkpoint_repo.update(stage, modified_state)
-    
+
     # 6. 完成重放，记录审计日志
     replay_log.end_time = datetime.now()
     replay_log.status = 'completed'
     await self.replay_log_repo.save(replay_log)
-    
+
     return ReplayResult(
         mode="Replay",
         modified_state=modified_state,
@@ -1143,7 +1143,7 @@ async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modifi
         affected_checkpoints=affected_checkpoints,
         timestamp=datetime.now()
     ))
-    
+
     # 7.2 定时任务触发：注册后台同步任务（延迟 5 分钟执行）
     await self.scheduler.schedule(
         task=self.sync_pending_checkpoints,
@@ -1162,36 +1162,36 @@ async def override_mode(self, checkpoint: Checkpoint, modifications: List[Modifi
 async def sync_pending_checkpoints(self, affected_checkpoints: List[UUID]) -> SyncResult:
     """
     同步待同步 Checkpoint（后台惰性同步）
-    
+
     同步策略：
     1. 惰性同步：仅在用户访问时同步（减少不必要的计算）
     2. 后台批量同步：定时任务批量处理待同步 Checkpoint
     3. 用户访问触发：用户访问某个 Checkpoint 时触发同步
     """
     sync_results = []
-    
+
     for cp_id in affected_checkpoints:
         # 1. 检查 Checkpoint 是否仍为"待同步"状态
         cp = await self.checkpoint_repo.get(cp_id)
         if cp.status != 'pending_sync':
             continue  # 已被其他操作同步
-        
+
         # 2. 惰性同步策略：检查是否被用户访问
         if not await self.is_checkpoint_accessed(cp_id):
             # 未被访问：跳过，等待下次定时任务或用户访问触发
             sync_results.append(SyncResult(checkpoint_id=cp_id, status='skipped'))
             continue
-        
+
         # 3. 用户已访问：执行同步（基于 Override 模式的差异应用）
         # 3.1 计算差异（修改点 vs 当前状态）
         diff = await self.calculate_diff(cp)
-        
+
         # 3.2 应用差异到 Checkpoint 状态
         synced_state = await self.apply_diff(cp.state, diff)
-        
+
         # 3.3 更新 Checkpoint 状态
         await self.checkpoint_repo.update(cp_id, synced_state, status='synced')
-        
+
         # 3.4 记录同步日志
         sync_log = SyncLog(
             checkpoint_id=cp_id,
@@ -1200,9 +1200,9 @@ async def sync_pending_checkpoints(self, affected_checkpoints: List[UUID]) -> Sy
             diff_applied=diff
         )
         await self.sync_log_repo.save(sync_log)
-        
+
         sync_results.append(SyncResult(checkpoint_id=cp_id, status='synced'))
-    
+
     return SyncResult(
         total=len(affected_checkpoints),
         synced=sum(1 for r in sync_results if r.status == 'synced'),
@@ -1213,7 +1213,7 @@ async def sync_pending_checkpoints(self, affected_checkpoints: List[UUID]) -> Sy
 async def on_checkpoint_access(self, checkpoint_id: UUID) -> None:
     """
     用户访问 Checkpoint 时的触发器
-    
+
     如果 Checkpoint 为"待同步"状态，立即触发同步
     """
     cp = await self.checkpoint_repo.get(checkpoint_id)
@@ -1272,40 +1272,40 @@ class BranchMerger:
         # 1. 加载分支和主线状态
         branch_state = await self.get_branch_state(branch_id)
         main_state = await self.get_main_state()
-        
+
         # 2. 冲突检测
         conflicts = await self.detect_conflicts(branch_state, main_state)
-        
+
         # 3. 根据冲突类型选择合并策略
         if len(conflicts) == 0:
             # 3.1 无冲突：自动合并
             return await self.auto_merge(branch_state, main_state)
-        
+
         conflict_type = self.classify_conflict_type(conflicts)
-        
+
         if conflict_type == "data_conflict":
             # 3.2 数据冲突：用户选择
             return await self.user_choice_merge(branch_state, main_state, conflicts)
-        
+
         elif conflict_type == "logical_conflict":
             # 3.3 逻辑冲突：强制人工仲裁
             return await self.manual_arbitration_merge(branch_state, main_state, conflicts)
-        
+
         elif conflict_type == "structural_conflict":
             # 3.4 结构冲突：专家确认
             return await self.expert_confirm_merge(branch_state, main_state, conflicts)
-        
+
         else:
             raise MergeError(f"Unknown conflict type: {conflict_type}")
 
     async def detect_conflicts(self, branch_state: State, main_state: State) -> List[Conflict]:
         """检测冲突"""
         conflicts = []
-        
+
         # 1. 变量级冲突检测
         branch_vars = set(branch_state.variables.keys())
         main_vars = set(main_state.variables.keys())
-        
+
         common_vars = branch_vars & main_vars
         for var in common_vars:
             if branch_state.variables[var] != main_state.variables[var]:
@@ -1316,14 +1316,14 @@ class BranchMerger:
                     main_value=main_state.variables[var],
                     severity='medium'
                 ))
-        
+
         # 2. 因果关系冲突检测（使用规则引擎）
         causal_conflicts = await self.rule_engine.check_causal_conflicts(
             branch_state.causal_graph,
             main_state.causal_graph
         )
         conflicts.extend(causal_conflicts)
-        
+
         # 3. 阶段顺序冲突检测
         if branch_state.stage_sequence != main_state.stage_sequence:
             conflicts.append(Conflict(
@@ -1333,27 +1333,27 @@ class BranchMerger:
                 main_value=main_state.stage_sequence,
                 severity='high'
             ))
-        
+
         return conflicts
 
     async def user_choice_merge(
-        self, 
-        branch_state: State, 
-        main_state: State, 
+        self,
+        branch_state: State,
+        main_state: State,
         conflicts: List[Conflict]
     ) -> MergeResult:
         """数据冲突：用户选择合并"""
         # 1. 生成冲突解决 UI
         conflict_ui = await self.generate_conflict_ui(conflicts)
-        
+
         # 2. 等待用户决策
         user_choices = await self.wait_for_user_choices(conflict_ui)
-        
+
         # 3. 应用用户选择
         merged_state = await self.apply_user_choices(
             branch_state, main_state, user_choices
         )
-        
+
         # 4. 记录合并日志
         merge_log = MergeLog(
             branch_id=branch_state.branch_id,
@@ -1363,7 +1363,7 @@ class BranchMerger:
             merged_at=datetime.now()
         )
         await self.merge_log_repo.save(merge_log)
-        
+
         return MergeResult(
             status='success',
             merged_state=merged_state,
@@ -1372,9 +1372,9 @@ class BranchMerger:
         )
 
     async def manual_arbitration_merge(
-        self, 
-        branch_state: State, 
-        main_state: State, 
+        self,
+        branch_state: State,
+        main_state: State,
         conflicts: List[Conflict]
     ) -> MergeResult:
         """逻辑冲突：强制人工仲裁（SYS AGENT 裁决）"""
@@ -1385,10 +1385,10 @@ class BranchMerger:
             main_state=main_state,
             conflicts=conflicts
         )
-        
+
         # 2. 等待裁决结果
         arbitration_result = await self.sys_arbiter.arbitrate(dispute)
-        
+
         # 3. 根据裁决结果合并
         if arbitration_result.confidence >= 0.6:
             merged_state = await self.apply_arbitration_decision(
@@ -1422,44 +1422,44 @@ class DiffViewGenerator:
             branch_checkpoint_id=branch_state.checkpoint_id,
             generated_at=datetime.now()
         )
-        
+
         # 1. 关键变量差异对比
         diff_view.variable_diffs = await self.compare_variables(
             main_state.variables, branch_state.variables
         )
-        
+
         # 2. 因果图差异对比
         diff_view.causal_graph_diff = await self.compare_causal_graphs(
             main_state.causal_graph, branch_state.causal_graph
         )
-        
+
         # 3. 影响评估
         diff_view.impact_assessment = await self.assess_impact(
             diff_view.variable_diffs, diff_view.causal_graph_diff
         )
-        
+
         # 4. 建议操作
         diff_view.recommended_action = await self.recommend_action(diff_view)
-        
+
         return diff_view
 
     async def compare_variables(
-        self, 
-        main_vars: Dict[str, Any], 
+        self,
+        main_vars: Dict[str, Any],
         branch_vars: Dict[str, Any]
     ) -> List[VariableDiff]:
         """变量差异对比"""
         diffs = []
         all_vars = set(main_vars.keys()) | set(branch_vars.keys())
-        
+
         for var in all_vars:
             main_val = main_vars.get(var, '<不存在>')
             branch_val = branch_vars.get(var, '<不存在>')
-            
+
             if main_val != branch_val:
                 # 计算影响范围
                 impact = await self.calculate_variable_impact(var, main_val, branch_val)
-                
+
                 diffs.append(VariableDiff(
                     variable_name=var,
                     main_value=main_val,
@@ -1468,7 +1468,7 @@ class DiffViewGenerator:
                     impact_score=impact.score,
                     affected_variables=impact.affected_vars
                 ))
-        
+
         return sorted(diffs, key=lambda x: x.impact_score, reverse=True)
 ```
 
@@ -1516,10 +1516,10 @@ class WormArchiver:
         """归档路由决策日志"""
         # 1. 序列化日志
         log_data = routing_log.dict().json()
-        
+
         # 2. 生成 WORM 对象键
         object_key = f"audit/routing/{routing_log.id}/{routing_log.timestamp.date()}.json"
-        
+
         # 3. 上传至 MinIO（启用 Object Lock COMPLIANCE 模式）
         await self.minio.put_object(
             bucket='worm-audit',
@@ -1528,7 +1528,7 @@ class WormArchiver:
             retain_until_date=routing_log.timestamp + timedelta(days=7*365),  # 7 年
             retention_mode=RetentionMode.COMPLIANCE
         )
-        
+
         # 4. 更新日志记录 WORM 引用
         routing_log.worm_storage_ref = f"minio://worm-audit/{object_key}"
         await self.routing_log_repo.update(routing_log)
@@ -1618,7 +1618,7 @@ CREATE TABLE event_outbox (
 class SemanticCache:
     SIMILARITY_THRESHOLD = 0.9
     TTL = 86400  # 24 小时
-    
+
     async def get_or_compute(self, query: str, compute_fn: Callable) -> CacheResult:
         query_embedding = await self.embedding_model.encode(query)
         cached = await self.redis.vector_search(
@@ -1626,10 +1626,10 @@ class SemanticCache:
             query_vector=query_embedding,
             threshold=self.SIMILARITY_THRESHOLD
         )
-        
+
         if cached:
             return CacheResult(value=cached.value, hit=True)
-        
+
         result = await compute_fn(query)
         await self.redis.setex(f"cache:{query}", self.TTL, result.serialize())
         return CacheResult(value=result, hit=False)
@@ -2695,34 +2695,34 @@ buckets/
 ```python
 class ResumableUpload:
     """支持断点续传的分片上传"""
-    
+
     CHUNK_SIZE = 10 * 1024 * 1024  # 10MB per chunk
     MAX_FILE_SIZE = 20 * 1024 * 1024 * 1024  # 20GB total
-    
+
     async def upload(self, file: UploadFile, user_id: str) -> UploadResult:
         # 1. 生成文件指纹
         file_hash = await self.calculate_hash(file)
-        
+
         # 2. 检查是否已存在（秒传）
         existing = await self.check_existing(file_hash)
         if existing:
             return UploadResult(status="exists", file_id=existing.id)
-        
+
         # 3. 分片上传
         upload_id = await self.initiate_multipart(file.filename)
         chunks = []
-        
+
         for offset in range(0, file.size, self.CHUNK_SIZE):
             chunk = await file.read(self.CHUNK_SIZE)
             chunk_etag = await self.upload_chunk(upload_id, offset, chunk)
             chunks.append({"offset": offset, "etag": chunk_etag})
-            
+
             # 保存上传进度（支持断点续传）
             await self.save_progress(upload_id, offset, chunks)
-        
+
         # 4. 合并分片
         file_id = await self.complete_multipart(upload_id, chunks)
-        
+
         return UploadResult(status="success", file_id=file_id)
 ```
 
@@ -2733,14 +2733,14 @@ class ResumableUpload:
 ```python
 class LayoutPreservingParser:
     """版面保留解析器 - 记录元素坐标"""
-    
+
     async def parse(self, document: Document) -> ParsedDocument:
         elements = []
-        
+
         for page in document.pages:
             # 1. 版面分析（检测文本/表格/图像/公式）
             layout_blocks = await self.detect_layout(page)
-            
+
             for block in layout_blocks:
                 # 2. 提取元素
                 element = {
@@ -2755,18 +2755,18 @@ class LayoutPreservingParser:
                     },
                     "confidence": block.confidence
                 }
-                
+
                 # 3. 表格特殊处理（行列语义）
                 if block.type == "table":
                     element["table_structure"] = await self.parse_table(block)
-                
+
                 # 4. 公式支持（LaTeX + MathML 双格式）
                 if block.type == "formula":
                     element["latex"] = block.latex
                     element["mathml"] = block.mathml
-                
+
                 elements.append(element)
-        
+
         return ParsedDocument(elements=elements, format="DocLayNet")
 ```
 
@@ -2775,13 +2775,13 @@ class LayoutPreservingParser:
 ```python
 class OCRProcessor:
     """OCR 处理器 - 支持中英文 + 置信度管理"""
-    
+
     CONFIDENCE_THRESHOLD = 0.85
-    
+
     async def process(self, image: ImageDocument) -> OCRResult:
         # 1. OCR 识别
         ocr_result = await self.tesseract.recognize(image)
-        
+
         # 2. 置信度标注
         low_confidence_regions = []
         for text_block in ocr_result.blocks:
@@ -2792,12 +2792,12 @@ class OCRProcessor:
                     "bbox": text_block.bbox,
                     "flag": "needs_review"
                 })
-        
+
         # 3. 低置信度标记（待人工复核）
         if low_confidence_regions:
             ocr_result.flag = "partial_review_needed"
             ocr_result.review_regions = low_confidence_regions
-        
+
         return ocr_result
 ```
 
@@ -2808,28 +2808,28 @@ class OCRProcessor:
 ```python
 class DataQualityAssessor:
     """数据质量评估器 - DQI 综合评分"""
-    
+
     # DQI = 0.4*完整性 + 0.3*唯一性 + 0.3*时效性
-    
+
     async def assess(self, document: ParsedDocument) -> DQIScore:
         # 1. 完整性评分（正文长度>100 字符）
         completeness = min(len(document.text) / 100, 1.0)
-        
+
         # 2. 唯一性评分（SIMHash 去重）
         similarity = await self.calculate_similarity(document)
         uniqueness = 1.0 - similarity
-        
+
         # 3. 时效性评分（文档日期）
         age_days = (datetime.now() - document.publish_date).days
         timeliness = max(0, 1.0 - age_days / 365)  # 1 年内满分
-        
+
         # 4. DQI 综合评分
         dqi_score = (
             0.4 * completeness +
             0.3 * uniqueness +
             0.3 * timeliness
         )
-        
+
         # 5. 质量门禁（DQI<0.6 阻断）
         if dqi_score < 0.6:
             return DQIScore(
@@ -2837,7 +2837,7 @@ class DataQualityAssessor:
                 status="blocked",
                 reason="DQI below threshold"
             )
-        
+
         return DQIScore(
             score=dqi_score,
             status="passed",
@@ -2860,11 +2860,11 @@ class RAGService(Protocol):
     async def retrieve(self, query: str, top_k: int = 100) -> List[Document]:
         """
         混合检索接口
-        
+
         Args:
             query: 检索查询
             top_k: 返回文档数量
-            
+
         Returns:
             相关文档列表（按相关性排序）
         """
@@ -3211,18 +3211,18 @@ class CompressionQualityEvaluator:
 ```python
 class HybridEntityExtractor:
     """混合实体抽取器 - 规则高准确率 + LLM 高召回率"""
-    
+
     async def extract(self, document: ParsedDocument) -> List[Entity]:
         # 1. 规则基抽取（高准确率≥80%）
         rule_entities = await self.rule_based_extract(document)
         # - 领域词典 AC 自动机匹配
         # - 正则模式（日期/金额/百分比）
         # - 依存句法分析
-        
+
         # 2. LLM 语义抽取（高召回率）
         llm_entities = await self.llm_extract(document)
         # - Few-Shot + CoT + Schema 约束
-        
+
         # 3. 冲突仲裁（规则权重 0.6 / LLM 权重 0.4）
         merged_entities = []
         for entity in rule_entities + llm_entities:
@@ -3232,7 +3232,7 @@ class HybridEntityExtractor:
                 existing.confidence = 0.6 * rule_entities.confidence + 0.4 * llm_entities.confidence
             else:
                 merged_entities.append(entity)
-        
+
         return merged_entities
 ```
 
@@ -3243,11 +3243,11 @@ class HybridEntityExtractor:
 ```python
 class CitationTracer:
     """高保真溯源追踪器"""
-    
+
     async def trace(self, claim: str) -> CitationResult:
         # 1. 检索相关文档切片
         chunks = await self.retriever.retrieve(claim, top_k=10)
-        
+
         # 2. 计算引用置信度
         citations = []
         for chunk in chunks:
@@ -3261,10 +3261,10 @@ class CitationTracer:
                     "bbox": chunk.bbox,  # Bounding Box 坐标
                     "page": chunk.page_number
                 })
-        
+
         # 3. 溯源树构建
         citation_tree = self.build_citation_tree(citations)
-        
+
         return CitationResult(
             claim=claim,
             citations=citation_tree,
@@ -3344,16 +3344,16 @@ class CitationTracer:
 ```python
 class ToolExecutionEngine:
     """工具执行引擎 - 原子循环"""
-    
+
     async def execute(self, tool_call: ToolCall) -> ToolResult:
         # 1. Think（规划）
         plan = await self.planner.generate(tool_call)
         # 输出：任务编排 JSON（子任务列表、工具映射、依赖边）
-        
+
         # 2. Code（代码生成）
         code = await self.code_generator.generate(plan)
         # 生成 Python 代码（数值计算）或数学模型（优化问题）
-        
+
         # 3. Execute（沙箱执行）
         try:
             result = await self.sandbox.execute(code)
@@ -3365,16 +3365,16 @@ class ToolExecutionEngine:
                 fix_code = await self.code_fixer.fix(e, code)
                 return await self.execute(fix_code)
             return ToolResult(status="failed", error=str(e))
-        
+
         # 4. Observe（结果观察）
         observation = await self.observer.observe(result)
         # 提取关键指标、异常检测、趋势分析
-        
+
         # 5. Validate（验证）
         validation = await self.validator.validate(observation, tool_call.schema)
         if not validation.passed:
             return ToolResult(status="invalid", reason=validation.reason)
-        
+
         # 6. 证据打包
         evidence_package = {
             "input_hash": hash(tool_call.input),
@@ -3386,7 +3386,7 @@ class ToolExecutionEngine:
             "confidence": validation.confidence,
             "citations": result.citations
         }
-        
+
         return ToolResult(
             status="success",
             output=observation,
@@ -3403,11 +3403,11 @@ class ToolExecutionEngine:
 ```python
 class PersistentSandbox:
     """持久化计算沙箱 - 支持跨步骤变量传递"""
-    
+
     def __init__(self):
         self.kernel_pool = {}
         self.idle_timeout = 1800  # 30 分钟无活动销毁
-    
+
     async def get_kernel(self, session_id: str) -> JupyterKernel:
         """获取或创建 Kernel"""
         if session_id not in self.kernel_pool:
@@ -3417,31 +3417,31 @@ class PersistentSandbox:
                 "kernel": kernel,
                 "last_used": datetime.now()
             }
-        
+
         # 更新使用时间
         self.kernel_pool[session_id]["last_used"] = datetime.now()
-        
+
         return self.kernel_pool[session_id]["kernel"]
-    
+
     async def execute(self, session_id: str, code: str) -> ExecutionResult:
         """在沙箱中执行代码"""
         kernel = await self.get_kernel(session_id)
-        
+
         # 1. 执行代码
         result = await kernel.execute(code)
-        
+
         # 2. 捕获 STDERR（Validation Feedback）
         if result.stderr:
             # 检索错误案例库辅助修复
             fix_suggestions = await self.error_db.search(result.stderr)
             result.fix_suggestions = fix_suggestions
-        
+
         # 3. 结果缓存（相同输入避免重复计算）
         cache_key = hash(code)
         await self.cache.set(cache_key, result, ttl=3600)
-        
+
         return result
-    
+
     async def cleanup_idle(self):
         """清理空闲 Kernel"""
         now = datetime.now()
@@ -3449,7 +3449,7 @@ class PersistentSandbox:
             sid for sid, data in self.kernel_pool.items()
             if (now - data["last_used"]).seconds > self.idle_timeout
         ]
-        
+
         for session_id in idle_sessions:
             await self.kernel_pool[session_id]["kernel"].shutdown()
             del self.kernel_pool[session_id]
@@ -3462,7 +3462,7 @@ class PersistentSandbox:
 ```python
 class SchemaEnforcer:
     """Schema 强制器 - Instructor Patch"""
-    
+
     async def enforce(self, llm_output: str, schema: Type[BaseModel]) -> BaseModel:
         """强制 LLM 输出符合 Schema"""
         try:
@@ -3475,7 +3475,7 @@ class SchemaEnforcer:
                 # 连续 3 次失败触发工具熔断
                 await self.trigger_circuit_breaker()
                 raise ToolCircuitError("Schema validation failed 3 times")
-            
+
             # 自动重试（带错误提示）
             fixed_output = await self.llm.fix(e, llm_output)
             return await self.enforce(fixed_output, schema)
@@ -3486,10 +3486,10 @@ class SchemaEnforcer:
 ```python
 class ConsistencyArbiter:
     """一致性校验仲裁器 - 检测逻辑冲突"""
-    
+
     async def check(self, tool_outputs: List[ToolResult]) -> ConsistencyReport:
         conflicts = []
-        
+
         # 1. 财务常识库检测
         for output in tool_outputs:
             # 利润率与成本矛盾检测
@@ -3500,11 +3500,11 @@ class ConsistencyArbiter:
                         "description": "利润率与成本矛盾",
                         "details": f"利润率{output.profit_margin} + 成本率{output.cost_ratio} > 100%"
                     })
-        
+
         # 2. 规则引擎检测
         rule_conflicts = await self.rule_engine.check(tool_outputs)
         conflicts.extend(rule_conflicts)
-        
+
         # 3. 生成冲突报告
         return ConsistencyReport(
             has_conflicts=len(conflicts) > 0,
@@ -3518,7 +3518,7 @@ class ConsistencyArbiter:
 ```python
 class PromptOptimizer:
     """提示词优化器 - 基于 DSPy 理念"""
-    
+
     async def optimize(self, feedback_logs: List[FeedbackLog]) -> OptimizedPrompt:
         # 1. 将用户修正转化为 Few-Shot 样本
         few_shot_samples = []
@@ -3531,7 +3531,7 @@ class PromptOptimizer:
                     "correction_type": log.correction_type
                 }
                 few_shot_samples.append(sample)
-        
+
         # 2. 多目标优化（NSGA-II 算法）
         # 目标：结构完整性 40% + 逻辑一致性 35% + 成本效率 25%
         optimized_prompts = await self.nsga2.optimize(
@@ -3542,10 +3542,10 @@ class PromptOptimizer:
                 "cost_efficiency": 0.25
             }
         )
-        
+
         # 3. Pareto 前沿选择
         best_prompt = self.select_from_pareto(optimized_prompts)
-        
+
         # 4. Strat-Bench 验证（通过率≥90%）
         test_result = await self.strat_bench.test(best_prompt)
         if test_result.pass_rate < 0.90:
@@ -3553,7 +3553,7 @@ class PromptOptimizer:
                 status="rejected",
                 reason=f"Strat-Bench pass rate {test_result.pass_rate:.2%} < 90%"
             )
-        
+
         return OptimizationResult(
             status="approved",
             optimized_prompt=best_prompt,
@@ -3572,7 +3572,7 @@ class PromptOptimizer:
 ```python
 class AgentIdentity:
     """Agent 身份档案 - 7+1 角色定义"""
-    
+
     # 核心 7 角色
     ROLES = {
         "CEO": {
@@ -3625,7 +3625,7 @@ class AgentIdentity:
             "view": "auditor",  # 审计视图
             "mode": "sidecar"   # 旁路监听模式
         },
-        
+
         # +1 仲裁者
         "SYS": {
             "full_name": "系统仲裁官",
@@ -3643,14 +3643,14 @@ class AgentIdentity:
 ```python
 class AgentWorkflow:
     """Agent 标准工作流 - 9 步原子循环"""
-    
+
     async def execute(self, task: AgentTask) -> AgentResult:
         # 1. 初始化
         await self.initialize(task)
         # - 加载身份档案（IDENTITY.md）
         # - 加载工具集（TOOLS.md）
         # - 实例化沙箱与记忆容器
-        
+
         # 2. 感知
         context = await self.perceive(task)
         # - 读取结构化 JSON 数据
@@ -3658,39 +3658,39 @@ class AgentWorkflow:
         # - 摘要质量评估（信息熵 + 实体覆盖率）
         if context.summary_quality < 0.7:
             context = await self.trigger_retrieval(context)  # 二次检索
-        
+
         # 3. 规划
         plan = await self.plan(context, task)
         # - 生成任务执行 DAG
         # - 匹配工具映射
         # - 定义依赖关系
-        
+
         # 4. 执行
         results = []
         for subtask in plan.topological_sort():
             result = await self.execute_atom(subtask)
             # Think→Code→Execute→Observe→Validate 原子循环
             results.append(result)
-        
+
         # 5. 深度思考（可选，关键决策点）
         if task.requires_deep_thinking:
             chains = await self.parallel_thinking(task)
             # 并行生成多条思维链推演路径
             best_chain = self.select_best_chain(chains)
             results.append(best_chain)
-        
+
         # 6. 验证
         validation = await self.validate(results, task.schema)
         if validation.confidence >= task.target_confidence:
             return self.early_terminate(validation)  # 提前终止
-        
+
         # 7. 反思
         if not validation.passed:
             reflection = await self.reflect(validation)
             # 错误分析驱动持续改进
             plan = await self.revise_plan(plan, reflection)
             return await self.execute(plan)  # 重试
-        
+
         # 8. 证据打包
         evidence_package = {
             "input_hash": hash(task.input),
@@ -3702,12 +3702,12 @@ class AgentWorkflow:
             "tool_calls": self.extract_tool_calls(results)
         }
         await self.archive.save(evidence_package)
-        
+
         # 9. 演化（可选）
         if task.should_evolve:
             await self.evolve(results, validation)
             # 匿名化执行轨迹存入演进数据集
-        
+
         return AgentResult(
             status="success",
             output=validation.output,
@@ -3722,7 +3722,7 @@ class AgentWorkflow:
 ```python
 class EIPExecutor:
     """弹性视角隔离协议执行器"""
-    
+
     # 四级隔离等级
     ISOLATION_LEVELS = {
         "L4": {
@@ -3755,14 +3755,14 @@ class EIPExecutor:
             "mandatory_audit": True      # 强制审计
         }
     }
-    
+
     async def evaluate_and_switch(self, agent_id: str, context: IsolationContext) -> str:
         """评估并切换隔离等级"""
         current_level = await self.get_current_level(agent_id)
-        
+
         # 1. 检测触发条件
         triggers = await self.detect_triggers(context)
-        
+
         # 2. 判定目标等级
         if triggers.sys_command:
             target_level = triggers.target_level  # SYS 命令直接指定
@@ -3774,10 +3774,10 @@ class EIPExecutor:
             target_level = triggers.target_level  # 用户请求指定
         else:
             return current_level  # 无触发条件
-        
+
         # 3. 执行切换
         await self.execute_switch(agent_id, current_level, target_level)
-        
+
         # 4. 记录审计日志
         log = IsolationSwitchLog(
             agent_id=agent_id,
@@ -3787,11 +3787,11 @@ class EIPExecutor:
             trigger_type=triggers.type
         )
         await self.audit_log.save(log)
-        
+
         # 5. 设置自动恢复（L2→L4，30 分钟无活动）
         if target_level == "L2":
             await self.schedule_auto_recovery(agent_id, delay_minutes=30)
-        
+
         return target_level
 ```
 
@@ -3800,7 +3800,7 @@ class EIPExecutor:
 ```python
 class SYSArbiter:
     """SYS AGENT 裁决状态机 - 五维评分"""
-    
+
     DIMENSION_WEIGHTS = {
         "factual_accuracy": 0.35,    # 事实准确性
         "logical_consistency": 0.25, # 逻辑一致性
@@ -3808,7 +3808,7 @@ class SYSArbiter:
         "resource_feasibility": 0.15,# 资源可行性
         "strategic_alignment": 0.05  # 战略对齐度
     }
-    
+
     async def arbitrate(self, dispute: Dispute) -> ArbitrationResult:
         """执行裁决流程"""
         # 1. 收集论据
@@ -3817,7 +3817,7 @@ class SYSArbiter:
             "party_b": dispute.party_b.arguments,
             "historical_cases": await self.retrieve_similar_cases(dispute)
         }
-        
+
         # 2. 五维评估
         scores = {}
         for party_id, party_args in arguments.items():
@@ -3828,7 +3828,7 @@ class SYSArbiter:
                 "resource_feasibility": await self.evaluate_resource_feasibility(party_args),
                 "strategic_alignment": await self.evaluate_strategic_alignment(party_args)
             }
-        
+
         # 3. 计算综合得分
         party_scores = {}
         for party_id, party_scores in scores.items():
@@ -3837,22 +3837,22 @@ class SYSArbiter:
                 for dim, score in party_scores.items()
             )
             party_scores[party_id] = total
-        
+
         # 4. 置信度评估
         sorted_scores = sorted(party_scores.values(), reverse=True)
         confidence = (sorted_scores[0] - sorted_scores[1]) / 5.0
-        
+
         # 5. 决策生成
         if confidence < 0.4:
             # 强制升级人工仲裁
             return await self.escalate_to_human(dispute, scores, confidence)
-        
+
         decision = self.generate_decision(scores)
-        
+
         if confidence < 0.6:
             decision.low_confidence_flag = True
             decision.recommend_human_review = True
-        
+
         return ArbitrationResult(
             decision=decision,
             scores=scores,
@@ -3878,7 +3878,7 @@ class SYSArbiter:
     async def arbitrate(self, debate_result: DebateResult) -> ArbitrationDecision:
         """
         执行裁决
-        
+
         流程：
         1. 使用 DebateEvaluator 评估辩论质量
         2. 基于辩论质量计算置信度
@@ -3921,7 +3921,7 @@ agent:
   display_name: "首席执行官"
   icon: "👔"
   version: "1.0.0"
-  
+
 identity:
   role: "战略决策者"
   background: "20 年 + 企业战略管理经验，擅长宏观战略规划和跨部门协调"
@@ -3930,7 +3930,7 @@ identity:
     - "业务设计"
     - "高管协调"
     - "风险决策"
-  
+
 capabilities:
   tools:
     - "差距分析"
@@ -3940,12 +3940,12 @@ capabilities:
     - "战略解码"
   max_context_length: 8192
   reasoning_mode: "strategic"
-  
+
 communication:
   style: "直接、战略性、关注大局"
   tone: "专业、权威、开放"
   language: "zh-CN"
-  
+
 principles:
   - "战略对齐优先"
   - "数据驱动决策"
@@ -4000,17 +4000,17 @@ class AgentConfig(BaseModel):
     display_name: str
     icon: str
     version: str
-    
+
     identity: Dict[str, Any]
     capabilities: Dict[str, Any]
     communication: Dict[str, str]
     principles: List[str]
-    
+
     llm_config: Dict[str, Any]
     eip_config: Dict[str, Any]
     memory_config: Dict[str, Any]
     prompts: Dict[str, str]
-    
+
     @classmethod
     def from_yaml(cls, path: str) -> 'AgentConfig':
         """从 YAML 文件加载配置"""
@@ -4053,25 +4053,25 @@ class A2AMessage(BaseModel):
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID  # 会话 ID，关联同一对话的消息
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # 发送者和接收者
     sender_id: str  # 发送 Agent ID
     receiver_id: str  # 接收 Agent ID，广播时为"broadcast"
-    
+
     # 消息类型和优先级
     message_type: MessageType
     priority: MessagePriority = MessagePriority.NORMAL
-    
+
     # 消息内容
     subject: str  # 消息主题
     content: Dict[str, Any]  # 消息内容
     context: Dict[str, Any] = Field(default_factory=dict)  # 上下文信息
-    
+
     # 元数据
     requires_response: bool = False
     timeout_seconds: int = 300
     correlation_id: UUID = None  # 关联请求 ID（响应时填写）
-    
+
     # EIP 隔离信息
     isolation_level: str = "L4"
     blackboard_visible: bool = False  # 是否对公共黑板可见
@@ -4120,16 +4120,16 @@ class A2AMessage(BaseModel):
 ```python
 class PerformanceGapAnalysis:
     """业绩差距分析 - BLM 阶段 1"""
-    
+
     # 主导 Agent：CFO（财务差距）、COO（运营差距）
     LEAD_AGENTS = ["CFO", "COO"]
-    
+
     # 协作 Agent：CEO（战略校准）、AUD（数据审计）
     COLLAB_AGENTS = ["CEO", "AUD"]
-    
+
     # 建议工具组合
     TOOLS = ["SWOT-TOWS", "KPI", "价值链分析", "GE-麦肯锡矩阵"]
-    
+
     async def execute(self, input_data: GapInput) -> GapOutput:
         # 1. 财务差距量化（CFO 主导）
         financial_gap = await self.cfo_agent.analyze_financial_gap(
@@ -4137,24 +4137,24 @@ class PerformanceGapAnalysis:
             target_performance=input_data.target,
             historical_data=input_data.historical
         )
-        
+
         # 2. 运营差距分析（COO 主导）
         operational_gap = await self.coo_agent.analyze_operational_gap(
             current_operations=input_data.operations,
             benchmark_data=input_data.benchmark
         )
-        
+
         # 3. 根因识别（SWOT-TOWS）
         root_causes = await self.swot_tows.analyze(
             financial_gap=financial_gap,
             operational_gap=operational_gap
         )
-        
+
         # 4. 业务组合健康度评估（GE 矩阵）
         portfolio_health = await self.ge_matrix.evaluate(
             business_units=input_data.business_units
         )
-        
+
         # 5. Checkpoint-1（用户确认）
         checkpoint = Checkpoint(
             stage="performance_gap",
@@ -4167,7 +4167,7 @@ class PerformanceGapAnalysis:
             status="pending_user_feedback"
         )
         await self.checkpoint_repo.save(checkpoint)
-        
+
         return GapOutput(
             financial_gap=financial_gap,
             operational_gap=operational_gap,
@@ -4182,7 +4182,7 @@ class PerformanceGapAnalysis:
 ```python
 class MarketInsight:
     """市场洞察 - BLM 阶段 2（六子步骤）"""
-    
+
     SUB_STEPS = {
         "2.1_看趋势": {
             "lead_agent": "CEO",
@@ -4221,10 +4221,10 @@ class MarketInsight:
             "output": "风险全景图 + 风险缓解措施"
         }
     }
-    
+
     async def execute(self, input_data: InsightInput) -> InsightOutput:
         all_outputs = {}
-        
+
         for step_name, config in self.SUB_STEPS.items():
             # 1. 执行子步骤
             output = await self.execute_sub_step(
@@ -4233,7 +4233,7 @@ class MarketInsight:
                 input_data=input_data
             )
             all_outputs[step_name] = output
-            
+
             # 2. Checkpoint（每个子步骤）
             checkpoint = Checkpoint(
                 stage=f"market_insight_{step_name}",
@@ -4241,10 +4241,10 @@ class MarketInsight:
                 status="pending_user_feedback"
             )
             await self.checkpoint_repo.save(checkpoint)
-        
+
         # 3. 综合洞察报告
         comprehensive_insight = self.synthesize_insights(all_outputs)
-        
+
         return InsightOutput(
             sub_steps_outputs=all_outputs,
             comprehensive_insight=comprehensive_insight,
@@ -4257,14 +4257,14 @@ class MarketInsight:
 ```python
 class CheckpointRecovery:
     """Checkpoint 恢复 - 双模式支持"""
-    
+
     async def recover(self, checkpoint_id: UUID, modifications: List[Modification]) -> RecoveryResult:
         # 1. 加载 Checkpoint
         checkpoint = await self.checkpoint_repo.get(checkpoint_id)
-        
+
         # 2. 影响范围评估
         affected_checkpoints = await self.assess_impact(checkpoint_id)
-        
+
         # 3. 恢复模式判定
         if len(affected_checkpoints) >= 2:
             # 影响≥2 个后续 Checkpoint → 强制 Replay 模式
@@ -4274,7 +4274,7 @@ class CheckpointRecovery:
             # 影响<2 个 → 推荐 Override 模式
             mode = "Override"
             consistency_guarantee = "manual_confirm"
-        
+
         # 4. 执行恢复
         if mode == "Replay":
             # Replay 模式：修改点后所有状态重新计算
@@ -4282,10 +4282,10 @@ class CheckpointRecovery:
         else:
             # Override 模式：仅修改指定状态
             result = await self.override_mode(checkpoint, modifications)
-        
+
         # 5. 更新战略档案库
         await self.archive.update(result)
-        
+
         return RecoveryResult(
             mode=mode,
             consistency_guarantee=consistency_guarantee,
@@ -4293,24 +4293,24 @@ class CheckpointRecovery:
             execution_time=result.execution_time,
             cost=result.cost
         )
-    
+
     async def replay_mode(self, checkpoint: Checkpoint, modifications: List[Modification]) -> ReplayResult:
         """Replay 模式 - 强一致性保证"""
         # 1. 应用修改
         modified_state = await self.apply_modifications(checkpoint.state, modifications)
-        
+
         # 2. 从修改点重新执行后续所有阶段
         current_stage = checkpoint.stage
         subsequent_stages = self.get_subsequent_stages(current_stage)
-        
+
         for stage in subsequent_stages:
             result = await self.execute_stage(stage, modified_state)
             modified_state = result.state
-        
+
         # 3. 更新所有受影响的 Checkpoint
         for stage in subsequent_stages:
             await self.checkpoint_repo.update(stage, modified_state)
-        
+
         return ReplayResult(
             mode="Replay",
             modified_state=modified_state,
@@ -4324,52 +4324,52 @@ class CheckpointRecovery:
 ```python
 class TimeTravelDebugger:
     """Time-Travel 调试器 - 两阶段能力"""
-    
+
     # 第一阶段：单点恢复
     async def single_point_recovery(self, checkpoint_id: UUID, modifications: Optional[List[Modification]] = None) -> RecoveryResult:
         """从任意 Checkpoint 恢复执行，支持修改中间状态变量"""
         checkpoint = await self.checkpoint_repo.get(checkpoint_id)
-        
+
         # 1. 加载状态快照（Redis Hash）
         state_snapshot = await self.redis.get(f"checkpoint:{checkpoint_id}:state")
-        
+
         # 2. 应用修改（如有）
         if modifications:
             state_snapshot = await self.apply_modifications(state_snapshot, modifications)
-        
+
         # 3. 从修改点继续执行
         result = await self.resume_execution(checkpoint.stage, state_snapshot)
-        
+
         return RecoveryResult(
             mode="single_point",
             recovered_state=state_snapshot,
             result=result
         )
-    
+
     # 第二阶段：分支对比
     async def branch_comparison(self, source_checkpoint_id: UUID, modifications: List[Modification]) -> BranchComparisonResult:
         """创建分支→执行恢复→差异对比→合并/放弃"""
         # 1. 创建分支
         branch_id = await self.create_branch(source_checkpoint_id)
-        
+
         # 2. 在分支上执行恢复
         branch_result = await self.single_point_recovery(source_checkpoint_id, modifications)
-        
+
         # 3. 并行维护主线与分支状态
         main_state = await self.get_main_state()
         branch_state = branch_result.recovered_state
-        
+
         # 4. 差异对比视图
         diff_view = await self.generate_diff_view(main_state, branch_state)
-        
+
         # 5. 等待用户确认（合并/放弃）
         user_decision = await self.wait_for_user_decision(diff_view)
-        
+
         if user_decision == "merge":
             await self.merge_branch(branch_id)
         else:
             await self.abandon_branch(branch_id)
-        
+
         return BranchComparisonResult(
             branch_id=branch_id,
             diff_view=diff_view,
@@ -4565,7 +4565,7 @@ RoutingScore = float
 # 类定义
 class StrategicPlan:
     """战略规划实体 - BLM 六阶段模型"""
-    
+
     def __init__(
         self,
         id: PlanId,
@@ -4576,11 +4576,11 @@ class StrategicPlan:
         self._plan_type = plan_type
         self._status = status
         self._checkpoints: List[Checkpoint] = []
-    
+
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """添加检查点"""
         self._checkpoints.append(checkpoint)
-    
+
     def _validate_status(self, status: str) -> bool:
         """验证状态有效性（私有方法）"""
         return status in [s.value for s in PlanStatus]
@@ -4691,7 +4691,7 @@ __all__ = [
 class StrategicPlan:
     """
     战略规划实体 - 基于 BLM 六阶段模型
-    
+
     Attributes:
         id: 规划唯一标识 (UUID)
         plan_type: 规划类型 (SP/BP)
@@ -4700,17 +4700,17 @@ class StrategicPlan:
         checkpoints: 检查点列表
         created_at: 创建时间
         updated_at: 更新时间
-    
+
     Example:
         >>> plan = StrategicPlan(plan_type=PlanType.SP)
         >>> plan.start_market_insight()
         >>> plan.add_checkpoint(checkpoint)
     """
-    
+
     # 类变量
     MAX_VERSIONS: int = 10
     ALLOWED_STATUSES: List[str] = ["draft", "in_progress", "approved", "archived"]
-    
+
     # 初始化
     def __init__(
         self,
@@ -4728,38 +4728,38 @@ class StrategicPlan:
         self._version: int = 1
         self.created_at = datetime.utcnow()
         self.updated_at = datetime.utcnow()
-    
+
     # 公共方法 - 业务行为
     def start_market_insight(self) -> None:
         """启动市场洞察阶段"""
         self._blm_stage = BLMStage.MARKET_INSIGHT
         self.updated_at = datetime.utcnow()
-    
+
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """添加检查点"""
         self._checkpoints.append(checkpoint)
         self.updated_at = datetime.utcnow()
-    
+
     def approve(self) -> None:
         """批准规划"""
         if self._status != PlanStatus.IN_PROGRESS:
             raise ValidationError("只有进行中的规划可以批准")
         self._status = PlanStatus.APPROVED
         self.updated_at = datetime.utcnow()
-    
+
     # 私有方法 - 内部实现
     def _validate_status(self, status: str) -> bool:
         """验证状态有效性"""
         return status in self.ALLOWED_STATUSES
-    
+
     def _calculate_next_version(self) -> int:
         """计算下一个版本号"""
         return self._version + 1
-    
+
     # 特殊方法
     def __str__(self) -> str:
         return f"StrategicPlan(id={self._id}, type={self._plan_type}, status={self._status})"
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, StrategicPlan):
             return False
@@ -4771,19 +4771,19 @@ class StrategicPlan:
 class UDMRService:
     """
     统一动态模型路由服务 - 三层决策架构
-    
+
     Responsibilities:
         - L1 合规性检查（敏感数据、数据驻留、白名单）
         - L2 任务复杂度评估（语义匹配、历史成功率、成本效率）
         - L3 路由决策执行（本地优先、云端兜底）
-    
+
     Dependencies:
         - ComplianceGateway: 合规性网关
         - ComplexityAssessor: 复杂度评估器
         - RouterExecutor: 路由决策执行器
         - RoutingLogRepository: 路由日志仓储
     """
-    
+
     def __init__(
         self,
         compliance_gateway: ComplianceGateway,
@@ -4795,17 +4795,17 @@ class UDMRService:
         self._complexity_assessor = complexity_assessor
         self._router_executor = router_executor
         self._routing_log_repo = routing_log_repo
-    
+
     async def route(self, task: Task) -> RoutingDecision:
         """
         执行三层路由决策
-        
+
         Args:
             task: 待路由的任务
-        
+
         Returns:
             RoutingDecision: 路由决策结果
-        
+
         Raises:
             ComplianceError: 当任务未通过合规性检查时
             RoutingError: 当路由决策失败时
@@ -4814,24 +4814,24 @@ class UDMRService:
         compliance_result = await self._compliance_gateway.check(task)
         if not compliance_result.allowed:
             raise ComplianceError(compliance_result.reason)
-        
+
         # L2: 复杂度评估
         candidate_models = await self._get_candidate_models(task)
         scored_models = await self._complexity_assessor.assess(task, candidate_models)
-        
+
         # L3: 路由决策
         decision = await self._router_executor.decide(scored_models)
-        
+
         # 记录路由日志
         await self._log_routing_decision(task, decision)
-        
+
         return decision
-    
+
     async def _get_candidate_models(self, task: Task) -> List[Model]:
         """获取候选模型列表"""
         # 实现细节
         pass
-    
+
     async def _log_routing_decision(self, task: Task, decision: RoutingDecision) -> None:
         """记录路由决策日志"""
         # 实现细节
@@ -5054,7 +5054,7 @@ class DomainEvent(BaseModel):
     payload: Dict[str, Any]  # 事件数据
     metadata: EventMetadata = Field(default_factory=EventMetadata)
     source: str  # 事件来源服务名： "sisys-planning-service"
-    
+
     class Config:
         frozen = True  # 事件不可变
 ```
@@ -5097,15 +5097,15 @@ class AgentState:
     current_task: Optional[str] = None
     isolation_level: str = "L4"
     blackboard: Dict[str, Any] = Field(default_factory=dict)
-    
+
     def with_status(self, new_status: str) -> 'AgentState':
         """返回新状态对象，不修改原对象"""
         return replace(self, status=new_status)
-    
+
     def with_task(self, task_id: str) -> 'AgentState':
         """分配新任务"""
         return replace(self, current_task=task_id, status="busy")
-    
+
     def release_task(self) -> 'AgentState':
         """释放任务"""
         return replace(self, current_task=None, status="idle")
@@ -5287,7 +5287,7 @@ from typing import Dict, Any
 
 class StructuredFormatter(logging.Formatter):
     """结构化日志格式器 - JSON 输出"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -5302,11 +5302,11 @@ class StructuredFormatter(logging.Formatter):
                 "line": record.lineno
             }
         }
-        
+
         # 添加额外字段
         if hasattr(record, "context"):
             log_entry["context"].update(record.context)
-        
+
         return json.dumps(log_entry, ensure_ascii=False)
 
 # 使用示例
@@ -5390,7 +5390,7 @@ from tenacity import RetryCallState, retry_if_result
 
 class RetryManager:
     """重试管理器 - 支持自定义重试逻辑"""
-    
+
     @staticmethod
     def with_custom_logic(
         max_attempts: int = 3,
@@ -5467,7 +5467,7 @@ class SearchPlansByKeywordQuery(BaseModel):
 ```python
 class CreateStrategicPlanCommandHandler:
     """创建战略规划命令处理器"""
-    
+
     def __init__(
         self,
         plan_repository: IStrategicPlanRepository,
@@ -5475,7 +5475,7 @@ class CreateStrategicPlanCommandHandler:
     ):
         self._plan_repository = plan_repository
         self._event_dispatcher = event_dispatcher
-    
+
     async def handle(self, command: CreateStrategicPlanCommand) -> UUID:
         """处理创建命令"""
         # 1. 创建实体
@@ -5485,10 +5485,10 @@ class CreateStrategicPlanCommandHandler:
             creator_id=command.creator_id,
             status=command.initial_status
         )
-        
+
         # 2. 保存到仓储
         await self._plan_repository.add(plan)
-        
+
         # 3. 发布领域事件
         await self._event_dispatcher.publish(
             PlanCreatedEvent(
@@ -5499,7 +5499,7 @@ class CreateStrategicPlanCommandHandler:
                 }
             )
         )
-        
+
         return plan.id
 ```
 
@@ -5507,7 +5507,7 @@ class CreateStrategicPlanCommandHandler:
 ```python
 class GetStrategicPlanByIdQueryHandler:
     """获取战略规划查询处理器"""
-    
+
     def __init__(
         self,
         plan_repository: IStrategicPlanRepository,
@@ -5515,25 +5515,25 @@ class GetStrategicPlanByIdQueryHandler:
     ):
         self._plan_repository = plan_repository
         self._cache = cache
-    
+
     async def handle(self, query: GetStrategicPlanByIdQuery) -> Optional[PlanDTO]:
         """处理查询"""
         # 1. 尝试缓存
         cached = await self._cache.get(f"plan:{query.plan_id}")
         if cached:
             return cached
-        
+
         # 2. 从仓储加载
         plan = await self._plan_repository.get_by_id(query.plan_id)
         if not plan:
             return None
-        
+
         # 3. 转换为 DTO
         dto = PlanDTO.from_entity(plan)
-        
+
         # 4. 写入缓存
         await self._cache.set(f"plan:{query.plan_id}", dto, ttl=3600)
-        
+
         return dto
 ```
 
@@ -5549,27 +5549,27 @@ T = TypeVar('T')
 
 class IStrategicPlanRepository(ABC):
     """战略规划仓储接口"""
-    
+
     @abstractmethod
     async def add(self, plan: StrategicPlan) -> None:
         """添加新规划"""
         pass
-    
+
     @abstractmethod
     async def get_by_id(self, plan_id: UUID) -> Optional[StrategicPlan]:
         """根据 ID 获取"""
         pass
-    
+
     @abstractmethod
     async def update(self, plan: StrategicPlan) -> None:
         """更新规划"""
         pass
-    
+
     @abstractmethod
     async def remove(self, plan_id: UUID) -> None:
         """删除规划"""
         pass
-    
+
     @abstractmethod
     async def find_by_criteria(
         self,
@@ -5587,10 +5587,10 @@ class IStrategicPlanRepository(ABC):
 ```python
 class StrategicPlanRepositoryImpl(IStrategicPlanRepository):
     """战略规划仓储实现 - PostgreSQL"""
-    
+
     def __init__(self, db: DatabaseConnection):
         self._db = db
-    
+
     async def add(self, plan: StrategicPlan) -> None:
         """添加新规划"""
         query = """
@@ -5604,7 +5604,7 @@ class StrategicPlanRepositoryImpl(IStrategicPlanRepository):
             "creator_id": plan.creator_id,
             "created_at": plan.created_at
         })
-    
+
     async def get_by_id(self, plan_id: UUID) -> Optional[StrategicPlan]:
         """根据 ID 获取"""
         query = """
@@ -5614,7 +5614,7 @@ class StrategicPlanRepositoryImpl(IStrategicPlanRepository):
         if not result:
             return None
         return self._map_to_entity(result)
-    
+
     async def find_by_criteria(
         self,
         status: Optional[PlanStatus] = None,
@@ -5626,26 +5626,26 @@ class StrategicPlanRepositoryImpl(IStrategicPlanRepository):
         """按条件查询"""
         query = "SELECT * FROM strategic_plans WHERE 1=1"
         params = {}
-        
+
         if status:
             query += " AND status = :status"
             params["status"] = status.value
-        
+
         if plan_type:
             query += " AND plan_type = :plan_type"
             params["plan_type"] = plan_type.value
-        
+
         if created_after:
             query += " AND created_at >= :created_after"
             params["created_after"] = created_after
-        
+
         query += " LIMIT :limit OFFSET :offset"
         params["limit"] = per_page
         params["offset"] = (page - 1) * per_page
-        
+
         results = await self._db.fetch_all(query, params)
         return [self._map_to_entity(r) for r in results]
-    
+
     def _map_to_entity(self, row) -> StrategicPlan:
         """数据库行映射到实体"""
         return StrategicPlan(
@@ -5670,13 +5670,13 @@ class StrategicPlanRepositoryImpl(IStrategicPlanRepository):
 class PlanningService:
     """
     战略规划领域服务
-    
+
     Responsibilities:
         - 协调多个实体完成复杂业务逻辑
         - 不持有状态，每次调用都是独立的
         - 依赖仓储接口和外部服务接口
     """
-    
+
     def __init__(
         self,
         plan_repository: IStrategicPlanRepository,
@@ -5686,7 +5686,7 @@ class PlanningService:
         self._plan_repository = plan_repository
         self._checkpoint_repository = checkpoint_repository
         self._event_dispatcher = event_dispatcher
-    
+
     async def execute_blm_stage(
         self,
         plan_id: UUID,
@@ -5695,7 +5695,7 @@ class PlanningService:
     ) -> BLMOutput:
         """
         执行 BLM 阶段
-        
+
         涉及多个实体：StrategicPlan, Checkpoint, Agent
         需要协调多个步骤
         """
@@ -5703,13 +5703,13 @@ class PlanningService:
         plan = await self._plan_repository.get_by_id(plan_id)
         if not plan:
             raise NotFoundError("StrategicPlan", str(plan_id))
-        
+
         # 2. 验证阶段转换
         plan.validate_stage_transition(stage)
-        
+
         # 3. 执行阶段逻辑
         output = await self._execute_stage_logic(plan, stage, input_data)
-        
+
         # 4. 创建检查点
         checkpoint = Checkpoint(
             stage=stage,
@@ -5717,11 +5717,11 @@ class PlanningService:
             status="completed"
         )
         plan.add_checkpoint(checkpoint)
-        
+
         # 5. 保存
         await self._plan_repository.update(plan)
         await self._checkpoint_repository.add(checkpoint)
-        
+
         # 6. 发布事件
         await self._event_dispatcher.publish(
             PlanStageCompletedEvent(
@@ -5729,7 +5729,7 @@ class PlanningService:
                 payload={"stage": stage.value, "output": output}
             )
         )
-        
+
         return output
 ```
 
@@ -5739,7 +5739,7 @@ class PlanningService:
 ```python
 class StrategicPlanFactory:
     """战略规划工厂 - 复杂对象创建"""
-    
+
     def __init__(
         self,
         default_checkpoints: List[Checkpoint],
@@ -5747,7 +5747,7 @@ class StrategicPlanFactory:
     ):
         self._default_checkpoints = default_checkpoints
         self._default_tools = default_tools
-    
+
     def create(
         self,
         plan_type: PlanType,
@@ -5760,7 +5760,7 @@ class StrategicPlanFactory:
             creator_id=creator_id,
             status=PlanStatus.DRAFT
         )
-    
+
     def create_with_defaults(
         self,
         plan_type: PlanType,
@@ -5768,13 +5768,13 @@ class StrategicPlanFactory:
     ) -> StrategicPlan:
         """创建带默认检查点的战略规划"""
         plan = self.create(plan_type, creator_id)
-        
+
         # 添加默认检查点
         for checkpoint_template in self._default_checkpoints:
             plan.add_checkpoint(checkpoint_template.clone())
-        
+
         return plan
-    
+
     def create_from_dto(
         self,
         dto: CreatePlanDTO
@@ -5786,12 +5786,12 @@ class StrategicPlanFactory:
             creator_id=dto.creator_id,
             status=dto.initial_status or PlanStatus.DRAFT
         )
-        
+
         # 添加工具
         for tool_dto in dto.tools:
             tool = Tool.from_dto(tool_dto)
             plan.add_tool(tool)
-        
+
         return plan
 ```
 
@@ -5807,29 +5807,29 @@ class StrategicPlanFactory:
 
 class TestStrategicPlan:
     """战略规划单元测试"""
-    
+
     def test_create_plan_with_invalid_status_raises_validation_error(self):
         """创建规划时状态无效应抛出验证异常"""
         with pytest.raises(ValidationError):
             StrategicPlan(id=uuid4(), plan_type=PlanType.SP, status="invalid")
-    
+
     def test_update_agent_when_not_found_raises_not_found_error(self):
         """更新不存在的 Agent 应抛出未找到异常"""
         with pytest.raises(NotFoundError):
             await agent_service.update_agent(non_existent_id, {...})
-    
+
     def test_recover_checkpoint_with_replay_mode_ensures_strong_consistency(self):
         """Replay 模式恢复检查点应保证强一致性"""
         # Arrange
         checkpoint = create_test_checkpoint()
-        
+
         # Act
         result = await recovery_service.recover(
             checkpoint.id,
             modifications=[],
             mode="Replay"
         )
-        
+
         # Assert
         assert result.consistency_guarantee == "strong"
 ```
@@ -5840,15 +5840,15 @@ class TestStrategicPlan:
 
 class TestStrategicPlanningWorkflow:
     """战略规划工作流集成测试"""
-    
+
     async def test_strategic_planning_workflow_create_to_approval(self):
         """战略规划工作流：从创建到批准的完整流程"""
         # 测试完整工作流
-    
+
     async def test_agent_collaboration_with_eip_isolation(self):
         """Agent 协作：EIP 隔离协议测试"""
         # 测试隔离协议
-    
+
     async def test_udmr_routing_with_local_priority(self):
         """UDMR 路由：本地优先策略测试"""
         # 测试路由决策
@@ -5904,30 +5904,30 @@ def app_client():
 ```python
 class StrategicPlanBuilder:
     """战略规划测试数据构建器"""
-    
+
     def __init__(self):
         self._id = uuid4()
         self._plan_type = PlanType.SP
         self._status = PlanStatus.DRAFT
         self._creator_id = "agent_ceo"
         self._checkpoints = []
-    
+
     def with_id(self, id: UUID) -> 'StrategicPlanBuilder':
         self._id = id
         return self
-    
+
     def with_status(self, status: PlanStatus) -> 'StrategicPlanBuilder':
         self._status = status
         return self
-    
+
     def with_creator(self, creator_id: str) -> 'StrategicPlanBuilder':
         self._creator_id = creator_id
         return self
-    
+
     def with_checkpoint(self, checkpoint: Checkpoint) -> 'StrategicPlanBuilder':
         self._checkpoints.append(checkpoint)
         return self
-    
+
     def build(self) -> StrategicPlan:
         """构建战略规划实体"""
         plan = StrategicPlan(
@@ -5947,7 +5947,7 @@ def test_plan_with_multiple_checkpoints():
             .with_checkpoint(create_market_insight_checkpoint())
             .with_checkpoint(create_business_design_checkpoint())
             .build())
-    
+
     assert len(plan.checkpoints) == 2
 ```
 
@@ -5964,10 +5964,10 @@ def test_service_with_mock(mock_llm_router, mock_event_bus):
         "selected_model": "ollama/qwen2.5-7b",
         "estimated_cost": 0.001
     }
-    
+
     # Act
     result = await udmr_service.route(test_task)
-    
+
     # Assert
     mock_llm_router.route.assert_called_once()
     assert result.selected_model == "ollama/qwen2.5-7b"
@@ -5983,14 +5983,14 @@ async def test_service_with_pytest_mock(mocker):
     # Mock 仓储
     mock_repo = mocker.patch("src.infrastructure.persistence.PlanRepository")
     mock_repo.get_by_id = AsyncMock(return_value=test_plan)
-    
+
     # Mock 事件分发器
     mock_event_dispatcher = mocker.patch("src.application.services.EventDispatcher")
     mock_event_dispatcher.publish = AsyncMock()
-    
+
     # 测试
     result = await service.get_plan(test_id)
-    
+
     # 验证
     mock_repo.get_by_id.assert_called_once_with(test_id)
 ```
@@ -6031,23 +6031,23 @@ from src.infrastructure.repositories.plan_repository import StrategicPlanReposit
 
 class Container(containers.DeclarativeContainer):
     """依赖注入容器"""
-    
+
     # 配置
     config = providers.Configuration()
-    
+
     # 单例
     database = providers.Singleton(
         Database,
         url=config.database.url,
         pool_size=config.database.pool_size
     )
-    
+
     # 工厂
     plan_repository = providers.Factory(
         StrategicPlanRepositoryImpl,
         db=database
     )
-    
+
     # 每个请求
     plan_service = providers.Callable(
         PlanningService,
@@ -6075,34 +6075,34 @@ from typing import List, Optional
 
 class Settings(BaseSettings):
     """应用配置"""
-    
+
     # 基础配置
     app_name: str = "sisys"
     debug: bool = False
     environment: str = "development"
-    
+
     # 数据库
     database_url: str
     database_pool_size: int = 10
-    
+
     # LLM 配置
     llm_api_key: SecretStr
     llm_base_url: str = "https://api.openai.com/v1"
     local_llm_url: str = "http://localhost:11434"
-    
+
     # 消息队列
     rabbitmq_url: str
     redis_url: str
-    
+
     # 安全
     secret_key: SecretStr
     jwt_algorithm: str = "HS256"
-    
+
     # UDMR 配置
     cloud_advantage_threshold: float = 0.15
     local_quality_threshold: float = 0.70
     allowed_models: List[str] = ["qwen", "claude", "gpt-4"]
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -6120,7 +6120,7 @@ settings = Settings()
 """create strategic_plans table
 
 Revision ID: 001
-Revises: 
+Revises:
 Create Date: 2026-02-25 10:00:00.000000
 
 """
@@ -6149,7 +6149,7 @@ def upgrade():
         sa.CheckConstraint("plan_type IN ('SP', 'BP')", name='chk_plans_plan_type'),
         sa.CheckConstraint("status IN ('draft', 'in_progress', 'approved', 'archived')", name='chk_plans_status')
     )
-    
+
     op.create_index('idx_plans_created_at', 'strategic_plans', ['created_at'])
     op.create_index('idx_plans_status', 'strategic_plans', ['status'])
 
@@ -6207,27 +6207,27 @@ async def process_document(file_path: str) -> Dict[str, Any]:
     # 异步文件读取
     async with aiofiles.open(file_path, 'r') as f:
         content = await f.read()
-    
+
     # 异步数据库操作
     document = await db.insert_document(content)
-    
+
     # 异步外部 API 调用
     result = await llm_client.analyze(content)
-    
+
     return result
 
 # ❌ 避免阻塞操作
 async def bad_example():
     import time
     time.sleep(1)  # ❌ 阻塞整个事件循环
-    
+
     with open('file.txt', 'r') as f:  # ❌ 同步文件 IO
         content = f.read()
 
 # ✅ 正确做法
 async def good_example():
     await asyncio.sleep(1)  # ✅ 非阻塞等待
-    
+
     async with aiofiles.open('file.txt', 'r') as f:  # ✅ 异步文件 IO
         content = await f.read()
 ```
@@ -6263,10 +6263,10 @@ def process_documents(
 # 泛型类
 class Repository(Generic[T]):
     """泛型仓储"""
-    
+
     async def get_by_id(self, id: UUID) -> Optional[T]:
         pass
-    
+
     async def find_all(self, limit: int = 100) -> List[T]:
         pass
 
@@ -6295,34 +6295,34 @@ def create_strategic_plan(
 ) -> StrategicPlan:
     """
     创建新的战略规划。
-    
+
     基于 BLM 六阶段模型创建战略规划，支持 SP(战略规划) 和 BP(业务计划) 两种类型。
     创建的规划初始状态为 DRAFT，需要经过批准流程才能生效。
-    
+
     Args:
         plan_type: 规划类型，SP(战略规划) 或 BP(业务计划)
         status: 初始状态，默认为 DRAFT
         creator_id: 创建者 ID，通常是 Agent 角色标识
-    
+
     Returns:
         创建的 StrategicPlan 实例
-    
+
     Raises:
         ValidationError: 当 plan_type 无效或 status 不合法时
         AuthorizationError: 当创建者无权限创建规划时
-    
+
     Example:
         >>> plan = create_strategic_plan(PlanType.SP, creator_id="agent_ceo")
         >>> plan.status
         <PlanStatus.DRAFT: 'draft'>
         >>> plan.blm_stage
         <BLMStage.GAP_ANALYSIS: 'gap_analysis'>
-    
+
     Note:
         - 创建的规划会自动添加 BLM 六阶段的默认检查点
         - 创建者会被自动赋予规划的编辑权限
         - 规划 ID 使用 UUID v4 生成
-    
+
     See Also:
         - update_strategic_plan: 更新现有规划
         - approve_strategic_plan: 批准规划
@@ -7458,6 +7458,97 @@ make run-server
 
 ---
 
+
+---
+
+### 25.2 SDD（Specification-Driven Development）开发模式
+
+**目标：** 定义规范驱动开发（SDD）流程，确保代码与 PRD/架构规范保持一致，支持 Qwen Code Agent 高效协作
+
+#### 25.2.1 核心流程
+
+**SDD 三阶段流程：**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SDD 开发循环                                  │
+│                                                                 │
+│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐    │
+│  │  1. 规范定义 │ ───▶ │  2. 代码生成 │ ───▶ │  3. 规范验证 │    │
+│  │  (Spec)     │      │  (Generate) │      │  (Validate) │    │
+│  └─────────────┘      └─────────────┘      └─────────────┘    │
+│         ▲                                        │            │
+│         │────────────────────────────────────────┘            │
+│                      迭代修正                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 25.2.2 阶段 1：规范定义
+
+**所有功能开发前必须先定义以下规范：**
+
+| 规范类型 | 定义内容 | 工具/格式 | 负责人 | 验收标准 |
+|---------|---------|----------|--------|---------|
+| **领域事件 Schema** | 事件名称、字段、类型、业务含义 | Pydantic v2 模型 | 领域工程师 | Schema 评审通过 |
+| **API 契约** | 端点、请求/响应 Schema、错误码 | OpenAPI 3.1 | 后端工程师 | OpenAPI 验证通过 |
+| **测试用例** | Given-When-Then 格式验收标准 | pytest-bdd/Gherkin | 测试工程师 | 业务方确认 |
+| **数据模型** | 数据库表结构、索引、约束 | SQLAlchemy DDL | 数据库工程师 | DDL 评审通过 |
+
+#### 25.2.3 阶段 2：代码生成
+
+**使用 Qwen Code Agent 从规范生成代码：**
+
+| 规范类型 | 生成代码 | Agent 角色 | Prompt 模板 |
+|---------|---------|-----------|------------|
+| **领域事件 Schema** | Pydantic 模型、事件处理器 | domain_agent_lead | "基于以下事件 Schema 生成领域事件类：{schema}" |
+| **API 契约** | FastAPI 路由、请求/响应模型 | infrastructure_agent_api | "基于 OpenAPI 规范生成 API 端点：{openapi_path}" |
+| **测试用例** | pytest 测试代码 | test_agent_unit | "基于 Gherkin 测试用例生成 pytest 测试：{feature_file}" |
+| **数据模型** | SQLAlchemy 模型、Alembic 迁移 | infrastructure_agent_db | "基于数据模型生成 ORM 和迁移脚本：{model_schema}" |
+
+#### 25.2.4 阶段 3：规范验证
+
+**所有生成的代码必须通过以下验证：**
+
+| 验证类型 | 工具 | 验证内容 | 阻断级别 |
+|---------|------|---------|---------|
+| **Schema 验证** | pydantic validate | 领域事件符合 Pydantic 模型 | P0 阻断 |
+| **契约测试** | Schemathesis | API 端点符合 OpenAPI 规范 | P0 阻断 |
+| **验收测试** | pytest-bdd | 功能符合 Gherkin 测试用例 | P0 阻断 |
+| **类型检查** | mypy | 类型注解正确 | P1 阻断 |
+| **代码质量** | ruff | 符合代码规范 | P1 阻断 |
+
+#### 25.2.5 SDD 工具链配置
+
+**必需工具（requirements/dev.txt）：**
+```txt
+# SDD 工具链
+pydantic>=2.5.0          # Schema 验证
+schemathesis>=3.19.0     # API 契约测试
+pytest-bdd>=7.0.0        # Gherkin 验收测试
+openapi-spec-validator>=0.5.0  # OpenAPI 验证
+jsonschema>=4.19.0       # JSON Schema 验证
+```
+
+#### 25.2.6 SDD 实施检查清单
+
+**每个 Story 开发前检查：**
+- [ ] 领域事件 Schema 已定义并评审通过
+- [ ] API 契约（OpenAPI）已定义并验证通过
+- [ ] 测试用例（Gherkin）已编写并业务方确认
+- [ ] 数据模型（SQLAlchemy）已定义并评审通过
+- [ ] Qwen Code Agent 已激活并理解规范
+- [ ] 生成的代码通过所有验证（Schema/契约/验收测试）
+
+**每个 Story 开发后检查：**
+- [ ] Schema 验证通过（pydantic validate）
+- [ ] 契约测试通过（Schemathesis）
+- [ ] 验收测试通过（pytest-bdd）
+- [ ] 类型检查通过（mypy）
+- [ ] 代码质量检查通过（ruff）
+- [ ] 测试覆盖率达标（≥80%）
+
+---
+
 ## 26. 附录F 工作流监控与运维
 
 ### 26.1 工作流监控指标
@@ -7578,7 +7669,7 @@ from typing import Any, Dict
 
 class WorkflowTemplate(ABC):
     """工作流模板基类"""
-    
+
     def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """模板方法 - 定义工作流骨架"""
         self.validate_input(input_data)
@@ -7588,26 +7679,26 @@ class WorkflowTemplate(ABC):
         self.after_execute(context, results)
         self.create_checkpoint(context, results)
         return self.format_output(results)
-    
+
     @abstractmethod
     def validate_input(self, input_data: Dict[str, Any]) -> None:
         """验证输入（子类实现）"""
         pass
-    
+
     @abstractmethod
     def prepare_context(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """准备上下文（子类实现）"""
         pass
-    
+
     @abstractmethod
     def execute_steps(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """执行核心步骤（子类实现）"""
         pass
-    
+
     def before_execute(self, context: Dict[str, Any]) -> None:
         """前置钩子（可选覆盖）"""
         pass
-    
+
     def after_execute(self, context: Dict[str, Any], results: Dict[str, Any]) -> None:
         """后置钩子（可选覆盖）"""
         pass
@@ -7635,7 +7726,7 @@ class WorkflowTemplate(ABC):
 ```python
 class Tenant(BaseModel):
     """租户实体定义"""
-    
+
     id: UUID                          # 租户唯一标识
     name: str                         # 租户名称
     slug: str                         # 租户短标识（用于域名/路径）
@@ -7725,7 +7816,7 @@ class Tenant(BaseModel):
 ```python
 class TenantResolver:
     """租户解析器 - 多源识别"""
-    
+
     def __init__(self):
         self.resolvers: List[TenantResolverStrategy] = [
             JWTTokenResolver(),      # 优先级 1
@@ -7734,7 +7825,7 @@ class TenantResolver:
             PathPrefixResolver(),    # 优先级 4
             APIKeyResolver(),        # 优先级 5
         ]
-    
+
     async def resolve(self, request: Request) -> TenantContext:
         """按优先级解析租户"""
         for resolver in self.resolvers:
@@ -7752,14 +7843,14 @@ class TenantResolver:
                         resolved_at=datetime.utcnow(),
                         resolver_type=type(resolver).__name__
                     )
-        
+
         raise TenantNotFoundError("无法从请求中识别租户")
-    
+
     async def validate_tenant(self, tenant: Tenant) -> None:
         """验证租户状态"""
         if tenant.status != TenantStatus.ACTIVE:
             raise TenantInactiveError(f"租户 {tenant.id} 未激活")
-        
+
         if tenant.expires_at and tenant.expires_at < datetime.utcnow():
             raise TenantExpiredError(f"租户 {tenant.id} 已过期")
 ```
@@ -7806,47 +7897,47 @@ class TenantResolver:
 ```python
 class JWTTokenResolver(TenantResolverStrategy):
     """JWT Token 租户解析器"""
-    
+
     async def resolve(self, request: Request) -> Optional[Tenant]:
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return None
-        
+
         token = auth_header[7:]
         try:
             # 验证 JWT 并提取 claims
             claims = await self.jwt_verifier.verify(token)
             tenant_id = claims.get("tenant_id")
-            
+
             if not tenant_id:
                 return None
-            
+
             # 从缓存或数据库获取租户信息
             return await self.tenant_cache.get(tenant_id)
-            
+
         except JWTValidationError:
             return None
 
 
 class SubdomainResolver(TenantResolverStrategy):
     """子域名租户解析器"""
-    
+
     async def resolve(self, request: Request) -> Optional[Tenant]:
         host = request.headers.get("Host", "")
         parts = host.split(".")
-        
+
         # 提取子域名：tenant.example.com → tenant
         if len(parts) >= 3:
             subdomain = parts[0]
             if subdomain != "www" and subdomain != "api":
                 return await self.tenant_repo.get_by_slug(subdomain)
-        
+
         return None
 
 
 class HeaderResolver(TenantResolverStrategy):
     """请求头租户解析器"""
-    
+
     async def resolve(self, request: Request) -> Optional[Tenant]:
         tenant_id = request.headers.get("X-Tenant-ID")
         if tenant_id:
@@ -7868,44 +7959,44 @@ class HeaderResolver(TenantResolverStrategy):
 ```python
 class TenantRedisCache:
     """租户 Redis 缓存 - 键名前缀隔离"""
-    
+
     def __init__(self, redis_client: Redis, tenant_context: TenantContext):
         self.redis = redis_client
         self.tenant = tenant_context
         # 租户键名前缀：tenant:{id}:
         self.key_prefix = f"tenant:{tenant_context.tenant_id}:"
-    
+
     def _make_key(self, key: str) -> str:
         """生成租户隔离的键名"""
         return f"{self.key_prefix}{key}"
-    
+
     async def get(self, key: str) -> Optional[Any]:
         """获取缓存值"""
         full_key = self._make_key(key)
         data = await self.redis.get(full_key)
         return self._deserialize(data) if data else None
-    
+
     async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """设置缓存值"""
         full_key = self._make_key(key)
         serialized = self._serialize(value)
-        
+
         if ttl:
             await self.redis.setex(full_key, ttl, serialized)
         else:
             await self.redis.set(full_key, serialized)
-    
+
     async def delete(self, key: str) -> None:
         """删除缓存"""
         full_key = self._make_key(key)
         await self.redis.delete(full_key)
-    
+
     async def clear_all(self) -> None:
         """清空租户所有缓存"""
         pattern = self._make_key("*")
         async for key in self.redis.scan_iter(pattern):
             await self.redis.delete(key)
-    
+
     # 语义缓存专用方法
     async def semantic_search(
         self,
@@ -7920,14 +8011,14 @@ class TenantRedisCache:
             query_params={"vec": np.array(query_embedding, dtype=np.float32).tobytes()},
             return_fields=["score", "value", "created_at"]
         )
-        
+
         if results.docs and float(results.docs[0].score) >= threshold:
             return SemanticCacheResult(
                 value=results.docs[0].value,
                 similarity=1 - float(results.docs[0].score),
                 hit=True
             )
-        
+
         return None
 ```
 
@@ -7953,24 +8044,24 @@ DECLARE
 BEGIN
     -- 生成 Schema 名称
     schema_name := 'tenant_' || replace(tenant_uuid::text, '-', '_');
-    
+
     -- 创建 Schema
     EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', schema_name);
-    
+
     -- 设置 Schema 权限
     EXECUTE format('GRANT ALL ON SCHEMA %I TO app_user', schema_name);
-    
+
     -- 创建租户专属表（复制公共表结构）
     EXECUTE format('CREATE TABLE %I.documents (LIKE public.documents INCLUDING ALL)', schema_name);
     EXECUTE format('CREATE TABLE %I.agents (LIKE public.agents INCLUDING ALL)', schema_name);
     EXECUTE format('CREATE TABLE %I.strategic_plans (LIKE public.strategic_plans INCLUDING ALL)', schema_name);
     EXECUTE format('CREATE TABLE %I.routing_decision_log (LIKE public.routing_decision_log INCLUDING ALL)', schema_name);
     EXECUTE format('CREATE TABLE %I.isolation_switch_log (LIKE public.isolation_switch_log INCLUDING ALL)', schema_name);
-    
+
     -- 创建租户专属索引
     EXECUTE format('CREATE INDEX idx_%I_documents_created ON %I.documents(created_at)', schema_name, schema_name);
     EXECUTE format('CREATE INDEX idx_%I_plans_status ON %I.strategic_plans(status)', schema_name, schema_name);
-    
+
     -- 记录 Schema 创建日志
     INSERT INTO public.tenant_schemas (tenant_id, schema_name, created_at)
     VALUES (tenant_uuid, schema_name, NOW());
@@ -7982,7 +8073,7 @@ $$ LANGUAGE plpgsql;
 ```python
 class TenantAwareRepository:
     """租户感知仓储基类"""
-    
+
     def __init__(
         self,
         db_session: AsyncSession,
@@ -7991,7 +8082,7 @@ class TenantAwareRepository:
         self.db = db_session
         self.tenant = tenant_context
         self.schema_prefix = f"tenant_{tenant_context.tenant_id.hex}"
-    
+
     async def _get_schema(self) -> str:
         """获取当前租户 Schema"""
         # Professional/Enterprise: Schema per Tenant
@@ -7999,7 +8090,7 @@ class TenantAwareRepository:
             return self.schema_prefix
         # Basic: 共享 Schema + Row-Level 过滤
         return "public"
-    
+
     async def _apply_tenant_filter(self, query: Select) -> Select:
         """应用租户过滤"""
         schema = await self._get_schema()
@@ -8027,14 +8118,14 @@ class TenantAwareRepository:
             # 使用连接级设置，执行后自动恢复
             await self.db.execute(text(f"SET LOCAL search_path TO {schema}"))
         return await self.db.execute(query)
-    
+
     async def get_document(self, document_id: UUID) -> Optional[Document]:
         """获取文档 - 自动租户过滤"""
         query = select(Document).where(Document.id == document_id)
         query = await self._apply_tenant_filter(query)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def find_documents(self, limit: int = 100) -> List[Document]:
         """查找文档 - 自动租户过滤"""
         query = select(Document).limit(limit)
@@ -8047,33 +8138,33 @@ class TenantAwareRepository:
 ```python
 class TenantDatabaseConnection:
     """租户数据库连接管理"""
-    
+
     async def get_connection(self, tenant: TenantContext) -> AsyncSession:
         """获取租户数据库连接"""
-        
+
         if tenant.tier == TenantTier.ENTERPRISE:
             # Enterprise: 独立数据库
             db_url = f"postgresql://{tenant.id}/sisys"
         else:
             # Professional/Basic: 共享数据库
             db_url = settings.database_url
-        
+
         # 创建引擎
         engine = create_async_engine(
             db_url,
             pool_size=20,
             max_overflow=40
         )
-        
+
         # 创建会话
         async_session = sessionmaker(engine, class_=AsyncSession)
         session = async_session()
-        
+
         # 设置 Schema
         if tenant.tier in [TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE]:
             schema_name = f"tenant_{tenant.tenant_id.hex}"
             await session.execute(text(f"SET search_path TO {schema_name}"))
-        
+
         return session
 ```
 
@@ -8084,27 +8175,27 @@ class TenantDatabaseConnection:
 ```python
 class TenantQdrantClient:
     """租户 Qdrant 客户端 - Collection 隔离"""
-    
+
     def __init__(self, qdrant_client: AsyncQdrantClient, tenant_context: TenantContext):
         self.client = qdrant_client
         self.tenant = tenant_context
         # 租户 Collection 前缀
         self.collection_prefix = f"tenant_{tenant_context.tenant_id.hex}"
-    
+
     def _get_collection_name(self, collection_type: str) -> str:
         """获取租户 Collection 名称"""
         return f"{self.collection_prefix}_{collection_type}"
-    
+
     async def initialize(self) -> None:
         """初始化租户 Collection"""
         collections = ["documents", "agents", "tools", "plans"]
-        
+
         for coll_type in collections:
             coll_name = self._get_collection_name(coll_type)
-            
+
             # 检查 Collection 是否存在
             exists = await self.client.collection_exists(coll_name)
-            
+
             if not exists:
                 # 创建租户 Collection
                 await self.client.create_collection(
@@ -8123,20 +8214,20 @@ class TenantQdrantClient:
                         "created_at": datetime.utcnow().isoformat()
                     }
                 )
-                
+
                 # 创建 Payload 索引
                 await self.client.create_payload_index(
                     collection_name=coll_name,
                     field_name="tenant_id",
                     field_schema=PayloadSchemaType.KEYWORD
                 )
-                
+
                 await self.client.create_payload_index(
                     collection_name=coll_name,
                     field_name="created_at",
                     field_schema=PayloadSchemaType.INTEGER
                 )
-    
+
     async def search(
         self,
         collection_type: str,
@@ -8146,7 +8237,7 @@ class TenantQdrantClient:
     ) -> List[ScoredPoint]:
         """向量搜索 - 租户隔离"""
         coll_name = self._get_collection_name(collection_type)
-        
+
         # 构建过滤条件（双重保障）
         must_conditions = [
             FieldCondition(
@@ -8154,7 +8245,7 @@ class TenantQdrantClient:
                 match=MatchValue(value=str(self.tenant.tenant_id))
             )
         ]
-        
+
         if filter_payload:
             for key, value in filter_payload.items():
                 must_conditions.append(
@@ -8163,16 +8254,16 @@ class TenantQdrantClient:
                         match=MatchValue(value=value)
                     )
                 )
-        
+
         results = await self.client.search(
             collection_name=coll_name,
             query_vector=query_vector,
             query_filter=Filter(must=must_conditions),
             limit=limit
         )
-        
+
         return results
-    
+
     async def upsert(
         self,
         collection_type: str,
@@ -8180,21 +8271,21 @@ class TenantQdrantClient:
     ) -> None:
         """插入向量 - 自动注入租户 ID"""
         coll_name = self._get_collection_name(collection_type)
-        
+
         # 为每个点注入租户 ID
         for point in points:
             point.payload["tenant_id"] = str(self.tenant.tenant_id)
             point.payload["tenant_slug"] = self.tenant.tenant_slug
-        
+
         await self.client.upsert(
             collection_name=coll_name,
             points=points
         )
-    
+
     async def delete_collection(self) -> None:
         """删除租户所有 Collection"""
         collections = ["documents", "agents", "tools", "plans"]
-        
+
         for coll_type in collections:
             coll_name = self._get_collection_name(coll_type)
             await self.client.delete_collection(coll_name)
@@ -8207,18 +8298,18 @@ class TenantQdrantClient:
 ```python
 class TenantMinIOClient:
     """租户 MinIO 客户端 - Bucket 隔离"""
-    
+
     def __init__(self, minio_client: Minio, tenant_context: TenantContext):
         self.client = minio_client
         self.tenant = tenant_context
         # 租户 Bucket 名称
         self.bucket_name = f"tenant-{tenant_context.tenant_id.hex}"
-    
+
     async def initialize(self) -> None:
         """初始化租户 Bucket"""
         # 检查 Bucket 是否存在
         exists = await self.client.bucket_exists(self.bucket_name)
-        
+
         if not exists:
             # 创建租户 Bucket
             await self.client.make_bucket(
@@ -8226,7 +8317,7 @@ class TenantMinIOClient:
                 # 启用对象锁定（WORM）
                 object_lock=True
             )
-            
+
             # 设置 Bucket 策略（租户隔离）
             policy = {
                 "Version": "2012-10-17",
@@ -8247,12 +8338,12 @@ class TenantMinIOClient:
                     }
                 ]
             }
-            
+
             await self.client.set_bucket_policy(self.bucket_name, json.dumps(policy))
-            
+
             # 启用版本控制
             await self.client.enable_versioning(self.bucket_name)
-            
+
             # 设置对象锁定默认保留规则（7 年）
             await self.client.set_object_lock_config(
                 self.bucket_name,
@@ -8266,7 +8357,7 @@ class TenantMinIOClient:
                     )
                 )
             )
-    
+
     async def upload_document(
         self,
         object_name: str,
@@ -8278,7 +8369,7 @@ class TenantMinIOClient:
         # 生成对象路径：tenant_id/year/month/day/object_name
         today = datetime.utcnow()
         object_path = f"{self.tenant.tenant_id}/{today.year}/{today.month:02d}/{today.day:02d}/{object_name}"
-        
+
         # 上传文件
         await self.client.fput_object(
             bucket_name=self.bucket_name,
@@ -8286,7 +8377,7 @@ class TenantMinIOClient:
             file_path=file_path,
             content_type=content_type
         )
-        
+
         # 设置对象锁定（WORM）
         await self.client.put_object_retention(
             bucket_name=self.bucket_name,
@@ -8296,9 +8387,9 @@ class TenantMinIOClient:
                 retain_until_date=datetime.utcnow() + timedelta(days=retention_days)
             )
         )
-        
+
         return object_path
-    
+
     async def get_document(self, object_path: str) -> bytes:
         """获取文档"""
         response = await self.client.get_object(
@@ -8306,17 +8397,17 @@ class TenantMinIOClient:
             object_name=object_path
         )
         return await response.read()
-    
+
     async def delete_bucket(self) -> None:
         """删除租户 Bucket（仅限未启用 WORM 的对象）"""
         # 列出所有对象
         objects = await self.client.list_objects(self.bucket_name, recursive=True)
-        
+
         # 删除非 WORM 对象
         async for obj in objects:
             if obj.retention_mode is None:
                 await self.client.remove_object(self.bucket_name, obj.object_name)
-        
+
         # 删除 Bucket
         await self.client.remove_bucket(self.bucket_name)
 ```
@@ -8336,17 +8427,17 @@ class TenantMinIOClient:
 ```python
 class TenantNeo4jClient:
     """租户 Neo4j 客户端 - Label 隔离"""
-    
+
     def __init__(self, neo4j_driver: AsyncDriver, tenant_context: TenantContext):
         self.driver = neo4j_driver
         self.tenant = tenant_context
-    
+
     async def create_entity(self, entity_type: str, properties: Dict[str, Any]) -> Node:
         """创建实体 - 自动注入租户 Label"""
         async with self.driver.session() as session:
             # 租户专属 Label
             tenant_label = f"Tenant_{self.tenant.tenant_id.hex}"
-            
+
             # Cypher 查询：创建带租户 Label 的节点
             query = f"""
             CREATE (n:`{entity_type}`:`{tenant_label}` $properties)
@@ -8355,17 +8446,17 @@ class TenantNeo4jClient:
                 n.tenant_slug = $tenant_slug
             RETURN n
             """
-            
+
             result = await session.run(
                 query,
                 properties=properties,
                 tenant_id=str(self.tenant.tenant_id),
                 tenant_slug=self.tenant.tenant_slug
             )
-            
+
             record = await result.single()
             return record["n"] if record else None
-    
+
     async def find_entities(
         self,
         entity_type: str,
@@ -8375,30 +8466,30 @@ class TenantNeo4jClient:
         """查找实体 - 自动租户过滤"""
         async with self.driver.session() as session:
             tenant_label = f"Tenant_{self.tenant.tenant_id.hex}"
-            
+
             # 构建过滤条件
             where_clauses = []
             params = {"tenant_id": str(self.tenant.tenant_id), "limit": limit}
-            
+
             if filters:
                 for key, value in filters.items():
                     where_clauses.append(f"n.{key} = ${key}")
                     params[key] = value
-            
+
             where_clause = " AND ".join(where_clauses)
             if where_clause:
                 where_clause = f"AND {where_clause}"
-            
+
             query = f"""
             MATCH (n:`{entity_type}`:`{tenant_label}`)
             WHERE n.tenant_id = $tenant_id {where_clause}
             RETURN n
             LIMIT $limit
             """
-            
+
             result = await session.run(query, **params)
             return [record["n"] async for record in result]
-    
+
     async def create_relationship(
         self,
         start_node_id: str,
@@ -8409,7 +8500,7 @@ class TenantNeo4jClient:
         """创建关系 - 租户内关系"""
         async with self.driver.session() as session:
             tenant_label = f"Tenant_{self.tenant.tenant_id.hex}"
-            
+
             query = f"""
             MATCH (a:`{tenant_label}` {{id: $start_id}})
             MATCH (b:`{tenant_label}` {{id: $end_id}})
@@ -8418,7 +8509,7 @@ class TenantNeo4jClient:
                 r.tenant_id = $tenant_id
             RETURN r
             """
-            
+
             result = await session.run(
                 query,
                 start_id=start_node_id,
@@ -8426,10 +8517,10 @@ class TenantNeo4jClient:
                 properties=properties or {},
                 tenant_id=str(self.tenant.tenant_id)
             )
-            
+
             record = await result.single()
             return record["r"] if record else None
-    
+
     async def traverse_graph(
         self,
         start_node_id: str,
@@ -8439,7 +8530,7 @@ class TenantNeo4jClient:
         """图遍历 - 租户内遍历"""
         async with self.driver.session() as session:
             tenant_label = f"Tenant_{self.tenant.tenant_id.hex}"
-            
+
             # 关系类型过滤
             rel_filter = ""
             if rel_types:
@@ -8447,34 +8538,34 @@ class TenantNeo4jClient:
                 rel_filter = f"-[:{rel_types_str}*..{max_depth}]-"
             else:
                 rel_filter = f"-[*..{max_depth}]-"
-            
+
             query = f"""
             MATCH path = (start:`{tenant_label}` {{id: $start_id}}){rel_filter}(end:`{tenant_label}`)
             WHERE start.tenant_id = $tenant_id AND end.tenant_id = $tenant_id
             RETURN path
             LIMIT 1000
             """
-            
+
             result = await session.run(
                 query,
                 start_id=start_node_id,
                 tenant_id=str(self.tenant.tenant_id)
             )
-            
+
             return [record["path"] async for record in result]
-    
+
     async def cleanup_tenant_data(self) -> None:
         """清理租户所有图数据"""
         async with self.driver.session() as session:
             tenant_label = f"Tenant_{self.tenant.tenant_id.hex}"
-            
+
             # 删除所有租户节点（级联删除关系）
             query = f"""
             MATCH (n:`{tenant_label}`)
             WHERE n.tenant_id = $tenant_id
             DETACH DELETE n
             """
-            
+
             await session.run(query, tenant_id=str(self.tenant.tenant_id))
 ```
 
@@ -8489,11 +8580,11 @@ from fastapi import Depends, HTTPException, status
 
 class TenantDependency:
     """租户依赖注入"""
-    
+
     def __init__(self):
         self.resolver = TenantResolver()
         self.context_manager = TenantContextManager()
-    
+
     async def __call__(
         self,
         request: Request,
@@ -8503,15 +8594,15 @@ class TenantDependency:
         try:
             # 解析租户
             context = await self.resolver.resolve(request)
-            
+
             # 将租户上下文注入请求状态
             request.state.tenant_context = context
-            
+
             # 将租户上下文注入上下文管理器（用于异步任务）
             await self.context_manager.set_current(context)
-            
+
             return context
-            
+
         except TenantNotFoundError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -8549,41 +8640,41 @@ async def list_documents(
 ```python
 class TenantPropagationMiddleware(BaseHTTPMiddleware):
     """租户传播中间件 - 服务间调用"""
-    
+
     async def dispatch(self, request: Request, call_next):
         # 从请求头获取租户上下文
         tenant_id = request.headers.get("X-Tenant-ID")
         tenant_tier = request.headers.get("X-Tenant-Tier")
         data_residency = request.headers.get("X-Data-Residency")
-        
+
         # 如果是内部服务调用，验证并传播租户上下文
         if tenant_id and self._is_internal_request(request):
             # 验证内部调用签名
             signature = request.headers.get("X-Internal-Signature")
             if not self._verify_internal_signature(tenant_id, signature):
                 raise HTTPException(status_code=401, detail="内部调用签名无效")
-            
+
             # 将租户上下文注入到下游调用
             request.state.tenant_context = TenantContext(
                 tenant_id=UUID(tenant_id),
                 tenant_tier=TenantTier(tenant_tier) if tenant_tier else TenantTier.BASIC,
                 data_residency=DataResidency(data_residency) if data_residency else DataResidency.GLOBAL
             )
-        
+
         response = await call_next(request)
-        
+
         # 在响应头中返回租户信息（用于调试）
         if hasattr(request.state, "tenant_context"):
             response.headers["X-Tenant-ID"] = str(request.state.tenant_context.tenant_id)
-        
+
         return response
-    
+
     def _is_internal_request(self, request: Request) -> bool:
         """检查是否为内部请求"""
         internal_ips = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         client_ip = request.client.host
         return any(ipaddress.ip_address(client_ip) in ipaddress.ip_network(cidr) for cidr in internal_ips)
-    
+
     def _verify_internal_signature(self, tenant_id: str, signature: str) -> bool:
         """验证内部调用签名"""
         expected = hmac.new(
@@ -8596,22 +8687,22 @@ class TenantPropagationMiddleware(BaseHTTPMiddleware):
 
 class TenantAwareHTTPClient:
     """租户感知 HTTP 客户端 - 自动传播租户上下文"""
-    
+
     def __init__(self, http_client: httpx.AsyncClient, tenant_context: TenantContext):
         self.client = http_client
         self.tenant = tenant_context
-    
+
     async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """发送请求 - 自动注入租户头"""
         # 确保 headers 存在
         if "headers" not in kwargs:
             kwargs["headers"] = {}
-        
+
         # 注入租户上下文
         kwargs["headers"]["X-Tenant-ID"] = str(self.tenant.tenant_id)
         kwargs["headers"]["X-Tenant-Tier"] = self.tenant.tenant_tier.value
         kwargs["headers"]["X-Data-Residency"] = self.tenant.data_residency.value
-        
+
         # 添加内部调用签名
         signature = hmac.new(
             settings.internal_api_secret.encode(),
@@ -8619,7 +8710,7 @@ class TenantAwareHTTPClient:
             hashlib.sha256
         ).hexdigest()
         kwargs["headers"]["X-Internal-Signature"] = signature
-        
+
         return await self.client.request(method, url, **kwargs)
 ```
 
@@ -8629,10 +8720,10 @@ class TenantAwareHTTPClient:
 ```python
 class CrossTenantAccessGuard:
     """跨租户访问防护器"""
-    
+
     def __init__(self):
         self.access_log: List[CrossTenantAccessLog] = []
-    
+
     async def check_access(
         self,
         source_tenant: TenantContext,
@@ -8642,29 +8733,29 @@ class CrossTenantAccessGuard:
         action: str
     ) -> AccessDecision:
         """检查跨租户访问权限"""
-        
+
         # 1. 同一租户：允许
         if source_tenant.tenant_id == target_tenant_id:
             return AccessDecision(allowed=True, reason="同一租户")
-        
+
         # 2. 检查是否有跨租户共享配置
         sharing_config = await self._get_sharing_config(target_tenant_id, resource_id)
-        
+
         if sharing_config:
             # 检查共享范围
             if sharing_config.shared_with_all:
                 return AccessDecision(allowed=True, reason="资源已公开共享")
-            
+
             if source_tenant.tenant_id in sharing_config.shared_with_tenants:
                 return AccessDecision(allowed=True, reason="资源已共享给本租户")
-        
+
         # 3. 检查是否有跨租户协作关系
         collaboration = await self._get_collaboration(source_tenant.tenant_id, target_tenant_id)
-        
+
         if collaboration and collaboration.is_active:
             if resource_type in collaboration.allowed_resources:
                 return AccessDecision(allowed=True, reason="协作关系允许访问")
-        
+
         # 4. 记录拒绝访问日志（用于审计和异常检测）
         await self._log_denied_access(
             source_tenant=source_tenant,
@@ -8674,21 +8765,21 @@ class CrossTenantAccessGuard:
             action=action,
             timestamp=datetime.utcnow()
         )
-        
+
         return AccessDecision(
             allowed=False,
             reason="跨租户访问未授权",
             should_alert=True  # 触发安全告警
         )
-    
+
     async def _log_denied_access(self, **kwargs) -> None:
         """记录拒绝访问日志"""
         log_entry = CrossTenantAccessLog(**kwargs)
         self.access_log.append(log_entry)
-        
+
         # 持久化到数据库
         await self.access_log_repo.save(log_entry)
-        
+
         # 检查是否为异常模式（同一源租户频繁尝试访问其他租户）
         await self._check_anomaly_pattern(kwargs["source_tenant"])
 ```
@@ -8701,7 +8792,7 @@ class CrossTenantAccessGuard:
 ```python
 class TenantRolePermission(BaseModel):
     """租户 - 角色 - 权限三维模型"""
-    
+
     id: UUID
     tenant_id: UUID                    # 租户维度
     role_id: UUID                      # 角色维度
@@ -8709,7 +8800,7 @@ class TenantRolePermission(BaseModel):
     resource_scope: Optional[str]      # 资源范围（可选）
     created_at: datetime
     created_by: UUID
-    
+
     class Config:
         # 唯一约束：同一租户下角色和权限的组合唯一
         unique_together = ["tenant_id", "role_id", "permission_id"]
@@ -8717,7 +8808,7 @@ class TenantRolePermission(BaseModel):
 
 class TenantRole(BaseModel):
     """租户角色"""
-    
+
     id: UUID
     tenant_id: UUID                    # 租户隔离
     name: str                          # 角色名称
@@ -8731,14 +8822,14 @@ class TenantRole(BaseModel):
 
 class Permission(BaseModel):
     """权限定义"""
-    
+
     id: UUID
     code: str                          # 权限代码
     name: str                          # 权限名称
     resource_type: str                 # 资源类型
     actions: List[str]                 # 允许的操作
     description: Optional[str]
-    
+
     # 权限代码格式：{resource_type}:{action}
     # 示例：documents:read, documents:write, plans:approve
 ```
@@ -8757,7 +8848,7 @@ class Permission(BaseModel):
 ```python
 class TenantPermissionService:
     """租户权限服务"""
-    
+
     async def check_permission(
         self,
         tenant_context: TenantContext,
@@ -8767,46 +8858,46 @@ class TenantPermissionService:
         resource_id: Optional[str] = None
     ) -> PermissionCheckResult:
         """检查用户权限"""
-        
+
         # 1. 获取用户角色
         user_roles = await self.user_role_repo.find_by_user(
             tenant_id=tenant_context.tenant_id,
             user_id=user_id
         )
-        
+
         if not user_roles:
             return PermissionCheckResult(
                 allowed=False,
                 reason="用户未分配角色"
             )
-        
+
         # 2. 检查角色权限
         for role in user_roles:
             permissions = await self.role_permission_repo.find_by_role(
                 tenant_id=tenant_context.tenant_id,
                 role_id=role.id
             )
-            
+
             for permission in permissions:
                 if (permission.resource_type == resource_type and
                     action in permission.actions):
-                    
+
                     # 3. 检查资源范围（如果有）
                     if resource_id and permission.resource_scope:
                         if not self._match_resource_scope(resource_id, permission.resource_scope):
                             continue
-                    
+
                     return PermissionCheckResult(
                         allowed=True,
                         role=role.name,
                         permission=permission.code
                     )
-        
+
         return PermissionCheckResult(
             allowed=False,
             reason="权限不足"
         )
-    
+
     def _match_resource_scope(self, resource_id: str, scope: str) -> bool:
         """检查资源范围匹配"""
         # 支持通配符：plans:* 或 plans:2026-*
@@ -8819,7 +8910,7 @@ class TenantPermissionService:
 ```python
 class CrossTenantPermissionService:
     """跨租户权限服务"""
-    
+
     async def grant_cross_tenant_access(
         self,
         source_tenant_id: UUID,
@@ -8830,12 +8921,12 @@ class CrossTenantPermissionService:
         expires_at: Optional[datetime] = None
     ) -> CrossTenantGrant:
         """授予跨租户访问权限"""
-        
+
         # 1. 验证源租户权限（必须是租户管理员）
         caller = await self.get_current_caller()
         if not await self._is_tenant_admin(caller, source_tenant_id):
             raise PermissionDeniedError("只有租户管理员可以授予跨租户访问权限")
-        
+
         # 2. 创建跨租户授权
         grant = CrossTenantGrant(
             id=uuid4(),
@@ -8848,9 +8939,9 @@ class CrossTenantPermissionService:
             created_by=caller.id,
             created_at=datetime.utcnow()
         )
-        
+
         await self.cross_tenant_grant_repo.save(grant)
-        
+
         # 3. 记录审计日志
         await self.audit_logger.log(
             event_type="cross_tenant_access_granted",
@@ -8864,28 +8955,28 @@ class CrossTenantPermissionService:
                 "expires_at": expires_at.isoformat() if expires_at else None
             }
         )
-        
+
         return grant
-    
+
     async def revoke_cross_tenant_access(
         self,
         grant_id: UUID,
         reason: str
     ) -> None:
         """撤销跨租户访问权限"""
-        
+
         grant = await self.cross_tenant_grant_repo.get(grant_id)
         if not grant:
             raise NotFoundError(f"跨租户授权 {grant_id} 未找到")
-        
+
         # 验证权限
         caller = await self.get_current_caller()
         if not await self._is_tenant_admin(caller, grant.source_tenant_id):
             raise PermissionDeniedError("只有租户管理员可以撤销跨租户访问权限")
-        
+
         # 撤销授权
         await self.cross_tenant_grant_repo.delete(grant_id)
-        
+
         # 记录审计日志
         await self.audit_logger.log(
             event_type="cross_tenant_access_revoked",
@@ -8933,12 +9024,12 @@ class CrossTenantPermissionService:
 ```python
 class TenantIsolationPenetrationTester:
     """租户隔离渗透测试器"""
-    
+
     def __init__(self, base_url: str, test_tenants: List[TenantFixture]):
         self.base_url = base_url
         self.tenants = test_tenants
         self.results: List[TestResult] = []
-    
+
     async def run_all_tests(self) -> PenetrationTestReport:
         """运行所有渗透测试"""
         test_methods = [
@@ -8953,7 +9044,7 @@ class TenantIsolationPenetrationTester:
             self.test_horizontal_privilege_escalation,
             self.test_vertical_privilege_escalation,
         ]
-        
+
         for test_method in test_methods:
             try:
                 result = await test_method()
@@ -8964,29 +9055,29 @@ class TenantIsolationPenetrationTester:
                     passed=False,
                     error=str(e)
                 ))
-        
+
         return self._generate_report()
-    
+
     async def test_jwt_tenant_tampering(self) -> TestResult:
         """PT-01: JWT Token 租户 ID 篡改测试"""
         # 获取租户 A 的有效 JWT
         tenant_a = self.tenants[0]
         tenant_b = self.tenants[1]
-        
+
         valid_token = await self._get_jwt_for_tenant(tenant_a)
-        
+
         # 篡改 tenant_id claim
         tampered_token = self._tamper_jwt_claim(valid_token, "tenant_id", str(tenant_b.tenant_id))
-        
+
         # 尝试访问租户 B 的资源
         response = await self._make_request(
             url=f"{self.base_url}/api/v1/documents",
             token=tampered_token
         )
-        
+
         # 预期：401 或 403
         passed = response.status_code in [401, 403]
-        
+
         return TestResult(
             test_name="PT-01: JWT Token 租户 ID 篡改",
             passed=passed,
@@ -8997,28 +9088,28 @@ class TenantIsolationPenetrationTester:
                 "response_body": response.text[:500]
             }
         )
-    
+
     async def test_redis_key_traversal(self) -> TestResult:
         """PT-05: Redis 键名遍历测试"""
         tenant_a = self.tenants[0]
         tenant_b = self.tenants[1]
-        
+
         # 在租户 A 的缓存中写入测试数据
         await self._set_cache_key(tenant_a, "test_key", "test_value")
-        
+
         # 尝试使用租户 B 的上下文访问租户 A 的键
         try:
             # 直接尝试访问租户 A 的键名
             key = f"tenant:{tenant_a.tenant_id}:test_key"
             value = await self.redis_client.get(key)
-            
+
             # 如果返回了值，说明隔离失败
             passed = value is None
-            
+
         except Exception as e:
             # 抛出异常也是正确的行为
             passed = True
-        
+
         return TestResult(
             test_name="PT-05: Redis 键名遍历",
             passed=passed,
@@ -9027,28 +9118,28 @@ class TenantIsolationPenetrationTester:
                 "from_tenant": str(tenant_b.tenant_id)
             }
         )
-    
+
     async def test_sql_injection_cross_tenant(self) -> TestResult:
         """PT-04: SQL 注入跨租户数据测试"""
         tenant_a = self.tenants[0]
         tenant_b = self.tenants[1]
-        
+
         # 在租户 A 中创建测试文档
         doc_id = await self._create_document(tenant_a, "Test Document")
-        
+
         # 使用租户 B 的上下文，尝试 SQL 注入访问租户 A 的文档
         malicious_query = f"{doc_id}' OR '1'='1"
-        
+
         response = await self._make_request(
             url=f"{self.base_url}/api/v1/documents",
             params={"search": malicious_query},
             tenant=tenant_b
         )
-        
+
         # 检查结果中是否包含租户 A 的文档
         documents = response.json().get("data", [])
         passed = not any(doc["id"] == str(doc_id) for doc in documents)
-        
+
         return TestResult(
             test_name="PT-04: SQL 注入跨租户数据",
             passed=passed,
@@ -9057,13 +9148,13 @@ class TenantIsolationPenetrationTester:
                 "documents_returned": len(documents)
             }
         )
-    
+
     def _generate_report(self) -> PenetrationTestReport:
         """生成渗透测试报告"""
         total_tests = len(self.results)
         passed_tests = sum(1 for r in self.results if r.passed)
         failed_tests = total_tests - passed_tests
-        
+
         return PenetrationTestReport(
             total_tests=total_tests,
             passed_tests=passed_tests,
@@ -9092,44 +9183,44 @@ class TenantIsolationPenetrationTester:
 ```python
 class TenantIsolationMetrics:
     """租户隔离监控指标"""
-    
+
     # Prometheus 指标定义
-    
+
     # 跨租户访问尝试次数
     cross_tenant_access_attempts = Counter(
         "tenant_isolation_cross_tenant_attempts_total",
         "跨租户访问尝试次数",
         ["source_tenant_id", "target_tenant_id", "resource_type", "action"]
     )
-    
+
     # 跨租户访问拒绝次数
     cross_tenant_access_denials = Counter(
         "tenant_isolation_cross_tenant_denials_total",
         "跨租户访问拒绝次数",
         ["source_tenant_id", "target_tenant_id", "resource_type", "reason"]
     )
-    
+
     # 租户解析失败次数
     tenant_resolution_failures = Counter(
         "tenant_isolation_resolution_failures_total",
         "租户解析失败次数",
         ["resolver_type", "failure_reason"]
     )
-    
+
     # 租户上下文传播延迟
     tenant_context_propagation_latency = Histogram(
         "tenant_isolation_context_propagation_latency_seconds",
         "租户上下文传播延迟",
         buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
     )
-    
+
     # 各层存储隔离状态
     storage_isolation_status = Gauge(
         "tenant_isolation_storage_status",
         "存储隔离状态",
         ["tenant_id", "storage_layer", "status"]
     )
-    
+
     # 租户配额使用率
     tenant_quota_usage = Gauge(
         "tenant_quota_usage_ratio",
@@ -9188,7 +9279,7 @@ class TenantIsolationMetrics:
 ```python
 class TenantIsolationAuditLogger:
     """租户隔离审计日志器"""
-    
+
     async def log_cross_tenant_access_attempt(
         self,
         source_tenant_id: UUID,
@@ -9201,7 +9292,7 @@ class TenantIsolationAuditLogger:
         request_id: str
     ) -> None:
         """记录跨租户访问尝试"""
-        
+
         log_entry = TenantIsolationAuditLog(
             id=uuid4(),
             timestamp=datetime.utcnow(),
@@ -9217,14 +9308,14 @@ class TenantIsolationAuditLogger:
             ip_address=await self._get_client_ip(),
             user_agent=await self._get_user_agent()
         )
-        
+
         # 写入审计日志表（WORM 存储）
         await self.audit_log_repo.save(log_entry)
-        
+
         # 如果拒绝且应告警，触发安全告警
         if not decision.allowed and decision.should_alert:
             await self._trigger_security_alert(log_entry)
-    
+
     async def log_tenant_context_switch(
         self,
         user_id: UUID,
@@ -9233,7 +9324,7 @@ class TenantIsolationAuditLogger:
         reason: str
     ) -> None:
         """记录租户上下文切换"""
-        
+
         log_entry = TenantContextSwitchLog(
             id=uuid4(),
             timestamp=datetime.utcnow(),
@@ -9242,9 +9333,9 @@ class TenantIsolationAuditLogger:
             to_tenant_id=to_tenant_id,
             reason=reason
         )
-        
+
         await self.audit_log_repo.save(log_entry)
-    
+
     async def log_storage_isolation_violation(
         self,
         tenant_id: UUID,
@@ -9253,7 +9344,7 @@ class TenantIsolationAuditLogger:
         details: Dict[str, Any]
     ) -> None:
         """记录存储隔离违规"""
-        
+
         log_entry = StorageIsolationViolationLog(
             id=uuid4(),
             timestamp=datetime.utcnow(),
@@ -9262,9 +9353,9 @@ class TenantIsolationAuditLogger:
             violation_type=violation_type,
             details=details
         )
-        
+
         await self.audit_log_repo.save(log_entry)
-        
+
         # 立即触发告警
         await self._trigger_critical_alert(log_entry)
 ```
@@ -9304,32 +9395,32 @@ CREATE TABLE tenant_isolation_audit_logs_2026_02 PARTITION OF tenant_isolation_a
 ```python
 class TenantIsolationAnomalyDetector:
     """租户隔离异常检测器"""
-    
+
     def __init__(self):
         self.alert_channels: List[AlertChannel] = [
             SlackAlertChannel(),
             EmailAlertChannel(),
             PagerDutyAlertChannel()
         ]
-    
+
     async def detect_and_alert(self) -> None:
         """检测异常并告警"""
-        
+
         # 1. 检测频繁跨租户访问尝试
         await self._detect_frequent_cross_tenant_attempts()
-        
+
         # 2. 检测租户解析失败激增
         await self._detect_tenant_resolution_spike()
-        
+
         # 3. 检测存储隔离违规
         await self._detect_storage_violations()
-        
+
         # 4. 检测异常时间段访问
         await self._detect_abnormal_time_access()
-    
+
     async def _detect_frequent_cross_tenant_attempts(self) -> None:
         """检测频繁跨租户访问尝试"""
-        
+
         # 查询过去 5 分钟内跨租户访问尝试次数
         query = """
         SELECT source_tenant_id, target_tenant_id, COUNT(*) as attempt_count
@@ -9339,9 +9430,9 @@ class TenantIsolationAnomalyDetector:
         GROUP BY source_tenant_id, target_tenant_id
         HAVING COUNT(*) > 10
         """
-        
+
         results = await self.db.fetch_all(query)
-        
+
         for row in results:
             alert = SecurityAlert(
                 alert_type="FREQUENT_CROSS_TENANT_ATTEMPTS",
@@ -9353,16 +9444,16 @@ class TenantIsolationAnomalyDetector:
                 attempt_count=row.attempt_count,
                 detected_at=datetime.utcnow()
             )
-            
+
             await self._send_alert(alert)
-    
+
     async def _detect_tenant_resolution_spike(self) -> None:
         """检测租户解析失败激增"""
-        
+
         # 使用 CUSUM 算法检测失败率漂移
         current_rate = await self._get_current_resolution_failure_rate()
         baseline_rate = await self._get_baseline_resolution_failure_rate()
-        
+
         if current_rate > baseline_rate * 3:  # 失败率超过基线 3 倍
             alert = SecurityAlert(
                 alert_type="TENANT_RESOLUTION_FAILURE_SPIKE",
@@ -9371,12 +9462,12 @@ class TenantIsolationAnomalyDetector:
                 description=f"当前失败率 {current_rate:.2f} 超过基线 {baseline_rate:.2f} 的 3 倍",
                 detected_at=datetime.utcnow()
             )
-            
+
             await self._send_alert(alert)
-    
+
     async def _send_alert(self, alert: SecurityAlert) -> None:
         """发送告警"""
-        
+
         for channel in self.alert_channels:
             try:
                 await channel.send(alert)
@@ -9399,7 +9490,7 @@ groups:
         annotations:
           summary: "跨租户访问拒绝率过高"
           description: "过去 5 分钟内跨租户访问拒绝率超过阈值"
-      
+
       - alert: TenantResolutionFailureSpike
         expr: rate(tenant_isolation_resolution_failures_total[5m]) > 5
         for: 1m
@@ -9408,7 +9499,7 @@ groups:
         annotations:
           summary: "租户解析失败激增"
           description: "租户解析失败率异常升高"
-      
+
       - alert: StorageIsolationViolation
         expr: tenant_isolation_storage_status{status="violation"} == 1
         for: 0m
@@ -9438,20 +9529,20 @@ _tenant_context_var: ContextVar[Optional[TenantContext]] = ContextVar(
 
 class TenantContextManager:
     """租户上下文管理器 - 支持异步任务"""
-    
+
     async def set_current(self, context: TenantContext) -> None:
         """设置当前租户上下文"""
         _tenant_context_var.set(context)
-    
+
     def get_current(self) -> Optional[TenantContext]:
         """获取当前租户上下文"""
         return _tenant_context_var.get()
-    
+
     def get_current_tenant_id(self) -> Optional[UUID]:
         """获取当前租户 ID"""
         context = self.get_current()
         return context.tenant_id if context else None
-    
+
     async def run_with_tenant(
         self,
         context: TenantContext,
@@ -9491,7 +9582,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class TenantIsolationMiddleware(BaseHTTPMiddleware):
     """租户隔离中间件"""
-    
+
     def __init__(
         self,
         app,
@@ -9502,31 +9593,31 @@ class TenantIsolationMiddleware(BaseHTTPMiddleware):
         self.resolver = tenant_resolver
         self.context_manager = context_manager
         self.audit_logger = TenantIsolationAuditLogger()
-    
+
     async def dispatch(self, request: Request, call_next) -> Response:
         """处理请求 - 租户隔离"""
         request_id = request.headers.get("X-Request-ID", str(uuid4()))
-        
+
         try:
             # 1. 解析租户上下文
             tenant_context = await self.resolver.resolve(request)
-            
+
             # 2. 设置租户上下文
             await self.context_manager.set_current(tenant_context)
             request.state.tenant_context = tenant_context
-            
+
             # 3. 记录租户解析成功
             await self._log_tenant_resolution(request, tenant_context, request_id)
-            
+
             # 4. 处理请求
             response = await call_next(request)
-            
+
             # 5. 在响应头中添加租户信息（用于调试）
             response.headers["X-Tenant-ID"] = str(tenant_context.tenant_id)
             response.headers["X-Request-ID"] = request_id
-            
+
             return response
-            
+
         except TenantNotFoundError as e:
             # 租户未找到
             await self._log_tenant_resolution_failure(request, "not_found", request_id)
@@ -9534,7 +9625,7 @@ class TenantIsolationMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={"error": "租户未找到", "request_id": request_id}
             )
-        
+
         except TenantInactiveError as e:
             # 租户未激活
             await self._log_tenant_resolution_failure(request, "inactive", request_id)
@@ -9542,7 +9633,7 @@ class TenantIsolationMiddleware(BaseHTTPMiddleware):
                 status_code=403,
                 content={"error": "租户未激活", "request_id": request_id}
             )
-        
+
         except TenantExpiredError as e:
             # 租户已过期
             await self._log_tenant_resolution_failure(request, "expired", request_id)
@@ -9550,12 +9641,12 @@ class TenantIsolationMiddleware(BaseHTTPMiddleware):
                 status_code=403,
                 content={"error": "租户已过期", "request_id": request_id}
             )
-        
+
         except Exception as e:
             # 其他异常
             await self._log_tenant_resolution_failure(request, "error", request_id, str(e))
             raise
-    
+
     async def _log_tenant_resolution(
         self,
         request: Request,
@@ -9573,7 +9664,7 @@ class TenantIsolationMiddleware(BaseHTTPMiddleware):
             resolver_type=context.resolver_type,
             status="success"
         ))
-    
+
     async def _log_tenant_resolution_failure(
         self,
         request: Request,
@@ -9604,7 +9695,7 @@ from sqlalchemy import select, text
 
 class TenantAwareRepository:
     """租户感知仓储基类"""
-    
+
     def __init__(
         self,
         db_session: AsyncSession,
@@ -9612,13 +9703,13 @@ class TenantAwareRepository:
     ):
         self.db = db_session
         self.tenant = tenant_context
-    
+
     async def _get_schema_name(self) -> str:
         """获取 Schema 名称"""
         if self.tenant.tier in [TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE]:
             return f"tenant_{self.tenant.tenant_id.hex}"
         return "public"
-    
+
     async def _apply_tenant_filter(self, query: Select) -> Select:
         """应用租户过滤"""
         # 设置 Schema
@@ -9628,18 +9719,18 @@ class TenantAwareRepository:
         else:
             # Row-Level 过滤
             query = query.where(Document.tenant_id == self.tenant.tenant_id)
-        
+
         return query
-    
+
     # ========== Document Repository 示例 ==========
-    
+
     async def get_document(self, document_id: UUID) -> Optional[Document]:
         """获取文档"""
         query = select(Document).where(Document.id == document_id)
         query = await self._apply_tenant_filter(query)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def find_documents(
         self,
         status: Optional[str] = None,
@@ -9649,24 +9740,24 @@ class TenantAwareRepository:
         """查找文档"""
         query = select(Document)
         query = await self._apply_tenant_filter(query)
-        
+
         if status:
             query = query.where(Document.status == status)
-        
+
         query = query.limit(limit).offset(offset)
         result = await self.db.execute(query)
         return result.scalars().all()
-    
+
     async def create_document(self, document: Document) -> Document:
         """创建文档 - 自动注入租户 ID"""
         # 确保租户 ID 被设置
         document.tenant_id = self.tenant.tenant_id
-        
+
         self.db.add(document)
         await self.db.flush()
         await self.db.refresh(document)
         return document
-    
+
     async def delete_document(self, document_id: UUID) -> bool:
         """删除文档"""
         doc = await self.get_document(document_id)
@@ -9675,16 +9766,16 @@ class TenantAwareRepository:
             await self.db.commit()
             return True
         return False
-    
+
     # ========== StrategicPlan Repository 示例 ==========
-    
+
     async def get_plan(self, plan_id: UUID) -> Optional[StrategicPlan]:
         """获取战略规划"""
         query = select(StrategicPlan).where(StrategicPlan.id == plan_id)
         query = await self._apply_tenant_filter(query)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def find_plans(
         self,
         plan_type: Optional[PlanType] = None,
@@ -9694,12 +9785,12 @@ class TenantAwareRepository:
         """查找战略规划"""
         query = select(StrategicPlan)
         query = await self._apply_tenant_filter(query)
-        
+
         if plan_type:
             query = query.where(StrategicPlan.plan_type == plan_type)
         if status:
             query = query.where(StrategicPlan.status == status)
-        
+
         query = query.limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -9807,10 +9898,10 @@ class TenantAwareRepository:
 
 ## 29. 附录I CUSUM 漂移检测基线与阈值规范
 
-**版本：** 1.0.0  
-**状态：** 已批准  
-**评审日期：** 2026-02-25  
-**关联文档：** 架构设计文档 v6.0.0 第 14 章、ADR-012、第 26 章  
+**版本：** 1.0.0
+**状态：** 已批准
+**评审日期：** 2026-02-25
+**关联文档：** 架构设计文档 v6.0.0 第 14 章、ADR-012、第 26 章
 **解决问题：** H4 - "CUSUM 漂移检测缺乏基线定义"
 
 
@@ -9909,16 +10000,16 @@ Sₗₜ = max(0, Sₗₜ₋₁ + (μ₀ - k - xₜ))    # 检测负向漂移
 EXCLUSION_RULES = [
     # 规则 1: 系统故障期间数据
     {"type": "incident", "window": "故障开始 - 故障恢复后 2 小时"},
-    
+
     # 规则 2: 重大变更后 24 小时
     {"type": "change", "window": "变更完成 + 24h"},
-    
+
     # 规则 3: 统计离群值（3σ原则）
     {"type": "outlier", "method": "z_score > 3"},
-    
+
     # 规则 4: 节假日特殊流量
     {"type": "holiday", "calendar": "国家法定节假日"},
-    
+
     # 规则 5: 压测/演练期间
     {"type": "test", "tags": ["load_test", "drill"]}
 ]
@@ -9931,11 +10022,11 @@ EXCLUSION_RULES = [
 ```python
 class BaselineStatistics:
     """基线统计量计算"""
-    
+
     def __init__(self, data: List[float], confidence_level: float = 0.95):
         self.data = np.array(data)
         self.confidence_level = confidence_level
-        
+
     def compute(self) -> BaselineResult:
         return BaselineResult(
             mean=np.mean(self.data),
@@ -9948,7 +10039,7 @@ class BaselineStatistics:
             sample_size=len(self.data),
             confidence_interval=self._compute_ci()
         )
-    
+
     def _compute_ci(self) -> Tuple[float, float]:
         """计算均值的置信区间"""
         n = len(self.data)
@@ -9973,18 +10064,18 @@ class BaselineStatistics:
 ```python
 class TimeSegmentedBaseline:
     """分时段基线管理器"""
-    
+
     def __init__(self):
         self.baselines: Dict[str, BaselineResult] = {}
-        
+
     def get_segment_key(self, timestamp: datetime) -> str:
         """生成时段键"""
         hour = timestamp.hour
         is_weekend = timestamp.weekday() >= 5
         day_segment = self._get_day_segment(timestamp.day)
-        
+
         return f"{hour:02d}_{'weekend' if is_weekend else 'weekday'}_{day_segment}"
-    
+
     def _get_day_segment(self, day: int) -> str:
         if day <= 10:
             return "month_start"
@@ -10017,27 +10108,27 @@ CV = σ / μ
 ```python
 def validate_baseline(data: List[float]) -> ValidationReport:
     """基线有效性验证"""
-    
+
     # 1. 样本量检查
     if len(data) < 30:
         return ValidationReport(valid=False, reason="样本量不足")
-    
+
     # 2. 缺失值检查
     missing_rate = sum(1 for x in data if x is None) / len(data)
     if missing_rate > 0.05:
         return ValidationReport(valid=False, reason=f"缺失率过高：{missing_rate:.2%}")
-    
+
     # 3. 正态性检验（Shapiro-Wilk）
     stat, p_value = stats.shapiro(data)
     is_normal = p_value > 0.05
-    
+
     # 4. 稳定性检验（变异系数）
     cv = np.std(data) / np.mean(data)
     stability_grade = self._get_stability_grade(cv)
-    
+
     # 5. 趋势检验（Mann-Kendall）
     trend = self._mann_kendall_test(data)
-    
+
     return ValidationReport(
         valid=is_normal and stability_grade in ['A', 'B', 'C'],
         normality=p_value,
@@ -10105,25 +10196,25 @@ def validate_baseline(data: List[float]) -> ValidationReport:
 ```python
 class DriftConfirmation:
     """漂移确认器"""
-    
+
     def __init__(self, warning_n=3, warning_m=5, critical_n=2, critical_m=3):
         self.warning_n = warning_n
         self.warning_m = warning_m
         self.critical_n = critical_n
         self.critical_m = critical_m
         self.history: Deque[bool] = deque(maxlen=5)
-    
+
     def add_detection(self, is_drift: bool, level: str) -> Optional[str]:
         self.history.append(is_drift)
-        
+
         if len(self.history) < self.warning_m:
             return None
-        
+
         threshold = self.warning_n if level == "warning" else self.critical_n
         window_size = self.warning_m if level == "warning" else self.critical_m
-        
+
         trigger_count = sum(self.history[-window_size:])
-        
+
         if trigger_count >= threshold:
             return "confirmed"
         return None
@@ -10166,7 +10257,7 @@ cusum:
   global:
     baseline_window_days: 7
     update_interval_hours: 24
-    
+
   metrics:
     # 性能指标
     performance:
@@ -10177,7 +10268,7 @@ cusum:
         confirmation:
           warning: { n: 3, m: 5 }
           critical: { n: 2, m: 3 }
-      
+
       latency_p99:
         k_multiplier: 0.5
         h_multiplier: 6.0    # P99 更敏感
@@ -10185,7 +10276,7 @@ cusum:
         confirmation:
           warning: { n: 3, m: 5 }
           critical: { n: 2, m: 3 }
-      
+
       throughput:
         k_multiplier: 0.5
         h_multiplier: 5.0
@@ -10193,7 +10284,7 @@ cusum:
         confirmation:
           warning: { n: 3, m: 5 }
           critical: { n: 2, m: 3 }
-      
+
       error_rate:
         k_multiplier: 0.3    # 错误率更敏感
         h_multiplier: 4.0
@@ -10201,7 +10292,7 @@ cusum:
         confirmation:
           warning: { n: 2, m: 3 }
           critical: { n: 2, m: 2 }
-    
+
     # 质量指标
     quality:
       accuracy:
@@ -10211,7 +10302,7 @@ cusum:
         confirmation:
           warning: { n: 3, m: 5 }
           critical: { n: 2, m: 3 }
-      
+
       hallucination_rate:
         k_multiplier: 0.3
         h_multiplier: 4.0
@@ -10219,7 +10310,7 @@ cusum:
         confirmation:
           warning: { n: 2, m: 3 }
           critical: { n: 2, m: 2 }
-    
+
     # 成本指标
     cost:
       token_cost_per_request:
@@ -10229,7 +10320,7 @@ cusum:
         confirmation:
           warning: { n: 3, m: 5 }
           critical: { n: 2, m: 3 }
-      
+
       local_routing_ratio:
         k_multiplier: 0.5
         h_multiplier: 4.0    # 本地路由占比更重要
@@ -10294,23 +10385,23 @@ cusum:
 ```python
 class QualityDetector:
     """LLM 输出质量检测器"""
-    
+
     def __init__(self, shield_cortex: ShieldCortex):
         self.shield_cortex = shield_cortex
-    
+
     async def evaluate(self, response: LLMResponse) -> QualityMetrics:
         # 1. 幻觉检测（ShieldCortex）
         hallucination_score = await self.shield_cortex.detect_hallucination(response)
-        
+
         # 2. 事实准确性（引用验证）
         factual_accuracy = await self._verify_citations(response)
-        
+
         # 3. 相关性（语义相似度）
         relevance = cosine_similarity(response.embedding, query.embedding)
-        
+
         # 4. 完整性（结构化检查）
         completeness = self._check_structure_completeness(response)
-        
+
         return QualityMetrics(
             hallucination_rate=hallucination_score,
             accuracy=factual_accuracy,
@@ -10411,7 +10502,7 @@ class QualityDetector:
 ```python
 class DriftStateMachine:
     """漂移确认状态机"""
-    
+
     states = {
         "IDLE": ["DETECTING"],
         "DETECTING": ["CONFIRMING", "IDLE"],
@@ -10421,19 +10512,19 @@ class DriftStateMachine:
         "ESCALATING": ["RESPONDING"],
         "RESOLVED": ["IDLE"]
     }
-    
+
     async def transition(self, event: DriftEvent) -> str:
         current_state = self.state
         valid_transitions = self.states.get(current_state, [])
-        
+
         next_state = self._determine_next_state(event)
-        
+
         if next_state not in valid_transitions:
             raise InvalidTransitionError(current_state, next_state)
-        
+
         self.state = next_state
         await self._execute_state_actions(next_state, event)
-        
+
         return next_state
 ```
 
@@ -10454,35 +10545,35 @@ class DriftStateMachine:
 # 告警通知模板
 alert_template:
   title: "[{severity}] CUSUM 漂移告警 - {metric_name}"
-  
+
   content: |
     ## 告警详情
-    
+
     **告警级别:** {severity}
     **告警时间:** {timestamp}
     **指标名称:** {metric_name}
-    
+
     ### 漂移信息
     - 当前值：{current_value}
     - 基线值：{baseline_mean} ± {baseline_std}
     - CUSUM 统计量：{cusum_value}
     - 漂移幅度：{drift_percentage}%
-    
+
     ### 影响评估
     - 业务影响：{business_impact}
     - 影响范围：{affected_services}
     - 预计用户影响：{estimated_user_impact}
-    
+
     ### 根因线索
     - 最近变更：{recent_changes}
     - 关联指标：{correlated_metrics}
     - 相似历史：{similar_incidents}
-    
+
     ### 建议操作
     1. {recommended_action_1}
     2. {recommended_action_2}
     3. {recommended_action_3}
-    
+
     [查看详情]({dashboard_url}) | [确认告警]({ack_url}) | [升级告警]({escalate_url})
 ```
 
@@ -10542,7 +10633,7 @@ RCA_CHECKLIST = {
         "检查网络延迟和丢包率",
         "检查队列积压情况"
     ],
-    
+
     "quality": [
         "检查模型版本变更",
         "检查 Prompt 模板变更",
@@ -10551,7 +10642,7 @@ RCA_CHECKLIST = {
         "检查用户反馈趋势",
         "抽样人工审核最近响应"
     ],
-    
+
     "cost": [
         "检查 Token 使用量趋势",
         "检查路由决策分布",
@@ -10568,14 +10659,14 @@ RCA_CHECKLIST = {
 ```python
 class RootCauseAnalyzer:
     """自动根因分析器"""
-    
+
     def __init__(self, metrics_client: MetricsClient, change_db: ChangeDB):
         self.metrics_client = metrics_client
         self.change_db = change_db
-    
+
     async def analyze(self, drift_event: DriftEvent) -> RCAReport:
         report = RCAReport(drift_event=drift_event)
-        
+
         # 1. 变更关联分析
         recent_changes = await self.change_db.get_recent_changes(
             window_hours=24
@@ -10583,17 +10674,17 @@ class RootCauseAnalyzer:
         report.correlated_changes = self._correlate_changes(
             drift_event, recent_changes
         )
-        
+
         # 2. 关联指标分析
         correlated_metrics = await self._find_correlated_metrics(
             drift_event.metric_name
         )
         report.correlated_metrics = correlated_metrics
-        
+
         # 3. 历史相似事件
         similar_incidents = await self._find_similar_incidents(drift_event)
         report.similar_incidents = similar_incidents
-        
+
         # 4. 根因假设生成
         hypotheses = self._generate_hypotheses(
             drift_event,
@@ -10601,10 +10692,10 @@ class RootCauseAnalyzer:
             report.correlated_metrics
         )
         report.hypotheses = hypotheses
-        
+
         # 5. 建议操作
         report.recommended_actions = self._generate_recommendations(hypotheses)
-        
+
         return report
 ```
 
@@ -10627,16 +10718,16 @@ class RootCauseAnalyzer:
 ```python
 class IncrementalBaselineUpdater:
     """增量基线更新器"""
-    
+
     def __init__(self, decay_factor: float = 0.95):
         self.decay_factor = decay_factor  # 历史数据衰减因子
         self.baseline: Optional[BaselineResult] = None
-    
+
     def update(self, new_data: List[float]) -> BaselineResult:
         if self.baseline is None:
             self.baseline = self._compute_baseline(new_data)
             return self.baseline
-        
+
         # 指数加权移动平均（EWMA）更新均值
         old_mean = self.baseline.mean
         old_var = self.baseline.std ** 2
@@ -10644,25 +10735,25 @@ class IncrementalBaselineUpdater:
         new_var = np.var(new_data)
         n_old = self.baseline.sample_size
         n_new = len(new_data)
-        
+
         # 加权更新
         alpha = n_new / (n_old + n_new)
         updated_mean = self.decay_factor * old_mean + (1 - self.decay_factor) * new_mean
-        
+
         # 方差更新（合并方差公式）
         updated_var = (
             self.decay_factor * (old_var + old_mean**2) +
             (1 - self.decay_factor) * (new_var + new_mean**2) -
             updated_mean**2
         )
-        
+
         self.baseline = BaselineResult(
             mean=updated_mean,
             std=np.sqrt(updated_var),
             sample_size=n_old + n_new,
             # ... 其他统计量
         )
-        
+
         return self.baseline
 ```
 
@@ -10671,34 +10762,34 @@ class IncrementalBaselineUpdater:
 ```python
 class BaselineVersionManager:
     """基线版本管理器"""
-    
+
     def __init__(self, storage: BaselineStorage):
         self.storage = storage
         self.retention_days = 90  # 保留 90 天历史基线
-    
+
     def save_version(self, baseline: BaselineResult, metadata: BaselineMetadata) -> str:
         version_id = f"baseline_{datetime.now().isoformat()}"
-        
+
         self.storage.save(
             version_id=version_id,
             baseline=baseline,
             metadata=metadata
         )
-        
+
         # 清理过期版本
         self._cleanup_old_versions()
-        
+
         return version_id
-    
+
     def rollback(self, target_version: str) -> BaselineResult:
         """回滚到指定版本"""
         return self.storage.get(target_version)
-    
+
     def compare_versions(self, version_a: str, version_b: str) -> BaselineComparison:
         """比较两个基线版本"""
         baseline_a = self.storage.get(version_a)
         baseline_b = self.storage.get(version_b)
-        
+
         return BaselineComparison(
             mean_diff=baseline_b.mean - baseline_a.mean,
             std_diff=baseline_b.std - baseline_a.std,
@@ -10713,25 +10804,25 @@ class BaselineVersionManager:
 ```python
 class SeasonalityDetector:
     """季节性模式检测器"""
-    
+
     def __init__(self, data: List[float], frequency: int = 24):
         self.data = np.array(data)
         self.frequency = frequency  # 周期频率（小时级=24，天级=7）
-    
+
     def detect(self) -> SeasonalityResult:
         # 1. STL 分解（Seasonal-Trend decomposition using LOESS）
         from statsmodels.tsa.seasonal import STL
-        
+
         stl = STL(self.data, period=self.frequency)
         result = stl.fit()
-        
+
         # 2. 季节性强度计算
         seasonal_strength = 1 - (np.var(result.resid) / np.var(result.seasonal + result.resid))
-        
+
         # 3. 周期性检验
         acf = sm.tsa.acf(self.data, nlags=self.frequency * 2)
         is_periodic = np.any(np.abs(acf[self.frequency:]) > 0.5)
-        
+
         return SeasonalityResult(
             has_seasonality=seasonal_strength > 0.5,
             strength=seasonal_strength,
@@ -10758,24 +10849,24 @@ class SeasonalityDetector:
 ```python
 class SeasonalAdjustedCUSUM:
     """季节性调整 CUSUM 检测器"""
-    
+
     def __init__(self, baselines: Dict[str, BaselineResult], seasonality_factors: Dict[str, float]):
         self.baselines = baselines
         self.seasonality_factors = seasonality_factors
-    
+
     def detect(self, value: float, timestamp: datetime) -> DriftResult:
         # 1. 获取对应时段的基线
         segment_key = self._get_segment_key(timestamp)
         baseline = self.baselines[segment_key]
-        
+
         # 2. 应用季节性调整因子
         adjustment_factor = self.seasonality_factors.get(segment_key, 1.0)
         adjusted_baseline_mean = baseline.mean * adjustment_factor
         adjusted_baseline_std = baseline.std * adjustment_factor
-        
+
         # 3. 执行 CUSUM 检测
         cusum_value = self._update_cusum(value, adjusted_baseline_mean, adjusted_baseline_std)
-        
+
         return DriftResult(
             value=value,
             baseline_mean=adjusted_baseline_mean,
@@ -10802,11 +10893,11 @@ class SeasonalAdjustedCUSUM:
 ```python
 class ChangeWindowExemption:
     """变更窗口豁免管理器"""
-    
+
     def __init__(self, change_db: ChangeDB):
         self.change_db = change_db
         self.exemption_windows: List[ExemptionWindow] = []
-    
+
     def register_exemption(self, change_id: str, start: datetime, end: datetime, affected_metrics: List[str]):
         """注册豁免窗口"""
         self.exemption_windows.append(ExemptionWindow(
@@ -10815,7 +10906,7 @@ class ChangeWindowExemption:
             end=end,
             affected_metrics=affected_metrics
         ))
-    
+
     def is_exempted(self, metric_name: str, timestamp: datetime) -> Tuple[bool, Optional[str]]:
         """检查是否处于豁免窗口"""
         for window in self.exemption_windows:
@@ -10830,11 +10921,11 @@ class ChangeWindowExemption:
 ```python
 class FalsePositiveLearner:
     """误报反馈学习器"""
-    
+
     def __init__(self, feedback_store: FeedbackStore):
         self.feedback_store = feedback_store
         self.model = self._train_model()
-    
+
     def record_feedback(self, alert_id: str, is_false_positive: bool, reason: str):
         """记录用户反馈"""
         self.feedback_store.save(
@@ -10843,16 +10934,16 @@ class FalsePositiveLearner:
             reason=reason,
             timestamp=datetime.now()
         )
-        
+
         # 定期重新训练
         if self.feedback_store.count() % 100 == 0:
             self._retrain_model()
-    
+
     def should_suppress(self, alert: Alert) -> bool:
         """预测是否应该抑制告警"""
         features = self._extract_features(alert)
         fp_probability = self.model.predict_proba([features])[0][1]
-        
+
         return fp_probability > 0.7  # 70% 概率为误报则抑制
 ```
 
@@ -10861,23 +10952,23 @@ class FalsePositiveLearner:
 ```python
 class AlertFatigueSuppressor:
     """告警疲劳抑制器"""
-    
+
     def __init__(self, max_alerts_per_hour: int = 10):
         self.max_alerts_per_hour = max_alerts_per_hour
         self.alert_history: Deque[datetime] = deque(maxlen=100)
-    
+
     def should_suppress(self, alert: Alert) -> bool:
         now = datetime.now()
         one_hour_ago = now - timedelta(hours=1)
-        
+
         # 清理过期记录
         while self.alert_history and self.alert_history[0] < one_hour_ago:
             self.alert_history.popleft()
-        
+
         # 检查是否超过阈值
         if len(self.alert_history) >= self.max_alerts_per_hour:
             return True
-        
+
         self.alert_history.append(now)
         return False
 ```
@@ -10933,7 +11024,7 @@ class BaselineResult:
     sample_size: int
     confidence_interval: Tuple[float, float]
     computed_at: datetime = field(default_factory=datetime.now)
-    
+
     @property
     def cv(self) -> float:
         """变异系数"""
@@ -10958,66 +11049,66 @@ class DriftResult:
 class CUSUMDetector:
     """
     CUSUM 漂移检测器
-    
+
     实现双侧 CUSUM 算法，支持：
     - 动态基线更新
     - N 中 M 确认机制
     - 多指标并行检测
     """
-    
+
     def __init__(self, config: CUSUMConfig, baseline_config: BaselineConfig):
         self.config = config
         self.baseline_config = baseline_config
-        
+
         # 基线存储
         self.baselines: Dict[str, BaselineResult] = {}
-        
+
         # CUSUM 统计量
         self.cusum_high: Dict[str, float] = {}
         self.cusum_low: Dict[str, float] = {}
-        
+
         # 确认历史
         self.confirmation_history: Dict[str, Deque[bool]] = {}
-        
+
         # 最近检测值
         self.recent_values: Dict[str, Deque[float]] = {}
-    
+
     def update_baseline(self, metric_name: str, data: List[float]) -> BaselineResult:
         """更新指标基线"""
         if len(data) < self.baseline_config.min_samples:
             raise ValueError(f"样本量不足：{len(data)} < {self.baseline_config.min_samples}")
-        
+
         baseline = self._compute_baseline(data)
         self.baselines[metric_name] = baseline
-        
+
         # 重置 CUSUM 统计量
         self.cusum_high[metric_name] = 0.0
         self.cusum_low[metric_name] = 0.0
         self.confirmation_history[metric_name] = deque(maxlen=self.config.confirmation_m)
         self.recent_values[metric_name] = deque(maxlen=self.baseline_config.window_days * 24)
-        
+
         return baseline
-    
+
     def detect(self, metric_name: str, value: float) -> Optional[DriftResult]:
         """
         执行 CUSUM 漂移检测
-        
+
         Args:
             metric_name: 指标名称
             value: 当前观测值
-            
+
         Returns:
             DriftResult 或 None（基线不存在时）
         """
         if metric_name not in self.baselines:
             return None
-        
+
         baseline = self.baselines[metric_name]
-        
+
         # 计算 CUSUM 统计量
         k = self.config.k_multiplier * baseline.std
         h = self.config.h_multiplier * baseline.std
-        
+
         # 更新 CUSUM 统计量
         self.cusum_high[metric_name] = max(
             0,
@@ -11027,25 +11118,25 @@ class CUSUMDetector:
             0,
             self.cusum_low[metric_name] + (baseline.mean - k - value)
         )
-        
+
         # 记录最近值
         self.recent_values[metric_name].append(value)
-        
+
         # 判断是否漂移
         cusum_max = max(self.cusum_high[metric_name], self.cusum_low[metric_name])
         is_drift = cusum_max > h
-        
+
         # 确认机制
         self.confirmation_history[metric_name].append(is_drift)
         confirmed = self._confirm_drift(metric_name)
-        
+
         if not confirmed:
             return None
-        
+
         # 确定漂移方向和严重程度
         direction = self._determine_direction(metric_name)
         severity = self._determine_severity(cusum_max, baseline.std)
-        
+
         return DriftResult(
             metric_name=metric_name,
             value=value,
@@ -11057,20 +11148,20 @@ class CUSUMDetector:
             drift_direction=direction,
             severity=severity
         )
-    
+
     def _compute_baseline(self, data: List[float]) -> BaselineResult:
         """计算基线统计量"""
         arr = np.array(data)
-        
+
         mean = np.mean(arr)
         std = np.std(arr, ddof=1)
-        
+
         # 置信区间
         n = len(arr)
         se = std / np.sqrt(n)
         z = stats.norm.ppf((1 + self.baseline_config.confidence_level) / 2)
         ci = (mean - z * se, mean + z * se)
-        
+
         return BaselineResult(
             mean=float(mean),
             std=float(std),
@@ -11080,16 +11171,16 @@ class CUSUMDetector:
             sample_size=n,
             confidence_interval=ci
         )
-    
+
     def _confirm_drift(self, metric_name: str) -> bool:
         """N 中 M 确认机制"""
         history = self.confirmation_history.get(metric_name, deque())
         if len(history) < self.config.confirmation_m:
             return False
-        
+
         trigger_count = sum(history[-self.config.confirmation_m:])
         return trigger_count >= self.config.confirmation_n
-    
+
     def _determine_direction(self, metric_name: str) -> str:
         """确定漂移方向"""
         if self.cusum_high[metric_name] > self.cusum_low[metric_name]:
@@ -11097,11 +11188,11 @@ class CUSUMDetector:
         elif self.cusum_low[metric_name] > self.cusum_high[metric_name]:
             return "down"
         return "none"
-    
+
     def _determine_severity(self, cusum_value: float, baseline_std: float) -> str:
         """确定漂移严重程度"""
         ratio = cusum_value / baseline_std
-        
+
         if ratio > 8:
             return "severe"
         elif ratio > 5:
@@ -11109,11 +11200,11 @@ class CUSUMDetector:
         elif ratio > 3:
             return "minor"
         return "none"
-    
+
     def get_baseline(self, metric_name: str) -> Optional[BaselineResult]:
         """获取指标基线"""
         return self.baselines.get(metric_name)
-    
+
     def reset(self, metric_name: str):
         """重置指标检测状态"""
         if metric_name in self.cusum_high:
@@ -11164,13 +11255,13 @@ class CUSUMConfig:
     """完整配置"""
     global_config: CUSUMGlobalConfig
     metric_configs: Dict[str, MetricThresholdConfig]
-    
+
     @classmethod
     def from_yaml(cls, path: str) -> "CUSUMConfig":
         """从 YAML 文件加载配置"""
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
-        
+
         global_config = CUSUMGlobalConfig(
             baseline_window_days=data['cusum']['global']['baseline_window_days'],
             update_interval_hours=data['cusum']['global']['update_interval_hours'],
@@ -11178,7 +11269,7 @@ class CUSUMConfig:
             enable_seasonality=data['cusum']['global'].get('enable_seasonality', True),
             enable_auto_update=data['cusum']['global'].get('enable_auto_update', True)
         )
-        
+
         metric_configs = {}
         for category, metrics in data['cusum']['metrics'].items():
             for metric_name, config in metrics.items():
@@ -11189,9 +11280,9 @@ class CUSUMConfig:
                     confirmation_warning=config['confirmation']['warning'],
                     confirmation_critical=config['confirmation']['critical']
                 )
-        
+
         return cls(global_config=global_config, metric_configs=metric_configs)
-    
+
     def get_metric_config(self, metric_name: str) -> Optional[MetricThresholdConfig]:
         """获取指标配置"""
         return self.metric_configs.get(metric_name)
@@ -11220,10 +11311,10 @@ import asyncio
 
 class CUSUMPrometheusIntegration:
     """CUSUM Prometheus 集成"""
-    
+
     def __init__(self, registry: Optional[CollectorRegistry] = None):
         self.registry = registry or CollectorRegistry()
-        
+
         # 漂移检测计数器
         self.drift_detected = Counter(
             'cusum_drift_detected_total',
@@ -11231,7 +11322,7 @@ class CUSUMPrometheusIntegration:
             ['metric_name', 'direction', 'severity'],
             registry=self.registry
         )
-        
+
         # CUSUM 统计量仪表盘
         self.cusum_value = Gauge(
             'cusum_statistic',
@@ -11239,7 +11330,7 @@ class CUSUMPrometheusIntegration:
             ['metric_name', 'direction'],
             registry=self.registry
         )
-        
+
         # 基线统计量仪表盘
         self.baseline_mean = Gauge(
             'cusum_baseline_mean',
@@ -11247,14 +11338,14 @@ class CUSUMPrometheusIntegration:
             ['metric_name'],
             registry=self.registry
         )
-        
+
         self.baseline_std = Gauge(
             'cusum_baseline_std',
             '基线标准差',
             ['metric_name'],
             registry=self.registry
         )
-        
+
         # 确认状态
         self.confirmation_count = Gauge(
             'cusum_confirmation_count',
@@ -11262,7 +11353,7 @@ class CUSUMPrometheusIntegration:
             ['metric_name'],
             registry=self.registry
         )
-    
+
     def record_drift(self, metric_name: str, direction: str, severity: str):
         """记录漂移事件"""
         self.drift_detected.labels(
@@ -11270,19 +11361,19 @@ class CUSUMPrometheusIntegration:
             direction=direction,
             severity=severity
         ).inc()
-    
+
     def update_cusum_value(self, metric_name: str, direction: str, value: float):
         """更新 CUSUM 统计量"""
         self.cusum_value.labels(
             metric_name=metric_name,
             direction=direction
         ).set(value)
-    
+
     def update_baseline(self, metric_name: str, mean: float, std: float):
         """更新基线统计量"""
         self.baseline_mean.labels(metric_name=metric_name).set(mean)
         self.baseline_std.labels(metric_name=metric_name).set(std)
-    
+
     def update_confirmation(self, metric_name: str, count: int):
         """更新确认计数"""
         self.confirmation_count.labels(metric_name=metric_name).set(count)
@@ -11290,23 +11381,23 @@ class CUSUMPrometheusIntegration:
 
 class CUSUMMonitor:
     """CUSUM 监控服务"""
-    
+
     def __init__(self, detector: CUSUMDetector, prometheus: CUSUMPrometheusIntegration):
         self.detector = detector
         self.prometheus = prometheus
         self.running = False
-    
+
     async def start_monitoring(self, metrics_source: MetricsSource):
         """启动监控"""
         self.running = True
-        
+
         while self.running:
             # 获取所有指标当前值
             metrics = await metrics_source.get_all_metrics()
-            
+
             for metric_name, value in metrics.items():
                 result = self.detector.detect(metric_name, value)
-                
+
                 if result:
                     # 更新 Prometheus 指标
                     self.prometheus.update_cusum_value(
@@ -11314,30 +11405,30 @@ class CUSUMMonitor:
                         result.drift_direction,
                         max(result.cusum_high, result.cusum_low)
                     )
-                    
+
                     if result.is_drift:
                         self.prometheus.record_drift(
                             metric_name,
                             result.drift_direction,
                             result.severity
                         )
-                        
+
                         # 触发告警
                         await self._trigger_alert(result)
-            
+
             # 等待下一个检测周期
             await asyncio.sleep(self._get_detection_interval())
-    
+
     async def _trigger_alert(self, result: DriftResult):
         """触发告警"""
         # 实现告警逻辑
         pass
-    
+
     def _get_detection_interval(self) -> int:
         """获取检测间隔"""
         # 返回最小检测间隔
         return 60
-    
+
     def stop_monitoring(self):
         """停止监控"""
         self.running = False
@@ -11370,27 +11461,27 @@ async def main():
         confirmation_m=5,
         detection_interval_seconds=300
     )
-    
+
     baseline_config = BaselineConfig(
         window_days=7,
         min_samples=100,
         update_interval_hours=24
     )
-    
+
     # 2. 创建检测器
     detector = CUSUMDetector(cusum_config, baseline_config)
-    
+
     # 3. 生成基线数据（模拟正常运营 7 天）
     np.random.seed(42)
     baseline_data = np.random.normal(loc=500, scale=50, size=1000).tolist()
-    
+
     # 4. 建立基线
     baseline = detector.update_baseline("latency_p95", baseline_data)
     print(f"基线建立完成：均值={baseline.mean:.2f}ms, 标准差={baseline.std:.2f}ms")
-    
+
     # 5. 模拟实时监控
     print("\n开始实时监控...")
-    
+
     # 正常数据（前 20 个点）
     for i in range(20):
         value = np.random.normal(500, 50)
@@ -11399,21 +11490,21 @@ async def main():
             print(f"[{i}] 漂移检测：{result.severity} - {result.drift_direction}")
         else:
             print(f"[{i}] 正常：{value:.2f}ms")
-    
+
     # 模拟性能漂移（从第 21 个点开始，均值逐渐上升）
     print("\n--- 模拟性能漂移 ---")
     for i in range(20, 50):
         drift = (i - 20) * 10  # 逐渐增加 10ms/点
         value = np.random.normal(500 + drift, 50)
         result = detector.detect("latency_p95", value)
-        
+
         status = "正常"
         if result:
             if result.is_drift:
                 status = f"🚨 漂移：{result.severity} - {result.drift_direction}"
             else:
                 status = f"⚠️ 检测中：CUSUM={max(result.cusum_high, result.cusum_low):.2f}"
-        
+
         print(f"[{i}] {status} - 当前值：{value:.2f}ms")
 
 
@@ -11439,21 +11530,21 @@ def test_detection_accuracy():
     """检测准确率测试"""
     # 1. 准备测试数据
     normal_data = np.random.normal(500, 50, 1000)
-    
+
     # 2. 注入已知漂移（+2σ, +3σ, +4σ）
     drift_scenarios = [
         {"magnitude": 2, "expected_detect": True},
         {"magnitude": 3, "expected_detect": True},
         {"magnitude": 4, "expected_detect": True},
     ]
-    
+
     # 3. 执行测试
     results = []
     for scenario in drift_scenarios:
         drift_data = np.random.normal(500 + scenario["magnitude"] * 50, 50, 100)
         detected = detector.detect("test_metric", drift_data)
         results.append(detected == scenario["expected_detect"])
-    
+
     # 4. 计算准确率
     accuracy = sum(results) / len(results)
     assert accuracy >= 0.95, f"检出率不足：{accuracy}"
@@ -11525,9 +11616,9 @@ def test_detection_accuracy():
 - 架构设计文档 v6.0.0 第 26 章：工作流监控与运维
 
 
-**文档版本：** 1.0.0  
-**最后更新：** 2026-02-25  
-**审核状态：** 已批准  
+**文档版本：** 1.0.0
+**最后更新：** 2026-02-25
+**审核状态：** 已批准
 **下一步：** 实施开发（预计 2 周完成）
 
 ---
@@ -13609,39 +13700,39 @@ mounts:
     source: /usr
     target: /usr
     options: ["ro", "nosuid", "noexec"]
-  
+
   - type: bind
     source: /etc
     target: /etc
     options: ["ro", "nosuid"]
-  
+
   - type: bind
     source: /bin
     target: /bin
     options: ["ro", "nosuid", "noexec"]
-  
+
   # 临时写入目录（沙箱隔离）
   - type: tmpfs
     target: /tmp/sandbox_{uuid}
     options: ["rw", "nosuid", "noexec", "size=512M"]
-  
+
   # 只读数据挂载
   - type: bind
     source: /data/readonly/{tenant_id}
     target: /data
     options: ["ro"]
-  
+
   # 禁止访问的目录
   - type: bind
     source: /dev/null
     target: /host
     options: ["ro"]  # 空挂载，阻止访问
-  
+
   - type: bind
     source: /dev/null
     target: /proc
     options: ["ro"]
-  
+
   - type: bind
     source: /dev/null
     target: /sys
@@ -13707,10 +13798,10 @@ NETWORK_WHITELIST = {
         "*.redis.internal",
         "*.minio.internal"
     ],
-    
+
     # 允许的端口
     "allowed_ports": [443, 6333, 6379, 9000],
-    
+
     # 禁止的 IP 范围
     "blocked_cidrs": [
         "10.0.0.0/8",      # 内部网络（除白名单）
@@ -13719,7 +13810,7 @@ NETWORK_WHITELIST = {
         "169.254.0.0/16",  # 链路本地
         "127.0.0.0/8"      # 本地回环
     ],
-    
+
     # 协议限制
     "allowed_protocols": ["HTTPS", "DNS"],
     "blocked_protocols": ["HTTP", "FTP", "SMTP", "SSH", "Telnet"]
@@ -13927,7 +14018,7 @@ STATIC_ANALYSIS_RULES = {
 ```python
 class PreExecutionValidator:
     """代码执行前验证器"""
-    
+
     async def validate(self, code: str, context: ExecutionContext) -> ValidationResult:
         checks = [
             self._check_code_signature(code),           # 代码签名验证
@@ -13937,9 +14028,9 @@ class PreExecutionValidator:
             self._check_file_access(context),           # 文件访问
             self._check_rate_limit(context.tenant_id),  # 速率限制
         ]
-        
+
         results = await asyncio.gather(*checks)
-        
+
         if all(r.passed for r in results):
             return ValidationResult(passed=True)
         else:
@@ -13973,12 +14064,12 @@ EXECUTION_METRICS = {
     "memory_usage_bytes": Gauge("sandbox_memory_usage", "内存使用量"),
     "disk_io_bytes": Counter("sandbox_disk_io", "磁盘 IO"),
     "network_io_bytes": Counter("sandbox_network_io", "网络 IO"),
-    
+
     # 执行状态
     "execution_duration_seconds": Histogram("sandbox_execution_duration", "执行时长"),
     "syscalls_count": Counter("sandbox_syscalls", "系统调用次数"),
     "file_operations_count": Counter("sandbox_file_ops", "文件操作次数"),
-    
+
     # 安全事件
     "blocked_syscalls": Counter("sandbox_blocked_syscalls", "被阻止的系统调用"),
     "blocked_network_attempts": Counter("sandbox_blocked_network", "被阻止的网络访问"),
@@ -14015,42 +14106,42 @@ EXECUTION_METRICS = {
 ```python
 class ExecutionAuditLog(BaseModel):
     """执行审计日志"""
-    
+
     # 基本信息
     log_id: UUID
     timestamp: datetime
     tenant_id: UUID
     agent_id: UUID
     agent_role: str
-    
+
     # 代码信息
     code_hash: str  # SHA-256
     code_size_bytes: int
     language: str  # "python", "sql"
-    
+
     # 执行信息
     sandbox_id: str
     execution_duration_ms: int
     exit_code: int
     status: Literal["success", "failed", "timeout", "killed"]
-    
+
     # 资源使用
     cpu_time_ms: int
     memory_peak_bytes: int
     disk_io_bytes: int
     network_io_bytes: int
-    
+
     # 安全信息
     syscalls_executed: List[str]
     files_accessed: List[str]
     network_connections: List[NetworkConnection]
     policy_violations: List[PolicyViolation]
-    
+
     # 输出信息
     stdout_hash: str
     stderr_hash: str
     output_size_bytes: int
-    
+
     # 审计追踪
     worm_storage_ref: str  # WORM 存储引用（7 年归档）
 ```
@@ -14119,7 +14210,7 @@ class ExecutionAuditLog(BaseModel):
 ```python
 class EscapeDetectionEngine:
     """沙箱逃逸检测引擎"""
-    
+
     # 逃逸行为特征
     ESCAPE_INDICATORS = {
         "kernel_exploit": {
@@ -14151,11 +14242,11 @@ class EscapeDetectionEngine:
             "severity": "HIGH"
         }
     }
-    
+
     async def detect(self, execution_context: ExecutionContext) -> DetectionResult:
         # 实时监控系统调用
         syscalls = await self.monitor_syscalls(execution_context.sandbox_id)
-        
+
         # 检测异常模式
         for indicator_type, config in self.ESCAPE_INDICATORS.items():
             for pattern in config["patterns"]:
@@ -14166,7 +14257,7 @@ class EscapeDetectionEngine:
                         severity=config["severity"],
                         evidence=syscalls
                     )
-        
+
         return DetectionResult(detected=False)
 ```
 
@@ -14180,19 +14271,19 @@ detection_rules:
     condition: "syscall.ptrace AND process.parent != init"
     severity: CRITICAL
     action: "KILL_AND_ALERT"
-    
+
   - name: "sensitive_mount"
     description: "检测敏感目录挂载"
     condition: "syscall.mount AND (target == '/' OR target == '/etc' OR target == '/proc')"
     severity: CRITICAL
     action: "KILL_AND_ALERT"
-    
+
   - name: "network_scan"
     description: "检测网络扫描行为"
     condition: "network.connections > 100 AND network.time_window < 60s"
     severity: HIGH
     action: "BLOCK_AND_ALERT"
-    
+
   - name: "crypto_miner"
     description: "检测加密货币挖矿"
     condition: "cpu.usage > 90% AND duration > 300s AND network.pool_detected"
@@ -14259,7 +14350,7 @@ DANGEROUS_FUNCTION_PATTERNS = {
         "severity": "CRITICAL",
         "action": "BLOCK"
     },
-    
+
     # 系统调用类
     "system_calls": {
         "functions": [
@@ -14270,14 +14361,14 @@ DANGEROUS_FUNCTION_PATTERNS = {
         "severity": "CRITICAL",
         "action": "BLOCK"
     },
-    
+
     # 动态导入类
     "dynamic_import": {
         "functions": ["__import__", "importlib.import_module", "importlib.__import__"],
         "severity": "HIGH",
         "action": "REVIEW"
     },
-    
+
     # C 扩展类
     "c_extensions": {
         "functions": [
@@ -14287,7 +14378,7 @@ DANGEROUS_FUNCTION_PATTERNS = {
         "severity": "CRITICAL",
         "action": "BLOCK"
     },
-    
+
     # 网络访问类
     "network_access": {
         "functions": [
@@ -14300,7 +14391,7 @@ DANGEROUS_FUNCTION_PATTERNS = {
         "severity": "HIGH",
         "action": "REVIEW"
     },
-    
+
     # 文件操作类
     "file_operations": {
         "functions": [
@@ -14322,15 +14413,15 @@ import ast
 
 class MaliciousCodeDetector(ast.NodeVisitor):
     """恶意代码 AST 检测器"""
-    
+
     def __init__(self):
         self.issues = []
         self.dangerous_calls = []
-    
+
     def visit_Call(self, node):
         # 检测危险函数调用
         func_name = self._get_full_name(node.func)
-        
+
         for category, config in DANGEROUS_FUNCTION_PATTERNS.items():
             if any(pattern in func_name for pattern in config["functions"]):
                 self.issues.append({
@@ -14343,9 +14434,9 @@ class MaliciousCodeDetector(ast.NodeVisitor):
                     "action": config["action"]
                 })
                 self.dangerous_calls.append(func_name)
-        
+
         self.generic_visit(node)
-    
+
     def visit_Import(self, node):
         # 检测危险导入
         for alias in node.names:
@@ -14357,7 +14448,7 @@ class MaliciousCodeDetector(ast.NodeVisitor):
                     "severity": "HIGH"
                 })
         self.generic_visit(node)
-    
+
     def _get_full_name(self, node):
         """获取完整函数名（处理属性访问）"""
         if isinstance(node, ast.Name):
@@ -14366,12 +14457,12 @@ class MaliciousCodeDetector(ast.NodeVisitor):
             value = self._get_full_name(node.value)
             return f"{value}.{node.attr}"
         return ""
-    
+
     def analyze(self, code: str) -> AnalysisResult:
         try:
             tree = ast.parse(code)
             self.visit(tree)
-            
+
             risk_score = self._calculate_risk_score()
             return AnalysisResult(
                 passed=risk_score < 50,
@@ -14384,7 +14475,7 @@ class MaliciousCodeDetector(ast.NodeVisitor):
                 passed=False,
                 error=f"Syntax error: {e}"
             )
-    
+
     def _calculate_risk_score(self) -> int:
         """计算风险评分（0-100）"""
         score = 0
@@ -14394,10 +14485,10 @@ class MaliciousCodeDetector(ast.NodeVisitor):
             "MEDIUM": 10,
             "LOW": 5
         }
-        
+
         for issue in self.issues:
             score += severity_weights.get(issue.get("severity", "LOW"), 5)
-        
+
         return min(score, 100)
 ```
 
@@ -14408,19 +14499,19 @@ class MaliciousCodeDetector(ast.NodeVisitor):
 ```python
 class RuntimeBehaviorAnalyzer:
     """运行时行为分析器"""
-    
+
     def __init__(self):
         self.syscall_trace = []
         self.file_access_log = []
         self.network_connections = []
-    
+
     async def analyze(self, sandbox_id: str) -> BehaviorReport:
         # 收集系统调用轨迹
         self.syscall_trace = await self.collect_syscalls(sandbox_id)
-        
+
         # 分析异常行为
         anomalies = []
-        
+
         # 检测 fork bomb
         if self._detect_fork_bomb():
             anomalies.append({
@@ -14428,7 +14519,7 @@ class RuntimeBehaviorAnalyzer:
                 "severity": "CRITICAL",
                 "evidence": "Excessive process creation detected"
             })
-        
+
         # 检测网络扫描
         if self._detect_network_scan():
             anomalies.append({
@@ -14436,7 +14527,7 @@ class RuntimeBehaviorAnalyzer:
                 "severity": "HIGH",
                 "evidence": "Rapid connection attempts to multiple hosts"
             })
-        
+
         # 检测加密挖矿
         if self._detect_crypto_mining():
             anomalies.append({
@@ -14444,7 +14535,7 @@ class RuntimeBehaviorAnalyzer:
                 "severity": "HIGH",
                 "evidence": "High CPU usage with mining pool connection"
             })
-        
+
         return BehaviorReport(
             anomalies=anomalies,
             risk_level=self._calculate_risk_level(anomalies)
@@ -14460,25 +14551,25 @@ class RuntimeBehaviorAnalyzer:
 ALLOWED_STANDARD_MODULES = {
     # 基础模块
     "builtins", "sys", "os.path", "pathlib",
-    
+
     # 数学计算
     "math", "cmath", "decimal", "fractions",
     "statistics", "random", "numpy", "scipy",
-    
+
     # 数据处理
     "json", "csv", "xml", "html",
     "collections", "itertools", "functools",
     "operator", "re", "string",
-    
+
     # 日期时间
     "datetime", "time", "calendar",
-    
+
     # 类型提示
     "typing", "dataclasses",
-    
+
     # 日志
     "logging",
-    
+
     # 数据科学
     "pandas", "matplotlib", "seaborn", "plotly"
 }
@@ -14501,17 +14592,17 @@ from importlib.machinery import ModuleSpec
 
 class SecureImportFinder(MetaPathFinder):
     """安全导入查找器"""
-    
+
     def __init__(self, allowed_modules: set, denied_modules: set):
         self.allowed_modules = allowed_modules
         self.denied_modules = denied_modules
         self.original_finders = sys.meta_path.copy()
-    
+
     def find_spec(self, fullname, path, target=None):
         # 检查是否在黑名单中
         if fullname in self.denied_modules:
             raise ImportError(f"Module '{fullname}' is not allowed")
-        
+
         # 检查是否在白名单中（标准库）
         base_module = fullname.split('.')[0]
         if base_module in self.allowed_modules:
@@ -14519,17 +14610,17 @@ class SecureImportFinder(MetaPathFinder):
                 spec = finder.find_spec(fullname, path, target)
                 if spec:
                     return spec
-        
+
         # 检查是否是已安装的第三方安全模块
         if self._is_safe_third_party(fullname):
             for finder in self.original_finders:
                 spec = finder.find_spec(fullname, path, target)
                 if spec:
                     return spec
-        
+
         # 默认拒绝
         raise ImportError(f"Module '{fullname}' is not in the allowed list")
-    
+
     def _is_safe_third_party(self, module_name: str) -> bool:
         """检查是否是安全的第三方模块"""
         safe_packages = {
@@ -14565,24 +14656,24 @@ groups:
       # 资源使用指标
       - record: sandbox:cpu_usage:percent
         expr: rate(sandbox_cpu_time_seconds_total[5m]) * 100
-      
+
       - record: sandbox:memory_usage:bytes
         expr: sandbox_memory_usage_bytes
-      
+
       - record: sandbox:execution_duration:seconds
         expr: histogram_quantile(0.95, rate(sandbox_execution_duration_seconds_bucket[5m]))
-      
+
       # 安全指标
       - record: sandbox:policy_violations:rate
         expr: rate(sandbox_policy_violations_total[5m])
-      
+
       - record: sandbox:escape_attempts:rate
         expr: rate(sandbox_escape_detection_total[5m])
-      
+
       # 业务指标
       - record: sandbox:executions:rate
         expr: rate(sandbox_executions_total[5m])
-      
+
       - record: sandbox:success_rate:ratio
         expr: rate(sandbox_executions_success_total[5m]) / rate(sandbox_executions_total[5m])
 ```
@@ -14631,28 +14722,28 @@ CREATE TABLE sandbox_audit_logs (
     tenant_id UUID NOT NULL,
     agent_id UUID NOT NULL,
     agent_role VARCHAR(50) NOT NULL,
-    
+
     -- 代码信息
     code_hash VARCHAR(64) NOT NULL,
     code_size_bytes INTEGER NOT NULL,
     language VARCHAR(20) NOT NULL,
-    
+
     -- 执行信息
     sandbox_id VARCHAR(100) NOT NULL,
     execution_duration_ms INTEGER NOT NULL,
     exit_code INTEGER NOT NULL,
     status VARCHAR(20) NOT NULL,
-    
+
     -- 资源使用
     cpu_time_ms INTEGER NOT NULL,
     memory_peak_bytes BIGINT NOT NULL,
     disk_io_bytes BIGINT NOT NULL,
-    
+
     -- 安全信息
     syscalls_executed JSONB NOT NULL DEFAULT '[]',
     files_accessed JSONB NOT NULL DEFAULT '[]',
     policy_violations JSONB NOT NULL DEFAULT '[]',
-    
+
     -- 审计追踪
     worm_storage_ref VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -14687,7 +14778,7 @@ groups:
         annotations:
           summary: "沙箱逃逸尝试被检测到"
           description: "检测到 {{ $value }} 次沙箱逃逸尝试"
-      
+
       - alert: HighPolicyViolationRate
         expr: rate(sandbox_policy_violations_total[10m]) > 0.1
         for: 5m
@@ -14696,7 +14787,7 @@ groups:
         annotations:
           summary: "策略违规率过高"
           description: "策略违规率：{{ $value }}/s"
-      
+
       # 资源告警
       - alert: SandboxMemoryHigh
         expr: sandbox_memory_usage_bytes / sandbox_memory_limit_bytes > 0.9
@@ -14706,7 +14797,7 @@ groups:
         annotations:
           summary: "沙箱内存使用率过高"
           description: "内存使用率：{{ $value | humanizePercentage }}"
-      
+
       - alert: SandboxExecutionTimeout
         expr: histogram_quantile(0.99, rate(sandbox_execution_duration_seconds_bucket[30m])) > 300
         for: 10m
@@ -14715,7 +14806,7 @@ groups:
         annotations:
           summary: "沙箱执行超时率过高"
           description: "P99 执行时长：{{ $value }}s"
-      
+
       # 业务告警
       - alert: SandboxSuccessRateLow
         expr: rate(sandbox_executions_success_total[30m]) / rate(sandbox_executions_total[30m]) < 0.95
@@ -14791,12 +14882,12 @@ class SandboxConfig:
 
 class DockerSandbox:
     """Docker 沙箱执行器"""
-    
+
     def __init__(self, config: SandboxConfig):
         self.config = config
         self.client = docker.from_env()
         self.container: Optional[docker.models.containers.Container] = None
-    
+
     async def create(self, image: str = "python:3.11-slim") -> str:
         """创建沙箱容器"""
         container = self.client.containers.run(
@@ -14821,49 +14912,49 @@ class DockerSandbox:
             },
             working_dir='/tmp/sandbox'
         )
-        
+
         self.container = container
         return container.id
-    
+
     async def execute(self, code: str) -> ExecutionResult:
         """执行代码"""
         if not self.container:
             raise RuntimeError("Sandbox not created")
-        
+
         # 将代码写入容器
         code_bytes = code.encode('utf-8')
         self.container.put_archive('/tmp/sandbox', self._create_tar(code_bytes))
-        
+
         # 执行代码
         result = self.container.exec_run(
             cmd=['python3', '/tmp/sandbox/code.py'],
             demux=True,
             timeout=self.config.timeout
         )
-        
+
         return ExecutionResult(
             exit_code=result.exit_code,
             stdout=result.output[0].decode('utf-8') if result.output[0] else '',
             stderr=result.output[1].decode('utf-8') if result.output[1] else ''
         )
-    
+
     async def cleanup(self):
         """清理沙箱"""
         if self.container:
             self.container.stop(timeout=5)
             self.container = None
-    
+
     def _create_tar(self, code_bytes: bytes) -> bytes:
         """创建包含代码的 tar 包"""
         import tarfile
         import io
-        
+
         tar_buffer = io.BytesIO()
         with tarfile.open(fileobj=tar_buffer, mode='w') as tar:
             code_info = tarfile.TarInfo(name='code.py')
             code_info.size = len(code_bytes)
             tar.addfile(code_info, io.BytesIO(code_bytes))
-        
+
         return tar_buffer.getvalue()
 
 @dataclass
@@ -14889,17 +14980,17 @@ import asyncio
 
 class GVisorSandbox:
     """gVisor 沙箱执行器（Kubernetes）"""
-    
+
     def __init__(self, namespace: str = "sandbox"):
         self.namespace = namespace
         self.v1 = client.CoreV1Api()
         self.batch_v1 = client.BatchV1Api()
         self.pod_name: Optional[str] = None
-    
+
     async def create_pod(self, image: str, resources: Dict[str, Any]) -> str:
         """创建 gVisor Pod"""
         self.pod_name = f"sandbox-{uuid.uuid4().hex[:8]}"
-        
+
         pod_manifest = {
             'apiVersion': 'v1',
             'kind': 'Pod',
@@ -14959,23 +15050,23 @@ class GVisorSandbox:
                 }
             }
         }
-        
+
         # 创建 Pod
         self.v1.create_namespaced_pod(
             namespace=self.namespace,
             body=pod_manifest
         )
-        
+
         # 等待 Pod 就绪
         await self._wait_for_pod_ready()
-        
+
         return self.pod_name
-    
+
     async def execute(self, code: str) -> ExecutionResult:
         """在 gVisor 沙箱中执行代码"""
         if not self.pod_name:
             raise RuntimeError("Sandbox pod not created")
-        
+
         # 创建 ConfigMap 存储代码
         config_map_name = f"code-{uuid.uuid4().hex[:8]}"
         config_map = client.V1ConfigMap(
@@ -14983,7 +15074,7 @@ class GVisorSandbox:
             data={'code.py': code}
         )
         self.v1.create_namespaced_config_map(namespace=self.namespace, body=config_map)
-        
+
         # 创建 Job 执行代码
         job_name = f"exec-{uuid.uuid4().hex[:8]}"
         job_manifest = {
@@ -15021,13 +15112,13 @@ class GVisorSandbox:
                 }
             }
         }
-        
+
         # 创建 Job
         self.batch_v1.create_namespaced_job(namespace=self.namespace, body=job_manifest)
-        
+
         # 等待 Job 完成并获取结果
         return await self._wait_for_job_completion(job_name)
-    
+
     async def _wait_for_pod_ready(self, timeout: int = 60):
         """等待 Pod 就绪"""
         import time
@@ -15038,7 +15129,7 @@ class GVisorSandbox:
                 return
             await asyncio.sleep(1)
         raise TimeoutError("Pod not ready within timeout")
-    
+
     async def _wait_for_job_completion(self, job_name: str, timeout: int = 300) -> ExecutionResult:
         """等待 Job 完成"""
         import time
@@ -15060,9 +15151,9 @@ class GVisorSandbox:
             elif job.status.failed:
                 return ExecutionResult(exit_code=1, stdout='', stderr='Job failed')
             await asyncio.sleep(2)
-        
+
         raise TimeoutError("Job not completed within timeout")
-    
+
     async def cleanup(self):
         """清理资源"""
         if self.pod_name:
@@ -15114,7 +15205,7 @@ class ValidationResult:
 
 class CodeValidator:
     """代码验证器"""
-    
+
     DANGEROUS_FUNCTIONS = {
         'eval': Severity.CRITICAL,
         'exec': Severity.CRITICAL,
@@ -15127,7 +15218,7 @@ class CodeValidator:
         '__import__': Severity.HIGH,
         'importlib.import_module': Severity.HIGH,
     }
-    
+
     DANGEROUS_MODULES = {
         'ctypes': Severity.CRITICAL,
         'cffi': Severity.CRITICAL,
@@ -15135,17 +15226,17 @@ class CodeValidator:
         'subprocess': Severity.CRITICAL,
         'multiprocessing': Severity.MEDIUM,
     }
-    
+
     def __init__(self):
         self.issues: List[Issue] = []
-    
+
     def validate(self, code: str) -> ValidationResult:
         """验证代码"""
         self.issues = []
-        
+
         # 计算代码哈希
         code_hash = hashlib.sha256(code.encode()).hexdigest()
-        
+
         # AST 分析
         try:
             tree = ast.parse(code)
@@ -15164,17 +15255,17 @@ class CodeValidator:
                 issues=self.issues,
                 code_hash=code_hash
             )
-        
+
         # 计算风险评分
         risk_score = self._calculate_risk_score()
-        
+
         return ValidationResult(
             passed=risk_score < 50,
             risk_score=risk_score,
             issues=self.issues,
             code_hash=code_hash
         )
-    
+
     def _analyze_ast(self, tree: ast.AST):
         """AST 分析"""
         for node in ast.walk(tree):
@@ -15189,7 +15280,7 @@ class CodeValidator:
                         line=node.lineno,
                         column=node.col_offset
                     ))
-            
+
             # 检测危险导入
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -15201,7 +15292,7 @@ class CodeValidator:
                             line=node.lineno,
                             column=node.col_offset
                         ))
-            
+
             if isinstance(node, ast.ImportFrom):
                 if node.module in self.DANGEROUS_MODULES:
                     self.issues.append(Issue(
@@ -15211,7 +15302,7 @@ class CodeValidator:
                         line=node.lineno,
                         column=node.col_offset
                     ))
-    
+
     def _get_func_name(self, node: ast.Call) -> str:
         """获取函数完整名称"""
         if isinstance(node.func, ast.Name):
@@ -15220,7 +15311,7 @@ class CodeValidator:
             value = self._get_func_name_base(node.func.value)
             return f"{value}.{node.func.attr}"
         return ""
-    
+
     def _get_func_name_base(self, node: ast.AST) -> str:
         """获取函数名称基础部分"""
         if isinstance(node, ast.Name):
@@ -15228,7 +15319,7 @@ class CodeValidator:
         elif isinstance(node, ast.Attribute):
             return f"{self._get_func_name_base(node.value)}.{node.attr}"
         return ""
-    
+
     def _calculate_risk_score(self) -> int:
         """计算风险评分"""
         severity_scores = {
@@ -15237,7 +15328,7 @@ class CodeValidator:
             Severity.MEDIUM: 10,
             Severity.LOW: 5
         }
-        
+
         score = sum(severity_scores.get(issue.severity, 5) for issue in self.issues)
         return min(score, 100)
 ```
@@ -15258,28 +15349,28 @@ from typing import Optional
 
 class SandboxMonitor:
     """沙箱监控器"""
-    
+
     def __init__(self, tenant_id: str, sandbox_id: str):
         self.tenant_id = tenant_id
         self.sandbox_id = sandbox_id
         self.start_time: Optional[float] = None
-        
+
         # 初始化 OpenTelemetry
         resource = Resource.create({
             "service.name": "sandbox-executor",
             "tenant.id": tenant_id,
             "sandbox.id": sandbox_id
         })
-        
+
         reader = PrometheusMetricReader()
         provider = MeterProvider(resource=resource, metric_readers=[reader])
         metrics.set_meter_provider(provider)
-        
+
         self.meter = metrics.get_meter("sandbox")
-        
+
         # 创建指标
         self._create_metrics()
-    
+
     def _create_metrics(self):
         """创建监控指标"""
         # CPU 使用率
@@ -15288,57 +15379,57 @@ class SandboxMonitor:
             description="CPU usage percentage",
             unit="%"
         )
-        
+
         # 内存使用
         self.memory_usage = self.meter.create_gauge(
             name="sandbox_memory_usage",
             description="Memory usage in bytes",
             unit="By"
         )
-        
+
         # 执行时长
         self.execution_duration = self.meter.create_histogram(
             name="sandbox_execution_duration",
             description="Execution duration in seconds",
             unit="s"
         )
-        
+
         # 系统调用计数
         self.syscall_count = self.meter.create_counter(
             name="sandbox_syscalls",
             description="Number of system calls",
             unit="1"
         )
-        
+
         # 策略违规
         self.policy_violations = self.meter.create_counter(
             name="sandbox_policy_violations",
             description="Number of policy violations",
             unit="1"
         )
-    
+
     def start_execution(self):
         """开始执行"""
         self.start_time = time.time()
-    
+
     def end_execution(self, exit_code: int):
         """结束执行"""
         if self.start_time:
             duration = time.time() - self.start_time
             self.execution_duration.record(duration)
-    
+
     def record_cpu_usage(self, percentage: float):
         """记录 CPU 使用率"""
         self.cpu_usage.set(percentage)
-    
+
     def record_memory_usage(self, bytes: int):
         """记录内存使用"""
         self.memory_usage.set(bytes)
-    
+
     def record_syscall(self, syscall_name: str):
         """记录系统调用"""
         self.syscall_count.add(1, {"syscall": syscall_name})
-    
+
     def record_policy_violation(self, violation_type: str):
         """记录策略违规"""
         self.policy_violations.add(1, {"type": violation_type})
@@ -15374,7 +15465,7 @@ import time
 
 class TestSandboxIsolation:
     """沙箱隔离测试"""
-    
+
     @pytest.fixture
     def sandbox_container(self):
         """创建测试沙箱容器"""
@@ -15392,16 +15483,16 @@ class TestSandboxIsolation:
         )
         yield container
         container.stop(timeout=5)
-    
+
     def test_filesystem_isolation(self, sandbox_container):
         """测试文件系统隔离"""
         # 尝试访问禁止的目录
         exit_code, output = sandbox_container.exec_run("ls /host")
         assert exit_code != 0, "Should not access /host"
-        
+
         exit_code, output = sandbox_container.exec_run("ls /proc")
         assert exit_code != 0, "Should not access /proc"
-    
+
     def test_network_isolation(self, sandbox_container):
         """测试网络隔离"""
         # 尝试网络连接
@@ -15409,13 +15500,13 @@ class TestSandboxIsolation:
             "python3 -c 'import socket; s=socket.socket(); s.connect((\"8.8.8.8\", 53))'"
         )
         assert exit_code != 0, "Should not connect to external network"
-    
+
     def test_readonly_filesystem(self, sandbox_container):
         """测试只读文件系统"""
         # 尝试写入只读目录
         exit_code, output = sandbox_container.exec_run("touch /etc/test")
         assert exit_code != 0, "Should not write to /etc"
-    
+
     def test_resource_limits(self, sandbox_container):
         """测试资源限制"""
         # 尝试消耗大量内存
@@ -15452,7 +15543,7 @@ import subprocess
 
 class TestSandboxEscape:
     """沙箱逃逸测试"""
-    
+
     @pytest.fixture
     def gvisor_sandbox(self):
         """创建 gVisor 测试沙箱"""
@@ -15471,7 +15562,7 @@ class TestSandboxEscape:
         container_id = result.stdout.strip()
         yield container_id
         subprocess.run(["docker", "stop", container_id])
-    
+
     def test_ptrace_injection(self, gvisor_sandbox):
         """测试 ptrace 注入防护"""
         exit_code = subprocess.run([
@@ -15480,7 +15571,7 @@ class TestSandboxEscape:
             "import ctypes; ctypes.CDLL('libc.so.6').ptrace(0, 1, 0, 0)"
         ]).returncode
         assert exit_code != 0, "ptrace should be blocked"
-    
+
     def test_mount_escape(self, gvisor_sandbox):
         """测试挂载逃逸防护"""
         exit_code = subprocess.run([
@@ -15488,7 +15579,7 @@ class TestSandboxEscape:
             "mount", "--bind", "/", "/tmp/host"
         ]).returncode
         assert exit_code != 0, "mount should be blocked"
-    
+
     def test_setns_escape(self, gvisor_sandbox):
         """测试 setns 逃逸防护"""
         exit_code = subprocess.run([
@@ -15527,7 +15618,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 class TestSandboxPerformance:
     """沙箱性能测试"""
-    
+
     def test_startup_latency(self, sandbox_factory):
         """测试启动延迟"""
         latencies = []
@@ -15536,52 +15627,52 @@ class TestSandboxPerformance:
             sandbox = sandbox_factory.create()
             latencies.append(time.time() - start)
             sandbox.cleanup()
-        
+
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         assert p95 < 2.0, f"P95 startup latency {p95}s exceeds 2s"
-    
+
     def test_execution_latency(self, sandbox_factory):
         """测试执行延迟"""
         sandbox = sandbox_factory.create()
         code = "print(sum(range(1000000)))"
-        
+
         latencies = []
         for _ in range(50):
             start = time.time()
             sandbox.execute(code)
             latencies.append(time.time() - start)
-        
+
         p95 = sorted(latencies)[int(len(latencies) * 0.95)]
         assert p95 < 5.0, f"P95 execution latency {p95}s exceeds 5s"
-        
+
         sandbox.cleanup()
-    
+
     def test_concurrent_executions(self, sandbox_factory):
         """测试并发执行"""
         def execute_task():
             sandbox = sandbox_factory.create()
             sandbox.execute("print('hello')")
             sandbox.cleanup()
-        
+
         start = time.time()
         with ThreadPoolExecutor(max_workers=50) as executor:
             list(executor.map(lambda _: execute_task(), range(50)))
         duration = time.time() - start
-        
+
         assert duration < 30.0, f"50 concurrent executions took {duration}s"
-    
+
     def test_memory_overhead(self, sandbox_factory):
         """测试内存开销"""
         import psutil
-        
+
         before = psutil.virtual_memory().used
         sandboxes = [sandbox_factory.create() for _ in range(10)]
         after = psutil.virtual_memory().used
-        
+
         overhead_per_sandbox = (after - before) / 10
         assert overhead_per_sandbox < 300 * 1024 * 1024, \
             f"Memory overhead {overhead_per_sandbox/1024/1024}MB exceeds 300MB"
-        
+
         for s in sandboxes:
             s.cleanup()
 ```
@@ -15692,13 +15783,13 @@ DATABASE_CONFIG = {
     "database": "sisys",
     "user": "sisys_app",
     "password": "${DB_PASSWORD}",
-    
+
     # 连接池配置
     "pool_size": 20,
     "max_overflow": 40,
     "pool_timeout": 30,
     "pool_recycle": 1800,
-    
+
     # SSL 配置
     "ssl_mode": "require",
     "ssl_cert": "/etc/ssl/certs/postgresql.crt",
@@ -16575,16 +16666,16 @@ CREATE TABLE event_outbox_archive (
 -- ============================================================================
 
 -- 组合索引：租户 + 状态 + 创建时间（常用查询）
-CREATE INDEX idx_strategic_plan_tenant_status_created 
+CREATE INDEX idx_strategic_plan_tenant_status_created
     ON strategic_plan(tenant_id, status, created_at DESC);
 
 -- 组合索引：创建者 + 计划类型
-CREATE INDEX idx_strategic_plan_creator_type 
+CREATE INDEX idx_strategic_plan_creator_type
     ON strategic_plan(creator_id, plan_type);
 
 -- 部分索引：只索引进行中的规划
-CREATE INDEX idx_strategic_plan_in_progress 
-    ON strategic_plan(tenant_id, created_at DESC) 
+CREATE INDEX idx_strategic_plan_in_progress
+    ON strategic_plan(tenant_id, created_at DESC)
     WHERE status IN ('draft', 'in_progress');
 
 -- ============================================================================
@@ -16592,11 +16683,11 @@ CREATE INDEX idx_strategic_plan_in_progress
 -- ============================================================================
 
 -- 组合索引：计划 + 阶段序列
-CREATE INDEX idx_checkpoint_plan_sequence 
+CREATE INDEX idx_checkpoint_plan_sequence
     ON checkpoint(plan_id, stage_sequence);
 
 -- 组合索引：计划 + 分支 + 状态
-CREATE INDEX idx_checkpoint_plan_branch_status 
+CREATE INDEX idx_checkpoint_plan_branch_status
     ON checkpoint(plan_id, branch_id, stage_status)
     WHERE branch_id IS NOT NULL;
 
@@ -16605,10 +16696,10 @@ CREATE INDEX idx_checkpoint_plan_branch_status
 -- ============================================================================
 
 -- BRIN 索引：时间范围查询（大表优化）
-CREATE INDEX idx_routing_decision_log_created_brin 
+CREATE INDEX idx_routing_decision_log_created_brin
     ON routing_decision_log USING BRIN(created_at);
 
-CREATE INDEX idx_saga_audit_log_started_brin 
+CREATE INDEX idx_saga_audit_log_started_brin
     ON saga_audit_log USING BRIN(started_at);
 
 -- ============================================================================
@@ -16616,15 +16707,15 @@ CREATE INDEX idx_saga_audit_log_started_brin
 -- ============================================================================
 
 -- GIN 索引：Agent 身份档案
-CREATE INDEX idx_agent_identity_gin 
+CREATE INDEX idx_agent_identity_gin
     ON agent USING GIN(identity);
 
 -- GIN 索引：检查点状态快照
-CREATE INDEX idx_checkpoint_state_snapshot_gin 
+CREATE INDEX idx_checkpoint_state_snapshot_gin
     ON checkpoint USING GIN(state_snapshot);
 
 -- 提取索引：JSONB 中的特定字段
-CREATE INDEX idx_agent_role_extracted 
+CREATE INDEX idx_agent_role_extracted
     ON agent((identity->>'role'));
 ```
 
@@ -16815,7 +16906,7 @@ black.options = -q
 """迁移脚本：创建初始 Schema
 
 Revision ID: 001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-02-25
 
 """
@@ -16834,7 +16925,7 @@ def upgrade() -> None:
     # 创建扩展
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
     op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
-    
+
     # 创建租户表
     op.create_table(
         'tenant',
@@ -16844,7 +16935,7 @@ def upgrade() -> None:
         sa.Column('tier', sa.String(20), nullable=False, default='basic'),
         # ... 其他字段
     )
-    
+
     # 创建索引
     op.create_index('idx_tenant_slug', 'tenant', ['slug'])
     op.create_index('idx_tenant_status', 'tenant', ['status'])
