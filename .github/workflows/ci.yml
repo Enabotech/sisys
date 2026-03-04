@@ -7,6 +7,7 @@
 # - Integration tests (with Docker containers)
 # - Security scanning (bandit)
 # - Build Docker image (multi-stage)
+# - Merge coverage reports and enforce 80% total coverage
 
 name: CI Pipeline
 
@@ -166,27 +167,36 @@ jobs:
         run: poetry install --with dev,test
 
       - name: Run unit tests with coverage
+        env:
+          COVERAGE_FILE: .coverage.unit   # 独立覆盖率数据文件
         run: |
           poetry run pytest tests/unit/ \
             --cov=src \
             --cov-report=xml:coverage-unit.xml \
             --cov-report=html:htmlcov-unit \
-            --cov-fail-under=80 \
             -v \
             --tb=short
+          # 注意：已移除 --cov-fail-under，防止中途失败
 
-      - name: Upload unit test coverage
+      - name: Upload unit test coverage HTML
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-unit
+          name: coverage-unit-html
           path: htmlcov-unit/
           retention-days: 7
 
-      - name: Upload coverage XML
+      - name: Upload unit test coverage XML
         uses: actions/upload-artifact@v4
         with:
           name: coverage-unit-xml
           path: coverage-unit.xml
+          retention-days: 7
+
+      - name: Upload raw coverage data (unit)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-unit
+          path: .coverage.unit
           retention-days: 7
 
   # =========================================
@@ -196,7 +206,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [unit-tests]
+    needs: [unit-tests]   # 保持依赖关系
     services:
       postgres:
         image: postgres:15-alpine
@@ -264,17 +274,9 @@ jobs:
           # Wait for services to be ready
           sleep 10
 
-      - name: Run integration tests
-        run: |
-          poetry run pytest tests/integration/ \
-            --cov=src \
-            --cov-report=xml:coverage-integration.xml \
-            --cov-report=html:htmlcov-integration \
-            --cov-append \
-            -v \
-            --tb=short \
-            --timeout=300
+      - name: Run integration tests with coverage
         env:
+          COVERAGE_FILE: .coverage.integration   # 独立覆盖率数据文件
           TEST_POSTGRES_URL: postgresql://test_user:test_password@localhost:5432/test_db
           TEST_REDIS_URL: redis://localhost:6379/0
           TEST_QDRANT_URL: http://localhost:6333
@@ -284,6 +286,16 @@ jobs:
           TEST_NEO4J_URI: bolt://localhost:7687
           TEST_NEO4J_USER: neo4j
           TEST_NEO4J_PASSWORD: test_neo4j_password
+        run: |
+          poetry run pytest tests/integration/ \
+            --cov=src \
+            --cov-report=xml:coverage-integration.xml \
+            --cov-report=html:htmlcov-integration \
+            --cov-append \
+            -v \
+            --tb=short \
+            --timeout=300
+          # 注意：已移除 --cov-fail-under，防止中途失败
 
       - name: Stop test containers
         if: always()
@@ -291,18 +303,25 @@ jobs:
           docker stop test-qdrant test-minio test-neo4j || true
           docker rm test-qdrant test-minio test-neo4j || true
 
-      - name: Upload integration test coverage
+      - name: Upload integration test coverage HTML
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-integration
+          name: coverage-integration-html
           path: htmlcov-integration/
           retention-days: 7
 
-      - name: Upload coverage XML
+      - name: Upload integration test coverage XML
         uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-xml
           path: coverage-integration.xml
+          retention-days: 7
+
+      - name: Upload raw coverage data (integration)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-integration
+          path: .coverage.integration
           retention-days: 7
 
   # =========================================
@@ -326,8 +345,8 @@ jobs:
           pip install safety bandit
 
       - name: Run bandit (security linting)
-        # run: bandit -r src/ -f json -o bandit-report.json --level high --severity high
         run: bandit -r src/ -f json -o bandit-report.json --severity-level high
+
       - name: Run safety (dependency vulnerabilities)
         run: safety check --json --fail-on critical --output safety-report.json
 
@@ -341,13 +360,68 @@ jobs:
           retention-days: 7
 
   # =========================================
-  # Job 5: Build Docker Image
+  # Job 5: Merge Coverage and Enforce Threshold
+  # =========================================
+  merge-coverage:
+    name: Merge Coverage Reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests, integration-tests]   # 等待两个测试作业完成
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install coverage
+        run: pip install coverage
+
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-data-*
+          merge-multiple: true
+
+      - name: List downloaded files
+        run: ls -la .coverage*
+
+      - name: Combine coverage data
+        run: coverage combine .coverage.unit .coverage.integration
+
+      - name: Generate coverage report (console)
+        run: coverage report --fail-under=80   # 整体覆盖率必须 ≥80%
+
+      - name: Generate XML report
+        run: coverage xml -o coverage-merged.xml
+
+      - name: Generate HTML report
+        run: coverage html -d htmlcov-merged
+
+      - name: Upload merged coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-merged-html
+          path: htmlcov-merged/
+          retention-days: 7
+
+      - name: Upload merged coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-merged-xml
+          path: coverage-merged.xml
+          retention-days: 7
+
+  # =========================================
+  # Job 6: Build Docker Image
   # =========================================
   build-docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [unit-tests, integration-tests]
+    needs: [merge-coverage]   # 改为依赖覆盖率合并作业
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     steps:
@@ -401,34 +475,27 @@ jobs:
           retention-days: 7
 
   # =========================================
-  # Job 6: Upload Coverage to Codecov
+  # Job 7: Upload Coverage to Codecov (可选)
   # =========================================
   upload-coverage:
     name: Upload Coverage to Codecov
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [unit-tests, integration-tests]
+    needs: [merge-coverage]   # 依赖合并后的覆盖率
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download coverage reports
+      - name: Download merged coverage XML
         uses: actions/download-artifact@v4
         with:
-          pattern: coverage-*-xml
-          merge-multiple: true
-
-      - name: List coverage files
-        run: |
-          echo "Available coverage files:"
-          ls -la *.xml || echo "No XML files found"
-          find . -name "*.xml" -type f
+          name: coverage-merged-xml
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./coverage-unit.xml,./coverage-integration.xml
-          flags: unittests,integration
+          files: ./coverage-merged.xml
+          flags: merged
           name: codecov-sisys
           fail_ci_if_error: true
           verbose: true
