@@ -181,7 +181,7 @@ omit = [
     "*/__init__.py",
     "*/conftest.py",
 ]
-branch = false
+# branch = false
 
 [tool.coverage.report]
 exclude_lines = [
@@ -195,4 +195,4 @@ exclude_lines = [
 ]
 show_missing = true
 fail_under = 80  # Story 0.2 质量门禁：覆盖率≥80%
-precision = 1
+# precision = 1
