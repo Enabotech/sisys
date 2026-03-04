@@ -125,3 +125,143 @@ class TestPlanValidation:
                 creator_id="agent_ceo",
                 id="invalid-uuid",  # type: ignore
             )
+
+
+class TestStrategicPlanSpecialMethods:
+    """测试战略规划特殊方法"""
+
+    def test_plan_repr(self):
+        """Given 规划实例，When 调用 repr，Then 返回格式化的字符串表示"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act
+        result = repr(plan)
+
+        # Assert
+        assert "StrategicPlan" in result
+        assert "SP" in result
+        assert "draft" in result
+        assert "agent_ceo" in result
+
+    def test_plan_eq_same_object(self):
+        """Given 同一对象，When 比较，Then 相等"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act & Assert
+        assert plan == plan
+
+    def test_plan_eq_different_objects_same_id(self):
+        """Given 不同对象但相同 ID，When 比较，Then 相等"""
+        # Arrange
+        plan1 = StrategicPlan.create(
+            plan_type=PlanType.SP,
+            creator_id="agent_ceo",
+            id=uuid4(),
+        )
+        plan2 = StrategicPlan.create(
+            plan_type=PlanType.SP,
+            creator_id="agent_ceo",
+            id=plan1.id,
+        )
+
+        # Act & Assert
+        assert plan1 == plan2
+
+    def test_plan_eq_different_objects_different_id(self):
+        """Given 不同对象且不同 ID，When 比较，Then 不相等"""
+        # Arrange
+        plan1 = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+        plan2 = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act & Assert
+        assert plan1 != plan2
+
+    def test_plan_eq_different_type(self):
+        """Given 不同类型对象，When 比较，Then 不相等"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act & Assert
+        assert plan != "not a plan"
+        assert plan != 123
+        assert plan != {"id": plan.id}
+
+    def test_plan_hash(self):
+        """Given 规划实例，When 调用 hash，Then 返回 ID 的哈希值"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act
+        result = hash(plan)
+
+        # Assert
+        assert result == hash(plan.id)
+
+    def test_add_checkpoint(self):
+        """Given 规划，When 添加检查点，Then 检查点添加到列表"""
+        # Arrange
+        from datetime import datetime, timezone
+
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+        checkpoint_time = datetime.now(timezone.utc)
+
+        # Act
+        plan.add_checkpoint(
+            stage="gap_analysis",
+            status="completed",
+            completed_at=checkpoint_time,
+            notes="Test checkpoint",
+        )
+
+        # Assert
+        assert len(plan.checkpoints) == 1
+        checkpoint = plan.checkpoints[0]
+        assert checkpoint["stage"] == "gap_analysis"
+        assert checkpoint["status"] == "completed"
+        assert checkpoint["notes"] == "Test checkpoint"
+
+    def test_add_checkpoint_without_optional_fields(self):
+        """Given 规划，When 添加检查点（不提供可选字段），Then 成功添加"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act
+        plan.add_checkpoint(
+            stage="market_insight",
+            status="in-progress",
+        )
+
+        # Assert
+        assert len(plan.checkpoints) == 1
+        checkpoint = plan.checkpoints[0]
+        assert checkpoint["stage"] == "market_insight"
+        assert checkpoint["status"] == "in-progress"
+        assert "completed_at" in checkpoint  # 自动生成
+
+    def test_clear_events(self):
+        """Given 有事件的规划，When 清空事件，Then 事件列表为空"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+        assert len(plan.domain_events) > 0
+
+        # Act
+        plan.clear_events()
+
+        # Assert
+        assert len(plan.domain_events) == 0
+
+    def test_plan_properties(self):
+        """Given 规划实例，When 访问属性，Then 返回正确的值"""
+        # Arrange
+        plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
+
+        # Act & Assert
+        assert plan.plan_type == PlanType.SP
+        assert plan.status == PlanStatus.DRAFT
+        assert plan.creator_id == "agent_ceo"
+        assert plan.version == 1
+        assert plan.blm_stage is None
+        assert plan.created_at is not None
+        assert plan.updated_at is not None
