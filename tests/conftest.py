@@ -115,7 +115,9 @@ def tests_root() -> Path:
 @pytest.fixture(scope="session")
 def test_data_dir(tests_root: Path) -> Path:
     """返回测试数据目录。"""
-    return tests_root / "data"
+    path = tests_root / "data"
+    path.mkdir(parents=True, exist_ok=True)   # 创建目录（如果不存在）
+    return path
 
 
 # ========== Docker 服务 Fixture ==========
