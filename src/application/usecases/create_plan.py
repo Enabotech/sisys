@@ -3,6 +3,7 @@ sisys - Create Plan Use Case.
 
 创建战略规划用例。
 """
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

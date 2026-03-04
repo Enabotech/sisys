@@ -3,6 +3,7 @@ sisys - Plan Repository Protocol.
 
 战略规划仓储接口定义（使用 Protocol 进行结构化子类型）。
 """
+
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 

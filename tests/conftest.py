@@ -3,6 +3,7 @@ sisys - Pytest Configuration and Global Fixtures.
 
 此文件包含所有测试共享的 Fixture 和配置。
 """
+
 import asyncio
 import uuid
 from pathlib import Path
@@ -116,7 +117,7 @@ def tests_root() -> Path:
 def test_data_dir(tests_root: Path) -> Path:
     """返回测试数据目录。"""
     path = tests_root / "data"
-    path.mkdir(parents=True, exist_ok=True)   # 创建目录（如果不存在）
+    path.mkdir(parents=True, exist_ok=True)  # 创建目录（如果不存在）
     return path
 
 

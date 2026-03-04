@@ -3,6 +3,7 @@ sisys - Strategic Plan Entity.
 
 战略规划领域实体 - 核心业务模型。
 """
+
 from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING

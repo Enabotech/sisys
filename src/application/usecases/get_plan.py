@@ -3,6 +3,7 @@ sisys - Get Plan Use Case.
 
 获取战略规划用例。
 """
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

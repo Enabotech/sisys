@@ -7,6 +7,7 @@
 - 验证命令处理
 - 验证事件发布
 """
+
 from uuid import uuid4
 
 import pytest
