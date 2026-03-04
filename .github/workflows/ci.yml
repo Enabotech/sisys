@@ -309,8 +309,8 @@ jobs:
           pip install safety bandit
 
       - name: Run bandit (security linting)
-        run: bandit -r src/ -f json -o bandit-report.json --level high --severity high
-
+        # run: bandit -r src/ -f json -o bandit-report.json --level high --severity high
+        run: bandit -r src/ -f json -o bandit-report.json --severity-level high
       - name: Run safety (dependency vulnerabilities)
         run: safety check --json --fail-on critical --output safety-report.json
 
