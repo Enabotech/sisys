@@ -4,12 +4,12 @@
 提供可复用的测试数据构建器，支持复杂对象构建。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import factory
 
-from src.domain.entities.strategic_plan import StrategicPlan, PlanType, PlanStatus
+from src.domain.entities.strategic_plan import PlanStatus, PlanType, StrategicPlan
 
 
 class StrategicPlanFactory(factory.Factory):
@@ -26,8 +26,8 @@ class StrategicPlanFactory(factory.Factory):
     plan_type = factory.LazyFunction(lambda: PlanType.SP)
     status = factory.LazyFunction(lambda: PlanStatus.DRAFT)
     creator_id = "agent_ceo"
-    created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
-    updated_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
+    created_at = factory.LazyFunction(lambda: datetime.now(UTC))
+    updated_at = factory.LazyFunction(lambda: datetime.now(UTC))
 
     class Params:
         # 简化创建特定状态的规划
@@ -56,7 +56,7 @@ class AgentFactory(factory.Factory):
     role = factory.LazyFunction(lambda: "CEO")
     status = "active"
     name = factory.Sequence(lambda n: f"Agent {n}")
-    created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
+    created_at = factory.LazyFunction(lambda: datetime.now(UTC))
 
 
 class TestDataBuilder:
