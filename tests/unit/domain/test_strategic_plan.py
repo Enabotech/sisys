@@ -7,6 +7,7 @@
 - 验证业务规则
 - 验证领域不变量
 """
+from datetime import UTC
 from uuid import uuid4
 
 import pytest
@@ -202,10 +203,10 @@ class TestStrategicPlanSpecialMethods:
     def test_add_checkpoint(self):
         """Given 规划，When 添加检查点，Then 检查点添加到列表"""
         # Arrange
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         plan = StrategicPlan.create(plan_type=PlanType.SP, creator_id="agent_ceo")
-        checkpoint_time = datetime.now(timezone.utc)
+        checkpoint_time = datetime.now(UTC)
 
         # Act
         plan.add_checkpoint(

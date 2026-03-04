@@ -1,10 +1,8 @@
 """
 领域事件基类测试 - 测试 DomainEvent 基类的功能。
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
-
-import pytest
 
 from src.domain.events.base import DomainEvent
 
@@ -26,7 +24,7 @@ class TestDomainEvent:
         """Given 自定义 ID 和时间，When 创建事件，Then 使用提供的值"""
         # Arrange
         custom_id = uuid4()
-        custom_time = datetime.now(timezone.utc)
+        custom_time = datetime.now(UTC)
 
         # Act
         event = DomainEvent(event_id=custom_id, occurred_on=custom_time)
@@ -37,6 +35,7 @@ class TestDomainEvent:
 
     def test_event_type_default_implementation(self):
         """Given 子类事件，When 获取 event_type，Then 返回蛇形命名的类名"""
+
         # Arrange
         class TestEvent(DomainEvent):
             pass
