@@ -3,6 +3,7 @@ sisys - Domain Event Base.
 
 领域事件基类 - 所有领域事件的抽象。
 """
+
 from abc import ABC
 from datetime import UTC, datetime
 from typing import Any

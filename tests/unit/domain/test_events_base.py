@@ -1,6 +1,7 @@
 """
 领域事件基类测试 - 测试 DomainEvent 基类的功能。
 """
+
 from datetime import UTC, datetime
 from uuid import uuid4
 

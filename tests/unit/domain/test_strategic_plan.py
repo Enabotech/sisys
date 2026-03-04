@@ -7,6 +7,7 @@
 - 验证业务规则
 - 验证领域不变量
 """
+
 from datetime import UTC
 from uuid import uuid4
 

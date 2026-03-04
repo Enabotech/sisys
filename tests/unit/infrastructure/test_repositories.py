@@ -7,6 +7,7 @@
 - 验证技术实现细节
 - 验证与外部服务的交互
 """
+
 from uuid import uuid4
 
 import pytest

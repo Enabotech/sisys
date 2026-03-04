@@ -3,6 +3,7 @@ sisys - Plan Events.
 
 战略规划相关领域事件。
 """
+
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
