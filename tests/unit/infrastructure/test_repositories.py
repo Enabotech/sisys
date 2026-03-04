@@ -164,3 +164,65 @@ class TestLLMRouterUnit:
         assert result["estimated_cost"] == 0.001
         assert result["estimated_latency"] == 500
         mock_llm_router.route.assert_called_once()
+
+
+class TestEventBusImplementation:
+    """事件总线实现测试"""
+
+    @pytest.mark.asyncio
+    async def test_event_bus_publish(self):
+        """Given 事件数据，When 发布，Then 不抛出异常"""
+        # Arrange
+        from src.infrastructure.event_bus import EventBus
+
+        event_bus = EventBus()
+
+        # Act & Assert
+        await event_bus.publish("plan.created", {"plan_id": "test-123"})
+        # 不抛出异常即为通过
+
+    @pytest.mark.asyncio
+    async def test_event_bus_subscribe(self):
+        """Given 事件处理器，When 订阅，Then 不抛出异常"""
+        # Arrange
+        from src.infrastructure.event_bus import EventBus
+
+        event_bus = EventBus()
+
+        async def handler(event):
+            pass
+
+        # Act & Assert
+        await event_bus.subscribe("plan.created", handler)
+        # 不抛出异常即为通过
+
+    @pytest.mark.asyncio
+    async def test_event_bus_unsubscribe(self):
+        """Given 订阅的处理器，When 取消订阅，Then 不抛出异常"""
+        # Arrange
+        from src.infrastructure.event_bus import EventBus
+
+        event_bus = EventBus()
+
+        async def handler(event):
+            pass
+
+        # Act & Assert
+        await event_bus.unsubscribe("plan.created", handler)
+        # 不抛出异常即为通过
+
+
+class TestPlanRepositoryProtocol:
+    """PlanRepository 协议测试（验证接口定义）"""
+
+    def test_repository_protocol_defined(self):
+        """Given PlanRepository 协议，When 检查，Then 定义所有必需方法"""
+        # Arrange
+        from src.domain.repositories.plan_repository import PlanRepository
+
+        # Act & Assert
+        assert hasattr(PlanRepository, "get_by_id")
+        assert hasattr(PlanRepository, "find_all")
+        assert hasattr(PlanRepository, "add")
+        assert hasattr(PlanRepository, "update")
+        assert hasattr(PlanRepository, "delete")
