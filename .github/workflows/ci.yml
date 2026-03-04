@@ -36,6 +36,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Free disk space on runner (best-effort)
+        run: |
+          echo "== free some preinstalled packages and caches =="
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/go || true
+          sudo apt-get clean || true
+          sudo rm -rf /var/cache/apt/archives/* || true
+          # pip/poetry caches
+          rm -rf ~/.cache/pip || true
+          rm -rf ~/.cache/pypoetry || true
+          # docker cleanup (builder cache + dangling)
+          sudo docker builder prune -af || true
+          sudo docker system prune -af --volumes || true
+          df -h
+
       - name: Checkout code
         uses: actions/checkout@v4
 
