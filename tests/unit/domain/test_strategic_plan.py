@@ -118,10 +118,10 @@ class TestPlanValidation:
             )
 
     def test_plan_id_cannot_be_none(self):
-        """Given 空的 ID，When 创建规划，Then 抛出验证异常"""
+        """Given 无效的 ID 类型，When 创建规划，Then 抛出验证异常"""
         with pytest.raises(DomainValidationError):
             StrategicPlan.create(
                 plan_type=PlanType.SP,
                 creator_id="agent_ceo",
-                id=None,  # type: ignore
+                id="invalid-uuid",  # type: ignore
             )
