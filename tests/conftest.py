@@ -32,6 +32,66 @@ def test_config() -> dict[str, Any]:
     }
 
 
+# ========== 数据库 Fixture ==========
+
+
+@pytest.fixture(scope="session")
+def test_engine(test_config: dict[str, Any]):
+    """
+    创建测试数据库引擎。
+
+    使用 StaticPool 确保测试隔离。
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_async_engine(
+        test_config["database_url"],
+        poolclass=StaticPool,
+        echo=False,
+    )
+    yield engine
+    asyncio.run(engine.dispose())
+
+
+@pytest.fixture(scope="function")
+async def db_session(test_engine):
+    """
+    数据库会话 Fixture - 每个测试函数独立事务。
+
+    测试完成后自动回滚，确保测试隔离。
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    async_sessionmaker = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_sessionmaker() as session:
+        async with session.begin():
+            yield session
+        # 事务自动回滚（测试隔离）
+
+
+@pytest.fixture(scope="function")
+async def clean_database(db_session: AsyncSession):
+    """
+    清理数据库 Fixture - 每个测试前清理所有表。
+
+    按依赖顺序删除数据，避免外键约束冲突。
+    """
+    from sqlalchemy import text
+
+    # 按依赖顺序删除数据
+    await db_session.execute(text("DELETE FROM event_outbox"))
+    await db_session.execute(text("DELETE FROM routing_decision_log"))
+    await db_session.execute(text("DELETE FROM strategic_plans"))
+    await db_session.commit()
+    yield db_session
+
+
 # ========== 项目结构 Fixture ==========
 
 
@@ -78,9 +138,12 @@ def docker_services(docker_compose_file: Path):
     """
     import subprocess
 
+    # 使用 docker compose (v2 插件版本) 而非废弃的 docker-compose
+    compose_cmd = ["docker", "compose"]
+
     # 启动服务
     subprocess.run(
-        ["docker-compose", "up", "-d"],
+        [*compose_cmd, "up", "-d"],
         cwd=docker_compose_file.parent,
         check=True,
         capture_output=True,
@@ -90,7 +153,7 @@ def docker_services(docker_compose_file: Path):
 
     # 停止服务
     subprocess.run(
-        ["docker-compose", "down"],
+        [*compose_cmd, "down"],
         cwd=docker_compose_file.parent,
         check=True,
         capture_output=True,
@@ -289,11 +352,8 @@ def time_travel(frozen_time):
             # Move time forward by 1 hour
             time_travel.move_to("2026-03-03 11:00:00")
     """
-    from freezegun import freeze_time
-
-    with freeze_time("2026-03-03 10:00:00") as frozen:
-        frozen.move_to = frozen.move_to
-        yield frozen
+    # frozen_time 已经是 freeze_time 上下文，直接使用
+    yield frozen_time
 
 
 # ========== 异步测试支持 ==========
