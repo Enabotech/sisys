@@ -7,13 +7,14 @@
 - 验证命令处理
 - 验证事件发布
 """
-import pytest
-from pytest_mock import MockerFixture
 from uuid import uuid4
 
+import pytest
+from pytest_mock import MockerFixture
+
 from src.application.usecases.create_plan import CreatePlanCommand, CreatePlanHandler
-from src.application.usecases.get_plan import GetPlanQuery, GetPlanHandler
-from src.domain.entities.strategic_plan import StrategicPlan, PlanType
+from src.application.usecases.get_plan import GetPlanHandler, GetPlanQuery
+from src.domain.entities.strategic_plan import PlanType, StrategicPlan
 from src.domain.exceptions import NotFoundError, ValidationError
 
 
@@ -106,6 +107,7 @@ class TestGetPlanHandler:
     async def test_get_plan_not_found_raises_error(
         self,
         mock_repository,
+        mocker: MockerFixture,
     ):
         """Given 不存在的规划 ID，When 执行查询用例，Then 抛出未找到异常"""
         # Arrange

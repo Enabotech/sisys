@@ -7,12 +7,10 @@
 - 验证技术实现细节
 - 验证与外部服务的交互
 """
-import pytest
-from pytest_mock import MockerFixture
 from uuid import uuid4
 
-from src.infrastructure.repositories.strategic_plan_repository import StrategicPlanRepositoryImpl
-from src.infrastructure.event_bus import EventBus
+import pytest
+from pytest_mock import MockerFixture
 
 
 class TestStrategicPlanRepositoryUnit:
@@ -79,6 +77,7 @@ class TestStrategicPlanRepositoryUnit:
     async def test_repository_delete_plan(
         self,
         mock_repository,
+        mocker: MockerFixture,
     ):
         """Given 规划 ID，When 删除，Then 成功删除"""
         # Arrange

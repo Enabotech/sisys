@@ -18,6 +18,7 @@ class TestCLIUnit:
         """Given help 命令，When 执行，Then 显示帮助信息"""
         # Arrange
         from click.testing import CliRunner
+
         from src.cli import app
 
         runner = CliRunner()
@@ -33,6 +34,7 @@ class TestCLIUnit:
         """Given version 命令，When 执行，Then 显示版本号"""
         # Arrange
         from click.testing import CliRunner
+
         from src.cli import app
 
         runner = CliRunner()
@@ -53,6 +55,7 @@ class TestAPIHealthEndpoint:
         """Given 健康检查请求，When 调用端点，Then 返回 OK 状态"""
         # Arrange
         from fastapi.testclient import TestClient
+
         from src.interfaces.api.main import app
 
         client = TestClient(app)
@@ -69,6 +72,7 @@ class TestAPIHealthEndpoint:
         """Given 就绪检查请求，When 调用端点，Then 返回 OK 状态"""
         # Arrange
         from fastapi.testclient import TestClient
+
         from src.interfaces.api.main import app
 
         client = TestClient(app)
@@ -88,6 +92,7 @@ class TestAPIErrorHandling:
         """Given 不存在的资源，When 请求，Then 返回 404"""
         # Arrange
         from fastapi.testclient import TestClient
+
         from src.interfaces.api.main import app
 
         client = TestClient(app)
@@ -103,6 +108,7 @@ class TestAPIErrorHandling:
         """Given 无效的请求数据，When 请求，Then 返回 422"""
         # Arrange
         from fastapi.testclient import TestClient
+
         from src.interfaces.api.main import app
 
         client = TestClient(app)
@@ -120,7 +126,7 @@ class TestEventListeners:
     def test_event_listener_registers_handlers(self, mocker: MockerFixture):
         """Given 事件监听器，When 启动，Then 注册所有处理器"""
         # Arrange
-        mock_listener = mocker.AsyncMock()
+        # mock_listener = mocker.AsyncMock()
 
         # Act
         # 根据实际实现调整
