@@ -94,6 +94,32 @@ So that **代码变更可以快速、可靠地发布**。
   - [x] Subtask 8.7: 生产健康检查 URL 使用环境变量
   - [x] Subtask 8.8: Secrets 管理文档添加紧急恢复流程
 
+
+## TDD 集成说明（2026-03-04 新增）
+
+**CI/CD 流水线已集成 TDD 测试门禁：**
+
+**阶段 2: 单元测试**
+- 运行 `pytest tests/unit/ --cov=src --cov-fail-under=80`
+- 领域层覆盖率≥90%
+- 应用层覆盖率≥85%
+
+**质量门禁：**
+- 覆盖率<80% 阻断流水线
+- 领域层覆盖率<90% 阻断流水线
+
+**TDD 红 - 绿 - 重构循环已整合到开发流程：**
+```bash
+# 开发流程
+make tdd-red TARGET=domain/entities    # 红阶段：编写失败测试
+make tdd-green TARGET=domain/entities # 绿阶段：最小实现
+make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
+```
+
+**相关文档：**
+- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
+- `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式指南
+
 ## Dev Notes
 
 ### 相关架构模式和约束

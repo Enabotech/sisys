@@ -53,6 +53,38 @@ So that **团队可以高效协作开发**。
 - 快速设置指南：`QUICK_SETUP.md`（2026-03-02 新增）
 - **安全提示：** 开发环境可使用默认密码，生产环境必须修改！
 
+## TDD 工具链说明（2026-03-04 新增）
+
+**SDD+TDD 融合模式工具链：**
+
+本项目已建立完整的 SDD+TDD 融合开发模式工具链：
+
+1. **测试框架** - pytest/pytest-cov/pytest-mock/factory_boy
+2. **代码质量** - ruff/mypy/black/bandit
+3. **规范验证** - pydantic/schemathesis/pytest-bdd
+4. **CI/CD** - GitHub Actions（6 个 Job）
+
+**Makefile 命令：**
+```bash
+# SDD 规范定义
+make sdd-define
+
+# TDD 红 - 绿 - 重构循环
+make tdd-red TARGET=domain/entities
+make tdd-green TARGET=domain/entities
+make tdd-refactor TARGET=domain/entities
+
+# SDD 规范验证
+make sdd-verify
+
+# 完整开发循环
+make sdd-tdd-cycle STORY=1.1
+```
+
+**相关文档：**
+- `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式完整指南
+- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
+
 ## Known Issues & Solutions
 
 ### Issue 1: Qdrant 健康检查显示问题

@@ -94,6 +94,68 @@ So that **可以快速编写和执行测试用例**。
   - [x] Subtask 11.3: 编写测试最佳实践指南
   - [x] Subtask 11.4: 创建测试检查清单
 
+## SDD+TDD 融合测试框架（2026-03-04 新增）
+
+**本 Story 建立的测试框架支持 SDD+TDD 融合模式：**
+
+### 测试分层
+
+1. **单元测试（70%）** - TDD 驱动开发
+   - 领域层测试（覆盖率≥90%）
+   - 应用层测试（覆盖率≥85%）
+   - 基础设施层测试（覆盖率≥75%）
+
+2. **集成测试（20%）** - 契约验证
+   - 外部服务集成
+   - 数据库集成
+   - 事件总线集成
+
+3. **E2E 测试（10%）** - 验收验证
+   - 用户旅程测试
+   - 完整业务流程测试
+
+### TDD 红 - 绿 - 重构循环
+
+**红阶段：**
+```bash
+make tdd-red TARGET=domain/entities
+```
+
+**绿阶段：**
+```bash
+make tdd-green TARGET=domain/entities
+```
+
+**重构阶段：**
+```bash
+make tdd-refactor TARGET=domain/entities
+```
+
+### 测试模板
+
+**单元测试模板：**
+```python
+# tests/unit/domain/entities/test_<entity>.py
+class Test<Entity>:
+    def test_create_<entity>_with_valid_data(self):
+        """Given 有效的领域数据，When 创建实体，Then 成功创建"""
+        # Arrange
+        # Act
+        # Assert
+```
+
+**验收测试模板：**
+```gherkin
+# tests/acceptance/test_<feature>.feature
+Feature: <功能名称>
+  Scenario: <场景名称>
+    Given <前置条件>
+    When <触发动作>
+    Then <预期结果>
+```
+
+**完整模板参考：** `docs/developer/sdd-tdd-fusion-guide.md` 附录
+
 ## Senior Developer Review (AI) - 第二次审查
 
 **Review Date:** 2026-03-04
