@@ -1,6 +1,6 @@
 # sisys - Production Dockerfile (Multi-stage build)
 # Optimized for production: minimal size, security, performance
-# 
+#
 # Usage:
 #   docker build -f docker/Dockerfile.prod -t ghcr.io/sisys/sisys:latest .
 #
@@ -10,6 +10,7 @@
 # - Health check included
 # - Resource limits configured
 # - Python 3.11+ with optimizations
+# - Disk space optimized for CI/CD
 
 # =========================================
 # Stage 1: Builder
@@ -26,14 +27,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_NO_INTERACTION=1
 
-# Install system dependencies
+# Install system dependencies (minimal set)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libpq-dev \
     libffi-dev \
     python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/*
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
@@ -45,7 +48,8 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
 # Install dependencies (production only)
-RUN $POETRY_HOME/bin/poetry install --only main --no-root
+# Use --no-root to avoid installing the package itself
+RUN $POETRY_HOME/bin/poetry install --only main --no-root --no-interaction
 
 # Copy source code
 COPY src/ ./src/
@@ -69,14 +73,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN groupadd --gid 1000 sisys && \
     useradd --uid 1000 --gid sisys --shell /bin/bash --create-home sisys
 
-# Install runtime dependencies
+# Install runtime dependencies (minimal set)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     libffi8 \
     curl \
-    wget \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/*
 
 # Set working directory
 WORKDIR $APP_HOME
@@ -87,9 +91,8 @@ COPY --from=builder /app/.venv $VIRTUAL_ENV
 # Copy application code
 COPY --from=builder /app/src ./src
 
-# Copy configuration files
+# Copy configuration files (only if needed)
 COPY configs/ ./configs/
-COPY scripts/ ./scripts/
 
 # Copy health check script
 COPY scripts/monitoring/health_check.py /app/health_check.py

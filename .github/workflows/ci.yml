@@ -372,6 +372,40 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Free disk space (critical for Docker build)
+        run: |
+          echo "=== Free disk space before build ==="
+          df -h
+
+          # Remove large unnecessary packages
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/go || true
+          sudo rm -rf /usr/local/share/boost || true
+          sudo rm -rf /usr/local/.ghcup || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+
+          # Clean apt cache
+          sudo apt-get clean || true
+          sudo rm -rf /var/cache/apt/archives/* || true
+          sudo rm -rf /var/log/apt/* || true
+
+          # Remove pip/poetry caches
+          rm -rf ~/.cache/pip || true
+          rm -rf ~/.cache/pypoetry || true
+
+          # Docker cleanup (from previous jobs)
+          sudo docker builder prune -af || true
+          sudo docker system prune -af --volumes || true
+
+          # Remove large ISO files if present
+          sudo rm -rf /usr/share/miniconda || true
+          sudo rm -rf /usr/share/swift || true
+
+          echo "=== Disk space after cleanup ==="
+          df -h
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -418,7 +452,7 @@ jobs:
           echo "Found Dockerfile: $DOCKERFILE_PATH"
           echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
 
-      - name: Build Docker image (multi-stage)
+      - name: Build Docker image (optimized for disk space)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -429,6 +463,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
+          # Optimize build to reduce disk usage
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # Use buildkit's advanced features
+          provenance: false
+          sbom: false
+
+      - name: Show Docker image size
+        run: |
+          echo "=== Docker image size ==="
+          docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Size}}"
+          docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Repository}}:{{.Tag}} - {{.Size}}"
+
+      - name: Free space after build (before Trivy)
+        run: |
+          echo "=== Disk space before Trivy scan ==="
+          df -h
+          # Additional cleanup before Trivy
+          sudo docker image prune -f || true
+          echo "=== Disk space after prune ==="
+          df -h
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
