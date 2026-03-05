@@ -37,11 +37,11 @@ story_location: g:\ai\sisys\_bmad-output\implementation-artifacts
 
 development_status:
   # Epic 0: Iteration 0
-  epic-0: in-progress
+  epic-0: done
   0-1-dev-environment-setup: done
   0-2-ci-cd-pipeline: done
   0-3-test-framework-setup: done
-  epic-0-retrospective: optional
+  epic-0-retrospective: done  # Completed: 2026-03-05, Retro doc: epic-0-retro-2026-03-05.md
 
   # Epic 1: 企业级架构基础与合规
   epic-1: backlog

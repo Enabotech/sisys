@@ -1890,6 +1890,34 @@ So that **系统可以处理企业现有各类文档**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 文档上传测试 - 验证 17 种格式支持
+   - [ ] 分片上传测试 - 验证断点续传
+   - [ ] 批量上传测试 - 验证并发处理
+
+2. **性能要求**
+   - [ ] 上传延迟 P95<100ms
+   - [ ] 并发上传≥20
+   - [ ] 总大小支持≤20GB
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_document_upload.py` - 单元测试
+   - [ ] `tests/integration/test_document_upload_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
+
 **Given** 用户已登录并具有上传权限
 **When** 拖拽或选择文件上传（支持批量，总大小≤20GB）
 **Then** 系统接收所有支持格式，显示上传进度
@@ -1902,6 +1930,34 @@ I want **系统解析基础格式文档（PDF/Word/TXT）并提取文本、表�
 So that **MVP 核心格式支持，非结构化文档转化为结构化知识资产**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 文档解析测试 - 验证 PDF/Word/TXT 格式支持
+   - [ ] 内容提取测试 - 验证文本/表格/图像/公式提取
+   - [ ] 准确率测试 - 验证解析准确率≥95%
+
+2. **性能要求**
+   - [ ] 解析延迟 P95<500ms
+   - [ ] 解析准确率≥95%
+   - [ ] 并发解析≥10
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_document_parse.py` - 单元测试
+   - [ ] `tests/integration/test_document_parse_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已上传完成（PDF/Word/TXT 格式）
 **When** 系统执行文档解析
@@ -1919,6 +1975,34 @@ I want **系统解析扩展格式文档（PPT/Excel/图像/HTML 等）并提取�
 So that **支持 17 种格式完整解析，企业现有各类文档都可处理**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 文档解析测试 - 验证 PPT/Excel/图像/HTML 格式支持
+   - [ ] OCR 测试 - 验证扫描件/图像 PDF 解析
+   - [ ] 表格语义测试 - 验证合并单元格/跨页表格识别
+
+2. **性能要求**
+   - [ ] 解析延迟 P95<500ms
+   - [ ] 解析准确率≥95%
+   - [ ] 并发解析≥10
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_document_parse_extended.py` - 单元测试
+   - [ ] `tests/integration/test_document_parse_extended_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已上传完成（PPT/PPTX/XLS/XLSX/CSV/JPEG/PNG/GIF/HTML 等扩展格式）
 **When** 系统执行文档解析
@@ -1938,6 +2022,34 @@ So that **支持高保真溯源至原始文档坐标点**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 版面信息测试 - 验证 DocLayNet 格式支持
+   - [ ] 坐标记录测试 - 验证元素坐标 x/y/width/height
+   - [ ] 溯源测试 - 验证 Bounding Box 级溯源
+
+2. **性能要求**
+   - [ ] 坐标记录延迟 P95<100ms
+   - [ ] 坐标准确率≥99%
+   - [ ] ONNX 格式跨平台推理支持
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_document_layout.py` - 单元测试
+   - [ ] `tests/integration/test_document_layout_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
+
 **Given** 文档解析完成
 **When** 记录文档元素坐标信息
 **Then** 采用 DocLayNet 标准格式（支持 ONNX 格式跨平台推理）
@@ -1950,6 +2062,36 @@ I want **系统提取表格的行列语义，输出包含表头与列类型的�
 So that **财务数据不失真，支持后续分析**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 表格解析测试 - 验证 xls/xlsx/csv/PDF 表格支持
+   - [ ] 表头提取测试 - 验证表头识别
+   - [ ] 列类型测试 - 验证列类型识别
+   - [ ] 合并单元格测试 - 验证合并单元格语义还原
+   - [ ] 跨页表格测试 - 验证跨页表格识别
+
+2. **性能要求**
+   - [ ] 表格解析延迟 P95<500ms
+   - [ ] 表头识别准确率≥95%
+   - [ ] 列类型识别准确率≥95%
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_table_extraction.py` - 单元测试
+   - [ ] `tests/integration/test_table_extraction_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档包含表格（xls/xlsx/csv/PDF 表格）
 **When** 系统执行表格解析
@@ -1964,9 +2106,41 @@ So that **历史纸质文档和扫描件可被系统处理**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] OCR 测试 - 验证扫描件/图像 PDF 解析
+   - [ ] 中文 OCR 测试 - 验证中文识别
+   - [ ] 英文 OCR 测试 - 验证英文识别
+   - [ ] 置信度测试 - 验证置信度评分输出
+
+2. **性能要求**
+   - [ ] OCR 解析延迟 P95<1s
+   - [ ] 中文识别准确率≥95%
+   - [ ] 英文识别准确率≥95%
+   - [ ] 置信度评分准确率≥90%
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_ocr.py` - 单元测试
+   - [ ] `tests/integration/test_ocr_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
+
 **Given** 上传的文档是扫描件或图像 PDF
 **When** 系统执行 OCR 解析
 **Then** 提取文本内容，输出置信度评分
+**And** 支持中文和英文识别
+**And** 置信度评分用于后续质量验证
 **And** 置信度<0.85 时自动标注为"待人工复核"
 
 ### Story 2.6: 文档版本快照
@@ -1976,6 +2150,34 @@ I want **创建文档版本快照，系统记录操作者、时间戳与差异�
 So that **支持版本追溯和回滚**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 版本快照测试 - 验证版本创建
+   - [ ] 差异摘要测试 - 验证 diff 计算
+   - [ ] 版本冲突测试 - 验证乐观锁/悲观锁
+
+2. **性能要求**
+   - [ ] 版本创建延迟 P95<100ms
+   - [ ] 差异计算延迟 P95<200ms
+   - [ ] 并发版本控制≥10
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_document_version.py` - 单元测试
+   - [ ] `tests/integration/test_document_version_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档已存在于系统
 **When** 用户上传新版本或修改文档
@@ -1990,6 +2192,32 @@ So that **确保文档元数据完整性和可追溯性**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 元数据校验测试 - 验证最小元字段集
+   - [ ] 阻断测试 - 验证关键字段缺失自动阻断
+
+2. **性能要求**
+   - [ ] 元数据校验延迟 P95<50ms
+   - [ ] 元数据校验准确率 100%
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_metadata_validation.py` - 单元测试
+   - [ ] `tests/integration/test_metadata_validation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
+
 **Given** 文档解析完成准备入库
 **When** 系统校验元数据
 **Then** 最小元字段集完整（creator/created_at/source/license/business_domain）
@@ -2002,6 +2230,35 @@ I want **系统对文档进行语义分块（基于文档语义边界而非固�
 So that **检索结果更符合语义完整性**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **基础设施测试**
+   - [ ] 语义分块测试 - 验证基于文档语义边界切片
+   - [ ] 段落边界测试 - 验证段落边界识别
+   - [ ] 章节边界测试 - 验证章节边界识别
+   - [ ] 表格边界测试 - 验证表格边界识别
+
+2. **性能要求**
+   - [ ] 语义分块延迟 P95<500ms
+   - [ ] 平均片段长度≈300 tokens（允许配置）
+   - [ ] 语义完整性≥90%
+
+3. **覆盖率要求**
+   - [ ] 基础设施层覆盖率≥75%
+   - [ ] 集成测试覆盖率≥70%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_semantic_chunking.py` - 单元测试
+   - [ ] `tests/integration/test_semantic_chunking_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
 
 **Given** 文档解析完成
 **When** 系统执行语义分块
@@ -2056,6 +2313,34 @@ So that **支持语义相似度检索，理解查询的深层含义**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Dense 检索测试 - 验证 bge-m3 嵌入生成
+   - [ ] 余弦相似度测试 - 验证相似度计算
+   - [ ] Payload 过滤测试 - 验证元数据过滤
+
+2. **性能要求**
+   - [ ] 检索延迟 P95<200ms（初检）
+   - [ ] 嵌入生成延迟 P95<50ms
+   - [ ] 并发检索≥50
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_dense_retrieval.py` - 单元测试
+   - [ ] `tests/integration/test_dense_retrieval_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 用户输入检索查询
 **When** 系统执行 Dense 检索
 **Then** 使用 bge-m3 生成查询嵌入（维度 1024），在 Qdrant 中执行余弦相似度检索
@@ -2069,6 +2354,35 @@ I want **系统执行 BM25 稀疏检索并与 Dense 检索融合（RRF 算法）
 So that **同时支持语义检索和关键词检索，综合提升相关性**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] BM25 检索测试 - 验证关键词检索
+   - [ ] RRF 融合测试 - 验证 Reciprocal Rank Fusion 算法
+   - [ ] ColBERT 重排序测试 - 验证精排
+
+2. **性能要求**
+   - [ ] 检索延迟 P95<800ms（MVP，含重排序）
+   - [ ] BM25 检索延迟 P95<100ms
+   - [ ] RRF 融合延迟 P95<50ms
+   - [ ] 并发检索≥50
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_bm25_rrf.py` - 单元测试
+   - [ ] `tests/integration/test_bm25_rrf_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 用户输入检索查询
 **When** 系统执行混合检索
@@ -2085,6 +2399,35 @@ So that **构建知识图谱的实体和关系**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 实体抽取测试 - 验证 LLM+ 规则混合策略
+   - [ ] 规则基测试 - 验证 AC 自动机/正则/依存句法
+   - [ ] LLM 语义测试 - 验证 Few-Shot+CoT+Schema 约束
+   - [ ] 冲突仲裁测试 - 验证规则权重 0.6/LLM 权重 0.4
+
+2. **性能要求**
+   - [ ] 规则基抽取准确率≥80%
+   - [ ] LLM 语义抽取召回率≥90%
+   - [ ] 冲突仲裁准确率≥85%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_entity_extraction.py` - 单元测试
+   - [ ] `tests/integration/test_entity_extraction_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 文档解析完成
 **When** 系统执行实体抽取
 **Then** 规则基抽取（领域词典 AC 自动机、正则、依存句法）准确率≥80%
@@ -2097,6 +2440,34 @@ I want **系统管理战略领域词典库，支持热更新与版本管理**,
 So that **实体抽取准确率持续提升**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 词典管理测试 - 验证添加/修改/删除词条
+   - [ ] 热更新测试 - 验证无需重启系统
+   - [ ] 版本管理测试 - 验证回滚功能
+
+2. **性能要求**
+   - [ ] 词典热更新延迟 P95<100ms
+   - [ ] 版本回滚延迟 P95<200ms
+   - [ ] 核心战略概念覆盖率≥95%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_domain_dictionary.py` - 单元测试
+   - [ ] `tests/integration/test_domain_dictionary_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 战略领域词典已初始化
 **When** 添加新词或修改现有词条
@@ -2111,6 +2482,34 @@ So that **综合多种检索信号提升相关性**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] RRF 融合测试 - 验证三路结果融合
+   - [ ] ColBERT 重排序测试 - 验证 Top-K 精排
+   - [ ] 权重配置测试 - 验证可配置权重
+
+2. **性能要求**
+   - [ ] RRF 融合延迟 P95<50ms
+   - [ ] ColBERT 重排序延迟 P95<200ms
+   - [ ] 并发检索≥50
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_rrf_fusion.py` - 单元测试
+   - [ ] `tests/integration/test_rrf_fusion_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 三路检索结果已获取
 **When** 执行 RRF 融合排序
 **Then** 可配置权重的 RRF 算法融合三路结果
@@ -2123,6 +2522,36 @@ I want **系统执行分层检索（L1 跨文档摘要→L2 文档摘要→L3 �
 So that **支持自顶向下和自底向上的双向检索**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 分层检索测试 - 验证 L1-L4 四级索引
+   - [ ] 自顶向下测试 - 验证 L1→L4 遍历
+   - [ ] 自底向上测试 - 验证 L4→L1 遍历
+   - [ ] Parent-Child 层级测试 - 验证层级关系
+
+2. **性能要求**
+   - [ ] 初检延迟 P95<200ms
+   - [ ] 精排延迟 P95<250ms
+   - [ ] 融合延迟 P95<50ms
+   - [ ] 并发检索≥50
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_layered_retrieval.py` - 单元测试
+   - [ ] `tests/integration/test_layered_retrieval_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 四级分层索引已构建（Parent-Child 层级）
 **When** 执行分层检索
@@ -2137,6 +2566,34 @@ So that **摘要质量可控且可验证**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 摘要生成测试 - 验证 LLM 生成摘要
+   - [ ] JSON Schema 测试 - 验证 Pydantic V2 Schema 验证
+   - [ ] 多视角测试 - 验证财务/市场/技术视角
+
+2. **性能要求**
+   - [ ] 摘要生成延迟 P95<30 秒
+   - [ ] Schema 验证通过率 100%
+   - [ ] 摘要质量评分≥8/10
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_contract_summary.py` - 单元测试
+   - [ ] `tests/integration/test_contract_summary_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 检索结果已获取
 **When** 调用 LLM 生成摘要
 **Then** 输出强制遵守预定义的 JSON Schema 契约（财务/市场/技术视角）
@@ -2149,6 +2606,34 @@ I want **系统评估检索相关性（LLM-as-a-Judge 实时多维评估），�
 So that **防止基于不足数据生成幻觉内容**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 相关性评估测试 - 验证 LLM-as-a-Judge 多维评估
+   - [ ] 阻断测试 - 验证相关性<0.6 标注"数据不足"
+   - [ ] 多维评估测试 - 验证相关性/完整性/时效性
+
+2. **性能要求**
+   - [ ] 相关性评估延迟 P95<500ms
+   - [ ] 评估准确率≥90%
+   - [ ] 阻断准确率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_relevance_evaluation.py` - 单元测试
+   - [ ] `tests/integration/test_relevance_evaluation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 检索结果已获取
 **When** 执行相关性评估
@@ -2163,6 +2648,34 @@ So that **从结论快速追溯至原始文档坐标点**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 溯源测试 - 验证引文"三元组"特征
+   - [ ] Bounding Box 测试 - 验证 PDF 坐标点定位
+   - [ ] 溯源卡片测试 - 验证文档 ID/页码/置信度显示
+
+2. **性能要求**
+   - [ ] 溯源响应<300ms
+   - [ ] 定位准确率≥95%
+   - [ ] 并发溯源≥50
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_traceability.py` - 单元测试
+   - [ ] `tests/integration/test_traceability_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 检索结果包含引文信息
 **When** 用户点击结论文字
 **Then** 弹出溯源卡片，显示文档 ID、页码、置信度
@@ -2175,6 +2688,34 @@ I want **系统执行语义缓存（相似度>0.9 直接返回缓存结果）**,
 So that **减少重复检索和 LLM 调用，降低 Token 消耗**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 语义缓存测试 - 验证相似度>0.9 返回缓存
+   - [ ] 缓存命中率测试 - 验证减少重复检索
+   - [ ] TTL 测试 - 验证缓存失效策略
+
+2. **性能要求**
+   - [ ] 缓存命中延迟 P95<50ms
+   - [ ] 缓存命中率≥40%
+   - [ ] Token 消耗降低 40-50%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_semantic_cache.py` - 单元测试
+   - [ ] `tests/integration/test_semantic_cache_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 查询已执行过
 **When** 新查询与历史查询相似度>0.9
@@ -2189,6 +2730,34 @@ So that **形成企业长期记忆和知识积累**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 档案存储测试 - 验证关键假设变量/决策依据/执行偏差存储
+   - [ ] 永久存储测试 - 验证向量存储 + 对象存储协同
+   - [ ] 归档测试 - 验证 SP/BP 规划完成归档
+
+2. **性能要求**
+   - [ ] 归档延迟 P95<500ms
+   - [ ] 存储完整性 100%
+   - [ ] 查询延迟 P95<200ms
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_strategic_archive.py` - 单元测试
+   - [ ] `tests/integration/test_strategic_archive_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** SP/BP 规划完成
 **When** 归档至战略档案库
 **Then** 关键假设变量、决策依据、实际执行偏差永久存储
@@ -2202,6 +2771,34 @@ So that **支持时间轴演进的动态知识网络查询**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 有效期标签测试 - 验证 valid_from/valid_until 管理
+   - [ ] 时间轴查询测试 - 验证按时间范围查询
+   - [ ] 数据陈旧测试 - 验证超 12 个月自动标记
+
+2. **性能要求**
+   - [ ] 时间轴查询延迟 P95<200ms
+   - [ ] 数据陈旧标记准确率 100%
+   - [ ] 降权处理准确率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_validity_period.py` - 单元测试
+   - [ ] `tests/integration/test_validity_period_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 战略档案已存储
 **When** 查询历史决策
 **Then** 支持按时间范围查询，显示事实有效期标签
@@ -2214,6 +2811,34 @@ I want **系统执行数据陈旧标记（超 12 个月自动降权）**,
 So that **提醒用户注意数据时效性**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 数据陈旧测试 - 验证超 12 个月自动降权
+   - [ ] 提示测试 - 验证生成结果中提示"数据陈旧"
+   - [ ] 降权处理测试 - 验证排序分数降低
+
+2. **性能要求**
+   - [ ] 数据陈旧标记延迟 P95<100ms
+   - [ ] 降权处理准确率 100%
+   - [ ] 提示准确率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_data_staleness.py` - 单元测试
+   - [ ] `tests/integration/test_data_staleness_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 引用数据已存储超 12 个月
 **When** 检索或生成结果引用该数据
@@ -2254,6 +2879,35 @@ So that **Agent 可以调用这些工具执行分析**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 工具注册测试 - 验证 23 种战略工具注册
+   - [ ] 工具标识测试 - 验证唯一标识
+   - [ ] Schema 测试 - 验证输入/输出 Schema
+   - [ ] Pydantic 契约测试 - 验证所有工具通过契约测试
+
+2. **性能要求**
+   - [ ] 工具加载延迟 P95<100ms
+   - [ ] 工具注册成功率 100%
+   - [ ] 并发工具调用≥20
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_tool_registry.py` - 单元测试
+   - [ ] `tests/integration/test_tool_registry_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 工具箱服务已启动
 **When** 系统加载工具注册表
 **Then** 23 种战略工具全部注册，每个工具有唯一标识、输入/输出 Schema、执行逻辑模板
@@ -2266,6 +2920,35 @@ I want **系统编排工具链（DAG 有向无环图），按拓扑顺序调度�
 So that **支持复杂分析任务的自动化执行**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] DAG 编排测试 - 验证拓扑顺序调度
+   - [ ] 工具链测试 - 验证复杂分析任务自动化
+   - [ ] 依赖关系测试 - 验证工具间依赖
+   - [ ] 循环依赖测试 - 验证 DAG 有效性校验器
+
+2. **性能要求**
+   - [ ] DAG 解析延迟 P95<100ms
+   - [ ] 工具链执行成功率≥95%
+   - [ ] 并发工具链≥10
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_tool_orchestration.py` - 单元测试
+   - [ ] `tests/integration/test_tool_orchestration_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 工具链 DAG 已定义
 **When** 执行工具链
@@ -2280,6 +2963,35 @@ So that **工具输出符合预期格式，防止模型漂移**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Schema 验证测试 - 验证 Pydantic V2 契约化
+   - [ ] 输入验证测试 - 验证输入数据验证
+   - [ ] 输出验证测试 - 验证输出数据验证
+   - [ ] 重试测试 - 验证失败重试或标记不可行
+
+2. **性能要求**
+   - [ ] Schema 验证延迟 P95<50ms
+   - [ ] 验证通过率≥95%
+   - [ ] 重试成功率≥80%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_tool_schema_validation.py` - 单元测试
+   - [ ] `tests/integration/test_tool_schema_validation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 工具已注册
 **When** 调用工具执行
 **Then** 输入数据通过 Pydantic V2 Schema 验证
@@ -2293,6 +3005,34 @@ So that **防止代码执行带来的安全风险**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Docker 沙箱测试 - 验证网络隔离
+   - [ ] 权限测试 - 验证权限最小化
+   - [ ] 安全测试 - 验证代码执行安全
+
+2. **性能要求**
+   - [ ] 沙箱启动延迟 P95<5 秒
+   - [ ] 沙箱逃逸 0 次
+   - [ ] 并发沙箱≥10
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全扫描通过
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_docker_sandbox.py` - 单元测试
+   - [ ] `tests/integration/test_docker_sandbox_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** 工具需要执行代码
 **When** 在 Docker 沙箱中执行
 **Then** 网络隔离（默认断网，仅允许白名单网关访问可信 API）
@@ -2305,6 +3045,34 @@ I want **系统执行红蓝辩论机制基础（单 Agent 多视角，MVP 替代
 So that **MVP 阶段支持基础的多视角分析**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 红蓝辩论测试 - 验证单 Agent 多视角
+   - [ ] 视角生成测试 - 验证激进派和保守派分析
+   - [ ] 风险视图测试 - 验证共识与分歧区域
+
+2. **性能要求**
+   - [ ] 辩论生成延迟 P95<30 秒
+   - [ ] 视角准确率≥90%
+   - [ ] 共识识别准确率≥85%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_red_blue_debate.py` - 单元测试
+   - [ ] `tests/integration/test_red_blue_debate_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 分析任务存在争议议题
 **When** 执行红蓝辩论（单 Agent 多视角）
@@ -2345,6 +3113,34 @@ So that **MVP 阶段支持单 Agent 执行任务**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Agent 实例化测试 - 验证 CEO Agent 实例化
+   - [ ] 配置加载测试 - 验证基础配置加载
+   - [ ] 状态持久化测试 - 验证 Redis 持久化
+
+2. **性能要求**
+   - [ ] 实例化延迟 P95<200ms
+   - [ ] 配置加载成功率 100%
+   - [ ] 并发 Agent≥10
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_agent_instantiation.py` - 单元测试
+   - [ ] `tests/integration/test_agent_instantiation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 **Given** Agent 协作服务已启动
 **When** 接收 Agent 任务命令
 **Then** 实例化 CEO Agent，加载基础配置
@@ -2357,6 +3153,34 @@ I want **系统加载 Agent 身份档案（IDENTITY.md/CODE.md/SOUL.md/TOOLS.md/
 So that **Agent 按照预定义的身份和规则执行任务**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 身份档案加载测试 - 验证 7 个档案文件加载
+   - [ ] 档案验证测试 - 验证档案内容验证
+   - [ ] 档案完整性测试 - 验证所有档案加载成功
+
+2. **性能要求**
+   - [ ] 档案加载延迟 P95<500ms
+   - [ ] 档案加载成功率 100%
+   - [ ] 档案验证通过率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_agent_profile_loading.py` - 单元测试
+   - [ ] `tests/integration/test_agent_profile_loading_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** Agent 已实例化
 **When** 加载身份档案
@@ -2376,6 +3200,34 @@ So that **Agent 自主完成任务并输出可验证结果**。
 **Then** 按标准工作流执行（感知→规划→执行→验证→反思→证据打包）
 **And** 输出 JSON 思维链（Input→<Reflection>→<Tools_Used>→<Constraints_Check>→JSON）
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Agent 工作流执行测试 - 验证感知→规划→执行→验证→反思→证据打包流程
+   - [ ] JSON 思维链输出测试 - 验证思维链格式正确
+   - [ ] 证据打包测试 - 验证输出可验证
+
+2. **性能要求**
+   - [ ] 工作流执行延迟 P95<5s
+   - [ ] 思维链输出完整率 100%
+   - [ ] 证据打包成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_agent_workflow.py` - 单元测试
+   - [ ] `tests/integration/test_agent_workflow_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 5.4: EIP 弹性隔离协议基础（L4 硬隔离）
 
 As a **安全工程师**,
@@ -2388,6 +3240,34 @@ So that **MVP 阶段支持 Agent 隔离**。
 **When** 执行任务
 **Then** 默认隔离等级为 L4 硬隔离（Prompt/工具/数据三重硬隔离）
 **And** 隔离状态持久化至 Redis
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] EIP 隔离协议测试 - 验证 L4 硬隔离默认启用
+   - [ ] 三重硬隔离测试 - 验证 Prompt/工具/数据隔离
+   - [ ] 隔离状态持久化测试 - 验证 Redis 持久化
+
+2. **性能要求**
+   - [ ] 隔离检查延迟 P95<100ms
+   - [ ] 隔离状态持久化成功率 100%
+   - [ ] 并发隔离 Agent≥10
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_eip_isolation.py` - 单元测试
+   - [ ] `tests/integration/test_eip_isolation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 5.5: Agent 三重硬隔离保证
 
@@ -2402,6 +3282,35 @@ So that **防止 Agent 间信息泄露和视角越界**。
 **Then** 每个 Agent 的 Prompt、工具、数据严格隔离
 **And** 隔离测试 100% 通过
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 三重硬隔离测试 - 验证 Prompt/工具/数据严格隔离
+   - [ ] 隔离穿透测试 - 验证无信息泄露
+   - [ ] 并发隔离测试 - 验证多 Agent 并行隔离
+
+2. **性能要求**
+   - [ ] 隔离检查延迟 P95<50ms
+   - [ ] 隔离测试通过率 100%
+   - [ ] 并发 Agent≥10 无泄露
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 安全测试覆盖率≥90%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_triple_isolation.py` - 单元测试
+   - [ ] `tests/integration/test_triple_isolation_integration.py` - 集成测试
+   - [ ] `tests/security/test_isolation_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例 + 安全层测试示例
+
 ### Story 5.6: 隔离切换日志记录
 
 As a **合规工程师**,
@@ -2414,6 +3323,34 @@ So that **满足审计追踪要求**。
 **When** 记录切换事件
 **Then** 日志包含 AGENT ID、时间戳、原隔离等级、目标隔离等级、触发原因、审批链
 **And** 支持按 AGENT/时间/隔离等级多维检索
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 隔离切换日志记录测试 - 验证日志字段完整
+   - [ ] 日志多维检索测试 - 验证按 AGENT/时间/隔离等级检索
+   - [ ] 日志持久化测试 - 验证日志存储
+
+2. **性能要求**
+   - [ ] 日志记录延迟 P95<50ms
+   - [ ] 日志检索响应时间 P95<500ms
+   - [ ] 日志存储成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_isolation_switch_log.py` - 单元测试
+   - [ ] `tests/integration/test_isolation_switch_log_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例 + 安全层测试示例
 
 ---
 
@@ -2468,6 +3405,34 @@ So that **完成战略规划的基础分析阶段**。
 **Then** 执行业绩差距分析和市场洞察六子步骤基础（看趋势/看市场与客户/看竞争/看自己/看机会/机会差距分析）
 **And** 流程可视化显示当前阶段和进度
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] BLM 流程执行测试 - 验证业绩差距分析和市场洞察流程
+   - [ ] 流程可视化测试 - 验证阶段和进度显示
+   - [ ] CEO Agent 替代测试 - 验证 MVP 单 Agent 方案
+
+2. **性能要求**
+   - [ ] BLM 流程执行延迟 P95<30s
+   - [ ] 流程可视化刷新率 60fps
+   - [ ] 市场洞察六子步骤成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_blm_process.py` - 单元测试
+   - [ ] `tests/integration/test_blm_process_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 6.2: 市场洞察六子步骤
 
 As a **分析师**,
@@ -2480,6 +3445,34 @@ So that **全面分析市场环境和机会**。
 **When** 执行市场洞察
 **Then** 依次执行六个子步骤，每个步骤输出结构化结果
 **And** 每个步骤触发 Checkpoint
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 市场洞察流程测试 - 验证六个子步骤正确执行
+   - [ ] 结构化输出测试 - 验证每个子步骤输出符合 Schema
+   - [ ] Checkpoint 触发测试 - 验证每个步骤正确创建快照
+
+2. **性能要求**
+   - [ ] 市场洞察执行延迟 P95<25s
+   - [ ] 六子步骤成功率 100%
+   - [ ] 并发执行 5 个市场洞察任务
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_market_insight.py` - 单元测试
+   - [ ] `tests/integration/test_market_insight_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.3: Checkpoint 快照创建
 
@@ -2495,6 +3488,34 @@ So that **支持阶段审批和中断恢复**。
 **Then** 状态快照序列化至 Redis Hash
 **And** 支持用户修正关键参数
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Checkpoint 创建测试 - 验证快照正确序列化至 Redis Hash
+   - [ ] Checkpoint 恢复测试 - 验证从快照恢复状态
+   - [ ] 用户修正测试 - 验证修正关键参数后正确恢复
+
+2. **性能要求**
+   - [ ] Checkpoint 创建延迟 P95<100ms
+   - [ ] Checkpoint 恢复延迟 P95<60s
+   - [ ] 快照持久化成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_checkpoint.py` - 单元测试
+   - [ ] `tests/integration/test_checkpoint_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 6.4: JSON 思维链输出
 
 As a **系统架构师**,
@@ -2507,6 +3528,34 @@ So that **Agent 决策过程可追溯和可解释**。
 **When** 输出结果
 **Then** 包含完整的 JSON 思维链（Input→<Reflection>→<Tools_Used>→<Constraints_Check>→JSON）
 **And** 思维链存储至战略档案库
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] JSON 思维链结构测试 - 验证思维链包含所有必需字段
+   - [ ] 思维链存储测试 - 验证正确存储至战略档案库
+   - [ ] 决策追溯测试 - 验证可通过思维链追溯 Agent 决策
+
+2. **性能要求**
+   - [ ] 思维链生成延迟 P95<50ms
+   - [ ] 思维链存储成功率 100%
+   - [ ] 并发写入 10 个思维链
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_json_chain_of_thought.py` - 单元测试
+   - [ ] `tests/integration/test_json_chain_of_thought_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.5a: Markdown 报告生成（基础）
 
@@ -2521,6 +3570,34 @@ So that **MVP 阶段可以导出和分享规划结果，支持高管视图和白
 **Then** 生成 Markdown 格式报告，包含结构化章节（业绩差距分析、市场洞察）
 **And** 支持基础格式化（标题、列表、表格）
 **And** 导出时间<30 秒
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Markdown 报告生成测试 - 验证报告包含结构化章节
+   - [ ] 格式化测试 - 验证标题、列表、表格正确渲染
+   - [ ] 导出性能测试 - 验证导出时间<30 秒
+
+2. **性能要求**
+   - [ ] 报告生成延迟 P95<30s
+   - [ ] 报告生成成功率 100%
+   - [ ] 并发生成 3 个报告
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_markdown_report.py` - 单元测试
+   - [ ] `tests/integration/test_markdown_report_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.5b: PDF 报告生成 + 引文索引
 
@@ -2537,6 +3614,34 @@ So that **可以导出专业格式的规划结果，支持溯源和分享**。
 **And** PDF 渲染质量高（文字清晰、表格完整、图像不失真）
 **And** 导出时间<1 分钟
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] PDF 转换测试 - 验证 Markdown 正确转换为 PDF
+   - [ ] 引文索引测试 - 验证引文支持 Bounding Box 溯源
+   - [ ] 渲染质量测试 - 验证文字、表格、图像质量
+
+2. **性能要求**
+   - [ ] PDF 生成延迟 P95<60s
+   - [ ] PDF 生成成功率 100%
+   - [ ] 引文点击响应<300ms
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_pdf_report.py` - 单元测试
+   - [ ] `tests/integration/test_pdf_report_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 6.6: Checkpoint 摘要查看与恢复
 
 As a **高管**,
@@ -2549,6 +3654,34 @@ So that **参与关键决策点审批**。
 **When** 高管查看 Checkpoint 摘要
 **Then** 显示阶段标识、完成状态、关键参数、用户反馈
 **And** 支持修正关键参数后恢复执行
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] Checkpoint 摘要显示测试 - 验证显示所有必需字段
+   - [ ] 参数修正测试 - 验证修正后正确恢复执行
+   - [ ] 审批流程测试 - 验证高管审批流程
+
+2. **性能要求**
+   - [ ] 摘要显示延迟 P95<200ms
+   - [ ] 恢复执行成功率 100%
+   - [ ] 并发审批 5 个 Checkpoint
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_checkpoint_recovery.py` - 单元测试
+   - [ ] `tests/integration/test_checkpoint_recovery_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.7: 溯源树展示
 
@@ -2563,6 +3696,34 @@ So that **验证分析结论的可靠性**。
 **Then** 展示溯源树（结论→分析→数据切片→原始文档）
 **And** 支持交互式展开和 Bounding Box 跳转
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 溯源树结构测试 - 验证正确展示四层溯源结构
+   - [ ] 交互式展开测试 - 验证节点可正确展开/收起
+   - [ ] Bounding Box 跳转测试 - 验证正确跳转至原始文档坐标点
+
+2. **性能要求**
+   - [ ] 溯源树加载延迟 P95<300ms
+   - [ ] Bounding Box 跳转响应<300ms
+   - [ ] 溯源定位准确率≥95%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_provenance_tree.py` - 单元测试
+   - [ ] `tests/integration/test_provenance_tree_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 6.8: 高管简化视图（仪表盘/审批中心/审计摘要）
 
 As a **CEO**,
@@ -2575,6 +3736,34 @@ So that **快速理解态势并做出决策**。
 **When** 查看仪表盘
 **Then** 第一屏仅显示 3 个关键指标，红/黄/绿状态指示器
 **And** 30 秒内理解当前态势（30 秒理解率≥90%）
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 仪表盘显示测试 - 验证显示 3 个关键指标和状态指示器
+   - [ ] 30 秒理解率测试 - 验证用户可在 30 秒内理解态势
+   - [ ] 审批中心测试 - 验证审批功能正确显示
+
+2. **性能要求**
+   - [ ] 仪表盘加载延迟 P95<500ms
+   - [ ] 状态指示器刷新率 60fps
+   - [ ] 并发查看 20 个仪表盘
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_executive_dashboard.py` - 单元测试
+   - [ ] `tests/integration/test_executive_dashboard_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.9: 分析师视图（专业工具、BLM 进度可视化、快捷键支持）
 
@@ -2590,6 +3779,34 @@ So that **高效完成战略规划和分析工作**。
 **And** 支持快速溯源（30 秒内跳转至原始文档坐标点）
 **And** 支持批量操作和快捷键导航
 
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 分析师视图显示测试 - 验证显示专业工具箱和 BLM 进度
+   - [ ] 快捷键测试 - 验证所有快捷键正确响应
+   - [ ] 快速溯源测试 - 验证 30 秒内跳转至原始文档
+
+2. **性能要求**
+   - [ ] 视图加载延迟 P95<800ms
+   - [ ] 快捷键响应<100ms
+   - [ ] 溯源跳转响应<300ms
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_analyst_view.py` - 单元测试
+   - [ ] `tests/integration/test_analyst_view_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
 ### Story 6.10: 顾问视图（白标报告导出、品牌模板配置、多项目管理）
 
 As a **专业顾问（咨询/投资/银行）**,
@@ -2603,6 +3820,34 @@ So that **高效交付客户项目并保证品牌一致性**。
 **Then** 显示多项目管理面板、品牌模板配置、白标报告导出功能
 **And** 支持品牌元素配置（Logo/配色/字体），导出报告品牌 100% 准确
 **And** 支持多客户数据隔离（Schema per Tenant）
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 顾问视图显示测试 - 验证显示多项目管理和品牌配置
+   - [ ] 白标报告测试 - 验证导出报告品牌 100% 准确
+   - [ ] 多租户隔离测试 - 验证客户数据正确隔离
+
+2. **性能要求**
+   - [ ] 视图加载延迟 P95<800ms
+   - [ ] 白标报告导出时间<1 分钟
+   - [ ] 多租户隔离测试 100% 通过
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_consultant_view.py` - 单元测试
+   - [ ] `tests/integration/test_consultant_view_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ### Story 6.11: 白标报告基础（品牌模板配置）
 
@@ -2620,6 +3865,34 @@ So that **可以直接交付客户，验证 MVP 付费意愿**。
 
 **依赖关系：** 依赖 Story 6.5b（PDF 报告生成）
 **执行优先级：** P0-11（MVP，UX 白标报告）
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 品牌模板配置测试 - 验证 Logo/配色/字体配置正确
+   - [ ] 品牌应用测试 - 验证导出报告品牌元素 100% 准确
+   - [ ] 模板复用测试 - 验证模板可保存和复用
+
+2. **性能要求**
+   - [ ] 品牌配置保存延迟 P95<200ms
+   - [ ] 白标报告导出时间<1 分钟
+   - [ ] 品牌应用准确率 100%
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_white_label_report.py` - 单元测试
+   - [ ] `tests/integration/test_white_label_report_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ---
 
@@ -2668,6 +3941,35 @@ So that **高效操作系统**。
 **Then** 命令正确解析并执行
 **And** 输出执行结果和进度反馈
 
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] CLI 命令解析测试 - 验证命令正确解析和执行
+   - [ ] CLI 输出测试 - 验证执行结果和进度反馈正确显示
+   - [ ] CLI 兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] CLI 命令响应延迟 P95<500ms
+   - [ ] CLI 可用性≥99%
+   - [ ] 并发执行 10 个 CLI 命令
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] CLI 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_cli.py` - 单元测试
+   - [ ] `tests/integration/test_cli_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_cli_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
+
 ### Story 7.2: REST API 接口
 
 As a **集成工程师**,
@@ -2680,6 +3982,35 @@ So that **支持外部系统集成**。
 **When** 调用 REST API 端点
 **Then** 符合 OpenAPI 3.1 规范，返回正确响应
 **And** API 可用性≥99%
+
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] REST API 端点测试 - 验证所有端点符合 OpenAPI 3.1 规范
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] API 响应延迟 P95<800ms
+   - [ ] API 可用性≥99%
+   - [ ] 并发请求≥50
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_rest_api.py` - 单元测试
+   - [ ] `tests/integration/test_rest_api_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_rest_api_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
 
 ### Story 7.3: API Gateway 统一入口
 
@@ -2694,6 +4025,35 @@ So that **集中管理 API 安全和流量**。
 **Then** 统一认证（OAuth 2.1/JWT）、限流（令牌桶算法）、路由（基于路径/方法/角色）、安全控制（请求验证/注入检测）
 **And** 限流测试通过
 
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] API Gateway 路由测试 - 验证请求正确路由至后端服务
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] Gateway 路由延迟 P95<50ms
+   - [ ] API 可用性≥99%
+   - [ ] 并发请求≥100
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_api_gateway.py` - 单元测试
+   - [ ] `tests/integration/test_api_gateway_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_api_gateway_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
+
 ### Story 7.4: 健康度仪表盘
 
 As a **运维工程师**,
@@ -2706,6 +4066,35 @@ So that **监控系统运行状态**。
 **When** 查看健康度仪表盘
 **Then** 实时显示 Agent 健康度、Token 消耗、检索延迟等指标
 **And** 指标通过 OpenTelemetry Trace 输出
+
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] 仪表盘数据展示测试 - 验证实时显示所有健康指标
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] 仪表盘数据刷新延迟 P95<500ms
+   - [ ] API 可用性≥99%
+   - [ ] 并发查看 20 个仪表盘
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_health_dashboard.py` - 单元测试
+   - [ ] `tests/integration/test_health_dashboard_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_health_dashboard_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
 
 ### Story 7.5: 无障碍设计（WCAG 2.1 AA）
 
@@ -2744,6 +4133,35 @@ So that **我可以无障碍地使用系统**。
 | alt 文本 | axe-core | 所有图像有描述 | 100% |
 | 表单 label | axe-core | 所有表单有关联 label | 100% |
 
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] 无障碍功能测试 - 验证键盘导航和屏幕阅读器兼容
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] 键盘导航响应延迟 P95<100ms
+   - [ ] API 可用性≥99%
+   - [ ] 并发请求≥50
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_accessibility.py` - 单元测试
+   - [ ] `tests/integration/test_accessibility_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_accessibility_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
+
 ### Story 7.6: API 契约测试（OpenAPI 3.1）
 
 As a **集成工程师**,
@@ -2778,6 +4196,35 @@ So that **确保 API 可用性和向后兼容性**。
 | 数据库契约 | Alembic | Schema 迁移验证 | 100% |
 | 向后兼容性 | Schemathesis | 1-2 个版本兼容 | 100% |
 
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范符合性
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] 契约测试执行时间<5 分钟
+   - [ ] API 可用性≥99%
+   - [ ] 并发请求≥50
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_api_contract.py` - 单元测试
+   - [ ] `tests/integration/test_api_contract_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_api_contract_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
+
 ### Story 7.7: API E2E 测试
 
 As a **测试工程师**,
@@ -2791,6 +4238,35 @@ So that **确保 API 从客户端到服务器的完整功能正确性**。
 **Then** 所有 API 端点的完整用户流程测试通过（文档上传→解析→检索→报告生成）
 **And** 测试数据隔离（测试数据库与生产数据库隔离）
 **And** 测试覆盖率≥80%
+
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] API E2E 流程测试 - 验证完整用户流程正确执行
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] E2E 测试执行时间<10 分钟
+   - [ ] API 可用性≥99%
+   - [ ] 并发请求≥50
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_api_e2e.py` - 单元测试
+   - [ ] `tests/integration/test_api_e2e_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_api_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
 
 ### Story 7.8: 骨架屏加载（感知性能优化）
 
@@ -2808,6 +4284,35 @@ So that **减少感知等待时间，提升体验流畅度**。
 
 **依赖关系：** 依赖 Story 7.1/7.2（CLI/API 基础）
 **执行优先级：** P0-8（MVP，UX 骨架屏加载）
+
+**TDD 测试要求:**
+
+1. **接口测试**
+   - [ ] 骨架屏显示测试 - 验证正确显示模拟真实内容的骨架屏
+   - [ ] API 契约测试 - 验证 OpenAPI 3.1 规范
+   - [ ] 接口兼容性测试 - 验证向后兼容
+
+2. **性能要求**
+   - [ ] 骨架屏显示延迟 P95<100ms
+   - [ ] 骨架屏动画 60fps
+   - [ ] 并发请求≥50
+
+3. **覆盖率要求**
+   - [ ] 接口层覆盖率≥85%
+   - [ ] E2E 测试覆盖率≥80%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] API 契约验证
+
+5. **测试文件**
+   - [ ] `tests/unit/interfaces/test_skeleton_screen.py` - 单元测试
+   - [ ] `tests/integration/test_skeleton_screen_integration.py` - 集成测试
+   - [ ] `tests/e2e/test_skeleton_screen_e2e.py` - E2E 测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 接口层测试示例
 
 ---
 
@@ -2852,6 +4357,35 @@ So that **支持合规审计和问题排查**。
 **Then** 支持按时间范围、角色、任务类型、修正级别组合查询
 **And** 检索结果支持导出（CSV/PDF）
 
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 审计日志检索测试 - 验证多维检索正确执行
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+
+2. **性能要求**
+   - [ ] 检索延迟 P95<500ms
+   - [ ] 检索准确率≥95%
+   - [ ] 误报率<5%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_audit_log_search.py` - 单元测试
+   - [ ] `tests/integration/test_audit_log_search_integration.py` - 集成测试
+   - [ ] `tests/security/test_audit_log_search_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
+
 ### Story 8.2: 修正分级判定基础（L0/L1 自动固化）
 
 As a **系统架构师**,
@@ -2864,6 +4398,35 @@ So that **L0/L1 级修正自动处理，减少人工干预**。
 **When** 执行修正分级判定
 **Then** L0（拼写/格式）和 L1（参数/权重微调，影响≤1 任务，置信度≥0.85）自动固化
 **And** 生成 Few-Shot 样本→Strat-Bench 测试→版本注册→WORM 存储
+
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 修正分级判定测试 - 验证 L0/L1 级修正正确判定
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+
+2. **性能要求**
+   - [ ] 判定延迟 P95<200ms
+   - [ ] 判定准确率≥95%
+   - [ ] 误报率<5%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_correction_classification.py` - 单元测试
+   - [ ] `tests/integration/test_correction_classification_integration.py` - 集成测试
+   - [ ] `tests/security/test_correction_classification_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
 
 ### Story 8.3: L0/L1 级修正自动固化流水线
 
@@ -2878,6 +4441,35 @@ So that **高频修正模式转化为业务规则模板**。
 **Then** 生成 Few-Shot 样本，通过 Strat-Bench 测试（通过率≥90%）
 **And** 版本注册，写入 WORM 存储，支持 24 小时内回滚
 
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 自动固化流水线测试 - 验证 Few-Shot 样本生成和 Strat-Bench 测试
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+
+2. **性能要求**
+   - [ ] 固化流水线执行延迟 P95<5s
+   - [ ] Strat-Bench 测试通过率≥90%
+   - [ ] 版本注册成功率 100%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_correction_solidification.py` - 单元测试
+   - [ ] `tests/integration/test_correction_solidification_integration.py` - 集成测试
+   - [ ] `tests/security/test_correction_solidification_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
+
 ### Story 8.4: 数据主权隔离执行
 
 As a **合规工程师**,
@@ -2890,6 +4482,35 @@ So that **满足数据安全法要求**。
 **When** 执行数据主权隔离
 **Then** 敏感数据默认本地优先处理
 **And** 外部网络调用需通过审计和白名单批准
+
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 数据主权隔离测试 - 验证敏感数据本地优先处理
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+
+2. **性能要求**
+   - [ ] 隔离判定延迟 P95<100ms
+   - [ ] 隔离准确率≥95%
+   - [ ] 误报率<5%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_data_sovereignty.py` - 单元测试
+   - [ ] `tests/integration/test_data_sovereignty_integration.py` - 集成测试
+   - [ ] `tests/security/test_data_sovereignty_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
 
 ### Story 8.5: ShieldCortex 提示注入防御
 
@@ -2905,6 +4526,35 @@ So that **防止提示注入攻击导致数据泄露**。
 **And** 检测准确率≥95%，误报率<5%
 **And** 支持规则热更新
 
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 提示注入检测测试 - 验证正则匹配和 ML 分类器正确检测
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+
+2. **性能要求**
+   - [ ] 检测延迟 P95<100ms
+   - [ ] 检测准确率≥95%
+   - [ ] 误报率<5%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_prompt_injection_detection.py` - 单元测试
+   - [ ] `tests/integration/test_prompt_injection_detection_integration.py` - 集成测试
+   - [ ] `tests/security/test_prompt_injection_detection_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
+
 ### Story 8.6: 渗透测试与漏洞扫描
 
 As a **安全工程师**,
@@ -2918,6 +4568,35 @@ So that **确保 MVP 无高危漏洞**。
 **Then** 无高危漏洞，中危漏洞<5 个
 **And** SSL Labs A+ 评级，权限测试 100% 通过
 **And** 沙箱逃逸测试 0 次成功
+
+**TDD 测试要求:**
+
+1. **安全测试**
+   - [ ] 渗透测试 - 验证 OWASP Top 10 防护
+   - [ ] 漏洞扫描 - 验证无高危漏洞
+   - [ ] 沙箱逃逸测试 - 验证 0 次逃逸成功
+
+2. **性能要求**
+   - [ ] 渗透测试执行时间<30 分钟
+   - [ ] 漏洞扫描执行时间<10 分钟
+   - [ ] 安全检测准确率≥95%
+
+3. **覆盖率要求**
+   - [ ] 安全层覆盖率≥90%
+   - [ ] 安全测试覆盖率≥95%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 安全约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/security/test_penetration_testing.py` - 单元测试
+   - [ ] `tests/integration/test_penetration_testing_integration.py` - 集成测试
+   - [ ] `tests/security/test_penetration_testing_security.py` - 安全测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 安全层测试示例
 
 ---
 
