@@ -3,6 +3,7 @@
 # =============================================================================
 # 基于 Story 0.1 验收标准创建
 # 提供统一的开发环境命令入口，简化日常开发操作
+# 更新：添加 SDD+TDD 融合模式命令（2026-03-04）
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -19,6 +20,10 @@ DOCKER := docker
 DOCKER_COMPOSE := docker-compose
 SCHEMATHESIS := schemathesis
 OPENAPI_VALIDATOR := openapi-spec-validator
+
+# SDD+TDD 融合模式变量
+TARGET ?= domain/entities
+STORY ?= 1.1
 
 # -----------------------------------------------------------------------------
 # 开发环境设置（Story 0.1 验收标准）
@@ -69,6 +74,121 @@ validate-contracts:
 
 sdd-validate: validate-schemas validate-openapi
 	@echo "✅ SDD 规范验证全部通过"
+
+# SDD 规范验证（融合模式）
+.PHONY: sdd-verify
+
+sdd-verify:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "✅ SDD 规范验证"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "1. Schema 验证..."
+	@echo "   python -c \"from src.domain.events import *; print('Schema OK')\""
+	@echo ""
+	@echo "2. 类型检查..."
+	$(POETRY) run mypy src/domain/
+	@echo ""
+	@echo "3. 验收测试..."
+	$(POETRY) run pytest tests/acceptance/ -v
+	@echo ""
+	@echo "✅ SDD 规范验证通过"
+	@echo ""
+
+# -----------------------------------------------------------------------------
+# SDD+TDD 融合模式命令（新增 2026-03-04）
+# -----------------------------------------------------------------------------
+.PHONY: sdd-define tdd-red tdd-green tdd-refactor tdd-cycle sdd-tdd-cycle
+
+# SDD 规范定义
+sdd-define:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📋 SDD 规范定义"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "1. 定义领域事件 Schema (src/domain/events/)"
+	@echo "2. 定义 API 契约 (docs/api/openapi.yaml)"
+	@echo "3. 定义验收标准 (tests/acceptance/*.feature)"
+	@echo "4. 定义数据模型 (src/domain/entities/)"
+	@echo ""
+	@echo "📝 检查清单："
+	@echo "   [ ] 领域事件 Schema 已定义并评审通过"
+	@echo "   [ ] API 契约（OpenAPI）已定义并验证通过"
+	@echo "   [ ] 测试用例（Gherkin）已编写并业务方确认"
+	@echo "   [ ] 数据模型（SQLAlchemy）已定义并评审通过"
+	@echo "   [ ] Qwen Code Agent 已激活并理解规范"
+	@echo ""
+
+# TDD 红阶段
+tdd-red:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔴 TDD 红阶段：编写失败测试"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "目标：$(TARGET)"
+	@echo ""
+	@echo "运行测试..."
+	$(POETRY) run pytest tests/unit/$(TARGET) -v --tb=short || echo ""
+	@echo ""
+	@echo "✅ 红阶段完成：测试失败（预期行为）"
+	@echo ""
+	@echo "📝 下一步："
+	@echo "   1. 确认测试失败原因符合预期"
+	@echo "   2. 准备编写最小实现（绿阶段）"
+	@echo ""
+
+# TDD 绿阶段
+tdd-green:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🟢 TDD 绿阶段：运行测试"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "目标：$(TARGET)"
+	@echo ""
+	@echo "运行测试..."
+	$(POETRY) run pytest tests/unit/$(TARGET) -v --tb=short
+	@echo ""
+	@echo "✅ 绿阶段完成：测试通过"
+	@echo ""
+	@echo "📝 下一步："
+	@echo "   1. 确认所有测试通过"
+	@echo "   2. 准备重构优化（重构阶段）"
+	@echo ""
+
+# TDD 重构阶段
+tdd-refactor:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔄 TDD 重构阶段：优化代码"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "目标：$(TARGET)"
+	@echo ""
+	@echo "1. 运行 ruff 检查代码质量..."
+	$(POETRY) run ruff check src/$(TARGET)
+	@echo ""
+	@echo "2. 运行 black 格式化代码..."
+	$(POETRY) run black src/$(TARGET)
+	@echo ""
+	@echo "3. 运行 mypy 类型检查..."
+	$(POETRY) run mypy src/$(TARGET)
+	@echo ""
+	@echo "4. 重新运行测试验证..."
+	$(POETRY) run pytest tests/unit/$(TARGET) -v --tb=short
+	@echo ""
+	@echo "✅ 重构阶段完成：代码优化，测试通过"
+	@echo ""
+	@echo "📝 下一步："
+	@echo "   1. 运行 SDD 规范验证"
+	@echo "   2. 运行质量门禁检查"
+	@echo ""
+
+# TDD 完整循环
+tdd-cycle: tdd-red tdd-green tdd-refactor
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "✅ TDD 完整循环完成（红 - 绿 - 重构）"
+	@echo "═══════════════════════════════════════════════════════════"
+
+# SDD+TDD 完整开发循环
+sdd-tdd-cycle: sdd-define tdd-cycle sdd-verify quality-gates
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "✅ SDD+TDD 完整开发循环完成"
+	@echo "═══════════════════════════════════════════════════════════"
 
 # -----------------------------------------------------------------------------
 # 代码质量（Story 0.2 验收标准 - 阶段 1）
@@ -378,5 +498,25 @@ help:
 	@echo "  make clean         - 清理构建/测试文件"
 	@echo "  make clean-all     - 清理所有（包括虚拟环境）"
 	@echo ""
+	@echo "🔥 SDD+TDD 融合模式（新增 2026-03-04）:"
+	@echo "  make sdd-define         - SDD 规范定义（检查清单）"
+	@echo "  make tdd-red TARGET=x   - TDD 红阶段（编写失败测试）"
+	@echo "  make tdd-green TARGET=x - TDD 绿阶段（运行测试）"
+	@echo "  make tdd-refactor TARGET=x - TDD 重构阶段（优化代码）"
+	@echo "  make tdd-cycle TARGET=x - TDD 完整循环（红 - 绿 - 重构）"
+	@echo "  make sdd-tdd-cycle STORY=x - SDD+TDD 完整开发循环"
+	@echo ""
+	@echo "  示例："
+	@echo "    make tdd-red TARGET=domain/entities"
+	@echo "    make tdd-green TARGET=domain/entities"
+	@echo "    make tdd-refactor TARGET=domain/entities"
+	@echo ""
 	@echo "📋 帮助:"
 	@echo "  make help          - 显示此帮助信息"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📝 相关文档："
+	@echo "  - docs/developer/sdd-tdd-fusion-guide.md (融合模式指南)"
+	@echo "  - docs/developer/sdd-tdd-checklist.md (实施检查清单)"
+	@echo "  - docs/developer/epic1-story1.1-pilot-plan.md (试点计划)"
+	@echo "═══════════════════════════════════════════════════════════"

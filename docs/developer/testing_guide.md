@@ -1,7 +1,7 @@
 # sisys 测试框架使用指南
 
-**版本：** 1.0.0  
-**最后更新：** 2026-03-02  
+**版本：** 1.0.0
+**最后更新：** 2026-03-02
 **状态：** Story 0.3 实现文档
 
 ---
@@ -89,14 +89,14 @@ tests/
 │
 ├── unit/                       # 单元测试
 │   ├── domain/
-│   │   ├── test_entities.py    # 领域实体测试
-│   │   ├── test_events.py      # 领域事件测试
-│   │   └── test_services.py    # 领域服务测试
+│   │   ├── entities/           # 领域实体测试
+│   │   ├── events/             # 领域事件测试
+│   │   └── services/           # 领域服务测试
 │   ├── application/
-│   │   ├── test_use_cases.py   # 用例测试
-│   │   └── test_handlers.py    # 处理器测试
+│   │   ├── use_cases/          # 用例测试
+│   │   └── handlers/           # 处理器测试
 │   └── infrastructure/
-│       └── test_adapters.py    # 适配器测试
+│       └── persistence/        # 存储持久化测试
 │
 ├── integration/                # 集成测试
 │   ├── conftest.py             # 集成测试 fixture
