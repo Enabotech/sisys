@@ -167,8 +167,6 @@ jobs:
         run: poetry install --with dev,test
 
       - name: Run unit tests with coverage
-        env:
-          COVERAGE_FILE: .coverage.unit   # 独立覆盖率数据文件
         run: |
           poetry run pytest tests/unit/ \
             --cov=src \
@@ -177,6 +175,7 @@ jobs:
             --cov-fail-under=0 \          # 强制不因覆盖率低而失败（虽然单元测试90%不会触发）
             -v \
             --tb=short
+            -n auto                     # 启用并行
 
       - name: Upload unit test coverage HTML
         uses: actions/upload-artifact@v4
@@ -196,7 +195,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-unit
-          path: .coverage.unit
+          path: .coverage*               # 上传所有 .coverage 相关文件
           retention-days: 7
 
   # =========================================
@@ -276,7 +275,6 @@ jobs:
 
       - name: Run integration tests with coverage
         env:
-          COVERAGE_FILE: .coverage.integration   # 独立覆盖率数据文件
           TEST_POSTGRES_URL: postgresql://test_user:test_password@localhost:5432/test_db
           TEST_REDIS_URL: redis://localhost:6379/0
           TEST_QDRANT_URL: http://localhost:6333
@@ -295,7 +293,8 @@ jobs:
             --cov-fail-under=0 \          # 关键修改：显式设为0，避免因覆盖率低而失败
             -v \
             --tb=short \
-            --timeout=300
+            --timeout=300 \
+            -n auto                     # 启用并行
 
       - name: Stop test containers
         if: always()
@@ -321,7 +320,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-integration
-          path: .coverage.integration
+          path: .coverage*               # 上传所有 .coverage 相关文件
           retention-days: 7
 
   # =========================================
@@ -389,7 +388,7 @@ jobs:
         run: ls -la .coverage*
 
       - name: Combine coverage data
-        run: coverage combine .coverage.unit .coverage.integration
+        run: coverage combine              # 自动合并所有 .coverage* 文件
 
       - name: Generate coverage report (console)
         run: coverage report --fail-under=80   # 整体覆盖率必须 ≥80%

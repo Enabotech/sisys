@@ -829,6 +829,30 @@ So that **领域逻辑与技术实现隔离，支持独立演进和测试**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **架构约束测试**
+   - [ ] 领域层零依赖测试（FR-AR-01）- 验证领域层仅使用 Python 标准库
+   - [ ] 依赖方向测试 - 验证基础设施层→应用层→领域层的依赖方向
+   - [ ] 导入检查测试 - 使用 ast 模块扫描导入语句
+
+2. **覆盖率要求**
+   - [ ] 领域层覆盖率≥90%
+   - [ ] 应用层覆盖率≥85%
+   - [ ] 整体覆盖率≥80%
+
+3. **代码质量**
+   - [ ] Ruff 检查通过（严重错误=0）
+   - [ ] MyPy 类型检查通过（错误率<5%）
+   - [ ] 安全扫描通过（高危漏洞=0）
+
+4. **测试文件**
+   - [ ] `tests/unit/architecture/test_hexagonal_architecture.py` - 架构约束测试
+   - [ ] `tests/unit/domain/test_strategic_plan.py` - 领域实体测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - TDD 红 - 绿 - 重构循环
+
 **Given** 项目初始化完成
 **When** 创建领域层、应用层、接口层、基础设施层目录结构
 **Then** 领域层仅依赖 Python 标准库，不包含任何外部框架导入
@@ -842,6 +866,29 @@ So that **系统支持事件驱动架构和事件溯源**。
 
 **Acceptance Criteria:**
 
+**TDD 测试要求:**
+
+1. **领域事件测试**
+   - [ ] DomainEvent 基类测试 - 验证 event_id、occurred_on、aggregate_id
+   - [ ] 事件子类测试 - 验证自定义事件类型正确继承
+   - [ ] 事件序列化测试 - 验证事件可以序列化和反序列化
+
+2. **覆盖率要求**
+   - [ ] 领域事件层覆盖率≥90%
+   - [ ] 事件发布测试覆盖率≥85%
+
+3. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] Pydantic Schema 验证通过
+
+4. **测试文件**
+   - [ ] `tests/unit/domain/events/test_events_base.py` - 事件基类测试
+   - [ ] `tests/unit/domain/events/test_plan_events.py` - 计划事件测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 领域事件测试示例
+
 **Given** 领域层已创建
 **When** 定义领域事件的 Schema（事件 ID、类型、时间戳、载荷、来源、Schema 版本、聚合根 ID、聚合根类型、版本号）
 **Then** 所有事件继承自统一的 DomainEvent 基类
@@ -854,6 +901,34 @@ I want **实现双通道事件总线（Redis 发布/订阅 + RabbitMQ + 事务�
 So that **实时事件低延迟路由，持久化事件可靠传输**。
 
 **Acceptance Criteria:**
+
+**TDD 测试要求:**
+
+1. **事件总线测试**
+   - [ ] Redis 发布/订阅测试 - 验证实时事件传输延迟<50ms
+   - [ ] RabbitMQ 持久化测试 - 验证事件 100% 可靠传输
+   - [ ] 事务发件箱测试 - 验证事件与业务操作原子性
+
+2. **性能要求**
+   - [ ] 实时事件延迟 P95<50ms
+   - [ ] 持久化事件成功率 100%
+   - [ ] 事件总线吞吐量≥1000 事件/秒
+
+3. **覆盖率要求**
+   - [ ] 事件总线层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 性能基准测试通过
+
+5. **测试文件**
+   - [ ] `tests/unit/infrastructure/test_event_bus.py` - 事件总线单元测试
+   - [ ] `tests/integration/test_event_bus_integration.py` - 事件总线集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-checklist.md` - 集成测试要求
 
 **Given** 领域事件已定义
 **When** 发布领域事件至事件总线
