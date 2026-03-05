@@ -167,7 +167,9 @@ jobs:
             --cov-report=html:htmlcov-unit \
             --cov-fail-under=80 \
             -v \
+            -n auto \
             --tb=short
+
       - name: Upload unit test coverage
         uses: actions/upload-artifact@v4
         with:
@@ -262,6 +264,7 @@ jobs:
             --cov-fail-under=0 \
             --cov-append \
             -v \
+            -n auto \
             --tb=short \
             --timeout=300
         env:

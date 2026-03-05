@@ -22,6 +22,8 @@ class DomainEvent(ABC):
         event_id: UUID | None = None,
         occurred_on: datetime | None = None,
         aggregate_id: UUID | None = None,
+        payload: dict[str, Any] | None = None,
+        schema_version: str = "1.0",
     ):
         """
         初始化领域事件。
@@ -30,10 +32,14 @@ class DomainEvent(ABC):
             event_id: 事件 ID，不提供则自动生成
             occurred_on: 事件发生时间，不提供则使用当前时间
             aggregate_id: 关联的聚合根 ID
+            payload: 事件载荷
+            schema_version: Schema 版本号，默认"1.0"
         """
         self._event_id = event_id or uuid4()
         self._occurred_on = occurred_on or datetime.now(UTC)
         self._aggregate_id = aggregate_id
+        self._payload = payload or {}
+        self._schema_version = schema_version
 
     @property
     def event_id(self) -> UUID:
@@ -49,6 +55,11 @@ class DomainEvent(ABC):
     def aggregate_id(self) -> UUID | None:
         """返回关联的聚合根 ID。"""
         return self._aggregate_id
+
+    @property
+    def schema_version(self) -> str:
+        """返回 Schema 版本号。"""
+        return self._schema_version
 
     @property
     def event_type(self) -> str:
