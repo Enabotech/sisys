@@ -63,8 +63,8 @@ class BaseRepository(ABC, Generic[T]):
         if entity is None:
             # 将 id 转换为字符串
             entity_id = str(id) if not isinstance(id, str) else id
-            raise NotFoundError(entity_type=self._entity_name(), entity_id=entity_id)
-            # raise NotFoundError(f"{self._entity_name()} with id {entity_id} not found")
+            # 使用自定义消息风格
+            raise NotFoundError(message=f"{self._entity_name()} with id {entity_id} not found")
         return entity
 
     @abstractmethod
