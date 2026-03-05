@@ -166,21 +166,6 @@ jobs:
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --with dev,test
 
-      - name: Debug - check unit test directory
-        run: |
-          echo "Current directory: $(pwd)"
-          ls -la tests/
-          ls -la tests/unit/ || echo "tests/unit/ not found"
-          ls -la tests/unit/*.py || echo "No Python files in tests/unit/"
-      
-      - name: Debug - pytest collection without coverage
-        run: |
-          poetry run pytest tests/unit/ --collect-only -v
-      
-      - name: Debug - try importing a test file manually
-        run: |
-          poetry run python -c "import tests.unit.test_framework_configuration" || echo "Import failed with error code $?"
-
       - name: Run unit tests with coverage
         run: |
           poetry run pytest tests/unit/ \
@@ -190,7 +175,7 @@ jobs:
             --cov-fail-under=0 \          # 强制不因覆盖率低而失败（虽然单元测试90%不会触发）
             -v \
             --tb=short
-            -n 0                     # 启用并行
+            -n auto                     # 启用并行
 
       - name: Upload unit test coverage HTML
         uses: actions/upload-artifact@v4
@@ -309,7 +294,7 @@ jobs:
             -v \
             --tb=short \
             --timeout=300 \
-            -n 0                     # 启用并行
+            -n auto                     # 启用并行
 
       - name: Stop test containers
         if: always()
@@ -514,5 +499,6 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
 
 
