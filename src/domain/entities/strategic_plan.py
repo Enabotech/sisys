@@ -9,6 +9,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from src.domain.entities.base import AggregateRoot
 from src.domain.events import DomainEvent
 from src.domain.exceptions import DomainValidationError, InvalidStatusError
 
@@ -35,7 +36,7 @@ class PlanStatus(str, Enum):
     CANCELLED = "cancelled"  # 已取消
 
 
-class StrategicPlan:
+class StrategicPlan(AggregateRoot):
     """
     战略规划领域实体。
 
@@ -63,16 +64,29 @@ class StrategicPlan:
         version: int = 1,
         blm_stage: str | None = None,
     ):
-        """初始化战略规划。"""
-        self._id = id
+        """
+        初始化战略规划。
+
+        Args:
+            id: 规划 ID
+            plan_type: 规划类型
+            status: 规划状态
+            creator_id: 创建者 ID
+            created_at: 创建时间（可选，默认自动生成）
+            updated_at: 更新时间（可选，默认自动生成）
+            version: 版本号
+            blm_stage: BLM 阶段
+        """
+        super().__init__(id)
         self._plan_type = plan_type
         self._status = status
         self._creator_id = creator_id
-        self._created_at = created_at or datetime.now(UTC)
-        self._updated_at = updated_at or datetime.now(UTC)
+        if created_at:
+            self._created_at = created_at
+        if updated_at:
+            self._updated_at = updated_at
         self._version = version
         self._blm_stage = blm_stage
-        self._domain_events: list[DomainEvent] = []
         self._checkpoints: list[dict] = []
 
     @classmethod

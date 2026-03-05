@@ -7124,7 +7124,91 @@ pytest tests/unit/domain/
 
 ## 24. 附录D 测试策略
 
-### 24.1 测试金字塔
+### 24.1 SDD+TDD 融合开发模式
+
+**核心理念：** 将规范驱动（SDD）与测试驱动（TDD）有机结合，通过 Qwen Code Agent 智能辅助，实现质量内建。
+
+#### 24.1.1 融合模式架构
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              SDD+TDD 融合开发流程 (6 步循环)               │
+├─────────────────────────────────────────────────────────┤
+│  1. SDD 规范定义 → 2. TDD 红 → 3. TDD 绿 → 4. TDD 重构    │
+│     ↓                                              ↓    │
+│  规范：Schema/API/验收                           优化代码 │
+│     ↓                                              ↓    │
+│  5. SDD 规范验证 ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←← 6. CI/CD │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 24.1.2 SDD 规范定义
+
+**规范文档清单：**
+
+| 规范类型 | 文档位置 | 验证工具 | 验收标准 |
+|---------|---------|---------|---------|
+| **领域事件 Schema** | `src/domain/events/` | Pydantic V2 | 100% 验证通过 |
+| **API 契约** | `docs/api/openapi.yaml` | Schemathesis | 契约测试 100% 通过 |
+| **验收标准** | `tests/acceptance/*.feature` | pytest-bdd | Gherkin 格式 |
+| **数据模型** | `src/domain/entities/` | SQLAlchemy | 模型验证通过 |
+
+#### 24.1.3 TDD 红 - 绿 - 重构循环
+
+**红阶段（编写失败测试）：**
+- 在实现之前编写测试
+- 基于验收标准（Gherkin）
+- 验证测试失败（预期行为）
+- Qwen Code Agent 生成测试初稿
+
+**绿阶段（最小实现）：**
+- 只编写让测试通过的代码
+- 不追求完美，先跑通流程
+- Qwen Code Agent 辅助实现
+
+**重构阶段（优化代码）：**
+- 保持测试通过的前提下优化
+- 应用设计模式/架构原则
+- Qwen Code Agent 提供重构建议
+
+#### 24.1.4 质量门禁
+
+| 检查类型 | 工具 | 阈值 | 阻断级别 |
+|---------|------|------|---------|
+| **领域层覆盖率** | pytest-cov | ≥90% | P0 阻断 |
+| **应用层覆盖率** | pytest-cov | ≥85% | P1 阻断 |
+| **基础设施层覆盖率** | pytest-cov | ≥75% | P1 阻断 |
+| **整体覆盖率** | pytest-cov | ≥80% | P0 阻断 |
+| **Ruff 代码检查** | ruff | 严重错误=0 | P0 阻断 |
+| **MyPy 类型检查** | mypy | 错误率<5% | P0 阻断 |
+| **安全扫描** | bandit | 高危漏洞=0 | P0 阻断 |
+
+#### 24.1.5 实施工具
+
+**Makefile 命令：**
+```bash
+# SDD 规范定义
+make sdd-define
+
+# TDD 红 - 绿 - 重构循环
+make tdd-red TARGET=domain/entities
+make tdd-green TARGET=domain/entities
+make tdd-refactor TARGET=domain/entities
+
+# SDD 规范验证
+make sdd-verify
+
+# 完整开发循环
+make sdd-tdd-cycle STORY=1.1
+```
+
+**相关文档：**
+- `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式完整指南
+- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
+- `docs/developer/epic1-story1.1-pilot-plan.md` - 试点实施计划
+
+
+### 24.2 测试金字塔
 
 ```
            E2E 测试 (10%)
@@ -7136,7 +7220,7 @@ pytest tests/unit/domain/
      /_____________________\
 ```
 
-### 24.2 契约测试策略
+### 24.3 契约测试策略
 
 **契约测试目标：** 确保 Agent 间、服务间、工具间的接口兼容性
 
@@ -7171,7 +7255,7 @@ def test_domain_event_contract():
     assert event.event_type == "plan.created"
 ```
 
-### 24.3 性能基准测试计划
+### 24.4 性能基准测试计划
 
 **测试目标：** 验证 NFR 定义的性能指标（阶段化：MVP/V1/V2）
 
@@ -7222,7 +7306,7 @@ class RetrievalUser(HttpUser):
         self.client.get("/api/v1/plans/plan_001")
 ```
 
-### 24.4 OWASP 安全测试矩阵
+### 24.5 OWASP 安全测试矩阵
 
 **测试目标：** 覆盖 OWASP Top 10 安全风险
 
@@ -7256,7 +7340,7 @@ def test_prompt_injection():
         assert is_injection_detected(response), f"未检测到注入：{payload}"
 ```
 
-### 24.5 测试覆盖率要求
+### 24.6 测试覆盖率要求
 
 | 模块 | 最低覆盖率 | 测量工具 | CI/CD 门禁 |
 |------|----------|---------|-----------|
