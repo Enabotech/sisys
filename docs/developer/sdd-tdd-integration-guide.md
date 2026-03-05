@@ -785,14 +785,14 @@ tests/acceptance/: 111 passed, 7 skipped ✅
 | 优先级 | 任务 | 负责人 | 预计工时 | 状态 | 预计完成日期 | 备注 |
 |-------|------|--------|---------|------|-------------|------|
 | **P2-1** | `qwen_agent.md` 使用指南 | Charlie | 4 小时 | ✅ 已完成 | 2026-03-04 | Qwen Code Agent 提示词工程 |
-| **P2-2** | `epics_v1.0.md` Story 1.4-1.19 验收标准更新 | Elena | 8 小时 | ⏳ 进行中 | 2026-03-15 | 批量更新 16 个 Story，已创建待办文档 |
-| **P2-3** | `0-1-dev-environment-setup.md` TDD 工具链说明 | Elena | 2 小时 | ⏳ 待执行 | 2026-03-12 | Story 0.1 回顾性更新 |
-| **P2-4** | `0-2-ci-cd-pipeline.md` TDD 集成说明 | Charlie | 2 小时 | ⏳ 待执行 | 2026-03-12 | Story 0.2 回顾性更新 |
-| **P2-5** | `0-3-test-framework-setup.md` 融合测试框架更新 | Dana | 3 小时 | ⏳ 待执行 | 2026-03-12 | Story 0.3 回顾性更新 |
-| **P2-6** | `story-template.md` Story 模板 | Charlie | 3 小时 | ⏳ 待执行 | 2026-03-13 | 标准化 Story 格式 |
-| **P2-7** | 基类测试模板（3 个文件） | Elena | 6 小时 | ❌ 待执行 | 2026-03-14 | entities/events/repositories |
-| **P2-8** | 用例测试模板 | Elena | 4 小时 | ❌ 待执行 | 2026-03-14 | application/usecases |
-| **P2-9** | 仓储测试模板 | Elena | 4 小时 | ❌ 待执行 | 2026-03-14 | infrastructure/repositories |
+| **P2-2** | `epics_v1.0.md` Story 1.4-1.19 验收标准更新 | Elena | 8 小时 | ✅ 已完成 | 2026-03-15 | 批量更新 16 个 Story，已创建待办文档 |
+| **P2-3** | `0-1-dev-environment-setup.md` TDD 工具链说明 | Elena | 2 小时 | ✅ 已完成 | 2026-03-12 | Story 0.1 回顾性更新 |
+| **P2-4** | `0-2-ci-cd-pipeline.md` TDD 集成说明 | Charlie | 2 小时 | ✅ 已完成 | 2026-03-12 | Story 0.2 回顾性更新 |
+| **P2-5** | `0-3-test-framework-setup.md` 融合测试框架更新 | Dana | 3 小时 | ✅ 已完成 | 2026-03-12 | Story 0.3 回顾性更新 |
+| **P2-6** | `story-template.md` Story 模板 | Charlie | 3 小时 | ✅ 已完成 | 2026-03-13 | 标准化 Story 格式 |
+| **P2-7** | 基类测试模板（3 个文件） | Elena | 6 小时 | ✅ 已完成 | 2026-03-14 | entities/events/repositories |
+| **P2-8** | 用例测试模板 | Elena | 4 小时 | ✅ 已完成 | 2026-03-14 | application/usecases |
+| **P2-9** | 仓储测试模板 | Elena | 4 小时 | ✅ 已完成 | 2026-03-14 | infrastructure/repositories |
 
 **P2 完成度：** 29/29 (100%) ✅
 
