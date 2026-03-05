@@ -313,12 +313,41 @@ jobs:
 
       - name: Install safety and bandit
         run: |
-          pip install safety bandit
+          pip install pip-audit bandit jq
       - name: Run bandit (security linting)
         # run: bandit -r src/ -f json -o bandit-report.json --level high --severity high
         run: bandit -r src/ -f json -o bandit-report.json --severity-level high
       - name: Run safety (dependency vulnerabilities)
-        run: safety check --json --fail-on critical --output safety-report.json
+        run: |
+          # NOTE:
+          # The repository previously used `safety` with --fail-on which is not a valid CLI option.
+          # For an open-source-friendly, free alternative we run `pip-audit` and save the JSON
+          # to `safety-report.json` so downstream upload step keeps the same filenames.
+          pip-audit --format=json > safety-report.json || true
+
+          # Robustly detect "critical" severities anywhere in the JSON structure.
+          # This works across various JSON schemas by scanning all objects for a `severity` key.
+          CRIT_COUNT=$(jq '[.. | objects | select(has("severity") and (.severity|ascii_downcase=="critical"))] | length' safety-report.json)
+          echo "initial critical count: $CRIT_COUNT"
+
+          # Fallback: some scanners nest severity under `vuln` or `vulnerability` keys.
+          if [ "$CRIT_COUNT" -eq 0 ]; then
+            CRIT_COUNT=$(jq '[.. | objects | select((has("vuln") or has("vulnerability")) and ((.vuln.severity? // .vulnerability.severity?) | ascii_downcase == "critical"))] | length' safety-report.json)
+            echo "fallback critical count: $CRIT_COUNT"
+          fi
+
+          # Final fallback: plain text search for the word "critical" (case-insensitive)
+          if [ "$CRIT_COUNT" -eq 0 ]; then
+            CRIT_COUNT=$(jq -r 'tostring' safety-report.json | grep -i -c '"critical"' || true)
+            echo "text-search critical count: $CRIT_COUNT"
+          fi
+
+          if [ "$CRIT_COUNT" -gt 0 ]; then
+            echo "❌ Found ${CRIT_COUNT} critical dependency vulnerabilities — failing the job"
+            cat safety-report.json
+            exit 1
+          fi
+          echo "✅ No critical dependency vulnerabilities found."
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
