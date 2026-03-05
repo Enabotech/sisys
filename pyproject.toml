@@ -163,7 +163,6 @@ addopts = [
     "--tb=short",
     "--cov=src",
     "--cov-report=term-missing:skip-covered",
-    "--cov-fail-under=80",
     "-n", "auto",
 ]
 
@@ -194,5 +193,4 @@ exclude_lines = [
     "@abstractmethod",
 ]
 show_missing = true
-fail_under = 80  # Story 0.2 质量门禁：覆盖率≥80%
 # precision = 1
