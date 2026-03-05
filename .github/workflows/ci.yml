@@ -166,6 +166,21 @@ jobs:
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --with dev,test
 
+      - name: Debug - check unit test directory
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la tests/
+          ls -la tests/unit/ || echo "tests/unit/ not found"
+          ls -la tests/unit/*.py || echo "No Python files in tests/unit/"
+      
+      - name: Debug - pytest collection without coverage
+        run: |
+          poetry run pytest tests/unit/ --collect-only -v
+      
+      - name: Debug - try importing a test file manually
+        run: |
+          poetry run python -c "import tests.unit.test_framework_configuration" || echo "Import failed with error code $?"
+
       - name: Run unit tests with coverage
         run: |
           poetry run pytest tests/unit/ \
@@ -499,4 +514,5 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
 
