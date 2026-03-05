@@ -393,18 +393,30 @@ jobs:
       - name: Determine Dockerfile path
         id: dockerfile-path
         run: |
-          echo "Checking possible Dockerfile locations..."
+          echo "Looking for Dockerfile candidates..."
+          # prefer docker/Dockerfile -> root Dockerfile -> any file named dockerfile*
           if [ -f docker/Dockerfile ]; then
-            echo "Found docker/Dockerfile"
-            echo "DOCKERFILE_PATH=docker/Dockerfile" >> $GITHUB_ENV
+            DOCKERFILE_PATH=docker/Dockerfile
           elif [ -f Dockerfile ]; then
-            echo "Found Dockerfile"
-            echo "DOCKERFILE_PATH=Dockerfile" >> $GITHUB_ENV
+            DOCKERFILE_PATH=Dockerfile
           else
-            echo "ERROR: No Dockerfile found. Listing repo root:"
-            ls -la
-            exit 1
+            # find any file named dockerfile* (case-insensitive), prefer shallow paths
+            CANDIDATE=$(find . -maxdepth 4 -type f -iname 'dockerfile*' -print 2>/dev/null | sed 's|^\./||' | sort | head -n1 || true)
+            if [ -n "$CANDIDATE" ]; then
+              DOCKERFILE_PATH="$CANDIDATE"
+            else
+              echo "ERROR: No Dockerfile found. Listing repo root:"
+              ls -la
+              echo ""
+              echo "Hints:"
+              echo " - Add a Dockerfile at docker/Dockerfile or at the repo root."
+              echo " - Or change the build step to point to an existing Dockerfile path."
+              exit 1
+            fi
           fi
+
+          echo "Found Dockerfile: $DOCKERFILE_PATH"
+          echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
 
       - name: Build Docker image (multi-stage)
         uses: docker/build-push-action@v5
@@ -466,4 +478,5 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
 
