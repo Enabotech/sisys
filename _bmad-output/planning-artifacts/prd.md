@@ -143,7 +143,41 @@ documentStatus: 'complete'
 | **目标用户** | 1) 大中型企业高管 (CEO/COO/CMO/CTO/CFO/CHO)；2) 企业战略与市场体系人员；3) 商业咨询师/战略顾问/市场分析师/产品经理 |
 | **市场聚焦** | 中国市场（适配国产模型、数据境内存储、本地部署） |
 | **架构策略** | 平台级架构（DDD 六边形架构 + 事件驱动 + 多 Agent 协作） |
-| **开发模式** | Qwen Code Agent + SDD（Specification-Driven Development） |
+| **开发模式** | Qwen Code Agent + SDD+TDD 融合模式（Specification-Driven + Test-Driven Development） |
+
+**开发模式详细说明：**
+
+本项目采用**SDD+TDD 融合开发模式**，将规范驱动（SDD）与测试驱动（TDD）有机结合，通过 Qwen Code Agent 智能辅助，实现质量内建：
+
+1. **SDD 规范驱动** - 保证方向正确
+   - 领域事件 Schema 定义（Pydantic V2）
+   - API 契约定义（OpenAPI 3.1）
+   - 验收标准定义（Gherkin 格式/pytest-bdd）
+   - 数据模型定义（SQLAlchemy）
+
+2. **TDD 测试驱动** - 保证实现正确
+   - 红阶段：在实现之前编写失败测试
+   - 绿阶段：编写刚好让测试通过的最小实现
+   - 重构阶段：保持测试通过的前提下优化代码
+
+3. **Qwen Code Agent 智能辅助** - 提升开发效率
+   - 生成测试初稿
+   - 辅助实现代码
+   - 提供重构建议
+   - 规范验证
+
+**质量门禁：**
+- 领域层覆盖率 ≥90%
+- 应用层覆盖率 ≥85%
+- 整体覆盖率 ≥80%
+- 严重错误 = 0，高危漏洞 = 0
+
+**相关文档：**
+- `docs/developer/sdd-tdd-fusion-guide.md` - 融合模式完整指南
+- `docs/developer/sdd-tdd-checklist.md` - 实施检查清单
+- `docs/developer/epic1-story1.1-pilot-plan.md` - 试点实施计划
+- `docs/developer/sdd-tdd-integration-guide.md` - SDD+TDD 融合模式项目整合指南
+
 | **产品路线图** | 4 阶段：分析师视图→高管视图→企业战略与市场人员视图→多租户→生态集成 |
 
 ---
@@ -690,7 +724,7 @@ sisys 自动解析所有文档，构建向量索引和知识图谱。
 
 > CFO 王总打开 sisys 的财务量化视图：
 >
-> "这套战略方案，5 年 NPV 是¥12 亿，IRR 25%。我们做了敏感性分析 - 
+> "这套战略方案，5 年 NPV 是¥12 亿，IRR 25%。我们做了敏感性分析 -
 > - 如果原材料涨价 10%，ROI 会从 25% 降到 18%；
 > - 如果新市场渗透率低于预期 20%，收入目标会下降¥3 亿；
 > - 最坏情况下，IRR 也有 15%，仍然高于资本成本 10%。"

@@ -935,7 +935,7 @@ class TestEventBusIntegration:
 - `tests/data/` - 测试数据目录（已存在）
 - `tests/factories/__init__.py` - 测试数据工厂包（新建）
 - `tests/fixtures/__init__.py` - 专用 fixture 包（新建）
-- `tests/unit/test_configuration.py` - 单元测试示例（验证 fixture、Mock、工具函数）
+- `tests/unit/shared/test_configuration.py` - 单元测试示例（验证 fixture、Mock、工具函数）
 - `tests/integration/test_framework_configuration.py` - 集成测试示例（验证标记系统）
 - `tests/e2e/test_framework_configuration.py` - E2E 测试示例（验证框架配置）
 
