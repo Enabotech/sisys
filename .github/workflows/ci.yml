@@ -174,8 +174,7 @@ jobs:
             --cov-report=html:htmlcov-unit \
             --cov-fail-under=0 \          # 强制不因覆盖率低而失败（虽然单元测试90%不会触发）
             -v \
-            --tb=short \
-            -n 0                     # 启用并行
+            --tb=short
 
       - name: Upload unit test coverage HTML
         uses: actions/upload-artifact@v4
@@ -293,8 +292,7 @@ jobs:
             --cov-fail-under=0 \          # 关键修改：显式设为0，避免因覆盖率低而失败
             -v \
             --tb=short \
-            --timeout=300 \
-            -n 0                     # 启用并行
+            --timeout=300
 
       - name: Stop test containers
         if: always()
@@ -499,3 +497,6 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+
+
