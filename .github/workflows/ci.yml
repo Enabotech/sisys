@@ -422,7 +422,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${ env.DOCKERFILE_PATH }
+          file: ${{ env.DOCKERFILE_PATH }}
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -478,5 +478,3 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
-
-
