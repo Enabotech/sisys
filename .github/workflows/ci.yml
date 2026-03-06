@@ -33,8 +33,7 @@ jobs:
   # =========================================
   code-quality:
     name: Code Quality Checks
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Free disk space on runner (best-effort)
@@ -129,8 +128,7 @@ jobs:
   # =========================================
   unit-tests:
     name: Unit Tests
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [code-quality]
     steps:
@@ -190,8 +188,7 @@ jobs:
   # =========================================
   integration-tests:
     name: Integration Tests
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [unit-tests]
     services:
@@ -303,8 +300,7 @@ jobs:
   # =========================================
   security-scan:
     name: Security Scanning
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -367,8 +363,7 @@ jobs:
   # =========================================
   build-docker:
     name: Build Docker Image
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [unit-tests, integration-tests]
     outputs:
@@ -457,7 +452,7 @@ jobs:
           echo "Found Dockerfile: $DOCKERFILE_PATH"
           echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
 
-      - name: Build Docker image (optimized for disk space)
+      - name: Build Docker image (multi-stage)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -511,8 +506,7 @@ jobs:
   # =========================================
   upload-coverage:
     name: Upload Coverage to Codecov
-    # runs-on: ubuntu-latest
-    runs-on: [self-hosted, windows, x64, local, gpu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [unit-tests, integration-tests]
     steps:
