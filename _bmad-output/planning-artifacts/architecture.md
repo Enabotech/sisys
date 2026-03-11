@@ -1715,8 +1715,8 @@ sisys/
 │   ├── docker-compose.yml                                 # Compose 配置
 │   └── docker-compose.prod.yml                            # 生产环境配置
 │
-├── .github/                                               # GitHub 配置
-│   └── workflows/                                         # GitHub Actions
+├── .gitea/                                                # Gitea 配置
+│   └── workflows/                                         # Gitea Pipeline
 │       ├── ci.yml                                         # 持续集成
 │       └── cd.yml                                         # 持续部署
 │
@@ -2340,18 +2340,17 @@ docs/
 docker/
 ├── Dockerfile                                             # 主 Dockerfile
 ├── Dockerfile.dev                                         # 开发环境 Dockerfile
-├── docker-compose.yml                                     # 基础 Compose 配置
 ├── docker-compose.dev.yml                                 # 开发环境 Compose
-├── docker-compose.prod.yml                                # 生产环境 Compose
+├── docker-compose.prod.yml                                # sisys产品交付 Compose
 └── docker-compose.test.yml                                # 测试环境 Compose
 ```
 
 ---
 
-### 13.12 GitHub Actions 目录结构 (.github/workflows/)
+### 13.12 Gitea Actions 目录结构 (.gitea/workflows/)
 
 ```
-.github/workflows/
+.gitea/workflows/
 ├── ci.yml                                                 # 持续集成工作流
 ├── cd.yml                                                 # 持续部署工作流
 ├── security-scan.yml                                      # 安全扫描工作流
@@ -2442,7 +2441,7 @@ sisys/
 | **scripts/** | ✅ | ✅ | ✅ 完整（新增 tools 子目录） |
 | **docs/** | ✅ | ✅ | ✅ 完整（新增 operations 子目录） |
 | **docker/** | ✅ | ✅ | ✅ 完整（新增 Dockerfile.dev） |
-| **.github/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
+| **.gitea/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
 | **requirements/** | ✅ | ✅ | ✅ 完整（新增 test.txt/docs.txt） |
 | **根目录配置** | 🟡 部分 | ✅ | ✅ 已补充完整 |
 | **工具配置** | ❌ 未定义 | ✅ | ✅ 已新增 |
@@ -17130,4 +17129,3 @@ $$ LANGUAGE plpgsql;
 | **最后更新** | 2026-02-26 |
 
 **所有附录 H~L 已完整合并到主架构文档中。**
-
