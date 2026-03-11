@@ -1,6 +1,7 @@
 #!/bin/bash
 # K3S 集群健康检查脚本
 # Story 0.4: K3S 集群部署
+# 技术栈：K3S v1.34.5
 # 验证：K3S/Longhorn/Traefik 状态
 
 set -e
@@ -132,6 +133,48 @@ else
     echo "  - Traefik 反向代理：未安装"
 fi
 echo ""
+
+# 检查关键组件状态，给出明确退出码
+FAILED=0
+
+# 检查 K3S 节点状态
+if [ "$NODE_STATUS" != "True" ]; then
+    echo "❌ 关键检查失败：K3S 节点未就绪"
+    FAILED=1
+fi
+
+# 检查系统 Pod
+if [ "$SYSTEM_PODS" -ne 0 ]; then
+    echo "❌ 关键检查失败：有 $SYSTEM_PODS 个系统 Pod 未运行"
+    FAILED=2
+fi
+
+# 如果 Longhorn 命名空间存在但 Pod 未运行，报告失败
+if kubectl get namespace longhorn-system &>/dev/null; then
+    LONGHORNS=$(kubectl get pods -n longhorn-system --no-headers | grep -v Running | wc -l)
+    if [ "$LONGHORNS" -ne 0 ]; then
+        echo "❌ 关键检查失败：有 $LONGHORNS 个 Longhorn Pod 未运行"
+        FAILED=3
+    fi
+fi
+
+# 如果 Traefik 命名空间存在但 Pod 未运行，报告失败
+if kubectl get namespace traefik &>/dev/null; then
+    TRAEFIKS=$(kubectl get pods -n traefik --no-headers | grep -v Running | wc -l)
+    if [ "$TRAEFIKS" -ne 0 ]; then
+        echo "❌ 关键检查失败：有 $TRAEFIKS 个 Traefik Pod 未运行"
+        FAILED=4
+    fi
+fi
+
+# 根据检查结果退出
+if [ "$FAILED" -ne 0 ]; then
+    echo ""
+    echo "❌ 健康检查失败（退出码：$FAILED）"
+    echo "   1=节点未就绪，2=系统 Pod 异常，3=Longhorn 异常，4=Traefik 异常"
+    exit $FAILED
+fi
+
 echo "下一步："
 if [ "$LONGHORN_DEFAULT" != "true" ]; then
     echo "  1. 安装 Longhorn：./scripts/deployment/k3s/install-longhorn.sh"
@@ -142,3 +185,5 @@ fi
 if [ "$LONGHORN_DEFAULT" = "true" ] && kubectl get namespace traefik &>/dev/null; then
     echo "  ✅ 所有组件已安装完成，可以开始部署应用"
 fi
+
+exit 0

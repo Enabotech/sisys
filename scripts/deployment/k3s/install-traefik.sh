@@ -2,6 +2,7 @@
 # Traefik 反向代理安装脚本
 # Story 0.4: K3S 集群部署
 # 技术栈：Traefik v2.10
+# K3S 版本：v1.34.5
 
 set -e
 
@@ -64,6 +65,9 @@ echo ""
 
 echo "安装 Traefik v2.10..."
 
+# 设置 Helm Chart 版本（版本锁定）
+TRAEFIK_CHART_VERSION="22.5.3"  # Traefik Helm Chart v22.5.3 对应 Traefik v2.10
+
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_FILE="$SCRIPT_DIR/traefik-values.yaml"
@@ -71,13 +75,17 @@ VALUES_FILE="$SCRIPT_DIR/traefik-values.yaml"
 # 检查配置文件是否存在
 if [ ! -f "$VALUES_FILE" ]; then
     echo "⚠️ 警告：traefik-values.yaml 不存在，使用默认配置"
-    helm install traefik traefik/traefik --namespace traefik --create-namespace
+    helm install traefik traefik/traefik \
+        --namespace traefik \
+        --create-namespace \
+        --version "$TRAEFIK_CHART_VERSION"
 else
     echo "使用配置文件：$VALUES_FILE"
     helm install traefik traefik/traefik \
         --namespace traefik \
         --create-namespace \
-        -f "$VALUES_FILE"
+        -f "$VALUES_FILE" \
+        --version "$TRAEFIK_CHART_VERSION"
 fi
 
 echo "等待 Traefik 部署..."

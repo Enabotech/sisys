@@ -11,7 +11,7 @@
 本指南介绍如何在高性能 PC 上部署 K3S 轻量级 Kubernetes 集群，为 Gitea、Harbor、ArgoCD 提供运行时环境。
 
 **技术栈:**
-- K3S v1.28.x
+- K3S v1.34.5
 - Longhorn v1.5.3 (分布式存储)
 - Traefik v2.10 (反向代理)
 
@@ -43,7 +43,7 @@ curl -sfL https://get.k3s.io | sh -
 # 验证安装
 sudo kubectl get nodes
 # 输出：NAME         STATUS   ROLES                  AGE   VERSION
-#       sisys-pc     Ready    control-plane,master   1m    v1.28.x
+#       sisys-pc     Ready    control-plane,master   1m    v1.34.5
 
 # 查看 K3S 服务状态
 sudo systemctl status k3s
