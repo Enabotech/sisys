@@ -1,23 +1,22 @@
-# K3S 配置文件 - 针对 13700K + 32G RAM 优化
-# Story 0.4: K3S 集群部署
-# 技术栈：K3S v1.34.5
+# K3S 配置文件 - WSL2 Ubuntu 22.04 环境
+# Story 0.4: K3S 集群部署（WSL2 重构版）
+# 技术栈：K3S v1.34.5 + local-path-provisioner
 # 路径：/etc/rancher/k3s/config.yaml
 
 # 节点配置
-node-name: sisys-pc
+node-name: sisys-pc-wsl2
 cluster-init: true
 
-# 网络配置
-# flannel-backend: none  # 使用 Calico 或其他 CNI
-flannel-backend: vxlan
-disable-network-policy: false
+# 网络配置（WSL2 特殊配置）
+flannel-backend: none  # WSL2 使用 host-network 模式
+disable-network-policy: true  # 禁用网络策略（WSL2 单节点）
 
 # 禁用不需要的组件（节省资源）
 disable:
   - traefik        # 使用独立的 Traefik Helm Chart
-  - servicelb      # 使用 MetalLB 或其他 LB
+  - servicelb      # WSL2 不支持 LoadBalancer
   - metrics-server # 可选：独立安装
-  - local-storage  # 使用 Longhorn
+  - local-storage  # 使用 local-path-provisioner
 
 # API Server 配置
 kube-apiserver-arg:
@@ -48,7 +47,6 @@ scheduler-memory-limit: 512
 # Kubelet 配置
 kubelet-arg:
   - max-pods=110
-  - serialization-verbosity=0
 
 # 系统预留资源
 system-reserved:
@@ -63,3 +61,7 @@ kube-reserved:
 # 日志配置
 debug: false
 logging: 0
+
+# WSL2 特殊配置
+# 注意：WSL2 使用 NAT 网络，不支持 hostNetwork
+# 存储使用 hostPath，数据存储在 WSL2 VHDX 虚拟磁盘

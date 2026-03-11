@@ -1,8 +1,9 @@
 #!/bin/bash
-# Traefik 反向代理安装脚本
-# Story 0.4: K3S 集群部署
+# Traefik 反向代理安装脚本 - WSL2 适配版
+# Story 0.4: K3S 集群部署（WSL2 重构版）
 # 技术栈：Traefik v2.10
 # K3S 版本：v1.34.5
+# 环境：WSL2 Ubuntu 22.04
 
 set -e
 

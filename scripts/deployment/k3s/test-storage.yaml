@@ -1,0 +1,63 @@
+# WSL2 K3S local-path-provisioner 存储测试文件
+# Story 0.4: K3S 集群部署（WSL2 重构版）
+# 技术栈：local-path-provisioner (K3S 内置)
+
+---
+# 测试 PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-pvc
+  labels:
+    app: storage-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard  # K3S 内置 local-path-provisioner
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 测试 Pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-storage-pod
+  labels:
+    app: storage-test
+spec:
+  containers:
+  - name: test-container
+    image: busybox:latest
+    command: ["sleep", "3600"]
+    volumeMounts:
+    - name: test-volume
+      mountPath: /data
+    # 写入测试数据
+  volumes:
+  - name: test-volume
+    persistentVolumeClaim:
+      claimName: test-pvc
+
+---
+# 验证 Pod（用于检查 PVC 是否成功挂载）
+apiVersion: v1
+kind: Pod
+metadata:
+  name: verify-storage-pod
+  labels:
+    app: storage-verify
+spec:
+  restartPolicy: Never
+  containers:
+  - name: verify-container
+    image: busybox:latest
+    command: ["sh", "-c", "echo 'Storage test successful' > /data/test.txt && cat /data/test.txt"]
+    volumeMounts:
+    - name: test-volume
+      mountPath: /data
+  volumes:
+  - name: test-volume
+    persistentVolumeClaim:
+      claimName: test-pvc

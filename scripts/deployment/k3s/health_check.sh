@@ -1,12 +1,11 @@
 #!/bin/bash
-# K3S 集群健康检查脚本
-# Story 0.4: K3S 集群部署
-# 技术栈：K3S v1.34.5
-# 验证：K3S/Longhorn/Traefik 状态
+# K3S 集群健康检查脚本 - WSL2 适配版
+# Story 0.4: K3S 集群部署（WSL2 重构版）
+# 技术栈：K3S v1.34.5 + local-path-provisioner
 
 set -e
 
-echo "=== K3S 集群健康检查 ==="
+echo "=== K3S 集群健康检查 (WSL2 版) ==="
 echo "日期：$(date)"
 echo ""
 
@@ -32,45 +31,67 @@ SYSTEM_PODS=$(kubectl get pods -n kube-system --no-headers | grep -v Running | w
 if [ "$SYSTEM_PODS" -ne 0 ]; then
     echo "❌ 有 $SYSTEM_PODS 个系统 Pod 未运行"
     kubectl get pods -n kube-system --no-headers | grep -v Running
-    exit 1
+    exit 2
 fi
 echo "✅ 系统 Pod 全部 Running"
 echo ""
 
-# ========== 3. 检查存储类 ==========
+# ========== 3. 检查存储类（local-path-provisioner） ==========
 
 echo "3. 检查存储类..."
 kubectl get storageclass
 
-LONGHORN_DEFAULT=$(kubectl get storageclass longhorn -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}' 2>/dev/null || echo "")
-if [ "$LONGHORN_DEFAULT" != "true" ]; then
-    echo "⚠️ Longhorn 不是默认存储类（可能还未安装 Longhorn）"
+STORAGE_CLASS=$(kubectl get storageclass standard -o jsonpath='{.provisioner}' 2>/dev/null || echo "")
+if [ "$STORAGE_CLASS" != "rancher.io/local-path" ]; then
+    echo "❌ local-path-provisioner 未配置（当前：$STORAGE_CLASS）"
+    exit 3
+fi
+echo "✅ local-path-provisioner 已配置（storageClassName: standard）"
+
+# 检查默认存储类
+DEFAULT_CLASS=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null || echo "")
+if [ "$DEFAULT_CLASS" = "standard" ]; then
+    echo "✅ standard 是默认存储类"
 else
-    echo "✅ Longhorn 存储类已配置为默认"
+    echo "⚠️ standard 不是默认存储类，当前默认：$DEFAULT_CLASS"
 fi
 echo ""
 
-# ========== 4. 检查 Longhorn（如果已安装） ==========
+# ========== 4. 测试 PVC 创建（可选） ==========
 
-echo "4. 检查 Longhorn..."
-if kubectl get namespace longhorn-system &>/dev/null; then
-    kubectl get pods -n longhorn-system
+echo "4. 测试 PVC 创建..."
+TEST_PVC_FILE="$(dirname "${BASH_SOURCE[0]}")/test-storage.yaml"
 
-    LONGHORNS=$(kubectl get pods -n longhorn-system --no-headers | grep -v Running | wc -l)
-    if [ "$LONGHORNS" -ne 0 ]; then
-        echo "❌ 有 $LONGHORNS 个 Longhorn Pod 未运行"
-        kubectl get pods -n longhorn-system --no-headers | grep -v Running
-        exit 1
-    fi
-    echo "✅ Longhorn 全部 Running"
+if [ -f "$TEST_PVC_FILE" ]; then
+    echo "创建测试 PVC..."
+    kubectl apply -f "$TEST_PVC_FILE" 2>/dev/null || true
 
-    # 检查 Longhorn UI
-    if kubectl get ingress -n longhorn-system longhorn-ingress &>/dev/null; then
-        echo "✅ Longhorn UI Ingress 已配置"
-        echo "   访问地址：http://longhorn.local"
+    echo "等待 PVC 绑定..."
+    sleep 5
+
+    PVC_STATUS=$(kubectl get pvc test-pvc -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [ "$PVC_STATUS" = "Bound" ]; then
+        echo "✅ PVC 创建成功"
+
+        # 验证 Pod 是否能写入数据
+        echo "验证存储写入..."
+        sleep 3
+        kubectl wait --for=condition=ready pod test-storage-pod --timeout=60s 2>/dev/null || true
+        kubectl exec test-storage-pod -- sh -c "echo 'WSL2 storage test successful' > /data/test.txt" 2>/dev/null || true
+        kubectl exec test-storage-pod -- cat /data/test.txt 2>/dev/null || echo "⚠️ 无法写入测试数据"
+
+        # 清理测试资源
+        echo "清理测试资源..."
+        kubectl delete pod test-storage-pod verify-storage-pod 2>/dev/null || true
+        kubectl delete pvc test-pvc 2>/dev/null || true
+        echo "✅ 测试资源已清理"
+    else
+        echo "⚠️ PVC 创建失败或未绑定（状态：$PVC_STATUS）"
+        kubectl describe pvc test-pvc 2>/dev/null || true
     fi
 else
-    echo "⚠️ Longhorn 命名空间不存在（可能还未安装）"
+    echo "⚠️ 测试文件不存在：$TEST_PVC_FILE"
+    echo "   跳过 PVC 测试"
 fi
 echo ""
 
@@ -78,13 +99,14 @@ echo ""
 
 echo "5. 检查 Traefik..."
 if kubectl get namespace traefik &>/dev/null; then
+    echo "检查 Traefik Pod..."
     kubectl get pods -n traefik
 
     TRAEFIKS=$(kubectl get pods -n traefik --no-headers | grep -v Running | wc -l)
     if [ "$TRAEFIKS" -ne 0 ]; then
         echo "❌ 有 $TRAEFIKS 个 Traefik Pod 未运行"
         kubectl get pods -n traefik --no-headers | grep -v Running
-        exit 1
+        exit 4
     fi
     echo "✅ Traefik 全部 Running"
 
@@ -93,6 +115,12 @@ if kubectl get namespace traefik &>/dev/null; then
     if [ -n "$TRAEFIK_SVC" ]; then
         echo "✅ Traefik 服务已配置"
         echo "   $TRAEFIK_SVC"
+    fi
+
+    # 检查 Ingress
+    INGRESS_COUNT=$(kubectl get ingress --all-namespaces --no-headers 2>/dev/null | wc -l)
+    if [ "$INGRESS_COUNT" -gt 0 ]; then
+        echo "✅ 发现 $INGRESS_COUNT 个 Ingress"
     fi
 else
     echo "⚠️ Traefik 命名空间不存在（可能还未安装）"
@@ -122,16 +150,17 @@ echo ""
 echo "集群状态总结："
 echo "  - K3S 集群：Ready"
 echo "  - 系统 Pod：全部 Running"
-if [ "$LONGHORN_DEFAULT" = "true" ]; then
-    echo "  - Longhorn 存储：已配置（默认存储类）"
-else
-    echo "  - Longhorn 存储：未安装"
-fi
+echo "  - 存储方案：local-path-provisioner (standard)"
 if kubectl get namespace traefik &>/dev/null; then
     echo "  - Traefik 反向代理：已安装"
 else
     echo "  - Traefik 反向代理：未安装"
 fi
+echo ""
+echo "WSL2 环境说明："
+echo "  - 存储类型：hostPath（绑定到 WSL2 VHDX 虚拟磁盘）"
+echo "  - 适用场景：开发/测试环境"
+echo "  - 生产环境：建议迁移到 NFS/Ceph 等分布式存储"
 echo ""
 
 # 检查关键组件状态，给出明确退出码
@@ -149,13 +178,10 @@ if [ "$SYSTEM_PODS" -ne 0 ]; then
     FAILED=2
 fi
 
-# 如果 Longhorn 命名空间存在但 Pod 未运行，报告失败
-if kubectl get namespace longhorn-system &>/dev/null; then
-    LONGHORNS=$(kubectl get pods -n longhorn-system --no-headers | grep -v Running | wc -l)
-    if [ "$LONGHORNS" -ne 0 ]; then
-        echo "❌ 关键检查失败：有 $LONGHORNS 个 Longhorn Pod 未运行"
-        FAILED=3
-    fi
+# 检查存储类
+if [ "$STORAGE_CLASS" != "rancher.io/local-path" ]; then
+    echo "❌ 关键检查失败：local-path-provisioner 未配置"
+    FAILED=3
 fi
 
 # 如果 Traefik 命名空间存在但 Pod 未运行，报告失败
@@ -171,18 +197,15 @@ fi
 if [ "$FAILED" -ne 0 ]; then
     echo ""
     echo "❌ 健康检查失败（退出码：$FAILED）"
-    echo "   1=节点未就绪，2=系统 Pod 异常，3=Longhorn 异常，4=Traefik 异常"
+    echo "   1=节点未就绪，2=系统 Pod 异常，3=存储配置异常，4=Traefik 异常"
     exit $FAILED
 fi
 
 echo "下一步："
-if [ "$LONGHORN_DEFAULT" != "true" ]; then
-    echo "  1. 安装 Longhorn：./scripts/deployment/k3s/install-longhorn.sh"
-fi
 if ! kubectl get namespace traefik &>/dev/null; then
-    echo "  2. 安装 Traefik：./scripts/deployment/k3s/install-traefik.sh"
+    echo "  1. 安装 Traefik：./scripts/deployment/k3s/install-traefik.sh"
 fi
-if [ "$LONGHORN_DEFAULT" = "true" ] && kubectl get namespace traefik &>/dev/null; then
+if kubectl get namespace traefik &>/dev/null; then
     echo "  ✅ 所有组件已安装完成，可以开始部署应用"
 fi
 
