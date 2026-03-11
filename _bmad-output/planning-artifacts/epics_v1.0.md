@@ -1,15 +1,18 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-epic0-refactor']
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/planning-artifacts/ux-design-specification.md
   - docs/or.md
+  - docs/developer/EPIC_0_REFACTORED.md
 workflowType: 'epics-and-stories'
 projectName: 'sisys'
 userName: 'Agimtech'
 date: '2026-02-28'
-documentStatus: 'step-02-complete'
+documentStatus: 'step-03-complete'
+lastUpdated: '2026-03-05'
+updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 ---
 
 # sisys - Epic Breakdown
@@ -17,6 +20,43 @@ documentStatus: 'step-02-complete'
 ## Overview
 
 本文档提供 sisys 企业战略规划管理系统的完整史诗 (Epic) 和用户故事 (Story) 分解，将 PRD、架构设计和 UX 设计中的需求分解为可实现的开发任务。
+
+---
+
+## 🔄 Epic 0 重构 (2026-03-05)
+
+**重构目标：** 建立两套系统 - 开发 CI/CD 系统 + 产品交付系统
+
+**技术栈确认：** ✅ 所有版本已由 Agimtech 测试验证
+- Gitea v1.25.4 ✅
+- Gitea Runner (最新版) ✅
+- Harbor v2.14.3 ✅
+- ArgoCD v3.3.2 ✅
+- K3S v1.28.x ✅
+
+**轨道 1: 开发 CI/CD 系统** (面向工程师)
+- Story 0.1: K3S 集群部署
+- Story 0.2: Gitea 代码托管
+- Story 0.3: Harbor 镜像仓库
+- Story 0.4: ArgoCD 持续部署
+- Story 0.5: Gitea Runner 配置
+- Story 0.6: CI/CD Pipeline 模板
+
+**轨道 2: SISYS 产品交付系统** (面向客户)
+- Story 0.11: Windows 安装包
+- Story 0.12: Mac 安装包
+- Story 0.13: Linux 一键脚本
+- Story 0.14: 自动检测与修复
+- Story 0.15: 用户友好配置向导
+
+**原有 Story 处理：**
+- Story 0.1 (开发环境搭建): ✅ 保留 (简化为 Python 环境)
+- Story 0.2 (CI/CD 流水线): ⚠️ 备份后废弃 (被新 Story 0.1-0.6 替代)
+- Story 0.3 (测试框架搭建): ✅ 根据新 Story 完善优化
+
+**详细定义：** 参考 `docs/developer/EPIC_0_REFACTORED.md`
+
+---
 
 ---
 
@@ -624,11 +664,28 @@ documentStatus: 'step-02-complete'
 **📦 价值组 1: Iteration 0（开发基础设施）**
 > 为团队提供统一的开发环境、CI/CD 和测试框架
 
-| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
-|-------|------|---------|---------|-----------|
-| Story 0.1 | **开发环境搭建** | 提供统一的开发环境和工具链 | 无依赖 | **P0-0（Iteration 0）** |
-| Story 0.2 | **CI/CD 流水线** | 自动化构建、测试和部署 | 依赖 Story 0.1 | **P0-0（所有 Epic 前置）** |
-| Story 0.3 | **测试框架搭建** | 提供单元测试、集成测试框架 | 依赖 Story 0.1 | **P0-0（Iteration 0）** |
+**⚠️ 注意：** Story 0.1-0.3 已于 2026-03-05 重构，新 Story 定义参考 `docs/developer/EPIC_0_REFACTORED.md`
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 | 状态 |
+|-------|------|---------|---------|-----------|------|
+| Story 0.1 | **开发环境搭建** | 提供统一的开发环境和工具链 | 无依赖 | **P0-0（Iteration 0）** | ✅ 保留 (简化为 Python 环境) |
+| Story 0.2 | **CI/CD 流水线** | 自动化构建、测试和部署 | 依赖 Story 0.1 | **P0-0（所有 Epic 前置）** | ⚠️ 备份后废弃 (被新 Story 0.1-0.6 替代) |
+| Story 0.3 | **测试框架搭建** | 提供单元测试、集成测试框架 | 依赖 Story 0.1 | **P0-0（Iteration 0）** | ✅ 根据新 Story 完善优化 |
+
+**新 Story 0.1-0.6 (开发 CI/CD 系统):**
+- Story 0.1: K3S 集群部署 🆕
+- Story 0.2: Gitea 代码托管 🆕
+- Story 0.3: Harbor 镜像仓库 🆕
+- Story 0.4: ArgoCD 持续部署 🆕
+- Story 0.5: Gitea Runner 配置 🆕
+- Story 0.6: CI/CD Pipeline 模板 🆕
+
+**新 Story 0.11-0.15 (产品交付系统):**
+- Story 0.11: Windows 安装包 🆕
+- Story 0.12: Mac 安装包 🆕
+- Story 0.13: Linux 一键脚本 🆕
+- Story 0.14: 自动检测与修复 🆕
+- Story 0.15: 用户友好配置向导 🆕
 
 **📦 价值组 2: 架构基础与事件驱动**
 > 实现六边形架构、领域事件和事件总线
