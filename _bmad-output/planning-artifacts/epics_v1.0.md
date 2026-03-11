@@ -12,7 +12,7 @@ userName: 'Agimtech'
 date: '2026-02-28'
 documentStatus: 'step-03-complete'
 lastUpdated: '2026-03-05'
-updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
+updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系统'
 ---
 
 # sisys - Epic Breakdown
@@ -20,43 +20,6 @@ updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 ## Overview
 
 本文档提供 sisys 企业战略规划管理系统的完整史诗 (Epic) 和用户故事 (Story) 分解，将 PRD、架构设计和 UX 设计中的需求分解为可实现的开发任务。
-
----
-
-## 🔄 Epic 0 重构 (2026-03-05)
-
-**重构目标：** 建立两套系统 - 开发 CI/CD 系统 + 产品交付系统
-
-**技术栈确认：** ✅ 所有版本已由 Agimtech 测试验证
-- Gitea v1.25.4 ✅
-- Gitea Runner (最新版) ✅
-- Harbor v2.14.3 ✅
-- ArgoCD v3.3.2 ✅
-- K3S v1.28.x ✅
-
-**轨道 1: 开发 CI/CD 系统** (面向工程师)
-- Story 0.1: K3S 集群部署
-- Story 0.2: Gitea 代码托管
-- Story 0.3: Harbor 镜像仓库
-- Story 0.4: ArgoCD 持续部署
-- Story 0.5: Gitea Runner 配置
-- Story 0.6: CI/CD Pipeline 模板
-
-**轨道 2: SISYS 产品交付系统** (面向客户)
-- Story 0.11: Windows 安装包
-- Story 0.12: Mac 安装包
-- Story 0.13: Linux 一键脚本
-- Story 0.14: 自动检测与修复
-- Story 0.15: 用户友好配置向导
-
-**原有 Story 处理：**
-- Story 0.1 (开发环境搭建): ✅ 保留 (简化为 Python 环境)
-- Story 0.2 (CI/CD 流水线): ⚠️ 备份后废弃 (被新 Story 0.1-0.6 替代)
-- Story 0.3 (测试框架搭建): ✅ 根据新 Story 完善优化
-
-**详细定义：** 参考 `docs/developer/EPIC_0_REFACTORED.md`
-
----
 
 ---
 
@@ -593,6 +556,7 @@ updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 | Story | 名称 | 覆盖内容 | 类型 |
 |-------|------|---------|------|
 | Story 0.1-0.3 | Iteration 0（开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
+| Story 0.4-0.9/0.14-0.18 | Iteration 1（重构开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
 | Story 1.13 | K8s 动态扩缩容 | NFR-SCALE-03（可扩展性） | NFR Story |
 | Story 1.14a/b/c | 自主调用循环（trigger/route/execute） | or.md 系统公理一 | or.md 追溯 |
 | Story 1.15a/b | 外部化记忆（上下文压缩/五层存储协同） | or.md 系统公理二 | or.md 追溯 |
@@ -620,6 +584,7 @@ updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 | Epic 编号 | Epic 名称 | 优先级 | 包含 FR | Story 数 | 用户价值 |
 |---------|---------|-------|--------|---------|---------|
 | Epic 0 | Iteration 0 | P0 | - | 3 | 开发环境、CI/CD、测试框架（合入 Epic 1） |
+| Epic 0 | Iteration 1 | P0 | - | 11 | 开发环境、CI/CD、测试框架（合入 Epic 1） |
 | Epic 1 | **企业级架构基础与合规** | P0 | AR-01~04, SC-01/02/03/07/08, CP-01/04, SA-01 | 23 | 系统稳定性、性能、安全、合规（等保 2.0） |
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
@@ -664,28 +629,63 @@ updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 **📦 价值组 1: Iteration 0（开发基础设施）**
 > 为团队提供统一的开发环境、CI/CD 和测试框架
 
-**⚠️ 注意：** Story 0.1-0.3 已于 2026-03-05 重构，新 Story 定义参考 `docs/developer/EPIC_0_REFACTORED.md`
-
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 | 状态 |
 |-------|------|---------|---------|-----------|------|
 | Story 0.1 | **开发环境搭建** | 提供统一的开发环境和工具链 | 无依赖 | **P0-0（Iteration 0）** | ✅ 保留 (简化为 Python 环境) |
 | Story 0.2 | **CI/CD 流水线** | 自动化构建、测试和部署 | 依赖 Story 0.1 | **P0-0（所有 Epic 前置）** | ⚠️ 备份后废弃 (被新 Story 0.1-0.6 替代) |
 | Story 0.3 | **测试框架搭建** | 提供单元测试、集成测试框架 | 依赖 Story 0.1 | **P0-0（Iteration 0）** | ✅ 根据新 Story 完善优化 |
 
-**新 Story 0.1-0.6 (开发 CI/CD 系统):**
-- Story 0.1: K3S 集群部署 🆕
-- Story 0.2: Gitea 代码托管 🆕
-- Story 0.3: Harbor 镜像仓库 🆕
-- Story 0.4: ArgoCD 持续部署 🆕
-- Story 0.5: Gitea Runner 配置 🆕
-- Story 0.6: CI/CD Pipeline 模板 🆕
+**📦 价值组 1: Iteration 1（Epic 0 重构）**
 
-**新 Story 0.11-0.15 (产品交付系统):**
-- Story 0.11: Windows 安装包 🆕
-- Story 0.12: Mac 安装包 🆕
-- Story 0.13: Linux 一键脚本 🆕
-- Story 0.14: 自动检测与修复 🆕
-- Story 0.15: 用户友好配置向导 🆕
+**重构目标：** 建立两套系统 - 开发 CI/CD 系统 + 产品交付系统
+
+**技术栈确认：** ✅ 所有版本已由 Agimtech 测试验证
+- Gitea v1.25.4 ✅
+- Gitea Runner (最新版) ✅
+- Harbor v2.14.3 ✅
+- ArgoCD v3.3.2 ✅
+- K3S v1.28.x ✅
+
+***📦 价值组 1.1: 开发 CI/CD 系统***
+> 为开发团队提供企业级 CI/CD 基础设施
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
+| Story 0.4 | **K3S 集群部署** | 提供轻量级 K8s 运行时 | 无依赖 | **P0-0** |
+| Story 0.5 | **Gitea 代码托管** | 代码版本管理和协作 | 依赖 Story 0.4 | **P0-1** |
+| Story 0.6 | **Harbor 镜像仓库** | 安全存储和分发 Docker 镜像 | 依赖 Story 0.4 | **P0-2** |
+| Story 0.7 | **ArgoCD 持续部署** | GitOps 自动化部署 | 依赖 Story 0.5, 0.6 | **P0-3** |
+| Story 0.8 | **Gitea Runner 配置** | 自动触发 CI/CD 任务 | 依赖 Story 0.5, 0.7 | **P0-4** |
+| Story 0.9 | **CI/CD Pipeline 模板** | 标准化 Pipeline 复用 | 依赖 Story 0.8 | **P0-5** |
+
+***📦 价值组 1.2: SISYS 产品交付系统***
+
+> 为客户提供简单快捷的产品部署体验
+
+| Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
+|-------|------|---------|---------|-----------|
+| Story 0.14 | **Windows 安装包** | Windows 用户一键安装 | 无依赖 | **P0-6** |
+| Story 0.15 | **Mac 安装包** | Mac 用户一键安装 | 无依赖 | **P0-7** |
+| Story 0.16 | **Linux 一键脚本** | Linux 用户一键安装 | 无依赖 | **P0-8** |
+| Story 0.17 | **自动检测与修复** | 安装问题自动修复 | 依赖 Story 0.14-0.16 | **P0-9** |
+| Story 0.18 | **用户友好配置向导** | 图形化配置无需 YAML | 依赖 Story 0.17 | **P0-10** |
+
+***📋 原有 Story 处理***
+
+Story 0.1 (开发环境搭建):
+- ✅ **保留** - 简化为 Python 环境配置
+- 删除 Docker/K3S 相关内容（移到新 Story 0.4）
+- 保留：Python 3.11+、Poetry、IDE 配置、SDD 工具链
+
+Story 0.2 (CI/CD 流水线):
+- ⚠️ **备份后废弃** - 被新 Story 0.4-0.9 替代
+- 归档到 `docs/archive/old-story-0.2.md`
+- 保留价值：质量门禁概念、Pipeline 阶段设计
+
+Story 0.3 (测试框架搭建):
+- ✅ **根据新 Story 完善优化** - 与新 Story 0.9 配合使用
+- 保留：pytest 配置、Fixture 系统、Mock 框架
+- 优化：与新 CI/CD 系统集成、增加 K3S 测试支持
 
 **📦 价值组 2: 架构基础与事件驱动**
 > 实现六边形架构、领域事件和事件总线
@@ -743,12 +743,13 @@ updateReason: 'Epic 0 重构 - 双轨制开发基础设施 + 产品交付系统'
 **✅ 依赖关系验证：**
 - Epic 1 内部故事依赖均为**组内依赖**，不依赖其他 Epic
 - Epic 1 是所有其他 Epic 的**基础依赖**，必须首先完成
-- 价值组 1（Iteration 0）→ 价值组 2（架构基础）→ 价值组 3（五层存储）→ 价值组 4（安全合规）→ 价值组 5（or.md 公理）→ 价值组 6（MVP 关键机制增强）
-- 价值组 1（Iteration 0）可独立交付
+- 价值组 1（Iteration 0 + 1）→ 价值组 2（架构基础）→ 价值组 3（五层存储）→ 价值组 4（安全合规）→ 价值组 5（or.md 公理）→ 价值组 6（MVP 关键机制增强）
+- 价值组 1（Iteration 0 + 1）可独立交付
 - 价值组 2-6 依赖价值组 1 和 2 的架构基础
 
-**📋 Iteration 0 和 or.md 追溯说明：**
-- **Story 0.1-0.3**：Iteration 0（开发环境、CI/CD、测试框架），必须在 Iteration 1 前完成
+**📋 Epic 0 和 or.md 追溯说明：**
+- **Story 0.1-0.3**：Iteration 0（开发环境、CI/CD、测试框架），必须在 Story 1 前完成
+- **Story 0.4-0.9/0.14-0.18**：Iteration 1（开发环境、CI/CD、测试框架），必须在 Story 1 前完成
 - **Story 0.2**：CI/CD 流水线是所有 Epic 的前置依赖（自动化构建、测试、部署）
 - **Story 1.13**：覆盖 NFR-SCALE-03（Agent 动态扩缩容，基于负载自动伸缩，响应时间<5 分钟）
 - **Story 1.14a/b/c**：覆盖 or.md 系统公理一（自主调用：trigger→route→execute）
@@ -877,6 +878,331 @@ So that **可以快速编写和执行测试用例**。
 - 领域层覆盖率：≥90%
 - 应用层覆盖率：≥85%
 - CI/CD 门禁：--cov-fail-under=80 强制执行
+
+### Story 0.4: K3S 集群部署
+
+**As a** DevOps 工程师,
+**I want** 在高性能 PC 上部署 K3S 集群,
+**So that** 提供轻量级 K8s 运行时环境。
+
+**Acceptance Criteria:**
+
+**Given** 13700K + 32G RAM + 1T SSD + 10T HDD 系统
+**When** 运行 K3S 安装脚本
+**Then** K3S v1.28.x 安装成功
+**And** Longhorn 存储配置完成
+**And** Traefik 反向代理配置完成
+**And** 集群健康检查通过
+
+**技术栈:**
+- K3S v1.28.x
+- Longhorn v1.5.3
+- Traefik v2.10
+
+**TDD 测试要求:**
+1. 集群部署测试 - 验证 K3S 安装成功
+2. 存储配置测试 - 验证 Longhorn 可用
+3. 网络配置测试 - 验证 Traefik 路由正常
+
+**实施指南:** `docs/deployment/K3S_CLUSTER_SETUP.md`
+
+---
+
+### Story 0.5: Gitea 代码托管
+
+**As a** 开发工程师,
+**I want** 部署 Gitea v1.25.4 代码托管平台,
+**So that** 团队可以进行代码版本管理和协作。
+
+**Acceptance Criteria:**
+
+**Given** K3S 集群已部署
+**When** 运行 Gitea Helm Chart
+**Then** Gitea v1.25.4 部署成功
+**And** PostgreSQL 数据库配置完成
+**And** HTTPS 证书配置完成
+**And** 初始管理员账号创建成功
+
+**技术栈:**
+- Gitea v1.25.4 ✅ (已验证)
+- PostgreSQL 15
+- Helm v3
+
+**TDD 测试要求:**
+1. Gitea 部署测试 - 验证服务可访问
+2. 数据库连接测试 - 验证 PostgreSQL 集成
+3. HTTPS 配置测试 - 验证证书有效
+
+**实施指南:** `docs/deployment/GITEA_INSTALLATION.md`
+
+---
+
+### Story 0.6: Harbor 镜像仓库
+
+**As a** DevOps 工程师,
+**I want** 部署 Harbor v2.14.3 镜像仓库,
+**So that** 团队可以安全存储和分发 Docker 镜像。
+
+**Acceptance Criteria:**
+
+**Given** K3S 集群已部署
+**When** 运行 Harbor Helm Chart
+**Then** Harbor v2.14.3 部署成功
+**And** 镜像仓库配置完成
+**And** Trivy 漏洞扫描配置完成
+**And** 镜像签名配置完成
+
+**技术栈:**
+- Harbor v2.14.3 ✅
+- Trivy (漏洞扫描)
+- Notary (镜像签名)
+
+**TDD 测试要求:**
+1. Harbor 部署测试 - 验证服务可访问
+2. 镜像推送测试 - 验证镜像可以推送
+3. 漏洞扫描测试 - 验证 Trivy 集成
+
+**实施指南:** `docs/deployment/HARBOR_INSTALLATION.md`
+
+---
+
+### Story 0.7: ArgoCD 持续部署
+
+**As a** DevOps 工程师,
+**I want** 部署 ArgoCD v3.3.2 持续部署工具,
+**So that** 实现 GitOps 自动化部署。
+
+**Acceptance Criteria:**
+
+**Given** K3S 集群已部署
+**When** 运行 ArgoCD 安装脚本
+**Then** ArgoCD v3.3.2 部署成功
+**And** Git 仓库集成配置完成
+**And** 多环境 (Dev/Test/Prod) 配置完成
+**And** 自动同步策略配置完成
+
+**技术栈:**
+- ArgoCD v3.3.2 ✅ (已验证)
+- Git (代码仓库)
+- Kustomize/Helm
+
+**TDD 测试要求:**
+1. ArgoCD 部署测试 - 验证服务可访问
+2. Git 集成测试 - 验证仓库连接
+3. 自动同步测试 - 验证 GitOps 流程
+
+**实施指南:** `docs/deployment/ARGOCD_SETUP.md`
+
+---
+
+### Story 0.8: Gitea Runner 配置
+
+**As a** DevOps 工程师,
+**I want** 配置 Gitea Runner 执行 CI/CD 任务,
+**So that** 代码提交后自动触发构建和测试。
+
+**Acceptance Criteria:**
+
+**Given** Gitea 和 K3S 已部署
+**When** 注册 Gitea Runner
+**Then** Runner 注册成功
+**And** Docker Executor 配置完成
+**And** Kubernetes Executor 配置完成 (可选)
+**And** 并发控制配置完成
+
+**技术栈:**
+- Gitea Runner (最新版)
+- Docker Executor (稳定)
+- Kubernetes Executor (实验性)
+
+**TDD 测试要求:**
+1. Runner 注册测试 - 验证 Runner 在线
+2. Docker Executor 测试 - 验证容器构建
+3. K8s Executor 测试 - 验证 Pod 调度
+
+**实施指南:** `docs/deployment/GITEA_RUNNER_SETUP.md`
+
+---
+
+### Story 0.9: CI/CD Pipeline 模板
+
+**As a** 开发工程师,
+**I want** 创建标准化的 CI/CD Pipeline 模板,
+**So that** 所有项目可以复用最佳实践。
+
+**Acceptance Criteria:**
+
+**Given** Gitea + Runner + Harbor + ArgoCD 已部署
+**When** 创建新项目
+**Then** 可以复用 CI/CD 模板
+**And** 包含代码质量检查
+**And** 包含单元测试
+**And** 包含集成测试
+**And** 包含安全扫描
+**And** 包含镜像构建
+**And** 包含自动部署
+
+**Pipeline 阶段:**
+1. 代码质量门禁 (Ruff + MyPy)
+2. 单元测试 (pytest + 覆盖率)
+3. 集成测试 (Docker Compose)
+4. 安全扫描 (Trivy + Bandit)
+5. 镜像构建 (Docker Build)
+6. 镜像推送 (Harbor)
+7. 自动部署 (ArgoCD)
+
+**实施指南:** `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md`
+
+---
+
+### Story 0.14: Windows 安装包
+
+**As a** SISYS 客户 (企业用户),
+**I want** 通过图形化安装包在 Windows PC 上部署 SISYS,
+**So that** 无需专业技术知识即可使用。
+
+**Acceptance Criteria:**
+
+**Given** Windows 10/11 高性能 PC
+**When** 双击 sisys-setup.exe
+**Then** 安装向导启动
+**And** 自动检测 Docker (如未安装则自动安装)
+**And** 自动配置端口和存储
+**And** 5 分钟内完成部署
+**And** 自动打开浏览器显示访问地址
+
+**安装包内容:**
+- sisys-setup.exe (150MB)
+- 包含 Docker Desktop 安装包
+- 包含 SISYS 产品镜像
+- 包含自动配置脚本
+
+**用户体验:**
+1. 双击运行
+2. 点击"下一步"
+3. 等待 5 分钟
+4. 完成！自动打开浏览器
+
+**实施指南:** `docs/delivery/WINDOWS_INSTALLER.md`
+
+---
+
+### Story 0.15: Mac 安装包
+
+**As a** SISYS 客户 (Mac 用户),
+**I want** 通过 DMG 安装包在 macOS 上部署 SISYS,
+**So that** 无需专业技术知识即可使用。
+
+**Acceptance Criteria:**
+
+**Given** macOS 12+ 高性能 Mac
+**When** 打开 sisys-cicd.dmg
+**Then** 拖拽到 Applications 即可
+**And** 自动安装依赖
+**And** 自动启动服务
+**And** 自动打开浏览器
+
+**安装包内容:**
+- sisys-cicd.dmg (150MB)
+- 包含 Docker Desktop 安装包
+- 包含 SISYS 产品镜像
+- 包含自动启动脚本
+
+**实施指南:** `docs/delivery/MAC_INSTALLER.md`
+
+---
+
+### Story 0.16: Linux 一键脚本
+
+**As a** SISYS 客户 (Linux 用户),
+**I want** 通过一键脚本在 Linux 服务器上部署 SISYS,
+**So that** 无需手动配置即可使用。
+
+**Acceptance Criteria:**
+
+**Given** Ubuntu 22.04 / Debian 11+ / CentOS 9
+**When** 运行 `curl -sSL https://sisys.example.com/install.sh | bash`
+**Then** 自动检测系统和依赖
+**And** 自动安装 Docker
+**And** 自动拉取镜像
+**And** 自动启动服务
+**And** 显示访问地址和密码
+
+**脚本功能:**
+- 系统检测
+- 依赖安装
+- 镜像拉取 (国内加速)
+- 端口检测 (自动避让)
+- 服务启动
+- 密码显示
+
+**实施指南:** `docs/delivery/LINUX_INSTALLER.md`
+
+---
+
+### Story 0.17: 自动检测与修复
+
+**As a** SISYS 客户 (技术小白),
+**I want** 安装过程自动检测和修复问题,
+**So that** 遇到问题时不会卡住。
+
+**Acceptance Criteria:**
+
+**Given** 安装过程中
+**When** 检测到问题
+**Then** 自动尝试修复
+**And** 修复失败时提供人话提示
+
+**自动修复场景:**
+1. 端口被占用 → 自动切换端口
+2. 镜像下载失败 → 切换国内镜像源
+3. 磁盘空间不足 → 提前预警并建议清理
+4. 服务启动失败 → 自动重启并诊断
+
+**人话提示示例:**
+❌ 错误：Port 3000 already in use
+✅ 提示：端口 3000 被占用，已自动改用 3001 端口
+
+**实施指南:** `docs/delivery/AUTO_DIAGNOSE_AND_FIX.md`
+
+---
+
+### Story 0.18: 用户友好配置向导
+
+**As a** SISYS 客户 (非技术人员),
+**I want** 通过图形化向导配置系统,
+**So that** 无需修改 YAML 配置文件。
+
+**Acceptance Criteria:**
+
+**Given** 安装完成后
+**When** 打开配置向导
+**Then** 显示图形化界面
+**And** 提供预设配置模板
+**And** 支持自定义配置
+**And** 配置一键生效
+
+**配置向导界面:**
+```
+┌────────────────────────────────────┐
+│  Sisys 配置向导                     │
+├────────────────────────────────────┤
+│  设置管理员账号：                   │
+│  用户名：[admin        ]           │
+│  密码：  [••••••••    ]           │
+│  邮箱：  [admin@example.com]      │
+├────────────────────────────────────┤
+│  选择安装路径：                     │
+│  [C:\sisys              ] [浏览]  │
+├────────────────────────────────────┤
+│  选择端口：                         │
+│  Gitea:  [3000]                   │
+│  Harbor: [8080]                   │
+│  ArgoCD: [8088]                   │
+├────────────────────────────────────┤
+│      [取消]        [应用]          │
+└────────────────────────────────────┘
+```
 
 ### Story 1.1: 六边形架构骨架
 
@@ -4723,6 +5049,7 @@ So that **确保 MVP 无高危漏洞**。
 | Epic | 价值组 | 依赖 Epic 1 | 依赖 Epic 2 | 依赖 Epic 3 | 内部依赖类型 | 可独立交付 | Story 数 |
 |------|--------|-----------|-----------|-----------|------------|-----------|---------|
 | **Epic 0: Iteration 0** | 开发环境/CI/CD/测试框架 | - | - | - | 顺序依赖 | ✅ 是 | 3 |
+| **Epic 0: Iteration 1** | 重构开发环境/CI/CD/测试框架 | - | - | - | 顺序依赖 | ✅ 是 | 11 |
 | **Epic 1: 企业级架构基础与合规** | 系统稳定性与性能基础<br/>安全与合规基础<br/>or.md 系统公理<br/>测试框架<br/>**MVP 关键机制增强** | - | - | - | 组内依赖 | ✅ 是 | **23** |
 | **Epic 2: 文档与数据管理** | 文档全生命周期管理 | Story 1.6/1.7 | - | - | 顺序依赖（流水线） | ✅ 是 | 9 |
 | **Epic 3: 智能检索与知识发现** | 智能检索与溯源 | Story 1.5/1.6/1.7 | **Story 2.3（关键路径）** | - | 顺序依赖（流水线） | ✅ 是 | 13 |
@@ -4732,8 +5059,9 @@ So that **确保 MVP 无高危漏洞**。
 | **Epic 7: 多触点用户界面与 API 集成** | 多触点操作与监控能力<br/>NFR 覆盖<br/>测试 Story<br/>**骨架屏加载** | Story 1.1/1.9/1.12/1.16 | - | - | 并行依赖 | ✅ 是 | 8 |
 | **Epic 8: 用户权限管理与审计合规** | 安全与合规 | Story 1.5/1.7/1.9/1.10/1.12 | - | - | 顺序依赖（安全测试） | ✅ 是 | 6 |
 
-**总计 Story 数：85 个**（原 81 个 + Party Mode 第二轮拆分 4 个→8 个，净增 4 个）
+**总计 Story 数：96 个**（原 81 个 + Party Mode 第二轮拆分 4 个→8 个，增 4 个 + Iteration 1 新增 11 个）
 - Iteration 0: 3 个（Story 0.1-0.3）
+- Iteration 1: 11 个（Story 0.4-0.9/0.14-0.8）
 - Epic 1: 23 个（Story 1.1-1.19，Story 1.18 拆分为 1.18a/1.18b）
 - Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
 - Epic 3: 13 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b）
@@ -4752,7 +5080,7 @@ So that **确保 MVP 无高危漏洞**。
 3. **每个 Epic 可独立交付价值** - 完成各自 Epic 的故事后，用户可使用完整功能
 4. **内部依赖均为顺序/组内/并行依赖** - 无跨未来 Epic 的依赖
 5. **关键路径已识别** - Story 2.3（版面信息保留）→ Epic 3 Story 3.8（高保真溯源）
-6. **Iteration 0 优先** - Story 0.1-0.3 必须在 Iteration 1 前完成
+6. **Iteration 0 + 1 优先** - Story 0.1-0.3 / 0.4-0.9 / 0.14-0.18 / 必须在 Story 1 前完成
 7. **or.md 系统公理覆盖** - Story 1.14a/b/c（自主调用循环）、Story 1.15a/b（外部化记忆）
 8. **NFR 完整覆盖** - Story 7.5（NFR-ACC-01）、Story 7.6（NFR-INT-05）、Story 1.13（NFR-SCALE-03）
 9. **测试 Story 覆盖** - Story 1.16（集成测试框架）、Story 7.7（API E2E 测试）
@@ -4763,7 +5091,7 @@ So that **确保 MVP 无高危漏洞**。
 ### 关键依赖路径图
 
 ```
-Epic 0（Iteration 0）
+Epic 0（Iteration 0 + 1）
     │
     └──→ Epic 1（企业级架构基础与合规）
             ├──→ Story 1.13（K8s 动态扩缩容，NFR-SCALE-03）
@@ -4821,10 +5149,10 @@ Epic 0（Iteration 0）
 
 ---
 
-**文档状态：** 本文档已完成 **Step 04（最终验证）**，FR 覆盖验证通过：122/122 已覆盖（FR-SA-10 为 V3+）；架构实现验证通过：无 Starter Template，数据库按需创建；Story 质量验证通过：85 个 Story 都可独立交付；Epic 结构验证通过：所有 Epic 可独立交付价值；依赖关系验证通过：关键路径清晰，依赖正确
+**文档状态：** 本文档已完成 **Step 04（最终验证）**，FR 覆盖验证通过：122/122 已覆盖（FR-SA-10 为 V3+）；架构实现验证通过：无 Starter Template，数据库按需创建；Story 质量验证通过：96 个 Story 都可独立交付；Epic 结构验证通过：所有 Epic 可独立交付价值；依赖关系验证通过：关键路径清晰，依赖正确
 
-**总计 Story 数：85 个**
-- 原 76 个 + Party Mode 第一轮新增 5 个（Story 1.17-1.19, 6.11, 7.8）+ Party Mode 第二轮拆分 4 个→8 个（净增 4 个）
+**总计 Story 数：96 个**
+- 原 76 个 + Party Mode 第一轮新增 5 个（Story 1.17-1.19, 6.11, 7.8）+ Party Mode 第二轮拆分 4 个→8 个（净增 4 个 + Epic 0 重构新增 11 个）
 
 **Story 拆分总结（Party Mode 第二轮）：**
 - Story 1.18 → Story 1.18a（Prefect）+ Story 1.18b（LangGraph）
@@ -4838,6 +5166,6 @@ Epic 0（Iteration 0）
 **下一步操作：**
 
 **Select an Option:**
-- **[S]** 开始开发 - 85 个 Story 已准备好，可按优先级逐个实现
+- **[S]** 开始开发 - 96 个 Story 已准备好，可按优先级逐个实现
 - **[Q]** 提问 - 我可以回答关于 Epic 和 Story 的任何问题
 - **[A]** 调整 - 如需调整优先级或范围，随时告诉我

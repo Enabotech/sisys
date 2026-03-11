@@ -11,19 +11,19 @@
 **目标：** 建立两套系统 - 开发 CI/CD 系统 + 产品交付系统
 
 **轨道 1: 开发 CI/CD 系统** (面向工程师)
-- Story 0.1: K3S 集群部署
-- Story 0.2: Gitea 代码托管
-- Story 0.3: Harbor 镜像仓库
-- Story 0.4: ArgoCD 持续部署
-- Story 0.5: Gitea Runner 配置
-- Story 0.6: CI/CD Pipeline 模板
+- Story 0.4: K3S 集群部署
+- Story 0.5: Gitea 代码托管
+- Story 0.6: Harbor 镜像仓库
+- Story 0.7: ArgoCD 持续部署
+- Story 0.8: Gitea Runner 配置
+- Story 0.9: CI/CD Pipeline 模板
 
 **轨道 2: SISYS 产品交付系统** (面向客户)
-- Story 0.11: Windows 安装包
-- Story 0.12: Mac 安装包
-- Story 0.13: Linux 一键脚本
-- Story 0.14: 自动检测与修复
-- Story 0.15: 用户友好配置向导
+- Story 0.14: Windows 安装包
+- Story 0.15: Mac 安装包
+- Story 0.16: Linux 一键脚本
+- Story 0.17: 自动检测与修复
+- Story 0.18: 用户友好配置向导
 
 ---
 
@@ -49,12 +49,12 @@
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 0.1 | **K3S 集群部署** | 提供轻量级 K8s 运行时 | 无依赖 | **P0-0** |
-| Story 0.2 | **Gitea 代码托管** | 代码版本管理和协作 | 依赖 Story 0.1 | **P0-1** |
-| Story 0.3 | **Harbor 镜像仓库** | 安全存储和分发 Docker 镜像 | 依赖 Story 0.1 | **P0-2** |
-| Story 0.4 | **ArgoCD 持续部署** | GitOps 自动化部署 | 依赖 Story 0.2, 0.3 | **P0-3** |
-| Story 0.5 | **Gitea Runner 配置** | 自动触发 CI/CD 任务 | 依赖 Story 0.2, 0.4 | **P0-4** |
-| Story 0.6 | **CI/CD Pipeline 模板** | 标准化 Pipeline 复用 | 依赖 Story 0.5 | **P0-5** |
+| Story 0.4 | **K3S 集群部署** | 提供轻量级 K8s 运行时 | 无依赖 | **P0-0** |
+| Story 0.5 | **Gitea 代码托管** | 代码版本管理和协作 | 依赖 Story 0.4 | **P0-1** |
+| Story 0.6 | **Harbor 镜像仓库** | 安全存储和分发 Docker 镜像 | 依赖 Story 0.4 | **P0-2** |
+| Story 0.7 | **ArgoCD 持续部署** | GitOps 自动化部署 | 依赖 Story 0.5, 0.6 | **P0-3** |
+| Story 0.8 | **Gitea Runner 配置** | 自动触发 CI/CD 任务 | 依赖 Story 0.5, 0.7 | **P0-4** |
+| Story 0.9 | **CI/CD Pipeline 模板** | 标准化 Pipeline 复用 | 依赖 Story 0.8 | **P0-5** |
 
 ---
 
@@ -64,17 +64,17 @@
 
 | Story | 名称 | 用户价值 | 依赖关系 | 执行优先级 |
 |-------|------|---------|---------|-----------|
-| Story 0.11 | **Windows 安装包** | Windows 用户一键安装 | 无依赖 | **P0-6** |
-| Story 0.12 | **Mac 安装包** | Mac 用户一键安装 | 无依赖 | **P0-7** |
-| Story 0.13 | **Linux 一键脚本** | Linux 用户一键安装 | 无依赖 | **P0-8** |
-| Story 0.14 | **自动检测与修复** | 安装问题自动修复 | 依赖 Story 0.11-0.13 | **P0-9** |
-| Story 0.15 | **用户友好配置向导** | 图形化配置无需 YAML | 依赖 Story 0.14 | **P0-10** |
+| Story 0.14 | **Windows 安装包** | Windows 用户一键安装 | 无依赖 | **P0-6** |
+| Story 0.15 | **Mac 安装包** | Mac 用户一键安装 | 无依赖 | **P0-7** |
+| Story 0.16 | **Linux 一键脚本** | Linux 用户一键安装 | 无依赖 | **P0-8** |
+| Story 0.17 | **自动检测与修复** | 安装问题自动修复 | 依赖 Story 0.14-0.16 | **P0-9** |
+| Story 0.18 | **用户友好配置向导** | 图形化配置无需 YAML | 依赖 Story 0.17 | **P0-10** |
 
 ---
 
 ## Story 详细定义
 
-### Story 0.1: K3S 集群部署
+### Story 0.4: K3S 集群部署
 
 **As a** DevOps 工程师,
 **I want** 在高性能 PC 上部署 K3S 集群,
@@ -103,7 +103,7 @@
 
 ---
 
-### Story 0.2: Gitea 代码托管
+### Story 0.5: Gitea 代码托管
 
 **As a** 开发工程师,
 **I want** 部署 Gitea v1.25.4 代码托管平台,
@@ -132,7 +132,7 @@
 
 ---
 
-### Story 0.3: Harbor 镜像仓库
+### Story 0.6: Harbor 镜像仓库
 
 **As a** DevOps 工程师,
 **I want** 部署 Harbor v2.14.3 镜像仓库,
@@ -161,7 +161,7 @@
 
 ---
 
-### Story 0.4: ArgoCD 持续部署
+### Story 0.7: ArgoCD 持续部署
 
 **As a** DevOps 工程师,
 **I want** 部署 ArgoCD v3.3.2 持续部署工具,
@@ -190,7 +190,7 @@
 
 ---
 
-### Story 0.5: Gitea Runner 配置
+### Story 0.8: Gitea Runner 配置
 
 **As a** DevOps 工程师,
 **I want** 配置 Gitea Runner 执行 CI/CD 任务,
@@ -219,7 +219,7 @@
 
 ---
 
-### Story 0.6: CI/CD Pipeline 模板
+### Story 0.9: CI/CD Pipeline 模板
 
 **As a** 开发工程师,
 **I want** 创建标准化的 CI/CD Pipeline 模板,
@@ -250,7 +250,7 @@
 
 ---
 
-### Story 0.11: Windows 安装包
+### Story 0.14: Windows 安装包
 
 **As a** SISYS 客户 (企业用户),
 **I want** 通过图形化安装包在 Windows PC 上部署 SISYS,
@@ -282,7 +282,7 @@
 
 ---
 
-### Story 0.12: Mac 安装包
+### Story 0.15: Mac 安装包
 
 **As a** SISYS 客户 (Mac 用户),
 **I want** 通过 DMG 安装包在 macOS 上部署 SISYS,
@@ -307,7 +307,7 @@
 
 ---
 
-### Story 0.13: Linux 一键脚本
+### Story 0.16: Linux 一键脚本
 
 **As a** SISYS 客户 (Linux 用户),
 **I want** 通过一键脚本在 Linux 服务器上部署 SISYS,
@@ -335,7 +335,7 @@
 
 ---
 
-### Story 0.14: 自动检测与修复
+### Story 0.17: 自动检测与修复
 
 **As a** SISYS 客户 (技术小白),
 **I want** 安装过程自动检测和修复问题,
@@ -362,7 +362,7 @@
 
 ---
 
-### Story 0.15: 用户友好配置向导
+### Story 0.18: 用户友好配置向导
 
 **As a** SISYS 客户 (非技术人员),
 **I want** 通过图形化向导配置系统,
@@ -407,16 +407,16 @@
 
 **Story 0.1 (开发环境搭建):**
 - ✅ **保留** - 简化为 Python 环境配置
-- 删除 Docker/K3S 相关内容（移到新 Story 0.1）
+- 删除 Docker/K3S 相关内容（移到新 Story 0.4）
 - 保留：Python 3.11+、Poetry、IDE 配置、SDD 工具链
 
 **Story 0.2 (CI/CD 流水线):**
-- ⚠️ **备份后废弃** - 被新 Story 0.1-0.6 替代
+- ⚠️ **备份后废弃** - 被新 Story 0.4-0.9 替代
 - 归档到 `docs/archive/old-story-0.2.md`
 - 保留价值：质量门禁概念、Pipeline 阶段设计
 
 **Story 0.3 (测试框架搭建):**
-- ✅ **根据新 Story 完善优化** - 与新 Story 0.6 配合使用
+- ✅ **根据新 Story 完善优化** - 与新 Story 0.9 配合使用
 - 保留：pytest 配置、Fixture 系统、Mock 框架
 - 优化：与新 CI/CD 系统集成、增加 K3S 测试支持
 

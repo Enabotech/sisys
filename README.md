@@ -1,38 +1,65 @@
-# sisys - Enterprise Strategic Planning System
+# SISYS - 企业战略规划管理系统
 
 > **🚀 新开发者？5 分钟快速开始：** [阅读 QUICK_SETUP.md](QUICK_SETUP.md)
 
 AI-driven strategic planning and decision intelligence platform for enterprises.
 
+**最新版本：** Epic 0 重构完成 (2026-03-05) ✅
+
 ---
 
 ## 📋 文档导航
 
+### 快速开始
 | 文档 | 用途 | 目标读者 | 阅读时间 |
 |------|------|---------|---------|
-| [**QUICK_SETUP.md**](QUICK_SETUP.md) | 5 分钟快速设置（WSL 2） | 新开发者 | 5 分钟 |
+| [**QUICK_SETUP.md**](QUICK_SETUP.md) | 5 分钟快速设置 | 新开发者 | 5 分钟 |
 | [**README.md**](README.md) | 项目综合说明 | 所有人员 | 15 分钟 |
+
+### 开发环境
+| 文档 | 用途 | 目标读者 | 阅读时间 |
+|------|------|---------|---------|
 | [**docker/WSL2_SETUP.md**](docker/WSL2_SETUP.md) | WSL 2 详细设置指南 | WSL 2 用户 | 10 分钟 |
 | [**docker/WSL2_QUICK_REFERENCE.md**](docker/WSL2_QUICK_REFERENCE.md) | WSL 2 快速参考卡片 | WSL 2 用户 | 2 分钟 |
+
+### 架构文档
+| 文档 | 用途 | 目标读者 | 阅读时间 |
+|------|------|---------|---------|
 | [_bmad-output/planning-artifacts/architecture.md](architecture.md) | 完整架构设计文档 | 架构师/开发者 | 60 分钟 |
+| [_bmad-output/planning-artifacts/architecture-epic0.md](architecture-epic0.md) | Epic 0 架构设计 (CI/CD) | DevOps/开发者 | 30 分钟 |
+
+### Epic 0 文档
+| 文档 | 用途 | 目标读者 | 阅读时间 |
+|------|------|---------|---------|
+| [**docs/developer/EPIC_0_REFACTORED.md**](docs/developer/EPIC_0_REFACTORED.md) | Epic 0 重构完整定义 | 所有人员 | 20 分钟 |
+| [**docs/developer/P0_FIX_REPORT.md**](docs/developer/P0_FIX_REPORT.md) | P0 问题修复报告 | 架构师/开发者 | 10 分钟 |
+| [**docs/developer/P1_FIX_REPORT.md**](docs/developer/P1_FIX_REPORT.md) | P1 问题修复报告 | 架构师/开发者 | 10 分钟 |
+| [**docs/developer/P2_FIX_REPORT.md**](docs/developer/P2_FIX_REPORT.md) | P2 问题修复报告 | 架构师/开发者 | 10 分钟 |
 
 **快速选择：**
 - 🆕 **第一次设置？** → 阅读 [QUICK_SETUP.md](QUICK_SETUP.md)
 - 📖 **了解项目？** → 继续阅读本 README
-- 🐧 **使用 WSL 2？** → 阅读 [docker/WSL2_SETUP.md](docker/WSL2_SETUP.md)
+- 🏗️ **了解架构？** → 阅读 [architecture.md](architecture.md) + [architecture-epic0.md](architecture-epic0.md)
+- 🔧 **DevOps 工程师？** → 阅读 [EPIC_0_REFACTORED.md](docs/developer/EPIC_0_REFACTORED.md)
 
 ---
 
 ## 🚀 Quick Start
 
-### 2026-03-02 更新：Story 0.2 CI/CD 流水线已完成！ ✅
+### 2026-03-05 更新：Epic 0 重构完成！ ✅
+
+**Epic 0 重构完成：**
+- ✅ **开发 CI/CD 系统** - Gitea v1.25.4 + Harbor v2.14.3 + ArgoCD v3.3.2 + K3S v1.28.x
+- ✅ **产品交付系统** - Windows/Mac/Linux 安装包 + 自动诊断与修复 + 配置向导
+- ✅ **文档质量** - 宗师级圆满 (5.0/5.0) - P0/P1/P2 问题 100% 修复
+- ✅ **技术栈验证** - 所有版本已由 Agimtech 测试验证
 
 **新功能：**
-- ✅ GitHub Actions CI/CD 流水线（自动测试、构建、部署）
-- ✅ Docker 多阶段构建（生产优化）
-- ✅ 测试框架（单元/集成/E2E 测试）
-- ✅ Pre-commit 代码质量钩子
-- ✅ 覆盖率报告（Codecov 集成）
+- ✅ Gitea Actions CI/CD Pipeline（代码质量、单元测试、集成测试、安全扫描、镜像构建、自动部署）
+- ✅ Harbor 企业级镜像仓库（漏洞扫描、镜像签名、自动复制）
+- ✅ ArgoCD GitOps 持续部署（自动同步、多环境管理、回滚策略）
+- ✅ K3S 轻量级 K8s 集群（Longhorn 存储、Traefik 反向代理）
+- ✅ 产品交付系统（Windows/Mac/Linux 一键安装、自动诊断修复、图形化配置向导）
 
 **快速开始：**
 ```bash
@@ -53,11 +80,27 @@ poetry install
 ./scripts/testing/run_tests.sh --all
 ```
 
+**DevOps 快速开始：**
+```bash
+# 部署开发 CI/CD 系统
+cd docs/deployment
+bash K3S_CLUSTER_SETUP.md      # 步骤 1: 部署 K3S
+bash GITEA_INSTALLATION.md     # 步骤 2: 部署 Gitea
+bash HARBOR_INSTALLATION.md    # 步骤 3: 部署 Harbor
+bash ARGOCD_SETUP.md           # 步骤 4: 部署 ArgoCD
+bash GITEA_RUNNER_SETUP.md     # 步骤 5: 配置 Runner
+bash CI_CD_PIPELINE_TEMPLATE.md # 步骤 6: 配置 Pipeline
+```
+
 **详细文档：**
 - 📖 [5 分钟快速设置](QUICK_SETUP.md)
+- 🏗️ [Epic 0 重构定义](docs/developer/EPIC_0_REFACTORED.md)
+- 🔧 [K3S 集群部署](docs/deployment/K3S_CLUSTER_SETUP.md)
+- 📦 [Gitea 安装](docs/deployment/GITEA_INSTALLATION.md)
+- 📦 [Harbor 安装](docs/deployment/HARBOR_INSTALLATION.md)
+- 🚀 [ArgoCD 部署](docs/deployment/ARGOCD_SETUP.md)
 - 🔑 [GitHub Secrets 配置](docs/developer/GITHUB_SECRETS_SETUP.md)
 - 📋 [Secrets 检查清单](docs/developer/SECRETS_CHECKLIST.md)
-- 🚀 [CI/CD 快速参考](docs/developer/cicd_quick_reference.md)
 
 ### Prerequisites
 
