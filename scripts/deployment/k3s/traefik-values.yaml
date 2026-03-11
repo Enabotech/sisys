@@ -20,8 +20,11 @@ ports:
       default: true
     exposedPort: 443
     protocol: TCP
-    tls:
-      enabled: true
+    # tls:
+    #   enabled: true
+
+
+
 
 # Provider 配置
 providers:
