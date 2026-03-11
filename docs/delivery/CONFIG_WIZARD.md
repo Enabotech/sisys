@@ -1,6 +1,6 @@
 # 配置向导工具指南
 
-本文档介绍 Sisyphus 系统的配置向导（Config Wizard）工具。
+本文档介绍 Sisys 系统的配置向导（Config Wizard）工具。
 
 ## 目录
 
@@ -271,7 +271,7 @@ class BasicInfoStep(BaseStep):
                 'label': '应用名称',
                 'type': 'text',
                 'required': True,
-                'default': 'Sisyphus',
+                'default': 'Sisys',
                 'help': '应用的显示名称'
             },
             {
@@ -695,7 +695,7 @@ class InteractiveWizard:
 
     def run(self, mode: str = 'quick'):
         """运行向导"""
-        console.print("\n[bold blue]Sisyphus 配置向导[/bold blue]\n")
+        console.print("\n[bold blue]Sisys 配置向导[/bold blue]\n")
 
         self.session = self.wizard.create_session(mode)
 
@@ -1027,7 +1027,7 @@ category: environment
 
 config:
   app:
-    name: Sisyphus
+    name: Sisys
     environment: development
     debug: true
 
@@ -1061,7 +1061,7 @@ category: environment
 
 config:
   app:
-    name: Sisyphus
+    name: Sisys
     environment: production
     debug: false
 
@@ -1637,7 +1637,7 @@ async def apply_template(request: TemplateApplyRequest):
 ```yaml
 # 完整配置示例
 app:
-  name: Sisyphus
+  name: Sisys
   environment: production
   debug: false
 

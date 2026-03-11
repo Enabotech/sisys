@@ -1,6 +1,6 @@
 # macOS 安装程序制作指南
 
-本文档介绍如何为 Sisyphus 系统创建 macOS 安装程序。
+本文档介绍如何为 Sisys 系统创建 macOS 安装程序。
 
 ## 目录
 
@@ -60,7 +60,7 @@ brew install create-dmg
 
 set -e
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 BUILD_DIR="build"
 DIST_DIR="dist"
@@ -73,7 +73,7 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 
 # 复制应用
-cp -r "${DIST_DIR}/Sisyphus.app" "${BUILD_DIR}/"
+cp -r "${DIST_DIR}/Sisys.app" "${BUILD_DIR}/"
 
 # 创建 DMG
 create-dmg \
@@ -82,14 +82,14 @@ create-dmg \
   --window-pos 200 120 \
   --window-size 600 400 \
   --icon-size 100 \
-  --icon "Sisyphus.app" 180 180 \
+  --icon "Sisys.app" 180 180 \
   --app-drop-link 420 180 \
-  --hide-extension "Sisyphus.app" \
+  --hide-extension "Sisys.app" \
   --background "assets/dmg-background.png" \
   --format UDZO \
   --compression-level 9 \
   "${BUILD_DIR}/${DMG_NAME}" \
-  "${BUILD_DIR}/Sisyphus.app"
+  "${BUILD_DIR}/Sisys.app"
 
 echo "DMG created: ${BUILD_DIR}/${DMG_NAME}"
 
@@ -140,7 +140,7 @@ EOF
 #!/bin/bash
 # build-dmg-manual.sh
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 
 # 创建临时目录
@@ -173,7 +173,7 @@ pkg-root/
 │   ├── postinstall
 │   └── uninstall
 └── payload/
-    └── Sisyphus.app/
+    └── Sisys.app/
 ```
 
 ### 4.2 安装脚本
@@ -213,7 +213,7 @@ exit 0
 #!/bin/sh
 # 后安装配置
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 INSTALL_DIR="/Applications/${APP_NAME}.app"
 
 # 设置权限
@@ -221,7 +221,7 @@ chmod -R 755 "${INSTALL_DIR}"
 chown -R root:wheel "${INSTALL_DIR}"
 
 # 注册 LaunchAgent
-LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.sisyphus.app.plist"
+LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.sisys.app.plist"
 mkdir -p "$(dirname "${LAUNCH_AGENT}")"
 cat > "${LAUNCH_AGENT}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -229,7 +229,7 @@ cat > "${LAUNCH_AGENT}" << EOF
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.sisyphus.app</string>
+    <string>com.sisys.app</string>
     <key>ProgramArguments</key>
     <array>
         <string>${INSTALL_DIR}/Contents/MacOS/sisys</string>
@@ -238,9 +238,9 @@ cat > "${LAUNCH_AGENT}" << EOF
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/sisyphus.log</string>
+    <string>/tmp/sisys.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/sisyphus.err</string>
+    <string>/tmp/sisys.err</string>
 </dict>
 </plist>
 EOF
@@ -263,9 +263,9 @@ exit 0
 
 set -e
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
-IDENTIFIER="com.sisyphus.app"
+IDENTIFIER="com.sisys.app"
 
 # 创建 payload
 mkdir -p pkg-root/payload
@@ -300,8 +300,8 @@ productbuild \
 <!-- distribution.xml -->
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
-    <title>Sisyphus</title>
-    <organization>com.sisyphus</organization>
+    <title>Sisys</title>
+    <organization>com.sisys</organization>
     <domains enable_localSystem="true"/>
     <options customize="never" require-scripts="true" allow-external-scripts="no"/>
 
@@ -319,17 +319,17 @@ productbuild \
 
     <choices-outline>
         <line choice="default">
-            <line choice="com.sisyphus.app"/>
+            <line choice="com.sisys.app"/>
         </line>
     </choices-outline>
 
     <choice id="default"/>
-    <choice id="com.sisyphus.app" visible="false">
-        <pkg-ref id="com.sisyphus.app"/>
+    <choice id="com.sisys.app" visible="false">
+        <pkg-ref id="com.sisys.app"/>
     </choice>
 
-    <pkg-ref id="com.sisyphus.app" version="0.3.0" onConclusion="none">
-        Sisyphus-0.3.0.pkg
+    <pkg-ref id="com.sisys.app" version="0.3.0" onConclusion="none">
+        Sisys-0.3.0.pkg
     </pkg-ref>
 </installer-gui-script>
 ```
@@ -342,10 +342,10 @@ productbuild \
 
 ```bash
 # 创建仓库
-# GitHub: homebrew-sisyphus
+# GitHub: homebrew-sisys
 
 # 目录结构
-homebrew-sisyphus/
+homebrew-sisys/
 ├── Formula/
 │   └── sisys.rb
 └── README.md
@@ -356,9 +356,9 @@ homebrew-sisyphus/
 ```ruby
 # Formula/sisys.rb
 class Sisys < Formula
-  desc "Sisyphus - Intelligent Development Assistant"
+  desc "Sisys - Intelligent Development Assistant"
   homepage "https://sisys.example.com"
-  url "https://github.com/sisyphus/sisys/releases/download/v0.3.0/sisys-0.3.0-macos.tar.gz"
+  url "https://github.com/sisys/sisys/releases/download/v0.3.0/sisys-0.3.0-macos.tar.gz"
   sha256 "abc123def456..."  # 使用实际校验和
   license "MIT"
 
@@ -380,7 +380,7 @@ class Sisys < Formula
 
   def caveats
     <<~EOS
-      To configure Sisyphus, edit:
+      To configure Sisys, edit:
         #{etc}/sisys/default.yaml
 
       To start the service:
@@ -405,7 +405,7 @@ end
 
 ```bash
 # 添加 Tap
-brew tap sisyphus/homebrew-sisyphus
+brew tap sisys/homebrew-sisys
 
 # 测试安装
 brew install --build-from-source sisys
@@ -414,7 +414,7 @@ brew install --build-from-source sisys
 brew test sisys
 
 # 发布后用户可安装
-brew install sisyphus/homebrew-sisyphus/sisys
+brew install sisys/homebrew-sisys/sisys
 ```
 
 ---
@@ -437,7 +437,7 @@ security find-identity -v -s "Developer ID Application"
 #!/bin/bash
 # sign-app.sh
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 CERT_NAME="Developer ID Application: Your Name (TEAM_ID)"
 ENTITLEMENTS="entitlements.plist"
 
@@ -495,7 +495,7 @@ codesign --verify --verbose "dist/${APP_NAME}.app"
 #!/bin/bash
 # notarize-app.sh
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 TEAM_ID="YOUR_TEAM_ID"
 APPLE_ID="your.apple.id@example.com"
@@ -524,7 +524,7 @@ spctl --assess -vv "dist/${APP_NAME}.app"
 #!/bin/bash
 # notarize-dmg.sh
 
-DMG_FILE="build/Sisyphus-0.3.0.dmg"
+DMG_FILE="build/Sisys-0.3.0.dmg"
 TEAM_ID="YOUR_TEAM_ID"
 APPLE_ID="your.apple.id@example.com"
 APP_PASSWORD="your-app-specific-password"
@@ -580,9 +580,9 @@ extension AppDelegate: SPUUpdaterDelegate {
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
-        <title>Sisyphus Updates</title>
+        <title>Sisys Updates</title>
         <link>https://sisys.example.com/updates/appcast.xml</link>
-        <description>Most recent changes to Sisyphus</description>
+        <description>Most recent changes to Sisys</description>
         <language>en</language>
 
         <item>
@@ -604,7 +604,7 @@ extension AppDelegate: SPUUpdaterDelegate {
                 <argument>-apply</argument>
             </sparkle:installerArguments>
 
-            <enclosure url="https://sisys.example.com/releases/0.3.0/Sisyphus-0.3.0.dmg"
+            <enclosure url="https://sisys.example.com/releases/0.3.0/Sisys-0.3.0.dmg"
                        sparkle:version="300"
                        sparkle:shortVersionString="0.3.0"
                        sparkle:osVersion="11.0"
@@ -623,7 +623,7 @@ extension AppDelegate: SPUUpdaterDelegate {
 ./generate_keys
 
 # 签名 Appcast
-./sign_update Sisyphus-0.3.0.dmg -o appcast.xml
+./sign_update Sisys-0.3.0.dmg -o appcast.xml
 ```
 
 ---
@@ -643,10 +643,10 @@ extension AppDelegate: SPUUpdaterDelegate {
 
 ```bash
 # 检查签名
-codesign --verify --verbose /Applications/Sisyphus.app
+codesign --verify --verbose /Applications/Sisys.app
 
 # 检查公证状态
-spctl --assess -vv /Applications/Sisyphus.app
+spctl --assess -vv /Applications/Sisys.app
 
 # 查看 Gatekeeper 状态
 spctl --status
@@ -661,8 +661,8 @@ sudo spctl --master-enable
 log show --predicate 'process == "installer"' --last 1h
 
 # 清理 LaunchAgent
-launchctl remove com.sisyphus.app
-rm ~/Library/LaunchAgents/com.sisyphus.app.plist
+launchctl remove com.sisys.app
+rm ~/Library/LaunchAgents/com.sisys.app.plist
 ```
 
 ### 8.3 卸载脚本
@@ -671,27 +671,27 @@ rm ~/Library/LaunchAgents/com.sisyphus.app.plist
 #!/bin/bash
 # uninstall.sh
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 INSTALL_DIR="/Applications/${APP_NAME}.app"
 
 echo "卸载 ${APP_NAME}..."
 
 # 停止服务
-launchctl remove com.sisyphus.app 2>/dev/null || true
+launchctl remove com.sisys.app 2>/dev/null || true
 
 # 删除应用
 rm -rf "${INSTALL_DIR}"
 
 # 删除配置文件
-rm -rf ~/Library/Application\ Support/Sisyphus
-rm -rf ~/Library/Preferences/com.sisyphus.app.plist
-rm -rf ~/Library/Caches/com.sisyphus.app
+rm -rf ~/Library/Application\ Support/Sisys
+rm -rf ~/Library/Preferences/com.sisys.app.plist
+rm -rf ~/Library/Caches/com.sisys.app
 
 # 删除 LaunchAgent
-rm ~/Library/LaunchAgents/com.sisyphus.app.plist
+rm ~/Library/LaunchAgents/com.sisys.app.plist
 
 # 删除日志
-rm -rf /tmp/sisyphus.*
+rm -rf /tmp/sisys.*
 
 echo "卸载完成。"
 ```
@@ -706,7 +706,7 @@ echo "卸载完成。"
 
 set -e
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 TEAM_ID="YOUR_TEAM_ID"
 APPLE_ID="your.apple.id@example.com"

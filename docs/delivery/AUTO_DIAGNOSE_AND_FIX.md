@@ -1,6 +1,6 @@
 # 自动诊断与修复工具指南
 
-本文档介绍 Sisyphus 系统的自动诊断与修复功能。
+本文档介绍 Sisys 系统的自动诊断与修复功能。
 
 ## 目录
 
@@ -1442,7 +1442,7 @@ diagnosis:
 
 ```
 ================================================================================
-                         Sisyphus 诊断报告
+                         Sisys 诊断报告
 ================================================================================
 生成时间：2026-03-11 14:30:00
 
@@ -1516,7 +1516,7 @@ class ReportGenerator:
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Sisyphus 诊断报告</title>
+            <title>Sisys 诊断报告</title>
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 20px; }}
                 .header {{ background: #f8f9fa; padding: 20px; border-radius: 5px; }}
@@ -1544,7 +1544,7 @@ class ReportGenerator:
         </head>
         <body>
             <div class="header">
-                <h1>Sisyphus 诊断报告</h1>
+                <h1>Sisys 诊断报告</h1>
                 <p>生成时间：{report.timestamp}</p>
                 <p><strong>摘要：</strong>{report.summary}</p>
             </div>
@@ -1635,7 +1635,7 @@ logging:
 # full-diagnosis.sh
 
 echo "=========================================="
-echo "  Sisyphus 完整诊断流程"
+echo "  Sisys 完整诊断流程"
 echo "=========================================="
 
 # 1. 运行所有检查
