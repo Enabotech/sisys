@@ -1,0 +1,171 @@
+# Traefik Helm Chart 值配置
+# Story 0.4: K3S 集群部署
+# 技术栈：Traefik v2.10
+
+# 端口配置
+ports:
+  # Web 入口（HTTP）
+  web:
+    port: 80
+    expose:
+      default: true
+    exposedPort: 80
+    protocol: TCP
+    # 重定向到 HTTPS（可选，MVP 阶段先不启用）
+    # redirectTo:
+    #   port: websecure
+
+  # Web Secure 入口（HTTPS）
+  websecure:
+    port: 443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+    tls:
+      enabled: true
+      # TLS 选项
+      options: ""
+      # certResolver: ""
+      # domains: []
+      # 禁用 HTTP/3（可选）
+      # http3:
+      #   enabled: false
+
+  # Traefik 仪表板（可选）
+  # traefik:
+  #   port: 9000
+  #   expose:
+  #     default: false
+
+# Provider 配置
+providers:
+  # Kubernetes CRD Provider
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: true
+    allowExternalNameServices: true
+    allowEmptyServices: false
+    # ingressClass: traefik
+
+  # Kubernetes Ingress Provider
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: true
+    allowEmptyServices: false
+    # ingressClass: traefik
+
+  # Kubernetes Gateway API（可选，实验性）
+  # kubernetesGateway:
+  #   enabled: false
+
+# 日志配置
+logs:
+  # 一般日志
+  general:
+    level: INFO  # DEBUG, INFO, WARN, ERROR
+    format: common
+    # filters:
+    #   - name: "traefik.internal"
+    #     level: "WARN"
+
+  # 访问日志
+  access:
+    enabled: true
+    format: common
+    # filters:
+    #   - statuscode: "200"
+    #     retryattempts: true
+    #     minduration: 10ms
+    # fields:
+    #   defaultmode: keep
+    #   names:
+    #     ClientAddr: redact
+    #     RequestAddr: redact
+
+# API 和仪表板配置
+api:
+  dashboard: true
+  insecure: false  # 需要认证访问（更安全）
+  # 启用基本认证（可选）
+  # dashboard:
+  #   auth:
+  #     basic:
+  #       secret: traefik-dashboard-auth
+
+# 全局配置
+globalArguments:
+  - "--global.checknewversion"
+  - "--global.sendanonymoususage"
+
+# 额外参数（可选）
+additionalArguments:
+  - "--serversTransport.insecureSkipVerify=true"
+
+# Pilot 配置（可选，Traefik 云服务）
+# pilot:
+#   enabled: false
+#   token: ""
+
+# 部署配置
+deployment:
+  enabled: true
+  replicas: 1  # 单机部署，1 个副本
+  annotations: {}
+  labels: {}
+  podAnnotations: {}
+  podLabels: {}
+
+# 资源限制
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# 服务配置
+service:
+  enabled: true
+  type: LoadBalancer
+  annotations: {}
+  labels: {}
+  spec: {}
+  # 如果使用 MetalLB，可以指定负载均衡器 IP
+  # loadBalancerIP: 192.168.1.100
+
+# 主机网络（可选，用于高性能场景）
+# hostNetwork: false
+
+# 镜像配置（可选，指定版本）
+# image:
+#   repository: traefik
+#   tag: v2.10.6
+#   pullPolicy: IfNotPresent
+
+# 持久化配置（用于 ACME TLS 证书）
+# persistence:
+#   enabled: true
+#   name: data
+#   accessMode: ReadWriteOnce
+#   size: 128Mi
+#   storageClass: longhorn
+
+# TLS 选项（可选）
+# tlsOptions:
+#   default:
+#     minVersion: VersionTLS12
+#     sniStrict: true
+#     cipherSuites:
+#       - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+#       - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+# 中间件（可选）
+# providers:
+#   kubernetesCRD:
+#     enabled: true
+#     namespaces: []
+#   kubernetesIngress:
+#     enabled: true
+#     namespaces: []
