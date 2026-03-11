@@ -155,36 +155,36 @@ kubectl get nodes
 
 ---
 
-## 📦 步骤 2: 配置 Longhorn 存储
+## 📦 ~~步骤 2: 配置 Longhorn 存储~~
 
-```bash
-# 添加 Longhorn Helm 仓库
-helm repo add longhorn https://charts.longhorn.io
-helm repo update
-
-# 安装 Longhorn
-kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.5.3/deploy/longhorn.yaml
-
-# 等待 Longhorn 就绪
-kubectl get pods -n longhorn-system
-# 所有 Pod 状态应为 Running
-
-# 访问 Longhorn UI
-kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80
-# 浏览器访问：http://localhost:8080
-```
-
-### 配置存储类
-
-```bash
-# 设置 Longhorn 为默认存储类
-kubectl patch storageclass longhorn -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-
-# 验证存储类
-kubectl get storageclass
-# 输出：NAME         PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
-#       longhorn   driver.longhorn.io      Delete          Immediate           true                   1m
-```
+~~```bash~~
+~~# 添加 Longhorn Helm 仓库~~
+~~helm repo add longhorn https://charts.longhorn.io~~
+~~helm repo update~~
+~~~~
+~~# 安装 Longhorn~~
+~~kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.5.3/deploy/longhorn.yaml~~
+~~~~
+~~# 等待 Longhorn 就绪~~
+~~kubectl get pods -n longhorn-system~~
+~~# 所有 Pod 状态应为 Running~~
+~~~~
+~~# 访问 Longhorn UI~~
+~~kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80~~
+~~# 浏览器访问：http://localhost:8080~~
+~~```~~
+~~~~
+~~### 配置存储类~~
+~~~~
+~~```bash~~
+~~# 设置 Longhorn 为默认存储类~~
+~~kubectl patch storageclass longhorn -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'~~
+~~~~
+~~# 验证存储类~~
+~~kubectl get storageclass~~
+~~# 输出：NAME         PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE~~
+~~#       longhorn   driver.longhorn.io      Delete          Immediate           true                   1m~~
+~~```~~
 
 ---
 
