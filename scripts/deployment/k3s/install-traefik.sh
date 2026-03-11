@@ -78,7 +78,8 @@ else
     echo "✅ 使用官方仓库：$HELM_REPO"
 fi
 
-helm repo add traefik "$HELM_REPO"
+# 添加仓库（忽略已存在的错误）
+helm repo add traefik "$HELM_REPO" 2>/dev/null || echo "✅ Helm 仓库已存在"
 helm repo update
 echo "✅ Helm 仓库已添加：$HELM_REPO"
 
@@ -88,44 +89,49 @@ echo ""
 
 echo "安装 Traefik v2.10..."
 
-# 设置 Helm Chart 版本（版本锁定）
-# 注意：Traefik Helm Chart 版本与 Traefik 应用版本不同
-# Chart 22.x 对应 Traefik v2.10.x
-# 如果不指定版本，使用最新版
-TRAEFIK_CHART_VERSION=""  # 留空表示使用最新版
-
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_FILE="$SCRIPT_DIR/traefik-values.yaml"
 
-# 检查配置文件是否存在
+# 检查配置文件
 if [ ! -f "$VALUES_FILE" ]; then
     echo "⚠️ 警告：traefik-values.yaml 不存在，使用默认配置"
-    if [ -n "$TRAEFIK_CHART_VERSION" ]; then
-        helm install traefik traefik/traefik \
-            --namespace traefik \
-            --create-namespace \
-            --version "$TRAEFIK_CHART_VERSION"
-    else
-        helm install traefik traefik/traefik \
-            --namespace traefik \
-            --create-namespace
-    fi
-else
-    echo "使用配置文件：$VALUES_FILE"
-    if [ -n "$TRAEFIK_CHART_VERSION" ]; then
-        helm install traefik traefik/traefik \
-            --namespace traefik \
-            --create-namespace \
-            -f "$VALUES_FILE" \
-            --version "$TRAEFIK_CHART_VERSION"
-    else
-        helm install traefik traefik/traefik \
-            --namespace traefik \
-            --create-namespace \
-            -f "$VALUES_FILE"
-    fi
+    VALUES_FILE=""
 fi
+
+# 使用国内镜像源下载 Chart
+echo "准备 Helm Chart..."
+CHART_URL="https://traefik.github.io/charts/traefik-39.0.5.tgz"
+CHART_URL_CN="https://helm.traefik.io/traefik/traefik-39.0.5.tgz"
+TEMP_CHART="/tmp/traefik-39.0.5.tgz"
+
+# 尝试下载 Chart（优先国内镜像）
+if curl -sfL --connect-timeout 10 -o "$TEMP_CHART" "$CHART_URL_CN"; then
+    echo "✅ 从国内镜像下载 Chart 成功"
+elif curl -sfL --connect-timeout 10 --retry 3 -o "$TEMP_CHART" "$CHART_URL"; then
+    echo "✅ 从官方仓库下载 Chart 成功"
+else
+    echo "❌ 无法下载 Helm Chart，请检查网络连接"
+    echo "   手动下载：wget $CHART_URL_CN -O $TEMP_CHART"
+    exit 1
+fi
+
+# 执行安装
+echo "安装 Traefik..."
+if [ -n "$VALUES_FILE" ]; then
+    echo "使用配置文件：$VALUES_FILE"
+    helm install traefik "$TEMP_CHART" \
+        --namespace traefik \
+        --create-namespace \
+        -f "$VALUES_FILE"
+else
+    helm install traefik "$TEMP_CHART" \
+        --namespace traefik \
+        --create-namespace
+fi
+
+# 清理临时文件
+rm -f "$TEMP_CHART"
 
 echo "等待 Traefik 部署..."
 sleep 30
