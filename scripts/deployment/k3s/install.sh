@@ -1,13 +1,14 @@
 #!/bin/bash
-# K3S 安装脚本 - 针对 13700K + 32G RAM + 1T SSD + 10T HDD 优化
-# Story 0.4: K3S 集群部署
-# 技术栈：K3S v1.34.5
+# K3S 安装脚本 - WSL2 Ubuntu 22.04 环境
+# Story 0.4: K3S 集群部署（WSL2 重构版）
+# 技术栈：K3S v1.34.5 + local-path-provisioner
 
 set -e
 
-echo "=== K3S 集群安装脚本 ==="
+echo "=== K3S 集群安装脚本 (WSL2 版) ==="
 echo "日期：$(date)"
 echo "目标版本：K3S v1.34.5"
+echo "环境：WSL2 Ubuntu 22.04"
 echo ""
 
 # ========== 前置检查 ==========
@@ -18,6 +19,15 @@ echo "检查前置条件..."
 if [ "$EUID" -ne 0 ]; then
     echo "❌ 请以 root 用户运行此脚本（使用 sudo）"
     exit 1
+fi
+
+# 检查是否在 WSL2 环境
+if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
+    echo "✅ 检测到 WSL2 环境"
+    WSL2_MODE=true
+else
+    echo "⚠️ 未在 WSL2 环境中运行，某些配置可能不适用"
+    WSL2_MODE=false
 fi
 
 # 检查操作系统
@@ -39,18 +49,20 @@ fi
 ROOT_SPACE=$(df -h / | awk 'NR==2 {print $4}')
 echo "✅ 根分区可用空间：$ROOT_SPACE"
 
-# 检查 Longhorn 数据目录空间（重要！）
-if df -h /var/lib/longhorn &>/dev/null; then
-    LONGHORN_SPACE=$(df -h /var/lib/longhorn | awk 'NR==2 {print $4}')
-    echo "✅ Longhorn 数据目录可用空间：$LONGHORN_SPACE"
+# 检查 WSL2 存储路径（替代 Longhorn 检查）
+echo "检查 WSL2 存储配置..."
+if [ -d /mnt/wsl-data ]; then
+    WSL_DATA_SPACE=$(df -h /mnt/wsl-data | awk 'NR==2 {print $4}')
+    echo "✅ WSL2 数据目录可用空间：$WSL_DATA_SPACE"
 else
-    echo "⚠️ 警告：/var/lib/longhorn 未独立挂载，将使用根分区空间"
+    echo "⚠️ /mnt/wsl-data 不存在，将使用默认路径 /var/lib/rancher/k3s/storage"
+    echo "   建议创建：sudo mkdir -p /mnt/wsl-data/k8s-storage"
 fi
 
 # 检查端口占用
 echo "检查端口占用..."
 for port in 6443 80 443; do
-    if netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+    if ss -tlnp 2>/dev/null | grep -q ":$port " || netstat -tlnp 2>/dev/null | grep -q ":$port "; then
         echo "⚠️ 警告：端口 $port 被占用"
     else
         echo "✅ 端口 $port 可用"
@@ -89,7 +101,8 @@ rm -f /tmp/k3s-install.sh
 echo "等待 K3S 服务启动..."
 sleep 10
 
-# 验证 K3S 状态
+# ========== 验证 K3S 状态 ==========
+
 echo "验证 K3S 状态..."
 if systemctl is-active --quiet k3s; then
     echo "✅ K3S 服务运行正常"
@@ -99,7 +112,8 @@ else
     exit 1
 fi
 
-# 部署 K3S 配置文件（重要！）
+# ========== 部署 K3S 配置文件 ==========
+
 echo "部署 K3S 配置文件..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/config.yaml"
@@ -135,6 +149,10 @@ if [ -f "$CONFIG_FILE" ]; then
 else
     echo "⚠️ 警告：config.yaml 不存在，使用默认配置"
 fi
+
+# ========== 配置 kubectl ==========
+
+echo "配置 kubectl..."
 
 # 配置 kubectl 别名
 if ! grep -q "alias kubectl='sudo kubectl'" /root/.bashrc 2>/dev/null; then
@@ -186,16 +204,30 @@ else
     echo "⚠️ 有 $SYSTEM_PODS 个系统 Pod 未运行"
 fi
 
+# 检查存储类（local-path-provisioner）
+echo "检查存储类..."
+kubectl get storageclass
+
+STORAGE_CLASS=$(kubectl get storageclass standard -o jsonpath='{.provisioner}' 2>/dev/null || echo "")
+if [ "$STORAGE_CLASS" = "rancher.io/local-path" ]; then
+    echo "✅ local-path-provisioner 已配置（storageClassName: standard）"
+else
+    echo "⚠️ 存储类配置可能不正确"
+fi
+
 echo ""
 
 # ========== 安装完成摘要 ==========
 
-echo "=== K3S 安装完成 ==="
+echo "=== K3S 安装完成 (WSL2 版) ==="
 echo "✅ K3S 版本：$K3S_VERSION"
 echo "✅ 节点状态：Ready"
+echo "✅ 存储方案：local-path-provisioner (standard)"
 echo "✅ 系统 Pod：运行正常"
 echo ""
-echo "下一步：运行 Longhorn 存储配置脚本"
-echo "命令：./scripts/deployment/k3s/install-longhorn.sh"
+echo "下一步："
+echo "  1. 安装 Traefik：./scripts/deployment/k3s/install-traefik.sh"
+echo "  2. 测试存储：kubectl apply -f scripts/deployment/k3s/test-storage.yaml"
+echo "  3. 运行健康检查：./scripts/deployment/k3s/health_check.sh"
 echo ""
 echo "=== 安装完成 ✅ ==="
