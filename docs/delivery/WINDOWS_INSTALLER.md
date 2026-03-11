@@ -1,6 +1,6 @@
 # Windows 安装程序制作指南
 
-本文档介绍如何为 Sisyphus 系统创建 Windows 安装程序。
+本文档介绍如何为 Sisys 系统创建 Windows 安装程序。
 
 ## 目录
 
@@ -46,10 +46,10 @@ Windows 安装程序需要支持以下功能：
 ### 3.1 安装脚本
 
 ```inno
-; Sisyphus.iss
-#define MyAppName "Sisyphus"
+; Sisys.iss
+#define MyAppName "Sisys"
 #define MyAppVersion "0.3.0"
-#define MyAppPublisher "Sisyphus Team"
+#define MyAppPublisher "Sisys Team"
 #define MyAppURL "https://sisys.example.com"
 #define MyAppExeName "sisys.exe"
 
@@ -73,7 +73,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 
 ; 输出设置
 OutputDir=Output
-OutputBaseFilename=Sisyphus-Setup-{#MyAppVersion}
+OutputBaseFilename=Sisys-Setup-{#MyAppVersion}
 SetupIconFile=..\assets\sisys-icon.ico
 
 ; 压缩设置
@@ -83,7 +83,7 @@ LZMAUseSeparateProcess=yes
 
 ; 日志
 SetupLogging=yes
-LogFilePath={log}\Sisyphus-Setup.log
+LogFilePath={log}\Sisys-Setup.log
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -240,7 +240,7 @@ end;
 
 [UninstallDelete]
 ; 清理用户数据（可选）
-; Type: filesandordirs; Name: "{userappdata}\Sisyphus"
+; Type: filesandordirs; Name: "{userappdata}\Sisys"
 
 [UninstallRun]
 ; 停止并移除服务
@@ -265,10 +265,10 @@ mkdir "%OUTPUT_DIR%"
 
 REM 编译安装程序
 echo Building installer...
-"%INNO_PATH\ISCC.exe" /Q Sisyphus.iss
+"%INNO_PATH\ISCC.exe" /Q Sisys.iss
 
 REM 验证输出
-if exist "%OUTPUT_DIR%\Sisyphus-Setup-*.exe" (
+if exist "%OUTPUT_DIR%\Sisys-Setup-*.exe" (
     echo Build successful!
     dir "%OUTPUT_DIR%\*.exe"
 ) else (
@@ -284,9 +284,9 @@ endlocal
 ```inno
 [Messages]
 ; 自定义中文消息
-chinesesimplified.BeveledLabel=Sisyphus 安装程序
-chinesesimplified.SetupAppTitle=Sisyphus 安装
-chinesesimplified.SetupWindowTitle=安装 Sisyphus
+chinesesimplified.BeveledLabel=Sisys 安装程序
+chinesesimplified.SetupAppTitle=Sisys 安装
+chinesesimplified.SetupWindowTitle=安装 Sisys
 chinesesimplified.SelectDirLabel3=选择安装位置：
 chinesesimplified.SelectDirBrowseLabel3=安装程序将安装到以下文件夹。
 ```
@@ -298,15 +298,15 @@ chinesesimplified.SelectDirBrowseLabel3=安装程序将安装到以下文件夹�
 ### 4.1 安装脚本
 
 ```nsis
-; Sisyphus.nsi
+; Sisys.nsi
 !include "MUI2.nsh"
 !include "x64.nsh"
 
 ; 基本设置
-Name "Sisyphus"
-OutFile "Output\Sisyphus-Setup-0.3.0.exe"
-InstallDir "$PROGRAMFILES\Sisyphus"
-InstallDirRegKey HKLM "Software\Sisyphus" ""
+Name "Sisys"
+OutFile "Output\Sisys-Setup-0.3.0.exe"
+InstallDir "$PROGRAMFILES\Sisys"
+InstallDirRegKey HKLM "Software\Sisys" ""
 RequestExecutionLevel admin
 
 ; 界面设置
@@ -344,10 +344,10 @@ Section "主程序" SecMain
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   ; 写入注册表
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisyphus" "DisplayName" "Sisyphus"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisyphus" "UninstallString" "$INSTDIR\uninstall.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisyphus" "DisplayVersion" "0.3.0"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisyphus" "Publisher" "Sisyphus Team"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisys" "DisplayName" "Sisys"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisys" "UninstallString" "$INSTDIR\uninstall.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisys" "DisplayVersion" "0.3.0"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisys" "Publisher" "Sisys Team"
 SectionEnd
 
 Section "添加到 PATH" SecPath
@@ -356,9 +356,9 @@ Section "添加到 PATH" SecPath
 SectionEnd
 
 Section "创建快捷方式" SecShortcuts
-  CreateDirectory "$SMPROGRAMS\Sisyphus"
-  CreateShortcut "$SMPROGRAMS\Sisyphus\Sisyphus.lnk" "$INSTDIR\sisys.exe"
-  CreateShortcut "$DESKTOP\Sisyphus.lnk" "$INSTDIR\sisys.exe"
+  CreateDirectory "$SMPROGRAMS\Sisys"
+  CreateShortcut "$SMPROGRAMS\Sisys\Sisys.lnk" "$INSTDIR\sisys.exe"
+  CreateShortcut "$DESKTOP\Sisys.lnk" "$INSTDIR\sisys.exe"
 SectionEnd
 
 Section -Post
@@ -371,12 +371,12 @@ Section "Uninstall"
   RMDir /r "$INSTDIR"
 
   ; 删除快捷方式
-  Delete "$SMPROGRAMS\Sisyphus\Sisyphus.lnk"
-  RMDir "$SMPROGRAMS\Sisyphus"
-  Delete "$DESKTOP\Sisyphus.lnk"
+  Delete "$SMPROGRAMS\Sisys\Sisys.lnk"
+  RMDir "$SMPROGRAMS\Sisys"
+  Delete "$DESKTOP\Sisys.lnk"
 
   ; 删除注册表
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisyphus"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sisys"
 SectionEnd
 ```
 
@@ -391,22 +391,22 @@ SectionEnd
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
-           Name="Sisyphus"
+           Name="Sisys"
            Language="1033"
            Version="0.3.0"
-           Manufacturer="Sisyphus Team"
+           Manufacturer="Sisys Team"
            UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
 
     <Package InstallerVersion="500"
              Compressed="yes"
              InstallScope="perMachine"
-             Description="Sisyphus Installation Package"/>
+             Description="Sisys Installation Package"/>
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Sisyphus is already installed."/>
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Sisys is already installed."/>
 
     <MediaTemplate EmbedCab="yes"/>
 
-    <Feature Id="ProductFeature" Title="Sisyphus" Level="1">
+    <Feature Id="ProductFeature" Title="Sisys" Level="1">
       <ComponentGroupRef Id="ProductComponents"/>
       <ComponentRef Id="ApplicationShortcut"/>
     </Feature>
@@ -421,10 +421,10 @@ SectionEnd
   <Fragment>
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-        <Directory Id="INSTALLFOLDER" Name="Sisyphus"/>
+        <Directory Id="INSTALLFOLDER" Name="Sisys"/>
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="Sisyphus"/>
+        <Directory Id="ApplicationProgramsFolder" Name="Sisys"/>
       </Directory>
     </Directory>
   </Fragment>
@@ -439,13 +439,13 @@ SectionEnd
 
     <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder">
       <Shortcut Id="ApplicationStartMenuShortcut"
-                Name="Sisyphus"
-                Description="Sisyphus Application"
+                Name="Sisys"
+                Description="Sisys Application"
                 Target="[INSTALLFOLDER]sisys.exe"
                 WorkingDirectory="INSTALLFOLDER"/>
       <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
       <RegistryValue Root="HKCU"
-                     Key="Software\Sisyphus"
+                     Key="Software\Sisys"
                      Name="installed"
                      Type="integer"
                      Value="1"
@@ -460,7 +460,7 @@ SectionEnd
 ```batch
 REM 构建 MSI
 candle.exe -out obj\ Product.wxs
-light.exe -out Output\Sisyphus-0.3.0.msi obj\Product.wixobj
+light.exe -out Output\Sisys-0.3.0.msi obj\Product.wixobj
 ```
 
 ---
@@ -509,7 +509,7 @@ begin
   if ResultCode = 0 then
   begin
     // 启动服务
-    Exec('sc.exe', 'start Sisyphus', '', SW_HIDE, ewNoWait, ResultCode);
+    Exec('sc.exe', 'start Sisys', '', SW_HIDE, ewNoWait, ResultCode);
     Log('Service installed and started successfully');
   end
   else
@@ -531,7 +531,7 @@ begin
   RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_HOME', ExpandConstant('{app}'));
 
   // 设置默认配置路径
-  RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_CONFIG', ExpandConstant('{userdocs}\Sisyphus\configs'));
+  RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_CONFIG', ExpandConstant('{userdocs}\Sisys\configs'));
 
   // 通知系统
   SendMessage(HWND_BROADCAST, WM_WININICHANGE, 0, 0);
@@ -550,12 +550,12 @@ end;
 
 # 创建自签名证书
 New-SelfSignedCertificate -Type CodeSigning `
-  -Subject "CN=Sisyphus Team" `
+  -Subject "CN=Sisys Team" `
   -KeyAlgorithm RSA `
   -KeyLength 2048 `
   -HashAlgorithm SHA256 `
   -CertStoreLocation "Cert:\CurrentUser\My" `
-  -FriendlyName "Sisyphus Code Signing"
+  -FriendlyName "Sisys Code Signing"
 ```
 
 ### 7.2 签名安装程序
@@ -573,7 +573,7 @@ SignedUninstaller=yes
 
 ```batch
 REM 使用 signtool 签名
-signtool sign /f SisyphusCert.pfx /p %CERT_PASSWORD% /tr http://timestamp.digicert.com /td sha256 /fd sha256 Output\Sisyphus-Setup-0.3.0.exe
+signtool sign /f SisysCert.pfx /p %CERT_PASSWORD% /tr http://timestamp.digicert.com /td sha256 /fd sha256 Output\Sisys-Setup-0.3.0.exe
 ```
 
 ---
@@ -663,9 +663,9 @@ end;
 ### 9.2 日志位置
 
 ```
-安装日志：%TEMP%\Sisyphus-Setup.log
-应用日志：%APPDATA%\Sisyphus\logs\
-服务日志：%PROGRAMDATA%\Sisyphus\logs\
+安装日志：%TEMP%\Sisys-Setup.log
+应用日志：%APPDATA%\Sisys\logs\
+服务日志：%PROGRAMDATA%\Sisys\logs\
 ```
 
 ### 9.3 诊断命令
@@ -673,16 +673,16 @@ end;
 ```powershell
 # 检查安装状态
 Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
-  Where-Object { $_.DisplayName -like "*Sisyphus*" }
+  Where-Object { $_.DisplayName -like "*Sisys*" }
 
 # 检查服务状态
-Get-Service Sisyphus
+Get-Service Sisys
 
 # 检查环境变量
 [Environment]::GetEnvironmentVariable("Path", "User")
 
 # 清理安装
-& "$env:ProgramFiles\Sisyphus\uninstall.exe" /VERYSILENT
+& "$env:ProgramFiles\Sisys\uninstall.exe" /VERYSILENT
 ```
 
 ---
@@ -695,7 +695,7 @@ REM build-all.bat - 完整构建流程
 
 setlocal enabledelayedexpansion
 
-echo === Sisyphus Windows Installer Build ===
+echo === Sisys Windows Installer Build ===
 echo.
 
 REM 1. 清理
@@ -719,7 +719,7 @@ if not exist "..\dist\sisys.exe" (
 
 REM 4. 编译安装程序
 echo [4/5] Compiling installer...
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q Sisyphus.iss
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Q Sisys.iss
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Installer compilation failed!
     exit /b 1
@@ -727,7 +727,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM 5. 签名
 echo [5/5] Signing installer...
-signtool sign /f SisyphusCert.pfx /p %CERT_PASSWORD% /tr http://timestamp.digicert.com /td sha256 /fd sha256 "Output\Sisyphus-Setup-*.exe"
+signtool sign /f SisysCert.pfx /p %CERT_PASSWORD% /tr http://timestamp.digicert.com /td sha256 /fd sha256 "Output\Sisys-Setup-*.exe"
 
 echo.
 echo === Build Complete ===

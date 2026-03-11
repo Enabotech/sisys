@@ -1,6 +1,6 @@
 # Linux 安装程序制作指南
 
-本文档介绍如何为 Sisyphus 系统创建 Linux 安装程序。
+本文档介绍如何为 Sisys 系统创建 Linux 安装程序。
 
 ## 目录
 
@@ -87,9 +87,9 @@ Architecture: amd64
 Depends: python3 (>= 3.10), python3-pip, python3-venv, curl, git
 Recommends: docker.io, kubectl
 Suggests: argocd
-Maintainer: Sisyphus Team <support@sisys.example.com>
-Description: Sisyphus Intelligent Development Assistant
- Sisyphus is an intelligent development assistant that provides
+Maintainer: Sisys Team <support@sisys.example.com>
+Description: Sisys Intelligent Development Assistant
+ Sisys is an intelligent development assistant that provides
  automated CI/CD, Kubernetes management, and development tools.
  .
  Features:
@@ -224,7 +224,7 @@ exit 0
 ```ini
 # usr/lib/systemd/system/sisys.service
 [Unit]
-Description=Sisyphus Development Assistant
+Description=Sisys Development Assistant
 Documentation=https://docs.sisys.example.com
 After=network.target docker.service
 Wants=docker.service
@@ -261,7 +261,7 @@ WantedBy=multi-user.target
 ```ini
 # usr/share/applications/sisys.desktop
 [Desktop Entry]
-Name=Sisyphus
+Name=Sisys
 GenericName=Development Assistant
 Comment=Intelligent Development Assistant with CI/CD and Kubernetes support
 Exec=/usr/bin/sisys gui
@@ -350,7 +350,7 @@ sudo apt purge sisys
 Name:           sisys
 Version:        0.3.0
 Release:        1%{?dist}
-Summary:        Sisyphus Intelligent Development Assistant
+Summary:        Sisys Intelligent Development Assistant
 License:        MIT
 URL:            https://sisys.example.com
 Source0:        %{name}-%{version}.tar.gz
@@ -367,7 +367,7 @@ Requires(preun): systemd
 Requires(postun): systemd
 
 %description
-Sisyphus is an intelligent development assistant that provides
+Sisys is an intelligent development assistant that provides
 automated CI/CD, Kubernetes management, and development tools.
 
 %prep
@@ -418,7 +418,7 @@ chown -R sisys:sisys /var/lib/sisys /var/log/sisys
 %dir /var/log/sisys
 
 %changelog
-* Wed Mar 11 2026 Sisyphus Team <support@sisys.example.com> - 0.3.0
+* Wed Mar 11 2026 Sisys Team <support@sisys.example.com> - 0.3.0
 - Initial package
 ```
 
@@ -481,7 +481,7 @@ sudo dnf remove sisys
 ### 5.1 AppDir 结构
 
 ```
-Sisyphus.AppDir/
+Sisys.AppDir/
 ├── AppRun          # 启动脚本
 ├── sisys.desktop   # Desktop 文件
 ├── sisys.svg       # 图标
@@ -520,7 +520,7 @@ exec "${HERE}/usr/bin/sisys" "$@"
 
 set -e
 
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 
 echo "=== Building AppImage ==="
@@ -565,13 +565,13 @@ echo "AppImage created: build/${APP_NAME}-${VERSION}-x86_64.AppImage"
 
 ```bash
 # 赋予执行权限
-chmod +x Sisyphus-0.3.0-x86_64.AppImage
+chmod +x Sisys-0.3.0-x86_64.AppImage
 
 # 运行
-./Sisyphus-0.3.0-x86_64.AppImage
+./Sisys-0.3.0-x86_64.AppImage
 
 # 集成到系统（可选）
-./Sisyphus-0.3.0-x86_64.AppImage --appimage-install
+./Sisys-0.3.0-x86_64.AppImage --appimage-install
 
 # 或使用 appimaged
 # 安装 appimaged 后自动识别 AppImage
@@ -584,8 +584,8 @@ chmod +x Sisyphus-0.3.0-x86_64.AppImage
 ### 6.1 Manifest 文件
 
 ```yaml
-# com.sisyphus.app.yml
-app-id: com.sisyphus.app
+# com.sisys.app.yml
+app-id: com.sisys.app
 runtime: org.freedesktop.Platform
 runtime-version: '23.08'
 sdk: org.freedesktop.Sdk
@@ -606,12 +606,12 @@ modules:
     buildsystem: simple
     build-commands:
       - install -D sisys /app/bin/sisys
-      - install -D sisys.desktop /app/share/applications/com.sisyphus.app.desktop
-      - install -D sisys.svg /app/share/icons/hicolor/scalable/apps/com.sisyphus.app.svg
+      - install -D sisys.desktop /app/share/applications/com.sisys.app.desktop
+      - install -D sisys.svg /app/share/icons/hicolor/scalable/apps/com.sisys.app.svg
       - cp -r lib /app/lib/sisys
     sources:
       - type: archive
-        url: https://github.com/sisyphus/sisys/releases/download/v0.3.0/sisys-0.3.0-linux.tar.gz
+        url: https://github.com/sisys/sisys/releases/download/v0.3.0/sisys-0.3.0-linux.tar.gz
         sha256: abc123...
       - type: file
         path: sisys.desktop
@@ -639,25 +639,25 @@ flatpak install -y flathub org.freedesktop.Sdk//23.08
 flatpak-builder --force-clean \
     --repo=repo \
     build-dir \
-    com.sisyphus.app.yml
+    com.sisys.app.yml
 
 # 创建 bundle
-flatpak build-bundle repo Sisyphus-0.3.0.flatpak com.sisyphus.app
+flatpak build-bundle repo Sisys-0.3.0.flatpak com.sisys.app
 
-echo "Flatpak created: Sisyphus-0.3.0.flatpak"
+echo "Flatpak created: Sisys-0.3.0.flatpak"
 ```
 
 ### 6.3 安装 Flatpak
 
 ```bash
 # 安装
-flatpak install Sisyphus-0.3.0.flatpak
+flatpak install Sisys-0.3.0.flatpak
 
 # 运行
-flatpak run com.sisyphus.app
+flatpak run com.sisys.app
 
 # 创建快捷方式
-flatpak override --user --filesystem=home com.sisyphus.app
+flatpak override --user --filesystem=home com.sisys.app
 ```
 
 ---
@@ -670,9 +670,9 @@ flatpak override --user --filesystem=home com.sisyphus.app
 # snap/snapcraft.yaml
 name: sisys
 version: '0.3.0'
-summary: Sisyphus Intelligent Development Assistant
+summary: Sisys Intelligent Development Assistant
 description: |
-  Sisyphus is an intelligent development assistant that provides
+  Sisys is an intelligent development assistant that provides
   automated CI/CD, Kubernetes management, and development tools.
 
 base: core22
@@ -778,7 +778,7 @@ sudo snap connect sisys:home
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_NAME="Sisyphus"
+APP_NAME="Sisys"
 VERSION="0.3.0"
 
 # 颜色输出
@@ -982,7 +982,7 @@ sudo rpm --rebuild sisys.spec  # RPM
 
 set -e
 
-echo "Uninstalling Sisyphus..."
+echo "Uninstalling Sisys..."
 
 # 停止服务
 sudo systemctl stop sisys.service 2>/dev/null || true
