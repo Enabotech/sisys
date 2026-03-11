@@ -16,7 +16,6 @@ disable:
   - traefik        # 使用独立的 Traefik Helm Chart
   - servicelb      # WSL2 不支持 LoadBalancer
   - metrics-server # 可选：独立安装
-  - local-storage  # 使用 local-path-provisioner
 
 # API Server 配置
 kube-apiserver-arg:

@@ -49,7 +49,7 @@ fi
 ROOT_SPACE=$(df -h / | awk 'NR==2 {print $4}')
 echo "✅ 根分区可用空间：$ROOT_SPACE"
 
-# 检查 WSL2 存储路径（替代 Longhorn 检查）
+# 检查 WSL2 存储路径（用于 local-path-provisioner）
 echo "检查 WSL2 存储配置..."
 if [ -d /mnt/wsl-data ]; then
     WSL_DATA_SPACE=$(df -h /mnt/wsl-data | awk 'NR==2 {print $4}')
