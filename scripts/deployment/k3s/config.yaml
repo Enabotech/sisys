@@ -9,7 +9,7 @@ cluster-init: true
 
 # 网络配置（WSL2 特殊配置）
 flannel-backend: none  # WSL2 使用 host-network 模式
-disable-network-policy: true  # 禁用网络策略（WSL2 单节点）
+disable-network-policy: false  # 禁用网络策略（WSL2 单节点）
 
 # 禁用不需要的组件（节省资源）
 disable:

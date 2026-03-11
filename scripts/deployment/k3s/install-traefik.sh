@@ -56,9 +56,31 @@ echo ""
 # ========== 添加 Traefik Helm 仓库 ==========
 
 echo "添加 Traefik Helm 仓库..."
-helm repo add traefik https://traefik.github.io/charts
+
+# 尝试使用国内镜像（如果官方仓库不可达）
+HELM_REPO="https://traefik.github.io/charts"
+HELM_REPO_CN="https://helm.traefik.io/traefik"  # Traefik 官方国内镜像
+HELM_REPO_GITEE="https://charts.traefik.cn"     # 国内镜像
+
+# 测试官方仓库连接
+if ! curl -sfL --connect-timeout 5 "$HELM_REPO/index.yaml" &>/dev/null; then
+    echo "⚠️ 官方仓库不可达，尝试使用国内镜像..."
+
+    # 尝试 Gitee 镜像
+    if curl -sfL --connect-timeout 5 "$HELM_REPO_GITEE/index.yaml" &>/dev/null; then
+        HELM_REPO="$HELM_REPO_GITEE"
+        echo "✅ 使用 Gitee 镜像：$HELM_REPO"
+    else
+        HELM_REPO="$HELM_REPO_CN"
+        echo "✅ 使用官方国内镜像：$HELM_REPO"
+    fi
+else
+    echo "✅ 使用官方仓库：$HELM_REPO"
+fi
+
+helm repo add traefik "$HELM_REPO"
 helm repo update
-echo "✅ Helm 仓库已添加"
+echo "✅ Helm 仓库已添加：$HELM_REPO"
 
 echo ""
 
@@ -67,7 +89,10 @@ echo ""
 echo "安装 Traefik v2.10..."
 
 # 设置 Helm Chart 版本（版本锁定）
-TRAEFIK_CHART_VERSION="22.5.3"  # Traefik Helm Chart v22.5.3 对应 Traefik v2.10
+# 注意：Traefik Helm Chart 版本与 Traefik 应用版本不同
+# Chart 22.x 对应 Traefik v2.10.x
+# 如果不指定版本，使用最新版
+TRAEFIK_CHART_VERSION=""  # 留空表示使用最新版
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,17 +101,30 @@ VALUES_FILE="$SCRIPT_DIR/traefik-values.yaml"
 # 检查配置文件是否存在
 if [ ! -f "$VALUES_FILE" ]; then
     echo "⚠️ 警告：traefik-values.yaml 不存在，使用默认配置"
-    helm install traefik traefik/traefik \
-        --namespace traefik \
-        --create-namespace \
-        --version "$TRAEFIK_CHART_VERSION"
+    if [ -n "$TRAEFIK_CHART_VERSION" ]; then
+        helm install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            --version "$TRAEFIK_CHART_VERSION"
+    else
+        helm install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace
+    fi
 else
     echo "使用配置文件：$VALUES_FILE"
-    helm install traefik traefik/traefik \
-        --namespace traefik \
-        --create-namespace \
-        -f "$VALUES_FILE" \
-        --version "$TRAEFIK_CHART_VERSION"
+    if [ -n "$TRAEFIK_CHART_VERSION" ]; then
+        helm install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            -f "$VALUES_FILE" \
+            --version "$TRAEFIK_CHART_VERSION"
+    else
+        helm install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            -f "$VALUES_FILE"
+    fi
 fi
 
 echo "等待 Traefik 部署..."

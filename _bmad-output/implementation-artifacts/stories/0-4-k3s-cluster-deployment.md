@@ -55,6 +55,14 @@ So that **提供轻量级 K8s 运行时环境给 Gitea、Harbor、ArgoCD 使用*
   - [ ] Subtask 4.3: 验证存储类配置正确
   - [ ] Subtask 4.4: 运行集群诊断命令
 
+- [x] Task 5: 多节点部署支持（可选）【新增】 ✅
+  - [x] Subtask 5.1: 创建 install-multi-node.sh（单 WSL2 + 多 Docker 容器节点） ✅
+  - [x] Subtask 5.2: 创建 health_check_docker.sh（多节点健康检查） ✅
+  - [x] Subtask 5.3: 创建 install-traefik-docker.sh（多节点 Traefik 安装） ✅
+  - [x] Subtask 5.4: 创建部署指南文档（K3S_MULTI_NODE_GUIDE.md） ✅
+  - [x] Subtask 5.5: 创建自动化测试脚本（run_tests.sh） ✅
+  - [x] Subtask 5.6: 创建测试报告模板（K3S_TEST_REPORT.md） ✅
+
 - [x] **Refactor Follow-ups (AI)** - 重构跟进【新增】 ✅
   - [x] [Refactor][HIGH] 移除所有 Longhorn 相关脚本和配置 ✅
   - [x] [Refactor][HIGH] 更新 install.sh 移除 Longhorn 检查 ✅
@@ -649,9 +657,15 @@ echo "=== 健康检查通过 ✅ ==="
 - [ ] `scripts/deployment/k3s/install.sh` 已创建 ✅
 - [ ] `scripts/deployment/k3s/config.yaml` 已创建 ✅
 - [ ] `scripts/deployment/k3s/traefik-values.yaml` 已创建 ✅
-- [ ] `scripts/deployment/k3s/health_check.sh` 已创建 ✅
-- [ ] `scripts/deployment/k3s/install-traefik.sh` 已创建 ✅
-- [ ] `scripts/deployment/k3s/test-storage.yaml` 已创建 ✅（新增）
+- [ ] `scripts/deployment/k3s/health_check.sh` 已创建 ✅（单节点）
+- [ ] `scripts/deployment/k3s/install-traefik.sh` 已创建 ✅（单节点）
+- [ ] `scripts/deployment/k3s/test-storage.yaml` 已创建 ✅
+- [ ] `scripts/deployment/k3s/install-multi-node.sh` 已创建 ✅（多节点）
+- [ ] `scripts/deployment/k3s/health_check_docker.sh` 已创建 ✅（多节点）
+- [ ] `scripts/deployment/k3s/install-traefik-docker.sh` 已创建 ✅（多节点）
+- [ ] `scripts/deployment/k3s/run_tests.sh` 已创建 ✅（自动化测试）
+- [ ] `docs/deployment/K3S_MULTI_NODE_GUIDE.md` 已创建 ✅（多节点部署指南）
+- [ ] `docs/deployment/K3S_TEST_REPORT.md` 已创建 ✅（测试报告模板）
 
 **已移除（Longhorn 不支持 WSL2）：**
 - [x] ~~`scripts/deployment/k3s/longhorn-values.yaml`~~ - 已删除
@@ -832,13 +846,20 @@ echo "=== 健康检查通过 ✅ ==="
 - **重构原因**: Longhorn 不支持 WSL2 环境（需要块设备，WSL2 使用 VHDX 虚拟磁盘）
 - **新方案**: 使用 K3S 内置 local-path-provisioner（hostPath 存储）替代 Longhorn
 - 删除 Longhorn 相关文件：`longhorn-values.yaml`, `install-longhorn.sh`
-- 新增测试文件：`test-storage.yaml` - PVC 测试
 - **重构脚本**:
   - ✅ `install.sh` - 移除 Longhorn 检查，添加 WSL2 环境检测
   - ✅ `health_check.sh` - 适配 local-path-provisioner，添加 PVC 测试
   - ✅ `config.yaml` - WSL2 网络配置（flannel-backend=none）
   - ✅ `install-traefik.sh` - WSL2 适配
   - ✅ `traefik-values.yaml` - 简化配置（移除持久化）
+- **多节点支持**:
+  - ✅ `install-multi-node.sh` - 单 WSL2 多节点部署（1 Server + 2 Agent）
+  - ✅ `health_check_docker.sh` - 多节点健康检查
+  - ✅ `install-traefik-docker.sh` - 多节点 Traefik 安装
+  - ✅ `K3S_MULTI_NODE_GUIDE.md` - 多节点部署指南
+- **测试支持**:
+  - ✅ `run_tests.sh` - 自动化测试脚本（17 项测试）
+  - ✅ `K3S_TEST_REPORT.md` - 测试报告模板
 - 更新 Story 状态：`done` → `in-progress`（重构中）
-- 更新 Tasks：移除 Longhorn 任务，添加 local-path-provisioner 任务
+- 更新 Tasks：移除 Longhorn 任务，添加 local-path-provisioner 任务，添加多节点任务
 - 更新文档：添加 WSL2 存储方案说明和限制
