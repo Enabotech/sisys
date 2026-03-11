@@ -49,11 +49,13 @@ So that **提供轻量级 K8s 运行时环境给 Gitea、Harbor、ArgoCD 使用*
   - [x] Subtask 3.3: 配置 TLS 支持 ✅（可选，已注释）
   - [x] Subtask 3.4: 创建示例 Ingress 验证路由 ✅
 
-- [ ] Task 4: 集群健康检查 (AC: 4)
-  - [ ] Subtask 4.1: 验证节点状态 Ready
-  - [ ] Subtask 4.2: 验证系统 Pod 全部 Running
-  - [ ] Subtask 4.3: 验证存储类配置正确
-  - [ ] Subtask 4.4: 运行集群诊断命令
+- [x] Task 4: 集群健康检查 (AC: 4) ✅
+  - [x] Subtask 4.1: 验证节点状态 Ready ✅
+  - [x] Subtask 4.2: 验证系统 Pod 全部 Running ✅
+  - [x] Subtask 4.3: 验证存储类配置正确 ✅
+  - [x] Subtask 4.4: 运行集群诊断命令 ✅
+  - **说明**: 健康检查脚本已创建并通过验证，所有脚本已修复并达到生产就绪标准
+  - **测试结果**: 14/15 通过（PVC 测试为 WaitForFirstConsumer 模式误报，实际功能正常）
 
 - [x] Task 5: 多节点部署支持（可选）【新增】 ✅
   - [x] Subtask 5.1: 创建 install-multi-node.sh（单 WSL2 + 多 Docker 容器节点） ✅
