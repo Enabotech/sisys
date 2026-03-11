@@ -2,6 +2,7 @@
 # Longhorn 存储安装脚本
 # Story 0.4: K3S 集群部署
 # 技术栈：Longhorn v1.5.3
+# K3S 版本：v1.34.5
 
 set -e
 
@@ -54,6 +55,9 @@ echo ""
 
 echo "安装 Longhorn v1.5.3..."
 
+# 设置 Helm Chart 版本（版本锁定）
+LONGHORN_CHART_VERSION="1.5.3"
+
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_FILE="$SCRIPT_DIR/longhorn-values.yaml"
@@ -61,13 +65,17 @@ VALUES_FILE="$SCRIPT_DIR/longhorn-values.yaml"
 # 检查配置文件是否存在
 if [ ! -f "$VALUES_FILE" ]; then
     echo "⚠️ 警告：longhorn-values.yaml 不存在，使用默认配置"
-    helm install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace
+    helm install longhorn longhorn/longhorn \
+        --namespace longhorn-system \
+        --create-namespace \
+        --version "$LONGHORN_CHART_VERSION"
 else
     echo "使用配置文件：$VALUES_FILE"
     helm install longhorn longhorn/longhorn \
         --namespace longhorn-system \
         --create-namespace \
-        -f "$VALUES_FILE"
+        -f "$VALUES_FILE" \
+        --version "$LONGHORN_CHART_VERSION"
 fi
 
 echo "等待 Longhorn 部署..."

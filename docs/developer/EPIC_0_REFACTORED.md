@@ -37,7 +37,7 @@
 | Gitea Runner | latest | ✅ 活跃开发 | - |
 | Harbor | v2.14.3 | ✅ 已发布 | - |
 | ArgoCD | v3.3.2 | ✅ 已发布 | Agimtech |
-| K3S | v1.28.x | ✅ 稳定版 | - |
+| K3S | v1.34.5 | ✅ 稳定版 | - |
 
 **风险等级：** 🟢 低 (所有版本已验证)
 
@@ -84,13 +84,13 @@
 
 **Given** 13700K + 32G RAM + 1T SSD + 10T HDD 系统
 **When** 运行 K3S 安装脚本
-**Then** K3S v1.28.x 安装成功
+**Then** K3S v1.34.5 安装成功
 **And** Longhorn 存储配置完成
 **And** Traefik 反向代理配置完成
 **And** 集群健康检查通过
 
 **技术栈:**
-- K3S v1.28.x
+- K3S v1.34.5
 - Longhorn v1.5.3
 - Traefik v2.10
 

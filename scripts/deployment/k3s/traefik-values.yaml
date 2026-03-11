@@ -145,12 +145,13 @@ service:
 #   pullPolicy: IfNotPresent
 
 # 持久化配置（用于 ACME TLS 证书）
-# persistence:
-#   enabled: true
-#   name: data
-#   accessMode: ReadWriteOnce
-#   size: 128Mi
-#   storageClass: longhorn
+persistence:
+  enabled: true
+  name: data
+  accessMode: ReadWriteOnce
+  size: 128Mi
+  storageClass: longhorn
+  path: /data
 
 # TLS 选项（可选）
 # tlsOptions:

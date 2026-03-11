@@ -1,5 +1,6 @@
 # K3S 配置文件 - 针对 13700K + 32G RAM 优化
 # Story 0.4: K3S 集群部署
+# 技术栈：K3S v1.34.5
 # 路径：/etc/rancher/k3s/config.yaml
 
 # 节点配置

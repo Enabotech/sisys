@@ -1,13 +1,13 @@
 #!/bin/bash
 # K3S 安装脚本 - 针对 13700K + 32G RAM + 1T SSD + 10T HDD 优化
 # Story 0.4: K3S 集群部署
-# 技术栈：K3S v1.28.x
+# 技术栈：K3S v1.34.5
 
 set -e
 
 echo "=== K3S 集群安装脚本 ==="
 echo "日期：$(date)"
-echo "目标版本：K3S v1.28.x"
+echo "目标版本：K3S v1.34.5"
 echo ""
 
 # ========== 前置检查 ==========
@@ -39,6 +39,14 @@ fi
 ROOT_SPACE=$(df -h / | awk 'NR==2 {print $4}')
 echo "✅ 根分区可用空间：$ROOT_SPACE"
 
+# 检查 Longhorn 数据目录空间（重要！）
+if df -h /var/lib/longhorn &>/dev/null; then
+    LONGHORN_SPACE=$(df -h /var/lib/longhorn | awk 'NR==2 {print $4}')
+    echo "✅ Longhorn 数据目录可用空间：$LONGHORN_SPACE"
+else
+    echo "⚠️ 警告：/var/lib/longhorn 未独立挂载，将使用根分区空间"
+fi
+
 # 检查端口占用
 echo "检查端口占用..."
 for port in 6443 80 443; do
@@ -53,13 +61,29 @@ echo ""
 
 # ========== 安装 K3S ==========
 
-echo "下载并安装 K3S v1.28.x..."
+echo "下载并安装 K3S v1.34.5..."
 
 # 设置 K3S 版本
-export INSTALL_K3S_VERSION="v1.28.15+k3s1"
+export INSTALL_K3S_VERSION="v1.34.5+k3s1"
 
-# 下载并运行安装脚本
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION sh -
+# 下载并运行安装脚本（带重试机制）
+echo "下载 K3S 安装脚本（最多重试 3 次）..."
+if ! curl --retry 3 --retry-delay 5 --retry-max-time 60 -sfL https://get.k3s.io -o /tmp/k3s-install.sh; then
+    echo "❌ 下载 K3S 安装脚本失败"
+    exit 1
+fi
+echo "✅ K3S 安装脚本下载成功"
+
+# 执行安装脚本
+echo "执行 K3S 安装..."
+if ! INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION sh /tmp/k3s-install.sh; then
+    echo "❌ K3S 安装失败"
+    rm -f /tmp/k3s-install.sh
+    exit 1
+fi
+
+# 清理临时文件
+rm -f /tmp/k3s-install.sh
 
 # 等待 K3S 启动
 echo "等待 K3S 服务启动..."
@@ -73,6 +97,43 @@ else
     echo "❌ K3S 服务未运行"
     systemctl status k3s
     exit 1
+fi
+
+# 部署 K3S 配置文件（重要！）
+echo "部署 K3S 配置文件..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/config.yaml"
+
+if [ -f "$CONFIG_FILE" ]; then
+    echo "复制配置文件到 /etc/rancher/k3s/config.yaml..."
+    mkdir -p /etc/rancher/k3s
+
+    # 备份现有配置（如果存在）
+    if [ -f /etc/rancher/k3s/config.yaml ]; then
+        cp /etc/rancher/k3s/config.yaml /etc/rancher/k3s/config.yaml.bak.$(date +%Y%m%d%H%M%S)
+        echo "✅ 已备份现有配置"
+    fi
+
+    # 复制新配置
+    cp "$CONFIG_FILE" /etc/rancher/k3s/config.yaml
+    chmod 600 /etc/rancher/k3s/config.yaml
+    echo "✅ K3S 配置文件已部署"
+
+    # 重启 K3S 服务使配置生效
+    echo "重启 K3S 服务使配置生效..."
+    systemctl restart k3s
+    sleep 10
+
+    # 验证重启后状态
+    if systemctl is-active --quiet k3s; then
+        echo "✅ K3S 服务重启成功，配置已生效"
+    else
+        echo "❌ K3S 服务重启失败"
+        systemctl status k3s
+        exit 1
+    fi
+else
+    echo "⚠️ 警告：config.yaml 不存在，使用默认配置"
 fi
 
 # 配置 kubectl 别名
