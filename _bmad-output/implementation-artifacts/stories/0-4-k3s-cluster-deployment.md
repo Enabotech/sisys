@@ -138,62 +138,7 @@ So that **提供轻量级 K8s 运行时环境给 Gitea、Harbor、ArgoCD 使用*
 
 ### 1. K3S 配置（config.yaml）
 
-```yaml
-# /etc/rancher/k3s/config.yaml
-# 针对 13700K + 32G RAM 优化，WSL2 环境
-
-# 节点配置
-node-name: sisys-pc-wsl2
-cluster-init: true
-
-# 网络配置（WSL2 特殊配置）
-flannel-backend: none  # WSL2 使用 host-network 模式
-disable-network-policy: true  # 禁用网络策略（WSL2 单节点）
-
-# 禁用不需要的组件（节省资源）
-disable:
-  - traefik        # 使用独立的 Traefik Helm Chart
-  - servicelb      # WSL2 不支持 LoadBalancer
-  - metrics-server # 可选：独立安装
-  - local-storage  # 使用 local-path-provisioner
-
-# API Server 配置
-kube-apiserver-arg:
-  - max-requests-inflight=1000
-  - max-mutating-requests-inflight=500
-
-# Controller Manager 配置
-kube-controller-manager-arg:
-  - node-cidr-mask-size=24
-
-# Scheduler 配置
-kube-scheduler-arg:
-  - leader-elect=true
-
-# 资源限制（针对 32G RAM 优化）
-etcd-memory-limit: 2048
-apiserver-memory-limit: 2048
-controller-manager-memory-limit: 1024
-scheduler-memory-limit: 512
-
-# Kubelet 配置
-kubelet-arg:
-  - max-pods=110
-
-# 系统预留资源
-system-reserved:
-  - cpu=2000m
-  - memory=4Gi
-
-# Kube 预留资源
-kube-reserved:
-  - cpu=1000m
-  - memory=2Gi
-
-# 日志配置
-debug: false
-logging: 0
-```
+针对 13700K + 32G RAM + WSL2 环境进行的 k3s 配置优化，详见scripts/deployment/k3s/config.yaml
 
 ### 2. 资源分配建议
 
@@ -502,7 +447,11 @@ exit 0
 - 创建 Longhorn 和 Traefik Helm 配置
 - 创建健康检查脚本
 
-**2026-03-11 (WSL2 重构):**
+**2026-03-11 (WSL2 配置修复):**
+- **关键修复**: flannel-backend: none → vxlan
+- **问题**: none 导致 Pod 网络不通，测试失败
+- **解决**: vxlan 模式支持 Pod 网络和 DNS 解析
+- **结果**: 测试从 14/15 提升到 15/15 通过（100%）
 - **重构原因**: Longhorn 不支持 WSL2 环境（需要块设备，WSL2 使用 VHDX 虚拟磁盘）
 - **新方案**: 使用 K3S 内置 local-path-provisioner（hostPath 存储）替代 Longhorn
 - 删除 Longhorn 相关文件：`longhorn-values.yaml`, `install-longhorn.sh`

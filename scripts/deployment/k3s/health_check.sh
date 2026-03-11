@@ -41,19 +41,27 @@ echo ""
 echo "3. 检查存储类..."
 kubectl get storageclass
 
-STORAGE_CLASS=$(kubectl get storageclass standard -o jsonpath='{.provisioner}' 2>/dev/null || echo "")
-if [ "$STORAGE_CLASS" != "rancher.io/local-path" ]; then
-    echo "❌ local-path-provisioner 未配置（当前：$STORAGE_CLASS）"
-    exit 3
+# 检查 local-path 存储类（K3S 默认）
+STORAGE_CLASS=$(kubectl get storageclass local-path -o jsonpath='{.provisioner}' 2>/dev/null || echo "")
+if [ "$STORAGE_CLASS" = "rancher.io/local-path" ]; then
+    echo "✅ local-path-provisioner 已配置（storageClassName: local-path）"
+else
+    # 尝试检查 standard 存储类（兼容模式）
+    STORAGE_CLASS=$(kubectl get storageclass standard -o jsonpath='{.provisioner}' 2>/dev/null || echo "")
+    if [ "$STORAGE_CLASS" = "rancher.io/local-path" ]; then
+        echo "✅ local-path-provisioner 已配置（storageClassName: standard）"
+    else
+        echo "❌ local-path-provisioner 未配置（当前：$STORAGE_CLASS）"
+        exit 3
+    fi
 fi
-echo "✅ local-path-provisioner 已配置（storageClassName: standard）"
 
 # 检查默认存储类
 DEFAULT_CLASS=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null || echo "")
-if [ "$DEFAULT_CLASS" = "standard" ]; then
-    echo "✅ standard 是默认存储类"
+if [ "$DEFAULT_CLASS" = "local-path" ] || [ "$DEFAULT_CLASS" = "standard" ]; then
+    echo "✅ 默认存储类检查通过 ($DEFAULT_CLASS)"
 else
-    echo "⚠️ standard 不是默认存储类，当前默认：$DEFAULT_CLASS"
+    echo "⚠️ 默认存储类未设置 (当前：$DEFAULT_CLASS)"
 fi
 echo ""
 

@@ -8,8 +8,10 @@ node-name: sisys-pc-wsl2
 cluster-init: true
 
 # 网络配置（WSL2 特殊配置）
-flannel-backend: none  # WSL2 使用 host-network 模式
-disable-network-policy: false  # 禁用网络策略（WSL2 单节点）
+# 重要：flannel-backend 必须设置为 vxlan 或 wireguard
+# none 会导致 Pod 网络不通，测试失败（Ping/DNS 测试无法通过）
+flannel-backend: vxlan  # WSL2 推荐使用 vxlan
+disable-network-policy: false  # 启用网络策略（支持 Pod 间通信）
 
 # 禁用不需要的组件（节省资源）
 disable:
