@@ -117,22 +117,29 @@ echo "  第二部分：存储功能测试"
 echo "========================================"
 
 # 测试 7: 存储类存在
-run_test "standard 存储类存在" "$KUBECTL_CMD get storageclass standard" "success"
+run_test "local-path 存储类存在" "$KUBECTL_CMD get storageclass local-path" "success"
 
 # 测试 8: 默认存储类
 DEFAULT_CLASS=$($KUBECTL_CMD get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null || echo "")
-if [ "$DEFAULT_CLASS" = "standard" ]; then
+if [ "$DEFAULT_CLASS" = "local-path" ] || [ "$DEFAULT_CLASS" = "standard" ]; then
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
-    echo "✅ PASS: standard 是默认存储类"
+    echo "✅ PASS: 默认存储类检查 ($DEFAULT_CLASS)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
-    echo "⚠️ WARN: standard 不是默认存储类 (当前：$DEFAULT_CLASS)"
+    echo "⚠️ WARN: 默认存储类未设置 (当前：$DEFAULT_CLASS)"
 fi
 
 # 测试 9: PVC 创建
 echo ""
 echo "创建测试 PVC..."
+
+# 先清理可能存在的旧资源
+cleanup_test "pod/test-storage-pod"
+cleanup_test "pod/test-storage-pod-2"
+cleanup_test "pvc/test-pvc-verify"
+sleep 2
+
 cat <<EOF | $KUBECTL_CMD apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -141,19 +148,31 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: standard
+  storageClassName: local-path
   resources:
     requests:
       storage: 100Mi
 EOF
 
 sleep 3
+
+# 等待 PVC 绑定（最多 30 秒）
+echo "等待 PVC 绑定..."
+for i in {1..6}; do
+    PVC_STATUS=$($KUBECTL_CMD get pvc test-pvc-verify -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [ "$PVC_STATUS" = "Bound" ]; then
+        break
+    fi
+    sleep 5
+done
+
 PVC_STATUS=$($KUBECTL_CMD get pvc test-pvc-verify -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 if [ "$PVC_STATUS" = "Bound" ]; then
     echo "✅ PASS: PVC 创建并绑定成功"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo "❌ FAIL: PVC 创建失败 (状态：$PVC_STATUS)"
+    $KUBECTL_CMD describe pvc test-pvc-verify 2>/dev/null || true
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
@@ -180,13 +199,23 @@ spec:
       claimName: test-pvc-verify
 EOF
 
-sleep 5
+# 等待 Pod 运行（最多 30 秒）
+echo "等待 Pod 运行..."
+for i in {1..6}; do
+    POD_STATUS=$($KUBECTL_CMD get pod test-storage-pod -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [ "$POD_STATUS" = "Running" ]; then
+        break
+    fi
+    sleep 5
+done
+
 POD_STATUS=$($KUBECTL_CMD get pod test-storage-pod -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 if [ "$POD_STATUS" = "Running" ]; then
     echo "✅ PASS: Pod 挂载 PVC 成功"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo "❌ FAIL: Pod 挂载 PVC 失败 (状态：$POD_STATUS)"
+    $KUBECTL_CMD describe pod test-storage-pod 2>/dev/null || true
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
@@ -208,7 +237,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 # 测试 12: 数据持久化测试
 echo ""
 echo "测试数据持久化（删除 Pod 后重建）..."
-$KUBECTL_CMD delete pod test-storage-pod
+$KUBECTL_CMD delete pod test-storage-pod --ignore-not-found=true
 sleep 3
 
 cat <<EOF | $KUBECTL_CMD apply -f -
@@ -230,14 +259,28 @@ spec:
       claimName: test-pvc-verify
 EOF
 
-sleep 5
-$KUBECTL_CMD wait --for=condition=ready pod test-storage-pod-2 --timeout=60s 2>/dev/null
+# 等待 Pod 完成（最多 30 秒）
+echo "等待 Pod 完成..."
+for i in {1..6}; do
+    POD_STATUS=$($KUBECTL_CMD get pod test-storage-pod-2 -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [ "$POD_STATUS" = "Succeeded" ] || [ "$POD_STATUS" = "Running" ]; then
+        break
+    fi
+    sleep 5
+done
+
+# 获取日志
 OUTPUT=$($KUBECTL_CMD logs test-storage-pod-2 2>/dev/null || echo "")
+echo "Pod 输出：$OUTPUT"
+
 if echo "$OUTPUT" | grep -q "K3S storage test successful"; then
     echo "✅ PASS: 数据持久化测试成功"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo "❌ FAIL: 数据持久化测试失败"
+    echo "   期望包含：K3S storage test successful"
+    echo "   实际输出：$OUTPUT"
+    $KUBECTL_CMD describe pod test-storage-pod-2 2>/dev/null || true
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
