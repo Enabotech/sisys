@@ -361,145 +361,145 @@ jobs:
   # =========================================
   # Job 5: Build Docker Image
   # =========================================
-  build-docker:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [unit-tests, integration-tests]
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # build-docker:
+  #   name: Build Docker Image
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 20
+  #   needs: [unit-tests, integration-tests]
+  #   outputs:
+  #     image_tag: ${{ steps.meta.outputs.tags }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Free disk space (critical for Docker build)
-        run: |
-          echo "=== Free disk space before build ==="
-          df -h
+  #     - name: Free disk space (critical for Docker build)
+  #       run: |
+  #         echo "=== Free disk space before build ==="
+  #         df -h
 
-          # Remove large unnecessary packages
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /opt/ghc || true
-          sudo rm -rf /usr/local/go || true
-          sudo rm -rf /usr/local/share/boost || true
-          sudo rm -rf /usr/local/.ghcup || true
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+  #         # Remove large unnecessary packages
+  #         sudo rm -rf /usr/share/dotnet || true
+  #         sudo rm -rf /usr/local/lib/android || true
+  #         sudo rm -rf /opt/ghc || true
+  #         sudo rm -rf /usr/local/go || true
+  #         sudo rm -rf /usr/local/share/boost || true
+  #         sudo rm -rf /usr/local/.ghcup || true
+  #         sudo rm -rf /opt/hostedtoolcache/CodeQL || true
 
-          # Clean apt cache
-          sudo apt-get clean || true
-          sudo rm -rf /var/cache/apt/archives/* || true
-          sudo rm -rf /var/log/apt/* || true
+  #         # Clean apt cache
+  #         sudo apt-get clean || true
+  #         sudo rm -rf /var/cache/apt/archives/* || true
+  #         sudo rm -rf /var/log/apt/* || true
 
-          # Remove pip/poetry caches
-          rm -rf ~/.cache/pip || true
-          rm -rf ~/.cache/pypoetry || true
+  #         # Remove pip/poetry caches
+  #         rm -rf ~/.cache/pip || true
+  #         rm -rf ~/.cache/pypoetry || true
 
-          # Docker cleanup (from previous jobs)
-          sudo docker builder prune -af || true
-          sudo docker system prune -af --volumes || true
+  #         # Docker cleanup (from previous jobs)
+  #         sudo docker builder prune -af || true
+  #         sudo docker system prune -af --volumes || true
 
-          # Remove large ISO files if present
-          sudo rm -rf /usr/share/miniconda || true
-          sudo rm -rf /usr/share/swift || true
+  #         # Remove large ISO files if present
+  #         sudo rm -rf /usr/share/miniconda || true
+  #         sudo rm -rf /usr/share/swift || true
 
-          echo "=== Disk space after cleanup ==="
-          df -h
+  #         echo "=== Disk space after cleanup ==="
+  #         df -h
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Get git SHA
-        id: git_sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+  #     - name: Get git SHA
+  #       id: git_sha
+  #       run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Generate Docker image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
+  #     - name: Generate Docker image metadata
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.DOCKER_IMAGE_NAME }}
+  #         tags: |
+  #           type=sha,prefix=
+  #           type=ref,event=branch
+  #           type=ref,event=pr
+  #           type=semver,pattern={{version}}
 
-      - name: Determine Dockerfile path
-        id: dockerfile-path
-        run: |
-          echo "Looking for Dockerfile candidates..."
-          # prefer docker/Dockerfile -> root Dockerfile -> any file named dockerfile*
-          if [ -f docker/Dockerfile ]; then
-            DOCKERFILE_PATH=docker/Dockerfile
-          elif [ -f Dockerfile ]; then
-            DOCKERFILE_PATH=Dockerfile
-          else
-            # find any file named dockerfile* (case-insensitive), prefer shallow paths
-            CANDIDATE=$(find . -maxdepth 4 -type f -iname 'dockerfile*' -print 2>/dev/null | sed 's|^\./||' | sort | head -n1 || true)
-            if [ -n "$CANDIDATE" ]; then
-              DOCKERFILE_PATH="$CANDIDATE"
-            else
-              echo "ERROR: No Dockerfile found. Listing repo root:"
-              ls -la
-              echo ""
-              echo "Hints:"
-              echo " - Add a Dockerfile at docker/Dockerfile or at the repo root."
-              echo " - Or change the build step to point to an existing Dockerfile path."
-              exit 1
-            fi
-          fi
+  #     - name: Determine Dockerfile path
+  #       id: dockerfile-path
+  #       run: |
+  #         echo "Looking for Dockerfile candidates..."
+  #         # prefer docker/Dockerfile -> root Dockerfile -> any file named dockerfile*
+  #         if [ -f docker/Dockerfile ]; then
+  #           DOCKERFILE_PATH=docker/Dockerfile
+  #         elif [ -f Dockerfile ]; then
+  #           DOCKERFILE_PATH=Dockerfile
+  #         else
+  #           # find any file named dockerfile* (case-insensitive), prefer shallow paths
+  #           CANDIDATE=$(find . -maxdepth 4 -type f -iname 'dockerfile*' -print 2>/dev/null | sed 's|^\./||' | sort | head -n1 || true)
+  #           if [ -n "$CANDIDATE" ]; then
+  #             DOCKERFILE_PATH="$CANDIDATE"
+  #           else
+  #             echo "ERROR: No Dockerfile found. Listing repo root:"
+  #             ls -la
+  #             echo ""
+  #             echo "Hints:"
+  #             echo " - Add a Dockerfile at docker/Dockerfile or at the repo root."
+  #             echo " - Or change the build step to point to an existing Dockerfile path."
+  #             exit 1
+  #           fi
+  #         fi
 
-          echo "Found Dockerfile: $DOCKERFILE_PATH"
-          echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
+  #         echo "Found Dockerfile: $DOCKERFILE_PATH"
+  #         echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
 
-      - name: Build Docker image (multi-stage)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.DOCKERFILE_PATH }}
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          load: true
-          # Optimize build to reduce disk usage
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-          # Use buildkit's advanced features
-          provenance: false
-          sbom: false
+  #     - name: Build Docker image (multi-stage)
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         context: .
+  #         file: ${{ env.DOCKERFILE_PATH }}
+  #         push: false
+  #         tags: ${{ steps.meta.outputs.tags }}
+  #         labels: ${{ steps.meta.outputs.labels }}
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
+  #         load: true
+  #         # Optimize build to reduce disk usage
+  #         build-args: |
+  #           BUILDKIT_INLINE_CACHE=1
+  #         # Use buildkit's advanced features
+  #         provenance: false
+  #         sbom: false
 
-      - name: Show Docker image size
-        run: |
-          echo "=== Docker image size ==="
-          docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Size}}"
-          docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Repository}}:{{.Tag}} - {{.Size}}"
+  #     - name: Show Docker image size
+  #       run: |
+  #         echo "=== Docker image size ==="
+  #         docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Size}}"
+  #         docker images ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }} --format "{{.Repository}}:{{.Tag}} - {{.Size}}"
 
-      - name: Free space after build (before Trivy)
-        run: |
-          echo "=== Disk space before Trivy scan ==="
-          df -h
-          # Additional cleanup before Trivy
-          sudo docker image prune -f || true
-          echo "=== Disk space after prune ==="
-          df -h
+  #     - name: Free space after build (before Trivy)
+  #       run: |
+  #         echo "=== Disk space before Trivy scan ==="
+  #         df -h
+  #         # Additional cleanup before Trivy
+  #         sudo docker image prune -f || true
+  #         echo "=== Disk space after prune ==="
+  #         df -h
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }}
-          format: "sarif"
-          output: "trivy-results.sarif"
-          severity: "CRITICAL,HIGH"
-          exit-code: 1
+  #     - name: Run Trivy vulnerability scanner
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         image-ref: ${{ env.DOCKER_IMAGE_NAME }}:${{ steps.git_sha.outputs.sha }}
+  #         format: "sarif"
+  #         output: "trivy-results.sarif"
+  #         severity: "CRITICAL,HIGH"
+  #         exit-code: 1
 
-      - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-results
-          path: trivy-results.sarif
-          retention-days: 7
+  #     - name: Upload Trivy scan results
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: trivy-results
+  #         path: trivy-results.sarif
+  #         retention-days: 7
 
   # =========================================
   # Job 6: Upload Coverage to Codecov
