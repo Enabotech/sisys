@@ -47,7 +47,7 @@ development_status:
   0-2-ci-cd-pipeline: done  # ⚠️ 已备份废弃 - 被新 Story 0.4-0.9 替代
   0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
   # Iteration 1: 开发 CI/CD 系统（面向工程师）- 📋 计划完成，待执行
-  0-4-k3s-cluster-deployment: backlog  # K3S v1.28.x, Longhorn, Traefik
+  0-4-k3s-cluster-deployment: review  # K3S v1.28.x, Longhorn, Traefik ✅ 脚本已创建，待部署验证
   0-5-gitea-code-hosting: backlog  # Gitea v1.25.4 + PostgreSQL
   0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps

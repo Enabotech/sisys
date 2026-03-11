@@ -1,0 +1,63 @@
+# K3S 配置文件 - 针对 13700K + 32G RAM 优化
+# Story 0.4: K3S 集群部署
+# 路径：/etc/rancher/k3s/config.yaml
+
+# 节点配置
+node-name: sisys-pc
+cluster-init: true
+
+# 网络配置
+flannel-backend: none  # 使用 Calico 或其他 CNI
+disable-network-policy: false
+
+# 禁用不需要的组件（节省资源）
+disable:
+  - traefik        # 使用独立的 Traefik Helm Chart
+  - servicelb      # 使用 MetalLB 或其他 LB
+  - metrics-server # 可选：独立安装
+  - local-storage  # 使用 Longhorn
+
+# API Server 配置
+kube-apiserver-arg:
+  - max-requests-inflight=1000
+  - max-mutating-requests-inflight=500
+
+# Controller Manager 配置
+kube-controller-manager-arg:
+  - node-cidr-mask-size=24
+
+# Scheduler 配置
+kube-scheduler-arg:
+  - leader-elect=true
+
+# 资源限制（针对 32G RAM 优化）
+# etcd 内存限制
+etcd-memory-limit: 2048
+
+# API Server 内存限制
+apiserver-memory-limit: 2048
+
+# Controller Manager 内存限制
+controller-manager-memory-limit: 1024
+
+# Scheduler 内存限制
+scheduler-memory-limit: 512
+
+# Kubelet 配置
+kubelet-arg:
+  - max-pods=110
+  - serialization-verbosity=0
+
+# 系统预留资源
+system-reserved:
+  - cpu=2000m
+  - memory=4Gi
+
+# Kube 预留资源
+kube-reserved:
+  - cpu=1000m
+  - memory=2Gi
+
+# 日志配置
+debug: false
+logging: 0
