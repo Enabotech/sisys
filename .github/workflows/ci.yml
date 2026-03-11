@@ -525,7 +525,7 @@ jobs:
           ls -la *.xml || echo "No XML files found"
           find . -name "*.xml" -type f
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage-unit.xml,./coverage-integration.xml
           flags: unittests,integration
