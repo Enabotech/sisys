@@ -1,4 +1,4 @@
-# generated: 2026-02-28
+# generated: 2026-03-11
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -29,135 +29,196 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-28
+generated: 2026-03-11
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
 story_location: g:\ai\sisys\_bmad-output\implementation-artifacts
 
 development_status:
-  # Epic 0: Iteration 0
+  # ===========================================================================
+  # Epic 0: Iteration 0 (开发基础设施) - ✅ 已完成
+  # ===========================================================================
+  # 状态说明：Epic 0 包含两个子迭代
+  # - Iteration 0 (Story 0.1-0.3): 原始开发环境、CI/CD、测试框架 - ✅ 已完成
+  # - Iteration 1 (Story 0.4-0.9, 0.14-0.18): 重构为双轨制（开发 CI/CD 系统 + 产品交付系统）- 📋 计划完成，待执行
   epic-0: done
-  0-1-dev-environment-setup: done
-  0-2-ci-cd-pipeline: done
-  0-3-test-framework-setup: done
+  0-1-dev-environment-setup: done  # Python 3.11+, Poetry, IDE 配置，SDD 工具链
+  0-2-ci-cd-pipeline: done  # ⚠️ 已备份废弃 - 被新 Story 0.4-0.9 替代
+  0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
+  # Iteration 1: 开发 CI/CD 系统（面向工程师）- 📋 计划完成，待执行
+  0-4-k3s-cluster-deployment: backlog  # K3S v1.28.x, Longhorn, Traefik
+  0-5-gitea-code-hosting: backlog  # Gitea v1.25.4 + PostgreSQL
+  0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
+  0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
+  0-8-gitea-runner-configuration: backlog  # Gitea Runner Docker/K8s Executor
+  0-9-ci-cd-pipeline-template: backlog  # 标准化 Pipeline 7 阶段
+  # Iteration 1: SISYS 产品交付系统（面向客户）- 📋 计划完成，待执行
+  0-14-windows-installer: backlog  # sisys-setup.exe 图形化安装
+  0-15-mac-installer: backlog  # sisys-cicd.dmg 拖拽安装
+  0-16-linux-one-click-script: backlog  # curl | bash 一键安装
+  0-17-auto-diagnose-and-fix: backlog  # 问题自动检测与修复
+  0-18-user-friendly-config-wizard: backlog  # 图形化配置向导
   epic-0-retrospective: done  # Completed: 2026-03-05, Retro doc: epic-0-retro-2026-03-05.md
 
-  # Epic 1: 企业级架构基础与合规
+  # ===========================================================================
+  # Epic 1: 企业级架构基础与合规 - 🔄 准备中 (等待 Epic 0 Iteration 1 执行)
+  # ===========================================================================
   epic-1: backlog
-  1-1-hexagonal-architecture-scaffold: backlog
-  1-2-domain-events-definition: backlog
-  1-3-event-bus-implementation: backlog
-  1-4-redis-cache-layer: backlog
-  1-5-postgresql-relational-layer: backlog
-  1-6-qdrant-vector-layer: backlog
-  1-7-minio-object-layer: backlog
-  1-8-neo4j-graph-layer: backlog
-  1-9-rbac-permission-management: backlog
-  1-10-unified-audit-logging: backlog
-  1-11-data-sovereignty-isolation: backlog
-  1-12-eq20-level3-compliance: backlog
-  1-13-k8s-auto-scaling: backlog
-  1-14a-autonomous-invocation-trigger: backlog
-  1-14b-autonomous-invocation-route: backlog
-  1-14c-autonomous-invocation-execute: backlog
-  1-15a-externalized-memory-context-compression: backlog
-  1-15b-externalized-memory-five-layer-storage: backlog
-  1-16-integration-test-framework: backlog
-  1-17-udmr-basic-routing: backlog
-  1-18a-prefect-workflow-engine: backlog
-  1-18b-langgraph-agent-orchestration: backlog
-  1-19-cost-metrics-basic: backlog
+  # 价值组 2: 架构基础与事件驱动
+  1-1-hexagonal-architecture-scaffold: backlog  # 领域层零依赖，六边形架构
+  1-2-domain-events-definition: backlog  # DomainEvent 基类，Pydantic Schema
+  1-3-event-bus-implementation: backlog  # Redis 发布/订阅 + RabbitMQ + 事务发件箱
+  1-16-integration-test-framework: backlog  # 集成测试、E2E 测试、测试数据管理
+  # 价值组 3: 五层存储架构
+  1-4-redis-cache-layer: backlog  # Redis 7.0+ 会话状态、语义缓存
+  1-5-postgresql-relational-layer: backlog  # PostgreSQL 15+ ACID 事务
+  1-6-qdrant-vector-layer: backlog  # Qdrant 1.7+ 混合检索
+  1-7-minio-object-layer: backlog  # MinIO WORM 版本控制
+  1-8-neo4j-graph-layer: backlog  # Neo4j 5.x GraphRAG
+  1-13-k8s-auto-scaling: backlog  # K8s 动态扩缩容 NFR-SCALE-03
+  # 价值组 4: 安全与合规基础
+  1-9-rbac-permission-management: backlog  # RBAC 细粒度访问控制
+  1-10-unified-audit-logging: backlog  # 统一审计日志等保 2.0
+  1-11-data-sovereignty-isolation: backlog  # 数据主权 PIPL 合规
+  1-12-eq20-level3-compliance: backlog  # 等保 2.0 三级基础
+  # 价值组 5: or.md 系统公理实现
+  1-14a-autonomous-invocation-trigger: backlog  # 自主调用循环 trigger
+  1-14b-autonomous-invocation-route: backlog  # 自主调用循环 route
+  1-14c-autonomous-invocation-execute: backlog  # 自主调用循环 execute
+  1-15a-externalized-memory-context-compression: backlog  # 外部化记忆上下文压缩
+  1-15b-externalized-memory-five-layer-storage: backlog  # 外部化记忆五层存储协同
+  # 价值组 6: MVP 关键机制增强
+  1-17-udmr-basic-routing: backlog  # UDMR 基础路由本地优先
+  1-18a-prefect-workflow-engine: backlog  # Prefect 3.6+ 数据管道
+  1-18b-langgraph-agent-orchestration: backlog  # LangGraph 1.0+ Agent 编排
+  1-19-cost-metrics-basic: backlog  # 成本度量 Token 消耗追踪
   epic-1-retrospective: optional
 
-  # Epic 2: 文档与数据管理
+  # ===========================================================================
+  # Epic 2: 文档与数据管理 - 📋 待开始
+  # ===========================================================================
   epic-2: backlog
-  2-1-document-upload-17-formats: backlog
-  2-2a-document-parsing-basic-formats: backlog
-  2-2b-document-parsing-extended-formats: backlog
-  2-3-layout-information-preservation: backlog
-  2-4-table-semantic-extraction: backlog
-  2-5-ocr-parsing: backlog
-  2-6-document-version-snapshot: backlog
-  2-7-metadata-validation: backlog
-  2-8-semantic-chunking: backlog
+  2-1-document-upload-17-formats: backlog  # 17 种格式文档上传
+  2-2a-document-parsing-basic-formats: backlog  # 基础格式解析
+  2-2b-document-parsing-extended-formats: backlog  # 扩展格式解析
+  2-3-layout-information-preservation: backlog  # 版面信息保留 DocLayNet
+  2-4-table-semantic-extraction: backlog  # 表格语义提取 JSON
+  2-5-ocr-parsing: backlog  # OCR 解析中英置信度
+  2-6-document-version-snapshot: backlog  # 版本快照操作者时间戳
+  2-7-metadata-validation: backlog  # 元数据校验最小集
+  2-8-semantic-chunking: backlog  # 语义分块文档边界
   epic-2-retrospective: optional
 
-  # Epic 3: 智能检索与知识发现
+  # ===========================================================================
+  # Epic 3: 智能检索与知识发现 - 📋 待开始
+  # ===========================================================================
   epic-3: backlog
-  3-1a-dense-semantic-search: backlog
-  3-1b-bm25-sparse-search-rrf: backlog
-  3-2-entity-extraction: backlog
-  3-3-domain-dictionary-management: backlog
-  3-4-rrf-fusion-ranking: backlog
-  3-5-layered-search: backlog
-  3-6-contract-structured-summary: backlog
-  3-7-relevance-evaluation: backlog
-  3-8-high-fidelity-traceability: backlog
-  3-9-semantic-caching: backlog
-  3-10-strategic-archive-storage: backlog
-  3-11-fact-validity-labels: backlog
-  3-12-data-staleness-marking: backlog
+  3-1a-dense-semantic-search: backlog  # Dense bge-m3 检索
+  3-1b-bm25-sparse-search-rrf: backlog  # BM25 稀疏检索 RRF
+  3-2-entity-extraction: backlog  # LLM+ 规则实体抽取
+  3-3-domain-dictionary-management: backlog  # 领域词典管理热更新
+  3-4-rrf-fusion-ranking: backlog  # RRF 融合排序三路
+  3-5-layered-search: backlog  # 分层检索 L1-L4
+  3-6-contract-structured-summary: backlog  # 契约化结构化摘要
+  3-7-relevance-evaluation: backlog  # LLM-as-a-Judge 相关性评估
+  3-8-high-fidelity-traceability: backlog  # Bounding Box 级溯源
+  3-9-semantic-caching: backlog  # 语义缓存相似度>0.9
+  3-10-strategic-archive-storage: backlog  # 战略档案库永久存储
+  3-11-fact-validity-labels: backlog  # 事实有效期标签
+  3-12-data-staleness-marking: backlog  # 数据陈旧标记降权
   epic-3-retrospective: optional
 
-  # Epic 4: 战略工具箱
+  # ===========================================================================
+  # Epic 4: 战略工具箱 - 📋 待开始
+  # ===========================================================================
   epic-4: backlog
-  4-1-strategic-tool-registration: backlog
-  4-2-tool-chain-orchestration: backlog
-  4-3-schema-validation: backlog
-  4-4-docker-sandbox-execution: backlog
-  4-5-red-blue-debate-basic: backlog
+  4-1-strategic-tool-registration: backlog  # 23 种工具注册
+  4-2-tool-chain-orchestration: backlog  # DAG 工具链编排
+  4-3-schema-validation: backlog  # Pydantic V2 Schema 验证
+  4-4-docker-sandbox-execution: backlog  # Docker 沙箱网络隔离
+  4-5-red-blue-debate-basic: backlog  # 红蓝辩论基础单 Agent
   epic-4-retrospective: optional
 
-  # Epic 5: Agent 协作系统
+  # ===========================================================================
+  # Epic 5: Agent 协作系统 - 📋 待开始
+  # ===========================================================================
   epic-5: backlog
-  5-1-ceo-agent-instantiation: backlog
-  5-2-agent-identity-loading: backlog
-  5-3-single-agent-workflow: backlog
-  5-4-eip-basic-isolation: backlog
-  5-5-triple-hard-isolation: backlog
-  5-6-isolation-switch-logging: backlog
+  5-1-ceo-agent-instantiation: backlog  # CEO Agent 实例化
+  5-2-agent-identity-loading: backlog  # IDENTITY.md 身份档案
+  5-3-single-agent-workflow: backlog  # 单 Agent 工作流
+  5-4-eip-basic-isolation: backlog  # EIP 基础隔离 L4
+  5-5-triple-hard-isolation: backlog  # 三重硬隔离 Prompt/工具/数据
+  5-6-isolation-switch-logging: backlog  # 隔离切换日志
   epic-5-retrospective: optional
 
-  # Epic 6: 战略规划流程 (BLM 前两阶段)
+  # ===========================================================================
+  # Epic 6: 战略规划流程 (BLM 前两阶段) - 📋 待开始
+  # ===========================================================================
   epic-6: backlog
-  6-1-blm-first-two-phases: backlog
-  6-2-market-insight-six-steps: backlog
-  6-3-checkpoint-snapshot-creation: backlog
-  6-4-json-thought-chain-output: backlog
-  6-5a-markdown-report-generation: backlog
-  6-5b-pdf-report-citation-index: backlog
-  6-6-checkpoint-review-recovery: backlog
-  6-7-traceability-tree-display: backlog
-  6-8-executive-dashboard: backlog
-  6-9-analyst-view: backlog
-  6-10-consultant-view: backlog
-  6-11-white-label-report-basic: backlog
+  6-1-blm-first-two-phases: backlog  # BLM 业绩差距分析 + 市场洞察
+  6-2-market-insight-six-steps: backlog  # 市场洞察六子步骤
+  6-3-checkpoint-snapshot-creation: backlog  # Checkpoint 快照
+  6-4-json-thought-chain-output: backlog  # JSON 思维链输出
+  6-5a-markdown-report-generation: backlog  # Markdown 报告生成
+  6-5b-pdf-report-citation-index: backlog  # PDF 报告可点击索引
+  6-6-checkpoint-review-recovery: backlog  # Checkpoint 审查恢复
+  6-7-traceability-tree-display: backlog  # 溯源树展示
+  6-8-executive-dashboard: backlog  # 高管简化视图 30 秒决策
+  6-9-analyst-view: backlog  # 分析师视图专业工具
+  6-10-consultant-view: backlog  # 顾问视图白标输出
+  6-11-white-label-report-basic: backlog  # 白标报告基础
   epic-6-retrospective: optional
 
-  # Epic 7: 多触点用户界面与 API 集成
+  # ===========================================================================
+  # Epic 7: 多触点用户界面与 API 集成 - 📋 待开始
+  # ===========================================================================
   epic-7: backlog
-  7-1-cli-command-interface: backlog
-  7-2-rest-api-interface: backlog
-  7-3-api-gateway: backlog
-  7-4-health-dashboard: backlog
-  7-5-accessibility-design: backlog
-  7-6-api-contract-testing: backlog
-  7-7-api-e2e-testing: backlog
-  7-8-skeleton-loading: backlog
+  7-1-cli-command-interface: backlog  # CLI 命令接口
+  7-2-rest-api-interface: backlog  # REST API 接口
+  7-3-api-gateway: backlog  # API Gateway 统一认证限流
+  7-4-health-dashboard: backlog  # 健康度仪表盘
+  7-5-accessibility-design: backlog  # WCAG 2.1 AA 无障碍
+  7-6-api-contract-testing: backlog  # API 契约测试 Schemathesis
+  7-7-api-e2e-testing: backlog  # API E2E 测试
+  7-8-skeleton-loading: backlog  # 骨架屏加载
   epic-7-retrospective: optional
 
-  # Epic 8: 用户权限管理与审计合规
+  # ===========================================================================
+  # Epic 8: 用户权限管理与审计合规 - 📋 待开始
+  # ===========================================================================
   epic-8: backlog
-  8-1-audit-log-multi-search: backlog
-  8-2-correction-classification-basic: backlog
-  8-3-l0-l1-auto-solidification: backlog
-  8-4-data-sovereignty-enforcement: backlog
-  8-5-shieldcortex-prompt-injection: backlog
-  8-6-penetration-testing: backlog
+  8-1-audit-log-multi-search: backlog  # 审计日志多维检索
+  8-2-correction-classification-basic: backlog  # 修正分级判定基础
+  8-3-l0-l1-auto-solidification: backlog  # L0/L1 自动固化
+  8-4-data-sovereignty-enforcement: backlog  # 数据主权强制隔离
+  8-5-shieldcortex-prompt-injection: backlog  # ShieldCortex 提示注入检测
+  8-6-penetration-testing: backlog  # 渗透测试 OWASP Top 10
   epic-8-retrospective: optional
 
+# =============================================================================
 # Summary:
-# Total Epics: 9 (Epic 0-8, MVP phase)
-# Total Stories: 85
-# All stories currently in 'backlog' status (ready for development)
+# =============================================================================
+# Total Epics: 10 (Epic 0-8 + Epic 0 Iteration 1 独立 Stories)
+# Total Stories: 96
+#   - Epic 0 Iteration 0: 3 stories (✅ done)
+#   - Epic 0 Iteration 1: 11 stories (📋 planned, backlog)
+#   - Epic 1-8: 82 stories (📋 backlog)
+#
+# Status Summary:
+#   - Done: 4 (Epic 0 Iteration 0: 3 stories + Epic 0 Retrospective)
+#   - Ready for Dev: 0
+#   - Backlog: 92
+#
+# Next Steps:
+#   1. Execute Epic 0 Iteration 1 (开发 CI/CD 系统 + 产品交付系统)
+#   2. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   3. Follow SDD+TDD 融合模式 for all stories
+#
+# Key Changes from Previous Version:
+#   - Updated Epic 0 structure to reflect refactoring (Iteration 0 + Iteration 1)
+#   - Added Iteration 1 stories (0.4-0.9, 0.14-0.18) for dual-track system
+#   - Marked Story 0.2 as done but deprecated (replaced by 0.4-0.9)
+#   - Updated Epic 1 stories to match refactored epic structure
+#   - Updated generation date to 2026-03-11
+# =============================================================================
