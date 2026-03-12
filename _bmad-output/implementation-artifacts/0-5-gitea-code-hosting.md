@@ -1,8 +1,53 @@
 # Story 0.5: Gitea 代码托管
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+
+## Dev Agent Record
+
+### Implementation Plan
+
+**Session Start:** 2026-03-12
+**Story Status:** ready-for-dev → in-progress
+
+**实施策略:**
+1. 遵循 Red-Green-Refactor 循环
+2. 按照 Tasks/Subtasks 顺序执行
+3. 每个任务完成后更新检查框
+4. 记录所有技术决策和实现细节
+
+### Task 1 Completion Notes
+
+**Completed:** 2026-03-12
+**Task:** Gitea Helm Chart 配置
+
+**实施内容:**
+1. ✅ 创建测试文件 `tests/deployment/test_gitea.py` - 包含 15+ 个测试用例
+2. ✅ 创建 Helm Chart 配置 `deployments/gitea/values.yaml` - Gitea v1.25.4 完整配置
+3. ✅ 创建 Ingress 配置 `deployments/gitea/ingress.yaml` - TLS 1.3 + Let's Encrypt
+4. ✅ 创建 Kustomize 配置 `deployments/gitea/kustomization.yaml` - 环境定制支持
+5. ✅ 创建命名空间配置 `deployments/gitea/namespace.yaml`
+6. ✅ 创建 Gitea 应用配置 `deployments/gitea/config/app.ini` - 安全加固配置
+7. ✅ 创建部署指南 `docs/deployment/GITEA_INSTALLATION.md` - 完整部署文档
+
+**技术决策:**
+- 使用 Helm Chart 而非原生 K8s 资源（简化部署和维护）
+- 使用 local-path-provisioner 存储（利用 NVMe SSD 性能）
+- 启用 Gitea Actions（为 Story 0.9 准备）
+- 禁用普通用户注册（安全加固）
+- 强制 TLS 1.3（安全验收标准）
+
+**测试覆盖:**
+- 部署测试：6 个测试用例
+- 数据库连接测试：2 个测试用例
+- HTTPS 配置测试：2 个测试用例
+- 安全配置测试：3 个测试用例
+- 集成准备测试：2 个测试用例
+
+**文件统计:**
+- 新增文件：7 个
+- 代码行数：约 2000+ 行（配置 + 测试 + 文档）
 
 ## Story
 
@@ -34,11 +79,11 @@ so that **团队可以进行代码版本管理和协作**。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Gitea Helm Chart 配置 (AC: 1, 2)
-  - [ ] 添加 Gitea Helm 仓库
-  - [ ] 配置 values.yaml (副本数、资源限制、存储)
-  - [ ] 配置 PostgreSQL 数据库连接
-  - [ ] 配置 Kubernetes Secret (密钥、密码)
+- [x] Task 1: Gitea Helm Chart 配置 (AC: 1, 2)
+  - [x] 添加 Gitea Helm 仓库
+  - [x] 配置 values.yaml (副本数、资源限制、存储)
+  - [x] 配置 PostgreSQL 数据库连接
+  - [x] 配置 Kubernetes Secret (密钥、密码)
 
 - [ ] Task 2: Gitea 部署与验证 (AC: 1, 2, 3, 4)
   - [ ] 执行 helm install 部署 Gitea
@@ -574,22 +619,50 @@ sisys/
 
 ### File List
 
-**创建/修改文件**:
+**创建/修改文件 (Task 1):**
 
-| 文件路径 | 操作类型 | 说明 |
-|---------|---------|------|
-| `docs/deployment/GITEA_INSTALLATION.md` | 创建 | Gitea 部署指南 |
-| `deployments/gitea/values.yaml` | 创建 | Helm Chart 配置 |
-| `deployments/gitea/ingress.yaml` | 创建 | Ingress 配置 |
-| `deployments/gitea/kustomization.yaml` | 创建 | Kustomize 配置 |
-| `tests/deployment/test_gitea.py` | 创建 | Gitea 部署测试 |
+| 文件路径 | 操作类型 | 说明 | 行数 |
+|---------|---------|------|------|
+| `tests/deployment/test_gitea.py` | 创建 + 修复 | Gitea 部署测试套件 (修复 H3: pytest.skip → pytest.fail) | ~380 |
+| `deployments/gitea/values.yaml` | 创建 | Helm Chart 配置 | ~200 |
+| `deployments/gitea/ingress.yaml` | 创建 + 修复 | Ingress + Certificate + Middleware (修复 H1: Traefik Middleware) | ~100 |
+| `deployments/gitea/kustomization.yaml` | 创建 + 修复 | Kustomize 配置 (修复 H4: 移除无效引用) | ~58 |
+| `deployments/gitea/namespace.yaml` | 创建 | 命名空间配置 | ~10 |
+| `deployments/gitea/config/app.ini` | 创建 + 修复 | Gitea 应用配置 (修复 H2: 删除 260+ 行无效配置) | ~590 |
+| `deployments/gitea/networkpolicy.yaml` | 创建 | NetworkPolicy 安全配置 (修复 L1) | ~120 |
+| `docs/deployment/GITEA_INSTALLATION.md` | 创建 + 修复 | Gitea 部署指南 (修复 M4: 添加期望输出示例) | ~460 |
+
+**审查修复摘要:**
+- 🔴 **HIGH 修复 (5 个)**: Ingress 配置、app.ini 无效配置、测试跳过、kustomization 引用、File List 对齐
+- 🟡 **MEDIUM 修复 (4 个)**: 日志配置、文档示例、测试 fixtures、PostgreSQL 注释
+- 🟢 **LOW 修复 (3 个)**: NetworkPolicy 创建、版本注释、测试 docstring 统一
 
 **依赖文件**:
 
 | 文件路径 | 说明 |
 |---------|------|
-| `docs/deployment/K3S_CLUSTER_SETUP.md` | Story 0.4 部署指南 (已存在) |
+| `docs/deployment/K3S_CLUSTER_SETUP.md` | Story 0.4 部署指南 (已存在，实际文件名为 K3S_DEPLOYMENT_GUIDE.md) |
 | `deployments/k3s/traefik-values.yaml` | Traefik 配置 (Story 0.4 已创建) |
+
+**文件结构:**
+
+```
+sisys/
+├── deployments/
+│   └── gitea/
+│       ├── values.yaml              # ✅ 已创建
+│       ├── ingress.yaml             # ✅ 已创建
+│       ├── kustomization.yaml       # ✅ 已创建
+│       ├── namespace.yaml           # ✅ 已创建
+│       └── config/
+│           └── app.ini              # ✅ 已创建
+├── docs/
+│   └── deployment/
+│       └── GITEA_INSTALLATION.md    # ✅ 已创建
+└── tests/
+    └── deployment/
+        └── test_gitea.py            # ✅ 已创建
+```
 
 ## References
 
@@ -607,3 +680,71 @@ sisys/
 - [Traefik Kubernetes Ingress Provider](https://doc.traefik.io/traefik/providers/kubernetes-ingress/)
 - [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
 - [Gitea Security Configuration](https://docs.gitea.com/administration/config-cheat-sheet#security)
+
+---
+
+## Change Log
+
+### 2026-03-12 - Task 1: Gitea Helm Chart 配置完成
+
+**实施内容:**
+- ✅ 创建完整的 Helm Chart 配置
+- ✅ 创建 Ingress 和 TLS 配置
+- ✅ 创建 Kustomize  overlays 配置
+- ✅ 创建 Gitea 应用配置 (app.ini)
+- ✅ 创建部署指南文档
+- ✅ 创建完整的测试套件
+- ✅ 创建 NetworkPolicy 安全配置
+
+**新增文件:** 8 个
+- `tests/deployment/test_gitea.py` (~380 行) - 修复 H3: pytest.skip → pytest.fail
+- `deployments/gitea/values.yaml` (~200 行)
+- `deployments/gitea/ingress.yaml` (~100 行) - 修复 H1: Traefik Middleware
+- `deployments/gitea/kustomization.yaml` (~58 行) - 修复 H4: 移除无效引用
+- `deployments/gitea/namespace.yaml` (~10 行)
+- `deployments/gitea/config/app.ini` (~590 行) - 修复 H2: 删除 260+ 行无效配置
+- `deployments/gitea/networkpolicy.yaml` (~120 行) - 修复 L1: 新增 NetworkPolicy
+- `docs/deployment/GITEA_INSTALLATION.md` (~460 行) - 修复 M4: 添加期望输出示例
+
+**技术亮点:**
+- TLS 1.3 强制启用
+- 容器安全加固（非 root、只读文件系统、禁用特权）
+- 密码复杂度要求（12 位 + 大小写 + 数字 + 符号）
+- 禁用普通用户注册
+- 启用 Gitea Actions（为 Story 0.9 准备）
+- 完整的测试覆盖（15+ 测试用例）
+- NetworkPolicy 默认拒绝安全策略
+- 日志持久化配置（30 天保留）
+
+### 2026-03-12 - 代码审查修复 (AI 高级开发者审查)
+
+**审查问题发现:** 12 个 (5 HIGH + 4 MEDIUM + 3 LOW)
+**审查问题修复:** 12 个 (100% 修复)
+
+**HIGH 问题修复 (5 个):**
+1. ✅ **H1**: Ingress nginx 注解改为 Traefik Middleware - 添加 `gitea-secure-headers` Middleware
+2. ✅ **H2**: 删除 app.ini 中 260+ 行无效 `HELM_CHARTS_*` 配置
+3. ✅ **H3**: 测试用例 `pytest.skip` 改为 `pytest.fail` (安全验收必须验证)
+4. ✅ **H4**: kustomization.yaml 移除不存在的 `values.yaml` 和 `secrets.yaml` 引用
+5. ✅ **H5**: 故事文件 File List 更新，包含所有新增文件和修复记录
+
+**MEDIUM 问题修复 (4 个):**
+1. ✅ **M1**: values.yaml PostgreSQL 配置添加注释说明
+2. ✅ **M2**: 测试文件添加 AC 关联到所有测试用例
+3. ✅ **M3**: app.ini 日志配置改进 (console + file 双模式，30 天保留)
+4. ✅ **M4**: 文档添加 kubectl 期望输出示例
+
+**LOW 问题修复 (3 个):**
+1. ✅ **L1**: 创建 NetworkPolicy 配置 (默认拒绝，仅允许必要流量)
+2. ✅ **L2**: app.ini 添加版本注释
+3. ✅ **L3**: 测试 docstring 统一格式，关联验收标准
+
+**修复后改进:**
+- 配置有效性：Traefik Middleware 正确替代 nginx 注解
+- 配置文件精简：app.ini 从 894 行减少到 592 行 (34% 减少)
+- 测试严格性：安全验收测试不再允许跳过
+- 部署可靠性：Kustomize 配置可正确执行
+- 安全加固：NetworkPolicy 默认拒绝策略
+- 文档质量：添加期望输出示例，便于验证
+
+**下一步:** Task 2 - Gitea 部署与验证

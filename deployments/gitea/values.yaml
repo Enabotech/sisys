@@ -1,0 +1,244 @@
+# Gitea Helm Chart 配置 - Story 0.5
+# 版本：1.0.0
+# 描述：Gitea v1.25.4 在 K3S 集群上的部署配置
+
+# 基础配置
+replicaCount: 1
+
+# 镜像配置
+image:
+  repository: gitea/gitea
+  tag: "1.25.4"  # ✅ 已由 Agimtech 测试验证
+  pullPolicy: IfNotPresent
+
+# 资源限制 (MVP 临时配置)
+# 架构规划：2 核 + 2GB，MVP 阶段节省资源
+resources:
+  limits:
+    cpu: "1000m"  # 1 Core
+    memory: "2Gi"
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+
+# 自动扩缩容 (MVP 阶段禁用)
+autoscaling:
+  enabled: false
+
+# 节点选择器
+nodeSelector: {}
+
+# 容忍度
+tolerations: []
+
+# 亲和性
+affinity: {}
+
+# Pod 安全上下文 (安全加固)
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+
+# 容器安全上下文 (安全加固)
+securityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Gitea 应用配置
+gitea:
+  admin:
+    existingSecret: gitea-admin-secret
+    secretKeys:
+      usernameKey: username
+      passwordKey: password
+      emailKey: email
+  
+  config:
+    APP_NAME: "SISYS Code Hosting"
+    RUN_MODE: prod
+    
+    repository:
+      ROOT: /data/git/repositories
+      DEFAULT_BRANCH: main
+    
+    server:
+      DOMAIN: gitea.sisys.local
+      HTTP_PORT: 3000
+      ROOT_URL: https://gitea.sisys.local/
+      START_SSH_SERVER: true
+      SSH_PORT: 2222
+      SSH_DOMAIN: gitea.sisys.local
+      SSH_ROOT_URL: ssh://gitea.sisys.local:2222
+    
+    database:
+      DB_TYPE: postgres
+      HOST: gitea-postgresql:5432
+      NAME: gitea
+      USER: gitea
+      PASSWD: ""  # 从 Secret 加载
+      SSL_MODE: disable
+    
+    session:
+      PROVIDER: memory
+      GC_INTERVAL_TIME: 3600
+    
+    cache:
+      ADAPTER: memory
+      INTERVAL: 60
+    
+    queue:
+      TYPE: level
+      DATADIR: /data/gitea/queues
+    
+    log:
+      MODE: console
+      LEVEL: info
+    
+    security:
+      INSTALL_LOCK: true
+      SECRET_KEY: ""  # 从 Secret 加载
+      INTERNAL_TOKEN: ""  # 从 Secret 加载
+      PASSWORD_COMPLEXITY: "upper,lower,digit,special"  # 密码复杂度要求
+      MIN_PASSWORD_LENGTH: 12  # 最小密码长度
+      DISABLE_REGISTRATION: true  # 禁用普通用户注册
+      REQUIRE_SIGNIN_VIEW: true  # 需要登录才能查看
+      ENABLE_BASIC_AUTHENTICATION: true
+      ENABLE_REVERSE_PROXY_AUTHENTICATION: false
+      ENABLE_REVERSE_PROXY_AUTO_REGISTRATION: false
+    
+    service:
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: true
+      DEFAULT_KEEP_EMAIL_PRIVATE: true
+      DEFAULT_ALLOW_CREATE_ORGANIZATION: true
+      ENABLE_NOTIFY_MAIL: false
+    
+    mailer:
+      ENABLED: false  # MVP 阶段不配置邮件
+    
+    openid:
+      ENABLE_OPENID_SIGNIN: false
+      ENABLE_OPENID_SIGNUP: false
+    
+    oauth2:
+      ENABLE: true
+      JWT_SECRET: ""  # 从 Secret 加载
+    
+    webhook:
+      ALLOWED_HOST_LIST: external,loopback
+      SKIP_TLS_VERIFY: false
+    
+    actions:
+      ENABLED: true  # 启用 Gitea Actions (Story 0.9 准备)
+      DEFAULT_ACTIONS_URL: github
+
+# PostgreSQL 子 Chart 配置
+postgresql:
+  enabled: true
+  auth:
+    existingSecret: gitea-postgresql-secret
+    secretKeys:
+      userPasswordKey: password
+      adminPasswordKey: admin-password
+  primary:
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 10Gi  # MVP 阶段 10Gi，V1 扩容至 50-100Gi
+    resources:
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+
+# 持久化存储配置
+persistence:
+  enabled: true
+  storageClass: local-path  # 使用 NVMe SSD
+  accessMode: ReadWriteOnce
+  size: 10Gi  # MVP 阶段 10Gi
+
+# Ingress 配置 (Traefik v3.x)
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: default-headers@kubernetescrd
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: gitea.sisys.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: gitea-tls-secret
+      hosts:
+        - gitea.sisys.local
+
+# Service 配置
+service:
+  http:
+    port: 3000
+    type: ClusterIP
+  ssh:
+    port: 2222
+    type: ClusterIP
+
+# 健康检查
+startupProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  failureThreshold: 30
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# 额外配置
+extraEnv:
+  - name: USER_UID
+    value: "1000"
+  - name: USER_GID
+    value: "1000"
+
+# 额外卷
+extraVolumes:
+  - name: gitea-config
+    configMap:
+      name: gitea-config
+      items:
+        - key: app.ini
+          path: app.ini
+
+extraVolumeMounts:
+  - name: gitea-config
+    mountPath: /etc/gitea/app.ini
+    subPath: app.ini
+    readOnly: true

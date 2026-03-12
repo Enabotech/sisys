@@ -1,0 +1,57 @@
+# Gitea Kustomize 配置 - Story 0.5
+# 描述：Kustomize  overlays 配置，用于环境定制
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 命名空间
+namespace: gitea
+
+# 资源列表
+resources:
+  - namespace.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+# 公共标签
+commonLabels:
+  app: gitea
+  app.kubernetes.io/name: gitea
+  app.kubernetes.io/component: code-hosting
+  version: "1.25.4"
+
+# ConfigMap 生成器
+configMapGenerator:
+  - name: gitea-config
+    files:
+      - app.ini=config/app.ini
+
+# Secret 生成器 (实际部署时使用外部 Secret)
+# 注意：生产环境应使用加密的 Secret 管理工具 (如 SealedSecrets 或 External Secrets)
+secretGenerator:
+  - name: gitea-admin-secret
+    type: Opaque
+    literals:
+      - username=gitea_admin
+      - password=CHANGE_ME_IN_PRODUCTION
+      - email=admin@sisys.local
+  - name: gitea-postgresql-secret
+    type: Opaque
+    literals:
+      - password=CHANGE_ME_IN_PRODUCTION
+      - admin-password=CHANGE_ME_IN_PRODUCTION
+
+# 变量替换 (Kustomize 变量)
+# vars:
+#   - name: GITEA_ADMIN_PASSWORD
+#     objref:
+#       kind: Secret
+#       name: gitea-admin-secret
+#       apiVersion: v1
+#     fieldref:
+#       fieldpath: data.password
+
+# patches:
+#   - path: patches/resource-limits.yaml
+#     target:
+#       kind: Deployment
+#       name: gitea

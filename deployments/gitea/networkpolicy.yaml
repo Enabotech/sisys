@@ -1,0 +1,128 @@
+# Gitea NetworkPolicy 配置 - Story 0.5
+# 描述：网络安全策略，默认拒绝所有流量，仅允许必要的访问
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-default-deny
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# 允许 Traefik Ingress 访问 Gitea HTTP 端口
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-allow-traefik
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+      app.kubernetes.io/component: http
+  policyTypes:
+    - Ingress
+  ingress:
+    # 允许来自 Traefik 的流量
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: traefik
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# 允许 Gitea 访问 PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-allow-postgres
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  policyTypes:
+    - Ingress
+  ingress:
+    # 仅允许 Gitea 访问 PostgreSQL
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# 允许 DNS 解析 (所有 Pod 需要)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-allow-dns
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+  policyTypes:
+    - Egress
+  egress:
+    # 允许 DNS 查询
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# 允许 Gitea Pod 访问外部网络 (用于 Git 操作、Webhook 等)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-allow-external
+  namespace: gitea
+  labels:
+    app: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+  policyTypes:
+    - Egress
+  egress:
+    # 允许访问 PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # 允许访问外部网络 (Webhook、Git 远程仓库等)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
