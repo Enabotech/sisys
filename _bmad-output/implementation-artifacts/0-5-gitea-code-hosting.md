@@ -30,6 +30,12 @@ Status: in-progress
 5. ✅ 创建命名空间配置 `deployments/gitea/namespace.yaml`
 6. ✅ 创建 Gitea 应用配置 `deployments/gitea/config/app.ini` - 安全加固配置
 7. ✅ 创建部署指南 `docs/deployment/GITEA_INSTALLATION.md` - 完整部署文档
+8. ✅ 创建 NetworkPolicy 配置 `deployments/gitea/networkpolicy.yaml` - 网络安全策略
+
+**代码审查修复 (2026-03-12):**
+- 审查问题：12 个 (5 HIGH + 4 MEDIUM + 3 LOW)
+- 修复完成：12 个 (100%)
+- Git 提交：`25d1f9b Story 0.5 Task 1: 代码审查修复 (12 个问题)`
 
 **技术决策:**
 - 使用 Helm Chart 而非原生 K8s 资源（简化部署和维护）
@@ -37,6 +43,8 @@ Status: in-progress
 - 启用 Gitea Actions（为 Story 0.9 准备）
 - 禁用普通用户注册（安全加固）
 - 强制 TLS 1.3（安全验收标准）
+- NetworkPolicy 默认拒绝策略（安全加固）
+- 日志持久化配置（30 天保留）
 
 **测试覆盖:**
 - 部署测试：6 个测试用例
@@ -46,8 +54,8 @@ Status: in-progress
 - 集成准备测试：2 个测试用例
 
 **文件统计:**
-- 新增文件：7 个
-- 代码行数：约 2000+ 行（配置 + 测试 + 文档）
+- 新增文件：8 个
+- 代码行数：约 2200+ 行（配置 + 测试 + 文档）
 
 ## Story
 
@@ -84,6 +92,7 @@ so that **团队可以进行代码版本管理和协作**。
   - [x] 配置 values.yaml (副本数、资源限制、存储)
   - [x] 配置 PostgreSQL 数据库连接
   - [x] 配置 Kubernetes Secret (密钥、密码)
+  - [x] **代码审查修复**: 12 个问题 100% 修复 (Git: 25d1f9b)
 
 - [ ] Task 2: Gitea 部署与验证 (AC: 1, 2, 3, 4)
   - [ ] 执行 helm install 部署 Gitea
@@ -105,11 +114,11 @@ so that **团队可以进行代码版本管理和协作**。
   - [ ] 配置 2FA (推荐管理员强制启用)
 
 - [ ] Task 5: 安全加固 (安全验收标准)
-  - [ ] 配置容器以非 root 用户运行
-  - [ ] 配置 NetworkPolicy (DefaultDeny)
-  - [ ] 配置只读根文件系统
-  - [ ] 禁用特权模式
-  - [ ] 镜像漏洞扫描 (Trivy)
+  - [x] 配置容器以非 root 用户运行 (values.yaml securityContext)
+  - [x] 配置 NetworkPolicy (DefaultDeny) - ✅ 已创建 networkpolicy.yaml
+  - [x] 配置只读根文件系统 (values.yaml securityContext)
+  - [x] 禁用特权模式 (values.yaml securityContext)
+  - [ ] 镜像漏洞扫描 (Trivy) - Story 0.6/0.9 Pipeline 实现
 
 - [ ] Task 6: 架构合规验证
   - [ ] 验证 TLS 1.3 强制启用
