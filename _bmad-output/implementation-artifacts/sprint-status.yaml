@@ -48,7 +48,7 @@ development_status:
   0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
   # Iteration 1: 开发 CI/CD 系统（面向工程师）- ✅ 已完成
   0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.x + local-path-provisioner ✅ 部署成功，测试 15/15 通过，代码审查问题全部修复
-  0-5-gitea-code-hosting: backlog  # Gitea v1.25.4 + PostgreSQL
+  0-5-gitea-code-hosting: ready-for-dev  # Gitea v1.25.4 + PostgreSQL ✅ 故事文件已创建
   0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
   0-8-gitea-runner-configuration: backlog  # Gitea Runner Docker/K8s Executor
@@ -200,22 +200,23 @@ development_status:
 # Summary:
 # =============================================================================
 # Total Epics: 10 (Epic 0-8 + Epic 0 Iteration 1 独立 Stories)
-# Total Stories: 96
+# Total Stories (excluding retrospectives): 96
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (📋 planned, backlog)
 #   - Epic 1-8: 82 stories (📋 backlog)
 #
 # Status Summary:
-#   - Done: 5 (Epic 0 Iteration 0: 3 stories + Epic 0 Retrospective + Story 0.4)
+#   - Done: 4 (Epic 0 Iteration 0: 3 stories + Story 0.4)
 #   - In-Progress: 0
-#   - Ready for Dev: 0
+#   - Ready for Dev: 1 (Story 0.5)
 #   - Backlog: 91
 #
 # Next Steps:
 #   1. ✅ Story 0.4 代码审查修复完成，状态更新为 done
-#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.5-0.9, 0.14-0.18)
-#   3. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
-#   4. Follow SDD+TDD 融合模式 for all stories
+#   2. ✅ Story 0.5 故事文件已创建，状态更新为 ready-for-dev
+#   3. Execute Epic 0 Iteration 1 剩余 Stories (0.6-0.9, 0.14-0.18)
+#   4. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   5. Follow SDD+TDD 融合模式 for all stories
 #
 # Key Changes from Previous Version:
 #   - Updated Epic 0 structure to reflect refactoring (Iteration 0 + Iteration 1)
@@ -227,4 +228,5 @@ development_status:
 #   - **Story 0.4 测试**: 15/15 自动化测试通过（100%）✅
 #   - **Story 0.4 代码审查**: 发现 9 个问题，已修复 7 个（4 HIGH + 3 MEDIUM）✅
 #   - **Story 0.4 状态**: in-progress → done (所有 HIGH/MEDIUM 问题已修复)
+#   - **Story 0.5 状态**: backlog → ready-for-dev ✅
 # =============================================================================
