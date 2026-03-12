@@ -46,6 +46,26 @@ Status: in-progress
 - NetworkPolicy 默认拒绝策略（安全加固）
 - 日志持久化配置（30 天保留）
 
+**测试状态:**
+- ✅ 测试文件已创建：`tests/deployment/test_gitea.py` (15+ 测试用例)
+- ⏸️ 测试执行：**待部署 K3S 环境后执行** (需要实际 K8s 集群)
+- 📋 测试类型：部署测试（需要 Docker + K3S 环境）
+
+**测试执行计划:**
+```bash
+# 1. 安装测试依赖
+poetry install --with test
+
+# 2. 启动 K3S 测试环境 (Story 0.4 已部署)
+docker compose -f docker/docker-compose.test.yml up -d
+
+# 3. 运行部署测试
+poetry run pytest tests/deployment/test_gitea.py -v
+
+# 4. 生成覆盖率报告
+poetry run pytest tests/deployment/test_gitea.py --cov=src --cov-report=html
+```
+
 **测试覆盖:**
 - 部署测试：6 个测试用例
 - 数据库连接测试：2 个测试用例
