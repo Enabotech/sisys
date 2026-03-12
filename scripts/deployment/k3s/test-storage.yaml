@@ -14,7 +14,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: standard  # K3S 内置 local-path-provisioner
+  storageClassName: local-path  # K3S 内置 local-path-provisioner（默认存储类）
   resources:
     requests:
       storage: 1Gi

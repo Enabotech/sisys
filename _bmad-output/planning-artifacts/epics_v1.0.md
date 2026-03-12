@@ -5090,38 +5090,442 @@ So that **确保 MVP 无高危漏洞**。
 
 ### 关键依赖路径图
 
+**文档版本:** 1.0.0
+**更新日期:** 2026-03-12
+**编制依据:** AI_AGENT_PARALLEL_DEPENDENCY_MAP.md
+
+#### 总体依赖关系 (Mermaid 可视化)
+
+```mermaid
+graph TD
+    %% ========== Epic 0 Iteration 0 (已完成) ==========
+    subgraph "Epic 0 Iteration 0 ✅ (已完成)"
+        S0_1["Story 0.1<br/>开发环境搭建<br/>✅ Done"]
+        S0_2["Story 0.2<br/>CI/CD 流水线<br/>⚠️ 备份废弃"]
+        S0_3["Story 0.3<br/>测试框架搭建<br/>✅ Done"]
+    end
+
+    %% ========== Epic 0 Iteration 1 (进行中) ==========
+    subgraph "Epic 0 Iteration 1 🔄 (进行中 - 5/11 完成)"
+        S0_4["Story 0.4<br/>K3S 集群部署<br/>✅ Done"]
+        S0_5["Story 0.5<br/>Gitea 代码托管<br/>📋 Backlog"]
+        S0_6["Story 0.6<br/>Harbor 镜像仓库<br/>📋 Backlog"]
+        S0_7["Story 0.7<br/>ArgoCD 持续部署<br/>📋 Backlog"]
+        S0_8["Story 0.8<br/>Gitea Runner 配置<br/>📋 Backlog"]
+        S0_9["Story 0.9<br/>CI/CD Pipeline 模板<br/>📋 Backlog"]
+        S0_14["Story 0.14<br/>Windows 安装器<br/>📋 Backlog"]
+        S0_15["Story 0.15<br/>Mac 安装器<br/>📋 Backlog"]
+        S0_16["Story 0.16<br/>Linux 一键脚本<br/>📋 Backlog"]
+        S0_17["Story 0.17<br/>自动诊断修复<br/>📋 Backlog"]
+        S0_18["Story 0.18<br/>配置向导<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 1 (待开始) ==========
+    subgraph "Epic 1 📋 (待开始 - 23 Stories)"
+        direction TB
+        S1_1["Story 1.1<br/>六边形架构脚手架<br/>📋 Backlog"]
+        S1_2["Story 1.2<br/>领域事件定义<br/>📋 Backlog"]
+        S1_3["Story 1.3<br/>事件总线实现<br/>📋 Backlog"]
+        S1_4["Story 1.4<br/>Redis 缓存层<br/>📋 Backlog"]
+        S1_5["Story 1.5<br/>PostgreSQL 存储层<br/>📋 Backlog"]
+        S1_6["Story 1.6<br/>Qdrant 向量层<br/>📋 Backlog"]
+        S1_7["Story 1.7<br/>MinIO 对象层<br/>📋 Backlog"]
+        S1_8["Story 1.8<br/>Neo4j 图层<br/>📋 Backlog"]
+        S1_9["Story 1.9<br/>RBAC 权限管理<br/>📋 Backlog"]
+        S1_10["Story 1.10<br/>统一审计日志<br/>📋 Backlog"]
+        S1_11["Story 1.11<br/>数据主权隔离<br/>📋 Backlog"]
+        S1_12["Story 1.12<br/>等保 2.0 三级<br/>📋 Backlog"]
+        S1_13["Story 1.13<br/>K8s 动态扩缩容<br/>📋 Backlog"]
+        S1_14a["Story 1.14a<br/>自主调用 trigger<br/>📋 Backlog"]
+        S1_14b["Story 1.14b<br/>自主调用 route<br/>📋 Backlog"]
+        S1_14c["Story 1.14c<br/>自主调用 execute<br/>📋 Backlog"]
+        S1_15a["Story 1.15a<br/>外部化记忆压缩<br/>📋 Backlog"]
+        S1_15b["Story 1.15b<br/>外部化记忆协同<br/>📋 Backlog"]
+        S1_16["Story 1.16<br/>集成测试框架<br/>📋 Backlog"]
+        S1_17["Story 1.17<br/>UDMR 基础路由<br/>📋 Backlog"]
+        S1_18a["Story 1.18a<br/>Prefect 工作流<br/>📋 Backlog"]
+        S1_18b["Story 1.18b<br/>LangGraph 编排<br/>📋 Backlog"]
+        S1_19["Story 1.19<br/>成本度量基础<br/>📋 Backlog"]
+    end
+
+    %% ========== Epic 2-8 (待开始) ==========
+    subgraph "Epic 2-8 📋 (待开始 - 82 Stories)"
+        E2["Epic 2<br/>文档与数据管理<br/>9 Stories"]
+        E3["Epic 3<br/>智能检索与发现<br/>13 Stories"]
+        E4["Epic 4<br/>战略工具箱<br/>5 Stories"]
+        E5["Epic 5<br/>Agent 协作<br/>6 Stories"]
+        E6["Epic 6<br/>战略规划流程<br/>12 Stories"]
+        E7["Epic 7<br/>用户界面与 API<br/>8 Stories"]
+        E8["Epic 8<br/>权限与审计<br/>6 Stories"]
+    end
+
+    %% ========== 关键依赖关系 ==========
+    %% Epic 0 Iteration 0 → Epic 0 Iteration 1
+    S0_1 --> S0_4
+    S0_3 --> S0_4
+
+    %% Epic 0 Iteration 1 内部依赖
+    S0_4 --> S0_5
+    S0_4 --> S0_6
+    S0_5 --> S0_7
+    S0_6 --> S0_7
+    S0_5 --> S0_8
+    S0_7 --> S0_9
+    S0_8 --> S0_9
+
+    %% Epic 0 Iteration 1 → Epic 1
+    S0_4 --> S1_1
+    S0_4 --> S1_4
+    S0_4 --> S1_5
+    S0_9 --> S1_16
+
+    %% Epic 1 内部依赖 (价值组 2: 架构基础)
+    S1_1 --> S1_2
+    S1_2 --> S1_3
+    S1_1 --> S1_16
+
+    %% Epic 1 内部依赖 (价值组 3: 五层存储)
+    S1_4 --> S1_5
+    S1_5 --> S1_6
+    S1_6 --> S1_7
+    S1_7 --> S1_8
+
+    %% Epic 1 内部依赖 (价值组 4: 安全合规)
+    S1_5 --> S1_9
+    S1_9 --> S1_10
+    S1_10 --> S1_11
+    S1_11 --> S1_12
+
+    %% Epic 1 内部依赖 (价值组 5: 系统公理)
+    S1_3 --> S1_14a
+    S1_14a --> S1_14b
+    S1_14b --> S1_14c
+    S1_14c --> S1_15a
+    S1_15a --> S1_15b
+
+    %% Epic 1 内部依赖 (价值组 6: 关键机制)
+    S1_14b --> S1_17
+    S1_3 --> S1_18a
+    S1_3 --> S1_18b
+    S1_17 --> S1_19
+
+    %% Epic 1 → Epic 2-8
+    S1_1 --> E2
+    S1_1 --> E3
+    S1_1 --> E4
+    S1_1 --> E5
+    S1_1 --> E6
+    S1_1 --> E7
+    S1_1 --> E8
+
+    S1_3 --> E2
+    S1_3 --> E3
+    S1_3 --> E5
+
+    S1_4 --> E2
+    S1_4 --> E3
+
+    S1_9 --> E7
+    S1_10 --> E8
+
+    %% 样式定义
+    classDef done fill:#4CAF50,color:white,stroke:#2E7D32,stroke-width:2px;
+    classDef inProgress fill:#FF9800,color:white,stroke:#E65100,stroke-width:2px;
+    classDef backlog fill:#9E9E9E,color:white,stroke:#424242,stroke-width:2px;
+    classDef critical fill:#F44336,color:white,stroke:#B71C1C,stroke-width:3px;
+
+    class S0_1,S0_3,S0_4 done;
+    class S0_5,S0_6,S0_7,S0_8,S0_9,S0_14,S0_15,S0_16,S0_17,S0_18 inProgress;
+    class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 backlog;
+    class E2,E3,E4,E5,E6,E7,E8 backlog;
 ```
-Epic 0（Iteration 0 + 1）
-    │
-    └──→ Epic 1（企业级架构基础与合规）
-            ├──→ Story 1.13（K8s 动态扩缩容，NFR-SCALE-03）
-            ├──→ Story 1.14a/b/c（自主调用循环，or.md 系统公理一）
-            ├──→ Story 1.15a/b（外部化记忆，or.md 系统公理二）
-            ├──→ Story 1.16（集成测试框架，支持所有 Epic）
-            ├──→ Story 1.17（UDMR 基础路由，成本优化基础）✨新增
-            ├──→ Story 1.18a（Prefect 工作流引擎集成）✨拆分
-            ├──→ Story 1.18b（LangGraph Agent 编排集成）✨拆分
-            └──→ Story 1.19（成本度量基础，Token 消耗与 ROI 验证）✨新增
-            │
-            ├──→ Epic 2（文档与数据管理）───→ Epic 3（智能检索与知识发现）───→ Epic 6（战略规划流程）
-            │       └─关键路径：Story 2.1→2.2a（基础格式）→2.3（版面信息）→3.1a（Dense）→3.1b（BM25+RRF）→3.8（高保真溯源）
-            │               │
-            │               └──→ Epic 6: Story 6.9（分析师视图）、Story 6.10（顾问视图）、Story 6.11（白标报告基础）✨新增
-            │
-            ├──→ Epic 4（战略工具箱）───────────────────────────────────────→ Epic 6（战略规划流程）
-            │
-            ├──→ Epic 5（Agent 协作系统）───────────────────────────────────→ Epic 6（战略规划流程）
-            │
-            ├──→ Epic 7（多触点用户界面与 API 集成）
-            │       ├──→ Story 7.5（无障碍设计，NFR-ACC-01）
-            │       ├──→ Story 7.6（API 契约测试，NFR-INT-05）
-            │       ├──→ Story 7.7（API E2E 测试，测试 Story）
-            │       └──→ Story 7.8（骨架屏加载，感知性能优化）✨新增
-            │
-            └──→ Epic 8（用户权限管理与审计合规）
-                    ├──→ Story 8.5（ShieldCortex 提示注入防御）
-                    └──→ Story 8.6（渗透测试与漏洞扫描）
+
+#### 关键路径识别
+
+**关键路径 1: Epic 0 Iteration 1 完成 (当前优先级最高) 🟥**
+
 ```
+Story 0.4 (✅ Done)
+  → Story 0.5 (Gitea)
+  → Story 0.7 (ArgoCD)
+  → Story 0.9 (Pipeline 模板)
+```
+
+**关键性分析:**
+- Story 0.9 是 Epic 1 的前置条件（CI/CD 基础设施）
+- 影响 Epic 1 所有 23 个 Story 的开发效率
+- 延迟 1 天 → Epic 1 延迟 1 天
+
+**资源建议:**
+- 分配 2 个 AI AGENT 并行开发 Story 0.5 和 Story 0.6
+- Story 0.7 和 Story 0.8 可并行
+- Story 0.9 需要 Story 0.7 和 Story 0.8 完成后才能开始
+
+---
+
+**关键路径 2: Epic 1 架构基础 (技术风险最高) 🟧**
+
+```
+Story 1.1 (六边形架构)
+  → Story 1.2 (领域事件)
+  → Story 1.3 (事件总线)
+  → Story 1.18a/b (Prefect + LangGraph)
+```
+
+**关键性分析:**
+- Story 1.1 是所有后续 Epic 的技术基础
+- Story 1.3 事件总线是系统"血液"，技术复杂度高
+- Story 1.18a/b 是双核引擎，决定系统核心能力
+
+**技术风险:**
+- 六边形架构边界划分（领域层 vs 应用层）
+- 事件总线可靠性（Redis + RabbitMQ 双通道）
+- 双引擎协调（Prefect + LangGraph）
+
+**资源建议:**
+- Story 1.1 分配资深架构师 AI AGENT
+- Story 1.3 需要 2 个 AI AGENT 协作（Redis 专家 + RabbitMQ 专家）
+- Story 1.18a/b 可并行开发，但需要同一 AI AGENT 保持上下文一致性
+
+---
+
+**关键路径 3: Epic 1 五层存储 (工作量最大) 🟨**
+
+```
+Story 1.4 (Redis)
+  → Story 1.5 (PostgreSQL)
+  → Story 1.6 (Qdrant)
+  → Story 1.7 (MinIO)
+  → Story 1.8 (Neo4j)
+```
+
+**关键性分析:**
+- 五层存储是系统公理二"外部化记忆"的实现
+- Story 1.5 PostgreSQL 是关系存储核心，依赖最多
+- Story 1.6 Qdrant 是智能检索基础，影响 Epic 3
+
+**技术风险:**
+- 五层存储协同（避免循环依赖）
+- 事务一致性（跨存储事务）
+- 性能优化（缓存命中率、检索延迟）
+
+**资源建议:**
+- Story 1.4/1.5/1.6 可并行开发（不同存储技术）
+- Story 1.7/1.8 可在 Story 1.6 完成后并行
+- 需要 1 个 AI AGENT 负责整体协调，确保存储协同
+
+---
+
+#### AI AGENT 并行开发计划
+
+**阶段 1: Epic 0 Iteration 1 冲刺 (2026-03-12 ~ 2026-03-30)**
+
+| AI AGENT | 分配 Story | 预计工期 | 依赖关系 | 优先级 |
+|---------|-----------|---------|---------|-------|
+| **Agent-01** | Story 0.5 (Gitea) | 3 天 | Story 0.4 ✅ | P0 |
+| **Agent-02** | Story 0.6 (Harbor) | 3 天 | Story 0.4 ✅ | P0 |
+| **Agent-03** | Story 0.7 (ArgoCD) | 4 天 | Story 0.5 + Story 0.6 | P0 |
+| **Agent-04** | Story 0.8 (Gitea Runner) | 3 天 | Story 0.5 | P0 |
+| **Agent-05** | Story 0.9 (Pipeline 模板) | 5 天 | Story 0.7 + Story 0.8 | P0 |
+| **Agent-06** | Story 0.14-0.18 (产品交付系统) | 5 天 | Story 0.4 ✅ | P1 |
+
+**集成计划:**
+- 每日站会：同步进度，解决依赖冲突
+- 第 3 天：Story 0.5 + Story 0.6 集成测试
+- 第 7 天：Story 0.7 + Story 0.8 集成测试
+- 第 10 天：Story 0.9 完整集成测试
+- 第 12 天：Epic 0 Iteration 1 验收
+
+---
+
+**阶段 2: Epic 1 架构基础 (2026-04-01 ~ 2026-04-20)**
+
+| AI AGENT | 分配 Story | 预计工期 | 依赖关系 | 优先级 |
+|---------|-----------|---------|---------|-------|
+| **Agent-01** | Story 1.1 (六边形架构) | 5 天 | Story 0.9 ✅ | P0 |
+| **Agent-02** | Story 1.2 (领域事件) | 3 天 | Story 1.1 | P0 |
+| **Agent-03** | Story 1.3 (事件总线) | 5 天 | Story 1.2 | P0 |
+| **Agent-04** | Story 1.4 (Redis 缓存) | 4 天 | Story 0.9 ✅ | P0 |
+| **Agent-05** | Story 1.5 (PostgreSQL) | 5 天 | Story 1.4 | P0 |
+| **Agent-06** | Story 1.6 (Qdrant) | 4 天 | Story 1.5 | P0 |
+| **Agent-07** | Story 1.7 (MinIO) | 3 天 | Story 1.6 | P0 |
+| **Agent-08** | Story 1.8 (Neo4j) | 4 天 | Story 1.7 | P0 |
+
+**并行策略:**
+- **第 1-5 天:** Agent-01 开发 Story 1.1，其他 Agent 待命或学习技术栈
+- **第 6-8 天:** Agent-01 开发 Story 1.2，Agent-04 开发 Story 1.4
+- **第 9-13 天:** Agent-02 开发 Story 1.3，Agent-05 开发 Story 1.5
+- **第 14-20 天:** Agent-06/07/08 并行开发 Story 1.6/1.7/1.8
+
+---
+
+**阶段 3: Epic 1 安全合规与系统公理 (2026-04-21 ~ 2026-05-10)**
+
+| AI AGENT | 分配 Story | 预计工期 | 依赖关系 | 优先级 |
+|---------|-----------|---------|---------|-------|
+| **Agent-01** | Story 1.9 (RBAC) | 4 天 | Story 1.5 ✅ | P0 |
+| **Agent-02** | Story 1.10 (审计日志) | 4 天 | Story 1.9 | P0 |
+| **Agent-03** | Story 1.11 (数据主权) | 3 天 | Story 1.10 | P0 |
+| **Agent-04** | Story 1.12 (等保 2.0) | 5 天 | Story 1.11 | P0 |
+| **Agent-05** | Story 1.14a/b/c (自主调用) | 5 天 | Story 1.3 ✅ | P0 |
+| **Agent-06** | Story 1.15a/b (外部化记忆) | 5 天 | Story 1.14c | P0 |
+| **Agent-07** | Story 1.17 (UDMR 路由) | 4 天 | Story 1.14b | P0 |
+| **Agent-08** | Story 1.18a (Prefect) | 5 天 | Story 1.3 ✅ | P0 |
+| **Agent-09** | Story 1.18b (LangGraph) | 5 天 | Story 1.3 ✅ | P0 |
+| **Agent-10** | Story 1.19 (成本度量) | 3 天 | Story 1.17 | P1 |
+
+---
+
+**阶段 4: Epic 2-8 MVP 功能 (2026-05-11 ~ 2026-05-31)**
+
+| Epic | Story 数 | 关键 Story | 依赖 Epic 1 Story | 预计工期 |
+|------|---------|-----------|------------------|---------|
+| **Epic 2** (文档管理) | 9 | 2.1/2.2/2.8 | Story 1.5/1.6/1.7 | 10 天 |
+| **Epic 3** (智能检索) | 13 | 3.1/3.4/3.8 | Story 1.6/1.8/1.17 | 12 天 |
+| **Epic 4** (工具箱) | 5 | 4.1/4.2/4.4 | Story 1.18a/1.18b | 8 天 |
+| **Epic 5** (Agent 协作) | 6 | 5.1/5.3/5.5 | Story 1.14c/1.15a | 10 天 |
+| **Epic 6** (战略规划) | 12 | 6.1/6.3/6.5 | Story 1.18a/1.18b | 15 天 |
+| **Epic 7** (用户界面) | 8 | 7.1/7.2/7.4 | Story 1.9/1.10 | 10 天 |
+| **Epic 8** (权限审计) | 6 | 8.1/8.2/8.3 | Story 1.10/1.11 | 8 天 |
+
+**并行策略:**
+- **Epic 2 + Epic 3:** 可并行（文档管理 + 智能检索）
+- **Epic 4 + Epic 5:** 可并行（工具箱 + Agent 协作）
+- **Epic 6:** 依赖 Epic 4 + Epic 5，需延后
+- **Epic 7 + Epic 8:** 可并行（用户界面 + 权限审计）
+
+---
+
+#### 依赖关系详细矩阵
+
+**Epic 0 Iteration 1 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **0.4** (K3S) | 0.1, 0.3 | 0.5, 0.6, 0.7, 0.8, 0.14-0.18 | Hard | ✅ |
+| **0.5** (Gitea) | 0.4 | 0.7, 0.8, 0.9 | Hard | ✅ |
+| **0.6** (Harbor) | 0.4 | 0.7, 0.9 | Hard | ✅ |
+| **0.7** (ArgoCD) | 0.5, 0.6 | 0.9 | Hard | ✅ |
+| **0.8** (Runner) | 0.5 | 0.9 | Hard | ❌ |
+| **0.9** (Pipeline) | 0.7, 0.8 | Epic 1 所有 Story | Hard | ✅ |
+| **0.14-0.18** (产品交付) | 0.4 | - | Soft | ❌ |
+
+**Epic 1 价值组 2 (架构基础) 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **1.1** (六边形架构) | 0.9 | 1.2, 1.16, Epic 2-8 | Hard | ✅ |
+| **1.2** (领域事件) | 1.1 | 1.3 | Hard | ✅ |
+| **1.3** (事件总线) | 1.2 | 1.14a, 1.18a, 1.18b | Hard | ✅ |
+| **1.16** (集成测试) | 1.1 | - | Soft | ❌ |
+
+**Epic 1 价值组 3 (五层存储) 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **1.4** (Redis) | 0.9 | 1.5 | Hard | ✅ |
+| **1.5** (PostgreSQL) | 1.4 | 1.6, 1.9 | Hard | ✅ |
+| **1.6** (Qdrant) | 1.5 | 1.7, Epic 3 | Hard | ✅ |
+| **1.7** (MinIO) | 1.6 | 1.8 | Hard | ❌ |
+| **1.8** (Neo4j) | 1.7 | Epic 3 | Hard | ❌ |
+
+**Epic 1 价值组 4 (安全合规) 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **1.9** (RBAC) | 1.5 | 1.10, Epic 7 | Hard | ✅ |
+| **1.10** (审计日志) | 1.9 | 1.11, Epic 8 | Hard | ✅ |
+| **1.11** (数据主权) | 1.10 | 1.12 | Hard | ✅ |
+| **1.12** (等保 2.0) | 1.11 | - | Hard | ❌ |
+
+**Epic 1 价值组 5 (系统公理) 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **1.14a** (trigger) | 1.3 | 1.14b | Hard | ✅ |
+| **1.14b** (route) | 1.14a | 1.14c, 1.17 | Hard | ✅ |
+| **1.14c** (execute) | 1.14b | 1.15a | Hard | ✅ |
+| **1.15a** (上下文压缩) | 1.14c | 1.15b | Hard | ❌ |
+| **1.15b** (五层协同) | 1.15a | - | Hard | ❌ |
+
+**Epic 1 价值组 6 (关键机制) 依赖矩阵**
+
+| Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
+|-------|---------|---------|---------|---------|
+| **1.17** (UDMR) | 1.14b | 1.19, Epic 3 | Hard | ✅ |
+| **1.18a** (Prefect) | 1.3 | Epic 2, Epic 6 | Hard | ✅ |
+| **1.18b** (LangGraph) | 1.3 | Epic 4, Epic 5, Epic 6 | Hard | ✅ |
+| **1.19** (成本度量) | 1.17 | - | Soft | ❌ |
+
+---
+
+#### 风险识别与缓解措施
+
+**技术风险**
+
+| 风险项 | 影响 Story | 影响程度 | 发生概率 | 缓解措施 |
+|-------|-----------|---------|---------|---------|
+| **K3S 多节点网络配置** | 0.4 | 高 | 中 | ✅ 已完成，flannel-backend 统一为 vxlan |
+| **Gitea 与 Harbor 集成** | 0.7 | 高 | 中 | 提前测试集成兼容性，预留 1 天缓冲 |
+| **六边形架构边界划分** | 1.1 | 高 | 高 | 架构评审会议，邀请资深架构师 |
+| **事件总线可靠性** | 1.3 | 高 | 中 | 压力测试，Redis + RabbitMQ 双通道验证 |
+| **五层存储循环依赖** | 1.4-1.8 | 高 | 中 | 架构约束：单向依赖链 + 异步缓存更新 |
+| **双引擎协调机制** | 1.18a/b | 高 | 中 | OrchestrationService 统一协调 |
+| **UDMR 路由延迟** | 1.17 | 中 | 中 | 性能基准测试，L1/L2 优化 |
+
+**进度风险**
+
+| 风险项 | 影响 Story | 影响程度 | 缓解措施 |
+|-------|-----------|---------|---------|
+| **Story 0.9 延迟** | Epic 1 所有 Story | 高 | 提前准备 Story 0.7/0.8，预留 2 天缓冲 |
+| **Story 1.1 复杂度高** | Story 1.2/1.3 | 高 | 分配资深 AI AGENT，架构评审 |
+| **Story 1.3 技术难度** | Story 1.14a/b/1.18a/b | 高 | 2 个 AI AGENT 协作，压力测试 |
+| **跨 Epic 集成** | Epic 2-8 | 中 | 每日站会，中期集成测试 |
+
+---
+
+#### 监控指标
+
+**进度监控**
+
+| 指标 | 目标值 | 测量频率 | 预警阈值 |
+|------|-------|---------|---------|
+| **Story 完成率** | 100% (按阶段) | 每日 | <80% → 🟡, <60% → 🟠 |
+| **关键路径延迟** | 0 天 | 每日 | >1 天 → 🟡, >3 天 → 🟠 |
+| **集成测试通过率** | 100% | 每次集成 | <90% → 🟡, <70% → 🟠 |
+| **Bug 修复率** | 100% (P0) | 每日 | <80% → 🟡 |
+
+**质量监控**
+
+| 指标 | 目标值 | 测量频率 | 预警阈值 |
+|------|-------|---------|---------|
+| **单元测试覆盖率** | ≥80% | CI/CD | <70% → 🟡, <60% → 🟠 |
+| **架构约束违反** | 0 | CI/CD | >0 → 🟠 |
+| **技术债务新增** | 0 | 每周 | >5 项 → 🟡 |
+| **文档完整性** | 100% | 每个 Story | <90% → 🟡 |
+
+---
+
+#### 成功标准
+
+**阶段成功标准**
+
+| 阶段 | 成功标准 | 验收方式 |
+|------|---------|---------|
+| **阶段 1** (Epic 0 Iteration 1) | 6 个 Story 100% 完成，集成测试通过 | 验收测试报告 |
+| **阶段 2** (Epic 1 价值组 2/3) | 11 个 Story 100% 完成，架构评审通过 | 架构评审报告 + 测试报告 |
+| **阶段 3** (Epic 1 价值组 4/5/6) | 12 个 Story 100% 完成，性能基准达标 | 性能基准测试报告 |
+| **阶段 4** (Epic 2-8 MVP) | 57 个 P0 FR 100% 覆盖，MVP 验收通过 | MVP 验收报告 |
+
+**整体成功标准**
+
+1. **零重大架构缺陷** - 架构评审 100% 通过
+2. **零 P0 Bug** - MVP 验收前 P0 Bug 清零
+3. **性能指标达标** - 检索延迟 P95<800ms，路由延迟 P95<100ms
+4. **FR 覆盖率 100%** - 57 个 P0 FR 完整实现
+5. **NFR 达标率 100%** - 12 项 P0 NFR 全部达标
+
+---
 
 ### P0 关键改进建议实施状态
 
