@@ -46,9 +46,9 @@ development_status:
   0-1-dev-environment-setup: done  # Python 3.11+, Poetry, IDE 配置，SDD 工具链
   0-2-ci-cd-pipeline: done  # ⚠️ 已备份废弃 - 被新 Story 0.4-0.9 替代
   0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
-  # Iteration 1: 开发 CI/CD 系统（面向工程师）- ✅ 已完成
+  # Iteration 1: 开发 CI/CD 系统（面向工程师）- 🔄 进行中
   0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.x + local-path-provisioner ✅ 部署成功，测试 15/15 通过，代码审查问题全部修复
-  0-5-gitea-code-hosting: ready-for-dev  # Gitea v1.25.4 + PostgreSQL ✅ 故事文件已创建
+  0-5-gitea-code-hosting: in-progress  # Gitea v1.25.4 + PostgreSQL 🚀 开发中
   0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
   0-8-gitea-runner-configuration: backlog  # Gitea Runner Docker/K8s Executor
