@@ -1,15 +1,35 @@
 #!/bin/bash
 # Traefik 反向代理安装脚本 - WSL2 适配版
 # Story 0.4: K3S 集群部署（WSL2 重构版）
-# 技术栈：Traefik v2.10
+# 技术栈：Traefik v3.x (Helm Chart 39.0.5+)
 # K3S 版本：v1.34.5
 # 环境：WSL2 Ubuntu 22.04
 
-set -e
+# 错误处理配置
+TRAEFIK_FAILED=0
+TRAEFIK_ERROR_REASON=""
+
+# 错误处理函数
+error_handler() {
+    local line_number=$1
+    echo ""
+    echo "❌ 脚本执行失败于第 $line_number 行"
+    echo "   退出码：$TRAEFIK_FAILED"
+    echo "   原因：$TRAEFIK_ERROR_REASON"
+    echo ""
+    echo "故障排除建议："
+    echo "  1. 检查 Helm 状态：helm list -n traefik"
+    echo "  2. 查看 Traefik Pod：kubectl get pods -n traefik"
+    echo "  3. 查看 Pod 日志：kubectl logs -n traefik -l app.kubernetes.io/name=traefik"
+    echo "  4. 检查事件：kubectl get events -n traefik --sort-by='.lastTimestamp'"
+    exit $TRAEFIK_FAILED
+}
+
+trap 'error_handler $LINENO' ERR
 
 echo "=== Traefik 反向代理安装脚本 ==="
 echo "日期：$(date)"
-echo "目标版本：Traefik v2.10"
+echo "目标版本：Traefik v3.x"
 echo ""
 
 # ========== 前置检查 ==========
@@ -87,7 +107,7 @@ echo ""
 
 # ========== 安装 Traefik ==========
 
-echo "安装 Traefik v2.10..."
+echo "安装 Traefik v3.x..."
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -99,39 +119,41 @@ if [ ! -f "$VALUES_FILE" ]; then
     VALUES_FILE=""
 fi
 
-# 使用国内镜像源下载 Chart
+# 动态获取最新稳定版本（避免硬编码版本号）
 echo "准备 Helm Chart..."
-CHART_URL="https://traefik.github.io/charts/traefik-39.0.5.tgz"
-CHART_URL_CN="https://helm.traefik.io/traefik/traefik-39.0.5.tgz"
-TEMP_CHART="/tmp/traefik-39.0.5.tgz"
+echo "获取最新 Traefik Chart 版本..."
 
-# 尝试下载 Chart（优先国内镜像）
-if curl -sfL --connect-timeout 10 -o "$TEMP_CHART" "$CHART_URL_CN"; then
-    echo "✅ 从国内镜像下载 Chart 成功"
-elif curl -sfL --connect-timeout 10 --retry 3 -o "$TEMP_CHART" "$CHART_URL"; then
-    echo "✅ 从官方仓库下载 Chart 成功"
-else
-    echo "❌ 无法下载 Helm Chart，请检查网络连接"
-    echo "   手动下载：wget $CHART_URL_CN -O $TEMP_CHART"
-    exit 1
+# 从 Helm 仓库获取最新版本
+TRAEFIK_VERSION=$(helm search repo traefik/traefik --versions 2>/dev/null | grep "^traefik/traefik" | head -1 | awk '{print $2}')
+
+if [ -z "$TRAEFIK_VERSION" ]; then
+    echo "⚠️ 无法获取最新版本，使用备用方案..."
+    # 备用方案：直接从 GitHub 获取 releases
+    TRAEFIK_VERSION=$(curl -s https://api.github.com/repos/traefik/traefik-helm-chart/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 | sed 's/^traefik-//')
 fi
 
-# 执行安装
-echo "安装 Traefik..."
+if [ -z "$TRAEFIK_VERSION" ]; then
+    echo "❌ 无法获取 Traefik 版本，使用默认版本：39.0.5"
+    TRAEFIK_VERSION="39.0.5"
+fi
+
+echo "✅ 使用 Traefik Chart 版本：$TRAEFIK_VERSION"
+
+# 使用 helm install 直接安装（推荐方式，无需手动下载）
+echo "使用 Helm 安装 Traefik..."
 if [ -n "$VALUES_FILE" ]; then
     echo "使用配置文件：$VALUES_FILE"
-    helm install traefik "$TEMP_CHART" \
+    helm install traefik traefik/traefik \
         --namespace traefik \
         --create-namespace \
+        --version "$TRAEFIK_VERSION" \
         -f "$VALUES_FILE"
 else
-    helm install traefik "$TEMP_CHART" \
+    helm install traefik traefik/traefik \
         --namespace traefik \
-        --create-namespace
+        --create-namespace \
+        --version "$TRAEFIK_VERSION"
 fi
-
-# 清理临时文件
-rm -f "$TEMP_CHART"
 
 echo "等待 Traefik 部署..."
 sleep 30

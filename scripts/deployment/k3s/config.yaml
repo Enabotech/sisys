@@ -33,17 +33,18 @@ kube-scheduler-arg:
   - leader-elect=true
 
 # 资源限制（针对 32G RAM 优化）
+# 注意：所有内存单位使用 Mi (Mebibytes) 和 Gi (Gibibytes)
 # etcd 内存限制
-etcd-memory-limit: 2048
+etcd-memory-limit: 2048Mi
 
 # API Server 内存限制
-apiserver-memory-limit: 2048
+apiserver-memory-limit: 2048Mi
 
 # Controller Manager 内存限制
-controller-manager-memory-limit: 1024
+controller-manager-memory-limit: 1024Mi
 
 # Scheduler 内存限制
-scheduler-memory-limit: 512
+scheduler-memory-limit: 512Mi
 
 # Kubelet 配置
 kubelet-arg:

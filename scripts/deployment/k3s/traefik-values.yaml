@@ -1,7 +1,8 @@
 # Traefik Helm Chart 值配置 - WSL2 简化版
 # Story 0.4: K3S 集群部署（WSL2 重构版）
-# 技术栈：Traefik v2.10
+# 技术栈：Traefik v3.x (Helm Chart 39.0.5+)
 # 环境：WSL2 Ubuntu 22.04
+# 注意：此配置针对 Traefik v3.x，与 v2.x 不兼容
 
 # 端口配置
 ports:

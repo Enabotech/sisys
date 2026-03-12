@@ -3,7 +3,29 @@
 # Story 0.4: K3S 集群部署
 # 修复版本：正确处理 WaitForFirstConsumer 模式
 
-set -e
+# 错误处理配置
+TEST_FAILED=0
+TEST_ERROR_REASON=""
+
+# 错误处理函数
+error_handler() {
+    local line_number=$1
+    echo ""
+    echo "========================================"
+    echo "  ❌ 测试脚本执行失败于第 $line_number 行"
+    echo "========================================"
+    echo "   退出码：$TEST_FAILED"
+    echo "   原因：$TEST_ERROR_REASON"
+    echo ""
+    echo "故障排除建议："
+    echo "  1. 检查集群状态：kubectl get nodes"
+    echo "  2. 查看系统 Pod：kubectl get pods -n kube-system"
+    echo "  3. 检查事件：kubectl get events --sort-by='.lastTimestamp'"
+    echo "  4. 查看详细日志：journalctl -u k3s"
+    exit $TEST_FAILED
+}
+
+trap 'error_handler $LINENO' ERR
 
 echo "========================================"
 echo "  K3S 验证测试套件"
