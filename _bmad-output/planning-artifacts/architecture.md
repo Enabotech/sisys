@@ -175,128 +175,136 @@ completedAt: '2026-02-26'
 graph TB
     %% ========== 外部系统 ==========
     subgraph "外部系统"
-        LLM_Cloud[云端 LLM API<br/>Qwen/Claude/GPT-4]
-        LLM_Local[本地 LLM<br/>Ollama+Qwen2.5]
-        VectorDB[向量数据库<br/>Qdrant 1.7+]
-        FileStorage[对象存储<br/>MinIO WORM]
+        LLM_Cloud["云端 LLM API<br/>Qwen/Claude/GPT-4"]
+        LLM_Local["本地 LLM<br/>Ollama+Qwen2.5"]
+        VectorDB["向量数据库<br/>Qdrant 1.7+"]
+        FileStorage["对象存储<br/>MinIO WORM"]
     end
 
     %% ========== 接口层 ==========
     subgraph "接口层 (Interfaces)"
-        CLI[CLI 接口<br/>click 8.1+]
-        API[REST API<br/>FastAPI 0.104+]
-        API_GW[API Gateway<br/>Kong/Traefik]
-        EventListener[事件监听器<br/>RabbitMQ+aio-pika]
+        CLI["CLI 接口<br/>click 8.1+"]
+        API["REST API<br/>FastAPI 0.104+"]
+        API_GW["API Gateway<br/>Kong/Traefik"]
+
+        subgraph "事件驱动接口"
+            Producer["事件生产者<br/>Event Producer"]
+            Consumer["事件消费者<br/>Event Consumer"]
+            EventListener["事件监听器<br/>RabbitMQ+aio-pika"]
+        end
+
     end
 
     %% ========== 应用层 ==========
     subgraph "应用层 (Application)"
         subgraph "用例服务"
-            DocUC[文档处理用例]
-            ToolUC[工具箱用例]
-            AgentUC[Agent 协作用例]
-            PlanningUC[规划生成用例]
-            RoutingUC[路由决策用例]
-            IsolationUC[隔离管理用例]
+            DocUC["文档处理用例"]
+            ToolUC["工具箱用例"]
+            AgentUC["Agent 协作用例"]
+            PlanningUC["规划生成用例"]
+            RoutingUC["路由决策用例"]
+            IsolationUC["隔离管理用例"]
         end
 
         subgraph "核心服务"
-            Orchestrator[编排协调器<br/>协调 Prefect+LangGraph]
-            UDMR_Service[UDMR 路由服务<br/>L1+L2+L3 三层决策]
-            EIP_Manager[EIP 隔离管理器<br/>四级隔离等级控制]
-            CorrectionJudge[修正分级判定器<br/>五维加权算法]
-            SYSArbiter[SYS AGENT 裁决器<br/>五维评分状态机]
-            DebateEvaluator[辩论质量评估器<br/>增益率 + 重复率检测]
-            SemanticCache[语义缓存服务<br/>相似度>0.9 命中]
+            Orchestrator["编排协调器<br/>协调 Prefect+LangGraph"]
+            UDMR_Service["UDMR 路由服务<br/>L1+L2+L3 三层决策"]
+            EIP_Manager["EIP 隔离管理器<br/>四级隔离等级控制"]
+            CorrectionJudge["修正分级判定器<br/>五维加权算法"]
+            SYSArbiter["SYS AGENT 裁决器<br/>五维评分状态机"]
+            DebateEvaluator["辩论质量评估器<br/>增益率 + 重复率检测"]
+            SemanticCache["语义缓存服务<br/>相似度>0.9 命中"]
         end
 
         subgraph "处理器"
-            CmdHandler[命令处理器<br/>CQRS 命令侧]
-            QueryHandler[查询处理器<br/>CQRS 查询侧]
-            EventHandler[事件处理器<br/>事件溯源]
+            CmdHandler["命令处理器<br/>CQRS 命令侧"]
+            QueryHandler["查询处理器<br/>CQRS 查询侧"]
+            EventHandler["事件处理器<br/>事件溯源"]
         end
     end
 
     %% ========== 领域层 ==========
     subgraph "领域层 (Domain)"
         subgraph "核心实体"
-            Document[文档实体<br/>17 种格式支持]
-            Agent[Agent 实体<br/>7 角色+SYS+AUD]
-            Tool[工具实体<br/>23 种战略工具]
-            StrategicPlan[战略规划实体<br/>SP/BP]
-            Checkpoint[检查点实体<br/>双模式恢复]
-            StrategicArchive[战略档案实体<br/>五层存储]
-            RoutingLog[路由决策日志<br/>UDMR 审计]
-            IsolationLog[隔离切换日志<br/>EIP 审计]
+            Document["文档实体<br/>17 种格式支持"]
+            Agent["Agent 实体<br/>7 角色+SYS+AUD"]
+            Tool["工具实体<br/>23 种战略工具"]
+            StrategicPlan["战略规划实体<br/>SP/BP"]
+            Checkpoint["检查点实体<br/>双模式恢复"]
+            StrategicArchive["战略档案实体<br/>五层存储"]
+            RoutingLog["路由决策日志<br/>UDMR 审计"]
+            IsolationLog["隔离切换日志<br/>EIP 审计"]
         end
 
         subgraph "领域服务接口"
-            RAGService[RAG 服务接口<br/>Dense+Sparse+Graph]
-            ToolService[工具箱服务接口<br/>MCP/A2A 协议]
-            AgentService[Agent 服务接口<br/>EIP 执行]
-            PlanningService[规划服务接口<br/>BLM/BEM 状态机]
-            RoutingService[路由服务接口<br/>UDMR 执行]
-            EvaluationService[评估服务接口<br/>五维评估]
+            RAGService["RAG 服务接口<br/>Dense+Sparse+Graph"]
+            ToolService["工具箱服务接口<br/>MCP/A2A 协议"]
+            AgentService["Agent 服务接口<br/>EIP 执行"]
+            PlanningService["规划服务接口<br/>BLM/BEM 状态机"]
+            RoutingService["路由服务接口<br/>UDMR 执行"]
+            EvaluationService["评估服务接口<br/>五维评估"]
         end
 
         subgraph "领域事件"
-            DocProcessed[文档处理完成事件]
-            ToolExecuted[工具执行完成事件]
-            AgentDecided[Agent 决策完成事件]
-            CheckpointReached[检查点到达事件]
-            RoutingDecided[路由决策事件]
-            IsolationSwitched[隔离等级切换事件]
-            CorrectionClassified[修正分级事件]
-            ArbitrationCompleted[裁决完成事件]
+            DocProcessed["文档处理完成事件"]
+            ToolExecuted["工具执行完成事件"]
+            AgentDecided["Agent 决策完成事件"]
+            CheckpointReached["检查点到达事件"]
+            RoutingDecided["路由决策事件"]
+            IsolationSwitched["隔离等级切换事件"]
+            CorrectionClassified["修正分级事件"]
+            ArbitrationCompleted["裁决完成事件"]
         end
 
         subgraph "仓储接口"
-            DocRepo[文档仓储接口]
-            AgentRepo[Agent 仓储接口]
-            ToolRepo[工具仓储接口]
-            PlanRepo[规划仓储接口]
-            RoutingLogRepo[路由日志仓储接口]
-            IsolationLogRepo[隔离日志仓储接口]
+            DocRepo["文档仓储接口"]
+            AgentRepo["Agent 仓储接口"]
+            ToolRepo["工具仓储接口"]
+            PlanRepo["规划仓储接口"]
+            RoutingLogRepo["路由日志仓储接口"]
+            IsolationLogRepo["隔离日志仓储接口"]
         end
     end
 
     %% ========== 基础设施层 ==========
     subgraph "基础设施层 (Infrastructure)"
         subgraph "工作流引擎 (Prefect)"
-            PrefectEngine[Prefect 引擎包装器<br/>3.6+]
-            DocFlow[文档处理流程]
-            RAGFlow[RAG 索引流程]
-            ReportFlow[报告生成流程]
+            PrefectEngine["Prefect 引擎包装器<br/>3.6+"]
+            DocFlow["文档处理流程"]
+            RAGFlow["RAG 索引流程"]
+            ReportFlow["报告生成流程"]
         end
 
         subgraph "Agent 编排引擎 (LangGraph)"
-            LangGraphEngine[LangGraph 引擎包装器<br/>1.0+]
-            AgentGraph[Agent 协作图]
-            BLMGraph[BLM 规划图<br/>六阶段状态机]
-            BEMGraph[BEM 规划图<br/>六阶段状态机]
+            LangGraphEngine["LangGraph 引擎包装器<br/>1.0+"]
+            AgentGraph["Agent 协作图"]
+            BLMGraph["BLM 规划图<br/>六阶段状态机"]
+            BEMGraph["BEM 规划图<br/>六阶段状态机"]
         end
 
         subgraph "消息总线"
-            Redis_PubSub[Redis 发布/订阅<br/>实时事件通道]
-            RabbitMQ[RabbitMQ 3.12+<br/>持久化事件通道]
-            Outbox[事务发件箱<br/>PostgreSQL event_outbox]
-            DLQ[死信队列<br/>失败事件处理]
+            Redis_PubSub["Redis 发布/订阅<br/>实时事件通道"]
+            RabbitMQ["RabbitMQ 3.12+<br/>持久化事件通道"]
+            Outbox["事务发件箱<br/>PostgreSQL event_outbox"]
+            DLQ["死信队列<br/>失败事件处理"]
+            EventBus["事件总线<br/>Event Bus"]
         end
 
         subgraph "五层存储架构"
-            Cache_Storage[高速缓存层<br/>Redis 7.0+]
-            Relational_Storage[关系存储层<br/>PostgreSQL 15+]
-            Vector_Storage[向量存储层<br/>Qdrant 1.7+]
-            Object_Storage[对象存储层<br/>MinIO WORM]
-            Graph_Storage[图存储层<br/>Neo4j 5.x]
+            Cache_Storage["高速缓存层<br/>Redis 7.0+"]
+            Relational_Storage["关系存储层<br/>PostgreSQL 15+"]
+            Vector_Storage["向量存储层<br/>Qdrant 1.7+"]
+            Object_Storage["对象存储层<br/>MinIO WORM"]
+            Graph_Storage["图存储层<br/>Neo4j 5.x"]
         end
 
         subgraph "外部适配器"
-            LLM_Router[LLM 动态路由器<br/>LiteLLM+UDMR]
-            EmbeddingAdapter[嵌入适配器<br/>BGE-M3]
-            StorageAdapter[存储适配器<br/>S3 兼容]
-            SandboxAdapter[沙箱适配器<br/>Docker/gVisor]
+            LLM_Router["LLM 动态路由器<br/>LiteLLM+UDMR"]
+            EmbeddingAdapter["嵌入适配器<br/>BGE-M3"]
+            StorageAdapter["存储适配器<br/>S3 兼容"]
+            SandboxAdapter["沙箱适配器<br/>Docker/gVisor"]
         end
+
     end
 
     %% ========== 关键交互流程 ==========
@@ -395,7 +403,7 @@ graph TB
     PrefectEngine -- "62. 工作流监控事件" --> EventBus
     LangGraphEngine -- "63. Agent 决策监控事件" --> EventBus
     EventBus -- "64. 聚合到监控系统" --> Producer
-​    EventBus -- "65. CUSUM 漂移检测" --> Producer
+    EventBus -- "65. CUSUM 漂移检测" --> Producer
 ```
 
 **五层存储依赖说明**：
@@ -1970,18 +1978,6 @@ src/infrastructure/
 │   ├── rabbitmq_adapter.py                                # RabbitMQ 适配器
 │   ├── redis_adapter.py                                   # Redis 适配器
 │   ├── message_serializer.py                              # 消息序列化
-│   ├── producers/                                         # 生产者
-│   │   ├── __init__.py
-│   │   ├── document_producer.py
-│   │   ├── tool_producer.py
-│   │   ├── agent_producer.py
-│   │   └── planning_producer.py
-│   ├── consumers/                                         # 消费者
-│   │   ├── __init__.py
-│   │   ├── document_consumer.py
-│   │   ├── tool_consumer.py
-│   │   ├── agent_consumer.py
-│   │   └── planning_consumer.py
 │   └── outbox/                                            # 事务发件箱
 │       ├── __init__.py
 │       ├── outbox_processor.py                            # Outbox 处理器

@@ -13,7 +13,6 @@
 # =============================================================================
 readonly SCRIPT_VERSION="2.0.0"
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly CLUSTER_NAME="${CLUSTER_NAME:-k3s-default}"  # 支持多集群
 
 # 错误处理配置
 DEPLOY_FAILED=0
@@ -64,7 +63,7 @@ error_handler() {
     echo ""
     log_info "故障排除建议："
     echo "  1. 查看容器日志：docker logs k3s-node-server-1"
-    echo "  2. 检查集群状态：docker exec k3s-node-server-1 k3s kubectl get nodes"
+    echo "  2. 检查集群状态：docker exec k3s-node-server-1 kubectl get nodes"
     echo "  3. 查看 K3S 日志：docker exec k3s-node-server-1 cat /var/log/k3s.log"
     echo "  4. 清理集群：$SCRIPT_NAME delete"
     exit $DEPLOY_FAILED
@@ -73,41 +72,48 @@ error_handler() {
 trap 'error_handler $LINENO' ERR
 
 # =============================================================================
-# 配置结构（支持命令行参数覆盖）
+# 全局配置（从 CONFIG 数组改为独立变量）
 # =============================================================================
-CONFIG=(
-    # 集群配置
-    SERVER_NODES=1
-    AGENT_NODES=2
-    K3S_VERSION="v1.34.5+k3s1"
-    TOKEN="k3s-multi-node-token-2026"
+# 集群配置
+SERVER_NODES=${SERVER_NODES:-1}
+AGENT_NODES=${AGENT_NODES:-2}
+K3S_VERSION="${K3S_VERSION:-v1.34.5-k3s1}"
+# 生成随机 Token（如果未提供）
+if [ -z "$TOKEN" ]; then
+    TOKEN="k3s-token-$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)"
+fi
 
-    # 网络配置
-    POD_CIDR="10.42.0.0/16"
-    SERVICE_CIDR="10.43.0.0/16"
-    CLUSTER_DNS="10.43.0.10"
-    NETWORK_NAME="k3s-network"
-    NETWORK_SUBNET="172.30.0.0/16"
-    NETWORK_GATEWAY="172.30.0.1"
+# 网络配置
+NETWORK_NAME="${NETWORK_NAME:-k3s-network}"
+NETWORK_SUBNET="${NETWORK_SUBNET:-172.30.0.0/16}"
+NETWORK_GATEWAY="${NETWORK_GATEWAY:-172.30.0.1}"
+POD_CIDR="${POD_CIDR:-10.42.0.0/16}"
+SERVICE_CIDR="${SERVICE_CIDR:-10.43.0.0/16}"
+CLUSTER_DNS="${CLUSTER_DNS:-10.43.0.10}"
 
-    # 节点配置
-    NODE_PREFIX="k3s-node"
-    SERVER_IP_BASE=10
-    AGENT_IP_BASE=20
+# 节点配置
+NODE_PREFIX="${NODE_PREFIX:-k3s-node}"
+SERVER_IP_BASE=${SERVER_IP_BASE:-10}
+AGENT_IP_BASE=${AGENT_IP_BASE:-20}
 
-    # K3S 配置
-    FLANNEL_BACKEND="vxlan"
-    DISABLE_COMPONENTS=("traefik" "servicelb" "metrics-server")
+# K3S 配置
+FLANNEL_BACKEND="${FLANNEL_BACKEND:-vxlan}"
+DISABLE_COMPONENTS="${DISABLE_COMPONENTS:-traefik servicelb metrics-server}"
 
-    # 端口映射
-    API_SERVER_PORT=6443
-    HTTP_PORT=80
-    HTTPS_PORT=443
+# 端口映射
+API_SERVER_PORT=${API_SERVER_PORT:-6443}
+HTTP_PORT=${HTTP_PORT:-80}
+HTTPS_PORT=${HTTPS_PORT:-443}
+MAP_PORTS="${MAP_PORTS:-true}"
 
-    # 路径配置
-    KUBECONFIG_DIR="$HOME/.kube"
-    TEMP_DIR="/tmp/k3s-${CLUSTER_NAME}"
-)
+# 路径配置
+KUBECONFIG_DIR="${KUBECONFIG_DIR:-$HOME/.kube}"
+TEMP_DIR="${TEMP_DIR:-/tmp/k3s-${CLUSTER_NAME:-k3s-default}}"
+
+# 运行模式
+QUIET_MODE="${QUIET_MODE:-false}"
+COMMAND="${COMMAND:-create}"
+# CLUSTER_NAME 在 parse_args 中处理
 
 # =============================================================================
 # 帮助信息
@@ -315,7 +321,7 @@ deploy_server_nodes() {
 
         # 构建禁用组件参数
         local disable_args=""
-        for component in "${DISABLE_COMPONENTS[@]}"; do
+        for component in $DISABLE_COMPONENTS; do
             disable_args+="--disable=$component "
         done
 
@@ -332,7 +338,7 @@ deploy_server_nodes() {
             --tmpfs /run:exec \
             --tmpfs /var/run:exec \
             $port_mappings \
-            rancher/k3s:"$K3S_VERSION" server \
+            rancher/k3s:$K3S_VERSION server \
             --cluster-init \
             --token "$TOKEN" \
             --node-ip "$node_ip" \
@@ -375,7 +381,7 @@ deploy_agent_nodes() {
             -v "${node_name}-data:/var/lib/rancher/k3s" \
             --tmpfs /run:exec \
             --tmpfs /var/run:exec \
-            rancher/k3s:"$K3S_VERSION" agent \
+            rancher/k3s:$K3S_VERSION agent \
             --server "https://$server_ip:6443" \
             --token "$TOKEN" \
             --node-ip "$node_ip" \
@@ -393,7 +399,7 @@ wait_for_nodes() {
 
     local total_nodes=$((SERVER_NODES + AGENT_NODES))
     local ready_nodes=0
-    local max_retries=24
+    local max_retries=10
     local retry_count=0
 
     log_info "等待 Server 节点启动..."
@@ -402,12 +408,13 @@ wait_for_nodes() {
     log_info "等待所有节点 Ready..."
     while [ $ready_nodes -lt $total_nodes ] && [ $retry_count -lt $max_retries ]; do
         sleep 5
-        ready_nodes=$(docker exec "${NODE_PREFIX}-server-1" k3s kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo 0)
+        ready_nodes=$(docker exec "${NODE_PREFIX}-server-1" kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo "0")
+        ready_nodes=$(echo "$ready_nodes" | tr -d '[:space:]')
         retry_count=$((retry_count + 1))
         log_info "  第 $retry_count 次检查：$ready_nodes/$total_nodes 节点已就绪..."
     done
 
-    if [ $ready_nodes -eq $total_nodes ]; then
+    if [ "$ready_nodes" -eq "$total_nodes" ]; then
         log_success "所有节点已就绪"
     else
         log_warn "超时：$ready_nodes/$total_nodes 节点已就绪"
@@ -430,15 +437,15 @@ configure_kubectl() {
     if docker exec "${NODE_PREFIX}-server-1" cat /output/kubeconfig.yaml > "$TEMP_DIR/kubeconfig.yaml" 2>/dev/null; then
         log_success "kubeconfig 已获取"
     else
-        log_warn "无法获取 kubeconfig，使用 k3s kubectl config view"
-        docker exec "${NODE_PREFIX}-server-1" k3s kubectl config view --raw > "$TEMP_DIR/kubeconfig.yaml"
+        log_warn "无法获取 kubeconfig，使用 kubectl config view"
+        docker exec "${NODE_PREFIX}-server-1" kubectl config view --raw > "$TEMP_DIR/kubeconfig.yaml"
     fi
 
     # 配置本地 kubectl
     if ! command_exists kubectl; then
         log_warn "kubectl 未安装，跳过本地配置"
         log_info "可使用 docker exec 执行 kubectl 命令："
-        echo "  docker exec ${NODE_PREFIX}-server-1 k3s kubectl get nodes"
+        echo "  docker exec ${NODE_PREFIX}-server-1 kubectl get nodes"
         return
     fi
 
@@ -476,19 +483,19 @@ verify_cluster() {
 
     # 节点状态
     log_info "检查节点状态..."
-    docker exec "$server_node" k3s kubectl get nodes -o wide
+    docker exec "$server_node" kubectl get nodes -o wide
 
     # 系统 Pod
     log_info "检查系统 Pod..."
-    docker exec "$server_node" k3s kubectl get pods -n kube-system -o wide
+    docker exec "$server_node" kubectl get pods -n kube-system -o wide
 
     # 存储类
     log_info "检查存储类..."
-    docker exec "$server_node" k3s kubectl get storageclass
+    docker exec "$server_node" kubectl get storageclass
 
     # 集群信息
     log_info "集群信息："
-    docker exec "$server_node" k3s kubectl cluster-info
+    docker exec "$server_node" kubectl cluster-info
 }
 
 # =============================================================================
@@ -641,6 +648,10 @@ show_cluster() {
 # 解析命令行参数
 # =============================================================================
 parse_args() {
+    # 设置默认集群名称
+    CLUSTER_NAME="${CLUSTER_NAME:-k3s-default}"
+    NODE_PREFIX="${CLUSTER_NAME}-node"
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             create)
