@@ -7,11 +7,25 @@
 node-name: sisys-pc-wsl2
 cluster-init: true
 
-# 网络配置（WSL2 特殊配置）
-# 重要：flannel-backend 必须设置为 vxlan 或 wireguard
-# none 会导致 Pod 网络不通，测试失败（Ping/DNS 测试无法通过）
-flannel-backend: vxlan  # WSL2 推荐使用 vxlan
-disable-network-policy: false  # 启用网络策略（支持 Pod 间通信）
+# 网络配置
+# 重要：flannel-backend 选择取决于部署环境
+#
+# 部署场景推荐:
+# - WSL2 单节点部署：vxlan (兼容性好)
+# - Docker 容器内多节点：host-gw (不需要内核模块)
+# - 物理机/虚拟机：vxlan 或 wireguard
+#
+# Flannel 后端对比:
+# | 后端 | 优点 | 缺点 | 适用场景 |
+# |------|------|------|---------|
+# | vxlan | 兼容性好，支持跨子网 | 需要 VXLAN 内核模块，性能一般 | WSL2 单节点 |
+# | host-gw | 性能好，不需要内核模块 | 要求节点在同一二层网络 | Docker 多节点 |
+# | wireguard | 加密传输，安全 | 需要 WireGuard 模块，CPU 开销 | 生产环境 |
+# | none | 无 Flannel | 需要外部 CNI | 使用 Calico/Cilium |
+
+# WSL2 单节点部署推荐配置
+flannel-backend: vxlan  # WSL2 单节点使用 vxlan
+disable-network-policy: false  # 启用网络策略
 
 # 禁用不需要的组件（节省资源）
 disable:

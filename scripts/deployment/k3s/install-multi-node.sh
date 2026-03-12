@@ -97,7 +97,8 @@ SERVER_IP_BASE=${SERVER_IP_BASE:-10}
 AGENT_IP_BASE=${AGENT_IP_BASE:-20}
 
 # K3S 配置
-FLANNEL_BACKEND="${FLANNEL_BACKEND:-vxlan}"
+# FLANNEL_BACKEND="${FLANNEL_BACKEND:-vxlan}"
+FLANNEL_BACKEND="${FLANNEL_BACKEND:-host-gw}"
 DISABLE_COMPONENTS="${DISABLE_COMPONENTS:-traefik servicelb metrics-server}"
 
 # 端口映射
@@ -331,12 +332,15 @@ deploy_server_nodes() {
             --net "$NETWORK_NAME" \
             --ip "$node_ip" \
             --privileged \
+            --cgroupns=host \
+            --tmpfs /run:exec \
+            --tmpfs /var/run:exec \
             -e K3S_TOKEN="$TOKEN" \
             -e K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml \
             -v "${node_name}-data:/var/lib/rancher/k3s" \
             -v "${node_name}-output:/output" \
-            --tmpfs /run:exec \
-            --tmpfs /var/run:exec \
+            -v /lib/modules:/lib/modules:ro \
+            -v /dev:/dev \
             $port_mappings \
             rancher/k3s:$K3S_VERSION server \
             --cluster-init \
@@ -344,12 +348,14 @@ deploy_server_nodes() {
             --node-ip "$node_ip" \
             --node-external-ip "$node_ip" \
             --flannel-backend="$FLANNEL_BACKEND" \
+            --flannel-iface="eth0" \
             --disable-network-policy=false \
             $disable_args \
             --cluster-cidr "$POD_CIDR" \
             --service-cidr "$SERVICE_CIDR" \
             --cluster-dns "$CLUSTER_DNS" \
-            --node-name "$node_name"
+            --node-name "$node_name" \
+            --write-kubeconfig-mode 644
 
         log_success "Server 节点已创建：$node_name"
     done
@@ -377,10 +383,13 @@ deploy_agent_nodes() {
             --net "$NETWORK_NAME" \
             --ip "$node_ip" \
             --privileged \
-            -e K3S_TOKEN="$TOKEN" \
-            -v "${node_name}-data:/var/lib/rancher/k3s" \
+            --cgroupns=host \
             --tmpfs /run:exec \
             --tmpfs /var/run:exec \
+            -e K3S_TOKEN="$TOKEN" \
+            -v "${node_name}-data:/var/lib/rancher/k3s" \
+            -v /lib/modules:/lib/modules:ro \
+            -v /dev:/dev \
             rancher/k3s:$K3S_VERSION agent \
             --server "https://$server_ip:6443" \
             --token "$TOKEN" \
@@ -508,21 +517,19 @@ show_summary() {
     local server_ip="$NETWORK_GATEWAY"
     server_ip="${server_ip%.*}.$SERVER_IP_BASE"
 
-    cat << EOF
-
-${GREEN}=== K3S 多节点集群部署完成 ===${NC}
-
-${CYAN}集群配置:${NC}
-  集群名称：$CLUSTER_NAME
-  Server 节点：$SERVER_NODES
-  Agent 节点：$AGENT_NODES
-  总节点数：$TOTAL_NODES
-  K3S 版本：$K3S_VERSION
-  Docker 网络：$NETWORK_NAME ($NETWORK_SUBNET)
-
-${CYAN}节点信息:${NC}
-  Server:
-EOF
+    echo ""
+    echo -e "${GREEN}=== K3S 多节点集群部署完成 ===${NC}"
+    echo ""
+    echo -e "${CYAN}集群配置:${NC}"
+    echo "  集群名称：$CLUSTER_NAME"
+    echo "  Server 节点：$SERVER_NODES"
+    echo "  Agent 节点：$AGENT_NODES"
+    echo "  总节点数：$TOTAL_NODES"
+    echo "  K3S 版本：$K3S_VERSION"
+    echo "  Docker 网络：$NETWORK_NAME ($NETWORK_SUBNET)"
+    echo ""
+    echo -e "${CYAN}节点信息:${NC}"
+    echo "  Server:"
 
     for i in $(seq 1 $SERVER_NODES); do
         local node_ip="$NETWORK_GATEWAY"
@@ -530,35 +537,30 @@ EOF
         echo "    - ${NODE_PREFIX}-server-$i ($node_ip)"
     done
 
-    cat << EOF
-  Agent:
-EOF
-
+    echo "  Agent:"
     for i in $(seq 1 $AGENT_NODES); do
         local node_ip="$NETWORK_GATEWAY"
         node_ip="${node_ip%.*}.$((AGENT_IP_BASE + i))"
         echo "    - ${NODE_PREFIX}-agent-$i ($node_ip)"
     done
 
-    cat << EOF
-
-${CYAN}管理命令:${NC}
-  kubectl get nodes                    # 查看节点
-  kubectl get pods -A                  # 查看所有 Pod
-  docker ps | grep k3s-node            # 查看容器
-  docker logs k3s-node-server-1        # 查看日志
-
-${CYAN}访问 Traefik（安装后）:${NC}
-  kubectl port-forward -n traefik svc/traefik 8080:80
-  浏览器访问：http://localhost:8080
-
-${CYAN}下一步:${NC}
-  1. 安装 Traefik: sudo ./scripts/deployment/k3s/install-traefik-docker.sh
-  2. 运行健康检查：sudo ./scripts/deployment/k3s/health_check_docker.sh
-  3. 部署应用：kubectl apply -f <your-app>.yaml
-
-${GREEN}=== 部署成功 ✅ ===${NC}
-EOF
+    echo ""
+    echo -e "${CYAN}管理命令:${NC}"
+    echo "  kubectl get nodes                    # 查看节点"
+    echo "  kubectl get pods -A                  # 查看所有 Pod"
+    echo "  docker ps | grep k3s-node            # 查看容器"
+    echo "  docker logs k3s-node-server-1        # 查看日志"
+    echo ""
+    echo -e "${CYAN}访问 Traefik（安装后）:${NC}"
+    echo "  kubectl port-forward -n traefik svc/traefik 8080:80"
+    echo "  浏览器访问：http://localhost:8080"
+    echo ""
+    echo -e "${CYAN}下一步:${NC}"
+    echo "  1. 安装 Traefik: sudo ./scripts/deployment/k3s/install-traefik-docker.sh"
+    echo "  2. 运行健康检查：sudo ./scripts/deployment/k3s/health_check_docker.sh"
+    echo "  3. 部署应用：kubectl apply -f <your-app>.yaml"
+    echo ""
+    echo -e "${GREEN}=== 部署成功 ✅ ===${NC}"
 }
 
 # =============================================================================
