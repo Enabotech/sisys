@@ -607,6 +607,96 @@ sudo ./scripts/deployment/k3s/install-multi-node.sh \
 # 编辑 install-multi-node.sh，修改端口映射
 ```
 
+### Q6: Docker 容器没有期望的镜像
+
+```bash
+# =============================================================================
+# 步骤 1：给镜像打正确的 TAG（匹配 K3S 期望的名称）
+# =============================================================================
+docker tag docker.m.daocloud.io/rancher/mirrored-pause:3.6 rancher/mirrored-pause:3.6
+docker tag docker.m.daocloud.io/rancher/mirrored-coredns-coredns:1.14.1 rancher/mirrored-coredns-coredns:1.14.1
+docker tag docker.m.daocloud.io/rancher/local-path-provisioner:v0.0.34 rancher/local-path-provisioner:v0.0.34
+docker tag docker.m.daocloud.io/rancher/k3s:v1.34.5-k3s1 rancher/k3s:v1.34.5-k3s1
+docker tag docker.m.daocloud.io/library/busybox:1.35 busybox:1.35
+docker tag docker.m.daocloud.io/library/nginx:alpine nginx:alpine
+
+# =============================================================================
+# 步骤 2：导入镜像到 K3S 容器的 containerd
+# =============================================================================
+# 方法 A：使用 crictl（推荐）
+docker save rancher/mirrored-pause:3.6 | docker exec -i test-node-server-1 ctr images import -
+
+docker save rancher/mirrored-coredns-coredns:1.14.1 | docker exec -i test-node-server-1 ctr images import -
+
+docker save rancher/local-path-provisioner:v0.0.34 | docker exec -i test-node-server-1 ctr images import -
+
+docker save busybox:1.35 | docker exec -i test-node-server-1 ctr images import -
+
+docker save nginx:alpine | docker exec -i test-node-server-1 ctr images import -
+
+# =============================================================================
+# 步骤 3：验证镜像已导入
+# =============================================================================
+docker exec test-node-server-1 ctr images ls | grep rancher
+
+# =============================================================================
+# 步骤 4：删除卡住的 Pod，让它们重新创建
+# =============================================================================
+docker exec test-node-server-1 kubectl delete pod -n kube-system --all
+
+# =============================================================================
+# 步骤 5：等待并验证（60 秒后）
+# =============================================================================
+echo "等待 60 秒..."
+sleep 60
+docker exec test-node-server-1 kubectl get pods -n kube-system
+```
+
+---
+
+### Q7: K3S 测试集群完整验证
+
+```bash
+# =============================================================================
+# K3S 测试集群完整验证
+# =============================================================================
+
+# 1. 节点状态
+echo "=== 1. 节点状态 ==="
+docker exec test-node-server-1 kubectl get nodes -o wide
+
+# 2. 系统 Pod
+echo ""
+echo "=== 2. 系统组件 ==="
+docker exec test-node-server-1 kubectl get pods -n kube-system
+
+# 3. DNS 解析测试
+echo ""
+echo "=== 3. DNS 解析测试 ==="
+docker exec test-node-server-1 kubectl run test-dns --rm -it --image=busybox:1.35 -- nslookup kubernetes.default 2>&1 | head -8
+
+# 4. 外网连通性测试
+echo ""
+echo "=== 4. 外网连通性测试 ==="
+docker exec test-node-server-1 kubectl run test-net --rm -it --image=busybox:1.35 -- ping -c 3 8.8.8.8 2>&1 | tail -5
+
+# 5. 存储功能测试
+echo ""
+echo "=== 5. 存储功能测试 ==="
+docker exec test-node-server-1 kubectl get storageclass
+
+# 6. 应用部署测试
+echo ""
+echo "=== 6. 应用部署测试 ==="
+docker exec test-node-server-1 kubectl create deployment nginx --image=nginx:alpine --replicas=2
+sleep 10
+docker exec test-node-server-1 kubectl get pods -l app=nginx -o wide
+docker exec test-node-server-1 kubectl delete deployment nginx
+
+echo ""
+echo "=== 验证完成 ✅ ==="
+```
+
 ---
 
 ## ✅ 验收标准
