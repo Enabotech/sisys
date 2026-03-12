@@ -1,6 +1,7 @@
 # WSL2 K3S local-path-provisioner 存储测试文件
 # Story 0.4: K3S 集群部署（WSL2 重构版）
 # 技术栈：local-path-provisioner (K3S 内置)
+# 注意：使用固定版本镜像避免不可预测行为
 
 ---
 # 测试 PVC
@@ -29,7 +30,7 @@ metadata:
 spec:
   containers:
   - name: test-container
-    image: busybox:latest
+    image: busybox:1.36  # 使用固定版本而非 latest
     command: ["sleep", "3600"]
     volumeMounts:
     - name: test-volume
@@ -52,7 +53,7 @@ spec:
   restartPolicy: Never
   containers:
   - name: verify-container
-    image: busybox:latest
+    image: busybox:1.36  # 使用固定版本而非 latest
     command: ["sh", "-c", "echo 'Storage test successful' > /data/test.txt && cat /data/test.txt"]
     volumeMounts:
     - name: test-volume

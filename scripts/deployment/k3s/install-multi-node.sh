@@ -2,6 +2,7 @@
 # K3S 多节点集群部署脚本 - 单 WSL2 实例
 # Story 0.4: K3S 集群部署（WSL2 多节点版）
 # 技术栈：K3S v1.34.5 + Docker 容器运行多节点
+# 注意：flannel-backend 使用 vxlan 模式（与单节点配置一致）
 
 set -e
 
@@ -135,8 +136,8 @@ for i in $(seq 1 $SERVER_NODES); do
         --token $TOKEN \
         --node-ip $NODE_IP \
         --node-external-ip $NODE_IP \
-        --flannel-backend=none \
-        --disable-network-policy \
+        --flannel-backend=vxlan \
+        --disable-network-policy=false \
         --disable=servicelb \
         --disable=traefik \
         --disable=metrics-server \

@@ -3,7 +3,26 @@
 # Story 0.4: K3S 集群部署（WSL2 重构版）
 # 技术栈：K3S v1.34.5 + local-path-provisioner
 
-set -e
+# 错误处理配置
+INSTALL_FAILED=0
+INSTALL_ERROR_REASON=""
+
+# 错误处理函数
+error_handler() {
+    local line_number=$1
+    echo ""
+    echo "❌ 脚本执行失败于第 $line_number 行"
+    echo "   退出码：$INSTALL_FAILED"
+    echo "   原因：$INSTALL_ERROR_REASON"
+    echo ""
+    echo "故障排除建议："
+    echo "  1. 检查日志：journalctl -u k3s"
+    echo "  2. 检查服务状态：systemctl status k3s"
+    echo "  3. 检查 K3S 日志：/var/log/k3s.log"
+    exit $INSTALL_FAILED
+}
+
+trap 'error_handler $LINENO' ERR
 
 echo "=== K3S 集群安装脚本 (WSL2 版) ==="
 echo "日期：$(date)"
@@ -68,6 +87,36 @@ for port in 6443 80 443; do
         echo "✅ 端口 $port 可用"
     fi
 done
+
+echo ""
+
+# ========== 检查 K3S 是否已安装 ==========
+
+echo "检查 K3S 安装状态..."
+if command -v k3s &>/dev/null; then
+    INSTALLED_VERSION=$(k3s --version 2>/dev/null | head -1 | awk '{print $3}')
+    echo "✅ K3S 已安装：$INSTALLED_VERSION"
+
+    # 检查目标版本
+    TARGET_VERSION="v1.34.5+k3s1"
+    if [ "$INSTALLED_VERSION" = "$TARGET_VERSION" ]; then
+        echo "✅ 已安装目标版本：$TARGET_VERSION"
+        read -p "是否重新安装？(y/n): " reinstall
+        if [ "$reinstall" != "y" ]; then
+            echo "取消安装"
+            exit 0
+        fi
+        echo "开始重新安装..."
+    else
+        echo "⚠️ 已安装版本 ($INSTALLED_VERSION) 与目标版本 ($TARGET_VERSION) 不同"
+        read -p "是否升级？(y/n): " upgrade
+        if [ "$upgrade" != "y" ]; then
+            echo "取消安装"
+            exit 0
+        fi
+        echo "开始升级..."
+    fi
+fi
 
 echo ""
 

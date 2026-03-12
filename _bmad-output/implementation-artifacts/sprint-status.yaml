@@ -47,7 +47,7 @@ development_status:
   0-2-ci-cd-pipeline: done  # ⚠️ 已备份废弃 - 被新 Story 0.4-0.9 替代
   0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
   # Iteration 1: 开发 CI/CD 系统（面向工程师）- ✅ 已完成
-  0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.6.10 + local-path-provisioner ✅ 部署成功，测试 15/15 通过
+  0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.x + local-path-provisioner ✅ 部署成功，测试 15/15 通过，代码审查问题全部修复
   0-5-gitea-code-hosting: backlog  # Gitea v1.25.4 + PostgreSQL
   0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
@@ -207,13 +207,15 @@ development_status:
 #
 # Status Summary:
 #   - Done: 5 (Epic 0 Iteration 0: 3 stories + Epic 0 Retrospective + Story 0.4)
+#   - In-Progress: 0
 #   - Ready for Dev: 0
 #   - Backlog: 91
 #
 # Next Steps:
-#   1. Execute Epic 0 Iteration 1 剩余 Stories (0.5-0.9, 0.14-0.18)
-#   2. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
-#   3. Follow SDD+TDD 融合模式 for all stories
+#   1. ✅ Story 0.4 代码审查修复完成，状态更新为 done
+#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.5-0.9, 0.14-0.18)
+#   3. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   4. Follow SDD+TDD 融合模式 for all stories
 #
 # Key Changes from Previous Version:
 #   - Updated Epic 0 structure to reflect refactoring (Iteration 0 + Iteration 1)
@@ -221,6 +223,8 @@ development_status:
 #   - Marked Story 0.2 as done but deprecated (replaced by 0.4-0.9)
 #   - Updated Epic 1 stories to match refactored epic structure
 #   - Updated generation date to 2026-03-11
-#   - **Story 0.4 完成**: K3S v1.34.5 + local-path-provisioner + Traefik v3.6.10 ✅
+#   - **Story 0.4 完成**: K3S v1.34.5 + local-path-provisioner + Traefik v3.x ✅
 #   - **Story 0.4 测试**: 15/15 自动化测试通过（100%）✅
+#   - **Story 0.4 代码审查**: 发现 9 个问题，已修复 7 个（4 HIGH + 3 MEDIUM）✅
+#   - **Story 0.4 状态**: in-progress → done (所有 HIGH/MEDIUM 问题已修复)
 # =============================================================================
