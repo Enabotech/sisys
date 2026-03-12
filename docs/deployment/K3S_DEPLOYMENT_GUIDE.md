@@ -333,26 +333,26 @@ sudo ./scripts/deployment/k3s/install-multi-node.sh [command] [options]
 
 ```bash
 # 创建开发集群
-sudo ./scripts/deployment/k3s/install-multi-node.sh \
+sudo ./install-multi-node.sh \
   --cluster-name dev \
   --servers 1 \
   --agents 2
 
 # 创建测试集群（不映射端口，避免冲突）
-sudo ./scripts/deployment/k3s/install-multi-node.sh \
+sudo ./install-multi-node.sh \
   --cluster-name test \
   --servers 1 \
   --agents 2 \
   --no-ports
 
 # 查看集群列表
-sudo ./scripts/deployment/k3s/install-multi-node.sh list
+sudo ./install-multi-node.sh list
 
 # 查看集群详情
-sudo ./scripts/deployment/k3s/install-multi-node.sh show dev
+sudo ./install-multi-node.sh show dev
 
 # 删除测试集群
-sudo ./scripts/deployment/k3s/install-multi-node.sh delete --cluster-name test
+sudo ./install-multi-node.sh delete --cluster-name test
 ```
 
 ---

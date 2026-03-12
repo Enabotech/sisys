@@ -95,10 +95,11 @@ CLUSTER_DNS="${CLUSTER_DNS:-10.43.0.10}"
 NODE_PREFIX="${NODE_PREFIX:-k3s-node}"
 SERVER_IP_BASE=${SERVER_IP_BASE:-10}
 AGENT_IP_BASE=${AGENT_IP_BASE:-20}
+SERVER_IP_FIRST="${SERVER_IP_BASE:+$((SERVER_IP_BASE + 1))}"
 
 # K3S 配置
-# FLANNEL_BACKEND="${FLANNEL_BACKEND:-vxlan}"
-FLANNEL_BACKEND="${FLANNEL_BACKEND:-host-gw}"
+FLANNEL_BACKEND="${FLANNEL_BACKEND:-vxlan}"
+# FLANNEL_BACKEND="${FLANNEL_BACKEND:-host-gw}"
 DISABLE_COMPONENTS="${DISABLE_COMPONENTS:-traefik servicelb metrics-server}"
 
 # 端口映射
@@ -349,7 +350,7 @@ deploy_server_nodes() {
             --node-external-ip "$node_ip" \
             --flannel-backend="$FLANNEL_BACKEND" \
             --flannel-iface="eth0" \
-            --disable-network-policy=false \
+            --disable-network-policy=true \
             $disable_args \
             --cluster-cidr "$POD_CIDR" \
             --service-cidr "$SERVICE_CIDR" \
@@ -368,7 +369,7 @@ deploy_agent_nodes() {
     log_step "部署 K3S Agent 节点"
 
     local server_ip="$NETWORK_GATEWAY"
-    server_ip="${server_ip%.*}.$SERVER_IP_BASE"
+    server_ip="${server_ip%.*}.$SERVER_IP_FIRST"
 
     for i in $(seq 1 $AGENT_NODES); do
         local node_name="${NODE_PREFIX}-agent-$i"
@@ -466,7 +467,7 @@ configure_kubectl() {
 
     # 更新服务器地址
     local server_ip="$NETWORK_GATEWAY"
-    server_ip="${server_ip%.*}.$SERVER_IP_BASE"
+    server_ip="${server_ip%.*}.$SERVER_IP_FIRST"
     sed -i "s|https://127.0.0.1:6443|https://$server_ip:6443|g" "$TEMP_DIR/kubeconfig.yaml"
 
     # 复制配置
@@ -515,7 +516,7 @@ show_summary() {
 
     local total_nodes=$((SERVER_NODES + AGENT_NODES))
     local server_ip="$NETWORK_GATEWAY"
-    server_ip="${server_ip%.*}.$SERVER_IP_BASE"
+    server_ip="${server_ip%.*}.$SERVER_IP_FIRST"
 
     echo ""
     echo -e "${GREEN}=== K3S 多节点集群部署完成 ===${NC}"
