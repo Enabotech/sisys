@@ -48,23 +48,47 @@ Status: in-progress
 
 **测试状态:**
 - ✅ 测试文件已创建：`tests/deployment/test_gitea.py` (15+ 测试用例)
-- ⏸️ 测试执行：**待部署 K3S 环境后执行** (需要实际 K8s 集群)
+- ⏸️ 测试执行：**需要安装 Python 测试环境**
 - 📋 测试类型：部署测试（需要 Docker + K3S 环境）
 
-**测试执行计划:**
+**测试环境要求:**
+- Python 3.11+ (当前系统：3.10.12，需要升级或安装 pyenv)
+- Poetry 包管理器
+- Docker + Docker Compose
+- K3S 集群 (Story 0.4 已部署)
+
+**测试环境安装步骤:**
 ```bash
-# 1. 安装测试依赖
+# 1. 安装 Python 3.11+ (使用 pyenv 或系统包管理器)
+# Ubuntu/Debian:
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3.11-dev
+
+# 或使用 pyenv (推荐):
+curl https://pyenv.run | bash
+pyenv install 3.11.8
+pyenv local 3.11.8
+
+# 2. 安装 Poetry
+curl -sSL https://install.python-poetry.org | python3.11 -
+
+# 3. 安装测试依赖
 poetry install --with test
 
-# 2. 启动 K3S 测试环境 (Story 0.4 已部署)
+# 4. 启动测试环境
 docker compose -f docker/docker-compose.test.yml up -d
 
-# 3. 运行部署测试
+# 5. 运行部署测试
 poetry run pytest tests/deployment/test_gitea.py -v
 
-# 4. 生成覆盖率报告
+# 6. 生成覆盖率报告
 poetry run pytest tests/deployment/test_gitea.py --cov=src --cov-report=html
 ```
+
+**测试执行计划:**
+- Task 1 配置测试：待环境安装后执行
+- Task 2 部署测试：需要实际 K3S 集群
+- Task 5 安全测试：需要 Trivy 镜像扫描工具
 
 **测试覆盖:**
 - 部署测试：6 个测试用例
