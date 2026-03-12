@@ -338,6 +338,7 @@ deploy_server_nodes() {
             --tmpfs /var/run:exec \
             -e K3S_TOKEN="$TOKEN" \
             -e K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml \
+            -v /etc/rancher/k3s/registries.yaml:/etc/rancher/k3s/registries.yaml \
             -v "${node_name}-data:/var/lib/rancher/k3s" \
             -v "${node_name}-output:/output" \
             -v /lib/modules:/lib/modules:ro \
