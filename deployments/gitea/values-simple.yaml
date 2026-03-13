@@ -1,0 +1,133 @@
+# Gitea Helm Chart 简化配置 - Story 0.5
+# 用于快速部署测试
+
+# 基础配置
+replicaCount: 1
+
+# 镜像配置
+image:
+  repository: gitea/gitea
+  tag: "1.25.4"
+  pullPolicy: IfNotPresent
+
+# 资源限制
+resources:
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+
+# Pod 安全上下文
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+
+# 容器安全上下文
+securityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: false  # 简化配置，允许写入
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+# Gitea 应用配置
+gitea:
+  admin:
+    existingSecret: ""  # 首次部署时自动创建
+    secretKeys:
+      usernameKey: username
+      passwordKey: password  # pragma: allowlist secret (示例配置)
+      emailKey: email
+
+  config:
+    APP_NAME: "SISYS Code Hosting"
+    RUN_MODE: prod
+
+    repository:
+      ROOT: /data/git/repositories
+      DEFAULT_BRANCH: main
+
+    server:
+      DOMAIN: gitea.sisys.local
+      HTTP_PORT: 3000
+      ROOT_URL: http://gitea.sisys.local/  # 简化：先不使用 HTTPS
+      START_SSH_SERVER: false  # 暂时禁用 SSH
+
+    database:
+      DB_TYPE: sqlite3  # 简化：使用 SQLite（MVP 测试）
+
+    session:
+      PROVIDER: memory
+      GC_INTERVAL_TIME: 3600
+
+    cache:
+      ADAPTER: memory
+      INTERVAL: 60
+
+    queue:
+      TYPE: level
+      DATADIR: /data/gitea/queues
+
+    log:
+      MODE: console
+      LEVEL: info
+
+    security:
+      INSTALL_LOCK: true
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: true
+
+    service:
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: true
+
+    mailer:
+      ENABLED: false
+
+    webhook:
+      ALLOWED_HOST_LIST: external,loopback
+
+    actions:
+      ENABLED: false  # 暂时禁用 Actions
+
+# 持久化存储
+persistence:
+  enabled: true
+  storageClass: local-path
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Service 配置
+service:
+  http:
+    port: 3000
+    type: ClusterIP
+
+# 健康检查
+startupProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  failureThreshold: 30
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
