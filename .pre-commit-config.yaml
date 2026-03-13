@@ -23,10 +23,15 @@
 #   - 不允许绕过 hooks（除非紧急情况使用 --no-verify）
 #   - 自动修复优先（能自动修复的问题不阻塞提交）
 #   - 快速反馈（失败时立即显示详细错误信息）
+#
+# ⚡ 性能优化:
+#   - 使用本地工具链（poetry 已安装的包）避免重复安装
+#   - 仅检查暂存文件（staged files only）
+#   - 并行执行 hooks
 
 repos:
   # =========================================
-  # Built-in hooks
+  # Built-in hooks (轻量级基础检查)
   # =========================================
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -43,57 +48,68 @@ repos:
       - id: check-case-conflict
 
   # =========================================
-  # Ruff - Fast Python linting (强制代码质量)
+  # Ruff - Fast Python linting (使用本地安装)
   # =========================================
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.6
+  - repo: local
     hooks:
       - id: ruff
         name: "Ruff 代码检查与自动修复"
-        args: [--fix, --exit-non-zero-on-fix]
+        entry: poetry run ruff check --fix
+        language: system
+        types: [python]
         verbose: true
         # 自动修复：导入排序、代码风格、常见错误
+
       - id: ruff-format
         name: "Ruff 代码格式化"
+        entry: poetry run ruff format
+        language: system
+        types: [python]
         verbose: true
         # 强制格式化：统一代码风格
 
   # =========================================
-  # MyPy - Type checking (强制类型检查)
+  # MyPy - Type checking (使用本地安装)
   # =========================================
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+  - repo: local
     hooks:
       - id: mypy
         name: "MyPy 类型检查"
+        entry: poetry run mypy
+        language: system
+        types: [python]
         verbose: true
+        require_serial: true
         # 强制类型注解检查，提高代码可靠性
         args: [--ignore-missing-imports, --warn-return-any, --warn-unused-configs, --pretty]
 
   # =========================================
-  # Security - Bandit (强制安全检查)
+  # Security - Bandit (使用本地安装)
   # =========================================
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.4
+  - repo: local
     hooks:
       - id: bandit
         name: "Bandit 安全漏洞扫描"
+        entry: poetry run bandit
+        language: system
+        types: [python]
         verbose: true
         args: ["--skip", "B101,B404,B603,B607"]
         # 强制安全扫描：检测常见安全漏洞
         # 跳过：B101(断言), B404(subprocess), B603(subprocess 无 shell), B607(部分 shell 使用)
 
   # =========================================
-  # Secret Detection - 强制密钥检测
+  # Secret Detection - 密钥检测 (使用本地安装)
   # =========================================
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+  - repo: local
     hooks:
       - id: detect-secrets
         name: "检测密钥泄露"
-        verbose: true
+        entry: poetry run detect-secrets-hook
+        language: system
         args: ['--baseline', '.secrets.baseline']
         exclude: package.lock.json
+        verbose: true
         # 强制检测：防止密钥、密码、Token 等敏感信息提交
 
   # =========================================
