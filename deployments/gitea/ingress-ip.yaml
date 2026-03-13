@@ -1,0 +1,26 @@
+# Gitea Ingress - 支持 IP 直接访问（Windows 主机）
+# 描述：添加默认后端，允许通过 IP 地址访问
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea-ingress-ip
+  namespace: gitea
+  labels:
+    app: gitea
+  annotations:
+    # 同时支持 HTTP 和 HTTPS 入口点
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+spec:
+  ingressClassName: traefik
+  # 不指定 host，允许所有 Host 头匹配
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gitea-http
+                port:
+                  number: 3000

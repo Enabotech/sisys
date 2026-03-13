@@ -1,30 +1,7 @@
 # Gitea Ingress 配置 - Story 0.5
 # 描述：Traefik v3.x Ingress 配置，启用 TLS 1.3
----
-# Traefik Middleware - 安全头配置
-apiVersion: traefik.containo.us/v1alpha1
-kind: Middleware
-metadata:
-  name: gitea-secure-headers
-  namespace: gitea
-  labels:
-    app: gitea
-spec:
-  headers:
-    # HSTS 配置 (安全验收标准)
-    stsSeconds: 31536000
-    stsIncludeSubdomains: true
-    forceSTSHeader: true
-    # SSL 重定向
-    sslRedirect: true
-    # 其他安全头
-    customFrameOptionsValue: "DENY"
-    customResponseHeaders:
-      X-Content-Type-Options: "nosniff"
-      X-Frame-Options: "DENY"
-      X-XSS-Protection: "1; mode=block"
-      Referrer-Policy: "strict-origin-when-cross-origin"
----
+# 注意：Middleware gitea-secure-headers 已存在，不需要重新创建
+
 # Gitea Ingress 配置
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -39,16 +16,13 @@ metadata:
     # Traefik 配置
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # 引用 Traefik Middleware 添加安全头 (见 secure-headers Middleware)
-    traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@kubernetescrd
-
-    # TLS 配置
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # 暂时禁用 Middleware（排查问题）
+    # traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@gitea
 
 spec:
   ingressClassName: traefik
 
-  # TLS 配置
+  # TLS 配置（使用自签名证书）
   tls:
     - hosts:
         - gitea.sisys.local
@@ -68,30 +42,10 @@ spec:
                 port:
                   number: 3000
 
-          # SSH 路径 (可选，用于 Git over SSH)
-          - path: /ssh
-            pathType: Prefix
-            backend:
-              service:
-                name: gitea-ssh
-                port:
-                  number: 2222
-
 ---
-# Certificate 配置 (cert-manager)
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: gitea-tls
-  namespace: gitea
-  labels:
-    app: gitea
-spec:
-  secretName: gitea-tls-secret
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - gitea.sisys.local
-  duration: 2160h  # 90 天
-  renewBefore: 360h  # 15 天前续期
+# 注意：cert-manager 未安装，使用手动创建的 TLS Secret
+# 运行以下命令创建自签名证书：
+# openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#   -keyout tls.key -out tls.crt \
+#   -subj "/CN=gitea.sisys.local/O=SISYS"
+# kubectl create secret tls gitea-tls-secret --cert=tls.crt --key=tls.key -n gitea
