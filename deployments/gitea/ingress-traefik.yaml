@@ -1,0 +1,54 @@
+# Gitea Traefik Ingress 配置 - Story 0.5 Task 3
+# 使用 Traefik 默认 TLS（自签名证书）
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea-ingress
+  namespace: gitea
+  annotations:
+    # Traefik 配置
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+
+    # 安全响应头（HSTS）
+    traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@kubernetescrd
+
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: gitea.sisys.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gitea-http
+            port:
+              number: 3000
+  tls:
+  - hosts:
+    - gitea.sisys.local
+    secretName: gitea-tls-secret  # pragma: allowlist secret (TLS 配置示例)
+
+---
+# Traefik Middleware - 安全响应头
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: gitea-secure-headers
+  namespace: gitea
+spec:
+  headers:
+    # HSTS - HTTP Strict Transport Security
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000  # 1 年
+
+    # 其他安全头
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    permissionsPolicy: "camera=(), microphone=(), geolocation=()"
