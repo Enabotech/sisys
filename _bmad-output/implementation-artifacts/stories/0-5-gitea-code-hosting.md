@@ -848,14 +848,56 @@ sisys/
 
 **部署详情:**
 - 命名空间：gitea
-- Helm Release: gitea (Revision 1)
+- Helm Release: gitea (Revision 2)
 - 部署时间：2026-03-13 21:17
+- 升级时间：2026-03-13 21:45 (密码策略配置)
 - 状态：deployed
 
 **测试结果:**
 - ✅ Pod 状态：Running (1/1)
 - ✅ 健康检查：{ status: "pass", database: "pass", cache: "pass" }
 - ✅ 服务访问：kubectl port-forward 测试通过
+
+### 2026-03-13 - Gitea 功能测试验证
+
+**测试项目:**
+
+1. **健康检查 API** ✅
+   - 端点：`/api/healthz`
+   - 结果：HTTP 200, status: "pass"
+   - 数据库：SQLite3 ✅
+   - 缓存：Redis/Valkey ✅
+
+2. **管理员账号** ✅
+   - 用户名：`gitea_admin`
+   - 密码策略：12 位 + 大小写 + 数字 + 特殊符号 ✅
+   - 状态：需要首次登录修改密码（安全策略）
+
+3. **测试用户创建** ✅
+   - 用户名：`test-user`
+   - 邮箱：`test@sisys.local`
+   - API Token 创建成功 ✅
+
+4. **仓库管理 API** ✅
+   - 创建仓库：`test-user/test-repo` ✅
+   - 获取仓库列表 ✅
+   - 仓库描述：支持中文 ✅
+
+5. **密码策略验证** ✅
+   - 最小长度：12 位
+   - 复杂度要求：大写字母 + 小写字母 + 数字 + 特殊符号
+   - 测试：短密码被拒绝 ✅
+
+**部署状态:**
+- Helm Release: gitea (Revision 2)
+- Chart: gitea-12.5.0
+- App Version: 1.25.4
+- 命名空间：gitea
+
+**访问方式:**
+- HTTP: http://localhost:3000 (port-forward)
+- API: http://localhost:3000/api/v1
+- HTTPS: https://gitea.sisys.local:3000 (需要 Traefik 外部访问)
 
 ### 2026-03-12 - Task 1: Gitea Helm Chart 配置完成
 
