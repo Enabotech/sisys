@@ -1,0 +1,152 @@
+# Gitea Helm Chart 配置 - Story 0.5 MVP 简化版
+# 使用 gitea/gitea 镜像（含内置 PostgreSQL）
+
+# 镜像配置 - 使用官方推荐镜像
+image:
+  repository: gitea/gitea
+  tag: "1.25.4"  # 最新稳定版
+  pullPolicy: IfNotPresent
+
+# 使用 gitea/gitea 镜像（包含所有依赖）
+gitea:
+  # 管理员账号（首次启动自动创建）
+  admin:
+    existingSecret: ""
+    secretKeys:
+      usernameKey: username
+      passwordKey: password  # pragma: allowlist secret (示例配置，实际部署使用 Secret)
+
+  # 应用配置
+  config:
+    APP_NAME: "SISYS Code Hosting"
+    RUN_MODE: prod
+
+    repository:
+      ROOT: /data/git/repositories
+      DEFAULT_BRANCH: main
+
+    server:
+      DOMAIN: gitea.sisys.local
+      HTTP_PORT: 3000
+      ROOT_URL: http://gitea.sisys.local/
+      START_SSH_SERVER: false
+
+    database:
+      DB_TYPE: postgres
+      HOST: localhost:5432
+      NAME: gitea
+      USER: gitea
+      PASSWD: gitea  # pragma: allowlist secret (示例密码，实际部署使用 Secret)
+      SSL_MODE: disable
+
+    session:
+      PROVIDER: memory
+
+    cache:
+      ADAPTER: memory
+
+    queue:
+      TYPE: level
+      DATADIR: /data/gitea/queues
+
+    log:
+      MODE: console
+      LEVEL: info
+
+    security:
+      INSTALL_LOCK: true
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: true
+      PASSWORD_COMPLEXITY: "upper,lower,digit"  # pragma: allowlist secret (配置示例)
+      MIN_PASSWORD_LENGTH: 8
+
+    service:
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: true
+
+    mailer:
+      ENABLED: false
+
+    webhook:
+      ALLOWED_HOST_LIST: external,loopback
+
+    actions:
+      ENABLED: false  # 暂时禁用
+
+# 单副本
+replicaCount: 1
+
+# 资源限制
+resources:
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+
+# 持久化存储
+persistence:
+  enabled: true
+  storageClass: local-path
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Service 配置
+service:
+  http:
+    port: 3000
+    type: ClusterIP
+
+# 健康检查
+startupProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  failureThreshold: 30
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# PostgreSQL 子 chart（禁用 HA，使用单实例）
+postgresql:
+  enabled: true
+  ha:
+    enabled: false  # 禁用 HA 模式
+  auth:
+    postgresPassword: gitea  # pragma: allowlist secret (示例密码)
+    username: gitea
+    password: gitea  # pragma: allowlist secret (示例密码)
+    database: gitea
+  primary:
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 10Gi
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+
+# 确保禁用 postgresql-ha
+postgresql-ha:
+  enabled: false
