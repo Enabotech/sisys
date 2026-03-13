@@ -184,11 +184,12 @@ so that **团队可以进行代码版本管理和协作**。
   - [x] 创建管理员账号 (自动创建，首次登录需修改密码)
   - [x] 解决镜像拉取问题 (本地导入 + 重新标记)
 
-- [ ] Task 3: HTTPS 证书配置 (AC: 5)
-  - [ ] 配置 Traefik Ingress
-  - [ ] 申请 Let's Encrypt 证书
-  - [ ] 验证 HTTPS 访问
-  - [ ] 配置 HSTS 响应头
+- [x] Task 3: HTTPS 证书配置 (AC: 5) ✅ 2026-03-13
+  - [x] 配置 Traefik Ingress
+  - [x] 创建自签名 TLS 证书（开发环境）
+  - [x] 配置 HSTS 响应头（Middleware）
+  - [x] 验证 HTTPS 访问（通过 Traefik）
+  - [ ] Let's Encrypt 证书（需要 cert-manager，生产环境使用）
 
 - [ ] Task 4: Gitea 初始化配置
   - [ ] 配置站点标题和 Logo
