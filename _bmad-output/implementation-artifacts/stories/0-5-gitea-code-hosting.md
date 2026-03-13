@@ -191,12 +191,12 @@ so that **团队可以进行代码版本管理和协作**。
   - [x] 验证 HTTPS 访问（通过 Traefik）
   - [ ] Let's Encrypt 证书（需要 cert-manager，生产环境使用）
 
-- [ ] Task 4: Gitea 初始化配置
-  - [ ] 配置站点标题和 Logo
-  - [ ] 配置用户注册策略 (禁用普通用户注册)
-  - [ ] 配置 Git LFS 支持
-  - [ ] 配置管理员密码复杂度要求
-  - [ ] 配置 2FA (推荐管理员强制启用)
+- [x] Task 4: Gitea 初始化配置 ✅ 2026-03-13
+  - [x] 配置站点标题和 Logo（SISYS Code Hosting）
+  - [x] 配置用户注册策略（DISABLE_REGISTRATION = true）
+  - [x] 配置 Git LFS 支持（LFS_JWT_SECRET 已生成）
+  - [x] 配置管理员密码复杂度要求（12 位 + 大小写 + 数字 + 特殊符号）
+  - [x] 配置 2FA（支持，用户可选启用）
 
 - [ ] Task 5: 安全加固 (安全验收标准)
   - [x] 配置容器以非 root 用户运行 (values.yaml securityContext)

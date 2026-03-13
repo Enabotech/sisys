@@ -26,6 +26,9 @@ gitea:
     security:
       INSTALL_LOCK: true
       DISABLE_REGISTRATION: true
+      PASSWORD_COMPLEXITY: "upper,lower,digit,special"  # pragma: allowlist secret (密码策略配置)
+      MIN_PASSWORD_LENGTH: 12
+      REQUIRE_EXTERNAL_LOGIN: false
     actions:
       ENABLED: false
 
