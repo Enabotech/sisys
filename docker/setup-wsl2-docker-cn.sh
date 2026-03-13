@@ -30,7 +30,7 @@ if ps aux | grep -v grep | grep systemd > /dev/null; then
     echo "[OK] systemd 已启用"
 else
     echo "[INFO] systemd 未启用，正在配置..."
-    
+
     # 创建 wsl.conf
     if [ ! -f /etc/wsl.conf ]; then
         sudo bash -c 'cat > /etc/wsl.conf << EOF
@@ -113,13 +113,13 @@ cd "$(dirname "$0")"
 
 for image_map in "${IMAGES[@]}"; do
     IFS=':' read -r mirror_repo mirror_tag official_repo official_tag <<< "$image_map"
-    
+
     mirror_image="${mirror_repo}:${mirror_tag}"
     official_image="${official_repo}:${official_tag}"
-    
+
     echo ""
     echo "[PULL] 拉取：$official_image"
-    
+
     if docker image inspect "$official_image" &> /dev/null; then
         echo "[OK] 镜像已存在：$official_image"
     else
@@ -142,11 +142,11 @@ echo "[STEP 5/5] 启动 Docker Compose 服务..."
 
 if [ -f "docker-compose.yml" ]; then
     docker compose up -d
-    
+
     # 等待服务启动
     echo "[INFO] 等待服务启动..."
     sleep 10
-    
+
     # 检查状态
     echo ""
     echo "=== 服务状态 ==="

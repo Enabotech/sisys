@@ -593,7 +593,7 @@ const sisysTokens = {
     success: '#52c41a',      // 成功状态
     warning: '#faad14',      // 警告状态
     danger: '#ff4d4f',       // 危险状态
-    
+
     // 高管视图状态色
     status: {
       green: '#73d13d',      // 正常/完成
@@ -601,13 +601,13 @@ const sisysTokens = {
       red: '#ff7875',        // 风险/延期
     }
   },
-  
+
   // 字体令牌
   fontFamily: {
     base: 'PingFang SC, Microsoft YaHei, sans-serif',
     code: 'Consolas, Monaco, monospace',
   },
-  
+
   // 间距令牌
   spacing: {
     xs: '4px',
@@ -616,14 +616,14 @@ const sisysTokens = {
     lg: '24px',
     xl: '32px',
   },
-  
+
   // 圆角令牌
   borderRadius: {
     sm: '4px',
     md: '8px',
     lg: '12px',
   },
-  
+
   // 阴影令牌
   shadow: {
     sm: '0 1px 2px rgba(0,0,0,0.1)',
@@ -647,9 +647,9 @@ interface BrandConfig {
 }
 
 // 主题切换组件
-const BrandThemeProvider: React.FC<{ brandConfig: BrandConfig }> = ({ 
-  brandConfig, 
-  children 
+const BrandThemeProvider: React.FC<{ brandConfig: BrandConfig }> = ({
+  brandConfig,
+  children
 }) => {
   return (
     <ConfigProvider
@@ -1011,19 +1011,19 @@ E2E 测试 (10%)
 
 ```css
 /* 中文优先字体栈 - 企业级专业感 */
-font-family: 
+font-family:
   'PingFang SC',           /* 苹果中文 - macOS/iOS - 首选 */
   'Microsoft YaHei',       /* 微软雅黑 - Windows - 备用 */
   'Helvetica Neue',        /* 西文备用 */
-  'Helvetica', 
-  'Arial', 
+  'Helvetica',
+  'Arial',
   sans-serif;
 
 /* 代码/数据字体 */
-font-family: 
-  'Consolas', 
-  'Monaco', 
-  'Courier New', 
+font-family:
+  'Consolas',
+  'Monaco',
+  'Courier New',
   monospace;
 ```
 
@@ -1200,17 +1200,17 @@ const sisysDesignTokens = {
     primaryHover: '#096dd9',
     primaryActive: '#40a9ff',
     primaryBg: '#e6f7ff',
-    
+
     success: '#52c41a',
     warning: '#faad14',
     danger: '#ff4d4f',
     info: '#1890ff',
-    
+
     // 高管视图状态色
     statusGreen: '#73d13d',
     statusYellow: '#ffc53d',
     statusRed: '#ff7875',
-    
+
     // 中性色
     textPrimary: '#262626',
     textSecondary: '#595959',
@@ -1220,13 +1220,13 @@ const sisysDesignTokens = {
     border: '#e8e8e8',
     white: '#ffffff',
   },
-  
+
   // 字体令牌
   fontFamily: {
     base: 'PingFang SC, Microsoft YaHei, sans-serif',
     code: 'Consolas, Monaco, monospace',
   },
-  
+
   fontSize: {
     xs: '12px',
     sm: '14px',
@@ -1236,7 +1236,7 @@ const sisysDesignTokens = {
     '2xl': '30px',
     '3xl': '38px',
   },
-  
+
   fontWeight: {
     light: '300',
     regular: '400',
@@ -1244,13 +1244,13 @@ const sisysDesignTokens = {
     semiBold: '600',
     bold: '700',
   },
-  
+
   lineHeight: {
     tight: '1.2',
     base: '1.5',
     relaxed: '1.8',
   },
-  
+
   // 间距令牌
   spacing: {
     xs: '4px',
@@ -1261,7 +1261,7 @@ const sisysDesignTokens = {
     '2xl': '48px',
     '3xl': '64px',
   },
-  
+
   // 圆角令牌
   borderRadius: {
     sm: '4px',
@@ -1270,7 +1270,7 @@ const sisysDesignTokens = {
     xl: '16px',
     full: '9999px',
   },
-  
+
   // 阴影令牌
   shadow: {
     sm: '0 1px 2px rgba(0,0,0,0.1)',
@@ -1813,7 +1813,6 @@ BLM 流程旅程（主线流程）
 
 **What would you like to do?**
 
-**[A]** 使用高级引导协议深化某个旅程细节  
-**[P]** Party Mode - 邀请多方视角评审完整旅程地图  
+**[A]** 使用高级引导协议深化某个旅程细节
+**[P]** Party Mode - 邀请多方视角评审完整旅程地图
 **[C]** Continue - 完成 UX 设计规格文档，准备进入实施阶段
-

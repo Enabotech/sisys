@@ -59,15 +59,15 @@ gitea:
       usernameKey: username
       passwordKey: password
       emailKey: email
-  
+
   config:
     APP_NAME: "SISYS Code Hosting"
     RUN_MODE: prod
-    
+
     repository:
       ROOT: /data/git/repositories
       DEFAULT_BRANCH: main
-    
+
     server:
       DOMAIN: gitea.sisys.local
       HTTP_PORT: 3000
@@ -76,7 +76,7 @@ gitea:
       SSH_PORT: 2222
       SSH_DOMAIN: gitea.sisys.local
       SSH_ROOT_URL: ssh://gitea.sisys.local:2222
-    
+
     database:
       DB_TYPE: postgres
       HOST: gitea-postgresql:5432
@@ -84,23 +84,23 @@ gitea:
       USER: gitea
       PASSWD: ""  # 从 Secret 加载
       SSL_MODE: disable
-    
+
     session:
       PROVIDER: memory
       GC_INTERVAL_TIME: 3600
-    
+
     cache:
       ADAPTER: memory
       INTERVAL: 60
-    
+
     queue:
       TYPE: level
       DATADIR: /data/gitea/queues
-    
+
     log:
       MODE: console
       LEVEL: info
-    
+
     security:
       INSTALL_LOCK: true
       SECRET_KEY: ""  # 从 Secret 加载
@@ -112,29 +112,29 @@ gitea:
       ENABLE_BASIC_AUTHENTICATION: true
       ENABLE_REVERSE_PROXY_AUTHENTICATION: false
       ENABLE_REVERSE_PROXY_AUTO_REGISTRATION: false
-    
+
     service:
       DISABLE_REGISTRATION: true
       REQUIRE_SIGNIN_VIEW: true
       DEFAULT_KEEP_EMAIL_PRIVATE: true
       DEFAULT_ALLOW_CREATE_ORGANIZATION: true
       ENABLE_NOTIFY_MAIL: false
-    
+
     mailer:
       ENABLED: false  # MVP 阶段不配置邮件
-    
+
     openid:
       ENABLE_OPENID_SIGNIN: false
       ENABLE_OPENID_SIGNUP: false
-    
+
     oauth2:
       ENABLE: true
       JWT_SECRET: ""  # 从 Secret 加载
-    
+
     webhook:
       ALLOWED_HOST_LIST: external,loopback
       SKIP_TLS_VERIFY: false
-    
+
     actions:
       ENABLED: true  # 启用 Gitea Actions (Story 0.9 准备)
       DEFAULT_ACTIONS_URL: github

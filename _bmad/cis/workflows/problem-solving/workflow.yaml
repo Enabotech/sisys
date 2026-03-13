@@ -25,4 +25,3 @@ solving_methods: "{installed_path}/solving-methods.csv"
 default_output_file: "{output_folder}/problem-solution-{{date}}.md"
 
 standalone: true
-
