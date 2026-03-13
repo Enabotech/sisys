@@ -12,16 +12,16 @@
       --color-primary-hover: #096dd9;
       --color-primary-active: #40a9ff;
       --color-primary-bg: #e6f7ff;
-      
+
       --color-success: #52c41a;
       --color-warning: #faad14;
       --color-danger: #ff4d4f;
       --color-info: #1890ff;
-      
+
       --color-status-green: #73d13d;
       --color-status-yellow: #ffc53d;
       --color-status-red: #ff7875;
-      
+
       --color-text-primary: #262626;
       --color-text-secondary: #595959;
       --color-text-tertiary: #8c8c8c;
@@ -29,11 +29,11 @@
       --color-bg-primary: #f5f5f5;
       --color-border: #e8e8e8;
       --color-white: #ffffff;
-      
+
       /* 字体令牌 */
       --font-family-base: 'PingFang SC', 'Microsoft YaHei', sans-serif;
       --font-family-code: 'Consolas', 'Monaco', monospace;
-      
+
       /* 间距令牌 */
       --spacing-xs: 4px;
       --spacing-sm: 8px;
@@ -42,33 +42,33 @@
       --spacing-xl: 32px;
       --spacing-2xl: 48px;
       --spacing-3xl: 64px;
-      
+
       /* 圆角令牌 */
       --radius-sm: 4px;
       --radius-md: 8px;
       --radius-lg: 12px;
       --radius-xl: 16px;
-      
+
       /* 阴影令牌 */
       --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
       --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
       --shadow-lg: 0 8px 16px rgba(0,0,0,0.15);
       --shadow-xl: 0 12px 24px rgba(0,0,0,0.2);
     }
-    
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: var(--font-family-base);
       background: var(--color-bg-primary);
       color: var(--color-text-primary);
       line-height: 1.6;
     }
-    
+
     /* 导航样式 */
     .nav {
       background: var(--color-white);
@@ -79,20 +79,20 @@
       z-index: 100;
       box-shadow: var(--shadow-sm);
     }
-    
+
     .nav h1 {
       font-size: 24px;
       font-weight: 600;
       color: var(--color-primary);
       margin-bottom: var(--spacing-sm);
     }
-    
+
     .nav-links {
       display: flex;
       gap: var(--spacing-md);
       flex-wrap: wrap;
     }
-    
+
     .nav-links a {
       color: var(--color-text-secondary);
       text-decoration: none;
@@ -100,23 +100,23 @@
       border-radius: var(--radius-sm);
       transition: all 0.2s;
     }
-    
+
     .nav-links a:hover {
       background: var(--color-primary-bg);
       color: var(--color-primary);
     }
-    
+
     /* 主内容区 */
     .main {
       max-width: 1400px;
       margin: 0 auto;
       padding: var(--spacing-2xl);
     }
-    
+
     .section {
       margin-bottom: var(--spacing-3xl);
     }
-    
+
     .section-title {
       font-size: 30px;
       font-weight: 600;
@@ -125,13 +125,13 @@
       border-left: 4px solid var(--color-primary);
       padding-left: var(--spacing-md);
     }
-    
+
     .section-desc {
       font-size: 16px;
       color: var(--color-text-secondary);
       margin-bottom: var(--spacing-xl);
     }
-    
+
     /* 设计方向卡片 */
     .direction-grid {
       display: grid;
@@ -139,7 +139,7 @@
       gap: var(--spacing-xl);
       margin-bottom: var(--spacing-2xl);
     }
-    
+
     .direction-card {
       background: var(--color-white);
       border-radius: var(--radius-lg);
@@ -147,33 +147,33 @@
       overflow: hidden;
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    
+
     .direction-card:hover {
       transform: translateY(-4px);
       box-shadow: var(--shadow-xl);
     }
-    
+
     .direction-header {
       background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
       color: white;
       padding: var(--spacing-lg);
     }
-    
+
     .direction-header h3 {
       font-size: 20px;
       font-weight: 600;
       margin-bottom: var(--spacing-xs);
     }
-    
+
     .direction-header p {
       font-size: 14px;
       opacity: 0.9;
     }
-    
+
     .direction-body {
       padding: var(--spacing-lg);
     }
-    
+
     .direction-feature {
       display: flex;
       align-items: flex-start;
@@ -181,13 +181,13 @@
       margin-bottom: var(--spacing-sm);
       font-size: 14px;
     }
-    
+
     .direction-feature::before {
       content: '✓';
       color: var(--color-success);
       font-weight: bold;
     }
-    
+
     .direction-tag {
       display: inline-block;
       padding: var(--spacing-xs) var(--spacing-sm);
@@ -199,7 +199,7 @@
       margin-right: var(--spacing-xs);
       margin-bottom: var(--spacing-xs);
     }
-    
+
     /* 样机展示区 */
     .mockup-container {
       background: var(--color-white);
@@ -208,7 +208,7 @@
       margin-bottom: var(--spacing-2xl);
       overflow: hidden;
     }
-    
+
     .mockup-header {
       background: var(--color-bg-primary);
       border-bottom: 1px solid var(--color-border);
@@ -217,16 +217,16 @@
       justify-content: space-between;
       align-items: center;
     }
-    
+
     .mockup-header h3 {
       font-size: 18px;
       font-weight: 600;
     }
-    
+
     .mockup-body {
       padding: var(--spacing-xl);
     }
-    
+
     /* 高管仪表盘样机 */
     .dashboard-grid {
       display: grid;
@@ -234,7 +234,7 @@
       gap: var(--spacing-lg);
       margin-bottom: var(--spacing-xl);
     }
-    
+
     .stat-card {
       background: var(--color-white);
       border: 1px solid var(--color-border);
@@ -242,28 +242,28 @@
       padding: var(--spacing-lg);
       box-shadow: var(--shadow-sm);
     }
-    
+
     .stat-card.success { border-top: 3px solid var(--color-success); }
     .stat-card.warning { border-top: 3px solid var(--color-warning); }
     .stat-card.danger { border-top: 3px solid var(--color-danger); }
-    
+
     .stat-icon {
       font-size: 24px;
       margin-bottom: var(--spacing-sm);
     }
-    
+
     .stat-value {
       font-size: 28px;
       font-weight: 600;
       margin-bottom: var(--spacing-xs);
     }
-    
+
     .stat-label {
       font-size: 14px;
       color: var(--color-text-secondary);
       margin-bottom: var(--spacing-md);
     }
-    
+
     .stat-btn {
       display: inline-block;
       padding: var(--spacing-xs) var(--spacing-md);
@@ -275,11 +275,11 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    
+
     .stat-btn:hover {
       background: var(--color-primary-hover);
     }
-    
+
     /* 进度条 */
     .progress-section {
       background: var(--color-white);
@@ -288,13 +288,13 @@
       padding: var(--spacing-lg);
       margin-bottom: var(--spacing-xl);
     }
-    
+
     .progress-title {
       font-size: 16px;
       font-weight: 600;
       margin-bottom: var(--spacing-md);
     }
-    
+
     .progress-bar {
       height: 12px;
       background: var(--color-bg-primary);
@@ -302,21 +302,21 @@
       overflow: hidden;
       margin-bottom: var(--spacing-md);
     }
-    
+
     .progress-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--color-primary), var(--color-primary-active));
       border-radius: var(--radius-sm);
       transition: width 0.3s;
     }
-    
+
     .progress-stages {
       display: flex;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: var(--spacing-sm);
     }
-    
+
     .stage {
       display: flex;
       align-items: center;
@@ -324,7 +324,7 @@
       font-size: 12px;
       color: var(--color-text-secondary);
     }
-    
+
     .stage-icon {
       width: 20px;
       height: 20px;
@@ -334,22 +334,22 @@
       justify-content: center;
       font-size: 12px;
     }
-    
+
     .stage-icon.done {
       background: var(--color-success);
       color: white;
     }
-    
+
     .stage-icon.active {
       background: var(--color-primary);
       color: white;
     }
-    
+
     .stage-icon.pending {
       background: var(--color-bg-primary);
       color: var(--color-text-disabled);
     }
-    
+
     /* 溯源卡片样机 */
     .source-tracing-demo {
       background: var(--color-white);
@@ -357,13 +357,13 @@
       border-radius: var(--radius-md);
       padding: var(--spacing-lg);
     }
-    
+
     .source-text {
       font-size: 16px;
       line-height: 1.8;
       margin-bottom: var(--spacing-lg);
     }
-    
+
     .source-link {
       color: var(--color-primary);
       text-decoration: underline;
@@ -372,11 +372,11 @@
       border-radius: var(--radius-sm);
       transition: background 0.2s;
     }
-    
+
     .source-link:hover {
       background: var(--color-primary-bg);
     }
-    
+
     .source-card {
       display: none;
       position: fixed;
@@ -391,17 +391,17 @@
       max-width: 500px;
       width: 90%;
     }
-    
+
     .source-card.show {
       display: block;
       animation: fadeIn 0.2s ease-out;
     }
-    
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translate(-50%, -45%); }
       to { opacity: 1; transform: translate(-50%, -50%); }
     }
-    
+
     .source-card-header {
       background: var(--color-bg-primary);
       border-bottom: 1px solid var(--color-border);
@@ -411,12 +411,12 @@
       align-items: center;
       border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
-    
+
     .source-card-title {
       font-size: 16px;
       font-weight: 600;
     }
-    
+
     .source-card-close {
       background: none;
       border: none;
@@ -424,26 +424,26 @@
       cursor: pointer;
       color: var(--color-text-tertiary);
     }
-    
+
     .source-card-body {
       padding: var(--spacing-lg);
     }
-    
+
     .source-info {
       margin-bottom: var(--spacing-md);
     }
-    
+
     .source-info-label {
       font-size: 12px;
       color: var(--color-text-tertiary);
       margin-bottom: var(--spacing-xs);
     }
-    
+
     .source-info-value {
       font-size: 14px;
       color: var(--color-text-primary);
     }
-    
+
     .confidence-badge {
       display: inline-flex;
       align-items: center;
@@ -455,7 +455,7 @@
       font-size: 12px;
       color: var(--color-success);
     }
-    
+
     .source-quote {
       background: var(--color-bg-primary);
       padding: var(--spacing-md);
@@ -465,12 +465,12 @@
       margin-bottom: var(--spacing-lg);
       border-left: 3px solid var(--color-primary);
     }
-    
+
     .source-actions {
       display: flex;
       gap: var(--spacing-sm);
     }
-    
+
     .source-btn {
       flex: 1;
       padding: var(--spacing-sm) var(--spacing-md);
@@ -480,32 +480,32 @@
       cursor: pointer;
       transition: all 0.2s;
     }
-    
+
     .source-btn-primary {
       background: var(--color-primary);
       color: white;
     }
-    
+
     .source-btn-primary:hover {
       background: var(--color-primary-hover);
     }
-    
+
     .source-btn-secondary {
       background: var(--color-bg-primary);
       color: var(--color-text-primary);
     }
-    
+
     .source-btn-secondary:hover {
       background: var(--color-border);
     }
-    
+
     /* 品牌配置样机 */
     .brand-config-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: var(--spacing-xl);
     }
-    
+
     .config-section {
       background: var(--color-white);
       border: 1px solid var(--color-border);
@@ -513,19 +513,19 @@
       padding: var(--spacing-lg);
       margin-bottom: var(--spacing-lg);
     }
-    
+
     .config-label {
       font-size: 14px;
       font-weight: 600;
       margin-bottom: var(--spacing-sm);
     }
-    
+
     .color-picker {
       display: flex;
       gap: var(--spacing-sm);
       align-items: center;
     }
-    
+
     .color-swatch {
       width: 40px;
       height: 40px;
@@ -533,7 +533,7 @@
       border: 2px solid var(--color-border);
       cursor: pointer;
     }
-    
+
     .color-input {
       flex: 1;
       padding: var(--spacing-sm);
@@ -541,44 +541,44 @@
       border-radius: var(--radius-sm);
       font-size: 14px;
     }
-    
+
     .preview-box {
       background: var(--color-bg-primary);
       border-radius: var(--radius-md);
       padding: var(--spacing-lg);
       text-align: center;
     }
-    
+
     .preview-logo {
       font-size: 24px;
       font-weight: 600;
       margin-bottom: var(--spacing-md);
     }
-    
+
     .preview-title {
       font-size: 18px;
       margin-bottom: var(--spacing-sm);
     }
-    
+
     /* 响应式 */
     @media (max-width: 768px) {
       .dashboard-grid {
         grid-template-columns: 1fr;
       }
-      
+
       .brand-config-grid {
         grid-template-columns: 1fr;
       }
-      
+
       .direction-grid {
         grid-template-columns: 1fr;
       }
-      
+
       .main {
         padding: var(--spacing-md);
       }
     }
-    
+
     /* 覆盖层 */
     .overlay {
       display: none;
@@ -590,7 +590,7 @@
       background: rgba(0, 0, 0, 0.5);
       z-index: 999;
     }
-    
+
     .overlay.show {
       display: block;
     }
@@ -608,10 +608,10 @@
       <a href="#white-label">白标报告</a>
     </div>
   </nav>
-  
+
   <!-- 主内容 -->
   <main class="main">
-    
+
     <!-- 设计方向概览 -->
     <section id="directions" class="section">
       <h2 class="section-title">设计方向探索</h2>
@@ -619,7 +619,7 @@
         基于 sisys 的品牌定位（专业权威 + 智能简洁）和情感目标（掌控感/成就感/信任感/专业感），
         我们探索了以下设计方向。每个方向都代表一种完整的视觉策略。
       </p>
-      
+
       <div class="direction-grid">
         <!-- 方向 1 -->
         <div class="direction-card">
@@ -639,7 +639,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 方向 2 -->
         <div class="direction-card">
           <div class="direction-header">
@@ -658,7 +658,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 方向 3 -->
         <div class="direction-card">
           <div class="direction-header">
@@ -677,7 +677,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 方向 4 -->
         <div class="direction-card">
           <div class="direction-header">
@@ -696,7 +696,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 方向 5 -->
         <div class="direction-card">
           <div class="direction-header">
@@ -715,7 +715,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 方向 6 -->
         <div class="direction-card">
           <div class="direction-header">
@@ -736,14 +736,14 @@
         </div>
       </div>
     </section>
-    
+
     <!-- 高管仪表盘样机 -->
     <section id="dashboard" class="section">
       <h2 class="section-title">高管仪表盘样机（方向 1: 高管优先）</h2>
       <p class="section-desc">
         第一屏仅显示 3 个关键指标，5 秒内理解态势，30 秒内做出决策。
       </p>
-      
+
       <div class="mockup-container">
         <div class="mockup-header">
           <h3>📊 战略决策仪表盘</h3>
@@ -786,7 +786,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 3 个关键指标卡片 -->
           <div class="dashboard-grid">
             <div class="stat-card success">
@@ -796,7 +796,7 @@
               <div style="font-size: 14px; margin-bottom: var(--spacing-md);">4/6 阶段完成</div>
               <button class="stat-btn">查看详情</button>
             </div>
-            
+
             <div class="stat-card warning">
               <div class="stat-icon">⚠️</div>
               <div class="stat-value" style="color: var(--color-warning);">3 项</div>
@@ -804,7 +804,7 @@
               <div style="font-size: 14px; margin-bottom: var(--spacing-md);">需 48 小时内处理</div>
               <button class="stat-btn">立即审批</button>
             </div>
-            
+
             <div class="stat-card danger">
               <div class="stat-icon">🔴</div>
               <div class="stat-value" style="color: var(--color-danger);">2 项</div>
@@ -816,7 +816,7 @@
         </div>
       </div>
     </section>
-    
+
     <!-- 高保真溯源样机 -->
     <section id="source-tracing" class="section">
       <h2 class="section-title">高保真溯源样机（方向 3: 溯源信任）</h2>
@@ -824,7 +824,7 @@
         点击结论文字 → 弹出溯源卡片 → 跳转 PDF 高亮，30 秒内完成溯源验证。
         <strong>（点击下划线文字体验溯源交互）</strong>
       </p>
-      
+
       <div class="mockup-container">
         <div class="mockup-header">
           <h3>📄 市场洞察分析</h3>
@@ -835,14 +835,14 @@
               根据分析，预计<span class="source-link" onclick="toggleSourceCard()">2025 年市场规模将达到 500 亿元</span>，
               年复合增长率 15%。主要增长动力来自数字化转型加速、消费升级趋势、以及政策支持。
             </div>
-            
+
             <div style="text-align: center; color: var(--color-text-tertiary); font-size: 14px;">
               ↑ 点击下划线文字体验溯源交互
             </div>
           </div>
         </div>
       </div>
-      
+
       <!-- 溯源卡片 -->
       <div class="overlay" id="overlay" onclick="toggleSourceCard()"></div>
       <div class="source-card" id="sourceCard">
@@ -873,14 +873,14 @@
         </div>
       </div>
     </section>
-    
+
     <!-- 品牌配置样机 -->
     <section id="brand-config" class="section">
       <h2 class="section-title">品牌配置样机（方向 4: 品牌灵活）</h2>
       <p class="section-desc">
         可视化品牌配置，所见即所得，支持多套品牌模板切换。
       </p>
-      
+
       <div class="mockup-container">
         <div class="mockup-header">
           <h3>🎨 品牌模板配置</h3>
@@ -898,7 +898,7 @@
                   <span style="font-size: 14px; color: var(--color-text-secondary);">支持 SVG/PNG，建议尺寸 200x50px</span>
                 </div>
               </div>
-              
+
               <div class="config-section">
                 <div class="config-label">品牌主色</div>
                 <div class="color-picker">
@@ -911,7 +911,7 @@
                   <span style="display: inline-block; width: 200px; height: 20px; background: linear-gradient(90deg, #1890ff, #40a9ff); border-radius: var(--radius-sm);"></span>
                 </div>
               </div>
-              
+
               <div class="config-section">
                 <div class="config-label">品牌字体</div>
                 <select class="color-input" style="width: 100%;">
@@ -923,7 +923,7 @@
                   预览：<span style="font-family: PingFang SC;">这是品牌字体效果示例</span>
                 </div>
               </div>
-              
+
               <div class="config-section">
                 <div class="config-label">报告模板</div>
                 <select class="color-input" style="width: 100%;">
@@ -943,14 +943,14 @@
                   </div>
                 </div>
               </div>
-              
+
               <div style="display: flex; gap: var(--spacing-sm);">
                 <button class="stat-btn">保存模板</button>
                 <button class="stat-btn" style="background: var(--color-bg-primary); color: var(--color-text-primary);">预览完整报告</button>
                 <button class="stat-btn" style="background: var(--color-success);">导出 PPT/PDF</button>
               </div>
             </div>
-            
+
             <!-- 预览区 -->
             <div>
               <div class="preview-box" style="background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%); color: white; height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
@@ -964,14 +964,14 @@
         </div>
       </div>
     </section>
-    
+
     <!-- 白标报告样机 -->
     <section id="white-label" class="section">
       <h2 class="section-title">白标报告样机</h2>
       <p class="section-desc">
         品牌元素 100% 准确应用，支持 PPT/PDF 导出，质量评分≥9/10。
       </p>
-      
+
       <div class="direction-grid" style="grid-template-columns: repeat(2, 1fr);">
         <!-- 封面 -->
         <div class="mockup-container">
@@ -987,7 +987,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 内容页 -->
         <div class="mockup-container">
           <div class="mockup-header">
@@ -1006,9 +1006,9 @@
         </div>
       </div>
     </section>
-    
+
   </main>
-  
+
   <script>
     function toggleSourceCard() {
       const card = document.getElementById('sourceCard');

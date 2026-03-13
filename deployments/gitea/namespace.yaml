@@ -6,6 +6,6 @@ metadata:
   labels:
     name: gitea
     app.kubernetes.io/name: gitea
-    
+
   # 网络策略默认拒绝 (安全验收标准)
   # NetworkPolicy 将在单独文件中配置

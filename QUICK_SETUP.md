@@ -276,6 +276,6 @@ docker compose restart postgres
 
 ---
 
-**最后更新：** 2026-03-02  
-**文档版本：** 1.1.0  
+**最后更新：** 2026-03-02
+**文档版本：** 1.1.0
 **适用环境：** WSL 2 (Ubuntu 22.04) + Docker Compose v2 + Python 3.11+

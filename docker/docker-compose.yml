@@ -9,7 +9,7 @@
 # Usage:
 #   Option 1 (Docker Desktop):
 #     - Run from PowerShell/CMD: cd docker && docker-compose up -d
-#   
+#
 #   Option 2 (WSL 2):
 #     - Run from WSL terminal: cd docker && docker-compose up -d
 #     - Ensure Docker daemon is running: sudo systemctl start docker

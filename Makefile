@@ -44,6 +44,7 @@ dev:
 	@echo "📋 SDD 工具链已安装：pydantic, schemathesis, pytest-bdd, openapi-spec-validator"
 	@echo "🔧 代码质量工具已安装：ruff, mypy, pytest, pytest-cov"
 	@echo "🎯 可用命令：make setup, make lint, make type-check, make test, make dev"
+	@echo "📜 预提交 Hooks 已启用：每次提交自动执行检查→修改→通过循环"
 
 setup: venv install dev
 	@echo "✅ 开发环境设置完成！"
@@ -51,6 +52,44 @@ setup: venv install dev
 clean-env:
 	rm -rf venv/ .venv/
 	@echo "✅ 虚拟环境已清理"
+
+# -----------------------------------------------------------------------------
+# 预提交 Hooks 管理（项目宪法）
+# -----------------------------------------------------------------------------
+.PHONY: hooks hooks-install hooks-uninstall hooks-run hooks-check hooks-update
+
+hooks: hooks-install
+	@echo "✅ 预提交 Hooks 命令入口"
+
+hooks-install:
+	@echo "📜 安装预提交 Hooks..."
+	$(POETRY) run pre-commit install
+	@echo "✅ 预提交 Hooks 已安装"
+	@echo "📋 宪法原则：每次 git commit 必须执行检查→修改→通过循环"
+	@echo "🔍 检查项：代码格式化、代码质量、类型检查、安全扫描、密钥检测"
+
+hooks-uninstall:
+	@echo "⚠️  卸载预提交 Hooks..."
+	$(POETRY) run pre-commit uninstall
+	@echo "✅ 预提交 Hooks 已卸载"
+
+hooks-run:
+	@echo "🔍 运行预提交 Hooks（所有文件）..."
+	$(POETRY) run pre-commit run --all-files
+	@echo "✅ 预提交 Hooks 检查通过"
+
+hooks-check:
+	@echo "🔍 检查预提交 Hooks 配置..."
+	$(POETRY) run pre-commit sample-config
+	@echo "✅ 预提交 Hooks 配置正常"
+
+hooks-update:
+	@echo "🔄 更新预提交 Hooks 到最新版本..."
+	$(POETRY) run pre-commit autoupdate
+	@echo "✅ 预提交 Hooks 已更新"
+
+hooks-validate: hooks-run validate-schemas validate-openapi
+	@echo "✅ 预提交 Hooks 完整验证通过"
 
 # -----------------------------------------------------------------------------
 # SDD 工具链验证（Story 0.1 验收标准）
@@ -437,6 +476,15 @@ help:
 	@echo "  make setup          - 设置开发环境（虚拟环境 + 依赖 + pre-commit）"
 	@echo "  make dev            - 安装开发依赖和 pre-commit 钩子"
 	@echo "  make install        - 安装项目依赖"
+	@echo ""
+	@echo "📜 预提交 Hooks（项目宪法）:"
+	@echo "  make hooks          - 安装预提交 Hooks（同 hooks-install）"
+	@echo "  make hooks-install  - 安装预提交 Hooks"
+	@echo "  make hooks-uninstall- 卸载预提交 Hooks"
+	@echo "  make hooks-run      - 运行预提交 Hooks（所有文件）"
+	@echo "  make hooks-check    - 检查预提交 Hooks 配置"
+	@echo "  make hooks-update   - 更新预提交 Hooks 到最新版本"
+	@echo "  make hooks-validate - 预提交 Hooks 完整验证"
 	@echo ""
 	@echo "🔍 SDD 规范验证:"
 	@echo "  make validate-schemas   - 验证领域事件 Schema"

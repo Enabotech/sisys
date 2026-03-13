@@ -2,20 +2,34 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 #
-# Usage:
-#   1. Install pre-commit: pip install pre-commit
-#   2. Install hooks: pre-commit install
-#   3. Run manually: pre-commit run --all-files
+# 📜 项目宪法：代码提交强制检查流程
+# ================================================================
+# 每次 git commit 必须自动执行以下循环：
+#   1. 检查 (Check) → 运行所有 hooks 检查代码问题
+#   2. 修改 (Fix) → 自动修复可修复的问题（格式化、导入排序等）
+#   3. 通过 (Pass) → 所有检查通过后才能提交
 #
-# This configuration runs fast checks on staged files only.
-# Full test suite runs in CI/CD pipeline.
+# 安装步骤:
+#   1. 安装 pre-commit: pip install pre-commit
+#   2. 安装 hooks: pre-commit install
+#   3. 验证安装：pre-commit run --all-files
+#
+# 工作流程:
+#   - 本地提交时自动运行（仅检查暂存文件）
+#   - CI/CD 推送时完整运行（检查所有文件）
+#   - 任何检查失败都会阻止提交
+#
+# 宪法原则:
+#   - 不允许绕过 hooks（除非紧急情况使用 --no-verify）
+#   - 自动修复优先（能自动修复的问题不阻塞提交）
+#   - 快速反馈（失败时立即显示详细错误信息）
 
 repos:
   # =========================================
   # Built-in hooks
   # =========================================
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -29,90 +43,91 @@ repos:
       - id: check-case-conflict
 
   # =========================================
-  # Ruff - Fast Python linting
+  # Ruff - Fast Python linting (强制代码质量)
   # =========================================
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.6
+    rev: v0.15.6
     hooks:
       - id: ruff
+        name: "Ruff 代码检查与自动修复"
         args: [--fix, --exit-non-zero-on-fix]
+        verbose: true
+        # 自动修复：导入排序、代码风格、常见错误
       - id: ruff-format
+        name: "Ruff 代码格式化"
+        verbose: true
+        # 强制格式化：统一代码风格
 
   # =========================================
-  # MyPy - Type checking (optional, can be slow)
+  # MyPy - Type checking (强制类型检查)
   # =========================================
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  - repo: local
-    # rev: v1.7.1
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
     hooks:
       - id: mypy
-        name: mypy
-        entry: poetry run mypy
-        language: system
-        types: [python]
-        require_serial: true
-        # Only check staged files
-        args: [--ignore-missing-imports, --warn-return-any, --warn-unused-configs]
-        # Optional: uncomment to skip in certain conditions
-        # stages: [manual]
+        name: "MyPy 类型检查"
+        verbose: true
+        # 强制类型注解检查，提高代码可靠性
+        args: [--ignore-missing-imports, --warn-return-any, --warn-unused-configs, --pretty]
 
   # =========================================
-  # Security - Bandit (security linting)
+  # Security - Bandit (强制安全检查)
   # =========================================
-  # - repo: https://github.com/PyCQA/bandit
-  - repo: local
-    # rev: 1.7.5
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
     hooks:
       - id: bandit
-        name: bandit
-        entry: poetry run bandit
-        language: system
-        types: [python]
+        name: "Bandit 安全漏洞扫描"
+        verbose: true
         args: ["--skip", "B101,B404,B603,B607"]
+        # 强制安全扫描：检测常见安全漏洞
+        # 跳过：B101(断言), B404(subprocess), B603(subprocess 无 shell), B607(部分 shell 使用)
 
   # =========================================
-  # Secret Detection - Detect secrets
+  # Secret Detection - 强制密钥检测
   # =========================================
-  # - repo: https://github.com/Yelp/detect-secrets
-  - repo: local
-    # rev: v1.4.0
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
-        name: detect-secrets
-        entry: poetry run detect-secrets-hook
-        language: system
+        name: "检测密钥泄露"
+        verbose: true
         args: ['--baseline', '.secrets.baseline']
         exclude: package.lock.json
+        # 强制检测：防止密钥、密码、Token 等敏感信息提交
 
   # =========================================
-  # SDD 工具链验证（Story 0.1 验收标准）
+  # SDD 工具链验证（Story 0.1 验收标准 - 强制）
   # =========================================
   - repo: local
     hooks:
       - id: validate-schemas
-        name: Validate Domain Event Schemas
+        name: "验证领域事件 Schema"
         entry: poetry run python scripts/tools/validate_schemas.py
         language: system
         types: [python]
         pass_filenames: false
         stages: [push]
-        # 验证领域事件 Schema 符合 Pydantic 模型
+        verbose: true
+        # 强制验证：领域事件 Schema 符合 Pydantic 模型
 
       - id: validate-openapi
-        name: Validate OpenAPI Specification
+        name: "验证 OpenAPI 规范"
         entry: poetry run openapi-spec-validator openapi/openapi.yaml
         language: system
         pass_filenames: false
         stages: [push]
-        # 验证 OpenAPI 3.1 规范符合性
+        verbose: true
+        # 强制验证：OpenAPI 3.1 规范符合性
 
       - id: pytest-bdd
-        name: Run BDD Acceptance Tests
+        name: "运行 BDD 验收测试"
         entry: poetry run pytest tests/features/ --bdd-verbose
         language: system
         pass_filenames: false
         stages: [push]
-        # 运行 Gherkin 验收测试
+        verbose: true
+        # 强制验证：Gherkin 验收测试通过
 
 # =========================================
 # CI-specific configuration

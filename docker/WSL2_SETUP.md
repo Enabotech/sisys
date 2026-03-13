@@ -312,7 +312,7 @@ After setup:
 
 ---
 
-**Last Updated:** 2026-03-02  
-**Document Version:** 1.1.0  
-**WSL 2 Version:** 2  
+**Last Updated:** 2026-03-02
+**Document Version:** 1.1.0
+**WSL 2 Version:** 2
 **Ubuntu Version:** 22.04 LTS
