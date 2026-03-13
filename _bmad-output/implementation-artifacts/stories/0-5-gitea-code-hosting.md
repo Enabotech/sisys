@@ -772,10 +772,10 @@ sisys/
 
 | 资源 | 状态 | 命名空间 | 说明 |
 |------|------|---------|------|
-| Gitea Pod | ✅ Running | gitea-deploy | 1/1 Running |
-| Gitea Service | ✅ ClusterIP | gitea-deploy | 端口 3000 |
+| Gitea Pod | ✅ Running | gitea | 1/1 Running |
+| Gitea Service | ✅ ClusterIP | gitea | 端口 3000 |
 | PostgreSQL | ⏸️ 未部署 | - | MVP 使用 SQLite |
-| Valkey Cluster | ✅ Running | gitea-deploy | 3/3 Running (Helm Chart 依赖) |
+| Valkey Cluster | ✅ Running | gitea | 3/3 Running (Helm Chart 依赖) |
 
 ## References
 
