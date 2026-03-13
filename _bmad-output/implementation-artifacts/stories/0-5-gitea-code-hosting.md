@@ -831,9 +831,30 @@ sisys/
 
 **测试结果:**
 - ✅ Pod 运行状态：Running (1/1)
-- ✅ 健康检查：HTTP 200, status: "pass"
+- ✅ 健康检查：HTTP 200, status: "pass" (数据库、缓存均通过)
 - ✅ 服务访问：port-forward 测试通过
+- ✅ 部署验证：2026-03-13 重新部署到 gitea 命名空间成功
 - ⚠️ 自动化测试：需要更新命名空间配置以匹配实际部署
+
+### 2026-03-13 - Task 2: Gitea 重新部署完成（gitea 命名空间）
+
+**实施内容:**
+- ✅ 清理 gitea-deploy 命名空间和旧部署
+- ✅ 创建 gitea 命名空间
+- ✅ 使用 values-test.yaml 重新部署 Gitea
+- ✅ 验证 Pod 运行状态（1/1 Running）
+- ✅ 验证健康检查 API（数据库、缓存均通过）
+
+**部署详情:**
+- 命名空间：gitea
+- Helm Release: gitea (Revision 1)
+- 部署时间：2026-03-13 21:17
+- 状态：deployed
+
+**测试结果:**
+- ✅ Pod 状态：Running (1/1)
+- ✅ 健康检查：{ status: "pass", database: "pass", cache: "pass" }
+- ✅ 服务访问：kubectl port-forward 测试通过
 
 ### 2026-03-12 - Task 1: Gitea Helm Chart 配置完成
 
