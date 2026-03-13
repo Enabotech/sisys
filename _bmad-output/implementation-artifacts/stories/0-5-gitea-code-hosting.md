@@ -57,14 +57,14 @@ Status: in-progress
 
 **实施内容:**
 1. ✅ 加载本地 Docker 镜像到 K3S containerd
-2. ✅ 创建命名空间 `gitea-deploy`
+2. ✅ 创建命名空间 `gitea`
 3. ✅ 使用 Helm 部署 Gitea（简化配置，SQLite 数据库）
 4. ✅ 验证 Pod 运行状态（1/1 Running）
 5. ✅ 验证健康检查 API（/api/healthz 返回 pass）
 6. ✅ 验证服务可访问（kubectl port-forward 测试通过）
 
 **部署详情:**
-- 命名空间：gitea-deploy
+- 命名空间：gitea
 - Helm Chart: gitea/gitea v12.5.0
 - Gitea 版本：1.25.4
 - 镜像：gitea/gitea:1.25.4-rootless（本地导入）
@@ -802,7 +802,7 @@ sisys/
 
 **实施内容:**
 - ✅ 加载本地 Docker 镜像到 K3S containerd
-- ✅ 部署 Gitea 到 gitea-deploy 命名空间
+- ✅ 部署 Gitea 到 gitea 命名空间
 - ✅ 验证 Pod 运行状态（1/1 Running）
 - ✅ 验证健康检查 API（/api/healthz 返回 pass）
 - ✅ 验证服务可访问（port-forward 测试通过）
@@ -822,7 +822,7 @@ sisys/
   ```
 
 **部署详情:**
-- 命名空间：gitea-deploy
+- 命名空间：gitea
 - Helm Chart: gitea/gitea v12.5.0
 - Gitea 版本：1.25.4
 - 数据库：SQLite3（MVP 简化）
