@@ -5,7 +5,7 @@
 set -u
 
 # ==================== 配置区 ====================
-BACKUP_DIR="/mnt/g/ai/sisys/image-backup"
+BACKUP_DIR="k3s-images-backup"
 CTR_SOCKET="/run/k3s/containerd/containerd.sock"
 NAMESPACE="k8s.io"
 PLATFORM="linux/amd64"  # 根据节点架构调整: amd64/arm64
