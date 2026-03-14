@@ -1,0 +1,209 @@
+---
+# Harbor NetworkPolicy 配置
+# Story 0.6: Harbor 镜像仓库部署
+# 网络安全加固 - DefaultDeny 策略
+
+# =============================================================================
+# 默认拒绝所有入站流量（DefaultDeny）
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-default-deny
+  namespace: harbor
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# 允许 Traefik Ingress 访问 Harbor Core
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-traefik-ingress
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor-core
+  policyTypes:
+  - Ingress
+  ingress:
+  # 允许 Traefik 命名空间的 Pod 访问
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: traefik-system
+    - podSelector:
+        matchLabels:
+          app: traefik
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# 允许 Harbor 内部组件通信
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-internal-communication
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: harbor
+  policyTypes:
+  - Ingress
+  ingress:
+  # 允许 Harbor 命名空间内的 Pod 互相访问
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: harbor
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+
+---
+# 允许 Harbor Core 访问 PostgreSQL
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-core-to-postgres
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor-database
+  policyTypes:
+  - Ingress
+  ingress:
+  # 允许 Harbor Core 访问数据库
+  - from:
+    - podSelector:
+        matchLabels:
+          app: harbor-core
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+# 允许 Harbor Core 访问 Redis
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-core-to-redis
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor-redis
+  policyTypes:
+  - Ingress
+  ingress:
+  # 允许 Harbor Core 访问 Redis
+  - from:
+    - podSelector:
+        matchLabels:
+          app: harbor-core
+    ports:
+    - protocol: TCP
+      port: 6379
+
+---
+# 允许 Registry 访问存储
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-registry-storage
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor-registry
+  policyTypes:
+  - Egress
+  egress:
+  # 允许访问 PVC 存储
+  - to:
+    - podSelector:
+        matchLabels:
+          app: harbor-registry
+    ports:
+    - protocol: TCP
+      port: 5000
+
+---
+# 允许 DNS 解析（所有 Pod 需要）
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-dns
+  namespace: harbor
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  # 允许 DNS 查询
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# 允许 Trivy 访问外部漏洞数据库
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-allow-trivy-external
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: trivy
+  policyTypes:
+  - Egress
+  egress:
+  # 允许访问外部网络（下载漏洞数据库）
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

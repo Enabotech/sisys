@@ -1,0 +1,45 @@
+---
+# Harbor Ingress 配置
+# Story 0.6: Harbor 镜像仓库部署
+# 配置 Traefik Ingress + TLS 1.3
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor-ingress
+  namespace: harbor
+  annotations:
+    # Traefik 配置
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.options: default
+
+    # TLS 1.3 强制启用
+    traefik.ingress.kubernetes.io/router.tls.minversion: VersionTLS13
+
+    # 代理配置（镜像推送需要大文件上传）
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+
+    # 安全配置
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: harbor.sisys.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 443
+  tls:
+  - hosts:
+    - harbor.sisys.local
+    # pragma: allowlist secret
+    secretName: harbor-tls-secret

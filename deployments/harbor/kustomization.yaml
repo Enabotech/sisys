@@ -1,0 +1,44 @@
+---
+# Kustomize 配置
+# Story 0.6: Harbor 镜像仓库部署
+# 用于组合所有 Kubernetes 资源
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 命名空间
+namespace: harbor
+
+# 资源列表
+resources:
+- namespace.yaml
+- secrets.yaml
+- ingress.yaml
+- middleware.yaml
+- networkpolicy.yaml
+
+# Helm Chart 配置（通过 HelmRelease 或 kustomize helm 插件）
+# 注意：Helm Chart 部署建议使用 ArgoCD 或 Helm CLI
+
+# 配置映射
+configMapGenerator:
+- name: harbor-config
+  files:
+  - config/harbor.yml
+
+# 生成器选项
+generatorOptions:
+  disableNameSuffixHash: true
+  annotations:
+    story: "0.6-harbor-image-registry"
+    managed-by: "kustomize"
+
+# 通用标签
+commonLabels:
+  app: harbor
+  story: "0.6"
+  component: "registry"
+
+# 通用注解
+commonAnnotations:
+  description: "Harbor 镜像仓库部署配置"

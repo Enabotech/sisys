@@ -1,0 +1,80 @@
+---
+# Traefik Middleware 配置 - 安全响应头
+# Story 0.6: Harbor 镜像仓库部署
+# 配置 HSTS 和其他安全响应头
+
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: harbor-security-headers
+  namespace: harbor
+spec:
+  headers:
+    # HSTS - HTTP Strict Transport Security
+    # 强制使用 HTTPS，有效期 1 年（31536000 秒）
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000
+
+    # 防止点击劫持
+    customFrameOptionsValue: "DENY"
+
+    # 防止 MIME 类型嗅探
+    contentTypeNosniff: true
+
+    # XSS 防护
+    browserXssFilter: true
+
+    # 内容安全策略（CSP）- 宽松配置，允许 Harbor 正常运行
+    # 生产环境应该更严格
+    customResponseHeaders:
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://harbor.sisys.local; frame-ancestors 'none';"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+      X-Permitted-Cross-Domain-Policies: "none"
+      Cache-Control: "no-store, no-cache, must-revalidate, proxy-revalidate"
+      Pragma: "no-cache"
+      Expires: "0"
+
+---
+# Traefik Middleware 链 - 组合所有安全头
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: harbor-middleware-chain
+  namespace: harbor
+spec:
+  chain:
+    middlewares:
+    - name: harbor-security-headers
+      namespace: harbor
+
+---
+# 将 Middleware 绑定到 Ingress
+# 注意：Traefik v3.x 使用 TraefikService 或直接在 IngressRoute 中引用
+# 此处使用 Ingress 注解方式
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: harbor-ingressroute
+  namespace: harbor
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - match: Host(`harbor.sisys.local`)
+    kind: Rule
+    services:
+    - name: harbor-core
+      port: 443
+      scheme: https
+    middlewares:
+    - name: harbor-middleware-chain
+      namespace: harbor
+  tls:
+    # pragma: allowlist secret
+    secretName: harbor-tls-secret
+    options:
+      name: default
+      namespace: default

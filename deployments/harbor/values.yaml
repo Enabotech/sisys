@@ -1,0 +1,304 @@
+# Harbor Helm Chart 配置
+# Story 0.6: Harbor 镜像仓库部署
+# 版本：Harbor v2.14.3
+# 命名空间：harbor
+
+# =============================================================================
+# 基础配置
+# =============================================================================
+
+# 副本数配置（MVP 阶段全部为 1）
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    auto:
+      enabled: true
+      commonName: "harbor.sisys.local"
+  ingress:
+    hosts:
+      core: harbor.sisys.local
+
+externalURL: https://harbor.sisys.local
+
+# =============================================================================
+# 组件启用配置
+# =============================================================================
+
+# 启用 Trivy 漏洞扫描
+trivy:
+  enabled: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# 启用 Notary 镜像签名
+notaryServer:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+notarySigner:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+# =============================================================================
+# 核心组件配置
+# =============================================================================
+
+core:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m  # 2 核
+      memory: 4Gi  # 4GB（符合架构规划）
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+# =============================================================================
+# 数据库配置（使用内部 PostgreSQL）
+# =============================================================================
+
+database:
+  type: internal
+  internal:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    persistentVolumeClaim:
+      size: 10Gi
+      storageClass: local-path
+
+# =============================================================================
+# 存储配置
+# =============================================================================
+
+# Registry 存储配置（500Gi NVMe SSD）
+registry:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  persistentVolumeClaim:
+    registry:
+      size: 500Gi
+      storageClass: local-path
+    chart:
+      size: 10Gi
+      storageClass: local-path
+
+# Jobservice 存储配置
+jobservice:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  jobLog:
+    persistentVolumeClaim:
+      size: 5Gi
+      storageClass: local-path
+
+# Redis 配置
+redis:
+  type: internal
+  internal:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+      memory: 1Gi
+
+# =============================================================================
+# Portal 配置
+# =============================================================================
+
+portal:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+# =============================================================================
+# Nginx 配置（内部代理）
+# =============================================================================
+
+nginx:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+# =============================================================================
+# 安全配置
+# =============================================================================
+
+# 容器安全上下文
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10000
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Pod 安全上下文
+podSecurityContext:
+  fsGroup: 10000
+
+# 网络策略（在单独的 networkpolicy.yaml 中配置）
+
+# =============================================================================
+# 密钥配置（通过 Kubernetes Secret 管理）
+# =============================================================================
+
+# 注意：实际密钥通过 deployments/harbor/secrets.yaml 管理
+# 此处仅配置密钥引用
+# pragma: allowlist secret
+secretName: "harbor-secret"
+secretKey: "secret"  # 密钥 key 名，实际值在 Secret 中
+
+# 数据库密码引用
+database:
+  password: ""  # 从 Secret 加载
+
+# Redis 密码引用
+redis:
+  password: ""  # 从 Secret 加载
+
+# Harbor 管理员密码（首次启动后需修改）
+harborAdminPassword: ""  # 从 Secret 加载
+
+# 密钥密钥（至少 32 字节）
+secretKey: ""  # 从 Secret 加载
+
+# =============================================================================
+# 日志配置
+# =============================================================================
+
+logLevel: info
+logRotate:
+  enabled: true
+  maxSize: 100M
+  maxBackups: 5
+  maxAge: 7
+
+# =============================================================================
+# 监控配置
+# =============================================================================
+
+metrics:
+  enabled: true
+  core:
+    path: /metrics
+    port: 8080
+  registry:
+    path: /metrics
+    port: 8001
+  jobservice:
+    path: /metrics
+    port: 8081
+  exporter:
+    path: /metrics
+    port: 9901
+
+# =============================================================================
+# 高可用配置（MVP 阶段禁用）
+# =============================================================================
+
+# MVP 阶段不使用集群模式
+enableCluster: false
+
+# =============================================================================
+# 自动扩缩容配置（MVP 阶段禁用）
+# =============================================================================
+
+# HPA 配置（后续根据监控指标启用）
+# autoscaling:
+#   enabled: false
+
+# =============================================================================
+# 备份配置
+# =============================================================================
+
+# 备份策略（通过 K3S etcd-snapshot 实现）
+# 每日凌晨 2 点备份，保留 7 天
+
+# =============================================================================
+# 其他配置
+# =============================================================================
+
+# 允许匿名拉取（公开项目）
+allowAnonymousPull: true
+
+# 禁用普通用户注册（仅管理员邀请制）
+selfRegistration:
+  enabled: false
+
+# 认证配置（本地数据库认证）
+authMode: db_auth
+
+# 密码策略
+passwordPolicy:
+  minLength: 12
+  requireUpper: true
+  requireLower: true
+  requireDigit: true
+  requireSpecial: true
+
+# 会话超时（分钟）
+sessionTimeout: 4320  # 3 天
+
+# 机器人账户配置
+robot:
+  enabled: true
+  namePrefix: "robot$"
+  tokenDuration: 365  # 天
+
+# =============================================================================
+# 版本信息
+# =============================================================================
+
+# Helm Chart 版本
+# harbor/harbor latest (v1.14.x)
+
+# Harbor 版本
+# v2.14.3
