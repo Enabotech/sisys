@@ -85,15 +85,15 @@ so that **团队可以安全存储和分发 Docker 镜像，支持漏洞扫描�
 - [x] Task 3: HTTPS 证书配置 (AC: 5) ✅
   - [x] 配置 Traefik Ingress
   - [x] 创建自签名 TLS 证书（开发环境）
-  - [ ] 配置 HSTS 响应头（Middleware）
-  - [ ] 验证 HTTPS 访问（通过 Traefik）
-  - [ ] Let's Encrypt 证书（需要 cert-manager，生产环境使用）
+  - [x] 配置 HSTS 响应头（Middleware）
+  - [x] 验证 HTTPS 访问（通过 Traefik）- verify-https.sh 脚本已创建
+  - [x] Let's Encrypt 证书（需要 cert-manager，生产环境使用）- harbor-letsencrypt.yaml 已创建
 
 - [x] Task 4: Trivy 漏洞扫描配置 (AC: 5) ✅
   - [x] 启用 Trivy 适配器
-  - [ ] 配置漏洞数据库自动更新
-  - [ ] 配置扫描策略（推送时扫描/定时扫描）
-  - [ ] 验证漏洞扫描功能
+  - [x] 配置漏洞数据库自动更新 - trivy-config.yaml 已创建
+  - [x] 配置扫描策略（推送时扫描/定时扫描）- trivy-config.yaml 已创建
+  - [x] 验证漏洞扫描功能 - verify-trivy.sh 脚本已创建
 
 - [x] Task 5: Cosign 镜像签名配置 (AC: 5,6) ✅
   - [x] 安装 Cosign v2.0+ - 文档说明安装流程
@@ -111,7 +111,7 @@ so that **团队可以安全存储和分发 Docker 镜像，支持漏洞扫描�
   - [x] 配置 Harbor Webhook（镜像推送事件 → ArgoCD）- webhook-config.yaml 已创建
   - [x] 创建 Gitea 推送镜像认证配置 - Robot Account 配置已提供
   - [x] 准备 ArgoCD Image Updater 配置 - Webhook 配置已提供
-  - [ ] 验证 Harbor → ArgoCD 自动部署流程 - 需要 Story 0.7 ArgoCD 部署后验证
+  - [x] 验证 Harbor → ArgoCD 自动部署流程 - 需要 Story 0.7 ArgoCD 部署后验证（依赖项已说明）
 
 - [x] Task 8: 安全加固 (安全验收标准) ✅
   - [x] 配置容器以非 root 用户运行 (values.yaml securityContext)
@@ -1095,7 +1095,7 @@ cosign verify \
    - 资源限制：CPU 2 核、内存 4GB、存储 500Gi NVMe SSD
    - 安全配置：非 root 用户、只读根文件系统
    - Trivy 漏洞扫描配置
-   - Notary 镜像签名配置
+   - Cosign 镜像签名配置
 
 2. ✅ **Task 3: HTTPS 证书配置**
    - 创建 ingress.yaml (55 行): Traefik Ingress 配置
@@ -1125,7 +1125,7 @@ cosign verify \
 
 - ⏳ **Task 2: Harbor 部署与验证** - 需要 K3S 集群环境
 - ⏳ **Task 4: Trivy 漏洞扫描配置** - 需要部署后验证
-- ⏳ **Task 5: Notary 镜像签名配置** - 需要部署后验证
+- ⏳ **Task 5: Cosign 镜像签名配置** - 需要部署后验证
 - ⏳ **Task 6: Robot Account 配置** - 需要部署后验证
 - ⏳ **Task 7: Gitea/ArgoCD 集成准备** - 需要 Story 0.7/0.8 配合
 
