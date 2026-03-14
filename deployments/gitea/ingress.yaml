@@ -1,6 +1,6 @@
 # Gitea Ingress 配置 - Story 0.5
-# 描述：Traefik v3.x Ingress 配置，启用 TLS 1.3
-# 注意：Middleware gitea-secure-headers 已存在，不需要重新创建
+# 描述：Traefik v3.x Ingress 配置，启用 TLS 1.3 + HSTS 安全头
+# 依赖：middleware.yaml (gitea-secure-headers)
 
 # Gitea Ingress 配置
 apiVersion: networking.k8s.io/v1
@@ -16,8 +16,8 @@ metadata:
     # Traefik 配置
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # 暂时禁用 Middleware（排查问题）
-    # traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@gitea
+    # 引用 Traefik Middleware 添加安全头 (见 middleware.yaml)
+    traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@gitea
 
 spec:
   ingressClassName: traefik
@@ -43,9 +43,32 @@ spec:
                   number: 3000
 
 ---
-# 注意：cert-manager 未安装，使用手动创建的 TLS Secret
+# TLS Secret 配置说明
+#
+# MVP 阶段（开发环境）：使用自签名证书
 # 运行以下命令创建自签名证书：
-# openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-#   -keyout tls.key -out tls.crt \
-#   -subj "/CN=gitea.sisys.local/O=SISYS"
-# kubectl create secret tls gitea-tls-secret --cert=tls.crt --key=tls.key -n gitea
+#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#     -keyout tls.key -out tls.crt \
+#     -subj "/CN=gitea.sisys.local/O=SISYS"
+#   kubectl create secret tls gitea-tls-secret --cert=tls.crt --key=tls.key -n gitea
+#
+# 生产环境：使用 cert-manager + Let's Encrypt
+# 1. 安装 cert-manager (Story 0.7 ArgoCD 部署后)
+# 2. 配置 ClusterIssuer (letsencrypt-prod)
+# 3. 取消下方 Certificate 资源的注释
+#
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: gitea-tls
+#   namespace: gitea
+# spec:
+#   secretName: gitea-tls-secret
+#   issuerRef:
+#     name: letsencrypt-prod
+#     kind: ClusterIssuer
+#   dnsNames:
+#     - gitea.sisys.local
+#   duration: 2160h  # 90 天
+#   renewBefore: 360h  # 15 天前续期

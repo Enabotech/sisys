@@ -196,11 +196,12 @@ gcloud-service-key.json
 # Azure
 *.azurecredentials
 
-# Kubernetes secrets (但保留模板)
+# Kubernetes secrets (但保留模板和示例)
 *-secret.yaml
 *-secrets.yaml
 !*-secret.example.yaml
 !*-secrets.example.yaml
+!secrets-example.yaml
 
 # =============================================================================
 # 6. 数据库与存储
