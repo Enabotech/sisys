@@ -92,7 +92,7 @@
 **技术栈:**
 - K3S v1.34.5
 - Longhorn v1.5.3
-- Traefik v2.10
+- Traefik v3.x
 
 **TDD 测试要求:**
 1. 集群部署测试 - 验证 K3S 安装成功
