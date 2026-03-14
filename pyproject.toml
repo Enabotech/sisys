@@ -104,6 +104,7 @@ schemathesis = "^3.19.0"  # API 契约测试
 openapi-spec-validator = "^0.5.0"  # OpenAPI 验证
 jsonschema = "^4.19.0"  # JSON Schema 验证
 safety = "^3.7.0"
+types-requests = "^2.32.4.20260107"
 
 [tool.poetry.scripts]
 sisys = "src.cli:app"

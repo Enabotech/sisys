@@ -2,6 +2,7 @@
 # Trivy 漏洞扫描配置
 # Story 0.6: Harbor 镜像仓库部署
 # 用途：配置 Trivy 漏洞数据库自动更新和扫描策略
+# 修复 MEDIUM-002: 明确配置漏洞数据库自动更新策略
 
 apiVersion: v1
 kind: ConfigMap
@@ -22,8 +23,14 @@ data:
       },
       "vulnerabilityDB": {
         "autoUpdate": true,
-        "updateSchedule": "0 4 * * *",
-        "skipUpdate": false
+        "updateSchedule": "0 4 * * *",  # 每天凌晨 4 点自动更新
+        "skipUpdate": false,
+        "updateTimeout": "10m",
+        "retryPolicy": {
+          "maxRetries": 3,
+          "retryInterval": "30m",
+          "backoffMultiplier": 2
+        }
       },
       "alert": {
         "enabled": true,

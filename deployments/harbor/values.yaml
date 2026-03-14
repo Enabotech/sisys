@@ -77,7 +77,9 @@ database:
 # 存储配置
 # =============================================================================
 
-# Registry 存储配置（500Gi NVMe SSD）
+# Registry 存储配置（50Gi NVMe SSD - MVP 阶段）
+# 修复 HIGH-003: 统一与 Change Log 一致的存储容量
+# 扩容触发条件：存储使用率>80% 时扩容至 100Gi，后续根据使用情况扩容至 500Gi
 registry:
   resources:
     requests:
@@ -88,7 +90,7 @@ registry:
       memory: 1Gi
   persistentVolumeClaim:
     registry:
-      size: 500Gi
+      size: 50Gi  # MVP 阶段：50Gi（符合架构规划 Change Log）
       storageClass: local-path
     chart:
       size: 10Gi
@@ -259,12 +261,16 @@ selfRegistration:
 authMode: db_auth
 
 # 密码策略
+# 修复 LOW-002: 添加密码历史策略配置
 passwordPolicy:
   minLength: 12
   requireUpper: true
   requireLower: true
   requireDigit: true
   requireSpecial: true
+  passwordHistoryCount: 5  # 不得重复最近 5 次密码
+  passwordExpiration: 90   # 密码 90 天过期（可选）
+  passwordMaxAge: 180      # 密码最大使用天数
 
 # 会话超时（分钟）
 sessionTimeout: 4320  # 3 天
