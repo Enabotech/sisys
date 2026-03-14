@@ -21,6 +21,8 @@ spec:
 ---
 # 允许 Traefik Ingress 访问 Harbor Core
 # =============================================================================
+# 修复 HIGH-002: 使用 K3S 默认的 kube-system 命名空间（Traefik 实际安装位置）
+# 或使用 kubernetes.io/metadata.name 标签选择器（更通用）
 
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -34,11 +36,31 @@ spec:
   policyTypes:
   - Ingress
   ingress:
-  # 允许 Traefik 命名空间的 Pod 访问
+  # 方案 1: 允许 kube-system 命名空间的 Traefik（K3S 默认）
   - from:
     - namespaceSelector:
         matchLabels:
-          name: traefik-system
+          kubernetes.io/metadata.name: kube-system
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 443
+  # 方案 2: 允许 traefik-system 命名空间（如果 Traefik 部署在独立命名空间）
+  # 注意：两个方案同时配置，兼容不同部署方式
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: traefik-system
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 443
+  # 方案 3: 允许任何命名空间中标签为 app=traefik 的 Pod（兜底方案）
+  - from:
     - podSelector:
         matchLabels:
           app: traefik
