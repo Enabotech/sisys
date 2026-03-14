@@ -34,6 +34,8 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+详细使用指南请参考 [预提交 Hooks 规范](./pre-commit-hooks.md)。
+
 ### 3. 触发 CI/CD
 
 ```bash

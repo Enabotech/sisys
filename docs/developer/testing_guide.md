@@ -539,6 +539,7 @@ git commit --no-verify
 - [Testcontainers Python](https://testcontainers-python.readthedocs.io/)
 - [Coverage.py 文档](https://coverage.readthedocs.io/)
 - [Pre-commit 文档](https://pre-commit.com/)
+- [预提交 Hooks 规范](./pre-commit-hooks.md)
 
 ---
 
