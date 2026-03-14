@@ -77,10 +77,11 @@ so that **团队可以安全存储和分发 Docker 镜像，支持漏洞扫描�
 
 - [x] Task 2: Harbor 部署与验证 (AC: 1, 2, 3, 4) ✅
   - [x] 执行 helm install 部署 Harbor
-  - [x] 验证 Pod 运行状态 (Running 1/1) - 8/8 Pod Running
-  - [x] 验证服务可访问 (健康检查通过) - API Ping 成功
+  - [x] 验证 Pod 运行状态 (Running 1/1) - 8/8 Pod Running ✅
+  - [x] 验证服务可访问 (健康检查通过) - API Ping 成功 ✅
   - [x] 创建管理员账号 (自动创建，首次登录需修改密码) - 密码：Harbor@2026Secure!
-  - [x] 验证 PostgreSQL 数据库连接 - 日志显示 ready to accept connections
+  - [x] 验证 PostgreSQL 数据库连接 - 日志显示 ready to accept connections ✅
+  - [x] 绿灯测试通过 - 8/8 测试用例通过 ✅
 
 - [x] Task 3: HTTPS 证书配置 (AC: 5) ✅
   - [x] 配置 Traefik Ingress
