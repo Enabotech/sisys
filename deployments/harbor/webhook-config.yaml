@@ -1,0 +1,136 @@
+---
+# Harbor Webhook 配置模板
+# Story 0.6: Harbor 镜像仓库部署
+# 用途：配置镜像推送事件通知 ArgoCD Image Updater
+
+# =============================================================================
+# 使用说明
+# =============================================================================
+#
+# Webhook 用于在镜像推送时自动触发 ArgoCD Image Updater 更新部署
+#
+# 配置步骤:
+# 1. 创建 ArgoCD Image Updater Webhook 端点
+# 2. 在 Harbor 中配置 Webhook
+# 3. 测试 Webhook 触发
+#
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-webhook-config
+  namespace: harbor
+  labels:
+    app: harbor
+data:
+  # Webhook 配置
+  webhook-url: "http://argocd-image-updater.argocd.svc.cluster.local:8080/api/v1/webhook"
+
+  # Webhook 事件类型
+  webhook-events: |
+    [
+      "PUSH_ARTIFACT",
+      "PULL_ARTIFACT",
+      "DELETE_ARTIFACT"
+    ]
+
+  # Webhook 目标（在 Harbor Web 界面配置）
+  webhook-targets: |
+    [
+      {
+        "name": "argocd-image-updater",
+        "url": "http://argocd-image-updater.argocd.svc.cluster.local:8080/api/v1/webhook",
+        "events": ["PUSH_ARTIFACT"],
+        "enabled": true
+      }
+    ]
+
+---
+# ArgoCD Image Updater Webhook 接收器配置
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-webhook
+  namespace: argocd
+  labels:
+    app: argocd-image-updater
+data:
+  # Webhook 配置
+  webhook-config: |
+    {
+      "webhook": {
+        "enabled": true,
+        "port": 8080,
+        "path": "/api/v1/webhook",
+        # pragma: allowlist secret
+        "secret": "webhook-secret-token"
+      }
+    }
+
+---
+# Harbor Webhook 创建脚本
+# =============================================================================
+# 使用 Harbor API 创建 Webhook
+#
+# #!/bin/bash
+#
+# HARBOR_URL="http://harbor.harbor.svc.cluster.local"
+# # pragma: allowlist secret
+# HARBOR_USER="admin"
+# # pragma: allowlist secret
+# HARBOR_PASSWORD="Harbor@2026Secure!"
+# PROJECT_NAME="sisys"
+#
+# # 获取项目 ID
+# PROJECT_ID=$(curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
+#   "$HARBOR_URL/api/v2.0/projects?name=$PROJECT_NAME" | \
+#   jq -r '.[0].project_id')
+#
+# # 创建 Webhook
+# curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
+#   -X POST "$HARBOR_URL/api/v2.0/webhook/policies" \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "name": "argocd-image-updater",
+#     "description": "Trigger ArgoCD Image Updater on image push",
+#     "enabled": true,
+#     "eventTypes": ["PUSH_ARTIFACT"],
+#     "targets": [
+#       {
+#         "type": "http",
+#         "address": "http://argocd-image-updater.argocd.svc.cluster.local:8080/api/v1/webhook",
+#         "skip_cert_verify": true
+#       }
+#     ],
+#     "project_id": '$PROJECT_ID'
+#   }' | jq .
+#
+# =============================================================================
+
+---
+# Webhook 测试
+# =============================================================================
+#
+# # 手动触发 Webhook 测试
+# curl -X POST http://argocd-image-updater.argocd.svc.cluster.local:8080/api/v1/webhook \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "type": "PUSH_ARTIFACT",
+#     "event_data": {
+#       "project_id": 1,
+#       "project_name": "sisys",
+#       "repository": {
+#         "name": "myapp",
+#         "url": "harbor.sisys.local/sisys/myapp"
+#       },
+#       "resource_data": {
+#           "digest": "sha256:abc123...",
+#           "tag": "latest"
+#         }
+#     }
+#   }'
+#
+# =============================================================================

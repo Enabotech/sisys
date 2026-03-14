@@ -1,0 +1,186 @@
+---
+# Cosign 镜像签名配置
+# Story 0.6: Harbor 镜像仓库部署
+# 用途：使用 Sigstore Cosign 进行 OCI 镜像签名和验证
+
+# =============================================================================
+# 概述
+# =============================================================================
+#
+# Cosign 是 Sigstore 项目的一部分，用于容器镜像签名和验证
+# 优势：
+# - 无需管理密钥（使用 Sigstore 密钥less 签名）
+# - 支持 Kubernetes 原生集成
+# - 符合 SLSA 框架要求
+# - 支持透明日志（Rekor）
+#
+# =============================================================================
+
+# =============================================================================
+# 1. 安装 Cosign
+# =============================================================================
+#
+# # macOS (Homebrew)
+# brew install sigstore/cosign/cosign
+#
+# # Linux
+# wget -q https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+# sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+# chmod +x /usr/local/bin/cosign
+#
+# # 验证安装
+# cosign version
+#
+# =============================================================================
+
+# =============================================================================
+# 2. 生成密钥对（可选，支持 keyless 签名）
+# =============================================================================
+#
+# # 生成密钥对（如果需要基于密钥的签名）
+# cosign generate-key-pair
+#
+# # 输入密码保护私钥
+# # 生成文件：
+# # - cosign.key (私钥)
+# # - cosign.pub (公钥)
+#
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cosign-config
+  namespace: harbor
+  labels:
+    app: cosign
+data:
+  # Cosign 配置
+  cosign-version: "v2.2.3"
+
+  # 签名策略
+  signature-policy: |
+    {
+      "default": [
+        {
+          "type": "sigstoreSignature",
+          "action": "verify",
+          "repositories": {
+            "harbor.sisys.local/*": {
+              "keyless": {
+                "url": "https://fulcio.sigstore.dev",
+                "identities": [
+                  {
+                    "issuer": "https://accounts.google.com",
+                    "subject": ".*@sisys.local"
+                  }
+                ]
+              },
+              "rekor": {
+                "url": "https://rekor.sigstore.dev"
+              }
+            }
+          }
+        }
+      ]
+    }
+
+---
+# Kubernetes 集成配置
+# =============================================================================
+
+# Cosign 验证 Webhook（可选，用于 Kubernetes 准入控制）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cosign-webhook-config
+  namespace: harbor
+data:
+  # Webhook 配置
+  webhook-config: |
+    {
+      "webhook": {
+        "enabled": false,
+        "port": 8443,
+        "verifyImages": true,
+        "keyless": true
+      }
+    }
+
+---
+# Harbor 配置集成
+# =============================================================================
+#
+# # 配置 Harbor 信任 Cosign 签名
+#
+# 1. 登录 Harbor
+# docker login harbor.sisys.local -u admin -p Harbor@2026Secure!
+#
+# 2. 推送镜像
+# docker push harbor.sisys.local/sisys/myapp:latest
+#
+# 3. 签名镜像（keyless 方式）
+# cosign sign harbor.sisys.local/sisys/myapp:latest
+#
+# 4. 验证签名
+# cosign verify \
+#   --certificate-identity-regexp=".*@sisys.local" \
+#   --certificate-oidc-issuer="https://accounts.google.com" \
+#   harbor.sisys.local/sisys/myapp:latest
+#
+# =============================================================================
+
+---
+# 密钥对签名方式（可选）
+# =============================================================================
+#
+# # 1. 生成密钥对
+# cosign generate-key-pair
+#
+# # 2. 将公钥导入 Harbor（作为可信密钥）
+# # 在 Harbor Web 界面：项目 → 配置 → 可信密钥 → 添加公钥
+# cat cosign.pub
+#
+# # 3. 签名镜像
+# cosign sign --key cosign.key harbor.sisys.local/sisys/myapp:latest
+#
+# # 4. 验证签名
+# cosign verify --key cosign.pub harbor.sisys.local/sisys/myapp:latest
+#
+# =============================================================================
+
+---
+# CI/CD Pipeline 集成示例
+# =============================================================================
+#
+# # Gitea CI/CD Pipeline 示例 (.gitea/workflows/ci-cd.yml)
+#
+# name: CI/CD with Cosign Signing
+# on: push
+#
+# jobs:
+#   build-and-sign:
+#     runs-on: ubuntu-latest
+#     steps:
+#     - uses: actions/checkout@v3
+#
+#     - name: Build and push image
+#       run: |
+#         docker build -t harbor.sisys.local/sisys/myapp:${{ github.sha }} .
+#         docker push harbor.sisys.local/sisys/myapp:${{ github.sha }}
+#
+#     - name: Install Cosign
+#       uses: sigstore/cosign-installer@v3
+#
+#     - name: Sign image (keyless)
+#       run: |
+#         cosign sign harbor.sisys.local/sisys/myapp:${{ github.sha }}
+#
+#     - name: Verify image
+#       run: |
+#         cosign verify \
+#           --certificate-identity-regexp=".*@sisys.local" \
+#           --certificate-oidc-issuer="https://accounts.google.com" \
+#           harbor.sisys.local/sisys/myapp:${{ github.sha }}
+#
+# =============================================================================

@@ -1,0 +1,138 @@
+---
+# Harbor Robot Account 配置模板
+# Story 0.6: Harbor 镜像仓库部署
+# 用途：为 Gitea Runner 和 ArgoCD 创建机器人账户
+
+# =============================================================================
+# 使用说明
+# =============================================================================
+#
+# Robot Account 用于自动化系统（如 CI/CD Pipeline）访问 Harbor
+# 与用户账号不同，Robot Account:
+# - 不能登录 Web 界面
+# - 权限范围可精确控制（项目级）
+# - Token 可设置过期时间
+# - 适合机器对机器认证
+#
+# 创建方式:
+# 1. 通过 Harbor Web 界面手动创建（推荐首次配置）
+# 2. 通过 Harbor API 自动创建（适合自动化）
+#
+# =============================================================================
+
+# Robot Account 配置列表
+# pragma: allowlist secret
+robotAccounts:
+  # ---------------------------------------------------------------------------
+  # Gitea Runner - 推送镜像用
+  # ---------------------------------------------------------------------------
+  - name: "gitea-runner-push"
+    description: "Gitea Runner 推送镜像到 Harbor"
+    project: "sisys"
+    level: "project"  # project 或 system
+    permissions:
+      - resource: "repository"
+        action: "push"
+      - resource: "repository"
+        action: "pull"
+      - resource: "artifact"
+        action: "read"
+      - resource: "artifact"
+        action: "create"
+      - resource: "tag"
+        action: "create"
+      - resource: "tag"
+        action: "read"
+    duration: -1  # 永不过期（-1）或天数
+    # 创建后 Token 示例（实际创建后获取）:
+    # pragma: allowlist secret
+    # secret: "robot$gitea-runner-push:xxxxxxxxxxxxxxxxxxxx"
+
+  # ---------------------------------------------------------------------------
+  # ArgoCD Image Updater - 拉取镜像用
+  # ---------------------------------------------------------------------------
+  - name: "argocd-pull"
+    description: "ArgoCD Image Updater 拉取镜像进行部署"
+    project: "sisys"
+    level: "project"
+    permissions:
+      - resource: "repository"
+        action: "pull"
+      - resource: "artifact"
+        action: "read"
+    duration: -1
+
+  # ---------------------------------------------------------------------------
+  # 备份系统 - 拉取镜像用
+  # ---------------------------------------------------------------------------
+  - name: "backup-system"
+    description: "备份系统拉取镜像进行备份"
+    project: "sisys"
+    level: "project"
+    permissions:
+      - resource: "repository"
+        action: "pull"
+    duration: 365  # 1 年
+
+# =============================================================================
+# 通过 Harbor API 创建 Robot Account 的脚本
+# =============================================================================
+#
+# #!/bin/bash
+# HARBOR_URL="https://harbor.sisys.local"
+# HARBOR_USER="admin"
+# HARBOR_PASSWORD="Harbor@2026Secure!"
+# PROJECT_NAME="sisys"
+#
+# # 获取项目 ID
+# PROJECT_ID=$(curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
+#   "$HARBOR_URL/api/v2.0/projects?name=$PROJECT_NAME" | jq '.[0].project_id')
+#
+# # 创建 Robot Account
+# curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
+#   -X POST "$HARBOR_URL/api/v2.0/robots" \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "name": "gitea-runner-push",
+#     "description": "Gitea Runner 推送镜像到 Harbor",
+#     "duration": -1,
+#     "level": "project",
+#     "permissions": [
+#       {
+#         "kind": "project",
+#         "namespace": "'$PROJECT_NAME'",
+#         "access": [
+#           {"resource": "repository", "action": "push"},
+#           {"resource": "repository", "action": "pull"},
+#           {"resource": "artifact", "action": "read"},
+#           {"resource": "artifact", "action": "create"}
+#         ]
+#       }
+#     ]
+#   }' | jq .
+#
+# =============================================================================
+
+---
+# Robot Account 使用示例
+# =============================================================================
+
+# Docker 登录
+# docker login harbor.sisys.local -u robot$gitea-runner-push -p <TOKEN>
+
+# 推送镜像
+# docker push harbor.sisys.local/sisys/myapp:latest
+
+# 拉取镜像
+# docker pull harbor.sisys.local/sisys/myapp:latest
+
+# Kubernetes Secret 配置
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: harbor-robot-secret
+#   namespace: default
+# type: kubernetes.io/dockerconfigjson
+# data:
+#   .dockerconfigjson: eyJhdXRocyI6eyJ0dXRvci5qdWlnaGFuLm9yZyI6eyJ1c2VybmFtZSI6InJvYm90JGd
+# pdGVhLXJ1bm5lci1wdXNoIiwicGFzc3dvcmQiOiJUT0tFTiIsImF1dGgiOiJCT1J5SDBWM1pY
