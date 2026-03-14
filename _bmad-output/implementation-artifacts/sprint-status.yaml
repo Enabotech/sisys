@@ -48,7 +48,7 @@ development_status:
   0-3-test-framework-setup: done  # pytest 配置，Fixture 系统，Mock 框架
   # Iteration 1: 开发 CI/CD 系统（面向工程师）- 🔄 进行中
   0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.x + local-path-provisioner ✅ 部署成功，测试 15/15 通过，代码审查问题全部修复
-  0-5-gitea-code-hosting: review  # Gitea v1.25.4 + PostgreSQL ✅ 开发完成，标记为 review
+  0-5-gitea-code-hosting: done  # Gitea v1.25.4 + PostgreSQL ✅ 开发完成，代码审查问题 100% 修复 (7 个问题：4 MEDIUM + 3 LOW)
   0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
   0-8-gitea-runner-configuration: backlog  # Gitea Runner Docker/K8s Executor

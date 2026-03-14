@@ -1,0 +1,35 @@
+# Gitea Traefik Middleware - 安全头配置 - Story 0.5
+# 描述：HSTS 和其他安全响应头配置
+# 修复：M1 - 恢复 Middleware 配置（之前被注释掉）
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: gitea-secure-headers
+  namespace: gitea
+  labels:
+    app: gitea
+    app.kubernetes.io/name: gitea
+    app.kubernetes.io/component: middleware
+spec:
+  headers:
+    # HSTS 配置 (安全验收标准)
+    # 强制 HTTPS，有效期 1 年，包含子域名
+    stsSeconds: 31536000
+    stsIncludeSubDomains: true
+    stsPreload: true
+
+    # 其他安全头
+    # 防止点击劫持
+    customFrameOptionsValue: "DENY"
+
+    # 防止 MIME 类型嗅探
+    contentTypeNosniff: true
+
+    # XSS 保护（现代浏览器已有，但保留兼容性）
+    customResponseHeaders:
+      X-Content-Type-Options: "nosniff"
+      X-Frame-Options: "DENY"
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
