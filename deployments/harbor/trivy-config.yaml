@@ -1,0 +1,154 @@
+---
+# Trivy 漏洞扫描配置
+# Story 0.6: Harbor 镜像仓库部署
+# 用途：配置 Trivy 漏洞数据库自动更新和扫描策略
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-scan-config
+  namespace: harbor
+  labels:
+    app: trivy
+data:
+  # 扫描策略配置
+  scan-policy: |
+    {
+      "scanning": {
+        "enabled": true,
+        "onPush": true,
+        "schedule": "0 3 * * *",
+        "autoScan": true
+      },
+      "vulnerabilityDB": {
+        "autoUpdate": true,
+        "updateSchedule": "0 4 * * *",
+        "skipUpdate": false
+      },
+      "alert": {
+        "enabled": true,
+        "severities": ["CRITICAL", "HIGH"],
+        "notification": ["webhook", "email"]
+      }
+    }
+
+---
+# Trivy 漏洞数据库自动更新配置
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-db-update-config
+  namespace: harbor
+data:
+  # 漏洞数据库更新配置
+  db-update-config: |
+    {
+      "githubToken": "",
+      "skipUpdate": false,
+      "downloadOnly": false,
+      "light": false,
+      "skipDirs": [],
+      "offlineScan": false,
+      "insecure": false,
+      "timeout": "10m0s"
+    }
+
+  # 更新调度
+  update-schedule: "0 4 * * *"  # 每天凌晨 4 点更新
+
+  # 漏洞数据库来源
+  db-source: "ghcr.io/aquasecurity/trivy-db:2"
+
+---
+# Trivy 扫描策略配置
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-scan-policies
+  namespace: harbor
+data:
+  # 推送时扫描策略
+  on-push-policy: |
+    {
+      "trigger": "PUSH_ARTIFACT",
+      "scanImmediately": true,
+      "scanType": "full",
+      "severities": ["UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      "ignoreUnfixed": false,
+      "timeout": "30m"
+    }
+
+  # 定时扫描策略
+  schedule-policy: |
+    {
+      "trigger": "SCHEDULE",
+      "cron": "0 3 * * *",
+      "scanType": "full",
+      "severities": ["HIGH", "CRITICAL"],
+      "ignoreUnfixed": true,
+      "timeout": "1h"
+    }
+
+  # 告警策略
+  alert-policy: |
+    {
+      "enabled": true,
+      "minSeverity": "HIGH",
+      "blockOnCritical": true,
+      "notifyOnNew": true,
+      "notifyOnFixed": false
+    }
+
+---
+# Trivy 扫描结果 Webhook 通知
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-webhook-notify
+  namespace: harbor
+data:
+  # Webhook 通知配置
+  webhook-config: |
+    {
+      "enabled": true,
+      "url": "http://gitea.gitea.svc.cluster.local:3000/api/v1/harbor/scan-result",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Harbor-Event": "scan-completed"
+      },
+      "events": ["scan_completed", "vulnerability_found"],
+      "retry": {
+        "maxRetries": 3,
+        "retryInterval": "5m"
+      }
+    }
+
+---
+# 使用示例
+# =============================================================================
+#
+# 1. 应用配置
+#    kubectl apply -f trivy-config.yaml
+#
+# 2. 验证 Trivy 状态
+#    kubectl get pods -n harbor -l app=trivy
+#    kubectl logs -n harbor harbor-trivy-0 | grep "Starting API server"
+#
+# 3. 测试扫描
+#    # 推送测试镜像
+#    docker push harbor.sisys.local/sisys/test-scan:latest
+#
+#    # 在 Harbor Web 界面查看扫描结果
+#    # 访问：项目 → sisys → 镜像 → test-scan → 漏洞
+#
+# 4. 验证漏洞数据库更新
+#    kubectl logs -n harbor harbor-trivy-0 | grep "vulnerability database"
+#
+# =============================================================================

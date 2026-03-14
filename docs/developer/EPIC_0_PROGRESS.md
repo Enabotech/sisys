@@ -54,7 +54,7 @@
 ### 3. HARBOR_INSTALLATION.md
 - Harbor v2.14.3 部署
 - Trivy 漏洞扫描配置
-- Notary 镜像签名
+- Cosign 镜像签名
 - 镜像推送/拉取验证
 - 故障排查
 
