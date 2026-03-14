@@ -36,26 +36,8 @@ trivy:
       cpu: 500m
       memory: 1Gi
 
-# 启用 Notary 镜像签名
-notaryServer:
-  enabled: true
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 200m
-      memory: 512Mi
-
-notarySigner:
-  enabled: true
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 200m
-      memory: 512Mi
+# Notary 已弃用 - 使用 Cosign 进行镜像签名
+# 参考：docs/deployment/HARBOR_COSIGN_SIGNING.md
 
 # =============================================================================
 # 核心组件配置

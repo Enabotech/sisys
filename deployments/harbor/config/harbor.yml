@@ -244,27 +244,32 @@ trivy:
       - webhook
 
 # =============================================================================
-# Notary 镜像签名配置
+# 镜像签名配置 - 使用 Cosign
 # =============================================================================
-
-notary:
-  # 启用 Notary
-  enabled: true
-
-  # Notary Server 配置
-  server:
-    host: http://harbor-notary-server:4443
-
-  # Notary Signer 配置
-  signer:
-    host: http://harbor-notary-signer:7899
-
-  # 签名策略
-  policy:
-    # 强制签名验证
-    enforce_signing: false
-    # 信任级别
-    trust_level: full
+# 注意：Notary 项目已弃用，推荐使用 Sigstore Cosign 进行镜像签名
+# Cosign 提供更现代、更安全的签名方案：
+# - Keyless 签名：无需管理密钥，使用 OIDC（Google/GitHub）
+# - 透明日志：Rekor 记录所有签名操作
+# - SLSA 合规：符合现代供应链安全要求
+#
+# 参考文档：docs/deployment/HARBOR_COSIGN_SIGNING.md
+#
+# cosign:
+#   # 启用 Cosign 集成
+#   enabled: true
+#
+#   # Keyless 签名配置
+#   keyless:
+#     enabled: true
+#     oidc_issuer: "https://accounts.google.com"
+#     identity_regexp: ".*@sisys.local"
+#
+#   # 密钥对签名配置（可选）
+#   keypair:
+#     enabled: false
+#     secret_name: "cosign-key-secret"
+#
+# =============================================================================
 
 # =============================================================================
 # 监控配置

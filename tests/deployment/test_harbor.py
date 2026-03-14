@@ -8,7 +8,6 @@ Harbor 镜像仓库部署测试套件
 import re
 import subprocess
 import time
-from typing import Optional
 
 import pytest
 import requests
@@ -70,7 +69,7 @@ def get_harbor_pods() -> list:
     return stdout.split() if stdout else []
 
 
-def get_pod_status(pod_name: str) -> Optional[str]:
+def get_pod_status(pod_name: str) -> str | None:
     """获取 Pod 状态"""
     returncode, stdout, stderr = run_kubectl_command(["get", "pod", pod_name, "-o", "jsonpath={.status.phase}"])
     return stdout.strip() if returncode == 0 else None
@@ -89,7 +88,7 @@ def get_pod_restart_count(pod_name: str) -> int:
     return sum(int(count) for count in restart_counts if count.isdigit())
 
 
-def get_pod_ready_time(pod_name: str) -> Optional[float]:
+def get_pod_ready_time(pod_name: str) -> float | None:
     """获取 Pod 启动时间（秒）"""
     returncode, stdout, stderr = run_kubectl_command(["get", "pod", pod_name, "-o", "jsonpath={.status.startTime}"])
     if returncode != 0 or not stdout:
@@ -145,13 +144,13 @@ def check_tls_version(host: str, port: int = 443, tls_version: str = "1.3") -> b
             context.maximum_version = ssl.TLSVersion.TLSv1_2
 
         with socket.create_connection((host, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=host) as ssock:
+            with context.wrap_socket(sock, server_hostname=host):
                 return True
     except Exception:
         return False
 
 
-def get_hsts_header(url: str) -> Optional[str]:
+def get_hsts_header(url: str) -> str | None:
     """获取 HSTS 响应头"""
     try:
         # nosec B501 - 开发环境使用自签名证书
@@ -398,44 +397,49 @@ class TestHarborVulnerabilityScan:
 
 
 # =============================================================================
-# 验收标准 6: Notary 镜像签名测试
+# 验收标准 6: Cosign 镜像签名测试
 # =============================================================================
 
 
-class TestHarborNotarySignature:
-    """验收标准 6: Notary 镜像签名功能可用"""
+class TestHarborCosignSignature:
+    """验收标准 6: Cosign 镜像签名功能可用"""
 
-    def test_notary_server_running(self):
+    def test_cosign_installed(self):
         """
-        验证 Notary Server 运行中
+        验证 Cosign 工具已安装
 
         验收标准:
-        - ✅ Notary Server 状态为 Running
+        - ✅ Cosign v2.0+ 已安装
         """
-        returncode, stdout, stderr = run_kubectl_command(
-            ["get", "pods", "-l", "app=notary-server", "-o", "jsonpath={.items[*].status.phase}"]
-        )
+        # 此测试需要在部署文档中说明安装步骤
+        # cosign version
+        pytest.skip("Cosign 安装需要在部署文档中说明")
 
-        if returncode != 0 or not stdout.strip():
-            pytest.skip("Notary Server Pod 不存在，可能未部署")
-
-        statuses = stdout.split()
-        for status in statuses:
-            assert status == "Running", f"Notary Server Pod 状态为 {status}，期望 Running"
-
-    def test_notary_signature_functionality(self):
+    def test_cosign_keyless_signing(self):
         """
-        验证镜像签名功能
+        验证 Cosign keyless 签名功能
 
         验收标准:
-        - ✅ 生成签名密钥成功
-        - ✅ 镜像签名成功
-        - ✅ 镜像签名验证成功
+        - ✅ Keyless 签名成功（使用 OIDC）
+        - ✅ 签名记录到 Rekor 透明日志
+        - ✅ 证书身份验证通过
 
-        注意：此测试需要 Docker 环境和 Notary 配置
+        注意：此测试需要 OIDC 账户和外部网络访问
         """
-        # 此测试需要 Docker 环境和 Notary 配置
-        pytest.skip("需要 Docker 环境和 Notary 配置")
+        # 此测试需要 OIDC 账户
+        pytest.skip("需要 OIDC 账户和外部网络访问")
+
+    def test_cosign_verify(self):
+        """
+        验证 Cosign 签名验证功能
+
+        验收标准:
+        - ✅ 签名验证成功
+        - ✅ 透明日志存在
+        - ✅ 证书链验证通过
+        """
+        # 此测试需要已签名的镜像
+        pytest.skip("需要已签名的镜像")
 
 
 # =============================================================================

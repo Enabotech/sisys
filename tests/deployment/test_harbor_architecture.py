@@ -9,7 +9,6 @@ import re
 import socket
 import ssl
 import subprocess
-from typing import Optional
 
 import pytest
 import requests
@@ -42,7 +41,7 @@ def run_kubectl_command(command: list, namespace: str = HARBOR_NAMESPACE) -> tup
         return -1, "", str(e)
 
 
-def get_k8s_resource(resource_type: str, name: str = "", output: str = "yaml") -> Optional[dict]:
+def get_k8s_resource(resource_type: str, name: str = "", output: str = "yaml") -> dict | None:
     """获取 Kubernetes 资源"""
     cmd = ["get", resource_type]
     if name:
@@ -82,7 +81,7 @@ def check_tls_version(host: str, port: int = 443, min_version: str = "TLSv1_3") 
         return False, str(e)
 
 
-def get_hsts_header(url: str) -> Optional[str]:
+def get_hsts_header(url: str) -> str | None:
     """获取 HSTS 响应头"""
     try:
         # nosec B501 - 开发环境使用自签名证书
