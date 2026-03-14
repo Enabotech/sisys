@@ -1,0 +1,425 @@
+# Harbor 应用配置文件
+# Story 0.6: Harbor 镜像仓库部署
+# 版本：v2.14.3
+
+# =============================================================================
+# 基础配置
+# =============================================================================
+
+# Harbor 外部访问 URL
+external_url: https://harbor.sisys.local
+
+# Harbor 数据目录
+data_volume: /var/harbor/data
+
+# 日志级别：debug, info, warning, error, fatal
+log_level: info
+
+# 日志目录
+log_dir: /var/log/harbor
+
+# =============================================================================
+# 数据库配置
+# =============================================================================
+
+database:
+  # 数据库类型：internal（内部）, external（外部）
+  type: internal
+
+  # 内部 PostgreSQL 配置
+  internal:
+    host: harbor-database
+    port: 5432
+    username: postgres
+    password: ${POSTGRES_PASSWORD}
+    database: registry
+    max_idle_conns: 50
+    max_open_conns: 1000
+    conn_max_lifetime: 5m
+
+  # 外部 PostgreSQL 配置（可选）
+  # external:
+  #   host: postgresql.sisys.local
+  #   port: 5432
+  #   username: harbor
+  #   password: ${POSTGRES_PASSWORD}
+  #   database: harbor
+  #   sslmode: require
+
+# =============================================================================
+# Redis 配置
+# =============================================================================
+
+redis:
+  # Redis 类型：internal（内部）, external（外部）
+  type: internal
+
+  # 内部 Redis 配置
+  internal:
+    host: harbor-redis
+    port: 6379
+    password: ${REDIS_PASSWORD}
+    db_index: 0
+
+  # 外部 Redis 配置（可选）
+  # external:
+  #   host: redis.sisys.local
+  #   port: 6379
+  #   password: ${REDIS_PASSWORD}
+  #   db_index: 0
+
+# =============================================================================
+# Registry 配置
+# =============================================================================
+
+registry:
+  # Registry URL
+  url: http://harbor-registry:5000
+
+  # 存储配置
+  storage:
+    # 存储类型：filesystem, s3, azure, gcs, swift, oss
+    type: filesystem
+
+    # 文件系统存储路径
+    filesystem:
+      rootdirectory: /var/harbor/data/registry
+
+    # S3 存储配置（可选）
+    # s3:
+    #   region: us-east-1
+    #   bucket: harbor-registry
+    #   accesskey: ${AWS_ACCESS_KEY}
+    #   secretkey: ${AWS_SECRET_KEY}
+
+  # 镜像复制配置
+  replication:
+    enabled: true
+    max_workers: 10
+
+  # 垃圾回收配置
+  gc:
+    enabled: true
+    schedule: "0 2 * * *"  # 每天凌晨 2 点
+    retention:
+      enabled: true
+      policies:
+        - repositories:
+            - "**"
+          tags:
+            - "latest"
+          most_recently_pushed: 10
+
+# =============================================================================
+# Core 配置
+# =============================================================================
+
+core:
+  # 认证模式
+  # db_auth: 本地数据库认证
+  # ldap_auth: LDAP 认证
+  # oidc_auth: OIDC 认证
+  auth_mode: db_auth
+
+  # 自注册（禁用 - 仅管理员邀请制）
+  self_registration: false
+
+  # 会话配置
+  session:
+    timeout: 4320  # 3 天（分钟）
+    cookie_secure: true
+    cookie_http_only: true
+
+  # 密码策略
+  password_policy:
+    min_length: 12
+    require_upper: true
+    require_lower: true
+    require_digit: true
+    require_special: true
+
+  # 机器人账户配置
+  robot:
+    enabled: true
+    name_prefix: "robot$"
+    token_duration: 365  # 天
+
+  # 项目配置
+  project:
+    # 默认项目配额
+    default_quota:
+      storage: -1  # 无限制
+      repository_count: -1  # 无限制
+
+    # 公开项目允许匿名拉取
+    allow_anonymous_pull: true
+
+# =============================================================================
+# Portal 配置
+# =============================================================================
+
+portal:
+  # Web 界面配置
+  enabled: true
+
+  # 主题配置
+  theme:
+    primary_color: "#0064C8"  # Harbor 蓝色
+
+  # 语言配置
+  languages:
+    - en-us
+    - zh-cn
+
+# =============================================================================
+# Job Service 配置
+# =============================================================================
+
+jobservice:
+  # 作业执行器配置
+  executors:
+    - type: pool
+      pool:
+        worker_num: 10
+
+  # 作业配置
+  jobs:
+    # 镜像复制
+    replication:
+      max_workers: 10
+    # 镜像扫描
+    scan:
+      max_workers: 5
+    # 垃圾回收
+    gc:
+      max_workers: 1
+    # 审计日志清理
+    audit_log_cleanup:
+      max_workers: 1
+      retention_days: 30
+
+# =============================================================================
+# Trivy 漏洞扫描配置
+# =============================================================================
+
+trivy:
+  # 启用 Trivy
+  enabled: true
+
+  # Trivy 适配器配置
+  adapter:
+    host: http://harbor-scanner-trivy:8080
+
+  # 扫描配置
+  scan:
+    # 推送时自动扫描
+    on_push: true
+    # 定时扫描
+    schedule: "0 3 * * *"  # 每天凌晨 3 点
+
+  # 漏洞数据库更新
+  vulnerability_db:
+    # 自动更新
+    auto_update: true
+    # 更新时间
+    update_schedule: "0 4 * * *"  # 每天凌晨 4 点
+
+  # 扫描策略
+  policy:
+    # 忽略未修复的漏洞
+    ignore_unfixed: false
+    # 扫描层级
+    security_check:
+      - vuln
+      - config
+
+  # 告警配置
+  alert:
+    enabled: true
+    # 高危漏洞告警
+    high_severity: true
+    # 通知方式
+    notification:
+      - email
+      - webhook
+
+# =============================================================================
+# Notary 镜像签名配置
+# =============================================================================
+
+notary:
+  # 启用 Notary
+  enabled: true
+
+  # Notary Server 配置
+  server:
+    host: http://harbor-notary-server:4443
+
+  # Notary Signer 配置
+  signer:
+    host: http://harbor-notary-signer:7899
+
+  # 签名策略
+  policy:
+    # 强制签名验证
+    enforce_signing: false
+    # 信任级别
+    trust_level: full
+
+# =============================================================================
+# 监控配置
+# =============================================================================
+
+metrics:
+  # 启用监控
+  enabled: true
+
+  # Prometheus 配置
+  prometheus:
+    # 指标路径
+    path: /metrics
+    # 指标端口
+    port: 8080
+
+  # 导出器配置
+  exporter:
+    enabled: true
+    port: 9901
+
+# =============================================================================
+# 安全配置
+# =============================================================================
+
+security:
+  # TLS 配置
+  tls:
+    # 强制 TLS 1.3
+    min_version: "1.3"
+    # 证书路径
+    cert_file: /etc/harbor/ssl/server.crt
+    key_file: /etc/harbor/ssl/server.key
+
+  # 密钥管理
+  secret:
+    # 密钥路径
+    path: /etc/harbor/secret/secret_key
+
+  # 容器安全
+  container:
+    # 非 root 用户运行
+    run_as_non_root: true
+    # 只读根文件系统
+    read_only_root_filesystem: true
+    # 禁用特权
+    privileged: false
+
+  # 网络安全
+  network:
+    # 网络策略
+    network_policy: true
+    # 默认拒绝
+    default_deny: true
+
+# =============================================================================
+# 高可用配置
+# =============================================================================
+
+ha:
+  # 集群模式（MVP 阶段禁用）
+  enabled: false
+
+  # 集群配置
+  # cluster:
+  #   redis:
+  #     host: redis-cluster.sisys.local
+  #     port: 6379
+
+# =============================================================================
+# 备份配置
+# =============================================================================
+
+backup:
+  # 备份策略
+  enabled: true
+
+  # 备份目录
+  backup_dir: /var/harbor/backup
+
+  # 备份计划
+  schedule: "0 2 * * *"  # 每天凌晨 2 点
+
+  # 保留策略
+  retention:
+    enabled: true
+    days: 7
+
+# =============================================================================
+# 审计日志配置
+# =============================================================================
+
+audit:
+  # 启用审计日志
+  enabled: true
+
+  # 审计日志保留天数
+  retention_days: 90
+
+  # 审计日志存储
+  storage:
+    type: database
+    # 或文件系统
+    # type: filesystem
+    # path: /var/harbor/audit
+
+# =============================================================================
+# 复制配置
+# =============================================================================
+
+replication:
+  # 启用复制
+  enabled: true
+
+  # 复制策略
+  policies:
+    - name: "to-backup"
+      target: "harbor-backup.sisys.local"
+      trigger: "manual"
+      filters:
+        - "repository: **/*"
+
+# =============================================================================
+# 配额配置
+# =============================================================================
+
+quota:
+  # 启用配额
+  enabled: true
+
+  # 默认配额
+  default:
+    storage: -1  # 无限制
+    repository_count: -1  # 无限制
+
+  # 项目配额
+  projects:
+    # 示例：sisys 项目配额
+    # sisys:
+    #   storage: 100Gi
+    #   repository_count: 50
+
+# =============================================================================
+# 系统配置
+# =============================================================================
+
+system:
+  # 版本
+  version: "2.14.3"
+
+  # 实例 ID（用于集群）
+  instance_id: harbor-sisys-01
+
+  # 区域
+  region: cn-east-1
+
+  # 时区
+  timezone: Asia/Shanghai
