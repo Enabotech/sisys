@@ -1,7 +1,7 @@
 #!/bin/bash
 # Traefik 安装脚本 - K3S 多节点（Docker 容器）
 # Story 0.4: K3S 集群部署（WSL2 多节点版）
-# 技术栈：Traefik v2.10 + K3S v1.34.5
+# 技术栈：Traefik v3.x + K3S v1.34.5
 
 set -e
 
@@ -50,7 +50,7 @@ echo ""
 
 # ========== 安装 Traefik ==========
 
-echo "安装 Traefik v2.10..."
+echo "安装 Traefik v3.x..."
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

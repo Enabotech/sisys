@@ -49,7 +49,7 @@ development_status:
   # Iteration 1: 开发 CI/CD 系统（面向工程师）- 🔄 进行中
   0-4-k3s-cluster-deployment: done  # K3S v1.34.5 + Traefik v3.x + local-path-provisioner ✅ 部署成功，测试 15/15 通过，代码审查问题全部修复
   0-5-gitea-code-hosting: done  # Gitea v1.25.4 + PostgreSQL ✅ 开发完成，代码审查问题 100% 修复 (7 个问题：4 MEDIUM + 3 LOW)
-  0-6-harbor-image-registry: backlog  # Harbor v2.14.3 + Trivy + Notary
+  0-6-harbor-image-registry: ready-for-dev  # Harbor v2.14.3 + Trivy + Notary ✅ 故事文件已创建
   0-7-argocd-continuous-deployment: backlog  # ArgoCD v3.3.2 GitOps
   0-8-gitea-runner-configuration: backlog  # Gitea Runner Docker/K8s Executor
   0-9-ci-cd-pipeline-template: backlog  # 标准化 Pipeline 7 阶段
@@ -206,17 +206,19 @@ development_status:
 #   - Epic 1-8: 82 stories (📋 backlog)
 #
 # Status Summary:
-#   - Done: 4 (Epic 0 Iteration 0: 3 stories + Story 0.4)
+#   - Done: 5 (Epic 0 Iteration 0: 3 stories + Story 0.4 + Story 0.5)
 #   - In-Progress: 0
-#   - Ready for Dev: 1 (Story 0.5)
-#   - Backlog: 91
+#   - Ready for Dev: 1 (Story 0.6)
+#   - Backlog: 90
 #
 # Next Steps:
 #   1. ✅ Story 0.4 代码审查修复完成，状态更新为 done
 #   2. ✅ Story 0.5 故事文件已创建，状态更新为 ready-for-dev
-#   3. Execute Epic 0 Iteration 1 剩余 Stories (0.6-0.9, 0.14-0.18)
-#   4. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
-#   5. Follow SDD+TDD 融合模式 for all stories
+#   3. ✅ Story 0.6 故事文件已创建，状态更新为 ready-for-dev
+#   4. Execute Story 0.6 (Harbor 镜像仓库部署)
+#   5. Execute Epic 0 Iteration 1 剩余 Stories (0.7-0.9, 0.14-0.18)
+#   6. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   7. Follow SDD+TDD 融合模式 for all stories
 #
 # Key Changes from Previous Version:
 #   - Updated Epic 0 structure to reflect refactoring (Iteration 0 + Iteration 1)
@@ -228,5 +230,8 @@ development_status:
 #   - **Story 0.4 测试**: 15/15 自动化测试通过（100%）✅
 #   - **Story 0.4 代码审查**: 发现 9 个问题，已修复 7 个（4 HIGH + 3 MEDIUM）✅
 #   - **Story 0.4 状态**: in-progress → done (所有 HIGH/MEDIUM 问题已修复)
-#   - **Story 0.5 状态**: backlog → ready-for-dev ✅
+#   - **Story 0.5 完成**: Gitea v1.25.4 + PostgreSQL ✅
+#   - **Story 0.5 代码审查**: 发现 12 个问题，已修复 12 个（100%）✅
+#   - **Story 0.5 状态**: backlog → done ✅
+#   - **Story 0.6 状态**: backlog → ready-for-dev ✅ 故事文件已创建
 # =============================================================================
