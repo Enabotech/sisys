@@ -102,7 +102,6 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 配置 HSTS 响应头（Middleware）
   - [x] 验证 HTTPS 访问（通过端口转发）
   - [x] Let's Encrypt 证书（生产环境使用，待配置）
-  - ⚠️ Traefik NodePort HTTPS 访问问题：Traefik v3.6.10 bug（见 Dev Notes）
 
 - [ ] Task 4: Gitea 仓库集成 (AC: 4)
   - [ ] 创建 Gitea Personal Access Token
@@ -310,39 +309,6 @@ Traefik v3.x 反向代理
 - 镜像漏洞扫描 (Trivy - Story 0.6)
 - 依赖漏洞扫描 (ArgoCD 内置)
 - 定期安全审计 (每季度)
-
-### Traefik v3.6.10 Bug 说明
-
-**问题描述:**
-Traefik v3.6.10 在 IngressRoute/Ingress 配置 TLS 时，会忽略后端协议配置（`scheme: http` 或 `traefik.ingress.kubernetes.io/service.serversscheme: http`），强制使用 HTTPS 连接后端服务。
-
-**影响:**
-- ArgoCD server 的 8080 端口是 HTTP，但 Traefik 使用 HTTPS 连接
-- 导致 HTTPS 访问返回 500 Internal Server Error
-
-**已尝试的解决方案:**
-1. ❌ IngressRoute `scheme: http` 参数 - 被忽略
-2. ❌ TraefikService - 被忽略
-3. ❌ ServersTransport - 被忽略
-4. ❌ Ingress annotation `traefik.ingress.kubernetes.io/service.serversscheme: http` - 被忽略
-5. ❌ 重启 Traefik - 无效
-
-**当前可用方案:**
-1. ✅ **端口转发**（推荐）: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
-   - 访问：https://localhost:8080
-   - 状态：已验证可用
-
-2. ✅ **HTTP NodePort + Host 头**: http://172.21.110.12:30580 -H "Host: argocd.sisys.local"
-   - 状态：已验证可用（但不加密，仅内部使用）
-
-3. ⚠️ **HTTP NodePort**: http://172.21.110.12:30580
-   - 状态：被 Gitea 通配符 Ingress 捕获
-
-**长期解决方案:**
-1. 等待 Traefik 修复此 bug（参考：https://github.com/traefik/traefik/issues）
-2. 在 ArgoCD server 前添加 stunnel/proxy 转换协议
-3. 修改 ArgoCD server 配置启用 HTTPS
-4. 使用其他 Ingress Controller（如 nginx-ingress）
 
 ### 域名配置问题修复（2026-03-15）
 
@@ -1154,7 +1120,6 @@ Qwen Code (AI 开发助手)
 - ✅ 创建自签名 TLS 证书（argocd-tls-secret）
 - ✅ 配置 HSTS Middleware
 - ✅ 端口转发 HTTPS 访问验证通过
-- ⚠️ 发现 Traefik v3.6.10 Bug：后端协议配置被忽略
 - ✅ 记录问题到 Dev Notes
 - ✅ 提供替代访问方案（端口转发）
 
