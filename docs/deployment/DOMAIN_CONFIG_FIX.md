@@ -14,13 +14,13 @@
 |------|------|---------------------|----------------------|------|
 | **Gitea** | gitea.sisys.local | ⚠️ 需 Host 头 | ✅ 200 OK | ✅ 正常 |
 | **Harbor** | harbor.sisys.local | ⚠️ 需 Host 头 | ✅ API 可用 | ✅ 正常 |
-| **ArgoCD** | argocd.sisys.local | ⚠️ 需 Host 头 | ✅ 307 重定向 | ✅ 正常 |
+| **ArgoCD** | argocd.sisys.local | ⚠️ 需 Host 头 | ✅ 200 OK | ✅ 已修复 |
 
 **测试命令**:
 ```bash
 # HTTPS 测试（推荐）
 curl -k -I https://172.21.110.12:31448 -H "Host: gitea.sisys.local"    # ✅ 200
-curl -k -I https://172.21.110.12:31448 -H "Host: argocd.sisys.local"   # ✅ 307
+curl -k -I https://172.21.110.12:31448 -H "Host: argocd.sisys.local"   # ✅ 200
 curl -k https://172.21.110.12:31448/api/v2.0/ping -H "Host: harbor.sisys.local"  # ✅ Pong
 
 # HTTP 测试（不推荐，仅内部使用）
@@ -42,7 +42,7 @@ curl -I http://172.21.110.12:30580 -H "Host: gitea.sisys.local"        # ⚠️ 
 
 4. ✅ **ArgoCD IngressRoute 已修复**
    - 移除 Middleware 依赖
-   - HTTPS 重定向工作正常
+   - 配置 `server.insecure: true` 解决重定向循环
 
 5. ✅ **Harbor API 验证通过**
    - `/api/v2.0/ping` 返回 `Pong`
@@ -55,10 +55,10 @@ curl -I http://172.21.110.12:30580 -H "Host: gitea.sisys.local"        # ⚠️ 
    - 必须添加 `-H "Host: <service>.sisys.local"` 头
    - 原因：Traefik web 入口点需要正确的 Host 头匹配 Ingress 规则
 
-2. **Harbor 根路径返回 404**
-   - 这是 Harbor 的正常行为
-   - API 端点正常工作：`/api/v2.0/ping` → `Pong`
-   - 浏览器访问需要通过完整 URL: https://harbor.sisys.local
+2. **Windows 浏览器需要额外配置**
+   - WSL2 的 `/etc/hosts` 不影响 Windows 浏览器
+   - 需要在 `C:\Windows\System32\drivers\etc\hosts` 中添加 DNS 映射
+   - 参考文档：`docs/deployment/WINDOWS_HOSTS_SETUP.md`
 
 ---
 
