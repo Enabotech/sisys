@@ -1,0 +1,76 @@
+---
+# ArgoCD Traefik IngressRoute 配置 - Story 0.7
+# 描述：使用 Traefik IngressRoute 暴露 ArgoCD Web 界面
+# 修复：暂时移除 Middleware 依赖以测试基本路由
+# pragma: allowlist secret
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+  annotations:
+    description: "ArgoCD Web 界面 IngressRoute"
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`argocd.sisys.local`)
+      kind: Rule
+      services:
+        - name: argocd-server
+          port: 80
+          passHostHeader: true
+          serversTransport: argocd-http
+  tls:
+    secretName: argocd-tls-secret  # pragma: allowlist secret
+
+---
+# ServersTransport 配置 - 强制使用 HTTP
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: argocd-http
+  namespace: argocd
+spec:
+  insecureSkipVerify: true
+
+---
+# Middleware 配置 - 添加必要的 headers
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: argocd-headers
+  namespace: argocd
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    stsPreload: true
+
+---
+# ArgoCD Dex Traefik IngressRoute (可选，用于 OIDC)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-dex
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+  annotations:
+    description: "ArgoCD Dex OIDC IngressRoute"
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`argocd.sisys.local`) && PathPrefix(`/dex`)
+      kind: Rule
+      services:
+        - name: argocd-dex-server
+          port: 5556
