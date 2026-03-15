@@ -321,14 +321,14 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 - ✅ `docker/docker-compose.prod.yml` - 镜像标签策略优化（使用环境变量）
 - ✅ 新增 Kubernetes 部署配置支持
 
-**新增文件 (生产部署支持)：**
-- `k8s/production/deployment.yaml` - Kubernetes 生产部署配置（含 ResourceQuota、LimitRange）
-- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南（含紧急恢复流程）
+~~**新增文件 (生产部署支持)：**~~
+~~- `k8s/production/deployment.yaml` - Kubernetes 生产部署配置（含 ResourceQuota、LimitRange）~~
+~~- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南（含紧急恢复流程）~~
 
 **二次审查修复 (2026-03-02)：**
 - ✅ `.github/workflows/cd.yml` - master 分支支持、钉钉通知、健康检查 URL 环境变量、测试环境卷清理
-- ✅ `k8s/production/deployment.yaml` - Secret 警告注释、ResourceQuota、LimitRange
-- ✅ `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程、预防措施
+~~- ✅ `k8s/production/deployment.yaml` - Secret 警告注释、ResourceQuota、LimitRange~~
+~~- ✅ `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程、预防措施~~
 
 ---
 
@@ -390,8 +390,8 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 
 **修改文件 (第二次审查):**
 - `.github/workflows/cd.yml` - 5 处修复
-- `k8s/production/deployment.yaml` - 3 处增强
-- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程
+~~- `k8s/production/deployment.yaml` - 3 处增强~~
+~~- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - 紧急恢复流程~~
 - `_bmad-output/implementation-artifacts/stories/0-2-ci-cd-pipeline.md` - Task 8 完成
 
 **审查状态:** 所有 MEDIUM 和 LOW 问题已修复，Story 准备标记为 "done"
@@ -407,9 +407,9 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 - 实现生产部署具体步骤（Kubernetes 部署）
 - 优化 Docker 镜像标签策略（使用环境变量控制）
 
-**新增文件:**
-- `k8s/production/deployment.yaml` - Kubernetes 生产部署完整配置
-- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南
+~~**新增文件:**~~
+~~- `k8s/production/deployment.yaml` - Kubernetes 生产部署完整配置~~
+~~- `docs/developer/KUBERNETES_SECRETS_SETUP.md` - Kubernetes Secrets 配置指南~~
 
 **修改文件:**
 - `.github/workflows/ci.yml` - 安全扫描和覆盖率修复

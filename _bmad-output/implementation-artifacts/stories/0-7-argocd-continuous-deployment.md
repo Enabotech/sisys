@@ -8,413 +8,758 @@ Status: ready-for-dev
 
 As a **DevOps 工程师**,
 I want **部署 ArgoCD v3.3.2 持续部署工具**,
-So that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集群**。
+so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集群**。
 
 ## Acceptance Criteria
 
-**Given** K3S 集群已部署 (Story 0.4 ✅ 已完成) 且 Harbor 镜像仓库已部署 (Story 0.6 ✅ 已完成)
-**When** 运行 ArgoCD 安装脚本
-**Then** ArgoCD v3.3.2 部署成功
-- [ ] 所有 Pod 状态为 Running (`kubectl get pods -n argocd`，无 CrashLoopBackOff 或 Error 状态)
-- [ ] 健康检查通过 (`curl -k https://argocd.sisys.local/api/v1/session`, HTTP 200)
-- [ ] Pod 启动时间 < 60 秒
-- [ ] 无重启次数异常（restart count < 3）
+1. **Given** K3S 集群已部署 (Story 0.4 ✅ 已完成)
+   **When** 运行 ArgoCD 安装脚本
+   **Then** ArgoCD v3.3.2 部署成功
+   - 所有 Pod 状态为 Running (`kubectl get pods -n argocd`，无 CrashLoopBackOff 或 Error 状态)
+   - 健康检查通过 (`curl -k https://argocd.sisys.local/health`，HTTP 200)
+   - Pod 启动时间 < 60 秒
+   - 无重启次数异常（restart count < 3）
 
-**Given** ArgoCD 服务已启动
-**When** 访问 https://argocd.sisys.local
-**Then** ArgoCD Web 界面可正常访问
-- [ ] HTTP 200 响应
-- [ ] 页面加载时间 < 3 秒
-- [ ] 页面标题包含"ArgoCD"
-- [ ] 登录表单可正常显示
-- [ ] TLS 1.3 强制启用，SSL Labs 测试评级 ≥ A
+2. **Given** ArgoCD 服务已启动
+   **When** 访问 https://argocd.sisys.local
+   **Then** ArgoCD Web 界面可正常访问
+   - HTTP 200 响应
+   - 页面加载时间 < 3 秒
+   - 页面标题包含"ArgoCD"
+   - 登录表单可正常显示
+   - SSL Labs 测试评级 ≥ A（TLS 1.3 强制启用）
 
-**Given** ArgoCD 初始化配置
-**When** 首次启动
-**Then** PostgreSQL/Redis 依赖服务连接成功
-- [ ] Redis 连接成功 (`kubectl exec -n argocd <argocd-server-pod> -- redis-cli ping` 返回 PONG)
-- [ ] 数据库连接延迟 < 100ms
-- [ ] 无连接错误日志
+3. **Given** ArgoCD 服务运行中
+   **When** 使用 admin 账号登录
+   **Then** 登录成功并可访问仪表盘
+   - 初始密码从 Kubernetes Secret 获取
+   - 首次登录强制修改密码
+   - 密码复杂度验证通过（12 位 + 大小写 + 数字 + 符号）
+   - 登录响应时间 < 2 秒
 
-**Given** ArgoCD 服务运行中
-**When** 创建管理员账号
-**Then** 管理员账号创建成功并可登录
-- [ ] 初始密码从 Kubernetes Secret 获取 (`kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`)
-- [ ] 登录成功（HTTP 302 重定向到仪表盘）
-- [ ] 登录响应时间 < 2 秒
-- [ ] 密码复杂度验证通过（12 位 + 大小写 + 数字 + 符号）
+4. **Given** ArgoCD 配置完成
+   **When** 添加 Gitea 代码仓库
+   **Then** Git 仓库连接成功
+   - Gitea 仓库地址配置正确（https://gitea.sisys.local/sisys/sisys.git）
+   - 认证凭据配置（Personal Access Token）
+   - 仓库连接测试通过
+   - 支持 Webhook 自动触发
 
-**Given** ArgoCD 配置完成
-**When** 添加 Git 仓库（Gitea Story 0.5 ✅ 已完成）
-**Then** Git 仓库连接成功
-- [ ] Gitea 仓库连接成功 (`argocd repo add https://gitea.sisys.local/sisys/sisys.git --username {USER} --password {TOKEN}`)
-- [ ] 仓库同步成功（Application 列表可见）
-- [ ] Git 认证使用 Personal Access Token（非明文密码）
+5. **Given** ArgoCD 与 Harbor 集成
+   **When** 配置 Image Updater
+   **Then** 镜像自动更新功能可用
+   - Harbor 镜像仓库配置正确
+   - Image Updater 检测到新镜像 tag
+   - 自动更新 K8s Deployment 镜像
+   - 滚动部署成功
 
-**Given** ArgoCD 与 Harbor 集成 (Story 0.6 ✅ 已完成)
-**When** 配置 Image Updater
-**Then** 镜像更新自动触发
-- [ ] ArgoCD Image Updater 部署成功
-- [ ] Harbor Webhook 配置成功（镜像推送事件 → Image Updater）
-- [ ] 新镜像推送后自动更新 K8s Deployment（< 5 分钟）
+6. **Given** ArgoCD Application 创建
+   **When** 配置 GitOps 应用
+   **Then** 应用同步状态正常
+   - Application 状态为 Synced
+   - Health 状态为 Healthy
+   - 自动同步策略启用（auto-prune, self-heal）
+   - 同步历史可追溯
 
-**Given** ArgoCD Application 创建
-**When** 配置自动同步策略
-**Then** Git 变更自动同步到集群
-- [ ] 自动同步策略配置成功（`syncPolicy.automated.prune = true`, `selfHeal = true`）
-- [ ] Git 提交后自动部署（< 2 分钟）
-- [ ] 部署失败自动回滚
-
-## SDD 规范定义
-
-### 领域事件 Schema
-- [ ] 事件定义（`src/domain/events/`）- 本 Story 为基础设施 Story，领域事件在 Story 1.2 实现
-- [ ] Pydantic 验证通过
-
-### API 契约
-- [ ] OpenAPI 定义（`docs/api/openapi.yaml`）- ArgoCD 使用原生 API，本 Story重点在 GitOps 流程
-- [ ] 契约测试通过
-
-### 验收标准（Gherkin）
-- [ ] `tests/acceptance/test_story_0_7.feature`
-- [ ] 业务方评审通过
+7. **Given** ArgoCD 多环境配置
+   **When** 创建 Dev/Test/Prod 环境
+   **Then** 多环境隔离成功
+   - 各环境独立命名空间
+   - 环境间配置差异管理（Kustomize/Helm）
+   - 环境晋升流程清晰
+   - 权限隔离（RBAC）
 
 ## Tasks / Subtasks
 
 - [ ] Task 1: ArgoCD Helm Chart 配置 (AC: 1, 2)
   - [ ] 添加 ArgoCD Helm 仓库
-  - [ ] 配置 values.yaml (副本数、资源限制、Ingress)
-  - [ ] 配置 Ingress (Traefik v3.x, TLS 1.3)
-  - [ ] 配置 Redis 和 PostgreSQL（内部/外部可选）
-  - [ ] 配置 Kubernetes Secret (密钥、密码)
+  - [ ] 配置 values.yaml（副本数、资源限制、Ingress）
+  - [ ] 配置 Kubernetes Secret（初始密码、认证凭据）
+  - [ ] 配置 Traefik Ingress（TLS 证书）
+  - [ ] 配置 RBAC 权限
 
-- [ ] Task 2: ArgoCD 部署与验证 (AC: 1, 2, 3, 4)
+- [ ] Task 2: ArgoCD 部署与验证 (AC: 1, 2, 3)
   - [ ] 执行 helm install 部署 ArgoCD
-  - [ ] 验证 Pod 运行状态 (Running 1/1)
-  - [ ] 验证服务可访问 (健康检查通过)
-  - [ ] 获取初始管理员密码 (argocd-initial-admin-secret)
-  - [ ] 验证 Redis/PostgreSQL 连接
+  - [ ] 验证 Pod 运行状态（Running 1/1）
+  - [ ] 验证服务可访问（健康检查通过）
+  - [ ] 获取初始 admin 密码（kubectl get secret）
+  - [ ] 首次登录修改密码
   - [ ] 绿灯测试通过
 
-- [ ] Task 3: Git 仓库集成配置 (AC: 5)
+- [ ] Task 3: HTTPS 证书配置 (AC: 2)
+  - [ ] 配置 Traefik Ingress
+  - [ ] 创建自签名 TLS 证书（开发环境）
+  - [ ] 配置 HSTS 响应头（Middleware）
+  - [ ] 验证 HTTPS 访问（通过 Traefik）
+  - [ ] Let's Encrypt 证书（生产环境使用）
+
+- [ ] Task 4: Gitea 仓库集成 (AC: 4)
   - [ ] 创建 Gitea Personal Access Token
-  - [ ] 添加 Gitea 仓库到 ArgoCD (`argocd repo add`)
-  - [ ] 验证仓库连接 (`argocd repo get`)
-  - [ ] 配置 Webhook（Gitea → ArgoCD）
+  - [ ] ArgoCD 添加 Gitea 仓库凭据
+  - [ ] 配置 Webhook 自动触发
+  - [ ] 验证 Git 仓库连接
+  - [ ] 测试 Webhook 触发
 
-- [ ] Task 4: ArgoCD Image Updater 配置 (AC: 6)
-  - [ ] 部署 ArgoCD Image Updater
-  - [ ] 配置 Harbor 镜像仓库凭证
-  - [ ] 配置 Harbor Webhook（镜像推送事件 → Image Updater）
+- [ ] Task 5: Harbor 镜像仓库集成 (AC: 5)
+  - [ ] 配置 Harbor 仓库凭据
+  - [ ] 安装 ArgoCD Image Updater
+  - [ ] 配置镜像更新策略
   - [ ] 验证镜像自动更新流程
+  - [ ] 测试端到端 GitOps 流程
 
-- [ ] Task 5: Application 与自动同步策略 (AC: 7)
-  - [ ] 创建示例 Application（GitOps 模式）
-  - [ ] 配置自动同步策略（prune=true, selfHeal=true）
-  - [ ] 验证 Git 提交后自动部署
-  - [ ] 配置部署失败自动回滚
+- [ ] Task 6: Application 配置 (AC: 6)
+  - [ ] 创建 ArgoCD Application（声明式）
+  - [ ] 配置自动同步策略（self-heal, auto-prune）
+  - [ ] 配置健康检查（Health Check）
+  - [ ] 验证同步状态
+  - [ ] 测试回滚功能
 
-- [ ] Task 6: 安全加固
-  - [ ] 配置容器以非 root 用户运行 (securityContext)
-  - [ ] 配置 NetworkPolicy (DefaultDeny)
+- [ ] Task 7: 多环境配置 (AC: 7)
+  - [ ] 创建 Dev/Test/Prod 命名空间
+  - [ ] 配置 Kustomize 多环境覆盖
+  - [ ] 配置环境晋升流程
+  - [ ] 配置 RBAC 环境隔离
+  - [ ] 验证环境隔离
+
+- [ ] Task 8: 安全加固
+  - [ ] 配置容器以非 root 用户运行
+  - [ ] 配置 NetworkPolicy（DefaultDeny）
   - [ ] 配置只读根文件系统
   - [ ] 禁用特权模式
-  - [ ] 配置 RBAC 权限（项目级隔离）
+  - [ ] 配置审计日志
 
-- [ ] Task 7: 架构合规验证
+- [ ] Task 9: 架构合规验证
   - [ ] 验证 TLS 1.3 强制启用
-  - [ ] 验证存储使用 local-path (NVMe SSD)
-  - [ ] 验证 Ingress 配置 (Traefik 443 → argocd-server:443)
+  - [ ] 验证存储使用 local-path
+  - [ ] 验证 Ingress 配置（Traefik 443 → argocd-server:443）
   - [ ] 验证密钥存储于 Kubernetes Secret
   - [ ] 运行所有 TDD 测试
 
-- [ ] Task 8: 代码审查修复
-  - [ ] 修复 AI 审查发现的问题
-  - [ ] 所有问题 100% 修复
+- [ ] Task 10: 代码审查修复
+  - [ ] 修复 HIGH 优先级问题
+  - [ ] 修复 MEDIUM 优先级问题
+  - [ ] 修复 LOW 优先级问题
 
-- [ ] Task 9: 功能验证
+- [ ] Task 11: 功能验证
   - [ ] AC-1: ArgoCD 部署验证
   - [ ] AC-2: Web 界面访问
-  - [ ] AC-3: Redis/PostgreSQL 连接
-  - [ ] AC-4: 管理员账号
-  - [ ] AC-5: Git 仓库集成
-  - [ ] AC-6: Harbor Image Updater
-  - [ ] AC-7: 自动同步策略
-
-## TDD 测试要求
-
-### 1. 基础设施测试
-- [ ] ArgoCD Pod 运行状态测试 - 验证所有 Pod Running
-- [ ] 服务可访问性测试 - 验证 HTTPS 访问
-- [ ] 数据库连接测试 - 验证 Redis/PostgreSQL 连接
-- [ ] Git 仓库连接测试 - 验证 Gitea 集成
-- [ ] Image Updater 测试 - 验证镜像自动更新
-
-### 2. 性能要求
-- [ ] Pod 启动时间 < 60 秒
-- [ ] 页面加载时间 < 3 秒
-- [ ] Git 提交后自动部署 < 2 分钟
-- [ ] 镜像推送后自动更新 < 5 分钟
-
-### 3. 覆盖率要求
-- [ ] 基础设施层覆盖率≥75%
-- [ ] 集成测试覆盖率≥70%
-
-### 4. 代码质量
-- [ ] Ruff 检查通过
-- [ ] MyPy 类型检查通过
-- [ ] YAML 语法验证通过（yamllint）
-
-### 5. 测试文件
-- [ ] `tests/deployment/test_argocd.py` - 部署测试
-- [ ] `tests/integration/test_argocd_gitops.py` - GitOps 集成测试
-
-**实施指南:**
-参考 `docs/deployment/ARGOCD_SETUP.md`
+  - [ ] AC-3: 管理员登录
+  - [ ] AC-4: Gitea 集成
+  - [ ] AC-5: Harbor 集成
+  - [ ] AC-6: Application 同步
+  - [ ] AC-7: 多环境配置
 
 ## Dev Notes
 
-### 相关架构模式和约束
+### 技术栈
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md)
+- **ArgoCD**: v3.3.2 ✅ (已由 epics_v1.0.md 确认)
+- **Helm**: v3.x
+- **Ingress**: Traefik v3.x (Story 0.4 已部署)
+- **存储**: local-path-provisioner (Story 0.4 已部署)
+- **Git**: Gitea v1.25.4 (Story 0.5 已部署)
+- **镜像仓库**: Harbor v2.14.3 (Story 0.6 已部署)
 
-**GitOps 模式:**
-- Git 作为唯一真相源（Single Source of Truth）
-- 声明式配置（YAML/Helm/Kustomize）
-- 自动同步（Automated Sync）
-- 自我修复（Self-Healing）
+### 网络架构
 
-**架构约束:**
-1. **Ingress 配置**: Traefik v3.x 反向代理，TLS 1.3 强制启用
-2. **存储架构**: local-path-provisioner (NVMe SSD)
-3. **网络架构**: DefaultDeny NetworkPolicy，仅允许 Traefik 访问
-4. **安全配置**: 非 root 用户、只读根文件系统、RBAC 权限隔离
+**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#网络架构)
 
-**依赖关系:**
-- ✅ Story 0.4: K3S 集群部署（已完成）- K3S v1.34.5, Traefik v3.x, local-path-provisioner
-- ✅ Story 0.5: Gitea 代码托管（已完成）- Gitea v1.25.4
-- ✅ Story 0.6: Harbor 镜像仓库（已完成）- Harbor v2.14.3
-- → Story 0.8: Gitea Runner 配置（可并行）
-- → Story 0.9: CI/CD Pipeline 模板（依赖本 Story）
+```
+互联网 (80/443)
+    │
+    ▼
+Traefik v3.x 反向代理
+    │
+    ├─→ argocd.sisys.local:443 (TLS 1.3)
+    │         │
+    │         ▼
+    │   argocd-server:443 (容器内部端口)
+    │
+    ├─→ harbor.sisys.local:443 (Story 0.6 ✅ 已完成)
+    │
+    └─→ gitea.sisys.local:443 (Story 0.5 ✅ 已完成)
+```
 
-### 项目结构说明
+**网络配置详情:**
 
-**统一项目结构:**
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| **外部访问 URL** | https://argocd.sisys.local | Traefik Ingress 443 端口 |
+| **内部服务名** | argocd-server | K8s Service 名称 |
+| **容器端口** | 443 | ArgoCD HTTPS 服务端口 |
+| **TLS 版本** | TLS 1.3 | 强制启用，禁用 TLS 1.2 以下 |
+| **证书颁发机构** | Let's Encrypt | 自动续期 (90 天) |
+| **网络策略** | DefaultDeny | 仅允许 Traefik Ingress 访问 |
+
+### 架构合规要求
+
+**来源**: [architecture.md](../../planning-artifacts/architecture.md)
+
+1. **六边形架构原则**: ArgoCD 作为外部系统，通过适配器模式集成
+   - ArgoCD Webhook → 事件总线 (RabbitMQ)
+   - ArgoCD API → 应用层服务调用
+
+2. **事件驱动架构**:
+   - Gitea 代码推送事件 → 触发 ArgoCD 同步
+   - Harbor 镜像推送事件 → 触发 ArgoCD 部署
+
+3. **存储要求**:
+   - ArgoCD 配置存储：local-path-provisioner (NVMe SSD)
+   - 备份存储：10T HDD (K3S 定时备份)
+
+### 安全配置
+
+**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统安全架构)
+
+**TLS/SSL 安全:**
+- TLS 1.3 强制启用 (禁用 TLS 1.2 及以下版本)
+- HSTS (HTTP Strict Transport Security) 启用
+- 证书自动续期 (Let's Encrypt 90 天)
+- 安全密码套件 (仅允许 AEAD 加密算法)
+
+**RBAC 权限控制:**
+- 管理员密码复杂度要求：
+  - 最小长度：12 位
+  - 必须包含：大写字母 + 小写字母 + 数字 + 特殊符号
+  - 密码历史：不得重复最近 5 次密码
+- 启用双因素认证 (2FA) - 推荐管理员强制启用
+
+**密钥管理:**
+- ArgoCD Secret 密钥 (至少 32 字节随机字符串)
+- 数据库密码存储于 Kubernetes Secret
+- 禁用配置文件中的明文密码
+
+**容器安全:**
+- 使用非 root 用户运行 ArgoCD 容器
+- 只读根文件系统 (readOnlyRootFilesystem: true)
+- 禁用特权模式 (privileged: false)
+- 限制 Linux Capabilities
+
+**网络安全:**
+- NetworkPolicy 默认拒绝 (DefaultDeny)
+- 仅允许 Traefik Ingress 访问 ArgoCD HTTPS 端口
+- 仅允许 Gitea Runner 访问 ArgoCD API (如启用)
+
+**安全扫描:**
+- 镜像漏洞扫描 (Trivy - Story 0.6)
+- 依赖漏洞扫描 (ArgoCD 内置)
+- 定期安全审计 (每季度)
+
+### 依赖关系
+
+**前置依赖:**
+- ✅ Story 0.4: K3S 集群部署 (已完成)
+  - K3S v1.34.5 ✅
+  - Traefik v3.x ✅
+  - local-path-provisioner ✅
+- ✅ Story 0.5: Gitea 代码托管 (已完成)
+- ✅ Story 0.6: Harbor 镜像仓库 (已完成)
+
+**后置依赖:**
+- → Story 0.8: Gitea Runner 配置 (可并行)
+- → Story 0.9: CI/CD Pipeline 模板 (依赖本 Story + Story 0.8)
+
+### 与 Gitea/Harbor 集成
+
+**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统组件架构)
+
+**集成架构图:**
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│   Gitea     │─────▶│   Harbor    │─────▶│   ArgoCD    │
+│  v1.25.4    │      │  v2.14.3    │      │  v3.3.2     │
+│  代码托管    │      │  镜像仓库    │      │  持续部署    │
+└─────────────┘      └─────────────┘      └─────────────┘
+      │                    │                    │
+      │ 1. 代码推送         │ 2. 镜像推送         │ 3. 自动部署
+      │    Webhook         │    Robot Account   │    GitOps
+      ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────┐
+│                    K3S 集群                              │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Gitea Runner (Story 0.8)                        │   │
+│  │  - 监听 Gitea Webhook                            │   │
+│  │  - 执行 CI/CD Pipeline                           │   │
+│  │  - 构建镜像并推送 Harbor                         │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**集成配置详情:**
+
+| 集成项 | 配置内容 | 用途 | 归属 Story |
+|--------|---------|------|-----------|
+| **Gitea → ArgoCD** | Webhook 配置 | CI/CD 触发 | Story 0.8 |
+| **Harbor → ArgoCD** | Image Updater Webhook | 自动触发部署 | 本 Story |
+| **ArgoCD → Gitea** | Git 仓库凭据 | GitOps 配置 | 本 Story |
+| **ArgoCD → Harbor** | 镜像拉取凭据 | 部署认证 | 本 Story |
+
+**本 Story (0.7) 集成工作:**
+
+1. **ArgoCD → Gitea 集成**
+   - 创建 Gitea Personal Access Token
+   - ArgoCD 添加 Gitea 仓库凭据
+   - 配置 Webhook 自动触发
+
+2. **ArgoCD → Harbor 集成**
+   - 配置 Harbor 仓库凭据
+   - 安装 ArgoCD Image Updater
+   - 配置镜像更新策略
+
+3. **Git 仓库结构规划**
+   ```
+   sisys/
+   ├── deployments/
+   │   ├── harbor/          # Story 0.6: Harbor 部署配置
+   │   ├── gitea/           # Story 0.5: Gitea 部署配置
+   │   └── argocd/          # 本 Story: ArgoCD 部署配置
+   │   └── apps/            # ArgoCD Application 配置
+   │       ├── dev/         # 开发环境
+   │       ├── test/        # 测试环境
+   │       └── prod/        # 生产环境
+   └── docs/
+       └── deployment/      # 部署文档
+   ```
+
+### 存储架构
+
+**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#存储架构)
+
+```
+┌─────────────────────┐
+│   1T NVMe SSD       │
+│                     │
+│  ┌───────────────┐  │
+│  │ ArgoCD 配置    │  │ ← 10Gi PVC
+│  │ Git 仓库缓存   │  │
+│  └───────────────┘  │
+│                     │
+│  ┌───────────────┐  │
+│  │ Harbor 镜像    │  │ ← 500Gi PVC (Story 0.6)
+│  │ Docker 镜像    │  │
+│  └───────────────┘  │
+│                     │
+│  ┌───────────────┐  │
+│  │ PostgreSQL    │  │ ← 10Gi PVC (Story 0.4/0.6)
+│  │ 数据库         │  │
+│  └───────────────┘  │
+└─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│   10T HDD (备份)    │
+│                     │
+│  ┌───────────────┐  │
+│  │ K3S 备份       │  │
+│  │ etcd 快照      │  │
+│  └───────────────┘  │
+└─────────────────────┘
+```
+
+**存储配置详情:**
+
+| 存储项 | 类型 | 容量 | 存储类 | 说明 |
+|--------|------|------|--------|------|
+| **ArgoCD 配置存储** | PVC | 10Gi | local-path (NVMe SSD) | Git 仓库缓存、应用配置 |
+| **ArgoCD Secret** | Secret | - | - | 密钥、密码、Token |
+| **Harbor 镜像存储** | PVC | 500Gi | local-path (NVMe SSD) | Docker 镜像、Helm Chart |
+| **PostgreSQL 数据** | PVC | 10Gi | local-path (NVMe SSD) | Harbor 数据库 |
+| **K3S 备份** | CronJob | - | 10T HDD | K3S 定时备份 (etcd-snapshot) |
+
+### 资源分配
+
+**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#资源分配)
+
+| 资源 | 分配量 | 说明 |
+|------|--------|------|
+| CPU | 2 核 | ArgoCD 核心服务 |
+| 内存 | 4GB | ArgoCD 运行时内存 |
+| 存储 | 10Gi | 配置存储 (NVMe SSD) |
+
+**MVP 临时配置 vs 架构规划:**
+
+| 资源项 | MVP 配置 | 架构规划 (architecture-epic0.md) | 说明 |
+|--------|---------|--------------------------------|------|
+| **CPU** | 2 Cores | 2 核 | 符合架构规划 |
+| **内存** | 4Gi | 4GB | 符合架构规划 |
+| **存储** | 10Gi | 10Gi | 符合架构规划 |
+
+**扩容触发条件:**
+- CPU 使用率持续>80% (5 分钟平均)
+- 内存使用率持续>85% (5 分钟平均)
+- 存储使用率>80%
+- 用户反馈性能问题
+
+**扩容目标值:**
+- CPU: 4 Cores (保留增长空间)
+- 内存: 8Gi (保留增长空间)
+- 存储: 20Gi (根据 GitOps 配置使用情况)
+
+### 实施指南
+
+**参考文档**: `docs/deployment/ARGOCD_INSTALLATION.md` (待创建)
+
+**实施步骤**:
+
+1. **添加 Helm 仓库**
+   ```bash
+   helm repo add argo https://argoproj.github.io/argo-helm
+   helm repo update
+   ```
+
+2. **创建命名空间**
+   ```bash
+   kubectl create namespace argocd
+   ```
+
+3. **配置 values.yaml**
+   - 副本数：1 (MVP)
+   - 资源限制：CPU 2Core, Memory 4Gi
+   - 存储：10Gi (local-path-provisioner)
+
+4. **部署 ArgoCD**
+   ```bash
+   helm install argocd argo/argo-cd -n argocd -f values.yaml
+   ```
+
+5. **配置 Ingress**
+   - Host: argocd.sisys.local
+   - TLS: Let's Encrypt
+   - Backend: argocd-server:443
+
+6. **初始化配置**
+   - 获取初始 admin 密码
+   - 访问 https://argocd.sisys.local
+   - 修改 admin 密码
+   - 配置 Gitea/Harbor 集成
+
+### 测试要求
+
+**TDD 测试用例**:
+
+#### 基础功能测试（6 个）
+
+1. **ArgoCD 部署测试**
+   ```python
+   def test_argocd_pod_running():
+       """验证 ArgoCD Pod 运行状态"""
+       # kubectl get pods -n argocd
+       # 期望：STATUS=Running，无 CrashLoopBackOff 或 Error 状态
+       # 验收：所有 Pod Running，restart count < 3
+   ```
+
+2. **服务可访问性测试**
+   ```python
+   def test_argocd_web_accessible():
+       """验证 ArgoCD Web 界面可访问"""
+       # curl -k https://argocd.sisys.local
+       # 期望：HTTP 200, 包含"ArgoCD"标题，页面加载时间 < 3 秒
+   ```
+
+3. **管理员登录测试**
+   ```python
+   def test_argocd_admin_login():
+       """验证 admin 账号登录"""
+       # 获取初始密码：kubectl get secret argocd-initial-admin-secret -n argocd
+       # 登录测试：argocd login argocd.sisys.local --username admin --password {PASSWORD}
+       # 期望：登录成功，首次登录强制修改密码
+   ```
+
+4. **Git 仓库连接测试**
+   ```python
+   def test_argocd_gitea_connection():
+       """验证 Gitea 仓库连接"""
+       # argocd repo add https://gitea.sisys.local/sisys/sisys.git --username {USER} --password {TOKEN}
+       # 期望：仓库连接成功，无认证错误
+   ```
+
+5. **镜像更新测试**
+   ```python
+   def test_argocd_image_update():
+       """验证 ArgoCD Image Updater 功能"""
+       # 推送新镜像到 Harbor
+       # 期望：Image Updater 检测到新 tag，自动更新 Deployment
+   ```
+
+6. **HTTPS 证书测试**
+   ```python
+   def test_argocd_https_certificate():
+       """验证 HTTPS 证书有效"""
+       # openssl s_client -connect argocd.sisys.local:443
+       # 期望：证书有效，Issuer=Let's Encrypt，TLS 1.3，SSL Labs 评级 ≥ A
+   ```
+
+#### 集成测试场景（4 个）
+
+7. **Gitea Webhook 集成测试**
+   ```python
+   def test_gitea_webhook_trigger_argocd():
+       """验证 Gitea 代码推送触发 ArgoCD 同步"""
+       # 步骤 1: 配置 Gitea Webhook（代码推送事件 → ArgoCD）
+       # 步骤 2: 推送代码到 Gitea 仓库
+       #   git push gitea.sisys.local/sisys/sisys.git main
+       # 步骤 3: ArgoCD 检测到 Git 变更
+       # 步骤 4: ArgoCD 自动同步应用配置
+       # 期望：
+       # - Gitea Webhook 触发成功（HTTP 200）
+       # - ArgoCD 检测到 Git 变更（< 1 分钟）
+       # - ArgoCD 同步成功（Application Synced）
+       # - K8s 资源更新成功
+   ```
+
+8. **Harbor 镜像更新测试**
+   ```python
+   def test_harbor_image_trigger_argocd():
+       """验证 Harbor 镜像推送触发 ArgoCD 部署"""
+       # 步骤 1: 配置 ArgoCD Image Updater 监听 Harbor 镜像
+       # 步骤 2: 推送新镜像到 Harbor（带新 tag）
+       #   docker push harbor.sisys.local/sisys/app:v1.0.1
+       # 步骤 3: ArgoCD Image Updater 检测到新镜像
+       # 步骤 4: ArgoCD 自动更新 K8s Deployment 镜像 tag
+       # 期望：
+       # - Image Updater 检测到新镜像（Webhook 触发 < 1 分钟）
+       # - ArgoCD 自动更新 Deployment 镜像 tag
+       # - K3S 滚动更新成功（新 Pod Running，旧 Pod Terminated）
+       # - 应用健康检查通过（/health 端点 HTTP 200）
+       # - 部署时间 < 5 分钟（从镜像推送到应用可用）
+   ```
+
+9. **多环境配置测试**
+   ```python
+   def test_argocd_multi_environment():
+       """验证多环境（Dev/Test/Prod）配置"""
+       # 步骤 1: 创建 Dev/Test/Prod 命名空间
+       # 步骤 2: 配置 Kustomize 多环境覆盖
+       # 步骤 3: 创建 ArgoCD Application（各环境独立）
+       # 步骤 4: 验证环境隔离
+       # 期望：
+       # - 各环境独立命名空间
+       # - Kustomize 覆盖正确应用
+       # - 环境间配置差异正确
+       # - RBAC 权限隔离有效
+   ```
+
+10. **端到端 GitOps 测试**
+    ```python
+    def test_e2e_gitops_pipeline():
+        """验证完整 GitOps Pipeline 流程"""
+        # 步骤 1: 代码提交到 Gitea
+        #   git commit -m "feat: add new feature" && git push
+        # 步骤 2: Gitea Runner 触发 CI/CD Pipeline（Story 0.9）
+        #   - 代码质量 (Ruff + MyPy)
+        #   - 单元测试 (pytest + cov≥80%)
+        #   - 集成测试 (Docker Compose/K3S)
+        #   - 安全扫描 (Trivy + Bandit)
+        #   - 镜像构建 (Docker Build)
+        #   - 镜像推送 (Harbor with Robot Account)
+        # 步骤 3: Harbor 镜像推送触发 ArgoCD 部署
+        # 步骤 4: 验证应用部署成功并可访问
+        # 期望：
+        # - Pipeline 触发成功（Webhook 延迟 < 10 秒）
+        # - 代码质量阶段通过（Ruff 无 error，MyPy 类型检查通过）
+        # - 单元测试通过（覆盖率≥80%）
+        # - 集成测试通过（所有 E2E 测试用例通过）
+        # - 安全扫描通过（Trivy 高危漏洞=0，Bandit 无 high severity）
+        # - 镜像构建成功（Docker image 创建成功）
+        # - 镜像推送成功（Harbor 接收镜像）
+        # - ArgoCD 自动部署成功（Synced + Healthy）
+        # - 应用健康检查通过（/health 端点 HTTP 200）
+        # - 总 Pipeline 时间 < 15 分钟
+    ```
+
+#### 架构合规验证测试（5 个）
+
+11. **TLS 配置验证测试**
+    ```python
+    def test_argocd_tls_configuration():
+        """验证 TLS 1.3 强制启用"""
+        # 步骤 1: 使用 openssl 测试 TLS 版本
+        #   openssl s_client -connect argocd.sisys.local:443 -tls1_3
+        # 步骤 2: 测试 TLS 1.2 被拒绝
+        #   openssl s_client -connect argocd.sisys.local:443 -tls1_2
+        # 步骤 3: 检查 HSTS 响应头
+        #   curl -I https://argocd.sisys.local
+        # 期望：
+        # - TLS 1.3 连接成功
+        # - TLS 1.2 连接被拒绝（或降级警告）
+        # - HSTS 响应头存在（Strict-Transport-Security: max-age=31536000）
+        # - 仅允许 AEAD 加密套件
+    ```
+
+12. **存储配置验证测试**
+    ```python
+    def test_argocd_storage_configuration():
+        """验证存储使用 local-path (NVMe SSD)"""
+        # 步骤 1: 检查 PVC 存储类
+        #   kubectl get pvc -n argocd -o jsonpath='{.items[*].spec.storageClassName}'
+        # 步骤 2: 验证 PVC 绑定状态
+        #   kubectl get pvc -n argocd
+        # 步骤 3: 检查实际存储路径
+        #   kubectl exec -n argocd <argocd-repo-server-pod> -- df -h
+        # 期望：
+        # - 存储类为 local-path
+        # - PVC 状态为 Bound
+        # - 存储路径挂载正确（/var/lib/rancher/k3s/storage）
+        # - 存储容量符合预期（10Gi）
+    ```
+
+13. **Ingress 配置验证测试**
+    ```python
+    def test_argocd_ingress_configuration():
+        """验证 Ingress 配置 (Traefik 443 → argocd-server:443)"""
+        # 步骤 1: 检查 Ingress 规则
+        #   kubectl get ingress -n argocd -o yaml
+        # 步骤 2: 验证 Traefik 路由配置
+        #   kubectl get traefikservices -n argocd
+        # 步骤 3: 测试外部访问
+        #   curl -k https://argocd.sisys.local/api/version
+        # 期望：
+        # - Ingress 规则正确（host: argocd.sisys.local）
+        # - Backend 服务为 argocd-server:443
+        # - TLS 配置正确（secretName: argocd-tls-secret）
+        # - 外部访问成功（HTTP 200）
+    ```
+
+14. **密钥管理验证测试**
+    ```python
+    def test_argocd_secret_management():
+        """验证密钥存储于 Kubernetes Secret"""
+        # 步骤 1: 检查 Secret 列表
+        #   kubectl get secrets -n argocd
+        # 步骤 2: 验证 Secret 内容（无明文密码）
+        #   kubectl get secret <secret-name> -n argocd -o jsonpath='{.data}'
+        # 步骤 3: 检查配置文件引用 Secret
+        #   kubectl get deployment argocd-server -n argocd -o yaml
+        # 期望：
+        # - 所有敏感信息存储于 Secret（argocd-secret, argocd-initial-admin-secret 等）
+        # - Secret 数据为 base64 编码（无明文）
+        # - Deployment 通过 envFrom 或 volumeMounts 引用 Secret
+        # - 配置文件中无明文密码
+    ```
+
+15. **网络安全验证测试**
+    ```python
+    def test_argocd_network_security():
+        """验证 NetworkPolicy 安全配置"""
+        # 步骤 1: 检查 NetworkPolicy
+        #   kubectl get networkpolicy -n argocd
+        # 步骤 2: 验证 DefaultDeny 策略
+        #   kubectl get networkpolicy default-deny -n argocd -o yaml
+        # 步骤 3: 测试仅 Traefik 可访问 ArgoCD
+        #   kubectl run test-pod --rm -it --image=busybox --restart=Never -- \
+        #     nc -zv argocd-server.argocd.svc.cluster.local 443
+        # 期望：
+        # - NetworkPolicy 存在（default-deny + allow-traefik）
+        # - 默认拒绝所有入站流量
+        # - 仅允许 Traefik Ingress 访问 ArgoCD HTTPS 端口
+        # - 非授权 Pod 无法访问 ArgoCD（连接被拒绝）
+    ```
+
+### 项目结构对齐
+
+**统一项目结构**:
 
 ```
 sisys/
 ├── docs/
 │   └── deployment/
-│       ├── ARGOCD_SETUP.md           # ArgoCD 部署指南
-│       ├── ARGOCD_IMAGE_UPDATER.md   # Image Updater 配置
-│       └── GITOPS_WORKFLOW.md        # GitOps 工作流
+│       ├── ARGOCD_INSTALLATION.md       # ArgoCD 部署指南
+│       ├── ARGOCD_IMAGE_UPDATER.md      # Image Updater 配置
+│       └── ARGOCD_MULTI_ENV.md          # 多环境配置
 ├── deployments/
 │   └── argocd/
-│       ├── values.yaml              # Helm Chart 配置
-│       ├── ingress.yaml             # Ingress 配置
-│       ├── rbac.yaml                # RBAC 配置
-│       └── kustomization.yaml       # Kustomize 配置
+│       ├── values.yaml                  # Helm Chart 配置
+│       ├── ingress.yaml                 # Ingress 配置
+│       ├── rbac.yaml                    # RBAC 配置
+│       └── kustomization.yaml           # Kustomize 配置
 ├── apps/
-│   └── example-app/                 # 示例应用（GitOps 演示）
-│       ├── deployment.yaml
-│       ├── service.yaml
-│       └── kustomization.yaml
+│   ├── dev/                             # 开发环境配置
+│   ├── test/                            # 测试环境配置
+│   └── prod/                            # 生产环境配置
 └── tests/
     └── deployment/
-        └── test_argocd.py           # ArgoCD 部署测试
+        └── test_argocd.py               # ArgoCD 部署测试
 ```
 
-### 前一个故事学习经验
+### 已知风险与缓解
 
-**来源**: [Story 0.6 (Harbor)](./0-6-harbor-image-registry.md)
+| 风险 | 影响 | 概率 | 缓解措施 |
+|------|------|------|---------|
+| Gitea 认证失败 | 无法连接仓库 | 中 | 验证 Personal Access Token 权限，检查网络策略 |
+| HTTPS 证书申请失败 | 无法 HTTPS 访问 | 中 | 检查 Traefik cert-manager 配置，确认 DNS 解析 |
+| Image Updater 不工作 | 无法自动更新 | 中 | 验证 Harbor Webhook 配置，检查 Image Updater 日志 |
+| 多环境配置混乱 | 环境间污染 | 低 | 严格 Kustomize 覆盖，RBAC 隔离 |
 
-**Story 0.6 关键学习:**
+### 验收标准检查清单
 
-1. **代码审查经验:**
-   - ✅ 9/9 问题已修复 (100%)
-   - ✅ HIGH 优先级问题：AC 测试代码、NetworkPolicy 选择器、存储容量、测试命名
-   - ✅ MEDIUM 优先级问题：Robot Account、Trivy 更新策略、集成测试
-   - ✅ LOW 优先级问题：File List 一致性、密码历史策略
+**功能验收:**
+- [ ] ArgoCD Pod 运行正常 (kubectl get pods -n argocd)
+- [ ] ArgoCD Web 界面可访问 (https://argocd.sisys.local)
+- [ ] admin 账号登录成功
+- [ ] Gitea 仓库连接成功
+- [ ] Harbor 镜像更新功能可用
+- [ ] Application 同步状态正常
+- [ ] 多环境配置成功
+- [ ] 所有 TDD 测试通过
 
-2. **功能验证经验:**
-   - ✅ 保守方案验证：7 项 AC 中 3 项完全通过，4 项部分通过（配置就绪，待依赖 Story）
-   - ✅ 关键教训：Ingress 配置需应用简化版（ingress-traefik.yaml）
-   - ✅ 关键教训：测试脚本需可执行（chmod +x）
+**安全验收:**
+- [ ] TLS 1.3 强制启用 (SSL Labs 测试 A+ 评级)
+- [ ] HSTS 启用 (Strict-Transport-Security 响应头)
+- [ ] admin 密码符合复杂度要求 (12 位 + 大小写 + 数字 + 符号)
+- [ ] 2FA 已配置 (管理员强制启用)
+- [ ] 容器以非 root 用户运行
+- [ ] NetworkPolicy 已配置 (DefaultDeny)
+- [ ] 审计日志功能可用
 
-3. **架构合规经验:**
-   - ✅ TLS 1.3 强制启用配置成功
-   - ✅ NetworkPolicy DefaultDeny 配置成功
-   - ✅ local-path-provisioner 存储配置成功
-   - ✅ Kubernetes Secret 密钥管理配置成功
-
-**应用到 Story 0.7:**
-- 提前应用简化 Ingress 配置，避免访问问题
-- 所有测试脚本确保可执行（chmod +x）
-- NetworkPolicy 选择器使用正确的命名空间（kube-system for Traefik）
-- 存储容量统一配置（50Gi for ArgoCD）
-- 所有测试用例在代码审查前完成
-
-### Git 智能分析
-
-**最近提交模式:**
-- Story 0.4: K3S 集群部署 - 15/15 测试通过，代码审查 9 个问题 100% 修复
-- Story 0.5: Gitea 代码托管 - 12 个问题 100% 修复
-- Story 0.6: Harbor 镜像仓库 - 9 个问题 100% 修复
-
-**代码模式:**
-- Helm Chart 配置：values.yaml + ingress.yaml + kustomization.yaml
-- 测试模式：test_*.py (pytest) + verify_*.sh (bash)
-- 文档模式：*_INSTALLATION.md + *_CONFIGURATION.md
-
-**架构决策:**
-- 使用 Helm Chart 部署（官方推荐）
-- 使用 Traefik Ingress（K3S 默认）
-- 使用 local-path-provisioner（NVMe SSD 性能优）
-- 使用 Kubernetes Secret 管理密钥
-
-### 最新技术信息
-
-**ArgoCD v3.3.2 关键特性:**
-- GitOps 自动化部署
-- 多集群管理
-- 自动同步策略（prune/selfHeal）
-- Webhook 集成（GitHub/Gitea/GitLab）
-- Image Updater（自动镜像更新）
-- RBAC 权限管理
-- SSO 集成（OIDC/SAML）
-
-**ArgoCD Image Updater:**
-- 监听镜像仓库标签变更
-- 自动更新 K8s Deployment
-- 支持 Harbor/Gitea/ACR/ECR
-- Webhook 触发（实时）或轮询（定时）
-
-**最佳实践:**
-- 使用 Helm Chart 部署（官方维护）
-- 配置自动同步策略（prune=true, selfHeal=true）
-- 使用 Image Updater 实现镜像自动更新
-- 配置 RBAC 项目级隔离
-- 启用审计日志
-
-### 最新技术信息研究
-
-**研究内容:**
-- ArgoCD v3.3.2 官方文档
-- ArgoCD Image Updater 配置
-- Harbor Webhook 配置
-- GitOps 最佳实践
-
-**关键发现:**
-1. ArgoCD v3.3.2 支持 K8s v1.34
-2. Image Updater 需要配置 Harbor 凭证
-3. Harbor Webhook 需配置镜像推送事件
-4. GitOps 最佳实践：prune=true, selfHeal=true
+**架构验收:**
+- [ ] 存储使用 local-path (NVMe SSD)
+- [ ] Ingress 配置正确 (Traefik 443 → argocd-server:443)
+- [ ] 密钥存储于 Kubernetes Secret (无明文配置)
+- [ ] 资源限制已配置 (CPU 2Core, Memory 4Gi)
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-- **Model**: Qwen Code (AI 开发助手)
-- **Version**: create-story workflow v6.0.1
-- **Execution Date**: 2026-03-14
+Qwen Code (AI 开发助手)
 
 ### Debug Log References
 
-- Workflow Config: `g:\ai\sisys\_bmad\bmm\workflows\4-implementation\create-story\workflow.yaml`
-- Instructions: `g:\ai\sisys\_bmad\bmm\workflows\4-implementation\create-story\instructions.xml`
-- Template: `g:\ai\sisys\docs\developer\story-template.md`
-- Epics: `g:\ai\sisys\_bmad-output\planning-artifacts\epics_v1.0.md`
-- Architecture: `g:\ai\sisys\_bmad-output\planning-artifacts\architecture-epic0.md`
-- Previous Story: `g:\ai\sisys\_bmad-output\implementation-artifacts\stories\0-6-harbor-image-registry.md`
-- Sprint Status: `g:\ai\sisys\_bmad-output\implementation-artifacts\sprint-status.yaml`
+- K3S 集群状态：Story 0.4 完成记录 ✅
+- Helm Chart 版本：argo/argo-cd v7.x (ArgoCD v3.3.2) ✅
+- Traefik Ingress 配置：Story 0.4 已验证 ✅
+- Gitea 部署状态：Story 0.5 完成记录 ✅
+- Harbor 部署状态：Story 0.6 完成记录 ✅
 
-### Completion Notes List
+### Implementation Notes
 
-- [x] 故事需求从 epics_v1.0.md 提取
-- [x] 架构约束从 architecture-epic0.md 提取
-- [x] 前一个故事学习经验整合（Story 0.6 Harbor）
-- [x] 最新技术信息研究（ArgoCD v3.3.2, Image Updater）
-- [x] 状态设置为 ready-for-dev
-- [x] TDD 测试要求定义完成
-- [x] 项目结构对齐统一项目结构
+**Session Date:** 2026-03-15
+
+**故事创建完成:**
+- ✅ 故事需求分析完成
+- ✅ 验收标准定义完成（7 项 AC）
+- ✅ 任务分解完成（11 个 Task）
+- ✅ 技术栈确认（ArgoCD v3.3.2）
+- ✅ 依赖关系确认（Story 0.4/0.5/0.6 已完成）
+- ✅ 架构合规要求提取完成
+- ✅ 安全配置要求提取完成
+- ✅ 测试用例定义完成（15 个测试）
+- ✅ 项目结构对齐完成
+- ✅ 风险评估完成
+
+**下一步:**
+1. 运行 `dev-story` 执行开发实施
+2. 完成后运行 `code-review` 进行代码审查
+3. 可选：运行 `validate-create-story` 进行质量检查
 
 ### File List
 
-**创建的文件：**
-- `g:\ai\sisys\_bmad-output\implementation-artifacts\stories\0-7-argocd-continuous-deployment.md`
+- `/mnt/g/ai/sisys/_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md` - 故事文件
+- `/mnt/g/ai/sisys/_bmad-output/implementation-artifacts/sprint-status.yaml` - Sprint 状态（已更新）
 
-**待创建的文件（Dev Story 实施）:**
-- `docs/deployment/ARGOCD_SETUP.md` - ArgoCD 部署指南
-- `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - Image Updater 配置
-- `docs/deployment/GITOPS_WORKFLOW.md` - GitOps 工作流
-- `deployments/argocd/values.yaml` - Helm Chart 配置
-- `deployments/argocd/ingress.yaml` - Ingress 配置
-- `deployments/argocd/rbac.yaml` - RBAC 配置
-- `tests/deployment/test_argocd.py` - ArgoCD 部署测试
-- `tests/integration/test_argocd_gitops.py` - GitOps 集成测试
+### Completion Notes
 
----
-
-**Story Details:**
-- Story ID: 0.7
-- Story Key: 0-7-argocd-continuous-deployment
-- File: `g:\ai\sisys\_bmad-output\implementation-artifacts\stories\0-7-argocd-continuous-deployment.md`
-- Status: ready-for-dev
-
-**Completion Summary:**
-1. [x] All tasks defined
-2. [x] All acceptance criteria defined
-3. [x] Architecture compliance verified
-4. [x] Sprint status synced
-
-**Next Steps:**
-1. Review the comprehensive story document
-2. Run `dev-story` for implementation
-3. Run `code-review` when complete
-4. Optional: Run `/bmad:tea:automate` to generate guardrail tests
-
----
-
-## 模板使用说明
-
-### 适用场景
-
-本 Story 为**基础设施层 Story**，适用于：
-- K8s 持续部署工具部署
-- GitOps 流程实施
-- 自动化部署流程
-
-### TDD 测试要求模板
-
-**基础设施层 Story：**
-```markdown
-### 1. 基础设施测试
-- [ ] ArgoCD Pod 运行状态测试 - 验证所有 Pod Running
-- [ ] 服务可访问性测试 - 验证 HTTPS 访问
-- [ ] 数据库连接测试 - 验证 Redis/PostgreSQL 连接
-- [ ] Git 集成测试 - 验证 Gitea 仓库连接
-- [ ] Image Updater 测试 - 验证镜像自动更新
-
-### 2. 性能要求
-- [ ] Pod 启动时间 < 60 秒
-- [ ] 页面加载时间 < 3 秒
-- [ ] Git 提交后自动部署 < 2 分钟
-- [ ] 镜像推送后自动更新 < 5 分钟
-
-### 3. 覆盖率要求
-- [ ] 基础设施层覆盖率≥75%
-- [ ] 集成测试覆盖率≥70%
-```
-
-### 相关文档
-
-- [Story 0.4: K3S 集群部署](./0-4-k3s-cluster-deployment.md)
-- [Story 0.5: Gitea 代码托管](./0-5-gitea-code-hosting.md)
-- [Story 0.6: Harbor 镜像仓库](./0-6-harbor-image-registry.md)
-- [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md)
-
----
-
-**模板版本:** 1.0.0
-**创建日期:** 2026-03-14
-**最后更新:** 2026-03-14
+**故事创建完成时间:** 2026-03-15
+**故事状态:** ready-for-dev
+**下一步执行:** dev-story（开发实施）

@@ -1,4 +1,4 @@
-# generated: 2026-03-11
+# generated: 2026-03-15
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -206,9 +206,9 @@ development_status:
 #   - Epic 1-8: 82 stories (📋 backlog)
 #
 # Status Summary:
-#   - Done: 5 (Epic 0 Iteration 0: 3 stories + Story 0.4 + Story 0.5 + Story 0.6)
+#   - Done: 6 (Epic 0 Iteration 0: 3 stories + Story 0.4 + Story 0.5 + Story 0.6)
 #   - In-Progress: 0
-#   - Ready for Dev: 2 (Story 0.6, Story 0.7)
+#   - Ready for Dev: 1 (Story 0.7)
 #   - Backlog: 89
 #
 # Next Steps:
@@ -226,7 +226,7 @@ development_status:
 #   - Added Iteration 1 stories (0.4-0.9, 0.14-0.18) for dual-track system
 #   - Marked Story 0.2 as done but deprecated (replaced by 0.4-0.9)
 #   - Updated Epic 1 stories to match refactored epic structure
-#   - Updated generation date to 2026-03-11
+#   - Updated generation date to 2026-03-15
 #   - **Story 0.4 完成**: K3S v1.34.5 + local-path-provisioner + Traefik v3.x ✅
 #   - **Story 0.4 测试**: 15/15 自动化测试通过（100%）✅
 #   - **Story 0.4 代码审查**: 发现 9 个问题，已修复 7 个（4 HIGH + 3 MEDIUM）✅
@@ -234,5 +234,7 @@ development_status:
 #   - **Story 0.5 完成**: Gitea v1.25.4 + PostgreSQL ✅
 #   - **Story 0.5 代码审查**: 发现 12 个问题，已修复 12 个（100%）✅
 #   - **Story 0.5 状态**: backlog → done ✅
-#   - **Story 0.6 状态**: backlog → ready-for-dev ✅ 故事文件已创建
+#   - **Story 0.6 完成**: Harbor v2.14.3 + Trivy ✅ 部署成功，代码审查 9 个问题 100% 修复
+#   - **Story 0.6 状态**: backlog → done ✅
+#   - **Story 0.7 状态**: backlog → ready-for-dev ✅ 故事文件已创建
 # =============================================================================
