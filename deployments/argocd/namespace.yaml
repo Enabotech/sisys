@@ -1,0 +1,17 @@
+---
+# ArgoCD 命名空间配置
+# Story 0.7: ArgoCD 持续部署
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app: argocd
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: cd
+    story: "0.7"
+    managed-by: kustomize
+  annotations:
+    description: "ArgoCD 持续部署命名空间"
+    story: "0.7-argocd-continuous-deployment"

@@ -1,0 +1,34 @@
+---
+# ArgoCD Ingress 配置 - Story 0.7
+# 描述：配置 Traefik Ingress 暴露 ArgoCD Web 界面
+# pragma: allowlist secret
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: argocd.sisys.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
+  tls:
+    - hosts:
+        - argocd.sisys.local  # pragma: allowlist secret
+      secretName: argocd-tls-secret  # pragma: allowlist secret

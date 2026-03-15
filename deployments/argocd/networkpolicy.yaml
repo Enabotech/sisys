@@ -1,0 +1,90 @@
+---
+# ArgoCD NetworkPolicy 配置 - Story 0.7
+# 描述：配置网络安全策略（默认拒绝）
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-default-deny
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# 允许 Traefik 访问 ArgoCD
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-allow-traefik
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 允许 ArgoCD 访问 Gitea (Git 仓库)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-allow-gitea
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-repo-server
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: gitea
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# 允许 ArgoCD 访问 Harbor (镜像仓库)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-allow-harbor
+  namespace: argocd
+  labels:
+    app: argocd
+    story: "0.7"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: harbor
+      ports:
+        - protocol: TCP
+          port: 8080

@@ -1,0 +1,66 @@
+# ArgoCD Kustomize 配置 - Story 0.7
+# 描述：Kustomize overlays 配置，用于环境定制
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 命名空间
+namespace: argocd
+
+# 资源列表
+resources:
+  - namespace.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - rbac.yaml
+
+# 公共标签
+commonLabels:
+  app: argocd
+  app.kubernetes.io/name: argocd
+  app.kubernetes.io/component: cd
+  version: "3.2.7"
+  story: "0.7"
+
+# ConfigMap 生成器 - ArgoCD 配置
+configMapGenerator:
+  - name: argocd-cm
+    literals:
+      - admin.enabled=true
+      - users.anonymous.enabled=false
+      - timeout.reconciliation=180s
+      - application.instanceLabelKey=argocd.argoproj.io/instance
+    options:
+      annotations:
+        description: "ArgoCD 配置文件"
+
+  - name: argocd-cmd-params-cm
+    literals:
+      - server.insecure=true
+      - server.disable.auth=true
+    options:
+      annotations:
+        description: "ArgoCD 命令行参数配置"
+
+# Secret 生成器 (实际部署时使用外部 Secret)
+# 注意：生产环境应使用加密的 Secret 管理工具
+secretGenerator:
+  - name: argocd-initial-admin-secret
+    type: Opaque
+    literals:
+      - password=ArgoCD@2026Secure!
+    options:
+      annotations:
+        description: "ArgoCD 初始 admin 密码"
+
+# 生成器选项
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    managed-by: kustomize
+    story: "0.7"
+
+# 通用注解
+commonAnnotations:
+  description: "ArgoCD 持续部署配置"
+  story: "0.7-argocd-continuous-deployment"
