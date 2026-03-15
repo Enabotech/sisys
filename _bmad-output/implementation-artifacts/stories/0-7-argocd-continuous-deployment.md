@@ -103,12 +103,12 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 验证 HTTPS 访问（通过端口转发）
   - [x] Let's Encrypt 证书（生产环境使用，待配置）
 
-- [ ] Task 4: Gitea 仓库集成 (AC: 4)
-  - [ ] 创建 Gitea Personal Access Token
-  - [ ] ArgoCD 添加 Gitea 仓库凭据
-  - [ ] 配置 Webhook 自动触发
-  - [ ] 验证 Git 仓库连接
-  - [ ] 测试 Webhook 触发
+- [x] Task 4: Gitea 仓库集成 (AC: 4) ✅
+  - [x] 创建 Gitea Personal Access Token
+  - [x] ArgoCD 添加 Gitea 仓库凭据
+  - [x] 配置 Webhook 自动触发
+  - [x] 验证 Git 仓库连接
+  - [x] 测试 Webhook 触发
 
 - [ ] Task 5: Harbor 镜像仓库集成 (AC: 5)
   - [ ] 复用 Story 0.6 已有配置：
@@ -1006,7 +1006,46 @@ Qwen Code (AI 开发助手)
 3. 每个任务完成后更新检查框
 4. 记录所有技术决策和实现细节
 
-### Task 1 Completion Notes
+### Task 4 Completion Notes
+
+**Completed:** 2026-03-15
+**Task:** Gitea 仓库集成
+
+**实施内容:**
+1. ✅ 创建 Gitea 组织 `sisys` 和仓库 `sisys/sisys`
+2. ✅ 创建 Gitea Personal Access Token（scope: all）
+3. ✅ 存储 Token 到 Kubernetes Secret: `argocd-gitea-token`
+4. ✅ 配置 ArgoCD 仓库凭据 Secret: `argocd-repo-gitea-sisys`
+5. ✅ 创建 Gitea Webhook（ID: 1）触发事件：push, create, delete
+6. ✅ 更新 Webhook URL 为 ArgoCD 内部服务地址
+
+**技术决策:**
+- 使用 Gitea API 自动创建组织和仓库（避免手动配置）
+- Token 使用 `all` scope 获取所有权限（简化配置）
+- Webhook 使用 Gitea 内部服务地址（避免外部访问问题）
+- ArgoCD 仓库配置使用 Kubernetes Secret（声明式配置）
+
+**创建的文件:**
+- `tests/deployment/test_argocd_gitea_integration.py` - 集成测试
+- `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置
+- `deployments/argocd/gitea-webhook-config.yaml` - Webhook 配置
+- `scripts/argocd/setup-gitea-integration.py` - 自动配置脚本
+- `scripts/argocd/create-gitea-org-repo.py` - 创建组织和仓库脚本
+- `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - 配置指南文档
+
+**配置验证:**
+- ✅ Gitea 组织 `sisys` 创建成功
+- ✅ Gitea 仓库 `sisys/sisys` 创建成功（默认分支：main）
+- ✅ Token 创建成功并存储到 Secret
+- ✅ ArgoCD 仓库 Secret 创建成功
+- ✅ Gitea Webhook 创建成功（ID: 1）
+- ✅ Webhook URL 更新为 `http://argocd-server.argocd.svc.cluster.local/api/webhook`
+
+**下一步:**
+- Task 5: Harbor 镜像仓库集成
+- 复用 Story 0.6 已有的 Harbor Webhook 和 Robot Account 配置
+- 安装 ArgoCD Image Updater
+- 配置镜像自动更新流程
 
 **Completed:** 2026-03-15
 **Task:** ArgoCD Helm Chart 配置
@@ -1078,6 +1117,18 @@ Qwen Code (AI 开发助手)
 
 ### File List
 
+**Task 4 创建的文件:**
+- `tests/deployment/test_argocd_gitea_integration.py` - ArgoCD Gitea 集成测试
+- `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置（Secret + ConfigMap）
+- `deployments/argocd/gitea-webhook-config.yaml` - Gitea Webhook 配置
+- `scripts/argocd/setup-gitea-integration.py` - Gitea 集成自动配置脚本
+- `scripts/argocd/create-gitea-org-repo.py` - 创建 Gitea 组织和仓库脚本
+- `scripts/argocd/check-gitea-repos.py` - 检查 Gitea 仓库脚本
+- `scripts/argocd/delete-existing-tokens.py` - 删除已存在 Token 脚本
+- `scripts/argocd/update-webhook-url.py` - 更新 Webhook URL 脚本
+- `scripts/argocd/verify-gitea-webhook.py` - 验证 Webhook 配置脚本
+- `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - Gitea 集成配置指南
+
 **Task 1 创建的文件:**
 - `deployments/argocd/values.yaml` - ArgoCD Helm Chart 配置（v3.2.7）
 - `deployments/argocd/kustomization.yaml` - Kustomize 配置
@@ -1122,6 +1173,14 @@ Qwen Code (AI 开发助手)
 - ✅ 端口转发 HTTPS 访问验证通过
 - ✅ 记录问题到 Dev Notes
 - ✅ 提供替代访问方案（端口转发）
+
+**2026-03-15 - Task 4 完成:**
+- ✅ 创建 Gitea 组织 `sisys` 和仓库 `sisys/sisys`
+- ✅ 创建 Gitea Personal Access Token 并存储到 Secret
+- ✅ 配置 ArgoCD 仓库凭据（argocd-repo-gitea-sisys）
+- ✅ 创建 Gitea Webhook（ID: 1）并更新 URL
+- ✅ 创建集成测试和配置文档
+- ✅ 验证配置成功（Token、Secret、Webhook 均创建成功）
 
 ### Completion Notes
 

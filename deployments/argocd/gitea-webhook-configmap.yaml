@@ -1,0 +1,40 @@
+---
+# Gitea Webhook 配置
+# 在 Gitea 中配置 Webhook，当代码推送时触发 ArgoCD 同步
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-webhook-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gitea-webhook
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    description: "Gitea Webhook 配置 - 用于自动触发 ArgoCD 同步"
+data:
+  # Webhook 目标 URL（ArgoCD Webhook 端点）
+  # 格式：https://<argocd-server>/api/webhook
+  webhook.url: "https://argocd.sisys.local/api/webhook"
+
+  # Webhook 内容类型
+  webhook.contentType: "application/json"
+
+  # Webhook 事件
+  webhook.events: |
+    - push
+    - pull_request
+    - create  # 创建分支或 tag
+    - delete  # 删除分支或 tag
+
+  # Webhook 激活
+  webhook.active: "true"
+
+  # 是否跳过 TLS 证书验证（开发环境设为 true）
+  webhook.insecureSkipVerify: "true"
+
+  # Gitea 仓库路径
+  repository.path: "sisys/sisys"
+
+  # Gitea 仓库分支
+  repository.branch: "main"

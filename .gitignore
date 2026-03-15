@@ -285,7 +285,7 @@ _build/
 output/
 outputs/
 artifacts/
-.bmad-output/
+_bmad-output/
 
 # Generated files
 generated/

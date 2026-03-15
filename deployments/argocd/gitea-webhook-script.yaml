@@ -1,0 +1,71 @@
+---
+# Gitea Webhook 部署脚本配置
+# 用于自动在 Gitea 中创建 Webhook
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-webhook-script
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gitea-webhook-script
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    description: "Gitea Webhook 创建脚本"
+data:
+  # Webhook 创建脚本
+  create-webhook.sh: |
+    #!/bin/bash
+    # Gitea Webhook 创建脚本
+
+    set -e
+
+    # 配置变量
+    GITEA_URL="https://gitea.sisys.local"
+    GITEA_API="${GITEA_URL}/api/v1"
+    GITEA_USERNAME="admin"
+    GITEA_PASSWORD="${GITEA_ADMIN_PASSWORD:-admin}"
+    GITEA_REPO="sisys/sisys"
+
+    ARGOCD_WEBHOOK_URL="https://argocd.sisys.local/api/webhook"
+
+    echo "Creating Gitea Webhook for ArgoCD..."
+
+    # 获取 Gitea Access Token
+    echo "Getting Gitea Access Token..."
+    ACCESS_TOKEN=$(curl -k -s -X POST "${GITEA_API}/users/${GITEA_USERNAME}/tokens" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"name\": \"argocd-webhook\",
+        \"scopes\": [\"repo\", \"admin:repo_hook\"]
+      }" \
+      -u "${GITEA_USERNAME}:${GITEA_PASSWORD}" | jq -r '.sha1')
+
+    if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+      echo "Failed to get access token"
+      exit 1
+    fi
+
+    echo "Access token obtained successfully"
+
+    # 创建 Webhook
+    echo "Creating Webhook..."
+    curl -k -s -X POST "${GITEA_API}/repos/${GITEA_REPO}/hooks" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: token ${ACCESS_TOKEN}" \
+      -d "{
+        \"active\": true,
+        \"type\": \"gitea\",
+        \"config\": {
+          \"url\": \"${ARGOCD_WEBHOOK_URL}\",
+          \"content_type\": \"json\",
+          \"insecure_ssl\": true
+        },
+        \"events\": [
+          \"push\",
+          \"create\",
+          \"delete\"
+        ]
+      }" | jq .
+
+    echo "Webhook created successfully!"
