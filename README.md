@@ -49,7 +49,7 @@ AI-driven strategic planning and decision intelligence platform for enterprises.
 ### 2026-03-05 更新：Epic 0 重构完成！ ✅
 
 **Epic 0 重构完成：**
-- ✅ **开发 CI/CD 系统** - Gitea v1.25.4 + Harbor v2.14.3 + ArgoCD v3.3.2 + K3S v1.34.5
+- ✅ **开发 CI/CD 系统** - Gitea v1.25.4 + Harbor v2.14.3 + ArgoCD v3.2.7 + K3S v1.34.5
 - ✅ **产品交付系统** - Windows/Mac/Linux 安装包 + 自动诊断与修复 + 配置向导
 - ✅ **文档质量** - 宗师级圆满 (5.0/5.0) - P0/P1/P2 问题 100% 修复
 - ✅ **技术栈验证** - 所有版本已由 Agimtech 测试验证
