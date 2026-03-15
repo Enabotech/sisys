@@ -1,0 +1,155 @@
+# ArgoCD Helm Chart values.yaml - Story 0.7
+# 描述：ArgoCD v2.10.1 Helm Chart 配置
+# Helm Chart: argo/argo-cd v6.x (对应 ArgoCD v2.10.x)
+# pragma: allowlist secret
+
+# 全局配置
+global:
+  domain: argocd.sisys.local
+  certificate:
+    domain: argocd.sisys.local
+
+# 镜像配置
+image:
+  repository: quay.io/argoproj/argocd
+  tag: v3.2.7
+  pullPolicy: IfNotPresent
+
+# 副本数配置 (MVP 单副本)
+replicaCount: 1
+
+# 资源限制
+controller:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Ingress 配置
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - argocd.sisys.local
+    tls:
+      - hosts:
+          - argocd.sisys.local  # pragma: allowlist secret
+        secretName: argocd-tls-secret  # pragma: allowlist secret
+    https: true
+
+  # 服务配置
+  service:
+    type: ClusterIP
+    servicePort: 443
+    targetPort: 8080
+
+  # 启用 admin 账号
+  adminEnabled: true
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+applicationSet:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+notifications:
+  enabled: false
+
+# Redis 配置
+redis:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# PostgreSQL 禁用（使用内置 SQLite 用于 MVP）
+crds:
+  install: true
+
+# 额外配置
+configs:
+  cm:
+    admin.enabled: "true"
+    users.anonymous.enabled: "false"
+    timeout.reconciliation: "180s"
+    application.instanceLabelKey: "argocd.argoproj.io/instance"
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, projects, *, *, allow
+      p, role:admin, logs, *, *, allow
+      p, role:admin, exec, *, */*, allow
+      g, admin, role:admin
+
+  params:
+    server.insecure: "true"
+    server.disable.auth: "true"
+
+# 持久化存储配置（使用 local-path-provisioner）
+# 注意：controller 使用内置 SQLite，需要持久化存储
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+# 安全上下文
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  fsGroup: 999
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # 临时禁用，以便调试
+  capabilities:
+    drop:
+      - ALL
+
+# 节点选择（可选）
+# nodeSelector: {}
+
+# 容忍（可选）
+# tolerations: []
+
+# 亲和性（可选）
+# affinity: {}
