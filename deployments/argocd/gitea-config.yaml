@@ -1,0 +1,25 @@
+---
+# ArgoCD 仓库配置 ConfigMap
+# 定义 Gitea 仓库连接参数
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-gitea-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-gitea-config
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    description: "Gitea 仓库连接配置"
+data:
+  # Gitea 基础 URL
+  gitea.baseURL: "https://gitea.sisys.local"
+  # Gitea API URL
+  gitea.apiURL: "https://gitea.sisys.local/api/v1"
+  # Git 协议（https 或 ssh）
+  git.protocol: "https"
+  # 是否启用 Webhook
+  webhook.enabled: "true"
+  # Webhook 事件类型
+  webhook.events: "push,pull_request"
