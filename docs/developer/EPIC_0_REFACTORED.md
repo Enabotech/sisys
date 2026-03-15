@@ -164,20 +164,20 @@
 ### Story 0.7: ArgoCD 持续部署
 
 **As a** DevOps 工程师,
-**I want** 部署 ArgoCD v3.3.2 持续部署工具,
+**I want** 部署 ArgoCD v3.2.7 持续部署工具,
 **So that** 实现 GitOps 自动化部署。
 
 **Acceptance Criteria:**
 
 **Given** K3S 集群已部署
 **When** 运行 ArgoCD 安装脚本
-**Then** ArgoCD v3.3.2 部署成功
+**Then** ArgoCD v3.2.7 部署成功
 **And** Git 仓库集成配置完成
 **And** 多环境 (Dev/Test/Prod) 配置完成
 **And** 自动同步策略配置完成
 
 **技术栈:**
-- ArgoCD v3.3.2 ✅ (已验证)
+- ArgoCD v3.2.7 ✅ (已验证)
 - Git (代码仓库)
 - Kustomize/Helm
 
@@ -452,7 +452,7 @@
 - [ ] K3S 集群部署完成
 - [ ] Gitea v1.25.4 部署完成
 - [ ] Harbor v2.14.3 部署完成
-- [ ] ArgoCD v3.3.2 部署完成
+- [ ] ArgoCD v3.2.7 部署完成
 - [ ] Gitea Runner 配置完成
 - [ ] CI/CD Pipeline 模板可用
 

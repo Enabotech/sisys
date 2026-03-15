@@ -120,7 +120,7 @@ Epic 0 重构后包含两套系统：
          │
          ▼
 ┌─────────────────┐
-│  ArgoCD v3.3.2  │
+│  ArgoCD v3.2.7  │
 │  - GitOps       │
 │  - 自动同步      │
 │  - 多环境管理    │
@@ -475,7 +475,7 @@ Windows (.exe)          Mac (.dmg)           Linux (.sh)
 
 - [ ] Gitea v1.25.4 部署成功
 - [ ] Harbor v2.14.3 部署成功
-- [ ] ArgoCD v3.3.2 部署成功
+- [ ] ArgoCD v3.2.7 部署成功
 - [ ] K3S v1.34.5 集群健康
 - [ ] Gitea Runner 注册成功
 - [ ] Pipeline 可正常运行

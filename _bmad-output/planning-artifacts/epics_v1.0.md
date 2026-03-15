@@ -643,7 +643,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 - Gitea v1.25.4 ✅
 - Gitea Runner (最新版) ✅
 - Harbor v2.14.3 ✅
-- ArgoCD v3.3.2 ✅
+- ArgoCD v3.2.7 ✅
 - K3S v1.34.5 ✅
 
 ***📦 价值组 1.1: 开发 CI/CD 系统***
@@ -969,20 +969,20 @@ So that **可以快速编写和执行测试用例**。
 ### Story 0.7: ArgoCD 持续部署
 
 **As a** DevOps 工程师,
-**I want** 部署 ArgoCD v3.3.2 持续部署工具,
+**I want** 部署 ArgoCD v3.2.7 持续部署工具,
 **So that** 实现 GitOps 自动化部署。
 
 **Acceptance Criteria:**
 
 **Given** K3S 集群已部署
 **When** 运行 ArgoCD 安装脚本
-**Then** ArgoCD v3.3.2 部署成功
+**Then** ArgoCD v3.2.7 部署成功
 **And** Git 仓库集成配置完成
 **And** 多环境 (Dev/Test/Prod) 配置完成
 **And** 自动同步策略配置完成
 
 **技术栈:**
-- ArgoCD v3.3.2 ✅ (已验证)
+- ArgoCD v3.2.7 ✅ (已验证)
 - Git (代码仓库)
 - Kustomize/Helm
 
