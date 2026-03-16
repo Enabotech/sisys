@@ -1,0 +1,75 @@
+---
+# Kustomize Test Environment Overlay
+# SISYS 应用测试环境配置
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 引用 base 配置
+resources:
+  - ../../base
+
+# 命名空间
+namespace: sisys-test
+
+# 通用标签
+commonLabels:
+  environment: test
+  app.kubernetes.io/environment: testing
+
+# 通用注解
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "0"
+
+# 镜像配置 (测试环境使用具体版本)
+images:
+  - name: harbor.sisys.local/sisys/app
+    newTag: v1.0.0
+
+# 名称前缀
+namePrefix: test-
+
+# ConfigMap 补丁
+configMapGenerator:
+  - name: sisys-app-config
+    behavior: merge
+    literals:
+      - APP_ENV=testing
+      - LOG_LEVEL=info
+      - ENABLE_PROFILING=false
+
+# Deployment 补丁
+patches:
+  # 副本数补丁 (测试环境 2 个副本)
+  - target:
+      kind: Deployment
+      name: sisys-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+      # 测试环境资源限制中等
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "500m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
+
+# HPA 补丁 (测试环境最小副本数 2)
+patchesStrategicMerge:
+  - |-
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: sisys-app
+    spec:
+      minReplicas: 2
+      maxReplicas: 3

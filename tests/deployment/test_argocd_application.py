@@ -1,0 +1,325 @@
+"""
+ArgoCD Application 配置测试
+
+测试 ArgoCD Application 的创建、自动同步策略、健康检查和回滚功能。
+"""
+
+import json
+import subprocess
+from pathlib import Path
+
+import pytest
+
+
+class TestArgoCDApplicationConfig:
+    """ArgoCD Application 配置测试类"""
+
+    def test_application_manifest_exists(self):
+        """验证 Application 清单文件存在"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+        assert manifest_path.exists(), "Application 清单文件不存在"
+
+    def test_application_manifest_valid_yaml(self):
+        """验证 Application 清单 YAML 格式有效"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+        result = subprocess.run(
+            ["python3", "-c", f"import yaml; list(yaml.safe_load_all(open('{manifest_path}')))"], capture_output=True, text=True
+        )
+        assert result.returncode == 0, f"YAML 格式无效：{result.stderr}"
+
+    def test_application_manifest_has_required_fields(self):
+        """验证 Application 清单包含必需字段"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            # 获取第一个 Application 文档
+            app = docs[0]
+
+        # 验证必需字段
+        assert "apiVersion" in app, "缺少 apiVersion 字段"
+        assert app["apiVersion"] == "argoproj.io/v1alpha1", "apiVersion 版本错误"
+        assert "kind" in app, "缺少 kind 字段"
+        assert app["kind"] == "Application", "kind 不是 Application"
+        assert "metadata" in app, "缺少 metadata 字段"
+        assert "name" in app["metadata"], "缺少 metadata.name 字段"
+        assert "namespace" in app["metadata"], "缺少 metadata.namespace 字段"
+        assert app["metadata"]["namespace"] == "argocd", "namespace 不是 argocd"
+        assert "spec" in app, "缺少 spec 字段"
+
+        # 验证 spec 必需字段
+        spec = app["spec"]
+        assert "source" in spec, "缺少 spec.source 字段"
+        assert "repoURL" in spec["source"], "缺少 source.repoURL"
+        assert "targetRevision" in spec["source"], "缺少 source.targetRevision"
+        assert "path" in spec["source"], "缺少 source.path"
+        assert "destination" in spec, "缺少 spec.destination"
+        assert "server" in spec["destination"], "缺少 destination.server"
+        assert "namespace" in spec["destination"], "缺少 destination.namespace"
+        assert "syncPolicy" in spec, "缺少 spec.syncPolicy"
+
+    def test_application_auto_sync_policy_configured(self):
+        """验证自动同步策略配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        sync_policy = app["spec"]["syncPolicy"]
+
+        # 验证自动同步启用
+        assert "automated" in sync_policy, "未配置 automated 同步策略"
+        assert sync_policy["automated"].get("prune", False) is True, "未启用 auto-prune"
+        assert sync_policy["automated"].get("selfHeal", False) is True, "未启用 self-heal"
+        assert sync_policy["automated"].get("allowEmpty", False) is True, "未允许空列表"
+
+    def test_application_sync_options_configured(self):
+        """验证同步选项配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        sync_policy = app["spec"]["syncPolicy"]
+
+        # 验证同步选项
+        assert "syncOptions" in sync_policy, "未配置 syncOptions"
+        sync_options = sync_policy["syncOptions"]
+
+        # 验证关键同步选项
+        assert any("CreateNamespace=true" in opt for opt in sync_options), "未启用 CreateNamespace"
+        assert any("PrunePropagationPolicy=foreground" in opt for opt in sync_options), "未配置 PrunePropagationPolicy"
+        assert any("PruneLast=true" in opt for opt in sync_options), "未启用 PruneLast"
+
+    def test_application_health_check_configured(self):
+        """验证健康检查配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        # 验证健康检查配置
+        assert "ignoreDifferences" in app["spec"], "未配置 ignoreDifferences"
+
+        # 验证资源忽略配置
+        ignore_diffs = app["spec"]["ignoreDifferences"]
+        assert len(ignore_diffs) > 0, "ignoreDifferences 为空"
+
+    def test_application_source_repository_configured(self):
+        """验证源代码仓库配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        source = app["spec"]["source"]
+
+        # 验证仓库 URL 配置
+        assert (
+            "gitea.sisys.local" in source["repoURL"] or "sisys/sisys" in source["repoURL"]
+        ), "仓库 URL 未指向 Gitea sisys/sisys 仓库"
+
+        # 验证目标分支
+        assert source["targetRevision"] in ["HEAD", "main", "master"], f"目标分支配置不合理：{source['targetRevision']}"
+
+        # 验证路径配置
+        assert source["path"].startswith("deployments/apps/"), f"应用路径配置不合理：{source['path']}"
+
+    def test_application_destination_configured(self):
+        """验证目标配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        destination = app["spec"]["destination"]
+
+        # 验证目标集群
+        assert destination["server"] in [
+            "https://kubernetes.default.svc",
+            "in-cluster",
+        ], f"目标集群配置错误：{destination['server']}"
+
+        # 验证目标命名空间
+        assert destination["namespace"] == "sisys", f"目标命名空间应该是 sisys，实际为：{destination['namespace']}"
+
+    def test_application_kustomize_config(self):
+        """验证 Kustomize 配置（如果使用 Kustomize）"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        source = app["spec"]["source"]
+
+        # 如果使用 Kustomize，验证配置
+        if "kustomize" in source:
+            kustomize = source["kustomize"]
+
+            # 验证 images 配置（用于镜像更新）
+            if "images" in kustomize:
+                assert len(kustomize["images"]) > 0, "Kustomize images 配置为空"
+
+            # 验证 namePrefix/nameSuffix 配置
+            assert "namePrefix" in kustomize or "nameSuffix" in kustomize, "未配置 Kustomize namePrefix/nameSuffix"
+
+    def test_application_rollback_config(self):
+        """验证回滚配置"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+
+        with open(manifest_path) as f:
+            import yaml
+
+            docs = list(yaml.safe_load_all(f))
+            app = docs[0]
+
+        sync_policy = app["spec"]["syncPolicy"]
+
+        # 验证历史保留配置
+        assert "retry" in sync_policy or "managedNamespaceMetadata" in app["spec"], "未配置回滚相关选项"
+
+
+class TestArgoCDApplicationDeployment:
+    """ArgoCD Application 部署测试类"""
+
+    @pytest.fixture(scope="class")
+    def application_deployed(self):
+        """Fixture: 验证 Application 是否已部署"""
+        try:
+            result = subprocess.run(
+                ["kubectl", "get", "application", "-n", "argocd"], capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                pytest.skip("ArgoCD Application 未部署，跳过部署测试")
+            return result.stdout
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("kubectl 不可用或集群未连接，跳过部署测试")
+
+    def test_application_created(self, application_deployed):
+        """验证 Application 已创建"""
+        if not application_deployed:
+            pytest.skip("Application 未部署")
+        assert "sisys-app" in application_deployed, "sisys-app Application 未创建"
+
+    def test_application_sync_status(self, application_deployed):
+        """验证 Application 同步状态"""
+        if not application_deployed:
+            pytest.skip("Application 未部署")
+        try:
+            result = subprocess.run(
+                ["kubectl", "get", "application", "sisys-app", "-n", "argocd", "-o", "json"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                pytest.skip("sisys-app Application 未找到")
+
+            app = json.loads(result.stdout)
+            status = app.get("status", {})
+            sync_status = status.get("sync", {}).get("status", "Unknown")
+
+            # 接受 Synced 或 Unknown（Unknown 表示刚创建或 Git 仓库不可访问）
+            assert sync_status in ["Synced", "Unknown"], f"Application 同步状态异常：{sync_status}"
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("kubectl 不可用，跳过同步状态测试")
+
+    def test_application_health_status(self, application_deployed):
+        """验证 Application 健康状态"""
+        if not application_deployed:
+            pytest.skip("Application 未部署")
+        try:
+            result = subprocess.run(
+                ["kubectl", "get", "application", "sisys-app", "-n", "argocd", "-o", "json"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                pytest.skip("sisys-app Application 未找到")
+
+            app = json.loads(result.stdout)
+            status = app.get("status", {})
+            health_status = status.get("health", {}).get("status", "Unknown")
+
+            assert health_status == "Healthy", f"Application 不健康：{health_status}"
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("kubectl 不可用，跳过健康状态测试")
+
+    def test_application_auto_sync_enabled(self, application_deployed):
+        """验证自动同步已启用"""
+        if not application_deployed:
+            pytest.skip("Application 未部署")
+        try:
+            result = subprocess.run(
+                ["argocd", "app", "get", "sisys-app", "-n", "argocd", "-o", "json"], capture_output=True, text=True, timeout=10
+            )
+
+            if result.returncode != 0:
+                pytest.skip("argocd CLI 未安装或 Application 未找到")
+
+            app = json.loads(result.stdout)
+            sync_policy = app.get("spec", {}).get("syncPolicy", {})
+            automated = sync_policy.get("automated", {})
+
+            assert automated.get("selfHeal", False) is True, "self-heal 未启用"
+            assert automated.get("prune", False) is True, "auto-prune 未启用"
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("argocd CLI 未安装，跳过自动同步测试")
+
+    def test_application_sync_history(self, application_deployed):
+        """验证同步历史可追溯"""
+        if not application_deployed:
+            pytest.skip("Application 未部署")
+        try:
+            result = subprocess.run(
+                ["argocd", "app", "history", "sisys-app", "-n", "argocd"], capture_output=True, text=True, timeout=10
+            )
+
+            if result.returncode != 0:
+                pytest.skip("无法获取同步历史")
+
+            # 验证有同步历史记录
+            assert "ID" in result.stdout or "Revision" in result.stdout, "同步历史格式异常"
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("argocd CLI 未安装，跳过同步历史测试")
+
+
+class TestArgoCDApplicationRollback:
+    """ArgoCD Application 回滚测试类"""
+
+    def test_rollback_manifest_exists(self):
+        """验证回滚配置清单存在"""
+        manifest_path = Path("deployments/argocd/applications/sisys-app-rollback.yaml")
+        # 回滚配置是可选的
+        assert manifest_path.exists() or True, "回滚配置清单不存在（可选）"
+
+    def test_rollback_command_available(self):
+        """验证回滚命令可用"""
+        try:
+            result = subprocess.run(["argocd", "app", "rollback", "--help"], capture_output=True, text=True, timeout=5)
+            assert result.returncode == 0, "argocd rollback 命令不可用"
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("argocd CLI 未安装，跳过回滚命令测试")

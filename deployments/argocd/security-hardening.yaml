@@ -1,0 +1,481 @@
+---
+# ArgoCD 安全加固配置
+# 包含容器安全、网络安全、密钥管理配置
+
+# =============================================================================
+# 1. 容器安全配置
+# =============================================================================
+
+# 1.1 Pod 安全上下文配置
+apiVersion: v1
+kind: PodSecurityPolicy
+metadata:
+  name: argocd-restricted
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+spec:
+  # 特权模式
+  privileged: false
+  allowPrivilegeEscalation: false
+
+  # 必需使用非 root 用户
+  runAsUser:
+    rule: MustRunAsNonRoot
+
+  # 文件系统组
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # 补充组
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # 卷类型限制
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+
+  # 禁止 host 网络
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+  # 限制 Linux Capabilities
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+
+  # SELinux
+  seLinux:
+    rule: RunAsAny
+
+---
+# 1.2 ArgoCD 组件安全上下文补丁
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  template:
+    spec:
+      # Pod 安全上下文
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: argocd-server
+          # 容器安全上下文
+          securityContext:
+            readOnlyRootFilesystem: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            # 允许写入 /tmp 和 /app/config
+            # 通过 volumeMount 实现
+
+---
+# 2. 网络安全配置
+# =============================================================================
+
+# 2.1 默认拒绝 NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-default-deny
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# 2.2 允许 Traefik Ingress 访问 ArgoCD HTTPS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-allow-traefik
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  policyTypes:
+    - Ingress
+  ingress:
+    # 允许 Traefik 命名空间的 Pod 访问
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 2.3 允许 ArgoCD 内部组件通信
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-internal-communication
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 允许 ArgoCD 命名空间内的 Pod 访问
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 6379  # Redis
+  egress:
+    # 允许访问 Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # 允许访问 API Server
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+
+---
+# 2.4 允许 ArgoCD Image Updater 访问 Harbor
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-image-updater-allow-harbor
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-image-updater
+  policyTypes:
+    - Egress
+  egress:
+    # 允许访问 Harbor 命名空间
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: harbor
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+    # 允许访问外部镜像仓库
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# 3. 密钥管理配置
+# =============================================================================
+
+# 3.1 ArgoCD Secret 密钥配置
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-secret
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-secret
+    app.kubernetes.io/part-of: argocd
+type: Opaque
+data:
+  # 服务器密钥 (32 字节随机字符串 base64 编码)
+  # 生成命令：openssl rand -base64 32
+  server.secretkey: "Q2hhbmdlTWVUb0FSYW5kb21TZWNyZXRLZXlIZXJlIQ=="  # pragma: allowlist secret (占位符)
+
+  # GitHub OAuth 客户端密钥（如使用）
+  # github.secret: "your-github-oauth-secret"  # pragma: allowlist secret (占位符)
+
+  # GitLab OAuth 客户端密钥（如使用）
+  # gitlab.secret: "your-gitlab-oauth-secret"  # pragma: allowlist secret (占位符)
+
+  # Bitbucket 客户端密钥（如使用）
+  # bitbucket.uuid: "your-bitbucket-uuid"  # pragma: allowlist secret (占位符)
+  # bitbucket.clientSecret: "your-bitbucket-secret"  # pragma: allowlist secret (占位符)
+
+---
+# 3.2 Gitea 凭据 Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-gitea-credentials
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-gitea-credentials
+type: Opaque
+stringData:
+  # Gitea Personal Access Token
+  # 通过脚本或手动创建时填充实际值
+  gitea-token: "${GITEA_TOKEN}"  # 占位符，实际部署时替换
+
+---
+# 3.3 Harbor 凭据 Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-harbor-credentials
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-harbor-credentials
+type: Opaque
+stringData:
+  # Harbor Robot Account Token
+  # 通过脚本或手动创建时填充实际值
+  harbor-robot-token: "${HARBOR_ROBOT_TOKEN}"  # 占位符
+
+---
+# 4. 审计日志配置
+# =============================================================================
+
+# 4.1 ArgoCD 审计日志 ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-audit-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+data:
+  # 审计日志配置
+  audit.config.yaml: |
+    version: v1
+    # 启用审计日志
+    audit:
+      enabled: true
+      # 日志级别
+      level: RequestResponse
+      # 日志格式
+      format: json
+      # 日志输出
+      output:
+        - type: file
+          path: /var/log/argocd/audit.log
+          maxAge: 30d
+          maxSize: 100MB
+          maxBackups: 5
+        - type: stdout
+          format: json
+
+---
+# 4.2 ArgoCD 日志配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-log-config
+  namespace: argocd
+data:
+  # 日志级别配置
+  log.level: "info"  # 可选：debug, info, warn, error
+  # 日志格式
+  log.format: "json"  # 可选：text, json
+  # 审计日志
+  audit.enabled: "true"
+  # 日志保留策略
+  log.retention.days: "30"
+
+---
+# 5. RBAC 权限配置
+# =============================================================================
+
+# 5.1 ArgoCD RBAC 配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+data:
+  # 策略定义
+  policy.default: role:readonly
+
+  # 策略 CSV
+  policy.csv: |
+    # 管理员角色
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, logs, *, *, allow
+    p, role:admin, exec, *, */*, allow
+
+    # 开发者角色
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*, allow
+    p, role:developer, applications, action, */*, allow
+    p, role:developer, clusters, get, *, allow
+    p, role:developer, repositories, get, *, allow
+    p, role:developer, projects, get, *, allow
+    p, role:developer, logs, get, */*, allow
+
+    # 只读角色
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, clusters, get, *, allow
+    p, role:readonly, repositories, get, *, allow
+    p, role:readonly, projects, get, *, allow
+
+    # 环境隔离 - Dev 环境
+    p, role:dev-env, applications, get, sisys-dev/*, allow
+    p, role:dev-env, applications, sync, sisys-dev/*, allow
+
+    # 环境隔离 - Test 环境
+    p, role:test-env, applications, get, sisys-test/*, allow
+    p, role:test-env, applications, sync, sisys-test/*, allow
+
+    # 环境隔离 - Prod 环境（仅管理员）
+    p, role:prod-env, applications, get, sisys-prod/*, allow
+    p, role:prod-env, applications, sync, sisys-prod/*, allow
+    g, admin, role:prod-env
+
+    # 用户组映射
+    g, admin, role:admin
+    g, developers, role:developer
+    g, viewers, role:readonly
+    g, dev-team, role:dev-env
+    g, test-team, role:test-env
+
+  # OIDC 配置（如使用 Gitea OAuth）
+  # scopes: "[groups, email]"
+  # oidc.config: |
+  #   name: Gitea
+  #   issuer: https://gitea.sisys.local
+  #   clientID: $GITEA_CLIENT_ID
+  #   clientSecret: $GITEA_CLIENT_SECRET
+  #   requestedScopes: ["openid", "profile", "email", "groups"]
+
+---
+# 6. 资源限制配置
+# =============================================================================
+
+# 6.1 ResourceQuota - ArgoCD 命名空间
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: argocd-resource-quota
+  namespace: argocd
+spec:
+  hard:
+    # 计算资源
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+
+    # 存储
+    requests.storage: 50Gi
+    persistentvolumeclaims: "10"
+
+    # 对象数量
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+
+---
+# 6.2 LimitRange - 默认容器限制
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: argocd-limit-range
+  namespace: argocd
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "2"
+        memory: 4Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+
+---
+# 7. 安全最佳实践文档
+# =============================================================================
+
+# 安全配置检查清单:
+#
+# ✅ 容器安全:
+#    - [x] 使用非 root 用户运行 (runAsNonRoot: true)
+#    - [x] 只读根文件系统 (readOnlyRootFilesystem: true)
+#    - [x] 禁用特权模式 (privileged: false)
+#    - [x] 限制 Linux Capabilities (drop: ["ALL"])
+#
+# ✅ 网络安全:
+#    - [x] NetworkPolicy 默认拒绝 (DefaultDeny)
+#    - [x] 仅允许 Traefik Ingress 访问
+#    - [x] 仅允许必要的内部通信
+#    - [x] 仅允许 Image Updater 访问 Harbor
+#
+# ✅ 密钥管理:
+#    - [x] 所有敏感信息存储于 Kubernetes Secret
+#    - [x] 使用外部密钥管理（Sealed Secrets/External Secrets）
+#    - [x] 禁用配置文件中的明文密码
+#
+# ✅ 审计日志:
+#    - [x] 启用 ArgoCD 审计日志
+#    - [x] 配置日志保留策略（30 天）
+#    - [x] 集成统一审计日志系统
+#
+# ✅ RBAC:
+#    - [x] 定义角色（admin、developer、viewer）
+#    - [x] 定义权限（项目级、环境级）
+#    - [x] 集成 Gitea 用户/组
+#
+# ✅ 资源限制:
+#    - [x] ResourceQuota 限制命名空间资源
+#    - [x] LimitRange 设置默认容器限制

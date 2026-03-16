@@ -16,7 +16,7 @@ class TestGiteaArchitectureCompliance:
         """加载 values.yaml 配置"""
         values_path = Path(__file__).parent.parent.parent / "deployments" / "gitea" / "values.yaml"
         with open(values_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            return yaml.safe_load(f)  # type: ignore[no-any-return]
 
     @pytest.fixture
     def ingress_yaml(self) -> list:

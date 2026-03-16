@@ -1,0 +1,83 @@
+---
+# Kustomize Prod Environment Overlay
+# SISYS 应用生产环境配置
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 引用 base 配置
+resources:
+  - ../../base
+
+# 命名空间
+namespace: sisys-prod
+
+# 通用标签
+commonLabels:
+  environment: prod
+  app.kubernetes.io/environment: production
+
+# 通用注解
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "0"
+
+# 镜像配置 (生产环境使用稳定版本)
+images:
+  - name: harbor.sisys.local/sisys/app
+    newTag: v1.0.0
+
+# 名称前缀
+namePrefix: prod-
+
+# ConfigMap 补丁
+configMapGenerator:
+  - name: sisys-app-config
+    behavior: merge
+    literals:
+      - APP_ENV=production
+      - LOG_LEVEL=warn
+      - ENABLE_PROFILING=false
+      - ENABLE_METRICS=true
+
+# Deployment 补丁
+patches:
+  # 副本数补丁 (生产环境 3 个副本)
+  - target:
+      kind: Deployment
+      name: sisys-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+      # 生产环境资源限制较高
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+
+      # 生产环境变量
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DEBUG_MODE
+          value: "false"
+
+# HPA 补丁 (生产环境最小副本数 3)
+patchesStrategicMerge:
+  - |-
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: sisys-app
+    spec:
+      minReplicas: 3
+      maxReplicas: 10

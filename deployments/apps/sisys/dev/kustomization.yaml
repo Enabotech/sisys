@@ -1,0 +1,82 @@
+---
+# Kustomize Dev Environment Overlay
+# SISYS 应用开发环境配置
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 引用 base 配置
+resources:
+  - ../../base
+
+# 命名空间
+namespace: sisys-dev
+
+# 通用标签
+commonLabels:
+  environment: dev
+  app.kubernetes.io/environment: development
+
+# 通用注解
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "0"
+
+# 镜像配置 (开发环境使用 latest)
+images:
+  - name: harbor.sisys.local/sisys/app
+    newTag: latest
+
+# 名称前缀
+namePrefix: dev-
+
+# ConfigMap 补丁
+configMapGenerator:
+  - name: sisys-app-config
+    behavior: merge
+    literals:
+      - APP_ENV=development
+      - LOG_LEVEL=debug
+      - ENABLE_PROFILING=true
+
+# Deployment 补丁
+patches:
+  # 副本数补丁 (开发环境 1 个副本)
+  - target:
+      kind: Deployment
+      name: sisys-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+      # 开发环境资源限制较低
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "50m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "64Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+
+      # 开发环境变量
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DEBUG_MODE
+          value: "true"
+
+# HPA 补丁 (开发环境最小副本数 1)
+patchesStrategicMerge:
+  - |-
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: sisys-app
+    spec:
+      minReplicas: 1
+      maxReplicas: 2
