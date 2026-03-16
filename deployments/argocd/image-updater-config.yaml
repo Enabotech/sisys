@@ -1,0 +1,167 @@
+---
+# ArgoCD Image Updater 完整配置
+# Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
+# 创建日期：2026-03-16
+
+# =============================================================================
+# 配置说明
+# =============================================================================
+#
+# 本配置包含：
+# 1. ArgoCD Image Updater 安装清单
+# 2. Harbor Robot Account 配置
+# 3. Kubernetes Secret 配置
+# 4. 示例 Application 配置
+#
+# 已执行步骤：
+# ✅ 1. Harbor 项目 'sisys' 创建成功 (project_id=2)
+# ✅ 2. Robot Account 创建成功 (robot$sisys+argocd-pull)
+# ✅ 3. Kubernetes Secret 已更新
+# ⚠️ 4. Harbor Webhook 需手动配置（API 版本差异）
+#
+# =============================================================================
+
+# =============================================================================
+# 1. Harbor Robot Account 信息
+# =============================================================================
+# Robot Account 名称：robot$sisys+argocd-pull
+# 权限：Pull（只读）
+# 有效期：永不过期
+# Token: mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j（已存储到 Kubernetes Secret）
+#
+# 验证命令:
+#   docker login harbor.sisys.local -u 'robot$sisys+argocd-pull' -p 'mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j'
+#
+# =============================================================================
+
+# =============================================================================
+# 2. Harbor Webhook 手动配置指南
+# =============================================================================
+# 由于 Harbor API 版本差异，Webhook 需通过 Web 界面手动配置：
+#
+# 1. 登录 Harbor: https://harbor.sisys.local
+# 2. 进入项目 → sisys
+# 3. 点击左侧 "Webhook"
+# 4. 点击 "+ NEW WEBHOOK"
+# 5. 填写信息:
+#    - Name: argocd-image-updater
+#    - Webhook URL: http://argocd-image-updater.argocd.svc.cluster.local:8080/api/v1/webhook
+#    - Events: 勾选 "PUSH_ARTIFACT"
+#    - Skip Cert Verify: 勾选
+# 6. 点击 "Add"
+#
+# =============================================================================
+
+# =============================================================================
+# 3. 验证安装
+# =============================================================================
+
+# 验证 Pod 状态
+# sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
+
+# 验证 Secret
+# sudo kubectl get secret argocd-image-updater-secret -n argocd
+
+# 查看日志
+# sudo kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater -f
+
+# =============================================================================
+# 4. 示例 Application 配置
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-example
+  namespace: argocd
+  annotations:
+    # 启用镜像更新
+    argocd-image-updater.argoproj.io/image-list: |
+      harbor.sisys.local/sisys/myapp=myapp
+
+    # 更新策略：语义化版本
+    argocd-image-updater.argoproj.io/myapp.update-strategy: semver
+
+    # 允许的 tag 格式
+    argocd-image-updater.argoproj.io/myapp.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+
+    # 排序方式
+    argocd-image-updater.argoproj.io/myapp.sort-mode: semver
+
+    # 忽略的 tag
+    argocd-image-updater.argoproj.io/myapp.ignore-tags: |
+      latest,dev,nightly
+
+    # 强制更新
+    argocd-image-updater.argoproj.io/myapp.force-update: "true"
+spec:
+  project: default
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/myapp
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# 测试 Application - 用于验证 Image Updater 功能
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-image-updater
+  namespace: argocd
+  annotations:
+    # 最简单的配置 - 使用 latest tag
+    argocd-image-updater.argoproj.io/image-list: harbor.sisys.local/sisys/test-app
+    argocd-image-updater.argoproj.io/update-strategy: latest
+spec:
+  project: default
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/test-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+---
+# 配置说明文档
+# =============================================================================
+#
+# 使用方法:
+#
+# 1. 应用 Image Updater 安装清单:
+#    sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+#
+# 2. 验证安装:
+#    sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
+#
+# 3. 配置 Harbor Webhook（通过 Web 界面）:
+#    参考上文配置指南
+#
+# 4. 创建 Application:
+#    sudo kubectl apply -f deployments/argocd/image-updater-config.yaml
+#
+# 5. 测试镜像更新:
+#    a. 推送新镜像到 Harbor:
+#       docker tag test-app:latest harbor.sisys.local/sisys/test-app:v1.0.0
+#       docker push harbor.sisys.local/sisys/test-app:v1.0.0
+#
+#    b. 等待 Image Updater 检测（约 1-2 分钟）:
+#       sudo kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater -f
+#
+#    c. 验证 Application 已更新:
+#       sudo kubectl get application test-image-updater -n argocd
+#
+# =============================================================================
