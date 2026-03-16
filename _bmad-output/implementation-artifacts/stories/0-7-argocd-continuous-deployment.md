@@ -12,6 +12,11 @@ Status: in-progress
 
 开发实施开始：2026-03-15
 实施状态：准备开始 Task 1 - ArgoCD Helm Chart 配置
+
+代码审查完成：2026-03-16
+审查者：Qwen Code (AI 高级开发者 - 对抗性审查模式)
+审查结果：10 个问题 (3 CRITICAL + 4 MEDIUM + 3 LOW)
+修复状态：全部修复 (100%)
 -->
 
 ## Story
@@ -121,12 +126,13 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 配置 Harbor Webhook 触发 Image Updater
     - Webhook 需通过 Harbor Web 界面手动配置（API 版本差异）
   - [x] 配置镜像更新策略 (`argocd-image-updater-config` ConfigMap)
-  - [x] 验证镜像自动更新流程
+  - [ ] 验证镜像自动更新流程
     - Pod 状态：Running 1/1
     - 日志：正常执行镜像更新检查（每 2 分钟）
-  - [x] 测试端到端 GitOps 流程
+    - **待完成**: 需要实际推送镜像测试端到端流程
+  - [ ] 测试端到端 GitOps 流程
     - 示例 Application 配置已创建
-    - 需实际推送镜像测试
+    - **待完成**: 需要实际推送镜像验证自动更新
 
 - [ ] Task 6: Application 配置 (AC: 6)
   - [ ] 创建 ArgoCD Application（声明式）
@@ -1031,6 +1037,84 @@ Qwen Code (AI 开发助手)
 - Token 使用 `all` scope 获取所有权限（简化配置）
 - Webhook 使用 Gitea 内部服务地址（避免外部访问问题）
 - ArgoCD 仓库配置使用 Kubernetes Secret（声明式配置）
+
+### Task 5 Code Review Fixes
+
+**Review Date:** 2026-03-16
+**Reviewer:** Qwen Code (AI 高级开发者 - 对抗性审查模式)
+**Review Type:** 对抗性代码审查 (Adversarial Code Review)
+
+**审查结果:** 10 个问题 (3 CRITICAL + 4 MEDIUM + 3 LOW)
+**修复状态:** 全部修复 (100%)
+
+#### CRITICAL 问题修复 (3 个)
+
+**问题 1: Task 5 标记为 [x] 完成但实际未验证功能**
+- **修复:** 更新 Task 5 子任务状态，将未实际验证的任务标记为 `[ ]`
+- **文件:** Story 文件第 125-131 行
+- **说明:** "验证镜像自动更新流程"和"测试端到端 GitOps 流程"需要实际推送镜像测试
+
+**问题 2: Secret 中硬编码 Token 占位符**
+- **修复:** 修改 `image-updater-install.yaml`，使用占位符并说明需要通过脚本创建
+- **文件:** `deployments/argocd/image-updater-install.yaml` 第 137-158 行
+- **说明:** 添加详细的使用说明，指导用户运行脚本或手动创建 Secret
+
+**问题 3: Harbor Webhook 配置不一致 (NetworkPolicy)**
+- **修复:** 在 NetworkPolicy 中添加允许 Harbor 命名空间访问的规则
+- **文件:** `deployments/argocd/image-updater-install.yaml` 第 337-348 行
+- **说明:** Webhook 可以从 Harbor 命名空间访问 Image Updater
+
+#### MEDIUM 问题修复 (4 个)
+
+**问题 4: 测试覆盖率不足**
+- **修复:** 增强 `test_end_to_end_image_update_workflow` 测试，添加实际验证逻辑
+- **文件:** `tests/deployment/test_argocd_harbor_integration.py` 第 291-378 行
+- **说明:** 移除 `pytest.skip()`，添加配置验证、NetworkPolicy 验证
+
+**问题 5: Harbor Ingress 路由配置顺序**
+- **修复:** 调整路径顺序，更具体的路径 (`/api/`, `/service/`) 在前
+- **文件:** `deployments/harbor/ingress.yaml` 第 26-48 行
+- **说明:** 避免根路径 `/` 匹配 API 请求
+
+**问题 6: Python 脚本硬编码配置**
+- **修复:** 添加 `argparse` 支持命令行参数
+- **文件:** `scripts/argocd/configure-image-updater.py` 第 1-65 行，第 373-473 行
+- **说明:** 支持自定义 Harbor URL、命名空间、凭据等参数
+
+**问题 7: 缺少资源限制监控**
+- **修复:** 添加 Prometheus 监控注解
+- **文件:** `deployments/argocd/image-updater-install.yaml` 第 173-189 行
+- **说明:** 配置 `prometheus.io/scrape: "true"` 等注解
+
+#### LOW 问题修复 (3 个)
+
+**问题 8: 文档中缺少故障恢复指南**
+- **修复:** 添加完整的故障恢复指南章节
+- **文件:** `docs/deployment/ARGOCD_IMAGE_UPDATER.md` 第 438-500 行
+- **说明:** 包含重置 Image Updater、重置凭据、回滚 Application、禁用 Image Updater
+
+**问题 9: 示例 Application 配置未实际创建**
+- **修复:** 创建 `example-application.yaml` 文件
+- **文件:** `deployments/argocd/example-application.yaml` (新建)
+- **说明:** 包含 3 个示例配置：标准语义化版本、latest tag 测试、多镜像更新
+
+**问题 10: 缺少版本兼容性说明**
+- **修复:** 添加版本兼容性章节
+- **文件:** `docs/deployment/ARGOCD_IMAGE_UPDATER.md` 第 506-574 行
+- **说明:** 包含已测试版本、兼容版本范围、降级方案、升级路径
+
+### 变更文件清单
+
+**新增文件:**
+- `deployments/argocd/example-application.yaml` - 示例 Application 配置
+
+**修改文件:**
+- `deployments/argocd/image-updater-install.yaml` - Secret 配置、NetworkPolicy、Prometheus 注解
+- `deployments/harbor/ingress.yaml` - 路由顺序调整
+- `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 故障恢复指南、版本兼容性
+- `scripts/argocd/configure-image-updater.py` - 命令行参数支持
+- `tests/deployment/test_argocd_harbor_integration.py` - 测试增强
+- `_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md` - 审查记录
 
 **创建的文件:**
 - `tests/deployment/test_argocd_gitea_integration.py` - 集成测试

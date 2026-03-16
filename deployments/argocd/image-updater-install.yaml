@@ -135,24 +135,29 @@ data:
 
 ---
 # Secret - Harbor 凭据配置
-# 注意：实际 Token 需要通过 kubectl 创建或手动更新
+# 注意：实际 Token 需要通过脚本或手动创建
+# 使用方法:
+#   1. 自动创建：python scripts/argocd/configure-image-updater.py
+#   2. 手动创建：kubectl create secret generic argocd-image-updater-secret \
+#                --from-literal=harbor="$(echo -n 'robot$argocd-pull:<TOKEN>' | base64)" \
+#                -n argocd
 apiVersion: v1
 kind: Secret
 metadata:
   name: argocd-image-updater-secret
   namespace: argocd
+  annotations:
+    note: "此 Secret 需要通过脚本或手动更新实际 Token"
   labels:
     app.kubernetes.io/name: argocd-image-updater
     app.kubernetes.io/part-of: argocd-image-updater
 type: Opaque
 data:
-  # Harbor 凭据 (base64 编码)
-  # 格式：username:password
-  # 示例：echo -n "robot$argocd-pull:<TOKEN>" | base64
-  harbor: cm9ib3QkYXJnb2NkLXB1bGw6VE9LRU5fUExBQ0VIT0xERVI=
-
+  # Harbor 凭据 (base64 编码) - 占位符，需要替换
+  # 格式：echo -n "robot$argocd-pull:<TOKEN>" | base64
+  harbor: PLACEHOLDER_RUN_SCRIPT_TO_CREATE
   # Docker Hub 凭据（可选，用于拉取公共镜像）
-  dockerhub: ZG9ja2VyaHViOnRva2VuX3BsYWNlaG9sZGVy
+  dockerhub: PLACEHOLDER_OPTIONAL
 
 ---
 # Deployment
@@ -164,6 +169,11 @@ metadata:
   labels:
     app.kubernetes.io/name: argocd-image-updater
     app.kubernetes.io/part-of: argocd-image-updater
+  annotations:
+    # Prometheus 监控注解（修复问题 7）
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
 spec:
   replicas: 1
   selector:
@@ -173,6 +183,11 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: argocd-image-updater
+      annotations:
+        # Prometheus 监控注解
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: argocd-image-updater
       containers:
@@ -326,6 +341,14 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: argocd-server
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 允许 Harbor Webhook 访问（修复问题 3）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: harbor
       ports:
         - protocol: TCP
           port: 8080

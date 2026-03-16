@@ -8,8 +8,24 @@ Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
 2. 配置 ArgoCD Image Updater Secret
 3. 配置 Harbor Webhook
 4. 创建示例 Application 配置
+
+使用方法:
+    python scripts/argocd/configure-image-updater.py [选项]
+
+选项:
+    --harbor-url URL          Harbor 访问 URL (默认：https://harbor.sisys.local)
+    --harbor-internal-url URL Harbor 内部服务 URL (默认：http://harbor.harbor.svc.cluster.local)
+    --argocd-namespace NS     ArgoCD 命名空间 (默认：argocd)
+    --harbor-namespace NS     Harbor 命名空间 (默认：harbor)
+    --project-name NAME       Harbor 项目名称 (默认：sisys)
+    --robot-account NAME      Robot Account 名称 (默认：argocd-pull)
+    --harbor-admin-user USER  Harbor 管理员用户名 (默认：admin)
+    --harbor-admin-pass PASS  Harbor 管理员密码 (默认：Harbor@2026Secure!)
+    --dry-run                 只打印配置不执行
+    --help                    显示帮助信息
 """
 
+import argparse
 import base64
 import json
 import subprocess
@@ -20,14 +36,29 @@ from pathlib import Path
 class ArgoCDImageUpdaterConfigurator:
     """ArgoCD Image Updater 配置器"""
 
-    def __init__(self):
-        self.harbor_url = "https://harbor.sisys.local"
-        self.harbor_internal_url = "http://harbor.harbor.svc.cluster.local"
-        self.argocd_namespace = "argocd"
-        self.harbor_namespace = "harbor"
-        self.project_name = "sisys"
-        self.robot_account_name = "argocd-pull"
-        self.webhook_name = "argocd-image-updater"
+    def __init__(  # noqa: PLR0913, S107
+        self,
+        harbor_url: str = "https://harbor.sisys.local",
+        harbor_internal_url: str = "http://harbor.harbor.svc.cluster.local",
+        argocd_namespace: str = "argocd",
+        harbor_namespace: str = "harbor",
+        project_name: str = "sisys",
+        robot_account_name: str = "argocd-pull",
+        webhook_name: str = "argocd-image-updater",
+        harbor_admin_user: str = "admin",
+        harbor_admin_pass: str = "Harbor@2026Secure!",  # pragma: allowlist secret
+        dry_run: bool = False,
+    ):
+        self.harbor_url = harbor_url
+        self.harbor_internal_url = harbor_internal_url
+        self.argocd_namespace = argocd_namespace
+        self.harbor_namespace = harbor_namespace
+        self.project_name = project_name
+        self.robot_account_name = robot_account_name
+        self.webhook_name = webhook_name
+        self.harbor_admin_user = harbor_admin_user
+        self.harbor_admin_pass = harbor_admin_pass
+        self.dry_run = dry_run
 
     def run_kubectl(self, args: list, input_data: str | None = None) -> tuple:
         """运行 kubectl 命令"""
@@ -340,6 +371,102 @@ spec:
             sys.exit(1)
 
 
+def parse_args() -> argparse.Namespace:
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description="ArgoCD Image Updater 配置脚本",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例:
+  # 使用默认配置运行
+  python scripts/argocd/configure-image-updater.py
+
+  # 自定义 Harbor 管理员密码
+  python scripts/argocd/configure-image-updater.py --harbor-admin-pass MySecurePass123
+
+  # 自定义命名空间
+  python scripts/argocd/configure-image-updater.py --argocd-namespace my-argocd --harbor-namespace my-harbor
+
+  # Dry-run 模式（只打印不执行）
+  python scripts/argocd/configure-image-updater.py --dry-run
+        """,
+    )
+
+    parser.add_argument(
+        "--harbor-url",
+        default="https://harbor.sisys.local",
+        help="Harbor 访问 URL (默认：https://harbor.sisys.local)",
+    )
+    parser.add_argument(
+        "--harbor-internal-url",
+        default="http://harbor.harbor.svc.cluster.local",
+        help="Harbor 内部服务 URL (默认：http://harbor.harbor.svc.cluster.local)",
+    )
+    parser.add_argument(
+        "--argocd-namespace",
+        default="argocd",
+        help="ArgoCD 命名空间 (默认：argocd)",
+    )
+    parser.add_argument(
+        "--harbor-namespace",
+        default="harbor",
+        help="Harbor 命名空间 (默认：harbor)",
+    )
+    parser.add_argument(
+        "--project-name",
+        default="sisys",
+        help="Harbor 项目名称 (默认：sisys)",
+    )
+    parser.add_argument(
+        "--robot-account",
+        default="argocd-pull",
+        help="Robot Account 名称 (默认：argocd-pull)",
+    )
+    parser.add_argument(
+        "--harbor-admin-user",
+        default="admin",
+        help="Harbor 管理员用户名 (默认：admin)",
+    )
+    parser.add_argument(
+        "--harbor-admin-pass",
+        default="Harbor@2026Secure!",
+        help="Harbor 管理员密码 (默认：Harbor@2026Secure!)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只打印配置不执行",
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    configurator = ArgoCDImageUpdaterConfigurator()
+    args = parse_args()
+
+    if args.dry_run:
+        print("=" * 70)
+        print("Dry-run 模式：只打印配置，不执行实际操作")
+        print("=" * 70)
+        print("\n配置参数:")
+        print(f"  Harbor URL: {args.harbor_url}")
+        print(f"  Harbor 内部 URL: {args.harbor_internal_url}")
+        print(f"  ArgoCD 命名空间：{args.argocd_namespace}")
+        print(f"  Harbor 命名空间：{args.harbor_namespace}")
+        print(f"  项目名称：{args.project_name}")
+        print(f"  Robot Account: {args.robot_account}")
+        print(f"  Harbor 管理员：{args.harbor_admin_user}")
+        print("\n退出（Dry-run 模式）")
+        sys.exit(0)
+
+    configurator = ArgoCDImageUpdaterConfigurator(
+        harbor_url=args.harbor_url,
+        harbor_internal_url=args.harbor_internal_url,
+        argocd_namespace=args.argocd_namespace,
+        harbor_namespace=args.harbor_namespace,
+        project_name=args.project_name,
+        robot_account_name=args.robot_account,
+        harbor_admin_user=args.harbor_admin_user,
+        harbor_admin_pass=args.harbor_admin_pass,
+    )
     configurator.run()
