@@ -1,6 +1,6 @@
 # Story 0.6: Harbor 镜像仓库
 
-Status: done
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -14,6 +14,16 @@ Status: done
 验证结果：7 项 AC 中 3 项完全通过，4 项部分通过 (配置就绪，待依赖 Story)
 验证状态：✅ 通过 (90%)
 验证者：Qwen Code (AI 开发助手)
+
+代码审查 #2 完成：2026-03-16 (Story 0.5~0.7 联合审查)
+审查结果：发现 12 个问题 (4 CRITICAL + 5 MEDIUM + 3 LOW)
+修复状态：待修复
+审查者：Qwen Code (AI 高级开发者 - Adversarial Code Reviewer)
+关键问题：
+- CRITICAL-001: Harbor 健康检查测试失败 (test_harbor.py:231 - HTTP 404)
+- CRITICAL-002: Task 5 标记完成但端到端验证未完成
+- MEDIUM-001: Harbor Ingress 路径路由配置注释不一致
+- MEDIUM-002: 测试覆盖率不足 (34% 测试跳过)
 -->
 
 ## Story
