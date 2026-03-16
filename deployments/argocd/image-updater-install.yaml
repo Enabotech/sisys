@@ -1,0 +1,362 @@
+---
+# ArgoCD Image Updater 安装清单
+# Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
+# 版本：v0.14.0 (对应 ArgoCD v3.2.x)
+
+# =============================================================================
+# 命名空间配置
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd-image-updater
+
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+
+---
+# RBAC - ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-image-updater
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+
+---
+# RBAC - ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-image-updater
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-image-updater
+subjects:
+  - kind: ServiceAccount
+    name: argocd-image-updater
+    namespace: argocd
+
+---
+# ConfigMap - Image Updater 配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+data:
+  # 镜像仓库配置
+  registries.conf: |
+    registries:
+      - name: Harbor
+        api_url: https://harbor.sisys.local
+        ping: yes
+        insecure: no
+        credentials: secret:argocd/argocd-image-updater-secret#harbor  # pragma: allowlist secret
+        defaultns: sisys
+        prefix: harbor.sisys.local
+
+      - name: Docker Hub
+        api_url: https://registry-1.docker.io
+        ping: yes
+        insecure: no
+        credentials: secret:argocd/argocd-image-updater-secret#dockerhub  # pragma: allowlist secret
+        prefix: docker.io
+
+      - name: Quay.io
+        api_url: https://quay.io
+        ping: yes
+        insecure: no
+        prefix: quay.io
+
+  # 更新策略配置
+  config.yaml: |
+    registries:
+      - name: Harbor
+        api_url: https://harbor.sisys.local
+        insecure: false
+        prefix: harbor.sisys.local
+        credentials: secret:argocd/argocd-image-updater-secret#harbor  # pragma: allowlist secret
+
+    # 日志配置
+    log_level: info
+
+    # 健康检查端点
+    health_port: 8080
+
+    # Webhook 配置（可选）
+    # webhook_url: http://argocd-server.argocd.svc.cluster.local/api/webhook
+
+---
+# Secret - Harbor 凭据配置
+# 注意：实际 Token 需要通过 kubectl 创建或手动更新
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-image-updater-secret
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+type: Opaque
+data:
+  # Harbor 凭据 (base64 编码)
+  # 格式：username:password
+  # 示例：echo -n "robot$argocd-pull:<TOKEN>" | base64
+  harbor: cm9ib3QkYXJnb2NkLXB1bGw6VE9LRU5fUExBQ0VIT0xERVI=
+
+  # Docker Hub 凭据（可选，用于拉取公共镜像）
+  dockerhub: ZG9ja2VyaHViOnRva2VuX3BsYWNlaG9sZGVy
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-image-updater
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argocd-image-updater
+    spec:
+      serviceAccountName: argocd-image-updater
+      containers:
+        - name: argocd-image-updater
+          image: quay.io/argoprojlabs/argocd-image-updater:v0.14.0
+          imagePullPolicy: Always
+          args:
+            - run
+            - --loglevel
+            - info
+            - --health-port
+            - "8080"
+            - --registries-conf-path
+            - /app/config/registries.conf
+          ports:
+            - containerPort: 8080
+              name: health
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: argocd-image-updater-config
+        - name: tmp
+          emptyDir: {}
+      securityContext:
+        fsGroup: 1000
+
+---
+# Service - 健康检查端点
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+spec:
+  ports:
+    - name: health
+      port: 8080
+      targetPort: health
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: argocd-image-updater
+
+---
+# ConfigMap - Webhook 配置（可选）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-webhook
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+    app.kubernetes.io/part-of: argocd-image-updater
+data:
+  webhook-config: |
+    {
+      "webhook": {
+        "enabled": true,
+        "port": 8080,
+        "path": "/api/v1/webhook",
+        "secret": "webhook-secret-token"  # pragma: allowlist secret
+      }
+    }
+
+---
+# NetworkPolicy - 默认拒绝策略
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-image-updater-default-deny
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-image-updater
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# NetworkPolicy - 允许必要流量
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-image-updater-allow
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-image-updater
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-image-updater
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 允许健康检查
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 允许 ArgoCD API 访问
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # 允许访问 Harbor
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: harbor
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    # 允许访问 ArgoCD API
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+      ports:
+        - protocol: TCP
+          port: 443
+    # 允许 DNS 解析
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

@@ -3,12 +3,15 @@
 # Story 0.6: Harbor 镜像仓库部署
 # 配置 Traefik Ingress + TLS
 # 修复：同时支持 HTTP (web) 和 HTTPS (websecure) 入口点，移除不支持的注解
+# 修复 2026-03-16: 根路径路由到 harbor-portal，API 路由到 harbor-core
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: harbor-ingress
   namespace: harbor
+  labels:
+    app: harbor
   annotations:
     # Traefik 配置 - 同时支持 HTTP 和 HTTPS 入口点
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
@@ -23,7 +26,24 @@ spec:
   - host: harbor.sisys.local
     http:
       paths:
+      # 根路径和前端页面路由到 harbor-portal
       - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-portal
+            port:
+              number: 80
+      # API 路径路由到 harbor-core
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      # 健康检查路由到 harbor-core
+      - path: /service/
         pathType: Prefix
         backend:
           service:
