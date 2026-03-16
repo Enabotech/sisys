@@ -173,7 +173,6 @@ out/
 
 # Secrets and credentials
 .secrets
-.secrets.baseline
 *.secret
 *.key
 *.pem
