@@ -297,28 +297,90 @@ class TestArgoCDHarborIntegration:
         2. Image Updater 检测到新镜像
         3. ArgoCD 自动更新 Deployment
         4. K8s 滚动更新成功
+
+        注意：此测试需要实际的 Harbor 和 ArgoCD 环境
+        在无实际环境时，验证配置的正确性
         """
-        # 检查 Image Updater 是否正在监控
-        result = subprocess.run(
+        # 验证 Image Updater 配置正确性
+        returncode, stdout, stderr = self._run_kubectl_command(
             [
-                "sudo",
-                "kubectl",
-                "logs",
+                "get",
+                "configmap",
+                "argocd-image-updater-config",
+                "-n",
+                argocd_namespace,
+                "-o",
+                "jsonpath={.data}",
+            ]
+        )
+        if returncode != 0:
+            pytest.fail(f"Image Updater ConfigMap 不存在：{stderr}")
+
+        config = json.loads(stdout)
+        config_str = str(config)
+
+        # 验证配置中包含 Harbor 注册表配置
+        assert (
+            "harbor" in config_str.lower() or "registries" in config_str.lower()
+        ), "Image Updater 配置中缺少 Harbor 注册表配置"
+
+        # 验证 Secret 存在
+        returncode, stdout, stderr = self._run_kubectl_command(
+            ["get", "secret", "argocd-image-updater-secret", "-n", argocd_namespace]
+        )
+        if returncode != 0:
+            pytest.fail(f"Image Updater Secret 不存在：{stderr}")
+
+        # 验证 Image Updater Pod 运行正常
+        returncode, stdout, stderr = self._run_kubectl_command(
+            [
+                "get",
+                "pods",
                 "-n",
                 argocd_namespace,
                 "-l",
                 "app.kubernetes.io/name=argocd-image-updater",
-                "--tail=200",
-            ],
-            capture_output=True,
-            text=True,
+                "-o",
+                "jsonpath={.items[*].status.phase}",
+            ]
         )
-        if result.returncode == 0:
-            logs = result.stdout
-            # 检查是否有监控活动
-            has_monitoring = any(keyword in logs.lower() for keyword in ["checking", "monitoring", "updating", "syncing"])
-            if not has_monitoring:
-                pytest.skip("Image Updater 暂无监控活动（等待首次配置）")
+        if returncode == 0 and stdout:
+            phases = stdout.split()
+            if phases and all(p == "Running" for p in phases):
+                # Pod 运行正常，继续验证日志
+                pass
+            else:
+                pytest.fail(f"Image Updater Pod 未运行：{phases}")
+        else:
+            pytest.fail("无法获取 Image Updater Pod 状态")
+
+        # 验证 NetworkPolicy 配置允许 Harbor 访问（修复问题 3 的验证）
+        returncode, stdout, stderr = self._run_kubectl_command(
+            [
+                "get",
+                "networkpolicy",
+                "argocd-image-updater-allow",
+                "-n",
+                argocd_namespace,
+                "-o",
+                "json",
+            ]
+        )
+        if returncode == 0:
+            policy = json.loads(stdout)
+            ingress_rules = policy["spec"].get("ingress", [])
+            # 验证是否有允许 Harbor 命名空间访问的规则
+            has_harbor_access = False
+            for rule in ingress_rules:
+                for from_item in rule.get("from", []):
+                    ns_selector = from_item.get("namespaceSelector", {})
+                    match_labels = ns_selector.get("matchLabels", {})
+                    if match_labels.get("kubernetes.io/metadata.name") == "harbor":
+                        has_harbor_access = True
+                        break
+            assert has_harbor_access, "NetworkPolicy 未配置允许 Harbor 命名空间访问 Webhook"
+        else:
+            pytest.fail("NetworkPolicy 配置不存在")
 
     # ===========================================================================
     # 辅助测试方法
@@ -349,7 +411,14 @@ class TestArgoCDHarborIntegration:
 class TestArgoCDHarborIntegrationE2E:
     """ArgoCD Harbor 端到端集成测试"""
 
-    def test_webhook_trigger_image_update(self):
+    @staticmethod
+    def _run_kubectl_command(args: list[str]) -> tuple:
+        """辅助方法：运行 kubectl 命令"""
+        cmd = ["sudo", "kubectl"] + args
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode, result.stdout, result.stderr
+
+    def test_webhook_trigger_image_update(self, argocd_namespace: str, harbor_namespace: str):
         """
         测试 Harbor Webhook 触发镜像更新
 
@@ -358,18 +427,64 @@ class TestArgoCDHarborIntegrationE2E:
         2. 验证 Webhook 触发成功
         3. 验证 Image Updater 检测到新镜像
         4. 验证 ArgoCD 更新 Deployment
-        """
-        # 这是一个完整的 E2E 测试，需要实际的镜像推送
-        # 在实际环境中执行，这里仅作为测试框架
-        pytest.skip("E2E 测试需要实际推送镜像，手动执行")
 
-    def test_multi_environment_image_update(self):
+        注意：此测试验证 Webhook 配置的正确性，实际推送需要手动执行
+        """
+        # 验证 Webhook ConfigMap 存在
+        returncode, stdout, stderr = self._run_kubectl_command(
+            ["get", "configmap", "argocd-image-updater-webhook", "-n", argocd_namespace]
+        )
+        if returncode != 0:
+            pytest.skip("Webhook ConfigMap 未配置（Webhook 为可选功能）")
+
+        # 验证 NetworkPolicy 允许 Harbor 访问
+        returncode, stdout, stderr = self._run_kubectl_command(
+            ["get", "networkpolicy", "argocd-image-updater-allow", "-n", argocd_namespace, "-o", "json"]
+        )
+        if returncode == 0:
+            policy = json.loads(stdout)
+            ingress_rules = policy["spec"].get("ingress", [])
+            has_harbor_access = any(
+                item.get("namespaceSelector", {}).get("matchLabels", {}).get("kubernetes.io/metadata.name") == "harbor"
+                for rule in ingress_rules
+                for item in rule.get("from", [])
+            )
+            assert has_harbor_access, "NetworkPolicy 未配置允许 Harbor 访问 Webhook"
+        else:
+            pytest.fail("NetworkPolicy 配置不存在")
+
+        # 验证 Harbor Webhook ConfigMap 存在
+        returncode, stdout, stderr = self._run_kubectl_command(
+            ["get", "configmap", "harbor-webhook-config", "-n", harbor_namespace]
+        )
+        if returncode != 0:
+            pytest.skip("Harbor Webhook ConfigMap 未配置（需要手动配置）")
+
+    def test_multi_environment_image_update(self, argocd_namespace: str):
         """
         测试多环境镜像更新
 
         验证 Dev/Test/Prod 各环境独立更新
         """
-        pytest.skip("多环境测试需要先配置 Kustomize 覆盖，手动执行")
+        # 验证 Kustomize 配置文件是否存在
+        kustomize_paths = [
+            "deployments/argocd/overlays/dev/kustomization.yaml",
+            "deployments/argocd/overlays/test/kustomization.yaml",
+            "deployments/argocd/overlays/prod/kustomization.yaml",
+        ]
+
+        import os  # noqa: PLC041
+
+        found_overlays = [p for p in kustomize_paths if os.path.exists(p)]
+
+        if len(found_overlays) < 3:
+            pytest.skip(f"多环境 Kustomize 覆盖未完全配置（找到 {len(found_overlays)}/3: {found_overlays}）")
+
+        # 验证各环境命名空间存在
+        for env in ["dev", "test", "prod"]:
+            returncode, stdout, stderr = self._run_kubectl_command(["get", "namespace", env])
+            if returncode != 0:
+                pytest.skip(f"{env.title()} 命名空间不存在（需要先创建）")
 
 
 # =============================================================================

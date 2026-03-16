@@ -422,12 +422,151 @@ docker login harbor.sisys.local -u robot\$argocd-pull -p <TOKEN>
 # 在 Harbor Web 界面检查：项目 → sisys → Robot Accounts
 ```
 
+### 问题 6: NetworkPolicy 阻止 Webhook
+
+```bash
+# 检查 NetworkPolicy 配置
+sudo kubectl get networkpolicy argocd-image-updater-allow -n argocd -o yaml
+
+# 验证是否允许 Harbor 命名空间访问
+# 应该包含以下 ingress 规则:
+# - from:
+#     - namespaceSelector:
+#         matchLabels:
+#           kubernetes.io/metadata.name: harbor
+```
+
+## 故障恢复指南
+
+### 恢复步骤 1: 重置 Image Updater
+
+```bash
+# 1. 删除 Image Updater Deployment
+sudo kubectl delete deployment argocd-image-updater -n argocd
+
+# 2. 删除 Secret（重新创建）
+sudo kubectl delete secret argocd-image-updater-secret -n argocd
+
+# 3. 重新运行配置脚本
+python scripts/argocd/configure-image-updater.py
+
+# 4. 重新应用安装清单
+sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+```
+
+### 恢复步骤 2: 重置 Harbor 凭据
+
+```bash
+# 1. 在 Harbor Web 界面删除旧的 Robot Account
+# 进入项目 → sisys → Robot Accounts → 删除 argocd-pull
+
+# 2. 重新创建 Robot Account
+python scripts/argocd/configure-image-updater.py
+
+# 3. 验证 Secret 已更新
+sudo kubectl get secret argocd-image-updater-secret -n argocd -o jsonpath='{.data.harbor}' | base64 -d
+```
+
+### 恢复步骤 3: 回滚 Application
+
+```bash
+# 1. 查看同步历史
+argocd app history myapp
+
+# 2. 回滚到上一版本
+argocd app rollback myapp <REVISION>
+
+# 3. 或者手动回滚镜像 tag
+sudo kubectl patch deployment myapp -n default \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "harbor.sisys.local/sisys/myapp:v1.0.0"}]'
+```
+
+### 恢复步骤 4: 禁用 Image Updater（临时）
+
+```bash
+# 1. 删除 Image Updater Deployment
+sudo kubectl delete deployment argocd-image-updater -n argocd
+
+# 2. 手动更新 Application 镜像
+argocd app set myapp --image harbor.sisys.local/sisys/myapp:v1.0.1
+
+# 3. 手动同步
+argocd app sync myapp
+```
+
 ## 参考文档
 
 - [ArgoCD Image Updater 官方文档](https://argocd-image-updater.readthedocs.io/)
 - [Harbor Webhook 配置](https://goharbor.io/docs/2.6.0/management/configure-webhook/)
 - [Story 0.6: Harbor 部署文档](./HARBOR_DEPLOYMENT.md)
 - [Story 0.7: ArgoCD 部署文档](./ARGOCD_DEPLOYMENT.md)
+
+## 版本兼容性
+
+### 已测试版本组合
+
+| 组件 | 版本 | 状态 | 说明 |
+|------|------|------|------|
+| ArgoCD | v3.2.7 | ✅ 已测试 | 当前部署版本 |
+| ArgoCD Image Updater | v0.14.0 | ✅ 已测试 | 对应 ArgoCD v3.2.x |
+| Harbor | v2.14.3 | ✅ 已测试 | 当前部署版本 |
+| K3S | v1.34.5 | ✅ 已测试 | 当前集群版本 |
+| Traefik | v3.6.10 | ✅ 已测试 | 当前 Ingress 版本 |
+
+### 兼容版本范围
+
+| 组件 | 兼容版本范围 | 注意事项 |
+|------|-------------|----------|
+| ArgoCD | v3.0.0 - v3.4.x | v3.0+ API 有变更，需使用 Image Updater v0.13+ |
+| ArgoCD Image Updater | v0.12.0 - v0.14.x | v0.12+ 支持 ArgoCD v3.x |
+| Harbor | v2.8.0 - v2.14.x | Webhook API 在 v2.10+ 有变更 |
+| K3S | v1.28.0 - v1.34.x | 无特殊要求 |
+
+### 降级方案
+
+如 ArgoCD Image Updater v0.14.0 部署失败：
+
+1. **使用 v0.13.0**（稳定版本）:
+   ```bash
+   # 修改 image-updater-install.yaml 中的镜像版本
+   image: quay.io/argoprojlabs/argocd-image-updater:v0.13.0
+   ```
+
+2. **使用 v0.12.0**（兼容 ArgoCD v3.0）:
+   ```bash
+   image: quay.io/argoprojlabs/argocd-image-updater:v0.12.0
+   ```
+
+3. **检查兼容性矩阵**:
+   - 参考 [ArgoCD Image Updater 兼容性矩阵](https://argocd-image-updater.readthedocs.io/en/stable/)
+   - 确保 Image Updater 版本与 ArgoCD 版本匹配
+
+### 升级路径
+
+从旧版本升级：
+
+1. **备份当前配置**:
+   ```bash
+   sudo kubectl get configmap argocd-image-updater-config -n argocd -o yaml > backup-config.yaml
+   sudo kubectl get secret argocd-image-updater-secret -n argocd -o yaml > backup-secret.yaml
+   ```
+
+2. **删除旧版本**:
+   ```bash
+   sudo kubectl delete deployment argocd-image-updater -n argocd
+   ```
+
+3. **应用新版本**:
+   ```bash
+   sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+   ```
+
+4. **验证升级**:
+   ```bash
+   sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
+   sudo kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater
+   ```
 
 ## 下一步
 

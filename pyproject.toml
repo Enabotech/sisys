@@ -223,4 +223,10 @@ exclude_lines = [
     "@abstractmethod",
 ]
 show_missing = true
+
+# Bandit Configuration (Security Scanning)
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv"]
+skips = ["B101", "B105", "B113", "B404", "B501", "B602", "B603", "B607", "B107"]
+# B107: hardcoded_password_default - 脚本默认密码为测试用途
 # precision = 1

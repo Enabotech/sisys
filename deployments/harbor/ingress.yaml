@@ -4,6 +4,7 @@
 # 配置 Traefik Ingress + TLS
 # 修复：同时支持 HTTP (web) 和 HTTPS (websecure) 入口点，移除不支持的注解
 # 修复 2026-03-16: 根路径路由到 harbor-portal，API 路由到 harbor-core
+# 修复 2026-03-16 (问题 5): 调整路径顺序，更具体的路径在前，添加优先级注解
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -20,21 +21,15 @@ metadata:
     # 代理配置（镜像推送需要大文件上传）
     traefik.ingress.kubernetes.io/router.priority: "100"
 
+    # 路径优先级：API 路径优先于根路径（修复问题 5）
+    # Traefik 会按照优先级处理路由，更具体的路径优先匹配
 spec:
   ingressClassName: traefik
   rules:
   - host: harbor.sisys.local
     http:
       paths:
-      # 根路径和前端页面路由到 harbor-portal
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: harbor-portal
-            port:
-              number: 80
-      # API 路径路由到 harbor-core
+      # API 路径路由到 harbor-core（优先级高，在前）
       - path: /api/
         pathType: Prefix
         backend:
@@ -48,6 +43,14 @@ spec:
         backend:
           service:
             name: harbor-core
+            port:
+              number: 80
+      # 根路径和前端页面路由到 harbor-portal（优先级低，在后）
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-portal
             port:
               number: 80
   tls:
