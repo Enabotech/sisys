@@ -1,0 +1,174 @@
+---
+# ArgoCD Application 回滚配置指南
+#
+# ArgoCD 支持多种回滚方式:
+# 1. 使用 argocd CLI 回滚到指定历史版本
+# 2. 使用 Git revert 回滚代码
+# 3. 使用 Kubernetes 原生回滚 (kubectl rollout undo)
+
+# =============================================================================
+# 方法 1: 使用 argocd CLI 回滚
+# =============================================================================
+
+# 查看应用历史
+# argocd app history sisys-app -n argocd
+
+# 回滚到指定版本 (例如版本 1)
+# argocd app rollback sisys-app 1 -n argocd
+
+# 回滚到上一个版本
+# argocd app rollback sisys-app --prune -n argocd
+
+# =============================================================================
+# 方法 2: 使用 Git revert 回滚
+# =============================================================================
+
+# 在 Git 仓库中 revert 提交
+# git revert <commit-hash>
+# git push origin main
+
+# ArgoCD 将自动检测到 Git 变更并同步
+
+# =============================================================================
+# 方法 3: 使用 Kubernetes 原生回滚
+# =============================================================================
+
+# 查看 Deployment 历史
+# kubectl rollout history deployment sisys-app -n sisys
+
+# 回滚到上一个版本
+# kubectl rollout undo deployment/sisys-app -n sisys
+
+# 回滚到指定版本
+# kubectl rollout undo deployment/sisys-app --to-revision=2 -n sisys
+
+# =============================================================================
+# 回滚配置清单 (可选)
+# =============================================================================
+
+# 以下配置用于定义回滚策略，通常不需要单独创建文件
+# 回滚策略已在 sisys-app.yaml 中配置:
+# - syncPolicy.retry: 自动重试配置
+# - syncOptions:
+#   - PrunePropagationPolicy=foreground (确保顺序删除)
+#   - PruneLast=true (最后修剪)
+
+# =============================================================================
+# 回滚最佳实践
+# =============================================================================
+
+# 1. 回滚前检查
+# - 确认当前应用状态: argocd app get sisys-app
+# - 查看应用日志：argocd app logs sisys-app
+# - 检查历史版本：argocd app history sisys-app
+
+# 2. 回滚步骤
+# a. 评估问题严重性
+# b. 确定回滚目标版本
+# c. 通知相关团队
+# d. 执行回滚
+# e. 验证回滚成功
+
+# 3. 回滚验证
+# - 检查应用状态：argocd app get sisys-app
+# - 验证健康状态：argocd app wait sisys-app --health
+# - 测试应用功能：curl https://sisys.sisys.local/health
+
+# 4. 回滚后操作
+# - 记录回滚原因和时间
+# - 分析问题根因
+# - 更新事故报告
+# - 制定预防措施
+
+# =============================================================================
+# 自动化回滚脚本示例
+# =============================================================================
+
+# 以下脚本可用于自动化回滚流程
+
+# scripts/argocd/rollback-app.sh:
+# #!/bin/bash
+#
+# set -e
+#
+# APP_NAME=${1:-sisys-app}
+# TARGET_REVISION=${2:-}
+# NAMESPACE=${3:-argocd}
+#
+# echo "🔄 开始回滚应用：$APP_NAME"
+#
+# if [ -z "$TARGET_REVISION" ]; then
+#   echo "📋 获取历史版本..."
+#   argocd app history $APP_NAME -n $NAMESPACE
+#   read -p "请输入要回滚的版本 ID: " TARGET_REVISION
+# fi
+#
+# echo "🔄 回滚到版本：$TARGET_REVISION"
+# argocd app rollback $APP_NAME $TARGET_REVISION -n $NAMESPACE
+#
+# echo "⏳ 等待回滚完成..."
+# argocd app wait $APP_NAME --health -n $NAMESPACE
+#
+# echo "✅ 回滚完成!"
+# argocd app get $APP_NAME -n $NAMESPACE
+
+# =============================================================================
+# 回滚配置清单模板 (用于特殊场景)
+# =============================================================================
+
+# 如果需要显式定义回滚配置，可以使用以下模板:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-rollback-config
+  namespace: argocd
+  annotations:
+    # 回滚说明
+    argocd.argoproj.io/rollback-description: "SISYS 应用回滚配置参考"
+spec:
+  # 回滚配置不是独立的 Application
+  # 而是在原有 Application 基础上的补充配置
+
+  # 同步策略已经包含回滚配置:
+  # syncPolicy:
+  #   retry:
+  #     limit: 5
+  #     backoff:
+  #       duration: 5s
+  #       factor: 2
+  #       maxDuration: 3m
+
+  # 其他配置参考 sisys-app.yaml
+  project: default
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/apps/sisys/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sisys-dev
+
+# =============================================================================
+# 监控和告警
+# =============================================================================
+
+# 配置回滚告警 (Prometheus AlertManager):
+
+# alerts:
+#   - alert: ArgoCDAppRollback
+#     expr: argocd_app_info{sync_status="OutOfSync"} == 1
+#     for: 5m
+#     labels:
+#       severity: warning
+#     annotations:
+#       summary: "ArgoCD 应用需要回滚"
+#       description: "应用 {{ $labels.app }} 处于不同步状态，可能需要回滚"
+
+# =============================================================================
+# 相关文档
+# =============================================================================
+
+# - ArgoCD 官方文档：https://argo-cd.readthedocs.io/
+# - ArgoCD 回滚指南：https://argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_app_rollback/
+# - Kustomize 文档：https://kustomize.io/

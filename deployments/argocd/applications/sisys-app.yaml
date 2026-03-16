@@ -1,0 +1,191 @@
+---
+# ArgoCD Application - SISYS 应用
+# 使用 GitOps 模式管理 SISYS 应用部署
+#
+# 特性:
+# - 自动同步 (self-heal, auto-prune)
+# - 健康检查配置
+# - 回滚支持
+# - Kustomize 多环境支持
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/managed-by: argocd
+  # 最终一致性保护
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # 启用级联删除
+spec:
+  # 项目配置
+  project: default
+
+  # 源代码配置 - Git 仓库
+  source:
+    # Gitea 仓库地址
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    # 目标分支
+    targetRevision: HEAD
+    # 应用配置路径 (使用 Kustomize)
+    path: deployments/apps/sisys/dev
+
+    # Kustomize 配置
+    kustomize:
+      # 镜像更新配置 (与 ArgoCD Image Updater 集成)
+      images:
+        - sisys/harbor.sisys.local/sisys/app:*
+      # 资源名称前缀 (环境隔离)
+      namePrefix: ""
+      # 通用标签
+      commonLabels:
+        app.kubernetes.io/managed-by: argocd
+        app.kubernetes.io/part-of: sisys
+      # Kustomize 构建选项
+      commonAnnotations:
+        argocd.argoproj.io/tracking-id: sisys-app
+      # 版本控制
+      version: v1
+
+  # 目标集群配置
+  destination:
+    # 目标集群 (in-cluster 表示当前 K3S 集群)
+    server: https://kubernetes.default.svc
+    # 目标命名空间
+    namespace: sisys
+
+  # 同步策略配置
+  syncPolicy:
+    # 自动同步配置
+    automated:
+      # 自动修剪 - 删除集群中不存在于 Git 的资源
+      prune: true
+      # 自动修复 - 当集群状态与 Git 不一致时自动同步
+      selfHeal: true
+      # 允许空列表 - 支持删除所有资源
+      allowEmpty: true
+
+    # 同步选项
+    syncOptions:
+      # 自动创建命名空间
+      - CreateNamespace=true
+      # 修剪传播策略 (foreground 确保顺序删除)
+      - PrunePropagationPolicy=foreground
+      # 最后修剪 - 确保其他资源先删除
+      - PruneLast=true
+      # 验证 webhook
+      - Validate=true
+      # 应用失败时回滚
+      - Retry=true
+      # 共享资源策略
+      - ServerSideApply=true
+
+    # 重试配置
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 健康检查配置
+  ignoreDifferences:
+    # 忽略 Deployment 的副本数差异 (由 HPA 管理)
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    # 忽略 ConfigMap 的 metadata.annotations
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations
+    # 忽略 Secret 的 metadata.annotations 和 data
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /metadata/annotations
+    # 忽略 HPA 的副本数
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+
+  # 信息注解
+  info:
+    - name: Description
+      value: SISYS 应用 - GitOps 管理
+    - name: Repository
+      value: https://gitea.sisys.local/sisys/sisys.git
+    - name: Branch
+      value: main
+
+---
+# ArgoCD Application - App of Apps 模式
+# 用于管理所有子应用 (Dev/Test/Prod 环境)
+#
+# 使用方法:
+# 1. 应用此配置：kubectl apply -f sisys-app-of-apps.yaml
+# 2. ArgoCD 将自动创建所有子应用
+# 3. 每个环境独立的 Application
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-of-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-of-apps
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # 源代码配置 - 指向 applications 目录
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    # 包含所有环境 Application 清单的目录
+    path: deployments/argocd/applications
+
+    # 使用 Directory 递归扫描
+    directory:
+      recurse: true
+      # 只包含 YAML 文件
+      exclude: exclude/*
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # App of Apps 不需要 ignoreDifferences
+  # 因为管理的是 Application 资源
+
+  info:
+    - name: Description
+      value: SISYS App of Apps - 管理所有环境
+    - name: Environments
+      value: dev, test, prod
