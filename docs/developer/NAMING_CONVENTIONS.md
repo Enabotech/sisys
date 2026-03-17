@@ -79,7 +79,7 @@
 | 组件 | 用户名 | 默认密码 | 首次登录强制修改 |
 |------|--------|---------|----------------|
 | Gitea | `admin` | `Admin12345!` | ✅ 是 |
-| Harbor | `admin` | `Harbor12345!` | ✅ 是 |
+| Harbor | `admin` | `Harbor@2026Secure!` | ✅ 是 |
 | ArgoCD | `admin` | `<动态生成>` | ✅ 是 |
 | K3S | `admin` | `<kubeconfig>` | ✅ 是 |
 
@@ -150,7 +150,7 @@ SISYS_VERSION=1.0.0
 # 镜像仓库
 REGISTRY=harbor.sisys.local
 REGISTRY_USERNAME=admin
-REGISTRY_PASSWORD=Harbor12345!
+REGISTRY_PASSWORD=Harbor@2026Secure!
 
 # K3S 配置
 KUBECONFIG=/etc/rancher/k3s/k3s.yaml

@@ -339,7 +339,7 @@ def harbor_config() -> Dict[str, str]:
     return {
         "url": "http://harbor.sisys.local",
         "username": "admin",
-        "password": "Harbor12345!",
+        "password": "Harbor@2026Secure!",
     }
 
 
