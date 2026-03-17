@@ -47,8 +47,8 @@ spec:
       # Kustomize 构建选项
       commonAnnotations:
         argocd.argoproj.io/tracking-id: sisys-app
-      # 版本控制
-      version: v1
+      # 版本控制 (使用 ArgoCD 默认 Kustomize 版本 v5.7.0)
+      # version 字段已移除，解决 "kustomize version v1 is not registered" 错误
 
   # 目标集群配置
   destination:
