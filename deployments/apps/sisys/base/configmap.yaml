@@ -1,0 +1,17 @@
+---
+# SISYS 应用 ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sisys-app-config
+  labels:
+    app.kubernetes.io/name: sisys-app
+    app.kubernetes.io/part-of: sisys
+data:
+  APP_ENV: "development"
+  LOG_LEVEL: "info"
+  DB_HOST: "postgres.sisys.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "sisys"
+  REDIS_HOST: "redis.sisys.svc.cluster.local"
+  REDIS_PORT: "6379"
