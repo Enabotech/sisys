@@ -465,6 +465,36 @@ clean-all: clean clean-env
 	@echo "✅ 所有清理完成"
 
 # -----------------------------------------------------------------------------
+# Harbor 部署与验证（Story 0.6）
+# -----------------------------------------------------------------------------
+.PHONY: harbor-secrets harbor-deploy harbor-verify harbor-clean
+
+harbor-secrets:
+	@echo "🔐 生成 Harbor 密码..."
+	@./scripts/security/generate-harbor-secrets.sh
+
+harbor-deploy: harbor-secrets
+	@echo "🚀 部署 Harbor..."
+	@kubectl apply -k deployments/harbor/
+	@helm upgrade --install harbor harbor/harbor \
+		-n harbor \
+		-f deployments/harbor/values.yaml \
+		--wait --timeout 10m
+	@echo "✅ Harbor 部署完成"
+	@echo "📋 访问地址：https://harbor.sisys.local"
+	@echo "🔑 管理员账号：admin / (查看 .secrets/harbor-credentials.txt)"
+
+harbor-verify:
+	@echo "✅ 验证 Harbor 部署..."
+	@./scripts/deployment/harbor/verify-deployment.sh
+
+harbor-clean:
+	@echo "🧹 清理 Harbor 部署..."
+	@helm uninstall harbor -n harbor || true
+	@kubectl delete -k deployments/harbor/ || true
+	@echo "✅ Harbor 已清理"
+
+# -----------------------------------------------------------------------------
 # 帮助
 # -----------------------------------------------------------------------------
 .PHONY: help
@@ -554,7 +584,17 @@ help:
 	@echo "  make tdd-cycle TARGET=x - TDD 完整循环（红 - 绿 - 重构）"
 	@echo "  make sdd-tdd-cycle STORY=x - SDD+TDD 完整开发循环"
 	@echo ""
+	@echo "🚀 Harbor 部署（Story 0.6）:"
+	@echo "  make harbor-secrets   - 生成 Harbor 安全密码"
+	@echo "  make harbor-deploy    - 部署 Harbor（生成密码 + Helm 安装）"
+	@echo "  make harbor-verify    - 验证 Harbor 部署状态"
+	@echo "  make harbor-clean     - 清理 Harbor 部署"
+	@echo ""
 	@echo "  示例："
+	@echo "    make harbor-deploy    # 完整部署流程"
+	@echo "    make harbor-verify    # 验证部署状态"
+	@echo ""
+	@echo "  SDD+TDD 融合模式示例："
 	@echo "    make tdd-red TARGET=domain/entities"
 	@echo "    make tdd-green TARGET=domain/entities"
 	@echo "    make tdd-refactor TARGET=domain/entities"

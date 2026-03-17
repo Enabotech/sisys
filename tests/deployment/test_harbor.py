@@ -3,41 +3,123 @@ Harbor 镜像仓库部署测试套件
 
 测试目标：验证 Harbor v2.14.3 部署的正确性、可用性和安全性
 验收标准：Story 0.6 Acceptance Criteria 1-7
+
+配置说明:
+    测试配置从以下来源加载 (优先级从高到低):
+    1. 环境变量 (HARBOR_NODE_IP, HARBOR_NODEPORT, HARBOR_NAMESPACE 等)
+    2. 配置文件 (tests/deployment/harbor-test-config.yaml)
+    3. 默认值 (硬编码在配置文件中)
+
+使用方式:
+    # 使用默认配置
+    pytest tests/deployment/test_harbor.py
+
+    # 使用环境变量覆盖
+    export HARBOR_NODE_IP=192.168.1.100
+    export HARBOR_NODEPORT=31448
+    pytest tests/deployment/test_harbor.py
+
+    # 修改配置文件 tests/deployment/harbor-test-config.yaml
 """
 
+import os
 import re
 import subprocess
 import time
 
 import pytest
 import requests
-import urllib3
-
-# 禁用 SSL 警告（开发环境使用自签名证书）
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import yaml
 
 # =============================================================================
-# 常量定义
+# 配置加载
 # =============================================================================
 
-HARBOR_NAMESPACE = "harbor"
-HARBOR_HOST = "harbor.sisys.local"
-# 使用 NodePort 访问（Traefik LoadBalancer 无 External IP）
-HARBOR_NODEPORT = 31448
-HARBOR_NODE_IP = "172.21.110.12"
+
+def load_test_config() -> dict:
+    """
+    加载测试配置
+
+    优先级：环境变量 > 配置文件 > 默认值
+
+    Returns:
+        配置字典
+    """
+    # 默认配置
+    config: dict = {
+        "cluster": {
+            "node_ip": "172.21.110.12",
+            "nodeport": 31448,
+            "namespace": "harbor",
+            "ingress_host": "harbor.sisys.local",
+        },
+        "timeouts": {
+            "pod_ready": 300,
+            "health_check": 30,
+            "api_request": 10,
+        },
+        "test_images": {
+            "push_pull": "nginx:latest",
+        },
+        "authentication": {},
+    }
+
+    # 从配置文件加载
+    config_file = os.path.join(os.path.dirname(__file__), "harbor-test-config.yaml")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file) as f:
+                file_config = yaml.safe_load(f)
+                if file_config:
+                    # 深度合并配置
+                    for key, value in file_config.items():
+                        if isinstance(value, dict) and key in config:
+                            config[key].update(value)  # type: ignore[attr-defined]
+                        else:
+                            config[key] = value
+        except Exception as e:
+            print(f"⚠️  加载配置文件失败：{e}，使用默认配置")
+
+    # 环境变量覆盖 (最高优先级)
+    if os.getenv("HARBOR_NODE_IP"):
+        config["cluster"]["node_ip"] = os.getenv("HARBOR_NODE_IP")
+    if os.getenv("HARBOR_NODEPORT"):
+        config["cluster"]["nodeport"] = int(os.getenv("HARBOR_NODEPORT", "31448"))
+    if os.getenv("HARBOR_NAMESPACE"):
+        config["cluster"]["namespace"] = os.getenv("HARBOR_NAMESPACE")
+    if os.getenv("HARBOR_INGRESS_HOST"):
+        config["cluster"]["ingress_host"] = os.getenv("HARBOR_INGRESS_HOST")
+    if os.getenv("HARBOR_ADMIN_PASSWORD"):
+        config["authentication"]["admin_password"] = os.getenv("HARBOR_ADMIN_PASSWORD")
+
+    return config
+
+
+# 加载配置
+TEST_CONFIG = load_test_config()
+
+# =============================================================================
+# 常量定义 (从配置加载)
+# =============================================================================
+
+HARBOR_NAMESPACE = TEST_CONFIG["cluster"]["namespace"]
+HARBOR_HOST = TEST_CONFIG["cluster"]["ingress_host"]
+HARBOR_NODEPORT = TEST_CONFIG["cluster"]["nodeport"]
+HARBOR_NODE_IP = TEST_CONFIG["cluster"]["node_ip"]
+
 # 优先使用 NodePort，如果 DNS 配置了则使用域名
 HARBOR_URL = f"https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT}"
 HARBOR_HEALTH_ENDPOINT = f"{HARBOR_URL}/health"
 HARBOR_API_V2 = f"{HARBOR_URL}/api/v2.0"
 
 # 测试镜像
-TEST_IMAGE = "nginx:latest"
-TEST_IMAGE_TAG = "test-harbor-connection"
+TEST_IMAGE = TEST_CONFIG.get("test_images", {}).get("push_pull", "nginx:latest")
+TEST_IMAGE_TAG = f"{TEST_CONFIG.get('test_images', {}).get('tag_prefix', 'test-harbor-')}connection"
 
 # 超时设置（秒）
-POD_READY_TIMEOUT = 300  # 5 分钟
-HEALTH_CHECK_TIMEOUT = 30
-API_REQUEST_TIMEOUT = 10
+POD_READY_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("pod_ready", 300)
+HEALTH_CHECK_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("health_check", 30)
+API_REQUEST_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("api_request", 10)
 
 # =============================================================================
 # 辅助函数

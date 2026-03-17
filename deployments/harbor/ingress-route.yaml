@@ -1,0 +1,171 @@
+---
+# Harbor IngressRoute 配置 (Traefik v3.x 原生 CRD)
+# Story 0.6: Harbor 镜像仓库部署
+#
+# 修复 CRITICAL-001: 使用 IngressRoute CRD 替代传统 Ingress
+# 优势:
+# - Traefik 原生支持，无兼容性问题
+# - 明确的 priority 字段控制路由优先级
+# - 支持更复杂的匹配规则
+#
+# 路由优先级说明:
+# - 数字越大优先级越高
+# - Traefik 按优先级降序匹配
+# - 相同优先级按匹配规则特异性排序
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: harbor-ingressroute
+  namespace: harbor
+  labels:
+    app: harbor
+    story: "0.6"
+  annotations:
+    story: "0.6-harbor-image-registry"
+    managed-by: "kustomize"
+    description: "Harbor 镜像仓库路由配置"
+spec:
+  entryPoints:
+  - websecure  # HTTPS 入口点 (Traefik 默认配置)
+
+  # =============================================================================
+  # 路由规则 - 按优先级排序
+  # =============================================================================
+
+  routes:
+  # ---------------------------------------------------------------------------
+  # 优先级 100: 登录页面 (最具体路径)
+  # ---------------------------------------------------------------------------
+  # Harbor v2.x 登录路径可能因版本而异:
+  # - v2.14.x: /c/portal/login
+  # - v2.8.x-v2.13.x: /c/login
+  # 此处配置两个路径以兼容不同版本
+
+  - match: Host(`harbor.sisys.local`) && Path(`/c/login`)
+    kind: Rule
+    priority: 100
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/c/portal/login`)
+    kind: Rule
+    priority: 100
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  # ---------------------------------------------------------------------------
+  # 优先级 90: Harbor Core API (高优先级路径)
+  # ---------------------------------------------------------------------------
+  # 这些路径都需要路由到 harbor-core 服务:
+  # - /c/ - Harbor 前端页面
+  # - /api/ - Harbor REST API
+  # - /service/ - 服务发现端点
+  # - /v2/ - Docker Registry V2 API
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/c/`)
+    kind: Rule
+    priority: 90
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/api/`)
+    kind: Rule
+    priority: 90
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/service/`)
+    kind: Rule
+    priority: 90
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/v2/`)
+    kind: Rule
+    priority: 90
+    services:
+    - name: harbor-core
+      port: 80
+      scheme: http
+
+  # ---------------------------------------------------------------------------
+  # 优先级 10: 前端页面 (兜底路径)
+  # ---------------------------------------------------------------------------
+  # 所有其他路径默认路由到 harbor-portal (前端静态资源)
+  # 并应用安全中间件 (HSTS、CSP 等)
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/`)
+    kind: Rule
+    priority: 10
+    services:
+    - name: harbor-portal
+      port: 80
+      scheme: http
+    middlewares:
+    - name: harbor-middleware-chain
+      namespace: harbor
+
+  # =============================================================================
+  # TLS 配置
+  # =============================================================================
+
+  tls:
+    # TLS Secret (证书)
+    # pragma: allowlist secret
+    # 此 Secret 包含 TLS 证书，由 cert-manager 或手动创建
+    secretName: harbor-tls-secret
+
+    # TLS 选项 (引用默认配置)
+    options:
+      name: default-tls-options
+      namespace: default
+
+---
+# TLS 选项配置 - 强制 TLS 1.3
+# Story 0.6: Harbor 镜像仓库部署
+#
+# 修复 LOW-001: 明确 TLS 版本配置
+
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: default-tls-options
+  namespace: default
+  labels:
+    app: harbor
+    story: "0.6"
+  annotations:
+    description: "强制 TLS 1.3，禁用 TLS 1.2 及以下版本"
+spec:
+  minVersion: VersionTLS13
+  maxVersion: VersionTLS13
+  cipherSuites:
+  # TLS 1.3 加密套件 (仅 AEAD)
+  - TLS_AES_128_GCM_SHA256
+  - TLS_AES_256_GCM_SHA384
+  - TLS_CHACHA20_POLY1305_SHA256
+  # SNI 配置
+  sniStrict: true
+  preferServerCipherSuites: true
+
+---
+# 中间件链 - 组合所有安全响应头
+# Story 0.6: Harbor 镜像仓库部署
+#
+# 注意：此文件引用 middleware.yaml 中定义的中间件
+# 此处仅用于 IngressRoute 的中间件链配置
+
+# 中间件定义在 middleware.yaml 中:
+# - harbor-security-headers: 安全响应头 (HSTS, CSP, X-Frame-Options 等)
+# - harbor-middleware-chain: 中间件链 (组合所有中间件)

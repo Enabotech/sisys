@@ -10,15 +10,21 @@ kind: Kustomization
 namespace: harbor
 
 # 资源列表
+# =============================================================================
+# 修复 CRITICAL-001: 使用 IngressRoute CRD 替代传统 Ingress
+# =============================================================================
 resources:
 - namespace.yaml
 - secrets.yaml
-- ingress.yaml
-- middleware.yaml
 - networkpolicy.yaml
+- middleware.yaml
+- ingress-route.yaml  # 使用 IngressRoute CRD (Traefik 原生)
+- password-policy-job.yaml  # 密码策略初始化 Job (MEDIUM-002 修复)
+# - ingress.yaml      # 已废弃，使用 ingress-route.yaml 替代
 
 # Helm Chart 配置（通过 HelmRelease 或 kustomize helm 插件）
 # 注意：Helm Chart 部署建议使用 ArgoCD 或 Helm CLI
+# values.yaml 中已禁用 Helm 管理的 Ingress (expose.ingress.enabled=false)
 
 # 配置映射
 configMapGenerator:
