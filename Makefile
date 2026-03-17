@@ -467,7 +467,7 @@ clean-all: clean clean-env
 # -----------------------------------------------------------------------------
 # Harbor 部署与验证（Story 0.6）
 # -----------------------------------------------------------------------------
-.PHONY: harbor-secrets harbor-deploy harbor-verify harbor-clean
+.PHONY: harbor-secrets harbor-deploy harbor-verify harbor-fix harbor-clean
 
 harbor-secrets:
 	@echo "🔐 生成 Harbor 密码..."
@@ -487,6 +487,10 @@ harbor-deploy: harbor-secrets
 harbor-verify:
 	@echo "✅ 验证 Harbor 部署..."
 	@./scripts/deployment/harbor/verify-deployment.sh
+
+harbor-fix:
+	@echo "🔧 验证并修复 Harbor 部署 (WSL 重启后使用)..."
+	@./scripts/deployment/harbor/verify-and-fix.sh
 
 harbor-clean:
 	@echo "🧹 清理 Harbor 部署..."
