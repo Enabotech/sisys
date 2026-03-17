@@ -125,8 +125,5 @@ spec:
     # pragma: allowlist secret
     # 此 Secret 包含 TLS 证书，由 cert-manager 或手动创建
     secretName: harbor-tls-secret
-
-    # TLS 选项 (引用 default 命名空间的 TLSOption)
-    options:
-      name: default-tls-options
-      namespace: default
+    # 注意：不使用 TLS options，因为 Traefik 的 TLSOption 配置可能导致 Misdirected Request
+    # TLS 1.3 由 Traefik 全局配置或证书本身控制
