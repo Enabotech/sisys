@@ -37,14 +37,36 @@ WSL 重启后，以下情况**可能需要手动修复**：
 
 ## 🔧 WSL 重启后操作指南
 
-### 方法 1: 使用 Makefile (推荐)
+### 方法 1: 完全自动 (推荐) ✅
+
+**安装自动修复服务（一次性操作）:**
 
 ```bash
-# WSL 重启后，运行以下命令
+# 安装 Harbor 自动修复 systemd 服务
+sudo ./scripts/deployment/harbor/install-autofix.sh
+```
+
+**安装后:**
+- ✅ WSL 每次启动时自动修复 Harbor 配置
+- ✅ 自动检查 K3S、Harbor Pods、IngressRoute
+- ✅ 自动删除冲突的旧 Ingress
+- ✅ 自动验证 API 访问
+- ✅ 详细日志记录在 `/var/log/harbor-autofix.log`
+
+**无需任何手动操作！**
+
+---
+
+### 方法 2: 半自动
+
+```bash
+# WSL 重启后，手动运行
 make harbor-fix
 ```
 
-### 方法 2: 手动验证
+---
+
+### 方法 3: 手动验证
 
 ```bash
 # 1. 检查 K3S 状态
