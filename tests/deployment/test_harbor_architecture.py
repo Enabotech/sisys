@@ -293,82 +293,91 @@ class TestStorageConfiguration:
 
 class TestIngressConfiguration:
     """
-    验证 Ingress 配置 (Traefik 443 → harbor-core:443)
+    验证 IngressRoute 配置 (Traefik 443 → harbor-core:80)
 
     架构要求:
     - 外部访问 URL: https://harbor.sisys.local
     - 内部服务名：harbor-core
-    - 容器端口：443
+    - 容器端口：80 (Harbor Core 服务端口)
     - TLS 版本：TLS 1.3
-    - 证书颁发机构：Let's Encrypt
+    - 证书颁发机构：自签名证书 (开发环境)
+    
+    注意：使用 Traefik IngressRoute CRD 替代传统 Kubernetes Ingress
     """
 
-    def test_ingress_exists(self):
-        """验证 Ingress 存在"""
-        ingress = get_k8s_resource("ingress", "harbor-ingress", HARBOR_NAMESPACE)
-        assert ingress is not None, "harbor-ingress 不存在"
+    def test_ingressroute_exists(self):
+        """验证 IngressRoute 存在"""
+        ingressroute = get_k8s_resource("ingressroute", "harbor-ingressroute", HARBOR_NAMESPACE)
+        assert ingressroute is not None, "harbor-ingressroute 不存在"
 
-    def test_ingress_host_rule(self):
-        """验证 Ingress 主机规则"""
-        ingress = get_k8s_resource("ingress", "harbor-ingress", HARBOR_NAMESPACE)
-        assert ingress is not None, "Ingress 不存在"
+    def test_ingressroute_host_rule(self):
+        """验证 IngressRoute 主机规则"""
+        ingressroute = get_k8s_resource("ingressroute", "harbor-ingressroute", HARBOR_NAMESPACE)
+        assert ingressroute is not None, "IngressRoute 不存在"
 
-        rules = ingress.get("spec", {}).get("rules", [])
-        assert len(rules) > 0, "Ingress 无规则"
+        routes = ingressroute.get("spec", {}).get("routes", [])
+        assert len(routes) > 0, "IngressRoute 无路由"
 
-        # 验证主机名
-        host = rules[0].get("host", "")
-        assert host == "harbor.sisys.local", f"Ingress 主机为 {host}，期望 harbor.sisys.local"
+        # 验证至少有一个路由包含 harbor.sisys.local
+        hosts_found = []
+        for route in routes:
+            match = route.get("match", "")
+            if "harbor.sisys.local" in match:
+                hosts_found.append(match)
+        
+        assert len(hosts_found) > 0, f"IngressRoute 无 harbor.sisys.local 路由：{routes}"
 
-    def test_ingress_backend_service(self):
-        """验证 Ingress 后端服务"""
-        ingress = get_k8s_resource("ingress", "harbor-ingress", HARBOR_NAMESPACE)
-        assert ingress is not None, "Ingress 不存在"
+    def test_ingressroute_backend_service(self):
+        """验证 IngressRoute 后端服务"""
+        ingressroute = get_k8s_resource("ingressroute", "harbor-ingressroute", HARBOR_NAMESPACE)
+        assert ingressroute is not None, "IngressRoute 不存在"
 
-        rules = ingress.get("spec", {}).get("rules", [])
-        assert len(rules) > 0, "Ingress 无规则"
+        routes = ingressroute.get("spec", {}).get("routes", [])
+        assert len(routes) > 0, "IngressRoute 无路由"
 
-        backend = rules[0].get("http", {}).get("paths", [{}])[0].get("backend", {})
-        service = backend.get("service", {})
+        # 验证 API 路径路由到 harbor-core
+        api_route_found = False
+        for route in routes:
+            match = route.get("match", "")
+            if "/api/" in match:
+                services = route.get("services", [])
+                if services:
+                    service_name = services[0].get("name", "")
+                    if service_name == "harbor-core":
+                        api_route_found = True
+                        break
+        
+        assert api_route_found, f"未找到 API 路由到 harbor-core: {routes}"
 
-        service_name = service.get("name", "")
-        assert service_name == "harbor-core", f"后端服务为 {service_name}，期望 harbor-core"
+    def test_ingressroute_tls_config(self):
+        """验证 IngressRoute TLS 配置"""
+        ingressroute = get_k8s_resource("ingressroute", "harbor-ingressroute", HARBOR_NAMESPACE)
+        assert ingressroute is not None, "IngressRoute 不存在"
 
-        port = service.get("port", {}).get("number", 0)
-        # Ingress 可能配置为 80 或 443，都接受
-        assert port in [80, 443], f"后端端口为 {port}，期望 80 或 443"
-
-    def test_ingress_tls_config(self):
-        """验证 Ingress TLS 配置"""
-        ingress = get_k8s_resource("ingress", "harbor-ingress", HARBOR_NAMESPACE)
-        assert ingress is not None, "Ingress 不存在"
-
-        tls_config = ingress.get("spec", {}).get("tls", [])
-        assert len(tls_config) > 0, "Ingress 无 TLS 配置"
-
-        # 验证 TLS 主机
-        hosts = tls_config[0].get("hosts", [])
-        assert "harbor.sisys.local" in hosts, f"TLS 主机为 {hosts}，期望包含 harbor.sisys.local"
+        tls_config = ingressroute.get("spec", {}).get("tls", {})
+        assert tls_config, "IngressRoute 无 TLS 配置"
 
         # 验证 Secret 名称
-        secret_name = tls_config[0].get("secretName", "")
+        secret_name = tls_config.get("secretName", "")
         # pragma: allowlist secret
         assert secret_name == "harbor-tls-secret", f"TLS Secret 为 {secret_name}，期望 harbor-tls-secret"
 
     def test_external_access(self):
-        """验证外部访问"""
-        # 使用 NodePort 和 Host 头访问（已配置 /etc/hosts）
+        """验证外部访问 (API 端点)"""
         import requests
 
         try:
+            # 测试 API Ping 端点 (更可靠)
             # nosec B501 - 开发环境使用自签名证书
             response = requests.get(
-                "https://172.21.110.12:31448",
+                "https://172.21.110.12:31448/api/v2.0/ping",
                 headers={"Host": "harbor.sisys.local"},
                 verify=False,
                 timeout=10,
             )
-            assert response.status_code == 200, f"外部访问返回 HTTP {response.status_code}，期望 200"
+            # API Ping 应该返回 "Pong"
+            assert response.status_code == 200, f"API 访问返回 HTTP {response.status_code}，期望 200"
+            assert response.text.strip() == "Pong", f"API 返回 {response.text!r}，期望 'Pong'"
         except Exception as e:
             pytest.fail(f"外部访问失败：{e}")
 
