@@ -1,6 +1,7 @@
 ---
-# ArgoCD Ingress 配置 - Story 0.7
+# ArgoCD Ingress 配置 - Story 0.7 + Story 0.8 (域名端口优化)
 # 描述：配置 Traefik Ingress 暴露 ArgoCD Web 界面
+# Story 0.8 更新：使用标准 HTTPS 端口，修复后端服务端口
 # pragma: allowlist secret
 
 apiVersion: networking.k8s.io/v1
@@ -10,11 +11,13 @@ metadata:
   namespace: argocd
   labels:
     app: argocd
-    story: "0.7"
+    story: "0.7-0.8"
   annotations:
-    kubernetes.io/ingress.class: traefik
+    # Traefik 配置 - 使用 HTTPS 入口点 (标准端口 443)
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
+    # ArgoCD 需要 gRPC-Web 支持
+    traefik.ingress.kubernetes.io/router.middlewares: argocd-grpc-web@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
@@ -27,7 +30,7 @@ spec:
               service:
                 name: argocd-server
                 port:
-                  number: 443
+                  number: 80  # 修复：ArgoCD 服务监听 80 端口，不是 443
   tls:
     - hosts:
         - argocd.sisys.local  # pragma: allowlist secret

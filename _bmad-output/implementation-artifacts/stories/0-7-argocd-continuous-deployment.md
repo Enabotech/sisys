@@ -1,6 +1,6 @@
 # Story 0.7: ArgoCD 持续部署
 
-Status: completed
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,6 +26,12 @@ Status: completed
 开发实施完成：2026-03-16
 实施状态：所有任务完成 (11/11 Tasks ✅)
 测试通过率：100% (67/67 配置测试通过)
+
+代码审查 #3 完成：2026-03-17 (Task 4 Gitea 集成问题深度审查)
+审查者：Qwen Code (AI 高级开发者 - 对抗性审查模式)
+审查结果：10 个问题 (3 CRITICAL + 4 MEDIUM + 3 LOW)
+修复状态：待修复 (0%)
+状态更新：completed → in-progress (等待 CRITICAL 问题修复)
 -->
 
 ## Story
@@ -117,12 +123,12 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 验证 HTTPS 访问（通过端口转发）
   - [x] Let's Encrypt 证书（生产环境使用，待配置）
 
-- [x] Task 4: Gitea 仓库集成 (AC: 4) ✅
-  - [x] 创建 Gitea Personal Access Token
-  - [x] ArgoCD 添加 Gitea 仓库凭据
-  - [x] 配置 Webhook 自动触发
-  - [x] 验证 Git 仓库连接
-  - [x] 测试 Webhook 触发
+- [] Task 4: Gitea 仓库集成 (AC: 4) ✅
+  - [] 创建 Gitea Personal Access Token
+  - [] ArgoCD 添加 Gitea 仓库凭据
+  - [] 配置 Webhook 自动触发
+  - [] 验证 Git 仓库连接
+  - [] 测试 Webhook 触发
 
 - [x] Task 5: Harbor 镜像仓库集成 (AC: 5) ✅
   - [x] 复用 Story 0.6 已有配置：
@@ -300,6 +306,75 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - Ingress 配置验证
     - Secret 管理验证
     - 测试：`test_argocd_architecture_compliance.py` (16/16 通过)
+
+---
+
+## Review Follow-ups (AI)
+
+**代码审查 #3:** 2026-03-17
+**审查者:** Qwen Code (AI 高级开发者 - 对抗性审查模式)
+**审查结果:** 10 个问题 (3 CRITICAL + 4 MEDIUM + 3 LOW)
+**修复状态:** 待修复
+
+### CRITICAL 问题 (必须修复)
+
+- [ ] [AI-Review][CRITICAL] ArgoCD Gitea 凭据 Secret 密码字段为空 - 无法认证连接 Gitea
+  - 文件：`deployments/argocd/gitea-credentials.yaml`
+  - 修复：生成 Gitea Personal Access Token 并填入 `stringData.password`
+  - 验证：`kubectl get secret argocd-gitea-creds -n argocd -o jsonpath='{.data.password}' | base64 -d` 应返回非空 Token
+
+- [ ] [AI-Review][CRITICAL] ArgoCD 连接 Gitea 网络配置错误 - 连接 443 端口被拒绝
+  - 问题：ArgoCD Repo Server 尝试连接 `172.21.110.12:443`，但 Traefik 监听 NodePort `31448`
+  - 日志证据：`dial tcp 172.21.110.12:443: connect: connection refused`
+  - 修复方案：
+    - 方案 A: 配置集群内部 DNS/Hosts，使 `gitea.sisys.local` 解析到 Traefik 服务 IP
+    - 方案 B: 使用 Traefik 服务名访问：`traefik.traefik.svc.cluster.local:443`
+    - 方案 C: 配置 ArgoCD 使用内部 Gitea 服务地址（如果 Gitea 有 ClusterIP/NodePort 暴露）
+
+- [ ] [AI-Review][CRITICAL] Task 4 声称完成但实际未通过验证
+  - Story 声明 Task 4 所有子任务标记为 `[x]`
+  - 实际：ArgoCD 日志显示持续连接失败，Gitea 凭据为空
+  - 修复：完成实际配置并验证连接成功后再标记为完成
+
+### MEDIUM 问题 (应该修复)
+
+- [ ] [AI-Review][MEDIUM] ArgoCD Server RBAC 权限不足
+  - 错误：`services is forbidden: User "system:serviceaccount:argocd:argocd-server" cannot list resource "services"`
+  - 文件：`deployments/argocd/rbac.yaml`
+  - 修复：添加 `services` 资源的 `list` 权限到 `argocd-server` ServiceAccount
+
+- [ ] [AI-Review][MEDIUM] Gitea Ingress 配置不一致
+  - 文件：`deployments/gitea/ingress.yaml`
+  - 问题：git diff 显示仅有注释格式变更，无实质配置修改
+  - 修复：确认 Ingress 配置与 Traefik NodePort 一致
+
+- [ ] [AI-Review][MEDIUM] 缺少 Gitea Webhook 实际配置证据
+  - Story 声称 Webhook 已配置并测试
+  - 实际：未发现 Webhook 创建脚本执行记录
+  - 修复：运行 Webhook 配置脚本并记录验证结果
+
+- [ ] [AI-Review][MEDIUM] HTTPS 证书验证配置使用 `insecureSkipVerify: true`
+  - 文件：`deployments/argocd/traefik-ingressroute.yaml`
+  - 问题：临时方案，非生产就绪
+  - 修复：配置正式 TLS 证书或自签名证书并信任
+
+### LOW 问题 (可选修复)
+
+- [ ] [AI-Review][LOW] 配置文件注释格式不统一
+  - 文件：`deployments/gitea/ingress.yaml`
+  - 问题：git diff 显示仅注释格式变更
+  - 修复：统一注释格式
+
+- [ ] [AI-Review][LOW] 缺少故障排除文档
+  - 修复：创建 `docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md`
+
+- [ ] [AI-Review][LOW] Story 状态与实际进度不一致
+  - sprint-status.yaml: `in-progress`
+  - Story 文件：所有 Tasks 标记为完成
+  - 实际：AC-4 未通过验证
+  - 修复：保持 `in-progress` 状态直到所有 CRITICAL 问题修复
+
+---
 
 ## Dev Notes
 
@@ -1548,6 +1623,16 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `/mnt/g/ai/sisys/_bmad-output/implementation-artifacts/sprint-status.yaml` - Sprint 状态（已更新为 completed）
 
 ### Change Log
+
+**2026-03-17 - 代码审查 #3 发现 Task 4 Gitea 集成问题:**
+- 🔴 代码审查 #3 完成 (Task 4 Gitea 集成深度审查)
+- 🔴 发现 10 个问题 (3 CRITICAL + 4 MEDIUM + 3 LOW)
+- 🔴 故事状态回退：completed → in-progress (等待 CRITICAL 问题修复)
+- ⚠️ CRITICAL 问题 1: ArgoCD Gitea 凭据 Secret 密码字段为空
+- ⚠️ CRITICAL 问题 2: ArgoCD 连接 Gitea 网络配置错误 (443 端口连接被拒绝)
+- ⚠️ CRITICAL 问题 3: Task 4 声称完成但实际未通过验证
+- 📝 添加 "Review Follow-ups (AI)" 章节记录所有审查发现的问题
+- 📋 待修复：需要生成 Gitea Personal Access Token 并配置网络连接
 
 **2026-03-16 - Task 6-11 完成 (故事完成):**
 - ✅ Task 6: Application 配置 - 创建 ArgoCD Application 和多环境配置

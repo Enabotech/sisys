@@ -2,6 +2,8 @@
 # Harbor Ingress 配置
 # Story 0.6: Harbor 镜像仓库部署
 # 配置 Traefik Ingress + TLS
+# 注意：此文件已废弃，使用 ingress-route.yaml 替代
+# 保留作为参考和回滚备用
 #
 # 修复历史：
 # - 2026-03-16: 根路径路由到 harbor-portal，API 路由到 harbor-core
@@ -16,8 +18,8 @@ metadata:
   labels:
     app: harbor
   annotations:
-    # Traefik 配置 - 同时支持 HTTP 和 HTTPS 入口点
-    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    # Traefik 配置 - 仅使用 HTTPS 入口点
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 
     # 路由优先级（数字越大优先级越高）

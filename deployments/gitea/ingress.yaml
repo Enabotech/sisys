@@ -1,6 +1,6 @@
-# Gitea Ingress 配置 - Story 0.5
-# 描述：Traefik v3.x Ingress 配置，启用 TLS 1.3 + HSTS 安全头
-# 依赖：middleware.yaml (gitea-secure-headers)
+# Gitea Ingress 配置 - Story 0.5 + Story 0.8 (域名端口优化)
+# 描述：Traefik v3.x Ingress 配置，启用 TLS
+# Story 0.8 更新：移除 Middleware 引用（命名空间兼容性问题）
 
 # Gitea Ingress 配置
 apiVersion: networking.k8s.io/v1
@@ -12,17 +12,17 @@ metadata:
     app: gitea
     app.kubernetes.io/name: gitea
     app.kubernetes.io/component: ingress
+    story: "0.5+0.8"
   annotations:
-    # Traefik 配置
+    # Traefik 配置 - 使用 HTTPS 入口点
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # 引用 Traefik Middleware 添加安全头 (见 middleware.yaml)
-    traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@gitea
+    # 注意：Middleware 引用已移除，由于 traefik.io/v1alpha1 API 的命名空间兼容性问题
 
 spec:
   ingressClassName: traefik
 
-  # TLS 配置（使用自签名证书）
+  # TLS 配置（使用自签名证书 - Story 0.8）
   tls:
     - hosts:
         - gitea.sisys.local
