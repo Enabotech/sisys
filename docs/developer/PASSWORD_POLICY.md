@@ -13,7 +13,7 @@
 | 组件 | 用户名 | 默认密码 | 首次登录强制修改 | 密码复杂度 |
 |------|--------|---------|----------------|-----------|
 | Gitea | `admin` | `Admin12345!` | ✅ 是 | 12 位 + 大小写 + 数字 + 特殊字符 |
-| Harbor | `admin` | `Harbor12345!` | ✅ 是 | 12 位 + 大小写 + 数字 + 特殊字符 |
+| Harbor | `admin` | `Harbor@2026Secure!` | ✅ 是 | 12 位 + 大小写 + 数字 + 特殊字符 |
 | ArgoCD | `admin` | `<动态生成>` | ✅ 是 | 16 位随机 |
 | K3S | `admin` | `<kubeconfig>` | ✅ 是 | N/A |
 | Longhorn | `admin` | `<动态生成>` | ✅ 是 | 16 位随机 |
@@ -94,7 +94,7 @@ metadata:
 type: Opaque
 stringData:
   gitea-admin-password: "Admin12345!"  # 首次登录后修改
-  harbor-admin-password: "Harbor12345!"  # 首次登录后修改
+  harbor-admin-password: "Harbor@2026Secure!"  # 首次登录后修改
   argocd-admin-password: "<动态生成>"  # 安装时生成
 ```
 
@@ -118,7 +118,7 @@ gitea:
 harbor:
   url: http://harbor.sisys.local
   username: admin
-  password: Harbor12345!  # 首次登录后修改
+  password: Harbor@2026Secure!  # 首次登录后修改
 
 argocd:
   url: http://argocd.sisys.local
