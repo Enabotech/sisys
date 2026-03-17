@@ -2,9 +2,11 @@
 # Harbor Ingress 配置
 # Story 0.6: Harbor 镜像仓库部署
 # 配置 Traefik Ingress + TLS
-# 修复：同时支持 HTTP (web) 和 HTTPS (websecure) 入口点，移除不支持的注解
-# 修复 2026-03-16: 根路径路由到 harbor-portal，API 路由到 harbor-core
-# 修复 2026-03-16 (问题 5): 调整路径顺序，更具体的路径在前，添加优先级注解
+#
+# 修复历史：
+# - 2026-03-16: 根路径路由到 harbor-portal，API 路由到 harbor-core
+# - 2026-03-16 (问题 5): 调整路径顺序，更具体的路径在前，添加优先级注解
+# - 2026-03-17 (问题 6): 添加 /c/login 和 /c/ 路径，修复 WSL 重启后 API 路由问题
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -18,18 +20,35 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 
-    # 代理配置（镜像推送需要大文件上传）
+    # 路由优先级（数字越大优先级越高）
     traefik.ingress.kubernetes.io/router.priority: "100"
 
-    # 路径优先级：API 路径优先于根路径（修复问题 5）
-    # Traefik 会按照优先级处理路由，更具体的路径优先匹配
+    # 路径优先级说明：
+    # Traefik 按照路径 specificity 匹配，更具体的路径优先
+    # 顺序：Exact > Prefix (更长) > Prefix (更短)
 spec:
   ingressClassName: traefik
   rules:
   - host: harbor.sisys.local
     http:
       paths:
-      # API 路径路由到 harbor-core（优先级高，在前）
+      # 1. 登录页面（精确匹配，最高优先级）
+      - path: /c/login
+        pathType: Exact
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      # 2. Core 相关路径（高优先级）
+      - path: /c/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      # 3. API 路径
       - path: /api/
         pathType: Prefix
         backend:
@@ -37,7 +56,7 @@ spec:
             name: harbor-core
             port:
               number: 80
-      # 健康检查路由到 harbor-core
+      # 4. 服务发现路径
       - path: /service/
         pathType: Prefix
         backend:
@@ -45,7 +64,15 @@ spec:
             name: harbor-core
             port:
               number: 80
-      # 根路径和前端页面路由到 harbor-portal（优先级低，在后）
+      # 5. Registry V2 API
+      - path: /v2/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      # 6. 根路径和前端页面（最低优先级）
       - path: /
         pathType: Prefix
         backend:
