@@ -145,9 +145,15 @@ echo "==========================================================================
 echo "部署状态总结"
 echo "=============================================================================="
 echo "Harbor Pods: $RUNNING_COUNT/8 Running"
-echo "IngressRoute: $([ $(sudo kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS &>/dev/null && echo yes) || echo no ])"
-echo "TLS Secret: $([ $(sudo kubectl get secret harbor-tls-secret -n $HARBOR_NS &>/dev/null && echo yes) || echo no ])"
-echo "API 访问：$([ "$API_RESPONSE" == "Pong" ] && echo "✅ 正常" || echo "❌ 异常")"
+INGRESS_EXISTS=$([ "$(sudo kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS &>/dev/null && echo yes)" ] || echo no)
+TLS_EXISTS=$([ "$(sudo kubectl get secret harbor-tls-secret -n $HARBOR_NS &>/dev/null && echo yes)" ] || echo no)
+echo "IngressRoute: $INGRESS_EXISTS"
+echo "TLS Secret: $TLS_EXISTS"
+if [ "$API_RESPONSE" == "Pong" ]; then
+    echo "API 访问：✅ 正常"
+else
+    echo "API 访问：❌ 异常"
+fi
 echo ""
 log_success "Harbor 部署验证完成！"
 echo "访问地址：https://harbor.sisys.local"
