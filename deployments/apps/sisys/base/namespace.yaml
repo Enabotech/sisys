@@ -1,0 +1,10 @@
+---
+# SISYS 命名空间
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sisys
+  labels:
+    app.kubernetes.io/name: sisys
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/managed-by: argocd

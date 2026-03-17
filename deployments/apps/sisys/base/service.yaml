@@ -1,0 +1,18 @@
+---
+# SISYS 应用 Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: sisys-app
+  labels:
+    app.kubernetes.io/name: sisys-app
+    app.kubernetes.io/part-of: sisys
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: sisys-app
