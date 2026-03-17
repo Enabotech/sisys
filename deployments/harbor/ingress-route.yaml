@@ -103,18 +103,25 @@ spec:
   # 优先级 10: 前端页面 (兜底路径)
   # ---------------------------------------------------------------------------
   # 所有其他路径默认路由到 harbor-portal (前端静态资源)
-  # 并应用安全中间件 (HSTS、CSP 等)
+  # 注意：不使用 middleware，因为 middleware 可能不存在导致 404
 
-  - match: Host(`harbor.sisys.local`) && PathPrefix(`/`)
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/harbor/`)
     kind: Rule
     priority: 10
     services:
     - name: harbor-portal
       port: 80
       scheme: http
-    middlewares:
-    - name: harbor-middleware-chain
-      namespace: harbor
+
+  - match: Host(`harbor.sisys.local`) && PathPrefix(`/`)
+    kind: Rule
+    priority: 5
+    services:
+    - name: harbor-portal
+      port: 80
+      scheme: http
+    # 注意：不引用 middleware，因为 harbor-middleware-chain 可能不存在
+    # 如需 HSTS 等安全头，直接在 Traefik 全局配置或通过其他方式添加
 
   # =============================================================================
   # TLS 配置
