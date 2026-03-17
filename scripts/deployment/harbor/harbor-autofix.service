@@ -1,0 +1,15 @@
+[Unit]
+Description=Harbor Auto-Fix Service
+Documentation=https://github.com/sisys/sisys/blob/main/docs/deployment/HARBOR_PERSISTENCE.md
+After=k3s.service
+Wants=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /mnt/g/ai/sisys/scripts/deployment/harbor/harbor-autofix.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
