@@ -1,8 +1,8 @@
 # 🔥 Harbor Story 0.6 代码审核报告
 
-**审核日期:** 2026-03-17  
-**审核者:** Qwen Code (AI 高级开发者 - Adversarial Code Reviewer)  
-**审核对象:** `0-6-harbor-image-registry.md` 及实现文件  
+**审核日期:** 2026-03-17
+**审核者:** Qwen Code (AI 高级开发者 - Adversarial Code Reviewer)
+**审核对象:** `0-6-harbor-image-registry.md` 及实现文件
 **审核焦点:** 1) Ingress 上行路由配置与启动正确性；2) 密码管理一致性同步性；3) 代码配置与实际部署的正确性一致性
 
 ---
@@ -24,7 +24,7 @@
 
 ### CRITICAL-001: 实际 Secret 密码与 Story 文档不一致
 
-**问题描述:**  
+**问题描述:**
 Story 文档中声明管理员密码为 `Harbor@2026Secure!`，但实际 K8s Secret 中配置的密码也是 `Harbor@2026Secure!`，**但这是硬编码在 Story 文件中的明文密码**，违反了安全最佳实践。
 
 **证据:**
@@ -56,7 +56,7 @@ kubectl get secret harbor-secret -n harbor -o jsonpath='{.data.HARBOR_ADMIN_PASS
 
 ### CRITICAL-002: Ingress 路由配置与实际部署状态不一致
 
-**问题描述:**  
+**问题描述:**
 Story 文件声称 Ingress 配置使用 `harbor-core:443` 作为后端端口，但**实际部署的 Ingress 使用 `harbor-core:80`**。
 
 **证据:**
@@ -99,7 +99,7 @@ kubectl get ingress -n harbor -o yaml
 
 ### HIGH-001: 密码历史策略配置未实际生效
 
-**问题描述:**  
+**问题描述:**
 Story 文件声称配置了密码历史策略（`passwordHistoryCount: 5`），但**Harbor 的密码策略需要通过 Web 界面或 API 配置，Helm values.yaml 中的配置不会自动应用**。
 
 **证据:**
@@ -138,7 +138,7 @@ curl -k https://harbor.sisys.local/api/v2.0/configurations \
 
 ### HIGH-002: NetworkPolicy 未实际应用到集群
 
-**问题描述:**  
+**问题描述:**
 Story 文件声称 NetworkPolicy 已配置（Task 8），但**实际 K8s 集群中没有应用任何 NetworkPolicy**。
 
 **证据:**
@@ -174,7 +174,7 @@ kubectl get networkpolicy -n harbor
 
 ### HIGH-003: 数据库密码复杂度不一致
 
-**问题描述:**  
+**问题描述:**
 Story 文件要求管理员密码符合复杂度要求（12 位 + 大小写 + 数字 + 符号），但**PostgreSQL 数据库密码 `Postgres@2026Db!` 只有 16 位，且复杂度不足**。
 
 **证据:**
@@ -204,7 +204,7 @@ kubectl get secret harbor-secret -n harbor -o jsonpath='{.data.POSTGRES_PASSWORD
 
 ### MEDIUM-001: Ingress 路由路径顺序注释不一致
 
-**问题描述:**  
+**问题描述:**
 Ingress 配置中的路径顺序注释声称"更具体的路径在前"，但**实际顺序中 `/c/` 在 `/api/` 之前，两者都是 Prefix 类型，可能导致路由冲突**。
 
 **证据:**
@@ -238,7 +238,7 @@ paths:
 
 ### MEDIUM-002: Story 文件中的 sudo 密码明文暴露
 
-**问题描述:**  
+**问题描述:**
 Story 文件 Change Log 中包含 sudo 密码明文 `H9yglwH7sdyj`。
 
 **证据:**
@@ -266,7 +266,7 @@ echo 'H9yglwH7sdyj' | sudo -S kubectl apply -f deployments/harbor/networkpolicy.
 
 ### MEDIUM-003: Pod 重启次数异常未调查
 
-**问题描述:**  
+**问题描述:**
 Harbor Pod 重启次数异常高（14-56 次），但 Story 文件未记录原因和解决方案。
 
 **证据:**
@@ -297,7 +297,7 @@ harbor-nginx-79f58d547f-t5m5t       1/1 Running   40 (17m ago)
 
 ### LOW-001: Story 文件状态未更新为 done
 
-**问题描述:**  
+**问题描述:**
 Story 文件状态仍为 `in-progress`，但根据 Change Log 所有 Task 已标记完成。
 
 **证据:**
@@ -320,7 +320,7 @@ Status: in-progress
 
 ### LOW-002: File List 未包含所有实际文件
 
-**问题描述:**  
+**问题描述:**
 Story 文件的 File List 未包含 `harbor-letsencrypt.yaml` 和 `ingress-traefik.yaml`。
 
 **证据:**
@@ -385,6 +385,6 @@ Story 文件的 File List 未包含 `harbor-letsencrypt.yaml` 和 `ingress-traef
 
 ---
 
-_审核者：Qwen Code (AI 高级开发者 - Adversarial Code Reviewer)_  
-_审核日期：2026-03-17_  
+_审核者：Qwen Code (AI 高级开发者 - Adversarial Code Reviewer)_
+_审核日期：2026-03-17_
 _审核依据：workflow.xml + checklist.md + 实际 K8s 集群状态_
