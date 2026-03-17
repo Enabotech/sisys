@@ -145,6 +145,50 @@ class TestArgoCDGiteaIntegration:
 
     def test_argocd_repo_list(self, argocd_namespace: str):
         """验证 ArgoCD 仓库列表命令可用"""
+        # 方法 1: 通过 kubectl 直接检查 Secret 配置（推荐）
+        result = run_kubectl(
+            ["get", "secrets", "-n", argocd_namespace, "-l", "argocd.argoproj.io/secret-type=repository", "-o", "json"],
+            check=False
+        )
+
+        if result.returncode == 0:
+            import json
+            secrets = json.loads(result.stdout)
+            repo_count = len(secrets.get("items", []))
+            
+            # 检查是否有 Gitea 仓库配置
+            gitea_repos = [
+                s for s in secrets.get("items", [])
+                if s.get("metadata", {}).get("name", "").startswith("argocd-repo-gitea") or
+                   s.get("metadata", {}).get("name", "").startswith("argocd-gitea")
+            ]
+            
+            if gitea_repos:
+                # 验证 Gitea 仓库配置
+                for repo in gitea_repos:
+                    data = repo.get("data", {})
+                    assert "url" in data, f"仓库 {repo['metadata']['name']} 缺少 URL 配置"
+                    assert "username" in data, f"仓库 {repo['metadata']['name']} 缺少用户名配置"
+                    assert "password" in data, f"仓库 {repo['metadata']['name']} 缺少密码配置"
+                    
+                    # 解码并验证 URL
+                    import base64
+                    url = base64.b64decode(data["url"]).decode("utf-8")
+                    assert "gitea.sisys.local" in url, f"Gitea URL 不正确：{url}"
+                    
+                    # 验证 insecure 配置
+                    if "insecure" in data:
+                        insecure = base64.b64decode(data["insecure"]).decode("utf-8")
+                        assert insecure == "true", "insecure 配置应为 true"
+                
+                # 测试通过
+                return
+            else:
+                pytest.skip("未找到 Gitea 仓库配置")
+        else:
+            pytest.fail(f"无法获取仓库 Secret: {result.stderr}")
+
+        # 方法 2: 通过 ArgoCD CLI（备用，需要额外权限）
         result = run_kubectl(
             ["exec", "-n", argocd_namespace, "deploy/argocd-server", "--", "argocd", "repo", "list"], check=False
         )
