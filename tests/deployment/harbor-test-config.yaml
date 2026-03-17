@@ -1,0 +1,167 @@
+# Harbor 测试配置
+# Story 0.6: Harbor 镜像仓库部署
+#
+# 修复 MEDIUM-004: 测试依赖硬编码的 NodePort 和 IP
+# 问题描述：test_harbor.py 中硬编码了 HARBOR_NODE_IP 和 HARBOR_NODEPORT
+# 解决方案：使用外部配置文件 + 环境变量覆盖，支持多环境测试
+#
+# 配置优先级：环境变量 > 此文件 > 默认值
+#
+# 使用方式:
+#   1. 修改此文件中的配置值
+#   2. 或使用环境变量覆盖：
+#      export HARBOR_NODE_IP=192.168.1.100
+#      export HARBOR_NODEPORT=31448
+#      pytest tests/deployment/test_harbor.py
+
+# =============================================================================
+# 集群配置
+# =============================================================================
+
+cluster:
+  # K3S 节点 IP
+  # 默认值：172.21.110.12 (本地开发环境)
+  # 环境变量：HARBOR_NODE_IP
+  node_ip: "172.21.110.12"
+
+  # NodePort 端口
+  # 默认值：31448 (Harbor HTTPS)
+  # 环境变量：HARBOR_NODEPORT
+  nodeport: 31448
+
+  # Kubernetes 命名空间
+  # 默认值：harbor
+  # 环境变量：HARBOR_NAMESPACE
+  namespace: "harbor"
+
+  # Ingress Host
+  # 默认值：harbor.sisys.local
+  # 环境变量：HARBOR_INGRESS_HOST
+  ingress_host: "harbor.sisys.local"
+
+  # Kubeconfig 路径 (可选)
+  # 默认值：~/.kube/config 或 /etc/rancher/k3s/k3s.yaml
+  # 环境变量：KUBECONFIG
+  kubeconfig: ""
+
+# =============================================================================
+# 测试超时设置 (秒)
+# =============================================================================
+
+timeouts:
+  # Pod 就绪超时
+  pod_ready: 300  # 5 分钟
+
+  # 健康检查超时
+  health_check: 30
+
+  # API 请求超时
+  api_request: 10
+
+  # 部署等待超时
+  deployment_wait: 600  # 10 分钟
+
+  # 测试镜像推送超时
+  image_push: 120  # 2 分钟
+
+# =============================================================================
+# 测试镜像配置
+# =============================================================================
+
+test_images:
+  # 推送/拉取测试镜像
+  push_pull: "nginx:latest"
+
+  # 漏洞扫描测试镜像 (包含已知漏洞)
+  vulnerability_scan: "alpine:3.18"
+
+  # 签名测试镜像
+  cosign_sign: "nginx:1.21"
+
+  # 测试镜像 tag 前缀
+  tag_prefix: "test-harbor-"
+
+# =============================================================================
+# 认证配置
+# =============================================================================
+
+authentication:
+  # 管理员用户名
+  admin_username: "admin"
+
+  # 管理员密码 (建议从 Secret 或环境变量获取)
+  # 生产环境请使用：export HARBOR_ADMIN_PASSWORD=xxx
+  admin_password: ""  # 从环境变量 HARBOR_ADMIN_PASSWORD 读取
+
+  # Robot Account 配置
+  robot_account:
+    enabled: false
+    name: "robot$test-runner"
+    token: ""  # 从环境变量 HARBOR_ROBOT_TOKEN 读取
+
+# =============================================================================
+# 测试用例配置
+# =============================================================================
+
+test_cases:
+  # 启用/禁用特定测试类
+  enable_deployment_tests: true
+  enable_web_interface_tests: true
+  enable_database_tests: true
+  enable_admin_account_tests: true
+  enable_vulnerability_scan_tests: true
+  enable_cosign_tests: false  # 需要安装 Cosign
+  enable_robot_account_tests: false  # 需要先创建 Robot Account
+  enable_integration_tests: false  # 需要 Gitea/ArgoCD 环境
+
+# =============================================================================
+# CI/CD 集成配置
+# =============================================================================
+
+ci_cd:
+  # CI 环境标志
+  # 如果在 CI 环境中运行，设置为 true
+  # 环境变量：CI
+  ci_environment: false
+
+  # 测试报告输出目录
+  report_output: "test-reports/harbor"
+
+  # 覆盖率输出文件
+  coverage_output: "test-reports/harbor/coverage.xml"
+
+  # JUnit XML 输出
+  junit_output: "test-reports/harbor/junit.xml"
+
+# =============================================================================
+# 日志配置
+# =============================================================================
+
+logging:
+  # 日志级别：DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+
+  # 日志输出文件 (可选)
+  file: ""
+
+  # 日志格式
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# =============================================================================
+# 高级配置 (一般不需要修改)
+# =============================================================================
+
+advanced:
+  # SSL 验证 (开发环境使用自签名证书时禁用)
+  verify_ssl: false
+
+  # 重试配置
+  retry:
+    max_attempts: 3
+    delay: 5  # 秒
+    backoff: 2  # 重试延迟倍数
+
+  # 并发配置
+  concurrency:
+    max_workers: 4
+    max_connections: 10

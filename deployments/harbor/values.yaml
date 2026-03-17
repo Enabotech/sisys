@@ -15,9 +15,16 @@ expose:
     auto:
       enabled: true
       commonName: "harbor.sisys.local"
+  # ==========================================================================
+  # 修复 CRITICAL-001: 禁用 Helm 管理的 Ingress
+  # ==========================================================================
+  # 原因：避免与 Kustomize 管理的 ingress-route.yaml 冲突
+  # Helm 负责管理 Harbor 内部组件，Kustomize 负责 K8s 原生资源
   ingress:
+    enabled: false  # 禁用 Helm Ingress，使用独立的 IngressRoute CRD
     hosts:
       core: harbor.sisys.local
+    # 保留配置用于文档说明，但实际不创建 Ingress 资源
 
 externalURL: https://harbor.sisys.local
 
