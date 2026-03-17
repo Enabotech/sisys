@@ -23,6 +23,8 @@ data:
     p, role:admin, logs, *, *, allow
     p, role:admin, exec, *, */*, allow
     p, role:admin, extensions, *, *, allow
+    # 修复 MEDIUM-1: 添加 services 资源的 list 权限
+    p, role:admin, services, list, */*, allow
 
     # 开发者角色 - 可以查看和同步应用
     p, role:developer, applications, get, */*, allow

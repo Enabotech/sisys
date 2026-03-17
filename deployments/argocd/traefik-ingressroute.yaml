@@ -30,13 +30,18 @@ spec:
 
 ---
 # ServersTransport 配置 - 强制使用 HTTP
+# 修复 MEDIUM-4: 临时方案 - 生产环境应配置正式 TLS 证书
 apiVersion: traefik.io/v1alpha1
 kind: ServersTransport
 metadata:
   name: argocd-http
   namespace: argocd
+  annotations:
+    description: "ServersTransport 配置 - 临时使用 insecureSkipVerify"
+    # TODO: 生产环境应配置正式 TLS 证书或导入自签名证书到信任链
+    # 参考：docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md
 spec:
-  insecureSkipVerify: true
+  insecureSkipVerify: true  # 临时方案：跳过 TLS 验证（仅开发环境）
 
 ---
 # Middleware 配置 - 添加必要的 headers
