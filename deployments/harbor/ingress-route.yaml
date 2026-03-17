@@ -126,46 +126,7 @@ spec:
     # 此 Secret 包含 TLS 证书，由 cert-manager 或手动创建
     secretName: harbor-tls-secret
 
-    # TLS 选项 (引用默认配置)
+    # TLS 选项 (引用 default 命名空间的 TLSOption)
     options:
       name: default-tls-options
       namespace: default
-
----
-# TLS 选项配置 - 强制 TLS 1.3
-# Story 0.6: Harbor 镜像仓库部署
-#
-# 修复 LOW-001: 明确 TLS 版本配置
-
-apiVersion: traefik.io/v1alpha1
-kind: TLSOption
-metadata:
-  name: default-tls-options
-  namespace: default
-  labels:
-    app: harbor
-    story: "0.6"
-  annotations:
-    description: "强制 TLS 1.3，禁用 TLS 1.2 及以下版本"
-spec:
-  minVersion: VersionTLS13
-  maxVersion: VersionTLS13
-  cipherSuites:
-  # TLS 1.3 加密套件 (仅 AEAD)
-  - TLS_AES_128_GCM_SHA256
-  - TLS_AES_256_GCM_SHA384
-  - TLS_CHACHA20_POLY1305_SHA256
-  # SNI 配置
-  sniStrict: true
-  preferServerCipherSuites: true
-
----
-# 中间件链 - 组合所有安全响应头
-# Story 0.6: Harbor 镜像仓库部署
-#
-# 注意：此文件引用 middleware.yaml 中定义的中间件
-# 此处仅用于 IngressRoute 的中间件链配置
-
-# 中间件定义在 middleware.yaml 中:
-# - harbor-security-headers: 安全响应头 (HSTS, CSP, X-Frame-Options 等)
-# - harbor-middleware-chain: 中间件链 (组合所有中间件)

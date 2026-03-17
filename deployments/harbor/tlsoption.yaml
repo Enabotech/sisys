@@ -1,0 +1,28 @@
+---
+# TLSOption 配置 - 强制 TLS 1.3
+# Story 0.6: Harbor 镜像仓库部署
+#
+# 注意：此资源必须部署在 default 命名空间，因为 Traefik 在此命名空间查找 TLSOption
+
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: default-tls-options
+  namespace: default
+  labels:
+    app: harbor
+    story: "0.6"
+  annotations:
+    description: "强制 TLS 1.3，禁用 TLS 1.2 及以下版本"
+    managed-by: "kustomize"
+spec:
+  minVersion: VersionTLS13
+  maxVersion: VersionTLS13
+  cipherSuites:
+  # TLS 1.3 加密套件 (仅 AEAD)
+  - TLS_AES_128_GCM_SHA256
+  - TLS_AES_256_GCM_SHA384
+  - TLS_CHACHA20_POLY1305_SHA256
+  # SNI 配置
+  sniStrict: true
+  preferServerCipherSuites: true

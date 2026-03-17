@@ -19,6 +19,7 @@ resources:
 - networkpolicy.yaml
 - middleware.yaml
 - ingress-route.yaml  # 使用 IngressRoute CRD (Traefik 原生)
+- tlsoption.yaml  # TLSOption (部署到 default 命名空间)
 - password-policy-job.yaml  # 密码策略初始化 Job (MEDIUM-002 修复)
 # - ingress.yaml      # 已废弃，使用 ingress-route.yaml 替代
 
