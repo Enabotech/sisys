@@ -16,6 +16,19 @@ metadata:
     app.kubernetes.io/environment: development
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  # ArgoCD Image Updater 注解
+  annotations:
+    # 指定要监控的镜像列表（使用纯镜像路径，不带标签）
+    argocd-image-updater.argoproj.io/image-list: |
+      harbor.sisys.local/sisys/app
+    # 写回方法：使用 git 提交更新
+    argocd-image-updater.argoproj.io/write-back-method: git
+    # Git 仓库配置
+    argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
+    # 更新策略：latest 表示使用最新标签
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.update-strategy: latest
+    # 允许更新到任何标签（包括 latest）
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:.*
 spec:
   project: default
 
@@ -28,7 +41,7 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - sisys/harbor.sisys.local/sisys/app:latest
+        - harbor.sisys.local/sisys/app:latest
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys

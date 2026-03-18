@@ -16,11 +16,24 @@ metadata:
     app.kubernetes.io/environment: production
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  # ArgoCD Image Updater 注解
   annotations:
-    # 生产环境需要手动同步
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # 指定要监控的镜像列表（使用纯镜像路径，不带标签）
+    argocd-image-updater.argoproj.io/image-list: |
+      harbor.sisys.local/sisys/app
+    # 写回方法：使用 git 提交更新
+    argocd-image-updater.argoproj.io/write-back-method: git
+    # Git 仓库配置
+    argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
+    # 更新策略：semver 表示使用语义化版本
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.update-strategy: semver
+    # 只允许稳定版本标签（排除 rc、beta 等）
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:^v?[0-9]+\.[0-9]+\.[0-9]+$
+    # 生产环境需要手动审批
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.force-update: "false"
     # 审批要求
     argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   project: default
 
@@ -33,7 +46,7 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - sisys/harbor.sisys.local/sisys/app:v1.0.0
+        - harbor.sisys.local/sisys/app:v1.0.0
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
