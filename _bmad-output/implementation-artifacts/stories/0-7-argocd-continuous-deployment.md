@@ -141,7 +141,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 - [x] Task 4: Gitea 仓库集成 (AC: 4) ✅ 完成 (代码审查 #3 问题全部修复)
   - [x] 创建 Gitea Personal Access Token ✅
-    - **Token**: `6f741edfafe6cec7a28a50e60a8169062f1b0e53` (已存储到 Secret)
+    - **Token**: `1f182aca3d38b66f7e49c034d98fb15bf02434b7` (已存储到 Secret)
     - **权限**: `repository`, `user`
     - **用户**: `gitea_admin`
   - [x] ArgoCD 添加 Gitea 仓库凭据 ✅
@@ -159,7 +159,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 测试 Webhook 触发 ✅
     - **ArgoCD 同步**: sisys-app-of-apps 和 sisys-app 正常同步
     - **当前状态**: Webhook 配置完成，Gitea 仓库已连接
-    - **部署状态**: 
+    - **部署状态**:
       - ✅ sisys-app Synced
       - 🔄 Pod 部署中（等待镜像推送）
       - ⚠️ 测试镜像推送：Harbor TLS 证书问题（需要配置 insecure-registries）
@@ -183,7 +183,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 测试端到端 GitOps 流程 🔄
     - 示例 Application 配置已创建 ✅
     - **说明**: 需要实际推送镜像测试端到端流程（已创建测试脚本，待实际执行）
-      **Task 5 完成日期:** 2026-03-17  
+      **Task 5 完成日期:** 2026-03-17
       **测试验证:** ✅ 14/17 通过 (3 个跳过为端到端测试，需要实际推送镜像)
 
 - [x] Task 6: Application 配置 (AC: 6) ✅
