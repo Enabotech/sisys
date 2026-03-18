@@ -154,8 +154,8 @@ metadata:
 type: Opaque
 data:
   # Harbor 凭据 (base64 编码) - 占位符，需要替换
-  # 格式：echo -n "robot$argocd-pull:<TOKEN>" | base64
-  harbor: PLACEHOLDER_RUN_SCRIPT_TO_CREATE
+  # 格式：echo -n "robot$sisys+argocd-pull:<TOKEN>" | base64
+  harbor: mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j
   # Docker Hub 凭据（可选，用于拉取公共镜像）
   dockerhub: PLACEHOLDER_OPTIONAL
 
