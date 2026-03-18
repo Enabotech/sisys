@@ -119,7 +119,7 @@ def harbor_project_exists():
     yield True
 
     # 清理（可选）
-    # cleanup_test_image()
+    cleanup_test_image()
 
 
 @pytest.fixture(scope="module")
