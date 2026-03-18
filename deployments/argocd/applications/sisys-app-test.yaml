@@ -1,0 +1,80 @@
+---
+# ArgoCD Application - Test 环境
+# 测试环境配置 - 自动同步 + 手动审批
+#
+# 同步策略：自动同步但需要审批
+# 适用于：QA 团队进行测试验证
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-test
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-test
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/environment: testing
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # 手动审批注解
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  project: default
+
+  # 源代码配置 - Test 环境
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/apps/sisys/test
+
+    # Kustomize 配置
+    kustomize:
+      images:
+        - sisys/harbor.sisys.local/sisys/app:v1.0.0
+      commonLabels:
+        app.kubernetes.io/managed-by: argocd
+        app.kubernetes.io/part-of: sisys
+      commonAnnotations:
+        argocd.argoproj.io/tracking-id: sisys-app-test
+
+  # 目标配置 - Test 命名空间
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sisys-test
+
+  # 同步策略 - 自动同步但需要审批
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略差异 - Test 环境
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  info:
+    - name: Description
+      value: SISYS 应用 - 测试环境
+    - name: Environment
+      value: testing
+    - name: SyncPolicy
+      value: Automatic with Approval
+    - name: ImageTag
+      value: v1.0.0

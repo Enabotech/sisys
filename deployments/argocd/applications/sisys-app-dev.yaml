@@ -1,0 +1,80 @@
+---
+# ArgoCD Application - Dev 环境
+# 开发环境配置 - 自动同步
+#
+# 同步策略：完全自动（self-heal + auto-prune）
+# 适用于：开发团队日常开发和测试
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-dev
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/environment: development
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # 源代码配置 - Dev 环境
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/apps/sisys/dev
+
+    # Kustomize 配置
+    kustomize:
+      images:
+        - sisys/harbor.sisys.local/sisys/app:latest
+      commonLabels:
+        app.kubernetes.io/managed-by: argocd
+        app.kubernetes.io/part-of: sisys
+      commonAnnotations:
+        argocd.argoproj.io/tracking-id: sisys-app-dev
+
+  # 目标配置 - Dev 命名空间
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sisys-dev
+
+  # 同步策略 - 完全自动
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略差异 - Dev 环境
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations
+
+  info:
+    - name: Description
+      value: SISYS 应用 - 开发环境
+    - name: Environment
+      value: development
+    - name: SyncPolicy
+      value: Automatic (self-heal + auto-prune)
+    - name: ImageTag
+      value: latest
