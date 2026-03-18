@@ -1,0 +1,80 @@
+---
+# ArgoCD Application - Prod 环境
+# 生产环境配置 - 手动同步 + 双人审批
+#
+# 同步策略：手动同步（不启用 automated）
+# 适用于：生产环境部署，需要严格审批流程
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-prod
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/environment: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # 生产环境需要手动同步
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # 审批要求
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  project: default
+
+  # 源代码配置 - Prod 环境
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deployments/apps/sisys/prod
+
+    # Kustomize 配置
+    kustomize:
+      images:
+        - sisys/harbor.sisys.local/sisys/app:v1.0.0
+      commonLabels:
+        app.kubernetes.io/managed-by: argocd
+        app.kubernetes.io/part-of: sisys
+      commonAnnotations:
+        argocd.argoproj.io/tracking-id: sisys-app-prod
+
+  # 目标配置 - Prod 命名空间
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sisys-prod
+
+  # 同步策略 - 手动同步（不启用 automated）
+  syncPolicy:
+    # 不启用 automated，需要手动触发同步
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+      - ServerSideApply=true
+      - Prune=false  # 生产环境禁用自动修剪
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略差异 - Prod 环境
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  info:
+    - name: Description
+      value: SISYS 应用 - 生产环境
+    - name: Environment
+      value: production
+    - name: SyncPolicy
+      value: Manual (requires approval)
+    - name: ImageTag
+      value: v1.0.0

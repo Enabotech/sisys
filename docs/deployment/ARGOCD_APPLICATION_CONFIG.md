@@ -8,8 +8,10 @@
 deployments/
 ├── argocd/
 │   └── applications/
-│       ├── sisys-app.yaml           # ArgoCD Application 配置
-│       └── sisys-app-rollback.yaml  # 回滚配置指南
+│       ├── sisys-app-of-apps.yaml   # App of Apps - 管理所有子应用
+│       ├── sisys-app-dev.yaml       # Dev 环境 Application
+│       ├── sisys-app-test.yaml      # Test 环境 Application
+│       └── sisys-app-prod.yaml      # Prod 环境 Application
 └── apps/
     └── sisys/
         ├── base/                    # 基础配置
@@ -24,27 +26,27 @@ deployments/
 
 ## 快速开始
 
-### 1. 部署 Application
+### 1. 部署 App of Apps
 
 ```bash
-# 使用脚本部署
-python scripts/argocd/deploy-application.py
-
-# 或手动部署
-kubectl apply -f deployments/argocd/applications/sisys-app.yaml
+# 使用 App of Apps 模式部署所有环境
+kubectl apply -f deployments/argocd/applications/sisys-app-of-apps.yaml
 ```
 
 ### 2. 验证 Application 状态
 
 ```bash
-# 查看 Application 状态
-kubectl get application sisys-app -n argocd
+# 查看 App of Apps 状态
+kubectl get application sisys-app-of-apps -n argocd
+
+# 查看所有子应用
+kubectl get application -n argocd -l app.kubernetes.io/part-of=sisys
 
 # 查看详细信息
-kubectl get application sisys-app -n argocd -o yaml
+kubectl get application sisys-app-dev -n argocd -o yaml
 
 # 使用 ArgoCD CLI
-argocd app get sisys-app -n argocd
+argocd app list -n argocd | grep sisys
 ```
 
 ### 3. 查看同步状态
@@ -54,7 +56,7 @@ argocd app get sisys-app -n argocd
 argocd app list -n argocd
 
 # 等待应用同步完成
-argocd app wait sisys-app --health -n argocd
+argocd app wait sisys-app-dev --health -n argocd
 ```
 
 ## Application 配置说明
@@ -65,7 +67,7 @@ argocd app wait sisys-app --health -n argocd
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sisys-app
+  name: sisys-app-dev
   namespace: argocd
 spec:
   project: default
@@ -79,12 +81,12 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - sisys/harbor.sisys.local/sisys/app:*
+        - sisys/harbor.sisys.local/sisys/app:latest
 
   # 目标配置
   destination:
     server: https://kubernetes.default.svc
-    namespace: sisys
+    namespace: sisys-dev
 
   # 同步策略
   syncPolicy:
@@ -121,25 +123,40 @@ syncPolicy:
 
 使用 Kustomize 实现多环境隔离：
 
-| 环境 | 命名空间 | 副本数 | 资源限制 | 镜像 Tag |
-|------|---------|--------|---------|---------|
-| Dev | `sisys-dev` | 1 | 200m CPU / 256Mi Mem | `latest` |
-| Test | `sisys-test` | 2 | 500m CPU / 512Mi Mem | `v1.0.0` |
-| Prod | `sisys-prod` | 3 | 1000m CPU / 1Gi Mem | `v1.0.0` |
+| 环境 | Application | 命名空间 | 副本数 | 资源限制 | 镜像 Tag | 同步策略 |
+|------|------------|---------|--------|---------|---------|---------|
+| Dev | `sisys-app-dev` | `sisys-dev` | 1 | 200m CPU / 256Mi Mem | `latest` | 完全自动 |
+| Test | `sisys-app-test` | `sisys-test` | 2 | 500m CPU / 512Mi Mem | `v1.0.0` | 自动 + 审批 |
+| Prod | `sisys-app-prod` | `sisys-prod` | 3 | 1000m CPU / 1Gi Mem | `v1.0.0` | 手动同步 |
 
-### 创建环境 Application
+### 环境 Application
 
-为每个环境创建独立的 Application：
+每个环境独立的 Application：
 
 ```bash
-# 开发环境
+# 开发环境 - 完全自动同步
 kubectl apply -f deployments/argocd/applications/sisys-app-dev.yaml
 
-# 测试环境
+# 测试环境 - 自动同步但需要审批
 kubectl apply -f deployments/argocd/applications/sisys-app-test.yaml
 
-# 生产环境
+# 生产环境 - 手动同步（需要人工批准）
 kubectl apply -f deployments/argocd/applications/sisys-app-prod.yaml
+```
+
+### App of Apps 模式
+
+使用 App of Apps 模式统一管理所有环境：
+
+```bash
+# 部署 App of Apps
+kubectl apply -f deployments/argocd/applications/sisys-app-of-apps.yaml
+
+# App of Apps 将自动创建和管理所有子应用
+# 子应用列表:
+# - sisys-app-dev
+# - sisys-app-test
+# - sisys-app-prod
 ```
 
 ## 健康检查配置
@@ -175,7 +192,7 @@ spec:
 
 ```bash
 # 查看同步历史
-argocd app history sisys-app -n argocd
+argocd app history sisys-app-dev -n argocd
 
 # 输出示例:
 # ID  DATE                           REVISION
@@ -187,13 +204,13 @@ argocd app history sisys-app -n argocd
 
 ```bash
 # 回滚到指定版本
-argocd app rollback sisys-app 1 -n argocd
+argocd app rollback sisys-app-dev 1 -n argocd
 
 # 回滚并等待完成
-argocd app rollback sisys-app 1 -n argocd --wait
+argocd app rollback sisys-app-dev 1 -n argocd --wait
 
 # 回滚并修剪资源
-argocd app rollback sisys-app 1 -n argocd --prune
+argocd app rollback sisys-app-dev 1 -n argocd --prune
 ```
 
 ### 使用 Git 回滚
@@ -216,7 +233,7 @@ git push origin main
 kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller
 
 # 查看 Application 事件
-kubectl get events -n argocd --field-selector involvedObject.name=sisys-app
+kubectl get events -n argocd --field-selector involvedObject.name=sisys-app-dev
 ```
 
 ### Prometheus 指标
@@ -239,10 +256,10 @@ argocd_app_operation_running             # 同步操作进行中
 **排查步骤**:
 ```bash
 # 查看详细状态
-argocd app get sisys-app -n argocd
+argocd app get sisys-app-dev -n argocd
 
 # 查看同步日志
-argocd app logs sisys-app -n argocd
+argocd app logs sisys-app-dev -n argocd
 
 # 检查 Git 仓库连接
 argocd repo list -n argocd
@@ -255,13 +272,13 @@ argocd repo list -n argocd
 **排查步骤**:
 ```bash
 # 检查 Pod 状态
-kubectl get pods -n sisys
+kubectl get pods -n sisys-dev
 
 # 查看 Pod 日志
-kubectl logs -n sisys -l app.kubernetes.io/name=sisys-app
+kubectl logs -n sisys-dev -l app.kubernetes.io/name=sisys-app
 
 # 检查服务配置
-kubectl get svc -n sisys
+kubectl get svc -n sisys-dev
 ```
 
 #### 3. 镜像拉取失败
@@ -271,7 +288,7 @@ kubectl get svc -n sisys
 **排查步骤**:
 ```bash
 # 检查镜像拉取密钥
-kubectl get secrets -n sisys
+kubectl get secrets -n sisys-dev
 
 # 验证镜像存在
 curl -u admin:password https://harbor.sisys.local/v2/sisys/app/tags/list
@@ -286,6 +303,7 @@ sisys/
 ├── deployments/
 │   ├── argocd/
 │   │   └── applications/
+│   │       ├── sisys-app-of-apps.yaml
 │   │       ├── sisys-app-dev.yaml
 │   │       ├── sisys-app-test.yaml
 │   │       └── sisys-app-prod.yaml
@@ -323,3 +341,4 @@ sisys/
 - [ArgoCD 官方文档](https://argo-cd.readthedocs.io/)
 - [Kustomize 文档](https://kustomize.io/)
 - [ArgoCD Application 管理](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
+- [ArgoCD App of Apps 模式](https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/)
