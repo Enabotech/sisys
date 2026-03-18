@@ -41,7 +41,7 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - harbor.sisys.local/sisys/app:latest
+        - harbor.sisys.local/sisys/app:v1.0.0
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
