@@ -55,7 +55,7 @@ spec:
               cpu: 500m
               memory: 512Mi
           securityContext:
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             privileged: false
             allowPrivilegeEscalation: false
             capabilities:
@@ -71,10 +71,22 @@ spec:
               mountPath: /tmp
             - name: cache-volume
               mountPath: /app/.cache
+            - name: nginx-cache-volume
+              mountPath: /var/cache/nginx
+            - name: nginx-run-volume
+              mountPath: /var/run
+            - name: nginx-log-volume
+              mountPath: /var/log/nginx
       volumes:
         - name: tmp-volume
           emptyDir: {}
         - name: cache-volume
+          emptyDir: {}
+        - name: nginx-cache-volume
+          emptyDir: {}
+        - name: nginx-run-volume
+          emptyDir: {}
+        - name: nginx-log-volume
           emptyDir: {}
       imagePullSecrets: []
       nodeSelector: {}
