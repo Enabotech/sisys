@@ -245,7 +245,7 @@ class TestArgoCDApplicationDeployment:
             # OutOfSync: 允许的场景 - 镜像拉取失败、Pod 启动中等临时状态
             # Unknown: Git 仓库不可访问或刚创建
             assert sync_status in ["Synced", "OutOfSync", "Unknown"], f"Application 同步状态异常：{sync_status}"
-            
+
             # 如果是 OutOfSync，记录原因供调试（不失败测试）
             if sync_status == "OutOfSync":
                 resources = status.get("resources", [])
@@ -273,7 +273,7 @@ class TestArgoCDApplicationDeployment:
             app = json.loads(result.stdout)
             status = app.get("status", {})
             health_status = status.get("health", {}).get("status", "Unknown")
-            
+
             # 获取资源状态用于诊断
             resources = status.get("resources", [])
             deployment_status = None
@@ -290,17 +290,16 @@ class TestArgoCDApplicationDeployment:
             #           这是开发环境常见状态，不表示配置错误
             # Unknown: 健康状态尚未计算
             assert health_status in ["Healthy", "Degraded", "Unknown"], f"Application 不健康：{health_status}"
-            
+
             # 如果是 Degraded，输出详细诊断信息（不失败测试）
             if health_status == "Degraded":
-                print(f"⚠️  Application 处于 Degraded 状态")
+                print("⚠️  Application 处于 Degraded 状态")
                 print(f"  Deployment 状态：{deployment_status}")
                 if pod_issues:
-                    print(f"  Pod 问题:")
+                    print("  Pod 问题:")
                     for issue in pod_issues[:5]:  # 最多显示 5 个
                         print(f"    - {issue}")
-                print(f"  常见原因：镜像拉取失败 (TLS 证书验证)、Pod 启动中、资源不足等")
-                print(f"  解决方案：参考 docs/deployment/HARBOR_TLS_TROUBLESHOOTING.md")
+                print("  常见原因：镜像拉取失败 (TLS 证书验证)、Pod 启动中、资源不足等")
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pytest.skip("kubectl 不可用，跳过健康状态测试")
 
