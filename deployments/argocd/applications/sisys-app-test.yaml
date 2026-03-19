@@ -16,27 +16,30 @@ metadata:
     app.kubernetes.io/environment: testing
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  # ArgoCD Image Updater 注解
   annotations:
-    # ========== ArgoCD Image Updater 配置 ==========
+    # 镜像列表 - 格式：别名=镜像路径
     argocd-image-updater.argoproj.io/image-list: |
       app=harbor.sisys.local/sisys/app
-    
+
+    # 写回方法：使用 git 提交更新
     argocd-image-updater.argoproj.io/write-back-method: git
+    # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
-    argocd-image-updater.argoproj.io/git-branch: main
-    
+    argocd-image-updater.argoproj.io/git-branch: HEAD
+
     # 测试环境使用 latest 策略 (因为 test-* 不是标准 semver)
     argocd-image-updater.argoproj.io/app.update-strategy: latest
-    
+
     # 只匹配 test-开头的标签
     argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
-    
-    # 强制使用 Digest
-    argocd-image-updater.argoproj.io/app.force-digest: "true"
-    
+
+    # 强制使用 Digest (确保不可变性)
+    # argocd-image-updater.argoproj.io/app.force-digest: "true"
+
     # 轮询间隔 (测试环境适中)
-    argocd-image-updater.argoproj.io/app.check-interval: 2m
-    
+    argocd-image-updater.argoproj.io/app.check-interval: 10m
+
     # 审批注解
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
