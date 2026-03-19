@@ -45,7 +45,83 @@ data:
     g, viewers, role:readonly
 
 ---
+# ArgoCD Server ServiceAccount ClusterRole
+# 修复 MEDIUM-5: 添加 services 资源的 list/watch 权限
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-server-clusterrole
+  labels:
+    app: argocd
+    story: "0.7"
+  annotations:
+    description: "ArgoCD Server ServiceAccount ClusterRole - 允许访问 Kubernetes 资源"
+rules:
+  # Services 权限（修复 MEDIUM-5）
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  
+  # Pods 权限（用于日志和健康检查）
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  
+  # Events 权限（用于事件查看）
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  
+  # ConfigMaps 权限（用于配置管理）
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  
+  # Secrets 权限（用于仓库凭据）
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  
+  # Deployments 权限（用于应用管理）
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  
+  # StatefulSets 权限
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ArgoCD Server ServiceAccount ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-server-clusterrolebinding
+  labels:
+    app: argocd
+    story: "0.7"
+  annotations:
+    description: "绑定 argocd-server ServiceAccount 到 ClusterRole"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-server-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: argocd-server
+    namespace: argocd
+
+---
 # Admin Secret
+# 安全修复 (CRITICAL-2): 2026-03-19
+# - 移除明文密码，改为通过环境变量注入
+# - 或使用 openssl 生成随机密码
+#
+# 部署前必须设置环境变量:
+#   export ARGOCD_ADMIN_PASSWORD="$(openssl rand -base64 32)"
+#   echo "Admin password: $ARGOCD_ADMIN_PASSWORD"
+
 apiVersion: v1
 kind: Secret
 metadata:
@@ -56,7 +132,84 @@ metadata:
     story: "0.7"
   annotations:
     description: "ArgoCD 初始 admin 密码"
-    # pragma: allowlist secret
+    # 注意：实际密码通过环境变量注入，不提交到 Git
+    # 密码复杂度要求：12 位 + 大小写 + 数字 + 符号
 type: Opaque
 stringData:
-  password: ArgoCD@2026Secure!  # pragma: allowlist secret
+  # 密码通过环境变量注入
+  # 部署命令：kubectl create secret generic argocd-initial-admin-secret \
+  #   --from-literal=password="$ARGOCD_ADMIN_PASSWORD" \
+  #   -n argocd --dry-run=client -o yaml | kubectl apply -f -
+  password: "${ARGOCD_ADMIN_PASSWORD}"
+---
+# 替代方案 1: 使用 openssl 生成随机密码 (推荐)
+# 部署脚本:
+#   #!/bin/bash
+#   # 生成随机密码（32 位 base64 编码）
+#   ARGOCD_ADMIN_PASSWORD="$(openssl rand -base64 32)"
+#   
+#   # 显示密码（仅显示一次，请妥善保存）
+#   echo "=== ArgoCD Admin Password ==="
+#   echo "Password: $ARGOCD_ADMIN_PASSWORD"
+#   echo "============================="
+#   
+#   # 创建 Secret
+#   kubectl create secret generic argocd-initial-admin-secret \
+#     --from-literal=password="$ARGOCD_ADMIN_PASSWORD" \
+#     -n argocd --dry-run=client -o yaml | kubectl apply -f -
+#
+# 替代方案 2: 使用 Kustomize secretGenerator
+# 文件：kustomization.yaml
+# apiVersion: kustomize.config.k8s.io/v1beta1
+# kind: Kustomization
+# secretGenerator:
+# - name: argocd-initial-admin-secret
+#   namespace: argocd
+#   type: Opaque
+#   literals:
+#   - password=CHANGE_ME  # 通过 kustomize 补丁替换
+#
+# 替代方案 3: 使用 External Secrets Operator (最佳实践)
+# 文件：external-secret.yaml
+# apiVersion: external-secrets.io/v1beta1
+# kind: ExternalSecret
+# metadata:
+#   name: argocd-initial-admin-secret
+#   namespace: argocd
+# spec:
+#   refreshInterval: 1h
+#   secretStoreRef:
+#     name: vault-backend
+#     kind: ClusterSecretStore
+#   target:
+#     name: argocd-initial-admin-secret
+#   data:
+#   - secretKey: password
+#     remoteRef:
+#       key: argocd/admin-credentials
+#       property: password
+---
+# 部署指南:
+# 
+# 方法 1: 使用 openssl 生成随机密码 (推荐)
+#   export ARGOCD_ADMIN_PASSWORD="$(openssl rand -base64 32)"
+#   echo "Admin password: $ARGOCD_ADMIN_PASSWORD"
+#   kubectl create secret generic argocd-initial-admin-secret \
+#     --from-literal=password="$ARGOCD_ADMIN_PASSWORD" \
+#     -n argocd
+#
+# 方法 2: 使用 Kustomize (推荐用于生产环境)
+#   kubectl apply -k deployments/argocd/
+#
+# 方法 3: 使用 Helm (如果通过 Helm 部署 ArgoCD)
+#   helm upgrade argocd argo/argo-cd -f values.yaml \
+#     --set server.admin.password="$(openssl rand -base64 32)"
+#
+# 方法 4: 使用 External Secrets Operator (最佳实践)
+#   kubectl apply -f external-secret.yaml
+#
+# 密码策略建议:
+# - 最小长度：12 位
+# - 必须包含：大写字母 + 小写字母 + 数字 + 特殊符号
+# - 定期轮换：每 90 天
+# - 密码历史：不得重复最近 5 次密码

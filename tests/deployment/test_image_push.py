@@ -25,7 +25,8 @@ HARBOR_NAMESPACE = "harbor"
 HARBOR_HOST = "harbor.sisys.local"
 HARBOR_NODEPORT = 31448
 HARBOR_NODE_IP = "172.21.110.12"
-HARBOR_URL = f"{HARBOR_NODE_IP}:{HARBOR_NODEPORT}"
+# 使用域名而非 IP（避免证书问题）
+HARBOR_URL = f"{HARBOR_HOST}:{HARBOR_NODEPORT}"
 HARBOR_PROJECT = "sisys"
 HARBOR_USERNAME = "admin"
 HARBOR_PASSWORD = "Admin@123456"  # nosec B105  # pragma: allowlist secret  # 默认密码
@@ -33,7 +34,8 @@ HARBOR_PASSWORD = "Admin@123456"  # nosec B105  # pragma: allowlist secret  # �
 # 测试镜像配置 - 使用国内镜像源
 TEST_SOURCE_IMAGE = "docker.m.daocloud.io/library/busybox:1.35"  # 使用国内镜像源
 TEST_IMAGE_TAG = f"test-push-{int(time.time())}"
-TEST_HARBOR_IMAGE = f"{HARBOR_URL}/{HARBOR_PROJECT}/test-image:{TEST_IMAGE_TAG}"
+# 使用域名而非 IP（避免证书问题）
+TEST_HARBOR_IMAGE = f"{HARBOR_HOST}:{HARBOR_NODEPORT}/{HARBOR_PROJECT}/test-image:{TEST_IMAGE_TAG}"
 
 
 # =============================================================================

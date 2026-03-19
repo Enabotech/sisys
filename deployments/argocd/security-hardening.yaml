@@ -1,65 +1,47 @@
 ---
 # ArgoCD 安全加固配置
 # 包含容器安全、网络安全、密钥管理配置
+# 
+# 安全修复 (CRITICAL-4): 2026-03-19
+# - 移除已废弃的 PodSecurityPolicy (PSP)
+# - 迁移到 Pod Security Admission (PSA)
+# - K8s v1.25+ 已移除 PSP，K3S v1.34.5 不支持 PSP
 
 # =============================================================================
-# 1. 容器安全配置
+# 1. Pod Security Admission (PSA) 配置
 # =============================================================================
 
-# 1.1 Pod 安全上下文配置
+# 1.1 Namespace 配置 PSA 标签
 apiVersion: v1
-kind: PodSecurityPolicy
+kind: Namespace
 metadata:
-  name: argocd-restricted
-  namespace: argocd
+  name: argocd
   labels:
+    # PSA 标签 - 强制执行 restricted 策略
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    
+    # 原有标签
     app.kubernetes.io/name: argocd
     app.kubernetes.io/part-of: argocd
-spec:
-  # 特权模式
-  privileged: false
-  allowPrivilegeEscalation: false
+  annotations:
+    description: "ArgoCD 命名空间 - 使用 PSA 进行安全控制"
+    # PSA 模式说明:
+    # - enforce: 强制执行，不符合策略的 Pod 会被拒绝
+    # - audit: 审计模式，记录不符合策略的 Pod 但不拒绝
+    # - warn: 警告模式，返回警告但不拒绝
+    # 策略级别:
+    # - privileged: 无限制（默认）
+    # - baseline: 基本安全要求
+    # - restricted: 严格安全要求（推荐）
 
-  # 必需使用非 root 用户
-  runAsUser:
-    rule: MustRunAsNonRoot
-
-  # 文件系统组
-  fsGroup:
-    rule: MustRunAs
-    ranges:
-      - min: 1000
-        max: 65535
-
-  # 补充组
-  supplementalGroups:
-    rule: MustRunAs
-    ranges:
-      - min: 1000
-        max: 65535
-
-  # 卷类型限制
-  volumes:
-    - 'configMap'
-    - 'emptyDir'
-    - 'projected'
-    - 'secret'
-    - 'downwardAPI'
-    - 'persistentVolumeClaim'
-
-  # 禁止 host 网络
-  hostNetwork: false
-  hostIPC: false
-  hostPID: false
-
-  # 限制 Linux Capabilities
-  requiredDropCapabilities:
-    - ALL
-  allowedCapabilities: []
-
-  # SELinux
-  seLinux:
-    rule: RunAsAny
+---
+# 1.2 容器安全上下文配置（与 PSA restricted 兼容）
+# 注意：PSA 通过标签强制执行，不需要单独的 PodSecurityPolicy
 
 ---
 # 1.2 ArgoCD 组件安全上下文补丁
