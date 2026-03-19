@@ -17,7 +17,27 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    # 手动审批注解
+    # ========== ArgoCD Image Updater 配置 ==========
+    argocd-image-updater.argoproj.io/image-list: |
+      app=harbor.sisys.local/sisys/app
+    
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
+    argocd-image-updater.argoproj.io/git-branch: HEAD
+    
+    # 测试环境使用 latest 策略 (因为 test-* 不是标准 semver)
+    argocd-image-updater.argoproj.io/app.update-strategy: latest
+    
+    # 只匹配 test-开头的标签
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
+    
+    # 强制使用 Digest
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
+    
+    # 轮询间隔 (测试环境适中)
+    argocd-image-updater.argoproj.io/app.check-interval: 5m
+    
+    # 审批注解
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   project: default
@@ -31,10 +51,12 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - sisys/harbor.sisys.local/sisys/app:v1.0.0
+        - name: harbor.sisys.local/sisys/app
+          newTag: test-v0.0.0-initial
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
+        app.kubernetes.io/environment: testing
       commonAnnotations:
         argocd.argoproj.io/tracking-id: sisys-app-test
 
@@ -76,5 +98,7 @@ spec:
       value: testing
     - name: SyncPolicy
       value: Automatic with Approval
-    - name: ImageTag
-      value: v1.0.0
+    - name: ImageTagPattern
+      value: test-{version}
+    - name: UpdateStrategy
+      value: latest (by push time)

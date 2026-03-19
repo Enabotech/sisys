@@ -25,10 +25,22 @@ metadata:
     argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
-    # 更新策略：latest 表示使用最新标签
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.update-strategy: latest
-    # 允许更新到任何标签（包括 latest）
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:^dev-
+    argocd-image-updater.argoproj.io/git-branch: HEAD
+    
+    # 更新策略：latest (按推送时间选择最新，不是指标签名为 latest)
+    argocd-image-updater.argoproj.io/app.update-strategy: latest
+    
+    # 标签过滤：只匹配 dev 开头的标签
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-.*
+    
+    # 忽略临时标签
+    argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
+    
+    # 强制使用 Digest (确保不可变性)
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
+    
+    # 轮询间隔 (开发环境频繁一些)
+    argocd-image-updater.argoproj.io/app.check-interval: 2m
 spec:
   project: default
 
@@ -40,11 +52,14 @@ spec:
 
     # Kustomize 配置
     kustomize:
+      # 正确格式：name 和 newTag 分开
       images:
-        - harbor.sisys.local/sisys/app:v1.0.0
+        - name: harbor.sisys.local/sisys/app
+          newTag: dev-main-initial-0000000
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
+        app.kubernetes.io/environment: development
       commonAnnotations:
         argocd.argoproj.io/tracking-id: sisys-app-dev
 
@@ -89,5 +104,7 @@ spec:
       value: development
     - name: SyncPolicy
       value: Automatic (self-heal + auto-prune)
-    - name: ImageTag
-      value: latest
+    - name: ImageTagPattern
+      value: dev-{branch}-{sha}
+    - name: UpdateStrategy
+      value: latest (by push time)

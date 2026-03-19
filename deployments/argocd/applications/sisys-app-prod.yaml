@@ -18,20 +18,28 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   # ArgoCD Image Updater 注解
   annotations:
-    # 指定要监控的镜像列表（使用纯镜像路径，不带标签）
+    # ========== ArgoCD Image Updater 配置 ==========
     argocd-image-updater.argoproj.io/image-list: |
-      harbor.sisys.local/sisys/app
-    # 写回方法：使用 git 提交更新
+      app=harbor.sisys.local/sisys/app
+    
     argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
-    # 更新策略：semver 表示使用语义化版本
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.update-strategy: semver
-    # 只允许稳定版本标签（排除 rc、beta 等）
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:^v?[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/git-branch: HEAD
+    
+    # 生产环境使用 semver 策略
+    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    
+    # 只匹配语义化版本标签 (v1.0.0, v1.2.3 等)
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    
+    # 忽略预发布版本
+    argocd-image-updater.argoproj.io/app.ignore-tags: regexp:.*-(test|rc|beta|alpha).*
+    
+    # 强制使用 Digest (生产环境必须)
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
+    
     # 生产环境需要手动审批
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.force-update: "false"
-    # 审批要求
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
@@ -46,10 +54,12 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - harbor.sisys.local/sisys/app:v1.0.0
+        - name: harbor.sisys.local/sisys/app
+          newTag: v1.0.0
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
+        app.kubernetes.io/environment: production
       commonAnnotations:
         argocd.argoproj.io/tracking-id: sisys-app-prod
 
@@ -89,5 +99,9 @@ spec:
       value: production
     - name: SyncPolicy
       value: Manual (requires approval)
-    - name: ImageTag
-      value: v1.0.0
+    - name: ImageTagPattern
+      value: v{major}.{minor}.{patch}
+    - name: UpdateStrategy
+      value: semver
+    - name: Security
+      value: Digest + Signature Required
