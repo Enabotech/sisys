@@ -21,7 +21,7 @@ export GITEA_PASSWORD=your_admin_password
 export GITEA_REPO=sisys/sisys
 
 # 运行配置脚本
-./scripts/argocd/configure-gitea-integration.sh
+./scripts/deployment/argocd/configure-gitea-integration.sh
 ```
 
 脚本将自动完成以下操作：

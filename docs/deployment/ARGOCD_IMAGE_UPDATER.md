@@ -448,7 +448,7 @@ sudo kubectl delete deployment argocd-image-updater -n argocd
 sudo kubectl delete secret argocd-image-updater-secret -n argocd
 
 # 3. 重新运行配置脚本
-python scripts/argocd/configure-image-updater.py
+python scripts/deployment/argocd/configure-image-updater.py
 
 # 4. 重新应用安装清单
 sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
@@ -461,7 +461,7 @@ sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
 # 进入项目 → sisys → Robot Accounts → 删除 argocd-pull
 
 # 2. 重新创建 Robot Account
-python scripts/argocd/configure-image-updater.py
+python scripts/deployment/argocd/configure-image-updater.py
 
 # 3. 验证 Secret 已更新
 sudo kubectl get secret argocd-image-updater-secret -n argocd -o jsonpath='{.data.harbor}' | base64 -d

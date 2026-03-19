@@ -51,7 +51,7 @@ get_harbor_token() {
     echo -e "${YELLOW}获取方式：登录 Harbor → 用户设置 → 访问令牌 → 新建访问令牌${NC}"
     read -s -p "Token: " HARBOR_ADMIN_TOKEN
     echo ""
-    
+
     if [ -z "$HARBOR_ADMIN_TOKEN" ]; then
         echo -e "${RED}错误：Token 不能为空${NC}"
         exit 1
@@ -62,17 +62,17 @@ get_harbor_token() {
 create_robot_account() {
     echo ""
     echo -e "${YELLOW}检查 Robot Account: robot\$${HARBOR_PROJECT}+${HARBOR_ROBOT_NAME}${NC}"
-    
+
     # 使用 Harbor API 检查 Robot Account
     ROBOT_EXISTS=$(curl -k -s -H "Authorization: Bearer $HARBOR_ADMIN_TOKEN" \
         "$HARBOR_URL/api/v2.0/robots?name=${HARBOR_ROBOT_NAME}" | \
         grep -c "\"name\":\"robot\$${HARBOR_PROJECT}+${HARBOR_ROBOT_NAME}\"" || true)
-    
+
     if [ "$ROBOT_EXISTS" -gt 0 ]; then
         echo -e "${GREEN}✓ Robot Account 已存在${NC}"
     else
         echo -e "${YELLOW}创建 Robot Account...${NC}"
-        
+
         # 创建 Robot Account
         ROBOT_RESPONSE=$(curl -k -s -X POST \
             -H "Authorization: Bearer $HARBOR_ADMIN_TOKEN" \
@@ -96,9 +96,9 @@ create_robot_account() {
                     }
                 ]
             }")
-        
+
         ROBOT_TOKEN=$(echo "$ROBOT_RESPONSE" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
-        
+
         if [ -n "$ROBOT_TOKEN" ]; then
             echo -e "${GREEN}✓ Robot Account 创建成功${NC}"
             HARBOR_ROBOT_TOKEN="$ROBOT_TOKEN"
@@ -118,7 +118,7 @@ get_robot_token() {
         echo -e "${YELLOW}获取方式：Harbor → 项目 → 机器人账户 → 复制令牌${NC}"
         read -s -p "Token: " HARBOR_ROBOT_TOKEN
         echo ""
-        
+
         if [ -z "$HARBOR_ROBOT_TOKEN" ]; then
             echo -e "${RED}错误：Token 不能为空${NC}"
             exit 1
@@ -130,13 +130,13 @@ get_robot_token() {
 create_secret() {
     echo ""
     echo -e "${YELLOW}创建 Kubernetes Secret...${NC}"
-    
+
     # 准备凭据
     HARBOR_CREDENTIALS="robot\$${HARBOR_PROJECT}+${HARBOR_ROBOT_NAME}:${HARBOR_ROBOT_TOKEN}"
-    
+
     # Base64 编码
     HARBOR_CREDENTIALS_B64=$(echo -n "$HARBOR_CREDENTIALS" | base64)
-    
+
     # 创建 Secret YAML
     cat > /tmp/argocd-image-updater-secret.yaml <<EOF
 ---
@@ -161,17 +161,17 @@ data:
   # 格式：robot$<project>+<robot_name>:<token>
   harbor: ${HARBOR_CREDENTIALS_B64}
 EOF
-    
+
     # 应用 Secret
     kubectl apply -f /tmp/argocd-image-updater-secret.yaml
-    
+
     echo -e "${GREEN}✓ Secret 创建成功${NC}"
-    
+
     # 验证 Secret
     echo ""
     echo -e "${YELLOW}验证 Secret...${NC}"
     kubectl get secret argocd-image-updater-secret -n "$ARGOCD_NAMESPACE"
-    
+
     echo -e "${GREEN}✓ Secret 验证成功${NC}"
 }
 
@@ -179,37 +179,37 @@ EOF
 restart_image_updater() {
     echo ""
     echo -e "${YELLOW}重启 ArgoCD Image Updater...${NC}"
-    
+
     kubectl rollout restart deployment argocd-image-updater -n "$ARGOCD_NAMESPACE"
-    
+
     echo -e "${GREEN}✓ Image Updater 重启成功${NC}"
-    
+
     # 等待重启完成
     echo -e "${YELLOW}等待 Pod 就绪...${NC}"
     kubectl rollout status deployment argocd-image-updater -n "$ARGOCD_NAMESPACE" --timeout=60s
-    
+
     echo -e "${GREEN}✓ Image Updater 就绪${NC}"
 }
 
 # 主函数
 main() {
     echo ""
-    
+
     # 检查
     check_kubectl
     check_harbor
-    
+
     # 获取凭据
     get_harbor_token
     create_robot_account
     get_robot_token
-    
+
     # 创建 Secret
     create_secret
-    
+
     # 重启
     restart_image_updater
-    
+
     echo ""
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}配置完成！${NC}"

@@ -7,7 +7,7 @@ from requests.auth import HTTPBasicAuth
 GITEA_URL = "http://localhost:3000"
 GITEA_API = f"{GITEA_URL}/api/v1"
 GITEA_USERNAME = "gitea_admin"
-GITEA_PASSWORD = "Admin@123456"  # nosec B105 pragma: allowlist secret
+GITEA_PASSWORD = "Admin@123456"  # pragma: allowlist secret
 
 # 获取 Token 列表
 url = f"{GITEA_API}/users/{GITEA_USERNAME}/tokens"

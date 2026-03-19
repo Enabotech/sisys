@@ -218,7 +218,7 @@ class TestEnvironmentPromotion:
 
     def test_promotion_script_exists(self):
         """验证环境晋升脚本存在"""
-        script_path = Path("scripts/argocd/promote-environment.py")
+        script_path = Path("scripts/deployment/argocd/promote-environment.py")
         # 可选功能
         assert script_path.exists() or True, "晋升脚本不存在（可选）"
 

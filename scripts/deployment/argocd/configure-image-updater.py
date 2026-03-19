@@ -10,7 +10,7 @@ Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
 4. 创建示例 Application 配置
 
 使用方法:
-    python scripts/argocd/configure-image-updater.py [选项]
+    python scripts/deployment/argocd/configure-image-updater.py [选项]
 
 选项:
     --harbor-url URL          Harbor 访问 URL (默认：https://harbor.sisys.local)
@@ -379,16 +379,16 @@ def parse_args() -> argparse.Namespace:
         epilog="""
 示例:
   # 使用默认配置运行
-  python scripts/argocd/configure-image-updater.py
+  python scripts/deployment/argocd/configure-image-updater.py
 
   # 自定义 Harbor 管理员密码
-  python scripts/argocd/configure-image-updater.py --harbor-admin-pass MySecurePass123
+  python scripts/deployment/argocd/configure-image-updater.py --harbor-admin-pass MySecurePass123
 
   # 自定义命名空间
-  python scripts/argocd/configure-image-updater.py --argocd-namespace my-argocd --harbor-namespace my-harbor
+  python scripts/deployment/argocd/configure-image-updater.py --argocd-namespace my-argocd --harbor-namespace my-harbor
 
   # Dry-run 模式（只打印不执行）
-  python scripts/argocd/configure-image-updater.py --dry-run
+  python scripts/deployment/argocd/configure-image-updater.py --dry-run
         """,
     )
 
