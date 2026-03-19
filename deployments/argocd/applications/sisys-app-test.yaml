@@ -51,8 +51,7 @@ spec:
     # Kustomize 配置
     kustomize:
       images:
-        - name: harbor.sisys.local/sisys/app
-          newTag: test-v0.0.0-initial
+        - harbor.sisys.local/sisys/app:test-v0.0.0-initial
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys

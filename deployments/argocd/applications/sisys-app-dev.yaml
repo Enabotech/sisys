@@ -52,10 +52,8 @@ spec:
 
     # Kustomize 配置
     kustomize:
-      # 正确格式：name 和 newTag 分开
       images:
-        - name: harbor.sisys.local/sisys/app
-          newTag: dev-main-initial-0000000
+        - harbor.sisys.local/sisys/app:dev-main-initial-0000000
       commonLabels:
         app.kubernetes.io/managed-by: argocd
         app.kubernetes.io/part-of: sisys
