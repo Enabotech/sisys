@@ -8,11 +8,8 @@ kind: Kustomization
 # 命名空间配置
 namespace: sisys
 
-# 通用标签
-commonLabels:
-  app.kubernetes.io/name: sisys-app
-  app.kubernetes.io/part-of: sisys
-  app.kubernetes.io/managed-by: argocd
+# 通用标签（注意：不要在这里添加 labels，因为会影响 selector）
+# selector 相关的 labels 应该在 deployment.yaml 中直接定义
 
 # 资源文件列表
 resources:
