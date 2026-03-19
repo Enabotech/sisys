@@ -2,6 +2,11 @@
 ArgoCD 安全加固测试
 
 验证容器安全、网络安全、密钥管理和审计日志配置。
+
+更新记录 (2026-03-19):
+- CRITICAL-4 修复：迁移 PSP 到 PSA (Pod Security Admission)
+- 测试更新：test_pod_security_policy_exists → test_psa_labels_configured
+- 新增测试：test_pod_security_policy_not_used (验证不再使用 PSP)
 """
 
 from pathlib import Path
@@ -17,35 +22,43 @@ class TestContainerSecurity:
         manifest_path = Path("deployments/argocd/security-hardening.yaml")
         assert manifest_path.exists(), "安全加固清单文件不存在"
 
-    def test_pod_security_policy_exists(self):
-        """验证 Pod Security Policy 配置"""
+    def test_psa_labels_configured(self):
+        """验证 Pod Security Admission (PSA) 标签配置 (CRITICAL-4 修复)"""
         manifest_path = Path("deployments/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
 
-        psp_found = False
+        psa_labels = [
+            'pod-security.kubernetes.io/enforce',
+            'pod-security.kubernetes.io/audit',
+            'pod-security.kubernetes.io/warn'
+        ]
+
+        namespace_found = False
         for doc in docs:
-            if doc.get("kind") == "PodSecurityPolicy":
-                psp_found = True
-                psp = doc
+            if doc.get("kind") == "Namespace" and doc.get("metadata", {}).get("name") == "argocd":
+                namespace_found = True
+                labels = doc.get("metadata", {}).get("labels", {})
+                
+                # 验证 PSA 标签存在
+                for label in psa_labels:
+                    assert label in labels, f"PSA 标签 {label} 未配置"
+                    assert labels[label] == "restricted", f"PSA 标签 {label} 值应为 restricted"
 
-                # 验证特权模式禁用
-                assert psp["spec"]["privileged"] is False
-                assert psp["spec"]["allowPrivilegeEscalation"] is False
+        assert namespace_found, "Namespace 配置未找到，PSA 标签无法配置"
 
-                # 验证非 root 用户
-                assert psp["spec"]["runAsUser"]["rule"] == "MustRunAsNonRoot"
+    def test_pod_security_policy_not_used(self):
+        """验证不再使用已废弃的 PodSecurityPolicy (CRITICAL-4 修复)"""
+        manifest_path = Path("deployments/argocd/security-hardening.yaml")
 
-                # 验证 Capabilities 限制
-                assert "ALL" in psp["spec"]["requiredDropCapabilities"]
+        with open(manifest_path) as f:
+            docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
 
-                # 验证 host 网络禁用
-                assert psp["spec"]["hostNetwork"] is False
-                assert psp["spec"]["hostIPC"] is False
-                assert psp["spec"]["hostPID"] is False
-
-        assert psp_found, "PodSecurityPolicy 未配置"
+        for doc in docs:
+            kind = doc.get("kind", "") if doc else ""
+            assert kind != "PodSecurityPolicy", \
+                "PodSecurityPolicy 已废弃 (K8s v1.25+ 移除)，应使用 Pod Security Admission (PSA)"
 
     def test_deployment_security_context(self):
         """验证 Deployment 安全上下文配置"""

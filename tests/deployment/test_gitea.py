@@ -270,19 +270,38 @@ class TestGiteaHttpsConfiguration:
 
         验收标准：AC5，安全验收
 
-        注意：这个测试需要实际的网络访问和有效的 TLS 证书。
-        在开发环境中，由于使用自签名证书或端口转发，可能无法通过此测试。
-        生产环境部署后应运行此测试。
+        使用 openssl 验证 TLS 版本
         """
-        # 在实际部署环境中，使用以下命令验证 TLS 1.3:
-        # openssl s_client -connect gitea.sisys.local:443 -tls1_3
-        #
-        # 开发环境使用端口转发时无法验证 TLS（因为 port-forward 是 HTTP）
-        # 此测试应在生产环境部署后运行
-        pytest.skip(
-            "TLS 1.3 验证需要生产环境部署和有效证书。"
-            "开发环境请使用：openssl s_client -connect gitea.sisys.local:443 -tls1_3 手动验证"
+        import subprocess
+        
+        # 使用 openssl 验证 TLS 1.3
+        result = subprocess.run(
+            [
+                "openssl", "s_client", "-connect", "gitea.sisys.local:31448",
+                "-tls1_3"
+            ],
+            input="Q\n",
+            text=True,
+            capture_output=True,
+            timeout=10,
         )
+        
+        # 检查 TLS 1.3 是否支持
+        if "Protocol  : TLSv1.3" in result.stdout or "TLSv1.3" in result.stderr:
+            assert True, "TLS 1.3 已启用"
+        elif "handshake failure" in result.stderr.lower() or "wrong version" in result.stderr.lower():
+            # TLS 1.3 不支持，尝试 TLS 1.2
+            result_tls12 = subprocess.run(
+                ["openssl", "s_client", "-connect", "gitea.sisys.local:31448", "-tls1_2"],
+                input="Q\n", text=True, capture_output=True, timeout=10,
+            )
+            if "Protocol  : TLSv1.2" in result_tls12.stdout:
+                pytest.fail("仅支持 TLS 1.2，应该启用 TLS 1.3")
+            else:
+                pytest.fail("无法验证 TLS 版本")
+        else:
+            # 可能成功连接，检查协议版本
+            assert "TLS" in result.stdout or "TLS" in result.stderr, "未启用 TLS"
 
 
 class TestGiteaSecurity:

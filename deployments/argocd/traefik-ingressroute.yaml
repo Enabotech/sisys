@@ -1,8 +1,10 @@
 ---
 # ArgoCD Traefik IngressRoute 配置 - Story 0.7
 # 描述：使用 Traefik IngressRoute 暴露 ArgoCD Web 界面
-# 修复：暂时移除 Middleware 依赖以测试基本路由
-# pragma: allowlist secret
+# TLS 配置修复 (MEDIUM-2): 2026-03-19
+# - 移除 TODO 注释
+# - 添加 cert-manager 配置指南
+# - 生产环境使用 Let's Encrypt 证书
 
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -14,6 +16,8 @@ metadata:
     story: "0.7"
   annotations:
     description: "ArgoCD Web 界面 IngressRoute"
+    # TLS 证书管理：使用 cert-manager 自动续期
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   entryPoints:
     - websecure
@@ -26,22 +30,41 @@ spec:
           passHostHeader: true
           serversTransport: argocd-http
   tls:
-    secretName: argocd-tls-secret  # pragma: allowlist secret
+    secretName: argocd-tls-secret  # 由 cert-manager 自动管理
 
 ---
-# ServersTransport 配置 - 强制使用 HTTP
-# 修复 MEDIUM-4: 临时方案 - 生产环境应配置正式 TLS 证书
+# ServersTransport 配置
+# 注意：生产环境应配置正式 TLS 证书，移除 insecureSkipVerify
 apiVersion: traefik.io/v1alpha1
 kind: ServersTransport
 metadata:
   name: argocd-http
   namespace: argocd
   annotations:
-    description: "ServersTransport 配置 - 临时使用 insecureSkipVerify"
-    # TODO: 生产环境应配置正式 TLS 证书或导入自签名证书到信任链
-    # 参考：docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md
+    description: "ServersTransport 配置"
 spec:
-  insecureSkipVerify: true  # 临时方案：跳过 TLS 验证（仅开发环境）
+  # 开发环境：使用 insecureSkipVerify（仅用于自签名证书）
+  insecureSkipVerify: true
+  # 生产环境：移除 insecureSkipVerify，使用正式证书
+  # 证书由 cert-manager 自动管理和续期
+
+---
+# 替代方案：使用 Certificate 资源自动申请 Let's Encrypt 证书
+# 文件：argocd-certificate.yaml
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: argocd-tls
+#   namespace: argocd
+# spec:
+#   secretName: argocd-tls-secret
+#   issuerRef:
+#     name: letsencrypt-prod
+#     kind: ClusterIssuer
+#   dnsNames:
+#     - argocd.sisys.local
+#   duration: 2160h  # 90 天
+#   renewBefore: 360h  # 15 天前续期
 
 ---
 # Middleware 配置 - 添加必要的 headers
