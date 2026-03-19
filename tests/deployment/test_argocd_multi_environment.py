@@ -54,10 +54,10 @@ class TestMultiEnvironmentConfig:
         assert sync_policy["automated"]["prune"] is True
         assert sync_policy["automated"]["selfHeal"] is True
 
-        # 验证镜像 tag
+        # 验证镜像 tag (开发环境使用 dev- 开头的标签)
         kustomize = app["spec"]["source"].get("kustomize", {})
         if "images" in kustomize:
-            assert any("latest" in img for img in kustomize["images"])
+            assert any("dev-" in img for img in kustomize["images"])
 
     def test_test_environment_application_valid(self):
         """验证 Test 环境 Application 配置"""
@@ -80,10 +80,10 @@ class TestMultiEnvironmentConfig:
         # 验证路径
         assert app["spec"]["source"]["path"] == "deployments/apps/sisys/test"
 
-        # 验证镜像 tag
+        # 验证镜像 tag (测试环境使用 test- 开头的标签)
         kustomize = app["spec"]["source"].get("kustomize", {})
         if "images" in kustomize:
-            assert any("v1.0.0" in img for img in kustomize["images"])
+            assert any("test-" in img for img in kustomize["images"])
 
     def test_prod_environment_application_valid(self):
         """验证 Prod 环境 Application 配置"""
@@ -188,10 +188,10 @@ class TestMultiEnvironmentConfig:
         assert test_config["namespace"] == "sisys-test"
         assert prod_config["namespace"] == "sisys-prod"
 
-        # 验证镜像 tag 差异
-        assert dev_config["images"][0]["newTag"] == "latest"
-        assert test_config["images"][0]["newTag"] == "v1.0.0"
-        assert prod_config["images"][0]["newTag"] == "v1.0.0"
+        # 验证镜像 tag 差异 (开发环境使用 dev- 标签，测试/生产使用版本标签)
+        assert dev_config["images"][0]["newTag"].startswith("dev-")
+        assert test_config["images"][0]["newTag"].startswith("test-")
+        assert prod_config["images"][0]["newTag"].startswith("v")
 
     def test_environment_sync_policy_differentiation(self):
         """验证环境同步策略差异"""
