@@ -35,7 +35,7 @@ metadata:
     argocd-image-updater.argoproj.io/app.force-digest: "true"
     
     # 轮询间隔 (测试环境适中)
-    argocd-image-updater.argoproj.io/app.check-interval: 5m
+    argocd-image-updater.argoproj.io/app.check-interval: 2m
     
     # 审批注解
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true

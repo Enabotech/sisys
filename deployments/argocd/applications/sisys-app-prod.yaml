@@ -38,7 +38,7 @@ metadata:
     
     # 强制使用 Digest (生产环境必须)
     argocd-image-updater.argoproj.io/app.force-digest: "true"
-    
+    argocd-image-updater.argoproj.io/app.check-interval: 2m
     # 生产环境需要手动审批
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
