@@ -310,7 +310,7 @@ docker-compose logs -f
 - **完整设置指南**: `WSL2_SETUP.md`
 - **Docker Compose 配置**: `docker-compose.yml`
 - **项目 README**: `../README.md`
-- **快速设置指南**: `../QUICK_SETUP.md`
+- **快速设置指南**: `../docs/delivery/QUICK_SETUP.md`
 
 ---
 
