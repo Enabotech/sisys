@@ -15,7 +15,6 @@ namespace: sisys-test
 # 通用标签
 commonLabels:
   environment: test
-  app.kubernetes.io/environment: testing
 
 # 通用注解
 commonAnnotations:

@@ -15,7 +15,6 @@ namespace: sisys-dev
 # 通用标签
 commonLabels:
   environment: dev
-  app.kubernetes.io/environment: development
 
 # 通用注解
 commonAnnotations:

@@ -15,7 +15,6 @@ namespace: sisys-prod
 # 通用标签
 commonLabels:
   environment: prod
-  app.kubernetes.io/environment: production
 
 # 通用注解
 commonAnnotations:
