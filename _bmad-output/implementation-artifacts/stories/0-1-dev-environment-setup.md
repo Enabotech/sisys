@@ -50,7 +50,7 @@ So that **团队可以高效协作开发**。
   - **方案 2**: WSL 2 + Ubuntu 22.04 + Docker Engine（推荐开发性能）
 - IDE 配置包括代码规范、调试配置、Git 集成
 - 详细 WSL 2 设置指南：`docker/WSL2_SETUP.md`
-- 快速设置指南：`QUICK_SETUP.md`（2026-03-02 新增）
+- 快速设置指南：`docs/delivery/QUICK_SETUP.md`（2026-03-02 新增）
 - **安全提示：** 开发环境可使用默认密码，生产环境必须修改！
 
 ## TDD 工具链说明（2026-03-04 新增）
@@ -146,7 +146,7 @@ scripts/
 ## Documentation
 
 **设置文档：**
-- [QUICK_SETUP.md](../../../QUICK_SETUP.md) - 5 分钟快速设置（推荐新开发者）
+- [docs/delivery/QUICK_SETUP.md](../../../docs/delivery/QUICK_SETUP.md) - 5 分钟快速设置（推荐新开发者）
 - [README.md](../../../README.md) - 项目综合说明
 - [docker/WSL2_SETUP.md](../../../docker/WSL2_SETUP.md) - WSL 2 详细设置指南
 - [docker/WSL2_QUICK_REFERENCE.md](../../../docker/WSL2_QUICK_REFERENCE.md) - WSL 2 快速参考卡片
