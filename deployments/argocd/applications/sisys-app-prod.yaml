@@ -25,7 +25,7 @@ metadata:
     argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
-    argocd-image-updater.argoproj.io/git-branch: HEAD
+    argocd-image-updater.argoproj.io/git-branch: main
     
     # 生产环境使用 semver 策略
     argocd-image-updater.argoproj.io/app.update-strategy: semver
