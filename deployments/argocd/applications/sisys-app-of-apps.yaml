@@ -73,3 +73,5 @@ spec:
       value: dev, test, prod
     - name: Child Applications
       value: sisys-app-dev, sisys-app-test, sisys-app-prod
+    - name: Tag Policy
+      value: Dev=dev-*, Test=test-*, Prod=v*

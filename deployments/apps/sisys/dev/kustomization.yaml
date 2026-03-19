@@ -21,10 +21,11 @@ commonLabels:
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0"
 
-# 镜像配置 (开发环境使用 latest)
+# 镜像配置 - 不使用 latest，使用具体标签
+# Image Updater 会自动更新这个值
 images:
   - name: harbor.sisys.local/sisys/app
-    newTag: latest
+    newTag: dev-main-initial-0000000
 
 # 名称前缀
 namePrefix: dev-
