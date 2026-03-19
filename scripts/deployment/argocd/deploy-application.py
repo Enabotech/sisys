@@ -8,7 +8,7 @@ ArgoCD Application 部署脚本
 3. 配置自动同步策略
 
 使用方法:
-    python scripts/argocd/deploy-application.py
+    python scripts/deployment/argocd/deploy-application.py
 """
 
 import subprocess

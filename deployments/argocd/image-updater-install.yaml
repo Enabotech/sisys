@@ -137,7 +137,7 @@ data:
 # Secret - Harbor 凭据配置
 # 注意：实际 Token 需要通过脚本或手动创建
 # 使用方法:
-#   1. 自动创建：python scripts/argocd/configure-image-updater.py
+#   1. 自动创建：python scripts/deployment/argocd/configure-image-updater.py
 #   2. 手动创建：kubectl create secret generic argocd-image-updater-secret \
 #                --from-literal=harbor="$(echo -n 'robot$argocd-pull:<TOKEN>' | base64)" \
 #                -n argocd

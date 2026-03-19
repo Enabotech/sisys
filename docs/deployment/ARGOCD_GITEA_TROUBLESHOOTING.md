@@ -1,8 +1,8 @@
 # ArgoCD Gitea 集成故障排除指南
 
-**创建日期:** 2026-03-19  
-**故事:** 0.7-argocd-continuous-deployment  
-**任务:** Task 4 - Gitea 仓库集成  
+**创建日期:** 2026-03-19
+**故事:** 0.7-argocd-continuous-deployment
+**任务:** Task 4 - Gitea 仓库集成
 **审查问题:** MEDIUM-1 修复
 
 ---
@@ -146,7 +146,7 @@ https://argocd.sisys.local/api/webhook
 
 ```bash
 # 使用脚本
-bash scripts/argocd/configure-gitea-webhook.sh
+bash scripts/deployment/argocd/configure-gitea-webhook.sh
 
 # 或手动创建
 # 1. Gitea 仓库 → 设置 → Webhook → 添加 Webhook

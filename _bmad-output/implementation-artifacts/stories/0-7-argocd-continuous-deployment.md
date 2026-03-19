@@ -45,7 +45,7 @@ Status: ready-for-review
 
 下一步行动：
 1. 在 Gitea 生成 Personal Access Token 并替换占位符
-2. 运行 `bash scripts/argocd/configure-gitea-webhook.sh` 配置 Webhook
+2. 运行 `bash scripts/deployment/argocd/configure-gitea-webhook.sh` 配置 Webhook
 3. 验证 ArgoCD 可以成功连接 Gitea 仓库
 4. 推送测试镜像验证 Harbor Image Updater 功能
 
@@ -168,7 +168,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - **修复**: 已添加 `insecure: "true"` 配置信任自签名证书
     - **状态**: Secret 已应用，Token 已配置
   - [x] 配置 Webhook 自动触发 ✅
-    - **脚本**: `scripts/argocd/configure-gitea-webhook.sh` (已创建 ✅)
+    - **脚本**: `scripts/deployment/argocd/configure-gitea-webhook.sh` (已创建 ✅)
     - **执行**: Webhook 创建成功 (ID: 2)
     - **验证**: Webhook 状态：激活
   - [x] 验证 Git 仓库连接 ✅
@@ -223,7 +223,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - dev: `deployments/apps/sisys/dev/kustomization.yaml`
     - test: `deployments/apps/sisys/test/kustomization.yaml`
     - prod: `deployments/apps/sisys/prod/kustomization.yaml`
-  - [x] 创建部署脚本：`scripts/argocd/deploy-application.py`
+  - [x] 创建部署脚本：`scripts/deployment/argocd/deploy-application.py`
   - [x] 创建配置文档：`docs/deployment/ARGOCD_APPLICATION_CONFIG.md`
 
 - [x] Task 7: 多环境配置 (AC: 7) ✅
@@ -395,7 +395,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 文件：`docs/deployment/ARGOCD_MULTI_ENV_VERIFICATION.md` (新建)
     - 验收：各环境配置差异符合预期 ✅
   - [x] [MEDIUM-4] 完善 Harbor Secret 配置 ✅
-    - 文件：`scripts/argocd/configure-image-updater-secret.sh` (新建)
+    - 文件：`scripts/deployment/argocd/configure-image-updater-secret.sh` (新建)
     - 验收：提供完整 Secret 创建脚本 ✅
   - [x] [MEDIUM-5] 修复 RBAC services 权限 ✅
     - 文件：`deployments/argocd/rbac.yaml`
@@ -642,7 +642,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 - [x] [AI-Review][MEDIUM] 缺少 Gitea Webhook 实际配置证据
   - Story 声称 Webhook 已配置并测试
   - 实际：未发现 Webhook 创建脚本执行记录
-  - 修复：✅ 已创建 `scripts/argocd/configure-gitea-webhook.sh` 脚本
+  - 修复：✅ 已创建 `scripts/deployment/argocd/configure-gitea-webhook.sh` 脚本
 
 - [x] [AI-Review][MEDIUM] HTTPS 证书验证配置使用 `insecureSkipVerify: true`
   - 文件：`deployments/argocd/traefik-ingressroute.yaml`
@@ -1540,7 +1540,7 @@ Qwen Code (AI 开发助手)
 
 **问题 6: Python 脚本硬编码配置**
 - **修复:** 添加 `argparse` 支持命令行参数
-- **文件:** `scripts/argocd/configure-image-updater.py` 第 1-65 行，第 373-473 行
+- **文件:** `scripts/deployment/argocd/configure-image-updater.py` 第 1-65 行，第 373-473 行
 - **说明:** 支持自定义 Harbor URL、命名空间、凭据等参数
 
 **问题 7: 缺少资源限制监控**
@@ -1574,7 +1574,7 @@ Qwen Code (AI 开发助手)
 - `deployments/argocd/image-updater-install.yaml` - Secret 配置、NetworkPolicy、Prometheus 注解
 - `deployments/harbor/ingress.yaml` - 路由顺序调整
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 故障恢复指南、版本兼容性
-- `scripts/argocd/configure-image-updater.py` - 命令行参数支持
+- `scripts/deployment/argocd/configure-image-updater.py` - 命令行参数支持
 - `tests/deployment/test_argocd_harbor_integration.py` - 测试增强
 - `_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md` - 审查记录
 
@@ -1582,8 +1582,8 @@ Qwen Code (AI 开发助手)
 - `tests/deployment/test_argocd_gitea_integration.py` - 集成测试
 - `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置
 - `deployments/argocd/gitea-webhook-config.yaml` - Webhook 配置
-- `scripts/argocd/setup-gitea-integration.py` - 自动配置脚本
-- `scripts/argocd/create-gitea-org-repo.py` - 创建组织和仓库脚本
+- `scripts/deployment/argocd/setup-gitea-integration.py` - 自动配置脚本
+- `scripts/deployment/argocd/create-gitea-org-repo.py` - 创建组织和仓库脚本
 - `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - 配置指南文档
 
 **配置验证:**
@@ -1701,7 +1701,7 @@ SKIPPED test_end_to_end_image_update_workflow - 需实际推送镜像测试
    - 包含故障排除、最佳实践、示例配置
 
 3. **自动化脚本**
-   - 创建 `scripts/argocd/configure-image-updater.py` 自动配置脚本
+   - 创建 `scripts/deployment/argocd/configure-image-updater.py` 自动配置脚本
    - 一键完成 Robot Account、Secret、Webhook 配置
 
 4. **安全加固**
@@ -1759,7 +1759,7 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `deployments/argocd/image-updater-config.yaml` - 完整配置指南和示例 Application
 - `tests/deployment/test_argocd_harbor_integration.py` - 集成测试
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 配置指南文档
-- `scripts/argocd/configure-image-updater.py` - 自动配置脚本
+- `scripts/deployment/argocd/configure-image-updater.py` - 自动配置脚本
 
 **Harbor 配置信息:**
 - 项目：sisys (project_id=2)
@@ -1869,7 +1869,7 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `deployments/apps/sisys/test/kustomization.yaml` - Test 环境 Overlay
 - `deployments/apps/sisys/prod/kustomization.yaml` - Prod 环境 Overlay
 - `tests/deployment/test_argocd_application.py` - Application 测试 (17 个测试用例)
-- `scripts/argocd/deploy-application.py` - Application 部署脚本
+- `scripts/deployment/argocd/deploy-application.py` - Application 部署脚本
 - `docs/deployment/ARGOCD_APPLICATION_CONFIG.md` - Application 配置指南
 
 **Task 5 创建的文件:**
@@ -1877,19 +1877,19 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `deployments/argocd/image-updater-install.yaml` - ArgoCD Image Updater 安装清单（v0.14.0）
 - `deployments/argocd/image-updater-config.yaml` - Image Updater 完整配置指南和示例 Application
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - ArgoCD Image Updater 配置指南
-- `scripts/argocd/configure-image-updater.py` - Image Updater 自动配置脚本
+- `scripts/deployment/argocd/configure-image-updater.py` - Image Updater 自动配置脚本
 - `_bmad-output/implementation-artifacts/stories/task-5-tdd-summary.md` - TDD 流程总结文档
 
 **Task 4 创建的文件:**
 - `tests/deployment/test_argocd_gitea_integration.py` - ArgoCD Gitea 集成测试
 - `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置（Secret + ConfigMap）
 - `deployments/argocd/gitea-webhook-config.yaml` - Gitea Webhook 配置
-- `scripts/argocd/setup-gitea-integration.py` - Gitea 集成自动配置脚本
-- `scripts/argocd/create-gitea-org-repo.py` - 创建 Gitea 组织和仓库脚本
-- `scripts/argocd/check-gitea-repos.py` - 检查 Gitea 仓库脚本
-- `scripts/argocd/delete-existing-tokens.py` - 删除已存在 Token 脚本
-- `scripts/argocd/update-webhook-url.py` - 更新 Webhook URL 脚本
-- `scripts/argocd/verify-gitea-webhook.py` - 验证 Webhook 配置脚本
+- `scripts/deployment/argocd/setup-gitea-integration.py` - Gitea 集成自动配置脚本
+- `scripts/deployment/argocd/create-gitea-org-repo.py` - 创建 Gitea 组织和仓库脚本
+- `scripts/deployment/argocd/check-gitea-repos.py` - 检查 Gitea 仓库脚本
+- `scripts/deployment/argocd/delete-existing-tokens.py` - 删除已存在 Token 脚本
+- `scripts/deployment/argocd/update-webhook-url.py` - 更新 Webhook URL 脚本
+- `scripts/deployment/argocd/verify-gitea-webhook.py` - 验证 Webhook 配置脚本
 - `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - Gitea 集成配置指南
 
 **Task 1 创建的文件:**
@@ -2214,7 +2214,7 @@ argocd-server-7bd488bb9b-gzjc7                      1/1 Running
   - Trivy 扫描验证 ✅
   - 明文密码验证 ✅
 
-**新增测试:** 
+**新增测试:**
 - `test_argocd_config_validation.py` - 配置验证测试 (CRITICAL-3)
 - `test_argocd_performance.py` - 性能基准测试 (LOW-2) - **已运行通过** ✅
 - `test_argocd_security.py` - 更新 PSP 测试为 PSA 测试 (CRITICAL-4)

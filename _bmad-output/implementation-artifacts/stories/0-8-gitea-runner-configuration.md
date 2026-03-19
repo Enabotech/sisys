@@ -9,19 +9,28 @@ Status: ready-for-dev
 创建者：Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 故事来源：sprint-status.yaml (第一个 backlog 故事)
 前置依赖：Story 0.4 (K3S 集群 ✅), Story 0.5 (Gitea ✅), Story 0.6 (Harbor ✅), Story 0.7 (ArgoCD ✅)
+
+质量审查修复记录：
+- 修复 #1: 添加明确的 TDD 测试要求和覆盖率指标 ✅
+- 修复 #2: 更正 Gitea Runner 版本为 v0.3.0 (2026-02-18 发布) ✅
+- 修复 #3: 更新文件头部注释，移除过时的"latest"说明 ✅
+- 修复 #4: 修正 Docker Executor 配置为 rootless 模式 ✅
+- 修复 #5: 添加故障排除指南 ✅
+- 修复 #6: 补充性能基准和监控指标 ✅
+- 修复 #7: 完善架构合规验证测试项 ✅
 -->
 
 ## Story
 
 As a **DevOps 工程师**,
-I want **配置 Gitea Runner v1.25.4 支持 Docker 和 K8s 执行器**,
+I want **配置 Gitea Runner v0.3.0 支持 Docker 和 K8s 执行器**,
 so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构建、测试和部署**。
 
 ## Acceptance Criteria
 
 1. **Given** K3S 集群已部署 (Story 0.4 ✅ 已完成)
    **When** 运行 Gitea Runner Helm Chart 或 kubectl apply
-   **Then** Gitea Runner v1.25.4 部署成功
+   **Then** Gitea Runner v0.3.0 部署成功
    - 所有 Pod 状态为 Running (`kubectl get pods -n gitea-actions`，无 CrashLoopBackOff 或 Error 状态)
    - Runner 在 Gitea 管理页面显示为"空闲"状态
    - Pod 启动时间 < 60 秒
@@ -142,10 +151,23 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 
 - [ ] Task 9: 架构合规验证
   - [ ] 验证 TLS 1.3 强制启用（Gitea/Harbor 通信）
+    - 测试文件：`test_architecture_compliance.py::TestTLSConfiguration`
+    - 验收：SSL Labs 评级 ≥ A，TLS 1.3 强制启用
   - [ ] 验证 Secret 存储于 Kubernetes Secret（无明文配置）
+    - 测试文件：`test_architecture_compliance.py::TestSecretManagement`
+    - 验收：Git 仓库无明文 Token/密码，配置测试 100% 通过
   - [ ] 验证网络策略（NetworkPolicy 隔离）
+    - 测试文件：`test_architecture_compliance.py::TestNetworkPolicy`
+    - 验收：默认拒绝策略，仅允许白名单通信
   - [ ] 验证资源限制（ResourceQuota + LimitRange）
+    - 测试文件：`test_architecture_compliance.py::TestResourceLimits`
+    - 验收：命名空间资源限制生效，Pod 限制配置正确
+  - [ ] 验证 rootless 模式（无特权容器）
+    - 测试文件：`test_architecture_compliance.py::TestRootlessMode`
+    - 验收：无 `--privileged`，无 docker.sock 挂载
   - [ ] 运行所有 TDD 测试
+    - 测试文件：`tests/gitea-runner/` 下所有测试
+    - 验收：通过率 100%，覆盖率 ≥ 80%
 
 - [ ] Task 10: 代码审查修复
   - [ ] 修复 HIGH 优先级问题
@@ -165,6 +187,23 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 
 ## Dev Notes
 
+### Story 复杂度评估
+
+| 维度 | 评估 | 说明 |
+|------|------|------|
+| **技术复杂度** | ⭐⭐⭐ 中等 | 涉及 K8s、Docker、CI/CD 多个技术领域 |
+| **依赖关系** | ⭐⭐⭐⭐ 较高 | 依赖 Story 0.4-0.7 全部完成 |
+| **工作量** | ⭐⭐⭐ 中等 | 预计 3-5 天（含测试和文档） |
+| **风险等级** | ⭐⭐ 中低 | 技术成熟，有官方文档支持 |
+| **测试复杂度** | ⭐⭐⭐ 中等 | 需要多环境验证和集成测试 |
+
+**预计工作量分解：**
+- Task 1-2 (Token + 部署): 0.5 天
+- Task 3-4 (Executor 配置): 1-1.5 天
+- Task 5-6 (Pipeline + Harbor): 1-1.5 天
+- Task 7-8 (多 Runner + 监控): 0.5-1 天
+- Task 9-11 (验证 + 审查): 0.5-1 天
+
 ### 前置依赖关系
 
 **必须完成的前置 Story：**
@@ -179,19 +218,77 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 
 ### 技术选型说明
 
-**Gitea Runner 版本：** v1.25.4（与 Gitea 服务端版本一致）
-- 来源：https://blog.gitea.com/release-of-1.25.4
-- 发布日期：2026-01-22
-- 安全修复：9 个 CVE 漏洞修复
-- Go 版本：1.25.6
+**Gitea Runner (act_runner) 版本：** v0.3.0（最新稳定版）
+- 镜像：`gitea/act_runner:v0.3.0` 或 `gitea/act_runner:latest`
+- 发布日期：2026-02-18
+- 来源：https://gitea.com/gitea/act_runner/releases/tag/v0.3.0
+- **关键更新**：
+  - 更新 act 到 v0.261.8（兼容 GitHub Actions 最新语法）
+  - 改进 DIND rootless 网络性能（构建速度提升）
+  - 升级 Go 版本到 1.26（更好的性能和安全性）
+  - 支持 linux/loong64 架构（如需龙芯平台）
+  - 不再隐式挂载 `/var/run/docker.sock`（更安全）
+- 与 Gitea 服务端版本关系：兼容 Gitea 1.20+ 所有版本（当前服务端 v1.25.4 ✅）
+
+**镜像标签策略：**
+
+| 环境 | 推荐标签 | 说明 |
+|------|---------|------|
+| **开发环境** | `latest` 或 `latest-dind-rootless` | 始终使用最新版本，快速获得新特性 |
+| **测试环境** | `v0.3.0` 或 `v0.3.0-dind-rootless` | 固定版本，保证测试可重复性 |
+| **生产环境** | `v0.3.0` (具体版本号) | 固定版本，变更需经过审批和测试 |
 
 **执行器选择：**
 - **Docker Executor**：适合简单构建任务，资源开销小
+  - 推荐镜像：`gitea/act_runner:v0.3.0-dind-rootless`（安全，无需特权模式）
 - **K8s Executor**：适合复杂任务，资源隔离好，支持并发
+  - 每个 Job 在独立 Pod 中执行，天然隔离
 
 **部署方式：**
 - **Helm Chart**：推荐，配置管理方便，支持多环境
 - **kubectl**：灵活，适合自定义场景
+
+### TDD 测试要求
+
+**测试覆盖率指标：**
+- 单元测试覆盖率：≥ 80%（使用 pytest-cov 测量）
+- 集成测试覆盖率：≥ 70%
+- 关键路径测试：100%（Runner 部署、Executor 配置、Pipeline 触发）
+
+**测试文件结构（与现有 tests/deployment/ 对齐）：**
+```
+tests/deployment/
+├── conftest.py                      # pytest 夹具配置（已有）
+├── test_gitea_runner_deployment.py  # Runner 部署测试 (≥10 个测试用例)
+├── test_docker_executor.py          # Docker 执行器测试 (≥8 个测试用例)
+├── test_k8s_executor.py             # K8s 执行器测试 (≥8 个测试用例)
+├── test_pipeline_trigger.py         # Pipeline 触发测试 (≥6 个测试用例)
+├── test_gitea_harbor_integration.py # Harbor 集成测试 (≥5 个测试用例)
+└── test_gitea_architecture_compliance.py  # 架构合规测试 (≥10 个测试用例)
+```
+
+**与现有测试对齐：**
+- 命名规范：`test_gitea_*.py`（与 `test_argocd_*.py`, `test_harbor_*.py` 保持一致）
+- 位置：`tests/deployment/`（部署测试标准位置）
+- 夹具：复用 `tests/conftest.py` 和 `tests/fixtures/` 中的通用夹具
+
+**测试实施步骤 (TDD 流程)：**
+1. **红** - 先写失败的测试（定义预期行为）
+2. **绿** - 编写最小实现使测试通过
+3. **重构** - 优化代码保持测试通过
+
+**Task 中的 TDD 实施：**
+- Task 2: 先写 `test_gitea_runner_deployment.py` 再部署 Runner
+- Task 3: 先写 `test_docker_executor.py` 再配置 Docker Executor
+- Task 4: 先写 `test_k8s_executor.py` 再配置 K8s Executor
+- Task 5: 先写 `test_pipeline_trigger.py` 再创建 Pipeline
+- Task 9: 运行所有测试，覆盖率达标后标记完成
+
+**验收标准：**
+- 所有测试文件存在且可执行
+- 测试通过率 100%
+- 总体覆盖率 ≥ 80%
+- 关键路径测试 100% 覆盖
 
 ### 关键配置参数
 
@@ -204,13 +301,182 @@ GITEA_RUNNER_LABELS: docker,k8s,standard
 GITEA_RUNNER_CAPACITY: 3  # 最大并发 Job 数
 ```
 
+### 性能基准
+
+**预期性能指标：**
+
+| 指标 | 目标值 | 测量方式 |
+|------|--------|---------|
+| Runner 启动时间 | < 30 秒 | `kubectl get pods -w` |
+| Job 调度延迟 | < 5 秒 | Gitea Actions 页面时间戳差 |
+| 并发 Job 支持 | ≥ 6 个 | 同时触发多个 PR |
+| Docker 镜像拉取速度 | ≥ 50MB/s (本地 Harbor) | `docker pull` 时间 |
+| Pipeline 执行效率 | 7 阶段 < 10 分钟 (标准项目) | Pipeline 总耗时 |
+| 资源消耗 (每 Runner) | CPU: 500m-2000m, Memory: 1-4Gi | Prometheus 监控 |
+
+**资源规划建议：**
+
+| 团队规模 | Runner 副本数 | 总资源需求 |
+|---------|-------------|-----------|
+| 小型 (1-5 人) | 2 | CPU: 2 核，Memory: 4Gi |
+| 中型 (5-15 人) | 3-5 | CPU: 6-10 核，Memory: 12-20Gi |
+| 大型 (15+ 人) | 5-10 | CPU: 10-20 核，Memory: 20-40Gi |
+
+### 监控指标定义
+
+**Prometheus Metrics (通过 Kube State Metrics 采集)：**
+
+```yaml
+# Runner Pod 监控指标
+- container_cpu_usage_seconds_total{namespace="gitea-actions"}  # CPU 使用率
+- container_memory_usage_bytes{namespace="gitea-actions"}  # 内存使用量
+- kube_pod_status_phase{namespace="gitea-actions",phase="Running"}  # Pod 运行状态
+- kube_pod_container_status_restarts_total{namespace="gitea-actions"}  # 重启次数
+
+# 自定义业务指标 (通过 Gitea API 采集)
+- gitea_actions_job_duration_seconds{job_name="~".*"}  # Job 执行时长
+- gitea_actions_job_result{job_name="~".*"}  # Job 结果 (success/failure/cancelled)
+- gitea_actions_queue_depth  # 等待执行的 Job 数量
+- gitea_runner_idle_count  # 空闲 Runner 数量
+```
+
+**Grafana 仪表盘建议：**
+
+1. **Runner 健康度** - Pod 状态、重启次数、资源使用率
+2. **Pipeline 效率** - 执行时长趋势、成功率、队列深度
+3. **资源容量规划** - CPU/内存使用趋势、并发 Job 数
+
+### 故障排除指南
+
+#### Runner 离线/不响应
+
+**症状：** Gitea 管理页面显示 Runner 为"离线"或"繁忙"
+
+**排查步骤：**
+```bash
+# 1. 检查 Pod 状态
+kubectl get pods -n gitea-actions
+kubectl describe pod <runner-pod-name> -n gitea-actions
+
+# 2. 查看 Runner 日志
+kubectl logs -n gitea-actions <runner-pod-name> --tail=100
+
+# 3. 检查 Token 是否有效
+kubectl get secret gitea-runner-token -n gitea-actions -o jsonpath='{.data.token}' | base64 -d
+
+# 4. 测试 Gitea 连接
+kubectl exec -n gitea-actions <runner-pod-name> -- curl -k https://gitea.sisys.local/api/v1/version
+
+# 5. 重启 Runner
+kubectl rollout restart deployment/gitea-runner -n gitea-actions
+```
+
+**常见问题：**
+- Token 过期 → 重新创建 Token 并更新 Secret
+- 网络不通 → 检查 NetworkPolicy 和 Service
+- 资源不足 → 增加副本数或调整资源限制
+
+#### Job 卡住/不执行
+
+**症状：** Pipeline 显示"等待 Runner"或 Job 长时间无进展
+
+**排查步骤：**
+```bash
+# 1. 查看 Gitea Actions 队列
+# Gitea 管理页面 → Actions → 查看队列深度
+
+# 2. 检查 Runner 容量
+kubectl get deployment gitea-runner -n gitea-actions -o yaml | grep CAPACITY
+
+# 3. 查看 Job 日志
+kubectl logs -n gitea-actions -l app=gitea-runner --tail=200
+
+# 4. 检查是否有匹配的 Runner 标签
+# Job 中 runs-on 标签需与 Runner LABELS 匹配
+```
+
+**常见问题：**
+- 无匹配 Runner → 检查 Job 的 `runs-on` 标签
+- 并发数已满 → 增加 `GITEA_RUNNER_CAPACITY` 或副本数
+- 镜像拉取失败 → 检查镜像源网络或配置镜像缓存
+
+#### Docker 构建失败
+
+**症状：** `docker build` 或 `docker push` 命令失败
+
+**排查步骤：**
+```bash
+# 1. 检查 dind 容器状态
+kubectl exec -n gitea-actions <runner-pod-name> -- docker ps
+
+# 2. 测试 Docker 命令
+kubectl exec -n gitea-actions <runner-pod-name> -- docker info
+
+# 3. 检查 Docker 存储空间
+kubectl exec -n gitea-actions <runner-pod-name> -- df -h
+
+# 4. 清理 Docker 缓存
+kubectl exec -n gitea-actions <runner-pod-name> -- docker system prune -af
+```
+
+**常见问题：**
+- dind 未启动 → 检查 `dind.enabled: true`
+- 存储空间不足 → 增加 PVC 容量或配置清理策略
+- 网络问题 → 检查 `network: host` 配置
+
+#### Harbor 推送失败
+
+**症状：** `docker push harbor.sisys.local/...` 认证失败或超时
+
+**排查步骤：**
+```bash
+# 1. 测试 Harbor 登录
+kubectl exec -n gitea-actions <runner-pod-name> -- \
+  docker login harbor.sisys.local -u <robot-account> -p <token>
+
+# 2. 检查 Harbor 可访问性
+kubectl exec -n gitea-actions <runner-pod-name> -- \
+  curl -k https://harbor.sisys.local/health
+
+# 3. 验证 Robot Account 权限
+# Harbor 管理页面 → 项目 → 机器人账户 → 检查推送权限
+```
+
+**常见问题：**
+- 认证失败 → 检查 Robot Account Token 是否过期
+- TLS 证书问题 → 配置 `insecure-registries` 或更新证书
+- 权限不足 → 检查 Robot Account 的项目权限
+
+#### Pipeline 触发失败
+
+**症状：** 代码推送后 Pipeline 未自动触发
+
+**排查步骤：**
+```bash
+# 1. 检查 Gitea Webhook 配置
+# 仓库设置 → Webhook → 检查是否配置推送事件
+
+# 2. 查看 Webhook 日志
+# Gitea 管理页面 → 站点管理 → Webhook 日志
+
+# 3. 检查 .gitea/workflows 文件
+# 确认 workflows 文件语法正确且位于正确路径
+
+# 4. 手动触发测试
+# Actions 页面 → 手动运行 workflow
+```
+
+**常见问题：**
+- 分支不匹配 → 检查 `on.push.branches` 配置
+- Workflow 语法错误 → 使用 Gitea 语法验证
+- Webhook 被禁用 → 启用 Webhook 并检查事件类型
+
 ### Project Structure Notes
 
-**统一项目结构对齐：**
+**统一项目结构对齐（与 sisys 根目录对齐）：**
+
 ```
-_bmad-output/implementation-artifacts/
-├── stories/
-│   └── 0-8-gitea-runner-configuration.md  # 本故事文件
+sisys/
 ├── deployments/
 │   └── gitea-runner/
 │       ├── values.yaml                    # Helm Chart 配置
@@ -218,21 +484,55 @@ _bmad-output/implementation-artifacts/
 │       ├── runner-k8s-executor.yaml       # K8s 执行器配置
 │       └── rbac.yaml                      # RBAC 权限配置
 ├── scripts/
-│   └── gitea-runner/
-│       ├── deploy-runner.sh               # 部署脚本
-│       ├── register-runner.sh             # 注册 Runner 脚本
-│       └── test-pipeline.sh               # Pipeline 测试脚本
+│   └── deployment/
+│       └── gitea-runner/
+│           ├── deploy-runner.sh           # Runner 部署脚本
+│           ├── register-runner.sh         # Runner 注册脚本
+│           └── test-pipeline.sh           # Pipeline 测试脚本
 ├── .gitea/
 │   └── workflows/
 │       ├── ci.yaml                        # CI Pipeline 模板
 │       └── cd.yaml                        # CD Pipeline 模板
-└── tests/
-    └── gitea-runner/
-        ├── test_runner_deployment.py      # Runner 部署测试
-        ├── test_docker_executor.py        # Docker 执行器测试
-        ├── test_k8s_executor.py           # K8s 执行器测试
-        └── test_pipeline_trigger.py       # Pipeline 触发测试
+├── tests/
+│   └── deployment/
+│       ├── test_gitea_runner_deployment.py    # Runner 部署测试
+│       ├── test_docker_executor.py            # Docker 执行器测试
+│       ├── test_k8s_executor.py               # K8s 执行器测试
+│       ├── test_pipeline_trigger.py           # Pipeline 触发测试
+│       ├── test_gitea_harbor_integration.py   # Harbor 集成测试
+│       └── test_gitea_architecture_compliance.py  # 架构合规测试
+└── docs/
+    └── deployment/
+        └── GITEA_RUNNER_CONFIG.md         # Gitea Runner 配置文档
 ```
+
+**与现有结构对齐说明：**
+
+| 目录 | 用途 | 现有内容 | 新增内容 |
+|------|------|---------|---------|
+| `deployments/` | K8s/Helm 部署配置 | gitea/, harbor/, argocd/, apps/, test-app/ | gitea-runner/ |
+| `scripts/deployment/` | 部署脚本 | argocd/ (12 个), harbor/ (5 个), k3s/ (10 个) | gitea-runner/ |
+| `tests/deployment/` | 部署测试 | test_argocd_*.py, test_harbor_*.py | test_gitea_runner_*.py |
+| `.gitea/workflows/` | CI/CD Pipeline | (待创建) | ci.yaml, cd.yaml |
+| `docs/deployment/` | 部署文档 | argocd/, harbor/ 目录 | GITEA_RUNNER_CONFIG.md |
+
+**脚本目录结构（已重构）：**
+```
+scripts/
+├── deployment/              # 所有部署相关脚本
+│   ├── argocd/             # ArgoCD 脚本（12 个，已从 scripts/argocd/ 移入）
+│   ├── harbor/             # Harbor 脚本（5 个，已从 scripts/harbor/ 移入）
+│   ├── k3s/                # K3S 脚本（10 个）
+│   └── gitea-runner/       # Gitea Runner 脚本（新增）
+├── testing/                # 测试相关脚本
+├── database/               # 数据库脚本
+└── ...
+```
+
+**命名规范：**
+- 测试文件：`test_gitea_runner_*.py`（与 `test_argocd_*.py`, `test_harbor_*.py` 保持一致）
+- 脚本目录：`scripts/deployment/gitea-runner/`（与 `scripts/deployment/argocd/` 保持一致）
+- 部署配置：`deployments/gitea-runner/`（与 `deployments/harbor/`, `deployments/argocd/` 保持一致）
 
 ### 与 Story 0.7 ArgoCD 的协同
 
@@ -268,6 +568,74 @@ ArgoCD 自动同步部署到 K8s
 - 推送前自动触发 Trivy 扫描
 - 配置镜像签名验证（复用 Story 0.6 Cosign）
 
+### 回滚方案
+
+**场景 1：Runner 配置错误导致无法使用**
+
+```bash
+# 1. 快速回滚到上一版本配置
+kubectl rollout undo deployment/gitea-runner -n gitea-actions
+
+# 2. 验证回滚后状态
+kubectl rollout status deployment/gitea-runner -n gitea-actions
+kubectl get pods -n gitea-actions
+
+# 3. 检查 Runner 是否重新上线
+# Gitea 管理页面 → Actions → Runners
+```
+
+**场景 2：Token 失效或泄露**
+
+```bash
+# 1. 在 Gitea 管理页面撤销旧 Token
+# 管理页面 → 设置 → Actions → 删除问题 Token
+
+# 2. 创建新 Token 并更新 Secret
+kubectl create secret generic gitea-runner-token \
+  --from-literal=token=<new-token> \
+  -n gitea-actions \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. 重启 Runner 使新 Token 生效
+kubectl rollout restart deployment/gitea-runner -n gitea-actions
+```
+
+**场景 3：Runner 镜像版本问题**
+
+```bash
+# 1. 回滚镜像版本到 v0.2.13（上一稳定版）
+kubectl set image deployment/gitea-runner \
+  runner=gitea/act_runner:v0.2.13 -n gitea-actions
+
+# 2. 观察回滚进度
+kubectl rollout status deployment/gitea-runner -n gitea-actions
+
+# 3. 验证 Runner 功能
+# 触发测试 Pipeline 确认功能正常
+```
+
+**场景 4：完全卸载 Runner**
+
+```bash
+# 1. 删除 Helm Release（如果是 Helm 部署）
+helm uninstall gitea-runner -n gitea-actions
+
+# 或删除 kubectl 资源
+kubectl delete -f deployments/gitea-runner/ -n gitea-actions
+
+# 2. 清理命名空间
+kubectl delete namespace gitea-actions
+
+# 3. 在 Gitea 管理页面删除 Runner 注册
+# 管理页面 → 设置 → Actions → 删除 Runner
+```
+
+**回滚验证清单：**
+- [ ] Runner 在 Gitea 页面显示为"空闲"
+- [ ] 能够触发测试 Pipeline
+- [ ] Pipeline 所有阶段执行成功
+- [ ] 监控指标恢复正常
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/sprint-status.yaml#development_status] - 故事来源和状态追踪
@@ -275,7 +643,8 @@ ArgoCD 自动同步部署到 K8s
 - [Source: _bmad-output/implementation-artifacts/stories/0-5-gitea-code-hosting.md] - Gitea 部署详情
 - [Source: _bmad-output/implementation-artifacts/stories/0-6-harbor-image-registry.md] - Harbor 部署详情
 - [Source: _bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md] - ArgoCD 部署详情
-- [Source: https://blog.gitea.com/release-of-1.25.4] - Gitea 1.25.4 发布说明
+- [Source: https://gitea.com/gitea/act_runner/releases/tag/v0.3.0] - Gitea act_runner v0.3.0 发布说明（2026-02-18）
+- [Source: https://gitea.com/gitea/act_runner] - Gitea act_runner 官方仓库
 - [Source: https://blog.lusyoe.com/article/gitea-runner-on-kubernetes] - Gitea Runner K8s 部署指南
 - [Source: https://docs.gitea.com/usage/actions/runner] - Gitea Runner 官方文档
 
@@ -309,20 +678,23 @@ ArgoCD 自动同步部署到 K8s
 **创建的文件：**
 - `_bmad-output/implementation-artifacts/stories/0-8-gitea-runner-configuration.md`
 
-**预期创建的文件（dev-story 执行后）：**
+**预期创建的文件（dev-story 执行后，路径相对于项目根目录）：**
 - `deployments/gitea-runner/values.yaml`
 - `deployments/gitea-runner/runner-docker-executor.yaml`
 - `deployments/gitea-runner/runner-k8s-executor.yaml`
 - `deployments/gitea-runner/rbac.yaml`
-- `scripts/gitea-runner/deploy-runner.sh`
-- `scripts/gitea-runner/register-runner.sh`
-- `scripts/gitea-runner/test-pipeline.sh`
+- `scripts/deployment/gitea-runner/deploy-runner.sh`
+- `scripts/deployment/gitea-runner/register-runner.sh`
+- `scripts/deployment/gitea-runner/test-pipeline.sh`
 - `.gitea/workflows/ci.yaml`
 - `.gitea/workflows/cd.yaml`
-- `tests/gitea-runner/test_runner_deployment.py`
-- `tests/gitea-runner/test_docker_executor.py`
-- `tests/gitea-runner/test_k8s_executor.py`
-- `tests/gitea-runner/test_pipeline_trigger.py`
+- `tests/deployment/test_gitea_runner_deployment.py`
+- `tests/deployment/test_docker_executor.py`
+- `tests/deployment/test_k8s_executor.py`
+- `tests/deployment/test_pipeline_trigger.py`
+- `tests/deployment/test_gitea_harbor_integration.py`
+- `tests/deployment/test_gitea_architecture_compliance.py`
+- `docs/deployment/GITEA_RUNNER_CONFIG.md`
 
 ---
 
@@ -336,8 +708,15 @@ replicaCount: 3
 
 image:
   repository: gitea/act_runner
-  tag: "1.25.4"
+  tag: "v0.3.0"  # 最新稳定版本 (2026-02-18)
   pullPolicy: IfNotPresent
+
+# Docker Executor 配置（推荐 rootless 模式）
+dind:
+  enabled: true
+  image:
+    repository: gitea/act_runner
+    tag: "v0.3.0-dind-rootless"  # rootless 模式，更安全
 
 env:
   GITEA_INSTANCE_URL: "https://gitea.sisys.local"
@@ -360,7 +739,7 @@ persistence:
   storageClass: "local-path"
 ```
 
-### Docker Executor 配置示例
+### Docker Executor 配置示例（推荐 rootless 模式）
 
 ```yaml
 # deployments/gitea-runner/runner-docker-executor.yaml
@@ -377,10 +756,12 @@ data:
       timeout: 10m
     container:
       network: host
-      options: --privileged
+      # rootless 模式 - 无需特权，更安全
       workdir: /workspace
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
+      # 使用 rootless dind 镜像
+      image: gitea/act_runner:v0.3.0-dind-rootless
+      # 不需要 --privileged 或挂载 docker.sock
+      # rootless dind 会在容器内运行无根 Docker
 ```
 
 ### K8s Executor 配置示例

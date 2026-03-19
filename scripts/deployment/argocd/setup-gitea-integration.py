@@ -17,7 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 GITEA_URL = "http://localhost:3000"
 GITEA_API = f"{GITEA_URL}/api/v1"
 GITEA_USERNAME = "gitea_admin"
-GITEA_PASSWORD = "Admin@123456"  # nosec B105 pragma: allowlist secret
+GITEA_PASSWORD = "Admin@123456"  # pragma: allowlist secret
 ARGOCD_NAMESPACE = "argocd"
 
 # Token 名称（带时间戳避免冲突）
