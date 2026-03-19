@@ -52,12 +52,6 @@ spec:
     kustomize:
       images:
         - harbor.sisys.local/sisys/app:test-v0.0.0-initial
-      commonLabels:
-        app.kubernetes.io/managed-by: argocd
-        app.kubernetes.io/part-of: sisys
-        app.kubernetes.io/environment: testing
-      commonAnnotations:
-        argocd.argoproj.io/tracking-id: sisys-app-test
 
   # 目标配置 - Test 命名空间
   destination:

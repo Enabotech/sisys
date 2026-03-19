@@ -55,12 +55,6 @@ spec:
     kustomize:
       images:
         - harbor.sisys.local/sisys/app:v1.0.0
-      commonLabels:
-        app.kubernetes.io/managed-by: argocd
-        app.kubernetes.io/part-of: sisys
-        app.kubernetes.io/environment: production
-      commonAnnotations:
-        argocd.argoproj.io/tracking-id: sisys-app-prod
 
   # 目标配置 - Prod 命名空间
   destination:

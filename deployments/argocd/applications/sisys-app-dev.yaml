@@ -54,12 +54,6 @@ spec:
     kustomize:
       images:
         - harbor.sisys.local/sisys/app:dev-main-initial-0000000
-      commonLabels:
-        app.kubernetes.io/managed-by: argocd
-        app.kubernetes.io/part-of: sisys
-        app.kubernetes.io/environment: development
-      commonAnnotations:
-        argocd.argoproj.io/tracking-id: sisys-app-dev
 
   # 目标配置 - Dev 命名空间
   destination:
