@@ -28,7 +28,7 @@ metadata:
     # 更新策略：latest 表示使用最新标签
     argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.update-strategy: latest
     # 允许更新到任何标签（包括 latest）
-    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:.*
+    argocd-image-updater.argoproj.io/harbor.sisys.local-sisys-app.allow-tags: regexp:^dev-
 spec:
   project: default
 
