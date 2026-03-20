@@ -1,0 +1,86 @@
+# ============================================================
+# Gitea Runner Helm Chart Values (标准版配置)
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# Task: 2 - Gitea Runner 部署
+#
+# 镜像：docker.io/gitea/act_runner:0.3.0 (标准版)
+# 理由：兼容性最好，无需特权模式，直接复用 K3s containerd
+# ============================================================
+
+# Helm Chart 基本信息
+nameOverride: gitea-runner
+fullnameOverride: gitea-runner
+
+# 副本数（支持并发）
+replicaCount: 3
+
+# 镜像配置（标准版 - 非 dind）
+image:
+  repository: docker.io/gitea/act_runner
+  tag: "0.3.0"              # 标准版，非 dind-rootless
+  pullPolicy: IfNotPresent  # 优先使用本地镜像
+
+# 环境变量配置
+env:
+  # Gitea 实例 URL (使用内部 HTTP 服务避免 TLS 问题)
+  GITEA_INSTANCE_URL: "http://gitea-http.gitea.svc.cluster.local:3000"
+  # Runner 名称
+  GITEA_RUNNER_NAME: "k8s-runner"
+  # Runner 标签（用于 Job 调度）
+  GITEA_RUNNER_LABELS: "docker,k8s,standard"
+  # 日志级别
+  GITEA_LOG_LEVEL: "info"
+
+# 从 Secret 注入敏感信息
+envFrom:
+  - secretRef:
+      name: gitea-runner-token
+      prefix: GITEA_
+
+# 资源限制
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+# Pod 安全配置（标准版不需要特权）
+podSecurityContext:
+  runAsNonRoot: false
+
+# 节点选择器
+nodeSelector: {}
+
+# 容忍度
+tolerations: []
+
+# 亲和性
+affinity: {}
+
+# 服务账户
+serviceAccount:
+  create: true
+  name: gitea-runner
+  annotations: {}
+
+# RBAC 配置
+rbac:
+  create: true
+
+# Ingress 配置（不需要）
+ingress:
+  enabled: false
+
+# 监控配置
+metrics:
+  enabled: true
+  port: 8080
+
+# 日志配置
+logging:
+  level: info
+  format: text
+  output: stdout

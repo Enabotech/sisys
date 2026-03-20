@@ -1,0 +1,197 @@
+# ============================================================
+# Gitea Runner 部署配置 (CA 证书挂载 - HTTPS 支持)
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+#
+# 此配置支持 HTTPS 访问 Gitea，通过挂载 CA 证书解决
+# 自签名证书验证问题
+#
+# 使用方式:
+#   1. 获取 Gitea TLS CA 证书
+#   2. 创建 ConfigMap:
+#      kubectl create configmap gitea-tls-ca \
+#        --from-file=ca.crt=/path/to/gitea-ca.crt \
+#        -n gitea-actions
+#   3. 应用此配置
+# ============================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea-actions
+  labels:
+    app: gitea-runner
+    story: "0-8"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea-runner
+  namespace: gitea-actions
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gitea-runner
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["get", "list", "create", "delete", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gitea-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gitea-runner
+subjects:
+  - kind: ServiceAccount
+    name: gitea-runner
+    namespace: gitea-actions
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-runner
+  namespace: gitea-actions
+  labels:
+    app: gitea-runner
+    story: "0-8"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: gitea-runner
+  template:
+    metadata:
+      labels:
+        app: gitea-runner
+    spec:
+      serviceAccountName: gitea-runner
+
+      # 标准镜像不需要特权模式
+      securityContext:
+        runAsNonRoot: false
+
+      containers:
+        - name: runner
+          image: docker.io/gitea/act_runner:0.3.0
+          imagePullPolicy: IfNotPresent
+
+          # Runner 启动参数
+          args:
+            - daemon
+
+          # 环境变量配置
+          env:
+            # Gitea 实例地址 (使用 HTTPS 域名)
+            - name: GITEA_INSTANCE_URL
+              value: "https://gitea.sisys.local"
+
+            # Runner 名称
+            - name: GITEA_RUNNER_NAME
+              value: "k8s-runner"
+
+            # Runner 标签 (用于 Job 调度)
+            - name: GITEA_RUNNER_LABELS
+              value: "docker,k8s,standard"
+
+            # Token (从 Secret 注入)
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-token
+                  key: token
+
+            # TLS 证书路径 (Node.js 使用)
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/etc/ssl/certs/gitea-ca.crt"
+
+            # TLS 证书路径 (Python requests 使用)
+            - name: REQUESTS_CA_BUNDLE
+              value: "/etc/ssl/certs/gitea-ca.crt"
+
+          # 卷挂载
+          volumeMounts:
+            # K3s containerd socket
+            - name: containerd-sock
+              mountPath: /var/run/docker.sock
+              readOnly: true
+
+            # CA 证书 (信任 Gitea 自签名证书)
+            - name: ca-certs
+              mountPath: /etc/ssl/certs/gitea-ca.crt
+              subPath: ca.crt
+              readOnly: true
+
+            # Runner 配置目录
+            - name: runner-config
+              mountPath: /root/.config/act_runner
+
+          # 资源限制
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+          # 健康检查
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -f
+                - act_runner
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      # 卷配置
+      volumes:
+        # K3s containerd socket
+        - name: containerd-sock
+          hostPath:
+            path: /run/k3s/containerd/containerd.sock
+            type: Socket
+        # CA 证书 (从 ConfigMap 挂载)
+        - name: ca-certs
+          configMap:
+            name: gitea-tls-ca
+            defaultMode: 0644
+        # Runner 配置
+        - name: runner-config
+          emptyDir: {}
+
+      # 节点调度
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+---
+# Service (用于监控)
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-runner
+  namespace: gitea-actions
+  labels:
+    app: gitea-runner
+spec:
+  selector:
+    app: gitea-runner
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

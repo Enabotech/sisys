@@ -464,9 +464,121 @@ clean-all: clean clean-env
 	rm -rf venv/ .venv/
 	@echo "✅ 所有清理完成"
 
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Git Worktree 并行开发（Qwen Agent + Worktree 融合模式）
+# =============================================================================
+.PHONY: worktree worktree-create worktree-list worktree-clean worktree-prune \
+        worktree-story worktree-bugfix worktree-pr-review worktree-setup
+
+# Worktree 基础目录（可覆盖：make worktree-setup WORKTREE_BASE=/custom/path）
+WORKTREE_BASE ?= $(HOME)/dev/sisys-worktrees
+STORY_NUM ?= 1.1
+BRANCH_NAME ?= story/$(STORY_NUM)
+WORKTREE_PATH ?= $(WORKTREE_BASE)/story-$(STORY_NUM)
+
+worktree: worktree-list
+	@echo "✅ 使用 'make worktree-help' 查看更多 Git Worktree 命令"
+
+worktree-help:
+	@echo "================================================================="
+	@echo "  Git Worktree 并行开发命令（Qwen Agent + Worktree 融合模式）"
+	@echo "================================================================="
+	@echo ""
+	@echo "📚 完整文档：docs/developer/qwen-git-worktree-parallel-dev-guide.md"
+	@echo "📋 快速参考：docs/developer/qwen-git-worktree-quick-reference.md"
+	@echo ""
+	@echo "🚀 快速开始:"
+	@echo "  make worktree-setup             - 一键设置并行开发环境"
+	@echo "  make worktree-story STORY_NUM=1.1  - 创建 Story worktree"
+	@echo "  make worktree-list              - 查看所有 worktrees"
+	@echo ""
+	@echo "🔧 常用命令:"
+	@echo "  make worktree-create PATH=x BRANCH=y  - 创建自定义 worktree"
+	@echo "  make worktree-bugfix ISSUE=123        - 创建 Bug 修复 worktree"
+	@echo "  make worktree-pr-review PR=123        - 创建 PR 审查 worktree"
+	@echo "  make worktree-prune                   - 清理无效 worktrees"
+	@echo "  make worktree-clean PATH=x            - 删除指定 worktree"
+	@echo ""
+	@echo "📖 使用示例:"
+	@echo "  # 创建 Story 1.1 worktree"
+	@echo "  make worktree-story STORY_NUM=1.1"
+	@echo ""
+	@echo "  # 创建 Bug 修复 worktree"
+	@echo "  make worktree-bugfix ISSUE=critical-issue"
+	@echo ""
+	@echo "  # 审查 PR #123"
+	@echo "  make worktree-pr-review PR=123"
+	@echo ""
+	@echo "================================================================="
+
+worktree-setup:
+	@echo "🚀 设置 Git Worktree 并行开发环境..."
+	@echo "   基础目录：$(WORKTREE_BASE)"
+	@mkdir -p $(WORKTREE_BASE)
+	@./scripts/dev/worktree-setup.sh --help
+	@echo ""
+	@echo "✅ 使用以下命令创建 Story worktrees:"
+	@echo "   ./scripts/dev/worktree-setup.sh 1.1 1.2 1.3"
+	@echo "   或"
+	@echo "   make worktree-story STORY_NUM=1.1"
+
+worktree-create:
+	@echo "🔧 创建 Git Worktree..."
+	@echo "   路径：$(WORKTREE_PATH)"
+	@echo "   分支：$(BRANCH_NAME)"
+	@git worktree add -b $(BRANCH_NAME) $(WORKTREE_PATH) main
+	@echo "✅ Worktree 创建完成"
+	@echo ""
+	@echo "📝 下一步:"
+	@echo "   1. cd $(WORKTREE_PATH)"
+	@echo "   2. python3 -m venv venv"
+	@echo "   3. poetry install --with dev,test"
+	@echo "   4. @qwen-agent activate domain_agent_1"
+
+worktree-story:
+	@echo "📖 创建 Story $(STORY_NUM) Worktree..."
+	@$(MAKE) worktree-create \
+		WORKTREE_PATH=$(WORKTREE_BASE)/story-$(STORY_NUM) \
+		BRANCH_NAME=story/$(STORY_NUM)-$(shell echo $(STORY_NUM) | tr '.' '-')
+
+worktree-bugfix:
+	@echo "🐛 创建 Bug 修复 Worktree (Issue: $(ISSUE))..."
+	@$(MAKE) worktree-create \
+		WORKTREE_PATH=$(WORKTREE_BASE)/bugfix-$(ISSUE) \
+		BRANCH_NAME=bugfix/$(ISSUE)
+
+worktree-pr-review:
+	@echo "🔍 创建 PR #$(PR) 审查 Worktree..."
+	@git fetch origin pull/$(PR)/head:pr-$(PR)-review
+	@$(MAKE) worktree-create \
+		WORKTREE_PATH=$(WORKTREE_BASE)/pr-$(PR)-review \
+		BRANCH_NAME=pr-$(PR)-review
+
+worktree-list:
+	@echo "📋 Git Worktrees:"
+	@echo "================================================================="
+	@git worktree list
+	@echo "================================================================="
+	@echo ""
+	@echo "💡 提示："
+	@echo "   - 每个 worktree 是独立的开发环境"
+	@echo "   - 使用 'cd <path>' 进入 worktree"
+	@echo "   - 使用 'make worktree-clean PATH=<path>' 删除 worktree"
+
+worktree-prune:
+	@echo "🧹 清理无效 Git Worktrees..."
+	@git worktree prune
+	@echo "✅ 清理完成"
+
+worktree-clean:
+	@echo "⚠️  删除 Worktree: $(PATH)"
+	@read -p "确认删除？[y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	@git worktree remove $(PATH) || true
+	@echo "✅ Worktree 已删除"
+
+# =============================================================================
 # Harbor 部署与验证（Story 0.6）
-# -----------------------------------------------------------------------------
+# =============================================================================
 .PHONY: harbor-secrets harbor-deploy harbor-verify harbor-fix harbor-clean
 
 harbor-secrets:
@@ -594,9 +706,23 @@ help:
 	@echo "  make harbor-verify    - 验证 Harbor 部署状态"
 	@echo "  make harbor-clean     - 清理 Harbor 部署"
 	@echo ""
+	@echo "🌳 Git Worktree 并行开发（Qwen Agent + Worktree 融合模式）:"
+	@echo "  make worktree              - 查看所有 worktrees"
+	@echo "  make worktree-help         - 显示 Worktree 命令帮助"
+	@echo "  make worktree-setup        - 一键设置并行开发环境"
+	@echo "  make worktree-story STORY_NUM=1.1 - 创建 Story worktree"
+	@echo "  make worktree-bugfix ISSUE=xxx    - 创建 Bug 修复 worktree"
+	@echo "  make worktree-pr-review PR=123    - 创建 PR 审查 worktree"
+	@echo "  make worktree-prune        - 清理无效 worktrees"
+	@echo "  make worktree-clean PATH=x - 删除指定 worktree"
+	@echo ""
 	@echo "  示例："
-	@echo "    make harbor-deploy    # 完整部署流程"
-	@echo "    make harbor-verify    # 验证部署状态"
+	@echo "    make worktree-story STORY_NUM=1.1  # 创建 Story 1.1 worktree"
+	@echo "    make worktree-bugfix ISSUE=critical  # 创建紧急 Bug 修复环境"
+	@echo "    make worktree-pr-review PR=123     # 创建 PR 审查环境"
+	@echo ""
+	@echo "  📚 完整文档：docs/developer/qwen-git-worktree-parallel-dev-guide.md"
+	@echo "  📋 快速参考：docs/developer/qwen-git-worktree-quick-reference.md"
 	@echo ""
 	@echo "  SDD+TDD 融合模式示例："
 	@echo "    make tdd-red TARGET=domain/entities"
