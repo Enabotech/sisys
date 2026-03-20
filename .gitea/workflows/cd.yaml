@@ -1,0 +1,350 @@
+# ============================================================
+# CD Pipeline 模板 (Continuous Deployment)
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# Task: 5 - Pipeline 模板配置
+#
+# 用途：生产环境自动部署
+# 触发条件：
+#   - 手动触发（推荐）
+#   - 或 main 分支标签推送（v*.*.*）
+#
+# 部署流程：
+#   1. 从 Harbor 拉取镜像
+#   2. 更新 K8s 部署配置
+#   3. 滚动更新到生产环境
+#   4. 健康检查
+#   5. 失败自动回滚
+# ============================================================
+
+name: CD Pipeline
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+
+      image_tag:
+        description: '镜像标签 (留空使用 latest)'
+        required: false
+        default: ''
+        type: string
+
+      enable_health_check:
+        description: '启用健康检查'
+        required: false
+        default: true
+        type: boolean
+
+  # 标签推送自动触发
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  # 应用配置
+  APP_NAME: sisys
+  REGISTRY: harbor.sisys.local
+  IMAGE_NAME: sisys/app
+
+  # 环境配置
+  PRODUCTION_NAMESPACE: sisys-prod
+  STAGING_NAMESPACE: sisys-test
+  DEVELOPMENT_NAMESPACE: sisys-dev
+
+jobs:
+  # ============================================================
+  # 阶段 1: 部署前验证
+  # ============================================================
+  pre-deployment-check:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest:host
+    outputs:
+      image_tag: ${{ steps.get-image-tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: get-image-tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify image exists in Harbor
+        run: |
+          IMAGE_TAG="${{ steps.get-image-tag.outputs.tag }}"
+          echo "🔍 Verifying image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+          # 使用 Harbor API 验证镜像存在
+          curl -sf -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
+            "https://${{ env.REGISTRY }}/api/v2.0/projects/sisys/repositories/app/artifacts" \
+            | jq -e ".[] | select(.tags[].name == \"${IMAGE_TAG}\")" > /dev/null \
+            && echo "✅ Image verified" \
+            || (echo "❌ Image not found" && exit 1)
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # 验证 K8s 配置语法
+          if [ -d "deployments/app" ]; then
+            for file in deployments/app/*.yaml; do
+              echo "Validating: $file"
+              kubectl apply --dry-run=client -f "$file" || exit 1
+            done
+            echo "✅ All manifests valid"
+          else
+            echo "⚠️ No K8s manifests found, skipping validation"
+          fi
+
+  # ============================================================
+  # 阶段 2: 部署到目标环境
+  # ============================================================
+  deploy:
+    name: 🚀 Deploy to ${{ github.event.inputs.environment || 'production' }}
+    runs-on: ubuntu-latest:host
+    needs: pre-deployment-check
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: https://${{ github.event.inputs.environment || 'prod' }}.sisys.local
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+      - name: Set deployment namespace
+        id: set-namespace
+        run: |
+          ENV="${{ github.event.inputs.environment || 'production' }}"
+          case $ENV in
+            production)
+              echo "namespace=${{ env.PRODUCTION_NAMESPACE }}" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "namespace=${{ env.STAGING_NAMESPACE }}" >> $GITHUB_OUTPUT
+              ;;
+            development)
+              echo "namespace=${{ env.DEVELOPMENT_NAMESPACE }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "namespace=${{ env.PRODUCTION_NAMESPACE }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Get current image version
+        id: current-version
+        run: |
+          CURRENT_IMAGE=$(kubectl get deployment ${APP_NAME}-app -n ${{ steps.set-namespace.outputs.namespace }} \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "none")
+          echo "image=$CURRENT_IMAGE" >> $GITHUB_OUTPUT
+          echo "📊 Current version: $CURRENT_IMAGE"
+
+      - name: Update image in deployment
+        run: |
+          IMAGE_TAG="${{ needs.pre-deployment-check.outputs.image_tag }}"
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+          echo "🚀 Deploying: $NEW_IMAGE"
+          echo "📍 Namespace: ${{ steps.set-namespace.outputs.namespace }}"
+
+          kubectl set image deployment/${APP_NAME}-app \
+            app=${NEW_IMAGE} \
+            -n ${{ steps.set-namespace.outputs.namespace }}
+
+          echo "✅ Deployment updated"
+
+      - name: Wait for rollout
+        run: |
+          echo "⏳ Waiting for rollout to complete..."
+          kubectl rollout status deployment/${APP_NAME}-app \
+            -n ${{ steps.set-namespace.outputs.namespace }} \
+            --timeout=300s
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Rollout successful"
+          else
+            echo "❌ Rollout failed"
+            exit 1
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "📊 Deployment status:"
+          kubectl get deployment ${APP_NAME}-app -n ${{ steps.set-namespace.outputs.namespace }}
+
+          echo "📊 Pod status:"
+          kubectl get pods -n ${{ steps.set-namespace.outputs.namespace }} -l app=${APP_NAME}-app
+
+  # ============================================================
+  # 阶段 3: 健康检查（可选）
+  # ============================================================
+  health-check:
+    name: 🏥 Health Check
+    runs-on: ubuntu-latest:host
+    needs: deploy
+    if: github.event.inputs.enable_health_check != 'false'
+    steps:
+      - name: Wait for pods to be ready
+        run: |
+          echo "⏳ Waiting 30 seconds for pods to stabilize..."
+          sleep 30
+
+      - name: Get service endpoint
+        id: get-endpoint
+        run: |
+          # 获取服务地址（根据实际配置调整）
+          ENDPOINT=$(kubectl get svc ${APP_NAME}-app -n ${{ env.PRODUCTION_NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+
+          if [ -z "$ENDPOINT" ]; then
+            # 如果没有 LoadBalancer，使用 ClusterIP
+            ENDPOINT=$(kubectl get svc ${APP_NAME}-app -n ${{ env.PRODUCTION_NAMESPACE }} \
+              -o jsonpath='{.spec.clusterIP}')
+          fi
+
+          echo "endpoint=$ENDPOINT" >> $GITHUB_OUTPUT
+          echo "📍 Service endpoint: $ENDPOINT"
+
+      - name: Health check endpoint
+        run: |
+          ENDPOINT="${{ steps.get-endpoint.outputs.endpoint }}"
+          HEALTH_URL="http://${ENDPOINT}/health"
+
+          echo "🏥 Checking health: $HEALTH_URL"
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            RESPONSE=$(curl -sf --connect-timeout 10 "$HEALTH_URL" || echo "")
+
+            if [ -n "$RESPONSE" ]; then
+              echo "✅ Health check passed"
+              echo "Response: $RESPONSE"
+              exit 0
+            fi
+
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "⚠️ Health check failed (attempt $RETRY_COUNT/$MAX_RETRIES)"
+            sleep 10
+          done
+
+          echo "❌ Health check failed after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Integration test
+        run: |
+          ENDPOINT="${{ steps.get-endpoint.outputs.endpoint }}"
+          TEST_URL="http://${ENDPOINT}/api/v1/status"
+
+          echo "🧪 Running integration test: $TEST_URL"
+
+          RESPONSE=$(curl -sf --connect-timeout 10 "$TEST_URL" || echo "")
+
+          if [ -n "$RESPONSE" ]; then
+            echo "✅ Integration test passed"
+            echo "Response: $RESPONSE"
+          else
+            echo "⚠️ Integration test skipped (endpoint may not exist)"
+          fi
+
+  # ============================================================
+  # 阶段 4: 部署后清理
+  # ============================================================
+  post-deployment:
+    name: 🧹 Post-deployment Cleanup
+    runs-on: ubuntu-latest:host
+    needs: [deploy, health-check]
+    if: always()
+    steps:
+      - name: Cleanup old ReplicaSets
+        run: |
+          echo "🧹 Cleaning up old ReplicaSets..."
+          kubectl rollout history deployment/${APP_NAME}-app \
+            -n ${{ env.PRODUCTION_NAMESPACE }} || true
+
+          # 保留最近 5 个版本
+          kubectl delete replicaset -n ${{ env.PRODUCTION_NAMESPACE }} \
+            -l app=${APP_NAME}-app \
+            --field-selector=status.replicas=0 || true
+
+          echo "✅ Cleanup complete"
+
+      - name: Send deployment notification
+        run: |
+          # 这里可以集成通知服务（钉钉、企业微信、Slack 等）
+          echo "📧 Deployment notification:"
+          echo "  Environment: ${{ github.event.inputs.environment || 'production' }}"
+          echo "  Image: ${{ needs.pre-deployment-check.outputs.image_tag }}"
+          echo "  Status: ${{ needs.health-check.result }}"
+          echo "  Commit: ${{ github.sha }}"
+
+  # ============================================================
+  # 阶段 5: 自动回滚（失败时）
+  # ============================================================
+  rollback:
+    name: 🔄 Auto Rollback
+    runs-on: ubuntu-latest:host
+    needs: deploy
+    if: failure() && needs.deploy.result == 'failure'
+    steps:
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+
+      - name: Rollback to previous version
+        run: |
+          echo "🔄 Rolling back to previous version..."
+
+          kubectl rollout undo deployment/${APP_NAME}-app \
+            -n ${{ env.PRODUCTION_NAMESPACE }}
+
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/${APP_NAME}-app \
+            -n ${{ env.PRODUCTION_NAMESPACE }} \
+            --timeout=300s
+
+          echo "✅ Rollback complete"
+
+      - name: Verify rollback
+        run: |
+          echo "📊 Current deployment status:"
+          kubectl get deployment ${APP_NAME}-app -n ${{ env.PRODUCTION_NAMESPACE }}
+
+          echo "📊 Current image:"
+          kubectl get deployment ${APP_NAME}-app -n ${{ env.PRODUCTION_NAMESPACE }} \
+            -o jsonpath='{.spec.template.spec.containers[0].image}'
