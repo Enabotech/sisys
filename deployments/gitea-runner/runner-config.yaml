@@ -26,7 +26,7 @@ runner:
 
 # 日志配置
 log:
-  level: info
+  level: debug  # 改为 debug 以便查看任务领取日志
   format: text
   output: stdout
 
