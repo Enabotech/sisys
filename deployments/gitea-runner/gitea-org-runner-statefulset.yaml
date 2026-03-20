@@ -1,35 +1,38 @@
 # ============================================================
-# Gitea Runner StatefulSet 配置 (解决重复注册问题)
+# Gitea 组织级 Runner StatefulSet 配置
 # ============================================================
 # Story: 0-8-gitea-runner-configuration
-# 问题修复：Runner 重复注册问题
+# 组织：sisys
+# 作用域：组织级别（org/sisys）
 #
-# 关键变更：
-#   - 使用 StatefulSet 替代 Deployment
-#   - 每个 Pod 使用独立 PVC (gitea-runner-data-{0,1,2})
-#   - Pod 名称固定 (gitea-runner-0, gitea-runner-1, gitea-runner-2)
-#   - 注册信息持久化，重启后不丢失
+# 特性：
+#   - 3 个并发 Runner（gitea-org-runner-00~02）
+#   - 每个 Pod 使用独立 PVC（持久化注册信息）
+#   - 组织级 Runner 自动可用于组织内所有仓库
+#   - 标签：ubuntu-latest,docker,k8s
 # ============================================================
 
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: gitea-runner
+  name: gitea-org-runner
   namespace: gitea-actions
   labels:
-    app: gitea-runner
+    app: gitea-org-runner
     story: "0-8"
+    scope: organization
+    org: sisys
 spec:
   # 3 个 Runner 支持 3 个并发 Job
   replicas: 3
-  serviceName: gitea-runner
+  serviceName: gitea-org-runner
   selector:
     matchLabels:
-      app: gitea-runner
+      app: gitea-org-runner
   template:
     metadata:
       labels:
-        app: gitea-runner
+        app: gitea-org-runner
     spec:
       serviceAccountName: gitea-runner
 
@@ -53,8 +56,6 @@ spec:
           imagePullPolicy: IfNotPresent
 
           # Runner 启动参数
-          # 关键：使用 --config 指定配置文件路径，确保 .runner 文件被正确读取
-          # config.yaml 从 ConfigMap 挂载，.runner 文件持久化在 PVC 中
           args:
             - daemon
             - --config
@@ -62,42 +63,39 @@ spec:
 
           # 环境变量配置
           env:
-            # Gitea 实例地址 (使用内部 HTTP 服务绕过 TLS 问题)
+            # Gitea 实例地址（使用内部 HTTP 服务绕过 TLS 问题）
             - name: GITEA_INSTANCE_URL
               value: "http://gitea-http.gitea.svc.cluster.local:3000"
 
-            # Runner 名称 (使用 Pod 名称后缀区分)
+            # Runner 名称（使用 Pod 名称后缀区分）
             - name: GITEA_RUNNER_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
 
-            # Runner 标签 (用于 Job 调度)
-            # 支持多种标签格式，兼容不同的 runs-on 配置
-            # act_runner 会自动添加 :host 后缀
+            # Runner 标签（用于 Job 调度）
             - name: GITEA_RUNNER_LABELS
-              value: "docker,k8s,standard,ubuntu-latest,linux"
+              value: "ubuntu-latest,docker,k8s,linux"
 
-            # Token (从 Secret 注入)
+            # Token（从 Secret 注入 - 组织级 Token）
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: gitea-runner-token
+                  name: gitea-org-runner-token
                   key: token
 
           # 卷挂载
           volumeMounts:
-            # K3s containerd socket (关键！)
+            # K3s containerd socket（关键！）
             - name: containerd-sock
               mountPath: /var/run/docker.sock
               readOnly: true
 
-            # Runner 持久化配置目录 (解决重复注册问题)
-            # act_runner 将 .runner 文件存储在 /data 目录 (PVC)
+            # Runner 持久化配置目录
             - name: runner-data
               mountPath: /data
 
-            # Runner 配置文件 (ConfigMap 挂载到独立目录)
+            # Runner 配置文件（ConfigMap 挂载到独立目录）
             - name: runner-config
               mountPath: /etc/act-runner/config.yaml
               subPath: config.yaml
@@ -143,7 +141,7 @@ spec:
           hostPath:
             path: /run/k3s/containerd/containerd.sock
             type: Socket
-        # Runner 配置文件 (ConfigMap)
+        # Runner 配置文件（ConfigMap）
         - name: runner-config
           configMap:
             name: gitea-runner-config
@@ -161,3 +159,48 @@ spec:
           requests:
             storage: 1Gi
         storageClassName: local-path  # K3s 默认 StorageClass
+
+---
+# ============================================================
+# Runner 配置文件 ConfigMap（复用现有配置）
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-runner-config
+  namespace: gitea-actions
+  labels:
+    app: gitea-org-runner
+    story: "0-8"
+data:
+  config.yaml: |
+    # Runner 配置
+    runner:
+      # 注册文件路径（持久化在 PVC 中）
+      file: /data/.runner
+      # 工作目录
+      workdir: /data/workdir
+      # 临时目录
+      tempdir: /data/tmp
+      # 超时设置
+      timeout: 10m
+
+    # 日志配置
+    log:
+      level: info
+      format: text
+      output: stdout
+
+    # 容器配置
+    container:
+      # 工作镜像
+      image: docker.gitea.com/runner-images:ubuntu-latest
+      # 网络模式
+      network: host
+      # 工作目录
+      workdir: /workspace
+
+    # 缓存配置
+    cache:
+      enabled: true
+      dir: /data/cache
