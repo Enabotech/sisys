@@ -260,8 +260,8 @@ class TestDockerExecutorSecurity:
 
     def test_rootless_mode_configured(self):
         """测试 rootless 模式配置"""
-        # 检查主部署配置 (gitea-runner-statefulset.yaml)
-        deployment_path = Path("deployments/gitea-runner/gitea-runner-statefulset.yaml")
+        # 检查组织级 Runner 配置 (gitea-org-runner-statefulset.yaml)
+        deployment_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
 
         has_security = False
 

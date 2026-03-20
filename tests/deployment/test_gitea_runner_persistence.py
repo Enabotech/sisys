@@ -9,6 +9,8 @@ AC: 1, 4
 - PVC 持久化
 - Runner 注册信息持久化
 - 重启后不重复注册
+
+注意：本测试针对组织级 Runner (gitea-org-runner)
 """
 
 import subprocess
@@ -24,12 +26,12 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_config_exists(self):
         """测试 StatefulSet 配置文件存在"""
-        config_path = Path("deployments/gitea-runner/gitea-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
         assert config_path.exists(), f"StatefulSet 配置文件不存在：{config_path}"
 
     def test_statefulset_valid_yaml(self):
         """测试 StatefulSet 配置 YAML 语法正确"""
-        config_path = Path("deployments/gitea-runner/gitea-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
         if config_path.exists():
             try:
                 with open(config_path, encoding="utf-8") as f:
@@ -39,19 +41,25 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_replicas(self):
         """测试 StatefulSet 副本数配置"""
-        config_path = Path("deployments/gitea-runner/gitea-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
-                statefulset = yaml.safe_load(f)
+                # 使用 safe_load_all 处理多文档 YAML
+                docs = list(yaml.safe_load_all(f))
+                # 第一个文档是 StatefulSet
+                statefulset = docs[0]
                 replicas = statefulset.get("spec", {}).get("replicas", 0)
                 assert replicas == 3, f"Runner 副本数应为 3，实际为：{replicas}"
 
     def test_volume_claim_templates(self):
         """测试 volumeClaimTemplates 配置"""
-        config_path = Path("deployments/gitea-runner/gitea-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
-                statefulset = yaml.safe_load(f)
+                # 使用 safe_load_all 处理多文档 YAML
+                docs = list(yaml.safe_load_all(f))
+                # 第一个文档是 StatefulSet
+                statefulset = docs[0]
                 spec = statefulset.get("spec", {})
 
                 # 检查 volumeClaimTemplates
@@ -144,7 +152,7 @@ class TestKubernetesResources:
         """测试 StatefulSet 已部署"""
         try:
             result = subprocess.run(
-                ["kubectl", "get", "statefulset", "gitea-runner", "-n", "gitea-actions"],
+                ["kubectl", "get", "statefulset", "gitea-org-runner", "-n", "gitea-actions"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -153,7 +161,7 @@ class TestKubernetesResources:
             if result.returncode != 0:
                 pytest.skip("StatefulSet 未部署")
 
-            assert "gitea-runner" in result.stdout, "StatefulSet 未找到"
+            assert "gitea-org-runner" in result.stdout, "StatefulSet 未找到"
             print(f"✅ StatefulSet 已部署:\n{result.stdout}")
 
         except Exception as e:
@@ -164,7 +172,7 @@ class TestKubernetesResources:
         """测试 PVC 已创建"""
         try:
             result = subprocess.run(
-                ["kubectl", "get", "pvc", "-n", "gitea-actions", "-l", "app=gitea-runner"],
+                ["kubectl", "get", "pvc", "-n", "gitea-actions", "-l", "app=gitea-org-runner"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -189,7 +197,7 @@ class TestKubernetesResources:
         """测试 Pod 运行中"""
         try:
             result = subprocess.run(
-                ["kubectl", "get", "pods", "-n", "gitea-actions", "-l", "app=gitea-runner"],
+                ["kubectl", "get", "pods", "-n", "gitea-actions", "-l", "app=gitea-org-runner"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -201,11 +209,11 @@ class TestKubernetesResources:
             # 检查 Pod 状态
             assert "Running" in result.stdout, "Pod 未运行"
 
-            # 检查 Pod 名称格式 (gitea-runner-0, gitea-runner-1, gitea-runner-2)
+            # 检查 Pod 名称格式 (gitea-org-runner-0, gitea-org-runner-1, gitea-org-runner-2)
             lines = result.stdout.strip().split("\n")[1:]  # 跳过标题行
             pod_names = [line.split()[0] for line in lines if line.strip()]
 
-            expected_names = ["gitea-runner-0", "gitea-runner-1", "gitea-runner-2"]
+            expected_names = ["gitea-org-runner-0", "gitea-org-runner-1", "gitea-org-runner-2"]
             for expected in expected_names:
                 assert any(expected in name for name in pod_names), f"缺少 Pod: {expected}"
 
@@ -219,7 +227,7 @@ class TestKubernetesResources:
         """测试 PVC 已绑定"""
         try:
             result = subprocess.run(
-                ["kubectl", "get", "pvc", "-n", "gitea-actions", "-l", "app=gitea-runner"],
+                ["kubectl", "get", "pvc", "-n", "gitea-actions", "-l", "app=gitea-org-runner"],
                 capture_output=True,
                 text=True,
                 check=False,
