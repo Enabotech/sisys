@@ -1,0 +1,47 @@
+# ============================================================
+# Gitea Runner 配置文件
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# 问题修复：Runner 重复注册问题
+#
+# 说明：
+#   - 此配置文件定义 Runner 的行为
+#   - .runner 文件存储注册凭证
+#   - 两者都需要持久化
+# ============================================================
+
+# Runner 配置
+runner:
+  # 注册文件路径（关键！）- 持久化在 PVC 中
+  file: /data/.runner
+
+  # 工作目录
+  workdir: /data/workdir
+
+  # 临时目录
+  tempdir: /data/tmp
+
+  # 超时设置
+  timeout: 10m
+
+# 日志配置
+log:
+  level: info
+  format: text
+  output: stdout
+
+# 容器配置
+container:
+  # 工作镜像
+  image: docker.gitea.com/runner-images:ubuntu-latest
+
+  # 网络模式
+  network: host
+
+  # 工作目录
+  workdir: /workspace
+
+# 缓存配置
+cache:
+  enabled: true
+  dir: /data/cache
