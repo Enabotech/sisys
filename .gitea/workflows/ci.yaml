@@ -41,7 +41,7 @@ jobs:
   # ============================================================
   code-quality:
     name: 📊 Code Quality
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
   # ============================================================
   unit-test:
     name: 🧪 Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: code-quality
     steps:
       - name: Checkout code
@@ -120,7 +120,7 @@ jobs:
   # ============================================================
   integration-test:
     name: 🔗 Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: unit-test
     services:
       postgres:
@@ -182,7 +182,7 @@ jobs:
   # ============================================================
   security-scan:
     name: 🛡️ Security Scan
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: unit-test
     steps:
       - name: Checkout code
@@ -239,7 +239,7 @@ jobs:
   # ============================================================
   build-image:
     name: 🏗️ Build Docker Image
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: [integration-test, security-scan]
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
@@ -292,7 +292,7 @@ jobs:
   # ============================================================
   push-image:
     name: 📤 Push to Harbor
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: build-image
     environment:
       name: harbor
@@ -359,7 +359,7 @@ jobs:
   # ============================================================
   deploy:
     name: 🚀 Deploy to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     needs: push-image
     if: github.ref == 'refs/heads/main'
     environment:
