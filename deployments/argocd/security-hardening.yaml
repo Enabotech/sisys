@@ -1,7 +1,7 @@
 ---
 # ArgoCD 安全加固配置
 # 包含容器安全、网络安全、密钥管理配置
-# 
+#
 # 安全修复 (CRITICAL-4): 2026-03-19
 # - 移除已废弃的 PodSecurityPolicy (PSP)
 # - 迁移到 Pod Security Admission (PSA)
@@ -24,7 +24,7 @@ metadata:
     pod-security.kubernetes.io/audit-version: latest
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/warn-version: latest
-    
+
     # 原有标签
     app.kubernetes.io/name: argocd
     app.kubernetes.io/part-of: argocd

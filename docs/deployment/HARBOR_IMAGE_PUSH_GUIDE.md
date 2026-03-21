@@ -1,7 +1,7 @@
 # Harbor 镜像推送快速指南
 
-**文档版本:** 1.0  
-**更新日期:** 2026-03-18  
+**文档版本:** 1.0
+**更新日期:** 2026-03-18
 **Harbor 状态:** ✅ 已部署 (8/8 Pod Running)
 
 ---
@@ -11,7 +11,7 @@
 | 项目 | 状态 | 说明 |
 |------|------|------|
 | **Harbor 版本** | v2.14.3 | ✅ 已部署 |
-| **Harbor API** | ✅ 可访问 | https://172.21.110.12:31448 |
+| **Harbor API** | ✅ 可访问 | https://<WSL2_IP>:<NODEPORT> |
 | **管理员凭据** | admin/Admin@123456 | ✅ 已验证 |
 | **项目 'sisys'** | ✅ 已创建 | project_id=2 |
 | **Robot Account** | ❌ 未创建 | 需要创建 |
@@ -28,7 +28,7 @@
 
 ```bash
 # 登录 Harbor Web 界面
-# https://172.21.110.12:31448 (浏览器访问)
+# https://<WSL2_IP>:<NODEPORT> (浏览器访问)
 # 用户名：admin
 # 密码：Admin@123456
 
@@ -47,7 +47,7 @@
 # 创建 Robot Account
 curl -k -X POST \
   -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/robots" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/robots" \
   -H "Host: harbor.sisys.local" \
   -H "Content-Type: application/json" \
   -d '{
@@ -178,7 +178,7 @@ sudo tee /etc/rancher/k3s/registries.yaml << 'EOF'
 mirrors:
   harbor.sisys.local:
     endpoint:
-      - http://172.21.110.12:30580
+      - http://<WSL2_IP>:nodeport
 configs:
   harbor.sisys.local:
     tls:
@@ -200,7 +200,7 @@ sudo systemctl restart k3s
 ```bash
 # API 查询
 curl -k -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/projects/sisys/repositories" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/projects/sisys/repositories" \
   -H "Host: harbor.sisys.local" | jq '.[].name'
 
 # 预期输出：["sisys/test-app"]
@@ -252,7 +252,7 @@ kubectl delete pod test-harbor-image
 
 ```bash
 curl -k -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/robots" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/robots" \
   -H "Host: harbor.sisys.local" | jq
 ```
 
@@ -261,14 +261,14 @@ curl -k -u admin:Admin@123456 \
 ```bash
 # 先获取 Robot ID
 ROBOT_ID=$(curl -k -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/robots" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/robots" \
   -H "Host: harbor.sisys.local" | \
   jq -r '.[] | select(.name=="gitea-runner-push") | .id')
 
 # 删除
 curl -k -X DELETE \
   -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/robots/${ROBOT_ID}" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/robots/${ROBOT_ID}" \
   -H "Host: harbor.sisys.local"
 ```
 
@@ -359,5 +359,5 @@ sudo journalctl -u k3s -f | grep -i "harbor"
 
 ---
 
-**最后更新:** 2026-03-18  
+**最后更新:** 2026-03-18
 **维护者:** DevOps Team

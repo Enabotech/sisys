@@ -30,9 +30,9 @@ class TestContainerSecurity:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
 
         psa_labels = [
-            'pod-security.kubernetes.io/enforce',
-            'pod-security.kubernetes.io/audit',
-            'pod-security.kubernetes.io/warn'
+            "pod-security.kubernetes.io/enforce",
+            "pod-security.kubernetes.io/audit",
+            "pod-security.kubernetes.io/warn",
         ]
 
         namespace_found = False
@@ -40,7 +40,7 @@ class TestContainerSecurity:
             if doc.get("kind") == "Namespace" and doc.get("metadata", {}).get("name") == "argocd":
                 namespace_found = True
                 labels = doc.get("metadata", {}).get("labels", {})
-                
+
                 # 验证 PSA 标签存在
                 for label in psa_labels:
                     assert label in labels, f"PSA 标签 {label} 未配置"
@@ -57,8 +57,9 @@ class TestContainerSecurity:
 
         for doc in docs:
             kind = doc.get("kind", "") if doc else ""
-            assert kind != "PodSecurityPolicy", \
-                "PodSecurityPolicy 已废弃 (K8s v1.25+ 移除)，应使用 Pod Security Admission (PSA)"
+            assert (
+                kind != "PodSecurityPolicy"
+            ), "PodSecurityPolicy 已废弃 (K8s v1.25+ 移除)，应使用 Pod Security Admission (PSA)"
 
     def test_deployment_security_context(self):
         """验证 Deployment 安全上下文配置"""

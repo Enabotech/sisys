@@ -16,15 +16,19 @@ import subprocess
 import pytest
 import requests
 
+# 从统一配置模块加载
+from tests.conftest import TestConfig
+
 
 class TestGiteaDeployment:
     """Gitea 部署测试套件"""
 
-    # 配置常量
-    GITEA_NAMESPACE = "gitea"
+    # 配置常量 - 使用统一配置
+    GITEA_NAMESPACE = TestConfig.GITEA_NAMESPACE
     GITEA_SERVICE = "gitea-http"
-    GITEA_PORT = 3000
-    GITEA_HOST = "gitea.sisys.local"
+    GITEA_PORT = TestConfig.GITEA_HTTP_PORT
+    GITEA_HOST = TestConfig.GITEA_HOST
+    GITEA_NODEPORT = TestConfig.GITEA_NODEPORT
     POSTGRES_SERVICE = "gitea-postgresql"
     POSTGRES_PORT = 5432
 
@@ -236,8 +240,10 @@ class TestGiteaDatabaseConnection:
 class TestGiteaHttpsConfiguration:
     """Gitea HTTPS 配置测试套件"""
 
-    GITEA_HOST = "gitea.sisys.local"
+    # 使用统一配置
+    GITEA_HOST = TestConfig.GITEA_HOST
     GITEA_PORT = 443
+    GITEA_NODEPORT = TestConfig.GITEA_NODEPORT
 
     def test_gitea_ingress_exists(self):
         """验证 Gitea Ingress 存在"""
@@ -273,27 +279,30 @@ class TestGiteaHttpsConfiguration:
         使用 openssl 验证 TLS 版本
         """
         import subprocess
-        
+
+        # 使用 NodePort 地址（动态获取）
+        connect_address = f"{self.GITEA_HOST}:{self.GITEA_NODEPORT}"
+
         # 使用 openssl 验证 TLS 1.3
         result = subprocess.run(
-            [
-                "openssl", "s_client", "-connect", "gitea.sisys.local:31448",
-                "-tls1_3"
-            ],
+            ["openssl", "s_client", "-connect", connect_address, "-tls1_3"],
             input="Q\n",
             text=True,
             capture_output=True,
             timeout=10,
         )
-        
+
         # 检查 TLS 1.3 是否支持
         if "Protocol  : TLSv1.3" in result.stdout or "TLSv1.3" in result.stderr:
             assert True, "TLS 1.3 已启用"
         elif "handshake failure" in result.stderr.lower() or "wrong version" in result.stderr.lower():
             # TLS 1.3 不支持，尝试 TLS 1.2
             result_tls12 = subprocess.run(
-                ["openssl", "s_client", "-connect", "gitea.sisys.local:31448", "-tls1_2"],
-                input="Q\n", text=True, capture_output=True, timeout=10,
+                ["openssl", "s_client", "-connect", connect_address, "-tls1_2"],
+                input="Q\n",
+                text=True,
+                capture_output=True,
+                timeout=10,
             )
             if "Protocol  : TLSv1.2" in result_tls12.stdout:
                 pytest.fail("仅支持 TLS 1.2，应该启用 TLS 1.3")

@@ -371,8 +371,10 @@ class TestArgoCDHarborIntegration:
             return  # Secret 存在，测试通过
 
         # 方法 2: 通过 Harbor API 检查 Robot Account
-        harbor_node_ip = "172.21.110.12"
-        harbor_nodeport = 31448
+        from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT
+
+        harbor_node_ip = HARBOR_NODE_IP
+        harbor_nodeport = HARBOR_NODEPORT
         harbor_host = "harbor.sisys.local"
         harbor_url = f"https://{harbor_node_ip}:{harbor_nodeport}"
         harbor_username = "admin"

@@ -105,8 +105,8 @@ class TestKubernetesSecretStorage:
         # 验证 Secret 结构
         assert secret_yaml["apiVersion"] == "v1"
         assert secret_yaml["kind"] == "Secret"
-        assert secret_yaml["metadata"]["name"] == "gitea-runner-token"
-        assert secret_yaml["metadata"]["namespace"] == "gitea-actions"
+        assert secret_yaml["metadata"]["name"] == "gitea-runner-token"  # type: ignore[index]
+        assert secret_yaml["metadata"]["namespace"] == "gitea-actions"  # type: ignore[index]
         assert secret_yaml["type"] == "Opaque"
         assert "token" in secret_yaml["data"]
 

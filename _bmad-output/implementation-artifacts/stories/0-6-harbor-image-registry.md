@@ -1236,7 +1236,7 @@ pytest tests/deployment/test_harbor.py
 
 # 7. 使用环境变量覆盖配置
 export HARBOR_NODE_IP=192.168.1.100
-export HARBOR_NODEPORT=31448
+export HARBOR_NODEPORT=nodeport
 pytest tests/deployment/test_harbor.py
 ```
 

@@ -1316,7 +1316,7 @@ data:
   classification-policy.yaml: |
     # SISYS 密钥分级分类管理策略
     # 符合 NIST SP 800-57 Part 1 Rev. 5
-    
+
     levels:
       # =========================================================================
       # L1-Critical: 根密钥级别
@@ -1328,26 +1328,26 @@ data:
           - "Vault Unseal Key"
           - "Sealed Secrets Master Key"
           - "主数据库 root 密码"
-        
+
         storage:
           type: "HSM/Vault"
           encryption: "AES-256-GCM"
           backup: "异地多活备份"
-        
+
         access:
           mode: "Dual-Control"
           approval: "Security Team Lead + CTO"
           audit: "所有访问记录审计"
-        
+
         rotation:
           interval: "30d"
           auto: false
           notification: "提前 7 天通知"
-        
+
         recovery:
           type: "Shamir's Secret Sharing"
           threshold: "3 of 5"
-    
+
       # =========================================================================
       # L2-High: 服务认证级别
       # =========================================================================
@@ -1358,26 +1358,26 @@ data:
           - "Harbor Robot Account Token"
           - "ArgoCD Git 凭据"
           - "服务间 mTLS 证书私钥"
-        
+
         storage:
           type: "Sealed Secrets"
           encryption: "AES-256-GCM"
           backup: "etcd 备份"
-        
+
         access:
           mode: "RBAC"
           approval: "Team Lead"
           audit: "所有访问记录审计"
-        
+
         rotation:
           interval: "90d"
           auto: true
           notification: "提前 14 天通知"
-        
+
         recovery:
           type: "Automated Re-issue"
           threshold: "N/A"
-    
+
       # =========================================================================
       # L3-Medium: 一般配置级别
       # =========================================================================
@@ -1387,26 +1387,26 @@ data:
           - "开发环境数据库密码"
           - "临时 API Token"
           - "测试环境 Secret"
-        
+
         storage:
           type: "Kubernetes Secret (加密)"
           encryption: "etcd 加密"
           backup: "etcd 备份"
-        
+
         access:
           mode: "Namespace RBAC"
           approval: "Developer"
           audit: "关键操作审计"
-        
+
         rotation:
           interval: "180d"
           auto: false
           notification: "提前 30 天通知"
-        
+
         recovery:
           type: "Manual Re-issue"
           threshold: "N/A"
-    
+
       # =========================================================================
       # L4-Low: 公开信息级别
       # =========================================================================
@@ -1415,22 +1415,22 @@ data:
         examples:
           - "公开 API Endpoint"
           - "配置参数（非敏感）"
-        
+
         storage:
           type: "ConfigMap"
           encryption: "None"
           backup: "Git 版本控制"
-        
+
         access:
           mode: "Public"
           approval: "None"
           audit: "None"
-        
+
         rotation:
           interval: "As needed"
           auto: false
           notification: "N/A"
-        
+
         recovery:
           type: "Git Revert"
           threshold: "N/A"
@@ -1452,7 +1452,7 @@ data:
   crypto-policy.yaml: |
     # SISYS 密码学算法敏捷性策略
     # 支持算法平滑迁移，应对量子计算威胁
-    
+
     supported-algorithms:
       # 对称加密
       symmetric:
@@ -1468,7 +1468,7 @@ data:
             deprecation-date: "2026-01-01"
             removal-date: "2027-01-01"
             reason: "CBC 模式存在填充预言攻击风险"
-      
+
       # 非对称加密
       asymmetric:
         current:
@@ -1492,7 +1492,7 @@ data:
             deprecation-date: "2025-01-01"
             removal-date: "2026-06-01"
             reason: "密钥长度不足"
-      
+
       # 哈希算法
       hash:
         current:
@@ -1514,25 +1514,25 @@ data:
             deprecation-date: "2020-01-01"
             removal-date: "2025-01-01"
             reason: "严重碰撞漏洞"
-    
+
     # 算法迁移路线图
     migration-path:
       - name: "RSA-2048 → RSA-4096"
         timeline: "2026-Q4"
         status: "planned"
         impact: "证书重新签发，密钥对更新"
-      
+
       - name: "ECDSA-P256 → Ed25519"
         timeline: "2027-Q2"
         status: "research"
         impact: "签名算法升级，需客户端支持"
-      
+
       - name: "后量子密码迁移"
         timeline: "2028-Q1"
         status: "monitoring"
         algorithms: ["CRYSTALS-Kyber", "CRYSTALS-Dilithium"]
         impact: "全面算法升级"
-    
+
     # 算法检测与告警
     detection:
       enabled: true
@@ -1561,7 +1561,7 @@ metadata:
 data:
   migration-steps.yaml: |
     # cert-manager 迁移计划
-    
+
     ## 阶段 1: 并行运行（第 1-2 天）
     phase-1-parallel:
       duration: "2 天"
@@ -1573,7 +1573,7 @@ data:
           verification: |
             kubectl get pods -n cert-manager
             # 期望：所有 Pod Running
-        
+
         - step: 2
           action: "配置 ClusterIssuer"
           command: |
@@ -1581,7 +1581,7 @@ data:
           verification: |
             kubectl get clusterissuer letsencrypt-prod
             # 期望：Ready=True
-        
+
         - step: 3
           action: "申请测试证书"
           command: |
@@ -1589,14 +1589,14 @@ data:
           verification: |
             kubectl get certificate test-cert -o jsonpath='{.status.conditions[0]}'
             # 期望：Ready=True
-        
+
         - step: 4
           action: "新旧证书并行（DNS 轮询）"
           details: |
             - 旧证书：手动管理的自签名证书
             - 新证书：cert-manager 管理的 Let's Encrypt 证书
             - 流量分配：旧 80% / 新 20%
-    
+
     ## 阶段 2: 流量切换（第 3-4 天）
     phase-2-cutover:
       duration: "2 天"
@@ -1609,7 +1609,7 @@ data:
           verification: |
             # 监控新证书使用情况
             kubectl get certificate | grep new
-        
+
         - step: 2
           action: "流量切换到新证书 50%"
           command: |
@@ -1618,7 +1618,7 @@ data:
             # 监控错误率，确保无 TLS 错误
             kubectl logs -l app=traefik | grep -i "tls error"
             # 期望：无错误
-        
+
         - step: 3
           action: "流量切换到新证书 100%"
           command: |
@@ -1626,7 +1626,7 @@ data:
           verification: |
             # 验证所有服务使用新证书
             curl -v https://gitea.sisys.local 2>&1 | grep "SSL certificate verify ok"
-    
+
     ## 阶段 3: 观察期（第 5-7 天）
     phase-3-observation:
       duration: "7 天"
@@ -1637,7 +1637,7 @@ data:
             - "证书续期自动化测试"
             - "TLS 错误率监控"
             - "证书过期告警测试"
-        
+
         - step: 2
           action: "证书续期自动化验证"
           command: |
@@ -1647,7 +1647,7 @@ data:
           verification: |
             # 验证自动续期触发
             kubectl get certificate sisys-wildcard-cert -w
-        
+
         - step: 3
           action: "旧证书吊销"
           command: |
@@ -1657,25 +1657,25 @@ data:
             # 确认旧证书已删除
             kubectl get secret | grep old-tls
             # 期望：无结果
-    
+
     ## 回滚方案
     rollback:
       trigger-conditions:
         - "证书续期失败 > 3 次"
         - "TLS 错误率 > 1%"
         - "Let's Encrypt 限流触发"
-      
+
       steps:
         - step: 1
           action: "DNS 切回旧证书"
           command: |
             kubectl apply -f deployments/apps/ingress-rollback.yaml
           rto: "30min"
-        
+
         - step: 2
           action: "通知 Let's Encrypt 支持团队"
           contact: "support@letsencrypt.org"
-        
+
         - step: 3
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
@@ -1693,7 +1693,7 @@ metadata:
 data:
   migration-steps.yaml: |
     # Gitea OIDC 迁移计划
-    
+
     ## 阶段 1: 准备阶段（第 1 天）
     phase-1-preparation:
       duration: "1 天"
@@ -1706,7 +1706,7 @@ data:
             # 验证 OIDC Endpoint 可访问
             curl -k https://gitea.sisys.local/.well-known/openid-configuration
             # 期望：返回 OIDC 配置 JSON
-        
+
         - step: 2
           action: "创建 OAuth2 应用"
           command: |
@@ -1718,14 +1718,14 @@ data:
             # 记录 Client ID 和 Client Secret
             echo "Client ID: $GITEA_CLIENT_ID"
             echo "Client Secret: $GITEA_CLIENT_SECRET"
-        
+
         - step: 3
           action: "配置用户组映射"
           details: |
             - gitea-admins → Harbor Admin
             - gitea-developers → Harbor Developer
             - gitea-viewers → Harbor Guest
-    
+
     ## 阶段 2: 双轨运行（第 2-7 天）
     phase-2-dual-auth:
       duration: "6 天"
@@ -1735,7 +1735,7 @@ data:
           details: |
             - 新注册用户：必须使用 Gitea OIDC
             - 现有用户：可继续使用本地密码，或迁移到 OIDC
-          
+
           communication: |
             邮件通知模板：
             主题：【重要】统一身份认证升级通知
@@ -1743,7 +1743,7 @@ data:
               - OIDC 优势说明
               - 迁移操作指南
               - 截止日期提醒
-        
+
         - step: 2
           action: "Harbor 配置双认证（Local + OIDC）"
           command: |
@@ -1755,14 +1755,14 @@ data:
               -d '{"username":"admin","password":"xxx"}'
             # 测试 OIDC 登录
             curl -X POST https://harbor.sisys.local/c/oidc/callback
-        
+
         - step: 3
           action: "监控迁移进度"
           metrics:
             - "每日 OIDC 登录用户数"
             - "每日本地登录用户数"
             - "迁移率目标：第 7 天达到 80%"
-    
+
     ## 阶段 3: 强制切换（第 8-14 天）
     phase-3-enforcement:
       duration: "7 天"
@@ -1776,7 +1776,7 @@ data:
               - 停用日期：30 天后
               - 未迁移用户列表
               - 紧急联系渠道
-        
+
         - step: 2
           action: "禁用本地认证"
           command: |
@@ -1786,7 +1786,7 @@ data:
             curl -X POST https://gitea.sisys.local/api/v1/users/login \
               -d '{"username":"admin","password":"xxx"}'
             # 期望：401 Unauthorized
-        
+
         - step: 3
           action: "清理本地密码数据"
           command: |
@@ -1798,27 +1798,27 @@ data:
             kubectl exec -it gitea-db-0 -- psql -c \
               "SELECT count(*) FROM \"user\" WHERE passwd_hash != '';"
             # 期望：0
-    
+
     ## 回滚方案
     rollback:
       trigger-conditions:
         - "SSO 故障 > 1h"
         - "用户投诉率 > 10%"
         - "OIDC 登录失败率 > 20%"
-      
+
       steps:
         - step: 1
           action: "降级到本地认证"
           command: |
             kubectl apply -f deployments/gitea/local-auth-config.yaml
           rto: "15min"
-        
+
         - step: 2
           action: "恢复本地密码"
           details: |
             - 从备份恢复密码哈希
             - 通知用户密码已恢复
-        
+
         - step: 3
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
@@ -1836,7 +1836,7 @@ metadata:
 data:
   migration-steps.yaml: |
     # Sealed Secrets 迁移计划
-    
+
     ## 阶段 1: 部署 Controller（第 1 天）
     phase-1-deployment:
       duration: "1 天"
@@ -1848,21 +1848,21 @@ data:
           verification: |
             kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
             # 期望：1/1 Running
-        
+
         - step: 2
           action: "备份主密钥"
           command: |
             # 备份 Sealed Secrets 私钥到安全位置
             kubectl get secret -n kube-system sealed-secrets-key \
               -o jsonpath='{.data}' | base64 -d > sealed-secrets-master-key.backup
-            
+
             # 加密备份文件
             openssl enc -aes-256-cbc -salt -in sealed-secrets-master-key.backup \
               -out sealed-secrets-master-key.backup.enc
           verification: |
             # 验证备份文件存在
             ls -la sealed-secrets-master-key.backup.enc
-        
+
         - step: 3
           action: "安装 kubeseal CLI"
           command: |
@@ -1870,7 +1870,7 @@ data:
             sudo install -m 755 kubeseal-0.24.0-linux-amd64 /usr/local/bin/kubeseal
           verification: |
             kubeseal --version
-    
+
     ## 阶段 2: 新 Secret 使用 SealedSecret（第 2-3 天）
     phase-2-new-secrets:
       duration: "2 天"
@@ -1879,20 +1879,20 @@ data:
           action: "配置 CI/CD 自动加密"
           details: |
             在 CI/CD Pipeline 中添加加密步骤：
-            
+
             ```yaml
             # .gitea/workflows/deploy.yaml
             - name: Encrypt Secret
               run: |
                 kubeseal --format yaml < secret.yaml > sealed-secret.yaml
             ```
-        
+
         - step: 2
           action: "新 Secret 必须使用 SealedSecret"
           policy: |
             - 所有新创建的 Secret 必须使用 SealedSecret 格式
             - PR 检查：检测明文 Secret 提交
-        
+
         - step: 3
           action: "验证 SealedSecret 自动解密"
           command: |
@@ -1904,7 +1904,7 @@ data:
             # 验证 Secret 自动创建
             kubectl get secret test-secret
             # 期望：test-secret 存在
-    
+
     ## 阶段 3: 分批迁移现有 Secret（第 4-10 天）
     phase-3-migration:
       duration: "7 天"
@@ -1916,42 +1916,42 @@ data:
             第 5 天：harbor 命名空间
             第 6 天：argocd 命名空间
             第 7 天：其他命名空间
-          
+
           command: |
             # 导出 Secret
             kubectl get secret gitea-admin-secret -n gitea \
               -o yaml > gitea-admin-secret.yaml
-            
+
             # 转换为 SealedSecret
             kubeseal --format yaml < gitea-admin-secret.yaml \
               > gitea-admin-sealedsecret.yaml
-            
+
             # 应用 SealedSecret
             kubectl apply -f gitea-admin-sealedsecret.yaml
-            
+
             # 删除原 Secret（Sealed Secrets Controller 会自动创建）
             kubectl delete secret gitea-admin-secret -n gitea
-        
+
         - step: 2
           action: "验证 Secret 功能正常"
           verification: |
             # 验证应用可以正常访问 Secret
             kubectl exec -it gitea-0 -- env | grep GITEA_ADMIN_PASSWORD
-        
+
         - step: 3
           action: "禁用明文 Secret 提交 CI"
           policy: |
             在 CI/CD 中添加检查：
             - 检测明文 Secret 提交
             - 拒绝包含明文的 PR
-    
+
     ## 回滚方案
     rollback:
       trigger-conditions:
         - "Controller 故障 > 2h"
         - "私钥丢失"
         - "解密失败率 > 10%"
-      
+
       steps:
         - step: 1
           action: "使用备份私钥手动解密"
@@ -1961,14 +1961,14 @@ data:
               --from-file=tls.key=sealed-secrets-master-key.backup \
               -n kube-system
           rto: "1h"
-        
+
         - step: 2
           action: "恢复明文 Secret"
           command: |
             # 从 Git 恢复明文 Secret
             kubectl apply -f deployments/secrets-backup/
           rto: "30min"
-        
+
         - step: 3
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
@@ -1989,18 +1989,18 @@ metadata:
 data:
   rollback-scenarios.yaml: |
     # SISYS 统一认证回滚手册
-    
+
     ## 场景 1: cert-manager 故障
     scenario-1-cert-manager-failure:
       trigger-conditions:
         - "证书续期失败 > 3 次"
         - "Let's Encrypt API 限流"
         - "DNS 验证失败持续 > 1h"
-      
+
       severity: "P1-Critical"
       rto: "30min"
       rpo: "0 (证书不丢失)"
-      
+
       steps:
         - step: 1
           action: "启动应急响应"
@@ -2009,7 +2009,7 @@ data:
             @channel cert-manager 故障，启动应急预案
           owner: "On-call Engineer"
           timeout: "5min"
-        
+
         - step: 2
           action: "DNS 切回旧证书"
           command: |
@@ -2019,7 +2019,7 @@ data:
           timeout: "15min"
           verification: |
             curl -v https://gitea.sisys.local 2>&1 | grep "SSL certificate"
-        
+
         - step: 3
           action: "联系 Let's Encrypt 支持"
           contact: |
@@ -2027,23 +2027,23 @@ data:
             社区：https://community.letsencrypt.org/
           owner: "Security Team Lead"
           timeout: "30min"
-        
+
         - step: 4
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
           owner: "Incident Commander"
-    
+
     ## 场景 2: Gitea OIDC 故障
     scenario-2-oidc-failure:
       trigger-conditions:
         - "SSO 登录失败率 > 20%"
         - "Gitea OIDC Endpoint 不可用 > 30min"
         - "Token 签发失败持续 > 1h"
-      
+
       severity: "P1-Critical"
       rto: "15min"
       rpo: "0 (用户数据不丢失)"
-      
+
       steps:
         - step: 1
           action: "启动应急响应"
@@ -2051,7 +2051,7 @@ data:
             @channel Gitea OIDC 故障，启动应急预案
           owner: "On-call Engineer"
           timeout: "5min"
-        
+
         - step: 2
           action: "降级到本地认证"
           command: |
@@ -2065,7 +2065,7 @@ data:
             # 验证本地登录可用
             curl -X POST https://harbor.sisys.local/api/v2.0/users/login \
               -d '{"username":"admin","password":"xxx"}'
-        
+
         - step: 3
           action: "通知用户"
           communication: |
@@ -2077,23 +2077,23 @@ data:
               - 预计恢复时间
           owner: "Communications Lead"
           timeout: "30min"
-        
+
         - step: 4
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
           owner: "Incident Commander"
-    
+
     ## 场景 3: Sealed Secrets Controller 故障
     scenario-3-sealed-secrets-failure:
       trigger-conditions:
         - "Controller Pod CrashLoopBackOff"
         - "Secret 解密失败 > 10%"
         - "私钥丢失"
-      
+
       severity: "P2-High"
       rto: "1h"
       rpo: "0 (密钥不丢失)"
-      
+
       steps:
         - step: 1
           action: "启动应急响应"
@@ -2101,7 +2101,7 @@ data:
             @channel Sealed Secrets 故障，启动应急预案
           owner: "On-call Engineer"
           timeout: "5min"
-        
+
         - step: 2
           action: "恢复私钥"
           command: |
@@ -2113,14 +2113,14 @@ data:
           timeout: "30min"
           verification: |
             kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
-        
+
         - step: 3
           action: "重启 Controller"
           command: |
             kubectl rollout restart deployment/sealed-secrets-controller -n kube-system
           owner: "DevOps Engineer"
           timeout: "15min"
-        
+
         - step: 4
           action: "验证解密功能"
           command: |
@@ -2129,23 +2129,23 @@ data:
               kubectl apply -f -
           owner: "DevOps Engineer"
           timeout: "15min"
-        
+
         - step: 5
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
           owner: "Incident Commander"
-    
+
     ## 场景 4: mTLS 导致服务间通信故障
     scenario-4-mtls-failure:
       trigger-conditions:
         - "服务间调用失败率 > 30%"
         - "mTLS 证书验证失败 > 50 次/min"
         - "延迟增加 > 100ms"
-      
+
       severity: "P1-Critical"
       rto: "10min"
       rpo: "N/A"
-      
+
       steps:
         - step: 1
           action: "启动应急响应"
@@ -2153,7 +2153,7 @@ data:
             @channel mTLS 故障，启动应急预案
           owner: "On-call Engineer"
           timeout: "5min"
-        
+
         - step: 2
           action: "临时禁用 mTLS"
           command: |
@@ -2165,7 +2165,7 @@ data:
           verification: |
             # 验证服务间通信恢复
             curl http://gitea-http.gitea.svc.cluster.local:3000
-        
+
         - step: 3
           action: "调查根因"
           focus-areas:
@@ -2174,46 +2174,46 @@ data:
             - "网络策略是否阻止"
           owner: "Security Team Lead"
           timeout: "30min"
-        
+
         - step: 4
           action: "根因分析"
           deliverable: "Post-Mortem 报告（24h 内）"
           owner: "Incident Commander"
-    
+
     ## 应急联系人
     emergency-contacts:
       - role: "On-call Engineer"
         contact: "+86-xxx-xxxx-xxxx"
         escalation: "15min 无响应 → Team Lead"
-      
+
       - role: "DevOps Team Lead"
         contact: "+86-xxx-xxxx-xxxx"
         escalation: "30min 无响应 → Security Team Lead"
-      
+
       - role: "Security Team Lead"
         contact: "+86-xxx-xxxx-xxxx"
         escalation: "1h 无响应 → CTO"
-      
+
       - role: "CTO"
         contact: "+86-xxx-xxxx-xxxx"
-    
+
     ## 应急演练计划
     drill-schedule:
       - name: "cert-manager 故障演练"
         frequency: "Quarterly"
         next-drill: "2026-Q2"
         participants: ["DevOps", "Security"]
-      
+
       - name: "OIDC 故障演练"
         frequency: "Quarterly"
         next-drill: "2026-Q2"
         participants: ["DevOps", "Security", "Support"]
-      
+
       - name: "Sealed Secrets 故障演练"
         frequency: "Semi-annually"
         next-drill: "2026-Q3"
         participants: ["Security", "DevOps"]
-      
+
       - name: "全面故障演练"
         frequency: "Annually"
         next-drill: "2026-Q4"
@@ -2241,14 +2241,14 @@ metadata:
 data:
   runbooks.yaml: |
     # SISYS 统一认证运维手册索引
-    
+
     ## cert-manager 运维手册
     runbook-cert-manager:
       path: "docs/runbooks/cert-manager/"
       owner: "DevOps Team"
       last-reviewed: "2026-03-18"
       next-review: "2026-06-18"
-      
+
       documents:
         - name: "证书申请失败排查流程"
           file: "cert-application-troubleshooting.md"
@@ -2256,40 +2256,40 @@ data:
             - Certificate 状态长时间不是 Ready
             - Challenge 验证失败
             - DNS 记录不存在
-          
+
           steps:
             1. 检查 Certificate 状态：kubectl describe certificate <name>
             2. 检查 Challenge 状态：kubectl get challenge
             3. 检查 DNS 记录：dig _acme-challenge.<domain> TXT
             4. 检查 cert-manager 日志：kubectl logs -l app=cert-manager
             5. 常见错误及解决方案：见文档
-        
+
         - name: "证书续期失败应急处理"
           file: "cert-renewal-failure.md"
           scenario: |
             - 证书即将过期（< 7 天）
             - 自动续期失败
             - Let's Encrypt 限流
-          
+
           steps:
             1. 检查限流状态：https://letsencrypt.org/docs/rate-limits/
             2. 手动触发续期：kubectl cert-manager renew <name>
             3. 如仍失败，切换到备用 CA
             4. 联系 Let's Encrypt 支持
-        
+
         - name: "ClusterIssuer 配置变更流程"
           file: "cluster-issuer-change.md"
           scenario: |
             - 更换 ACME Server
             - 修改 DNS Provider
             - 更新私钥
-          
+
           steps:
             1. 备份当前配置：kubectl get clusterissuer -o yaml > backup.yaml
             2. 应用新配置：kubectl apply -f new-cluster-issuer.yaml
             3. 验证新配置：kubectl describe clusterissuer
             4. 监控证书签发：kubectl get certificate -w
-        
+
         - name: "监控告警响应流程"
           file: "monitoring-alert-response.md"
           alerts:
@@ -2299,14 +2299,14 @@ data:
             - name: "CertificateExpired"
               severity: "critical"
               response: "立即启动应急预案，手动续期"
-    
+
     ## Sealed Secrets 运维手册
     runbook-sealed-secrets:
       path: "docs/runbooks/sealed-secrets/"
       owner: "Security Team"
       last-reviewed: "2026-03-18"
       next-review: "2026-06-18"
-      
+
       documents:
         - name: "私钥备份与恢复流程"
           file: "master-key-backup-restore.md"
@@ -2314,55 +2314,55 @@ data:
             - 定期备份私钥
             - Controller 故障后恢复
             - 私钥丢失恢复
-          
+
           steps:
             1. 备份：kubectl get secret sealed-secrets-key -n kube-system -o yaml > backup.yaml
             2. 加密备份文件：openssl enc -aes-256-cbc -salt -in backup.yaml -out backup.yaml.enc
             3. 存储到安全位置：Vault / AWS Secrets Manager
             4. 恢复：kubectl apply -f backup.yaml
-        
+
         - name: "Controller 升级流程"
           file: "controller-upgrade.md"
           scenario: |
             - 新版本发布
             - 安全补丁
             - 功能升级
-          
+
           steps:
             1. 阅读 Release Notes
             2. 在测试环境验证
             3. 备份当前配置
             4. 执行升级：helm upgrade sealed-secrets ...
             5. 验证功能正常
-        
+
         - name: "密钥轮换操作流程"
           file: "key-rotation.md"
           scenario: |
             - 定期轮换（90 天）
             - 泄露后紧急轮换
             - 员工离职轮换
-          
+
           steps:
             1. 生成新密钥
             2. 创建新 SealedSecret
             3. 应用新 Secret
             4. 删除旧 Secret
             5. 更新所有引用
-        
+
         - name: "故障排查流程"
           file: "troubleshooting.md"
           scenarios:
             - "Secret 无法解密"
             - "Controller CrashLoopBackOff"
             - "SealedSecret 状态不是 Ready"
-    
+
     ## Gitea OIDC 运维手册
     runbook-gitea-oidc:
       path: "docs/runbooks/gitea-oidc/"
       owner: "DevOps Team"
       last-reviewed: "2026-03-18"
       next-review: "2026-06-18"
-      
+
       documents:
         - name: "OIDC 故障应急处理"
           file: "oidc-failure-emergency.md"
@@ -2370,88 +2370,88 @@ data:
             - 用户无法登录
             - Token 签发失败
             - OIDC Endpoint 不可用
-          
+
           steps:
             1. 检查 Gitea 服务状态：kubectl get pods -n gitea
             2. 检查 OIDC Endpoint: curl https://gitea.sisys.local/.well-known/openid-configuration
             3. 检查日志：kubectl logs -l app=gitea | grep -i oidc
             4. 如无法快速恢复，启动降级方案
-        
+
         - name: "用户迁移操作流程"
           file: "user-migration.md"
           scenario: |
             - 本地用户迁移到 OIDC
             - 批量用户导入
             - 用户数据同步
-          
+
           steps:
             1. 导出本地用户：kubectl exec -it gitea-0 -- gitea admin user list
             2. 创建 OIDC 用户组
             3. 发送迁移通知邮件
             4. 监控迁移进度
             5. 清理未迁移用户
-        
+
         - name: "Token 吊销操作流程"
           file: "token-revocation.md"
           scenario: |
             - Token 泄露
             - 员工离职
             - 安全事件
-          
+
           steps:
             1. 识别需吊销的 Token
             2. 执行吊销：kubectl exec -it gitea-0 -- gitea admin user revoke-oauth2-token ...
             3. 通知相关系统
             4. 审计日志分析
-        
+
         - name: "性能调优指南"
           file: "performance-tuning.md"
           topics:
             - "OIDC Token 缓存优化"
             - "数据库连接池优化"
             - "JWK 缓存策略"
-    
+
     ## 安全事件响应手册
     runbook-security-incident:
       path: "docs/runbooks/security/"
       owner: "Security Team"
       last-reviewed: "2026-03-18"
       next-review: "2026-06-18"
-      
+
       documents:
         - name: "密钥泄露应急响应"
           file: "secret-leak-response.md"
           severity: "P1-Critical"
-          
+
           steps:
             1. 立即轮换泄露密钥（15min 内）
             2. 审计日志分析泄露范围（1h 内）
             3. 通知受影响用户（4h 内）
             4. 根因分析报告（24h 内）
             5. 改进措施实施（7d 内）
-        
+
         - name: "证书泄露应急响应"
           file: "certificate-leak-response.md"
           severity: "P1-Critical"
-          
+
           steps:
             1. 立即吊销证书（5min 内）
             2. 申请新证书
             3. 部署新证书
             4. 审计日志分析
             5. 根因分析
-        
+
         - name: "OIDC 入侵应急响应"
           file: "oidc-breach-response.md"
           severity: "P1-Critical"
-          
+
           steps:
             1. 吊销所有 OIDC Token（5min 内）
             2. 强制所有用户重新登录
             3. 启用紧急本地认证
             4. 重建 OIDC 密钥对
             5. 安全审计
-        
+
         - name: "审计日志分析流程"
           file: "audit-log-analysis.md"
           tools:
@@ -2475,12 +2475,12 @@ metadata:
 data:
   metrics-spec.yaml: |
     # SISYS 统一认证监控指标规范
-    
+
     ## cert-manager 指标
     cert-manager-metrics:
       source: "cert-manager"
       service-monitor: "cert-manager-monitor"
-      
+
       metrics:
         - name: certmanager_certificate_ready_status
           type: "gauge"
@@ -2491,7 +2491,7 @@ data:
               expr: "certmanager_certificate_ready_status{condition=\"True\"} == 0"
               for: "5m"
               severity: "warning"
-        
+
         - name: certmanager_certificate_expiry_timestamp
           type: "gauge"
           description: "证书过期时间戳（Unix timestamp）"
@@ -2505,7 +2505,7 @@ data:
               expr: "(certmanager_certificate_expiry_timestamp - time()) < 0"
               for: "1m"
               severity: "critical"
-        
+
         - name: certmanager_certificate_renewal_total
           type: "counter"
           description: "证书续期总次数"
@@ -2515,22 +2515,22 @@ data:
               expr: "rate(certmanager_certificate_renewal_total{result=\"failed\"}[5m]) > 0.1"
               for: "5m"
               severity: "critical"
-        
+
         - name: certmanager_http_acme_client_request_count
           type: "counter"
           description: "ACME 请求总次数"
           labels: ["host", "method", "status"]
-        
+
         - name: certmanager_http_acme_client_request_duration_seconds
           type: "histogram"
           description: "ACME 请求延迟"
           labels: ["host", "method"]
-    
+
     ## Sealed Secrets 指标
     sealed-secrets-metrics:
       source: "sealed-secrets-controller"
       service-monitor: "sealed-secrets-monitor"
-      
+
       metrics:
         - name: sealed_secrets_controller_errors_total
           type: "counter"
@@ -2541,23 +2541,23 @@ data:
               expr: "rate(sealed_secrets_controller_errors_total[5m]) > 0.5"
               for: "5m"
               severity: "critical"
-        
+
         - name: sealed_secrets_decryption_latency_seconds
           type: "histogram"
           description: "解密延迟"
           labels: ["quantile"]
           buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-        
+
         - name: sealed_secrets_controller_reconcile_duration_seconds
           type: "histogram"
           description: "Reconcile 延迟"
           labels: ["quantile"]
-    
+
     ## Gitea OIDC 指标
     gitea-oidc-metrics:
       source: "gitea"
       service-monitor: "gitea-monitor"
-      
+
       metrics:
         - name: gitea_login_total
           type: "counter"
@@ -2568,59 +2568,59 @@ data:
               expr: "rate(gitea_login_total{status=\"failure\"}[5m]) / rate(gitea_login_total[5m]) > 0.1"
               for: "5m"
               severity: "warning"
-        
+
         - name: gitea_token_issued_total
           type: "counter"
           description: "Token 签发总次数"
           labels: ["type", "client"]
-        
+
         - name: gitea_token_revoked_total
           type: "counter"
           description: "Token 吊销总次数"
           labels: ["type", "reason"]
-        
+
         - name: gitea_oidc_auth_duration_seconds
           type: "histogram"
           description: "OIDC 认证延迟"
           labels: ["status"]
           buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-        
+
         - name: gitea_active_users
           type: "gauge"
           description: "活跃用户数"
           labels: ["type"]  # local/oidc
-    
+
     ## ArgoCD 指标
     argocd-metrics:
       source: "argocd"
       service-monitor: "argocd-monitor"
-      
+
       metrics:
         - name: argocd_cluster_info
           type: "gauge"
           description: "集群信息"
           labels: ["server", "name"]
-        
+
         - name: argocd_app_info
           type: "gauge"
           description: "Application 状态"
           labels: ["name", "namespace", "sync_status", "health_status"]
-        
+
         - name: argocd_git_request_total
           type: "counter"
           description: "Git 请求总次数"
           labels: ["request_type", "status"]
-        
+
         - name: argocd_git_request_duration_seconds
           type: "histogram"
           description: "Git 请求延迟"
           labels: ["request_type"]
-    
+
     ## Harbor 指标
     harbor-metrics:
       source: "harbor"
       service-monitor: "harbor-monitor"
-      
+
       metrics:
         - name: harbor_health
           type: "gauge"
@@ -2631,22 +2631,22 @@ data:
               expr: "harbor_health{component=\"core\"} == 0"
               for: "5m"
               severity: "critical"
-        
+
         - name: harbor_robot_account_login_total
           type: "counter"
           description: "Robot Account 登录总次数"
           labels: ["status", "robot_name"]
-        
+
         - name: harbor_image_push_total
           type: "counter"
           description: "镜像推送总次数"
           labels: ["status", "project"]
-        
+
         - name: harbor_image_scan_total
           type: "counter"
           description: "镜像扫描总次数"
           labels: ["status", "severity"]
-    
+
     ## Grafana 仪表盘
     grafana-dashboards:
       - name: "统一认证监控总览"
@@ -2657,7 +2657,7 @@ data:
           - "Token 签发/吊销趋势"
           - "Secret 解密延迟"
           - "告警汇总"
-      
+
       - name: "cert-manager 详情"
         file: "cert-manager-detail.json"
         panels:
@@ -2665,7 +2665,7 @@ data:
           - "续期成功率"
           - "ACME 请求延迟"
           - "错误分布"
-      
+
       - name: "Gitea OIDC 详情"
         file: "gitea-oidc-detail.json"
         panels:
@@ -2673,7 +2673,7 @@ data:
           - "OIDC vs 本地登录对比"
           - "Token 生命周期"
           - "活跃用户数"
-      
+
       - name: "安全事件监控"
         file: "security-events.json"
         panels:
@@ -2815,10 +2815,10 @@ kubectl apply -f deployments/gitea/local-auth-config.yaml
 
 ---
 
-**文档版本:** 2.0.0 (根据评估报告完善)  
-**最后更新:** 2026-03-18  
-**维护者:** SISYS Architecture Team  
-**审查状态:** ✅ 已通过宗师级评估 (B+ 级)  
+**文档版本:** 2.0.0 (根据评估报告完善)
+**最后更新:** 2026-03-18
+**维护者:** SISYS Architecture Team
+**审查状态:** ✅ 已通过宗师级评估 (B+ 级)
 **下次审查:** 2026-06-18
 
 本宗师级方案提供：

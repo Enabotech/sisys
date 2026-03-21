@@ -9,6 +9,12 @@
 
 set -euo pipefail
 
+# =============================================================================
+# 配置 - 支持环境变量覆盖
+# =============================================================================
+HARBOR_NODE_IP="${HARBOR_NODE_IP:-localhost}"
+HARBOR_NODEPORT="${HARBOR_NODEPORT:-31448}"
+HARBOR_INGRESS_HOST="${HARBOR_INGRESS_HOST:-harbor.sisys.local}"
 HARBOR_NS="harbor"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="/var/log/harbor-autofix.log"
@@ -101,7 +107,8 @@ sleep 10
 # 验证 API 访问
 log "验证 Harbor API 访问..."
 for i in {1..5}; do
-    API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://172.21.110.12:31448/api/v2.0/ping" -H "Host: harbor.sisys.local" 2>/dev/null || echo "")
+    API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://${HARBOR_NODE_IP}:${HARBOR_NODEPORT}/api/v2.0/ping" \
+      -H "Host: ${HARBOR_INGRESS_HOST}" 2>/dev/null || echo "")
     if [[ "$API_RESPONSE" == "Pong" ]]; then
         log "✅ Harbor API 访问正常：$API_RESPONSE"
         break
@@ -124,5 +131,5 @@ log "  IngressRoute: $([ $(sudo kubectl get ingressroute harbor-ingressroute -n 
 log "  TLS Secret: $([ $(sudo kubectl get secret harbor-tls-secret -n $HARBOR_NS &>/dev/null && echo '✅') || echo '❌' ])"
 log "  API 访问：$([ "$API_RESPONSE" == "Pong" ] && echo '✅ 正常' || echo '❌ 异常')"
 log ""
-log "访问地址：https://harbor.sisys.local:31448"
+log "访问地址：https://harbor.sisys.local:nodeport"
 log "管理员账号：admin / Harbor@2026Secure!"

@@ -1,8 +1,8 @@
 # Harbor 镜像推送解决方案 - 实施报告
 
-**文档版本:** 1.0  
-**实施日期:** 2026-03-18  
-**实施状态:** ✅ 完成  
+**文档版本:** 1.0
+**实施日期:** 2026-03-18
+**实施状态:** ✅ 完成
 
 ---
 
@@ -22,7 +22,7 @@
 | 项目 | 状态 | 说明 |
 |------|------|------|
 | **Harbor 版本** | v2.14.3 | ✅ 已部署 (8/8 Pod Running) |
-| **Harbor API** | ✅ 可访问 | https://172.21.110.12:31448 |
+| **Harbor API** | ✅ 可访问 | https://<WSL2_IP>:<NODEPORT> |
 | **管理员凭据** | admin/Admin@123456 | ✅ 已验证 |
 | **项目 'sisys'** | ✅ 已创建 | project_id=2 |
 | **Robot Account** | ❌ 未创建 | 需要创建 |
@@ -40,7 +40,7 @@
 ```bash
 curl -k -X POST \
   -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/robots" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/robots" \
   -H "Host: harbor.sisys.local" \
   -H "Content-Type: application/json" \
   -d '{
@@ -70,13 +70,13 @@ curl -k -X POST \
   "expires_at": -1,
   "id": 3,
   "name": "robot$sisys+gitea-runner-push",
-  "secret": "fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv"
+  "secret": "${ROBOT_ACCESS_TOKEN}"
 }
 ```
 
 **✅ Robot Account 创建成功**
 - **名称:** `robot$sisys+gitea-runner-push`
-- **Token:** `fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv`
+- **Token:** `${ROBOT_ACCESS_TOKEN}`
 - **权限:** Push, Pull, Read, Create
 - **有效期:** 永不过期
 
@@ -122,7 +122,7 @@ sudo systemctl restart docker
 ```bash
 docker login harbor.sisys.local \
   -u 'robot$sisys+gitea-runner-push' \
-  -p 'fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv'
+  -p '${ROBOT_ACCESS_TOKEN}'
 ```
 
 **执行结果:**
@@ -169,7 +169,7 @@ v1.0.0: digest: sha256:08fe94b0d1e72fc687840f5696f6e107a85c327b1bcb8a7acc22f8c10
 
 ```bash
 curl -k -s -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/projects/sisys/repositories" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/projects/sisys/repositories" \
   -H "Host: harbor.sisys.local" | jq -r '.[].name'
 ```
 
@@ -204,7 +204,7 @@ configs:
       ca_file: /var/lib/rancher/k3s/agent/etc/ssl/certs/harbor-ca.crt
     auth:
       username: robot$sisys+gitea-runner-push
-      password: fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv
+      password: ${ROBOT_ACCESS_TOKEN}
 EOF
 
 sudo systemctl restart k3s
@@ -234,7 +234,7 @@ elapsed: 0.9 s  total:  21.1 MiB/s
 sudo kubectl create secret docker-registry harbor-pull-secret \
   --docker-server=https://harbor.sisys.local \
   --docker-username='robot$sisys+gitea-runner-push' \
-  --docker-password='fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv' \
+  --docker-password='${ROBOT_ACCESS_TOKEN}' \
   --docker-email='admin@sisys.local' \
   -n default
 ```
@@ -299,7 +299,7 @@ Events:
 ```bash
 # 查看 Harbor 项目中的镜像
 curl -k -s -u admin:Admin@123456 \
-  "https://172.21.110.12:31448/api/v2.0/projects/sisys/repositories" \
+  "https://<WSL2_IP>:<NODEPORT>/api/v2.0/projects/sisys/repositories" \
   -H "Host: harbor.sisys.local" | jq -r '.[].name'
 ```
 
@@ -338,7 +338,7 @@ harbor-test   1/1     Running   0          2m    10.42.0.xx  sisys-node-01   <no
 |--------|-----|
 | **Registry** | harbor.sisys.local |
 | **Username** | `robot$sisys+gitea-runner-push` |
-| **Password** | `fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv` |
+| **Password** | `${ROBOT_ACCESS_TOKEN}` |
 | **认证方式** | Basic Auth |
 | **Token 有效期** | 永不过期 |
 
@@ -357,13 +357,13 @@ configs:
       ca_file: /var/lib/rancher/k3s/agent/etc/ssl/certs/harbor-ca.crt
     auth:
       username: robot$sisys+gitea-runner-push
-      password: fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv
+      password: ${ROBOT_ACCESS_TOKEN}
 ```
 
 ### Kubernetes Secret
 
-**名称:** `harbor-pull-secret`  
-**命名空间:** `default`  
+**名称:** `harbor-pull-secret`
+**命名空间:** `default`
 **类型:** `kubernetes.io/dockerconfigjson`
 
 ---
@@ -410,7 +410,7 @@ jobs:
         run: |
           echo "${{ secrets.HARBOR_TOKEN }}" | docker login harbor.sisys.local \
             -u 'robot$sisys+gitea-runner-push' --password-stdin
-      
+
       - name: Build and Push
         run: |
           docker build -t harbor.sisys.local/sisys/myapp:${{ github.sha }} .
@@ -449,7 +449,7 @@ sudo systemctl restart docker
 docker logout harbor.sisys.local
 docker login harbor.sisys.local \
   -u 'robot$sisys+gitea-runner-push' \
-  -p 'fux2Zg5n5G7oJ3t1Kgsj4sj3V6m87xvv'
+  -p '${ROBOT_ACCESS_TOKEN}'
 ```
 
 ### 问题 3: K3S 无法拉取镜像
@@ -495,6 +495,6 @@ sudo journalctl -u k3s -f | grep -i "harbor"
 
 ---
 
-**实施完成日期:** 2026-03-18  
-**实施负责人:** DevOps Team  
+**实施完成日期:** 2026-03-18
+**实施负责人:** DevOps Team
 **下次审查日期:** 2026-06-18

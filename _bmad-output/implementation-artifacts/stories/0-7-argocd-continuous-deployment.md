@@ -614,8 +614,8 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - **待完成**: 在 Gitea 生成实际 Token 并替换占位符
 
 - [x] [AI-Review][CRITICAL] ArgoCD 连接 Gitea 网络配置错误 - 连接 443 端口被拒绝
-  - 问题：ArgoCD Repo Server 尝试连接 `172.21.110.12:443`，但 Traefik 监听 NodePort `31448`
-  - 日志证据：`dial tcp 172.21.110.12:443: connect: connection refused`
+  - 问题：ArgoCD Repo Server 尝试连接 `<WSL2_IP>:443`，但 Traefik 监听 NodePort `31448`
+  - 日志证据：`dial tcp <WSL2_IP>:443: connect: connection refused`
   - 修复方案：✅ 已配置 `insecure: "true"` 信任自签名证书
     - 方案 A: 配置集群内部 DNS/Hosts，使 `gitea.sisys.local` 解析到 Traefik 服务 IP
     - 方案 B: 使用 Traefik 服务名访问：`traefik.traefik.svc.cluster.local:443`
@@ -798,11 +798,11 @@ Traefik v3.x 反向代理
 5. ✅ 修复 ArgoCD IngressRoute（移除 Middleware 依赖）
 
 **当前访问方式:**
-| 服务 | HTTPS NodePort:31448 | HTTP NodePort:30580 |
+| 服务 | HTTPS NodePort:nodeport | HTTP NodePort:nodeport |
 |------|----------------------|---------------------|
-| **Gitea** | `curl -k -I https://172.21.110.12:31448 -H "Host: gitea.sisys.local"` ✅ | `curl -I http://172.21.110.12:30580 -H "Host: gitea.sisys.local"` ⚠️ |
-| **Harbor** | `curl -k https://172.21.110.12:31448/api/v2.0/ping -H "Host: harbor.sisys.local"` ✅ | `curl -I http://172.21.110.12:30580 -H "Host: harbor.sisys.local"` ⚠️ |
-| **ArgoCD** | `curl -k -I https://172.21.110.12:31448 -H "Host: argocd.sisys.local"` ✅ | `curl -I http://172.21.110.12:30580 -H "Host: argocd.sisys.local"` ⚠️ |
+| **Gitea** | `curl -k -I https://<WSL2_IP>:<NODEPORT> -H "Host: gitea.sisys.local"` ✅ | `curl -I http://<WSL2_IP>:nodeport -H "Host: gitea.sisys.local"` ⚠️ |
+| **Harbor** | `curl -k https://<WSL2_IP>:<NODEPORT>/api/v2.0/ping -H "Host: harbor.sisys.local"` ✅ | `curl -I http://<WSL2_IP>:nodeport -H "Host: harbor.sisys.local"` ⚠️ |
+| **ArgoCD** | `curl -k -I https://<WSL2_IP>:<NODEPORT> -H "Host: argocd.sisys.local"` ✅ | `curl -I http://<WSL2_IP>:nodeport -H "Host: argocd.sisys.local"` ⚠️ |
 
 **详细说明:**
 - ✅ = 正常工作
@@ -2130,7 +2130,7 @@ argocd-server-7bd488bb9b-gzjc7                      1/1 Running
 - 用户名：admin
 - 初始密码：q9SA1CLRerdGY1Ev（从 argocd-initial-admin-secret Secret 获取）
 - **当前密码**: Admin@123456（首次登录后已修改）
-- 登录地址：https://localhost:8080 或 https://argocd.sisys.local:31448
+- 登录地址：https://localhost:8080 或 https://argocd.sisys.local:nodeport
 - 密码复杂度：12 位 + 大小写 + 数字 + 符号 ✅
 
 **下一步:**

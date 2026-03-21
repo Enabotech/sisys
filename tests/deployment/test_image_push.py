@@ -18,13 +18,12 @@ import time
 import pytest
 
 # =============================================================================
-# 配置常量
+# 配置常量 - 从统一配置模块加载
 # =============================================================================
+from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
 
-HARBOR_NAMESPACE = "harbor"
-HARBOR_HOST = "harbor.sisys.local"
-HARBOR_NODEPORT = 31448
-HARBOR_NODE_IP = "172.21.110.12"
+HARBOR_NAMESPACE = TestConfig.get_harbor_config()["namespace"]
+HARBOR_HOST = TestConfig.get_harbor_config()["ingress_host"]
 # 使用域名而非 IP（避免证书问题）
 HARBOR_URL = f"{HARBOR_HOST}:{HARBOR_NODEPORT}"
 HARBOR_PROJECT = "sisys"

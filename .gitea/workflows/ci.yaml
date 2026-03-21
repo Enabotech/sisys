@@ -49,27 +49,45 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+        run: |
+          # Python 已在 Runner 镜像中预装 (Python 3.12)
+          echo "✅ Python version: $(python3 --version)"
+          echo "✅ pip version: $(pip3 --version)"
+
+          # 创建虚拟环境
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          # 升级 pip
+          pip install --upgrade pip
+
+          # 验证 Python 可用
+          which python
+          python --version
+
+          # 设置环境变量供后续步骤使用
+          echo "PYTHON_BIN=python" >> $GITHUB_ENV
+
+      - name: Install Poetry
+        run: |
+          pip install poetry
+          poetry --version
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          poetry install --with dev
 
       - name: Ruff linting
         run: |
-          ruff check . --output-format=github
+          poetry run ruff check . --output-format=github
 
       - name: Ruff format check
         run: |
-          ruff format . --check
+          poetry run ruff format . --check
 
       - name: MyPy type checking
         run: |
-          mypy src/ --pretty
+          poetry run mypy src/ --pretty
 
   # ============================================================
   # 阶段 2: 单元测试
@@ -83,19 +101,30 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+        run: |
+          # Python 已在 Runner 镜像中预装
+          echo "✅ Python version: $(python3 --version)"
+
+          # 创建虚拟环境
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          # 验证 Python 可用
+          which python
+          python --version
+
+      - name: Install Poetry
+        run: |
+          pip install poetry
+          poetry --version
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          poetry install --with dev
 
       - name: Run pytest with coverage
         run: |
-          pytest tests/unit \
+          poetry run pytest tests/unit \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
@@ -152,19 +181,26 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+        run: |
+          # Python 已在 Runner 镜像中预装
+          echo "✅ Python version: $(python3 --version)"
+
+          # 创建虚拟环境
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          # 验证 Python 可用
+          which python
+          python --version
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install poetry
+          poetry install --with dev
 
       - name: Run integration tests
         run: |
-          pytest tests/integration \
+          poetry run pytest tests/integration \
             --cov=src \
             --cov-append \
             -v \
@@ -189,9 +225,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+        run: |
+          # Python 已在 Runner 镜像中预装
+          echo "✅ Python version: $(python3 --version)"
+
+          # 创建虚拟环境
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          # 验证 Python 可用
+          which python
+          python --version
 
       - name: Install security tools
         run: |
@@ -199,7 +243,7 @@ jobs:
 
       - name: Bandit security scan
         run: |
-          bandit -r src/ -f json -o bandit-report.json || true
+          poetry run bandit -r src/ -f json -o bandit-report.json || true
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4

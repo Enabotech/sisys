@@ -14,6 +14,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# =============================================================================
+# 配置 - 支持环境变量覆盖
+# =============================================================================
+HARBOR_NODE_IP="${HARBOR_NODE_IP:-localhost}"
+HARBOR_NODEPORT="${HARBOR_NODEPORT:-31448}"
+HARBOR_INGRESS_HOST="${HARBOR_INGRESS_HOST:-harbor.sisys.local}"
 HARBOR_NS="harbor"
 FIX_NEEDED=false
 
@@ -98,18 +104,18 @@ echo "==========================================================================
 if [[ "$FIX_NEEDED" == "true" ]]; then
     log_warning "检测到问题，开始修复..."
     echo ""
-    
+
     # 重新应用 IngressRoute
     if [[ -f "deployments/harbor/ingress-route.yaml" ]]; then
         log_info "应用 IngressRoute 配置..."
         sudo kubectl apply -f deployments/harbor/ingress-route.yaml -n $HARBOR_NS
         log_success "IngressRoute 已应用"
     fi
-    
+
     # 等待 Traefik 同步
     log_info "等待 Traefik 同步 (10 秒)..."
     sleep 10
-    
+
     echo ""
     log_success "修复完成！"
 else
@@ -123,7 +129,8 @@ echo "==========================================================================
 
 # 测试 API 访问
 log_info "测试 Harbor API..."
-API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://172.21.110.12:31448/api/v2.0/ping" -H "Host: harbor.sisys.local" 2>/dev/null || echo "")
+API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://${HARBOR_NODE_IP}:${HARBOR_NODEPORT}/api/v2.0/ping" \
+  -H "Host: ${HARBOR_INGRESS_HOST}" 2>/dev/null || echo "")
 
 if [[ "$API_RESPONSE" == "Pong" ]]; then
     log_success "Harbor API 访问正常：$API_RESPONSE"
@@ -131,7 +138,8 @@ else
     log_warning "Harbor API 响应异常：$API_RESPONSE"
     log_info "等待 30 秒后重试..."
     sleep 30
-    API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://172.21.110.12:31448/api/v2.0/ping" -H "Host: harbor.sisys.local" 2>/dev/null || echo "")
+    API_RESPONSE=$(curl -k -s --connect-timeout 5 "https://${HARBOR_NODE_IP}:${HARBOR_NODEPORT}/api/v2.0/ping" \
+      -H "Host: ${HARBOR_INGRESS_HOST}" 2>/dev/null || echo "")
     if [[ "$API_RESPONSE" == "Pong" ]]; then
         log_success "Harbor API 访问正常：$API_RESPONSE"
     else

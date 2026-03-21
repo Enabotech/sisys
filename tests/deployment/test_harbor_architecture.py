@@ -14,18 +14,18 @@ import requests
 import urllib3
 import yaml  # type: ignore[import-untyped]
 
+# 从统一配置模块加载
+from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
+
 # 禁用 SSL 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =============================================================================
-# 常量定义
+# 常量定义 - 从统一配置加载
 # =============================================================================
 
-HARBOR_NAMESPACE = "harbor"
-HARBOR_HOST = "harbor.sisys.local"
-# 使用 NodePort 访问（Traefik LoadBalancer 无 External IP）
-HARBOR_NODEPORT = 31448
-HARBOR_NODE_IP = "172.21.110.12"
+HARBOR_NAMESPACE = TestConfig.get_harbor_config()["namespace"]
+HARBOR_HOST = TestConfig.get_harbor_config()["ingress_host"]
 HARBOR_URL = f"https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT}"
 
 # =============================================================================
@@ -131,8 +131,12 @@ class TestTLSConfiguration:
     def test_tls_1_3_enforced(self):
         """验证 TLS 1.3 强制启用"""
         # 使用 openssl 通过 NodePort 测试 TLS 1.3
+        cmd = (
+            f"openssl s_client -connect {HARBOR_NODE_IP}:{HARBOR_NODEPORT} "
+            f"-servername harbor.sisys.local -tls1_3 </dev/null 2>&1"
+        )
         result = subprocess.run(
-            "openssl s_client -connect 172.21.110.12:31448 -servername harbor.sisys.local -tls1_3 </dev/null 2>&1",
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
@@ -143,8 +147,12 @@ class TestTLSConfiguration:
     def test_tls_1_2_rejected(self):
         """验证 TLS 1.2 被拒绝"""
         # 测试 TLS 1.2 应该被拒绝（或降级警告）
+        cmd = (
+            f"openssl s_client -connect {HARBOR_NODE_IP}:{HARBOR_NODEPORT} "
+            f"-servername harbor.sisys.local -tls1_2 </dev/null 2>&1"
+        )
         result = subprocess.run(
-            "openssl s_client -connect 172.21.110.12:31448 -servername harbor.sisys.local -tls1_2 </dev/null 2>&1",
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
@@ -159,7 +167,7 @@ class TestTLSConfiguration:
         """验证 HSTS 启用"""
         # 通过 curl 测试 HSTS 头
         result = subprocess.run(
-            "curl -k -s -I -H 'Host: harbor.sisys.local' https://172.21.110.12:31448 2>&1",
+            f"curl -k -s -I -H 'Host: harbor.sisys.local' https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT} 2>&1",
             shell=True,
             capture_output=True,
             text=True,
@@ -182,7 +190,7 @@ class TestTLSConfiguration:
         # 跳过 SSL Labs API 测试（需要外部 API 访问）
         # 改为本地验证 TLS 配置和加密套件
         result = subprocess.run(
-            "openssl s_client -connect 172.21.110.12:31448 -servername harbor.sisys.local </dev/null 2>&1",
+            f"openssl s_client -connect {HARBOR_NODE_IP}:{HARBOR_NODEPORT} -servername harbor.sisys.local </dev/null 2>&1",
             shell=True,
             capture_output=True,
             text=True,
@@ -305,7 +313,7 @@ class TestIngressConfiguration:
     - 容器端口：80 (Harbor Core 服务端口)
     - TLS 版本：TLS 1.3
     - 证书颁发机构：自签名证书 (开发环境)
-    
+
     注意：使用 Traefik IngressRoute CRD 替代传统 Kubernetes Ingress
     """
 
@@ -328,7 +336,7 @@ class TestIngressConfiguration:
             match = route.get("match", "")
             if "harbor.sisys.local" in match:
                 hosts_found.append(match)
-        
+
         assert len(hosts_found) > 0, f"IngressRoute 无 harbor.sisys.local 路由：{routes}"
 
     def test_ingressroute_backend_service(self):
@@ -350,7 +358,7 @@ class TestIngressConfiguration:
                     if service_name == "harbor-core":
                         api_route_found = True
                         break
-        
+
         assert api_route_found, f"未找到 API 路由到 harbor-core: {routes}"
 
     def test_ingressroute_tls_config(self):
@@ -378,7 +386,7 @@ class TestIngressConfiguration:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
                 response = requests.get(
-                    "https://172.21.110.12:31448/api/v2.0/ping",
+                    f"https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT}/api/v2.0/ping",
                     headers={"Host": "harbor.sisys.local"},
                     verify=False,
                     timeout=10,

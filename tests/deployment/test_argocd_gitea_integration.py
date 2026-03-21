@@ -73,12 +73,12 @@ class TestArgoCDGiteaIntegration:
     @pytest.fixture(scope="class")
     def gitea_url(self) -> str:
         """Gitea 仓库 URL（使用 NodePort）"""
-        return "https://gitea.sisys.local:31448/sisys/sisys.git"
+        return "https://gitea.sisys.local/sisys/sisys.git"
 
     @pytest.fixture(scope="class")
     def gitea_base_url(self) -> str:
         """Gitea 基础 URL（使用 NodePort）"""
-        return "https://gitea.sisys.local:31448"
+        return "https://gitea.sisys.local"
 
     @pytest.fixture(scope="class")
     def gitea_token(self) -> str:
@@ -148,21 +148,23 @@ class TestArgoCDGiteaIntegration:
         # 方法 1: 通过 kubectl 直接检查 Secret 配置（推荐）
         result = run_kubectl(
             ["get", "secrets", "-n", argocd_namespace, "-l", "argocd.argoproj.io/secret-type=repository", "-o", "json"],
-            check=False
+            check=False,
         )
 
         if result.returncode == 0:
             import json
+
             secrets = json.loads(result.stdout)
-            repo_count = len(secrets.get("items", []))
-            
+            # repo_count = len(secrets.get("items", []))  # 仅用于调试
+
             # 检查是否有 Gitea 仓库配置
             gitea_repos = [
-                s for s in secrets.get("items", [])
-                if s.get("metadata", {}).get("name", "").startswith("argocd-repo-gitea") or
-                   s.get("metadata", {}).get("name", "").startswith("argocd-gitea")
+                s
+                for s in secrets.get("items", [])
+                if s.get("metadata", {}).get("name", "").startswith("argocd-repo-gitea")
+                or s.get("metadata", {}).get("name", "").startswith("argocd-gitea")
             ]
-            
+
             if gitea_repos:
                 # 验证 Gitea 仓库配置
                 for repo in gitea_repos:
@@ -170,17 +172,18 @@ class TestArgoCDGiteaIntegration:
                     assert "url" in data, f"仓库 {repo['metadata']['name']} 缺少 URL 配置"
                     assert "username" in data, f"仓库 {repo['metadata']['name']} 缺少用户名配置"
                     assert "password" in data, f"仓库 {repo['metadata']['name']} 缺少密码配置"
-                    
+
                     # 解码并验证 URL
                     import base64
+
                     url = base64.b64decode(data["url"]).decode("utf-8")
                     assert "gitea.sisys.local" in url, f"Gitea URL 不正确：{url}"
-                    
+
                     # 验证 insecure 配置
                     if "insecure" in data:
                         insecure = base64.b64decode(data["insecure"]).decode("utf-8")
                         assert insecure == "true", "insecure 配置应为 true"
-                
+
                 # 测试通过
                 return
             else:

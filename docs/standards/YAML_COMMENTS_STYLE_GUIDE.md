@@ -1,7 +1,7 @@
 # YAML Configuration Comments Style Guide
 
-**Created:** 2026-03-19  
-**Story:** 0.7-argocd-continuous-deployment  
+**Created:** 2026-03-19
+**Story:** 0.7-argocd-continuous-deployment
 **LOW-1 Fix**
 
 ---
@@ -242,5 +242,5 @@ Add to CI/CD pipeline:
 
 ---
 
-**Last Updated:** 2026-03-19  
+**Last Updated:** 2026-03-19
 **Maintained By:** DevOps Team
