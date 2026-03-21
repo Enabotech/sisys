@@ -12,6 +12,12 @@
 #   5. 镜像构建 (Docker Build)
 #   6. 镜像推送 (Harbor)
 #   7. 自动部署 (ArgoCD)
+#
+# 缓存优化:
+#   - Python 虚拟环境缓存 (.venv)
+#   - Poetry 依赖缓存 (~/.cache/pypoetry)
+#   - pip 缓存 (~/.cache/pip)
+#   - 缓存键：poetry.lock hash + Python 版本
 # ============================================================
 
 name: CI Pipeline
@@ -35,6 +41,10 @@ env:
   # Python 版本
   PYTHON_VERSION: "3.11"
 
+  # 缓存配置
+  PIP_CACHE_DIR: "~/.cache/pip"
+  POETRY_CACHE_DIR: "~/.cache/pypoetry"
+
 jobs:
   # ============================================================
   # 阶段 1: 代码质量
@@ -48,6 +58,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache Python virtual environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/pip
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
       - name: Setup Python
         run: |
           # Python 已在 Runner 镜像中预装 (Python 3.12)
@@ -58,7 +80,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
 
-          # 升级 pip
+          # 升级 pip（使用缓存）
           pip install --upgrade pip
 
           # 验证 Python 可用
@@ -67,35 +89,46 @@ jobs:
 
           # 设置环境变量供后续步骤使用
           echo "PYTHON_BIN=python" >> $GITHUB_ENV
+          echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
 
       - name: Install Poetry
         run: |
           # 在虚拟环境中直接安装 Poetry
           source .venv/bin/activate
 
-          # 添加 Poetry 到 PATH
-          pip install --upgrade pip
-          pip install poetry
+          # 检查 Poetry 是否已缓存
+          if poetry --version &>/dev/null; then
+            echo "✅ Poetry already cached: $(poetry --version)"
+          else
+            echo "⏳ Installing Poetry..."
+            pip install --upgrade pip
+            pip install poetry
+          fi
           poetry --version
 
       - name: Install dependencies
         run: |
+          source .venv/bin/activate
 
-          poetry install --with dev
+          # 检查依赖是否已缓存
+          echo "⏳ Checking cached dependencies..."
+          if poetry check &>/dev/null; then
+            echo "✅ Dependencies already cached and verified"
+          else
+            echo "⏳ Installing dependencies with Poetry..."
+            poetry install --with dev
+          fi
 
       - name: Ruff linting
         run: |
-
           poetry run ruff check . --output-format=github
 
       - name: Ruff format check
         run: |
-
           poetry run ruff format . --check
 
       - name: MyPy type checking
         run: |
-
           poetry run mypy src/ --pretty
 
   # ============================================================
@@ -108,6 +141,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Cache Python virtual environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/pip
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
 
       - name: Setup Python
         run: |
@@ -122,24 +167,29 @@ jobs:
           which python
           python --version
 
+          echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
+
       - name: Install Poetry
         run: |
-          # 在虚拟环境中直接安装 Poetry
           source .venv/bin/activate
-
-          # 添加 Poetry 到 PATH
-          pip install --upgrade pip
-          pip install poetry
+          if poetry --version &>/dev/null; then
+            echo "✅ Poetry already cached: $(poetry --version)"
+          else
+            pip install poetry
+          fi
           poetry --version
 
       - name: Install dependencies
         run: |
-
-          poetry install --with dev
+          source .venv/bin/activate
+          if poetry check &>/dev/null; then
+            echo "✅ Dependencies already cached and verified"
+          else
+            poetry install --with dev
+          fi
 
       - name: Run pytest with coverage
         run: |
-
           poetry run pytest tests/unit \
             --cov=src \
             --cov-report=xml \
@@ -196,6 +246,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Cache Python virtual environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/pip
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
       - name: Setup Python
         run: |
           # Python 已在 Runner 镜像中预装
@@ -209,14 +271,26 @@ jobs:
           which python
           python --version
 
+          echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
+
+      - name: Install Poetry
+        run: |
+          source .venv/bin/activate
+          if poetry --version &>/dev/null; then
+            echo "✅ Poetry already cached: $(poetry --version)"
+          else
+            pip install poetry
+          fi
+          poetry --version
+
       - name: Install dependencies
         run: |
-          # 在虚拟环境中直接安装 Poetry
           source .venv/bin/activate
-
-          # 添加 Poetry 到 PATH
-          pip install --upgrade pip
-          poetry install --with dev
+          if poetry check &>/dev/null; then
+            echo "✅ Dependencies already cached and verified"
+          else
+            poetry install --with dev
+          fi
 
       - name: Run integration tests
         run: |
@@ -245,6 +319,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Cache Python virtual environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/pip
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-poetry-
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
       - name: Setup Python
         run: |
           # Python 已在 Runner 镜像中预装
@@ -258,8 +344,21 @@ jobs:
           which python
           python --version
 
+          echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
+
+      - name: Install Poetry
+        run: |
+          source .venv/bin/activate
+          if poetry --version &>/dev/null; then
+            echo "✅ Poetry already cached: $(poetry --version)"
+          else
+            pip install poetry
+          fi
+          poetry --version
+
       - name: Install security tools
         run: |
+          source .venv/bin/activate
           pip install bandit safety
 
       - name: Bandit security scan
