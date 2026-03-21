@@ -6,19 +6,19 @@
 
 ```bash
 # 已配置
-172.21.110.12 gitea.sisys.local
+<WSL2_IP> gitea.sisys.local
 ```
 
 ### 2. 访问 URL
 
 | 协议 | URL | 状态 |
 |------|-----|------|
-| **HTTPS** | https://gitea.sisys.local:31448 | ✅ 工作正常 |
-| **HTTP** | http://gitea.sisys.local:30580 | ✅ 工作正常 |
+| **HTTPS** | https://gitea.sisys.local:nodeport | ✅ 工作正常 |
+| **HTTP** | http://gitea.sisys.local:nodeport | ✅ 工作正常 |
 
 ### 3. 管理员登录
 
-- **URL**: https://gitea.sisys.local:31448
+- **URL**: https://gitea.sisys.local:nodeport
 - **用户名**: `gitea_admin`
 - **密码**: `Admin@123456`
 
@@ -31,10 +31,10 @@
 ```
 互联网/局域网
     │
-    ▼ 访问 172.21.110.12:31448 (HTTPS)
+    ▼ 访问 <WSL2_IP>:<NODEPORT> (HTTPS)
 你的机器
     │
-    ▼ DNS 解析 gitea.sisys.local → 172.21.110.12
+    ▼ DNS 解析 gitea.sisys.local → <WSL2_IP>
 K3S 集群 (NodePort)
     │
     ▼ NodePort 31448
@@ -65,7 +65,7 @@ Gitea Pod
 
 1. **在其他机器上配置 hosts**：
    ```bash
-   # 将 172.21.110.12 替换为你的 K3S 服务器 IP
+   # 将 <WSL2_IP> 替换为你的 K3S 服务器 IP
    <K3S_SERVER_IP> gitea.sisys.local
    ```
 
@@ -114,7 +114,7 @@ echo "H9yglwH7sdyj" | sudo -S k3s kubectl exec -n traefik $(sudo k3s kubectl get
 
 ## 管理员登录信息
 
-- **URL**: https://gitea.sisys.local:31448
+- **URL**: https://gitea.sisys.local:nodeport
 - **用户名**: `gitea_admin`
 - **密码**: `Admin@123456`
 
@@ -125,5 +125,5 @@ echo "H9yglwH7sdyj" | sudo -S k3s kubectl exec -n traefik $(sudo k3s kubectl get
 ## 生成文件
 
 - 创建时间：2026-03-13
-- K3S 服务器 IP: 172.21.110.12
+- K3S 服务器 IP: <WSL2_IP>
 - Traefik NodePort: 30580 (HTTP), 31448 (HTTPS)

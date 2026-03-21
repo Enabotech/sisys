@@ -61,32 +61,32 @@ rules:
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "list", "watch"]
-  
+
   # Pods 权限（用于日志和健康检查）
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
-  
+
   # Events 权限（用于事件查看）
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch"]
-  
+
   # ConfigMaps 权限（用于配置管理）
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
-  
+
   # Secrets 权限（用于仓库凭据）
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch"]
-  
+
   # Deployments 权限（用于应用管理）
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "update", "patch"]
-  
+
   # StatefulSets 权限
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
@@ -147,12 +147,12 @@ stringData:
 #   #!/bin/bash
 #   # 生成随机密码（32 位 base64 编码）
 #   ARGOCD_ADMIN_PASSWORD="$(openssl rand -base64 32)"
-#   
+#
 #   # 显示密码（仅显示一次，请妥善保存）
 #   echo "=== ArgoCD Admin Password ==="
 #   echo "Password: $ARGOCD_ADMIN_PASSWORD"
 #   echo "============================="
-#   
+#
 #   # 创建 Secret
 #   kubectl create secret generic argocd-initial-admin-secret \
 #     --from-literal=password="$ARGOCD_ADMIN_PASSWORD" \
@@ -190,7 +190,7 @@ stringData:
 #       property: password
 ---
 # 部署指南:
-# 
+#
 # 方法 1: 使用 openssl 生成随机密码 (推荐)
 #   export ARGOCD_ADMIN_PASSWORD="$(openssl rand -base64 32)"
 #   echo "Admin password: $ARGOCD_ADMIN_PASSWORD"

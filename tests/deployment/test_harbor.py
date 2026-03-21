@@ -5,24 +5,19 @@ Harbor 镜像仓库部署测试套件
 验收标准：Story 0.6 Acceptance Criteria 1-7
 
 配置说明:
-    测试配置从以下来源加载 (优先级从高到低):
-    1. 环境变量 (HARBOR_NODE_IP, HARBOR_NODEPORT, HARBOR_NAMESPACE 等)
-    2. 配置文件 (tests/deployment/harbor-test-config.yaml)
-    3. 默认值 (硬编码在配置文件中)
+    使用统一测试配置模块 (tests/conftest.py)
+    支持环境变量覆盖和 NAT/Mirrored 网络模式自动检测
 
 使用方式:
-    # 使用默认配置
+    # 使用默认配置（自动检测网络模式）
     pytest tests/deployment/test_harbor.py
 
     # 使用环境变量覆盖
     export HARBOR_NODE_IP=192.168.1.100
-    export HARBOR_NODEPORT=31448
+    export HARBOR_NODEPORT=nodeport
     pytest tests/deployment/test_harbor.py
-
-    # 修改配置文件 tests/deployment/harbor-test-config.yaml
 """
 
-import os
 import re
 import subprocess
 import time
@@ -30,102 +25,28 @@ import time
 import pytest
 import requests
 import urllib3
-import yaml
+
+# 从统一配置模块加载
+from tests.conftest import TestConfig
 
 # 抑制自签名证书的 InsecureRequestWarning（开发环境使用）
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =============================================================================
-# 配置加载
+# 便捷常量（使用统一配置）
 # =============================================================================
 
+HARBOR_NAMESPACE = TestConfig.get_harbor_config()["namespace"]
+HARBOR_NODE_IP = TestConfig.get_harbor_node_ip()
+HARBOR_NODEPORT = TestConfig.HARBOR_DEFAULTS["nodeport"]
+HARBOR_HOST = TestConfig.HARBOR_DEFAULTS["ingress_host"]
+HARBOR_URL = TestConfig.get_harbor_url()
 
-def load_test_config() -> dict:
-    """
-    加载测试配置
+# 超时配置（秒）- 从 TestConfig 加载
+POD_READY_TIMEOUT = TestConfig.get_timeout("pod_ready")
+HEALTH_CHECK_TIMEOUT = TestConfig.get_timeout("health_check")
+API_REQUEST_TIMEOUT = TestConfig.get_timeout("api_request")
 
-    优先级：环境变量 > 配置文件 > 默认值
-
-    Returns:
-        配置字典
-    """
-    # 默认配置
-    config: dict = {
-        "cluster": {
-            "node_ip": "172.21.110.12",
-            "nodeport": 31448,
-            "namespace": "harbor",
-            "ingress_host": "harbor.sisys.local",
-        },
-        "timeouts": {
-            "pod_ready": 300,
-            "health_check": 30,
-            "api_request": 10,
-        },
-        "test_images": {
-            "push_pull": "nginx:latest",
-        },
-        "authentication": {},
-    }
-
-    # 从配置文件加载
-    config_file = os.path.join(os.path.dirname(__file__), "harbor-test-config.yaml")
-    if os.path.exists(config_file):
-        try:
-            with open(config_file) as f:
-                file_config = yaml.safe_load(f)
-                if file_config:
-                    # 深度合并配置
-                    for key, value in file_config.items():
-                        if isinstance(value, dict) and key in config:
-                            config[key].update(value)  # type: ignore[attr-defined]
-                        else:
-                            config[key] = value
-        except Exception as e:
-            print(f"⚠️  加载配置文件失败：{e}，使用默认配置")
-
-    # 环境变量覆盖 (最高优先级)
-    if os.getenv("HARBOR_NODE_IP"):
-        config["cluster"]["node_ip"] = os.getenv("HARBOR_NODE_IP")
-    if os.getenv("HARBOR_NODEPORT"):
-        config["cluster"]["nodeport"] = int(os.getenv("HARBOR_NODEPORT", "31448"))
-    if os.getenv("HARBOR_NAMESPACE"):
-        config["cluster"]["namespace"] = os.getenv("HARBOR_NAMESPACE")
-    if os.getenv("HARBOR_INGRESS_HOST"):
-        config["cluster"]["ingress_host"] = os.getenv("HARBOR_INGRESS_HOST")
-    if os.getenv("HARBOR_ADMIN_PASSWORD"):
-        config["authentication"]["admin_password"] = os.getenv("HARBOR_ADMIN_PASSWORD")
-
-    return config
-
-
-# 加载配置
-TEST_CONFIG = load_test_config()
-
-# =============================================================================
-# 常量定义 (从配置加载)
-# =============================================================================
-
-HARBOR_NAMESPACE = TEST_CONFIG["cluster"]["namespace"]
-HARBOR_HOST = TEST_CONFIG["cluster"]["ingress_host"]
-HARBOR_NODEPORT = TEST_CONFIG["cluster"]["nodeport"]
-HARBOR_NODE_IP = TEST_CONFIG["cluster"]["node_ip"]
-
-# 优先使用 NodePort，如果 DNS 配置了则使用域名
-HARBOR_URL = f"https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT}"
-HARBOR_HEALTH_ENDPOINT = f"{HARBOR_URL}/health"
-HARBOR_API_V2 = f"{HARBOR_URL}/api/v2.0"
-
-# 测试镜像
-TEST_IMAGE = TEST_CONFIG.get("test_images", {}).get("push_pull", "nginx:latest")
-TEST_IMAGE_TAG = f"{TEST_CONFIG.get('test_images', {}).get('tag_prefix', 'test-harbor-')}connection"
-
-# 超时设置（秒）
-POD_READY_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("pod_ready", 300)
-HEALTH_CHECK_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("health_check", 30)
-API_REQUEST_TIMEOUT = TEST_CONFIG.get("timeouts", {}).get("api_request", 10)
-
-# =============================================================================
 # 辅助函数
 # =============================================================================
 
@@ -217,6 +138,7 @@ def check_https_access(
             headers["Host"] = host_header
         # 使用 warnings.catch_warnings() 临时抑制警告
         import warnings
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
             response = requests.get(url, verify=False, timeout=timeout, headers=headers)  # nosec B501
@@ -260,6 +182,7 @@ def get_hsts_header(url: str) -> str | None:
     try:
         # 开发环境使用自签名证书
         import warnings
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
             response = requests.head(url, verify=False, timeout=10)  # nosec B501
@@ -360,7 +283,7 @@ class TestHarborWebInterface:
         - ✅ 页面加载时间 < 3 秒
         - ✅ 页面标题包含"Harbor"
         - ✅ 登录表单可正常显示
-        
+
         注意：Harbor 是单页应用 (SPA)，根路径可能返回 404，使用 API 端点验证更可靠
         """
         # 测试 Harbor API 端点 (更可靠的验证方式)
@@ -375,7 +298,7 @@ class TestHarborWebInterface:
                 "%{http_code}",
                 "-H",
                 "Host: harbor.sisys.local",
-                "https://172.21.110.12:31448/api/v2.0/ping",
+                f"https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT}/api/v2.0/ping",
             ],
             capture_output=True,
             text=True,
@@ -392,8 +315,12 @@ class TestHarborWebInterface:
         - ✅ SSL Labs 测试评级 ≥ A（TLS 1.3 强制启用）
         """
         # 使用 openssl 测试 TLS 版本（通过 NodePort）
+        cmd = (
+            f"openssl s_client -connect {HARBOR_NODE_IP}:{HARBOR_NODEPORT} "
+            f"-servername harbor.sisys.local -tls1_3 </dev/null 2>&1"
+        )
         result = subprocess.run(
-            "openssl s_client -connect 172.21.110.12:31448 -servername harbor.sisys.local -tls1_3 </dev/null 2>&1",
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
@@ -749,8 +676,12 @@ class TestHarborCertificateManagement:
         - ✅ 证书颁发机构可信
         """
         # 使用 openssl 通过 NodePort 测试 TLS 证书
+        cmd = (
+            f"openssl s_client -connect {HARBOR_NODE_IP}:{HARBOR_NODEPORT} "
+            f"-servername harbor.sisys.local -showcerts </dev/null 2>&1"
+        )
         result = subprocess.run(
-            "openssl s_client -connect 172.21.110.12:31448 -servername harbor.sisys.local -showcerts </dev/null 2>&1",
+            cmd,
             shell=True,
             capture_output=True,
             text=True,
@@ -768,18 +699,19 @@ class TestHarborCertificateManagement:
         """
         # 通过 curl 测试 HSTS 头
         result = subprocess.run(
-            "curl -k -s -I -H 'Host: harbor.sisys.local' https://172.21.110.12:31448 2>&1",
+            f"curl -k -s -I -H 'Host: harbor.sisys.local' https://{HARBOR_NODE_IP}:{HARBOR_NODEPORT} 2>&1",
             shell=True,
             capture_output=True,
             text=True,
             timeout=10,
         )
-        
+
         # 检查 HSTS 头（不区分大小写）
         if "strict-transport-security" in result.stdout.lower():
             # 验证 max-age
             import re
-            match = re.search(r'max-age=(\d+)', result.stdout, re.IGNORECASE)
+
+            match = re.search(r"max-age=(\d+)", result.stdout, re.IGNORECASE)
             if match:
                 max_age = int(match.group(1))
                 assert max_age >= 31536000, f"HSTS max-age 应该至少 1 年 (当前：{max_age})"
@@ -875,12 +807,12 @@ class TestHarborRobotAccount:
 
             if robot_username and robot_password:
                 # 测试 Docker 登录（需要 Docker 环境）
-                # 使用 NodePort 地址（172.21.110.12:31448）而非域名
+                # 使用 NodePort 地址（动态获取）而非域名
                 import subprocess
 
                 # Docker 登录需要使用实际可访问的地址
                 docker_login_result = subprocess.run(
-                    ["docker", "login", "172.21.110.12:31448", "-u", robot_username, "-p", robot_password],
+                    ["docker", "login", f"{HARBOR_NODE_IP}:{HARBOR_NODEPORT}", "-u", robot_username, "-p", robot_password],
                     capture_output=True,
                     text=True,
                     timeout=30,

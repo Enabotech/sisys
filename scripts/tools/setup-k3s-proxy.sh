@@ -72,9 +72,9 @@ check_proxy_port() {
 # 配置 WSL 主机代理环境变量
 configure_host_proxy() {
     log_info "配置 WSL 主机代理环境变量..."
-    
+
     local proxy_config="/etc/profile.d/k3s-proxy.sh"
-    
+
     sudo tee "$proxy_config" > /dev/null << EOF
 # K3S VPN 代理配置 - WSL2 + Windows
 # 自动生成于：$(date)
@@ -104,7 +104,7 @@ export http_proxy https_proxy ftp_proxy no_proxy
 EOF
 
     sudo chmod 644 "$proxy_config"
-    
+
     # 同时添加到用户 bashrc
     if ! grep -q "K3S VPN 代理配置" ~/.bashrc 2>/dev/null; then
         cat >> ~/.bashrc << EOF
@@ -115,7 +115,7 @@ if [ -f /etc/profile.d/k3s-proxy.sh ]; then
 fi
 EOF
     fi
-    
+
     # 立即生效
     export HTTP_PROXY="http://${WINDOWS_HOST}:${PROXY_PORT}"
     export HTTPS_PROXY="http://${WINDOWS_HOST}:${PROXY_PORT}"
@@ -123,16 +123,16 @@ EOF
     export http_proxy="$HTTP_PROXY"
     export https_proxy="$HTTPS_PROXY"
     export no_proxy="$NO_PROXY"
-    
+
     log_success "WSL 主机代理配置完成"
 }
 
 # 配置 k3s systemd 服务
 configure_k3s_service() {
     log_info "配置 K3S systemd 服务代理..."
-    
+
     sudo mkdir -p /etc/systemd/system/k3s.service.d
-    
+
     sudo tee /etc/systemd/system/k3s.service.d/proxy.conf > /dev/null << EOF
 [Service]
 # K3S 服务进程使用 Windows VPN 代理（用于拉取镜像、访问外部 API）
@@ -153,9 +153,9 @@ EOF
 # 配置 containerd 代理
 configure_containerd() {
     log_info "配置 Containerd 代理..."
-    
+
     sudo mkdir -p /etc/default
-    
+
     sudo tee /etc/default/containerd > /dev/null << EOF
 # Containerd 代理配置 - K3S 环境
 # 自动生成于：$(date)
@@ -177,25 +177,25 @@ EOF
 # 为现有工作负载添加 NO_PROXY 环境变量
 patch_workloads() {
     log_info "为现有工作负载添加 NO_PROXY 环境变量..."
-    
+
     local NO_PROXY_VALUE="localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,*.local,*.svc,*.cluster.local,${POD_CIDR},${SERVICE_CIDR}"
-    
+
     # 获取所有命名空间（排除 kube-public 和 kube-node-lease）
     local namespaces=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep -vE "^kube-(public|node-lease)$")
-    
+
     for ns in $namespaces; do
         log_info "处理命名空间：$ns"
-        
+
         # 补丁 Deployments
         for deploy in $(kubectl -n "$ns" get deploy -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
             log_info "  补丁 Deployment: $deploy"
-            
+
             # 检查是否已有 NO_PROXY
             if kubectl -n "$ns" get deployment "$deploy" -o jsonpath='{.spec.template.spec.containers[0].env}' | grep -q "NO_PROXY"; then
                 log_info "    已包含 NO_PROXY，跳过"
                 continue
             fi
-            
+
             # 添加环境变量
             kubectl -n "$ns" patch deployment "$deploy" --type='json' -p="[
                 {'op': 'add', 'path': '/spec/template/spec/containers/0/env/-', 'value': {'name': 'NO_PROXY', 'value': '${NO_PROXY_VALUE}'}},
@@ -204,16 +204,16 @@ patch_workloads() {
                 {'op': 'add', 'path': '/spec/template/spec/containers/0/env/-', 'value': {'name': 'HTTPS_PROXY', 'value': ''}}
             ]" 2>/dev/null || log_warning "    补丁失败，可能已有环境变量"
         done
-        
+
         # 补丁 StatefulSets
         for sts in $(kubectl -n "$ns" get sts -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
             log_info "  补丁 StatefulSet: $sts"
-            
+
             if kubectl -n "$ns" get statefulset "$sts" -o jsonpath='{.spec.template.spec.containers[0].env}' | grep -q "NO_PROXY"; then
                 log_info "    已包含 NO_PROXY，跳过"
                 continue
             fi
-            
+
             kubectl -n "$ns" patch statefulset "$sts" --type='json' -p="[
                 {'op': 'add', 'path': '/spec/template/spec/containers/0/env/-', 'value': {'name': 'NO_PROXY', 'value': '${NO_PROXY_VALUE}'}},
                 {'op': 'add', 'path': '/spec/template/spec/containers/0/env/-', 'value': {'name': 'no_proxy', 'value': '${NO_PROXY_VALUE}'}},
@@ -222,28 +222,28 @@ patch_workloads() {
             ]" 2>/dev/null || log_warning "    补丁失败，可能已有环境变量"
         done
     done
-    
+
     log_success "工作负载补丁完成，Pod 将自动重启"
 }
 
 # 验证配置
 verify_configuration() {
     log_info "验证配置..."
-    
+
     echo ""
     echo "=== 环境变量检查 ==="
     echo "HTTP_PROXY: $HTTP_PROXY"
     echo "HTTPS_PROXY: $HTTPS_PROXY"
     echo "NO_PROXY: $NO_PROXY"
-    
+
     echo ""
     echo "=== K3S 集群状态 ==="
     kubectl get nodes
-    
+
     echo ""
     echo "=== Pod 状态 ==="
     kubectl get pods -A --no-headers | head -10
-    
+
     echo ""
     echo "=== 测试外部访问（应通过代理）==="
     if timeout 5 curl -I --connect-timeout 3 https://www.google.com 2>&1 | head -1; then
@@ -251,7 +251,7 @@ verify_configuration() {
     else
         log_warning "外部访问失败，请检查代理配置"
     fi
-    
+
     echo ""
     echo "=== 测试 k3s 内部访问（应直连）==="
     if kubectl run test-proxy --rm -it --image=curlimages/curl:latest --restart=Never -- curl -I --connect-timeout 3 https://kubernetes.default 2>&1 | head -1; then
@@ -295,31 +295,31 @@ main() {
     echo "Service CIDR: $SERVICE_CIDR"
     echo "================================================================="
     echo ""
-    
+
     # 检查是否为 root
-    if [ "$EUID" -ne 0 ]; then 
+    if [ "$EUID" -ne 0 ]; then
         log_error "请使用 sudo 运行此脚本"
         exit 1
     fi
-    
+
     # 检查 kubectl 是否可用
     if ! command -v kubectl &> /dev/null; then
         log_error "kubectl 未安装或不在 PATH 中"
         exit 1
     fi
-    
+
     # 检查 k3s 是否运行
     if ! sudo systemctl is-active --quiet k3s; then
         log_warning "k3s 服务未运行，配置完成后请手动启动"
     fi
-    
+
     # 执行配置步骤
     check_windows_host
     check_proxy_port
     configure_host_proxy
     configure_k3s_service
     configure_containerd
-    
+
     # 询问是否补丁现有工作负载
     echo ""
     read -p "是否为现有工作负载添加 NO_PROXY 环境变量？[y/N] " -n 1 -r
@@ -327,7 +327,7 @@ main() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         patch_workloads
     fi
-    
+
     verify_configuration
     show_usage
 }

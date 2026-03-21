@@ -1,7 +1,7 @@
 # Version Compatibility Matrix
 
-**Created:** 2026-03-19  
-**Story:** 0.7-argocd-continuous-deployment  
+**Created:** 2026-03-19
+**Story:** 0.7-argocd-continuous-deployment
 **LOW-3 Fix**
 
 ---

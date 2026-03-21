@@ -1,7 +1,7 @@
 # Harbor 部署持久化说明
 
-**文档版本:** 1.0  
-**创建日期:** 2026-03-17  
+**文档版本:** 1.0
+**创建日期:** 2026-03-17
 **最后更新:** 2026-03-17
 
 ---
@@ -79,7 +79,7 @@ sudo kubectl get pods -n harbor
 sudo kubectl get ingressroute harbor-ingressroute -n harbor
 
 # 4. 测试 API 访问
-curl -k -s "https://172.21.110.12:31448/api/v2.0/ping" -H "Host: harbor.sisys.local"
+curl -k -s "https://<WSL2_IP>:<NODEPORT>/api/v2.0/ping" -H "Host: harbor.sisys.local"
 # 期望输出：Pong
 ```
 
@@ -114,7 +114,7 @@ WSL 重启后，运行以下检查：
 
 **症状:** `curl` 返回 404 或连接超时
 
-**原因:** 
+**原因:**
 - K3S 未启动
 - Traefik 未同步配置
 - 旧的 Ingress 冲突
@@ -128,7 +128,7 @@ make harbor-fix
 
 **症状:** `kubectl get ingressroute` 返回空
 
-**原因:** 
+**原因:**
 - 配置文件未应用
 - 命名空间错误
 
@@ -142,7 +142,7 @@ kubectl apply -f deployments/harbor/ingress-route.yaml -n harbor
 
 **症状:** 浏览器显示证书错误
 
-**原因:** 
+**原因:**
 - 自签名证书有效期 1 年
 
 **解决:**
@@ -217,6 +217,6 @@ helm list -n harbor
 
 ---
 
-**最后验证:** 2026-03-17  
-**验证者:** Qwen Code (AI 开发助手)  
+**最后验证:** 2026-03-17
+**验证者:** Qwen Code (AI 开发助手)
 **验证结果:** ✅ 所有测试通过 (32 passed, 8 skipped)

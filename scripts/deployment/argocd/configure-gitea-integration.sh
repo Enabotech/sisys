@@ -49,7 +49,7 @@ check_gitea_accessible() {
     if ! curl -k -s -o /dev/null -w "%{http_code}" "${GITEA_URL}" | grep -q "200\|302"; then
         echo -e "${YELLOW}警告：Gitea 可能不可访问，请检查 hosts 配置和 NodePort${NC}"
         echo "尝试通过 NodePort 访问..."
-        GITEA_URL="http://localhost:30580"
+        GITEA_URL="http://localhost:nodeport"
         GITEA_API="${GITEA_URL}/api/v1"
     fi
     echo -e "${GREEN}✓ Gitea 可访问${NC}"

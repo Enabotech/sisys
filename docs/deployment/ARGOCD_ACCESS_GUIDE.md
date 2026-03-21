@@ -19,10 +19,10 @@
 
 ```bash
 # 使用 curl 测试
-curl -k -H "Host: argocd.sisys.local" https://172.21.110.12:31448/
+curl -k -H "Host: argocd.sisys.local" https://<WSL2_IP>:<NODEPORT>/
 
 # 使用浏览器访问（需要手动输入 IP 和端口）
-https://172.21.110.12:31448/
+https://<WSL2_IP>:<NODEPORT>/
 # 然后在浏览器开发者工具中设置 Host 头为 argocd.sisys.local
 ```
 
@@ -34,7 +34,7 @@ https://172.21.110.12:31448/
 2. 打开文件：`C:\Windows\System32\drivers\etc\hosts`
 3. 添加以下行：
    ```
-   172.21.110.12    argocd.sisys.local
+   <WSL2_IP>    argocd.sisys.local
    ```
 4. 保存文件
 5. 刷新 DNS 缓存：`ipconfig /flushdns`
@@ -55,7 +55,7 @@ https://localhost:8443
 ```bash
 # Traefik HTTPS NodePort: 31448
 # 在浏览器访问：
-https://172.21.110.12:31448/
+https://<WSL2_IP>:<NODEPORT>/
 
 # 需要在浏览器中设置 Host 头或使用浏览器扩展
 ```
@@ -127,10 +127,10 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 ```bash
 # 测试 API 版本
-curl -k -H "Host: argocd.sisys.local" https://172.21.110.12:31448/api/version
+curl -k -H "Host: argocd.sisys.local" https://<WSL2_IP>:<NODEPORT>/api/version
 
 # 测试健康检查
-curl -k -H "Host: argocd.sisys.local" https://172.21.110.12:31448/healthz
+curl -k -H "Host: argocd.sisys.local" https://<WSL2_IP>:<NODEPORT>/healthz
 ```
 
 ## 📅 部署日期

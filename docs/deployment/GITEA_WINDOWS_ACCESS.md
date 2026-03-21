@@ -6,10 +6,10 @@
 
 ```bash
 # HTTPS（推荐，使用域名）
-curl -k https://gitea.sisys.local:31448
+curl -k https://gitea.sisys.local:nodeport
 
 # HTTP
-curl http://gitea.sisys.local:30580
+curl http://gitea.sisys.local:nodeport
 ```
 
 ### 从 Windows 11 主机访问
@@ -18,8 +18,8 @@ curl http://gitea.sisys.local:30580
 
 | 协议 | URL | 说明 |
 |------|-----|------|
-| **HTTP** | http://172.21.110.12:30580 | 简单，但无加密 |
-| **HTTPS** | https://172.21.110.12:31448 | 加密，但证书警告（自签名） |
+| **HTTP** | http://<WSL2_IP>:nodeport | 简单，但无加密 |
+| **HTTPS** | https://<WSL2_IP>:<NODEPORT> | 加密，但证书警告（自签名） |
 
 **方式 2：配置 Windows hosts 文件（推荐）**
 
@@ -27,18 +27,18 @@ curl http://gitea.sisys.local:30580
 
 2. **添加 hosts 条目**：
    ```powershell
-   Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "172.21.110.12 gitea.sisys.local"
+   Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "<WSL2_IP> gitea.sisys.local"
    ```
 
 3. **验证配置**：
    ```powershell
    ping gitea.sisys.local
-   # 应该返回 172.21.110.12
+   # 应该返回 <WSL2_IP>
    ```
 
 4. **在 Edge 浏览器访问**：
-   - HTTP: http://gitea.sisys.local:30580
-   - HTTPS: https://gitea.sisys.local:31448
+   - HTTP: http://gitea.sisys.local:nodeport
+   - HTTPS: https://gitea.sisys.local:nodeport
 
 ---
 
@@ -72,7 +72,7 @@ curl http://gitea.sisys.local:30580
 ```powershell
 # 在 PowerShell 中运行
 wsl hostname -I
-# 应该返回 172.21.110.12（或类似）
+# 应该返回 <WSL2_IP>（或类似）
 ```
 
 ### 2. 检查防火墙
@@ -88,7 +88,7 @@ New-NetFirewallRule -DisplayName "WSL2 K3S" -Direction Inbound -LocalPort 30580,
 
 ```bash
 # 在 WSL2 中测试
-curl http://172.21.110.12:30580
+curl http://<WSL2_IP>:nodeport
 # 应该返回 HTML 页面
 ```
 
@@ -106,15 +106,15 @@ echo "H9yglwH7sdyj" | sudo -S k3s kubectl get svc -n traefik
 
 **Windows 主机用户推荐：**
 
-1. **日常开发**：使用 HTTP http://gitea.sisys.local:30580（配置 hosts 后）
-2. **需要加密**：使用 HTTPS https://gitea.sisys.local:31448（接受证书警告）
-3. **临时访问**：直接使用 IP http://172.21.110.12:30580
+1. **日常开发**：使用 HTTP http://gitea.sisys.local:nodeport（配置 hosts 后）
+2. **需要加密**：使用 HTTPS https://gitea.sisys.local:nodeport（接受证书警告）
+3. **临时访问**：直接使用 IP http://<WSL2_IP>:nodeport
 
 ---
 
 ## 📝 管理员登录
 
-- **URL**: http://gitea.sisys.local:30580 或 https://gitea.sisys.local:31448
+- **URL**: http://gitea.sisys.local:nodeport 或 https://gitea.sisys.local:nodeport
 - **用户名**: `gitea_admin`
 - **密码**: `Admin@123456`
 
@@ -125,6 +125,6 @@ echo "H9yglwH7sdyj" | sudo -S k3s kubectl get svc -n traefik
 ## 配置时间
 
 - **创建时间**: 2026-03-13
-- **WSL2 IP**: 172.21.110.12
+- **WSL2 IP**: <WSL2_IP>
 - **HTTP NodePort**: 30580
 - **HTTPS NodePort**: 31448
