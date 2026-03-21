@@ -70,32 +70,32 @@ jobs:
 
       - name: Install Poetry
         run: |
-          # 使用官方安装脚本安装 Poetry
-          curl -sSL https://install.python-poetry.org | python3 -
+          # 在虚拟环境中直接安装 Poetry
+          source .venv/bin/activate
 
           # 添加 Poetry 到 PATH
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          pip install --upgrade pip
+          pip install poetry
           poetry --version
 
       - name: Install dependencies
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry install --with dev
 
       - name: Ruff linting
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry run ruff check . --output-format=github
 
       - name: Ruff format check
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry run ruff format . --check
 
       - name: MyPy type checking
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry run mypy src/ --pretty
 
   # ============================================================
@@ -124,22 +124,22 @@ jobs:
 
       - name: Install Poetry
         run: |
-          # 使用官方安装脚本安装 Poetry
-          curl -sSL https://install.python-poetry.org | python3 -
+          # 在虚拟环境中直接安装 Poetry
+          source .venv/bin/activate
 
           # 添加 Poetry 到 PATH
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          pip install --upgrade pip
+          pip install poetry
           poetry --version
 
       - name: Install dependencies
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry install --with dev
 
       - name: Run pytest with coverage
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+
           poetry run pytest tests/unit \
             --cov=src \
             --cov-report=xml \
@@ -211,16 +211,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # 使用官方安装脚本安装 Poetry
-          curl -sSL https://install.python-poetry.org | python3 -
+          # 在虚拟环境中直接安装 Poetry
+          source .venv/bin/activate
 
           # 添加 Poetry 到 PATH
-          export PATH="$HOME/.local/bin:$PATH"
+          pip install --upgrade pip
           poetry install --with dev
 
       - name: Run integration tests
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          pip install --upgrade pip
           poetry run pytest tests/integration \
             --cov=src \
             --cov-append \
