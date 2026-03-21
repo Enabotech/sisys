@@ -113,9 +113,11 @@ jobs:
         run: |
           source .venv/bin/activate
 
-          # 检查依赖是否已缓存
+          # 检查虚拟环境和依赖是否已缓存
           echo "⏳ Checking cached dependencies..."
-          if poetry check &>/dev/null; then
+
+          # 检查关键依赖是否已安装（通过导入测试）
+          if python -c "import ruff; import mypy; import pytest" &>/dev/null; then
             echo "✅ Dependencies already cached and verified"
           else
             echo "⏳ Installing dependencies with Poetry..."
@@ -188,7 +190,7 @@ jobs:
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          if poetry check &>/dev/null; then
+          if python -c "import ruff; import mypy; import pytest" &>/dev/null; then
             echo "✅ Dependencies already cached and verified"
           else
             poetry install --with dev
@@ -292,7 +294,7 @@ jobs:
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          if poetry check &>/dev/null; then
+          if python -c "import ruff; import mypy; import pytest" &>/dev/null; then
             echo "✅ Dependencies already cached and verified"
           else
             poetry install --with dev
