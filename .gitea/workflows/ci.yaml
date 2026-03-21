@@ -121,15 +121,15 @@ jobs:
 
       - name: Ruff linting
         run: |
-          poetry run ruff check . --output-format=github
+          source .venv/bin/activate && poetry run ruff check . --output-format=github
 
       - name: Ruff format check
         run: |
-          poetry run ruff format . --check
+          source .venv/bin/activate && poetry run ruff format . --check
 
       - name: MyPy type checking
         run: |
-          poetry run mypy src/ --pretty
+          source .venv/bin/activate && poetry run mypy src/ --pretty
 
   # ============================================================
   # 阶段 2: 单元测试
@@ -190,7 +190,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          poetry run pytest tests/unit \
+          source .venv/bin/activate && poetry run pytest tests/unit \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
@@ -295,7 +295,7 @@ jobs:
       - name: Run integration tests
         run: |
           pip install --upgrade pip
-          poetry run pytest tests/integration \
+          source .venv/bin/activate && poetry run pytest tests/integration \
             --cov=src \
             --cov-append \
             -v \
@@ -363,7 +363,7 @@ jobs:
 
       - name: Bandit security scan
         run: |
-          poetry run bandit -r src/ -f json -o bandit-report.json || true
+          source .venv/bin/activate && poetry run bandit -r src/ -f json -o bandit-report.json || true
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4
