@@ -106,6 +106,9 @@ jobs:
           fi
           poetry --version
 
+          # 设置 PATH 环境变量供后续步骤使用
+          echo "POETRY_BIN=$HOME/.local/bin" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           source .venv/bin/activate
@@ -121,15 +124,18 @@ jobs:
 
       - name: Ruff linting
         run: |
-          source .venv/bin/activate && poetry run ruff check . --output-format=github
+          source .venv/bin/activate
+          poetry run ruff check . --output-format=github
 
       - name: Ruff format check
         run: |
-          source .venv/bin/activate && poetry run ruff format . --check
+          source .venv/bin/activate
+          poetry run ruff format . --check
 
       - name: MyPy type checking
         run: |
-          source .venv/bin/activate && poetry run mypy src/ --pretty
+          source .venv/bin/activate
+          poetry run mypy src/ --pretty
 
   # ============================================================
   # 阶段 2: 单元测试
