@@ -29,9 +29,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-NAMESPACE="gitea-actions"
-STATEFULSET="gitea-org-runner"
-LABEL="app=gitea-org-runner"
+# 可通过环境变量覆盖，支持多环境部署
+NAMESPACE="${GITEA_RUNNER_NAMESPACE:-gitea-actions}"
+STATEFULSET="${GITEA_RUNNER_STATEFULSET:-gitea-org-runner}"
+LABEL="${GITEA_RUNNER_LABEL_SELECTOR:-app=gitea-org-runner}"
 
 # 帮助信息
 show_help() {
@@ -114,21 +115,35 @@ show_metrics() {
 
     # CPU 使用率
     echo -e "${YELLOW}📊 CPU 使用率:${NC}"
-    kubectl top pods -n "$NAMESPACE" -l "$LABEL" 2>/dev/null || echo "   ⚠️  metrics-server 未安装"
+    if kubectl top pods -n "$NAMESPACE" -l "$LABEL" 2>/dev/null; then
+        : # metrics-server 可用
+    else
+        echo -e "   ${YELLOW}⚠️  metrics-server 未安装，使用备用方案...${NC}"
+        echo "   使用 cgroup 统计 (需要容器内执行):"
+        echo "   kubectl exec -n $NAMESPACE gitea-org-runner-0 -- cat /sys/fs/cgroup/cpu/cpu.stat"
+    fi
     echo ""
 
     # 内存使用率
     echo -e "${YELLOW}📊 内存使用率:${NC}"
-    kubectl top pods -n "$NAMESPACE" -l "$LABEL" 2>/dev/null || echo "   ⚠️  metrics-server 未安装"
+    if kubectl top pods -n "$NAMESPACE" -l "$LABEL" 2>/dev/null; then
+        : # metrics-server 可用
+    else
+        echo -e "   ${YELLOW}⚠️  metrics-server 未安装，使用备用方案...${NC}"
+        echo "   使用 cgroup 统计 (需要容器内执行):"
+        echo "   kubectl exec -n $NAMESPACE gitea-org-runner-0 -- cat /sys/fs/cgroup/memory/memory.stat"
+    fi
     echo ""
 
     # Prometheus 检查
     echo -e "${YELLOW}📊 Prometheus 监控:${NC}"
     PROMETHEUS_PODS=$(kubectl get pods -A -l app.kubernetes.io/name=prometheus 2>/dev/null | grep -c Running || echo "0")
     if [ "$PROMETHEUS_PODS" -gt 0 ]; then
-        echo "   ✅ Prometheus 已部署 ($PROMETHEUS_PODS 个 Pod)"
+        echo -e "   ${GREEN}✅ Prometheus 已部署 ($PROMETHEUS_PODS 个 Pod)${NC}"
+        echo "   访问 Grafana 仪表板：kubectl port-forward svc/grafana 3000:80 -n monitoring"
     else
-        echo "   ⚠️  Prometheus 未部署 (可选)"
+        echo -e "   ${YELLOW}⚠️  Prometheus 未部署 (可选)${NC}"
+        echo "   安装 Prometheus: helm install prometheus prometheus-community/kube-prometheus-stack"
     fi
     echo ""
 }

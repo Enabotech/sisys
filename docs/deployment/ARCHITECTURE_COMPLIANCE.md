@@ -253,6 +253,22 @@ kubectl apply -f deployments/gitea-runner/limitrange.yaml
 
 ## 🔒 Rootless 模式验证
 
+### 配置说明
+
+**重要**: 当前 Runner 部署使用 **hybrid 模式**，并非完全的 rootless 模式。
+
+**原因**:
+- Docker-in-Docker (DIND) 需要访问 K3s containerd socket (`/run/k3s/containerd/containerd.sock`)
+- 这要求容器具有一定的特权来挂载和使用 containerd socket
+- 作为权衡，我们使用 `runAsNonRoot: false` 但禁用了 `privileged: true`
+
+**安全缓解措施**:
+1. ✅ 未使用 `privileged: true`（完全特权）
+2. ✅ 使用 `securityContext` 限制 capabilities
+3. ✅ containerd socket 以只读方式挂载
+4. ✅ 命名空间隔离（gitea-actions）
+5. ⚠️  NetworkPolicy 推荐配置但未启用（生产环境建议）
+
 ### 检查 privileged 配置
 
 ```bash
@@ -278,7 +294,19 @@ grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-org-runner-statefu
 grep -A 5 "securityContext:" deployments/gitea-runner/gitea-org-runner-statefulset.yaml
 ```
 
-**验证结果**: ✅ securityContext 已配置
+**验证结果**: ✅ securityContext 已配置，`runAsNonRoot: false`（DIND 需要）
+
+### 生产环境建议
+
+如需真正的 rootless 模式，考虑以下方案：
+
+1. **使用 Kaniko 替代 DIND**: 无需 Docker daemon，完全 rootless
+2. **使用 Buildah**: 支持 rootless 镜像构建
+3. **使用 K8s native executor**: 每个 Job 在独立 Pod 中运行，无需容器嵌套
+
+**权衡**:
+- DIND 方案：成熟稳定，但需要 containerd 访问权限
+- Kaniko/Buildah: 更安全，但可能需要调整现有 Pipeline
 
 ---
 

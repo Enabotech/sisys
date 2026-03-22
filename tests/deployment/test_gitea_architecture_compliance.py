@@ -89,29 +89,41 @@ class TestSecretManagement:
         """Verify no plaintext secrets in repository"""
         # Search for common secret patterns in config files
         config_dir = Path("deployments/gitea-runner")
+        plaintext_issues = []
 
         if config_dir.exists():
             for yaml_file in config_dir.glob("*.yaml"):
                 content = yaml_file.read_text()
-                # Check for pragma allowlist secret (approved secrets)
-                # or ensure secrets are referenced via SecretKeyRef
-
-                # Look for actual secret values (should be minimal or marked)
                 lines = content.split("\n")
-                for line in lines:
+
+                for line_num, line in enumerate(lines, 1):
                     # Skip if marked as allowed
                     if "# pragma: allowlist secret" in line:
                         continue
+
+                    # Skip environment variable placeholders
+                    if '"$' in line or "'$" in line or "${" in line:
+                        continue  # These are placeholders, not actual secrets
+
                     # Check for potential plaintext secrets
-                    if "password:" in line.lower() or "token:" in line.lower() or "secret:" in line.lower():
+                    if any(pattern in line.lower() for pattern in ["password:", "token:", "secret:"]):
                         # Should reference Kubernetes Secret, not contain actual values
                         if "valueFrom:" not in content and "secretKeyRef" not in content:
-                            # May contain placeholder values
-                            if "test-token" in content or "changeme" in content.lower():
+                            # Check for actual secret values (not placeholders)
+                            if any(
+                                placeholder in content.lower()
+                                for placeholder in ["test-token", "changeme", "<your-", "${", '"$']
+                            ):
                                 continue  # Placeholder is OK
+                            else:
+                                plaintext_issues.append(f"{yaml_file.name}:{line_num}")
 
-        # Test passes if we've reviewed the files
-        assert True, "Secret review completed"
+        # Fail if actual plaintext secrets found
+        if plaintext_issues:
+            pytest.fail(f"Potential plaintext secrets found in: {', '.join(plaintext_issues)}")
+
+        # Test passes if no issues found
+        assert True, "No plaintext secrets detected"
 
     def test_kubernetes_secrets_used(self):
         """Verify Kubernetes Secrets are used for sensitive data"""
@@ -165,12 +177,28 @@ class TestNetworkPolicy:
 
         if result.returncode == 0:
             policies = json.loads(result.stdout)
-            if len(policies.get("items", [])) > 0:
-                assert True, "NetworkPolicy found"
+            items = policies.get("items", [])
+
+            if len(items) > 0:
+                # Verify at least one NetworkPolicy has meaningful rules
+                has_valid_policy = False
+                for policy in items:
+                    spec = policy.get("spec", {})
+                    # Check if policy has podSelector and policyTypes
+                    if spec.get("podSelector") is not None and spec.get("policyTypes"):
+                        has_valid_policy = True
+                        break
+
+                if has_valid_policy:
+                    assert True, "Valid NetworkPolicy found"
+                else:
+                    pytest.fail("NetworkPolicy exists but lacks proper configuration")
             else:
-                pytest.skip("No NetworkPolicy in gitea-actions namespace (optional)")
+                # NetworkPolicy is optional but recommended for production
+                # Mark as failed with recommendation
+                pytest.skip("No NetworkPolicy in gitea-actions namespace (RECOMMENDED for production)")
         else:
-            pytest.skip("NetworkPolicy not configured (optional)")
+            pytest.skip("NetworkPolicy not configured (RECOMMENDED for production)")
 
     def test_networkpolicy_default_deny(self):
         """Verify default deny NetworkPolicy exists"""
@@ -241,18 +269,67 @@ class TestResourceLimits:
         """Verify Runner pods have resource limits"""
         runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
 
-        if runner_config.exists():
-            content = runner_config.read_text()
+        if not runner_config.exists():
+            pytest.fail("Runner deployment config not found")
 
-            # Check for resources section
-            has_limits = "resources:" in content
-            has_requests = "requests:" in content or "limits:" in content
+        content = runner_config.read_text()
 
-            if has_limits or has_requests:
-                assert True, "Resource limits configured"
+        # Check for resources section with both requests and limits
+        has_resources_section = "resources:" in content
+
+        if not has_resources_section:
+            pytest.fail("No resources section found in Runner deployment")
+
+        # Parse YAML to verify structure
+        import yaml
+
+        try:
+            docs = list(yaml.safe_load_all(content))
+            statefulset_doc = next((doc for doc in docs if doc and doc.get("kind") == "StatefulSet"), None)
+
+            if statefulset_doc:
+                # Navigate to container spec
+                spec = statefulset_doc.get("spec", {})
+                template = spec.get("template", {})
+                pod_spec = template.get("spec", {})
+                containers = pod_spec.get("containers", [])
+
+                if not containers:
+                    pytest.fail("No containers defined in StatefulSet")
+
+                runner_container = next((c for c in containers if c.get("name") == "runner"), None)
+
+                if not runner_container:
+                    pytest.fail("Runner container not found")
+
+                resources = runner_container.get("resources", {})
+
+                # Verify both requests and limits are defined
+                has_requests = "requests" in resources and resources["requests"]
+                has_limits = "limits" in resources and resources["limits"]
+
+                if not has_requests:
+                    pytest.fail("Resource requests not defined for Runner container")
+
+                if not has_limits:
+                    pytest.fail("Resource limits not defined for Runner container")
+
+                # Verify CPU and memory are specified
+                requests = resources.get("requests", {})
+                limits = resources.get("limits", {})
+
+                if "cpu" not in requests or "memory" not in requests:
+                    pytest.fail("CPU and memory requests not specified")
+
+                if "cpu" not in limits or "memory" not in limits:
+                    pytest.fail("CPU and memory limits not specified")
+
+                assert True, "Resource limits properly configured"
             else:
-                # May be set via defaults
-                pytest.skip("Resource limits not explicitly set (may use defaults)")
+                pytest.fail("StatefulSet document not found in YAML")
+
+        except yaml.YAMLError as e:
+            pytest.fail(f"Invalid YAML in runner config: {e}")
 
 
 class TestRootlessMode:

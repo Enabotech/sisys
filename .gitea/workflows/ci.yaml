@@ -487,6 +487,7 @@ jobs:
 
       - name: Login to Harbor
         uses: docker/login-action@v3
+        timeout-minutes: 5
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
@@ -505,6 +506,7 @@ jobs:
       - name: Push Docker image to Harbor
         id: push
         uses: docker/build-push-action@v5
+        timeout-minutes: 15
         with:
           context: .
           push: true
@@ -583,3 +585,61 @@ jobs:
           echo "- Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           echo "- Environment: Production"
           echo "- Status: ✅ Deployed"
+
+  # ============================================================
+  # 阶段 8: 失败通知 (仅当 Pipeline 失败时触发)
+  # ============================================================
+  notify-failure:
+    name: 📢 Failure Notification
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [code-quality, unit-test, integration-test, security-scan, build-image, push-image, deploy]
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "## 🔴 CI Pipeline Failed"
+          echo ""
+          echo "**Repository:** ${{ github.repository }}"
+          echo "**Branch:** ${{ github.ref }}"
+          echo "**Commit:** ${{ github.sha }}"
+          echo "**Workflow:** ${{ github.workflow }}"
+          echo ""
+          echo "### Failed Jobs:"
+          echo "- Check Gitea Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "### Next Steps:"
+          echo "1. Review the failed logs in Gitea Actions"
+          echo "2. Check recent code changes"
+          echo "3. Re-run failed jobs after fixing"
+          echo ""
+          echo "---"
+          echo "*This is an automated notification from Gitea Actions*"
+
+      # 可选：发送邮件通知（需要配置 SMTP）
+      # - name: Send email notification
+      #   uses: dawidd6/action-send-mail@v3
+      #   with:
+      #     server_address: smtp.sisys.local
+      #     server_port: 587
+      #     username: ${{ secrets.SMTP_USERNAME }}
+      #     password: ${{ secrets.SMTP_PASSWORD }}
+      #     subject: "🔴 CI Pipeline Failed: ${{ github.repository }}@${{ github.ref }}"
+      #     to: dev-team@sisys.local
+      #     from: "Gitea CI <ci@sisys.local>"
+      #     body: |
+      #       CI Pipeline failed for ${{ github.repository }}
+      #       Branch: ${{ github.ref }}
+      #       Commit: ${{ github.sha }}
+      #       View logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      # 可选：发送钉钉通知（需要配置 Webhook）
+      # - name: Send DingTalk notification
+      #   uses: zhanglong-long/dingtalk-action@v1
+      #   with:
+      #     webhook: ${{ secrets.DINGTALK_WEBHOOK }}
+      #     msgtype: markdown
+      #     content: |
+      #       ## 🔴 CI Pipeline Failed
+      #       - Repository: ${{ github.repository }}
+      #       - Branch: ${{ github.ref }}
+      #       - [View Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
