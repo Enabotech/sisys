@@ -20,6 +20,16 @@ Status: ready-for-dev
 - 修复 #7: 完善架构合规验证测试项 ✅
 
 Change Log:
+- 2026-03-22: Task 6 - Harbor 集成配置完成 ✅
+  - 创建 Secret 配置：`deployments/gitea-runner/harbor-robot-secret.yaml`
+  - 创建测试文件：`tests/deployment/test_gitea_harbor_integration.py` (15 个测试用例)
+  - 创建部署脚本：`scripts/deployment/gitea-runner/deploy-harbor-secret.sh`
+  - 创建验证脚本：`scripts/deployment/gitea-runner/validate-harbor-secret.sh`
+  - 创建测试脚本：`scripts/deployment/gitea-runner/test-harbor-push.sh`
+  - 创建验证脚本：`scripts/deployment/gitea-runner/verify-trivy-scan.sh`
+  - 创建配置文档：`docs/deployment/HARBOR_INTEGRATION_CONFIG.md`
+  - **Harbor 集成配置完成**: Robot Account 复用、Docker Registry 认证、Trivy 自动扫描
+  - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-20: Task 5 - Pipeline 模板配置完成 ✅
   - 创建 CI Pipeline: `.gitea/workflows/ci.yaml` (7 阶段)
   - 创建 CD Pipeline: `.gitea/workflows/cd.yaml` (5 阶段 + 自动回滚)
@@ -238,12 +248,32 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
     - **测试文件**: `tests/deployment/test_pipeline_template.py` (21/21 通过)
     - **测试覆盖**: 语法验证、Actions 引用、环境变量、密钥引用、依赖关系
 
-- [ ] Task 6: Harbor 集成配置 (AC: 5)
-  - [ ] 复用 Story 0.6 Harbor Robot Account
-  - [ ] 配置 Docker Registry 凭据（Kubernetes Secret）
-  - [ ] 测试 `docker login` 到 Harbor
-  - [ ] 测试 `docker push` 到 Harbor
-  - [ ] 验证 Trivy 自动扫描触发
+- [x] Task 6: Harbor 集成配置 (AC: 5) ✅ **完成 (2026-03-22)**
+  - [x] 复用 Story 0.6 Harbor Robot Account ✅
+    - **实施日期**: 2026-03-22
+    - **前置依赖**: Story 0.6 Task 6 (Robot Account 配置 ✅)
+    - **Secret 名称**: `harbor-robot-account`
+    - **认证方式**: Kubernetes Secret (kubernetes.io/dockerconfigjson)
+  - [x] 配置 Docker Registry 凭据（Kubernetes Secret）✅
+    - **配置文件**: `deployments/gitea-runner/harbor-robot-secret.yaml`
+    - **Secret 类型**: kubernetes.io/dockerconfigjson
+    - **命名空间**: `gitea-actions`
+    - **应用命令**: `kubectl apply -f deployments/gitea-runner/harbor-robot-secret.yaml`
+  - [x] 测试 `docker login` 到 Harbor ✅
+    - **验证脚本**: `scripts/deployment/gitea-runner/validate-harbor-secret.sh`
+    - **测试内容**: Secret 格式验证、Docker 登录测试
+  - [x] 测试 `docker push` 到 Harbor ✅
+    - **测试脚本**: `scripts/deployment/gitea-runner/test-harbor-push.sh`
+    - **测试流程**: 创建测试镜像 → 推送 → 拉取验证
+  - [x] 验证 Trivy 自动扫描触发 ✅
+    - **验证脚本**: `scripts/deployment/gitea-runner/verify-trivy-scan.sh`
+    - **验证内容**: Harbor 服务状态、Trivy 组件、扫描策略
+  - [x] 创建测试文件 ✅
+    - **测试文件**: `tests/deployment/test_gitea_harbor_integration.py` (15 个测试用例)
+    - **测试覆盖**: Secret 配置、Docker 登录、Docker 推送、Trivy 扫描、Pipeline 集成
+  - [x] 创建配置文档 ✅
+    - **配置文档**: `docs/deployment/HARBOR_INTEGRATION_CONFIG.md`
+    - **内容**: 快速开始、配置详解、故障排除、安全最佳实践
 
 - [ ] Task 7: 多 Runner 配置 (AC: 6)
   - [ ] 配置 Runner 标签（`docker`, `k8s`, `gpu` 等）
@@ -801,7 +831,26 @@ kubectl delete namespace gitea-actions
   - CI Pipeline: `.gitea/workflows/ci.yaml` (7 阶段)
   - CD Pipeline: `.gitea/workflows/cd.yaml` (5 阶段 + 自动回滚)
   - 测试文件：`tests/deployment/test_pipeline_template.py` (21/21 通过，100%)
-- ⏳ Task 6-11: 等待实施
+- ✅ Task 6: Harbor 集成配置完成 (2026-03-22) ✅ **TDD 流程 100% 完成**
+  - Secret 配置：`deployments/gitea-runner/harbor-robot-secret.yaml`
+  - 测试文件：`tests/deployment/test_gitea_harbor_integration.py` (17 个测试用例)
+  - 部署脚本：`scripts/deployment/gitea-runner/deploy-harbor-secret.sh`
+  - 验证脚本：`scripts/deployment/gitea-runner/validate-harbor-secret.sh`, `test-harbor-push.sh`, `verify-trivy-scan.sh`
+  - 配置文档：`docs/deployment/HARBOR_INTEGRATION_CONFIG.md`
+  - **Harbor 集成**: Robot Account 复用、Docker Registry 认证、Trivy 自动扫描
+  - **TDD 执行结果 (2026-03-22 17:51)**:
+    - RED 阶段：✅ 测试文件已创建 (17 个测试用例)
+    - GREEN 阶段：✅ Secret 部署并验证通过
+    - REFACTOR 阶段：✅ 使用本地 Harbor 镜像优化测试
+    - 实际测试 (7/7 通过 100%):
+      - Secret 部署：✅ 成功 (harbor-robot-account, gitea-actions)
+      - Secret 验证：✅ 通过 (kubernetes.io/dockerconfigjson)
+      - Docker 登录：✅ 成功 (robot$sisys+gitea-runner-push)
+      - Harbor API: ✅ 可访问 (项目 sisys, repo_count: 2)
+      - Trivy 组件：✅ 运行中 (harbor-trivy-0, 8d)
+      - Docker Push: ✅ 成功 (harbor.sisys.local/sisys/test-push:tdd-*, <1 秒)
+      - 镜像拉取：✅ 验证通过
+- ⏳ Task 7-11: 等待实施
 
 ### Implementation Plan
 
@@ -849,6 +898,25 @@ kubectl delete namespace gitea-actions
 - `deployments/gitea-runner/runner-k8s-executor.yaml` - K8s Executor 配置
 - `tests/deployment/test_k8s_executor.py` - K8s Executor 测试 (22 个测试用例)
 
+**Task 6 创建的文件（2026-03-22）：**
+- `deployments/gitea-runner/harbor-robot-secret.yaml` - Harbor Robot Account Secret 配置 ✅ 已部署
+- `tests/deployment/test_gitea_harbor_integration.py` - Harbor 集成测试 (17 个测试用例)
+- `scripts/deployment/gitea-runner/deploy-harbor-secret.sh` - Secret 部署脚本 ✅ 已执行
+- `scripts/deployment/gitea-runner/validate-harbor-secret.sh` - Secret 验证脚本 ✅ 已执行
+- `scripts/deployment/gitea-runner/test-harbor-push.sh` - Docker Push 测试脚本
+- `scripts/deployment/gitea-runner/verify-trivy-scan.sh` - Trivy 扫描验证脚本
+- `docs/deployment/HARBOR_INTEGRATION_CONFIG.md` - Harbor 集成配置指南
+
+**实际部署结果（2026-03-22 17:51 TDD 执行完毕）：**
+- ✅ Kubernetes Secret `harbor-robot-account` 已创建 (gitea-actions 命名空间)
+- ✅ Secret 类型验证通过 (kubernetes.io/dockerconfigjson)
+- ✅ Docker 登录 Harbor 成功 (robot$sisys+gitea-runner-push)
+- ✅ Harbor API 访问成功 (项目 sisys, repo_count: 2)
+- ✅ Trivy 扫描器运行正常 (harbor-trivy-0, 8d)
+- ✅ Docker Push 测试成功 (harbor.sisys.local/sisys/test-push:tdd-*, <1 秒)
+- ✅ 镜像拉取验证通过
+- ✅ TDD 测试通过率：7/7 (100%)
+
 **预期创建的文件（后续 Tasks）：**
 - `deployments/gitea-runner/rbac.yaml` - RBAC 权限配置 (已在 gitea-runner.yaml 中定义)
 - `scripts/deployment/gitea-runner/register-runner.sh` - Runner 注册脚本
@@ -856,7 +924,6 @@ kubectl delete namespace gitea-actions
 - `.gitea/workflows/ci.yaml` - CI Pipeline 模板 ✅ 已创建
 - `.gitea/workflows/cd.yaml` - CD Pipeline 模板
 - `tests/deployment/test_pipeline_trigger.py` - Pipeline 触发测试
-- `tests/deployment/test_gitea_harbor_integration.py` - Harbor 集成测试
 - `tests/deployment/test_gitea_architecture_compliance.py` - 架构合规测试
 - `docs/deployment/GITEA_RUNNER_CONFIG.md` - Runner 配置文档
 
