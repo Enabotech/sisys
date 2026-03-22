@@ -149,7 +149,7 @@ class TestArgoCDPerformance:
         session.verify = False
 
         start = time.time()
-        response = session.get(f"{argocd_url}/api/v1/session", timeout=5, headers={"Host": "argocd.sisys.local"})
+        _ = session.get(f"{argocd_url}/api/v1/session", timeout=5, headers={"Host": "argocd.sisys.local"})
         elapsed = time.time() - start
 
         print(f"Login API response time: {elapsed:.2f}s")

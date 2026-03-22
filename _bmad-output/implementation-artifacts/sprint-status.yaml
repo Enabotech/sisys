@@ -51,7 +51,7 @@ development_status:
   0-5-gitea-code-hosting: done  # Gitea v1.25.4 + PostgreSQL ✅ 开发完成，代码审查问题 100% 修复 (7 个问题：4 MEDIUM + 3 LOW)
   0-6-harbor-image-registry: done  # Harbor v2.14.3 + Trivy ✅ 部署成功，8/8 Pod Running，代码审查 9 个问题 100% 修复，功能验证 90% 通过
   0-7-argocd-continuous-deployment: done  # ArgoCD v3.2.7 GitOps ✅ 所有问题修复完成 (12/12)，代码审查准备就绪
-  0-8-gitea-runner-configuration: ready-for-dev  # Gitea Runner Docker/K8s Executor ✅ 故事文件已创建
+  0-8-gitea-runner-configuration: in-progress  # Gitea Runner Docker/K8s Executor ✅ Task 6 Harbor 集成完成 (TDD 流程执行完毕)
   0-9-ci-cd-pipeline-template: backlog  # 标准化 Pipeline 7 阶段
   # Iteration 1: SISYS 产品交付系统（面向客户）- 📋 计划完成，待执行
   0-14-windows-installer: backlog  # sisys-setup.exe 图形化安装
