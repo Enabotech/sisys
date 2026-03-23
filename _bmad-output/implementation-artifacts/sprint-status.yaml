@@ -52,7 +52,7 @@ development_status:
   0-6-harbor-image-registry: done  # Harbor v2.14.3 + Trivy ✅ 部署成功，8/8 Pod Running，代码审查 9 个问题 100% 修复，功能验证 90% 通过
   0-7-argocd-continuous-deployment: done  # ArgoCD v3.2.7 GitOps ✅ 所有问题修复完成 (12/12)，代码审查准备就绪
   0-8-gitea-runner-configuration: done  # Gitea Runner Docker/K8s Executor ✅ 所有问题修复完成 (10/10)，代码审查 100% 通过，功能验证 100% 通过
-  0-9-ci-cd-pipeline-template: backlog  # 标准化 Pipeline 7 阶段
+  0-9-ci-cd-pipeline-template: ready-for-dev  # 标准化 Pipeline 7 阶段 + 预构建镜像优化 ✅ 故事文件已创建 (含 GPU 调度/三层镜像架构)
   # Iteration 1: SISYS 产品交付系统（面向客户）- 📋 计划完成，待执行
   0-14-windows-installer: backlog  # sisys-setup.exe 图形化安装
   0-15-mac-installer: backlog  # sisys-cicd.dmg 拖拽安装
@@ -208,8 +208,8 @@ development_status:
 # Status Summary:
 #   - Done: 7 (Epic 0 Iteration 0: 3 stories + Story 0.4 + Story 0.5 + Story 0.6 + Story 0.7)
 #   - In-Progress: 0
-#   - Ready for Dev: 1 (Story 0.8)
-#   - Backlog: 88
+#   - Ready for Dev: 2 (Story 0.8, Story 0.9)
+#   - Backlog: 87
 #
 # Next Steps:
 #   1. ✅ Story 0.4 代码审查修复完成，状态更新为 done
@@ -218,10 +218,12 @@ development_status:
 #   4. ✅ Story 0.7 故事文件已创建，状态更新为 ready-for-dev
 #   5. ✅ Story 0.7 实施完成，状态更新为 done
 #   6. ✅ Story 0.8 故事文件已创建，状态更新为 ready-for-dev
-#   7. Execute Story 0.8 (Gitea Runner 配置)
-#   8. Execute Epic 0 Iteration 1 剩余 Stories (0.9, 0.14-0.18)
-#   9. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
-#   10. Follow SDD+TDD 融合模式 for all stories
+#   7. ✅ Story 0.8 实施完成，状态更新为 done
+#   8. ✅ Story 0.9 故事文件已创建，状态更新为 ready-for-dev
+#   9. Execute Story 0.9 (CI/CD Pipeline 模板)
+#   10. Execute Epic 0 Iteration 1 剩余 Stories (0.14-0.18)
+#   11. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   12. Follow SDD+TDD 融合模式 for all stories
 #
 # Key Changes from Previous Version:
 #   - Updated Epic 0 structure to reflect refactoring (Iteration 0 + Iteration 1)
@@ -242,4 +244,7 @@ development_status:
 #   - **Story 0.7 完成**: ArgoCD v3.2.7 GitOps ✅ 部署成功，代码审查问题 100% 修复
 #   - **Story 0.7 状态**: ready-for-dev → done ✅
 #   - **Story 0.8 状态**: backlog → ready-for-dev ✅ 故事文件已创建
+#   - **Story 0.8 完成**: Gitea Runner v0.3.0 ✅ 部署成功，代码审查 10 个问题 100% 修复，功能验证 8/8 通过
+#   - **Story 0.8 状态**: ready-for-dev → done ✅
+#   - **Story 0.9 状态**: backlog → ready-for-dev ✅ 故事文件已创建
 # =============================================================================
