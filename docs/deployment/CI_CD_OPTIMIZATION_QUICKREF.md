@@ -56,8 +56,8 @@ project/
 
 # 手动步骤
 docker load -i /mnt/x/backup/images/pytorch-pytorch-2.7.1-cuda12.8-cudnn9-devel.tar
-docker tag pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
-docker push harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
+docker tag pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
+docker push harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 ```
 
 ### 镜像清理
@@ -73,7 +73,7 @@ export HARBOR_PASSWORD=your_password
 
 ```bash
 # 验证 GPU 支持
-docker run --rm --gpus all harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 \
+docker run --rm --gpus all harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
   python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 
@@ -287,7 +287,7 @@ KUBECONFIG=base64_encoded_kubeconfig
 ### 首次部署
 
 - [ ] PyTorch 镜像导入 (`./scripts/image/import-pytorch.sh`)
-- [ ] Harbor 验证 (`docker pull harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8`)
+- [ ] Harbor 验证 (`docker pull harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel`)
 - [ ] GPU 测试 (`docker run --rm --gpus all ...`)
 - [ ] 依赖镜像构建 (触发 `build-dependency-image.yml`)
 - [ ] CI Pipeline 测试 (推送代码触发)

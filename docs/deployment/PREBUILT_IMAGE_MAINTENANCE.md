@@ -15,7 +15,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 1: 基础镜像 (PyTorch)                                 │
-│  镜像：harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 │
+│  镜像：harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel │
 │  大小：~8GB                                                  │
 │  更新：手动 (版本升级时)                                     │
 │  维护：本文档第 3 章                                          │
@@ -56,7 +56,7 @@
 
 ### 3.1 当前版本信息
 
-**镜像:** `harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8`
+**镜像:** `harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel`
 
 **规格:**
 - PyTorch: 2.7.1
@@ -103,7 +103,7 @@ docker push harbor.sisys.local/sisys/pytorch-base:3.0.0-cuda13.0
 
 ```bash
 # 定期备份到 NAS
-docker save harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 \
+docker save harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
   | gzip > /mnt/x/backup/images/pytorch-base-2.7.1-cuda12.8-$(date +%Y%m%d).tar.gz
 
 # 验证备份
