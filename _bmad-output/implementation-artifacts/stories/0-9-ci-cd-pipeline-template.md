@@ -207,7 +207,7 @@ so that **所有项目可以复用最佳实践，确保代码质量、安全性�
 │  来源：本地备份 `/mnt/x/backup/images/pytorch-...tar`        │
 │  大小：~8GB                                                  │
 │  更新：手动 (版本升级时)                                     │
-│  推送到：harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 │
+│  推送到：harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel │
 └─────────────────────────────────────────────────────────────┘
                             ↓ docker pull
 ┌─────────────────────────────────────────────────────────────┐
@@ -359,13 +359,13 @@ docker images | grep pytorch
 
 # 3. 推送到 Harbor
 docker tag pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
-  harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
+  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
-docker push harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
+docker push harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
 # 4. 验证 GPU 兼容性
 docker run --rm --gpus all \
-  harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 \
+  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
   python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 

@@ -123,10 +123,10 @@ docker login -u "${HARBOR_USERNAME}" -p "${HARBOR_PASSWORD}" "${HARBOR_REGISTRY}
 
 # 3. 打标签
 docker tag pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
-  ${HARBOR_REGISTRY}/sisys/pytorch-base:2.7.1-cuda12.8
+  ${HARBOR_REGISTRY}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
 # 4. 推送到 Harbor
-docker push ${HARBOR_REGISTRY}/sisys/pytorch-base:2.7.1-cuda12.8
+docker push ${HARBOR_REGISTRY}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 ```
 
 **预期输出:**
@@ -149,11 +149,11 @@ curl -sf -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
   | jq '.[].tags[].name'
 
 # 2. 拉取验证
-docker pull ${HARBOR_REGISTRY}/sisys/pytorch-base:2.7.1-cuda12.8
+docker pull ${HARBOR_REGISTRY}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
 # 3. 再次验证 GPU
 docker run --rm --gpus all \
-  ${HARBOR_REGISTRY}/sisys/pytorch-base:2.7.1-cuda12.8 \
+  ${HARBOR_REGISTRY}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel \
   python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 
@@ -275,7 +275,7 @@ export HARBOR_PASSWORD="your_password"
 # .gitea/workflows/ci.yaml
 env:
   DEPENDENCY_IMAGE: harbor.sisys.local/sisys/dependency:latest
-  PYTORCH_BASE: harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
+  PYTORCH_BASE: harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
 jobs:
   unit-test:
@@ -297,7 +297,7 @@ jobs:
 # docker/Dockerfile.dependency
 # Layer 2: 基于本地 PyTorch 镜像构建项目依赖
 
-FROM harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8 AS base
+FROM harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel AS base
 
 LABEL maintainer="Agimtech <agimtech@example.com>"
 LABEL description="SISYS Project Dependency Image"
@@ -495,7 +495,7 @@ curl -sf -u "admin:password" \
 
 ```bash
 # 测试拉取时间
-time docker pull harbor.sisys.local/sisys/pytorch-base:2.7.1-cuda12.8
+time docker pull harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 
 # 预期：本地网络 < 30 秒
 #       远程网络 < 2 分钟
