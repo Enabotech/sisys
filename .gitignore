@@ -548,7 +548,7 @@ rollup.config.cache
 # 保留源代码
 !src/**/*.py
 !tests/**/*.py
-!scripts/**/*.py
+!scripts/*
 
 # 保留配置
 !configs/**/*.yaml
