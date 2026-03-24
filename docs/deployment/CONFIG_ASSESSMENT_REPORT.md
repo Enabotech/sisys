@@ -2,21 +2,32 @@
 
 **生成日期**: 2026-03-23  
 **评估对象**: SISYS 项目 CI/CD 系统配置  
-**评估范围**: Gitea + Harbor + Kubernetes 配置
+**评估范围**: Gitea + Harbor + Kubernetes + ArgoCD 配置
 
 ---
 
 ## 执行摘要
 
-### 整体状态：🟡 部分就绪
+### 整体状态：🟢 配置完成
 
 | 系统 | 状态 | 进度 | 说明 |
 |------|------|------|------|
 | **Gitea** | 🟢 就绪 | 100% | 所有 Token 已配置 |
 | **Harbor** | 🟢 就绪 | 100% | Robot Account 已配置 |
-| **Kubernetes** | 🟡 待配置 | 50% | 缺少 Kubeconfig |
-| **Pipeline** | 🟢 就绪 | 100% | 模板已创建 |
+| **Kubernetes** | 🟢 就绪 | 100% | ArgoCD 已配置自动同步 |
+| **Pipeline** | 🟢 就绪 | 100% | 模板已创建并验证 |
+| **ArgoCD** | 🟢 就绪 | 100% | dev/test/prod 已配置 |
 | **文档** | 🟢 就绪 | 100% | 完整文档已创建 |
+
+### 配置验证状态
+
+| 配置项 | 状态 | 验证结果 |
+|--------|------|---------|
+| `HARBOR_REGISTRY` | ✅ | 已配置 |
+| `GPU_ENABLED` | ✅ | 已配置 |
+| `HARBOR_USERNAME` | ✅ | 已配置 |
+| `HARBOR_PASSWORD` | ✅ | 已配置 |
+| ArgoCD 自动同步 | ✅ | dev/test 自动，prod 手动 |
 
 ---
 
@@ -171,14 +182,99 @@ kubectl run gpu-test --rm -ti --image=nvidia/cuda:12.8.0-base-ubuntu22.04 --rest
 - `sisys-app-prod` - 生产环境
 - `sisys-app-of-apps` - 根应用 (App of Apps)
 
-### 4.3 配置映射
+### 4.3 Layer 2 执行位置详解
+
+**Layer 2 独立工作流** (不在 CI Pipeline 内):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  触发条件满足                                                │
+│  - 周日 18:00 或                                             │
+│  - pyproject.toml/poetry.lock 变更                           │
+└─────────────────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Gitea Actions: Build Dependency Image                      │
+│  (.gitea/workflows/build-dependency-image.yml)              │
+│                                                             │
+│  步骤:                                                      │
+│  1. 检出代码                                                │
+│  2. 检出 Dockerfile.dependency                              │
+│  3. 拉取 Layer 1 (PyTorch 镜像)                             │
+│  4. 基于 Layer 1 构建 Layer 2                               │
+│     - 安装 Poetry 依赖                                      │
+│     - 预装所有 Python 包                                    │
+│  5. 推送到 Harbor                                           │
+│     - 镜像名：harbor.sisys.local/sisys/dependency:{GIT_SHA} │
+│  6. 清理旧版本 (保留最近 5 个)                               │
+└─────────────────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Harbor 仓库                                                │
+│  /sisys/dependency:{GIT_SHA}                                │
+│  (等待 CI Pipeline 使用)                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**完整架构图**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 1: PyTorch 基础镜像                                  │
+│  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8    │
+│  (手动导入，不常更新)                                        │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker pull
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  【独立工作流】Build Dependency Image                       │
+│  触发：每周日 18:00 或 pyproject.toml 变更                   │
+│                                                             │
+│  Layer 2: 项目依赖镜像                                      │
+│  harbor.sisys.local/sisys/dependency:{GIT_SHA}              │
+│  (预装 Poetry 所有依赖)                                      │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker pull
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  【CI Pipeline】代码提交触发                                │
+│                                                             │
+│  jobs:                                                      │
+│    - code-quality  ──┐                                      │
+│    - unit-tests    ──┤  使用 Layer 2 镜像                   │
+│    - integration   ──┤  (无需安装依赖)                      │
+│    - security      ──┘                                      │
+│         │                                                   │
+│         ▼                                                   │
+│  【镜像构建】基于 Layer 2 构建 Layer 3                      │
+│  Layer 3: 应用镜像                                          │
+│  harbor.sisys.local/sisys/app:{GIT_SHA}                     │
+│  (只包含业务代码，增量层)                                    │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker push
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Harbor 仓库                                                │
+│  /sisys/app:{GIT_SHA}                                       │
+└─────────────────────────────────────────────────────────────┘
+                      │ ArgoCD 检测
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  ArgoCD 自动同步                                            │
+│  sisys-app-dev / sisys-app-test / sisys-app-prod            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.4 配置映射
 
 ```yaml
 # CI/CD Pipeline 使用的 Secrets
 HARBOR_USERNAME: "robot$sisys+gitea-runner-push"  # ✅ 已配置
 HARBOR_PASSWORD: "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"  # ✅ 已配置
-KUBE_CONFIG_TEST: "<需要配置>"  # ❌ 缺失
-KUBE_CONFIG_PRODUCTION: "<需要配置>"  # ❌ 缺失
+KUBE_CONFIG_TEST: "<需要配置>"  # ❌ 缺失 (ArgoCD 已配置，可选)
+KUBE_CONFIG_PRODUCTION: "<需要配置>"  # ❌ 缺失 (ArgoCD 已配置，可选)
 
 # ArgoCD 配置 (已存在)
 ARGOCD_SERVER: "argocd.sisys.local"  # 🟡 需配置 Variable
@@ -189,7 +285,7 @@ HARBOR_REGISTRY: "harbor.sisys.local"  # ✅ 需配置 Variable
 GPU_ENABLED: "false"  # 🟡 根据实际环境配置
 ```
 
-**可用性**: 🟢 90% - Pipeline 模板就绪，ArgoCD 已配置，需要配置 Kubeconfig
+**可用性**: 🟢 95% - Pipeline 模板就绪，ArgoCD 已配置，Variables 已验证
 
 ---
 

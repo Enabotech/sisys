@@ -467,6 +467,16 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 
 ## Change Log
 
+### v1.1.0 (2026-03-23) - 架构图更新
+
+**更新:**
+- ✅ 添加 Layer 2 执行位置详解图
+- ✅ 添加完整架构图 (含 Layer 1/2/3 流程)
+- ✅ 添加执行时间线图
+- ✅ 更新 CI_CD_PIPELINE_TEMPLATE.md
+- ✅ 更新 CI_CD_ARGOCD_INTEGRATION_SUMMARY.md
+- ✅ 更新 CONFIG_ASSESSMENT_REPORT.md
+
 ### v1.0.0 (2026-03-23) - 初始实施
 
 **新增:**
