@@ -3,10 +3,11 @@
 ## 目录
 
 1. [概述](#概述)
-2. [Gitea Secrets 配置](#gitea-secrets-配置)
-3. [Kubernetes Secrets 配置](#kubernetes-secrets-配置)
-4. [Harbor 配置](#harbor-配置)
-5. [安全最佳实践](#安全最佳实践)
+2. [现有配置评估](#现有配置评估)
+3. [Gitea Secrets 配置](#gitea-secrets-配置)
+4. [Kubernetes Secrets 配置](#kubernetes-secrets-配置)
+5. [Harbor 配置](#harbor-配置)
+6. [安全最佳实践](#安全最佳实践)
 
 ---
 
@@ -14,20 +15,52 @@
 
 本指南说明如何安全地配置 CI/CD Pipeline 所需的敏感信息。
 
-### Secrets 分类
+---
 
-| 类别 | 示例 | 存储位置 |
-|------|------|----------|
-| **认证凭据** | Harbor 密码、API Key | Gitea Secrets |
-| **Kubeconfig** | Kubernetes 配置 | Gitea Secrets (Base64) |
-| **数据库连接** | 数据库 URL | Kubernetes Secrets |
-| **通知配置** | Webhook URL | Gitea Secrets |
+## 现有配置评估
+
+### ✅ 可用配置
+
+| 配置项 | 值/说明 | 状态 | 用途 |
+|--------|---------|------|------|
+| **Gitea Admin** | `gitea_admin` / `Admin@123456` | ✅ 可用 | 管理员访问 |
+| **Gitea Write Token** | `1f182aca3d38b66f7e49c034d98fb15bf02434b7` | ✅ 可用 | CI/CD 推送 (write:repository + write:user) |
+| **Gitea Read Token** | `1a8e0eb9d7b712558efe03ad5fe9cda6ad980bc8` | ✅ 可用 | 只读操作 |
+| **Gitea Runner Token** | `2qsfG21yaoJHUPG1E8JoikRiNJXhVrrbKKGzFMzJ` | ✅ 可用 | 组织级工作流运行器 |
+| **Harbor Admin** | `admin` / `Admin@123456` | ✅ 可用 | 管理员访问 |
+| **Harbor Robot (ArgoCD)** | `robot$sisys+argocd-pull` | ✅ 可用 | ArgoCD 拉取镜像 |
+| **Harbor Robot Token** | `mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j` | ✅ 可用 | ArgoCD 拉取凭据 |
+| **Harbor Robot (Gitea)** | `robot$sisys+gitea-runner-push` | ✅ 可用 | Gitea Runner 推送镜像 |
+| **Gitea Runner Secret** | `gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd` | ✅ 可用 | Gitea Runner 推送凭据 |
+
+### 📋 需要配置
+
+| 配置项 | 说明 | 优先级 |
+|--------|------|--------|
+| **KUBE_CONFIG_TEST** | 测试环境 Kubeconfig | 🔴 高 |
+| **KUBE_CONFIG_PRODUCTION** | 生产环境 Kubeconfig | 🔴 高 |
+| **HARBOR_USERNAME** | CI Pipeline 推送用户名 | 🟡 中 (使用 robot$sisys+gitea-runner-push) |
+| **HARBOR_PASSWORD** | CI Pipeline 推送密码 | 🟡 中 (使用 gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd) |
+
+### 推荐配置映射
+
+```yaml
+# Gitea Secrets (仓库级别)
+HARBOR_USERNAME: "robot$sisys+gitea-runner-push"
+HARBOR_PASSWORD: "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"
+KUBE_CONFIG_TEST: "<需要配置>"
+KUBE_CONFIG_PRODUCTION: "<需要配置>"
+
+# Gitea Variables (仓库级别)
+HARBOR_REGISTRY: "harbor.sisys.local"
+GPU_ENABLED: "false"  # 根据实际 GPU 环境配置
+```
 
 ---
 
 ## Gitea Secrets 配置
 
-### 1. Harbor 凭据
+### 1. Harbor 凭据 (使用现有 Robot Account)
 
 **步骤**:
 
@@ -36,14 +69,14 @@
 3. 添加以下 Secrets:
 
 ```yaml
-# Harbor 用户名
+# Harbor 用户名 (使用已有的 Robot Account)
 Name: HARBOR_USERNAME
-Value: admin
+Value: robot$sisys+gitea-runner-push
 Secret: ✅
 
-# Harbor 密码
+# Harbor 密码 (使用已有的 Secret)
 Name: HARBOR_PASSWORD
-Value: <your-secure-password>
+Value: gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd
 Secret: ✅
 ```
 
@@ -54,7 +87,7 @@ Secret: ✅
 docker login harbor.sisys.local -u $HARBOR_USERNAME -p $HARBOR_PASSWORD
 ```
 
-### 2. Kubernetes 配置
+### 2. Kubernetes 配置 (需要配置)
 
 **获取 Kubeconfig**:
 
@@ -88,17 +121,32 @@ echo "<base64-string>" | base64 -d > /tmp/test-kubeconfig
 KUBECONFIG=/tmp/test-kubeconfig kubectl get pods
 ```
 
-### 3. 通知配置 (可选)
+### 3. 使用现有 Gitea Token
+
+**组织级工作流 Token**:
 
 ```yaml
-# 通用通知 Webhook
-Name: NOTIFICATION_WEBHOOK
-Value: https://hooks.slack.com/services/xxx
+# 已配置的 Runner Token
+Name: GITEA_RUNNER_TOKEN
+Value: 2qsfG21yaoJHUPG1E8JoikRiNJXhVrrbKKGzFMzJ
 Secret: ✅
+```
 
-# 生产环境通知
-Name: PRODUCTION_NOTIFICATION_WEBHOOK
-Value: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+**只读 Token (用于拉取代码)**:
+
+```yaml
+# 只读访问
+Name: GITEA_READ_TOKEN
+Value: 1a8e0eb9d7b712558efe03ad5fe9cda6ad980bc8
+Secret: ✅
+```
+
+**写入 Token (用于推送/创建 Release)**:
+
+```yaml
+# 写入访问
+Name: GITEA_WRITE_TOKEN
+Value: 1f182aca3d38b66f7e49c034d98fb15bf02434b7
 Secret: ✅
 ```
 
@@ -168,34 +216,50 @@ kubectl get secret sisys-secrets -n sisys-test -o jsonpath='{.data}' | jq 'with_
 
 ## Harbor 配置
 
-### 1. 创建项目
+### 1. 现有 Robot Account 配置
+
+**已配置的 Robot Account**:
+
+| 名称 | 权限 | Token | 用途 |
+|------|------|-------|------|
+| `robot$sisys+argocd-pull` | Pull (只读) | `mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j` | ArgoCD 拉取镜像 |
+| `robot$sisys+gitea-runner-push` | Push + Pull | `gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd` | Gitea Runner 推送镜像 |
+
+**验证命令**:
 
 ```bash
-# 通过 Harbor UI 创建项目
-# 项目名称：sisys
-# 访问级别：私有
-# 内容信任：启用
-# 漏洞扫描：自动
+# 验证 ArgoCD Robot
+docker login harbor.sisys.local -u 'robot$sisys+argocd-pull' -p 'mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j'
+
+# 验证 Gitea Runner Robot
+docker login harbor.sisys.local -u 'robot$sisys+gitea-runner-push' -p 'gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd'
 ```
 
-### 2. 配置机器人账户
+### 2. 项目配置
 
 **步骤**:
 
-1. 登录 Harbor UI
-2. 进入项目 `sisys`
-3. 点击 **机器人账户** → **+ 机器人账户**
-4. 配置:
-   - 名称：`ci-pipeline`
-   - 权限：推送、拉取、删除
-   - 有效期：永久
+1. 登录 Harbor UI (https://harbor.sisys.local)
+2. 使用管理员账号登录：`admin` / `Admin@123456`
+3. 进入项目 `sisys`
+4. 点击 **机器人账户** 验证现有配置
 
-**使用机器人账户**:
+**权限说明**:
 
-```yaml
-# Gitea Secrets
-HARBOR_USERNAME: robot$ci-pipeline
-HARBOR_PASSWORD: <robot-token>
+```json
+// robot$sisys+gitea-runner-push 权限
+{
+  "permissions": [{
+    "access": [
+      {"action": "create", "resource": "artifact"},
+      {"action": "pull", "resource": "repository"},
+      {"action": "push", "resource": "repository"},
+      {"action": "read", "resource": "artifact"}
+    ],
+    "kind": "project",
+    "namespace": "sisys"
+  }]
+}
 ```
 
 ### 3. 配置漏洞扫描
@@ -204,6 +268,32 @@ HARBOR_PASSWORD: <robot-token>
 # Harbor UI → 管理 → 配置 → 漏洞扫描
 # 自动扫描：启用
 # 扫描策略：每日
+```
+
+### 4. Kubernetes Secret 配置
+
+**已存储的 Secret**:
+
+```yaml
+# ArgoCD 拉取密钥 (已存储)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-secret
+  namespace: sisys-test
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: <base64-encoded-json>
+```
+
+**验证 Secret**:
+
+```bash
+# 查看 Secret
+kubectl get secret harbor-secret -n sisys-test -o yaml
+
+# 解码验证
+kubectl get secret harbor-secret -n sisys-test -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | jq
 ```
 
 ---
