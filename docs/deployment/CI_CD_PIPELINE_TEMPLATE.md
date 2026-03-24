@@ -68,6 +68,143 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### 完整架构图
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 1: PyTorch 基础镜像                                  │
+│  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8    │
+│  (手动导入，不常更新)                                        │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker pull
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  【独立工作流】Build Dependency Image                       │
+│  触发：每周日 18:00 或 pyproject.toml 变更                   │
+│                                                             │
+│  Layer 2: 项目依赖镜像                                      │
+│  harbor.sisys.local/sisys/dependency:{GIT_SHA}              │
+│  (预装 Poetry 所有依赖)                                      │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker pull
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  【CI Pipeline】代码提交触发                                │
+│                                                             │
+│  jobs:                                                      │
+│    - code-quality  ──┐                                      │
+│    - unit-tests    ──┤  使用 Layer 2 镜像                   │
+│    - integration   ──┤  (无需安装依赖)                      │
+│    - security      ──┘                                      │
+│         │                                                   │
+│         ▼                                                   │
+│  【镜像构建】基于 Layer 2 构建 Layer 3                      │
+│  Layer 3: 应用镜像                                          │
+│  harbor.sisys.local/sisys/app:{GIT_SHA}                     │
+│  (只包含业务代码，增量层)                                    │
+└─────────────────────────────────────────────────────────────┘
+                      │ docker push
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Harbor 仓库                                                │
+│  /sisys/app:{GIT_SHA}                                       │
+└─────────────────────────────────────────────────────────────┘
+                      │ ArgoCD 检测
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  ArgoCD 自动同步                                            │
+│  sisys-app-dev / sisys-app-test / sisys-app-prod            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Layer 2 执行位置详解
+
+**Layer 2 不是在 CI Pipeline 中构建的**，而是有独立的工作流：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  触发条件满足                                                │
+│  - 周日 18:00 或                                             │
+│  - pyproject.toml/poetry.lock 变更                           │
+└─────────────────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Gitea Actions: Build Dependency Image                      │
+│  (.gitea/workflows/build-dependency-image.yml)              │
+│                                                             │
+│  步骤:                                                      │
+│  1. 检出代码                                                │
+│  2. 检出 Dockerfile.dependency                              │
+│  3. 拉取 Layer 1 (PyTorch 镜像)                             │
+│  4. 基于 Layer 1 构建 Layer 2                               │
+│     - 安装 Poetry 依赖                                      │
+│     - 预装所有 Python 包                                    │
+│  5. 推送到 Harbor                                           │
+│     - 镜像名：harbor.sisys.local/sisys/dependency:{GIT_SHA} │
+│  6. 清理旧版本 (保留最近 5 个)                               │
+└─────────────────────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Harbor 仓库                                                │
+│  /sisys/dependency:{GIT_SHA}                                │
+│  (等待 CI Pipeline 使用)                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**CI Pipeline 使用 Layer 2**:
+
+```yaml
+# .gitea/workflows/ci.yaml
+jobs:
+  code-quality:
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:${{ github.sha }}
+      # ↑ 使用 Layer 2 镜像，无需重新安装依赖！
+    
+  unit-tests:
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:${{ github.sha }}
+      # ↑ 直接使用预装好的依赖环境
+```
+
+### 执行时间线
+
+```
+时间轴:
+
+第 1 周 周日 18:00
+    │
+    ▼
+【Layer 2 构建】
+harbor.sisys.local/sisys/dependency:abc123
+    │
+    └─── 保存到 Harbor ───┘
+
+第 2 周 周一 10:00 (代码提交)
+    │
+    ▼
+【CI Pipeline 触发】
+    │
+    ├── code-quality (使用 Layer 2)
+    ├── unit-tests (使用 Layer 2)
+    ├── integration (使用 Layer 2)
+    │
+    └── build-image (基于 Layer 2 构建 Layer 3)
+            │
+            ▼
+        harbor.sisys.local/sisys/app:def456
+            │
+            ▼
+        ArgoCD 部署
+
+第 2 周 周日 18:00
+    │
+    ▼
+【Layer 2 定期构建】(检查依赖是否变更)
+```
+
 ### Pipeline 流程图
 
 ```
