@@ -1,0 +1,95 @@
+# Layer 2: 项目依赖镜像
+# 基于 PyTorch 官方镜像 (Layer 1)，预装项目依赖
+# 更新频率：每周日 18 点 + 依赖变更触发
+# 保留策略：保留最近 5 个版本
+
+# ===========================================================================
+# Stage 1: 基础镜像 (Layer 1)
+# ===========================================================================
+ARG PYTORCH_IMAGE=harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
+FROM ${PYTORCH_IMAGE} AS base
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_CACHE_DIR='/tmp/poetry_cache'
+
+# 设置 Python 和 Poetry 版本
+ARG PYTHON_VERSION=3.11
+ARG POETRY_VERSION=1.8.0
+
+# 验证基础镜像
+RUN python3 --version && \
+    pip3 --version && \
+    echo "CUDA 版本:" && \
+    python3 -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.version.cuda}')"
+
+# ===========================================================================
+# Stage 2: 安装项目依赖
+# ===========================================================================
+FROM base AS dependencies
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖文件
+COPY pyproject.toml poetry.lock ./
+
+# 安装 Poetry (如果基础镜像没有)
+RUN pip3 install --no-cache-dir "poetry==${POETRY_VERSION}"
+
+# 安装项目依赖 (不开发依赖)
+RUN poetry install --only main --no-interaction --no-ansi
+
+# 清理缓存
+RUN rm -rf ${POETRY_CACHE_DIR} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 验证安装
+RUN python3 -c "import sys; print(f'Python: {sys.version}')"
+
+# ===========================================================================
+# Stage 3: 最终镜像
+# ===========================================================================
+FROM base AS final
+
+# 设置工作目录
+WORKDIR /app
+
+# 从 dependencies 阶段复制已安装的依赖
+COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=dependencies /usr/local/bin/poetry /usr/local/bin/poetry
+
+# 复制项目依赖文件 (用于验证)
+COPY pyproject.toml poetry.lock ./
+
+# 创建非 root 用户
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+USER appuser
+
+# 验证
+RUN python3 --version && \
+    poetry --version
+
+# 设置入口点
+ENTRYPOINT ["/bin/bash"]
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import sys; sys.exit(0)" || exit 1
+
+# 镜像标签说明
+LABEL org.opencontainers.image.title="SISYS Dependency Image" \
+      org.opencontainers.image.description="Pre-built dependency image for SISYS project (Layer 2)" \
+      org.opencontainers.image.vendor="SISYS" \
+      sisys.image.type="dependency" \
+      sisys.image.layer="2" \
+      sisys.python.version="3.11" \
+      sisys.poetry.version="1.8.0" \
+      sisys.pytorch.version="2.7.1" \
+      sisys.cuda.version="12.8"
