@@ -1,192 +1,247 @@
 #!/bin/bash
-# 本地 PyTorch 镜像导入脚本
-# 功能：将本地备份的 PyTorch 镜像导入 Docker 并推送到 Harbor
-# 镜像文件：/mnt/x/backup/images/pytorch-pytorch-2.7.1-cuda12.8-cudnn9-devel.tar
+# =============================================================================
+# PyTorch 基础镜像导入脚本 (Layer 1)
+# =============================================================================
+# 功能：从本地备份导入 PyTorch 镜像到 Docker 和 Harbor
+# =============================================================================
 
-set -e  # 遇到错误立即退出
+set -euo pipefail
 
-# ===========================================================================
-# 配置变量
-# ===========================================================================
-LOCAL_IMAGE_PATH="/mnt/x/backup/images/pytorch-pytorch-2.7.1-cuda12.8-cudnn9-devel.tar"
-HARBOR_REGISTRY="harbor.sisys.local"
-HARBOR_PROJECT="sisys"
-IMAGE_NAME="pytorch/pytorch"
-IMAGE_TAG="2.7.1-cuda12.8-cudnn9-devel"
-HARBOR_USERNAME="${HARBOR_USERNAME:-admin}"  # 可从环境变量读取
-HARBOR_PASSWORD="${HARBOR_PASSWORD:-}"       # 建议从环境变量读取
+# 配置
+BACKUP_FILE="${BACKUP_FILE:-/mnt/x/backup/images/pytorch-pytorch-2.7.1-cuda12.8-cudnn9-devel.tar}"
+HARBOR_URL="${HARBOR_URL:-harbor.sisys.local}"
+HARBOR_USERNAME="${HARBOR_USERNAME:-admin}"
+HARBOR_PASSWORD="${HARBOR_PASSWORD:-Admin@123456}"
+HARBOR_PROJECT="${HARBOR_PROJECT:-sisys}"
+
+# 镜像名称
+LOCAL_IMAGE="pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel"
+HARBOR_IMAGE="$HARBOR_URL/$HARBOR_PROJECT/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel"
 
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# ===========================================================================
-# 函数定义
-# ===========================================================================
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-check_file_exists() {
-    if [ ! -f "$LOCAL_IMAGE_PATH" ]; then
-        log_error "镜像文件不存在：$LOCAL_IMAGE_PATH"
+# =============================================================================
+# 步骤 1: 验证备份文件
+# =============================================================================
+
+verify_backup() {
+    log_info "步骤 1: 验证备份文件..."
+    
+    if [ ! -f "$BACKUP_FILE" ]; then
+        log_error "备份文件不存在：$BACKUP_FILE"
         exit 1
     fi
-    log_info "镜像文件存在：$LOCAL_IMAGE_PATH"
-}
-
-check_docker_installed() {
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker 未安装"
-        exit 1
-    fi
-    log_info "Docker 已安装：$(docker --version)"
-}
-
-check_gpu_support() {
-    if ! command -v nvidia-smi &> /dev/null; then
-        log_warn "nvidia-smi 未找到，GPU 支持可能不可用"
-        return 1
-    fi
-    log_info "GPU 支持可用：$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1)"
-    return 0
-}
-
-# ===========================================================================
-# 主流程
-# ===========================================================================
-main() {
-    log_info "=========================================="
-    log_info "  本地 PyTorch 镜像导入脚本"
-    log_info "=========================================="
     
-    # 步骤 1: 预检查
-    log_info "步骤 1: 预检查..."
-    check_file_exists
-    check_docker_installed
-    check_gpu_support || true  # GPU 可选
+    local file_size
+    file_size=$(du -h "$BACKUP_FILE" | cut -f1)
+    log_info "  文件路径：$BACKUP_FILE"
+    log_info "  文件大小：$file_size"
     
-    # 步骤 2: 导入镜像到 Docker
-    log_info "步骤 2: 导入镜像到 Docker..."
-    docker load -i "$LOCAL_IMAGE_PATH"
-    
-    # 步骤 3: 验证导入
-    log_info "步骤 3: 验证导入..."
-    docker images | grep -E "pytorch.*2.7.1" || {
-        log_error "镜像导入失败"
-        exit 1
-    }
-    log_info "镜像导入成功"
-    
-    # 步骤 4: 标记镜像
-    log_info "步骤 4: 标记镜像..."
-    FULL_IMAGE_NAME="${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}"
-    docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${FULL_IMAGE_NAME}"
-    log_info "镜像标记为：${FULL_IMAGE_NAME}"
-    
-    # 步骤 5: 登录 Harbor
-    log_info "步骤 5: 登录 Harbor..."
-    if [ -z "$HARBOR_PASSWORD" ]; then
-        log_warn "HARBOR_PASSWORD 未设置，请手动输入密码"
-        docker login "${HARBOR_REGISTRY}" -u "${HARBOR_USERNAME}" -p "${HARBOR_PASSWORD}"
+    # 验证文件完整性 (可选)
+    if [ -f "${BACKUP_FILE}.sha256" ]; then
+        log_info "  验证 SHA256..."
+        if sha256sum -c "${BACKUP_FILE}.sha256" &> /dev/null; then
+            log_success "  SHA256 验证通过"
+        else
+            log_error "  SHA256 验证失败，文件可能损坏"
+            exit 1
+        fi
     else
-        docker login "${HARBOR_REGISTRY}" -u "${HARBOR_USERNAME}" -p "${HARBOR_PASSWORD}"
+        log_warning "  未找到 SHA256 校验文件，跳过完整性验证"
     fi
-    
-    # 步骤 6: 推送镜像到 Harbor
-    log_info "步骤 6: 推送镜像到 Harbor..."
-    docker push "${FULL_IMAGE_NAME}"
-    
-    # 步骤 7: 验证 GPU 兼容性
-    log_info "步骤 7: 验证 GPU 兼容性..."
-    if check_gpu_support; then
-        docker run --rm --gpus all "${FULL_IMAGE_NAME}" \
-            python3 -c "import torch; print(f'CUDA 可用：{torch.cuda.is_available()}'); print(f'CUDA 版本：{torch.version.cuda}')" || \
-            log_warn "GPU 验证失败，请检查镜像完整性"
-    else
-        log_warn "跳过 GPU 验证 (GPU 不可用)"
-    fi
-    
-    # 步骤 8: 清理
-    log_info "步骤 8: 清理..."
-    docker logout "${HARBOR_REGISTRY}"
-    
-    # 完成
-    log_info "=========================================="
-    log_info "  导入完成!"
-    log_info "=========================================="
-    log_info "镜像信息:"
-    log_info "  - 本地标签：${IMAGE_NAME}:${IMAGE_TAG}"
-    log_info "  - Harbor 标签：${FULL_IMAGE_NAME}"
-    log_info ""
-    log_info "使用示例:"
-    log_info "  docker pull ${FULL_IMAGE_NAME}"
-    log_info "  docker run --rm --gpus all ${FULL_IMAGE_NAME} python3 -c 'import torch; print(torch.cuda.is_available())'"
-    log_info ""
-    log_info "下一步:"
-    log_info "  1. 在 CI/CD Pipeline 中使用此镜像作为 Layer 1"
-    log_info "  2. 更新 .gitea/workflows/ci.yaml 中的 PYTORCH_IMAGE 变量"
-    log_info "  3. 验证 GPU 任务调度正常"
 }
 
-# 显示帮助
-show_help() {
+# =============================================================================
+# 步骤 2: 导入到 Docker
+# =============================================================================
+
+import_to_docker() {
+    log_info "步骤 2: 导入到 Docker..."
+    
+    # 检查是否已存在
+    if docker image inspect "$LOCAL_IMAGE" &> /dev/null; then
+        log_warning "镜像已存在：$LOCAL_IMAGE"
+        read -p "是否覆盖？[y/N]: " confirm
+        if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+            log_info "跳过导入"
+            return 0
+        fi
+        docker rmi "$LOCAL_IMAGE"
+    fi
+    
+    # 导入镜像
+    log_info "  执行导入..."
+    docker load -i "$BACKUP_FILE"
+    
+    # 验证导入
+    if docker image inspect "$LOCAL_IMAGE" &> /dev/null; then
+        log_success "  导入成功：$LOCAL_IMAGE"
+    else
+        log_error "  导入失败"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# 步骤 3: 验证 GPU 兼容性
+# =============================================================================
+
+verify_gpu() {
+    log_info "步骤 3: 验证 GPU 兼容性..."
+    
+    # 检查 NVIDIA Docker
+    if ! docker run --rm --gpus all nvidia/cuda:12.8.0-base nvidia-smi &> /dev/null; then
+        log_warning "NVIDIA Docker 不可用，跳过 GPU 验证"
+        log_info "  请确保已安装 NVIDIA Container Toolkit"
+        return 0
+    fi
+    
+    # 测试 PyTorch GPU
+    log_info "  测试 PyTorch GPU..."
+    local gpu_test
+    gpu_test=$(docker run --rm --gpus all "$LOCAL_IMAGE" \
+        python3 -c "import torch; print(f'CUDA 可用：{torch.cuda.is_available()}'); print(f'CUDA 版本：{torch.version.cuda}')" 2>&1 || echo "")
+    
+    if echo "$gpu_test" | grep -q "CUDA 可用：True"; then
+        log_success "  GPU 验证通过"
+        log_info "  $gpu_test"
+    else
+        log_warning "  GPU 验证失败或不可用"
+        log_info "  $gpu_test"
+    fi
+}
+
+# =============================================================================
+# 步骤 4: 推送到 Harbor
+# =============================================================================
+
+push_to_harbor() {
+    log_info "步骤 4: 推送到 Harbor..."
+    
+    # 登录 Harbor
+    log_info "  登录 Harbor..."
+    if ! docker login "$HARBOR_URL" -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD" &> /dev/null; then
+        log_error "  Harbor 登录失败"
+        exit 1
+    fi
+    log_success "  Harbor 登录成功"
+    
+    # 检查项目存在
+    log_info "  检查项目：$HARBOR_PROJECT"
+    local response
+    response=$(curl -k -s -o /dev/null -w "%{http_code}" \
+        -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
+        "https://$HARBOR_URL/api/v2.0/projects/$HARBOR_PROJECT")
+    
+    if [ "$response" == "404" ]; then
+        log_info "    项目不存在，尝试创建..."
+        curl -k -s -X POST \
+            -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -d "{\"project_name\":\"$HARBOR_PROJECT\",\"metadata\":{\"public\":\"false\"}}" \
+            "https://$HARBOR_URL/api/v2.0/projects" > /dev/null
+        log_success "    项目创建成功"
+    else
+        log_success "    项目已存在"
+    fi
+    
+    # 标记镜像
+    log_info "  标记镜像..."
+    docker tag "$LOCAL_IMAGE" "$HARBOR_IMAGE"
+    
+    # 推送镜像
+    log_info "  推送到 Harbor..."
+    docker push "$HARBOR_IMAGE"
+    
+    # 验证推送
+    log_info "  验证推送..."
+    if docker pull "$HARBOR_IMAGE" &> /dev/null; then
+        log_success "  推送成功：$HARBOR_IMAGE"
+    else
+        log_error "  推送失败或验证失败"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# 步骤 5: 生成报告
+# =============================================================================
+
+generate_report() {
+    log_info "步骤 5: 生成报告..."
+    
     cat << EOF
-本地 PyTorch 镜像导入脚本
 
-用法：$0 [选项]
+============================================
+  PyTorch 镜像导入完成
+============================================
 
-选项:
-  -h, --help      显示帮助信息
-  -u, --username  Harbor 用户名 (默认：admin)
-  -p, --password  Harbor 密码 (默认：从环境变量读取)
-  -f, --file      镜像文件路径 (默认：/mnt/x/backup/images/pytorch-pytorch-2.7.1-cuda12.8-cudnn9-devel.tar)
+镜像信息:
+  本地镜像：$LOCAL_IMAGE
+  Harbor 镜像：$HARBOR_IMAGE
 
-示例:
-  $0                                    # 使用默认配置
-  $0 -u admin -p Harbor123              # 指定用户名和密码
-  $0 -f /path/to/image.tar              # 指定镜像文件
-  HARBOR_PASSWORD=secret $0             # 通过环境变量传递密码
+使用方式:
 
+1. 在 Dockerfile 中使用:
+   FROM $HARBOR_IMAGE
+
+2. 在 Gitea Actions 中使用:
+   container:
+     image: $HARBOR_IMAGE
+
+3. 作为 Layer 1 构建 Layer 2:
+   docker build --build-arg PYTORCH_IMAGE=$HARBOR_IMAGE ...
+
+下一步:
+  1. 运行 ./scripts/image/build-dependency-image.sh 构建 Layer 2
+  2. 验证 CI/CD Pipeline
+
+============================================
 EOF
 }
 
-# 解析命令行参数
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -u|--username)
-            HARBOR_USERNAME="$2"
-            shift 2
-            ;;
-        -p|--password)
-            HARBOR_PASSWORD="$2"
-            shift 2
-            ;;
-        -f|--file)
-            LOCAL_IMAGE_PATH="$2"
-            shift 2
-            ;;
-        *)
-            log_error "未知选项：$1"
-            show_help
-            exit 1
-            ;;
-    esac
-done
+# =============================================================================
+# 主函数
+# =============================================================================
 
-# 执行主流程
-main
+main() {
+    echo "=============================================="
+    echo "  PyTorch 基础镜像导入工具 (Layer 1)"
+    echo "=============================================="
+    echo
+    echo "备份文件：$BACKUP_FILE"
+    echo "Harbor: $HARBOR_URL"
+    echo
+    
+    verify_backup
+    import_to_docker
+    verify_gpu
+    push_to_harbor
+    
+    generate_report
+    
+    log_success "所有步骤完成！"
+}
+
+main "$@"

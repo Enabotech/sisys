@@ -281,6 +281,7 @@ kubeconfig
 
 # Build outputs
 _build/
+.build/
 output/
 outputs/
 artifacts/
