@@ -37,6 +37,7 @@ securityContext:
 gitea:
   admin:
     existingSecret: ""  # 首次部署时自动创建
+    passwordMode: initialOnlyRequireReset
     secretKeys:
       usernameKey: username
       passwordKey: password  # pragma: allowlist secret (示例配置)
