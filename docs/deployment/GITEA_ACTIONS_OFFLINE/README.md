@@ -11,8 +11,8 @@
 **适用**: 有外网访问
 
 ```bash
-export GITEA_TOKEN="186b8a68867531b1a80622ec778452587ab00e75"
-export GITHUB_TOKEN="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"
+export GITEA_TOKEN="YOUR_GITEA_TOKEN"
+export GITHUB_TOKEN="YOUR_GITHUB_TOKEN"
 
 ./scripts/actions/gitea-mirror-actions.sh create-all
 ```
