@@ -1377,7 +1377,7 @@ jobs:
     needs: build-image
     steps:
       - name: Login to Harbor
-        run: docker login harbor.sisys.local -u ${{ secrets.HARBOR_USERNAME }} -p ${{ secrets.HARBOR_PASSWORD }}
+        run: docker login harbor.sisys.local -u ${{ secrets.HARBOR_ROBOT_USERNAME }} -p ${{ secrets.HARBOR_ROBOT_PASSWORD }}
       - name: Docker push
         run: docker push harbor.sisys.local/sisys/app:${{ github.sha }}
 

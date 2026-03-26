@@ -350,8 +350,8 @@ jobs:
       uses: docker/login-action@v2
       with:
         registry: harbor.sisys.local
-        username: ${{ secrets.HARBOR_USERNAME }}
-        password: ${{ secrets.HARBOR_PASSWORD }}
+        username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+        password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
     - name: Build and push image
       uses: docker/build-push-action@v4
