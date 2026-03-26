@@ -228,7 +228,7 @@ class TestStorageConfiguration:
 
         storage_classes = stdout.split()
         # 允许存储类：local-path, local-path-ssd, local-path-hdd
-        valid_classes = {"local-path", "local-path-ssd", "local-path-hdd"}
+        valid_classes = {"local-path", "local-path-ssd", "local-path-hdd", "native-hdd-vhdx"}
         for sc in storage_classes:
             assert sc in valid_classes, f"PVC 存储类为 {sc}，期望 {valid_classes}"
 
