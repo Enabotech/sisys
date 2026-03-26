@@ -114,7 +114,7 @@ jobs:
           docker pull ${PYTORCH_IMAGE}
 
       - name: 构建依赖镜像 (Layer 2)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker/Dockerfile.dependency
