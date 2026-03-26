@@ -11,6 +11,7 @@
 #   - 组织级 Runner 自动可用于组织内所有仓库
 #   - 标签：ubuntu-latest,docker,k8s
 #   - **已修复**: 添加 Node.js 运行时支持（解决 "Cannot find: node in PATH" 错误）
+#   - **已修复**: 添加 SSL 证书支持（解决 "x509: certificate signed by unknown authority" 错误）
 # ============================================================
 
 apiVersion: apps/v1
@@ -112,6 +113,12 @@ spec:
                   name: gitea-org-runner-token
                   key: token
 
+            # SSL 证书配置 - 信任自签名证书
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: GIT_SSL_NO_VERIFY
+              value: "false"
+
           # 卷挂载
           volumeMounts:
             # K3s containerd socket（关键！）
@@ -127,6 +134,12 @@ spec:
             - name: runner-config
               mountPath: /etc/act-runner/config.yaml
               subPath: config.yaml
+              readOnly: true
+
+            # SSL 证书挂载
+            - name: ca-certificates
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: ca-certificates.crt
               readOnly: true
 
           # 资源限制
@@ -174,6 +187,12 @@ spec:
         - name: runner-config
           configMap:
             name: gitea-runner-config
+            defaultMode: 0644
+
+        # SSL 证书卷
+        - name: ca-certificates
+          secret:
+            secretName: ca-certificates  # pragma: allowlist secret
             defaultMode: 0644
 
   # volumeClaimTemplates - StatefulSet 核心特性
