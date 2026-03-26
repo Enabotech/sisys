@@ -17,6 +17,10 @@ on:
 
 # 环境变量配置
 env:
+  APP_NAME: sisys-app
+  REGISTRY: harbor.sisys.local
+  IMAGE_NAME: sisys-app
+  ARGOCD_SERVER: argocd.sisys.local
   HARBOR_REGISTRY: harbor.sisys.local
   HARBOR_PROJECT: sisys
   PYTHON_VERSION: "3.11"
@@ -43,29 +47,29 @@ jobs:
     container:
       image: ${DEPENDENCY_IMAGE}
       options: --user root
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Python 环境
         run: |
           python3 --version
           poetry --version
-      
+
       - name: 安装项目依赖
         run: |
           poetry install --no-interaction
-      
+
       - name: Ruff 代码检查
         run: |
           poetry run ruff check .
           poetry run ruff format --check .
-      
+
       - name: MyPy 类型检查
         run: |
           poetry run mypy src/ tests/
-      
+
       - name: 上传质量报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -79,9 +83,10 @@ jobs:
   # ===========================================================================
   # 阶段 2: 单元测试 (pytest + 覆盖率) - 支持 GPU
   # ===========================================================================
-  unit-tests:
+  unit-test:
     name: "🧪 单元测试"
     runs-on: ${{ vars.GPU_RUNNER_LABEL || 'ubuntu-latest' }}
+    needs: code-quality
     container:
       image: ${DEPENDENCY_IMAGE}
       options: --user root
@@ -90,25 +95,25 @@ jobs:
         - /var/run/docker.sock:/var/run/docker.sock
     # GPU 任务调度
     if: ${{ vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[gpu]') || vars.GPU_ENABLED == 'false' }}
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Python 环境
         run: |
           python3 --version
           poetry --version
-      
+
       - name: 安装项目依赖
         run: |
           poetry install --no-interaction
-      
+
       - name: 验证 GPU 可用性 (可选)
         if: ${{ vars.GPU_ENABLED == 'true' }}
         run: |
           python3 -c "import torch; print(f'CUDA 可用：{torch.cuda.is_available()}')" || echo "GPU 不可用，使用 CPU 模式"
-      
+
       - name: 运行单元测试
         run: |
           mkdir -p reports/coverage reports/pytest
@@ -119,11 +124,11 @@ jobs:
             --cov-report=term-missing \
             --junitxml=reports/pytest/unit-tests.xml \
             -v
-      
+
       - name: 检查覆盖率门禁 (≥80%)
         run: |
           poetry run coverage report --fail-under=80
-      
+
       - name: 上传覆盖率报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -131,7 +136,7 @@ jobs:
           name: coverage-report
           path: reports/coverage/
           retention-days: 30
-      
+
       - name: 上传测试结果
         if: always()
         uses: actions/upload-artifact@v4
@@ -143,16 +148,16 @@ jobs:
   # ===========================================================================
   # 阶段 3: 集成测试 (Docker Compose) - 支持 GPU
   # ===========================================================================
-  integration-tests:
+  integration-test:
     name: "🔗 集成测试"
     runs-on: ${{ vars.GPU_RUNNER_LABEL || 'ubuntu-latest' }}
-    needs: [unit-tests]
+    needs: [unit-test]
     container:
       image: ${DEPENDENCY_IMAGE}
       options: --user root --privileged
     # GPU 任务调度
     if: ${{ vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[gpu]') || vars.GPU_ENABLED == 'false' }}
-    
+
     services:
       postgres:
         image: postgres:15-alpine
@@ -162,35 +167,35 @@ jobs:
           POSTGRES_DB: test_db
         ports:
           - 5432:5432
-      
+
       redis:
         image: redis:7-alpine
         ports:
           - 6379:6379
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Python 环境
         run: |
           python3 --version
           poetry --version
-      
+
       - name: 安装项目依赖
         run: |
           poetry install --no-interaction
-      
+
       - name: 等待服务就绪
         run: |
           echo "等待 PostgreSQL 就绪..."
           until pg_isready -h postgres -p 5432 -U test; do sleep 1; done
           echo "PostgreSQL 就绪"
-          
+
           echo "等待 Redis 就绪..."
           until redis-cli -h redis ping | grep -q PONG; do sleep 1; done
           echo "Redis 就绪"
-      
+
       - name: 运行集成测试
         run: |
           mkdir -p reports/integration
@@ -198,7 +203,7 @@ jobs:
             --junitxml=reports/integration/integration-tests.xml \
             -v \
             --tb=short
-      
+
       - name: 上传集成测试报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -213,30 +218,30 @@ jobs:
   security-scan:
     name: "🔒 安全扫描"
     runs-on: ubuntu-latest
-    needs: [code-quality]
+    needs: [unit-test]
     container:
       image: ${DEPENDENCY_IMAGE}
       options: --user root
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Python 环境
         run: |
           python3 --version
           poetry --version
-      
+
       - name: 安装项目依赖
         run: |
           poetry install --no-interaction
-      
+
       - name: Bandit 代码安全扫描
         run: |
           mkdir -p reports/security
           poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
           poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true
-      
+
       - name: Trivy 文件系统扫描
         uses: aquasecurity/trivy-action@master
         with:
@@ -245,7 +250,7 @@ jobs:
           format: 'sarif'
           output: 'reports/security/trivy-fs.sarif'
           severity: 'CRITICAL,HIGH'
-      
+
       - name: 上传安全报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -260,25 +265,25 @@ jobs:
   build-image:
     name: "🏗️ 构建 Docker 镜像"
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, security-scan]
+    needs: [integration-test, security-scan]
     container:
       image: docker:24-dind
       options: --privileged
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: 登录 Harbor 镜像仓库
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.HARBOR_REGISTRY }}
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
-      
+          username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+          password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
+
       - name: 生成镜像标签
         id: meta
         run: |
@@ -287,7 +292,7 @@ jobs:
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           echo "tags=${{ vars.HARBOR_REGISTRY }}/sisys/app:${GIT_SHA},${{ vars.HARBOR_REGISTRY }}/sisys/app:latest" >> $GITHUB_OUTPUT
-      
+
       - name: 构建并推送 Docker 镜像
         uses: docker/build-push-action@v5
         with:
@@ -304,7 +309,7 @@ jobs:
           build-args: |
             DEPENDENCY_IMAGE=${{ env.DEPENDENCY_IMAGE }}
             PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }}
-      
+
       - name: 上传镜像信息
         uses: actions/upload-artifact@v4
         with:
@@ -316,33 +321,33 @@ jobs:
   # ===========================================================================
   # 阶段 6: 镜像推送 (Harbor) - 含自动漏洞扫描
   # ===========================================================================
-  push-and-scan:
+  push-image:
     name: "📤 推送镜像并扫描"
     runs-on: ubuntu-latest
     needs: [build-image]
     container:
       image: ${DEPENDENCY_IMAGE}
       options: --user root
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 获取镜像标签
         id: meta
         run: |
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "image_tag=${{ vars.HARBOR_REGISTRY }}/sisys/app:${GIT_SHA}" >> $GITHUB_OUTPUT
-      
+
       - name: 触发 Harbor 漏洞扫描
         run: |
           echo "触发 Harbor 自动漏洞扫描..."
           # Harbor 会自动扫描新推送的镜像
           # 可通过 API 查询扫描结果
-          curl -k -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+          curl -k -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
             "https://${{ vars.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/app/artifacts" \
             -H "accept: application/json" || echo "扫描已触发"
-      
+
       - name: 验证镜像推送
         run: |
           echo "验证镜像推送成功..."
@@ -351,52 +356,58 @@ jobs:
   # ===========================================================================
   # 阶段 7: 自动部署 (ArgoCD) - 支持 GPU 资源申请
   # ===========================================================================
-  auto-deploy:
+  deploy:
     name: "🚀 自动部署到测试环境"
     runs-on: ubuntu-latest
-    needs: [push-and-scan]
+    needs: [push-image]
     # 仅在 main 分支部署
     if: github.ref == 'refs/heads/main'
     container:
       image: bitnami/kubectl:latest
       options: --user root
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 设置 Kubectl
         run: |
           kubectl version --client
-      
+
       - name: 配置 Kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-      
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
       - name: 更新镜像版本
         run: |
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           kubectl set image deployment/sisys-app \
             app=${{ vars.HARBOR_REGISTRY }}/sisys/app:${GIT_SHA} \
             -n sisys-test || echo "部署更新"
-      
+
       - name: 触发 ArgoCD 同步
         run: |
           echo "触发 ArgoCD 自动同步..."
           # ArgoCD 会自动检测到镜像变更并同步
           # 也可手动触发：argocd app sync sisys-app
-      
+
+          # 使用 ArgoCD API 触发同步
+          curl -k -X POST "https://${{ env.ARGOCD_SERVER }}/api/v1/applications/sisys-app/sync" \
+            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"prune": false, "dryRun": false}' || echo "ArgoCD 同步已触发"
+
       - name: 等待部署就绪
         run: |
           kubectl rollout status deployment/sisys-app -n sisys-test --timeout=300s
-      
+
       - name: 执行健康检查
         run: |
           echo "执行健康检查..."
           kubectl get pods -n sisys-test -l app=sisys-app
           kubectl get svc -n sisys-test -l app=sisys-app
-      
+
       - name: 发送部署通知
         if: always()
         run: |

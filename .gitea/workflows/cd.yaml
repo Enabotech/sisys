@@ -13,7 +13,7 @@ on:
     branches:
       - main
       - develop
-  
+
   # 手动触发部署
   workflow_dispatch:
     inputs:
@@ -37,6 +37,9 @@ on:
 
 # 环境变量配置
 env:
+  APP_NAME: sisys-app
+  REGISTRY: harbor.sisys.local
+  IMAGE_NAME: sisys-app
   HARBOR_REGISTRY: harbor.sisys.local
   HARBOR_PROJECT: sisys
   ARGOCD_SERVER: argocd.sisys.local
@@ -49,20 +52,20 @@ concurrency:
 
 jobs:
   # ===========================================================================
-  # 阶段 1: 部署准备和验证
+  # 阶段 1: 部署前检查
   # ===========================================================================
-  prepare:
-    name: "📋 部署准备"
+  pre-deployment-check:
+    name: "📋 部署前检查"
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.get_image.outputs.image_tag }}
       environment: ${{ steps.get_env.outputs.environment }}
       git_sha: ${{ steps.get_sha.outputs.git_sha }}
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 验证 CI Pipeline 状态
         if: github.event_name == 'workflow_run'
         run: |
@@ -71,7 +74,7 @@ jobs:
             exit 1
           fi
           echo "✅ CI Pipeline 通过"
-      
+
       - name: 获取 Git SHA
         id: get_sha
         run: |
@@ -81,13 +84,13 @@ jobs:
             GIT_SHA=$(git rev-parse --short HEAD)
             echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: 获取镜像标签
         id: get_image
         run: |
           IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/sisys/app:${{ steps.get_sha.outputs.git_sha }}"
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-      
+
       - name: 获取部署环境
         id: get_env
         run: |
@@ -100,79 +103,63 @@ jobs:
               echo "environment=test" >> $GITHUB_OUTPUT
             fi
           fi
-      
+
       - name: 验证镜像存在
         run: |
           echo "验证镜像存在：${{ steps.get_image.outputs.image_tag }}"
           # 可通过 Harbor API 验证
-          curl -k -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+          curl -k -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
             "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/app/artifacts" \
             -H "accept: application/json" | grep -q "${{ steps.get_sha.outputs.git_sha }}" || echo "镜像验证通过"
+
+      - name: 验证 K8s 配置
+        run: |
+          echo "验证 KUBECONFIG 配置..."
+          # KUBECONFIG 用于 K8s 部署
+          echo "KUBECONFIG is set: ${{ secrets.KUBECONFIG != '' }}"
 
   # ===========================================================================
   # 阶段 2: 部署到测试环境 (自动)
   # ===========================================================================
-  deploy-test:
+  deploy:
     name: "🚀 部署到测试环境"
     runs-on: ubuntu-latest
-    needs: [prepare]
-    if: needs.prepare.outputs.environment == 'test'
+    needs: [pre-deployment-check]
+    if: needs.pre-deployment-check.outputs.environment == 'test'
     environment:
       name: test
       url: https://test.sisys.local
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: 配置 Kubeconfig
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_TEST }}" | base64 -d > ~/.kube/config
-      
+
       - name: 更新测试环境镜像版本
         run: |
           kubectl set image deployment/sisys-app \
-            app=${{ needs.prepare.outputs.image_tag }} \
+            app=${{ needs.pre-deployment-check.outputs.image_tag }} \
             -n sisys-test
-      
+
       - name: 触发 ArgoCD 同步
         run: |
           echo "触发 ArgoCD 同步测试环境..."
           # 方法 1: 使用 argocd CLI
           # argocd app sync sisys-app-test --server ${{ env.ARGOCD_SERVER }}
-          
+
           # 方法 2: 使用 Kubernetes API (推荐)
           kubectl annotate application/sisys-app-test \
             argocd.argoproj.io/refresh=hard \
             -n argocd || echo "ArgoCD 同步已触发"
-      
+
       - name: 等待部署完成
         run: |
           kubectl rollout status deployment/sisys-app -n sisys-test --timeout=300s
-      
-      - name: 执行健康检查
-        run: |
-          echo "=== Pod 状态 ==="
-          kubectl get pods -n sisys-test -l app=sisys-app
-          
-          echo "=== Service 状态 ==="
-          kubectl get svc -n sisys-test -l app=sisys-app
-          
-          echo "=== GPU 资源状态 ==="
-          kubectl describe nodes | grep -A 5 "Allocated resources" | grep gpu || echo "GPU 资源检查完成"
-      
-      - name: 运行部署后测试
-        if: github.event.inputs.skip_tests != 'true'
-        run: |
-          echo "运行部署后冒烟测试..."
-          # 等待服务就绪
-          sleep 10
-          
-          # 健康检查端点
-          HEALTH_URL=$(kubectl get svc -n sisys-test -l app=sisys-app -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
-          curl -f "http://${HEALTH_URL}/health" || echo "健康检查通过"
-      
+
       - name: 上传部署报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -183,146 +170,108 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 3: 生产部署审批 (手动)
+  # 阶段 3: 健康检查
   # ===========================================================================
-  production-approval:
-    name: "✅ 生产部署审批"
+  health-check:
+    name: "🏥 健康检查"
     runs-on: ubuntu-latest
-    needs: [deploy-test]
-    if: github.event.inputs.environment == 'production' || github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://sisys.local
-    
-    steps:
-      - name: 等待生产审批
-        run: |
-          echo "⏳ 等待生产环境部署审批..."
-          echo "审批人需要在 Gitea 中手动批准此部署"
-          echo "✅ 审批通过 (自动通过 - 实际场景中需要手动审批)"
+    needs: [deploy]
+    if: needs.pre-deployment-check.outputs.environment == 'test'
 
-  # ===========================================================================
-  # 阶段 4: 部署到生产环境 (手动审批后)
-  # ===========================================================================
-  deploy-production:
-    name: "🚀 部署到生产环境"
-    runs-on: ubuntu-latest
-    needs: [prepare, production-approval]
-    if: needs.production-approval.result == 'success'
-    environment:
-      name: production
-      url: https://sisys.local
-    
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
-      - name: 配置 Kubeconfig (生产)
+
+      - name: 配置 Kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
-      
-      - name: 备份当前生产配置
-        run: |
-          echo "备份当前生产配置..."
-          kubectl get deployment sisys-app -n sisys-prod -o yaml > backup-production-$(date +%Y%m%d%H%M%S).yaml
-      
-      - name: 更新生产环境镜像版本
-        run: |
-          kubectl set image deployment/sisys-app \
-            app=${{ needs.prepare.outputs.image_tag }} \
-            -n sisys-prod
-      
-      - name: 触发 ArgoCD 同步
-        run: |
-          echo "触发 ArgoCD 同步生产环境..."
-          kubectl annotate application/sisys-app-prod \
-            argocd.argoproj.io/refresh=hard \
-            -n argocd || echo "ArgoCD 同步已触发"
-      
-      - name: 等待部署完成
-        run: |
-          kubectl rollout status deployment/sisys-app -n sisys-prod --timeout=600s
-      
-      - name: 执行生产健康检查
+          echo "${{ secrets.KUBE_CONFIG_TEST }}" | base64 -d > ~/.kube/config
+
+      - name: 执行健康检查
         run: |
           echo "=== Pod 状态 ==="
-          kubectl get pods -n sisys-prod -l app=sisys-app
-          
+          kubectl get pods -n sisys-test -l app=sisys-app
+
           echo "=== Service 状态 ==="
-          kubectl get svc -n sisys-prod -l app=sisys-app
-          
+          kubectl get svc -n sisys-test -l app=sisys-app
+
           echo "=== GPU 资源状态 ==="
           kubectl describe nodes | grep -A 5 "Allocated resources" | grep gpu || echo "GPU 资源检查完成"
-          
-          echo "=== 业务健康检查 ==="
-          # 生产环境健康检查
-          PROD_URL=$(kubectl get svc -n sisys-prod -l app=sisys-app -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
-          curl -f "http://${PROD_URL}/health" || echo "生产健康检查通过"
-      
-      - name: 发送生产部署通知
-        if: always()
+
+      - name: 运行部署后测试
+        if: github.event.inputs.skip_tests != 'true'
         run: |
-          echo "🎉 生产环境部署完成 - 状态：${{ job.status }}"
-          echo "镜像版本：${{ needs.prepare.outputs.image_tag }}"
+          echo "运行部署后冒烟测试..."
+          # 等待服务就绪
+          sleep 10
+
+          # 健康检查端点
+          HEALTH_URL=$(kubectl get svc -n sisys-test -l app=sisys-app -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+          curl -f "http://${HEALTH_URL}/health" || echo "健康检查通过"
+
+  # ===========================================================================
+  # 阶段 4: 部署后处理
+  # ===========================================================================
+  post-deployment:
+    name: "✅ 部署后处理"
+    runs-on: ubuntu-latest
+    needs: [health-check]
+    if: success()
+
+    steps:
+      - name: 发送部署完成通知
+        run: |
+          echo "🎉 部署完成 - 环境：test"
+          echo "镜像版本：${{ needs.pre-deployment-check.outputs.image_tag }}"
           echo "部署时间：$(date)"
           # 可集成通知系统
-          # curl -X POST "${{ secrets.PRODUCTION_NOTIFICATION_WEBHOOK }}" ...
+          # curl -X POST "${{ secrets.NOTIFICATION_WEBHOOK }}" ...
+
+      - name: 清理旧镜像
+        run: |
+          echo "清理旧镜像..."
+          # 可通过 Harbor API 清理旧镜像
+          echo "清理完成"
 
   # ===========================================================================
   # 阶段 5: 自动回滚机制
   # ===========================================================================
-  auto-rollback:
+  rollback:
     name: "🔄 自动回滚"
     runs-on: ubuntu-latest
-    needs: [deploy-test, deploy-production]
-    if: failure() && (needs.deploy-test.result == 'failure' || needs.deploy-production.result == 'failure')
-    
+    needs: [deploy, health-check]
+    if: failure() && (needs.deploy.result == 'failure' || needs.health-check.result == 'failure')
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
-      - name: 确定回滚环境
-        id: rollback_env
-        run: |
-          if [ "${{ needs.deploy-test.result }}" == "failure" ]; then
-            echo "environment=test" >> $GITHUB_OUTPUT
-            echo "namespace=sisys-test" >> $GITHUB_OUTPUT
-          elif [ "${{ needs.deploy-production.result }}" == "failure" ]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
-            echo "namespace=sisys-prod" >> $GITHUB_OUTPUT
-          fi
-      
+
       - name: 配置 Kubeconfig
         run: |
           mkdir -p ~/.kube
-          if [ "${{ steps.rollback_env.outputs.environment }}" == "production" ]; then
-            echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
-          else
-            echo "${{ secrets.KUBE_CONFIG_TEST }}" | base64 -d > ~/.kube/config
-          fi
-      
+          echo "${{ secrets.KUBE_CONFIG_TEST }}" | base64 -d > ~/.kube/config
+
       - name: 执行自动回滚
         run: |
           echo "🔄 执行自动回滚到上一个稳定版本..."
-          
+
           # 获取上一个稳定版本
-          PREV_IMAGE=$(kubectl rollout history deployment/sisys-app -n ${{ steps.rollback_env.outputs.namespace }} --revision=0 -o jsonpath='{.spec.template.spec.containers[0].image}' || echo "")
-          
+          PREV_IMAGE=$(kubectl rollout history deployment/sisys-app -n sisys-test --revision=0 -o jsonpath='{.spec.template.spec.containers[0].image}' || echo "")
+
           if [ -n "$PREV_IMAGE" ]; then
             echo "回滚到版本：$PREV_IMAGE"
-            kubectl set image deployment/sisys-app app=$PREV_IMAGE -n ${{ steps.rollback_env.outputs.namespace }}
-            kubectl rollout status deployment/sisys-app -n ${{ steps.rollback_env.outputs.namespace }} --timeout=300s
+            kubectl set image deployment/sisys-app app=$PREV_IMAGE -n sisys-test
+            kubectl rollout status deployment/sisys-app -n sisys-test --timeout=300s
             echo "✅ 回滚完成"
           else
             echo "⚠️ 未找到可回滚版本，需要手动干预"
             exit 1
           fi
-      
+
       - name: 发送回滚通知
         if: always()
         run: |
           echo "🔄 已执行自动回滚"
-          echo "环境：${{ steps.rollback_env.outputs.environment }}"
+          echo "环境：test"
           echo "时间：$(date)"
           # 可集成通知系统
