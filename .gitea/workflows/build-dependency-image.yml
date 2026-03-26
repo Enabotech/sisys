@@ -87,8 +87,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.HARBOR_REGISTRY }}
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
+          username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+          password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
       - name: 生成镜像标签
         id: meta
@@ -162,7 +162,7 @@ jobs:
           # 保留策略：保留最近 5 个版本
 
           # 获取所有镜像标签
-          TAGS=$(curl -k -s -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+          TAGS=$(curl -k -s -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
             "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/dependency/artifacts?with_tag=true" | \
             jq -r '.[].tags[].name' | grep -v 'latest\|weekly' | sort -r)
 
@@ -173,7 +173,7 @@ jobs:
             if [ $COUNT -gt 5 ]; then
               echo "删除旧版本：$TAG"
               # 实际删除操作 (需要 Harbor API 支持)
-              # curl -k -X DELETE -u "${{ secrets.HARBOR_USERNAME }}:${{ secrets.HARBOR_PASSWORD }}" \
+              # curl -k -X DELETE -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
               #   "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/dependency/tags/${TAG}"
             fi
           done

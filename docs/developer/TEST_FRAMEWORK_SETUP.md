@@ -540,8 +540,8 @@ jobs:
             -m "harbor"
         env:
           HARBOR_URL: ${{ secrets.HARBOR_URL }}
-          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          HARBOR_USERNAME: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
