@@ -65,8 +65,8 @@ spec:
             - |
               echo "🔧 Installing Node.js from mirrors..."
 
-              # 使用阿里云镜像源加速 apk 安装
-              sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+              # 使用清华镜像源加速 apk 安装
+              sed -i 's/mirrors.tuna.tsinghua.edu.cn/alpine/g' /etc/apk/repositories
 
               # 安装 nodejs 和 npm
               if apk add --no-cache nodejs npm; then
