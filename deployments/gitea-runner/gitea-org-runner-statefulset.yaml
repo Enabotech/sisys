@@ -59,34 +59,51 @@ spec:
           imagePullPolicy: IfNotPresent
 
           # Runner 启动参数 - 使用自定义启动脚本
+          # 修复：使用清华镜像源 (HTTP) 和正确的 Alpine 版本 (v3.21)
           command:
             - /bin/sh
             - -c
             - |
-              echo "🔧 Installing Node.js from mirrors..."
-
-              # 使用清华镜像源加速 apk 安装
-              sed -i 's/mirrors.tuna.tsinghua.edu.cn/alpine/g' /etc/apk/repositories
-
-              # 安装 nodejs 和 npm
+              echo "🔧 Setting up Alpine repositories..."
+              
+              # 使用清华镜像源 (HTTP 避免 HTTPS 证书问题)
+              # Alpine 3.23 太新，降级到稳定的 v3.21
+              cat > /etc/apk/repositories << 'EOF'
+              http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/main
+              http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/community
+              EOF
+              
+              # 更新仓库索引
+              echo "📦 Updating package index..."
+              apk update
+              
+              # 安装 Node.js (Alpine 3.21 使用 nodejs 包)
+              echo "🔧 Installing Node.js..."
               if apk add --no-cache nodejs npm; then
                 echo "✅ Node.js version: $(node --version)"
                 echo "✅ npm version: $(npm --version)"
               else
-                echo "⚠️ apk add failed, continuing anyway..."
+                echo "⚠️ Node.js install failed, trying edge repository..."
+                # 尝试从 edge 仓库安装
+                echo "http://mirrors.tuna.tsinghua.edu.cn/alpine/edge/community" >> /etc/apk/repositories
+                apk update
+                apk add --no-cache nodejs npm || echo "⚠️ Still failed, workflows requiring node will fail"
               fi
-
-              # 安装 Python 3.11 和 pip
-              echo "🔧 Installing Python 3.11..."
-              if apk add --no-cache python3 py3-pip; then
+              
+              # 安装 Python 3 (使用 python3 包名)
+              echo "🔧 Installing Python..."
+              if apk add --no-cache python3 py3-pip py3-setuptools; then
                 echo "✅ Python version: $(python3 --version)"
-                echo "✅ pip version: $(pip3 --version)"
                 # 创建 python 符号链接（某些 actions 需要）
                 ln -sf /usr/bin/python3 /usr/bin/python
               else
                 echo "⚠️ Python install failed, continuing anyway..."
               fi
-
+              
+              # 安装 git 和 curl (actions 需要)
+              echo "🔧 Installing git and curl..."
+              apk add --no-cache git curl ca-certificates
+              
               echo "🚀 Starting act_runner..."
               exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
 

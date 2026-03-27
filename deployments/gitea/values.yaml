@@ -137,7 +137,7 @@ gitea:
 
     actions:
       ENABLED: true  # 启用 Gitea Actions (Story 0.9 准备)
-      DEFAULT_ACTIONS_URL: github
+      DEFAULT_ACTIONS_URL: self
 
 # PostgreSQL 子 Chart 配置
 postgresql:
