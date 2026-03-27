@@ -258,8 +258,8 @@ data:
 
     # 容器配置
     container:
-      # 工作镜像
-      image: docker.gitea.com/runner-images:ubuntu-latest
+      # 工作镜像（使用本地 Harbor 镜像，包含 Docker 和 Buildx）
+      image: harbor.sisys.local/sisys/runner-images:ubuntu-act-latest
       # 网络模式
       network: host
       # 工作目录
