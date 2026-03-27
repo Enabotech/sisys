@@ -1,0 +1,52 @@
+USER-SUPPLIED VALUES:
+api:
+  dashboard: true
+  insecure: false
+deployment:
+  enabled: true
+  podAnnotations: {}
+  podLabels: {}
+  replicas: 1
+logs:
+  access:
+    enabled: true
+    format: common
+  general:
+    format: common
+    level: INFO
+ports:
+  web:
+    expose:
+      default: true
+    exposedPort: 80
+    port: 80
+    protocol: TCP
+  websecure:
+    expose:
+      default: true
+    exposedPort: 443
+    port: 443
+    protocol: TCP
+providers:
+  kubernetesCRD:
+    allowCrossNamespace: true
+    allowEmptyServices: false
+    allowExternalNameServices: true
+    enabled: true
+  kubernetesIngress:
+    allowEmptyServices: false
+    allowExternalNameServices: true
+    enabled: true
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  annotations: {}
+  enabled: true
+  labels: {}
+  spec: {}
+  type: LoadBalancer

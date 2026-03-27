@@ -92,7 +92,8 @@ gitea:
       ALLOWED_HOST_LIST: external,loopback
 
     actions:
-      ENABLED: false  # 暂时禁用 Actions
+      ENABLED: true
+      DEFAULT_ACTIONS_URL: self
 
 # 持久化存储
 persistence:

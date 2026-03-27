@@ -1,0 +1,267 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "10"
+    meta.helm.sh/release-name: gitea
+    meta.helm.sh/release-namespace: gitea
+  creationTimestamp: "2026-03-13T13:17:25Z"
+  generation: 10
+  labels:
+    app: gitea
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gitea
+    app.kubernetes.io/version: 1.25.4
+    helm.sh/chart: gitea-12.5.0
+    version: 1.25.4
+  name: gitea
+  namespace: gitea
+  resourceVersion: "1657714"
+  uid: c0d1f9eb-c303-4abe-8108-596e141ec66e
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: gitea
+      app.kubernetes.io/name: gitea
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 3f9ec0b61d4e421555cd0ef3d816b6a94e782449f645257107fca68456bfb67d
+        kubectl.kubernetes.io/restartedAt: "2026-03-26T13:58:43+08:00"
+      labels:
+        app: gitea
+        app.kubernetes.io/instance: gitea
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gitea
+        app.kubernetes.io/version: 1.25.4
+        helm.sh/chart: gitea-12.5.0
+        version: 1.25.4
+    spec:
+      containers:
+      - env:
+        - name: SSH_LISTEN_PORT
+          value: "2222"
+        - name: SSH_PORT
+          value: "22"
+        - name: GITEA_APP_INI
+          value: /data/gitea/conf/app.ini
+        - name: GITEA_CUSTOM
+          value: /data/gitea
+        - name: GITEA_WORK_DIR
+          value: /data
+        - name: GITEA_TEMP
+          value: /tmp/gitea
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              divisor: "1"
+              resource: limits.cpu
+        - name: TMPDIR
+          value: /tmp/gitea
+        - name: HOME
+          value: /data/gitea/git
+        - name: GITEA_ADMIN_PASSWORD
+          value: Admin@123456
+        - name: GITEA_ADMIN_PASSWORD_MODE
+          value: initialOnlyRequireReset
+        image: docker.gitea.com/gitea/gitea:1.25.4-rootless
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 10
+          initialDelaySeconds: 200
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 1
+        name: gitea
+        ports:
+        - containerPort: 2222
+          name: ssh
+          protocol: TCP
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /tmp
+          name: temp
+        - mountPath: /data
+          name: data
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - /usr/sbinx/init_directory_structure.sh
+        env:
+        - name: GITEA_APP_INI
+          value: /data/gitea/conf/app.ini
+        - name: GITEA_CUSTOM
+          value: /data/gitea
+        - name: GITEA_WORK_DIR
+          value: /data
+        - name: GITEA_TEMP
+          value: /tmp/gitea
+        - name: GITEA_ADMIN_PASSWORD
+          value: Admin@123456
+        - name: GITEA_ADMIN_PASSWORD_MODE
+          value: initialOnlyRequireReset
+        image: docker.gitea.com/gitea/gitea:1.25.4-rootless
+        imagePullPolicy: IfNotPresent
+        name: init-directories
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/sbinx
+          name: init
+        - mountPath: /tmp
+          name: temp
+        - mountPath: /data
+          name: data
+      - command:
+        - /usr/sbinx/config_environment.sh
+        env:
+        - name: GITEA_APP_INI
+          value: /data/gitea/conf/app.ini
+        - name: GITEA_CUSTOM
+          value: /data/gitea
+        - name: GITEA_WORK_DIR
+          value: /data
+        - name: GITEA_TEMP
+          value: /tmp/gitea
+        - name: TMP_EXISTING_ENVS_FILE
+          value: /tmp/existing-envs
+        - name: ENV_TO_INI_MOUNT_POINT
+          value: /env-to-ini-mounts
+        - name: GITEA_ADMIN_PASSWORD
+          value: Admin@123456
+        - name: GITEA_ADMIN_PASSWORD_MODE
+          value: initialOnlyRequireReset
+        image: docker.gitea.com/gitea/gitea:1.25.4-rootless
+        imagePullPolicy: IfNotPresent
+        name: init-app-ini
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/sbinx
+          name: config
+        - mountPath: /tmp
+          name: temp
+        - mountPath: /data
+          name: data
+        - mountPath: /env-to-ini-mounts/inlines/
+          name: inline-config-sources
+      - command:
+        - /usr/sbinx/configure_gitea.sh
+        env:
+        - name: GITEA_APP_INI
+          value: /data/gitea/conf/app.ini
+        - name: GITEA_CUSTOM
+          value: /data/gitea
+        - name: GITEA_WORK_DIR
+          value: /data
+        - name: GITEA_TEMP
+          value: /tmp/gitea
+        - name: HOME
+          value: /data/gitea/git
+        - name: GITEA_ADMIN_USERNAME
+          value: gitea_admin
+        - name: GITEA_ADMIN_PASSWORD
+          value: r8sA8CPHD9!bt6d
+        - name: GITEA_ADMIN_PASSWORD_MODE
+          value: initialOnlyRequireReset
+        image: docker.gitea.com/gitea/gitea:1.25.4-rootless
+        imagePullPolicy: IfNotPresent
+        name: configure-gitea
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          runAsUser: 1000
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /usr/sbinx
+          name: init
+        - mountPath: /tmp
+          name: temp
+        - mountPath: /data
+          name: data
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: init
+        secret:
+          defaultMode: 110
+          secretName: gitea-init
+      - name: config
+        secret:
+          defaultMode: 110
+          secretName: gitea
+      - name: inline-config-sources
+        secret:
+          defaultMode: 420
+          secretName: gitea-inline-config
+      - emptyDir: {}
+        name: temp
+      - name: data
+        persistentVolumeClaim:
+          claimName: gitea-shared-storage
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-03-13T13:17:25Z"
+    lastUpdateTime: "2026-03-26T05:59:00Z"
+    message: ReplicaSet "gitea-67dc5f46" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-03-27T10:23:44Z"
+    lastUpdateTime: "2026-03-27T10:23:44Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 10
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

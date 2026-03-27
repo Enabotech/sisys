@@ -1,0 +1,17 @@
+# Traefik 资源配置调整
+# 日期：2026-03-27
+# 目的：提升生产环境资源限制
+resources:
+  requests:
+    cpu: 300m
+    memory: 384Mi
+  limits:
+    cpu: 1500m
+    memory: 1536Mi
+# Go Runtime 配置
+env:
+  - name: GOMEMLIMIT
+    value: "1300MiB"
+  - name: GOGC
+    value: "75"
+

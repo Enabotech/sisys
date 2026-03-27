@@ -81,7 +81,24 @@ jobs:
         run: echo "dependencies_changed=true" >> $GITHUB_OUTPUT
 
       - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        # 直接从本地 Gitea 下载 buildx 二进制，避免访问 GitHub
+        run: |
+          # 创建插件目录
+          mkdir -p ~/.docker/cli-plugins
+          
+          # 从本地 Gitea 下载 buildx
+          curl -L https://gitea.sisys.local/docker/buildx/releases/download/v0.32.1/buildx-v0.32.1.linux-amd64 \
+            -o ~/.docker/cli-plugins/docker-buildx
+          
+          # 添加执行权限
+          chmod +x ~/.docker/cli-plugins/docker-buildx
+          
+          # 创建并使用 builder 实例（关键！）
+          docker buildx create --use --name gitea-builder --driver docker-container
+          
+          # 验证
+          docker buildx version
+          docker buildx ls
 
       - name: 登录 Harbor 镜像仓库
         uses: docker/login-action@v3
