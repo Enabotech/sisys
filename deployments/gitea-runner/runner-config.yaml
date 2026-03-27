@@ -2,7 +2,6 @@
 # Gitea Runner 配置文件
 # ============================================================
 # Story: 0-8-gitea-runner-configuration
-# 问题修复：Runner 重复注册问题
 #
 # 说明：
 #   - 此配置文件定义 Runner 的行为
@@ -17,7 +16,7 @@ metadata:
   namespace: gitea-actions
   labels:
     app: gitea-org-runner
-    story: 0-8
+    story: "0-8"
 data:
   config.yaml: |
     # Runner 配置
@@ -37,14 +36,33 @@ data:
       format: text
       output: stdout
 
-    # 容器配置
+    # 容器配置（Docker Executor 模式）
     container:
-      # 工作镜像
+      # 工作镜像（使用本地 Harbor 镜像，包含 Docker 和 Buildx）
       image: harbor.sisys.local/sisys/runner-images:ubuntu-act-latest
+      
       # 网络模式
       network: host
+      
       # 工作目录
       workdir: /workspace
+      
+      # Docker 选项（关键！启用 Docker in Docker）
+      options: |
+        --privileged
+        --tmpfs /tmp
+        --tmpfs /var/tmp
+      
+      # 环境变量
+      env:
+        - DOCKER_HOST=unix:///var/run/docker.sock
+        - DOCKER_TLS_CERTDIR=
+      
+      # 卷挂载（关键！挂载 docker.sock 到 Job 容器）
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /workspace:/workspace
+        - /tmp:/tmp
 
     # 缓存配置
     cache:
