@@ -1,0 +1,271 @@
+apiVersion: v1
+items:
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      description: ArgoCD Dex OIDC IngressRoute
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{"description":"ArgoCD Dex OIDC IngressRoute"},"labels":{"app":"argocd","story":"0.7"},"name":"argocd-dex","namespace":"argocd"},"spec":{"entryPoints":["websecure"],"routes":[{"kind":"Rule","match":"Host(`argocd.sisys.local`) \u0026\u0026 PathPrefix(`/dex`)","services":[{"name":"argocd-dex-server","port":5556}]}]}}
+    creationTimestamp: "2026-03-15T11:38:36Z"
+    generation: 1
+    labels:
+      app: argocd
+      story: "0.7"
+    name: argocd-dex
+    namespace: argocd
+    resourceVersion: "508319"
+    uid: 5b429bb3-aaf2-43db-bfac-8c9fa03b4021
+  spec:
+    entryPoints:
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`argocd.sisys.local`) && PathPrefix(`/dex`)
+      services:
+      - name: argocd-dex-server
+        port: 5556
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      description: ArgoCD Web 界面 IngressRoute
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{"description":"ArgoCD Web 界面 IngressRoute"},"labels":{"app":"argocd","story":"0.7"},"name":"argocd-server","namespace":"argocd"},"spec":{"entryPoints":["websecure"],"routes":[{"kind":"Rule","match":"Host(`argocd.sisys.local`)","services":[{"name":"argocd-server","passHostHeader":true,"port":80,"serversTransport":"argocd-http"}]}],"tls":{"secretName":"argocd-tls-secret"}}}
+    creationTimestamp: "2026-03-15T12:53:06Z"
+    generation: 2
+    labels:
+      app: argocd
+      story: "0.7"
+    name: argocd-server
+    namespace: argocd
+    resourceVersion: "521259"
+    uid: e8ef2067-d0f3-4da2-a4c8-399949ec03c5
+  spec:
+    entryPoints:
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`argocd.sisys.local`)
+      services:
+      - name: argocd-server
+        passHostHeader: true
+        port: 80
+        serversTransport: argocd-http
+    tls:
+      secretName: argocd-tls-secret
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      description: Harbor 镜像仓库路由配置
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{"description":"Harbor 镜像仓库路由配置","managed-by":"kustomize","story":"0.6-harbor-image-registry"},"labels":{"app":"harbor","story":"0.6"},"name":"harbor-ingressroute","namespace":"harbor"},"spec":{"entryPoints":["websecure"],"routes":[{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 Path(`/c/login`)","priority":100,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/c/portal/login`)","priority":100,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/c/`)","priority":90,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/api/`)","priority":90,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/service/`)","priority":90,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/v2/`)","priority":90,"services":[{"name":"harbor-core","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/harbor/`)","priority":10,"services":[{"name":"harbor-portal","port":80,"scheme":"http"}]},{"kind":"Rule","match":"Host(`harbor.sisys.local`) \u0026\u0026 PathPrefix(`/`)","priority":5,"services":[{"name":"harbor-portal","port":80,"scheme":"http"}]}],"tls":{"secretName":"harbor-tls-secret"}}}
+      managed-by: kustomize
+      story: 0.6-harbor-image-registry
+    creationTimestamp: "2026-03-17T04:11:51Z"
+    generation: 4
+    labels:
+      app: harbor
+      story: "0.6"
+    name: harbor-ingressroute
+    namespace: harbor
+    resourceVersion: "676721"
+    uid: 69764d1c-82be-4175-a44f-b989d821dbf8
+  spec:
+    entryPoints:
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && Path(`/c/login`)
+      priority: 100
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/c/portal/login`)
+      priority: 100
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/c/`)
+      priority: 90
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/api/`)
+      priority: 90
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/service/`)
+      priority: 90
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/v2/`)
+      priority: 90
+      services:
+      - name: harbor-core
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/harbor/`)
+      priority: 10
+      services:
+      - name: harbor-portal
+        port: 80
+        scheme: http
+    - kind: Rule
+      match: Host(`harbor.sisys.local`) && PathPrefix(`/`)
+      priority: 5
+      services:
+      - name: harbor-portal
+        port: 80
+        scheme: http
+    tls:
+      secretName: harbor-tls-secret
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"argocd-grpc-web","namespace":"argocd"},"spec":{"grpcWeb":{}}}
+    creationTimestamp: "2026-03-17T09:08:35Z"
+    generation: 1
+    name: argocd-grpc-web
+    namespace: argocd
+    resourceVersion: "711173"
+    uid: f7eb055e-2ee4-42cf-bad1-1c3a6ab18c54
+  spec:
+    grpcWeb: {}
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"argocd-headers","namespace":"argocd"},"spec":{"headers":{"customRequestHeaders":{"X-Forwarded-Proto":"https"},"stsIncludeSubdomains":true,"stsPreload":true,"stsSeconds":31536000}}}
+    creationTimestamp: "2026-03-15T11:38:36Z"
+    generation: 2
+    name: argocd-headers
+    namespace: argocd
+    resourceVersion: "510388"
+    uid: 82e42db6-4b70-446c-bde7-bb731c70e9e7
+  spec:
+    headers:
+      customRequestHeaders:
+        X-Forwarded-Proto: https
+      stsIncludeSubdomains: true
+      stsPreload: true
+      stsSeconds: 31536000
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"gitea-secure-headers","namespace":"gitea"},"spec":{"headers":{"contentTypeNosniff":true,"customFrameOptionsValue":"SAMEORIGIN","referrerPolicy":"strict-origin-when-cross-origin","stsIncludeSubdomains":true,"stsPreload":true,"stsSeconds":31536000}}}
+    creationTimestamp: "2026-03-13T13:35:29Z"
+    generation: 2
+    name: gitea-secure-headers
+    namespace: gitea
+    resourceVersion: "711174"
+    uid: 01d3801d-c41c-45c8-9a3a-1df2a7544be2
+  spec:
+    headers:
+      contentTypeNosniff: true
+      customFrameOptionsValue: SAMEORIGIN
+      referrerPolicy: strict-origin-when-cross-origin
+      stsIncludeSubdomains: true
+      stsPreload: true
+      stsSeconds: 31536000
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"gitea-secure-headers","namespace":"traefik"},"spec":{"headers":{"contentTypeNosniff":true,"customFrameOptionsValue":"SAMEORIGIN","referrerPolicy":"strict-origin-when-cross-origin","stsIncludeSubdomains":true,"stsPreload":true,"stsSeconds":31536000}}}
+    creationTimestamp: "2026-03-17T09:17:29Z"
+    generation: 1
+    name: gitea-secure-headers
+    namespace: traefik
+    resourceVersion: "712776"
+    uid: 9078b2c5-e21f-4939-b792-a697d1380054
+  spec:
+    headers:
+      contentTypeNosniff: true
+      customFrameOptionsValue: SAMEORIGIN
+      referrerPolicy: strict-origin-when-cross-origin
+      stsIncludeSubdomains: true
+      stsPreload: true
+      stsSeconds: 31536000
+- apiVersion: traefik.io/v1alpha1
+  kind: TLSOption
+  metadata:
+    annotations:
+      description: 强制 TLS 1.3，禁用 TLS 1.2 及以下版本
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"TLSOption","metadata":{"annotations":{"description":"强制 TLS 1.3，禁用 TLS 1.2 及以下版本","managed-by":"kustomize"},"labels":{"app":"harbor","story":"0.6"},"name":"default-tls-options","namespace":"default"},"spec":{"cipherSuites":["TLS_AES_128_GCM_SHA256","TLS_AES_256_GCM_SHA384","TLS_CHACHA20_POLY1305_SHA256"],"maxVersion":"VersionTLS13","minVersion":"VersionTLS13","preferServerCipherSuites":true,"sniStrict":true}}
+      managed-by: kustomize
+    creationTimestamp: "2026-03-17T04:11:57Z"
+    generation: 1
+    labels:
+      app: harbor
+      story: "0.6"
+    name: default-tls-options
+    namespace: default
+    resourceVersion: "673932"
+    uid: 829f8377-dbe0-497b-8419-8a26aa39591b
+  spec:
+    cipherSuites:
+    - TLS_AES_128_GCM_SHA256
+    - TLS_AES_256_GCM_SHA384
+    - TLS_CHACHA20_POLY1305_SHA256
+    maxVersion: VersionTLS13
+    minVersion: VersionTLS13
+    preferServerCipherSuites: true
+    sniStrict: true
+- apiVersion: traefik.io/v1alpha1
+  kind: TLSOption
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"TLSOption","metadata":{"annotations":{},"name":"default-tls-options","namespace":"traefik"},"spec":{"cipherSuites":["TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"],"minVersion":"VersionTLS12"}}
+    creationTimestamp: "2026-03-17T09:05:57Z"
+    generation: 1
+    name: default-tls-options
+    namespace: traefik
+    resourceVersion: "710676"
+    uid: 96b10ce3-5ea9-4986-b52d-97276e1f2800
+  spec:
+    cipherSuites:
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+    minVersion: VersionTLS12
+- apiVersion: traefik.io/v1alpha1
+  kind: ServersTransport
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"ServersTransport","metadata":{"annotations":{},"name":"argocd-http","namespace":"argocd"},"spec":{"insecureSkipVerify":true}}
+    creationTimestamp: "2026-03-15T12:05:08Z"
+    generation: 1
+    name: argocd-http
+    namespace: argocd
+    resourceVersion: "512835"
+    uid: 2a350d0b-2fd6-4dc6-9e23-5b5c1c3a5c79
+  spec:
+    insecureSkipVerify: true
+kind: List
+metadata:
+  resourceVersion: ""
