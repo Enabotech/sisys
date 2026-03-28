@@ -47,7 +47,6 @@ data:
       # 工作目录
       workdir: /workspace
       
-      # Docker 选项（关键！启用 Docker in Docker）
       options: |
         --privileged
         --tmpfs /tmp
