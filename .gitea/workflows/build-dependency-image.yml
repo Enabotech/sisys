@@ -45,11 +45,8 @@ jobs:
   build-dependency-image:
     name: "📦 构建依赖镜像"
     runs-on: ubuntu-latest
-    # 使用 Kaniko 进行无守护进程镜像构建
-    # 使用阿里云镜像源替代 gcr.io（国内可访问）
-    container:
-      image: registry.cn-hangzhou.aliyuncs.com/acs/kaniko:latest
-      options: --user root
+    # 不指定 container，让 act_runner 决定执行方式
+    # 步骤将直接在 Runner 容器内执行
 
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
@@ -85,25 +82,23 @@ jobs:
 
       - name: 设置 Docker Buildx
         run: |
-          echo "⚠️  使用 Kaniko 进行镜像构建，无需 Docker Buildx"
-          echo "Kaniko 版本:"
-          /kaniko/executor --version || echo "Kaniko 已就绪"
+          echo "检查 Docker 连接..."
+          # 验证 Docker socket 可访问
+          if command -v docker &> /dev/null; then
+            echo "✅ Docker 命令可用"
+            docker version
+            # 尝试使用 docker build (不依赖 buildx)
+            echo "ℹ️  使用 docker build 进行镜像构建"
+          else
+            echo "❌ Docker 命令不可用"
+            exit 1
+          fi
 
       - name: 登录 Harbor 镜像仓库
         run: |
-          # 创建 Kaniko Docker 配置
-          mkdir -p /kaniko/.docker
-          cat > /kaniko/.docker/config.json << DOCKER_CONFIG
-          {
-            "auths": {
-              "${{ env.HARBOR_REGISTRY }}": {
-                "username": "${{ secrets.HARBOR_ROBOT_USERNAME }}",
-                "password": "${{ secrets.HARBOR_ROBOT_PASSWORD }}"
-              }
-            }
-          }
-          DOCKER_CONFIG
-          echo "✅ Harbor 登录配置完成"
+          echo "登录 Harbor: ${{ env.HARBOR_REGISTRY }}"
+          echo "${{ secrets.HARBOR_ROBOT_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} -u "${{ secrets.HARBOR_ROBOT_USERNAME }}" --password-stdin
+          echo "✅ Harbor 登录成功"
 
       - name: 生成镜像标签
         id: meta
@@ -125,25 +120,30 @@ jobs:
 
       - name: 拉取基础镜像 (Layer 1)
         run: |
-          echo "ℹ️  Kaniko 会自动拉取基础镜像，无需手动拉取"
-          echo "基础镜像：${PYTORCH_IMAGE}"
+          echo "拉取 PyTorch 基础镜像..."
+          docker pull ${PYTORCH_IMAGE}
 
       - name: 构建依赖镜像 (Layer 2)
         run: |
-          echo "🔨 使用 Kaniko 构建依赖镜像..."
-          /kaniko/executor \
-            --context ${{ github.workspace }} \
-            --dockerfile ${{ github.workspace }}/docker/Dockerfile.dependency \
-            --destination ${{ steps.meta.outputs.image_tag }} \
-            --destination ${{ steps.meta.outputs.latest_tag }} \
-            --destination ${{ steps.meta.outputs.weekly_tag }} \
+          echo "🔨 使用 docker build 构建依赖镜像..."
+          GIT_SHA=${{ steps.git_info.outputs.git_sha }}
+          
+          docker build -f ./docker/Dockerfile.dependency \
+            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA} \
+            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest \
+            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:weekly-$(date +%Y%m%d) \
             --build-arg PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }} \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg POETRY_VERSION=${{ env.POETRY_VERSION }} \
-            --cache=true \
-            --cache-repo ${{ env.HARBOR_REGISTRY }}/sisys/dependency-cache \
-            --compressed-caching=false \
-            --verbosity=info
+            --progress=plain \
+            .
+          
+          echo "推送镜像到 Harbor..."
+          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA}
+          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest
+          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:weekly-$(date +%Y%m%d)
+          
+          echo "✅ 镜像构建并推送成功"
 
       - name: 验证镜像构建
         run: |
