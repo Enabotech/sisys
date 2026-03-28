@@ -35,7 +35,7 @@ env:
   PYTHON_VERSION: "3.11"
   POETRY_VERSION: "2.3.2"
   # 预构建镜像配置
-  DEPENDENCY_IMAGE: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:${{ github.sha }}
+  DEPENDENCY_IMAGE: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:latest
   PYTORCH_IMAGE: ${{ vars.HARBOR_REGISTRY }}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
   # GPU 配置
   GPU_ENABLED: ${{ vars.GPU_ENABLED || 'false' }}
