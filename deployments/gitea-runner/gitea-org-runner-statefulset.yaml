@@ -166,6 +166,11 @@ spec:
               mountPath: /var/run/docker.sock
               readOnly: false
 
+            # Docker 配置 (Harbor 证书)
+            - name: docker-config
+              mountPath: /etc/docker
+              readOnly: true
+
             # Runner 持久化配置目录
             - name: runner-data
               mountPath: /data
@@ -217,11 +222,17 @@ spec:
 
       # 卷配置
       volumes:
-        # Docker socket (关键！使用宿主机 Docker 而非 containerd)
+        # Docker socket (关键！)
         - name: docker-sock
           hostPath:
             path: /var/run/docker.sock
             type: Socket
+
+        # Docker 配置 (包含 Harbor 证书和认证)
+        - name: docker-config
+          hostPath:
+            path: /etc/docker
+            type: DirectoryOrCreate
 
         # Runner 配置文件（ConfigMap）
         - name: runner-config
