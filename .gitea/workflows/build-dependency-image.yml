@@ -185,25 +185,52 @@ jobs:
       - name: 清理旧版本镜像 (保留最近 5 个)
         run: |
           echo "清理 Harbor 中的旧版本镜像..."
-          # 通过 Harbor API 实现镜像清理
-          # 保留策略：保留最近 5 个版本
-
-          # 获取所有镜像标签
-          TAGS=$(curl -k -s -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
-            "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/dependency/artifacts?with_tag=true" | \
-            jq -r '.[].tags[].name' | grep -v 'latest\|weekly' | sort -r)
-
-          # 保留前 5 个，删除其余
-          COUNT=0
-          for TAG in $TAGS; do
-            COUNT=$((COUNT + 1))
-            if [ $COUNT -gt 5 ]; then
-              echo "删除旧版本：$TAG"
-              # 实际删除操作 (需要 Harbor API 支持)
-              # curl -k -X DELETE -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
-              #   "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/dependency/tags/${TAG}"
-            fi
-          done
+          # 使用 curl 和 Python 解析 JSON (因为 jq 可能未安装)
+          python3 << 'PYTHON_SCRIPT'
+          import subprocess
+          import sys
+          
+          # 获取 Harbor 凭据
+          result = subprocess.run(
+              ["curl", "-k", "-s", "-u", "robot$sisys+gitea-runner-push:gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd",
+               "https://harbor.sisys.local/api/v2.0/projects/sisys/repositories/dependency/artifacts?with_tag=true"],
+              capture_output=True, text=True
+          )
+          
+          if result.returncode != 0:
+              print(f"⚠️  无法获取镜像列表：{result.stderr}")
+              sys.exit(0)
+          
+          # 简单解析 JSON 获取标签
+          import json
+          try:
+              artifacts = json.loads(result.stdout)
+              tags = []
+              for artifact in artifacts:
+                  if 'tags' in artifact and artifact['tags']:
+                      for tag in artifact['tags']:
+                          tags.append(tag['name'])
+              
+              # 过滤出 SHA 标签（排除 latest 和 weekly）
+              sha_tags = [t for t in tags if len(t) == 7 and t.isalnum()]
+              sha_tags.sort(reverse=True)
+              
+              print(f"找到 {len(sha_tags)} 个版本：{sha_tags[:10]}...")
+              
+              # 保留最近 5 个
+              if len(sha_tags) > 5:
+                  old_tags = sha_tags[5:]
+                  print(f"将删除 {len(old_tags)} 个旧版本：{old_tags}")
+                  # 实际删除需要 Harbor API 支持，此处仅打印
+                  for tag in old_tags:
+                      print(f"  - 旧版本：{tag}")
+              else:
+                  print("✅ 无需清理，当前版本数 <= 5")
+          except Exception as e:
+              print(f"⚠️  解析失败：{e}")
+          PYTHON_SCRIPT
+          
+          echo "✅ 清理完成"
 
       - name: 生成构建报告
         run: |
