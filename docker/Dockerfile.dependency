@@ -33,6 +33,9 @@ RUN python3 --version && \
 # ===========================================================================
 FROM base AS dependencies
 
+# 重新声明 ARG (在 FROM 之后需要重新声明才能使用)
+ARG POETRY_VERSION
+
 # 设置工作目录
 WORKDIR /app
 
