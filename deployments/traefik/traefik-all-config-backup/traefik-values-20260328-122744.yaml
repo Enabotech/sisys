@@ -1,4 +1,3 @@
-USER-SUPPLIED VALUES:
 api:
   dashboard: true
   insecure: false
@@ -7,6 +6,11 @@ deployment:
   podAnnotations: {}
   podLabels: {}
   replicas: 1
+env:
+- name: GOMEMLIMIT
+  value: 1300MiB
+- name: GOGC
+  value: "75"
 logs:
   access:
     enabled: true
@@ -39,11 +43,11 @@ providers:
     enabled: true
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 1500m
+    memory: 1536Mi
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 300m
+    memory: 384Mi
 service:
   annotations: {}
   enabled: true
