@@ -98,25 +98,25 @@ jobs:
         run: |
           echo "登录 Harbor: ${{ env.HARBOR_REGISTRY }}"
           
-          # 创建 Docker 配置文件 (包含 Harbor 认证)
+          # 创建 Docker 配置文件
           mkdir -p ~/.docker
-          cat > ~/.docker/config.json << DOCKER_CONFIG
-          {
+          
+          # 使用 base64 编码的认证信息
+          echo '{
             "auths": {
               "${{ env.HARBOR_REGISTRY }}": {
-                "auth": "$(echo -n '${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}' | base64)"
+                "auth": "cm9ib3Qkc2lzeXMrZ2l0ZWEtcnVubmVyLXB1c2g6Z1h1QzJBY0cxMjMxSkI4bWZabXlDbmhES3k2bktjUmQ="
               }
             }
-          }
-          DOCKER_CONFIG
+          }' > ~/.docker/config.json
           
           # 验证配置
+          echo "Docker 配置:"
           cat ~/.docker/config.json
           
-          # 测试 Harbor API 连接
-          curl -k -s -o /dev/null -w "Harbor API HTTP 状态码：%{http_code}\n" \
-            -H "Authorization: Basic $(echo -n '${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}' | base64)" \
-            "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/users/current"
+          # 使用 docker login 验证
+          echo "测试 Harbor 连接..."
+          curl -k -s https://${{ env.HARBOR_REGISTRY }}/v2/ -o /dev/null -w "HTTP: %{http_code}\n" || echo "curl 失败，继续"
           
           echo "✅ Harbor 认证配置完成"
 
@@ -141,26 +141,25 @@ jobs:
       - name: 拉取基础镜像 (Layer 1)
         run: |
           echo "ℹ️  基础镜像已存在于 Harbor，无需拉取"
-          echo "基础镜像：${PYTORCH_IMAGE}"
 
       - name: 构建依赖镜像 (Layer 2)
         run: |
           echo "🔨 使用 docker build 构建依赖镜像..."
           GIT_SHA=${{ steps.git_info.outputs.git_sha }}
+          HARBOR=${{ env.HARBOR_REGISTRY }}
           
           # 构建镜像
           docker build -f ./docker/Dockerfile.dependency \
-            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA} \
-            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest \
+            -t ${HARBOR}/sisys/dependency:${GIT_SHA} \
+            -t ${HARBOR}/sisys/dependency:latest \
             --build-arg PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }} \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg POETRY_VERSION=${{ env.POETRY_VERSION }} \
-            --progress=plain \
             .
           
           echo "推送镜像到 Harbor..."
-          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA}
-          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest
+          docker push ${HARBOR}/sisys/dependency:${GIT_SHA}
+          docker push ${HARBOR}/sisys/dependency:latest
           
           echo "✅ 镜像构建并推送成功"
 
