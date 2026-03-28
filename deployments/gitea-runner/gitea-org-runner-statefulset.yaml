@@ -138,10 +138,10 @@ spec:
 
           # 卷挂载
           volumeMounts:
-            # K3s containerd socket（关键！）
-            - name: containerd-sock
+            # Docker socket（关键！）
+            - name: docker-sock
               mountPath: /var/run/docker.sock
-              readOnly: true
+              readOnly: false
 
             # Runner 持久化配置目录
             - name: runner-data
@@ -194,10 +194,10 @@ spec:
 
       # 卷配置
       volumes:
-        # K3s containerd socket
-        - name: containerd-sock
+        # Docker socket (关键！使用宿主机 Docker 而非 containerd)
+        - name: docker-sock
           hostPath:
-            path: /run/k3s/containerd/containerd.sock
+            path: /var/run/docker.sock
             type: Socket
 
         # Runner 配置文件（ConfigMap）
