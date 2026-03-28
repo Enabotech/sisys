@@ -65,18 +65,18 @@ spec:
             - -c
             - |
               echo "🔧 Setting up Alpine repositories..."
-              
+
               # 使用清华镜像源 (HTTP 避免 HTTPS 证书问题)
               # Alpine 3.23 太新，降级到稳定的 v3.21
               cat > /etc/apk/repositories << 'EOF'
               http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/main
               http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/community
               EOF
-              
+
               # 更新仓库索引
               echo "📦 Updating package index..."
               apk update
-              
+
               # 安装 Node.js (Alpine 3.21 使用 nodejs 包)
               echo "🔧 Installing Node.js..."
               if apk add --no-cache nodejs npm; then
@@ -89,7 +89,7 @@ spec:
                 apk update
                 apk add --no-cache nodejs npm || echo "⚠️ Still failed, workflows requiring node will fail"
               fi
-              
+
               # 安装 Python 3 (使用 python3 包名)
               echo "🔧 Installing Python..."
               if apk add --no-cache python3 py3-pip py3-setuptools; then
@@ -99,11 +99,27 @@ spec:
               else
                 echo "⚠️ Python install failed, continuing anyway..."
               fi
-              
-              # 安装 git 和 curl (actions 需要)
-              echo "🔧 Installing git and curl..."
+
+              # 安装 git, curl 和 Docker CLI (关键！)
+              echo "🔧 Installing git, curl and Docker CLI..."
               apk add --no-cache git curl ca-certificates
               
+              # 安装 Docker CLI (用于与宿主机 Docker daemon 通信)
+              if apk add --no-cache docker-cli; then
+                echo "✅ Docker CLI version: $(docker --version)"
+                # 安装 Docker Buildx
+                echo "🔧 Installing Docker Buildx..."
+                BUILDX_VERSION=v0.12.0
+                if curl -sSL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" -o /usr/local/bin/docker-buildx; then
+                  chmod +x /usr/local/bin/docker-buildx
+                  echo "✅ Buildx version: $(docker buildx version)"
+                else
+                  echo "⚠️  Buildx install failed, will retry later"
+                fi
+              else
+                echo "⚠️ Docker CLI install failed"
+              fi
+
               echo "🚀 Starting act_runner..."
               exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
 

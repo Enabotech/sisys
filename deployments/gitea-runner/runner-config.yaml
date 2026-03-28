@@ -36,30 +36,20 @@ data:
       format: text
       output: stdout
 
-    # 容器配置（Docker Executor 模式 - 使用 containerd.sock）
+    # 容器配置 - 禁用容器化执行，直接在 Runner 上运行
     container:
-      # 工作镜像（使用本地 Harbor 镜像，包含 Docker 和 Buildx）
-      image: harbor.sisys.local/sisys/runner-images:ubuntu-act-latest
-      
-      # 网络模式
+      # 禁用容器隔离，直接在 Runner 容器内执行步骤
       network: host
       
       # 工作目录
       workdir: /workspace
       
-      # Docker 选项 - 使用 containerd.sock 替代 docker.sock
-      options: |
-        --privileged
-        --tmpfs /tmp
-        --tmpfs /var/tmp
-      
-      # 环境变量 - 关键！指向 containerd.sock
+      # 环境变量
       env:
         - DOCKER_HOST=unix:///var/run/docker.sock
         - DOCKER_TLS_CERTDIR=
-        - CONTAINERD_HOST=unix:///var/run/docker.sock
       
-      # 卷挂载 - 使用宿主机 Docker socket
+      # 卷挂载
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
         - /workspace:/workspace
