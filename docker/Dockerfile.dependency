@@ -65,15 +65,12 @@ FROM base AS final
 WORKDIR /app
 
 # 从 dependencies 阶段复制已安装的依赖
-COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=dependencies /usr/local/bin/poetry /usr/local/bin/poetry
+# 注意：PyTorch 基础镜像使用 conda，包在 /opt/conda 下
+COPY --from=dependencies /opt/conda/lib/python3.11/site-packages /opt/conda/lib/python3.11/site-packages
+COPY --from=dependencies /opt/conda/bin/poetry /opt/conda/bin/poetry
 
 # 复制项目依赖文件 (用于验证)
 COPY pyproject.toml poetry.lock ./
-
-# 创建非 root 用户
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
-USER appuser
 
 # 验证
 RUN python3 --version && \
