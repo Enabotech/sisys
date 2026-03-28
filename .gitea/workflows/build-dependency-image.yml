@@ -97,9 +97,28 @@ jobs:
       - name: 登录 Harbor 镜像仓库
         run: |
           echo "登录 Harbor: ${{ env.HARBOR_REGISTRY }}"
-          # Docker daemon 已配置 Harbor 证书，直接登录
-          echo "${{ secrets.HARBOR_ROBOT_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} -u "${{ secrets.HARBOR_ROBOT_USERNAME }}" --password-stdin
-          echo "✅ Harbor 登录成功"
+          
+          # 创建 Docker 配置文件 (包含 Harbor 认证)
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << DOCKER_CONFIG
+          {
+            "auths": {
+              "${{ env.HARBOR_REGISTRY }}": {
+                "auth": "$(echo -n '${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}' | base64)"
+              }
+            }
+          }
+          DOCKER_CONFIG
+          
+          # 验证配置
+          cat ~/.docker/config.json
+          
+          # 测试 Harbor API 连接
+          curl -k -s -o /dev/null -w "Harbor API HTTP 状态码：%{http_code}\n" \
+            -H "Authorization: Basic $(echo -n '${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}' | base64)" \
+            "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/users/current"
+          
+          echo "✅ Harbor 认证配置完成"
 
       - name: 生成镜像标签
         id: meta
