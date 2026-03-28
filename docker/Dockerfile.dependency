@@ -45,8 +45,8 @@ COPY pyproject.toml poetry.lock ./
 # 安装 Poetry (如果基础镜像没有)
 RUN pip3 install --no-cache-dir "poetry==${POETRY_VERSION}"
 
-# 安装项目依赖 (不开发依赖)
-RUN poetry install --only main --no-interaction --no-ansi
+# 安装项目依赖 (不安装当前项目，只安装依赖)
+RUN poetry install --only main --no-interaction --no-ansi --no-root
 
 # 清理缓存
 RUN rm -rf ${POETRY_CACHE_DIR} && \
