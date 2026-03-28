@@ -97,6 +97,7 @@ jobs:
       - name: 登录 Harbor 镜像仓库
         run: |
           echo "登录 Harbor: ${{ env.HARBOR_REGISTRY }}"
+          # Docker daemon 已配置 Harbor 证书，直接登录
           echo "${{ secrets.HARBOR_ROBOT_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} -u "${{ secrets.HARBOR_ROBOT_USERNAME }}" --password-stdin
           echo "✅ Harbor 登录成功"
 
@@ -120,18 +121,18 @@ jobs:
 
       - name: 拉取基础镜像 (Layer 1)
         run: |
-          echo "拉取 PyTorch 基础镜像..."
-          docker pull ${PYTORCH_IMAGE}
+          echo "ℹ️  基础镜像已存在于 Harbor，无需拉取"
+          echo "基础镜像：${PYTORCH_IMAGE}"
 
       - name: 构建依赖镜像 (Layer 2)
         run: |
           echo "🔨 使用 docker build 构建依赖镜像..."
           GIT_SHA=${{ steps.git_info.outputs.git_sha }}
           
+          # 构建镜像
           docker build -f ./docker/Dockerfile.dependency \
             -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA} \
             -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest \
-            -t ${{ env.HARBOR_REGISTRY }}/sisys/dependency:weekly-$(date +%Y%m%d) \
             --build-arg PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }} \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg POETRY_VERSION=${{ env.POETRY_VERSION }} \
@@ -141,7 +142,6 @@ jobs:
           echo "推送镜像到 Harbor..."
           docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA}
           docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest
-          docker push ${{ env.HARBOR_REGISTRY }}/sisys/dependency:weekly-$(date +%Y%m%d)
           
           echo "✅ 镜像构建并推送成功"
 
