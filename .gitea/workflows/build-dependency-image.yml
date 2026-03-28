@@ -261,14 +261,6 @@ jobs:
 
           cat reports/dependency-image-build-report.md
 
-      - name: 上传构建报告
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-image-build-report
-          path: reports/
-          retention-days: 90
-
       - name: 发送构建通知
         if: always()
         run: |
