@@ -43,10 +43,12 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
 # 安装 Node.js (GitHub Actions 需要)
-# 先安装 curl，再从 NodeSource 安装 Node.js
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+# 注意：不修改系统源，避免破坏基础镜像
+# 使用 NodeSource 官方脚本安装
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/* && \
     node --version && \
     npm --version
