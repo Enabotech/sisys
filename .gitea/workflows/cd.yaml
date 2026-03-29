@@ -121,7 +121,7 @@ jobs:
   # ===========================================================================
   # 阶段 2: 部署到测试环境 (自动)
   # ===========================================================================
-  deploy:
+  deploy-test:
     name: "🚀 部署到测试环境"
     runs-on: ubuntu-latest
     needs: [pre-deployment-check]
@@ -175,7 +175,7 @@ jobs:
   health-check:
     name: "🏥 健康检查"
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [deploy-test]
     if: needs.pre-deployment-check.outputs.environment == 'test'
 
     steps:
@@ -234,13 +234,78 @@ jobs:
           echo "清理完成"
 
   # ===========================================================================
-  # 阶段 5: 自动回滚机制
+  # 阶段 5: 生产环境审批 (手动)
   # ===========================================================================
-  rollback:
+  production-approval:
+    name: "✅ 生产部署审批"
+    runs-on: ubuntu-latest
+    needs: [deploy-test]
+    if: needs.pre-deployment-check.outputs.environment == 'production'
+    environment:
+      name: production
+      url: https://sisys.local
+
+    steps:
+      - name: 等待生产环境审批
+        run: |
+          echo "等待生产环境人工审批..."
+          # 在 Gitea/GitHub 界面手动点击批准
+          echo "审批通过后继续部署"
+
+  # ===========================================================================
+  # 阶段 6: 部署到生产环境
+  # ===========================================================================
+  deploy-production:
+    name: "🚀 部署到生产环境"
+    runs-on: ubuntu-latest
+    needs: [production-approval]
+    environment:
+      name: production
+      url: https://sisys.local
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Kubeconfig (生产环境)
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: 更新生产环境镜像版本
+        run: |
+          kubectl set image deployment/sisys-app \
+            app=${{ needs.pre-deployment-check.outputs.image_tag }} \
+            -n sisys-prod
+
+      - name: 触发 ArgoCD 同步生产环境
+        run: |
+          echo "触发 ArgoCD 同步生产环境..."
+          kubectl annotate application/sisys-app-production \
+            argocd.argoproj.io/refresh=hard \
+            -n argocd || echo "ArgoCD 同步已触发"
+
+      - name: 等待部署完成
+        run: |
+          kubectl rollout status deployment/sisys-app -n sisys-prod --timeout=300s
+
+      - name: 上传部署报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-production-report
+          path: |
+            reports/deploy-production/
+          retention-days: 90
+
+  # ===========================================================================
+  # 阶段 7: 自动回滚机制
+  # ===========================================================================
+  auto-rollback:
     name: "🔄 自动回滚"
     runs-on: ubuntu-latest
-    needs: [deploy, health-check]
-    if: failure() && (needs.deploy.result == 'failure' || needs.health-check.result == 'failure')
+    needs: [deploy-test, health-check]
+    if: failure() && (needs.deploy-test.result == 'failure' || needs.health-check.result == 'failure')
 
     steps:
       - name: 检出代码

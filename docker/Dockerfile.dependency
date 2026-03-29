@@ -45,11 +45,16 @@ COPY pyproject.toml poetry.lock ./
 # 安装 Poetry 并安装依赖
 # 使用清华源加速 pip 安装（关键！避免超时）
 # Poetry 2.x 需要安装 poetry-plugin-export 插件
-# 注意：使用 poetry install --no-root 安装依赖，不安装项目本身
-RUN pip3 install --no-cache-dir --break-system-packages \
+# 注意：pyproject.toml 中已指定 torch==2.7.1 与基础镜像一致
+# 设置 pip 重试机制
+ENV PIP_RETRIES=3
+ENV PIP_TIMEOUT=30
+
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip3 install --no-cache-dir --break-system-packages \
+    --retries 3 --timeout 30 \
     "poetry==${POETRY_VERSION}" \
     poetry-plugin-export && \
-    pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     poetry install --only main --no-interaction --no-root && \
     rm -rf /root/.cache/pypoetry pyproject.toml poetry.lock
 

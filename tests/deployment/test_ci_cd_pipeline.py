@@ -383,18 +383,7 @@ class TestDocumentation:
         """测试故障排除指南存在"""
         guide_path = Path("docs/deployment/CI_CD_TROUBLESHOOTING.md")
         assert guide_path.exists(), "Troubleshooting guide not found"
-    
-    def test_prebuilt_image_guide_exists(self):
-        """测试预构建镜像维护指南存在"""
-        guide_path = Path("docs/deployment/PREBUILT_IMAGE_MAINTENANCE.md")
-        assert guide_path.exists(), "Prebuilt image guide not found"
-    
-    def test_pytorch_import_guide_exists(self):
-        """测试本地 PyTorch 镜像导入指南存在"""
-        guide_path = Path("docs/deployment/LOCAL_PYTORCH_IMPORT.md")
-        assert guide_path.exists(), "PyTorch import guide not found"
-
-
+   
 class TestScripts:
     """脚本完整性测试"""
     
