@@ -142,6 +142,11 @@ RUN groupadd --gid 1000 sisys && \
 WORKDIR /app
 RUN chown -R sisys:sisys /app
 
+# 复制入口脚本
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    chown sisys:sisys /usr/local/bin/entrypoint.sh
+
 # =========================================
 # 8. 配置工作目录和环境
 # =========================================
@@ -173,5 +178,12 @@ LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
       sisys.ubuntu.version="22.04" \
       sisys.mirror.provider="Tsinghua University"
 
-# 默认命令
+# =========================================
+# 11. 入口点和默认命令
+# =========================================
+# ENTRYPOINT 设计说明：
+# - 开发模式：直接运行容器，进入交互式 bash
+# - 应用模式：docker run image poetry run python src/main.py
+# - CI/CD 模式：docker run image make test
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
