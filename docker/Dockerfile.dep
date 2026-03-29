@@ -83,10 +83,10 @@ RUN ln -sf /usr/local/bin/python3.11 /usr/local/bin/python \
     && python --version
 
 # =========================================
-# 4. 配置 pip 清华源
+# 4. 配置 pip 清华源（系统级配置）
 # =========================================
-RUN mkdir -p /root/.pip && \
-    cat > /root/.pip/pip.conf <<EOF
+RUN mkdir -p /etc/pip && \
+    cat > /etc/pip.conf <<EOF
 [global]
 index-url = https://pypi.tuna.tsinghua.edu.cn/simple
 trusted-host = pypi.tuna.tsinghua.edu.cn
@@ -114,9 +114,9 @@ ENV POETRY_HOME="/opt/poetry" \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_NO_INTERACTION=1
 
-# 配置 Poetry 使用清华源
-RUN mkdir -p /root/.config/pypoetry && \
-    cat > /root/.config/pypoetry/config.toml <<EOF
+# 配置 Poetry 使用清华源（系统级配置）
+RUN mkdir -p /etc/pypoetry && \
+    cat > /etc/pypoetry/config.toml <<EOF
 [[tool.poetry.source]]
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"

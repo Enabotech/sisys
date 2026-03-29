@@ -471,10 +471,10 @@ docker-verify:
 		poetry --version && \
 		echo '========================================' && \
 		echo '=== pip 源配置 ===' && \
-		cat /root/.pip/pip.conf && \
+		cat /etc/pip.conf && \
 		echo '========================================' && \
 		echo '=== Poetry 源配置 ===' && \
-		cat /root/.config/pypoetry/config.toml && \
+		cat /etc/pypoetry/config.toml && \
 		echo '========================================'"
 	@echo ""
 	@echo "✅ 镜像验证完成！"
