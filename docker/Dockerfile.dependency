@@ -65,8 +65,16 @@ COPY pyproject.toml poetry.lock ./
 
 # 使用 poetry run pip freeze 导出依赖并安装（Poetry 2.x 推荐方式）
 # 使用清华源加速 pip 安装
+# 过滤掉本地路径依赖（Conda 构建路径）
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    poetry run pip freeze | grep -v "^-e" | grep -v "pkg-resources" > /tmp/requirements.txt && \
+    poetry run pip freeze | \
+    grep -v "^-e" | \
+    grep -v "pkg-resources" | \
+    grep -v "file://" | \
+    grep -v "/home/conda" | \
+    grep -v "/opt/conda" | \
+    grep -v "build_artifacts" | \
+    grep -v "@ file://" > /tmp/requirements.txt && \
     pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 
