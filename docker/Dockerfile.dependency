@@ -43,7 +43,11 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
 # 安装 Node.js (GitHub Actions 需要)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 使用清华源加速 apt 安装
+RUN sed -i -e 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+           -e 's|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+           /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -60,7 +64,9 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 COPY pyproject.toml poetry.lock ./
 
 # 使用 poetry run pip freeze 导出依赖并安装（Poetry 2.x 推荐方式）
-RUN poetry run pip freeze | grep -v "^-e" | grep -v "pkg-resources" > /tmp/requirements.txt && \
+# 使用清华源加速 pip 安装
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    poetry run pip freeze | grep -v "^-e" | grep -v "pkg-resources" > /tmp/requirements.txt && \
     pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 
