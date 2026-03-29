@@ -4,11 +4,12 @@
 
 | 组件 | 版本 | 加速源 |
 |------|------|--------|
-| **Ubuntu** | 22.04 LTS | 清华大学 apt 源 |
+| **Ubuntu** | 22.04 LTS | 阿里云 apt 源 |
 | **Python** | 3.11.15 | 源码编译 |
-| **Node.js** | 20.x LTS | 清华 NodeSource 镜像 |
+| **Node.js** | 20.x LTS | NodeSource 官方 |
 | **Poetry** | 2.3.2 | 清华 PyPI 源 |
 | **pip** | - | 清华 PyPI 源 |
+| **镜像仓库** | harbor.sisys.local/sisys/dependency | 私有仓库 |
 
 ## 🚀 快速开始
 
@@ -21,7 +22,7 @@ make docker-build-dep
 # 或使用 Docker 命令
 export DOCKER_BUILDKIT=1
 docker build -f docker/Dockerfile.dep \
-    -t ghcr.io/sisys/sisys-base:ubuntu22.04-py311.15-poetry2.3.2 \
+    -t harbor.sisys.local/sisys/dependency:dep-v1.0.0-$(date +%Y%m%d%H%M) \
     --progress=plain \
     .
 ```
@@ -33,7 +34,7 @@ docker build -f docker/Dockerfile.dep \
 make docker-verify
 
 # 或手动验证
-docker run --rm ghcr.io/sisys/sisys-base:ubuntu22.04-py311.15-poetry2.3.2 bash -c "
+docker run --rm harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292125 bash -c "
     python --version &&
     node --version &&
     npm --version &&
@@ -45,7 +46,7 @@ docker run --rm ghcr.io/sisys/sisys-base:ubuntu22.04-py311.15-poetry2.3.2 bash -
 
 ```bash
 # 登录镜像仓库
-docker login ghcr.io
+docker login harbor.sisys.local
 
 # 推送镜像
 make docker-push-base
