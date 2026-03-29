@@ -107,13 +107,15 @@ spec:
               # 安装 Docker CLI (用于与宿主机 Docker daemon 通信)
               if apk add --no-cache docker-cli; then
                 echo "✅ Docker CLI version: $(docker --version)"
-                
-                # 配置 Docker 跳过 TLS 验证 (用于自签名证书的 Harbor)
-                echo "🔧 配置 Docker insecure registry..."
-                mkdir -p /etc/docker/certs.d/harbor.sisys.local
-                # 创建空的 ca.crt 文件以跳过验证
-                touch /etc/docker/certs.d/harbor.sisys.local/ca.crt
+                # 宿主机已配置 Harbor 证书，Pod 内无需额外配置
               fi
+
+              # 安装 git 和 curl (actions 需要)
+              echo "🔧 Installing git and curl..."
+              apk add --no-cache git curl
+
+              echo "🚀 Starting act_runner..."
+              exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
                 
           # 环境变量配置
           env:
