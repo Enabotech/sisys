@@ -54,7 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 安装 Poetry
 RUN pip3 install --no-cache-dir --break-system-packages \
-    "poetry==${POETRY_VERSION}" && \
+    "poetry==${POETRY_VERSION}" \
+    poetry-plugin-export && \
     poetry export --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt && \
     pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
