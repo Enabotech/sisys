@@ -122,9 +122,15 @@ class TestRunnerConfigFile:
         config_path = Path("deployments/gitea-runner/runner-config.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-                runner_file = config.get("runner", {}).get("file", "")
-                assert runner_file == "/data/.runner", f".runner 文件路径应为 /data/.runner，实际为：{runner_file}"
+                # ConfigMap 格式，从 data.config.yaml 中提取配置
+                configmap = yaml.safe_load(f)
+                config_yaml = configmap.get("data", {}).get("config.yaml", "")
+                if config_yaml:
+                    config = yaml.safe_load(config_yaml)
+                    runner_file = config.get("runner", {}).get("file", "")
+                    assert runner_file == "/data/.runner", f".runner 文件路径应为 /data/.runner，实际为：{runner_file}"
+                else:
+                    pytest.fail("ConfigMap 中缺少 data.config.yaml 字段")
 
 
 class TestKubernetesResources:
