@@ -42,16 +42,16 @@ WORKDIR /app
 # 复制依赖文件
 COPY pyproject.toml poetry.lock ./
 
-# 安装 Poetry 并导出依赖
+# 安装 Poetry 并安装依赖
 # 使用清华源加速 pip 安装（关键！避免超时）
-# Poetry 2.x 需要安装 poetry-plugin-export 插件才能使用 export 命令
+# Poetry 2.x 需要安装 poetry-plugin-export 插件
+# 注意：使用 poetry install --no-root 安装依赖，不安装项目本身
 RUN pip3 install --no-cache-dir --break-system-packages \
     "poetry==${POETRY_VERSION}" \
     poetry-plugin-export && \
     pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    poetry export --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt && \
-    pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
-    rm -f /tmp/requirements.txt pyproject.toml poetry.lock
+    poetry install --only main --no-interaction --no-root && \
+    rm -rf /root/.cache/pypoetry pyproject.toml poetry.lock
 
 # ===========================================================================
 # 清理和验证
