@@ -29,12 +29,9 @@ RUN python3 --version && \
     python3 -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.version.cuda}')"
 
 # ===========================================================================
-# Stage 2: 安装项目依赖 (Node.js + Poetry + Python 依赖)
+# Stage 2: 安装 Python 依赖
 # ===========================================================================
-# 注意：直接在基础镜像上安装，不使用多阶段构建
-
-# 重新声明 ARG (在 FROM 之后需要重新声明才能使用)
-ARG POETRY_VERSION
+# 注意：不安装 Node.js，由 Gitea Runner 提供
 
 # 设置工作目录
 WORKDIR /app
@@ -42,28 +39,12 @@ WORKDIR /app
 # 复制依赖文件
 COPY pyproject.toml poetry.lock ./
 
-# 安装 Node.js (GitHub Actions 需要)
-# 注意：不修改系统源，避免破坏基础镜像
-# 使用 NodeSource 官方脚本安装
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/* && \
-    node --version && \
-    npm --version
-
 # 安装 Poetry 并使用 poetry run pip freeze 导出依赖
-RUN pip3 install --no-cache-dir --break-system-packages \
-    "poetry==${POETRY_VERSION}"
-
-# 复制依赖文件
-COPY pyproject.toml poetry.lock ./
-
-# 使用 poetry run pip freeze 导出依赖并安装（Poetry 2.x 推荐方式）
 # 使用清华源加速 pip 安装
 # 过滤掉本地路径依赖（Conda 构建路径）
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+RUN pip3 install --no-cache-dir --break-system-packages \
+    "poetry==${POETRY_VERSION}" && \
+    pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     poetry run pip freeze | \
     grep -v "^-e" | \
     grep -v "pkg-resources" | \
@@ -73,21 +54,17 @@ RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple &&
     grep -v "build_artifacts" | \
     grep -v "@ file://" > /tmp/requirements.txt && \
     pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
-    rm -f /tmp/requirements.txt
+    rm -f /tmp/requirements.txt pyproject.toml poetry.lock
 
 # ===========================================================================
-# Stage 3: 最终镜像 (单阶段构建)
+# Stage 3: 最终镜像
 # ===========================================================================
-# 注意：不使用多阶段构建，因为 Conda 二进制文件与基础镜像不兼容
-# 直接在基础镜像上安装依赖
 
 # 清理缓存
-RUN rm -rf ${POETRY_CACHE_DIR} && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN rm -rf ${POETRY_CACHE_DIR}
 
 # 验证安装
-RUN python3 --version && node --version && npm --version
+RUN python3 --version && poetry --version
 
 # 设置入口点
 ENTRYPOINT ["/bin/bash"]
@@ -105,5 +82,4 @@ LABEL org.opencontainers.image.title="SISYS Dependency Image" \
       sisys.python.version="3.11" \
       sisys.poetry.version="2.3.2" \
       sisys.pytorch.version="2.7.1" \
-      sisys.cuda.version="12.8" \
-      sisys.node.version="20.x"
+      sisys.cuda.version="12.8"
