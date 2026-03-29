@@ -4,7 +4,7 @@
 # 保留策略：保留最近 5 个版本
 
 # ===========================================================================
-# Stage 1: 基础镜像 (Layer 1)
+# 基础镜像 (Layer 1)
 # ===========================================================================
 ARG PYTORCH_IMAGE=harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 FROM ${PYTORCH_IMAGE} AS base
@@ -29,7 +29,7 @@ RUN python3 --version && \
     python3 -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.version.cuda}')"
 
 # ===========================================================================
-# Stage 2: 安装 Python 依赖
+# 安装 Python 依赖
 # ===========================================================================
 # 注意：不安装 Node.js，由 Gitea Runner 提供
 
@@ -42,25 +42,18 @@ WORKDIR /app
 # 复制依赖文件
 COPY pyproject.toml poetry.lock ./
 
-# 安装 Poetry 并使用 poetry run pip freeze 导出依赖
-# 使用清华源加速 pip 安装
+# 安装 Poetry 并使用 poetry export 导出依赖
+# 使用清华源加速 pip 安装（关键！避免超时）
 # 过滤掉本地路径依赖（Conda 构建路径）
 RUN pip3 install --no-cache-dir --break-system-packages \
     "poetry==${POETRY_VERSION}" && \
     pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    poetry run pip freeze | \
-    grep -v "^-e" | \
-    grep -v "pkg-resources" | \
-    grep -v "file://" | \
-    grep -v "/home/conda" | \
-    grep -v "/opt/conda" | \
-    grep -v "build_artifacts" | \
-    grep -v "@ file://" > /tmp/requirements.txt && \
+    poetry export --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt && \
     pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt pyproject.toml poetry.lock
 
 # ===========================================================================
-# Stage 3: 最终镜像
+# 清理和验证
 # ===========================================================================
 
 # 清理缓存
