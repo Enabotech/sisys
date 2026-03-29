@@ -39,8 +39,8 @@ ARG POETRY_VERSION
 # 设置工作目录
 WORKDIR /app
 
-# 复制依赖文件
-COPY pyproject.toml poetry.lock ./
+# 复制依赖文件和 README
+COPY pyproject.toml poetry.lock README.md ./
 
 # 安装依赖
 # 使用清华源加速 pip 安装（关键！避免超时）
@@ -51,7 +51,7 @@ ENV PIP_TIMEOUT=30
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip3 install --retries 3 --timeout 30 --no-cache-dir --break-system-packages . && \
-    rm -rf pyproject.toml poetry.lock
+    rm -rf pyproject.toml poetry.lock README.md
 
 # ===========================================================================
 # 清理和验证
