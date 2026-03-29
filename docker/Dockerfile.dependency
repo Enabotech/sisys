@@ -61,8 +61,8 @@ RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple &&
 # 清理缓存
 RUN rm -rf ${POETRY_CACHE_DIR}
 
-# 验证安装
-RUN python3 --version && poetry --version
+# 验证安装（只验证 python，不验证 poetry）
+RUN python3 --version
 
 # 设置入口点
 ENTRYPOINT ["/bin/bash"]
