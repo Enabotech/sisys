@@ -7,6 +7,16 @@ E2E 测试示例 - 验证 E2E 测试框架配置。
 import pytest
 
 
+@pytest.fixture
+def test_config():
+    """E2E 测试配置 fixture"""
+    return {
+        "base_url": "http://localhost:8000",
+        "timeout": 30,
+        "retry_count": 3,
+    }
+
+
 @pytest.mark.e2e
 class TestE2EFramework:
     """测试 E2E 测试框架配置"""
@@ -20,6 +30,8 @@ class TestE2EFramework:
         """Given E2E 测试结构，When 验证，Then 配置可用"""
         # Assert
         assert test_config is not None
+        assert "base_url" in test_config
+        assert test_config["timeout"] > 0
 
 
 @pytest.mark.e2e
