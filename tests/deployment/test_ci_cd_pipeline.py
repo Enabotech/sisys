@@ -29,13 +29,14 @@ class TestCIPipeline:
     
     def test_trigger_events(self, ci_workflow):
         """测试触发事件"""
-        on_config = ci_workflow['on']
-        
+        # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+        on_config = ci_workflow.get('on') or ci_workflow.get(True) or {}
+
         # 检查 push 触发
         assert 'push' in on_config
         assert 'branches' in on_config['push']
         assert 'main' in on_config['push']['branches']
-        
+
         # 检查 PR 触发
         assert 'pull_request' in on_config
         assert 'branches' in on_config['pull_request']
@@ -153,9 +154,10 @@ class TestCDPipeline:
     
     def test_manual_dispatch(self, cd_workflow):
         """测试手动触发配置"""
-        on_config = cd_workflow['on']
+        # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+        on_config = cd_workflow.get('on') or cd_workflow.get(True) or {}
         assert 'workflow_dispatch' in on_config
-        
+
         inputs = on_config['workflow_dispatch']['inputs']
         assert 'environment' in inputs
         assert 'git_sha' in inputs
@@ -220,19 +222,21 @@ class TestDependencyImageWorkflow:
     
     def test_schedule_trigger(self, dependency_workflow):
         """测试定时触发"""
-        on_config = dependency_workflow['on']
+        # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+        on_config = dependency_workflow.get('on') or dependency_workflow.get(True) or {}
         assert 'schedule' in on_config
-        
+
         # 检查 cron 配置 (每周日 18 点)
         cron = on_config['schedule'][0]['cron']
         assert cron == '0 10 * * 0'  # UTC 10:00 = 北京时间 18:00
     
     def test_path_trigger(self, dependency_workflow):
         """测试路径触发"""
-        on_config = dependency_workflow['on']
+        # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+        on_config = dependency_workflow.get('on') or dependency_workflow.get(True) or {}
         assert 'push' in on_config
         assert 'paths' in on_config['push']
-        
+
         paths = on_config['push']['paths']
         assert 'pyproject.toml' in paths
         assert 'poetry.lock' in paths

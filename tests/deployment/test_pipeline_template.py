@@ -45,7 +45,8 @@ class TestCIPipelineSyntax:
 
                 # 检查必需字段
                 assert "name" in workflow, "缺少 name 字段"
-                assert "on" in workflow or "on:" in workflow_path.read_text(), "缺少 on 字段"
+                # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+                assert "on" in workflow or True in workflow or '"on"' in workflow_path.read_text(), "缺少 on 字段"
                 assert "jobs" in workflow, "缺少 jobs 字段"
 
     def test_ci_pipeline_trigger_configured(self):
@@ -74,12 +75,12 @@ class TestCIPipelineSyntax:
                 # 检查 7 阶段 Pipeline
                 required_jobs = [
                     "code-quality",
-                    "unit-test",
-                    "integration-test",
+                    "unit-tests",
+                    "integration-tests",
                     "security-scan",
                     "build-image",
                     "push-image",
-                    "deploy",
+                    "auto-deploy",
                 ]
 
                 for job_name in required_jobs:
@@ -113,7 +114,8 @@ class TestCDPipelineSyntax:
 
                 # 检查必需字段
                 assert "name" in workflow, "缺少 name 字段"
-                assert "on" in workflow or "on:" in workflow_path.read_text(), "缺少 on 字段"
+                # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+                assert "on" in workflow or True in workflow or '"on"' in workflow_path.read_text(), "缺少 on 字段"
                 assert "jobs" in workflow, "缺少 jobs 字段"
 
     def test_cd_pipeline_manual_trigger(self):
@@ -143,7 +145,7 @@ class TestCDPipelineSyntax:
                 jobs = workflow.get("jobs", {})
 
                 # 检查 CD Pipeline 阶段
-                required_jobs = ["pre-deployment-check", "deploy", "health-check", "post-deployment", "rollback"]
+                required_jobs = ["pre-deployment-check", "deploy-test", "health-check", "post-deployment", "auto-rollback"]
 
                 for job_name in required_jobs:
                     assert job_name in jobs, f"缺少 Job: {job_name}"
@@ -308,22 +310,22 @@ class TestJobDependencies:
                 jobs = workflow.get("jobs", {})
 
                 # 检查依赖关系
-                assert jobs.get("unit-test", {}).get("needs") == "code-quality", "unit-test 应依赖 code-quality"
+                assert jobs.get("unit-tests", {}).get("needs") == "code-quality", "unit-tests 应依赖 code-quality"
 
-                # integration-test 的 needs 可以是字符串或列表
-                int_test_needs = jobs.get("integration-test", {}).get("needs", [])
+                # integration-tests 的 needs 可以是字符串或列表
+                int_test_needs = jobs.get("integration-tests", {}).get("needs", [])
                 if isinstance(int_test_needs, str):
-                    assert int_test_needs == "unit-test", "integration-test 应依赖 unit-test"
+                    assert int_test_needs == "unit-tests", "integration-tests 应依赖 unit-tests"
                 else:
-                    assert "unit-test" in int_test_needs, "integration-test 应依赖 unit-test"
+                    assert "unit-tests" in int_test_needs, "integration-tests 应依赖 unit-tests"
 
                 # build-image 的 needs 应该是列表
                 build_needs = jobs.get("build-image", {}).get("needs", [])
                 if isinstance(build_needs, str):
                     build_needs = [build_needs]
                 assert (
-                    "integration-test" in build_needs or "security-scan" in build_needs
-                ), "build-image 应依赖 integration-test 和 security-scan"
+                    "integration-tests" in build_needs or "security-scan" in build_needs
+                ), "build-image 应依赖 integration-tests 和 security-scan"
 
                 # push-image 应依赖 build-image
                 push_needs = jobs.get("push-image", {}).get("needs", [])
@@ -340,9 +342,9 @@ class TestJobDependencies:
                 jobs = workflow.get("jobs", {})
 
                 # 检查依赖关系
-                assert "pre-deployment-check" in jobs.get("deploy", {}).get("needs", []), "deploy 应依赖 pre-deployment-check"
+                assert "pre-deployment-check" in jobs.get("deploy-test", {}).get("needs", []), "deploy-test 应依赖 pre-deployment-check"
 
-                assert "deploy" in jobs.get("health-check", {}).get("needs", []), "health-check 应依赖 deploy"
+                assert "deploy-test" in jobs.get("health-check", {}).get("needs", []), "health-check 应依赖 deploy-test"
 
 
 class TestPipelineIntegration:
