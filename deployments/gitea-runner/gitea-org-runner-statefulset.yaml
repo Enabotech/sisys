@@ -114,22 +114,6 @@ spec:
                 # 创建空的 ca.crt 文件以跳过验证
                 touch /etc/docker/certs.d/harbor.sisys.local/ca.crt
                 
-                # 安装 Docker Buildx
-                echo "🔧 Installing Docker Buildx..."
-                BUILDX_VERSION=v0.12.0
-                if curl -sSL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" -o /usr/local/bin/docker-buildx; then
-                  chmod +x /usr/local/bin/docker-buildx
-                  echo "✅ Buildx version: $(docker buildx version)"
-                else
-                  echo "⚠️  Buildx install failed, will retry later"
-                fi
-              else
-                echo "⚠️ Docker CLI install failed"
-              fi
-
-              echo "🚀 Starting act_runner..."
-              exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
-
           # 环境变量配置
           env:
             # Gitea 实例地址（使用内部 HTTP 服务绕过 TLS 问题）
