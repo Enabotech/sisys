@@ -16,6 +16,7 @@ import subprocess
 import time
 
 import pytest
+from tests.utils.kubectl import run_kubectl
 
 # =============================================================================
 # 配置常量 - 从统一配置模块加载
@@ -27,8 +28,9 @@ HARBOR_HOST = TestConfig.get_harbor_config()["ingress_host"]
 # 使用域名而非 IP（避免证书问题）
 HARBOR_URL = f"{HARBOR_HOST}:{HARBOR_NODEPORT}"
 HARBOR_PROJECT = "sisys"
-HARBOR_USERNAME = "admin"
-HARBOR_PASSWORD = "Admin@123456"  # nosec B105  # pragma: allowlist secret  # 默认密码
+# 使用 Gitea Harbor 机器人账号（从 harbor-robot-account Secret 获取）
+HARBOR_USERNAME = "robot$sisys+gitea-runner-push"
+HARBOR_PASSWORD = "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"  # nosec B105  # pragma: allowlist secret
 
 # 测试镜像配置 - 使用国内镜像源
 TEST_SOURCE_IMAGE = "docker.m.daocloud.io/library/busybox:1.35"  # 使用国内镜像源
@@ -51,12 +53,6 @@ def run_command(cmd: list[str], check: bool = False, timeout: int = 300) -> subp
         return result
     except subprocess.TimeoutExpired:
         pytest.fail(f"命令超时：{' '.join(cmd)}")
-
-
-def run_kubectl(args: list[str], check: bool = False) -> subprocess.CompletedProcess:
-    """运行 kubectl 命令（带 sudo）"""
-    cmd = ["sudo", "kubectl"] + args
-    return run_command(cmd, check=check)
 
 
 def harbor_api_call(endpoint: str, method: str = "GET", data: dict | None = None) -> tuple[int, dict]:
@@ -195,6 +191,7 @@ class TestImagePush:
         result = run_command(["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"])
         assert TEST_HARBOR_IMAGE in result.stdout, f"镜像 tag 未找到：{TEST_HARBOR_IMAGE}"
 
+    @pytest.mark.xdist_group(name="harbor-login")
     def test_docker_login_harbor(self):
         """测试登录 Harbor"""
         # 使用 docker login（通过 stdin 传递密码，避免警告）
@@ -211,12 +208,22 @@ class TestImagePush:
             password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
 
         # 使用 --password-stdin 避免警告
-        result = subprocess.run(
-            f"echo '{password}' | docker login -u {HARBOR_USERNAME} --password-stdin {HARBOR_URL}",
-            shell=True,
-            capture_output=True,
+        # 使用列表形式避免 shell 转义问题（特别是 $ 符号）
+        import subprocess
+
+        login_process = subprocess.Popen(
+            ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=30,
+        )
+        stdout, stderr = login_process.communicate(input=f"{password}\n")
+        result = subprocess.CompletedProcess(
+            args=["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
+            returncode=login_process.returncode,
+            stdout=stdout,
+            stderr=stderr,
         )
 
         if result.returncode != 0:
@@ -226,6 +233,7 @@ class TestImagePush:
 
         assert "Login Succeeded" in result.stdout or "already logged in" in result.stderr.lower(), f"登录失败：{result.stderr}"
 
+    @pytest.mark.xdist_group(name="harbor-login")
     def test_push_image_to_harbor(self):
         """测试推送镜像到 Harbor"""
         # 先 tag 镜像
@@ -284,6 +292,7 @@ class TestImagePush:
             # 仓库为空是预期的（在推送之前）
             pytest.skip(f"测试镜像仓库为空（需要先推送）：{HARBOR_PROJECT}/test-image")
 
+    @pytest.mark.xdist_group(name="harbor-login")
     def test_pull_image_from_harbor(self):
         """测试从 Harbor 拉取镜像"""
         # 先确保已推送
@@ -295,9 +304,12 @@ class TestImagePush:
         if tag_result.returncode != 0:
             pytest.skip(f"无法 tag 镜像：{tag_result.stderr}")
 
-        # 登录 Harbor（跳过 TLS 验证）
+        # 登录 Harbor
+        # Docker daemon.json 已配置 insecure-registries: ["harbor.sisys.local"]
+        # 无需额外 TLS 配置
         import subprocess
 
+        # 使用 kubectl 获取密码（如果可用），否则使用默认密码
         secret_result = run_kubectl(
             ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"]
         )
@@ -307,20 +319,25 @@ class TestImagePush:
 
             password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
 
-        # 使用 --insecure-registry 跳过 TLS 验证
-        login_result = subprocess.run(
-            f"echo '{password}' | docker login -u {HARBOR_USERNAME} --password-stdin {HARBOR_URL}",
-            shell=True,
-            capture_output=True,
+        # 使用 --password-stdin 避免警告
+        # 使用列表形式避免 shell 转义问题（特别是 $ 符号）
+        login_process = subprocess.Popen(
+            ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=30,
-            env={**os.environ, "DOCKER_TLS_VERIFY": "0"},
+        )
+        stdout, stderr = login_process.communicate(input=f"{password}\n")
+        login_result = subprocess.CompletedProcess(
+            args=["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
+            returncode=login_process.returncode,
+            stdout=stdout,
+            stderr=stderr,
         )
         if login_result.returncode != 0 and "already logged in" not in login_result.stderr.lower():
-            # TLS 证书问题，这是开发环境预期行为
-            pytest.skip(
-                f"无法登录 Harbor（TLS 证书问题，需要在 docker daemon 配置 insecure-registries）：{login_result.stderr[:200]}"
-            )
+            # 登录失败
+            pytest.skip(f"无法登录 Harbor: {login_result.stderr[:200]}")
 
         # 推送镜像
         push_result = subprocess.run(
@@ -328,7 +345,6 @@ class TestImagePush:
             capture_output=True,
             text=True,
             timeout=300,
-            env={**os.environ, "DOCKER_TLS_VERIFY": "0"},
         )
         if push_result.returncode != 0:
             pytest.skip(f"无法推送镜像：{push_result.stderr[:200]}")

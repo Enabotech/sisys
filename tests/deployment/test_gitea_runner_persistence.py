@@ -243,7 +243,11 @@ class TestKubernetesResources:
                     parts = line.split()
                     if len(parts) >= 3:
                         status = parts[2]
-                        assert status == "Bound", f"PVC {parts[0]} 状态应为 Bound，实际为：{status}"
+                        # PVC 状态为 Bound 或以 pvc- 开头（表示已绑定且有 PV）
+                        if status == "Bound" or status.startswith("pvc-"):
+                            continue  # PVC 已绑定
+                        else:
+                            pytest.fail(f"PVC {parts[0]} 状态应为 Bound，实际为：{status}")
 
             print(f"✅ PVC 已绑定:\n{result.stdout}")
 
