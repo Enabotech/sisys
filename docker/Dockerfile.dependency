@@ -44,17 +44,14 @@ COPY pyproject.toml poetry.lock ./
 
 # 安装依赖
 # 使用清华源加速 pip 安装（关键！避免超时）
-# 注意：使用 pip 直接安装依赖，绕过 poetry install（避免 lock 文件不匹配问题）
+# 注意：直接使用 pip 安装 pyproject.toml，绕过 poetry（避免 lock 文件不匹配）
 # pyproject.toml 中已指定 torch==2.7.1 与基础镜像一致
 ENV PIP_RETRIES=3
 ENV PIP_TIMEOUT=30
 
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip3 install --retries 3 --timeout 30 --no-cache-dir --break-system-packages \
-    "poetry==${POETRY_VERSION}" poetry-plugin-export && \
-    poetry export --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt && \
-    pip3 install --retries 3 --timeout 30 --no-cache-dir --break-system-packages -r /tmp/requirements.txt && \
-    rm -rf /root/.cache/pypoetry pyproject.toml poetry.lock /tmp/requirements.txt
+    pip3 install --retries 3 --timeout 30 --no-cache-dir --break-system-packages . && \
+    rm -rf pyproject.toml poetry.lock
 
 # ===========================================================================
 # 清理和验证
