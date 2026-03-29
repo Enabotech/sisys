@@ -113,6 +113,7 @@ spec:
                 mkdir -p /etc/docker/certs.d/harbor.sisys.local
                 # 创建空的 ca.crt 文件以跳过验证
                 touch /etc/docker/certs.d/harbor.sisys.local/ca.crt
+              fi
                 
           # 环境变量配置
           env:
