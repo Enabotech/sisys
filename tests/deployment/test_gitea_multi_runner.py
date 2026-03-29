@@ -218,8 +218,8 @@ class TestConcurrentJobExecution:
             capacity = int(capacity_env["value"])
             assert capacity >= 3, f"Runner capacity too low: {capacity}"
         else:
-            # Default capacity is usually sufficient
-            pytest.skip("GITEA_RUNNER_CAPACITY not explicitly set")
+            # GITEA_RUNNER_CAPACITY 未设置是允许的（使用默认值）
+            pytest.skip("GITEA_RUNNER_CAPACITY 未设置（可选配置，使用默认值）")
 
     @pytest.mark.integration
     def test_concurrent_pipeline_trigger(self):

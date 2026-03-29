@@ -293,7 +293,7 @@ class TestK8sExecutorIntegration:
 
             # 5. 检查 Runner Pod 是否运行
             pod_result = subprocess.run(
-                ["kubectl", "get", "pods", "-n", "gitea-actions", "-l", "app=gitea-runner"],
+                ["kubectl", "get", "pods", "-n", "gitea-actions", "-l", "app=gitea-org-runner"],
                 capture_output=True,
                 text=True,
                 check=False,

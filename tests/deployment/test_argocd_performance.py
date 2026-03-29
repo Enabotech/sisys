@@ -22,6 +22,7 @@ import statistics
 import subprocess
 import time
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import requests
@@ -32,6 +33,11 @@ from urllib3.util.retry import Retry
 pytestmark = pytest.mark.skipif(
     not subprocess.run(["kubectl", "version", "--client"], capture_output=True).returncode == 0, reason="kubectl not available"
 )
+
+# Certificate configuration for HTTPS verification
+# Uses ArgoCD self-signed certificate to avoid InsecureRequestWarning
+TEST_CERTS_DIR = Path(__file__).parent.parent / "certs"
+ARGOCD_CERT = TEST_CERTS_DIR / "argocd-sisys-local.crt"
 
 
 class TestArgoCDPerformance:
@@ -53,6 +59,15 @@ class TestArgoCDPerformance:
         Skips if pod was created more than 1 hour ago.
         """
         from datetime import timedelta
+
+        # Check if metrics.k8s.io API is available
+        metrics_check = subprocess.run(
+            ["kubectl", "api-resources", "--api-group=metrics.k8s.io"],
+            capture_output=True,
+            text=True,
+        )
+        if metrics_check.returncode != 0:
+            pytest.skip("Metrics server not available (metrics.k8s.io API)")
 
         # Get argocd-server pod
         result = subprocess.run(
@@ -78,8 +93,9 @@ class TestArgoCDPerformance:
         now = datetime.now(creation_time.tzinfo)
         pod_age = now - creation_time
 
-        # Skip if pod is older than 1 hour (not a fresh deployment)
-        if pod_age > timedelta(hours=1):
+        # Skip if pod is older than 24 hours (not a fresh deployment)
+        # 24 小时窗口允许测试在稳定环境中运行
+        if pod_age > timedelta(hours=24):
             pytest.skip(f"Pod is {pod_age.total_seconds()/3600:.1f} hours old (not a fresh deployment)")
 
         # Get pod ready time
@@ -119,7 +135,7 @@ class TestArgoCDPerformance:
         retry = Retry(total=3, backoff_factor=0.1)
         adapter = HTTPAdapter(max_retries=retry)
         session.mount("https://", adapter)
-        session.verify = False  # Self-signed certificate
+        session.verify = str(ARGOCD_CERT)  # Use self-signed certificate for verification
 
         times: list[float] = []
 
@@ -146,7 +162,7 @@ class TestArgoCDPerformance:
         Metric: GET /api/v1/session response time
         """
         session = requests.Session()
-        session.verify = False
+        session.verify = str(ARGOCD_CERT)  # Use self-signed certificate for verification
 
         start = time.time()
         _ = session.get(f"{argocd_url}/api/v1/session", timeout=5, headers={"Host": "argocd.sisys.local"})
@@ -178,6 +194,15 @@ class TestArgoCDPerformance:
         Requirement: NFR-PERF-05
         Metric: ArgoCD components CPU utilization
         """
+        # Check if metrics.k8s.io API is available
+        metrics_check = subprocess.run(
+            ["kubectl", "api-resources", "--api-group=metrics.k8s.io"],
+            capture_output=True,
+            text=True,
+        )
+        if metrics_check.returncode != 0:
+            pytest.skip("Metrics server not available (metrics.k8s.io API)")
+
         # Get ArgoCD pods
         result = subprocess.run(
             ["kubectl", "top", "pods", "-n", "argocd", "-l", "app.kubernetes.io/part-of=argocd", "--no-headers"],
@@ -219,6 +244,15 @@ class TestArgoCDPerformance:
         Requirement: NFR-PERF-06
         Metric: ArgoCD components memory utilization
         """
+        # Check if metrics.k8s.io API is available
+        metrics_check = subprocess.run(
+            ["kubectl", "api-resources", "--api-group=metrics.k8s.io"],
+            capture_output=True,
+            text=True,
+        )
+        if metrics_check.returncode != 0:
+            pytest.skip("Metrics server not available (metrics.k8s.io API)")
+
         # Get ArgoCD pods
         result = subprocess.run(
             ["kubectl", "top", "pods", "-n", "argocd", "-l", "app.kubernetes.io/part-of=argocd", "--no-headers"],
