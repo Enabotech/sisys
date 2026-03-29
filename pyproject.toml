@@ -3,8 +3,6 @@ name = "sisys"
 version = "0.1.0"
 description = "AI-driven strategic planning and decision intelligence platform for enterprises"
 authors = [{name = "Agimtech", email = "agimtech@example.com"}]
-license-files = ["LICENSE"]
-readme = "README.md"
 requires-python = ">=3.11,<3.15"
 dynamic = ["dependencies"]
 
