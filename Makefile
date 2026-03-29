@@ -371,6 +371,157 @@ docker-clean:
 	@echo "✅ Docker 环境已清理"
 
 # -----------------------------------------------------------------------------
+# Docker 基础镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
+# -----------------------------------------------------------------------------
+.PHONY: docker-build-base docker-build-dep docker-verify docker-push-base \
+        docker-build-all docker-clean-base
+
+# 镜像命名
+DOCKER_REGISTRY ?= ghcr.io/sisys
+BASE_IMAGE_NAME := sisys-base
+DEP_IMAGE_NAME := sisys-dependency
+BASE_TAG := ubuntu22.04-py311.15-poetry2.3.2
+DEP_TAG := latest
+
+# 构建基础依赖镜像（Dockerfile.dep）
+docker-build-dep:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建基础依赖镜像 (Dockerfile.dep)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)"
+	@echo "基础：Ubuntu 22.04"
+	@echo "Python: 3.11.15 (源码编译)"
+	@echo "Node.js: 20.x"
+	@echo "Poetry: 2.3.2"
+	@echo "加速源："
+	@echo "  - apt: 阿里云镜像 (http://mirrors.aliyun.com/ubuntu/)"
+	@echo "  - pip: 清华源 (https://pypi.tuna.tsinghua.edu.cn/simple)"
+	@echo "  - Poetry: 清华源 (https://pypi.tuna.tsinghua.edu.cn/simple)"
+	@echo "  - NodeSource: 清华镜像 (https://mirrors.tuna.tsinghua.edu.cn/help/nodesource.com/)"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/Dockerfile.dep \
+		-t $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG) \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo ""
+	@echo "✅ 基础依赖镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)"
+	@echo ""
+	@echo "🚀 下一步:"
+	@echo "   make docker-verify    - 验证镜像版本"
+	@echo "   make docker-push-base - 推送到镜像仓库"
+	@echo ""
+
+# 构建应用镜像（Dockerfile.app）
+docker-build-app:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建应用镜像 (Dockerfile.app)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(DEP_TAG)"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/Dockerfile.app \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(DEP_TAG) \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo ""
+	@echo "✅ 应用镜像构建完成！"
+	@echo ""
+
+# 构建生产镜像（Dockerfile.prod）
+docker-build-prod:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建生产镜像 (Dockerfile.prod)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/Dockerfile.prod \
+		-t $(DOCKER_REGISTRY)/sisys:latest \
+		-t $(DOCKER_REGISTRY)/sisys:$$(git describe --tags --always --dirty) \
+		--progress=plain \
+		.
+	@echo ""
+	@echo "✅ 生产镜像构建完成！"
+	@echo ""
+
+# 验证镜像版本
+docker-verify:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "✅ 验证基础镜像版本"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	$(DOCKER) run --rm $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG) bash -c "\
+		echo '========================================' && \
+		echo '=== Ubuntu 版本 ===' && \
+		cat /etc/os-release | grep PRETTY_NAME && \
+		echo '========================================' && \
+		echo '=== Python 版本 ===' && \
+		python --version && \
+		echo '========================================' && \
+		echo '=== Node.js 版本 ===' && \
+		node --version && \
+		echo '========================================' && \
+		echo '=== npm 版本 ===' && \
+		npm --version && \
+		echo '========================================' && \
+		echo '=== Poetry 版本 ===' && \
+		poetry --version && \
+		echo '========================================' && \
+		echo '=== pip 源配置 ===' && \
+		cat /root/.pip/pip.conf && \
+		echo '========================================' && \
+		echo '=== Poetry 源配置 ===' && \
+		cat /root/.config/pypoetry/config.toml && \
+		echo '========================================'"
+	@echo ""
+	@echo "✅ 镜像验证完成！"
+	@echo ""
+
+# 推送基础镜像到仓库
+docker-push-base:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送基础镜像到仓库"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)"
+	@echo ""
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)
+	@echo ""
+	@echo "✅ 镜像推送完成！"
+	@echo ""
+
+# 推送所有镜像
+docker-push-all:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送所有镜像到仓库"
+	@echo "═══════════════════════════════════════════════════════════"
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(DEP_TAG)
+	$(DOCKER) push $(DOCKER_REGISTRY)/sisys:latest
+	@echo ""
+	@echo "✅ 所有镜像推送完成！"
+	@echo ""
+
+# 构建所有镜像
+docker-build-all: docker-build-dep docker-build-app docker-build-prod
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "✅ 所有 Docker 镜像构建完成！"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📋 镜像列表:"
+	@echo "   - $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG)"
+	@echo "   - $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(DEP_TAG)"
+	@echo "   - $(DOCKER_REGISTRY)/sisys:latest"
+	@echo ""
+
+# 清理基础镜像
+docker-clean-base:
+	@echo "🧹 清理本地基础镜像..."
+	$(DOCKER) rmi $(DOCKER_REGISTRY)/$(BASE_IMAGE_NAME):$(BASE_TAG) || true
+	@echo "✅ 清理完成"
+
+# -----------------------------------------------------------------------------
 # 服务管理
 # -----------------------------------------------------------------------------
 .PHONY: run-server run-worker run-scheduler run-dev
@@ -671,6 +822,17 @@ help:
 	@echo "  make docker-down   - 停止 Docker 环境"
 	@echo "  make docker-build  - 构建 Docker 镜像"
 	@echo "  make docker-logs   - 查看 Docker 日志"
+	@echo "  make docker-clean  - 清理 Docker 容器"
+	@echo ""
+	@echo "🔨 Docker 镜像构建 (Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2):"
+	@echo "  make docker-build-dep   - 构建基础依赖镜像 (Dockerfile.dep)"
+	@echo "  make docker-build-app   - 构建应用镜像 (Dockerfile.app)"
+	@echo "  make docker-build-prod  - 构建生产镜像 (Dockerfile.prod)"
+	@echo "  make docker-build-all   - 构建所有镜像"
+	@echo "  make docker-verify      - 验证镜像版本"
+	@echo "  make docker-push-base   - 推送基础镜像到仓库"
+	@echo "  make docker-push-all    - 推送所有镜像到仓库"
+	@echo "  make docker-clean-base  - 清理本地基础镜像"
 	@echo ""
 	@echo "🚀 服务管理:"
 	@echo "  make run-server    - 启动开发服务器"
