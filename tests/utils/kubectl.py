@@ -5,20 +5,20 @@ Kubernetes kubectl 工具模块
 
 Usage:
     from tests.utils.kubectl import run_kubectl, KubectlError
-    
+
     # 基本用法
     result = run_kubectl(["get", "pods", "-n", "default"])
     print(result.stdout)
-    
+
     # 带错误检查
     try:
         result = run_kubectl(["get", "pod", "nonexistent"], check=True)
     except KubectlError as e:
         print(f"命令失败：{e}")
-    
+
     # 指定命名空间
     result = run_kubectl(["get", "pods"], namespace="argocd")
-    
+
     # 解析 JSON 输出
     pods = run_kubectl(["get", "pods", "-o", "json"], namespace="default").json()
 """
@@ -26,12 +26,12 @@ Usage:
 import json
 import subprocess
 from dataclasses import dataclass
-from typing import Optional, Union, Any
+from typing import Any
 
 
 class KubectlError(Exception):
     """kubectl 命令执行异常"""
-    
+
     def __init__(self, command: list[str], returncode: int, stderr: str, stdout: str = ""):
         self.command = command
         self.returncode = returncode
@@ -43,15 +43,16 @@ class KubectlError(Exception):
 @dataclass
 class KubectlResult:
     """kubectl 命令执行结果"""
+
     command: list[str]
     returncode: int
     stdout: str
     stderr: str
-    
+
     def json(self) -> Any:
         """解析 JSON 输出"""
         return json.loads(self.stdout)
-    
+
     def check(self) -> "KubectlResult":
         """检查命令是否成功，失败则抛出异常"""
         if self.returncode != 0:
@@ -61,15 +62,15 @@ class KubectlResult:
 
 def run_kubectl(
     args: list[str],
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     check: bool = False,
     timeout: int = 30,
     capture_output: bool = True,
     text: bool = True,
-) -> Union[KubectlResult, subprocess.CompletedProcess]:
+) -> KubectlResult | subprocess.CompletedProcess:
     """
     执行 kubectl 命令
-    
+
     Args:
         args: kubectl 命令参数（不包含 "kubectl"），如 ["get", "pods", "-n", "default"]
         namespace: 命名空间（可选），如果提供则自动添加 -n 参数
@@ -77,21 +78,21 @@ def run_kubectl(
         timeout: 命令超时时间（秒）
         capture_output: 是否捕获输出
         text: 是否以文本模式返回输出
-    
+
     Returns:
         KubectlResult: 命令执行结果（包含 stdout, stderr, returncode）
         或 subprocess.CompletedProcess（当 capture_output=False 时）
-    
+
     Raises:
         KubectlError: 当 check=True 且命令失败时
-    
+
     Examples:
         >>> result = run_kubectl(["get", "pods"])
         >>> print(result.stdout)
-        
+
         >>> result = run_kubectl(["get", "pods"], namespace="argocd")
         >>> pods = result.json()
-        
+
         >>> try:
         ...     result = run_kubectl(["get", "pod", "nonexistent"], check=True)
         ... except KubectlError as e:
@@ -99,14 +100,14 @@ def run_kubectl(
     """
     # 构建命令
     cmd = ["kubectl"]
-    
+
     # 添加命名空间参数
     if namespace:
         cmd.extend(["-n", namespace])
-    
+
     # 添加用户参数
     cmd.extend(args)
-    
+
     # 执行命令
     result = subprocess.run(
         cmd,
@@ -115,7 +116,7 @@ def run_kubectl(
         timeout=timeout,
         check=False,  # 不自动抛出异常，我们自己处理
     )
-    
+
     # 返回 KubectlResult 或原始结果
     if capture_output:
         kubectl_result = KubectlResult(
@@ -124,12 +125,12 @@ def run_kubectl(
             stdout=result.stdout,
             stderr=result.stderr,
         )
-        
+
         if check and result.returncode != 0:
             raise KubectlError(args, result.returncode, result.stderr, result.stdout)
-        
+
         return kubectl_result
-    
+
     return result
 
 
@@ -137,17 +138,18 @@ def run_kubectl(
 # 便捷函数（常用 kubectl 操作）
 # =============================================================================
 
+
 def get(
     resource: str,
-    name: Optional[str] = None,
-    namespace: Optional[str] = None,
+    name: str | None = None,
+    namespace: str | None = None,
     output: str = "",
-    labels: Optional[str] = None,
+    labels: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl get 命令
-    
+
     Args:
         resource: 资源类型，如 "pods", "deployments", "services"
         name: 资源名称（可选）
@@ -155,7 +157,7 @@ def get(
         output: 输出格式，如 "json", "yaml"
         labels: 标签选择器，如 "app=nginx"
         check: 是否检查错误
-    
+
     Examples:
         >>> get("pods", namespace="default")
         >>> get("pod", "my-pod", namespace="default", output="json")
@@ -170,42 +172,46 @@ def get(
         args.extend(["-o", output])
     if labels:
         args.extend(["-l", labels])
-    
-    return run_kubectl(args, check=check)
+
+    result = run_kubectl(args, check=check)
+    assert isinstance(result, KubectlResult)
+    return result
 
 
 def describe(
     resource: str,
     name: str,
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl describe 命令
-    
+
     Examples:
         >>> describe("pod", "my-pod", namespace="default")
     """
     args = ["describe", resource, name]
     if namespace:
         args.extend(["-n", namespace])
-    
-    return run_kubectl(args, check=check)
+
+    result = run_kubectl(args, check=check)
+    assert isinstance(result, KubectlResult)
+    return result
 
 
 def create(
     manifest: str,
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl create 命令（从 YAML/JSON 字符串创建）
-    
+
     Args:
         manifest: Kubernetes 资源清单（YAML 或 JSON 格式）
         namespace: 命名空间
         check: 是否检查错误
-    
+
     Examples:
         >>> create('''
         ... apiVersion: v1
@@ -221,7 +227,7 @@ def create(
     args = ["create", "-f", "-"]
     if namespace:
         args.extend(["-n", namespace])
-    
+
     return subprocess.run(
         ["kubectl"] + args,
         input=manifest,
@@ -233,12 +239,12 @@ def create(
 
 def apply(
     manifest: str,
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl apply 命令（从 YAML/JSON 字符串应用）
-    
+
     Examples:
         >>> apply('''
         ... apiVersion: v1
@@ -252,7 +258,7 @@ def apply(
     args = ["apply", "-f", "-"]
     if namespace:
         args.extend(["-n", namespace])
-    
+
     return subprocess.run(
         ["kubectl"] + args,
         input=manifest,
@@ -264,14 +270,14 @@ def apply(
 
 def delete(
     resource: str,
-    name: Optional[str] = None,
-    namespace: Optional[str] = None,
-    labels: Optional[str] = None,
+    name: str | None = None,
+    namespace: str | None = None,
+    labels: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl delete 命令
-    
+
     Examples:
         >>> delete("pod", "my-pod", namespace="default")
         >>> delete("pods", labels="app=test", namespace="default")
@@ -283,7 +289,7 @@ def delete(
         args.extend(["-n", namespace])
     if labels:
         args.extend(["-l", labels])
-    
+
     return run_kubectl(args, check=check)
 
 
@@ -291,38 +297,42 @@ def wait(
     resource: str,
     name: str,
     condition: str = "Ready",
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     timeout: str = "60s",
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl wait 命令
-    
+
     Examples:
         >>> wait("pod", "my-pod", condition="Ready", namespace="default", timeout="120s")
     """
     args = [
-        "wait", resource, name,
-        "--for", f"condition={condition}",
-        "--timeout", timeout,
+        "wait",
+        resource,
+        name,
+        "--for",
+        f"condition={condition}",
+        "--timeout",
+        timeout,
     ]
     if namespace:
         args.extend(["-n", namespace])
-    
+
     return run_kubectl(args, timeout=120, check=check)
 
 
 def logs(
     pod: str,
-    namespace: Optional[str] = None,
-    container: Optional[str] = None,
+    namespace: str | None = None,
+    container: str | None = None,
     follow: bool = False,
-    tail: Optional[int] = None,
+    tail: int | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl logs 命令
-    
+
     Examples:
         >>> logs("my-pod", namespace="default")
         >>> logs("my-pod", container="nginx", tail=100)
@@ -336,20 +346,20 @@ def logs(
         args.append("-f")
     if tail:
         args.extend(["--tail", str(tail)])
-    
+
     return run_kubectl(args, timeout=60, check=check)
 
 
 def exec_command(
     pod: str,
     command: list[str],
-    namespace: Optional[str] = None,
-    container: Optional[str] = None,
+    namespace: str | None = None,
+    container: str | None = None,
     check: bool = False,
 ) -> KubectlResult:
     """
     kubectl exec 命令
-    
+
     Examples:
         >>> exec_command("my-pod", ["ls", "-la"], namespace="default")
         >>> exec_command("my-pod", ["cat", "/etc/config"], container="sidecar")
@@ -360,7 +370,7 @@ def exec_command(
     if container:
         args.extend(["-c", container])
     args.extend(command)
-    
+
     return run_kubectl(args, check=check)
 
 
@@ -368,33 +378,33 @@ def exec_command(
 # 上下文管理器（用于临时资源）
 # =============================================================================
 
-from contextlib import contextmanager
+from contextlib import contextmanager  # noqa: E402
 
 
 @contextmanager
-def temporary_resource(manifest: str, namespace: Optional[str] = None):
+def temporary_resource(manifest: str, namespace: str | None = None):
     """
     上下文管理器：创建临时资源，退出时自动删除
-    
+
     Args:
         manifest: Kubernetes 资源清单
         namespace: 命名空间
-    
+
     Yields:
         str: 资源名称（从 manifest 中解析）
-    
+
     Examples:
         >>> with temporary_resource(pod_manifest, namespace="default") as pod_name:
         ...     # 使用临时 Pod
         ...     result = exec_command(pod_name, ["echo", "hello"])
     """
     import yaml
-    
+
     # 解析资源名称
     resource_data = yaml.safe_load(manifest)
     kind = resource_data["kind"].lower()
     name = resource_data["metadata"]["name"]
-    
+
     try:
         # 创建资源
         create(manifest, namespace=namespace, check=True)
