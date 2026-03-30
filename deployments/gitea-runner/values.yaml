@@ -23,8 +23,7 @@ image:
 
 # 环境变量配置
 env:
-  # Gitea 实例 URL (使用内部 HTTP 服务避免 TLS 问题)
-  GITEA_INSTANCE_URL: "http://gitea-http.gitea.svc.cluster.local:3000"
+  GITEA_INSTANCE_URL: "https://gitea.sisys.local"
   # Runner 名称
   GITEA_RUNNER_NAME: "k8s-runner"
   # Runner 标签（用于 Job 调度）

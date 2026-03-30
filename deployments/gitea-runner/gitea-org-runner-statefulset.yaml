@@ -123,6 +123,31 @@ spec:
                 exit 1
               fi
 
+              # 检查注册文件是否存在，不存在则自动注册
+              if [ ! -f /data/.runner ]; then
+                echo "📝 No registration file found, registering runner..."
+                /usr/local/bin/act_runner generate config \
+                  --name "${GITEA_RUNNER_NAME}" \
+                  --instance "${GITEA_INSTANCE_URL}" \
+                  --token "${GITEA_RUNNER_REGISTRATION_TOKEN}" \
+                  --labels "${GITEA_RUNNER_LABELS}" \
+                  --config /etc/act-runner/config.yaml || echo "⚠️ Config generation failed, using existing config"
+                
+                echo "🔑 Registering runner..."
+                /usr/local/bin/act_runner register \
+                  --name "${GITEA_RUNNER_NAME}" \
+                  --instance "${GITEA_INSTANCE_URL}" \
+                  --token "${GITEA_RUNNER_REGISTRATION_TOKEN}" \
+                  --labels "${GITEA_RUNNER_LABELS}" \
+                  --config /etc/act-runner/config.yaml || {
+                    echo "❌ Registration failed, exiting..."
+                    exit 1
+                  }
+                echo "✅ Runner registered successfully"
+              else
+                echo "✅ Registration file found, starting runner..."
+              fi
+
               echo "🚀 Starting act_runner..."
               exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
 
