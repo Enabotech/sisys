@@ -413,7 +413,34 @@ docker-build-dep:
 	@echo ""
 	@echo "🚀 下一步:"
 	@echo "   make docker-verify    - 验证镜像版本"
-	@echo "   make docker-push-dep - 推送到镜像仓库"
+	@echo "   make docker-build-dev - 构建开发环境镜像"
+	@echo "   make docker-push-dep  - 推送到镜像仓库"
+	@echo ""
+
+# 构建开发环境镜像（Dockerfile.dev）
+docker-build-dev:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建开发环境镜像 (Dockerfile.dev)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "基础镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)"
+	@echo "Poetry: 2.3.2"
+	@echo "依赖：pyproject.toml (包含 dev,test 组)"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/Dockerfile.dev \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG) \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo ""
+	@echo "✅ 开发环境镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)"
+	@echo ""
+	@echo "🚀 下一步:"
+	@echo "   make docker-run-dev   - 运行开发容器"
+	@echo "   make docker-push-dev  - 推送到镜像仓库"
 	@echo ""
 
 # 验证镜像版本
@@ -461,6 +488,44 @@ docker-push-dep:
 	@echo ""
 	@echo "✅ 镜像推送完成！"
 	@echo ""
+
+# -----------------------------------------------------------------------------
+# Docker 开发环境运行
+# -----------------------------------------------------------------------------
+.PHONY: docker-run-dev docker-push-dev docker-clean-dev
+
+docker-run-dev:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🚀 运行开发容器"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)"
+	@echo ""
+	@echo "💡 提示："
+	@echo "  - 容器内已预装所有依赖，无需挂载 .venv"
+	@echo "  - 代码挂载使用 -v \$$(pwd):/app 会自动包含 .venv"
+	@echo "  - 如需使用宿主机 .venv，请先执行 poetry install"
+	@echo ""
+	docker run -it --rm \
+		-v $(PWD):/app \
+		-e APP_ENV=development \
+		-p 8000:8000 \
+		$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)
+
+docker-push-dev:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送开发环境镜像到仓库"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)"
+	@echo ""
+	docker push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG)
+	@echo ""
+	@echo "✅ 开发环境镜像推送完成！"
+	@echo ""
+
+docker-clean-dev:
+	@echo "🧹 清理本地开发环境镜像..."
+	docker rmi $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):dev-$(BASE_TAG) || true
+	@echo "✅ 清理完成"
 
 # -----------------------------------------------------------------------------
 # 服务管理
@@ -768,7 +833,10 @@ help:
 	@echo "🔨 Docker 镜像构建 (Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2):"
 	@echo "  make docker-build-dep   - 构建依赖镜像 (Dockerfile.dep)"
 	@echo "  make docker-verify      - 验证镜像版本"
-	@echo "  make docker-push-dep   - 推送项目依赖镜像到仓库"
+	@echo "  make docker-build-dev   - 构建开发环境镜像 (Dockerfile.dev)"
+	@echo "  make docker-run-dev     - 运行开发容器"
+	@echo "  make docker-push-dep    - 推送项目依赖镜像到仓库"
+	@echo "  make docker-push-dev    - 推送开发环境镜像到仓库"
 	@echo ""
 	@echo "🚀 服务管理:"
 	@echo "  make run-server    - 启动开发服务器"
