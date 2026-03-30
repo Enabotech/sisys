@@ -95,15 +95,15 @@ jobs:
           mkdir -p reports/mypy
           poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt || true
 
-      - name: 上传质量报告
+      # Gitea 不支持 actions/upload-artifact，跳过上传步骤
+      # 报告已生成在 Runner 容器内，可通过日志查看
+      - name: 显示质量报告摘要
         if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: code-quality-report
-          path: |
-            reports/linting/
-            reports/mypy/
-          retention-days: 30
+        run: |
+          echo "=== Ruff 检查摘要 ==="
+          cat reports/linting/ruff-check.txt 2>/dev/null | head -20 || echo "无 Ruff 报告"
+          echo -e "\n=== MyPy 报告摘要 ==="
+          cat reports/mypy/mypy-report.txt 2>/dev/null | head -20 || echo "无 MyPy 报告"
 
   # ===========================================================================
   # 阶段 2: 单元测试 (pytest + 覆盖率) - 支持 GPU
@@ -148,21 +148,14 @@ jobs:
         run: |
           poetry run coverage report --fail-under=80
 
-      - name: 上传覆盖率报告
+      # Gitea 不支持 actions/upload-artifact，改为显示摘要
+      - name: 显示测试报告摘要
         if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: reports/coverage/
-          retention-days: 30
-
-      - name: 上传测试结果
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: unit-test-results
-          path: reports/pytest/
-          retention-days: 30
+        run: |
+          echo "=== 覆盖率报告 ==="
+          poetry run coverage report || echo "无覆盖率数据"
+          echo -e "\n=== 测试结果 ==="
+          cat reports/pytest/unit-tests.xml 2>/dev/null | head -30 || echo "无测试结果"
 
   # ===========================================================================
   # 阶段 3: 集成测试 (Docker Compose) - 支持 GPU
@@ -232,13 +225,12 @@ jobs:
             -v \
             --tb=short
 
-      - name: 上传集成测试报告
+      # Gitea 不支持 actions/upload-artifact，改为显示摘要
+      - name: 显示集成测试摘要
         if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: integration-test-results
-          path: reports/integration/
-          retention-days: 30
+        run: |
+          echo "=== 集成测试结果 ==="
+          cat reports/integration/integration-tests.xml 2>/dev/null | head -30 || echo "无测试结果"
 
   # ===========================================================================
   # 阶段 4: 安全扫描 (Trivy + Bandit)
@@ -276,13 +268,14 @@ jobs:
           output: 'reports/security/trivy-fs.sarif'
           severity: 'CRITICAL,HIGH'
 
-      - name: 上传安全报告
+      # Gitea 不支持 actions/upload-artifact，改为显示摘要
+      - name: 显示安全扫描摘要
         if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-reports
-          path: reports/security/
-          retention-days: 90
+        run: |
+          echo "=== Bandit 安全扫描 ==="
+          cat reports/security/bandit-report.txt 2>/dev/null | head -20 || echo "无 Bandit 报告"
+          echo -e "\n=== Trivy 扫描 ==="
+          cat reports/security/trivy-fs.sarif 2>/dev/null | head -30 || echo "无 Trivy 报告"
 
   # ===========================================================================
   # 阶段 5: 镜像构建 (Docker Build 多阶段)
