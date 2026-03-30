@@ -10,8 +10,9 @@
 #   - 每个 Pod 使用独立 PVC（持久化注册信息）
 #   - 组织级 Runner 自动可用于组织内所有仓库
 #   - 标签：ubuntu-latest,docker,k8s
-#   - **已修复**: 添加 Node.js 运行时支持（解决 "Cannot find: node in PATH" 错误）
-#   - **已修复**: 添加 SSL 证书支持（解决 "x509: certificate signed by unknown authority" 错误）
+#   - ✅ 已修复：使用 Docker Socket（/var/run/docker.sock）
+#   - ✅ 已修复：添加 Docker CLI 运行时支持
+#   - ✅ 已修复：添加 SSL 证书支持
 # ============================================================
 
 apiVersion: apps/v1
@@ -59,7 +60,8 @@ spec:
           imagePullPolicy: IfNotPresent
 
           # Runner 启动参数 - 使用自定义启动脚本
-          # 修复：使用清华镜像源 (HTTP) 和正确的 Alpine 版本 (v3.21)
+          # ✅ 修复：使用 Docker Socket（/var/run/docker.sock）
+          # ✅ 修复：安装 Docker CLI 支持
           command:
             - /bin/sh
             - -c
@@ -103,20 +105,27 @@ spec:
               # 安装 git, curl 和 Docker CLI (关键！)
               echo "🔧 Installing git, curl and Docker CLI..."
               apk add --no-cache git curl ca-certificates
-              
+
               # 安装 Docker CLI (用于与宿主机 Docker daemon 通信)
+              # ✅ 关键修复：确保 Docker CLI 正确安装
               if apk add --no-cache docker-cli; then
                 echo "✅ Docker CLI version: $(docker --version)"
-                # 宿主机已配置 Harbor 证书，Pod 内无需额外配置
+                # 验证 Docker socket 连接
+                echo "🔍 Testing Docker socket connection..."
+                if docker info >/dev/null 2>&1; then
+                  echo "✅ Docker socket connection successful"
+                else
+                  echo "⚠️ Docker socket connection failed, checking socket..."
+                  ls -la /var/run/docker.sock || echo "Socket file not found"
+                fi
+              else
+                echo "❌ Docker CLI install failed - CI workflows will fail!"
+                exit 1
               fi
-
-              # 安装 git 和 curl (actions 需要)
-              echo "🔧 Installing git and curl..."
-              apk add --no-cache git curl
 
               echo "🚀 Starting act_runner..."
               exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
-                
+
           # 环境变量配置
           env:
             # Gitea 实例地址（使用内部 HTTP 服务绕过 TLS 问题）
@@ -148,12 +157,12 @@ spec:
 
           # 卷挂载
           volumeMounts:
-            # Docker socket（关键！）
+            # ✅ Docker socket（关键！使用 Docker Shim）
             - name: docker-sock
               mountPath: /var/run/docker.sock
               readOnly: false
 
-            # Docker 配置 (Harbor 证书)
+            # ✅ Docker 配置 (Harbor 证书)
             - name: docker-config
               mountPath: /etc/docker
               readOnly: true
@@ -209,13 +218,13 @@ spec:
 
       # 卷配置
       volumes:
-        # Docker socket (关键！)
+        # ✅ Docker socket (使用 Docker Shim)
         - name: docker-sock
           hostPath:
             path: /var/run/docker.sock
             type: Socket
 
-        # Docker 配置 (包含 Harbor 证书和认证)
+        # ✅ Docker 配置 (包含 Harbor 证书和认证)
         - name: docker-config
           hostPath:
             path: /etc/docker
@@ -230,7 +239,7 @@ spec:
         # SSL 证书卷
         - name: ca-certificates
           secret:
-            secretName: ca-certificates  # pragma: allowlist secret
+            secretName: ca-certificates
             defaultMode: 0644
 
   # volumeClaimTemplates - StatefulSet 核心特性
