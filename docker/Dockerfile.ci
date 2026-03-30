@@ -10,7 +10,7 @@ ARG PYTORCH_IMAGE=harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9
 # =========================================
 # Stage 1: 基础环境（继承依赖镜像）
 # =========================================
-FROM harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292201 AS base
+FROM harbor.sisys.local/sisys/dependency:dep-v1.0.0-py311-poe232-node20 AS base
 
 # CI/CD 环境变量
 ENV PYTHONUNBUFFERED=1 \
