@@ -1,0 +1,250 @@
+# SISYS Docker Compose - CI/CD 环境配置
+# 用途：本地运行 CI Pipeline，验证测试结果
+# 使用：docker-compose -f docker/docker-compose.ci.yml up
+#
+# 对应 .gitea/workflows/ci.yaml 的 7 个阶段：
+# 1. 代码质量门禁 (Ruff + MyPy)
+# 2. 单元测试 (pytest + 覆盖率)
+# 3. 集成测试 (Docker Compose)
+# 4. 安全扫描 (Trivy + Bandit)
+# 5. 镜像构建 (Docker Build)
+# 6. 镜像推送 (Harbor)
+# 7. 自动部署 (ArgoCD)
+#
+# 重要：CI 镜像仅包含依赖，不包含源码
+#       源码通过卷挂载提供
+
+version: '3.8'
+
+# 通用配置模板
+x-environment: &ci-environment
+  APP_ENV: test
+  APP_DEBUG: false
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONPATH: /app/src
+  CI: "true"
+  DATABASE_URL: postgresql://test:test@postgres:5432/test_db
+  REDIS_URL: redis://redis:6379/0
+
+x-volumes: &ci-volumes
+  # 项目代码（只读）
+  - ../src:/app/src:ro
+  - ../tests:/app/tests:ro
+  - ../configs:/app/configs:ro
+  - ../scripts:/app/scripts:ro
+  - ../pyproject.toml:/app/pyproject.toml:ro
+  - ../poetry.lock:/app/poetry.lock:ro
+  # Poetry 缓存
+  - poetry_cache:/home/sisys/.cache/pypoetry
+  # 报告输出
+  - ../reports:/app/reports
+
+x-image: &ci-image
+  ${DEPENDENCY_IMAGE:-harbor.sisys.local/sisys/dependency:ci-latest}
+
+services:
+  # ===========================================================================
+  # 阶段 1: 代码质量门禁 (Ruff + MyPy)
+  # ===========================================================================
+  code-quality:
+    image: *ci-image
+    container_name: sisys-ci-quality
+    volumes:
+      - ../src:/app/src:ro
+      - ../tests:/app/tests:ro
+      - ../pyproject.toml:/app/pyproject.toml:ro
+      - ../poetry.lock:/app/poetry.lock:ro
+      - poetry_cache:/home/sisys/.cache/pypoetry
+      - ../reports:/app/reports
+    environment: *ci-environment
+    command: >
+      sh -c "
+        echo '=== Ruff 代码检查 ===' &&
+        poetry run ruff check . &&
+        echo '=== Ruff 格式化检查 ===' &&
+        poetry run ruff format --check . &&
+        echo '=== MyPy 类型检查 ===' &&
+        poetry run mypy src/ tests/ &&
+        echo '=== 质量检查通过 ==='
+      "
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 阶段 2: 单元测试 (pytest + 覆盖率)
+  # ===========================================================================
+  unit-tests:
+    image: *ci-image
+    container_name: sisys-ci-unit
+    volumes: *ci-volumes
+    environment: *ci-environment
+    command: >
+      poetry run pytest tests/unit/
+      --cov=src
+      --cov-report=xml:reports/coverage/coverage.xml
+      --cov-report=html:reports/coverage/html
+      --cov-report=term-missing
+      --cov-fail-under=80
+      --junitxml=reports/pytest/unit-tests.xml
+      -v
+      --tb=short
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 阶段 3: 集成测试 (需要 PostgreSQL 和 Redis)
+  # ===========================================================================
+  integration-tests:
+    image: *ci-image
+    container_name: sisys-ci-integration
+    volumes: *ci-volumes
+    environment: *ci-environment
+    command: >
+      poetry run pytest tests/integration/
+      --junitxml=reports/integration/integration-tests.xml
+      -v
+      --tb=short
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 阶段 4: 安全扫描 (Bandit + Safety)
+  # ===========================================================================
+  security-scan:
+    image: *ci-image
+    container_name: sisys-ci-security
+    volumes:
+      - ../src:/app/src:ro
+      - ../pyproject.toml:/app/pyproject.toml:ro
+      - ../poetry.lock:/app/poetry.lock:ro
+      - poetry_cache:/home/sisys/.cache/pypoetry
+      - ../reports:/app/reports
+    environment: *ci-environment
+    command: >
+      sh -c "
+        echo '=== Bandit 安全扫描 ===' &&
+        mkdir -p reports/security &&
+        poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true &&
+        poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true &&
+        echo '=== Safety 依赖检查 ===' &&
+        poetry run safety check --json > reports/security/safety-report.json || true &&
+        echo '=== 安全扫描完成 ==='
+      "
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 全量 CI（一键运行所有检查）
+  # ===========================================================================
+  ci-full:
+    image: *ci-image
+    container_name: sisys-ci-full
+    volumes: *ci-volumes
+    environment: *ci-environment
+    command: >
+      sh -c "
+        echo '═══════════════════════════════════════════════════════════' &&
+        echo '  SISYS CI Pipeline - 本地完整测试' &&
+        echo '═══════════════════════════════════════════════════════════' &&
+        echo '' &&
+        echo '=== 阶段 1: 代码质量门禁 ===' &&
+        poetry run ruff check . &&
+        poetry run ruff format --check . &&
+        poetry run mypy src/ tests/ &&
+        echo '' &&
+        echo '=== 阶段 2: 单元测试 ===' &&
+        poetry run pytest tests/unit/
+        --cov=src
+        --cov-report=xml:reports/coverage/coverage.xml
+        --cov-report=term-missing
+        --cov-fail-under=80
+        --junitxml=reports/pytest/unit-tests.xml
+        -v &&
+        echo '' &&
+        echo '=== 阶段 3: 集成测试 ===' &&
+        poetry run pytest tests/integration/
+        --junitxml=reports/integration/integration-tests.xml
+        -v &&
+        echo '' &&
+        echo '=== 阶段 4: 安全扫描 ===' &&
+        poetry run bandit -r src/ -f screen -l &&
+        poetry run safety check &&
+        echo '' &&
+        echo '═══════════════════════════════════════════════════════════' &&
+        echo '  ✅ CI Pipeline 完成 - 所有检查通过！' &&
+        echo '═══════════════════════════════════════════════════════════'
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 支持服务：PostgreSQL（集成测试用）
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: sisys-ci-postgres
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d test_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sisys-ci
+
+  # ===========================================================================
+  # 支持服务：Redis（缓存/队列用）
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: sisys-ci-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sisys-ci
+
+# 网络配置
+networks:
+  sisys-ci:
+    driver: bridge
+    name: sisys-ci-network
+
+# 数据卷
+volumes:
+  poetry_cache:
+    driver: local
+    name: sisys-ci-poetry-cache
+  postgres_data:
+    driver: local
+    name: sisys-ci-postgres-data
+  redis_data:
+    driver: local
+    name: sisys-ci-redis-data

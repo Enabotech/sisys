@@ -1,0 +1,157 @@
+# SISYS CI/CD Docker 命令
+# 用途：构建和运行 CI 镜像，配合 .gitea/workflows/ci.yaml 使用
+
+.PHONY: docker-build-ci docker-run-ci docker-compose-ci docker-push-ci ci-help
+
+# 镜像配置
+DOCKER_REGISTRY ?= harbor.sisys.local
+DEP_IMAGE_NAME := sisys/dependency
+CI_TAG := ci-latest
+
+# 构建 CI 镜像
+docker-build-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建 CI 镜像 (Dockerfile.ci)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)"
+	@echo "用途：Gitea CI Pipeline 预构建镜像"
+	@echo "特点：预装项目依赖，加速 CI 流程"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	docker build -f docker/Dockerfile.ci \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG) \
+		--target ci \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo ""
+	@echo "✅ CI 镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)"
+	@echo ""
+	@echo "🚀 下一步:"
+	@echo "   make -f docker/Makefile.ci docker-run-ci    - 运行 CI 测试"
+	@echo "   make -f docker/Makefile.ci docker-compose-ci - 使用 Compose 运行完整 CI"
+	@echo "   make -f docker/Makefile.ci docker-push-ci    - 推送 CI 镜像到仓库"
+	@echo ""
+
+# 构建 GPU CI 镜像
+docker-build-gpu-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建 GPU CI 镜像 (Dockerfile.ci --target gpu-ci)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG)"
+	@echo "用途：Gitea CI Pipeline GPU 测试"
+	@echo "特点：包含 PyTorch CUDA 环境"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	docker build -f docker/Dockerfile.ci \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG) \
+		--target gpu-ci \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		.
+	@echo ""
+	@echo "✅ GPU CI 镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG)"
+	@echo ""
+
+# 推送 GPU CI 镜像
+docker-push-gpu-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送 GPU CI 镜像到 Harbor"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG)"
+	@echo ""
+	docker push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG)
+	@echo ""
+	@echo "✅ GPU CI 镜像推送完成！"
+	@echo ""
+
+# 运行 CI 测试（单次运行）
+docker-run-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🧪 运行 CI 测试"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)"
+	@echo ""
+	docker run -it --rm \
+		-v $(PWD):/app \
+		$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)
+
+# 使用 Docker Compose 运行完整 CI Pipeline
+docker-compose-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🧪 运行完整 CI Pipeline（Docker Compose）"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	docker-compose -f docker/docker-compose.ci.yml up --build
+
+# 运行单个 CI 阶段
+docker-compose-ci-%:
+	@echo "🧪 运行 CI 阶段：$*"
+	docker-compose -f docker/docker-compose.ci.yml run $*
+
+# 推送 CI 镜像到 Harbor 仓库
+docker-push-ci:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送 CI 镜像到 Harbor"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)"
+	@echo ""
+	docker push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)
+	@echo ""
+	@echo "✅ CI 镜像推送完成！"
+	@echo ""
+
+# 清理 CI 容器和卷
+docker-clean-ci:
+	@echo "🧹 清理 CI 环境..."
+	docker-compose -f docker/docker-compose.ci.yml down -v
+	docker rm -f sisys-ci-quality sisys-ci-unit sisys-ci-integration sisys-ci-security sisys-ci-full 2>/dev/null || true
+	@echo "✅ 清理完成"
+
+# 帮助信息
+ci-help:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  SISYS CI/CD Docker 命令帮助"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "🔨 构建命令:"
+	@echo "  make -f docker/Makefile.ci docker-build-ci       - 构建 CI 镜像"
+	@echo "  make -f docker/Makefile.ci docker-build-gpu-ci   - 构建 GPU CI 镜像"
+	@echo ""
+	@echo "🧪 运行命令:"
+	@echo "  make -f docker/Makefile.ci docker-run-ci         - 运行 CI 测试"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci     - 运行完整 CI Pipeline"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci-code-quality    - 代码质量检查"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci-unit-tests      - 单元测试"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci-integration-tests - 集成测试"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci-security-scan   - 安全扫描"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci-ci-full         - 完整 CI 流程"
+	@echo ""
+	@echo "📤 推送命令:"
+	@echo "  make -f docker/Makefile.ci docker-push-ci        - 推送 CI 镜像到 Harbor"
+	@echo "  make -f docker/Makefile.ci docker-push-gpu-ci    - 推送 GPU CI 镜像到 Harbor"
+	@echo ""
+	@echo "🧹 清理命令:"
+	@echo "  make -f docker/Makefile.ci docker-clean-ci       - 清理 CI 环境"
+	@echo ""
+	@echo "📋 使用示例:"
+	@echo "  # 1. 构建 CI 镜像"
+	@echo "  make -f docker/Makefile.ci docker-build-ci"
+	@echo ""
+	@echo "  # 2. 运行单元测试"
+	@echo "  make -f docker/Makefile.ci docker-run-ci"
+	@echo ""
+	@echo "  # 3. 运行完整 CI Pipeline"
+	@echo "  make -f docker/Makefile.ci docker-compose-ci"
+	@echo ""
+	@echo "  # 4. 推送镜像到 Harbor（用于 Gitea CI）"
+	@echo "  make -f docker/Makefile.ci docker-push-ci"
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════"
+
+# 默认目标
+help: ci-help
