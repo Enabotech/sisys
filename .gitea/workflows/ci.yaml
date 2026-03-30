@@ -42,14 +42,7 @@ env:
   # Python 配置
   PYTHON_VERSION: "3.11"
   POETRY_VERSION: "2.3.2"
-  
-  # PyTorch 配置
-  PYTORCH_IMAGE: ${{ vars.HARBOR_REGISTRY }}/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
-  
-  # GPU 配置
-  GPU_ENABLED: ${{ vars.GPU_ENABLED || 'false' }}
-  CUDA_VERSION: "12.8"
-  
+    
   # CI 镜像标签（使用固定标签，本地手动构建）
   # 当 pyproject.toml 变更时，手动运行 make docker-build-ci 更新镜像
   CI_IMAGE_TAG: ci-latest
@@ -341,7 +334,6 @@ jobs:
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/app:buildcache,mode=max
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.CI_IMAGE_TAG }}
-            PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }}
 
       - name: 上传镜像信息
         uses: actions/upload-artifact@v4
