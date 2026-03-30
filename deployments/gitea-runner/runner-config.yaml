@@ -70,6 +70,9 @@ data:
       env:
         - DOCKER_HOST=unix:///var/run/docker.sock
         - DOCKER_TLS_CERTDIR=
+        # ✅ 禁用 Node.js TLS 证书验证（用于自签名证书环境）
+        # 解决 upload-artifact 等 Action 的证书验证失败问题
+        - NODE_TLS_REJECT_UNAUTHORIZED=0
 
       # 卷挂载（关键！挂载 docker.sock 到 Job 容器）
       volumes:
