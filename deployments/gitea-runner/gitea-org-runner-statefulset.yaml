@@ -128,9 +128,9 @@ spec:
 
           # 环境变量配置
           env:
-            # Gitea 实例地址（使用内部 HTTP 服务绕过 TLS 问题）
+            # Gitea 实例地址（使用 HTTPS 外部入口，upload-artifact 需要 TLS）
             - name: GITEA_INSTANCE_URL
-              value: "http://gitea-http.gitea.svc.cluster.local:3000"
+              value: "https://gitea.sisys.local"
 
             # Runner 名称（使用 Pod 名称后缀区分）
             - name: GITEA_RUNNER_NAME
