@@ -57,6 +57,7 @@ data:
       # Docker 选项（关键！启用 Docker in Docker）
       # ✅ 特权模式：允许容器内运行 Docker 命令
       # ✅ 添加 DNS 配置以支持 Kubernetes 服务发现
+      # ✅ 传递 SSL 环境变量到 Job 容器（解决自签名证书问题）
       options: |
         --privileged
         --tmpfs /tmp
@@ -65,19 +66,21 @@ data:
         --dns-search gitea-actions.svc.cluster.local
         --dns-search svc.cluster.local
         --dns-search cluster.local
+        -e GIT_SSL_NO_VERIFY=true
+        -e NODE_TLS_REJECT_UNAUTHORIZED=0
 
-      # 环境变量
+      # 环境变量（仅用于 Runner 容器本身）
       env:
         - DOCKER_HOST=unix:///var/run/docker.sock
         - DOCKER_TLS_CERTDIR=
-        # ✅ 禁用 Node.js TLS 证书验证（用于自签名证书环境）
-        # 解决 upload-artifact 等 Action 的证书验证失败问题
-        - NODE_TLS_REJECT_UNAUTHORIZED=0
 
       # 卷挂载（关键！挂载 docker.sock 到 Job 容器）
       volumes:
+        # Docker socket
         - /var/run/docker.sock:/var/run/docker.sock
+        # 工作目录
         - /workspace:/workspace
+        # 临时目录
         - /tmp:/tmp
 
     # 缓存配置

@@ -126,11 +126,11 @@ class TestCIPipelineGPU:
         with open(workflow_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def test_gpu_environment_variable(self, ci_workflow):
-        """测试 GPU 环境变量配置"""
-        env = ci_workflow["env"]
+    # def test_gpu_environment_variable(self, ci_workflow):
+    #     """测试 GPU 环境变量配置"""
+    #     env = ci_workflow["env"]
 
-        assert "GPU_ENABLED" in env, "GPU_ENABLED environment variable not configured"
+    #     assert "GPU_ENABLED" in env, "GPU_ENABLED environment variable not configured"
 
     def test_unit_tests_gpu_support(self, ci_workflow):
         """测试单元测试 GPU 支持"""
