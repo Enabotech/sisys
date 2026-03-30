@@ -11,17 +11,16 @@
 - 推送的镜像可被拉取
 """
 
-import os
 import subprocess
 import time
 
 import pytest
-from tests.utils.kubectl import run_kubectl
 
 # =============================================================================
 # 配置常量 - 从统一配置模块加载
 # =============================================================================
 from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
+from tests.utils.kubectl import run_kubectl
 
 HARBOR_NAMESPACE = TestConfig.get_harbor_config()["namespace"]
 HARBOR_HOST = TestConfig.get_harbor_config()["ingress_host"]
@@ -209,8 +208,6 @@ class TestImagePush:
 
         # 使用 --password-stdin 避免警告
         # 使用列表形式避免 shell 转义问题（特别是 $ 符号）
-        import subprocess
-
         login_process = subprocess.Popen(
             ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
             stdin=subprocess.PIPE,

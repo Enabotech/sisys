@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from tests.utils.kubectl import run_kubectl
 
 
@@ -414,18 +415,21 @@ class TestArgoCDApplicationDeployment:
                 ["annotate", "application", "sisys-app", "argocd.argoproj.io/refresh=hard", "-n", "argocd"],
                 check=False,
             )
-            
+
             if trigger_result.returncode == 0:
                 print("✅ 同步已触发，等待 30 秒...")
                 import time
+
                 time.sleep(30)
-                
+
                 # 重新检查
-                app = json.loads(run_kubectl(
-                    ["get", "application", "sisys-app", "-n", "argocd", "-o", "json"],
-                    check=False,
-                ).stdout)
-                
+                app = json.loads(
+                    run_kubectl(
+                        ["get", "application", "sisys-app", "-n", "argocd", "-o", "json"],
+                        check=False,
+                    ).stdout
+                )
+
                 operation_history = app.get("status", {}).get("operationHistory", [])
                 if operation_history:
                     print(f"✅ Application 同步历史：{len(operation_history)} 条记录")

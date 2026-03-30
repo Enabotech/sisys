@@ -342,7 +342,9 @@ class TestJobDependencies:
                 jobs = workflow.get("jobs", {})
 
                 # 检查依赖关系
-                assert "pre-deployment-check" in jobs.get("deploy-test", {}).get("needs", []), "deploy-test 应依赖 pre-deployment-check"
+                assert "pre-deployment-check" in jobs.get("deploy-test", {}).get(
+                    "needs", []
+                ), "deploy-test 应依赖 pre-deployment-check"
 
                 assert "deploy-test" in jobs.get("health-check", {}).get("needs", []), "health-check 应依赖 deploy-test"
 

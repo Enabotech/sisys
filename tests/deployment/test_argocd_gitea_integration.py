@@ -145,20 +145,22 @@ class TestArgoCDGiteaIntegration:
             )
             if token_result.returncode == 0:
                 import base64
+
                 gitea_token = base64.b64decode(token_result.stdout.strip()).decode("utf-8")
-        
+
         if not gitea_token:
             pytest.skip("Gitea Token 未配置")
-        
+
         # 使用 kubectl 验证 ArgoCD 可以配置 Gitea 仓库（无需 CLI）
         # 检查 argocd-secret 中是否有 Gitea 凭据
         result = run_kubectl(
             ["get", "secret", "argocd-secret", "-n", argocd_namespace, "-o", "jsonpath={.data.url}"],
             check=False,
         )
-        
+
         if result.returncode == 0:
             import base64
+
             try:
                 url = base64.b64decode(result.stdout.strip()).decode("utf-8")
                 if "gitea" in url.lower():
@@ -166,7 +168,7 @@ class TestArgoCDGiteaIntegration:
                     return
             except Exception:
                 pass
-        
+
         # 如果没有配置，验证凭据可用（使用 kubectl 创建仓库 Secret）
         print("✅ Gitea Token 可用，ArgoCD 可配置仓库")
 

@@ -167,6 +167,17 @@ line-length = 128
 target-version = "py311"
 select = ["E", "F", "I", "N", "W", "UP"]
 
+# 排除外部目录和生成文件
+extend-exclude = [
+    ".qwen/",
+    "_bmad/",
+    ".git/",
+    "__pycache__/",
+    "*.egg-info/",
+    ".venv/",
+    "venv/",
+]
+
 # Mypy Configuration
 [tool.mypy]
 python_version = "3.11"
