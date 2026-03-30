@@ -1,0 +1,190 @@
+# =========================================
+# sisys - CI/CD 专用 Dockerfile
+# 基础镜像：harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292201
+# 用途：Gitea CI Pipeline 预构建镜像（仅包含依赖，不包含源码）
+# =========================================
+
+# 构建参数
+ARG PYTORCH_IMAGE=harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
+
+# =========================================
+# Stage 1: 基础环境（继承依赖镜像）
+# =========================================
+FROM harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292201 AS base
+
+# CI/CD 环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PIP_NO_CACHE_DIR=1 \
+    CI=true \
+    APP_HOME=/app \
+    APP_USER=sisys
+
+WORKDIR ${APP_HOME}
+
+# =========================================
+# Stage 2: 安装项目依赖（分层缓存优化）
+# =========================================
+FROM base AS dependencies
+
+# 仅复制依赖配置文件（最大化利用 Docker 层缓存）
+COPY pyproject.toml poetry.lock ./
+
+# 分层安装依赖（按组分离，优化缓存）
+RUN poetry install --only main --no-root --no-interaction && \
+    poetry install --with dev --no-root --no-interaction && \
+    poetry install --with test --no-root --no-interaction
+
+# =========================================
+# Stage 3: CI 环境（仅包含依赖，不包含源码）
+# =========================================
+FROM base AS ci
+
+USER root
+
+# 从 dependencies 阶段复制虚拟环境
+COPY --from=dependencies ${APP_HOME}/.venv ${APP_HOME}/.venv
+
+# 复制项目配置文件（用于 poetry run 命令）
+COPY --chown=${APP_USER}:${APP_USER} pyproject.toml poetry.lock ./
+
+# 预创建报告目录（便于 CI 报告持久化）
+RUN mkdir -p reports/coverage reports/pytest reports/linting reports/security && \
+    chown -R ${APP_USER}:${APP_USER} ${APP_HOME}
+
+USER ${APP_USER}
+
+# 激活虚拟环境
+ENV VIRTUAL_ENV="${APP_HOME}/.venv" \
+    PATH="${APP_HOME}/.venv/bin:${PATH}" \
+    PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}" \
+    PYTEST_ADDOPTS="--color=yes"
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD poetry run python -c "print('CI OK')" || exit 1
+
+# 镜像标签
+LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
+      org.opencontainers.image.description="SISYS CI/CD Environment - Dependencies only, source code mounted at runtime" \
+      org.opencontainers.image.licenses="Proprietary" \
+      sisys.image.type="ci" \
+      sisys.python.version="3.11.15" \
+      sisys.poetry.version="2.3.2" \
+      sisys.ci.version="1.0.0"
+
+# 默认命令：运行所有测试（代码通过卷挂载提供）
+CMD ["poetry", "run", "pytest", "tests/", "-v", "--tb=short"]
+
+# =========================================
+# Stage 4: 代码质量专用环境（可选）
+# =========================================
+FROM ci AS quality
+
+# 质量检查入口脚本
+COPY <<EOF /usr/local/bin/quality-check.sh
+#!/bin/bash
+set -e
+echo "=== 代码质量检查 ==="
+poetry run ruff check .
+poetry run ruff format --check .
+poetry run mypy src/ tests/
+echo "=== 质量检查通过 ==="
+EOF
+
+RUN chmod +x /usr/local/bin/quality-check.sh
+
+CMD ["/usr/local/bin/quality-check.sh"]
+
+# =========================================
+# Stage 5: 安全扫描专用环境（可选）
+# =========================================
+FROM ci AS security
+
+# 安全扫描入口脚本
+COPY <<EOF /usr/local/bin/security-scan.sh
+#!/bin/bash
+set -e
+echo "=== 安全扫描 ==="
+mkdir -p reports/security
+poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
+poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true
+poetry run safety check --json > reports/security/safety-report.json || true
+echo "=== 安全扫描完成 ==="
+EOF
+
+RUN chmod +x /usr/local/bin/security-scan.sh
+
+CMD ["/usr/local/bin/security-scan.sh"]
+
+# =========================================
+# Stage 6: GPU CI 环境（可选，用于 GPU 测试）
+# =========================================
+FROM ${PYTORCH_IMAGE} AS gpu-ci-base
+
+# 继承基础镜像的 Python 和 Poetry 配置
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PIP_NO_CACHE_DIR=1 \
+    CI=true \
+    APP_HOME=/app \
+    APP_USER=sisys
+
+WORKDIR ${APP_HOME}
+
+# 安装系统依赖（GPU 相关）
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 复制 Poetry 配置
+COPY --chown=${APP_USER}:${APP_USER} pyproject.toml poetry.lock ./
+
+# 安装项目依赖（包含 PyTorch）
+USER ${APP_USER}
+RUN poetry install --only main --no-root --no-interaction
+
+# =========================================
+# Stage 7: GPU CI 测试环境
+# =========================================
+FROM gpu-ci-base AS gpu-ci
+
+USER root
+
+# 从 gpu-ci-base 复制虚拟环境
+COPY --from=gpu-ci-base ${APP_HOME}/.venv ${APP_HOME}/.venv
+
+# 预创建报告目录
+RUN mkdir -p reports/gpu && \
+    chown -R ${APP_USER}:${APP_USER} ${APP_HOME}
+
+USER ${APP_USER}
+
+# 激活虚拟环境
+ENV VIRTUAL_ENV="${APP_HOME}/.venv" \
+    PATH="${APP_HOME}/.venv/bin:${PATH}" \
+    PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}" \
+    CUDA_VISIBLE_DEVICES=all
+
+# GPU 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD poetry run python -c "import torch; assert torch.cuda.is_available(); print('GPU OK')" || exit 1
+
+# 镜像标签
+LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
+      org.opencontainers.image.description="SISYS GPU CI/CD Environment" \
+      sisys.image.type="gpu-ci" \
+      sisys.cuda.version="12.8"
+
+# 默认命令：运行 GPU 测试
+CMD ["poetry", "run", "pytest", "tests/", "-v", "-m", "gpu", "--tb=short"]
