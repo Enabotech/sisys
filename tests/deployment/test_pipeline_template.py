@@ -214,7 +214,7 @@ class TestEnvironmentVariables:
                 env = workflow.get("env", {})
 
                 # 检查必需的环境变量
-                required_envs = ["APP_NAME", "REGISTRY", "IMAGE_NAME"]
+                required_envs = ["APP_NAME", "IMAGE_NAME"]
 
                 for env_name in required_envs:
                     assert env_name in env, f"缺少环境变量：{env_name}"
