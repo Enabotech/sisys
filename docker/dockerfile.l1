@@ -1,6 +1,6 @@
 # =========================================
-# sisys - 开发环境基础镜像
-# 基础镜像：Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2
+# sisys - Layer 1 基础依赖镜像
+# 基础镜像：Ubuntu 22.04 + Python 3.11.15 + Node.js 20.x + Poetry 2.3.2 + Docker 24.0.9
 # 加速源：清华大学开源软件镜像站
 # =========================================
 
@@ -11,7 +11,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Shanghai \
     PYTHON_VERSION=3.11.15 \
     POETRY_VERSION=2.3.2 \
-    NODE_VERSION=20.x
+    NODE_VERSION=20.x \
+    DOCKER_VERSION=24.0.9
 
 # =========================================
 # 1. 配置 apt 镜像源 (使用阿里云源，HTTPS 兼容性更好)
@@ -106,7 +107,44 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get clean
 
 # =========================================
-# 6. 安装 Poetry 2.3.2 (使用清华源)
+# 6. 安装 Docker 24.0.9 (使用官方源)
+# =========================================
+WORKDIR /tmp
+
+# 添加 Docker 官方 GPG 密钥
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+# 添加 Docker 仓库到 apt 源
+RUN echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu \
+    $(lsb_release -cs) stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 安装 Docker Engine 24.0.9
+RUN apt-get update && \
+    DOCKER_VERSION_STRING="5:24.0.9-1~ubuntu.22.04~jammy" && \
+    apt-get install -y --no-install-recommends \
+        docker-ce=${DOCKER_VERSION_STRING} \
+        docker-ce-cli=${DOCKER_VERSION_STRING} \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
+
+# 验证 Docker 安装
+RUN docker --version && \
+    dockerd --version && \
+    docker compose version
+
+# 将当前用户添加到 docker 组
+RUN usermod -aG docker sisys || true
+
+# =========================================
+# 7. 安装 Poetry 2.3.2 (使用清华源)
 # =========================================
 # 设置 Poetry 环境变量
 ENV POETRY_HOME="/opt/poetry" \
@@ -133,7 +171,7 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 RUN poetry --version
 
 # =========================================
-# 7. 创建应用用户和目录
+# 8. 创建应用用户和目录
 # =========================================
 RUN groupadd --gid 1000 sisys && \
     useradd --uid 1000 --gid sisys --shell /bin/bash --create-home sisys
@@ -148,7 +186,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
     chown sisys:sisys /usr/local/bin/entrypoint.sh
 
 # =========================================
-# 8. 配置工作目录和环境
+# 9. 配置工作目录和环境
 # =========================================
 USER sisys
 
@@ -161,25 +199,26 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # =========================================
-# 9. 健康检查
+# 10. 健康检查
 # =========================================
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python --version && poetry --version && node --version || exit 1
+    CMD python --version && poetry --version && node --version && docker --version || exit 1
 
 # =========================================
-# 10. 镜像标签
+# 11. 镜像标签
 # =========================================
 LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
-      org.opencontainers.image.description="SISYS Development Environment - Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2" \
+      org.opencontainers.image.description="SISYS Layer 1 Base Image - Ubuntu 22.04 + Python 3.11.15 + Node.js 20.x + Poetry 2.3.2 + Docker 24.0.9" \
       org.opencontainers.image.licenses="Proprietary" \
       sisys.python.version="3.11.15" \
       sisys.nodejs.version="20.x" \
       sisys.poetry.version="2.3.2" \
+      sisys.docker.version="24.0.9" \
       sisys.ubuntu.version="22.04" \
       sisys.mirror.provider="Tsinghua University"
 
 # =========================================
-# 11. 入口点和默认命令
+# 12. 入口点和默认命令
 # =========================================
 # ENTRYPOINT 设计说明：
 # - 开发模式：直接运行容器，进入交互式 bash

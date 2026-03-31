@@ -94,6 +94,13 @@ l1-v1.0.0-08058ac
 # - layer: l1 (固定)
 # - semver: 基础镜像版本号
 # - git_sha: Git 提交 SHA (前 7 位)
+
+# 包含内容
+# - Ubuntu 22.04
+# - Python 3.11.15 (源码编译)
+# - Node.js 20.x
+# - Poetry 2.3.2
+# - Docker 24.0.9 (含 buildx 和 compose 插件)
 ```
 
 #### Layer 2: CI/CD 依赖镜像
