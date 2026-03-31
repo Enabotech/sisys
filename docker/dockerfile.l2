@@ -2,6 +2,7 @@
 # sisys - L2 镜像 / CI/CD 专用 Dockerfile
 # 基础镜像：harbor.sisys.local/sisys/dependency:l1-latest
 # 用途：Gitea CI Pipeline 预构建镜像（仅包含依赖，不包含源码）
+# 包含：Trivy 安全扫描工具 v0.69.3
 # =========================================
 
 # 构建参数
@@ -20,9 +21,32 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     CI=true \
     APP_HOME=/app \
-    APP_USER=sisys
+    APP_USER=sisys \
+    TRIVY_VERSION=0.69.3
 
 WORKDIR ${APP_HOME}
+
+# =========================================
+# 安装 Trivy 安全扫描工具 (从本地 Harbor 仓库)
+# =========================================
+USER root
+
+RUN set -eux; \
+    # 下载 Trivy deb 包 (使用本地 Harbor 仓库，跳过证书验证)
+    wget --no-check-certificate \
+        https://gitea.sisys.local/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb \
+        -O /tmp/trivy.deb; \
+    # 安装 Trivy
+    dpkg -i /tmp/trivy.deb; \
+    # 清理下载文件
+    rm -f /tmp/trivy.deb; \
+    # 验证 Trivy 安装
+    trivy --version; \
+    # 配置 Trivy 缓存目录
+    mkdir -p /root/.cache/trivy; \
+    chown -R ${APP_USER}:${APP_USER} /root/.cache/trivy
+
+USER ${APP_USER}
 
 # =========================================
 # Stage 2: 安装项目依赖（分层缓存优化）
@@ -68,11 +92,12 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # 镜像标签
 LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
-      org.opencontainers.image.description="SISYS CI/CD Environment - Dependencies only, source code mounted at runtime" \
+      org.opencontainers.image.description="SISYS CI/CD Environment - Dependencies + Trivy v0.69.3" \
       org.opencontainers.image.licenses="Proprietary" \
       sisys.image.type="ci" \
       sisys.python.version="3.11.15" \
       sisys.poetry.version="2.3.2" \
+      sisys.trivy.version="0.69.3" \
       sisys.ci.version="1.0.0"
 
 # 默认命令：运行所有测试（代码通过卷挂载提供）
@@ -103,15 +128,23 @@ CMD ["/usr/local/bin/quality-check.sh"]
 # =========================================
 FROM ci AS security
 
-# 安全扫描入口脚本
+# 安全扫描入口脚本（使用 Trivy）
 COPY <<EOF /usr/local/bin/security-scan.sh
 #!/bin/bash
 set -e
 echo "=== 安全扫描 ==="
 mkdir -p reports/security
+
+# Python 代码安全扫描 (Bandit)
+echo "🔍 运行 Bandit 代码安全扫描..."
 poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
 poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true
-poetry run safety check --json > reports/security/safety-report.json || true
+
+# 依赖漏洞扫描 (Trivy)
+echo "🔍 运行 Trivy 依赖漏洞扫描..."
+trivy fs --format json --output reports/security/trivy-fs.json . || true
+trivy fs --format table --output reports/security/trivy-fs.txt . || true
+
 echo "=== 安全扫描完成 ==="
 EOF
 

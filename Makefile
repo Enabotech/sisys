@@ -489,7 +489,7 @@ docker-push-l1: docker-build-l1
 # =============================================================================
 # Layer 2: CI/CD 依赖镜像 (CI/CD Dependency Image)
 # 格式：l2-v{major}.{minor}.{patch}-{git_sha}
-# 说明：基于 L1 + 项目依赖 (pyproject.toml)
+# 说明：基于 L1 + 项目依赖 (pyproject.toml) + Trivy 安全扫描工具
 # =============================================================================
 L2_VERSION := 1.0.0
 L2_GIT_SHA := $(shell git rev-parse --short HEAD)
@@ -505,6 +505,7 @@ docker-build-l2:
 	@echo "版本：l2-v$(L2_VERSION)-$(L2_GIT_SHA)"
 	@echo "基础：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
 	@echo "依赖：pyproject.toml"
+	@echo "工具：Trivy v0.69.3 (安全扫描)"
 	@echo ""
 	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
 	@echo ""
