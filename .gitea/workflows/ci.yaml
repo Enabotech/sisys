@@ -196,6 +196,11 @@ jobs:
     # ✅ 逻辑：除非 (GPU 开启 且 消息包含 [no gpu])，否则都运行
     if: ${{ !(vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[no gpu]')) }}
 
+    # ===========================================================================
+    # 服务容器配置
+    # ✅ 最佳实践：不使用端口映射，通过容器网络（DNS 名称）通信
+    # ✅ 兼容性：支持 bridge/host/container 所有网络模式
+    # ===========================================================================
     services:
       postgres:
         image: postgres:15-alpine
@@ -203,8 +208,7 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test  # pragma: allowlist secret
           POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
+        # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -213,8 +217,7 @@ jobs:
 
       redis:
         image: redis:7-alpine
-        ports:
-          - 6379:6379
+        # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -233,12 +236,14 @@ jobs:
       - name: 等待 PostgreSQL 就绪
         run: |
           echo "等待 PostgreSQL 就绪..."
+          # ✅ 使用服务名访问（兼容所有网络模式）
           until pg_isready -h postgres -p 5432 -U test; do sleep 1; done
           echo "✅ PostgreSQL 就绪"
 
       - name: 等待 Redis 就绪
         run: |
           echo "等待 Redis 就绪..."
+          # ✅ 使用服务名访问（兼容所有网络模式）
           until redis-cli -h redis ping | grep -q PONG; do sleep 1; done
           echo "✅ Redis 就绪"
 
