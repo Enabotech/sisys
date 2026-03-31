@@ -115,7 +115,7 @@ jobs:
     container:
       # ✅ 使用预构建 CI 镜像（固定标签，本地手动构建）
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.CI_IMAGE_TAG }}
-      options: --user root
+      options: --user root --gpus all
 
     # ✅ 逻辑：除非 (GPU 开启 且 消息包含 [no gpu])，否则都运行
     if: ${{ !(vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[no gpu]')) }}
@@ -132,7 +132,23 @@ jobs:
       - name: 验证 GPU 可用性
         if: ${{ vars.GPU_ENABLED == 'true' }}
         run: |
-          poetry run python -c "import torch; print(f'CUDA 可用：{torch.cuda.is_available()}')" || echo "GPU 不可用，使用 CPU 模式"
+          poetry run python -c "
+          import sys
+          import torch
+
+          is_cuda = torch.cuda.is_available()
+          version = torch.__version__
+
+          print(f'CUDA  ：{torch.cuda.is_available()}')
+          print(f'Torch ：{torch.__version__}')
+
+          if not is_cuda:
+              print('❌ 错误：GPU_ENABLED 为 true，但 CUDA 不可用！')
+              print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动。')
+              sys.exit(1)
+
+          print('✅ GPU 验证通过')
+          "
 
       - name: 运行单元测试
         run: |
