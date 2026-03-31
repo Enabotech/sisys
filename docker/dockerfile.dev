@@ -1,0 +1,97 @@
+# =========================================
+# sisys - 开发环境 Dockerfile
+# 基础镜像：harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292201
+# 用途：项目开发与测试环境
+# =========================================
+
+# =========================================
+# Stage 1: 使用基础依赖镜像
+# =========================================
+FROM harbor.sisys.local/sisys/dependency:dep-v1.0.0-202603292201 AS base
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PIP_NO_CACHE_DIR=1 \
+    APP_HOME=/app \
+    APP_USER=sisys
+
+# 设置工作目录
+WORKDIR ${APP_HOME}
+
+# =========================================
+# Stage 2: 安装项目依赖
+# =========================================
+FROM base AS dependencies
+
+# 复制 Poetry 配置文件
+COPY pyproject.toml poetry.lock ./
+
+# 安装项目依赖（包含开发依赖）
+# 使用 --no-root 避免安装包本身
+RUN poetry install --with dev,test --no-root --no-interaction
+
+# =========================================
+# Stage 3: 开发环境
+# =========================================
+FROM base AS dev
+
+# 切换回 root 用户进行安装
+USER root
+
+# 设置工作目录
+WORKDIR ${APP_HOME}
+
+# 从 dependencies 阶段复制虚拟环境
+COPY --from=dependencies /app/.venv ${APP_HOME}/.venv
+
+# 复制 Poetry 配置文件（用于 poetry run 命令）
+COPY pyproject.toml poetry.lock ./
+
+# 复制项目源代码
+COPY src/ ./src/
+COPY tests/ ./tests/
+
+# 复制配置文件
+COPY .env.example .env
+
+# 复制可选目录（如果存在）
+COPY configs/ ./configs/
+COPY scripts/ ./scripts/
+
+# 复制入口脚本
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    chown ${APP_USER}:${APP_USER} /usr/local/bin/entrypoint.sh
+
+# 设置项目目录权限
+RUN chown -R ${APP_USER}:${APP_USER} ${APP_HOME}
+
+# 切换到非 root 用户
+USER ${APP_USER}
+
+# 激活虚拟环境
+ENV VIRTUAL_ENV="${APP_HOME}/.venv" \
+    PATH="${APP_HOME}/.venv/bin:${PATH}" \
+    PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}"
+
+# 暴露端口
+EXPOSE 8000 8080 9090
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD poetry run python -c "print('OK')" || exit 1
+
+# 镜像标签
+LABEL org.opencontainers.image.source="https://github.com/sisys/sisys" \
+      org.opencontainers.image.description="SISYS Development Environment - Based on dependency image" \
+      org.opencontainers.image.licenses="Proprietary" \
+      sisys.image.type="development" \
+      sisys.python.version="3.11.15" \
+      sisys.poetry.version="2.3.2"
+
+# 入口点和默认命令
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/bin/bash"]

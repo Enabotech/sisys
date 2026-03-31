@@ -332,17 +332,17 @@ class TestDockerfiles:
 
     def test_dependency_dockerfile_exists(self):
         """测试依赖 Dockerfile 存在"""
-        dockerfile_path = Path("docker/Dockerfile.dependency")
+        dockerfile_path = Path("docker/dockerfile.l2")
         assert dockerfile_path.exists(), "Dependency Dockerfile not found"
 
     def test_app_dockerfile_exists(self):
         """测试应用 Dockerfile 存在"""
-        dockerfile_path = Path("docker/Dockerfile.app")
+        dockerfile_path = Path("docker/dockerfile.app")
         assert dockerfile_path.exists(), "App Dockerfile not found"
 
     def test_dependency_dockerfile_base_image(self):
         """测试依赖 Dockerfile 基础镜像"""
-        dockerfile_path = Path("docker/Dockerfile.dependency")
+        dockerfile_path = Path("docker/dockerfile.l2")
 
         with open(dockerfile_path, encoding="utf-8") as f:
             content = f.read()
@@ -352,7 +352,7 @@ class TestDockerfiles:
 
     def test_dependency_dockerfile_poetry(self):
         """测试依赖 Dockerfile 安装 Poetry"""
-        dockerfile_path = Path("docker/Dockerfile.dependency")
+        dockerfile_path = Path("docker/dockerfile.l2")
 
         with open(dockerfile_path, encoding="utf-8") as f:
             content = f.read()
@@ -361,7 +361,7 @@ class TestDockerfiles:
 
     def test_app_dockerfile_multistage(self):
         """测试应用 Dockerfile 多阶段构建"""
-        dockerfile_path = Path("docker/Dockerfile.app")
+        dockerfile_path = Path("docker/dockerfile.app")
 
         with open(dockerfile_path, encoding="utf-8") as f:
             content = f.read()

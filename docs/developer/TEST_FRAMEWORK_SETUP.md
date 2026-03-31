@@ -1063,7 +1063,7 @@ class TestHarborIntegration:
         import subprocess
 
         # 构建测试镜像
-        dockerfile = Path(__file__).parent / "fixtures" / "Dockerfile.test"
+        dockerfile = Path(__file__).parent / "fixtures" / "dockerfile.test"
         image_tag = f"{os.getenv('HARBOR_URL')}/{test_project}/test-image:test"
 
         result = subprocess.run(

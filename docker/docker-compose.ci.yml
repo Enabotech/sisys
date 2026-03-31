@@ -24,7 +24,7 @@ x-environment: &ci-environment
   PYTHONDONTWRITEBYTECODE: "1"
   PYTHONPATH: /app/src
   CI: "true"
-  DATABASE_URL: postgresql://test:test@postgres:5432/test_db
+  DATABASE_URL: postgresql://test:test@postgres:5432/test_db    # pragma: allowlist secret
   REDIS_URL: redis://redis:6379/0
 
 x-volumes: &ci-volumes
@@ -199,7 +199,7 @@ services:
     container_name: sisys-ci-postgres
     environment:
       POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
+      POSTGRES_PASSWORD: test    # pragma: allowlist secret
       POSTGRES_DB: test_db
     ports:
       - "5432:5432"
@@ -217,7 +217,7 @@ services:
   # 支持服务：Redis（缓存/队列用）
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: sisys-ci-redis
     ports:
       - "6379:6379"

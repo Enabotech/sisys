@@ -158,7 +158,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 |------|------|------|
 | `.github/workflows/ci.yml` | CI 流水线 | PR/代码提交触发（6 个 Job） |
 | `.github/workflows/cd.yml` | CD 流水线 | main 分支触发（4 个 Job） |
-| `docker/Dockerfile.prod` | 生产 Dockerfile | 多阶段构建 |
+| `docker/dockerfile.prod` | 生产 Dockerfile | 多阶段构建 |
 | `docker/docker-compose.prod.yml` | 生产编排 | 资源限制/健康检查 |
 | `docker/docker-compose.test.yml` | 测试编排 | 自动清理测试数据 |
 | `scripts/testing/run_tests.sh` | 测试运行 | 单元/集成/E2E 测试 |
@@ -302,7 +302,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 **已实现的文件：**
 - `.github/workflows/ci.yml` - CI 流水线（6 个 Job）
 - `.github/workflows/cd.yml` - CD 流水线（4 个 Job）
-- `docker/Dockerfile.prod` - 生产 Dockerfile（多阶段构建）
+- `docker/dockerfile.prod` - 生产 Dockerfile（多阶段构建）
 - `docker/docker-compose.prod.yml` - 生产 Docker Compose 配置
 - `docker/docker-compose.test.yml` - 测试环境 Docker Compose 配置
 - `scripts/testing/run_tests.sh` - 测试运行脚本
@@ -317,7 +317,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 **代码审查修复 (2026-03-02)：**
 - ✅ `.github/workflows/ci.yml` - 覆盖率阈值、安全扫描、Trivy、Codecov 修复
 - ✅ `.github/workflows/cd.yml` - Trivy 扫描修复、生产部署实现
-- ✅ `docker/Dockerfile.prod` - 健康检查间隔优化
+- ✅ `docker/dockerfile.prod` - 健康检查间隔优化
 - ✅ `docker/docker-compose.prod.yml` - 镜像标签策略优化（使用环境变量）
 - ✅ 新增 Kubernetes 部署配置支持
 
@@ -414,7 +414,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 **修改文件:**
 - `.github/workflows/ci.yml` - 安全扫描和覆盖率修复
 - `.github/workflows/cd.yml` - 生产部署实现、Trivy 修复
-- `docker/Dockerfile.prod` - 健康检查优化
+- `docker/dockerfile.prod` - 健康检查优化
 - `docker/docker-compose.prod.yml` - 镜像标签策略优化
 
 **审查状态:** 所有 HIGH 和 MEDIUM 问题已修复，Story 状态更新为 "review"

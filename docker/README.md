@@ -21,7 +21,7 @@ make docker-build-dep
 
 # 或使用 Docker 命令
 export DOCKER_BUILDKIT=1
-docker build -f docker/Dockerfile.dep \
+docker build -f docker/dockerfile.l1 \
     -t harbor.sisys.local/sisys/dependency:dep-v1.0.0-$(date +%Y%m%d%H%M) \
     --progress=plain \
     .
@@ -54,17 +54,17 @@ make docker-push-base
 
 ## 📦 Dockerfile 说明
 
-### Dockerfile.dep - 基础依赖镜像
+### dockerfile.l1 - 基础依赖镜像
 - **用途**: 包含 Python、Node.js、Poetry 等基础依赖
 - **更新频率**: 低（依赖版本变更时）
 - **构建时间**: ~10-15 分钟（首次构建）
 
-### Dockerfile.app - 应用镜像
+### dockerfile.app - 应用镜像
 - **用途**: 基于基础镜像，包含应用代码和项目依赖
 - **更新频率**: 中（代码提交时）
 - **构建时间**: ~3-5 分钟
 
-### Dockerfile.prod - 生产镜像
+### dockerfile.prod - 生产镜像
 - **用途**: 多阶段构建，最小化生产镜像
 - **更新频率**: 高（发布时）
 - **构建时间**: ~5-8 分钟
@@ -131,7 +131,7 @@ docker buildx build --platform linux/amd64,linux/arm64 ...
 echo $DOCKER_BUILDKIT
 
 # 使用清华源加速
-# Dockerfile.dep 已配置清华源，无需额外配置
+# dockerfile.l1 已配置清华源，无需额外配置
 ```
 
 ### 问题 2: 磁盘空间不足

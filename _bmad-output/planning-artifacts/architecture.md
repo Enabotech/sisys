@@ -2335,7 +2335,7 @@ docs/
 ```
 docker/
 ├── Dockerfile                                             # 主 Dockerfile
-├── Dockerfile.dev                                         # 开发环境 Dockerfile
+├── dockerfile.dev                                         # 开发环境 Dockerfile
 ├── docker-compose.dev.yml                                 # 开发环境 Compose
 ├── docker-compose.prod.yml                                # sisys产品交付 Compose
 └── docker-compose.test.yml                                # 测试环境 Compose
@@ -2436,7 +2436,7 @@ sisys/
 | **configs/** | ✅ | ✅ | ✅ 完整 |
 | **scripts/** | ✅ | ✅ | ✅ 完整（新增 tools 子目录） |
 | **docs/** | ✅ | ✅ | ✅ 完整（新增 operations 子目录） |
-| **docker/** | ✅ | ✅ | ✅ 完整（新增 Dockerfile.dev） |
+| **docker/** | ✅ | ✅ | ✅ 完整（新增 dockerfile.dev） |
 | **.gitea/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
 | **requirements/** | ✅ | ✅ | ✅ 完整（新增 test.txt/docs.txt） |
 | **根目录配置** | 🟡 部分 | ✅ | ✅ 已补充完整 |
@@ -7478,7 +7478,7 @@ docker-down:
 	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down
 
 docker-build:
-	$(DOCKER) build -f docker/Dockerfile.dev -t sisys:dev .
+	$(DOCKER) build -f docker/dockerfile.dev -t sisys:dev .
 
 docker-logs:
 	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml logs -f

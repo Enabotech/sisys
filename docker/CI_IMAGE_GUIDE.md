@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-**Dockerfile.ci** 是专门为 Gitea CI Pipeline 设计的预构建镜像，包含所有项目依赖，可显著加速 CI 流程。
+**dockerfile.l2** 是专门为 Gitea CI Pipeline 设计的预构建镜像，包含所有项目依赖，可显著加速 CI 流程。
 
 ### 镜像特点
 
@@ -25,7 +25,7 @@ cd /mnt/g/ai/sisys
 make -f docker/Makefile.ci docker-build-ci
 
 # 或直接构建
-docker build -f docker/Dockerfile.ci \
+docker build -f docker/dockerfile.l2 \
     -t harbor.sisys.local/sisys/dependency:ci-latest \
     --target ci \
     .
@@ -50,7 +50,7 @@ make -f docker/Makefile.ci docker-push-ci
 
 ---
 
-## 📦 Dockerfile.ci 结构
+## 📦 dockerfile.l2 结构
 
 ```
 Stage 1: base          → 基础环境（继承 dependency 镜像）
@@ -114,7 +114,7 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-      
+
       - name: Ruff 检查
         run: poetry run ruff check .
         # 无需 poetry install，镜像已包含依赖
@@ -157,7 +157,7 @@ jobs:
 export APP_ENV=test
 export CI=true
 export PYTHONUNBUFFERED=1
-export DATABASE_URL=postgresql://test:test@postgres:5432/test_db
+export DATABASE_URL=postgresql://test:test@postgres:5432/test_db    # pragma: allowlist secret
 export REDIS_URL=redis://redis:6379/0
 ```
 
@@ -271,12 +271,12 @@ make -f docker/Makefile.ci ci-help
 
 ## 📚 相关文档
 
-- [Dockerfile.ci](./Dockerfile.ci) - CI 镜像 Dockerfile
+- [dockerfile.l2](./dockerfile.l2) - CI 镜像 Dockerfile
 - [docker-compose.ci.yml](./docker-compose.ci.yml) - Docker Compose 配置
 - [Makefile.ci](./Makefile.ci) - Makefile 命令
 - [.gitea/workflows/ci.yaml](../../.gitea/workflows/ci.yaml) - Gitea CI 配置
 
 ---
 
-**更新日期**: 2026-03-29  
+**更新日期**: 2026-03-29
 **版本**: v1.0.0

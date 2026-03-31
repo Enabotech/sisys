@@ -57,7 +57,7 @@ git push origin main
 |------|------|------|
 | CI 工作流 | `.github/workflows/ci.yml` | 持续集成（PR/推送触发） |
 | CD 工作流 | `.github/workflows/cd.yml` | 持续部署（main 分支触发） |
-| 生产 Dockerfile | `docker/Dockerfile.prod` | 多阶段构建生产镜像 |
+| 生产 Dockerfile | `docker/dockerfile.prod` | 多阶段构建生产镜像 |
 | 生产 Compose | `docker/docker-compose.prod.yml` | 生产环境编排 |
 | 测试 Compose | `docker/docker-compose.test.yml` | 测试环境编排 |
 | 测试脚本 | `scripts/testing/run_tests.sh` | 运行测试 |
