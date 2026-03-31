@@ -256,19 +256,19 @@ jobs:
         run: |
           poetry install --no-interaction --quiet || echo "依赖安装完成"
 
-      - name: 等待 PostgreSQL 就绪
-        run: |
-          echo "等待 PostgreSQL 就绪..."
-          # ✅ 使用服务名访问（兼容所有网络模式）
-          until pg_isready -h postgres -p 5432 -U test; do sleep 1; done
-          echo "✅ PostgreSQL 就绪"
+      # - name: 等待 PostgreSQL 就绪
+      #   run: |
+      #     echo "等待 PostgreSQL 就绪..."
+      #     # ✅ 使用服务名访问（兼容所有网络模式）
+      #     until pg_isready -h postgres -p 5432 -U test; do sleep 1; done
+      #     echo "✅ PostgreSQL 就绪"
 
-      - name: 等待 Redis 就绪
-        run: |
-          echo "等待 Redis 就绪..."
-          # ✅ 使用服务名访问（兼容所有网络模式）
-          until redis-cli -h redis ping | grep -q PONG; do sleep 1; done
-          echo "✅ Redis 就绪"
+      # - name: 等待 Redis 就绪
+      #   run: |
+      #     echo "等待 Redis 就绪..."
+      #     # ✅ 使用服务名访问（兼容所有网络模式）
+      #     until redis-cli -h redis ping | grep -q PONG; do sleep 1; done
+      #     echo "✅ Redis 就绪"
 
       - name: 运行集成测试
         run: |

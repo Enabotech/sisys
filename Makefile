@@ -432,7 +432,7 @@ docker-build-l1:
 	@echo ""
 
 # 验证镜像版本
-docker-verify-l1:
+docker-verify-l1: docker-build-l1
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "✅ 验证 Layer 1 基础依赖镜像版本"
 	@echo "═══════════════════════════════════════════════════════════"
@@ -470,13 +470,18 @@ docker-verify-l1:
 	@echo ""
 
 # 推送 Layer 1 镜像到仓库
-docker-push-l1:
+docker-push-l1: docker-build-l1
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "📤 推送 Layer 1 基础依赖镜像到仓库"
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
+	@echo "      $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest"
 	@echo ""
+	@echo "🏷️  推送版本标签..."
 	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)
+	@echo ""
+	@echo "🏷️  推送 l1-latest 标签..."
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest
 	@echo ""
 	@echo "✅ 镜像推送完成！"
 	@echo ""
@@ -524,13 +529,18 @@ docker-build-l2:
 	@echo ""
 
 # 推送 Layer 2 镜像到仓库
-docker-push-l2:
+docker-push-l2: docker-build-l2
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "📤 推送 Layer 2 CI/CD 依赖镜像到仓库"
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
+	@echo "      $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest"
 	@echo ""
+	@echo "🏷️  推送版本标签..."
 	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)
+	@echo ""
+	@echo "🏷️  推送 l2-latest 标签..."
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest
 	@echo ""
 	@echo "✅ 镜像推送完成！"
 	@echo ""
@@ -577,13 +587,18 @@ docker-build-l3:
 	@echo ""
 
 # 推送 Layer 3 镜像到仓库
-docker-push-l3:
+docker-push-l3: docker-build-l3
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "📤 推送 Layer 3 应用镜像到仓库"
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "镜像：$(DOCKER_REGISTRY)/app:$(L3_TAG)"
+	@echo "      $(DOCKER_REGISTRY)/app:l3-latest"
 	@echo ""
+	@echo "🏷️  推送版本标签..."
 	$(DOCKER) push $(DOCKER_REGISTRY)/app:$(L3_TAG)
+	@echo ""
+	@echo "🏷️  推送 l3-latest 标签..."
+	$(DOCKER) push $(DOCKER_REGISTRY)/app:l3-latest
 	@echo ""
 	@echo "✅ 镜像推送完成！"
 	@echo ""
