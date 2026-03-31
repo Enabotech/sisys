@@ -322,7 +322,7 @@ jobs:
           output: 'reports/security/trivy-fs.sarif'
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: 'true'
-          offline-scan: 'true'
+          # offline-scan: 'true'
         db:
           db-repository: 'https://harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
           java-db-repository: 'https://harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1'
