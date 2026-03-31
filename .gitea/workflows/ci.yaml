@@ -321,6 +321,16 @@ jobs:
           format: 'sarif'
           output: 'reports/security/trivy-fs.sarif'
           severity: 'CRITICAL,HIGH'
+          # 离线参数
+          db-repository: 'https://gitea.sisys.local/aquasecurity/trivy-db'
+          java-db-repository: 'https://gitea.sisys.local/aquasecurity/trivy-java-db'
+          checks-bundle-repository: 'https://gitea.sisys.local/aquasecurity/trivy-checks'
+          offline-scan: 'true'
+          skip-update: 'true'
+          skip-db-update: 'true'
+          skip-java-db-update: 'true'
+          skip-check-update: 'true'
+
 
       - name: 上传安全报告
         if: always()
