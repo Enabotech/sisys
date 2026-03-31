@@ -22,7 +22,9 @@ class TestCIPipeline:
             pytest.skip("CI workflow file not found")
 
         with open(workflow_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+        assert isinstance(data, dict)
+        return data
 
     def test_workflow_name(self, ci_workflow):
         """测试工作流名称"""
@@ -147,7 +149,9 @@ class TestCDPipeline:
             pytest.skip("CD workflow file not found")
 
         with open(workflow_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+        assert isinstance(data, dict)
+        return data
 
     def test_workflow_name(self, cd_workflow):
         """测试工作流名称"""
@@ -219,7 +223,9 @@ class TestDependencyImageWorkflow:
             pytest.skip("Dependency image workflow file not found")
 
         with open(workflow_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+        assert isinstance(data, dict)
+        return data
 
     def test_schedule_trigger(self, dependency_workflow):
         """测试定时触发"""
@@ -263,7 +269,9 @@ class TestKubernetesDeployment:
 
         with open(deploy_path, encoding="utf-8") as f:
             docs = list(yaml.safe_load_all(f))
-        return docs[0]  # 返回测试环境配置
+        data = docs[0]  # 返回测试环境配置
+        assert isinstance(data, dict)
+        return data
 
     def test_deployment_name(self, deployment_config):
         """测试部署名称"""

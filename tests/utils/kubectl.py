@@ -67,7 +67,7 @@ def run_kubectl(
     timeout: int = 30,
     capture_output: bool = True,
     text: bool = True,
-) -> KubectlResult | subprocess.CompletedProcess:
+) -> KubectlResult:
     """
     执行 kubectl 命令
 
@@ -76,12 +76,11 @@ def run_kubectl(
         namespace: 命名空间（可选），如果提供则自动添加 -n 参数
         check: 是否检查返回码，为 True 时失败会抛出 KubectlError
         timeout: 命令超时时间（秒）
-        capture_output: 是否捕获输出
-        text: 是否以文本模式返回输出
+        capture_output: 是否捕获输出（默认为 True）
+        text: 是否以文本模式返回输出（默认为 True）
 
     Returns:
         KubectlResult: 命令执行结果（包含 stdout, stderr, returncode）
-        或 subprocess.CompletedProcess（当 capture_output=False 时）
 
     Raises:
         KubectlError: 当 check=True 且命令失败时
@@ -111,27 +110,23 @@ def run_kubectl(
     # 执行命令
     result = subprocess.run(
         cmd,
-        capture_output=capture_output,
-        text=text,
+        capture_output=True,
+        text=True,
         timeout=timeout,
         check=False,  # 不自动抛出异常，我们自己处理
     )
 
-    # 返回 KubectlResult 或原始结果
-    if capture_output:
-        kubectl_result = KubectlResult(
-            command=args,
-            returncode=result.returncode,
-            stdout=result.stdout,
-            stderr=result.stderr,
-        )
+    kubectl_result = KubectlResult(
+        command=args,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
 
-        if check and result.returncode != 0:
-            raise KubectlError(args, result.returncode, result.stderr, result.stdout)
+    if check and result.returncode != 0:
+        raise KubectlError(args, result.returncode, result.stderr, result.stdout)
 
-        return kubectl_result
-
-    return result
+    return kubectl_result
 
 
 # =============================================================================
@@ -228,12 +223,18 @@ def create(
     if namespace:
         args.extend(["-n", namespace])
 
-    return subprocess.run(
+    result = subprocess.run(
         ["kubectl"] + args,
         input=manifest,
         capture_output=True,
         text=True,
         check=check,
+    )
+    return KubectlResult(
+        command=["kubectl"] + args,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
     )
 
 
@@ -259,12 +260,18 @@ def apply(
     if namespace:
         args.extend(["-n", namespace])
 
-    return subprocess.run(
+    result = subprocess.run(
         ["kubectl"] + args,
         input=manifest,
         capture_output=True,
         text=True,
         check=check,
+    )
+    return KubectlResult(
+        command=["kubectl"] + args,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
     )
 
 
