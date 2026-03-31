@@ -124,7 +124,7 @@ class TestArgoCDPerformance:
         print(f"Pod startup time: {startup_time:.2f}s")
         assert startup_time < 60, f"Pod startup time {startup_time}s exceeds 60s limit"
 
-    def test_page_load_time(self, argocd_url):
+    def test_page_load_time(self, argocd_url: str) -> None:
         """
         Test page load time < 3 seconds
 
@@ -187,7 +187,7 @@ class TestArgoCDPerformance:
 
         pytest.skip("Requires actual Git repository and Application configuration")
 
-    def test_cpu_usage(self):
+    def test_cpu_usage(self) -> None:
         """
         Test CPU usage < 70% (5 minute average)
 
@@ -237,7 +237,7 @@ class TestArgoCDPerformance:
         else:
             pytest.skip("Could not retrieve CPU metrics")
 
-    def test_memory_usage(self):
+    def test_memory_usage(self) -> None:
         """
         Test memory usage < 80% (5 minute average)
 
@@ -293,7 +293,7 @@ class TestArgoCDPerformance:
 class TestGitOperationLatency:
     """Git Operation Latency Tests"""
 
-    def test_git_clone_time(self):
+    def test_git_clone_time(self) -> None:
         """
         Test Git clone latency P95 < 5 seconds
 
