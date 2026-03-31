@@ -43,11 +43,11 @@ env:
   PYTHON_VERSION: "3.11"
   POETRY_VERSION: "2.3.2"
 
-  IMAGE_TAG_BASE: base-latest
+  IMAGE_TAG_BASE: l1-latest
 
   # CI 镜像标签（使用固定标签，本地手动构建）
   # 当 pyproject.toml 变更时，手动运行 make docker-build-ci 更新镜像
-  IMAGE_TAG_CI: ci-latest
+  IMAGE_TAG_CI: l2-latest
 
 # ===========================================================================
 # 并发控制 - 同一 PR 只运行一个 Pipeline
