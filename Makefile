@@ -372,23 +372,32 @@ docker-clean:
 
 # -----------------------------------------------------------------------------
 # Docker 基础依赖镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
+# 标签命名规范：docs/architecture/image-tagging-strategy.md
 # -----------------------------------------------------------------------------
-.PHONY: docker-build-l1 docker-verify docker-push-l1
+.PHONY: docker-build-l1 docker-verify docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
 
 # 镜像命名
 DOCKER_REGISTRY ?= harbor.sisys.local/sisys
-DEP_IMAGE_NAME := dependency
-# 时间戳格式：YYYYMMDDHHMM
-TIMESTAMP := $(shell date +%Y%m%d%H%M)
-BASE_TAG := dep-v1.0.0-$(TIMESTAMP)
-DEP_TAG := latest
 
-# 构建基础依赖镜像（Dockerfile.dep）
+# =============================================================================
+# Layer 1: 基础依赖镜像 (Base Dependency Image)
+# 格式：l1-v{major}.{minor}.{patch}-{git_sha}
+# 说明：Ubuntu 22.04 + Python 3.11.15 + Node.js 20.x + Poetry 2.3.2
+# =============================================================================
+DEP_IMAGE_NAME := dependency
+# Git SHA (前 7 位)
+L1_GIT_SHA := $(shell git rev-parse --short HEAD)
+L1_VERSION := 1.0.0
+L1_TAG := l1-v$(L1_VERSION)-$(L1_GIT_SHA)
+
+# 构建基础依赖镜像（dockerfile.l1）
 docker-build-l1:
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "🔨 构建基础依赖镜像 (dockerfile.l1)"
+	@echo "🔨 构建 Layer 1 基础依赖镜像 (dockerfile.l1)"
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
+	@echo "格式：l1-v{major}.{minor}.{patch}-{git_sha}"
+	@echo "版本：l1-v$(L1_VERSION)-$(L1_GIT_SHA)"
 	@echo "基础：Ubuntu 22.04"
 	@echo "Python: 3.11.15 (源码编译)"
 	@echo "Node.js: 20.x"
@@ -398,18 +407,24 @@ docker-build-l1:
 	@echo "  - pip: 清华源 (https://pypi.tuna.tsinghua.edu.cn/simple)"
 	@echo "  - Poetry: 清华源 (https://pypi.tuna.tsinghua.edu.cn/simple)"
 	@echo "  - NodeSource: 清华镜像 (https://mirrors.tuna.tsinghua.edu.cn/help/nodesource.com/)"
-	@echo "时间戳：$(TIMESTAMP)"
+	@echo "Git SHA: $(L1_GIT_SHA)"
+	@echo ""
+	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
 	$(DOCKER) build -f docker/dockerfile.l1 \
-		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG) \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) \
 		--progress=plain \
 		--build-arg BUILDKIT_INLINE_CACHE=1 \
 		.
 	@echo ""
-	@echo "✅ 基础依赖镜像构建完成！"
+	@echo "🏷️  标记 l1-latest 标签..."
+	$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest
+	@echo ""
+	@echo "✅ Layer 1 基础依赖镜像构建完成！"
 	@echo "📋 镜像信息:"
-	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest"
 	@echo ""
 	@echo "🚀 下一步:"
 	@echo "   make docker-verify    - 验证镜像版本"
@@ -419,11 +434,11 @@ docker-build-l1:
 # 验证镜像版本
 docker-verify:
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "✅ 验证基础依赖镜像版本"
+	@echo "✅ 验证 Layer 1 基础依赖镜像版本"
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
 	@echo ""
-	$(DOCKER) run --rm $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG) bash -c "\
+	$(DOCKER) run --rm $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) bash -c "\
 		echo '========================================' && \
 		echo '=== Ubuntu 版本 ===' && \
 		cat /etc/os-release | grep PRETTY_NAME && \
@@ -450,14 +465,121 @@ docker-verify:
 	@echo "✅ 镜像验证完成！"
 	@echo ""
 
-# 推送镜像到仓库
+# 推送 Layer 1 镜像到仓库
 docker-push-l1:
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "📤 推送基础依赖镜像到仓库"
+	@echo "📤 推送 Layer 1 基础依赖镜像到仓库"
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
 	@echo ""
-	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(BASE_TAG)
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)
+	@echo ""
+	@echo "✅ 镜像推送完成！"
+	@echo ""
+
+# =============================================================================
+# Layer 2: CI/CD 依赖镜像 (CI/CD Dependency Image)
+# 格式：l2-v{major}.{minor}.{patch}-{git_sha}
+# 说明：基于 L1 + 项目依赖 (pyproject.toml)
+# =============================================================================
+L2_VERSION := 1.0.0
+L2_GIT_SHA := $(shell git rev-parse --short HEAD)
+L2_TAG := l2-v$(L2_VERSION)-$(L2_GIT_SHA)
+
+# 构建 Layer 2 CI/CD 依赖镜像（dockerfile.l2）
+docker-build-l2:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建 Layer 2 CI/CD 依赖镜像 (dockerfile.l2)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
+	@echo "格式：l2-v{major}.{minor}.{patch}-{git_sha}"
+	@echo "版本：l2-v$(L2_VERSION)-$(L2_GIT_SHA)"
+	@echo "基础：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
+	@echo "依赖：pyproject.toml"
+	@echo ""
+	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/dockerfile.l2 \
+		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		--build-arg BASE_IMAGE=$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) \
+		.
+	@echo ""
+	@echo "🏷️  标记 l2-latest 标签..."
+	$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest
+	@echo ""
+	@echo "✅ Layer 2 CI/CD 依赖镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
+	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest"
+	@echo ""
+	@echo "🚀 下一步:"
+	@echo "   make docker-push-l2  - 推送到镜像仓库"
+	@echo ""
+
+# 推送 Layer 2 镜像到仓库
+docker-push-l2:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送 Layer 2 CI/CD 依赖镜像到仓库"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
+	@echo ""
+	$(DOCKER) push $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)
+	@echo ""
+	@echo "✅ 镜像推送完成！"
+	@echo ""
+
+# =============================================================================
+# Layer 3: 应用镜像 (Application Image)
+# 格式：l3-v{major}.{minor}.{patch}-{git_sha}
+# 说明：基于 L2 + 业务代码
+# 构建：CI/CD 自动触发，此命令仅用于本地测试
+# =============================================================================
+L3_VERSION := 1.0.0
+L3_TAG := l3-v$(L3_VERSION)-$(L2_GIT_SHA)
+
+# 构建 Layer 3 应用镜像（dockerfile.app）
+docker-build-l3:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "🔨 构建 Layer 3 应用镜像 (dockerfile.app)"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/app:$(L3_TAG)"
+	@echo "格式：l3-v{major}.{minor}.{patch}-{git_sha}"
+	@echo "版本：l3-v$(L3_VERSION)-$(L2_GIT_SHA)"
+	@echo "基础：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
+	@echo ""
+	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
+	@echo ""
+	@export DOCKER_BUILDKIT=1 && \
+	$(DOCKER) build -f docker/dockerfile.app \
+		-t $(DOCKER_REGISTRY)/app:$(L3_TAG) \
+		--progress=plain \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		--build-arg DEPENDENCY_IMAGE=$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) \
+		.
+	@echo ""
+	@echo "🏷️  标记 l3-latest 标签..."
+	$(DOCKER) tag $(DOCKER_REGISTRY)/app:$(L3_TAG) $(DOCKER_REGISTRY)/app:l3-latest
+	@echo ""
+	@echo "✅ Layer 3 应用镜像构建完成！"
+	@echo "📋 镜像信息:"
+	@echo "   $(DOCKER_REGISTRY)/app:$(L3_TAG)"
+	@echo "   $(DOCKER_REGISTRY)/app:l3-latest"
+	@echo ""
+	@echo "🚀 下一步:"
+	@echo "   make docker-push-l3  - 推送到镜像仓库"
+	@echo ""
+
+# 推送 Layer 3 镜像到仓库
+docker-push-l3:
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "📤 推送 Layer 3 应用镜像到仓库"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "镜像：$(DOCKER_REGISTRY)/app:$(L3_TAG)"
+	@echo ""
+	$(DOCKER) push $(DOCKER_REGISTRY)/app:$(L3_TAG)
 	@echo ""
 	@echo "✅ 镜像推送完成！"
 	@echo ""

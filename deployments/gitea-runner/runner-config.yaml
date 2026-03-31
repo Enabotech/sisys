@@ -46,7 +46,7 @@ data:
     # ✅ 修复：使用 bridge 网络模式以支持 Kubernetes DNS 解析
     container:
       # 工作镜像（使用本地 Harbor 镜像，包含 Docker 和 Buildx）
-      image: harbor.sisys.local/sisys/runner-images:ubuntu-act-latest
+      image: harbor.sisys.local/sisys/dependency:l1-latest
 
       # 网络模式 - ✅ 使用 bridge 模式支持 DNS 解析
       network: bridge
