@@ -45,6 +45,15 @@ env:
   ARGOCD_SERVER: argocd.sisys.local
   PYTHON_VERSION: "3.11"
 
+  # =======================================================================
+  # 镜像标签命名规范 (参考：docs/architecture/image-tagging-strategy.md)
+  # =======================================================================
+  # Layer 3: 应用镜像 - 使用 l3-latest 作为最新稳定版本标签 (用于测试环境部署)
+  IMAGE_TAG_L3_LATEST: l3-latest
+  
+  # 生产环境标签 (使用语义化版本)
+  IMAGE_TAG_PROD: v1.0.0
+
 # 并发控制 - 同一环境只允许一个部署
 concurrency:
   group: cd-${{ github.event.inputs.environment || 'test' }}-${{ github.ref }}
@@ -88,8 +97,10 @@ jobs:
       - name: 获取镜像标签
         id: get_image
         run: |
-          IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/sisys/app:${{ steps.get_sha.outputs.git_sha }}"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          GIT_SHA="${{ steps.get_sha.outputs.git_sha }}"
+          echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
+          # 测试环境使用 l3-latest 标签
+          echo "image_tag=${{ env.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_L3_LATEST }}" >> $GITHUB_OUTPUT
 
       - name: 获取部署环境
         id: get_env
@@ -141,8 +152,12 @@ jobs:
 
       - name: 更新测试环境镜像版本
         run: |
+          # 测试环境使用 l3-latest 标签 (遵循标签命名规范)
+          IMAGE_FULL_TAG="${{ env.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_L3_LATEST }}"
+          
+          echo "部署镜像：${IMAGE_FULL_TAG}"
           kubectl set image deployment/sisys-app \
-            app=${{ needs.pre-deployment-check.outputs.image_tag }} \
+            app=${IMAGE_FULL_TAG} \
             -n sisys-test
 
       - name: 触发 ArgoCD 同步
@@ -274,8 +289,12 @@ jobs:
 
       - name: 更新生产环境镜像版本
         run: |
+          # 生产环境使用语义化版本标签 (不含 git_sha)
+          IMAGE_FULL_TAG="${{ env.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_PROD }}"
+          
+          echo "部署镜像：${IMAGE_FULL_TAG}"
           kubectl set image deployment/sisys-app \
-            app=${{ needs.pre-deployment-check.outputs.image_tag }} \
+            app=${IMAGE_FULL_TAG} \
             -n sisys-prod
 
       - name: 触发 ArgoCD 同步生产环境

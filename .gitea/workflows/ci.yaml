@@ -52,21 +52,21 @@ env:
   # 构建：make docker-build-l1
   # Layer 1: 基础依赖镜像 - 使用 l1-latest 引用最新稳定版本
   IMAGE_TAG_L1_LATEST: l1-latest
-  
+
   # Layer 2: CI/CD 依赖镜像 (CI/CD Dependency Image)
   # 格式：l2-v{major}.{minor}.{patch}-{git_sha}
   # 说明：基于 L1 + 项目依赖 (pyproject.toml)
   # 构建：make docker-build-l2
   # Layer 2: CI/CD 依赖镜像 - 使用 l2-latest 引用最新稳定版本
   IMAGE_TAG_L2_LATEST: l2-latest
-  
+
   # Layer 3: 应用镜像 (Application Image) - CI 自动构建
   # 格式：l3-v{major}.{minor}.{patch}-{git_sha}
   # 说明：基于 L2 + 业务代码
   # 构建：CI 自动触发
   # Layer 3: 应用镜像 - 使用 l3-latest 作为最新稳定版本标签
   IMAGE_TAG_L3_LATEST: l3-latest
-  
+
   # --- 版本标签前缀 (用于生成具体版本标签) ---
   # Layer 3 基础版本号，CI 构建时会生成 l3-v1.0.0-{git_sha}
   IMAGE_TAG_L3_BASE: l3-v1.0.0
@@ -399,16 +399,16 @@ jobs:
           # 登录 Harbor
           echo "${{ secrets.HARBOR_ROBOT_PASSWORD }}" | docker login ${{ vars.HARBOR_REGISTRY }} \
             --username ${{ secrets.HARBOR_ROBOT_USERNAME }} --password-stdin
-          
+
           # 推送版本标签
           docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
-          
+
           # 推送 latest 标签
           docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
-          
+
           # 推送测试环境标签
           docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
-          
+
           echo "✅ 所有镜像已推送到 Harbor"
 
       - name: 上传镜像信息
