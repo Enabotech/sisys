@@ -15,7 +15,7 @@ class TestGPUConfiguration:
     """GPU 配置测试"""
 
     @pytest.fixture
-    def deployment_config(self) -> dict[str, Any]:
+    def deployment_config(self) -> list[dict[str, Any]]:
         """加载 Deployment 配置"""
         deploy_path = Path("deployments/k8s/deployment.yaml")
         if not deploy_path.exists():
@@ -124,7 +124,9 @@ class TestCIPipelineGPU:
             pytest.skip("CI workflow file not found")
 
         with open(workflow_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            data = yaml.safe_load(f)
+        assert isinstance(data, dict)
+        return data
 
     # def test_gpu_environment_variable(self, ci_workflow):
     #     """测试 GPU 环境变量配置"""
