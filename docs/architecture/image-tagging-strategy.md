@@ -117,6 +117,12 @@ l2-v1.0.0-08058ac
 # - layer: l2 (固定)
 # - semver: 依赖镜像版本号
 # - git_sha: Git 提交 SHA (前 7 位)
+
+# 包含内容
+# - 继承 L1 镜像所有内容
+# - 项目 Python 依赖 (pyproject.toml)
+# - Trivy v0.69.3 (安全扫描工具)
+# - 预配置虚拟环境
 ```
 
 #### Layer 3: 应用镜像
