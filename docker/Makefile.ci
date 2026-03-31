@@ -11,14 +11,14 @@ CI_TAG := ci-latest
 # 构建 CI 镜像
 docker-build-ci:
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "🔨 构建 CI 镜像 (Dockerfile.ci)"
+	@echo "🔨 构建 CI 镜像 (dockerfile.l2)"
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG)"
 	@echo "用途：Gitea CI Pipeline 预构建镜像"
 	@echo "特点：预装项目依赖，加速 CI 流程"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
-	docker build -f docker/Dockerfile.ci \
+	docker build -f docker/dockerfile.l2 \
 		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(CI_TAG) \
 		--target ci \
 		--progress=plain \
@@ -38,14 +38,14 @@ docker-build-ci:
 # 构建 GPU CI 镜像
 docker-build-gpu-ci:
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "🔨 构建 GPU CI 镜像 (Dockerfile.ci --target gpu-ci)"
+	@echo "🔨 构建 GPU CI 镜像 (dockerfile.l2 --target gpu-ci)"
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG)"
 	@echo "用途：Gitea CI Pipeline GPU 测试"
 	@echo "特点：包含 PyTorch CUDA 环境"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
-	docker build -f docker/Dockerfile.ci \
+	docker build -f docker/dockerfile.l2 \
 		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):gpu-$(CI_TAG) \
 		--target gpu-ci \
 		--progress=plain \

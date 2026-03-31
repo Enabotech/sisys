@@ -20,7 +20,7 @@
 本 CI/CD Pipeline 模板为 SISYS 项目提供标准化的持续集成和持续部署流程，包含以下特性：
 
 - ✅ **7 个标准阶段**：代码质量 → 单元测试 → 集成测试 → 安全扫描 → 镜像构建 → 镜像推送 → 自动部署
-- ✅ **三层镜像架构**：Layer 1 (PyTorch) + Layer 2 (依赖) + Layer 3 (应用)
+- ✅ **三层镜像架构**：Layer 1 (基础) + Layer 2 (依赖) + Layer 3 (应用)
 - ✅ **GPU 任务调度**：自动识别 GPU 任务并调度到 GPU 节点
 - ✅ **性能优化**：预构建依赖镜像，CI 时间缩短 60-70%
 - ✅ **安全合规**：Trivy + Bandit 双重安全扫描
@@ -43,11 +43,11 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 1: 官方基础镜像 (PyTorch)                             │
-│  来源：本地备份 `/mnt/x/backup/images/pytorch-...tar`        │
+│  Layer 1: 官方基础镜像 (ubuntu:22.04)                             │
+│  来源：harbor.sisys.local/sisys/tools/ubuntu:22.04        │
 │  大小：~8GB                                                  │
 │  更新：手动 (版本升级时)                                     │
-│  推送到：harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel │
+│  推送到：harbor.sisys.local/sisys/dependency:l1-latest │
 └─────────────────────────────────────────────────────────────┘
                             ↓ docker pull
 ┌─────────────────────────────────────────────────────────────┐
@@ -72,8 +72,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 1: PyTorch 基础镜像                                  │
-│  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8    │
+│  Layer 1: 基础镜像                                  │
+│  harbor.sisys.local/sisys/dependency:l1-latest    │
 │  (手动导入，不常更新)                                        │
 └─────────────────────────────────────────────────────────────┘
                       │ docker pull
@@ -100,7 +100,7 @@
 │         ▼                                                   │
 │  【镜像构建】基于 Layer 2 构建 Layer 3                      │
 │  Layer 3: 应用镜像                                          │
-│  harbor.sisys.local/sisys/app:{GIT_SHA}                     │
+│  harbor.sisys.local/sisys/app:v1.0.0-{GIT_SHA}                     │
 │  (只包含业务代码，增量层)                                    │
 └─────────────────────────────────────────────────────────────┘
                       │ docker push
@@ -135,13 +135,13 @@
 │                                                             │
 │  步骤:                                                      │
 │  1. 检出代码                                                │
-│  2. 检出 Dockerfile.dependency                              │
-│  3. 拉取 Layer 1 (PyTorch 镜像)                             │
+│  2. 检出 dockerfile.l2                              │
+│  3. 拉取 Layer 1 (基础镜像)                             │
 │  4. 基于 Layer 1 构建 Layer 2                               │
-│     - 安装 Poetry 依赖                                      │
 │     - 预装所有 Python 包                                    │
+│     - 安装项目 Poetry 依赖                                      │
 │  5. 推送到 Harbor                                           │
-│     - 镜像名：harbor.sisys.local/sisys/dependency:{GIT_SHA} │
+│     - 镜像名：harbor.sisys.local/sisys/dependency:l2-v1.0.0-{GIT_SHA} │
 │  6. 清理旧版本 (保留最近 5 个)                               │
 └─────────────────────────────────────────────────────────────┘
                       │
@@ -162,7 +162,7 @@ jobs:
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:${{ github.sha }}
       # ↑ 使用 Layer 2 镜像，无需重新安装依赖！
-    
+
   unit-tests:
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/sisys/dependency:${{ github.sha }}
@@ -246,8 +246,8 @@ cp .gitea/workflows/cd.yaml /path/to/your-project/.gitea/workflows/
 cp .gitea/workflows/build-dependency-image.yml /path/to/your-project/.gitea/workflows/
 
 # 复制 Docker 配置
-cp docker/Dockerfile.dependency /path/to/your-project/docker/
-cp docker/Dockerfile.app /path/to/your-project/docker/
+cp docker/dockerfile.l2 /path/to/your-project/docker/
+cp docker/dockerfile.app /path/to/your-project/docker/
 
 # 复制 K8s 配置
 cp deployments/k8s/deployment.yaml /path/to/your-project/deployments/k8s/
@@ -362,7 +362,7 @@ trivy fs --format sarif --output reports/security/trivy-fs.sarif
 
 ```bash
 # 构建命令
-docker build -f docker/Dockerfile.app \
+docker build -f docker/dockerfile.app \
   --build-arg DEPENDENCY_IMAGE=harbor.sisys.local/sisys/dependency:${GIT_SHA} \
   -t harbor.sisys.local/sisys/app:${GIT_SHA} .
 ```

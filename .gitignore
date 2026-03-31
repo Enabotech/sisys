@@ -245,7 +245,7 @@ minio_data/
 # Docker
 docker-compose.override.yml
 .docker/
-Dockerfile.local
+dockerfile.local
 
 # Docker volumes
 volumes/

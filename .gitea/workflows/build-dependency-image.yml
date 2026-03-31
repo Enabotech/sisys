@@ -97,10 +97,10 @@ jobs:
       - name: 登录 Harbor 镜像仓库
         run: |
           echo "登录 Harbor: ${{ env.HARBOR_REGISTRY }}"
-          
+
           # 创建 Docker 配置文件
           mkdir -p ~/.docker
-          
+
           # 使用 base64 编码的认证信息
           echo '{
             "auths": {
@@ -109,15 +109,15 @@ jobs:
               }
             }
           }' > ~/.docker/config.json
-          
+
           # 验证配置
           echo "Docker 配置:"
           cat ~/.docker/config.json
-          
+
           # 使用 docker login 验证
           echo "测试 Harbor 连接..."
           curl -k -s https://${{ env.HARBOR_REGISTRY }}/v2/ -o /dev/null -w "HTTP: %{http_code}\n" || echo "curl 失败，继续"
-          
+
           echo "✅ Harbor 认证配置完成"
 
       - name: 生成镜像标签
@@ -130,7 +130,7 @@ jobs:
           IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/sisys/dependency:${GIT_SHA}"
 
           # 附加标签
-          LATEST_TAG="${{ env.HARBOR_REGISTRY }}/sisys/dependency:latest"
+          LATEST_TAG="${{ env.HARBOR_REGISTRY }}/sisys/dependency:l2-latest"
           WEEKLY_TAG="${{ env.HARBOR_REGISTRY }}/sisys/dependency:weekly-$(date +%Y%m%d)"
 
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
@@ -147,20 +147,20 @@ jobs:
           echo "🔨 使用 docker build 构建依赖镜像..."
           GIT_SHA=${{ steps.git_info.outputs.git_sha }}
           HARBOR=${{ env.HARBOR_REGISTRY }}
-          
+
           # 构建镜像
-          docker build -f ./docker/Dockerfile.dependency \
+          docker build -f ./docker/dockerfile.l2 \
             -t ${HARBOR}/sisys/dependency:${GIT_SHA} \
             -t ${HARBOR}/sisys/dependency:latest \
             --build-arg PYTORCH_IMAGE=${{ env.PYTORCH_IMAGE }} \
             --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg POETRY_VERSION=${{ env.POETRY_VERSION }} \
             .
-          
+
           echo "推送镜像到 Harbor..."
           docker push ${HARBOR}/sisys/dependency:${GIT_SHA}
           docker push ${HARBOR}/sisys/dependency:latest
-          
+
           echo "✅ 镜像构建并推送成功"
 
       - name: 验证镜像构建
@@ -170,7 +170,7 @@ jobs:
           IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
           REPO=$(echo $IMAGE_TAG | cut -d: -f1 | cut -d/ -f4-)
           TAG=$(echo $IMAGE_TAG | cut -d: -f2)
-          
+
           echo "检查镜像：$IMAGE_TAG"
           curl -k -s -u "${{ secrets.HARBOR_ROBOT_USERNAME }}:${{ secrets.HARBOR_ROBOT_PASSWORD }}" \
             "https://${{ env.HARBOR_REGISTRY }}/api/v2.0/projects/sisys/repositories/${REPO}/artifacts?with_tag=true" | \
@@ -189,18 +189,18 @@ jobs:
           python3 << 'PYTHON_SCRIPT'
           import subprocess
           import sys
-          
+
           # 获取 Harbor 凭据
           result = subprocess.run(
               ["curl", "-k", "-s", "-u", "robot$sisys+gitea-runner-push:gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd",
                "https://harbor.sisys.local/api/v2.0/projects/sisys/repositories/dependency/artifacts?with_tag=true"],
               capture_output=True, text=True
           )
-          
+
           if result.returncode != 0:
               print(f"⚠️  无法获取镜像列表：{result.stderr}")
               sys.exit(0)
-          
+
           # 简单解析 JSON 获取标签
           import json
           try:
@@ -210,13 +210,13 @@ jobs:
                   if 'tags' in artifact and artifact['tags']:
                       for tag in artifact['tags']:
                           tags.append(tag['name'])
-              
+
               # 过滤出 SHA 标签（排除 latest 和 weekly）
               sha_tags = [t for t in tags if len(t) == 7 and t.isalnum()]
               sha_tags.sort(reverse=True)
-              
+
               print(f"找到 {len(sha_tags)} 个版本：{sha_tags[:10]}...")
-              
+
               # 保留最近 5 个
               if len(sha_tags) > 5:
                   old_tags = sha_tags[5:]
@@ -229,7 +229,7 @@ jobs:
           except Exception as e:
               print(f"⚠️  解析失败：{e}")
           PYTHON_SCRIPT
-          
+
           echo "✅ 清理完成"
 
       - name: 生成构建报告

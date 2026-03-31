@@ -141,7 +141,7 @@ def test_task_completion():
 
     # Task 4: Docker 配置
     print("\nTask 4: Docker 配置优化")
-    assert (ROOT / "docker/Dockerfile.prod").exists(), "生产 Dockerfile 不存在"
+    assert (ROOT / "docker/dockerfile.prod").exists(), "生产 Dockerfile 不存在"
     assert (ROOT / "docker/docker-compose.prod.yml").exists(), "生产 Compose 不存在"
     assert (ROOT / "docker/docker-compose.test.yml").exists(), "测试 Compose 不存在"
     print("  [OK] 生产 Dockerfile")

@@ -1,6 +1,6 @@
 # CI/CD + ArgoCD 集成配置总结
 
-**生成日期**: 2026-03-23  
+**生成日期**: 2026-03-23
 **状态**: CI/CD 就绪，ArgoCD 已配置
 
 ---
@@ -11,8 +11,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 1: PyTorch 基础镜像                                  │
-│  harbor.sisys.local/sisys/pytorch/pytorch:2.7.1-cuda12.8    │
+│  Layer 1: 基础镜像                                  │
+│  harbor.sisys.local/sisys/dependency:l1-latest    │
 │  (手动导入，不常更新)                                        │
 └─────────────────────────────────────────────────────────────┘
                       │ docker pull
@@ -120,8 +120,8 @@ harbor.sisys.local/sisys/dependency:abc123
 | **CI/CD** | CI Pipeline | ✅ | `.gitea/workflows/ci.yaml` |
 | | CD Pipeline | ✅ | `.gitea/workflows/cd.yaml` |
 | | 依赖镜像 | ✅ | `.gitea/workflows/build-dependency-image.yml` |
-| **Docker** | Layer 2 Dockerfile | ✅ | `docker/Dockerfile.dependency` |
-| | Layer 3 Dockerfile | ✅ | `docker/Dockerfile.app` |
+| **Docker** | Layer 2 Dockerfile | ✅ | `docker/dockerfile.l2` |
+| | Layer 3 Dockerfile | ✅ | `docker/dockerfile.app` |
 | **K8s** | Deployment | ✅ | `deployments/k8s/deployment.yaml` |
 | | Service | ✅ | `deployments/k8s/service.yaml` |
 
@@ -144,7 +144,7 @@ harbor.sisys.local/sisys/dependency:abc123
 ```yaml
 # Harbor 凭据 (使用现有 Robot Account)
 HARBOR_USERNAME: "robot$sisys+gitea-runner-push"
-HARBOR_PASSWORD: "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"
+HARBOR_PASSWORD: "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"    # pragma: allowlist secret
 
 # 需要配置
 KUBE_CONFIG_TEST: "<base64-encoded-kubeconfig>"
@@ -443,5 +443,5 @@ kubectl run gpu-test --rm -ti --image=nvidia/cuda:12.8.0-base -- nvidia-smi
 
 ---
 
-**文档生成**: Qwen Code (AI 高级开发者)  
+**文档生成**: Qwen Code (AI 高级开发者)
 **审核状态**: ✅ 配置验证完成

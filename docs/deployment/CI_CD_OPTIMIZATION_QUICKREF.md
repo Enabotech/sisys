@@ -29,8 +29,8 @@ Layer 3: 应用镜像 (12GB)          → 每次 CI 构建
 ```
 project/
 ├── docker/
-│   ├── Dockerfile.dependency        # Layer 2: 依赖镜像
-│   └── Dockerfile.app               # Layer 3: 应用镜像
+│   ├── dockerfile.l2        # Layer 2: 依赖镜像
+│   └── dockerfile.app               # Layer 3: 应用镜像
 ├── .gitea/workflows/
 │   ├── ci.yaml                      # CI Pipeline (7 阶段)
 │   ├── cd.yaml                      # CD Pipeline (5 阶段)
@@ -223,7 +223,7 @@ kubectl get secret harbor-secret -n sisys
 
 ```bash
 # 检查缓存命中
-docker build --progress=plain -f docker/Dockerfile.dependency .
+docker build --progress=plain -f docker/dockerfile.l2 .
 
 # 查看层缓存
 docker history harbor.sisys.local/sisys/dependency:latest

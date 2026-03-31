@@ -134,7 +134,7 @@ so that **所有项目可以复用最佳实践，确保代码质量、安全性�
   - [x] Subtask 4.4: 创建 Secrets 配置指南
 
 - [x] Task 5: 预构建镜像系统 (AC: 6) **新增**
-  - [x] Subtask 5.1: 创建 `docker/Dockerfile.dependency` (Layer 2)
+  - [x] Subtask 5.1: 创建 `docker/dockerfile.l2` (Layer 2)
   - [x] Subtask 5.2: 创建 `.gitea/workflows/build-dependency-image.yml`
   - [x] Subtask 5.3: 配置定时触发 (每周日 18 点)
   - [x] Subtask 5.4: 配置依赖变更触发
@@ -424,8 +424,8 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 - `.gitea/workflows/build-dependency-image.yml` - 依赖镜像构建 ✅
 
 **Docker 配置:**
-- `docker/Dockerfile.dependency` - Layer 2 依赖镜像 ✅
-- `docker/Dockerfile.app` - Layer 3 应用镜像 ✅
+- `docker/dockerfile.l2` - Layer 2 依赖镜像 ✅
+- `docker/dockerfile.app` - Layer 3 应用镜像 ✅
 
 **文档:**
 - `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md` - 使用指南 ✅
@@ -490,7 +490,7 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 
 **配置映射:**
 - HARBOR_USERNAME: `robot$sisys+gitea-runner-push`
-- HARBOR_PASSWORD: `gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd`
+- HARBOR_PASSWORD: `gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd`        # pragma: allowlist secret
 
 **ArgoCD 配置 (用户已配置):**
 - `./developments/apps/sisys/` - ArgoCD Application 配置
