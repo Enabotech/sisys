@@ -374,7 +374,7 @@ docker-clean:
 # Docker 基础依赖镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
 # 标签命名规范：docs/architecture/image-tagging-strategy.md
 # -----------------------------------------------------------------------------
-.PHONY: docker-build-l1 docker-verify docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
+.PHONY: docker-build-l1 docker-verify-l1 docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
 
 # 镜像命名
 DOCKER_REGISTRY ?= harbor.sisys.local/sisys
@@ -427,12 +427,12 @@ docker-build-l1:
 	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest"
 	@echo ""
 	@echo "🚀 下一步:"
-	@echo "   make docker-verify    - 验证镜像版本"
+	@echo "   make docker-verify-l1    - 验证镜像版本"
 	@echo "   make docker-push-l1  - 推送到镜像仓库"
 	@echo ""
 
 # 验证镜像版本
-docker-verify:
+docker-verify-l1:
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "✅ 验证 Layer 1 基础依赖镜像版本"
 	@echo "═══════════════════════════════════════════════════════════"
@@ -454,6 +454,10 @@ docker-verify:
 		echo '========================================' && \
 		echo '=== Poetry 版本 ===' && \
 		poetry --version && \
+		echo '========================================' && \
+		echo '=== Docker 版本 ===' && \
+		docker --version && \
+		docker compose version && \
 		echo '========================================' && \
 		echo '=== pip 源配置 ===' && \
 		cat /etc/pip.conf && \
@@ -889,7 +893,7 @@ help:
 	@echo ""
 	@echo "🔨 Docker 镜像构建 (Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2):"
 	@echo "  make docker-build-l1   - 构建基础依赖镜像 (dockerfile.l1)"
-	@echo "  make docker-verify      - 验证镜像版本"
+	@echo "  make docker-verify-l1      - 验证镜像版本"
 	@echo ""
 	@echo "🚀 服务管理:"
 	@echo "  make run-server    - 启动开发服务器"
