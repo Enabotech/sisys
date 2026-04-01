@@ -313,8 +313,17 @@ jobs:
           poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
           poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true
 
+      - name: Trivy 缓存
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/trivy
+          key: cache-trivy-${{ runner.os }}-${{ hashFiles('**/trivy-cache-key') }}
+          restore-keys: |
+            cache-trivy-${{ runner.os }}-
+
       - name: Trivy 文件系统扫描
-        uses: https://gitea.sisys.local/aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.35.0
         env:
           TRIVY_INSECURE: 'true'
           TRIVY_DB_REPOSITORY: 'harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
@@ -328,9 +337,6 @@ jobs:
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: 'true'
           # offline-scan: 'true'
-          # db-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
-          # java-db-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1'
-          # trivy-checks-bundle-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-checks:2'
           skip-db-update: 'true'
           skip-java-db-update: 'true'
           skip-check-update: 'true'
