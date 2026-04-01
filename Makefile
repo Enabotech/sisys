@@ -374,7 +374,7 @@ docker-clean:
 # Docker 基础依赖镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
 # 标签命名规范：docs/architecture/image-tagging-strategy.md
 # -----------------------------------------------------------------------------
-.PHONY: docker-build-l1 docker-verify-l1 docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
+.PHONY: docker-build-l1 docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
 
 # 镜像命名
 DOCKER_REGISTRY ?= harbor.sisys.local/sisys
@@ -419,54 +419,30 @@ docker-build-l1:
 		.
 	@echo ""
 	@echo "🏷️  标记 l1-latest 标签..."
-	$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest
+	@$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest
 	@echo ""
-	@echo "✅ Layer 1 基础依赖镜像构建完成！"
-	@echo "📋 镜像信息:"
-	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
-	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l1-latest"
+	@echo "🔍 验证镜像版本..."
+	@echo ""
+	@$(DOCKER) run --rm \
+		-e IMAGE_TAG=$(L1_TAG) \
+		$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) bash -c '\
+		echo "════════════════════════════════════════════════" && \
+		echo "  Layer 1 镜像版本验证" && \
+		echo "════════════════════════════════════════════════" && \
+		echo "  Image  : $$IMAGE_TAG" && \
+		echo "  Ubuntu : $$(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d \"\"'\"'\"')" && \
+		echo "  Python : $$(python --version 2>&1)" && \
+		echo "  Node.js: $$(node --version)" && \
+		echo "  npm    : $$(npm --version)" && \
+		echo "  Poetry : $$(poetry --version)" && \
+		echo "  Docker : $$(docker --version)" && \
+		echo "  Compose: $$(docker compose version)" && \
+		echo "════════════════════════════════════════════════"'
+	@echo ""
+	@echo "✅ 镜像构建并验证完成！"
 	@echo ""
 	@echo "🚀 下一步:"
-	@echo "   make docker-verify-l1    - 验证镜像版本"
 	@echo "   make docker-push-l1  - 推送到镜像仓库"
-	@echo ""
-
-# 验证镜像版本
-docker-verify-l1: docker-build-l1
-	@echo "═══════════════════════════════════════════════════════════"
-	@echo "✅ 验证 Layer 1 基础依赖镜像版本"
-	@echo "═══════════════════════════════════════════════════════════"
-	@echo "镜像：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG)"
-	@echo ""
-	$(DOCKER) run --rm $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) bash -c "\
-		echo '========================================' && \
-		echo '=== Ubuntu 版本 ===' && \
-		cat /etc/os-release | grep PRETTY_NAME && \
-		echo '========================================' && \
-		echo '=== Python 版本 ===' && \
-		python --version && \
-		echo '========================================' && \
-		echo '=== Node.js 版本 ===' && \
-		node --version && \
-		echo '========================================' && \
-		echo '=== npm 版本 ===' && \
-		npm --version && \
-		echo '========================================' && \
-		echo '=== Poetry 版本 ===' && \
-		poetry --version && \
-		echo '========================================' && \
-		echo '=== Docker 版本 ===' && \
-		docker --version && \
-		docker compose version && \
-		echo '========================================' && \
-		echo '=== pip 源配置 ===' && \
-		cat /etc/pip.conf && \
-		echo '========================================' && \
-		echo '=== Poetry 源配置 ===' && \
-		cat /etc/pypoetry/config.toml && \
-		echo '========================================'"
-	@echo ""
-	@echo "✅ 镜像验证完成！"
 	@echo ""
 
 # 推送 Layer 1 镜像到仓库
@@ -518,12 +494,29 @@ docker-build-l2:
 		.
 	@echo ""
 	@echo "🏷️  标记 l2-latest 标签..."
-	$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest
+	@$(DOCKER) tag $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest
 	@echo ""
-	@echo "✅ Layer 2 CI/CD 依赖镜像构建完成！"
-	@echo "📋 镜像信息:"
-	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
-	@echo "   $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):l2-latest"
+	@echo "🔍 验证镜像版本..."
+	@echo ""
+	@$(DOCKER) run --rm --gpus all \
+		-e IMAGE_TAG=$(L2_TAG) \
+		$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) bash -c '\
+		echo "════════════════════════════════════════════════" && \
+		echo "  Layer 2 镜像版本验证" && \
+		echo "════════════════════════════════════════════════" && \
+		echo "  Image  : $$IMAGE_TAG" && \
+		echo "  Python : $$(python --version 2>&1)" && \
+		echo "  Poetry : $$(poetry --version)" && \
+		echo "  Trivy  : $$(trivy --version | head -n1)" && \
+		echo "  Docker : $$(docker --version)" && \
+		TORCH_VER=$$(python -c "import torch; print(torch.__version__)") && \
+		CUDA_VER=$$(python -c "import torch; print(torch.version.cuda)") && \
+		CUDA_AVAIL=$$(python -c "import torch; print(torch.cuda.is_available())") && \
+		echo "  Torch  : v$$TORCH_VER (CUDA: $$CUDA_VER)" && \
+		if [ "$$CUDA_AVAIL" = "True" ]; then echo "  CUDA   : ✅ Available"; else echo "  CUDA   : ❌ Not available"; fi && \
+		echo "════════════════════════════════════════════════"'
+	@echo ""
+	@echo "✅ 镜像构建并验证完成！"
 	@echo ""
 	@echo "🚀 下一步:"
 	@echo "   make docker-push-l2  - 推送到镜像仓库"
@@ -576,12 +569,22 @@ docker-build-l3:
 		.
 	@echo ""
 	@echo "🏷️  标记 l3-latest 标签..."
-	$(DOCKER) tag $(DOCKER_REGISTRY)/app:$(L3_TAG) $(DOCKER_REGISTRY)/app:l3-latest
+	@$(DOCKER) tag $(DOCKER_REGISTRY)/app:$(L3_TAG) $(DOCKER_REGISTRY)/app:l3-latest
 	@echo ""
-	@echo "✅ Layer 3 应用镜像构建完成！"
-	@echo "📋 镜像信息:"
-	@echo "   $(DOCKER_REGISTRY)/app:$(L3_TAG)"
-	@echo "   $(DOCKER_REGISTRY)/app:l3-latest"
+	@echo "🔍 验证镜像版本..."
+	@echo ""
+	@$(DOCKER) run --rm \
+		-e IMAGE_TAG=$(L3_TAG) \
+		$(DOCKER_REGISTRY)/app:$(L3_TAG) bash -c '\
+		echo "════════════════════════════════════════════════" && \
+		echo "  Layer 3 镜像版本验证" && \
+		echo "════════════════════════════════════════════════" && \
+		echo "  Image  : $$IMAGE_TAG" && \
+		echo "  Python : $$(python --version 2>&1)" && \
+		echo "  App    : sisys-app" && \
+		echo "════════════════════════════════════════════════"'
+	@echo ""
+	@echo "✅ 镜像构建并验证完成！"
 	@echo ""
 	@echo "🚀 下一步:"
 	@echo "   make docker-push-l3  - 推送到镜像仓库"
@@ -907,9 +910,15 @@ help:
 	@echo "  make docker-logs   - 查看 Docker 日志"
 	@echo "  make docker-clean  - 清理 Docker 容器"
 	@echo ""
-	@echo "🔨 Docker 镜像构建 (Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2):"
-	@echo "  make docker-build-l1   - 构建基础依赖镜像 (dockerfile.l1)"
-	@echo "  make docker-verify-l1      - 验证镜像版本"
+	@echo "🔨 Docker 镜像构建 (Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2 + Docker 24.0.9 + Trivy 0.69.3):"
+	@echo "  make docker-build-l1   - 构建基础依赖镜像 (dockerfile.l1) + 自动验证"
+	@echo "  make docker-build-l2   - 构建 CI/CD 依赖镜像 (dockerfile.l2) + 自动验证"
+	@echo "  make docker-build-l3   - 构建应用镜像 (dockerfile.app) + 自动验证"
+	@echo ""
+	@echo "📤 镜像推送:"
+	@echo "  make docker-push-l1    - 推送基础依赖镜像 (构建 + tag + push)"
+	@echo "  make docker-push-l2    - 推送 CI/CD 依赖镜像 (构建 + tag + push)"
+	@echo "  make docker-push-l3    - 推送应用镜像 (构建 + tag + push)"
 	@echo ""
 	@echo "🚀 服务管理:"
 	@echo "  make run-server    - 启动开发服务器"
