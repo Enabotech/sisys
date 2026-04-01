@@ -356,7 +356,7 @@ class TestDockerfiles:
             content = f.read()
 
         assert "FROM" in content
-        assert "pytorch" in content.lower() or "PYTORCH_IMAGE" in content
+        assert "dependency:l1-" in content.lower()
 
     def test_dependency_dockerfile_poetry(self):
         """测试依赖 Dockerfile 安装 Poetry"""
