@@ -183,7 +183,7 @@ jobs:
             --cov-report=term-missing \
             --junitxml=reports/pytest/unit-tests.xml \
             --html=reports/pytest/unit-tests.html \
-            --self-contained-html
+            --self-contained-html \
             -v
 
       - name: 检查覆盖率门禁 (≥80%)
@@ -278,7 +278,7 @@ jobs:
           poetry run pytest tests/integration \
             --junitxml=reports/integration/integration-tests.xml \
             --html=reports/integration/integration-tests.html \
-            --self-contained-html
+            --self-contained-html \
             -v \
             --tb=short
 
