@@ -315,6 +315,11 @@ jobs:
 
       - name: Trivy 文件系统扫描
         uses: https://gitea.sisys.local/aquasecurity/trivy-action@v0.35.0
+        env:
+          TRIVY_INSECURE: 'true'
+          TRIVY_DB_REPOSITORY: 'harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
+          TRIVY_JAVA_DB_REPOSITORY: 'harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1'
+          TRIVY_CHECKS_BUNDLE_REPOSITORY: 'harbor.sisys.local/sisys/aquasecurity/trivy-checks:2'
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -322,16 +327,13 @@ jobs:
           output: 'reports/security/trivy-fs.sarif'
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: 'true'
-          offline-scan: 'true'
-        db:
-          db-repository: 'https://harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
-          java-db-repository: 'https://harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1'
-          checks-bundle-repository: 'https://harbor.sisys.local/sisys/aquasecurity/trivy-checks:2'
-          skip-update: 'true'
+          # offline-scan: 'true'
+          db-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-db:2'
+          java-db-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1'
+          trivy-checks-bundle-repository: 'harbor.sisys.local/sisys/aquasecurity/trivy-checks:2'
           skip-db-update: 'true'
           skip-java-db-update: 'true'
           skip-check-update: 'true'
-
 
       - name: 上传安全报告
         if: always()
