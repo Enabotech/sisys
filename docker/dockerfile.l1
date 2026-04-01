@@ -4,7 +4,7 @@
 # 加速源：清华大学开源软件镜像站
 # =========================================
 
-FROM ubuntu:22.04
+FROM harbor.sisys.local/sisys/tools/ubuntu:22.04
 
 # 避免交互式提示
 ENV DEBIAN_FRONTEND=noninteractive \
