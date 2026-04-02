@@ -397,6 +397,9 @@ jobs:
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
               insecure = true
+          buildkitd-flags: --dns-search gitea-advacts.svc.cluster.local  --dns-search=svc.cluster.local
+        env:
+          BUILDKIT_DNS_NAMESERVERS: "10.43.0.10"
 
       - name: 生成镜像标签
         id: meta
