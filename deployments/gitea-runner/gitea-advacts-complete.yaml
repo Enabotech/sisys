@@ -3,51 +3,23 @@
 # ============================================================
 # Story: 0-8-gitea-runner-configuration
 # 命名空间：gitea-advacts (独立部署，不影响 gitea-actions)
-# 版本：v3.1 (包含 Secret)
+# 版本：v4.0 (合规版 - Secret 外部管理)
 # 日期：2026-04-02
 #
 # 包含：
-#   - Secret (ca-certificates, gitea-org-runner-token)
 #   - Namespace (gitea-advacts)
 #   - ServiceAccount + RBAC
 #   - ConfigMap (Runner 配置)
 #   - StatefulSet (DinD Runner)
+#
+# 需要手动创建的 Secret：
+#   - ca-certificates (从 gitea-actions 复制)
+#   - gitea-org-runner-token (从 gitea-actions 复制)
 # ============================================================
 
 # -----------------------------------------------------------------------------
-# 1. Secret 配置
+# 1. 命名空间配置
 # -----------------------------------------------------------------------------
-# CA Certificates Secret（从 gitea-actions 复制）
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ca-certificates
-  namespace: gitea-advacts
-  labels:
-    app: gitea-runner-dind
-type: Opaque
-data:
-  ca-certificates.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURXRENDQWtDZ0F3SUJBZ0lVSTVMTENrc2pTQkVZNm1GMFdOVVJtNGk2MlV3d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0tERVdNQlFHQTFVRUF3d05LaTV6YVhONWN5NXNiMk5oYkRFT01Bd0dBMVVFQ2d3RlUwbFRXVk13SGhjTgpNall3TXpFM01Ea3dOakUxV2hjTk1qY3dNekUzTURrd05qRTFXakFvTVJZd0ZBWURWUVFEREEwcUxuTnBjM2x6CkxteHZZMkZzTVE0d0RBWURWUVFLREFWVFNWTlpVekNDQVNJd0RRWUpLb1pJaHZjTkFRRUJCUUFEZ2dFUEFEQ0MKQVFvQ2dnRUJBTGU5cDlvM3FLU01NdU1ERDV3M2dTUzhZNy9IWTB0OUd6V0JSUTU0TFVDNTJ1ODZqNDNVNzVUNQphS2N1ZEVTMm5BMSs0aGJ2SHppdEwvTklCcnppMVI4NURzaGROTzRjZWUzV0NSYldFRGwvVk9hU3Iwb1JFV1VQCmI3NkJuaWdnTzE5d0Z1bGVvV0xVcEp1L3FENmVENUI5OUZaRUFrM1lScDFsOHViRzNTNVpyaDltK2l0NldCRwppTFdCVFFmUFJtc3lTcDJWN0NMdTRVb0FZbkRhODd5US9GbHJZVHpxYmxxeTN1RWNWVVcyam5KeG5tVjBaL24zCkpsSlpoa0hjYmU3d2FEaTIvaGNsbEVXQ0d1YTZTRlEzNElQY1BzOFh3cjByMHZmTkcxUUJwdWF6dnZlc0ZvWlYKaTl5OTFOeWVJWXoyU1hsaFIvNjJrcE5xblhwbktzVUNBd0VBQWFONk1IZ3dIUVlEVlIwT0JCWUVGQ0xaekdIdAovV1Vsd2pVMnk2eWlkYzV4dlZYZE1COEdBMVVkSXdRWU1CYUFGQ0xaekdIdC9XVWx3alUyeTZ5aWRjNXh2VlhkCk1BOEdBMVVkRXdFQi93UUZNQU1CQWY4d0pRWURWUjBSQkI0d0hJSU5LaTV6YVhONWN5NXNiMk5oYklJTGMybHoKZVhNdWJHOWpZV3d3RFFZSktvWklodmNOQVFFTEJRQURnZ0VCQUdHNFovSDN6eXBja3d0cGxyc2dpYi92MFRPNgp6NXVOTTFMV3MrYTRNV3pLY1hmSnR4bkpOWlRWZXVlcFBvdytyQ2U4bWF5aXJjTjJTdDdNb01qaE4zMWRCZFVPCmN1SjlPK0dKVlYxWGRJOXpJNmkwOFFCdEd1TEcwVkpDTWI5cEkzNXlTQVdpczQ2aElJNDRPMjZFZ2Q5bGcvdSsKY1pvV1J6dmRyRk1OVUdmVnF6ZXVvMWhvR3RJVyt4VElxdzhGN2ZXSFl1U2pORWEwSUFNUnJXQWNidDg1emhWdgpJbFlickFTNlgvYXdHQXpGODh0Z1dkaVdQai9ZOUF5R2pmZE4xOENoYUllVUFpNnRrVXp5RTlsZ0o2L2ZueUE4CmRlWjhVWnFxT25WcE1SVmZzOHRRODVSbHVtUVUrR0NOUTN5blM4NmhsT3Q2U255T1psVmFmREpRODJVPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpNSUlEV0RDQ0FrQ2dBd0lCQWdJVUk1TExDa3NqU0JFWTZtRjBXTlVSbTRpNjJVd3dEUVlKS29aSWh2Y05BUUVMCkJRQXdLREVXTUJRR0ExVUVBd3dOS2k1emFYTjVjeTVzYjJOaGJERU9NQXdHQTFVRUNnd0ZVMGxUV1ZNd0hjY04KTWpZd016RTNNRGt3TmpFMVdoY05Namd3TXpFM01Ea3dOakUxV2pBb01SWXdGQVlEVlFRREQBMHFMbk5wYzNsegpMbXh2WTJGc01RNHdEQVlEVlFRS0RBVlRTVk5aVXpDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDClFRb0NnZ0VCQUxlN3A5bzNxS1NNTXVNRUQ1dzNnU1M4WTcvSFkwdDlHeldCUlE1NExVQzUydTg2ajQzVTc1VDUKYUtjdWRFUzJuQTErNGhidkh6aXRML05JQnJ6aTFSTDVEc2hkTk80Y2VlM1dDUmJXRURsL1ZPYVNyMG9SRVdVUApiNzZCbmlnZ08xOXdGdWxlb1dMVXBKdS9xRDZlRDRDQjk5RlpFQWszWVJwMWw4dWJHM1M1WnJoOW0raXQ2V0JHCmlMV0JUUWZQUm1zeVNwMlY3Q0x1NFVvQVluRGE4N3lRL0ZscllUenFibHF5M3VFY1ZVVzJqbkp4bm1WMFovbjMKSmxKWmhrSGNiZTd3YURpMi9oY2xsRVdDR3VhNlNGUTM0SVBjUHM4WHdyMHIwdmZORzFRQnB1YXp2dmVzRm9aVgppOXk5MU55ZUlZejJTWGxoUi82MmtwTnFuWHBuS3NVQ0F3RUFBYU42TUhnd0hRWURWUjBPQkJZRUZDTFp6R0h0Ci9XVWx3alUyeTZ5aWRjNXh2VlhkTUI4R0ExVWRJd1FZTUJhQUZDTFp6R0h0L1dVbHdqVTJ5NnlpZGM1eHZWWGQKTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3SlFZRFZSMFJCQjR3SElJTktpNXphWE41Y3k1c2IyTmhiSUlMYzJsegplWE11Ykc5allXd3dEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBR0c0Wi9IM3p5cGNrd3RwbHJzZ2liL3YwVE82Cno1dU5NMUxXcythNE1XektjWGZKdHhuSk5aVFZldWVwUG93K3JDbzhtYXlyY04yU3Q3TW9NamhOMzFkQmRVTwpjdUo5TytHSlZWMVhkSTl6STZpMDhRQnRHdUxHMFlKQ01iOXBJMzV5U0FXaXM0NmhJSTQ0TzI2RWdkOWxnL3UrCmNab1dSenZkckZNTlVHZlZxemV1bzFob0d0SVcreFRJcXc4RjdmV0hZdVNqTkVhMElBTVJyV0FjYnQ4NXpoVnYKSWxZYnJBUzZYL2F3R0F6Rjg4dGdXZGlXUGovWTlBeUdqZmROUThDaGFJZVVBaTZ0a1V6eUU5bGdKNi9mbnlBOApkZVo4VVpxcU9uVnBNUlZmczh0UTg1Umx1bVFVK0dDTlEzeW5TODZobE90NlNueU9abFZhZkRKUTgyVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
----
-# Runner Token Secret
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitea-org-runner-token
-  namespace: gitea-advacts
-  labels:
-    app: gitea-runner-dind
-type: Opaque
-data:
-  # Token: 2qsfG21yaoJHUPG1E8JoikRiNJXhVrrbKKGzFMzJ
-  token: MnFzZkcyMXlhb0pIVVBHMUU4Sm9pa1JpTkpYaFZycmJLS0d6Rk16Sgo=
----
-# ============================================================
-# Gitea AdvActs 命名空间配置
-# ============================================================
-# 添加 Pod 安全标签，允许特权容器和 rootless 模式
-# ============================================================
-
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -64,12 +36,6 @@ metadata:
 # -----------------------------------------------------------------------------
 # 2. ServiceAccount 和 RBAC
 # -----------------------------------------------------------------------------
-# ============================================================
-# Gitea Runner DinD RBAC 配置
-# ============================================================
-# ServiceAccount + Role + RoleBinding
-# ============================================================
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -188,7 +154,7 @@ metadata:
     env: advacts
 spec:
   # 初始 1 个副本，验证后扩展到 2 个
-  replicas: 1
+  replicas: 2
   serviceName: gitea-runner-dind
   selector:
     matchLabels:
@@ -198,9 +164,6 @@ spec:
       labels:
         app: gitea-runner-dind
     spec:
-      # ✅ 移除 hostNetwork - 使用 Pod 内网络命名空间（安全改进）
-      # Pod 内容器共享网络命名空间，localhost 可达
-
       serviceAccountName: gitea-runner-dind
 
       # Pod 级别安全上下文
@@ -235,7 +198,14 @@ spec:
               
               # ✅ 安装 CA 证书包（与 gitea-actions 一致）
               echo "📦 Installing CA certificates..."
-              apk add --no-cache ca-certificates >/dev/null 2>&1 || echo "⚠️ CA install failed"
+              apk add --no-cache git curl ca-certificates >/dev/null 2>&1 || echo "⚠️ CA install failed"
+              
+              # ✅ 追加 Gitea 自签名证书到系统证书包
+              echo "📜 Appending Gitea certificate to system bundle..."
+              cat /etc/ssl/certs/ca-certificates.crt > /tmp/system-ca.crt
+              cat /tmp/gitea-ca.crt >> /tmp/system-ca.crt
+              cp /tmp/system-ca.crt /etc/ssl/certs/ca-certificates.crt
+              echo "✅ Gitea certificate appended"
               
               echo "⏳ Waiting for Docker daemon..."
               until docker -H tcp://127.0.0.1:2375 info >/dev/null 2>&1; do
@@ -244,9 +214,9 @@ spec:
               done
               echo "✅ Docker daemon ready"
 
-              # 设置环境变量
-              export GIT_SSL_NO_VERIFY=true
-              export NODE_TLS_REJECT_UNAUTHORIZED=0
+              # 设置环境变量（与 gitea-actions 一致）
+              export GIT_SSL_NO_VERIFY=false
+              export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
               if [ ! -f /data/.runner ]; then
                 echo "📝 Registering runner..."
@@ -268,7 +238,7 @@ spec:
               exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
 
           env:
-            # Gitea 配置 - 使用 HTTPS（证书已配置）
+            # Gitea 配置 - 使用 HTTPS
             - name: GITEA_INSTANCE_URL
               value: "https://gitea.sisys.local"
             - name: GITEA_RUNNER_NAME
@@ -284,16 +254,10 @@ spec:
                   key: token
             - name: DOCKER_HOST
               value: "tcp://127.0.0.1:2375"
-            # SSL 证书配置（自签名证书）
+            # SSL 证书配置（与 gitea-actions 一致）
             - name: GIT_SSL_NO_VERIFY
-              value: "true"
-            - name: NODE_TLS_REJECT_UNAUTHORIZED
-              value: "0"
-            - name: SSL_CERT_FILE
-              value: "/etc/ssl/certs/ca-certificates.crt"
-            - name: REQUESTS_CA_BUNDLE
-              value: "/etc/ssl/certs/ca-certificates.crt"
-            - name: CURL_CA_BUNDLE
+              value: "false"
+            - name: NODE_EXTRA_CA_CERTS
               value: "/etc/ssl/certs/ca-certificates.crt"
 
           volumeMounts:
@@ -309,9 +273,9 @@ spec:
               mountPath: /var/lib/docker
             - name: tmp
               mountPath: /tmp
-            # ✅ 添加 Gitea 证书（与 gitea-actions 一致）
+            # ✅ Gitea 证书挂载到临时位置（用于追加到系统证书包）
             - name: ca-certificates
-              mountPath: /etc/ssl/certs/ca-certificates.crt
+              mountPath: /tmp/gitea-ca.crt
               subPath: ca-certificates.crt
               readOnly: true
 
@@ -450,7 +414,7 @@ spec:
           configMap:
             name: gitea-runner-config
             defaultMode: 0644
-        # ✅ Gitea 证书 Secret（与 gitea-actions 一致）
+        # ✅ Gitea 证书 Secret（挂载到临时位置用于追加）
         - name: ca-certificates
           secret:
             secretName: ca-certificates
