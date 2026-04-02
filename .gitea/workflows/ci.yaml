@@ -459,12 +459,16 @@ jobs:
                      ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
           echo "✅ 已标记 l3-latest 标签"
 
+      # ✅ 使用 docker/login-action 登录 Harbor
+      - name: 登录 Harbor 镜像仓库
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+          password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
+
       - name: 推送镜像到 Harbor
         run: |
-          # 登录 Harbor
-          echo "${{ secrets.HARBOR_ROBOT_PASSWORD }}" | docker login ${{ vars.HARBOR_REGISTRY }} \
-            --username ${{ secrets.HARBOR_ROBOT_USERNAME }} --password-stdin
-
           # 推送版本标签
           docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
 
