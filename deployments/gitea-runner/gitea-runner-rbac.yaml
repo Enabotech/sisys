@@ -1,0 +1,43 @@
+# ============================================================
+# Gitea Runner DinD RBAC 配置
+# ============================================================
+# ServiceAccount + Role + RoleBinding
+# ============================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea-runner-dind
+  namespace: gitea-actions
+  labels:
+    app: gitea-runner-dind
+    runner-type: dind-rootless
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitea-runner-dind-role
+  namespace: gitea-actions
+rules:
+  # 允许访问 Pod（用于动态调度）
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # 允许访问 ConfigMaps 和 Secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-runner-dind-binding
+  namespace: gitea-actions
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitea-runner-dind-role
+subjects:
+  - kind: ServiceAccount
+    name: gitea-runner-dind
+    namespace: gitea-actions
