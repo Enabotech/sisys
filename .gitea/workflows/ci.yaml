@@ -385,6 +385,11 @@ jobs:
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
             network=host
+          # ✅ 配置 Buildx 信任 Harbor 自签名证书
+          buildkitd-config: |
+            [registry."harbor.sisys.local"]
+              http = true
+              insecure = true
 
       - name: 登录 Harbor 镜像仓库
         uses: docker/login-action@v3
