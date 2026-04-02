@@ -385,11 +385,7 @@ jobs:
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
             network=host
-          # ✅ 配置 Buildx 信任 Harbor 自签名证书
-          buildkitd-config: |
-            [registry."harbor.sisys.local"]
-              http = true
-              insecure = true
+            insecure-registries=harbor.sisys.local
 
       - name: 登录 Harbor 镜像仓库
         uses: docker/login-action@v3
@@ -428,6 +424,10 @@ jobs:
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/app:buildcache,mode=max
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+          # ✅ 配置 insecure registry 信任 Harbor 自签名证书
+          provenance: false
+          # ✅ 使用 docker 容器驱动支持多平台
+          platforms: linux/amd64
 
       - name: 标记 L3 latest 标签
         run: |
