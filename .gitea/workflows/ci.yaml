@@ -388,6 +388,16 @@ jobs:
           mkdir -p ~/.config/docker/certs.d/harbor.sisys.local
           cp /tmp/buildkit-certs/harbor-ca.crt ~/.config/docker/certs.d/harbor.sisys.local/ca.crt
 
+
+      - name: 安装 Harbor CA 到系统信任链（Alpine）
+        run: |
+          # 确保有 CA 工具
+          # apk add --no-cache ca-certificates
+          # 写入 CA
+          cp /tmp/buildkit-certs/harbor-ca.crt /usr/local/share/ca-certificates/harbor.crt
+          # 更新系统信任
+          update-ca-certificates
+
       - name: 生成 BuildKit 配置
         run: |
           cat > buildkitd.toml <<EOF
