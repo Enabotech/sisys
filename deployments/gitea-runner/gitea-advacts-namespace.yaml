@@ -1,0 +1,21 @@
+# ============================================================
+# Gitea Advanced Act Runner - 命名空间配置
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# 命名空间：gitea-advacts (独立部署，不影响 gitea-actions)
+# 版本：v1.0 (借鉴成功配置)
+# 日期：2026-04-02
+# ============================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea-advacts
+  labels:
+    # 允许特权容器和 rootless 模式
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: v1.34
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: v1.34
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: v1.34

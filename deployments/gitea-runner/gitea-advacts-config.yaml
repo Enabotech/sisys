@@ -1,0 +1,68 @@
+# ============================================================
+# Gitea Advanced Act Runner - Runner 配置
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# 命名空间：gitea-advacts
+# 版本：v1.0 (借鉴成功配置)
+# 日期：2026-04-02
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-runner-config
+  namespace: gitea-advacts
+  labels:
+    app: gitea-runner-dind
+    story: "0-8"
+data:
+  config.yaml: |
+    # Runner 配置
+    runner:
+      file: /data/.runner
+      workdir: /data/workdir
+      tempdir: /data/tmp
+      timeout: 30m
+
+    log:
+      level: info
+      format: text
+      output: stdout
+
+    # 容器配置（DinD 模式）
+    container:
+      # 使用 L2 依赖镜像
+      image: harbor.sisys.local/sisys/dependency:l2-latest
+
+      # 网络模式 - bridge（WSL2 兼容性）
+      network: bridge
+
+      workdir: /workspace
+
+      # Docker 选项
+      options: |
+        --privileged
+        --user root:root
+        --tmpfs /tmp
+        --tmpfs /var/tmp
+        --dns 10.43.0.10
+        --dns-search gitea-advacts.svc.cluster.local
+        --dns-search svc.cluster.local
+        -e DOCKER_HOST=unix:///var/run/docker.sock
+        -e DOCKER_TLS_CERTDIR=
+        -e GIT_SSL_NO_VERIFY=true
+        -e NODE_TLS_REJECT_UNAUTHORIZED=0
+        -e BUILDKIT_PROGRESS=plain
+
+      env:
+        - DOCKER_HOST=unix:///var/run/docker.sock
+        - DOCKER_TLS_CERTDIR=
+
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /workspace:/workspace
+        - /tmp:/tmp
+
+    cache:
+      enabled: true
+      dir: /data/cache
