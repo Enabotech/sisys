@@ -437,8 +437,10 @@ jobs:
           file: ./docker/dockerfile.app
           # ✅ 使用 load: true 将镜像加载到本地 Docker daemon
           load: true
+          # ✅ 构建时生成所有需要的标签
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
