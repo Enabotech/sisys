@@ -389,6 +389,7 @@ jobs:
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
+          insecure-entitlements: security.insecure
           # ✅ 使用 Harbor 中的 buildkit 镜像（避免从 Docker Hub 拉取）
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
