@@ -246,7 +246,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: GITEA_RUNNER_LABELS
-              value: "ubuntu-latest,docker,k8s,linux,dind,advacts"
+              value: "ubuntu-latest,dind,advacts,buildx"
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:

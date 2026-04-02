@@ -165,7 +165,7 @@ spec:
 
             # Runner 标签（用于 Job 调度）
             - name: GITEA_RUNNER_LABELS
-              value: "ubuntu-latest,docker,k8s,linux"
+              value: "ubuntu-latest,docker,k3s,linux,gpu"
 
             # Token（从 Secret 注入 - 组织级 Token）
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
