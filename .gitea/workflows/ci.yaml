@@ -397,6 +397,7 @@ jobs:
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
               insecure = true
+              skip_verify = true
           # buildkitd-flags: --dns-search gitea-advacts.svc.cluster.local  --dns-search=svc.cluster.local
         env:
           BUILDKIT_DNS_NAMESERVERS: "10.43.0.10"
