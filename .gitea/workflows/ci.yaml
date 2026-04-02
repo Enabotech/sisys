@@ -428,9 +428,7 @@ jobs:
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/app:buildcache,mode=max
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-          # ✅ 配置 insecure registry 信任 Harbor 自签名证书
           provenance: false
-          # ✅ 使用 docker 容器驱动支持多平台
           platforms: linux/amd64
 
       - name: 标记 L3 latest 标签
