@@ -400,8 +400,6 @@ jobs:
               skip_verify = true
             [dns]
               nameservers = ["10.43.0.10"]
-              searchDomains = ["gitea-advacts.svc.cluster.local"]
-              nameservers = ["10.43.0.10"]
               searchDomains = [
                 "gitea-advacts.svc.cluster.local",
                 "svc.cluster.local",
