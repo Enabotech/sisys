@@ -343,7 +343,7 @@ spec:
               rm -f /var/run/docker.pid 2>/dev/null || true
               rm -f /var/run/docker/*.pid 2>/dev/null || true
 
-              # ✅ 创建 Docker daemon 配置（使用 K8s DNS 解析内部域名）
+              # ✅ 创建 Docker daemon 配置（使用 K8s DNS 解析内部域名 + insecure registry）
               mkdir -p /etc/docker
               cat > /etc/docker/daemon.json <<'EOF'
               {

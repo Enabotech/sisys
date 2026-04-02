@@ -392,7 +392,7 @@ jobs:
           # ✅ 使用 Harbor 中的 buildkit 镜像（避免从 Docker Hub 拉取）
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
-            network=host
+          #  network=host
           # ✅ 配置 buildkitd.toml 信任 Harbor 自签名证书（HTTPS + 自签名）
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
