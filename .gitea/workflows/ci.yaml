@@ -387,6 +387,7 @@ jobs:
         run: |
           mkdir -p /etc/docker/certs.d/harbor.sisys.local
           cp /tmp/buildkit-certs/harbor-ca.crt /etc/docker/certs.d/harbor.sisys.local/ca.crt
+          systemctl restart docker
 
       - name: 生成 BuildKit 配置
         run: |
