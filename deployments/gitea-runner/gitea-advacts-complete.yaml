@@ -343,11 +343,14 @@ spec:
               rm -f /var/run/docker.pid 2>/dev/null || true
               rm -f /var/run/docker/*.pid 2>/dev/null || true
 
-              # ✅ 创建 Docker daemon 配置（仅 insecure-registries，避免与标志冲突）
+              # ✅ 创建 Docker daemon 配置（使用 K8s DNS 解析内部域名）
               mkdir -p /etc/docker
               cat > /etc/docker/daemon.json <<'EOF'
               {
-                "insecure-registries": ["harbor.sisys.local"]
+                "insecure-registries": ["harbor.sisys.local"],
+                "dns": ["10.43.0.10", "8.8.8.8"],
+                "dns-search": ["gitea-advacts.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+                "ipv6": false
               }
               EOF
 
