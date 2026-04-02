@@ -387,7 +387,6 @@ jobs:
           password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
       # ✅ 使用存储在 Gitea 密钥中的 Harbor CA 证书
-      # 注意：HARBOR_CA_CRT 必须是单行格式（去除所有换行符）
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -401,7 +400,7 @@ jobs:
           # ✅ 配置 buildkitd.toml 信任 Harbor 自签名证书
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
-              ca=[${{ secrets.HARBOR_CA_CRT }}]
+              ca=["""${{ secrets.HARBOR_CA_CRT }}"""]
 
             [worker.oci]
               enabled = true
