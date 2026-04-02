@@ -358,7 +358,8 @@ jobs:
   # ===========================================================================
   build-image:
     name: "🏗️ 构建 Docker 镜像"
-    runs-on: ubuntu-latest
+    # ✅ 使用 DinD Runner 进行构建（有完整的 Buildx 支持）
+    runs-on: dind
     needs: [integration-tests, security-scan]
     container:
       # ✅ 使用 Layer 1 基础镜像进行构建
