@@ -401,7 +401,7 @@ jobs:
           # ✅ 配置 buildkitd.toml 信任 Harbor 自签名证书
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
-              ca=["${{ secrets.HARBOR_CA_CRT }}"]
+              ca=[${{ secrets.HARBOR_CA_CRT }}]
 
             [worker.oci]
               enabled = true
