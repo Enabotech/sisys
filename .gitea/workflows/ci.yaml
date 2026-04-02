@@ -388,28 +388,24 @@ jobs:
 
       - name: 生成证书和配置
         run: |
-          # 写入 CA 证书文件
-          echo "${{ secrets.HARBOR_CA_CRT }}" > harbor-ca.crt
-          # 写入 buildkitd.toml，ca 指向同目录下的证书文件
+          mkdir -p /tmp/buildkit-certs
+          printf '%s' "${{ secrets.HARBOR_CA_CRT }}" > /tmp/buildkit-certs/harbor-ca.crt
+
           cat > buildkitd.toml <<EOF
           [registry."harbor.sisys.local"]
-            ca = ["harbor-ca.crt"]
-          [worker.oci]
-            enabled = true
-            snapshotter = "overlayfs"
+            ca = ["/tmp/buildkit-certs/harbor-ca.crt"]
           EOF
 
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          config: buildkitd.toml                     # 使用独立的配置文件
+          driver: docker-container
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
           buildkitd-flags: |
             --allow-insecure-entitlement security.insecure
-            --allow-insecure-entitlement network.host   # 如果需要网络 host 权限
-          # insecure-entitlements 参数可以保留，也可由 flags 覆盖
-          insecure-entitlements: security.insecure
+            --allow-insecure-entitlement network.host
+          config: buildkitd.toml
 
       - name: 生成镜像标签
         id: meta
