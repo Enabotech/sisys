@@ -383,12 +383,6 @@ jobs:
           mkdir -p /tmp/buildkit-certs
           printf '%s' "${{ secrets.HARBOR_CA_CRT }}" > /tmp/buildkit-certs/harbor-ca.crt
 
-      - name: 安装 CA 到 rootless Docker（正确方式）
-        run: |
-          mkdir -p ~/.config/docker/certs.d/harbor.sisys.local
-          cp /tmp/buildkit-certs/harbor-ca.crt ~/.config/docker/certs.d/harbor.sisys.local/ca.crt
-
-
       - name: 安装 Harbor CA 到系统信任链（Alpine）
         run: |
           # 确保有 CA 工具
@@ -441,7 +435,8 @@ jobs:
         with:
           context: .
           file: ./docker/dockerfile.app
-          push: false  # 先不推送，本地 tag 后再推送
+          # ✅ 使用 load: true 将镜像加载到本地 Docker daemon
+          load: true
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
           labels: |
