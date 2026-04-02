@@ -386,26 +386,25 @@ jobs:
           username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
           password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
+      # ✅ 使用存储在 Gitea 密钥中的 Harbor CA 证书
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
+          # ✅ 允许 insecure entitlement
           insecure-entitlements: security.insecure
+
           # ✅ 使用 Harbor 中的 buildkit 镜像（避免从 Docker Hub 拉取）
           driver-opts: |
             image=harbor.sisys.local/sisys/tools/moby/buildkit:buildx-stable-1
-          #  network=host
-          # ✅ 配置 buildkitd.toml 信任 Harbor 自签名证书（HTTPS + 自签名）
+
+          # ✅ 配置 buildkitd.toml 信任 Harbor 自签名证书（使用 Gitea 密钥中的 CA 证书）
           buildkitd-config-inline: |
             [registry."harbor.sisys.local"]
-              insecure = true
-              skip_verify = true
-            [dns]
-              nameservers = ["10.43.0.10"]
-              searchDomains = [
-                "gitea-advacts.svc.cluster.local",
-                "svc.cluster.local",
-                "cluster.local"
-              ]
+              ca=["${{ secrets.HARBOR_CA_CRT }}"]
+
+            [worker.oci]
+              enabled = true
+              snapshotter = "overlayfs"
 
       - name: 生成镜像标签
         id: meta
