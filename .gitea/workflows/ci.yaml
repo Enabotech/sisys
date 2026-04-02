@@ -133,7 +133,7 @@ jobs:
   # ===========================================================================
   unit-tests:
     name: "🧪 单元测试"
-    runs-on: ${{ vars.GPU_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ vars.GPU_RUNNER_LABEL || 'gpu' }}
     needs: code-quality
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -211,7 +211,7 @@ jobs:
   # ===========================================================================
   integration-tests:
     name: "🔗 集成测试"
-    runs-on: ${{ vars.GPU_RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ vars.GPU_RUNNER_LABEL || 'gpu' }}
     needs: [unit-tests]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -359,7 +359,7 @@ jobs:
   build-image:
     name: "🏗️ 构建 Docker 镜像"
     # ✅ 使用 DinD Runner 进行构建（有完整的 Buildx 支持）
-    runs-on: dind
+    runs-on: buildx
     needs: [integration-tests, security-scan]
     container:
       # ✅ 使用 Layer 1 基础镜像进行构建
@@ -456,7 +456,7 @@ jobs:
   # ===========================================================================
   push-image:
     name: "📤 推送镜像并扫描"
-    runs-on: ubuntu-latest
+    runs-on: buildx
     needs: [build-image]
     container:
       # ✅ 使用 Layer 2 CI 镜像
