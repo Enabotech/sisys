@@ -385,8 +385,8 @@ jobs:
 
       - name: 安装 CA 到 Docker（关键）
         run: |
-          sudo mkdir -p /etc/docker/certs.d/harbor.sisys.local
-          sudo cp /tmp/buildkit-certs/harbor-ca.crt /etc/docker/certs.d/harbor.sisys.local/ca.crt
+          mkdir -p /etc/docker/certs.d/harbor.sisys.local
+          cp /tmp/buildkit-certs/harbor-ca.crt /etc/docker/certs.d/harbor.sisys.local/ca.crt
 
       - name: 生成 BuildKit 配置
         run: |
