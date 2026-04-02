@@ -388,6 +388,17 @@ jobs:
           mkdir -p /etc/docker/certs.d/harbor.sisys.local
           cp /tmp/buildkit-certs/harbor-ca.crt /etc/docker/certs.d/harbor.sisys.local/ca.crt
           systemctl restart docker
+          echo "等待 Docker 启动..."
+          for i in {1..30}; do
+            if docker info >/dev/null 2>&1; then
+              echo "Docker 已就绪"
+              break
+            fi
+            echo "Docker 未就绪，重试中 ($i)..."
+            sleep 2
+          done
+          # 兜底检查
+          docker info
 
       - name: 生成 BuildKit 配置
         run: |
