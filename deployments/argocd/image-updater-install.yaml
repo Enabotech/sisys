@@ -97,7 +97,7 @@ data:
       - name: Harbor
         api_url: https://harbor.sisys.local
         ping: yes
-        insecure: no
+        insecure: yes
         credentials: secret:argocd/argocd-image-updater-secret#harbor  # pragma: allowlist secret
         defaultns: sisys
         prefix: harbor.sisys.local
@@ -115,15 +115,6 @@ data:
         insecure: no
         prefix: quay.io
 
-  # 更新策略配置
-  config.yaml: |
-    registries:
-      - name: Harbor
-        api_url: https://harbor.sisys.local
-        insecure: false
-        prefix: harbor.sisys.local
-        credentials: secret:argocd/argocd-image-updater-secret#harbor  # pragma: allowlist secret
-
     # 日志配置
     log_level: info
 
@@ -132,6 +123,15 @@ data:
 
     # Webhook 配置（可选）
     # webhook_url: http://argocd-server.argocd.svc.cluster.local/api/webhook
+
+    # 全局 Git Commit Message 模板
+    git.commit-message-template: |
+      build: automatic update of {{ .AppName }} [skip actions]
+
+      Image updated:
+      {{ range .AppChanges -}}
+      - {{ .Image }}: {{ .OldTag }} → {{ .NewTag }}
+      {{ end }}
 
 ---
 # Secret - Harbor 凭据配置

@@ -28,15 +28,6 @@ metadata:
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
 
-    # 自定义提交消息
-    argocd-image-updater.argoproj.io/git-commit-message: |
-      build: automatic update of {{ .AppName }}
-      changes:
-      {{ range .AppChanges -}}
-      updates image {{ .Image }} tag '{{ .OldTag }}' -> '{{ .NewTag }}'
-      {{ end }}
-      [skip actions]
-
     # 更新策略
     argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
@@ -50,6 +41,7 @@ metadata:
     argocd-image-updater.argoproj.io/app.check-interval: 10m
 
     # 审批注解
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   project: default
@@ -72,10 +64,10 @@ spec:
 
   # 同步策略 - 自动同步但需要审批
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: true
+    # automated:
+    #   prune: true
+    #   selfHeal: true
+    #   allowEmpty: true
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
