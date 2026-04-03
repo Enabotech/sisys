@@ -69,12 +69,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python3 -c "import sys; sys.exit(0)" || exit 1
 
-# 设置入口点
+# 设置入口点（智能判断是否启动应用或占位服务器）
 ENTRYPOINT ["./entrypoint.sh"]
 
-# 默认命令
-# CMD ["python3", "-m", "src.app"]
-CMD ["/bin/sh", "-c", "sleep infinity"]
+# 由 entrypoint.sh 处理启动逻辑，无需默认 CMD
 
 # 镜像标签说明
 LABEL org.opencontainers.image.title="SISYS Application Image" \
