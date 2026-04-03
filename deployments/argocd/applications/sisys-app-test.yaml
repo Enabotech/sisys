@@ -53,9 +53,9 @@ spec:
     path: deployments/apps/sisys/test
 
     # Kustomize 配置
-    kustomize:
-      images:
-        - harbor.sisys.local/sisys/app:test-v0.0.0-initial
+    # kustomize:
+    #   images:
+    #     - harbor.sisys.local/sisys/app:test-v0.0.0-initial
 
   # 目标配置 - Test 命名空间
   destination:

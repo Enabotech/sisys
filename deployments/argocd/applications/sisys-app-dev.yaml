@@ -52,9 +52,9 @@ spec:
     path: deployments/apps/sisys/dev
 
     # Kustomize 配置
-    kustomize:
-      images:
-        - harbor.sisys.local/sisys/app:dev-main-initial-0000000
+    # kustomize:
+    #   images:
+    #     - harbor.sisys.local/sisys/app:dev-main-initial-0000000
 
   # 目标配置 - Dev 命名空间
   destination:
