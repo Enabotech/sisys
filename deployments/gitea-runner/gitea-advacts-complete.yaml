@@ -154,7 +154,7 @@ metadata:
     env: advacts
 spec:
   # 初始 1 个副本，验证后扩展到 2 个
-  replicas: 2
+  replicas: 1
   serviceName: gitea-runner-dind
   selector:
     matchLabels:
