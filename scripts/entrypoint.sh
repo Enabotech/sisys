@@ -35,25 +35,6 @@ else
     log_warn "GPU 不可用，使用 CPU 模式"
 fi
 
-# 环境变量检查
-if [ -n "$DATABASE_URL" ]; then
-    log_info "数据库连接：已配置"
-else
-    log_warn "DATABASE_URL 未配置"
-fi
-
-if [ -n "$REDIS_URL" ]; then
-    log_info "Redis 连接：已配置"
-else
-    log_warn "REDIS_URL 未配置"
-fi
-
-# 执行数据库迁移 (如果有)
-if [ -f "scripts/migrate.sh" ]; then
-    log_info "执行数据库迁移..."
-    bash scripts/migrate.sh || log_warn "数据库迁移失败"
-fi
-
 # 启动应用
 log_info "启动应用..."
 exec "$@"
