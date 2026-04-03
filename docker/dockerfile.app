@@ -74,7 +74,7 @@ ENTRYPOINT ["./entrypoint.sh"]
 
 # 默认命令
 # CMD ["python3", "-m", "src.app"]
-CMD ["/bin/bash"]
+CMD ["/bin/sh", "-c", "sleep infinity"]
 
 # 镜像标签说明
 LABEL org.opencontainers.image.title="SISYS Application Image" \
