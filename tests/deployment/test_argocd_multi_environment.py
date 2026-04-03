@@ -197,7 +197,7 @@ class TestMultiEnvironmentConfig:
         """验证环境同步策略差异"""
         env_configs = [
             ("deployments/argocd/applications/sisys-app-dev.yaml", True),
-            ("deployments/argocd/applications/sisys-app-test.yaml", True),
+            ("deployments/argocd/applications/sisys-app-test.yaml", False),
             ("deployments/argocd/applications/sisys-app-prod.yaml", False),
         ]
 
