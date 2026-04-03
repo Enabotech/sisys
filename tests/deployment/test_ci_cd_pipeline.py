@@ -66,7 +66,7 @@ class TestCIPipeline:
         assert "code-quality" in jobs
 
         code_quality = jobs["code-quality"]
-        assert code_quality["name"] == "🔍 代码质量检查"
+        assert code_quality["name"] == "🔍 代码检查"
 
         # 检查步骤
         steps = [s["name"] for s in code_quality["steps"]]
@@ -118,11 +118,11 @@ class TestCIPipeline:
         assert "build-image" in jobs
 
         build_image = jobs["build-image"]
-        assert build_image["name"] == "🏗️ 构建 Docker 镜像"
+        assert build_image["name"] == "🏗️ 构建镜像"
 
         # 检查 Docker Buildx
         steps = [s["name"] for s in build_image["steps"]]
-        assert "设置 Docker Buildx" in steps
+        assert "设置 Buildx" in steps
         assert "构建并推送 Docker 镜像" in steps
 
     def test_auto_deploy_job(self, ci_workflow):
@@ -131,7 +131,7 @@ class TestCIPipeline:
         assert "auto-deploy" in jobs
 
         auto_deploy = jobs["auto-deploy"]
-        assert auto_deploy["name"] == "🚀 自动部署到测试环境"
+        assert auto_deploy["name"] == "🚀 自动部署"
 
         # 检查部署条件
         assert "if" in auto_deploy
