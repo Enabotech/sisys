@@ -42,11 +42,11 @@ main() {
         exec "$@"
     elif [ -d "/app/src/app" ]; then
         # 如果应用代码存在，启动应用
-        log_info "Application code detected. Starting application..."
+        log_info "检测到应用程序，启动应用..."
         exec poetry run python -m src.app
     else
         # 开发平台占位模式：启动简易 HTTP 服务器响应探针
-        log_warn "Application code missing. Starting placeholder server on :8080..."
+        log_warn "应用程序开发中，8080端口启动 HTTP 响应服务..."
         exec python3 -c "
 from http.server import HTTPServer, BaseHTTPRequestHandler
 class Handler(BaseHTTPRequestHandler):
