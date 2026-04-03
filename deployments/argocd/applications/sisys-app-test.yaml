@@ -60,8 +60,10 @@ spec:
     targetRevision: HEAD
     path: deployments/apps/sisys/test
 
-    # ✅ Kustomize 配置（移除硬编码的 images，让 Image Updater 管理）
-    kustomize: {}
+    # Kustomize 配置
+    kustomize:
+      images:
+        - harbor.sisys.local/sisys/app:test-v0.0.0-initial
 
   # 目标配置 - Test 命名空间
   destination:

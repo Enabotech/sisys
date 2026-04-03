@@ -65,8 +65,10 @@ spec:
     targetRevision: HEAD
     path: deployments/apps/sisys/prod
 
-    # ✅ Kustomize 配置（移除硬编码的 images，让 Image Updater 管理）
-    kustomize: {}
+    # Kustomize 配置
+    kustomize:
+      images:
+        - harbor.sisys.local/sisys/app:v1.0.0
 
   # 目标配置 - Prod 命名空间
   destination:
