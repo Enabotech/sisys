@@ -29,10 +29,16 @@ metadata:
     argocd-image-updater.argoproj.io/git-branch: HEAD
 
     # 自定义提交消息
-    argocd-image-updater.argoproj.io/git-commit-message: "image updater automatic update of {{.app}} - [skip actions]"
+    argocd-image-updater.argoproj.io/git-commit-message: |
+      build: automatic update of {{ .AppName }}
+      changes:
+      {{ range .AppChanges -}}
+      updates image {{ .Image }} tag '{{ .OldTag }}' -> '{{ .NewTag }}'
+      {{ end }}
+      [skip actions]
 
-    # 更新策略：latest (按推送时间选择最新，不是指标签名为 latest)
-    argocd-image-updater.argoproj.io/app.update-strategy: latest
+    # 更新策略
+    argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
     # 只匹配 test-开头的标签
     argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
