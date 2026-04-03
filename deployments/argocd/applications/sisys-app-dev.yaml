@@ -54,10 +54,8 @@ spec:
     targetRevision: HEAD
     path: deployments/apps/sisys/dev
 
-    # Kustomize 配置
-    kustomize:
-      images:
-        - harbor.sisys.local/sisys/app:dev-main-initial-0000000
+    # ✅ Kustomize 配置（移除硬编码的 images，让 Image Updater 管理）
+    kustomize: {}
 
   # 目标配置 - Dev 命名空间
   destination:
