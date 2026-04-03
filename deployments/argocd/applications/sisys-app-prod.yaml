@@ -57,9 +57,9 @@ spec:
     path: deployments/apps/sisys/prod
 
     # Kustomize 配置
-    kustomize:
-      images:
-        - harbor.sisys.local/sisys/app:v1.0.0
+    # kustomize:
+    #   images:
+    #     - harbor.sisys.local/sisys/app:v1.0.0
 
   # 目标配置 - Prod 命名空间
   destination:
