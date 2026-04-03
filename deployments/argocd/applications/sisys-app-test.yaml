@@ -28,6 +28,9 @@ metadata:
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
 
+    # ✅ 自定义提交消息
+    argocd-image-updater.argoproj.io/git-commit-message: "ci: 自动更新测试环境镜像版本至 {{.app}}"
+
     # 测试环境使用 latest 策略 (因为 test-* 不是标准 semver)
     argocd-image-updater.argoproj.io/app.update-strategy: latest
 
