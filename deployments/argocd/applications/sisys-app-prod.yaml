@@ -28,15 +28,6 @@ metadata:
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
 
-    # 自定义提交消息
-    argocd-image-updater.argoproj.io/git-commit-message: |
-      build: automatic update of {{ .AppName }}
-      changes:
-      {{ range .AppChanges -}}
-      updates image {{ .Image }} tag '{{ .OldTag }}' -> '{{ .NewTag }}'
-      {{ end }}
-      [skip actions]
-
     # 生产环境使用 semver 策略
     argocd-image-updater.argoproj.io/app.update-strategy: semver
 
