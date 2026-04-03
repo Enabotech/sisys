@@ -31,8 +31,9 @@ metadata:
     # 自定义提交消息
     argocd-image-updater.argoproj.io/git-commit-message: "image updater automatic update of {{.app}} - [skip actions]"
 
-    # 测试环境使用 latest 策略 (因为 test-* 不是标准 semver)
-    argocd-image-updater.argoproj.io/app.update-strategy: latest
+    # ✅ 使用 name 策略（按标签名称字母排序，选择最后一个）
+    # 因为 test-v1.0.0-{sha} 格式中 sha 越大表示越新
+    argocd-image-updater.argoproj.io/app.update-strategy: name
 
     # 只匹配 test-开头的标签
     argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
