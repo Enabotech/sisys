@@ -73,7 +73,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 ENTRYPOINT ["./entrypoint.sh"]
 
 # 默认命令
-CMD ["python3", "-m", "src.app"]
+# CMD ["python3", "-m", "src.app"]
+CMD ["/bin/bash"]
 
 # 镜像标签说明
 LABEL org.opencontainers.image.title="SISYS Application Image" \
