@@ -447,9 +447,9 @@ jobs:
             org.opencontainers.image.created=${{ steps.meta.outputs.timestamp }}
             sisys.image.layer="l3"
             sisys.image.type="application"
-          cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/app:buildcache
+          cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache
           # ✅ 使用 mode=min 减少缓存大小（从 4.6GB 降至 ~50MB）
-          cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/app:buildcache,mode=min
+          cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache,mode=min
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
           provenance: false
