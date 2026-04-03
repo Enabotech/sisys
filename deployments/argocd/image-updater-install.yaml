@@ -115,17 +115,17 @@ data:
         insecure: no
         prefix: quay.io
 
-    # 日志配置
-    log_level: info
+  # 日志配置
+  log_level: info
 
-    # 健康检查端点
-    health_port: 8080
+  # 健康检查端点
+  health_port: 8080
 
     # Webhook 配置（可选）
     # webhook_url: http://argocd-server.argocd.svc.cluster.local/api/webhook
 
   # 全局 Git Commit Message 模板
-  git.commit-message-template: |
+  commit.template: |
     build: automatic update of {{ .AppName }} [skip actions]
 
     Image updated:
@@ -202,6 +202,9 @@ spec:
             - "8080"
             - --registries-conf-path
             - /app/config/registries.conf
+            - --git-commit-message-path
+            - /app/config/commit.template
+
           ports:
             - containerPort: 8080
               name: health
