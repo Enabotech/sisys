@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 kustomize:
   images:
   - harbor.sisys.local/sisys/app:test-v1.0.0-67656c7
+=======
+kustomize:
+  images:
+  - harbor.sisys.local/sisys/app:test-v1.0.0-b7d4e4a
+>>>>>>> 32851ecb1b264f0c34079fcef4bc405994f57d18
