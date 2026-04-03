@@ -119,7 +119,7 @@ data:
   log_level: info
 
   # 健康检查端点
-  health_port: 8080
+  health_port: "8080"
 
     # Webhook 配置（可选）
     # webhook_url: http://argocd-server.argocd.svc.cluster.local/api/webhook
@@ -155,7 +155,7 @@ type: Opaque
 data:
   # Harbor 凭据 (base64 编码) - 占位符，需要替换
   # 格式：echo -n "robot$sisys+argocd-pull:<TOKEN>" | base64
-  harbor: mMbDaASmDi2fE1CIIFYMyZWorAQYLQ1j
+  harbor: PLACEHOLDER_OPTIONAL
   # Docker Hub 凭据（可选，用于拉取公共镜像）
   dockerhub: PLACEHOLDER_OPTIONAL
 
@@ -202,8 +202,6 @@ spec:
             - "8080"
             - --registries-conf-path
             - /app/config/registries.conf
-            - --git-commit-message-path
-            - /app/config/commit.template
 
           ports:
             - containerPort: 8080
