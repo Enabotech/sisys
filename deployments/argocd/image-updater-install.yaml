@@ -124,14 +124,14 @@ data:
     # Webhook 配置（可选）
     # webhook_url: http://argocd-server.argocd.svc.cluster.local/api/webhook
 
-    # 全局 Git Commit Message 模板
-    git.commit-message-template: |
-      build: automatic update of {{ .AppName }} [skip actions]
+  # 全局 Git Commit Message 模板
+  git.commit-message-template: |
+    build: automatic update of {{ .AppName }} [skip actions]
 
-      Image updated:
-      {{ range .AppChanges -}}
-      - {{ .Image }}: {{ .OldTag }} → {{ .NewTag }}
-      {{ end }}
+    Image updated:
+    {{ range .AppChanges -}}
+    - {{ .Image }}: {{ .OldTag }} → {{ .NewTag }}
+    {{ end }}
 
 ---
 # Secret - Harbor 凭据配置
