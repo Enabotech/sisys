@@ -31,8 +31,8 @@ HARBOR_PROJECT = "sisys"
 HARBOR_USERNAME = "robot$sisys+gitea-runner-push"
 HARBOR_PASSWORD = "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"  # nosec B105  # pragma: allowlist secret
 
-# 测试镜像配置 - 使用国内镜像源
-TEST_SOURCE_IMAGE = "docker.m.daocloud.io/library/busybox:1.35"  # 使用国内镜像源
+# 测试镜像配置
+TEST_SOURCE_IMAGE = "harbor.sisys.local/sisys/tools/mirrored-pause:3.6"
 TEST_IMAGE_TAG = f"test-push-{int(time.time())}"
 # 使用域名而非 IP（避免证书问题）
 TEST_HARBOR_IMAGE = f"{HARBOR_HOST}:{HARBOR_NODEPORT}/{HARBOR_PROJECT}/test-image:{TEST_IMAGE_TAG}"
