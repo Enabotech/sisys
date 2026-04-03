@@ -35,6 +35,30 @@ else
     log_warn "GPU 不可用，使用 CPU 模式"
 fi
 
-# 启动应用
-log_info "启动应用..."
-exec "$@"
+# 启动逻辑
+main() {
+    if [ $# -gt 0 ]; then
+        # 如果有参数，执行参数（支持 K8s 覆盖）
+        exec "$@"
+    elif [ -d "/app/src/app" ]; then
+        # 如果应用代码存在，启动应用
+        log_info "Application code detected. Starting application..."
+        exec poetry run python -m src.app
+    else
+        # 开发平台占位模式：启动简易 HTTP 服务器响应探针
+        log_warn "Application code missing. Starting placeholder server on :8080..."
+        exec python3 -c "
+from http.server import HTTPServer, BaseHTTPRequestHandler
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Development Placeholder OK')
+    def log_message(self, format, *args): pass
+HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+"
+    fi
+}
+
+main "$@"
