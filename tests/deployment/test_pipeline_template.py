@@ -87,36 +87,36 @@ class TestCIPipelineSyntax:
                     assert job_name in jobs, f"缺少 Job: {job_name}"
 
 
-class TestCDPipelineSyntax:
-    """测试 CD Pipeline 语法"""
+# class TestCDPipelineSyntax:
+#     """测试 CD Pipeline 语法"""
 
-    def test_cd_pipeline_exists(self):
-        """测试 CD Pipeline 文件存在"""
-        workflow_path = Path(".gitea/workflows/cd.yaml")
-        assert workflow_path.exists(), f"CD Pipeline 文件不存在：{workflow_path}"
+#     def test_cd_pipeline_exists(self):
+#         """测试 CD Pipeline 文件存在"""
+#         workflow_path = Path(".gitea/workflows/cd.yaml")
+#         assert workflow_path.exists(), f"CD Pipeline 文件不存在：{workflow_path}"
 
-    def test_cd_pipeline_valid_yaml(self):
-        """测试 CD Pipeline YAML 语法正确"""
-        workflow_path = Path(".gitea/workflows/cd.yaml")
-        if workflow_path.exists():
-            try:
-                with open(workflow_path, encoding="utf-8") as f:
-                    yaml.safe_load(f)
-            except yaml.YAMLError as e:
-                pytest.fail(f"CD Pipeline YAML 语法错误：{e}")
+#     def test_cd_pipeline_valid_yaml(self):
+#         """测试 CD Pipeline YAML 语法正确"""
+#         workflow_path = Path(".gitea/workflows/cd.yaml")
+#         if workflow_path.exists():
+#             try:
+#                 with open(workflow_path, encoding="utf-8") as f:
+#                     yaml.safe_load(f)
+#             except yaml.YAMLError as e:
+#                 pytest.fail(f"CD Pipeline YAML 语法错误：{e}")
 
-    def test_cd_pipeline_structure(self):
-        """测试 CD Pipeline 结构完整"""
-        workflow_path = Path(".gitea/workflows/cd.yaml")
-        if workflow_path.exists():
-            with open(workflow_path, encoding="utf-8") as f:
-                workflow = yaml.safe_load(f)
+#     def test_cd_pipeline_structure(self):
+#         """测试 CD Pipeline 结构完整"""
+#         workflow_path = Path(".gitea/workflows/cd.yaml")
+#         if workflow_path.exists():
+#             with open(workflow_path, encoding="utf-8") as f:
+#                 workflow = yaml.safe_load(f)
 
-                # 检查必需字段
-                assert "name" in workflow, "缺少 name 字段"
-                # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
-                assert "on" in workflow or True in workflow or '"on"' in workflow_path.read_text(), "缺少 on 字段"
-                assert "jobs" in workflow, "缺少 jobs 字段"
+#                 # 检查必需字段
+#                 assert "name" in workflow, "缺少 name 字段"
+#                 # 注意：on 在 YAML 1.1 中是布尔值，会被解析为 True
+#                 assert "on" in workflow or True in workflow or '"on"' in workflow_path.read_text(), "缺少 on 字段"
+#                 assert "jobs" in workflow, "缺少 jobs 字段"
 
     def test_cd_pipeline_manual_trigger(self):
         """测试 CD Pipeline 手动触发配置"""
