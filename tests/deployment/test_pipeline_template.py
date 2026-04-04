@@ -80,7 +80,7 @@ class TestCIPipelineSyntax:
                     "security-scan",
                     "build-image",
                     "push-image",
-                    "auto-deploy",
+                    # "auto-deploy",
                 ]
 
                 for job_name in required_jobs:

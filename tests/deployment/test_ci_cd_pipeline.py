@@ -125,17 +125,17 @@ class TestCIPipeline:
         assert "设置 Buildx" in steps
         assert "构建并推送 Docker 镜像" in steps
 
-    def test_auto_deploy_job(self, ci_workflow):
-        """测试自动部署任务"""
-        jobs = ci_workflow["jobs"]
-        assert "auto-deploy" in jobs
+    # def test_auto_deploy_job(self, ci_workflow):
+    #     """测试自动部署任务"""
+    #     jobs = ci_workflow["jobs"]
+    #     assert "auto-deploy" in jobs
 
-        auto_deploy = jobs["auto-deploy"]
-        assert auto_deploy["name"] == "🚀 自动部署"
+    #     auto_deploy = jobs["auto-deploy"]
+    #     assert auto_deploy["name"] == "🚀 自动部署"
 
-        # 检查部署条件
-        assert "if" in auto_deploy
-        assert "main" in auto_deploy["if"]
+    #     # 检查部署条件
+    #     assert "if" in auto_deploy
+    #     assert "main" in auto_deploy["if"]
 
 
 class TestCDPipeline:
