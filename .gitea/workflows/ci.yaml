@@ -528,64 +528,64 @@ jobs:
           docker pull ${{ steps.meta.outputs.image_tag_test }} || echo "测试镜像验证失败"
 
   # ===========================================================================
-  # 阶段 7: 自动部署 (ArgoCD) - 仅 main 分支
+  # 阶段 7: 自动部署 (ArgoCD) - 仅 main 分支 -Argocd 已部署自动部署功能
   # ===========================================================================
-  auto-deploy:
-    name: "🚀 自动部署"
-    runs-on: ubuntu-latest
-    needs: [push-image]
-    # 仅在 main 分支部署
-    if: github.ref == 'refs/heads/main'
-    container:
-      image: bitnami/kubectl:latest
-      options: --user root
+  # auto-deploy:
+  #   name: "🚀 自动部署"
+  #   runs-on: ubuntu-latest
+  #   needs: [push-image]
+  #   # 仅在 main 分支部署
+  #   if: github.ref == 'refs/heads/main'
+  #   container:
+  #     image: bitnami/kubectl:latest
+  #     options: --user root
 
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: 检出代码
+  #       uses: actions/checkout@v4
 
-      - name: 设置 Kubectl
-        run: |
-          kubectl version --client
+  #     - name: 设置 Kubectl
+  #       run: |
+  #         kubectl version --client
 
-      - name: 配置 Kubeconfig
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+  #     - name: 配置 Kubeconfig
+  #       run: |
+  #         mkdir -p ~/.kube
+  #         echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
 
-      - name: 更新镜像版本
-        run: |
-          GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          IMAGE_TAG_L3="${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}"
-          kubectl set image deployment/sisys-app \
-            app=${{ vars.HARBOR_REGISTRY }}/sisys/app:${IMAGE_TAG_L3} \
-            -n sisys-test || echo "部署更新"
+  #     - name: 更新镜像版本
+  #       run: |
+  #         GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+  #         IMAGE_TAG_L3="${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}"
+  #         kubectl set image deployment/sisys-app \
+  #           app=${{ vars.HARBOR_REGISTRY }}/sisys/app:${IMAGE_TAG_L3} \
+  #           -n sisys-test || echo "部署更新"
 
-      - name: 触发 ArgoCD 同步
-        run: |
-          echo "触发 ArgoCD 自动同步..."
-          # ArgoCD 会自动检测到镜像变更并同步
-          # 也可手动触发：argocd app sync sisys-app
+  #     - name: 触发 ArgoCD 同步
+  #       run: |
+  #         echo "触发 ArgoCD 自动同步..."
+  #         # ArgoCD 会自动检测到镜像变更并同步
+  #         # 也可手动触发：argocd app sync sisys-app
 
-          # 使用 ArgoCD API 触发同步
-          curl -k -X POST "https://${{ env.ARGOCD_SERVER }}/api/v1/applications/sisys-app/sync" \
-            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"prune": false, "dryRun": false}' || echo "ArgoCD 同步已触发"
+  #         # 使用 ArgoCD API 触发同步
+  #         curl -k -X POST "https://${{ env.ARGOCD_SERVER }}/api/v1/applications/sisys-app/sync" \
+  #           -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+  #           -H "Content-Type: application/json" \
+  #           -d '{"prune": false, "dryRun": false}' || echo "ArgoCD 同步已触发"
 
-      - name: 等待部署就绪
-        run: |
-          kubectl rollout status deployment/sisys-app -n sisys-test --timeout=300s
+  #     - name: 等待部署就绪
+  #       run: |
+  #         kubectl rollout status deployment/sisys-app -n sisys-test --timeout=300s
 
-      - name: 执行健康检查
-        run: |
-          echo "执行健康检查..."
-          kubectl get pods -n sisys-test -l app=sisys-app
-          kubectl get svc -n sisys-test -l app=sisys-app
+  #     - name: 执行健康检查
+  #       run: |
+  #         echo "执行健康检查..."
+  #         kubectl get pods -n sisys-test -l app=sisys-app
+  #         kubectl get svc -n sisys-test -l app=sisys-app
 
-      - name: 发送部署通知
-        if: always()
-        run: |
-          echo "部署完成 - 状态：${{ job.status }}"
-          # 可集成 Slack/钉钉/企业微信通知
-          # curl -X POST "${{ secrets.NOTIFICATION_WEBHOOK }}" ...
+  #     - name: 发送部署通知
+  #       if: always()
+  #       run: |
+  #         echo "部署完成 - 状态：${{ job.status }}"
+  #         # 可集成 Slack/钉钉/企业微信通知
+  #         # curl -X POST "${{ secrets.NOTIFICATION_WEBHOOK }}" ...
