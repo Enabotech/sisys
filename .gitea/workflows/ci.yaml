@@ -69,7 +69,7 @@ env:
 
   # --- 版本标签前缀 (用于生成具体版本标签) ---
   # Layer 3 基础版本号，CI 构建时会生成 l3-v1.0.0-{git_sha}
-  IMAGE_TAG_L3_BASE: l3-v1.0.0
+  IMAGE_TAG_L3_BASE: v1.0.0
 
 # ===========================================================================
 # 并发控制 - 同一 PR 只运行一个 Pipeline
@@ -437,7 +437,7 @@ jobs:
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:dev-${{ steps.meta.outputs.image_tag_l3 }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
