@@ -431,11 +431,11 @@ jobs:
         with:
           context: .
           file: ./docker/dockerfile.app
-          push: true  # 🚀 优化：从 load: true 改为 push: true，直接推送
+          push: true
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest  # 🚀 优化：把 latest 标签直接加到这里
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
