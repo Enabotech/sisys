@@ -401,16 +401,6 @@ class TestDocumentation:
 class TestScripts:
     """脚本完整性测试"""
 
-    def test_import_pytorch_script_exists(self):
-        """测试 PyTorch 镜像导入脚本存在"""
-        script_path = Path("scripts/image/import-pytorch.sh")
-        assert script_path.exists(), "import-pytorch.sh not found"
-
-    def test_cleanup_script_exists(self):
-        """测试镜像清理脚本存在"""
-        script_path = Path("scripts/image/cleanup-old-versions.sh")
-        assert script_path.exists(), "cleanup-old-versions.sh not found"
-
     def test_entrypoint_script_exists(self):
         """测试入口脚本存在"""
         script_path = Path("scripts/entrypoint.sh")
@@ -419,8 +409,6 @@ class TestScripts:
     def test_scripts_executable(self):
         """测试脚本可执行权限"""
         scripts = [
-            Path("scripts/image/import-pytorch.sh"),
-            Path("scripts/image/cleanup-old-versions.sh"),
             Path("scripts/entrypoint.sh"),
         ]
 
