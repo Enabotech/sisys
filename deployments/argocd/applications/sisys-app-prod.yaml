@@ -76,6 +76,8 @@ spec:
       - Validate=true
       - ServerSideApply=true
       - Prune=false  # 生产环境禁用自动修剪
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
