@@ -370,34 +370,27 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # ✅ 新增：验证 Docker 环境
-      - name: 验证 Docker 环境
+      - name: 配置CA
         run: |
-          echo "Docker 版本:"
-          docker --version
-          docker info
-          docker buildx version
-
-      - name: 写入 Harbor CA
-        run: |
+          # 写入 Harbor CA
           mkdir -p /tmp/buildkit-certs
           printf '%s' "${{ secrets.HARBOR_CA_CRT }}" > /tmp/buildkit-certs/harbor-ca.crt
 
-      - name: 安装 Harbor CA 到系统信任链（Alpine）
-        run: |
-          # 确保有 CA 工具
-          # apk add --no-cache ca-certificates
-          # 写入 CA
+          # 安装 Harbor CA 到系统信任链（Alpine）
           cp /tmp/buildkit-certs/harbor-ca.crt /usr/local/share/ca-certificates/harbor.crt
           # 更新系统信任
           update-ca-certificates
 
-      - name: 生成 BuildKit 配置
-        run: |
+          # 生成 BuildKit 配置
           cat > buildkitd.toml <<EOF
           [registry."harbor.sisys.local"]
             ca = ["/tmp/buildkit-certs/harbor-ca.crt"]
           EOF
+
+          echo "Docker 版本:"
+          docker --version
+          docker info
+          docker buildx version
 
       # ✅ 先登录 Harbor（因为 buildkit 镜像在 Harbor 中）
       - name: 登录 Harbor 镜像仓库
@@ -430,7 +423,7 @@ jobs:
           # 测试环境标签
           echo "image_tag_test=test-v1.0.0-${GIT_SHA}" >> $GITHUB_OUTPUT
 
-      - name: 构建并推送 Docker 镜像
+      - name: 构建镜像
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -455,15 +448,8 @@ jobs:
           provenance: false
           platforms: linux/amd64
 
-      - name: 标记 L3 latest 标签
-        run: |
-          # 将刚构建的镜像标记为 l3-latest
-          docker tag ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }} \
-                     ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
-          echo "✅ 已标记 l3-latest 标签"
-
       # ✅ 使用 docker/login-action 登录 Harbor
-      - name: 登录 Harbor 镜像仓库
+      - name: 登录镜像仓库
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.HARBOR_REGISTRY }}
@@ -472,6 +458,11 @@ jobs:
 
       - name: 推送镜像到 Harbor
         run: |
+          # 将刚构建的镜像标记为 l3-latest
+          docker tag ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }} \
+                     ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
+          echo "✅ 已标记 l3-latest 标签"
+
           # 推送版本标签
           docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
 
