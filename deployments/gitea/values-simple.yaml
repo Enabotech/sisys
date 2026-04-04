@@ -6,8 +6,8 @@ replicaCount: 1
 
 # 镜像配置
 image:
-  repository: gitea/gitea
-  tag: "1.25.4"
+  repository: harbor.sisys.local/sisys/tools/gitea
+  tag: "1.25.4-rootless"
   pullPolicy: IfNotPresent
 
 # 资源限制
