@@ -307,11 +307,11 @@ jobs:
         uses: actions/checkout@v4
 
       # ✅ 保留 poetry install 作为补充（处理微小依赖变更）
-      - name: 安装项目依赖（如有变更）
+      - name: 更新项目依赖
         run: |
           poetry install --no-interaction --quiet || echo "依赖安装完成"
 
-      - name: Bandit 代码安全扫描
+      - name: 代码安全扫描 (Bandit)
         run: |
           mkdir -p reports/security
           poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
@@ -326,7 +326,7 @@ jobs:
       #     restore-keys: |
       #       cache-trivy-${{ runner.os }}-
 
-      - name: Trivy 文件系统扫描
+      - name: 文件系统扫描 (Trivy)
         uses: aquasecurity/trivy-action@v0.35.0
         env:
           TRIVY_INSECURE: 'true'
@@ -425,8 +425,10 @@ jobs:
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
           # 测试环境标签
           echo "image_tag_test=test-v1.0.0-${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}"
+          echo "image_tag_test=test-v1.0.0-${GIT_SHA}"
 
-      - name: 构建并推送镜像
+      - name: 构建推送镜像
         uses: docker/build-push-action@v5
         with:
           context: .
