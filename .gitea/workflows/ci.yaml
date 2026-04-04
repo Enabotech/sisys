@@ -365,6 +365,9 @@ jobs:
       # ✅ 使用 Layer 1 基础镜像进行构建
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
       options: --user root --privileged  # ✅ 修复：添加 --user root
+      credentials:
+        username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
+        password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
     steps:
       - name: 检出代码
@@ -393,7 +396,7 @@ jobs:
           docker buildx version
 
       # ✅ 先登录 Harbor（因为 buildkit 镜像在 Harbor 中）
-      - name: 登录 Harbor 镜像仓库
+      - name: 登录镜像仓库
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.HARBOR_REGISTRY }}
@@ -423,17 +426,16 @@ jobs:
           # 测试环境标签
           echo "image_tag_test=test-v1.0.0-${GIT_SHA}" >> $GITHUB_OUTPUT
 
-      - name: 构建镜像
+      - name: 构建并推送镜像
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/dockerfile.app
-          # ✅ 使用 load: true 将镜像加载到本地 Docker daemon
-          load: true
-          # ✅ 构建时生成所有需要的标签
+          push: true  # 🚀 优化：从 load: true 改为 push: true，直接推送
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest  # 🚀 优化：把 latest 标签直接加到这里
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -441,38 +443,11 @@ jobs:
             sisys.image.layer="l3"
             sisys.image.type="application"
           cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache
-          # ✅ 使用 mode=min 减少缓存大小（从 4.6GB 降至 ~50MB）
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache,mode=min
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
           provenance: false
           platforms: linux/amd64
-
-      # ✅ 使用 docker/login-action 登录 Harbor
-      - name: 登录镜像仓库
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.HARBOR_REGISTRY }}
-          username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
-          password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
-
-      - name: 推送镜像到 Harbor
-        run: |
-          # 将刚构建的镜像标记为 l3-latest
-          docker tag ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }} \
-                     ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
-          echo "✅ 已标记 l3-latest 标签"
-
-          # 推送版本标签
-          docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
-
-          # 推送 latest 标签
-          docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
-
-          # 推送测试环境标签
-          docker push ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
-
-          echo "✅ 所有镜像已推送到 Harbor"
 
       - name: 上传镜像信息
         uses: actions/upload-artifact@v3
