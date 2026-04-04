@@ -70,8 +70,8 @@ class TestCIPipeline:
 
         # 检查步骤
         steps = [s["name"] for s in code_quality["steps"]]
-        assert "Ruff 代码检查" in steps
-        assert "MyPy 类型检查" in steps
+        assert "代码检查 ( Ruff )" in steps
+        assert "类型检查 ( MyPy )" in steps
 
     def test_unit_tests_job(self, ci_workflow):
         """测试单元测试任务"""
@@ -109,8 +109,8 @@ class TestCIPipeline:
 
         # 检查步骤
         steps = [s["name"] for s in security_scan["steps"]]
-        assert "Bandit 代码安全扫描" in steps
-        assert "Trivy 文件系统扫描" in steps
+        assert "代码安全扫描 ( Bandit )" in steps
+        assert "文件系统扫描 ( Trivy )" in steps
 
     def test_build_image_job(self, ci_workflow):
         """测试镜像构建任务"""
@@ -123,7 +123,7 @@ class TestCIPipeline:
         # 检查 Docker Buildx
         steps = [s["name"] for s in build_image["steps"]]
         assert "设置 Buildx" in steps
-        assert "构建并推送 Docker 镜像" in steps
+        assert "构建推送镜像" in steps
 
     # def test_auto_deploy_job(self, ci_workflow):
     #     """测试自动部署任务"""

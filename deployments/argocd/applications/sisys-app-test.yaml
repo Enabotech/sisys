@@ -40,9 +40,10 @@ metadata:
     # 轮询间隔 (测试环境适中)
     argocd-image-updater.argoproj.io/app.check-interval: 2m
 
-    # 审批注解
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # # 审批注解
+    # argocd.argoproj.io/compare-options: IgnoreExtraneous
+    # argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+
 spec:
   project: default
 
@@ -64,16 +65,14 @@ spec:
 
   # 同步策略 - 自动同步但需要审批
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: true
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
       - Validate=true
       - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
