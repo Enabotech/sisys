@@ -360,7 +360,7 @@ jobs:
     name: "🏗️ 构建镜像"
     # ✅ 使用 DinD Runner 进行构建 ( 有完整的 Buildx 支持 ) 
     runs-on: buildx
-    needs: [integration-tests, security-scan]
+    needs: [integration-tests, security-scan, code-quality]
     container:
       # ✅ 使用 Layer 1 基础镜像进行构建
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
