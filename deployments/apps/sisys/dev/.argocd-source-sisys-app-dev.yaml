@@ -1,3 +1,3 @@
 kustomize:
   images:
-  - harbor.sisys.local/sisys/app:dev-v1.0.0-fea3600
+  - harbor.harbor.svc.cluster.local/sisys/app:dev-v1.0.0-fea3600
