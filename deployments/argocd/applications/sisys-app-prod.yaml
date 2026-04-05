@@ -23,7 +23,7 @@ metadata:
       app=harbor.sisys.local/sisys/app
 
     # 写回方法：使用 git 提交更新
-    argocd-image-updater.argoproj.io/write-back-method: none
+    argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
