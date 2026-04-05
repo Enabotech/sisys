@@ -96,17 +96,24 @@ data:
     registries:
       - name: Harbor
         api_url: https://harbor.sisys.local
-        ping: yes
         insecure: yes
-        credentials: secret:argocd/argocd-image-updater-secret#harbor  # pragma: allowlist secret
+        credentials: secret:argocd/argocd-image-updater-secret#harbor # pragma: allowlist secret
         defaultns: sisys
         prefix: harbor.sisys.local
+
+      - name: Harbor-Internal
+        api_url: https://harbor.sisys.local
+        ping: yes
+        insecure: yes
+        credentials: secret:argocd/argocd-image-updater-secret#harbor # pragma: allowlist secret
+        defaultns: sisys
+        prefix: harbor.harbor.svc.cluster.local
 
       - name: Docker Hub
         api_url: https://registry-1.docker.io
         ping: yes
         insecure: no
-        credentials: secret:argocd/argocd-image-updater-secret#dockerhub  # pragma: allowlist secret
+        credentials: secret:argocd/argocd-image-updater-secret#dockerhub # pragma: allowlist secret
         prefix: docker.io
 
       - name: Quay.io

@@ -18,9 +18,9 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   # ArgoCD Image Updater 注解
   annotations:
-    # 镜像列表 - 格式：别名=镜像路径
+    # 镜像列表 - 格式：别名=镜像路径（使用 Harbor 内部地址以匹配 webhook）
     argocd-image-updater.argoproj.io/image-list: |
-      app=harbor.sisys.local/sisys/app
+      app=harbor.harbor.svc.cluster.local/sisys/app
 
     # 写回方法：禁用自动写回，手动控制镜像版本
     argocd-image-updater.argoproj.io/write-back-method: git
