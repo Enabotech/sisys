@@ -46,7 +46,7 @@ main() {
         exec poetry run python -m src.app
     else
         # 开发平台占位模式：启动简易 HTTP 服务器响应探针
-        log_warn "应用程序开发中，8080端口启动 HTTP 响应服务..."
+        log_warn "SISYS 开发中，8080端口启动 HTTP 响应服务..."
         exec python3 -c "
 from http.server import HTTPServer, BaseHTTPRequestHandler
 class Handler(BaseHTTPRequestHandler):
