@@ -41,7 +41,7 @@ metadata:
     argocd-image-updater.argoproj.io/app.force-digest: "true"
 
     # 轮询间隔
-    argocd-image-updater.argoproj.io/app.check-interval: 30m
+    argocd-image-updater.argoproj.io/app.check-interval: 2m
 
     # 生产环境需要手动审批
     argocd.argoproj.io/compare-options: IgnoreExtraneous
