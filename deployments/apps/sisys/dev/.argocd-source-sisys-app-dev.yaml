@@ -1,3 +1,0 @@
-kustomize:
-  images:
-  - harbor.sisys.local/sisys/app:dev-v1.0.0-aa4668f
