@@ -1,7 +1,7 @@
 ---
 # ArgoCD Image Updater 安装清单
 # Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
-# 版本：v0.14.0 (对应 ArgoCD v3.2.x)
+# 版本：v0.18.0 (兼容 ArgoCD v3.x)
 
 # =============================================================================
 # 命名空间配置
@@ -192,7 +192,7 @@ spec:
       serviceAccountName: argocd-image-updater
       containers:
         - name: argocd-image-updater
-          image: harbor.sisys.local/sisys/tools/argoprojlabs/argocd-image-updater:v0.14.0
+          image: harbor.sisys.local/sisys/tools/argoprojlabs/argocd-image-updater:v0.18.0
           imagePullPolicy: Always
           args:
             - run
@@ -200,6 +200,7 @@ spec:
             - info
             - --health-port
             - "8080"
+            - --enable-webhook
             - --registries-conf-path
             - /app/config/registries.conf
 
@@ -267,6 +268,10 @@ spec:
     - name: health
       port: 8080
       targetPort: health
+      protocol: TCP
+    - name: webhook
+      port: 8082
+      targetPort: 8082
       protocol: TCP
   selector:
     app.kubernetes.io/name: argocd-image-updater
@@ -345,14 +350,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # 允许 Harbor Webhook 访问（修复问题 3）
+    # 允许 Harbor Webhook 访问
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: harbor
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8082
   egress:
     # 允许访问 Harbor
     - to:

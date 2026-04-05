@@ -28,8 +28,8 @@ metadata:
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
 
-    # 更新策略：按推送时间选择最新镜像
-    argocd-image-updater.argoproj.io/app.update-strategy: latest
+    # 更新策略：按推送时间选择最新镜像（v0.18.0 官方命名）
+    argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
     # 只匹配 test-开头的标签
     argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
