@@ -51,11 +51,6 @@ spec:
     targetRevision: HEAD
     path: deployments/apps/sisys/dev
 
-    # Kustomize 配置
-    # kustomize:
-    #   images:
-    #     - harbor.sisys.local/sisys/app:dev-main-initial-0000000
-
   # 目标配置 - Dev 命名空间
   destination:
     server: https://kubernetes.default.svc
@@ -66,7 +61,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
