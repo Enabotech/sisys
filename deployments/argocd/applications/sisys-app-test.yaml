@@ -23,7 +23,7 @@ metadata:
       app=harbor.sisys.local/sisys/app
 
     # 写回方法：禁用自动写回，手动控制镜像版本
-    argocd-image-updater.argoproj.io/write-back-method: none
+    argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: HEAD
@@ -35,14 +35,14 @@ metadata:
     argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
 
     # 强制使用 Digest (确保不可变性)
-    # argocd-image-updater.argoproj.io/app.force-digest: "true"
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
 
     # 轮询间隔 (测试环境适中)
     argocd-image-updater.argoproj.io/app.check-interval: 2m
 
-    # # 审批注解
-    # argocd.argoproj.io/compare-options: IgnoreExtraneous
-    # argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # 审批注解
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 
 spec:
   project: default
@@ -53,11 +53,6 @@ spec:
     targetRevision: HEAD
     path: deployments/apps/sisys/test
 
-    # Kustomize 配置
-    # kustomize:
-    #   images:
-    #     - harbor.sisys.local/sisys/app:test-v0.0.0-initial
-
   # 目标配置 - Test 命名空间
   destination:
     server: https://kubernetes.default.svc
@@ -65,6 +60,10 @@ spec:
 
   # 同步策略 - 自动同步但需要审批
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
