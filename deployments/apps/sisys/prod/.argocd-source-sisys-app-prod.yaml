@@ -1,0 +1,3 @@
+kustomize:
+  images:
+  - harbor.sisys.local/sisys/app:v1.0.0-ac04e1f
