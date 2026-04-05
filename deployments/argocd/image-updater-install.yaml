@@ -208,7 +208,7 @@ spec:
             - --health-port
             - "8080"
             - --interval
-            - "0"
+            - "24h"
             - --enable-webhook
             - --registries-conf-path
             - /app/config/registries.conf
