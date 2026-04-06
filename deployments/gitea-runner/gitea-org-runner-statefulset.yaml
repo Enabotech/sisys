@@ -56,7 +56,7 @@ spec:
 
       containers:
         - name: runner
-          image: docker.io/gitea/act_runner:0.3.0
+          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3-dind
           imagePullPolicy: IfNotPresent
 
           # Runner 启动参数 - 使用自定义启动脚本
@@ -66,63 +66,6 @@ spec:
             - /bin/sh
             - -c
             - |
-              echo "🔧 Setting up Alpine repositories..."
-
-              # 使用清华镜像源 (HTTP 避免 HTTPS 证书问题)
-              # Alpine 3.23 太新，降级到稳定的 v3.21
-              cat > /etc/apk/repositories << 'EOF'
-              http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/main
-              http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.21/community
-              EOF
-
-              # 更新仓库索引
-              echo "📦 Updating package index..."
-              apk update
-
-              # 安装 Node.js (Alpine 3.21 使用 nodejs 包)
-              echo "🔧 Installing Node.js..."
-              if apk add --no-cache nodejs npm; then
-                echo "✅ Node.js version: $(node --version)"
-                echo "✅ npm version: $(npm --version)"
-              else
-                echo "⚠️ Node.js install failed, trying edge repository..."
-                # 尝试从 edge 仓库安装
-                echo "http://mirrors.tuna.tsinghua.edu.cn/alpine/edge/community" >> /etc/apk/repositories
-                apk update
-                apk add --no-cache nodejs npm || echo "⚠️ Still failed, workflows requiring node will fail"
-              fi
-
-              # 安装 Python 3 (使用 python3 包名)
-              echo "🔧 Installing Python..."
-              if apk add --no-cache python3 py3-pip py3-setuptools; then
-                echo "✅ Python version: $(python3 --version)"
-                # 创建 python 符号链接（某些 actions 需要）
-                ln -sf /usr/bin/python3 /usr/bin/python
-              else
-                echo "⚠️ Python install failed, continuing anyway..."
-              fi
-
-              # 安装 git, curl 和 Docker CLI (关键！)
-              echo "🔧 Installing git, curl and Docker CLI..."
-              apk add --no-cache git curl ca-certificates
-
-              # 安装 Docker CLI (用于与宿主机 Docker daemon 通信)
-              # ✅ 关键修复：确保 Docker CLI 正确安装
-              if apk add --no-cache docker-cli; then
-                echo "✅ Docker CLI version: $(docker --version)"
-                # 验证 Docker socket 连接
-                echo "🔍 Testing Docker socket connection..."
-                if docker info >/dev/null 2>&1; then
-                  echo "✅ Docker socket connection successful"
-                else
-                  echo "⚠️ Docker socket connection failed, checking socket..."
-                  ls -la /var/run/docker.sock || echo "Socket file not found"
-                fi
-              else
-                echo "❌ Docker CLI install failed - CI workflows will fail!"
-                exit 1
-              fi
-
               # 检查注册文件是否存在，不存在则自动注册
               if [ ! -f /data/.runner ]; then
                 echo "📝 No registration file found, registering runner..."

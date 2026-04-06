@@ -162,8 +162,8 @@ jobs:
           is_cuda = torch.cuda.is_available()
           version = torch.__version__
 
-          print(f'CUDA  : {torch.cuda.is_available()}')
-          print(f'Torch : {torch.__version__}')
+          print(f'CUDA  : {is_cuda}')
+          print(f'Torch : {version}')
 
           if not is_cuda:
               print('❌ 错误: GPU_ENABLED 为 true，但 CUDA 不可用！')
