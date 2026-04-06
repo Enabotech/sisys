@@ -2,6 +2,23 @@
 # Traefik Middleware 配置 - 安全响应头
 # Story 0.6: Harbor 镜像仓库部署
 # 配置 HSTS 和其他安全响应头
+#
+# ⚠️ 当前状态：未部署 (HIGH-002)
+# 此文件定义了安全响应头 Middleware，但当前未实际应用到 IngressRoute
+# 缺失的安全头:
+#   - HSTS (HTTP Strict Transport Security)
+#   - Content-Security-Policy
+#   - X-Frame-Options: DENY
+#   - X-Content-Type-Options: nosniff
+#   - XSS-Protection
+#
+# 启用方式:
+#   1. 在 ingress-route.yaml 的 routes 中添加:
+#      middlewares:
+#      - name: harbor-middleware-chain
+#        namespace: harbor
+#   2. 应用此配置: kubectl apply -f middleware.yaml
+#   3. 验证: curl -vk https://harbor.sisys.local -I | grep -i strict
 
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -49,32 +66,28 @@ spec:
     - name: harbor-security-headers
       namespace: harbor
 
----
-# 将 Middleware 绑定到 Ingress
-# 注意：Traefik v3.x 使用 TraefikService 或直接在 IngressRoute 中引用
-# 此处使用 Ingress 注解方式
-
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: harbor-ingressroute
-  namespace: harbor
-spec:
-  entryPoints:
-  - websecure
-  routes:
-  - match: Host(`harbor.sisys.local`)
-    kind: Rule
-    services:
-    - name: harbor-core
-      port: 443
-      scheme: https
-    middlewares:
-    - name: harbor-middleware-chain
-      namespace: harbor
-  tls:
-    # pragma: allowlist secret
-    secretName: harbor-tls-secret
-    options:
-      name: default
-      namespace: default
+# =============================================================================
+# 使用说明
+# =============================================================================
+#
+# 当前状态：未部署 (HIGH-002)
+#
+# 要在 IngressRoute 中启用安全响应头，请在 ingress-route.yaml 的 routes 中添加:
+#
+#   routes:
+#   - match: Host(`harbor.sisys.local`) && PathPrefix(`/`)
+#     kind: Rule
+#     priority: 5
+#     services:
+#     - name: harbor-portal
+#       port: 80
+#       scheme: http
+#     middlewares:                        # ← 添加此行
+#     - name: harbor-middleware-chain     # ← 添加此行
+#       namespace: harbor                 # ← 添加此行
+#
+# 然后应用此配置:
+#   kubectl apply -f middleware.yaml
+#
+# 验证安全响应头:
+#   curl -vk https://harbor.sisys.local -I | grep -iE "strict|x-frame|x-content|xss"

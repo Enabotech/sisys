@@ -1,7 +1,8 @@
 # Harbor Helm Chart 配置
 # Story 0.6: Harbor 镜像仓库部署
-# 版本：Harbor v2.14.3
+# 版本：Harbor v2.14.2 (实际运行版本)
 # 命名空间：harbor
+# 最后更新：2026-04-06 (基于实际运行时配置验证)
 
 # =============================================================================
 # 基础配置
@@ -12,9 +13,11 @@ expose:
   type: ingress
   tls:
     enabled: true
+    # 注意：实际使用自签泛域名证书 *.sisys.local (RSA 2048, 有效期至 2027-03-17)
+    # 未使用 cert-manager/Let's Encrypt
     auto:
-      enabled: true
-      commonName: "harbor.sisys.local"
+      enabled: false  # 禁用自动证书管理，使用手动证书
+      commonName: "*.sisys.local"  # 泛域名证书
   # ==========================================================================
   # 修复 CRITICAL-001: 禁用 Helm 管理的 Ingress
   # ==========================================================================
@@ -79,14 +82,20 @@ database:
     persistentVolumeClaim:
       size: 10Gi
       storageClass: local-path
+    # PostgreSQL 连接配置 (实际运行值)
+    max_idle_conns: 100  # 实际运行：100 (非默认 50)
+    max_open_conns: 900  # 实际运行：900 (非默认 1000)
+    ssl_mode: disable
 
 # =============================================================================
 # 存储配置
 # =============================================================================
 
-# Registry 存储配置（50Gi NVMe SSD - MVP 阶段）
-# 修复 HIGH-003: 统一与 Change Log 一致的存储容量
-# 扩容触发条件：存储使用率>80% 时扩容至 100Gi，后续根据使用情况扩容至 500Gi
+# Registry 存储配置
+# 实际运行采用分层存储架构：
+# - Hot: 50Gi SSD (local-path-ssd) - 高频访问镜像层
+# - Warm: 2Ti HDD (native-hdd-vhdx) - 历史镜像层
+# - Cold: Pending (local-path-hdd) - 归档存储 (未绑定)
 registry:
   resources:
     requests:
@@ -97,8 +106,8 @@ registry:
       memory: 1Gi
   persistentVolumeClaim:
     registry:
-      size: 50Gi  # MVP 阶段：50Gi（符合架构规划 Change Log）
-      storageClass: local-path
+      size: 50Gi  # Hot 层：50Gi SSD
+      storageClass: local-path-ssd  # 实际使用 SSD StorageClass
     chart:
       size: 10Gi
       storageClass: local-path
@@ -114,7 +123,7 @@ jobservice:
       memory: 1Gi
   jobLog:
     persistentVolumeClaim:
-      size: 5Gi
+      size: 2Gi  # 推荐值：日志保留 14 天的安全容量（当前实际 1Gi，需手动扩容）
       storageClass: local-path
 
 # Redis 配置
@@ -127,7 +136,14 @@ redis:
         memory: 512Mi
       limits:
         cpu: 500m
-      memory: 1Gi
+        memory: 1Gi
+    persistentVolumeClaim:
+      size: 1Gi  # 实际运行配置
+    # Redis DB 分配 (实际运行值)
+    # Core: DB 0 (会话、缓存) - redis://harbor-redis:6379/0
+    # Jobservice: DB 1 (任务队列) - redis://harbor-redis:6379/1
+    # Registry: DB 2 (层信息缓存) - redis://harbor-redis:6379/2
+    # Trivy: DB 5 (扫描任务) - redis://harbor-redis:6379/5?idle_timeout_seconds=30
 
 # =============================================================================
 # Portal 配置
@@ -187,16 +203,11 @@ podSecurityContext:
 secretName: "harbor-secret"
 secretKey: "secret"  # 密钥 key 名，实际值在 Secret 中
 
-# 数据库密码引用
-database:
-  password: ""  # 从 Secret 加载
-
-# Redis 密码引用
-redis:
-  password: ""  # 从 Secret 加载
-
 # Harbor 管理员密码（首次启动后需修改）
 harborAdminPassword: ""  # 从 Secret 加载
+
+# 数据库密码引用 (在上方 database.internal 中配置)
+# Redis 密码引用 (在上方 redis.internal 中配置)
 
 # 密钥密钥（至少 32 字节）
 secretKey: ""  # 从 Secret 加载
@@ -293,7 +304,11 @@ robot:
 # =============================================================================
 
 # Helm Chart 版本
-# harbor/harbor latest (v1.14.x)
+# harbor/harbor (managed-by: Helm)
 
-# Harbor 版本
-# v2.14.3
+# Harbor 版本 (实际运行)
+# v2.14.2
+
+# 实际运行项目:
+# - library (公开, 0 仓库)
+# - sisys (公开, 38 仓库, 自动扫描启用)

@@ -2,6 +2,19 @@
 # Let's Encrypt 证书配置（生产环境）
 # Story 0.6: Harbor 镜像仓库部署
 # 用途：配置 cert-manager 自动申请 Let's Encrypt 证书
+#
+# ⚠️ 当前状态：未使用
+# 当前使用自签泛域名证书 *.sisys.local (RSA 2048, 有效期至 2027-03-17)
+# 证书 Secret: harbor-tls-secret (kubernetes.io/tls)    # pragma: allowlist secret
+#
+# 切换到 Let's Encrypt 的步骤:
+#   1. 安装 cert-manager: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.3/cert-manager.yaml
+#   2. 确保 harbor.sisys.local 可从外部访问 (HTTP-01 验证需要)
+#   3. 应用此配置: kubectl apply -f harbor-letsencrypt.yaml
+#   4. 验证: kubectl get certificate -n harbor
+#
+# 注意: 由于 harbor.sisys.local 是内网域名，Let's Encrypt 无法验证，
+#       建议使用自签证书或内部 CA 签发证书。
 
 # =============================================================================
 # 前置条件
