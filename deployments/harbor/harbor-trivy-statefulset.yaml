@@ -49,7 +49,8 @@ spec:
         heritage: Helm
         release: harbor
       annotations:
-        checksum/secret: 43a68aaf73f915e1a439ffd372d1e902937844716ee36410cdf96cbb4ab6f7a3
+        # pragma: allowlist secret
+        checksum/secret: 43a68aaf73f915e1a439ffd372d1e902937844716ee36410cdf96cbb4ab6f7a3   # pragma: allowlist secret
     spec:
       containers:
         - name: trivy
@@ -132,6 +133,7 @@ spec:
               value: "true"
             - name: SCANNER_API_SERVER_ADDR
               value: ":8080"
+            # Trivy 使用 Redis DB 5 (与 Core/Jobservice/Registry 不同)
             - name: SCANNER_REDIS_URL
               valueFrom:
                 secretKeyRef:

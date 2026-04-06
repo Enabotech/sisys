@@ -1,6 +1,7 @@
 # Harbor 应用配置文件
 # Story 0.6: Harbor 镜像仓库部署
-# 版本：v2.14.3
+# 版本：v2.14.2 (实际运行版本)
+# 最后更新：2026-04-06 (基于实际运行时配置验证)
 
 # =============================================================================
 # 基础配置
@@ -26,15 +27,16 @@ database:
   # 数据库类型：internal（内部）, external（外部）
   type: internal
 
-  # 内部 PostgreSQL 配置
+  # 内部 PostgreSQL 配置 (实际运行值)
   internal:
     host: harbor-database
     port: 5432
     username: postgres
     password: ${POSTGRES_PASSWORD}
     database: registry
-    max_idle_conns: 50
-    max_open_conns: 1000
+    max_idle_conns: 100  # 实际运行：100
+    max_open_conns: 900  # 实际运行：900
+    ssl_mode: disable    # 实际运行：禁用
     conn_max_lifetime: 5m
 
   # 外部 PostgreSQL 配置（可选）
@@ -59,7 +61,13 @@ redis:
     host: harbor-redis
     port: 6379
     password: ${REDIS_PASSWORD}
-    db_index: 0
+    db_index: 0  # Core 使用 DB 0
+
+  # Redis DB 分配 (实际运行)
+  # Core: DB 0 - 会话、缓存
+  # Jobservice: DB 1 - 任务队列
+  # Registry: DB 2 - 层信息缓存
+  # Trivy: DB 5 - 扫描任务队列
 
   # 外部 Redis 配置（可选）
   # external:
@@ -83,7 +91,39 @@ registry:
 
     # 文件系统存储路径
     filesystem:
-      rootdirectory: /var/harbor/data/registry
+      rootdirectory: /storage  # 实际运行路径
+
+    # 分层存储配置 (实际运行架构)
+    # Hot: 50Gi SSD (local-path-ssd) - harbor-registry-warm PVC
+    # Warm: 2Ti HDD (native-hdd-vhdx) - harbor-registry-warm PVC
+    # Cold: Pending (local-path-hdd) - 未绑定
+
+    # Redis 缓存层 (实际运行配置)
+    cache:
+      layerinfo: redis
+    redis:
+      addr: harbor-redis:6379
+      db: 2  # Registry 使用 DB 2
+      readtimeout: 10s
+      writetimeout: 10s
+      dialtimeout: 10s
+      enableTLS: false
+      pool:
+        maxidle: 100
+        maxactive: 500
+        idletimeout: 60s
+
+    # 删除配置
+    delete:
+      enabled: true
+
+    # 上传清理配置
+    maintenance:
+      uploadpurging:
+        enabled: true
+        age: 168h      # 7 天
+        interval: 24h
+        dryrun: false
 
     # S3 存储配置（可选）
     # s3:
@@ -91,6 +131,24 @@ registry:
     #   bucket: harbor-registry
     #   accesskey: ${AWS_ACCESS_KEY}
     #   secretkey: ${AWS_SECRET_KEY}
+
+  # HTTP 配置
+  http:
+    addr: :5000
+    relativeurls: false
+    debug:
+      addr: localhost:5001
+
+  # 认证配置
+  auth:
+    htpasswd:
+      realm: harbor-registry-basic-realm
+      path: /etc/registry/passwd
+
+  # 兼容性配置
+  compatibility:
+    schema1:
+      enabled: true  # 兼容 Docker Schema V1
 
   # 镜像复制配置
   replication:
@@ -177,10 +235,33 @@ portal:
 
 jobservice:
   # 作业执行器配置
+  protocol: "http"
+  port: 8080
   executors:
     - type: pool
       pool:
         worker_num: 10
+        backend: "redis"
+        redis_pool:
+          redis_url: "redis://harbor-redis:6379/1"  # Jobservice 使用 DB 1
+          namespace: "harbor_job_service_namespace"
+          idle_timeout_second: 3600
+
+  # 作业日志配置
+  job_loggers:
+    - name: "FILE"
+      level: INFO
+      settings:
+        base_dir: "/var/log/jobs"
+      sweeper:
+        duration: 14  # 日志保留 14 天
+        settings:
+          work_dir: "/var/log/jobs"
+
+  # Reaper 配置
+  reaper:
+    max_update_hours: 24       # 任务最大更新时间
+    max_dangling_hours: 168    # 悬空任务最大时长 (7 天)
 
   # 作业配置
   jobs:
@@ -208,7 +289,7 @@ trivy:
 
   # Trivy 适配器配置
   adapter:
-    host: http://harbor-scanner-trivy:8080
+    host: http://harbor-trivy:8080
 
   # 扫描配置
   scan:
@@ -216,6 +297,10 @@ trivy:
     on_push: true
     # 定时扫描
     schedule: "0 3 * * *"  # 每天凌晨 3 点
+    # 扫描立即执行
+    scan_immediately: true
+    # 扫描类型
+    scan_type: full
 
   # 漏洞数据库更新
   vulnerability_db:
@@ -223,15 +308,38 @@ trivy:
     auto_update: true
     # 更新时间
     update_schedule: "0 4 * * *"  # 每天凌晨 4 点
+    # 重要：从内部 Harbor 仓库拉取 (非 GitHub)
+    db_repository: harbor.sisys.local/sisys/aquasecurity/trivy-db:2
+    java_db_repository: harbor.sisys.local/sisys/aquasecurity/trivy-java-db:1
+    checks_bundle_repository: harbor.sisys.local/sisys/aquasecurity/trivy-checks:2
+    # 更新策略
+    skip_update: false
+    skip_java_db_update: false
+    timeout: 10m
+    retry:
+      max_retries: 3
+      retry_interval: 30m
+      backoff_multiplier: 2
 
-  # 扫描策略
+  # 扫描策略 (实际运行值)
   policy:
+    # 漏洞类型
+    vuln_type:
+      - os
+      - library
+    # 严重程度
+    severity:
+      - HIGH
+      - CRITICAL
     # 忽略未修复的漏洞
     ignore_unfixed: false
-    # 扫描层级
+    # 安全检查
     security_check:
       - vuln
-      - config
+    # 超时
+    timeout: 5m0s
+    # 不安全模式 (允许内部仓库)
+    insecure: true
 
   # 告警配置
   alert:
@@ -241,7 +349,7 @@ trivy:
     # 通知方式
     notification:
       - email
-      - webhook
+      - webhook  # → Gitea
 
 # =============================================================================
 # 镜像签名配置 - 使用 Cosign
@@ -417,8 +525,8 @@ quota:
 # =============================================================================
 
 system:
-  # 版本
-  version: "2.14.3"
+  # 版本 (实际运行版本)
+  version: "2.14.2"
 
   # 实例 ID（用于集群）
   instance_id: harbor-sisys-01

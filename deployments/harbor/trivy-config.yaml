@@ -2,7 +2,14 @@
 # Trivy 漏洞扫描配置
 # Story 0.6: Harbor 镜像仓库部署
 # 用途：配置 Trivy 漏洞数据库自动更新和扫描策略
-# 修复 MEDIUM-002: 明确配置漏洞数据库自动更新策略
+# 最后更新：2026-04-06 (基于实际运行时配置验证)
+#
+# 实际运行配置:
+#   - 严重程度: HIGH, CRITICAL
+#   - 漏洞类型: os, library
+#   - 超时: 5m0s
+#   - 不安全模式: true (允许内部仓库)
+#   - 漏洞数据库来源: harbor.sisys.local/sisys/aquasecurity/*
 
 apiVersion: v1
 kind: ConfigMap

@@ -2,7 +2,17 @@
 # Harbor Robot Account 配置模板
 # Story 0.6: Harbor 镜像仓库部署
 # 用途：为 Gitea Runner 和 ArgoCD 创建机器人账户
-# 修复：添加有效的 Kubernetes Job 配置用于创建 Robot Account
+#
+# ⚠️ 当前状态：参考模板
+# create-robot-account Job 未实际执行
+# Robot Account 可能已通过 Harbor UI 手动创建
+#
+# 实际创建方式:
+# 1. 通过 Harbor Web 界面手动创建 (当前使用方式)
+#    - 登录 https://harbor.sisys.local
+#    - 项目 → sisys → Robot Accounts → New Robot Account
+# 2. 通过 Harbor API 自动创建 (自动化方式)
+#    参考: docs/deployment/HARBOR_ROBOT_ACCOUNT.md
 
 # =============================================================================
 # 使用说明
