@@ -76,7 +76,7 @@ data:
             containers:
               - name: job
                 # 默认工作镜像
-                image: docker.gitea.com/runner-images:ubuntu-latest
+                image: harbor.sisys.local/sisys/dependency:l2-latest
 
                 # 工作目录
                 workingDir: /workspace
@@ -386,7 +386,7 @@ spec:
       # 容器
       containers:
         - name: job
-          image: docker.gitea.com/runner-images:ubuntu-latest
+          image: harbor.sisys.local/sisys/dependency:l2-latest
           imagePullPolicy: IfNotPresent
 
           # 工作目录
