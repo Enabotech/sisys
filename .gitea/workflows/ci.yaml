@@ -423,11 +423,7 @@ jobs:
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           # Layer 3 应用镜像标签 (遵循标签命名规范)
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
-          # 测试环境标签
-          echo "image_tag_test=test-v1.0.0-${GIT_SHA}" >> $GITHUB_OUTPUT
-
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}"
-          echo "image_tag_test=test-v1.0.0-${GIT_SHA}"
 
       - name: 构建推送镜像
         uses: docker/build-push-action@v5
@@ -437,8 +433,9 @@ jobs:
           push: true
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_L3_LATEST }}
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ env.image_tag_l3 }}-${{ steps.meta.outputs.timestamp }}
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_test }}
+            ${{ vars.HARBOR_REGISTRY }}/sisys/app:test-${{ steps.meta.outputs.image_tag_l3 }}
             ${{ vars.HARBOR_REGISTRY }}/sisys/app:dev-${{ steps.meta.outputs.image_tag_l3 }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
