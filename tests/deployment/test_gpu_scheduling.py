@@ -206,22 +206,13 @@ class TestCIPipelineGPU:
 #         assert "torch" in content.lower() or "pytorch" in content.lower(), "Dockerfile should include PyTorch for GPU support"
 
 
+@pytest.mark.skip(reason="import-pytorch 方案已作废")
 class TestGPUScripts:
-    """GPU 相关脚本测试"""
+    """GPU 相关脚本测试（已废弃）"""
 
     def test_import_pytorch_script_gpu_verification(self):
         """测试 PyTorch 导入脚本 GPU 验证"""
-        script_path = Path("scripts/image/import-pytorch.sh")
-
-        if not script_path.exists():
-            pytest.skip("import-pytorch.sh not found")
-
-        with open(script_path, encoding="utf-8") as f:
-            content = f.read()
-
-        # 检查 GPU 验证
-        assert "--gpus all" in content, "Script should use --gpus all for GPU verification"
-        assert "torch.cuda.is_available" in content or "CUDA" in content, "Script should verify CUDA availability"
+        pytest.skip("import-pytorch 方案已作废")
 
 
 class TestKubernetesGPUService:

@@ -11,6 +11,7 @@
 - 推送的镜像可被拉取
 """
 
+import os
 import subprocess
 import time
 
@@ -27,9 +28,16 @@ HARBOR_HOST = TestConfig.get_harbor_config()["ingress_host"]
 # 使用域名而非 IP（避免证书问题）
 HARBOR_URL = f"{HARBOR_HOST}:{HARBOR_NODEPORT}"
 HARBOR_PROJECT = "sisys"
-# 使用 Gitea Harbor 机器人账号（从 harbor-robot-account Secret 获取）
-HARBOR_USERNAME = "robot$sisys+gitea-runner-push"
-HARBOR_PASSWORD = "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"  # nosec B105  # pragma: allowlist secret
+
+# Harbor 认证凭据（从 Gitea 仓库密钥获取）
+# 本地测试：从环境变量或 .env 文件获取
+# CI/CD：通过 ${{secrets.HARBOR_USERNAME}} 和 ${{secrets.HARBOR_PASSWORD}} 注入
+HARBOR_USERNAME = os.environ.get("HARBOR_USERNAME", "admin")
+HARBOR_PASSWORD = os.environ.get("HARBOR_PASSWORD", "")
+
+# Harbor 机器人账户（用于 CI/CD Pipeline）
+HARBOR_ROBOT_USERNAME = os.environ.get("HARBOR_ROBOT_USERNAME", "robot$sisys+gitea-runner-push")
+HARBOR_ROBOT_PASSWORD = os.environ.get("HARBOR_ROBOT_PASSWORD", "")
 
 # 测试镜像配置
 TEST_SOURCE_IMAGE = "harbor.sisys.local/sisys/tools/mirrored-pause:3.6"
@@ -245,31 +253,53 @@ class TestImagePush:
         # 登录 Harbor（使用 --password-stdin）
         import subprocess
 
-        secret_result = run_kubectl(
-            ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"]
-        )
+        # 从环境变量获取 Harbor 凭据（Gitea 仓库密钥）
         password = HARBOR_PASSWORD
-        if secret_result.returncode == 0:
-            import base64
+        username = HARBOR_USERNAME
 
-            password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
+        # 如果环境变量未设置，尝试从 Kubernetes Secret 获取
+        if not password:
+            secret_result = run_kubectl(
+                ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"],
+                check=False,
+            )
+
+            if secret_result.returncode == 0 and secret_result.stdout.strip():
+                import base64
+
+                try:
+                    password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
+                except Exception:
+                    pass
+
+        # 如果仍然没有密码，使用占位符（实际环境应通过 CI/CD 密钥注入）
+        if not password:
+            pytest.skip("HARBOR_PASSWORD 环境变量未设置")
 
         login_result = subprocess.run(
-            f"echo '{password}' | docker login -u {HARBOR_USERNAME} --password-stdin {HARBOR_URL}",
+            f"echo '{password}' | docker login -u {username} --password-stdin {HARBOR_URL}",
             shell=True,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        if login_result.returncode != 0 and "already logged in" not in login_result.stderr.lower():
-            pytest.skip(f"无法登录 Harbor: {login_result.stderr}")
+
+        assert (
+            login_result.returncode == 0 or "already logged in" in login_result.stderr.lower()
+        ), f"Harbor 登录失败：{login_result.stderr}"
 
         # 推送镜像
         result = run_command(["docker", "push", TEST_HARBOR_IMAGE], timeout=300)
         assert result.returncode == 0, f"推送失败：{result.stderr}"
 
-        # 验证推送成功（检查输出）
-        assert "pushed" in result.stdout.lower() or "done" in result.stdout.lower(), f"推送输出异常：{result.stdout}"
+        # 验证推送成功（检查输出 - 允许 "Layer already exists" 或 "digest" 作为成功标志）
+        output_lower = result.stdout.lower()
+        assert (
+            "pushed" in output_lower
+            or "done" in output_lower
+            or "layer already exists" in output_lower
+            or "digest:" in output_lower
+        ), f"推送输出异常：{result.stdout}"
 
     def test_harbor_image_exists(self):
         """验证 Harbor 中的镜像存在"""

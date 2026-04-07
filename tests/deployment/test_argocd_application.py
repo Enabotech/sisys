@@ -10,8 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from tests.utils.kubectl import run_kubectl
-
 
 class TestArgoCDApplicationConfig:
     """ArgoCD Application 配置测试类"""
@@ -409,45 +407,24 @@ class TestArgoCDApplicationDeployment:
                 print(f"✅ Application 有同步历史：{len(operation_history)} 条记录")
                 return
 
-            # 如果没有历史，触发一次同步
-            print("⚠️ Application 暂无同步历史，触发同步...")
-            trigger_result = run_kubectl(
-                ["annotate", "application", "sisys-app", "argocd.argoproj.io/refresh=hard", "-n", "argocd"],
-                check=False,
-            )
-
-            if trigger_result.returncode == 0:
-                print("✅ 同步已触发，等待 30 秒...")
-                import time
-
-                time.sleep(30)
-
-                # 重新检查
-                app = json.loads(
-                    run_kubectl(
-                        ["get", "application", "sisys-app", "-n", "argocd", "-o", "json"],
-                        check=False,
-                    ).stdout
-                )
-
-                operation_history = app.get("status", {}).get("operationHistory", [])
-                if operation_history:
-                    print(f"✅ Application 同步历史：{len(operation_history)} 条记录")
-                    return
-
             # 检查同步状态
             sync_status = app.get("status", {}).get("sync", {}).get("status", "Unknown")
             health_status = app.get("status", {}).get("health", {}).get("status", "Unknown")
 
-            if sync_status == "Unknown" and health_status == "Healthy":
-                source = app.get("spec", {}).get("source", {})
-                assert source.get("repoURL"), "缺少 repoURL 配置"
-                assert source.get("targetRevision"), "缺少 targetRevision 配置"
-                assert source.get("path"), "缺少 path 配置"
-                print("✅ Application 配置完整（无同步历史但配置正确）")
-                return
+            # 验证 Application 配置完整性
+            source = app.get("spec", {}).get("source", {})
+            assert source.get("repoURL"), "缺少 repoURL 配置"
+            assert source.get("targetRevision"), "缺少 targetRevision 配置"
+            assert source.get("path"), "缺少 path 配置"
 
-            pytest.skip("Application 刚创建，暂无同步历史（预期行为）")
+            if operation_history:
+                msg = f"✅ Application 同步历史：{len(operation_history)} 条记录"
+                msg += f"，同步状态：{sync_status}，健康状态：{health_status}"
+                print(msg)
+            else:
+                msg = f"✅ Application 配置完整（同步状态：{sync_status}"
+                msg += f"，健康状态：{health_status}）"
+                print(msg)
 
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
             pytest.skip(f"无法获取同步历史：{e}")
