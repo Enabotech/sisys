@@ -1,0 +1,33 @@
+# 证书监控告警规则 (需要 Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: certificate-expiry-alert
+  namespace: cert-manager
+  labels:
+    app: certificate-monitoring
+spec:
+  groups:
+  - name: certificate.rules
+    rules:
+    - alert: CertificateExpiringSoon
+      expr: certmanager_certificate_expiration_timestamp_seconds - time() < 7*24*3600
+      for: 1h
+      labels:
+        severity: warning
+      annotations:
+        summary: "证书 {{ $labels.name }} 将在 7 天内到期"
+    - alert: CertificateExpiringCritical
+      expr: certmanager_certificate_expiration_timestamp_seconds - time() < 24*3600
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "证书 {{ $labels.name }} 将在 24 小时内到期"
+    - alert: CertificateRenewalFailed
+      expr: certmanager_certificate_ready_status{condition="False"} == 1
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "证书 {{ $labels.name }} 续期失败"
