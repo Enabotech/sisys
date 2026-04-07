@@ -33,19 +33,19 @@ if command -v nvidia-smi &> /dev/null; then
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -n 1
 elif command -v python &> /dev/null && python -c "import torch" &> /dev/null; then
     log_info "GPU 环境 (PyTorch CUDA):"
-    python -c "
-        import sys
-        import torch
-        is_cuda = torch.cuda.is_available()
-        version = torch.__version__
-        print(f'CUDA  : {is_cuda}')
-        print(f'Torch : {version}')
-        if not is_cuda:
-            print('❌ 错误:  CUDA 不可用！')
-            print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动')
-            sys.exit(1)
-        print('✅ GPU 直通验证通过')
-        "
+    exec python -c "
+import sys
+import torch
+is_cuda = torch.cuda.is_available()
+version = torch.__version__
+print(f'CUDA  : {is_cuda}')
+print(f'Torch : {version}')
+if not is_cuda:
+    print('❌ 错误:  CUDA 不可用！')
+    print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动')
+    sys.exit(1)
+print('✅ GPU 直通验证通过')
+"
 else
     log_warn "GPU 不可用，使用 CPU 模式"
 fi
