@@ -31,16 +31,6 @@ log_info "运行用户：$(whoami)"
 if command -v nvidia-smi &> /dev/null; then
     log_info "本应用环境 GPU 可用:"
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -n 1
-elif command -v python &> /dev/null && python -c "import torch" &> /dev/null; then
-    log_info "GPU 环境 (PyTorch CUDA):"
-    exec python -c "
-import sys
-import torch
-is_cuda = torch.cuda.is_available()
-version = torch.__version__
-print(f'CUDA  : {is_cuda}')
-print(f'Torch : {version}')
-"
 else
     log_warn "GPU 不可用，使用 CPU 模式"
 fi
