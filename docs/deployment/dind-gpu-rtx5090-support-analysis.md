@@ -1,9 +1,9 @@
 # DinD 架构支持 GPU RTX 5090 分析与实施方案
 
-**版本**: v1.0
+**版本**: v2.0
 **日期**: 2026-04-07
 **作者**: SISYS Team
-**状态**: 已评审
+**状态**: 已评审（根因修订版）
 **关联文档**: `wsl2-dind-gpu-passthrough-implementation-plan.md`
 
 ---
@@ -14,10 +14,11 @@
 
 **核心结论**：
 
-1. **WSL2 环境下 DinD 嵌套容器中 PyTorch CUDA 存在根本性限制**（NVML 无法初始化）
-2. **gitea-actions Runner 已通过 containerd WSL GPU 集成提供完整 GPU 支持**（基线验证通过）
-3. **推荐采用分层调度策略**：GPU 任务路由到 gitea-actions，DinD 专注于构建/测试/部署
-4. **nvidia-smi 查询和基础 GPU 信息获取在 DinD 中可行**（补全 WSL GPU 挂载即可）
+1. **NVML 初始化失败的根本原因不是镜像选择**，而是 WSL2 GPU 库挂载机制不传递到 DinD 容器内部
+2. **`act_runner:0.3.0-dind-rootless` 镜像不是问题所在**，当前部署已以 `privileged: true` + `root` 运行
+3. **WSL2 GPU 架构依赖容器运行时的特殊集成**：containerd 自动注入 GPU 库（overlay/9p），dockerd 不支持
+4. **gitea-actions Runner 已通过 containerd WSL GPU 集成提供完整 GPU 支持**（基线验证通过）
+5. **推荐采用分层调度策略**：GPU 任务路由到 gitea-actions，DinD 专注于构建/测试/部署
 
 ---
 
@@ -41,7 +42,7 @@
 | **Windows 驱动** | ✅ | 581.57 (Blackwell 架构) |
 | **CUDA 版本** | ✅ | 13.0 |
 | **WSL GPU 设备** | ✅ | `/dev/dxg` (字符设备, 10:125) |
-| **WSL GPU 库** | ✅ | `/usr/lib/wsl/lib/libcuda.so` |
+| **WSL GPU 库** | ✅ | `/usr/lib/wsl/lib/libcuda.so` (宿主机) |
 | **NVIDIA Device Plugin** | ❌ | 未部署（WSL2 不兼容） |
 | **节点 GPU 资源** | ❌ | 无 `nvidia.com/gpu` 暴露 |
 | **nvidia-container-runtime** | ❌ | 未安装（仅 runc） |
@@ -52,7 +53,7 @@
 | Runner | 命名空间 | 副本 | 状态 | 标签 | GPU 可用 | 机制 |
 |--------|---------|------|------|------|---------|------|
 | gitea-org-runner | gitea-actions | 3 | Running | `ubuntu-latest,docker,k3s,linux,gpu` | ✅ | containerd → WSL GPU 自动集成 |
-| gitea-runner-dind-0 | gitea-advacts | 1 | Running (2/2) | `ubuntu-latest,dind,advacts,buildx` | ⚠️ 部分 | DinD daemon → `/dev/dxg`（WSL2 全局可见） |
+| gitea-runner-dind-0 | gitea-advacts | 1 | Running (2/2) | `ubuntu-latest,dind,advacts,buildx` | ❌ | DinD daemon → 无 GPU 库 |
 
 ### 1.4 gitea-actions GPU 基线验证
 
@@ -95,8 +96,8 @@ Pod: gitea-runner-dind-0 (gitea-advacts)
 | 配置项 | 是否存在 | 说明 |
 |--------|---------|------|
 | `/dev/dxg` 显式 hostPath | ❌ | 未声明，但 WSL2 全局设备自动可见 |
-| `/usr/lib/wsl/lib/` 挂载 | ❌ | 完全缺失 |
-| `/usr/lib/wsl/drivers/` 挂载 | ❌ | 完全缺失 |
+| `/usr/lib/wsl/lib/` 挂载 | ❌ | 完全缺失（且 DinD 中该目录为空） |
+| `/usr/lib/wsl/drivers/` 挂载 | ❌ | 完全缺失（且 DinD 中该目录为空） |
 | GPU 相关环境变量 | ❌ | 无 `NVIDIA_VISIBLE_DEVICES` 等 |
 | GPU 标签 | ❌ | Runner 标签不含 `gpu` |
 | RBAC GPU 扩展 | ❌ | 无 GPU 相关权限扩展 |
@@ -108,9 +109,13 @@ Pod: gitea-runner-dind-0 (gitea-advacts)
 kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- ls -la /dev/dxg
 # 输出: crw-rw-rw- 1 root root 10, 125 Apr  7 00:17 /dev/dxg
 
-# ❌ /usr/lib/wsl/lib/ 在 DinD 容器中不存在
-kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- ls -la /usr/lib/wsl/lib/libcuda.so
-# 输出: ls: /usr/lib/wsl/lib/libcuda.so: No such file or directory
+# ❌ /usr/lib/wsl/lib/ 在 DinD 容器中是空目录
+kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- ls -la /usr/lib/wsl/lib/
+# 输出:
+# total 8
+# drwxr-xr-x 2 root root 4096 .
+# drwxr-xr-x 4 root root 4096 ..
+# ← 空！没有任何 GPU 库
 
 # ❌ 节点无 GPU 资源声明
 kubectl describe nodes | grep -i gpu
@@ -121,57 +126,152 @@ kubectl describe nodes | grep -i gpu
 
 ## 3. 问题根因分析
 
-### 3.1 WSL2 GPU 架构差异
+### 3.1 NVML 初始化失败的根本原因
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  containerd (gitea-actions 使用)                                     │
-├──────────────────────────────────────────────────────────────────────┤
-│  - 自动挂载 /dev/dxg                                                 │
-│  - 自动挂载 /usr/lib/wsl/drivers/ (9p 只读文件系统)                   │
-│  - 自动执行 ldconfig 注册 GPU 库到系统路径                            │
-│  - WSL GPU 运行时集成（微软 + NVIDIA 联合实现）                       │
-│  - NVML 初始化成功 ✅                                                │
-│  - PyTorch CUDA 可用 ✅                                              │
-└──────────────────────────────────────────────────────────────────────┘
+> **直接回答用户问题**：NVML 初始化失败**不是**因为使用了 `act_runner:0.3.0-dind-rootless` 镜像。根本原因是 **WSL2 的 GPU 库挂载（9p/overlay）不传递到 DinD 容器内部**。
 
-┌──────────────────────────────────────────────────────────────────────┐
-│  独立 dockerd (gitea-advacts DinD 使用)                               │
-├──────────────────────────────────────────────────────────────────────┤
-│  - /dev/dxg 自动可见（WSL2 全局设备，所有容器默认可见）                │
-│  - /usr/lib/wsl/drivers/ 未挂载 ❌                                    │
-│  - /usr/lib/wsl/lib/ 未挂载 ❌                                        │
-│  - ldconfig 未执行 ❌                                                │
-│  - NVML 初始化失败（`Can't initialize NVML`） ❌                      │
-│  - PyTorch CUDA 不可用（`torch.cuda.is_available()` 返回 False） ❌   │
-│  - nvidia-smi 可通过手动挂载工作 ✅                                   │
-└──────────────────────────────────────────────────────────────────────┘
+#### 实验验证结果
+
+**WSL2 宿主机**（真实环境）：
+```bash
+# /usr/lib/wsl/lib/ 包含完整 GPU 库（overlay 挂载）
+$ ls -la /usr/lib/wsl/lib/
+libcuda.so, libnvidia-ml.so.1, libnvidia-encode.so, libdxcore.so, ...
+# 共 389MB+ GPU 库文件
+
+# /usr/lib/wsl/drivers/ 包含 Windows 驱动文件（9p 挂载）
+$ ls -la /usr/lib/wsl/drivers/
+nv_dispsi.inf_amd64_*/libcuda.so.1.1, libnvidia-ptxjitcompiler.so.1, ...
+
+# mount 类型
+$ mount | grep -E "wsl|9p|overlay"
+drivers on /usr/lib/wsl/drivers type 9p (ro, aname=drivers, trans=fd)
+none on /usr/lib/wsl/lib type overlay (ro, lowerdir=/gpu_lib_packaged:/gpu_lib_inbox)
 ```
 
-### 3.2 关键发现
+**DinD docker-dind 容器**（第一层嵌套）：
+```bash
+# /usr/lib/wsl/lib/ 和 /usr/lib/wsl/drivers/ 是**空目录**
+$ ls -la /usr/lib/wsl/lib/
+total 8
+drwxr-xr-x 2 root root 4096 .
+drwxr-xr-x 4 root root 4096 ..
+# ← 空！
 
-1. **`/dev/dxg` 是 WSL2 全局设备**：无需显式 hostPath 声明，所有容器默认可见。但这仅提供 GPU 网关通道。
+$ ls -la /usr/lib/wsl/drivers/
+total 8
+drwxr-xr-x 2 root root 4096 .
+drwxr-xr-x 4 root root 4096 ..
+# ← 空！
 
-2. **WSL GPU 驱动依赖 9p 文件系统**：实际驱动文件通过 9p 协议挂载在 `/usr/lib/wsl/drivers/<driver>/`，这是微软 WSLg 架构特有的机制。
+# mount 输出中**没有** 9p 或 WSL GPU overlay 挂载
+$ mount | grep -E "wsl|9p|overlay"
+# ← 无 WSL GPU 相关挂载
+```
 
-3. **containerd 与 dockerd 的 WSL 集成差异**：
-   - containerd 通过 K3s 内置逻辑自动处理 WSL GPU 集成
-   - dockerd 不支持 WSL 9p 文件系统自动挂载
+**gitea-actions Job 容器**（containerd 创建，通过 `--gpus all`）：
+```bash
+# GPU 库通过 overlay/9p 挂载到容器系统路径
+$ mount | grep -E "wsl|overlay|9p"
+drivers on /usr/bin/nvidia-smi type 9p (ro, aname=drivers, trans=fd)
+none on /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1 type overlay (ro, lowerdir=/gpu_lib_packaged:/gpu_lib_inbox)
+none on /usr/lib/x86_64-linux-gnu/libcuda.so.1 type overlay (ro, lowerdir=/gpu_lib_packaged:/gpu_lib_inbox)
+drivers on /usr/lib/wsl/drivers/nv_dispsi.inf_amd64_*/libcuda.so.1.1 type 9p (ro)
+drivers on /usr/lib/wsl/drivers/nv_dispsi.inf_amd64_*/libnvidia-ptxjitcompiler.so.1 type 9p (ro)
+```
 
-4. **嵌套容器问题**：在 DinD 内运行的 Job 容器（嵌套第二层）无法继承宿主 WSL GPU 环境，因为：
-   - dockerd 不知道 WSL GPU 的特殊挂载需求
-   - `--device /dev/dxg` 仅传递设备节点，不传递 9p 文件系统
-   - NVML 初始化需要完整的驱动栈（设备 + 库 + 9p 驱动文件）
+#### 根因链条
 
-### 3.3 已尝试方案及结果
+```
+WSL2 宿主机
+├── /dev/dxg (字符设备 10:125)          ← 全局可见，所有容器可访问
+├── /usr/lib/wsl/lib/ (overlay 挂载)     ← 仅 WSL2 宿主机直接可见
+│   └── lowerdir=/gpu_lib_packaged:/gpu_lib_inbox  ← WSLg 特殊机制
+└── /usr/lib/wsl/drivers/ (9p 挂载)      ← 仅 WSL2 宿主机直接可见
+    └── trans=fd, aname=drivers          ← WSLg 特殊机制
+
+K3s containerd 创建容器时（gitea-actions --gpus all）
+├── 检测到 WSL2 环境
+├── 自动将 GPU 库以 overlay 形式挂载到容器系统路径 ✅
+│   └── /usr/lib/x86_64-linux-gnu/libcuda.so.1
+│   └── /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+│   └── /usr/lib/x86_64-linux-gnu/libnvidia-gpucomp.so
+│   └── /usr/bin/nvidia-smi (9p 直接挂载)
+├── 自动挂载 /usr/lib/wsl/drivers/ (9p) ✅
+├── 自动执行 ldconfig 注册 GPU 库 ✅
+└── NVML 初始化成功 ✅ → PyTorch CUDA 可用 ✅
+
+DinD docker-dind 容器（containerd 创建的第一层容器）
+├── DinD 容器根文件系统是 containerd overlay
+├── 但 containerd **不会**自动为 DinD 容器注入 WSL GPU 挂载
+│   └── WSL GPU 注入仅在 Job Pod 级别，DinD 不是 Job Pod
+├── /usr/lib/wsl/lib/ 是镜像中的空目录 ❌
+├── /usr/lib/wsl/drivers/ 是镜像中的空目录 ❌
+├── mount 中无 9p/overlay GPU 挂载 ❌
+└── NVML 在 DinD 容器本身就无法初始化 ❌
+
+DinD dockerd 创建嵌套 Job 容器（第二层）
+├── DinD 宿主机本身就没有 GPU 库
+├── --device /dev/dxg 仅传递设备节点 ✅（设备可见）
+├── -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro 挂载空目录 ❌
+├── 嵌套容器同样没有 GPU 库 ❌
+└── NVML 初始化失败 ❌（找不到 libnvidia-ml.so）
+```
+
+### 3.2 `act_runner:0.3.0-dind-rootless` 镜像的影响
+
+**结论**：该镜像**不是** NVML 失败的直接原因。
+
+| 维度 | dind-rootless | 标准 dind | 对 GPU 的影响 |
+|------|--------------|-----------|--------------|
+| 默认用户 | 非 root | root | 无影响（当前以 root 运行） |
+| dockerd 模式 | rootless | 标准 | 无影响（当前 `privileged: true`） |
+| GPU 库内置 | 无 | 无 | 两者都没有 GPU 库 |
+| 当前实际运行 | `runAsUser: 0`, `privileged: true` | 相同 | **已覆盖 rootless 限制** |
+
+当前部署配置已经**完全覆盖**了 rootless 模式的限制：
+```yaml
+securityContext:
+  runAsUser: 0              # root 用户
+  runAsGroup: 0
+  fsGroup: 0
+  privileged: true          # 特权模式
+```
+
+**即使换用标准 `docker:28-dind` 镜像，NVML 初始化仍然会失败**，因为根本问题是 WSL2 GPU 挂载机制不传递到容器内部，与镜像无关。
+
+### 3.3 三层环境 GPU 能力对比（实测）
+
+| GPU 组件 | WSL2 宿主机 | containerd Job 容器 | DinD docker-dind | DinD 嵌套 Job |
+|---------|:----------:|:------------------:|:---------------:|:------------:|
+| `/dev/dxg` | ✅ | ✅ | ✅ | ✅ (--device) |
+| GPU 库 (libcuda.so) | ✅ (overlay) | ✅ (overlay 注入) | ❌ (空目录) | ❌ (空目录) |
+| `nvidia-smi` | ✅ | ✅ (9p 注入) | ❌ | ❌ |
+| `/usr/lib/wsl/drivers/` | ✅ (9p) | ✅ (9p) | ❌ (空) | ❌ (空) |
+| 9p/overlay mount | ✅ | ✅ | ❌ | ❌ |
+| NVML 初始化 | ✅ | ✅ | ❌ | ❌ |
+| PyTorch CUDA | ✅ | ✅ | ❌ | ❌ |
+| `nvidia-smi` 查询 | ✅ | ✅ | ❌ | ❌ |
+
+### 3.4 关键发现
+
+1. **WSL2 GPU 库注入是容器运行时级别的行为**：只有 containerd（通过 WSLg 集成）能在创建容器时自动注入 GPU 库到系统路径（`/usr/lib/x86_64-linux-gnu/`）。dockerd 不支持此机制。
+
+2. **9p/overlay 挂载不传递到 DinD 容器内部**：WSL2 的 9p 挂载（`/usr/lib/wsl/drivers/`）和 overlay 挂载（`/usr/lib/wsl/lib/`）仅在 WSL2 宿主机级别可见。containerd 为 DinD Pod 创建容器时，不会触发 WSL GPU 注入逻辑（因为 DinD 不是 GPU Job Pod）。
+
+3. **DinD 容器的 "空壳" 问题**：DinD 容器虽然运行在 WSL2 宿主机上，但其根文件系统是 containerd 创建的 overlay，其中 `/usr/lib/wsl/` 目录来自镜像（空目录），不会自动继承宿主机的 9p/overlay 挂载。
+
+4. **`--device /dev/dxg` 仅传递设备节点**：这提供了 GPU 网关通道，但没有 GPU 驱动库（`libcuda.so`, `libnvidia-ml.so` 等），NVML 无法初始化。
+
+### 3.5 已尝试方案及结果
 
 | 方案 | 操作 | 结果 | 说明 |
 |------|------|------|------|
-| 手动挂载 `/usr/lib/wsl/lib/` | `-v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro` | ⚠️ 部分 | `nvidia-smi` 可用，NVML 失败 |
-| 挂载 `/usr/lib/wsl/drivers/` | `hostPath: /usr/lib/wsl/drivers` | ❌ | 9p 只读文件系统，嵌套容器无法访问 |
-| Docker Wrapper 自动注入 | 包装 `docker run` 添加 GPU 参数 | ❌ | 参数正确，NVML 仍失败 |
-| ldconfig 手动注册 | `ldconfig` 注册 GPU 库路径 | ❌ | 注册成功，NVML 仍失败 |
-| 共享 containerd socket | 挂载 `/run/k3s/containerd/containerd.sock` | ✅ 可行 | 需改用 `ctr`/`nerdctl`，放弃 dockerd |
+| 手动挂载 `/usr/lib/wsl/lib/` | `-v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro` | ❌ | DinD 中该目录为空，挂载后仍为空 |
+| 挂载 `/usr/lib/wsl/drivers/` | `hostPath: /usr/lib/wsl/drivers` | ❌ | DinD 中该目录为空 |
+| Docker Wrapper 自动注入 | 包装 `docker run` 添加 GPU 参数 | ❌ | 参数正确，但源目录为空 |
+| ldconfig 手动注册 | `ldconfig` 注册 GPU 库路径 | ❌ | 无库可注册 |
+| 共享 containerd socket | 挂载 `/run/k3s/containerd/containerd.sock` | ✅ 理论可行 | 需改用 `ctr`/`nerdctl`，放弃 dockerd |
 
 ---
 
@@ -181,42 +281,42 @@ kubectl describe nodes | grep -i gpu
 
 | 方案 | 名称 | 核心思路 | 可行性 |
 |------|------|---------|--------|
-| **A** | 补全 WSL GPU 挂载 | 在 DinD 中显式挂载 `/usr/lib/wsl/lib/` + `/usr/lib/wsl/drivers/` | 🟡 部分（nvidia-smi 可用，PyTorch 不可用） |
+| **A** | DinD 中注入 GPU 库 | 通过 init container 或 sidecar 将 GPU 库复制到 DinD 可访问路径 | 🟡 复杂但可能 |
 | **B** | 共享 containerd socket | 挂载 containerd socket，使用 `ctr`/`nerdctl` 操作容器 | ✅ 可行（但需放弃 dockerd） |
 | **C** | 分层调度策略 | GPU 任务路由到 gitea-actions，DinD 处理非 GPU 任务 | ✅ 当前最优 |
 | **D** | 裸机/VM 迁移 | 迁移到裸机 Linux + NVIDIA Device Plugin + `nvidia.com/gpu` 调度 | ✅ 长期方案 |
 
 ### 4.2 方案详细对比
 
-| 维度 | A: 补全挂载 | B: containerd 共享 | C: 分层调度 | D: 裸机迁移 |
+| 维度 | A: DinD 注入 GPU 库 | B: containerd 共享 | C: 分层调度 | D: 裸机迁移 |
 |------|------------|-------------------|------------|------------|
-| **nvidia-smi 可用** | ✅ | ✅ | ✅ (gitea-actions) | ✅ |
-| **PyTorch CUDA 可用** | ❌ | ✅ | ✅ (gitea-actions) | ✅ |
+| **nvidia-smi 可用** | ✅ (如果注入成功) | ✅ | ✅ (gitea-actions) | ✅ |
+| **PyTorch CUDA 可用** | ⚠️ 不确定 | ✅ | ✅ (gitea-actions) | ✅ |
 | **Docker buildx 支持** | ✅ | ❌ (需切换工具) | ✅ | ✅ |
 | **DinD 隔离性** | ✅ 保留 | ❌ 丧失 | ✅ 保留 | ✅ |
-| **配置复杂度** | 低 | 中 | 极低 | 高 |
+| **配置复杂度** | 高 | 中 | 极低 | 高 |
 | **基础设施变更** | 无 | 无 | 无 | 需新节点/集群 |
-| **安全风险** | 低（仅新增 hostPath） | 中（containerd socket 高权限） | 无新增 | 低 |
-| **维护成本** | 低 | 中 | 低 | 中 |
-| **WSL2 兼容性** | ✅ | ✅ | ✅ | N/A |
-| **推荐场景** | GPU 信息查询 | 替代 DinD 的 GPU 方案 | 当前生产推荐 | 最终目标 |
+| **安全风险** | 中（hostPath 注入） | 中（containerd socket 高权限） | 无新增 | 低 |
+| **维护成本** | 高 | 中 | 低 | 中 |
+| **WSL2 兼容性** | ⚠️ 需持续适配 | ✅ | ✅ | N/A |
+| **推荐场景** | 需要 DinD GPU 支持 | 替代 DinD 的 GPU 方案 | 当前生产推荐 | 最终目标 |
 
 ### 4.3 评分矩阵
 
 | 标准 | 权重 | A | B | C | D |
 |------|------|---|---|---|---|
-| GPU 功能完整性 | 30% | 3/10 | 8/10 | 9/10 | 10/10 |
-| 实施复杂度 | 20% | 9/10 | 6/10 | 10/10 | 3/10 |
-| 架构兼容性 | 20% | 8/10 | 5/10 | 10/10 | 9/10 |
-| 安全风险 | 15% | 8/10 | 6/10 | 10/10 | 8/10 |
-| 维护成本 | 15% | 9/10 | 6/10 | 10/10 | 5/10 |
-| **加权总分** | **100%** | **6.75** | **6.55** | **9.65** | **7.55** |
+| GPU 功能完整性 | 30% | 5/10 | 8/10 | 9/10 | 10/10 |
+| 实施复杂度 | 20% | 4/10 | 6/10 | 10/10 | 3/10 |
+| 架构兼容性 | 20% | 6/10 | 5/10 | 10/10 | 9/10 |
+| 安全风险 | 15% | 6/10 | 6/10 | 10/10 | 8/10 |
+| 维护成本 | 15% | 4/10 | 6/10 | 10/10 | 5/10 |
+| **加权总分** | **100%** | **5.30** | **6.55** | **9.65** | **7.55** |
 
 ---
 
 ## 5. 推荐实施方案
 
-### 5.1 策略：分层调度（方案 C）+ GPU 查询能力补全（方案 A 子集）
+### 5.1 策略：分层调度（方案 C）为主
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -232,81 +332,76 @@ kubectl describe nodes | grep -i gpu
 │  │ DinD 特色任务 (镜像构建/集成测试/部署):                │         │
 │  │   runs-on: ubuntu-latest,dind,advacts,buildx        │         │
 │  │   → gitea-advacts Runner (DinD, 构建加速)            │ → ✅  │
-│  │                                                      │         │
-│  │ GPU 信息查询/验证类任务:                               │         │
-│  │   runs-on: ubuntu-latest,dind,advacts,buildx,gpu    │         │
-│  │   → gitea-advacts DinD (nvidia-smi 可用)             │ → ⚠️  │
 │  └─────────────────────────────────────────────────────┘         │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 立即可执行：补全 DinD GPU 挂载（支持 nvidia-smi）
+### 5.2 方案 A 探索：在 DinD 中注入 GPU 库
 
-> **适用场景**：GPU 信息查询、驱动版本验证、GPU 资源监控等不需要 CUDA 运行时 的任务。
+> **适用场景**：如果需要在 DinD 环境中获取 GPU 信息（nvidia-smi、驱动版本等），不需要 CUDA 运行时。
 
-#### 5.2.1 StatefulSet 修订
+由于 DinD 容器中 `/usr/lib/wsl/lib/` 是空目录，核心挑战是如何将宿主机的 GPU 库传递到 DinD 容器内部。
 
-在现有 `gitea-advacts-complete.yaml` 基础上，对 `docker-dind` 容器新增以下挂载：
+#### 5.2.1 思路：Init Container 复制 GPU 库
 
 ```yaml
-# Container 2: docker-dind 新增 volumeMounts
+spec:
+  initContainers:
+    - name: gpu-lib-injector
+      image: harbor.sisys.local/sisys/dependency:l2-latest
+      command:
+        - sh -c - |
+          # 从宿主机复制 GPU 库到共享 volume
+          if [ -d /usr/lib/wsl/lib ] && [ "$(ls -A /usr/lib/wsl/lib)" ]; then
+            cp -a /usr/lib/wsl/lib/* /gpu-libs/
+            echo "GPU libs copied successfully"
+            ls -la /gpu-libs/
+          else
+            echo "WARNING: No GPU libs found on host"
+          fi
+      volumeMounts:
+        - name: gpu-libs-staging
+          mountPath: /gpu-libs
+      securityContext:
+        privileged: true  # 需要访问 hostPath
+
+  containers:
+    - name: docker-dind
+      # ... 现有配置 ...
+      volumeMounts:
+        # ... 现有挂载 ...
+        - name: gpu-libs-staging
+          mountPath: /usr/lib/wsl/lib
+          readOnly: true
+
+  volumes:
+    - name: gpu-libs-staging
+      emptyDir:
+        sizeLimit: 500Mi
+```
+
+**限制**：
+- 此方法可复制 `/usr/lib/wsl/lib/` 中的 GPU 库
+- 但 **9p 挂载的 `/usr/lib/wsl/drivers/`** 中的文件**无法复制**（9p 在容器内不可见）
+- NVML 可能仍需要 9p 挂载的驱动文件（`libnvidia-ptxjitcompiler.so` 等）
+- **不能保证 PyTorch CUDA 可用**
+
+#### 5.2.2 思路二：直接挂载宿主机 GPU 库路径
+
+```yaml
 volumeMounts:
-  # ... 现有挂载保持不变 ...
-
-  # 🆕 WSL2 GPU 设备挂载
-  - name: wsl-dxg
-    mountPath: /dev/dxg
-  - name: wsl-gpu-libs
-    mountPath: /usr/lib/wsl/lib
+  - name: host-gpu-libs
+    mountPath: /usr/lib/x86_64-linux-gnu/nvidia
     readOnly: true
-  # 🆕 可写 Docker 配置目录
-  - name: etc-docker
-    mountPath: /etc/docker
 
-# Pod spec 新增 volumes
 volumes:
-  # ... 现有 volumes 保持不变 ...
-
-  # 🆕 WSL2 GPU 卷
-  - name: wsl-dxg
+  - name: host-gpu-libs
     hostPath:
-      path: /dev/dxg
-      type: CharDevice
-  - name: wsl-gpu-libs
-    hostPath:
-      path: /usr/lib/wsl/lib
+      path: /usr/lib/x86_64-linux-gnu
       type: Directory
-  - name: etc-docker
-    emptyDir:
-      sizeLimit: 10Mi
 ```
 
-#### 5.2.2 docker-dind 环境变量
-
-```yaml
-env:
-  # ... 现有环境变量 ...
-
-  # 🆕 WSL2 GPU 环境变量
-  - name: NVIDIA_VISIBLE_DEVICES
-    value: all
-  - name: NVIDIA_DRIVER_CAPABILITIES
-    value: compute,utility
-```
-
-#### 5.2.3 验证命令
-
-```bash
-# 部署修订版后验证
-kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- \
-  docker run --rm \
-    --device /dev/dxg:/dev/dxg \
-    -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro \
-    harbor.sisys.local/sisys/dependency:l2-latest \
-    nvidia-smi | head -15
-```
-
-**预期输出**：RTX 5090 GPU 信息（温度、内存、利用率等）
+**问题**：DinD 容器中挂载的是宿主机的完整 `/usr/lib/x86_64-linux-gnu/`，其中包含 GPU 库（因为宿主机有 overlay 挂载）。但嵌套 Job 容器通过 docker-dind 访问时，这些库的路径映射可能不一致。
 
 ### 5.3 中期：containerd socket 共享方案（方案 B 评估）
 
@@ -320,15 +415,13 @@ kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- \
   image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3.0-dind-rootless
   securityContext:
     privileged: false
-    # 需要访问 containerd socket
   volumeMounts:
     - name: containerd-socket
       mountPath: /run/k3s/containerd/containerd.sock
   command:
     - sh -c - |
       # 安装 nerdctl
-      ctr images pull harbor.sisys.local/sisys/tools/nerdctl:latest
-      # 使用 nerdctl 操作 containerd
+      # 使用 nerdctl 操作 containerd（复用 WSL GPU 集成）
       nerdctl run --rm --gpus all <image> nvidia-smi
 
 volumes:
@@ -353,7 +446,7 @@ volumes:
 ┌──────────────────────────────────────────────────────────────────┐
 │  裸机/VM Linux 节点池                                             │
 ├──────────────────────────────────────────────────────────────────┤
-│  NVIDIA Driver + nvidia-container-runtime + NVIDIA Device Plugin │
+│  NVIDIA Driver + Container Toolkit + NVIDIA Device Plugin        │
 ├──────────────────────────────────────────────────────────────────┤
 │  K8s 节点暴露资源: nvidia.com/gpu: 1                             │
 ├──────────────────────────────────────────────────────────────────┤
@@ -433,24 +526,28 @@ print(f'4096x4096 Matrix Multiplication: {time.time()-start:.4f}s')
 
 ## 7. 实施检查清单
 
-### 7.1 立即可执行（方案 A + C 混合）
+### 7.1 立即可执行（方案 C 分层调度）
 
-- [ ] 修订 `gitea-advacts-complete.yaml`，在 docker-dind 中新增 WSL GPU 卷
-- [ ] 新增环境变量 `NVIDIA_VISIBLE_DEVICES` 和 `NVIDIA_DRIVER_CAPABILITIES`
-- [ ] 部署修订版 StatefulSet (`kubectl apply -f gitea-advacts-complete.yaml`)
-- [ ] 验证 `nvidia-smi` 在 DinD 嵌套容器中可用
-- [ ] 更新 Runner 标签添加 `gpu` 标识
-- [ ] 文档化 GPU 任务路由策略（Workflow 模板）
-- [ ] 创建 GPU 查询类 Workflow 示例
+- [ ] 文档化 GPU 任务路由策略
+- [ ] 创建 GPU 计算 Workflow 模板（指向 gitea-actions）
+- [ ] 创建 DinD 构建/测试 Workflow 模板
+- [ ] 更新团队文档说明两种 Runner 的用途区分
 
-### 7.2 中期评估（方案 B）
+### 7.2 中期探索（方案 A GPU 库注入）
+
+- [ ] 测试 Init Container GPU 库复制方案
+- [ ] 验证复制后的 GPU 库在嵌套容器中是否可用
+- [ ] 评估 9p 驱动文件依赖程度
+- [ ] 如可行，创建 DinD GPU 查询 Workflow 模板
+
+### 7.3 中期评估（方案 B）
 
 - [ ] 评估 `nerdctl` 与现有 DinD 构建流水线的兼容性
 - [ ] 验证 containerd socket 共享的安全影响
 - [ ] 制定 DinD → containerd 迁移计划（如选择此方案）
 - [ ] 测试 CUDA 计算任务在 nerdctl 下的可用性
 
-### 7.3 长期规划（方案 D）
+### 7.4 长期规划（方案 D）
 
 - [ ] 评估裸机 GPU 节点方案（自建 vs 云服务）
 - [ ] 制定 NVIDIA Device Plugin 部署计划
@@ -469,6 +566,7 @@ print(f'4096x4096 Matrix Multiplication: {time.time()-start:.4f}s')
 | 恶意容器滥用 GPU | 低 | 中 | 🟡 | 安全上下文约束 + 监控 |
 | DinD 嵌套容器 GPU 不可用 | 高 | 中 | 🟡 | 路由到 gitea-actions（方案 C） |
 | WSL2 9p 文件系统变更 | 低 | 高 | 🔴 | 关注微软 WSLg 更新 |
+| GPU 库注入方案不兼容 | 高 | 中 | 🟡 | 方案 A 仅作为探索方向 |
 
 ---
 
@@ -479,44 +577,13 @@ print(f'4096x4096 Matrix Multiplication: {time.time()-start:.4f}s')
 | WSL2 DinD GPU 直通实施方案 | `docs/deployment/wsl2-dind-gpu-passthrough-implementation-plan.md` | 详细实施方案（v5.1） |
 | Gitea AdvActs 完整配置 | `deployments/gitea-runner/gitea-advacts-complete.yaml` | 当前 DinD 配置 |
 | Gitea Runner 配置 Story | `_bmad-output/implementation-artifacts/stories/0-8-gitea-runner-configuration.md` | Runner 配置文档 |
-| WSL2 DinD GPU 集成研究 | `docs/deployment/wsl2-dind-gpu-integration-research.md` | 嵌套容器 CUDA 限制研究 |
 | K8s GPU 调度参考 | `deployments/k8s/deployment.yaml` | K8s GPU 资源声明示例 |
 
 ---
 
 ## 附录 A：GPU Workflow 模板
 
-### A.1 GPU 信息查询（DinD 可用）
-
-```yaml
-name: GPU Info Check
-on:
-  push:
-    branches: [main]
-
-jobs:
-  gpu-info:
-    runs-on: ubuntu-latest,dind,advacts,buildx,gpu
-
-    steps:
-      - name: GPU Device Information
-        run: |
-          docker run --rm \
-            --device /dev/dxg:/dev/dxg \
-            -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro \
-            harbor.sisys.local/sisys/dependency:l2-latest \
-            nvidia-smi
-
-      - name: GPU Memory Usage
-        run: |
-          docker run --rm \
-            --device /dev/dxg:/dev/dxg \
-            -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro \
-            harbor.sisys.local/sisys/dependency:l2-latest \
-            nvidia-smi --query-gpu=memory.used,memory.total --format=csv
-```
-
-### A.2 GPU 计算任务（gitea-actions）
+### A.1 GPU 计算任务（gitea-actions，推荐）
 
 ```yaml
 name: GPU Compute Task
@@ -529,6 +596,12 @@ jobs:
     runs-on: ubuntu-latest,docker,k3s,linux,gpu
 
     steps:
+      - name: GPU Device Information
+        run: |
+          docker run --rm --gpus all \
+            harbor.sisys.local/sisys/dependency:l2-latest \
+            nvidia-smi
+
       - name: PyTorch CUDA Verification
         run: |
           docker run --rm --gpus all \
@@ -541,6 +614,30 @@ jobs:
             "
 ```
 
+### A.2 DinD 构建任务（gitea-advacts，无 GPU）
+
+```yaml
+name: Docker Build
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest,dind,advacts,buildx
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Image
+        run: |
+          docker buildx build \
+            --push \
+            -t harbor.sisys.local/sisys/myapp:latest \
+            .
+```
+
 ---
 
 ## 附录 B：关键命令速查
@@ -549,7 +646,7 @@ jobs:
 # ========== GPU 环境验证 ==========
 # 宿主机 GPU 设备
 ls -la /dev/dxg
-ls -la /usr/lib/wsl/lib/libcuda.so
+ls -la /usr/lib/wsl/lib/
 
 # 集群 GPU 资源
 kubectl describe nodes | grep -i gpu   # 预期: 空 (WSL2)
@@ -558,18 +655,19 @@ kubectl describe nodes | grep -i gpu   # 预期: 空 (WSL2)
 kubectl exec -n gitea-actions gitea-org-runner-0 -- \
   docker run --rm --gpus all harbor.sisys.local/sisys/dependency:l2-latest nvidia-smi
 
-# ========== DinD GPU 验证 ==========
+# ========== DinD GPU 诊断 ==========
 # DinD 中 /dev/dxg 可见性
 kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- ls -la /dev/dxg
 
-# DinD 中 GPU 传递测试
-kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- \
-  docker run --rm --device /dev/dxg:/dev/dxg \
-  -v /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro \
-  harbor.sisys.local/sisys/dependency:l2-latest nvidia-smi
+# DinD 中 GPU 库检查
+kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- ls -la /usr/lib/wsl/lib/
+# 预期: 空目录（根因确认）
+
+# DinD mount 信息
+kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- mount | grep -E "wsl|9p|overlay"
+# 预期: 无 WSL GPU 相关挂载
 
 # ========== 部署/回滚 ==========
-# 部署修订版 StatefulSet
 kubectl apply -f deployments/gitea-runner/gitea-advacts-complete.yaml
 kubectl rollout restart statefulset gitea-runner-dind -n gitea-advacts
 kubectl wait --for=condition=Ready pod -l app=gitea-runner-dind -n gitea-advacts --timeout=300s
@@ -578,7 +676,6 @@ kubectl wait --for=condition=Ready pod -l app=gitea-runner-dind -n gitea-advacts
 kubectl rollout undo statefulset gitea-runner-dind -n gitea-advacts
 
 # ========== 监控 ==========
-# GPU 利用率监控
 watch -n 5 'kubectl exec -n gitea-actions gitea-org-runner-0 -- \
   docker run --rm --gpus all harbor.sisys.local/sisys/dependency:l2-latest \
   nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader'
@@ -586,4 +683,4 @@ watch -n 5 'kubectl exec -n gitea-actions gitea-org-runner-0 -- \
 
 ---
 
-**文档版本**: v1.0 | **最后更新**: 2026-04-07 | **状态**: 已评审
+**文档版本**: v2.0（根因修订版） | **最后更新**: 2026-04-07 | **状态**: 已评审

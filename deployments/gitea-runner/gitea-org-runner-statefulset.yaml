@@ -9,7 +9,6 @@
 #   - 3 个并发 Runner（gitea-org-runner-00~02）
 #   - 每个 Pod 使用独立 PVC（持久化注册信息）
 #   - 组织级 Runner 自动可用于组织内所有仓库
-#   - 标签：ubuntu-latest,docker,k8s
 #   - ✅ 已修复：使用 Docker Socket（/var/run/docker.sock）
 #   - ✅ 已修复：添加 Docker CLI 运行时支持
 #   - ✅ 已修复：添加 SSL 证书支持
@@ -108,7 +107,7 @@ spec:
 
             # Runner 标签（用于 Job 调度）
             - name: GITEA_RUNNER_LABELS
-              value: "ubuntu-latest,docker,k3s,linux,gpu"
+              value: "docker,ubuntu2204,gpu"
 
             # Token（从 Secret 注入 - 组织级 Token）
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
