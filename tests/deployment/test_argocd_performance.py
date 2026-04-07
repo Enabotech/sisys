@@ -201,6 +201,7 @@ class TestArgoCDPerformance:
             text=True,
         )
         if metrics_check.returncode != 0:
+            print("⚠️ Metrics server 不可用，跳过 CPU 使用率测试")
             pytest.skip("Metrics server not available (metrics.k8s.io API)")
 
         # Get ArgoCD pods
@@ -251,6 +252,7 @@ class TestArgoCDPerformance:
             text=True,
         )
         if metrics_check.returncode != 0:
+            print("⚠️ Metrics server 不可用，跳过内存使用率测试")
             pytest.skip("Metrics server not available (metrics.k8s.io API)")
 
         # Get ArgoCD pods

@@ -185,7 +185,7 @@ class TestKubernetesResources:
             lines = result.stdout.strip().split("\n")
             if len(lines) > 1:  # 第一行是标题
                 pvc_count = len(lines) - 1
-                assert pvc_count == 3, f"PVC 数量应为 3，实际为：{pvc_count}"
+                assert pvc_count == 4, f"PVC 数量应为 4，实际为：{pvc_count}"
 
             print(f"✅ PVC 已创建:\n{result.stdout}")
 
@@ -275,20 +275,20 @@ class TestDuplicateRegistrationFix:
     def test_no_duplicate_runners(self):
         """测试无重复 Runner"""
         try:
-            # 获取 Gitea 管理员 Token
+            # 获取 Gitea Runner Token (从 gitea-actions namespace)
             token_result = subprocess.run(
-                ["kubectl", "get", "secret", "gitea-admin-token", "-n", "gitea", "-o", "jsonpath='{.data.token}'"],
+                ["kubectl", "get", "secret", "gitea-org-runner-token", "-n", "gitea-actions", "-o", "jsonpath={.data.token}"],
                 capture_output=True,
                 text=True,
                 check=False,
             )
 
-            if token_result.returncode != 0:
-                pytest.skip("无法获取 Gitea 管理员 Token")
+            if token_result.returncode != 0 or not token_result.stdout.strip():
+                pytest.skip("无法获取 Gitea Runner Token")
 
             import base64
 
-            token = base64.b64decode(token_result.stdout.strip("'")).decode()
+            token = base64.b64decode(token_result.stdout.strip()).decode()
 
             # 获取所有 Runner
             import requests

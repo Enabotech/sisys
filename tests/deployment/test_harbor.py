@@ -469,9 +469,9 @@ class TestHarborAdminAccount:
         import os
         import warnings
 
-        admin_username = os.environ.get("HARBOR_ADMIN_USERNAME", "sisys_admin")
-        # 默认密码 Admin@123456
-        admin_password = os.environ.get("HARBOR_ADMIN_PASSWORD", "Admin@123456")
+        admin_username = os.environ.get("HARBOR_ADMIN_USERNAME", "admin")
+        # 密码应从 Gitea 仓库密钥或环境变量获取
+        admin_password = os.environ.get("HARBOR_ADMIN_PASSWORD", "")
 
         # 使用 Harbor API v2.0 验证登录
         # 先测试 API 是否可访问（不需要认证）

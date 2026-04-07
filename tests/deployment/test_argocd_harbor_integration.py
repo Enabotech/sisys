@@ -170,12 +170,11 @@ class TestArgoCDHarborIntegration:
     def test_harbor_webhook_configmap_exists(self, harbor_namespace: str):
         """验证 Harbor Webhook ConfigMap 已创建"""
         result = subprocess.run(
-            ["sudo", "kubectl", "get", "configmap", "harbor-webhook-config", "-n", harbor_namespace, "-o", "json"],
+            ["sudo", "kubectl", "get", "configmap", "trivy-webhook-notify", "-n", harbor_namespace, "-o", "json"],
             capture_output=True,
             text=True,
         )
-        if result.returncode != 0:
-            pytest.skip("Harbor Webhook ConfigMap 不存在（可选配置，可通过 Web 界面手动配置）")
+        assert result.returncode == 0, f"Harbor Webhook ConfigMap 不存在：{result.stderr}"
 
     def test_argocd_webhook_receiver_configured(self, argocd_namespace: str):
         """验证 ArgoCD Webhook 接收器已配置"""
@@ -278,20 +277,24 @@ class TestArgoCDHarborIntegration:
         logs = result.stdout
         if not logs:
             pytest.skip("日志为空")
-        # 检查是否有正常运行日志（不要求必须有 Harbor 连接日志，因为可能没有配置 Application）
-        # Image Updater 正常运行时会输出周期性的 update cycle 日志
+        # 检查是否有正常运行日志（Webhook 触发更新已正常运作）
         has_normal_operation = any(
             keyword in logs.lower()
             for keyword in [
                 "starting image update cycle",
                 "processing results",
+                "webhook",
+                "image updated",
             ]
         )
-        if not has_normal_operation:
-            pytest.skip("Image Updater 暂无正常运行日志（等待首次配置）")
-        # 如果有运行日志，检查没有持续的错误
+
+        # 验证没有持续的错误
         error_lines = [line for line in logs.split("\n") if "level=error" in line.lower()]
         critical_errors = [line for line in error_lines if "apiserver not ready" not in line.lower()]
+
+        if has_normal_operation:
+            print(f"✅ Image Updater 正常运行，发现 {len(critical_errors)} 个非关键错误")
+
         assert len(critical_errors) < 20, f"Image Updater 日志中存在过多关键错误：{len(critical_errors)} 个"
 
     # ===========================================================================
@@ -377,8 +380,10 @@ class TestArgoCDHarborIntegration:
         harbor_nodeport = HARBOR_NODEPORT
         harbor_host = "harbor.sisys.local"
         harbor_url = f"https://{harbor_node_ip}:{harbor_nodeport}"
-        harbor_username = "admin"
-        harbor_password = "Harbor12345"  # nosec B105  # pragma: allowlist secret
+
+        # 从环境变量获取 Harbor 凭据（Gitea 仓库密钥）
+        harbor_username = os.environ.get("HARBOR_USERNAME", "admin")
+        harbor_password = os.environ.get("HARBOR_PASSWORD", "your_harbor_admin_password_here")
 
         try:
             # 获取 Harbor 管理员 Token
@@ -596,16 +601,16 @@ class TestArgoCDHarborIntegrationE2E:
                 if has_harbor_access:
                     break
             if not has_harbor_access:
-                pytest.skip("NetworkPolicy 未明确配置允许 Harbor 访问（可能使用默认策略）")
+                # NetworkPolicy 使用默认策略（允许所有），也是可接受的
+                print("⚠️ NetworkPolicy 未明确配置允许 Harbor 访问（使用默认策略）")
         else:
             pytest.skip("NetworkPolicy 配置不存在，跳过详细验证")
 
         # 验证 Harbor Webhook ConfigMap 存在
         returncode, stdout, stderr = self._run_kubectl_command(
-            ["get", "configmap", "harbor-webhook-config", "-n", harbor_namespace]
+            ["get", "configmap", "trivy-webhook-notify", "-n", harbor_namespace]
         )
-        if returncode != 0:
-            pytest.skip("Harbor Webhook ConfigMap 未配置（需要手动配置）")
+        assert returncode == 0, f"Harbor Webhook ConfigMap 未配置：{stderr}"
 
     def test_multi_environment_image_update(self, argocd_namespace: str):
         """
@@ -624,14 +629,12 @@ class TestArgoCDHarborIntegrationE2E:
 
         found_overlays = [p for p in kustomize_paths if os.path.exists(p)]
 
-        if len(found_overlays) < 3:
-            pytest.skip(f"多环境 Kustomize 覆盖未完全配置（找到 {len(found_overlays)}/3: {found_overlays}）")
+        assert len(found_overlays) >= 3, f"多环境 Kustomize 配置不完整（找到 {len(found_overlays)}/3: {found_overlays}）"
 
         # 验证各环境命名空间存在
         for env in ["sisys-dev", "sisys-test", "sisys-prod"]:
             returncode, stdout, stderr = self._run_kubectl_command(["get", "namespace", env])
-            if returncode != 0:
-                pytest.skip(f"{env} 命名空间不存在（需要先创建）")
+            assert returncode == 0, f"{env} 命名空间不存在：{stderr}"
 
 
 # =============================================================================
