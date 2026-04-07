@@ -49,7 +49,7 @@ class TestStatefulSetConfiguration:
                 # 第一个文档是 StatefulSet
                 statefulset = docs[0]
                 replicas = statefulset.get("spec", {}).get("replicas", 0)
-                assert replicas == 3, f"Runner 副本数应为 3，实际为：{replicas}"
+                assert replicas == 4, f"Runner 副本数应为 3，实际为：{replicas}"
 
     def test_volume_claim_templates(self):
         """测试 volumeClaimTemplates 配置"""

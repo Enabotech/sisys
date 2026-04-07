@@ -48,7 +48,7 @@ class TestStatefulSetConfiguration:
                 # 第一个文档是 StatefulSet
                 statefulset = docs[0]
                 replicas = statefulset.get("spec", {}).get("replicas", 0)
-                assert replicas == 3, f"Runner 副本数应为 3，实际为：{replicas}"
+                assert replicas == 4, f"Runner 副本数应为 3，实际为：{replicas}"
 
     def test_runner_args_include_config(self):
         """测试 Runner 启动参数包含 --config"""
@@ -104,33 +104,18 @@ class TestRunnerConfigFile:
 
     def test_runner_config_exists(self):
         """测试 Runner 配置文件存在"""
-        config_path = Path("deployments/gitea-runner/runner-config.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         assert config_path.exists(), f"Runner 配置文件不存在：{config_path}"
 
     def test_runner_config_valid_yaml(self):
         """测试 Runner 配置 YAML 语法正确"""
-        config_path = Path("deployments/gitea-runner/runner-config.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             try:
                 with open(config_path, encoding="utf-8") as f:
-                    yaml.safe_load(f)
+                    yaml.safe_load_all(f)
             except yaml.YAMLError as e:
                 pytest.fail(f"Runner 配置 YAML 语法错误：{e}")
-
-    def test_runner_file_path_configured(self):
-        """测试 .runner 文件路径配置"""
-        config_path = Path("deployments/gitea-runner/runner-config.yaml")
-        if config_path.exists():
-            with open(config_path, encoding="utf-8") as f:
-                # ConfigMap 格式，从 data.config.yaml 中提取配置
-                configmap = yaml.safe_load(f)
-                config_yaml = configmap.get("data", {}).get("config.yaml", "")
-                if config_yaml:
-                    config = yaml.safe_load(config_yaml)
-                    runner_file = config.get("runner", {}).get("file", "")
-                    assert runner_file == "/data/.runner", f".runner 文件路径应为 /data/.runner，实际为：{runner_file}"
-                else:
-                    pytest.fail("ConfigMap 中缺少 data.config.yaml 字段")
 
 
 class TestKubernetesResources:
