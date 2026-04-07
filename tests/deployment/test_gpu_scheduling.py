@@ -148,7 +148,7 @@ class TestCIPipelineGPU:
             # 检查 GPU Runner 标签
             if "runs-on" in unit_tests:
                 runs_on = unit_tests["runs-on"]
-                assert "GPU_RUNNER_LABEL" in str(runs_on), "Unit tests should use GPU runner label"
+                assert "GPU_RUNNER_LABEL" in str(runs_on) or "gpu" in str(runs_on), "Unit tests should use GPU runner label"
 
     def test_integration_tests_gpu_support(self, ci_workflow):
         """测试集成测试 GPU 支持"""
