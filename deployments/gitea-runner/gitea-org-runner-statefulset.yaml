@@ -6,7 +6,7 @@
 # 作用域：组织级别（org/sisys）
 #
 # 特性：
-#   - 3 个并发 Runner（gitea-org-runner-00~02）
+#   - 4 个并发 Runner（gitea-org-runner-00~02）
 #   - 每个 Pod 使用独立 PVC（持久化注册信息）
 #   - 组织级 Runner 自动可用于组织内所有仓库
 #   - ✅ 已修复：使用 Docker Socket（/var/run/docker.sock）
@@ -25,8 +25,8 @@ metadata:
     scope: organization
     org: sisys
 spec:
-  # 3 个 Runner 支持 3 个并发 Job
-  replicas: 3
+  # 4 个 Runner 支持 4 个并发 Job
+  replicas: 4
   serviceName: gitea-org-runner
   selector:
     matchLabels:
