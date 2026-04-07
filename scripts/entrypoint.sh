@@ -43,7 +43,7 @@ print(f'Torch : {version}')
 if not is_cuda:
     print('❌ 错误:  CUDA 不可用！')
     print('💡 请检查 Runner 是否配置了 --gpus all 及 NVIDIA 驱动')
-else
+else:
     print('✅ GPU 直通验证通过')
 "
 else
