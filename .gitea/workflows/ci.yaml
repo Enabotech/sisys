@@ -298,7 +298,7 @@ jobs:
   security-scan:
     name: "🔒 安全扫描"
     runs-on: ubuntu2204
-    # needs: [unit-tests]
+    needs: [unit-tests]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
