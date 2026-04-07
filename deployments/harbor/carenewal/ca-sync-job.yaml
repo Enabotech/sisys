@@ -1,0 +1,36 @@
+# CA 证书同步 Job
+# 手动触发: kubectl create job -n cert-manager ca-sync-manual --from=job/ca-cert-sync
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ca-cert-sync
+  namespace: cert-manager
+  labels:
+    app: ca-sync
+spec:
+  template:
+    spec:
+      serviceAccountName: ca-sync-sa
+      containers:
+      - name: ca-sync
+        image: bitnami/kubectl:1.31.4
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -euo pipefail
+            CA_CRT=$(kubectl get secret sisys-internal-ca -n cert-manager -o jsonpath='{.data.tls\.crt}')
+            NAMESPACES="gitea-advacts gitea-actions gitea harbor argocd"
+            for NS in $NAMESPACES; do
+              if kubectl get namespace $NS >/dev/null 2>&1; then
+                EXISTING_CRT=$(kubectl get secret ca-certificates -n $NS -o jsonpath='{.data.ca-certificates\.crt}' 2>/dev/null || echo "")
+                if [ "$CA_CRT" != "$EXISTING_CRT" ]; then
+                  kubectl create secret generic ca-certificates \
+                    --from-literal=ca-certificates.crt="$CA_CRT" \
+                    -n $NS --dry-run=client -o yaml | kubectl apply -f -
+                  kubectl rollout restart statefulset gitea-runner-dind -n $NS 2>/dev/null || true
+                fi
+              fi
+            done
+      restartPolicy: Never
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600

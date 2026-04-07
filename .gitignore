@@ -566,3 +566,6 @@ deployments/gitea/config/app.ini.fixed
 deployments/gitea/config/app.ini.new
 deployments/gitea/config/app.ini.bak
 deployments/gitea/config/gitea_v.1.25+_example.app.ini
+# CA 私钥 - 敏感数据
+deployments/harbor/carenewal/internal-ca.key
+deployments/harbor/carenewal/ca-secret.yaml

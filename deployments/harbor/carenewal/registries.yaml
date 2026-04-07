@@ -1,0 +1,30 @@
+# 镜像仓库配置（生产环境 - 完整 TLS 验证）
+mirrors:
+  docker.io:
+    endpoint:
+      - "https://registry.cn-hangzhou.aliyuncs.com"
+      - "https://docker.m.daocloud.io"
+      - "https://docker.1ms.run"
+      - "https://registry-1.docker.io"
+  quay.io:
+    endpoint:
+      - "https://quay.mirrors.ustc.edu.cn"
+  registry.k8s.io:
+    endpoint:
+      - "https://registry.cn-hangzhou.aliyuncs.com/google_containers"
+  gcr.io:
+    endpoint:
+      - "https://gcr.cn-hangzhou.aliyuncs.com"
+  ghcr.io:
+    endpoint:
+      - "https://ghcr.io"
+  harbor.sisys.local:
+    endpoint:
+      - "https://harbor.sisys.local"
+configs:
+  harbor.sisys.local:
+    tls:
+      # insecure_skip_verify 已移除 - 使用完整证书验证
+    auth:
+      username: "robot$sisys+gitea-runner-push"
+      password: "gXuC2AcG1231JB8mfZmyCnhDKy6nKcRd"

@@ -1,0 +1,39 @@
+# CA 同步 RBAC 配置
+# 为每个需要同步的命名空间执行:
+# kubectl create role ca-sync-role-remote -n <NAMESPACE> \
+#   --verb=get,list,create,update,patch --resource=secrets \
+#   --verb=get,patch --resource=statefulsets,deployments
+# kubectl create rolebinding ca-sync-rolebinding-remote -n <NAMESPACE> \
+#   --role=ca-sync-role-remote \
+#   --serviceaccount=cert-manager:ca-sync-sa
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ca-sync-sa
+  namespace: cert-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ca-sync-role
+  namespace: cert-manager
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["sisys-internal-ca"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ca-sync-rolebinding
+  namespace: cert-manager
+subjects:
+- kind: ServiceAccount
+  name: ca-sync-sa
+  namespace: cert-manager
+roleRef:
+  kind: Role
+  name: ca-sync-role
+  apiGroup: rbac.authorization.k8s.io
