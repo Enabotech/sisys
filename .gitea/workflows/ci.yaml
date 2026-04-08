@@ -450,7 +450,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
-          echo "image_tag_l2=l2-${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag_l2=l2-${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
       # ---------- L2 构建 ----------
