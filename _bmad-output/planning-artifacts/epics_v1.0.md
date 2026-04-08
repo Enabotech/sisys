@@ -126,7 +126,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 **战略工具箱 (ST-06 ~ ST-09) - 4 项：**
 - FR-ST-06: 管理工具版本，支持版本控制、灰度发布与回滚
 - FR-ST-07: 执行 Validation Feedback 闭环（最大重试 3 次，失败标记不可行）
-- FR-ST-08: 遵循 MCP 2025 规范与 A2A 协议，通过 MCP Registry 暴露工具能力
+- FR-ST-08: 遵循 SAP（sisys Agent Protocol）实现内部 Agent 协作，V2+ 可选通过 MCP Registry 暴露工具能力给外部生态
 - FR-ST-09: 支持财务建模与估值基础（DCF/可比公司/先例交易基础）
 
 **Agent 协作 (AC-07 ~ AC-14) - 8 项：**
@@ -284,7 +284,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 | NFR-INT-02 | 预置集成适配器 | ≥5 个（ERP/CRM/OA 各至少 1 个） |
 | NFR-INT-03 | 外部数据源接入 | ≥3 个（工商/税务/专利等） |
 | NFR-INT-04 | 集成失败率 | <1%，失败自动重试（最多 3 次），重试成功率≥80% |
-| NFR-INT-05 | MCP/A2A 协议兼容性 | 向后兼容 1-2 个版本，协议兼容性测试通过 |
+| NFR-INT-05 | SAP 协议兼容性 | 向后兼容 1-2 个版本，协议兼容性测试通过 |
 
 #### 可访问性 (NFR-ACC-01 ~ NFR-ACC-02) - 2 项
 
@@ -445,7 +445,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 | **战略工具箱 (ST) - 4 项** |
 | FR-ST-06 | 工具版本管理 | Epic 4 | Story 4.6 | P1 |
 | FR-ST-07 | Validation Feedback 闭环 | Epic 4 | Story 4.7 | P1 |
-| FR-ST-08 | MCP/A2A 协议支持 | Epic 4 | Story 4.8 | P1 |
+| FR-ST-08 | SAP 协议支持 | Epic 4 | Story 4.8 | P2 |
 | FR-ST-09 | 财务建模与估值基础 | Epic 4 | Story 4.9 | P1 |
 | **Agent 协作 (AC) - 8 项** |
 | FR-AC-07 | 多 Agent 任务分解 | Epic 9 | Story 9.1 | P1 |
@@ -4307,7 +4307,7 @@ So that **可以直接交付客户，验证 MVP 付费意愿**。
 
 **📋 NFR 覆盖说明：**
 - **Story 7.5** 覆盖 NFR-ACC-01（无障碍设计，WCAG 2.1 AA）
-- **Story 7.6** 覆盖 NFR-INT-05（MCP/A2A 协议兼容性）
+- **Story 7.6** 覆盖 NFR-INT-05（SAP 协议兼容性）
 - **Story 7.7** 覆盖测试 Story（API E2E 测试，确保端到端功能正确性）
 - **Story 7.8（新增）** 覆盖 UX 骨架屏加载（感知性能优化）
 
@@ -4560,13 +4560,13 @@ So that **确保 API 可用性和向后兼容性**。
 
 **契约测试范围：**
 - **Agent 接口契约** - Schemathesis 验证所有 API 端点
-- **MCP 工具契约** - JSON Schema 验证工具输入/输出
+- **SAP 消息契约** - Pydantic 模型验证 SAP 消息格式
 - **事件契约** - Pydantic 模型验证领域事件
 - **数据库契约** - Alembic 迁移测试 + Schema 验证
 
 **测试工具：**
 - Schemathesis（API 契约测试）
-- jsonschema（MCP 工具契约）
+- pydantic（SAP 消息契约）
 - pytest + pydantic（事件契约）
 - Alembic + SQLAlchemy（数据库契约）
 
@@ -4574,7 +4574,7 @@ So that **确保 API 可用性和向后兼容性**。
 | 契约类型 | 工具 | 验证内容 | 通过率要求 |
 |---------|------|---------|-----------|
 | API 契约 | Schemathesis | OpenAPI 3.1 规范符合性 | 100% |
-| MCP 工具契约 | jsonschema | 工具输入/输出 Schema 验证 | 100% |
+| SAP 消息契约 | pydantic | SAP 消息模型验证 | 100% |
 | 事件契约 | pydantic | 领域事件模型验证 | 100% |
 | 数据库契约 | Alembic | Schema 迁移验证 | 100% |
 | 向后兼容性 | Schemathesis | 1-2 个版本兼容 | 100% |

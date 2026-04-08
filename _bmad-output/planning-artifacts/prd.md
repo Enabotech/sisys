@@ -46,27 +46,29 @@ documentStatus: 'complete'
   - 7.5 合规要求
 
 ### 第五部分：功能需求（能力契约）
-- [8. Functional Requirements](#functional-requirements) - 122 项功能需求
+- [8. Functional Requirements](#functional-requirements) - 135 项功能需求
   - 8.1 文档与数据管理（FR-DM-01 ~ FR-DM-15）- 15 项
-  - 8.2 智能检索与知识发现（FR-SR-01 ~ FR-SR-15）- 15 项
+  - 8.2 智能检索与知识发现（FR-SR-01 ~ FR-SR-16）- 16 项
   - 8.3 战略工具箱（FR-ST-01 ~ FR-ST-11）- 11 项
   - 8.4 Agent 协作（FR-AC-01 ~ FR-AC-16）- 16 项
-  - 8.5 战略规划流程（FR-SP-01 ~ FR-SP-12）- 12 项
+  - 8.5 战略规划流程（FR-SP-01 ~ FR-SP-17）- 17 项
   - 8.6 用户交互与报告（FR-UI-01 ~ FR-UI-13）- 13 项
   - 8.7 系统管理与合规（FR-SC-01 ~ FR-SC-14）- 14 项
   - 8.8 成本与性能优化（FR-CP-01 ~ FR-CP-12）- 12 项
   - 8.9 战略档案库与长期记忆（FR-SA-01 ~ FR-SA-10）- 10 项
   - 8.10 架构约束（FR-AR-01 ~ FR-AR-04）- 4 项
+  - 8.11 接口与协议（FR-IF-01 ~ FR-IF-07）- 7 项
 
 ### 第六部分：非功能需求（质量属性）
-- [9. Non-Functional Requirements](#non-functional-requirements) - 39 项 NFR
+- [9. Non-Functional Requirements](#non-functional-requirements) - 45 项 NFR
   - 9.1 性能（NFR-PERF-01 ~ NFR-PERF-07）- 7 项
   - 9.2 安全性（NFR-SEC-01 ~ NFR-SEC-07）- 7 项
-  - 9.3 合规性（NFR-COMP-01 ~ NFR-COMP-08）- 8 项
+  - 9.3 合规性（NFR-COMP-01 ~ NFR-COMP-09）- 9 项
   - 9.4 可靠性（NFR-REL-01 ~ NFR-REL-06）- 6 项
   - 9.5 可扩展性（NFR-SCALE-01 ~ NFR-SCALE-04）- 4 项
   - 9.6 集成性（NFR-INT-01 ~ NFR-INT-05）- 5 项
   - 9.7 可访问性（NFR-ACC-01 ~ NFR-ACC-02）- 2 项
+  - 9.8 接口性能（NFR-IF-01 ~ NFR-IF-05）- 5 项
 
 ### 附录
 - [附录 A：FR 溯源矩阵](#功能需求汇总矩阵) - FR 与 or.md 溯源对照
@@ -505,7 +507,7 @@ documentStatus: 'complete'
 
 **主题：生态建设，全球化扩张**
 
-**目标用户：** 跨国企业（多语言）+ 生态伙伴（A2A 协作）+ 行业标杆（群体智能）
+**目标用户：** 跨国企业（多语言）+ 生态伙伴（SAP 协作）+ 行业标杆（群体智能）
 
 **商业目标：**
 - 通过**生态集成**实现渠道获客（用友/金蝶/华为云）
@@ -518,7 +520,7 @@ documentStatus: 'complete'
 |---------|---------|---------|---------|
 | **完整生态集成** | 用友/金蝶/华为云/阿里云市场 API 深度集成 | 渠道获客，降低 CAC | 10+ 生态伙伴，渠道获客≥30% |
 | **全球化多语言** | 中/英/日/韩等多语言 + 数据驻留 | 市场扩张，全球化 | 5 种语言，10 个国家数据驻留 |
-| **A2A 协议支持** | 跨系统 Agent 协作（MCP/A2A 协议） | 生态建设，网络效应 | 10+ 外部系统 A2A 对接 |
+| **外部 Agent 协议支持** | 跨系统 Agent 协作（MCP/A2A 协议适配） | 生态建设，网络效应 | 10+ 外部系统对接 |
 | **知识图谱增强** | GraphRAG 多跳推理 + 实体关系挖掘 | 洞察深度，技术壁垒 | 多跳推理准确率≥85% |
 | **边缘 AI 部署** | 本地设备离线运行 + 联邦学习 | 隐私保护，特殊场景 | 离线功能完整度≥90% |
 | **群体智能** | 多企业匿名数据学习 + 行业基准 | 网络效应，数据护城河 | 行业基准覆盖率≥80% |
@@ -1687,7 +1689,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 **编号规则：**
 - **格式：** `[能力领域缩写]-[序号] (优先级): 描述 [or.md 溯源]`
-- **能力领域缩写：** DM（文档管理）、SR（智能检索）、ST（工具箱）、AC（Agent 协作）、SP（战略规划）、UI（用户交互）、SC（系统合规）、CP（成本性能）、SA（战略档案）、AR（架构约束）
+- **能力领域缩写：** DM（文档管理）、SR（智能检索）、ST（工具箱）、AC（Agent 协作）、SP（战略规划）、UI（用户交互）、SC（系统合规）、CP（成本性能）、SA（战略档案）、AR（架构约束）、IF（接口与协议）
 - **优先级：** P0（MVP 必需）、P1（V1 增加）、P2（V2 增加）
 
 ---
@@ -1741,10 +1743,14 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 - **FR-SR-12 (P1):** 系统可以触发自动补救机制（扩展检索范围/调用白名单外部数据源/生成数据缺口报告）[or.md 二.6.(3)]
 - **FR-SR-13 (P1):** 系统可以构建知识图谱（实体节点 + 关系边），支持 GraphRAG 增强检索 [or.md 一.5.(5)]
 
-**P2 (V2) - 2 项：** 高级图遍历和数据时效性管理
+**P2 (V2) - 3 项：** 高级图遍历、数据时效性管理和高保真溯源 API
 
 - **FR-SR-14 (P2):** 系统可以管理引用数据的时效性，超 12 个月数据自动标记"数据陈旧"并降权 [or.md 二.7.(3)]
 - **FR-SR-15 (P2):** 系统可以执行实体关联查询、路径查询、社区发现算法（Louvain/Label Propagation）[or.md 一.5.(5)]
+- **FR-SR-16 (P2):** 系统可以通过 REST API 提供高保真溯源接口 `GET /documents/{id}/trace`，返回 Bounding Box 坐标（x, y, width, height）[interface-design-rules.md 7.2.1]
+  - 请求参数：`document_id`（路径参数）、`citation_id`（查询参数，可选）
+  - 响应格式：`{ "document_id", "page_number", "bounding_boxes": [{ "element_id", "type": "text|table|image", "x", "y", "width", "height", "confidence" }], "source_text", "citation_chain": [...] }`
+  - **验收标准：** Bounding Box 坐标准确率 ≥ 95%，溯源跳转延迟 < 30 秒（从结论到原始文档坐标点）
 
 ---
 
@@ -1762,7 +1768,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 - **FR-ST-06 (P1):** 系统可以管理工具版本，支持版本控制、灰度发布与回滚 [or.md 三.1.(2)]
 - **FR-ST-07 (P1):** 系统可以执行 Validation Feedback 闭环（最大重试 3 次，失败标记不可行）[or.md 三.3.(3)]
-- **FR-ST-08 (P1):** 系统可以遵循 MCP 2025 规范与 A2A 协议，通过 MCP Registry 暴露工具能力 [or.md 三.1.(4)]
+- **FR-ST-08 (P2):** 系统可以遵循 SAP（sisys Agent Protocol）实现内部 Agent 协作，V2+ 可选通过 MCP Registry 暴露工具能力给外部生态 [or.md 三.1.(4)]
 - **FR-ST-09 (P1):** 系统可以支持财务建模与估值基础（DCF/可比公司/先例交易基础）[or.md 五.3]
 
 **P2 (V2) - 2 项：** 高级安全隔离和金融行业特定能力
@@ -1819,10 +1825,30 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 - **FR-SP-09 (P1):** 系统可以执行 Time-travel 两阶段能力（单点恢复/分支对比）[or.md 五.6.(4)]
 - **FR-SP-10 (P1):** 系统可以支持红蓝辩论机制完整实现（发散 Temperature=0.8→收敛 Temperature=0.5→裁决 Temperature=0.2）[or.md 三.5.(3)]
 
-**P2 (V2) - 2 项：** BEM 战略解码和 SP→BP 映射
+**P2 (V2) - 6 项：** BEM 战略解码、SP→BP 映射和财务量化 REST API
 
 - **FR-SP-11 (P2):** 系统可以执行 BEM 六阶段流程（澄清战略方向→导出战略举措→导出衡量指标→确定年度措施→分解目标→导出重点工作计划）[or.md 五.3]
 - **FR-SP-12 (P2):** 系统可以将 SP 输出结构化映射为 BP 输入（战略解码器）[or.md 五.3]
+- **FR-SP-13 (P2):** 系统可以通过 REST API `POST /financial/analyze` 提供财务量化分析（NPV/IRR/现金流）[interface-design-rules.md 7.2.4]
+  - 请求体：`{ "project_name", "cash_flows": [{ "year", "amount" }], "discount_rate", "initial_investment" }`
+  - 响应体：`{ "npv", "irr", "payback_period", "roi", "sensitivity_analysis_url" }`
+  - **验收标准：** NPV/IRR 计算准确率 100%（与 Excel 公式对齐），分析延迟 < 5s
+- **FR-SP-14 (P2):** 系统可以通过 REST API `POST /financial/sensitivity` 提供敏感性分析（单变量/多变量龙卷风图）[interface-design-rules.md 7.2.4]
+  - 请求体：`{ "base_case", "variables": [{ "name", "min", "max", "steps" }], "target_metric" }`
+  - 响应体：`{ "tornado_chart_data", "sensitivity_coefficients": [{ "variable", "coefficient" }], "critical_variables": [...] }`
+  - **验收标准：** 龙卷风图数据完整，敏感性系数计算准确率 ≥ 99%
+- **FR-SP-15 (P2):** 系统可以通过 REST API `GET /plans/{id}/compare` 提供情景对比（3 方案并排对比）[interface-design-rules.md 7.2.5]
+  - 请求参数：`plan_id`（路径参数）、`scenarios`（查询参数，最多 3 个方案 ID）
+  - 响应体：`{ "scenarios": [{ "id", "name", "metrics", "risks", "assumptions" }], "comparison_matrix": [...], "recommendation" }`
+  - **验收标准：** 3 方案并排对比加载延迟 < 3s，对比指标覆盖财务/风险/资源维度
+- **FR-SP-16 (P2):** 系统可以通过 REST API `POST /reports/whitelabel` 提供白标品牌定制和 `POST /reports/regulatory` 提供监管报告导出 [interface-design-rules.md 7.2.8]
+  - 白标报告请求：`{ "plan_id", "brand": { "logo_url", "primary_color", "font_family", "company_name" }, "format": "pdf|markdown" }`
+  - 监管报告请求：`{ "plan_id", "report_type": "1104|EAST|SOX404", "period": "YYYY-QN" }`
+  - **验收标准：** 白标报告品牌元素准确率 100%，监管报告格式合规率 100%
+- **FR-SP-17 (P2):** 系统可以通过 REST API `GET /risk/heatmap` 提供风险热力图（高管视图核心可视化）[interface-design-rules.md 7.2.9]
+  - 请求参数：`plan_id`（查询参数）、`time_range`（可选）、`risk_category`（可选过滤）
+  - 响应体：`{ "heatmap": [{ "risk_id", "likelihood", "impact", "score", "category", "owner" }], "summary": { "high_risks_count", "medium_risks_count", "low_risks_count" } }`
+  - **验收标准：** 热力图数据更新延迟 < 2s，风险评分算法与 NFR 定义的评分公式一致
 
 ---
 
@@ -1837,6 +1863,9 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 - **FR-UI-05 (P0):** 用户可以查看 Checkpoint 摘要并修正关键参数后恢复运行 [or.md 六.6]
 - **FR-UI-06 (P0):** 系统可以展示溯源树（从结论逐层展开至原始数据）[or.md 六.9]
 - **FR-UI-07 (P0):** 系统可以支持高管简化视图（仪表盘/审批中心/审计摘要）[or.md 六.4]
+  - **三视图架构补充：** 高管视图是三视图之一，完整三视图定义见 FR-IF-05
+  - 高管视图核心功能：3 个关键指标仪表盘（战略进度/风险评分/预算消耗）、审批中心（Checkpoint 审批/修正确认）、审计摘要（合规告警/异常操作）
+  - **验收标准：** 高管视图加载延迟 < 2s，关键指标实时更新（WebSocket 推送）
 
 **P1 (V1) - 5 项：** 决策可视化、分支管理和多语言支持
 
@@ -1844,7 +1873,9 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 - **FR-UI-09 (P1):** 系统可以创建/切换/删除分支，提供分支差异对比视图 [or.md 六.13]
 - **FR-UI-10 (P1):** 系统可以展示 Checkpoint 恢复模式选择界面（影响范围、推荐模式、风险提示）[or.md 六.14]
 - **FR-UI-11 (P1):** 系统可以支持无障碍设计（WCAG 2.1 AA，键盘导航，屏幕阅读器兼容）[or.md 六.11]
+  - **详细规范补充：** 见 FR-IF-06（WCAG 2.1 AA 合规详细验收标准）
 - **FR-UI-12 (P1):** 系统可以支持多语言界面（中文/英文切换）[or.md 六.12]
+  - **详细规范补充：** 见 FR-IF-07（多语言术语表/切换延迟/准确率）
 
 **P2 (V2) - 1 项：** 高级决策影响分析
 
@@ -1944,23 +1975,74 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 ---
 
+### 11. 接口与协议（IF - Interface & Protocol）[interface-design-rules.md v2.1]
+
+**P0 (MVP) - 4 项：** CLI 七原则合规、Skills 三级加载、SAP 协议 Schema 定义、事件监听基础
+
+- **FR-IF-01 (P0):** 系统可以保证 CLI 接口符合七条核心原则（P1-P7）[interface-design-rules.md 1.2]
+  - P1: CLI 是 LLM 的母语 — 内部工具 100% 有 CLI 入口
+  - P2: Skills = 渐进式披露 — Agent 启动上下文 < 500 tokens
+  - P3: Skill = SOP — 23 种工具各有完整 SOP（操作流程/失败处理/兜底策略）
+  - P4: MCP 退居生态层 — MVP 阶段 MCP 代码量 = 0
+  - P5: Less scaffolding — 工具选择准确率 ≥ 85%，避免硬编码分类器
+  - P6: 负向触发条件 — 误触发率 < 5%，明确"何时不应触发"
+  - P7: input_examples 驱动 — 复杂工具提供 1-5 个典型输入示例，工具调用准确率 ≥ 90%
+  - **验收标准：** CLI 命令覆盖 6 个服务模块（document/tool/agent/plan/checkpoint/archive），所有命令支持 `--yes`/`--dry-run`/`--mock` Agent 参数
+- **FR-IF-02 (P0):** 系统可以执行 Skills 三级渐进式加载（L1 元数据→L2 SOP→L3 资源）[interface-design-rules.md 4]
+  - L1: TOOLS.md (< 200 tokens) — 工具元数据清单，Agent 启动时加载
+  - L2: SKILL.md (< 500 行) — SOP 完整定义，任务匹配后加载
+  - L3: scripts/references — 按需加载资源（Python 脚本/理论参考/模板）
+  - **验收标准：** Agent 启动上下文 < 500 tokens，SkillSelector 推荐准确率 ≥ 85%（关键词 40% + 语义 60% 融合排序）
+- **FR-IF-03 (P0):** 系统可以定义 SAP（sisys Agent Protocol）消息 Schema，支持 Agent 间辩论/裁决/公共黑板 [interface-design-rules.md 6]
+  - 消息类型：REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE
+  - 消息优先级：LOW/NORMAL/HIGH/URGENT
+  - 公共黑板：支持 MVCC（多版本并发控制），中间结论附带置信度与引用源
+  - **验收标准：** SAPMessage Pydantic 模型定义完成，包含 message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible 字段
+- **FR-IF-04 (P0):** 系统可以监听 10 种领域事件并触发下游用例，保证事件处理幂等性 [interface-design-rules.md 12]
+  - 监听事件：DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered/IsolationLevelSwitched/CheckpointRecovered/RoutingDecided
+  - 幂等性保证：基于 event_id 的 Redis 缓存检查（TTL 7 天），支持事件重放与失败重试
+  - 双通道分发：Redis Pub/Sub（实时通知）+ RabbitMQ（持久化）
+  - **验收标准：** 事件处理成功率 ≥ 99%，幂等性检查准确率 100%，失败自动重试（最多 3 次）
+
+**P1 (V1) - 3 项：** 三视图 Web 前端、无障碍合规、多语言切换
+
+- **FR-IF-05 (P1):** 系统可以提供 Web 前端三视图架构（高管视图/分析师视图/企业战略与市场人员视图）[interface-design-rules.md 13]
+  - 高管视图：仪表盘（3 个关键指标）、审批中心、审计摘要、风险热力图
+  - 分析师视图：专业工具执行、溯源树展示（Bounding Box 级）、报告生成、分支管理
+  - 企业战略与市场人员视图：流程标准化执行、Checkpoint 管理、证据包打包
+  - **验收标准：** 三视图路由隔离，用户角色自动匹配对应视图，视图切换延迟 < 100ms
+- **FR-IF-06 (P1):** 系统可以支持无障碍设计，符合 WCAG 2.1 AA 标准 [interface-design-rules.md 13.4]
+  - 键盘导航：100% 功能可通过纯键盘操作
+  - 屏幕阅读器：兼容 NVDA/JAWS/VoiceOver，ARIA 标签完整
+  - 色盲友好配色：不依赖颜色传递信息，颜色+文字双重编码
+  - 对比度：文本与背景对比度 ≥ 4.5:1，焦点环 2px 以上
+  - **验收标准：** 无障碍自动化测试通过率 100%，屏幕阅读器功能可用性 100%
+- **FR-IF-07 (P1):** 系统可以支持多语言中英文界面切换 [interface-design-rules.md 13.5]
+  - 术语表统一：战略领域术语中英文对照，覆盖 100% 领域概念
+  - 界面切换：中/英文一键切换，切换延迟 < 100ms
+  - 翻译准确率：专业术语翻译准确率 ≥ 95%，经领域专家审核
+  - **验收标准：** 随机抽样 1000 条 UI 文本，翻译准确率 ≥ 95%
+
+---
+
 ### 功能需求汇总矩阵
 
-**基于系统整体视角和商业价值视角双维度评估，122 项功能需求优先级划分如下：**
+**基于系统整体视角和商业价值视角双维度评估，133 项功能需求优先级划分如下：**
 
 | 能力领域 | 缩写 | P0 (MVP) | P1 (V1) | P2 (V2) | P3 (V3+) | 总计 | or.md 溯源 |
 |---------|------|---------|--------|--------|---------|------|----------|
 | 文档与数据管理 | FR-DM | 8 | 4 | 3 | - | 15 | 二.1-二.2 |
-| 智能检索与知识发现 | FR-SR | 8 | 5 | 2 | - | 15 | 二.3-二.7, 一.5.(5) |
+| 智能检索与知识发现 | FR-SR | 8 | 5 | 3 | - | 16 | 二.3-二.7, 一.5.(5) |
 | 战略工具箱 | FR-ST | 5 | 4 | 2 | - | 11 | 三.1-三.10, 五.3 |
 | Agent 协作 | FR-AC | 6 | 8 | 2 | - | 16 | 四.1-四.15 |
-| 战略规划流程 | FR-SP | 4 | 6 | 2 | - | 12 | 五.1-五.10 |
+| 战略规划流程 | FR-SP | 4 | 6 | 7 | - | 17 | 五.1-五.10 |
 | 用户交互与报告 | FR-UI | 7 | 5 | 1 | - | 13 | 六.1-六.14 |
 | 系统管理与合规 | FR-SC | 8 | 4 | 2 | - | 14 | 七.1-七.6, 八.4 |
 | 成本与性能优化 | FR-CP | 4 | 6 | 2 | - | 12 | 二.12-二.13, 四.13-四.15 |
 | 战略档案库与长期记忆 | FR-SA | 3 | 4 | 2 | 1 | 10 | 二.8, 四.10-四.14, 一.2 |
-| 架构约束 | FR-R | 4 | 0 | 0 | - | 4 | 八.1-八.8 |
-| **总计** | - | **57** | **46** | **18** | **1** | **122** | - |
+| 架构约束 | FR-AR | 4 | 0 | 0 | - | 4 | 八.1-八.8 |
+| 接口与协议 | FR-IF | 4 | 3 | 0 | - | 7 | interface-design-rules.md v2.1 |
+| **总计** | - | **61** | **49** | **24** | **1** | **135** | - |
 
 **优先级划分原则：**
 
@@ -2240,7 +2322,7 @@ NFR 定义系统**表现得多好**，而不是它**必须做什么**。它们�
 | **NFR-INT-02** | 预置集成适配器 | ≥5 个（ERP/CRM/OA 各至少 1 个） | P1 |
 | **NFR-INT-03** | 外部数据源接入 | ≥3 个（工商/税务/专利等） | P1 |
 | **NFR-INT-04** | 集成失败率 | <1%，失败自动重试（最多 3 次），重试成功率≥80% | P0 |
-| **NFR-INT-05** | MCP/A2A 协议兼容性 | 向后兼容 1-2 个版本，协议兼容性测试通过 | P0 |
+| **NFR-INT-05** | SAP 协议兼容性 | 向后兼容 1-2 个版本，协议兼容性测试通过 | P1 |
 
 **测试方法：**
 - 集成测试：与 5 个预置适配器集成，验证数据流正确性
@@ -2262,6 +2344,27 @@ NFR 定义系统**表现得多好**，而不是它**必须做什么**。它们�
 - 无障碍测试：使用屏幕阅读器（如 NVDA/JAWS）验证 100% 功能可用
 - 键盘导航测试：不使用鼠标，仅用键盘完成所有操作
 - 多语言测试：随机抽样 1000 条 UI 文本，验证翻译准确率≥95%
+
+---
+
+### 接口性能（Interface Performance）
+
+**业务价值：** CLI/Skills/SAP/事件监听/REST API 是 sisys 的核心接口层，接口性能直接影响用户体验和系统可靠性
+
+| NFR 编号 | 需求 | 验收标准 | 优先级 | 阶段 |
+|---------|------|---------|-------|------|
+| **NFR-IF-01** | CLI 命令响应延迟 P95 | < 1s（MVP），< 500ms（V1），< 300ms（V2）；覆盖 document/tool/agent/plan/checkpoint/archive 6 个服务模块 | P0 | MVP |
+| **NFR-IF-02** | Skills 加载上下文大小 | Agent 启动上下文 < 500 tokens（L1 TOOLS.md < 200 tokens + L2 SKILL.md 按需加载）；单个 SKILL.md < 500 行 | P0 | MVP |
+| **NFR-IF-03** | SAP 消息传递延迟 P95 | < 200ms（V1 多 Agent 协作），消息队列积压 < 100 条；公共黑板 MVCC 读写延迟 < 50ms | P1 | V1 |
+| **NFR-IF-04** | 事件监听处理成功率 | ≥ 99%（10 种领域事件），幂等性检查准确率 100%，事件重放成功率 ≥ 99.5% | P0 | MVP |
+| **NFR-IF-05** | REST API 可用性 | ≥ 99.5%（V1），≥ 99.9%（V2）；OpenAPI 3.1 契约测试通过率 100%；API 速率限制准确率 100% | P0 | MVP |
+
+**测试方法：**
+- CLI 延迟测试：对 6 个服务模块各执行 100 次命令，测量 P95 延迟分布
+- Skills 上下文测试：Agent 启动后测量实际加载的 token 数量，验证 < 500 tokens
+- SAP 消息测试：模拟 1000 次 Agent 间消息传递，测量 P95 延迟和队列积压
+- 事件监听测试：模拟 10000 次领域事件发布，验证处理成功率 ≥ 99% 和幂等性 100%
+- REST API 测试：连续运行 30 天测量可用性，OpenAPI 契约测试覆盖所有端点
 
 ---
 
@@ -2289,9 +2392,10 @@ NFR 定义系统**表现得多好**，而不是它**必须做什么**。它们�
 | 合规性 | 5 | 2 | 2 | 9 | 增加 NFR-COMP-09（完整审计追踪），NFR-COMP-02 明确 MVP 用 PostgreSQL 审计表 |
 | 可靠性 | 4 | 2 | 0 | 6 | NFR-REL-05/06 改为 P1（CUSUM/成本熔断是 V1 能力） |
 | 可扩展性 | 1 | 3 | 0 | 4 | 保持不变，多租户隔离是 MVP 必需 |
-| 集成性 | 3 | 2 | 0 | 5 | 保持不变，API/MCP 基础是 MVP 必需 |
+| 集成性 | 3 | 2 | 0 | 5 | 保持不变，API 基础是 MVP 必需，SAP 协议 V1 实现 |
 | 可访问性 | 0 | 2 | 0 | 2 | 保持不变，V1 支持 |
-| **总计** | **25** | **13** | **2** | **40** | 更符合 roadmap 阶段化目标 |
+| 接口性能 | 4 | 1 | 0 | 5 | 新增 NFR-IF 类别（CLI/Skills/SAP/事件/REST API 性能） |
+| **总计** | **29** | **14** | **2** | **45** | 更符合 roadmap 阶段化目标 |
 
 **修正原则：**
 
@@ -2330,11 +2434,12 @@ NFR 定义系统**表现得多好**，而不是它**必须做什么**。它们�
 | 可扩展性 | 扩展测试 | 10+ scale tests | V1 前 | 1 项 (MVP) | 3 项 (V1) |
 | 集成性 | 集成测试 + 契约测试 | 25+ integration tests | 每 Sprint | 3 项 (MVP) | 2 项 (V1) |
 | 可访问性 | 无障碍测试 | 10+ accessibility tests | V1 前 | - | 2 项 (V1) |
-| **总计** | - | **145+ tests** | - | **25 项 P0** | **13 项 P1 + 2 项 P2** |
+| 接口性能 | CLI 延迟 + Skills 上下文 + 事件监听 + API 可用性 | 20+ interface tests | 每 Sprint | 4 项 (MVP) | 1 项 (V1) |
+| **总计** | - | **165+ tests** | - | **29 项 P0** | **14 项 P1 + 2 项 P2** |
 
 **测试阶段说明：**
-- **MVP 测试（P0）：** 25 项 NFR 测试，聚焦基础性能/安全/合规，确保 MVP 达到 roadmap 定义的 99% 可用性/<800ms 检索延迟
-- **V1 测试（P1）：** 13 项 NFR 测试，增加语义缓存/性能漂移检测/CUSUM 等 V1 能力验证
+- **MVP 测试（P0）：** 29 项 NFR 测试，聚焦基础性能/安全/合规/接口性能，确保 MVP 达到 roadmap 定义的 99% 可用性/<800ms 检索延迟/CLI P95<1s
+- **V1 测试（P1）：** 14 项 NFR 测试，增加语义缓存/性能漂移检测/CUSUM/SAP 消息延迟等 V1 能力验证
 - **V2 测试（P2）：** 2 项 NFR 测试，完整审计追踪可视化和银保监会规范验证
 
 ---
@@ -2352,12 +2457,14 @@ NFR 定义系统**表现得多好**，而不是它**必须做什么**。它们�
 | 可扩展性 | ¥10-20 万 | ¥20-30 万 | - | ¥30-50 万 | MVP/V1 | MVP 多租户基础，V1 K8s/监控 |
 | 集成性 | ¥30-50 万 | ¥20-50 万 | - | ¥50-100 万 | MVP/V1 | MVP API 基础，V1 适配器开发 |
 | 可访问性 | - | ¥10-20 万 | - | ¥10-20 万 | V1 | 无障碍设计 |
-| **总计** | **¥150-250 万** | **¥120-210 万** | **¥20-30 万** | **¥290-490 万** | - | P0 级约¥150-250 万 |
+| 接口性能 | ¥15-25 万 | ¥10-15 万 | - | ¥25-40 万 | MVP/V1/V2 | CLI 性能优化/Skills 上下文控制/SAP 消息队列/事件监听框架 |
+| **总计** | **¥165-275 万** | **¥130-225 万** | **¥20-30 万** | **¥315-530 万** | - | P0 级约¥165-275 万 |
 
 **成本修正说明：**
-- P0 成本从¥150-260 万调整为¥150-250 万（基本持平）
-- P1 成本从¥90-140 万增加至¥120-210 万（增加语义缓存/性能漂移检测/CUSUM 等 V1 能力）
-- P2 成本从¥0 增加至¥20-30 万（增加完整审计追踪可视化）
+- P0 成本从¥150-260 万调整为¥165-275 万（增加接口性能 MVP 基础能力）
+- P1 成本从¥90-140 万增加至¥130-225 万（增加语义缓存/性能漂移检测/CUSUM/SAP 消息等 V1 能力）
+- P2 成本保持¥20-30 万（完整审计追踪可视化和银保监会规范验证）
+- 新增接口性能类别总成本 ¥25-40 万（CLI 延迟优化/Skills 上下文控制/SAP 消息/事件监听/REST API 可用性）
 - 更符合 roadmap.md 定义的阶段化投入策略
 
 ---

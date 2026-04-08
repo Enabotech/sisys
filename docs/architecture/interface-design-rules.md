@@ -16,7 +16,7 @@
 4. [CLI 接口设计规范](#4-cli-接口设计规范)
 5. [Skills 渐进式加载机制](#5-skills-渐进式加载机制)
 6. [MCP 外部生态接口](#6-mcp-外部生态接口)
-7. [A2A Agent 间通信协议](#7-a2a-agent-间通信协议)
+7. [SAP Agent 间通信协议](#7-sap-agent-间通信协议)
 8. [REST API 集成接口](#8-rest-api-集成接口)
 9. [LLM 接入协议](#9-llm-接入协议)
 10. [工具间调用协议](#10-工具间调用协议)
@@ -116,7 +116,7 @@ sisys 采用 **"CLI + Skills 为内核，MCP 为外延"** 的接口架构哲学�
 │  └──────────────────────────────────────┘                           │
 │                                                                     │
 │  ┌──────────────────────────────────────┐                           │
-│  │   A2A 层（V1+，Agent 间通信）          │  ← 横向协作               │
+│  │   SAP 层（V1+，Agent 间通信）          │  ← 横向协作               │
 │  │   自定义消息协议 + mTLS               │                           │
 │  │   用于：多 Agent 协作/辩论/仲裁        │                           │
 │  └──────────────────────────────────────┘                           │
@@ -136,7 +136,7 @@ sisys 采用 **"CLI + Skills 为内核，MCP 为外延"** 的接口架构哲学�
 | **CLI** | 系统内部能力暴露 | 用户 + Agent | 外→内 | MVP | **P0** |
 | **Skills** | Agent 行为知识（SOP） | Agent 内部 | 内部 | MVP | **P0** |
 | **REST API** | 外部系统集成 | 第三方系统 | 外→内 | MVP | **P0** |
-| **A2A** | Agent 间通信 | Agent 之间 | 横向 | V1 | **P1** |
+| **SAP** | Agent 间通信 | Agent 之间 | 横向 | V1 | **P1** |
 | **LLM Adapter** | 统一 LLM 调用 | 系统内部 | 内→外 | MVP | **P0** |
 | **MCP** | 外部 Agent 生态 | 外部 Agent | 外→内 | V2+ | **P2** |
 
@@ -149,7 +149,7 @@ Skills ──→ Agent ──→ ToolService ──→ Domain
               │
 LLM Adapter ──→ Agent（推理时调用）
               │
-A2A ──→ Agent 之间（协作时调用）
+SAP ──→ Agent 之间（协作时调用）
               │
 MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 ```
@@ -897,7 +897,7 @@ Agent 启动
 | 版本 | MCP 角色 | 启用场景 | 理由 |
 |------|---------|---------|------|
 | **MVP** | ❌ 不启用 | - | 内部走 CLI + Skills，100% 覆盖 |
-| **V1** | ❌ 不启用 | - | 多 Agent 协作走 A2A 协议 |
+| **V1** | ❌ 不启用 | - | 多 Agent 协作走 SAP 协议 |
 | **V2+** | ✅ 可选启用 | 外部 Agent 生态集成 | 企业级统一权限管控 |
 | **V3+** | ✅ 建议启用 | 跨系统工具平台对接 | 与用友/金蝶/华为云集成 |
 
@@ -1532,7 +1532,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 | **REST API** | `/api/v1/` | URL 路径包含版本号 |
 | **Skills** | `SKILL.md` frontmatter `version` | 向后兼容 1 个主版本 |
 | **MCP** | `registry.yaml` version | 向后兼容 1-2 个版本 |
-| **A2A** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
+| **SAP** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
 | **LLM Adapter** | LiteLLM 版本 | 跟随 LiteLLM 升级 |
 
 ### 11.2 破坏性变更流程
@@ -1552,7 +1552,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 | **API 契约** | Schemathesis | OpenAPI 3.1 验证 | 100% |
 | **Skill 契约** | jsonschema | SKILL.md Schema 验证 | 100% |
 | **MCP 契约** | jsonschema | 工具输入/输出 Schema | 100% |
-| **A2A 契约** | Pydantic 模型 | 消息格式验证 | 100% |
+| **SAP 契约** | Pydantic 模型 | 消息格式验证 | 100% |
 | **事件契约** | Pydantic 模型 | 领域事件 Schema | 100% |
 
 ---
@@ -1687,7 +1687,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | 任务 | 交付物 | Story 关联 |
 |------|-------|-----------|
 | 补全 20 个 SKILL.md | `skills/` 完整 | Story 4.x |
-| 实现 A2A 协议 | `domain/agent/a2a.py` | Story 9.x |
+| 实现 SAP 协议 | `domain/agent/sap.py` | Story 9.x |
 | 实现多 Agent 协作 | SYS Agent 裁决 | Story 9.6 |
 | 实现 Skill 版本管理 | 版本注册 + 回滚 | Story 4.6 |
 
@@ -1885,7 +1885,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | **REST API** | `/api/v1/` | URL 路径包含版本号 |
 | **Skills** | `SKILL.md` frontmatter `version` | 向后兼容 1 个主版本 |
 | **MCP** | `registry.yaml` version | 向后兼容 1-2 个版本 |
-| **A2A** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
+| **SAP** | 消息头 `protocol_version` | 向后兼容 1 个版本 |
 | **LLM Adapter** | LiteLLM 版本 | 跟随 LiteLLM 升级 |
 | **领域事件** | `event_schema_version` | 向后兼容 1-2 个版本 |
 
@@ -1906,7 +1906,7 @@ GET    /api/v1/system/metrics               # 监控指标
 | **API 契约** | Schemathesis | OpenAPI 3.1 验证 | 100% |
 | **Skill 契约** | jsonschema | SKILL.md Schema 验证 | 100% |
 | **MCP 契约** | jsonschema | 工具输入/输出 Schema | 100% |
-| **A2A 契约** | Pydantic 模型 | 消息格式验证 | 100% |
+| **SAP 契约** | Pydantic 模型 | 消息格式验证 | 100% |
 | **事件契约** | Pydantic 模型 | 领域事件 Schema | 100% |
 
 ---
@@ -2045,7 +2045,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | 任务 | 交付物 | Story 关联 | or.md 追溯 |
 |------|-------|-----------|-----------|
 | 补全 20 个 SKILL.md | `skills/` 完整 | Story 4.x | or.md 1.2.2(3) |
-| 实现 A2A 协议 | `domain/agent/a2a.py` | Story 9.x | or.md 1.3(3) |
+| 实现 SAP 协议 | `domain/agent/sap.py` | Story 9.x | or.md 1.3(3) |
 | 实现多 Agent 协作 | SYS Agent 裁决 | Story 9.6 | or.md 1.3(3) |
 | 实现 Skill 版本管理 | 版本注册 + 回滚 | Story 4.6 | or.md 1.2.1(2) |
 | 实现 Web 前端三视图 | 高管/分析师/战略人员视图 | Story 6.9/6.10 | or.md 1.4.1(4)-(6) |
