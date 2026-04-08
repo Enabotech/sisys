@@ -360,8 +360,6 @@ jobs:
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root
-    # 手动强制重建时跳过检测
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.force_rebuild != 'true' }}
     outputs:
       l2: ${{ steps.filter.outputs.l2 }}
       l3: ${{ steps.filter.outputs.l3 }}
