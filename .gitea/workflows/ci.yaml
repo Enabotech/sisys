@@ -392,12 +392,15 @@ jobs:
     runs-on: buildx
     timeout-minutes: 30
     needs: [detect-changes, integration-tests, security-scan, code-quality]
-    # ✅ 精准触发: 任一镜像相关文件变更时构建，或手动强制重建
+    # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
+    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
-        || needs.detect-changes.outputs.l2 == 'true'
-        || needs.detect-changes.outputs.l3 == 'true'
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || (github.event_name != 'workflow_dispatch' && (
+          needs.detect-changes.outputs.l2 == 'true'
+          || needs.detect-changes.outputs.l3 == 'true'
+        ))
       }}
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
