@@ -390,6 +390,7 @@ jobs:
   build-images:
     name: "🏗️ 构建镜像"
     runs-on: buildx
+    timeout-minutes: 30
     needs: [detect-changes, integration-tests, security-scan, code-quality]
     # ✅ 精准触发: 任一镜像相关文件变更时构建，或手动强制重建
     if: >-
