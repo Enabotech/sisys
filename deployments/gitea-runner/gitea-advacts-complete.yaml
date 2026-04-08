@@ -175,7 +175,7 @@ spec:
       containers:
         # Container 1: act_runner (Runner 管理容器)
         - name: runner
-          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3.0-dind-rootless
+          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3-dind-rootless
           imagePullPolicy: IfNotPresent
 
           # 容器级别安全上下文（非特权）
@@ -311,7 +311,7 @@ spec:
 
         # Container 2: docker-dind (Docker Daemon)
         - name: docker-dind
-          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3.0-dind-rootless
+          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3-dind-rootless
           imagePullPolicy: IfNotPresent
 
           # 安全上下文（特权模式 - K3s/WSL2 兼容性）
