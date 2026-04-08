@@ -285,7 +285,7 @@ so that **团队可以进行代码版本管理和协作**。
 
 ### 网络架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#网络架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#网络架构)
 
 ```
 互联网 (80/443)
@@ -363,7 +363,7 @@ spec:
 
 ### 安全配置
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统安全架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统安全架构)
 
 **TLS/SSL 安全:**
 - [ ] TLS 1.3 强制启用 (禁用 TLS 1.2 及以下版本)
@@ -417,7 +417,7 @@ spec:
 
 ### 与 Harbor/ArgoCD 集成准备
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统组件架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统组件架构)
 
 **集成架构图:**
 
@@ -520,7 +520,7 @@ argocd repo add https://gitea.sisys.local/sisys/sisys.git \
 
 ### 存储架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#存储架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#存储架构)
 
 ```
 ┌─────────────────────┐
@@ -702,7 +702,7 @@ sisys/
 
 **MVP 临时配置 vs 架构规划:**
 
-| 资源项 | MVP 配置 | 架构规划 (architecture-epic0.md) | 说明 |
+| 资源项 | MVP 配置 | 架构规划 (epic0-design.md) | 说明 |
 |--------|---------|--------------------------------|------|
 | **CPU** | 1 Core | 2 核 | MVP 阶段节省资源，V1 阶段根据监控扩容 |
 | **内存** | 2Gi | 2GB | 符合架构规划最低要求 |
@@ -865,7 +865,7 @@ sisys/
 
 **内部文档:**
 - [Source: epics_v1.0.md#Story 0.5: Gitea 代码托管](../../planning-artifacts/epics_v1.0.md#Story-05-Gitea-代码托管)
-- [Source: architecture-epic0.md#开发-ci-cd-系统详细架构](../../planning-artifacts/architecture-epic0.md#-开发-ci-cd-系统详细架构)
+- [Source: epic0-design.md#开发-ci-cd-系统详细架构](../../planning-artifacts/epic0-design.md#-开发-ci-cd-系统详细架构)
   - 网络架构、存储架构、安全架构、资源分配、CI/CD Pipeline 架构
 - [Source: architecture.md#12 技术栈详细选型](../../planning-artifacts/architecture.md#12-技术栈详细选型)
 - [Source: sprint-status.yaml#development_status](../../implementation-artifacts/sprint-status.yaml#development_status)

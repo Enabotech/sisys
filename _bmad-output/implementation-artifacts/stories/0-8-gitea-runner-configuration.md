@@ -932,7 +932,7 @@ kubectl delete namespace gitea-actions
 ### References
 
 - [Source: _bmad-output/planning-artifacts/sprint-status.yaml#development_status] - 故事来源和状态追踪
-- [Source: _bmad-output/planning-artifacts/architecture-epic0.md] - Epic 0 架构设计（开发 CI/CD 系统）
+- [Source: _bmad-output/planning-artifacts/epic0-design.md] - Epic 0 架构设计（开发 CI/CD 系统）
 - [Source: _bmad-output/implementation-artifacts/stories/0-5-gitea-code-hosting.md] - Gitea 部署详情
 - [Source: _bmad-output/implementation-artifacts/stories/0-6-harbor-image-registry.md] - Harbor 部署详情
 - [Source: _bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md] - ArgoCD 部署详情

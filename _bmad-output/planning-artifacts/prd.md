@@ -1747,7 +1747,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 - **FR-SR-14 (P2):** 系统可以管理引用数据的时效性，超 12 个月数据自动标记"数据陈旧"并降权 [or.md 二.7.(3)]
 - **FR-SR-15 (P2):** 系统可以执行实体关联查询、路径查询、社区发现算法（Louvain/Label Propagation）[or.md 一.5.(5)]
-- **FR-SR-16 (P2):** 系统可以通过 REST API 提供高保真溯源接口 `GET /documents/{id}/trace`，返回 Bounding Box 坐标（x, y, width, height）[interface-design-rules.md 7.2.1]
+- **FR-SR-16 (P2):** 系统可以通过 REST API 提供高保真溯源接口 `GET /documents/{id}/trace`，返回 Bounding Box 坐标（x, y, width, height）[interface-design.md 7.2.1]
   - 请求参数：`document_id`（路径参数）、`citation_id`（查询参数，可选）
   - 响应格式：`{ "document_id", "page_number", "bounding_boxes": [{ "element_id", "type": "text|table|image", "x", "y", "width", "height", "confidence" }], "source_text", "citation_chain": [...] }`
   - **验收标准：** Bounding Box 坐标准确率 ≥ 95%，溯源跳转延迟 < 30 秒（从结论到原始文档坐标点）
@@ -1829,23 +1829,23 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 - **FR-SP-11 (P2):** 系统可以执行 BEM 六阶段流程（澄清战略方向→导出战略举措→导出衡量指标→确定年度措施→分解目标→导出重点工作计划）[or.md 五.3]
 - **FR-SP-12 (P2):** 系统可以将 SP 输出结构化映射为 BP 输入（战略解码器）[or.md 五.3]
-- **FR-SP-13 (P2):** 系统可以通过 REST API `POST /financial/analyze` 提供财务量化分析（NPV/IRR/现金流）[interface-design-rules.md 7.2.4]
+- **FR-SP-13 (P2):** 系统可以通过 REST API `POST /financial/analyze` 提供财务量化分析（NPV/IRR/现金流）[interface-design.md 7.2.4]
   - 请求体：`{ "project_name", "cash_flows": [{ "year", "amount" }], "discount_rate", "initial_investment" }`
   - 响应体：`{ "npv", "irr", "payback_period", "roi", "sensitivity_analysis_url" }`
   - **验收标准：** NPV/IRR 计算准确率 100%（与 Excel 公式对齐），分析延迟 < 5s
-- **FR-SP-14 (P2):** 系统可以通过 REST API `POST /financial/sensitivity` 提供敏感性分析（单变量/多变量龙卷风图）[interface-design-rules.md 7.2.4]
+- **FR-SP-14 (P2):** 系统可以通过 REST API `POST /financial/sensitivity` 提供敏感性分析（单变量/多变量龙卷风图）[interface-design.md 7.2.4]
   - 请求体：`{ "base_case", "variables": [{ "name", "min", "max", "steps" }], "target_metric" }`
   - 响应体：`{ "tornado_chart_data", "sensitivity_coefficients": [{ "variable", "coefficient" }], "critical_variables": [...] }`
   - **验收标准：** 龙卷风图数据完整，敏感性系数计算准确率 ≥ 99%
-- **FR-SP-15 (P2):** 系统可以通过 REST API `GET /plans/{id}/compare` 提供情景对比（3 方案并排对比）[interface-design-rules.md 7.2.5]
+- **FR-SP-15 (P2):** 系统可以通过 REST API `GET /plans/{id}/compare` 提供情景对比（3 方案并排对比）[interface-design.md 7.2.5]
   - 请求参数：`plan_id`（路径参数）、`scenarios`（查询参数，最多 3 个方案 ID）
   - 响应体：`{ "scenarios": [{ "id", "name", "metrics", "risks", "assumptions" }], "comparison_matrix": [...], "recommendation" }`
   - **验收标准：** 3 方案并排对比加载延迟 < 3s，对比指标覆盖财务/风险/资源维度
-- **FR-SP-16 (P2):** 系统可以通过 REST API `POST /reports/whitelabel` 提供白标品牌定制和 `POST /reports/regulatory` 提供监管报告导出 [interface-design-rules.md 7.2.8]
+- **FR-SP-16 (P2):** 系统可以通过 REST API `POST /reports/whitelabel` 提供白标品牌定制和 `POST /reports/regulatory` 提供监管报告导出 [interface-design.md 7.2.8]
   - 白标报告请求：`{ "plan_id", "brand": { "logo_url", "primary_color", "font_family", "company_name" }, "format": "pdf|markdown" }`
   - 监管报告请求：`{ "plan_id", "report_type": "1104|EAST|SOX404", "period": "YYYY-QN" }`
   - **验收标准：** 白标报告品牌元素准确率 100%，监管报告格式合规率 100%
-- **FR-SP-17 (P2):** 系统可以通过 REST API `GET /risk/heatmap` 提供风险热力图（高管视图核心可视化）[interface-design-rules.md 7.2.9]
+- **FR-SP-17 (P2):** 系统可以通过 REST API `GET /risk/heatmap` 提供风险热力图（高管视图核心可视化）[interface-design.md 7.2.9]
   - 请求参数：`plan_id`（查询参数）、`time_range`（可选）、`risk_category`（可选过滤）
   - 响应体：`{ "heatmap": [{ "risk_id", "likelihood", "impact", "score", "category", "owner" }], "summary": { "high_risks_count", "medium_risks_count", "low_risks_count" } }`
   - **验收标准：** 热力图数据更新延迟 < 2s，风险评分算法与 NFR 定义的评分公式一致
@@ -1975,11 +1975,11 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 ---
 
-### 11. 接口与协议（IF - Interface & Protocol）[interface-design-rules.md v2.1]
+### 11. 接口与协议（IF - Interface & Protocol）[interface-design.md v2.1]
 
 **P0 (MVP) - 4 项：** CLI 七原则合规、Skills 三级加载、SAP 协议 Schema 定义、事件监听基础
 
-- **FR-IF-01 (P0):** 系统可以保证 CLI 接口符合七条核心原则（P1-P7）[interface-design-rules.md 1.2]
+- **FR-IF-01 (P0):** 系统可以保证 CLI 接口符合七条核心原则（P1-P7）[interface-design.md 1.2]
   - P1: CLI 是 LLM 的母语 — 内部工具 100% 有 CLI 入口
   - P2: Skills = 渐进式披露 — Agent 启动上下文 < 500 tokens
   - P3: Skill = SOP — 23 种工具各有完整 SOP（操作流程/失败处理/兜底策略）
@@ -1988,17 +1988,17 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
   - P6: 负向触发条件 — 误触发率 < 5%，明确"何时不应触发"
   - P7: input_examples 驱动 — 复杂工具提供 1-5 个典型输入示例，工具调用准确率 ≥ 90%
   - **验收标准：** CLI 命令覆盖 6 个服务模块（document/tool/agent/plan/checkpoint/archive），所有命令支持 `--yes`/`--dry-run`/`--mock` Agent 参数
-- **FR-IF-02 (P0):** 系统可以执行 Skills 三级渐进式加载（L1 元数据→L2 SOP→L3 资源）[interface-design-rules.md 4]
+- **FR-IF-02 (P0):** 系统可以执行 Skills 三级渐进式加载（L1 元数据→L2 SOP→L3 资源）[interface-design.md 4]
   - L1: TOOLS.md (< 200 tokens) — 工具元数据清单，Agent 启动时加载
   - L2: SKILL.md (< 500 行) — SOP 完整定义，任务匹配后加载
   - L3: scripts/references — 按需加载资源（Python 脚本/理论参考/模板）
   - **验收标准：** Agent 启动上下文 < 500 tokens，SkillSelector 推荐准确率 ≥ 85%（关键词 40% + 语义 60% 融合排序）
-- **FR-IF-03 (P0):** 系统可以定义 SAP（sisys Agent Protocol）消息 Schema，支持 Agent 间辩论/裁决/公共黑板 [interface-design-rules.md 6]
+- **FR-IF-03 (P0):** 系统可以定义 SAP（sisys Agent Protocol）消息 Schema，支持 Agent 间辩论/裁决/公共黑板 [interface-design.md 6]
   - 消息类型：REQUEST/RESPONSE/NOTIFICATION/BROADCAST/DEBATE
   - 消息优先级：LOW/NORMAL/HIGH/URGENT
   - 公共黑板：支持 MVCC（多版本并发控制），中间结论附带置信度与引用源
   - **验收标准：** SAPMessage Pydantic 模型定义完成，包含 message_id/conversation_id/sender_id/receiver_id/message_type/priority/content/correlation_id/isolation_level/blackboard_visible 字段
-- **FR-IF-04 (P0):** 系统可以监听 10 种领域事件并触发下游用例，保证事件处理幂等性 [interface-design-rules.md 12]
+- **FR-IF-04 (P0):** 系统可以监听 10 种领域事件并触发下游用例，保证事件处理幂等性 [interface-design.md 12]
   - 监听事件：DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CorrectionApproved/StrategicDeviationWarning/HeartbeatTriggered/IsolationLevelSwitched/CheckpointRecovered/RoutingDecided
   - 幂等性保证：基于 event_id 的 Redis 缓存检查（TTL 7 天），支持事件重放与失败重试
   - 双通道分发：Redis Pub/Sub（实时通知）+ RabbitMQ（持久化）
@@ -2006,18 +2006,18 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 
 **P1 (V1) - 3 项：** 三视图 Web 前端、无障碍合规、多语言切换
 
-- **FR-IF-05 (P1):** 系统可以提供 Web 前端三视图架构（高管视图/分析师视图/企业战略与市场人员视图）[interface-design-rules.md 13]
+- **FR-IF-05 (P1):** 系统可以提供 Web 前端三视图架构（高管视图/分析师视图/企业战略与市场人员视图）[interface-design.md 13]
   - 高管视图：仪表盘（3 个关键指标）、审批中心、审计摘要、风险热力图
   - 分析师视图：专业工具执行、溯源树展示（Bounding Box 级）、报告生成、分支管理
   - 企业战略与市场人员视图：流程标准化执行、Checkpoint 管理、证据包打包
   - **验收标准：** 三视图路由隔离，用户角色自动匹配对应视图，视图切换延迟 < 100ms
-- **FR-IF-06 (P1):** 系统可以支持无障碍设计，符合 WCAG 2.1 AA 标准 [interface-design-rules.md 13.4]
+- **FR-IF-06 (P1):** 系统可以支持无障碍设计，符合 WCAG 2.1 AA 标准 [interface-design.md 13.4]
   - 键盘导航：100% 功能可通过纯键盘操作
   - 屏幕阅读器：兼容 NVDA/JAWS/VoiceOver，ARIA 标签完整
   - 色盲友好配色：不依赖颜色传递信息，颜色+文字双重编码
   - 对比度：文本与背景对比度 ≥ 4.5:1，焦点环 2px 以上
   - **验收标准：** 无障碍自动化测试通过率 100%，屏幕阅读器功能可用性 100%
-- **FR-IF-07 (P1):** 系统可以支持多语言中英文界面切换 [interface-design-rules.md 13.5]
+- **FR-IF-07 (P1):** 系统可以支持多语言中英文界面切换 [interface-design.md 13.5]
   - 术语表统一：战略领域术语中英文对照，覆盖 100% 领域概念
   - 界面切换：中/英文一键切换，切换延迟 < 100ms
   - 翻译准确率：专业术语翻译准确率 ≥ 95%，经领域专家审核
@@ -2041,7 +2041,7 @@ L4 硬隔离 ──────→ L3 软隔离 ──────→ L2 协作�
 | 成本与性能优化 | FR-CP | 4 | 6 | 2 | - | 12 | 二.12-二.13, 四.13-四.15 |
 | 战略档案库与长期记忆 | FR-SA | 3 | 4 | 2 | 1 | 10 | 二.8, 四.10-四.14, 一.2 |
 | 架构约束 | FR-AR | 4 | 0 | 0 | - | 4 | 八.1-八.8 |
-| 接口与协议 | FR-IF | 4 | 3 | 0 | - | 7 | interface-design-rules.md v2.1 |
+| 接口与协议 | FR-IF | 4 | 3 | 0 | - | 7 | interface-design.md v2.1 |
 | **总计** | - | **61** | **49** | **24** | **1** | **135** | - |
 
 **优先级划分原则：**
