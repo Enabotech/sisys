@@ -459,7 +459,7 @@ jobs:
             github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
             || needs.detect-changes.outputs.l2 == 'true'
           }}
-        run: poetry lock --no-update --no-interaction
+        run: poetry lock --no-interaction
 
       - name: 构建 L2 镜像
         if: >-
