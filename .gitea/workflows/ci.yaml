@@ -352,52 +352,54 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
-  # 阶段 5: 文件变更检测 (精准触发构建)
+  # 阶段 5: 文件变更检测 (精准触发 L2/L3 构建)
   # ===========================================================================
-  detect-image-changes:
-    name: "🔎 变更检测 - L3"
+  detect-changes:
+    name: "🔎 变更检测"
     runs-on: ubuntu2204
     # 手动强制重建时跳过检测
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.force_rebuild != 'true' }}
     outputs:
-      should_build: ${{ steps.filter.outputs.docker }}
+      l2: ${{ steps.filter.outputs.l2 }}
+      l3: ${{ steps.filter.outputs.l3 }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 检测镜像相关文件变更
+      - name: 检测相关文件变更
         uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            docker:
+            l2:
+              - 'docker/dockerfile.l2'
+              - 'pyproject.toml'
+              - 'poetry.lock'
+            l3:
               - 'docker/dockerfile.app'
               - 'src/**'
               - 'tests/**'
               - 'configs/**'
-              - 'pyproject.toml'
-              - 'poetry.lock'
               - '.env.example'
               - 'scripts/entrypoint.sh'
 
   # ===========================================================================
-  # 阶段 6: 镜像构建 (Docker Build 多阶段) — 仅在相关文件变更时触发
+  # 阶段 6: 镜像构建 (Docker Build 多阶段) — L2/L3 精准触发
   # ===========================================================================
-  build-image:
+  build-images:
     name: "🏗️ 构建镜像"
-    # ✅ 使用 DinD Runner 进行构建 ( 有完整的 Buildx 支持 )
     runs-on: buildx
-    needs: [detect-image-changes, integration-tests, security-scan, code-quality]
-    # ✅ 精准触发: 仅在镜像相关文件变更时构建，或手动强制重建
+    needs: [detect-changes, integration-tests, security-scan, code-quality]
+    # ✅ 精准触发: 任一镜像相关文件变更时构建，或手动强制重建
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
-        || needs.detect-image-changes.outputs.should_build == 'true'
+        || needs.detect-changes.outputs.l2 == 'true'
+        || needs.detect-changes.outputs.l3 == 'true'
       }}
     container:
-      # ✅ 使用 Layer 1 基础镜像进行构建
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
-      options: --user root --privileged  # ✅ 修复: 添加 --user root
+      options: --user root --privileged
       credentials:
         username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
         password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
@@ -408,27 +410,19 @@ jobs:
 
       - name: 配置 CA 链
         run: |
-          # 写入 Harbor CA
           mkdir -p /tmp/buildkit-certs
           printf '%s' "${{ secrets.HARBOR_CA_CRT }}" > /tmp/buildkit-certs/harbor-ca.crt
-
-          # 安装 Harbor CA 到系统信任链 ( Alpine )
           cp /tmp/buildkit-certs/harbor-ca.crt /usr/local/share/ca-certificates/harbor.crt
-          # 更新系统信任
           update-ca-certificates
-
-          # 生成 BuildKit 配置
           cat > buildkitd.toml <<EOF
           [registry."harbor.sisys.local"]
             ca = ["/tmp/buildkit-certs/harbor-ca.crt"]
           EOF
-
           echo "Docker 版本:"
           docker --version
           docker info
           docker buildx version
 
-      # ✅ 先登录 Harbor ( 因为 buildkit 镜像在 Harbor 中 )
       - name: 登录镜像仓库
         uses: docker/login-action@v3
         with:
@@ -454,22 +448,54 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
-          # Layer 3 应用镜像标签 (遵循标签命名规范)
+          echo "image_tag_l2=l2-${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
-          echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}"
 
-      - name: 构建推送镜像 - L3
+      # ---------- L2 构建 ----------
+      - name: 构建 L2 镜像
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || needs.detect-changes.outputs.l2 == 'true'
+          }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/dockerfile.l2
+          push: true
+          tags: |
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ steps.meta.outputs.image_tag_l2 }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.timestamp }}
+            sisys.image.layer="l2"
+            sisys.image.type="ci-dependency"
+          cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:l2-cache
+          cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:l2-cache,mode=min
+          provenance: false
+          platforms: linux/amd64
+          build-args: |
+            BASE_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
+
+      # ---------- L3 构建 ----------
+      - name: 构建 L3 镜像
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || needs.detect-changes.outputs.l3 == 'true'
+          }}
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/dockerfile.app
           push: true
           tags: |
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_L3_LATEST }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ env.IMAGE_TAG_L3_BASE }}-${{ steps.meta.outputs.timestamp }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:test-${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/sisys/app:dev-${{ steps.meta.outputs.image_tag_l3 }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ env.IMAGE_TAG_L3_LATEST }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:dev-${{ steps.meta.outputs.image_tag_l3 }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.meta.outputs.image_tag_l3 }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -478,13 +504,14 @@ jobs:
             sisys.image.type="application"
           cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache,mode=min
-          build-args: |
-            DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
           provenance: false
           platforms: linux/amd64
+          build-args: |
+            DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
       - name: 上传镜像信息
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: docker-image-info
           path: |
