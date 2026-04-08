@@ -73,7 +73,7 @@ sisys 采用 **"CLI + Skills 为内核，MCP 为外延"** 的接口架构哲学�
 │  ┌─────────────────┐     ┌──────────────────┐                       │
 │  │   CLI 接口层     │     │   REST API 层     │  ← 对外（用户/集成）   │
 │  │   sisys CLI     │     │   FastAPI 0.104+  │                       │
-│  │   (click 8.1+)  │     │   OpenAPI 3.1     │                       │
+│  │   (typer 0.24+) │     │   OpenAPI 3.1     │                       │
 │  └────────┬────────┘     └────────┬─────────┘                       │
 │           │                       │                                  │
 │           └───────────┬───────────┘                                  │
@@ -184,7 +184,7 @@ MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 │  │  接口层 (Interfaces) - 输入适配器 (or.md 1.4.1)                   │    │
 │  │  ┌──────────────┐  ┌────────────┐  ┌──────────────────────┐     │    │
 │  │  │ CLI 适配器    │  │ REST API   │  │ 事件监听适配器        │     │    │
-│  │  │ (click)      │  │ (FastAPI)  │  │ (RabbitMQ Consumer)  │     │    │
+│  │  │ (typer)      │  │ (FastAPI)  │  │ (RabbitMQ Consumer)  │     │    │
 │  │  └──────┬───────┘  └─────┬──────┘  └──────────┬───────────┘     │    │
 │  │         │                │                     │                 │    │
 │  │         └────────────────┼─────────────────────┘                 │    │
@@ -275,7 +275,7 @@ MCP ──→ 外部 Agent 发现/调用工具箱（V2+ 启用）
 | 步骤 | 层级 | 组件 | 操作 | 输出 |
 |------|------|------|------|------|
 | T0 | 外部触发 | CLI 命令 | 用户执行命令 | 命令行输入 |
-| T1 | 接口层 | CLI 适配器（click） | 解析参数，生成 Command | `ToolExecutionCommand` |
+| T1 | 接口层 | CLI 适配器（typer） | 解析参数，生成 Command | `ToolExecutionCommand` |
 | T2 | 应用层 | StrategicAnalysisUseCase | 接收命令，加载 Skill | `skill = SkillSelector.recommend(...)` |
 | T3 | 应用层 | SKILL.md（L2 SOP） | 加载完整操作流程 | SOP 步骤 1-8 |
 | T4 | 应用层 | 按 SOP 调用领域服务 | `ToolService.execute("pestel", input)` | 领域服务调用 |
@@ -1548,7 +1548,7 @@ applicable_stages: ["market-insight", "strategic-analysis"]
 
 | 契约类型 | 工具 | 验证内容 | 通过率要求 |
 |---------|------|---------|-----------|
-| **CLI 契约** | click 测试框架 | 命令解析 + 输出格式 | 100% |
+| **CLI 契约** | typer 测试框架 | 命令解析 + 输出格式 | 100% |
 | **API 契约** | Schemathesis | OpenAPI 3.1 验证 | 100% |
 | **Skill 契约** | jsonschema | SKILL.md Schema 验证 | 100% |
 | **MCP 契约** | jsonschema | 工具输入/输出 Schema | 100% |
@@ -1674,7 +1674,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | 任务 | 交付物 | Story 关联 | 工作量 |
 |------|-------|-----------|-------|
 | 定义 sisys CLI 6 个服务模块 | `cli/commands/` 骨架 | Story 7.1 | 2 周 |
-| 实现 CLI 基础框架 | click 8.1+ 命令解析 | Story 7.1 | 1 周 |
+| 实现 CLI 基础框架 | typer 0.24+ 类型注解驱动 | Story 7.1 | 1 周 |
 | 设计 TOOLS.md 元数据清单 | `agents/ceo/TOOLS.md` | Story 5.2 | 1 周 |
 | 编写 3 个 Pilot SKILL.md | pestel/swot/five-forces | Story 4.1 | 2 周 |
 | 实现 SkillSelector | 关键词 + 语义推荐 | Story 5.3 | 2 周 |
@@ -1902,7 +1902,7 @@ GET    /api/v1/system/metrics               # 监控指标
 
 | 契约类型 | 工具 | 验证内容 | 通过率要求 |
 |---------|------|---------|-----------|
-| **CLI 契约** | click 测试框架 | 命令解析 + 输出格式 | 100% |
+| **CLI 契约** | typer 测试框架 | 命令解析 + 输出格式 | 100% |
 | **API 契约** | Schemathesis | OpenAPI 3.1 验证 | 100% |
 | **Skill 契约** | jsonschema | SKILL.md Schema 验证 | 100% |
 | **MCP 契约** | jsonschema | 工具输入/输出 Schema | 100% |
@@ -2030,7 +2030,7 @@ async def execute_tool(tool_id: str, input_data: Dict):
 | 任务 | 交付物 | Story 关联 | 工作量 | or.md 追溯 |
 |------|-------|-----------|-------|-----------|
 | 定义 sisys CLI 6 个服务模块 | `cli/commands/` 骨架 | Story 7.1 | 2 周 | or.md 1.4.1(1) |
-| 实现 CLI 基础框架 | click 8.1+ 命令解析 | Story 7.1 | 1 周 | or.md 1.4.1(1) |
+| 实现 CLI 基础框架 | typer 0.24+ 类型注解驱动 | Story 7.1 | 1 周 | or.md 1.4.1(1) |
 | 设计 TOOLS.md 元数据清单 | `agents/ceo/TOOLS.md` | Story 5.2 | 1 周 | or.md 1.1.3(2) |
 | 编写 3 个 Pilot SKILL.md | pestel/swot/five-forces | Story 4.1 | 2 周 | or.md 1.2.2(3) |
 | 实现 SkillSelector | 关键词 + 语义推荐 | Story 5.3 | 2 周 | or.md 1.1.3(1) |

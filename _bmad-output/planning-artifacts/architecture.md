@@ -216,7 +216,7 @@ graph TB
 
     %% ========== 接口层 ==========
     subgraph "接口层 (Interfaces)"
-        CLI["CLI 接口<br/>click 8.1+"]
+        CLI["CLI 接口<br/>typer 0.24+"]
         API["REST API<br/>FastAPI 0.104+"]
         API_GW["API Gateway<br/>Kong/Traefik"]
         EventListener["事件监听器<br/>RabbitMQ+aio-pika"]
@@ -1733,7 +1733,7 @@ class SemanticCache:
 
 | 层级 | 组件 | 技术选型 | 版本 | 风险 |
 |------|------|---------|------|------|
-| **接口层** | CLI 框架 | click | 8.1+ | ✅ 低 |
+| **接口层** | CLI 框架 | typer | 0.24+ | ✅ 低 |
 | | Web 框架 | FastAPI | 0.104+ | ✅ 低 |
 | | API Gateway | Kong/Traefik | 最新 | ✅ 低 |
 | **应用层** | 编排服务 | 自定义 | - | 🟡 中 |
@@ -2184,7 +2184,7 @@ src/infrastructure/
 src/interfaces/
 ├── __init__.py                                            # 接口层包初始化
 │
-├── cli/                                                   # 命令行接口 (click 8.1+)
+├── cli/                                                   # 命令行接口 (typer 0.24+, Python 类型注解驱动)
 │   ├── __init__.py
 │   ├── main.py                                            # CLI 主入口（6+2 服务模块）
 │   ├── commands/                                          # CLI 命令定义
@@ -6958,7 +6958,7 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. 安装基础依赖
-pip install pydantic fastapi click pytest mypy ruff
+pip install pydantic fastapi typer pytest mypy ruff
 
 # 3. 创建领域层骨架
 mkdir -p src/domain/{models,services,repositories,events,exceptions}

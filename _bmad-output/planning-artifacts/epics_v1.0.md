@@ -316,7 +316,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 - 修正分级判定体系：L0-L3 四级（L0 拼写/格式/L1 参数/权重自动固化，L2 专家确认，L3 委员会审批），基于五维特征加权算法
 
 **3. 技术栈要求：**
-- 后端：Python 3.11+、FastAPI 0.104+、Click 8.1+
+- 后端：Python 3.11+、FastAPI 0.104+、Typer 0.24+
 - 工作流引擎：Prefect 3.6+（数据管道）、LangGraph 1.0+（Agent 编排）
 - 模型路由：LiteLLM（统一代理）、bge-m3（嵌入模型）
 - 沙箱：Docker（MVP）、gVisor（V2）
