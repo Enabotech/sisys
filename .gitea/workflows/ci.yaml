@@ -453,6 +453,14 @@ jobs:
           echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
       # ---------- L2 构建 ----------
+      - name: 同步 Lock 文件 (L2)
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || needs.detect-changes.outputs.l2 == 'true'
+          }}
+        run: poetry lock --no-update --no-interaction
+
       - name: 构建 L2 镜像
         if: >-
           ${{
