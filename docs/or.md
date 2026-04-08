@@ -76,7 +76,7 @@
 
     4. 接口层：输入适配器与输出适配器隔离外部系统与领域层
        [1]. 输入适配器（Inbound Adapters）
-            (1). CLI 适配器：支持命令行接口（click 8.1+ 框架），采用"服务/资源/动作"三级命令结构（如 sisys tool run pestel --input data.json），提供 6 个核心服务模块（document/tool/agent/plan/checkpoint/archive）+ 2 个辅助模块（system/config），支持 Agent 友好参数（--yes 跳过确认/--dry-run 预览不执行/--mock 模拟数据调试），所有命令支持 --format json/table/pretty 输出格式切换，遵循七条核心设计原则（P1: CLI 是 LLM 的母语/P2: Skills 渐进式披露/P3: Skill = SOP/P4: MCP 退居生态层/P5: Less scaffolding more model/P6: 负向触发条件/P7: input_examples 驱动）
+            (1). CLI 适配器：支持命令行接口（typer 0.24+ 框架，基于 click 封装，Python 类型注解驱动），采用"服务/资源/动作"三级命令结构（如 sisys tool run pestel --input data.json），提供 6 个核心服务模块（document/tool/agent/plan/checkpoint/archive）+ 2 个辅助模块（system/config），支持 Agent 友好参数（--yes 跳过确认/--dry-run 预览不执行/--mock 模拟数据调试），所有命令支持 --format json/table/pretty 输出格式切换，遵循七条核心设计原则（P1: CLI 是 LLM 的母语/P2: Skills 渐进式披露/P3: Skill = SOP/P4: MCP 退居生态层/P5: Less scaffolding more model/P6: 负向触发条件/P7: input_examples 驱动）
             (2). REST API 适配器：支持 FastAPI 框架，实现 OpenAPI 3.1 规范，提供完整业务端点（文档管理/工具执行/Agent 协作/财务量化分析/战略规划/Checkpoint 管理/战略档案/报告生成/风险管理/系统管理共 30+ 端点），API Gateway 统一入口（统一认证 OAuth 2.1/JWT、限流令牌桶算法、路由基于路径/方法/角色、安全控制请求验证/注入检测）
             (3). 事件监听适配器：支持 RabbitMQ 事件消费者 + Redis 发布/订阅双通道监听，监听 10 种领域事件（文档处理完成/工具执行完成/AGENT 决策完成/检查点到达/修正审批/战略偏差预警/心跳唤醒/隔离等级切换/Checkpoint 恢复/路由决策），转换为 ApplicationCommand 触发下游应用层用例，保证事件处理幂等性（基于 event_id 的 Redis 缓存去重，TTL 7 天），支持事件重放与失败重试（指数退避 + 死信队列），事件处理成功率 ≥ 99%，延迟 P95 < 5s
             (4). 无障碍设计适配器：遵循 WCAG 2.1 AA 标准，支持键盘导航（100% 键盘可访问）、屏幕阅读器兼容（ARIA 标签完整，支持 NVDA/JAWS/VoiceOver）、色盲友好配色（不依赖颜色传递信息，颜色+文字双重编码，文本与背景对比度 ≥ 4.5:1，焦点环 2px 以上）
