@@ -32,9 +32,9 @@ FROM base AS dependencies
 COPY pyproject.toml poetry.lock ./
 
 # 分层安装依赖（按组分离，优化缓存）
-RUN poetry install --only main --no-root --no-interaction --retry && \
-    poetry install --with dev --no-root --no-interaction --retry && \
-    poetry install --with test --no-root --no-interaction --retry
+RUN poetry install --only main --no-root --no-interaction && \
+    poetry install --with dev --no-root --no-interaction && \
+    poetry install --with test --no-root --no-interaction
 
 # =========================================
 # Stage 3: CI 环境（仅包含依赖，不包含源码）
