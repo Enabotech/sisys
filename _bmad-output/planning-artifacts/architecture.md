@@ -166,6 +166,39 @@ completedAt: '2026-02-26'
 | | 幻觉检测准确率 | ≥95% | ≥97% | ≥99% | ShieldCortex |
 | **成本** | 本地模型路由占比 | ≥60% | ≥80% | ≥85% | 路由日志 |
 | | Token 成本节省 | ≥30% | ≥50% | ≥60% | 成本分析 |
+| **接口** | CLI 命令响应延迟 P95 | <1s | <500ms | <200ms | OpenTelemetry |
+| | Skills 加载上下文 | <500 tokens | <300 tokens | <200 tokens | 日志分析 |
+| | SAP 消息传递延迟 P95 | <500ms | <200ms | <100ms | 链路追踪 |
+| | 事件监听处理成功率 | ≥99% | ≥99.5% | ≥99.9% | 事件总线监控 |
+
+### 1.5 CLI+Skills 核心设计原则
+
+**设计哲学：CLI + Skills 为内核，MCP 为外延**（基于行业共识：钉钉/飞书 CLI 化改造 + Claude Code 渐进式披露 + MCP vs CLI benchmark）
+
+| 编号 | 原则 | 描述 | 验收标准 |
+|------|------|------|---------|
+| **P1** | CLI 是 LLM 的母语 | 系统内部所有能力优先通过 CLI 暴露，Agent 通过 CLI 调用内部工具 | 内部工具 100% 有 CLI 入口 |
+| **P2** | Skills = 渐进式披露 | Agent 启动只加载元数据（< 200 tokens），按需加载完整 SOP | Agent 启动上下文 < 500 tokens |
+| **P3** | Skill = SOP + Examples | 不仅定义工具签名，还定义操作流程、失败处理、兜底策略 + 1-5 个典型输入示例 | 23 种工具各有完整 SOP + input_examples，工具调用准确率 ≥ 90% |
+| **P4** | MCP 退居生态层 | MVP/V1 不启用 MCP，V2+ 按需用于外部 Agent 集成 | MVP 阶段 MCP 代码量 = 0 |
+| **P5** | Less scaffolding, more model | 依赖模型自身推理进行工具路由，避免硬编码分类器（SOP 是必要 scaffolding，不违反此原则） | 工具选择准确率 ≥ 85% |
+| **P6** | 负向触发条件 | 明确"何时不应触发"Skill，避免误激活 | 误触发率 < 5% |
+
+### 1.6 四层映射架构（DDD + EDA + CLI+Skills 统一）
+
+**解决三层脱节问题：** CLI 命令→应用层用例缺少精确映射、Skills→领域服务关系不明确、领域事件发布与 CLI 响应协调机制缺失
+
+**关键映射规则：**
+
+| 规则 | 描述 | 示例 |
+|------|------|------|
+| **规则 1** | CLI→用例→领域服务→领域事件完整链路 | `sisys tool run pestel` → CLI 解析 → StrategicAnalysisUseCase → Skill 加载 → ToolService.execute → Tool 聚合根状态变更 → ToolExecuted 事件 |
+| **规则 2** | CLI 命令到应用层用例的精确映射 | `sisys document`→DocumentProcessingUseCase / `sisys tool`→StrategicAnalysisUseCase / `sisys agent`→AgentCollaborationUseCase / `sisys plan`→PlanningGenerationUseCase / `sisys system`→SystemOperationsUseCase |
+| **规则 3** | Skills 在 DDD 架构中的精确位置 | L1 TOOLS.md（应用层元数据清单，Agent 实例化时加载）→ L2 SKILL.md（应用层操作手册，任务匹配后加载）→ L3 scripts/references（基础设施层资源，按需加载） |
+| **规则 4** | CLI 同步响应与事件异步处理协调 | CLI 响应不阻塞下游事件处理；`--wait-for-events` 参数可选等待特定事件完成（超时默认 30 秒，V1 可选增强，MVP 不实现） |
+| **规则 5** | 系统公理一与 CLI 的关系 | CLI 是"点火开关"（外部触发器），领域事件是"引擎血液"（内部触发器），trigger→route→execute 是"引擎运转逻辑" |
+
+**CLI 是"点火开关"，领域事件是"引擎血液"，trigger→route→execute 是"引擎运转逻辑"。**
 
 ---
 
@@ -186,13 +219,7 @@ graph TB
         CLI["CLI 接口<br/>click 8.1+"]
         API["REST API<br/>FastAPI 0.104+"]
         API_GW["API Gateway<br/>Kong/Traefik"]
-
-        subgraph "事件驱动接口"
-            Producer["事件生产者<br/>Event Producer"]
-            Consumer["事件消费者<br/>Event Consumer"]
-            EventListener["事件监听器<br/>RabbitMQ+aio-pika"]
-        end
-
+        EventListener["事件监听器<br/>RabbitMQ+aio-pika"]
     end
 
     %% ========== 应用层 ==========
@@ -204,6 +231,12 @@ graph TB
             PlanningUC["规划生成用例"]
             RoutingUC["路由决策用例"]
             IsolationUC["隔离管理用例"]
+        end
+
+        subgraph "Skills 操作手册"
+            SkillsL1["L1: TOOLS.md<br/>元数据清单 <200t"]
+            SkillsL2["L2: SKILL.md × 23<br/>SOP <500 行"]
+            SkillsL3["L3: scripts/references<br/>按需资源"]
         end
 
         subgraph "核心服务"
@@ -238,7 +271,7 @@ graph TB
 
         subgraph "领域服务接口"
             RAGService["RAG 服务接口<br/>Dense+Sparse+Graph"]
-            ToolService["工具箱服务接口<br/>MCP/A2A 协议"]
+            ToolService["工具箱服务接口<br/>CLI+Skills"]
             AgentService["Agent 服务接口<br/>EIP 执行"]
             PlanningService["规划服务接口<br/>BLM/BEM 状态机"]
             RoutingService["路由服务接口<br/>UDMR 执行"]
@@ -254,6 +287,9 @@ graph TB
             IsolationSwitched["隔离等级切换事件"]
             CorrectionClassified["修正分级事件"]
             ArbitrationCompleted["裁决完成事件"]
+            StrategicDeviationWarning["战略偏差预警事件"]
+            HeartbeatTriggered["心跳唤醒事件"]
+            CheckpointRecovered["Checkpoint 恢复事件"]
         end
 
         subgraph "仓储接口"
@@ -287,6 +323,7 @@ graph TB
             RabbitMQ["RabbitMQ 3.12+<br/>持久化事件通道"]
             Outbox["事务发件箱<br/>PostgreSQL event_outbox"]
             DLQ["死信队列<br/>失败事件处理"]
+            Consumer["事件消费者<br/>Event Consumer"]
             EventBus["事件总线<br/>Event Bus"]
         end
 
@@ -1608,6 +1645,49 @@ CREATE TABLE event_outbox (
 );
 ```
 
+### 10.4 事件监听适配器实现
+
+**设计原则：双通道监听（Redis Pub/Sub 实时 + RabbitMQ 持久化）、幂等性保证、下游用例自动触发**
+
+**10 种领域事件监听映射：**
+
+| 领域事件 | 监听器 | 触发的下游用例 | 事件流转链 |
+|---------|--------|---------------|-----------|
+| DocumentProcessed | DocumentProcessedListener | 实体抽取、图谱构建、索引构建 | [1] 文档处理事件流转 |
+| ToolExecuted | ToolExecutedListener | 成本聚合、技能演进、Agent 决策 | [2] 战略分析事件流转 |
+| AgentDecided | AgentDecidedListener | SYS 仲裁、公共黑板更新、审计日志 | [3] Agent 协作事件流转 |
+| CheckpointReached | CheckpointReachedListener | 用户反馈、状态持久化 | [5] 规划生成事件流转 |
+| CorrectionApproved | CorrectionApprovedListener | 自动固化、版本注册、演进日志 | [8] 修正审批事件流转 |
+| StrategicDeviationWarning | DeviationWarningListener | Agent 响应、偏差分析报告 | - |
+| HeartbeatTriggered | HeartbeatListener | 周期任务检查、偏差预警、成本校验 | - |
+| IsolationLevelSwitched | IsolationSwitchedListener | 公共黑板权限更新、协作状态同步 | [4] 隔离切换事件流转 |
+| CheckpointRecovered | CheckpointRecoveredListener | 档案库版本更新、分支管理 | [6] Checkpoint 恢复事件流转 |
+| RoutingDecided | RoutingDecidedListener | 路由决策日志存储、成本监控 | [7] 路由决策事件流转 |
+
+**幂等性保证：**
+
+```python
+class EventListener:
+    async def handle_event(self, event: DomainEvent):
+        # 1. 幂等性检查（基于 event_id）
+        if await redis.exists(f"processed_event:{event.event_id}"):
+            return  # 已处理，跳过
+
+        # 2. 转换为 ApplicationCommand
+        command = self.event_to_command(event)
+
+        # 3. 触发下游用例
+        try:
+            result = await self.use_case.execute(command)
+        except Exception as e:
+            await self.handle_failure(event, e)  # NACK + 重试
+            raise
+
+        # 4. 标记已处理 + ACK（TTL 7 天）
+        await redis.set(f"processed_event:{event.event_id}", "1", ex=7*24*3600)
+        await self.acknowledge(event)
+```
+
 ---
 
 ## 11. 存储架构设计
@@ -1831,7 +1911,24 @@ src/application/
 │   ├── event_dispatcher.py                                # 事件分发器
 │   ├── notification_service.py                            # 通知服务
 │   ├── audit_service.py                                   # 审计服务
-│   └── cost_management_service.py                         # 成本管理服务 ⭐
+│   └── cost_management_service.py                         # 成本管理服务
+│
+├── skills/                                                # Skills 操作手册（应用层）
+│   ├── __init__.py
+│   ├── selector.py                                        # SkillSelector（关键词 40% + 语义 60%）
+│   ├── loader.py                                          # Skills 加载器（L1/L2/L3 渐进式）
+│   ├── tools_manifest.yaml                                # L1: TOOLS.md 元数据清单 (<200 tokens)
+│   ├── pestel/                                            # L2: SKILL.md × 23
+│   │   ├── SKILL.md                                       # SOP 完整定义 (<500 行)
+│   │   ├── scripts/                                       # L3: scripts 确定性计算
+│   │   │   ├── validate_input.py
+│   │   │   └── analyze.py
+│   │   └── references/                                    # L3: references 理论参考
+│   │       ├── pestel_theory.md
+│   │       └── scoring_rules.md
+│   ├── swot/
+│   ├── five_forces/
+│   └── ... (共 23 种工具)
 │
 ├── use_cases/                                             # 用例定义
 │   ├── __init__.py
@@ -1839,8 +1936,8 @@ src/application/
 │   ├── strategic_analysis.py                              # 战略分析用例
 │   ├── agent_collaboration.py                             # Agent 协作用例
 │   ├── planning_generation.py                             # 规划生成用例
-│   ├── routing_decision.py                                # 路由决策用例 ⭐
-│   ├── isolation_management.py                            # 隔离管理用例 ⭐
+│   ├── routing_decision.py                                # 路由决策用例
+│   ├── isolation_management.py                            # 隔离管理用例
 │   └── system_operations.py                               # 系统操作用例
 │
 ├── commands/                                              # 命令定义
@@ -1849,7 +1946,7 @@ src/application/
 │   ├── tool_commands.py                                   # 工具命令
 │   ├── agent_commands.py                                  # Agent 命令
 │   ├── planning_commands.py                               # 规划命令
-│   ├── routing_commands.py                                # 路由命令 ⭐
+│   ├── routing_commands.py                                # 路由命令
 │   └── system_commands.py                                 # 系统命令
 │
 ├── queries/                                               # 查询定义
@@ -1882,8 +1979,8 @@ src/application/
 │       ├── tool_event_handler.py
 │       ├── agent_event_handler.py
 │       ├── planning_event_handler.py
-│       ├── routing_event_handler.py                       # ⭐
-│       └── isolation_event_handler.py                     # ⭐
+│       ├── routing_event_handler.py
+│       └── isolation_event_handler.py
 │
 └── dtos/                                                  # 数据传输对象
     ├── __init__.py
@@ -2051,6 +2148,16 @@ src/infrastructure/
 │       ├── code_executor.py
 │       └── security_validator.py
 │
+├── mcp/                                                   # MCP 外部生态接口（V2+ 可选）
+│   ├── __init__.py
+│   ├── registry.py                                        # MCP Registry（工具能力暴露）
+│   ├── server.py                                          # MCP Server 实现
+│   ├── registry.yaml                                      # 工具能力描述配置
+│   └── schemas/                                           # 工具输入/输出 Schema
+│       ├── pestel_input_v1.json
+│       ├── pestel_output_v1.json
+│       └── ... (共 23 种工具)
+│
 ├── security/                                              # 安全
 │   ├── __init__.py
 │   ├── auth_service.py                                    # 认证服务
@@ -2077,48 +2184,63 @@ src/infrastructure/
 src/interfaces/
 ├── __init__.py                                            # 接口层包初始化
 │
-├── cli/                                                   # 命令行接口
+├── cli/                                                   # 命令行接口 (click 8.1+)
 │   ├── __init__.py
-│   ├── main.py                                            # CLI 主入口
+│   ├── main.py                                            # CLI 主入口（6+2 服务模块）
 │   ├── commands/                                          # CLI 命令定义
 │   │   ├── __init__.py
-│   │   ├── document_commands.py
-│   │   ├── tool_commands.py
-│   │   ├── agent_commands.py
-│   │   ├── planning_commands.py
-│   │   └── system_commands.py
+│   │   ├── document_commands.py                           # sisys document upload/parse/search
+│   │   ├── tool_commands.py                               # sisys tool run/chain/list
+│   │   ├── agent_commands.py                              # sisys agent run/status/arbitrate
+│   │   ├── planning_commands.py                           # sisys plan generate/export/review
+│   │   ├── checkpoint_commands.py                         # sisys checkpoint recover/list/show
+│   │   ├── archive_commands.py                            # sisys archive query/diff/timeline
+│   │   ├── system_commands.py                             # sisys system auth/monitor/route
+│   │   └── config_commands.py                             # sisys config env/route/isolation
 │   ├── controllers/                                       # CLI 控制器
 │   │   ├── __init__.py
 │   │   ├── document_controller.py
 │   │   ├── tool_controller.py
 │   │   ├── agent_controller.py
 │   │   ├── planning_controller.py
-│   │   └── system_controller.py
+│   │   ├── checkpoint_controller.py
+│   │   ├── archive_controller.py
+│   │   ├── system_controller.py
+│   │   └── config_controller.py
 │   └── formatters/                                        # 输出格式化器
 │       ├── __init__.py
 │       ├── json_formatter.py
 │       ├── table_formatter.py
-│       ├── pdf_formatter.py
-│       └── html_formatter.py
+│       └── pretty_formatter.py
 │
-├── api/                                                   # REST API 接口 (FastAPI)
+├── api/                                                   # REST API 接口 (FastAPI 0.104+)
 │   ├── __init__.py
 │   ├── main.py                                            # FastAPI 应用
 │   ├── v1/                                                # API 版本 1
 │   │   ├── __init__.py
-│   │   ├── routes/                                        # 路由定义
+│   │   ├── routes/                                        # 路由定义 (30+ 端点)
 │   │   │   ├── __init__.py
-│   │   │   ├── document_routes.py
-│   │   │   ├── tool_routes.py
-│   │   │   ├── agent_routes.py
-│   │   │   ├── planning_routes.py
-│   │   │   └── system_routes.py
+│   │   │   ├── document_routes.py                         # POST /documents, GET /documents/{id}, GET /documents/{id}/trace
+│   │   │   ├── tool_routes.py                             # POST /tools/{id}/execute, GET /tools/{id}/schema
+│   │   │   ├── agent_routes.py                            # POST /agents/{role}/run, POST /agents/arbitrate
+│   │   │   ├── planning_routes.py                         # POST /plans/generate, GET /plans/{id}/compare
+│   │   │   ├── checkpoint_routes.py                       # POST /checkpoints/{id}/recover
+│   │   │   ├── archive_routes.py                          # GET /archive/query, GET /archive/timeline, GET /archive/diff
+│   │   │   ├── financial_routes.py                        # POST /financial/analyze, POST /financial/sensitivity
+│   │   │   ├── report_routes.py                           # POST /reports/whitelabel, POST /reports/regulatory
+│   │   │   ├── risk_routes.py                             # GET /risk/heatmap
+│   │   │   └── system_routes.py                           # POST /auth/login, GET /system/health
 │   │   ├── controllers/                                   # API 控制器
 │   │   │   ├── __init__.py
 │   │   │   ├── document_controller.py
 │   │   │   ├── tool_controller.py
 │   │   │   ├── agent_controller.py
 │   │   │   ├── planning_controller.py
+│   │   │   ├── checkpoint_controller.py
+│   │   │   ├── archive_controller.py
+│   │   │   ├── financial_controller.py
+│   │   │   ├── report_controller.py
+│   │   │   ├── risk_controller.py
 │   │   │   └── system_controller.py
 │   │   ├── schemas/                                       # Pydantic 模型
 │   │   │   ├── __init__.py
@@ -2126,11 +2248,17 @@ src/interfaces/
 │   │   │   ├── tool_schemas.py
 │   │   │   ├── agent_schemas.py
 │   │   │   ├── planning_schemas.py
+│   │   │   ├── checkpoint_schemas.py
+│   │   │   ├── archive_schemas.py
+│   │   │   ├── financial_schemas.py                       # NPV/IRR/现金流分析
+│   │   │   ├── report_schemas.py                          # 白标/监管报告
+│   │   │   ├── risk_schemas.py                            # 风险热力图
 │   │   │   └── system_schemas.py
 │   │   └── middleware/                                    # 中间件
 │   │       ├── __init__.py
-│   │       ├── auth_middleware.py
-│   │       ├── logging_middleware.py
+│   │       ├── auth_middleware.py                         # OAuth 2.1 + JWT
+│   │       ├── rate_limit_middleware.py                   # 令牌桶算法
+│   │       ├── request_validation_middleware.py           # 注入检测
 │   │       └── error_middleware.py
 │   └── dependencies/                                      # FastAPI 依赖
 │       ├── __init__.py
@@ -2138,37 +2266,45 @@ src/interfaces/
 │       ├── database_deps.py
 │       └── service_deps.py
 │
-├── event_driven/                                          # 事件驱动接口
+├── event_listeners/                                       # 事件监听适配器 (接口层)
 │   ├── __init__.py
-│   ├── consumers/                                         # 事件消费者
+│   ├── listeners/                                         # 领域事件监听器
 │   │   ├── __init__.py
-│   │   ├── document_consumer.py
-│   │   ├── tool_consumer.py
-│   │   ├── agent_consumer.py
-│   │   └── planning_consumer.py
-│   ├── producers/                                         # 事件生产者
-│   │   ├── __init__.py
-│   │   ├── document_producer.py
-│   │   ├── tool_producer.py
-│   │   ├── agent_producer.py
-│   │   └── planning_producer.py
-│   └── listeners/                                         # 事件监听器
+│   │   ├── document_processed_listener.py                 # → 实体抽取/图谱构建/索引构建
+│   │   ├── tool_executed_listener.py                      # → 成本聚合/技能演进/Agent 决策
+│   │   ├── agent_decided_listener.py                      # → SYS 仲裁/公共黑板更新/审计日志
+│   │   ├── checkpoint_reached_listener.py                 # → 用户反馈/状态持久化
+│   │   ├── correction_approved_listener.py                # → 自动固化/版本注册/演进日志
+│   │   ├── deviation_warning_listener.py                  # → Agent 响应/偏差分析报告
+│   │   ├── heartbeat_listener.py                          # → 周期任务检查/偏差预警/成本校验
+│   │   ├── isolation_switched_listener.py                 # → 公共黑板权限更新/协作状态同步
+│   │   ├── checkpoint_recovered_listener.py               # → 档案库版本更新/分支管理
+│   │   └── routing_decided_listener.py                    # → 路由决策日志存储/成本监控
+│   └── converters/                                        # Event → ApplicationCommand 转换器
 │       ├── __init__.py
-│       ├── domain_event_listener.py
-│       └── integration_event_listener.py
+│       └── event_to_command_converter.py
 │
-└── adapters/                                              # 适配器
+├── adapters/                                              # 适配器
+│   ├── __init__.py
+│   ├── inbound_adapters/                                  # 入站适配器
+│   │   ├── __init__.py
+│   │   ├── cli_adapter.py
+│   │   ├── rest_adapter.py
+│   │   ├── accessibility_adapter.py                       # WCAG 2.1 AA 无障碍
+│   │   └── i18n_adapter.py                                # 中英文多语言
+│   └── outbound_adapters/                                 # 出站适配器
+│       ├── __init__.py
+│       ├── database_adapter.py
+│       ├── llm_adapter.py                                 # LiteLLM + UDMR 路由
+│       ├── messaging_adapter.py
+│       └── mcp_adapter.py                                 # V2+ 可选，外部生态集成
+│
+└── sap/                                                   # SAP 协议 (sisys Agent Protocol)
     ├── __init__.py
-    ├── inbound_adapters/                                  # 入站适配器
-    │   ├── __init__.py
-    │   ├── cli_adapter.py
-    │   ├── rest_adapter.py
-    │   └── event_adapter.py
-    └── outbound_adapters/                                 # 出站适配器
-        ├── __init__.py
-        ├── database_adapter.py
-        ├── external_service_adapter.py
-        └── messaging_adapter.py
+    ├── message.py                                         # SAPMessage Pydantic 模型
+    ├── bus.py                                             # SAP 消息总线
+    ├── types.py                                           # MessageType, MessagePriority 枚举
+    └── middleware.py                                      # 隔离等级 + mTLS 加密 (V2)
 ```
 
 ---
@@ -2464,18 +2600,39 @@ sisys/
 
 **外部 API 端点:**
 ```
-# 公共 API（通过 API Gateway 暴露）
-GET    /api/v1/plans                    # 获取规划列表
+# 文档管理
+POST   /api/v1/documents                # 上传文档
+POST   /api/v1/documents/batch          # 批量上传
+GET    /api/v1/documents/{doc_id}       # 查询文档
+GET    /api/v1/documents/{doc_id}/trace # 高保真溯源（Bounding Box）
+
+# 工具执行
+POST   /api/v1/tools/{tool_id}/execute  # 执行工具
+GET    /api/v1/tools/{tool_id}/schema   # 查看 Schema
+
+# Agent 协作
+POST   /api/v1/agents/{agent_id}/execute # 执行 Agent 任务
+POST   /api/v1/agents/arbitrate         # SYS Agent 裁决
+
+# 财务量化分析
+POST   /api/v1/financial/analyze        # NPV/IRR/现金流
+POST   /api/v1/financial/sensitivity    # 敏感性分析
+
+# 战略规划
+GET    /api/v1/plans                    # 规划列表
 POST   /api/v1/plans                    # 创建规划
-GET    /api/v1/plans/{plan_id}          # 获取规划详情
-PATCH  /api/v1/plans/{plan_id}          # 更新规划
-DELETE /api/v1/plans/{plan_id}          # 删除规划
+GET    /api/v1/plans/{plan_id}          # 规划详情
 POST   /api/v1/plans/{plan_id}/recover  # 恢复规划
 
-GET    /api/v1/agents                   # 获取 Agent 列表
-POST   /api/v1/agents/{agent_id}/execute # 执行 Agent 任务
+# 报告生成
+POST   /api/v1/reports/whitelabel       # 白标品牌定制
+POST   /api/v1/reports/regulatory       # 监管报告
 
-GET    /api/v1/routing-decisions        # 获取路由决策日志
+# 风险管理
+GET    /api/v1/risk/heatmap             # 风险热力图
+
+# 路由决策
+GET    /api/v1/routing-decisions        # 路由决策日志
 ```
 
 **内部服务边界:**
@@ -3279,7 +3436,7 @@ class CitationTracer:
 
 ### 17.2 工具箱架构设计
 
-**设计哲学：** 23 种战略工具通过 MCP/A2A 协议暴露标准化接口，支持工具注册、版本控制、灰度发布与回滚。
+**设计哲学：** 23 种战略工具通过 CLI + Skills 机制暴露给内部 AGENT 调用，V2+ 可选通过 MCP 协议暴露给外部生态，支持工具注册、版本控制、灰度发布与回滚。
 
 #### 17.2.1 工具箱总体架构
 
@@ -3289,9 +3446,13 @@ class CitationTracer:
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    MCP/A2A 协议层                                │   │
+│  │                    CLI + Skills 协议层（MVP/V1）                  │   │
 │  │   - 工具注册表暴露  │  输入/输出 Schema  │  版本/可靠性评分       │   │
 │  └────────────────────────────────────────────────── ─────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    MCP 协议层（V2+ 可选，外部生态）               │   │
+│  │   - MCP Registry  │  外部 Agent 发现  │  mTLS 认证              │   │
+│  └───────────────────────────────────────────────────────────────┘   │
 │                                    │                                    │
 │         ┌──────────────────────────┼──────────────────────────┐        │
 │         │                          │                          │        │
@@ -4025,9 +4186,11 @@ class AgentConfig(BaseModel):
 config = AgentConfig.from_yaml('configs/agents/ceo_agent.yaml')
 ```
 
-#### 17.3.7 Agent 间通信协议 (A2A)
+#### 17.3.7 Agent 间通信协议（SAP - sisys Agent Protocol）
 
-**目标：** 定义 Agent 间标准通信协议，确保协作一致性
+**目标：** 定义 sisys 内部 Agent 间标准通信协议，确保协作一致性
+
+**设计原则：** 内部 Agent 通信使用 SAP 协议，不依赖外部标准（如 Google A2A），V2+ 可通过适配器桥接外部生态
 
 **消息格式:**
 ```python
@@ -4051,8 +4214,8 @@ class MessagePriority(str, Enum):
     HIGH = "high"
     URGENT = "urgent"
 
-class A2AMessage(BaseModel):
-    """Agent 间通信消息"""
+class SAPMessage(BaseModel):
+    """Agent 间通信消息（SAP 协议）"""
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID  # 会话 ID，关联同一对话的消息
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -4444,6 +4607,21 @@ GET    /api/v1/agents                   # 获取 Agent 列表
 GET    /api/v1/agents/{agent_id}        # 获取单个 Agent
 POST   /api/v1/agents/{agent_id}/execute # 执行 Agent 任务
 GET    /api/v1/agents/{agent_id}/state  # 获取 Agent 状态
+POST   /api/v1/agents/arbitrate         # SYS Agent 裁决
+
+# 财务量化分析（新增）
+POST   /api/v1/financial/analyze        # 财务量化分析（NPV/IRR/现金流）
+POST   /api/v1/financial/sensitivity    # 敏感性分析（龙卷风图）
+
+# 报告生成（新增）
+POST   /api/v1/reports/whitelabel       # 白标品牌定制（Logo/配色/字体）
+POST   /api/v1/reports/regulatory       # 监管报告导出（银保监会 1104/EAST）
+
+# 风险可视化（新增）
+GET    /api/v1/risk/heatmap             # 风险热力图（高管视图核心）
+
+# 高保真溯源（新增）
+GET    /api/v1/documents/{doc_id}/trace # Bounding Box 坐标级溯源
 
 # 路由决策资源
 GET    /api/v1/routing-decisions        # 获取路由决策日志
@@ -6453,7 +6631,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 |--------|--------|--------|--------|---------|
 | **DM** 文档与数据管理 | 15 | 15 | 100% | `DocumentService`, `RAGService`, `MinIO` |
 | **SR** 智能检索与发现 | 15 | 15 | 100% | 混合检索 (Dense+Sparse+Graph)+RRF+ 重排序 |
-| **ST** 战略工具箱 | 11 | 11 | 100% | 23 种工具实现，MCP/A2A 协议 |
+| **ST** 战略工具箱 | 11 | 11 | 100% | 23 种工具实现，CLI+Skills/MCP 协议 |
 | **AC** Agent 协作 | 16 | 16 | 100% | 7+1 角色，EIP 隔离，辩论机制 |
 | **SP** 战略规划流程 | 12 | 12 | 100% | BLM/BEM 六阶段状态机，Checkpoint |
 | **UI** 用户交互与报告 | 13 | 13 | 100% | CLI+REST API，PDF/HTML 报告生成 |
@@ -6488,7 +6666,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | **NFR-COMP** 合规性 | 5 | 2 | 2 | 9 | 100% | 等保 2.0, WORM 存储，审计追踪，数据主权 |
 | **NFR-REL** 可靠性 | 4 | 2 | 0 | 6 | 100% | Outbox, 死信队列，Checkpoint 恢复 |
 | **NFR-SCALE** 可扩展性 | 1 | 3 | 0 | 4 | 100% | 分层架构，水平扩展，缓存策略 |
-| **NFR-INT** 集成性 | 3 | 2 | 0 | 5 | 100% | MCP/A2A 协议，外部适配器 |
+| **NFR-INT** 集成性 | 3 | 2 | 0 | 5 | 100% | SAP 协议，外部适配器 |
 | **NFR-ACC** 可访问性 | 0 | 2 | 0 | 2 | 100% | CLI+REST API，无障碍设计 |
 | **合计** | **25** | **13** | **2** | **40** | **100%** | ✅ 全覆盖 |
 
@@ -6973,8 +7151,9 @@ pytest tests/unit/domain/
 | **AUD** | Auditor | 审计 Agent | 第 7 章 |
 | **RAG** | Retrieval-Augmented Generation | 检索增强生成 | 第 4 章 |
 | **RRF** | Reciprocal Rank Fusion | 倒数排名融合，混合检索结果融合算法 | 第 4 章 |
-| **MCP** | Model Context Protocol | 模型上下文协议，Agent 工具调用协议 | 第 17 章 |
-| **A2A** | Agent-to-Agent | Agent 间通信协议 | 第 7 章 |
+| **MCP** | Model Context Protocol | 模型上下文协议，V2+ 可选用于外部 Agent 生态集成 | 第 17 章 |
+| **SAP** | sisys Agent Protocol | sisys 内部 Agent 间通信协议（辩论/裁决/公共黑板） | 第 6 章 |
+| **A2A** | Agent-to-Agent | 外部 Agent 通信协议（Google 标准），V2+ 可选通过 SAP↔A2A 适配器桥接 | 第 6 章 |
 | **CQRS** | Command Query Responsibility Segregation | 命令查询职责分离 | 第 3 章 |
 | **Outbox** | Transactional Outbox | 事务发件箱，保证事件可靠性模式 | 第 10 章 |
 | **DLQ** | Dead Letter Queue | 死信队列，处理失败事件 | 第 10 章 |
@@ -7227,7 +7406,7 @@ make sdd-tdd-cycle STORY=1.1
 | 契约类型 | 测试方法 | 工具 | 频率 |
 |---------|---------|------|------|
 | **Agent 接口契约** | OpenAPI Schema 验证 | Schemathesis | 每次提交 |
-| **MCP 工具契约** | JSON Schema 验证 | jsonschema | 每次提交 |
+| **SAP 消息契约** | Pydantic 模型验证 | pydantic | 每次提交 |
 | **事件契约** | Pydantic 模型验证 | pytest + pydantic | 每次提交 |
 | **数据库契约** | 迁移测试 + Schema 验证 | Alembic + SQLAlchemy | 每次迁移 |
 
@@ -7240,12 +7419,19 @@ def test_agent_execute_api_contract():
     response = client.post("/api/v1/agents/{id}/execute", json={...})
     validate_response(schema, response)
 
-# MCP 工具契约测试
-def test_tool_registry_contract():
-    """验证工具注册表符合 JSON Schema"""
-    schema = load_json_schema("tool_registry.json")
-    tools = get_all_tools()
-    jsonschema.validate(tools, schema)
+# SAP 消息契约测试
+def test_sap_message_contract():
+    """验证 SAP 消息符合 Pydantic 模型"""
+    msg = SAPMessage(
+        sender_id="ceo",
+        receiver_id="cfo",
+        message_type=MessageType.REQUEST,
+        subject="财务分析",
+        content={"task": "analyze_revenue"}
+    )
+    assert isinstance(msg.message_id, UUID)
+    assert msg.message_type == MessageType.REQUEST
+    assert msg.priority == MessagePriority.NORMAL
 
 # 事件契约测试
 def test_domain_event_contract():
@@ -13697,7 +13883,7 @@ class SagaEventHandler:
 
 | 威胁类别 | 具体威胁场景 | 影响等级 | 缓解措施 |
 |---------|-------------|---------|---------|
-| **Spoofing（伪装）** | 恶意 Agent 伪装成合法工具执行代码 | 🔴 高 | MCP 协议认证 + 工具签名验证 |
+| **Spoofing（伪装）** | 恶意 Agent 伪装成合法工具执行代码 | 🔴 高 | SAP 协议认证 + 工具签名验证 |
 | **Tampering（篡改）** | 攻击者篡改沙箱内执行的代码 | 🔴 高 | 代码完整性校验 + WORM 存储 |
 | **Repudiation（抵赖）** | Agent 否认执行的恶意操作 | 🟠 中 | 完整审计日志 + 不可篡改记录 |
 | **Information Disclosure（信息泄露）** | 沙箱内代码访问敏感数据 | 🔴 高 | 数据隔离 + 最小权限原则 |
