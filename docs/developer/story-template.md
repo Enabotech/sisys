@@ -140,7 +140,7 @@
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
-**来源:** [`architecture-epic0.md`](../../_bmad-output/planning-artifacts/architecture-epic0.md)
+**来源:** [`epic0-design.md`](../../_bmad-output/planning-artifacts/epic0-design.md)
 
 - **架构模式:** [如 CQRS、Event Sourcing、Hexagonal 等]
 - **设计约束:** [如 TLS 1.3、非 root 用户、只读文件系统等]
@@ -196,14 +196,14 @@ sisys/
 | **Instructions** | `_bmad/bmm/workflows/4-implementation/create-story/instructions.xml` |
 | **Template** | `_bmad/bmm/workflows/4-implementation/create-story/template.md` |
 | **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md` |
-| **架构文档** | `_bmad-output/planning-artifacts/architecture-epic0.md` |
+| **架构文档** | `_bmad-output/planning-artifacts/epic0-design.md` |
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/[编号]-[name].md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 
 ### 完成清单 Completion Notes List
 
 - [ ] 故事需求从 `epics_v1.0.md` 提取
-- [ ] 架构约束从 `architecture-epic0.md` 提取
+- [ ] 架构约束从 `epic0-design.md` 提取
 - [ ] 前一个故事学习经验整合
 - [ ] 状态设置为 `ready-for-dev`
 - [ ] SDD+TDD 融合开发要求定义完成

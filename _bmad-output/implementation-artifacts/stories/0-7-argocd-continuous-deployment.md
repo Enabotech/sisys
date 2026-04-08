@@ -702,7 +702,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 ### 网络架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#网络架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#网络架构)
 
 ```
 互联网 (80/443)
@@ -749,7 +749,7 @@ Traefik v3.x 反向代理
 
 ### 安全配置
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统安全架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统安全架构)
 
 **TLS/SSL 安全:**
 - TLS 1.3 强制启用 (禁用 TLS 1.2 及以下版本)
@@ -872,7 +872,7 @@ sisys/
 
 ### 与 Gitea/Harbor 集成
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统组件架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统组件架构)
 
 **集成架构图:**
 
@@ -935,7 +935,7 @@ sisys/
 
 ### 存储架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#存储架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#存储架构)
 
 ```
 ┌─────────────────────┐
@@ -980,7 +980,7 @@ sisys/
 
 ### 资源分配
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#资源分配)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#资源分配)
 
 | 资源 | 分配量 | 说明 |
 |------|--------|------|
@@ -990,7 +990,7 @@ sisys/
 
 **MVP 临时配置 vs 架构规划:**
 
-| 资源项 | MVP 配置 | 架构规划 (architecture-epic0.md) | 说明 |
+| 资源项 | MVP 配置 | 架构规划 (epic0-design.md) | 说明 |
 |--------|---------|--------------------------------|------|
 | **CPU** | 2 Cores | 2 核 | 符合架构规划 |
 | **内存** | 4Gi | 4GB | 符合架构规划 |

@@ -208,7 +208,7 @@ so that **团队可以安全存储和分发 Docker 镜像，支持漏洞扫描�
 
 ### 网络架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#网络架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#网络架构)
 
 ```
 互联网 (80/443)
@@ -286,7 +286,7 @@ spec:
 
 ### 安全配置
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统安全架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统安全架构)
 
 **TLS/SSL 安全:**
 - [ ] TLS 1.3 强制启用 (禁用 TLS 1.2 及以下版本)
@@ -339,7 +339,7 @@ spec:
 
 ### 与 Gitea/ArgoCD 集成准备
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#开发-ci-cd-系统组件架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#开发-ci-cd-系统组件架构)
 
 **集成架构图:**
 
@@ -433,7 +433,7 @@ argocd repo add https://gitea.sisys.local/sisys/sisys.git \
 
 ### 存储架构
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#存储架构)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#存储架构)
 
 ```
 ┌─────────────────────┐
@@ -508,7 +508,7 @@ spec:
 
 ### 资源分配
 
-**来源**: [architecture-epic0.md](../../planning-artifacts/architecture-epic0.md#资源分配)
+**来源**: [epic0-design.md](../../planning-artifacts/epic0-design.md#资源分配)
 
 | 资源 | 分配量 | 说明 |
 |------|--------|------|
@@ -518,7 +518,7 @@ spec:
 
 **MVP 临时配置 vs 架构规划:**
 
-| 资源项 | MVP 配置 | 架构规划 (architecture-epic0.md) | 说明 |
+| 资源项 | MVP 配置 | 架构规划 (epic0-design.md) | 说明 |
 |--------|---------|--------------------------------|------|
 | **CPU** | 2 Cores | 2 核 | 符合架构规划 |
 | **内存** | 4Gi | 4GB | 符合架构规划 |
@@ -1069,7 +1069,7 @@ sisys/
 
 **内部文档:**
 - [Source: epics_v1.0.md#Story 0.6: Harbor 镜像仓库](../../planning-artifacts/epics_v1.0.md#Story-06-Harbor-镜像仓库)
-- [Source: architecture-epic0.md#开发-ci-cd-系统详细架构](../../planning-artifacts/architecture-epic0.md#-开发-ci-cd-系统详细架构)
+- [Source: epic0-design.md#开发-ci-cd-系统详细架构](../../planning-artifacts/epic0-design.md#-开发-ci-cd-系统详细架构)
   - 网络架构、存储架构、安全架构、资源分配、CI/CD Pipeline 架构
 - [Source: architecture.md#12 技术栈详细选型](../../planning-artifacts/architecture.md#12-技术栈详细选型)
 - [Source: sprint-status.yaml#development_status](../../implementation-artifacts/sprint-status.yaml#development_status)
