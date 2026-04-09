@@ -602,6 +602,9 @@ jobs:
           DIGEST="${{ steps.build-l3.outputs.digest }}"
           echo "构建 Digest: ${DIGEST}"
 
+          # 确保目录存在
+          mkdir -p reports/build
+
           # 写入构建元数据文件
           cat > reports/build/build-metadata.json <<EOF
           {
