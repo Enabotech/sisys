@@ -572,16 +572,9 @@ jobs:
           file: ./docker/dockerfile.app
           push: true
           tags: |
-            # === 稳定标签（latest 指向最新开发版）===
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
-
-            # === 开发环境标签 ===
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
-
-            # === 测试环境标签 ===
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
-
-            # === 发布标签（Git Tag 触发时生成纯 SemVer 标签）===
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}
           labels: |
@@ -590,7 +583,6 @@ jobs:
             org.opencontainers.image.created=${{ steps.context.outputs.build_time }}
             sisys.image.layer="l3"
             sisys.image.type="application"
-            # Feature 信息（用于 Harbor 查询 + K8s 追溯）
             sisys.io/feature=${{ steps.context.outputs.feature_name }}
             sisys.io/author=${{ steps.context.outputs.author }}
             sisys.io/build-time=${{ steps.context.outputs.build_time }}
