@@ -10,6 +10,8 @@ on:
       - main
       - develop
       - 'feature/**'
+    tags:
+      - 'v*'  # Git Tag 触发生产发布
   pull_request:
     branches:
       - main
@@ -18,6 +20,10 @@ on:
   # 手动触发
   workflow_dispatch:
     inputs:
+      version:
+        description: '镜像版本号 (如 v1.1.0)'
+        required: false
+        type: string
       force_rebuild:
         description: '强制重新构建'
         required: false
@@ -68,8 +74,13 @@ env:
   IMAGE_TAG_L3_LATEST: latest
 
   # --- 版本标签前缀 (用于生成具体版本标签) ---
-  # Layer 3 基础版本号，CI 构建时会生成 v1.0.0-{git_sha}
-  IMAGE_TAG_L3_BASE: v1.0.0
+  # Layer 3 动态版本号: 手动输入 > Git Tag > VERSION 文件 > 默认值 v1.0.0
+  IMAGE_TAG_L3_BASE: |
+    ${{
+      github.event.inputs.version ||
+      (startsWith(github.ref, 'refs/tags/') && github.ref_name) ||
+      'v1.0.0'
+    }}
 
 # ===========================================================================
 # 并发控制 - 同一 PR 只运行一个 Pipeline
@@ -110,13 +121,13 @@ jobs:
       - name: 代码检查 ( Ruff )
         run: |
           mkdir -p reports/linting
-          poetry run ruff check . --output-format=github > reports/linting/ruff-check.txt || true
+          poetry run ruff check . --output-format=github > reports/linting/ruff-check.txt 2>&1 || { cat reports/linting/ruff-check.txt; exit 1; }
           poetry run ruff format --check .
 
       - name: 类型检查 ( MyPy )
         run: |
           mkdir -p reports/mypy
-          poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt || true
+          poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt
 
       - name: 上传质量报告
         if: always()
@@ -312,8 +323,11 @@ jobs:
       - name: 代码安全扫描 ( Bandit )
         run: |
           mkdir -p reports/security
-          poetry run bandit -r src/ -f json -o reports/security/bandit-report.json || true
-          poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt || true
+          # 阻断 High 及以上级别漏洞
+          poetry run bandit -r src/ -f json -o reports/security/bandit-report.json \
+            --severity-level high
+          poetry run bandit -r src/ -f screen -o reports/security/bandit-report.txt \
+            --severity-level high
 
       # - name: Trivy 缓存
       #   uses: actions/cache@v3
@@ -336,9 +350,9 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'reports/security/trivy-fs.sarif'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL'
+          exit-code: '1'  # 发现 Critical 级别漏洞时阻断
           skip-setup-trivy: 'true'
-          # offline-scan: 'true'
           skip-db-update: 'true'
           skip-java-db-update: 'true'
           skip-check-update: 'true'
@@ -446,15 +460,65 @@ jobs:
             --allow-insecure-entitlement network.host
           config: buildkitd.toml
 
-      - name: 生成镜像标签
-        id: meta
+      - name: 提取构建上下文
+        id: context
         run: |
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
+
+          # 提取分支名 / feature 信息
+          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            # feature/login-page → login-page
+            FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
+            IMAGE_PREFIX="dev-feature"
+          elif [[ "${{ github.ref }}" == refs/heads/develop ]] || \
+               [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            FEATURE_NAME="develop"
+            IMAGE_PREFIX="dev"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            FEATURE_NAME="release"
+            IMAGE_PREFIX=""
+          else
+            FEATURE_NAME="unknown"
+            IMAGE_PREFIX="dev"
+          fi
+
+          # 提取提交作者（清理换行和多余空格）
+          AUTHOR=$(git log -1 --pretty=format:'%an' | tr -d '[:space:]')
+
+          # 清理版本号（去除换行和空格）
+          VERSION=$(echo "${{ env.IMAGE_TAG_L3_BASE }}" | tr -d '[:space:]')
+
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
-          echo "image_tag_l2=l2-${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
-          echo "image_tag_l3=${{ env.IMAGE_TAG_L3_BASE }}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "feature_name=${FEATURE_NAME}" >> $GITHUB_OUTPUT
+          echo "author=${AUTHOR}" >> $GITHUB_OUTPUT
+          echo "image_prefix=${IMAGE_PREFIX}" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: 生成镜像标签
+        id: meta
+        run: |
+          GIT_SHA="${{ steps.context.outputs.git_sha }}"
+          VERSION="${{ steps.context.outputs.version }}"
+          PREFIX="${{ steps.context.outputs.image_prefix }}"
+          FEATURE="${{ steps.context.outputs.feature_name }}"
+
+          # L3 基础标签
+          if [[ -n "$PREFIX" ]]; then
+            echo "image_tag_l3=${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          else
+            echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+          # L2 标签
+          echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+
+          echo "✅ 版本: ${VERSION}"
+          echo "✅ Feature: ${FEATURE}"
+          echo "✅ SHA: ${GIT_SHA}"
+          echo "✅ 标签: ${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}"
 
       # ---------- L2 构建 ----------
       - name: 同步 Lock 文件 (L2)
@@ -494,6 +558,7 @@ jobs:
 
       # ---------- L3 构建 ----------
       - name: 构建 L3 镜像
+        id: build-l3
         if: >-
           ${{
             github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
@@ -505,22 +570,65 @@ jobs:
           file: ./docker/dockerfile.app
           push: true
           tags: |
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ env.IMAGE_TAG_L3_LATEST }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:dev-${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.meta.outputs.image_tag_l3 }}
+            # === 稳定标签（latest 指向最新开发版）===
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
+
+            # === 开发环境标签 ===
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
+
+            # === 测试环境标签 ===
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
+
+            # === 发布标签（Git Tag 触发时生成纯 SemVer 标签）===
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ steps.meta.outputs.timestamp }}
+            org.opencontainers.image.created=${{ steps.context.outputs.build_time }}
             sisys.image.layer="l3"
             sisys.image.type="application"
+            # Feature 信息（用于 Harbor 查询 + K8s 追溯）
+            sisys.io/feature=${{ steps.context.outputs.feature_name }}
+            sisys.io/author=${{ steps.context.outputs.author }}
+            sisys.io/build-time=${{ steps.context.outputs.build_time }}
+            sisys.io/branch=${{ github.ref_name }}
+            sisys.io/version=${{ steps.context.outputs.version }}
           cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache
           cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache,mode=min
           provenance: false
           platforms: linux/amd64
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+
+      # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
+      - name: 记录 Digest 信息
+        if: always() && steps.build-l3.outputs.digest != ''
+        run: |
+          DIGEST="${{ steps.build-l3.outputs.digest }}"
+          echo "构建 Digest: ${DIGEST}"
+
+          # 写入构建元数据文件
+          cat > reports/build/build-metadata.json <<EOF
+          {
+            "version": "${{ steps.context.outputs.version }}",
+            "git_sha": "${{ steps.context.outputs.git_sha }}",
+            "digest": "${DIGEST}",
+            "image": "${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app",
+            "tags": [
+              "latest",
+              "${{ steps.meta.outputs.image_tag_l3 }}",
+              "test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}",
+              "${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}",
+              "${{ steps.context.outputs.version }}"
+            ],
+            "build_time": "${{ steps.context.outputs.build_time }}",
+            "feature": "${{ steps.context.outputs.feature_name }}",
+            "author": "${{ steps.context.outputs.author }}",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+          echo "✅ 元数据已保存到 reports/build/build-metadata.json"
 
       - name: 上传镜像信息
         uses: actions/upload-artifact@v3
