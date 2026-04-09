@@ -71,15 +71,41 @@ ArgoCD 期望: v1.0.0               ← 纯 SemVer
 - develop/main 统一使用 `dev-{version}-{sha}` 格式
 - 只有 feature 分支需要额外标识 feature 名称
 
-### 决策 2: 双标签策略（解决 CI 与 ArgoCD 冲突）
+### 决策 2: Digest + 多标签引用（不可变制品策略）
 
-**CI 构建时同时推送两组标签：**
+**核心思想：** 标签是**可变指针**，Digest 是**不可变事实源**。两者共存，兼顾可读性与安全性。
 
 ```
-环境标签（Dev/Test 用）     发布标签（Prod 用）
-dev-{version}-{sha}    →   v{major}.{minor}.{patch}
-test-{version}-{sha}   →   （同一镜像，不同标签）
+CI 构建同一镜像 → 推送多标签 + 记录 Digest
+                      │
+    ┌─────────────────┼──────────────────┐
+    ▼                 ▼                  ▼
+ dev-v1.1.0-xxx   test-v1.1.0-xxx    v1.1.0
+       │              │                  │
+       └──────────────┴──────────────────┘
+                      │
+                      └──→ sha256:8f2e3d... (不可变)
+                              │
+                              └── K8s 实际拉取的镜像
 ```
+
+**CI 构建时同时推送：**
+- 多标签：`dev-{version}-{sha}`、`test-{version}-{sha}`、`v{version}`（可读性）
+- Digest：`sha256:xxx`（不可变性，K8s 实际拉取）
+
+**Kustomize 配置格式（两字段共存）：**
+```yaml
+kustomize:
+  images:
+  - name: harbor.sisys.local/sisys/app
+    newTag: v1.1.0                # ← 人看的（审批、追溯）
+    newDigest: sha256:8f2e3d...   # ← K8s 实际拉的（不可变）
+```
+
+**Harbor 不可变标签策略：**
+- 所有标签（`v*`、`dev-*`、`test-*`）一旦推送即不可覆盖
+- 同名标签推送 → Harbor 直接拒绝
+- `git_sha` + 不可变标签 = 等价于 Digest 的不可变性
 
 ### 决策 3: Feature 信息通过 OCI 注解 + K8s 注解双重记录
 
@@ -101,6 +127,15 @@ test-{version}-{sha}   →   （同一镜像，不同标签）
 | **测试环境** | `test-{version}-{sha}` | `test-v1.1.0-3c8353a` | CI 自动构建 | `regexp:^test-.*` |
 | **发布溯源** | `{version}-{sha}` | `v1.1.0-3c8353a` | push tag `v*` | 不匹配（仅追溯用） |
 | **生产发布** | `v{major}.{minor}.{patch}` | `v1.1.0` | push tag `v*` | `regexp:^v[0-9]+\.[0-9]+\.[0-9]+$` |
+
+### Digest 标签（所有场景）
+
+| 维度 | 说明 | 示例 |
+|------|------|------|
+| **格式** | `sha256:{64 位 hex}` | `sha256:8f2e3d4a1b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1` |
+| **来源** | Docker Buildx 构建输出 `steps.build-l3.outputs.digest` | 自动生成 |
+| **用途** | K8s 实际拉取镜像（不可变）、审计追溯、供应链安全 | K8s 优先使用 Digest |
+| **生命周期** | 永久不变（镜像内容的 SHA-256 哈希） | 即使标签被覆盖，Digest 仍指向原镜像 |
 
 ### 标签说明
 
@@ -279,6 +314,37 @@ echo "v1.1.0" > VERSION
           platforms: linux/amd64
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+
+      # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
+      - name: 记录 Digest 信息
+        run: |
+          DIGEST="${{ steps.build-l3.outputs.digest }}"
+          echo "构建 Digest: ${DIGEST}"
+
+          # 写入构建元数据文件
+          cat > build-metadata.json <<EOF
+          {
+            "version": "${{ env.IMAGE_TAG_L3_BASE }}",
+            "git_sha": "${{ steps.context.outputs.git_sha }}",
+            "digest": "${DIGEST}",
+            "image": "${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app",
+            "tags": [
+              "latest",
+              "${{ steps.context.outputs.image_prefix }}-${{ steps.context.outputs.feature_name }}-${{ env.IMAGE_TAG_L3_BASE }}-${{ steps.context.outputs.git_sha }}",
+              "test-${{ env.IMAGE_TAG_L3_BASE }}-${{ steps.context.outputs.git_sha }}",
+              "${{ env.IMAGE_TAG_L3_BASE }}-${{ steps.context.outputs.git_sha }}",
+              "${{ env.IMAGE_TAG_L3_BASE }}"
+            ],
+            "build_time": "${{ steps.context.outputs.build_time }}",
+            "feature": "${{ steps.context.outputs.feature_name }}",
+            "author": "${{ steps.context.outputs.author }}"
+          }
+          EOF
+
+          # 上传为 artifact
+          mkdir -p reports/build
+          mv build-metadata.json reports/build/
+          echo "✅ 元数据已保存到 reports/build/build-metadata.json"
 ```
 
 ---
@@ -301,7 +367,41 @@ syncPolicy:
     allowEmpty: true
 ```
 
-### 2. Prod 环境标签过滤
+### 2. 启用 Digest 不可变性（所有环境）
+
+**为每个 Application 添加 `force-digest` 注解：**
+
+```yaml
+annotations:
+  # 强制使用 Digest（确保不可变性）
+  argocd-image-updater.argoproj.io/app.force-digest: "true"
+```
+
+**`.argocd-source-*.yaml` 格式变更（由 Image Updater 自动写回）：**
+
+```yaml
+# 当前格式（仅标签）
+kustomize:
+  images:
+  - harbor.sisys.local/sisys/app:v1.0.2
+
+# Digest 格式（Image Updater 自动写回 newTag + newDigest）
+kustomize:
+  images:
+  - name: harbor.sisys.local/sisys/app
+    newTag: v1.1.0                # 人看的（审批、追溯）
+    newDigest: sha256:8f2e3d...   # K8s 实际拉的（不可变）
+```
+
+**各环境配置汇总：**
+
+| 环境 | 文件 | `force-digest` | 预期 `.argocd-source-*.yaml` 格式 |
+|------|------|---------------|----------------------------------|
+| Dev | `sisys-app-dev.yaml` | `"true"` | `newTag: dev-v1.1.0-xxx` + `newDigest: sha256:xxx` |
+| Test | `sisys-app-test.yaml` | `"true"` | `newTag: test-v1.1.0-xxx` + `newDigest: sha256:xxx` |
+| Prod | `sisys-app-prod.yaml` | `"true"` | `newTag: v1.1.0` + `newDigest: sha256:xxx` |
+
+### 3. Prod 环境标签过滤
 
 **问题：** 正则表达式 `^v[0-9]+\.[0-9]+\.[0-9]+$` 无法匹配 CI 生成的 `v1.1.0-3c8353a`。
 
@@ -321,7 +421,7 @@ argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+
 
 如果采用方案 B，则 Prod 正则保持不变，CI 会额外推送 `v1.1.0`（无 SHA）标签。
 
-### 3. Dev 环境标签过滤
+### 4. Dev 环境标签过滤
 
 **修改以精确匹配 feature 标签：**
 
@@ -334,6 +434,114 @@ argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-.*
 # 修改后（区分 feature 和 develop/main）
 argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-(feature-)?v[0-9]+.*
 ```
+
+### 5. Harbor 不可变标签策略（安全基石）
+
+**问题：** 当前 Harbor 未启用不可变标签策略，同名标签可被覆盖。
+
+**配置步骤（Harbor UI）：**
+
+```
+1. 登录 Harbor → 项目 "sisys"
+2. 左侧菜单 → 策略 → 不可变标签
+3. 添加规则:
+   - 仓库匹配: **
+   - 标签匹配: v*
+   - 标签匹配: dev-*
+   - 标签匹配: test-*
+   - 标签匹配: latest
+4. 保存
+```
+
+**效果：**
+
+```bash
+# 首次推送 → ✅ 成功
+$ docker push harbor.sisys.local/sisys/app:v1.1.0
+
+# 同名再次推送 → ❌ 拒绝
+Error: tag 'v1.1.0' is immutable, cannot be overridden
+```
+
+**验证：**
+
+```bash
+# Harbor API 查询不可变规则
+curl -s -u "$USER:$PASS" \
+  "https://harbor.sisys.local/api/v2.0/projects/sisys/immutabletag/rules" \
+  | jq '.[] | {id, tag_pattern, scope}'
+```
+
+---
+
+## 各角色 TAG 全景图（Digest + 标签共存）
+
+### 核心原则
+
+```
+标签 (newTag)    → 人看的（审批、追溯、可读性）
+Digest (newDigest) → K8s 实际拉的（不可变、安全、审计）
+```
+
+### 各角色视角
+
+| 角色/场景 | 主要看到的 | 补充信息 |
+|-----------|-----------|---------|
+| **CI 构建日志** | `dev-feature-xxx-v1.1.0-3c8353a` | `sha256:8f2e3d...` (输出 digest) |
+| **Harbor UI** | 标签列表: `dev-xxx`, `test-xxx`, `v1.1.0` | 点击详情显示: Digest, Size, Labels |
+| **kubectl get pods** | `sha256:8f2e3d...` (默认显示 Digest) | 需要 annotation 或自定义命令补回标签 |
+| **ArgoCD UI** | `sha256:8f2e3d... (v1.1.0)` | 通常同时显示标签和 Digest |
+| **Git 配置 (.argocd-source-*.yml)** | `newTag: v1.1.0` + `newDigest: sha256:xxx` | 审批人看 newTag，K8s 用 newDigest |
+| **/version 端点** | `"image": "v1.1.0"` | `"digest": "sha256:8f.."`, `"git_sha": "3c8353a"` |
+| **最终用户** | `v1.1.0` (应用层自行暴露) | 与镜像拉取方式无关 |
+
+### kubectl 可读性增强
+
+**自定义列输出（推荐添加到 ~/.bashrc）：**
+
+```bash
+function k8s-img() {
+  local ns="${1:-default}"
+  kubectl get pods -n "$ns" \
+    -o custom-columns=\
+'NAME:.metadata.name,\
+IMAGE:.spec.containers[0].image,\
+FEATURE:.metadata.annotations.sisys\.io/feature,\
+BUILD_TIME:.metadata.annotations.sisys\.io/build-time'
+}
+
+# 使用效果
+$ k8s-img sisys-dev
+
+NAME                         IMAGE                           FEATURE                  BUILD_TIME
+dev-sisys-app-6d8f9a7b5c-abc12   sha256:8f2e3d...   feature/login-page       2026-04-09T10:00:00Z
+```
+
+### 发布审批体验
+
+**ArgoCD 审批人看到的（Prod）：**
+
+```
+Application: sisys-app-prod
+Source: deployments/apps/sisys/prod
+
+Pending Image Update:
+  Current: harbor.sisys.local/sisys/app@sha256:1a2b3c... (v1.0.9)
+  New:     harbor.sisys.local/sisys/app@sha256:8f2e3d... (v1.1.0)
+
+Git Diff:
+  deployments/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml
+  - newTag: v1.0.9
+  + newTag: v1.1.0
+  - newDigest: sha256:1a2b3c...
+  + newDigest: sha256:8f2e3d...
+```
+
+**审批人确认项：**
+- ✅ `newTag` 从 `v1.0.9` → `v1.1.0`（可读，一眼确认版本）
+- ✅ `newDigest` 变了（不可变，保证是这个具体构建）
+- ✅ CI 门禁全部通过
+- ✅ QA 签字确认
 
 ---
 
@@ -1027,8 +1235,11 @@ chmod +x scripts/release.sh
 #### P0: ArgoCD 配置修复
 
 - [ ] 修复 Test 环境 `syncPolicy.automated`
+- [ ] 为 Dev/Test/Prod 添加 `force-digest: "true"` 注解
+- [ ] 清空现有 `.argocd-source-*.yaml`（让 Image Updater 重建为 Digest 格式）
 - [ ] （可选）修改 Prod 标签过滤正则
 - [ ] 修改 Dev 标签过滤正则
+- [ ] Harbor 启用不可变标签策略（v*, dev-*, test-*, latest）
 
 #### P0: 回滚与门禁（新增）
 
@@ -1060,6 +1271,8 @@ chmod +x scripts/release.sh
 - [ ] push tag `v1.1.0`，确认生成 `v1.1.0` 和 `v1.1.0-{sha}` 两个标签
 - [ ] 手动触发 Workflow 并输入版本号，确认标签正确
 - [ ] 检查 Harbor 中 OCI labels 是否正确（feature、author、build_time）
+- [ ] 确认 CI 构建日志中输出了 `sha256:xxx` Digest
+- [ ] 确认 `reports/build/build-metadata.json` 包含 version、digest、tags 字段
 
 ### ArgoCD 验证
 
@@ -1068,6 +1281,15 @@ chmod +x scripts/release.sh
 - [ ] Test 环境手动同步生效
 - [ ] Prod 环境手动审批生效
 - [ ] kubectl 查询 K8s annotations 中 feature 信息正确
+- [ ] 确认 `.argocd-source-*.yaml` 格式为 `newTag` + `newDigest` 双字段
+- [ ] 确认 `kubectl get pods` 显示的是 `@sha256:xxx` 而非标签名
+- [ ] ArgoCD UI 中同时显示标签和 Digest
+
+### Harbor 验证
+
+- [ ] 不可变标签策略已启用（v*, dev-*, test-*, latest）
+- [ ] 尝试推送同名标签被拒绝（验证不可变性）
+- [ ] Harbor UI 中标签详情页显示正确的 Digest 和 OCI labels
 
 ### 发布脚本验证
 
@@ -1087,10 +1309,11 @@ chmod +x scripts/release.sh
 
 ---
 
-**文档版本**: 1.1  
-**最后更新**: 2026-04-09  
-**维护者**: SISYS 团队  
-**状态**: ✅ 待实施  
+**文档版本**: 1.2
+**最后更新**: 2026-04-09
+**维护者**: SISYS 团队
+**状态**: ✅ 待审批
 **变更日志**:
+- v1.2: 引入 Digest + 多标签引用策略（不可变制品）；新增 Harbor 不可变标签策略；新增各角色 TAG 全景图；更新 CI 构建输出 Digest 元数据；更新 ArgoCD 配置（force-digest + newTag/newDigest 双字段）；更新验证清单
 - v1.1: 新增回滚策略、质量门禁、发布节奏章节（评审改进）
 - v1.0: 初始版本（标签策略、动态版本号、Feature 关联、环境晋级）
