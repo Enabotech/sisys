@@ -126,7 +126,7 @@ sisys = "src.cli:app"
 [[tool.poetry.source]]
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-priority = "primary"
+priority = "supplemental"
 
 
 [[tool.poetry.source]]
@@ -138,7 +138,7 @@ priority = "supplemental"
 [[tool.poetry.source]]
 name = "ustc"
 url = "https://mirrors.ustc.edu.cn/pypi/simple/"
-priority = "supplemental"
+priority = "primary"
 
 
 [[tool.poetry.source]]
