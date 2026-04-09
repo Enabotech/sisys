@@ -4,6 +4,8 @@
 
 name: Release
 
+run-name: "🚀 发布 ${{ inputs.version }}"
+
 on:
   workflow_dispatch:
     inputs:
