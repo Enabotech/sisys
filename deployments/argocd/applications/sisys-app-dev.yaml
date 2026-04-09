@@ -31,8 +31,8 @@ metadata:
     # 更新策略：按推送时间选择最新镜像（v0.18.0 官方命名）
     argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
-    # 标签过滤：只匹配 dev 开头的标签
-    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-.*
+    # 标签过滤：只匹配 dev 开头的标签（含 feature 分支）
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-(feature-)?v[0-9]+.*
     # 忽略临时标签
     argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
 
