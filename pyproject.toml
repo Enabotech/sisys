@@ -131,7 +131,7 @@ priority = "supplemental"
 [[tool.poetry.source]]
 name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple/"
-priority = "supplemental"
+priority = "primary"
 
 [[tool.poetry.source]]
 name = "ustc"
@@ -141,7 +141,7 @@ priority = "supplemental"
 [[tool.poetry.source]]
 name = "tencent"
 url = "https://mirrors.cloud.tencent.com/pypi/simple/"
-priority = "primary"
+priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "PyPI"
