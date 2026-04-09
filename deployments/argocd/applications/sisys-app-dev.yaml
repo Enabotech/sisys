@@ -37,7 +37,7 @@ metadata:
     argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
 
     # 强制使用 Digest (确保不可变性)
-    # argocd-image-updater.argoproj.io/app.force-digest: "true"
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
 
     # 轮询间隔 (开发环境频繁一些)
     argocd-image-updater.argoproj.io/app.check-interval: 2m
