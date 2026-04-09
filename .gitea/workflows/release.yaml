@@ -39,6 +39,20 @@ jobs:
 
     steps:
       # =========================================================================
+      # 步骤 0: 检出代码（必须在所有 git 操作之前）
+      # =========================================================================
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITEA_TOKEN || secrets.RELEASE_BOT_TOKEN }}
+
+      - name: 配置 Git 用户
+        run: |
+          git config user.name "${{ env.GIT_USER_NAME }}"
+          git config user.email "${{ env.GIT_USER_EMAIL }}"
+
+      # =========================================================================
       # 步骤 1: 验证
       # =========================================================================
       - name: 验证版本号格式
@@ -62,17 +76,6 @@ jobs:
             exit 1
           fi
           echo "✅ Tag $VERSION 不存在，可以发布"
-
-      - name: 检出代码
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITEA_TOKEN || secrets.RELEASE_BOT_TOKEN }}
-
-      - name: 配置 Git 用户
-        run: |
-          git config user.name "${{ env.GIT_USER_NAME }}"
-          git config user.email "${{ env.GIT_USER_EMAIL }}"
 
       # =========================================================================
       # 步骤 2: 干运行（不推送）
