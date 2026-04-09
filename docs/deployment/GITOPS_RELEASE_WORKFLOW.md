@@ -62,11 +62,15 @@ ArgoCD 期望: v1.0.0               ← 纯 SemVer
 
 ## 核心设计决策
 
-### 决策 1: 单分支策略
+### 决策 1: 分支策略
 
-**背景：** 采用单分支策略，main 即开发分支。
+**背景：** main 是开发分支，release 是发布分支。
 
 **影响：**
+- `main`：日常开发、feature 合并、CI 持续构建开发版镜像
+- `release`：生产发布的唯一来源
+- 发布前需先 `git merge main → release`，确保 release 包含最新代码
+- Release Workflow 仅在 release 分支触发
 - main 统一使用 `dev-{version}-{sha}` 格式
 - 只有 feature 分支需要额外标识 feature 名称
 
@@ -454,11 +458,14 @@ $ docker push harbor.sisys.local/sisys/app:v1.1.0
 Error: tag 'v1.1.0' is immutable, cannot be overridden
 ```
 
-**安全意义：**
+**验证：**
 
-- `git_sha` + 不可变标签 = 等价于 Digest 的不可变性
-- 即使标签被恶意尝试覆盖，Harbor 直接拒绝
-- 配合 `force-digest: true`，实现双重不可变保障
+```bash
+# Harbor API 查询不可变规则
+curl -s -u "$USER:$PASS" \
+  "https://harbor.sisys.local/api/v2.0/projects/sisys/immutabletag/rules" \
+  | jq '.[] | {id, tag_pattern, scope}'
+```
 
 ---
 
@@ -1095,97 +1102,186 @@ kubectl scale deployment prod-sisys-app -n sisys-prod --replicas=3
 
 ## 发布流程
 
-### 架构设计
+### 架构设计（Release Workflow）
 
 ```
-开发者本地:  ./scripts/release.sh v1.1.0
+开发者本地:  git checkout release && git merge main && git push
                   │
-                  │ (仅验证格式 + 触发 Workflow)
                   ▼
-Gitea:  .gitea/workflows/release.yaml (workflow_dispatch)
+Gitea:  .gitea/workflows/release.yaml (workflow_dispatch on release 分支)
                   │
                   ├─ 1. 验证版本号
-                  ├─ 2. 更新 VERSION → commit → push main
-                  ├─ 3. 创建 annotated tag → push
+                  ├─ 2. 检查 Tag 是否存在
+                  ├─ 3. 更新 VERSION → commit → push release
+                  ├─ 4. 创建 annotated tag → push tag
                   │         │
                   │         ▼ (触发)
                   │  .gitea/workflows/ci.yaml (push.tags: v*)
                   │         │
                   │         ├─ 代码检查 → 测试 → 安全扫描
                   │         └─ 构建镜像 → 推送 Harbor
+                  │                    │
+                  │                    ▼
+                  │              ArgoCD Image Updater 检测
+                  │              → 更新 .argocd-source-prod.yaml
+                  │              → ArgoCD Prod 手动审批同步
 ```
 
-### `scripts/release.sh`（本地入口）
+### 发布方式
 
-**职责：** 本地验证 + 触发 Gitea Release Workflow
+**方式 1: Gitea UI（推荐，无需额外配置）**
+
+```
+1. 切换到 release 分支: git checkout release && git merge main
+2. 打开: https://gitea.sisys.local/sisys/sisys/actions
+3. 点击 'Release' 工作流
+4. 点击 'Run Workflow'
+5. 输入版本号: v1.0.3
+6. （可选）勾选 '干运行' 验证流程
+7. 点击运行
+```
+
+**方式 2: Gitea API（适合脚本化/CI 集成）**
 
 ```bash
-# 方式 1: UI 触发（默认，无需 token）
-./scripts/release.sh v1.1.0
-# 输出 Gitea UI 链接，手动触发
-
-# 方式 2: API 触发（需要 token）
 export GITEA_TOKEN=your_token
-./scripts/release.sh v1.1.0
-# 自动调用 API 触发 Workflow
 
-# 干运行
-./scripts/release.sh v1.1.0 --dry-run
+curl -X POST \
+  -H "Authorization: token $GITEA_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ref":"refs/heads/release","inputs":{"version":"v1.0.3"}}' \
+  "https://gitea.sisys.local/api/v1/repos/sisys/sisys/actions/workflows/release.yaml/runs"
 ```
+
+**方式 3: 干运行（验证不推送）**
+
+在 UI 中勾选 `dry_run`，或 API 传入 `"dry_run":"true"`。
+Workflow 会验证版本号、检查 Tag 是否存在、打印将执行的步骤，但不做任何更改。
 
 ### `.gitea/workflows/release.yaml`（服务端执行）
 
-**职责：** 版本号管理 + VERSION 文件更新 + Git Tag 创建
-
-**触发方式：** `workflow_dispatch`（手动）
-
-**输入参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `version` | string | ✅ | 语义化版本号，如 `v1.1.0` |
-| `dry_run` | boolean | ❌ | 干运行，仅验证不推送 |
+**触发方式：** `workflow_dispatch` on `release` 分支
 
 **执行流程：**
 
-1. 验证版本号格式
-2. 检查 Tag 是否已存在
-3. （干运行模式）打印将执行的步骤
-4. 更新 `VERSION` 文件 → commit → push main
+1. 检出 release 分支
+2. 验证版本号格式
+3. 检查 Tag 是否已存在
+4. 更新 `VERSION` 文件 → commit → push release
 5. 创建 annotated tag → push tag
 6. tag push 自动触发 CI Pipeline
 
 **安全特性：**
 
-- 仅允许 main 分支触发
+- 仅允许 release 分支触发（`if: github.ref == 'refs/heads/release'`）
 - 并发控制：`concurrency: release`（防止同时发布）
 - 使用 Release Bot 身份提交（可审计）
-
-### 使用方式对比
-
-| 方式 | 适用场景 | 前置条件 |
-|------|---------|---------|
-| **UI 触发** | 偶尔发布、无 token | Gitea 访问权限 |
-| **API 触发** | 频繁发布、CI/CD 集成 | `GITEA_TOKEN` |
-| **干运行** | 验证版本号、测试流程 | 无 |
-
----
-
-## 发布脚本验证
 
 ---
 
 ## 实施清单
 
+```bash
+#!/bin/bash
+# ============================================================================
+# GitOps 发布脚本
+# 示例:
+# ============================================================================
+set -euo pipefail
+
+VERSION="${1:-}"
+ENVIRONMENT="${2:-prod}"
+
+# 颜色输出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
+
+# 验证参数
+if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+  log_error "版本号格式错误，应为 v{major}.{minor}.{patch}[-{suffix}]，如 v1.1.0 或 v1.2.0-beta"
+  exit 1
+fi
+
+# 安全检查
+if [[ -n "$(git status --porcelain)" ]]; then
+  log_error "有未提交的更改，请先提交或暂存"
+  git status --short
+  exit 1
+fi
+
+if git rev-parse "$VERSION" >/dev/null 2>&1; then
+  log_error "Tag $VERSION 已存在"
+  exit 1
+fi
+
+# 获取当前分支
+CURRENT_BRANCH=$(git branch --show-current)
+log_info "当前分支: $CURRENT_BRANCH"
+
+# 执行发布
+log_info "=========================================="
+log_info "开始发布 $VERSION 到 $ENVIRONMENT 环境"
+log_info "=========================================="
+
+# Step 1: 更新 VERSION 文件
+log_step "更新 VERSION 文件..."
+echo "$VERSION" > VERSION
+git add VERSION
+git commit -m "chore(release): bump version to $VERSION"
+
+# Step 2: 推送到远程
+log_step "推送到远程仓库..."
+git push origin "$CURRENT_BRANCH"
+
+# Step 3: 创建并推送 Tag
+log_step "创建 Tag: $VERSION..."
+git tag -a "$VERSION" -m "Release $VERSION to $ENVIRONMENT"
+git push origin "$VERSION"
+
+log_info "=========================================="
+log_info "✅ 发布完成！"
+log_info "=========================================="
+log_info ""
+log_info "📊 查看 CI 进度: https://gitea.sisys.local/sisys/sisys/actions"
+log_info "🏷️  镜像标签: harbor.sisys.local/sisys/app:$VERSION"
+
+if [[ "$ENVIRONMENT" == "prod" ]]; then
+  log_warn ""
+  log_warn "⚠️  生产环境需要手动在 ArgoCD 中审批同步"
+  log_warn "🔗 ArgoCD Prod: https://argocd.sisys.local/applications/sisys-app-prod"
+fi
+```
+
+**使用方法：**
+```bash
+# 赋予执行权限
+
+# 发布到生产
+
+# 发布 beta 版本
+```
+
+---
+
+
 ### 改动总览
 
 | 优先级 | 文件 | 改动类型 | 说明 |
 |--------|------|---------|------|
-| **P0** | `.gitea/workflows/ci.yaml` | 修改 | 动态版本号 + 构建上下文提取 + 标签逻辑 |
+| **P0** | `.gitea/workflows/ci.yaml` | 修改 | 动态版本号 + 构建上下文提取 + 标签逻辑 + 质量门禁阻断 |
+| **P0** | `.gitea/workflows/release.yaml` | 新建 | Release Workflow（版本号管理 + VERSION 更新 + Git Tag 创建） |
 | **P0** | `deployments/argocd/applications/sisys-app-prod.yaml` | 修改 | 标签过滤正则（可选，如果 CI 推送纯 SemVer 则不需要） |
 | **P0** | `deployments/argocd/applications/sisys-app-test.yaml` | 修改 | 恢复 `syncPolicy.automated` |
-| **P0** | `deployments/argocd/applications/sisys-app-dev.yaml` | 修改 | 标签过滤正则精确匹配 |
-| **P1** | `scripts/release.sh` | 新建 | 一键发布脚本 |
+| **P0** | `deployments/argocd/applications/sisys-app-dev.yaml` | 修改 | 标签过滤正则精确匹配 + force-digest |
+| **P1** | `scripts/rollback.sh` | 新建 | 一键回滚脚本 |
 | **P1** | `VERSION` | 新建 | 版本号文件 |
 | **P2** | `src/api/version.py` | 新建 | 应用 `/version` 端点 |
 | **P2** | `deployments/apps/sisys/base/deployment.yaml` | 修改 | 注入 OCI 注解为环境变量 |
@@ -1209,7 +1305,7 @@ export GITEA_TOKEN=your_token
 - [ ] 清空现有 `.argocd-source-*.yaml`（让 Image Updater 重建为 Digest 格式）
 - [ ] （可选）修改 Prod 标签过滤正则
 - [ ] 修改 Dev 标签过滤正则
-- [ ] Harbor 不可变标签策略已启用（v*, dev-*, test-*, latest）✅
+- [ ] Harbor 启用不可变标签策略（v*, dev-*, test-*, latest）
 
 #### P0: 回滚与门禁（新增）
 
@@ -1218,11 +1314,12 @@ export GITEA_TOKEN=your_token
 - [ ] CI 门禁全部改为阻断模式
 - [ ] 发布预检清单集成到 PR 模板
 
-#### P1: 发布脚本
+#### P1: 发布相关
 
-- [ ] 创建 `scripts/release.sh`
 - [ ] 创建 `VERSION` 文件（初始值 `v1.0.0`）
-- [ ] 测试脚本各种场景（正常发布、Tag 已存在、未提交更改）
+- [ ] 测试 Release Workflow 正常发布
+- [ ] 测试 Release Workflow 干运行模式
+- [ ] 验证 API 触发方式
 
 #### P2: Feature 信息注入
 
@@ -1237,7 +1334,7 @@ export GITEA_TOKEN=your_token
 ### CI 验证
 
 - [ ] push 到 feature 分支，确认生成 `dev-feature-{name}-...` 标签
-- [ ] push 到 main，确认生成 `dev-main-{version}-{sha}` 标签
+- [ ] push 到 main，确认生成 `dev-{version}-...` 标签
 - [ ] push tag `v1.1.0`，确认生成 `v1.1.0` 和 `v1.1.0-{sha}` 两个标签
 - [ ] 手动触发 Workflow 并输入版本号，确认标签正确
 - [ ] 检查 Harbor 中 OCI labels 是否正确（feature、author、build_time）
@@ -1257,15 +1354,15 @@ export GITEA_TOKEN=your_token
 
 ### Harbor 验证
 
-- [ ] ✅ 不可变标签策略已启用（v*, dev-*, test-*, latest）
+- [ ] 不可变标签策略已启用（v*, dev-*, test-*, latest）
 - [ ] 尝试推送同名标签被拒绝（验证不可变性）
 - [ ] Harbor UI 中标签详情页显示正确的 Digest 和 OCI labels
 
-### 发布脚本验证
+### 发布验证
 
-- [ ] 正常发布流程成功（更新 VERSION → push → 创建 Tag → 推送）
+- [ ] 正常发布流程成功（通过 UI 或 API 触发 Release Workflow）
+- [ ] 干运行模式验证（确认不推送任何更改）
 - [ ] Tag 已存在时报错退出
-- [ ] 有未提交更改时报错退出
 - [ ] 版本号格式错误时报错退出
 
 ---
