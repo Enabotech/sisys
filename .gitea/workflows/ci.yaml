@@ -8,14 +8,12 @@ on:
   push:
     branches:
       - main
-      - develop
       - 'feature/**'
     tags:
       - 'v*'  # Git Tag 触发生产发布
   pull_request:
     branches:
       - main
-      - develop
 
   # 手动触发
   workflow_dispatch:
@@ -471,9 +469,8 @@ jobs:
             # feature/login-page → login-page
             FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
             IMAGE_PREFIX="dev-feature"
-          elif [[ "${{ github.ref }}" == refs/heads/develop ]] || \
-               [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            FEATURE_NAME="develop"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            FEATURE_NAME="main"
             IMAGE_PREFIX="dev"
           elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             FEATURE_NAME="release"
