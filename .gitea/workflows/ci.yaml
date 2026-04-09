@@ -369,6 +369,7 @@ jobs:
   detect-changes:
     name: "🔎 变更检测"
     runs-on: ubuntu2204
+    needs: [code-quality]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root

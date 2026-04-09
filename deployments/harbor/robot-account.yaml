@@ -185,5 +185,4 @@ robotAccounts:
 #   namespace: default
 # type: kubernetes.io/dockerconfigjson
 # data:
-#   .dockerconfigjson: eyJhdXRocyI6eyJ0dXRvci5qdWlnaGFuLm9yZyI6eyJ1c2VybmFtZSI6InJvYm90JGd
-# pdGVhLXJ1bm5lci1wdXNoIiwicGFzc3dvcmQiOiJUT0tFTiIsImF1dGgiOiJCT1J5SDBWM1pY
+#   .dockerconfigjson: <PLACE_HOLDER>
