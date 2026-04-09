@@ -128,18 +128,15 @@ name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 priority = "supplemental"
 
-
 [[tool.poetry.source]]
 name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple/"
 priority = "supplemental"
 
-
 [[tool.poetry.source]]
 name = "ustc"
 url = "https://mirrors.ustc.edu.cn/pypi/simple/"
 priority = "primary"
-
 
 [[tool.poetry.source]]
 name = "tencent"
