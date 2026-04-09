@@ -1,0 +1,157 @@
+# GitOps 发布工作流
+# 职责: 版本号管理 + VERSION 文件更新 + Git Tag 创建
+# 触发后会自动通过 tag 推送触发 CI Pipeline 构建镜像
+#
+# 发布目标: release 分支
+# 完整流程:
+#   1. 开发者本地合并 main → release
+#   2. 在 release 分支上触发此 Workflow
+#   3. Workflow 更新 VERSION → commit → push release → 创建 tag → push tag
+#   4. tag push 自动触发 ci.yaml 构建镜像
+
+name: Release
+
+run-name: "🚀 发布 ${{ inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (语义化版本)'
+        required: true
+        type: string
+      dry_run:
+        description: '干运行（仅验证，不推送）'
+        required: false
+        default: false
+        type: boolean
+
+# 防止并发发布
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  GIT_USER_NAME: "SISYS Release Bot"
+  GIT_USER_EMAIL: "release-bot@sisys.local"
+
+jobs:
+  release:
+    name: "🚀 版本发布"
+    runs-on: ubuntu2204
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:l2-latest
+      options: --user root
+
+    # 仅允许 release 分支触发
+    if: github.ref == 'refs/heads/release'
+
+    steps:
+      # =========================================================================
+      # 步骤 0: 检出代码（必须在所有 git 操作之前）
+      # =========================================================================
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: release
+          token: ${{ secrets.GITEA_TOKEN || secrets.RELEASE_BOT_TOKEN }}
+
+      - name: 配置 Git 用户
+        run: |
+          git config user.name "${{ env.GIT_USER_NAME }}"
+          git config user.email "${{ env.GIT_USER_EMAIL }}"
+
+      # =========================================================================
+      # 步骤 1: 格式校验
+      # =========================================================================
+      - name: 格式校验
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ 版本号格式错误，应为 v{major}.{minor}.{patch}[-{suffix}]"
+            echo "示例: v1.1.0, v1.2.0-beta, v2.0.0-rc.1"
+            exit 1
+          fi
+          echo "✅ 版本号格式正确: $VERSION"
+
+      - name: 检查 Tag 是否已存在
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          if git ls-remote --tags origin "$VERSION" | grep -q "$VERSION"; then
+            echo "❌ Tag $VERSION 已存在"
+            echo "查看已有 Tag: git show $VERSION"
+            exit 1
+          fi
+          echo "✅ Tag $VERSION 不存在，可以发布"
+
+      # =========================================================================
+      # 步骤 2: 干运行（不推送）
+      # =========================================================================
+      - name: 干运行验证
+        if: inputs.dry_run
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "=== 干运行模式 ==="
+          echo "将执行的步骤:"
+          echo "  1. 更新 VERSION 文件为: $VERSION"
+          echo "  2. 提交到 release 分支: chore(release): bump version to $VERSION"
+          echo "  3. 创建 Tag: $VERSION"
+          echo "  4. 推送 release 分支和 Tag"
+          echo ""
+          echo "✅ 干运行验证通过，未做任何更改"
+
+      # =========================================================================
+      # 步骤 3: 更新本地 VERSION 文件
+      # =========================================================================
+      - name: 更新 VERSION 文件
+        if: "!inputs.dry_run"
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "$VERSION" > VERSION
+          git add VERSION
+          git commit -m "chore(release): bump version to $VERSION"
+
+      # =========================================================================
+      # 步骤 4: 推送到远程
+      # =========================================================================
+      - name: 推送 release 分支
+        if: "!inputs.dry_run"
+        shell: bash
+        run: |
+          git push origin release
+          echo "✅ 已推送 release 分支"
+
+      # =========================================================================
+      # 步骤 5: 创建并推送 Tag
+      # =========================================================================
+      - name: 创建推送版本标签
+        if: "!inputs.dry_run"
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+          echo "✅ 已创建并推送 Tag: $VERSION"
+
+      # =========================================================================
+      # 步骤 6: 完成提示
+      # =========================================================================
+      - name: 发布完成
+        if: "!inputs.dry_run"
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "=========================================="
+          echo "✅ 发布完成！"
+          echo "=========================================="
+          echo ""
+          echo "📊 查看 CI 进度: ${{ github.server_url }}/${{ github.repository }}/actions"
+          echo "🏷️  镜像标签: harbor.sisys.local/sisys/app:$VERSION"
+          echo ""
+          echo "⚠️  生产环境需要手动在 ArgoCD 中审批同步"
+          echo "🔗 ArgoCD Prod: https://argocd.sisys.local/applications/sisys-app-prod"

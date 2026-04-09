@@ -128,32 +128,29 @@ name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 priority = "primary"
 
-
 [[tool.poetry.source]]
 name = "aliyun"
 url = "https://mirrors.aliyun.com/pypi/simple/"
-priority = "primary"
-
+priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "ustc"
 url = "https://mirrors.ustc.edu.cn/pypi/simple/"
-priority = "primary"
-
+priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "tencent"
 url = "https://mirrors.cloud.tencent.com/pypi/simple/"
-priority = "primary"
-
-[[tool.poetry.source]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
-priority = "explicit"
+priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "PyPI"
 priority = "supplemental"
+
+[[tool.poetry.source]]
+name = "pytorch-cuda"
+url = "https://mirrors.nju.edu.cn/pytorch/whl/cu128/"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
