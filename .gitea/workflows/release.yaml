@@ -28,7 +28,7 @@ env:
 
 jobs:
   release:
-    name: "🚀 发布 ${{ inputs.version }}"
+    name: "🚀 发布 '${{ inputs.version }}'"
     runs-on: ubuntu2204
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:l2-latest
