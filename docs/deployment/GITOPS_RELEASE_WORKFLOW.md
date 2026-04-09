@@ -64,11 +64,10 @@ ArgoCD 期望: v1.0.0               ← 纯 SemVer
 
 ### 决策 1: 单分支策略
 
-**背景：** main 和 develop 是同一个分支。
+**背景：** 采用单分支策略，main 即开发分支。
 
 **影响：**
-- 不再区分 `dev-main` 和 `dev-develop` 标签
-- develop/main 统一使用 `dev-{version}-{sha}` 格式
+- main 统一使用 `dev-{version}-{sha}` 格式
 - 只有 feature 分支需要额外标识 feature 名称
 
 ### 决策 2: Digest + 多标签引用（不可变制品策略）
@@ -123,7 +122,7 @@ kustomize:
 | 场景 | 标签格式 | 示例 | 触发条件 | ArgoCD 匹配 |
 |------|---------|------|---------|------------|
 | **feature 分支** | `dev-feature-{name}-{version}-{sha}` | `dev-feature-login-page-v1.1.0-3c8353a` | push to `feature/*` | `regexp:^dev-feature-.*` |
-| **develop/main** | `dev-{version}-{sha}` | `dev-v1.1.0-3c8353a` | push to `develop`/`main` | `regexp:^dev-v[0-9]+.*` |
+| **main 分支** | `dev-{version}-{sha}` | `dev-v1.1.0-3c8353a` | push to `main` | `regexp:^dev-v[0-9]+.*` |
 | **测试环境** | `test-{version}-{sha}` | `test-v1.1.0-3c8353a` | CI 自动构建 | `regexp:^test-.*` |
 | **发布溯源** | `{version}-{sha}` | `v1.1.0-3c8353a` | push tag `v*` | 不匹配（仅追溯用） |
 | **生产发布** | `v{major}.{minor}.{patch}` | `v1.1.0` | push tag `v*` | `regexp:^v[0-9]+\.[0-9]+\.[0-9]+$` |
@@ -155,10 +154,10 @@ git push origin feature/login-page
 # ArgoCD Dev 自动同步
 ```
 
-**develop/main 分支推送：**
+**main 分支推送：**
 ```bash
-git push origin develop
-# CI 生成: dev-v1.1.0-3c8353a
+git push origin main
+# CI 生成: dev-main-v1.1.0-3c8353a
 # ArgoCD Dev 自动同步
 ```
 
@@ -185,14 +184,12 @@ on:
   push:
     branches:
       - main
-      - develop
       - 'feature/**'
     tags:
       - 'v*'  # ✅ 新增：支持 Git Tag 触发
   pull_request:
     branches:
       - main
-      - develop
 
   # 手动触发
   workflow_dispatch:
@@ -247,9 +244,8 @@ echo "v1.1.0" > VERSION
             # feature/login-page → login-page
             FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
             IMAGE_PREFIX="dev-feature"
-          elif [[ "${{ github.ref }}" == refs/heads/develop ]] || \
-               [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            FEATURE_NAME="develop"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            FEATURE_NAME="main"
             IMAGE_PREFIX="dev"
           elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             FEATURE_NAME="release"
@@ -431,27 +427,22 @@ argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+
 # 修改前
 argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-.*
 
-# 修改后（区分 feature 和 develop/main）
+# 修改后（区分 feature 和 main）
 argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-(feature-)?v[0-9]+.*
 ```
 
 ### 5. Harbor 不可变标签策略（安全基石）
 
-**问题：** 当前 Harbor 未启用不可变标签策略，同名标签可被覆盖。
+**状态：** ✅ 已启用
 
-**配置步骤（Harbor UI）：**
+**当前规则（项目 sisys）：**
 
-```
-1. 登录 Harbor → 项目 "sisys"
-2. 左侧菜单 → 策略 → 不可变标签
-3. 添加规则:
-   - 仓库匹配: **
-   - 标签匹配: v*
-   - 标签匹配: dev-*
-   - 标签匹配: test-*
-   - 标签匹配: latest
-4. 保存
-```
+| 仓库匹配 | 标签匹配 | 效果 |
+|---------|---------|------|
+| `**` | `v*` | 发布标签不可覆盖 |
+| `**` | `dev-*` | 开发标签不可覆盖 |
+| `**` | `test-*` | 测试标签不可覆盖 |
+| `**` | `latest` | 稳定标签不可覆盖 |
 
 **效果：**
 
@@ -463,14 +454,11 @@ $ docker push harbor.sisys.local/sisys/app:v1.1.0
 Error: tag 'v1.1.0' is immutable, cannot be overridden
 ```
 
-**验证：**
+**安全意义：**
 
-```bash
-# Harbor API 查询不可变规则
-curl -s -u "$USER:$PASS" \
-  "https://harbor.sisys.local/api/v2.0/projects/sisys/immutabletag/rules" \
-  | jq '.[] | {id, tag_pattern, scope}'
-```
+- `git_sha` + 不可变标签 = 等价于 Digest 的不可变性
+- 即使标签被恶意尝试覆盖，Harbor 直接拒绝
+- 配合 `force-digest: true`，实现双重不可变保障
 
 ---
 
@@ -679,7 +667,7 @@ curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
 │           ▼                                                       │
 │  ┌─────────────────────┐      验证通过      ┌──────────────┐      │
 │  │ ArgoCD Dev          │ ────────────────→  │ merge to      │      │
-│  │ 自动同步             │                   │ develop/main  │      │
+│  │ 自动同步             │                   │ main          │      │
 │  └─────────────────────┘                   └──────┬───────┘      │
 │                                                   │               │
 │                                                   ▼               │
@@ -712,8 +700,8 @@ curl -s -u "$HARBOR_USER:$HARBOR_PASSWORD" \
 
 | 阶段 | 触发条件 | 镜像标签 | 验证要求 | 审批 |
 |------|---------|---------|---------|------|
-| **Dev** | push to `feature/*` 或 `develop` | `dev-feature-{name}-{ver}-{sha}` / `dev-{ver}-{sha}` | CI 测试通过 | 自动 |
-| **Test** | merge to `develop`/`main` | `test-{ver}-{sha}` | 集成测试通过 | 手动同步 |
+| **Dev** | push to `feature/*` 或 `main` | `dev-feature-{name}-{ver}-{sha}` / `dev-{ver}-{sha}` | CI 测试通过 | 自动 |
+| **Test** | push to `main` | `test-{ver}-{sha}` | 集成测试通过 | 手动同步 |
 | **Prod** | push tag `v{x.y.z}` | `v{x.y.z}` | QA 签字确认 | ArgoCD 手动审批 |
 
 ### 环境职责
@@ -1046,7 +1034,7 @@ kubectl scale deployment prod-sisys-app -n sisys-prod --replicas=3
 
 - [ ] 所有 CI 门禁通过（Lint、类型、测试、安全）
 - [ ] 无未解决的 Critical/High 级别 Code Review 评论
-- [ ] 分支已与 `develop`/`main` 同步，无冲突
+- [ ] 分支已与 `main` 同步，无冲突
 
 #### 测试验证
 
@@ -1105,103 +1093,85 @@ kubectl scale deployment prod-sisys-app -n sisys-prod --replicas=3
 
 ---
 
-## 发布脚本
+## 发布流程
 
-### `scripts/release.sh`
+### 架构设计
 
-```bash
-#!/bin/bash
-# ============================================================================
-# GitOps 发布脚本
-# 用法: ./scripts/release.sh <version> [environment]
-# 示例:
-#   ./scripts/release.sh v1.1.0        # 发布到生产环境
-#   ./scripts/release.sh v1.2.0-beta   # 发布 beta 版本
-# ============================================================================
-set -euo pipefail
-
-VERSION="${1:-}"
-ENVIRONMENT="${2:-prod}"
-
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
-
-# 验证参数
-if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-  log_error "版本号格式错误，应为 v{major}.{minor}.{patch}[-{suffix}]，如 v1.1.0 或 v1.2.0-beta"
-  exit 1
-fi
-
-# 安全检查
-if [[ -n "$(git status --porcelain)" ]]; then
-  log_error "有未提交的更改，请先提交或暂存"
-  git status --short
-  exit 1
-fi
-
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  log_error "Tag $VERSION 已存在"
-  exit 1
-fi
-
-# 获取当前分支
-CURRENT_BRANCH=$(git branch --show-current)
-log_info "当前分支: $CURRENT_BRANCH"
-
-# 执行发布
-log_info "=========================================="
-log_info "开始发布 $VERSION 到 $ENVIRONMENT 环境"
-log_info "=========================================="
-
-# Step 1: 更新 VERSION 文件
-log_step "更新 VERSION 文件..."
-echo "$VERSION" > VERSION
-git add VERSION
-git commit -m "chore(release): bump version to $VERSION"
-
-# Step 2: 推送到远程
-log_step "推送到远程仓库..."
-git push origin "$CURRENT_BRANCH"
-
-# Step 3: 创建并推送 Tag
-log_step "创建 Tag: $VERSION..."
-git tag -a "$VERSION" -m "Release $VERSION to $ENVIRONMENT"
-git push origin "$VERSION"
-
-log_info "=========================================="
-log_info "✅ 发布完成！"
-log_info "=========================================="
-log_info ""
-log_info "📊 查看 CI 进度: https://gitea.sisys.local/sisys/sisys/actions"
-log_info "🏷️  镜像标签: harbor.sisys.local/sisys/app:$VERSION"
-
-if [[ "$ENVIRONMENT" == "prod" ]]; then
-  log_warn ""
-  log_warn "⚠️  生产环境需要手动在 ArgoCD 中审批同步"
-  log_warn "🔗 ArgoCD Prod: https://argocd.sisys.local/applications/sisys-app-prod"
-fi
+```
+开发者本地:  ./scripts/release.sh v1.1.0
+                  │
+                  │ (仅验证格式 + 触发 Workflow)
+                  ▼
+Gitea:  .gitea/workflows/release.yaml (workflow_dispatch)
+                  │
+                  ├─ 1. 验证版本号
+                  ├─ 2. 更新 VERSION → commit → push main
+                  ├─ 3. 创建 annotated tag → push
+                  │         │
+                  │         ▼ (触发)
+                  │  .gitea/workflows/ci.yaml (push.tags: v*)
+                  │         │
+                  │         ├─ 代码检查 → 测试 → 安全扫描
+                  │         └─ 构建镜像 → 推送 Harbor
 ```
 
-**使用方法：**
-```bash
-# 赋予执行权限
-chmod +x scripts/release.sh
+### `scripts/release.sh`（本地入口）
 
-# 发布到生产
+**职责：** 本地验证 + 触发 Gitea Release Workflow
+
+```bash
+# 方式 1: UI 触发（默认，无需 token）
 ./scripts/release.sh v1.1.0
+# 输出 Gitea UI 链接，手动触发
 
-# 发布 beta 版本
-./scripts/release.sh v1.2.0-beta
+# 方式 2: API 触发（需要 token）
+export GITEA_TOKEN=your_token
+./scripts/release.sh v1.1.0
+# 自动调用 API 触发 Workflow
+
+# 干运行
+./scripts/release.sh v1.1.0 --dry-run
 ```
+
+### `.gitea/workflows/release.yaml`（服务端执行）
+
+**职责：** 版本号管理 + VERSION 文件更新 + Git Tag 创建
+
+**触发方式：** `workflow_dispatch`（手动）
+
+**输入参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `version` | string | ✅ | 语义化版本号，如 `v1.1.0` |
+| `dry_run` | boolean | ❌ | 干运行，仅验证不推送 |
+
+**执行流程：**
+
+1. 验证版本号格式
+2. 检查 Tag 是否已存在
+3. （干运行模式）打印将执行的步骤
+4. 更新 `VERSION` 文件 → commit → push main
+5. 创建 annotated tag → push tag
+6. tag push 自动触发 CI Pipeline
+
+**安全特性：**
+
+- 仅允许 main 分支触发
+- 并发控制：`concurrency: release`（防止同时发布）
+- 使用 Release Bot 身份提交（可审计）
+
+### 使用方式对比
+
+| 方式 | 适用场景 | 前置条件 |
+|------|---------|---------|
+| **UI 触发** | 偶尔发布、无 token | Gitea 访问权限 |
+| **API 触发** | 频繁发布、CI/CD 集成 | `GITEA_TOKEN` |
+| **干运行** | 验证版本号、测试流程 | 无 |
+
+---
+
+## 发布脚本验证
 
 ---
 
@@ -1239,7 +1209,7 @@ chmod +x scripts/release.sh
 - [ ] 清空现有 `.argocd-source-*.yaml`（让 Image Updater 重建为 Digest 格式）
 - [ ] （可选）修改 Prod 标签过滤正则
 - [ ] 修改 Dev 标签过滤正则
-- [ ] Harbor 启用不可变标签策略（v*, dev-*, test-*, latest）
+- [ ] Harbor 不可变标签策略已启用（v*, dev-*, test-*, latest）✅
 
 #### P0: 回滚与门禁（新增）
 
@@ -1267,7 +1237,7 @@ chmod +x scripts/release.sh
 ### CI 验证
 
 - [ ] push 到 feature 分支，确认生成 `dev-feature-{name}-...` 标签
-- [ ] push 到 develop/main，确认生成 `dev-{version}-...` 标签
+- [ ] push 到 main，确认生成 `dev-main-{version}-{sha}` 标签
 - [ ] push tag `v1.1.0`，确认生成 `v1.1.0` 和 `v1.1.0-{sha}` 两个标签
 - [ ] 手动触发 Workflow 并输入版本号，确认标签正确
 - [ ] 检查 Harbor 中 OCI labels 是否正确（feature、author、build_time）
@@ -1277,7 +1247,7 @@ chmod +x scripts/release.sh
 ### ArgoCD 验证
 
 - [ ] Dev 环境自动同步 feature 分支镜像
-- [ ] Dev 环境自动同步 develop/main 镜像
+- [ ] Dev 环境自动同步 main 镜像
 - [ ] Test 环境手动同步生效
 - [ ] Prod 环境手动审批生效
 - [ ] kubectl 查询 K8s annotations 中 feature 信息正确
@@ -1287,7 +1257,7 @@ chmod +x scripts/release.sh
 
 ### Harbor 验证
 
-- [ ] 不可变标签策略已启用（v*, dev-*, test-*, latest）
+- [ ] ✅ 不可变标签策略已启用（v*, dev-*, test-*, latest）
 - [ ] 尝试推送同名标签被拒绝（验证不可变性）
 - [ ] Harbor UI 中标签详情页显示正确的 Digest 和 OCI labels
 
