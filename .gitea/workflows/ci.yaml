@@ -465,21 +465,25 @@ jobs:
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
-          # 提取分支名 / feature 信息
-          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-            # feature/login-page → login-page
-            FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
-            IMAGE_PREFIX="dev-feature"
-          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            FEATURE_NAME="main"
-            IMAGE_PREFIX="dev"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            FEATURE_NAME="release"
-            IMAGE_PREFIX=""
-          else
-            FEATURE_NAME="unknown"
-            IMAGE_PREFIX="dev"
-          fi
+          # 提取分支名 / feature 信息 (POSIX 兼容写法)
+          case "${{ github.ref }}" in
+            refs/heads/feature/*)
+              FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
+              IMAGE_PREFIX="dev-feature"
+              ;;
+            refs/heads/main)
+              FEATURE_NAME="main"
+              IMAGE_PREFIX="dev"
+              ;;
+            refs/tags/v*)
+              FEATURE_NAME="release"
+              IMAGE_PREFIX=""
+              ;;
+            *)
+              FEATURE_NAME="unknown"
+              IMAGE_PREFIX="dev"
+              ;;
+          esac
 
           # 提取提交作者（清理换行和多余空格）
           AUTHOR=$(git log -1 --pretty=format:'%an' | tr -d '[:space:]')
@@ -503,8 +507,8 @@ jobs:
           PREFIX="${{ steps.context.outputs.image_prefix }}"
           FEATURE="${{ steps.context.outputs.feature_name }}"
 
-          # L3 基础标签
-          if [[ -n "$PREFIX" ]]; then
+          # L3 基础标签 (POSIX 兼容写法)
+          if [ -n "$PREFIX" ]; then
             echo "image_tag_l3=${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
             echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
