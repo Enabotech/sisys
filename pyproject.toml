@@ -126,7 +126,7 @@ sisys = "src.cli:app"
 [[tool.poetry.source]]
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-priority = "primary"
+priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "aliyun"
@@ -141,7 +141,7 @@ priority = "supplemental"
 [[tool.poetry.source]]
 name = "tencent"
 url = "https://mirrors.cloud.tencent.com/pypi/simple/"
-priority = "supplemental"
+priority = "primary"
 
 [[tool.poetry.source]]
 name = "PyPI"
