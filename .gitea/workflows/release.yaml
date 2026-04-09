@@ -30,6 +30,9 @@ jobs:
   release:
     name: "🚀 发布 ${{ inputs.version }}"
     runs-on: ubuntu2204
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
 
     # 仅允许 main 分支触发
     if: github.ref == 'refs/heads/main'
