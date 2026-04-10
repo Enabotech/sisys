@@ -23,7 +23,7 @@ commonAnnotations:
 # 镜像配置 (测试环境使用具体版本)
 images:
   - name: harbor.sisys.local/sisys/app
-    newTag: test-v1.0.0-0000000
+    newTag: test-v0.0.3-458c871
 
 # 名称前缀
 namePrefix: test-
