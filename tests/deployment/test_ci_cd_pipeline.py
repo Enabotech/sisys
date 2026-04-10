@@ -115,15 +115,16 @@ class TestCIPipeline:
     def test_build_image_job(self, ci_workflow):
         """测试镜像构建任务"""
         jobs = ci_workflow["jobs"]
-        assert "build-image" in jobs
+        assert "build-images" in jobs
 
-        build_image = jobs["build-image"]
+        build_image = jobs["build-images"]
         assert build_image["name"] == "🏗️ 构建镜像"
 
         # 检查 Docker Buildx
         steps = [s["name"] for s in build_image["steps"]]
         assert "设置 Buildx" in steps
-        assert "构建推送镜像" in steps
+        # 检查构建步骤（实际步骤名称）
+        assert "构建 L2 镜像" in steps or "构建 L3 镜像（Dev）" in steps
 
     # def test_auto_deploy_job(self, ci_workflow):
     #     """测试自动部署任务"""

@@ -214,7 +214,7 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
     - [x] 部署脚本：`scripts/deployment/gitea-runner/deploy-runner.sh` ✅
   - [x] **问题修复：Runner 重复注册问题** ✅ **已部署 (2026-03-20 10:47)**
     - [x] 使用 StatefulSet 替代 Deployment ✅
-      - **文件**: `deployments/gitea-runner/gitea-runner-statefulset.yaml`
+      - **文件**: `deployments/gitea-runner/gitea-actions-complete.yaml`
       - **说明**: StatefulSet 为每个 Pod 分配独立 PVC，重启后注册信息不丢失
       - **部署状态**: ✅ 已部署，3/3 Pod 运行中
     - [x] 配置 PVC 持久化存储 ✅
@@ -1067,7 +1067,7 @@ kubectl delete namespace gitea-actions
 - `scripts/deployment/gitea-runner/configure-token.sh` - Token 配置脚本
 
 **Task 2 创建的文件（2026-03-20）：**
-- `deployments/gitea-runner/gitea-org-runner-statefulset.yaml` - StatefulSet 配置 (3 副本，解决重复注册) ✅
+- `deployments/gitea-runner/gitea-actions-complete.yaml` - StatefulSet 配置 (3 副本，解决重复注册) ✅
 - `deployments/gitea-runner/gitea-org-runner-token-secret.yaml` - Runner Token Secret
 - `deployments/gitea-runner/gitea-runner-pvc.yaml` - PVC 持久化配置 (3 个 PVC) ✅
 - `scripts/deployment/gitea-runner/deploy-runner.sh` - Runner 部署脚本

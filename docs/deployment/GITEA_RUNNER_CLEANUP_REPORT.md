@@ -24,7 +24,7 @@
 
 | 文件名 | 删除原因 | 替代方案 |
 |--------|---------|---------|
-| `gitea-runner.yaml` | 旧 Deployment 配置，无持久化 | `gitea-runner-statefulset.yaml` |
+| `gitea-runner.yaml` | 旧 Deployment 配置，无持久化 | `gitea-actions-complete.yaml` |
 | `gitea-runner-pvc.yaml` | 手动 PVC，StatefulSet 自动创建 | volumeClaimTemplates |
 | `gitea-runner-https.yaml` | HTTPS 可选配置，当前使用 HTTP | - |
 
@@ -56,7 +56,7 @@
 
 | 文件名 | 用途 | 状态 |
 |--------|------|------|
-| `gitea-runner-statefulset.yaml` | StatefulSet 主配置 | ✅ 运行中 |
+| `gitea-actions-complete.yaml` | StatefulSet 主配置 | ✅ 运行中 |
 | `runner-config.yaml` | Runner 配置文件 (ConfigMap 源) | ✅ 已挂载 |
 | `gitea-runner-token-secret.yaml` | Token Secret 配置 | ✅ 已应用 |
 
@@ -112,7 +112,7 @@
 
 ```
 deployments/gitea-runner/
-├── gitea-runner-statefulset.yaml    # StatefulSet 主配置
+├── gitea-actions-complete.yaml    # StatefulSet 主配置
 ├── runner-config.yaml               # Runner 配置文件
 └── gitea-runner-token-secret.yaml   # Token Secret
 
@@ -168,7 +168,7 @@ Pod gitea-runner-0/1/2: Running
 
 ```bash
 # 1. 应用配置
-kubectl apply -f deployments/gitea-runner/gitea-runner-statefulset.yaml -n gitea-actions
+kubectl apply -f deployments/gitea-runner/gitea-actions-complete.yaml -n gitea-actions
 
 # 2. 验证部署
 kubectl get statefulset gitea-runner -n gitea-actions

@@ -264,7 +264,7 @@ class TestRunnerConfiguration:
         """Verify Runner deployment configuration exists"""
         # Try multiple possible config file names
         config_paths = [
-            Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml"),
+            Path("deployments/gitea-runner/gitea-actions-complete.yaml"),
             Path("deployments/gitea-runner/gitea-runner.yaml"),
             Path("deployments/gitea-runner/runner-statefulset.yaml"),
         ]

@@ -7,7 +7,7 @@
 # 日期：2026-04-06
 #
 # 整合来源：
-#   - gitea-org-runner-statefulset.yaml  (GPU Runner - hostPath Docker Socket)
+#   - gitea-actions-complete.yaml  (GPU Runner - hostPath Docker Socket)
 #   - gitea-org-runner-config.yaml       (Runner ConfigMap)
 #   - gitea-org-runner-token-secret.yaml (注册 Token Secret)
 #   - harbor-robot-secret.yaml           (Harbor 认证 Secret)
@@ -437,7 +437,7 @@ spec:
         # SSL 证书卷
         - name: ca-certificates
           secret:
-            secretName: ca-certificates
+            secretName: ca-certificates   # pragma: allowlist secret
             defaultMode: 0644
 
   # volumeClaimTemplates - StatefulSet 核心特性

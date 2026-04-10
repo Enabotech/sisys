@@ -385,7 +385,7 @@ curl -X POST https://webhook.site/your-unique-id
 
 ## 📚 参考文档
 
-- [Source: deployments/gitea-runner/gitea-org-runner-statefulset.yaml] - Runner StatefulSet 配置
+- [Source: deployments/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
 - [Source: https://docs.gitea.com/usage/actions/runner] - Gitea Runner 官方文档
 - [Source: https://prometheus.io/docs/prometheus/latest/configuration/configuration/] - Prometheus 配置文档
 - [Source: https://grafana.com/docs/grafana/latest/datasources/prometheus/] - Grafana Prometheus 数据源
