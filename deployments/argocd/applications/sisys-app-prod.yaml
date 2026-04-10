@@ -28,11 +28,11 @@ metadata:
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
     argocd-image-updater.argoproj.io/git-branch: release
 
-    # 生产环境使用 semver 策略
-    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    # argocd-image-updater.argoproj.io/app.update-strategy: semver
+    argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
-    # 只匹配语义化版本标签 (v1.0.0, v1.2.3 等)
-    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    # argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+-.*
 
     # 忽略预发布版本
     argocd-image-updater.argoproj.io/app.ignore-tags: regexp:.*-(test|rc|beta|alpha).*
