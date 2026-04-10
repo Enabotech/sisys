@@ -38,7 +38,7 @@ echo ""
 # 1. gitea-runner.yaml - 旧 Deployment 配置（已废弃）
 log_info "1. gitea-runner.yaml"
 log_warning "   状态：已废弃 (使用 Deployment，无持久化)"
-log_info "   替代：gitea-runner-statefulset.yaml"
+log_info "   替代：gitea-actions-complete.yaml"
 read -p "   是否删除？(y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -52,7 +52,7 @@ echo ""
 # 2. gitea-runner-pvc.yaml - 手动 PVC 配置（已废弃）
 log_info "2. gitea-runner-pvc.yaml"
 log_warning "   状态：已废弃 (StatefulSet 使用 volumeClaimTemplates 自动创建 PVC)"
-log_info "   替代：gitea-runner-statefulset.yaml 中的 volumeClaimTemplates"
+log_info "   替代：gitea-actions-complete.yaml 中的 volumeClaimTemplates"
 read -p "   是否删除？(y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -77,8 +77,8 @@ else
 fi
 echo ""
 
-# 4. gitea-runner-statefulset.yaml - 当前有效配置
-log_info "4. gitea-runner-statefulset.yaml"
+# 4. gitea-actions-complete.yaml - 当前有效配置
+log_info "4. gitea-actions-complete.yaml"
 log_success "   状态：✅ 有效 (当前运行配置)"
 log_info "   保留"
 echo ""
@@ -222,7 +222,7 @@ echo "清理完成！"
 echo "=============================================="
 echo ""
 log_info "保留的有效文件："
-echo "  - gitea-runner-statefulset.yaml (主配置)"
+echo "  - gitea-actions-complete.yaml (主配置)"
 echo "  - runner-config.yaml (Runner 配置)"
 echo "  - gitea-runner-token-secret.yaml (Token Secret)"
 echo "  - configure-token.sh (Token 配置脚本)"

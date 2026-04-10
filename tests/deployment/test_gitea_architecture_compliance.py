@@ -73,7 +73,7 @@ class TestTLSConfiguration:
     def test_https_urls_in_config(self):
         """Verify HTTPS URLs are used in configuration"""
         # Check for HTTPS URLs in Runner config
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -128,7 +128,7 @@ class TestSecretManagement:
     def test_kubernetes_secrets_used(self):
         """Verify Kubernetes Secrets are used for sensitive data"""
         # Check Runner deployment for Secret references
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -267,7 +267,7 @@ class TestResourceLimits:
 
     def test_runner_has_resource_limits(self):
         """Verify Runner pods have resource limits"""
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if not runner_config.exists():
             pytest.fail("Runner deployment config not found")
@@ -337,7 +337,7 @@ class TestRootlessMode:
 
     def test_no_privileged_flag(self):
         """Verify no --privileged flag in deployment"""
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -351,7 +351,7 @@ class TestRootlessMode:
 
     def test_no_docker_socket_mount(self):
         """Verify no docker.sock mount in Runner config"""
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -370,7 +370,7 @@ class TestRootlessMode:
 
     def test_security_context_configured(self):
         """Verify security context is configured"""
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -385,7 +385,7 @@ class TestRootlessMode:
 
     def test_runasnonroot_or_runasroot_false(self):
         """Verify runAsNonRoot or runAsRoot configuration"""
-        runner_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()

@@ -273,7 +273,7 @@ kubectl apply -f deployments/gitea-runner/limitrange.yaml
 
 ```bash
 # 检查是否有 privileged: true
-grep -n "privileged: true" deployments/gitea-runner/gitea-org-runner-statefulset.yaml
+grep -n "privileged: true" deployments/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ✅ 未发现 privileged: true
@@ -282,7 +282,7 @@ grep -n "privileged: true" deployments/gitea-runner/gitea-org-runner-statefulset
 
 ```bash
 # 检查 docker.sock 挂载
-grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-org-runner-statefulset.yaml
+grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ℹ️ docker.sock 挂载存在，但用于 K3s containerd 集成 ✅
@@ -291,7 +291,7 @@ grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-org-runner-statefu
 
 ```bash
 # 检查 securityContext 配置
-grep -A 5 "securityContext:" deployments/gitea-runner/gitea-org-runner-statefulset.yaml
+grep -A 5 "securityContext:" deployments/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ✅ securityContext 已配置，`runAsNonRoot: false`（DIND 需要）
@@ -387,7 +387,7 @@ pytest tests/deployment/test_gitea_architecture_compliance.py -v
 
 ## 📚 参考文档
 
-- [Source: deployments/gitea-runner/gitea-org-runner-statefulset.yaml] - Runner StatefulSet 配置
+- [Source: deployments/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
 - [Source: deployments/gitea-runner/gitea-org-runner-token-secret.yaml] - Runner Token Secret
 - [Source: deployments/gitea-runner/harbor-robot-secret.yaml] - Harbor Robot Account Secret
 - [Source: https://kubernetes.io/docs/concepts/security/] - Kubernetes 安全文档

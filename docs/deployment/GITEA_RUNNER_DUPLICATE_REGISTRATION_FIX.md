@@ -89,7 +89,7 @@ spec:
 
 ### 2. StatefulSet 配置
 
-文件：`deployments/gitea-runner/gitea-runner-statefulset.yaml`
+文件：`deployments/gitea-runner/gitea-actions-complete.yaml`
 
 关键配置：
 ```yaml
@@ -289,7 +289,7 @@ kubectl delete pvc -n gitea-actions -l app=gitea-runner
 
 # 重新部署
 kubectl apply -f deployments/gitea-runner/gitea-runner-pvc.yaml
-kubectl apply -f deployments/gitea-runner/gitea-runner-statefulset.yaml
+kubectl apply -f deployments/gitea-runner/gitea-actions-complete.yaml
 ```
 
 ## 📊 预期效果

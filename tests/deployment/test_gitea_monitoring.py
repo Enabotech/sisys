@@ -57,7 +57,7 @@ class TestRunnerLogCollection:
         ]
 
         # At least check if logging is mentioned in deployment config
-        deployment_config = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        deployment_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if deployment_config.exists():
             _ = deployment_config.read_text()
             # Logging configuration is optional for now

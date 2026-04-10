@@ -25,12 +25,12 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_config_exists(self):
         """测试 StatefulSet 配置文件存在"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         assert config_path.exists(), f"StatefulSet 配置文件不存在：{config_path}"
 
     def test_statefulset_valid_yaml(self):
         """测试 StatefulSet 配置 YAML 语法正确"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             try:
                 with open(config_path, encoding="utf-8") as f:
@@ -40,19 +40,20 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_replicas(self):
         """测试 StatefulSet 副本数配置"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
                 # 使用 safe_load_all 处理多文档 YAML
                 docs = list(yaml.safe_load_all(f))
-                # 第一个文档是 StatefulSet
-                statefulset = docs[0]
+                # 动态查找 StatefulSet 文档
+                statefulset = next((doc for doc in docs if doc and doc.get("kind") == "StatefulSet"), None)
+                assert statefulset is not None, "未找到 StatefulSet 文档"
                 replicas = statefulset.get("spec", {}).get("replicas", 0)
-                assert replicas == 4, f"Runner 副本数应为 3，实际为：{replicas}"
+                assert replicas == 4, f"Runner 副本数应为 4，实际为：{replicas}"
 
     def test_runner_args_include_config(self):
         """测试 Runner 启动参数包含 --config"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
             # 检查是否包含 --config 参数
@@ -60,13 +61,14 @@ class TestStatefulSetConfiguration:
 
     def test_volume_claim_templates_configured(self):
         """测试 volumeClaimTemplates 配置"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
                 # 使用 safe_load_all 处理多文档 YAML
                 docs = list(yaml.safe_load_all(f))
-                # 第一个文档是 StatefulSet
-                statefulset = docs[0]
+                # 动态查找 StatefulSet 文档
+                statefulset = next((doc for doc in docs if doc and doc.get("kind") == "StatefulSet"), None)
+                assert statefulset is not None, "未找到 StatefulSet 文档"
                 spec = statefulset.get("spec", {})
 
                 # 检查 volumeClaimTemplates
@@ -84,7 +86,7 @@ class TestStatefulSetConfiguration:
 
     def test_config_file_mounted(self):
         """测试配置文件挂载"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
             # 检查是否挂载了 config.yaml
@@ -92,7 +94,7 @@ class TestStatefulSetConfiguration:
 
     def test_data_directory_mounted(self):
         """测试 /data 目录挂载"""
-        config_path = Path("deployments/gitea-runner/gitea-org-runner-statefulset.yaml")
+        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
             # 检查是否挂载了 /data 目录

@@ -78,7 +78,7 @@ class TestCIPipelineSyntax:
                     "unit-tests",
                     "integration-tests",
                     "security-scan",
-                    "build-image",
+                    "build-images",
                     # "push-image",
                     # "auto-deploy",
                 ]
@@ -284,13 +284,13 @@ class TestJobDependencies:
                 else:
                     assert "unit-tests" in int_test_needs, "integration-tests 应依赖 unit-tests"
 
-                # build-image 的 needs 应该是列表
-                build_needs = jobs.get("build-image", {}).get("needs", [])
+                # build-images 的 needs 应该是列表
+                build_needs = jobs.get("build-images", {}).get("needs", [])
                 if isinstance(build_needs, str):
                     build_needs = [build_needs]
                 assert (
                     "integration-tests" in build_needs or "security-scan" in build_needs or "code-quality" in build_needs
-                ), "build-image 应依赖 integration-tests 和 security-scan 和 code-quality"
+                ), "build-images 应依赖 integration-tests 和 security-scan 和 code-quality"
 
                 # push-image 应依赖 build-image
                 # push_needs = jobs.get("push-image", {}).get("needs", [])
