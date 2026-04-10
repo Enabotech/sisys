@@ -6,6 +6,8 @@ sudo crictl images -q --filter "reference=harbor.sisys.local/sisys/app:*" | xarg
 echo "🧹 清理 DinD 内部..."
 kubectl exec gitea-runner-dind-0 -n gitea-advacts -c docker-dind -- \
   docker system prune -af 2>/dev/null || true
+kubectl exec gitea-runner-dind-0 -n gitea-advacts -c docker-dind -- \
+  docker volume prune -af 2>/dev/null || true
 echo "🧹 清理 Docker 构建缓存..."
 docker builder prune -f
 echo "🧹 清理 Docker 容器无用数据..."
