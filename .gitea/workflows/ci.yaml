@@ -525,6 +525,7 @@ jobs:
           GIT_SHA="${{ steps.context.outputs.git_sha }}"
           VERSION="${{ steps.context.outputs.version }}"
           PREFIX="${{ steps.context.outputs.image_prefix }}"
+          FEATURE="${{ steps.context.outputs.feature_name }}"
           IMAGE="${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app"
 
           # L2 标签
@@ -532,13 +533,10 @@ jobs:
 
           # L3 基础标签
           if [ -n "$PREFIX" ]; then
-            # Dev: dev-feature-ade-v0.0.2-xxx  或  dev-main-v0.0.2-xxx
-            echo "image_tag_l3=${IMAGE}:${PREFIX}-${FEATURE_NAME}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+            echo "image_tag_l3=${IMAGE}:${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/release" ]; then
-            # Release 分支: v1.1.0-xxx（带 git sha）
             echo "image_tag_l3=${IMAGE}:${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
-            # Tag 推送: 纯 SemVer v1.1.0
             echo "image_tag_l3=${IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
           fi
 
@@ -546,7 +544,7 @@ jobs:
           echo "image_tag_test=${IMAGE}:test-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
           echo "✅ 版本: ${VERSION}"
-          echo "✅ Feature: ${FEATURE_NAME}"
+          echo "✅ Feature: ${FEATURE}"
           echo "✅ SHA: ${GIT_SHA}"
 
       # ---------- L2 构建 ----------
