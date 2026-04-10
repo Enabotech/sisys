@@ -532,8 +532,13 @@ jobs:
 
           # L3 基础标签
           if [ -n "$PREFIX" ]; then
-            echo "image_tag_l3=${IMAGE}:${PREFIX}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+            # Dev: dev-feature-ade-v0.0.2-xxx  或  dev-main-v0.0.2-xxx
+            echo "image_tag_l3=${IMAGE}:${PREFIX}-${FEATURE_NAME}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/release" ]; then
+            # Release 分支: v1.1.0-xxx（带 git sha）
+            echo "image_tag_l3=${IMAGE}:${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
+            # Tag 推送: 纯 SemVer v1.1.0
             echo "image_tag_l3=${IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
           fi
 
