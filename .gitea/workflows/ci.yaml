@@ -492,7 +492,7 @@ jobs:
               ;;
             refs/heads/main)
               FEATURE_NAME="main"
-              IMAGE_PREFIX="dev-main"
+              IMAGE_PREFIX="dev"
               ;;
             refs/heads/release)
               FEATURE_NAME="release"
@@ -504,7 +504,7 @@ jobs:
               ;;
             *)
               FEATURE_NAME="unknown"
-              IMAGE_PREFIX="dev-main"
+              IMAGE_PREFIX="dev"
               ;;
           esac
 
