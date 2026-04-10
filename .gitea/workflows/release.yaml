@@ -25,6 +25,13 @@ on:
         required: false
         default: false
         type: boolean
+      target_branch:
+        description: '目标分支'
+        required: false
+        default: 'release'
+        type: choice
+        options:
+          - release
 
 # 防止并发发布
 concurrency:
@@ -43,10 +50,19 @@ jobs:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:l2-latest
       options: --user root
 
-    # 仅允许 release 分支触发
-    if: github.ref == 'refs/heads/release'
-
     steps:
+      # =========================================================================
+      # 分支验证（清晰的错误提示）
+      # =========================================================================
+      - name: 验证目标分支
+        run: |
+          if [[ "${{ inputs.target_branch }}" != "release" ]]; then
+            echo "❌ 仅允许从 release 分支触发发布"
+            echo "💡 请先将代码合并到 release 分支后再执行发布"
+            exit 1
+          fi
+          echo "✅ 目标分支验证通过: ${{ inputs.target_branch }}"
+
       # =========================================================================
       # 检出代码（必须在所有 git 操作之前）
       # =========================================================================
@@ -54,8 +70,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: release
-          token: ${{ secrets.GITEA_TOKEN || secrets.RELEASE_BOT_TOKEN }}
+          ref: ${{ inputs.target_branch }}
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
 
       - name: 配置 Git 用户
         run: |
