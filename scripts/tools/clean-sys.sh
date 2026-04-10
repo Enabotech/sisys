@@ -3,11 +3,32 @@
 echo "🧹 清理 K3s 容器无用镜像..."
 sudo k3s crictl rmi --prune 2>/dev/null || true
 sudo crictl images -q --filter "reference=harbor.sisys.local/sisys/app:*" | xargs sudo crictl rmi
-echo "🧹 清理 DinD 内部..."
+
+echo "🧹 清理 advacts Runner 内部..."
 kubectl exec gitea-runner-dind-0 -n gitea-advacts -c docker-dind -- \
   docker system prune -af 2>/dev/null || true
 kubectl exec gitea-runner-dind-0 -n gitea-advacts -c docker-dind -- \
   docker volume prune -af 2>/dev/null || true
+
+echo "🧹 清理 actions runner 内部..."
+kubectl exec gitea-org-runner-0 -n gitea-actions -c runner -- \
+  docker system prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-1 -n gitea-actions -c runner -- \
+  docker system prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-2 -n gitea-actions -c runner -- \
+  docker system prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-3 -n gitea-actions -c runner -- \
+  docker system prune -af 2>/dev/null || true
+
+kubectl exec gitea-org-runner-0 -n gitea-actions -c runner -- \
+  docker volume prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-1 -n gitea-actions -c runner -- \
+  docker volume prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-2 -n gitea-actions -c runner -- \
+  docker volume prune -af 2>/dev/null || true
+kubectl exec gitea-org-runner-3 -n gitea-actions -c runner -- \
+  docker volume prune -af 2>/dev/null || true
+
 echo "🧹 清理 Docker 构建缓存..."
 docker builder prune -f
 echo "🧹 清理 Docker 容器无用数据..."
