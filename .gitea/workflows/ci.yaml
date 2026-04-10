@@ -659,7 +659,7 @@ jobs:
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
       # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
-      - name: 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
+      - name: 记录 Digest 信息
         if: always() && (steps.build-l3-dev.outputs.digest != '' || steps.build-l3-release.outputs.digest != '')
         run: |
           DIGEST="${{ steps.build-l3-release.outputs.digest || steps.build-l3-dev.outputs.digest }}"
