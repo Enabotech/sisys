@@ -32,7 +32,7 @@ metadata:
     argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
     # 标签过滤：只匹配 dev 开头的标签（含 feature 分支）
-    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-(feature-)?v[0-9]+.*
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-((feature-)?v[0-9]+.*|(main-)?v[0-9]+.*)
     # 忽略临时标签
     argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
 
