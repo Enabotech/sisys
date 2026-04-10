@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - release
       - 'feature/**'
     tags:
       - 'v*'  # Git Tag 触发生产发布
@@ -72,7 +73,8 @@ env:
   IMAGE_TAG_L3_LATEST: latest
 
   # --- 版本标签前缀 (用于生成具体版本标签) ---
-  # Layer 3 动态版本号: 手动输入 > Git Tag > VERSION 文件 > 默认值 v1.0.0
+  # Layer 3 动态版本号: 手动输入 > Git Tag > 默认值 v0.0.0
+  # 注意: 分支推送时版本号由 "提取构建上下文" 步骤从 VERSION 文件读取
   IMAGE_TAG_L3_BASE: |
     ${{
       github.event.inputs.version ||
@@ -467,7 +469,22 @@ jobs:
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
-          # 提取分支名 / feature 信息 (POSIX 兼容写法)
+          # ========== 版本号确定 ==========
+          # 优先级: 手动输入 > Git Tag > VERSION 文件 > 默认值 v0.0.0
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" = "push" ] && \
+               echo "${{ github.ref }}" | grep -q '^refs/tags/'; then
+            VERSION="${{ github.ref_name }}"
+          elif [ -f VERSION ]; then
+            VERSION=$(cat VERSION | tr -d '[:space:]')
+            echo "📄 版本号来自 VERSION 文件: ${VERSION}"
+          else
+            VERSION="v0.0.0"
+            echo "⚠️  使用默认版本号: ${VERSION}"
+          fi
+
+          # ========== 分支识别 ==========
           case "${{ github.ref }}" in
             refs/heads/feature/*)
               FEATURE_NAME=$(echo "${{ github.ref }}" | sed 's|refs/heads/feature/||')
@@ -475,23 +492,24 @@ jobs:
               ;;
             refs/heads/main)
               FEATURE_NAME="main"
-              IMAGE_PREFIX="dev"
+              IMAGE_PREFIX="dev-main"
+              ;;
+            refs/heads/release)
+              FEATURE_NAME="release"
+              IMAGE_PREFIX=""
               ;;
             refs/tags/v*)
               FEATURE_NAME="release"
-              IMAGE_PREFIX="prod"
+              IMAGE_PREFIX=""
               ;;
             *)
               FEATURE_NAME="unknown"
-              IMAGE_PREFIX="dev"
+              IMAGE_PREFIX="dev-main"
               ;;
           esac
 
           # 提取提交作者（清理换行和多余空格）
           AUTHOR=$(git log -1 --pretty=format:'%an' | tr -d '[:space:]')
-
-          # 清理版本号（去除换行和空格）
-          VERSION=$(echo "${{ env.IMAGE_TAG_L3_BASE }}" | tr -d '[:space:]')
 
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
@@ -507,23 +525,24 @@ jobs:
           GIT_SHA="${{ steps.context.outputs.git_sha }}"
           VERSION="${{ steps.context.outputs.version }}"
           PREFIX="${{ steps.context.outputs.image_prefix }}"
-          FEATURE="${{ steps.context.outputs.feature_name }}"
+          IMAGE="${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app"
 
           # L2 标签
           echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
-          # L3 基础标签 (POSIX 兼容写法)
+          # L3 基础标签
           if [ -n "$PREFIX" ]; then
-            echo "image_tag_l3=${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+            echo "image_tag_l3=${IMAGE}:${PREFIX}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
-            echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+            echo "image_tag_l3=${IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
           fi
-          echo "image_tag_test=test-${VERSION}-${{ steps.context.outputs.git_sha }}" >> $GITHUB_OUTPUT
+
+          # 测试标签（仅 release/Tag 推送时生成）
+          echo "image_tag_test=${IMAGE}:test-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
           echo "✅ 版本: ${VERSION}"
-          echo "✅ Feature: ${FEATURE}"
+          echo "✅ Feature: ${FEATURE_NAME}"
           echo "✅ SHA: ${GIT_SHA}"
-          echo "✅ 标签: ${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}"
 
       # ---------- L2 构建 ----------
       - name: 同步 Lock 文件 (L2)
@@ -564,27 +583,62 @@ jobs:
             BASE_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
 
       # ---------- L3 构建 ----------
-      - name: 构建 L3 镜像
-        id: build-l3
+
+      # Dev 构建（main / feature）— 仅推 dev 标签
+      - name: 构建 L3 镜像（Dev）
+        id: build-l3-dev
         if: >-
           ${{
-            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
-            || startsWith(github.ref, 'refs/tags/')
-            || needs.detect-changes.outputs.l3 == 'true'
+            startsWith(github.ref, 'refs/heads/main') ||
+            startsWith(github.ref, 'refs/heads/feature/')
           }}
+        needs: [detect-changes, integration-tests, security-scan, code-quality]
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/dockerfile.app
           push: true
           tags: |
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_test }}
+            ${{ steps.meta.outputs.image_tag_l3 }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.context.outputs.build_time }}
+            sisys.image.layer="l3"
+            sisys.image.type="application"
+            sisys.io/feature=${{ steps.context.outputs.feature_name }}
+            sisys.io/author=${{ steps.context.outputs.author }}
+            sisys.io/build-time=${{ steps.context.outputs.build_time }}
+            sisys.io/branch=${{ github.ref_name }}
+            sisys.io/version=${{ steps.context.outputs.version }}
+          cache-from: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache
+          cache-to: type=registry,ref=${{ vars.HARBOR_REGISTRY }}/sisys/buildcache:app-cache,mode=min
+          provenance: false
+          platforms: linux/amd64
+          build-args: |
+            DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+
+      # Release/Tag 构建 — 推 SemVer + test，Tag 推送额外推 latest
+      - name: 构建 L3 镜像（Release/Tag）
+        id: build-l3-release
+        if: >-
+          ${{
+            startsWith(github.ref, 'refs/heads/release') ||
+            startsWith(github.ref, 'refs/tags/')
+          }}
+        needs: [detect-changes, integration-tests, security-scan, code-quality]
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/dockerfile.app
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_tag_l3 }}
+            ${{ steps.meta.outputs.image_tag_test }}
             ${{
               startsWith(github.ref, 'refs/tags/') &&
-              format('{0}/{1}/app:{2}', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT, steps.context.outputs.version) ||
-              format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT)
+              format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT) ||
+              ''
             }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -606,9 +660,9 @@ jobs:
 
       # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
       - name: 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
-        if: always() && steps.build-l3.outputs.digest != ''
+        if: always() && (steps.build-l3-dev.outputs.digest != '' || steps.build-l3-release.outputs.digest != '')
         run: |
-          DIGEST="${{ steps.build-l3.outputs.digest }}"
+          DIGEST="${{ steps.build-l3-release.outputs.digest || steps.build-l3-dev.outputs.digest }}"
           echo "构建 Digest: ${DIGEST}"
 
           # 确保目录存在
@@ -622,10 +676,8 @@ jobs:
             "digest": "${DIGEST}",
             "image": "${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app",
             "tags": [
-              "latest",
               "${{ steps.meta.outputs.image_tag_l3 }}",
-              "test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}",
-              "${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}",
+              "${{ steps.meta.outputs.image_tag_test }}",
               "${{ steps.context.outputs.version }}"
             ],
             "build_time": "${{ steps.context.outputs.build_time }}",
