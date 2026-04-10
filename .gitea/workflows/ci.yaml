@@ -575,7 +575,7 @@ jobs:
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_test }}
             ${{
               startsWith(github.ref, 'refs/tags/') &&
               format('{0}/{1}/app:{2}', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT, steps.context.outputs.version) ||
