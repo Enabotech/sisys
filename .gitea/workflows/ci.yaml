@@ -507,15 +507,16 @@ jobs:
           PREFIX="${{ steps.context.outputs.image_prefix }}"
           FEATURE="${{ steps.context.outputs.feature_name }}"
 
+          # L2 标签
+          echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+
           # L3 基础标签 (POSIX 兼容写法)
           if [ -n "$PREFIX" ]; then
             echo "image_tag_l3=${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
             echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           fi
-
-          # L2 标签
-          echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag_test=test-${VERSION}-${{ steps.context.outputs.git_sha }}" >> $GITHUB_OUTPUT
 
           echo "✅ 版本: ${VERSION}"
           echo "✅ Feature: ${FEATURE}"
@@ -575,6 +576,11 @@ jobs:
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
+            ${{
+              startsWith(github.ref, 'refs/tags/') &&
+              format('{0}/{1}/app:{2}', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT, steps.context.outputs.version) ||
+              format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT)
+            }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -594,7 +600,7 @@ jobs:
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
       # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
-      - name: 记录 Digest 信息
+      - name: 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
         if: always() && steps.build-l3.outputs.digest != ''
         run: |
           DIGEST="${{ steps.build-l3.outputs.digest }}"
@@ -631,5 +637,5 @@ jobs:
         with:
           name: docker-image-info
           path: |
-            reports/image-info.txt
+            reports/build/build-metadata.json
           retention-days: 30
