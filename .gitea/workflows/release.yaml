@@ -25,6 +25,13 @@ on:
         required: false
         default: false
         type: boolean
+      target_branch:
+        description: '目标分支'
+        required: false
+        default: 'release'
+        type: choice
+        options:
+          - release
 
 # 防止并发发布
 concurrency:
@@ -43,19 +50,28 @@ jobs:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:l2-latest
       options: --user root
 
-    # 仅允许 release 分支触发
-    if: github.ref == 'refs/heads/release'
-
     steps:
       # =========================================================================
-      # 步骤 0: 检出代码（必须在所有 git 操作之前）
+      # 分支验证（清晰的错误提示）
+      # =========================================================================
+      - name: 验证目标分支
+        run: |
+          if [[ "${{ inputs.target_branch }}" != "release" ]]; then
+            echo "❌ 仅允许从 release 分支触发发布"
+            echo "💡 请先将代码合并到 release 分支后再执行发布"
+            exit 1
+          fi
+          echo "✅ 目标分支验证通过: ${{ inputs.target_branch }}"
+
+      # =========================================================================
+      # 检出代码（必须在所有 git 操作之前）
       # =========================================================================
       - name: 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: release
-          token: ${{ secrets.GITEA_TOKEN || secrets.RELEASE_BOT_TOKEN }}
+          ref: ${{ inputs.target_branch }}
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
 
       - name: 配置 Git 用户
         run: |
@@ -63,7 +79,7 @@ jobs:
           git config user.email "${{ env.GIT_USER_EMAIL }}"
 
       # =========================================================================
-      # 步骤 1: 格式校验
+      # 格式校验
       # =========================================================================
       - name: 格式校验
         shell: bash
@@ -88,7 +104,7 @@ jobs:
           echo "✅ Tag $VERSION 不存在，可以发布"
 
       # =========================================================================
-      # 步骤 2: 干运行（不推送）
+      # 干运行（不推送）
       # =========================================================================
       - name: 干运行验证
         if: inputs.dry_run
@@ -105,29 +121,7 @@ jobs:
           echo "✅ 干运行验证通过，未做任何更改"
 
       # =========================================================================
-      # 步骤 3: 更新本地 VERSION 文件
-      # =========================================================================
-      - name: 更新 VERSION 文件
-        if: "!inputs.dry_run"
-        shell: bash
-        run: |
-          VERSION="${{ inputs.version }}"
-          echo "$VERSION" > VERSION
-          git add VERSION
-          git commit -m "chore(release): bump version to $VERSION"
-
-      # =========================================================================
-      # 步骤 4: 推送到远程
-      # =========================================================================
-      - name: 推送 release 分支
-        if: "!inputs.dry_run"
-        shell: bash
-        run: |
-          git push origin release
-          echo "✅ 已推送 release 分支"
-
-      # =========================================================================
-      # 步骤 5: 创建并推送 Tag
+      # 创建并推送 Tag
       # =========================================================================
       - name: 创建推送版本标签
         if: "!inputs.dry_run"
@@ -139,7 +133,7 @@ jobs:
           echo "✅ 已创建并推送 Tag: $VERSION"
 
       # =========================================================================
-      # 步骤 6: 完成提示
+      # 完成提示
       # =========================================================================
       - name: 发布完成
         if: "!inputs.dry_run"
