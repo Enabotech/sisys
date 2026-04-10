@@ -77,7 +77,7 @@ env:
     ${{
       github.event.inputs.version ||
       (startsWith(github.ref, 'refs/tags/') && github.ref_name) ||
-      'v1.0.0'
+      'v0.0.0'
     }}
 
 # ===========================================================================
@@ -406,10 +406,12 @@ jobs:
     timeout-minutes: 30
     needs: [detect-changes, integration-tests, security-scan, code-quality]
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
+    # ✅ Tag 推送 (release 发布) 强制构建生产镜像
     # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
     if: >-
       ${{
         (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
         || (github.event_name != 'workflow_dispatch' && (
           needs.detect-changes.outputs.l2 == 'true'
           || needs.detect-changes.outputs.l3 == 'true'
@@ -477,7 +479,7 @@ jobs:
               ;;
             refs/tags/v*)
               FEATURE_NAME="release"
-              IMAGE_PREFIX=""
+              IMAGE_PREFIX="prod"
               ;;
             *)
               FEATURE_NAME="unknown"
@@ -507,15 +509,16 @@ jobs:
           PREFIX="${{ steps.context.outputs.image_prefix }}"
           FEATURE="${{ steps.context.outputs.feature_name }}"
 
+          # L2 标签
+          echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+
           # L3 基础标签 (POSIX 兼容写法)
           if [ -n "$PREFIX" ]; then
             echo "image_tag_l3=${PREFIX}-${FEATURE}-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           else
             echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
           fi
-
-          # L2 标签
-          echo "image_tag_l2=l2-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag_test=test-${VERSION}-${{ steps.context.outputs.git_sha }}" >> $GITHUB_OUTPUT
 
           echo "✅ 版本: ${VERSION}"
           echo "✅ Feature: ${FEATURE}"
@@ -527,6 +530,7 @@ jobs:
         if: >-
           ${{
             github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || startsWith(github.ref, 'refs/tags/')
             || needs.detect-changes.outputs.l2 == 'true'
           }}
         run: poetry lock --no-interaction
@@ -535,6 +539,7 @@ jobs:
         if: >-
           ${{
             github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || startsWith(github.ref, 'refs/tags/')
             || needs.detect-changes.outputs.l2 == 'true'
           }}
         uses: docker/build-push-action@v5
@@ -564,6 +569,7 @@ jobs:
         if: >-
           ${{
             github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+            || startsWith(github.ref, 'refs/tags/')
             || needs.detect-changes.outputs.l3 == 'true'
           }}
         uses: docker/build-push-action@v5
@@ -574,9 +580,12 @@ jobs:
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:latest
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_l3 }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:test-${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}-${{ steps.context.outputs.git_sha }}
-            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.context.outputs.version }}
+            ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/app:${{ steps.meta.outputs.image_tag_test }}
+            ${{
+              startsWith(github.ref, 'refs/tags/') &&
+              format('{0}/{1}/app:{2}', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT, steps.context.outputs.version) ||
+              format('{0}/{1}/app:latest', vars.HARBOR_REGISTRY, vars.HARBOR_PROJECT)
+            }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -596,7 +605,7 @@ jobs:
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
       # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
-      - name: 记录 Digest 信息
+      - name: 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
         if: always() && steps.build-l3.outputs.digest != ''
         run: |
           DIGEST="${{ steps.build-l3.outputs.digest }}"
@@ -633,5 +642,5 @@ jobs:
         with:
           name: docker-image-info
           path: |
-            reports/image-info.txt
+            reports/build/build-metadata.json
           retention-days: 30
