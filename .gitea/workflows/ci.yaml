@@ -479,7 +479,7 @@ jobs:
               ;;
             refs/tags/v*)
               FEATURE_NAME="release"
-              IMAGE_PREFIX=""
+              IMAGE_PREFIX="prod"
               ;;
             *)
               FEATURE_NAME="unknown"
