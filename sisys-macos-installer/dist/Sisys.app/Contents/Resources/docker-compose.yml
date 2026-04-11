@@ -1,0 +1,291 @@
+# SISYS Docker Compose 配置
+# 版本: 0.15
+# 用途: 定义 SISYS 战略规划管理系统的所有服务
+#
+# ⚠ 安全警告: 所有密码必须在首次启动时修改！
+# 请勿使用默认值部署到生产环境！
+
+version: "3.8"
+
+services:
+  # ============================================================================
+  # L2: PostgreSQL - 关系数据存储
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: sisys-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sisys
+      POSTGRES_USER: sisys_admin
+      # ⚠ 必须修改: 首次启动时生成随机密码
+      POSTGRES_PASSWORD: ${SISYS_DB_PASSWORD:?ERROR: 必须设置 SISYS_DB_PASSWORD 环境变量}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sisys_admin -d sisys"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+    labels:
+      - "com.sisys.service=postgres"
+      - "com.sisys.layer=L2"
+
+  # ============================================================================
+  # L1: Redis - 高速缓存层
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: sisys-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --requirepass ${SISYS_REDIS_PASSWORD:?ERROR: 必须设置 SISYS_REDIS_PASSWORD 环境变量}
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SISYS_REDIS_PASSWORD:-SisysRedis2026!Secure}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    labels:
+      - "com.sisys.service=redis"
+      - "com.sisys.layer=L1"
+
+  # ============================================================================
+  # L3: Qdrant - 向量存储层
+  # ============================================================================
+  qdrant:
+    image: qdrant/qdrant:v1.7.0
+    container_name: sisys-qdrant
+    restart: unless-stopped
+    environment:
+      - QDRANT__SERVICE__API_KEY=${SISYS_QDRANT_API_KEY:?ERROR: 必须设置 SISYS_QDRANT_API_KEY 环境变量}
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/qdrant-data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+    labels:
+      - "com.sisys.service=qdrant"
+      - "com.sisys.layer=L3"
+
+  # ============================================================================
+  # L4: MinIO - 对象存储层 (支持 WORM)
+  # ============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: sisys-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${SISYS_MINIO_ACCESS_KEY:?ERROR: 必须设置 SISYS_MINIO_ACCESS_KEY 环境变量}
+      MINIO_ROOT_PASSWORD: ${SISYS_MINIO_SECRET_KEY:?ERROR: 必须设置 SISYS_MINIO_SECRET_KEY 环境变量}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+    labels:
+      - "com.sisys.service=minio"
+      - "com.sisys.layer=L4"
+
+  # ============================================================================
+  # L5: Neo4j - 图存储层
+  # ============================================================================
+  neo4j:
+    image: neo4j:5.x
+    container_name: sisys-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=${SISYS_NEO4J_USER:-neo4j}/${SISYS_NEO4J_PASSWORD:?ERROR: 必须设置 SISYS_NEO4J_PASSWORD 环境变量}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/neo4j-data:/data
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+    labels:
+      - "com.sisys.service=neo4j"
+      - "com.sisys.layer=L5"
+
+  # ============================================================================
+  # SISYS 主服务
+  # ============================================================================
+  sisys:
+    image: ${SISYS_IMAGE:-sisys/sisys:0.15}
+    container_name: sisys-app
+    restart: unless-stopped
+    environment:
+      # 数据库配置
+      - SISYS_DB_HOST=postgres
+      - SISYS_DB_PORT=5432
+      - SISYS_DB_NAME=sisys
+      - SISYS_DB_USER=sisys_admin
+      - SISYS_DB_PASSWORD=${SISYS_DB_PASSWORD:-SisysAdmin2026!Secure}
+
+      # Redis 配置
+      - SISYS_REDIS_HOST=redis
+      - SISYS_REDIS_PORT=6379
+      - SISYS_REDIS_PASSWORD=${SISYS_REDIS_PASSWORD:-SisysRedis2026!Secure}
+
+      # Qdrant 配置
+      - SISYS_QDRANT_HOST=qdrant
+      - SISYS_QDRANT_PORT=6333
+      - SISYS_QDRANT_API_KEY=${SISYS_QDRANT_API_KEY:-SisysQdrant2026!Secure}
+
+      # MinIO 配置
+      - SISYS_MINIO_ENDPOINT=minio
+      - SISYS_MINIO_PORT=9000
+      - SISYS_MINIO_ACCESS_KEY=${SISYS_MINIO_ACCESS_KEY:-sisysadmin}
+      - SISYS_MINIO_SECRET_KEY=${SISYS_MINIO_SECRET_KEY:-SisysMinIO2026!Secure}
+
+      # Neo4j 配置
+      - SISYS_NEO4J_URI=bolt://neo4j:7687
+      - SISYS_NEO4J_USER=neo4j
+      - SISYS_NEO4J_PASSWORD=${SISYS_NEO4J_PASSWORD:-SisysNeo4j2026!Secure}
+
+      # 应用配置
+      - SISYS_PORT=8080
+      - SISYS_ADMIN_PASSWORD=${SISYS_ADMIN_PASSWORD:-}
+      - SISYS_ENV=${SISYS_ENV:-production}
+
+      # 预留 Story 0.17 扩展点
+      - SISYS_HEALTH_ENDPOINT=/health
+      - SISYS_LOG_FORMAT=json
+    volumes:
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/sisys-config:/app/config
+      - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/sisys-logs:/app/logs
+    ports:
+      - "${SISYS_PORT:-8080}:8080"
+    networks:
+      - sisys-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+        reservations:
+          cpus: "2.0"
+          memory: 4G
+    labels:
+      - "com.sisys.service=sisys"
+      - "com.sisys.layer=application"
+
+# ============================================================================
+# 网络配置 - 隔离 SISYS 服务
+# ============================================================================
+networks:
+  sisys-network:
+    driver: bridge
+    name: sisys-network
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+
+# ============================================================================
+# ⚠ 安全警告
+# ============================================================================
+# 所有服务端口都暴露到宿主机，仅适用于本地开发环境！
+# 生产环境部署时，请：
+# 1. 移除不必要的 ports 映射
+# 2. 使用反向代理（如 nginx）仅暴露 8080 端口
+# 3. 配置防火墙规则
+# 4. 启用 TLS/SSL 加密
+# ============================================================================
