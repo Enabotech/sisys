@@ -1,9 +1,9 @@
 # generated: 2026-03-11
-# last_updated: 2026-03-23
+# last_updated: 2026-04-11
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
-# story_location: _bmad-output/implementation-artifacts
+# story_location: _bmad-output/implementation-artifacts/stories
 
 # STATUS DEFINITIONS:
 # ==================
@@ -39,7 +39,7 @@ last_updated: 2026-03-23
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
-story_location: _bmad-output/implementation-artifacts
+story_location: _bmad-output/implementation-artifacts/stories
 
 development_status:
   # ===========================================================================
@@ -62,7 +62,7 @@ development_status:
   0-8-gitea-runner-configuration: done
   0-9-ci-cd-pipeline-template: done
   # 价值组 1.2: SISYS 产品交付系统（面向客户）
-  0-14-windows-installer: backlog
+  0-14-windows-installer: ready-for-dev
   0-15-mac-installer: backlog
   0-16-linux-installer: backlog
   0-17-auto-diagnose-and-fix: backlog
