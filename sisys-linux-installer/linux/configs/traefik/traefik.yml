@@ -1,0 +1,31 @@
+# Traefik 静态配置
+api:
+  dashboard: true
+  # P0-3: 禁用 insecure API，生产环境必须关闭
+  # MVP 阶段限制 Dashboard 仅可通过内网访问（通过防火墙规则）
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: sisys-network
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
