@@ -1,0 +1,206 @@
+#!/bin/bash
+# SISYS CLI 入口脚本
+# 用途：提供 sisys 命令行接口
+
+set -euo pipefail
+
+# 获取脚本目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+RESOURCES_DIR="$APP_DIR/Contents/Resources"
+DATA_DIR="$HOME/Library/Application Support/Sisys"
+
+# 确保 PATH 包含必要路径
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# 显示帮助信息
+show_help() {
+    cat << EOF
+SISYS 战略规划管理系统 v0.15
+
+用法: sisys <命令> [选项]
+
+命令:
+  start           启动 SISYS 服务
+  stop            停止 SISYS 服务
+  status          查看服务状态
+  uninstall       卸载 SISYS
+  diagnose        诊断系统问题 (为 Story 0.17 预留)
+  help            显示此帮助信息
+
+选项:
+  -v, --version   显示版本信息
+  -h, --help      显示帮助信息
+
+示例:
+  sisys start     # 启动服务
+  sisys status    # 查看状态
+  sisys uninstall # 卸载系统
+
+更多信息请访问: https://sisys.example.com
+EOF
+}
+
+# 显示版本信息
+show_version() {
+    echo "SISYS v0.15.0"
+    echo "macOS Installer (DMG/PKG)"
+    echo "Build: 2026-04-11"
+}
+
+# 启动服务
+start_service() {
+    echo "🚀 正在启动 SISYS 服务..."
+    
+    # 检查 Docker
+    if ! command -v docker &> /dev/null; then
+        echo "❌ 错误: Docker 未安装"
+        echo "请先安装 Docker Desktop: https://www.docker.com/products/docker-desktop"
+        exit 1
+    fi
+    
+    # 检查 Docker daemon
+    if ! docker info &> /dev/null; then
+        echo "❌ 错误: Docker daemon 未运行"
+        echo "请启动 Docker Desktop 应用程序"
+        exit 1
+    fi
+    
+    # 检查 docker-compose.yml
+    if [ ! -f "$RESOURCES_DIR/docker-compose.yml" ]; then
+        echo "❌ 错误: docker-compose.yml 未找到"
+        exit 1
+    fi
+    
+    # 创建数据目录
+    mkdir -p "$DATA_DIR/data"
+    
+    # 启动服务
+    echo "📦 正在启动 Docker 容器..."
+    cd "$RESOURCES_DIR"
+    docker compose up -d
+    
+    echo "✅ SISYS 服务已启动"
+    echo "🌐 访问地址: http://localhost:8080"
+}
+
+# 停止服务
+stop_service() {
+    echo "🛑 正在停止 SISYS 服务..."
+    
+    if [ -f "$RESOURCES_DIR/docker-compose.yml" ]; then
+        cd "$RESOURCES_DIR"
+        docker compose down
+    fi
+    
+    echo "✅ SISYS 服务已停止"
+}
+
+# 查看状态
+show_status() {
+    echo "📊 SISYS 服务状态:"
+    echo ""
+    
+    # 检查 Docker
+    if command -v docker &> /dev/null && docker info &> /dev/null; then
+        echo "✅ Docker: 运行中"
+    else
+        echo "❌ Docker: 未运行"
+    fi
+    
+    # 检查容器
+    if [ -f "$RESOURCES_DIR/docker-compose.yml" ]; then
+        echo ""
+        echo "容器状态:"
+        cd "$RESOURCES_DIR"
+        docker compose ps
+    fi
+    
+    echo ""
+    echo "🌐 访问地址: http://localhost:8080"
+}
+
+# 诊断系统 (为 Story 0.17 预留)
+diagnose_system() {
+    echo "🔍 SISYS 系统诊断..."
+    echo ""
+    
+    # 系统信息
+    echo "系统信息:"
+    echo "  macOS 版本: $(sw_vers -productVersion)"
+    echo "  架构: $(uname -m)"
+    echo "  磁盘可用: $(df -h / | tail -1 | awk '{print $4}')"
+    echo "  内存总计: $(sysctl -n hw.memsize | awk '{print $0/1073741824 "GB"}')"
+    echo ""
+    
+    # Docker 状态
+    echo "Docker 状态:"
+    if command -v docker &> /dev/null; then
+        echo "  Docker 版本: $(docker --version)"
+        if docker info &> /dev/null; then
+            echo "  Docker daemon: ✅ 运行中"
+        else
+            echo "  Docker daemon: ❌ 未运行"
+        fi
+    else
+        echo "  Docker: ❌ 未安装"
+    fi
+    echo ""
+    
+    # SISYS 服务状态
+    echo "SISYS 服务状态:"
+    if [ -f "$RESOURCES_DIR/docker-compose.yml" ]; then
+        cd "$RESOURCES_DIR"
+        docker compose ps --format "table {{.Name}}\t{{.Status}}"
+    else
+        echo "  服务未安装"
+    fi
+    echo ""
+    
+    # 网络端口
+    echo "端口占用:"
+    if lsof -i :8080 &> /dev/null; then
+        echo "  8080: ⚠️ 被占用"
+    else
+        echo "  8080: ✅ 空闲"
+    fi
+    echo ""
+    
+    echo "诊断完成 ✅"
+}
+
+# 主逻辑
+case "${1:-help}" in
+    start)
+        start_service
+        ;;
+    stop)
+        stop_service
+        ;;
+    status)
+        show_status
+        ;;
+    uninstall)
+        # 调用卸载脚本
+        if [ -f "$RESOURCES_DIR/uninstall.sh" ]; then
+            bash "$RESOURCES_DIR/uninstall.sh"
+        else
+            echo "❌ 错误: 卸载脚本未找到"
+            exit 1
+        fi
+        ;;
+    diagnose)
+        diagnose_system
+        ;;
+    -v|--version)
+        show_version
+        ;;
+    -h|--help|help)
+        show_help
+        ;;
+    *)
+        echo "❌ 未知命令: $1"
+        show_help
+        exit 1
+        ;;
+esac

@@ -1,9 +1,9 @@
 # generated: 2026-03-11
-# last_updated: 2026-03-23
+# last_updated: 2026-04-11
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
-# story_location: _bmad-output/implementation-artifacts
+# story_location: _bmad-output/implementation-artifacts/stories
 
 # STATUS DEFINITIONS:
 # ==================
@@ -35,11 +35,11 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-03-23
+last_updated: 2026-04-11
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
-story_location: _bmad-output/implementation-artifacts
+story_location: _bmad-output/implementation-artifacts/stories
 
 development_status:
   # ===========================================================================
@@ -63,7 +63,7 @@ development_status:
   0-9-ci-cd-pipeline-template: done
   # 价值组 1.2: SISYS 产品交付系统（面向客户）
   0-14-windows-installer: backlog
-  0-15-mac-installer: backlog
+  0-15-mac-installer: review
   0-16-linux-installer: backlog
   0-17-auto-diagnose-and-fix: backlog
   0-18-user-friendly-config-wizard: backlog
@@ -313,25 +313,24 @@ development_status:
 # Total Epics: 20 (Epic 0-19, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
 # Total Stories (excluding retrospectives): 152
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
-#   - Epic 0 Iteration 1: 11 stories (🔄 5 done, 1 ready-for-dev, 5 backlog)
+#   - Epic 0 Iteration 1: 11 stories (🔄 5 done, 2 ready-for-dev, 4 backlog)
 #   - Epic 1-19: 138 stories (📋 backlog)
 #
 # Status Summary:
 #   - Done: 8 (Epic 0 Iteration 0: 3 + Epic 0 Iteration 1: 5)
-#   - Ready for Dev: 1 (Story 0.9)
-#   - Backlog: 143
+#   - Ready for Dev: 2 (Story 0.9, Story 0.15)
+#   - Backlog: 142
 #
 # Next Steps:
-#   1. Execute Story 0.9 (CI/CD Pipeline 模板) - 当前唯一 ready-for-dev 的故事
-#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.14-0.18) - 产品交付系统
-#   3. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
-#   4. Follow SDD+TDD 融合模式 for all stories
+#   1. Execute Story 0.9 (CI/CD Pipeline 模板) - ready-for-dev
+#   2. Execute Story 0.15 (Mac 安装包) - ready-for-dev ✨ 新增
+#   3. Execute Epic 0 Iteration 1 剩余 Stories (0.14, 0.16-0.18) - 产品交付系统
+#   4. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   5. Follow SDD+TDD 融合模式 for all stories
 #
 # Key Changes from Previous Version:
-#   - Updated generation date to 2026-03-23
-#   - Added all Epics (0-19) with complete story lists
-#   - Updated Story 0.4-0.8 status to done (completed)
-#   - Updated Story 0.9 status to ready-for-dev (story file created)
-#   - Maintained Epic 0 Iteration 0 as done
-#   - All Epic 1-19 stories remain in backlog (not started)
+#   - Updated last_updated date to 2026-04-11
+#   - Updated Story 0.15 status to ready-for-dev (story file created)
+#   - Ready for Dev count: 1 → 2 (Story 0.9 + Story 0.15)
+#   - Backlog count: 143 → 142
 # =============================================================================
