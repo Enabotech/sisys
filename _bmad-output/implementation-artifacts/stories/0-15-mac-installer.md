@@ -707,5 +707,3 @@ sisys-macos-installer/
 - `sisys-macos-installer/dist/Sisys.app/Contents/Resources/README.txt`
 - `sisys-macos-installer/scripts/build-dmg.sh`
 - `sisys-macos-installer/build-all-macos.sh`
-- `tests/installer/conftest.py`
-- `tests/installer/test_lifecycle_scripts.py`
