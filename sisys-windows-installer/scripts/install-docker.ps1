@@ -16,24 +16,24 @@ function Test-VirtualizationPrerequisites {
     <#
     .SYNOPSIS
         检查虚拟化前置条件（修复 H6）
-    
+
     .OUTPUTS
         Boolean - True 表示满足前置条件
     #>
-    
+
     Write-Host "🔍 检查虚拟化前置条件..." -ForegroundColor Cyan
-    
+
     # 1. 检查 Windows 版本
     $osInfo = Get-CimInstance Win32_OperatingSystem
     $osVersion = [version]$osInfo.Version
-    
+
     if ($osVersion.Major -lt 10 -or ($osVersion.Major -eq 10 -and $osVersion.Build -lt 19041)) {
         Write-Host "❌ Windows 版本过低（需要 Windows 10 2004+）" -ForegroundColor Red
         Write-Host "   当前版本: $($osInfo.Caption) (Build $($osVersion.Build))" -ForegroundColor Gray
         return $false
     }
     Write-Host "✅ Windows 版本: $($osInfo.Caption)" -ForegroundColor Green
-    
+
     # 2. 检查虚拟化支持
     try {
         $computerInfo = Get-CimInstance Win32_ComputerSystem
@@ -47,11 +47,11 @@ function Test-VirtualizationPrerequisites {
     } catch {
         Write-Host "⚠️  无法检查虚拟化状态: $_" -ForegroundColor Yellow
     }
-    
+
     # 3. 检查 WSL2 或 Hyper-V
     $wslInstalled = $false
     $hyperVInstalled = $false
-    
+
     try {
         $wsl = wsl --status 2>&1
         if ($LASTEXITCODE -eq 0) {
@@ -61,7 +61,7 @@ function Test-VirtualizationPrerequisites {
     } catch {
         # WSL 未安装
     }
-    
+
     try {
         $hyperV = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction Stop
         if ($hyperV.State -eq "Enabled") {
@@ -71,7 +71,7 @@ function Test-VirtualizationPrerequisites {
     } catch {
         # Hyper-V 未安装或不可用
     }
-    
+
     if (-not $wslInstalled -and -not $hyperVInstalled) {
         Write-Host "❌ 未检测到 WSL2 或 Hyper-V" -ForegroundColor Red
         Write-Host ""
@@ -81,7 +81,7 @@ function Test-VirtualizationPrerequisites {
         Write-Host "   3. 重启计算机后重试" -ForegroundColor Gray
         return $false
     }
-    
+
     Write-Host ""
     return $true
 }
@@ -90,19 +90,19 @@ function Start-DockerDesktopInstall {
     <#
     .SYNOPSIS
         静默安装 Docker Desktop
-    
+
     .PARAMETER InstallerPath
         安装程序路径
-    
+
     .OUTPUTS
         Boolean - True 表示安装成功
     #>
     param([string]$InstallerPath)
-    
+
     Write-Host "🔧 开始安装 Docker Desktop..." -ForegroundColor Cyan
     Write-Host "   安装程序: $InstallerPath" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Docker Desktop 静默安装参数
     # --quiet: 静默模式
     # --accept-license: 接受许可条款
@@ -113,7 +113,7 @@ function Start-DockerDesktopInstall {
         "--accept-license",
         "--noreboot"
     )
-    
+
     try {
         $process = Start-Process -FilePath $InstallerPath `
             -ArgumentList $arguments `
@@ -121,7 +121,7 @@ function Start-DockerDesktopInstall {
             -PassThru `
             -NoNewWindow `
             -ErrorAction Stop
-        
+
         if ($process.ExitCode -eq 0) {
             Write-Host "✅ Docker Desktop 安装成功" -ForegroundColor Green
             return $true
@@ -139,25 +139,25 @@ function Start-RancherDesktopInstall {
     <#
     .SYNOPSIS
         静默安装 Rancher Desktop
-    
+
     .PARAMETER InstallerPath
         安装程序路径
-    
+
     .OUTPUTS
         Boolean - True 表示安装成功
     #>
     param([string]$InstallerPath)
-    
+
     Write-Host "🔧 开始安装 Rancher Desktop..." -ForegroundColor Cyan
     Write-Host "   安装程序: $InstallerPath" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Rancher Desktop 静默安装参数
     $arguments = @(
         "/S",  # 静默模式
         "/norestart"  # 不重启
     )
-    
+
     try {
         $process = Start-Process -FilePath $InstallerPath `
             -ArgumentList $arguments `
@@ -165,7 +165,7 @@ function Start-RancherDesktopInstall {
             -PassThru `
             -NoNewWindow `
             -ErrorAction Stop
-        
+
         if ($process.ExitCode -eq 0) {
             Write-Host "✅ Rancher Desktop 安装成功" -ForegroundColor Green
             return $true
@@ -183,16 +183,16 @@ function Start-DockerInstallWithRetry {
     <#
     .SYNOPSIS
         带重试机制的 Docker 安装
-    
+
     .PARAMETER InstallTarget
         安装目标 (DockerDesktop/RancherDesktop)
-    
+
     .PARAMETER InstallerPath
         安装程序路径
-    
+
     .PARAMETER MaxRetries
         最大重试次数
-    
+
     .OUTPUTS
         Boolean - True 表示安装成功
     #>
@@ -201,37 +201,37 @@ function Start-DockerInstallWithRetry {
         [string]$InstallerPath,
         [int]$MaxRetries = 2
     )
-    
+
     $attempt = 1
-    
+
     while ($attempt -le $MaxRetries) {
         Write-Host ""
         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
         Write-Host "安装尝试 $attempt/$MaxRetries" -ForegroundColor Cyan
         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
         Write-Host ""
-        
+
         $success = $false
-        
+
         if ($InstallTarget -eq "DockerDesktop") {
             $success = Start-DockerDesktopInstall -InstallerPath $InstallerPath
         } else {
             $success = Start-RancherDesktopInstall -InstallerPath $InstallerPath
         }
-        
+
         if ($success) {
             return $true
         }
-        
+
         $attempt++
-        
+
         if ($attempt -le $MaxRetries) {
             Write-Host ""
             Write-Host "⏳ $RetryDelaySeconds 秒后重试..." -ForegroundColor Yellow
             Start-Sleep -Seconds $RetryDelaySeconds
         }
     }
-    
+
     Write-Host ""
     Write-Host "❌ 安装失败（已重试 $MaxRetries 次）" -ForegroundColor Red
     return $false
@@ -246,9 +246,9 @@ function Show-InstallProgress {
         [string]$Stage,
         [int]$PercentComplete
     )
-    
+
     $bar = "[" + ("█" * ($PercentComplete / 5)) + ("░" * (20 - $PercentComplete / 5)) + "]"
-    
+
     Write-Host "`r$bar $PercentComplete% - $Stage" -NoNewline
 }
 

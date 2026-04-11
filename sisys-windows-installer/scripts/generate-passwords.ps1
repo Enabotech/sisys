@@ -13,18 +13,18 @@ function New-RandomPassword {
     <#
     .SYNOPSIS
         生成随机强密码
-    
+
     .PARAMETER Length
         密码长度（默认 16）
-    
+
     .OUTPUTS
         string - 随机密码
     #>
     param([int]$Length = 16)
-    
+
     $Chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+'
     $Password = -join ((1..$Length) | ForEach-Object { Get-Random -Input $Chars.ToCharArray() })
-    
+
     return $Password
 }
 
@@ -46,16 +46,16 @@ if (Test-Path $EnvTemplatePath) {
     $content = Get-Content $EnvTemplatePath -Raw
     $content = $content -replace '__POSTGRES_PASSWORD_PLACEHOLDER__', $postgresPassword
     $content = $content -replace '__MINIO_PASSWORD_PLACEHOLDER__', $minioPassword
-    
+
     # 替换数据路径占位符
     $sisysDataPath = "$env:USERPROFILE\SISYS\data"
     $sisysLogsPath = "$env:USERPROFILE\SISYS\logs"
     $content = $content -replace '__SISYS_DATA_PATH__', $sisysDataPath
     $content = $content -replace '__SISYS_LOGS_PATH__', $sisysLogsPath
-    
+
     # 写入输出文件
     $content | Set-Content $EnvOutputPath -NoNewline
-    
+
     Write-Host "✅ 配置文件已生成: $EnvOutputPath" -ForegroundColor Green
     Write-Host ""
     Write-Host "⚠️  重要: 请妥善保管以下密码:" -ForegroundColor Yellow

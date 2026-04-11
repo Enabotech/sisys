@@ -14,33 +14,33 @@ function Start-SISYSServices {
     <#
     .SYNOPSIS
         启动 SISYS 服务
-    
+
     .DESCRIPTION
         使用 Docker Compose 启动所有服务
     #>
-    
+
     Write-Host "🚀 正在启动 SISYS 服务..." -ForegroundColor Cyan
-    
+
     $composePath = Join-Path $PSScriptRoot "..\configs\$ComposeFile"
-    
+
     if (-not (Test-Path $composePath)) {
         Write-Host "❌ docker-compose.yml 文件不存在: $composePath" -ForegroundColor Red
         return $false
     }
-    
+
     # 切换到配置目录
     Push-Location (Split-Path $composePath)
-    
+
     try {
         # 启动服务
         docker compose up -d
-        
+
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ 服务启动失败" -ForegroundColor Red
             Write-Host "查看日志: docker compose logs" -ForegroundColor Yellow
             return $false
         }
-        
+
         Write-Host "✅ 服务启动命令已发送" -ForegroundColor Green
         return $true
     } finally {
@@ -52,22 +52,22 @@ function Test-ServiceHealth {
     <#
     .SYNOPSIS
         验证服务健康状态
-    
+
     .DESCRIPTION
         通过 HTTP 健康检查端点验证服务是否正常启动
     #>
-    
+
     Write-Host "🏥 正在验证服务健康..." -ForegroundColor Cyan
-    
+
     $healthUrl = "http://localhost:$HealthCheckPort/health"
     $retryCount = 0
-    
+
     while ($retryCount -lt $MaxRetries) {
         $retryCount++
-        
+
         try {
             $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
-            
+
             if ($response.StatusCode -eq 200) {
                 Write-Host "✅ 服务健康检查通过" -ForegroundColor Green
                 Write-Host "   URL: $healthUrl" -ForegroundColor Gray
@@ -79,7 +79,7 @@ function Test-ServiceHealth {
             Start-Sleep -Seconds $RetryDelay
         }
     }
-    
+
     Write-Host "❌ 服务健康检查失败（已尝试 $MaxRetries 次）" -ForegroundColor Red
     Write-Host ""
     Write-Host "💡 故障排查建议:" -ForegroundColor Yellow
@@ -89,7 +89,7 @@ function Test-ServiceHealth {
     Write-Host "3. 检查磁盘空间: Get-PSDrive C"
     Write-Host "4. 重新启动服务: docker compose down && docker compose up -d"
     Write-Host ""
-    
+
     return $false
 }
 
@@ -98,17 +98,17 @@ function Show-ServiceStatus {
     .SYNOPSIS
         显示服务状态信息
     #>
-    
+
     Write-Host ""
     Write-Host "📊 SISYS 服务状态" -ForegroundColor Cyan
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
-    
+
     try {
         $services = docker compose ps --format json 2>&1
-        
+
         if ($LASTEXITCODE -eq 0) {
             Write-Host "服务列表:" -ForegroundColor Green
-            
+
             # 解析并显示服务信息
             $services | ForEach-Object {
                 Write-Host "  $_" -ForegroundColor Gray
@@ -120,7 +120,7 @@ function Show-ServiceStatus {
     } catch {
         Write-Host "⚠️  服务状态检查失败" -ForegroundColor Yellow
     }
-    
+
     Write-Host ""
     Write-Host "🌐 访问地址:" -ForegroundColor Cyan
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
@@ -165,14 +165,14 @@ if ($started) {
     Write-Host ""
     Write-Host "⏳ 等待服务启动..." -ForegroundColor Yellow
     Start-Sleep -Seconds 10
-    
+
     # 验证健康状态
     $healthy = Test-ServiceHealth
-    
+
     if ($healthy) {
         # 显示服务状态
         Show-ServiceStatus
-        
+
         Write-Host "🎉 SISYS 已成功启动！" -ForegroundColor Green
         Write-Host ""
         Write-Host "💡 下一步:" -ForegroundColor Cyan
@@ -181,7 +181,7 @@ if ($started) {
         Write-Host "2. 查看快速入门指南: docs\quick-start-guide.md"
         Write-Host "3. 查看服务日志: docker compose logs -f"
         Write-Host ""
-        
+
         exit 0
     } else {
         Write-Host "❌ 服务启动失败，请查看上面的故障排查建议" -ForegroundColor Red
