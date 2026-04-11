@@ -22,13 +22,13 @@ def mock_docker_available(monkeypatch):
         if cmd == "docker":
             return "/usr/local/bin/docker"
         return None
-    
+
     def mock_run(cmd, *args, **kwargs):
         class MockResult:
             returncode = 0
             stdout = "Docker version 24.0.0"
         return MockResult()
-    
+
     monkeypatch.setattr("shutil.which", mock_which)
 
 
@@ -37,7 +37,7 @@ def mock_docker_not_available(monkeypatch):
     """模拟 Docker 未安装"""
     def mock_which(cmd):
         return None
-    
+
     monkeypatch.setattr("shutil.which", mock_which)
 
 
