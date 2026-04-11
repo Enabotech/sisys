@@ -64,7 +64,7 @@ development_status:
   # 价值组 1.2: SISYS 产品交付系统（面向客户）
   0-14-windows-installer: done
   0-15-mac-installer: done
-  0-16-linux-installer: backlog
+  0-16-linux-installer: review
   0-17-auto-diagnose-and-fix: backlog
   0-18-user-friendly-config-wizard: backlog
   epic-0-iteration-1-retrospective: optional
