@@ -71,7 +71,7 @@ so that **无需专业技术知识即可使用**。
 4. **Given** 安装配置已完成
    **When** 用户点击"安装"
    **Then** 分阶段显示安装进度（**安装总时长根据网速 5-40 分钟不等**）
-   
+
    **安装阶段反馈（用户可见）：**
    | 阶段 | 用户可见文案 | 技术细节（可折叠） | 预计时长 |
    |------|-------------|-------------------|---------|
@@ -80,7 +80,7 @@ so that **无需专业技术知识即可使用**。
    | 3️⃣ 部署服务 | 🔄 正在部署 SISYS 服务... | 拉取镜像、配置端口 | 2-10 分钟 |
    | 4️⃣ 验证健康 | 🔄 正在验证服务健康... | HTTP 健康检查 | < 30 秒 |
    | 5️⃣ 完成 | 🎉 安装成功！ | 打开浏览器、显示访问地址 | < 10 秒 |
-   
+
    - 每阶段显示：✅ 成功 / ⏳ 进行中 / ❌ 失败 + 解决建议
    - 显示动态预估剩余时间
    - 支持取消安装（已下载文件可选择保留或删除）
@@ -88,7 +88,7 @@ so that **无需专业技术知识即可使用**。
 5. **Given** 安装完成
    **When** 安装程序显示"安装成功"
    **Then** 提供完整的安装完成体验
-   
+
    **安装完成体验：**
    - ☑️ 自动打开浏览器访问欢迎页面 `http://localhost:8080/welcome`
    - 📋 **欢迎页面内容**：
@@ -102,7 +102,7 @@ so that **无需专业技术知识即可使用**。
 6. **Given** 安装过程中出现错误
    **When** 任何安装步骤失败
    **Then** 显示友好的错误提示和解决建议
-   
+
    **错误处理 UX 设计：**
    | 错误场景 | 用户可见提示 | 解决建议 | 自助操作 |
    |---------|-------------|---------|---------|
@@ -111,7 +111,7 @@ so that **无需专业技术知识即可使用**。
    | 网络失败 | "网络连接中断" | "请检查网络后重试" | 重试/诊断网络 |
    | 磁盘不足 | "磁盘空间不足" | "需要至少 50GB 可用空间" | 清理磁盘/更改路径 |
    | 权限不足 | "需要管理员权限" | "请以管理员身份运行" | 重新启动 |
-   
+
    - 提供"一键诊断"按钮（自动检测问题并生成报告）
    - 提供"联系技术支持"链接（自动附带错误报告）
    - 允许用户安全退出（已安装部分可保留或回滚）
@@ -119,7 +119,7 @@ so that **无需专业技术知识即可使用**。
 7. **Given** 安装包构建完成
    **When** 检查安装包大小和内容
    **Then** 安装包符合以下策略
-   
+
    **V1 MVP 安装包策略：**
    ```yaml
    安装包大小：10-15MB
@@ -129,15 +129,15 @@ so that **无需专业技术知识即可使用**。
      ✅ 用户界面和文案
      ✅ 检测和配置脚本（PowerShell）
      ✅ 用户文档（快速入门）
-   
+
    ❌ 不包含（运行时动态下载）：
      - Docker Desktop 安装包（从官网下载）
      - SISYS 产品镜像（从 Harbor 拉取）
-   
+
    网络要求：
      - 必须联网安装
      - 需要访问：docker.com, Harbor 地址
-   
+
    安装时长（根据网速）：
      - 快速网络（100Mbps）：5-10 分钟
      - 普通网络（20Mbps）：10-20 分钟
@@ -349,7 +349,7 @@ begin
   Result := RegQueryStringValue(HKLM, 'SOFTWARE\Docker Inc.\Docker Desktop', 'InstallPath', sDockerPath);
   if not Result then
     Result := RegQueryStringValue(HKCU, 'SOFTWARE\Docker Inc.\Docker Desktop', 'InstallPath', sDockerPath);
-  
+
   // 如注册表未找到，检查 PATH 中是否有 docker.exe
   if not Result then
     Result := FileExists(ExpandConstant('{cmd}')) and Exec('docker', '--version', '', SW_HIDE, ewNoWait, ResultCode);
@@ -549,7 +549,7 @@ Describe "Docker 检测功能" {
         $result = & "$PSScriptRoot\..\scripts\check-docker.ps1"
         $result | Should -Be $true
     }
-    
+
     It "Docker 未安装时应返回 false" {
         # 模拟 Docker 未安装
         Mock Get-Command { throw "Command not found" } -CommandName docker
@@ -567,22 +567,22 @@ from scripts.check_docker import is_docker_installed, check_docker_version
 
 class TestDockerDetection:
     """Docker 检测功能测试"""
-    
+
     def test_docker_registry_detection(self):
         """测试通过注册表检测 Docker Desktop"""
         # 模拟注册表存在 Docker 安装路径
         assert is_docker_installed() == True
-    
+
     def test_docker_path_in_env(self):
         """测试通过 PATH 环境变量检测 Docker"""
         # 模拟 PATH 中包含 docker.exe
         assert check_docker_version() is not None
-    
+
     def test_docker_version_validation(self):
         """测试 Docker 版本验证"""
         version = check_docker_version()
         assert version['major'] >= 20  # 要求 Docker 20+
-    
+
     def test_docker_compose_available(self):
         """测试 Docker Compose 可用性"""
         assert check_docker_compose() == True
