@@ -34,13 +34,13 @@ confirm_uninstall() {
     echo "  - 配置文件和日志"
     echo "  - LaunchAgent 注册"
     echo ""
-    
+
     # 提示备份
     read -p "是否在卸载前备份数据？[y/N]: " backup_choice
     if [[ "$backup_choice" =~ ^[Yy]$ ]]; then
         backup_data
     fi
-    
+
     read -p "确定要卸载 SISYS 吗？此操作不可逆 [y/N]: " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}卸载已取消${NC}"
@@ -53,12 +53,12 @@ confirm_uninstall() {
 # ============================================================================
 backup_data() {
     local backup_dir="$HOME/SISYS_Backup_$(date +%Y%m%d_%H%M%S)"
-    
+
     echo ""
     log INFO "正在备份数据到: $backup_dir"
-    
+
     mkdir -p "$backup_dir"
-    
+
     if [ -d "$DATA_DIR" ]; then
         cp -r "$DATA_DIR" "$backup_dir/"
         log SUCCESS "数据备份完成"
@@ -74,7 +74,7 @@ log() {
     local level="$1"
     shift
     local message="$*"
-    
+
     case "$level" in
         INFO)    echo -e "${BLUE}[INFO]${NC} $message" ;;
         SUCCESS) echo -e "${GREEN}[✓]${NC} $message" ;;
@@ -88,10 +88,10 @@ log() {
 # ============================================================================
 step_stop_containers() {
     log INFO "步骤 1/5: 正在停止 Docker 容器..."
-    
+
     if [ -f "$DATA_DIR/docker-compose.yml" ]; then
         cd "$DATA_DIR"
-        
+
         # 停止所有容器
         if docker compose ps 2>/dev/null | grep -q "sisys"; then
             docker compose down -v
@@ -101,7 +101,7 @@ step_stop_containers() {
         fi
     elif [ -f "$RESOURCES_DIR/docker-compose.yml" ]; then
         cd "$RESOURCES_DIR"
-        
+
         if docker compose ps 2>/dev/null | grep -q "sisys"; then
             docker compose down -v
             log SUCCESS "容器已停止并删除"
@@ -111,7 +111,7 @@ step_stop_containers() {
     else
         log WARNING "未找到 docker-compose.yml"
     fi
-    
+
     # 确保删除所有相关容器
     docker rm -f sisys-postgres sisys-redis sisys-qdrant sisys-minio sisys-neo4j sisys-app 2>/dev/null || true
     log SUCCESS "残留容器已清理"
@@ -128,7 +128,7 @@ step_remove_data() {
         log ERROR "DATA_DIR 环境变量未设置，拒绝删除"
         exit 1
     fi
-    
+
     # ⚠ 安全检查: 确保 DATA_DIR 包含 Sisys 路径
     if [[ "$DATA_DIR" != *"Sisys"* ]]; then
         log ERROR "DATA_DIR 路径不包含 'Sisys'，拒绝删除: $DATA_DIR"
@@ -148,16 +148,16 @@ step_remove_data() {
 # ============================================================================
 step_remove_launch_agent() {
     log INFO "步骤 3/5: 正在清理 LaunchAgent..."
-    
+
     local plist_path="$HOME/Library/LaunchAgents/com.sisys.app.plist"
-    
+
     if [ -f "$plist_path" ]; then
         # 卸载
         launchctl unload "$plist_path" 2>/dev/null || true
-        
+
         # 删除
         rm -f "$plist_path"
-        
+
         log SUCCESS "LaunchAgent 已删除"
     else
         log INFO "LaunchAgent 不存在"
@@ -169,14 +169,14 @@ step_remove_launch_agent() {
 # ============================================================================
 step_clear_keychain() {
     log INFO "步骤 4/5: 正在清理 Keychain 密码..."
-    
+
     # 删除互联网密码
     security delete-internet-password -s "sisys" -a "sisys_admin" 2>/dev/null || true
-    
+
     # 删除通用密码
     security delete-generic-password -s "sisys" 2>/dev/null || true
     security delete-generic-password -l "SISYS" 2>/dev/null || true
-    
+
     log SUCCESS "Keychain 密码已清理"
 }
 
@@ -185,7 +185,7 @@ step_clear_keychain() {
 # ============================================================================
 step_remove_app() {
     log INFO "步骤 5/5: 正在删除应用..."
-    
+
     if [ -d "$APP_DIR" ]; then
         rm -rf "$APP_DIR"
         log SUCCESS "应用已删除: $APP_DIR"
@@ -214,13 +214,13 @@ show_completion() {
 # ============================================================================
 main() {
     confirm_uninstall
-    
+
     step_stop_containers
     step_remove_data
     step_remove_launch_agent
     step_clear_keychain
     step_remove_app
-    
+
     show_completion
 }
 

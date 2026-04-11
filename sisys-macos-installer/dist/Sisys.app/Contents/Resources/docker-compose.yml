@@ -203,33 +203,33 @@ services:
       - SISYS_DB_NAME=sisys
       - SISYS_DB_USER=sisys_admin
       - SISYS_DB_PASSWORD=${SISYS_DB_PASSWORD:-SisysAdmin2026!Secure}
-      
+
       # Redis 配置
       - SISYS_REDIS_HOST=redis
       - SISYS_REDIS_PORT=6379
       - SISYS_REDIS_PASSWORD=${SISYS_REDIS_PASSWORD:-SisysRedis2026!Secure}
-      
+
       # Qdrant 配置
       - SISYS_QDRANT_HOST=qdrant
       - SISYS_QDRANT_PORT=6333
       - SISYS_QDRANT_API_KEY=${SISYS_QDRANT_API_KEY:-SisysQdrant2026!Secure}
-      
+
       # MinIO 配置
       - SISYS_MINIO_ENDPOINT=minio
       - SISYS_MINIO_PORT=9000
       - SISYS_MINIO_ACCESS_KEY=${SISYS_MINIO_ACCESS_KEY:-sisysadmin}
       - SISYS_MINIO_SECRET_KEY=${SISYS_MINIO_SECRET_KEY:-SisysMinIO2026!Secure}
-      
+
       # Neo4j 配置
       - SISYS_NEO4J_URI=bolt://neo4j:7687
       - SISYS_NEO4J_USER=neo4j
       - SISYS_NEO4J_PASSWORD=${SISYS_NEO4J_PASSWORD:-SisysNeo4j2026!Secure}
-      
+
       # 应用配置
       - SISYS_PORT=8080
       - SISYS_ADMIN_PASSWORD=${SISYS_ADMIN_PASSWORD:-}
       - SISYS_ENV=${SISYS_ENV:-production}
-      
+
       # 预留 Story 0.17 扩展点
       - SISYS_HEALTH_ENDPOINT=/health
       - SISYS_LOG_FORMAT=json
