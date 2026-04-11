@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-03-23
+last_updated: 2026-04-11 (Story 0-16 重新创建 - 修正部署内容为 SISYS 应用)
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   # 价值组 1.2: SISYS 产品交付系统（面向客户）
   0-14-windows-installer: backlog
   0-15-mac-installer: backlog
-  0-16-linux-installer: backlog
+  0-16-linux-installer: review
   0-17-auto-diagnose-and-fix: backlog
   0-18-user-friendly-config-wizard: backlog
   epic-0-iteration-1-retrospective: optional
