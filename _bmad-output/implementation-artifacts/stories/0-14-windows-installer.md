@@ -754,9 +754,6 @@ sisys-windows-installer/
 └── docs/
     ├── quick-start-guide.md               # 快速入门指南（150 行）
     └── welcome.html                       # 欢迎页面（250 行）
-
-tests/
-└── test-docker-detection.Tests.ps1        # Docker 检测测试（120 行）
 ```
 
 **总计:** 13 个新文件，约 2500 行代码/配置/文档
