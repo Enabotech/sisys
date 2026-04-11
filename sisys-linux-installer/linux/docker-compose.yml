@@ -1,0 +1,259 @@
+version: "3.8"
+
+# SISYS 企业应用 Docker Compose 编排配置
+# 部署内容：SISYS App + 五层存储（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）+ Traefik
+
+networks:
+  sisys-network:
+    driver: bridge
+    name: sisys-network
+
+volumes:
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SISYS_DATA_PATH:-/opt/sisys/data}/redis
+      o: bind
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SISYS_DATA_PATH:-/opt/sisys/data}/postgres
+      o: bind
+  qdrant-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SISYS_DATA_PATH:-/opt/sisys/data}/qdrant
+      o: bind
+  minio-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SISYS_DATA_PATH:-/opt/sisys/data}/minio
+      o: bind
+  neo4j-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SISYS_DATA_PATH:-/opt/sisys/data}/neo4j
+      o: bind
+
+services:
+  # ========== L1 高速缓存层: Redis ==========
+  redis:
+    image: redis:7.0-alpine
+    container_name: sisys-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ========== L2 关系存储层: PostgreSQL ==========
+  postgres:
+    image: postgres:15-alpine
+    container_name: sisys-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: sisys
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sisys
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sisys"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ========== L3 向量存储层: Qdrant ==========
+  qdrant:
+    image: qdrant/qdrant:v1.7.0
+    container_name: sisys-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # ========== L4 对象存储层: MinIO (WORM) ==========
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: sisys-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-sisysadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # P1-10: MinIO WORM 使用 Object Lock 模式代替废弃的 MINIO_WORM 变量
+      MINIO_API_ROOT_ACCESS: "on"
+    volumes:
+      - minio-data:/data
+    networks:
+      - sisys-network
+    # P1-10: 启动时启用 Object Lock 支持
+    command: server /data --console-address ":9001" --keep-etag
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # ========== L5 图存储层: Neo4j ==========
+  neo4j:
+    image: neo4j:5.15
+    container_name: sisys-neo4j
+    restart: unless-stopped
+    ports:
+      - "${NEO4J_PORT:-7687}:7687"
+    environment:
+      # P1-7: 使用独立 Neo4j 密码
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      # P1-11: APOC 插件增加启动延迟（APOC JAR 下载需要时间）
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_auth__enabled: "true"
+      # P1-11: 增加数据库启动超时，等待 APOC 插件加载
+      NEO4J_dbms_startup_timeout: "120s"
+    volumes:
+      - neo4j-data:/data
+    networks:
+      - sisys-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 7687 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # P1-11: APOC 插件首次启动需要下载 JAR，增加 start_period
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ========== Traefik 反向代理 ==========
+  traefik:
+    image: traefik:v3.6
+    container_name: sisys-traefik
+    restart: unless-stopped
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+      - sisys-network
+    depends_on:
+      - sisys-app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    labels:
+      - "traefik.enable=true"
+
+  # ========== SISYS 企业应用 ==========
+  sisys-app:
+    image: ${SISYS_REGISTRY:-docker.io}/${SISYS_IMAGE_PREFIX:-sisys}/app:${SISYS_IMAGE_TAG:-latest}
+    container_name: sisys-app
+    restart: unless-stopped
+    ports:
+      - "${SISYS_APP_PORT:-8080}:8080"
+    environment:
+      # 数据库配置
+      DATABASE_URL: postgresql://sisys:${POSTGRES_PASSWORD}@sisys-postgres:5432/sisys
+      # Redis 配置
+      REDIS_URL: redis://sisys-redis:6379
+      # Qdrant 配置
+      QDRANT_URL: http://sisys-qdrant:6333
+      # MinIO 配置 (P1-7: 使用独立 MinIO 密码)
+      MINIO_ENDPOINT: sisys-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-sisysadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # Neo4j 配置 (P1-7: 使用独立 Neo4j 密码)
+      NEO4J_URI: bolt://sisys-neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      # 应用配置
+      SISYS_ADMIN_PASSWORD: ${SISYS_ADMIN_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./configs/app:/etc/sisys:ro
+    networks:
+      - sisys-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sisys.rule=Host(`sisys.local`)"
+      - "traefik.http.routers.sisys.entrypoints=web"
+      - "traefik.http.routers.sisys.service=sisys"
+      - "traefik.http.services.sisys.loadbalancer.server.port=8080"
