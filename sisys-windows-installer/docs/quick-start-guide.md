@@ -127,8 +127,8 @@ curl http://localhost:8080/health
 
 ---
 
-**版本**: 0.14.0  
-**安装日期**: $(Get-Date -Format "yyyy-MM-dd")  
+**版本**: 0.14.0
+**安装日期**: $(Get-Date -Format "yyyy-MM-dd")
 **操作系统**: Windows 10/11
 
 祝您使用愉快！🎊

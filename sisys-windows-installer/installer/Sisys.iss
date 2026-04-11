@@ -155,7 +155,7 @@ var
   ResultCode: Integer;
 begin
   Result := False;
-  
+
   // 检查注册表 (HKLM - 64位)
   if RegQueryStringValue(HKLM, 'SOFTWARE\Docker Inc.\Docker Desktop', 'InstallPath', sDockerPath) then
   begin
@@ -163,7 +163,7 @@ begin
     Result := True;
     Exit;
   end;
-  
+
   // 检查注册表 (HKLM - WoW6432Node，32位 Inno Setup 在 64位系统上)
   if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Docker Inc.\Docker Desktop', 'InstallPath', sDockerPath) then
   begin
@@ -171,7 +171,7 @@ begin
     Result := True;
     Exit;
   end;
-  
+
   // 检查注册表 (HKCU)
   if RegQueryStringValue(HKCU, 'SOFTWARE\Docker Inc.\Docker Desktop', 'InstallPath', sDockerPath) then
   begin
@@ -179,7 +179,7 @@ begin
     Result := True;
     Exit;
   end;
-  
+
   // 检查 PATH 中的 docker.exe（使用 ewWaitUntilTerminated - 修复 H1）
   if Exec(ExpandConstant('{cmd}'), '/C docker --version >nul 2>&1', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
@@ -190,7 +190,7 @@ begin
       Exit;
     end;
   end;
-  
+
   Log('未检测到 Docker');
 end;
 
@@ -205,9 +205,9 @@ var
 begin
   ScriptPath := ExpandConstant('{app}\scripts\' + ScriptName);
   CmdLine := '-ExecutionPolicy Bypass -File "' + ScriptPath + '" ' + Args;
-  
+
   Log('执行脚本: ' + ScriptName + ' 参数: ' + Args);
-  
+
   if Exec('powershell.exe', CmdLine, '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     if ResultCode = 0 then
@@ -250,7 +250,7 @@ end;
 function InitializeSetup(): Boolean;
 begin
   Result := True;
-  
+
   // 检查管理员权限
   if not IsAdminLoggedOn() then
   begin
@@ -260,7 +260,7 @@ begin
     Result := False;
     Exit;
   end;
-  
+
   Log('管理员权限验证通过');
 end;
 
@@ -289,7 +289,7 @@ begin
   LicenseNoticeLabel.Left := 0;
   LicenseNoticeLabel.Width := DockerOptionsPage.Surface.Width;
   LicenseNoticeLabel.WordWrap := True;
-  
+
   // 创建阶段标签
   StageLabel := WizardForm.CreateLabel(WizardForm);
   StageLabel.Caption := '';
@@ -322,7 +322,7 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  
+
   if CurPageID = DockerOptionsPage.ID then
   begin
     Log('用户选择 Docker 选项: ' + IntToStr(DockerOptionsPage.SelectedValue));
@@ -352,17 +352,17 @@ begin
   if CurStep = ssPostInstall then
   begin
     DockerInstalled := IsDockerInstalled();
-    
+
     // ========================================================================
     // 阶段 2: Docker 准备
     // ========================================================================
     UpdateStageUI(2, '正在准备运行环境...');
-    
+
     if not DockerInstalled then
     begin
       DockerChoice := DockerOptionsPage.SelectedValue;
       Log('Docker 未安装，用户选择: ' + IntToStr(DockerChoice));
-      
+
       case DockerChoice of
         0: begin  // Docker Desktop
           Log('开始下载 Docker Desktop...');
@@ -370,7 +370,7 @@ begin
           begin
             MsgBox('Docker Desktop 下载失败。请检查网络连接后重试。', mbError, MB_OK);
           end;
-          
+
           Log('开始安装 Docker Desktop...');
           if not RunPowerShellScript('install-docker.ps1', '-InstallTarget DockerDesktop') then
           begin
@@ -383,7 +383,7 @@ begin
           begin
             MsgBox('Rancher Desktop 下载失败。请检查网络连接后重试。', mbError, MB_OK);
           end;
-          
+
           Log('开始安装 Rancher Desktop...');
           if not RunPowerShellScript('install-docker.ps1', '-InstallTarget RancherDesktop') then
           begin
@@ -404,45 +404,45 @@ begin
     begin
       Log('Docker 已安装，跳过安装步骤');
     end;
-    
+
     // ========================================================================
     // 阶段 3: 配置端口和存储 (C6: 调用端口配置脚本)
     // ========================================================================
     UpdateStageUI(3, '正在配置端口和存储...');
-    
+
     if not RunPowerShellScript('configure-ports.ps1', '') then
     begin
       Log('端口配置脚本执行失败，继续使用默认端口');
     end;
-    
+
     // ========================================================================
     // 阶段 4: 启动服务
     // ========================================================================
     UpdateStageUI(4, '正在部署 SISYS 服务...');
-    
+
     if not RunPowerShellScript('start-services.ps1', '') then
     begin
       Log('服务启动脚本执行失败');
       // 不阻断安装，仅记录日志
     end;
-    
+
     // ========================================================================
     // 阶段 5: 完成
     // ========================================================================
     UpdateStageUI(5, '安装完成！');
-    
+
     Log('========== 安装流程完成 ==========');
-    
+
     // 配置环境变量
     RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_HOME', ExpandConstant('{app}'));
     RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_CONFIG', ExpandConstant('{app}\configs'));
-    
+
     // 添加到 PATH
     if WizardIsTaskSelected('addToPath') then
     begin
       // 简化处理，实际应检查 PATH 长度
     end;
-    
+
     // 通知环境变量已更改（修复 H2）
     SendMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, LPARAM(PChar('Environment')));
   end;
@@ -460,7 +460,7 @@ begin
     MB_YESNO,
     IDNO
   ) = IDYES;
-  
+
   if Result then
     Log('用户取消安装');
 end;
@@ -478,11 +478,11 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     Log('开始卸载清理...');
-    
+
     // 1. 停止并清理 Docker 资源
     Log('正在停止 Docker 服务...');
     Exec('docker', 'compose down -v', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
+
     // 2. 从 PATH 中移除
     if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', PathValue) then
     begin
@@ -505,14 +505,14 @@ begin
         RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', NewPathValue);
       end;
     end;
-    
+
     // 3. 移除环境变量
     RegDeleteValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_HOME');
     RegDeleteValue(HKEY_CURRENT_USER, 'Environment', 'SISYS_CONFIG');
-    
+
     // 4. 通知系统
     SendMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, LPARAM(PChar('Environment')));
-    
+
     Log('卸载清理完成');
   end;
 end;
