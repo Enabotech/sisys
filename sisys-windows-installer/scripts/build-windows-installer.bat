@@ -69,19 +69,19 @@ echo 📦 验证构建输出...
 if exist "%OUTPUT_DIR%\SISYS-Setup-*.exe" (
     echo ✅ 构建成功!
     echo.
-    
+
     REM 显示文件大小
     for %%F in ("%OUTPUT_DIR%\SISYS-Setup-*.exe") do (
         set "FILE_SIZE=%%~zF"
         set /a "FILE_MB=!FILE_SIZE!/1048576"
         echo 📊 安装包大小: !FILE_MB! MB
     )
-    
+
     echo.
     echo 📁 输出目录: %OUTPUT_DIR%
     dir "%OUTPUT_DIR%\*.exe"
     echo.
-    
+
     echo ================================================================================
     echo ✅ 构建完成！
     echo ================================================================================
