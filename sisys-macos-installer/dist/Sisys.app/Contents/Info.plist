@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>SISYS</string>
+    <key>CFBundleDisplayName</key>
+    <string>SISYS 战略规划管理系统</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.sisys.app</string>
+    <key>CFBundleVersion</key>
+    <string>0.15.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.15</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>SISY</string>
+    <key>CFBundleExecutable</key>
+    <string>sisys</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 SISYS. All rights reserved.</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.business</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+</dict>
+</plist>
