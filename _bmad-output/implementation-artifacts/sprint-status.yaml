@@ -323,12 +323,11 @@ development_status:
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
-#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.14, 0.16-0.18) - 产品交付系统
-#   3. After Epic 0 Iteration 1 completion → Start Epic 1 Story 1.1
+#   2. Execute Epic 0 Iteration 1 剩余 Stories (0.17/18) - 产品交付系统依赖Epic 1
+#   3. Start Epic 1 Story 1.1
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-04-11
-#   - Updated Story 0.15 status to ready-for-dev (story file created)
-#   - Ready for Dev count: 1 → 2 (Story 0.9 + Story 0.15)
-#   - Backlog count: 143 → 142
+#   - Updated last_updated date to 2026-04-12
+#   - Ready for Dev count: 2 (Story 0.17/0.18)
+#   - Backlog count: 142 → 140
 # =============================================================================

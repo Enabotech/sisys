@@ -668,7 +668,7 @@ updateReason: 'Epic 0 重构 - 双轨制 - 开发基础设施 + 产品交付系�
 | Story 0.15 | **Mac 安装包** | Mac 用户一键安装 | 无依赖 | **P0-7** |
 | Story 0.16 | **Linux 一键脚本** | Linux 用户一键安装 | 无依赖 | **P0-8** |
 | Story 0.17 | **自动检测与修复** | 安装问题自动修复 | 依赖 Story 0.14-0.16 | **P0-9** |
-| Story 0.18 | **用户友好配置向导** | 图形化配置无需 YAML | 依赖 Story 0.17 | **P0-10** |
+| Story 0.18 | **用户友好配置向导** | 图形化配置无需 YAML | 强依赖 Story 1.1 + 0.14/0.15/0.16 + 应用镜像框架；可选依赖 Story 0.17 | **P0-10** |
 
 ***📋 原有 Story 处理***
 
@@ -5096,6 +5096,9 @@ So that **确保 MVP 无高危漏洞**。
 
 #### 总体依赖关系 (Mermaid 可视化)
 
+**更新时间：** 2026-04-12
+**更新说明：** 添加 Story 0.18 依赖关系，更新安装包状态
+
 ```mermaid
 graph TD
     %% ========== Epic 0 Iteration 0 (已完成) ==========
@@ -5106,18 +5109,18 @@ graph TD
     end
 
     %% ========== Epic 0 Iteration 1 (进行中) ==========
-    subgraph "Epic 0 Iteration 1 🔄 (进行中 - 5/11 完成)"
+    subgraph "Epic 0 Iteration 1 🔄 (进行中 - 9/11 完成)"
         S0_4["Story 0.4<br/>K3S 集群部署<br/>✅ Done"]
-        S0_5["Story 0.5<br/>Gitea 代码托管<br/>📋 Backlog"]
-        S0_6["Story 0.6<br/>Harbor 镜像仓库<br/>📋 Backlog"]
-        S0_7["Story 0.7<br/>ArgoCD 持续部署<br/>📋 Backlog"]
-        S0_8["Story 0.8<br/>Gitea Runner 配置<br/>📋 Backlog"]
-        S0_9["Story 0.9<br/>CI/CD Pipeline 模板<br/>📋 Backlog"]
-        S0_14["Story 0.14<br/>Windows 安装器<br/>📋 Backlog"]
-        S0_15["Story 0.15<br/>Mac 安装器<br/>📋 Backlog"]
-        S0_16["Story 0.16<br/>Linux 一键脚本<br/>📋 Backlog"]
-        S0_17["Story 0.17<br/>自动诊断修复<br/>📋 Backlog"]
-        S0_18["Story 0.18<br/>配置向导<br/>📋 Backlog"]
+        S0_5["Story 0.5<br/>Gitea 代码托管<br/>✅ Done"]
+        S0_6["Story 0.6<br/>Harbor 镜像仓库<br/>✅ Done"]
+        S0_7["Story 0.7<br/>ArgoCD 持续部署<br/>✅ Done"]
+        S0_8["Story 0.8<br/>Gitea Runner 配置<br/>✅ Done"]
+        S0_9["Story 0.9<br/>CI/CD Pipeline 模板<br/>✅ Done"]
+        S0_14["Story 0.14<br/>Windows 安装器<br/>⚠️ 编码完成/未测试"]
+        S0_15["Story 0.15<br/>Mac 安装器<br/>⚠️ 编码完成/未测试"]
+        S0_16["Story 0.16<br/>Linux 一键脚本<br/>⚠️ 编码完成/未测试"]
+        S0_17["Story 0.17<br/>自动诊断修复<br/>📋 ready-for-dev"]
+        S0_18["Story 0.18<br/>配置向导<br/>📋 ready-for-dev"]
     end
 
     %% ========== Epic 1 (待开始) ==========
@@ -5172,6 +5175,13 @@ graph TD
     S0_5 --> S0_8
     S0_7 --> S0_9
     S0_8 --> S0_9
+
+    %% Story 0.18 依赖关系 (新增)
+    S1_1 -. "强依赖：架构基础" .-> S0_18
+    S0_14 -. "强依赖：必须测试通过" .-> S0_18
+    S0_15 -. "强依赖：必须测试通过" .-> S0_18
+    S0_16 -. "强依赖：必须测试通过" .-> S0_18
+    S0_18 -. "可选依赖：后续增强" .-> S0_17
 
     %% Epic 0 Iteration 1 → Epic 1
     S0_4 --> S1_1
@@ -5230,13 +5240,16 @@ graph TD
 
     %% 样式定义
     classDef done fill:#4CAF50,color:white,stroke:#2E7D32,stroke-width:2px;
-    classDef inProgress fill:#FF9800,color:white,stroke:#E65100,stroke-width:2px;
+    classDef untested fill:#FF9800,color:white,stroke:#E65100,stroke-width:2px;
+    classDef ready fill:#2196F3,color:white,stroke:#0D47A1,stroke-width:2px;
     classDef backlog fill:#9E9E9E,color:white,stroke:#424242,stroke-width:2px;
     classDef critical fill:#F44336,color:white,stroke:#B71C1C,stroke-width:3px;
 
-    class S0_1,S0_3,S0_4 done;
-    class S0_5,S0_6,S0_7,S0_8,S0_9,S0_14,S0_15,S0_16,S0_17,S0_18 inProgress;
-    class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 backlog;
+    class S0_1,S0_3,S0_4,S0_5,S0_6,S0_7,S0_8,S0_9 done;
+    class S0_14,S0_15,S0_16 untested;
+    class S0_17,S0_18 ready;
+    class S1_1 critical;
+    class S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 backlog;
     class E2,E3,E4,E5,E6,E7,E8 backlog;
 ```
 
