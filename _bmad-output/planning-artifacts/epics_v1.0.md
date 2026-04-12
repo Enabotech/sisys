@@ -1263,7 +1263,7 @@ So that **系统支持事件驱动架构和事件溯源**。
 3. **代码质量**
    - [ ] Ruff 检查通过
    - [ ] MyPy 类型检查通过
-   - [ ] Pydantic Schema 验证通过
+   - [ ] 事件 Schema 通过验证
 
 4. **测试文件**
    - [ ] `tests/unit/domain/events/test_events_base.py` - 事件基类测试
@@ -1275,7 +1275,10 @@ So that **系统支持事件驱动架构和事件溯源**。
 **Given** 领域层已创建
 **When** 定义领域事件的 Schema（事件 ID、类型、时间戳、载荷、来源、Schema 版本、聚合根 ID、聚合根类型、版本号）
 **Then** 所有事件继承自统一的 DomainEvent 基类
-**And** 事件 Schema 通过 Pydantic V2 验证
+**And** 领域层中的 Domain Event 必须使用标准库类型定义，不依赖 Pydantic 或其他第三方库
+**And** Pydantic 仅用于应用层/基础设施层的边界校验、序列化与反序列化
+**And** 领域事件与传输 DTO 必须分离，必要时通过 TypeAdapter 做无样板转换
+**And** 事件 Schema 通过验证
 
 ### Story 1.3: 事件总线实现
 
