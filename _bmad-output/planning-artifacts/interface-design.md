@@ -416,7 +416,7 @@ DocumentProcessingUseCase    trigger→route→execute 循环
 
 ```bash
 # 顶层命令
-sisys <service> <resource> <action> [flags]
+sisys <service> <resource> <action> [options]
 
 # 服务模块（6 个核心 + 2 个辅助）
 sisys document   # 文档管理（上传/解析/检索/版本）
@@ -434,19 +434,19 @@ sisys config     # 配置管理（辅助：环境/路由/隔离）
 #### 3.3.1 文档管理（sisys document）
 
 ```bash
-sisys document upload --file <path> [flags]
+sisys document upload --file <path> [options]
   --format <type>           # 自动检测，可手动指定
   --business-domain <name>  # 业务域分类
   --yes                     # 跳过确认（Agent 模式）
   --dry-run                 # 预览解析结果
   --mock                    # 模拟数据调试
 
-sisys document parse --id <doc-id> [flags]
+sisys document parse --id <doc-id> [options]
   --output-format <json|markdown|text>
   --extract-tables          # 提取表格语义
   --ocr                     # 启用 OCR（扫描件）
 
-sisys document search --query <text> [flags]
+sisys document search --query <text> [options]
   --top-k <n>               # 返回结果数
   --domain <name>           # 业务域过滤
   --time-range <start:end>  # 时间范围
@@ -460,11 +460,11 @@ sisys document delete --id <doc-id> --confirm  # 需要确认
 #### 3.3.2 工具箱（sisys tool）
 
 ```bash
-sisys tool list [flags]
+sisys tool list [options]
   --domain <name>           # 按领域过滤
   --format <json|table>
 
-sisys tool run <tool-id> [flags]
+sisys tool run <tool-id> [options]
   --input <path>            # 输入数据文件
   --output <path>           # 输出结果文件
   --yes                     # 跳过确认（Agent 模式）
@@ -473,7 +473,7 @@ sisys tool run <tool-id> [flags]
   --session <session-id>    # 会话上下文
   --cost-budget <amount>    # 成本预算限制
 
-sisys tool chain run <chain-id> --config <path> [flags]
+sisys tool chain run <chain-id> --config <path> [options]
   --parallel                # 并行执行无依赖子任务
   --yes
   --dry-run
@@ -484,7 +484,7 @@ sisys tool schema <tool-id> --format <json|pretty>  # 查看工具 Schema
 #### 3.3.3 Agent 协作（sisys agent）
 
 ```bash
-sisys agent run <role> --task <text> [flags]
+sisys agent run <role> --task <text> [options]
   --input <path>            # 输入数据
   --output <path>           # 输出文件
   --skills <list>           # 指定加载的 Skills（逗号分隔）
@@ -492,18 +492,18 @@ sisys agent run <role> --task <text> [flags]
   --yes
   --dry-run
 
-sisys agent status [flags]
+sisys agent status [options]
   --session <session-id>
   --format <json|table|pretty>
 
-sisys agent arbitrate --session <session-id> [flags]
+sisys agent arbitrate --session <session-id> [options]
   # SYS Agent 裁决入口
 ```
 
 #### 3.3.4 战略规划（sisys plan）
 
 ```bash
-sisys plan generate <type> [flags]
+sisys plan generate <type> [options]
   # type: SP（战略规划）| BP（业务计划）
   --stage <n>               # 阶段编号
   --checkpoint <id>         # 从 Checkpoint 恢复
@@ -520,7 +520,7 @@ sisys plan review --id <plan-id>  # 人工审批入口
 ```bash
 sisys checkpoint list --plan-id <id>
 sisys checkpoint show --id <cp-id>
-sisys checkpoint recover --id <cp-id> [flags]
+sisys checkpoint recover --id <cp-id> [options]
   --mode <replay|override>  # 恢复模式
   --modifications <path>    # 修改内容文件
   --yes
@@ -530,7 +530,7 @@ sisys checkpoint recover --id <cp-id> [flags]
 #### 3.3.6 战略档案（sisys archive）
 
 ```bash
-sisys archive query [flags]
+sisys archive query [options]
   --time-range <start:end>
   --topic <text>
   --format <json|table>
