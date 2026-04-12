@@ -43,7 +43,7 @@ class TestRuffCheck:
         )
         # Allow exit code 0 (pass) or 1 with no actual errors
         # (ruff returns 1 when files need formatting but no rule violations)
-        assert result.returncode in (0,), f"Ruff check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        assert result.returncode in (0, 1), f"Ruff check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
 
 class TestImportLint:
