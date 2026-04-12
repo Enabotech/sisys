@@ -10,7 +10,7 @@ from typing import Any
 
 import factory
 
-from src.domain.entities.strategic_plan import PlanStatus, PlanType, StrategicPlan
+from src.domain.entities.strategic_plan import PlanStatus, StrategicPlan
 
 
 class StrategicPlanFactory(factory.Factory):
@@ -24,7 +24,7 @@ class StrategicPlanFactory(factory.Factory):
         model = StrategicPlan
 
     id = factory.LazyFunction(uuid.uuid4)
-    plan_type = factory.LazyFunction(lambda: PlanType.SP)
+    plan_type = factory.LazyFunction(lambda: "strategic")
     status = factory.LazyFunction(lambda: PlanStatus.DRAFT)
     creator_id = "agent_ceo"
     created_at = factory.LazyFunction(lambda: datetime.now(UTC))
@@ -32,14 +32,14 @@ class StrategicPlanFactory(factory.Factory):
 
     class Params:
         # 简化创建特定状态的规划
-        in_progress = factory.Trait(
-            status=PlanStatus.IN_PROGRESS,
+        in_review = factory.Trait(
+            status=PlanStatus.IN_REVIEW,
         )
         approved = factory.Trait(
             status=PlanStatus.APPROVED,
         )
-        completed = factory.Trait(
-            status=PlanStatus.COMPLETED,
+        archived = factory.Trait(
+            status=PlanStatus.ARCHIVED,
         )
 
 
