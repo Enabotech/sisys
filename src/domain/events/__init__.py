@@ -1,6 +1,9 @@
 """Domain events."""
 
 from .base import DomainEvent
+from .deviation_events import HeartbeatTriggered, StrategicDeviationWarning
+from .enums import CorrectionType, DeviationLevel, IsolationLevel, RecoveryMode
+from .isolation_events import CheckpointRecovered, IsolationLevelSwitched
 from .plan_events import (
     AgentDecided,
     CheckpointReached,
@@ -9,6 +12,7 @@ from .plan_events import (
     ToolExecuted,
 )
 from .publisher import EventPublisher
+from .routing_events import RoutingDecided
 
 __all__ = [
     "DomainEvent",
@@ -17,5 +21,14 @@ __all__ = [
     "AgentDecided",
     "CheckpointReached",
     "CorrectionApproved",
+    "StrategicDeviationWarning",
+    "HeartbeatTriggered",
+    "IsolationLevelSwitched",
+    "CheckpointRecovered",
+    "RoutingDecided",
     "EventPublisher",
+    "DeviationLevel",
+    "CorrectionType",
+    "IsolationLevel",
+    "RecoveryMode",
 ]

@@ -39,8 +39,11 @@ class DomainEvent:
             Dictionary representation of the event.
 
         Raises:
-            ValueError: If payload is not JSON serializable.
+            ValueError: If event_type is empty or payload is not JSON serializable.
         """
+        # P1-05 Fix: Validate event_type is non-empty
+        if not self.event_type:
+            raise ValueError("event_type must not be empty")
         result: dict[str, Any] = {
             "event_id": str(self.event_id),
             "event_type": self.event_type,

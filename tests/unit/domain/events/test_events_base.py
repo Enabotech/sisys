@@ -122,3 +122,12 @@ class TestDomainEventSerialization:
         )
         d = event.to_dict()  # Should not raise
         assert d["payload"] == {"key": "value", "number": 42}
+
+    def test_empty_event_type_raises(self):
+        """P1-05 Fix: Empty event_type raises ValueError in to_dict()."""
+        event = DomainEvent(
+            aggregate_id=uuid.uuid4(),
+            event_type="",
+        )
+        with pytest.raises(ValueError, match="event_type must not be empty"):
+            event.to_dict()

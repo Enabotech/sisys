@@ -125,3 +125,56 @@ class TestStrategicPlanPhaseTransition:
         old_time = plan.updated_at
         plan.advance_phase(BLMPhase.MARKET_INSIGHT)
         assert plan.updated_at >= old_time
+
+    def test_cannot_advance_past_final_phase(self):
+        """P0-01 Fix: Cannot advance past EXECUTION_MONITORING."""
+        plan = _make_plan()
+        # Advance through all phases
+        for phase in [
+            BLMPhase.MARKET_INSIGHT,
+            BLMPhase.STRATEGIC_DESIGN,
+            BLMPhase.ORGANIZATIONAL_DESIGN,
+            BLMPhase.IMPLEMENTATION_PLANNING,
+            BLMPhase.EXECUTION_MONITORING,
+        ]:
+            plan.advance_phase(phase)
+        assert plan.current_phase == BLMPhase.EXECUTION_MONITORING
+        # Now attempting to advance again should fail with clear message
+        with pytest.raises(ValueError, match="has reached the final phase"):
+            plan.advance_phase(BLMPhase.EXECUTION_MONITORING)
+
+    def test_completed_phases_consistency_validation(self):
+        """P1-01 Fix: current_phase must not be in completed_phases."""
+        plan = _make_plan()
+        plan.advance_phase(BLMPhase.MARKET_INSIGHT)
+        assert BLMPhase.STRATEGIC_INTENT in plan.completed_phases
+        # Corrupt the state by adding current_phase to completed_phases
+        plan.completed_phases.append(BLMPhase.MARKET_INSIGHT)
+        with pytest.raises(ValueError, match="current_phase must not be in completed_phases"):
+            plan.validate()
+
+    def test_cannot_complete_past_final_phase(self):
+        """Re-review Fix: complete_phase() has final phase guard."""
+        plan = _make_plan()
+        for phase in [
+            BLMPhase.MARKET_INSIGHT,
+            BLMPhase.STRATEGIC_DESIGN,
+            BLMPhase.ORGANIZATIONAL_DESIGN,
+            BLMPhase.IMPLEMENTATION_PLANNING,
+            BLMPhase.EXECUTION_MONITORING,
+        ]:
+            plan.advance_phase(phase)
+        with pytest.raises(ValueError, match="has reached the final phase"):
+            plan.complete_phase()
+
+    def test_cannot_complete_archived_plan(self):
+        """Re-review Fix: complete_phase() has status guard."""
+        plan = _make_plan(status=PlanStatus.ARCHIVED)
+        with pytest.raises(ValueError, match="Cannot complete phase"):
+            plan.complete_phase()
+
+    def test_cannot_complete_approved_plan(self):
+        """Re-review Fix: complete_phase() has status guard."""
+        plan = _make_plan(status=PlanStatus.APPROVED)
+        with pytest.raises(ValueError, match="Cannot complete phase"):
+            plan.complete_phase()

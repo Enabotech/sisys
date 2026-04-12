@@ -66,6 +66,9 @@ class StrategicPlan:
         # P2-05 Fix: created_at/updated_at have default_factory, never None
         if self.created_at > self.updated_at:
             raise ValueError("created_at must be before or equal to updated_at")
+        # P1-01 Fix: Validate completed_phases consistency
+        if self.current_phase in self.completed_phases:
+            raise ValueError("current_phase must not be in completed_phases")
         return True
 
     def advance_phase(self, next_phase: BLMPhase) -> None:
@@ -81,6 +84,12 @@ class StrategicPlan:
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
             raise ValueError(f"Cannot advance phase when plan is {self.status.value}")
 
+        # P0-01 Fix: Guard against advancing past the final phase
+        if self.current_phase == BLMPhase.EXECUTION_MONITORING:
+            raise ValueError(
+                "Plan has reached the final phase (EXECUTION_MONITORING), " "no further phase advancement possible"
+            )
+
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
         next_idx = phase_order.index(next_phase)
@@ -94,7 +103,21 @@ class StrategicPlan:
         self.updated_at = datetime.now(UTC)
 
     def complete_phase(self) -> None:
-        """Mark current phase as completed and advance."""
+        """Mark current phase as completed and advance.
+
+        Raises:
+            ValueError: If plan is archived/approved or already at final phase.
+        """
+        # Status guard — cannot complete archived or approved plans
+        if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
+            raise ValueError(f"Cannot complete phase when plan is {self.status.value}")
+
+        # Final phase guard — cannot complete past the final phase
+        if self.current_phase == BLMPhase.EXECUTION_MONITORING:
+            raise ValueError(
+                "Plan has reached the final phase (EXECUTION_MONITORING), " "no further phase advancement possible"
+            )
+
         self.completed_phases.append(self.current_phase)
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
