@@ -594,14 +594,24 @@
 
 ---
 
-### Task 6: 架构约束验证测试
+### Task 6: 架构约束验证测试（🔴 Must-Have，分两阶段执行）
 
 **关联 AC:** AC-6
 
 > **性质说明:** 本 Task 验证事件总线实现是否符合六边形架构约束(依赖方向、层分离)，而非编写单元测试。
+> **两阶段验证策略:**
+> - **Phase 3 增量验证**: Task 1/2 完成后执行，检查 Redis/RabbitMQ 客户端导入仅在基础设施层
+> - **最终全量验证**: 所有 Task 完成后执行，验证全量依赖方向、层分离
 
 #### 架构验证测试实现
 
+**Phase 3 增量验证（Task 1/2 完成后执行）:**
+- [ ] Subtask: 验证 Redis 客户端导入仅在基础设施层（`src/infrastructure/events/redis_*.py`）
+- [ ] Subtask: 验证 RabbitMQ 客户端导入仅在基础设施层（`src/infrastructure/events/rabbitmq_*.py`）
+- [ ] Subtask: 运行 `ruff check src/infrastructure/events/` 确认通过
+- [ ] Subtask: 运行 `mypy src/infrastructure/events/` 确认通过
+
+**最终全量验证（所有 Task 完成后执行）:**
 - [ ] Subtask: 创建 `tests/unit/architecture/test_event_bus_architecture.py`
 - [ ] Subtask: 实现事件总线依赖方向验证(Redis/RabbitMQ 客户端导入仅在基础设施层)
 - [ ] Subtask: 实现领域层接口不依赖实现验证(EventPublisher/EventListener/OutboxRepository)
@@ -610,6 +620,8 @@
 - [ ] Subtask: 运行 `mypy src/infrastructure/events/` 确认通过
 
 **完成标准/Definition of Done:**
+- [ ] Phase 3 增量验证通过
+- [ ] 最终全量验证通过
 - [ ] 事件总线依赖方向验证通过
 - [ ] 领域层接口不依赖实现验证通过
 - [ ] import-linter 依赖方向验证通过
@@ -619,6 +631,16 @@
 ---
 
 ## 📝 Dev Notes 开发笔记
+
+### 审查决议参考
+
+本 Story 已通过 Party Mode 多代理审查 + 架构师修正（v1.2），详见 [`1-3-event-bus-review-decision.md`](./1-3-event-bus-review-decision.md)。
+
+**关键决议：**
+- 优先级分级：Must-Have(Task 0,1,2,3,6) + Should-Have(Task 4) + Could-Have(Task 5.1,5.2)
+- Task 5 拆分：5.1/5.2 保留 Story 1.3，5.3/5.4/5.5 移至后续故事
+- AC-4 拆分：AC-4.1 幂等性(Must) + AC-4.2 重试(Should，简化版固定延迟)
+- Task 6 两阶段验证：Phase 3 增量 + 最终全量
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints
 
@@ -714,6 +736,86 @@
 │                      └─ 未找到 ──→ 记录警告日志                │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### 测试环境策略（审查决议补充）
+
+**分层测试策略：**
+| 测试类型 | 依赖策略 | pytest 标记 | 说明 |
+|---------|---------|-------------|------|
+| **单元测试** | Mock（`unittest.mock` / `fakeredis ^2.20.0`） | `@pytest.mark.unit` | 快速执行，无外部依赖 |
+| **集成测试** | Docker Compose（Redis + RabbitMQ 真实实例） | `@pytest.mark.integration` | 验证真实连接、序列化、网络异常 |
+| **验收测试（Gherkin）** | Docker Compose | `@pytest.mark.e2e` | 端到端业务场景验证 |
+
+**Docker Compose 配置（`docker-compose.test.yml`，Story 1.3 实施时创建）：**
+- `redis-test`: redis:7-alpine, 端口 6380:6379, healthcheck `redis-cli ping`
+- `rabbitmq-test`: rabbitmq:3-management-alpine, 端口 5673:5672, healthcheck `rabbitmq-diagnostics check_running`
+- **无 PostgreSQL**（Story 1.3 Outbox 使用 InMemoryOutboxRepository，PostgreSQL 延后至 Story 1.5）
+
+**Makefile 命令（Story 1.3 实施时添加）：**
+```makefile
+test-env-up:
+	docker-compose -f docker-compose.test.yml up -d
+
+test-env-down:
+	docker-compose -f docker-compose.test.yml down -v
+
+test-integration: test-env-up
+	@# 健康检查等待替代 sleep 10
+	@until redis-cli -p 6380 ping | grep -q PONG; do echo "Waiting for Redis..."; sleep 1; done
+	pytest -m integration --cov=src --cov-fail-under=80
+	make test-env-down
+```
+
+### 依赖包确认
+
+| 依赖包 | 当前状态 | 版本 | 用途 |
+|--------|---------|------|------|
+| `redis` | ✅ 已存在 | `^5.0.1` | Redis 客户端 |
+| `aio-pika` | ✅ 已存在 | `^9.3.0` | RabbitMQ **异步**客户端（`async/await`） |
+| `opentelemetry-api` | ✅ 已存在 | `^1.21.0` | OpenTelemetry API（Task 5） |
+| `opentelemetry-sdk` | ✅ 已存在 | `^1.21.0` | OpenTelemetry SDK（Task 5） |
+| `prometheus-client` | ✅ 已存在 | `^0.21.1` | Prometheus 指标导出 |
+| `pytest-asyncio` | ✅ 已存在 | — | 异步测试支持（RabbitMQ 组件必需） |
+| `fakeredis` | ❌ 需添加 | `^2.20.0` | Redis Mock（单元测试） |
+
+**需添加的测试依赖：**
+```toml
+[tool.poetry.group.test.dependencies]
+fakeredis = "^2.20.0"  # Redis Mock 支持单元测试
+```
+
+### Task 实施顺序建议（审查决议推荐）
+
+```
+Phase 1（核心基础）:
+  Task 0 → SDD 规范定义（前置）
+  Task 1 → Redis Pub/Sub（简单，快速验证通道）
+
+Phase 2（可靠传输）:
+  Task 2 → RabbitMQ 持久化通道（async/await，需 pytest-asyncio）
+  Task 3 → Outbox Pattern（InMemoryOutboxRepository + 轮询发布）
+
+Phase 3（架构验证）:
+  Task 6 → 架构约束验证（增量验证 Redis/RabbitMQ 导入位置）
+
+Phase 4（增强能力）:
+  Task 4 → 幂等性与重试（Must: 幂等性检查, Should: 简化重试）
+
+Phase 5（可观测性基础，本故事最后完成）:
+  Task 5.1 → EventMetrics + EventMetricsCollector 基础计数器
+  Task 5.2 → OpenTelemetry Trace 基础版（span 创建+属性，默认关闭导出）
+
+最终验证:
+  Task 6 → 架构约束全量验证（确保所有 Task 完成后依赖方向仍正确）
+```
+
+**完成标志：**
+- Must-Have Task(0,1,2,3,6) 全部完成且测试通过
+- Task 4 至少实现幂等性检查(`IdempotencyChecker`)
+- Task 5.1/5.2 至少实现 `EventMetrics` + `EventMetricsCollector` 基础计数器 + OpenTelemetry span 创建
+- 覆盖率达标（领域层 ≥90%，基础设施层 ≥75%，整体 ≥80%）
+- `ruff check` + `mypy` + `import-linter` 全部通过
+- Gherkin 验收测试通过（至少 1 个端到端场景）
 
 ### 项目结构说明 Project Structure
 

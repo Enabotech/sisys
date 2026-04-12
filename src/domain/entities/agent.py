@@ -103,9 +103,7 @@ class Agent:
         """
         # P1-03 Fix: Reject re-failing an already failed agent
         if self.status == AgentStatus.FAILED:
-            raise ValueError(
-                f"Agent is already failed (reason: {self.failure_reason!r})"
-            )
+            raise ValueError(f"Agent is already failed (reason: {self.failure_reason!r})")
         self.failure_reason = reason
         self.status = AgentStatus.FAILED
         self.updated_at = datetime.now(UTC)
@@ -117,9 +115,7 @@ class Agent:
             ValueError: If agent is not in FAILED or COMPLETED state.
         """
         if self.status not in (AgentStatus.FAILED, AgentStatus.COMPLETED):
-            raise ValueError(
-                f"Can only restart from FAILED or COMPLETED, current: {self.status.value}"
-            )
+            raise ValueError(f"Can only restart from FAILED or COMPLETED, current: {self.status.value}")
         self.failure_reason = ""
         self.status = AgentStatus.IDLE
         self.updated_at = datetime.now(UTC)
