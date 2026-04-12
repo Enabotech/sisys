@@ -46,6 +46,7 @@ class Agent:
     name: str
     description: str = ""
     status: AgentStatus = AgentStatus.IDLE
+    failure_reason: str = ""
     domain_knowledge: list[str] = field(default_factory=list)
     responsibilities: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -92,8 +93,25 @@ class Agent:
         self.updated_at = datetime.now(UTC)
 
     def fail(self, reason: str = "") -> None:
-        """Transition agent to FAILED state."""
+        """Transition agent to FAILED state.
+
+        Args:
+            reason: Optional failure reason for diagnostics.
+        """
+        self.failure_reason = reason
         self.status = AgentStatus.FAILED
+        self.updated_at = datetime.now(UTC)
+
+    def restart(self) -> None:
+        """Restart a failed agent back to IDLE.
+
+        Raises:
+            ValueError: If agent is not in FAILED state.
+        """
+        if self.status != AgentStatus.FAILED:
+            raise ValueError(f"Can only restart from FAILED, current: {self.status.value}")
+        self.failure_reason = ""
+        self.status = AgentStatus.IDLE
         self.updated_at = datetime.now(UTC)
 
     def wait(self) -> None:

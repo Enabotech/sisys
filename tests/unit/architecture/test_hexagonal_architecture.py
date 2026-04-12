@@ -7,6 +7,7 @@ These tests verify that the hexagonal architecture boundaries are respected:
 
 import ast
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
@@ -45,25 +46,69 @@ def _get_imports(file_path: Path) -> list[str]:
     return imports
 
 
-# External libraries that domain layer must NOT import
-FORBIDDEN_DOMAIN_IMPORTS = {
+def _get_external_dependencies() -> set[str]:
+    """Dynamically derive forbidden imports from pyproject.toml dependencies.
+
+    P1-06 Fix: Instead of maintaining a hardcoded list, extract actual
+    project dependencies from pyproject.toml [project.dependencies].
+    """
+    pyproject = ROOT / "pyproject.toml"
+    if not pyproject.exists():
+        return set()
+
+    content = pyproject.read_text()
+    # Simple extraction: find all package names in dependencies
+    # Format: "package-name>=version" or "package_name"
+    import re
+
+    # Match dependency patterns like "langgraph>=0.1", "pydantic", etc.
+    deps_section = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
+    if not deps_section:
+        return set()
+
+    forbidden: set[str] = set()
+    for dep_match in re.finditer(r'"([a-zA-Z0-9_-]+)', deps_section.group(1)):
+        # Normalize: hyphens to underscores (pip normalizes names)
+        forbidden.add(dep_match.group(1).replace("-", "_"))
+    return forbidden
+
+
+# P1-06 Fix: Derive forbidden imports from pyproject.toml, merged with
+# known external frameworks that might be transitive dependencies.
+FORBIDDEN_DOMAIN_IMPORTS = _get_external_dependencies() | {
+    # External frameworks (project dependencies — also in pyproject.toml)
     "langgraph",
     "prefect",
     "fastapi",
     "pydantic",
+    "pydantic_settings",
     "sqlalchemy",
     "typer",
     "redis",
-    "psycopg2",
-    "qdrant",
+    "qdrant_client",
     "minio",
     "neo4j",
     "aio_pika",
     "litellm",
     "instructor",
+    # Common third-party packages
     "requests",
     "httpx",
     "docker",
+    "psycopg2",
+    "boto3",
+    "numpy",
+    "pandas",
+    "torch",
+    "uvicorn",
+    "alembic",
+    "loguru",
+    "dotenv",
+    "jsonschema",
+    # Other project layers (domain must not depend on these)
+    "src.application",
+    "src.interfaces",
+    "src.infrastructure",
 }
 
 
@@ -93,103 +138,109 @@ class TestDomainLayerZeroDependency:
         assert not violations, "Domain layer has external dependencies:\n" + "\n".join(violations)
 
     def test_domain_uses_only_stdlib(self):
-        """Domain layer only uses known stdlib modules."""
-        stdlib_modules = {
-            "dataclasses",
-            "datetime",
-            "uuid",
-            "enum",
-            "typing",
-            "abc",
-            "json",
-            "copy",
-            "collections",
-            "itertools",
-            "functools",
-            "operator",
-            "pathlib",
-            "os",
-            "sys",
-            "io",
-            "re",
-            "string",
-            "math",
-            "numbers",
-            "decimal",
-            "fractions",
-            "statistics",
-            "array",
-            "weakref",
-            "types",
-            "contextlib",
-            "warnings",
-            "traceback",
-            "logging",
-            "unittest",
-            "ast",
-            "dis",
-            "pickle",
-            "shelve",
-            "dbm",
-            "csv",
-            "configparser",
-            "hashlib",
-            "hmac",
-            "secrets",
-            "time",
-            "calendar",
-            "zoneinfo",
-            "textwrap",
-            "difflib",
-            "pprint",
-            "reprlib",
-            "inspect",
-            "importlib",
-            "pkgutil",
-            "sysconfig",
-            "atexit",
-            "signal",
-            "threading",
-            "multiprocessing",
-            "concurrent",
-            "subprocess",
-            "sched",
-            "queue",
-            "contextvars",
-            "_thread",
-            "socket",
-            "ssl",
-            "select",
-            "selectors",
-            "asyncio",
-            "socketserver",
-            "xml",
-            "html",
-            "webbrowser",
-            "cgi",
-            "urllib",
-            "http",
-            "ftplib",
-            "poplib",
-            "imaplib",
-            "smtplib",
-            "uuid",
-            "email",
-            "struct",
-            "codecs",
-            "unicodedata",
-            "stringprep",
-            "readline",
-            "rlcompleter",
-            "bisect",
-            "heapq",
-            "array",
-            "copy",
-            "deepcopy",
-            "typing",
-            "abc",
-            "__future__",
-        }
+        """Domain layer only uses known stdlib modules.
+
+        P1-06 Fix: Use sys.stdlib_module_names (Python 3.10+) instead of
+        a manually maintained allowlist.
+        """
+        # Python 3.10+ provides the complete stdlib module set
+        if hasattr(sys, "stdlib_module_names"):
+            stdlib_modules: set[str] = sys.stdlib_module_names
+        else:
+            # Fallback for older Python versions
+            stdlib_modules = {
+                "dataclasses",
+                "datetime",
+                "uuid",
+                "enum",
+                "typing",
+                "abc",
+                "json",
+                "copy",
+                "collections",
+                "itertools",
+                "functools",
+                "operator",
+                "pathlib",
+                "os",
+                "sys",
+                "io",
+                "re",
+                "string",
+                "math",
+                "numbers",
+                "decimal",
+                "fractions",
+                "statistics",
+                "array",
+                "weakref",
+                "types",
+                "contextlib",
+                "warnings",
+                "traceback",
+                "logging",
+                "unittest",
+                "ast",
+                "dis",
+                "pickle",
+                "shelve",
+                "dbm",
+                "csv",
+                "configparser",
+                "hashlib",
+                "hmac",
+                "secrets",
+                "time",
+                "calendar",
+                "zoneinfo",
+                "textwrap",
+                "difflib",
+                "pprint",
+                "reprlib",
+                "inspect",
+                "importlib",
+                "pkgutil",
+                "sysconfig",
+                "atexit",
+                "signal",
+                "threading",
+                "multiprocessing",
+                "concurrent",
+                "subprocess",
+                "sched",
+                "queue",
+                "contextvars",
+                "_thread",
+                "socket",
+                "ssl",
+                "select",
+                "selectors",
+                "asyncio",
+                "socketserver",
+                "xml",
+                "html",
+                "webbrowser",
+                "cgi",
+                "urllib",
+                "http",
+                "ftplib",
+                "poplib",
+                "imaplib",
+                "smtplib",
+                "email",
+                "struct",
+                "codecs",
+                "unicodedata",
+                "stringprep",
+                "readline",
+                "rlcompleter",
+                "bisect",
+                "heapq",
+                "tomllib",
+                "graphlib",
+                "__future__",
+                "typing_extensions",
+            }
 
         files = _get_python_files(DOMAIN_DIR)
         violations = []

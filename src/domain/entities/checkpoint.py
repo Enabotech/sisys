@@ -84,6 +84,9 @@ class Checkpoint:
     def complete(self) -> None:
         """Mark checkpoint as completed.
 
+        Valid transitions: PENDING -> COMPLETED, IN_PROGRESS -> COMPLETED,
+        RECOVERED -> COMPLETED.
+
         Raises:
             ValueError: If checkpoint is already completed.
         """
@@ -96,6 +99,10 @@ class Checkpoint:
 
     def recover(self, mode: RecoveryMode) -> None:
         """Recover from this checkpoint using specified mode.
+
+        Valid transitions: PENDING -> RECOVERED, IN_PROGRESS -> RECOVERED,
+        RECOVERED -> RECOVERED (re-recover with different mode).
+        Cannot recover a COMPLETED checkpoint.
 
         Args:
             mode: Recovery mode (REPLAY or OVERRIDE).

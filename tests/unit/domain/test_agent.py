@@ -110,3 +110,38 @@ class TestAgentStateTransitions:
         agent.start()
         agent.wait()
         assert agent.status == AgentStatus.WAITING
+
+    def test_fail_stores_reason(self):
+        """P1-02 Fix: fail() stores the failure reason."""
+        agent = _make_agent()
+        agent.fail("database timeout")
+        assert agent.status == AgentStatus.FAILED
+        assert agent.failure_reason == "database timeout"
+
+    def test_fail_with_empty_reason(self):
+        """P1-02 Fix: fail() works with empty reason."""
+        agent = _make_agent()
+        agent.fail()
+        assert agent.status == AgentStatus.FAILED
+        assert agent.failure_reason == ""
+
+    def test_restart_from_failed_state(self):
+        """P1-03 Fix: Can restart a failed agent."""
+        agent = _make_agent()
+        agent.fail("network error")
+        agent.restart()
+        assert agent.status == AgentStatus.IDLE
+        assert agent.failure_reason == ""
+
+    def test_cannot_restart_from_non_failed_state(self):
+        """P1-03 Fix: Cannot restart agent from IDLE state."""
+        agent = _make_agent()
+        with pytest.raises(ValueError, match="Can only restart from FAILED"):
+            agent.restart()
+
+    def test_cannot_restart_from_running(self):
+        """P1-03 Fix: Cannot restart agent from RUNNING state."""
+        agent = _make_agent()
+        agent.start()
+        with pytest.raises(ValueError, match="Can only restart from FAILED"):
+            agent.restart()

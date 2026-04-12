@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from uuid import UUID
 
 T = TypeVar("T")
 
 
-class BaseRepository(Generic[T]):
+class BaseRepository(Generic[T], ABC):
     """Generic repository interface for domain entities.
 
     This interface is defined in the domain layer and implemented
     in the infrastructure layer (Dependency Inversion Principle).
+
+    P1-07 Fix: Use ABC + @abstractmethod to prevent instantiation of
+    subclasses that haven't implemented all methods.
     """
 
+    @abstractmethod
     def get_by_id(self, id: UUID) -> T | None:
         """Retrieve an entity by its ID.
 
@@ -24,28 +29,27 @@ class BaseRepository(Generic[T]):
         Returns:
             The entity if found, None otherwise.
         """
-        raise NotImplementedError("BaseRepository.get_by_id must be implemented by subclass")
 
+    @abstractmethod
     def save(self, entity: T) -> None:
         """Save an entity.
 
         Args:
             entity: The entity to save or update.
         """
-        raise NotImplementedError("BaseRepository.save must be implemented by subclass")
 
+    @abstractmethod
     def delete(self, id: UUID) -> None:
         """Delete an entity by its ID.
 
         Args:
             id: The unique identifier of the entity to delete.
         """
-        raise NotImplementedError("BaseRepository.delete must be implemented by subclass")
 
+    @abstractmethod
     def list_all(self) -> list[T]:
         """List all entities.
 
         Returns:
             A list of all entities.
         """
-        raise NotImplementedError("BaseRepository.list_all must be implemented by subclass")
