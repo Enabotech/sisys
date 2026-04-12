@@ -17,7 +17,7 @@ import pytest
 import requests
 
 # 从统一配置模块加载
-from tests.conftest import TestConfig
+from config import TestConfig
 
 
 class TestGiteaDeployment:

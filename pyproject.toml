@@ -118,6 +118,7 @@ jsonschema = "^4.19.0"  # JSON Schema 验证
 safety = "^3.7.0"
 types-requests = "^2.32.4.20260107"
 types-PyYAML = "^6.0.0"
+import-linter = "^2.11"
 
 [project.scripts]
 sisys = "src.cli:app"

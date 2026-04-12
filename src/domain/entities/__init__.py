@@ -1,20 +1,9 @@
-"""
-sisys - Domain Entities.
+"""Domain entities."""
 
-领域实体模块 - 包含核心业务实体定义。
-"""
+from .agent import Agent
+from .checkpoint import Checkpoint
+from .document import Document
+from .strategic_plan import StrategicPlan
+from .tool import Tool
 
-from src.domain.entities.base import AggregateRoot, BaseEntity, ValueObject
-from src.domain.entities.strategic_plan import PlanStatus, PlanType, StrategicPlan
-
-__all__ = [
-    # 基类
-    "BaseEntity",
-    "AggregateRoot",
-    "ValueObject",
-    # 实体
-    "StrategicPlan",
-    # 枚举
-    "PlanType",
-    "PlanStatus",
-]
+__all__ = ["StrategicPlan", "Document", "Agent", "Tool", "Checkpoint"]

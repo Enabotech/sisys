@@ -20,7 +20,8 @@ import pytest
 # =============================================================================
 # 配置常量 - 从统一配置模块加载
 # =============================================================================
-from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
+from config import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
+
 from tests.utils.kubectl import run_kubectl
 
 HARBOR_NAMESPACE = TestConfig.get_harbor_config()["namespace"]
