@@ -45,12 +45,25 @@
 
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
-| 规范项 | 位置 | 完成标准 | 负责人 |
-|--------|------|----------|--------|
-| **领域事件 Schema** | `src/domain/events/` | [描述 Schema 要求] | [负责人] |
-| **API 契约** | `docs/api/openapi.yaml` | [骨架 Story 仅需占位 / 完整 Story 补充定义] | [负责人] |
-| **验收标准 Gherkin** | `tests/acceptance/test_story_[编号].feature` | Given-When-Then 格式，覆盖所有 AC 的主要场景 | [负责人] |
-| **数据模型** | `src/domain/entities/` 或对应层 | [描述数据模型要求] | [负责人] |
+#### 领域事件 Schema (Domain Events)
+- [ ] 事件定义位于 `src/domain/events/`
+- [ ] Pydantic 模型验证通过
+- [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `UserCreated`）
+
+#### API 契约 (API Contract)
+- [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
+- [ ] 契约测试通过（`tests/contract/test_api_contract.py`）
+- [ ] API 版本管理正确（`/api/v1/[resource]`）
+
+#### 数据模型 (Data Models)
+- [ ] 模型定义位于 `src/domain/entities/` 或对应层
+- [ ] [描述数据模型要求]
+- [ ] ...
+
+#### 验收标准 Gherkin (Acceptance Tests)
+- [ ] 功能测试文件：`tests/acceptance/test_story_[编号].feature`
+- [ ] 业务方评审通过
+- [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -125,8 +138,11 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | [描述] | Task [N] | [Subtask 范围] | `test_[file].py` |
-| AC-2 | [描述] | Task [N] | [Subtask 范围] | `test_[file].py` |
+| AC-1 | [描述] | Task [2] | [Subtask 简述] | `test_[file].py` |
+| AC-1 | [描述] | Task [5] | [Subtask 简述] | `test_[file].py` |
+| AC-2 | [描述] | Task [1] | [Subtask 简述] | `test_[file].py` |
+| AC-2 | [描述] | Task [3] | [Subtask 简述] | `test_[file].py` |
+...
 
 ---
 
