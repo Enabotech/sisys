@@ -74,7 +74,7 @@ development_status:
   # ===========================================================================
   epic-1: in-progress
   # 价值组 2: 架构基础与事件驱动
-  1-1-hexagonal-architecture-skeleton: review
+  1-1-hexagonal-architecture-skeleton: done
   1-2-domain-event-definition: review
   1-3-event-bus-implementation: backlog
   1-16-integration-test-framework: backlog

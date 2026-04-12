@@ -98,7 +98,9 @@ class StrategicPlan:
         if next_idx != current_idx + 1:
             raise ValueError("Can only advance to the immediately next phase")
 
-        self.completed_phases.append(self.current_phase)
+        # P1-01 Fix: Prevent duplicate entries in completed_phases
+        if self.current_phase not in self.completed_phases:
+            self.completed_phases.append(self.current_phase)
         self.current_phase = next_phase
         self.updated_at = datetime.now(UTC)
 
@@ -118,7 +120,9 @@ class StrategicPlan:
                 "Plan has reached the final phase (EXECUTION_MONITORING), " "no further phase advancement possible"
             )
 
-        self.completed_phases.append(self.current_phase)
+        # P1-01 Fix: Prevent duplicate entries in completed_phases
+        if self.current_phase not in self.completed_phases:
+            self.completed_phases.append(self.current_phase)
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
         if current_idx < len(phase_order) - 1:

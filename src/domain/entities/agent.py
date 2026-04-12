@@ -97,19 +97,29 @@ class Agent:
 
         Args:
             reason: Optional failure reason for diagnostics.
+
+        Raises:
+            ValueError: If agent is already in FAILED state.
         """
+        # P1-03 Fix: Reject re-failing an already failed agent
+        if self.status == AgentStatus.FAILED:
+            raise ValueError(
+                f"Agent is already failed (reason: {self.failure_reason!r})"
+            )
         self.failure_reason = reason
         self.status = AgentStatus.FAILED
         self.updated_at = datetime.now(UTC)
 
     def restart(self) -> None:
-        """Restart a failed agent back to IDLE.
+        """Restart a failed or completed agent back to IDLE.
 
         Raises:
-            ValueError: If agent is not in FAILED state.
+            ValueError: If agent is not in FAILED or COMPLETED state.
         """
-        if self.status != AgentStatus.FAILED:
-            raise ValueError(f"Can only restart from FAILED, current: {self.status.value}")
+        if self.status not in (AgentStatus.FAILED, AgentStatus.COMPLETED):
+            raise ValueError(
+                f"Can only restart from FAILED or COMPLETED, current: {self.status.value}"
+            )
         self.failure_reason = ""
         self.status = AgentStatus.IDLE
         self.updated_at = datetime.now(UTC)
