@@ -23,7 +23,7 @@ class TestDomainEventCreation:
         assert event.aggregate_id == agg_id
         assert event.event_type == "TestEvent"
         assert event.payload == {"key": "value"}
-        assert isinstance(event.occurred_on, datetime)
+        assert isinstance(event.timestamp, datetime)
 
     def test_event_has_auto_generated_id(self):
         """Event ID is auto-generated UUID."""
@@ -34,13 +34,13 @@ class TestDomainEventCreation:
         assert isinstance(event.event_id, uuid.UUID)
 
     def test_event_has_auto_timestamp(self):
-        """Event has auto-generated occurred_on timestamp."""
+        """Event has auto-generated timestamp."""
         event = DomainEvent(
             aggregate_id=uuid.uuid4(),
             event_type="TestEvent",
         )
-        assert isinstance(event.occurred_on, datetime)
-        assert event.occurred_on.tzinfo is not None
+        assert isinstance(event.timestamp, datetime)
+        assert event.timestamp.tzinfo is not None
 
     def test_frozen_event_is_immutable(self):
         """DomainEvent is frozen (immutable)."""
@@ -67,7 +67,7 @@ class TestDomainEventSerialization:
         assert d["event_type"] == "TestEvent"
         assert d["aggregate_id"] == str(agg_id)
         assert d["payload"] == {"data": 42}
-        assert "occurred_on" in d
+        assert "timestamp" in d
 
     def test_from_dict_roundtrip(self):
         """Can serialize and deserialize event."""
@@ -83,6 +83,7 @@ class TestDomainEventSerialization:
         assert restored.aggregate_id == event.aggregate_id
         assert restored.event_type == event.event_type
         assert restored.payload == event.payload
+        assert restored.timestamp == event.timestamp
 
     def test_to_dict_excludes_none_aggregate_id(self):
         """P0-01 Fix: aggregate_id=None is excluded from dict."""
@@ -123,6 +124,43 @@ class TestDomainEventSerialization:
         d = event.to_dict()  # Should not raise
         assert d["payload"] == {"key": "value", "number": 42}
 
+    def test_from_dict_missing_event_id_raises(self):
+        """Missing event_id raises ValueError."""
+        with pytest.raises(ValueError, match="Missing required field: event_id"):
+            DomainEvent.from_dict({"event_type": "Test", "timestamp": "2026-01-01T00:00:00+00:00"})
+
+    def test_from_dict_missing_event_type_raises(self):
+        """Missing event_type raises ValueError."""
+        with pytest.raises(ValueError, match="Missing required field: event_type"):
+            DomainEvent.from_dict({"event_id": str(uuid.uuid4()), "timestamp": "2026-01-01T00:00:00+00:00"})
+
+    def test_from_dict_missing_timestamp_raises(self):
+        """Missing timestamp raises ValueError."""
+        with pytest.raises(ValueError, match="Missing required field: timestamp"):
+            DomainEvent.from_dict({"event_id": str(uuid.uuid4()), "event_type": "Test"})
+
+    def test_from_dict_invalid_uuid_raises(self):
+        """Invalid UUID raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid event_id"):
+            DomainEvent.from_dict(
+                {
+                    "event_id": "not-a-uuid",
+                    "event_type": "Test",
+                    "timestamp": "2026-01-01T00:00:00+00:00",
+                }
+            )
+
+    def test_from_dict_invalid_timestamp_raises(self):
+        """Invalid timestamp raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid timestamp"):
+            DomainEvent.from_dict(
+                {
+                    "event_id": str(uuid.uuid4()),
+                    "event_type": "Test",
+                    "timestamp": "not-a-datetime",
+                }
+            )
+
     def test_empty_event_type_raises(self):
         """P1-05 Fix: Empty event_type raises ValueError in to_dict()."""
         event = DomainEvent(
@@ -135,48 +173,24 @@ class TestDomainEventSerialization:
     def test_from_dict_invalid_event_id_raises(self):
         """P0-01 Fix: Invalid event_id raises ValueError with context."""
         with pytest.raises(ValueError, match="Invalid event_id"):
-            DomainEvent.from_dict({
-                "event_id": "not-a-uuid",
-                "event_type": "TestEvent",
-                "occurred_on": "2024-01-01T00:00:00+00:00",
-                "payload": {},
-            })
-
-    def test_from_dict_invalid_occurred_on_raises(self):
-        """P0-02 Fix: Invalid occurred_on raises ValueError with context."""
-        with pytest.raises(ValueError, match="Invalid occurred_on"):
-            DomainEvent.from_dict({
-                "event_id": str(uuid.uuid4()),
-                "event_type": "TestEvent",
-                "occurred_on": "not-a-datetime",
-                "payload": {},
-            })
-
-    def test_from_dict_missing_event_id_raises(self):
-        """P1-04 Fix: Missing event_id raises ValueError with context."""
-        with pytest.raises(ValueError, match="Missing required field: event_id"):
-            DomainEvent.from_dict({
-                "event_type": "TestEvent",
-                "occurred_on": "2024-01-01T00:00:00+00:00",
-                "payload": {},
-            })
-
-    def test_from_dict_missing_occurred_on_raises(self):
-        """P1-04 Fix: Missing occurred_on raises ValueError with context."""
-        with pytest.raises(ValueError, match="Missing required field: occurred_on"):
-            DomainEvent.from_dict({
-                "event_id": str(uuid.uuid4()),
-                "event_type": "TestEvent",
-                "payload": {},
-            })
+            DomainEvent.from_dict(
+                {
+                    "event_id": "not-a-uuid",
+                    "event_type": "TestEvent",
+                    "timestamp": "2024-01-01T00:00:00+00:00",
+                    "payload": {},
+                }
+            )
 
     def test_from_dict_invalid_aggregate_id_raises(self):
         """P0-01 Fix: Invalid aggregate_id raises ValueError with context."""
         with pytest.raises(ValueError, match="Invalid aggregate_id"):
-            DomainEvent.from_dict({
-                "event_id": str(uuid.uuid4()),
-                "event_type": "TestEvent",
-                "occurred_on": "2024-01-01T00:00:00+00:00",
-                "aggregate_id": "not-a-uuid",
-                "payload": {},
-            })
+            DomainEvent.from_dict(
+                {
+                    "event_id": str(uuid.uuid4()),
+                    "event_type": "TestEvent",
+                    "timestamp": "2024-01-01T00:00:00+00:00",
+                    "aggregate_id": "not-a-uuid",
+                    "payload": {},
+                }
+            )
