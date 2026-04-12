@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-11
+last_updated: 2026-04-12
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   # ===========================================================================
   epic-1: in-progress
   # 价值组 2: 架构基础与事件驱动
-  1-1-hexagonal-architecture-skeleton: backlog
+  1-1-hexagonal-architecture-skeleton: ready-for-dev
   1-2-domain-event-definition: backlog
   1-3-event-bus-implementation: backlog
   1-16-integration-test-framework: backlog
@@ -315,20 +315,20 @@ development_status:
 # Total Stories (excluding retrospectives): 152
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
-#   - Epic 1-19: 140 stories (📋 backlog)
+#   - Epic 1-19: 140 stories (📋 backlog, 1 ready-for-dev)
 #
 # Status Summary:
 #   - Done: 8 (Epic 0 Iteration 0: 3 + Epic 0 Iteration 1: 5)
-#   - Ready for Dev: 2 (Story 0.9, Story 0.15)
-#   - Backlog: 142
+#   - Ready for Dev: 3 (Story 0.17, Story 0.18, Story 1.1)
+#   - Backlog: 141
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
 #   2. Execute Epic 0 Iteration 1 剩余 Stories (0.17/18) - 产品交付系统依赖Epic 1
-#   3. Start Epic 1 Story 1.1
+#   3. Start Epic 1 Story 1.1 (1-1-hexagonal-architecture-skeleton) - 架构基础
 #
 # Key Changes from Previous Version:
 #   - Updated last_updated date to 2026-04-12
-#   - Ready for Dev count: 2 (Story 0.17/0.18)
-#   - Backlog count: 142 → 140
+#   - Ready for Dev count: 3 (Story 0.17, Story 0.18, Story 1.1)
+#   - Backlog count: 141 (Story 1.1 moved to ready-for-dev)
 # =============================================================================

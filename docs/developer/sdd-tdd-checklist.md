@@ -3,8 +3,9 @@
 **版本:** 1.0.0
 **日期:** 2026-03-04
 **用途:** 每个 Story 开发时的检查清单
-
 ---
+
+**Story模板:** `docs/developer/story-template.md`
 
 ## 📋 开发前检查清单（SDD 规范定义）
 
