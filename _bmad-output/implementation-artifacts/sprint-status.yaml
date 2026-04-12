@@ -65,8 +65,8 @@ development_status:
   0-14-windows-installer: done
   0-15-mac-installer: done
   0-16-linux-installer: done
-  0-17-auto-diagnose-and-fix: backlog
-  0-18-user-friendly-config-wizard: backlog
+  0-17-auto-diagnose-and-fix: ready-for-dev
+  0-18-user-friendly-config-wizard: ready-for-dev
   epic-0-iteration-1-retrospective: optional
 
   # ===========================================================================
@@ -313,7 +313,7 @@ development_status:
 # Total Epics: 20 (Epic 0-19, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
 # Total Stories (excluding retrospectives): 152
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
-#   - Epic 0 Iteration 1: 11 stories (🔄 9 done, 2 backlog)
+#   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (📋 backlog)
 #
 # Status Summary:
