@@ -67,3 +67,38 @@ class Agent:
         if not self.name or not self.name.strip():
             raise ValueError("name must not be empty")
         return True
+
+    # P1-05 Fix: Add state transition methods
+    def start(self) -> None:
+        """Transition agent from IDLE to RUNNING.
+
+        Raises:
+            ValueError: If agent is not in IDLE state.
+        """
+        if self.status != AgentStatus.IDLE:
+            raise ValueError(f"Can only start from IDLE, current: {self.status.value}")
+        self.status = AgentStatus.RUNNING
+        self.updated_at = datetime.now(UTC)
+
+    def complete(self) -> None:
+        """Transition agent from RUNNING to COMPLETED.
+
+        Raises:
+            ValueError: If agent is not in RUNNING state.
+        """
+        if self.status != AgentStatus.RUNNING:
+            raise ValueError(f"Can only complete from RUNNING, current: {self.status.value}")
+        self.status = AgentStatus.COMPLETED
+        self.updated_at = datetime.now(UTC)
+
+    def fail(self, reason: str = "") -> None:
+        """Transition agent to FAILED state."""
+        self.status = AgentStatus.FAILED
+        self.updated_at = datetime.now(UTC)
+
+    def wait(self) -> None:
+        """Transition agent to WAITING state."""
+        if self.status not in (AgentStatus.RUNNING, AgentStatus.WAITING):
+            raise ValueError(f"Can only wait from RUNNING or WAITING, current: {self.status.value}")
+        self.status = AgentStatus.WAITING
+        self.updated_at = datetime.now(UTC)

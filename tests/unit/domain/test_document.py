@@ -98,3 +98,29 @@ class TestDocumentVersioning:
         assert len(doc.version_history) == 2
         assert doc.version_history[0].version == 1
         assert doc.version_history[1].version == 2
+
+
+class TestDocumentEmbeddingValidation:
+    """P1-03 Fix: Test Document embedding NaN/Inf validation."""
+
+    def test_valid_embedding_passes(self):
+        """Document with valid embedding passes validation."""
+        doc = _make_doc(embedding=[0.1, 0.2, 0.3])
+        assert doc.validate() is True
+
+    def test_nan_embedding_fails(self):
+        """Document with NaN in embedding fails validation."""
+        doc = _make_doc(embedding=[0.1, float("nan"), 0.3])
+        with pytest.raises(ValueError, match="contains NaN"):
+            doc.validate()
+
+    def test_inf_embedding_fails(self):
+        """Document with Inf in embedding fails validation."""
+        doc = _make_doc(embedding=[0.1, float("inf"), 0.3])
+        with pytest.raises(ValueError, match="contains NaN"):
+            doc.validate()
+
+    def test_none_embedding_passes(self):
+        """Document with None embedding passes validation."""
+        doc = _make_doc(embedding=None)
+        assert doc.validate() is True

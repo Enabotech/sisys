@@ -83,3 +83,42 @@ class TestDomainEventSerialization:
         assert restored.aggregate_id == event.aggregate_id
         assert restored.event_type == event.event_type
         assert restored.payload == event.payload
+
+    def test_to_dict_excludes_none_aggregate_id(self):
+        """P0-01 Fix: aggregate_id=None is excluded from dict."""
+        event = DomainEvent(
+            aggregate_id=None,
+            event_type="TestEvent",
+        )
+        d = event.to_dict()
+        assert "aggregate_id" not in d
+
+    def test_from_dict_with_none_aggregate_id(self):
+        """P0-01 Fix: from_dict handles missing aggregate_id gracefully."""
+        event = DomainEvent(
+            aggregate_id=None,
+            event_type="TestEvent",
+        )
+        d = event.to_dict()
+        restored = DomainEvent.from_dict(d)
+        assert restored.aggregate_id is None
+
+    def test_payload_non_json_serializable_raises(self):
+        """P1-04 Fix: Non-JSON-serializable payload raises ValueError."""
+        event = DomainEvent(
+            aggregate_id=uuid.uuid4(),
+            event_type="TestEvent",
+            payload={"bad_key": set()},  # set is not JSON serializable
+        )
+        with pytest.raises(ValueError, match="not JSON serializable"):
+            event.to_dict()
+
+    def test_payload_json_serializable_passes(self):
+        """P1-04 Fix: JSON-serializable payload passes."""
+        event = DomainEvent(
+            aggregate_id=uuid.uuid4(),
+            event_type="TestEvent",
+            payload={"key": "value", "number": 42},
+        )
+        d = event.to_dict()  # Should not raise
+        assert d["payload"] == {"key": "value", "number": 42}

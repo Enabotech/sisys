@@ -7,6 +7,7 @@ serialization and validation.
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -36,14 +37,25 @@ class DomainEvent:
 
         Returns:
             Dictionary representation of the event.
+
+        Raises:
+            ValueError: If payload is not JSON serializable.
         """
-        return {
+        result: dict[str, Any] = {
             "event_id": str(self.event_id),
             "event_type": self.event_type,
-            "aggregate_id": str(self.aggregate_id),
             "occurred_on": self.occurred_on.isoformat(),
             "payload": self.payload,
         }
+        # P0-01: Conditionally serialize aggregate_id
+        if self.aggregate_id is not None:
+            result["aggregate_id"] = str(self.aggregate_id)
+        # P1-04: Validate payload is JSON serializable
+        try:
+            json.dumps(self.payload)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"payload is not JSON serializable: {e}") from e
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
@@ -54,11 +66,18 @@ class DomainEvent:
 
         Returns:
             Reconstructed DomainEvent instance.
+
+        Raises:
+            ValueError: If required fields are missing or malformed.
         """
+        # P0-01: Safely parse aggregate_id (may be None)
+        agg_id: uuid.UUID | None = None
+        if data.get("aggregate_id") is not None:
+            agg_id = uuid.UUID(data["aggregate_id"])
         return cls(
             event_id=uuid.UUID(data["event_id"]),
             event_type=data["event_type"],
-            aggregate_id=uuid.UUID(data["aggregate_id"]),
+            aggregate_id=agg_id,
             payload=data.get("payload", {}),
             occurred_on=datetime.fromisoformat(data["occurred_on"]),
         )

@@ -11,15 +11,10 @@ from src.domain.events.publisher import EventPublisher
 class TestEventPublisher:
     """Test EventPublisher abstract interface."""
 
-    def test_publish_raises_not_implemented(self):
-        """Base EventPublisher.publish() raises NotImplementedError."""
-        publisher = EventPublisher()
-        event = DomainEvent(
-            aggregate_id=uuid.uuid4(),
-            event_type="TestEvent",
-        )
-        with pytest.raises(NotImplementedError, match="Subclasses must implement"):
-            publisher.publish(event)
+    def test_cannot_instantiate_abc(self):
+        """P1-07 Fix: EventPublisher is ABC and cannot be instantiated."""
+        with pytest.raises(TypeError, match="abstract method"):
+            EventPublisher()  # type: ignore
 
     def test_can_be_subclassed(self):
         """EventPublisher can be subclassed and overridden."""

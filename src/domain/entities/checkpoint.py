@@ -8,6 +8,26 @@ from datetime import UTC, datetime
 from enum import Enum
 
 
+@dataclass
+class CorrectionRecord:
+    """P1-06 Fix: Strongly typed correction record for checkpoints.
+
+    Attributes:
+        correction_id: Unique identifier for this correction.
+        correction_type: Type of correction (e.g., L0, L1, L2, L3).
+        previous_value: The value before correction.
+        new_value: The value after correction.
+        applied_by: User or system that applied the correction.
+        applied_at: Timestamp when correction was applied.
+    """
+
+    correction_type: str
+    previous_value: str = ""
+    new_value: str = ""
+    applied_by: str = ""
+    applied_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
 class RecoveryMode(str, Enum):
     """Checkpoint recovery modes."""
 
@@ -39,7 +59,7 @@ class Checkpoint:
     status: CheckpointStatus = CheckpointStatus.PENDING
     recovery_mode: RecoveryMode | None = None
     summary: str = ""
-    correction_records: list[dict] = field(default_factory=list)
+    correction_records: list[CorrectionRecord] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -62,17 +82,30 @@ class Checkpoint:
         return True
 
     def complete(self) -> None:
-        """Mark checkpoint as completed."""
+        """Mark checkpoint as completed.
+
+        Raises:
+            ValueError: If checkpoint is already completed.
+        """
+        # P1-01 Fix: Add state guard
+        if self.status == CheckpointStatus.COMPLETED:
+            raise ValueError("Checkpoint is already completed")
         self.status = CheckpointStatus.COMPLETED
         self.completed_at = datetime.now(UTC)
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = self.completed_at
 
     def recover(self, mode: RecoveryMode) -> None:
         """Recover from this checkpoint using specified mode.
 
         Args:
             mode: Recovery mode (REPLAY or OVERRIDE).
+
+        Raises:
+            ValueError: If checkpoint is already completed.
         """
+        # P1-02 Fix: Add state guard
+        if self.status == CheckpointStatus.COMPLETED:
+            raise ValueError("Cannot recover a completed checkpoint")
         self.recovery_mode = mode
         self.status = CheckpointStatus.RECOVERED
         self.updated_at = datetime.now(UTC)
