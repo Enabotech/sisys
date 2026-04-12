@@ -52,6 +52,12 @@ class TestInMemoryEventBusPublish:
         bus.publish(event)
         assert event.event_id in bus.processed_event_ids
 
+    def test_publish_none_raises(self):
+        """Publishing None raises ValueError."""
+        bus = InMemoryEventBus()
+        with pytest.raises(ValueError, match="event must not be None"):
+            bus.publish(None)  # type: ignore
+
 
 class TestInMemoryEventBusIdempotency:
     """Test InMemoryEventBus idempotency (deduplication)."""
@@ -156,3 +162,26 @@ class TestInMemoryEventBusReset:
         assert len(bus.published_events) == 1
         bus.reset()
         assert len(bus.published_events) == 0
+
+
+class TestInMemoryEventBusDispatchOrder:
+    """Test dispatch-before-record ordering (P0-5)."""
+
+    def test_dispatch_before_record(self):
+        """Event is dispatched before being marked as processed."""
+        listener = InMemoryEventListener()
+        bus = InMemoryEventBus(listener=listener)
+        captured_during_dispatch: bool | None = None
+
+        def capture_handler(event: DomainEvent) -> None:
+            nonlocal captured_during_dispatch
+            captured_during_dispatch = event.event_id in bus.processed_event_ids
+
+        listener.on_event("DocumentProcessed", capture_handler)
+        event = DocumentProcessed(document_id=uuid.uuid4())
+        bus.publish(event)
+
+        # During dispatch, event was NOT yet marked as processed
+        assert captured_during_dispatch is False
+        # After publish completes, it IS marked as processed
+        assert event.event_id in bus.processed_event_ids

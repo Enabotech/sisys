@@ -26,8 +26,11 @@ class DocumentProcessed(DomainEvent):
     embedding: list[float] | None = None
 
     def __post_init__(self) -> None:
-        """Set aggregate_id from document_id."""
-        object.__setattr__(self, "aggregate_id", self.document_id)
+        """Set aggregate_id and aggregate_type if not already set."""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.document_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Document")
 
 
 @dataclass(frozen=True)
@@ -40,8 +43,11 @@ class ToolExecuted(DomainEvent):
     cost_audit: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Set aggregate_id from tool_id."""
-        object.__setattr__(self, "aggregate_id", self.tool_id)
+        """Set aggregate_id and aggregate_type if not already set."""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.tool_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Tool")
 
 
 @dataclass(frozen=True)
@@ -54,8 +60,11 @@ class AgentDecided(DomainEvent):
     confidence: float = 0.0
 
     def __post_init__(self) -> None:
-        """Set aggregate_id from agent_id."""
-        object.__setattr__(self, "aggregate_id", self.agent_id)
+        """Set aggregate_id and aggregate_type if not already set."""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.agent_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Agent")
 
 
 @dataclass(frozen=True)
@@ -68,8 +77,11 @@ class CheckpointReached(DomainEvent):
     user_feedback_request: bool = False
 
     def __post_init__(self) -> None:
-        """Set aggregate_id from checkpoint_id."""
-        object.__setattr__(self, "aggregate_id", self.checkpoint_id)
+        """Set aggregate_id and aggregate_type if not already set."""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.checkpoint_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Checkpoint")
 
 
 @dataclass(frozen=True)
@@ -84,5 +96,8 @@ class CorrectionApproved(DomainEvent):
     approval_chain: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        """Set aggregate_id from correction_id."""
-        object.__setattr__(self, "aggregate_id", self.correction_id)
+        """Set aggregate_id and aggregate_type if not already set."""
+        if self.aggregate_id is None:
+            object.__setattr__(self, "aggregate_id", self.correction_id)
+        if not self.aggregate_type:
+            object.__setattr__(self, "aggregate_type", "Correction")
