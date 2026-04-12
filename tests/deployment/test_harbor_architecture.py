@@ -15,7 +15,7 @@ import urllib3
 import yaml  # type: ignore[import-untyped]
 
 # 从统一配置模块加载
-from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
+from config import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig
 
 # 禁用 SSL 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

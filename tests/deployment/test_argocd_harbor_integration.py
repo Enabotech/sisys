@@ -374,7 +374,7 @@ class TestArgoCDHarborIntegration:
             return  # Secret 存在，测试通过
 
         # 方法 2: 通过 Harbor API 检查 Robot Account
-        from tests.conftest import HARBOR_NODE_IP, HARBOR_NODEPORT
+        from config import HARBOR_NODE_IP, HARBOR_NODEPORT
 
         harbor_node_ip = HARBOR_NODE_IP
         harbor_nodeport = HARBOR_NODEPORT

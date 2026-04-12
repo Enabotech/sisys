@@ -1,0 +1,39 @@
+[importlinter]
+root_package = src
+include_external_packages = True
+
+[importlinter:contract:domain-zero-dependency]
+name = Domain layer must not depend on external packages
+type = forbidden
+source_modules =
+    src.domain
+forbidden_modules =
+    langgraph
+    prefect
+    fastapi
+    pydantic
+    sqlalchemy
+    typer
+    redis
+    qdrant
+    minio
+    neo4j
+    aio_pika
+    litellm
+    instructor
+
+[importlinter:contract:dependency-direction]
+name = Dependency direction must follow hexagonal architecture
+type = layers
+layers =
+    src.interfaces
+    src.application
+    src.domain
+
+[importlinter:contract:infrastructure-does-not-depend-on-interfaces]
+name = Infrastructure layer must not depend on interfaces layer
+type = forbidden
+source_modules =
+    src.infrastructure
+forbidden_modules =
+    src.interfaces
