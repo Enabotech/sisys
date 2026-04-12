@@ -153,6 +153,17 @@ class TestStrategicPlanPhaseTransition:
         with pytest.raises(ValueError, match="current_phase must not be in completed_phases"):
             plan.validate()
 
+    def test_completed_phases_no_duplicates(self):
+        """P1-01 Fix: advance_phase/complete_phase prevent duplicate entries."""
+        plan = _make_plan()
+        plan.advance_phase(BLMPhase.MARKET_INSIGHT)
+        # External code tries to add duplicate
+        plan.completed_phases.append(BLMPhase.STRATEGIC_INTENT)
+        assert plan.completed_phases.count(BLMPhase.STRATEGIC_INTENT) == 2
+        # advance_phase should NOT add another duplicate
+        plan.advance_phase(BLMPhase.STRATEGIC_DESIGN)
+        assert plan.completed_phases.count(BLMPhase.MARKET_INSIGHT) == 1
+
     def test_cannot_complete_past_final_phase(self):
         """Re-review Fix: complete_phase() has final phase guard."""
         plan = _make_plan()

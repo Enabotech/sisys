@@ -94,7 +94,7 @@ class TestAgentStateTransitions:
             agent.complete()
 
     def test_fail_from_any_state(self):
-        """Can fail agent from any state."""
+        """Can fail agent from IDLE or RUNNING state."""
         agent = _make_agent()
         agent.fail()
         assert agent.status == AgentStatus.FAILED
@@ -103,6 +103,30 @@ class TestAgentStateTransitions:
         agent2.start()
         agent2.fail()
         assert agent2.status == AgentStatus.FAILED
+
+    def test_cannot_fail_from_failed_state(self):
+        """P1-03 Fix: Cannot fail an already failed agent."""
+        agent = _make_agent()
+        agent.fail("first reason")
+        with pytest.raises(ValueError, match="Agent is already failed"):
+            agent.fail("second reason")
+        # Original reason preserved
+        assert agent.failure_reason == "first reason"
+
+    def test_restart_from_completed(self):
+        """P0-03 Fix: Can restart a completed agent."""
+        agent = _make_agent()
+        agent.start()
+        agent.complete()
+        agent.restart()
+        assert agent.status == AgentStatus.IDLE
+        assert agent.failure_reason == ""
+
+    def test_cannot_restart_from_idle(self):
+        """P0-03 Fix: Cannot restart agent from IDLE state."""
+        agent = _make_agent()
+        with pytest.raises(ValueError, match="Can only restart from FAILED or COMPLETED"):
+            agent.restart()
 
     def test_wait_from_running(self):
         """Can wait agent from RUNNING state."""

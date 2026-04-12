@@ -131,3 +131,52 @@ class TestDomainEventSerialization:
         )
         with pytest.raises(ValueError, match="event_type must not be empty"):
             event.to_dict()
+
+    def test_from_dict_invalid_event_id_raises(self):
+        """P0-01 Fix: Invalid event_id raises ValueError with context."""
+        with pytest.raises(ValueError, match="Invalid event_id"):
+            DomainEvent.from_dict({
+                "event_id": "not-a-uuid",
+                "event_type": "TestEvent",
+                "occurred_on": "2024-01-01T00:00:00+00:00",
+                "payload": {},
+            })
+
+    def test_from_dict_invalid_occurred_on_raises(self):
+        """P0-02 Fix: Invalid occurred_on raises ValueError with context."""
+        with pytest.raises(ValueError, match="Invalid occurred_on"):
+            DomainEvent.from_dict({
+                "event_id": str(uuid.uuid4()),
+                "event_type": "TestEvent",
+                "occurred_on": "not-a-datetime",
+                "payload": {},
+            })
+
+    def test_from_dict_missing_event_id_raises(self):
+        """P1-04 Fix: Missing event_id raises ValueError with context."""
+        with pytest.raises(ValueError, match="Missing required field: event_id"):
+            DomainEvent.from_dict({
+                "event_type": "TestEvent",
+                "occurred_on": "2024-01-01T00:00:00+00:00",
+                "payload": {},
+            })
+
+    def test_from_dict_missing_occurred_on_raises(self):
+        """P1-04 Fix: Missing occurred_on raises ValueError with context."""
+        with pytest.raises(ValueError, match="Missing required field: occurred_on"):
+            DomainEvent.from_dict({
+                "event_id": str(uuid.uuid4()),
+                "event_type": "TestEvent",
+                "payload": {},
+            })
+
+    def test_from_dict_invalid_aggregate_id_raises(self):
+        """P0-01 Fix: Invalid aggregate_id raises ValueError with context."""
+        with pytest.raises(ValueError, match="Invalid aggregate_id"):
+            DomainEvent.from_dict({
+                "event_id": str(uuid.uuid4()),
+                "event_type": "TestEvent",
+                "occurred_on": "2024-01-01T00:00:00+00:00",
+                "aggregate_id": "not-a-uuid",
+                "payload": {},
+            })

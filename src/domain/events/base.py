@@ -72,17 +72,41 @@ class DomainEvent:
 
         Raises:
             ValueError: If required fields are missing or malformed.
-            KeyError: If event_id or event_type is missing (P2-04: will be
-                converted to ValueError in Story 1.2).
         """
+        # P1-04 Fix: Validate required fields with descriptive errors
+        if "event_id" not in data:
+            raise ValueError("Missing required field: event_id")
+        if "event_type" not in data:
+            raise ValueError("Missing required field: event_type")
+        if "occurred_on" not in data:
+            raise ValueError("Missing required field: occurred_on")
+
+        # P0-01 Fix: UUID parsing with context
+        try:
+            eid = uuid.UUID(data["event_id"])
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Invalid event_id: {data.get('event_id', 'missing')}") from e
+
         # P0-01: Safely parse aggregate_id (may be None)
         agg_id: uuid.UUID | None = None
         if data.get("aggregate_id") is not None:
-            agg_id = uuid.UUID(data["aggregate_id"])
+            try:
+                agg_id = uuid.UUID(data["aggregate_id"])
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"Invalid aggregate_id: {data.get('aggregate_id', 'missing')}") from e
+
+        # P0-02 Fix: datetime parsing with context
+        try:
+            occurred = datetime.fromisoformat(data["occurred_on"])
+        except (ValueError, AttributeError, TypeError) as e:
+            raise ValueError(
+                f"Invalid occurred_on: {data.get('occurred_on', 'missing')}"
+            ) from e
+
         return cls(
-            event_id=uuid.UUID(data["event_id"]),
+            event_id=eid,
             event_type=data["event_type"],
             aggregate_id=agg_id,
             payload=data.get("payload", {}),
-            occurred_on=datetime.fromisoformat(data["occurred_on"]),
+            occurred_on=occurred,
         )
