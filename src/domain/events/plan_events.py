@@ -1,4 +1,11 @@
-"""Core domain events for strategic planning."""
+"""Core domain events for strategic planning.
+
+P2-03 Design Note: DomainEvent uses frozen=True for immutability, but
+subclasses use object.__setattr__() in __post_init__ to set aggregate_id.
+This is the standard Python pattern for modifying frozen dataclasses during
+initialization — the immutability guarantee applies after construction,
+not during it. Event objects cannot be mutated after they are created.
+"""
 
 from __future__ import annotations
 

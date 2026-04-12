@@ -69,6 +69,8 @@ class DomainEvent:
 
         Raises:
             ValueError: If required fields are missing or malformed.
+            KeyError: If event_id or event_type is missing (P2-04: will be
+                converted to ValueError in Story 1.2).
         """
         # P0-01: Safely parse aggregate_id (may be None)
         agg_id: uuid.UUID | None = None

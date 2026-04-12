@@ -63,7 +63,8 @@ class StrategicPlan:
             raise ValueError("name must not be empty")
         if not isinstance(self.current_phase, BLMPhase):
             raise ValueError("current_phase must be a valid BLMPhase")
-        if self.created_at and self.updated_at and self.created_at > self.updated_at:
+        # P2-05 Fix: created_at/updated_at have default_factory, never None
+        if self.created_at > self.updated_at:
             raise ValueError("created_at must be before or equal to updated_at")
         return True
 
