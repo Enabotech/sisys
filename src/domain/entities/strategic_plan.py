@@ -74,14 +74,19 @@ class StrategicPlan:
             next_phase: The next BLM phase to advance to.
 
         Raises:
-            ValueError: If phase transition is invalid.
+            ValueError: If phase transition is invalid or plan is archived/approved.
         """
+        # P0-03: Status guard — cannot advance archived or approved plans
+        if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
+            raise ValueError(f"Cannot advance phase when plan is {self.status.value}")
+
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
         next_idx = phase_order.index(next_phase)
 
-        if next_idx <= current_idx:
-            raise ValueError("Can only advance to a later phase")
+        # P0-02: Must advance to immediately next phase (no skipping)
+        if next_idx != current_idx + 1:
+            raise ValueError("Can only advance to the immediately next phase")
 
         self.completed_phases.append(self.current_phase)
         self.current_phase = next_phase

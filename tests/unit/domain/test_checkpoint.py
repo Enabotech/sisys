@@ -86,3 +86,17 @@ class TestCheckpointTransitions:
         cp.recover(RecoveryMode.OVERRIDE)
         assert cp.status == CheckpointStatus.RECOVERED
         assert cp.recovery_mode == RecoveryMode.OVERRIDE
+
+    def test_cannot_complete_twice(self):
+        """P1-01 Fix: Cannot complete an already completed checkpoint."""
+        cp = _make_checkpoint()
+        cp.complete()
+        with pytest.raises(ValueError, match="already completed"):
+            cp.complete()
+
+    def test_cannot_recover_completed_checkpoint(self):
+        """P1-02 Fix: Cannot recover a completed checkpoint."""
+        cp = _make_checkpoint()
+        cp.complete()
+        with pytest.raises(ValueError, match="Cannot recover"):
+            cp.recover(RecoveryMode.REPLAY)

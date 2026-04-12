@@ -94,6 +94,24 @@ class TestStrategicPlanPhaseTransition:
         with pytest.raises(ValueError, match="Can only advance"):
             plan.advance_phase(BLMPhase.STRATEGIC_INTENT)
 
+    def test_cannot_skip_phases(self):
+        """P0-02 Fix: Cannot skip intermediate phases."""
+        plan = _make_plan()
+        with pytest.raises(ValueError, match="immediately next phase"):
+            plan.advance_phase(BLMPhase.EXECUTION_MONITORING)
+
+    def test_cannot_advance_archived_plan(self):
+        """P0-03 Fix: Cannot advance archived plan."""
+        plan = _make_plan(status=PlanStatus.ARCHIVED)
+        with pytest.raises(ValueError, match="Cannot advance phase"):
+            plan.advance_phase(BLMPhase.MARKET_INSIGHT)
+
+    def test_cannot_advance_approved_plan(self):
+        """P0-03 Fix: Cannot advance approved plan."""
+        plan = _make_plan(status=PlanStatus.APPROVED)
+        with pytest.raises(ValueError, match="Cannot advance phase"):
+            plan.advance_phase(BLMPhase.MARKET_INSIGHT)
+
     def test_complete_current_phase(self):
         """complete_phase() marks current phase done and advances."""
         plan = _make_plan()

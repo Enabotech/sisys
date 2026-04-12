@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -80,6 +81,13 @@ class Document:
             raise ValueError("version must be >= 1")
         if self.file_size_bytes < 0:
             raise ValueError("file_size_bytes must be non-negative")
+        # P1-03 Fix: Validate embedding for NaN/Inf values
+        if self.embedding is not None:
+            for i, val in enumerate(self.embedding):
+                if not isinstance(val, int | float):
+                    raise ValueError(f"embedding[{i}] must be a number")
+                if math.isnan(val) or math.isinf(val):
+                    raise ValueError(f"embedding[{i}] contains NaN/Inf")
         return True
 
     def validate_metadata(self, required_fields: list[str] | None = None) -> bool:

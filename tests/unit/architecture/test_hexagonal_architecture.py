@@ -9,6 +9,8 @@ import ast
 import importlib
 from pathlib import Path
 
+import pytest
+
 # Paths
 ROOT = Path(__file__).resolve().parents[3]
 SRC_DIR = ROOT / "src"
@@ -21,12 +23,16 @@ def _get_python_files(directory: Path) -> list[Path]:
 
 
 def _get_imports(file_path: Path) -> list[str]:
-    """Extract all import module names from a Python file using ast."""
+    """Extract all import module names from a Python file using ast.
+
+    P0-04 Fix: Raise test failure on syntax errors instead of silent skip.
+    """
     with open(file_path, encoding="utf-8") as f:
         try:
             tree = ast.parse(f.read(), filename=str(file_path))
-        except SyntaxError:
-            return []
+        except SyntaxError as e:
+            pytest.fail(f"Syntax error in {file_path}: {e}")
+            return []  # unreachable, keeps type checker happy
 
     imports = []
     for node in ast.walk(tree):

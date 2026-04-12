@@ -24,7 +24,7 @@ class BaseRepository(Generic[T]):
         Returns:
             The entity if found, None otherwise.
         """
-        raise NotImplementedError
+        raise NotImplementedError("BaseRepository.get_by_id must be implemented by subclass")
 
     def save(self, entity: T) -> None:
         """Save an entity.
@@ -32,7 +32,7 @@ class BaseRepository(Generic[T]):
         Args:
             entity: The entity to save or update.
         """
-        raise NotImplementedError
+        raise NotImplementedError("BaseRepository.save must be implemented by subclass")
 
     def delete(self, id: UUID) -> None:
         """Delete an entity by its ID.
@@ -40,7 +40,7 @@ class BaseRepository(Generic[T]):
         Args:
             id: The unique identifier of the entity to delete.
         """
-        raise NotImplementedError
+        raise NotImplementedError("BaseRepository.delete must be implemented by subclass")
 
     def list_all(self) -> list[T]:
         """List all entities.
@@ -48,4 +48,4 @@ class BaseRepository(Generic[T]):
         Returns:
             A list of all entities.
         """
-        raise NotImplementedError
+        raise NotImplementedError("BaseRepository.list_all must be implemented by subclass")
