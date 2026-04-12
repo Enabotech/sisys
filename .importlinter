@@ -2,18 +2,43 @@
 root_package = src
 include_external_packages = True
 
-# P0-05 Fix: Use independence constraint instead of whitelist forbidden list.
-# This ensures domain layer cannot import ANY external package, not just the
-# ones we happened to list.
-[importlinter:contract:domain-independent-layer]
-name = Domain layer must be independent from all other layers
-type = independence
-modules =
+# P0-05 Fix (corrected): Domain layer must not import any external packages.
+# Uses forbidden type with a comprehensive list of known external dependencies.
+# This is NOT an independence constraint — it only restricts src.domain.
+[importlinter:contract:domain-no-external-dependencies]
+name = Domain layer must not depend on external packages
+type = forbidden
+source_modules =
     src.domain
+forbidden_modules =
+    # External frameworks (project dependencies)
+    langgraph
+    prefect
+    fastapi
+    pydantic
+    sqlalchemy
+    typer
+    redis
+    qdrant
+    minio
+    neo4j
+    aio_pika
+    litellm
+    instructor
+    # Common third-party packages
+    requests
+    httpx
+    docker
+    psycopg2
+    boto3
+    numpy
+    pandas
+    # Other project layers (domain must not depend on these)
     src.application
     src.interfaces
     src.infrastructure
 
+# Correct dependency direction: interfaces -> application -> domain
 [importlinter:contract:dependency-direction]
 name = Dependency direction must follow hexagonal architecture
 type = layers
@@ -22,6 +47,7 @@ layers =
     src.application
     src.domain
 
+# Infrastructure must not depend on interfaces
 [importlinter:contract:infrastructure-does-not-depend-on-interfaces]
 name = Infrastructure layer must not depend on interfaces layer
 type = forbidden

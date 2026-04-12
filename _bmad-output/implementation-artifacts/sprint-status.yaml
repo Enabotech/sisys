@@ -75,7 +75,7 @@ development_status:
   epic-1: in-progress
   # 价值组 2: 架构基础与事件驱动
   1-1-hexagonal-architecture-skeleton: review
-  1-2-domain-event-definition: backlog
+  1-2-domain-event-definition: ready-for-dev
   1-3-event-bus-implementation: backlog
   1-16-integration-test-framework: backlog
   # 价值组 3: 五层存储架构
