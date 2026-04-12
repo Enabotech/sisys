@@ -305,20 +305,20 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
 ### 项目结构
 
 ```
-sisys-0-16-linux-installer/                    # ← 当前项目根目录
-└── sisys-linux-installer/                     # ← 交付件目录
-    ├── linux/
-    │   ├── install.sh                         # ← 主安装脚本（本 Story 核心产出）
-    │   ├── uninstall.sh                       # ← 卸载脚本
-    │   ├── docker-compose.yml                 # ← Docker Compose 编排配置
-    │   ├── .env.example                       # ← 环境变量模板
-    │   └── configs/
-    │       ├── traefik/
-    │       │   └── traefik.yml                # ← Traefik 配置
-    │       └── minio/
-    │           └── worm-config.json           # ← MinIO WORM 配置
-    └── tests/
-        └── verify_install.sh                  # ← 安装验证脚本
+sisys/delivery/
+      └── sisys-linux-installer/                     # ← Linux 交付件目录
+          ├── linux/
+          │   ├── install.sh                         # ← 主安装脚本（本 Story 核心产出）
+          │   ├── uninstall.sh                       # ← 卸载脚本
+          │   ├── docker-compose.yml                 # ← Docker Compose 编排配置
+          │   ├── .env.example                       # ← 环境变量模板
+          │   └── configs/
+          │       ├── traefik/
+          │       │   └── traefik.yml                # ← Traefik 配置
+          │       └── minio/
+          │           └── worm-config.json           # ← MinIO WORM 配置
+          └── tests/
+              └── verify_install.sh                  # ← 安装验证脚本
 ```
 
 ### 技术栈与工具
@@ -586,10 +586,10 @@ N/A - Implementation completed without runtime errors
 
 | 文件 | 说明 |
 |------|------|
-| `deploy/linux/install.sh` | 主安装脚本（~500 行） |
-| `deploy/linux/uninstall.sh` | 卸载脚本（~60 行） |
-| `deploy/linux/docker-compose.yml` | Docker Compose 编排配置（~220 行） |
-| `deploy/linux/.env.example` | 环境变量模板 |
-| `deploy/linux/configs/traefik/traefik.yml` | Traefik 静态配置 |
-| `deploy/linux/configs/minio/worm-config.json` | MinIO WORM 存储配置 |
-| `deploy/tests/verify_install.sh` | 安装验证脚本（~120 行） |
+| `sisys-linux-installer/linux/install.sh` | 主安装脚本（~500 行） |
+| `sisys-linux-installer/linux/uninstall.sh` | 卸载脚本（~60 行） |
+| `sisys-linux-installer/linux/docker-compose.yml` | Docker Compose 编排配置（~220 行） |
+| `sisys-linux-installer/linux/.env.example` | 环境变量模板 |
+| `sisys-linux-installer/linux/configs/traefik/traefik.yml` | Traefik 静态配置 |
+| `sisys-linux-installer/linux/configs/minio/worm-config.json` | MinIO WORM 存储配置 |
+| `sisys-linux-installer/tests/verify_install.sh` | 安装验证脚本（~120 行） |

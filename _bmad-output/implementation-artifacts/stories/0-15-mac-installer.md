@@ -538,48 +538,49 @@ open /Applications/Docker.app
 **统一项目结构对齐（与 sisys 根目录对齐）：**
 
 ```
-sisys-macos-installer/
-├── build/
-│   ├── sisys-0.15.dmg              # DMG 安装包
-│   ├── sisys-0.15.pkg              # PKG 安装包
-│   └── sisys-0.15.dmg.sha256       # SHA256 校验
-├── dist/
-│   └── Sisys.app/                  # macOS 应用包
-│       ├── Contents/
-│       │   ├── Info.plist
-│       │   ├── MacOS/
-│       │   │   └── sisys           # CLI 入口
-│       │   └── Resources/
-│       │       ├── icon.icns
-│       │       ├── dmg-background.png
-│       │       ├── first-run.sh    # 首次启动脚本
-│       │       └── uninstall.sh    # 卸载脚本
-├── pkg-root/
-│   ├── payload/                    # PKG 内容
-│   │   └── Applications/
-│   │       └── Sisys.app/
-│   └── scripts/
-│       ├── preinstall              # 预安装检查
-│       └── postinstall             # 后安装配置
-├── scripts/
-│   ├── build-dmg.sh                # DMG 构建脚本
-│   ├── build-pkg.sh                # PKG 构建脚本
-│   ├── sign-app.sh                 # 代码签名脚本
-│   ├── notarize-app.sh             # 公证脚本
-│   ├── uninstall.sh                # 卸载脚本
-│   └── first-run.sh                # 首次启动脚本
-├── configs/
-│   └── launch-agent.plist          # LaunchAgent 配置
-├── tests/
-│   └── installer/
-│       ├── test_dmg_install.py     # DMG 安装测试
-│       ├── test_pkg_install.py     # PKG 安装测试
-│       ├── test_code_signing.py    # 代码签名测试
-│       ├── test_first_run.py       # 首次启动测试
-│       └── test_uninstall.py       # 卸载测试
-└── docs/
-    └── installer/
-        └── MAC_INSTALLER.md        # macOS 安装程序制作指南
+sisys/delivery/
+      └── sisys-macos-installer/                # Mac 安装包独立项目
+            ├── build/
+            │   ├── sisys-0.15.dmg              # DMG 安装包
+            │   ├── sisys-0.15.pkg              # PKG 安装包
+            │   └── sisys-0.15.dmg.sha256       # SHA256 校验
+            ├── dist/
+            │   └── Sisys.app/                  # macOS 应用包
+            │       ├── Contents/
+            │       │   ├── Info.plist
+            │       │   ├── MacOS/
+            │       │   │   └── sisys           # CLI 入口
+            │       │   └── Resources/
+            │       │       ├── icon.icns
+            │       │       ├── dmg-background.png
+            │       │       ├── first-run.sh    # 首次启动脚本
+            │       │       └── uninstall.sh    # 卸载脚本
+            ├── pkg-root/
+            │   ├── payload/                    # PKG 内容
+            │   │   └── Applications/
+            │   │       └── Sisys.app/
+            │   └── scripts/
+            │       ├── preinstall              # 预安装检查
+            │       └── postinstall             # 后安装配置
+            ├── scripts/
+            │   ├── build-dmg.sh                # DMG 构建脚本
+            │   ├── build-pkg.sh                # PKG 构建脚本
+            │   ├── sign-app.sh                 # 代码签名脚本
+            │   ├── notarize-app.sh             # 公证脚本
+            │   ├── uninstall.sh                # 卸载脚本
+            │   └── first-run.sh                # 首次启动脚本
+            ├── configs/
+            │   └── launch-agent.plist          # LaunchAgent 配置
+            ├── tests/
+            │   └── installer/
+            │       ├── test_dmg_install.py     # DMG 安装测试
+            │       ├── test_pkg_install.py     # PKG 安装测试
+            │       ├── test_code_signing.py    # 代码签名测试
+            │       ├── test_first_run.py       # 首次启动测试
+            │       └── test_uninstall.py       # 卸载测试
+            └── docs/
+               └── installer/
+                  └── MAC_INSTALLER.md        # macOS 安装程序制作指南
 ```
 
 **与现有结构对齐说明：**

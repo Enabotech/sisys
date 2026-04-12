@@ -374,25 +374,25 @@ PATH = {app} （可选添加）
 本项目为独立的 Windows Installer 交付物，与 sisys 主项目关系：
 
 ```
-sisys-0-14-windows-installer/
-└── sisys-windows-installer/              # Windows 安装包独立项目
-    ├── installer/                        # Inno Setup 安装程序配置
-    │   └── Sisys.iss                     # Inno Setup 脚本
-    ├── scripts/                          # 配置脚本
-    │   ├── check-docker.ps1              # Docker 检测脚本
-    │   ├── configure-ports.ps1           # 端口配置脚本
-    │   ├── start-services.ps1            # 服务启动脚本
-    │   └── build-windows-installer.bat   # 构建脚本
-    ├── configs/                          # SISYS 配置文件
-    │   ├── docker-compose.yml            # Docker Compose 配置
-    │   ├── .env                          # 环境变量配置
-    │   └── default.yaml                  # 六边形架构配置
-    ├── docs/
-    │   ├── delivery/
-    │   │   └── WINDOWS_INSTALLER.md      # 实施指南（已存在）
-    │   └── quick-start-guide.md          # 快速入门指南
-    └── assets/                           # 资源文件
-        └── sisys-icon.ico                # 安装包图标（待添加）
+sisys/delivery
+      └── sisys-windows-installer/              # Windows 安装包独立项目
+          ├── installer/                        # Inno Setup 安装程序配置
+          │   └── Sisys.iss                     # Inno Setup 脚本
+          ├── scripts/                          # 配置脚本
+          │   ├── check-docker.ps1              # Docker 检测脚本
+          │   ├── configure-ports.ps1           # 端口配置脚本
+          │   ├── start-services.ps1            # 服务启动脚本
+          │   └── build-windows-installer.bat   # 构建脚本
+          ├── configs/                          # SISYS 配置文件
+          │   ├── docker-compose.yml            # Docker Compose 配置
+          │   ├── .env                          # 环境变量配置
+          │   └── default.yaml                  # 六边形架构配置
+          ├── docs/
+          │   ├── delivery/
+          │   │   └── WINDOWS_INSTALLER.md      # 实施指南（已存在）
+          │   └── quick-start-guide.md          # 快速入门指南
+          └── assets/                           # 资源文件
+              └── sisys-icon.ico                # 安装包图标（待添加）
 ```
 
 **注意**：`sisys-windows-installer/` 是一个独立的项目目录，专用于构建 Windows 安装程序。
