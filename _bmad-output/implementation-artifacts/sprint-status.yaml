@@ -1,5 +1,5 @@
 # generated: 2026-03-11
-# last_updated: 2026-04-11
+# last_updated: 2026-04-12
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -70,10 +70,11 @@ development_status:
   epic-0-iteration-1-retrospective: optional
 
   # ===========================================================================
-  # Epic 1: 企业级架构基础与合规 - 📋 待开始
+  # Epic 1: 企业级架构基础与合规 - 🔄 进行中
   # ===========================================================================
+  epic-1: in-progress
   # 价值组 2: 架构基础与事件驱动
-  1-1-hexagonal-architecture-skeleton: backlog
+  1-1-hexagonal-architecture-skeleton: ready-for-dev
   1-2-domain-event-definition: backlog
   1-3-event-bus-implementation: backlog
   1-16-integration-test-framework: backlog

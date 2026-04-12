@@ -360,7 +360,7 @@ sisys/
 │   ├── domain/                    # 领域层（零外部依赖）
 │   │   ├── entities/              # 核心实体（Document, Agent, Tool, etc.）
 │   │   ├── services/              # 领域服务接口
-│   │   ├── events/                # 领域事件定义（Pydantic V2）
+│   │   ├── events/                # 领域事件定义
 │   │   ├── repositories/          # 仓储接口
 │   │   └── value_objects/         # 值对象
 │   ├── application/               # 应用层
@@ -669,6 +669,8 @@ bandit -r src/                           # 安全扫描
 ---
 
 ## 12. 领域事件速查
+
+**领域事件定义：**领域层中的 Domain Event 必须使用标准库类型定义，不依赖 Pydantic 或其他第三方库；Pydantic 仅用于应用层/基础设施层的边界校验、序列化与反序列化。领域事件与传输 DTO 必须分离，必要时通过 TypeAdapter 做无样板转换。
 
 | 事件 | 携带内容 | 触发下游 |
 |------|---------|---------|
