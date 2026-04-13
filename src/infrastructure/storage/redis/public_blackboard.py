@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 
 import redis
@@ -40,19 +41,22 @@ class RedisPublicBlackboard:
         """
         self._config = config
         self._pool: redis.ConnectionPool | None = None
+        self._pool_lock = threading.Lock()
 
     def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池。"""
+        """懒加载连接池（线程安全）。"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool(
-                host=self._config.host,
-                port=self._config.port,
-                db=self._config.db,
-                password=self._config.password,
-                max_connections=self._config.max_connections,
-                socket_timeout=self._config.socket_timeout,
-                decode_responses=True,
-            )
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = redis.ConnectionPool(
+                        host=self._config.host,
+                        port=self._config.port,
+                        db=self._config.db,
+                        password=self._config.password,
+                        max_connections=self._config.max_connections,
+                        socket_timeout=self._config.socket_timeout,
+                        decode_responses=True,
+                    )
         return self._pool
 
     def _get_version_key(self, conversation_id: str) -> str:
@@ -65,7 +69,7 @@ class RedisPublicBlackboard:
         agent_id: str,
         content: dict,
         confidence: float = 1.0,
-        citations: list | None = None,
+        citations: list[str] | None = None,
     ) -> int:
         """发布内容到黑板。
 
@@ -119,7 +123,7 @@ class RedisPublicBlackboard:
                 conversation_id,
                 e,
             )
-            return 0
+            raise
 
     async def get(self, conversation_id: str) -> list[dict]:
         """获取会话的所有内容。
@@ -129,20 +133,33 @@ class RedisPublicBlackboard:
 
         Returns:
             内容列表（按时间排序）
+
+        Raises:
+            redis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, conversation_id)
         pool = self._get_pool()
         try:
             with redis.Redis(connection_pool=pool) as client:
                 entries = client.zrange(key, 0, -1)
-                return [json.loads(entry) for entry in entries]
+                result = []
+                for entry in entries:
+                    try:
+                        raw = json.loads(entry)
+                        if isinstance(raw, dict):
+                            result.append(raw)
+                        else:
+                            logger.warning("Unexpected data type in blackboard key %s: %s", key, type(raw).__name__)
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning("Corrupt data in blackboard key %s: %s", key, e)
+                return result
         except redis.ConnectionError as e:
             logger.error(
                 "Failed to get blackboard %s from Redis: %s",
                 conversation_id,
                 e,
             )
-            return []
+            raise
 
     async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None:
         """获取指定 Agent 的最新内容。
@@ -171,6 +188,9 @@ class RedisPublicBlackboard:
 
         Returns:
             最新内容数据，如果不存在则返回 None
+
+        Raises:
+            redis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, conversation_id)
         pool = self._get_pool()
@@ -179,8 +199,10 @@ class RedisPublicBlackboard:
                 # 获取 score 最高的条目（最新版本）
                 entries = client.zrange(key, -1, -1)
                 if entries:
-                    result: dict = json.loads(entries[0])
-                    return result
+                    raw = json.loads(entries[0])
+                    if isinstance(raw, dict):
+                        return raw
+                    logger.warning("Unexpected data type in blackboard key %s: %s", key, type(raw).__name__)
                 return None
         except redis.ConnectionError as e:
             logger.error(
@@ -188,7 +210,7 @@ class RedisPublicBlackboard:
                 conversation_id,
                 e,
             )
-            return None
+            raise
 
     def close(self) -> None:
         """关闭连接池。"""
@@ -196,3 +218,12 @@ class RedisPublicBlackboard:
             self._pool.disconnect()
             self._pool = None
             logger.debug("Redis connection pool closed")
+
+    def __enter__(self) -> RedisPublicBlackboard:
+        """上下文管理器入口。"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """上下文管理器出口，确保连接池关闭。"""
+        self.close()
+        return None

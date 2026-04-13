@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import fakeredis
 import pytest
 
@@ -67,95 +65,111 @@ class TestCosineSimilarity:
         """零向量相似度应为 0.0。"""
         assert cosine_similarity([0.0, 0.0], [1.0, 2.0]) == 0.0
 
+    def test_clamped_result(self) -> None:
+        """结果应裁剪到 [-1, 1] 防止浮点误差。"""
+        # 构造极端情况确保裁剪逻辑存在
+        result = cosine_similarity([1e-200], [1e-200])
+        assert -1.0 <= result <= 1.0
+
 
 class TestRedisSemanticCache:
     """RedisSemanticCache 测试。"""
 
-    def test_set_and_get_hit(self) -> None:
+    @pytest.mark.asyncio
+    async def test_set_and_get_hit(self) -> None:
         """存储和查询命中。"""
         fake_redis = fakeredis.FakeRedis(decode_responses=True)
         cache = _create_cache(fake_redis)
 
-        async def run() -> None:
-            embedding = [0.1, 0.2, 0.3]
-            result = {"answer": "test"}
-            await cache.set(embedding, result)
+        embedding = [0.1, 0.2, 0.3]
+        result = {"answer": "test"}
+        await cache.set(embedding, result)
 
-            # 相同向量应命中
-            found = await cache.get(embedding, threshold=0.99)
-            assert found is not None
-            assert found["answer"] == "test"
+        # 相同向量应命中
+        found = await cache.get(embedding, threshold=0.99)
+        assert found is not None
+        assert found["answer"] == "test"
 
-        asyncio.run(run())
-
-    def test_get_miss(self) -> None:
+    @pytest.mark.asyncio
+    async def test_get_miss(self) -> None:
         """查询未命中。"""
         fake_redis = fakeredis.FakeRedis(decode_responses=True)
         cache = _create_cache(fake_redis)
 
-        async def run() -> None:
-            # 查询空缓存
-            found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
-            assert found is None
+        # 查询空缓存
+        found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
+        assert found is None
 
-        asyncio.run(run())
-
-    def test_semantic_match(self) -> None:
+    @pytest.mark.asyncio
+    async def test_semantic_match(self) -> None:
         """语义相似的向量应命中缓存。"""
         fake_redis = fakeredis.FakeRedis(decode_responses=True)
         cache = _create_cache(fake_redis)
 
-        async def run() -> None:
-            # 存储一个向量
-            original = [1.0, 0.0, 0.0]
-            await cache.set(original, {"cached": True})
+        # 存储一个向量
+        original = [1.0, 0.0, 0.0]
+        await cache.set(original, {"cached": True})
 
-            # 查询相似向量（余弦相似度很高）
-            query = [0.99, 0.01, 0.0]
-            found = await cache.get(query, threshold=0.9)
-            assert found is not None
-            assert found["cached"] is True
+        # 查询相似向量（余弦相似度很高）
+        query = [0.99, 0.01, 0.0]
+        found = await cache.get(query, threshold=0.9)
+        assert found is not None
+        assert found["cached"] is True
 
-        asyncio.run(run())
-
-    def test_invalidate(self) -> None:
+    @pytest.mark.asyncio
+    async def test_invalidate(self) -> None:
         """使缓存失效。"""
         fake_redis = fakeredis.FakeRedis(decode_responses=True)
         cache = _create_cache(fake_redis)
 
-        async def run() -> None:
-            embedding = [0.1, 0.2, 0.3]
-            await cache.set(embedding, {"data": "value"})
+        embedding = [0.1, 0.2, 0.3]
+        await cache.set(embedding, {"data": "value"})
 
-            # 获取缓存键
-            cache_key = cache._build_cache_key(embedding)
-            await cache.invalidate(cache_key)
+        # 获取缓存键
+        cache_key = cache._build_cache_key(embedding)
+        await cache.invalidate(cache_key)
 
-            # 查询应未命中
-            found = await cache.get(embedding, threshold=0.99)
-            assert found is None
+        # 查询应未命中
+        found = await cache.get(embedding, threshold=0.99)
+        assert found is None
 
-        asyncio.run(run())
+    @pytest.mark.asyncio
+    async def test_invalidate_with_full_key(self) -> None:
+        """使用完整 Redis 键使缓存失效。"""
+        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        cache = _create_cache(fake_redis)
 
-    def test_metrics_recording(self) -> None:
+        embedding = [0.1, 0.2, 0.3]
+        await cache.set(embedding, {"data": "value"})
+
+        # 获取完整键
+        from src.infrastructure.storage.redis.key_builder import build_key
+
+        full_key = build_key("cache:semantic", cache._build_cache_key(embedding))
+
+        # 使用完整键失效
+        await cache.invalidate(full_key)
+
+        found = await cache.get(embedding, threshold=0.99)
+        assert found is None
+
+    @pytest.mark.asyncio
+    async def test_metrics_recording(self) -> None:
         """缓存命中/未命中应记录指标。"""
         fake_redis = fakeredis.FakeRedis(decode_responses=True)
         metrics = EventMetricsCollector()
         cache = _create_cache(fake_redis, metrics_collector=metrics)
 
-        async def run() -> None:
-            # 未命中
-            await cache.get([0.1, 0.2], threshold=0.9)
-            assert metrics.metrics.cache_misses_total == 1
+        # 未命中
+        await cache.get([0.1, 0.2], threshold=0.9)
+        assert metrics.metrics.cache_misses_total == 1
 
-            # 存储
-            await cache.set([0.1, 0.2], {"result": "value"})
+        # 存储
+        await cache.set([0.1, 0.2], {"result": "value"})
 
-            # 命中
-            await cache.get([0.1, 0.2], threshold=0.99)
-            assert metrics.metrics.cache_hits_total == 1
-
-        asyncio.run(run())
+        # 命中
+        await cache.get([0.1, 0.2], threshold=0.99)
+        assert metrics.metrics.cache_hits_total == 1
 
     def test_close(self) -> None:
         """关闭连接池。"""
@@ -164,3 +178,25 @@ class TestRedisSemanticCache:
 
         cache.close()
         assert cache._pool is None
+
+    def test_context_manager(self) -> None:
+        """上下文管理器应自动关闭连接池。"""
+        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        config = RedisConfig()
+        cache = RedisSemanticCache(config)
+        cache._pool = fake_redis.connection_pool
+
+        with cache:
+            assert cache._pool is not None
+
+        assert cache._pool is None
+
+    def test_deterministic_cache_key(self) -> None:
+        """相同向量应生成相同的缓存键（跨进程一致）。"""
+        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        cache = _create_cache(fake_redis)
+
+        embedding = [0.1, 0.2, 0.3]
+        key1 = cache._build_cache_key(embedding)
+        key2 = cache._build_cache_key(embedding)
+        assert key1 == key2

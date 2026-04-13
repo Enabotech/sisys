@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 
 import redis
 
@@ -34,28 +35,32 @@ class RedisCleanup:
         """
         self._config = config
         self._pool: redis.ConnectionPool | None = None
+        self._pool_lock = threading.Lock()
 
     def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池。"""
+        """懒加载连接池（线程安全）。"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool(
-                host=self._config.host,
-                port=self._config.port,
-                db=self._config.db,
-                password=self._config.password,
-                max_connections=self._config.max_connections,
-                socket_timeout=self._config.socket_timeout,
-                decode_responses=True,
-            )
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = redis.ConnectionPool(
+                        host=self._config.host,
+                        port=self._config.port,
+                        db=self._config.db,
+                        password=self._config.password,
+                        max_connections=self._config.max_connections,
+                        socket_timeout=self._config.socket_timeout,
+                        decode_responses=True,
+                    )
         return self._pool
 
-    def cleanup_namespace(self, namespace: str) -> int:
+    def cleanup_namespace(self, namespace: str, batch_size: int = 100) -> int:
         """清理指定命名空间的所有键。
 
         使用 SCAN 命令迭代匹配的键，并批量删除。
 
         Args:
             namespace: 命名空间（如 session, cache:semantic, blackboard）
+            batch_size: 每批扫描的键数量（默认 100）
 
         Returns:
             删除的键数量
@@ -69,12 +74,12 @@ class RedisCleanup:
                 cursor = 0
 
                 while True:
-                    cursor, keys = client.scan(cursor=cursor, match=pattern, count=100)
+                    cursor, keys = client.scan(cursor=cursor, match=pattern, count=batch_size)
 
                     if keys:
-                        result = client.delete(*keys)
-                        deleted_count += result
-                        logger.debug("Deleted %d keys matching pattern %s", result, pattern)
+                        batch_deleted = client.delete(*keys)
+                        deleted_count += batch_deleted
+                        logger.debug("Deleted %d keys matching pattern %s", batch_deleted, pattern)
 
                     if cursor == 0:
                         break
@@ -96,3 +101,12 @@ class RedisCleanup:
             self._pool.disconnect()
             self._pool = None
             logger.debug("Redis connection pool closed")
+
+    def __enter__(self) -> RedisCleanup:
+        """上下文管理器入口。"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """上下文管理器出口，确保连接池关闭。"""
+        self.close()
+        return None

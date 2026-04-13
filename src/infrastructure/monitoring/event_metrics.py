@@ -109,15 +109,23 @@ class EventMetricsCollector:
         self.metrics.events_dlq_total += 1
         logger.warning("Event %s sent to DLQ", event_type)
 
-    def record_cache_hit(self) -> None:
-        """记录缓存命中。"""
-        self.metrics.cache_hits_total += 1
-        logger.debug("Cache hit")
+    def record_cache_hit(self, cache_type: str = "semantic") -> None:
+        """记录缓存命中。
 
-    def record_cache_miss(self) -> None:
-        """记录缓存未命中。"""
+        Args:
+            cache_type: 缓存类型标识（如 semantic, session）
+        """
+        self.metrics.cache_hits_total += 1
+        logger.debug("Cache hit (%s)", cache_type)
+
+    def record_cache_miss(self, cache_type: str = "semantic") -> None:
+        """记录缓存未命中。
+
+        Args:
+            cache_type: 缓存类型标识（如 semantic, session）
+        """
         self.metrics.cache_misses_total += 1
-        logger.debug("Cache miss")
+        logger.debug("Cache miss (%s)", cache_type)
 
     @property
     def hit_rate(self) -> float:

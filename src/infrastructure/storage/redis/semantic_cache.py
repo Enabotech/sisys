@@ -6,9 +6,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
+import threading
 
 import redis
 
@@ -27,7 +29,7 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
         vec2: 第二个向量
 
     Returns:
-        余弦相似度值（-1.0 到 1.0）
+        余弦相似度值（-1.0 到 1.0），零向量或空向量返回 0.0
     """
     if len(vec1) != len(vec2):
         raise ValueError(f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
@@ -49,7 +51,9 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     if norm1 == 0.0 or norm2 == 0.0:
         return 0.0
 
-    return dot_product / (norm1 * norm2)
+    sim = dot_product / (norm1 * norm2)
+    # 裁剪到 [-1, 1] 防止浮点误差导致 NaN
+    return max(-1.0, min(1.0, sim))
 
 
 class RedisSemanticCache:
@@ -80,28 +84,32 @@ class RedisSemanticCache:
         self._config = config
         self._metrics_collector = metrics_collector
         self._pool: redis.ConnectionPool | None = None
+        self._pool_lock = threading.Lock()
 
     def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池。"""
+        """懒加载连接池（线程安全）。"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool(
-                host=self._config.host,
-                port=self._config.port,
-                db=self._config.db,
-                password=self._config.password,
-                max_connections=self._config.max_connections,
-                socket_timeout=self._config.socket_timeout,
-                decode_responses=True,
-            )
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = redis.ConnectionPool(
+                        host=self._config.host,
+                        port=self._config.port,
+                        db=self._config.db,
+                        password=self._config.password,
+                        max_connections=self._config.max_connections,
+                        socket_timeout=self._config.socket_timeout,
+                        decode_responses=True,
+                    )
         return self._pool
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
         """根据查询向量生成缓存键。
 
-        使用向量的哈希值作为键的一部分，确保唯一性。
+        使用 MD5 哈希（确定性，跨进程一致）向量的量化版本作为键标识。
         """
-        # 使用向量的前几个元素生成一个简单的标识符
-        vector_id = hash(tuple(round(v, 6) for v in query_embedding[:10]))
+        # 量化前 10 个元素为 6 位小数，用 MD5 生成确定性标识符
+        quantized = [round(v, 6) for v in query_embedding[:10]]
+        vector_id = hashlib.md5(str(quantized).encode(), usedforsecurity=False).hexdigest()[:16]
         return f"vec:{vector_id}"
 
     async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None:
@@ -115,6 +123,9 @@ class RedisSemanticCache:
 
         Returns:
             缓存结果，如果未命中则返回 None
+
+        Raises:
+            redis.ConnectionError: Redis 连接失败时抛出
         """
         pool = self._get_pool()
         try:
@@ -129,20 +140,29 @@ class RedisSemanticCache:
                     for key in keys:
                         # 获取缓存条目数据
                         stored_embedding = client.hget(key, "embedding")
-                        stored_result = client.hget(key, "result")
+                        stored_result_data = client.hget(key, "result")
 
-                        if stored_embedding is None or stored_result is None:
+                        if stored_embedding is None or stored_result_data is None:
                             continue
 
-                        stored_vec = json.loads(stored_embedding)
+                        try:
+                            stored_vec: list[float] = json.loads(stored_embedding)
+                            raw_result = json.loads(stored_result_data)
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning("Corrupt data in cache key %s: %s", key, e)
+                            continue
+
+                        if not isinstance(stored_vec, list) or not isinstance(raw_result, dict):
+                            logger.warning("Unexpected data types in cache key %s", key)
+                            continue
+
                         similarity = cosine_similarity(query_embedding, stored_vec)
 
                         if similarity >= threshold:
-                            result: dict = json.loads(stored_result)
                             if self._metrics_collector:
                                 self._metrics_collector.record_cache_hit()
                             logger.debug("Cache hit with similarity %.4f", similarity)
-                            return result
+                            return raw_result
 
                     if cursor == 0:
                         break
@@ -154,9 +174,7 @@ class RedisSemanticCache:
 
         except redis.ConnectionError as e:
             logger.error("Failed to query semantic cache from Redis: %s", e)
-            if self._metrics_collector:
-                self._metrics_collector.record_cache_miss()
-            return None
+            raise
 
     async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None:
         """存储到语义缓存。
@@ -165,6 +183,9 @@ class RedisSemanticCache:
             query_embedding: 查询向量嵌入
             result: 缓存结果数据
             ttl: 过期时间（秒）
+
+        Raises:
+            redis.ConnectionError: Redis 连接失败时抛出
         """
         cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
@@ -177,14 +198,23 @@ class RedisSemanticCache:
                 logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
         except redis.ConnectionError as e:
             logger.error("Failed to store semantic cache in Redis: %s", e)
+            raise
 
     async def invalidate(self, cache_key: str) -> None:
         """使缓存失效。
 
         Args:
-            cache_key: 缓存键
+            cache_key: 缓存键（内部格式或完整 Redis 键）
+
+        Raises:
+            redis.ConnectionError: Redis 连接失败时抛出
         """
-        key = build_key(self._NAMESPACE, cache_key)
+        # 如果传入的 key 已经是全名（包含命名空间前缀），直接使用
+        prefix = build_key(self._NAMESPACE, "")
+        if cache_key.startswith(prefix):
+            key = cache_key
+        else:
+            key = build_key(self._NAMESPACE, cache_key)
         pool = self._get_pool()
         try:
             with redis.Redis(connection_pool=pool) as client:
@@ -192,6 +222,7 @@ class RedisSemanticCache:
                 logger.debug("Invalidated cache key %s", cache_key)
         except redis.ConnectionError as e:
             logger.error("Failed to invalidate cache key %s in Redis: %s", cache_key, e)
+            raise
 
     def close(self) -> None:
         """关闭连接池。"""
@@ -199,3 +230,12 @@ class RedisSemanticCache:
             self._pool.disconnect()
             self._pool = None
             logger.debug("Redis connection pool closed")
+
+    def __enter__(self) -> RedisSemanticCache:
+        """上下文管理器入口。"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """上下文管理器出口，确保连接池关闭。"""
+        self.close()
+        return None

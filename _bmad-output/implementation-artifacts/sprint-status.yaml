@@ -80,11 +80,11 @@ development_status:
   1-16-integration-test-framework: done
   # 价值组 3: 五层存储架构
   1-4-redis-cache-layer: review
-  1-5-postgresql-relational-layer: ready-for-dev   # 事务发件箱Story 1.3内存模拟,事务Mock模拟;PostgreSQL完整实现event_outbox
+  1-5-postgresql-relational-layer: in-progress   # 事务发件箱Story 1.3内存模拟,事务Mock模拟;PostgreSQL完整实现event_outbox
   1-6-qdrant-vector-layer: backlog
   1-7-minio-object-layer: backlog
   1-8-neo4j-graph-layer: backlog
-  1-13-k8s-auto-scaling: backlog      # Prometheus `/metrics` HTTP 端点 Story 1.13
+  1-13-k8s-auto-scaling: backlog      # 增补 Prometheus `/metrics` HTTP 端点 Story 1.13
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: backlog
   1-10-unified-audit-log: backlog

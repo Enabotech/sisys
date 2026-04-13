@@ -23,7 +23,7 @@ class PublicBlackboard(Protocol):
         agent_id: str,
         content: dict,
         confidence: float = 1.0,
-        citations: list | None = None,
+        citations: list[str] | None = None,
     ) -> int:
         """发布内容到黑板。
 

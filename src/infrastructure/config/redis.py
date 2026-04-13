@@ -35,9 +35,23 @@ class RedisConfig:
             REDIS_SOCKET_TIMEOUT: Socket 超时秒数 (默认: 5.0)
             REDIS_RETRY_ON_TIMEOUT: 超时时重试 (默认: true)
             REDIS_DEFAULT_TTL: 默认 TTL 秒数 (默认: 86400)
+
+        Raises:
+            ValueError: 当环境变量值无法解析为正确类型时
         """
         retry_on_timeout_env = os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower()
-        default_ttl_env = os.getenv("REDIS_DEFAULT_TTL", "86400")
+
+        socket_timeout_str = os.getenv("REDIS_SOCKET_TIMEOUT", "5.0")
+        try:
+            socket_timeout = float(socket_timeout_str)
+        except ValueError as e:
+            raise ValueError(f"Invalid REDIS_SOCKET_TIMEOUT value: {socket_timeout_str}") from e
+
+        default_ttl_str = os.getenv("REDIS_DEFAULT_TTL", "86400")
+        try:
+            default_ttl = int(default_ttl_str)
+        except ValueError as e:
+            raise ValueError(f"Invalid REDIS_DEFAULT_TTL value: {default_ttl_str}") from e
 
         return cls(
             host=os.getenv("REDIS_HOST", "localhost"),
@@ -45,7 +59,7 @@ class RedisConfig:
             db=int(os.getenv("REDIS_DB", "0")),
             password=os.getenv("REDIS_PASSWORD") or None,
             max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "10")),
-            socket_timeout=float(os.getenv("REDIS_SOCKET_TIMEOUT", "5.0")),
+            socket_timeout=socket_timeout,
             retry_on_timeout=retry_on_timeout_env in ("true", "1", "yes"),
-            default_ttl=int(default_ttl_env),
+            default_ttl=default_ttl,
         )
