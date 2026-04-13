@@ -3,7 +3,7 @@
 import uuid
 
 from src.domain.events.checkpoint_events import CheckpointRecovered
-from src.domain.events.enums import DeviationLevel, IsolationLevel, RecoveryMode
+from src.domain.events.enums import DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
     IsolationLevelSwitched,
@@ -20,7 +20,7 @@ class TestStrategicDeviationWarning:
         warning_id = uuid.uuid4()
         event = StrategicDeviationWarning(
             warning_id=warning_id,
-            deviation_type="budget_overrun",
+            deviation_type=DeviationType.BUDGET_OVERUN,
             deviation_level=DeviationLevel.SEVERE,
             actual_value=150000.0,
             planned_value=100000.0,

@@ -8,7 +8,7 @@ import pytest
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.checkpoint_events import CheckpointRecovered
-from src.domain.events.enums import DeviationLevel, RecoveryMode
+from src.domain.events.enums import DeviationLevel, DeviationType, RecoveryMode
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
     IsolationLevelSwitched,
@@ -42,7 +42,7 @@ class TestToDictSerialization:
         """StrategicDeviationWarning serializes to dict."""
         event = StrategicDeviationWarning(
             warning_id=uuid.uuid4(),
-            deviation_type="scope_creep",
+            deviation_type=DeviationType.SCOPE_CREEP,
             deviation_level=DeviationLevel.SEVERE,
             actual_value=200.0,
             planned_value=100.0,

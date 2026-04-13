@@ -14,7 +14,7 @@ from src.domain.events import (
 )
 from src.domain.events.base import DomainEvent
 from src.domain.events.checkpoint_events import CheckpointRecovered
-from src.domain.events.enums import DeviationLevel, IsolationLevel, RecoveryMode
+from src.domain.events.enums import DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
     IsolationLevelSwitched,
@@ -410,7 +410,7 @@ def create_strategic_deviation_warning_event(events_context):
     """Create StrategicDeviationWarning event."""
     event = StrategicDeviationWarning(
         warning_id=uuid.uuid4(),
-        deviation_type="budget_overrun",
+        deviation_type=DeviationType.BUDGET_OVERUN,
         deviation_level=DeviationLevel.SEVERE,
         actual_value=150.0,
         planned_value=100.0,
