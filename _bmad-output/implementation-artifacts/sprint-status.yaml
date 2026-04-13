@@ -1,5 +1,5 @@
 # generated: 2026-03-11
-# last_updated: 2026-04-13T00:00:00Z
+# last_updated: 2026-04-13
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -76,15 +76,15 @@ development_status:
   # 价值组 2: 架构基础与事件驱动
   1-1-hexagonal-architecture-skeleton: done
   1-2-domain-event-definition: done
-  1-3-event-bus-implementation: done
+  1-3-event-bus-implementation: done  # OTLP 导出器配置补充实现完成
   1-16-integration-test-framework: review
   # 价值组 3: 五层存储架构
   1-4-redis-cache-layer: ready-for-dev
-  1-5-postgresql-relational-layer: ready-for-dev
+  1-5-postgresql-relational-layer: ready-for-dev   # 事务发件箱Story 1.3内存模拟,事务Mock模拟;PostgreSQL完整实现event_outbox
   1-6-qdrant-vector-layer: backlog
   1-7-minio-object-layer: backlog
   1-8-neo4j-graph-layer: backlog
-  1-13-k8s-auto-scaling: backlog
+  1-13-k8s-auto-scaling: backlog      # Prometheus `/metrics` HTTP 端点 Story 1.13
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: backlog
   1-10-unified-audit-log: backlog
@@ -318,17 +318,17 @@ development_status:
 #   - Epic 1-19: 140 stories (📋 backlog, 1 ready-for-dev)
 #
 # Status Summary:
-#   - Done: 8 (Epic 0 Iteration 0: 3 + Epic 0 Iteration 1: 5)
+#   - Done: 8 (Epic 0 Iteration 0: 3 + Epic 0 Iteration 1: 5 + Story 1.3)
 #   - Ready for Dev: 3 (Story 0.17, Story 0.18, Story 1.1)
 #   - Backlog: 141
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
 #   2. Execute Epic 0 Iteration 1 剩余 Stories (0.17/18) - 产品交付系统依赖Epic 1
-#   3. Start Epic 1 Story 1.1 (1-1-hexagonal-architecture-skeleton) - 架构基础
+#   3. Start Epic 1 Story 1.4 (Redis Cache Layer)
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-04-12
-#   - Ready for Dev count: 3 (Story 0.17, Story 0.18, Story 1.1)
-#   - Backlog count: 141 (Story 1.1 moved to ready-for-dev)
+#   - Updated last_updated date to 2026-04-13
+#   - Story 1.3 OTLP 导出器配置补充实现完成 → done
+#   - Done count: 8 (Story 1.3 complete with OTLP exporter)
 # =============================================================================
