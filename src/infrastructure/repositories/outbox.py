@@ -32,7 +32,7 @@ class InMemoryOutboxRepository(OutboxRepository):
     ⚠️ 此类非线程安全。多线程/协程并发访问公共方法可能导致竞态条件。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._entities: list[OutboxEntity] = []
         self._lock = asyncio.Lock()  # 仅保护内部异步方法，不保护公共同步方法
 

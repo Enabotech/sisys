@@ -40,7 +40,7 @@ class InMemoryDeadLetterQueue(DeadLetterQueue):
     进程重启后丢失，仅用于测试和 MVP 占位。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._items: list[tuple[DomainEvent, str, int]] = []
 
     def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
