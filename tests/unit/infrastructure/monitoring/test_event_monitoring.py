@@ -168,7 +168,7 @@ class TestOpenTelemetryTrace:
         tracer.enabled = True  # Force enable for test
 
         # Test that the context manager works without errors
-        with tracer.create_span("test-span", event_id="uuid-1", event_type="DocumentProcessed") as span:
+        with tracer.create_span("test-span", event_id="uuid-1", event_type="DocumentProcessed") as _span:
             # When OpenTelemetry is not installed or fails, span is None
             # When it works, span would be a real span object
             pass  # Context manager should enter and exit cleanly

@@ -76,8 +76,8 @@ development_status:
   # 价值组 2: 架构基础与事件驱动
   1-1-hexagonal-architecture-skeleton: done
   1-2-domain-event-definition: done
-  1-3-event-bus-implementation: review
-  1-16-integration-test-framework: ready-for-dev
+  1-3-event-bus-implementation: done
+  1-16-integration-test-framework: in-progress
   # 价值组 3: 五层存储架构
   1-4-redis-cache-layer: ready-for-dev
   1-5-postgresql-relational-layer: backlog
