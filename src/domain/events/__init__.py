@@ -5,7 +5,7 @@ from .base import DomainEvent
 from .checkpoint_events import CheckpointReached, CheckpointRecovered
 from .correction_events import CorrectionApproved
 from .document_events import DocumentProcessed
-from .enums import CorrectionType, DeviationLevel, IsolationLevel, RecoveryMode
+from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
 from .planning_events import StrategicDeviationWarning
@@ -27,6 +27,7 @@ __all__ = [
     "RoutingDecided",
     "EventPublisher",
     "DeviationLevel",
+    "DeviationType",
     "CorrectionType",
     "IsolationLevel",
     "RecoveryMode",

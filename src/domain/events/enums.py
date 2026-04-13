@@ -8,6 +8,17 @@ from __future__ import annotations
 from enum import Enum
 
 
+class DeviationType(str, Enum):
+    """Strategic deviation types."""
+
+    BUDGET_OVERUN = "budget_overrun"
+    TIMELINE_DELAY = "timeline_delay"
+    SCOPE_CREEP = "scope_creep"
+    QUALITY_DROP = "quality_drop"
+    RESOURCE_SHORTAGE = "resource_shortage"
+    STRATEGY_MISALIGN = "strategy_misalign"
+
+
 class DeviationLevel(str, Enum):
     """Strategic deviation severity levels."""
 

@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from .base import DomainEvent
-from .enums import DeviationLevel
+from .enums import DeviationLevel, DeviationType
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class StrategicDeviationWarning(DomainEvent):
 
     warning_id: uuid.UUID = field(default_factory=uuid.uuid4)
     event_type: str = field(default="StrategicDeviationWarning", init=False)
-    deviation_type: str = ""
+    deviation_type: DeviationType = DeviationType.BUDGET_OVERUN
     deviation_level: DeviationLevel = DeviationLevel.MINOR
     actual_value: float = 0.0
     planned_value: float = 0.0
