@@ -36,6 +36,8 @@ class EventMetrics:
         events_retried_total: 重试事件总数
         events_dlq_total: 死信队列事件总数
         event_processing_duration_seconds: 处理耗时采样（有界队列，防止 OOM）
+        cache_hits_total: 缓存命中总数
+        cache_misses_total: 缓存未命中总数
     """
 
     events_processed_total: int = 0
@@ -45,6 +47,8 @@ class EventMetrics:
     event_processing_duration_seconds: deque[float] = field(
         default_factory=lambda: deque(maxlen=10_000),
     )
+    cache_hits_total: int = 0
+    cache_misses_total: int = 0
 
 
 class EventMetricsCollector:
@@ -104,6 +108,28 @@ class EventMetricsCollector:
         """
         self.metrics.events_dlq_total += 1
         logger.warning("Event %s sent to DLQ", event_type)
+
+    def record_cache_hit(self) -> None:
+        """记录缓存命中。"""
+        self.metrics.cache_hits_total += 1
+        logger.debug("Cache hit")
+
+    def record_cache_miss(self) -> None:
+        """记录缓存未命中。"""
+        self.metrics.cache_misses_total += 1
+        logger.debug("Cache miss")
+
+    @property
+    def hit_rate(self) -> float:
+        """计算缓存命中率。
+
+        Returns:
+            命中率（0.0-1.0），当总请求数为 0 时返回 0.0
+        """
+        total = self.metrics.cache_hits_total + self.metrics.cache_misses_total
+        if total == 0:
+            return 0.0
+        return self.metrics.cache_hits_total / total
 
 
 # ============================================================================

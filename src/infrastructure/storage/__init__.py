@@ -1,1 +1,1 @@
-"""Storage implementations (5-layer architecture)."""
+"""Infrastructure storage package."""

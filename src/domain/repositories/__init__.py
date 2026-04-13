@@ -1,6 +1,6 @@
-"""Repository interfaces."""
+"""Domain repositories package."""
 
-from .base import BaseRepository
-from .outbox import OutboxRepository
+from src.domain.repositories.outbox import OutboxRepository
+from src.domain.repositories.session_storage import SessionStorage
 
-__all__ = ["BaseRepository", "OutboxRepository"]
+__all__ = ["OutboxRepository", "SessionStorage"]
