@@ -5,18 +5,32 @@ Provides Mock services, test data factories, and test isolation fixtures.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import fakeredis
 import pytest
 
+# Ensure all domain events are imported so EventRegistry is populated.
+# This MUST happen before any test that uses EventOutboxAdapter.
+from src.domain.events import (  # noqa: F401, E402
+    AgentDecided,
+    CheckpointReached,
+    CheckpointRecovered,
+    CorrectionApproved,
+    DocumentProcessed,
+    HeartbeatTriggered,
+    IsolationLevelSwitched,
+    RoutingDecided,
+    StrategicDeviationWarning,
+    ToolExecuted,
+)
 from src.domain.events.base import DomainEvent
 from src.infrastructure.events.in_memory_store import InMemoryEventStore
 from src.infrastructure.idempotency.checker import IdempotencyChecker
 from src.infrastructure.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
-
 
 # ===================================================================
 # Mock Fixtures (AC-1)
@@ -101,7 +115,7 @@ def outbox_repo() -> InMemoryOutboxRepository:
 
 
 @pytest.fixture
-def event_store() -> InMemoryEventStore:
+def event_store() -> Generator[InMemoryEventStore, None, None]:
     """Provide a fresh InMemoryEventStore instance per test."""
     store = InMemoryEventStore()
     yield store

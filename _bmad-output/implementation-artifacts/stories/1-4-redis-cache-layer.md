@@ -1,10 +1,16 @@
 # Story 1.4: Redis Cache Layer
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
+>
+> **🔧 技术约束（v1.1 修订）：**
+> 1. **复用 Story 1.3 RedisConfig** — `src/infrastructure/config/redis.py` 已定义，需扩展 `retry_on_timeout` 和 `default_ttl` 字段
+> 2. **复用 Story 1.3 RedisEventPublisher 连接池** — 各存储服务共享连接池，不重复创建
+> 3. **缓存数据结构位于基础设施层** — SessionState/CacheEntry/BlackboardEntry 是存储结构，非核心领域实体
+> 4. **IdempotencyChecker 已在 Story 1.3 AC-4.1 定义接口** — 本 Story 仅实现基础设施层适配器
 
 ---
 
@@ -31,20 +37,21 @@
 
 ## ✅ Acceptance Criteria 验收标准
 
-### AC-1: Redis 连接池与客户端实现
+### AC-1: Redis 连接池管理与客户端抽象
 
-**Given** Story 1.3 事件总线已实现（包含 Redis Pub/Sub 实时通知通道）
-**When** 实现 Redis 连接池管理与客户端抽象
-**Then** 支持连接池复用、超时控制、断线重连
-**And** 客户端接口不依赖具体 Redis 实现（依赖倒置）
+**Given** Story 1.3 已定义 `RedisConfig` (`src/infrastructure/config/redis.py`) 和 `RedisEventPublisher` 连接池
+**When** 扩展 RedisConfig 并实现通用连接池管理器
+**Then** 所有 Redis 服务实例（会话存储/语义缓存/公共黑板/幂等检查）共享同一连接池
+**And** 连接池支持懒初始化、健康检查、优雅降级
 
 **验证标准/Validation Criteria:**
-- [ ] RedisConfig 配置模型定义（`src/infrastructure/config/redis.py`）
-  - 字段: `host`, `port`, `db`, `password`, `max_connections`, `socket_timeout`, `retry_on_timeout`
-- [ ] RedisClient 接口定义（`src/infrastructure/storage/redis/client.py`）
-  - 方法: `connect()`, `close()`, `health_check()`, `get_client()`
+- [ ] **扩展** `RedisConfig` 配置模型（`src/infrastructure/config/redis.py`）
+  - **新增字段**: `retry_on_timeout: bool = True`, `default_ttl: int = 86400`（24 小时）
+  - **向后兼容**: 保持 Story 1.3 已有字段不变
+- [ ] RedisClient 通用接口定义（`src/infrastructure/storage/redis/client.py`）
+  - 方法: `get_pool() -> redis.ConnectionPool`, `health_check() -> bool`, `close() -> None`
+  - **不重复创建连接池**，使用单例模式或依赖注入共享
 - [ ] 连接池懒初始化（首次调用时创建）
-- [ ] 连接池共享（多个 Redis 服务实例共享同一连接池）
 - [ ] 健康检查实现（ping/pong 检测）
 - [ ] Redis 连接失败优雅降级（返回 None 或默认值，不抛出异常）
 - [ ] 单元测试覆盖连接池创建、复用、关闭场景
@@ -57,10 +64,11 @@
 **And** TTL 自动过期（可配置 24h-30d）
 
 **验证标准/Validation Criteria:**
-- [ ] SessionState 数据模型定义（`src/domain/entities/session.py`）
-  - 字段: `session_id`, `agent_id`, `state: dict`, `created_at`, `updated_at`, `ttl`
+- [ ] SessionState 数据模型定义（`src/infrastructure/entities/session_state.py`）
+  > **📌 架构说明**: SessionState 是缓存存储结构，非核心领域实体，位于基础设施层（与 OutboxEntity 一致）
+  - 字段: `session_id: str`, `agent_id: str`, `state: dict`, `created_at: datetime`, `updated_at: datetime`, `ttl: int`
 - [ ] SessionStorage 接口定义（`src/domain/repositories/session_storage.py`）
-  - 方法: `save(session)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)`
+  - 方法: `save(session_id, agent_id, state, ttl) -> None`, `load(session_id) -> Optional[dict]`, `delete(session_id) -> None`, `exists(session_id) -> bool`
 - [ ] RedisSessionStorage 实现（`src/infrastructure/storage/redis/session_storage.py`）
   - 使用 Redis Hash 存储（`HSET/HGET/HDEL`）
   - 键命名规范: `sisys:session:{session_id}`
@@ -77,14 +85,15 @@
 **And** 缓存命中率纳入可观测性指标
 
 **验证标准/Validation Criteria:**
-- [ ] CacheEntry 数据模型定义（`src/domain/entities/cache_entry.py`）
-  - 字段: `cache_key`, `query_embedding`, `result`, `similarity_threshold`, `created_at`, `ttl`
+- [ ] CacheEntry 数据模型定义（`src/infrastructure/entities/cache_entry.py`）
+  > **📌 架构说明**: CacheEntry 是缓存存储结构，非核心领域实体，位于基础设施层
+  - 字段: `cache_key: str`, `query_embedding: list[float]`, `result: dict`, `similarity_threshold: float`, `created_at: datetime`, `ttl: int`
 - [ ] SemanticCache 接口定义（`src/domain/services/semantic_cache.py`）
-  - 方法: `get(query_embedding, threshold=0.9)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)`
+  - 方法: `get(query_embedding: list[float], threshold: float = 0.9) -> Optional[dict]`, `set(query_embedding: list[float], result: dict, ttl: int) -> None`, `invalidate(cache_key: str) -> None`
 - [ ] RedisSemanticCache 实现（`src/infrastructure/storage/redis/semantic_cache.py`）
   - 使用 Redis Hash 存储嵌入向量和结果
   - 键命名规范: `sisys:cache:semantic:{cache_key}`
-  - 余弦相似度计算（使用 numpy 或纯 Python）
+  - **余弦相似度计算使用纯 Python 实现**（项目技术栈不含 numpy，避免额外依赖）
 - [ ] 缓存未命中时返回 None（触发正常检索流程）
 - [ ] 缓存命中率统计（`hits`, `misses`, `hit_rate`）
 - [ ] 单元测试覆盖命中、未命中、过期、失效场景
@@ -97,10 +106,11 @@
 **And** 支持 MVCC 并发控制（读写不阻塞）
 
 **验证标准/Validation Criteria:**
-- [ ] BlackboardEntry 数据模型定义（`src/domain/entities/blackboard.py`）
-  - 字段: `conversation_id`, `agent_id`, `content`, `confidence`, `citations`, `timestamp`, `version`
+- [ ] BlackboardEntry 数据模型定义（`src/infrastructure/entities/blackboard_entry.py`）
+  > **📌 架构说明**: BlackboardEntry 是缓存存储结构，非核心领域实体，位于基础设施层
+  - 字段: `conversation_id: str`, `agent_id: str`, `content: dict`, `confidence: float`, `citations: list`, `timestamp: datetime`, `version: int`
 - [ ] PublicBlackboard 接口定义（`src/domain/services/public_blackboard.py`）
-  - 方法: `post(entry)`, `get(conversation_id)`, `get_by_agent(conversation_id, agent_id)`, `get_latest(conversation_id)`
+  - 方法: `post(conversation_id, agent_id, content, confidence, citations) -> int`（返回版本号）, `get(conversation_id) -> list[dict]`, `get_by_agent(conversation_id, agent_id) -> Optional[dict]`, `get_latest(conversation_id) -> Optional[dict]`
 - [ ] RedisPublicBlackboard 实现（`src/infrastructure/storage/redis/public_blackboard.py`）
   - 使用 Redis Sorted Set 存储（按 timestamp 排序）
   - 键命名规范: `sisys:blackboard:{conversation_id}`
@@ -110,13 +120,14 @@
 
 ### AC-5: 幂等性检查器（IdempotencyChecker）
 
-**Given** Story 1.3 AC-4.1 已定义 IdempotencyChecker 接口
-**When** 实现基于 Redis `SET NX` 原子操作的幂等性检查
+**Given** Story 1.3 AC-4.1 已定义 IdempotencyChecker 接口策略
+**When** 实现基于 Redis `SET NX` 原子操作的幂等性检查基础设施层适配器
 **Then** 重复处理相同 event_id 的事件时仅处理一次
 **And** TTL 7 天自动过期
 
 **验证标准/Validation Criteria:**
-- [ ] IdempotencyChecker 接口实现（`src/infrastructure/storage/redis/idempotency_checker.py`）
+- [ ] IdempotencyChecker 基础设施层实现（`src/infrastructure/storage/redis/idempotency_checker.py`）
+  > **📌 复用说明**: Story 1.3 AC-4.1 已定义接口策略，本 Story 实现基础设施层适配器
   - **仅实现** `try_acquire(event_id: UUID, ttl: int = 7*24*3600) -> bool`
   - 使用 `SET key value NX EX ttl` 原子操作
   - 返回 True=首次处理，False=已处理
@@ -153,11 +164,11 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 数据模型 (Data Models)
-- [ ] SessionState 定义（`src/domain/entities/session.py`）
+- [ ] SessionState 定义（`src/infrastructure/entities/session_state.py`）
   - 字段: session_id, agent_id, state, created_at, updated_at, ttl
-- [ ] CacheEntry 定义（`src/domain/entities/cache_entry.py`）
+- [ ] CacheEntry 定义（`src/infrastructure/entities/cache_entry.py`）
   - 字段: cache_key, query_embedding, result, similarity_threshold, created_at, ttl
-- [ ] BlackboardEntry 定义（`src/domain/entities/blackboard.py`）
+- [ ] BlackboardEntry 定义（`src/infrastructure/entities/blackboard_entry.py`）
   - 字段: conversation_id, agent_id, content, confidence, citations, timestamp, version
 
 #### 仓储/服务接口 (Repository/Service Interfaces)
@@ -166,8 +177,9 @@
 - [ ] PublicBlackboard 接口（`src/domain/services/public_blackboard.py`）
 
 #### 配置模型 (Configuration Models)
-- [ ] RedisConfig 定义（`src/infrastructure/config/redis.py`）
-  - 字段: host, port, db, password, max_connections, socket_timeout, retry_on_timeout, default_ttl
+- [ ] **扩展** RedisConfig（`src/infrastructure/config/redis.py`）
+  - **新增字段**: `retry_on_timeout: bool = True`, `default_ttl: int = 86400`
+  - **向后兼容**: 保持 Story 1.3 已有字段不变
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.4.feature`
@@ -289,39 +301,41 @@
 
 ---
 
-### Task 1: Redis 连接池与客户端实现
+### Task 1: Redis 连接池管理与客户端抽象
 
 **关联 AC:** AC-1
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
+> **📌 复用说明:** Story 1.3 已定义 `RedisConfig`，本 Task 仅扩展字段并实现通用连接池管理器。
 
-#### TDD 循环 A：RedisConfig 配置模型
+#### TDD 循环 A：扩展 RedisConfig 配置模型
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_redis_config.py`（字段验证、默认值、类型检查） |
-| 🟢 绿 | 实现 `RedisConfig` dataclass 最小代码 |
-| 🔄 重构 | 添加类型注解、docstring、默认值 |
+| 🔴 红 | 编写 `test_redis_config_extension.py`（新字段验证、向后兼容测试） |
+| 🟢 绿 | 扩展 `RedisConfig` 添加 `retry_on_timeout` 和 `default_ttl` 字段 |
+| 🔄 重构 | 添加类型注解、docstring、from_env 支持 |
 
-- [ ] Subtask: 🔴 红 — 编写 RedisConfig 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 RedisConfig 最小代码
+- [ ] Subtask: 🔴 红 — 编写 RedisConfig 扩展字段失败测试
+- [ ] Subtask: 🟢 绿 — 扩展 RedisConfig 最小代码
 - [ ] Subtask: 🔄 重构 — 优化 RedisConfig 代码
 
-#### TDD 循环 B：RedisClient 连接管理
+#### TDD 循环 B：RedisClient 通用连接池管理器
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_redis_client.py`（连接、断开、健康检查） |
-| 🟢 绿 | 实现 `RedisClient` 类最小代码 |
-| 🔄 重构 | 添加连接池懒初始化、异常处理 |
+| 🔴 红 | 编写 `test_redis_client.py`（连接池获取、健康检查、关闭） |
+| 🟢 绿 | 实现 `RedisClient` 类（单例模式/依赖注入共享连接池） |
+| 🔄 重构 | 添加连接池懒初始化、异常处理、优雅降级 |
 
 - [ ] Subtask: 🔴 红 — 编写 RedisClient 失败测试
 - [ ] Subtask: 🟢 绿 — 实现 RedisClient 最小代码
 - [ ] Subtask: 🔄 重构 — 优化 RedisClient 代码
 
 **完成标准/Definition of Done:**
-- [ ] RedisConfig 和 RedisClient 实现完成
+- [ ] RedisConfig 扩展字段和 RedisClient 实现完成
 - [ ] TDD 循环全部通过
+- [ ] **向后兼容验证**: Story 1.3 的 RedisEventPublisher 仍正常工作
 - [ ] 基础设施层覆盖率≥10%
 
 ---
@@ -336,8 +350,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_session.py`（字段验证、序列化/反序列化） |
-| 🟢 绿 | 实现 `SessionState` dataclass 最小代码 |
+| 🔴 红 | 编写 `test_session_state.py`（字段验证、序列化/反序列化） |
+| 🟢 绿 | 实现 `SessionState` dataclass 最小代码（`src/infrastructure/entities/session_state.py`） |
 | 🔄 重构 | 添加 datetime/UUID 序列化支持 |
 
 - [ ] Subtask: 🔴 红 — 编写 SessionState 失败测试
@@ -349,7 +363,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写接口定义验证测试（Protocol 类型检查） |
-| 🟢 绿 | 实现 `SessionStorage` Protocol 接口 |
+| 🟢 绿 | 实现 `SessionStorage` Protocol 接口（`src/domain/repositories/session_storage.py`） |
 | 🔄 重构 | 添加类型注解、docstring |
 
 - [ ] Subtask: 🔴 红 — 编写 SessionStorage 接口
@@ -386,7 +400,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_cache_entry.py`（字段验证、嵌入向量存储） |
-| 🟢 绿 | 实现 `CacheEntry` dataclass 最小代码 |
+| 🟢 绿 | 实现 `CacheEntry` dataclass 最小代码（`src/infrastructure/entities/cache_entry.py`） |
 | 🔄 重构 | 添加嵌入向量序列化支持 |
 
 - [ ] Subtask: 🔴 红 — 编写 CacheEntry 失败测试
@@ -398,7 +412,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写接口定义验证测试 |
-| 🟢 绿 | 实现 `SemanticCache` Protocol 接口 |
+| 🟢 绿 | 实现 `SemanticCache` Protocol 接口（`src/domain/services/semantic_cache.py`） |
 | 🔄 重构 | 添加类型注解、docstring |
 
 - [ ] Subtask: 🔴 红 — 编写 SemanticCache 接口
@@ -411,7 +425,7 @@
 |------|------|
 | 🔴 红 | 编写 `test_semantic_cache.py`（命中、未命中、相似度计算） |
 | 🟢 绿 | 实现 `RedisSemanticCache` 类最小代码 |
-| 🔄 重构 | 添加余弦相似度、缓存命中率统计、异常处理 |
+| 🔄 重构 | 添加余弦相似度（纯 Python）、缓存命中率统计、异常处理 |
 
 - [ ] Subtask: 🔴 红 — 编写 RedisSemanticCache 失败测试
 - [ ] Subtask: 🟢 绿 — 实现 RedisSemanticCache 最小代码
@@ -434,8 +448,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_blackboard.py`（字段验证、版本号自增） |
-| 🟢 绿 | 实现 `BlackboardEntry` dataclass 最小代码 |
+| 🔴 红 | 编写 `test_blackboard_entry.py`（字段验证、版本号自增） |
+| 🟢 绿 | 实现 `BlackboardEntry` dataclass 最小代码（`src/infrastructure/entities/blackboard_entry.py`） |
 | 🔄 重构 | 添加 citations 序列化支持 |
 
 - [ ] Subtask: 🔴 红 — 编写 BlackboardEntry 失败测试
@@ -447,7 +461,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写接口定义验证测试 |
-| 🟢 绿 | 实现 `PublicBlackboard` Protocol 接口 |
+| 🟢 绿 | 实现 `PublicBlackboard` Protocol 接口（`src/domain/services/public_blackboard.py`） |
 | 🔄 重构 | 添加类型注解、docstring |
 
 - [ ] Subtask: 🔴 红 — 编写 PublicBlackboard 接口
@@ -615,10 +629,6 @@
 sisys/
 ├── src/
 │   ├── domain/
-│   │   ├── entities/
-│   │   │   ├── session.py              # SessionState 数据模型
-│   │   │   ├── cache_entry.py          # CacheEntry 数据模型
-│   │   │   └── blackboard.py           # BlackboardEntry 数据模型
 │   │   ├── repositories/
 │   │   │   └── session_storage.py      # SessionStorage 接口
 │   │   └── services/
@@ -626,11 +636,15 @@ sisys/
 │   │       └── public_blackboard.py    # PublicBlackboard 接口
 │   └── infrastructure/
 │       ├── config/
-│       │   └── redis.py                # RedisConfig 配置模型
+│       │   └── redis.py                # RedisConfig 配置模型（扩展 Story 1.3）
+│       ├── entities/
+│       │   ├── session_state.py        # SessionState 数据模型
+│       │   ├── cache_entry.py          # CacheEntry 数据模型
+│       │   └── blackboard_entry.py     # BlackboardEntry 数据模型
 │       └── storage/
 │           └── redis/
 │               ├── __init__.py
-│               ├── client.py           # RedisClient 连接池管理
+│               ├── client.py           # RedisClient 通用连接池管理器
 │               ├── session_storage.py  # RedisSessionStorage 实现
 │               ├── semantic_cache.py   # RedisSemanticCache 实现
 │               ├── public_blackboard.py # RedisPublicBlackboard 实现
@@ -639,19 +653,23 @@ sisys/
 │               └── cleanup.py          # RedisCleanup 工具类
 ├── tests/
 │   ├── unit/
-│   │   ├── domain/
-│   │   │   ├── test_session.py
+│   │   ├── infrastructure/
+│   │   │   ├── test_redis_config_extension.py  # RedisConfig 扩展字段测试
+│   │   │   ├── test_redis_client.py
+│   │   │   ├── test_session_state.py
+│   │   │   ├── test_session_storage.py
 │   │   │   ├── test_cache_entry.py
-│   │   │   └── test_blackboard.py
-│   │   └── infrastructure/
-│   │       ├── test_redis_client.py
-│   │       ├── test_session_storage.py
-│   │       ├── test_semantic_cache.py
-│   │       ├── test_public_blackboard.py
-│   │       ├── test_idempotency_checker.py
-│   │       ├── test_key_builder.py
-│   │       ├── test_cleanup.py
-│   │       └── test_architecture_constraints.py
+│   │   │   ├── test_semantic_cache.py
+│   │   │   ├── test_blackboard_entry.py
+│   │   │   ├── test_public_blackboard.py
+│   │   │   ├── test_idempotency_checker.py
+│   │   │   ├── test_key_builder.py
+│   │   │   ├── test_cleanup.py
+│   │   │   └── test_architecture_constraints.py
+│   │   └── domain/
+│   │       ├── test_session_storage_interface.py
+│   │       ├── test_semantic_cache_interface.py
+│   │       └── test_public_blackboard_interface.py
 │   ├── integration/
 │   │   └── test_redis_integration.py
 │   └── acceptance/
@@ -716,31 +734,35 @@ sisys/
 - `_bmad-output/implementation-artifacts/stories/1-4-redis-cache-layer.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/entities/session.py` — SessionState 数据模型
-- `src/domain/entities/cache_entry.py` — CacheEntry 数据模型
-- `src/domain/entities/blackboard.py` — BlackboardEntry 数据模型
+- `src/infrastructure/config/redis.py` — **扩展** RedisConfig（新增 `retry_on_timeout`, `default_ttl`）
+- `src/infrastructure/entities/session_state.py` — SessionState 数据模型
+- `src/infrastructure/entities/cache_entry.py` — CacheEntry 数据模型
+- `src/infrastructure/entities/blackboard_entry.py` — BlackboardEntry 数据模型
 - `src/domain/repositories/session_storage.py` — SessionStorage 接口
 - `src/domain/services/semantic_cache.py` — SemanticCache 接口
 - `src/domain/services/public_blackboard.py` — PublicBlackboard 接口
-- `src/infrastructure/config/redis.py` — RedisConfig 配置模型
-- `src/infrastructure/storage/redis/client.py` — RedisClient 连接池管理
+- `src/infrastructure/storage/redis/client.py` — RedisClient 通用连接池管理器
 - `src/infrastructure/storage/redis/session_storage.py` — RedisSessionStorage 实现
 - `src/infrastructure/storage/redis/semantic_cache.py` — RedisSemanticCache 实现
 - `src/infrastructure/storage/redis/public_blackboard.py` — RedisPublicBlackboard 实现
 - `src/infrastructure/storage/redis/idempotency_checker.py` — IdempotencyChecker 实现
 - `src/infrastructure/storage/redis/key_builder.py` — RedisKeyBuilder 工具类
 - `src/infrastructure/storage/redis/cleanup.py` — RedisCleanup 工具类
-- `tests/unit/domain/test_session.py` — SessionState 单元测试
-- `tests/unit/domain/test_cache_entry.py` — CacheEntry 单元测试
-- `tests/unit/domain/test_blackboard.py` — BlackboardEntry 单元测试
+- `tests/unit/infrastructure/test_redis_config_extension.py` — RedisConfig 扩展字段测试
 - `tests/unit/infrastructure/test_redis_client.py` — RedisClient 单元测试
+- `tests/unit/infrastructure/test_session_state.py` — SessionState 单元测试
 - `tests/unit/infrastructure/test_session_storage.py` — RedisSessionStorage 单元测试
+- `tests/unit/infrastructure/test_cache_entry.py` — CacheEntry 单元测试
 - `tests/unit/infrastructure/test_semantic_cache.py` — RedisSemanticCache 单元测试
+- `tests/unit/infrastructure/test_blackboard_entry.py` — BlackboardEntry 单元测试
 - `tests/unit/infrastructure/test_public_blackboard.py` — RedisPublicBlackboard 单元测试
 - `tests/unit/infrastructure/test_idempotency_checker.py` — IdempotencyChecker 单元测试
 - `tests/unit/infrastructure/test_key_builder.py` — RedisKeyBuilder 单元测试
 - `tests/unit/infrastructure/test_cleanup.py` — RedisCleanup 单元测试
 - `tests/unit/infrastructure/test_architecture_constraints.py` — 架构约束验证测试
+- `tests/unit/domain/test_session_storage_interface.py` — SessionStorage 接口验证
+- `tests/unit/domain/test_semantic_cache_interface.py` — SemanticCache 接口验证
+- `tests/unit/domain/test_public_blackboard_interface.py` — PublicBlackboard 接口验证
 - `tests/integration/test_redis_integration.py` — Redis 端到端集成测试
 - `tests/acceptance/test_story_1.4.feature` — Gherkin 验收测试
 - `docs/infrastructure/redis_cache_guide.md` — Redis 缓存层实施指南
