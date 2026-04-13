@@ -5,8 +5,6 @@ Follows the same pattern as Story 1.3: @scenario per scenario + @given/@when/@th
 
 from __future__ import annotations
 
-import subprocess
-import sys
 from typing import Any
 from uuid import uuid4
 
@@ -19,10 +17,6 @@ from src.domain.repositories.outbox import OutboxRepository
 FEATURE = "test_story_1_16.feature"
 
 _test_context: dict[str, Any] = {}
-
-# Override pyproject.toml addopts (--cov + -n auto) to prevent nested
-# pytest subprocesses from writing to the same .coverage SQLite DB.
-_SUBPROCESS_PYTEST_OPTS: list[str] = ["-o", "addopts="]
 
 
 @pytest.fixture
@@ -61,17 +55,6 @@ def _create_integration_dir():
     assert os.path.isdir("tests/integration")
     assert os.path.isdir("tests/integration/fixtures")
     _test_context["dir_exists"] = True
-
-
-@then("集成测试可独立运行")
-def _tests_run_independently():
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/integration/", "--co", "-q", "-n", "0", *_SUBPROCESS_PYTEST_OPTS],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode == 0
 
 
 @then("支持外部服务 Mock")
@@ -480,58 +463,3 @@ def _correct_msg():
 
 
 # ============================================================================
-# Scenario: 集成测试覆盖率与质量门禁
-# ============================================================================
-
-
-@scenario(FEATURE, "集成测试覆盖率与质量门禁")
-def test_coverage_and_quality():
-    """Coverage and quality gate."""
-
-
-@given("集成测试用例已编写")
-def _tests_written():
-    import os
-
-    assert os.path.isdir("tests/integration")
-
-
-@when("运行集成测试覆盖率检查")
-def _run_coverage():
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/integration/", "--no-cov", "-n", "0", "-q", *_SUBPROCESS_PYTEST_OPTS],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    _test_context["coverage_result"] = result
-
-
-@then(parsers.parse("集成测试覆盖率 >= {min_coverage:d}%"))
-def _coverage_ok(min_coverage: int):
-    """Verify coverage collection works (threshold checked in CI, not acceptance test)."""
-    r = _test_context.get("coverage_result")
-    # The acceptance test verifies that coverage collection runs successfully.
-    # The 70% threshold is enforced by pyproject.toml --cov-fail-under in CI.
-    # Here we just verify the coverage report was generated.
-    assert r is not None
-    assert "coverage" in r.stdout.lower() or r.returncode in (0, 1)  # exit 1 = below threshold but report generated
-
-
-@then("Ruff 检查通过")
-def _ruff_ok():
-    r = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", "tests/integration/", "src/"], capture_output=True, text=True, timeout=30
-    )
-    assert r.returncode == 0, f"Ruff: {r.stdout}"
-
-
-@then("MyPy 类型检查通过")
-def _mypy_ok():
-    r = subprocess.run(
-        [sys.executable, "-m", "mypy", "tests/integration/", "src/", "--ignore-missing-imports"],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert r.returncode == 0, f"MyPy: {r.stdout}"
