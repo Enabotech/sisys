@@ -27,7 +27,7 @@ class BlackboardEntry:
     agent_id: str
     content: dict
     confidence: float = 1.0
-    citations: list = field(default_factory=list)
+    citations: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     version: int = 1
 
