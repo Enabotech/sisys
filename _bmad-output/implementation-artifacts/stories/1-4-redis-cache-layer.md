@@ -6,11 +6,12 @@
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
 >
-> **🔧 技术约束（v1.1 修订）：**
-> 1. **复用 Story 1.3 RedisConfig** — `src/infrastructure/config/redis.py` 已定义，需扩展 `retry_on_timeout` 和 `default_ttl` 字段
-> 2. **复用 Story 1.3 RedisEventPublisher 连接池** — 各存储服务共享连接池，不重复创建
-> 3. **缓存数据结构位于基础设施层** — SessionState/CacheEntry/BlackboardEntry 是存储结构，非核心领域实体
-> 4. **IdempotencyChecker 已在 Story 1.3 AC-4.1 定义接口** — 本 Story 仅实现基础设施层适配器
+> **🔧 技术约束（v2.0 代码级审查修订）：**
+> 1. **扩展 Story 1.3 RedisConfig** — `src/infrastructure/config/redis.py` 已有 `host/port/db/password/max_connections/socket_timeout/from_env()`，本 Story 仅新增 `retry_on_timeout` 和 `default_ttl` 字段
+> 2. **复用 Story 1.3 独立连接池模式** — `RedisEventPublisher._get_pool()` / `RedisEventSubscriber._get_pool()` 已验证通过，本 Story 各存储组件沿用相同的 `_get_pool()` 懒加载模式，**不引入全局共享连接池**（架构已审查通过）
+> 3. **缓存数据结构位于基础设施层** — SessionState/CacheEntry/BlackboardEntry 是存储结构，非核心领域实体（与 OutboxEntity 一致）
+> 4. **~~IdempotencyChecker~~ ✅ Story 1.3 已完整实现** — `src/infrastructure/idempotency/checker.py`（70 行生产代码），含 `try_acquire()` + `SET NX EX` + TTL 7 天 + 优雅降级，本 Story 无需重复实现
+> 5. **扩展 EventMetricsCollector** — `src/infrastructure/monitoring/event_metrics.py` 已有基础计数器，本 Story 新增 `record_cache_hit()`/`record_cache_miss()`/`hit_rate` 属性
 
 ---
 
@@ -29,7 +30,7 @@
 | **会话状态缓存** | 支持 Agent 会话中断恢复，Checkpoint 恢复时间<60 秒 | TTL 可配置（24h-30d） |
 | **语义缓存** | 相似度>0.9 的检索请求直接返回缓存结果，Token 成本节省≥30% | 命中率监控，延迟 P95<100ms |
 | **公共黑板** | 多 Agent 协作时交换中间结论，支持 MVCC 并发控制 | 读写延迟 P95<50ms |
-| **幂等性检查** | 基于 event_id 的 Redis `SET NX` 原子操作去重，TTL 7 天 | 并发测试通过 |
+| **键命名与清理** | 统一 Redis 键管理，支持运维批量清理 | `sisys:{namespace}:{key}` 格式 + SCAN 清理 |
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构
 
@@ -37,23 +38,21 @@
 
 ## ✅ Acceptance Criteria 验收标准
 
-### AC-1: Redis 连接池管理与客户端抽象
+### AC-1: 扩展 RedisConfig + 统一连接池模式
 
-**Given** Story 1.3 已定义 `RedisConfig` (`src/infrastructure/config/redis.py`) 和 `RedisEventPublisher` 连接池
-**When** 扩展 RedisConfig 并实现通用连接池管理器
-**Then** 所有 Redis 服务实例（会话存储/语义缓存/公共黑板/幂等检查）共享同一连接池
-**And** 连接池支持懒初始化、健康检查、优雅降级
+**Given** Story 1.3 已实现 `RedisConfig` (`src/infrastructure/config/redis.py`) 和独立连接池模式（`RedisEventPublisher._get_pool()` / `RedisEventSubscriber._get_pool()`）
+**When** 扩展 RedisConfig 配置并为各存储组件统一 `_get_pool()` 模式
+**Then** 各 Redis 存储服务（会话存储/语义缓存/公共黑板）使用独立连接池（与 Story 1.3 一致）
+**And** 配置统一通过 RedisConfig 注入，新增 `retry_on_timeout` 和 `default_ttl` 字段
 
 **验证标准/Validation Criteria:**
 - [ ] **扩展** `RedisConfig` 配置模型（`src/infrastructure/config/redis.py`）
   - **新增字段**: `retry_on_timeout: bool = True`, `default_ttl: int = 86400`（24 小时）
-  - **向后兼容**: 保持 Story 1.3 已有字段不变
-- [ ] RedisClient 通用接口定义（`src/infrastructure/storage/redis/client.py`）
-  - 方法: `get_pool() -> redis.ConnectionPool`, `health_check() -> bool`, `close() -> None`
-  - **不重复创建连接池**，使用单例模式或依赖注入共享
-- [ ] 连接池懒初始化（首次调用时创建）
-- [ ] 健康检查实现（ping/pong 检测）
-- [ ] Redis 连接失败优雅降级（返回 None 或默认值，不抛出异常）
+  - **向后兼容**: 保持 Story 1.3 已有字段不变，`from_env()` 支持新环境变量
+- [ ] 各存储组件实现 `_get_pool() -> redis.ConnectionPool` 懒加载方法（与 Story 1.3 模式一致）
+  - **不引入全局连接池**（Story 1.3 架构决策：独立连接池避免单点故障和并发争用）
+- [ ] Redis 连接失败优雅降级（记录日志，不抛出异常阻塞业务）
+- [ ] **向后兼容验证**: Story 1.3 的 `RedisEventPublisher` / `RedisEventSubscriber` / `IdempotencyChecker` 仍正常工作
 - [ ] 单元测试覆盖连接池创建、复用、关闭场景
 
 ### AC-2: 会话状态存储（Session State Storage）
@@ -95,7 +94,10 @@
   - 键命名规范: `sisys:cache:semantic:{cache_key}`
   - **余弦相似度计算使用纯 Python 实现**（项目技术栈不含 numpy，避免额外依赖）
 - [ ] 缓存未命中时返回 None（触发正常检索流程）
-- [ ] 缓存命中率统计（`hits`, `misses`, `hit_rate`）
+- [ ] **扩展** `EventMetricsCollector`（Story 1.3 已有 `src/infrastructure/monitoring/event_metrics.py`）
+  - 新增方法: `record_cache_hit() -> None`, `record_cache_miss() -> None`
+  - 新增属性: `cache_hits_total: int`, `cache_misses_total: int`
+  - 计算属性: `hit_rate: float`（hits / (hits + misses)，misses=0 时返回 0.0）
 - [ ] 单元测试覆盖命中、未命中、过期、失效场景
 
 ### AC-4: 公共黑板服务（Public Blackboard）
@@ -118,24 +120,7 @@
 - [ ] 并发写入测试通过（多 Agent 同时写入不丢失数据）
 - [ ] 单元测试覆盖发布、读取、版本冲突场景
 
-### AC-5: 幂等性检查器（IdempotencyChecker）
-
-**Given** Story 1.3 AC-4.1 已定义 IdempotencyChecker 接口策略
-**When** 实现基于 Redis `SET NX` 原子操作的幂等性检查基础设施层适配器
-**Then** 重复处理相同 event_id 的事件时仅处理一次
-**And** TTL 7 天自动过期
-
-**验证标准/Validation Criteria:**
-- [ ] IdempotencyChecker 基础设施层实现（`src/infrastructure/storage/redis/idempotency_checker.py`）
-  > **📌 复用说明**: Story 1.3 AC-4.1 已定义接口策略，本 Story 实现基础设施层适配器
-  - **仅实现** `try_acquire(event_id: UUID, ttl: int = 7*24*3600) -> bool`
-  - 使用 `SET key value NX EX ttl` 原子操作
-  - 返回 True=首次处理，False=已处理
-- [ ] **禁止实现** `is_processed()` + `mark_processed()` 分离方法（避免 Check-Then-Act 竞态条件）
-- [ ] 并发测试通过（模拟多消费者同时消费同一 event_id，仅处理一次）
-- [ ] Redis 不可用时优雅降级（返回 True，允许处理）
-
-### AC-6: Redis 键命名规范与清理机制
+### AC-5: Redis 键命名规范与清理机制
 
 **Given** 所有 Redis 存储服务已实现
 **When** 实现统一的键命名规范与清理工具
@@ -146,6 +131,7 @@
 - [ ] RedisKeyBuilder 工具类实现（`src/infrastructure/storage/redis/key_builder.py`）
   - 方法: `build_key(namespace: str, *parts: str) -> str`
   - 示例: `build_key("session", "abc-123")` → `"sisys:session:abc-123"`
+  - **统一 Story 1.3 已有键规范**: `sisys:rt:{type}`（实时通知）、`idempotency:{event_id}`（幂等检查）
 - [ ] RedisCleanup 工具类实现（`src/infrastructure/storage/redis/cleanup.py`）
   - 方法: `cleanup_namespace(namespace: str) -> int`（返回删除的键数量）
   - 使用 `SCAN` 命令（不阻塞 Redis，替代 `KEYS`）
@@ -179,16 +165,17 @@
 #### 配置模型 (Configuration Models)
 - [ ] **扩展** RedisConfig（`src/infrastructure/config/redis.py`）
   - **新增字段**: `retry_on_timeout: bool = True`, `default_ttl: int = 86400`
-  - **向后兼容**: 保持 Story 1.3 已有字段不变
+  - **向后兼容**: 保持 Story 1.3 已有字段不变，更新 `from_env()` 方法
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.4.feature`
 - [ ] 覆盖场景:
   - 会话状态保存与恢复
-  - 语义缓存命中与未命中
+  - 语义缓存命中与未命中（含命中率统计）
   - 公共黑板多 Agent 并发写入
-  - 幂等性检查（重复 event_id 仅处理一次）
+  - ~~幂等性检查~~（已由 Story 1.3 实现）
   - Redis 连接失败优雅降级
+  - Redis 键命名规范与批量清理
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -220,14 +207,14 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | Redis 连接池 | 连接池创建、复用、关闭 | `test_redis_client.py` | Task 1 |
+| **TDD 单元测试** | RedisConfig 扩展 | 新字段验证、向后兼容 | `test_redis_config_extension.py` | Task 1 |
 | **TDD 单元测试** | 会话状态存储 | 保存、加载、删除、过期 | `test_session_storage.py` | Task 2 |
 | **TDD 单元测试** | 语义缓存 | 命中、未命中、过期、失效 | `test_semantic_cache.py` | Task 3 |
 | **TDD 单元测试** | 公共黑板 | 发布、读取、版本冲突 | `test_public_blackboard.py` | Task 4 |
-| **TDD 单元测试** | 幂等性检查 | 原子性获取、并发安全 | `test_idempotency_checker.py` | Task 5 |
-| **TDD 单元测试** | 键命名规范 | 键构建、批量清理 | `test_key_builder.py`, `test_cleanup.py` | Task 6 |
-| **TDD 集成测试** | Redis 端到端 | 完整存储/读取流程 | `test_redis_integration.py` | Task 7 |
-| **SDD 架构验证** | 基础设施层覆盖率 | 基础设施层覆盖率≥75% | `test_coverage.py` | Task 8 |
+| **TDD 单元测试** | EventMetrics 扩展 | 缓存命中/未命中计数、hit_rate | `test_event_metrics_extension.py` | Task 3 |
+| **TDD 单元测试** | 键命名规范 | 键构建、批量清理 | `test_key_builder.py`, `test_cleanup.py` | Task 5 |
+| **TDD 集成测试** | Redis 端到端 | 完整存储/读取流程 | `test_redis_integration.py` | Task 6 |
+| **SDD 架构验证** | 基础设施层覆盖率 | 基础设施层覆盖率≥75% | `test_coverage.py` | Task 7 |
 
 ---
 
@@ -261,14 +248,15 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | Redis 连接池与客户端实现 | Task 1 | RedisConfig + RedisClient | `test_redis_client.py` |
+| AC-1 | 扩展 RedisConfig + 统一连接池模式 | Task 1 | 扩展 RedisConfig + 各组件 `_get_pool()` | `test_redis_config_extension.py` |
 | AC-2 | 会话状态存储 | Task 2 | SessionStorage 接口 + RedisSessionStorage | `test_session_storage.py` |
-| AC-3 | 语义缓存服务 | Task 3 | SemanticCache 接口 + RedisSemanticCache | `test_semantic_cache.py` |
+| AC-3 | 语义缓存服务 | Task 3 | SemanticCache 接口 + RedisSemanticCache + 扩展 EventMetrics | `test_semantic_cache.py`, `test_event_metrics_extension.py` |
 | AC-4 | 公共黑板服务 | Task 4 | PublicBlackboard 接口 + RedisPublicBlackboard | `test_public_blackboard.py` |
-| AC-5 | 幂等性检查器 | Task 5 | IdempotencyChecker 实现 | `test_idempotency_checker.py` |
-| AC-6 | Redis 键命名规范与清理 | Task 6 | RedisKeyBuilder + RedisCleanup | `test_key_builder.py`, `test_cleanup.py` |
-| AC-1~AC-6 | Redis 端到端集成测试 | Task 7 | 完整存储/读取流程验证 | `test_redis_integration.py` |
-| AC-6 | 架构约束验证 | Task 8 | 基础设施层覆盖率验证 | `test_coverage.py` |
+| AC-5 | Redis 键命名规范与清理 | Task 5 | RedisKeyBuilder + RedisCleanup | `test_key_builder.py`, `test_cleanup.py` |
+| AC-1~AC-5 | Redis 端到端集成测试 | Task 6 | 完整存储/读取流程验证 | `test_redis_integration.py` |
+| AC-5 | 架构约束验证 | Task 7 | 基础设施层覆盖率验证 | `test_coverage.py` |
+
+> **📌 注**：原 AC-5 幂等性检查已删除（Story 1.3 已实现），当前 AC-1~AC-5 共 5 个验收标准。
 
 ---
 
@@ -281,7 +269,7 @@
 
 ### Task 0: SDD 规范定义（必选前置）
 
-**关联 AC:** AC-1 ~ AC-6
+**关联 AC:** AC-1 ~ AC-5
 
 > **目的：** 在进入代码实现前，明确数据模型、接口、配置、验收标准。这是 SDD 规范驱动的基础。
 
@@ -291,7 +279,7 @@
 - [ ] Subtask: 定义 SessionStorage 接口
 - [ ] Subtask: 定义 SemanticCache 接口
 - [ ] Subtask: 定义 PublicBlackboard 接口
-- [ ] Subtask: 定义 RedisConfig 配置模型
+- [ ] Subtask: **扩展** RedisConfig 配置模型（新增 `retry_on_timeout`, `default_ttl`）
 - [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.4.feature`
 - [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -301,42 +289,30 @@
 
 ---
 
-### Task 1: Redis 连接池管理与客户端抽象
+### Task 1: 扩展 RedisConfig + 统一连接池模式
 
 **关联 AC:** AC-1
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
-> **📌 复用说明:** Story 1.3 已定义 `RedisConfig`，本 Task 仅扩展字段并实现通用连接池管理器。
+> **📌 复用说明:** Story 1.3 已实现 `RedisConfig`（40 行）和独立连接池模式（`RedisEventPublisher._get_pool()` / `RedisEventSubscriber._get_pool()`），本 Task 仅扩展 2 个字段并为各存储组件统一相同的 `_get_pool()` 模式。**不新建全局 RedisClient 类**。
 
 #### TDD 循环 A：扩展 RedisConfig 配置模型
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_redis_config_extension.py`（新字段验证、向后兼容测试） |
-| 🟢 绿 | 扩展 `RedisConfig` 添加 `retry_on_timeout` 和 `default_ttl` 字段 |
-| 🔄 重构 | 添加类型注解、docstring、from_env 支持 |
+| 🔴 红 | 编写 `test_redis_config_extension.py`（新字段验证、向后兼容测试、`from_env()` 支持新环境变量） |
+| 🟢 绿 | 扩展 `RedisConfig` 添加 `retry_on_timeout: bool = True` 和 `default_ttl: int = 86400` 字段 |
+| 🔄 重构 | 更新 `from_env()` 方法支持新环境变量，添加类型注解和 docstring |
 
 - [ ] Subtask: 🔴 红 — 编写 RedisConfig 扩展字段失败测试
 - [ ] Subtask: 🟢 绿 — 扩展 RedisConfig 最小代码
 - [ ] Subtask: 🔄 重构 — 优化 RedisConfig 代码
 
-#### TDD 循环 B：RedisClient 通用连接池管理器
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 编写 `test_redis_client.py`（连接池获取、健康检查、关闭） |
-| 🟢 绿 | 实现 `RedisClient` 类（单例模式/依赖注入共享连接池） |
-| 🔄 重构 | 添加连接池懒初始化、异常处理、优雅降级 |
-
-- [ ] Subtask: 🔴 红 — 编写 RedisClient 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 RedisClient 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 RedisClient 代码
-
 **完成标准/Definition of Done:**
-- [ ] RedisConfig 扩展字段和 RedisClient 实现完成
+- [ ] RedisConfig 扩展字段实现完成
 - [ ] TDD 循环全部通过
-- [ ] **向后兼容验证**: Story 1.3 的 RedisEventPublisher 仍正常工作
-- [ ] 基础设施层覆盖率≥10%
+- [ ] **向后兼容验证**: Story 1.3 的 `RedisEventPublisher` / `RedisEventSubscriber` / `IdempotencyChecker` 初始化不受影响
+- [ ] 基础设施层覆盖率≥5%
 
 ---
 
@@ -431,8 +407,20 @@
 - [ ] Subtask: 🟢 绿 — 实现 RedisSemanticCache 最小代码
 - [ ] Subtask: 🔄 重构 — 优化 RedisSemanticCache 代码
 
+#### TDD 循环 D：扩展 EventMetricsCollector（Story 1.3 已有类）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `test_event_metrics_extension.py`（`record_cache_hit()`/`record_cache_miss()`/`hit_rate` 属性） |
+| 🟢 绿 | 扩展 `EventMetricsCollector` 添加缓存计数器方法和属性 |
+| 🔄 重构 | 添加线程安全保护、边界条件处理（misses=0 时 hit_rate=0.0） |
+
+- [ ] Subtask: 🔴 红 — 编写 EventMetrics 缓存扩展失败测试
+- [ ] Subtask: 🟢 绿 — 扩展 EventMetricsCollector 最小代码
+- [ ] Subtask: 🔄 重构 — 优化 EventMetrics 缓存扩展代码
+
 **完成标准/Definition of Done:**
-- [ ] CacheEntry、SemanticCache 接口、RedisSemanticCache 实现完成
+- [ ] CacheEntry、SemanticCache 接口、RedisSemanticCache、EventMetrics 缓存扩展实现完成
 - [ ] TDD 循环全部通过
 - [ ] 基础设施层覆盖率≥40%
 
@@ -487,36 +475,9 @@
 
 ---
 
-### Task 5: 幂等性检查器（IdempotencyChecker）
+### Task 5: Redis 键命名规范与清理机制
 
 **关联 AC:** AC-5
-
-> ⚠️ **本 Task 包含自己的 TDD 循环。**
-> **关键约束：** 必须使用原子方法 `try_acquire()`，禁止实现 `is_processed()` + `mark_processed()` 分离方法。
-
-#### TDD 循环 A：IdempotencyChecker 实现
-
-| 阶段 | 动作 |
-|------|------|
-| 🔴 红 | 编写 `test_idempotency_checker.py`（原子性获取、并发安全） |
-| 🟢 绿 | 实现 `IdempotencyChecker` 类最小代码 |
-| 🔄 重构 | 添加 `SET NX EX` 原子操作、TTL 控制、Redis 不可用降级 |
-
-- [ ] Subtask: 🔴 红 — 编写 IdempotencyChecker 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 IdempotencyChecker 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 IdempotencyChecker 代码
-
-**完成标准/Definition of Done:**
-- [ ] IdempotencyChecker 实现完成
-- [ ] TDD 循环全部通过
-- [ ] 并发测试通过（多消费者同时消费同一 event_id，仅处理一次）
-- [ ] 基础设施层覆盖率≥60%
-
----
-
-### Task 6: Redis 键命名规范与清理机制
-
-**关联 AC:** AC-6
 
 > ⚠️ **本 Task 包含自己的 TDD 循环。**
 
@@ -547,13 +508,13 @@
 **完成标准/Definition of Done:**
 - [ ] RedisKeyBuilder 和 RedisCleanup 实现完成
 - [ ] TDD 循环全部通过
-- [ ] 基础设施层覆盖率≥70%
+- [ ] 基础设施层覆盖率≥60%
 
 ---
 
-### Task 7: Redis 端到端集成测试
+### Task 6: Redis 端到端集成测试
 
-**关联 AC:** AC-1 ~ AC-6
+**关联 AC:** AC-1 ~ AC-5
 
 > **性质说明：** 本 Task 是集成测试，验证所有 Redis 服务的端到端流程。
 
@@ -563,8 +524,8 @@
 - [ ] Subtask: 实现会话状态端到端测试（保存→加载→验证→删除）
 - [ ] Subtask: 实现语义缓存端到端测试（写入→命中→过期→失效）
 - [ ] Subtask: 实现公共黑板端到端测试（多 Agent 并发写入→读取验证）
-- [ ] Subtask: 实现幂等性检查端到端测试（并发 event_id 仅处理一次）
 - [ ] Subtask: 实现 Redis 连接失败降级测试（服务优雅降级）
+- [ ] Subtask: 验证 Story 1.3 `IdempotencyChecker` 可被本 Story 服务复用
 
 **完成标准/Definition of Done:**
 - [ ] 所有集成测试通过
@@ -573,9 +534,9 @@
 
 ---
 
-### Task 8: 架构约束验证测试
+### Task 7: 架构约束验证测试
 
-**关联 AC:** AC-6
+**关联 AC:** AC-5
 
 > **性质说明：** 本 Task 验证 Redis 缓存层实现是否符合六边形架构约束。
 
@@ -636,33 +597,32 @@ sisys/
 │   │       └── public_blackboard.py    # PublicBlackboard 接口
 │   └── infrastructure/
 │       ├── config/
-│       │   └── redis.py                # RedisConfig 配置模型（扩展 Story 1.3）
+│       │   └── redis.py                # RedisConfig 配置模型（**扩展** Story 1.3）
 │       ├── entities/
 │       │   ├── session_state.py        # SessionState 数据模型
 │       │   ├── cache_entry.py          # CacheEntry 数据模型
 │       │   └── blackboard_entry.py     # BlackboardEntry 数据模型
+│       ├── monitoring/
+│       │   └── event_metrics.py        # EventMetricsCollector（**扩展** Story 1.3）
 │       └── storage/
 │           └── redis/
 │               ├── __init__.py
-│               ├── client.py           # RedisClient 通用连接池管理器
 │               ├── session_storage.py  # RedisSessionStorage 实现
 │               ├── semantic_cache.py   # RedisSemanticCache 实现
 │               ├── public_blackboard.py # RedisPublicBlackboard 实现
-│               ├── idempotency_checker.py # IdempotencyChecker 实现
 │               ├── key_builder.py      # RedisKeyBuilder 工具类
 │               └── cleanup.py          # RedisCleanup 工具类
 ├── tests/
 │   ├── unit/
 │   │   ├── infrastructure/
 │   │   │   ├── test_redis_config_extension.py  # RedisConfig 扩展字段测试
-│   │   │   ├── test_redis_client.py
 │   │   │   ├── test_session_state.py
 │   │   │   ├── test_session_storage.py
 │   │   │   ├── test_cache_entry.py
 │   │   │   ├── test_semantic_cache.py
+│   │   │   ├── test_event_metrics_extension.py # EventMetrics 缓存扩展测试
 │   │   │   ├── test_blackboard_entry.py
 │   │   │   ├── test_public_blackboard.py
-│   │   │   ├── test_idempotency_checker.py
 │   │   │   ├── test_key_builder.py
 │   │   │   ├── test_cleanup.py
 │   │   │   └── test_architecture_constraints.py
@@ -684,16 +644,18 @@ sisys/
 **来源:** [Story 1.3-事件总线实现](./1-3-event-bus-implementation.md)
 
 **关键学习/Key Learnings:**
-1. **Redis 连接池生命周期管理** — 每个 Redis 服务实例独立管理连接池，应用层负责关闭时调用 `close()`
-2. **领域层接口与基础设施层实现分离** — 领域层定义同步接口，基础设施层实现异步接口，应用层决定调用方式
-3. **幂等性检查必须使用原子操作** — `SET NX` 原子操作替代分离的 `is_processed()` + `mark_processed()`，避免 Check-Then-Act 竞态条件
-4. **OutboxEntity 位于基础设施层** — 领域层不依赖具体存储实现，通过仓储接口访问
+1. **Redis 独立连接池模式** — `RedisEventPublisher._get_pool()` / `RedisEventSubscriber._get_pool()` 各自管理连接池，避免单点故障和并发争用（架构已审查通过）
+2. **领域层接口与基础设施层实现分离** — 领域层定义同步接口，基础设施层实现，应用层决定调用方式
+3. **幂等性检查已由 Story 1.3 完整实现** — `src/infrastructure/idempotency/checker.py`（70 行生产代码），本 Story 直接复用
+4. **EventMetrics 基础计数器已由 Story 1.3 实现** — 本 Story 扩展缓存命中率统计
+5. **OutboxEntity 位于基础设施层** — 领域层不依赖具体存储实现，通过仓储接口访问
 
 **应用到本故事/Applied to This Story:**
-- [ ] Redis 连接池采用 Story 1.3 相同的生命周期管理模式
+- [ ] 各存储组件采用 Story 1.3 相同的 `_get_pool()` 独立连接池模式
 - [ ] 所有存储服务遵循领域层接口/基础设施层实现分离模式
-- [ ] IdempotencyChecker 直接使用 Story 1.3 定义的原子操作策略
-- [ ] Redis 键命名规范统一为 `sisys:{namespace}:{key}`
+- [ ] IdempotencyChecker 直接使用 Story 1.3 已实现的 `src/infrastructure/idempotency/checker.py`
+- [ ] EventMetricsCollector 扩展 Story 1.3 已有类，添加 `record_cache_hit()`/`record_cache_miss()`
+- [ ] Redis 键命名规范统一为 `sisys:{namespace}:{key}`，与 Story 1.3 `sisys:rt:{type}` / `idempotency:{event_id}` 保持一致
 
 ---
 
@@ -741,22 +703,20 @@ sisys/
 - `src/domain/repositories/session_storage.py` — SessionStorage 接口
 - `src/domain/services/semantic_cache.py` — SemanticCache 接口
 - `src/domain/services/public_blackboard.py` — PublicBlackboard 接口
-- `src/infrastructure/storage/redis/client.py` — RedisClient 通用连接池管理器
+- `src/infrastructure/monitoring/event_metrics.py` — **扩展** EventMetricsCollector（新增 `record_cache_hit()`/`record_cache_miss()`/`hit_rate`）
 - `src/infrastructure/storage/redis/session_storage.py` — RedisSessionStorage 实现
 - `src/infrastructure/storage/redis/semantic_cache.py` — RedisSemanticCache 实现
 - `src/infrastructure/storage/redis/public_blackboard.py` — RedisPublicBlackboard 实现
-- `src/infrastructure/storage/redis/idempotency_checker.py` — IdempotencyChecker 实现
 - `src/infrastructure/storage/redis/key_builder.py` — RedisKeyBuilder 工具类
 - `src/infrastructure/storage/redis/cleanup.py` — RedisCleanup 工具类
 - `tests/unit/infrastructure/test_redis_config_extension.py` — RedisConfig 扩展字段测试
-- `tests/unit/infrastructure/test_redis_client.py` — RedisClient 单元测试
 - `tests/unit/infrastructure/test_session_state.py` — SessionState 单元测试
 - `tests/unit/infrastructure/test_session_storage.py` — RedisSessionStorage 单元测试
 - `tests/unit/infrastructure/test_cache_entry.py` — CacheEntry 单元测试
 - `tests/unit/infrastructure/test_semantic_cache.py` — RedisSemanticCache 单元测试
+- `tests/unit/infrastructure/test_event_metrics_extension.py` — EventMetrics 缓存扩展测试
 - `tests/unit/infrastructure/test_blackboard_entry.py` — BlackboardEntry 单元测试
 - `tests/unit/infrastructure/test_public_blackboard.py` — RedisPublicBlackboard 单元测试
-- `tests/unit/infrastructure/test_idempotency_checker.py` — IdempotencyChecker 单元测试
 - `tests/unit/infrastructure/test_key_builder.py` — RedisKeyBuilder 单元测试
 - `tests/unit/infrastructure/test_cleanup.py` — RedisCleanup 单元测试
 - `tests/unit/infrastructure/test_architecture_constraints.py` — 架构约束验证测试
@@ -766,6 +726,14 @@ sisys/
 - `tests/integration/test_redis_integration.py` — Redis 端到端集成测试
 - `tests/acceptance/test_story_1.4.feature` — Gherkin 验收测试
 - `docs/infrastructure/redis_cache_guide.md` — Redis 缓存层实施指南
+
+> **📌 Story 1.3 已有文件（本 Story 复用，不创建）：**
+> - `src/infrastructure/idempotency/checker.py` — IdempotencyChecker（70 行，生产可用）
+> - `src/infrastructure/events/redis_publisher.py` — RedisEventPublisher（79 行，生产可用）
+> - `src/infrastructure/events/redis_subscriber.py` — RedisEventSubscriber（146 行，生产可用）
+> - `src/infrastructure/monitoring/event_metrics.py` — EventMetrics + EventMetricsCollector + OpenTelemetryTracer（147 行，生产可用）
+> - `src/infrastructure/idempotency/retry_policy.py` — RetryPolicy（50 行，生产可用）
+> - `src/infrastructure/idempotency/dead_letter_queue.py` — DeadLetterQueue（57 行，生产可用）
 
 ---
 
@@ -780,7 +748,10 @@ sisys/
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 3: 五层存储架构 |
 | **优先级** | P0 |
+| **职责** | **会话状态缓存** + **语义缓存** + **公共黑板** + **键命名与清理** |
 | **覆盖 FR** | FR-AR-04 (仓储模式), FR-SA-01 (永久存储基础) |
+| **Task 数** | 7 个（Task 0~7，原 8 个→删除重复的幂等性 Task 5，合并 Task 1） |
+| **Story 1.3 复用** | 6 个组件 589 行生产代码（IdempotencyChecker、RedisEventPublisher/Subscriber、EventMetrics、RetryPolicy、DeadLetterQueue） |
 
 ### 完成总结 Completion Summary
 

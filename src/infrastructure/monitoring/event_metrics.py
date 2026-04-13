@@ -2,17 +2,19 @@
 
 Task 5.1: EventMetrics + EventMetricsCollector 基础计数器
 Task 5.2: OpenTelemetry Trace 基础版（span 创建+属性，默认关闭导出）
+Task 5.4: OpenTelemetry OTLP 导出器配置（gRPC/HTTP 协议、端点、批量导出、采样策略）
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
+
+from .otel_config import OtelConfig, init
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,7 @@ class EventMetricsCollector:
 
 
 # ============================================================================
-# Task 5.2: OpenTelemetry Trace 基础版
+# Task 5.2 + Task 5.4: OpenTelemetry Trace 基础版 + OTLP 导出器配置
 # ============================================================================
 
 
@@ -113,11 +115,29 @@ class OpenTelemetryTracer:
     """OpenTelemetry Trace 包装器。
 
     默认关闭（EVENT_BUS_OTEL_TRACE_ENABLED=false）。
-    仅实现 span 创建+属性设置，不配置 OTLP 导出器（移至 Story 1.16）。
+    启用后通过 OTLP 协议导出至后端（Jaeger/Tempo/collector）。
+
+    支持:
+    - gRPC/HTTP 协议选择
+    - 批量导出（BatchSpanProcessor）
+    - 采样策略（TraceIdRatioBased）
+    - Resource 属性（service.name, service.version, deployment.environment）
+
+    M-02 修复: 使用 OtelConfig 作为单一配置源，避免重复读取环境变量。
     """
 
-    def __init__(self):
-        self.enabled = os.getenv("EVENT_BUS_OTEL_TRACE_ENABLED", "false").lower() == "true"
+    def __init__(self, config: OtelConfig | None = None):
+        """初始化 Tracer。
+
+        Args:
+            config: 可选的 OtelConfig 实例。如果为 None，则从环境变量读取。
+        """
+        if config is None:
+            config = OtelConfig.from_env()
+        self.enabled = config.trace_enabled
+        self._initialized = False
+        if self.enabled:
+            self._initialized = init(config)
 
     @contextmanager
     def create_span(
@@ -140,14 +160,14 @@ class OpenTelemetryTracer:
         Yields:
             span 对象（如果启用）
         """
-        if not self.enabled:
+        if not self.enabled or not self._initialized:
             yield None
             return
 
         try:
             from opentelemetry import trace
 
-            tracer = trace.get_tracer("event_bus")
+            tracer = trace.get_tracer("sisys-event-bus")
             with tracer.start_as_current_span(span_name) as span:
                 if event_id:
                     span.set_attribute("event.id", event_id)
@@ -161,6 +181,7 @@ class OpenTelemetryTracer:
         except ImportError:
             logger.warning("OpenTelemetry not installed, tracing disabled")
             self.enabled = False
+            self._initialized = False
             yield None
         except Exception as e:
             logger.error("Error creating OpenTelemetry span: %s", e)

@@ -1,8 +1,14 @@
 """InMemoryOutboxRepository — 基础设施层实现。
 
 MVP 阶段使用内存列表存储 OutboxEntity。
-使用 asyncio.Lock 保护所有 _entities 操作。
-领域层零 OutboxEntity 污染（方案 A 彻底隔离）。
+
+⚠️ 线程安全说明：
+本实现非线程安全。公共方法（save/get_unpublished/mark_published/mark_failed）
+为同步方法，不使用锁保护。内部异步方法（_get_unpublished_entities 等）使用
+asyncio.Lock 保护异步访问。
+
+在生产环境中（Story 1.5 PostgreSQL 持久化层），仓储实现将替换为
+基于数据库事务的线程安全实现。
 """
 
 from __future__ import annotations
@@ -20,15 +26,17 @@ from src.infrastructure.entities.outbox import OutboxEntity
 class InMemoryOutboxRepository(OutboxRepository):
     """内存发件箱仓储实现（MVP 占位）。
 
-    公开方法实现领域层接口（使用 DomainEvent）。
-    内部方法（_ 前缀）直接操作 OutboxEntity，仅 Poller 使用。
+    公开方法实现领域层接口（使用 DomainEvent），同步访问，无锁保护。
+    内部方法（_ 前缀）直接操作 OutboxEntity，使用 asyncio.Lock 保护，仅 Poller 使用。
+
+    ⚠️ 此类非线程安全。多线程/协程并发访问公共方法可能导致竞态条件。
     """
 
     def __init__(self):
         self._entities: list[OutboxEntity] = []
-        self._lock = asyncio.Lock()  # 一把锁，保护所有 _entities 操作
+        self._lock = asyncio.Lock()  # 仅保护内部异步方法，不保护公共同步方法
 
-    # ========== 公开方法（实现领域层接口） ==========
+    # ========== 公开方法（实现领域层接口，同步，无锁） ==========
 
     def save(self, event: DomainEvent) -> None:
         """保存事件至发件箱。
