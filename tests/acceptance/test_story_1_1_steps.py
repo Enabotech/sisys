@@ -466,11 +466,11 @@ def check_domain_event_files(arch_context):
     """Check that all event files and classes exist."""
     events = {
         "DomainEvent": "src.domain.events.base",
-        "DocumentProcessed": "src.domain.events.plan_events",
-        "ToolExecuted": "src.domain.events.plan_events",
-        "AgentDecided": "src.domain.events.plan_events",
-        "CheckpointReached": "src.domain.events.plan_events",
-        "CorrectionApproved": "src.domain.events.plan_events",
+        "DocumentProcessed": "src.domain.events.document_events",
+        "ToolExecuted": "src.domain.events.tool_events",
+        "AgentDecided": "src.domain.events.agent_events",
+        "CheckpointReached": "src.domain.events.checkpoint_events",
+        "CorrectionApproved": "src.domain.events.correction_events",
     }
 
     for event_name, module_path in events.items():

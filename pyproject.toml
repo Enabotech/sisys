@@ -209,9 +209,10 @@ python_functions = "test_*"
 
 # 标记系统
 markers = [
-    "unit: 单元测试（快速，无外部依赖）",
-    "integration: 集成测试（需要数据库/外部服务）",
-    "e2e: E2E 测试（完整用户旅程）",
+    "unit: 单元测试（Mock 外部依赖，快速执行）",
+    "integration: 集成测试（Docker Compose 真实实例，较慢执行）",
+    "e2e: 端到端验收测试（Gherkin BDD 场景）",
+    "asyncio: 异步测试（aio-pika 组件需要）",
     "slow: 慢速测试（>1 秒）",
     "k8s: 需要 Kubernetes 集群访问的测试",
     "database: 需要数据库的测试",

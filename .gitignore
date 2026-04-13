@@ -398,7 +398,6 @@ tests/data/temp/
 # Upload directories
 uploads/
 downloads/
-storage/
 
 # Cache directories
 .cache/
