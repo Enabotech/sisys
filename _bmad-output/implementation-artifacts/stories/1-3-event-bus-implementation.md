@@ -53,7 +53,7 @@
 - [ ] RedisEventPublisher 实现(支持 `publish(event: DomainEvent, channel: str) -> None`)
 - [ ] RedisEventSubscriber 实现(支持 `subscribe(channel: str, handler: Callable)`)
 - [ ] Redis 频道命名规范(`sisys:rt:{event_type}`，使用 Redis 冒号分隔惯例，与 RabbitMQ 路由键明确区分)
-- [ ] 事件序列化后发布(JSON 格式，使用 `dataclasses.asdict()` + `json.dumps()`，与 Story 1.2 序列化策略一致)
+- [ ] 事件序列化后发布(JSON 格式，使用 `event.to_dict()` + `json.dumps()`，与 Story 1.2 序列化策略一致)
 - [ ] Redis 连接池配置(支持连接复用，最大连接数可配置)
 - [ ] 文档/注释明确标注：Redis 不参与事务一致性、不保证可靠投递
 - [ ] Redis 发布/订阅端到端测试通过
@@ -89,7 +89,7 @@
 **验证标准/Validation Criteria:**
 - [ ] OutboxEntity 定义在**基础设施层**(`src/infrastructure/entities/outbox.py`)
   - 字段: id, event_id, event_type, payload: dict, status, created_at, published_at, retry_count, max_retries, error_message
-  - **序列化策略**: `to_dict()` 使用 `dataclasses.asdict(self)`，`from_dict()` 使用 dataclass 构造函数
+  - **序列化策略**: OutboxEntity 使用 `dataclasses.asdict(self)`（基础设施层 entity 可用 asdict）；DomainEvent 使用 `event.to_dict()`（Story 1.2 策略，处理 Enum/UUID/datetime 转换）
 - [ ] OutboxRepository 接口定义(领域层抽象) **使用 DomainEvent 实例**
   - [ ] `save(event: DomainEvent) -> None`(与业务操作同事务，内部将 DomainEvent 转为 OutboxEntity)
   - [ ] `get_unpublished(limit: int) -> List[DomainEvent]`(返回 DomainEvent 列表，内部转换 OutboxEntity → DomainEvent)
@@ -97,7 +97,9 @@
   - [ ] `mark_failed(event_id: UUID, error: str) -> None`(标记事件失败)
 - [ ] InMemoryOutboxRepository 实现(MVP 阶段占位，基础设施层，使用内存列表存储 OutboxEntity)
   - **MVP 事务限制**: Story 1.3 使用内存实现，无法保证真正的事务原子性；事务测试使用 Mock 模拟；PostgreSQL 实现延后至 Story 1.5
-- [ ] **AsyncOutboxPoller 实现(使用 `async/await` 异步轮询 OutboxEntity，默认 1 秒间隔)**
+  - **MVP 锁策略**: 使用 `asyncio.Lock()`（async 上下文安全），禁止使用 `threading.Lock()`
+- [ ] **AsyncOutboxPoller 实现(使用 `async/await` 异步轮询，默认 1 秒间隔)**
+  - Poller 使用内部方法 `_get_unpublished_entities()` 和 `_mark_published_entity()` 直接操作 OutboxEntity
 - [ ] 领域层零 OutboxEntity 依赖验证(领域层不导入 `src/infrastructure/entities/`)
 
 ### AC-4: 事件处理幂等性与重试机制（🔴 Must）
@@ -202,7 +204,7 @@
 - [ ] OutboxRepository 接口(`src/domain/repositories/outbox.py`) **使用 DomainEvent 基类（方案 A 彻底隔离）**
   - [ ] `save(event: DomainEvent) -> None`(与业务操作同事务，基础设施层内部将 DomainEvent 转为 OutboxEntity)
     - **DomainEvent 说明**: Story 1.2 定义的领域事件基类(`src/domain/events/base.py`)，所有 10 种具体事件(DocumentProcessed/ToolExecuted/AgentDecided 等)均继承自此基类
-    - **转换逻辑**: 基础设施层通过 `EventOutboxAdapter.from_domain_event(event)` 提取 `event.event_id`, `event.event_type`, `dataclasses.asdict(event)` 等信息构建 OutboxEntity
+    - **转换逻辑**: 基础设施层通过 `EventOutboxAdapter.from_domain_event(event)` 提取 `event.event_id`, `event.event_type`, `event.to_dict()` 等信息构建 OutboxEntity
   - [ ] `get_unpublished(limit: int) -> List[DomainEvent]`(返回 DomainEvent 基类列表，实际类型为具体事件子类)
     - **反序列化**: 基础设施层通过 `EventOutboxAdapter.to_domain_event(entity)` 根据 `entity.event_type` 路由到正确的具体事件类
   - [ ] `mark_published(event_id: UUID) -> None`(标记事件已发布)
@@ -213,7 +215,7 @@
   - [ ] id: int, event_id: UUID, event_type: str, payload: dict
   - [ ] status: str('pending'|'published'|'failed'), created_at: datetime
   - [ ] published_at: Optional[datetime], retry_count: int, max_retries: int, error_message: Optional[str]
-  - [ ] **序列化策略**: 与 Story 1.2 保持一致 — `to_dict()` 使用 `dataclasses.asdict(self)`，`from_dict()` 使用 dataclass 构造函数
+  - [ ] **序列化策略**: OutboxEntity 使用 `dataclasses.asdict(self)`（基础设施层 entity）；DomainEvent 使用 `event.to_dict()`（Story 1.2 策略）
 - [ ] DomainEvent → OutboxEntity 转换器(`src/infrastructure/adapters/event_outbox_adapter.py`)
   - [ ] `from_domain_event(event: DomainEvent) -> OutboxEntity`(领域事件转 OutboxEntity)
   - [ ] `to_domain_event(entity: OutboxEntity) -> DomainEvent`(OutboxEntity 转领域事件)
@@ -246,72 +248,147 @@
 
 > **目的:** 明确实现策略，防止 dev-story 实施时困惑。
 
-##### 1. 事件类型注册表（P0-1 解答 + P1-02 修复）
+##### 1. 事件类型注册表（P0-1 解答 + P1-02 修复 + P0-4 修复）
 
-`EventOutboxAdapter` 使用**自动注册模式**，而非硬编码字典，遵守开闭原则（OCP）。
+`EventOutboxAdapter` 使用**显式导入 + 惰性构建**模式，确保测试环境下注册表可靠。
+
+> **P0-4 修复**: `__subclasses__()` 只在模块加载时被调用一次，且在首次 `get()` 时构建。
+> 为确保所有事件类已导入，注册表在模块顶层显式导入所有事件类后构建。
 
 ```python
 # src/infrastructure/adapters/event_outbox_adapter.py
 from src.domain.events.base import DomainEvent
+# 显式导入所有事件类，确保 __subclasses__() 能发现它们
+# P1-2 前提: src/domain/events/__init__.py 必须 re-export 所有 10 个事件类（Story 1.2 已实现）
+from src.domain.events import (  # noqa: F401 (导入用于注册表发现)
+    DocumentProcessed, ToolExecuted, AgentDecided,
+    CheckpointReached, CorrectionApproved, StrategicDeviationWarning,
+    HeartbeatTriggered, IsolationLevelSwitched, CheckpointRecovered, RoutingDecided,
+)
 
 class EventRegistry:
-    """事件类型注册表 — 自动发现 DomainEvent 子类，无需硬编码"""
-    _registry: dict[str, type[DomainEvent]] = {}
-    _built = False
+    """事件类型注册表 — 显式导入 + 惰性构建
+
+    P0-4 修复要点:
+    1. 模块顶层显式导入所有事件类 → 确保 __subclasses__() 能发现它们
+    2. 惰性构建: 首次 get() 时扫描，避免导入时序问题
+    3. 支持手动注册: 测试 Mock 或自定义事件
+    """
+    _registry: dict[str, type[DomainEvent]] | None = None
 
     @classmethod
     def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
         """手动注册（用于测试 Mock 或自定义事件）"""
+        if cls._registry is None:
+            cls._build_registry()
         cls._registry[event_type] = event_class
 
     @classmethod
     def _build_registry(cls) -> None:
-        """自动发现所有 DomainEvent 子类"""
-        if cls._built:
-            return
+        """扫描所有 DomainEvent 子类并注册"""
+        cls._registry = {}
         for subclass in DomainEvent.__subclasses__():
-            # 递归收集所有子类（包括间接子类）
             cls._registry[subclass.__name__] = subclass
-            cls._build_from_subclasses(subclass)
-        cls._built = True
+            cls._recurse_subclasses(subclass)
 
     @classmethod
-    def _build_from_subclasses(cls, parent: type) -> None:
+    def _recurse_subclasses(cls, parent: type) -> None:
+        """递归收集所有子类"""
         for subclass in parent.__subclasses__():
-            cls._registry[subclass.__name__] = subclass
-            cls._build_from_subclasses(subclass)
+            cls._registry[subclass.__name__] = subclass  # type: ignore[index]
+            cls._recurse_subclasses(subclass)
 
     @classmethod
     def get(cls, event_type: str) -> type[DomainEvent]:
-        """根据 event_type 获取事件类，找不到则抛异常"""
-        if not cls._built:
+        """根据 event_type 获取事件类"""
+        if cls._registry is None:
             cls._build_registry()
-        event_class = cls._registry.get(event_type)
+        event_class = cls._registry.get(event_type)  # type: ignore[union-attr]
         if not event_class:
             raise ValueError(f"Unknown event_type: {event_type}")
         return event_class
+
+    @classmethod
+    def reset(cls) -> None:
+        """重置注册表（仅用于测试隔离）"""
+        cls._registry = None
+```
+
+**测试隔离:**
+```python
+# conftest.py
+@pytest.fixture(autouse=True)
+def reset_event_registry():
+    """每个测试后重置注册表，防止测试间状态泄漏"""
+    yield
+    EventRegistry.reset()
 ```
 
 **优势:**
-- ✅ 新增事件类型无需修改适配器代码（开闭原则）
-- ✅ 自动发现所有 `DomainEvent` 子类（包括 Story 1.2 的 10 种事件 + 未来新增事件）
+- ✅ 显式导入确保所有事件类已加载，`__subclasses__()` 可靠工作
+- ✅ 惰性构建避免循环导入
+- ✅ 测试隔离通过 `reset()` 实现
 - ✅ 支持手动注册（用于测试 Mock 或第三方自定义事件）
 
-##### 2. OutboxRepository 转换责任明确（P0-2 解答）
+##### 2. OutboxRepository 转换责任明确（P0-2 解答 + P0-5 修复）
 
+> **P0-5 修复**: 领域层 `OutboxRepository` 接口使用 `DomainEvent`，但 `AsyncOutboxPoller` 需要直接操作 `OutboxEntity`。
+> 解决方案：在基础设施层 `InMemoryOutboxRepository` 内部提供**内部方法**返回 `OutboxEntity`，不暴露给领域层。
+
+**领域层接口（领域层定义，使用 DomainEvent）:**
+```python
+# src/domain/repositories/outbox.py
+class OutboxRepository(Protocol):
+    def save(self, event: DomainEvent) -> None: ...
+    def get_unpublished(self, limit: int) -> List[DomainEvent]: ...
+    def mark_published(self, event_id: UUID) -> None: ...
+    def mark_failed(self, event_id: UUID, error: str) -> None: ...
 ```
-InMemoryOutboxRepository.get_unpublished(limit) 调用流程:
-  1. 内部: 从内存列表过滤 status='pending' 的 OutboxEntity
-  2. 调用: EventOutboxAdapter.to_domain_event(entity) 逐个转换
-  3. 返回: List[DomainEvent]（实际类型为具体事件子类）
 
-InMemoryOutboxRepository.save(event: DomainEvent) 调用流程:
-  1. 接收: DomainEvent 基类（实际传入的是具体事件如 DocumentProcessed）
-  2. 调用: EventOutboxAdapter.from_domain_event(event) 转为 OutboxEntity
-  3. 存储: 将 OutboxEntity 加入内存列表
+**基础设施层实现（内部方法返回 OutboxEntity，仅 Poller 使用）:**
+```
+InMemoryOutboxRepository 类结构:
+  ├── 公开方法（实现领域层接口）:
+  │   ├── save(event: DomainEvent) → 内部转 OutboxEntity 存储
+  │   ├── get_unpublished(limit) → List[DomainEvent]（内部转换 OutboxEntity → DomainEvent）
+  │   ├── mark_published(event_id)
+  │   └── mark_failed(event_id, error)
+  │
+  └── 内部方法（仅 Poller 使用，不暴露给领域层）:
+      ├── _get_unpublished_entities(limit) → List[OutboxEntity]  ← Poller 内部调用
+      └── _mark_published_entity(entity) → 直接操作 OutboxEntity  ← Poller 内部调用
 ```
 
-##### 3. MVP 事务策略说明（P0-3 解答）
+**调用流程:**
+```
+业务代码调用（领域层视角）:
+  1. 创建 DomainEvent（如 DocumentProcessed）
+  2. outbox_repo.save(event)  ← 接口使用 DomainEvent
+  3. 内部: EventOutboxAdapter.from_domain_event(event) → OutboxEntity
+  4. 存储 OutboxEntity 到内存列表
+
+Poller 调用（基础设施层视角）:
+  1. self._get_unpublished_entities(limit)  ← 内部方法，直接获取 OutboxEntity 列表
+  2. 逐个处理 OutboxEntity → EventOutboxAdapter.to_domain_event(entity) → DomainEvent
+  3. 发布 DomainEvent 到 RabbitMQ
+  4. self._mark_published_entity(entity)  ← 内部方法，直接操作 OutboxEntity 状态
+```
+
+**P0-5 asyncio.Lock 修复（最终确定，不再修改）**:
+InMemoryOutboxRepository **全部使用 `asyncio.Lock()`**，一把锁保护所有 `_entities` 操作：
+```python
+class InMemoryOutboxRepository:
+    def __init__(self):
+        self._entities: list[OutboxEntity] = []
+        self._lock = asyncio.Lock()  # 一把锁，以后不再修改
+
+    async def _get_unpublished_entities(self, limit: int) -> list[OutboxEntity]:
+        async with self._lock:
+            unpublished = [e for e in self._entities if e.status == "pending"]
+            return unpublished[:limit]
+```
+
+##### 3. MVP 事务策略说明（原 P0-3 解答）
 
 Story 1.3 的 `InMemoryOutboxRepository` 是内存实现，**无法保证真正的事务原子性**。
 
@@ -354,7 +431,7 @@ class RedisEventPublisher:
     def publish(self, event: DomainEvent, channel: str) -> None:
         pool = self._get_pool()
         with redis.Redis(connection_pool=pool) as client:
-            payload = json.dumps(dataclasses.asdict(event))
+            payload = json.dumps(event.to_dict())
             client.publish(channel, payload)
 
     def close(self) -> None:
@@ -376,6 +453,12 @@ class AsyncRabbitMQPublisher:
         self._channel: aio_pika.Channel | None = None
 
     async def connect(self) -> None:
+        """连接到 RabbitMQ。
+        使用 connect_robust: 连接断开时自动重连，无需应用层干预。
+        启动时如果 RabbitMQ 不可用，connect_robust 会持续重试直到连接成功。
+        重连后已声明的交换机/队列不会自动重建，需在连接成功后重新声明。
+        """
+
         self._connection = await aio_pika.connect_robust(
             host=self._config.host,
             port=self._config.port,
@@ -385,21 +468,23 @@ class AsyncRabbitMQPublisher:
         )
         self._channel = await self._connection.channel()
         await self._channel.set_qos(prefetch_count=self._config.prefetch_count)
-        # 声明交换机
+        # 声明交换机（每次连接后重新声明，确保重连后交换机存在）
         self._exchange = await self._channel.declare_exchange(
             self._config.exchange_name,
             aio_pika.ExchangeType.TOPIC,
             durable=True,
         )
 
-    async def async_publish(self, event: DomainEvent, routing_key: str) -> None:
+    async def async_publish(self, event: DomainEvent, routing_key: str, retry_count: int = 0) -> None:
         if not self._exchange:
             raise RuntimeError("Not connected. Call connect() first.")
-        payload = json.dumps(dataclasses.asdict(event))
+        payload = json.dumps(event.to_dict())
         message = aio_pika.Message(
             body=payload.encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             content_type="application/json",
+            message_id=str(event.event_id),  # P2-3: 消息唯一标识，用于消费者幂等检查
+            headers={"x-retry-count": str(retry_count)},  # P1-03: 重试计数通过消息头传递
         )
         await self._exchange.publish(message, routing_key=routing_key)
 
@@ -410,54 +495,117 @@ class AsyncRabbitMQPublisher:
 
 **责任:** Publisher 和 Consumer **各自独立管理连接**（不共享）；通道在连接时创建，关闭时一起关闭。
 
-##### 6. AsyncOutboxPoller 标记调用点（P1-3 解答）
+##### 6. AsyncOutboxPoller 标记调用点（原 P1-3 解答 + P0-1/P0-5 修复）
 
+**内部方法签名定义（P0-1 修复）:**
+```python
+# InMemoryOutboxRepository 内部方法（仅 Poller 调用，不暴露给领域层）
+
+async def _get_unpublished_entities(self, limit: int) -> list[OutboxEntity]:
+    """内部方法: 获取未发布的 OutboxEntity 列表（FIFO 排序）"""
+    async with self._lock:  # asyncio.Lock，一把锁保护所有
+        unpublished = [e for e in self._entities if e.status == "pending"]
+        unpublished.sort(key=lambda e: e.created_at)  # FIFO 防止旧事件饥饿
+        return unpublished[:limit]
+
+async def _mark_published_entity(self, entity: OutboxEntity) -> None:
+    """内部方法: 标记 OutboxEntity 为 published"""
+    async with self._lock:
+        for e in self._entities:
+            if e.event_id == entity.event_id:
+                e.status = "published"
+                e.published_at = datetime.now(timezone.utc)
+                break
+
+async def _mark_failed_entity(self, entity: OutboxEntity, error: str) -> None:
+    """内部方法: 标记 OutboxEntity 为 failed，递增 retry_count"""
+    async with self._lock:
+        for e in self._entities:
+            if e.event_id == entity.event_id:
+                e.status = "failed"
+                e.retry_count += 1
+                e.error_message = error
+                break
 ```
-AsyncOutboxPoller 自己调用 mark_published/mark_failed:
 
+**Poller 调用示例:**
+```python
 async def poll_once(self) -> None:
-    entities = await self._outbox_repo.get_unpublished_entities(limit=self._batch_size)
+    entities = await self._repo._get_unpublished_entities(limit=self._batch_size)  # ← 内部方法
     semaphore = asyncio.Semaphore(self._batch_size)
 
     async def process_one(entity: OutboxEntity) -> None:
         async with semaphore:
             try:
                 domain_event = EventOutboxAdapter.to_domain_event(entity)
+                # 注意: 此处不传 retry_count（使用默认值 0），因为这是 Outbox → RabbitMQ 的发布阶段，
+                # 与 Consumer 消费阶段的 x-retry-count 是两个独立的计数器
                 await self._publisher.async_publish(domain_event, routing_key=f"sisys.events.reliable.{entity.event_type}")
-                await self._outbox_repo.mark_published(entity.event_id)  # ← Poller 调用
+                await self._repo._mark_published_entity(entity)  # ← 内部方法
             except Exception as e:
-                await self._outbox_repo.mark_failed(entity.event_id, str(e))  # ← Poller 调用
+                await self._repo._mark_failed_entity(entity, str(e))  # ← 内部方法
 
     await asyncio.gather(*[process_one(e) for e in entities])
 ```
 
-**依赖注入:** `AsyncOutboxPoller` 构造函数接收 `OutboxRepository` 实例（用于标记状态）和 `AsyncRabbitMQPublisher` 实例（用于发布）。
+**依赖注入:** `AsyncOutboxPoller` 构造函数接收 `InMemoryOutboxRepository` 实例（内部方法）和 `AsyncRabbitMQPublisher` 实例（用于发布）。
 
-##### 7. DLQ JSON Lines 文件格式（P1-4 解答）
+##### 7. DLQ 文件格式（P1-4 解答 + P0-2 修复）
 
-```jsonl
-# data/dead_letter_queue.jsonl 每行格式:
-{"event_id": "...", "event_type": "DocumentProcessed", "payload": {...}, "error": "Connection timeout", "retry_count": 3, "failed_at": "2026-04-12T10:30:00Z"}
+> **P0-2 修复**: MVP 阶段实现 `InMemoryDeadLetterQueue`（内存列表），不是文件持久化。
+> 文件/DLX 方案延至 Story 1.5。
+
+**MVP 实现（Story 1.3）:**
+```python
+class InMemoryDeadLetterQueue:
+    """内存死信队列 — MVP 阶段使用"""
+    def __init__(self):
+        self._items: list[tuple[DomainEvent, str, int]] = []  # (event, error, retry_count)
+
+    def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
+        self._items.append((event, error, retry_count))
+
+    def dequeue(self) -> Optional[tuple[DomainEvent, str, int]]:
+        return self._items.pop(0) if self._items else None
+
+    def __len__(self) -> int:
+        return len(self._items)
 ```
 
+**正式版实现（Story 1.5，文件持久化或 RabbitMQ DLX）:**
 ```python
-class DeadLetterQueue:
+class FileDeadLetterQueue:
+    """文件死信队列 — Story 1.5 启用，JSON Lines 格式"""
     def __init__(self, file_path: str = "data/dead_letter_queue.jsonl"):
         self._file_path = Path(file_path)
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        self._lock = threading.Lock()  # 同步上下文安全（仅用于文件 I/O）
 
     def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
         record = {
             "event_id": str(event.event_id),
             "event_type": event.event_type,
-            "payload": dataclasses.asdict(event),
+            "payload": event.to_dict(),
             "error": error,
             "retry_count": retry_count,
-            "failed_at": datetime.utcnow().isoformat() + "Z",
+            "failed_at": datetime.now(timezone.utc).isoformat(),
         }
         with self._lock, open(self._file_path, "a") as f:
             f.write(json.dumps(record) + "\n")
+
+    def dequeue(self) -> Optional[tuple[DomainEvent, str, int]]:
+        # 注意: 对于大文件 O(n) 操作，建议使用数据库替代
+        with self._lock:
+            lines = self._file_path.read_text().splitlines()
+            if not lines:
+                return None
+            first = lines[0]
+            record = json.loads(first)
+            # 重写文件（移除第一行）
+            self._file_path.write_text("\n".join(lines[1:]))
+            event_class = EventRegistry.get(record["event_type"])
+            event = event_class.from_dict(record["payload"])
+            return event, record["error"], record["retry_count"]
 ```
 
 ##### 8. 同步/异步调用策略（替代 EventPublisherAdapter）
@@ -558,14 +706,18 @@ class AsyncRabbitMQConsumer:
         await queue.consume(self._on_message)  # 手动 ACK/NACK
 
     async def _on_message(self, message: aio_pika.IncomingMessage) -> None:
-        """消息处理回调 — 手动 ACK/NACK，失败时重新入队"""
+        """消息处理回调 — 手动 ACK/NACK，失败时重新入队
+
+        P0-3 修复: 使用 event 变量前先检查是否已定义，防止反序列化失败时 UnboundLocalError。
+        """
+        event: DomainEvent | None = None  # 预先初始化为 None
         try:
             # 1. 反序列化
             event_dict = json.loads(message.body.decode())
             event_type = event_dict.get("event_type")
-            event_class = EVENT_TYPE_REGISTRY.get(event_type)
+            event_class = EventRegistry.get(event_type)
             if not event_class:
-                await message.nack(requeue=False)  # 未知事件类型，不移除
+                await message.nack(requeue=False)  # 未知事件类型，死信
                 return
             event = event_class.from_dict(event_dict)
 
@@ -585,6 +737,10 @@ class AsyncRabbitMQConsumer:
 
         except Exception as e:
             # 5. 失败 → 决定重试或死信
+            if event is None:
+                # 反序列化失败，event 未定义 → 直接死信，无法重试
+                await message.nack(requeue=False)
+                return
             await self._handle_failure(message, event, e)
 
     async def _handle_failure(self, message: aio_pika.IncomingMessage,
@@ -621,31 +777,48 @@ class AsyncRabbitMQConsumer:
 
 | 阶段 | 负责组件 | 重试方式 | retry_count 来源 |
 |------|---------|---------|-----------------|
-| **发布阶段**（Outbox → RabbitMQ） | AsyncOutboxPoller | 重新调用 `async_publish()` | `OutboxEntity.retry_count` |
-| **消费阶段**（RabbitMQ → handler） | AsyncRabbitMQConsumer | `nack(requeue=True)` 重新入队 | 消息头 `x-retry-count` |
+| **发布阶段**（Outbox → RabbitMQ） | AsyncOutboxPoller | 重新调用 `async_publish()`，Poller 内部 `_mark_failed_entity` 递增 `OutboxEntity.retry_count` | `OutboxEntity.retry_count` |
+| **消费阶段**（RabbitMQ → handler） | AsyncRabbitMQConsumer | `nack(requeue=True)` 重新入队，更新消息头 `x-retry-count` | 消息头 `x-retry-count` |
 
 **为什么不会冲突?**
 ```
 OutboxEntity.pending → Poller 调用 async_publish()
     │
-    ├─ 发布成功 → OutboxEntity.published → 消息到达 RabbitMQ
+    ├─ 发布成功 → OutboxEntity.published → 消息到达 RabbitMQ（带 x-retry-count=0）
     │   │
     │   ▼
     │   Consumer 接收消息 → handler 处理
     │       │
     │       ├─ 成功 → ack() → 消息移除 ✅
-    │       └─ 失败 → nack(requeue=True) → RabbitMQ 重新投递
+    │       └─ 失败 → nack(requeue=True)，x-retry-count++ → RabbitMQ 重新投递
     │                                       ↑
     │                              Consumer 路径（非 Poller）
     │
     └─ 发布失败 → OutboxEntity.failed → Poller 下次轮询重新尝试
-                                        ↑
-                                 Poller 路径（未到达 Consumer）
+        │                                ↑
+        │                         Poller 路径（未到达 Consumer）
+        └─ 超过 max_retries → OutboxEntity 状态不变（不再重试）
 ```
 
-**结论**: Poller 重试的是**发布到 RabbitMQ**（消息还未到达 Consumer），Consumer 重试的是**handler 处理**（消息已成功到达 RabbitMQ）。两条路径**严格互斥**。
+**结论**:
+- Poller 重试的是**发布到 RabbitMQ**（消息还未到达 Consumer），retry_count 存储在 `OutboxEntity` 持久化字段
+- Consumer 重试的是**handler 处理**（消息已成功到达 RabbitMQ），retry_count 存储在消息头 `x-retry-count`
+- 两条路径**严格互斥**，各自的 retry_count 独立维护，不会互相干扰
 
-**RabbitMQ 死信交换机配置（可选增强）:**
+**RabbitMQ 死信交换机配置（Story 1.5 启用，Story 1.3 MVP 不配置）:**
+
+> **P0-2 修复**: Story 1.3 MVP 阶段仅使用**应用层 DLQ**（`InMemoryDeadLetterQueue`），不配置 RabbitMQ DLX。
+> 两条死信路径（DLX 自动路由 + 应用层手动入队）互斥，同时启用会导致混乱。
+> DLX 配置延后至 Story 1.5（持久化层），届时替换应用层 DLQ 实现。
+
+**Story 1.3 MVP 死信路径（唯一路径）:**
+```
+Consumer handler 失败 → retry_count >= max_retries
+    → message.nack(requeue=False)  # 消息从队列移除（不路由到 DLX）
+    → self._dlq.enqueue(event, ...)  # 应用层记录死信（内存列表）
+```
+
+**Story 1.5 正式版死信路径（DLX 自动路由）:**
 ```python
 # 主队列配置 DLX（Dead Letter Exchange）
 queue = await self._channel.declare_queue(
@@ -660,7 +833,12 @@ queue = await self._channel.declare_queue(
 dlx = await self._channel.declare_exchange("sisys.events.dlx", aio_pika.ExchangeType.DIRECT, durable=True)
 dlq = await self._channel.declare_queue("sisys.events.dlq", durable=True)
 await dlx.bind(dlq, routing_key="sisys.events.dlq")
+
+# 此时消息自动路由到 DLX，应用层 _dlq.enqueue() 不再被调用
+# 需要从 RabbitMQ DLQ 读取死信，而非从内存列表
 ```
+
+> **注意**: RabbitMQ DLX 传递时消息头（含 `x-retry-count`）会被保留。
 
 **消息流转图:**
 ```
@@ -675,13 +853,13 @@ await dlx.bind(dlq, routing_key="sisys.events.dlq")
     └─ 失败（超次数）→ message.nack(requeue=False) → 死信队列 → DLQ 持久化
 ```
 
-##### 10. OutboxEntity 状态机约束（P2-3 解答）
+##### 10. OutboxEntity 状态机约束（P2-3 解答 + P1-03 修复）
 
 ```
 允许的状态转换:
   pending → published  (发布成功)
   pending → failed     (发布失败)
-  failed  → pending    (重试重置，最多 max_retries 次)
+  failed  → pending    (重试重置，仅当 retry_count < max_retries)
   failed  → archived   (超过 max_retries，人工归档)
 
 禁止的状态转换:
@@ -689,8 +867,9 @@ await dlx.bind(dlq, routing_key="sisys.events.dlq")
   published → failed   (不允许回滚)
   archived  → *        (终态，不允许任何转换)
 
-验证逻辑:
-  def _validate_transition(self, from_status: str, to_status: str) -> None:
+验证逻辑（P1-03 修复: failed→pending 检查 retry_count）:
+  def _validate_transition(self, from_status: str, to_status: str,
+                            retry_count: int = 0, max_retries: int = 3) -> None:
       allowed = {
           "pending": {"published", "failed"},
           "failed": {"pending", "archived"},
@@ -699,29 +878,33 @@ await dlx.bind(dlq, routing_key="sisys.events.dlq")
       }
       if to_status not in allowed.get(from_status, set()):
           raise InvalidStateTransition(from_status, to_status)
+      # P1-03 修复: failed→pending 必须检查 retry_count
+      if from_status == "failed" and to_status == "pending":
+          if retry_count >= max_retries:
+              raise InvalidStateTransition(from_status, to_status,
+                  f"Max retries ({max_retries}) exceeded")
 ```
 
 ##### 11. retry_count 权威来源（P1-03 修复）
 
-**核心原则**: **OutboxEntity.retry_count 是唯一权威来源**。Consumer 不应维护本地计数器。
+**核心原则**: **两条重试路径各自维护独立的 retry_count，互不干扰**。
 
-**两条重试路径的职责边界:**
-
-| 路径 | 重试场景 | 重试对象 | retry_count 来源 | 负责组件 |
-|------|---------|---------|-----------------|---------|
-| **Poller 路径** | Outbox → RabbitMQ 发布失败 | OutboxEntity 重新发布 | `OutboxEntity.retry_count` | AsyncOutboxPoller |
-| **Consumer 路径** | RabbitMQ 消费 → handler 处理失败 | RabbitMQ 消息重新投递 | 消息头 `x-retry-count` | AsyncRabbitMQConsumer |
+| 路径 | 重试场景 | retry_count 来源 | 负责组件 |
+|------|---------|-----------------|---------|
+| **Poller 路径** | Outbox → RabbitMQ 发布失败 | `OutboxEntity.retry_count`（持久化字段） | AsyncOutboxPoller 调用 `_mark_failed_entity` 时递增 |
+| **Consumer 路径** | RabbitMQ 消费 → handler 处理失败 | 消息头 `x-retry-count`（随消息流转） | AsyncRabbitMQConsumer 更新消息头 |
 
 **关键设计: Consumer 通过消息头传递 retry_count**
 
 ```python
 # AsyncRabbitMQPublisher — 发布时将 retry_count 放入消息头
 async def async_publish(self, event: DomainEvent, routing_key: str, retry_count: int = 0) -> None:
-    payload = json.dumps(dataclasses.asdict(event))
+    payload = json.dumps(event.to_dict())
     message = aio_pika.Message(
         body=payload.encode(),
         delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         content_type="application/json",
+        message_id=str(event.event_id),
         headers={"x-retry-count": str(retry_count)},  # ← 消息头传递
     )
     await self._exchange.publish(message, routing_key=routing_key)
@@ -1027,7 +1210,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 |------|------|
 | 🔴 红 | 编写 `test_outbox_pattern.py`(验证 CRUD 操作、状态转换、DomainEvent ↔ OutboxEntity 转换) |
 | 🟢 绿 | 实现 `InMemoryOutboxRepository`(MVP 占位，基础设施层，内部使用 OutboxEntity) |
-| 🔄 重构 | 添加线程安全锁、按状态过滤 |
+| 🔄 重构 | 添加 asyncio.Lock 保护（async 上下文安全）、按状态过滤 |
 
 - [ ] Subtask: 创建 `src/infrastructure/repositories/outbox.py`
 - [ ] Subtask: 🔴 红 — 编写 `InMemoryOutboxRepository` 失败测试
@@ -1049,7 +1232,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 - [ ] Subtask: 🟢 绿 — 实现 `AsyncOutboxPoller`(异步协程轮询 OutboxEntity，调用 `AsyncRabbitMQPublisher.async_publish()`)
 - [ ] Subtask: 🔄 重构 — 添加可配置轮询间隔、优雅关闭逻辑、批量发布优化
 
-**设计约束：**
+**设计约束（P0-5 修复）:**
 ```
 OutboxEntity (PostgreSQL event_outbox) ← 唯一真源，位于基础设施层
     │
@@ -1057,13 +1240,14 @@ OutboxEntity (PostgreSQL event_outbox) ← 唯一真源，位于基础设施层
 EventOutboxAdapter (基础设施层转换器)
     │
     ▼ async poll_once()
-AsyncOutboxPoller ← 异步协程轮询 OutboxEntity，默认 1s 间隔
+AsyncOutboxPoller ← 异步协程轮询，调用内部方法 _get_unpublished_entities()
     │                 并发策略: 使用 asyncio.Semaphore(batch_size) 控制并发发布数量
     │                 防止 Outbox 积压时消息延迟急剧增加
+    │                 锁策略: 使用 asyncio.Lock()（非 threading.Lock()）
     │
-    ├─→ 成功 → mark_published(event_id) → OutboxEntity 状态更新
+    ├─→ 成功 → _mark_published_entity(entity) → OutboxEntity 状态更新
     │
-    └─→ 失败 → mark_failed(event_id, error) → 记录错误，后续重试
+    └─→ 失败 → _mark_failed_entity(entity, error) → 记录错误，后续重试
 ```
 
 **完成标准/Definition of Done:**
@@ -1149,7 +1333,13 @@ AsyncOutboxPoller ← 异步协程轮询 OutboxEntity，默认 1s 间隔
 - [ ] 重试机制测试通过(指数退避 + jitter + 死信队列)
 - [ ] 覆盖率≥75%(基础设施层)
 
-**线程安全说明:** `InMemoryOutboxRepository` 使用 `threading.Lock()` 保证线程安全（同步模式）。若后续改为异步模式，切换为 `asyncio.Lock()`。
+**线程安全说明（最终确定，不再修改）:**
+
+`InMemoryOutboxRepository` **全部使用 `asyncio.Lock()`**，一把锁保护所有 `_entities` 操作。
+
+- MVP 单 Poller 场景：锁永远不竞争，零性能开销
+- 后续并发 Poller：锁直接生效保护，无需修改代码
+- **永不使用 `threading.Lock()`**：async 上下文中使用会阻塞整个事件循环
 
 ---
 
@@ -1271,7 +1461,7 @@ AsyncOutboxPoller ← 异步协程轮询 OutboxEntity，默认 1s 间隔
 - **设计约束:**
   - **可靠传输仅 Outbox → RabbitMQ**: PostgreSQL `event_outbox` 表是事件持久化的权威来源，与业务操作同事务提交；RabbitMQ 是可靠传输通道；**Redis Pub/Sub 仅用于实时通知**（低延迟<100ms，允许丢失），不参与事务一致性与可靠投递承诺
   - **OutboxRepository 以 OutboxEntity 为读写单位**: 领域层仓储接口直接读写 `OutboxEntity` 实例(`save(entity)`, `get_unpublished() -> List[OutboxEntity]`)，不暴露底层表结构
-  - **统一 async 路径**: 所有 RabbitMQ 操作与 Outbox Poller 统一使用 `async/await`(`AsyncRabbitMQPublisher.async_publish()`, `AsyncOutboxPoller.async_poll_once()`)
+  - **统一 async 路径**: 所有 RabbitMQ 操作与 Outbox Poller 统一使用 `async/await`(`AsyncRabbitMQPublisher.async_publish()`, `AsyncOutboxPoller.poll_once()`)
   - **领域层事件接口与基础设施层异步发布接口分离**: 领域层定义同步 `EventPublisher.publish(event)` 接口，基础设施层实现 `AsyncRabbitMQPublisher.async_publish(event)` 异步接口，领域层不感知异步实现细节
   - 事件处理幂等性:基于 `event_id` 的 Redis 原子去重(`try_acquire()` 方法，`SET NX` 命令，TTL 7 天)
   - 事件重试机制:完整指数退避 + jitter + 最大延迟上限 + 死信队列(默认最大重试 3 次)
@@ -1327,17 +1517,17 @@ AsyncOutboxPoller ← 异步协程轮询 OutboxEntity，默认 1s 间隔
 │                 OutboxEntity(pending 状态)                    │
 │                      │                                       │
 │                      ▼                                       │
-│        AsyncOutboxPoller.async_poll_once()                   │
+│        AsyncOutboxPoller.poll_once()                         │
 │        (异步协程轮询 OutboxEntity，默认 1s 间隔)               │
 │                      │                                       │
 │                      ▼                                       │
 │        AsyncRabbitMQPublisher.async_publish()                │
 │        (可靠通道，消息持久化，async/await)                     │
 │                      │                                       │
-│                      ├─ 成功 → mark_published(entity)        │
+│                      ├─ 成功 → _mark_published_entity(entity) │
 │                      │         OutboxEntity 状态 → published  │
 │                      │                                       │
-│                      └─ 失败 → mark_failed(entity, error)    │
+│                      └─ 失败 → _mark_failed_entity(entity, error) │
 │                                OutboxEntity 状态 → failed    │
 │                                后续重试                        │
 │                      ▼                                       │
@@ -1377,7 +1567,7 @@ AsyncOutboxPoller ← 异步协程轮询 OutboxEntity，默认 1s 间隔
 **关键设计约束：**
 1. **可靠传输仅 Outbox → RabbitMQ**: 事件的生命周期由 OutboxEntity 状态决定（pending → published/failed），RabbitMQ 是可靠通道，Redis 仅实时通知
 2. **领域层零 OutboxEntity 污染（方案 A）**: OutboxEntity 定义在基础设施层，领域层 `OutboxRepository` 接口使用 `DomainEvent` 实例，基础设施层负责 `DomainEvent ↔ OutboxEntity` 转换
-3. **统一 async 路径**: `AsyncOutboxPoller.async_poll_once()` 和 `AsyncRabbitMQPublisher.async_publish()` 统一使用 `async/await`
+3. **统一 async 路径**: `AsyncOutboxPoller.poll_once()` 和`AsyncRabbitMQPublisher.async_publish()` 统一使用 `async/await`
 4. **接口分离**: 领域层定义同步 `EventPublisher.publish(event)` 接口，基础设施层实现 `AsyncRabbitMQPublisher.async_publish(event)` 异步接口，领域层不感知异步实现细节
 5. **事件处理器注册机制**: 使用 `EventListener.on_event(event_type, handler)` 按事件类型注册处理器；处理器注册表使用字典 `{event_type: List[Callable]}` 存储，支持多处理器监听同一事件类型
 
@@ -1567,14 +1757,14 @@ sisys/
 1. **领域层零依赖约束是架构基石** — Story 1.1/1.2 严格遵循领域层仅使用 Python 标准库，为后续基础设施实现提供清晰边界
 2. **import-linter 验证依赖方向高效可靠** — 替代手写 ast 扫描，大幅降低架构验证测试复杂度
 3. **TDD 红→绿→重构循环内化到每个 Task** — 禁止将测试编写与代码实现分离，确保每个 Task 独立完成完整循环
-4. **dataclasses.asdict() 序列化策略清晰** — 领域事件使用 `dataclasses.asdict()` 转换，应用层 TypeAdapter 仅用于 JSON 边界转换
+4. **序列化策略清晰** — 领域事件使用 `event.to_dict()`（Story 1.2），OutboxEntity 使用 `dataclasses.asdict(self)`（基础设施层 entity）；两者不可混用
 
 **应用到本故事/Applied to This Story:**
 - [ ] 严格遵守领域层零依赖约束(OutboxRepository 接口仅使用 DomainEvent，不导入 OutboxEntity)
 - [ ] OutboxEntity 定义在基础设施层，领域层零 OutboxEntity 污染
 - [ ] 使用 import-linter 验证事件总线相关依赖方向
 - [ ] 每个 Task 独立完成 TDD 红→绿→重构循环
-- [ ] 继续使用 dataclasses.asdict() 序列化领域事件
+- [ ] 继续使用 `event.to_dict()` 序列化领域事件，OutboxEntity 使用 `dataclasses.asdict(self)`
 - [ ] Redis/RabbitMQ 客户端导入仅在基础设施层，不得泄漏至领域层
 
 ---
