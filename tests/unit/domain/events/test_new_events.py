@@ -2,15 +2,13 @@
 
 import uuid
 
-from src.domain.events.deviation_events import (
-    HeartbeatTriggered,
-    StrategicDeviationWarning,
-)
+from src.domain.events.checkpoint_events import CheckpointRecovered
 from src.domain.events.enums import DeviationLevel, IsolationLevel, RecoveryMode
+from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
-    CheckpointRecovered,
     IsolationLevelSwitched,
 )
+from src.domain.events.planning_events import StrategicDeviationWarning
 from src.domain.events.routing_events import RoutingDecided
 
 

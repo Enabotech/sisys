@@ -4,9 +4,9 @@ import uuid
 
 import pytest
 
+from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import InMemoryEventListener
-from src.domain.events.plan_events import DocumentProcessed
 from src.infrastructure.events.in_memory_bus import InMemoryEventBus
 
 

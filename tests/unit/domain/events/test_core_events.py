@@ -2,7 +2,7 @@
 
 import uuid
 
-from src.domain.events.plan_events import (
+from src.domain.events import (
     AgentDecided,
     CheckpointReached,
     CorrectionApproved,
