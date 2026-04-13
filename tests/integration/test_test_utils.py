@@ -8,6 +8,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import fakeredis
+import pytest
 
 from src.domain.events.base import DomainEvent
 from src.infrastructure.idempotency.checker import IdempotencyChecker
@@ -138,8 +139,12 @@ class TestIdempotencyChecker:
 class TestRetryPolicy:
     """Verify RetryPolicy implements exponential backoff with jitter."""
 
-    def test_get_delay_increases_with_retries(self, retry_policy: RetryPolicy) -> None:
+    def test_get_delay_increases_with_retries(self, retry_policy: RetryPolicy, monkeypatch: pytest.MonkeyPatch) -> None:
         """Delay should increase with retry count (exponential backoff)."""
+        # Mock jitter to fixed 1.0 so ordering is deterministic.
+        # Without this, random.uniform(0.5, 1.5) can make delay_1 < delay_0.
+        monkeypatch.setattr("src.infrastructure.idempotency.retry_policy.random.uniform", lambda a, b: 1.0)
+
         delay_0 = retry_policy.get_delay(0)
         delay_1 = retry_policy.get_delay(1)
         delay_2 = retry_policy.get_delay(2)

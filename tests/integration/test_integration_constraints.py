@@ -106,31 +106,15 @@ class TestTimeoutConfiguration:
         content = pyproject_path.read_text()
         assert "pytest-timeout" in content, "pytest-timeout not found in pyproject.toml"
 
-    def test_pytest_timeout_actually_enforces_timeout(self) -> None:
-        """Verify that pytest-timeout plugin is registered and active.
+    def test_pytest_timeout_plugin_is_registered(self, pytestconfig) -> None:
+        """Verify the timeout plugin is actually registered in the running pytest session.
 
-        When pytest runs with --timeout, the timeout plugin is registered.
-        We verify this by checking the pytest plugin list.
+        This is more reliable than spawning a subprocess — no race conditions
+        with xdist workers, no .pytest_cache conflicts.
         """
-        import subprocess
-        import sys
+        plugin_names = set()
+        for plugin in pytestconfig.pluginmanager.get_plugins():
+            name = getattr(plugin, "__name__", type(plugin).__name__)
+            plugin_names.add(name)
 
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "--co",  # Collect only
-                "--timeout=1",
-                "-q",
-                str(Path(__file__).resolve().parent / "test_test_utils.py"),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        # If timeout plugin is not registered, pytest would show a warning
-        # and exit with a different code. We verify it runs cleanly.
-        assert result.returncode == 0, f"pytest --timeout=1 failed:\nstdout={result.stdout}\nstderr={result.stderr}"
-        # The fact that pytest accepted --timeout=1 without error proves it's active
+        assert any("timeout" in name.lower() for name in plugin_names), f"timeout plugin not found in: {plugin_names}"
