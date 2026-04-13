@@ -19,17 +19,12 @@
       | tests/integration/fixtures   |
       | tests/acceptance             |
 
-  场景大纲: 外部服务 Mock 配置
+  场景: 外部服务 Mock 配置
     假如需要 Mock 外部服务
     当配置 Mock fixtures
     那么 Redis 使用 fakeredis 行为级 Mock
-    并且 PostgreSQL/RabbitMQ 使用 AsyncMock 接口级 Mock
-
-    例子:
-      | 服务        | Mock 类型    |
-      | Redis       | 行为级       |
-      | PostgreSQL  | 接口级       |
-      | RabbitMQ    | 接口级       |
+    并且 PostgreSQL 使用 AsyncMock 接口级 Mock
+    并且 RabbitMQ 使用 AsyncMock 接口级 Mock
 
   场景大纲: 领域事件冒烟测试
     假如领域事件定义和内存发件箱已实现
