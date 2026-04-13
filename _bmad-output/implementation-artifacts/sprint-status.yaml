@@ -1,5 +1,5 @@
 # generated: 2026-03-11
-# last_updated: 2026-04-12T00:00:00Z
+# last_updated: 2026-04-13T00:00:00Z
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-12
+last_updated: 2026-04-13
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -76,10 +76,10 @@ development_status:
   # 价值组 2: 架构基础与事件驱动
   1-1-hexagonal-architecture-skeleton: done
   1-2-domain-event-definition: done
-  1-3-event-bus-implementation: ready-for-dev
-  1-16-integration-test-framework: backlog
+  1-3-event-bus-implementation: review
+  1-16-integration-test-framework: ready-for-dev
   # 价值组 3: 五层存储架构
-  1-4-redis-cache-layer: backlog
+  1-4-redis-cache-layer: ready-for-dev
   1-5-postgresql-relational-layer: backlog
   1-6-qdrant-vector-layer: backlog
   1-7-minio-object-layer: backlog
