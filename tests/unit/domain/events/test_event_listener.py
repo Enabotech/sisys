@@ -4,9 +4,9 @@ import uuid
 
 import pytest
 
+from src.domain.events import DocumentProcessed, ToolExecuted
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import InMemoryEventListener
-from src.domain.events.plan_events import DocumentProcessed, ToolExecuted
 
 
 class TestEventListenerRegistration:

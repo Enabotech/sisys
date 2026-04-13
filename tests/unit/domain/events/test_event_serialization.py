@@ -5,17 +5,15 @@ import uuid
 
 import pytest
 
+from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.domain.events.deviation_events import (
-    HeartbeatTriggered,
-    StrategicDeviationWarning,
-)
+from src.domain.events.checkpoint_events import CheckpointRecovered
 from src.domain.events.enums import DeviationLevel, RecoveryMode
+from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.isolation_events import (
-    CheckpointRecovered,
     IsolationLevelSwitched,
 )
-from src.domain.events.plan_events import DocumentProcessed
+from src.domain.events.planning_events import StrategicDeviationWarning
 from src.domain.events.routing_events import RoutingDecided
 
 

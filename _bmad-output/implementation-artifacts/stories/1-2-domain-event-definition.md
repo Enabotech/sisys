@@ -546,7 +546,7 @@ sisys/
 │   │   │   ├── agent_events.py          # AgentDecided 事件
 │   │   │   ├── checkpoint_events.py     # CheckpointReached, CheckpointRecovered 事件
 │   │   │   ├── correction_events.py     # CorrectionApproved 事件
-│   │   │   ├── deviation_events.py      # StrategicDeviationWarning 事件
+│   │   │   ├── planning_events.py       # StrategicDeviationWarning 事件
 │   │   │   ├── heartbeat_events.py      # HeartbeatTriggered 事件
 │   │   │   ├── isolation_events.py      # IsolationLevelSwitched 事件
 │   │   │   ├── routing_events.py        # RoutingDecided 事件

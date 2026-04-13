@@ -6,8 +6,8 @@ import uuid
 import pytest
 
 from src.application.events.adapters import event_dict_to_json, json_to_event_dict
+from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.domain.events.plan_events import DocumentProcessed
 
 
 class TestEventDictToJson:

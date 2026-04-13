@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 
+from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.domain.events.plan_events import DocumentProcessed
 from src.domain.events.store import EventStore
 from src.infrastructure.events.in_memory_store import InMemoryEventStore
 

@@ -39,8 +39,13 @@ class TestDomainEventsNoPydantic:
         event_files = [
             "src/domain/events/base.py",
             "src/domain/events/enums.py",
-            "src/domain/events/plan_events.py",
-            "src/domain/events/deviation_events.py",
+            "src/domain/events/document_events.py",
+            "src/domain/events/tool_events.py",
+            "src/domain/events/agent_events.py",
+            "src/domain/events/checkpoint_events.py",
+            "src/domain/events/correction_events.py",
+            "src/domain/events/planning_events.py",
+            "src/domain/events/heartbeat_events.py",
             "src/domain/events/isolation_events.py",
             "src/domain/events/routing_events.py",
         ]
