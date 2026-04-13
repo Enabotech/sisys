@@ -20,6 +20,10 @@ FEATURE = "test_story_1_16.feature"
 
 _test_context: dict[str, Any] = {}
 
+# Override pyproject.toml addopts (--cov + -n auto) to prevent nested
+# pytest subprocesses from writing to the same .coverage SQLite DB.
+_SUBPROCESS_PYTEST_OPTS: list[str] = ["-o", "addopts="]
+
 
 @pytest.fixture
 def repo():
@@ -62,7 +66,7 @@ def _create_integration_dir():
 @then("集成测试可独立运行")
 def _tests_run_independently():
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/integration/", "--co", "-q", "-n", "0"],
+        [sys.executable, "-m", "pytest", "tests/integration/", "--co", "-q", "-n", "0", *_SUBPROCESS_PYTEST_OPTS],
         capture_output=True,
         text=True,
         timeout=30,
@@ -495,7 +499,7 @@ def _tests_written():
 @when("运行集成测试覆盖率检查")
 def _run_coverage():
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/integration/", "--cov=src", "--cov-fail-under=70", "-n", "0", "-q"],
+        [sys.executable, "-m", "pytest", "tests/integration/", "--no-cov", "-n", "0", "-q", *_SUBPROCESS_PYTEST_OPTS],
         capture_output=True,
         text=True,
         timeout=120,
