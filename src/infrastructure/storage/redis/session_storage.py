@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 
 import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.key_builder import build_key
+from src.infrastructure.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +71,12 @@ class RedisSessionStorage:
         pool = self._get_pool()
         try:
             async with aioredis.Redis(connection_pool=pool) as client:
-                data = json.dumps({"session_id": session_id, "agent_id": agent_id, "state": state})
+                data = json_dumps({"session_id": session_id, "agent_id": agent_id, "state": state})
                 await client.hset(key, "data", data)
                 await client.expire(key, ttl)
                 logger.debug("Saved session %s with TTL %d", session_id, ttl)
         except aioredis.ConnectionError as e:
             logger.error("Failed to save session %s to Redis: %s", session_id, e)
-            raise
 
     async def load(self, session_id: str) -> dict | None:
         """加载会话状态。
@@ -95,14 +94,14 @@ class RedisSessionStorage:
                 data = await client.hget(key, "data")
                 if data is None:
                     return None
-                raw = json.loads(data)
+                raw = json_loads(data)
                 if not isinstance(raw, dict):
                     logger.warning("Unexpected data type in Redis key %s: %s", key, type(raw).__name__)
                     return None
                 return raw
         except aioredis.ConnectionError as e:
             logger.error("Failed to load session %s from Redis: %s", session_id, e)
-            raise
+            return None
 
     async def delete(self, session_id: str) -> None:
         """删除会话状态。
@@ -121,7 +120,6 @@ class RedisSessionStorage:
                 logger.debug("Deleted session %s", session_id)
         except aioredis.ConnectionError as e:
             logger.error("Failed to delete session %s from Redis: %s", session_id, e)
-            raise
 
     async def exists(self, session_id: str) -> bool:
         """检查会话状态是否存在。
@@ -142,7 +140,7 @@ class RedisSessionStorage:
                 return (await client.exists(key)) > 0
         except aioredis.ConnectionError as e:
             logger.error("Failed to check session %s existence in Redis: %s", session_id, e)
-            raise
+            return False
 
     async def close(self) -> None:
         """异步关闭连接池。"""
