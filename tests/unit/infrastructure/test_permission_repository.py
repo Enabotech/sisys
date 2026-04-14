@@ -1,0 +1,47 @@
+"""PermissionRepository 单元测试。"""
+
+from __future__ import annotations
+
+from unittest import mock
+
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.storage.postgresql.permission_repository import PermissionRepository
+
+
+@pytest.fixture
+def mock_session():
+    return mock.AsyncMock(spec=AsyncSession)
+
+
+@pytest.fixture
+def repository(mock_session):
+    return PermissionRepository(mock_session)
+
+
+class TestPermissionRepository:
+    """PermissionRepository 测试。"""
+
+    @pytest.mark.asyncio
+    async def test_get_by_name(self, repository, mock_session):
+        """测试根据名称获取权限。"""
+        permission = mock.Mock()
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = permission
+        mock_session.execute.return_value = mock_result
+
+        result = await repository.get_by_name("read:document")
+
+        assert result == permission
+
+    @pytest.mark.asyncio
+    async def test_get_by_name_not_found(self, repository, mock_session):
+        """测试根据名称获取不存在的权限。"""
+        mock_result = mock.Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+
+        result = await repository.get_by_name("nonexistent")
+
+        assert result is None
