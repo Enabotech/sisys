@@ -98,7 +98,7 @@ class TestTimeoutConfiguration:
 
     def test_pytest_timeout_is_installed(self) -> None:
         """pytest-timeout should be installed and importable."""
-        import pytest_timeout  # noqa: F401 (verify package exists)
+        import pytest_timeout  # type: ignore[import-untyped]  # noqa: F401
 
     def test_pytest_timeout_in_pyproject(self) -> None:
         """pyproject.toml should reference pytest-timeout."""

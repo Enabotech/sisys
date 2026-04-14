@@ -1,6 +1,7 @@
 """Tests for BaseRepository interface."""
 
 import uuid
+from typing import Any
 
 import pytest
 
@@ -28,19 +29,19 @@ class TestBaseRepositoryAbstract:
         """A subclass that implements all methods can be instantiated."""
 
         class InMemoryRepo(BaseRepository):
-            def __init__(self):
+            def __init__(self) -> None:
                 self._store: dict = {}
 
-            def get_by_id(self, id: uuid.UUID):
+            def get_by_id(self, id: uuid.UUID) -> Any:
                 return self._store.get(id)
 
-            def save(self, entity):
+            def save(self, entity: Any) -> None:
                 self._store[entity.id] = entity
 
-            def delete(self, id: uuid.UUID):
+            def delete(self, id: uuid.UUID) -> None:
                 self._store.pop(id, None)
 
-            def list_all(self):
+            def list_all(self) -> list:
                 return list(self._store.values())
 
         # This should not raise

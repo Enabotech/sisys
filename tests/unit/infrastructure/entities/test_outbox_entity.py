@@ -166,7 +166,7 @@ class TestEventOutboxAdapter:
         """EventRegistry should support manual registration."""
 
         class MockEvent(DomainEvent):
-            event_type: str = "MockEvent"
+            event_type: str = "MockEvent"  # type annotation for mypy
 
         EventRegistry.register("MockEvent", MockEvent)
         event_class = EventRegistry.get("MockEvent")
