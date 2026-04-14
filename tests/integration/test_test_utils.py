@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-import fakeredis
+import fakeredis.aioredis
 import pytest
 
 from src.domain.events.base import DomainEvent
@@ -87,19 +87,21 @@ class TestDataFactory:
 class TestMockConfiguration:
     """Verify external service Mock fixtures work correctly."""
 
-    def test_mock_redis_is_fakeredis(self, mock_redis: fakeredis.FakeRedis) -> None:
+    def test_mock_redis_is_fakeredis(self, mock_redis: fakeredis.aioredis.FakeRedis) -> None:
         """Mock Redis should be a fakeredis instance."""
-        assert isinstance(mock_redis, fakeredis.FakeRedis)
+        assert isinstance(mock_redis, fakeredis.aioredis.FakeRedis)
 
-    def test_mock_redis_can_set_and_get(self, mock_redis: fakeredis.FakeRedis) -> None:
+    @pytest.mark.asyncio
+    async def test_mock_redis_can_set_and_get(self, mock_redis: fakeredis.aioredis.FakeRedis) -> None:
         """Mock Redis should support basic set/get operations."""
-        mock_redis.set("key", "value")
-        assert mock_redis.get("key") == "value"
+        await mock_redis.set("key", "value")
+        assert await mock_redis.get("key") == "value"
 
-    def test_mock_redis_set_nx_atomic(self, mock_redis: fakeredis.FakeRedis) -> None:
+    @pytest.mark.asyncio
+    async def test_mock_redis_set_nx_atomic(self, mock_redis: fakeredis.aioredis.FakeRedis) -> None:
         """Mock Redis SET NX should be atomic (first call succeeds, second fails)."""
-        result1 = mock_redis.set("idempotency:test", "1", nx=True, ex=3600)
-        result2 = mock_redis.set("idempotency:test", "1", nx=True, ex=3600)
+        result1 = await mock_redis.set("idempotency:test", "1", nx=True, ex=3600)
+        result2 = await mock_redis.set("idempotency:test", "1", nx=True, ex=3600)
         assert result1 is True
         assert not result2  # Already exists (fakeredis returns None or False)
 
@@ -119,21 +121,24 @@ class TestMockConfiguration:
 class TestIdempotencyChecker:
     """Verify IdempotencyChecker uses fakeredis atomically."""
 
-    def test_try_acquire_first_time_succeeds(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
+    @pytest.mark.asyncio
+    async def test_try_acquire_first_time_succeeds(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """First try_acquire should return True."""
-        assert idempotency_checker.try_acquire(event_id) is True
+        assert await idempotency_checker.try_acquire(event_id) is True
 
-    def test_try_acquire_second_time_fails(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
+    @pytest.mark.asyncio
+    async def test_try_acquire_second_time_fails(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """Second try_acquire for same event_id should return False."""
-        idempotency_checker.try_acquire(event_id)
-        assert idempotency_checker.try_acquire(event_id) is False
+        await idempotency_checker.try_acquire(event_id)
+        assert await idempotency_checker.try_acquire(event_id) is False
 
-    def test_try_acquire_different_events_both_succeed(self, idempotency_checker: IdempotencyChecker) -> None:
+    @pytest.mark.asyncio
+    async def test_try_acquire_different_events_both_succeed(self, idempotency_checker: IdempotencyChecker) -> None:
         """Different event_ids should both succeed independently."""
         id1 = uuid4()
         id2 = uuid4()
-        assert idempotency_checker.try_acquire(id1) is True
-        assert idempotency_checker.try_acquire(id2) is True
+        assert await idempotency_checker.try_acquire(id1) is True
+        assert await idempotency_checker.try_acquire(id2) is True
 
 
 class TestRetryPolicy:

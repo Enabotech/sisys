@@ -6,11 +6,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import threading
 
-import redis
+import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.key_builder import build_key
@@ -38,23 +38,21 @@ class RedisSessionStorage:
             config: Redis 连接配置
         """
         self._config = config
-        self._pool: redis.ConnectionPool | None = None
-        self._pool_lock = threading.Lock()
+        self._pool: aioredis.ConnectionPool | None = None
+        self._pool_lock = asyncio.Lock()
 
-    def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池（线程安全）。"""
+    def _get_pool(self) -> aioredis.ConnectionPool:
+        """懒加载连接池（异步安全）。"""
         if self._pool is None:
-            with self._pool_lock:
-                if self._pool is None:
-                    self._pool = redis.ConnectionPool(
-                        host=self._config.host,
-                        port=self._config.port,
-                        db=self._config.db,
-                        password=self._config.password,
-                        max_connections=self._config.max_connections,
-                        socket_timeout=self._config.socket_timeout,
-                        decode_responses=True,
-                    )
+            self._pool = aioredis.ConnectionPool(
+                host=self._config.host,
+                port=self._config.port,
+                db=self._config.db,
+                password=self._config.password,
+                max_connections=self._config.max_connections,
+                socket_timeout=self._config.socket_timeout,
+                decode_responses=True,
+            )
         return self._pool
 
     async def save(self, session_id: str, agent_id: str, state: dict, ttl: int = 86400) -> None:
@@ -67,17 +65,17 @@ class RedisSessionStorage:
             ttl: 过期时间（秒）
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, session_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
+            async with aioredis.Redis(connection_pool=pool) as client:
                 data = json.dumps({"session_id": session_id, "agent_id": agent_id, "state": state})
-                client.hset(key, "data", data)
-                client.expire(key, ttl)
+                await client.hset(key, "data", data)
+                await client.expire(key, ttl)
                 logger.debug("Saved session %s with TTL %d", session_id, ttl)
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to save session %s to Redis: %s", session_id, e)
             raise
 
@@ -93,8 +91,8 @@ class RedisSessionStorage:
         key = build_key(self._NAMESPACE, session_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                data = client.hget(key, "data")
+            async with aioredis.Redis(connection_pool=pool) as client:
+                data = await client.hget(key, "data")
                 if data is None:
                     return None
                 raw = json.loads(data)
@@ -102,7 +100,7 @@ class RedisSessionStorage:
                     logger.warning("Unexpected data type in Redis key %s: %s", key, type(raw).__name__)
                     return None
                 return raw
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to load session %s from Redis: %s", session_id, e)
             raise
 
@@ -113,15 +111,15 @@ class RedisSessionStorage:
             session_id: 会话唯一标识
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, session_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                client.delete(key)
+            async with aioredis.Redis(connection_pool=pool) as client:
+                await client.delete(key)
                 logger.debug("Deleted session %s", session_id)
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to delete session %s from Redis: %s", session_id, e)
             raise
 
@@ -135,29 +133,28 @@ class RedisSessionStorage:
             如果存在返回 True，否则返回 False
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, session_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                return client.exists(key) > 0
-        except redis.ConnectionError as e:
+            async with aioredis.Redis(connection_pool=pool) as client:
+                return (await client.exists(key)) > 0
+        except aioredis.ConnectionError as e:
             logger.error("Failed to check session %s existence in Redis: %s", session_id, e)
             raise
 
-    def close(self) -> None:
-        """关闭连接池。"""
+    async def close(self) -> None:
+        """异步关闭连接池。"""
         if self._pool:
-            self._pool.disconnect()
+            await self._pool.aclose()  # type: ignore[attr-defined]
             self._pool = None
             logger.debug("Redis connection pool closed")
 
-    def __enter__(self) -> RedisSessionStorage:
-        """上下文管理器入口。"""
+    async def __aenter__(self) -> RedisSessionStorage:
+        """异步上下文管理器入口。"""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """上下文管理器出口，确保连接池关闭。"""
-        self.close()
-        return None
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """异步上下文管理器出口，确保连接池关闭。"""
+        await self.close()

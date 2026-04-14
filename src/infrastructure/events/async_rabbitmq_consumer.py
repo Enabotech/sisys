@@ -121,8 +121,8 @@ class AsyncRabbitMQConsumer:
                 await message.nack(requeue=False)
                 return
 
-            # 2. 幂等性检查（原子操作）
-            if self._idempotency and not self._idempotency.try_acquire(event.event_id):
+            # 2. 幂等性检查（原子操作，异步）
+            if self._idempotency and not await self._idempotency.try_acquire(event.event_id):
                 await message.ack()  # 已处理，确认
                 return
 

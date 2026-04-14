@@ -7,7 +7,7 @@ import subprocess
 from typing import Any
 from uuid import UUID, uuid4
 
-import fakeredis
+import fakeredis.aioredis
 import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
@@ -46,7 +46,8 @@ def test_redis_pubsub():
 
 @when(parsers.parse("I publish a {event_type} event to Redis channel"))
 def publish_redis_event(event_type):
-    """Publish event to Redis channel."""
+    import asyncio
+
     from src.domain.events import (
         DocumentProcessed,
         HeartbeatTriggered,
@@ -54,13 +55,12 @@ def publish_redis_event(event_type):
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.events.redis_publisher import RedisEventPublisher
 
-    fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     config = RedisConfig()
 
     publisher = RedisEventPublisher(config)
     publisher._pool = fake_redis.connection_pool
 
-    # Create appropriate event based on type
     if event_type == "DocumentProcessed":
         event = DocumentProcessed(
             document_id=uuid4(),
@@ -77,7 +77,13 @@ def publish_redis_event(event_type):
         pytest.fail(f"Unknown event type: {event_type}")
 
     channel = f"sisys:rt:{event_type.lower()}"
-    publisher.publish(event, channel)
+
+    # 安全地运行异步函数而不破坏全局事件循环
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(publisher.publish(event, channel))
+    finally:
+        loop.close()
 
     _test_context["event"] = event
     _test_context["channel"] = channel
@@ -288,15 +294,24 @@ def test_idempotency():
 @when(parsers.parse('I process an event with event_id "{event_id}" for the first time'))
 def first_process_event(event_id):
     """First processing of event."""
+    import asyncio
+
     from src.infrastructure.idempotency.checker import IdempotencyChecker
 
-    fake_redis = fakeredis.FakeRedis()
+    fake_redis = fakeredis.aioredis.FakeRedis()
     checker = IdempotencyChecker(redis_client=fake_redis)
     _test_context["checker"] = checker
     _test_context["fake_redis"] = fake_redis
     _test_context["event_id"] = UUID(event_id)
 
-    result = checker.try_acquire(_test_context["event_id"])
+    async def _acquire(eid):
+        return await checker.try_acquire(eid)
+
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(_acquire(_test_context["event_id"]))
+    finally:
+        loop.close()
     _test_context["first_result"] = result
 
 
@@ -309,10 +324,19 @@ def try_acquire_returns_true():
 @then(parsers.parse('I process the same event_id "{event_id}" a second time'))
 def second_process_event(event_id):
     """Second processing of same event."""
+    import asyncio
 
     checker = _test_context.get("checker")
     event_id_uuid = UUID(event_id)
-    result = checker.try_acquire(event_id_uuid)
+
+    async def _acquire(eid):
+        return await checker.try_acquire(eid)
+
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(_acquire(event_id_uuid))
+    finally:
+        loop.close()
     _test_context["second_result"] = result
 
 

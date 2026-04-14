@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import fakeredis
+import fakeredis.aioredis
 import pytest
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
 
 
-def _create_blackboard(fake_redis: fakeredis.FakeRedis) -> RedisPublicBlackboard:
+def _create_blackboard(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisPublicBlackboard:
     """创建使用 fake Redis 的 PublicBlackboard。"""
     config = RedisConfig()
     board = RedisPublicBlackboard(config)
@@ -22,8 +22,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_post_and_get(self) -> None:
-        """发布和读取黑板内容。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         version = await board.post("conv-1", "agent-1", {"data": "value"})
@@ -36,8 +35,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_get_empty_conversation(self) -> None:
-        """空会话返回空列表。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         entries = await board.get("conv-1")
@@ -45,8 +43,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_get_by_agent(self) -> None:
-        """获取指定 Agent 的最新内容。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         await board.post("conv-1", "agent-1", {"data": "first"})
@@ -60,8 +57,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_get_by_agent_not_found(self) -> None:
-        """Agent 无内容时返回 None。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         await board.post("conv-1", "agent-1", {"data": "value"})
@@ -71,8 +67,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_version_increments(self) -> None:
-        """每次发布版本号递增。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         v1 = await board.post("conv-1", "agent-1", {"data": "first"})
@@ -85,8 +80,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_get_latest(self) -> None:
-        """获取最新版本。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         await board.post("conv-1", "agent-1", {"data": "first"})
@@ -99,8 +93,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_get_latest_empty(self) -> None:
-        """空会话返回 None。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         result = await board.get_latest("conv-1")
@@ -108,8 +101,7 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_post_with_confidence_and_citations(self) -> None:
-        """发布时包含置信度和引用。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
         await board.post(
@@ -127,36 +119,33 @@ class TestRedisPublicBlackboard:
 
     @pytest.mark.asyncio
     async def test_concurrent_writes(self) -> None:
-        """模拟并发写入版本号应唯一。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
-        # 顺序执行（模拟并发场景）
         results = []
         for i in range(5):
             v = await board.post("conv-1", f"agent-{i}", {"data": f"value-{i}"})
             results.append(v)
 
-        # 版本号应唯一且递增
         assert len(set(results)) == 5
         assert results == [1, 2, 3, 4, 5]
 
-    def test_close(self) -> None:
-        """关闭连接池。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    @pytest.mark.asyncio
+    async def test_close(self) -> None:
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
-        board.close()
+        await board.close()
         assert board._pool is None
 
-    def test_context_manager(self) -> None:
-        """上下文管理器应自动关闭连接池。"""
-        fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    @pytest.mark.asyncio
+    async def test_context_manager(self) -> None:
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         config = RedisConfig()
         board = RedisPublicBlackboard(config)
         board._pool = fake_redis.connection_pool
 
-        with board:
+        async with board:
             assert board._pool is not None
 
         assert board._pool is None

@@ -163,19 +163,21 @@ class TestEventRegistry:
 class TestIdempotencyAndRetry:
     """Verify idempotency checker and retry policy at smoke level."""
 
-    def test_idempotency_try_acquire_atomic(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
+    @pytest.mark.asyncio
+    async def test_idempotency_try_acquire_atomic(self, idempotency_checker: IdempotencyChecker, event_id: UUID) -> None:
         """try_acquire should be atomic — only first call succeeds."""
-        assert idempotency_checker.try_acquire(event_id) is True
-        assert idempotency_checker.try_acquire(event_id) is False
+        assert await idempotency_checker.try_acquire(event_id) is True
+        assert await idempotency_checker.try_acquire(event_id) is False
 
-    def test_idempotency_different_events_independent(self, idempotency_checker: IdempotencyChecker) -> None:
+    @pytest.mark.asyncio
+    async def test_idempotency_different_events_independent(self, idempotency_checker: IdempotencyChecker) -> None:
         """Different event IDs should be independent."""
         id1 = uuid4()
         id2 = uuid4()
-        assert idempotency_checker.try_acquire(id1) is True
-        assert idempotency_checker.try_acquire(id2) is True
-        assert idempotency_checker.try_acquire(id1) is False
-        assert idempotency_checker.try_acquire(id2) is False
+        assert await idempotency_checker.try_acquire(id1) is True
+        assert await idempotency_checker.try_acquire(id2) is True
+        assert await idempotency_checker.try_acquire(id1) is False
+        assert await idempotency_checker.try_acquire(id2) is False
 
     def test_retry_policy_exponential_backoff(self, retry_policy: RetryPolicy) -> None:
         """Retry delays should follow exponential backoff pattern."""

@@ -15,7 +15,10 @@ from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOu
 
 @pytest.fixture
 def mock_session():
-    return mock.AsyncMock(spec=AsyncSession)
+    session = mock.AsyncMock(spec=AsyncSession)
+    # add 是同步方法（不执行 I/O）
+    session.add = mock.Mock()
+    return session
 
 
 @pytest.fixture

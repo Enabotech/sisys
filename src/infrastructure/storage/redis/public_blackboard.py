@@ -7,12 +7,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import threading
 import time
 
-import redis
+import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.key_builder import build_key
@@ -40,23 +40,21 @@ class RedisPublicBlackboard:
             config: Redis 连接配置
         """
         self._config = config
-        self._pool: redis.ConnectionPool | None = None
-        self._pool_lock = threading.Lock()
+        self._pool: aioredis.ConnectionPool | None = None
+        self._pool_lock = asyncio.Lock()
 
-    def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池（线程安全）。"""
+    def _get_pool(self) -> aioredis.ConnectionPool:
+        """懒加载连接池（异步安全）。"""
         if self._pool is None:
-            with self._pool_lock:
-                if self._pool is None:
-                    self._pool = redis.ConnectionPool(
-                        host=self._config.host,
-                        port=self._config.port,
-                        db=self._config.db,
-                        password=self._config.password,
-                        max_connections=self._config.max_connections,
-                        socket_timeout=self._config.socket_timeout,
-                        decode_responses=True,
-                    )
+            self._pool = aioredis.ConnectionPool(
+                host=self._config.host,
+                port=self._config.port,
+                db=self._config.db,
+                password=self._config.password,
+                max_connections=self._config.max_connections,
+                socket_timeout=self._config.socket_timeout,
+                decode_responses=True,
+            )
         return self._pool
 
     def _get_version_key(self, conversation_id: str) -> str:
@@ -91,9 +89,9 @@ class RedisPublicBlackboard:
             citations = []
 
         try:
-            with redis.Redis(connection_pool=pool) as client:
+            async with aioredis.Redis(connection_pool=pool) as client:
                 # 原子递增版本号
-                version = client.incr(version_key)
+                version = await client.incr(version_key)
 
                 entry = {
                     "conversation_id": conversation_id,
@@ -107,7 +105,7 @@ class RedisPublicBlackboard:
 
                 # 使用版本号作为 score，支持排序
                 score = float(version)
-                client.zadd(key, {json.dumps(entry): score})
+                await client.zadd(key, {json.dumps(entry): score})
 
                 logger.debug(
                     "Posted to blackboard %s by agent %s, version %d",
@@ -117,7 +115,7 @@ class RedisPublicBlackboard:
                 )
                 return version
 
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error(
                 "Failed to post to blackboard %s in Redis: %s",
                 conversation_id,
@@ -135,13 +133,13 @@ class RedisPublicBlackboard:
             内容列表（按时间排序）
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, conversation_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                entries = client.zrange(key, 0, -1)
+            async with aioredis.Redis(connection_pool=pool) as client:
+                entries = await client.zrange(key, 0, -1)
                 result = []
                 for entry in entries:
                     try:
@@ -153,7 +151,7 @@ class RedisPublicBlackboard:
                     except (json.JSONDecodeError, TypeError) as e:
                         logger.warning("Corrupt data in blackboard key %s: %s", key, e)
                 return result
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error(
                 "Failed to get blackboard %s from Redis: %s",
                 conversation_id,
@@ -190,21 +188,21 @@ class RedisPublicBlackboard:
             最新内容数据，如果不存在则返回 None
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         key = build_key(self._NAMESPACE, conversation_id)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
+            async with aioredis.Redis(connection_pool=pool) as client:
                 # 获取 score 最高的条目（最新版本）
-                entries = client.zrange(key, -1, -1)
+                entries = await client.zrange(key, -1, -1)
                 if entries:
                     raw = json.loads(entries[0])
                     if isinstance(raw, dict):
                         return raw
                     logger.warning("Unexpected data type in blackboard key %s: %s", key, type(raw).__name__)
                 return None
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error(
                 "Failed to get latest blackboard %s from Redis: %s",
                 conversation_id,
@@ -212,18 +210,17 @@ class RedisPublicBlackboard:
             )
             raise
 
-    def close(self) -> None:
-        """关闭连接池。"""
+    async def close(self) -> None:
+        """异步关闭连接池。"""
         if self._pool:
-            self._pool.disconnect()
+            await self._pool.aclose()  # type: ignore[attr-defined]
             self._pool = None
             logger.debug("Redis connection pool closed")
 
-    def __enter__(self) -> RedisPublicBlackboard:
-        """上下文管理器入口。"""
+    async def __aenter__(self) -> RedisPublicBlackboard:
+        """异步上下文管理器入口。"""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """上下文管理器出口，确保连接池关闭。"""
-        self.close()
-        return None
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """异步上下文管理器出口，确保连接池关闭。"""
+        await self.close()

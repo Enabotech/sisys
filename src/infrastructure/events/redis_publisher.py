@@ -1,15 +1,16 @@
 """Redis Event Publisher — 基础设施层实现。
 
-实现 Story 1.2 定义的 EventPublisher 接口。
-用于 Redis Pub/Sub 实时通知通道（尽力而为，允许丢失）。
+实现领域事件的 Redis 发布/订阅通道。
+用于实时通知型事件的低延迟分发。
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
-import redis
+import redis.asyncio as aioredis
 
 from src.domain.events.base import DomainEvent
 from src.infrastructure.config.redis import RedisConfig
@@ -18,25 +19,31 @@ logger = logging.getLogger(__name__)
 
 
 class RedisEventPublisher:
-    """Redis Pub/Sub 事件发布器。
+    """Redis 事件发布器。
 
-    使用连接池管理 Redis 连接，支持事件序列化后发布。
-    注意：Redis 通道为"尽力而为"，不参与事务一致性与可靠投递承诺。
+    通过 Redis 发布/订阅通道分发实时通知型事件。
+    允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）。
+
+    Args:
+        config: Redis 连接配置
     """
 
+    _NAMESPACE = "rt"
+
     def __init__(self, config: RedisConfig):
-        """初始化 RedisEventPublisher。
+        """初始化 Redis 事件发布器。
 
         Args:
             config: Redis 连接配置
         """
         self._config = config
-        self._pool: redis.ConnectionPool | None = None
+        self._pool: aioredis.ConnectionPool | None = None
+        self._pool_lock = asyncio.Lock()
 
-    def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池。"""
+    def _get_pool(self) -> aioredis.ConnectionPool:
+        """懒加载连接池（异步安全）。"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool(
+            self._pool = aioredis.ConnectionPool(
                 host=self._config.host,
                 port=self._config.port,
                 db=self._config.db,
@@ -47,23 +54,23 @@ class RedisEventPublisher:
             )
         return self._pool
 
-    def publish(self, event: DomainEvent, channel: str) -> None:
-        """发布事件到 Redis 频道。
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
+        """发布领域事件到 Redis 通道。
 
         Args:
             event: 领域事件实例
-            channel: Redis 频道名（推荐格式: sisys:rt:{event_type_lowercase}）
-
-        Raises:
-            redis.ConnectionError: 当 Redis 连接失败时
+            channel: 通道名，默认使用事件类型
         """
+        if channel is None:
+            channel = f"{self._NAMESPACE}:{event.event_type}"
+
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
+            async with aioredis.Redis(connection_pool=pool) as client:
                 payload = json.dumps(event.to_dict())
-                client.publish(channel, payload)
+                await client.publish(channel, payload)
                 logger.debug("Published event %s to channel %s", event.event_id, channel)
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error(
                 "Failed to publish event %s to Redis channel %s: %s",
                 event.event_id,
@@ -72,9 +79,17 @@ class RedisEventPublisher:
             )
             raise
 
-    def close(self) -> None:
-        """关闭连接池。"""
+    async def close(self) -> None:
+        """异步关闭连接池。"""
         if self._pool:
-            self._pool.disconnect()
+            await self._pool.aclose()  # type: ignore[attr-defined]
             self._pool = None
             logger.debug("Redis connection pool closed")
+
+    async def __aenter__(self) -> RedisEventPublisher:
+        """异步上下文管理器入口。"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """异步上下文管理器出口，确保连接池关闭。"""
+        await self.close()

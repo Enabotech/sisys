@@ -9,7 +9,7 @@ from collections.abc import Generator
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
-import fakeredis
+import fakeredis.aioredis
 import pytest
 
 # Ensure all domain events are imported so EventRegistry is populated.
@@ -38,9 +38,9 @@ from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 
 @pytest.fixture
-def mock_redis() -> fakeredis.FakeRedis:
+def mock_redis() -> fakeredis.aioredis.FakeRedis:
     """Provide a fakeredis instance mimicking real Redis behavior."""
-    return fakeredis.FakeRedis(decode_responses=True)
+    return fakeredis.aioredis.FakeRedis(decode_responses=True)
 
 
 @pytest.fixture
@@ -123,7 +123,7 @@ def event_store() -> Generator[InMemoryEventStore, None, None]:
 
 
 @pytest.fixture
-def idempotency_checker(mock_redis: fakeredis.FakeRedis) -> IdempotencyChecker:
+def idempotency_checker(mock_redis: fakeredis.aioredis.FakeRedis) -> IdempotencyChecker:
     """Provide IdempotencyChecker backed by fakeredis."""
     return IdempotencyChecker(redis_client=mock_redis)
 

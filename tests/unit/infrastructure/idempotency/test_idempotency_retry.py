@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import fakeredis
+import fakeredis.aioredis
 import pytest
+import redis.asyncio as aioredis
 
 from src.domain.events import DocumentProcessed
 from src.infrastructure.idempotency.checker import IdempotencyChecker
@@ -34,92 +37,76 @@ def _make_event():
 class TestIdempotencyChecker:
     """IdempotencyChecker tests using fakeredis."""
 
-    def test_try_acquire_returns_true_first_time(self):
+    @pytest.mark.asyncio
+    async def test_try_acquire_returns_true_first_time(self):
         """try_acquire should return True on first call."""
-        from fakeredis import FakeRedis
-
-        checker = IdempotencyChecker(redis_client=FakeRedis())
+        checker = IdempotencyChecker(redis_client=fakeredis.aioredis.FakeRedis())
         event_id = uuid4()
-        result = checker.try_acquire(event_id)
+        result = await checker.try_acquire(event_id)
         assert result is True
 
-    def test_try_acquire_returns_false_second_time(self):
+    @pytest.mark.asyncio
+    async def test_try_acquire_returns_false_second_time(self):
         """try_acquire should return False on duplicate call."""
-        fake_redis = fakeredis.FakeRedis()
+        fake_redis = fakeredis.aioredis.FakeRedis()
         checker = IdempotencyChecker(redis_client=fake_redis)
         event_id = uuid4()
 
-        assert checker.try_acquire(event_id) is True
+        assert await checker.try_acquire(event_id) is True
         # Use same redis instance
         checker2 = IdempotencyChecker(redis_client=fake_redis)
-        assert checker2.try_acquire(event_id) is False
+        assert await checker2.try_acquire(event_id) is False
 
-    def test_try_acquire_uses_default_ttl(self):
+    @pytest.mark.asyncio
+    async def test_try_acquire_uses_default_ttl(self):
         """try_acquire should use default 7-day TTL."""
-        from fakeredis import FakeRedis
-
-        checker = IdempotencyChecker(redis_client=FakeRedis())
+        checker = IdempotencyChecker(redis_client=fakeredis.aioredis.FakeRedis())
         event_id = uuid4()
-        checker.try_acquire(event_id, ttl=86400)  # 1 day for faster test
+        await checker.try_acquire(event_id, ttl=86400)
 
         # Key should exist
         redis_client = checker._redis
-        assert redis_client.exists(f"idempotency:{event_id}") == 1
+        assert await redis_client.exists(f"idempotency:{event_id}") == 1
 
-    def test_try_acquire_fail_open_on_connection_error(self):
+    @pytest.mark.asyncio
+    async def test_try_acquire_fail_open_on_connection_error(self):
         """try_acquire should return True (fail-open) on Redis connection error."""
-        from unittest.mock import MagicMock
+        # Create a checker with a mock Redis that raises ConnectionError
+        mock_redis = MagicMock()
+        mock_redis.set = AsyncMock(side_effect=aioredis.ConnectionError("Connection refused"))
 
-        import redis as redis_module
+        checker = IdempotencyChecker.__new__(IdempotencyChecker)
+        checker._redis = mock_redis
 
-        # Create a checker that will fail on set()
-        checker = IdempotencyChecker(host="invalid-host", port=9999)
-
-        # Mock the Redis set method to raise ConnectionError
-        checker._redis = MagicMock()
-        checker._redis.set.side_effect = redis_module.ConnectionError("Connection refused")
-
-        # Should return True (fail-open) to allow processing
-        result = checker.try_acquire(uuid4())
+        result = await checker.try_acquire(uuid4())
         assert result is True
 
-    def test_try_acquire_fail_open_on_timeout_error(self):
+    @pytest.mark.asyncio
+    async def test_try_acquire_fail_open_on_timeout_error(self):
         """try_acquire should return True (fail-open) on Redis timeout error."""
-        from unittest.mock import MagicMock
+        mock_redis = MagicMock()
+        mock_redis.set = AsyncMock(side_effect=aioredis.TimeoutError("Connection timed out"))
 
-        import redis as redis_module
+        checker = IdempotencyChecker.__new__(IdempotencyChecker)
+        checker._redis = mock_redis
 
-        checker = IdempotencyChecker(host="invalid-host", port=9999)
-        checker._redis = MagicMock()
-        checker._redis.set.side_effect = redis_module.TimeoutError("Connection timed out")
-
-        # Should return True (fail-open)
-        result = checker.try_acquire(uuid4())
+        result = await checker.try_acquire(uuid4())
         assert result is True
 
-    def test_concurrent_try_acquire_only_one_succeeds(self):
-        """Concurrent try_acquire calls should only return True once.
-
-        Note: fakeredis doesn't support true multi-threading, so we
-        simulate concurrency by using asyncio.gather in a single thread.
-        """
-        import asyncio
-
-        fake_redis = fakeredis.FakeRedis()
+    @pytest.mark.asyncio
+    async def test_concurrent_try_acquire_only_one_succeeds(self):
+        """Concurrent try_acquire calls should only return True once."""
+        fake_redis = fakeredis.aioredis.FakeRedis()
         checker = IdempotencyChecker(redis_client=fake_redis)
         event_id = uuid4()
 
         async def try_acquire_async():
-            return checker.try_acquire(event_id)
+            return await checker.try_acquire(event_id)
 
-        async def run_concurrent():
-            results = await asyncio.gather(*[try_acquire_async() for _ in range(10)])
-            return list(results)
+        results = await asyncio.gather(*[try_acquire_async() for _ in range(10)])
 
-        results = asyncio.run(run_concurrent())
-
-        assert results.count(True) == 1
-        assert results.count(False) == 9
+        assert list(results).count(True) == 1
+        assert list(results).count(False) == 9
 
 
 # ============================================================================

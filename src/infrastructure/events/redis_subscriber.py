@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import threading
 from collections.abc import Callable
 from typing import Any
 
-import redis
+import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 
@@ -37,17 +37,17 @@ class RedisEventSubscriber:
             config: Redis 连接配置
         """
         self._config = config
-        self._pool: redis.ConnectionPool | None = None
+        self._pool: aioredis.ConnectionPool | None = None
         self._handlers: dict[str, list[EventHandler]] = {}
         self._error_handlers: dict[str, ErrorHandler | None] = {}
-        self._pubsub: redis.client.PubSub | None = None
-        self._thread: threading.Thread | None = None
+        self._pubsub: aioredis.client.PubSub | None = None
+        self._task: asyncio.Task | None = None
         self._running = False
 
-    def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池。"""
+    def _get_pool(self) -> aioredis.ConnectionPool:
+        """懒加载连接池（异步安全）。"""
         if self._pool is None:
-            self._pool = redis.ConnectionPool(
+            self._pool = aioredis.ConnectionPool(
                 host=self._config.host,
                 port=self._config.port,
                 db=self._config.db,
@@ -76,30 +76,33 @@ class RedisEventSubscriber:
             self._error_handlers[channel] = error_handler
         self._handlers[channel].append(handler)
 
-    def start(self) -> None:
-        """开始监听所有订阅的频道。"""
+    async def start(self) -> None:
+        """异步开始监听所有订阅的频道。"""
         if self._running:
             return
 
         pool = self._get_pool()
-        self._pubsub = redis.Redis(connection_pool=pool).pubsub()
-        self._pubsub.subscribe(*self._handlers.keys())
+        redis_client = aioredis.Redis(connection_pool=pool)
+        self._pubsub = redis_client.pubsub()
+        await self._pubsub.subscribe(*self._handlers.keys())
 
         self._running = True
-        self._thread = threading.Thread(target=self._listen_loop, daemon=True)
-        self._thread.start()
+        self._task = asyncio.create_task(self._listen_loop())
         logger.info("RedisEventSubscriber started, subscribed to: %s", list(self._handlers.keys()))
 
-    def _listen_loop(self) -> None:
-        """后台监听循环。"""
+    async def _listen_loop(self) -> None:
+        """后台监听循环（异步版本）。"""
         assert self._pubsub is not None
-        for message in self._pubsub.listen():
-            if not self._running:
-                break
-            if message["type"] == "message":
-                channel = message["channel"]
-                data = message["data"]
-                self._dispatch_message(channel, data)
+        try:
+            async for message in self._pubsub.listen():
+                if not self._running:
+                    break
+                if message["type"] == "message":
+                    channel = message["channel"]
+                    data = message["data"]
+                    self._dispatch_message(channel, data)
+        except asyncio.CancelledError:
+            logger.debug("RedisEventSubscriber listen loop cancelled")
 
     def _dispatch_message(self, channel: str, data: str) -> None:
         """分发消息到注册的处理器。
@@ -134,21 +137,26 @@ class RedisEventSubscriber:
                     e,
                 )
 
-    def close(self) -> None:
-        """停止订阅并关闭连接。"""
+    async def close(self) -> None:
+        """异步停止订阅并关闭连接。"""
         self._running = False
+        if self._task:
+            self._task.cancel()
+            try:
+                await asyncio.wait_for(self._task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            self._task = None
         if self._pubsub:
             try:
-                self._pubsub.unsubscribe()
-                self._pubsub.close()
+                await self._pubsub.unsubscribe()
+                await self._pubsub.close()
             except Exception:
                 pass
             self._pubsub = None
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
         self._handlers.clear()
         self._error_handlers.clear()
         if self._pool:
-            self._pool.disconnect()
+            await self._pool.aclose()  # type: ignore[attr-defined]
             self._pool = None
         logger.info("RedisEventSubscriber closed")
