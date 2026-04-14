@@ -848,6 +848,45 @@ harbor-clean:
 	@echo "✅ Harbor 已清理"
 
 # -----------------------------------------------------------------------------
+# Qdrant 向量存储（Story 1.6）
+# -----------------------------------------------------------------------------
+.PHONY: qdrant-up qdrant-down qdrant-logs qdrant-check qdrant-test qdrant-clean
+
+qdrant-up:
+	@echo "🧠 启动 Qdrant 向量存储服务..."
+	@docker compose -f deploy/qdrant/docker-compose.yml up -d
+	@echo "⏳ 等待 Qdrant 启动..."
+	@sleep 5
+	@echo "✅ Qdrant 服务已启动"
+	@echo "📍 REST API: http://localhost:6333"
+	@echo "📍 gRPC API: http://localhost:6334"
+	@echo "💡 运行 'make qdrant-check' 验证健康状态"
+
+qdrant-down:
+	@echo "🛑 停止 Qdrant 服务..."
+	@docker compose -f deploy/qdrant/docker-compose.yml down
+	@echo "✅ Qdrant 服务已停止"
+
+qdrant-logs:
+	@docker compose -f deploy/qdrant/docker-compose.yml logs -f qdrant
+
+qdrant-check:
+	@echo "🔍 运行 Qdrant 健康检查..."
+	@./scripts/check-qdrant.sh
+
+qdrant-test: qdrant-up qdrant-check
+	@echo "🧪 运行 Qdrant 集成测试..."
+	@$(POETRY) run pytest tests/integration/test_qdrant_integration.py -v
+	@echo "✅ Qdrant 集成测试完成"
+
+qdrant-clean:
+	@echo "⚠️  警告：这将删除所有 Qdrant 数据！"
+	@read -p "确认删除？(y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@docker compose -f deploy/qdrant/docker-compose.yml down -v
+	@docker volume rm sisys-qdrant-data 2>/dev/null || true
+	@echo "✅ Qdrant 数据已清理"
+
+# -----------------------------------------------------------------------------
 # 帮助
 # -----------------------------------------------------------------------------
 .PHONY: help
@@ -953,6 +992,14 @@ help:
 	@echo "  make harbor-deploy    - 部署 Harbor（生成密码 + Helm 安装）"
 	@echo "  make harbor-verify    - 验证 Harbor 部署状态"
 	@echo "  make harbor-clean     - 清理 Harbor 部署"
+	@echo ""
+	@echo "🧠 Qdrant 向量存储（Story 1.6）:"
+	@echo "  make qdrant-up          - 启动 Qdrant 服务（本地开发）"
+	@echo "  make qdrant-down        - 停止 Qdrant 服务"
+	@echo "  make qdrant-logs        - 查看 Qdrant 日志"
+	@echo "  make qdrant-check       - 运行 Qdrant 健康检查脚本"
+	@echo "  make qdrant-test        - 运行 Qdrant 集成测试（需服务运行）"
+	@echo "  make qdrant-clean       - 清理 Qdrant Docker 卷"
 	@echo ""
 	@echo "🌳 Git Worktree 并行开发（Qwen Agent + Worktree 融合模式）:"
 	@echo "  make worktree              - 查看所有 worktrees"

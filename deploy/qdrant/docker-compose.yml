@@ -1,0 +1,51 @@
+version: '3.8'
+
+# =============================================================================
+# Qdrant 向量数据库 - 本地开发环境部署配置
+# =============================================================================
+# 用途：Story 1.6 (Qdrant Vector Layer) 本地开发和集成测试
+# 版本：Qdrant v1.7.0+（支持异步客户端和 query_points API）
+# =============================================================================
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: sisys-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"    # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:6334"  # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=info
+      # 可选：API 密钥（生产环境必须启用）
+      # - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+volumes:
+  qdrant_data:
+    driver: local
+    name: sisys-qdrant-data
+
+networks:
+  sisys-network:
+    driver: bridge
+    name: sisys-network
