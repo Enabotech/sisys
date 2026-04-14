@@ -75,7 +75,7 @@ class RedisSessionStorage:
                 await client.hset(key, "data", data)
                 await client.expire(key, ttl)
                 logger.debug("Saved session %s with TTL %d", session_id, ttl)
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to save session %s to Redis: %s", session_id, e)
 
     async def load(self, session_id: str) -> dict | None:
@@ -99,7 +99,7 @@ class RedisSessionStorage:
                     logger.warning("Unexpected data type in Redis key %s: %s", key, type(raw).__name__)
                     return None
                 return raw
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to load session %s from Redis: %s", session_id, e)
             return None
 
@@ -118,7 +118,7 @@ class RedisSessionStorage:
             async with aioredis.Redis(connection_pool=pool) as client:
                 await client.delete(key)
                 logger.debug("Deleted session %s", session_id)
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to delete session %s from Redis: %s", session_id, e)
 
     async def exists(self, session_id: str) -> bool:
@@ -138,7 +138,7 @@ class RedisSessionStorage:
         try:
             async with aioredis.Redis(connection_pool=pool) as client:
                 return (await client.exists(key)) > 0
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to check session %s existence in Redis: %s", session_id, e)
             return False
 

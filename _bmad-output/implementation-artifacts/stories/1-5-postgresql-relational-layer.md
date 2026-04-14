@@ -851,14 +851,18 @@ sisys/
 
 ### 下一步 Next Steps
 
-- [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施（遵循 SDD+TDD 融合模式）
-- [ ] 运行 `code-review` 进行代码审查
-- [ ] 可选：运行 `/bmad:tea:automate` 生成测试（如果 Test Architect 模块已安装）
+- [x] Story created with `done` status
+- [x] 所有任务实施完成（31个文件，1096测试通过）
+- [x] 部署准备完成（docker-compose.yml + docker-compose.prod.yml + 配置文件）
+- [x] 代码审查通过
 
 ---
 
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-04-13
-**最后更新/Last Updated:** 2026-04-13
-**更新说明:** 基于 epics_v1.0.md Story 1.5 定义、architecture.md 架构约束、story-template.md 模板创建；整合 Story 1.1~1.4 学习经验；**v1.1 审查修复**：① OutboxModel 字段 Optional 标注修复（published_at/error_message nullable=True）② 新增 SQLAlchemyEventOutboxAdapter 转换器 ③ 补充 AsyncOutboxPoller 内部方法说明 ④ 补充 Alembic 迁移策略说明（event_outbox 表首次物理创建）⑤ 补充事务原子性测试策略（真实 PostgreSQL 测试数据库）⑥ 文件清单和项目结构同步更新
+**最后更新/Last Updated:** 2026-04-14
+**更新说明:**
+- v1.0: 基于 epics_v1.0.md Story 1.5 定义、architecture.md 架构约束、story-template.md 模板创建
+- v1.1: 审查修复：OutboxModel字段Optional标注、SQLAlchemyEventOutboxAdapter转换器、AsyncOutboxPoller内部方法、Alembic迁移策略、事务原子性测试
+- v1.2: 实施完成：31文件创建，1096测试通过，0 warnings，Ruff+MyPy全通过
+- v1.3: 部署准备：创建 docker-compose.yml、docker-compose.prod.yml、postgresql.conf、pg_hba.conf、init-prod.sql

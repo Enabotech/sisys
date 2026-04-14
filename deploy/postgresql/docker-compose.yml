@@ -1,0 +1,51 @@
+version: '3.8'
+
+# =============================================================================
+# PostgreSQL 关系存储层 - 本地开发环境部署配置
+# =============================================================================
+# 用途：Story 1.5 (PostgreSQL Relational Layer) 本地开发和集成测试
+# 版本：PostgreSQL 15+（支持异步驱动 asyncpg/psycopg2）
+# 职责：L2 关系存储层（用户/RBAC、审计元数据、业务实体、事件发件箱）
+# =============================================================================
+
+services:
+  postgres:
+    image: harbor.sisys.local/sisys/tools/postgres:15.4
+    container_name: sisys-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DATABASE:-sisys}
+      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME:-postgres} -d ${POSTGRES_DATABASE:-sisys}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+volumes:
+  postgres_data:
+    driver: local
+    name: sisys-postgres-data
+
+networks:
+  sisys-network:
+    driver: bridge
+    name: sisys-network

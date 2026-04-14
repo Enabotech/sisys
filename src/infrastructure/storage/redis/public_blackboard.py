@@ -116,7 +116,7 @@ class RedisPublicBlackboard:
                 )
                 return version
 
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error(
                 "Failed to post to blackboard %s in Redis: %s",
                 conversation_id,
@@ -152,7 +152,7 @@ class RedisPublicBlackboard:
                     except (json.JSONDecodeError, TypeError) as e:
                         logger.warning("Corrupt data in blackboard key %s: %s", key, e)
                 return result
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error(
                 "Failed to get blackboard %s from Redis: %s",
                 conversation_id,
@@ -203,7 +203,7 @@ class RedisPublicBlackboard:
                         return raw
                     logger.warning("Unexpected data type in blackboard key %s: %s", key, type(raw).__name__)
                 return None
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error(
                 "Failed to get latest blackboard %s from Redis: %s",
                 conversation_id,

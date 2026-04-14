@@ -80,7 +80,7 @@ development_status:
   1-16-integration-test-framework: done
   # 价值组 3: 五层存储架构
   1-4-redis-cache-layer: done  # ✅ 性能基准<10ms, 覆盖率91%, 优雅降级, JSON序列化, async迁移
-  1-5-postgresql-relational-layer: done   # 1096测试通过,PostgreSQL完整实现event_outbox
+  1-5-postgresql-relational-layer: done   # 1096测试,PostgreSQL完整实现,部署配置完成
   1-6-qdrant-vector-layer: done   # ✅ 773测试通过,覆盖率92%,Qdrant v1.7.0集成,部署准备完成
   1-7-minio-object-layer: ready-for-dev  # Story 文件已创建，SDD+TDD 融合开发要求定义完成
   1-8-neo4j-graph-layer: ready-for-dev
