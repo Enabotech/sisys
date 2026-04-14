@@ -85,7 +85,7 @@ def _make_blackboard_entry() -> dict:
 class TestSerializationPerformance:
     """验证序列化/反序列化时间 <10ms。"""
 
-    def test_session_serialize_deserialize_under_10ms(self):
+    def test_session_serialize_deserialize_under_10ms(self) -> None:
         data = _make_session_data()
         serialize_times: list[float] = []
         deserialize_times: list[float] = []
@@ -104,7 +104,7 @@ class TestSerializationPerformance:
         assert _percentile(serialize_times, 95) < PERF_THRESHOLDS["serialize_ms"]
         assert _percentile(deserialize_times, 95) < PERF_THRESHOLDS["deserialize_ms"]
 
-    def test_cache_serialize_deserialize_under_10ms(self):
+    def test_cache_serialize_deserialize_under_10ms(self) -> None:
         embedding, result = _make_cache_entry()
         data = {"embedding": embedding, "result": result}
         times: list[float] = []
@@ -114,7 +114,7 @@ class TestSerializationPerformance:
             times.append((time.perf_counter() - start) * 1000)
         assert statistics.mean(times) < PERF_THRESHOLDS["serialize_ms"]
 
-    def test_blackboard_serialize_deserialize_under_10ms(self):
+    def test_blackboard_serialize_deserialize_under_10ms(self) -> None:
         data = _make_blackboard_entry()
         times: list[float] = []
         for _ in range(BENCHMARK_ITERATIONS):
@@ -123,7 +123,7 @@ class TestSerializationPerformance:
             times.append((time.perf_counter() - start) * 1000)
         assert statistics.mean(times) < PERF_THRESHOLDS["serialize_ms"]
 
-    def test_json_encoder_handles_special_types(self):
+    def test_json_encoder_handles_special_types(self) -> None:
         from enum import Enum
 
         class Status(Enum):
@@ -153,7 +153,7 @@ class TestReadLatencyPerformance:
     """验证读取延迟 P95 <5ms。"""
 
     @pytest.mark.asyncio
-    async def test_session_read_latency_p95_under_5ms(self):
+    async def test_session_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(RedisConfig())
         storage._pool = fake_redis.connection_pool
@@ -172,7 +172,7 @@ class TestReadLatencyPerformance:
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["read_p95_ms"]
 
     @pytest.mark.asyncio
-    async def test_blackboard_read_latency_p95_under_5ms(self):
+    async def test_blackboard_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         blackboard = RedisPublicBlackboard(RedisConfig())
         blackboard._pool = fake_redis.connection_pool
@@ -206,7 +206,7 @@ class TestWriteLatencyPerformance:
     """验证写入延迟 P95 <10ms。"""
 
     @pytest.mark.asyncio
-    async def test_session_write_latency_p95_under_10ms(self):
+    async def test_session_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(RedisConfig())
         storage._pool = fake_redis.connection_pool
@@ -223,7 +223,7 @@ class TestWriteLatencyPerformance:
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
     @pytest.mark.asyncio
-    async def test_blackboard_write_latency_p95_under_10ms(self):
+    async def test_blackboard_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         blackboard = RedisPublicBlackboard(RedisConfig())
         blackboard._pool = fake_redis.connection_pool
@@ -246,7 +246,7 @@ class TestWriteLatencyPerformance:
         assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
     @pytest.mark.asyncio
-    async def test_cache_set_latency_p95_under_10ms(self):
+    async def test_cache_set_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         cache = RedisSemanticCache(RedisConfig())
         cache._pool = fake_redis.connection_pool
@@ -271,7 +271,7 @@ class TestTTLBehavior:
     """验证 TTL 过期策略。"""
 
     @pytest.mark.asyncio
-    async def test_session_ttl_is_applied(self):
+    async def test_session_ttl_is_applied(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = RedisSessionStorage(RedisConfig())
         storage._pool = fake_redis.connection_pool
@@ -281,7 +281,7 @@ class TestTTLBehavior:
         assert 0 < ttl <= 60
 
     @pytest.mark.asyncio
-    async def test_cache_ttl_is_applied(self):
+    async def test_cache_ttl_is_applied(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         cache = RedisSemanticCache(RedisConfig())
         cache._pool = fake_redis.connection_pool
@@ -301,7 +301,7 @@ class TestTTLBehavior:
 class TestCosineSimilarityPerformance:
     """验证余弦相似度计算性能。"""
 
-    def test_cosine_similarity_under_1ms_for_1024_dim(self):
+    def test_cosine_similarity_under_1ms_for_1024_dim(self) -> None:
         vec1 = [0.1 * (i % 10) for i in range(1024)]
         vec2 = [0.2 * (i % 5) for i in range(1024)]
         times: list[float] = []
