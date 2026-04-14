@@ -14,6 +14,12 @@ from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter,
 from src.infrastructure.entities.outbox import InvalidStateTransitionError, OutboxEntity
 
 
+class _MockEventForTest(DomainEvent):
+    """Mock event class for testing EventRegistry."""
+
+    event_type: str = "MockEvent"
+
+
 def _make_event() -> DocumentProcessed:
     return DocumentProcessed(
         document_id=uuid4(),
@@ -162,15 +168,12 @@ class TestEventOutboxAdapter:
         with pytest.raises(ValueError, match="Unknown event_type"):
             EventOutboxAdapter.to_domain_event(entity)
 
-    def test_registry_manual_register(self):
+    def test_registry_manual_register(self) -> None:
         """EventRegistry should support manual registration."""
 
-        class MockEvent(DomainEvent):
-            event_type: str = "MockEvent"  # type annotation for mypy
-
-        EventRegistry.register("MockEvent", MockEvent)
+        EventRegistry.register("MockEvent", _MockEventForTest)
         event_class = EventRegistry.get("MockEvent")
-        assert event_class == MockEvent
+        assert event_class == _MockEventForTest
 
     def test_registry_reset(self) -> None:
         """EventRegistry.reset should clear the registry."""
