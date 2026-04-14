@@ -5,6 +5,13 @@
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
+>
+> **🔧 技术约束（v1.1 审查修订）：**
+> 1. **实体位于基础设施层** — `ObjectMetadata`/`LifecycleRule` 是存储结构（与 Story 1.4 的 `SessionState`/`CacheEntry` 一致），位于 `src/infrastructure/storage/minio/entities.py`，**不在领域层**
+> 2. **复用连接池模式** — 各组件独立 `_get_pool()` 懒加载，**不引入全局连接池**（与 Story 1.3/1.4 一致，架构已审查通过）
+> 3. **新增 MinIOConfig** — 参考 Story 1.3 `RedisConfig` / Story 1.5 `PostgreSQLConfig` 模式，位于 `src/infrastructure/config/minio.py`
+> 4. **流式上传防止 OOM** — `upload_object` 接受 `file_path: str` 或 `AsyncIterator[bytes]`，不接受全量 `bytes`（or.md 要求"流式处理防止内存溢出"）
+> 5. **领域仓储接口抽象化** — `ObjectStorageRepository`（领域层）定义领域操作（`store`/`retrieve`/`archive`），S3 原生操作（`create_bucket`/`enable_worm_lock`）仅在基础设施层暴露
 
 ---
 
@@ -49,9 +56,11 @@
 
 **验证标准/Validation Criteria:**
 - [ ] MinIO 客户端适配器实现位于 `src/infrastructure/storage/minio/`
+- [ ] MinIOConfig 配置模型位于 `src/infrastructure/config/minio.py`（参考 Story 1.3/1.5 模式）
 - [ ] Bucket 命名规范验证（documents/audit-logs/versions/backups）
-- [ ] 支持连接池与超时配置
+- [ ] 支持连接池与超时配置（独立懒加载，不引入全局连接池）
 - [ ] 错误处理完整（桶不存在、权限不足、网络异常）
+- [ ] 流式上传支持（不接受全量 `bytes`，使用 `file_path` 或 `AsyncIterator[bytes]`）
 
 ### AC-2: 版本控制与断点续传实现
 
@@ -115,7 +124,8 @@
 - [ ] 通过领域层仓储接口间接调用
 
 #### 数据模型 (Data Models)
-- [ ] 对象存储元数据模型定义位于 `src/domain/entities/object_metadata.py`
+- [ ] 对象存储元数据模型定义位于 `src/infrastructure/storage/minio/entities.py`
+  > **📌 架构说明**: `ObjectMetadata`/`LifecycleRule` 是存储结构（与 Story 1.4 的 `SessionState`/`CacheEntry` 一致），位于基础设施层
 - [ ] 关键字段：
   - `object_id: UUID` - 对象唯一标识
   - `bucket_name: str` - Bucket 名称（必须符合命名规范）
@@ -133,52 +143,47 @@
   - `tags: Dict[str, str]` - 对象标签（用于生命周期管理）
 
 #### 仓储接口 (Repository Interface)
+
+**领域层接口（抽象操作，不暴露 S3 概念）：**
 - [ ] 领域层接口定义位于 `src/domain/repositories/storage.py`
 - [ ] 接口方法：
   ```python
   class ObjectStorageRepository(ABC):
       @abstractmethod
-      async def create_bucket(self, bucket_name: str, enable_versioning: bool = False,
-                              enable_object_lock: bool = False) -> bool: ...
+      async def store(self, bucket_type: str, object_key: str,
+                      file_path: str, content_type: str,
+                      tags: Optional[Dict[str, str]] = None) -> str: ...
+      """存储对象，返回 version_id。大文件自动分片上传。"""
 
       @abstractmethod
-      async def upload_object(self, bucket_name: str, object_key: str,
-                              data: bytes, content_type: str,
-                              tags: Optional[Dict[str, str]] = None) -> ObjectMetadata: ...
+      async def retrieve(self, bucket_type: str, object_key: str,
+                         version_id: Optional[str] = None) -> AsyncIterator[bytes]: ...
+      """流式下载对象，防止大文件 OOM。"""
 
       @abstractmethod
-      async def upload_object_multipart(self, bucket_name: str, object_key: str,
-                                        file_path: str, content_type: str,
-                                        part_size: int = 10 * 1024 * 1024) -> ObjectMetadata: ...
+      async def delete(self, bucket_type: str, object_key: str,
+                       version_id: Optional[str] = None) -> bool: ...
+      """删除对象。WORM 锁定对象抛出 ComplianceLockError。"""
 
       @abstractmethod
-      async def resume_multipart_upload(self, bucket_name: str, object_key: str,
-                                        upload_id: str) -> ObjectMetadata: ...
+      async def get_metadata(self, bucket_type: str, object_key: str,
+                             version_id: Optional[str] = None) -> dict: ...
+      """获取对象元数据。"""
 
       @abstractmethod
-      async def download_object(self, bucket_name: str, object_key: str,
-                                version_id: Optional[str] = None) -> bytes: ...
-
-      @abstractmethod
-      async def delete_object(self, bucket_name: str, object_key: str,
-                              version_id: Optional[str] = None) -> bool: ...
-
-      @abstractmethod
-      async def get_object_metadata(self, bucket_name: str, object_key: str,
-                                    version_id: Optional[str] = None) -> ObjectMetadata: ...
-
-      @abstractmethod
-      async def list_objects(self, bucket_name: str, prefix: str = "",
-                             recursive: bool = True) -> List[ObjectMetadata]: ...
-
-      @abstractmethod
-      async def enable_worm_lock(self, bucket_name: str, object_key: str,
-                                 retention_days: int = 2555) -> bool: ...
-
-      @abstractmethod
-      async def configure_lifecycle(self, bucket_name: str,
-                                    rules: List[LifecycleRule]) -> bool: ...
+      async def archive(self, bucket_type: str, object_key: str,
+                        retention_days: int = 2555) -> bool: ...
+      """归档对象至 WORM 存储，启用 Object Lock。"""
   ```
+
+**基础设施层实现（S3 原生操作）：**
+- [ ] 基础设施层实现位于 `src/infrastructure/storage/minio/minio_repository.py`
+- [ ] 实现上述领域接口，内部调用 MinIO SDK
+- [ ] 额外暴露内部管理方法（不通过领域接口）：
+  - `create_bucket(bucket_name, enable_versioning, enable_object_lock)`
+  - `enable_worm_lock(bucket_name, object_key, retention_days)`
+  - `configure_lifecycle(bucket_name, rules)`
+  - `resume_multipart_upload(bucket_name, object_key, upload_id)`
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1_7.feature`
@@ -216,10 +221,11 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 对象元数据实体 | 验证元数据创建、字段校验、命名规范 | `test_object_metadata.py` | Task 1 |
+| **TDD 单元测试** | MinIO 配置模型 | 验证 MinIOConfig 初始化、环境变量读取、默认值 | `test_minio_config.py` | Task 1 |
+| **TDD 单元测试** | 存储实体 | 验证 ObjectMetadata/LifecycleRule 创建、字段校验 | `test_minio_entities.py` | Task 1 |
 | **TDD 单元测试** | MinIO 客户端适配器 | 验证客户端初始化、连接池、错误处理 | `test_minio_client_adapter.py` | Task 2 |
 | **TDD 单元测试** | Bucket 管理 | 验证 Bucket 创建、版本控制、Object Lock | `test_bucket_management.py` | Task 3 |
-| **TDD 单元测试** | 对象上传/下载 | 验证普通上传、分片上传、断点续传、下载 | `test_object_operations.py` | Task 4 |
+| **TDD 单元测试** | 对象存储/检索 | 验证流式上传、分片上传、断点续传、流式下载 | `test_object_operations.py` | Task 4 |
 | **TDD 单元测试** | WORM 锁定与生命周期 | 验证 WORM 启用、保留期限计算、生命周期规则 | `test_worm_and_lifecycle.py` | Task 5 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收（端到端对象存储操作） | `test_story_1_7.feature` | Task 0 |
 | **SDD 架构验证** | 依赖方向 | 领域层零 MinIO 依赖、仓储模式正确 | `test_storage_architecture.py` | Task 6 |
@@ -251,11 +257,11 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | MinIO 客户端适配器就绪 | Task 0 | SDD 规范定义（数据模型、仓储接口、验收测试） | `test_story_1_7.feature` |
-| AC-1 | MinIO 客户端适配器就绪 | Task 1 | 对象元数据实体创建 + 命名规范验证 | `test_object_metadata.py` |
+| AC-1 | MinIO 客户端适配器就绪 | Task 0 | SDD 规范定义（数据模型、MinIOConfig、仓储接口、验收测试） | `test_story_1_7.feature` |
+| AC-1 | MinIO 客户端适配器就绪 | Task 1 | MinIOConfig 配置 + ObjectMetadata/LifecycleRule 实体 | `test_minio_config.py`, `test_minio_entities.py` |
 | AC-1 | MinIO 客户端适配器就绪 | Task 2 | MinIO 客户端适配器封装（连接池、错误处理） | `test_minio_client_adapter.py` |
 | AC-2 | 版本控制与断点续传实现 | Task 3 | Bucket 管理（版本控制、Object Lock 启用） | `test_bucket_management.py` |
-| AC-2 | 版本控制与断点续传实现 | Task 4 | 对象操作（上传/下载、分片上传、断点续传） | `test_object_operations.py` |
+| AC-2 | 版本控制与断点续传实现 | Task 4 | 对象操作（流式上传/下载、分片上传、断点续传） | `test_object_operations.py` |
 | AC-3 | WORM 存储与对象生命周期管理 | Task 5 | WORM 锁定逻辑 + 生命周期规则配置 | `test_worm_and_lifecycle.py` |
 | AC-4 | 仓储模式适配器实现 | Task 6 | 依赖方向验证 + Mock 实现 + 领域层测试 | `test_storage_architecture.py` |
 
@@ -274,7 +280,8 @@
 
 > **目的：** 在进入代码实现前，明确数据模型、仓储接口、验收标准。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask: 定义对象存储元数据模型（`src/domain/entities/object_metadata.py`）
+- [ ] Subtask: 定义对象存储元数据模型（`src/infrastructure/storage/minio/entities.py`）
+- [ ] Subtask: 定义 MinIOConfig 配置模型（`src/infrastructure/config/minio.py`）
 - [ ] Subtask: 定义领域层仓储接口（`src/domain/repositories/storage.py`）
 - [ ] Subtask: 创建 Gherkin 验收测试 `tests/acceptance/test_story_1_7.feature`
 - [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
@@ -285,40 +292,40 @@
 
 ---
 
-### Task 1: 对象元数据实体实现
+### Task 1: MinIO 配置模型与存储实体实现
 
 **关联 AC:** AC-1
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
-#### TDD 循环 A：ObjectMetadata 实体
+#### TDD 循环 A：MinIOConfig 配置模型
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_object_metadata.py`（实体创建、字段校验、命名规范验证） |
-| 🟢 绿 | 实现 `ObjectMetadata` 数据类最小代码 |
-| 🔄 重构 | 添加类型注解、docstring、应用 Pydantic V2 验证 |
+| 🔴 红 | 编写 `test_minio_config.py`（配置初始化、环境变量读取、默认值验证） |
+| 🟢 绿 | 实现 `MinIOConfig` 数据类（参考 Story 1.3 RedisConfig / Story 1.5 PostgreSQLConfig） |
+| 🔄 重构 | 添加 `from_env()` 类方法、类型注解、docstring |
 
-- [ ] Subtask: 🔴 红 — 编写 ObjectMetadata 失败测试（字段校验、命名规范）
-- [ ] Subtask: 🟢 绿 — 实现 ObjectMetadata 数据类
-- [ ] Subtask: 🔄 重构 — 优化 ObjectMetadata 代码（类型注解、docstring）
+- [ ] Subtask: 🔴 红 — 编写 MinIOConfig 失败测试（必填字段缺失、默认值验证）
+- [ ] Subtask: 🟢 绿 — 实现 MinIOConfig 配置模型
+- [ ] Subtask: 🔄 重构 — 优化 MinIOConfig 代码（`from_env()` 方法、类型注解）
 
-#### TDD 循环 B：LifecycleRule 实体
+#### TDD 循环 B：ObjectMetadata / LifecycleRule 实体
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_lifecycle_rule.py`（规则创建、过期策略、转换策略） |
-| 🟢 绿 | 实现 `LifecycleRule` 数据类最小代码 |
+| 🔴 红 | 编写 `test_minio_entities.py`（实体创建、字段校验、命名规范验证） |
+| 🟢 绿 | 实现 `ObjectMetadata` / `LifecycleRule` 数据类 |
 | 🔄 重构 | 添加类型注解、docstring、验证逻辑 |
 
-- [ ] Subtask: 🔴 红 — 编写 LifecycleRule 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 LifecycleRule 数据类
-- [ ] Subtask: 🔄 重构 — 优化 LifecycleRule 代码
+- [ ] Subtask: 🔴 红 — 编写实体失败测试（字段类型错误、必填字段缺失）
+- [ ] Subtask: 🟢 绿 — 实现 ObjectMetadata / LifecycleRule 数据类
+- [ ] Subtask: 🔄 重构 — 优化实体代码（类型注解、docstring）
 
 **完成标准/Definition of Done:**
-- [ ] ObjectMetadata 和 LifecycleRule 实体实现完成
+- [ ] MinIOConfig、ObjectMetadata 和 LifecycleRule 实现完成
 - [ ] TDD 循环测试全部通过
-- [ ] 领域层覆盖率≥90%
+- [ ] 基础设施层覆盖率≥75%
 
 ---
 
@@ -553,24 +560,25 @@
 sisys/
 ├── src/
 │   ├── domain/
-│   │   ├── entities/
-│   │   │   └── object_metadata.py          # ObjectMetadata, LifecycleRule 实体
 │   │   └── repositories/
-│   │       └── storage.py                  # ObjectStorageRepository 接口
-│   └── infrastructure/
-│       └── storage/
-│           ├── minio/
-│           │   ├── __init__.py
-│           │   ├── client_adapter.py       # MinioClientAdapter 实现
-│           │   ├── bucket_manager.py       # Bucket 管理逻辑
-│           │   ├── object_operations.py    # 对象上传/下载逻辑
-│           │   └── worm_lifecycle.py       # WORM 锁定与生命周期管理
-│           └── minio_repository.py         # ObjectStorageRepository 实现
+│   │       └── storage.py                  # ObjectStorageRepository 接口（领域抽象操作）
+│   ├── infrastructure/
+│   │   ├── config/
+│   │   │   └── minio.py                    # MinIOConfig 配置模型
+│   │   └── storage/
+│   │       └── minio/
+│   │           ├── __init__.py
+│   │           ├── entities.py             # ObjectMetadata, LifecycleRule 实体
+│   │           ├── client_adapter.py       # MinioClientAdapter 实现（连接池、错误处理）
+│   │           ├── bucket_manager.py       # Bucket 管理逻辑
+│   │           ├── object_operations.py    # 对象上传/下载逻辑（流式）
+│   │           ├── worm_lifecycle.py       # WORM 锁定与生命周期管理
+│   │           └── minio_repository.py     # ObjectStorageRepository 实现
 ├── tests/
 │   ├── unit/
-│   │   ├── domain/
-│   │   │   └── test_object_metadata.py     # 实体单元测试
 │   │   └── infrastructure/
+│   │       ├── test_minio_config.py         # 配置模型测试
+│   │       ├── test_minio_entities.py       # 实体测试
 │   │       ├── test_minio_client_adapter.py
 │   │       ├── test_bucket_management.py
 │   │       ├── test_object_operations.py
@@ -638,14 +646,16 @@ sisys/
 - `_bmad-output/implementation-artifacts/stories/1-7-minio-object-layer.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/entities/object_metadata.py` - 对象元数据实体
-- `src/domain/repositories/storage.py` - 仓储接口
+- `src/domain/repositories/storage.py` - 领域仓储接口（抽象操作：store/retrieve/delete/archive）
+- `src/infrastructure/config/minio.py` - MinIOConfig 配置模型
+- `src/infrastructure/storage/minio/entities.py` - ObjectMetadata, LifecycleRule 实体
 - `src/infrastructure/storage/minio/client_adapter.py` - MinIO 客户端适配器
 - `src/infrastructure/storage/minio/bucket_manager.py` - Bucket 管理
-- `src/infrastructure/storage/minio/object_operations.py` - 对象操作
+- `src/infrastructure/storage/minio/object_operations.py` - 对象操作（流式上传/下载）
 - `src/infrastructure/storage/minio/worm_lifecycle.py` - WORM 锁定与生命周期
-- `src/infrastructure/storage/minio_repository.py` - 仓储实现
-- `tests/unit/domain/test_object_metadata.py` - 实体单元测试
+- `src/infrastructure/storage/minio/minio_repository.py` - ObjectStorageRepository 实现
+- `tests/unit/infrastructure/test_minio_config.py` - 配置模型测试
+- `tests/unit/infrastructure/test_minio_entities.py` - 实体测试
 - `tests/unit/infrastructure/test_minio_client_adapter.py` - 客户端适配器测试
 - `tests/unit/infrastructure/test_bucket_management.py` - Bucket 管理测试
 - `tests/unit/infrastructure/test_object_operations.py` - 对象操作测试

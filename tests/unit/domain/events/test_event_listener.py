@@ -43,7 +43,7 @@ class TestEventListenerRegistration:
 class TestEventListenerDispatch:
     """Test event dispatch to handlers."""
 
-    def test_dispatch_calls_handler(self):
+    def test_dispatch_calls_handler(self) -> None:
         """Dispatch calls the registered handler."""
         listener = InMemoryEventListener()
         received_event: DomainEvent | None = None
@@ -59,19 +59,25 @@ class TestEventListenerDispatch:
         assert received_event is not None
         assert received_event.event_id == event.event_id
 
-    def test_dispatch_no_handler_for_type(self):
+    def test_dispatch_no_handler_for_type(self) -> None:
         """Dispatch with no handler for type does nothing."""
         listener = InMemoryEventListener()
         event = DocumentProcessed(document_id=uuid.uuid4())
         listener.dispatch(event)  # Should not raise
 
-    def test_dispatch_only_matching_handler(self):
+    def test_dispatch_only_matching_handler(self) -> None:
         """Only handlers for the matching event type are called."""
         listener = InMemoryEventListener()
         results: list[str] = []
 
-        listener.on_event("DocumentProcessed", lambda e: results.append("doc"))
-        listener.on_event("ToolExecuted", lambda e: results.append("tool"))
+        def handler_doc(event: DomainEvent) -> None:
+            results.append("doc")
+
+        def handler_tool(event: DomainEvent) -> None:
+            results.append("tool")
+
+        listener.on_event("DocumentProcessed", handler_doc)
+        listener.on_event("ToolExecuted", handler_tool)
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         listener.dispatch(event)
@@ -79,13 +85,19 @@ class TestEventListenerDispatch:
         assert results == ["doc"]
         assert "tool" not in results
 
-    def test_dispatch_all_handlers_for_same_type(self):
+    def test_dispatch_all_handlers_for_same_type(self) -> None:
         """All handlers for the same event type are called."""
         listener = InMemoryEventListener()
         results: list[int] = []
 
-        listener.on_event("TestEvent", lambda e: results.append(1))
-        listener.on_event("TestEvent", lambda e: results.append(2))
+        def handler1(event: DomainEvent) -> None:
+            results.append(1)
+
+        def handler2(event: DomainEvent) -> None:
+            results.append(2)
+
+        listener.on_event("TestEvent", handler1)
+        listener.on_event("TestEvent", handler2)
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         # Manually set event_type for testing
@@ -93,13 +105,19 @@ class TestEventListenerDispatch:
         # The event type is "DocumentProcessed", so no handlers fire
         assert results == []
 
-    def test_dispatch_with_actual_event_type(self):
+    def test_dispatch_with_actual_event_type(self) -> None:
         """Dispatch with actual event type fires correct handlers."""
         listener = InMemoryEventListener()
         received: list[str] = []
 
-        listener.on_event("DocumentProcessed", lambda e: received.append("doc"))
-        listener.on_event("ToolExecuted", lambda e: received.append("tool"))
+        def handler_doc(event: DomainEvent) -> None:
+            received.append("doc")
+
+        def handler_tool(event: DomainEvent) -> None:
+            received.append("tool")
+
+        listener.on_event("DocumentProcessed", handler_doc)
+        listener.on_event("ToolExecuted", handler_tool)
 
         doc_event = DocumentProcessed(document_id=uuid.uuid4())
         listener.dispatch(doc_event)
@@ -111,7 +129,7 @@ class TestEventListenerDispatch:
 
         assert received == ["doc", "tool"]
 
-    def test_dispatch_continues_after_handler_error(self):
+    def test_dispatch_continues_after_handler_error(self) -> None:
         """One handler failing doesn't stop subsequent handlers (P0-4)."""
         listener = InMemoryEventListener()
         results: list[int] = []
