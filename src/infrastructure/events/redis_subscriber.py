@@ -14,6 +14,7 @@ from typing import Any
 import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
+from src.infrastructure.utils import json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class RedisEventSubscriber:
             data: 原始消息数据（JSON 字符串）
         """
         try:
-            event_dict = json.loads(data)
+            event_dict = json_loads(data)
         except (json.JSONDecodeError, TypeError) as e:
             error_handler = self._error_handlers.get(channel)
             if error_handler:

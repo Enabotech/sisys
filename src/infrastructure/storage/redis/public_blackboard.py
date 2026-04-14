@@ -16,6 +16,7 @@ import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.key_builder import build_key
+from src.infrastructure.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class RedisPublicBlackboard:
 
                 # 使用版本号作为 score，支持排序
                 score = float(version)
-                await client.zadd(key, {json.dumps(entry): score})
+                await client.zadd(key, {json_dumps(entry): score})
 
                 logger.debug(
                     "Posted to blackboard %s by agent %s, version %d",
@@ -121,7 +122,7 @@ class RedisPublicBlackboard:
                 conversation_id,
                 e,
             )
-            raise
+            return 0
 
     async def get(self, conversation_id: str) -> list[dict]:
         """获取会话的所有内容。
@@ -143,7 +144,7 @@ class RedisPublicBlackboard:
                 result = []
                 for entry in entries:
                     try:
-                        raw = json.loads(entry)
+                        raw = json_loads(entry)
                         if isinstance(raw, dict):
                             result.append(raw)
                         else:
@@ -157,7 +158,7 @@ class RedisPublicBlackboard:
                 conversation_id,
                 e,
             )
-            raise
+            return []
 
     async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None:
         """获取指定 Agent 的最新内容。
@@ -197,7 +198,7 @@ class RedisPublicBlackboard:
                 # 获取 score 最高的条目（最新版本）
                 entries = await client.zrange(key, -1, -1)
                 if entries:
-                    raw = json.loads(entries[0])
+                    raw = json_loads(entries[0])
                     if isinstance(raw, dict):
                         return raw
                     logger.warning("Unexpected data type in blackboard key %s: %s", key, type(raw).__name__)
@@ -208,7 +209,7 @@ class RedisPublicBlackboard:
                 conversation_id,
                 e,
             )
-            raise
+            return None
 
     async def close(self) -> None:
         """异步关闭连接池。"""
