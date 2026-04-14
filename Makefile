@@ -321,23 +321,23 @@ security: bandit-scan snyk-scan
 
 db-migrate:
 	@echo "🔄 运行数据库迁移..."
-	$(POETRY) run alembic upgrade head
+	$(POETRY) run alembic -c alembic/alembic.ini upgrade head
 
 db-downgrade:
 	@echo "⏮️  回滚数据库..."
-	$(POETRY) run alembic downgrade -1
+	$(POETRY) run alembic -c alembic/alembic.ini downgrade -1
 
 db-upgrade:
 	@echo "⏭️  升级数据库到指定版本..."
-	$(POETRY) run alembic upgrade $(revision)
+	$(POETRY) run alembic -c alembic/alembic.ini upgrade $(revision)
 
 db-head:
 	@echo "📍 查看当前数据库版本..."
-	$(POETRY) run alembic heads
+	$(POETRY) run alembic -c alembic/alembic.ini heads
 
 db-revision:
 	@echo "📝 创建新的数据库迁移..."
-	$(POETRY) run alembic revision -m "$(message)"
+	$(POETRY) run alembic -c alembic/alembic.ini revision -m "$(message)"
 
 db-init: db-migrate
 	@echo "✅ 数据库初始化完成"
