@@ -768,6 +768,8 @@ sisys/
 - [x] Coverage ≥75% (actual: 91%)
 - [x] Full regression passing (1096 tests)
 - [x] 部署 Redis 基础设施（生产环境）- docker-compose.prod.yml + redis-prod.conf 已创建
+- [ ] 部署 Redis 实例后验证集成测试（替换 mock 为真实实例）
+- [ ] 部署 Redis 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 

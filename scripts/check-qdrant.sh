@@ -1,19 +1,47 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Qdrant 健康检查脚本
+# Qdrant 向量存储层健康检查脚本
 # =============================================================================
 # 用途：验证 Qdrant 服务是否正常运行并满足 Story 1.6 要求
-# 用法：./scripts/check-qdrant.sh
+# 用法：./scripts/check-qdrant.sh [--host HOST] [--port PORT]
 # =============================================================================
 
 set -euo pipefail
 
-# 配置
-QDRANT_HOST="${QDRANT_HOST:-localhost}"
-QDRANT_PORT="${QDRANT_PORT:-6333}"
-QDRANT_URL="http://${QDRANT_HOST}:${QDRANT_PORT}"
+# 默认配置
+QDRANT_HOST="localhost"
+QDRANT_PORT="6333"
 TIMEOUT=10
 MAX_RETRIES=5
+
+# 解析命令行参数
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --host)
+      QDRANT_HOST="$2"
+      shift 2
+      ;;
+    --port)
+      QDRANT_PORT="$2"
+      shift 2
+      ;;
+    --help)
+      echo "用法: $0 [--host HOST] [--port PORT]"
+      echo ""
+      echo "选项:"
+      echo "  --host HOST    Qdrant 主机地址 (默认: localhost)"
+      echo "  --port PORT    Qdrant REST API 端口 (默认: 6333)"
+      echo "  --help         显示此帮助信息"
+      exit 0
+      ;;
+    *)
+      echo "错误: 未知选项 $1"
+      exit 1
+      ;;
+  esac
+done
+
+QDRANT_URL="http://${QDRANT_HOST}:${QDRANT_PORT}"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -42,6 +70,7 @@ for i in $(seq 1 $MAX_RETRIES); do
         echo "请确认："
         echo "  1. Qdrant 服务已启动：docker compose -f deploy/qdrant/docker-compose.yml up -d"
         echo "  2. 端口未被占用：lsof -i :${QDRANT_PORT}"
+        echo "  3. 网络连接正常：ping ${QDRANT_HOST}"
         exit 1
     fi
     echo -n "."
@@ -107,5 +136,5 @@ echo "========================================="
 echo ""
 echo "下一步："
 echo "  1. 运行集成测试: poetry run pytest tests/integration/test_qdrant_integration.py -v"
-echo "  2. 查看文档: cat docs/infrastructure/qdrant-deployment-guide.md"
+echo "  2. 查看文档: cat deploy/qdrant/README.md"
 echo ""

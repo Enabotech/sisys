@@ -1923,6 +1923,8 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [x] 运行 `validate-create-story` 质量检查
 - [x] 可选: 运行 `/bmad:tea:automate` 生成测试(如果 Test Architect 模块已安装)
+- [ ] 部署五层存储实例后验证集成测试（替换 mock 为真实实例）
+- [ ] 部署五层存储实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 

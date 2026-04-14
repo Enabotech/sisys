@@ -1,5 +1,5 @@
 # generated: 2026-03-11
-# last_updated: 2026-04-14T18:30
+# last_updated: 2026-04-14T19:00
 # project: sisys
 # project_key: NOKEY
 # tracking_system: file-system
@@ -83,7 +83,7 @@ development_status:
   1-5-postgresql-relational-layer: done         # ✅ PostgreSQL完整实现,部署配置完成
   1-6-qdrant-vector-layer: done                 # ✅ Qdrant v1.7.0集成,部署准备完成
   1-7-minio-object-layer: done                  # ✅ MinIO SDK集成,WORM/生命周期/断点续传
-  1-8-neo4j-graph-layer: ready-for-dev
+  1-8-neo4j-graph-layer: review
   1-13-k8s-auto-scaling: backlog      # 增补 Prometheus `/metrics` HTTP 端点 Story 1.13
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: backlog
