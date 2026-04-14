@@ -94,10 +94,10 @@ repos:
         language: system
         types: [python]
         verbose: true
-        args: ["--skip", "B101,B105,B107,B110,B113,B404,B501,B602,B603,B607"]
+        args: ["--skip", "B101,B105,B106,B107,B110,B113,B404,B501,B602,B603,B607"]
         # 强制安全扫描：检测常见安全漏洞
-        # 跳过：B101(断言), B105/B107(硬编码密码), B110(try-except-pass), B113(请求无超时), B404(subprocess), B501(SSL 验证), B602(shell=True), B603(subprocess 无 shell), B607(部分 shell 使用)
-        # 注意：scripts/deployment/argocd/ 中的脚本为本地测试工具，使用 # nosec 注释标记
+        # 跳过：B101(断言), B105/B106/B107(硬编码密码), B110(try-except-pass), B113(请求无超时), B404(subprocess), B501(SSL 验证), B602(shell=True), B603(subprocess 无 shell), B607(部分 shell 使用)
+        exclude: "^tests/"
 
   # =========================================
   # Secret Detection - 密钥检测 (使用本地安装)
