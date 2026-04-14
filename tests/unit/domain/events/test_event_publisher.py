@@ -98,7 +98,7 @@ class TestInMemoryEventBusDispatch:
         bus = InMemoryEventBus(listener=listener)
 
         received_events: list[DomainEvent] = []
-        listener.on_event("DocumentProcessed", lambda e: received_events.append(e))
+        listener.on_event("DocumentProcessed", lambda e: received_events.append(e))  # type: ignore[arg-type]
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
@@ -112,8 +112,8 @@ class TestInMemoryEventBusDispatch:
         bus = InMemoryEventBus(listener=listener)
 
         received: list[str] = []
-        listener.on_event("DocumentProcessed", lambda e: received.append("doc"))
-        listener.on_event("ToolExecuted", lambda e: received.append("tool"))
+        listener.on_event("DocumentProcessed", lambda e: received.append("doc"))  # type: ignore[arg-type]
+        listener.on_event("ToolExecuted", lambda e: received.append("tool"))  # type: ignore[arg-type]
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
@@ -134,9 +134,9 @@ class TestInMemoryEventBusDispatch:
         bus = InMemoryEventBus(listener=listener)
 
         results: list[int] = []
-        listener.on_event("DocumentProcessed", lambda e: results.append(1))
-        listener.on_event("DocumentProcessed", lambda e: results.append(2))
-        listener.on_event("DocumentProcessed", lambda e: results.append(3))
+        listener.on_event("DocumentProcessed", lambda e: results.append(1))  # type: ignore[arg-type]
+        listener.on_event("DocumentProcessed", lambda e: results.append(2))  # type: ignore[arg-type]
+        listener.on_event("DocumentProcessed", lambda e: results.append(3))  # type: ignore[arg-type]
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
@@ -167,7 +167,7 @@ class TestInMemoryEventBusReset:
 class TestInMemoryEventBusDispatchOrder:
     """Test dispatch-before-record ordering (P0-5)."""
 
-    def test_dispatch_before_record(self):
+    def test_dispatch_before_record(self) -> None:
         """Event is dispatched before being marked as processed."""
         listener = InMemoryEventListener()
         bus = InMemoryEventBus(listener=listener)
