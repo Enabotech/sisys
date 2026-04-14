@@ -1,0 +1,37 @@
+# Qdrant 自定义配置文件
+# 参考：https://qdrant.tech/documentation/guides/configuration/
+
+# 服务配置
+service:
+  http_port: 6333
+  grpc_port: 6334
+  # 生产环境必须启用 API 密钥
+  # api_key: your-secure-api-key-here
+
+# 存储配置
+storage:
+  storage_path: /qdrant/storage
+  snapshots_path: /qdrant/snapshots
+  temp_path: /qdrant/temp
+
+  # 性能优化
+  perform_update_after_flush: true
+
+  # HNSW 索引全局默认配置
+  # 可在 Collection 创建时覆盖
+  hnsw_index:
+    m: 16                    # 连接数，默认 16
+    ef_construct: 128        # 构建时 ef 参数，默认 128
+    full_scan_threshold: 10000  # 全扫描阈值，默认 10000
+
+# 日志配置
+log_level: info
+
+# Telemetry 配置（可选）
+# telemetry:
+#   disabled: false
+#   anonymous: true
+
+# 集群配置（单节点 MVP 阶段不需要）
+# cluster:
+#   enabled: false

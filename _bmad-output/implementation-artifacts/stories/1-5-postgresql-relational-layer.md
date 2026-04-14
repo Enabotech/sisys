@@ -855,6 +855,8 @@ sisys/
 - [x] 所有任务实施完成（31个文件，1096测试通过）
 - [x] 部署准备完成（docker-compose.yml + docker-compose.prod.yml + 配置文件）
 - [x] 代码审查通过
+- [ ] 部署 PostgreSQL 实例后验证集成测试（替换 mock 为真实实例）
+- [ ] 部署 PostgreSQL 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 

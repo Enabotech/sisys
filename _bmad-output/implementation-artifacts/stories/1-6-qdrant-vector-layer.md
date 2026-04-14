@@ -688,3 +688,5 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [x] 运行 `validate-create-story` 质量检查
 - [x] 运行 `/bmad:tea:automate` 生成测试（可选）
+- [ ] 部署 qdrant 实例后验证集成测试（替换 mock 为真实实例）
+- [ ] 部署 qdrant 实例后最终完成验收测试（禁止使用 mock / fake）
