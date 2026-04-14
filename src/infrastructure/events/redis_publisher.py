@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 
 import redis.asyncio as aioredis
 
 from src.domain.events.base import DomainEvent
 from src.infrastructure.config.redis import RedisConfig
+from src.infrastructure.utils import json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class RedisEventPublisher:
         pool = self._get_pool()
         try:
             async with aioredis.Redis(connection_pool=pool) as client:
-                payload = json.dumps(event.to_dict())
+                payload = json_dumps(event.to_dict())
                 await client.publish(channel, payload)
                 logger.debug("Published event %s to channel %s", event.event_id, channel)
         except aioredis.ConnectionError as e:
@@ -77,7 +77,6 @@ class RedisEventPublisher:
                 channel,
                 e,
             )
-            raise
 
     async def close(self) -> None:
         """异步关闭连接池。"""

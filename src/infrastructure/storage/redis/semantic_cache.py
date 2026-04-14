@@ -17,6 +17,7 @@ import redis.asyncio as aioredis
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.key_builder import build_key
+from src.infrastructure.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,8 @@ class RedisSemanticCache:
                             continue
 
                         try:
-                            stored_vec: list[float] = json.loads(stored_embedding)
-                            raw_result = json.loads(stored_result_data)
+                            stored_vec: list[float] = json_loads(stored_embedding)
+                            raw_result = json_loads(stored_result_data)
                         except (json.JSONDecodeError, TypeError) as e:
                             logger.warning("Corrupt data in cache key %s: %s", key, e)
                             continue
@@ -172,7 +173,7 @@ class RedisSemanticCache:
 
         except aioredis.ConnectionError as e:
             logger.error("Failed to query semantic cache from Redis: %s", e)
-            raise
+            return None
 
     async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None:
         """存储到语义缓存。
@@ -190,13 +191,12 @@ class RedisSemanticCache:
         pool = self._get_pool()
         try:
             async with aioredis.Redis(connection_pool=pool) as client:
-                await client.hset(key, "embedding", json.dumps(query_embedding))
-                await client.hset(key, "result", json.dumps(result))
+                await client.hset(key, "embedding", json_dumps(query_embedding))
+                await client.hset(key, "result", json_dumps(result))
                 await client.expire(key, ttl)
                 logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
         except aioredis.ConnectionError as e:
             logger.error("Failed to store semantic cache in Redis: %s", e)
-            raise
 
     async def invalidate(self, cache_key: str) -> None:
         """使缓存失效。
@@ -220,7 +220,6 @@ class RedisSemanticCache:
                 logger.debug("Invalidated cache key %s", cache_key)
         except aioredis.ConnectionError as e:
             logger.error("Failed to invalidate cache key %s in Redis: %s", cache_key, e)
-            raise
 
     async def close(self) -> None:
         """异步关闭连接池。"""
