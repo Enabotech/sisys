@@ -333,17 +333,17 @@
 
 > **目的：** 在进入代码实现前，明确配置模型、数据模型、接口、Alembic 配置、验收标准。
 
-- [ ] Subtask: 定义 PostgreSQLConfig 配置模型
-- [ ] Subtask: 定义 OutboxModel SQLAlchemy 模型
-- [ ] Subtask: 定义 UserModel/RoleModel/PermissionModel SQLAlchemy 模型
-- [ ] Subtask: 定义关联表（user_roles, role_permissions）
-- [ ] Subtask: 配置 Alembic（alembic.ini + env.py）
-- [ ] Subtask: 编写初始迁移脚本（001_initial.py）
+- [x] Subtask: 定义 PostgreSQLConfig 配置模型
+- [x] Subtask: 定义 OutboxModel SQLAlchemy 模型
+- [x] Subtask: 定义 UserModel/RoleModel/PermissionModel SQLAlchemy 模型
+- [x] Subtask: 定义关联表（user_roles, role_permissions）
+- [x] Subtask: 配置 Alembic（alembic.ini + env.py）
+- [x] Subtask: 编写初始迁移脚本（001_initial.py）
 - [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.5.feature`
 - [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
+- [x] 规范项全部定义完毕
 - [ ] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
@@ -362,9 +362,9 @@
 | 🟢 绿 | 实现 `PostgreSQLConfig` dataclass 最小代码 |
 | 🔄 重构 | 添加类型注解、docstring、from_env 支持 |
 
-- [ ] Subtask: 🔴 红 — 编写 PostgreSQLConfig 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 PostgreSQLConfig 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 PostgreSQLConfig 代码
+- [x] Subtask: 🔴 红 — 编写 PostgreSQLConfig 失败测试
+- [x] Subtask: 🟢 绿 — 实现 PostgreSQLConfig 最小代码
+- [x] Subtask: 🔄 重构 — 优化 PostgreSQLConfig 代码
 
 #### TDD 循环 B：DatabaseEngine 通用接口
 
@@ -374,14 +374,14 @@
 | 🟢 绿 | 实现 `DatabaseEngine` 类最小代码 |
 | 🔄 重构 | 添加懒初始化、异常处理、健康检查 |
 
-- [ ] Subtask: 🔴 红 — 编写 DatabaseEngine 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 DatabaseEngine 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 DatabaseEngine 代码
+- [x] Subtask: 🔴 红 — 编写 DatabaseEngine 失败测试
+- [x] Subtask: 🟢 绿 — 实现 DatabaseEngine 最小代码
+- [x] Subtask: 🔄 重构 — 优化 DatabaseEngine 代码
 
 **完成标准/Definition of Done:**
-- [ ] PostgreSQLConfig 和 DatabaseEngine 实现完成
-- [ ] TDD 循环全部通过
-- [ ] 基础设施层覆盖率≥10%
+- [x] PostgreSQLConfig 和 DatabaseEngine 实现完成
+- [x] TDD 循环全部通过
+- [x] 基础设施层覆盖率≥10%
 
 ---
 
@@ -399,9 +399,9 @@
 | 🟢 绿 | 创建 `alembic.ini` + `alembic/env.py` 最小配置 |
 | 🔄 重构 | 添加 metadata 自动收集、URL 从环境变量读取 |
 
-- [ ] Subtask: 🔴 红 — 编写 Alembic 配置失败测试
-- [ ] Subtask: 🟢 绿 — 创建 Alembic 配置文件
-- [ ] Subtask: 🔄 重构 — 优化配置逻辑
+- [x] Subtask: 🔴 红 — 编写 Alembic 配置失败测试
+- [x] Subtask: 🟢 绿 — 创建 Alembic 配置文件
+- [x] Subtask: 🔄 重构 — 优化配置逻辑
 
 #### TDD 循环 B：初始迁移脚本
 
@@ -411,12 +411,12 @@
 | 🟢 绿 | 创建 `alembic/versions/001_initial.py` 迁移脚本 |
 | 🔄 重构 | 添加表注释、索引、外键约束 |
 
-- [ ] Subtask: 🔴 红 — 编写迁移失败测试
-- [ ] Subtask: 🟢 绿 — 创建初始迁移脚本
-- [ ] Subtask: 🔄 重构 — 优化迁移脚本（索引、约束）
+- [x] Subtask: 🔴 红 — 编写迁移失败测试
+- [x] Subtask: 🟢 绿 — 创建初始迁移脚本
+- [x] Subtask: 🔄 重构 — 优化迁移脚本（索引、约束）
 
 **完成标准/Definition of Done:**
-- [ ] Alembic 配置与初始迁移脚本就绪
+- [x] Alembic 配置与初始迁移脚本就绪
 - [ ] `alembic upgrade head` 执行成功
 - [ ] `alembic downgrade -1` 执行成功
 - [ ] 迁移幂等性测试通过
@@ -438,9 +438,9 @@
 | 🟢 绿 | 实现 `OutboxModel` 最小代码 |
 | 🔄 重构 | 添加索引、唯一约束、JSONB 类型支持 |
 
-- [ ] Subtask: 🔴 红 — 编写 OutboxModel 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 OutboxModel 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 OutboxModel（索引、约束）
+- [x] Subtask: 🔴 红 — 编写 OutboxModel 失败测试
+- [x] Subtask: 🟢 绿 — 实现 OutboxModel 最小代码
+- [x] Subtask: 🔄 重构 — 优化 OutboxModel（索引、约束）
 
 #### TDD 循环 B：UserModel/RoleModel/PermissionModel 定义
 
@@ -450,9 +450,9 @@
 | 🟢 绿 | 实现 3 个模型类最小代码 |
 | 🔄 重构 | 添加关联表、外键约束 |
 
-- [ ] Subtask: 🔴 红 — 编写 3 个模型失败测试
-- [ ] Subtask: 🟢 绿 — 实现 3 个模型类
-- [ ] Subtask: 🔄 重构 — 添加关联表、外键约束
+- [x] Subtask: 🔴 红 — 编写 3 个模型失败测试
+- [x] Subtask: 🟢 绿 — 实现 3 个模型类
+- [x] Subtask: 🔄 重构 — 添加关联表、外键约束
 
 #### TDD 循环 C：BaseRepository 抽象基类
 
@@ -462,15 +462,15 @@
 | 🟢 绿 | 实现 `BaseRepository[T]` 抽象基类最小代码 |
 | 🔄 重构 | 添加异步支持、分页查询、异常处理 |
 
-- [ ] Subtask: 🔴 红 — 编写 BaseRepository 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 BaseRepository 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 BaseRepository 代码
+- [x] Subtask: 🔴 红 — 编写 BaseRepository 失败测试
+- [x] Subtask: 🟢 绿 — 实现 BaseRepository 最小代码
+- [x] Subtask: 🔄 重构 — 优化 BaseRepository 代码
 
 **完成标准/Definition of Done:**
-- [ ] 所有 SQLAlchemy 模型定义完成
-- [ ] BaseRepository 抽象基类实现完成
-- [ ] TDD 循环全部通过
-- [ ] 基础设施层覆盖率≥40%
+- [x] 所有 SQLAlchemy 模型定义完成
+- [x] BaseRepository 抽象基类实现完成
+- [x] TDD 循环全部通过
+- [x] 基础设施层覆盖率≥40%
 
 ---
 
@@ -489,9 +489,9 @@
 | 🟢 绿 | 实现 `SQLAlchemyEventOutboxAdapter` 最小代码 |
 | 🔄 重构 | 复用 Story 1.3 的 `EventRegistry` 按 event_type 路由到正确的领域事件子类 |
 
-- [ ] Subtask: 🔴 红 — 编写 `SQLAlchemyEventOutboxAdapter` 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 `SQLAlchemyEventOutboxAdapter` 最小代码
-- [ ] Subtask: 🔄 重构 — 复用 `EventRegistry` 路由逻辑，添加类型注解
+- [x] Subtask: 🔴 红 — 编写 `SQLAlchemyEventOutboxAdapter` 失败测试
+- [x] Subtask: 🟢 绿 — 实现 `SQLAlchemyEventOutboxAdapter` 最小代码
+- [x] Subtask: 🔄 重构 — 复用 `EventRegistry` 路由逻辑，添加类型注解
 
 #### TDD 循环 B：PostgreSQLOutboxRepository 实现（含内部方法）
 
@@ -501,9 +501,9 @@
 | 🟢 绿 | 实现 `PostgreSQLOutboxRepository` 类最小代码（含内部方法） |
 | 🔄 重构 | 添加 `SQLAlchemyEventOutboxAdapter` 转换、事务支持、异常处理、`asyncio.Lock()` 保护内部方法 |
 
-- [ ] Subtask: 🔴 红 — 编写 PostgreSQLOutboxRepository 公开方法 + 内部方法失败测试
-- [ ] Subtask: 🟢 绿 — 实现 PostgreSQLOutboxRepository 最小代码（含内部方法）
-- [ ] Subtask: 🔄 重构 — 优化 PostgreSQLOutboxRepository 代码
+- [x] Subtask: 🔴 红 — 编写 PostgreSQLOutboxRepository 公开方法 + 内部方法失败测试
+- [x] Subtask: 🟢 绿 — 实现 PostgreSQLOutboxRepository 最小代码（含内部方法）
+- [x] Subtask: 🔄 重构 — 优化 PostgreSQLOutboxRepository 代码
 
 #### TDD 循环 C：事务原子性测试
 
@@ -519,8 +519,8 @@
 - [ ] Subtask: 验证 3 个场景：①事件+业务都提交 ②事件成功+业务异常→都回滚 ③事件失败+业务成功→都回滚
 
 **完成标准/Definition of Done:**
-- [ ] `SQLAlchemyEventOutboxAdapter` 实现完成
-- [ ] `PostgreSQLOutboxRepository` 公开方法 + 内部方法实现完成
+- [x] `SQLAlchemyEventOutboxAdapter` 实现完成
+- [x] `PostgreSQLOutboxRepository` 公开方法 + 内部方法实现完成
 - [ ] 事务原子性测试通过（3 个场景全覆盖）
 - [ ] TDD 循环全部通过
 - [ ] 基础设施层覆盖率≥55%
@@ -541,9 +541,9 @@
 | 🟢 绿 | 实现 `UserRepository` 类最小代码 |
 | 🔄 重构 | 添加唯一约束检查、密码哈希支持 |
 
-- [ ] Subtask: 🔴 红 — 编写 UserRepository 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 UserRepository 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 UserRepository 代码
+- [x] Subtask: 🔴 红 — 编写 UserRepository 失败测试
+- [x] Subtask: 🟢 绿 — 实现 UserRepository 最小代码
+- [x] Subtask: 🔄 重构 — 优化 UserRepository 代码
 
 #### TDD 循环 B：RoleRepository 实现
 
@@ -553,9 +553,9 @@
 | 🟢 绿 | 实现 `RoleRepository` 类最小代码 |
 | 🔄 重构 | 添加权限关联查询、级联删除支持 |
 
-- [ ] Subtask: 🔴 红 — 编写 RoleRepository 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 RoleRepository 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 RoleRepository 代码
+- [x] Subtask: 🔴 红 — 编写 RoleRepository 失败测试
+- [x] Subtask: 🟢 绿 — 实现 RoleRepository 最小代码
+- [x] Subtask: 🔄 重构 — 优化 RoleRepository 代码
 
 #### TDD 循环 C：PermissionRepository 实现
 
@@ -565,15 +565,15 @@
 | 🟢 绿 | 实现 `PermissionRepository` 类最小代码 |
 | 🔄 重构 | 添加资源/动作组合索引 |
 
-- [ ] Subtask: 🔴 红 — 编写 PermissionRepository 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 PermissionRepository 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 PermissionRepository 代码
+- [x] Subtask: 🔴 红 — 编写 PermissionRepository 失败测试
+- [x] Subtask: 🟢 绿 — 实现 PermissionRepository 最小代码
+- [x] Subtask: 🔄 重构 — 优化 PermissionRepository 代码
 
 **完成标准/Definition of Done:**
-- [ ] UserRepository/RoleRepository/PermissionRepository 实现完成
-- [ ] TDD 循环全部通过
+- [x] UserRepository/RoleRepository/PermissionRepository 实现完成
+- [x] TDD 循环全部通过
 - [ ] 外键约束测试通过
-- [ ] 基础设施层覆盖率≥70%
+- [x] 基础设施层覆盖率≥70%
 
 ---
 
@@ -607,17 +607,17 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask: 创建 `tests/unit/infrastructure/test_architecture_constraints.py`
-- [ ] Subtask: 实现领域层零 SQLAlchemy 依赖验证（扫描 `src/domain/` 目录）
-- [ ] Subtask: 实现依赖方向验证（使用 `import-linter`）
-- [ ] Subtask: 实现 Alembic 迁移脚本语法验证
-- [ ] Subtask: 运行 Ruff 检查（`ruff check src/`，0 错误）
-- [ ] Subtask: 运行 MyPy 类型检查（`mypy src/`，0 问题）
+- [x] Subtask: 创建 `tests/unit/infrastructure/test_architecture_constraints.py`
+- [x] Subtask: 实现领域层零 SQLAlchemy 依赖验证（扫描 `src/domain/` 目录）
+- [x] Subtask: 实现依赖方向验证（使用 `import-linter`）
+- [x] Subtask: 实现 Alembic 迁移脚本语法验证
+- [x] Subtask: 运行 Ruff 检查（`ruff check src/`，0 错误）
+- [x] Subtask: 运行 MyPy 类型检查（`mypy src/`，0 问题）
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过
+- [x] 所有架构约束测试通过
 - [ ] 测试输出清晰的合规报告
-- [ ] 任何违规都会导致测试失败
+- [x] 任何违规都会导致测试失败
 
 ---
 
