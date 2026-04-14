@@ -1,0 +1,58 @@
+version: '3.8'
+
+# =============================================================================
+# Redis 高速缓存层 - 生产环境部署配置
+# =============================================================================
+# 用途：Story 1.4 (Redis Cache Layer) 生产环境部署
+# 版本：Redis 7.2.5+（支持 redis.asyncio 异步客户端）
+# 职责：L1 高速缓存层（会话状态、语义缓存、公共黑板、事件发布/订阅）
+# =============================================================================
+
+services:
+  redis:
+    image: harbor.sisys.local/sisys/tools/redis:7.2.5
+    container_name: sisys-redis-prod
+    restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?Redis password required in production}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+volumes:
+  redis_data:
+    driver: local
+    name: sisys-redis-data-prod
+
+networks:
+  sisys-network:
+    driver: overlay
+    name: sisys-network-prod

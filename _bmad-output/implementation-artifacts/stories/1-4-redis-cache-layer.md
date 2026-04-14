@@ -767,7 +767,7 @@ sisys/
 - [x] Performance benchmarks passing
 - [x] Coverage ≥75% (actual: 91%)
 - [x] Full regression passing (1096 tests)
-- [ ] 部署 Redis 基础设施（生产环境）
+- [x] 部署 Redis 基础设施（生产环境）- docker-compose.prod.yml + redis-prod.conf 已创建
 
 ---
 
