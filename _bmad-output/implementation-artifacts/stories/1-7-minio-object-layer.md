@@ -100,9 +100,10 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 领域层仓储接口定义位于 `src/domain/repositories/storage.py`
-- [ ] 基础设施层实现位于 `src/infrastructure/storage/minio_repository.py`
+- [ ] 基础设施层实现位于 `src/infrastructure/storage/minio/minio_repository.py`
 - [ ] 依赖方向正确（领域层零 MinIO 依赖）
 - [ ] Mock 实现通过所有领域层测试
+- [ ] `bucket_type → bucket_name` 映射逻辑正确（自动追加 `{tenant_id}`）
 
 ---
 
@@ -414,37 +415,37 @@
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
-#### TDD 循环 A：普通上传与下载
+#### TDD 循环 A：流式上传与下载
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_object_operations.py`（普通上传、下载、元数据返回） |
-| 🟢 绿 | 实现 `upload_object()` 和 `download_object()` 方法 |
-| 🔄 重构 | 添加内容类型检测、优化错误处理 |
+| 🔴 红 | 编写 `test_object_operations.py`（流式上传 `store(file_path)`、流式下载 `retrieve()` → `AsyncIterator[bytes]`、元数据返回） |
+| 🟢 绿 | 实现 `store()` 和 `retrieve()` 方法（内部调用 MinIO `fput_object()` / `get_object()` 流式 API） |
+| 🔄 重构 | 添加内容类型检测、优化错误处理、统一进度回调 |
 
-- [ ] Subtask: 🔴 红 — 编写上传/下载失败测试
-- [ ] Subtask: 🟢 绿 — 实现上传/下载方法
+- [ ] Subtask: 🔴 红 — 编写流式上传/下载失败测试
+- [ ] Subtask: 🟢 绿 — 实现 `store()` / `retrieve()` 方法
 - [ ] Subtask: 🔄 重构 — 优化上传/下载代码
 
 #### TDD 循环 B：分片上传与断点续传
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写分片上传测试（大文件分割、分片 ETag 记录） |
-| 🟢 绿 | 实现 `upload_object_multipart()` 方法 |
+| 🔴 红 | 编写分片上传测试（大文件自动分片、分片 ETag 记录，内部调用 `compose_object()`） |
+| 🟢 绿 | 实现 `_multipart_upload()` 内部方法（`store()` 自动触发，对外透明） |
 | 🔄 重构 | 优化分片大小计算、添加进度回调 |
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写断点续传测试（上传 ID 持久化、分片状态恢复） |
-| 🟢 绿 | 实现 `resume_multipart_upload()` 方法 + Redis 状态持久化 |
+| 🔴 红 | 编写断点续传测试（上传 ID 持久化至 Redis、分片状态恢复、`SET NX` 分布式锁防并发重复恢复） |
+| 🟢 绿 | 实现 `resume_multipart_upload()` 内部方法 + Redis 状态持久化 |
 | 🔄 重构 | 统一状态管理逻辑、优化 TTL 配置 |
 
 - [ ] Subtask: 🔴 红 — 编写分片上传失败测试
-- [ ] Subtask: 🟢 绿 — 实现分片上传方法
+- [ ] Subtask: 🟢 绿 — 实现分片上传内部方法
 - [ ] Subtask: 🔄 重构 — 优化分片上传代码
 - [ ] Subtask: 🔴 红 — 编写断点续传失败测试
-- [ ] Subtask: 🟢 绿 — 实现断点续传方法
+- [ ] Subtask: 🟢 绿 — 实现断点续传内部方法
 - [ ] Subtask: 🔄 重构 — 优化断点续传代码
 
 **完成标准/Definition of Done:**
