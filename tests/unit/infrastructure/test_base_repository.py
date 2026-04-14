@@ -17,7 +17,13 @@ from src.infrastructure.storage.postgresql.models import UserModel
 @pytest.fixture
 def mock_session():
     """创建模拟数据库会话。"""
-    return mock.AsyncMock(spec=AsyncSession)
+    session = mock.AsyncMock(spec=AsyncSession)
+    # add/delete/refresh 是同步方法，不应使用 AsyncMock
+    session.add = mock.Mock()
+    session.delete = mock.Mock()
+    session.flush = mock.AsyncMock()
+    session.refresh = mock.AsyncMock()
+    return session
 
 
 @pytest.fixture

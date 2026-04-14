@@ -6,13 +6,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
 import math
-import threading
 
-import redis
+import redis.asyncio as aioredis
 
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
@@ -83,23 +83,21 @@ class RedisSemanticCache:
         """
         self._config = config
         self._metrics_collector = metrics_collector
-        self._pool: redis.ConnectionPool | None = None
-        self._pool_lock = threading.Lock()
+        self._pool: aioredis.ConnectionPool | None = None
+        self._pool_lock = asyncio.Lock()
 
-    def _get_pool(self) -> redis.ConnectionPool:
-        """懒加载连接池（线程安全）。"""
+    def _get_pool(self) -> aioredis.ConnectionPool:
+        """懒加载连接池（异步安全）。"""
         if self._pool is None:
-            with self._pool_lock:
-                if self._pool is None:
-                    self._pool = redis.ConnectionPool(
-                        host=self._config.host,
-                        port=self._config.port,
-                        db=self._config.db,
-                        password=self._config.password,
-                        max_connections=self._config.max_connections,
-                        socket_timeout=self._config.socket_timeout,
-                        decode_responses=True,
-                    )
+            self._pool = aioredis.ConnectionPool(
+                host=self._config.host,
+                port=self._config.port,
+                db=self._config.db,
+                password=self._config.password,
+                max_connections=self._config.max_connections,
+                socket_timeout=self._config.socket_timeout,
+                decode_responses=True,
+            )
         return self._pool
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
@@ -125,22 +123,22 @@ class RedisSemanticCache:
             缓存结果，如果未命中则返回 None
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
+            async with aioredis.Redis(connection_pool=pool) as client:
                 # 使用 SCAN 遍历所有缓存键
                 cursor = 0
                 pattern = build_key(self._NAMESPACE, "vec:*")
 
                 while True:
-                    cursor, keys = client.scan(cursor=cursor, match=pattern, count=100)
+                    cursor, keys = await client.scan(cursor=cursor, match=pattern, count=100)
 
                     for key in keys:
                         # 获取缓存条目数据
-                        stored_embedding = client.hget(key, "embedding")
-                        stored_result_data = client.hget(key, "result")
+                        stored_embedding = await client.hget(key, "embedding")
+                        stored_result_data = await client.hget(key, "result")
 
                         if stored_embedding is None or stored_result_data is None:
                             continue
@@ -172,7 +170,7 @@ class RedisSemanticCache:
                 logger.debug("Cache miss")
                 return None
 
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to query semantic cache from Redis: %s", e)
             raise
 
@@ -185,18 +183,18 @@ class RedisSemanticCache:
             ttl: 过期时间（秒）
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                client.hset(key, "embedding", json.dumps(query_embedding))
-                client.hset(key, "result", json.dumps(result))
-                client.expire(key, ttl)
+            async with aioredis.Redis(connection_pool=pool) as client:
+                await client.hset(key, "embedding", json.dumps(query_embedding))
+                await client.hset(key, "result", json.dumps(result))
+                await client.expire(key, ttl)
                 logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to store semantic cache in Redis: %s", e)
             raise
 
@@ -207,7 +205,7 @@ class RedisSemanticCache:
             cache_key: 缓存键（内部格式或完整 Redis 键）
 
         Raises:
-            redis.ConnectionError: Redis 连接失败时抛出
+            aioredis.ConnectionError: Redis 连接失败时抛出
         """
         # 如果传入的 key 已经是全名（包含命名空间前缀），直接使用
         prefix = build_key(self._NAMESPACE, "")
@@ -217,25 +215,24 @@ class RedisSemanticCache:
             key = build_key(self._NAMESPACE, cache_key)
         pool = self._get_pool()
         try:
-            with redis.Redis(connection_pool=pool) as client:
-                client.delete(key)
+            async with aioredis.Redis(connection_pool=pool) as client:
+                await client.delete(key)
                 logger.debug("Invalidated cache key %s", cache_key)
-        except redis.ConnectionError as e:
+        except aioredis.ConnectionError as e:
             logger.error("Failed to invalidate cache key %s in Redis: %s", cache_key, e)
             raise
 
-    def close(self) -> None:
-        """关闭连接池。"""
+    async def close(self) -> None:
+        """异步关闭连接池。"""
         if self._pool:
-            self._pool.disconnect()
+            await self._pool.aclose()  # type: ignore[attr-defined]
             self._pool = None
             logger.debug("Redis connection pool closed")
 
-    def __enter__(self) -> RedisSemanticCache:
-        """上下文管理器入口。"""
+    async def __aenter__(self) -> RedisSemanticCache:
+        """异步上下文管理器入口。"""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """上下文管理器出口，确保连接池关闭。"""
-        self.close()
-        return None
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """异步上下文管理器出口，确保连接池关闭。"""
+        await self.close()

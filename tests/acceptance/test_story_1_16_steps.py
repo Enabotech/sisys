@@ -97,7 +97,7 @@ def _configure_mocks():
 
 @then("Redis 使用 fakeredis 行为级 Mock")
 def _redis_mock():
-    assert isinstance(fakeredis.FakeRedis(), fakeredis.FakeRedis)
+    assert isinstance(fakeredis.aioredis.FakeRedis(), fakeredis.aioredis.FakeRedis)
 
 
 @then("PostgreSQL 使用 AsyncMock 接口级 Mock")
@@ -228,17 +228,36 @@ def test_idempotency_atomic():
 
 @given("IdempotencyChecker 使用 fakeredis")
 def _idempotency_setup():
+    import asyncio
+
     from src.infrastructure.idempotency.checker import IdempotencyChecker
 
-    _test_context["checker"] = IdempotencyChecker(redis_client=fakeredis.FakeRedis())
+    async def _create_checker():
+        return IdempotencyChecker(redis_client=fakeredis.aioredis.FakeRedis())
+
+    loop = asyncio.new_event_loop()
+    try:
+        _test_context["checker"] = loop.run_until_complete(_create_checker())
+    finally:
+        loop.close()
 
 
 @when("对同一 event_id 调用 try_acquire 两次")
 def _acquire_twice():
+    import asyncio
+
     checker = _test_context["checker"]
     eid = uuid4()
-    _test_context["first"] = checker.try_acquire(eid)
-    _test_context["second"] = checker.try_acquire(eid)
+
+    async def _acquire(eid):
+        return await checker.try_acquire(eid)
+
+    loop = asyncio.new_event_loop()
+    try:
+        _test_context["first"] = loop.run_until_complete(_acquire(eid))
+        _test_context["second"] = loop.run_until_complete(_acquire(eid))
+    finally:
+        loop.close()
 
 
 @then("第一次返回 True")

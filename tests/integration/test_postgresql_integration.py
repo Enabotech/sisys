@@ -348,4 +348,7 @@ class TestTransactionRollback:
 @pytest.fixture
 def mock_session():
     """提供模拟的 AsyncSession。"""
-    return mock.AsyncMock()
+    session = mock.AsyncMock()
+    # add 是同步方法（不执行 I/O）
+    session.add = mock.Mock()
+    return session
