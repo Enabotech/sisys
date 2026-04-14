@@ -479,7 +479,7 @@ pull_images() {
     local images=(
         "redis:7.0-alpine"
         "postgres:15-alpine"
-        "qdrant/qdrant:v1.7.0"
+        "harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0"
         "minio/minio:RELEASE.2024-01-16T16-07-38Z"
         "neo4j:5.15"
         "traefik:v3.6"

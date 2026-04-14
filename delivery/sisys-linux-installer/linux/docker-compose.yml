@@ -92,7 +92,7 @@ services:
 
   # ========== L3 向量存储层: Qdrant ==========
   qdrant:
-    image: qdrant/qdrant:v1.7.0
+    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0
     container_name: sisys-qdrant
     restart: unless-stopped
     ports:
