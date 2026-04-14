@@ -171,7 +171,7 @@ class RedisSemanticCache:
                 logger.debug("Cache miss")
                 return None
 
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to query semantic cache from Redis: %s", e)
             return None
 
@@ -195,7 +195,7 @@ class RedisSemanticCache:
                 await client.hset(key, "result", json_dumps(result))
                 await client.expire(key, ttl)
                 logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to store semantic cache in Redis: %s", e)
 
     async def invalidate(self, cache_key: str) -> None:
@@ -218,7 +218,7 @@ class RedisSemanticCache:
             async with aioredis.Redis(connection_pool=pool) as client:
                 await client.delete(key)
                 logger.debug("Invalidated cache key %s", cache_key)
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to invalidate cache key %s in Redis: %s", cache_key, e)
 
     async def close(self) -> None:

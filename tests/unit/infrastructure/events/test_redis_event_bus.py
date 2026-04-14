@@ -114,16 +114,17 @@ class TestRedisEventPublisher:
         assert publisher._pool is None
 
     @pytest.mark.asyncio
-    async def test_publish_raises_on_connection_error(self):
-        """RedisEventPublisher should raise on connection failure."""
+    async def test_publish_returns_none_on_connection_error(self):
+        """RedisEventPublisher 连接失败应返回 None（优雅降级）。"""
         from src.infrastructure.events.redis_publisher import RedisEventPublisher
 
         config = RedisConfig(host="invalid-host", port=9999)
         publisher = RedisEventPublisher(config)
         event = self._make_event()
 
-        with pytest.raises(Exception):
-            await publisher.publish(event, channel="sisys:rt:test")
+        # 优雅降级：不抛异常，返回 None
+        result = await publisher.publish(event, channel="sisys:rt:test")
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_close_disconnects_pool(self):

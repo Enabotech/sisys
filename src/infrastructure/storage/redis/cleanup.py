@@ -89,7 +89,7 @@ class RedisCleanup:
                 logger.info("Total cleaned up %d keys in namespace %s", deleted_count, namespace)
                 return deleted_count
 
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error("Failed to cleanup namespace %s in Redis: %s", namespace, e)
             raise
 

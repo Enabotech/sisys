@@ -70,7 +70,7 @@ class RedisEventPublisher:
                 payload = json_dumps(event.to_dict())
                 await client.publish(channel, payload)
                 logger.debug("Published event %s to channel %s", event.event_id, channel)
-        except aioredis.ConnectionError as e:
+        except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error(
                 "Failed to publish event %s to Redis channel %s: %s",
                 event.event_id,
