@@ -53,7 +53,7 @@ services:
 
   # Qdrant 1.7+ - Vector Storage Layer (L3) - Test
   qdrant:
-    image: qdrant/qdrant:v1.7.0
+    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0
     container_name: sisys-test-qdrant
     restart: "no"
     ports:

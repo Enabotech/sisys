@@ -107,7 +107,7 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
    | SISYS App | `registry.sisys.local/sisys/app:latest` | 8080 |
    | Redis | `redis:7.0-alpine` | 6379 |
    | PostgreSQL | `postgres:15-alpine` | 5432 |
-   | Qdrant | `qdrant/qdrant:v1.7.0` | 6333 |
+   | Qdrant | `harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0` | 6333 |
    | MinIO | `minio/minio:RELEASE.2024-01-16T16-07-38Z` | 9000 |
    | Neo4j | `neo4j:5.15` | 7687 |
    | Traefik | `traefik:v3.6` | 80/443 |

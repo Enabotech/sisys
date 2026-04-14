@@ -47,7 +47,7 @@ services:
 
   # Qdrant 向量数据库（修复 H7: 移除不必要的端口暴露）
   qdrant:
-    image: qdrant/qdrant:v1.7.0  # 使用固定版本（修复 EC-30）
+    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0  # 使用固定版本（修复 EC-30）
     container_name: sisys-qdrant
     # 不暴露端口到宿主机，仅内部网络通信
     volumes:
