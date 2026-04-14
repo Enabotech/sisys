@@ -171,6 +171,11 @@
       """获取对象元数据。"""
 
       @abstractmethod
+      async def list_objects(self, bucket_type: str, prefix: str = "",
+                             recursive: bool = True) -> list[dict]: ...
+      """列出对象，支持前缀过滤。"""
+
+      @abstractmethod
       async def archive(self, bucket_type: str, object_key: str,
                         retention_days: int = 2555) -> bool: ...
       """归档对象至 WORM 存储，启用 Object Lock。"""
@@ -537,13 +542,19 @@
 
 ### MinIO Bucket 命名规范
 
-| Bucket 类型 | 命名规范 | 用途 | 保留策略 |
-|------------|---------|------|---------|
-| **documents** | `documents-{tenant_id}` | 原始文档存储 | 版本控制启用 |
-| **audit-logs** | `audit-logs-{tenant_id}` | 审计日志归档 | WORM COMPLIANCE 模式，7 年 |
-| **versions** | `versions-{tenant_id}` | 版本快照存储 | 版本控制启用 |
-| **backups** | `backups-{tenant_id}` | Checkpoint 旧版本归档 | WORM COMPLIANCE 模式，7 年 |
-| **branches** | `branches-{tenant_id}` | 分支状态存储 | 版本控制启用，合并后可删除 |
+> **📌 架构对齐说明**：or.md 和 architecture.md 13.17.3 节定义了 Bucket 边界。
+> Story 的 `bucket_type` 参数与架构文档的 Bucket 命名映射如下：
+
+| bucket_type 参数 | 架构文档 Bucket 名称 | 实际物理 Bucket（多租户） | 用途 | 保留策略 |
+|-----------------|---------------------|------------------------|------|---------|
+| `"raw-documents"` | `raw-documents/` | `raw-documents-{tenant_id}` | 原始文档（WORM 7 年） | 版本控制启用 |
+| `"processed-documents"` | `processed-documents/` | `processed-documents-{tenant_id}` | 处理后文档 | 版本控制启用 |
+| `"evidence-packages"` | `evidence-packages/` | `evidence-packages-{tenant_id}` | 证据包 | 版本控制启用 |
+| `"audit-archives"` | `audit-archives/` | `audit-archives-{tenant_id}` | 审计归档（WORM 7 年） | WORM COMPLIANCE，7 年 |
+| `"backups"` | `backups/` | `backups-{tenant_id}` | Checkpoint 旧版本归档 | WORM COMPLIANCE，7 年 |
+| `"branches"` | `branches/` | `branches-{tenant_id}` | 分支状态存储 | 版本控制启用 |
+
+> **基础设施层负责 `bucket_type → bucket_name` 映射**（自动追加 `{tenant_id}` 后缀）
 
 ### 分片上传策略
 

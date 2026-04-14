@@ -172,7 +172,7 @@ class TestEventOutboxAdapter:
         event_class = EventRegistry.get("MockEvent")
         assert event_class == MockEvent
 
-    def test_registry_reset(self):
+    def test_registry_reset(self) -> None:
         """EventRegistry.reset should clear the registry."""
         EventRegistry.reset()
         event_class = EventRegistry.get("DocumentProcessed")
