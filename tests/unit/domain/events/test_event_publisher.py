@@ -92,13 +92,17 @@ class TestInMemoryEventBusIdempotency:
 class TestInMemoryEventBusDispatch:
     """Test InMemoryEventBus event dispatch to listener."""
 
-    def test_dispatch_to_listener(self):
+    def test_dispatch_to_listener(self) -> None:
         """Events are dispatched to registered listener."""
         listener = InMemoryEventListener()
         bus = InMemoryEventBus(listener=listener)
 
         received_events: list[DomainEvent] = []
-        listener.on_event("DocumentProcessed", lambda e: received_events.append(e))  # type: ignore[arg-type]
+
+        def handler(event: DomainEvent) -> None:
+            received_events.append(event)
+
+        listener.on_event("DocumentProcessed", handler)
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
@@ -106,14 +110,21 @@ class TestInMemoryEventBusDispatch:
         assert len(received_events) == 1
         assert received_events[0].event_id == event.event_id
 
-    def test_dispatch_filters_by_event_type(self):
+    def test_dispatch_filters_by_event_type(self) -> None:
         """Only handlers for the matching event type are called."""
         listener = InMemoryEventListener()
         bus = InMemoryEventBus(listener=listener)
 
         received: list[str] = []
-        listener.on_event("DocumentProcessed", lambda e: received.append("doc"))  # type: ignore[arg-type]
-        listener.on_event("ToolExecuted", lambda e: received.append("tool"))  # type: ignore[arg-type]
+
+        def handler_doc(event: DomainEvent) -> None:
+            received.append("doc")
+
+        def handler_tool(event: DomainEvent) -> None:
+            received.append("tool")
+
+        listener.on_event("DocumentProcessed", handler_doc)
+        listener.on_event("ToolExecuted", handler_tool)
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
@@ -128,15 +139,25 @@ class TestInMemoryEventBusDispatch:
         bus.publish(event)  # Should not raise
         assert len(bus.published_events) == 1
 
-    def test_multiple_handlers_same_event_type(self):
+    def test_multiple_handlers_same_event_type(self) -> None:
         """Multiple handlers for same event type all receive event."""
         listener = InMemoryEventListener()
         bus = InMemoryEventBus(listener=listener)
 
         results: list[int] = []
-        listener.on_event("DocumentProcessed", lambda e: results.append(1))  # type: ignore[arg-type]
-        listener.on_event("DocumentProcessed", lambda e: results.append(2))  # type: ignore[arg-type]
-        listener.on_event("DocumentProcessed", lambda e: results.append(3))  # type: ignore[arg-type]
+
+        def handler1(event: DomainEvent) -> None:
+            results.append(1)
+
+        def handler2(event: DomainEvent) -> None:
+            results.append(2)
+
+        def handler3(event: DomainEvent) -> None:
+            results.append(3)
+
+        listener.on_event("DocumentProcessed", handler1)
+        listener.on_event("DocumentProcessed", handler2)
+        listener.on_event("DocumentProcessed", handler3)
 
         event = DocumentProcessed(document_id=uuid.uuid4())
         bus.publish(event)
