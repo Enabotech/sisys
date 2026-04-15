@@ -76,28 +76,28 @@ class TestAlembicMigration:
         """alembic.ini 配置文件应存在。"""
         from pathlib import Path
 
-        alembic_ini = Path(__file__).parents[2] / "alembic" / "alembic.ini"
+        alembic_ini = Path(__file__).parents[2] / "deploy" / "alembic" / "alembic.ini"
         assert alembic_ini.exists()
 
     def test_alembic_env_exists(self):
         """deploy/alembic/env.py 应存在。"""
         from pathlib import Path
 
-        env_py = Path(__file__).parents[2] / "alembic" / "env.py"
+        env_py = Path(__file__).parents[2] / "deploy" / "alembic" / "env.py"
         assert env_py.exists()
 
     def test_initial_migration_exists(self):
         """初始迁移脚本应存在。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         assert migration.exists()
 
     def test_initial_migration_has_upgrade(self):
         """初始迁移应定义 upgrade 函数。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "def upgrade()" in content
@@ -107,7 +107,7 @@ class TestAlembicMigration:
         """初始迁移应创建 event_outbox 表。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "event_outbox" in content
@@ -117,7 +117,7 @@ class TestAlembicMigration:
         """初始迁移应创建 users 表。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "users" in content
@@ -126,7 +126,7 @@ class TestAlembicMigration:
         """初始迁移应创建 roles 表。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "roles" in content
@@ -135,7 +135,7 @@ class TestAlembicMigration:
         """初始迁移应创建 permissions 表。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "permissions" in content
@@ -144,7 +144,7 @@ class TestAlembicMigration:
         """初始迁移应创建关联表。"""
         from pathlib import Path
 
-        migration = Path(__file__).parents[2] / "alembic" / "versions" / "001_initial.py"
+        migration = Path(__file__).parents[2] / "deploy" / "alembic" / "versions" / "001_initial.py"
         content = migration.read_text()
 
         assert "user_roles" in content
