@@ -173,6 +173,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 # 排除外部目录和生成文件
 extend-exclude = [
+    ".claude/",
     ".qwen/",
     "_bmad/",
     ".git/",
@@ -191,6 +192,7 @@ disallow_untyped_defs = false
 
 # 排除外部目录和生成文件
 exclude = [
+    '^\.claude/',
     '^\.qwen/',
     '^_bmad/',
     '^\.git/',
