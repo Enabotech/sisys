@@ -80,7 +80,7 @@ class TestAlembicMigration:
         assert alembic_ini.exists()
 
     def test_alembic_env_exists(self):
-        """alembic/env.py 应存在。"""
+        """deploy/alembic/env.py 应存在。"""
         from pathlib import Path
 
         env_py = Path(__file__).parents[2] / "alembic" / "env.py"
