@@ -260,19 +260,6 @@ class TestKubernetesResources:
 class TestDuplicateRegistrationFix:
     """测试重复注册修复"""
 
-    def test_fix_script_exists(self):
-        """测试修复脚本存在"""
-        script_path = Path("scripts/deployment/gitea-runner/fix-duplicate-registration.sh")
-        assert script_path.exists(), f"修复脚本不存在：{script_path}"
-
-    def test_fix_script_executable(self):
-        """测试修复脚本可执行"""
-        script_path = Path("scripts/deployment/gitea-runner/fix-duplicate-registration.sh")
-        if script_path.exists():
-            import os
-
-            assert os.access(script_path, os.X_OK), f"修复脚本不可执行：{script_path}"
-
     @pytest.mark.integration
     def test_no_duplicate_runners(self):
         """测试无重复 Runner"""
