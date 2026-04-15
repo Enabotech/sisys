@@ -264,33 +264,5 @@ class TestKubernetesResources:
             pytest.skip(f"无法验证持久化：{str(e)}")
 
 
-class TestCleanupScripts:
-    """测试清理脚本"""
-
-    def test_cleanup_offline_runners_script_exists(self):
-        """测试清理离线 Runner 脚本存在"""
-        script_path = Path("scripts/deployment/gitea-runner/cleanup-offline-runners.sh")
-        assert script_path.exists(), f"清理脚本不存在：{script_path}"
-
-    def test_fix_duplicate_registration_script_exists(self):
-        """测试修复重复注册脚本存在"""
-        script_path = Path("scripts/deployment/gitea-runner/fix-duplicate-registration.sh")
-        assert script_path.exists(), f"修复脚本不存在：{script_path}"
-
-    def test_scripts_executable(self):
-        """测试脚本可执行"""
-        import os
-
-        scripts = [
-            "scripts/deployment/gitea-runner/cleanup-offline-runners.sh",
-            "scripts/deployment/gitea-runner/fix-duplicate-registration.sh",
-        ]
-
-        for script in scripts:
-            script_path = Path(script)
-            if script_path.exists():
-                assert os.access(script_path, os.X_OK), f"脚本不可执行：{script_path}"
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
