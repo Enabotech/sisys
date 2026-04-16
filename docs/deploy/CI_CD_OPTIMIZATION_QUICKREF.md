@@ -38,7 +38,7 @@ project/
 ├── scripts/image/
 │   ├── import-pytorch.sh            # PyTorch 镜像导入
 │   └── cleanup-old-versions.sh      # 镜像清理
-└── docs/deployment/
+└── docs/deploy/
     ├── CI_CD_PIPELINE_TEMPLATE.md   # Pipeline 使用指南
     ├── LOCAL_PYTORCH_IMPORT.md      # PyTorch 镜像导入指南
     └── PREBUILT_IMAGE_MAINTENANCE.md # 预构建镜像维护指南

@@ -360,7 +360,7 @@ trivy:
 # - 透明日志：Rekor 记录所有签名操作
 # - SLSA 合规：符合现代供应链安全要求
 #
-# 参考文档：docs/deployment/HARBOR_COSIGN_SIGNING.md
+# 参考文档：docs/deploy/HARBOR_COSIGN_SIGNING.md
 #
 # cosign:
 #   # 启用 Cosign 集成

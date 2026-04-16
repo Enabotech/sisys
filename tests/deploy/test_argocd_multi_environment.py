@@ -224,7 +224,7 @@ class TestEnvironmentPromotion:
 
     def test_promotion_workflow_documented(self):
         """验证环境晋升流程有文档"""
-        doc_path = Path("docs/deployment/ARGOCD_APPLICATION_CONFIG.md")
+        doc_path = Path("docs/deploy/ARGOCD_APPLICATION_CONFIG.md")
         assert doc_path.exists(), "应用配置文档不存在"
 
         with open(doc_path) as f:

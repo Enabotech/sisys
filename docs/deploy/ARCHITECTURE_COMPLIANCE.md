@@ -316,7 +316,7 @@ grep -A 5 "securityContext:" deploy/kubernetes/gitea-runner/gitea-actions-comple
 
 ```bash
 # 运行 pytest 测试
-pytest tests/deployment/test_gitea_architecture_compliance.py -v
+pytest tests/deploy/test_gitea_architecture_compliance.py -v
 
 # 测试覆盖:
 # - TestTLSConfiguration: TLS 配置验证

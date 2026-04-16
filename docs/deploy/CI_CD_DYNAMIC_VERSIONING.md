@@ -93,10 +93,10 @@ env:
   # =======================================================================
   # 优先级：手动输入 > Git Tag > 默认值
   IMAGE_TAG_L3_BASE: |
-    ${{ 
-      github.event.inputs.version || 
+    ${{
+      github.event.inputs.version ||
       (startsWith(github.ref, 'refs/tags/') && github.ref_name) ||
-      'v1.0.0' 
+      'v1.0.0'
     }}
 ```
 
@@ -114,20 +114,20 @@ env:
         run: |
           GIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          
+
           # ✅ 使用动态版本号（自动去除换行和空格）
           VERSION=$(echo "${{ env.IMAGE_TAG_L3_BASE }}" | tr -d '[:space:]')
-          
+
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          
+
           # Layer 3 应用镜像标签
           echo "image_tag_l3=${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
-          
+
           # 测试环境标签
           echo "image_tag_test=test-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
-          
+
           echo "✅ 构建版本: ${VERSION}-${GIT_SHA}"
           echo "✅ 测试版本: test-${VERSION}-${GIT_SHA}"
 ```
@@ -530,6 +530,6 @@ annotations:
 
 ---
 
-**文档版本**: 1.0  
-**最后更新**: 2026-04-04  
+**文档版本**: 1.0
+**最后更新**: 2026-04-04
 **维护者**: SISYS 团队

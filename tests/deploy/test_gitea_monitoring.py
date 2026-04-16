@@ -102,7 +102,7 @@ class TestPipelineMetrics:
 
     def test_runner_metrics_documentation(self):
         """Verify Runner metrics are documented"""
-        doc_path = Path("docs/deployment/RUNNER_MONITORING.md")
+        doc_path = Path("docs/deploy/RUNNER_MONITORING.md")
 
         # Documentation is optional for now
         if doc_path.exists():
@@ -171,8 +171,8 @@ class TestBuildDurationStatistics:
         """Verify metrics dashboard is documented"""
         # Check for Grafana or dashboard documentation
         doc_paths = [
-            Path("docs/deployment/GRAFANA_DASHBOARD.md"),
-            Path("docs/deployment/RUNNER_MONITORING.md"),
+            Path("docs/deploy/GRAFANA_DASHBOARD.md"),
+            Path("docs/deploy/RUNNER_MONITORING.md"),
         ]
 
         # Documentation is optional

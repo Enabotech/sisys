@@ -174,7 +174,7 @@ scripts/deployment/gitea-runner/
 ├── test-harbor-push.sh            # Docker Push 测试脚本
 └── verify-trivy-scan.sh           # Trivy 扫描验证脚本
 
-tests/deployment/
+tests/deploy/
 └── test_gitea_harbor_integration.py  # Harbor 集成测试
 ```
 
@@ -231,7 +231,7 @@ container:
 
 ```bash
 # 单元测试（需要 pytest）
-pytest tests/deployment/test_gitea_harbor_integration.py -v
+pytest tests/deploy/test_gitea_harbor_integration.py -v
 
 # 集成测试（需要 K8s 集群和 Harbor 运行）
 bash scripts/deployment/gitea-runner/deploy-harbor-secret.sh

@@ -95,7 +95,7 @@
 ### 1. YAML 配置验证
 
 ```python
-# tests/deployment/test_argocd_config_validation.py
+# tests/deploy/test_argocd_config_validation.py
 
 def test_gitea_credentials_config_valid():
     """验证 Gitea 凭据配置格式正确"""
@@ -119,7 +119,7 @@ def test_security_hardening_config_valid():
 ### 2. 静态分析测试
 
 ```python
-# tests/deployment/test_argocd_static_analysis.py
+# tests/deploy/test_argocd_static_analysis.py
 
 def test_kubeconform_validation():
     """使用 kubeconform 验证所有 YAML 配置"""

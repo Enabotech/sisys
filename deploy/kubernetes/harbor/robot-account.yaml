@@ -12,7 +12,7 @@
 #    - 登录 https://harbor.sisys.local
 #    - 项目 → sisys → Robot Accounts → New Robot Account
 # 2. 通过 Harbor API 自动创建 (自动化方式)
-#    参考: docs/deployment/HARBOR_ROBOT_ACCOUNT.md
+#    参考: docs/deploy/HARBOR_ROBOT_ACCOUNT.md
 
 # =============================================================================
 # 使用说明
@@ -65,8 +65,8 @@ spec:
             echo "Creating Robot Account for Gitea Runner..."
             # 注意：需要先获取 Harbor 管理员 Token
             # export HARBOR_TOKEN=$(curl -k -u admin:Harbor@2026Secure! -X POST "https://harbor-core.harbor.svc.cluster.local/api/v2.0/users" ...)
-            # 实际创建请参考 docs/deployment/HARBOR_ROBOT_ACCOUNT.md
-            echo "Robot Account 创建指南：请参考 docs/deployment/HARBOR_ROBOT_ACCOUNT.md"
+            # 实际创建请参考 docs/deploy/HARBOR_ROBOT_ACCOUNT.md
+            echo "Robot Account 创建指南：请参考 docs/deploy/HARBOR_ROBOT_ACCOUNT.md"
       restartPolicy: Never
   backoffLimit: 1
 

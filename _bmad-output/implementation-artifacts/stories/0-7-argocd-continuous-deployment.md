@@ -224,7 +224,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - test: `deploy/kubernetes/apps/sisys/test/kustomization.yaml`
     - prod: `deploy/kubernetes/apps/sisys/prod/kustomization.yaml`
   - [x] 创建部署脚本：`scripts/deployment/argocd/deploy-application.py`
-  - [x] 创建配置文档：`docs/deployment/ARGOCD_APPLICATION_CONFIG.md`
+  - [x] 创建配置文档：`docs/deploy/ARGOCD_APPLICATION_CONFIG.md`
 
 - [x] Task 7: 多环境配置 (AC: 7) ✅
   - [x] 选择多环境管理方案：**Kustomize** (与 Story 0.5/0.6 保持一致)
@@ -259,7 +259,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 创建环境 Application 配置
     - 文件：`deploy/kubernetes/argocd/applications/sisys-app-environments.yaml`
   - [x] 创建多环境测试
-    - 文件：`tests/deployment/test_argocd_multi_environment.py`
+    - 文件：`tests/deploy/test_argocd_multi_environment.py`
 
 - [x] Task 8: 安全加固 ✅
   - [x] 容器安全配置：
@@ -289,7 +289,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - [x] ResourceQuota 限制命名空间资源
     - [x] LimitRange 设置默认容器限制
   - [x] 创建安全加固配置：`deploy/kubernetes/argocd/security-hardening.yaml`
-  - [x] 创建安全测试：`tests/deployment/test_argocd_security.py` (18/18 通过)
+  - [x] 创建安全测试：`tests/deploy/test_argocd_security.py` (18/18 通过)
 
 - [x] Task 9: 架构合规验证 ✅
   - [x] 验证 TLS 1.3 强制启用
@@ -374,8 +374,8 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 修复：使用环境变量注入 `${ARGOCD_ADMIN_PASSWORD}`
     - 验收：密码不再以明文出现在 Git 仓库中 ✅
   - [x] [CRITICAL-3] 减少测试跳过或提供替代验证 ✅
-    - 文件：`tests/deployment/SKIPPED_TESTS_TRACKING.md` (新建)
-    - 文件：`tests/deployment/test_argocd_config_validation.py` (新建)
+    - 文件：`tests/deploy/SKIPPED_TESTS_TRACKING.md` (新建)
+    - 文件：`tests/deploy/test_argocd_config_validation.py` (新建)
     - 修复：创建测试追踪文档和配置验证测试
     - 验收：关键测试有替代验证方案或明确追踪记录 ✅
   - [x] [CRITICAL-4] 迁移 PSP 到 PSA ✅
@@ -383,7 +383,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 修复：使用 Pod Security Admission 标签
     - 验收：使用 PSA 标签替代 PSP ✅
   - [x] [MEDIUM-1] 创建缺失文件或更新 File List ✅
-    - 文件：`docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md` (新建)
+    - 文件：`docs/deploy/ARGOCD_GITEA_TROUBLESHOOTING.md` (新建)
     - 验收：File List 与实际文件一致 ✅
     - 说明：`sisys-app.yaml` 不必要（已有 dev/test/prod 配置 + of-apps 总控）
     - 说明：`sisys-app-rollback.yaml` 不必要（ArgoCD 3.2.7 已内置回滚功能）
@@ -392,7 +392,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 修复：移除 TODO 注释，添加 cert-manager 配置
     - 验收：配置生产就绪 TLS ✅
   - [x] [MEDIUM-3] 验证多环境配置差异 ✅
-    - 文件：`docs/deployment/ARGOCD_MULTI_ENV_VERIFICATION.md` (新建)
+    - 文件：`docs/deploy/ARGOCD_MULTI_ENV_VERIFICATION.md` (新建)
     - 验收：各环境配置差异符合预期 ✅
   - [x] [MEDIUM-4] 完善 Harbor Secret 配置 ✅
     - 文件：`scripts/deployment/argocd/configure-image-updater-secret.sh` (新建)
@@ -410,7 +410,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 修复：创建性能基准测试脚本（7 个测试用例）
     - 验收：有性能测试脚本 ✅
   - [x] [LOW-3] 创建版本兼容性矩阵 ✅
-    - 文件：`docs/deployment/VERSION_COMPATIBILITY_MATRIX.md` (新建)
+    - 文件：`docs/deploy/VERSION_COMPATIBILITY_MATRIX.md` (新建)
     - 修复：创建版本兼容性文档
     - 验收：有版本兼容性矩阵 ✅
 
@@ -468,7 +468,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - **缺失文件:**
     - `deploy/kubernetes/argocd/applications/sisys-app.yaml` - 不必要（已有 dev/test/prod 配置 + of-apps 总控）
     - `deploy/kubernetes/argocd/applications/sisys-app-rollback.yaml` - 不必要（ArgoCD 3.2.7 已内置回滚功能）
-    - `docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md` - ✅ 已创建
+    - `docs/deploy/ARGOCD_GITEA_TROUBLESHOOTING.md` - ✅ 已创建
   - **修复方案:** 创建缺失文件或更新 File List
   - **验收:** ✅ File List 与实际文件一致
 
@@ -657,7 +657,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - 修复：✅ 已统一注释格式并添加 Story 标签
 
 - [x] [AI-Review][LOW] 缺少故障排除文档
-  - 修复：✅ 已创建 `docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md`
+  - 修复：✅ 已创建 `docs/deploy/ARGOCD_GITEA_TROUBLESHOOTING.md`
 
 - [x] [AI-Review][LOW] Story 状态与实际进度不一致
   - sprint-status.yaml: `in-progress`
@@ -810,7 +810,7 @@ Traefik v3.x 反向代理
 - 推荐通过浏览器访问：https://<service>.sisys.local（需要本地 DNS 配置）
 
 **参考文档:**
-- `docs/deployment/DOMAIN_CONFIG_FIX.md`
+- `docs/deploy/DOMAIN_CONFIG_FIX.md`
 
 ### 依赖关系
 
@@ -1009,7 +1009,7 @@ sisys/
 
 ### 实施指南
 
-**参考文档**: `docs/deployment/ARGOCD_INSTALLATION.md` (待创建)
+**参考文档**: `docs/deploy/ARGOCD_INSTALLATION.md` (待创建)
 
 **实施步骤**:
 
@@ -1048,18 +1048,18 @@ sisys/
 ### 测试要求
 
 **TDD 测试文件位置:**
-- `tests/deployment/test_argocd.py` - ArgoCD 部署测试
+- `tests/deploy/test_argocd.py` - ArgoCD 部署测试
 
 **测试执行命令:**
 ```bash
 # 运行所有测试
-pytest tests/deployment/test_argocd.py -v
+pytest tests/deploy/test_argocd.py -v
 
 # 运行特定测试
-pytest tests/deployment/test_argocd.py::test_argocd_pod_running -v
+pytest tests/deploy/test_argocd.py::test_argocd_pod_running -v
 
 # 运行并生成覆盖率报告
-pytest tests/deployment/test_argocd.py --cov=deploy/kubernetes/argocd --cov-report=html
+pytest tests/deploy/test_argocd.py --cov=deploy/kubernetes/argocd --cov-report=html
 ```
 
 **测试环境准备:**
@@ -1530,7 +1530,7 @@ Qwen Code (AI 开发助手)
 
 **问题 4: 测试覆盖率不足**
 - **修复:** 增强 `test_end_to_end_image_update_workflow` 测试，添加实际验证逻辑
-- **文件:** `tests/deployment/test_argocd_harbor_integration.py` 第 291-378 行
+- **文件:** `tests/deploy/test_argocd_harbor_integration.py` 第 291-378 行
 - **说明:** 移除 `pytest.skip()`，添加配置验证、NetworkPolicy 验证
 
 **问题 5: Harbor Ingress 路由配置顺序**
@@ -1552,7 +1552,7 @@ Qwen Code (AI 开发助手)
 
 **问题 8: 文档中缺少故障恢复指南**
 - **修复:** 添加完整的故障恢复指南章节
-- **文件:** `docs/deployment/ARGOCD_IMAGE_UPDATER.md` 第 438-500 行
+- **文件:** `docs/deploy/ARGOCD_IMAGE_UPDATER.md` 第 438-500 行
 - **说明:** 包含重置 Image Updater、重置凭据、回滚 Application、禁用 Image Updater
 
 **问题 9: 示例 Application 配置未实际创建**
@@ -1562,7 +1562,7 @@ Qwen Code (AI 开发助手)
 
 **问题 10: 缺少版本兼容性说明**
 - **修复:** 添加版本兼容性章节
-- **文件:** `docs/deployment/ARGOCD_IMAGE_UPDATER.md` 第 506-574 行
+- **文件:** `docs/deploy/ARGOCD_IMAGE_UPDATER.md` 第 506-574 行
 - **说明:** 包含已测试版本、兼容版本范围、降级方案、升级路径
 
 ### 变更文件清单
@@ -1573,18 +1573,18 @@ Qwen Code (AI 开发助手)
 **修改文件:**
 - `deploy/kubernetes/argocd/image-updater-install.yaml` - Secret 配置、NetworkPolicy、Prometheus 注解
 - `deploy/kubernetes/harbor/ingress.yaml` - 路由顺序调整
-- `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 故障恢复指南、版本兼容性
+- `docs/deploy/ARGOCD_IMAGE_UPDATER.md` - 故障恢复指南、版本兼容性
 - `scripts/deployment/argocd/configure-image-updater.py` - 命令行参数支持
-- `tests/deployment/test_argocd_harbor_integration.py` - 测试增强
+- `tests/deploy/test_argocd_harbor_integration.py` - 测试增强
 - `_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md` - 审查记录
 
 **创建的文件:**
-- `tests/deployment/test_argocd_gitea_integration.py` - 集成测试
+- `tests/deploy/test_argocd_gitea_integration.py` - 集成测试
 - `deploy/kubernetes/argocd/gitea-credentials.yaml` - Gitea 凭据配置
 - `deploy/kubernetes/argocd/gitea-webhook-config.yaml` - Webhook 配置
 - `scripts/deployment/argocd/setup-gitea-integration.py` - 自动配置脚本
 - `scripts/deployment/argocd/create-gitea-org-repo.py` - 创建组织和仓库脚本
-- `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - 配置指南文档
+- `docs/deploy/ARGOCD_GITEA_INTEGRATION.md` - 配置指南文档
 
 **配置验证:**
 - ✅ Gitea 组织 `sisys` 创建成功
@@ -1606,7 +1606,7 @@ Qwen Code (AI 开发助手)
 
 ### RED 阶段 - 先写失败的测试
 
-**创建测试文件:** `tests/deployment/test_argocd_harbor_integration.py`
+**创建测试文件:** `tests/deploy/test_argocd_harbor_integration.py`
 
 **测试用例 (17 个):**
 1. `test_image_updater_helm_chart_installed` - 验证 Helm Chart 安装
@@ -1697,7 +1697,7 @@ SKIPPED test_end_to_end_image_update_workflow - 需实际推送镜像测试
    - 便于独立管理和复用
 
 2. **文档完善**
-   - 创建 `docs/deployment/ARGOCD_IMAGE_UPDATER.md` 完整配置指南
+   - 创建 `docs/deploy/ARGOCD_IMAGE_UPDATER.md` 完整配置指南
    - 包含故障排除、最佳实践、示例配置
 
 3. **自动化脚本**
@@ -1757,15 +1757,15 @@ kubectl get configmap argocd-image-updater-config -n argocd
 **创建的文件:**
 - `deploy/kubernetes/argocd/image-updater-install.yaml` - Image Updater 安装清单
 - `deploy/kubernetes/argocd/image-updater-config.yaml` - 完整配置指南和示例 Application
-- `tests/deployment/test_argocd_harbor_integration.py` - 集成测试
-- `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 配置指南文档
+- `tests/deploy/test_argocd_harbor_integration.py` - 集成测试
+- `docs/deploy/ARGOCD_IMAGE_UPDATER.md` - 配置指南文档
 - `scripts/deployment/argocd/configure-image-updater.py` - 自动配置脚本
 
 **Harbor 配置信息:**
 - 项目：sisys (project_id=2)
 - Robot Account: robot$sisys+argocd-pull
 - Token: 已存储到 Kubernetes Secret
-- Webhook: 需手动配置（参考 docs/deployment/ARGOCD_IMAGE_UPDATER.md）
+- Webhook: 需手动配置（参考 docs/deploy/ARGOCD_IMAGE_UPDATER.md）
 
 **验证结果:**
 ```
@@ -1851,15 +1851,15 @@ kubectl get configmap argocd-image-updater-config -n argocd
 ### File List
 
 **Task 9 创建的文件 (2026-03-16):**
-- `tests/deployment/test_argocd_architecture_compliance.py` - 架构合规验证测试 (16 个测试用例)
+- `tests/deploy/test_argocd_architecture_compliance.py` - 架构合规验证测试 (16 个测试用例)
 
 **Task 8 创建的文件 (2026-03-16):**
 - `deploy/kubernetes/argocd/security-hardening.yaml` - 安全加固配置（容器安全、网络安全、密钥管理）
-- `tests/deployment/test_argocd_security.py` - 安全加固测试 (18 个测试用例)
+- `tests/deploy/test_argocd_security.py` - 安全加固测试 (18 个测试用例)
 
 **Task 7 创建的文件 (2026-03-16):**
 - `deploy/kubernetes/argocd/applications/sisys-app-environments.yaml` - 多环境 Application 配置
-- `tests/deployment/test_argocd_multi_environment.py` - 多环境配置测试 (11 个测试用例)
+- `tests/deploy/test_argocd_multi_environment.py` - 多环境配置测试 (11 个测试用例)
 
 **Task 6 创建的文件 (2026-03-16):**
 - `deploy/kubernetes/argocd/applications/sisys-app.yaml` - ArgoCD Application 配置
@@ -1868,20 +1868,20 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `deploy/kubernetes/apps/sisys/dev/kustomization.yaml` - Dev 环境 Overlay
 - `deploy/kubernetes/apps/sisys/test/kustomization.yaml` - Test 环境 Overlay
 - `deploy/kubernetes/apps/sisys/prod/kustomization.yaml` - Prod 环境 Overlay
-- `tests/deployment/test_argocd_application.py` - Application 测试 (17 个测试用例)
+- `tests/deploy/test_argocd_application.py` - Application 测试 (17 个测试用例)
 - `scripts/deployment/argocd/deploy-application.py` - Application 部署脚本
-- `docs/deployment/ARGOCD_APPLICATION_CONFIG.md` - Application 配置指南
+- `docs/deploy/ARGOCD_APPLICATION_CONFIG.md` - Application 配置指南
 
 **Task 5 创建的文件:**
-- `tests/deployment/test_argocd_harbor_integration.py` - ArgoCD Harbor 集成测试（17 个测试用例）
+- `tests/deploy/test_argocd_harbor_integration.py` - ArgoCD Harbor 集成测试（17 个测试用例）
 - `deploy/kubernetes/argocd/image-updater-install.yaml` - ArgoCD Image Updater 安装清单（v0.14.0）
 - `deploy/kubernetes/argocd/image-updater-config.yaml` - Image Updater 完整配置指南和示例 Application
-- `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - ArgoCD Image Updater 配置指南
+- `docs/deploy/ARGOCD_IMAGE_UPDATER.md` - ArgoCD Image Updater 配置指南
 - `scripts/deployment/argocd/configure-image-updater.py` - Image Updater 自动配置脚本
 - `_bmad-output/implementation-artifacts/stories/task-5-tdd-summary.md` - TDD 流程总结文档
 
 **Task 4 创建的文件:**
-- `tests/deployment/test_argocd_gitea_integration.py` - ArgoCD Gitea 集成测试
+- `tests/deploy/test_argocd_gitea_integration.py` - ArgoCD Gitea 集成测试
 - `deploy/kubernetes/argocd/gitea-credentials.yaml` - Gitea 凭据配置（Secret + ConfigMap）
 - `deploy/kubernetes/argocd/gitea-webhook-config.yaml` - Gitea Webhook 配置
 - `scripts/deployment/argocd/setup-gitea-integration.py` - Gitea 集成自动配置脚本
@@ -1890,7 +1890,7 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `scripts/deployment/argocd/delete-existing-tokens.py` - 删除已存在 Token 脚本
 - `scripts/deployment/argocd/update-webhook-url.py` - 更新 Webhook URL 脚本
 - `scripts/deployment/argocd/verify-gitea-webhook.py` - 验证 Webhook 配置脚本
-- `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - Gitea 集成配置指南
+- `docs/deploy/ARGOCD_GITEA_INTEGRATION.md` - Gitea 集成配置指南
 
 **Task 1 创建的文件:**
 - `deploy/kubernetes/argocd/values.yaml` - ArgoCD Helm Chart 配置（v3.2.7）
@@ -1942,11 +1942,11 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - ✅ LOW-2: 添加性能测试 - 创建性能基准测试脚本
 - ✅ LOW-3: 创建版本兼容性矩阵 - 创建版本兼容性文档
 - 📋 新增文件:
-  - `tests/deployment/SKIPPED_TESTS_TRACKING.md` - 跳过测试追踪文档
-  - `tests/deployment/test_argocd_config_validation.py` - 配置验证测试
+  - `tests/deploy/SKIPPED_TESTS_TRACKING.md` - 跳过测试追踪文档
+  - `tests/deploy/test_argocd_config_validation.py` - 配置验证测试
   - `tests/performance/test_argocd_performance.py` - 性能测试
-  - `docs/deployment/VERSION_COMPATIBILITY_MATRIX.md` - 版本兼容性矩阵
-  - `docs/deployment/ARGOCD_MULTI_ENV_VERIFICATION.md` - 多环境验证
+  - `docs/deploy/VERSION_COMPATIBILITY_MATRIX.md` - 版本兼容性矩阵
+  - `docs/deploy/ARGOCD_MULTI_ENV_VERIFICATION.md` - 多环境验证
 - 📋 修改文件:
   - `deploy/kubernetes/argocd/gitea-credentials.yaml` - 移除明文 Token
   - `deploy/kubernetes/argocd/rbac.yaml` - 移除明文密码 + 添加 services 权限
@@ -2034,7 +2034,7 @@ kubectl get configmap argocd-image-updater-config -n argocd
   - config.yaml: 更新策略配置
 - ⚠️ Harbor Webhook 需手动配置
   - API 版本差异导致自动创建失败
-  - 参考 docs/deployment/ARGOCD_IMAGE_UPDATER.md 手动配置
+  - 参考 docs/deploy/ARGOCD_IMAGE_UPDATER.md 手动配置
 - ✅ 创建集成测试和配置文档
 - ✅ 完成 TDD 流程（RED→GREEN→REFACTOR）
   - RED 阶段：创建 17 个测试用例

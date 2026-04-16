@@ -1,6 +1,6 @@
 [Unit]
 Description=Harbor Auto-Fix Service
-Documentation=https://github.com/sisys/sisys/blob/main/docs/deployment/HARBOR_PERSISTENCE.md
+Documentation=https://github.com/sisys/sisys/blob/main/docs/deploy/HARBOR_PERSISTENCE.md
 After=k3s.service
 Wants=k3s.service
 

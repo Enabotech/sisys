@@ -134,7 +134,7 @@ labels:
 bash scripts/deployment/gitea-runner/test-concurrent-jobs.sh
 
 # 运行 pytest 测试
-pytest tests/deployment/test_gitea_multi_runner.py -v
+pytest tests/deploy/test_gitea_multi_runner.py -v
 ```
 
 ---

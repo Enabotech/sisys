@@ -431,11 +431,11 @@ if __name__ == "__main__":
     测试执行命令：
 
     # 运行所有测试
-    pytest tests/deployment/test_image_push.py -v
+    pytest tests/deploy/test_image_push.py -v
 
     # 运行特定测试
-    pytest tests/deployment/test_image_push.py::TestImagePush::test_push_image_to_harbor -v
+    pytest tests/deploy/test_image_push.py::TestImagePush::test_push_image_to_harbor -v
 
     # 运行并显示 skip 原因
-    pytest tests/deployment/test_image_push.py -v -rs
+    pytest tests/deploy/test_image_push.py -v -rs
     """

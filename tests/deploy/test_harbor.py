@@ -10,12 +10,12 @@ Harbor 镜像仓库部署测试套件
 
 使用方式:
     # 使用默认配置（自动检测网络模式）
-    pytest tests/deployment/test_harbor.py
+    pytest tests/deploy/test_harbor.py
 
     # 使用环境变量覆盖
     export HARBOR_NODE_IP=192.168.1.100
     export HARBOR_NODEPORT=nodeport
-    pytest tests/deployment/test_harbor.py
+    pytest tests/deploy/test_harbor.py
 """
 
 import re

@@ -219,7 +219,7 @@ echo "  6. Docker 镜像：查看方法 6 输出"
 
 echo ""
 print_info "如需清理空间，参考:"
-echo "  - docs/deployment/PREBUILT_IMAGE_MAINTENANCE.md"
+echo "  - docs/deploy/PREBUILT_IMAGE_MAINTENANCE.md"
 echo "  - ./scripts/image/cleanup-old-versions.sh"
 
 echo ""
