@@ -102,8 +102,8 @@ echo "[STEP 4/5] 拉取 Docker 镜像..."
 
 # 定义镜像列表
 IMAGES=(
-    "docker.m.daocloud.io/library/redis:7.2-alpine:redis:7.2-alpine"
-    "docker.m.daocloud.io/library/postgres:15-alpine:postgres:15-alpine"
+    "docker.m.daocloud.io/library/redis:7.2.5:redis:7.2.5"
+    "docker.m.daocloud.io/library/postgres:15.4:postgres:15.4"
     "docker.m.daocloud.io/library/minio:latest:minio:latest"
     "harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0"
     "docker.m.daocloud.io/library/neo4j:5.15:neo4j:5.15"

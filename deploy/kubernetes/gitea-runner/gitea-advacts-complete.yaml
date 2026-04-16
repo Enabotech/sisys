@@ -246,7 +246,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: GITEA_RUNNER_LABELS
-              value: "advacts,dind,ubuntu2204,buildx"
+              value: "ubuntu2204,advacts,dind,buildx"
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -355,12 +355,6 @@ spec:
                 "log-opts": {
                   "max-size": "100m",
                   "max-file": "3"
-                },
-                "builder": {
-                  "gc": {
-                    "enabled": true,
-                    "defaultKeepStorage": "10GB"
-                  }
                 }
               }
               EOF

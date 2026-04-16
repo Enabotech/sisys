@@ -10,7 +10,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: harbor.sisys.local/sisys/tools/postgres:15.4
+    image: harbor.sisys.local/sisys/tools/postgres/postgres:15.4
     container_name: sisys-postgres-prod
     restart: always
     ports:

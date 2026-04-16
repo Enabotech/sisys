@@ -14,7 +14,7 @@
 services:
   # PostgreSQL 15+ - Relational Storage Layer (L2) - Test
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15.4
     container_name: sisys-test-postgres
     restart: "no"
     environment:
@@ -35,7 +35,7 @@ services:
 
   # Redis 7.0+ - High-Speed Cache Layer (L1) - Test
   redis:
-    image: redis:7.2-alpine
+    image: redis:7.2.5
     container_name: sisys-test-redis
     restart: "no"
     command: redis-server --appendonly yes

@@ -75,6 +75,7 @@ docker compose down -v
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
+| `dir` | /data | **重要**：必须与容器 volume 挂载点一致 |
 | `maxmemory` | 2gb | 最大内存，根据服务器调整 |
 | `maxmemory-policy` | volatile-lru | 淘汰策略，推荐 volatile-lru |
 | `timeout` | 300 | 空闲连接超时（秒） |
@@ -171,7 +172,7 @@ docker compose logs redis
 
 ### 持久化失败
 
-RDB 快照失败通常是磁盘空间不足。检查 `/var/lib/redis` 目录权限和磁盘空间。
+RDB 快照失败通常是磁盘空间不足或 `dir` 配置路径错误。Docker 部署中 `dir` 必须设置为 `/data`（与 volume 挂载点一致）。检查日志中的配置路径错误信息。
 
 ## 架构集成
 

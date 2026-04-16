@@ -13,7 +13,7 @@ services:
   # L1: Redis 高速缓存层
   # ===========================================================================
   redis:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis:7.2.5
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
     container_name: sisys-redis
     restart: unless-stopped
     ports:
@@ -46,7 +46,7 @@ services:
   # L2: PostgreSQL 关系存储层
   # ===========================================================================
   postgres:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/postgres:15.4
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/postgres/postgres:15.4
     container_name: sisys-postgres
     restart: unless-stopped
     ports:
@@ -80,7 +80,7 @@ services:
   # L3: Qdrant 向量存储层
   # ===========================================================================
   qdrant:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant:v1.7.4
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.4
     container_name: sisys-qdrant
     restart: unless-stopped
     ports:
@@ -95,11 +95,11 @@ services:
       - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-info}
       # - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
     healthcheck:
-      test: ["CMD", "bash", "-c", "curl -f http://localhost:6333/healthz || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - sisys-network
     deploy:
@@ -115,7 +115,7 @@ services:
   # L4: MinIO 对象存储层
   # ===========================================================================
   minio:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2024-01-01T00-00-00Z
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: sisys-minio
     restart: unless-stopped
     ports:
@@ -151,7 +151,7 @@ services:
   # L5: Neo4j 图存储层
   # ===========================================================================
   neo4j:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j:5.22.0
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j/neo4j:5.15
     container_name: sisys-neo4j
     restart: unless-stopped
     ports:
@@ -161,19 +161,18 @@ services:
       - neo4j_data:/data
       - ./neo4j/neo4j.conf:/neo4j/conf/neo4j.conf:ro
     environment:
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-neo4j}
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password123}
       - NEO4J_PLUGINS=["apoc"]
       - NEO4J_dbms_memory_heap_initial__size=${NEO4J_HEAP_INITIAL_SIZE:-512m}
       - NEO4J_dbms_memory_heap_max__size=${NEO4J_HEAP_MAX_SIZE:-1G}
       - NEO4J_dbms_memory_pagecache_size=${NEO4J_PAGECACHE_SIZE:-512m}
-      - NEO4J_dbms_transaction_bookmark_ready__timeout=5s
       - NEO4J_dbms_transaction_timeout=60s
     healthcheck:
-      test: ["CMD", "bash", "-c", "curl -f http://localhost:7474/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - sisys-network
     deploy:
@@ -212,3 +211,4 @@ networks:
   sisys-network:
     driver: bridge
     name: sisys-network
+    external: true

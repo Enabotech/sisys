@@ -5,19 +5,56 @@
 ### 一键启动所有存储服务（本地开发）
 
 ```bash
-# 1. 复制环境变量文件
+# 1. 复制环境变量文件（如已存在可跳过）
 for svc in redis postgresql qdrant minio neo4j; do
-  cp deploy/$svc/.env.example deploy/$svc/.env
+  cp deploy/$svc/.env.example deploy/$svc/.env 2>/dev/null || true
 done
+# 或直接使用统一配置
+cp deploy/.env.example deploy/.env 2>/dev/null || true
 
 # 2. 启动所有服务
 docker compose -f deploy/docker-compose.yml up -d
 
-# 3. 验证服务状态
-docker compose -f deploy/docker-compose.yml ps
+# 3. 等待服务就绪（约 30 秒）
+sleep 30
 
-# 4. 运行数据库迁移
-poetry run alembic -c deploy/postgresql/alembic/alembic.ini upgrade head
+# 4. 验证服务状态
+docker compose -f deploy/docker-compose.yml ps
+```
+
+**预期输出：**
+```
+NAME                STATUS          HEALTH
+sisys-redis         Up ... seconds (healthy)
+sisys-postgres      Up ... seconds (healthy)
+sisys-qdrant        Up ... seconds (healthy)
+sisys-minio         Up ... seconds (healthy)
+sisys-neo4j         Up ... seconds (healthy)
+```
+
+### 清除部署
+
+```bash
+# 停止服务并删除数据卷（彻底清除，所有数据将丢失）
+docker compose -f deploy/docker-compose.yml down -v
+
+# 仅停止服务（保留数据卷，可重新启动恢复数据）
+docker compose -f deploy/docker-compose.yml down
+```
+
+### 重新部署
+
+```bash
+# 方法一：完全重置（删除所有容器和数据卷后重新创建）
+docker compose -f deploy/docker-compose.yml down -v
+docker compose -f deploy/docker-compose.yml up -d
+
+# 方法二：保留数据重部署（停止并重建容器，数据保留）
+docker compose -f deploy/docker-compose.yml down
+docker compose -f deploy/docker-compose.yml up -d
+
+# 方法三：仅重建单个服务（如 Redis）
+docker compose -f deploy/docker-compose.yml up -d --force-recreate redis
 ```
 
 ### 停止所有服务
@@ -226,6 +263,9 @@ docker compose -f deploy/docker-compose.yml logs neo4j
 ### 重建服务
 
 ```bash
-docker compose -f deploy/docker-compose.yml down
+# 重建所有服务
 docker compose -f deploy/docker-compose.yml up -d --force-recreate
+
+# 重建单个服务
+docker compose -f deploy/docker-compose.yml up -d --force-recreate redis
 ```

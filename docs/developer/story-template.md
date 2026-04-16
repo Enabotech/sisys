@@ -159,11 +159,11 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。这是 SDD 规范驱动的基础。
 
-- [ ] Subtask: 定义领域事件 Schema（[关键属性]）
-- [ ] Subtask: 定义数据模型（[关键属性]）
-- [ ] Subtask: 创建/更新 `docs/api/openapi.yaml`
-- [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_[编号].feature`
-- [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask [m.n]: 定义领域事件 Schema（[关键属性]）
+- [ ] Subtask [m.n]: 定义数据模型（[关键属性]）
+- [ ] Subtask [m.n]: 创建/更新 `docs/api/openapi.yaml`
+- [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_story_[编号].feature`
+- [ ] Subtask [m.n]: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -185,9 +185,9 @@
 | 🟢 绿 | 实现 [组件/类] 最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask: 🔴 红 — 编写 [组件] 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 [组件] 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 [组件] 代码
+- [ ] Subtask [m.n]: 🔴 红 — 编写 [组件] 失败测试
+- [ ] Subtask [m.n]: 🟢 绿 — 实现 [组件] 最小代码
+- [ ] Subtask [m.n]: 🔄 重构 — 优化 [组件] 代码
 
 **完成标准/Definition of Done:**
 - [ ] [组件] 实现完成
@@ -210,9 +210,9 @@
 | 🟢 绿 | 实现 `[ComponentA]` 类/函数最小代码 |
 | 🔄 重构 | 添加类型注解、docstring、应用设计模式 |
 
-- [ ] Subtask: 🔴 红 — 编写 [组件 A] 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 [组件 A]
-- [ ] Subtask: 🔄 重构 — 优化 [组件 A] 代码
+- [ ] Subtask [m.n]: 🔴 红 — 编写 [组件 A] 失败测试
+- [ ] Subtask [m.n]: 🟢 绿 — 实现 [组件 A]
+- [ ] Subtask [m.n]: 🔄 重构 — 优化 [组件 A] 代码
 
 #### TDD 循环 [B]：[组件 B]
 
@@ -222,9 +222,9 @@
 | 🟢 绿 | 实现 `[ComponentB]` 类/函数最小代码 |
 | 🔄 重构 | 统一命名、添加类型注解 |
 
-- [ ] Subtask: 🔴 红 — 编写 [组件 B] 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 [组件 B]
-- [ ] Subtask: 🔄 重构 — 优化 [组件 B] 代码
+- [ ] Subtask [m.n]: 🔴 红 — 编写 [组件 B] 失败测试
+- [ ] Subtask [m.n]: 🟢 绿 — 实现 [组件 B]
+- [ ] Subtask [m.n]: 🔄 重构 — 优化 [组件 B] 代码
 
 **完成标准/Definition of Done:**
 - [ ] [组件 A] 和 [组件 B] 全部实现
@@ -242,11 +242,11 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask: 创建 `tests/unit/[type]/test_[architecture].py`
-- [ ] Subtask: 实现 [验证器 A]（[验证内容]）
-- [ ] Subtask: 实现 [验证器 B]（[验证内容]）
-- [ ] Subtask: 实现循环依赖检测（**使用 ruff 的 `E` 规则或 `isort --check-only`，不引入 pylint**）
-- [ ] Subtask: 运行完整测试套件并生成报告
+- [ ] Subtask [m.n]: 创建 `tests/unit/[type]/test_[architecture].py`
+- [ ] Subtask [m.n]: 实现 [验证器 A]（[验证内容]）
+- [ ] Subtask [m.n]: 实现 [验证器 B]（[验证内容]）
+- [ ] Subtask [m.n]: 实现循环依赖检测（**使用 ruff 的 `E` 规则或 `isort --check-only`，不引入 pylint**）
+- [ ] Subtask [m.n]: 运行完整测试套件并生成报告
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
@@ -437,9 +437,9 @@ sisys/
 | 🟢 绿 | 实现 `[Component]` 类/函数最小代码 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask: 🔴 红 — 编写 [组件] 失败测试
-- [ ] Subtask: 🟢 绿 — 实现 [组件] 最小代码
-- [ ] Subtask: 🔄 重构 — 优化 [组件] 代码
+- [ ] Subtask [m.n]: 🔴 红 — 编写 [组件] 失败测试
+- [ ] Subtask [m.n]: 🟢 绿 — 实现 [组件] 最小代码
+- [ ] Subtask [m.n]: 🔄 重构 — 优化 [组件] 代码
 ```
 
 **红阶段检查点：**
