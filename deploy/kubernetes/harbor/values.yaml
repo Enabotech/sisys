@@ -47,7 +47,7 @@ trivy:
       memory: 1Gi
 
 # Notary 已弃用 - 使用 Cosign 进行镜像签名
-# 参考：docs/deployment/HARBOR_COSIGN_SIGNING.md
+# 参考：docs/deploy/HARBOR_COSIGN_SIGNING.md
 
 # =============================================================================
 # 核心组件配置

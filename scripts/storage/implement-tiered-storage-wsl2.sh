@@ -5,7 +5,7 @@
 # =============================================================================
 # 用途：在 WSL2 环境中自动化部署 SSD+HDD 分层存储架构
 # 关联 Story: 0.9 (CI/CD Pipeline 模板)
-# 方案文档：docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md
+# 方案文档：docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md
 # =============================================================================
 
 set -e
@@ -388,7 +388,7 @@ main() {
     print_header "✅ Harbor 分层存储实施完成 (WSL2)"
     echo ""
     echo "下一步:"
-    echo "  1. 查看 WSL2 方案文档：docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md"
+    echo "  1. 查看 WSL2 方案文档：docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md"
     echo "  2. 更新 Harbor Helm 配置：参考方案文档 5.2 节"
     echo "  3. 执行功能测试：推送/拉取镜像"
     echo "  4. 配置监控告警：参考方案文档监控章节"

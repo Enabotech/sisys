@@ -249,13 +249,13 @@ openssl s_client -connect gitea.sisys.local:443 -tls1_3
 
 ```bash
 # 运行所有 Gitea 测试
-pytest tests/deployment/test_gitea.py -v
+pytest tests/deploy/test_gitea.py -v
 
 # 运行特定测试
-pytest tests/deployment/test_gitea.py::TestGiteaDeployment::test_gitea_pod_running -v
+pytest tests/deploy/test_gitea.py::TestGiteaDeployment::test_gitea_pod_running -v
 
 # 运行带标记的测试
-pytest tests/deployment/test_gitea.py -m "验收标准"
+pytest tests/deploy/test_gitea.py -m "验收标准"
 ```
 
 ### 测试覆盖

@@ -273,7 +273,7 @@ class TestGPUDocumentation:
 
     def test_gpu_section_in_ci_cd_guide(self):
         """测试 CI/CD 指南包含 GPU 章节"""
-        guide_path = Path("docs/deployment/CI_CD_PIPELINE_TEMPLATE.md")
+        guide_path = Path("docs/deploy/CI_CD_PIPELINE_TEMPLATE.md")
 
         if not guide_path.exists():
             pytest.skip("CI/CD guide not found")
@@ -289,7 +289,7 @@ class TestGPUDocumentation:
 
     def test_gpu_scheduling_documentation(self):
         """测试 GPU 调度文档"""
-        guide_path = Path("docs/deployment/CI_CD_PIPELINE_TEMPLATE.md")
+        guide_path = Path("docs/deploy/CI_CD_PIPELINE_TEMPLATE.md")
 
         if not guide_path.exists():
             pytest.skip("CI/CD guide not found")

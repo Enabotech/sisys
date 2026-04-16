@@ -178,7 +178,7 @@ class TestHarborIntegrationDocumentation:
     def test_story_06_robot_account_documentation_exists(self):
         """Verify Story 0.6 Robot Account documentation exists"""
         # This is optional - Story 0.6 may have created it
-        # doc_path = Path("docs/deployment/HARBOR_ROBOT_ACCOUNT.md")
+        # doc_path = Path("docs/deploy/HARBOR_ROBOT_ACCOUNT.md")
         # assert doc_path.exists(), \
         #     "Harbor Robot Account documentation not found"
 

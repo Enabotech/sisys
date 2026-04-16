@@ -59,9 +59,9 @@ scripts/
 
 ### 高优先级（直接影响使用）
 
-- [x] `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 2 处引用
-- [x] `docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md` - 1 处引用
-- [x] `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - 1 处引用
+- [x] `docs/deploy/ARGOCD_IMAGE_UPDATER.md` - 2 处引用
+- [x] `docs/deploy/ARGOCD_GITEA_TROUBLESHOOTING.md` - 1 处引用
+- [x] `docs/deploy/ARGOCD_GITEA_INTEGRATION.md` - 1 处引用
 - [x] `_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md` - 20+ 处引用
 
 ### 中优先级（注释和文档）
@@ -73,7 +73,7 @@ scripts/
 ### 低优先级（配置和测试）
 
 - [x] `.pre-commit-config.yaml` - 1 处注释
-- [x] `tests/deployment/test_argocd_multi_environment.py` - 1 处引用
+- [x] `tests/deploy/test_argocd_multi_environment.py` - 1 处引用
 
 ---
 
@@ -109,7 +109,7 @@ scripts/harbor/     →  scripts/deployment/harbor/
 3. **测试用例验证**
    ```bash
    # 运行相关测试
-   pytest tests/deployment/test_argocd_multi_environment.py -v
+   pytest tests/deploy/test_argocd_multi_environment.py -v
    ```
 
 ---
@@ -137,8 +137,8 @@ rmdir scripts/deployment/harbor
 
 - [Story 0.7: ArgoCD 持续部署](_bmad-output/implementation-artifacts/stories/0-7-argocd-continuous-deployment.md)
 - [Story 0.8: Gitea Runner 配置](_bmad-output/implementation-artifacts/stories/0-8-gitea-runner-configuration.md)
-- [ArgoCD 镜像更新器配置](docs/deployment/ARGOCD_IMAGE_UPDATER.md)
-- [ArgoCD Gitea 集成指南](docs/deployment/ARGOCD_GITEA_INTEGRATION.md)
+- [ArgoCD 镜像更新器配置](docs/deploy/ARGOCD_IMAGE_UPDATER.md)
+- [ArgoCD Gitea 集成指南](docs/deploy/ARGOCD_GITEA_INTEGRATION.md)
 
 ---
 

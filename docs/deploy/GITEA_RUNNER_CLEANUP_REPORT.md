@@ -122,13 +122,13 @@ scripts/deployment/gitea-runner/
 ├── cleanup-offline-runners.sh            # 清理离线 Runner
 └── cleanup-invalid-configs.sh            # 清理分析脚本
 
-tests/deployment/
+tests/deploy/
 ├── test_gitea_runner_token.py            # Token 测试
 ├── test_gitea_runner_persistence.py      # 持久化测试
 ├── test_gitea_runner_statefulset.py      # StatefulSet 测试
 └── test_gitea_architecture.py            # 架构测试
 
-docs/deployment/
+docs/deploy/
 └── GITEA_RUNNER_CLEANUP_REPORT.md        # 本报告
 ```
 
@@ -186,10 +186,10 @@ kubectl get pods -n gitea-actions -l app=gitea-runner
 
 ```bash
 # 运行所有测试
-poetry run pytest tests/deployment/test_gitea_runner_*.py -v
+poetry run pytest tests/deploy/test_gitea_runner_*.py -v
 
 # 运行集成测试
-poetry run pytest tests/deployment/test_gitea_runner_statefulset.py::TestKubernetesResources -v
+poetry run pytest tests/deploy/test_gitea_runner_statefulset.py::TestKubernetesResources -v
 ```
 
 ---

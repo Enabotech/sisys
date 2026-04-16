@@ -188,16 +188,16 @@ kubectl logs -n harbor deploy/harbor-core
 | Values | `deploy/kubernetes/harbor/values.yaml` | Helm Chart 配置 |
 | Kustomize | `deploy/kubernetes/harbor/kustomization.yaml` | K8s 资源组合 |
 | 验证脚本 | `scripts/deployment/harbor/verify-and-fix.sh` | WSL 重启后修复 |
-| 测试文件 | `tests/deployment/test_harbor*.py` | 自动化测试 |
+| 测试文件 | `tests/deploy/test_harbor*.py` | 自动化测试 |
 
 ---
 
 ## 🔗 相关文档
 
-- [Harbor 安装指南](docs/deployment/HARBOR_INSTALLATION.md)
+- [Harbor 安装指南](docs/deploy/HARBOR_INSTALLATION.md)
 - [Harbor 配置说明](deploy/kubernetes/harbor/README.md)
 - [Traefik 配置](deploy/kubernetes/harbor/ingress-route.yaml)
-- [测试用例](tests/deployment/test_harbor.py)
+- [测试用例](tests/deploy/test_harbor.py)
 
 ---
 

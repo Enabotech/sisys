@@ -218,7 +218,7 @@ print_summary() {
     echo "     bash scripts/deployment/gitea-runner/deploy-runner.sh"
     echo ""
     echo "  3. 查看配置文档："
-    echo "     cat docs/deployment/GITEA_RUNNER_TOKEN_CONFIG.md"
+    echo "     cat docs/deploy/GITEA_RUNNER_TOKEN_CONFIG.md"
     echo ""
 }
 

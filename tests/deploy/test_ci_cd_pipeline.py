@@ -385,17 +385,17 @@ class TestDocumentation:
 
     def test_ci_cd_guide_exists(self):
         """测试 CI/CD 使用指南存在"""
-        guide_path = Path("docs/deployment/CI_CD_PIPELINE_TEMPLATE.md")
+        guide_path = Path("docs/deploy/CI_CD_PIPELINE_TEMPLATE.md")
         assert guide_path.exists(), "CI/CD guide not found"
 
     def test_secrets_guide_exists(self):
         """测试 Secrets 配置指南存在"""
-        guide_path = Path("docs/deployment/CI_CD_SECRETS_GUIDE.md")
+        guide_path = Path("docs/deploy/CI_CD_SECRETS_GUIDE.md")
         assert guide_path.exists(), "Secrets guide not found"
 
     def test_troubleshooting_guide_exists(self):
         """测试故障排除指南存在"""
-        guide_path = Path("docs/deployment/CI_CD_TROUBLESHOOTING.md")
+        guide_path = Path("docs/deploy/CI_CD_TROUBLESHOOTING.md")
         assert guide_path.exists(), "Troubleshooting guide not found"
 
 

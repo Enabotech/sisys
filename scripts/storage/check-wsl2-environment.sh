@@ -235,11 +235,11 @@ cat << 'EOF'
    ./scripts/storage/implement-tiered-storage-wsl2.sh
 
 3. 查看完整方案:
-   docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md
+   docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md
 EOF
 
 echo ""
-print_info "详细配置指南参考：docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md"
+print_info "详细配置指南参考：docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION_WSL2.md"
 
 # =============================================================================
 # 总结

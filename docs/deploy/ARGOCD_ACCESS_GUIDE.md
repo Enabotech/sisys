@@ -142,4 +142,4 @@ curl -k -H "Host: argocd.sisys.local" https://<WSL2_IP>:<NODEPORT>/healthz
 如有问题，请查看：
 - Story 文件：`_bmad-output/implementation-artifacts/stories/0.7-argocd-continuous-deployment.md`
 - 部署配置：`deploy/kubernetes/argocd/`
-- 测试文件：`tests/deployment/test_argocd.py`
+- 测试文件：`tests/deploy/test_argocd.py`

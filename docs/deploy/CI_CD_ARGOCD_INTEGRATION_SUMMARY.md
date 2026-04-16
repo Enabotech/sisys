@@ -404,14 +404,14 @@ kubectl run gpu-test --rm -ti --image=nvidia/cuda:12.8.0-base -- nvidia-smi
 
 | 文档 | 路径 | 说明 |
 |------|------|------|
-| **CI/CD Pipeline 模板** | `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md` | 使用指南 |
-| **Secrets 配置** | `docs/deployment/CI_CD_SECRETS_GUIDE.md` | 凭据配置 |
-| **故障排除** | `docs/deployment/CI_CD_TROUBLESHOOTING.md` | 常见问题 |
-| **镜像维护** | `docs/deployment/PREBUILT_IMAGE_MAINTENANCE.md` | 镜像管理 |
-| **PyTorch 导入** | `docs/deployment/LOCAL_PYTORCH_IMPORT.md` | 镜像导入 |
-| **配置评估** | `docs/deployment/CONFIG_ASSESSMENT_REPORT.md` | 配置状态 |
-| **ArgoCD 配置** | `docs/deployment/ARGOCD_APPLICATION_CONFIG.md` | ArgoCD 分析 |
-| **ArgoCD 总结** | `docs/deployment/ARGOCD_SETUP_SUMMARY.md` | 配置总结 |
+| **CI/CD Pipeline 模板** | `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md` | 使用指南 |
+| **Secrets 配置** | `docs/deploy/CI_CD_SECRETS_GUIDE.md` | 凭据配置 |
+| **故障排除** | `docs/deploy/CI_CD_TROUBLESHOOTING.md` | 常见问题 |
+| **镜像维护** | `docs/deploy/PREBUILT_IMAGE_MAINTENANCE.md` | 镜像管理 |
+| **PyTorch 导入** | `docs/deploy/LOCAL_PYTORCH_IMPORT.md` | 镜像导入 |
+| **配置评估** | `docs/deploy/CONFIG_ASSESSMENT_REPORT.md` | 配置状态 |
+| **ArgoCD 配置** | `docs/deploy/ARGOCD_APPLICATION_CONFIG.md` | ArgoCD 分析 |
+| **ArgoCD 总结** | `docs/deploy/ARGOCD_SETUP_SUMMARY.md` | 配置总结 |
 
 ---
 

@@ -646,14 +646,14 @@ if __name__ == "__main__":
     测试执行命令：
 
     # 运行所有测试
-    pytest tests/deployment/test_argocd_harbor_integration.py -v
+    pytest tests/deploy/test_argocd_harbor_integration.py -v
 
     # 运行特定测试
-    pytest tests/deployment/test_argocd_harbor_integration.py::TestArgoCDHarborIntegration::test_image_updater_pod_running -v
+    pytest tests/deploy/test_argocd_harbor_integration.py::TestArgoCDHarborIntegration::test_image_updater_pod_running -v
 
     # 运行并生成覆盖率报告
-    pytest tests/deployment/test_argocd_harbor_integration.py --cov=deploy/kubernetes/argocd --cov-report=html
+    pytest tests/deploy/test_argocd_harbor_integration.py --cov=deploy/kubernetes/argocd --cov-report=html
 
     # 运行集成测试
-    pytest tests/deployment/test_argocd_harbor_integration.py -m integration -v
+    pytest tests/deploy/test_argocd_harbor_integration.py -m integration -v
     """

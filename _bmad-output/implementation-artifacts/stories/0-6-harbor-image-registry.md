@@ -537,7 +537,7 @@ spec:
 
 ### 实施指南
 
-**参考文档**: `docs/deployment/HARBOR_INSTALLATION.md` (待创建)
+**参考文档**: `docs/deploy/HARBOR_INSTALLATION.md` (待创建)
 
 **实施步骤**:
 
@@ -907,18 +907,18 @@ Qwen Code (AI 开发助手)
 
 5. ✅ **Task 5: 镜像签名配置** - 完成（使用 Cosign）
    - deploy/kubernetes/harbor/cosign-config.yaml: Cosign 配置模板
-   - docs/deployment/HARBOR_COSIGN_SIGNING.md: 完整使用指南
+   - docs/deploy/HARBOR_COSIGN_SIGNING.md: 完整使用指南
    - 支持 keyless 签名（推荐）和密钥对签名
    - Kubernetes 集成配置（Kyverno 策略示例）
    - CI/CD Pipeline 集成示例（Gitea Actions）
 
 6. ✅ **Task 6: Robot Account 配置** - 完成
    - deploy/kubernetes/harbor/robot-account.yaml: Robot Account 配置模板
-   - docs/deployment/HARBOR_ROBOT_ACCOUNT.md: 完整使用指南
+   - docs/deploy/HARBOR_ROBOT_ACCOUNT.md: 完整使用指南
 
 7. ✅ **Task 7: Gitea/ArgoCD 集成准备** - 完成
    - deploy/kubernetes/harbor/webhook-config.yaml: Webhook 配置模板
-   - docs/deployment/HARBOR_WEBHOOK_SETUP.md: Webhook 配置指南
+   - docs/deploy/HARBOR_WEBHOOK_SETUP.md: Webhook 配置指南
 
 8. ✅ **Task 8: 安全加固** - 完成
    - networkpolicy.yaml: DefaultDeny + 细粒度访问控制
@@ -926,7 +926,7 @@ Qwen Code (AI 开发助手)
    - 允许内部组件通信、DNS 解析、Trivy 外部访问
 
 10. ✅ **Task 10: TDD 测试框架** - 完成（红灯阶段 ✅）
-   - tests/deployment/test_harbor.py: 15 个测试用例
+   - tests/deploy/test_harbor.py: 15 个测试用例
      - TestHarborDeployment: Pod 状态、健康检查
      - TestHarborWebInterface: Web 访问、TLS 证书
      - TestHarborDatabase: 数据库连接、日志检查
@@ -934,7 +934,7 @@ Qwen Code (AI 开发助手)
      - TestHarborVulnerabilityScan: Trivy 扫描
      - TestHarborNotarySignature: Cosign 签名
      - TestHarborRobotAccount: Robot Account 认证
-   - tests/deployment/test_harbor_architecture.py: 20 个测试用例
+   - tests/deploy/test_harbor_architecture.py: 20 个测试用例
      - TestTLSConfiguration: TLS 1.3、HSTS、SSL Labs
      - TestStorageConfiguration: PVC、存储类、容量
      - TestIngressConfiguration: Ingress 规则、后端服务、TLS
@@ -1016,8 +1016,8 @@ kubectl get ingress -n harbor
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `tests/deployment/test_harbor.py` | ✅ 已创建 | Harbor 部署测试套件 (含 AC-5/6/7 测试) | 698 |
-| `tests/deployment/test_harbor_architecture.py` | ✅ 已创建 | 架构合规验证测试 | 420 |
+| `tests/deploy/test_harbor.py` | ✅ 已创建 | Harbor 部署测试套件 (含 AC-5/6/7 测试) | 698 |
+| `tests/deploy/test_harbor_architecture.py` | ✅ 已创建 | 架构合规验证测试 | 420 |
 | `deploy/kubernetes/harbor/values.yaml` | ✅ 已修复 | Helm Chart 配置 (修复 HIGH-003: 50Gi) | 293 |
 | `deploy/kubernetes/harbor/ingress.yaml` | ✅ 已创建 | Ingress + TLS 配置 | 55 |
 | `deploy/kubernetes/harbor/middleware.yaml` | ✅ 已创建 | Traefik Middleware 安全头 | 85 |
@@ -1098,7 +1098,7 @@ sisys/
 
 1. ✅ **Task 5: 镜像签名配置** - 使用 Cosign 实现
    - deploy/kubernetes/harbor/cosign-config.yaml: Cosign 配置模板
-   - docs/deployment/HARBOR_COSIGN_SIGNING.md: 完整使用指南（350+ 行）
+   - docs/deploy/HARBOR_COSIGN_SIGNING.md: 完整使用指南（350+ 行）
    - 支持 keyless 签名（推荐）和密钥对签名
    - Kubernetes 集成配置（Kyverno 策略示例）
    - CI/CD Pipeline 集成示例（Gitea Actions）
@@ -1188,7 +1188,7 @@ cosign verify \
    - 支持 harbor/gitea/argocd/all 组件
 
 7. **MEDIUM-004: 测试配置外部化修复**
-   - 创建 `tests/deployment/harbor-test-config.yaml`
+   - 创建 `tests/deploy/harbor-test-config.yaml`
    - 配置优先级：环境变量 > 配置文件 > 默认值
    - 支持多环境测试 (开发/测试/生产)
    - 更新 `test_harbor.py`: 添加 load_test_config() 函数
@@ -1204,13 +1204,13 @@ cosign verify \
 - `scripts/security/generate-harbor-secrets.sh` (新增，200 行)
 - `scripts/deployment/harbor/verify-deployment.sh` (新增，180 行)
 - `scripts/docs/generate-file-list.sh` (新增，200 行)
-- `tests/deployment/harbor-test-config.yaml` (新增，150 行)
+- `tests/deploy/harbor-test-config.yaml` (新增，150 行)
 
 **修改文件:**
 - `deploy/kubernetes/harbor/values.yaml`: 添加 `expose.ingress.enabled: false`
 - `deploy/kubernetes/harbor/kustomization.yaml`: 使用 ingress-route.yaml，添加 password-policy-job.yaml
 - `deploy/kubernetes/harbor/secrets.yaml`: 更新使用说明和安全警告
-- `tests/deployment/test_harbor.py`: 添加配置加载函数，移除硬编码
+- `tests/deploy/test_harbor.py`: 添加配置加载函数，移除硬编码
 - `Makefile`: 添加 Harbor 部署与验证目标
 - `Story 文件`: 更新 Change Log 和 Task 列表
 
@@ -1232,12 +1232,12 @@ make harbor-clean
 ./scripts/docs/generate-file-list.sh harbor
 
 # 6. 运行测试 (使用外部配置)
-pytest tests/deployment/test_harbor.py
+pytest tests/deploy/test_harbor.py
 
 # 7. 使用环境变量覆盖配置
 export HARBOR_NODE_IP=192.168.1.100
 export HARBOR_NODEPORT=nodeport
-pytest tests/deployment/test_harbor.py
+pytest tests/deploy/test_harbor.py
 ```
 
 **修复效果:**

@@ -157,8 +157,8 @@ sudo systemctl enable gitea-runner
 
 ## 🔗 相关文档
 
-- [CI_CD_ARGOCD_INTEGRATION_SUMMARY.md](./docs/deployment/CI_CD_ARGOCD_INTEGRATION_SUMMARY.md)
-- [CI_CD_PIPELINE_TEMPLATE.md](./docs/deployment/CI_CD_PIPELINE_TEMPLATE.md)
+- [CI_CD_ARGOCD_INTEGRATION_SUMMARY.md](./docs/deploy/CI_CD_ARGOCD_INTEGRATION_SUMMARY.md)
+- [CI_CD_PIPELINE_TEMPLATE.md](./docs/deploy/CI_CD_PIPELINE_TEMPLATE.md)
 - [build-dependency-image.yml](./.gitea/workflows/build-dependency-image.yml)
 
 ---

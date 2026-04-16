@@ -10,12 +10,12 @@
 ### 部署文档 (6 篇)
 | 文档 | 状态 | 文件路径 |
 |------|------|---------|
-| K3S 集群部署 | ✅ 已完成 | `docs/deployment/K3S_CLUSTER_SETUP.md` |
-| Gitea 安装 | ✅ 已完成 | `docs/deployment/GITEA_INSTALLATION.md` |
-| Harbor 安装 | ✅ 已完成 | `docs/deployment/HARBOR_INSTALLATION.md` |
-| ArgoCD 部署 | ⏳ 待创建 | `docs/deployment/ARGOCD_SETUP.md` |
-| Gitea Runner | ⏳ 待创建 | `docs/deployment/GITEA_RUNNER_SETUP.md` |
-| CI/CD Pipeline | ⏳ 待创建 | `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md` |
+| K3S 集群部署 | ✅ 已完成 | `docs/deploy/K3S_CLUSTER_SETUP.md` |
+| Gitea 安装 | ✅ 已完成 | `docs/deploy/GITEA_INSTALLATION.md` |
+| Harbor 安装 | ✅ 已完成 | `docs/deploy/HARBOR_INSTALLATION.md` |
+| ArgoCD 部署 | ⏳ 待创建 | `docs/deploy/ARGOCD_SETUP.md` |
+| Gitea Runner | ⏳ 待创建 | `docs/deploy/GITEA_RUNNER_SETUP.md` |
+| CI/CD Pipeline | ⏳ 待创建 | `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md` |
 
 ### 交付文档 (5 篇)
 | 文档 | 状态 | 文件路径 |
