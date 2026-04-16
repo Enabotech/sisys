@@ -548,14 +548,14 @@ jobs:
           echo "✅ SHA: ${GIT_SHA}"
 
       # ---------- L2 构建 ----------
-      - name: 同步 Lock 文件 (L2)
-        if: >-
-          ${{
-            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
-            || startsWith(github.ref, 'refs/tags/')
-            || needs.detect-changes.outputs.l2 == 'true'
-          }}
-        run: poetry lock --no-interaction
+      # - name: 同步 Lock 文件 (L2)
+      #   if: >-
+      #     ${{
+      #       github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+      #       || startsWith(github.ref, 'refs/tags/')
+      #       || needs.detect-changes.outputs.l2 == 'true'
+      #     }}
+      #   run: poetry lock --no-interaction
 
       - name: 构建 L2 镜像
         if: >-

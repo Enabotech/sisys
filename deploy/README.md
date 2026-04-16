@@ -17,7 +17,7 @@ docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml ps
 
 # 4. 运行数据库迁移
-poetry run alembic -c deploy/alembic/alembic.ini upgrade head
+poetry run alembic -c deploy/postgresql/alembic/alembic.ini upgrade head
 ```
 
 ### 停止所有服务
@@ -62,7 +62,7 @@ cp .env.example .env
 docker compose up -d
 
 # 运行初始迁移
-poetry run alembic -c deploy/alembic/alembic.ini upgrade head
+poetry run alembic -c deploy/postgresql/alembic/alembic.ini upgrade head
 ```
 
 **健康检查：** `pg_isready -h localhost -p 5432 -U postgres`
