@@ -23,7 +23,7 @@ version: '3.8'
 services:
   # PostgreSQL 15+ - Relational Storage Layer (L2)
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15.4
     container_name: sisys-postgres
     restart: unless-stopped
     environment:
@@ -45,7 +45,7 @@ services:
 
   # Redis 7.0+ - High-Speed Cache Layer (L1)
   redis:
-    image: redis:7.2-alpine
+    image: redis:7.2.5
     container_name: sisys-redis
     restart: unless-stopped
     command: redis-server --appendonly yes

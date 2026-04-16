@@ -238,7 +238,7 @@ jobs:
     # ===========================================================================
     services:
       postgres:
-        image: harbor.sisys.local/sisys/tools/postgres/postgres:15-alpine
+        image: harbor.sisys.local/sisys/tools/postgres/postgres:15.4
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test  # pragma: allowlist secret
@@ -251,7 +251,7 @@ jobs:
           --health-retries 5
 
       redis:
-        image: harbor.sisys.local/sisys/tools/redis/redis:7.2-alpine
+        image: harbor.sisys.local/sisys/tools/redis/redis:7.2.5
         # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
         options: >-
           --health-cmd "redis-cli ping"

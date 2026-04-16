@@ -10,7 +10,7 @@ version: '3.8'
 
 services:
   redis:
-    image: harbor.sisys.local/sisys/tools/redis:7.2.5
+    image: harbor.sisys.local/sisys/tools/redis/redis:7.2.5
     container_name: sisys-redis
     restart: unless-stopped
     ports:

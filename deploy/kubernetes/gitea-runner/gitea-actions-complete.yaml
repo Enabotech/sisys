@@ -338,7 +338,7 @@ spec:
             # ubuntu2204: Ubuntu 22.04 工具链
             # gpu: 支持 GPU 直通（RTX 5090）
             - name: GITEA_RUNNER_LABELS
-              value: "docker,ubuntu2204,gpu"
+              value: "ubuntu2204,actions,docker,gpu"
 
             # Token（从 Secret 注入 - 组织级 Token）
             - name: GITEA_RUNNER_REGISTRATION_TOKEN

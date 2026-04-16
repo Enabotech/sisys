@@ -10,7 +10,7 @@ version: '3.8'
 
 services:
   minio:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2024-01-01T00-00-00Z
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: sisys-minio
     restart: unless-stopped
     ports:

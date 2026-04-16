@@ -10,7 +10,7 @@ version: '3.8'
 
 services:
   neo4j:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j:5.15.0
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j/neo4j:5.15
     container_name: sisys-neo4j
     restart: unless-stopped
     ports:
