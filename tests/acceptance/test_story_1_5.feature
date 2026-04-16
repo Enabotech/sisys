@@ -54,7 +54,7 @@ Feature: PostgreSQL Relational Layer (Story 1.5)
     And target_metadata 从模型自动收集
 
   Scenario: 初始迁移脚本就绪
-    When 检查 deploy/alembic/versions/001_initial.py
+    When 检查 deploy/postgresql/alembic/versions/001_initial.py
     Then 迁移文件存在
     And 包含 event_outbox 表定义
     And 包含 users 表定义

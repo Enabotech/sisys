@@ -65,10 +65,10 @@
 **And** 迁移可重复执行（幂等性），支持回滚
 
 **验证标准/Validation Criteria:**
-- [ ] Alembic 配置文件就绪（`alembic.ini` + `deploy/alembic/env.py`）
+- [ ] Alembic 配置文件就绪（`alembic.ini` + `deploy/postgresql/alembic/env.py`）
   - 配置 `sqlalchemy.url` 从环境变量读取
   - 配置 `target_metadata` 从基础设施层 SQLAlchemy 模型自动收集
-- [ ] 初始迁移脚本（`deploy/alembic/versions/001_initial.py`）
+- [ ] 初始迁移脚本（`deploy/postgresql/alembic/versions/001_initial.py`）
   > **📌 重要说明：** Story 1.3 的 `InMemoryOutboxRepository` 使用内存实现（内存列表存储 `OutboxEntity`），**未创建任何数据库表**。
   > Story 1.5 的初始迁移脚本 `001_initial.py` 是 `event_outbox` 表的**首次物理创建**。
   > 如果 Story 1.3 实施时已创建空迁移脚本（未执行），请使用 `alembic merge` 合并或跳过本 Story 的迁移。
@@ -231,8 +231,8 @@
 
 #### Alembic 配置
 - [ ] `alembic.ini` 配置文件
-- [ ] `deploy/alembic/env.py` 环境配置（自动收集 metadata）
-- [ ] `deploy/alembic/versions/001_initial.py` 初始迁移脚本
+- [ ] `deploy/postgresql/alembic/env.py` 环境配置（自动收集 metadata）
+- [ ] `deploy/postgresql/alembic/versions/001_initial.py` 初始迁移脚本
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.5.feature`
@@ -396,7 +396,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_alembic_config.py`（配置文件加载、环境变量） |
-| 🟢 绿 | 创建 `alembic.ini` + `deploy/alembic/env.py` 最小配置 |
+| 🟢 绿 | 创建 `alembic.ini` + `deploy/postgresql/alembic/env.py` 最小配置 |
 | 🔄 重构 | 添加 metadata 自动收集、URL 从环境变量读取 |
 
 - [x] Subtask: 🔴 红 — 编写 Alembic 配置失败测试
@@ -408,7 +408,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_alembic_migration.py`（升级/回滚/幂等性） |
-| 🟢 绿 | 创建 `deploy/alembic/versions/001_initial.py` 迁移脚本 |
+| 🟢 绿 | 创建 `deploy/postgresql/alembic/versions/001_initial.py` 迁移脚本 |
 | 🔄 重构 | 添加表注释、索引、外键约束 |
 
 - [x] Subtask: 🔴 红 — 编写迁移失败测试
@@ -795,10 +795,10 @@ sisys/
 | `src/infrastructure/storage/postgresql/user_repository.py` | UserRepository |
 | `src/infrastructure/storage/postgresql/role_repository.py` | RoleRepository |
 | `src/infrastructure/storage/postgresql/permission_repository.py` | PermissionRepository |
-| `deploy/alembic/alembic.ini` | Alembic 配置文件 |
-| `deploy/alembic/env.py` | Alembic 环境配置 |
-| `deploy/alembic/script.py.mako` | Alembic 迁移模板 |
-| `deploy/alembic/versions/001_initial.py` | 初始迁移脚本 |
+| `deploy/postgresql/alembic/alembic.ini` | Alembic 配置文件 |
+| `deploy/postgresql/alembic/env.py` | Alembic 环境配置 |
+| `deploy/postgresql/alembic/script.py.mako` | Alembic 迁移模板 |
+| `deploy/postgresql/alembic/versions/001_initial.py` | 初始迁移脚本 |
 | `tests/unit/infrastructure/test_postgresql_config.py` | PostgreSQLConfig 单元测试 |
 | `tests/unit/infrastructure/test_database_engine.py` | DatabaseEngine 单元测试 |
 | `tests/unit/infrastructure/test_base_repository.py` | BaseRepository 单元测试 |
