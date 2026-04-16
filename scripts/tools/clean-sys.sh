@@ -1,6 +1,6 @@
 #!/bin/bash
 #===============================================================================
-# 系统存储垃圾清理脚本 v2.2
+# 系统存储垃圾清理脚本 v2.6
 #
 # 整合 gitea-runner-dind, gitea-org-runner, Harbor, Trivy 等组件的
 # 全面存储垃圾清理解决方案
@@ -25,7 +25,7 @@
 #
 #===============================================================================
 
-VERSION="2.2"
+VERSION="2.6"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -50,10 +50,11 @@ DRY_RUN=false
 CONFIRMED=false
 
 # 全局统计
-STATS_CLEANED=0
 STATS_CONTAINERS=0
-STATS_IMAGES=0
-STATS_VOLUMES=0
+
+# 脚本锁文件路径
+LOCK_FILE="/tmp/clean-sys.lock"
+LOCK_FD=200
 
 #===============================================================================
 # 辅助函数
@@ -128,11 +129,14 @@ kubectl_exec() {
     local ns=$2
     local container=$3
     shift 3
-    if kubectl get pod "$pod" -n "$ns" &>/dev/null; then
-        kubectl exec -n "$ns" "$pod" -c "$container" -- "$@" 2>&1
-    else
+    if ! kubectl get pod "$pod" -n "$ns" &>/dev/null; then
         echo "Pod $pod not found or not ready"
         return 1
+    fi
+    if [ -n "$container" ]; then
+        kubectl exec -n "$ns" "$pod" -c "$container" -- "$@" 2>&1
+    else
+        kubectl exec -n "$ns" "$pod" -- "$@" 2>&1
     fi
 }
 
@@ -151,7 +155,10 @@ get_trivy_cache_path() {
     cache_path=$(kubectl exec -n "$ns" "$pod" -- printenv SCANNER_TRIVY_CACHE_DIR 2>/dev/null || echo "")
     if [ -z "$cache_path" ]; then
         # 回退到默认路径
-        cache_path="/home/scanner/.cache"
+        cache_path="/home/scanner/.cache/trivy"
+    else
+        # 追加 trivy 子目录（Trivy 实际缓存位置）
+        cache_path="$cache_path/trivy"
     fi
     echo "$cache_path"
 }
@@ -164,6 +171,20 @@ safe_wc() {
     else
         echo -n "$text" | wc -l
     fi
+}
+
+# 安全的 du 格式化输出
+# 用法: safe_du "du -sh /path"
+# 返回: "size" 或 "N/A"
+safe_du() {
+    local output
+    output=$("$@" 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "N/A"
+        return 1
+    fi
+    # du -sh 输出格式: "size\tpath"
+    echo "$output" | awk '{print $1}'
 }
 
 # 安全的命令执行 (支持 dry-run)
@@ -231,7 +252,7 @@ show_report() {
         trivy_path=$(get_trivy_cache_path "$TRIVY_POD" "$HARBOR_NS")
         if [ -n "$trivy_path" ]; then
             local trivy_size
-            trivy_size=$(kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path" 2>&1 | cut -f1 || echo "N/A")
+            trivy_size=$(safe_du kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path")
             echo "Trivy 缓存 ($trivy_path): $trivy_size"
         else
             echo "Trivy 缓存: 无法确定路径"
@@ -243,7 +264,7 @@ show_report() {
     local registry_pod
     registry_pod=$(get_registry_pod)
     if [ -n "$registry_pod" ]; then
-        echo "Registry 存储: $(kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage 2>&1 | cut -f1)"
+        echo "Registry 存储: $(safe_du kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage)"
     fi
 }
 
@@ -299,15 +320,15 @@ clean_dind_runner() {
     run_cmd $prefix docker image prune -af 2>/dev/null || true
     log_success "镜像已清理"
 
-    #--------- 3. 清理 volumes ---------
-    log_subheader "3. 清理 volumes"
-    run_cmd $prefix docker volume prune -af 2>/dev/null || true
-    log_success "Volumes 已清理"
-
-    #--------- 4. 清理 overlay2 ---------
-    log_subheader "4. 清理 overlay2 未引用层"
-    run_cmd $prefix docker system prune -af --volumes 2>/dev/null || true
+    #--------- 3. 清理 overlay2 ---------
+    log_subheader "3. 清理 overlay2 未引用层"
+    run_cmd $prefix docker system prune -f 2>/dev/null || true
     log_success "overlay2 层已清理"
+
+    #--------- 4. 清理未使用 volumes ---------
+    log_subheader "4. 清理未使用 volumes"
+    run_cmd $prefix docker volume prune -af 2>/dev/null || true
+    log_success "未使用 volumes 已清理"
 
     #--------- 5. 清理容器日志 ---------
     log_subheader "5. 清理容器日志"
@@ -387,7 +408,10 @@ clean_org_runners() {
 clean_k3s() {
     log_header "清理 K3s 容器运行时"
 
-    check_sudo
+    if ! check_sudo; then
+        log_error "sudo 权限不可用，K3s 清理需要 sudo 权限"
+        return 1
+    fi
 
     if ! confirm_action "确认清理 K3s 未使用镜像?"; then
         log_info "已取消"
@@ -398,7 +422,7 @@ clean_k3s() {
     log_subheader "K3s 镜像状态概览"
 
     echo "--- harbor.sisys.local/sisys/app ---"
-    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $3 ")"}' | sort -u || echo "  无"
+    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $4 ")"}' | sort -u || echo "  无"
     echo ""
     echo "--- harbor.sisys.local/sisys/tools (系统工具) ---"
     sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/tools" | awk '{print $1":"$2}' | sort -u | head -10 || echo "  无"
@@ -414,7 +438,7 @@ clean_k3s() {
 
     #--------- 清理后状态 ---------
     log_subheader "清理后 harbor.sisys.local/sisys/app 状态"
-    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $3 ")"}' | sort -u || echo "  无 (已清理)"
+    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $4 ")"}' | sort -u || echo "  无 (已清理)"
 
     log_success "K3s 清理完成"
 }
@@ -424,9 +448,24 @@ clean_k3s() {
 #===============================================================================
 
 check_harbor_gc_lock() {
-    # 检查是否有正在运行的 GC 或推送操作
+    # 检查 Harbor Registry 是否有正在运行的 GC 或推送操作
+    # 通过检查进程存在性和 API 可用性来判断
     local registry_pod=$1
-    # 这里可以添加更复杂的锁机制，如检查 annotation 或 lock file
+
+    # 检查 GC 锁文件是否存在 (Harbor Registry GC 期间会创建锁文件)
+    if kubectl exec -n "$HARBOR_NS" "$registry_pod" -c registry -- \
+        sh -c "test -f /storage/.registry.gc.lock" 2>/dev/null; then
+        log_error "Harbor Registry 正在执行 GC 或镜像推送，请稍后重试"
+        return 1
+    fi
+
+    # 检查 Registry 进程是否运行
+    if ! kubectl exec -n "$HARBOR_NS" "$registry_pod" -c registry -- \
+        pgrep -x registry >/dev/null 2>&1; then
+        log_error "Registry 进程未运行，GC 无法执行"
+        return 1
+    fi
+
     return 0
 }
 
@@ -448,13 +487,13 @@ clean_harbor() {
         local trivy_path
         trivy_path=$(get_trivy_cache_path "$TRIVY_POD" "$HARBOR_NS")
         local before_size
-        before_size=$(kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path" 2>&1 | cut -f1)
+        before_size=$(safe_du kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path")
         log_info "Trivy 缓存清理前: $before_size"
 
         run_cmd kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" trivy clean --all 2>/dev/null || true
 
         local after_size
-        after_size=$(kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path" 2>&1 | cut -f1)
+        after_size=$(safe_du kubectl_exec "$TRIVY_POD" "$HARBOR_NS" "" du -sh "$trivy_path")
         log_info "Trivy 缓存清理后: $after_size"
         log_success "Trivy 缓存已清理"
     else
@@ -473,7 +512,7 @@ clean_harbor() {
         log_warn "⚠️ 重要: GC 期间请勿推送镜像，可能导致数据不一致"
 
         local registry_before
-        registry_before=$(kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage 2>&1 | cut -f1)
+        registry_before=$(safe_du kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage)
         log_info "Registry 清理前: $registry_before"
 
         # 使用长参数避免歧义
@@ -481,7 +520,7 @@ clean_harbor() {
             /bin/registry garbage-collect /etc/registry/config.yml --compact 2>/dev/null || true
 
         local registry_after
-        registry_after=$(kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage 2>&1 | cut -f1)
+        registry_after=$(safe_du kubectl_exec "$registry_pod" "$HARBOR_NS" "registry" du -sh /storage)
         log_info "Registry 清理后: $registry_after"
         log_success "Registry 垃圾回收完成"
     else
@@ -544,13 +583,13 @@ clean_local_docker() {
     log_subheader "镜像 prune"
     run_cmd docker image prune -af 2>/dev/null || true
 
-    #--------- 3. 清理 volumes ---------
+    #--------- 3. 清理 overlay2 ---------
+    log_subheader "系统 prune (overlay2)"
+    run_cmd docker system prune -f 2>/dev/null || true
+
+    #--------- 4. 清理未使用 volumes ---------
     log_subheader "Volumes prune"
     run_cmd docker volume prune -af 2>/dev/null || true
-
-    #--------- 4. 清理系统 ---------
-    log_subheader "系统 prune"
-    run_cmd docker system prune -af --volumes 2>/dev/null || true
 
     log_success "本地 Docker 清理完成"
 }
@@ -562,7 +601,10 @@ clean_local_docker() {
 clean_system() {
     log_header "清理系统日志和缓存"
 
-    check_sudo
+    if ! check_sudo; then
+        log_error "sudo 权限不可用，系统清理需要 sudo 权限"
+        return 1
+    fi
 
     if ! confirm_action "确认清理系统日志/缓存?"; then
         log_info "已取消"
@@ -621,8 +663,6 @@ clean_system() {
 show_stats() {
     log_header "清理统计"
     echo "停止的容器: $STATS_CONTAINERS"
-    echo "清理的镜像: $STATS_IMAGES"
-    echo "清理的卷: $STATS_VOLUMES"
 }
 
 #===============================================================================
@@ -709,9 +749,22 @@ main() {
     echo ""
     log_header "系统存储垃圾清理 v${VERSION}"
 
+    # 检查脚本是否已运行 (使用 flock 原子锁)
+    exec {LOCK_FD}>"$LOCK_FILE"
+    if ! flock -n "$LOCK_FD"; then
+        log_error "检测到清理脚本正在运行 (锁文件: $LOCK_FILE)"
+        log_error "如果确认没有其他实例在运行，请删除锁文件后重试"
+        exit 1
+    fi
+    # 设置退出时释放锁和关闭文件描述符
+    trap "flock -u $LOCK_FD; exec $LOCK_FD>&-; rm -f '$LOCK_FILE' 2>/dev/null" EXIT
+
     # 验证 kubectl 上下文
     if [[ "$MODE" != "report" ]]; then
-        verify_kubectl_context || true
+        if ! verify_kubectl_context; then
+            log_error "kubectl context 验证失败，请检查集群配置"
+            exit 1
+        fi
     fi
 
     echo "模式: $MODE"
