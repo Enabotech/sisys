@@ -174,7 +174,7 @@ clean_dind_runner() {
 
     #--------- 1. 清理 BuildKit 缓存 (保留 5GB) ---------
     log_subheader "1. 清理 BuildKit 缓存 (保留 5GB)"
-    $prefix docker builder prune -af --keep-storage=5G 2>/dev/null || true
+    $prefix docker builder prune -af --reserved-space=5G 2>/dev/null || true
     log_success "BuildKit 缓存已清理"
 
     #--------- 2. 清理临时容器 ---------
@@ -237,7 +237,7 @@ clean_org_runners() {
         fi
 
         # 清理构建缓存
-        $prefix docker builder prune -af --keep-storage=2G 2>/dev/null || true
+        $prefix docker builder prune -af --reserved-space=2G 2>/dev/null || true
 
         # 清理容器和镜像
         $prefix docker system prune -af 2>/dev/null || true
@@ -256,24 +256,30 @@ clean_org_runners() {
 clean_k3s() {
     log_header "清理 K3s 容器运行时"
 
-    #--------- 清理未使用的镜像 ---------
-    log_subheader "清理未使用的镜像"
-    sudo k3s crictl images | grep -v "IMAGE" | awk '{print $3}' | sort -u | while read img; do
-        if [ "$img" != "<none>" ]; then
-            echo "  清理镜像: $img"
-            [ "$DRY_RUN" = false ] && sudo k3s crictl rmi "$img" 2>/dev/null || true
-        fi
-    done
+    #--------- 显示当前镜像状态 ---------
+    log_subheader "Harbor 镜像状态"
+    echo "--- harbor.sisys.local/sisys/app (可清理) ---"
+    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $3 ")"}' | sort -u || echo "  无"
+    echo ""
+    echo "--- harbor.sisys.local/sisys/tools (禁止清理) ---"
+    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/tools" | awk '{print $1":"$2}' | sort -u | head -10 || echo "  无"
+    echo ""
+    echo "--- docker.io/goharbor/* (禁止清理) ---"
+    sudo k3s crictl images 2>/dev/null | grep "docker.io/goharbor" | awk '{print $1":"$2}' | sort -u || echo "  无"
 
-    #--------- crictl prune ---------
-    log_subheader "执行 crictl prune"
+    #--------- crictl prune (清理所有未使用的镜像) ---------
+    log_subheader "执行 crictl rmi --prune (清理未使用镜像)"
     sudo k3s crictl rmi --prune 2>/dev/null || true
+    log_success "K3s 未使用镜像已清理"
 
-    #--------- 清理 harbor.sisys.local 的过时镜像 ---------
-    log_subheader "清理 harbor.sisys.local 过时镜像"
-    sudo k3s crictl images | grep "harbor.sisys.local" | awk '{print $3}' | sort -u | while read img; do
-        echo "  检查镜像: $img"
-    done
+    #--------- crictl rmi (清理 sisys/app 镜像) ---------
+    log_subheader "执行 crictl rmi (清理 sisys/app 镜像)"
+    sudo crictl images -q --filter "reference=harbor.sisys.local/sisys/app:*" | xargs sudo crictl rmi
+    log_success "sisys/app 镜像已清理"
+
+    #--------- 清理后状态 ---------
+    log_subheader "清理后 harbor.sisys.local/sisys/app 状态"
+    sudo k3s crictl images 2>/dev/null | grep "harbor.sisys.local/sisys/app" | awk '{print $1":"$2, "(" $3 ")"}' | sort -u || echo "  无"
 
     log_success "K3s 清理完成"
 }
@@ -346,7 +352,7 @@ clean_local_docker() {
         log_info "本地 Docker 可用, 执行清理..."
 
         log_subheader "BuildKit 缓存"
-        docker builder prune -af --keep-storage=10G 2>/dev/null || true
+        docker builder prune -af --reserved-space=10G 2>/dev/null || true
 
         log_subheader "系统 prune"
         docker system prune -af --volumes 2>/dev/null || true
