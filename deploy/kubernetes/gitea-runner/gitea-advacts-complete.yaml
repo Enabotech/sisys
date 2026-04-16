@@ -356,11 +356,6 @@ spec:
                   "max-size": "100m",
                   "max-file": "3"
                 },
-                "storage-driver": "overlay2",
-                "storage-opts": [
-                  "overlay2.size=30G",
-                  "overlay2.metacopy=on"
-                ],
                 "builder": {
                   "gc": {
                     "enabled": true,
