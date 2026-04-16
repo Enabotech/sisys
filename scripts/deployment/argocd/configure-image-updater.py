@@ -309,7 +309,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/myapp
+    path: deploy/kubernetes/myapp
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -321,7 +321,7 @@ spec:
       - CreateNamespace=true
 """
 
-        output_path = Path("/mnt/g/ai/sisys/deployments/argocd/example-application.yaml")
+        output_path = Path("/mnt/g/ai/sisys/deploy/kubernetes/argocd/example-application.yaml")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(example_yaml)
 

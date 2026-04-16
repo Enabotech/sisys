@@ -5,7 +5,7 @@
 ## 目录结构
 
 ```
-deployments/
+deploy/kubernetes/
 ├── argocd/
 │   └── applications/
 │       ├── sisys-app-of-apps.yaml   # App of Apps - 管理所有子应用
@@ -30,7 +30,7 @@ deployments/
 
 ```bash
 # 使用 App of Apps 模式部署所有环境
-kubectl apply -f deployments/argocd/applications/sisys-app-of-apps.yaml
+kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml
 ```
 
 ### 2. 验证 Application 状态
@@ -76,7 +76,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/apps/sisys/dev
+    path: deploy/kubernetes/apps/sisys/dev
 
     # Kustomize 配置
     kustomize:
@@ -135,13 +135,13 @@ syncPolicy:
 
 ```bash
 # 开发环境 - 完全自动同步
-kubectl apply -f deployments/argocd/applications/sisys-app-dev.yaml
+kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-dev.yaml
 
 # 测试环境 - 自动同步但需要审批
-kubectl apply -f deployments/argocd/applications/sisys-app-test.yaml
+kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-test.yaml
 
 # 生产环境 - 手动同步（需要人工批准）
-kubectl apply -f deployments/argocd/applications/sisys-app-prod.yaml
+kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-prod.yaml
 ```
 
 ### App of Apps 模式
@@ -150,7 +150,7 @@ kubectl apply -f deployments/argocd/applications/sisys-app-prod.yaml
 
 ```bash
 # 部署 App of Apps
-kubectl apply -f deployments/argocd/applications/sisys-app-of-apps.yaml
+kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml
 
 # App of Apps 将自动创建和管理所有子应用
 # 子应用列表:
@@ -300,7 +300,7 @@ curl -u admin:password https://harbor.sisys.local/v2/sisys/app/tags/list
 
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   ├── argocd/
 │   │   └── applications/
 │   │       ├── sisys-app-of-apps.yaml

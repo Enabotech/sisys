@@ -16,8 +16,8 @@ class TestTLSConfiguration:
         """验证 TLS 1.3 强制启用"""
         # 检查 Ingress 配置
         ingress_paths = [
-            Path("deployments/argocd/ingress.yaml"),
-            Path("deployments/argocd/traefik-ingressroute.yaml"),
+            Path("deploy/kubernetes/argocd/ingress.yaml"),
+            Path("deploy/kubernetes/argocd/traefik-ingressroute.yaml"),
         ]
 
         tls_configured = False
@@ -34,7 +34,7 @@ class TestTLSConfiguration:
                             tls_configured = True
 
         # 验证 security-hardening 配置
-        security_path = Path("deployments/argocd/security-hardening.yaml")
+        security_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
         assert security_path.exists(), "安全加固配置不存在"
 
         # TLS 配置已在 Story 0.4/0.5 中验证
@@ -43,7 +43,7 @@ class TestTLSConfiguration:
     def test_hsts_enabled(self):
         """验证 HSTS 启用"""
         # 检查 Middleware 配置
-        ingressroute_path = Path("deployments/argocd/traefik-ingressroute.yaml")
+        ingressroute_path = Path("deploy/kubernetes/argocd/traefik-ingressroute.yaml")
 
         if ingressroute_path.exists():
             with open(ingressroute_path) as f:
@@ -61,7 +61,7 @@ class TestTLSConfiguration:
     def test_https_certificate_configured(self):
         """验证 HTTPS 证书配置"""
         # 检查 TLS Secret 配置
-        Path("deployments/argocd/security-hardening.yaml")
+        Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         # 证书配置已在 Story 0.4 中验证
         assert True, "HTTPS 证书配置验证通过"
@@ -73,7 +73,7 @@ class TestStorageConfiguration:
     def test_local_path_storage_class(self):
         """验证使用 local-path 存储类"""
         # 检查 values.yaml 配置
-        values_path = Path("deployments/argocd/values.yaml")
+        values_path = Path("deploy/kubernetes/argocd/values.yaml")
 
         if values_path.exists():
             with open(values_path) as f:
@@ -86,7 +86,7 @@ class TestStorageConfiguration:
     def test_pvc_configuration(self):
         """验证 PVC 配置"""
         # 检查是否有 PVC 配置
-        values_path = Path("deployments/argocd/values.yaml")
+        values_path = Path("deploy/kubernetes/argocd/values.yaml")
 
         if values_path.exists():
             with open(values_path) as f:
@@ -101,7 +101,7 @@ class TestIngressConfiguration:
 
     def test_traefik_ingress_configured(self):
         """验证 Traefik Ingress 配置"""
-        ingressroute_path = Path("deployments/argocd/traefik-ingressroute.yaml")
+        ingressroute_path = Path("deploy/kubernetes/argocd/traefik-ingressroute.yaml")
         assert ingressroute_path.exists(), "Traefik IngressRoute 配置不存在"
 
         with open(ingressroute_path) as f:
@@ -133,7 +133,7 @@ class TestIngressConfiguration:
 
     def test_ingress_tls_configuration(self):
         """验证 Ingress TLS 配置"""
-        ingress_path = Path("deployments/argocd/ingress.yaml")
+        ingress_path = Path("deploy/kubernetes/argocd/ingress.yaml")
 
         if ingress_path.exists():
             with open(ingress_path) as f:
@@ -154,7 +154,7 @@ class TestIngressConfiguration:
 
     def test_service_backend_configuration(self):
         """验证后端服务配置"""
-        ingressroute_path = Path("deployments/argocd/traefik-ingressroute.yaml")
+        ingressroute_path = Path("deploy/kubernetes/argocd/traefik-ingressroute.yaml")
 
         with open(ingressroute_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -179,7 +179,7 @@ class TestSecretManagement:
     def test_secrets_in_kubernetes_secret(self):
         """验证密钥存储于 Kubernetes Secret"""
         # 扫描所有配置文件
-        yaml_files = list(Path("deployments/argocd").glob("*.yaml"))
+        yaml_files = list(Path("deploy/kubernetes/argocd").glob("*.yaml"))
 
         secret_refs = []
         for yaml_file in yaml_files:
@@ -191,7 +191,7 @@ class TestSecretManagement:
                 secret_refs.append(yaml_file)
 
         # 验证有 Secret 引用或定义（security-hardening.yaml 包含 Secret）
-        security_path = Path("deployments/argocd/security-hardening.yaml")
+        security_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
         assert security_path.exists(), "security-hardening.yaml 不存在"
 
         # Secret 已在 security-hardening.yaml 中配置
@@ -200,7 +200,7 @@ class TestSecretManagement:
     def test_no_plaintext_secrets(self):
         """验证配置文件中无明文密钥"""
         # 扫描所有 YAML 文件
-        yaml_files = list(Path("deployments/argocd").glob("*.yaml"))
+        yaml_files = list(Path("deploy/kubernetes/argocd").glob("*.yaml"))
 
         plaintext_patterns = [
             "password: admin",
@@ -220,7 +220,7 @@ class TestSecretManagement:
     def test_secret_references_valid(self):
         """验证 Secret 引用有效性"""
         # 检查 Deployment/StatefulSet 中的 Secret 引用
-        values_path = Path("deployments/argocd/values.yaml")
+        values_path = Path("deploy/kubernetes/argocd/values.yaml")
 
         if values_path.exists():
             with open(values_path) as f:
@@ -239,7 +239,7 @@ class TestArchitectureCompliance:
         # 验证配置中没有直接依赖
 
         # 检查配置文件
-        values_path = Path("deployments/argocd/values.yaml")
+        values_path = Path("deploy/kubernetes/argocd/values.yaml")
         assert values_path.exists(), "values.yaml 不存在"
 
         # ArgoCD 配置独立，不直接依赖应用代码
@@ -249,8 +249,8 @@ class TestArchitectureCompliance:
         """验证事件驱动架构合规性"""
         # 验证 Webhook 配置
         webhook_files = [
-            Path("deployments/argocd/gitea-webhook-configmap.yaml"),
-            Path("deployments/argocd/gitea-webhook-secret.yaml"),
+            Path("deploy/kubernetes/argocd/gitea-webhook-configmap.yaml"),
+            Path("deploy/kubernetes/argocd/gitea-webhook-secret.yaml"),
         ]
 
         webhook_configured = any(f.exists() for f in webhook_files)
@@ -259,7 +259,7 @@ class TestArchitectureCompliance:
     def test_namespace_isolation(self):
         """验证命名空间隔离"""
         # 检查命名空间配置
-        namespace_path = Path("deployments/argocd/namespace.yaml")
+        namespace_path = Path("deploy/kubernetes/argocd/namespace.yaml")
 
         if namespace_path.exists():
             with open(namespace_path) as f:
@@ -269,7 +269,7 @@ class TestArchitectureCompliance:
             assert ns_config["metadata"]["name"] == "argocd"
 
         # 验证多环境命名空间
-        env_manifest = Path("deployments/argocd/applications/sisys-app-environments.yaml")
+        env_manifest = Path("deploy/kubernetes/argocd/applications/sisys-app-environments.yaml")
         if env_manifest.exists():
             with open(env_manifest) as f:
                 docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -285,7 +285,7 @@ class TestArchitectureCompliance:
 
     def test_resource_limits_compliance(self):
         """验证资源限制合规性"""
-        values_path = Path("deployments/argocd/values.yaml")
+        values_path = Path("deploy/kubernetes/argocd/values.yaml")
 
         if values_path.exists():
             with open(values_path) as f:

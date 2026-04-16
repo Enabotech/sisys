@@ -1,5 +1,5 @@
 # 已添加 Reloader 注解的 Deployment 列表
-# 安装: kubectl apply -k https://github.com/stakater/Reloader/deployments/kubernetes
+# 安装: kubectl apply -k https://github.com/stakater/Reloader/deploy/kubernetes/kubernetes
 #
 # harbor:
 #   - harbor-core (reloader.stakater.com/auto: "true")

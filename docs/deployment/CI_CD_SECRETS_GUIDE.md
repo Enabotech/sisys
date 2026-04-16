@@ -375,7 +375,7 @@ env:
   HARBOR_REGISTRY: harbor.sisys.local
   HARBOR_PROJECT: sisys
   PYTHON_VERSION: "3.11"
-  
+
   # 可选
   GPU_ENABLED: "true"
   CUDA_VERSION: "12.8"
@@ -388,7 +388,7 @@ env:
   # 必需
   HARBOR_REGISTRY: harbor.sisys.local
   ARGOCD_SERVER: argocd.sisys.local
-  
+
   # 环境特定
   DEPLOY_ENV: test  # 或 production
 ```
@@ -407,7 +407,7 @@ env:
 kubectl get secret sisys-secrets -n sisys-test
 
 # 检查 Secret 名称是否匹配
-grep -r "sisys-secrets" deployments/k8s/
+grep -r "sisys-secrets" deploy/kubernetes/k8s/
 ```
 
 ### 2. Harbor 认证失败

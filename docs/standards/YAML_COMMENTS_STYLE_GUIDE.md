@@ -194,7 +194,7 @@ spec:
 
 1. **Scan for Chinese comments**
    ```bash
-   grep -r "#" deployments/argocd/*.yaml | grep -E "[\u4e00-\u9fff]"
+   grep -r "#" deploy/kubernetes/argocd/*.yaml | grep -E "[\u4e00-\u9fff]"
    ```
 
 2. **Translate to English**
@@ -218,7 +218,7 @@ spec:
 Use `yamllint` to check comment style:
 
 ```bash
-yamllint deployments/argocd/
+yamllint deploy/kubernetes/argocd/
 ```
 
 ### Automated Checks
@@ -229,7 +229,7 @@ Add to CI/CD pipeline:
 # .github/workflows/lint.yaml
 - name: Lint YAML comments
   run: |
-    yamllint deployments/argocd/ --config-file .yamllint.yaml
+    yamllint deploy/kubernetes/argocd/ --config-file .yamllint.yaml
 ```
 
 ---

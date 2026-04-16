@@ -896,8 +896,8 @@ spec:
       maxUnavailable: 0
       maxSurge: 1
   minReadySeconds: 0
-  
-  template: 
+
+  template:
     metadata:
       annotations:
         prometheus.io/path: /metrics
@@ -1043,5 +1043,5 @@ metadata:
 spec:
   controller: traefik.io/ingress-controller
 
-NOTES:
-traefik with docker.io/traefik:v3.6.10 has been deployed successfully on traefik namespace!
+# NOTES:
+# traefik with docker.io/traefik:v3.6.10 has been deployed successfully on traefik namespace!

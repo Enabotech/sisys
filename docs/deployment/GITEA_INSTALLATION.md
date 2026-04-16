@@ -76,14 +76,14 @@ kubectl create secret generic gitea-postgresql-secret \
 # 使用 Helm 部署
 helm install gitea gitea-charts/gitea \
   --namespace gitea \
-  --values deployments/gitea/values.yaml
+  --values deploy/kubernetes/gitea/values.yaml
 ```
 
 或使用 Kustomize:
 
 ```bash
 # 使用 Kustomize 部署
-kubectl apply -k deployments/gitea/
+kubectl apply -k deploy/kubernetes/gitea/
 ```
 
 ### 5. 验证部署
@@ -128,7 +128,7 @@ kubectl get ingress -n gitea
 
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   └── gitea/
 │       ├── namespace.yaml         # 命名空间配置
 │       ├── values.yaml            # Helm Chart 配置

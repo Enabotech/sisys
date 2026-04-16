@@ -54,9 +54,9 @@ class TestTLSConfiguration:
         """Verify TLS configuration in deployment files"""
         # Check deployment configs for TLS settings
         config_paths = [
-            Path("deployments/gitea/gitea.yaml"),
-            Path("deployments/harbor/harbor.yaml"),
-            Path("deployments/harbor/values.yaml"),
+            Path("deploy/kubernetes/gitea/gitea.yaml"),
+            Path("deploy/kubernetes/harbor/harbor.yaml"),
+            Path("deploy/kubernetes/harbor/values.yaml"),
         ]
 
         tls_found = False
@@ -73,7 +73,7 @@ class TestTLSConfiguration:
     def test_https_urls_in_config(self):
         """Verify HTTPS URLs are used in configuration"""
         # Check for HTTPS URLs in Runner config
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -88,7 +88,7 @@ class TestSecretManagement:
     def test_no_plaintext_secrets_in_repo(self):
         """Verify no plaintext secrets in repository"""
         # Search for common secret patterns in config files
-        config_dir = Path("deployments/gitea-runner")
+        config_dir = Path("deploy/kubernetes/gitea-runner")
         plaintext_issues = []
 
         if config_dir.exists():
@@ -128,7 +128,7 @@ class TestSecretManagement:
     def test_kubernetes_secrets_used(self):
         """Verify Kubernetes Secrets are used for sensitive data"""
         # Check Runner deployment for Secret references
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -144,7 +144,7 @@ class TestSecretManagement:
     def test_gitea_runner_token_secret(self):
         """Verify Gitea Runner Token is stored in Secret"""
         # Check Token Secret file
-        token_secret = Path("deployments/gitea-runner/gitea-org-runner-token-secret.yaml")
+        token_secret = Path("deploy/kubernetes/gitea-runner/gitea-org-runner-token-secret.yaml")
 
         if token_secret.exists():
             content = token_secret.read_text()
@@ -156,7 +156,7 @@ class TestSecretManagement:
     def test_harbor_robot_account_secret(self):
         """Verify Harbor Robot Account is stored in Secret"""
         # Check Harbor Secret file
-        harbor_secret = Path("deployments/gitea-runner/harbor-robot-secret.yaml")
+        harbor_secret = Path("deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml")
 
         if harbor_secret.exists():
             content = harbor_secret.read_text()
@@ -204,8 +204,8 @@ class TestNetworkPolicy:
         """Verify default deny NetworkPolicy exists"""
         # Check for NetworkPolicy configuration files
         config_paths = [
-            Path("deployments/gitea-runner/networkpolicy.yaml"),
-            Path("deployments/gitea-runner/network-policy.yaml"),
+            Path("deploy/kubernetes/gitea-runner/networkpolicy.yaml"),
+            Path("deploy/kubernetes/gitea-runner/network-policy.yaml"),
         ]
 
         exists = any(path.exists() for path in config_paths)
@@ -267,7 +267,7 @@ class TestResourceLimits:
 
     def test_runner_has_resource_limits(self):
         """Verify Runner pods have resource limits"""
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if not runner_config.exists():
             pytest.fail("Runner deployment config not found")
@@ -337,7 +337,7 @@ class TestRootlessMode:
 
     def test_no_privileged_flag(self):
         """Verify no --privileged flag in deployment"""
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -351,7 +351,7 @@ class TestRootlessMode:
 
     def test_no_docker_socket_mount(self):
         """Verify no docker.sock mount in Runner config"""
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -370,7 +370,7 @@ class TestRootlessMode:
 
     def test_security_context_configured(self):
         """Verify security context is configured"""
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -385,7 +385,7 @@ class TestRootlessMode:
 
     def test_runasnonroot_or_runasroot_false(self):
         """Verify runAsNonRoot or runAsRoot configuration"""
-        runner_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        runner_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
 
         if runner_config.exists():
             content = runner_config.read_text()
@@ -406,7 +406,7 @@ class TestArchitectureCompliance:
 
     def test_all_config_files_valid_yaml(self):
         """Verify all configuration files are valid YAML"""
-        config_dir = Path("deployments/gitea-runner")
+        config_dir = Path("deploy/kubernetes/gitea-runner")
 
         if config_dir.exists():
             for yaml_file in config_dir.glob("*.yaml"):

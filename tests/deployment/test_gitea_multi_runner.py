@@ -50,7 +50,7 @@ class TestRunnerLabelsConfiguration:
         """Verify Runner labels are registered in Gitea"""
         # This would require Gitea API access
         # For now, check configuration file
-        config_path = Path("deployments/gitea-runner/gitea-runner.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-runner.yaml")
         if config_path.exists():
             content = config_path.read_text()
             assert "GITEA_RUNNER_LABELS" in content, "Runner labels not configured in deployment"
@@ -227,7 +227,7 @@ class TestConcurrentJobExecution:
         """Test triggering multiple concurrent pipelines"""
         # This would require Gitea API access
         # For now, verify configuration supports it
-        config_path = Path("deployments/gitea-runner/gitea-runner.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-runner.yaml")
         if config_path.exists():
             content = config_path.read_text()
             # Check for capacity or concurrency settings
@@ -264,9 +264,9 @@ class TestRunnerConfiguration:
         """Verify Runner deployment configuration exists"""
         # Try multiple possible config file names
         config_paths = [
-            Path("deployments/gitea-runner/gitea-actions-complete.yaml"),
-            Path("deployments/gitea-runner/gitea-runner.yaml"),
-            Path("deployments/gitea-runner/runner-statefulset.yaml"),
+            Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml"),
+            Path("deploy/kubernetes/gitea-runner/gitea-runner.yaml"),
+            Path("deploy/kubernetes/gitea-runner/runner-statefulset.yaml"),
         ]
 
         config_found = any(path.exists() for path in config_paths)
@@ -274,7 +274,7 @@ class TestRunnerConfiguration:
 
     def test_runner_values_exists(self):
         """Verify Runner Helm values exist"""
-        values_path = Path("deployments/gitea-runner/values.yaml")
+        values_path = Path("deploy/kubernetes/gitea-runner/values.yaml")
         assert values_path.exists(), f"Runner Helm values not found: {values_path}"
 
     def test_runner_labels_documented(self):

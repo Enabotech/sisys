@@ -491,7 +491,7 @@ class TestNetworkSecurity:
         if returncode != 0:
             pytest.skip(
                 "harbor-default-deny NetworkPolicy 不存在。"
-                "这是 Story 0.6 的待办事项，需要创建：kubectl apply -f deployments/harbor/networkpolicy.yaml"
+                "这是 Story 0.6 的待办事项，需要创建：kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml"
             )
 
     def test_allow_traefik_ingress_policy(self):
@@ -501,7 +501,7 @@ class TestNetworkSecurity:
         if returncode != 0:
             pytest.skip(
                 "harbor-allow-traefik-ingress NetworkPolicy 不存在。"
-                "这是 Story 0.6 的待办事项，需要创建：kubectl apply -f deployments/harbor/networkpolicy.yaml"
+                "这是 Story 0.6 的待办事项，需要创建：kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml"
             )
 
     def test_network_policy_count(self):

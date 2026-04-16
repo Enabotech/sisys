@@ -756,7 +756,6 @@ class TestHarborRobotAccount:
         - ✅ 推送后自动触发漏洞扫描
 
         注意：此测试需要手动创建 Robot Account
-        已创建 Robot Account 相关信息导出到：G:\ai\\sisys\\deployments\\harbor\robot$robot_test_deployment.json
         """
         # 验证 Robot Account 配置文件存在
         import os
@@ -766,14 +765,14 @@ class TestHarborRobotAccount:
         # 支持 Windows 和 Linux 路径格式
         # 用户提供的路径：G:\ai\sisys\deployments\harbor\robot$robot_test_deployment.json
         json_paths_to_try = [
-            # 项目根目录下的 deployments/harbor（Linux 挂载路径）
-            Path("/mnt/g/ai/sisys/deployments/harbor/robot$robot_test_deployment.json"),
+            # 项目根目录下的 deploy/kubernetes/harbor（Linux 挂载路径）
+            Path("/home/agimtech/sisys/deploy/kubernetes/harbor/robot$robot_test_deployment.json"),
             # Windows 格式路径（用户提供的）
-            Path("G:/ai/sisys/deployments/harbor/robot$robot_test_deployment.json"),
+            Path("/home/agimtech/sisys/deploy/kubernetes/harbor/robot$robot_test_deployment.json"),
             # 标准 Linux 格式路径
-            Path(__file__).parent.parent.parent / "deployments" / "harbor" / "robot$robot_test_deployment.json",
+            Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot$robot_test_deployment.json",
             # 备用路径
-            Path(__file__).parent.parent.parent / "deployments" / "harbor" / "robot_test_deployment.json",
+            Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot_test_deployment.json",
         ]
 
         json_path = None
@@ -784,7 +783,7 @@ class TestHarborRobotAccount:
 
         if not json_path:
             # 尝试 YAML 配置文件
-            yaml_path = Path(__file__).parent.parent.parent / "deployments" / "harbor" / "robot-account.yaml"
+            yaml_path = Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot-account.yaml"
             if yaml_path.exists():
                 pytest.skip("Robot Account 配置已创建 (YAML)，但缺少 JSON 导出文件，跳过认证测试")
             else:

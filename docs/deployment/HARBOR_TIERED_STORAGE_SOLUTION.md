@@ -217,7 +217,7 @@ df -h /mnt/data/harbor
 ### 4.2 创建 StorageClass
 
 ```yaml
-# deployments/storage/storageclass-ssd.yaml
+# deploy/kubernetes/storage/storageclass-ssd.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -243,8 +243,8 @@ parameters:
 
 **应用:**
 ```bash
-kubectl apply -f deployments/storage/storageclass-ssd.yaml
-kubectl apply -f deployments/storage/storageclass-hdd.yaml
+kubectl apply -f deploy/kubernetes/storage/storageclass-ssd.yaml
+kubectl apply -f deploy/kubernetes/storage/storageclass-hdd.yaml
 
 # 验证
 kubectl get storageclass
@@ -255,7 +255,7 @@ kubectl get storageclass
 ### 4.3 创建分层 PVC
 
 ```bash
-kubectl apply -f deployments/harbor/harbor-tiered-pvc.yaml
+kubectl apply -f deploy/kubernetes/harbor/harbor-tiered-pvc.yaml
 # 文件包含 3 个 PVC: hot (50Gi SSD), warm (2Ti HDD), cold (8Ti HDD)
 
 # 验证
@@ -316,9 +316,9 @@ rm -f /mnt/x/hddstorage/harbor/test
 ### 5.3 创建 StorageClass (WSL2)
 
 ```yaml
-# deployments/storage/storageclass-ssd.yaml (SSD 相同)
+# deploy/kubernetes/storage/storageclass-ssd.yaml (SSD 相同)
 ---
-# deployments/storage/storageclass-hdd-wsl2.yaml
+# deploy/kubernetes/storage/storageclass-hdd-wsl2.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -333,8 +333,8 @@ parameters:
 
 **应用:**
 ```bash
-kubectl apply -f deployments/storage/storageclass-ssd.yaml
-kubectl apply -f deployments/storage/storageclass-hdd-wsl2.yaml
+kubectl apply -f deploy/kubernetes/storage/storageclass-ssd.yaml
+kubectl apply -f deploy/kubernetes/storage/storageclass-hdd-wsl2.yaml
 
 # 验证
 kubectl get storageclass
@@ -401,7 +401,7 @@ wsl
 kubectl scale deployment harbor-registry -n harbor --replicas=0
 
 # 2. 创建迁移 Job
-kubectl apply -f deployments/harbor/data-migration-job.yaml
+kubectl apply -f deploy/kubernetes/harbor/data-migration-job.yaml
 
 # 3. 监控进度
 kubectl logs -f job/harbor-data-migration -n harbor

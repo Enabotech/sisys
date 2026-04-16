@@ -322,14 +322,14 @@ CA 同步架构:
 
 ```bash
 # 创建目录结构
-mkdir -p deployments/certificates
+mkdir -p deploy/kubernetes/certificates
 
 # 生成内部 CA 私钥 (ECDSA P-256)
-openssl ecparam -genkey -name prime256v1 -noout -out deployments/certificates/ca.key
+openssl ecparam -genkey -name prime256v1 -noout -out deploy/kubernetes/certificates/ca.key
 
 # 生成 CA 证书 (10 年有效期)
-openssl req -new -x509 -key deployments/certificates/ca.key \
-  -out deployments/certificates/ca.crt \
+openssl req -new -x509 -key deploy/kubernetes/certificates/ca.key \
+  -out deploy/kubernetes/certificates/ca.crt \
   -days 3650 \
   -subj "/O=SISYS/CN=SISYS Internal CA" \
   -addext "basicConstraints=critical,CA:TRUE" \
@@ -337,15 +337,15 @@ openssl req -new -x509 -key deployments/certificates/ca.key \
 
 # 创建 Kubernetes Secret
 kubectl create secret tls sisys-internal-ca \
-  --cert=deployments/certificates/ca.crt \
-  --key=deployments/certificates/ca.key \
+  --cert=deploy/kubernetes/certificates/ca.crt \
+  --key=deploy/kubernetes/certificates/ca.key \
   -n cert-manager --dry-run=client -o yaml | \
   kubectl apply -f -
 ```
 
 **生成的配置文件**:
 ```yaml
-# deployments/certificates/internal-ca.yaml
+# deploy/kubernetes/certificates/internal-ca.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -378,7 +378,7 @@ kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-m
 #### 1.3 创建 InternalCA ClusterIssuer
 
 ```yaml
-# deployments/certificates/clusterissuer.yaml
+# deploy/kubernetes/certificates/clusterissuer.yaml
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -393,7 +393,7 @@ spec:
 
 **应用配置**:
 ```bash
-kubectl apply -f deployments/certificates/clusterissuer.yaml
+kubectl apply -f deploy/kubernetes/certificates/clusterissuer.yaml
 
 # 验证
 kubectl get clusterissuer sisys-internal-ca
@@ -403,8 +403,8 @@ kubectl get clusterissuer sisys-internal-ca
 
 ```bash
 # 1. 备份 CA 证书和私钥
-cp deployments/certificates/ca.crt /etc/kubernetes/ca.crt
-cp deployments/certificates/ca.key /etc/kubernetes/ca.key
+cp deploy/kubernetes/certificates/ca.crt /etc/kubernetes/ca.crt
+cp deploy/kubernetes/certificates/ca.key /etc/kubernetes/ca.key
 
 # 2. 设置严格权限 (仅 root 可读)
 chmod 600 /etc/kubernetes/ca.key
@@ -458,7 +458,7 @@ kubectl get secret -n harbor harbor-tls-secret -o yaml > backup/harbor-tls-backu
 #### 2.2 创建 Harbor Certificate 资源
 
 ```yaml
-# deployments/harbor/harbor-certificate.yaml
+# deploy/kubernetes/harbor/harbor-certificate.yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -510,7 +510,7 @@ spec:
 
 ```bash
 # 应用 Certificate 资源
-kubectl apply -f deployments/harbor/harbor-certificate.yaml
+kubectl apply -f deploy/kubernetes/harbor/harbor-certificate.yaml
 
 # 等待证书签发完成
 kubectl wait --for=condition=Ready certificate/harbor-tls -n harbor --timeout=60s
@@ -557,7 +557,7 @@ kubectl get secret -n gitea gitea-tls-secret -o yaml > backup/gitea-tls-backup-$
 #### 3.2 创建 Gitea Certificate 资源
 
 ```yaml
-# deployments/gitea/gitea-certificate.yaml
+# deploy/kubernetes/gitea/gitea-certificate.yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -585,7 +585,7 @@ spec:
 #### 3.3 应用并重启
 
 ```bash
-kubectl apply -f deployments/gitea/gitea-certificate.yaml
+kubectl apply -f deploy/kubernetes/gitea/gitea-certificate.yaml
 kubectl wait --for=condition=Ready certificate/gitea-tls -n gitea --timeout=60s
 
 # 重启 Gitea
@@ -609,7 +609,7 @@ kubectl get secret -n argocd argocd-tls-secret -o yaml > backup/argocd-tls-backu
 #### 4.2 创建 ArgoCD Certificate 资源
 
 ```yaml
-# deployments/argocd/argocd-certificate.yaml
+# deploy/kubernetes/argocd/argocd-certificate.yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -637,7 +637,7 @@ spec:
 #### 4.3 应用并重启
 
 ```bash
-kubectl apply -f deployments/argocd/argocd-certificate.yaml
+kubectl apply -f deploy/kubernetes/argocd/argocd-certificate.yaml
 kubectl wait --for=condition=Ready certificate/argocd-tls -n argocd --timeout=60s
 
 # 重启 ArgoCD Server
@@ -752,7 +752,7 @@ kubectl delete pod test-pull
 **事件驱动实现**:
 
 ```yaml
-# deployments/certificates/ca-sync-job.yaml
+# deploy/kubernetes/certificates/ca-sync-job.yaml
 # 此 Job 由 cert-manager Certificate 更新事件触发
 apiVersion: batch/v1
 kind: Job
@@ -869,7 +869,7 @@ kubectl create job -n cert-manager ca-cert-sync-manual \
 > 缺少 `gitea-actions`、`gitea`、`harbor`、`argocd` 等命名空间。
 
 ```yaml
-# deployments/certificates/ca-sync-rbac.yaml
+# deploy/kubernetes/certificates/ca-sync-rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -953,10 +953,10 @@ done
 
 ```bash
 # 应用 RBAC
-kubectl apply -f deployments/certificates/ca-sync-rbac.yaml
+kubectl apply -f deploy/kubernetes/certificates/ca-sync-rbac.yaml
 
 # 应用 CronJob
-kubectl apply -f deployments/certificates/ca-sync-cronjob.yaml
+kubectl apply -f deploy/kubernetes/certificates/ca-sync-cronjob.yaml
 
 # 验证 CronJob
 kubectl get cronjob -n cert-manager
@@ -1227,7 +1227,7 @@ kubectl exec harbor-core-xxx -n harbor -- cat /etc/harbor/ssl/tls.crt | \
 
 ```bash
 #!/bin/bash
-# deployments/certificates/test-renewal.sh
+# deploy/kubernetes/certificates/test-renewal.sh
 # 证书续期 E2E 测试脚本
 set -euo pipefail
 
@@ -1284,7 +1284,7 @@ echo "✅ 证书续期 E2E 测试全部通过！"
 
 ```bash
 #!/bin/bash
-# deployments/certificates/test-failure-injection.sh
+# deploy/kubernetes/certificates/test-failure-injection.sh
 # 故障注入测试: 模拟续期失败场景
 set -euo pipefail
 
@@ -1330,7 +1330,7 @@ if [ "$JOB_STATUS" != "0" ]; then
 fi
 
 # 恢复 RBAC
-kubectl apply -f deployments/certificates/ca-sync-rbac.yaml
+kubectl apply -f deploy/kubernetes/certificates/ca-sync-rbac.yaml
 
 echo ""
 echo "✅ 故障注入测试完成！"
@@ -1340,8 +1340,8 @@ echo "✅ 故障注入测试完成！"
 
 ```bash
 # 部署前必须运行
-bash deployments/certificates/test-renewal.sh
-bash deployments/certificates/test-failure-injection.sh
+bash deploy/kubernetes/certificates/test-renewal.sh
+bash deploy/kubernetes/certificates/test-failure-injection.sh
 ```
 
 ---
@@ -1352,16 +1352,16 @@ bash deployments/certificates/test-failure-injection.sh
 
 | 文件路径 | 类型 | 用途 |
 |---------|------|------|
-| `deployments/certificates/internal-ca.yaml` | Secret | 内部 CA 密钥对 |
-| `deployments/certificates/clusterissuer.yaml` | ClusterIssuer | cert-manager CA 签发器 |
-| `deployments/certificates/ca-sync-job.yaml` | Job | CA 事件驱动同步 |
-| `deployments/certificates/ca-sync-rbac.yaml` | RBAC | 全命名空间权限 |
-| `deployments/certificates/test-renewal.sh` | Script | 证书续期 E2E 测试 |
-| `deployments/certificates/test-failure-injection.sh` | Script | 故障注入测试 |
-| `deployments/certificates/README.md` | Markdown | 证书管理文档 |
-| `deployments/harbor/harbor-certificate.yaml` | Certificate | Harbor TLS 证书定义 |
-| `deployments/gitea/gitea-certificate.yaml` | Certificate | Gitea TLS 证书定义 |
-| `deployments/argocd/argocd-certificate.yaml` | Certificate | ArgoCD TLS 证书定义 |
+| `deploy/kubernetes/certificates/internal-ca.yaml` | Secret | 内部 CA 密钥对 |
+| `deploy/kubernetes/certificates/clusterissuer.yaml` | ClusterIssuer | cert-manager CA 签发器 |
+| `deploy/kubernetes/certificates/ca-sync-job.yaml` | Job | CA 事件驱动同步 |
+| `deploy/kubernetes/certificates/ca-sync-rbac.yaml` | RBAC | 全命名空间权限 |
+| `deploy/kubernetes/certificates/test-renewal.sh` | Script | 证书续期 E2E 测试 |
+| `deploy/kubernetes/certificates/test-failure-injection.sh` | Script | 故障注入测试 |
+| `deploy/kubernetes/certificates/README.md` | Markdown | 证书管理文档 |
+| `deploy/kubernetes/harbor/harbor-certificate.yaml` | Certificate | Harbor TLS 证书定义 |
+| `deploy/kubernetes/gitea/gitea-certificate.yaml` | Certificate | Gitea TLS 证书定义 |
+| `deploy/kubernetes/argocd/argocd-certificate.yaml` | Certificate | ArgoCD TLS 证书定义 |
 
 ### 备份文件
 
@@ -1446,7 +1446,7 @@ kubectl apply -f backup/harbor-tls-backup-YYYYMMDD.yaml
 kubectl rollout restart deployment harbor-core harbor-nginx -n harbor
 
 # 删除 Certificate 资源
-kubectl delete -f deployments/harbor/harbor-certificate.yaml
+kubectl delete -f deploy/kubernetes/harbor/harbor-certificate.yaml
 
 # 对 Gitea/ArgoCD 执行相同操作
 ```

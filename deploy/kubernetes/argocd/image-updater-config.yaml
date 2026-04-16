@@ -99,7 +99,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/myapp
+    path: deploy/kubernetes/myapp
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -126,7 +126,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/test-app
+    path: deploy/kubernetes/test-app
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -142,7 +142,7 @@ spec:
 # 使用方法:
 #
 # 1. 应用 Image Updater 安装清单:
-#    sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+#    sudo kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml
 #
 # 2. 验证安装:
 #    sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
@@ -151,7 +151,7 @@ spec:
 #    参考上文配置指南
 #
 # 4. 创建 Application:
-#    sudo kubectl apply -f deployments/argocd/image-updater-config.yaml
+#    sudo kubectl apply -f deploy/kubernetes/argocd/image-updater-config.yaml
 #
 # 5. 测试镜像更新:
 #    a. 推送新镜像到 Harbor:

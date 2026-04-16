@@ -2,7 +2,7 @@
 # ============================================================
 # Gitea Advanced Act Runner 重新部署 - 快速命令清单
 # ============================================================
-# 执行：bash deployments/gitea-runner/redeploy-advacts.sh
+# 执行：bash deploy/kubernetes/gitea-runner/redeploy-advacts.sh
 # ============================================================
 
 set -e
@@ -39,7 +39,7 @@ echo ""
 
 # 步骤 4: 应用配置
 echo "📦 步骤 4: 应用 gitea-advacts-complete.yaml..."
-cd /mnt/g/ai/sisys/deployments/gitea-runner/
+cd /mnt/g/ai/sisys/deploy/kubernetes/gitea-runner/
 kubectl apply -f gitea-advacts-complete.yaml
 echo "✅ 配置已应用"
 echo ""

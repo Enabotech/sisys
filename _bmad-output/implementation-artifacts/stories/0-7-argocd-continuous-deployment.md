@@ -164,7 +164,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - **权限**: `repository`, `user`
     - **用户**: `gitea_admin`
   - [x] ArgoCD 添加 Gitea 仓库凭据 ✅
-    - **配置文件**: `deployments/argocd/gitea-credentials.yaml`
+    - **配置文件**: `deploy/kubernetes/argocd/gitea-credentials.yaml`
     - **修复**: 已添加 `insecure: "true"` 配置信任自签名证书
     - **状态**: Secret 已应用，Token 已配置
   - [x] 配置 Webhook 自动触发 ✅
@@ -186,9 +186,9 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 - [x] Task 5: Harbor 镜像仓库集成 (AC: 5) ✅ 完成 (代码审查 #3 验证通过)
   - [x] 复用 Story 0.6 已有配置：
-    - `deployments/harbor/webhook-config.yaml` - Harbor Webhook 配置（Story 0.6 ✅ 已完成）
-    - `deployments/harbor/robot-account.yaml` - Harbor Robot Account（Story 0.6 ✅ 已完成）
-  - [x] 安装 ArgoCD Image Updater (`kubectl apply -f deployments/argocd/image-updater-install.yaml`)
+    - `deploy/kubernetes/harbor/webhook-config.yaml` - Harbor Webhook 配置（Story 0.6 ✅ 已完成）
+    - `deploy/kubernetes/harbor/robot-account.yaml` - Harbor Robot Account（Story 0.6 ✅ 已完成）
+  - [x] 安装 ArgoCD Image Updater (`kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml`)
   - [x] 配置 Harbor 仓库凭据 (`argocd-image-updater-secret`)
     - Robot Account: `robot$sisys+argocd-pull`
     - Token: 已存储到 Kubernetes Secret
@@ -219,10 +219,10 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 测试回滚功能
     - 支持 argocd CLI 回滚、Git revert、kubectl rollout undo
   - [x] 创建 Kustomize 多环境配置
-    - base: `deployments/apps/sisys/base/kustomization.yaml`
-    - dev: `deployments/apps/sisys/dev/kustomization.yaml`
-    - test: `deployments/apps/sisys/test/kustomization.yaml`
-    - prod: `deployments/apps/sisys/prod/kustomization.yaml`
+    - base: `deploy/kubernetes/apps/sisys/base/kustomization.yaml`
+    - dev: `deploy/kubernetes/apps/sisys/dev/kustomization.yaml`
+    - test: `deploy/kubernetes/apps/sisys/test/kustomization.yaml`
+    - prod: `deploy/kubernetes/apps/sisys/prod/kustomization.yaml`
   - [x] 创建部署脚本：`scripts/deployment/argocd/deploy-application.py`
   - [x] 创建配置文档：`docs/deployment/ARGOCD_APPLICATION_CONFIG.md`
 
@@ -230,7 +230,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 选择多环境管理方案：**Kustomize** (与 Story 0.5/0.6 保持一致)
   - [x] 创建环境目录结构：
     ```
-    deployments/apps/sisys/
+    deploy/kubernetes/apps/sisys/
     ├── base/                    # 基础配置
     │   └── kustomization.yaml
     ├── overlays/
@@ -257,7 +257,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 验证环境隔离（Dev 环境无法访问 Prod 资源）
     - 配置测试 11/11 通过
   - [x] 创建环境 Application 配置
-    - 文件：`deployments/argocd/applications/sisys-app-environments.yaml`
+    - 文件：`deploy/kubernetes/argocd/applications/sisys-app-environments.yaml`
   - [x] 创建多环境测试
     - 文件：`tests/deployment/test_argocd_multi_environment.py`
 
@@ -288,12 +288,12 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - [x] 资源限制：
     - [x] ResourceQuota 限制命名空间资源
     - [x] LimitRange 设置默认容器限制
-  - [x] 创建安全加固配置：`deployments/argocd/security-hardening.yaml`
+  - [x] 创建安全加固配置：`deploy/kubernetes/argocd/security-hardening.yaml`
   - [x] 创建安全测试：`tests/deployment/test_argocd_security.py` (18/18 通过)
 
 - [x] Task 9: 架构合规验证 ✅
   - [x] 验证 TLS 1.3 强制启用
-    - 配置：`deployments/argocd/traefik-ingressroute.yaml`
+    - 配置：`deploy/kubernetes/argocd/traefik-ingressroute.yaml`
     - 测试：`test_argocd_architecture_compliance.py::TestTLSConfiguration`
   - [x] 验证存储使用 local-path
     - K3S 默认存储类：local-path
@@ -366,11 +366,11 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 - [x] Task 12: 代码审查 #4 修复 ✅ 完成 (CRITICAL+MEDIUM 问题全部修复)
   - [x] [CRITICAL-1] 移除 Gitea Token 明文配置 ✅
-    - 文件：`deployments/argocd/gitea-credentials.yaml`
+    - 文件：`deploy/kubernetes/argocd/gitea-credentials.yaml`
     - 修复：使用环境变量注入 `${GITEA_ADMIN_TOKEN}`
     - 验收：Token 不再以明文出现在 Git 仓库中 ✅
   - [x] [CRITICAL-2] 移除 Admin 密码明文配置 ✅
-    - 文件：`deployments/argocd/rbac.yaml`
+    - 文件：`deploy/kubernetes/argocd/rbac.yaml`
     - 修复：使用环境变量注入 `${ARGOCD_ADMIN_PASSWORD}`
     - 验收：密码不再以明文出现在 Git 仓库中 ✅
   - [x] [CRITICAL-3] 减少测试跳过或提供替代验证 ✅
@@ -379,7 +379,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 修复：创建测试追踪文档和配置验证测试
     - 验收：关键测试有替代验证方案或明确追踪记录 ✅
   - [x] [CRITICAL-4] 迁移 PSP 到 PSA ✅
-    - 文件：`deployments/argocd/security-hardening.yaml`
+    - 文件：`deploy/kubernetes/argocd/security-hardening.yaml`
     - 修复：使用 Pod Security Admission 标签
     - 验收：使用 PSA 标签替代 PSP ✅
   - [x] [MEDIUM-1] 创建缺失文件或更新 File List ✅
@@ -388,7 +388,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 说明：`sisys-app.yaml` 不必要（已有 dev/test/prod 配置 + of-apps 总控）
     - 说明：`sisys-app-rollback.yaml` 不必要（ArgoCD 3.2.7 已内置回滚功能）
   - [x] [MEDIUM-2] 完成 TLS 配置 ✅
-    - 文件：`deployments/argocd/traefik-ingressroute.yaml`
+    - 文件：`deploy/kubernetes/argocd/traefik-ingressroute.yaml`
     - 修复：移除 TODO 注释，添加 cert-manager 配置
     - 验收：配置生产就绪 TLS ✅
   - [x] [MEDIUM-3] 验证多环境配置差异 ✅
@@ -398,7 +398,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
     - 文件：`scripts/deployment/argocd/configure-image-updater-secret.sh` (新建)
     - 验收：提供完整 Secret 创建脚本 ✅
   - [x] [MEDIUM-5] 修复 RBAC services 权限 ✅
-    - 文件：`deployments/argocd/rbac.yaml`
+    - 文件：`deploy/kubernetes/argocd/rbac.yaml`
     - 修复：添加 ClusterRole 和 ClusterRoleBinding
     - 验收：ArgoCD Server 可以 list/watch services ✅
   - [x] [LOW-1] 统一注释格式 ✅
@@ -430,13 +430,13 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 ### CRITICAL 问题 (必须修复 - Blocking) - ✅ 全部修复完成
 
 - [x] [AI-Review][CRITICAL-1] Gitea Token 明文硬编码在配置文件中 ✅
-  - **文件:** `deployments/argocd/gitea-credentials.yaml:24`
+  - **文件:** `deploy/kubernetes/argocd/gitea-credentials.yaml:24`
   - **问题:** Token 以明文形式存在于 Git 版本控制中，违反安全要求
   - **修复方案:** 使用环境变量注入 `${GITEA_ADMIN_TOKEN}`
   - **验收:** ✅ Token 不再以明文出现在 Git 仓库中
 
 - [x] [AI-Review][CRITICAL-2] Admin 初始密码硬编码且复杂度不足 ✅
-  - **文件:** `deployments/argocd/rbac.yaml:62`
+  - **文件:** `deploy/kubernetes/argocd/rbac.yaml:62`
   - **问题:** 密码明文存储，包含年份易被猜测
   - **修复方案:** 使用环境变量注入 `${ARGOCD_ADMIN_PASSWORD}`
   - **验收:** ✅ 密码不再以明文出现在 Git 仓库中
@@ -455,7 +455,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - **验收:** ✅ 关键测试有替代验证方案或明确追踪记录
 
 - [x] [AI-Review][CRITICAL-4] PodSecurityPolicy 已废弃但仍在使用 ✅
-  - **文件:** `deployments/argocd/security-hardening.yaml:11`
+  - **文件:** `deploy/kubernetes/argocd/security-hardening.yaml:11`
   - **问题:** PSP 在 K8s v1.25+ 已移除，K3S v1.34.5 不支持
   - **修复方案:** 迁移到 Pod Security Admission (PSA)
   - **验收:** ✅ 使用 PSA 标签替代 PSP
@@ -466,14 +466,14 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 - [x] [AI-Review][MEDIUM-1] File List 中声明的文件实际不存在 ✅
   - **缺失文件:**
-    - `deployments/argocd/applications/sisys-app.yaml` - 不必要（已有 dev/test/prod 配置 + of-apps 总控）
-    - `deployments/argocd/applications/sisys-app-rollback.yaml` - 不必要（ArgoCD 3.2.7 已内置回滚功能）
+    - `deploy/kubernetes/argocd/applications/sisys-app.yaml` - 不必要（已有 dev/test/prod 配置 + of-apps 总控）
+    - `deploy/kubernetes/argocd/applications/sisys-app-rollback.yaml` - 不必要（ArgoCD 3.2.7 已内置回滚功能）
     - `docs/deployment/ARGOCD_GITEA_TROUBLESHOOTING.md` - ✅ 已创建
   - **修复方案:** 创建缺失文件或更新 File List
   - **验收:** ✅ File List 与实际文件一致
 
 - [x] [AI-Review][MEDIUM-2] TODO 注释表明配置未完成 ✅
-  - **文件:** `deployments/argocd/traefik-ingressroute.yaml:41`
+  - **文件:** `deploy/kubernetes/argocd/traefik-ingressroute.yaml:41`
   - **问题:** TLS 配置使用 `insecureSkipVerify: true`
   - **修复方案:**
     1. ✅ 移除 TODO 注释
@@ -481,19 +481,19 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - **验收:** ✅ 配置生产就绪 TLS
 
 - [x] [AI-Review][MEDIUM-3] 多环境配置缺少实际差异 ✅
-  - **文件:** `deployments/apps/sisys/{dev,test,prod}/kustomization.yaml`
+  - **文件:** `deploy/kubernetes/apps/sisys/{dev,test,prod}/kustomization.yaml`
   - **问题:** 环境间 replica 和 resource 差异未验证
   - **修复方案:** 验证并记录环境差异
   - **验收:** ✅ 已创建 `ARGOCD_MULTI_ENV_VERIFICATION.md`
 
 - [x] [AI-Review][MEDIUM-4] Harbor Image Updater Secret 配置不完整 ✅
-  - **文件:** `deployments/argocd/image-updater-install.yaml:137-158`
+  - **文件:** `deploy/kubernetes/argocd/image-updater-install.yaml:137-158`
   - **问题:** Secret 使用占位符，需要手动干预
   - **修复方案:** 提供完整的 Secret 创建脚本
   - **验收:** ✅ 已创建 `configure-image-updater-secret.sh`
 
 - [x] [AI-Review][MEDIUM-5] RBAC 配置缺少 services 资源权限 ✅
-  - **文件:** `deployments/argocd/rbac.yaml`
+  - **文件:** `deploy/kubernetes/argocd/rbac.yaml`
   - **问题:** `argocd-server` ServiceAccount 缺少 services 权限
   - **修复方案:** 添加独立的 ClusterRole 绑定
   - **验收:** ✅ ArgoCD Server 可以 list/watch services
@@ -608,7 +608,7 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 ### CRITICAL 问题 (必须修复)
 
 - [x] [AI-Review][CRITICAL] ArgoCD Gitea 凭据 Secret 密码字段为空 - 无法认证连接 Gitea
-  - 文件：`deployments/argocd/gitea-credentials.yaml`
+  - 文件：`deploy/kubernetes/argocd/gitea-credentials.yaml`
   - 修复：✅ 已填入占位符 Token `REPLACE_WITH_YOUR_GITEA_TOKEN` + 添加 `insecure: "true"` 配置
   - 验证：`kubectl get secret argocd-gitea-creds -n argocd -o jsonpath='{.data.password}' | base64 -d` 应返回非空 Token
   - **待完成**: 在 Gitea 生成实际 Token 并替换占位符
@@ -631,11 +631,11 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
 
 - [x] [AI-Review][MEDIUM] ArgoCD Server RBAC 权限不足
   - 错误：`services is forbidden: User "system:serviceaccount:argocd:argocd-server" cannot list resource "services"`
-  - 文件：`deployments/argocd/rbac.yaml`
+  - 文件：`deploy/kubernetes/argocd/rbac.yaml`
   - 修复：✅ 已添加 `services` 资源的 `list` 权限到 `argocd-server` ServiceAccount
 
 - [x] [AI-Review][MEDIUM] Gitea Ingress 配置不一致
-  - 文件：`deployments/gitea/ingress.yaml`
+  - 文件：`deploy/kubernetes/gitea/ingress.yaml`
   - 问题：git diff 显示仅有注释格式变更，无实质配置修改
   - 修复：✅ 已添加 Story 标签 "0.5+0.8" 标识联合修改
 
@@ -645,14 +645,14 @@ so that **实现 GitOps 自动化部署，代码提交后自动同步到 K8s 集
   - 修复：✅ 已创建 `scripts/deployment/argocd/configure-gitea-webhook.sh` 脚本
 
 - [x] [AI-Review][MEDIUM] HTTPS 证书验证配置使用 `insecureSkipVerify: true`
-  - 文件：`deployments/argocd/traefik-ingressroute.yaml`
+  - 文件：`deploy/kubernetes/argocd/traefik-ingressroute.yaml`
   - 问题：临时方案，非生产就绪
   - 修复：✅ 已添加 TODO 注释说明生产环境应配置正式 TLS 证书
 
 ### LOW 问题 (可选修复)
 
 - [x] [AI-Review][LOW] 配置文件注释格式不统一
-  - 文件：`deployments/gitea/ingress.yaml`
+  - 文件：`deploy/kubernetes/gitea/ingress.yaml`
   - 问题：git diff 显示仅注释格式变更
   - 修复：✅ 已统一注释格式并添加 Story 标签
 
@@ -843,7 +843,7 @@ Traefik v3.x 反向代理
 **推荐结构:**
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   ├── argocd/          # ArgoCD 自身部署配置
 │   │   ├── base/
 │   │   │   ├── kustomization.yaml
@@ -921,7 +921,7 @@ sisys/
 3. **Git 仓库结构规划**
    ```
    sisys/
-   ├── deployments/
+   ├── deploy/kubernetes/
    │   ├── harbor/          # Story 0.6: Harbor 部署配置
    │   ├── gitea/           # Story 0.5: Gitea 部署配置
    │   └── argocd/          # 本 Story: ArgoCD 部署配置
@@ -1059,7 +1059,7 @@ pytest tests/deployment/test_argocd.py -v
 pytest tests/deployment/test_argocd.py::test_argocd_pod_running -v
 
 # 运行并生成覆盖率报告
-pytest tests/deployment/test_argocd.py --cov=deployments/argocd --cov-report=html
+pytest tests/deployment/test_argocd.py --cov=deploy/kubernetes/argocd --cov-report=html
 ```
 
 **测试环境准备:**
@@ -1068,7 +1068,7 @@ pytest tests/deployment/test_argocd.py --cov=deployments/argocd --cov-report=htm
 kubectl create namespace argocd-test
 
 # 部署测试依赖
-helm install argocd argo/argo-cd -n argocd-test -f deployments/argocd/values-test.yaml
+helm install argocd argo/argo-cd -n argocd-test -f deploy/kubernetes/argocd/values-test.yaml
 ```
 
 **TDD 测试用例**:
@@ -1302,7 +1302,7 @@ sisys/
 │       ├── ARGOCD_INSTALLATION.md       # ArgoCD 部署指南
 │       ├── ARGOCD_IMAGE_UPDATER.md      # Image Updater 配置
 │       └── ARGOCD_MULTI_ENV.md          # 多环境配置
-├── deployments/
+├── deploy/kubernetes/
 │   └── argocd/
 │       ├── values.yaml                  # Helm Chart 配置
 │       ├── ingress.yaml                 # Ingress 配置
@@ -1466,8 +1466,8 @@ Qwen Code (AI 开发助手)
 - Traefik Ingress 配置：Story 0.4 已验证 ✅
 - Gitea 部署状态：Story 0.5 完成记录 ✅
 - Harbor 部署状态：Story 0.6 完成记录 ✅
-- Harbor Webhook 配置：`deployments/harbor/webhook-config.yaml` ✅
-- Harbor Robot Account: `deployments/harbor/robot-account.yaml` ✅
+- Harbor Webhook 配置：`deploy/kubernetes/harbor/webhook-config.yaml` ✅
+- Harbor Robot Account: `deploy/kubernetes/harbor/robot-account.yaml` ✅
 
 ### Implementation Notes
 
@@ -1518,12 +1518,12 @@ Qwen Code (AI 开发助手)
 
 **问题 2: Secret 中硬编码 Token 占位符**
 - **修复:** 修改 `image-updater-install.yaml`，使用占位符并说明需要通过脚本创建
-- **文件:** `deployments/argocd/image-updater-install.yaml` 第 137-158 行
+- **文件:** `deploy/kubernetes/argocd/image-updater-install.yaml` 第 137-158 行
 - **说明:** 添加详细的使用说明，指导用户运行脚本或手动创建 Secret
 
 **问题 3: Harbor Webhook 配置不一致 (NetworkPolicy)**
 - **修复:** 在 NetworkPolicy 中添加允许 Harbor 命名空间访问的规则
-- **文件:** `deployments/argocd/image-updater-install.yaml` 第 337-348 行
+- **文件:** `deploy/kubernetes/argocd/image-updater-install.yaml` 第 337-348 行
 - **说明:** Webhook 可以从 Harbor 命名空间访问 Image Updater
 
 #### MEDIUM 问题修复 (4 个)
@@ -1535,7 +1535,7 @@ Qwen Code (AI 开发助手)
 
 **问题 5: Harbor Ingress 路由配置顺序**
 - **修复:** 调整路径顺序，更具体的路径 (`/api/`, `/service/`) 在前
-- **文件:** `deployments/harbor/ingress.yaml` 第 26-48 行
+- **文件:** `deploy/kubernetes/harbor/ingress.yaml` 第 26-48 行
 - **说明:** 避免根路径 `/` 匹配 API 请求
 
 **问题 6: Python 脚本硬编码配置**
@@ -1545,7 +1545,7 @@ Qwen Code (AI 开发助手)
 
 **问题 7: 缺少资源限制监控**
 - **修复:** 添加 Prometheus 监控注解
-- **文件:** `deployments/argocd/image-updater-install.yaml` 第 173-189 行
+- **文件:** `deploy/kubernetes/argocd/image-updater-install.yaml` 第 173-189 行
 - **说明:** 配置 `prometheus.io/scrape: "true"` 等注解
 
 #### LOW 问题修复 (3 个)
@@ -1557,7 +1557,7 @@ Qwen Code (AI 开发助手)
 
 **问题 9: 示例 Application 配置未实际创建**
 - **修复:** 创建 `example-application.yaml` 文件
-- **文件:** `deployments/argocd/example-application.yaml` (新建)
+- **文件:** `deploy/kubernetes/argocd/example-application.yaml` (新建)
 - **说明:** 包含 3 个示例配置：标准语义化版本、latest tag 测试、多镜像更新
 
 **问题 10: 缺少版本兼容性说明**
@@ -1568,11 +1568,11 @@ Qwen Code (AI 开发助手)
 ### 变更文件清单
 
 **新增文件:**
-- `deployments/argocd/example-application.yaml` - 示例 Application 配置
+- `deploy/kubernetes/argocd/example-application.yaml` - 示例 Application 配置
 
 **修改文件:**
-- `deployments/argocd/image-updater-install.yaml` - Secret 配置、NetworkPolicy、Prometheus 注解
-- `deployments/harbor/ingress.yaml` - 路由顺序调整
+- `deploy/kubernetes/argocd/image-updater-install.yaml` - Secret 配置、NetworkPolicy、Prometheus 注解
+- `deploy/kubernetes/harbor/ingress.yaml` - 路由顺序调整
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 故障恢复指南、版本兼容性
 - `scripts/deployment/argocd/configure-image-updater.py` - 命令行参数支持
 - `tests/deployment/test_argocd_harbor_integration.py` - 测试增强
@@ -1580,8 +1580,8 @@ Qwen Code (AI 开发助手)
 
 **创建的文件:**
 - `tests/deployment/test_argocd_gitea_integration.py` - 集成测试
-- `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置
-- `deployments/argocd/gitea-webhook-config.yaml` - Webhook 配置
+- `deploy/kubernetes/argocd/gitea-credentials.yaml` - Gitea 凭据配置
+- `deploy/kubernetes/argocd/gitea-webhook-config.yaml` - Webhook 配置
 - `scripts/deployment/argocd/setup-gitea-integration.py` - 自动配置脚本
 - `scripts/deployment/argocd/create-gitea-org-repo.py` - 创建组织和仓库脚本
 - `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - 配置指南文档
@@ -1663,7 +1663,7 @@ SKIPPED test_end_to_end_image_update_workflow - 需实际推送镜像
 
 3. **安装 ArgoCD Image Updater**
    ```bash
-   kubectl apply -f deployments/argocd/image-updater-install.yaml
+   kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml
    ```
    结果：✅ 所有资源创建成功
    - Namespace, ServiceAccount, ClusterRole, ClusterRoleBinding
@@ -1755,8 +1755,8 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - Webhook 配置采用手动方式（API 兼容性）
 
 **创建的文件:**
-- `deployments/argocd/image-updater-install.yaml` - Image Updater 安装清单
-- `deployments/argocd/image-updater-config.yaml` - 完整配置指南和示例 Application
+- `deploy/kubernetes/argocd/image-updater-install.yaml` - Image Updater 安装清单
+- `deploy/kubernetes/argocd/image-updater-config.yaml` - 完整配置指南和示例 Application
 - `tests/deployment/test_argocd_harbor_integration.py` - 集成测试
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - 配置指南文档
 - `scripts/deployment/argocd/configure-image-updater.py` - 自动配置脚本
@@ -1799,16 +1799,16 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - RBAC 分角色权限（admin/developer/readonly）
 
 **创建的文件:**
-- `deployments/argocd/values.yaml` - Helm Chart 配置
-- `deployments/argocd/kustomization.yaml` - Kustomize 配置
-- `deployments/argocd/namespace.yaml` - 命名空间配置
-- `deployments/argocd/ingress.yaml` - Ingress 配置
-- `deployments/argocd/networkpolicy.yaml` - 网络安全策略
-- `deployments/argocd/rbac.yaml` - RBAC 配置
+- `deploy/kubernetes/argocd/values.yaml` - Helm Chart 配置
+- `deploy/kubernetes/argocd/kustomization.yaml` - Kustomize 配置
+- `deploy/kubernetes/argocd/namespace.yaml` - 命名空间配置
+- `deploy/kubernetes/argocd/ingress.yaml` - Ingress 配置
+- `deploy/kubernetes/argocd/networkpolicy.yaml` - 网络安全策略
+- `deploy/kubernetes/argocd/rbac.yaml` - RBAC 配置
 
 **下一步:**
 - Task 2: ArgoCD 部署与验证
-- 运行 `helm install argocd argo/argo-cd -n argocd -f deployments/argocd/values.yaml`
+- 运行 `helm install argocd argo/argo-cd -n argocd -f deploy/kubernetes/argocd/values.yaml`
 - 验证 Pod 运行状态
 - 验证服务可访问性
 
@@ -1854,36 +1854,36 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `tests/deployment/test_argocd_architecture_compliance.py` - 架构合规验证测试 (16 个测试用例)
 
 **Task 8 创建的文件 (2026-03-16):**
-- `deployments/argocd/security-hardening.yaml` - 安全加固配置（容器安全、网络安全、密钥管理）
+- `deploy/kubernetes/argocd/security-hardening.yaml` - 安全加固配置（容器安全、网络安全、密钥管理）
 - `tests/deployment/test_argocd_security.py` - 安全加固测试 (18 个测试用例)
 
 **Task 7 创建的文件 (2026-03-16):**
-- `deployments/argocd/applications/sisys-app-environments.yaml` - 多环境 Application 配置
+- `deploy/kubernetes/argocd/applications/sisys-app-environments.yaml` - 多环境 Application 配置
 - `tests/deployment/test_argocd_multi_environment.py` - 多环境配置测试 (11 个测试用例)
 
 **Task 6 创建的文件 (2026-03-16):**
-- `deployments/argocd/applications/sisys-app.yaml` - ArgoCD Application 配置
-- `deployments/argocd/applications/sisys-app-rollback.yaml` - 回滚配置指南
-- `deployments/apps/sisys/base/kustomization.yaml` - Kustomize Base 配置
-- `deployments/apps/sisys/dev/kustomization.yaml` - Dev 环境 Overlay
-- `deployments/apps/sisys/test/kustomization.yaml` - Test 环境 Overlay
-- `deployments/apps/sisys/prod/kustomization.yaml` - Prod 环境 Overlay
+- `deploy/kubernetes/argocd/applications/sisys-app.yaml` - ArgoCD Application 配置
+- `deploy/kubernetes/argocd/applications/sisys-app-rollback.yaml` - 回滚配置指南
+- `deploy/kubernetes/apps/sisys/base/kustomization.yaml` - Kustomize Base 配置
+- `deploy/kubernetes/apps/sisys/dev/kustomization.yaml` - Dev 环境 Overlay
+- `deploy/kubernetes/apps/sisys/test/kustomization.yaml` - Test 环境 Overlay
+- `deploy/kubernetes/apps/sisys/prod/kustomization.yaml` - Prod 环境 Overlay
 - `tests/deployment/test_argocd_application.py` - Application 测试 (17 个测试用例)
 - `scripts/deployment/argocd/deploy-application.py` - Application 部署脚本
 - `docs/deployment/ARGOCD_APPLICATION_CONFIG.md` - Application 配置指南
 
 **Task 5 创建的文件:**
 - `tests/deployment/test_argocd_harbor_integration.py` - ArgoCD Harbor 集成测试（17 个测试用例）
-- `deployments/argocd/image-updater-install.yaml` - ArgoCD Image Updater 安装清单（v0.14.0）
-- `deployments/argocd/image-updater-config.yaml` - Image Updater 完整配置指南和示例 Application
+- `deploy/kubernetes/argocd/image-updater-install.yaml` - ArgoCD Image Updater 安装清单（v0.14.0）
+- `deploy/kubernetes/argocd/image-updater-config.yaml` - Image Updater 完整配置指南和示例 Application
 - `docs/deployment/ARGOCD_IMAGE_UPDATER.md` - ArgoCD Image Updater 配置指南
 - `scripts/deployment/argocd/configure-image-updater.py` - Image Updater 自动配置脚本
 - `_bmad-output/implementation-artifacts/stories/task-5-tdd-summary.md` - TDD 流程总结文档
 
 **Task 4 创建的文件:**
 - `tests/deployment/test_argocd_gitea_integration.py` - ArgoCD Gitea 集成测试
-- `deployments/argocd/gitea-credentials.yaml` - Gitea 凭据配置（Secret + ConfigMap）
-- `deployments/argocd/gitea-webhook-config.yaml` - Gitea Webhook 配置
+- `deploy/kubernetes/argocd/gitea-credentials.yaml` - Gitea 凭据配置（Secret + ConfigMap）
+- `deploy/kubernetes/argocd/gitea-webhook-config.yaml` - Gitea Webhook 配置
 - `scripts/deployment/argocd/setup-gitea-integration.py` - Gitea 集成自动配置脚本
 - `scripts/deployment/argocd/create-gitea-org-repo.py` - 创建 Gitea 组织和仓库脚本
 - `scripts/deployment/argocd/check-gitea-repos.py` - 检查 Gitea 仓库脚本
@@ -1893,19 +1893,19 @@ kubectl get configmap argocd-image-updater-config -n argocd
 - `docs/deployment/ARGOCD_GITEA_INTEGRATION.md` - Gitea 集成配置指南
 
 **Task 1 创建的文件:**
-- `deployments/argocd/values.yaml` - ArgoCD Helm Chart 配置（v3.2.7）
-- `deployments/argocd/kustomization.yaml` - Kustomize 配置
-- `deployments/argocd/namespace.yaml` - ArgoCD 命名空间配置
-- `deployments/argocd/ingress.yaml` - Traefik Ingress 配置（TLS 1.3）
-- `deployments/argocd/networkpolicy.yaml` - 网络安全策略（默认拒绝）
-- `deployments/argocd/rbac.yaml` - RBAC 角色配置
+- `deploy/kubernetes/argocd/values.yaml` - ArgoCD Helm Chart 配置（v3.2.7）
+- `deploy/kubernetes/argocd/kustomization.yaml` - Kustomize 配置
+- `deploy/kubernetes/argocd/namespace.yaml` - ArgoCD 命名空间配置
+- `deploy/kubernetes/argocd/ingress.yaml` - Traefik Ingress 配置（TLS 1.3）
+- `deploy/kubernetes/argocd/networkpolicy.yaml` - 网络安全策略（默认拒绝）
+- `deploy/kubernetes/argocd/rbac.yaml` - RBAC 角色配置
 
 **Task 2 创建的文件:**
-- `deployments/argocd/traefik-ingressroute.yaml` - Traefik IngressRoute 配置
+- `deploy/kubernetes/argocd/traefik-ingressroute.yaml` - Traefik IngressRoute 配置
 
 **Task 3 创建的文件:**
-- `deployments/argocd/traefik-ingressroute-fixed.yaml` - Traefik IngressRoute 修正配置（未生效）
-- `deployments/argocd/ingress-native.yaml` - 原生 Kubernetes Ingress 配置（未生效）
+- `deploy/kubernetes/argocd/traefik-ingressroute-fixed.yaml` - Traefik IngressRoute 修正配置（未生效）
+- `deploy/kubernetes/argocd/ingress-native.yaml` - 原生 Kubernetes Ingress 配置（未生效）
 - `/tmp/argocd.crt` - 自签名 TLS 证书
 - `/tmp/argocd.key` - 自签名 TLS 私钥
 
@@ -1948,10 +1948,10 @@ kubectl get configmap argocd-image-updater-config -n argocd
   - `docs/deployment/VERSION_COMPATIBILITY_MATRIX.md` - 版本兼容性矩阵
   - `docs/deployment/ARGOCD_MULTI_ENV_VERIFICATION.md` - 多环境验证
 - 📋 修改文件:
-  - `deployments/argocd/gitea-credentials.yaml` - 移除明文 Token
-  - `deployments/argocd/rbac.yaml` - 移除明文密码 + 添加 services 权限
-  - `deployments/argocd/security-hardening.yaml` - 迁移 PSP 到 PSA
-  - `deployments/argocd/traefik-ingressroute.yaml` - 移除 TODO，添加 cert-manager
+  - `deploy/kubernetes/argocd/gitea-credentials.yaml` - 移除明文 Token
+  - `deploy/kubernetes/argocd/rbac.yaml` - 移除明文密码 + 添加 services 权限
+  - `deploy/kubernetes/argocd/security-hardening.yaml` - 迁移 PSP 到 PSA
+  - `deploy/kubernetes/argocd/traefik-ingressroute.yaml` - 移除 TODO，添加 cert-manager
 - 📋 状态：**所有问题全部修复完成 (12/12)**，可以重新提交审查
 - 📋 故事状态：`in-progress` → `ready-for-review`
 
@@ -2241,12 +2241,12 @@ argocd-server-7bd488bb9b-gzjc7                      1/1 Running
 ### CRITICAL 问题修复详情
 
 **CRITICAL-1: Gitea Token 明文硬编码** ✅
-- **文件:** `deployments/argocd/gitea-credentials.yaml`
+- **文件:** `deploy/kubernetes/argocd/gitea-credentials.yaml`
 - **修复:** 使用环境变量注入 `${GITEA_ADMIN_TOKEN}`
 - **验收:** Token 不再以明文出现在 Git 仓库中
 
 **CRITICAL-2: Admin 密码明文硬编码** ✅
-- **文件:** `deployments/argocd/rbac.yaml`
+- **文件:** `deploy/kubernetes/argocd/rbac.yaml`
 - **修复:** 使用环境变量注入 `${ARGOCD_ADMIN_PASSWORD}`
 - **验收:** 密码不再以明文出现在 Git 仓库中
 
@@ -2256,7 +2256,7 @@ argocd-server-7bd488bb9b-gzjc7                      1/1 Running
 - **验收:** 有关键测试的替代验证方案
 
 **CRITICAL-4: PSP 已废弃** ✅
-- **文件:** `deployments/argocd/security-hardening.yaml`
+- **文件:** `deploy/kubernetes/argocd/security-hardening.yaml`
 - **修复:** 迁移到 Pod Security Admission
 - **验收:** 使用 PSA 标签替代 PSP
 

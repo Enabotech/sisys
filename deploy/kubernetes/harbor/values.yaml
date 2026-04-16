@@ -197,7 +197,7 @@ podSecurityContext:
 # 密钥配置（通过 Kubernetes Secret 管理）
 # =============================================================================
 
-# 注意：实际密钥通过 deployments/harbor/secrets.yaml 管理
+# 注意：实际密钥通过 deploy/kubernetes/harbor/secrets.yaml 管理
 # 此处仅配置密钥引用
 # pragma: allowlist secret
 secretName: "harbor-secret"

@@ -52,7 +52,7 @@ ArgoCD Image Updater 用于自动检测 Harbor 镜像仓库中的新镜像 tag�
 
 ```bash
 # 使用已准备的安装清单
-sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+sudo kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml
 ```
 
 ### 步骤 2: 验证 Pod 状态
@@ -100,7 +100,7 @@ sudo kubectl create secret generic argocd-image-updater-secret \
 
 ### 方式 2: 使用配置文件
 
-编辑 `deployments/argocd/image-updater-install.yaml` 中的 Secret 部分：
+编辑 `deploy/kubernetes/argocd/image-updater-install.yaml` 中的 Secret 部分：
 
 ```yaml
 apiVersion: v1
@@ -162,7 +162,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/myapp
+    path: deploy/kubernetes/myapp
 ```
 
 ### 更新策略说明
@@ -451,7 +451,7 @@ sudo kubectl delete secret argocd-image-updater-secret -n argocd
 python scripts/deployment/argocd/configure-image-updater.py
 
 # 4. 重新应用安装清单
-sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+sudo kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml
 ```
 
 ### 恢复步骤 2: 重置 Harbor 凭据
@@ -559,7 +559,7 @@ argocd app sync myapp
 
 3. **应用新版本**:
    ```bash
-   sudo kubectl apply -f deployments/argocd/image-updater-install.yaml
+   sudo kubectl apply -f deploy/kubernetes/argocd/image-updater-install.yaml
    ```
 
 4. **验证升级**:

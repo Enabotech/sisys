@@ -444,8 +444,8 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 - `scripts/entrypoint.sh` - 应用入口脚本 ✅
 
 **K8s 配置:**
-- `deployments/k8s/deployment.yaml` - 含 GPU 资源申请 ✅
-- `deployments/k8s/service.yaml` - 服务配置 ✅
+- `deploy/kubernetes/k8s/deployment.yaml` - 含 GPU 资源申请 ✅
+- `deploy/kubernetes/k8s/service.yaml` - 服务配置 ✅
 
 **ArgoCD 配置 (已存在):**
 - `./developments/apps/sisys/` - ArgoCD Application 配置 (用户已配置)

@@ -416,7 +416,7 @@ class TestArgoCDHarborIntegration:
         # 方法 3: 检查机器人账号配置文件
         from pathlib import Path
 
-        robot_config_path = Path("deployments/harbor/robot$robot_test_deployment.json")
+        robot_config_path = Path("deploy/kubernetes/harbor/robot$robot_test_deployment.json")
         if robot_config_path.exists():
             return  # 配置文件存在，证明已创建
 
@@ -620,9 +620,9 @@ class TestArgoCDHarborIntegrationE2E:
         """
         # 验证 Kustomize 配置文件是否存在
         kustomize_paths = [
-            "deployments/apps/sisys/dev/kustomization.yaml",
-            "deployments/apps/sisys/test/kustomization.yaml",
-            "deployments/apps/sisys/prod/kustomization.yaml",
+            "deploy/kubernetes/apps/sisys/dev/kustomization.yaml",
+            "deploy/kubernetes/apps/sisys/test/kustomization.yaml",
+            "deploy/kubernetes/apps/sisys/prod/kustomization.yaml",
         ]
 
         import os  # noqa: PLC041
@@ -652,7 +652,7 @@ if __name__ == "__main__":
     pytest tests/deployment/test_argocd_harbor_integration.py::TestArgoCDHarborIntegration::test_image_updater_pod_running -v
 
     # 运行并生成覆盖率报告
-    pytest tests/deployment/test_argocd_harbor_integration.py --cov=deployments/argocd --cov-report=html
+    pytest tests/deployment/test_argocd_harbor_integration.py --cov=deploy/kubernetes/argocd --cov-report=html
 
     # 运行集成测试
     pytest tests/deployment/test_argocd_harbor_integration.py -m integration -v

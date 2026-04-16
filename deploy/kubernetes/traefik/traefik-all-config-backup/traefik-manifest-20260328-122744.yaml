@@ -167,8 +167,8 @@ spec:
       maxUnavailable: 0
       maxSurge: 1
   minReadySeconds: 0
-  
-  template: 
+
+  template:
     metadata:
       annotations:
         prometheus.io/path: /metrics
@@ -313,4 +313,3 @@ metadata:
   name: traefik
 spec:
   controller: traefik.io/ingress-controller
-

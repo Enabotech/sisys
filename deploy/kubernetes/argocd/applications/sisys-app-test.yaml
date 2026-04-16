@@ -1,19 +1,19 @@
 ---
-# ArgoCD Application - Dev 环境
-# 开发环境配置 - 自动同步
+# ArgoCD Application - Test 环境
+# 测试环境配置 - 自动同步 + 手动审批
 #
-# 同步策略：完全自动（self-heal + auto-prune）
-# 适用于：开发团队日常开发和测试
+# 同步策略：自动同步但需要审批
+# 适用于：QA 团队进行测试验证
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sisys-app-dev
+  name: sisys-app-test
   namespace: argocd
   labels:
-    app.kubernetes.io/name: sisys-app-dev
+    app.kubernetes.io/name: sisys-app-test
     app.kubernetes.io/part-of: sisys
-    app.kubernetes.io/environment: development
+    app.kubernetes.io/environment: testing
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   # ArgoCD Image Updater 注解
@@ -22,46 +22,48 @@ metadata:
     argocd-image-updater.argoproj.io/image-list: |
       app=harbor.sisys.local/sisys/app
 
-    # 写回方法：使用 git 提交更新
+    # 写回方法：禁用自动写回，手动控制镜像版本
     argocd-image-updater.argoproj.io/write-back-method: git
     # Git 仓库配置
     argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
-    argocd-image-updater.argoproj.io/git-branch: HEAD
+    argocd-image-updater.argoproj.io/git-branch: release
 
     # 更新策略：按推送时间选择最新镜像（v0.18.0 官方命名）
     argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
-    # 标签过滤：只匹配 dev 开头的标签（含 feature 分支）
-    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-((feature-)?v[0-9]+.*|(main-)?v[0-9]+.*)
-    # 忽略临时标签
-    argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
+    # 只匹配 test-开头的标签
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^test-.*
 
     # 强制使用 Digest (确保不可变性)
     argocd-image-updater.argoproj.io/app.force-digest: "true"
 
-    # 轮询间隔 (开发环境频繁一些)
+    # 轮询间隔 (测试环境适中)
     argocd-image-updater.argoproj.io/app.check-interval: 2m
+
+    # 审批注解
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 
 spec:
   project: default
 
-  # 源代码配置 - Dev 环境
+  # 源代码配置 - Test 环境
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/apps/sisys/dev
+    path: deploy/kubernetes/apps/sisys/test
 
-  # 目标配置 - Dev 命名空间
+  # 目标配置 - Test 命名空间
   destination:
     server: https://kubernetes.default.svc
-    namespace: sisys-dev
+    namespace: sisys-test
 
-  # 同步策略 - 完全自动
+  # 同步策略 - 自动同步但需要审批
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true
-      allowEmpty: false
+      selfHeal: false  # 测试环境不需要自我修复
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
@@ -77,25 +79,21 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # 忽略差异 - Dev 环境
+  # 忽略差异 - Test 环境
   ignoreDifferences:
     - group: apps
       kind: Deployment
       jsonPointers:
         - /spec/replicas
-    - group: ""
-      kind: ConfigMap
-      jsonPointers:
-        - /metadata/annotations
 
   info:
     - name: Description
-      value: SISYS 应用 - 开发环境
+      value: SISYS 应用 - 测试环境
     - name: Environment
-      value: development
+      value: testing
     - name: SyncPolicy
-      value: Automatic (self-heal + auto-prune)
+      value: Automatic with Approval
     - name: ImageTagPattern
-      value: dev-{branch}-{sha}
+      value: test-{version}
     - name: UpdateStrategy
       value: latest (by push time)

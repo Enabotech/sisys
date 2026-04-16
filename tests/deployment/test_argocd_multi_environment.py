@@ -15,21 +15,21 @@ class TestMultiEnvironmentConfig:
     def test_environment_applications_manifest_exists(self):
         """验证环境 Application 清单文件存在"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             assert Path(manifest_path).exists(), f"环境 Application 清单文件不存在：{manifest_path}"
 
     def test_app_of_apps_manifest_exists(self):
         """验证 App of Apps 清单文件存在"""
-        manifest_path = Path("deployments/argocd/applications/sisys-app-of-apps.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml")
         assert manifest_path.exists(), "App of Apps 清单文件不存在"
 
     def test_dev_environment_application_valid(self):
         """验证 Dev 环境 Application 配置"""
-        manifest_path = Path("deployments/argocd/applications/sisys-app-dev.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-dev.yaml")
 
         with open(manifest_path) as f:
             app = yaml.safe_load(f)
@@ -47,7 +47,7 @@ class TestMultiEnvironmentConfig:
         assert app["spec"]["destination"]["namespace"] == "sisys-dev"
 
         # 验证路径
-        assert app["spec"]["source"]["path"] == "deployments/apps/sisys/dev"
+        assert app["spec"]["source"]["path"] == "deploy/kubernetes/apps/sisys/dev"
 
         # 验证自动同步策略
         sync_policy = app["spec"]["syncPolicy"]
@@ -61,7 +61,7 @@ class TestMultiEnvironmentConfig:
 
     def test_test_environment_application_valid(self):
         """验证 Test 环境 Application 配置"""
-        manifest_path = Path("deployments/argocd/applications/sisys-app-test.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-test.yaml")
 
         with open(manifest_path) as f:
             app = yaml.safe_load(f)
@@ -78,7 +78,7 @@ class TestMultiEnvironmentConfig:
         assert app["spec"]["destination"]["namespace"] == "sisys-test"
 
         # 验证路径
-        assert app["spec"]["source"]["path"] == "deployments/apps/sisys/test"
+        assert app["spec"]["source"]["path"] == "deploy/kubernetes/apps/sisys/test"
 
         # 验证镜像 tag (测试环境使用 test- 开头的标签)
         kustomize = app["spec"]["source"].get("kustomize", {})
@@ -87,7 +87,7 @@ class TestMultiEnvironmentConfig:
 
     def test_prod_environment_application_valid(self):
         """验证 Prod 环境 Application 配置"""
-        manifest_path = Path("deployments/argocd/applications/sisys-app-prod.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-prod.yaml")
 
         with open(manifest_path) as f:
             app = yaml.safe_load(f)
@@ -104,7 +104,7 @@ class TestMultiEnvironmentConfig:
         assert app["spec"]["destination"]["namespace"] == "sisys-prod"
 
         # 验证路径
-        assert app["spec"]["source"]["path"] == "deployments/apps/sisys/prod"
+        assert app["spec"]["source"]["path"] == "deploy/kubernetes/apps/sisys/prod"
 
         # 验证手动同步策略（不启用 automated）
         sync_policy = app["spec"]["syncPolicy"]
@@ -116,7 +116,7 @@ class TestMultiEnvironmentConfig:
 
     def test_app_of_apps_config(self):
         """验证 App of Apps 配置"""
-        manifest_path = Path("deployments/argocd/applications/sisys-app-of-apps.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml")
 
         with open(manifest_path) as f:
             app = yaml.safe_load(f)
@@ -127,7 +127,7 @@ class TestMultiEnvironmentConfig:
         assert app["metadata"]["namespace"] == "argocd"
 
         # 验证 source 路径指向 applications 目录
-        assert app["spec"]["source"]["path"] == "deployments/argocd/applications"
+        assert app["spec"]["source"]["path"] == "deploy/kubernetes/argocd/applications"
 
         # 验证使用 directory 模式
         assert "directory" in app["spec"]["source"]
@@ -139,20 +139,20 @@ class TestMultiEnvironmentConfig:
         """验证 Kustomize overlay 文件存在"""
         overlays = ["dev", "test", "prod"]
         for env in overlays:
-            overlay_path = Path(f"deployments/apps/sisys/{env}/kustomization.yaml")
+            overlay_path = Path(f"deploy/kubernetes/apps/sisys/{env}/kustomization.yaml")
             assert overlay_path.exists(), f"{env} 环境 Kustomize overlay 不存在"
 
     def test_kustomize_base_exists(self):
         """验证 Kustomize base 文件存在"""
-        base_path = Path("deployments/apps/sisys/base/kustomization.yaml")
+        base_path = Path("deploy/kubernetes/apps/sisys/base/kustomization.yaml")
         assert base_path.exists(), "Kustomize base 配置不存在"
 
     def test_environment_namespace_isolation(self):
         """验证环境命名空间隔离"""
         env_configs = [
-            ("deployments/argocd/applications/sisys-app-dev.yaml", "sisys-dev"),
-            ("deployments/argocd/applications/sisys-app-test.yaml", "sisys-test"),
-            ("deployments/argocd/applications/sisys-app-prod.yaml", "sisys-prod"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-dev.yaml", "sisys-dev"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-test.yaml", "sisys-test"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-prod.yaml", "sisys-prod"),
         ]
 
         namespaces = set()
@@ -172,9 +172,9 @@ class TestMultiEnvironmentConfig:
     def test_environment_resource_differentiation(self):
         """验证环境资源配置差异"""
         # 验证 Kustomize overlay 配置了不同的资源限制
-        dev_overlay = Path("deployments/apps/sisys/dev/kustomization.yaml")
-        test_overlay = Path("deployments/apps/sisys/test/kustomization.yaml")
-        prod_overlay = Path("deployments/apps/sisys/prod/kustomization.yaml")
+        dev_overlay = Path("deploy/kubernetes/apps/sisys/dev/kustomization.yaml")
+        test_overlay = Path("deploy/kubernetes/apps/sisys/test/kustomization.yaml")
+        prod_overlay = Path("deploy/kubernetes/apps/sisys/prod/kustomization.yaml")
 
         with open(dev_overlay) as f:
             dev_config = yaml.safe_load(f)
@@ -196,9 +196,9 @@ class TestMultiEnvironmentConfig:
     def test_environment_sync_policy_differentiation(self):
         """验证环境同步策略差异"""
         env_configs = [
-            ("deployments/argocd/applications/sisys-app-dev.yaml", True),
-            ("deployments/argocd/applications/sisys-app-test.yaml", True),
-            ("deployments/argocd/applications/sisys-app-prod.yaml", False),
+            ("deploy/kubernetes/argocd/applications/sisys-app-dev.yaml", True),
+            ("deploy/kubernetes/argocd/applications/sisys-app-test.yaml", True),
+            ("deploy/kubernetes/argocd/applications/sisys-app-prod.yaml", False),
         ]
 
         for manifest_path, should_have_automated in env_configs:

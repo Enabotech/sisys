@@ -171,7 +171,7 @@ data:
     sisys/
     ├── .gitea/
     │   └── workflows/        # Gitea Actions CI/CD 定义 (Story 0.9)
-    ├── deployments/
+    ├── deploy/kubernetes/
     │   ├── gitea/           # Story 0.5: Gitea 部署配置 ✅ 已完成
     │   ├── harbor/          # Story 0.6: Harbor 部署配置
     │   └── argocd/          # Story 0.7: ArgoCD 部署配置

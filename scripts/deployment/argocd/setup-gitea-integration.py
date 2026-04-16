@@ -133,7 +133,7 @@ def configure_argocd_repo(token):
     print("配置 ArgoCD 仓库凭据...")
 
     # 应用配置文件
-    returncode, stdout, stderr = run_kubectl(["apply", "-f", "/mnt/g/ai/sisys/deployments/argocd/gitea-credentials.yaml"])
+    returncode, stdout, stderr = run_kubectl(["apply", "-f", "/mnt/g/ai/sisys/deploy/kubernetes/argocd/gitea-credentials.yaml"])
 
     if returncode != 0:
         print(f"✗ 应用配置失败：{stderr}")

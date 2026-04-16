@@ -54,7 +54,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/apps/sisys/prod
+    path: deploy/kubernetes/apps/sisys/prod
 
   # 目标配置 - Prod 命名空间
   destination:

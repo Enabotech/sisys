@@ -8,7 +8,7 @@
 # 3. 每个环境独立的 Application
 #
 # 目录结构:
-# deployments/argocd/applications/
+# deploy/kubernetes/argocd/applications/
 # ├── sisys-app-of-apps.yaml   # 本文件
 # ├── sisys-app-dev.yaml
 # ├── sisys-app-test.yaml
@@ -33,7 +33,7 @@ spec:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
     # 包含所有环境 Application 清单的目录
-    path: deployments/argocd/applications
+    path: deploy/kubernetes/argocd/applications
 
     # 使用 Directory 递归扫描
     directory:

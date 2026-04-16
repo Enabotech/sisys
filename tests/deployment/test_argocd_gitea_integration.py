@@ -243,17 +243,17 @@ class TestArgoCDGiteaWebhook:
     @pytest.fixture(scope="class")
     def webhook_config_path(self) -> str:
         """Webhook 配置文件路径"""
-        return "deployments/argocd/gitea-webhook-configmap.yaml"
+        return "deploy/kubernetes/argocd/gitea-webhook-configmap.yaml"
 
     @pytest.fixture(scope="class")
     def webhook_script_path(self) -> str:
         """Webhook 脚本配置文件路径"""
-        return "deployments/argocd/gitea-webhook-script.yaml"
+        return "deploy/kubernetes/argocd/gitea-webhook-script.yaml"
 
     @pytest.fixture(scope="class")
     def webhook_secret_path(self) -> str:
         """Webhook Secret 配置文件路径"""
-        return "deployments/argocd/gitea-webhook-secret.yaml"
+        return "deploy/kubernetes/argocd/gitea-webhook-secret.yaml"
 
     @pytest.fixture(scope="class")
     def argocd_namespace(self) -> str:

@@ -564,10 +564,10 @@ rollup.config.cache
 # 覆盖了 Python 全栈开发、AI/ML、Docker、Kubernetes 等场景
 # 定期审查和更新以适应项目需求变化
 # =============================================================================
-deployments/gitea/config/app.ini.fixed
-deployments/gitea/config/app.ini.new
-deployments/gitea/config/app.ini.bak
-deployments/gitea/config/gitea_v.1.25+_example.app.ini
+deploy/kubernetes/gitea/config/app.ini.fixed
+deploy/kubernetes/gitea/config/app.ini.new
+deploy/kubernetes/gitea/config/app.ini.bak
+deploy/kubernetes/gitea/config/gitea_v.1.25+_example.app.ini
 # CA 私钥 - 敏感数据
-deployments/harbor/carenewal/internal-ca.key
-deployments/harbor/carenewal/ca-secret.yaml
+deploy/kubernetes/harbor/carenewal/internal-ca.key
+deploy/kubernetes/harbor/carenewal/ca-secret.yaml

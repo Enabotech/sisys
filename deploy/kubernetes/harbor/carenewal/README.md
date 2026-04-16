@@ -1,8 +1,8 @@
 # Harbor 证书自动续期配置
 
-> **创建日期**: 2026-04-07  
-> **CA 类型**: 内部自签 CA (ECDSA P-256)  
-> **CA 有效期**: 10 年 (2036-04-04)  
+> **创建日期**: 2026-04-07
+> **CA 类型**: 内部自签 CA (ECDSA P-256)
+> **CA 有效期**: 10 年 (2036-04-04)
 > **服务证书有效期**: 90 天 (自动续期)
 
 ## 目录结构
@@ -31,7 +31,7 @@ carenewal/
 
 ```bash
 # 1. 安装 cert-manager
-kubectl apply -k https://github.com/stakater/Reloader/deployments/kubernetes
+kubectl apply -k https://github.com/stakater/Reloader/deploy/kubernetes/kubernetes
 
 # 2. 创建 CA Secret
 kubectl create secret tls sisys-internal-ca \

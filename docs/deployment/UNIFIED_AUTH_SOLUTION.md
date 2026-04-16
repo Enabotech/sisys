@@ -78,11 +78,11 @@
 **认证方式:**
 | 认证类型 | 用途 | 配置位置 | 状态 |
 |---------|------|---------|------|
-| **Basic Auth** | Web 界面登录、API 访问 | `deployments/gitea/secrets.yaml` | ✅ 已配置 |
-| **SSH Key** | Git SSH 推送/拉取 | `deployments/gitea/config/app.ini` | ✅ 已启用 |
-| **Personal Access Token** | API 访问、ArgoCD 集成 | `deployments/argocd/gitea-credentials.yaml` | ✅ 已配置 |
-| **OAuth2 JWT** | 第三方应用集成 | `deployments/gitea/config/app.ini` | ✅ 已启用 |
-| **Webhook Secret** | Webhook 签名验证 | `deployments/argocd/gitea-webhook-secret.yaml` | ⚠️ 为空 |
+| **Basic Auth** | Web 界面登录、API 访问 | `deploy/kubernetes/gitea/secrets.yaml` | ✅ 已配置 |
+| **SSH Key** | Git SSH 推送/拉取 | `deploy/kubernetes/gitea/config/app.ini` | ✅ 已启用 |
+| **Personal Access Token** | API 访问、ArgoCD 集成 | `deploy/kubernetes/argocd/gitea-credentials.yaml` | ✅ 已配置 |
+| **OAuth2 JWT** | 第三方应用集成 | `deploy/kubernetes/gitea/config/app.ini` | ✅ 已启用 |
+| **Webhook Secret** | Webhook 签名验证 | `deploy/kubernetes/argocd/gitea-webhook-secret.yaml` | ⚠️ 为空 |
 | **OIDC (可选)** | SSO 单点登录 | 未配置 | ❌ 未启用 |
 
 **证书配置:**
@@ -93,7 +93,7 @@
 
 **密钥管理:**
 ```yaml
-# deployments/gitea/secrets.yaml
+# deploy/kubernetes/gitea/secrets.yaml
 - gitea-admin-secret         # 管理员账号
 - gitea-app-secret           # 应用密钥 (SECRET_KEY, INTERNAL_TOKEN, JWT_SECRET)
 - gitea-postgresql-secret    # 数据库密码
@@ -111,11 +111,11 @@
 **认证方式:**
 | 认证类型 | 用途 | 配置位置 | 状态 |
 |---------|------|---------|------|
-| **Basic Auth** | Web 界面登录、API 访问 | `deployments/harbor/secrets-example.yaml` | ✅ 已配置 |
-| **Robot Account** | 镜像推送/拉取（CI/CD） | `deployments/harbor/robot-account.yaml` | ✅ 已配置 |
+| **Basic Auth** | Web 界面登录、API 访问 | `deploy/kubernetes/harbor/secrets-example.yaml` | ✅ 已配置 |
+| **Robot Account** | 镜像推送/拉取（CI/CD） | `deploy/kubernetes/harbor/robot-account.yaml` | ✅ 已配置 |
 | **OIDC (可选)** | SSO 单点登录 | 未配置 | ❌ 未启用 |
-| **Cosign Keyless** | 镜像签名（OIDC + Fulcio） | `deployments/harbor/cosign-config.yaml` | ✅ 已配置 |
-| **Webhook Secret** | Webhook 签名验证 | `deployments/harbor/webhook-config.yaml` | ⚠️ 占位符 |
+| **Cosign Keyless** | 镜像签名（OIDC + Fulcio） | `deploy/kubernetes/harbor/cosign-config.yaml` | ✅ 已配置 |
+| **Webhook Secret** | Webhook 签名验证 | `deploy/kubernetes/harbor/webhook-config.yaml` | ⚠️ 占位符 |
 
 **证书配置:**
 | 证书类型 | 用途 | 存储位置 | 状态 |
@@ -125,7 +125,7 @@
 
 **密钥管理:**
 ```yaml
-# deployments/harbor/secrets-example.yaml
+# deploy/kubernetes/harbor/secrets-example.yaml
 - harbor-secret              # 核心密钥 (SECRET_KEY, ADMIN_PASSWORD)
 - harbor-postgres-secret     # 数据库密码
 - harbor-redis-secret        # Redis 密码
@@ -146,11 +146,11 @@
 | 认证类型 | 用途 | 配置位置 | 状态 |
 |---------|------|---------|------|
 | **Basic Auth** | Web 界面登录（admin 账号） | `argocd-initial-admin-secret` (argocd 命名空间) | ✅ 已配置 |
-| **Git 凭据** | 连接 Gitea 仓库 | `deployments/argocd/gitea-credentials.yaml` | ✅ 已配置 |
-| **Harbor 凭据** | Image Updater 拉取镜像 | `deployments/argocd/image-updater-config.yaml` | ✅ 已配置 |
-| **OIDC (可选)** | SSO 单点登录（Gitea OAuth） | `deployments/argocd/rbac.yaml` | ⚠️ 注释掉 |
+| **Git 凭据** | 连接 Gitea 仓库 | `deploy/kubernetes/argocd/gitea-credentials.yaml` | ✅ 已配置 |
+| **Harbor 凭据** | Image Updater 拉取镜像 | `deploy/kubernetes/argocd/image-updater-config.yaml` | ✅ 已配置 |
+| **OIDC (可选)** | SSO 单点登录（Gitea OAuth） | `deploy/kubernetes/argocd/rbac.yaml` | ⚠️ 注释掉 |
 | **ServiceAccount** | 内部组件认证 | K8s 自动创建 | ✅ 已配置 |
-| **Webhook Secret** | Webhook 签名验证 | `deployments/argocd/gitea-webhook-secret.yaml` | ⚠️ 为空 |
+| **Webhook Secret** | Webhook 签名验证 | `deploy/kubernetes/argocd/gitea-webhook-secret.yaml` | ⚠️ 为空 |
 
 **证书配置:**
 | 证书类型 | 用途 | 存储位置 | 状态 |
@@ -161,7 +161,7 @@
 
 **密钥管理:**
 ```yaml
-# deployments/argocd/security-hardening.yaml
+# deploy/kubernetes/argocd/security-hardening.yaml
 - argocd-secret              # ArgoCD 服务器密钥
 - argocd-gitea-credentials   # Gitea Personal Access Token
 - argocd-harbor-credentials  # Harbor Robot Account Token
@@ -309,7 +309,7 @@
 1. **启用 Gitea OIDC 身份提供商**
 
 ```yaml
-# deployments/gitea/oidc-config.yaml
+# deploy/kubernetes/gitea/oidc-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -337,7 +337,7 @@ data:
 2. **配置 Harbor 使用 Gitea OIDC**
 
 ```yaml
-# deployments/harbor/oidc-values.yaml
+# deploy/kubernetes/harbor/oidc-values.yaml
 oidc:
   enabled: true
   name: "Gitea"
@@ -354,7 +354,7 @@ oidc:
 3. **配置 ArgoCD 使用 Gitea OIDC**
 
 ```yaml
-# deployments/argocd/oidc-config.yaml
+# deploy/kubernetes/argocd/oidc-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -387,7 +387,7 @@ data:
 1. **部署 cert-manager**
 
 ```yaml
-# deployments/cert-manager/cert-manager-install.yaml
+# deploy/kubernetes/cert-manager/cert-manager-install.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -425,7 +425,7 @@ spec:
 2. **配置 Let's Encrypt ClusterIssuer**
 
 ```yaml
-# deployments/cert-manager/cluster-issuer.yaml
+# deploy/kubernetes/cert-manager/cluster-issuer.yaml
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -460,7 +460,7 @@ spec:
 3. **配置通配符证书（使用 DNS Challenge）**
 
 ```yaml
-# deployments/cert-manager/wildcard-certificate.yaml
+# deploy/kubernetes/cert-manager/wildcard-certificate.yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -485,7 +485,7 @@ spec:
 
 ```yaml
 # Gitea 使用统一证书
-# deployments/gitea/tls-secret-ref.yaml
+# deploy/kubernetes/gitea/tls-secret-ref.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -512,7 +512,7 @@ data:
 1. **部署 Sealed Secrets**
 
 ```yaml
-# deployments/sealed-secrets/sealed-secrets-install.yaml
+# deploy/kubernetes/sealed-secrets/sealed-secrets-install.yaml
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
@@ -563,7 +563,7 @@ kubectl create secret generic gitea-admin-secret \
 kubeseal --format yaml < gitea-admin-secret.yaml > gitea-admin-sealedsecret.yaml
 
 # 提交到 git
-git add deployments/gitea/gitea-admin-sealedsecret.yaml
+git add deploy/kubernetes/gitea/gitea-admin-sealedsecret.yaml
 git commit -m "Add sealed Gitea admin secret"
 
 # 应用到集群
@@ -573,7 +573,7 @@ kubectl apply -f gitea-admin-sealedsecret.yaml
 4. **部署 External Secrets Operator（可选，用于集成 Vault/AWS SM）**
 
 ```yaml
-# deployments/external-secrets/eso-install.yaml
+# deploy/kubernetes/external-secrets/eso-install.yaml
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
@@ -602,7 +602,7 @@ spec:
 5. **配置 External Secret（从 Vault 同步）**
 
 ```yaml
-# deployments/external-secrets/gitea-secret.yaml
+# deploy/kubernetes/external-secrets/gitea-secret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
@@ -655,7 +655,7 @@ openssl req -x509 -new -nodes -sha256 -days 3650 \
 2. **配置 Traefik 信任内部 CA**
 
 ```yaml
-# deployments/traefik/trust-store.yaml
+# deploy/kubernetes/traefik/trust-store.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -691,7 +691,7 @@ spec:
 3. **配置 Docker 信任 Harbor 证书**
 
 ```yaml
-# deployments/harbor/docker-daemon-config.yaml
+# deploy/kubernetes/harbor/docker-daemon-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -721,7 +721,7 @@ data:
 4. **配置组件间 mTLS（可选，高安全场景）**
 
 ```yaml
-# deployments/service-mesh/mtls-policy.yaml
+# deploy/kubernetes/service-mesh/mtls-policy.yaml
 # 使用 Linkerd 或 Istio 实现服务间 mTLS
 apiVersion: linkerd.io/v1alpha1
 kind: ServerAuthorization
@@ -805,7 +805,7 @@ spec:
 #### 2.4.1 密码策略统一
 
 ```yaml
-# deployments/security/unified-password-policy.yaml
+# deploy/kubernetes/security/unified-password-policy.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -828,7 +828,7 @@ data:
 #### 2.4.2 Token 生命周期管理
 
 ```yaml
-# deployments/security/token-lifecycle-policy.yaml
+# deploy/kubernetes/security/token-lifecycle-policy.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -848,7 +848,7 @@ data:
 #### 2.4.3 Webhook 签名验证
 
 ```yaml
-# deployments/security/webhook-security.yaml
+# deploy/kubernetes/security/webhook-security.yaml
 # Gitea Webhook Secret
 apiVersion: v1
 kind: Secret
@@ -1047,7 +1047,7 @@ sudo systemctl restart docker
 
 ```bash
 # 部署 cert-manager
-kubectl apply -f deployments/cert-manager/cert-manager-install.yaml
+kubectl apply -f deploy/kubernetes/cert-manager/cert-manager-install.yaml
 
 # 验证部署
 kubectl get pods -n cert-manager
@@ -1057,7 +1057,7 @@ kubectl get pods -n cert-manager
 
 ```bash
 # 部署 Sealed Secrets
-kubectl apply -f deployments/sealed-secrets/sealed-secrets-install.yaml
+kubectl apply -f deploy/kubernetes/sealed-secrets/sealed-secrets-install.yaml
 
 # 验证部署
 kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
@@ -1070,7 +1070,7 @@ kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
 ### 5.1 认证监控指标
 
 ```yaml
-# deployments/monitoring/auth-metrics.yaml
+# deploy/kubernetes/monitoring/auth-metrics.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1115,7 +1115,7 @@ data:
 ### 5.2 审计日志配置
 
 ```yaml
-# deployments/audit/unified-audit-log.yaml
+# deploy/kubernetes/audit/unified-audit-log.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1303,7 +1303,7 @@ data:
 ### 7.2 密钥分级分类管理
 
 ```yaml
-# deployments/security/secret-classification.yaml
+# deploy/kubernetes/security/secret-classification.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1439,7 +1439,7 @@ data:
 ### 7.3 密码学算法敏捷性设计
 
 ```yaml
-# deployments/security/crypto-agility.yaml
+# deploy/kubernetes/security/crypto-agility.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1552,7 +1552,7 @@ data:
 #### 8.1.1 Story 0.10: cert-manager 迁移
 
 ```yaml
-# deployments/cert-manager/migration-plan.yaml
+# deploy/kubernetes/cert-manager/migration-plan.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1569,7 +1569,7 @@ data:
         - step: 1
           action: "部署 cert-manager"
           command: |
-            kubectl apply -f deployments/cert-manager/cert-manager-install.yaml
+            kubectl apply -f deploy/kubernetes/cert-manager/cert-manager-install.yaml
           verification: |
             kubectl get pods -n cert-manager
             # 期望：所有 Pod Running
@@ -1577,7 +1577,7 @@ data:
         - step: 2
           action: "配置 ClusterIssuer"
           command: |
-            kubectl apply -f deployments/cert-manager/cluster-issuer.yaml
+            kubectl apply -f deploy/kubernetes/cert-manager/cluster-issuer.yaml
           verification: |
             kubectl get clusterissuer letsencrypt-prod
             # 期望：Ready=True
@@ -1585,7 +1585,7 @@ data:
         - step: 3
           action: "申请测试证书"
           command: |
-            kubectl apply -f deployments/cert-manager/test-certificate.yaml
+            kubectl apply -f deploy/kubernetes/cert-manager/test-certificate.yaml
           verification: |
             kubectl get certificate test-cert -o jsonpath='{.status.conditions[0]}'
             # 期望：Ready=True
@@ -1605,7 +1605,7 @@ data:
           action: "流量切换到新证书 20%"
           command: |
             # 修改 Ingress 配置，20% 流量使用新证书
-            kubectl apply -f deployments/apps/ingress-canary.yaml
+            kubectl apply -f deploy/kubernetes/apps/ingress-canary.yaml
           verification: |
             # 监控新证书使用情况
             kubectl get certificate | grep new
@@ -1613,7 +1613,7 @@ data:
         - step: 2
           action: "流量切换到新证书 50%"
           command: |
-            kubectl apply -f deployments/apps/ingress-50.yaml
+            kubectl apply -f deploy/kubernetes/apps/ingress-50.yaml
           verification: |
             # 监控错误率，确保无 TLS 错误
             kubectl logs -l app=traefik | grep -i "tls error"
@@ -1622,7 +1622,7 @@ data:
         - step: 3
           action: "流量切换到新证书 100%"
           command: |
-            kubectl apply -f deployments/apps/ingress-full.yaml
+            kubectl apply -f deploy/kubernetes/apps/ingress-full.yaml
           verification: |
             # 验证所有服务使用新证书
             curl -v https://gitea.sisys.local 2>&1 | grep "SSL certificate verify ok"
@@ -1669,7 +1669,7 @@ data:
         - step: 1
           action: "DNS 切回旧证书"
           command: |
-            kubectl apply -f deployments/apps/ingress-rollback.yaml
+            kubectl apply -f deploy/kubernetes/apps/ingress-rollback.yaml
           rto: "30min"
 
         - step: 2
@@ -1684,7 +1684,7 @@ data:
 #### 8.1.2 Story 0.12: Gitea OIDC 迁移
 
 ```yaml
-# deployments/gitea/oidc-migration-plan.yaml
+# deploy/kubernetes/gitea/oidc-migration-plan.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1701,7 +1701,7 @@ data:
         - step: 1
           action: "启用 Gitea OIDC 身份提供商"
           command: |
-            kubectl apply -f deployments/gitea/oidc-config.yaml
+            kubectl apply -f deploy/kubernetes/gitea/oidc-config.yaml
           verification: |
             # 验证 OIDC Endpoint 可访问
             curl -k https://gitea.sisys.local/.well-known/openid-configuration
@@ -1748,7 +1748,7 @@ data:
           action: "Harbor 配置双认证（Local + OIDC）"
           command: |
             # Harbor 同时支持本地认证和 OIDC
-            kubectl apply -f deployments/harbor/dual-auth-config.yaml
+            kubectl apply -f deploy/kubernetes/harbor/dual-auth-config.yaml
           verification: |
             # 测试本地登录
             curl -X POST https://harbor.sisys.local/api/v2.0/users/login \
@@ -1780,7 +1780,7 @@ data:
         - step: 2
           action: "禁用本地认证"
           command: |
-            kubectl apply -f deployments/gitea/oidc-only-config.yaml
+            kubectl apply -f deploy/kubernetes/gitea/oidc-only-config.yaml
           verification: |
             # 验证本地登录被拒绝
             curl -X POST https://gitea.sisys.local/api/v1/users/login \
@@ -1810,7 +1810,7 @@ data:
         - step: 1
           action: "降级到本地认证"
           command: |
-            kubectl apply -f deployments/gitea/local-auth-config.yaml
+            kubectl apply -f deploy/kubernetes/gitea/local-auth-config.yaml
           rto: "15min"
 
         - step: 2
@@ -1827,7 +1827,7 @@ data:
 #### 8.1.3 Story 0.11: Sealed Secrets 迁移
 
 ```yaml
-# deployments/sealed-secrets/migration-plan.yaml
+# deploy/kubernetes/sealed-secrets/migration-plan.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1844,7 +1844,7 @@ data:
         - step: 1
           action: "部署 Sealed Secrets Controller"
           command: |
-            kubectl apply -f deployments/sealed-secrets/sealed-secrets-install.yaml
+            kubectl apply -f deploy/kubernetes/sealed-secrets/sealed-secrets-install.yaml
           verification: |
             kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
             # 期望：1/1 Running
@@ -1966,7 +1966,7 @@ data:
           action: "恢复明文 Secret"
           command: |
             # 从 Git 恢复明文 Secret
-            kubectl apply -f deployments/secrets-backup/
+            kubectl apply -f deploy/kubernetes/secrets-backup/
           rto: "30min"
 
         - step: 3
@@ -1977,7 +1977,7 @@ data:
 ### 8.2 回滚方案（详细版）
 
 ```yaml
-# deployments/disaster-recovery/rollback-playbook.yaml
+# deploy/kubernetes/disaster-recovery/rollback-playbook.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2014,7 +2014,7 @@ data:
           action: "DNS 切回旧证书"
           command: |
             # 切换 Ingress 配置使用旧证书
-            kubectl apply -f deployments/apps/ingress-rollback.yaml
+            kubectl apply -f deploy/kubernetes/apps/ingress-rollback.yaml
           owner: "DevOps Engineer"
           timeout: "15min"
           verification: |
@@ -2056,9 +2056,9 @@ data:
           action: "降级到本地认证"
           command: |
             # Harbor 切换回本地认证
-            kubectl apply -f deployments/harbor/local-auth-config.yaml
+            kubectl apply -f deploy/kubernetes/harbor/local-auth-config.yaml
             # ArgoCD 切换回本地认证
-            kubectl apply -f deployments/argocd/local-auth-config.yaml
+            kubectl apply -f deploy/kubernetes/argocd/local-auth-config.yaml
           owner: "DevOps Engineer"
           timeout: "10min"
           verification: |
@@ -2229,7 +2229,7 @@ data:
 基于评估报告建议，增加完整的运维手册清单：
 
 ```yaml
-# deployments/runbook/runbook-index.yaml
+# deploy/kubernetes/runbook/runbook-index.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2463,7 +2463,7 @@ data:
 ### 9.2 监控指标（详细版）
 
 ```yaml
-# deployments/monitoring/unified-auth-metrics.yaml
+# deploy/kubernetes/monitoring/unified-auth-metrics.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -2765,13 +2765,13 @@ data:
 
 ### A. 配置文件模板
 
-- [Sealed Secret 模板](deployments/sealed-secrets/templates/sealedsecret-template.yaml)
-- [External Secret 模板](deployments/external-secrets/templates/externalsecret-template.yaml)
-- [Certificate 模板](deployments/cert-manager/templates/certificate-template.yaml)
-- [OIDC 配置模板](deployments/gitea/templates/oidc-config-template.yaml)
-- [密钥分级模板](deployments/security/templates/secret-classification-template.yaml)
-- [迁移计划模板](deployments/migration/templates/migration-plan-template.yaml)
-- [回滚方案模板](deployments/disaster-recovery/templates/rollback-plan-template.yaml)
+- [Sealed Secret 模板](deploy/kubernetes/sealed-secrets/templates/sealedsecret-template.yaml)
+- [External Secret 模板](deploy/kubernetes/external-secrets/templates/externalsecret-template.yaml)
+- [Certificate 模板](deploy/kubernetes/cert-manager/templates/certificate-template.yaml)
+- [OIDC 配置模板](deploy/kubernetes/gitea/templates/oidc-config-template.yaml)
+- [密钥分级模板](deploy/kubernetes/security/templates/secret-classification-template.yaml)
+- [迁移计划模板](deploy/kubernetes/migration/templates/migration-plan-template.yaml)
+- [回滚方案模板](deploy/kubernetes/disaster-recovery/templates/rollback-plan-template.yaml)
 
 ### B. 命令速查表
 
@@ -2798,7 +2798,7 @@ kubectl annotate certificate my-cert cert-manager.io/renewal-time=$(date -d "+20
 kubectl logs -l app=gitea | grep -E "(login|auth)" | jq '.status'
 
 # 应急响应：降级到本地认证
-kubectl apply -f deployments/gitea/local-auth-config.yaml
+kubectl apply -f deploy/kubernetes/gitea/local-auth-config.yaml
 ```
 
 ### C. 参考文档
@@ -2866,10 +2866,10 @@ kubectl apply -f deployments/gitea/local-auth-config.yaml
 
 ### A. 配置文件模板
 
-- [Sealed Secret 模板](deployments/sealed-secrets/templates/sealedsecret-template.yaml)
-- [External Secret 模板](deployments/external-secrets/templates/externalsecret-template.yaml)
-- [Certificate 模板](deployments/cert-manager/templates/certificate-template.yaml)
-- [OIDC 配置模板](deployments/gitea/templates/oidc-config-template.yaml)
+- [Sealed Secret 模板](deploy/kubernetes/sealed-secrets/templates/sealedsecret-template.yaml)
+- [External Secret 模板](deploy/kubernetes/external-secrets/templates/externalsecret-template.yaml)
+- [Certificate 模板](deploy/kubernetes/cert-manager/templates/certificate-template.yaml)
+- [OIDC 配置模板](deploy/kubernetes/gitea/templates/oidc-config-template.yaml)
 
 ### B. 命令速查表
 
