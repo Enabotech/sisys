@@ -122,8 +122,8 @@ harbor.sisys.local/sisys/dependency:abc123
 | | 依赖镜像 | ✅ | `.gitea/workflows/build-dependency-image.yml` |
 | **Docker** | Layer 2 Dockerfile | ✅ | `docker/dockerfile.l2` |
 | | Layer 3 Dockerfile | ✅ | `docker/dockerfile.app` |
-| **K8s** | Deployment | ✅ | `deployments/k8s/deployment.yaml` |
-| | Service | ✅ | `deployments/k8s/service.yaml` |
+| **K8s** | Deployment | ✅ | `deploy/kubernetes/k8s/deployment.yaml` |
+| | Service | ✅ | `deploy/kubernetes/k8s/service.yaml` |
 
 ### 2.2 待配置 (❌)
 

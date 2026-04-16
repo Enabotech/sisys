@@ -14,4 +14,3 @@ env:
     value: "1300MiB"
   - name: GOGC
     value: "75"
-

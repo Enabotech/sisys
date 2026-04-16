@@ -114,7 +114,7 @@ kubectl logs -n gitea-actions gitea-org-runner-0 -f --tail=100
 
 **方式 2: Fluentd（推荐生产环境）**
 ```yaml
-# deployments/gitea-runner/fluentd-config.yaml
+# deploy/kubernetes/gitea-runner/fluentd-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -142,7 +142,7 @@ data:
 
 **方式 3: Loki（轻量级）**
 ```yaml
-# deployments/gitea-runner/loki-config.yaml
+# deploy/kubernetes/gitea-runner/loki-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -188,7 +188,7 @@ data:
 ### Prometheus 配置（可选）
 
 ```yaml
-# deployments/gitea-runner/servicemonitor.yaml
+# deploy/kubernetes/gitea-runner/servicemonitor.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -213,7 +213,7 @@ spec:
 ### 告警规则（可选）
 
 ```yaml
-# deployments/gitea-runner/alerting-rules.yaml
+# deploy/kubernetes/gitea-runner/alerting-rules.yaml
 groups:
 - name: gitea-runner-alerts
   rules:
@@ -385,7 +385,7 @@ curl -X POST https://webhook.site/your-unique-id
 
 ## 📚 参考文档
 
-- [Source: deployments/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
+- [Source: deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
 - [Source: https://docs.gitea.com/usage/actions/runner] - Gitea Runner 官方文档
 - [Source: https://prometheus.io/docs/prometheus/latest/configuration/configuration/] - Prometheus 配置文档
 - [Source: https://grafana.com/docs/grafana/latest/datasources/prometheus/] - Grafana Prometheus 数据源

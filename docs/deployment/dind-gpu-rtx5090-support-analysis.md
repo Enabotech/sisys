@@ -575,9 +575,9 @@ print(f'4096x4096 Matrix Multiplication: {time.time()-start:.4f}s')
 | 资源 | 路径/链接 | 说明 |
 |------|----------|------|
 | WSL2 DinD GPU 直通实施方案 | `docs/deployment/wsl2-dind-gpu-passthrough-implementation-plan.md` | 详细实施方案（v5.1） |
-| Gitea AdvActs 完整配置 | `deployments/gitea-runner/gitea-advacts-complete.yaml` | 当前 DinD 配置 |
+| Gitea AdvActs 完整配置 | `deploy/kubernetes/gitea-runner/gitea-advacts-complete.yaml` | 当前 DinD 配置 |
 | Gitea Runner 配置 Story | `_bmad-output/implementation-artifacts/stories/0-8-gitea-runner-configuration.md` | Runner 配置文档 |
-| K8s GPU 调度参考 | `deployments/k8s/deployment.yaml` | K8s GPU 资源声明示例 |
+| K8s GPU 调度参考 | `deploy/kubernetes/k8s/deployment.yaml` | K8s GPU 资源声明示例 |
 
 ---
 
@@ -668,7 +668,7 @@ kubectl exec -n gitea-advacts gitea-runner-dind-0 -c docker-dind -- mount | grep
 # 预期: 无 WSL GPU 相关挂载
 
 # ========== 部署/回滚 ==========
-kubectl apply -f deployments/gitea-runner/gitea-advacts-complete.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/gitea-advacts-complete.yaml
 kubectl rollout restart statefulset gitea-runner-dind -n gitea-advacts
 kubectl wait --for=condition=Ready pod -l app=gitea-runner-dind -n gitea-advacts --timeout=300s
 

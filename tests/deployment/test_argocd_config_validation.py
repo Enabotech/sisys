@@ -19,7 +19,7 @@ class TestGiteaCredentialsConfig:
     @pytest.fixture
     def gitea_credentials(self) -> dict[str, Any]:
         """加载 Gitea 凭据配置"""
-        config_path = Path(__file__).parent.parent.parent / "deployments/argocd/gitea-credentials.yaml"
+        config_path = Path(__file__).parent.parent.parent / "deploy/kubernetes/argocd/gitea-credentials.yaml"
         with open(config_path, encoding="utf-8") as f:
             # 处理多文档 YAML
             docs = list(yaml.safe_load_all(f))
@@ -68,7 +68,7 @@ class TestAdminSecretConfig:
     @pytest.fixture
     def admin_secret(self) -> dict[str, Any]:
         """加载 Admin Secret 配置"""
-        config_path = Path(__file__).parent.parent.parent / "deployments/argocd/rbac.yaml"
+        config_path = Path(__file__).parent.parent.parent / "deploy/kubernetes/argocd/rbac.yaml"
         with open(config_path, encoding="utf-8") as f:
             docs = list(yaml.safe_load_all(f))
             for doc in docs:
@@ -107,7 +107,7 @@ class TestSecurityHardeningConfig:
     @pytest.fixture
     def security_hardening(self) -> list[Any]:
         """加载安全加固配置"""
-        config_path = Path(__file__).parent.parent.parent / "deployments/argocd/security-hardening.yaml"
+        config_path = Path(__file__).parent.parent.parent / "deploy/kubernetes/argocd/security-hardening.yaml"
         with open(config_path, encoding="utf-8") as f:
             docs = list(yaml.safe_load_all(f))
             return list(docs)
@@ -149,7 +149,7 @@ class TestYamlSyntax:
     @pytest.fixture
     def yaml_files(self) -> list:
         """获取所有 YAML 文件"""
-        base_path = Path(__file__).parent.parent.parent / "deployments/argocd"
+        base_path = Path(__file__).parent.parent.parent / "deploy/kubernetes/argocd"
         return list(base_path.glob("**/*.yaml"))
 
     def test_all_yaml_files_valid_syntax(self, yaml_files):
@@ -170,7 +170,7 @@ class TestConfigurationCompleteness:
 
     def test_required_files_exist(self):
         """验证必需文件存在（MEDIUM-1 修复验证）"""
-        base_path = Path(__file__).parent.parent.parent / "deployments/argocd"
+        base_path = Path(__file__).parent.parent.parent / "deploy/kubernetes/argocd"
         required_files = [
             "namespace.yaml",
             "rbac.yaml",

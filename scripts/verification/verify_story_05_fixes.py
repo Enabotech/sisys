@@ -43,15 +43,15 @@ def check_middleware_config() -> bool:
     success = True
 
     # 检查 middleware.yaml 是否存在
-    if not check_file_exists("deployments/gitea/middleware.yaml", "Middleware 配置"):
+    if not check_file_exists("deploy/kubernetes/gitea/middleware.yaml", "Middleware 配置"):
         return False
 
     # 检查 YAML 语法
-    if not check_yaml_syntax("deployments/gitea/middleware.yaml", "Middleware"):
+    if not check_yaml_syntax("deploy/kubernetes/gitea/middleware.yaml", "Middleware"):
         return False
 
     # 检查内容
-    with open("deployments/gitea/middleware.yaml", encoding="utf-8") as f:
+    with open("deploy/kubernetes/gitea/middleware.yaml", encoding="utf-8") as f:
         content = f.read()
 
     checks = [
@@ -68,7 +68,7 @@ def check_middleware_config() -> bool:
             success = False
 
     # 检查 ingress.yaml 引用 Middleware
-    with open("deployments/gitea/ingress.yaml", encoding="utf-8") as f:
+    with open("deploy/kubernetes/gitea/ingress.yaml", encoding="utf-8") as f:
         ingress_content = f.read()
 
     if "traefik.ingress.kubernetes.io/router.middlewares: gitea-secure-headers@gitea" in ingress_content:
@@ -84,7 +84,7 @@ def check_tls_config() -> bool:
     """验证 M2: TLS 证书配置说明"""
     print("\n=== 验证 M2: TLS 证书配置说明 ===")
 
-    with open("deployments/gitea/ingress.yaml", encoding="utf-8") as f:
+    with open("deploy/kubernetes/gitea/ingress.yaml", encoding="utf-8") as f:
         content = f.read()
 
     checks = [
@@ -113,14 +113,14 @@ def check_secrets_config() -> bool:
     success = True
 
     # 检查 secrets.yaml
-    if not check_file_exists("deployments/gitea/secrets.yaml", "Secrets 模板"):
+    if not check_file_exists("deploy/kubernetes/gitea/secrets.yaml", "Secrets 模板"):
         success = False
 
-    if not check_file_exists("deployments/gitea/secrets-example.yaml", "Secrets 示例"):
+    if not check_file_exists("deploy/kubernetes/gitea/secrets-example.yaml", "Secrets 示例"):
         success = False
 
     # 检查 secrets.yaml 使用环境变量占位符
-    with open("deployments/gitea/secrets.yaml", encoding="utf-8") as f:
+    with open("deploy/kubernetes/gitea/secrets.yaml", encoding="utf-8") as f:
         secrets_content = f.read()
 
     if "${GITEA_ADMIN_PASSWORD}" in secrets_content:
@@ -130,7 +130,7 @@ def check_secrets_config() -> bool:
         success = False
 
     # 检查 secrets-example.yaml 有警告说明
-    with open("deployments/gitea/secrets-example.yaml", encoding="utf-8") as f:
+    with open("deploy/kubernetes/gitea/secrets-example.yaml", encoding="utf-8") as f:
         example_content = f.read()
 
     checks = [

@@ -265,7 +265,7 @@ class TestTokenIntegration:
     def test_kubectl_apply_secret(self):
         """测试 kubectl 应用 Secret。"""
         # 模拟 kubectl 命令
-        kubectl_cmd = "kubectl apply -f deployments/gitea-runner/gitea-runner-token-secret.yaml"
+        kubectl_cmd = "kubectl apply -f deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml"
 
         # 验证命令格式
         assert kubectl_cmd.startswith("kubectl apply -f")

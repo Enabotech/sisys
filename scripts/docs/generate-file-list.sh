@@ -116,7 +116,7 @@ get_operation_type() {
 
 # 生成 Harbor 文件清单
 generate_harbor_file_list() {
-    local harbor_dir="$PROJECT_ROOT/deployments/harbor"
+    local harbor_dir="$PROJECT_ROOT/deploy/kubernetes/harbor"
     local scripts_dir="$PROJECT_ROOT/scripts"
     local tests_dir="$PROJECT_ROOT/tests/deployment"
     local docs_dir="$PROJECT_ROOT/docs/deployment"
@@ -130,12 +130,12 @@ generate_harbor_file_list() {
     echo "| 文件路径 | 操作类型 | 说明 | 行数 |"
     echo "|---------|---------|------|------|"
 
-    # 扫描 deployments/harbor 目录
+    # 扫描 deploy/kubernetes/harbor 目录
     if [[ -d "$harbor_dir" ]]; then
         for file in "$harbor_dir"/*.yaml; do
             if [[ -f "$file" ]]; then
                 local filename=$(basename "$file")
-                local relpath="deployments/harbor/$filename"
+                local relpath="deploy/kubernetes/harbor/$filename"
                 local lines=$(wc -l < "$file")
                 local desc=$(get_file_description "$file")
                 local op=$(get_operation_type "$file")

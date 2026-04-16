@@ -166,8 +166,8 @@ kubectl run gpu-test --rm -ti --image=nvidia/cuda:12.8.0-base-ubuntu22.04 --rest
 | `.gitea/workflows/build-dependency-image.yml` | ✅ | 依赖镜像构建 |
 | `docker/dockerfile.l2` | ✅ | Layer 2 依赖镜像 |
 | `docker/dockerfile.app` | ✅ | Layer 3 应用镜像 |
-| `deployments/k8s/deployment.yaml` | ✅ | K8s 部署配置 (含 GPU) |
-| `deployments/k8s/service.yaml` | ✅ | K8s 服务配置 |
+| `deploy/kubernetes/k8s/deployment.yaml` | ✅ | K8s 部署配置 (含 GPU) |
+| `deploy/kubernetes/k8s/service.yaml` | ✅ | K8s 服务配置 |
 
 ### 4.2 ArgoCD 配置 (已存在)
 

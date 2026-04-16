@@ -74,7 +74,7 @@ Change Log:
   - **TDD 执行结果**: 5/5 测试通过 (100%)
   - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-22: Task 6 - Harbor 集成配置完成 ✅
-  - 创建 Secret 配置：`deployments/gitea-runner/harbor-robot-secret.yaml`
+  - 创建 Secret 配置：`deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml`
   - 创建测试文件：`tests/deployment/test_gitea_harbor_integration.py` (15 个测试用例)
   - 创建部署脚本：`scripts/deployment/gitea-runner/deploy-harbor-secret.sh`
   - 创建验证脚本：`scripts/deployment/gitea-runner/validate-harbor-secret.sh`
@@ -90,27 +90,27 @@ Change Log:
   - **Pipeline 功能**: 代码质量、单元测试、集成测试、安全扫描、镜像构建、Harbor 推送、ArgoCD 部署
   - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-20: Task 3 - Docker Executor 配置完成 ✅
-  - 创建配置文件：`deployments/gitea-runner/runner-docker-executor.yaml`
+  - 创建配置文件：`deploy/kubernetes/gitea-runner/runner-docker-executor.yaml`
   - 创建测试文件：`tests/deployment/test_docker_executor.py` (25/25 通过)
   - 创建部署脚本：`scripts/deployment/gitea-runner/configure-docker-executor.sh`
-  - 创建 Harbor Secret: `deployments/gitea-runner/runner-docker-executor.yaml` (harbor-robot-account)     # pragma: allowlist secret
+  - 创建 Harbor Secret: `deploy/kubernetes/gitea-runner/runner-docker-executor.yaml` (harbor-robot-account)     # pragma: allowlist secret
   - **Docker Executor 配置完成**: DIND 模式、镜像缓存、Harbor 集成、构建加速
   - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-20: Task 4 - K8s Executor 配置完成 ✅
-  - 创建配置文件：`deployments/gitea-runner/runner-k8s-executor.yaml`
+  - 创建配置文件：`deploy/kubernetes/gitea-runner/runner-k8s-executor.yaml`
   - 创建测试文件：`tests/deployment/test_k8s_executor.py` (23/23 通过)
   - **K8s Executor 配置完成**: RBAC 权限、Pod 模板、并发限制、资源配额、网络策略
   - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-20: Task 1 - Gitea Runner Token 配置完成 ✅
   - 创建测试文件：`tests/deployment/test_gitea_runner_token.py` (18/18 通过)
-  - 创建 Secret 配置：`deployments/gitea-runner/gitea-runner-token-secret.yaml`
+  - 创建 Secret 配置：`deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml`
   - 创建配置文档：`docs/deployment/GITEA_RUNNER_TOKEN_CONFIG.md`
   - 创建配置脚本：`scripts/deployment/gitea-runner/configure-token.sh`
   - **Token 已实际配置**: Kubernetes Secret `gitea-runner-token` 已创建并验证
   - 实施者：Qwen Code (AI 高级开发者)
 - 2026-03-20: Task 2 - Gitea Runner 部署完成 ✅
-  - 创建 Helm Chart: `deployments/gitea-runner/Chart.yaml, values.yaml`
-  - 创建 kubectl 部署：`deployments/gitea-runner/gitea-runner.yaml`
+  - 创建 Helm Chart: `deploy/kubernetes/gitea-runner/Chart.yaml, values.yaml`
+  - 创建 kubectl 部署：`deploy/kubernetes/gitea-runner/gitea-runner.yaml`
   - 创建部署脚本：`scripts/deployment/gitea-runner/deploy-runner.sh`
   - 创建测试文件：`tests/deployment/test_gitea_runner_deployment.py` (21/21 通过)
   - 实施者：Qwen Code (AI 高级开发者)
@@ -189,10 +189,10 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
     - **配置脚本**: `scripts/deployment/gitea-runner/configure-token.sh`
     - **Token 状态**: ✅ 已创建并存储到 Kubernetes Secret
   - [x] 存储 Token 到 Kubernetes Secret（`gitea-runner-token`）✅
-    - **Secret 文件**: `deployments/gitea-runner/gitea-runner-token-secret.yaml`
+    - **Secret 文件**: `deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml`
     - **命名空间**: `gitea-actions`
     - **Secret 名称**: `gitea-runner-token`
-    - **应用命令**: `kubectl apply -f deployments/gitea-runner/gitea-runner-token-secret.yaml`
+    - **应用命令**: `kubectl apply -f deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml`
     - **验证**: ✅ Secret 已创建 (`kubectl get secret gitea-runner-token -n gitea-actions`)
   - [x] 配置 Token 过期策略（建议 90 天轮换）✅
     - **轮换周期**: 90 天
@@ -205,20 +205,20 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 
 - [x] Task 2: Gitea Runner 部署 (AC: 1, 4) ✅ **完成 (2026-03-20)**
   - [x] 方案 A：Helm Chart 部署（推荐）✅
-    - [x] Chart 配置：`deployments/gitea-runner/Chart.yaml` ✅
+    - [x] Chart 配置：`deploy/kubernetes/gitea-runner/Chart.yaml` ✅
     - [x] values.yaml 配置（副本数=3、资源限制、镜像 v0.3.0）✅
     - [x] Secret 引用配置（复用 Task 1 的 gitea-runner-token）✅
   - [x] 方案 B：kubectl 部署 ✅
-    - [x] Deployment YAML: `deployments/gitea-runner/gitea-runner-deployment.yaml` ✅
+    - [x] Deployment YAML: `deploy/kubernetes/gitea-runner/gitea-runner-deployment.yaml` ✅
     - [x] 环境变量配置（GITEA_INSTANCE_URL, GITEA_TOKEN from Secret）✅
     - [x] 部署脚本：`scripts/deployment/gitea-runner/deploy-runner.sh` ✅
   - [x] **问题修复：Runner 重复注册问题** ✅ **已部署 (2026-03-20 10:47)**
     - [x] 使用 StatefulSet 替代 Deployment ✅
-      - **文件**: `deployments/gitea-runner/gitea-actions-complete.yaml`
+      - **文件**: `deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml`
       - **说明**: StatefulSet 为每个 Pod 分配独立 PVC，重启后注册信息不丢失
       - **部署状态**: ✅ 已部署，3/3 Pod 运行中
     - [x] 配置 PVC 持久化存储 ✅
-      - **文件**: `deployments/gitea-runner/gitea-runner-pvc.yaml`
+      - **文件**: `deploy/kubernetes/gitea-runner/gitea-runner-pvc.yaml`
       - **PVC**: runner-data-gitea-runner-0, runner-data-gitea-runner-1, runner-data-gitea-runner-2 (自动创建)
       - **存储**: 1Gi per PVC, local-path StorageClass
       - **绑定状态**: ✅ 全部 Bound
@@ -239,7 +239,7 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 - [x] Task 3: Docker Executor 配置 (AC: 2, 5) ✅ **完成 (2026-03-20)**
   - [x] 配置 Docker in Docker (dind) 模式 ✅
     - **实施日期**: 2026-03-20
-    - **配置文件**: `deployments/gitea-runner/runner-docker-executor.yaml`
+    - **配置文件**: `deploy/kubernetes/gitea-runner/runner-docker-executor.yaml`
     - **DIND 模式**: 使用 K3s containerd socket (无需独立 Docker daemon)
   - [x] 预拉取常用镜像（`ubuntu-latest`, `node-latest`, `python-latest`）✅
     - **预拉取配置**: ConfigMap `gitea-runner-docker-config`
@@ -259,7 +259,7 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
 
 - [x] Task 4: K8s Executor 配置 (AC: 3, 6) ✅ **完成 (2026-03-20)**
   - [x] 配置 K8s API 访问权限（ServiceAccount + RBAC）✅
-    - **配置文件**: `deployments/gitea-runner/runner-k8s-executor.yaml`
+    - **配置文件**: `deploy/kubernetes/gitea-runner/runner-k8s-executor.yaml`
     - **ServiceAccount**: `gitea-runner` (已配置)
     - **ClusterRole**: Pod 管理、ConfigMap/Secret 读取
   - [x] 创建 K8s Executor 配置（`config.yaml`）✅
@@ -308,10 +308,10 @@ so that **实现 CI/CD Pipeline 自动化执行，代码推送后自动触发构
     - **Secret 名称**: `harbor-robot-account`
     - **认证方式**: Kubernetes Secret (kubernetes.io/dockerconfigjson)
   - [x] 配置 Docker Registry 凭据（Kubernetes Secret）✅
-    - **配置文件**: `deployments/gitea-runner/harbor-robot-secret.yaml`
+    - **配置文件**: `deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml`
     - **Secret 类型**: kubernetes.io/dockerconfigjson
     - **命名空间**: `gitea-actions`
-    - **应用命令**: `kubectl apply -f deployments/gitea-runner/harbor-robot-secret.yaml`
+    - **应用命令**: `kubectl apply -f deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml`
   - [x] 测试 `docker login` 到 Harbor ✅
     - **验证脚本**: `scripts/deployment/gitea-runner/validate-harbor-secret.sh`
     - **测试内容**: Secret 格式验证、Docker 登录测试
@@ -770,7 +770,7 @@ kubectl exec -n gitea-actions <runner-pod-name> -- \
 
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   └── gitea-runner/
 │       ├── values.yaml                    # Helm Chart 配置
 │       ├── runner-docker-executor.yaml    # Docker 执行器配置
@@ -803,7 +803,7 @@ sisys/
 
 | 目录 | 用途 | 现有内容 | 新增内容 |
 |------|------|---------|---------|
-| `deployments/` | K8s/Helm 部署配置 | gitea/, harbor/, argocd/, apps/, test-app/ | gitea-runner/ |
+| `deploy/kubernetes/` | K8s/Helm 部署配置 | gitea/, harbor/, argocd/, apps/, test-app/ | gitea-runner/ |
 | `scripts/deployment/` | 部署脚本 | argocd/ (12 个), harbor/ (5 个), k3s/ (10 个) | gitea-runner/ |
 | `tests/deployment/` | 部署测试 | test_argocd_*.py, test_harbor_*.py | test_gitea_runner_*.py |
 | `.gitea/workflows/` | CI/CD Pipeline | (待创建) | ci.yaml, cd.yaml |
@@ -825,7 +825,7 @@ scripts/
 **命名规范：**
 - 测试文件：`test_gitea_runner_*.py`（与 `test_argocd_*.py`, `test_harbor_*.py` 保持一致）
 - 脚本目录：`scripts/deployment/gitea-runner/`（与 `scripts/deployment/argocd/` 保持一致）
-- 部署配置：`deployments/gitea-runner/`（与 `deployments/harbor/`, `deployments/argocd/` 保持一致）
+- 部署配置：`deploy/kubernetes/gitea-runner/`（与 `deploy/kubernetes/harbor/`, `deploy/kubernetes/argocd/` 保持一致）
 
 ### 与 Story 0.7 ArgoCD 的协同
 
@@ -914,7 +914,7 @@ kubectl rollout status deployment/gitea-runner -n gitea-actions
 helm uninstall gitea-runner -n gitea-actions
 
 # 或删除 kubectl 资源
-kubectl delete -f deployments/gitea-runner/ -n gitea-actions
+kubectl delete -f deploy/kubernetes/gitea-runner/ -n gitea-actions
 
 # 2. 清理命名空间
 kubectl delete namespace gitea-actions
@@ -967,16 +967,16 @@ kubectl delete namespace gitea-actions
 - ✅ Task 1: Gitea Runner Token 配置完成 (2026-03-20)
   - 测试文件：`tests/deployment/test_gitea_runner_token.py` (18/18 通过)
 - ✅ Task 2: Gitea Runner 部署完成 (2026-03-20)
-  - Helm Chart: `deployments/gitea-runner/Chart.yaml, values.yaml`
-  - kubectl 部署：`deployments/gitea-runner/gitea-runner.yaml`
+  - Helm Chart: `deploy/kubernetes/gitea-runner/Chart.yaml, values.yaml`
+  - kubectl 部署：`deploy/kubernetes/gitea-runner/gitea-runner.yaml`
   - 测试文件：`tests/deployment/test_gitea_runner_deployment.py` (21/21 通过)
 - ✅ Task 3: Docker Executor 配置完成 (2026-03-20)
-  - 配置文件：`deployments/gitea-runner/runner-docker-executor.yaml`
+  - 配置文件：`deploy/kubernetes/gitea-runner/runner-docker-executor.yaml`
   - 测试文件：`tests/deployment/test_docker_executor.py` (25/25 通过，100%)
   - **TDD 流程**: 红→绿→重构 完成 ✅
   - **集成测试**: ✅ 容器化环境验证通过 (gitea-actions 命名空间，3 个 Runner Pod 运行)
 - ✅ Task 4: K8s Executor 配置完成 (2026-03-20)
-  - 配置文件：`deployments/gitea-runner/runner-k8s-executor.yaml`
+  - 配置文件：`deploy/kubernetes/gitea-runner/runner-k8s-executor.yaml`
   - 测试文件：`tests/deployment/test_k8s_executor.py` (23/23 通过，100%)
   - **TDD 流程**: 红→绿→重构 完成 ✅
   - **集成测试**: ✅ K8s RBAC 和资源配置验证通过
@@ -1021,7 +1021,7 @@ kubectl delete namespace gitea-actions
   - **Runner 状态**: 3/3 Running (100%)
   - **Runner 标签**: ubuntu-latest,docker,k8s,linux
 - ✅ Task 6: Harbor 集成配置完成 (2026-03-22) ✅ **TDD 流程 100% 完成**
-  - Secret 配置：`deployments/gitea-runner/harbor-robot-secret.yaml`
+  - Secret 配置：`deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml`
   - 测试文件：`tests/deployment/test_gitea_harbor_integration.py` (17 个测试用例)
   - 部署脚本：`scripts/deployment/gitea-runner/deploy-harbor-secret.sh`
   - 验证脚本：`scripts/deployment/gitea-runner/validate-harbor-secret.sh`, `test-harbor-push.sh`, `verify-trivy-scan.sh`
@@ -1062,14 +1062,14 @@ kubectl delete namespace gitea-actions
 
 **Task 1 创建的文件（2026-03-20）：**
 - `tests/deployment/test_gitea_runner_token.py` - Token 配置测试（18/18 通过）
-- `deployments/gitea-runner/gitea-runner-token-secret.yaml` - Kubernetes Secret 配置
+- `deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml` - Kubernetes Secret 配置
 - `docs/deployment/GITEA_RUNNER_TOKEN_CONFIG.md` - Token 配置指南
 - `scripts/deployment/gitea-runner/configure-token.sh` - Token 配置脚本
 
 **Task 2 创建的文件（2026-03-20）：**
-- `deployments/gitea-runner/gitea-actions-complete.yaml` - StatefulSet 配置 (3 副本，解决重复注册) ✅
-- `deployments/gitea-runner/gitea-org-runner-token-secret.yaml` - Runner Token Secret
-- `deployments/gitea-runner/gitea-runner-pvc.yaml` - PVC 持久化配置 (3 个 PVC) ✅
+- `deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml` - StatefulSet 配置 (3 副本，解决重复注册) ✅
+- `deploy/kubernetes/gitea-runner/gitea-org-runner-token-secret.yaml` - Runner Token Secret
+- `deploy/kubernetes/gitea-runner/gitea-runner-pvc.yaml` - PVC 持久化配置 (3 个 PVC) ✅
 - `scripts/deployment/gitea-runner/deploy-runner.sh` - Runner 部署脚本
 - `scripts/deployment/gitea-runner/fix-duplicate-registration.sh` - 重复注册修复脚本 ✅
 - `tests/deployment/test_gitea_runner_deployment.py` - Runner 部署测试 (21/21 通过)
@@ -1077,12 +1077,12 @@ kubectl delete namespace gitea-actions
 - `docs/deployment/GITEA_RUNNER_DUPLICATE_REGISTRATION_FIX.md` - 修复指南文档 ✅
 
 **Task 3 创建的文件（2026-03-20）：**
-- `deployments/gitea-runner/runner-docker-executor.yaml` - Docker Executor 配置
+- `deploy/kubernetes/gitea-runner/runner-docker-executor.yaml` - Docker Executor 配置
 - `tests/deployment/test_docker_executor.py` - Docker Executor 测试 (24 个测试用例)
 - `scripts/deployment/gitea-runner/configure-docker-executor.sh` - Docker Executor 部署脚本
 
 **Task 4 创建的文件（2026-03-20）：**
-- `deployments/gitea-runner/runner-k8s-executor.yaml` - K8s Executor 配置
+- `deploy/kubernetes/gitea-runner/runner-k8s-executor.yaml` - K8s Executor 配置
 - `tests/deployment/test_k8s_executor.py` - K8s Executor 测试 (22 个测试用例)
 
 **Task 9 创建的文件（2026-03-22）：**
@@ -1125,7 +1125,7 @@ kubectl delete namespace gitea-actions
 - ✅ TDD 测试通过率：5/5 (100%)
 
 **Task 6 创建的文件（2026-03-22）：**
-- `deployments/gitea-runner/harbor-robot-secret.yaml` - Harbor Robot Account Secret 配置 ✅ 已部署
+- `deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml` - Harbor Robot Account Secret 配置 ✅ 已部署
 - `tests/deployment/test_gitea_harbor_integration.py` - Harbor 集成测试 (17 个测试用例)
 - `scripts/deployment/gitea-runner/deploy-harbor-secret.sh` - Secret 部署脚本 ✅ 已执行
 - `scripts/deployment/gitea-runner/validate-harbor-secret.sh` - Secret 验证脚本 ✅ 已执行
@@ -1144,7 +1144,7 @@ kubectl delete namespace gitea-actions
 - ✅ TDD 测试通过率：7/7 (100%)
 
 **预期创建的文件（后续 Tasks）：**
-- `deployments/gitea-runner/rbac.yaml` - RBAC 权限配置 (已在 gitea-runner.yaml 中定义)
+- `deploy/kubernetes/gitea-runner/rbac.yaml` - RBAC 权限配置 (已在 gitea-runner.yaml 中定义)
 - `scripts/deployment/gitea-runner/register-runner.sh` - Runner 注册脚本
 - `scripts/deployment/gitea-runner/test-pipeline.sh` - Pipeline 测试脚本
 - `.gitea/workflows/ci.yaml` - CI Pipeline 模板 ✅ 已创建
@@ -1162,9 +1162,9 @@ kubectl delete namespace gitea-actions
 **注意**: 以下是历史配置示例，实际部署请使用 `gitea-runner.yaml` 中的标准配置。
 
 ```yaml
-# deployments/gitea-runner/values.yaml
+# deploy/kubernetes/gitea-runner/values.yaml
 # ⚠️ 历史配置示例 (dind-rootless) - 不推荐在标准 K8s 中使用
-# ✅ 当前使用标准版配置，见 deployments/gitea-runner/gitea-runner.yaml
+# ✅ 当前使用标准版配置，见 deploy/kubernetes/gitea-runner/gitea-runner.yaml
 
 replicaCount: 3
 
@@ -1190,7 +1190,7 @@ resources:
 ### Docker Executor 配置示例（推荐 rootless 模式）
 
 ```yaml
-# deployments/gitea-runner/runner-docker-executor.yaml
+# deploy/kubernetes/gitea-runner/runner-docker-executor.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1206,7 +1206,7 @@ data:
 ### 附录：历史配置示例（仅供参考）
 
 **注意**: 以下是 dind-rootless 历史配置示例，**不推荐**在标准 K8s 环境中使用。
-当前推荐使用标准版配置，见 `deployments/gitea-runner/gitea-runner.yaml`。
+当前推荐使用标准版配置，见 `deploy/kubernetes/gitea-runner/gitea-runner.yaml`。
 
 ```yaml
 # 历史配置示例 (dind-rootless) - 已废弃
@@ -1233,7 +1233,7 @@ data:
 ### K8s Executor 配置示例
 
 ```yaml
-# deployments/gitea-runner/runner-k8s-executor.yaml
+# deploy/kubernetes/gitea-runner/runner-k8s-executor.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1267,7 +1267,7 @@ data:
 ### RBAC 配置示例
 
 ```yaml
-# deployments/gitea-runner/rbac.yaml
+# deploy/kubernetes/gitea-runner/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:

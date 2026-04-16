@@ -113,7 +113,7 @@ EOF
 
 ### 步骤 3: 更新 Kubernetes Secret
 
-编辑 `deployments/gitea-runner/harbor-robot-secret.yaml`:
+编辑 `deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -164,7 +164,7 @@ bash scripts/deployment/gitea-runner/verify-trivy-scan.sh
 ### 文件结构
 
 ```
-deployments/gitea-runner/
+deploy/kubernetes/gitea-runner/
 ├── harbor-robot-secret.yaml       # Harbor Robot Account Secret
 └── runner-docker-executor.yaml    # Docker Executor 配置（含 Harbor 集成）
 
@@ -185,7 +185,7 @@ tests/deployment/
 ### Docker Executor 中的 Harbor 配置
 
 ```yaml
-# deployments/gitea-runner/runner-docker-executor.yaml
+# deploy/kubernetes/gitea-runner/runner-docker-executor.yaml
 
 container:
   # Harbor 集成配置
@@ -368,8 +368,8 @@ kubectl auth can-i get secrets -n gitea-actions
 
 ## 📚 参考文档
 
-- [Source: deployments/harbor/robot-account.yaml] - Story 0.6 Robot Account 配置
-- [Source: deployments/gitea-runner/runner-docker-executor.yaml] - Docker Executor 配置
+- [Source: deploy/kubernetes/harbor/robot-account.yaml] - Story 0.6 Robot Account 配置
+- [Source: deploy/kubernetes/gitea-runner/runner-docker-executor.yaml] - Docker Executor 配置
 - [Source: https://goharbor.io/docs/2.10.0/administration/user-management/robot-accounts/] - Harbor Robot Account 官方文档
 - [Source: https://goharbor.io/docs/2.10.0/administration/vulnerability-scanning/] - Harbor 漏洞扫描官方文档
 - [Source: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/] - Kubernetes Docker Registry 认证

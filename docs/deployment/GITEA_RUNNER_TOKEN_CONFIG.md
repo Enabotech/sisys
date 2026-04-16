@@ -49,7 +49,7 @@ kubectl create secret generic gitea-runner-token \
 
 ```bash
 # 1. 编辑 Secret 文件
-vim deployments/gitea-runner/gitea-runner-token-secret.yaml
+vim deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml
 
 # 2. 替换 Token 占位符
 # 将 'REPLACE_WITH_YOUR_GITEA_RUNNER_TOKEN' 替换为实际 Token 的 base64 编码
@@ -58,7 +58,7 @@ vim deployments/gitea-runner/gitea-runner-token-secret.yaml
 echo -n "YOUR_TOKEN_HERE" | base64
 
 # 4. 应用 Secret
-kubectl apply -f deployments/gitea-runner/gitea-runner-token-secret.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml
 ```
 
 **验证 Secret 创建：**

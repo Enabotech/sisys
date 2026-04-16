@@ -31,7 +31,7 @@
 ### 文件结构
 
 ```
-deployments/gitea/
+deploy/kubernetes/gitea/
 ├── secrets.yaml              # 生产环境模板（占位符，不可直接使用）
 ├── secrets-example.yaml      # 开发环境示例（包含示例值）
 └── ...
@@ -83,7 +83,7 @@ password: "Admin@123456"  # pragma: allowlist secret # 仅开发环境
 
 ```bash
 # 1. 复制示例文件
-cd deployments/gitea
+cd deploy/kubernetes/gitea
 cp secrets-example.yaml secrets-values.yaml
 
 # 2. （可选）修改密码为自定义值
@@ -311,7 +311,7 @@ vault kv put secret/gitea/app \
 **使用 ExternalSecrets**:
 
 ```yaml
-# deployments/gitea/external-secret.yaml
+# deploy/kubernetes/gitea/external-secret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:

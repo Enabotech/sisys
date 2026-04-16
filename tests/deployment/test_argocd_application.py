@@ -17,10 +17,10 @@ class TestArgoCDApplicationConfig:
     def test_application_manifests_exist(self):
         """验证 Application 清单文件存在"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-of-apps.yaml",
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             assert Path(manifest_path).exists(), f"Application 清单文件不存在：{manifest_path}"
@@ -28,10 +28,10 @@ class TestArgoCDApplicationConfig:
     def test_application_manifest_valid_yaml(self):
         """验证 Application 清单 YAML 格式有效"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-of-apps.yaml",
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             result = subprocess.run(
@@ -44,10 +44,10 @@ class TestArgoCDApplicationConfig:
     def test_application_manifest_has_required_fields(self):
         """验证 Application 清单包含必需字段"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-of-apps.yaml",
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:
@@ -81,7 +81,7 @@ class TestArgoCDApplicationConfig:
     def test_application_auto_sync_policy_configured(self):
         """验证自动同步策略配置 - Dev 和 Test 环境"""
         # Dev 环境 - 完全自动
-        manifest_path = Path("deployments/argocd/applications/sisys-app-dev.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-dev.yaml")
         with open(manifest_path) as f:
             import yaml
 
@@ -94,7 +94,7 @@ class TestArgoCDApplicationConfig:
         assert sync_policy["automated"].get("selfHeal", False) is True, "Dev 环境未启用 self-heal"
 
         # Test 环境 - 自动同步
-        manifest_path = Path("deployments/argocd/applications/sisys-app-test.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app-test.yaml")
         with open(manifest_path) as f:
             import yaml
 
@@ -109,10 +109,10 @@ class TestArgoCDApplicationConfig:
     def test_application_sync_options_configured(self):
         """验证同步选项配置"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-of-apps.yaml",
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:
@@ -136,9 +136,9 @@ class TestArgoCDApplicationConfig:
     def test_application_health_check_configured(self):
         """验证健康检查配置"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:
@@ -157,10 +157,10 @@ class TestArgoCDApplicationConfig:
     def test_application_source_repository_configured(self):
         """验证源代码仓库配置"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-of-apps.yaml",
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-of-apps.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:
@@ -184,14 +184,14 @@ class TestArgoCDApplicationConfig:
             ], f"{manifest_path}: 目标分支配置不合理：{source['targetRevision']}"
 
             # 验证路径配置
-            assert source["path"].startswith("deployments/"), f"{manifest_path}: 应用路径配置不合理：{source['path']}"
+            assert source["path"].startswith("deploy/kubernetes/"), f"{manifest_path}: 应用路径配置不合理：{source['path']}"
 
     def test_application_destination_configured(self):
         """验证目标配置 - 各环境使用独立命名空间"""
         env_configs = [
-            ("deployments/argocd/applications/sisys-app-dev.yaml", "sisys-dev"),
-            ("deployments/argocd/applications/sisys-app-test.yaml", "sisys-test"),
-            ("deployments/argocd/applications/sisys-app-prod.yaml", "sisys-prod"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-dev.yaml", "sisys-dev"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-test.yaml", "sisys-test"),
+            ("deploy/kubernetes/argocd/applications/sisys-app-prod.yaml", "sisys-prod"),
         ]
         for manifest_path, expected_ns in env_configs:
             with open(manifest_path) as f:
@@ -216,9 +216,9 @@ class TestArgoCDApplicationConfig:
     def test_application_kustomize_config(self):
         """验证 Kustomize 配置（如果使用 Kustomize）"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:
@@ -240,9 +240,9 @@ class TestArgoCDApplicationConfig:
     def test_application_rollback_config(self):
         """验证回滚配置 - retry 配置"""
         manifests = [
-            "deployments/argocd/applications/sisys-app-dev.yaml",
-            "deployments/argocd/applications/sisys-app-test.yaml",
-            "deployments/argocd/applications/sisys-app-prod.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-dev.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-test.yaml",
+            "deploy/kubernetes/argocd/applications/sisys-app-prod.yaml",
         ]
         for manifest_path in manifests:
             with open(manifest_path) as f:

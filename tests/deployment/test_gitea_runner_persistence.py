@@ -26,12 +26,12 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_config_exists(self):
         """测试 StatefulSet 配置文件存在"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         assert config_path.exists(), f"StatefulSet 配置文件不存在：{config_path}"
 
     def test_statefulset_valid_yaml(self):
         """测试 StatefulSet 配置 YAML 语法正确"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             try:
                 with open(config_path, encoding="utf-8") as f:
@@ -41,7 +41,7 @@ class TestStatefulSetConfiguration:
 
     def test_statefulset_replicas(self):
         """测试 StatefulSet 副本数配置"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
                 # 使用 safe_load_all 处理多文档 YAML
@@ -54,7 +54,7 @@ class TestStatefulSetConfiguration:
 
     def test_volume_claim_templates(self):
         """测试 volumeClaimTemplates 配置"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             with open(config_path, encoding="utf-8") as f:
                 # 使用 safe_load_all 处理多文档 YAML
@@ -83,7 +83,7 @@ class TestPVCConfiguration:
 
     def test_volume_claim_templates_exists(self):
         """测试 volumeClaimTemplates 配置（替代手动 PVC 文件）"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
             # 检查是否配置了 volumeClaimTemplates
@@ -93,7 +93,7 @@ class TestPVCConfiguration:
 
     def test_pvc_auto_created_by_statefulset(self):
         """测试 PVC 由 StatefulSet 自动创建（替代手动 PVC 文件测试）"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
             # 检查 storageClassName 配置
@@ -105,7 +105,7 @@ class TestPersistenceConfiguration:
 
     def test_runner_data_mount(self):
         """测试 Runner 数据挂载"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
 
@@ -117,7 +117,7 @@ class TestPersistenceConfiguration:
 
     def test_subpath_usage(self):
         """测试 subPath 使用（用于 config.yaml 挂载）"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
 
@@ -127,7 +127,7 @@ class TestPersistenceConfiguration:
 
     def test_runner_data_uses_pvc_not_configmap(self):
         """测试 runner-data 使用 PVC 而非 ConfigMap"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if config_path.exists():
             config_text = config_path.read_text(encoding="utf-8")
 

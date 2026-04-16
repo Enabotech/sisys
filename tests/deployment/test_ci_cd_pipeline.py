@@ -264,7 +264,7 @@ class TestKubernetesDeployment:
     @pytest.fixture
     def deployment_config(self) -> dict[str, Any]:
         """加载 Deployment 配置"""
-        deploy_path = Path("deployments/k8s/deployment.yaml")
+        deploy_path = Path("deploy/kubernetes/k8s/deployment.yaml")
         if not deploy_path.exists():
             pytest.skip("Deployment config file not found")
 

@@ -51,13 +51,13 @@ class TestRunnerLogCollection:
         """Verify centralized logging configuration exists"""
         # Check for logging configuration files
         _ = [
-            Path("deployments/gitea-runner/logging-config.yaml"),
-            Path("deployments/gitea-runner/fluentd-config.yaml"),
-            Path("deployments/gitea-runner/loki-config.yaml"),
+            Path("deploy/kubernetes/gitea-runner/logging-config.yaml"),
+            Path("deploy/kubernetes/gitea-runner/fluentd-config.yaml"),
+            Path("deploy/kubernetes/gitea-runner/loki-config.yaml"),
         ]
 
         # At least check if logging is mentioned in deployment config
-        deployment_config = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        deployment_config = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         if deployment_config.exists():
             _ = deployment_config.read_text()
             # Logging configuration is optional for now
@@ -121,8 +121,8 @@ class TestFailureAlerting:
         """Verify alerting configuration exists"""
         # Check for alerting configuration files
         config_paths = [
-            Path("deployments/gitea-runner/alerting-config.yaml"),
-            Path("deployments/gitea-runner/notification-config.yaml"),
+            Path("deploy/kubernetes/gitea-runner/alerting-config.yaml"),
+            Path("deploy/kubernetes/gitea-runner/notification-config.yaml"),
         ]
 
         # At least one should exist (optional)

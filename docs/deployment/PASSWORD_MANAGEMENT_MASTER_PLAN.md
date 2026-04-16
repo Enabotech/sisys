@@ -111,7 +111,7 @@ users:
 
 **当前配置**:
 ```yaml
-# deployments/gitea/secrets.yaml
+# deploy/kubernetes/gitea/secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -141,7 +141,7 @@ stringData:
 
 **当前配置**:
 ```yaml
-# deployments/harbor/secrets-example.yaml
+# deploy/kubernetes/harbor/secrets-example.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -173,7 +173,7 @@ stringData:
 
 **当前配置**:
 ```yaml
-# deployments/argocd/gitea-credentials.yaml
+# deploy/kubernetes/argocd/gitea-credentials.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -344,7 +344,7 @@ validate_password() {
 
 **部署配置**:
 ```yaml
-# deployments/vault/vault-values.yaml
+# deploy/kubernetes/vault/vault-values.yaml
 server:
   dev:
     enabled: false  # 生产环境禁用 dev 模式
@@ -377,7 +377,7 @@ server:
 **实现**: External Secrets Operator
 
 ```yaml
-# deployments/external-secrets/external-secret-gitea.yaml
+# deploy/kubernetes/external-secrets/external-secret-gitea.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
@@ -408,7 +408,7 @@ spec:
 
 **实现**:
 ```yaml
-# deployments/vault/password-rotation-policy.yaml
+# deploy/kubernetes/vault/password-rotation-policy.yaml
 apiVersion: secrets.hashicorp.com/v1alpha1
 kind: StaticAccount
 metadata:
@@ -461,8 +461,8 @@ credentials.txt
 EOF
 
 # 3. 使用 sops 加密
-sops -e deployments/harbor/secrets-example.yaml > deployments/harbor/secrets.enc.yaml
-shred -u deployments/harbor/secrets-example.yaml
+sops -e deploy/kubernetes/harbor/secrets-example.yaml > deploy/kubernetes/harbor/secrets.enc.yaml
+shred -u deploy/kubernetes/harbor/secrets-example.yaml
 
 # 4. 配置 kubeconfig 权限
 chmod 600 ~/.kube/config
@@ -825,7 +825,7 @@ class TestPasswordPolicy:
 
     def test_gitea_secrets_no_plaintext(self):
         """验证 Gitea Secret 无明文密码"""
-        with open('deployments/gitea/secrets.yaml') as f:
+        with open('deploy/kubernetes/gitea/secrets.yaml') as f:
             content = f.read()
 
         # 应该使用占位符
@@ -836,10 +836,10 @@ class TestPasswordPolicy:
     def test_harbor_secrets_encrypted(self):
         """验证 Harbor Secret 已加密"""
         # 应该存在加密文件
-        assert Path('deployments/harbor/secrets.enc.yaml').exists()
+        assert Path('deploy/kubernetes/harbor/secrets.enc.yaml').exists()
 
         # 加密文件应包含 sops 元数据
-        with open('deployments/harbor/secrets.enc.yaml') as f:
+        with open('deploy/kubernetes/harbor/secrets.enc.yaml') as f:
             content = f.read()
         assert 'sops:' in content
 ```
@@ -904,7 +904,7 @@ class TestPasswordArchitecture:
 
 - [Gitea Secrets 管理指南](../deployment/GITEA_SECRETS_GUIDE.md)
 - [Harbor 密码生成脚本](../../scripts/security/generate-harbor-secrets.sh)
-- [ArgoCD 安全加固配置](../../deployments/argocd/security-hardening.yaml)
+- [ArgoCD 安全加固配置](../../deploy/kubernetes/argocd/security-hardening.yaml)
 - [K3S 部署指南](../deployment/K3S_DEPLOYMENT_GUIDE.md)
 
 ### 外部资源

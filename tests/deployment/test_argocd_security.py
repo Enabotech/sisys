@@ -19,12 +19,12 @@ class TestContainerSecurity:
 
     def test_security_hardening_manifest_exists(self):
         """验证安全加固清单文件存在"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
         assert manifest_path.exists(), "安全加固清单文件不存在"
 
     def test_psa_labels_configured(self):
         """验证 Pod Security Admission (PSA) 标签配置 (CRITICAL-4 修复)"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -50,7 +50,7 @@ class TestContainerSecurity:
 
     def test_pod_security_policy_not_used(self):
         """验证不再使用已废弃的 PodSecurityPolicy (CRITICAL-4 修复)"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -63,7 +63,7 @@ class TestContainerSecurity:
 
     def test_deployment_security_context(self):
         """验证 Deployment 安全上下文配置"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -93,7 +93,7 @@ class TestContainerSecurity:
 
     def test_base_image_security(self):
         """验证基础镜像安全（检查 base 配置）"""
-        base_path = Path("deployments/apps/sisys/base/kustomization.yaml")
+        base_path = Path("deploy/kubernetes/apps/sisys/base/kustomization.yaml")
 
         if base_path.exists():
             with open(base_path) as f:
@@ -108,7 +108,7 @@ class TestNetworkSecurity:
 
     def test_network_policy_default_deny(self):
         """验证默认拒绝 NetworkPolicy"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -128,7 +128,7 @@ class TestNetworkSecurity:
 
     def test_network_policy_allow_traefik(self):
         """验证允许 Traefik 访问的 NetworkPolicy"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -153,7 +153,7 @@ class TestNetworkSecurity:
 
     def test_network_policy_internal_communication(self):
         """验证内部通信 NetworkPolicy"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -172,7 +172,7 @@ class TestNetworkSecurity:
 
     def test_network_policy_image_updater(self):
         """验证 Image Updater NetworkPolicy"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -196,7 +196,7 @@ class TestSecretManagement:
 
     def test_argocd_secret_exists(self):
         """验证 ArgoCD Secret 配置"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -214,7 +214,7 @@ class TestSecretManagement:
 
     def test_gitea_credentials_secret(self):
         """验证 Gitea 凭据 Secret"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -233,7 +233,7 @@ class TestSecretManagement:
 
     def test_harbor_credentials_secret(self):
         """验证 Harbor 凭据 Secret"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -253,7 +253,7 @@ class TestSecretManagement:
     def test_no_plaintext_passwords(self):
         """验证配置文件中无明文密码"""
         # 扫描所有 YAML 文件
-        yaml_files = list(Path("deployments/argocd").glob("*.yaml"))
+        yaml_files = list(Path("deploy/kubernetes/argocd").glob("*.yaml"))
 
         plaintext_patterns = [
             "password: admin",
@@ -275,7 +275,7 @@ class TestAuditLogging:
 
     def test_audit_configmap_exists(self):
         """验证审计日志 ConfigMap"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -294,7 +294,7 @@ class TestAuditLogging:
 
     def test_log_config_exists(self):
         """验证日志配置 ConfigMap"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -318,7 +318,7 @@ class TestRBAC:
 
     def test_rbac_configmap_exists(self):
         """验证 RBAC ConfigMap"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -337,7 +337,7 @@ class TestRBAC:
 
     def test_rbac_roles_defined(self):
         """验证 RBAC 角色定义"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -359,7 +359,7 @@ class TestResourceLimits:
 
     def test_resource_quota_exists(self):
         """验证 ResourceQuota"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]
@@ -382,7 +382,7 @@ class TestResourceLimits:
 
     def test_limit_range_exists(self):
         """验证 LimitRange"""
-        manifest_path = Path("deployments/argocd/security-hardening.yaml")
+        manifest_path = Path("deploy/kubernetes/argocd/security-hardening.yaml")
 
         with open(manifest_path) as f:
             docs = [doc for doc in list(yaml.safe_load_all(f)) if doc is not None]

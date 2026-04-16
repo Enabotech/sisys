@@ -250,8 +250,8 @@ cp docker/dockerfile.l2 /path/to/your-project/docker/
 cp docker/dockerfile.app /path/to/your-project/docker/
 
 # 复制 K8s 配置
-cp deployments/k8s/deployment.yaml /path/to/your-project/deployments/k8s/
-cp deployments/k8s/service.yaml /path/to/your-project/deployments/k8s/
+cp deploy/kubernetes/k8s/deployment.yaml /path/to/your-project/deploy/kubernetes/k8s/
+cp deploy/kubernetes/k8s/service.yaml /path/to/your-project/deploy/kubernetes/k8s/
 ```
 
 ### 3. 配置 Secrets

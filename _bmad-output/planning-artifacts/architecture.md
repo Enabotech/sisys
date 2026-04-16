@@ -2017,7 +2017,7 @@ src/infrastructure/
 │   │   ├── llm_tasks.py                                   # LLM 调用任务
 │   │   ├── vector_tasks.py                                # 向量存储任务
 │   │   └── analysis_tasks.py                              # 分析任务
-│   └── deployments/                                       # 部署配置
+│   └── deploy/kubernetes/                                       # 部署配置
 │       ├── __init__.py
 │       ├── development.yaml                               # 开发环境部署
 │       └── production.yaml                                # 生产环境部署

@@ -355,7 +355,7 @@ echo "v1.1.0" > VERSION
 
 **问题：** `syncPolicy.automated` 被注释，实际为全手动。
 
-**文件：** `deployments/argocd/applications/sisys-app-test.yaml`
+**文件：** `deploy/kubernetes/argocd/applications/sisys-app-test.yaml`
 
 **修复：**
 
@@ -407,7 +407,7 @@ kustomize:
 
 **方案 A：修改正则（推荐，向后兼容）**
 
-**文件：** `deployments/argocd/applications/sisys-app-prod.yaml`
+**文件：** `deploy/kubernetes/argocd/applications/sisys-app-prod.yaml`
 
 ```yaml
 # 修改前
@@ -425,7 +425,7 @@ argocd-image-updater.argoproj.io/app.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+
 
 **修改以精确匹配 feature 标签：**
 
-**文件：** `deployments/argocd/applications/sisys-app-dev.yaml`
+**文件：** `deploy/kubernetes/argocd/applications/sisys-app-dev.yaml`
 
 ```yaml
 # 修改前
@@ -518,14 +518,14 @@ dev-sisys-app-6d8f9a7b5c-abc12   sha256:8f2e3d...   feature/login-page       202
 
 ```
 Application: sisys-app-prod
-Source: deployments/apps/sisys/prod
+Source: deploy/kubernetes/apps/sisys/prod
 
 Pending Image Update:
   Current: harbor.sisys.local/sisys/app@sha256:1a2b3c... (v1.0.9)
   New:     harbor.sisys.local/sisys/app@sha256:8f2e3d... (v1.1.0)
 
 Git Diff:
-  deployments/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml
+  deploy/kubernetes/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml
   - newTag: v1.0.9
   + newTag: v1.1.0
   - newDigest: sha256:1a2b3c...
@@ -862,14 +862,14 @@ log_info "🔗 ArgoCD: https://argocd.sisys.local/applications/$APP_NAME"
 # 在 Harbor 中查找 v1.0.9 或 v1.0.9-xxxxxxx
 
 # 2. 手动更新 Kustomize 配置
-cat > deployments/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml <<EOF
+cat > deploy/kubernetes/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml <<EOF
 kustomize:
   images:
   - harbor.sisys.local/sisys/app:v1.0.9
 EOF
 
 # 3. 提交并推送
-git add deployments/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml
+git add deploy/kubernetes/apps/sisys/prod/.argocd-source-sisys-app-prod.yaml
 git commit -m "revert: rollback prod to v1.0.9"
 git push origin main
 
@@ -1278,13 +1278,13 @@ fi
 |--------|------|---------|------|
 | **P0** | `.gitea/workflows/ci.yaml` | 修改 | 动态版本号 + 构建上下文提取 + 标签逻辑 + 质量门禁阻断 |
 | **P0** | `.gitea/workflows/release.yaml` | 新建 | Release Workflow（版本号管理 + VERSION 更新 + Git Tag 创建） |
-| **P0** | `deployments/argocd/applications/sisys-app-prod.yaml` | 修改 | 标签过滤正则（可选，如果 CI 推送纯 SemVer 则不需要） |
-| **P0** | `deployments/argocd/applications/sisys-app-test.yaml` | 修改 | 恢复 `syncPolicy.automated` |
-| **P0** | `deployments/argocd/applications/sisys-app-dev.yaml` | 修改 | 标签过滤正则精确匹配 + force-digest |
+| **P0** | `deploy/kubernetes/argocd/applications/sisys-app-prod.yaml` | 修改 | 标签过滤正则（可选，如果 CI 推送纯 SemVer 则不需要） |
+| **P0** | `deploy/kubernetes/argocd/applications/sisys-app-test.yaml` | 修改 | 恢复 `syncPolicy.automated` |
+| **P0** | `deploy/kubernetes/argocd/applications/sisys-app-dev.yaml` | 修改 | 标签过滤正则精确匹配 + force-digest |
 | **P1** | `scripts/rollback.sh` | 新建 | 一键回滚脚本 |
 | **P1** | `VERSION` | 新建 | 版本号文件 |
 | **P2** | `src/api/version.py` | 新建 | 应用 `/version` 端点 |
-| **P2** | `deployments/apps/sisys/base/deployment.yaml` | 修改 | 注入 OCI 注解为环境变量 |
+| **P2** | `deploy/kubernetes/apps/sisys/base/deployment.yaml` | 修改 | 注入 OCI 注解为环境变量 |
 
 ### 详细改动
 

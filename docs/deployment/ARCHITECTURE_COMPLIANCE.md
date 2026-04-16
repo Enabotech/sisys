@@ -59,7 +59,7 @@ curl -k https://harbor.sisys.local/api/v2.0/ping
 
 **1. Gitea Runner Token Secret**
 ```yaml
-# deployments/gitea-runner/gitea-org-runner-token-secret.yaml
+# deploy/kubernetes/gitea-runner/gitea-org-runner-token-secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -72,7 +72,7 @@ data:
 
 **2. Harbor Robot Account Secret**
 ```yaml
-# deployments/gitea-runner/harbor-robot-secret.yaml
+# deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -96,7 +96,7 @@ data:
 ### 默认拒绝策略示例
 
 ```yaml
-# deployments/gitea-runner/networkpolicy.yaml
+# deploy/kubernetes/gitea-runner/networkpolicy.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -156,7 +156,7 @@ spec:
 kubectl get networkpolicy -n gitea-actions
 
 # 应用 NetworkPolicy（可选）
-kubectl apply -f deployments/gitea-runner/networkpolicy.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/networkpolicy.yaml
 ```
 
 ---
@@ -166,7 +166,7 @@ kubectl apply -f deployments/gitea-runner/networkpolicy.yaml
 ### ResourceQuota 示例
 
 ```yaml
-# deployments/gitea-runner/resourcequota.yaml
+# deploy/kubernetes/gitea-runner/resourcequota.yaml
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -198,7 +198,7 @@ spec:
 kubectl get resourcequota -n gitea-actions
 
 # 应用 ResourceQuota（可选）
-kubectl apply -f deployments/gitea-runner/resourcequota.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/resourcequota.yaml
 ```
 
 ---
@@ -208,7 +208,7 @@ kubectl apply -f deployments/gitea-runner/resourcequota.yaml
 ### LimitRange 示例
 
 ```yaml
-# deployments/gitea-runner/limitrange.yaml
+# deploy/kubernetes/gitea-runner/limitrange.yaml
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -246,7 +246,7 @@ spec:
 kubectl get limitrange -n gitea-actions
 
 # 应用 LimitRange（可选）
-kubectl apply -f deployments/gitea-runner/limitrange.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/limitrange.yaml
 ```
 
 ---
@@ -273,7 +273,7 @@ kubectl apply -f deployments/gitea-runner/limitrange.yaml
 
 ```bash
 # 检查是否有 privileged: true
-grep -n "privileged: true" deployments/gitea-runner/gitea-actions-complete.yaml
+grep -n "privileged: true" deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ✅ 未发现 privileged: true
@@ -282,7 +282,7 @@ grep -n "privileged: true" deployments/gitea-runner/gitea-actions-complete.yaml
 
 ```bash
 # 检查 docker.sock 挂载
-grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-actions-complete.yaml
+grep -n "/var/run/docker.sock" deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ℹ️ docker.sock 挂载存在，但用于 K3s containerd 集成 ✅
@@ -291,7 +291,7 @@ grep -n "/var/run/docker.sock" deployments/gitea-runner/gitea-actions-complete.y
 
 ```bash
 # 检查 securityContext 配置
-grep -A 5 "securityContext:" deployments/gitea-runner/gitea-actions-complete.yaml
+grep -A 5 "securityContext:" deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml
 ```
 
 **验证结果**: ✅ securityContext 已配置，`runAsNonRoot: false`（DIND 需要）
@@ -387,9 +387,9 @@ pytest tests/deployment/test_gitea_architecture_compliance.py -v
 
 ## 📚 参考文档
 
-- [Source: deployments/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
-- [Source: deployments/gitea-runner/gitea-org-runner-token-secret.yaml] - Runner Token Secret
-- [Source: deployments/gitea-runner/harbor-robot-secret.yaml] - Harbor Robot Account Secret
+- [Source: deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml] - Runner StatefulSet 配置
+- [Source: deploy/kubernetes/gitea-runner/gitea-org-runner-token-secret.yaml] - Runner Token Secret
+- [Source: deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml] - Harbor Robot Account Secret
 - [Source: https://kubernetes.io/docs/concepts/security/] - Kubernetes 安全文档
 - [Source: https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/] - 资源管理文档
 

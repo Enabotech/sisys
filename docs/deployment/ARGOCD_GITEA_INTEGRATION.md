@@ -58,7 +58,7 @@ kubectl create secret generic argocd-gitea-token \
 
 ```bash
 # 应用配置文件
-kubectl apply -f deployments/argocd/gitea-credentials.yaml
+kubectl apply -f deploy/kubernetes/argocd/gitea-credentials.yaml
 ```
 
 #### 步骤 4: 添加仓库到 ArgoCD

@@ -87,7 +87,7 @@ bash scripts/deployment/gitea-runner/test-concurrent-jobs.sh
 Runner 标签在 StatefulSet 的环境变量中配置：
 
 ```yaml
-# deployments/gitea-runner/gitea-runner.yaml
+# deploy/kubernetes/gitea-runner/gitea-runner.yaml
 spec:
   template:
     spec:
@@ -278,7 +278,7 @@ kubectl set env statefulset/gitea-org-runner -n gitea-actions \
 
 ## 📚 参考文档
 
-- [Source: deployments/gitea-runner/gitea-runner.yaml] - Runner 部署配置
+- [Source: deploy/kubernetes/gitea-runner/gitea-runner.yaml] - Runner 部署配置
 - [Source: https://docs.gitea.com/usage/actions/runner] - Gitea Runner 官方文档
 - [Source: https://github.com/go-gitea/act_runner] - act_runner GitHub 仓库
 

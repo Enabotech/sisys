@@ -46,7 +46,7 @@
 
 ### Dev 环境验证
 
-**文件:** `deployments/apps/sisys/dev/kustomization.yaml`
+**文件:** `deploy/kubernetes/apps/sisys/dev/kustomization.yaml`
 
 **验证项:**
 - ✅ 命名空间：`sisys-dev`
@@ -66,7 +66,7 @@
 
 ### Test 环境验证
 
-**文件:** `deployments/apps/sisys/test/kustomization.yaml`
+**文件:** `deploy/kubernetes/apps/sisys/test/kustomization.yaml`
 
 **验证项:**
 - ✅ 命名空间：`sisys-test`
@@ -86,7 +86,7 @@
 
 ### Prod 环境验证
 
-**文件:** `deployments/apps/sisys/prod/kustomization.yaml`
+**文件:** `deploy/kubernetes/apps/sisys/prod/kustomization.yaml`
 
 **验证项:**
 - ✅ 命名空间：`sisys-prod`

@@ -66,7 +66,7 @@ scripts/
 
 ### 中优先级（注释和文档）
 
-- [x] `deployments/argocd/image-updater-install.yaml` - 1 处注释
+- [x] `deploy/kubernetes/argocd/image-updater-install.yaml` - 1 处注释
 - [x] `scripts/deployment/argocd/deploy-application.py` - 1 处文档字符串
 - [x] `scripts/deployment/argocd/configure-image-updater.py` - 5 处文档字符串
 

@@ -16,19 +16,19 @@ metadata:
 spec:
   # 副本数 (可由 HPA 自动调整)
   replicas: 2
-  
+
   # 更新策略
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 0
-  
+
   # 选择器
   selector:
     matchLabels:
       app: sisys-app
-  
+
   # Pod 模板
   template:
     metadata:
@@ -57,14 +57,14 @@ spec:
                     values:
                       - gpu-node
                       - mixed-node
-      
+
       # 容器定义
       containers:
         - name: sisys-app
           # 镜像版本 (由 CI/CD 自动更新)
           image: harbor.sisys.local/sisys/app:latest
           imagePullPolicy: Always
-          
+
           # 端口配置
           ports:
             - name: http
@@ -73,7 +73,7 @@ spec:
             - name: metrics
               containerPort: 8080
               protocol: TCP
-          
+
           # 资源请求和限制
           resources:
             requests:
@@ -86,7 +86,7 @@ spec:
               cpu: "2000m"
               # GPU 资源限制
               nvidia.com/gpu: "1"
-          
+
           # 环境变量
           env:
             - name: APP_ENV
@@ -108,7 +108,7 @@ spec:
               value: "true"
             - name: CUDA_VISIBLE_DEVICES
               value: "all"
-          
+
           # 健康检查 - 存活探针
           livenessProbe:
             httpGet:
@@ -118,7 +118,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
-          
+
           # 健康检查 - 就绪探针
           readinessProbe:
             httpGet:
@@ -128,7 +128,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
-          
+
           # 健康检查 - 启动探针
           startupProbe:
             httpGet:
@@ -138,7 +138,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 30
-          
+
           # 挂载配置
           volumeMounts:
             - name: config-volume
@@ -146,7 +146,7 @@ spec:
               readOnly: true
             - name: logs-volume
               mountPath: /app/logs
-          
+
           # 安全上下文
           securityContext:
             runAsNonRoot: true
@@ -155,23 +155,23 @@ spec:
             capabilities:
               drop:
                 - ALL
-      
+
       # 镜像拉取密钥
       imagePullSecrets:
         - name: harbor-secret
-      
+
       # 服务账户
       serviceAccountName: sisys-app-sa
-      
+
       # 终止宽限期
       terminationGracePeriodSeconds: 30
-      
+
       # DNS 配置
       dnsPolicy: ClusterFirst
-      
+
       # 重启策略
       restartPolicy: Always
-      
+
       # 卷定义
       volumes:
         - name: config-volume
@@ -184,7 +184,7 @@ spec:
           emptyDir:
             sizeLimit: 1Gi
             medium: Memory  # 使用内存加速日志写入
-      
+
       # 容忍度 - 允许调度到 GPU 专用节点
       tolerations:
         - key: "nvidia.com/gpu"
@@ -204,17 +204,17 @@ metadata:
 spec:
   # 生产环境更多副本
   replicas: 3
-  
+
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 0
-  
+
   selector:
     matchLabels:
       app: sisys-app
-  
+
   template:
     metadata:
       labels:
@@ -235,12 +235,12 @@ spec:
                     operator: In
                     values:
                       - gpu-node
-      
+
       containers:
         - name: sisys-app
           image: harbor.sisys.local/sisys/app:latest
           imagePullPolicy: Always
-          
+
           ports:
             - name: http
               containerPort: 8000
@@ -248,7 +248,7 @@ spec:
             - name: metrics
               containerPort: 8080
               protocol: TCP
-          
+
           # 生产环境更高资源配置
           resources:
             requests:
@@ -259,7 +259,7 @@ spec:
               memory: "8Gi"
               cpu: "4000m"
               nvidia.com/gpu: "1"
-          
+
           env:
             - name: APP_ENV
               value: "production"
@@ -270,7 +270,7 @@ spec:
                   key: database-url
             - name: GPU_ENABLED
               value: "true"
-          
+
           livenessProbe:
             httpGet:
               path: /health/live
@@ -279,7 +279,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
-          
+
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -288,7 +288,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
-          
+
           startupProbe:
             httpGet:
               path: /health/startup
@@ -297,21 +297,21 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 30
-          
+
           volumeMounts:
             - name: config-volume
               mountPath: /app/configs
               readOnly: true
             - name: logs-volume
               mountPath: /app/logs
-      
+
       imagePullSecrets:
         - name: harbor-secret
-      
+
       serviceAccountName: sisys-app-sa
-      
+
       terminationGracePeriodSeconds: 30
-      
+
       volumes:
         - name: config-volume
           configMap:
@@ -319,7 +319,7 @@ spec:
         - name: logs-volume
           emptyDir:
             sizeLimit: 2Gi
-      
+
       # 生产环境更严格的容忍度
       tolerations:
         - key: "nvidia.com/gpu"

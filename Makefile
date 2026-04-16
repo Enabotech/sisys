@@ -823,10 +823,10 @@ harbor-secrets:
 
 harbor-deploy: harbor-secrets
 	@echo "🚀 部署 Harbor..."
-	@kubectl apply -k deployments/harbor/
+	@kubectl apply -k deploy/kubernetes/harbor/
 	@helm upgrade --install harbor harbor/harbor \
 		-n harbor \
-		-f deployments/harbor/values.yaml \
+		-f deploy/kubernetes/harbor/values.yaml \
 		--wait --timeout 10m
 	@echo "✅ Harbor 部署完成"
 	@echo "📋 访问地址：https://harbor.sisys.local"
@@ -843,7 +843,7 @@ harbor-fix:
 harbor-clean:
 	@echo "🧹 清理 Harbor 部署..."
 	@helm uninstall harbor -n harbor || true
-	@kubectl delete -k deployments/harbor/ || true
+	@kubectl delete -k deploy/kubernetes/harbor/ || true
 	@echo "✅ Harbor 已清理"
 
 # -----------------------------------------------------------------------------

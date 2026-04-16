@@ -68,7 +68,7 @@
 
 ### 1. PVC 配置
 
-文件：`deployments/gitea-runner/gitea-runner-pvc.yaml`
+文件：`deploy/kubernetes/gitea-runner/gitea-runner-pvc.yaml`
 
 ```yaml
 apiVersion: v1
@@ -89,7 +89,7 @@ spec:
 
 ### 2. StatefulSet 配置
 
-文件：`deployments/gitea-runner/gitea-actions-complete.yaml`
+文件：`deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml`
 
 关键配置：
 ```yaml
@@ -288,8 +288,8 @@ kubectl delete statefulset gitea-runner -n gitea-actions
 kubectl delete pvc -n gitea-actions -l app=gitea-runner
 
 # 重新部署
-kubectl apply -f deployments/gitea-runner/gitea-runner-pvc.yaml
-kubectl apply -f deployments/gitea-runner/gitea-actions-complete.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/gitea-runner-pvc.yaml
+kubectl apply -f deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml
 ```
 
 ## 📊 预期效果

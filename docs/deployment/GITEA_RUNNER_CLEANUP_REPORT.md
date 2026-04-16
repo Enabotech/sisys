@@ -111,7 +111,7 @@
 ## 📋 清理后目录结构
 
 ```
-deployments/gitea-runner/
+deploy/kubernetes/gitea-runner/
 ├── gitea-actions-complete.yaml    # StatefulSet 主配置
 ├── runner-config.yaml               # Runner 配置文件
 └── gitea-runner-token-secret.yaml   # Token Secret
@@ -168,7 +168,7 @@ Pod gitea-runner-0/1/2: Running
 
 ```bash
 # 1. 应用配置
-kubectl apply -f deployments/gitea-runner/gitea-actions-complete.yaml -n gitea-actions
+kubectl apply -f deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml -n gitea-actions
 
 # 2. 验证部署
 kubectl get statefulset gitea-runner -n gitea-actions

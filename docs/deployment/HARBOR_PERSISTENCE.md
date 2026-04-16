@@ -135,7 +135,7 @@ make harbor-fix
 **解决:**
 ```bash
 # 重新应用配置
-kubectl apply -f deployments/harbor/ingress-route.yaml -n harbor
+kubectl apply -f deploy/kubernetes/harbor/ingress-route.yaml -n harbor
 ```
 
 ### Q3: TLS 证书过期
@@ -183,10 +183,10 @@ kubectl logs -n harbor deploy/harbor-core
 
 | 文件 | 路径 | 用途 |
 |------|------|------|
-| IngressRoute | `deployments/harbor/ingress-route.yaml` | Traefik 路由配置 |
-| TLS Secret | `deployments/harbor/tlsoption.yaml` | TLS 选项配置 |
-| Values | `deployments/harbor/values.yaml` | Helm Chart 配置 |
-| Kustomize | `deployments/harbor/kustomization.yaml` | K8s 资源组合 |
+| IngressRoute | `deploy/kubernetes/harbor/ingress-route.yaml` | Traefik 路由配置 |
+| TLS Secret | `deploy/kubernetes/harbor/tlsoption.yaml` | TLS 选项配置 |
+| Values | `deploy/kubernetes/harbor/values.yaml` | Helm Chart 配置 |
+| Kustomize | `deploy/kubernetes/harbor/kustomization.yaml` | K8s 资源组合 |
 | 验证脚本 | `scripts/deployment/harbor/verify-and-fix.sh` | WSL 重启后修复 |
 | 测试文件 | `tests/deployment/test_harbor*.py` | 自动化测试 |
 
@@ -195,8 +195,8 @@ kubectl logs -n harbor deploy/harbor-core
 ## 🔗 相关文档
 
 - [Harbor 安装指南](docs/deployment/HARBOR_INSTALLATION.md)
-- [Harbor 配置说明](deployments/harbor/README.md)
-- [Traefik 配置](deployments/harbor/ingress-route.yaml)
+- [Harbor 配置说明](deploy/kubernetes/harbor/README.md)
+- [Traefik 配置](deploy/kubernetes/harbor/ingress-route.yaml)
 - [测试用例](tests/deployment/test_harbor.py)
 
 ---

@@ -273,7 +273,7 @@ display_security_notice() {
     echo "🔐 建议操作:"
     echo "   1. 立即将 harbor-credentials.txt 存储到密码管理器"
     echo "   2. 使用 sops 加密 harbor-secret.yaml:"
-    echo "      sops -e $OUTPUT_DIR/harbor-secret.yaml > $PROJECT_ROOT/deployments/harbor/secrets.enc.yaml"
+    echo "      sops -e $OUTPUT_DIR/harbor-secret.yaml > $PROJECT_ROOT/deploy/kubernetes/harbor/secrets.enc.yaml"
     echo "   3. 删除明文文件:"
     echo "      shred -u $OUTPUT_DIR/harbor-credentials.txt"
     echo ""

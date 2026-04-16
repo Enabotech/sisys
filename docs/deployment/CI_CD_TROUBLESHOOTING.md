@@ -253,7 +253,7 @@ kubectl get ingress -n sisys-test
 kubectl top nodes
 
 # 2. 调整资源请求
-# deployments/k8s/deployment.yaml
+# deploy/kubernetes/k8s/deployment.yaml
 resources:
   requests:
     memory: "1Gi"  # 降低请求
@@ -302,7 +302,7 @@ kubectl describe nodes | grep -A 10 "Allocated resources"
 kubectl get pods -n kube-system | grep nvidia
 
 # 4. 重新安装 Device Plugin
-kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.0/deployments/static/nvidia-device-plugin.yml
+kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.0/deploy/kubernetes/static/nvidia-device-plugin.yml
 ```
 
 ### 2. GPU 无法识别

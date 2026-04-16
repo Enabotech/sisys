@@ -24,12 +24,12 @@ class TestHarborRobotAccountSecret:
 
     def test_secret_file_exists(self):
         """Verify Secret YAML file exists"""
-        secret_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        secret_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         assert secret_path.exists(), f"Secret file not found at {secret_path}"
 
     def test_secret_defined_in_executor_config(self):
         """Verify Harbor Robot Account Secret is defined in executor config"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         assert "harbor-robot-account" in content, "Harbor Robot Account Secret not referenced in config"
@@ -37,7 +37,7 @@ class TestHarborRobotAccountSecret:
 
     def test_secret_has_dockerconfigjson_data(self):
         """Verify Secret contains valid .dockerconfigjson data"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         # Check for base64 encoded dockerconfigjson
@@ -52,7 +52,7 @@ class TestHarborDockerLogin:
         """Verify Harbor registry is accessible from cluster"""
         # This would be run inside the cluster
         # For now, check configuration
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         assert "harbor.sisys.local" in content, "Harbor registry URL not configured"
@@ -60,7 +60,7 @@ class TestHarborDockerLogin:
     @pytest.mark.integration
     def test_imagepullsecrets_configured(self):
         """Verify imagePullSecrets is configured for Harbor authentication"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         # Check for auth_secret reference in registry config
@@ -69,7 +69,7 @@ class TestHarborDockerLogin:
 
     def test_harbor_credentials_encoded(self):
         """Verify Harbor credentials are properly base64 encoded"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         # Extract base64 encoded dockerconfigjson
@@ -104,7 +104,7 @@ class TestHarborDockerPush:
     @pytest.mark.integration
     def test_harbor_project_namespace(self):
         """Verify Harbor project namespace is configured"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         # Check for sisys project namespace
@@ -118,7 +118,7 @@ class TestTrivyAutoScan:
     def test_trivy_enabled_in_harbor(self):
         """Verify Trivy scanning is configured in Harbor"""
         # Check Story 0.6 Harbor configuration for Trivy
-        harbor_config = Path("deployments/harbor/values.yaml")
+        harbor_config = Path("deploy/kubernetes/harbor/values.yaml")
         if harbor_config.exists():
             content = harbor_config.read_text()
             # Trivy should be enabled in Harbor
@@ -127,7 +127,7 @@ class TestTrivyAutoScan:
     # @pytest.mark.integration
     # def test_harbor_vulnerability_scan_config(self):
     #     """Verify Harbor vulnerability scan configuration"""
-    #     config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+    #     config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
     #     content = config_path.read_text()
 
     #     # Check for registry configuration that enables scanning
@@ -140,7 +140,7 @@ class TestHarborIntegrationEndToEnd:
     @pytest.mark.integration
     def test_harbor_mirror_configured(self):
         """Verify Harbor is configured as image mirror for caching"""
-        config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+        config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
         content = config_path.read_text()
 
         # Check for mirror configuration
@@ -150,7 +150,7 @@ class TestHarborIntegrationEndToEnd:
     # @pytest.mark.integration
     # def test_harbor_image_prefetch(self):
     #     """Verify common images are prefetched from Harbor"""
-    #     config_path = Path("deployments/gitea-runner/gitea-actions-complete.yaml")
+    #     config_path = Path("deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml")
     #     content = config_path.read_text()
 
     #     # Check for prefetch configuration

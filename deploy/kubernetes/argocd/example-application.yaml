@@ -11,7 +11,7 @@
 # 通过注解方式配置 Image Updater 行为。
 #
 # 使用方法:
-#   sudo kubectl apply -f deployments/argocd/example-application.yaml
+#   sudo kubectl apply -f deploy/kubernetes/argocd/example-application.yaml
 #
 # =============================================================================
 
@@ -81,7 +81,7 @@ spec:
     # 分支/Tag
     targetRevision: HEAD
     # 应用路径
-    path: deployments/myapp
+    path: deploy/kubernetes/myapp
 
   destination:
     # 目标集群
@@ -154,7 +154,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/test-app
+    path: deploy/kubernetes/test-app
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -195,7 +195,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/multi-image-app
+    path: deploy/kubernetes/multi-image-app
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -220,7 +220,7 @@ spec:
 #    - 修改 image-list 为你的镜像
 #
 # 3. 应用配置
-#    sudo kubectl apply -f deployments/argocd/example-application.yaml
+#    sudo kubectl apply -f deploy/kubernetes/argocd/example-application.yaml
 #
 # 4. 验证配置
 #    sudo kubectl get application myapp-example -n argocd

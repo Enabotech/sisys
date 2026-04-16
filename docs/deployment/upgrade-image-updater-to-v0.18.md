@@ -45,7 +45,7 @@ v0.18.0:  newest-build → 按构建时间排序   → 4529fa4 被认为最新
 
 ## 🔧 修改清单（共 3 个文件 + 2 个 Secret 配置）
 
-### 修改 1: `deployments/argocd/image-updater-install.yaml`
+### 修改 1: `deploy/kubernetes/argocd/image-updater-install.yaml`
 
 共 3 处修改：
 
@@ -96,7 +96,7 @@ args:
 
 ---
 
-### 修改 2: `deployments/argocd/applications/sisys-app-dev.yaml`
+### 修改 2: `deploy/kubernetes/argocd/applications/sisys-app-dev.yaml`
 
 回滚之前错误的策略修改：
 
@@ -110,7 +110,7 @@ argocd-image-updater.argoproj.io/app.update-strategy: newest-build
 
 ---
 
-### 修改 3: `deployments/argocd/applications/sisys-app-test.yaml`
+### 修改 3: `deploy/kubernetes/argocd/applications/sisys-app-test.yaml`
 
 同样回滚：
 
@@ -229,9 +229,9 @@ webhook.harbor-secret: **** (已配置)
 ### 步骤 4: 应用配置到集群
 
 ```bash
-kubectl apply -f /mnt/g/ai/sisys/deployments/argocd/image-updater-install.yaml
-kubectl apply -f /mnt/g/ai/sisys/deployments/argocd/applications/sisys-app-dev.yaml
-kubectl apply -f /mnt/g/ai/sisys/deployments/argocd/applications/sisys-app-test.yaml
+kubectl apply -f /mnt/g/ai/sisys/deploy/kubernetes/argocd/image-updater-install.yaml
+kubectl apply -f /mnt/g/ai/sisys/deploy/kubernetes/argocd/applications/sisys-app-dev.yaml
+kubectl apply -f /mnt/g/ai/sisys/deploy/kubernetes/argocd/applications/sisys-app-test.yaml
 ```
 
 ### 步骤 5: 重启 Image Updater
@@ -349,7 +349,7 @@ kubectl rollout undo deployment/argocd-image-updater -n argocd
 # 恢复 image 版本为 v0.14.0
 # 移除 --enable-webhook 参数
 # 重新应用
-kubectl apply -f /mnt/g/ai/sisys/deployments/argocd/image-updater-install.yaml
+kubectl apply -f /mnt/g/ai/sisys/deploy/kubernetes/argocd/image-updater-install.yaml
 kubectl rollout restart deployment/argocd-image-updater -n argocd
 ```
 
@@ -357,10 +357,10 @@ kubectl rollout restart deployment/argocd-image-updater -n argocd
 
 ```bash
 # 如果策略名修改有问题，恢复为 v0.14 时的原始值
-# git checkout -- deployments/argocd/applications/sisys-app-dev.yaml
-# git checkout -- deployments/argocd/applications/sisys-app-test.yaml
-# kubectl apply -f deployments/argocd/applications/sisys-app-dev.yaml
-# kubectl apply -f deployments/argocd/applications/sisys-app-test.yaml
+# git checkout -- deploy/kubernetes/argocd/applications/sisys-app-dev.yaml
+# git checkout -- deploy/kubernetes/argocd/applications/sisys-app-test.yaml
+# kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-dev.yaml
+# kubectl apply -f deploy/kubernetes/argocd/applications/sisys-app-test.yaml
 ```
 
 ---

@@ -1,7 +1,7 @@
 # 镜像标签命名策略
 
-> 文档版本：1.0.0  
-> 创建日期：2026-03-31  
+> 文档版本：1.0.0
+> 创建日期：2026-03-31
 > 最后更新：2026-03-31
 
 ## 概述
@@ -210,13 +210,13 @@ build-image:
       with:
         tags: ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }}
         push: false  # 先不推送
-    
+
     # 2. 标记 latest 标签
     - name: 标记 L3 latest 标签
       run: |
         docker tag ${{ vars.HARBOR_REGISTRY }}/sisys/app:${{ steps.meta.outputs.image_tag_l3 }} \
                    ${{ vars.HARBOR_REGISTRY }}/sisys/app:l3-latest
-    
+
     # 3. 推送所有标签
     - name: 推送镜像到 Harbor
       run: |
@@ -245,7 +245,7 @@ deploy-test:
 ### Base 配置
 
 ```yaml
-# deployments/apps/sisys/base/kustomization.yaml
+# deploy/kubernetes/apps/sisys/base/kustomization.yaml
 images:
   - name: harbor.sisys.local/sisys/app
     newTag: l3-v1.0.0-placeholder  # 占位符，会被 overlay 覆盖
@@ -254,7 +254,7 @@ images:
 ### Dev Overlay
 
 ```yaml
-# deployments/apps/sisys/dev/kustomization.yaml
+# deploy/kubernetes/apps/sisys/dev/kustomization.yaml
 images:
   - name: harbor.sisys.local/sisys/app
     newTag: dev-main-initial-0000000
@@ -263,7 +263,7 @@ images:
 ### Test Overlay
 
 ```yaml
-# deployments/apps/sisys/test/kustomization.yaml
+# deploy/kubernetes/apps/sisys/test/kustomization.yaml
 images:
   - name: harbor.sisys.local/sisys/app
     newTag: test-v1.0.0-0000000
@@ -272,7 +272,7 @@ images:
 ### Prod Overlay
 
 ```yaml
-# deployments/apps/sisys/prod/kustomization.yaml
+# deploy/kubernetes/apps/sisys/prod/kustomization.yaml
 images:
   - name: harbor.sisys.local/sisys/app
     newTag: v1.0.0
@@ -283,7 +283,7 @@ images:
 ### 测试环境
 
 ```yaml
-# deployments/argocd/applications/sisys-app-test.yaml
+# deploy/kubernetes/argocd/applications/sisys-app-test.yaml
 metadata:
   annotations:
     argocd-image-updater.argoproj.io/app.update-strategy: latest
@@ -293,7 +293,7 @@ metadata:
 ### 生产环境
 
 ```yaml
-# deployments/argocd/applications/sisys-app-prod.yaml
+# deploy/kubernetes/argocd/applications/sisys-app-prod.yaml
 metadata:
   annotations:
     argocd-image-updater.argoproj.io/app.update-strategy: semver
@@ -376,7 +376,7 @@ git push origin main
 
 ```bash
 # 更新生产环境配置
-# deployments/apps/sisys/prod/kustomization.yaml
+# deploy/kubernetes/apps/sisys/prod/kustomization.yaml
 images:
   - name: harbor.sisys.local/sisys/app
     newTag: v1.0.0
@@ -415,7 +415,7 @@ curl -k -u "admin:password" \
   "https://harbor.sisys.local/api/v2.0/projects/sisys/repositories/app/artifacts"
 
 # 检查 Kustomize 配置
-cat deployments/apps/sisys/test/kustomization.yaml | grep newTag
+cat deploy/kubernetes/apps/sisys/test/kustomization.yaml | grep newTag
 
 # 检查 ArgoCD 应用状态
 argocd app get sisys-app-test

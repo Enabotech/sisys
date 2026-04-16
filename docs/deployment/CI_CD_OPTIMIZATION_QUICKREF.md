@@ -171,7 +171,7 @@ jobs:
 ### K8s GPU 资源
 
 ```yaml
-# deployments/k8s/deployment.yaml
+# deploy/kubernetes/k8s/deployment.yaml
 spec:
   nodeSelector:
     nvidia.com/gpu.present: "true"

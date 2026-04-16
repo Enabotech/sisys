@@ -337,7 +337,7 @@ class TestPipelineIntegration:
         """测试 K8s 部署配置"""
         ci_path = Path(".gitea/workflows/ci.yaml")
         cd_path = Path(".gitea/workflows/cd.yaml")
-        deploy_path = Path("deployments/k8s/deployment.yaml")
+        deploy_path = Path("deploy/kubernetes/k8s/deployment.yaml")
 
         k8s_configured = False
 
