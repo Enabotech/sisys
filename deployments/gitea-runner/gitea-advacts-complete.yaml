@@ -195,18 +195,18 @@ spec:
             - -c
             - |
               echo "🚀 Starting act_runner..."
-              
+
               # ✅ 安装 CA 证书包（与 gitea-actions 一致）
               echo "📦 Installing CA certificates..."
               apk add --no-cache git curl ca-certificates >/dev/null 2>&1 || echo "⚠️ CA install failed"
-              
+
               # ✅ 追加 Gitea 自签名证书到系统证书包
               echo "📜 Appending Gitea certificate to system bundle..."
               cat /etc/ssl/certs/ca-certificates.crt > /tmp/system-ca.crt
               cat /tmp/gitea-ca.crt >> /tmp/system-ca.crt
               cp /tmp/system-ca.crt /etc/ssl/certs/ca-certificates.crt
               echo "✅ Gitea certificate appended"
-              
+
               echo "⏳ Waiting for Docker daemon..."
               until docker -H tcp://127.0.0.1:2375 info >/dev/null 2>&1; do
                 echo "  Docker not ready yet, waiting..."
@@ -350,7 +350,23 @@ spec:
                 "insecure-registries": ["harbor.sisys.local"],
                 "dns": ["10.43.0.10", "8.8.8.8"],
                 "dns-search": ["gitea-advacts.svc.cluster.local", "svc.cluster.local", "cluster.local"],
-                "ipv6": false
+                "ipv6": false,
+                "log-driver": "json-file",
+                "log-opts": {
+                  "max-size": "100m",
+                  "max-file": "3"
+                },
+                "storage-driver": "overlay2",
+                "storage-opts": [
+                  "overlay2.size=30G",
+                  "overlay2.metacopy=on"
+                ],
+                "builder": {
+                  "gc": {
+                    "enabled": true,
+                    "defaultKeepStorage": "10GB"
+                  }
+                }
               }
               EOF
 
@@ -397,7 +413,7 @@ spec:
               memory: 2Gi
             limits:
               cpu: 4000m
-              memory: 8Gi
+              memory: 12Gi
 
           livenessProbe:
             exec:
@@ -405,7 +421,7 @@ spec:
                 - sh
                 - -c
                 - docker -H unix:///var/run/docker.sock info >/dev/null 2>&1
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 5
