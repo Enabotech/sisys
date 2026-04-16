@@ -88,6 +88,7 @@ prometheus-client = "^0.21.1"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 pylint = "^4.0.5"
+pydantic-extra-types = "^2.11.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"
