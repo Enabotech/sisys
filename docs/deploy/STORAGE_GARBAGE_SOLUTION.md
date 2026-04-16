@@ -440,19 +440,6 @@ rm -rf /var/lib/docker/overlay2/<unreferenced-layer>
   },
 
   "storage-driver": "overlay2",
-  "storage-opts": [
-    "overlay2.size=30G",
-    "overlay2.metacopy=on"
-  ],
-
-  "live-restore": false,
-
-  "default-ulimits": {
-    "nofile": {
-      "Name": "nofile",
-      "Hard": 65536,
-      "Soft": 65536
-    }
   },
 
   "builder": {
@@ -1118,11 +1105,6 @@ spec:
                   "max-size": "100m",
                   "max-file": "3"
                 },
-                "storage-driver": "overlay2",
-                "storage-opts": [
-                  "overlay2.size=30G",
-                  "overlay2.metacopy=on"
-                ],
                 "builder": {
                   "gc": {
                     "enabled": true,
