@@ -95,7 +95,7 @@ jobs:
   # ===========================================================================
   code-quality:
     name: "🔍 代码检查"
-    runs-on: actions
+    runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -305,7 +305,7 @@ jobs:
   # ===========================================================================
   security-scan:
     name: "🔒 安全扫描"
-    runs-on: actions
+    runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -370,7 +370,7 @@ jobs:
   # ===========================================================================
   detect-changes:
     name: "🔎 变更检测"
-    runs-on: actions
+    runs-on: gpu
     needs: [code-quality]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
