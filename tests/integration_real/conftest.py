@@ -183,7 +183,7 @@ async def real_minio_client():
     """
     import os
 
-    from src.infrastructure.storage.minio.client import MinioClientWrapper
+    from src.infrastructure.storage.minio.client import MinioClientWrapper  # type: ignore[import-untyped]
 
     wrapper = MinioClientWrapper(
         endpoint=os.getenv("MINIO_HOST", "localhost") + ":" + os.getenv("MINIO_API_PORT", "9000"),
