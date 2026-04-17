@@ -44,6 +44,28 @@ class QdrantVectorStorage:
         """
         return self._client_wrapper.get_async_client()
 
+    def _normalize_point_id(self, point_id: str) -> int:
+        """规范化向量点 ID，确保 Qdrant 接受。
+
+        Qdrant v1.7.x 要求 ID 为无符号整数或 UUID。
+        对于字符串 ID：
+        - 纯数字字符串转换为整数
+        - 小整数（<1000）使用 hash 映射到有效范围避免被拒绝
+
+        Args:
+            point_id: 原始点 ID（字符串）
+
+        Returns:
+            规范化后的整数 ID
+        """
+        try:
+            pid = int(point_id)
+            if pid < 1000:
+                return abs(hash(point_id)) % (2**31)
+            return pid
+        except ValueError:
+            return abs(hash(point_id)) % (2**31)
+
     async def upsert_points(self, collection: str, points: list[VectorPoint]) -> bool:
         """批量插入或更新向量点。
 
@@ -55,14 +77,16 @@ class QdrantVectorStorage:
             操作成功返回 True
         """
         client = self._get_client()
-        point_structs = [
-            PointStruct(
-                id=point.id,
-                vector=point.vector,
-                payload={**point.payload, "created_at": point.created_at.isoformat()},
+        point_structs = []
+        for point in points:
+            pid = self._normalize_point_id(point.id)
+            point_structs.append(
+                PointStruct(
+                    id=pid,
+                    vector=point.vector,
+                    payload={**point.payload, "created_at": point.created_at.isoformat()},
+                )
             )
-            for point in points
-        ]
         await client.upsert(collection_name=collection, points=point_structs)
         return True
 
@@ -107,9 +131,9 @@ class QdrantVectorStorage:
                     must=conditions  # type: ignore[arg-type]
                 )
 
-        response = await client.query_points(
+        response = await client.search(
             collection_name=collection,
-            query=query_vector,
+            query_vector=query_vector,
             query_filter=query_filter,
             limit=limit,
             with_payload=True,
@@ -120,7 +144,7 @@ class QdrantVectorStorage:
                 "score": point.score,
                 "payload": point.payload or {},
             }
-            for point in response.points
+            for point in response
         ]
 
     async def search_sparse(
@@ -157,9 +181,10 @@ class QdrantVectorStorage:
                 indices=sparse_vector.indices,
                 values=sparse_vector.values,
             )
-            response = await client.query_points(
+            # 使用 search 方法，支持 NamedSparseVector
+            response = await client.search(
                 collection_name=collection,
-                query=qdrant_sparse,
+                query_vector=qdrant_sparse,  # type: ignore[arg-type]
                 query_filter=query_filter,
                 limit=limit,
                 with_payload=True,
@@ -170,7 +195,7 @@ class QdrantVectorStorage:
                     "score": point.score,
                     "payload": point.payload or {},
                 }
-                for point in response.points
+                for point in response
             ]
         except Exception:
             return []
@@ -186,9 +211,10 @@ class QdrantVectorStorage:
             操作成功返回 True
         """
         client = self._get_client()
+        converted_ids = [self._normalize_point_id(pid) for pid in point_ids]
         await client.delete(
             collection_name=collection,
-            points_selector=PointIdsList(points=list(point_ids)),  # type: ignore[arg-type]
+            points_selector=PointIdsList(points=converted_ids),  # type: ignore[arg-type]
         )
         return True
 
@@ -203,9 +229,10 @@ class QdrantVectorStorage:
             向量点数据，不存在返回 None
         """
         client = self._get_client()
+        normalized_id = self._normalize_point_id(point_id)
         points = await client.retrieve(
             collection_name=collection,
-            ids=[point_id],
+            ids=[normalized_id],
             with_payload=True,
         )
         if not points:

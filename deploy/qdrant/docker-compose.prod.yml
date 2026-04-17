@@ -10,7 +10,7 @@ version: '3.8'
 
 services:
   qdrant:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.4
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.1
     container_name: sisys-qdrant-prod
     restart: unless-stopped
     ports:

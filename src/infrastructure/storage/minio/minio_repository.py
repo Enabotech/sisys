@@ -173,9 +173,8 @@ class MinIORepository(ObjectStorageRepository):
         """将 bucket_type 解析为完整的物理 bucket 名称。
 
         格式: {bucket_prefix}-{bucket_type}-{tenant_id}
-        如果 tenant_id 未配置，使用 {bucket_prefix}-{bucket_type}
+        如果 tenant_id 未配置，使用 "default" 作为默认值
         """
         prefix = self._bucket_manager.bucket_prefix
-        if self._tenant_id:
-            return f"{prefix}-{bucket_type}-{self._tenant_id}"
-        return f"{prefix}-{bucket_type}"
+        tenant_id = self._tenant_id if self._tenant_id else "default"
+        return f"{prefix}-{bucket_type}-{tenant_id}"

@@ -66,7 +66,7 @@ log_step() {
 
 check_prerequisites() {
     log_step "检查前置条件..."
-    
+
     # 检查 Gitea Token
     if [ -z "$GITEA_TOKEN" ]; then
         log_error "GITEA_TOKEN 未设置"
@@ -76,7 +76,7 @@ check_prerequisites() {
         echo
         exit 1
     fi
-    
+
     # 检查 GitHub Token
     if [ -z "$GITHUB_TOKEN" ]; then
         log_warning "GITHUB_TOKEN 未设置"
@@ -86,26 +86,26 @@ check_prerequisites() {
         echo "需要权限：public_repo"
         echo
     fi
-    
+
     # 验证 Gitea 连接
     log_info "验证 Gitea 连接..."
     local response
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/user")
-    
+
     if [ "$response" != "200" ]; then
         log_error "Gitea 认证失败 (HTTP $response)"
         exit 1
     fi
     log_success "Gitea 连接成功"
-    
+
     # 检查或创建 actions 组织
     log_info "检查组织：$GITEA_ORG"
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/orgs/$GITEA_ORG")
-    
+
     if [ "$response" == "404" ]; then
         log_info "  创建组织..."
         curl -s -X POST \
@@ -127,25 +127,25 @@ check_prerequisites() {
 create_mirror_repo() {
     local github_repo="$1"
     local gitea_repo="$2"
-    
+
     log_info "创建镜像仓库：$gitea_repo"
-    
+
     # 检查仓库是否已存在
     local response
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/repos/$GITEA_ORG/$gitea_repo")
-    
+
     if [ "$response" == "200" ]; then
         log_warning "  仓库已存在，跳过创建"
         return 0
     fi
-    
+
     # 通过 Gitea 迁移 API 创建镜像
     local github_url="https://github.com/$github_repo.git"
-    
+
     log_info "  迁移源：$github_url"
-    
+
     # 使用 Gitea 迁移 API
     local migrate_data
     migrate_data=$(cat << EOF
@@ -163,14 +163,14 @@ create_mirror_repo() {
 }
 EOF
 )
-    
+
     local migrate_response
     migrate_response=$(curl -s -X POST \
         -H "Authorization: token $GITEA_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$migrate_data" \
         "$GITEA_URL/api/v1/repos/migrate")
-    
+
     # 检查迁移状态
     if echo "$migrate_response" | jq -e '.id' > /dev/null; then
         local repo_name
@@ -186,9 +186,9 @@ EOF
 # 配置推送镜像 (从 Gitea 到 GitHub)
 configure_push_mirror() {
     local gitea_repo="$1"
-    
+
     log_info "配置推送镜像：$gitea_repo"
-    
+
     # 注意：Gitea API 不直接支持配置镜像，需要通过 Web UI
     # 这里提供说明
     log_warning "  推送镜像需要通过 Web UI 配置"
@@ -201,16 +201,16 @@ configure_push_mirror() {
 # 手动同步镜像
 sync_mirror() {
     local gitea_repo="$1"
-    
+
     log_info "同步镜像：$gitea_repo"
-    
+
     # 通过 Gitea API 触发同步
     local response
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -X POST \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/repos/$GITEA_ORG/$gitea_repo/mirror-sync")
-    
+
     if [ "$response" == "204" ] || [ "$response" == "200" ]; then
         log_success "  同步成功"
     else
@@ -222,20 +222,20 @@ sync_mirror() {
 # 检查镜像状态
 check_mirror_status() {
     local gitea_repo="$1"
-    
+
     log_info "检查镜像状态：$gitea_repo"
-    
+
     local repo_info
     repo_info=$(curl -s \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/repos/$GITEA_ORG/$gitea_repo")
-    
+
     local is_mirror
     is_mirror=$(echo "$repo_info" | jq -r '.mirror')
-    
+
     local mirror_address
     mirror_address=$(echo "$repo_info" | jq -r '.mirror_url')
-    
+
     if [ "$is_mirror" == "true" ]; then
         log_success "  是镜像仓库"
         log_info "  镜像源：$mirror_address"
@@ -252,17 +252,17 @@ check_mirror_status() {
 cmd_create_all() {
     log_step "开始创建所有 Actions 镜像..."
     echo
-    
+
     local success=0
     local failed=0
     local skipped=0
-    
+
     for github_repo in "${!ACTIONS_MIRROR[@]}"; do
         local gitea_repo="${ACTIONS_MIRROR[$github_repo]}"
-        
+
         echo "----------------------------------------"
         log_info "处理：$github_repo -> $gitea_repo"
-        
+
         if [ -n "$GITHUB_TOKEN" ]; then
             if create_mirror_repo "$github_repo" "$gitea_repo"; then
                 ((success++))
@@ -279,10 +279,10 @@ cmd_create_all() {
             log_info "  5. ✅ 勾选 '此仓库将成为镜像'"
             ((skipped++))
         fi
-        
+
         echo
     done
-    
+
     echo "=============================================="
     log_info "创建完成统计:"
     log_success "  成功：$success"
@@ -294,15 +294,15 @@ cmd_create_all() {
 cmd_sync_all() {
     log_step "开始同步所有 Actions 镜像..."
     echo
-    
+
     for github_repo in "${!ACTIONS_MIRROR[@]}"; do
         local gitea_repo="${ACTIONS_MIRROR[$github_repo]}"
-        
+
         log_info "同步：$gitea_repo"
         sync_mirror "$gitea_repo" || true
         echo
     done
-    
+
     log_success "同步完成"
 }
 
@@ -310,26 +310,26 @@ cmd_sync_all() {
 cmd_status() {
     log_step "Actions 镜像状态:"
     echo
-    
+
     printf "%-35s %-30s %-10s\n" "GITHUB" "GITEA" "STATUS"
     printf "%s\n" "$(printf '=%.0s' {1..80})"
-    
+
     for github_repo in "${!ACTIONS_MIRROR[@]}"; do
         local gitea_repo="${ACTIONS_MIRROR[$github_repo]}"
-        
+
         # 检查仓库是否存在
         local response
         response=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token $GITEA_TOKEN" \
             "$GITEA_URL/api/v1/repos/$GITEA_ORG/$gitea_repo")
-        
+
         local status
         if [ "$response" == "200" ]; then
             status="✅ OK"
         else
             status="❌ MISSING"
         fi
-        
+
         printf "%-35s %-30s %-10s\n" "$github_repo" "$gitea_repo" "$status"
     done
 }
@@ -465,12 +465,12 @@ main() {
         cmd_help
         exit 0
     fi
-    
+
     check_prerequisites
-    
+
     local command="$1"
     shift
-    
+
     case "$command" in
         create-all)
             cmd_create_all

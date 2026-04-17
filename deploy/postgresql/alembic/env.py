@@ -65,8 +65,12 @@ async def run_async_migrations() -> None:
     """
     from src.infrastructure.storage.postgresql.models import pg_registry
 
+    # Build config dict with URL from environment variables
+    cfg_dict = config.get_section(config.config_ini_section, {})
+    cfg_dict["sqlalchemy.url"] = get_url()
+
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        cfg_dict,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

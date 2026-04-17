@@ -802,3 +802,23 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [ ] 部署 Neo4j 实例后验证集成测试（替换 Mock 为真实实例）
 - [ ] 部署 Neo4j 实例后最终完成验收测试（禁止使用 mock / fake）
+
+---
+
+**模板版本/Template Version:** 2.0.0
+**创建日期/Created:** 2026-04-13
+**最后更新/Last Updated:** 2026-04-17
+**更新说明:**
+- v1.0: 基于 epics_v1.0.md Story 1.8 定义、architecture.md 架构约束创建
+- v1.1: 实施完成：17文件创建，80测试通过，0 warnings，Ruff+MyPy全通过
+- v1.2: 修复 Neo4j 单元测试 `test_find_path_max_depth` 断言问题
+
+### v1.2 修复详情
+
+#### Neo4j 单元测试断言修复
+
+| 文件 | 问题 | 修复方案 |
+|------|------|---------|
+| `tests/unit/infrastructure/test_neo4j_graph_storage.py` | `test_find_path_max_depth` 期望 Cypher 查询使用 `$max_depth` 参数 | 改为验证字面值 `[*1..2]`（Cypher 可变长度模式 `[*1..$max_depth]` 不支持参数） |
+
+**测试结果：** 9 passed

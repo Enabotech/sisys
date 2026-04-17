@@ -49,7 +49,7 @@ main() {
     # 默认行为：交互式 bash
     print_welcome
     check_poetry_env
-    
+
     echo -e "${YELLOW}💡 常用命令:${NC}"
     echo "  poetry install          - 安装项目依赖"
     echo "  poetry shell            - 激活虚拟环境"
@@ -57,7 +57,7 @@ main() {
     echo "  poetry run pytest       - 运行测试"
     echo "  exit                    - 退出容器"
     echo ""
-    
+
     exec /bin/bash
 }
 

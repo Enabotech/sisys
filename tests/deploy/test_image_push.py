@@ -17,6 +17,7 @@ import time
 
 import pytest
 
+# pytestmark = pytest.mark.xdist_group(name="serial")
 # =============================================================================
 # 配置常量 - 从统一配置模块加载
 # =============================================================================
@@ -61,6 +62,65 @@ def run_command(cmd: list[str], check: bool = False, timeout: int = 300) -> subp
         return result
     except subprocess.TimeoutExpired:
         pytest.fail(f"命令超时：{' '.join(cmd)}")
+
+
+def login_to_harbor() -> bool:
+    """
+    统一登录 Harbor 的辅助函数
+
+    登录逻辑：
+    1. 优先使用环境变量 HARBOR_PASSWORD
+    2. 否则从 Kubernetes Secret harbor-core 获取
+    3. 登录成功或已经登录返回 True
+    4. 支持重试机制，应对并行执行时的竞争条件
+
+    Returns:
+        bool: 登录是否成功
+    """
+    import subprocess
+    import time
+
+    # 获取密码
+    password = HARBOR_PASSWORD
+    if not password:
+        secret_result = run_kubectl(
+            ["get", "secret", "harbor-core", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"],
+            check=False,
+        )
+        if secret_result.returncode == 0 and secret_result.stdout.strip():
+            try:
+                import base64
+
+                password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
+            except Exception:
+                pass
+
+    if not password:
+        return False
+
+    # 重试机制：并行执行时 docker login 可能因竞争失败
+    max_retries = 3
+    retry_delay = 1.0  # 1秒延迟
+    for attempt in range(max_retries):
+        login_process = subprocess.Popen(
+            ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        stdout, stderr = login_process.communicate(input=f"{password}\n")
+
+        if login_process.returncode == 0:
+            return True
+        if "already logged in" in stderr.lower():
+            return True
+
+        # 如果失败且还有重试次数，等待后重试
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+
+    return False
 
 
 def harbor_api_call(endpoint: str, method: str = "GET", data: dict | None = None) -> tuple[int, dict]:
@@ -170,10 +230,11 @@ def harbor_accessible():
 class TestImagePush:
     """镜像推送测试类"""
 
-    @pytest.fixture(autouse=True)
-    def setup(self, docker_daemon_running, harbor_accessible, harbor_project_exists):
-        """设置测试前置条件"""
-        pass
+    @pytest.fixture(scope="module", autouse=True)
+    def ensure_harbor_login(self, docker_daemon_running, harbor_accessible, harbor_project_exists):
+        """在模块级别执行一次 Harbor 登录，确保所有测试共享登录状态"""
+        login_to_harbor()
+        yield
 
     def test_source_image_exists(self):
         """验证源镜像存在"""
@@ -199,47 +260,11 @@ class TestImagePush:
         result = run_command(["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"])
         assert TEST_HARBOR_IMAGE in result.stdout, f"镜像 tag 未找到：{TEST_HARBOR_IMAGE}"
 
-    @pytest.mark.xdist_group(name="harbor-login")
     def test_docker_login_harbor(self):
         """测试登录 Harbor"""
-        # 使用 docker login（通过 stdin 传递密码，避免警告）
-        import subprocess
+        if not login_to_harbor():
+            pytest.skip("无法登录 Harbor")
 
-        # 尝试使用 kubectl 获取最新凭据
-        secret_result = run_kubectl(
-            ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"]
-        )
-        password = HARBOR_PASSWORD
-        if secret_result.returncode == 0:
-            import base64
-
-            password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
-
-        # 使用 --password-stdin 避免警告
-        # 使用列表形式避免 shell 转义问题（特别是 $ 符号）
-        login_process = subprocess.Popen(
-            ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        stdout, stderr = login_process.communicate(input=f"{password}\n")
-        result = subprocess.CompletedProcess(
-            args=["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
-            returncode=login_process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-        )
-
-        if result.returncode != 0:
-            # 检查是否已经登录
-            if "already logged in" not in result.stderr.lower():
-                pytest.skip(f"无法登录 Harbor: {result.stderr}")
-
-        assert "Login Succeeded" in result.stdout or "already logged in" in result.stderr.lower(), f"登录失败：{result.stderr}"
-
-    @pytest.mark.xdist_group(name="harbor-login")
     def test_push_image_to_harbor(self):
         """测试推送镜像到 Harbor"""
         # 先 tag 镜像
@@ -251,43 +276,9 @@ class TestImagePush:
         if tag_result.returncode != 0:
             pytest.skip(f"无法 tag 镜像：{tag_result.stderr}")
 
-        # 登录 Harbor（使用 --password-stdin）
-        import subprocess
-
-        # 从环境变量获取 Harbor 凭据（Gitea 仓库密钥）
-        password = HARBOR_PASSWORD
-        username = HARBOR_USERNAME
-
-        # 如果环境变量未设置，尝试从 Kubernetes Secret 获取
-        if not password:
-            secret_result = run_kubectl(
-                ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"],
-                check=False,
-            )
-
-            if secret_result.returncode == 0 and secret_result.stdout.strip():
-                import base64
-
-                try:
-                    password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
-                except Exception:
-                    pass
-
-        # 如果仍然没有密码，使用占位符（实际环境应通过 CI/CD 密钥注入）
-        if not password:
-            pytest.skip("HARBOR_PASSWORD 环境变量未设置")
-
-        login_result = subprocess.run(
-            f"echo '{password}' | docker login -u {username} --password-stdin {HARBOR_URL}",
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        assert (
-            login_result.returncode == 0 or "already logged in" in login_result.stderr.lower()
-        ), f"Harbor 登录失败：{login_result.stderr}"
+        # 登录 Harbor
+        if not login_to_harbor():
+            pytest.skip("无法登录 Harbor")
 
         # 推送镜像
         result = run_command(["docker", "push", TEST_HARBOR_IMAGE], timeout=300)
@@ -320,7 +311,6 @@ class TestImagePush:
             # 仓库为空是预期的（在推送之前）
             pytest.skip(f"测试镜像仓库为空（需要先推送）：{HARBOR_PROJECT}/test-image")
 
-    @pytest.mark.xdist_group(name="harbor-login")
     def test_pull_image_from_harbor(self):
         """测试从 Harbor 拉取镜像"""
         # 先确保已推送
@@ -332,53 +322,18 @@ class TestImagePush:
         if tag_result.returncode != 0:
             pytest.skip(f"无法 tag 镜像：{tag_result.stderr}")
 
-        # 登录 Harbor
-        # Docker daemon.json 已配置 insecure-registries: ["harbor.sisys.local"]
-        # 无需额外 TLS 配置
-        import subprocess
-
-        # 使用 kubectl 获取密码（如果可用），否则使用默认密码
-        secret_result = run_kubectl(
-            ["get", "secret", "harbor-core-env", "-n", HARBOR_NAMESPACE, "-o", "jsonpath={.data.HARBOR_ADMIN_PASSWORD}"]
-        )
-        password = HARBOR_PASSWORD
-        if secret_result.returncode == 0:
-            import base64
-
-            password = base64.b64decode(secret_result.stdout.strip()).decode("utf-8")
-
-        # 使用 --password-stdin 避免警告
-        # 使用列表形式避免 shell 转义问题（特别是 $ 符号）
-        login_process = subprocess.Popen(
-            ["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        stdout, stderr = login_process.communicate(input=f"{password}\n")
-        login_result = subprocess.CompletedProcess(
-            args=["docker", "login", "-u", HARBOR_USERNAME, "--password-stdin", HARBOR_URL],
-            returncode=login_process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-        )
-        if login_result.returncode != 0 and "already logged in" not in login_result.stderr.lower():
-            # 登录失败
-            pytest.skip(f"无法登录 Harbor: {login_result.stderr[:200]}")
+        # 确保登录（使用统一函数）
+        if not login_to_harbor():
+            pytest.skip("无法登录 Harbor")
 
         # 推送镜像
-        push_result = subprocess.run(
-            ["docker", "push", TEST_HARBOR_IMAGE],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
+        push_result = run_command(["docker", "push", TEST_HARBOR_IMAGE], timeout=300)
         if push_result.returncode != 0:
             pytest.skip(f"无法推送镜像：{push_result.stderr[:200]}")
 
         # 删除本地镜像
         run_command(["docker", "rmi", TEST_HARBOR_IMAGE], check=False)
+        run_command(["docker", "rmi", TEST_SOURCE_IMAGE], check=False)
 
         # 从 Harbor 拉取
         result = run_command(["docker", "pull", TEST_HARBOR_IMAGE], timeout=120)

@@ -76,8 +76,10 @@ class Neo4jGraphStorage:
         Returns:
             路径列表（每个路径包含节点和关系信息）
         """
-        cypher = """
-        MATCH path = (start {id: $start_id})-[*1..$max_depth]-(end {id: $end_id})
+        # Cypher doesn't support parameters in variable-length patterns,
+        # so we construct the pattern with literal value
+        cypher = f"""
+        MATCH path = (start {{id: $start_id}})-[*1..{max_depth}]-(end {{id: $end_id}})
         RETURN path
         LIMIT 10
         """
@@ -86,7 +88,6 @@ class Neo4jGraphStorage:
             {
                 "start_id": start_id,
                 "end_id": end_id,
-                "max_depth": max_depth,
             },
         )
 

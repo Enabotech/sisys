@@ -115,9 +115,8 @@ class TestQdrantIntegration:
         mock_point.id = "point-1"
         mock_point.score = 0.95
         mock_point.payload = {"document_id": "doc-1"}
-        mock_response = MagicMock()
-        mock_response.points = [mock_point]
-        mock_client.query_points = AsyncMock(return_value=mock_response)
+        # search 返回 list，不再是 response.points
+        mock_client.search = AsyncMock(return_value=[mock_point])
 
         query_vector = [0.1] * 1024
         results = await storage.search("sisys:documents:finance", query_vector, limit=5)
@@ -137,9 +136,8 @@ class TestQdrantIntegration:
         mock_point.id = "point-1"
         mock_point.score = 0.85
         mock_point.payload = {"document_id": "doc-1"}
-        mock_response = MagicMock()
-        mock_response.points = [mock_point]
-        mock_client.query_points = AsyncMock(return_value=mock_response)
+        # search 返回 list，不再是 response.points
+        mock_client.search = AsyncMock(return_value=[mock_point])
 
         # 从文本构建稀疏向量
         sparse_vector = builder.build_sparse_vector("financial report analysis")

@@ -730,12 +730,24 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [x] 运行 `validate-create-story` 质量检查（可选）
 - [x] 更新 sprint-status.yaml 中 Epic 1 进度
-- [ ] 部署 minio 实例后验证集成测试（替换 mock 为真实实例）
-- [ ] 部署 minio 实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署 minio 实例后验证集成测试（替换 mock 为真实实例）
+- [x] 部署 minio 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-04-14
-**最后更新/Last Updated:** 2026-04-14
+**最后更新/Last Updated:** 2026-04-17
 **更新说明:** 基于 story-template.md 创建，整合 or.md/prd.md/architecture.md/epics_v1.0.md/project-context.md 上下文
+- v1.1: 实施完成，验收测试通过
+- v1.2: 修复 bucket 名称解析逻辑
+
+### v1.2 修复详情
+
+#### Bucket 名称解析逻辑修复
+
+| 文件 | 问题 | 修复方案 |
+|------|------|---------|
+| `src/infrastructure/storage/minio/minio_repository.py` | `_resolve_bucket_name` tenant_id 为空时 bucket 名称不一致 | 当 tenant_id 为空时使用 `"default"` 作为默认值，保证 bucket 名称格式统一 |
+
+**测试结果：** 集成测试通过

@@ -688,5 +688,26 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [x] 运行 `validate-create-story` 质量检查
 - [x] 运行 `/bmad:tea:automate` 生成测试（可选）
-- [ ] 部署 qdrant 实例后验证集成测试（替换 mock 为真实实例）
-- [ ] 部署 qdrant 实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署 qdrant 实例后验证集成测试（替换 mock 为真实实例）
+- [x] 部署 qdrant 实例后最终完成验收测试（禁止使用 mock / fake）
+
+---
+
+**模板版本/Template Version:** 2.0.0
+**创建日期/Created:** 2026-04-14
+**最后更新/Last Updated:** 2026-04-17
+**更新说明:** 基于 story-template.md 创建，整合 architecture.md/epics_v1.0.md 上下文
+- v1.1: 实施完成，验收测试通过
+- v1.2: 修复 Qdrant v1.7.x API 兼容性问题
+
+### v1.2 修复详情
+
+#### Qdrant v1.7.x API 兼容性修复
+
+| 文件 | 问题 | 修复方案 |
+|------|------|---------|
+| `src/infrastructure/storage/qdrant/vector_storage.py` | `query_points` API 已废弃 | 改用 `search` 方法 |
+| `src/infrastructure/storage/qdrant/vector_storage.py` | `response.points` 访问方式变更 | 直接迭代 `response` 对象 |
+| `src/infrastructure/storage/qdrant/vector_storage.py` | Qdrant v1.7.x 要求 ID 为无符号整数 | 添加 `_normalize_point_id()` 方法处理字符串 ID |
+
+**测试结果：** 集成测试通过

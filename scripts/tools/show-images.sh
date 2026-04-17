@@ -28,17 +28,17 @@ sudo k3s crictl images 2>/dev/null | tail -n +2 | while IFS= read -r line; do
     TAG=$(echo "$line" | awk '{print $2}')
     ID=$(echo "$line" | awk '{print $3}')
     SIZE_STR=$(echo "$line" | awk '{print $4}')
-    
+
     # 组合完整镜像名
     if [ "$TAG" = "<none>" ]; then
         FULL_NAME="$IMAGE"
     else
         FULL_NAME="$IMAGE:$TAG"
     fi
-    
+
     # 提取前7位 SHA256
     SHORT_ID=$(echo "$ID" | cut -c1-7)
-    
+
     # 检查是否正在使用
     if echo "$USED" | grep -q "$FULL_NAME"; then
         : # 正在使用
@@ -52,7 +52,7 @@ sudo k3s crictl images 2>/dev/null | tail -n +2 | while IFS= read -r line; do
         else
             SIZE_KB=0
         fi
-        
+
         # 显示: 镜像名 (sha256:xxx) [大小]
         printf "  🗑️  %-50s (sha256:%-7s) [%s]\n" "$FULL_NAME" "$SHORT_ID" "$SIZE_STR"
     fi
