@@ -121,6 +121,7 @@ safety = "^3.7.0"
 types-requests = "^2.32.4.20260107"
 types-PyYAML = "^6.0.0"
 import-linter = "^2.11"
+asyncpg-stubs = "^0.31.2"
 
 [project.scripts]
 sisys = "src.cli:app"
