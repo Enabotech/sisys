@@ -126,8 +126,8 @@ docker pull harbor.sisys.local/sisys/tools/redis/redis:7.2.5 2>/dev/null || true
 echo "  拉取 PostgreSQL 15.4..."
 docker pull harbor.sisys.local/sisys/tools/postgres/postgres:15.4 2>/dev/null || true
 
-echo "  拉取 Qdrant v1.7.4..."
-docker pull harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.4 2>/dev/null || true
+echo "  拉取 Qdrant v1.7.1..."
+docker pull harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.1 2>/dev/null || true
 
 echo "  拉取 MinIO ${MINIO_VERSION}..."
 docker pull harbor.sisys.local/sisys/tools/minio:${MINIO_VERSION} 2>/dev/null || true

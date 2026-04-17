@@ -70,7 +70,7 @@ services:
 
 services:
   qdrant:
-    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0
+    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.1
     container_name: sisys-qdrant
     restart: unless-stopped
     ports:

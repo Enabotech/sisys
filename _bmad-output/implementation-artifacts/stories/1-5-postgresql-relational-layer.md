@@ -857,16 +857,56 @@ sisys/
 - [x] 所有任务实施完成（31个文件，1096测试通过）
 - [x] 部署准备完成（docker-compose.yml + docker-compose.prod.yml + 配置文件）
 - [x] 代码审查通过
-- [ ] 部署 PostgreSQL 实例后验证集成测试（替换 mock 为真实实例）
-- [ ] 部署 PostgreSQL 实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署 PostgreSQL 实例后验证集成测试（替换 mock 为真实实例）
+- [x] 部署 PostgreSQL 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-04-13
-**最后更新/Last Updated:** 2026-04-14
+**最后更新/Last Updated:** 2026-04-17
 **更新说明:**
 - v1.0: 基于 epics_v1.0.md Story 1.5 定义、architecture.md 架构约束、story-template.md 模板创建
 - v1.1: 审查修复：OutboxModel字段Optional标注、SQLAlchemyEventOutboxAdapter转换器、AsyncOutboxPoller内部方法、Alembic迁移策略、事务原子性测试
 - v1.2: 实施完成：31文件创建，1096测试通过，0 warnings，Ruff+MyPy全通过
 - v1.3: 部署准备：创建 docker-compose.yml、docker-compose.prod.yml、postgresql.conf、pg_hba.conf、init-prod.sql
+- v1.4: 修复时区处理（按业界最佳实践）、Alembic配置修复、验收测试完善、集成测试警告修复
+
+### v1.4 修复详情
+
+#### 1. 时区处理按业界最佳实践修复
+
+**问题：** 原实现使用 `datetime.utcnow`（naive）存入 PostgreSQL DateTime 列，与设计文档定义的 `datetime.now(timezone.utc)` 不一致，且存在 UTC aware 与 naive 混合导致的 `can't subtract offset-naive and offset-aware datetimes` 错误。
+
+**修复方案：** 采用 PostgreSQL 业界最佳实践 `TIMESTAMP WITH TIME ZONE`（UTC 存储）：
+
+| 文件 | 修改 |
+|------|------|
+| `src/infrastructure/storage/postgresql/models/outbox.py` | `created_at`/`published_at` → `DateTime(timezone=True)` + `datetime.now(UTC)` |
+| `deploy/postgresql/alembic/versions/001_initial.py` | 列定义 → `sa.DateTime(timezone=True)` + `NOW()` |
+| `src/infrastructure/adapters/sqlalchemy_event_outbox_adapter.py` | 移除临时 `replace(tzinfo=None)` 修复，直接使用 UTC aware 时间戳 |
+
+#### 2. Alembic 迁移配置修复
+
+**问题：** `alembic.ini` 中 `script_location = alembic` 路径不存在；`sqlalchemy.url` 使用 `%(VAR)s` 插值语法（Python configparser 不支持）。
+
+**修复方案：**
+
+| 文件 | 修改 |
+|------|------|
+| `deploy/postgresql/alembic/alembic.ini` | `script_location` → `.`；移除 `sqlalchemy.url` 配置 |
+| `deploy/postgresql/alembic/env.py` | 直接在 config dict 中设置 `cfg_dict["sqlalchemy.url"] = get_url()` |
+
+#### 3. 验收测试完善
+
+| 文件 | 修改 |
+|------|------|
+| `tests/acceptance/test_story_1_5_steps.py` | 添加 `ensure_alembic_migration` fixture；添加 "Alembic 升级迁移执行成功" 场景；修复 `pg_config` scope 不匹配 |
+
+#### 4. 集成测试警告修复
+
+| 文件 | 修改 |
+|------|------|
+| `tests/integration_real/test_postgresql_real_integration.py` | `engine.close()` → `await engine.close()`（close 是 async 方法） |
+
+**测试结果：** 1353 passed, 0 warnings

@@ -768,12 +768,25 @@ sisys/
 - [x] Coverage ≥75% (actual: 91%)
 - [x] Full regression passing (1096 tests)
 - [x] 部署 Redis 基础设施（生产环境）- docker-compose.prod.yml + redis-prod.conf 已创建
-- [ ] 部署 Redis 实例后验证集成测试（替换 mock 为真实实例）
-- [ ] 部署 Redis 实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署 Redis 实例后验证集成测试（替换 mock 为真实实例）
+- [x] 部署 Redis 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-04-13
-**最后更新/Last Updated:** 2026-04-13
+**最后更新/Last Updated:** 2026-04-17
 **更新说明:** 基于 Story 1.3 学习经验，实现 L1 高速缓存层（Redis 7.0+），遵循六边形架构和 SDD+TDD 融合模式
+- v1.1: 实施完成，验收测试通过
+- v1.2: 修复验收测试：Redis 隔离 fixture、cleanup 集成
+
+### v1.2 修复详情
+
+#### 验收测试隔离与修复
+
+| 文件 | 问题 | 修复方案 |
+|------|------|---------|
+| `tests/acceptance/test_story_1_4_steps.py` | 测试间 Redis 数据污染（共享状态） | 添加 `flush_redis_before_test` autouse fixture，每个测试前执行 `flushdb()` |
+| `tests/acceptance/test_story_1_4_steps.py` | `RedisCleanup.cleanup_namespace` 未集成到测试 | 添加 `redis_cleanup` fixture，修复 `cleanup_session_namespace` 步骤调用实际清理方法 |
+
+**测试结果：** 13 passed

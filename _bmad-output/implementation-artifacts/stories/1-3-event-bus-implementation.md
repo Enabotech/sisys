@@ -1923,12 +1923,35 @@ sisys/
 - [x] 运行 `code-review` 进行代码审查
 - [x] 运行 `validate-create-story` 质量检查
 - [x] 可选: 运行 `/bmad:tea:automate` 生成测试(如果 Test Architect 模块已安装)
-- [ ] 部署五层存储实例后验证集成测试（替换 mock 为真实实例）
-- [ ] 部署五层存储实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署五层存储实例后验证集成测试（替换 mock 为真实实例）
+- [x] 部署五层存储实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-04-12
-**最后更新/Last Updated:** 2026-04-12
+**最后更新/Last Updated:** 2026-04-17
 **更新说明:** 基于 epics_v1.0.md Story 1.3 定义、architecture.md 双通道事件总线约束、story-template.md 模板创建
+- v1.1: 实施完成，验收测试通过
+- v1.2: 修复验收测试：async/await、Redis subscriber 回调模式、bind_queue 方法、幂等性检查器
+
+### v1.2 修复详情
+
+#### 异步方法与 Redis Subscriber 修复
+
+| 文件 | 问题 | 修复方案 |
+|------|------|---------|
+| `tests/acceptance/test_story_1_3_steps.py` | `async_publish` 实际是同步方法 | 改为 `publish`（移除 async/await） |
+| `tests/acceptance/test_story_1_3_steps.py` | Redis subscriber API 不匹配 | 修复为 callback 模式：`subscribe(channel, handler)` + `await start()` |
+| `src/infrastructure/events/async_rabbitmq_consumer.py` | 缺少 `bind_queue()` 方法 | 添加 `bind_queue()` 用于绑定队列到交换器 |
+| `tests/acceptance/test_story_1_3_steps.py` | `register_handler()` 是同步方法却用了 await | 移除 await |
+| `tests/acceptance/test_story_1_3_steps.py` | feature 文件语法歧义（`并且` 被解析为 When） | 添加 `@when` 映射处理 |
+| `tests/acceptance/test_story_1_3_steps.py` | 架构测试使用子进程（不可靠） | 改用 AST 解析扫描源码 |
+
+#### 幂等性检查器集成
+
+| 文件 | 修改 |
+|------|------|
+| `tests/acceptance/test_story_1_3_steps.py` | 添加 `IdempotencyChecker` 导入和注入逻辑 |
+
+**测试结果：** 10 passed

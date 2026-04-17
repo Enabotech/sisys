@@ -96,13 +96,19 @@ class TestNeo4jGraphStorage:
         assert len(result) >= 0
 
     async def test_find_path_max_depth(self, storage, mock_driver, mock_session):
-        """测试路径最大深度限制。"""
+        """测试路径最大深度限制。
+
+        注意：Cypher 不支持参数在可变长度模式中（如 [*1..$max_depth]），
+        所以实现使用 f-string 直接插值。这是 Cypher 限制，不是 bug。
+        """
         _mock_session(mock_driver, mock_session, [])
 
         await storage.find_path("node-a", "node-b", max_depth=2)
         call_args = mock_session.run.call_args
-        assert "$max_depth" in call_args[0][0]
-        assert call_args[1]["max_depth"] == 2
+        # Cypher uses literal value in variable-length patterns, not parameter
+        assert "[*1..2]" in call_args[0][0]
+        assert call_args[1]["start_id"] == "node-a"
+        assert call_args[1]["end_id"] == "node-b"
 
     async def test_get_neighbors_no_rel_type(self, storage, mock_driver, mock_session):
         """测试获取所有邻居（无关系类型过滤）。"""

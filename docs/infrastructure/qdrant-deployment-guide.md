@@ -201,7 +201,7 @@ spec:
     spec:
       containers:
       - name: qdrant
-        image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.0
+        image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.1
         ports:
         - containerPort: 6333
           name: http

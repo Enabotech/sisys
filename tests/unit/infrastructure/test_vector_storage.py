@@ -49,9 +49,8 @@ class TestQdrantVectorStorage:
         mock_point.id = "point-1"
         mock_point.score = 0.95
         mock_point.payload = {"document_id": "doc-1"}
-        mock_response = MagicMock()
-        mock_response.points = [mock_point]
-        mock_client.query_points = AsyncMock(return_value=mock_response)
+        # search 返回 list，不再是 response.points
+        mock_client.search = AsyncMock(return_value=[mock_point])
 
         storage = QdrantVectorStorage(wrapper)
         query_vector = [0.1] * 1024
@@ -77,7 +76,7 @@ class TestQdrantVectorStorage:
         )
 
         assert results == []
-        mock_client.query_points.assert_called_once()
+        mock_client.search.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_delete_points(self, mock_client_wrapper):
@@ -126,9 +125,8 @@ class TestQdrantVectorStorage:
         mock_point.id = "point-1"
         mock_point.score = 0.85
         mock_point.payload = {"document_id": "doc-1"}
-        mock_response = MagicMock()
-        mock_response.points = [mock_point]
-        mock_client.query_points = AsyncMock(return_value=mock_response)
+        # search 返回 list，不再是 response.points
+        mock_client.search = AsyncMock(return_value=[mock_point])
 
         storage = QdrantVectorStorage(wrapper)
         sparse_vector = SparseVector(indices=[1, 2, 3], values=[0.5, 0.3, 0.2])

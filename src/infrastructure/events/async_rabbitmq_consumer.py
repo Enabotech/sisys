@@ -92,7 +92,7 @@ class AsyncRabbitMQConsumer:
             queue_name: 队列名
 
         Returns:
-            声明的队列对象
+            声明队列对象
         """
         # 声明队列（不自动 ACK）
         assert self._channel is not None, "Must call connect() before async_consume()"
@@ -100,6 +100,20 @@ class AsyncRabbitMQConsumer:
         await queue.consume(self._on_message)
         logger.info("Started consuming from queue: %s", queue_name)
         return queue
+
+    async def bind_queue(self, queue_name: str, routing_key: str, exchange_name: str = "sisys.events.reliable") -> None:
+        """绑定队列到交换器。
+
+        Args:
+            queue_name: 队列名
+            routing_key: 路由键（用于绑定）
+            exchange_name: 交换器名，默认使用配置的交换器名
+        """
+        assert self._channel is not None, "Must call connect() before bind_queue()"
+        queue = await self._channel.declare_queue(queue_name, durable=True)
+        exchange = await self._channel.declare_exchange(exchange_name, aio_pika.ExchangeType.TOPIC, durable=True)
+        await queue.bind(exchange, routing_key=routing_key)
+        logger.info("Bound queue %s to exchange %s with routing key %s", queue_name, exchange_name, routing_key)
 
     async def _on_message(self, message: AbstractIncomingMessage) -> None:
         """消息处理回调 — 手动 ACK/NACK。

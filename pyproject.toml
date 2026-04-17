@@ -31,7 +31,7 @@ alembic = "^1.12.1"
 psycopg2-binary = "^2.9.9"
 
 # L3 Vector Database
-qdrant-client = "^1.7.0"
+qdrant-client = "1.7.1"
 
 # L4 Object Storage
 minio = "^7.2.0"
@@ -246,6 +246,7 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing:skip-covered",
     "-n", "auto",
+    "--dist", "loadscope",
 ]
 
 # 过滤器

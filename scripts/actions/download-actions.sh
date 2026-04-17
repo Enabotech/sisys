@@ -68,7 +68,7 @@ log_error() {
 # 检查依赖
 check_dependencies() {
     log_info "检查依赖工具..."
-    
+
     local deps=("git" "curl" "jq" "tar")
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" &> /dev/null; then
@@ -76,7 +76,7 @@ check_dependencies() {
             exit 1
         fi
     done
-    
+
     log_success "依赖检查通过"
 }
 
@@ -86,27 +86,27 @@ verify_gitea() {
         log_warning "GITEA_TOKEN 未设置，将只下载不上传到 Gitea"
         return
     fi
-    
+
     log_info "验证 Gitea 连接..."
-    
+
     local response
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/user")
-    
+
     if [ "$response" != "200" ]; then
         log_error "Gitea 认证失败 (HTTP $response)"
         exit 1
     fi
-    
+
     log_success "Gitea 连接成功"
-    
+
     # 检查或创建组织
     log_info "检查组织：$GITEA_ORG"
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/orgs/$GITEA_ORG")
-    
+
     if [ "$response" == "404" ]; then
         log_info "创建组织：$GITEA_ORG"
         curl -s -X POST \
@@ -125,26 +125,26 @@ download_action() {
     local action="$1"
     local action_name="${action%@*}"
     local action_version="${action@#*}"
-    
+
     log_info "下载 Action: $action"
-    
+
     # 创建本地目录结构
     local local_dir="$LOCAL_ROOT/$action_name"
     mkdir -p "$local_dir"
-    
+
     # 构建 GitHub API URL
     local github_url="https://api.github.com/repos/$action_name"
-    
+
     # 获取 Action 的元数据
     log_info "  获取元数据..."
     local metadata
     metadata=$(curl -s "$github_url")
-    
+
     if echo "$metadata" | jq -e '.message' | grep -q "Not Found"; then
         log_error "  Action 不存在：$action_name"
         return 1
     fi
-    
+
     # 下载指定版本的代码
     local tarball_url
     if [ "$action_version" == "master" ] || [ "$action_version" == "main" ]; then
@@ -153,24 +153,24 @@ download_action() {
         # 尝试获取 tag
         tarball_url="$github_url/tarball/refs/tags/$action_version"
     fi
-    
+
     log_info "  下载代码包：$tarball_url"
     local temp_file="/tmp/${action_name//\//_}-${action_version}.tar.gz"
-    
+
     curl -sL "$tarball_url" -o "$temp_file"
-    
+
     if [ ! -f "$temp_file" ] || [ ! -s "$temp_file" ]; then
         log_error "  下载失败：$action"
         return 1
     fi
-    
+
     # 解压到目标目录
     log_info "  解压到：$local_dir"
     tar -xzf "$temp_file" -C "$local_dir" --strip-components=1
-    
+
     # 清理临时文件
     rm -f "$temp_file"
-    
+
     # 创建 action.yml 的符号链接（如果存在）
     if [ -f "$local_dir/action.yml" ]; then
         log_success "  下载完成：$action (含 action.yml)"
@@ -179,7 +179,7 @@ download_action() {
     else
         log_warning "  未找到 action.yml，可能需要手动验证"
     fi
-    
+
     return 0
 }
 
@@ -187,23 +187,23 @@ download_action() {
 push_to_gitea() {
     local action="$1"
     local action_name="${action%@*}"
-    
+
     if [ -z "$GITEA_TOKEN" ]; then
         log_warning "跳过推送到 Gitea (未设置 GITEA_TOKEN)"
         return
     fi
-    
+
     log_info "推送到 Gitea: $action_name"
-    
+
     local repo_name="${action_name//\//_}"  # 替换 / 为 _ 避免命名冲突
     local local_dir="$LOCAL_ROOT/$action_name"
-    
+
     # 检查或创建仓库
     local response
     response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/repos/$GITEA_ORG/$repo_name")
-    
+
     if [ "$response" == "404" ]; then
         log_info "  创建仓库：$GITEA_ORG/$repo_name"
         curl -s -X POST \
@@ -212,34 +212,34 @@ push_to_gitea() {
             -d "{\"name\":\"$repo_name\",\"private\":false,\"auto_init\":false}" \
             "$GITEA_URL/api/v1/orgs/$GITEA_ORG/repos" > /dev/null
     fi
-    
+
     # 推送代码到 Gitea
     log_info "  推送代码..."
     cd "$local_dir"
-    
+
     git init -q
     git config user.email "actions-sync@sisys.local"
     git config user.name "Actions Sync Bot"
     git add .
     git commit -m "chore: mirror $action_name from GitHub" -q
-    
+
     local gitea_repo_url="$GITEA_URL/$GITEA_ORG/$repo_name.git"
     git remote add origin "$gitea_repo_url" 2>/dev/null || true
     git push -f origin main -q 2>/dev/null || git push -f origin master -q 2>/dev/null || true
-    
+
     cd - > /dev/null
-    
+
     log_success "  推送完成：$repo_name"
 }
 
 # 生成 Actions 清单
 generate_manifest() {
     log_info "生成 Actions 清单..."
-    
+
     local manifest_file="$LOCAL_ROOT/manifest.json"
     local timestamp
     timestamp=$(date -Iseconds)
-    
+
     cat > "$manifest_file" << EOF
 {
     "generated_at": "$timestamp",
@@ -247,19 +247,19 @@ generate_manifest() {
     "gitea_org": "$GITEA_ORG",
     "actions": [
 EOF
-    
+
     local first=true
     for action in "${ACTIONS_LIST[@]}"; do
         local action_name="${action%@*}"
         local action_version="${action@#*}"
         local repo_name="${action_name//\//_}"
-        
+
         if [ "$first" = true ]; then
             first=false
         else
             echo "," >> "$manifest_file"
         fi
-        
+
         cat >> "$manifest_file" << EOF
         {
             "name": "$action_name",
@@ -269,22 +269,22 @@ EOF
         }
 EOF
     done
-    
+
     cat >> "$manifest_file" << EOF
 
     ]
 }
 EOF
-    
+
     log_success "清单已生成：$manifest_file"
 }
 
 # 生成使用指南
 generate_usage_guide() {
     log_info "生成使用指南..."
-    
+
     local guide_file="$LOCAL_ROOT/USAGE.md"
-    
+
     cat > "$guide_file" << 'EOF'
 # Gitea Actions 离线使用指南
 
@@ -308,7 +308,7 @@ jobs:
     steps:
       # 原始：uses: actions/checkout@v4
       - uses: actions/checkout@v4
-      
+
       # 本地：uses: {GITEA_ORG}/{repo_name}@{version}
       - uses: actions/actions_checkout@v4
 ```
@@ -351,7 +351,7 @@ jobs:
 2. 验证 Action 的依赖是否也已本地化
 3. 查看 Gitea Runner 日志
 EOF
-    
+
     log_success "使用指南已生成：$guide_file"
 }
 
@@ -361,17 +361,17 @@ main() {
     echo "  Gitea Actions 离线下载工具"
     echo "=============================================="
     echo
-    
+
     check_dependencies
     verify_gitea
-    
+
     echo
     log_info "开始下载 Actions..."
     echo
-    
+
     local success_count=0
     local fail_count=0
-    
+
     for action in "${ACTIONS_LIST[@]}"; do
         if download_action "$action"; then
             push_to_gitea "$action"
@@ -381,7 +381,7 @@ main() {
         fi
         echo
     done
-    
+
     echo
     echo "=============================================="
     echo "  下载完成"
@@ -389,15 +389,15 @@ main() {
     echo "  成功：$success_count"
     echo "  失败：$fail_count"
     echo
-    
+
     generate_manifest
     generate_usage_guide
-    
+
     if [ "$fail_count" -gt 0 ]; then
         log_warning "部分 Actions 下载失败，请检查日志"
         exit 1
     fi
-    
+
     log_success "所有 Actions 下载完成！"
 }
 

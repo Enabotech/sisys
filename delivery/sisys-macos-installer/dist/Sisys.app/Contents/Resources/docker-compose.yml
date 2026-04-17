@@ -19,7 +19,7 @@ services:
       POSTGRES_DB: sisys
       POSTGRES_USER: sisys_admin
       # ⚠ 必须修改: 首次启动时生成随机密码
-      POSTGRES_PASSWORD: ${SISYS_DB_PASSWORD:?ERROR: 必须设置 SISYS_DB_PASSWORD 环境变量}
+      POSTGRES_PASSWORD: "${SISYS_DB_PASSWORD:?ERROR: 必须设置 SISYS_DB_PASSWORD 环境变量}"
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/postgres-data:/var/lib/postgresql/data
@@ -86,7 +86,7 @@ services:
   # L3: Qdrant - 向量存储层
   # ============================================================================
   qdrant:
-    image: qdrant/qdrant:v1.7.0
+    image: qdrant/qdrant:v1.7.1
     container_name: sisys-qdrant
     restart: unless-stopped
     environment:
@@ -125,8 +125,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${SISYS_MINIO_ACCESS_KEY:?ERROR: 必须设置 SISYS_MINIO_ACCESS_KEY 环境变量}
-      MINIO_ROOT_PASSWORD: ${SISYS_MINIO_SECRET_KEY:?ERROR: 必须设置 SISYS_MINIO_SECRET_KEY 环境变量}
+      MINIO_ROOT_USER: "${SISYS_MINIO_ACCESS_KEY:?ERROR: 必须设置 SISYS_MINIO_ACCESS_KEY 环境变量}"
+      MINIO_ROOT_PASSWORD: "${SISYS_MINIO_SECRET_KEY:?ERROR: 必须设置 SISYS_MINIO_SECRET_KEY 环境变量}"
       MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
     volumes:
       - ${SISYS_DATA_DIR:-$HOME/Library/Application Support/Sisys}/data/minio-data:/data

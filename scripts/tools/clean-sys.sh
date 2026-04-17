@@ -555,29 +555,29 @@ clean_local_docker() {
 
     log_info "本地 Docker 可用, 执行清理..."
 
-    #--------- 0. 停止并删除所有容器 ---------
-    log_subheader "停止并删除所有容器"
-    local containers
-    containers=$(docker ps -aq 2>/dev/null || echo "")
-    local container_count
-    container_count=$(safe_wc "$containers")
+    # #--------- 0. 停止并删除所有容器 ---------
+    # log_subheader "停止并删除所有容器"
+    # local containers
+    # containers=$(docker ps -aq 2>/dev/null || echo "")
+    # local container_count
+    # container_count=$(safe_wc "$containers")
 
-    if [ -n "$containers" ]; then
-        if [ "$DRY_RUN" = true ]; then
-            log_warn "[DRY-RUN] Would stop/remove $container_count containers"
-        else
-            echo "$containers" | xargs -r docker stop 2>/dev/null || true
-            containers=$(docker ps -aq 2>/dev/null || echo "")
-            [ -n "$containers" ] && echo "$containers" | xargs -r docker rm -f 2>/dev/null || true
-            STATS_CONTAINERS=$((STATS_CONTAINERS + container_count))
-        fi
-    else
-        log_info "无运行中的容器"
-    fi
+    # if [ -n "$containers" ]; then
+    #     if [ "$DRY_RUN" = true ]; then
+    #         log_warn "[DRY-RUN] Would stop/remove $container_count containers"
+    #     else
+    #         echo "$containers" | xargs -r docker stop 2>/dev/null || true
+    #         containers=$(docker ps -aq 2>/dev/null || echo "")
+    #         [ -n "$containers" ] && echo "$containers" | xargs -r docker rm -f 2>/dev/null || true
+    #         STATS_CONTAINERS=$((STATS_CONTAINERS + container_count))
+    #     fi
+    # else
+    #     log_info "无运行中的容器"
+    # fi
 
     #--------- 1. 清理 BuildKit ---------
     log_subheader "BuildKit 缓存"
-    run_cmd docker builder prune -af --reserved-space=10g 2>/dev/null || true
+    run_cmd docker builder prune -af 2>/dev/null || true
 
     #--------- 2. 清理镜像 ---------
     log_subheader "镜像 prune"
@@ -585,7 +585,7 @@ clean_local_docker() {
 
     #--------- 3. 清理 overlay2 ---------
     log_subheader "系统 prune (overlay2)"
-    run_cmd docker system prune -f 2>/dev/null || true
+    run_cmd docker system prune -af 2>/dev/null || true
 
     #--------- 4. 清理未使用 volumes ---------
     log_subheader "Volumes prune"

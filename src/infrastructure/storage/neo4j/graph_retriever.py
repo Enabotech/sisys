@@ -48,8 +48,10 @@ class GraphRetriever:
             相关实体列表，按关系权重/置信度排序
         """
         driver = self._get_driver()
-        cypher = """
-        MATCH path = (start {id: $entity_id})-[*1..$max_depth]-(related)
+        # Cypher doesn't support parameters in variable-length patterns,
+        # so we construct the pattern with literal value
+        cypher = f"""
+        MATCH path = (start {{id: $entity_id}})-[*1..{max_depth}]-(related)
         WHERE start <> related
         WITH related, length(path) as hops, count(*) as connection_count
         ORDER BY connection_count DESC, hops ASC
@@ -60,7 +62,6 @@ class GraphRetriever:
             result = await session.run(
                 cypher,
                 entity_id=entity_id,
-                max_depth=max_depth,
                 limit=limit,
             )
             records = await result.data()
