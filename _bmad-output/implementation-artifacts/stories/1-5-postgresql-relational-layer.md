@@ -1,6 +1,6 @@
 # Story 1.5: PostgreSQL Relational Layer
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -764,7 +764,7 @@ sisys/
 - [x] 故事需求从 `epics_v1.0.md` 提取
 - [x] 架构约束从 `architecture.md` 提取
 - [x] 前一个故事学习经验整合（Story 1.3/1.4 配置模式、接口分离、连接池管理）
-- [x] 状态设置为 `ready-for-dev`
+- [x] 状态设置为 `done`
 - [x] SDD+TDD 融合开发要求定义完成（Task 0 前置 + 7 个实现 Task）
 - [x] 项目结构对齐统一规范
 - [x] FR 追溯矩阵完整（FR-AR-03, FR-AR-04, FR-SC-01, FR-SC-02, FR-SC-03, FR-CP-01）
@@ -836,7 +836,7 @@ sisys/
 | **Story ID** | 1.5 |
 | **Story Key** | 1-5-postgresql-relational-layer |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-5-postgresql-relational-layer.md` |
-| **Status** | `ready-for-dev` |
+| **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 3: 五层存储架构 |
 | **优先级** | P0-5（基础架构，用户/RBAC/Outbox 持久化基础） |
@@ -849,7 +849,7 @@ sisys/
 | **前置依赖** | Story 1.1 六边形架构骨架 | ✅ done | 提供领域层接口定义基础 |
 | **前置依赖** | Story 1.2 领域事件定义 | ✅ done | 提供 DomainEvent 基类与 EventOutboxAdapter |
 | **前置依赖** | Story 1.3 事件总线实现 | ✅ done | 提供 OutboxRepository 接口定义 |
-| **前置依赖** | Story 1.4 Redis 缓存层 | ready-for-dev | 配置模式参考（无代码依赖） |
+| **前置依赖** | Story 1.4 Redis 缓存层 | done | 配置模式参考（无代码依赖） |
 
 ### 下一步 Next Steps
 
