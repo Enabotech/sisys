@@ -1,0 +1,311 @@
+# Prometheus Adapter - 将 Prometheus 指标转换为 K8s External Metrics API
+#
+# Story 1.13: K8s 动态扩缩容
+# 用于 HPA 基于自定义业务指标 (sisys_agent_sessions_active 等) 进行扩缩容
+#
+# 部署方式:
+#   kubectl apply -f deploy/kubernetes/metrics/prometheus-adapter.yaml
+#
+# 验证 External Metrics API:
+#   kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/sisys/sisys_agent_sessions_active"
+#
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes/metrics
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resourceNames:
+  - "extension-apiserver-authentication-reader"
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-adapter
+subjects:
+- kind: ServiceAccount
+  name: prometheus-adapter
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter-auth-reader
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - "extension-apiserver-authentication-reader"
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-adapter-auth-reader
+subjects:
+- kind: ServiceAccount
+  name: prometheus-adapter
+  namespace: kube-system
+---
+# Prometheus Adapter 配置文件
+# 定义如何从 Prometheus 抓取指标并转换为 External Metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    # Prometheus Adapter 配置
+    # 将 Prometheus 指标映射为 K8s External Metrics
+
+    rules:
+      # SISYS 自定义业务指标
+      # 这些指标会被转换为 K8s External Metrics API
+    - seriesQuery: 'sisys_agent_sessions_active'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    - seriesQuery: 'sisys_task_queue_length'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    - seriesQuery: 'sisys_events_processing_rate'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    - seriesQuery: 'sisys_cache_hit_rate'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    # Kubernetes HPA 指标 (来自 kube-state-metrics)
+    - seriesQuery: 'kube_hpa_status_current_replicas'
+      resources:
+        template: '<<.resource>>'
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    - seriesQuery: 'kube_hpa_status_desired_replicas'
+      resources:
+        template: '<<.resource>>'
+      name:
+        matches: '^(.*)$'
+        as: '${1}'
+
+    # Prometheus 服务器配置
+    prometheus:
+      # 指向 Prometheus Server Service
+      url: http://prometheus-server.monitoring.svc.cluster.local
+      port: 9090
+      path: /api/v1/query
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: prometheus-adapter
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: prometheus-adapter
+    spec:
+      containers:
+      - args:
+        - --secure-port=6443
+        - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384
+        - --config=/etc/adapter/config.yaml
+        image: harbor.sisys.local/sisys/tools/prometheus-community/prometheus-adapter:v0.14.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 6443
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: prometheus-adapter
+        ports:
+        - containerPort: 6443
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 6443
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /etc/adapter
+          name: config
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: prometheus-adapter
+      volumes:
+      - configMap:
+          items:
+          - key: config.yaml
+            path: config.yaml
+          name: prometheus-adapter-config
+        name: config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: prometheus-adapter
+  namespace: kube-system
+spec:
+  ports:
+  - appProtocol: https
+    name: https
+    port: 443
+    protocol: TCP
+    targetPort: 6443
+  selector:
+    k8s-app: prometheus-adapter
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  type: ClusterIP
+---
+# External Metrics APIService 注册
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  labels:
+    k8s-app: prometheus-adapter
+  name: v1beta1.external.metrics.k8s.io
+spec:
+  group: external.metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true
+  service:
+    name: prometheus-adapter
+    namespace: kube-system
+  version: v1beta1
+  versionPriority: 100

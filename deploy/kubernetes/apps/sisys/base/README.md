@@ -19,15 +19,38 @@ HPA 的 `External Metrics` 需要通过 **Prometheus Adapter**（如 `prometheus
 | 组件 | 负责方 | 说明 |
 |------|--------|------|
 | Prometheus Server | Story 0.4 / 运维团队 | 抓取应用 `/metrics` 端点 |
-| Prometheus Adapter | Story 0.4 / 运维团队 | 将 Prometheus 指标转换为 K8s External Metrics |
-| HPA 配置 | Story 1.13（本 Story） | 基于自定义指标的扩缩容策略 |
+| Prometheus Adapter | ✅ 已配置 (Story 1.13) | 将 Prometheus 指标转换为 K8s External Metrics |
+| HPA 配置 | ✅ 已配置 (Story 1.13) | 基于自定义指标的扩缩容策略 |
 
-### Prometheus Adapter 部署步骤
+### Prometheus Adapter 部署
 
-1. **安装 prometheus-adapter**:
+**配置文件**: `deploy/kubernetes/metrics/prometheus-adapter.yaml`
+
+**部署命令**:
+```bash
+kubectl apply -f deploy/kubernetes/metrics/prometheus-adapter.yaml
+```
+
+**部署步骤**:
+
+1. **部署 prometheus-adapter**:
    ```bash
-   helm install prometheus-adapter prometheus-community/prometheus-adapter \
-     -n kube-system \
+   kubectl apply -f deploy/kubernetes/metrics/prometheus-adapter.yaml
+   ```
+
+2. **验证 External Metrics API 可用**:
+   ```bash
+   kubectl get apiservice v1beta1.external.metrics.k8s.io
+   # 应显示: Available
+
+   # 测试查询 SISYS 指标:
+   kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/sisys/sisys_agent_sessions_active"
+   ```
+
+3. **验证 HPA 能看到外部指标**:
+   ```bash
+   kubectl describe hpa sisys-app
+   # 应显示 External metrics 配置
      --set prometheus.url=http://prometheus-server \
      --set prometheus.port=9090 \
      --set rules.custom[0].seriesQuery='sisys_agent_sessions_active'
