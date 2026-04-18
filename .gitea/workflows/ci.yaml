@@ -243,6 +243,8 @@ jobs:
 
       - name: 初始化环境
         run: |
+          pwd
+          ls -la .env
           set -a
           . .env
           set +a
