@@ -5,6 +5,7 @@ TDD Red phase - tests should fail before implementation.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -219,3 +220,95 @@ class TestAuthService:
         result = await auth_service.get_user_by_id(uuid4())
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_account_locked(self, auth_service, mock_user_repo, mock_role_repo):
+        """Should raise AccountLockedError when account is locked."""
+        from datetime import timedelta
+
+        from src.infrastructure.security.auth_service import AccountLockedError
+
+        user_id = uuid4()
+        locked_until = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=30)
+
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.username = "lockeduser"
+        mock_user.email = "locked@example.com"
+        mock_user.hashed_password = auth_service.hash_password("Test123!")
+        mock_user.is_active = True
+        mock_user.failed_login_attempts = 5
+        mock_user.locked_until = locked_until
+
+        mock_user_repo.get_by_username = AsyncMock(return_value=mock_user)
+
+        with pytest.raises(AccountLockedError):
+            await auth_service.authenticate("lockeduser", "Test123!")
+
+    @pytest.mark.asyncio
+    async def test_authenticate_empty_password_fails(self, auth_service, mock_user_repo, mock_role_repo):
+        """Should raise InvalidCredentialsError when hashed_password is empty."""
+        user_id = uuid4()
+
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.username = "testuser"
+        mock_user.email = "test@example.com"
+        mock_user.hashed_password = ""  # Empty password
+        mock_user.is_active = True
+        mock_user.failed_login_attempts = 0
+        mock_user.locked_until = None
+
+        mock_user_repo.get_by_username = AsyncMock(return_value=mock_user)
+
+        with pytest.raises(InvalidCredentialsError):
+            await auth_service.authenticate("testuser", "anypassword")
+
+    @pytest.mark.asyncio
+    async def test_authenticate_wrong_password_increments_attempts(self, auth_service, mock_user_repo, mock_role_repo):
+        """Should increment failed_login_attempts on wrong password."""
+        from src.infrastructure.security.auth_service import InvalidCredentialsError
+
+        user_id = uuid4()
+
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.username = "testuser"
+        mock_user.email = "test@example.com"
+        mock_user.hashed_password = auth_service.hash_password("CorrectPassword!")  # pragma: allowlist secret
+        mock_user.is_active = True
+        mock_user.failed_login_attempts = 2
+        mock_user.locked_until = None
+        mock_user.save = AsyncMock()
+
+        mock_user_repo.get_by_username = AsyncMock(return_value=mock_user)
+
+        with pytest.raises(InvalidCredentialsError):
+            await auth_service.authenticate("testuser", "WrongPassword!")
+
+        assert mock_user.failed_login_attempts == 3
+
+    @pytest.mark.asyncio
+    async def test_authenticate_success_resets_failed_attempts(self, auth_service, mock_user_repo, mock_role_repo):
+        """Should reset failed_login_attempts on successful login."""
+        user_id = uuid4()
+
+        # Create a mock user with failed_login_attempts > 0
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.username = "testuser"
+        mock_user.email = "test@example.com"
+        mock_user.hashed_password = auth_service.hash_password("CorrectPassword!")  # pragma: allowlist secret
+        mock_user.is_active = True
+        mock_user.failed_login_attempts = 3  # Set to non-zero value
+        mock_user.locked_until = None
+        mock_user.save = AsyncMock()
+
+        mock_user_repo.get_by_username = AsyncMock(return_value=mock_user)
+
+        with patch.object(auth_service, "get_user_roles", return_value=["admin"]):
+            result = await auth_service.authenticate("testuser", "CorrectPassword!")
+
+        assert "access_token" in result
+        # Verify failed attempts were reset to 0
+        assert mock_user.failed_login_attempts == 0
