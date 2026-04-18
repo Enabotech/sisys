@@ -1,7 +1,7 @@
 """Integration tests for Authentication and Authorization.
 
 End-to-end tests for the complete auth flow.
-Requires PostgreSQL running at localhost:5432.
+Requires PostgreSQL running and accessible.
 """
 
 from __future__ import annotations
@@ -31,10 +31,24 @@ from src.infrastructure.storage.postgresql.user_repository import UserRepository
 # Load .env file from project root
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-# Skip if PostgreSQL is not available
+
+def is_postgres_available() -> bool:
+    """Check if PostgreSQL is actually reachable."""
+    try:
+        from src.infrastructure.config.postgresql import PostgreSQLConfig
+
+        config = PostgreSQLConfig.from_env()
+        engine = DatabaseEngine(config)
+        # Use health_check method instead of accessing private attribute
+        return asyncio.run(engine.health_check())
+    except Exception:
+        return False
+
+
+# Skip if PostgreSQL is not actually available
 pytestmark = pytest.mark.skipif(
-    os.getenv("POSTGRES_HOST") is None,
-    reason="PostgreSQL not available",
+    not is_postgres_available(),
+    reason="PostgreSQL not available or not reachable",
 )
 
 
