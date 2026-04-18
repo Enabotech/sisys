@@ -1,7 +1,7 @@
 # SDD+TDD 融合模式实施检查清单
 
-**版本:** 1.0.0
-**日期:** 2026-03-04
+**版本:** 1.1.0
+**日期:** 2026-04-18
 **用途:** 每个 Story 开发时的检查清单
 ---
 
@@ -110,6 +110,62 @@ $ mypy src/<TARGET>
 $ pytest tests/unit/<TARGET> -v
 PASSED ... (必须全部通过！)
 ```
+
+### 5.5 测试隔离与数据清理
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+
+#### 数据库测试隔离规则
+
+- [ ] **集成测试使用 transaction rollback**，禁止手动 `delete`/`truncate`
+- [ ] **Schema 初始化在 fixture 内完成**，不依赖外部迁移命令
+- [ ] **每个测试创建自己的测试数据**，不依赖预置数据
+- [ ] **测试数据使用唯一标识符**（如 `uuid4()`），避免 ID 冲突
+
+**正确模式：**
+```python
+# ✅ 使用 transaction rollback 清理
+@pytest.fixture
+async def session(db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
+    async with db_engine.get_async_session() as sess:
+        async with sess.begin_nested():  # 开启嵌套事务
+            yield sess
+        # 嵌套事务退出时自动 rollback
+```
+
+**错误模式（禁止）：**
+```python
+# ❌ 手动删除数据（不可靠，破坏完整性约束）
+# await session.execute(delete(UserModel).where(...))
+
+# ❌ 依赖外部迁移（不可控，CI 可能失败）
+# subprocess.run(["alembic", "upgrade", "head"], ...)
+```
+
+**Schema 初始化标准模式：**
+```python
+# ✅ 测试 fixture 内确保 schema 存在
+@pytest.fixture(scope="module")
+def ensure_schema(pg_config: PostgreSQLConfig):
+    try:
+        run_alembic_upgrade(pg_config)  # 优先 alembic
+    except Exception:
+        engine = DatabaseEngine(pg_config)
+        Base.metadata.create_all(engine.get_sync_engine())  # Fallback
+    yield
+```
+
+#### 外部服务隔离规则
+
+- [ ] **Redis 测试前清理或使用 fakeredis**
+- [ ] **Neo4j/Qdrant 测试数据用唯一标识符隔离**
+- [ ] **外部 API 调用使用 mock/stub**
+
+**违反约束的后果：**
+- ❌ 测试间相互影响（数据泄漏导致随机失败）
+- ❌ 测试依赖执行顺序（违反 pytest 独立性原则）
+- ❌ CI 环境与本地环境不一致
+- ❌ 并行测试失败（共享数据竞争）
 
 ---
 

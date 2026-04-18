@@ -130,6 +130,68 @@
 - [ ] **无 P0/P1 级别问题**（代码审查）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
+#### 测试隔离与数据清理约束
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+
+**数据库测试隔离规则：**
+
+| 规则 | 要求 | 实现方式 |
+|------|------|----------|
+| **事务隔离** | 每个测试在独立 transaction 中执行 | pytest fixture + `session.begin_nested()` 或 `begin_rollback` |
+| **自动回滚** | 测试结束后自动 rollback | fixture `yield` 后执行 `await session.rollback()` |
+| **Schema 自创建** | 测试不依赖外部迁移 | fixture 内调用 `Base.metadata.create_all()` 或 alembic fallback |
+| **外部服务隔离** | Redis/Neo4j/Qdrant 等需清理或用 fakeredis | fixture 内清理或 scope="module" 复用 |
+
+**事务回滚标准模式（必须遵守）：**
+
+```python
+# ✅ 正确：使用 transaction rollback 清理
+@pytest.fixture
+async def session(db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
+    async with db_engine.get_async_session() as sess:
+        # 开启嵌套事务
+        async with sess.begin_nested():
+            yield sess
+        # 测试结束后自动 rollback（嵌套事务退出时执行）
+
+# ❌ 错误：手动删除数据（不可靠，且破坏数据完整性约束）
+#    await session.execute(delete(UserModel).where(...))
+```
+
+**Schema 初始化标准模式：**
+
+```python
+# ✅ 正确：测试 fixture 内确保 schema 存在
+@pytest.fixture(scope="module")
+def ensure_schema(pg_config: PostgreSQLConfig):
+    """Ensure schema exists before tests run."""
+    try:
+        # 优先 alembic 迁移
+        run_alembic_upgrade(pg_config)
+    except Exception:
+        # Fallback: 直接用 SQLAlchemy 创建
+        engine = DatabaseEngine(pg_config)
+        Base.metadata.create_all(engine.get_sync_engine())
+    yield  # 测试运行
+    # 无需清理：事务回滚处理
+```
+
+**违反约束的后果：**
+
+- ❌ 测试间相互影响（数据泄漏导致随机失败）
+- ❌ 测试依赖执行顺序（违反 pytest 独立性原则）
+- ❌ CI 环境与本地环境不一致（外部状态差异）
+- ❌ 并行测试失败（共享数据竞争）
+
+**检查清单：**
+
+- [ ] **集成测试使用 transaction rollback**，禁止手动 `delete`/`truncate`
+- [ ] **Schema 初始化在 fixture 内完成**，不依赖外部迁移命令
+- [ ] **外部服务（Redis/Neo4j/Qdrant）测试前清理或使用 fakeredis**
+- [ ] **每个测试创建自己的测试数据**，不依赖预置数据
+- [ ] **测试数据使用唯一标识符**（如 `uuid4()`），避免 ID 冲突
+
 ---
 
 ## 📊 AC → Task → Subtask 追溯矩阵
@@ -468,7 +530,7 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.0.0
+**模板版本/Template Version:** 2.1.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-04-12
-**更新说明:** 基于对抗性审查经验全面重构：(1) SDD 规范定义改为 Task 0 必选前置；(2) TDD 循环内化到每个 Task，禁止测试与实现分离；(3) 增加测试分类与归属表；(4) 增加 AC→Task→Subtask 追溯矩阵；(5) 骨架 Story 覆盖率豁免指引；(6) 循环依赖检测统一为 ruff/isort
+**最后更新/Last Updated:** 2026-04-18
+**更新说明:** 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback 清理测试数据；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate；(4) 外部服务必须隔离或使用 mock；(5) 测试数据必须使用唯一标识符
