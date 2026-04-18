@@ -163,10 +163,19 @@ def require_permission(resource: str, action: str) -> Callable:
 
         Raises:
             HTTPException: 403 if permission denied.
+            HTTPException: 401 if user_id is invalid.
         """
         from uuid import UUID
 
-        user_id = UUID(current_user["user_id"])
+        try:
+            user_id = UUID(current_user["user_id"])
+        except (ValueError, KeyError, TypeError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid user_id in token",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+
         roles = current_user.get("roles", [])
 
         # Admin role has all permissions

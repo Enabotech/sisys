@@ -1,6 +1,6 @@
 # Story 1.13: K8s 动态扩缩容
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -445,7 +445,7 @@ output = generate_latest()
   - prometheus_client `^0.21.1`（项目内已安装，指标暴露）
   - K8s HPA（自动扩缩容，依赖 prometheus-adapter）
   - K3S v1.34.5（K8s 运行时）
-  - **多进程注意**: FastAPI + Uvicorn 多 worker 时使用 `generate_latest()` 聚合
+  - **多进程注意**: FastAPI + Gunicorn 多 worker 时使用 `prometheus_client.multiprocess` 模式
 
 ### 关键架构决策
 
@@ -455,6 +455,35 @@ output = generate_latest()
 |------|------|------|------|
 | **使用 prometheus_client 库** | 标准库，Prometheus 原生支持 | 引入额外依赖 | ✅ 9/10 |
 | 自定义 Prometheus 格式 | 无额外依赖 | 格式兼容风险 | 6/10 |
+
+#### 多进程指标架构决策
+
+**问题**: Gunicorn 多 worker 模式下，每个 worker 是独立进程，有独立内存空间。`EventMetricsCollector` 的内存计数器无法跨进程共享，导致 Prometheus 抓取时只能看到当前 worker 的数据。
+
+**已选择方案**: `prometheus_client.multiprocess` 模式
+
+| 评估维度 | 方案A: multiprocess | 方案B: 单Worker | 方案C: PushGateway |
+|----------|---------------------|----------------|-------------------|
+| 数据准确性 | ✅ 完美 | ✅ 完美 | ⚠️ 有延迟 |
+| 实现复杂度 | 中 | 极简 | 中 |
+| 运维成本 | 无额外依赖 | 无 | PushGateway 依赖 |
+| HPA 友好度 | ✅ 实时 | ✅ 实时 | ⚠️ 有延迟 |
+| **采用** | **✅ 已选择** | 不采用 | 不采用 |
+
+**实现要求**:
+- 环境变量 `prometheus_multiproc_dir` 必须设置为持久化目录
+- 应用容器需配置共享 volume 挂载该目录
+- `MetricsAggregator.collect()` 需使用 `generate_latest(registry)` 的多进程版本
+
+**部署配置示例**:
+```yaml
+# docker-compose / K8s Deployment
+env:
+  - name: prometheus_multiproc_dir
+    value: /tmp/prom_metrics
+volumes:
+  - prometheus_metrics:/tmp/prom_metrics
+```
 
 ### 项目结构说明 Project Structure
 

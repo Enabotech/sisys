@@ -5,7 +5,8 @@
       "WebSearch",
       "Bash(curl -sL \"https://github.com/bmad-code-org/BMAD-METHOD/pull/2255\")",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(python -m pytest tests/unit/interfaces/api/test_metrics_endpoint.py tests/unit/infrastructure/monitoring/test_business_metrics.py tests/unit/infrastructure/monitoring/test_metrics_aggregator.py -v --tb=short)"
     ]
   }
 }

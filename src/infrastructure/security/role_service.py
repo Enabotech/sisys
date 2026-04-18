@@ -346,6 +346,13 @@ class RoleService:
         if result.scalar_one_or_none():
             return True  # Already assigned
 
+        # Check max roles per user limit
+        max_roles_per_user = 10
+        result = await self._session.execute(select(user_roles_table.c.user_id).where(user_roles_table.c.user_id == user_id))
+        current_roles = len(result.scalars().all())
+        if current_roles >= max_roles_per_user:
+            raise ValueError(f"User already has maximum number of roles ({max_roles_per_user})")
+
         # Assign role
         await self._session.execute(
             user_roles_table.insert().values(
@@ -418,14 +425,18 @@ class RoleService:
 
     async def _get_or_create_permission(self, permission_str: str) -> PermissionModel:
         """Get or create a permission by string."""
+        # Validate permission format
+        if not permission_str or ":" not in permission_str or permission_str.startswith(":"):
+            raise ValueError(f"Invalid permission format: '{permission_str}'. Expected 'resource:action'")
+
         perm = await self._get_permission_by_string(permission_str)
         if perm:
             return perm
 
         # Parse resource and action
         parts = permission_str.split(":", 1)
-        resource = parts[0] if len(parts) > 0 else "*"
-        action = parts[1] if len(parts) > 1 else "*"
+        resource = parts[0]
+        action = parts[1]
 
         perm = PermissionModel(
             id=uuid4(),

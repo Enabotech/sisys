@@ -9,6 +9,7 @@ Story 1.13: K8s 动态扩缩容
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from fastapi import APIRouter, Response
@@ -69,9 +70,10 @@ def create_metrics_router(
     return router
 
 
-# 全局路由实例（延迟初始化）
+# 全局路由实例（延迟初始化，线程安全）
 _metrics_router: APIRouter | None = None
 _metrics_aggregator: MetricsAggregator | None = None
+_init_lock = threading.Lock()
 
 
 def get_metrics_router(
@@ -79,7 +81,7 @@ def get_metrics_router(
     business_metrics_collector: Any = None,
     registry: Any = None,
 ) -> APIRouter:
-    """获取 metrics 路由实例。
+    """获取 metrics 路由实例（线程安全延迟初始化）。
 
     Args:
         event_metrics_collector: EventMetricsCollector 实例
@@ -92,23 +94,26 @@ def get_metrics_router(
     global _metrics_router, _metrics_aggregator  # noqa: PLW0603
 
     if _metrics_router is None:
-        from prometheus_client import REGISTRY
+        with _init_lock:
+            # 双重检查锁定 (Double-Checked Locking)
+            if _metrics_router is None:
+                from prometheus_client import REGISTRY
 
-        from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
-        from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
+                from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
+                from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
-        if event_metrics_collector is None:
-            event_metrics_collector = EventMetricsCollector()
-        if business_metrics_collector is None:
-            business_metrics_collector = BusinessMetricsCollector(registry=registry or REGISTRY)
+                if event_metrics_collector is None:
+                    event_metrics_collector = EventMetricsCollector()
+                if business_metrics_collector is None:
+                    business_metrics_collector = BusinessMetricsCollector(registry=registry or REGISTRY)
 
-        _metrics_aggregator = MetricsAggregator(
-            event_metrics_collector=event_metrics_collector,
-            business_metrics_collector=business_metrics_collector,
-            registry=registry or REGISTRY,
-        )
+                _metrics_aggregator = MetricsAggregator(
+                    event_metrics_collector=event_metrics_collector,
+                    business_metrics_collector=business_metrics_collector,
+                    registry=registry or REGISTRY,
+                )
 
-        metrics_config = MetricsConfig.from_env()
-        _metrics_router = create_metrics_router(_metrics_aggregator, metrics_config)
+                metrics_config = MetricsConfig.from_env()
+                _metrics_router = create_metrics_router(_metrics_aggregator, metrics_config)
 
     return _metrics_router
