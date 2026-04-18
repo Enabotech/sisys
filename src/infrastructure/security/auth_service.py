@@ -8,7 +8,7 @@ Reference: architecture.md - ADR-010 JWT local auth decision.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
@@ -117,7 +117,7 @@ class AuthServiceImpl:
         # For now, we use simple logic; can be enhanced with Redis for distributed locking
         # Note: UserModel would need these fields - if not present, we skip this check
         if hasattr(user, "locked_until") and user.locked_until:
-            if user.locked_until > datetime.utcnow():
+            if user.locked_until > datetime.now(UTC).replace(tzinfo=None):
                 raise AccountLockedError(
                     f"Account locked due to multiple failed attempts. " f"Try again after {user.locked_until.isoformat()}"
                 )
@@ -136,7 +136,9 @@ class AuthServiceImpl:
                     if hasattr(user, "lock_account"):
                         user.lock_account(self._config.lockout_duration_minutes)
                     elif hasattr(user, "locked_until"):
-                        user.locked_until = datetime.utcnow() + timedelta(minutes=self._config.lockout_duration_minutes)
+                        user.locked_until = datetime.now(UTC).replace(tzinfo=None) + timedelta(
+                            minutes=self._config.lockout_duration_minutes
+                        )
 
                 await self._user_repo.save(user)
 

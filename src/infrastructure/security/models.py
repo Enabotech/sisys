@@ -7,7 +7,7 @@ in the infrastructure layer, not SQLAlchemy models.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -175,7 +175,7 @@ class User:
         """
         if self.locked_until is None:
             return False
-        return datetime.utcnow() < self.locked_until
+        return datetime.now(UTC).replace(tzinfo=None) < self.locked_until
 
     def increment_failed_login(self) -> None:
         """Increment failed login attempt counter."""
@@ -193,4 +193,4 @@ class User:
         """
         from datetime import timedelta
 
-        self.locked_until = datetime.utcnow() + timedelta(minutes=duration_minutes)
+        self.locked_until = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=duration_minutes)

@@ -1,5 +1,10 @@
 ---
 # SISYS 应用 HorizontalPodAutoscaler
+# Story 1.13: K8s 动态扩缩容
+#
+# 支持两类指标:
+# - Resource (CPU/memory): K8s metrics-server 提供
+# - External: Prometheus Adapter 将 Prometheus 指标转换为 K8s External Metrics API
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -15,6 +20,7 @@ spec:
   minReplicas: 1
   maxReplicas: 5
   metrics:
+    # Resource metrics (K8s metrics-server)
     - type: Resource
       resource:
         name: cpu
@@ -27,3 +33,15 @@ spec:
         target:
           type: Utilization
           averageUtilization: 80
+    # External metrics (Prometheus Adapter)
+    # 需要 prometheus-adapter 将 sisys_agent_sessions_active 转换为 External Metrics
+    - type: External
+      external:
+        metric:
+          name: sisys_agent_sessions_active
+          selector:
+            matchLabels:
+              namespace: sisys
+        target:
+          type: AverageValue
+          averageValue: "10"  # 平均每个 Pod 10 个活跃会话时扩容
