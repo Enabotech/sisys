@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 
 from src.infrastructure.config.auth import AuthConfig, get_auth_config
 
@@ -134,7 +134,7 @@ class JWTService:
                 ),
             )
             return dict(payload)
-        except jwt.ExpiredSignatureError as e:
+        except ExpiredSignatureError as e:
             raise TokenExpiredError("Token has expired") from e
         except JWTError as e:
             raise InvalidTokenError(f"Invalid token: {e}") from e
