@@ -48,7 +48,7 @@ class TestConfig:
     # Harbor 默认配置
     HARBOR_DEFAULTS = {
         "node_ip": "localhost",
-        "nodeport": 443,  # 使用标准 HTTPS 端口（而非 31448）
+        "nodeport": 31448,  # 使用标准 HTTPS 端口（而非 31448）
         "namespace": "harbor",
         "ingress_host": "harbor.sisys.local",
         "admin_password": os.environ.get("HARBOR_PASSWORD", "your_harbor_admin_password_here"),  # 从环境变量或 CI/CD 密钥获取
