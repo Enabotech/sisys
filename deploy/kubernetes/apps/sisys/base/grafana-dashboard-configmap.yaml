@@ -1,0 +1,16 @@
+# Grafana Dashboard ConfigMap Provisioning
+# Story 1.13: K8s 动态扩缩容
+#
+# 用于 Grafana 自动加载 Dashboard 配置
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sisys-grafana-dashboard
+  labels:
+    app.kubernetes.io/name: sisys-app
+    app.kubernetes.io/part-of: sisys
+    grafana_dashboard: "1"
+data:
+  k8s-autoscaling.json: |
+    {{ include "grafana-dashboard.json" . }}

@@ -7,6 +7,11 @@ metadata:
   labels:
     app.kubernetes.io/name: sisys-app
     app.kubernetes.io/part-of: sisys
+  annotations:
+    # Prometheus 抓取配置（Story 1.13 K8s 动态扩缩容）
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   ports:

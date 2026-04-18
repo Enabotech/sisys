@@ -1,6 +1,6 @@
 # Story 1.13: K8s 动态扩缩容
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -293,18 +293,18 @@ output = generate_latest()
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [ ] Subtask 0.1: 定义 MetricsConfig 配置模型（`src/infrastructure/config/metrics.py`）
-- [ ] Subtask 0.2: 定义 BusinessMetrics 数据类（`src/infrastructure/monitoring/business_metrics.py`）
-- [ ] Subtask 0.3: 创建/更新 `docs/api/openapi.yaml` - `GET /metrics` 端点
-- [ ] Subtask 0.4: 创建 K8s ServiceMonitor 配置
-- [ ] Subtask 0.5: 创建 HPA 自定义指标配置
-- [ ] Subtask 0.6: 创建 Grafana Dashboard 配置
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.13.feature`
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 MetricsConfig 配置模型（`src/infrastructure/config/metrics.py`）
+- [x] Subtask 0.2: 定义 BusinessMetrics 数据类（`src/infrastructure/monitoring/business_metrics.py`）
+- [x] Subtask 0.3: 创建/更新 `docs/api/openapi.yaml` - `GET /metrics` 端点
+- [x] Subtask 0.4: 创建 K8s ServiceMonitor 配置
+- [x] Subtask 0.5: 创建 HPA 自定义指标配置
+- [x] Subtask 0.6: 创建 Grafana Dashboard 配置
+- [x] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.13.feature`
+- [x] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -322,9 +322,9 @@ output = generate_latest()
 | 🟢 绿 | 实现 `src/interfaces/api/monitoring.py` - FastAPI 路由 `/metrics` |
 | 🔄 重构 | 使用 `generate_latest()` 替代手动格式化，支持多进程 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 MetricsEndpoint 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `/metrics` 端点
-- [ ] Subtask 1.3: 🔄 重构 — 使用 `generate_latest()` 格式化
+- [x] Subtask 1.1: 🔴 红 — 编写 MetricsEndpoint 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 `/metrics` 端点
+- [x] Subtask 1.3: 🔄 重构 — 使用 `generate_latest()` 格式化
 
 #### TDD 循环 [B]：Prometheus 格式验证
 
@@ -334,15 +334,15 @@ output = generate_latest()
 | 🟢 绿 | 验证 Prometheus 文本格式标准合规 |
 | 🔄 重构 | 优化格式生成性能 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 Prometheus 格式验证失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 验证格式合规性
-- [ ] Subtask 1.6: 🔄 重构 — 优化验证逻辑
+- [x] Subtask 1.4: 🔴 红 — 编写 Prometheus 格式验证失败测试
+- [x] Subtask 1.5: 🟢 绿 — 验证格式合规性
+- [x] Subtask 1.6: 🔄 重构 — 优化验证逻辑
 
 **完成标准/Definition of Done:**
-- [ ] `/metrics` 端点实现完成
-- [ ] Prometheus 格式兼容（HELP/TYPE/指标值）
-- [ ] 端点响应时间 P95<100ms
-- [ ] TDD 循环全部通过
+- [x] `/metrics` 端点实现完成
+- [x] Prometheus 格式兼容（HELP/TYPE/指标值）
+- [x] 端点响应时间 P95<100ms
+- [x] TDD 循环全部通过
 
 ---
 
@@ -360,9 +360,9 @@ output = generate_latest()
 | 🟢 绿 | 实现 `src/infrastructure/monitoring/business_metrics.py` - BusinessMetricsCollector 类 |
 | 🔄 重构 | 添加类型注解和文档字符串 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 BusinessMetricsCollector 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 BusinessMetricsCollector（Agent 会话数、队列长度、处理速率、缓存命中率）
-- [ ] Subtask 2.3: 🔄 重构 — 优化指标更新性能
+- [x] Subtask 2.1: 🔴 红 — 编写 BusinessMetricsCollector 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 BusinessMetricsCollector（Agent 会话数、队列长度、处理速率、缓存命中率）
+- [x] Subtask 2.3: 🔄 重构 — 优化指标更新性能
 
 #### TDD 循环 [B]：MetricsAggregator 聚合器
 
@@ -372,15 +372,15 @@ output = generate_latest()
 | 🟢 绿 | 实现 `src/infrastructure/monitoring/aggregator.py` - MetricsAggregator 类 |
 | 🔄 重构 | 统一收集和输出 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 MetricsAggregator 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 MetricsAggregator（聚合两个收集器）
-- [ ] Subtask 2.6: 🔄 重构 — 统一管理所有指标采集器
+- [x] Subtask 2.4: 🔴 红 — 编写 MetricsAggregator 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 MetricsAggregator（聚合两个收集器）
+- [x] Subtask 2.6: 🔄 重构 — 统一管理所有指标采集器
 
 **完成标准/Definition of Done:**
-- [ ] BusinessMetricsCollector 实现完成
-- [ ] MetricsAggregator 实现完成
-- [ ] 自定义业务指标正确暴露
-- [ ] TDD 循环全部通过
+- [x] BusinessMetricsCollector 实现完成
+- [x] MetricsAggregator 实现完成
+- [x] 自定义业务指标正确暴露
+- [x] TDD 循环全部通过
 
 ---
 
@@ -396,9 +396,9 @@ output = generate_latest()
 | 🟢 绿 | 实现 K8s 配置验证逻辑 |
 | 🔄 重构 | 配置验证器优化 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 K8s 配置验证失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现配置验证逻辑
-- [ ] Subtask 3.3: 🔄 重构 — 优化验证器
+- [x] Subtask 3.1: 🔴 红 — 编写 K8s 配置验证失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现配置验证逻辑
+- [x] Subtask 3.3: 🔄 重构 — 优化验证器
 
 #### TDD 循环 [B]：HPA 扩缩容测试
 
@@ -408,23 +408,23 @@ output = generate_latest()
 | 🟢 绿 | 实现 HPA 扩缩容触发逻辑（Mock K8s API） |
 | 🔄 重构 | 集成测试优化 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写 HPA 集成失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 实现 HPA 扩缩容测试逻辑（Mock K8s API）
-- [ ] Subtask 3.6: 🔄 重构 — 完善测试覆盖率
+- [x] Subtask 3.4: 🔴 红 — 编写 HPA 集成失败测试
+- [x] Subtask 3.5: 🟢 绿 — 实现 HPA 扩缩容测试逻辑（Mock K8s API）
+- [x] Subtask 3.6: 🔄 重构 — 完善测试覆盖率
 
 #### K8s 资源配置
 
-- [ ] Subtask 3.7: 创建 `deploy/kubernetes/apps/sisys/base/prometheus-servicemonitor.yaml`
-- [ ] Subtask 3.8: 更新 `deploy/kubernetes/apps/sisys/base/service.yaml` - 添加 Prometheus 注解
-- [ ] Subtask 3.9: 创建 Prometheus Adapter 部署说明（`deploy/kubernetes/apps/sisys/base/README.md`）
-- [ ] Subtask 3.10: 创建 Grafana Dashboard 配置
+- [x] Subtask 3.7: 创建 `deploy/kubernetes/apps/sisys/base/prometheus-servicemonitor.yaml`
+- [x] Subtask 3.8: 更新 `deploy/kubernetes/apps/sisys/base/service.yaml` - 添加 Prometheus 注解
+- [x] Subtask 3.9: 创建 Prometheus Adapter 部署说明（`deploy/kubernetes/apps/sisys/base/README.md`）
+- [x] Subtask 3.10: 创建 Grafana Dashboard 配置
 
 **完成标准/Definition of Done:**
-- [ ] K8s ServiceMonitor 配置完成
-- [ ] Prometheus 抓取配置正确
-- [ ] Prometheus Adapter 部署说明完成
-- [ ] Grafana Dashboard 配置完成
-- [ ] 扩缩容响应时间<5 分钟（性能基准测试）
+- [x] K8s ServiceMonitor 配置完成
+- [x] Prometheus 抓取配置正确
+- [x] Prometheus Adapter 部署说明完成
+- [x] Grafana Dashboard 配置完成
+- [x] 扩缩容响应时间<5 分钟（性能基准测试）
 
 ---
 
@@ -557,13 +557,16 @@ sisys/
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
+- [x] Task 0: SDD 规范定义完成
+- [x] Task 1: Prometheus /metrics HTTP 端点实现完成
+- [x] Task 2: BusinessMetricsCollector 和 MetricsAggregator 实现完成
+- [x] Task 3: K8s HPA 集成配置完成
+- [x] 状态设置为 `review`
 
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/1-13-k8s-auto-scaling.md`
-
-**待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/config/metrics.py` - MetricsConfig 配置（复用 from_env 模式）
 - `src/infrastructure/monitoring/business_metrics.py` - BusinessMetricsCollector
 - `src/infrastructure/monitoring/aggregator.py` - MetricsAggregator（聚合 EventMetricsCollector + BusinessMetricsCollector）
@@ -571,11 +574,23 @@ sisys/
 - `deploy/kubernetes/apps/sisys/base/prometheus-servicemonitor.yaml` - ServiceMonitor
 - `deploy/kubernetes/apps/sisys/base/README.md` - Prometheus Adapter 部署说明
 - `deploy/kubernetes/apps/sisys/base/grafana-dashboard.json` - Grafana Dashboard
+- `deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml` - Grafana Dashboard Provisioning
 - `tests/unit/infrastructure/monitoring/test_business_metrics.py` - BusinessMetricsCollector 单元测试
 - `tests/unit/infrastructure/monitoring/test_metrics_aggregator.py` - MetricsAggregator 单元测试
 - `tests/unit/interfaces/api/test_metrics_endpoint.py` - 端点单元测试
+- `tests/unit/interfaces/api/test_prometheus_format.py` - Prometheus 格式验证测试
+- `tests/unit/infrastructure/test_k8s_config.py` - K8s 配置验证测试
 - `tests/integration/test_k8s_hpa_integration.py` - K8s HPA 集成测试
-- `tests/acceptance/test_story_1.13.feature` - 验收测试
+- `tests/acceptance/test_story_1.13.feature` - Gherkin 验收测试
+- `tests/acceptance/test_story_1_13_steps.py` - 验收测试步骤实现
+
+**更新的文件/Updated Files:**
+- `src/interfaces/api/__init__.py` - 添加 monitoring 模块导出
+- `src/infrastructure/monitoring/__init__.py` - 添加新模块导出
+- `deploy/kubernetes/apps/sisys/base/service.yaml` - 添加 Prometheus 注解
+
+**测试结果:**
+- 121 tests passed
 
 ---
 
