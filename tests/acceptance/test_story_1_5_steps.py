@@ -73,11 +73,21 @@ def event_loop():
 
 @pytest.fixture
 async def outbox_repo(db_engine: DatabaseEngine, ensure_alembic_migration) -> AsyncGenerator[PostgreSQLOutboxRepository, None]:
-    """Real PostgreSQL outbox repository."""
+    """Real PostgreSQL outbox repository with transaction rollback.
+
+    Uses begin_nested() to create a savepoint. After test completes,
+    the nested transaction is rolled back, ensuring test data is
+    cleaned up automatically.
+    """
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)
     repo = PostgreSQLOutboxRepository(session)
-    yield repo
+
+    # Start a nested transaction (savepoint) for rollback isolation
+    async with session.begin_nested():
+        yield repo
+    # Rollback happens automatically when nested context exits
+
     await session.close()
 
 

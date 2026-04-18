@@ -86,9 +86,16 @@ class TestAuthIntegration:
 
     @pytest.fixture
     async def session(self, db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
-        """Get database session."""
+        """Get database session with transaction rollback.
+
+        Uses begin_nested() to create a savepoint. After test completes,
+        the nested transaction is rolled back, ensuring test data is
+        cleaned up automatically.
+        """
         async with db_engine.get_async_session() as sess:
-            yield sess
+            async with sess.begin_nested():
+                yield sess
+            # Rollback happens automatically when nested context exits
 
     @pytest.fixture
     def auth_config(self) -> AuthConfig:
@@ -221,9 +228,16 @@ class TestRoleManagementIntegration:
 
     @pytest.fixture
     async def session(self, db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
-        """Get database session."""
+        """Get database session with transaction rollback.
+
+        Uses begin_nested() to create a savepoint. After test completes,
+        the nested transaction is rolled back, ensuring test data is
+        cleaned up automatically.
+        """
         async with db_engine.get_async_session() as sess:
-            yield sess
+            async with sess.begin_nested():
+                yield sess
+            # Rollback happens automatically when nested context exits
 
     @pytest.mark.asyncio
     async def test_create_and_query_role(self, session: AsyncSession):
