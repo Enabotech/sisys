@@ -7,7 +7,6 @@ Requires PostgreSQL running and accessible.
 from __future__ import annotations
 
 import asyncio
-import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from uuid import uuid4
@@ -39,10 +38,23 @@ def is_postgres_available() -> bool:
 
         config = PostgreSQLConfig.from_env()
         engine = DatabaseEngine(config)
-        # Use health_check method instead of accessing private attribute
         return asyncio.run(engine.health_check())
     except Exception:
         return False
+
+
+def ensure_schema_created() -> None:
+    """Create database schema if tables don't exist."""
+    try:
+        from src.infrastructure.config.postgresql import PostgreSQLConfig
+        from src.infrastructure.storage.postgresql.models import Base
+
+        config = PostgreSQLConfig.from_env()
+        engine = DatabaseEngine(config)
+        Base.metadata.create_all(engine.get_sync_engine())
+    except Exception:
+        # If schema creation fails, let tests fail naturally
+        pass
 
 
 # Skip if PostgreSQL is not actually available
@@ -64,18 +76,13 @@ class TestAuthIntegration:
 
     @pytest.fixture(scope="class")
     def db_engine(self) -> DatabaseEngine:
-        """Get database engine."""
+        """Get database engine and ensure schema exists."""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
 
-        config = PostgreSQLConfig(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            database=os.getenv("POSTGRES_DATABASE", "sisys"),
-            username=os.getenv("POSTGRES_USERNAME", "postgres"),
-            password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-        )
-
-        return DatabaseEngine(config)
+        config = PostgreSQLConfig.from_env()
+        engine = DatabaseEngine(config)
+        ensure_schema_created()
+        return engine
 
     @pytest.fixture
     async def session(self, db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
@@ -204,18 +211,13 @@ class TestRoleManagementIntegration:
 
     @pytest.fixture(scope="class")
     def db_engine(self) -> DatabaseEngine:
-        """Get database engine."""
+        """Get database engine and ensure schema exists."""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
 
-        config = PostgreSQLConfig(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            database=os.getenv("POSTGRES_DATABASE", "sisys"),
-            username=os.getenv("POSTGRES_USERNAME", "postgres"),
-            password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-        )
-
-        return DatabaseEngine(config)
+        config = PostgreSQLConfig.from_env()
+        engine = DatabaseEngine(config)
+        ensure_schema_created()
+        return engine
 
     @pytest.fixture
     async def session(self, db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
