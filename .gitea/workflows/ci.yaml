@@ -252,13 +252,13 @@ jobs:
 
           echo "等待所有服务健康..."
           for i in {1..30}; do
-            UNHEALTHY=$(docker compose -f ./deploy/app/docker-compose.yml ps --format json 2>/dev/null | grep -o '"Health":"unhealthy"' | wc -l || echo 0)
-            if [ "$UNHEALTHY" -eq 0 ]; then
+            if docker compose -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -qi "unhealthy"; then
+              echo "等待服务健康... ($i/30)"
+              sleep 2
+            else
               echo "✅ 所有服务已就绪"
               break
             fi
-            echo "等待服务健康... ($i/30) - $UNHEALTHY 个服务仍不健康"
-            sleep 2
           done
           docker compose -f ./deploy/app/docker-compose.yml ps
 
