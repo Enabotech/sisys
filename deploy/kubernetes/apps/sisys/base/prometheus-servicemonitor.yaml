@@ -1,0 +1,55 @@
+# Prometheus ServiceMonitor — K8s HPA 自定义指标采集
+# Story 1.13: K8s 动态扩缩容
+#
+# 说明:
+# - K8s HPA **不能直接使用 Prometheus 自定义指标**，需要 Prometheus Adapter
+#   (如 prometheus-adapter) 将 Prometheus 指标转换为 K8s External Metrics API
+# - 本配置用于 Prometheus Server 抓取应用指标
+# - Prometheus Adapter 部署由 Story 0.4 或运维团队负责
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sisys-app
+  labels:
+    app.kubernetes.io/name: sisys-app
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/managed-by: argocd
+    # Prometheus Operator 标签（用于 ServiceMonitor 发现）
+    release: prometheus
+spec:
+  # 抓取间隔（性能要求 ≤15 秒）
+  scrapeInterval: 15s
+  # 抓取超时
+  scrapeTimeout: 10s
+  # 目标命名空间
+  namespaceSelector:
+    matchNames:
+      - sisys
+  # 目标 Service 选择器
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sisys-app
+      app.kubernetes.io/part-of: sisys
+  # 端点配置
+  endpoints:
+    - port: http
+      path: /metrics
+      scheme: http
+      # 指标路径（根据 MetricsConfig.METRICS_PATH 配置）
+      # 认证配置（METRICS_AUTH_ENABLED=true 时启用）
+      # tlsConfig:
+      #   insecureSkipVerify: false
+  # 指标重标签
+  metricRelabelings:
+    # 示例：保留特定指标
+    # - sourceLabels: [__name__]
+    #   regex: 'sisys_.*'
+    #   action: keep
+  # 目标重标签
+  relabelings:
+    # 添加 sisys-app 标识
+    - sourceLabels: [__meta_kubernetes_service_name]
+      targetLabel: service
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace

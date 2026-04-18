@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import Engine, text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
@@ -29,6 +31,7 @@ class DatabaseEngine:
         self._async_engine: AsyncEngine | None = None
         self._sync_engine: Engine | None = None
         self._init_lock = asyncio.Lock()
+        self._async_session_maker: async_sessionmaker[AsyncSession] | None = None
 
     def _build_async_url(self) -> str:
         """构建异步引擎连接 URL。"""
@@ -104,3 +107,19 @@ class DatabaseEngine:
         if self._sync_engine is not None:
             self._sync_engine.dispose()
             self._sync_engine = None
+
+    @asynccontextmanager
+    async def get_async_session(self) -> AsyncIterator[AsyncSession]:
+        """获取异步会话上下文管理器。
+
+        Returns:
+            AsyncSession 实例作为异步上下文管理器
+        """
+        if self._async_session_maker is None:
+            self._async_session_maker = async_sessionmaker(
+                bind=self.get_async_engine(),
+                class_=AsyncSession,
+                expire_on_commit=False,
+            )
+        async with self._async_session_maker() as session:
+            yield session
