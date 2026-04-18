@@ -86,7 +86,7 @@ development_status:
   1-8-neo4j-graph-layer: done
   1-13-k8s-auto-scaling: done  # ✅ K8s动态扩缩容实现完成
   # 价值组 4: 安全与合规基础
-  1-9-rbac-permission-management: review  # 🔍 代码审查中
+  1-9-rbac-permission-management: done  # ✅ RBAC权限管理实现完成
   1-10-unified-audit-log: ready-for-dev  # ✅ Story 文件已创建
   1-11-data-sovereignty-isolation: ready-for-dev  # ✅ Story 文件已创建
   1-12-equilibrium-level-3-compliance: backlog
