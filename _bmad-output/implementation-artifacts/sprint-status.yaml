@@ -76,14 +76,14 @@ development_status:
   # 价值组 2: 架构基础与事件驱动
   1-1-hexagonal-architecture-skeleton: done
   1-2-domain-event-definition: done
-  1-3-event-bus-implementation: review            # ✅ OTLP 导出器配置补充实现完成
+  1-3-event-bus-implementation: done              # ✅ OTLP 导出器配置补充实现完成
   1-16-integration-test-framework: done
   # 价值组 3: 五层存储架构
-  1-4-redis-cache-layer: review                   # ✅ 性能基准<10ms, 优雅降级, JSON序列化, async迁移
-  1-5-postgresql-relational-layer: review         # ✅ PostgreSQL完整实现,部署配置完成
-  1-6-qdrant-vector-layer: review                 # ✅ Qdrant v1.7.0集成,部署准备完成
-  1-7-minio-object-layer: review                  # ✅ MinIO SDK集成,WORM/生命周期/断点续传
-  1-8-neo4j-graph-layer: review
+  1-4-redis-cache-layer: done                     # ✅ 性能基准<10ms, 优雅降级, JSON序列化, async迁移
+  1-5-postgresql-relational-layer: done           # ✅ PostgreSQL完整实现,部署配置完成
+  1-6-qdrant-vector-layer: done                   # ✅ Qdrant v1.7.0集成,部署准备完成
+  1-7-minio-object-layer: done                    # ✅ MinIO SDK集成,WORM/生命周期/断点续传
+  1-8-neo4j-graph-layer: done
   1-13-k8s-auto-scaling: ready-for-dev  # ✅ Story 文件已创建
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: ready-for-dev  # ✅ Story 文件已创建

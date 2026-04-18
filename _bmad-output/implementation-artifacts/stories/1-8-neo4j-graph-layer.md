@@ -1,6 +1,6 @@
 # Story 1.8: Neo4j Graph Layer
 
-**Status:** `review`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -761,7 +761,7 @@ sisys/
 | **Story ID** | 1.8 |
 | **Story Key** | 1-8-neo4j-graph-layer |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-8-neo4j-graph-layer.md` |
-| **Status** | `review` |
+| **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 3: 五层存储架构 |
 | **优先级** | P0 |
@@ -775,7 +775,7 @@ sisys/
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
 3. [x] Architecture constraints extracted 架构约束已提取（五层存储、节点/关系规范、多租户隔离、单向依赖链）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、懒初始化、循环依赖避免）
-5. [x] Sprint status synced to `review`（已与 sprint-status.yaml 同步）
+5. [x] Sprint status synced to `done`（已与 sprint-status.yaml 同步）
 6. [x] 全部 80 个测试通过，0 失败
 7. [x] Ruff 检查通过（0 错误）
 8. [x] MyPy 类型检查通过（0 问题）
@@ -798,10 +798,10 @@ sisys/
 ### 下一步 Next Steps
 
 - [x] Story implemented with all tasks completed
-- [x] Status set to `review`
+- [x] Status set to `done`
 - [x] 运行 `code-review` 进行代码审查
-- [ ] 部署 Neo4j 实例后验证集成测试（替换 Mock 为真实实例）
-- [ ] 部署 Neo4j 实例后最终完成验收测试（禁止使用 mock / fake）
+- [x] 部署 Neo4j 实例后验证集成测试（替换 Mock 为真实实例）
+- [x] 部署 Neo4j 实例后最终完成验收测试（禁止使用 mock / fake）
 
 ---
 
