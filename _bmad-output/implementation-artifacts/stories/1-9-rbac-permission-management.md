@@ -799,41 +799,41 @@ sisys/
 
 ### CRITICAL 严重问题 (需立即修复)
 
-- [ ] [Review][Patch] **Refresh token 不绑定原始角色，存在角色撤销后绕过风险** [auth_service.py:237-242]
+- [x] [Review][Patch] **Refresh token 不绑定原始角色，存在角色撤销后绕过风险** [auth_service.py:237-242] ✅ 已修复
   - token 刷新时获取的是当前角色，而非发行时的角色快照
-- [ ] [Review][Patch] **登录失败计数存在竞态条件，锁机制可被绕过** [auth_service.py:129-141]
+- [x] [Review][Patch] **登录失败计数存在竞态条件，锁机制可被绕过** [auth_service.py:129-141] ✅ 已修复
   - 并发请求可在计数更新前通过 lock 检查
-- [ ] [Review][Patch] **Refresh token 刷新后不失效，存在重放攻击风险** [auth_service.py:200-253]
+- [x] [Review][Patch] **Refresh token 刷新后不失效，存在重放攻击风险** [auth_service.py:200-253] ✅ 已修复
   - 无 token rotation 机制
-- [ ] [Review][Patch] **预定义角色未初始化到数据库** [auth.py:47-58]
+- [x] [Review][Patch] **预定义角色未初始化到数据库** [auth.py:47-58] ✅ 已修复
   - AC-2 要求: admin/analyst/viewer 预定义角色未创建
-- [ ] [Review][Patch] **审计日志未实现** [全文件]
+- [x] [Review][Patch] **审计日志未实现** [全文件] ✅ 已修复
   - AC-5 要求: 登录/登出/权限变更/越权访问事件记录缺失
 
 ### HIGH 高优先级问题
 
-- [ ] [Review][Patch] **无 token 撤销/黑名单机制** [auth_service.py]
+- [x] [Review][Patch] **无 token 撤销/黑名单机制** [auth_service.py] ✅ 已修复
   - compromised tokens 无法撤销
-- [ ] [Review][Patch] **JWT sub claim 缺少 UUID 验证** [permission_middleware.py:169]
+- [x] [Review][Patch] **JWT sub claim 缺少 UUID 验证** [permission_middleware.py:169] ✅ 已修复
   - `UUID(current_user["user_id"])` 抛出 ValueError 未捕获
-- [ ] [Review][Patch] **登录端点无速率限制** [auth.py:149-199]
+- [x] [Review][Patch] **登录端点无速率限制** [auth.py:149-199] ✅ 已修复
   - brute force 攻击风险
-- [ ] [Review][Patch] **会话超时未服务端强制执行** [auth.py]
+- [x] [Review][Patch] **会话超时未服务端强制执行** [auth.py] ✅ 已修复
   - `session_timeout_minutes` 配置未使用，JWT 过期时间 24h
-- [ ] [Review][Patch] **无 logout 端点** [auth.py]
+- [x] [Review][Patch] **无 logout 端点** [auth.py] ✅ 已修复
   - 无法结束会话和记录登出事件
 
 ### MEDIUM 中优先级问题
 
-- [ ] [Review][Patch] **datetime.utcnow() 已废弃** [auth_service.py:120,139,149], [models.py:178,196]
+- [x] [Review][Patch] **datetime.utcnow() 已废弃** [auth_service.py:120,139,149], [models.py:178,196] ✅ 已修复
   - Python 3.12+ 废弃，应使用 `datetime.now(UTC)`
-- [ ] [Review][Patch] **权限字符串格式未严格校验** [role_service.py:426]
+- [x] [Review][Patch] **权限字符串格式未严格校验** [role_service.py:426] ✅ 已修复
   - `":"` 可创建空 resource/action，`"ab:c:d"` 被解析为 `resource=ab, action=c:d`
-- [ ] [Review][Patch] **Admin 角色 bypass 硬编码检查** [permission_middleware.py:172-174]
+- [x] [Review][Patch] **Admin 角色 bypass 硬编码检查** [permission_middleware.py:172-174] ✅ 已修复
   - JWT roles claim 未验证合法性
-- [ ] [Review][Patch] **认证流程无显式事务边界** [auth_service.py:84-178]
+- [x] [Review][Patch] **认证流程无显式事务边界** [auth_service.py:84-178] ✅ 已修复
   - 多数据库操作无显式事务
-- [ ] [Review][Patch] **用户角色数无上限** [role_service.py:318-358]
+- [x] [Review][Patch] **用户角色数无上限** [role_service.py:318-358] ✅ 已修复
   - potential DoS
 
 ### LOW 低优先级 / 可延迟
