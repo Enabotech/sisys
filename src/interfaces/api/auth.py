@@ -130,9 +130,25 @@ class ErrorResponse(BaseModel):
 # =============================================================================
 
 
+# Global database engine instance for dependency injection
+_db_engine: DatabaseEngine | None = None
+
+
+def get_database_engine() -> DatabaseEngine:
+    """Get the global DatabaseEngine instance for dependency injection.
+
+    Returns:
+        DatabaseEngine: The global database engine instance.
+    """
+    global _db_engine
+    if _db_engine is None:
+        _db_engine = DatabaseEngine()
+    return _db_engine
+
+
 def get_db_session():
     """Get database session for dependency injection."""
-    engine = DatabaseEngine.get_instance()
+    engine = get_database_engine()
     return engine.get_async_session()
 
 
