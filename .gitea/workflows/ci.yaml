@@ -243,13 +243,11 @@ jobs:
 
       - name: 初始化环境
         run: |
-          pwd
-          ls -la .env
           set -a
-          . .env
+          . ./.env
           set +a
           docker network create sisys-network 2>/dev/null || true
-          docker compose -f deploy/app/docker-compose.yml up -d --wait
+          docker compose -f ./deploy/app/docker-compose.yml up -d --wait
           echo "✅ 环境已初始化"
 
       - name: 验证服务健康状态
