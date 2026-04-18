@@ -363,35 +363,53 @@ clean_org_runners() {
             continue
         fi
 
-        #--------- 0. 停止并删除所有容器 ---------
-        log_info "停止并删除所有容器..."
-        local containers
-        containers=$($prefix docker ps -aq 2>/dev/null || echo "")
-        local container_count
-        container_count=$(safe_wc "$containers")
+        #--------- 0. 安全停止 runner 容器 (不操作宿主机容器) ---------
+        # log_info "停止 runner 容器 (跳过 docker-compose 等外部容器)..."
+        # # Gitea Actions/Act Runner 创建的临时容器名称通常包含 runner- 或 act_runner- 前缀
+        # # 使用 --filter 过滤，只处理 runner 相关的容器，不影响宿主机上其他容器
+        # local runner_containers
+        # runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
+        # local runner_container_count
+        # runner_container_count=$(safe_wc "$runner_containers")
 
-        if [ -n "$containers" ]; then
-            if [ "$DRY_RUN" = true ]; then
-                log_warn "[DRY-RUN] Would stop/remove $container_count containers"
-            else
-                echo "$containers" | xargs -r $prefix docker stop 2>/dev/null || true
-                containers=$($prefix docker ps -aq 2>/dev/null || echo "")
-                [ -n "$containers" ] && echo "$containers" | xargs -r $prefix docker rm -f 2>/dev/null || true
-                STATS_CONTAINERS=$((STATS_CONTAINERS + container_count))
-            fi
-        fi
+        # if [ -n "$runner_containers" ]; then
+        #     if [ "$DRY_RUN" = true ]; then
+        #         log_warn "[DRY-RUN] Would stop/remove $runner_container_count runner containers"
+        #     else
+        #         echo "$runner_containers" | xargs -r $prefix docker stop 2>/dev/null || true
+        #         runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
+        #         [ -n "$runner_containers" ] && echo "$runner_containers" | xargs -r $prefix docker rm -v 2>/dev/null || true
+        #         STATS_CONTAINERS=$((STATS_CONTAINERS + runner_container_count))
+        #     fi
+        # else
+        #     log_info "无 runner 容器需要清理"
+        # fi
 
         #--------- 1. 清理 BuildKit ---------
         log_info "清理 BuildKit..."
         run_cmd $prefix docker builder prune -af --reserved-space=2g 2>/dev/null || true
 
-        #--------- 2. 清理镜像 ---------
-        log_info "清理镜像..."
-        run_cmd $prefix docker image prune -af 2>/dev/null || true
+        #--------- 2. 清理 dangling 镜像 ---------
+        log_info "清理 dangling 镜像..."
+        # 只清理未被任何容器使用的镜像 (dangling)，不删除正在使用的镜像
+        run_cmd $prefix docker image prune -f 2>/dev/null || true
 
-        #--------- 3. 清理 volumes ---------
-        log_info "清理 volumes..."
-        run_cmd $prefix docker volume prune -af 2>/dev/null || true
+        #--------- 3. 安全清理 volumes (只删除 runner 创建的 volumes) ---------
+        log_info "清理 runner 创建的 volumes..."
+        # 获取 runner 容器创建的 volumes (通过 inspect 容器获取所有 volumes)
+        # 然后只删除这些 volumes，避免影响宿主机上其他容器使用的 volumes
+        local runner_volumes
+        runner_volumes=$($prefix docker volume ls -q 2>/dev/null | grep -E "^(sisys-|runner-|act-|gitea-)" || echo "")
+
+        if [ -n "$runner_volumes" ]; then
+            if [ "$DRY_RUN" = true ]; then
+                log_warn "[DRY-RUN] Would remove volumes: $runner_volumes"
+            else
+                echo "$runner_volumes" | xargs -r $prefix docker volume rm 2>/dev/null || true
+            fi
+        else
+            log_info "无 runner volumes 需要清理"
+        fi
 
         #--------- 4. 清理日志 ---------
         log_info "清理日志..."
@@ -435,6 +453,10 @@ clean_k3s() {
     log_warn "注意: 仅删除完全未使用的镜像，正在使用的镜像不会被删除"
     run_cmd sudo k3s crictl rmi --prune 2>/dev/null || true
     log_success "K3s 未使用镜像已清理"
+
+    log_subheader "执行 crictl rmi 清理 sisys/app 镜像"
+    sudo crictl images -q --filter "reference=harbor.sisys.local/sisys/app:*" | xargs sudo crictl rmi
+    log_success "sisys/app 镜像已清理"
 
     #--------- 清理后状态 ---------
     log_subheader "清理后 harbor.sisys.local/sisys/app 状态"

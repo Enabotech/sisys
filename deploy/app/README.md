@@ -13,6 +13,7 @@ done
 cp deploy/app/.env.example deploy/app/.env 2>/dev/null || true
 
 # 2. 启动所有服务
+docker network create sisys-network
 docker compose -f deploy/app/docker-compose.yml up -d
 
 # 3. 等待服务就绪（约 30 秒）
