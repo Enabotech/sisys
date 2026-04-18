@@ -248,13 +248,19 @@ jobs:
           source ./.env
           set +a
           docker network create sisys-network 2>/dev/null || true
-          docker compose -f ./deploy/app/docker-compose.yml up -d --wait
-          echo "✅ 环境已初始化"
+          docker compose -f ./deploy/app/docker-compose.yml up -d
 
-      - name: 验证服务健康状态
-        run: |
-          echo "验证服务健康状态..."
-          docker compose -f deploy/app/docker-compose.yml ps
+          echo "等待所有服务健康..."
+          for i in {1..30}; do
+            UNHEALTHY=$(docker compose -f ./deploy/app/docker-compose.yml ps --format json 2>/dev/null | grep -o '"Health":"unhealthy"' | wc -l || echo 0)
+            if [ "$UNHEALTHY" -eq 0 ]; then
+              echo "✅ 所有服务已就绪"
+              break
+            fi
+            echo "等待服务健康... ($i/30) - $UNHEALTHY 个服务仍不健康"
+            sleep 2
+          done
+          docker compose -f ./deploy/app/docker-compose.yml ps
 
       - name: 增量更新依赖
         run: |
@@ -273,7 +279,7 @@ jobs:
       - name: 清理存储服务
         if: always()
         run: |
-          docker compose -f deploy/app/docker-compose.yml down -v 2>/dev/null || true
+          docker compose -f ./deploy/app/docker-compose.yml down -v 2>/dev/null || true
           echo "✅ 服务已清理"
 
       - name: 上传集成测试报告
