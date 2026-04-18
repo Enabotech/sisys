@@ -428,7 +428,7 @@ jobs:
     needs: unit-tests
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15.4
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: testpass

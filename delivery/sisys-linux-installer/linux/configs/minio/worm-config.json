@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "worm": {
+    "enabled": true,
+    "retention_days": 2555,
+    "description": "7年 WORM 存储策略（SOX/ISO27001 合规）"
+  }
+}

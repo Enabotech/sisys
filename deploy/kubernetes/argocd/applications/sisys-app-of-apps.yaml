@@ -1,0 +1,77 @@
+---
+# ArgoCD Application - App of Apps 模式
+# 用于管理所有子应用 (Dev/Test/Prod 环境)
+#
+# 使用方法:
+# 1. 应用此配置：kubectl apply -f sisys-app-of-apps.yaml
+# 2. ArgoCD 将自动创建所有子应用
+# 3. 每个环境独立的 Application
+#
+# 目录结构:
+# deploy/kubernetes/argocd/applications/
+# ├── sisys-app-of-apps.yaml   # 本文件
+# ├── sisys-app-dev.yaml
+# ├── sisys-app-test.yaml
+# └── sisys-app-prod.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-of-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-of-apps
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # 启用级联删除
+spec:
+  project: default
+
+  # 源代码配置 - 指向 applications 目录
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    # 包含所有环境 Application 清单的目录
+    path: deploy/kubernetes/argocd/applications
+
+    # 使用 Directory 递归扫描
+    directory:
+      recurse: false  # 只扫描当前目录，不递归
+      # 排除自身，避免递归引用
+      exclude: sisys-app-of-apps.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  # 同步策略
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # App of Apps 不需要 ignoreDifferences
+  # 因为管理的是 Application 资源
+
+  info:
+    - name: Description
+      value: SISYS App of Apps - 管理所有环境
+    - name: Environments
+      value: dev, test, prod
+    - name: Child Applications
+      value: sisys-app-dev, sisys-app-test, sisys-app-prod
+    - name: Tag Policy
+      value: Dev=dev-*, Test=test-*, Prod=v*

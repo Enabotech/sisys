@@ -1,0 +1,223 @@
+# Gitea 与 Harbor/ArgoCD 集成配置 - Story 0.5
+# 描述：为 Story 0.6/0.7/0.8/0.9 准备集成配置
+# 集成架构：Gitea → Harbor → ArgoCD
+---
+# =============================================================================
+# 1. Harbor Robot Account 配置 (Story 0.6 准备)
+# =============================================================================
+# 说明：Harbor Robot Account 用于 Gitea 推送镜像到 Harbor 仓库
+# 归属 Story: Story 0.6 (Harbor 镜像仓库)
+# =============================================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-robot-secret
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: harbor
+type: Opaque
+stringData:
+  # Harbor Robot Account 凭证
+  # Story 0.6 实施时创建并更新此 Secret
+  ROBOT_NAME: "robot@sisys"
+  ROBOT_TOKEN: "change-me-in-story-06"  # pragma: allowlist secret # Story 0.6 创建后更新
+  HARBOR_URL: "https://harbor.sisys.local"
+  HARBOR_PROJECT: "sisys"
+
+---
+# =============================================================================
+# 2. Gitea Webhook 配置 (Story 0.8 准备)
+# =============================================================================
+# 说明：Gitea Webhook 用于触发 CI/CD Pipeline (Story 0.8 Gitea Runner)
+# 归属 Story: Story 0.8 (Gitea Runner 配置)
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-webhook-config
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: webhook
+data:
+  # Webhook 配置
+  WEBHOOK_ENABLED: "true"
+  # Story 0.8 实施时配置 Webhook 端点
+  WEBHOOK_URL: "http://gitea-runner:8080/hook"  # Story 0.8 创建后更新
+  WEBHOOK_CONTENT_TYPE: "json"
+  WEBHOOK_EVENTS: "push,pull_request,create,delete"
+  # Webhook 安全
+  WEBHOOK_SECRET: "change-me-in-story-08"  # Story 0.8 生成
+
+---
+# =============================================================================
+# 3. ArgoCD Git 仓库凭证 (Story 0.7 准备)
+# =============================================================================
+# 说明：ArgoCD 使用此凭证读取 Gitea Git 仓库进行 GitOps 部署
+# 归属 Story: Story 0.7 (ArgoCD 持续部署)
+# =============================================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-git-secret
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: argocd
+type: Opaque
+stringData:
+  # ArgoCD Git 仓库凭证
+  # Story 0.7 实施时创建并更新此 Secret
+  GIT_USERNAME: "argocd-bot"
+  GIT_TOKEN: "change-me-in-story-07"  # Story 0.7 创建 Gitea API Token
+  GIT_REPO_URL: "https://gitea.sisys.local/sisys/sisys.git"
+  # ArgoCD 配置
+  ARGOCD_URL: "https://argocd.sisys.local"
+
+---
+# =============================================================================
+# 4. Gitea Actions 配置 (Story 0.9 准备)
+# =============================================================================
+# 说明：Gitea Actions 用于执行 CI/CD Pipeline
+# 归属 Story: Story 0.9 (CI/CD Pipeline 模板)
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-actions-config
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: actions
+data:
+  # Gitea Actions 配置
+  ACTIONS_ENABLED: "true"
+  # Workflow 目录
+  ACTIONS_WORKFLOW_DIR: ".gitea/workflows"
+  # Runner 配置 (Story 0.8 实施)
+  ACTIONS_RUNNER_URL: "http://gitea-runner:8080"
+  ACTIONS_RUNNER_TOKEN: "change-me-in-story-08"  # Story 0.8 生成
+  # Harbor 集成 (Story 0.6/0.9 实施)
+  HARBOR_REGISTRY: "harbor.sisys.local"
+  HARBOR_PROJECT: "sisys"
+
+---
+# =============================================================================
+# 5. Gitea → Harbor → ArgoCD 集成验证配置
+# =============================================================================
+# 说明：验证完整集成流程的配置
+# 归属 Story: Story 0.5 (本 Story 准备) + Story 0.6/0.7/0.8/0.9 (实施)
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-integration-verification
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: verification
+data:
+  # 集成验证脚本配置
+  # 验证 Gitea Webhook 可达性
+  VERIFY_WEBHOOK_CMD: |
+    curl -X POST https://gitea.sisys.local/api/v1/repos/{owner}/{repo}/hooks \
+      -H "Authorization: token {GITEA_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{"config": {"url": "http://gitea-runner:8080/hook", "content_type": "json"}}'
+
+  # 验证 Harbor Robot Account
+  VERIFY_HARBOR_CMD: |
+    docker login harbor.sisys.local -u robot@sisys -p {ROBOT_TOKEN}
+
+  # 验证 ArgoCD Git 仓库连接
+  VERIFY_ARGOCD_CMD: |
+    argocd repo add https://gitea.sisys.local/sisys/sisys.git \
+      --username {GIT_USER} --password {GIT_TOKEN}
+
+  # 集成验证检查清单
+  VERIFICATION_CHECKLIST: |
+    - [ ] Gitea Webhook 配置完成
+    - [ ] Harbor Robot Account 创建完成
+    - [ ] ArgoCD Git 仓库凭证配置完成
+    - [ ] Gitea Actions Runner 注册完成
+    - [ ] CI/CD Pipeline 模板创建完成
+    - [ ] 完整集成流程验证通过
+
+---
+# =============================================================================
+# 6. Git 仓库结构规划 (Story 0.7/0.8/0.9 准备)
+# =============================================================================
+# 说明：定义 Gitea Git 仓库的标准结构
+# 归属 Story: Story 0.5 (规划) + Story 0.7/0.8/0.9 (实施)
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-repo-structure
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: repo-structure
+data:
+  # Git 仓库结构
+  REPO_STRUCTURE: |
+    sisys/
+    ├── .gitea/
+    │   └── workflows/        # Gitea Actions CI/CD 定义 (Story 0.9)
+    ├── deploy/kubernetes/
+    │   ├── gitea/           # Story 0.5: Gitea 部署配置 ✅ 已完成
+    │   ├── harbor/          # Story 0.6: Harbor 部署配置
+    │   └── argocd/          # Story 0.7: ArgoCD 部署配置
+    ├── docs/
+    │   └── deployment/      # 部署文档
+    │       ├── GITEA_INSTALLATION.md    # Story 0.5 ✅ 已完成
+    │       ├── HARBOR_INSTALLATION.md   # Story 0.6
+    │       ├── ARGOCD_INSTALLATION.md   # Story 0.7
+    │       ├── GITEA_RUNNER_SETUP.md    # Story 0.8
+    │       └── CI_CD_PIPELINE_TEMPLATE.md # Story 0.9
+    └── tests/
+        └── deployment/      # 部署测试
+            ├── test_gitea.py            # Story 0.5 ✅ 已完成
+            ├── test_harbor.py           # Story 0.6
+            └── test_argocd.py           # Story 0.7
+
+---
+# =============================================================================
+# 7. 集成准备完成检查清单
+# =============================================================================
+# 说明：Story 0.5 Task 7 完成标准
+# 归属 Story: Story 0.5 (本 Story)
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-integration-readiness
+  namespace: gitea
+  labels:
+    app: gitea
+    integration: readiness
+data:
+  # 集成准备检查清单
+  READINESS_CHECKLIST: |
+    # Story 0.5 Task 7 完成标准
+
+    - [x] 创建 Harbor Robot Account 配置模板 (Secret 占位，Story 0.6 填充真实值)
+    - [x] 配置 Gitea Webhook 支持 (ConfigMap 占位，Story 0.8 填充真实值)
+    - [x] 准备 ArgoCD Git 仓库凭证模板 (Secret 占位，Story 0.7 填充真实值)
+    - [x] 配置 Gitea Actions 与 Harbor 集成模板 (ConfigMap 占位，Story 0.9 填充真实值)
+    - [x] 创建集成验证配置 (验证脚本和检查清单)
+    - [x] 规划 Git 仓库结构
+
+    # 依赖 Story 状态
+    - [ ] Story 0.6: Harbor 镜像仓库 (并行开发)
+    - [ ] Story 0.7: ArgoCD 持续部署 (并行开发)
+    - [ ] Story 0.8: Gitea Runner 配置 (依赖本 Story)
+    - [ ] Story 0.9: CI/CD Pipeline 模板 (依赖 Story 0.8)

@@ -157,9 +157,9 @@ docker run -it --rm ubuntu:22.04 bash
 
 ## 📚 相关文档
 
-- [Docker 最佳实践](../../docs/deployment/docker-best-practices.md)
-- [CI/CD 部署流程](../../docs/deployment/cicd-pipeline.md)
-- [Kubernetes 部署指南](../../docs/deployment/k8s-deployment.md)
+- [Docker 最佳实践](../../docs/deploy/docker-best-practices.md)
+- [CI/CD 部署流程](../../docs/deploy/cicd-pipeline.md)
+- [Kubernetes 部署指南](../../docs/deploy/k8s-deployment.md)
 
 ## 🆘 获取帮助
 

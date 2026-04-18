@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # SISYS 主应用
+  sisys-app:
+    image: ${DOCKER_REGISTRY:-docker.io}/sisys/app:${APP_VERSION:-latest}
+    container_name: sisys-app
+    ports:
+      - "${SISYS_PORT:-8080}:8080"
+    environment:
+      - SISYS_HOME=/app
+      - SISYS_CONFIG=/app/configs
+      - SISYS_DATA=/data
+      - SISYS_LOGS=/logs
+    volumes:
+      - sisys-data:/data
+      - sisys-logs:/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s  # 修复 C5: 增加启动宽限期
+
+  # Redis 缓存（修复 H7: 移除不必要的端口暴露）
+  redis:
+    image: redis:7-alpine
+    container_name: sisys-redis
+    # 不暴露端口到宿主机，仅内部网络通信
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # PostgreSQL 数据库（修复 H7: 移除不必要的端口暴露）
+  postgres:
+    image: postgres:15.4
+    container_name: sisys-postgres
+    # 不暴露端口到宿主机，仅内部网络通信
+    environment:
+      - POSTGRES_DB=sisys
+      - POSTGRES_USER=sisys
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sisys_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Qdrant 向量数据库（修复 H7: 移除不必要的端口暴露）
+  qdrant:
+    image: harbor.sisys.local/sisys/tools/qdrant/qdrant:v1.7.1  # 使用固定版本（修复 EC-30）
+    container_name: sisys-qdrant
+    # 不暴露端口到宿主机，仅内部网络通信
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+
+  # MinIO 对象存储（修复 H7: 移除不必要的端口暴露）
+  minio:
+    image: harbor.sisys.local/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z  # 使用固定版本（修复 EC-30）
+    container_name: sisys-minio
+    # 不暴露端口到宿主机，仅内部网络通信
+    environment:
+      - MINIO_ROOT_USER=${MINIO_USER:-sisys_admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:-sisys_password}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+volumes:
+  sisys-data:
+  sisys-logs:
+  redis-data:
+  postgres-data:
+  qdrant-data:
+  minio-data:

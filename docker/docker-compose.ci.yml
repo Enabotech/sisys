@@ -195,7 +195,7 @@ services:
   # 支持服务：PostgreSQL（集成测试用）
   # ===========================================================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15.4
     container_name: sisys-ci-postgres
     environment:
       POSTGRES_USER: test
@@ -217,7 +217,7 @@ services:
   # 支持服务：Redis（缓存/队列用）
   # ===========================================================================
   redis:
-    image: redis:7.2-alpine
+    image: redis:7.2.5
     container_name: sisys-ci-redis
     ports:
       - "6379:6379"

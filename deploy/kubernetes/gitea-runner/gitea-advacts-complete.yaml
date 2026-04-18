@@ -1,0 +1,444 @@
+# ============================================================
+# Gitea Advanced Act Runner - 完整部署配置
+# ============================================================
+# Story: 0-8-gitea-runner-configuration
+# 命名空间：gitea-advacts (独立部署，不影响 gitea-actions)
+# 版本：v4.0 (合规版 - Secret 外部管理)
+# 日期：2026-04-02
+#
+# 包含：
+#   - Namespace (gitea-advacts)
+#   - ServiceAccount + RBAC
+#   - ConfigMap (Runner 配置)
+#   - StatefulSet (DinD Runner)
+#
+# 需要手动创建的 Secret：
+#   - ca-certificates (从 gitea-actions 复制)
+#   - gitea-org-runner-token (从 gitea-actions 复制)
+# ============================================================
+
+# -----------------------------------------------------------------------------
+# 1. 命名空间配置
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea-advacts
+  labels:
+    # 允许特权容器和 rootless 模式
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: v1.34
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: v1.34
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: v1.34
+---
+# -----------------------------------------------------------------------------
+# 2. ServiceAccount 和 RBAC
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea-runner-dind
+  namespace: gitea-advacts
+  labels:
+    app: gitea-runner-dind
+    runner-type: dind
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitea-runner-dind-role
+  namespace: gitea-advacts
+rules:
+  # 允许访问 Pod（用于动态调度）
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # 允许访问 ConfigMaps 和 Secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-runner-dind-binding
+  namespace: gitea-advacts
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitea-runner-dind-role
+subjects:
+  - kind: ServiceAccount
+    name: gitea-runner-dind
+    namespace: gitea-advacts
+---
+# -----------------------------------------------------------------------------
+# 3. Runner ConfigMap
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-runner-config
+  namespace: gitea-advacts
+  labels:
+    app: gitea-runner-dind
+    story: "0-8"
+data:
+  config.yaml: |
+    # Runner 配置
+    runner:
+      file: /data/.runner
+      workdir: /data/workdir
+      tempdir: /data/tmp
+      timeout: 30m
+
+    log:
+      level: info
+      format: text
+      output: stdout
+
+    # 容器配置（DinD 模式）
+    container:
+      # 使用 L2 依赖镜像
+      image: harbor.sisys.local/sisys/dependency:l2-latest
+
+      # 网络模式 - bridge（WSL2 兼容性）
+      network: bridge
+
+      workdir: /workspace
+
+      # Docker 选项
+      options: |
+        --privileged
+        --user root:root
+        --tmpfs /tmp
+        --tmpfs /var/tmp
+        --dns 10.43.0.10
+        --dns-search gitea-advacts.svc.cluster.local
+        --dns-search svc.cluster.local
+        -e DOCKER_HOST=unix:///var/run/docker.sock
+        -e DOCKER_TLS_CERTDIR=
+        -e GIT_SSL_NO_VERIFY=true
+        -e NODE_TLS_REJECT_UNAUTHORIZED=0
+        -e BUILDKIT_PROGRESS=plain
+
+      env:
+        - DOCKER_HOST=unix:///var/run/docker.sock
+        - DOCKER_TLS_CERTDIR=
+
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /workspace:/workspace
+        - /tmp:/tmp
+
+    cache:
+      enabled: true
+      dir: /data/cache
+---
+# -----------------------------------------------------------------------------
+# 4. StatefulSet 配置
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitea-runner-dind
+  namespace: gitea-advacts
+  labels:
+    app: gitea-runner-dind
+    story: "0-8"
+    scope: organization
+    org: sisys
+    runner-type: dind
+    env: advacts
+spec:
+  # 初始 1 个副本，验证后扩展到 2 个
+  replicas: 1
+  serviceName: gitea-runner-dind
+  selector:
+    matchLabels:
+      app: gitea-runner-dind
+  template:
+    metadata:
+      labels:
+        app: gitea-runner-dind
+    spec:
+      serviceAccountName: gitea-runner-dind
+
+      # Pod 级别安全上下文
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+        # Container 1: act_runner (Runner 管理容器)
+        - name: runner
+          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3-dind-rootless
+          imagePullPolicy: IfNotPresent
+
+          # 容器级别安全上下文（非特权）
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+
+          # Runner 启动命令
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "🚀 Starting act_runner..."
+
+              # ✅ 安装 CA 证书包（与 gitea-actions 一致）
+              echo "📦 Installing CA certificates..."
+              apk add --no-cache git curl ca-certificates >/dev/null 2>&1 || echo "⚠️ CA install failed"
+
+              # ✅ 追加 Gitea 自签名证书到系统证书包
+              echo "📜 Appending Gitea certificate to system bundle..."
+              cat /etc/ssl/certs/ca-certificates.crt > /tmp/system-ca.crt
+              cat /tmp/gitea-ca.crt >> /tmp/system-ca.crt
+              cp /tmp/system-ca.crt /etc/ssl/certs/ca-certificates.crt
+              echo "✅ Gitea certificate appended"
+
+              echo "⏳ Waiting for Docker daemon..."
+              until docker -H tcp://127.0.0.1:2375 info >/dev/null 2>&1; do
+                echo "  Docker not ready yet, waiting..."
+                sleep 2
+              done
+              echo "✅ Docker daemon ready"
+
+              # 设置环境变量（与 gitea-actions 一致）
+              export GIT_SSL_NO_VERIFY=false
+              export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
+              if [ ! -f /data/.runner ]; then
+                echo "📝 Registering runner..."
+                /usr/local/bin/act_runner register \
+                  --name "${GITEA_RUNNER_NAME}" \
+                  --instance "${GITEA_INSTANCE_URL}" \
+                  --token "${GITEA_RUNNER_REGISTRATION_TOKEN}" \
+                  --labels "${GITEA_RUNNER_LABELS}" \
+                  --config /etc/act-runner/config.yaml || {
+                    echo "❌ Registration failed, exiting..."
+                    exit 1
+                  }
+                echo "✅ Runner registered successfully"
+              else
+                echo "✅ Registration file found, starting runner..."
+              fi
+
+              echo "🚀 Starting act_runner daemon..."
+              exec /usr/local/bin/act_runner daemon --config /etc/act-runner/config.yaml
+
+          env:
+            # Gitea 配置 - 使用 HTTPS
+            - name: GITEA_INSTANCE_URL
+              value: "https://gitea.sisys.local"
+            - name: GITEA_RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: GITEA_RUNNER_LABELS
+              value: "ubuntu2204,advacts,dind,buildx"
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-org-runner-token
+                  key: token
+            - name: DOCKER_HOST
+              value: "tcp://127.0.0.1:2375"
+            # SSL 证书配置（与 gitea-actions 一致）
+            - name: GIT_SSL_NO_VERIFY
+              value: "false"
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/etc/ssl/certs/ca-certificates.crt"
+
+          volumeMounts:
+            - name: var-run
+              mountPath: /var/run
+            - name: runner-data
+              mountPath: /data
+            - name: runner-config
+              mountPath: /etc/act-runner/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: docker-graph
+              mountPath: /var/lib/docker
+            - name: tmp
+              mountPath: /tmp
+            # ✅ Gitea 证书挂载到临时位置（用于追加到系统证书包）
+            - name: ca-certificates
+              mountPath: /tmp/gitea-ca.crt
+              subPath: ca-certificates.crt
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 512m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -f
+                - act_runner
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+          readinessProbe:
+            exec:
+              command:
+                - pgrep
+                - -f
+                - act_runner
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+        # Container 2: docker-dind (Docker Daemon)
+        - name: docker-dind
+          image: harbor.sisys.local/sisys/tools/gitea/act_runner:0.3-dind-rootless
+          imagePullPolicy: IfNotPresent
+
+          # 安全上下文（特权模式 - K3s/WSL2 兼容性）
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_PTRACE
+                - NET_ADMIN
+              drop:
+                - SYS_MODULE
+            seccompProfile:
+              type: RuntimeDefault
+
+          # Docker 启动命令
+          command:
+            - sh
+            - -c
+            - |
+              echo "🚀 Starting Docker Daemon (localhost only)..."
+              echo "📦 Network: Pod-internal (no hostNetwork)"
+              echo "📦 Listen: tcp://127.0.0.1:2375 + unix:///var/run/docker.sock"
+
+              mkdir -p /var/run
+
+              # ✅ 清理旧的 PID 文件（系统重启后可能残留）
+              rm -f /var/run/docker.pid 2>/dev/null || true
+              rm -f /var/run/docker/*.pid 2>/dev/null || true
+
+              # ✅ 创建 Docker daemon 配置（使用 K8s DNS 解析内部域名 + insecure registry）
+              mkdir -p /etc/docker
+              cat > /etc/docker/daemon.json <<'EOF'
+              {
+                "insecure-registries": ["harbor.sisys.local"],
+                "dns": ["10.43.0.10", "8.8.8.8"],
+                "dns-search": ["gitea-advacts.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+                "ipv6": false
+              }
+              EOF
+
+              # 启动 dockerd
+              dockerd \
+                --log-level=error \
+                --storage-driver=overlay2 \
+                --host=unix:///var/run/docker.sock \
+                --host=tcp://127.0.0.1:2375 \
+                &
+
+              # 等待 Docker 就绪
+              echo "⏳ Waiting for Docker daemon..."
+              for i in {1..30}; do
+                if docker -H unix:///var/run/docker.sock info >/dev/null 2>&1; then
+                  echo "✅ Docker daemon ready"
+                  break
+                fi
+                sleep 1
+              done
+
+              # 显示 Docker 信息
+              docker -H unix:///var/run/docker.sock info 2>&1 | head -20
+
+              # ✅ 使用 tail -f 保持容器运行
+              echo "📋 Keeping container alive..."
+              tail -f /dev/null
+
+          env:
+            - name: DOCKER_HOST
+              value: "unix:///var/run/docker.sock"
+
+          volumeMounts:
+            - name: var-run
+              mountPath: /var/run
+            - name: docker-graph
+              mountPath: /var/lib/docker
+            - name: tmp
+              mountPath: /tmp
+
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+            limits:
+              cpu: 5000m
+              memory: 16Gi
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - docker -H unix:///var/run/docker.sock info >/dev/null 2>&1
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+      volumes:
+        - name: var-run
+          emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: gitea-runner-config
+            defaultMode: 0644
+        # ✅ Gitea 证书 Secret（挂载到临时位置用于追加）
+        - name: ca-certificates
+          secret:
+            secretName: ca-certificates
+            defaultMode: 0644
+        - name: tmp
+          emptyDir: {}
+
+  volumeClaimTemplates:
+    - metadata:
+        name: runner-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+        storageClassName: local-path
+    - metadata:
+        name: docker-graph
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 50Gi
+        storageClassName: local-path

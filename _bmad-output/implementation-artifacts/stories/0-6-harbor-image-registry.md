@@ -388,7 +388,7 @@ spec:
 3. **Git 仓库结构规划** (为 Story 0.7/0.8/0.9 准备)
    ```
    sisys/
-   ├── deployments/
+   ├── deploy/kubernetes/
    │   ├── harbor/          # 本 Story: Harbor 部署配置
    │   ├── gitea/           # Story 0.5: Gitea 部署配置
    │   └── argocd/          # Story 0.7: ArgoCD 部署配置
@@ -537,7 +537,7 @@ spec:
 
 ### 实施指南
 
-**参考文档**: `docs/deployment/HARBOR_INSTALLATION.md` (待创建)
+**参考文档**: `docs/deploy/HARBOR_INSTALLATION.md` (待创建)
 
 **实施步骤**:
 
@@ -811,7 +811,7 @@ sisys/
 │       ├── HARBOR_INSTALLATION.md    # Harbor 部署指南
 │       ├── HARBOR_ROBOT_ACCOUNT.md   # Robot Account 配置
 │       └── HARBOR_WEBHOOK_SETUP.md   # Webhook 配置
-├── deployments/
+├── deploy/kubernetes/
 │   └── harbor/
 │       ├── values.yaml              # Helm Chart 配置
 │       ├── ingress-route.yaml       # IngressRoute CRD 配置 (2026-03-17 新增)
@@ -906,19 +906,19 @@ Qwen Code (AI 开发助手)
    - 漏洞数据库配置完成
 
 5. ✅ **Task 5: 镜像签名配置** - 完成（使用 Cosign）
-   - deployments/harbor/cosign-config.yaml: Cosign 配置模板
-   - docs/deployment/HARBOR_COSIGN_SIGNING.md: 完整使用指南
+   - deploy/kubernetes/harbor/cosign-config.yaml: Cosign 配置模板
+   - docs/deploy/HARBOR_COSIGN_SIGNING.md: 完整使用指南
    - 支持 keyless 签名（推荐）和密钥对签名
    - Kubernetes 集成配置（Kyverno 策略示例）
    - CI/CD Pipeline 集成示例（Gitea Actions）
 
 6. ✅ **Task 6: Robot Account 配置** - 完成
-   - deployments/harbor/robot-account.yaml: Robot Account 配置模板
-   - docs/deployment/HARBOR_ROBOT_ACCOUNT.md: 完整使用指南
+   - deploy/kubernetes/harbor/robot-account.yaml: Robot Account 配置模板
+   - docs/deploy/HARBOR_ROBOT_ACCOUNT.md: 完整使用指南
 
 7. ✅ **Task 7: Gitea/ArgoCD 集成准备** - 完成
-   - deployments/harbor/webhook-config.yaml: Webhook 配置模板
-   - docs/deployment/HARBOR_WEBHOOK_SETUP.md: Webhook 配置指南
+   - deploy/kubernetes/harbor/webhook-config.yaml: Webhook 配置模板
+   - docs/deploy/HARBOR_WEBHOOK_SETUP.md: Webhook 配置指南
 
 8. ✅ **Task 8: 安全加固** - 完成
    - networkpolicy.yaml: DefaultDeny + 细粒度访问控制
@@ -926,7 +926,7 @@ Qwen Code (AI 开发助手)
    - 允许内部组件通信、DNS 解析、Trivy 外部访问
 
 10. ✅ **Task 10: TDD 测试框架** - 完成（红灯阶段 ✅）
-   - tests/deployment/test_harbor.py: 15 个测试用例
+   - tests/deploy/test_harbor.py: 15 个测试用例
      - TestHarborDeployment: Pod 状态、健康检查
      - TestHarborWebInterface: Web 访问、TLS 证书
      - TestHarborDatabase: 数据库连接、日志检查
@@ -934,7 +934,7 @@ Qwen Code (AI 开发助手)
      - TestHarborVulnerabilityScan: Trivy 扫描
      - TestHarborNotarySignature: Cosign 签名
      - TestHarborRobotAccount: Robot Account 认证
-   - tests/deployment/test_harbor_architecture.py: 20 个测试用例
+   - tests/deploy/test_harbor_architecture.py: 20 个测试用例
      - TestTLSConfiguration: TLS 1.3、HSTS、SSL Labs
      - TestStorageConfiguration: PVC、存储类、容量
      - TestIngressConfiguration: Ingress 规则、后端服务、TLS
@@ -997,12 +997,12 @@ Harbor 部署验证报告
 - ⏳ **Task 6: Robot Account 配置** - 已创建配置和文档，待手动创建
 - ⏳ **Task 7: Gitea/ArgoCD 集成准备** - 已创建配置和文档，待 Story 0.7/0.8 配合
 - ⏳ **Task 10: 代码审查修复** - 待运行 code-review 工作流
-helm install harbor harbor/harbor -n harbor -f deployments/harbor/values.yaml
+helm install harbor harbor/harbor -n harbor -f deploy/kubernetes/harbor/values.yaml
 
 # 4. 应用其他配置
-kubectl apply -f deployments/harbor/ingress.yaml
-kubectl apply -f deployments/harbor/middleware.yaml
-kubectl apply -f deployments/harbor/networkpolicy.yaml
+kubectl apply -f deploy/kubernetes/harbor/ingress.yaml
+kubectl apply -f deploy/kubernetes/harbor/middleware.yaml
+kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml
 
 # 5. 验证部署
 kubectl get pods -n harbor
@@ -1016,29 +1016,29 @@ kubectl get ingress -n harbor
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `tests/deployment/test_harbor.py` | ✅ 已创建 | Harbor 部署测试套件 (含 AC-5/6/7 测试) | 698 |
-| `tests/deployment/test_harbor_architecture.py` | ✅ 已创建 | 架构合规验证测试 | 420 |
-| `deployments/harbor/values.yaml` | ✅ 已修复 | Helm Chart 配置 (修复 HIGH-003: 50Gi) | 293 |
-| `deployments/harbor/ingress.yaml` | ✅ 已创建 | Ingress + TLS 配置 | 55 |
-| `deployments/harbor/middleware.yaml` | ✅ 已创建 | Traefik Middleware 安全头 | 85 |
-| `deployments/harbor/kustomization.yaml` | ✅ 已创建 | Kustomize 配置 | 45 |
-| `deployments/harbor/namespace.yaml` | ✅ 已创建 | 命名空间配置 | 15 |
-| `deployments/harbor/config/harbor.yml` | ✅ 已创建 | Harbor 应用配置 | 450 |
-| `deployments/harbor/networkpolicy.yaml` | ✅ 已修复 | NetworkPolicy (修复 HIGH-002: Traefik 选择器) | 232 |
-| `deployments/harbor/secrets.yaml` | ✅ 已创建 | Kubernetes Secret 配置 | 120 |
-| `deployments/harbor/secrets-example.yaml` | ✅ 已创建 | 开发环境 Secrets 示例 | 35 |
-| `deployments/harbor/robot-account.yaml` | ✅ 已创建 | Robot Account 配置模板 | 50 |
-| `deployments/harbor/webhook-config.yaml` | ✅ 已创建 | Webhook 配置模板 | 65 |
-| `deployments/harbor/cosign-config.yaml` | ✅ 已创建 | Cosign 镜像签名配置 | 80 |
-| `deployments/harbor/trivy-config.yaml` | ✅ 已修复 | Trivy 漏洞扫描配置 (修复 MEDIUM-002) | 162 |
-| `deployments/harbor/harbor-letsencrypt.yaml` | ✅ 已创建 | Let's Encrypt 证书配置 | 40 |
-| `deployments/harbor/ingress-traefik.yaml` | ✅ 已创建 | Traefik Ingress 简化配置 | 30 |
+| `tests/deploy/test_harbor.py` | ✅ 已创建 | Harbor 部署测试套件 (含 AC-5/6/7 测试) | 698 |
+| `tests/deploy/test_harbor_architecture.py` | ✅ 已创建 | 架构合规验证测试 | 420 |
+| `deploy/kubernetes/harbor/values.yaml` | ✅ 已修复 | Helm Chart 配置 (修复 HIGH-003: 50Gi) | 293 |
+| `deploy/kubernetes/harbor/ingress.yaml` | ✅ 已创建 | Ingress + TLS 配置 | 55 |
+| `deploy/kubernetes/harbor/middleware.yaml` | ✅ 已创建 | Traefik Middleware 安全头 | 85 |
+| `deploy/kubernetes/harbor/kustomization.yaml` | ✅ 已创建 | Kustomize 配置 | 45 |
+| `deploy/kubernetes/harbor/namespace.yaml` | ✅ 已创建 | 命名空间配置 | 15 |
+| `deploy/kubernetes/harbor/config/harbor.yml` | ✅ 已创建 | Harbor 应用配置 | 450 |
+| `deploy/kubernetes/harbor/networkpolicy.yaml` | ✅ 已修复 | NetworkPolicy (修复 HIGH-002: Traefik 选择器) | 232 |
+| `deploy/kubernetes/harbor/secrets.yaml` | ✅ 已创建 | Kubernetes Secret 配置 | 120 |
+| `deploy/kubernetes/harbor/secrets-example.yaml` | ✅ 已创建 | 开发环境 Secrets 示例 | 35 |
+| `deploy/kubernetes/harbor/robot-account.yaml` | ✅ 已创建 | Robot Account 配置模板 | 50 |
+| `deploy/kubernetes/harbor/webhook-config.yaml` | ✅ 已创建 | Webhook 配置模板 | 65 |
+| `deploy/kubernetes/harbor/cosign-config.yaml` | ✅ 已创建 | Cosign 镜像签名配置 | 80 |
+| `deploy/kubernetes/harbor/trivy-config.yaml` | ✅ 已修复 | Trivy 漏洞扫描配置 (修复 MEDIUM-002) | 162 |
+| `deploy/kubernetes/harbor/harbor-letsencrypt.yaml` | ✅ 已创建 | Let's Encrypt 证书配置 | 40 |
+| `deploy/kubernetes/harbor/ingress-traefik.yaml` | ✅ 已创建 | Traefik Ingress 简化配置 | 30 |
 
 **文件结构:**
 
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   └── harbor/
 │       ├── values.yaml              # ✅ 已修复 (HIGH-003)
 │       ├── ingress.yaml             # ✅ 已创建
@@ -1097,8 +1097,8 @@ sisys/
 **新增工作:**
 
 1. ✅ **Task 5: 镜像签名配置** - 使用 Cosign 实现
-   - deployments/harbor/cosign-config.yaml: Cosign 配置模板
-   - docs/deployment/HARBOR_COSIGN_SIGNING.md: 完整使用指南（350+ 行）
+   - deploy/kubernetes/harbor/cosign-config.yaml: Cosign 配置模板
+   - docs/deploy/HARBOR_COSIGN_SIGNING.md: 完整使用指南（350+ 行）
    - 支持 keyless 签名（推荐）和密钥对签名
    - Kubernetes 集成配置（Kyverno 策略示例）
    - CI/CD Pipeline 集成示例（Gitea Actions）
@@ -1147,7 +1147,7 @@ cosign verify \
 **阶段 1 修复 (CRITICAL 问题):**
 
 1. **CRITICAL-001: Ingress 配置冲突修复**
-   - 创建 `deployments/harbor/ingress-route.yaml` (Traefik IngressRoute CRD)
+   - 创建 `deploy/kubernetes/harbor/ingress-route.yaml` (Traefik IngressRoute CRD)
    - 使用 `priority` 字段明确路由优先级 (100 > 90 > 10)
    - 更新 `values.yaml`: `expose.ingress.enabled: false` (禁用 Helm Ingress)
    - 更新 `kustomization.yaml`: 使用 `ingress-route.yaml` 替代 `ingress.yaml`
@@ -1176,19 +1176,19 @@ cosign verify \
    - 前端页面 priority=10 (兜底)
 
 5. **MEDIUM-002: 密码策略自动配置修复**
-   - 创建 `deployments/harbor/password-policy-job.yaml`
+   - 创建 `deploy/kubernetes/harbor/password-policy-job.yaml`
    - Harbor 部署后自动调用 API 配置密码策略
    - 配置项：最小长度 12 位、密码历史 5 次、90 天过期
    - Job 自动清理：1 小时后删除
 
 6. **MEDIUM-003: File List 自动生成修复**
    - 创建 `scripts/docs/generate-file-list.sh`
-   - 自动扫描 deployments/, scripts/, tests/, docs/ 目录
+   - 自动扫描 deploy/kubernetes/, scripts/, tests/, docs/ 目录
    - 生成 Markdown 表格 (文件路径、说明、行数)
    - 支持 harbor/gitea/argocd/all 组件
 
 7. **MEDIUM-004: 测试配置外部化修复**
-   - 创建 `tests/deployment/harbor-test-config.yaml`
+   - 创建 `tests/deploy/harbor-test-config.yaml`
    - 配置优先级：环境变量 > 配置文件 > 默认值
    - 支持多环境测试 (开发/测试/生产)
    - 更新 `test_harbor.py`: 添加 load_test_config() 函数
@@ -1199,18 +1199,18 @@ cosign verify \
    - `/c/portal/login` (Prefix) - 兼容新版本
 
 **新增文件 (阶段 1+2):**
-- `deployments/harbor/ingress-route.yaml` (新增，180 行)
-- `deployments/harbor/password-policy-job.yaml` (新增，150 行)
+- `deploy/kubernetes/harbor/ingress-route.yaml` (新增，180 行)
+- `deploy/kubernetes/harbor/password-policy-job.yaml` (新增，150 行)
 - `scripts/security/generate-harbor-secrets.sh` (新增，200 行)
 - `scripts/deployment/harbor/verify-deployment.sh` (新增，180 行)
 - `scripts/docs/generate-file-list.sh` (新增，200 行)
-- `tests/deployment/harbor-test-config.yaml` (新增，150 行)
+- `tests/deploy/harbor-test-config.yaml` (新增，150 行)
 
 **修改文件:**
-- `deployments/harbor/values.yaml`: 添加 `expose.ingress.enabled: false`
-- `deployments/harbor/kustomization.yaml`: 使用 ingress-route.yaml，添加 password-policy-job.yaml
-- `deployments/harbor/secrets.yaml`: 更新使用说明和安全警告
-- `tests/deployment/test_harbor.py`: 添加配置加载函数，移除硬编码
+- `deploy/kubernetes/harbor/values.yaml`: 添加 `expose.ingress.enabled: false`
+- `deploy/kubernetes/harbor/kustomization.yaml`: 使用 ingress-route.yaml，添加 password-policy-job.yaml
+- `deploy/kubernetes/harbor/secrets.yaml`: 更新使用说明和安全警告
+- `tests/deploy/test_harbor.py`: 添加配置加载函数，移除硬编码
 - `Makefile`: 添加 Harbor 部署与验证目标
 - `Story 文件`: 更新 Change Log 和 Task 列表
 
@@ -1232,12 +1232,12 @@ make harbor-clean
 ./scripts/docs/generate-file-list.sh harbor
 
 # 6. 运行测试 (使用外部配置)
-pytest tests/deployment/test_harbor.py
+pytest tests/deploy/test_harbor.py
 
 # 7. 使用环境变量覆盖配置
 export HARBOR_NODE_IP=192.168.1.100
 export HARBOR_NODEPORT=nodeport
-pytest tests/deployment/test_harbor.py
+pytest tests/deploy/test_harbor.py
 ```
 
 **修复效果:**
@@ -1339,7 +1339,7 @@ PostgreSQL 15.15 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 12.2.0, 64-bit
 
 **配置文件验证:**
 ```bash
-kubectl apply --dry-run=client -f deployments/harbor/robot-account.yaml -n harbor
+kubectl apply --dry-run=client -f deploy/kubernetes/harbor/robot-account.yaml -n harbor
 job.batch/create-robot-account created (dry run)
 ```
 
@@ -1360,7 +1360,7 @@ job.batch/create-robot-account created (dry run)
 
 1. **NetworkPolicy 未应用** - `kubectl get networkpolicy -n harbor` 返回空
    - **原因:** 配置文件存在但未实际 apply
-   - **建议:** 执行 `kubectl apply -f deployments/harbor/networkpolicy.yaml`
+   - **建议:** 执行 `kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml`
 
 2. **Cosign 未安装** - 本地环境未安装 Cosign 工具
    - **影响:** 无法验证 AC-5 签名功能
@@ -1395,7 +1395,7 @@ job.batch/create-robot-account created (dry run)
 
 1. **立即执行:** 应用 NetworkPolicy 配置
    ```bash
-   echo 'H9yglwH7sdyj' | sudo -S kubectl apply -f deployments/harbor/networkpolicy.yaml
+   echo 'H9yglwH7sdyj' | sudo -S kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml
    ```
 
 2. **Story 0.7 完成后:** 验证 Harbor → ArgoCD 集成 (AC-7)
@@ -1578,18 +1578,18 @@ job.batch/create-robot-account created (dry run)
 **部署指南:**
 ```bash
 # 1. 创建命名空间
-kubectl apply -f deployments/harbor/namespace.yaml
+kubectl apply -f deploy/kubernetes/harbor/namespace.yaml
 
 # 2. 生成并应用密钥
-kubectl apply -f deployments/harbor/secrets.yaml
+kubectl apply -f deploy/kubernetes/harbor/secrets.yaml
 
 # 3. 部署 Harbor
-helm install harbor harbor/harbor -n harbor -f deployments/harbor/values.yaml
+helm install harbor harbor/harbor -n harbor -f deploy/kubernetes/harbor/values.yaml
 
 # 4. 应用其他配置
-kubectl apply -f deployments/harbor/ingress.yaml
-kubectl apply -f deployments/harbor/middleware.yaml
-kubectl apply -f deployments/harbor/networkpolicy.yaml
+kubectl apply -f deploy/kubernetes/harbor/ingress.yaml
+kubectl apply -f deploy/kubernetes/harbor/middleware.yaml
+kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml
 ```
 
 **文件清单:**

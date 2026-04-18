@@ -51,10 +51,10 @@ deploy_org_runner() {
     log_info "部署组织级 Runner..."
 
     # 应用 Token Secret
-    kubectl apply -f "$SCRIPT_DIR/../../deployments/gitea-runner/gitea-org-runner-token-secret.yaml"
+    kubectl apply -f "$SCRIPT_DIR/../../deploy/kubernetes/gitea-runner/gitea-org-runner-token-secret.yaml"
 
     # 应用 StatefulSet 配置
-    kubectl apply -f "$SCRIPT_DIR/../../deployments/gitea-runner/gitea-actions-complete.yaml"
+    kubectl apply -f "$SCRIPT_DIR/../../deploy/kubernetes/gitea-runner/gitea-actions-complete.yaml"
 
     log_success "组织级 Runner 部署完成"
 }

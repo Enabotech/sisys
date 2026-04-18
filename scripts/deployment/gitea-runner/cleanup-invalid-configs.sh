@@ -20,9 +20,9 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 PROJECT_ROOT="/mnt/g/ai/sisys"
-DEPLOY_DIR="$PROJECT_ROOT/deployments/gitea-runner"
+DEPLOY_DIR="$PROJECT_ROOT/deploy/kubernetes/gitea-runner"
 SCRIPT_DIR="$PROJECT_ROOT/scripts/deployment/gitea-runner"
-TEST_DIR="$PROJECT_ROOT/tests/deployment"
+TEST_DIR="$PROJECT_ROOT/tests/deploy"
 
 echo "=============================================="
 echo "Gitea Runner 配置清理分析"

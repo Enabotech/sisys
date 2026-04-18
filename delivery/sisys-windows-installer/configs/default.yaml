@@ -1,0 +1,26 @@
+# SISYS 默认配置
+# 六边形架构配置文件
+
+app:
+  name: SISYS
+  version: 0.14.0
+  description: 企业战略规划管理系统
+
+server:
+  port: 8080
+  host: localhost
+  health_check: /health
+
+storage:
+  data_path: "%USERPROFILE%\\SISYS\\data"
+  log_path: "%USERPROFILE%\\SISYS\\logs"
+  config_path: "%USERPROFILE%\\SISYS\\configs"
+
+docker:
+  compose_file: "docker-compose.yml"
+  network: "sisys-network"
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "sisys.log"

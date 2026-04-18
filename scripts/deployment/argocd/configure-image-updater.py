@@ -309,7 +309,7 @@ spec:
   source:
     repoURL: https://gitea.sisys.local/sisys/sisys.git
     targetRevision: HEAD
-    path: deployments/myapp
+    path: deploy/kubernetes/myapp
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -321,7 +321,7 @@ spec:
       - CreateNamespace=true
 """
 
-        output_path = Path("/mnt/g/ai/sisys/deployments/argocd/example-application.yaml")
+        output_path = Path("/mnt/g/ai/sisys/deploy/kubernetes/argocd/example-application.yaml")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(example_yaml)
 
@@ -361,7 +361,7 @@ spec:
             print("1. 在 Harbor Web 界面验证 Robot Account: https://harbor.sisys.local")
             print("2. 创建 ArgoCD Application 并添加镜像更新注解")
             print("3. 推送新镜像测试自动更新流程")
-            print("\n参考文档：docs/deployment/ARGOCD_IMAGE_UPDATER.md")
+            print("\n参考文档：docs/deploy/ARGOCD_IMAGE_UPDATER.md")
 
         except KeyboardInterrupt:
             print("\n\n⚠️  用户中断")

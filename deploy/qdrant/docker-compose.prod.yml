@@ -1,0 +1,59 @@
+version: '3.8'
+
+# =============================================================================
+# Qdrant 向量存储层 - 生产环境部署配置
+# =============================================================================
+# 用途：Story 1.6 (Qdrant Vector Layer) 生产环境部署
+# 版本：Qdrant v1.7.0+（支持异步客户端和 query_points API）
+# 职责：L3 向量存储层（嵌入向量存储、Dense 语义检索、BM25 稀疏检索、混合检索基础）
+# =============================================================================
+
+services:
+  qdrant:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.1
+    container_name: sisys-qdrant-prod
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"    # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:6334"  # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./qdrant.yaml:/qdrant/config/custom_config.yaml:ro
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-warn}
+      # 生产环境必须启用 API 密钥
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      # 生产环境禁用 Telemetry
+      - QDRANT__TELEMETRY__DISABLED=true
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+volumes:
+  qdrant_data:
+    driver: local
+    name: sisys-qdrant-data-prod
+
+networks:
+  sisys-network:
+    driver: overlay
+    name: sisys-network-prod

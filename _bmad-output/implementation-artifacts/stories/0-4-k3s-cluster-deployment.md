@@ -103,7 +103,7 @@ So that **提供轻量级 K8s 运行时环境给 Gitea、Harbor、ArgoCD 使用*
 - **可行性:** ⚠️ 部分可行（仅开发/测试）
 - **推荐方案:** WSL2 单节点 + Kind/Minikube 多节点测试
 - **限制:** 网络配置复杂、存储无法共享、IP 动态变化
-- **详见:** `docs/deployment/K3S_MULTI_NODE_GUIDE.md`
+- **详见:** `docs/deploy/K3S_MULTI_NODE_GUIDE.md`
 
 ### 项目结构说明
 
@@ -121,8 +121,8 @@ So that **提供轻量级 K8s 运行时环境给 Gitea、Harbor、ArgoCD 使用*
 | `scripts/deployment/k3s/health_check_docker.sh` | 多节点健康检查 | Docker 容器集群检查 |
 | `scripts/deployment/k3s/install-traefik-docker.sh` | 多节点 Traefik | Docker 容器集群 Traefik 安装 |
 | `scripts/deployment/k3s/run_tests.sh` | 自动化测试 | 15 项验证测试 |
-| `docs/deployment/K3S_MULTI_NODE_GUIDE.md` | 部署指南 | 多节点部署完整指南 |
-| `docs/deployment/K3S_TEST_REPORT.md` | 测试报告 | 测试报告模板 |
+| `docs/deploy/K3S_MULTI_NODE_GUIDE.md` | 部署指南 | 多节点部署完整指南 |
+| `docs/deploy/K3S_TEST_REPORT.md` | 测试报告 | 测试报告模板 |
 
 **已弃用文件（Longhorn 不支持 WSL2）：**
 - ~~`scripts/deployment/k3s/longhorn-values.yaml`~~ - 已删除
@@ -315,8 +315,8 @@ exit 0
 - [x] `scripts/deployment/k3s/health_check_docker.sh` 已创建 ✅（多节点）
 - [x] `scripts/deployment/k3s/install-traefik-docker.sh` 已创建 ✅（多节点）
 - [x] `scripts/deployment/k3s/run_tests.sh` 已创建 ✅（自动化测试）
-- [x] `docs/deployment/K3S_MULTI_NODE_GUIDE.md` 已创建 ✅（多节点部署指南）
-- [x] `docs/deployment/K3S_TEST_REPORT.md` 已创建 ✅（测试报告模板）
+- [x] `docs/deploy/K3S_MULTI_NODE_GUIDE.md` 已创建 ✅（多节点部署指南）
+- [x] `docs/deploy/K3S_TEST_REPORT.md` 已创建 ✅（测试报告模板）
 
 **已弃用（Longhorn 不支持 WSL2）：**
 - [x] ~~`scripts/deployment/k3s/longhorn-values.yaml`~~ - 已删除
@@ -475,8 +475,8 @@ exit 0
 **总计：** 10 个文件，约 1698 行代码
 
 **文档文件：**
-- `docs/deployment/K3S_MULTI_NODE_GUIDE.md` - 多节点部署指南（350 行）
-- `docs/deployment/K3S_TEST_REPORT.md` - 测试报告模板（150 行）
+- `docs/deploy/K3S_MULTI_NODE_GUIDE.md` - 多节点部署指南（350 行）
+- `docs/deploy/K3S_TEST_REPORT.md` - 测试报告模板（150 行）
 
 ---
 

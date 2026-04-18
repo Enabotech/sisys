@@ -169,8 +169,8 @@ configure_alerts() {
     echo ""
 
     echo "参考配置："
-    echo "  - deployments/gitea-runner/servicemonitor.yaml"
-    echo "  - deployments/gitea-runner/alerting-rules.yaml"
+    echo "  - deploy/kubernetes/gitea-runner/servicemonitor.yaml"
+    echo "  - deploy/kubernetes/gitea-runner/alerting-rules.yaml"
     echo ""
 }
 

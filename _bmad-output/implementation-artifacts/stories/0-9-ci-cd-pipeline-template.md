@@ -158,7 +158,7 @@ so that **所有项目可以复用最佳实践，确保代码质量、安全性�
   - [x] Subtask 7.7: 验证预构建镜像加速效果
 
 - [x] Task 8: 文档与培训 (AC: 1)
-  - [x] Subtask 8.1: 创建使用指南 `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md`
+  - [x] Subtask 8.1: 创建使用指南 `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md`
   - [x] Subtask 8.2: 创建快速开始指南
   - [x] Subtask 8.3: 创建故障排除指南
   - [x] Subtask 8.4: 创建最佳实践文档
@@ -258,7 +258,7 @@ so that **所有项目可以复用最佳实践，确保代码质量、安全性�
 
 ### 实施指南
 
-**创建文档:** `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md`
+**创建文档:** `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md`
 
 **文档内容应包含:**
 1. Pipeline 架构图 (含三层镜像架构)
@@ -428,11 +428,11 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 - `docker/dockerfile.app` - Layer 3 应用镜像 ✅
 
 **文档:**
-- `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md` - 使用指南 ✅
-- `docs/deployment/CI_CD_SECRETS_GUIDE.md` - Secrets 配置指南 ✅
-- `docs/deployment/CI_CD_TROUBLESHOOTING.md` - 故障排除指南 ✅
-- `docs/deployment/PREBUILT_IMAGE_MAINTENANCE.md` - 预构建镜像维护指南 ✅
-- `docs/deployment/LOCAL_PYTORCH_IMPORT.md` - 本地 PyTorch 镜像导入指南 ✅
+- `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md` - 使用指南 ✅
+- `docs/deploy/CI_CD_SECRETS_GUIDE.md` - Secrets 配置指南 ✅
+- `docs/deploy/CI_CD_TROUBLESHOOTING.md` - 故障排除指南 ✅
+- `docs/deploy/PREBUILT_IMAGE_MAINTENANCE.md` - 预构建镜像维护指南 ✅
+- `docs/deploy/LOCAL_PYTORCH_IMPORT.md` - 本地 PyTorch 镜像导入指南 ✅
 
 **测试:**
 - `tests/pipeline/test_ci_cd_pipeline.py` - Pipeline 测试 ✅
@@ -444,18 +444,18 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 - `scripts/entrypoint.sh` - 应用入口脚本 ✅
 
 **K8s 配置:**
-- `deployments/k8s/deployment.yaml` - 含 GPU 资源申请 ✅
-- `deployments/k8s/service.yaml` - 服务配置 ✅
+- `deploy/kubernetes/k8s/deployment.yaml` - 含 GPU 资源申请 ✅
+- `deploy/kubernetes/k8s/service.yaml` - 服务配置 ✅
 
 **ArgoCD 配置 (已存在):**
 - `./developments/apps/sisys/` - ArgoCD Application 配置 (用户已配置)
 - `./developments/argocd/` - ArgoCD 根配置 (用户已配置)
 
 **配置评估:**
-- `docs/deployment/CONFIG_ASSESSMENT_REPORT.md` - 配置评估报告 ✅
-- `docs/deployment/ARGOCD_APPLICATION_CONFIG.md` - ArgoCD 配置分析 ✅
-- `docs/deployment/ARGOCD_SETUP_SUMMARY.md` - ArgoCD 配置总结 ✅
-- `docs/deployment/CI_CD_ARGOCD_INTEGRATION_SUMMARY.md` - 集成总结 ✅
+- `docs/deploy/CONFIG_ASSESSMENT_REPORT.md` - 配置评估报告 ✅
+- `docs/deploy/ARGOCD_APPLICATION_CONFIG.md` - ArgoCD 配置分析 ✅
+- `docs/deploy/ARGOCD_SETUP_SUMMARY.md` - ArgoCD 配置总结 ✅
+- `docs/deploy/CI_CD_ARGOCD_INTEGRATION_SUMMARY.md` - 集成总结 ✅
 
 **参考的文件:**
 - `_bmad-output/implementation-artifacts/stories/0-2-ci-cd-pipeline.md` - 已废弃但有参考价值

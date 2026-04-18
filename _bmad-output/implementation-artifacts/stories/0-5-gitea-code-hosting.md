@@ -40,14 +40,14 @@ Status: done
 **Task:** Gitea Helm Chart 配置
 
 **实施内容:
-1. ✅ 创建测试文件 `tests/deployment/test_gitea.py` - 包含 15+ 个测试用例
-2. ✅ 创建 Helm Chart 配置 `deployments/gitea/values.yaml` - Gitea v1.25.4 完整配置
-3. ✅ 创建 Ingress 配置 `deployments/gitea/ingress.yaml` - TLS 1.3 + Let's Encrypt
-4. ✅ 创建 Kustomize 配置 `deployments/gitea/kustomization.yaml` - 环境定制支持
-5. ✅ 创建命名空间配置 `deployments/gitea/namespace.yaml`
-6. ✅ 创建 Gitea 应用配置 `deployments/gitea/config/app.ini` - 安全加固配置
-7. ✅ 创建 NetworkPolicy 配置 `deployments/gitea/networkpolicy.yaml` - 网络安全策略
-8. ✅ 创建部署指南 `docs/deployment/GITEA_INSTALLATION.md` - 完整部署文档
+1. ✅ 创建测试文件 `tests/deploy/test_gitea.py` - 包含 15+ 个测试用例
+2. ✅ 创建 Helm Chart 配置 `deploy/kubernetes/gitea/values.yaml` - Gitea v1.25.4 完整配置
+3. ✅ 创建 Ingress 配置 `deploy/kubernetes/gitea/ingress.yaml` - TLS 1.3 + Let's Encrypt
+4. ✅ 创建 Kustomize 配置 `deploy/kubernetes/gitea/kustomization.yaml` - 环境定制支持
+5. ✅ 创建命名空间配置 `deploy/kubernetes/gitea/namespace.yaml`
+6. ✅ 创建 Gitea 应用配置 `deploy/kubernetes/gitea/config/app.ini` - 安全加固配置
+7. ✅ 创建 NetworkPolicy 配置 `deploy/kubernetes/gitea/networkpolicy.yaml` - 网络安全策略
+8. ✅ 创建部署指南 `docs/deploy/GITEA_INSTALLATION.md` - 完整部署文档
 
 **代码审查修复 (2026-03-12):**
 - 审查问题：12 个 (5 HIGH + 4 MEDIUM + 3 LOW)
@@ -64,20 +64,20 @@ Status: done
 - 日志持久化配置（30 天保留）
 
 **测试状态:**
-- ✅ 测试文件已创建：`tests/deployment/test_gitea.py` (15+ 测试用例)
+- ✅ 测试文件已创建：`tests/deploy/test_gitea.py` (15+ 测试用例)
 - ✅ 部署验证通过（2026-03-13）：Gitea Pod 运行正常，健康检查通过
 
 ### Task 2 Completion Notes
 
 **实施内容:**
-1. ✅ 创建测试文件 `tests/deployment/test_gitea.py` - 包含 15+ 个测试用例
-2. ✅ 创建 Helm Chart 配置 `deployments/gitea/values.yaml` - Gitea v1.25.4 完整配置
-3. ✅ 创建 Ingress 配置 `deployments/gitea/ingress.yaml` - TLS 1.3 + Let's Encrypt
-4. ✅ 创建 Kustomize 配置 `deployments/gitea/kustomization.yaml` - 环境定制支持
-5. ✅ 创建命名空间配置 `deployments/gitea/namespace.yaml`
-6. ✅ 创建 Gitea 应用配置 `deployments/gitea/config/app.ini` - 安全加固配置
-7. ✅ 创建部署指南 `docs/deployment/GITEA_INSTALLATION.md` - 完整部署文档
-8. ✅ 创建 NetworkPolicy 配置 `deployments/gitea/networkpolicy.yaml` - 网络安全策略
+1. ✅ 创建测试文件 `tests/deploy/test_gitea.py` - 包含 15+ 个测试用例
+2. ✅ 创建 Helm Chart 配置 `deploy/kubernetes/gitea/values.yaml` - Gitea v1.25.4 完整配置
+3. ✅ 创建 Ingress 配置 `deploy/kubernetes/gitea/ingress.yaml` - TLS 1.3 + Let's Encrypt
+4. ✅ 创建 Kustomize 配置 `deploy/kubernetes/gitea/kustomization.yaml` - 环境定制支持
+5. ✅ 创建命名空间配置 `deploy/kubernetes/gitea/namespace.yaml`
+6. ✅ 创建 Gitea 应用配置 `deploy/kubernetes/gitea/config/app.ini` - 安全加固配置
+7. ✅ 创建部署指南 `docs/deploy/GITEA_INSTALLATION.md` - 完整部署文档
+8. ✅ 创建 NetworkPolicy 配置 `deploy/kubernetes/gitea/networkpolicy.yaml` - 网络安全策略
 
 **代码审查修复 (2026-03-12):**
 - 审查问题：12 个 (5 HIGH + 4 MEDIUM + 3 LOW)
@@ -94,7 +94,7 @@ Status: done
 - 日志持久化配置（30 天保留）
 
 **测试状态:**
-- ✅ 测试文件已创建：`tests/deployment/test_gitea.py` (15+ 测试用例)
+- ✅ 测试文件已创建：`tests/deploy/test_gitea.py` (15+ 测试用例)
 - ✅ 部署验证通过（2026-03-13）：Gitea Pod 运行正常，健康检查通过
 
 ### Task 2 Completion Notes
@@ -131,9 +131,9 @@ Status: done
 - ⚠️ 自动化测试：需要更新命名空间配置以匹配实际部署
 
 **文件更新:**
-- 新增：`deployments/gitea/values-test.yaml` - MVP 简化配置
-- 新增：`deployments/gitea/values-mvp.yaml` - 简化 PostgreSQL 配置
-- 新增：`deployments/gitea/values-simple.yaml` - SQLite 简化配置
+- 新增：`deploy/kubernetes/gitea/values-test.yaml` - MVP 简化配置
+- 新增：`deploy/kubernetes/gitea/values-mvp.yaml` - 简化 PostgreSQL 配置
+- 新增：`deploy/kubernetes/gitea/values-simple.yaml` - SQLite 简化配置
 - ⏸️ 测试执行：**需要安装 Python 测试环境**
 - 📋 测试类型：部署测试（需要 Docker + K3S 环境）
 
@@ -165,10 +165,10 @@ poetry install --with test
 docker compose -f docker/docker-compose.test.yml up -d
 
 # 5. 运行部署测试
-poetry run pytest tests/deployment/test_gitea.py -v
+poetry run pytest tests/deploy/test_gitea.py -v
 
 # 6. 生成覆盖率报告
-poetry run pytest tests/deployment/test_gitea.py --cov=src --cov-report=html
+poetry run pytest tests/deploy/test_gitea.py --cov=src --cov-report=html
 ```
 
 **测试执行计划:**
@@ -468,7 +468,7 @@ spec:
    sisys/
    ├── .gitea/
    │   └── workflows/        # Gitea Actions CI/CD 定义
-   ├── deployments/
+   ├── deploy/kubernetes/
    │   ├── gitea/           # Story 0.5: Gitea 部署配置
    │   ├── harbor/          # Story 0.6: Harbor 部署配置
    │   └── argocd/          # Story 0.7: ArgoCD 部署配置
@@ -596,7 +596,7 @@ spec:
 
 ### 实施指南
 
-**参考文档**: `docs/deployment/GITEA_INSTALLATION.md`
+**参考文档**: `docs/deploy/GITEA_INSTALLATION.md`
 
 **实施步骤**:
 
@@ -679,7 +679,7 @@ sisys/
 │       ├── GITEA_INSTALLATION.md    # Gitea 部署指南
 │       ├── GITEA_RUNNER_SETUP.md    # Gitea Runner 配置 (Story 0.8)
 │       └── CI_CD_PIPELINE_TEMPLATE.md # CI/CD Pipeline 模板 (Story 0.9)
-├── deployments/
+├── deploy/kubernetes/
 │   └── gitea/
 │       ├── values.yaml              # Helm Chart 配置
 │       ├── ingress.yaml             # Ingress 配置
@@ -771,42 +771,42 @@ sisys/
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `tests/deployment/test_gitea.py` | 创建 + 修复 | Gitea 部署测试套件 (修复 H3: pytest.skip → pytest.fail) | ~380 |
-| `deployments/gitea/values.yaml` | 创建 | Helm Chart 配置 | ~200 |
-| `deployments/gitea/ingress.yaml` | 创建 + 修复 + M1 修复 | Ingress + TLS 配置 (修复 H1: Traefik Middleware; M1: 恢复 Middleware 配置) | ~75 |
-| `deployments/gitea/middleware.yaml` | **新增 (M1 修复)** | Traefik Middleware 安全头配置 (HSTS) | ~40 |
-| `deployments/gitea/kustomization.yaml` | 创建 + 修复 | Kustomize 配置 (修复 H4: 移除无效引用) | ~58 |
-| `deployments/gitea/namespace.yaml` | 创建 | 命名空间配置 | ~10 |
-| `deployments/gitea/config/app.ini` | 创建 + 修复 | Gitea 应用配置 (修复 H2: 删除 260+ 行无效配置) | ~590 |
-| `deployments/gitea/networkpolicy.yaml` | 创建 | NetworkPolicy 安全配置 (修复 L1) | ~120 |
-| `docs/deployment/GITEA_INSTALLATION.md` | 创建 + 修复 | Gitea 部署指南 (修复 M4: 添加期望输出示例) | ~460 |
+| `tests/deploy/test_gitea.py` | 创建 + 修复 | Gitea 部署测试套件 (修复 H3: pytest.skip → pytest.fail) | ~380 |
+| `deploy/kubernetes/gitea/values.yaml` | 创建 | Helm Chart 配置 | ~200 |
+| `deploy/kubernetes/gitea/ingress.yaml` | 创建 + 修复 + M1 修复 | Ingress + TLS 配置 (修复 H1: Traefik Middleware; M1: 恢复 Middleware 配置) | ~75 |
+| `deploy/kubernetes/gitea/middleware.yaml` | **新增 (M1 修复)** | Traefik Middleware 安全头配置 (HSTS) | ~40 |
+| `deploy/kubernetes/gitea/kustomization.yaml` | 创建 + 修复 | Kustomize 配置 (修复 H4: 移除无效引用) | ~58 |
+| `deploy/kubernetes/gitea/namespace.yaml` | 创建 | 命名空间配置 | ~10 |
+| `deploy/kubernetes/gitea/config/app.ini` | 创建 + 修复 | Gitea 应用配置 (修复 H2: 删除 260+ 行无效配置) | ~590 |
+| `deploy/kubernetes/gitea/networkpolicy.yaml` | 创建 | NetworkPolicy 安全配置 (修复 L1) | ~120 |
+| `docs/deploy/GITEA_INSTALLATION.md` | 创建 + 修复 | Gitea 部署指南 (修复 M4: 添加期望输出示例) | ~460 |
 
 **创建/修改文件 (Task 2):**
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `deployments/gitea/values-test.yaml` | 创建 | MVP 简化配置（SQLite，无 PostgreSQL） | ~60 |
-| `deployments/gitea/values-mvp.yaml` | 创建 | 简化 PostgreSQL 配置（禁用 HA） | ~150 |
-| `deployments/gitea/values-simple.yaml` | 创建 | SQLite 简化配置 | ~120 |
+| `deploy/kubernetes/gitea/values-test.yaml` | 创建 | MVP 简化配置（SQLite，无 PostgreSQL） | ~60 |
+| `deploy/kubernetes/gitea/values-mvp.yaml` | 创建 | 简化 PostgreSQL 配置（禁用 HA） | ~150 |
+| `deploy/kubernetes/gitea/values-simple.yaml` | 创建 | SQLite 简化配置 | ~120 |
 
 **创建/修改文件 (Task 5-7):**
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `deployments/gitea/secrets.yaml` | 创建 + M3 修复 | Kubernetes Secret 配置 (M3: 移除明文占位符，改用环境变量注入) | ~70 |
-| `deployments/gitea/secrets-example.yaml` | **新增 (M3 修复)** | 开发环境 Secrets 示例（明确标注不可提交） | ~50 |
-| `docs/deployment/GITEA_SECRETS_GUIDE.md` | **新增 (M3 修复)** | Secrets 管理完整使用指南 | ~450 |
-| `tests/deployment/test_gitea_architecture.py` | 创建 + 修复 | 架构合规验证测试 (11 测试用例，修复 yaml 加载问题) | ~240 |
-| `deployments/gitea/integration-config.yaml` | 创建 | Harbor/ArgoCD 集成配置模板 | ~200 |
+| `deploy/kubernetes/gitea/secrets.yaml` | 创建 + M3 修复 | Kubernetes Secret 配置 (M3: 移除明文占位符，改用环境变量注入) | ~70 |
+| `deploy/kubernetes/gitea/secrets-example.yaml` | **新增 (M3 修复)** | 开发环境 Secrets 示例（明确标注不可提交） | ~50 |
+| `docs/deploy/GITEA_SECRETS_GUIDE.md` | **新增 (M3 修复)** | Secrets 管理完整使用指南 | ~450 |
+| `tests/deploy/test_gitea_architecture.py` | 创建 + 修复 | 架构合规验证测试 (11 测试用例，修复 yaml 加载问题) | ~240 |
+| `deploy/kubernetes/gitea/integration-config.yaml` | 创建 | Harbor/ArgoCD 集成配置模板 | ~200 |
 
 **创建/修改文件 (外部访问增强 - 最新提交):**
 
 | 文件路径 | 操作类型 | 说明 | 行数 |
 |---------|---------|------|------|
-| `deployments/gitea/ingress-ip.yaml` | **新增** | IP 直接访问 Ingress 配置（Windows 主机） | ~26 |
-| `docs/deployment/GITEA_ACCESS_GUIDE.md` | **新增** | Gitea 外部访问配置指南 | ~130 |
-| `docs/deployment/GITEA_WINDOWS_ACCESS.md` | **新增** | Windows 主机访问 WSL2 指南 | ~131 |
-| `docs/deployment/configure-windows-hosts.ps1` | **新增** | Windows hosts 配置脚本 | ~106 |
+| `deploy/kubernetes/gitea/ingress-ip.yaml` | **新增** | IP 直接访问 Ingress 配置（Windows 主机） | ~26 |
+| `docs/deploy/GITEA_ACCESS_GUIDE.md` | **新增** | Gitea 外部访问配置指南 | ~130 |
+| `docs/deploy/GITEA_WINDOWS_ACCESS.md` | **新增** | Windows 主机访问 WSL2 指南 | ~131 |
+| `docs/deploy/configure-windows-hosts.ps1` | **新增** | Windows hosts 配置脚本 | ~106 |
 
 **审查修复摘要:**
 - 🔴 **HIGH 修复 (5 个)**: Ingress 配置、app.ini 无效配置、测试跳过、kustomization 引用、File List 对齐
@@ -817,14 +817,14 @@ sisys/
 
 | 文件路径 | 说明 |
 |---------|------|
-| `docs/deployment/K3S_CLUSTER_SETUP.md` | Story 0.4 部署指南 (已存在，实际文件名为 K3S_DEPLOYMENT_GUIDE.md) |
-| `deployments/k3s/traefik-values.yaml` | Traefik 配置 (Story 0.4 已创建) |
+| `docs/deploy/K3S_CLUSTER_SETUP.md` | Story 0.4 部署指南 (已存在，实际文件名为 K3S_DEPLOYMENT_GUIDE.md) |
+| `deploy/kubernetes/k3s/traefik-values.yaml` | Traefik 配置 (Story 0.4 已创建) |
 
 **文件结构:**
 
 ```
 sisys/
-├── deployments/
+├── deploy/kubernetes/
 │   └── gitea/
 │       ├── values.yaml              # ✅ 已创建 (完整配置)
 │       ├── values-test.yaml         # ✅ 已创建 (MVP 简化)
@@ -899,13 +899,13 @@ sisys/
 3. ✅ **L3**: PowerShell 脚本错误处理 - 已添加权限检查和错误提示
 
 **新增文件:**
-- `deployments/gitea/middleware.yaml` (~40 行) - Traefik Middleware 安全头配置
-- `deployments/gitea/secrets-example.yaml` (~50 行) - 开发环境 Secrets 示例
-- `docs/deployment/GITEA_SECRETS_GUIDE.md` (~450 行) - Secrets 管理完整使用指南
+- `deploy/kubernetes/gitea/middleware.yaml` (~40 行) - Traefik Middleware 安全头配置
+- `deploy/kubernetes/gitea/secrets-example.yaml` (~50 行) - 开发环境 Secrets 示例
+- `docs/deploy/GITEA_SECRETS_GUIDE.md` (~450 行) - Secrets 管理完整使用指南
 
 **更新文件:**
-- `deployments/gitea/ingress.yaml` - 恢复 Middleware 引用，更新 TLS 证书说明
-- `deployments/gitea/secrets.yaml` - 移除明文密码，改用环境变量占位符
+- `deploy/kubernetes/gitea/ingress.yaml` - 恢复 Middleware 引用，更新 TLS 证书说明
+- `deploy/kubernetes/gitea/secrets.yaml` - 移除明文密码，改用环境变量占位符
 - `.gitignore` - 添加 secrets-example.yaml 例外规则
 - `_bmad-output/implementation-artifacts/stories/0-5-gitea-code-hosting.md` - 更新 File List 和 Change Log
 
@@ -925,9 +925,9 @@ sisys/
 - ✅ Task 7: Harbor/ArgoCD 集成准备完成
 
 **新增文件:** 3 个
-- `deployments/gitea/secrets.yaml` (~60 行) - Kubernetes Secret 配置
-- `tests/deployment/test_gitea_architecture.py` (~240 行) - 架构合规验证测试
-- `deployments/gitea/integration-config.yaml` (~200 行) - Harbor/ArgoCD 集成配置模板
+- `deploy/kubernetes/gitea/secrets.yaml` (~60 行) - Kubernetes Secret 配置
+- `tests/deploy/test_gitea_architecture.py` (~240 行) - 架构合规验证测试
+- `deploy/kubernetes/gitea/integration-config.yaml` (~200 行) - Harbor/ArgoCD 集成配置模板
 
 **测试结果:**
 - ✅ 架构合规验证测试：11/11 通过 (100%)
@@ -975,9 +975,9 @@ sisys/
 - ✅ 验证服务可访问（port-forward 测试通过）
 
 **新增文件:** 3 个
-- `deployments/gitea/values-test.yaml` (~60 行) - MVP 简化配置
-- `deployments/gitea/values-mvp.yaml` (~150 行) - PostgreSQL 简化配置
-- `deployments/gitea/values-simple.yaml` (~120 行) - SQLite 简化配置
+- `deploy/kubernetes/gitea/values-test.yaml` (~60 行) - MVP 简化配置
+- `deploy/kubernetes/gitea/values-mvp.yaml` (~150 行) - PostgreSQL 简化配置
+- `deploy/kubernetes/gitea/values-simple.yaml` (~120 行) - SQLite 简化配置
 
 **技术问题解决:**
 - 问题：Helm Chart 默认从 docker.gitea.com 拉取镜像，但该仓库不可访问
@@ -1079,14 +1079,14 @@ sisys/
 - ✅ 创建 NetworkPolicy 安全配置
 
 **新增文件:** 8 个
-- `tests/deployment/test_gitea.py` (~380 行) - 修复 H3: pytest.skip → pytest.fail
-- `deployments/gitea/values.yaml` (~200 行)
-- `deployments/gitea/ingress.yaml` (~100 行) - 修复 H1: Traefik Middleware
-- `deployments/gitea/kustomization.yaml` (~58 行) - 修复 H4: 移除无效引用
-- `deployments/gitea/namespace.yaml` (~10 行)
-- `deployments/gitea/config/app.ini` (~590 行) - 修复 H2: 删除 260+ 行无效配置
-- `deployments/gitea/networkpolicy.yaml` (~120 行) - 修复 L1: 新增 NetworkPolicy
-- `docs/deployment/GITEA_INSTALLATION.md` (~460 行) - 修复 M4: 添加期望输出示例
+- `tests/deploy/test_gitea.py` (~380 行) - 修复 H3: pytest.skip → pytest.fail
+- `deploy/kubernetes/gitea/values.yaml` (~200 行)
+- `deploy/kubernetes/gitea/ingress.yaml` (~100 行) - 修复 H1: Traefik Middleware
+- `deploy/kubernetes/gitea/kustomization.yaml` (~58 行) - 修复 H4: 移除无效引用
+- `deploy/kubernetes/gitea/namespace.yaml` (~10 行)
+- `deploy/kubernetes/gitea/config/app.ini` (~590 行) - 修复 H2: 删除 260+ 行无效配置
+- `deploy/kubernetes/gitea/networkpolicy.yaml` (~120 行) - 修复 L1: 新增 NetworkPolicy
+- `docs/deploy/GITEA_INSTALLATION.md` (~460 行) - 修复 M4: 添加期望输出示例
 
 **技术亮点:**
 - TLS 1.3 强制启用

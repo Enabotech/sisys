@@ -106,9 +106,9 @@ if [[ "$FIX_NEEDED" == "true" ]]; then
     echo ""
 
     # 重新应用 IngressRoute
-    if [[ -f "deployments/harbor/ingress-route.yaml" ]]; then
+    if [[ -f "deploy/kubernetes/harbor/ingress-route.yaml" ]]; then
         log_info "应用 IngressRoute 配置..."
-        sudo kubectl apply -f deployments/harbor/ingress-route.yaml -n $HARBOR_NS
+        sudo kubectl apply -f deploy/kubernetes/harbor/ingress-route.yaml -n $HARBOR_NS
         log_success "IngressRoute 已应用"
     fi
 

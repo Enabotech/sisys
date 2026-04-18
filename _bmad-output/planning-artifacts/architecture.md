@@ -1839,7 +1839,7 @@ sisys/
 src/domain/
 ├── __init__.py                                            # 领域层包初始化
 │
-├── models/                                                # 领域模型
+├── entities/                                              # 领域模型
 │   ├── __init__.py
 │   ├── document.py                                        # 文档实体（17 种格式支持）
 │   ├── agent.py                                           # Agent 实体（7 角色+SYS+AUD）
@@ -1849,12 +1849,13 @@ src/domain/
 │   ├── checkpoint.py                                      # 检查点实体（双模式恢复）
 │   ├── strategic_archive.py                               # 战略档案实体（五层存储）
 │   ├── routing_log.py                                     # 路由决策日志实体 ⭐
-│   ├── isolation_log.py                                   # 隔离切换日志实体 ⭐
-│   └── value_objects.py                                   # 值对象集合
-│       ├── embedding.py                                   # 嵌入向量值对象
-│       ├── citation.py                                    # 引用索引值对象
-│       ├── confidence.py                                  # 置信度值对象
-│       └── cost.py                                        # 成本值对象
+│   └── isolation_log.py                                   # 隔离切换日志实体 ⭐
+│
+├── value_objects/                                         # 值对象集合
+│   ├── embedding.py                                       # 嵌入向量值对象
+│   ├── citation.py                                        # 引用索引值对象
+│   ├── confidence.py                                      # 置信度值对象
+│   └── cost.py                                            # 成本值对象
 │
 ├── services/                                              # 领域服务接口
 │   ├── __init__.py
@@ -2016,7 +2017,7 @@ src/infrastructure/
 │   │   ├── llm_tasks.py                                   # LLM 调用任务
 │   │   ├── vector_tasks.py                                # 向量存储任务
 │   │   └── analysis_tasks.py                              # 分析任务
-│   └── deployments/                                       # 部署配置
+│   └── deploy/kubernetes/                                       # 部署配置
 │       ├── __init__.py
 │       ├── development.yaml                               # 开发环境部署
 │       └── production.yaml                                # 生产环境部署

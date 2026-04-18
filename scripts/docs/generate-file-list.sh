@@ -116,9 +116,9 @@ get_operation_type() {
 
 # 生成 Harbor 文件清单
 generate_harbor_file_list() {
-    local harbor_dir="$PROJECT_ROOT/deployments/harbor"
+    local harbor_dir="$PROJECT_ROOT/deploy/kubernetes/harbor"
     local scripts_dir="$PROJECT_ROOT/scripts"
-    local tests_dir="$PROJECT_ROOT/tests/deployment"
+    local tests_dir="$PROJECT_ROOT/tests/deploy"
     local docs_dir="$PROJECT_ROOT/docs/deployment"
 
     echo "### File List"
@@ -130,12 +130,12 @@ generate_harbor_file_list() {
     echo "| 文件路径 | 操作类型 | 说明 | 行数 |"
     echo "|---------|---------|------|------|"
 
-    # 扫描 deployments/harbor 目录
+    # 扫描 deploy/kubernetes/harbor 目录
     if [[ -d "$harbor_dir" ]]; then
         for file in "$harbor_dir"/*.yaml; do
             if [[ -f "$file" ]]; then
                 local filename=$(basename "$file")
-                local relpath="deployments/harbor/$filename"
+                local relpath="deploy/kubernetes/harbor/$filename"
                 local lines=$(wc -l < "$file")
                 local desc=$(get_file_description "$file")
                 local op=$(get_operation_type "$file")
@@ -184,12 +184,12 @@ generate_harbor_file_list() {
     echo "| 文件路径 | 操作类型 | 说明 | 行数 |"
     echo "|---------|---------|------|------|"
 
-    # 扫描 tests/deployment 目录
+    # 扫描 tests/deploy 目录
     if [[ -d "$tests_dir" ]]; then
         for file in "$tests_dir"/test_harbor*.py; do
             if [[ -f "$file" ]]; then
                 local filename=$(basename "$file")
-                local relpath="tests/deployment/$filename"
+                local relpath="tests/deploy/$filename"
                 local lines=$(wc -l < "$file")
                 # 从 Python 文件 docstring 获取描述
                 local desc=$(grep -m1 '^"""' "$file" 2>/dev/null | sed 's/^"""//' | head -c 50 || echo "测试文件")
@@ -210,7 +210,7 @@ generate_harbor_file_list() {
         for file in "$docs_dir"/HARBOR*.md; do
             if [[ -f "$file" ]]; then
                 local filename=$(basename "$file")
-                local relpath="docs/deployment/$filename"
+                local relpath="docs/deploy/$filename"
                 local lines=$(wc -l < "$file")
                 local desc=$(head -1 "$file" 2>/dev/null | sed 's/^# //' || echo "文档")
                 local op=$(get_operation_type "$file")
@@ -222,7 +222,7 @@ generate_harbor_file_list() {
             for file in "$docs_dir"/*.md; do
                 if [[ -f "$file" ]]; then
                     local filename=$(basename "$file")
-                    local relpath="docs/deployment/$filename"
+                    local relpath="docs/deploy/$filename"
                     local lines=$(wc -l < "$file")
                     local desc=$(head -1 "$file" 2>/dev/null | sed 's/^# //' || echo "文档")
                     local op=$(get_operation_type "$file")

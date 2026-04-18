@@ -29,7 +29,7 @@ NC='\033[0m' # No Color
 # 配置变量
 NAMESPACE="gitea-actions"
 SECRET_NAME="harbor-robot-account"  # pragma: allowlist secret
-CONFIG_FILE="deployments/gitea-runner/harbor-robot-secret.yaml"
+CONFIG_FILE="deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml"
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   Harbor Robot Account Secret 部署脚本                  ║${NC}"
