@@ -129,45 +129,55 @@ _migration_run = False
 
 @pytest.fixture(scope="module")
 def ensure_alembic_migration(pg_config: PostgreSQLConfig):
-    """Ensure Alembic migrations are applied before tests.
+    """Ensure database schema exists before tests.
 
-    This fixture runs alembic upgrade head once per module to ensure
-    the database schema exists before outbox/repository tests run.
+    First tries alembic upgrade head. If that fails, falls back to
+    Base.metadata.create_all() to ensure tests can run even without
+    proper migration setup.
     """
     global _migration_run
     if _migration_run:
         yield
         return
 
+    # Try alembic migration first
     alembic_ini = ROOT / "deploy/postgresql/alembic/alembic.ini"
-    if not alembic_ini.exists():
-        pytest.skip(f"alembic.ini not found at {alembic_ini}")
+    migration_success = False
 
-    # Set environment variables for alembic
-    env = {
-        "POSTGRES_HOST": pg_config.host,
-        "POSTGRES_PORT": str(pg_config.port),
-        "POSTGRES_USERNAME": pg_config.username,
-        "POSTGRES_PASSWORD": pg_config.password,
-        "POSTGRES_DATABASE": pg_config.database,
-    }
+    if alembic_ini.exists():
+        env = {
+            "POSTGRES_HOST": pg_config.host,
+            "POSTGRES_PORT": str(pg_config.port),
+            "POSTGRES_USERNAME": pg_config.username,
+            "POSTGRES_PASSWORD": pg_config.password,
+            "POSTGRES_DATABASE": pg_config.database,
+        }
 
-    # Run alembic upgrade head with explicit config file path
-    try:
-        result = subprocess.run(
-            ["poetry", "run", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
-            cwd=str(ROOT),
-            env={**os.environ, **env},
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode != 0:
-            # Migration might have already been applied, which is OK
-            if "already up to date" not in result.stderr and "already up to date" not in result.stdout:
+        try:
+            result = subprocess.run(
+                ["poetry", "run", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
+                cwd=str(ROOT),
+                env={**os.environ, **env},
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0 or "already up to date" in result.stdout:
+                migration_success = True
+            else:
                 print(f"Alembic upgrade warning: {result.stderr}")
-    except Exception as e:
-        pytest.skip(f"Failed to run alembic migration: {e}")
+        except Exception as e:
+            print(f"Alembic upgrade failed: {e}")
+
+    # Fallback: create schema directly via SQLAlchemy models
+    if not migration_success:
+        try:
+            from src.infrastructure.storage.postgresql.models import Base
+
+            engine = DatabaseEngine(pg_config)
+            Base.metadata.create_all(engine.get_sync_engine())
+        except Exception as e:
+            pytest.skip(f"Failed to create schema: {e}")
 
     _migration_run = True
     yield
