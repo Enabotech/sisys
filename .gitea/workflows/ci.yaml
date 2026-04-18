@@ -254,7 +254,7 @@ jobs:
       - name: 验证服务健康状态
         run: |
           echo "验证服务健康状态..."
-          docker compose -f deploy/app/docker-compose.yml ps --format json | jq -r 'select(.Service!=null) | "\(.Service): \(.State)"'
+          docker compose -f deploy/app/docker-compose.yml ps
 
       - name: 增量更新依赖
         run: |
