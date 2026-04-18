@@ -114,9 +114,9 @@ jobs:
 
       # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
       # 预构建镜像包含大部分依赖，此步骤仅处理新增/变更的依赖
-      - name: 更新项目依赖
+      - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖安装完成"
+          poetry install --no-interaction --quiet || echo "依赖更新完成"
 
       - name: 代码检查 ( Ruff )
         run: |
@@ -158,9 +158,9 @@ jobs:
         uses: actions/checkout@v4
 
       # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
-      - name: 更新项目依赖
+      - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖安装完成"
+          poetry install --no-interaction --quiet || echo "依赖更新完成"
 
       - name: 验证 GPU 可用性
         if: ${{ vars.GPU_ENABLED == 'true' }}
@@ -217,7 +217,13 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 3: 集成测试 (Docker Compose) - 支持 GPU
+  # 阶段 3: 集成测试 (Docker Compose) - 宿主机 Runner
+  # ===========================================================================
+  # 说明:
+  #   - runs-on: gpu 指向 gitea-org-runner (K8s StatefulSet)
+  #   - Runner 通过 hostPath 挂载 /var/run/docker.sock 到 Job 容器
+  #   - Job 容器内可直接运行 docker compose 命令
+  #   - 使用根目录 .env 文件配置服务连接参数
   # ===========================================================================
   integration-tests:
     name: "🔗 集成测试"
@@ -231,56 +237,27 @@ jobs:
     # ✅ 逻辑: 除非 (GPU 开启 且 消息包含 [no gpu])，否则都运行
     if: ${{ !(vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[no gpu]')) }}
 
-    # ===========================================================================
-    # 服务容器配置
-    # ✅ 最佳实践: 不使用端口映射，通过容器网络 ( DNS 名称 ) 通信
-    # ✅ 兼容性: 支持 bridge/host/container 所有网络模式
-    # ===========================================================================
-    services:
-      postgres:
-        image: harbor.sisys.local/sisys/tools/postgres/postgres:15.4
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test  # pragma: allowlist secret
-          POSTGRES_DB: test_db
-        # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: harbor.sisys.local/sisys/tools/redis/redis:7.2.5
-        # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
-      - name: 更新项目依赖
+      - name: 初始化环境
         run: |
-          poetry install --no-interaction --quiet || echo "依赖安装完成"
+          set -a
+          source .env
+          set +a
+          docker network create sisys-network 2>/dev/null || true
+          docker compose -f deploy/app/docker-compose.yml up -d --wait
+          echo "✅ 环境已初始化"
 
-      # - name: 等待 PostgreSQL 就绪
-      #   run: |
-      #     echo "等待 PostgreSQL 就绪..."
-      #     # ✅ 使用服务名访问 ( 兼容所有网络模式 )
-      #     until pg_isready -h postgres -p 5432 -U test; do sleep 1; done
-      #     echo "✅ PostgreSQL 就绪"
+      - name: 验证服务健康状态
+        run: |
+          echo "验证服务健康状态..."
+          docker compose -f deploy/app/docker-compose.yml ps --format json | jq -r 'select(.Service!=null) | "\(.Service): \(.State)"'
 
-      # - name: 等待 Redis 就绪
-      #   run: |
-      #     echo "等待 Redis 就绪..."
-      #     # ✅ 使用服务名访问 ( 兼容所有网络模式 )
-      #     until redis-cli -h redis ping | grep -q PONG; do sleep 1; done
-      #     echo "✅ Redis 就绪"
+      - name: 增量更新依赖
+        run: |
+          poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 运行集成测试
         run: |
@@ -291,6 +268,12 @@ jobs:
             --self-contained-html \
             -v \
             --tb=short
+
+      - name: 清理存储服务
+        if: always()
+        run: |
+          docker compose -f deploy/app/docker-compose.yml down -v 2>/dev/null || true
+          echo "✅ 服务已清理"
 
       - name: 上传集成测试报告
         if: always()
@@ -316,9 +299,9 @@ jobs:
         uses: actions/checkout@v4
 
       # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
-      - name: 更新项目依赖
+      - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖安装完成"
+          poetry install --no-interaction --quiet || echo "依赖更新完成"
 
       - name: 代码安全扫描 ( Bandit )
         run: |
