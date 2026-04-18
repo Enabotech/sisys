@@ -1,0 +1,250 @@
+# =============================================================================
+# SISYS 五层存储 - 统一部署配置
+# =============================================================================
+# 用途：一键部署所有存储服务（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）
+# Story: 1.4-1.8 (五层存储架构)
+# =============================================================================
+
+version: '3.8'
+
+services:
+
+  # ===========================================================================
+  # L1: Redis 高速缓存层
+  # ===========================================================================
+  redis:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    container_name: sisys-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    environment:
+      - REDIS_PORT=6379
+      # - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # ===========================================================================
+  # L2: PostgreSQL 关系存储层
+  # ===========================================================================
+  postgres:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/postgres/postgres:15.4
+    container_name: sisys-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DATABASE:-sisys}
+      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME:-postgres} -d ${POSTGRES_DATABASE:-sisys}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # ===========================================================================
+  # L3: Qdrant 向量存储层
+  # ===========================================================================
+  qdrant:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/qdrant/qdrant:v1.7.1
+    container_name: sisys-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./qdrant/qdrant.yaml:/qdrant/config/custom_config.yaml:ro
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-info}
+      # - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # ===========================================================================
+  # L4: MinIO 对象存储层
+  # ===========================================================================
+  minio:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: sisys-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+      - ./minio/minio.conf:/etc/minio/minio.conf:ro
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_VOLUMES=/data
+      - MINIO_OPTS=--config-dir /etc/minio
+    command: ["server", "/data", "--console-address", ":9001", "--config-dir", "/etc/minio"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # ===========================================================================
+  # L5: Neo4j 图存储层
+  # ===========================================================================
+  neo4j:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/neo4j/neo4j:5.15
+    container_name: sisys-neo4j
+    restart: unless-stopped
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j/neo4j.conf:/neo4j/conf/neo4j.conf:ro
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password123}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=${NEO4J_HEAP_INITIAL_SIZE:-512m}
+      - NEO4J_dbms_memory_heap_max__size=${NEO4J_HEAP_MAX_SIZE:-1G}
+      - NEO4J_dbms_memory_pagecache_size=${NEO4J_PAGECACHE_SIZE:-512m}
+      - NEO4J_dbms_transaction_timeout=60s
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # ===========================================================================
+  # RabbitMQ 可靠事件通道 (Story 1.3 Event Bus)
+  # ===========================================================================
+  rabbitmq:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/rabbitmq/rabbitmq:3.13-management
+    container_name: sisys-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
+      - RABBITMQ_DEFAULT_VHOST=/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+# =============================================================================
+# 存储卷
+# =============================================================================
+volumes:
+  redis_data:
+    driver: local
+    name: sisys-redis-data
+  postgres_data:
+    driver: local
+    name: sisys-postgres-data
+  qdrant_data:
+    driver: local
+    name: sisys-qdrant-data
+  minio_data:
+    driver: local
+    name: sisys-minio-data
+  neo4j_data:
+    driver: local
+    name: sisys-neo4j-data
+  rabbitmq_data:
+    driver: local
+    name: sisys-rabbitmq-data
+
+# =============================================================================
+# 网络
+# =============================================================================
+networks:
+  sisys-network:
+    driver: bridge
+    name: sisys-network
+    external: true

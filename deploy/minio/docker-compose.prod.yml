@@ -1,0 +1,61 @@
+version: '3.8'
+
+# =============================================================================
+# MinIO 对象存储层 - 生产环境部署配置
+# =============================================================================
+# 用途：Story 1.7 (MinIO Object Storage Layer) 生产环境部署
+# 版本：MinIO RELEASE.2024-01+（支持对象锁定和生命周期管理）
+# 职责：L4 对象存储层（文档存储、WORM 合规锁、生命周期管理、多租户 Bucket）
+# =============================================================================
+
+services:
+  minio:
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: sisys-minio-prod
+    restart: always
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+      - ./minio-prod.conf:/etc/minio/minio.conf:ro
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MinIO root user required}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MinIO root password required (min 8 chars)}
+      - MINIO_VOLUMES=/data
+      - MINIO_OPTS=--config-dir /etc/minio
+    command: ["server", "/data", "--console-address", ":9001", "--config-dir", "/etc/minio"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sisys-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "5"
+
+volumes:
+  minio_data:
+    driver: local
+    name: sisys-minio-data-prod
+
+networks:
+  sisys-network:
+    driver: overlay
+    name: sisys-network-prod

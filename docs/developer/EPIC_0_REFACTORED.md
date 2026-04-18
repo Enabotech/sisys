@@ -99,7 +99,7 @@
 2. 存储配置测试 - 验证 Longhorn 可用
 3. 网络配置测试 - 验证 Traefik 路由正常
 
-**实施指南:** `docs/deployment/K3S_CLUSTER_SETUP.md`
+**实施指南:** `docs/deploy/K3S_CLUSTER_SETUP.md`
 
 ---
 
@@ -128,7 +128,7 @@
 2. 数据库连接测试 - 验证 PostgreSQL 集成
 3. HTTPS 配置测试 - 验证证书有效
 
-**实施指南:** `docs/deployment/GITEA_INSTALLATION.md`
+**实施指南:** `docs/deploy/GITEA_INSTALLATION.md`
 
 ---
 
@@ -157,7 +157,7 @@
 2. 镜像推送测试 - 验证镜像可以推送
 3. 漏洞扫描测试 - 验证 Trivy 集成
 
-**实施指南:** `docs/deployment/HARBOR_INSTALLATION.md`
+**实施指南:** `docs/deploy/HARBOR_INSTALLATION.md`
 
 ---
 
@@ -186,7 +186,7 @@
 2. Git 集成测试 - 验证仓库连接
 3. 自动同步测试 - 验证 GitOps 流程
 
-**实施指南:** `docs/deployment/ARGOCD_SETUP.md`
+**实施指南:** `docs/deploy/ARGOCD_SETUP.md`
 
 ---
 
@@ -215,7 +215,7 @@
 2. Docker Executor 测试 - 验证容器构建
 3. K8s Executor 测试 - 验证 Pod 调度
 
-**实施指南:** `docs/deployment/GITEA_RUNNER_SETUP.md`
+**实施指南:** `docs/deploy/GITEA_RUNNER_SETUP.md`
 
 ---
 
@@ -246,7 +246,7 @@
 6. 镜像推送 (Harbor)
 7. 自动部署 (ArgoCD)
 
-**实施指南:** `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md`
+**实施指南:** `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md`
 
 ---
 
@@ -425,12 +425,12 @@
 ## 📚 文档刷新清单
 
 ### 部署文档 (6 篇)
-- [ ] `docs/deployment/K3S_CLUSTER_SETUP.md`
-- [ ] `docs/deployment/GITEA_INSTALLATION.md`
-- [ ] `docs/deployment/HARBOR_INSTALLATION.md`
-- [ ] `docs/deployment/ARGOCD_SETUP.md`
-- [ ] `docs/deployment/GITEA_RUNNER_SETUP.md`
-- [ ] `docs/deployment/CI_CD_PIPELINE_TEMPLATE.md`
+- [ ] `docs/deploy/K3S_CLUSTER_SETUP.md`
+- [ ] `docs/deploy/GITEA_INSTALLATION.md`
+- [ ] `docs/deploy/HARBOR_INSTALLATION.md`
+- [ ] `docs/deploy/ARGOCD_SETUP.md`
+- [ ] `docs/deploy/GITEA_RUNNER_SETUP.md`
+- [ ] `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md`
 
 ### 交付文档 (5 篇)
 - [ ] `docs/delivery/WINDOWS_INSTALLER.md`

@@ -1,0 +1,327 @@
+# Kubernetes Deployment 配置
+# 支持 GPU 资源申请和自动扩缩容
+# 符合架构要求：architecture.md#NFR-SCA
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sisys-app
+  namespace: sisys-test
+  labels:
+    app: sisys-app
+    version: v1.0.0
+  annotations:
+    description: "SISYS 应用部署配置"
+    author: "SISYS Team"
+spec:
+  # 副本数 (可由 HPA 自动调整)
+  replicas: 2
+
+  # 更新策略
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  # 选择器
+  selector:
+    matchLabels:
+      app: sisys-app
+
+  # Pod 模板
+  template:
+    metadata:
+      labels:
+        app: sisys-app
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # 节点选择器 - GPU 任务调度
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  # GPU 节点标签
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values:
+                      - "true"
+                  # 或使用自定义标签
+                  - key: node-type
+                    operator: In
+                    values:
+                      - gpu-node
+                      - mixed-node
+
+      # 容器定义
+      containers:
+        - name: sisys-app
+          # 镜像版本 (由 CI/CD 自动更新)
+          image: harbor.sisys.local/sisys/app:latest
+          imagePullPolicy: Always
+
+          # 端口配置
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+
+          # 资源请求和限制
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+              # GPU 资源申请
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+              # GPU 资源限制
+              nvidia.com/gpu: "1"
+
+          # 环境变量
+          env:
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: sisys-config
+                  key: app.env
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sisys-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sisys-secrets
+                  key: redis-url
+            - name: GPU_ENABLED
+              value: "true"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "all"
+
+          # 健康检查 - 存活探针
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # 健康检查 - 就绪探针
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # 健康检查 - 启动探针
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          # 挂载配置
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/configs
+              readOnly: true
+            - name: logs-volume
+              mountPath: /app/logs
+
+          # 安全上下文
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+      # 镜像拉取密钥
+      imagePullSecrets:
+        - name: harbor-secret
+
+      # 服务账户
+      serviceAccountName: sisys-app-sa
+
+      # 终止宽限期
+      terminationGracePeriodSeconds: 30
+
+      # DNS 配置
+      dnsPolicy: ClusterFirst
+
+      # 重启策略
+      restartPolicy: Always
+
+      # 卷定义
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sisys-config
+            items:
+              - key: app.config
+                path: app.config
+        - name: logs-volume
+          emptyDir:
+            sizeLimit: 1Gi
+            medium: Memory  # 使用内存加速日志写入
+
+      # 容忍度 - 允许调度到 GPU 专用节点
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+---
+# 生产环境 Deployment 配置
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sisys-app
+  namespace: sisys-prod
+  labels:
+    app: sisys-app
+    version: v1.0.0
+spec:
+  # 生产环境更多副本
+  replicas: 3
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  selector:
+    matchLabels:
+      app: sisys-app
+
+  template:
+    metadata:
+      labels:
+        app: sisys-app
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # 生产环境使用独立 GPU 节点
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - gpu-node
+
+      containers:
+        - name: sisys-app
+          image: harbor.sisys.local/sisys/app:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+
+          # 生产环境更高资源配置
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2000m"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "8Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: "1"
+
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sisys-secrets-prod
+                  key: database-url
+            - name: GPU_ENABLED
+              value: "true"
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/configs
+              readOnly: true
+            - name: logs-volume
+              mountPath: /app/logs
+
+      imagePullSecrets:
+        - name: harbor-secret
+
+      serviceAccountName: sisys-app-sa
+
+      terminationGracePeriodSeconds: 30
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sisys-config-prod
+        - name: logs-volume
+          emptyDir:
+            sizeLimit: 2Gi
+
+      # 生产环境更严格的容忍度
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"

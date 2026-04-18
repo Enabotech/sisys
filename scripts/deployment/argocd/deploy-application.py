@@ -80,7 +80,7 @@ def main():
     check_argocd_installed()
 
     # 部署 Application
-    manifest_path = Path("deployments/argocd/applications/sisys-app.yaml")
+    manifest_path = Path("deploy/kubernetes/argocd/applications/sisys-app.yaml")
     if not manifest_path.exists():
         print(f"❌ 清单文件不存在：{manifest_path}")
         sys.exit(1)

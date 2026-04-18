@@ -51,7 +51,7 @@ if [[ -n "$OLD_REGISTRIES" && -n "$NEW_REGISTRY" ]]; then
     sudo k3s crictl images | tail -n +2 | while read -r IMAGE TAG IMAGE_ID SIZE; do
         [[ -z "$TAG" || "$TAG" == "<none>" ]] && continue
         IFS=',' read -ra TAG_ARRAY <<< "$TAG"
-        
+
         for SINGLE_TAG in "${TAG_ARRAY[@]}"; do
             FULL_IMAGE="$IMAGE:$SINGLE_TAG"
             for OLD_REG in "${OLD_REG_ARRAY[@]}"; do
@@ -82,7 +82,7 @@ if [[ -n "$MATCH_PATTERN" ]]; then
     echo "================================================"
 
     HARBOR_HOST=$(echo "$MATCH_PATTERN" | cut -d'/' -f1)
-    
+
     # 预检认证 (使用 sudo 检查 Root 目录，避免权限拒绝)
     if sudo [ -f "/root/.docker/config.json" ]; then
         if ! sudo grep -q "$HARBOR_HOST" "/root/.docker/config.json"; then
@@ -96,14 +96,14 @@ if [[ -n "$MATCH_PATTERN" ]]; then
     sudo k3s crictl images | tail -n +2 | while read -r IMAGE TAG IMAGE_ID SIZE; do
         [[ -z "$TAG" || "$TAG" == "<none>" ]] && continue
         IFS=',' read -ra TAG_ARRAY <<< "$TAG"
-        
+
         for SINGLE_TAG in "${TAG_ARRAY[@]}"; do
             FULL_IMAGE="$IMAGE:$SINGLE_TAG"
-            
+
             # 匹配逻辑
             if [[ "$FULL_IMAGE" == $MATCH_PATTERN ]]; then
                 echo "📤 Push: $FULL_IMAGE"
-                
+
                 if [[ "$DRY_RUN" == true ]]; then
                     echo "   📝 (模拟) 推送中..."
                 else

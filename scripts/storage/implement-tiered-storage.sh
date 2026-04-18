@@ -5,7 +5,7 @@
 # =============================================================================
 # 用途：自动化部署 SSD+HDD 分层存储架构
 # 关联 Story: 0.9 (CI/CD Pipeline 模板)
-# 方案文档：docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION.md
+# 方案文档：docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION.md
 # =============================================================================
 
 set -e
@@ -468,8 +468,8 @@ main() {
     print_header "✅ Harbor 分层存储实施完成"
     echo ""
     echo "下一步:"
-    echo "  1. 查看存储报告：docs/deployment/HARBOR_STORAGE_REPORT.md"
-    echo "  2. 查看分层存储方案：docs/deployment/HARBOR_TIERED_STORAGE_SOLUTION.md"
+    echo "  1. 查看存储报告：docs/deploy/HARBOR_STORAGE_REPORT.md"
+    echo "  2. 查看分层存储方案：docs/deploy/HARBOR_TIERED_STORAGE_SOLUTION.md"
     echo "  3. 配置监控告警：参考方案文档"
     echo "  4. 执行功能测试：推送/拉取镜像"
     echo ""

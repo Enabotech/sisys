@@ -1,0 +1,31 @@
+# OpenAPI Specification v3.1
+#
+# MVP V1 实现 - 占位文件
+# API 端点将在后续 Story 中逐步定义.
+#
+# API 版本管理: /api/v1/[resource]
+
+openapi: "3.1.0"
+info:
+  title: sisys API
+  description: AI 驱动的战略规划与决策智能平台 API
+  version: "0.1.0"
+  contact:
+    name: sisys Team
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+paths: {}
+
+components:
+  schemas: {}
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+          scopes: {}

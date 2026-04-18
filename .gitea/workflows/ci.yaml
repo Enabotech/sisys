@@ -95,7 +95,7 @@ jobs:
   # ===========================================================================
   code-quality:
     name: "🔍 代码检查"
-    runs-on: ubuntu2204
+    runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -238,7 +238,7 @@ jobs:
     # ===========================================================================
     services:
       postgres:
-        image: harbor.sisys.local/sisys/tools/postgres/postgres:15-alpine
+        image: harbor.sisys.local/sisys/tools/postgres/postgres:15.4
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test  # pragma: allowlist secret
@@ -251,7 +251,7 @@ jobs:
           --health-retries 5
 
       redis:
-        image: harbor.sisys.local/sisys/tools/redis/redis:7.2-alpine
+        image: harbor.sisys.local/sisys/tools/redis/redis:7.2.5
         # ✅ 移除 ports 配置 - 使用容器网络通信，避免端口冲突
         options: >-
           --health-cmd "redis-cli ping"
@@ -305,7 +305,7 @@ jobs:
   # ===========================================================================
   security-scan:
     name: "🔒 安全扫描"
-    runs-on: ubuntu2204
+    runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -370,7 +370,7 @@ jobs:
   # ===========================================================================
   detect-changes:
     name: "🔎 变更检测"
-    runs-on: ubuntu2204
+    runs-on: gpu
     needs: [code-quality]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -405,7 +405,7 @@ jobs:
   build-images:
     name: "🏗️ 构建镜像"
     runs-on: buildx
-    timeout-minutes: 30
+    timeout-minutes: 60
     needs: [detect-changes, integration-tests, security-scan, code-quality]
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
@@ -548,14 +548,14 @@ jobs:
           echo "✅ SHA: ${GIT_SHA}"
 
       # ---------- L2 构建 ----------
-      - name: 同步 Lock 文件 (L2)
-        if: >-
-          ${{
-            github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
-            || startsWith(github.ref, 'refs/tags/')
-            || needs.detect-changes.outputs.l2 == 'true'
-          }}
-        run: poetry lock --no-interaction
+      # - name: 同步 Lock 文件 (L2)
+      #   if: >-
+      #     ${{
+      #       github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true'
+      #       || startsWith(github.ref, 'refs/tags/')
+      #       || needs.detect-changes.outputs.l2 == 'true'
+      #     }}
+      #   run: poetry lock --no-interaction
 
       - name: 构建 L2 镜像
         if: >-

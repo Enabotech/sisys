@@ -1,0 +1,101 @@
+---
+# ArgoCD Application - Dev 环境
+# 开发环境配置 - 自动同步
+#
+# 同步策略：完全自动（self-heal + auto-prune）
+# 适用于：开发团队日常开发和测试
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sisys-app-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: sisys-app-dev
+    app.kubernetes.io/part-of: sisys
+    app.kubernetes.io/environment: development
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  # ArgoCD Image Updater 注解
+  annotations:
+    # 镜像列表 - 格式：别名=镜像路径
+    argocd-image-updater.argoproj.io/image-list: |
+      app=harbor.sisys.local/sisys/app
+
+    # 写回方法：使用 git 提交更新
+    argocd-image-updater.argoproj.io/write-back-method: git
+    # Git 仓库配置
+    argocd-image-updater.argoproj.io/git-repo: https://gitea.sisys.local/sisys/sisys.git
+    argocd-image-updater.argoproj.io/git-branch: HEAD
+
+    # 更新策略：按推送时间选择最新镜像（v0.18.0 官方命名）
+    argocd-image-updater.argoproj.io/app.update-strategy: newest-build
+
+    # 标签过滤：只匹配 dev 开头的标签（含 feature 分支）
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^dev-((feature-)?v[0-9]+.*|(main-)?v[0-9]+.*)
+    # 忽略临时标签
+    argocd-image-updater.argoproj.io/app.ignore-tags: regexp:^dev-temp-.*
+
+    # 强制使用 Digest (确保不可变性)
+    argocd-image-updater.argoproj.io/app.force-digest: "true"
+
+    # 轮询间隔 (开发环境频繁一些)
+    argocd-image-updater.argoproj.io/app.check-interval: 2m
+
+spec:
+  project: default
+
+  # 源代码配置 - Dev 环境
+  source:
+    repoURL: https://gitea.sisys.local/sisys/sisys.git
+    targetRevision: HEAD
+    path: deploy/kubernetes/apps/sisys/dev
+
+  # 目标配置 - Dev 命名空间
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sisys-dev
+
+  # 同步策略 - 完全自动
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Validate=true
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略差异 - Dev 环境
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations
+
+  info:
+    - name: Description
+      value: SISYS 应用 - 开发环境
+    - name: Environment
+      value: development
+    - name: SyncPolicy
+      value: Automatic (self-heal + auto-prune)
+    - name: ImageTagPattern
+      value: dev-{branch}-{sha}
+    - name: UpdateStrategy
+      value: latest (by push time)

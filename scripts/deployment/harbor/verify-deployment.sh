@@ -123,7 +123,7 @@ main() {
     # 3. NetworkPolicy 检查
     echo -e "${BLUE}🛡️  NetworkPolicy 检查${NC}"
     POLICY_COUNT=$(kubectl get networkpolicy -n $HARBOR_NS --no-headers 2>/dev/null | wc -l || echo "0")
-    check "NetworkPolicy 已应用 (期望>=8 个，实际${POLICY_COUNT}个)" "[[ $POLICY_COUNT -ge 8 ]]" "运行：kubectl apply -k deployments/harbor/"
+    check "NetworkPolicy 已应用 (期望>=8 个，实际${POLICY_COUNT}个)" "[[ $POLICY_COUNT -ge 8 ]]" "运行：kubectl apply -k deploy/kubernetes/harbor/"
 
     if [[ $POLICY_COUNT -lt 8 ]]; then
         echo -e "       ${YELLOW}当前 NetworkPolicy 列表:${NC}"
@@ -134,7 +134,7 @@ main() {
     # 4. IngressRoute 检查
     echo -e "${BLUE}🌐 IngressRoute 检查${NC}"
     if kubectl get crd ingressroutes.traefik.io &> /dev/null; then
-        check "IngressRoute CRD 存在" "kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS" "运行：kubectl apply -f deployments/harbor/ingress-route.yaml"
+        check "IngressRoute CRD 存在" "kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS" "运行：kubectl apply -f deploy/kubernetes/harbor/ingress-route.yaml"
         check "IngressRoute 配置正确" "kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS -o jsonpath='{.spec.entryPoints}' | grep -q websecure"
     else
         log_warning "Traefik IngressRoute CRD 未安装，跳过 IngressRoute 检查"
@@ -144,8 +144,8 @@ main() {
     # 5. Middleware 检查
     echo -e "${BLUE}⚙️  Middleware 检查${NC}"
     if kubectl get crd middlewares.traefik.io &> /dev/null; then
-        check "安全头 Middleware 存在" "kubectl get middleware harbor-security-headers -n $HARBOR_NS" "运行：kubectl apply -f deployments/harbor/middleware.yaml"
-        check "Middleware 链存在" "kubectl get middleware harbor-middleware-chain -n $HARBOR_NS" "运行：kubectl apply -f deployments/harbor/middleware.yaml"
+        check "安全头 Middleware 存在" "kubectl get middleware harbor-security-headers -n $HARBOR_NS" "运行：kubectl apply -f deploy/kubernetes/harbor/middleware.yaml"
+        check "Middleware 链存在" "kubectl get middleware harbor-middleware-chain -n $HARBOR_NS" "运行：kubectl apply -f deploy/kubernetes/harbor/middleware.yaml"
     else
         log_warning "Traefik Middleware CRD 未安装，跳过 Middleware 检查"
     fi
@@ -154,7 +154,7 @@ main() {
     # 6. Pod 状态检查
     echo -e "${BLUE}📊 Pod 状态检查${NC}"
     POD_COUNT=$(kubectl get pods -n $HARBOR_NS --no-headers 2>/dev/null | wc -l || echo "0")
-    check "Pod 已部署 (实际${POD_COUNT}个)" "[[ $POD_COUNT -gt 0 ]]" "运行：helm install harbor harbor/harbor -n harbor -f deployments/harbor/values.yaml"
+    check "Pod 已部署 (实际${POD_COUNT}个)" "[[ $POD_COUNT -gt 0 ]]" "运行：helm install harbor harbor/harbor -n harbor -f deploy/kubernetes/harbor/values.yaml"
 
     if [[ $POD_COUNT -gt 0 ]]; then
         RUNNING_COUNT=$(kubectl get pods -n $HARBOR_NS --no-headers 2>/dev/null | grep -c "Running" || echo "0")
@@ -170,7 +170,7 @@ main() {
 
     # 7. 服务连通性检查
     echo -e "${BLUE}🔗 服务连通性检查${NC}"
-    check "Harbor Core 服务存在" "kubectl get service harbor-core -n $HARBOR_NS" "运行：kubectl apply -f deployments/harbor/values.yaml (Helm 部署)"
+    check "Harbor Core 服务存在" "kubectl get service harbor-core -n $HARBOR_NS" "运行：kubectl apply -f deploy/kubernetes/harbor/values.yaml (Helm 部署)"
 
     if [[ $POD_COUNT -gt 0 ]]; then
         # 尝试 API Ping 检查
@@ -210,8 +210,8 @@ main() {
         echo ""
         echo "建议执行:"
         echo "  1. 生成密码：./scripts/security/generate-harbor-secrets.sh"
-        echo "  2. 应用配置：kubectl apply -k deployments/harbor/"
-        echo "  3. 部署 Harbor: helm install harbor harbor/harbor -n harbor -f deployments/harbor/values.yaml"
+        echo "  2. 应用配置：kubectl apply -k deploy/kubernetes/harbor/"
+        echo "  3. 部署 Harbor: helm install harbor harbor/harbor -n harbor -f deploy/kubernetes/harbor/values.yaml"
         echo "  4. 重新验证：./scripts/deployment/harbor/verify-deployment.sh"
         echo ""
         exit 1

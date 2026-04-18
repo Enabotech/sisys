@@ -1,102 +1,266 @@
-"""
-sisys - Domain Event Base.
+"""Base domain event class.
 
-领域事件基类 - 所有领域事件的抽象。
+Domain events use only Python standard library types (dataclasses, uuid, datetime).
+Pydantic is used only at the application/infrastructure layer boundaries for
+serialization and validation.
 """
 
-from abc import ABC
+from __future__ import annotations
+
+import json
+import uuid
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime
-from typing import Any
-from uuid import UUID, uuid4
+from enum import Enum
+from typing import Any, ClassVar, get_args, get_origin
+
+# Core field names that are part of the DomainEvent standard schema (AC-1).
+# These are serialized at the top level of to_dict(), not in payload.
+_CORE_FIELD_NAMES = frozenset(
+    {
+        "event_id",
+        "event_type",
+        "timestamp",
+        "source",
+        "schema_version",
+        "aggregate_id",
+        "aggregate_type",
+        "version",
+        "payload",
+    }
+)
+
+# Default schema version for all events
+DEFAULT_SCHEMA_VERSION = "1.0.0"
 
 
-class DomainEvent(ABC):
+@dataclass(frozen=True)
+class DomainEvent:
+    """Base class for all domain events.
+
+    AC-1 standard fields:
+        event_id: Unique identifier for this event instance.
+        event_type: Type discriminator string (e.g. "DocumentProcessed").
+        timestamp: When the event occurred (UTC).
+        source: Origin system or module that produced this event.
+        schema_version: Version of this event's schema (e.g. "1.0.0").
+        aggregate_id: ID of the aggregate that produced this event.
+        aggregate_type: Type name of the aggregate (e.g. "Document").
+        version: Monotonically increasing version number of this event.
+        payload: Event-specific data dictionary.
     """
-    领域事件基类。
 
-    领域事件表示领域中发生的重要事情，用于触发后续操作或通知其他组件。
-    """
+    event_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source: str = ""
+    schema_version: str = DEFAULT_SCHEMA_VERSION
+    aggregate_id: uuid.UUID | None = None
+    aggregate_type: str = ""
+    version: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(
-        self,
-        event_id: UUID | None = None,
-        occurred_on: datetime | None = None,
-        aggregate_id: UUID | None = None,
-        payload: dict[str, Any] | None = None,
-        schema_version: str = "1.0",
-    ):
-        """
-        初始化领域事件。
+    # Event type registry for polymorphic deserialization
+    _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Automatically register subclasses by event_type."""
+        super().__init_subclass__(**kwargs)
+        if is_dataclass(cls):
+            for f in fields(cls):
+                if f.name == "event_type" and not f.init:
+                    if f.default is not MISSING:
+                        DomainEvent._registry[f.default] = cls
+                    break
+
+    @classmethod
+    def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
+        """Manually register an event class for polymorphic deserialization.
 
         Args:
-            event_id: 事件 ID，不提供则自动生成
-            occurred_on: 事件发生时间，不提供则使用当前时间
-            aggregate_id: 关联的聚合根 ID
-            payload: 事件载荷
-            schema_version: Schema 版本号，默认"1.0"
+            event_type: The event_type string that maps to this class.
+            event_class: The event class to register.
         """
-        self._event_id = event_id or uuid4()
-        self._occurred_on = occurred_on or datetime.now(UTC)
-        self._aggregate_id = aggregate_id
-        self._payload = payload or {}
-        self._schema_version = schema_version
+        cls._registry[event_type] = event_class
 
-    @property
-    def event_id(self) -> UUID:
-        """返回事件 ID。"""
-        return self._event_id
+    # ------------------------------------------------------------------
+    # Serialization
+    # ------------------------------------------------------------------
 
-    @property
-    def occurred_on(self) -> datetime:
-        """返回事件发生时间。"""
-        return self._occurred_on
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize event to dictionary, including subclass-specific fields.
 
-    @property
-    def aggregate_id(self) -> UUID | None:
-        """返回关联的聚合根 ID。"""
-        return self._aggregate_id
+        Subclass-specific fields (beyond the core DomainEvent fields) are
+        included in the payload dict for roundtrip fidelity.
 
-    @property
-    def schema_version(self) -> str:
-        """返回 Schema 版本号。"""
-        return self._schema_version
+        Returns:
+            Dictionary representation of the event.
 
-    @property
-    def event_type(self) -> str:
+        Raises:
+            ValueError: If event_type is empty or payload is not JSON serializable.
         """
-        返回事件类型。
+        if not self.event_type:
+            raise ValueError("event_type must not be empty")
 
-        默认实现返回类名的蛇形命名（如 PlanCreated -> plan.created）。
-        子类可以重写此属性以自定义事件类型。
-        """
-        class_name = self.__class__.__name__
-        # 将驼峰命名转换为点分命名
-        result = ""
-        for i, char in enumerate(class_name):
-            if char.isupper() and i > 0:
-                result += "."
-            result += char.lower()
+        # Collect subclass-specific fields into extra payload
+        extra_payload: dict[str, Any] = {}
+        for f in fields(self):
+            if f.name not in _CORE_FIELD_NAMES and f.init:
+                value = getattr(self, f.name)
+                extra_payload[f.name] = self._serialize_value(value)
+
+        # Merge with existing payload
+        merged_payload = {**self.payload, **extra_payload}
+
+        result: dict[str, Any] = {
+            "event_id": str(self.event_id),
+            "event_type": self.event_type,
+            "timestamp": self.timestamp.isoformat(),
+            "source": self.source,
+            "schema_version": self.schema_version,
+            "occurred_on": self.timestamp.isoformat(),  # backward compat alias
+            "payload": merged_payload,
+        }
+        if self.aggregate_id is not None:
+            result["aggregate_id"] = str(self.aggregate_id)
+        if self.aggregate_type:
+            result["aggregate_type"] = self.aggregate_type
+        result["version"] = self.version
+
+        try:
+            json.dumps(merged_payload)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"payload is not JSON serializable: {e}") from e
         return result
 
-    @property
-    def payload(self) -> dict[str, Any]:
+    @staticmethod
+    def _serialize_value(value: Any) -> Any:
+        """Serialize a single field value for JSON transport."""
+        if value is None:
+            return None
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, uuid.UUID):
+            return str(value)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, list | tuple):
+            return [DomainEvent._serialize_value(item) for item in value]
+        if isinstance(value, dict):
+            return {k: DomainEvent._serialize_value(v) for k, v in value.items()}
+        return value
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
+        """Deserialize event from dictionary using event type registry.
+
+        If the event_type in data maps to a registered subclass, that subclass
+        is instantiated. Otherwise, the base DomainEvent is returned.
+
+        Args:
+            data: Dictionary with event data.
+
+        Returns:
+            Reconstructed DomainEvent instance (possibly a subclass).
+
+        Raises:
+            ValueError: If required fields are missing or malformed.
         """
-        返回事件负载。
+        if "event_id" not in data:
+            raise ValueError("Missing required field: event_id")
+        if "event_type" not in data:
+            raise ValueError("Missing required field: event_type")
+        # Support both "timestamp" and backward-compat "occurred_on"
+        ts_raw = data.get("timestamp") or data.get("occurred_on")
+        if ts_raw is None:
+            raise ValueError("Missing required field: timestamp")
 
-        子类应重写此属性以提供事件的具体数据。
+        try:
+            eid = uuid.UUID(data["event_id"])
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Invalid event_id: {data.get('event_id', 'missing')}") from e
+
+        try:
+            ts = datetime.fromisoformat(ts_raw)
+        except (ValueError, AttributeError, TypeError) as e:
+            raise ValueError(f"Invalid timestamp: {ts_raw!r}") from e
+
+        agg_id: uuid.UUID | None = None
+        if data.get("aggregate_id") is not None:
+            try:
+                agg_id = uuid.UUID(data["aggregate_id"])
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"Invalid aggregate_id: {data.get('aggregate_id', 'missing')}") from e
+
+        event_type = data["event_type"]
+        payload = data.get("payload", {}).copy()
+
+        # Look up the correct class from the registry
+        target_class: type[DomainEvent] = cls
+        if event_type in cls._registry:
+            target_class = cls._registry[event_type]
+
+        # Extract subclass-specific fields from payload
+        extra_kwargs: dict[str, Any] = {}
+        if target_class is not cls and is_dataclass(target_class):
+            for f in fields(target_class):
+                if f.name in _CORE_FIELD_NAMES or not f.init:
+                    continue
+                if f.name in payload:
+                    value = payload.pop(f.name)
+                    value = cls._deserialize_value(value, f.type)
+                    extra_kwargs[f.name] = value
+
+        return target_class(
+            event_id=eid,
+            event_type=event_type,
+            timestamp=ts,
+            source=data.get("source", ""),
+            schema_version=data.get("schema_version", DEFAULT_SCHEMA_VERSION),
+            aggregate_id=agg_id,
+            aggregate_type=data.get("aggregate_type", ""),
+            version=data.get("version", 0),
+            payload=payload,
+            **extra_kwargs,
+        )
+
+    @classmethod
+    def _deserialize_value(cls, value: Any, target_type: Any) -> Any:
+        """Deserialize a payload value back to its original Python type.
+
+        Handles UUID, datetime, Enum, and container types (list, dict).
+        Correctly processes union types like ``uuid.UUID | None``.
         """
-        return {}
+        if value is None:
+            return None
 
-    def __repr__(self) -> str:
-        """返回事件的字符串表示。"""
-        return f"{self.__class__.__name__}(id={self.event_id}, type={self.event_type})"
+        origin = get_origin(target_type)
+        args = get_args(target_type)
 
-    def __eq__(self, other: object) -> bool:
-        """比较两个事件是否相等。"""
-        if not isinstance(other, DomainEvent):
-            return False
-        return self.event_id == other.event_id
+        # Handle Optional / Union types: try each arg in order
+        if origin is not None:
+            for arg in args:
+                if arg is type(None):
+                    continue
+                try:
+                    return cls._deserialize_value(value, arg)
+                except (ValueError, TypeError):
+                    continue
+            # If no arg matched, return as-is
+            return value
 
-    def __hash__(self) -> int:
-        """返回事件的哈希值。"""
-        return hash(self.event_id)
+        # Concrete types
+        if target_type is uuid.UUID and isinstance(value, str):
+            return uuid.UUID(value)
+        if target_type is datetime and isinstance(value, str):
+            return datetime.fromisoformat(value)
+        if isinstance(target_type, type) and issubclass(target_type, Enum) and isinstance(value, str):
+            return target_type(value)  # type: ignore[operator]
+        if origin is list and isinstance(value, list):
+            item_type = args[0] if args else Any
+            return [cls._deserialize_value(item, item_type) for item in value]
+        if origin is dict and isinstance(value, dict):
+            key_type = args[0] if args else Any
+            val_type = args[1] if args else Any
+            return {cls._deserialize_value(k, key_type): cls._deserialize_value(v, val_type) for k, v in value.items()}
+        return value

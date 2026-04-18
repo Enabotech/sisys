@@ -88,8 +88,8 @@ if [ "$PASSWORD" = "test-token" ]; then  # pragma: allowlist secret
     echo -e "${YELLOW}请更新 Secret 中的 Robot Account Token:${NC}"
     echo "  1. 在 Harbor 界面创建 Robot Account"
     echo "  2. 复制 Token"
-    echo "  3. 更新 deployments/gitea-runner/harbor-robot-secret.yaml"
-    echo "  4. 重新部署：kubectl apply -f deployments/gitea-runner/harbor-robot-secret.yaml"
+    echo "  3. 更新 deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml"
+    echo "  4. 重新部署：kubectl apply -f deploy/kubernetes/gitea-runner/harbor-robot-secret.yaml"
     echo ""
     echo -e "${YELLOW}跳过实际推送测试...${NC}"
     exit 0

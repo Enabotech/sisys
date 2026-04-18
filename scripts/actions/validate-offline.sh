@@ -55,7 +55,7 @@ log_info() {
 verify_gitea_config() {
     echo
     log_info "验证 Gitea 配置..."
-    
+
     # 检查 Gitea 可访问性
     if curl -s -o /dev/null -w "%{http_code}" "$GITEA_URL" | grep -q "200\|302"; then
         log_pass "Gitea 实例可访问：$GITEA_URL"
@@ -63,24 +63,24 @@ verify_gitea_config() {
         log_fail "Gitea 实例无法访问：$GITEA_URL"
         return 1
     fi
-    
+
     # 检查 Actions 是否启用
     local actions_config
     actions_config=$(curl -s "$GITEA_URL/api/v1/settings" | jq -r '.actions.enabled' 2>/dev/null || echo "null")
-    
+
     if [ "$actions_config" == "true" ]; then
         log_pass "Gitea Actions 已启用"
     else
         log_warn "无法验证 Actions 状态 (可能需要管理员权限)"
     fi
-    
+
     # 检查 Actions 组织
     if [ -n "$GITEA_TOKEN" ]; then
         local response
         response=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token $GITEA_TOKEN" \
             "$GITEA_URL/api/v1/orgs/actions")
-        
+
         if [ "$response" == "200" ]; then
             log_pass "Actions 组织存在"
         else
@@ -98,7 +98,7 @@ verify_gitea_config() {
 verify_actions() {
     echo
     log_info "验证 Actions..."
-    
+
     # Actions 清单
     local actions=(
         "actions/checkout"
@@ -109,16 +109,16 @@ verify_actions() {
         "docker/build-push-action"
         "aquasecurity/trivy-action"
     )
-    
+
     for action in "${actions[@]}"; do
         local repo_name="${action//\//_}"
-        
+
         if [ -n "$GITEA_TOKEN" ]; then
             local response
             response=$(curl -s -o /dev/null -w "%{http_code}" \
                 -H "Authorization: token $GITEA_TOKEN" \
                 "$GITEA_URL/api/v1/repos/actions/$repo_name")
-            
+
             if [ "$response" == "200" ]; then
                 log_pass "Action 已镜像：$action -> actions/$repo_name"
             elif [ "$response" == "404" ]; then
@@ -145,7 +145,7 @@ verify_actions() {
 verify_docker_images() {
     echo
     log_info "验证 Docker 镜像..."
-    
+
     # 镜像清单
     local images=(
         "$HARBOR_URL/sisys/pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel"
@@ -154,7 +154,7 @@ verify_docker_images() {
         "docker:24-dind"
         "bitnami/kubectl:latest"
     )
-    
+
     for image in "${images[@]}"; do
         if docker image inspect "$image" &> /dev/null; then
             log_pass "Docker 镜像已本地化：$image"
@@ -177,7 +177,7 @@ verify_docker_images() {
 verify_harbor() {
     echo
     log_info "验证 Harbor..."
-    
+
     # 检查 Harbor 可访问性
     if curl -k -s -o /dev/null -w "%{http_code}" "https://$HARBOR_URL" | grep -q "200"; then
         log_pass "Harbor 可访问：$HARBOR_URL"
@@ -185,25 +185,25 @@ verify_harbor() {
         log_fail "Harbor 无法访问：$HARBOR_URL"
         return 1
     fi
-    
+
     # 验证认证
     local response
     response=$(curl -k -s -o /dev/null -w "%{http_code}" \
         -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
         "https://$HARBOR_URL/api/v2.0/users/me")
-    
+
     if [ "$response" == "200" ]; then
         log_pass "Harbor 认证成功"
     else
         log_fail "Harbor 认证失败 (HTTP $response)"
         return 1
     fi
-    
+
     # 检查项目存在
     response=$(curl -k -s -o /dev/null -w "%{http_code}" \
         -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
         "https://$HARBOR_URL/api/v2.0/projects/sisys")
-    
+
     if [ "$response" == "200" ]; then
         log_pass "Harbor 项目 sisys 存在"
     else
@@ -218,23 +218,23 @@ verify_harbor() {
 verify_runner() {
     echo
     log_info "验证 Gitea Runner..."
-    
+
     if [ -n "$GITEA_TOKEN" ]; then
         # 检查 Runner 注册
         local response
         response=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token $GITEA_TOKEN" \
             "$GITEA_URL/api/v1/orgs/actions/runners")
-        
+
         if [ "$response" == "200" ]; then
             log_pass "可访问 Runner API"
-            
+
             # 检查 Runner 在线状态
             local runners
             runners=$(curl -s \
                 -H "Authorization: token $GITEA_TOKEN" \
                 "$GITEA_URL/api/v1/orgs/actions/runners" | jq -r '.runners[] | "\(.name): \(.status)"' 2>/dev/null || echo "")
-            
+
             if [ -n "$runners" ]; then
                 log_info "Runner 状态:"
                 while IFS= read -r line; do
@@ -262,14 +262,14 @@ verify_runner() {
 verify_network() {
     echo
     log_info "网络连通性测试..."
-    
+
     # 测试 GitHub 连接 (可选，离线环境应该失败)
     if curl -s -o /dev/null -w "%{http_code}" "https://github.com" | grep -q "200\|301"; then
         log_warn "可访问 GitHub (离线环境应该无法访问)"
     else
         log_pass "已断开 GitHub 连接 (符合离线环境要求)"
     fi
-    
+
     # 测试 Google DNS
     if ping -c 1 8.8.8.8 &> /dev/null; then
         log_warn "可访问外网 (离线环境应该无法访问)"
@@ -292,14 +292,14 @@ generate_report() {
     echo -e "  ${RED}失败${NC}: $FAIL_COUNT"
     echo -e "  ${YELLOW}警告${NC}: $WARN_COUNT"
     echo
-    
+
     if [ "$FAIL_COUNT" -gt 0 ]; then
         echo -e "${RED}❌ 验证失败${NC} - 存在 $FAIL_COUNT 个关键问题"
         echo
         echo "建议操作:"
         echo "1. 运行 ./scripts/actions/download-actions.sh 下载缺失的 Actions"
         echo "2. 运行 ./scripts/image/import-pytorch.sh 导入 PyTorch 镜像"
-        echo "3. 参考 docs/deployment/GITEA_ACTIONS_OFFLINE_DEPLOYMENT.md"
+        echo "3. 参考 docs/deploy/GITEA_ACTIONS_OFFLINE_DEPLOYMENT.md"
         exit 1
     elif [ "$WARN_COUNT" -gt 0 ]; then
         echo -e "${YELLOW}⚠️  验证通过但有警告${NC}"
@@ -330,14 +330,14 @@ main() {
     echo "  Harbor URL: $HARBOR_URL"
     echo "  验证时间：$(date '+%Y-%m-%d %H:%M:%S')"
     echo "=============================================="
-    
+
     verify_gitea_config
     verify_actions
     verify_docker_images
     verify_harbor
     verify_runner
     verify_network
-    
+
     generate_report
 }
 

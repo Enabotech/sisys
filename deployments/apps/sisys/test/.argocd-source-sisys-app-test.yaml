@@ -1,3 +1,0 @@
-kustomize:
-  images:
-  - harbor.sisys.local/sisys/app:test-v0.0.4-9e14e00

@@ -94,7 +94,7 @@ log "检查 IngressRoute..."
 if ! sudo kubectl get ingressroute harbor-ingressroute -n $HARBOR_NS &>/dev/null; then
     log "⚠️  IngressRoute 不存在，重新应用配置..."
     cd "$SCRIPT_DIR/../../.."
-    sudo kubectl apply -f deployments/harbor/ingress-route.yaml -n $HARBOR_NS
+    sudo kubectl apply -f deploy/kubernetes/harbor/ingress-route.yaml -n $HARBOR_NS
     log "✅ IngressRoute 已重新应用"
 else
     log "✅ IngressRoute 存在"
