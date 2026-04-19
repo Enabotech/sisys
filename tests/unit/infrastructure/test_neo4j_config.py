@@ -19,6 +19,8 @@ class TestNeo4jConfig:
     def test_default_values(self):
         """测试默认值是否正确。"""
         config = Neo4jConfig()
+        assert config.host == "localhost"
+        assert config.bolt_port == 7687
         assert config.uri == "bolt://localhost:7687"
         assert config.username == "neo4j"
         assert config.password == ""
@@ -30,7 +32,8 @@ class TestNeo4jConfig:
     def test_custom_values(self):
         """测试自定义值。"""
         config = Neo4jConfig(
-            uri="bolt://neo4j.example.com:7687",
+            host="neo4j.example.com",
+            bolt_port=7687,
             username="admin",
             password="secret",  # pragma: allowlist secret
             database="sisys_db",
@@ -38,6 +41,8 @@ class TestNeo4jConfig:
             connection_timeout=60.0,
             max_retry_time=45.0,
         )
+        assert config.host == "neo4j.example.com"
+        assert config.bolt_port == 7687
         assert config.uri == "bolt://neo4j.example.com:7687"
         assert config.username == "admin"
         assert config.password == "secret"  # pragma: allowlist secret
@@ -50,6 +55,8 @@ class TestNeo4jConfig:
     def test_from_env_defaults(self):
         """测试从环境变量加载配置的默认行为。"""
         config = Neo4jConfig.from_env()
+        assert config.host == "localhost"
+        assert config.bolt_port == 7687
         assert config.uri == "bolt://localhost:7687"
         assert config.username == "neo4j"
         assert config.password == ""
@@ -61,7 +68,8 @@ class TestNeo4jConfig:
     @patch.dict(
         os.environ,
         {
-            "NEO4J_URI": "bolt://neo4j.example.com:7687",
+            "NEO4J_HOST": "neo4j.example.com",
+            "NEO4J_BOLT_PORT": "7687",
             "NEO4J_USERNAME": "admin",
             "NEO4J_PASSWORD": "test-password",  # pragma: allowlist secret
             "NEO4J_DATABASE": "sisys_db",
@@ -74,6 +82,8 @@ class TestNeo4jConfig:
     def test_from_env_custom_values(self):
         """测试从环境变量加载自定义值。"""
         config = Neo4jConfig.from_env()
+        assert config.host == "neo4j.example.com"
+        assert config.bolt_port == 7687
         assert config.uri == "bolt://neo4j.example.com:7687"
         assert config.username == "admin"
         assert config.password == "test-password"  # pragma: allowlist secret

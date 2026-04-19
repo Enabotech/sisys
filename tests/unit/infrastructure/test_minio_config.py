@@ -19,6 +19,8 @@ class TestMinIOConfigInit:
     def test_default_values(self):
         """验证默认值正确。"""
         config = MinIOConfig()
+        assert config.host == "localhost"
+        assert config.port == 9000
         assert config.endpoint == "localhost:9000"
         assert config.access_key == ""
         assert config.secret_key == ""
@@ -30,12 +32,15 @@ class TestMinIOConfigInit:
     def test_custom_values(self):
         """验证自定义值。"""
         config = MinIOConfig(
-            endpoint="minio.example.com:9000",
+            host="minio.example.com",
+            port=9000,
             access_key="my-access",
             secret_key="my-secret",  # pragma: allowlist secret
             secure=True,
             bucket_prefix="my-project",
         )
+        assert config.host == "minio.example.com"
+        assert config.port == 9000
         assert config.endpoint == "minio.example.com:9000"
         assert config.access_key == "my-access"
         assert config.secret_key == "my-secret"
@@ -50,6 +55,8 @@ class TestMinIOConfigFromEnv:
         """无环境变量时使用默认值。"""
         with patch.dict(os.environ, {}, clear=True):
             config = MinIOConfig.from_env()
+            assert config.host == "localhost"
+            assert config.port == 9000
             assert config.endpoint == "localhost:9000"
             assert config.access_key == ""
             assert config.secret_key == ""
@@ -57,8 +64,10 @@ class TestMinIOConfigFromEnv:
 
     def test_from_env_custom_endpoint(self):
         """自定义端点环境变量。"""
-        with patch.dict(os.environ, {"MINIO_ENDPOINT": "custom.minio:9000"}):
+        with patch.dict(os.environ, {"MINIO_HOST": "custom.minio", "MINIO_API_PORT": "9000"}):
             config = MinIOConfig.from_env()
+            assert config.host == "custom.minio"
+            assert config.port == 9000
             assert config.endpoint == "custom.minio:9000"
 
     def test_from_env_credentials(self):

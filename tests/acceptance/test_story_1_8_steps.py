@@ -52,7 +52,8 @@ def event_loop():
 def neo4j_config() -> Neo4jConfig:
     """Real Neo4j configuration from environment."""
     return Neo4jConfig(
-        uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        host=os.getenv("NEO4J_HOST", "localhost"),
+        bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password123"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),

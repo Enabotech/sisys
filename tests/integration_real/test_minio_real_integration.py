@@ -35,7 +35,8 @@ async def minio_config():
     import os
 
     return MinIOConfig(
-        endpoint=os.getenv("MINIO_HOST", "localhost") + ":" + os.getenv("MINIO_API_PORT", "9000"),
+        host=os.getenv("MINIO_HOST", "localhost"),
+        port=int(os.getenv("MINIO_API_PORT", "9000")),
         access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
         secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
         secure=False,

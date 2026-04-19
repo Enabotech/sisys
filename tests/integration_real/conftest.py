@@ -181,16 +181,11 @@ async def real_minio_client():
 
     Assumes MinIO is running at localhost:9000.
     """
-    import os
+    from src.infrastructure.config.minio import MinIOConfig
+    from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
 
-    from src.infrastructure.storage.minio.client import MinioClientWrapper  # type: ignore[import-untyped]
-
-    wrapper = MinioClientWrapper(
-        endpoint=os.getenv("MINIO_HOST", "localhost") + ":" + os.getenv("MINIO_API_PORT", "9000"),
-        access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
-        secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
-        secure=False,
-    )
+    config = MinIOConfig.from_env()
+    wrapper = MinioClientAdapter(config)
 
     # Verify connection
     try:
