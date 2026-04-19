@@ -1,0 +1,395 @@
+# =============================================================================
+# Prometheus Server - K8s 部署配置
+# =============================================================================
+# 用途：K8s 环境指标采集（HPA + 自定义指标）
+# Story: 1.13 (K8s 动态扩缩容)
+# 依赖：prometheus-adapter.yaml（External Metrics API）
+# =============================================================================
+#
+# 架构说明：
+#   ┌─────────────────────────────────────────────────────────┐
+#   │  Namespace: monitoring                                  │
+#   ├─────────────────────────────────────────────────────────┤
+#   │  Prometheus Server (Deployment)                         │
+#   │  - 副本: 1 (开发/测试环境)                               │
+#   │  - 持久化存储: 10Gi (local-path)                        │
+#   │  - 抓取间隔: 15s                                        │
+#   │  - 指标保留: 15d                                        │
+#   │  ConfigMap: prometheus.yml (抓取配置)                   │
+#   │  Service: prometheus (ClusterIP)                        │
+#   └─────────────────────────────────────────────────────────┘
+#
+# 关键配置：
+#   - 抓取 sisys-agent pods (metrics port: 9091)
+#   - 抓取 node-exporter (可选)
+#   - 启用 Remote Write（可选，对接长期存储）
+#   - Prometheus Adapter 通过 Service 访问: http://prometheus.monitoring:9090
+#
+# 部署命令：
+#   kubectl apply -f deploy/kubernetes/metrics/prometheus.yaml
+#
+# 验证命令：
+#   kubectl get pods -n monitoring -l app=prometheus
+#   kubectl port-forward -n monitoring svc/prometheus 9090:9090
+#   curl http://localhost:9090/api/v1/query?query=up
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. 命名空间配置
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app: prometheus
+    story: "1-13"
+    # Pod 安全标准
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.34
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.34
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.34
+---
+# -----------------------------------------------------------------------------
+# 2. ServiceAccount
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+    story: "1-13"
+---
+# -----------------------------------------------------------------------------
+# 3. RBAC - ClusterRole (只读 nodes 和 pods)
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+    story: "1-13"
+rules:
+  # 允许读取 K8s 指标（用于服务发现）
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - "networking.k8s.io"
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  # 允许读取 PodMonitor 和 ServiceMonitor (CRD)
+  - apiGroups: ["monitoring.coreos.com"]
+    resources:
+      - podmonitors
+      - servicemonitors
+      - prometheuses
+      - prometheusrules
+    verbs: ["get", "list", "watch"]
+  # 允许读取 configmaps
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+    story: "1-13"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+---
+# -----------------------------------------------------------------------------
+# 4. Prometheus 配置 (ConfigMap)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    app: prometheus
+    story: "1-13"
+data:
+  prometheus.yml: |
+    # 全局配置
+    global:
+      # 抓取间隔
+      scrape_interval: 15s
+      # 评估规则间隔
+      evaluation_interval: 15s
+      # 默认外部标签（区分环境）
+      external_labels:
+        cluster: 'sisys-k8s'
+        environment: 'development'
+
+    # 告警配置
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: []
+
+    # 规则文件（可选）
+    rule_files: []
+
+    # 抓取配置
+    scrape_configs:
+      # -------------------------------------------------------------------------
+      # Prometheus 自身指标（监控 Prometheus 健康状态）
+      # -------------------------------------------------------------------------
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+        metrics_path: /metrics
+
+      # -------------------------------------------------------------------------
+      # sisys-agent Pods (关键！HPA 依赖的外部指标来源)
+      # -------------------------------------------------------------------------
+      # 要求：
+      #   - sisys-agent 启动时暴露 metrics port (默认 9091)
+      #   - Pod 添加标签: app: sisys-agent
+      #   - ServiceMonitor 或本配置二选一
+      # -------------------------------------------------------------------------
+      - job_name: 'sisys-agent'
+        # K8s 服务发现 - 自动发现同 namespace 下的 pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - sisys
+        # 过滤条件：只抓取带有 app=sisys-agent 标签的 pods
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: sisys-agent
+          # 将 pod IP:metrics_port 转换为目标地址
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_container_port_number]
+            action: replace
+            target_label: __address__
+            regex: (.+);(\d+)
+            replacement: ${1}:${2}
+          # 添加 namespace 标签
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+            replacement: ${1}
+          # 添加 pod 名称标签
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod_name
+            replacement: ${1}
+
+      # -------------------------------------------------------------------------
+      # sisys 应用服务（可选 - 业务指标）
+      # -------------------------------------------------------------------------
+      - job_name: 'sisys-app'
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - sisys
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: sisys-app
+          - source_labels: [__meta_kubernetes_service_name]
+            action: replace
+            target_label: service_name
+            replacement: ${1}
+
+      # -------------------------------------------------------------------------
+      # K8s API Server 指标（集群健康监控，可选）
+      # -------------------------------------------------------------------------
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+            action: keep
+            regex: default;kubernetes
+---
+# -----------------------------------------------------------------------------
+# 5. Prometheus Deployment
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+    story: "1-13"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+      annotations:
+        # 允许 Prometheus Adapter 抓取指标
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: prometheus
+
+      # 安全上下文
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.47.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--storage.tsdb.retention.time=15d'
+            - '--storage.tsdb.retention.size=5GB'
+            - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+            - '--web.console.templates=/usr/share/prometheus/consoles'
+            - '--web.enable-lifecycle'
+            # 启用远程写入（可选）
+            # - '--web.enable-remote-write-receiver'
+            # 安全配置
+            - '--web.external-url=http://prometheus.monitoring:9090'
+          ports:
+            - name: web
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: web
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 2Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+              readOnly: false
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+            defaultMode: 0644
+        - name: data
+          emptyDir: {}
+          # 开发环境用 emptyDir，生产环境应使用 PVC：
+          # persistentVolumeClaim:
+          #   claimName: prometheus-data
+
+---
+# -----------------------------------------------------------------------------
+# 6. Prometheus Service
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+    story: "1-13"
+  annotations:
+    # Prometheus Adapter 通过此地址访问 Prometheus
+    # 格式: http://prometheus.monitoring:9090
+spec:
+  type: ClusterIP
+  ports:
+    - name: web
+      port: 9090
+      targetPort: web
+      protocol: TCP
+  selector:
+    app: prometheus
+---
+# -----------------------------------------------------------------------------
+# 7. Prometheus 数据持久化 (PVC) - 可选，开发环境可跳过
+# -----------------------------------------------------------------------------
+# API server 默认可能没有 local-path storage class，下面的 PVC 需要根据实际情况调整
+# kubectl get storageclass
+# -----------------------------------------------------------------------------
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: prometheus-data
+#   namespace: monitoring
+#   labels:
+#     app: prometheus
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 10Gi
+#   # 使用 local-path 或其他可用的 StorageClass
+#   storageClassName: local-path
+---
+# =============================================================================
+# 附录：Prometheus Adapter 配置（参考 deploy/kubernetes/metrics/prometheus-adapter.yaml）
+# =============================================================================
+# Prometheus Adapter 需要知道 Prometheus 的地址才能抓取指标并转换为 External Metrics API
+#
+# prometheus-adapter.yaml 中的关键配置：
+#   - url: http://prometheus.monitoring:9090  (Adapter 通过 K8s DNS 访问 Prometheus)
+#
+# 验证步骤：
+#   1. 部署 Prometheus: kubectl apply -f prometheus.yaml
+#   2. 部署 Prometheus Adapter: kubectl apply -f prometheus-adapter.yaml
+#   3. 验证 External Metrics API:
+#      kubectl get --raw="/apis/external.metrics.k8s.io/v1beta1/" | jq
+#   4. 验证 sisys 指标是否存在:
+#      kubectl get --raw="/apis/external.metrics.k8s.io/v1beta1/namespaces/sisys/sisys_agent_sessions_active" | jq
+# =============================================================================

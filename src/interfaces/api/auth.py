@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.infrastructure.security.auth_service import (
@@ -225,13 +225,13 @@ async def login(
     description="Use refresh token to get new access token.",
 )
 async def refresh_token(
-    refresh_token: str,
+    refresh_token: str = Form(..., description="Valid refresh token"),
     session=Depends(get_db_session),
 ) -> TokenResponse:
     """Refresh access token using refresh token.
 
     Args:
-        refresh_token: Valid refresh token.
+        refresh_token: Valid refresh token from login response.
         session: Database session.
 
     Returns:

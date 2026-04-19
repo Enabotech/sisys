@@ -184,9 +184,7 @@ data:
     # Prometheus 服务器配置
     prometheus:
       # 指向 Prometheus Server Service
-      url: http://prometheus-server.monitoring.svc.cluster.local
-      port: 9090
-      path: /api/v1/query
+      url: http://prometheus.monitoring.svc.cluster.local:9090
 
 ---
 apiVersion: apps/v1
