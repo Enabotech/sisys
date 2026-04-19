@@ -265,33 +265,15 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
-      - name: 运行集成测试
+      - name: 集成验收测试
         run: |
           mkdir -p reports/integration
-          poetry run pytest tests/integration \
+          poetry run pytest tests/integration tests/integration_real tests/acceptance \
             --junitxml=reports/integration/integration-tests.xml \
             --html=reports/integration/integration-tests.html \
             --self-contained-html \
             -v \
             --tb=short
-
-      - name: 清理存储服务
-        if: always()
-        run: |
-          echo "🧹 开始清理存储服务..."
-          docker compose -f ./deploy/app/docker-compose.yml stop || true
-          sleep 5
-          for i in {1..30}; do
-            running=$(docker compose -f ./deploy/app/docker-compose.yml ps --status running 2>/dev/null | wc -l)
-            if [ "$running" -eq "1" ]; then
-              echo "✅ 所有容器已停止"
-              break
-            fi
-            echo "等待容器停止... ($i/30)"
-            sleep 1
-          done
-          docker compose -f ./deploy/app/docker-compose.yml rm -v -f || true
-          echo "✅ 服务已清理"
 
       - name: 上传集成测试报告
         if: always()
