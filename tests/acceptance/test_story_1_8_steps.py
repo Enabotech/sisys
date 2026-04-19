@@ -124,7 +124,8 @@ def load_neo4j_config(neo4j_config: Neo4jConfig):
 @then("配置应包含正确的连接参数")
 def verify_config_connection_params(neo4j_config: Neo4jConfig):
     """Verify config has correct connection parameters."""
-    assert neo4j_config.uri == os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    expected_uri = f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_BOLT_PORT', '7687')}"
+    assert neo4j_config.uri == expected_uri
     assert neo4j_config.username == os.getenv("NEO4J_USERNAME", "neo4j")
     assert neo4j_config.database == os.getenv("NEO4J_DATABASE", "neo4j")
 

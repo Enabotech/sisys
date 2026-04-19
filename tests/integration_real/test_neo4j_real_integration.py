@@ -33,7 +33,7 @@ async def neo4j_client():
     import os
 
     wrapper = Neo4jClientWrapper(
-        uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        uri=f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_BOLT_PORT', '7687')}",
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password123"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
