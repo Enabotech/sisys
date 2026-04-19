@@ -23,19 +23,23 @@ class TestMinioClientAdapterInit:
     def test_init_with_config(self):
         """使用配置对象初始化。"""
         config = MinIOConfig(
-            endpoint="test.minio:9000",
+            host="test.minio",
+            port=9000,
             access_key="test-key",
             secret_key="test-secret",  # pragma: allowlist secret
             secure=True,
         )
         adapter = MinioClientAdapter(config)
+        assert adapter._config.host == "test.minio"
+        assert adapter._config.port == 9000
         assert adapter._config.endpoint == "test.minio:9000"
         assert adapter._client is None
 
     def test_client_property_creates_once(self):
         """客户端属性创建一次。"""
         config = MinIOConfig(
-            endpoint="test.minio:9000",
+            host="test.minio",
+            port=9000,
             access_key="key",
             secret_key="secret",  # pragma: allowlist secret
             secure=False,
