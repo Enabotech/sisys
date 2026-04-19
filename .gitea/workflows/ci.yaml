@@ -279,6 +279,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 开始清理存储服务..."
+          sleep 10
           docker compose -f ./deploy/app/docker-compose.yml down -v || true
           for i in {1..30}; do
             running=$(docker compose -f ./deploy/app/docker-compose.yml ps --status running 2>/dev/null | wc -l)
