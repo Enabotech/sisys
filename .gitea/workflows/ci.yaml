@@ -278,7 +278,8 @@ jobs:
       - name: 清理存储服务
         if: always()
         run: |
-          docker compose -f ./deploy/app/docker-compose.yml down -v 2>/dev/null || true
+          echo "🧹 开始清理存储服务..."
+          docker compose -f ./deploy/app/docker-compose.yml down -v
           echo "✅ 服务已清理"
 
       - name: 上传集成测试报告
