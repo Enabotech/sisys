@@ -269,13 +269,6 @@ jobs:
 
       - name: 集成验收测试
         shell: bash
-        env:
-          REDIS_HOST: host.docker.internal
-          POSTGRES_HOST: host.docker.internal
-          QDRANT_HOST: host.docker.internal
-          MINIO_HOST: host.docker.internal
-          NEO4J_HOST: host.docker.internal
-          RABBITMQ_HOST: host.docker.internal
         run: |
           set -a
           source ./.env
