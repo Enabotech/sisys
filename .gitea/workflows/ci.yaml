@@ -268,6 +268,7 @@ jobs:
           poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 集成验收测试
+        shell: bash
         env:
           REDIS_HOST: host.docker.internal
           POSTGRES_HOST: host.docker.internal
