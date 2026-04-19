@@ -280,6 +280,16 @@ jobs:
         run: |
           echo "🧹 开始清理存储服务..."
           docker compose -f ./deploy/app/docker-compose.yml stop || true
+          echo "⏳ 等待容器完全停止..."
+          for i in {1..30}; do
+            running=$(docker compose -f ./deploy/app/docker-compose.yml ps --status running 2>/dev/null | wc -l)
+            if [ "$running" -eq "1" ]; then
+              echo "✅ 所有容器已停止"
+              break
+            fi
+            echo "等待容器停止... ($i/30)"
+            sleep 1
+          done
           docker compose -f ./deploy/app/docker-compose.yml down -v || true
           echo "✅ 服务已清理"
 
