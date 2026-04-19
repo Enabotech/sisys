@@ -273,11 +273,12 @@ jobs:
           POSTGRES_HOST: host.docker.internal
           QDRANT_HOST: host.docker.internal
           MINIO_HOST: host.docker.internal
-          MINIO_API_PORT: "9000"
           NEO4J_HOST: host.docker.internal
-          NEO4J_BOLT_PORT: "7687"
           RABBITMQ_HOST: host.docker.internal
         run: |
+          set -a
+          source ./.env
+          set +a
           mkdir -p reports/integration
           poetry run pytest tests/integration tests/integration_real tests/acceptance \
             --junitxml=reports/integration/integration-tests.xml \
