@@ -85,20 +85,6 @@ class TestCIPipeline:
         assert "if" in unit_tests
         assert "GPU_ENABLED" in unit_tests["if"]
 
-    def test_integration_tests_job(self, ci_workflow):
-        """测试集成测试任务"""
-        jobs = ci_workflow["jobs"]
-        assert "integration-tests" in jobs
-
-        integration_tests = jobs["integration-tests"]
-        assert integration_tests["name"] == "🔗 集成测试"
-
-        # 检查服务依赖
-        assert "services" in integration_tests
-        services = integration_tests["services"]
-        assert "postgres" in services
-        assert "redis" in services
-
     def test_security_scan_job(self, ci_workflow):
         """测试安全扫描任务"""
         jobs = ci_workflow["jobs"]

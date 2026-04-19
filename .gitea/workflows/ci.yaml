@@ -268,6 +268,13 @@ jobs:
           poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 集成验收测试
+        env:
+          REDIS_HOST: host.docker.internal
+          POSTGRES_HOST: host.docker.internal
+          QDRANT_HOST: host.docker.internal
+          MINIO_HOST: host.docker.internal
+          NEO4J_HOST: host.docker.internal
+          RABBITMQ_HOST: host.docker.internal
         run: |
           mkdir -p reports/integration
           poetry run pytest tests/integration tests/integration_real tests/acceptance \

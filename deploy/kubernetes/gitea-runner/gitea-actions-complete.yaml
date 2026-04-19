@@ -167,6 +167,7 @@ data:
       # ✅ 特权模式：允许容器内运行 Docker 命令
       # ✅ DNS 配置支持 Kubernetes 服务发现
       # ✅ SSL 环境变量传递到 Job 容器（解决自签名证书问题）
+      # ✅ host.docker.internal：让 Job 容器访问 host 上的服务
       options: |
         --privileged
         --tmpfs /tmp
@@ -175,6 +176,7 @@ data:
         --dns-search gitea-actions.svc.cluster.local
         --dns-search svc.cluster.local
         --dns-search cluster.local
+        --add-host=host.docker.internal:host-gateway
         -e GIT_SSL_NO_VERIFY=true
         -e NODE_TLS_REJECT_UNAUTHORIZED=0
 
