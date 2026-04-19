@@ -71,7 +71,8 @@ def reset_test_state():
 def minio_config() -> MinIOConfig:
     """Real MinIO configuration from environment."""
     return MinIOConfig(
-        endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+        host=os.getenv("MINIO_HOST", "localhost"),
+        port=int(os.getenv("MINIO_API_PORT", "9000")),
         access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
         secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
         secure=False,

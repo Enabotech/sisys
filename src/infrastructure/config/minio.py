@@ -16,7 +16,8 @@ class MinIOConfig:
     用于 L4 对象存储层（MinIO），支持连接池管理和超时配置。
 
     字段说明:
-        endpoint: MinIO 服务地址（host:port）
+        host: MinIO 服务主机地址
+        port: MinIO 服务端口
         access_key: 访问密钥
         secret_key: 密钥
         secure: 是否使用 HTTPS
@@ -25,7 +26,8 @@ class MinIOConfig:
         read_timeout: 读取超时（秒）
     """
 
-    endpoint: str = "localhost:9000"
+    host: str = "localhost"
+    port: int = 9000
     access_key: str = ""
     secret_key: str = ""
     secure: bool = False
@@ -33,12 +35,18 @@ class MinIOConfig:
     connect_timeout: float = 5.0
     read_timeout: float = 30.0
 
+    @property
+    def endpoint(self) -> str:
+        """返回 host:port 格式的 endpoint。"""
+        return f"{self.host}:{self.port}"
+
     @classmethod
     def from_env(cls) -> MinIOConfig:
         """从环境变量加载配置。
 
         环境变量:
-            MINIO_ENDPOINT: MinIO 服务地址 (默认: localhost:9000)
+            MINIO_HOST: MinIO 服务主机地址 (默认: localhost)
+            MINIO_API_PORT: MinIO API 端口 (默认: 9000)
             MINIO_ACCESS_KEY: 访问密钥 (默认: 空字符串)
             MINIO_SECRET_KEY: 密钥 (默认: 空字符串)
             MINIO_SECURE: 是否使用 HTTPS (默认: false)
@@ -62,7 +70,8 @@ class MinIOConfig:
             raise ValueError(f"Invalid MINIO_READ_TIMEOUT value: {read_timeout_str}") from e
 
         return cls(
-            endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+            host=os.getenv("MINIO_HOST", "localhost"),
+            port=int(os.getenv("MINIO_API_PORT", "9000")),
             access_key=os.getenv("MINIO_ACCESS_KEY", ""),
             secret_key=os.getenv("MINIO_SECRET_KEY", ""),
             secure=os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes"),

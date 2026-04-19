@@ -17,7 +17,8 @@ class Neo4jConfig:
     用于 L5 图存储层（Neo4j 5.x），支持连接池管理和超时配置。
 
     字段说明:
-        uri: Neo4j 服务地址（bolt://host:port 或 neo4j://host:port）
+        host: Neo4j 服务主机地址
+        bolt_port: Neo4j Bolt 协议端口
         username: 认证用户名
         password: 认证密码
         database: 数据库名称
@@ -26,7 +27,8 @@ class Neo4jConfig:
         max_retry_time: 最大重试时间（秒）
     """
 
-    uri: str = "bolt://localhost:7687"
+    host: str = "localhost"
+    bolt_port: int = 7687
     username: str = "neo4j"
     password: str = ""
     database: str = "neo4j"
@@ -34,12 +36,18 @@ class Neo4jConfig:
     connection_timeout: float = 30.0
     max_retry_time: float = 30.0
 
+    @property
+    def uri(self) -> str:
+        """返回 bolt://host:port 格式的 URI。"""
+        return f"bolt://{self.host}:{self.bolt_port}"
+
     @classmethod
     def from_env(cls) -> Neo4jConfig:
         """从环境变量加载配置。
 
         环境变量:
-            NEO4J_URI: Neo4j 服务地址 (默认: bolt://localhost:7687)
+            NEO4J_HOST: Neo4j 服务主机地址 (默认: localhost)
+            NEO4J_BOLT_PORT: Neo4j Bolt 端口 (默认: 7687)
             NEO4J_USERNAME: 认证用户名 (默认: neo4j)
             NEO4J_PASSWORD: 认证密码 (默认: 空字符串)
             NEO4J_DATABASE: 数据库名称 (默认: neo4j)
@@ -69,7 +77,8 @@ class Neo4jConfig:
             raise ValueError(f"Invalid NEO4J_MAX_RETRY_TIME value: {max_retry_time_str}") from e
 
         return cls(
-            uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            host=os.getenv("NEO4J_HOST", "localhost"),
+            bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
             username=os.getenv("NEO4J_USERNAME", "neo4j"),
             password=os.getenv("NEO4J_PASSWORD", ""),
             database=os.getenv("NEO4J_DATABASE", "neo4j"),
