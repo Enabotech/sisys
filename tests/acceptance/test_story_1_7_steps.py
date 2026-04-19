@@ -15,7 +15,6 @@ Prerequisites:
 from __future__ import annotations
 
 import asyncio
-import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -70,16 +69,7 @@ def reset_test_state():
 @pytest.fixture
 def minio_config() -> MinIOConfig:
     """Real MinIO configuration from environment."""
-    return MinIOConfig(
-        host=os.getenv("MINIO_HOST", "localhost"),
-        port=int(os.getenv("MINIO_API_PORT", "9000")),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
-        secure=False,
-        bucket_prefix="sisys",
-        connect_timeout=5.0,
-        read_timeout=30.0,
-    )
+    return MinIOConfig.from_env()
 
 
 @pytest.fixture
