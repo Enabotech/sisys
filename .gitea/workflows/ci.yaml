@@ -279,7 +279,8 @@ jobs:
         if: always()
         run: |
           echo "🧹 开始清理存储服务..."
-          docker compose -f ./deploy/app/docker-compose.yml down -v
+          docker compose -f ./deploy/app/docker-compose.yml stop || true
+          docker compose -f ./deploy/app/docker-compose.yml down -v || true
           echo "✅ 服务已清理"
 
       - name: 上传集成测试报告
