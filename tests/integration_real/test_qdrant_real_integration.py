@@ -155,17 +155,15 @@ class TestQdrantVectorStorage:
     Collection Manager 测试通过，验证核心功能正常。Vector Storage 测试在某些版本组合下可能失败。
     """
 
-    async def test_upsert_and_search_vectors(self, vector_storage: QdrantVectorStorage):
+    async def test_upsert_and_search_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper):
         """测试向量插入和搜索。"""
         collection_name = "test-vector-storage"
         vector_size = 1024
 
         # Create collection
-        from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-        wrapper = QdrantClientWrapper()
-        manager = QdrantCollectionManager(wrapper)
+        manager = QdrantCollectionManager(qdrant_client)
         await manager.create_collection(collection_name, vector_size=vector_size)
 
         try:
@@ -219,19 +217,16 @@ class TestQdrantVectorStorage:
         finally:
             # Cleanup
             await manager.delete_collection(collection_name)
-            await wrapper.close()
 
-    async def test_delete_vectors(self, vector_storage: QdrantVectorStorage):
+    async def test_delete_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper):
         """测试删除向量。"""
         collection_name = "test-vector-delete"
         vector_size = 1024
 
         # Create collection
-        from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-        wrapper = QdrantClientWrapper()
-        manager = QdrantCollectionManager(wrapper)
+        manager = QdrantCollectionManager(qdrant_client)
         await manager.create_collection(collection_name, vector_size=vector_size)
 
         try:
@@ -268,7 +263,6 @@ class TestQdrantVectorStorage:
         finally:
             # Cleanup
             await manager.delete_collection(collection_name)
-            await wrapper.close()
 
 
 # ===================================================================
