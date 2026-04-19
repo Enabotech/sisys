@@ -363,27 +363,27 @@ clean_org_runners() {
             continue
         fi
 
-        #--------- 0. 安全停止 runner 容器 (不操作宿主机容器) ---------
-        # log_info "停止 runner 容器 (跳过 docker-compose 等外部容器)..."
-        # # Gitea Actions/Act Runner 创建的临时容器名称通常包含 runner- 或 act_runner- 前缀
-        # # 使用 --filter 过滤，只处理 runner 相关的容器，不影响宿主机上其他容器
-        # local runner_containers
-        # runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
-        # local runner_container_count
-        # runner_container_count=$(safe_wc "$runner_containers")
+        # --------- 0. 安全停止 runner 容器 (不操作宿主机容器) ---------
+        log_info "停止 runner 容器 (跳过 docker-compose 等外部容器)..."
+        # Gitea Actions/Act Runner 创建的临时容器名称通常包含 runner- 或 act_runner- 前缀
+        # 使用 --filter 过滤，只处理 runner 相关的容器，不影响宿主机上其他容器
+        local runner_containers
+        runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
+        local runner_container_count
+        runner_container_count=$(safe_wc "$runner_containers")
 
-        # if [ -n "$runner_containers" ]; then
-        #     if [ "$DRY_RUN" = true ]; then
-        #         log_warn "[DRY-RUN] Would stop/remove $runner_container_count runner containers"
-        #     else
-        #         echo "$runner_containers" | xargs -r $prefix docker stop 2>/dev/null || true
-        #         runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
-        #         [ -n "$runner_containers" ] && echo "$runner_containers" | xargs -r $prefix docker rm -v 2>/dev/null || true
-        #         STATS_CONTAINERS=$((STATS_CONTAINERS + runner_container_count))
-        #     fi
-        # else
-        #     log_info "无 runner 容器需要清理"
-        # fi
+        if [ -n "$runner_containers" ]; then
+            if [ "$DRY_RUN" = true ]; then
+                log_warn "[DRY-RUN] Would stop/remove $runner_container_count runner containers"
+            else
+                echo "$runner_containers" | xargs -r $prefix docker stop 2>/dev/null || true
+                runner_containers=$($prefix docker ps --filter "name=runtime-" --filter "name=runner-" --filter "name=act_runner-" -aq 2>/dev/null || echo "")
+                [ -n "$runner_containers" ] && echo "$runner_containers" | xargs -r $prefix docker rm -v 2>/dev/null || true
+                STATS_CONTAINERS=$((STATS_CONTAINERS + runner_container_count))
+            fi
+        else
+            log_info "无 runner 容器需要清理"
+        fi
 
         #--------- 1. 清理 BuildKit ---------
         log_info "清理 BuildKit..."
@@ -577,25 +577,25 @@ clean_local_docker() {
 
     log_info "本地 Docker 可用, 执行清理..."
 
-    # #--------- 0. 停止并删除所有容器 ---------
-    # log_subheader "停止并删除所有容器"
-    # local containers
-    # containers=$(docker ps -aq 2>/dev/null || echo "")
-    # local container_count
-    # container_count=$(safe_wc "$containers")
+    #--------- 0. 停止并删除所有容器 ---------
+    log_subheader "停止并删除所有容器"
+    local containers
+    containers=$(docker ps -aq 2>/dev/null || echo "")
+    local container_count
+    container_count=$(safe_wc "$containers")
 
-    # if [ -n "$containers" ]; then
-    #     if [ "$DRY_RUN" = true ]; then
-    #         log_warn "[DRY-RUN] Would stop/remove $container_count containers"
-    #     else
-    #         echo "$containers" | xargs -r docker stop 2>/dev/null || true
-    #         containers=$(docker ps -aq 2>/dev/null || echo "")
-    #         [ -n "$containers" ] && echo "$containers" | xargs -r docker rm -f 2>/dev/null || true
-    #         STATS_CONTAINERS=$((STATS_CONTAINERS + container_count))
-    #     fi
-    # else
-    #     log_info "无运行中的容器"
-    # fi
+    if [ -n "$containers" ]; then
+        if [ "$DRY_RUN" = true ]; then
+            log_warn "[DRY-RUN] Would stop/remove $container_count containers"
+        else
+            echo "$containers" | xargs -r docker stop 2>/dev/null || true
+            containers=$(docker ps -aq 2>/dev/null || echo "")
+            [ -n "$containers" ] && echo "$containers" | xargs -r docker rm -f 2>/dev/null || true
+            STATS_CONTAINERS=$((STATS_CONTAINERS + container_count))
+        fi
+    else
+        log_info "无运行中的容器"
+    fi
 
     #--------- 1. 清理 BuildKit ---------
     log_subheader "BuildKit 缓存"

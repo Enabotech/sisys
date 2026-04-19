@@ -252,13 +252,12 @@ jobs:
 
           echo "等待所有服务健康..."
           for i in {1..30}; do
-            if docker compose -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -qi "unhealthy"; then
-              echo "等待服务健康... ($i/30)"
-              sleep 2
-            else
+            if docker compose -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -E -qi '\(healthy\)'; then
               echo "✅ 所有服务已就绪"
               break
             fi
+            echo "等待服务健康... ($i/30)"
+            sleep 2
           done
           docker compose -f ./deploy/app/docker-compose.yml ps
 
