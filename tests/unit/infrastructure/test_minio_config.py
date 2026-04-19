@@ -75,8 +75,8 @@ class TestMinIOConfigFromEnv:
         with patch.dict(
             os.environ,
             {
-                "MINIO_ACCESS_KEY": "test-key",
-                "MINIO_SECRET_KEY": "test-secret",  # pragma: allowlist secret
+                "MINIO_ROOT_USER": "test-key",
+                "MINIO_ROOT_PASSWORD": "test-secret",  # pragma: allowlist secret
             },
         ):
             config = MinIOConfig.from_env()

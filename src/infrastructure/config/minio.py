@@ -47,8 +47,8 @@ class MinIOConfig:
         环境变量:
             MINIO_HOST: MinIO 服务主机地址 (默认: localhost)
             MINIO_API_PORT: MinIO API 端口 (默认: 9000)
-            MINIO_ACCESS_KEY: 访问密钥 (默认: 空字符串)
-            MINIO_SECRET_KEY: 密钥 (默认: 空字符串)
+            MINIO_ROOT_USER: 访问密钥 (默认: 空字符串)
+            MINIO_ROOT_PASSWORD: 密钥 (默认: 空字符串)
             MINIO_SECURE: 是否使用 HTTPS (默认: false)
             MINIO_BUCKET_PREFIX: Bucket 前缀 (默认: sisys)
             MINIO_CONNECT_TIMEOUT: 连接超时秒数 (默认: 5.0)
@@ -72,8 +72,8 @@ class MinIOConfig:
         return cls(
             host=os.getenv("MINIO_HOST", "localhost"),
             port=int(os.getenv("MINIO_API_PORT", "9000")),
-            access_key=os.getenv("MINIO_ACCESS_KEY", ""),
-            secret_key=os.getenv("MINIO_SECRET_KEY", ""),
+            access_key=os.getenv("MINIO_ROOT_USER", ""),
+            secret_key=os.getenv("MINIO_ROOT_PASSWORD", ""),
             secure=os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes"),
             bucket_prefix=os.getenv("MINIO_BUCKET_PREFIX", "sisys"),
             connect_timeout=connect_timeout,

@@ -268,16 +268,18 @@ jobs:
           poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 集成验收测试
-        env:
-          REDIS_HOST: host.docker.internal
-          POSTGRES_HOST: host.docker.internal
-          QDRANT_HOST: host.docker.internal
-          MINIO_HOST: host.docker.internal
-          MINIO_API_PORT: "9000"
-          NEO4J_HOST: host.docker.internal
-          NEO4J_BOLT_PORT: "7687"
-          RABBITMQ_HOST: host.docker.internal
+        shell: bash
         run: |
+          set -a
+          source ./.env
+          set +a
+          # Override HOST variables to use host.docker.internal for CI
+          export REDIS_HOST=host.docker.internal
+          export POSTGRES_HOST=host.docker.internal
+          export QDRANT_HOST=host.docker.internal
+          export MINIO_HOST=host.docker.internal
+          export NEO4J_HOST=host.docker.internal
+          export RABBITMQ_HOST=host.docker.internal
           mkdir -p reports/integration
           poetry run pytest tests/integration tests/integration_real tests/acceptance \
             --junitxml=reports/integration/integration-tests.xml \

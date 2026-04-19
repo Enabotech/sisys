@@ -32,16 +32,7 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 async def minio_config():
     """Provide MinIO configuration."""
-    import os
-
-    return MinIOConfig(
-        host=os.getenv("MINIO_HOST", "localhost"),
-        port=int(os.getenv("MINIO_API_PORT", "9000")),
-        access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
-        secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
-        secure=False,
-        bucket_prefix="sisys",
-    )
+    return MinIOConfig.from_env()
 
 
 @pytest.fixture

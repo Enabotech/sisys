@@ -51,15 +51,7 @@ def event_loop():
 @pytest.fixture
 def neo4j_config() -> Neo4jConfig:
     """Real Neo4j configuration from environment."""
-    return Neo4jConfig(
-        host=os.getenv("NEO4J_HOST", "localhost"),
-        bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
-        username=os.getenv("NEO4J_USERNAME", "neo4j"),
-        password=os.getenv("NEO4J_PASSWORD", "password123"),
-        database=os.getenv("NEO4J_DATABASE", "neo4j"),
-        max_connection_pool_size=int(os.getenv("NEO4J_MAX_POOL_SIZE", "50")),
-        connection_timeout=float(os.getenv("NEO4J_CONNECT_TIMEOUT", "30.0")),
-    )
+    return Neo4jConfig.from_env()
 
 
 @pytest.fixture

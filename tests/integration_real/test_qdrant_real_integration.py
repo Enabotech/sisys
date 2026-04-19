@@ -30,17 +30,17 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 async def qdrant_client():
     """Provide a real Qdrant client connection."""
-    import os
+    from src.infrastructure.config.qdrant import QdrantConfig
 
-    api_key = os.getenv("QDRANT_API_KEY")
+    config = QdrantConfig.from_env()
     wrapper = QdrantClientWrapper(
-        host=os.getenv("QDRANT_HOST", "localhost"),
-        port=int(os.getenv("QDRANT_PORT", "6333")),
-        grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
-        api_key=api_key,
-        https=False,
-        timeout=30.0,
-        max_retries=3,
+        host=config.host,
+        port=config.port,
+        grpc_port=config.grpc_port,
+        api_key=config.api_key,
+        https=config.https,
+        timeout=config.timeout,
+        max_retries=config.max_retries,
     )
 
     # Verify connection
