@@ -64,6 +64,12 @@ rules:
   - configmaps
   verbs:
   - get
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -166,10 +172,6 @@ data:
         matches: '^(.*)$'
         as: '${1}'
 
-    # Prometheus 服务器配置
-    prometheus:
-      url: http://prometheus.monitoring.svc.cluster.local:9090
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -196,7 +198,8 @@ spec:
         - --secure-port=6443
         - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384
         - --config=/etc/adapter/config.yaml
-        image: harbor.sisys.local/sisys/tools/prometheus/prometheus-adapter:v0.14.0
+        - --prometheus-url=http://prometheus.monitoring.svc.cluster.local:9090
+        image: harbor.sisys.local/sisys/tools/prometheus/prometheus-adapter:v0.12.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

@@ -69,6 +69,12 @@ spec:
               value: "development"
             - name: LOG_LEVEL
               value: "info"
+            - name: METRICS_ENABLED
+              value: "true"
+            - name: METRICS_PORT
+              value: "8080"
+            - name: METRICS_PATH
+              value: "/metrics"
           volumeMounts:
             - name: tmp-volume
               mountPath: /tmp

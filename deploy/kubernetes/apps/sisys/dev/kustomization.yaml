@@ -12,10 +12,6 @@ resources:
 # 命名空间
 namespace: sisys-dev
 
-# 通用标签
-commonLabels:
-  environment: dev
-
 # 通用注解
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0"
@@ -71,12 +67,14 @@ patches:
           value: "true"
 
 # HPA 补丁 (开发环境最小副本数 1)
-patchesStrategicMerge:
-  - |-
-    apiVersion: autoscaling/v2
-    kind: HorizontalPodAutoscaler
-    metadata:
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
       name: sisys-app
-    spec:
-      minReplicas: 1
-      maxReplicas: 2
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
