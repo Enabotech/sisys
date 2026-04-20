@@ -393,7 +393,7 @@ class PIPLComplianceService:
         """
         age_threshold = self._config.minor_age_threshold
 
-        if age < age_threshold:
+        if age < age_threshold and not guardian_id:
             raise GuardianConsentRequiredError(f"Guardian consent required for minors under {age_threshold} years old")
 
         record = PIPLAccessRecord(

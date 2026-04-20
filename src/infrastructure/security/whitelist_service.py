@@ -292,12 +292,12 @@ class WhitelistService:
 
     def list_rules(
         self,
-        status: WhitelistStatus | None = None,
+        status: WhitelistStatus | str | None = None,
     ) -> list[WhitelistRule]:
         """List whitelist rules with optional status filter.
 
         Args:
-            status: Filter by rule status.
+            status: Filter by rule status (WhitelistStatus or string).
 
         Returns:
             List of matching rules.
@@ -305,6 +305,8 @@ class WhitelistService:
         rules = list(self._rules.values())
 
         if status is not None:
+            if isinstance(status, str):
+                status = WhitelistStatus(status)
             rules = [r for r in rules if r.status == status]
 
         return rules

@@ -46,6 +46,9 @@ _idempotency_event_id = None
 _idempotency_first_result = None
 _idempotency_second_result = None
 
+# Shared state for redis pub/sub channel tracking
+_redis_published_channel = None
+
 # ===================================================================
 # Fixtures
 # ===================================================================
@@ -182,7 +185,9 @@ def redis_available(redis_config: RedisConfig):
 @when("我发布一个 DocumentProcessed 事件到 Redis channel")
 def publish_documentprocessed_to_redis_channel(redis_publisher: RedisEventPublisher, event_loop):
     """Publish DocumentProcessed event to Redis channel."""
+    global _redis_published_channel
     channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    _redis_published_channel = channel
 
     event = DocumentProcessed(
         document_id=uuid.uuid4(),
@@ -199,7 +204,9 @@ def publish_documentprocessed_to_redis_channel(redis_publisher: RedisEventPublis
 @when("我发布一个 HeartbeatTriggered 事件到 Redis channel")
 def publish_heartbeattriggered_to_redis_channel(redis_publisher: RedisEventPublisher, event_loop):
     """Publish HeartbeatTriggered event to Redis channel."""
+    global _redis_published_channel
     channel = f"{REDIS_CHANNEL_PREFIX}heartbeattriggered"
+    _redis_published_channel = channel
 
     event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -222,7 +229,7 @@ def verify_subscriber_receives_event(redis_subscriber: RedisEventSubscriber, red
     def handler(event_data: dict) -> None:
         received_events.append(event_data)
 
-    channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    channel = _redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
     redis_subscriber.subscribe(channel, handler)
 
     async def _test():
@@ -247,7 +254,7 @@ def verify_event_serialized_as_json(redis_subscriber: RedisEventSubscriber, redi
     def handler(event_data: dict) -> None:
         received_data.update(event_data)
 
-    channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    channel = _redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
     redis_subscriber.subscribe(channel, handler)
 
     async def _test():
@@ -490,13 +497,13 @@ def event_status_updated():
 
 
 # ===================================================================
-# AC-4.1: Idempotency Check Tests
+# AC-4: Idempotency Check Tests
 # ===================================================================
 
 
 @scenario(
     "test_story_1_3.feature",
-    "AC-4.1 - 事件处理幂等性检查",
+    "AC-4 - 事件处理幂等性检查",
 )
 def test_ac4_idempotency():
     """Test event processing idempotency check."""
@@ -563,44 +570,6 @@ def event_processed_once():
 @when("事件应该只被处理一次")
 def when_event_processed_once():
     """Verify event is only processed once (feature file syntax quirk)."""
-    pass
-
-
-# ===================================================================
-# AC-4.2: Retry Mechanism Tests
-# ===================================================================
-
-
-@scenario(
-    "test_story_1_3.feature",
-    "AC-4.2 - 事件处理重试机制（指数退避 + 抖动）",
-)
-def test_ac4_retry():
-    """Test event processing retry mechanism."""
-    pass
-
-
-@when("事件处理失败并触发重试")
-def event_processing_fails_and_retries():
-    """Verify retry mechanism with exponential backoff."""
-    pass
-
-
-@then("重试延迟应该遵循指数退避: min(base * 2^retry_count * jitter, max)")
-def verify_exponential_backoff():
-    """Verify retry delay follows exponential backoff formula."""
-    pass
-
-
-@then("jitter 应该在 0.5 和 1.5 之间")
-def verify_jitter_range():
-    """Verify jitter is between 0.5 and 1.5."""
-    pass
-
-
-@then("超过最大重试次数后事件应该进入死信队列")
-def verify_dlq_after_max_retries():
-    """Verify event enters DLQ after max retries exceeded."""
     pass
 
 
@@ -751,3 +720,41 @@ def verify_mypy_check():
     )
     # Note: This may have warnings but should not have errors
     assert "error:" not in result.stdout.lower(), f"MyPy check failed: {result.stdout}"
+
+
+# ===================================================================
+# AC-7: Retry Mechanism Tests
+# ===================================================================
+
+
+@scenario(
+    "test_story_1_3.feature",
+    "AC-7 - 事件处理重试机制（指数退避 + 抖动）",
+)
+def test_ac4_retry():
+    """Test event processing retry mechanism."""
+    pass
+
+
+@when("事件处理失败并触发重试")
+def event_processing_fails_and_retries():
+    """Verify retry mechanism with exponential backoff."""
+    pass
+
+
+@then("重试延迟应该遵循指数退避: min(base * 2^retry_count * jitter, max)")
+def verify_exponential_backoff():
+    """Verify retry delay follows exponential backoff formula."""
+    pass
+
+
+@then("jitter 应该在 0.5 和 1.5 之间")
+def verify_jitter_range():
+    """Verify jitter is between 0.5 and 1.5."""
+    pass
+
+
+@then("超过最大重试次数后事件应该进入死信队列")
+def verify_dlq_after_max_retries():
+    """Verify event enters DLQ after max retries exceeded."""
+    pass
