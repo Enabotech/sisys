@@ -1,6 +1,7 @@
 """Domain events."""
 
 from .agent_events import AgentDecided
+from .audit_events import AuditActionType, AuditEvent
 from .base import DomainEvent
 from .checkpoint_events import CheckpointReached, CheckpointRecovered
 from .correction_events import CorrectionApproved
@@ -31,4 +32,6 @@ __all__ = [
     "CorrectionType",
     "IsolationLevel",
     "RecoveryMode",
+    "AuditEvent",
+    "AuditActionType",
 ]
