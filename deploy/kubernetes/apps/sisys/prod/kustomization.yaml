@@ -19,7 +19,7 @@ commonAnnotations:
 # 镜像配置 (生产环境使用稳定版本)
 images:
   - name: harbor.sisys.local/sisys/app
-    newTag: v0.0.3-458c871
+    newTag: v0.0.0-0000000
 
 # 名称前缀
 namePrefix: prod-
