@@ -279,7 +279,7 @@ class SensitiveDataDetector:
 
         # Check financial patterns first
         for label, (pattern, confidence, dtype) in self._financial_patterns.items():
-            if pattern.search(text) and label not in found_patterns:
+            if pattern.search(text) and label not in found_patterns and confidence >= self.min_confidence:
                 results.append(
                     DetectionResult(
                         is_sensitive=True,
@@ -294,7 +294,7 @@ class SensitiveDataDetector:
 
         # Check all PII patterns
         for label, (pattern, confidence, dtype) in self._pii_patterns.items():
-            if pattern.search(text) and label not in found_patterns:
+            if pattern.search(text) and label not in found_patterns and confidence >= self.min_confidence:
                 results.append(
                     DetectionResult(
                         is_sensitive=True,
@@ -314,15 +314,59 @@ class SensitiveDataDetector:
                 matched_keywords.append(keyword)
 
         if matched_keywords:
-            results.append(
-                DetectionResult(
-                    is_sensitive=True,
-                    sensitive_type=SensitiveDataType.TRADE_SECRET,
-                    confidence=min(0.95, 0.8 + 0.05 * len(matched_keywords)),
-                    labels=matched_keywords[:5],
-                    detection_method="keyword",
-                    matched_pattern="trade_secret_keyword",
+            keyword_confidence = min(0.95, 0.8 + 0.05 * len(matched_keywords))
+            if keyword_confidence >= self.min_confidence:
+                results.append(
+                    DetectionResult(
+                        is_sensitive=True,
+                        sensitive_type=SensitiveDataType.TRADE_SECRET,
+                        confidence=keyword_confidence,
+                        labels=matched_keywords[:5],
+                        detection_method="keyword",
+                        matched_pattern="trade_secret_keyword",
+                    )
                 )
-            )
+
+        # Check for biometric data
+        for keyword in self._biometric_keywords:
+            if keyword.lower() in text.lower():
+                if 0.95 >= self.min_confidence:
+                    results.append(
+                        DetectionResult(
+                            is_sensitive=True,
+                            sensitive_type=SensitiveDataType.BIOMETRIC,
+                            confidence=0.95,
+                            labels=["biometric_data"],
+                            detection_method="keyword",
+                            matched_pattern=keyword,
+                        )
+                    )
+                    break  # Only report biometric once
+
+        # Check for minor-related data
+        for keyword in self._minor_keywords:
+            # Skip if preceded by "非" (e.g., "非未成年人" should not match)
+            pos = text.find(keyword)
+            if pos > 0 and text[pos - 1] == "非":
+                continue
+            # Check if age indicator is present
+            age_pattern = re.compile(r"\b(\d+)\s*岁\b")
+            matches = age_pattern.findall(text)
+            if matches:
+                ages = [int(m) for m in matches]
+                min_age = min(ages)
+                if min_age <= 14:
+                    if 0.95 >= self.min_confidence:
+                        results.append(
+                            DetectionResult(
+                                is_sensitive=True,
+                                sensitive_type=SensitiveDataType.MINOR,
+                                confidence=0.95,
+                                labels=[keyword, f"age_{min_age}"],
+                                detection_method="keyword",
+                                matched_pattern=keyword,
+                            )
+                        )
+                        break  # Only report minor once
 
         return results

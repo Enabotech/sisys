@@ -8,12 +8,15 @@ Architecture: Infrastructure layer service (hexagonal architecture).
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from .models import WhitelistRule, WhitelistStatus
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..config.sovereignty import DataSovereigntyConfig
@@ -342,6 +345,15 @@ class WhitelistService:
             True if call is allowed, False otherwise.
         """
         result = self.validate_endpoint(endpoint)
+        # AC-3: All whitelist validations must be logged for audit
+        # TODO(V2): Integrate with AuditService for structured audit logging
+        logger.info(
+            "Whitelist validation: endpoint=%s, allowed=%s, rule_id=%s, reason=%s",
+            endpoint,
+            result.is_allowed,
+            result.matched_rule_id,
+            result.reason,
+        )
         return result.is_allowed
 
     def get_coverage_report(self) -> dict:

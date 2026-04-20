@@ -121,6 +121,9 @@ class ApprovalWorkflowService:
         if approval is None:
             raise ApprovalNotFoundError(f"Approval {actual_id} not found")
 
+        if approval.status != ApprovalStatus.PENDING:
+            raise ValueError(f"Cannot approve request with status {approval.status.value}, must be PENDING")
+
         approval.approve(approver)
         return approval
 
@@ -152,6 +155,9 @@ class ApprovalWorkflowService:
         approval = self._approvals.get(actual_id)
         if approval is None:
             raise ApprovalNotFoundError(f"Approval {actual_id} not found")
+
+        if approval.status != ApprovalStatus.PENDING:
+            raise ValueError(f"Cannot reject request with status {approval.status.value}, must be PENDING")
 
         approval.reject(approver, reason)
         return approval
@@ -270,10 +276,8 @@ class ApprovalWorkflowService:
         if not approvals:
             return False
 
-        approvals.sort(key=lambda a: a.requested_at, reverse=True)
-        most_recent = approvals[0]
-
-        return most_recent.status == ApprovalStatus.APPROVED
+        # Check if ANY approval has APPROVED status (not just the most recent)
+        return any(a.status == ApprovalStatus.APPROVED for a in approvals)
 
     def get_approval_rate_report(self) -> dict:
         """Get approval rate statistics report.

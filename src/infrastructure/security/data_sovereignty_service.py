@@ -213,8 +213,9 @@ class DataSovereigntyService:
                 region = self._extract_region(layer)
                 if region and policy.allows_storage(region):
                     return layer
-            # Fallback: if no layer matches storage_allowed, return first available
-            return available_layers[0]
+            # Fallback: if no layer matches storage_allowed, return None
+            # to force proper approval flow rather than bypassing policy
+            return None
 
         # Check if any layer is allowed by policy
         for layer in available_layers:
@@ -323,7 +324,16 @@ class DataSovereigntyService:
 
         Returns:
             Dict with compliance status.
+
+        Note:
+            This is a placeholder implementation. Full compliance verification
+            requires traversing actual data residency records. For MVP, this
+            returns a compliant status. V2 will implement actual verification.
         """
+        # TODO(V2): Implement actual compliance verification by checking:
+        # - All data residency records match policy requirements
+        # - No cross-border transfers without valid approvals
+        # - Whitelist validation coverage is 100%
         return {
             "compliant": True,
             "domestic_rate": 1.0,
