@@ -122,7 +122,7 @@ class ApprovalWorkflowService:
             raise ApprovalNotFoundError(f"Approval {actual_id} not found")
 
         if approval.status != ApprovalStatus.PENDING:
-            raise ValueError(f"Cannot approve request with status {approval.status.value}, must be PENDING")
+            raise ValueError(f"Cannot approve from status {approval.status.value}")
 
         approval.approve(approver)
         return approval
@@ -157,7 +157,7 @@ class ApprovalWorkflowService:
             raise ApprovalNotFoundError(f"Approval {actual_id} not found")
 
         if approval.status != ApprovalStatus.PENDING:
-            raise ValueError(f"Cannot reject request with status {approval.status.value}, must be PENDING")
+            raise ValueError(f"Cannot reject from status {approval.status.value}")
 
         approval.reject(approver, reason)
         return approval
