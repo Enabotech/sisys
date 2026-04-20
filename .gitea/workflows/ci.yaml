@@ -116,7 +116,7 @@ jobs:
       # 预构建镜像包含大部分依赖，此步骤仅处理新增/变更的依赖
       - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖更新完成"
+          poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 代码检查 ( Ruff )
         run: |
@@ -160,7 +160,7 @@ jobs:
       # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
       - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖更新完成"
+          poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 验证 GPU 可用性
         if: ${{ vars.GPU_ENABLED == 'true' }}
@@ -314,7 +314,7 @@ jobs:
       # ✅ 保留 poetry install 作为补充 ( 处理微小依赖变更 )
       - name: 增量更新依赖
         run: |
-          poetry install --no-interaction --quiet || echo "依赖更新完成"
+          poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 代码安全扫描 ( Bandit )
         run: |
