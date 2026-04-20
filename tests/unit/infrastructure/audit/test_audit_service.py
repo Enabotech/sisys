@@ -21,7 +21,7 @@ class TestAuditServiceLog:
         """log() creates audit log and outbox entry."""
         from src.infrastructure.audit.audit_service import AuditServiceImpl
 
-        mock_session = mock.AsyncMock()
+        mock_session = mock.MagicMock()
         mock_session.flush = mock.AsyncMock()
 
         service = AuditServiceImpl(session=mock_session)
@@ -45,7 +45,7 @@ class TestAuditServiceLog:
         """log() supports correction_level for FR-SC-04."""
         from src.infrastructure.audit.audit_service import AuditServiceImpl
 
-        mock_session = mock.AsyncMock()
+        mock_session = mock.MagicMock()
         mock_session.flush = mock.AsyncMock()
 
         service = AuditServiceImpl(session=mock_session)
