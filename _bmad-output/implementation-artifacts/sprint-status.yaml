@@ -84,9 +84,9 @@ development_status:
   1-6-qdrant-vector-layer: done                   # ✅ Qdrant v1.7.0集成,部署准备完成
   1-7-minio-object-layer: done                    # ✅ MinIO SDK集成,WORM/生命周期/断点续传
   1-8-neo4j-graph-layer: done
-  1-13-k8s-auto-scaling: done  # ✅ K8s动态扩缩容实现完成
+  1-13-k8s-auto-scaling: done                     # ✅ K8s动态扩缩容实现完成
   # 价值组 4: 安全与合规基础
-  1-9-rbac-permission-management: done  # ✅ RBAC权限管理实现完成
+  1-9-rbac-permission-management: done            # ✅ RBAC权限管理实现完成
   1-10-unified-audit-log: done  # ✅ 代码审查完成，所有patch已修复
   1-11-data-sovereignty-isolation: review  # ✅ 开发完成，待审查
   1-12-equilibrium-level-3-compliance: ready-for-dev  # ✅ Story 文件已创建

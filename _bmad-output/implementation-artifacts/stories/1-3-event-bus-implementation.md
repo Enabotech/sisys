@@ -105,9 +105,9 @@
 ### AC-4: 事件处理幂等性与重试机制（🔴 Must）
 
 > **AC-4 拆分说明：**
-> - **AC-4.1 幂等性检查**（🔴 Must）: `IdempotencyChecker` 基于 Redis `SET NX` 原子操作，TTL 7 天
+> - **AC-4 幂等性检查**（🔴 Must）: `IdempotencyChecker` 基于 Redis `SET NX` 原子操作，TTL 7 天
 >   - **⚠️ 关键约束**: 必须使用**原子方法** `try_acquire()`，禁止分离 `is_processed()` + `mark_processed()`（避免 Check-Then-Act 竞态条件）
-> - **AC-4.2 重试机制**（🔴 Must）: `RetryPolicy` 完整实现（指数退避 + jitter + 最大延迟上限）+ `DeadLetterQueue` 基础实现
+> - **AC-7 重试机制**（🔴 Must）: `RetryPolicy` 完整实现（指数退避 + jitter + 最大延迟上限）+ `DeadLetterQueue` 基础实现
 
 **Given** 双通道事件总线已实现
 **When** 实现事件处理幂等性保证与失败重试机制
@@ -1018,10 +1018,10 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 | AC-1 | Redis Pub/Sub 实时通知通道实现 | 🔴 Must | Task 0, Task 1 | SDD 规范定义 + RedisEventPublisher/Subscriber | `test_story_1.3.feature`, `test_redis_event_bus.py` |
 | AC-2 | RabbitMQ 可靠事件通道(async 路径) | 🔴 Must | Task 2 | AsyncRabbitMQPublisher/Consumer (async/await) | `test_rabbitmq_event_bus.py` |
 | AC-3 | 事务发件箱模式(OutboxEntity 为读写单位) | 🔴 Must | Task 3 | OutboxRepository(OutboxEntity) + AsyncOutboxPoller | `test_outbox_pattern.py` |
-| AC-4.1 | 事件处理幂等性检查 | 🔴 Must | Task 4 | IdempotencyChecker (Redis SET NX) | `test_idempotency_retry.py` |
-| AC-4.2 | 事件处理重试机制(指数退避完整) | 🔴 Must | Task 4 | RetryPolicy (指数退避+jitter) + DeadLetterQueue | `test_idempotency_retry.py` |
+| AC-4 | 事件处理幂等性检查 | 🔴 Must | Task 4 | IdempotencyChecker (Redis SET NX) | `test_idempotency_retry.py` |
 | AC-5 | 事件处理监控与可观测性 | 🔵 Could | Task 5.1, 5.2 | EventMetrics + Collector + Otel span 基础 | `test_event_monitoring.py` |
 | AC-6 | 架构约束验证测试就绪(含接口分离验证) | 🔴 Must | Task 6 | 事件总线依赖方向验证、领域层/基础设施层接口分离验证 | `test_event_bus_architecture.py` |
+| AC-7 | 事件处理重试机制(指数退避完整) | 🔴 Must | Task 4 | RetryPolicy (指数退避+jitter) + DeadLetterQueue | `test_idempotency_retry.py` |
 
 ---
 
@@ -1265,7 +1265,7 @@ AsyncOutboxPoller ← 异步协程轮询，调用内部方法 _get_unpublished_e
 **关联 AC:** AC-4
 
 > ⚠️ **本 Task 包含自己的 TDD 循环。**
-> **优先级说明:** AC-4.1 幂等性检查(🔴 Must) 必须完成，AC-4.2 重试机制(🔴 Must) 完整实现指数退避+jitter。
+> **优先级说明:** AC-4 幂等性检查(🔴 Must) 必须完成，AC-7 重试机制(🔴 Must) 完整实现指数退避+jitter。
 
 #### TDD 循环 A:IdempotencyChecker 幂等性检查 **🔴 Must**
 
@@ -1459,7 +1459,7 @@ AsyncOutboxPoller ← 异步协程轮询，调用内部方法 _get_unpublished_e
 **关键决议：**
 - 优先级分级：Must-Have(Task 0,1,2,3,6) + Should-Have(Task 4) + Could-Have(Task 5.1,5.2)
 - Task 5 拆分：5.1/5.2 保留 Story 1.3，5.3/5.4/5.5 移至后续故事
-- AC-4 拆分：AC-4.1 幂等性(Must) + AC-4.2 重试(Must)
+- AC-4 拆分：AC-4 幂等性(Must) + AC-7 重试(Must)
 - Task 6 两阶段验证：Phase 3 增量 + 最终全量
 
 ### 相关架构模式和约束 Architecture Patterns & Constraints

@@ -347,7 +347,7 @@ class DataSovereigntyService:
         Returns:
             True if layer is domestic.
         """
-        layer_upper = layer.upper()
+        layer_upper = layer.upper().replace("-", "_")
         domestic_indicators = ["CN_", "_CN", "CHINA", "DOMESTIC"]
         return any(indicator in layer_upper for indicator in domestic_indicators)
 
