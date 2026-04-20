@@ -22,7 +22,7 @@
 |------|---------|---------|
 | **会话命名空间隔离** | 任务在 Docker/gVisor 沙箱中隔离执行，防止资源冲突和环境污染 | 沙箱隔离 100%，无状态泄漏 |
 | **状态快照持久化** | 执行状态序列化至 Redis Hash，支持主从复制与故障转移 | 快照延迟 P95<50ms，恢复成功率 100% |
-| **执行事件发布** | 完成后发布 DocumentProcessed/ToolExecuted/AgentDecided 事件 | 事件发布成功率 ≥99% |
+| **执行事件发布** | 完成后发布 Executed 技术事件，下游监听器根据业务类型发布对应领域事件 | 事件发布成功率 ≥99% |
 | **execute 与 trigger/route 解耦** | execute 机制通过事件总线接收 Routed 事件，发布执行完成事件 | 六边形架构合规，无循环依赖 |
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 5: or.md 系统公理实现，Story 1.14c
@@ -47,7 +47,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] ExecuteService 事件监听器注册（`src/domain/services/execute_service.py`）
-- [ ] Docker/gVisor 沙箱隔离实现（`src/infrastructure/sandbox/sandbox_executor.py`）
+- [ ] DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
 - [ ] 会话命名空间管理（session_id → namespace 映射）
 - [ ] 资源限制配置（CPU/内存/超时）
 - [ ] 沙箱隔离 100%（无状态泄漏、资源隔离）
@@ -73,15 +73,18 @@
 
 **Given** 任务执行完成
 **When** ExecuteService 发布执行结果
-**Then** 发布领域事件（DocumentProcessed/ToolExecuted/AgentDecided）至事件总线
+**Then** 发布 Executed 技术事件至事件总线
+**And** 下游监听器根据业务类型发布对应领域事件（DocumentProcessed/ToolExecuted/AgentDecided）
 **And** 事件携带完整执行上下文（结果、成本、耗时）
 
 **验证标准/Validation Criteria:**
 - [ ] Executed 事件定义（`src/domain/events/execute_events.py`）
-- [ ] DocumentProcessed/ToolExecuted/AgentDecided 事件发布
+  - 字段: event_id, session_id, task_context, execution_result, cost_estimate, latency_ms, timestamp, business_event_type
+  - business_event_type 字段标识下游应发布的具体领域事件（DocumentProcessed/ToolExecuted/AgentDecided）
+- [ ] 下游监听器（`src/interfaces/event_listeners/execute_completed_listener.py`）根据 business_event_type 发布对应领域事件
 - [ ] 事件携带执行结果、成本审计、耗时信息
 - [ ] 事件发布成功率 ≥99%（RabbitMQ 持久化）
-- [ ] 事务发件箱模式（与业务操作同事务提交）
+- [ ] 事务发件箱模式（Executed 事件与业务操作同事务提交）
 
 ### AC-4: execute 与 trigger/route 解耦
 
@@ -124,10 +127,11 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] Executed 事件定义（`src/domain/events/execute_events.py`）
-  - 字段: event_id, session_id, task_context, execution_result, cost_estimate, latency_ms, timestamp
+- [ ] Executed 技术事件定义（`src/domain/events/execute_events.py`）
+  - 字段: event_id, session_id, task_context, execution_result, cost_estimate, latency_ms, timestamp, business_event_type
   - 事件类型自动设置: `event_type = "Executed"`
-  - 子事件: DocumentProcessed, ToolExecuted, AgentDecided
+  - business_event_type 标识下游应发布的领域事件类型（DocumentProcessed/ToolExecuted/AgentDecided）
+- [ ] 下游监听器接口 `execute_completed_listener.py`（根据 business_event_type 发布对应领域事件）
 - [ ] Routed 事件监听接口（接收来自 Story 1.14b 的 Routed 事件）
 
 #### 数据模型 (Data Models)
@@ -139,16 +143,22 @@
   - 继承系统公理二（外部化记忆）模式
 
 #### 沙箱执行 (Sandbox Execution)
-- [ ] SandboxExecutor 抽象（`src/infrastructure/sandbox/sandbox_executor.py`）
+- [ ] SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
   - 接口方法: `start_container()`, `execute_code()`, `stop_container()`
-  - 支持 Docker/gVisor 两种实现
+  - 定义在 interfaces 层（作为六边形架构的"端口"）
+- [ ] DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
+  - 实现 SandboxExecutor 端口接口
+  - Docker 沙箱隔离
 - [ ] SessionNamespaceManager 会话命名空间管理（`src/infrastructure/sandbox/session_namespace_manager.py`）
   - session_id → namespace 映射
   - 资源限制配置
 
 #### 状态快照存储 (Snapshot Storage)
-- [ ] SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
+- [ ] SnapshotRepository 仓储接口定义在 domain 层（`src/domain/repositories/snapshot_repository.py`）
+  - 接口方法: `save(snapshot)`, `load(session_id)`, `delete(session_id)`
+  - 遵循六边形架构：领域层定义接口，基础设施层实现
 - [ ] RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
+  - 实现 SnapshotRepository 接口
   - Redis Hash 存储
   - TTL 管理
   - 主从复制支持
@@ -164,7 +174,7 @@
   - 沙箱隔离 execute → route（单一沙箱执行）
   - 状态快照持久化
   - 状态恢复测试
-  - 执行事件发布（DocumentProcessed/ToolExecuted/AgentDecided）
+  - 执行事件发布（Executed 技术事件 → 下游监听器 → DocumentProcessed/ToolExecuted/AgentDecided）
   - execute 与 trigger/route 解耦
   - 沙箱启动延迟 P95<100ms
   - 状态快照延迟 P95<50ms
@@ -197,7 +207,7 @@
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | ExecuteService | 会话命名空间执行 | `test_execute_service.py` | Task 1 |
-| **TDD 单元测试** | SandboxExecutor | 沙箱隔离 | `test_sandbox_executor.py` | Task 1 |
+| **TDD 单元测试** | DockerSandboxAdapter | 沙箱隔离 | `test_docker_sandbox_adapter.py` | Task 1 |
 | **TDD 单元测试** | CheckpointSnapshot | 状态快照 | `test_checkpoint_snapshot.py` | Task 2 |
 | **TDD 单元测试** | RedisSnapshotStore | Redis 存储 | `test_redis_snapshot_store.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.14c.feature` | Task 0 |
@@ -212,7 +222,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 会话命名空间隔离 | Task 1 | Subtask 1.1-1.3（SandboxExecutor 红→绿→重构） | `test_sandbox_executor.py` |
+| AC-1 | 会话命名空间隔离 | Task 1 | Subtask 1.1-1.3（DockerSandboxAdapter 红→绿→重构） | `test_docker_sandbox_adapter.py` |
 | AC-1 | ExecuteService 事件监听 | Task 1 | Subtask 1.4-1.6（ExecuteService 红→绿→重构） | `test_execute_service.py` |
 | AC-2 | 状态快照持久化 | Task 2 | Subtask 2.1-2.3（CheckpointSnapshot 红→绿→重构） | `test_checkpoint_snapshot.py` |
 | AC-2 | Redis 存储实现 | Task 2 | Subtask 2.4-2.6（RedisSnapshotStore 红→绿→重构） | `test_redis_snapshot_store.py` |
@@ -232,11 +242,11 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [ ] Subtask 0.1: 定义 Executed 领域事件 Schema（`src/domain/events/execute_events.py`）
+- [ ] Subtask 0.1: 定义 Executed 技术事件 Schema（`src/domain/events/execute_events.py`）
 - [ ] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
 - [ ] Subtask 0.3: 定义 ExecuteService 服务接口（`src/domain/services/execute_service.py`）
-- [ ] Subtask 0.4: 定义 SandboxExecutor 抽象（`src/infrastructure/sandbox/sandbox_executor.py`）
-- [ ] Subtask 0.5: 定义 SessionNamespaceManager（`src/infrastructure/sandbox/session_namespace_manager.py`）
+- [ ] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
+- [ ] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
 - [ ] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
 - [ ] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
 - [ ] Subtask 0.8: 定义 ExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
@@ -259,12 +269,12 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/sandbox/test_sandbox_executor.py`（验证沙箱隔离） |
-| 🟢 绿 | 实现 `src/infrastructure/sandbox/sandbox_executor.py` - SandboxExecutor 抽象（Docker/gVisor） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
+| 🟢 绿 | 实现 `src/interfaces/sandbox/sandbox_port.py`（端口接口）和 `src/infrastructure/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 SandboxExecutor 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 SandboxExecutor（Docker 沙箱 + gVisor 支持）
+- [ ] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
+- [ ] Subtask 1.2: 🟢 绿 — 实现 SandboxExecutor 端口接口和 DockerSandboxAdapter
 - [ ] Subtask 1.3: 🔄 重构 — 优化沙箱资源限制
 
 #### TDD 循环 [B]：ExecuteService 事件监听
@@ -280,7 +290,7 @@
 - [ ] Subtask 1.6: 🔄 重构 — 优化事件处理逻辑
 
 **完成标准/Definition of Done:**
-- [ ] SandboxExecutor 实现完成（Docker/gVisor 沙箱隔离）
+- [ ] DockerSandboxAdapter 实现完成（沙箱隔离）
 - [ ] ExecuteService 实现完成
 - [ ] 沙箱隔离 100%（无状态泄漏）
 - [ ] TDD 循环全部通过
@@ -474,24 +484,27 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── events/
-│   │   │   └── execute_events.py      # Executed 事件（新实现）
+│   │   │   └── execute_events.py      # Executed 技术事件（新实现）
 │   │   ├── services/
 │   │   │   └── execute_service.py     # ExecuteService（核心逻辑）
 │   │   ├── entities/
 │   │   │   └── checkpoint_snapshot.py # CheckpointSnapshot（状态快照）
 │   │   └── repositories/
-│   │       └── snapshot_repository.py # SnapshotRepository 接口
+│   │       └── snapshot_repository.py # SnapshotRepository 接口（领域层定义）
 │   ├── infrastructure/
 │   │   ├── config/
 │   │   │   └── execute.py            # ExecuteConfig 配置（新实现）
 │   │   ├── sandbox/
-│   │   │   ├── sandbox_executor.py   # SandboxExecutor 抽象
+│   │   │   ├── docker_sandbox_adapter.py # DockerSandboxAdapter（实现）
 │   │   │   └── session_namespace_manager.py # 会话命名空间管理
 │   │   └── storage/
 │   │       └── redis_snapshot_store.py # RedisSnapshotStore
 │   └── interfaces/
+│       ├── sandbox/
+│       │   └── sandbox_port.py       # SandboxExecutor 端口接口（六边形架构）
 │       └── event_listeners/
-│           └── execute_listener.py     # 事件监听适配器（复用 Story 1.3）
+│           ├── execute_listener.py     # Routed 事件监听适配器（复用 Story 1.3）
+│           └── execute_completed_listener.py # Executed → 下游领域事件监听器
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
@@ -501,7 +514,7 @@ sisys/
 │   │   │       └── test_checkpoint_snapshot.py
 │   │   ├── infrastructure/
 │   │   │   ├── sandbox/
-│   │   │   │   └── test_sandbox_executor.py
+│   │   │   │   └── test_docker_sandbox_adapter.py
 │   │   │   └── storage/
 │   │   │       └── test_redis_snapshot_store.py
 │   │   ├── architecture/
@@ -529,12 +542,20 @@ sisys/
 4. **性能基准测试** — route 性能要求 P95<50ms，execute 沙箱启动 P95<100ms、快照 P95<50ms，需独立基准测试
 5. **语义路由与 UDMR 路由关系澄清** — 需明确 execute 与后续 Story 的关系
 
+**本故事修正/Story Corrections:**
+> 以下问题已在本次审查中修正：
+
+6. **Executed 事件与下游领域事件关系修正** — Executed 是技术事件，下游监听器根据 business_event_type 发布 DocumentProcessed/ToolExecuted/AgentDecided
+7. **SnapshotRepository 位置澄清** — 接口定义在 domain 层，实现在 infrastructure 层
+8. **SandboxExecutor 架构位置修正** — 端口接口在 interfaces 层，DockerSandboxAdapter 实现在 infrastructure 层
+
 **应用到本故事/Applied to This Story:**
 - [ ] ExecuteConfig 采用与 OtelConfig 相同的 `from_env()` 模式
 - [ ] ExecuteService 仅负责执行和快照，不处理 route 逻辑
 - [ ] Task 3 包含架构验证测试（六边形架构约束检测）
 - [ ] 性能基准测试验证沙箱启动 P95<100ms、快照 P95<50ms
-- [ ] 明确 Executed 事件与 DocumentProcessed/ToolExecuted/AgentDecided 的关系
+- [ ] Executed 技术事件通过下游监听器发布 DocumentProcessed/ToolExecuted/AgentDecided
+- [ ] SandboxExecutor 端口在 interfaces 层，实现在 infrastructure 层（DockerSandboxAdapter）
 
 ### Git Intelligence Summary
 
@@ -592,18 +613,20 @@ sisys/
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/1-14c-autonomous-invocation-execute.md`
-- `src/domain/events/execute_events.py` - Executed 事件（DocumentProcessed/ToolExecuted/AgentDecided）
+- `src/domain/events/execute_events.py` - Executed 技术事件（携带 business_event_type）
 - `src/domain/services/execute_service.py` - ExecuteService
 - `src/domain/entities/checkpoint_snapshot.py` - CheckpointSnapshot
-- `src/domain/repositories/snapshot_repository.py` - SnapshotRepository 接口
+- `src/domain/repositories/snapshot_repository.py` - SnapshotRepository 接口（领域层定义）
 - `src/infrastructure/config/execute.py` - ExecuteConfig
-- `src/infrastructure/sandbox/sandbox_executor.py` - SandboxExecutor（Docker/gVisor）
+- `src/interfaces/sandbox/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
+- `src/infrastructure/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
 - `src/infrastructure/sandbox/session_namespace_manager.py` - SessionNamespaceManager
-- `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore
+- `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
+- `src/interfaces/event_listeners/execute_completed_listener.py` - Executed → 下游领域事件监听器
 - `tests/unit/domain/services/test_execute_service.py` - ExecuteService 单元测试
 - `tests/unit/domain/entities/test_checkpoint_snapshot.py` - CheckpointSnapshot 单元测试
 - `tests/unit/domain/events/test_execute_events.py` - Executed 事件单元测试
-- `tests/unit/infrastructure/sandbox/test_sandbox_executor.py` - SandboxExecutor 单元测试
+- `tests/unit/infrastructure/sandbox/test_docker_sandbox_adapter.py` - DockerSandboxAdapter 单元测试
 - `tests/unit/infrastructure/storage/test_redis_snapshot_store.py` - RedisSnapshotStore 单元测试
 - `tests/unit/architecture/test_execute_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_execute_performance.py` - 性能基准测试
@@ -618,11 +641,13 @@ sisys/
 - `src/domain/entities/__init__.py` - 添加 CheckpointSnapshot 导出
 - `src/domain/repositories/__init__.py` - 添加 SnapshotRepository 导出
 - `src/infrastructure/config/__init__.py` - 添加 ExecuteConfig 导出
-- `src/infrastructure/sandbox/__init__.py` - 添加 SandboxExecutor, SessionNamespaceManager 导出
+- `src/infrastructure/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
 - `src/infrastructure/storage/__init__.py` - 添加 RedisSnapshotStore 导出
+- `src/interfaces/sandbox/__init__.py` - 添加 SandboxPort 导出
+- `src/interfaces/event_listeners/__init__.py` - 添加 execute_completed_listener 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/interfaces/event_listeners/execute_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
+- `src/interfaces/event_listeners/execute_listener.py` - Routed 事件监听适配器（复用 Story 1.3 模式）
 
 ---
 
@@ -702,6 +727,13 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 3 | 状态快照存储选型未明确 | P2 | 添加 ADR 状态快照存储选型决策，明确使用 Redis Hash | ✅ 已修复 |
 | 4 | 性能指标与其他 Story 不一致 | P2 | 统一性能指标：沙箱启动 P95<100ms，快照 P95<50ms | ✅ 已修复 |
 | 5 | Executed 事件与 DocumentProcessed/ToolExecuted/AgentDecided 关系模糊 | P2 | 明确 Executed 事件包含三个子事件类型，遵循 Story 1.2 领域事件定义 | ✅ 已修复 |
+| 6 | Executed 事件与下游领域事件关系不正确 | P1 | 修正为：Executed 是技术事件，下游监听器根据 business_event_type 发布 DocumentProcessed/ToolExecuted/AgentDecided | ✅ 已修复 |
+| 7 | SnapshotRepository 位置需澄清 | P1 | 明确接口定义在 domain 层，实现在 infrastructure 层 | ✅ 已修复 |
+| 8 | SandboxExecutor 架构位置不准确 | P2 | 修正为：端口接口在 interfaces 层，DockerSandboxAdapter 实现在 infrastructure 层 | ✅ 已修复 |
+| 9 | Task 0 Subtask 路径引用旧架构 | P2 | 修正 Task 0.1/0.4/0.5 路径与项目结构一致 | ✅ 已修复 |
+| 10 | AC-1 验证标准路径引用旧架构 | P2 | 修正 sandbox_executor.py → docker_sandbox_adapter.py | ✅ 已修复 |
+| 11 | 测试文件引用不一致 | P2 | 修正 test_sandbox_executor.py → test_docker_sandbox_adapter.py | ✅ 已修复 |
+| 12 | 业务价值表格与 AC-3 描述不一致 | P1 | 业务价值表格改为"Executed 技术事件，下游监听器根据业务类型发布对应领域事件" | ✅ 已修复 |
 
 ### 下一步 Next Steps
 
@@ -730,4 +762,4 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 **模板版本/Template Version:** 2.1.0
 **创建日期/Created:** 2026-04-20
 **最后更新/Last Updated:** 2026-04-20
-**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor Docker/gVisor 沙箱隔离; (2) ExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) Executed 事件发布; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；修复问题：execute 解耦关系澄清、沙箱/快照存储选型明确、性能指标统一、事件关系澄清
+**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor 端口接口（interfaces 层）+ DockerSandboxAdapter（infrastructure 层）; (2) ExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) Executed 技术事件（携带 business_event_type）触发下游领域事件; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；二轮审查修复：一致性修正（Task 0 Subtask 路径、AC-1 验证标准、测试文件引用）
