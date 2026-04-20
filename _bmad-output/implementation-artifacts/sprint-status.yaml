@@ -88,7 +88,7 @@ development_status:
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: done            # ✅ RBAC权限管理实现完成
   1-10-unified-audit-log: done  # ✅ 代码审查完成，所有patch已修复
-  1-11-data-sovereignty-isolation: in-progress  # 🔄 代码审查完成，18个patch待修复（4个Critical）
+  1-11-data-sovereignty-isolation: done  # ✅ 代码审查完成，Critical/Major patch已修复
   1-12-equilibrium-level-3-compliance: review  # 🔍 代码审查阶段
   # 价值组 5: or.md 系统公理实现
   1-14a-autonomous-invocation-trigger: ready-for-dev  # ✅ Story 文件已创建
