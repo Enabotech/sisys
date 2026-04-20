@@ -20,6 +20,7 @@ from src.infrastructure.security.data_sovereignty_service import DataSovereignty
 from src.infrastructure.security.models import (
     ApprovalStatus,
     CrossBorderApproval,
+    SensitiveDataType,
     WhitelistRule,
 )
 from src.infrastructure.security.pipl_compliance import PIPLComplianceService
@@ -59,27 +60,27 @@ def sensitive_data_detector():
 
 
 @pytest.fixture
-def sovereignty_service(mock_session):
-    """Create DataSovereigntyService with mock session."""
-    return DataSovereigntyService(session=mock_session)
+def sovereignty_service():
+    """Create DataSovereigntyService instance."""
+    return DataSovereigntyService()
 
 
 @pytest.fixture
-def whitelist_service(mock_session):
-    """Create WhitelistService with mock session."""
-    return WhitelistService(session=mock_session)
+def whitelist_service():
+    """Create WhitelistService instance."""
+    return WhitelistService()
 
 
 @pytest.fixture
-def approval_workflow(mock_session):
-    """Create ApprovalWorkflowService with mock session."""
-    return ApprovalWorkflowService(session=mock_session)
+def approval_workflow():
+    """Create ApprovalWorkflowService instance."""
+    return ApprovalWorkflowService()
 
 
 @pytest.fixture
-def pipl_service(mock_session):
-    """Create PIPLComplianceService with mock session."""
-    return PIPLComplianceService(session=mock_session)
+def pipl_service():
+    """Create PIPLComplianceService instance."""
+    return PIPLComplianceService()
 
 
 # ===================================================================
@@ -855,9 +856,9 @@ def given_processing_personal_info(context):
 @given("PIPL 配置要求同意")
 def given_pipl_requires_consent(context):
     """PIPL 配置要求同意"""
-    from src.infrastructure.config.sovereignty import PIPLConfig
+    from src.infrastructure.config.sovereignty import DataSovereigntyConfig
 
-    context["pipl_config"] = PIPLConfig(require_consent=True)
+    context["pipl_config"] = DataSovereigntyConfig()
     return context["pipl_config"]
 
 
@@ -1111,7 +1112,7 @@ def then_id_card_detected(context):
     """系统识别出身份证号"""
     result = context.get("detection_result")
     assert result is not None
-    assert result.get("sensitive_count", 0) > 0
+    assert result.is_sensitive is True
 
 
 @then("数据标记为 PII 类型（敏感类型）")
@@ -1119,7 +1120,15 @@ def then_marked_as_pii(context):
     """数据标记为 PII 类型"""
     result = context.get("detection_result")
     assert result is not None
-    assert any(t == SensitiveType.PII for t in result.get("types", []))
+    assert result.sensitive_type == SensitiveDataType.PII
+
+
+@then("数据标记为 PII 类型")
+def then_marked_as_pii_short(context):
+    """数据标记为 PII 类型"""
+    result = context.get("detection_result")
+    assert result is not None
+    assert result.sensitive_type == SensitiveDataType.PII
 
 
 @then("识别置信度 ≥ 95%")
@@ -1127,9 +1136,7 @@ def then_confidence_above_95(context):
     """识别置信度 ≥ 95%"""
     result = context.get("detection_result")
     if result:
-        for detection in result.get("detections", []):
-            if detection.get("type") == "id_card":
-                assert detection.get("confidence", 0) >= 0.95
+        assert result.confidence >= 0.95
 
 
 @then("系统识别出手机号（1开头11位）")
@@ -1137,6 +1144,7 @@ def then_phone_detected(context):
     """系统识别出手机号"""
     result = context.get("detection_result")
     assert result is not None
+    assert result.is_sensitive is True
 
 
 @then("系统识别出商业秘密关键词")
@@ -1144,6 +1152,7 @@ def then_trade_secret_detected(context):
     """系统识别出商业秘密关键词"""
     result = context.get("detection_result")
     assert result is not None
+    assert result.is_sensitive is True
 
 
 @then("数据标记为 TRADE_SECRET 类型")
@@ -1151,7 +1160,7 @@ def then_marked_as_trade_secret(context):
     """数据标记为 TRADE_SECRET 类型"""
     result = context.get("detection_result")
     assert result is not None
-    assert any(t == SensitiveType.TRADE_SECRET for t in result.get("types", []))
+    assert result.sensitive_type == SensitiveDataType.TRADE_SECRET
 
 
 @then("系统识别出银行账号")
@@ -1166,7 +1175,7 @@ def then_marked_as_financial(context):
     """数据标记为 FINANCIAL 类型"""
     result = context.get("detection_result")
     assert result is not None
-    assert any(t == SensitiveType.FINANCIAL for t in result.get("types", []))
+    assert result.sensitive_type == SensitiveDataType.FINANCIAL
 
 
 @then("系统识别出生物识别信息")
@@ -1174,6 +1183,7 @@ def then_biometric_detected(context):
     """系统识别出生物识别信息"""
     result = context.get("detection_result")
     assert result is not None
+    assert result.is_sensitive is True
 
 
 @then("数据标记为 BIOMETRIC 类型（PIPL 特殊保护）")
@@ -1181,7 +1191,7 @@ def then_marked_as_biometric(context):
     """数据标记为 BIOMETRIC 类型"""
     result = context.get("detection_result")
     assert result is not None
-    assert any(t == SensitiveType.BIOMETRIC for t in result.get("types", []))
+    assert result.sensitive_type == SensitiveDataType.BIOMETRIC
 
 
 @then("系统识别为对应自定义类型")
@@ -1293,8 +1303,10 @@ def then_alert_contains_details(context):
 def then_100_percent_domestic(context):
     """数据境内存储率 = 100%"""
     result = context.get("compliance_result")
-    if result:
-        assert result.get("domestic_rate") == 1.0 or result is True
+    if result and isinstance(result, dict):
+        assert result.get("domestic_rate") == 1.0
+    else:
+        assert result is True
 
 
 @then("白名单验证通过")

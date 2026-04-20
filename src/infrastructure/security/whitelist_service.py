@@ -215,18 +215,47 @@ class WhitelistService:
         """
         return self._validator
 
-    def add_rule(self, rule: WhitelistRule) -> WhitelistRule:
+    def add_rule(
+        self,
+        rule: WhitelistRule | None = None,
+        endpoint: str = "",
+        provider: str = "",
+        purpose: str = "",
+        risk_level: str = "medium",
+        status: str = "pending",
+    ) -> WhitelistRule:
         """Add a new whitelist rule.
+
+        Can be called with a WhitelistRule object or with individual parameters.
 
         Args:
             rule: Whitelist rule to add.
+            endpoint: External API endpoint URL pattern.
+            provider: Service provider name.
+            purpose: Purpose/description of the external call.
+            risk_level: Risk level (low, medium, high, critical).
+            status: Initial rule status.
 
         Returns:
             Added rule.
 
         Raises:
-            ValueError: If max rules limit reached.
+            ValueError: If max rules limit reached or no rule/parameters provided.
         """
+        if rule is None:
+            if not endpoint:
+                raise ValueError("Either rule or endpoint must be provided")
+            from uuid import uuid4
+
+            rule = WhitelistRule(
+                id=uuid4(),
+                endpoint=endpoint,
+                provider=provider,
+                purpose=purpose,
+                risk_level=risk_level,
+                status=WhitelistStatus(status),
+            )
+
         if len(self._rules) >= self._config.whitelist_max_rules:
             raise ValueError(f"Maximum whitelist rules limit ({self._config.whitelist_max_rules}) reached")
 
@@ -300,3 +329,67 @@ class WhitelistService:
             is_allowed=False,
             reason="Endpoint not in whitelist",
         )
+
+    def validate_call(self, endpoint: str) -> bool:
+        """Validate an endpoint call (returns bool for convenience).
+
+        Args:
+            endpoint: Endpoint URL to validate.
+
+        Returns:
+            True if call is allowed, False otherwise.
+        """
+        result = self.validate_endpoint(endpoint)
+        return result.is_allowed
+
+    def get_coverage_report(self) -> dict:
+        """Get whitelist coverage statistics report.
+
+        Returns:
+            Dict with coverage statistics.
+        """
+        all_rules = list(self._rules.values())
+        active_rules = [r for r in all_rules if r.status == WhitelistStatus.ACTIVE]
+
+        return {
+            "total_rules": len(all_rules),
+            "active_rules": len(active_rules),
+            "pending_rules": len([r for r in all_rules if r.status == WhitelistStatus.PENDING]),
+            "expired_rules": len([r for r in all_rules if r.status == WhitelistStatus.EXPIRED]),
+            "revoked_rules": len([r for r in all_rules if r.status == WhitelistStatus.REVOKED]),
+            "coverage_percentage": len(active_rules) / len(all_rules) if all_rules else 1.0,
+        }
+
+    def add_rule_by_params(
+        self,
+        endpoint: str,
+        provider: str,
+        purpose: str,
+        risk_level: str = "medium",
+        status: str = "pending",
+    ) -> WhitelistRule:
+        """Add a new whitelist rule by parameters.
+
+        Convenience method to create and add a rule in one call.
+
+        Args:
+            endpoint: External API endpoint URL pattern.
+            provider: Service provider name.
+            purpose: Purpose/description of the external call.
+            risk_level: Risk level (low, medium, high, critical).
+            status: Initial rule status.
+
+        Returns:
+            Created WhitelistRule.
+        """
+        from uuid import uuid4
+
+        rule = WhitelistRule(
+            id=uuid4(),
+            endpoint=endpoint,
+            provider=provider,
+            purpose=purpose,
+            risk_level=risk_level,
+            status=WhitelistStatus(status),
+        )
+        return self.add_rule(rule)

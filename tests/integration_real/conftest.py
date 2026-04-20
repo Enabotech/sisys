@@ -7,13 +7,18 @@ Use this conftest for end-to-end tests with actual deployments.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 import pytest
 import redis.asyncio as redis
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 # ===================================================================
 # Redis Fixtures (Real Instance)

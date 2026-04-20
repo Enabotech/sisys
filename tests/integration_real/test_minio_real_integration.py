@@ -14,12 +14,17 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 pytestmark = pytest.mark.asyncio
 
