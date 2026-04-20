@@ -20,7 +20,7 @@ commonAnnotations:
 # Image Updater 会自动更新这个值
 images:
   - name: harbor.sisys.local/sisys/app
-    newTag: dev-main-v0.0.3-458c871
+    newTag: dev-main-v0.0.0-0000000
 
 # 名称前缀
 namePrefix: dev-
