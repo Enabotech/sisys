@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 import redis.asyncio as redis
 
@@ -20,13 +22,17 @@ pytestmark = pytest.mark.asyncio
 
 
 # ===================================================================
-# Function-scoped Redis client
+# Function-scoped Redis client with unique test isolation
 # ===================================================================
 
 
 @pytest.fixture
 async def real_redis_client():
-    """Provide a real Redis client (function-scoped to avoid event loop issues)."""
+    """Provide a real Redis client (function-scoped to avoid event loop issues).
+
+    Uses a unique test isolation prefix to prevent interference between
+    parallel pytest-xdist workers sharing the same Redis DB.
+    """
     import os
 
     client = redis.Redis(
@@ -41,10 +47,20 @@ async def real_redis_client():
     except Exception as e:
         pytest.skip(f"Redis not available: {e}")
 
-    yield client
+    # Generate unique prefix for this test to ensure isolation
+    unique_prefix = f"test-{uuid.uuid4().hex[:8]}"
+
+    yield client, unique_prefix
 
     try:
-        await client.flushdb()
+        # Clean up only this test's keys using the unique prefix
+        cursor = 0
+        while True:
+            cursor, keys = await client.scan(cursor=cursor, match=f"{unique_prefix}:*", count=100)
+            if keys:
+                await client.delete(*keys)
+            if cursor == 0:
+                break
     except Exception:
         pass
     await client.aclose()
@@ -60,11 +76,10 @@ class TestSessionStorageReal:
 
     async def test_full_session_lifecycle(self, real_redis_client):
         """测试完整会话生命周期：保存→加载→验证→删除。"""
-        client = real_redis_client
-        from src.infrastructure.storage.redis.key_builder import build_key
+        client, uid = real_redis_client
 
-        # Save directly using Redis client
-        key = build_key("session", "sess-real-1")
+        # Save directly using Redis client — use unique prefix to isolate parallel tests
+        key = f"{uid}:session:sess-real-1"
         state_data = {"counter": 42, "items": ["a", "b"], "nested": {"key": "value"}}
 
         # HSET
@@ -90,12 +105,10 @@ class TestSessionStorageReal:
 
     async def test_session_ttl_expiration(self, real_redis_client):
         """测试会话 TTL 设置生效。"""
-        client = real_redis_client
+        client, uid = real_redis_client
         import json
 
-        from src.infrastructure.storage.redis.key_builder import build_key
-
-        key = build_key("session", "sess-ttl-test")
+        key = f"{uid}:session:sess-ttl-test"
         await client.hset(
             key, "data", json.dumps({"session_id": "sess-ttl-test", "agent_id": "agent-1", "state": {"data": "test"}})
         )
@@ -112,13 +125,11 @@ class TestSemanticCacheReal:
 
     async def test_cache_operations(self, real_redis_client):
         """测试语义缓存基本操作。"""
-        client = real_redis_client
+        client, uid = real_redis_client
         import json
 
-        from src.infrastructure.storage.redis.key_builder import build_key
-
         vec = [0.1, 0.2, 0.3]
-        cache_key = build_key("cache", "semantic", str(vec))
+        cache_key = f"{uid}:cache:semantic:{vec}"
         data = {"answer": "cached_result"}
 
         # SET
@@ -139,14 +150,11 @@ class TestPublicBlackboardReal:
 
     async def test_blackboard_operations(self, real_redis_client):
         """测试公共黑板基本操作。"""
-        client = real_redis_client
-        from src.infrastructure.storage.redis.key_builder import build_key
-
-        conv_id = "conv-test-blackboard"
-        key = build_key("blackboard", conv_id)
-
-        # ZADD entries
+        client, uid = real_redis_client
         import time
+
+        conv_id = f"{uid}:conv-test-blackboard"
+        key = f"{uid}:blackboard:{conv_id}"
 
         now = time.time()
         await client.zadd(key, {f"agent-a:msg1:{now}": now})
@@ -167,13 +175,11 @@ class TestCombinedFlowReal:
 
     async def test_full_workflow(self, real_redis_client):
         """测试完整工作流程。"""
-        client = real_redis_client
+        client, uid = real_redis_client
         import json
 
-        from src.infrastructure.storage.redis.key_builder import build_key
-
-        # 1. Session storage
-        sess_key = build_key("session", "sess-workflow")
+        # 1. Session storage — use unique prefix
+        sess_key = f"{uid}:session:sess-workflow"
         await client.hset(
             sess_key,
             "data",
@@ -181,22 +187,26 @@ class TestCombinedFlowReal:
         )
 
         # 2. Semantic cache
-        cache_key = build_key("cache", "semantic", "query-1")
+        cache_key = f"{uid}:cache:semantic:query-1"
         await client.set(cache_key, json.dumps({"result": "cached_analysis"}), ex=3600)
 
         # 3. Blackboard
-        bb_key = build_key("blackboard", "conv-workflow")
+        bb_key = f"{uid}:blackboard:conv-workflow"
         await client.zadd(bb_key, {"analyst:status_update:1234567890": 1234567890})
 
-        # Verify all data
+        # Verify all data exists and was stored correctly
         sess_data = await client.hget(sess_key, "data")
-        assert sess_data is not None
+        assert sess_data is not None, f"Session data not found at key {sess_key}"
+        sess_loaded = json.loads(sess_data)
+        assert sess_loaded["session_id"] == "sess-workflow"
 
         cache_data = await client.get(cache_key)
-        assert cache_data is not None
+        assert cache_data is not None, f"Cache data not found at key {cache_key}"
+        assert json.loads(cache_data)["result"] == "cached_analysis"
 
         bb_entries = await client.zrange(bb_key, 0, -1)
-        assert len(bb_entries) > 0
+        assert len(bb_entries) > 0, f"Blackboard entries not found at key {bb_key}"
+        assert "analyst:status_update:1234567890" in bb_entries
 
     async def test_graceful_degradation(self):
         """测试连接失败时的优雅降级。"""
@@ -236,29 +246,29 @@ class TestRedisCleanupReal:
 
     async def test_cleanup_namespace(self, real_redis_client):
         """测试按命名空间清理。"""
-        client = real_redis_client
+        client, uid = real_redis_client
 
-        # Create test keys
-        test_keys = [f"sisys:session:cleanup-{i}" for i in range(5)]
+        # Create test keys with unique prefix — no collision with parallel tests
+        test_keys = [f"{uid}:session:cleanup-{i}" for i in range(5)]
         for key in test_keys:
             await client.set(key, "test_value")
 
-        # Verify keys exist
+        # Verify keys exist immediately after creation
         for key in test_keys:
-            assert await client.exists(key) == 1
+            assert await client.exists(key) == 1, f"Key {key} was not created"
 
-        # Delete using SCAN pattern
+        # Delete using SCAN pattern scoped to this test's prefix
         deleted = 0
         cursor = 0
         while True:
-            cursor, keys = await client.scan(cursor, match="sisys:session:cleanup-*", count=100)
+            cursor, keys = await client.scan(cursor, match=f"{uid}:session:cleanup-*", count=100)
             if keys:
                 await client.delete(*keys)
                 deleted += len(keys)
             if cursor == 0:
                 break
 
-        # Verify all deleted
-        assert deleted >= 5
+        # Verify all created keys were deleted
+        assert deleted == 5, f"Expected 5 keys deleted, got {deleted}"
         for key in test_keys:
-            assert await client.exists(key) == 0
+            assert await client.exists(key) == 0, f"Key {key} was not deleted"
