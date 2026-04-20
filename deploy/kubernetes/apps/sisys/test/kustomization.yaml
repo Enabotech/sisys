@@ -12,10 +12,6 @@ resources:
 # 命名空间
 namespace: sisys-test
 
-# 通用标签
-commonLabels:
-  environment: test
-
 # 通用注解
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0"
@@ -62,13 +58,14 @@ patches:
         path: /spec/template/spec/containers/0/resources/limits/memory
         value: "512Mi"
 
-# HPA 补丁 (测试环境最小副本数 2)
-patchesStrategicMerge:
-  - |-
-    apiVersion: autoscaling/v2
-    kind: HorizontalPodAutoscaler
-    metadata:
+  # HPA 补丁 (测试环境最小副本数 2)
+  - target:
+      kind: HorizontalPodAutoscaler
       name: sisys-app
-    spec:
-      minReplicas: 2
-      maxReplicas: 3
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3

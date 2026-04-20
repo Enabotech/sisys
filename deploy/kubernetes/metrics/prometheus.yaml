@@ -163,25 +163,21 @@ data:
         metrics_path: /metrics
 
       # -------------------------------------------------------------------------
-      # sisys-agent Pods (关键！HPA 依赖的外部指标来源)
+      # sisys-app Pods (HPA 外部指标来源)
       # -------------------------------------------------------------------------
       # 要求：
-      #   - sisys-agent 启动时暴露 metrics port (默认 9091)
-      #   - Pod 添加标签: app: sisys-agent
-      #   - ServiceMonitor 或本配置二选一
+      #   - sisys-app 暴露 metrics port (8080)
+      #   - Pod 标签: app.kubernetes.io/name=sisys-app
       # -------------------------------------------------------------------------
-      - job_name: 'sisys-agent'
-        # K8s 服务发现 - 自动发现同 namespace 下的 pods
+      - job_name: 'sisys-app-pods'
+        # K8s 服务发现 - 自动发现所有 namespace 的 pods
         kubernetes_sd_configs:
           - role: pod
-            namespaces:
-              names:
-                - sisys
-        # 过滤条件：只抓取带有 app=sisys-agent 标签的 pods
+        # 过滤条件：只抓取带有 app.kubernetes.io/name=sisys-app 标签的 pods
         relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
             action: keep
-            regex: sisys-agent
+            regex: sisys-app
           # 将 pod IP:metrics_port 转换为目标地址
           - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_container_port_number]
             action: replace

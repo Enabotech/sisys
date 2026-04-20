@@ -12,10 +12,6 @@ resources:
 # 命名空间
 namespace: sisys-prod
 
-# 通用标签
-commonLabels:
-  environment: prod
-
 # 通用注解
 commonAnnotations:
   argocd.argoproj.io/sync-wave: "0"
@@ -36,7 +32,7 @@ configMapGenerator:
       - APP_ENV=production
       - LOG_LEVEL=warn
       - ENABLE_PROFILING=false
-      - ENABLE_METRICS=true
+      - METRICS_ENABLED=true
 
 # Deployment 补丁
 patches:
@@ -71,12 +67,14 @@ patches:
           value: "false"
 
 # HPA 补丁 (生产环境最小副本数 3)
-patchesStrategicMerge:
-  - |-
-    apiVersion: autoscaling/v2
-    kind: HorizontalPodAutoscaler
-    metadata:
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
       name: sisys-app
-    spec:
-      minReplicas: 3
-      maxReplicas: 10
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
