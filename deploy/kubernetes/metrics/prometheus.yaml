@@ -271,8 +271,12 @@ spec:
 
       containers:
         - name: prometheus
-          image: prom/prometheus:v2.47.0
+          image: harbor.sisys.local/sisys/tools/prometheus/prometheus:v2.47.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           args:
             - '--config.file=/etc/prometheus/prometheus.yml'
             - '--storage.tsdb.path=/prometheus'

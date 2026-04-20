@@ -37,13 +37,12 @@
 
 **覆盖 FR:**
 - FR-SC-02: 统一审计日志（Story 1.10）
-- FR-SC-03: WORM 存储（Story 1.10，与 Story 1.7 协作）
+- FR-SC-03: WORM 存储（Story 1.10 写入审计日志至 Story 1.7 的 `audit-archives` WORM bucket）
 - FR-SC-04: 审计日志多维检索（**基础实现**：PostgreSQL 索引 + API；**完整实现**：Epic 8 Story 8.1）
 
 **覆盖 NFR:**
-- NFR-COMP-01: 等保 2.0 三级（通过公安部指定测评机构测评）
-- NFR-COMP-02: 审计日志保留（PostgreSQL 审计表 MVP，7 年 WORM 存储 V2）
-- NFR-COMP-05: 审计日志完整性（100% 完整，日志审计工具验证通过）
+- NFR-COMP-02: 审计日志保留（Story 1.10 写入 PostgreSQL MVP，V2 归档至 Story 1.7 MinIO WORM）✓
+- NFR-COMP-05: 审计日志完整性（100% 完整，日志审计工具验证通过）✓
 
 ### 依赖关系 Dependencies
 
@@ -761,8 +760,8 @@ sisys/
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 4: 安全与合规基础 |
 | **优先级** | P0 |
-| **覆盖 FR** | FR-SC-02（统一审计日志）、FR-SC-03（WORM 存储）、FR-SC-04（多维检索基础实现，完整实现见 Epic 8 Story 8.1） |
-| **覆盖 NFR** | NFR-COMP-01（等保 2.0 三级）、NFR-COMP-02（审计日志保留）、NFR-COMP-05（审计日志完整性） |
+| **覆盖 FR** | FR-SC-02（统一审计日志）、FR-SC-03（WORM 存储，Story 1.10 写入 Story 1.7 WORM bucket）、FR-SC-04（多维检索基础实现，完整实现见 Epic 8 Story 8.1） |
+| **覆盖 NFR** | NFR-COMP-02（审计日志保留）、NFR-COMP-05（审计日志完整性） |
 | **层类型** | 安全层（覆盖率≥85%） |
 
 ### 完成总结 Completion Summary
