@@ -1,7 +1,8 @@
-# 多用户并发测试工程系统实施方案
+# SISYS 测试工程框架方案
 
-**文档版本**: v1.0.0
+**文档版本**: v2.0.0
 **创建日期**: 2026-04-20
+**更新日期**: 2026-04-21
 **状态**: 已批准实施
 **负责人**: Agimtech
 
@@ -27,15 +28,37 @@ tests/
 
 **CI 测试执行流程** (`.gitea/workflows/ci.yaml` lines 240-289):
 1. 启动 `deploy/app/docker-compose.yml` 服务，等待 `healthy`
-2. 覆盖环境变量：`REDIS_HOST=host.docker.internal` 等
+2. 设置 `SISYS_TEST_ENV=ci` 环境变量（让 `environments.py` 自动检测）
 3. 运行：`pytest tests/integration tests/integration_real tests/acceptance`
+
+**注意**：不要使用 `export REDIS_HOST=host.docker.internal` 覆盖已有环境变量。这样会与 `.env` 读取冲突。应设置 `SISYS_TEST_ENV=ci` 让自动检测逻辑生效。
 
 **连接配置**:
 - 本地开发：从 `.env` 读取 `localhost:6379/5432/6333...`
 - CI 环境：覆盖为 `host.docker.internal:6380/5432/6333...`
 - K8s 环境：通过 ArgoCD Service DNS 访问
 
-### 1.2 问题背景
+### 1.2 测试目录概览
+
+| 目录 | 文件数 | 测试类型 | 特性 |
+|------|--------|---------|------|
+| `tests/acceptance/` | 12 | BDD 验收测试 | 真实服务 + Gherkin |
+| `tests/integration/` | 15 | 集成测试 | fakeredis mock |
+| `tests/integration_real/` | 6 | 真实服务集成测试 | 真实存储服务 |
+| `tests/unit/` | 70 | 单元测试 | mock + 快速执行 |
+
+### 1.3 服务依赖分析
+
+| 服务 | acceptance | integration | integration_real | unit | 优先级 |
+|------|------------|-------------|------------------|------|--------|
+| Redis | 89 | 84 | 43 | 58 | 🔴 高 |
+| Neo4j | 61 | 13 | 20 | 58 | 🔴 高 |
+| RabbitMQ | 41 | 4 | - | 1 | 🟡 中 |
+| MinIO | 40 | - | 29 | 61 | 🟡 中 |
+| PostgreSQL | 25 | 58 | 13 | 16 | 🔴 高 |
+| Qdrant | 25 | 16 | 23 | 19 | 🟡 中 |
+
+### 1.4 问题背景
 
 在 gitea-runner CI 环境和本地开发环境同时运行时，发现以下测试失败：
 
@@ -45,7 +68,7 @@ tests/
 | `test_ac2_rabbitmq_documentprocessed` | 本地 | Consumer did not receive event (0 received) |
 | `test_dense_search_with_filter` | 本地 | Collection `sisys_documents_finance` doesn't exist |
 
-### 1.3 核心问题分类
+### 1.5 核心问题分类
 
 | 问题编号 | 分类 | 问题描述 | 严重度 |
 |---------|------|---------|--------|
@@ -56,7 +79,7 @@ tests/
 | P5 | 架构设计 | 多环境 docker-compose 端口不一致 | 🟡 中等 |
 | P6 | 测试工程 | 测试使用 `scope=module` 事件循环导致状态污染 | 🟡 中等 |
 
-### 1.4 根因分析结论
+### 1.6 根因分析结论
 
 > **这是测试实现问题，而非多用户并发架构缺陷。**
 
@@ -801,6 +824,7 @@ class TenantContext:
 
     async def cleanup(self) -> None:
         """清理租户所有资源."""
+        errors: list[Exception] = []
         for cleanup_fn in self._cleanup_tasks:
             try:
                 if asyncio.iscoroutinefunction(cleanup_fn):
@@ -808,18 +832,47 @@ class TenantContext:
                 else:
                     cleanup_fn()
             except Exception as e:
-                print(f"Cleanup error: {e}")
+                errors.append(e)
 
         self._resources.clear()
         self._cleanup_tasks.clear()
 
+        if errors:
+            # 至少记录所有错误，最后一个作为主异常抛出
+            raise RuntimeError(
+                f"Cleanup failed with {len(errors)} error(s): {[str(e) for e in errors]}"
+            ) from errors[0]
+
 
 # 全局租户上下文存储
-_tenant_contexts: dict[str, TenantContext] = {}
+# key 类型为 int：asyncio.current_task().ident 返回 int
+# 使用 | None 处理边界情况（task 无 ident 时）
+_tenant_contexts: dict[int | None, TenantContext] = {}
+
+
+def _get_task_id() -> int:
+    """获取当前 asyncio task 的唯一标识符.
+
+    处理边界情况：task.ident 可能为 None（如 event loop 未启动）。
+    此时使用 object id 作为 fallback。
+    """
+    task = asyncio.current_task()
+    task_id = task.ident if task else None
+    if task_id is None:
+        # Fallback: 使用 task 对象 id（进程内唯一）
+        return id(task)  # type: ignore[return-value]
+    return task_id
 
 
 def generate_test_tenant() -> TestTenant:
-    """生成测试租户."""
+    """生成测试租户.
+
+    使用 8 字符 hex UUID，提供约 4.3 billion (16^8) 个可能性。
+    并行度限制：
+    - 100 并行：碰撞概率 ~0.001%
+    - 1000 并行：碰撞概率 ~0.12%
+    - 建议并行度 ≤4，碰撞概率可忽略
+    """
     tenant_id = uuid.uuid4().hex[:8]
     return TestTenant(
         id=tenant_id,
@@ -829,17 +882,15 @@ def generate_test_tenant() -> TestTenant:
 
 def get_current_tenant() -> TestTenant | None:
     """获取当前租户 (如果存在)."""
-    import threading
-    thread_id = threading.current_thread().ident
-    context = _tenant_contexts.get(thread_id)
+    task_id = _get_task_id()
+    context = _tenant_contexts.get(task_id)
     return context.tenant if context else None
 
 
 def get_current_context() -> TenantContext | None:
     """获取当前上下文 (如果存在)."""
-    import threading
-    thread_id = threading.current_thread().ident
-    return _tenant_contexts.get(thread_id)
+    task_id = _get_task_id()
+    return _tenant_contexts.get(task_id)
 
 
 @asynccontextmanager
@@ -848,23 +899,21 @@ async def tenant_context(
     env_config: TestEnvConfig | None = None,
 ):
     """创建租户上下文字典管理器."""
-    import threading
-
     if tenant is None:
         tenant = generate_test_tenant()
     if env_config is None:
         env_config = get_test_env()
 
     context = TenantContext(tenant=tenant, config=env_config)
-    thread_id = threading.current_thread().ident
-    _tenant_contexts[thread_id] = context
+    task_id = _get_task_id()
+    _tenant_contexts[task_id] = context
 
     try:
         yield context
     finally:
         await context.cleanup()
-        if thread_id in _tenant_contexts:
-            del _tenant_contexts[thread_id]
+        if task_id in _tenant_contexts:
+            del _tenant_contexts[task_id]
 
 
 # Pytest 集成
@@ -884,15 +933,14 @@ async def isolated_tenant_context(test_tenant: TestTenant) -> TenantContext:
     env_config = get_test_env()
     context = TenantContext(tenant=test_tenant, config=env_config)
 
-    import threading
-    thread_id = threading.current_thread().ident
-    _tenant_contexts[thread_id] = context
+    task_id = _get_task_id()
+    _tenant_contexts[task_id] = context
 
     yield context
 
     await context.cleanup()
-    if thread_id in _tenant_contexts:
-        del _tenant_contexts[thread_id]
+    if task_id in _tenant_contexts:
+        del _tenant_contexts[task_id]
 
 
 # Mock 适配器 - 用于替换真实服务为测试租户隔离版本
@@ -1097,15 +1145,7 @@ async def _cleanup_tenant_resources(
 # ===================================================================
 
 
-@pytest.fixture(scope="function")
-def event_loop():
-    """Function 级事件循环.
-
-    替代 module 级事件循环，确保测试隔离。
-    """
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# 注意：pytest-asyncio 使用 auto mode，不要手动创建 event_loop fixture
 
 
 # ===================================================================
@@ -1132,33 +1172,393 @@ def reset_test_environment():
 
 ---
 
-## 四、实施路线图
+## 四、详细实施计划 (Checklist)
 
-### 4.1 实施阶段
+---
+
+### Phase 1: 紧急修复 (P1, P2, P6) — 预计 1-2 天
+
+#### P1: 修复 `async_consume()` 永久阻塞
+
+- [ ] **1.1** 在 `test_story_1_3_steps.py` 中创建 `temporary_consumer` 异步上下文管理器
+  - 使用 `asyncio.create_task()` 后台运行 consumer，不阻塞
+  - 包含 setup/cleanup 顺序正确
+  - 参考实现：文档 3.1.1 节
+
+- [ ] **1.2** 重构 `verify_rabbitmq_consumer_receives` step 函数
+  - 将 `event_loop.run_until_complete()` 调用改为使用 async context manager
+  - 验证 consumer 能正确接收事件
+
+- [ ] **1.3** 验证修复：本地运行 `test_ac2_rabbitmq_documentprocessed`
+  ```bash
+  poetry run pytest tests/acceptance/test_story_1_3_steps.py::test_ac2_rabbitmq_documentprocessed -v
+  ```
+
+- [ ] **1.4** 验证修复：CI 环境运行相同测试
+  ```bash
+  git push && 观察 CI logs
+  ```
+
+#### P2: 修复 `collection_has_different_domains` 缺少 create_collection
+
+- [ ] **2.1** 在 `test_story_1_6_steps.py` 的 `collection_has_different_domains` 中添加 collection 创建
+  - 调用 `collection_manager.create_collection()` 先于 `upsert_points()`
+  - 处理 collection 已存在的异常（ignore if exists）
+
+- [ ] **2.2** 验证修复：本地运行 `test_dense_search_with_filter`
+  ```bash
+  poetry run pytest tests/acceptance/test_story_1_6_steps.py::test_dense_search_with_filter -v
+  ```
+
+#### P6: 修复 event_loop scope 问题
+
+- [ ] **3.1** 检查 `tests/acceptance/` 下所有 fixtures 的 scope
+  - 确认 `rabbitmq_publisher`, `rabbitmq_consumer` 等为 `scope=function`（非 module/session）
+
+- [ ] **3.2** ⚠️ **不要创建 `event_loop` fixture** — `pyproject.toml` 已配置 `asyncio_mode = "auto"`，pytest-asyncio 会自动管理 event loop
+  - 如需 function scope event loop，设置 `pytest.ini_options.asyncio_mode = "auto"` 即可
+  - 手动创建 `event_loop` fixture 会与 pytest-asyncio 冲突
+
+- [ ] **3.3** 验证：无状态污染，运行多次同一测试
+  ```bash
+  poetry run pytest tests/acceptance/test_story_1_3_steps.py -v --count 3
+  ```
+
+---
+
+### Phase 2: 环境标准化 (P3, P5) — 预计 2-3 天
+
+#### P3: 实现 `tests/environments.py`
+
+- [ ] **4.1** 创建 `tests/environments.py` 文件
+  - 实现 `TestEnvironment` 枚举（LOCAL / CI / K8S / AUTO）
+  - 实现 `_is_running_in_k8s()` 检测函数
+  - 实现 `_is_running_in_container()` 检测函数
+  - 实现 `resolve_env()` 主函数
+
+- [ ] **4.2** 实现 `TestEnvConfig` 数据类
+  - 包含所有服务 host/port 配置
+  - 包含 `k8s_namespace` 字段
+  - 实现 `get_k8s_service_dns()` 方法
+
+- [ ] **4.3** 实现自动环境检测逻辑（优先级从高到低）
+  1. 环境变量 `SISYS_TEST_ENV` 显式指定（最高优先级）
+  2. K8s Service Account token 检测
+  3. CI 环境变量 (`CI=true` 或 `GITEA_RUNNER=true`)
+  4. 容器内运行检测 (`/.dockerenv` 或 cgroup)
+  5. 默认本地开发环境 LOCAL
+
+- [ ] **4.4** 创建全局单例 `get_test_env()` 和 `reset_test_env()`
+
+- [ ] **4.5** 更新 `tests/integration_real/conftest.py` 使用 `environments.py`
+  ```python
+  from tests.environments import get_test_env
+  config = get_test_env()
+  ```
+
+#### P5: 创建 `deploy/app/docker-compose.test.yml`
+
+- [ ] **5.1** 创建测试专用 docker-compose 文件
+  - 复制 `docker-compose.yml` 作为基础
+  - 修改端口为测试专用端口（6380/5433/6334...）
+  - 添加 `TEST_` 前缀的环境变量
+
+- [ ] **5.2** 更新 CI workflow (`.gitea/workflows/ci.yaml`)
+  - ⚠️ **不要使用 `export HOST=host.docker.internal`** 覆盖已有环境变量
+  - 正确做法：设置 `SISYS_TEST_ENV=ci`，让 `environments.py` 自动检测
+  - 移除 `docker-compose.yml` 改用 `docker-compose.test.yml`，或传递 `TEST_*` 端口变量
+
+- [ ] **5.3** 验证：本地启动测试环境
+  ```bash
+  docker compose -f deploy/app/docker-compose.test.yml up -d
+  docker compose -f deploy/app/docker-compose.test.yml ps
+  ```
+
+- [ ] **5.4** 验证：测试连接到测试环境
+  ```bash
+  export SISYS_TEST_ENV=local
+  poetry run pytest tests/integration_real/ -v
+  ```
+
+---
+
+### Phase 3: 测试隔离 (P4) — 预计 3-4 天
+
+#### P4: 实现 `tests/isolation.py`
+
+- [ ] **6.1** 创建 `tests/isolation.py` 文件
+  - 实现 `TestTenant` 数据类（id, prefix）
+  - 实现 `TenantContext` 上下文管理器
+
+- [ ] **6.2** 实现资源隔离方法
+  - `rabbitmq_queue_prefix`
+  - `qdrant_collection(base_name)`
+  - `redis_key_prefix()`
+  - `postgres_schema()`
+
+- [ ] **6.3** 实现 `tenant_context` 异步上下文管理器
+  - ⚠️ **必须使用 `asyncio.current_task().ident`** 作为 context key
+  - ❌ 不要使用 `threading.current_thread().ident`（异步环境中无效）
+
+- [ ] **6.4** 创建 pytest fixtures
+  - `test_tenant` fixture
+  - `isolated_tenant_context` fixture
+
+- [ ] **6.5** 创建 `TenantAwareMock` 类
+  - 自动为资源添加租户前缀
+
+#### P4: 实现 `tests/fixtures.py`
+
+- [ ] **7.1** 创建 `tests/fixtures.py` 文件
+  - 实现 `test_env_config` (session scope)
+  - 实现 `fresh_test_env_config` (function scope)
+
+- [ ] **7.2** 实现租户清理 fixtures
+  - `isolated_tenant` (function scope)
+  - `tenant_context` (async context manager)
+
+- [ ] **7.3** 实现资源清理函数 `_cleanup_tenant_resources()`
+  - 清理 RabbitMQ 队列
+  - 清理 Qdrant collections
+  - 清理 Redis keys
+  - 清理 PostgreSQL schema
+
+- [ ] **7.4** 添加 `autouse=True` 的 `reset_test_environment` fixture
+
+- [ ] **7.5** 更新 `tests/acceptance/test_story_1_3_steps.py` 使用租户隔离
+  - 为队列名添加租户前缀
+  - 为 Redis keys 添加租户前缀
+
+- [ ] **7.6** 更新 `tests/acceptance/test_story_1_6_steps.py` 使用租户隔离
+  - 为 collection 名称添加租户前缀
+
+- [ ] **7.7** 验证：并发运行测试无冲突
+  - ⚠️ **注意**：pytest-xdist `-n 4` 有两种并行模式：
+    1. **多进程模式**（默认，`--dist loadscope`）：每个 worker 是独立进程，天然隔离
+    2. **线程模式**（`--dist loadscope --forked`）：同一进程内多线程，需租户隔离
+  - 本方案使用多进程模式，无需 `asyncio.current_task().ident`
+  - 租户 ID 仅用于区分同一进程内的多个 async context
+  - 建议并行度 `-n 4` 而非更高，避免资源竞争
+  ```bash
+  poetry run pytest tests/acceptance/ -v -n 4
+  ```
+
+---
+
+### Phase 4: 验证与优化 — 预计 2-3 天
+
+#### 验证
+
+- [ ] **8.1** 运行完整验收测试套件（本地）
+  ```bash
+  poetry run pytest tests/acceptance/ -v --tb=short
+  ```
+
+- [ ] **8.2** 运行完整验收测试套件（CI）
+  ```bash
+  git push && 等待 CI pipeline 完成
+  ```
+
+- [ ] **8.3** 验证所有 3 个之前失败的测试现在通过
+  - [ ] `test_ac2_rabbitmq_agentdecided`
+  - [ ] `test_ac2_rabbitmq_documentprocessed`
+  - [ ] `test_dense_search_with_filter`
+
+- [ ] **8.4** 架构约束验证测试通过
+  ```bash
+  poetry run pytest tests/acceptance/test_story_1_3_steps.py::test_ac6_architecture_constraints -v
+  ```
+
+#### 优化
+
+- [ ] **9.1** 检查测试运行时间，优化慢速测试
+  - 减少不必要的 `asyncio.sleep()` 等待
+  - 优化 collection 创建（if not exists）
+
+- [ ] **9.2** 更新覆盖率门禁（如需要）
+  - 确认 coverage report 生成正确
+
+#### 文档更新
+
+- [ ] **10.1** 更新 README 或相关文档
+  - 说明新的测试环境变量
+  - 说明租户隔离机制
+
+- [ ] **10.2** 更新 CI README（如果存在）
+  - 说明 CI 测试环境配置
+
+---
+
+### tests/acceptance/ 重构清单
+
+**现状**：12 个 BDD 验收测试文件，使用真实服务（RabbitMQ/Redis/Qdrant 等）
+
+| 序号 | 检查项 | 影响测试 |
+|------|--------|---------|
+| **A1** | 检查所有 fixtures 是否为 `scope=function`（非 module/session） | 全部 12 个 |
+| **A2** | `test_story_1_3_steps.py` 修复 `async_consume()` 阻塞问题 | Story 1.3 |
+| **A3** | `test_story_1_6_steps.py` 修复 `collection_has_different_domains` 缺少 create_collection | Story 1.6 |
+| **A4** | 为所有队列名添加租户前缀 `test_{uuid}_queue` | 全部 12 个 |
+| **A5** | 为所有 Redis keys 添加租户前缀 `test:{uuid}:` | 全部 12 个 |
+| **A6** | 为所有 Qdrant collections 添加租户前缀 `test_{uuid}_` | 全部 12 个 |
+| **A7** | 检查 pytest-asyncio `asyncio_mode = "auto"` 配置 | 全部 12 个 |
+| **A8** | 添加 `autouse=True` 的 `reset_test_environment` fixture | 全部 12 个 |
+| **A9** | 确保 `temporary_consumer` 使用独立队列名（UUID） | Story 1.3 |
+| **A10** | 检查并行执行 (`-n 4`) 时消费者隔离 | 全部 12 个 |
+
+**详细文件分析**：
+
+| 文件 | step 函数数 | 主要服务依赖 | 需隔离资源 |
+|------|------------|------------|-----------|
+| `test_story_1_1_steps.py` | 104 | Redis | channels/keys |
+| `test_story_1_2_steps.py` | 111 | Redis, PostgreSQL | keys, schemas |
+| `test_story_1_3_steps.py` | 103 | RabbitMQ, Redis | queues, keys | ← P1 修复 |
+| `test_story_1_4_steps.py` | 109 | PostgreSQL, Redis | schemas, keys |
+| `test_story_1_5_steps.py` | 149 | Neo4j, Redis | graphs, keys |
+| `test_story_1_6_steps.py` | 67 | Qdrant | collections | ← P2 修复 |
+| `test_story_1_7_steps.py` | 83 | RabbitMQ | queues, exchanges |
+| `test_story_1_8_steps.py` | 88 | RabbitMQ | queues, exchanges |
+| `test_story_1_9_steps.py` | 238 | Neo4j, PostgreSQL | graphs, schemas |
+| `test_story_1_10_steps.py` | 190 | PostgreSQL, MinIO | schemas, buckets |
+| `test_story_1_11_steps.py` | 371 | PostgreSQL, Redis | schemas, keys |
+| `test_story_1_13_steps.py` | 80 | PostgreSQL, Neo4j | schemas, graphs |
+
+---
+
+### tests/integration/ 重构清单
+
+**现状**：15 个集成测试文件，使用 fakeredis mock
+
+| 序号 | 检查项 | 影响测试 |
+|------|--------|---------|
+| **I1** | 确认使用 `fakeredis` 而非真实 Redis | 全部 15 个 |
+| **I2** | 确认 fixtures 为 `scope=function` | 全部 15 个 |
+| **I3** | 检查 PostgreSQL mock 是否正确 | 全部 15 个 |
+| **I4** | 添加 `autouse=True` 的 `reset_test_environment` fixture | 全部 15 个 |
+| **I5** | 验证 `mock_redis` 每个测试后清理 | 全部 15 个 |
+| **I6** | 检查 `in_memory_store` 状态隔离 | Event 相关测试 |
+| **I7** | 确认 IdempotencyChecker mock 正确 | Event 相关测试 |
+| **I8** | 检查 `RetryPolicy` 测试参数 | Retry 相关测试 |
+
+**注意**：`tests/integration/` 使用 mock，**不需要**租户隔离，因为没有真实资源竞争。但需要确保：
+- fakeredis 实例每个测试独立
+- `InMemoryEventStore` 每个测试独立
+- `InMemoryOutboxRepository` 每个测试独立
+
+---
+
+### tests/integration_real/ 重构清单
+
+**现状**：6 个真实服务集成测试文件
+
+| 序号 | 检查项 | 影响测试 |
+|------|--------|---------|
+| **R1** | 更新 `conftest.py` 使用 `tests/environments.py` | 全部 6 个 |
+| **R2** | 检查 `scope=session` 的连接池是否需要改为 function | 全部 6 个 |
+| **R3** | 添加资源清理 (collection/queue/key cleanup) | 全部 6 个 |
+| **R4** | 为 `real_qdrant_client` 添加 collection 前缀 | Qdrant 相关 |
+| **R5** | 为 `real_redis_pool` 添加 key 前缀 | Redis 相关 |
+| **R6** | 检查 PostgreSQL schema 清理 | PG 相关 |
+| **R7** | 验证连接配置使用 `get_test_env()` | 全部 6 个 |
+
+**文件列表**：
+
+| 文件 | 服务依赖 | 需隔离资源 |
+|------|---------|-----------|
+| `test_redis_real_integration.py` | Redis | keys |
+| `test_postgresql_real_integration.py` | PostgreSQL | schemas |
+| `test_qdrant_real_integration.py` | Qdrant | collections |
+| `test_minio_real_integration.py` | MinIO | buckets |
+| `test_neo4j_real_integration.py` | Neo4j | graphs |
+| `conftest.py` | All | 连接配置 |
+
+---
+
+### tests/unit/ 重构清单
+
+**现状**：70 个单元测试文件，分布在 7 个子目录
+
+| 序号 | 检查项 | 影响测试 |
+|------|--------|---------|
+| **U1** | 确认使用 mock 而非真实服务 | 全部 70 个 |
+| **U2** | 检查 fixture scope 是否正确 | 全部 70 个 |
+| **U3** | 验证 mock 清理（每个测试后） | 全部 70 个 |
+| **U4** | 检查是否有泄露到真实服务的情况 | 全部 70 个 |
+| **U5** | 确认 async mock 使用 `AsyncMock` | async 测试 |
+| **U6** | 检查 pytest.mark 标记使用 | 全部 70 个 |
+
+**子目录分析**：
+
+| 子目录 | 文件数 | 测试对象 | Mock 策略 |
+|--------|--------|---------|----------|
+| `application/` | ? | 应用服务 | AsyncMock |
+| `architecture/` | ? | 架构约束 | 无 mock |
+| `domain/` | ? | 领域模型 | 无 mock |
+| `infrastructure/` | ? | 基础设施 | Mock 服务 |
+| `interfaces/` | ? | 接口层 | AsyncMock |
+| `quality/` | ? | 质量指标 | 无 mock |
+| `security/` | ? | 安全模块 | Mock 加密 |
+| `shared/` | ? | 共享工具 | 无 mock |
+
+---
+
+### 重构优先级排序
 
 ```
-Phase 1: 紧急修复 (1-2 天)
-├── P1: 修复 async_consume 永久阻塞
-├── P2: 修复 collection_has_different_domains
-└── P6: 修复 event_loop scope 问题
+优先级 1 (紧急 - 阻塞性问题):
+├── A2: test_story_1_3 async_consume 修复
+├── A3: test_story_1_6 collection 创建修复
+└── A1: acceptance fixtures scope 修正
 
-Phase 2: 环境标准化 (2-3 天)
-├── P3: 实现 tests/environments.py
-├── P5: 创建 deploy/app/docker-compose.test.yml
-└── 更新 CI workflow 使用统一配置
+优先级 2 (高 - 隔离性问题):
+├── A4-A6: acceptance 租户隔离添加
+├── R1-R3: integration_real 环境标准化
+└── R4-R7: integration_real 资源隔离
 
-Phase 3: 测试隔离 (3-4 天)
-├── P4: 实现 tests/isolation.py
-├── P4: 实现 tests/fixtures.py
-└── 更新所有 acceptance test fixtures
+优先级 3 (中 - 优化项):
+├── A7-A10: acceptance 配置优化
+├── I1-I8: integration mock 验证
+└── U1-U6: unit 测试检查
 
-Phase 4: 验证与优化 (2-3 天)
-├── 运行完整测试套件验证
-├── 性能优化
+优先级 4 (低 - 文档/清理):
+├── U5-U6: unit 标记检查
 └── 文档更新
 ```
 
-### 4.2 预期效果
+### 风险评估
+
+| 测试目录 | 改动范围 | 风险等级 | 预计工时 |
+|----------|---------|---------|----------|
+| `tests/acceptance/` | 大（12 个文件，~1500 行代码） | 🔴 高 | 3-4 天 |
+| `tests/integration/` | 小（mock 验证为主） | 🟡 中 | 0.5 天 |
+| `tests/integration_real/` | 中（6 个文件，连接配置） | 🟡 中 | 1-2 天 |
+| `tests/unit/` | 小（70 个文件，但大部分已隔离） | 🟢 低 | 0.5 天 |
+
+---
+
+### 执行顺序建议
+
+```
+Step 1: 修复 tests/acceptance/ 的 P1/P2 问题 (A2, A3)
+        ↓
+Step 2: 建立 tests/environments.py (Phase 2)
+        ↓
+Step 3: 建立 tests/isolation.py + tests/fixtures.py (Phase 3)
+        ↓
+Step 4: 应用租户隔离到 acceptance/ (A4-A6)
+        ↓
+Step 5: 更新 integration_real/conftest.py (R1-R3)
+        ↓
+Step 6: 验证 integration/ mock 正确性 (I1-I8)
+        ↓
+Step 7: unit 测试检查 (U1-U6)
+        ↓
+Step 8: 完整回归测试
+```
+
+---
+
+## 五、预期效果
 
 | 指标 | 修复前 | 修复后 |
 |------|--------|--------|
@@ -1170,7 +1570,7 @@ Phase 4: 验证与优化 (2-3 天)
 
 ---
 
-## 五、关键文件清单
+## 六、关键文件清单
 
 ```
 tests/
@@ -1191,9 +1591,9 @@ deploy/app/
 
 ---
 
-## 六、验证方案
+## 七、验证方案
 
-### 6.1 本地验证
+### 7.1 本地验证
 
 ```bash
 # 1. 启动测试环境
@@ -1211,7 +1611,7 @@ poetry run pytest tests/acceptance/test_story_1_6_steps.py::test_dense_search_wi
 docker compose -f deploy/app/docker-compose.test.yml down -v
 ```
 
-### 6.2 CI 验证
+### 7.2 CI 验证
 
 ```bash
 # 触发 CI pipeline，验证集成测试阶段
@@ -1220,9 +1620,9 @@ git push origin main
 
 ---
 
-## 七、附录
+## 八、附录
 
-### 7.1 环境变量参考
+### 8.1 环境变量参考
 
 | 变量名 | 说明 | 可选值 |
 |--------|------|--------|
@@ -1236,7 +1636,7 @@ git push origin main
 | `RABBITMQ_HOST` | RabbitMQ 主机 | localhost / host.docker.internal / rabbitmq.sisys.svc.cluster.local |
 | `RABBITMQ_PORT` | RabbitMQ 端口 | 5672 (生产) / 5673 (测试) |
 
-### 7.2 端口映射对照表
+### 8.2 端口映射对照表
 
 #### 本地开发 / CI 环境
 
@@ -1264,7 +1664,7 @@ git push origin main
 | Neo4j | neo4j.sisys.svc.cluster.local | sisys |
 | RabbitMQ | rabbitmq.sisys.svc.cluster.local | sisys |
 
-### 7.3 ArgoCD 环境配置
+### 8.3 ArgoCD 环境配置
 
 | 环境 | ArgoCD App | K8s Namespace | 同步策略 |
 |------|-----------|---------------|---------|
