@@ -4,6 +4,8 @@ from src.infrastructure.storage.postgresql.models.association import (
     role_permissions_table,
     user_roles_table,
 )
+from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
 from src.infrastructure.storage.postgresql.models.outbox import (
     Base,
     OutboxModel,
@@ -19,6 +21,8 @@ __all__ = [
     "UserModel",
     "RoleModel",
     "PermissionModel",
+    "AuditLogModel",
+    "AuditOutboxModel",
     "user_roles_table",
     "role_permissions_table",
     "pg_registry",

@@ -1,6 +1,6 @@
 # Story 1.10: Unified Audit Log
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -771,6 +771,40 @@ sisys/
 3. [ ] Architecture constraints extracted 架构约束已提取（事务发件箱、WORM、双通道事件总线）
 4. [ ] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、架构约束验证）
 5. [ ] Sprint status synced to `ready-for-dev`
+
+### Review Findings (2026-04-20)
+
+#### decision-needed (需要明确决策)
+- [x] [Review][Decision] D1: 双重写入 vs 纯Outbox模式 — **已决策：保持双写（audit_log + outbox）**，符合 ADR-003 双通道架构，RabbitMQ 已部署
+
+#### patch (可直接修复)
+- [x] [Review][Patch] P1: `_publish_entry` 是空实现 [outbox_processor.py:102-120] — **已修复**：实现 RabbitMQ 发布
+- [x] [Review][Patch] P2: Archive UPDATE 被 RLS 拒绝 [audit_service.py:337-339] — **已修复**：添加注释说明 RLS 限制，V2 实现 MinIO WORM
+- [x] [Review][Patch] P3: `asyncio.run()` 在 async 上下文崩溃 [event_listener.py:91-102] — **已修复**：添加运行时检查
+- [x] [Review][Patch] P4: `_running` 标志竞态条件 [outbox_processor.py:131] — **已修复**：使用 `asyncio.Event`
+- [x] [Review][Patch] P5: `page_size` 无上限验证 [audit_service.py:197-199] — **已修复**：添加验证逻辑
+- [x] [Review][Patch] P6: 环境变量解析无异常处理 [audit.py:75-86] — **已修复**：添加 `_int_env` 辅助函数
+- [x] [Review][Patch] P7: Outbox 变更可能因无 commit 丢失 — **跳过**：设计决策，由调用方管理事务
+- [x] [Review][Patch] P8: `correction_level` 无范围校验 [audit_events.py:102] — **已修复**：添加 `__post_init__` 校验
+- [x] [Review][Patch] P9: `mark_entries_for_retry` 冗余代码 [outbox_processor.py:173-177] — **已修复**：移除重复赋值
+- [x] [Review][Patch] P10: `rowcount` 可能为 None — **跳过**：代码已处理，无需修改
+
+#### defer (已存在，非本次引入)
+- [x] [Review][Defer] W1: Archive 不强制 7 年保留 — deferred, MVP 限制，MinIO WORM V2 才实现
+- [x] [Review][Defer] W2: 缺少 CLI 命令 — deferred, Spec 要求但未实现，属于后续 Story
+- [x] [Review][Defer] W4: 合规分析不验证完整覆盖 — deferred, MVP 限制，完整验证 V2 实现
+
+#### Review Tasks (Story 1.10 补丁)
+- [x] [Review][Task] T1: 事件监听器映射对齐 — `event_listener.py` 映射类型与 spec 对齐 (AC-5)
+  - **结论**: event_listener.py 映射与实际领域事件命名一致（Story 1.2 规范: `DocumentProcessed`, `AgentDecided` 等，无 "Event" 后缀）
+  - **修复**: 测试文件 `test_audit_event_listener_mapping.py` 使用正确的事件类型名称
+  - **Spec 问题**: Story 1.10 AC-5 错误使用 `DocumentProcessedEvent` 后缀，应与 Story 1.2 保持一致
+- [x] [Review][Task] T2: Outbox RLS 状态转换收紧 — `002_audit_tables.py` 策略审查 (AC-2)
+  - **结论**: 原 RLS 策略允许 `published → published` 过渡（不应该）
+  - **修复**: 使用 CASE 表达式显式验证状态转换:
+    - `pending → published|failed` ✓
+    - `failed → pending` ✓
+    - `published → 任意` ✗ (终态不可转换)
 
 ### 下一步 Next Steps
 
