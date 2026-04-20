@@ -178,17 +178,18 @@ class TestOutboxProcessorLifecycle:
         """start() creates asyncio task."""
         from src.infrastructure.audit.outbox_processor import OutboxProcessor
 
-        mock_session = mock.AsyncMock()
+        # Use Mock instead of AsyncMock to avoid coroutine warnings
+        mock_session = mock.Mock()
 
         processor = OutboxProcessor(session=mock_session)
         processor._running = False
         processor._task = None
 
         # Mock asyncio.create_task to avoid needing a running event loop
-        # Also mock process_forever to prevent coroutine warning
+        # Mock process_forever with a regular Mock since it's passed to create_task
         mock_task = mock.Mock()
         with mock.patch("asyncio.create_task", return_value=mock_task):
-            with mock.patch.object(processor, "process_forever", mock.AsyncMock()):
+            with mock.patch.object(processor, "process_forever", mock.Mock()):
                 processor.start()
                 # Verify task was assigned
                 assert processor._task is mock_task
@@ -200,7 +201,8 @@ class TestOutboxProcessorLifecycle:
         """start() does nothing if task already exists and not done."""
         from src.infrastructure.audit.outbox_processor import OutboxProcessor
 
-        mock_session = mock.AsyncMock()
+        # Use plain Mock to avoid coroutine warnings from AsyncMock
+        mock_session = mock.Mock()
 
         processor = OutboxProcessor(session=mock_session)
 
@@ -209,7 +211,9 @@ class TestOutboxProcessorLifecycle:
         mock_task.done.return_value = False
         processor._task = mock_task
 
-        processor.start()
+        # Mock asyncio.create_task to prevent actual task creation
+        with mock.patch("asyncio.create_task", return_value=mock_task):
+            processor.start()
 
         # Should not create new task
         mock_task.done.assert_called()

@@ -960,6 +960,7 @@ sisys/
 | 2026-04-18 | Task 0-7 实现完成，Story 进入 review 状态 | ✅ 完成 |
 | 2026-04-19 | Task 8 实现完成：auth.py 覆盖率 50%→100%，新增 test_auth_endpoint_exceptions.py (21 tests) 和 test_auth_api_integration.py (22 tests) | ✅ 完成 |
 | 2026-04-19 | Bug 修复：refresh_token endpoint `str` → `Form(...)`，覆盖率 93%→100% | ✅ 完成 |
+| 2026-04-20 | 新增 `tests/acceptance/test_story_1_9_steps.py`（34 BDD 验收测试步骤定义），所有测试通过 | ✅ 完成 |
 
 ### 文件清单 File List
 
@@ -986,7 +987,8 @@ sisys/
 - `tests/unit/security/test_architecture_constraints.py` - 架构约束测试 ✅
 - `tests/unit/security/test_dengbao_compliance.py` - 等保合规测试 ✅
 - `tests/integration/test_auth_integration.py` - 集成测试 ✅
-- `tests/acceptance/test_story_1.9.feature` - 验收测试 ✅
+- `tests/acceptance/test_story_1.9.feature` - 验收测试 Gherkin 场景 ✅
+- `tests/acceptance/test_story_1_9_steps.py` - 验收测试步骤定义（34 tests）✅
 - `tests/unit/interfaces/api/test_auth_endpoint_exceptions.py` - API 异常处理测试 ✅
 - `tests/unit/interfaces/api/test_auth_api_integration.py` - API 集成测试 ✅
 
