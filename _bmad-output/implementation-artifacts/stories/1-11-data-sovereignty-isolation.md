@@ -650,52 +650,6 @@ sisys/
 
 ---
 
-### Review Findings (2026-04-20)
-
-#### Critical（必须修复）
-
-- [x] [Review][Patch] C1: 缩进错误导致 IndentationError [pipl_compliance.py:978] — **非本次变更**：当前代码无此问题
-- [x] [Review][Patch] C2: 属性拼写错误 `matched_reason` 应为 `matched_rule_id` [whitelist_service.py:1406] — **非本次变更**：当前代码无此问题
-- [x] [Review][Patch] C3: `approve()/reject()` 无状态验证，可对 REJECTED 状态再次 approve [approval_workflow.py:130] — **已修复**：添加 PENDING 状态检查
-- [x] [Review][Patch] C4: `detect_all()` 缺少生物识别/未成年人检测，AC-1 违规 [sensitive_data_detector.py:1251] — **已修复**：添加 biometric/minor 检测
-
-#### Major（应修复）
-
-- [x] [Review][Patch] M1: `verify_compliance()` 始终返回 True，未执行实际检查 [data_sovereignty_service.py:680] — **已修复**：添加 TODO 注释占位说明
-- [x] [Review][Patch] M2: `validate_transfer()` 只检查最近审批，忽略已存在的 APPROVED [approval_workflow.py:275] — **已修复**：改为检查 ANY APPROVED
-- [ ] [Review][Patch] M3: `add_custom_rule()` 无 ReDoS 防护 [sensitive_data_detector.py:1127]
-- [ ] [Review][Patch] M4: `_extract_region()` 对未知格式静默返回 None，绕过策略检查 [data_sovereignty_service.py:354]
-- [x] [Review][Patch] M5: 白名单审计日志缺失，AC-3 违规 [whitelist_service.py:1655] — **已修复**：添加 logger.info 审计日志
-- [ ] [Review][Patch] M6: `escalate_request()` 无审计追踪 [approval_workflow.py:326]
-- [x] [Review][Patch] M7: 年龄判断 `<` 应为 `<=`，PIPL 保护失效 [pipl_compliance.py:889] — **已修复**
-- [x] [Review][Patch] M8: `corrected_data` 参数被忽略，更正权实现不完整 [pipl_compliance.py:830] — **已修复**：存储 corrected_values
-- [x] [Review][Patch] M9: `select_storage_layer` 跨境 fallback 绕过审批，AC-2 违规 [data_sovereignty_service.py:570] — **已修复**：fallback 返回 None
-
-#### Minor（建议修复）
-
-- [ ] [Review][Patch] m1: `process_minor_data()` 硬编码 purpose [pipl_compliance.py:894]
-- [ ] [Review][Patch] m2: IPv6 URL 端口剥离错误 [whitelist_service.py:1488]
-- [ ] [Review][Patch] m3: URL 端口剥离过于激进 [whitelist_service.py:1488]
-- [ ] [Review][Patch] m4: 否定检查仅处理单字符前缀 [sensitive_data_detector.py:1229]
-- [ ] [Review][Patch] m5: `_glob_to_regex()` 对 literal `\*` 处理错误 [whitelist_service.py:1493]
-- [ ] [Review][Patch] m6: `risk_level` 无校验 [whitelist_service.py:218]
-- [ ] [Review][Patch] m7: 中文硬编码错误消息 [data_sovereignty_service.py:514]
-- [ ] [Review][Patch] m8: `run_compliance_tests()` 为 no-op [pipl_compliance.py:975]
-- [ ] [Review][Patch] m9: `approve()/reject()` 不验证 approver 非空 [approval_workflow.py:105]
-- [ ] [Review][Patch] m10: `_rules` 字典非线程安全 [whitelist_service.py:207]
-- [x] [Review][Patch] m11: `detect_all()` 缺少 min_confidence 检查 [sensitive_data_detector.py:1265] — **已修复**：添加 confidence 阈值检查
-- [ ] [Review][Patch] m12: `validate_all_transfers` 名不符实 [approval_workflow.py:312]
-- [ ] [Review][Patch] m13: 内联 import 不规范 [approval_workflow.py:343]
-- [ ] [Review][Patch] m14: `generate_report()` 与 `generate_pipl_report()` 重复 [pipl_compliance.py:538,904]
-
-#### Deferred（暂缓）
-
-- [x] [Review][Defer] i18n 国际化 — 预引入，非本次变更
-- [x] [Review][Defer] 线程安全（`_rules` 字典竞态）— 预引入，非本次变更
-- [x] [Review][Defer] 双重否定/空格干扰等边缘否定处理 — 属于 NLU 范畴，MVP 阶段非必须
-- [x] [Review][Defer] 年龄格式国际化（周岁、英文 age X）— MVP 限制
-- [x] 项目结构对齐统一规范
-
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
@@ -759,75 +713,6 @@ sisys/
 | 2 | URL 比较大小写敏感 | 中 | 修复 `WhitelistValidator.validate()` 使用 case-insensitive 比较 | ✅ 已修复 |
 | 3 | datetime 时区处理不一致 | 中 | 统一使用 `datetime.now(UTC)` 替换 `datetime.utcnow()` | ✅ 已修复 |
 | 4 | 审批人角色验证缺失 | **中** | **采用 API 层预验证模式（见下方架构决策）** | ✅ 已修复 |
-
----
-
-## 🔍 代码审查发现（第二轮 — 2026-04-20）
-
-> **审查模式:** Full (含 Spec 对照)
-> **审查层:** Blind Hunter (13) + Acceptance Auditor (11) = 24 发现
-
-### 🔧 Review Findings 代码审查发现
-
-| # | 问题 | 严重度 | 来源 | 分类 |
-|---|------|--------|------|------|
-| 1 | ReDoS 正则表达式漏洞 | HIGH | Blind | [Review][Patch] |
-| 2 | 关键词检测易被绕过（子串匹配无边界） | MEDIUM | Blind | [Review][Patch] |
-| 3 | 区域提取逻辑缺陷（STORAGE_CN 无法提取 CN） | MEDIUM | Blind | [Review][Patch] |
-| 4 | Glob 转正则安全缺陷（? 未处理） | HIGH | Blind | [Review][Patch] |
-| 5 | 状态机未验证状态转换有效性（REJECTED 可再 APPROVE） | MEDIUM | Blind | [Review][Patch] |
-| 6 | 时区处理不一致（is_locked 方法） | MEDIUM | Blind | [Review][Patch] |
-| 7 | 信用卡/银行卡检测模式过于宽泛 | MEDIUM | Blind | [Review][Patch] |
-| 8 | purpose 缺少输入验证（日志注入风险） | LOW | Blind | [Review][Patch] |
-| 9 | PIPL 年龄阈值逻辑反转（< 14 应该是 >= 14） | MEDIUM | Blind | [Review][Patch] |
-| 10 | 域名规范化缺陷（端口处理缺失） | MEDIUM | Blind | [Review][Patch] |
-| 11 | config 延迟加载多线程不安全 | MEDIUM | Blind | [Review][Patch] |
-| 12 | 生物特征关键词检测大小写问题（中文无效） | LOW | Blind | [Review][Patch] |
-| 13 | `min_confidence` 阈值应用错误（0.95 >= min 应为 confidence >= min） | HIGH | Auditor | [Review][Patch] |
-| 14 | `select_storage_layer` 违反境内优先策略 | HIGH | Auditor | [Review][Patch] |
-| 15 | `create_approval_request` 缺少政策验证 | MEDIUM | Auditor | [Review][Patch] |
-| 16 | `WhitelistRule` 字段默认值不正确 | LOW | Auditor | [Review][Patch] |
-| 17 | 白名单审计日志缺失 | MEDIUM | Auditor | [Review][Patch] |
-| 18 | 缺少白名单管理 API 端点 | HIGH | Auditor | [Review][Defer] — 待 sovereignty_endpoints.py 实现 |
-| 19 | 缺少 CLI 命令 | HIGH | Auditor | [Review][Defer] — 待 sovereignty_commands.py 实现 |
-| 20 | SLA 自动升级机制未实现 | MEDIUM | Auditor | [Review][Defer] — AC-4 增强功能 |
-| 21 | PIPL 增强保护未实现 | MEDIUM | Auditor | [Review][Defer] — AC-5 增强功能 |
-| 22 | 通知机制未实现 | MEDIUM | Auditor | [Review][Defer] — AC-4 增强功能 |
-| 23 | 事件类缺少版本字段 | LOW | Blind | [Review][Defer] — 未来兼容 |
-
-### 🔍 代码审查发现（第三轮 — 2026-04-20 下午）
-
-> **审查模式:** Full (含 Spec 对照)
-> **审查层:** Blind Hunter (9 新发现)
-
-| # | 问题 | 严重度 | 来源 | 分类 | 验证 |
-|---|------|--------|------|------|------|
-| 24 | select_storage_layer 跨境时跳过 storage_allowed 验证 | HIGH | Blind | [Review][Patch] | 上次修复不完整 |
-| 25 | API 硬编码测试用户 | HIGH | Blind | [Review][Patch] | 新问题 |
-| 26 | detect_all() 缺失生物特征和未成年人检测 | MEDIUM | Blind | [Review][Defer] | 待 detect_all 增强 |
-| 27 | 关键词检测易被 Unicode 同形字符绕过 | MEDIUM | Blind | [Review][Patch] | 上次修复不完整 |
-| 28 | 未成年人年龄提取只取第一个匹配 | MEDIUM | Blind | [Review][Patch] | 新问题 |
-| 29 | _normalize_url 端口处理歧义 | LOW | Blind | [Review][Defer] | 低优先级 |
-| 30 | _is_domestic_layer 覆盖不全 | LOW | Blind | [Review][Defer] | 低优先级 |
-| 31 | approve/reject 未验证 approver 非空 | LOW | Blind | [Review][Patch] | 新问题 |
-| 32 | Email 检测 `\b` 边界中文失效 | LOW | Blind | [Review][Dismiss] | 误报/低影响 |
-
-### 📊 Triage 结果汇总（第三轮）
-
-| 分类 | 数量 |
-|------|------|
-| **patch** | 5 |
-| **defer** | 3 |
-| **dismiss** | 1 |
-| **decision_needed** | 0 |
-
-### 累计修复状态
-
-| 轮次 | patch | defer | dismiss |
-|------|-------|-------|---------|
-| 第二轮 | 17 | 6 | 1 |
-| 第三轮 | +5 | +3 | +1 |
-| **总计** | 22 | 9 | 2 |
 
 ---
 
@@ -906,6 +791,123 @@ sisys/
 
 **结果：**
 审批人角色验证问题已解决，架构符合业界最佳实践。
+
+---
+
+## 🔍 代码审查发现（第二轮 — 2026-04-20）
+
+> **审查模式:** Full (含 Spec 对照)
+> **审查层:** Blind Hunter (13) + Acceptance Auditor (11) = 24 发现
+
+### 🔧 Review Findings 代码审查发现
+
+| # | 问题 | 严重度 | 来源 | 分类 |
+|---|------|--------|------|------|
+| 1 | ReDoS 正则表达式漏洞 | HIGH | Blind | [Review][Patch] |
+| 2 | 关键词检测易被绕过（子串匹配无边界） | MEDIUM | Blind | [Review][Patch] |
+| 3 | 区域提取逻辑缺陷（STORAGE_CN 无法提取 CN） | MEDIUM | Blind | [Review][Patch] |
+| 4 | Glob 转正则安全缺陷（? 未处理） | HIGH | Blind | [Review][Patch] |
+| 5 | 状态机未验证状态转换有效性（REJECTED 可再 APPROVE） | MEDIUM | Blind | [Review][Patch] |
+| 6 | 时区处理不一致（is_locked 方法） | MEDIUM | Blind | [Review][Patch] |
+| 7 | 信用卡/银行卡检测模式过于宽泛 | MEDIUM | Blind | [Review][Patch] |
+| 8 | purpose 缺少输入验证（日志注入风险） | LOW | Blind | [Review][Patch] |
+| 9 | PIPL 年龄阈值逻辑反转（< 14 应该是 >= 14） | MEDIUM | Blind | [Review][Patch] |
+| 10 | 域名规范化缺陷（端口处理缺失） | MEDIUM | Blind | [Review][Patch] |
+| 11 | config 延迟加载多线程不安全 | MEDIUM | Blind | [Review][Patch] |
+| 12 | 生物特征关键词检测大小写问题（中文无效） | LOW | Blind | [Review][Patch] |
+| 13 | `min_confidence` 阈值应用错误（0.95 >= min 应为 confidence >= min） | HIGH | Auditor | [Review][Patch] |
+| 14 | `select_storage_layer` 违反境内优先策略 | HIGH | Auditor | [Review][Patch] |
+| 15 | `create_approval_request` 缺少政策验证 | MEDIUM | Auditor | [Review][Patch] |
+| 16 | `WhitelistRule` 字段默认值不正确 | LOW | Auditor | [Review][Patch] |
+| 17 | 白名单审计日志缺失 | MEDIUM | Auditor | [Review][Patch] |
+| 18 | 缺少白名单管理 API 端点 | HIGH | Auditor | [Review][Defer] — 待 sovereignty_endpoints.py 实现 |
+| 19 | 缺少 CLI 命令 | HIGH | Auditor | [Review][Defer] — 待 sovereignty_commands.py 实现 |
+| 20 | SLA 自动升级机制未实现 | MEDIUM | Auditor | [Review][Defer] — AC-4 增强功能 |
+| 21 | PIPL 增强保护未实现 | MEDIUM | Auditor | [Review][Defer] — AC-5 增强功能 |
+| 22 | 通知机制未实现 | MEDIUM | Auditor | [Review][Defer] — AC-4 增强功能 |
+| 23 | 事件类缺少版本字段 | LOW | Blind | [Review][Defer] — 未来兼容 |
+
+### 🔍 代码审查发现（第三轮 — 2026-04-20 下午）
+
+> **审查模式:** Full (含 Spec 对照)
+> **审查层:** Blind Hunter (9 新发现)
+
+| # | 问题 | 严重度 | 来源 | 分类 | 验证 |
+|---|------|--------|------|------|------|
+| 24 | select_storage_layer 跨境时跳过 storage_allowed 验证 | HIGH | Blind | [Review][Patch] | 上次修复不完整 |
+| 25 | API 硬编码测试用户 | HIGH | Blind | [Review][Patch] | 新问题 |
+| 26 | detect_all() 缺失生物特征和未成年人检测 | MEDIUM | Blind | [Review][Defer] | 待 detect_all 增强 |
+| 27 | 关键词检测易被 Unicode 同形字符绕过 | MEDIUM | Blind | [Review][Patch] | 上次修复不完整 |
+| 28 | 未成年人年龄提取只取第一个匹配 | MEDIUM | Blind | [Review][Patch] | 新问题 |
+| 29 | _normalize_url 端口处理歧义 | LOW | Blind | [Review][Defer] | 低优先级 |
+| 30 | _is_domestic_layer 覆盖不全 | LOW | Blind | [Review][Defer] | 低优先级 |
+| 31 | approve/reject 未验证 approver 非空 | LOW | Blind | [Review][Patch] | 新问题 |
+| 32 | Email 检测 `\b` 边界中文失效 | LOW | Blind | [Review][Dismiss] | 误报/低影响 |
+
+### 📊 Triage 结果汇总（第三轮）
+
+| 分类 | 数量 |
+|------|------|
+| **patch** | 5 |
+| **defer** | 3 |
+| **dismiss** | 1 |
+| **decision_needed** | 0 |
+
+### 累计修复状态
+
+| 轮次 | patch | defer | dismiss |
+|------|-------|-------|---------|
+| 第二轮 | 17 | 6 | 1 |
+| 第三轮 | +5 | +3 | +1 |
+| **总计** | 22 | 9 | 2 |
+
+---
+
+### Review Findings (2026-04-20)
+
+#### Critical（必须修复）
+
+- [x] [Review][Patch] C1: 缩进错误导致 IndentationError [pipl_compliance.py:978] — **非本次变更**：当前代码无此问题
+- [x] [Review][Patch] C2: 属性拼写错误 `matched_reason` 应为 `matched_rule_id` [whitelist_service.py:1406] — **非本次变更**：当前代码无此问题
+- [x] [Review][Patch] C3: `approve()/reject()` 无状态验证，可对 REJECTED 状态再次 approve [approval_workflow.py:130] — **已修复**：添加 PENDING 状态检查
+- [x] [Review][Patch] C4: `detect_all()` 缺少生物识别/未成年人检测，AC-1 违规 [sensitive_data_detector.py:1251] — **已修复**：添加 biometric/minor 检测
+
+#### Major（应修复）
+
+- [x] [Review][Patch] M1: `verify_compliance()` 始终返回 True，未执行实际检查 [data_sovereignty_service.py:680] — **已修复**：添加 TODO 注释占位说明
+- [x] [Review][Patch] M2: `validate_transfer()` 只检查最近审批，忽略已存在的 APPROVED [approval_workflow.py:275] — **已修复**：改为检查 ANY APPROVED
+- [ ] [Review][Patch] M3: `add_custom_rule()` 无 ReDoS 防护 [sensitive_data_detector.py:1127]
+- [ ] [Review][Patch] M4: `_extract_region()` 对未知格式静默返回 None，绕过策略检查 [data_sovereignty_service.py:354]
+- [x] [Review][Patch] M5: 白名单审计日志缺失，AC-3 违规 [whitelist_service.py:1655] — **已修复**：添加 logger.info 审计日志
+- [ ] [Review][Patch] M6: `escalate_request()` 无审计追踪 [approval_workflow.py:326]
+- [x] [Review][Patch] M7: 年龄判断 `<` 应为 `<=`，PIPL 保护失效 [pipl_compliance.py:889] — **已修复**
+- [x] [Review][Patch] M8: `corrected_data` 参数被忽略，更正权实现不完整 [pipl_compliance.py:830] — **已修复**：存储 corrected_values
+- [x] [Review][Patch] M9: `select_storage_layer` 跨境 fallback 绕过审批，AC-2 违规 [data_sovereignty_service.py:570] — **已修复**：fallback 返回 None
+
+#### Minor（建议修复）
+
+- [ ] [Review][Patch] m1: `process_minor_data()` 硬编码 purpose [pipl_compliance.py:894]
+- [ ] [Review][Patch] m2: IPv6 URL 端口剥离错误 [whitelist_service.py:1488]
+- [ ] [Review][Patch] m3: URL 端口剥离过于激进 [whitelist_service.py:1488]
+- [ ] [Review][Patch] m4: 否定检查仅处理单字符前缀 [sensitive_data_detector.py:1229]
+- [ ] [Review][Patch] m5: `_glob_to_regex()` 对 literal `\*` 处理错误 [whitelist_service.py:1493]
+- [ ] [Review][Patch] m6: `risk_level` 无校验 [whitelist_service.py:218]
+- [ ] [Review][Patch] m7: 中文硬编码错误消息 [data_sovereignty_service.py:514]
+- [ ] [Review][Patch] m8: `run_compliance_tests()` 为 no-op [pipl_compliance.py:975]
+- [ ] [Review][Patch] m9: `approve()/reject()` 不验证 approver 非空 [approval_workflow.py:105]
+- [ ] [Review][Patch] m10: `_rules` 字典非线程安全 [whitelist_service.py:207]
+- [x] [Review][Patch] m11: `detect_all()` 缺少 min_confidence 检查 [sensitive_data_detector.py:1265] — **已修复**：添加 confidence 阈值检查
+- [ ] [Review][Patch] m12: `validate_all_transfers` 名不符实 [approval_workflow.py:312]
+- [ ] [Review][Patch] m13: 内联 import 不规范 [approval_workflow.py:343]
+- [ ] [Review][Patch] m14: `generate_report()` 与 `generate_pipl_report()` 重复 [pipl_compliance.py:538,904]
+
+#### Deferred（暂缓）
+
+- [x] [Review][Defer] i18n 国际化 — 预引入，非本次变更
+- [x] [Review][Defer] 线程安全（`_rules` 字典竞态）— 预引入，非本次变更
+- [x] [Review][Defer] 双重否定/空格干扰等边缘否定处理 — 属于 NLU 范畴，MVP 阶段非必须
+- [x] [Review][Defer] 年龄格式国际化（周岁、英文 age X）— MVP 限制
+- [x] 项目结构对齐统一规范
 
 ---
 
