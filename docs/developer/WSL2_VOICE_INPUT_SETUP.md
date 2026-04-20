@@ -85,11 +85,13 @@
 ```bash
 # 系统依赖
 sudo apt update
-sudo apt install -y xbindkeys ffmpeg
+sudo apt install -y ffmpeg pulseaudio-utils
 
 # Python 依赖（使用清华源加速）
 pip3 install openai-whisper -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
+
+> **注意**：xbindkeys 已安装但非必需，如不使用快捷键可忽略
 
 ### Phase 2：创建语音输入脚本
 
@@ -285,9 +287,61 @@ powershell.exe -c "Add-Type -AssemblyName System.Speech; ..."
 
 ---
 
+## 已安装内容清单
+
+### 系统包（apt）
+
+| 包名 | 版本 | 路径 | 用途 |
+|------|------|------|------|
+| ffmpeg | 7:4.4.2 | `/usr/bin/ffmpeg` | 音频格式转换 |
+| xbindkeys | 1.8.7 | `/usr/bin/xbindkeys` | 快捷键绑定 |
+| pulseaudio-utils | 1:15.99.1 | `/usr/bin/parec` (→pacat) | PulseAudio 客户端 |
+
+### Python 包（pip）
+
+| 包名 | 版本 | 路径 | 用途 |
+|------|------|------|------|
+| openai-whisper | 20240930 | `~/.local/lib/python3.10/site-packages/` | 语音识别引擎 |
+
+### Whisper 模型
+
+| 模型 | 大小 | 路径 |
+|------|------|------|
+| tiny | ~75MB | `~/.cache/whisper/tiny.pt` |
+| small | ~255MB | `~/.cache/whisper/small.pt` |
+
+模型首次使用时自动下载，之后无需网络。
+
+### 创建的文件
+
+| 文件 | 路径 | 用途 |
+|------|------|------|
+| 语音输入脚本 | `~/bin/voicein` | 录音+识别+输入 |
+| 快捷键配置 | `~/.xbindkeysrc` | xbindkeys 配置（可忽略） |
+
+### ~/.bashrc 添加的内容
+
+```bash
+# 第132行：PulseAudio 配置
+export PULSE_SERVER="unix:/mnt/wslg/runtime-dir/pulse/native"
+
+# 第135-139行：xbindkeys 自启动
+if ! pgrep -x xbindkeys > /dev/null 2>&1; then
+    sleep 1
+    xbindkeys 2>/dev/null || true
+fi
+
+# 第142-143行：语音输入别名
+alias v='~/bin/voicein'
+alias vp='~/bin/voicein 5'
+```
+
+---
+
 ## 更新日志
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-04-19 | 1.0 | 初始版本 |
 | 2026-04-19 | 1.1 | 更新实际验证结论，添加 WSLg 音频问题说明 |
+| 2026-04-19 | 1.2 | 添加已安装内容清单，使用别名替代快捷键 |

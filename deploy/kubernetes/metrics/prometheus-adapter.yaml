@@ -166,24 +166,8 @@ data:
         matches: '^(.*)$'
         as: '${1}'
 
-    # Kubernetes HPA 指标 (来自 kube-state-metrics)
-    - seriesQuery: 'kube_hpa_status_current_replicas'
-      resources:
-        template: '<<.resource>>'
-      name:
-        matches: '^(.*)$'
-        as: '${1}'
-
-    - seriesQuery: 'kube_hpa_status_desired_replicas'
-      resources:
-        template: '<<.resource>>'
-      name:
-        matches: '^(.*)$'
-        as: '${1}'
-
     # Prometheus 服务器配置
     prometheus:
-      # 指向 Prometheus Server Service
       url: http://prometheus.monitoring.svc.cluster.local:9090
 
 ---
@@ -212,7 +196,7 @@ spec:
         - --secure-port=6443
         - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384
         - --config=/etc/adapter/config.yaml
-        image: harbor.sisys.local/sisys/tools/prometheus-community/prometheus-adapter:v0.14.0
+        image: harbor.sisys.local/sisys/tools/prometheus/prometheus-adapter:v0.14.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -258,6 +242,8 @@ spec:
         - mountPath: /etc/adapter
           name: config
           readOnly: true
+        - mountPath: /apiserver.local.config
+          name: tmp-cert-dir
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: prometheus-adapter
@@ -268,6 +254,8 @@ spec:
             path: config.yaml
           name: prometheus-adapter-config
         name: config
+      - name: tmp-cert-dir
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
