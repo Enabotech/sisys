@@ -63,6 +63,7 @@ class DataSubjectRights:
         correction_right: Whether correction right has been exercised.
         portability_right: Whether data portability right has been exercised.
         last_exercised: Last time any right was exercised.
+        corrected_values: Stores corrected data values after correction right exercise.
     """
 
     data_id: UUID
@@ -71,6 +72,7 @@ class DataSubjectRights:
     correction_right: bool = False
     portability_right: bool = False
     last_exercised: datetime | None = None
+    corrected_values: dict | None = None
 
 
 @dataclass
@@ -342,6 +344,9 @@ class PIPLComplianceService:
             True if correction was recorded.
         """
         self.exercise_correction_right(personal_data_id)
+        if personal_data_id not in self._data_subject_rights:
+            self._data_subject_rights[personal_data_id] = DataSubjectRights(data_id=personal_data_id)
+        self._data_subject_rights[personal_data_id].corrected_values = corrected_data
         return True
 
     def process_biometric_data(
@@ -393,7 +398,7 @@ class PIPLComplianceService:
         """
         age_threshold = self._config.minor_age_threshold
 
-        if age < age_threshold and not guardian_id:
+        if age <= age_threshold and not guardian_id:
             raise GuardianConsentRequiredError(f"Guardian consent required for minors under {age_threshold} years old")
 
         record = PIPLAccessRecord(
