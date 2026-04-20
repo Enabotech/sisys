@@ -61,7 +61,7 @@
 - [ ] ...
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_[编号].feature`
+- [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
@@ -97,7 +97,7 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | [组件 A] | [验证内容描述] | `test_[component_a].py` | Task [N] |
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_[编号].feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
 | **SDD 架构验证** | [架构约束] | [约束描述] | `test_[architecture].py` | Task [N] |
 | **集成测试** | [层间协作] | [协作描述] | `test_[integration].py` | Task [N] |
 
@@ -224,7 +224,7 @@ def ensure_schema(pg_config: PostgreSQLConfig):
 - [ ] Subtask [m.n]: 定义领域事件 Schema（[关键属性]）
 - [ ] Subtask [m.n]: 定义数据模型（[关键属性]）
 - [ ] Subtask [m.n]: 创建/更新 `docs/api/openapi.yaml`
-- [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_story_[编号].feature`
+- [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_story_x_y.feature`
 - [ ] Subtask [m.n]: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -352,7 +352,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_[integration].py # 集成测试
 │   └── acceptance/
-│       └── test_story_[编号].feature # 验收测试
+│       └── test_story_x_y.feature # 验收测试
 └── docs/
     └── [layer]/
         └── [component]_guide.md # 实施指南
