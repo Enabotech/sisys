@@ -135,6 +135,23 @@ class SensitiveDataDetector:
             "child",
         }
 
+        # Custom patterns for user-defined sensitive types
+        self._custom_patterns: dict[str, tuple[re.Pattern, float, SensitiveDataType]] = {}
+
+    def add_custom_rule(self, pattern: str, sensitive_type: str, confidence: float = 0.95) -> None:
+        """Add a custom detection rule.
+
+        Args:
+            pattern: Regex pattern to match.
+            sensitive_type: Type name for the sensitive data.
+            confidence: Detection confidence (0.0-1.0).
+        """
+        self._custom_patterns[sensitive_type] = (
+            re.compile(pattern),
+            confidence,
+            SensitiveDataType.CUSTOM,
+        )
+
     def detect(self, text: str | None) -> DetectionResult:
         """Detect sensitive data in text.
 
@@ -169,6 +186,18 @@ class SensitiveDataDetector:
                     labels=[label],
                     detection_method="regex",
                     matched_pattern=label,
+                )
+
+        # Check for custom patterns
+        for type_name, (pattern, confidence, dtype) in self._custom_patterns.items():
+            if pattern.search(text) and confidence >= self.min_confidence:
+                return DetectionResult(
+                    is_sensitive=True,
+                    sensitive_type=dtype,
+                    confidence=confidence,
+                    labels=[type_name],
+                    detection_method="regex",
+                    matched_pattern=type_name,
                 )
 
         # Check for trade secrets via keywords

@@ -234,6 +234,7 @@ markers = [
     "AC-3: Acceptance Criterion 3 - Outbox Pattern",
     "AC-4.1: Acceptance Criterion 4.1 - Idempotency",
     "AC-4.2: Acceptance Criterion 4.2 - Retry",
+    "AC-4: Acceptance Criterion 4 - Scaling Response",
     "AC-5: Acceptance Criterion 5 - Monitoring",
     "AC-6: Acceptance Criterion 6 - Architecture",
     "edge-case: Edge case scenarios",

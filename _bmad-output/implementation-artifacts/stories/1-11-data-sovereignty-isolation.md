@@ -742,14 +742,39 @@ sisys/
 | 22 | 通知机制未实现 | MEDIUM | Auditor | [Review][Defer] — AC-4 增强功能 |
 | 23 | 事件类缺少版本字段 | LOW | Blind | [Review][Defer] — 未来兼容 |
 
-### 📊 Triage 结果汇总
+### 🔍 代码审查发现（第三轮 — 2026-04-20 下午）
+
+> **审查模式:** Full (含 Spec 对照)
+> **审查层:** Blind Hunter (9 新发现)
+
+| # | 问题 | 严重度 | 来源 | 分类 | 验证 |
+|---|------|--------|------|------|------|
+| 24 | select_storage_layer 跨境时跳过 storage_allowed 验证 | HIGH | Blind | [Review][Patch] | 上次修复不完整 |
+| 25 | API 硬编码测试用户 | HIGH | Blind | [Review][Patch] | 新问题 |
+| 26 | detect_all() 缺失生物特征和未成年人检测 | MEDIUM | Blind | [Review][Defer] | 待 detect_all 增强 |
+| 27 | 关键词检测易被 Unicode 同形字符绕过 | MEDIUM | Blind | [Review][Patch] | 上次修复不完整 |
+| 28 | 未成年人年龄提取只取第一个匹配 | MEDIUM | Blind | [Review][Patch] | 新问题 |
+| 29 | _normalize_url 端口处理歧义 | LOW | Blind | [Review][Defer] | 低优先级 |
+| 30 | _is_domestic_layer 覆盖不全 | LOW | Blind | [Review][Defer] | 低优先级 |
+| 31 | approve/reject 未验证 approver 非空 | LOW | Blind | [Review][Patch] | 新问题 |
+| 32 | Email 检测 `\b` 边界中文失效 | LOW | Blind | [Review][Dismiss] | 误报/低影响 |
+
+### 📊 Triage 结果汇总（第三轮）
 
 | 分类 | 数量 |
 |------|------|
-| **patch** | 17 |
-| **defer** | 6 |
+| **patch** | 5 |
+| **defer** | 3 |
 | **dismiss** | 1 |
 | **decision_needed** | 0 |
+
+### 累计修复状态
+
+| 轮次 | patch | defer | dismiss |
+|------|-------|-------|---------|
+| 第二轮 | 17 | 6 | 1 |
+| 第三轮 | +5 | +3 | +1 |
+| **总计** | 22 | 9 | 2 |
 
 ---
 
