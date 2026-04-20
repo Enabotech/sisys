@@ -185,12 +185,14 @@ class TestOutboxProcessorLifecycle:
         processor._task = None
 
         # Mock asyncio.create_task to avoid needing a running event loop
+        # Also mock process_forever to prevent coroutine warning
         mock_task = mock.Mock()
-        with mock.patch("asyncio.create_task", return_value=mock_task) as mock_create:
-            processor.start()
-            mock_create.assert_called_once()
+        with mock.patch("asyncio.create_task", return_value=mock_task):
+            with mock.patch.object(processor, "process_forever", mock.AsyncMock()):
+                processor.start()
+                # Verify task was assigned
+                assert processor._task is mock_task
 
-        assert processor._task is mock_task
         # Clean up
         processor._running = False
 
@@ -235,9 +237,9 @@ class TestOutboxProcessorPublish:
         mock_exchange = mock.AsyncMock()
         mock_channel.default_exchange = mock_exchange
 
-        with mock.patch("aio_pika.connect_robust") as mock_connect:
+        with mock.patch("aio_pika.connect_robust", new_callable=mock.AsyncMock) as mock_connect:
             mock_connection = mock.AsyncMock()
-            mock_connection.channel.return_value = mock_channel
+            mock_connection.channel = mock.AsyncMock(return_value=mock_channel)
             mock_connect.return_value = mock_connection
 
             await processor._publish_entry(mock_entry)
