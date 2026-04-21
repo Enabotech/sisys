@@ -182,13 +182,24 @@ event_loop.run_until_complete(_publish_and_wait())  # 永远不会执行
 
 **修复方案**:
 ```python
-# ✅ 修复方案 - 使用 asyncio.create_task 后台运行
+# ✅ 修复方案 - 使用 asyncio.create_task 后台运行 + 启动确认
 import asyncio
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
-async def temporary_consumer(consumer, queue_name, routing_key, handler):
-    """临时消费者上下文管理器，确保正确的设置和清理顺序."""
+async def temporary_consumer(consumer, queue_name, routing_key, handler, timeout=5.0):
+    """临时消费者上下文管理器，确保正确的设置和清理顺序.
+
+    Args:
+        consumer: RabbitMQ consumer 实例
+        queue_name: 队列名称
+        routing_key: 路由键
+        handler: 事件处理函数
+        timeout: 等待消费者启动的超时时间（秒）
+
+    Raises:
+        TimeoutError: 消费者在超时时间内未能启动
+    """
     event_type = queue_name.split("-")[-1]
     consumer.register_handler(event_type, handler)
     await consumer.bind_queue(queue_name, routing_key)
@@ -196,19 +207,74 @@ async def temporary_consumer(consumer, queue_name, routing_key, handler):
     # 使用 create_task 后台运行，不阻塞
     consume_task = asyncio.create_task(consumer.async_consume(queue_name))
 
-    # 短暂等待消费者真正开始消费
-    await asyncio.sleep(0.5)
+    # 轮询等待消费者真正开始消费（替代硬编码 sleep）
+    # 这样在慢速环境下也能正常工作
+    try:
+        await asyncio.wait_for(_wait_for_consumer_ready(consumer), timeout=timeout)
+    except asyncio.TimeoutError:
+        consume_task.cancel()
+        await consume_task
+        raise RuntimeError(
+            f"Consumer failed to start within {timeout}s. "
+            "Check RabbitMQ connection and queue binding."
+        )
 
     try:
         yield
     finally:
-        # 清理：取消任务并关闭连接
-        consume_task.cancel()
+        # 清理：先停止消费，再取消任务，最后关闭连接
         try:
-            await consume_task
-        except asyncio.CancelledError:
-            pass
-        await consumer.close()
+            # 如果 consumer 有 stop_consuming 方法，先调用它
+            if hasattr(consumer, 'stop_consuming'):
+                await consumer.stop_consuming()
+        except Exception:
+            pass  # 忽略关闭时的错误
+
+        # 取消任务
+        if not consume_task.done():
+            consume_task.cancel()
+            try:
+                await asyncio.wait_for(consume_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                # 超时后强制取消
+                consume_task.cancel()
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        # 最后关闭连接
+        try:
+            await consumer.close()
+        except Exception:
+            pass  # 忽略关闭时的错误
+
+
+async def _wait_for_consumer_ready(consumer, poll_interval=0.1, max_polls=50):
+    """轮询等待消费者就绪.
+
+    Args:
+        consumer: AsyncRabbitMQConsumer 实例
+        poll_interval: 轮询间隔（秒）
+        max_polls: 最大轮询次数
+
+    Returns:
+        True: 消费者已就绪
+
+    Raises:
+        asyncio.TimeoutError: 超过最大轮询次数
+    """
+    for _ in range(max_polls):
+        # AsyncRabbitMQConsumer 没有公共 is_ready() 方法
+        # 使用私有属性判断：_connection 和 _channel
+        if consumer._connection is not None and not consumer._connection.is_closed:
+            return True
+        if consumer._channel is not None:
+            return True
+        await asyncio.sleep(poll_interval)
+
+    raise asyncio.TimeoutError("Consumer not ready after maximum polls")
+
 
 @then("异步消费者应该接收到该事件")
 def verify_rabbitmq_consumer_receives(
@@ -226,7 +292,9 @@ def verify_rabbitmq_consumer_receives(
         received_events.append(event)
 
     async def _test():
-        async with temporary_consumer(rabbitmq_consumer, queue_name, routing_key, handler):
+        async with temporary_consumer(
+            rabbitmq_consumer, queue_name, routing_key, handler, timeout=5.0
+        ):
             event = DocumentProcessed(
                 document_id=uuid.uuid4(),
                 parse_result={"pages": 5},
@@ -239,6 +307,28 @@ def verify_rabbitmq_consumer_receives(
     event_loop.run_until_complete(_test())
     assert len(received_events) > 0, f"Consumer did not receive event. Got {len(received_events)}"
 ```
+
+**P1 修复关键改进点：**
+
+| 问题 | 原方案 | 修复方案 |
+|------|--------|---------|
+| 启动确认 | 硬编码 `sleep(0.5)` | 轮询 `_connection.is_closed` 状态 |
+| 慢速环境 | 0.5s 可能不足 | 可配置超时，最长 5s |
+| 任务取消 | 直接 `cancel()` 可能丢消息 | 先 `stop_consuming()` 再取消 |
+| 异常处理 | 无 | 分层异常处理，层层保障 |
+
+**实现验证**（`AsyncRabbitMQConsumer` 私有属性）：
+```python
+# 第 60-61 行
+self._connection: AbstractConnection | None = None
+self._channel: AbstractChannel | None = None
+
+# 第 215 行 close() 方法中：
+if self._connection and not self._connection.is_closed:
+    await self._connection.close()
+```
+
+**⚠️ 注意**：测试代码直接访问 `consumer._connection` 和 `consumer._channel` 私有属性。这是测试专用 hack，不应修改源码。
 
 #### 3.1.2 修复 `collection_has_different_domains` fixture
 
@@ -258,7 +348,7 @@ def collection_has_different_domains(...):
 
 **修复方案**:
 ```python
-# ✅ 修复方案 - 添加 collection 创建
+# ✅ 修复方案 - 利用 create_collection 的幂等性
 @given('Collection "sisys:documents:finance" 包含不同业务域的向量点')
 def collection_has_different_domains(
     collection_manager: QdrantCollectionManager,
@@ -268,15 +358,18 @@ def collection_has_different_domains(
     """Collection contains vectors with different business domains."""
 
     async def _setup_and_insert():
+        collection_name = "sisys_documents_finance"
+
         # 1. 确保 collection 存在
-        try:
-            await collection_manager.create_collection(
-                name="sisys_documents_finance",
-                vector_size=1024,
-                distance="Cosine",
-            )
-        except Exception:
-            pass
+        # QdrantCollectionManager.create_collection() 本身是幂等的：
+        # - 如果已存在，返回 False
+        # - 如果新建成功，返回 True
+        # - 不抛出异常
+        await collection_manager.create_collection(
+            name=collection_name,
+            vector_size=1024,
+            distance="Cosine",
+        )
 
         # 2. 插入不同业务域的向量
         for domain in ["report", "analysis", "summary"]:
@@ -291,10 +384,29 @@ def collection_has_different_domains(
                         },
                     )
                 ]
-                await vector_storage.upsert_points("sisys_documents_finance", points)
+                await vector_storage.upsert_points(collection_name, points)
 
     event_loop.run_until_complete(_setup_and_insert())
 ```
+
+**P2 修复关键改进点：**
+
+| 问题 | 原方案 | 修复方案 |
+|------|--------|---------|
+| 异常处理 | `except Exception: pass` 静默忽略 | 利用 `create_collection()` 幂等性，无需异常处理 |
+| 代码简洁性 | 复杂异常判断逻辑 | 简单调用，返回值即可判断 |
+| 错误诊断 | 网络超时等真正错误被隐藏 | 真正的错误会正常抛出 |
+
+**实现验证**（`QdrantCollectionManager.create_collection` 第 54-55 行）：
+```python
+if await self.collection_exists(name):
+    return False  # 已存在，返回 False
+```
+
+**⚠️ 重要提醒**：`create_collection` 的幂等性实现意味着：
+- 测试首次运行：collection 被创建，返回 `True`
+- 测试再次运行：collection 已存在，返回 `False`
+- 无论哪种情况，都不会抛出异常
 
 ---
 
@@ -378,18 +490,30 @@ _K8S_ENV_NAMESPACES = {
 
 
 def _detect_environment() -> TestEnvironment:
-    """自动检测当前测试环境."""
+    """自动检测当前测试环境.
 
+    检测优先级（从高到低）：
+    1. 环境变量显式指定（SISYS_TEST_ENV）
+    2. K8s Service Account token（最可靠的 K8s 证据）
+    3. 容器内运行 + CI 环境变量
+    4. 默认本地开发环境
+
+    注意：K8s 检测优先于 CI 环境变量检测。
+    原因：在 ArgoCD K8s 环境中运行时，CI 系统可能设置 CI=true，
+    但我们必须优先识别为 K8s 环境，因为连接参数（Service DNS）不同。
+    """
     # 1. 优先使用环境变量显式指定
     explicit = os.getenv("SISYS_TEST_ENV", "").lower()
     if explicit in ("local", "ci", "k8s"):
         return TestEnvironment(explicit)
 
     # 2. K8s 环境检测（检查 Service Account token）
+    # 这是最可靠的 K8s 运行环境证据
     if _is_running_in_k8s():
         return TestEnvironment.K8S
 
     # 3. CI 环境检测 (gitea-runner)
+    # 注意：如果在 K8s 中运行但 token 检测失败，仍然应该通过 CI 变量识别
     if os.getenv("CI") == "true" or os.getenv("GITEA_RUNNER") == "true":
         return TestEnvironment.CI
 
@@ -1212,17 +1336,45 @@ def reset_test_environment():
 
 #### P6: 修复 event_loop scope 问题
 
+> ⚠️ **核心问题**：`scope=module` 的 `event_loop` fixture 会导致多个测试函数共享同一个事件循环，造成状态污染。这与 pytest-asyncio 的 `asyncio_mode = "auto"` 模式冲突。
+
 - [ ] **3.1** 检查 `tests/acceptance/` 下所有 fixtures 的 scope
   - 确认 `rabbitmq_publisher`, `rabbitmq_consumer` 等为 `scope=function`（非 module/session）
+  - **如果存在 `scope=module` 的 `event_loop` fixture，必须删除**
 
 - [ ] **3.2** ⚠️ **不要创建 `event_loop` fixture** — `pyproject.toml` 已配置 `asyncio_mode = "auto"`，pytest-asyncio 会自动管理 event loop
-  - 如需 function scope event loop，设置 `pytest.ini_options.asyncio_mode = "auto"` 即可
-  - 手动创建 `event_loop` fixture 会与 pytest-asyncio 冲突
+  - pytest-asyncio auto mode 会为每个测试函数自动创建和清理 event loop
+  - 手动创建 `event_loop` fixture 会与 pytest-asyncio 冲突，导致 `RuntimeError: Event loop is running`
 
-- [ ] **3.3** 验证：无状态污染，运行多次同一测试
+- [ ] **3.3** 修复现有 event_loop fixture（如存在）
+
+  **错误示例（必须删除）：**
+  ```python
+  # ❌ 错误：scope=module 导致状态污染
+  @pytest.fixture(scope="module")
+  def event_loop():
+      loop = asyncio.new_event_loop()
+      yield loop
+      loop.close()
+  ```
+
+  **正确做法：删除 event_loop fixture，让 pytest-asyncio 自动管理：**
+  ```python
+  # ✅ 正确：不定义 event_loop fixture，使用 pytest-asyncio auto mode
+  # 在 pyproject.toml 中配置：
+  # [tool.pytest.ini_options]
+  # asyncio_mode = "auto"
+  ```
+
+- [ ] **3.4** 验证：无状态污染，运行多次同一测试
   ```bash
   poetry run pytest tests/acceptance/test_story_1_3_steps.py -v --count 3
   ```
+
+**P6 修复验证清单：**
+- [ ] `tests/acceptance/test_story_1_3_steps.py` 中无 `event_loop` fixture
+- [ ] `tests/acceptance/test_story_1_6_steps.py` 中无 `event_loop` fixture
+- [ ] 所有 async fixtures 使用 `async def` 而非手动管理事件循环
 
 ---
 
@@ -1334,14 +1486,37 @@ def reset_test_environment():
 
 - [ ] **7.7** 验证：并发运行测试无冲突
   - ⚠️ **注意**：pytest-xdist `-n 4` 有两种并行模式：
-    1. **多进程模式**（默认，`--dist loadscope`）：每个 worker 是独立进程，天然隔离
-    2. **线程模式**（`--dist loadscope --forked`）：同一进程内多线程，需租户隔离
-  - 本方案使用多进程模式，无需 `asyncio.current_task().ident`
-  - 租户 ID 仅用于区分同一进程内的多个 async context
+    1. **多进程模式**（默认，`--dist loadscope`）：每个 worker 是独立进程，天然进程级隔离
+    2. **线程模式**（`--dist loadscope --forked`）：同一进程内多线程，**不推荐**，需额外同步
+  - **本方案使用多进程模式**，每个 worker 进程有独立内存空间
+  - `asyncio.current_task().ident` 用于**同一进程内**区分不同 async context
+  - 租户 ID（UUID 前缀）用于**全局**资源隔离，避免不同 worker 间冲突
   - 建议并行度 `-n 4` 而非更高，避免资源竞争
   ```bash
   poetry run pytest tests/acceptance/ -v -n 4
   ```
+
+**多进程租户隔离原理：**
+
+```
+Worker 进程 A                         Worker 进程 B
+┌─────────────────────────────┐     ┌─────────────────────────────┐
+│ asyncio.current_task().ident │     │ asyncio.current_task().ident │
+│         = 1                  │     │         = 1                  │
+│                             │     │                             │
+│ _tenant_contexts[1]         │     │ _tenant_contexts[1]         │
+│   → TenantContext_A         │     │   → TenantContext_B         │
+│                             │     │                             │
+│ 队列名: test_abc123_queue  │     │ 队列名: test_def456_queue  │
+│ (进程 A 独有，不会冲突)      │     │ (进程 B 独有，不会冲突)      │
+└─────────────────────────────┘     └─────────────────────────────┘
+```
+
+**关键理解**：
+- 不同 worker 进程间**天然隔离**（独立内存）
+- 同一 worker 进程内通过 `task.ident` 区分 context
+- 全局资源（队列名、collection 名）通过 UUID 前缀隔离
+- **`asyncio.current_task().ident` 不跨进程**，所以不存在 ident 冲突问题
 
 ---
 

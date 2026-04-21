@@ -1799,11 +1799,6 @@ sisys/
 │   ├── user_guides/                                       # 用户指南
 │   └── developer/                                         # 开发者文档
 │
-├── docker/                                                # Docker 配置
-│   ├── Dockerfile                                         # 主 Dockerfile
-│   ├── docker-compose.yml                                 # Compose 配置
-│   └── docker-compose.prod.yml                            # 生产环境配置
-│
 ├── .gitea/                                                # Gitea 配置
 │   └── workflows/                                         # Gitea Pipeline
 │       ├── ci.yml                                         # 持续集成
