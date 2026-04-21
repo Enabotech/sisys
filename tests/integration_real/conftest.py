@@ -25,54 +25,53 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # ===================================================================
 
 
-@pytest.fixture(scope="session")
-async def real_redis_pool() -> AsyncGenerator[redis.ConnectionPool, None]:
-    """Provide a real Redis connection pool.
+@pytest.fixture
+async def real_redis() -> AsyncGenerator[redis.Redis, None]:
+    """Provide a real Redis connection.
 
     Assumes Redis is running at localhost:6379.
     Uses REDIS_HOST/REDIS_PORT/REDIS_PASSWORD from environment.
+
+    Note: 使用 function scope 确保每个测试独立，避免状态污染。
     """
     import os
 
-    pool = redis.ConnectionPool(
+    client = redis.Redis(
         host=os.getenv("REDIS_HOST", "localhost"),
         port=int(os.getenv("REDIS_PORT", "6379")),
         db=int(os.getenv("REDIS_DB", "0")),
         password=os.getenv("REDIS_PASSWORD") or None,
-        max_connections=10,
         decode_responses=True,
     )
 
     # Verify connection
-    client = redis.Redis(connection_pool=pool)
     try:
         await client.ping()
     except Exception as e:
-        pytest.skip(f"Redis not available at localhost:6379: {e}")
-    finally:
         await client.close()
+        pytest.skip(f"Redis not available at localhost:6379: {e}")
 
-    yield pool
+    yield client
 
-    # Cleanup: close pool
-    await pool.disconnect()
+    # Cleanup: close connection
+    await client.close()
 
 
 @pytest.fixture
-async def redis_session_storage(real_redis_pool: redis.ConnectionPool):
-    """Provide RedisSessionStorage with real Redis connection pool."""
+async def redis_session_storage(real_redis: redis.Redis):
+    """Provide RedisSessionStorage with real Redis connection."""
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
     config = RedisConfig()
     storage = RedisSessionStorage(config)
-    storage._pool = real_redis_pool
+    storage._pool = real_redis.connection_pool
     return storage
 
 
 @pytest.fixture
-async def redis_semantic_cache(real_redis_pool: redis.ConnectionPool):
-    """Provide RedisSemanticCache with real Redis connection pool."""
+async def redis_semantic_cache(real_redis: redis.Redis):
+    """Provide RedisSemanticCache with real Redis connection."""
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
     from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
@@ -80,19 +79,19 @@ async def redis_semantic_cache(real_redis_pool: redis.ConnectionPool):
     config = RedisConfig()
     metrics = EventMetricsCollector()
     cache = RedisSemanticCache(config, metrics_collector=metrics)
-    cache._pool = real_redis_pool
+    cache._pool = real_redis.connection_pool
     return cache
 
 
 @pytest.fixture
-async def redis_public_blackboard(real_redis_pool: redis.ConnectionPool):
-    """Provide RedisPublicBlackboard with real Redis connection pool."""
+async def redis_public_blackboard(real_redis: redis.Redis):
+    """Provide RedisPublicBlackboard with real Redis connection."""
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
 
     config = RedisConfig()
     board = RedisPublicBlackboard(config)
-    board._pool = real_redis_pool
+    board._pool = real_redis.connection_pool
     return board
 
 
