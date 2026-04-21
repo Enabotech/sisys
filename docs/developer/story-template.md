@@ -192,6 +192,136 @@ def ensure_schema(pg_config: PostgreSQLConfig):
 - [ ] **每个测试创建自己的测试数据**，不依赖预置数据
 - [ ] **测试数据使用唯一标识符**（如 `uuid4()`），避免 ID 冲突
 
+### 5.3 并行测试隔离规则（Story 20-1 实战新增）
+
+> **核心规则：并行测试必须使用 UUID 前缀隔离资源，禁止 autouse fixture 删除全局共享资源。**
+
+**资源隔离前缀规范：**
+
+| 资源类型 | 前缀格式 | 示例 |
+|---------|---------|------|
+| Redis keys | `test:{uuid}:` | `test:a1b2c3d4:session:001` |
+| RabbitMQ queues | `test_{uuid}_queue_` | `test_a1b2c3d4_queue_docs` |
+| Qdrant collections | `test_{uuid}_` | `test_a1b2c3d4_documents` |
+| PostgreSQL schemas | `test_{uuid}` | `test_a1b2c3d4` |
+| MinIO buckets | `test-{uuid}` | `test-a1b2c3d4` |
+
+**Fixture 依赖管理（关键）：**
+
+```python
+# ✅ 正确：显式依赖确保清理顺序
+@pytest.fixture
+async def semantic_cache(redis_config: RedisConfig, flush_redis_before_test: None):
+    """Depends on flush_redis_before_test to ensure clean state before test."""
+    cache = RedisSemanticCache(redis_config)
+    yield cache
+    await cache.close()
+
+# ❌ 错误：假设 autouse 会先执行（并行时顺序不确定）
+@pytest.fixture
+async def semantic_cache(redis_config: RedisConfig):
+    cache = RedisSemanticCache(redis_config)
+    yield cache
+    await cache.close()
+```
+
+**autouse cleanup 陷阱：**
+
+```python
+# ❌ 错误：删除所有 test_* 资源会误删其他测试的资源
+@pytest.fixture(autouse=True)
+async def cleanup_test_collections(qdrant_client):
+    yield
+    # 删除所有 test_* collection → 并行时可能误删其他测试的 collection！
+    for coll in await manager.list_collections():
+        if coll.startswith("test_"):
+            await manager.delete_collection(coll)
+
+# ✅ 正确：每个测试只清理自己创建的资源
+@pytest.fixture(autouse=True)
+async def init_test_collection_names():
+    for key in _test_collection_names:
+        _test_collection_names[key] = f"test_{uuid.uuid4().hex[:8]}"
+    yield
+    # 只清理自己创建的 collection
+    for key in _test_collection_names:
+        if _test_collection_names[key]:
+            try:
+                await manager.delete_collection(_test_collection_names[key])
+            except Exception:
+                pass
+```
+
+**asyncio 上下文规则：**
+
+```python
+# ✅ 正确：asyncio.Lock 是类变量
+class TenantContext:
+    _lock: asyncio.Lock = asyncio.Lock()  # 类变量，所有实例共享
+
+# ❌ 错误：实例变量会导致锁无效
+class TenantContext:
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # 实例变量
+
+# ✅ 正确：处理 threading.current_thread().ident 可能为 None
+tid = threading.current_thread().ident
+return tid if tid is not None else 0
+
+# ❌ 错误：or 0 无法处理 None
+return threading.current_thread().ident or 0  # Any type error
+```
+
+**pytest-asyncio auto mode 配置：**
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+```
+
+```python
+# ❌ 错误：scope=module 与 auto mode 冲突
+@pytest.fixture(scope="module")
+def event_loop():
+    ...
+
+# ✅ 正确：删除所有 scope=module 的 event_loop fixture
+```
+
+**Real Neo4j Client 使用：**
+
+```python
+# ✅ 正确：使用 get_async_driver().session()
+driver = neo4j_client.get_async_driver()
+async with driver.session(database=neo4j_client._database) as session:
+    await session.run("MATCH (n) DETACH DELETE n")
+
+# ❌ 错误：Neo4jClientWrapper 没有 session() 方法
+async with neo4j_client.session() as session:  # AttributeError!
+```
+
+### 5.4 并行测试验证要求
+
+> **每个 Story 必须验证并行执行（`pytest -n 4`）无冲突，这是 DoD 的一部分。**
+
+**验证命令：**
+```bash
+# 并行测试稳定性验证（连续5次）
+for i in {1..5}; do
+  echo "Run $i:"
+  poetry run pytest tests/ -n 4 --tb=no -q
+done
+
+# mypy 类型检查（必须通过）
+poetry run mypy tests/
+```
+
+**DoD 并行测试检查项：**
+- [ ] `pytest tests/ -n 4` 通过（2071 passed）
+- [ ] 连续5次运行无随机失败
+- [ ] mypy 类型检查通过
+- [ ] 无资源被误删（collection/queue/key）
+
 ---
 
 ## 📊 AC → Task → Subtask 追溯矩阵
@@ -530,7 +660,9 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.1.0
+**模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-04-18
-**更新说明:** 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback 清理测试数据；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate；(4) 外部服务必须隔离或使用 mock；(5) 测试数据必须使用唯一标识符
+**最后更新/Last Updated:** 2026-04-21
+**更新说明:**
+- v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱（禁止删除全局共享资源）；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置；(5) Real Neo4j Client 正确用法；(6) 并行测试验证要求
+- v2.1.0: 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback 清理测试数据；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate；(4) 外部服务必须隔离或使用 mock；(5) 测试数据必须使用唯一标识符

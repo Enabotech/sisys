@@ -1,7 +1,7 @@
 # SDD+TDD 融合模式实施检查清单
 
-**版本:** 1.1.0
-**日期:** 2026-04-18
+**版本:** 1.2.0
+**日期:** 2026-04-21
 **用途:** 每个 Story 开发时的检查清单
 ---
 
@@ -128,11 +128,60 @@ PASSED ... (必须全部通过！)
 - [ ] **Neo4j/Qdrant 测试数据用唯一标识符隔离**
 - [ ] **外部 API 调用使用 mock/stub**
 
+#### 并行测试隔离规则（Story 20-1 实战经验）
+
+> **核心规则：并行测试必须使用 UUID 前缀隔离资源，禁止 autouse fixture 删除全局共享资源。**
+
+**资源隔离前缀规范：**
+- [ ] **Redis keys**: `test:{uuid}:` 格式
+- [ ] **RabbitMQ queues**: `test_{uuid}_queue_` 格式
+- [ ] **Qdrant collections**: `test_{uuid}_` 格式
+- [ ] **PostgreSQL schemas**: `test_{uuid}` 格式
+- [ ] **MinIO buckets**: `test-{uuid}` 格式
+
+**Fixture 依赖管理：**
+- [ ] **清理 fixture 必须显式依赖被清理的资源 fixture**
+  - ✅ 正确：`semantic_cache(redis_config, flush_redis_before_test: None)`
+  - ❌ 错误：假设 autouse flush_redis_before_test 会先执行
+- [ ] **每个测试清理自己的资源**，不依赖 autouse fixture 删除 "所有" test_* 资源
+  - ❌ 错误：autouse cleanup 删除所有 `test_*` collection → 会误删其他测试的资源
+  - ✅ 正确：每个测试在 finally 块中清理自己创建的资源
+
+**asyncio 上下文注意事项：**
+- [ ] **asyncio.Lock 必须是类变量**，不是实例变量
+  - ✅ 正确：`_lock: asyncio.Lock = asyncio.Lock()`（类变量）
+  - ❌ 错误：`_lock: asyncio.Lock = field(default_factory=asyncio.Lock)`（实例变量）
+- [ ] **使用 `id(task)` 而非 `task.ident` 获取任务标识**
+  - `task.ident` 在某些 Python 版本中不存在
+- [ ] **threading.current_thread().ident 可能为 None**
+  - 需显式处理：`tid if tid is not None else 0`
+
+**pytest-asyncio auto mode 配置：**
+- [ ] **删除所有 `scope=module/event_loop` fixture**
+- [ ] **在 `pyproject.toml` 配置 `asyncio_mode = "auto"`**
+- [ ] **异步测试使用 `@pytest.mark.asyncio` 标记**
+
+**Real Neo4j Client 使用规范：**
+- [ ] **Neo4jClientWrapper 没有 `session()` 方法**
+- [ ] 必须使用 `get_async_driver().session(database=...)` 获取 session
+
 **违反约束的后果：**
 - ❌ 测试间相互影响（数据泄漏导致随机失败）
 - ❌ 测试依赖执行顺序（违反 pytest 独立性原则）
 - ❌ CI 环境与本地环境不一致
 - ❌ 并行测试失败（共享数据竞争）
+- ❌ mypy 类型错误（asyncio.Lock 实例变量、None 处理）
+
+---
+
+### 5.6 并行测试验证清单
+
+> **每个 Story 必须验证并行执行（`pytest -n 4`）无冲突。**
+
+- [ ] 运行 `pytest tests/ -n 4` 验证并行测试通过
+- [ ] 连续运行 5 次验证稳定性
+- [ ] 验证无资源冲突（collection/queue/key 不被误删）
+- [ ] 验证 mypy 类型检查通过
 
 ---
 
