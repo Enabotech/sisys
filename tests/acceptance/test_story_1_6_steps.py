@@ -32,9 +32,26 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src"
 DOMAIN_DIR = SRC_DIR / "domain"
 
+# Module-level test state for UUID isolation
+_test_collection_names = {
+    "finance": None,
+    "hr": None,
+}
+
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+
+@pytest.fixture(autouse=True)
+def init_test_collection_names():
+    """Initialize unique collection names for each test."""
+    for key in _test_collection_names:
+        _test_collection_names[key] = f"sisys_documents_{key}_{uuid.uuid4().hex[:8]}"
+    yield
+    # Cleanup after test
+    for key in _test_collection_names:
+        _test_collection_names[key] = None
 
 
 @pytest.fixture
@@ -116,7 +133,7 @@ def create_collection(collection_manager: QdrantCollectionManager, event_loop):
 
     async def _create():
         await collection_manager.create_collection(
-            name="sisys_documents_finance",
+            name=_test_collection_names["finance"],
             vector_size=1024,
             distance="Cosine",
         )
@@ -180,7 +197,7 @@ def collection_exists(collection_manager: QdrantCollectionManager, event_loop):
 
     async def _create():
         await collection_manager.create_collection(
-            name="sisys_documents_finance",
+            name=_test_collection_names["finance"],
             vector_size=1024,
             distance="Cosine",
         )
@@ -274,7 +291,7 @@ def collection_contains_100_vectors(
         # Create collection if not exists
         try:
             await collection_manager.create_collection(
-                name="sisys_documents_finance",
+                name=_test_collection_names["finance"],
                 vector_size=1024,
                 distance="Cosine",
             )
@@ -362,7 +379,7 @@ def collection_has_different_domains(
         # P2 Fix: Create collection before inserting points
         try:
             await collection_manager.create_collection(
-                name="sisys_documents_finance",
+                name=_test_collection_names["finance"],
                 vector_size=1024,
                 distance="Cosine",
             )
@@ -445,7 +462,7 @@ def collection_has_text_vectors(
     async def _insert():
         try:
             await collection_manager.create_collection(
-                name="sisys_documents_finance",
+                name=_test_collection_names["finance"],
                 vector_size=1024,
                 distance="Cosine",
             )
@@ -531,7 +548,7 @@ def both_collections_exist(
     async def _create():
         try:
             await collection_manager.create_collection(
-                name="sisys_documents_finance",
+                name=_test_collection_names["finance"],
                 vector_size=1024,
                 distance="Cosine",
             )
@@ -539,7 +556,7 @@ def both_collections_exist(
             pass
         try:
             await collection_manager.create_collection(
-                name="sisys_documents_hr",
+                name=_test_collection_names["hr"],
                 vector_size=1024,
                 distance="Cosine",
             )
