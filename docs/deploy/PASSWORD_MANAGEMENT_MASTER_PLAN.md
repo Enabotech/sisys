@@ -204,7 +204,6 @@ stringData:
 
 **当前配置**:
 ```yaml
-# docker/docker-compose.prod.yml
 services:
   postgres:
     environment:
