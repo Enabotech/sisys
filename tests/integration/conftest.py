@@ -32,6 +32,10 @@ from src.infrastructure.idempotency.checker import IdempotencyChecker
 from src.infrastructure.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
+# Import reset_test_environment from tests.fixtures for test isolation
+# Note: reset_test_environment in tests/fixtures.py is already autouse=True
+from tests.fixtures import reset_test_environment  # noqa: F401
+
 # ===================================================================
 # Mock Fixtures (AC-1)
 # ===================================================================

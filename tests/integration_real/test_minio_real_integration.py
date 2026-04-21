@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from dotenv import load_dotenv
@@ -26,12 +27,20 @@ from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
+# Import reset_test_environment for test isolation (AC-6)
+
 pytestmark = pytest.mark.asyncio
 
 
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation (uses hyphen for MinIO compatibility)."""
+    return f"test-{uuid4().hex[:8]}"
 
 
 @pytest.fixture
@@ -86,9 +95,9 @@ class TestMinioClientAdapter:
 class TestBucketManager:
     """Bucket 管理器真实实例测试。"""
 
-    async def test_create_and_delete_bucket(self, bucket_manager: BucketManager):
+    async def test_create_and_delete_bucket(self, bucket_manager: BucketManager, test_tenant_id: str):
         """测试 Bucket 创建和删除。"""
-        bucket_name = "sisys-test-documents-tenant1"
+        bucket_name = f"sisys-documents-{test_tenant_id}"
 
         # Cleanup first
         bucket_manager.delete_bucket(bucket_name, force=True)
@@ -109,9 +118,9 @@ class TestBucketManager:
         exists = bucket_manager.bucket_exists(bucket_name)
         assert exists is False
 
-    async def test_create_existing_bucket_returns_false(self, bucket_manager: BucketManager):
+    async def test_create_existing_bucket_returns_false(self, bucket_manager: BucketManager, test_tenant_id: str):
         """测试创建已存在的 Bucket 返回 False。"""
-        bucket_name = "sisys-test-exists-tenant1"
+        bucket_name = f"sisys-exists-{test_tenant_id}"
 
         # Cleanup first
         bucket_manager.delete_bucket(bucket_name, force=True)
@@ -127,14 +136,14 @@ class TestBucketManager:
         # Cleanup
         bucket_manager.delete_bucket(bucket_name, force=True)
 
-    async def test_delete_nonexistent_bucket_returns_false(self, bucket_manager: BucketManager):
+    async def test_delete_nonexistent_bucket_returns_false(self, bucket_manager: BucketManager, test_tenant_id: str):
         """测试删除不存在的 Bucket 返回 False。"""
-        result = bucket_manager.delete_bucket("sisys-nonexistent-bucket-xyz")
+        result = bucket_manager.delete_bucket(f"sisys-nonexistent-{test_tenant_id}")
         assert result is False
 
-    async def test_list_buckets(self, bucket_manager: BucketManager):
+    async def test_list_buckets(self, bucket_manager: BucketManager, test_tenant_id: str):
         """测试列出所有 Bucket。"""
-        bucket_name = "sisys-test-list-tenant1"
+        bucket_name = f"sisys-list-{test_tenant_id}"
 
         # Cleanup first
         bucket_manager.delete_bucket(bucket_name, force=True)
@@ -162,9 +171,9 @@ class TestBucketManager:
 class TestMinioObjectOperations:
     """MinIO 对象操作真实实例测试。"""
 
-    async def test_bucket_creation_for_objects(self, minio_client: MinioClientAdapter):
+    async def test_bucket_creation_for_objects(self, minio_client: MinioClientAdapter, test_tenant_id: str):
         """测试对象操作前的 Bucket 创建。"""
-        bucket_name = "sisys-test-objects-tenant1"
+        bucket_name = f"sisys-objects-{test_tenant_id}"
 
         # Cleanup
         try:
@@ -182,9 +191,9 @@ class TestMinioObjectOperations:
         # Cleanup
         minio_client.client.remove_bucket(bucket_name)
 
-    async def test_put_and_get_object(self, minio_client: MinioClientAdapter):
+    async def test_put_and_get_object(self, minio_client: MinioClientAdapter, test_tenant_id: str):
         """测试对象上传和下载。"""
-        bucket_name = "sisys-test-ops-tenant1"
+        bucket_name = f"sisys-ops-{test_tenant_id}"
         object_name = "test-document.txt"
         content = b"Hello, MinIO!"
 
