@@ -109,11 +109,28 @@
 **And** 吞吐量支持 100 executions/second
 
 **验证标准/Validation Criteria:**
-- [ ] 沙箱启动延迟 P95<100ms（基准测试）
-- [ ] 状态快照延迟 P95<50ms（基准测试）
-- [ ] 吞吐量 100 executions/second（负载测试）
+- [ ] 沙箱启动延迟 P95<100ms（使用 `pytest-benchmark` 测量，1000 次采样）
+- [ ] 状态快照延迟 P95<50ms（使用 `pytest-benchmark` 测量，1000 次采样）
+- [ ] 吞吐量 100 executions/second（使用 `locust` 或 `pytest-benchmark` 持续压测 30 秒）
 - [ ] 执行幂等性（相同输入产生相同输出）
 - [ ] 执行错误重试机制（指数退避）
+
+**基准测试方法：**
+```bash
+# 沙箱启动延迟基准测试
+pytest tests/unit/performance/test_execute_performance.py::test_sandbox_startup_latency --benchmark-min-rounds=1000
+
+# 状态快照延迟基准测试
+pytest tests/unit/performance/test_execute_performance.py::test_snapshot_latency --benchmark-min-rounds=1000
+
+# 吞吐量负载测试
+locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host http://localhost:8000
+```
+
+**性能指标采集：**
+- 使用 `pytest-benchmark` 自动采集 P50/P95/P99 延迟
+- 使用 `prometheus_client` 导出指标到 Prometheus
+- 使用 `Grafana` 可视化性能趋势
 
 ---
 
@@ -213,6 +230,39 @@
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.14c.feature` | Task 0 |
 | **SDD 架构验证** | execute 解耦 | 六边形架构约束 | `test_execute_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端 execute 流程 | `test_execute_integration.py` | Task 3 |
+
+#### 测试隔离约束（必须遵守）
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+> 参考 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md) §5.5 测试隔离约束。
+
+**约束规则：**
+
+| 约束类型 | 规则 | 违反后果 |
+|---------|------|---------|
+| **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
+| **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
+| **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
+| **外部服务隔离** | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
+| **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
+| **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
+| **asyncio 上下文** | asyncio.Lock 使用类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
+
+**禁止行为：**
+- ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
+- ❌ autouse fixture 删除全局匹配资源（如 `test_*`）
+- ❌ Fixture 假设清理顺序（必须显式声明依赖）
+- ❌ asyncio.Lock 使用实例变量
+- ❌ scope=module 的 event_loop fixture
+
+**验证要求：**
+- [ ] 并行测试 `pytest tests/ -n 8` 通过
+- [ ] 连续5次运行无随机失败
+- [ ] `ruff check` 通过
+- [ ] `mypy` 通过
 
 ---
 
@@ -370,13 +420,22 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/performance/test_execute_performance.py`（验证性能要求） |
+| 🔴 红 | 编写 `tests/unit/performance/test_execute_performance.py`（验证性能要求，使用 pytest-benchmark） |
 | 🟢 绿 | 实现性能优化（沙箱预热、连接池复用） |
 | 🔄 重构 | 性能调优 |
 
 - [ ] Subtask 3.4: 🔴 红 — 编写性能基准失败测试
+  - 沙箱启动延迟测试（`test_sandbox_startup_latency`）
+  - 状态快照延迟测试（`test_snapshot_latency`）
+  - 吞吐量负载测试（`test_execution_throughput`）
+  - 执行幂等性测试（`test_execution_idempotency`）
 - [ ] Subtask 3.5: 🟢 绿 — 实现性能优化
+  - 沙箱连接池复用（Docker SDK connection pooling）
+  - Redis 连接池配置（`max_connections=50`）
+  - 沙箱预热机制（空闲时保持最小容器实例）
 - [ ] Subtask 3.6: 🔄 重构 — 性能调优
+  - 运行 `pytest-benchmark --compare` 对比优化前后性能
+  - 确认 P95 延迟达标
 
 #### 集成测试
 
@@ -556,6 +615,8 @@ sisys/
 - [ ] 性能基准测试验证沙箱启动 P95<100ms、快照 P95<50ms
 - [ ] Executed 技术事件通过下游监听器发布 DocumentProcessed/ToolExecuted/AgentDecided
 - [ ] SandboxExecutor 端口在 interfaces 层，实现在 infrastructure 层（DockerSandboxAdapter）
+- [ ] 测试隔离约束显式强调（asyncio.Lock 类变量、pytest-asyncio auto mode）
+- [ ] 性能基准测试方法明确（pytest-benchmark + locust）
 
 ### Git Intelligence Summary
 
@@ -600,14 +661,16 @@ sisys/
 
 ### 完成清单 Completion Notes List
 
-- [ ] 故事需求从 `epics_v1.0.md` 提取
-- [ ] 架构约束从 `architecture.md` 提取
-- [ ] or.md 系统公理一（execute）追溯完成
-- [ ] 状态设置为 `ready-for-dev`
-- [ ] SDD+TDD 融合开发要求定义完成
-- [ ] 项目结构对齐统一规范
-- [ ] 前一个故事学习经验已整合
-- [ ] execute 与 trigger/route 解耦关系已澄清
+- [x] 故事需求从 `epics_v1.0.md` 提取
+- [x] 架构约束从 `architecture.md` 提取
+- [x] or.md 系统公理一（execute）追溯完成
+- [x] 状态设置为 `ready-for-dev`
+- [x] SDD+TDD 融合开发要求定义完成
+- [x] 项目结构对齐统一规范
+- [x] 前一个故事学习经验已整合
+- [x] execute 与 trigger/route 解耦关系已澄清
+- [x] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
+- [x] 性能基准测试方法明确（pytest-benchmark + locust）
 
 ### 文件清单 File List
 
@@ -710,11 +773,13 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成
-2. [ ] All acceptance criteria specified 所有验收标准已定义
-3. [ ] Architecture constraints extracted 架构约束已提取
-4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
+1. [x] All tasks defined 所有任务定义完成
+2. [x] All acceptance criteria specified 所有验收标准已定义
+3. [x] Architecture constraints extracted 架构约束已提取
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+5. [x] Sprint status synced to `ready-for-dev`
+6. [x] 测试隔离约束显式强调
+7. [x] 性能基准测试方法明确
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -734,10 +799,12 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 10 | AC-1 验证标准路径引用旧架构 | P2 | 修正 sandbox_executor.py → docker_sandbox_adapter.py | ✅ 已修复 |
 | 11 | 测试文件引用不一致 | P2 | 修正 test_sandbox_executor.py → test_docker_sandbox_adapter.py | ✅ 已修复 |
 | 12 | 业务价值表格与 AC-3 描述不一致 | P1 | 业务价值表格改为"Executed 技术事件，下游监听器根据业务类型发布对应领域事件" | ✅ 已修复 |
+| 13 | 测试隔离约束未显式强调 | P2 | 添加"测试隔离约束"章节，明确 asyncio.Lock 类变量、pytest-asyncio auto mode 等规则 | ✅ 已修复 |
+| 14 | 性能基准测试方法未明确 | P2 | 补充具体测试方法（pytest-benchmark + locust）和验证命令 | ✅ 已修复 |
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
+- [x] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `validate-create-story` 质量检查
@@ -759,7 +826,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.1.0
+**模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-20
-**最后更新/Last Updated:** 2026-04-20
-**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor 端口接口（interfaces 层）+ DockerSandboxAdapter（infrastructure 层）; (2) ExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) Executed 技术事件（携带 business_event_type）触发下游领域事件; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；二轮审查修复：一致性修正（Task 0 Subtask 路径、AC-1 验证标准、测试文件引用）
+**最后更新/Last Updated:** 2026-04-21
+**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor 端口接口（interfaces 层）+ DockerSandboxAdapter（infrastructure 层）; (2) ExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) Executed 技术事件（携带 business_event_type）触发下游领域事件; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；二轮审查修复：一致性修正；三轮审查修复：添加测试隔离约束章节（asyncio.Lock/pytest-asyncio）、补充性能基准测试方法（pytest-benchmark + locust）
