@@ -827,14 +827,6 @@ def reset_test_env() -> None:
 services:
 
   # ===========================================================================
-  # 测试专用网络
-  # ===========================================================================
-  networks:
-    sisys-test:
-      driver: bridge
-      name: sisys-test-network
-
-  # ===========================================================================
   # L1: Redis 高速缓存层 (测试实例)
   # ===========================================================================
   redis-test:
@@ -964,8 +956,13 @@ services:
       - sisys-test
 
 # =============================================================================
-# 存储卷 (测试数据卷，与生产隔离)
+# 网络和存储卷 (测试数据卷，与生产隔离)
 # =============================================================================
+networks:
+  sisys-test:
+    driver: bridge
+    name: sisys-test-network
+
 volumes:
   redis_test_data:
     driver: local
@@ -1147,10 +1144,15 @@ async def isolated_tenant_context(test_tenant: TestTenant) -> TenantContext:
     """Pytest fixture: 创建隔离的租户上下文 (async).
 
     自动清理资源。
+
+    ✅ T2: 使用 resolve_env(test_tenant_id=test_tenant.id) 确保 config.test_tenant_id
+    与 tenant.prefix 一致，与 tenant_context fixture 行为对齐。
     """
-    from tests.environments import get_test_env
-    env_config = get_test_env()
-    context = TenantContext(tenant=test_tenant, config=env_config)
+    from tests.environments import resolve_env
+
+    # ✅ 复用 test_tenant 的 ID，确保 config.test_tenant_id 与 tenant.prefix 一致
+    config = resolve_env(test_tenant_id=test_tenant.id)
+    context = TenantContext(tenant=test_tenant, config=config)
 
     task_id = _get_task_id()
     _tenant_contexts[task_id] = context
@@ -1162,16 +1164,15 @@ async def isolated_tenant_context(test_tenant: TestTenant) -> TenantContext:
         del _tenant_contexts[task_id]
 
 
-# Mock 适配器 - 用于替换真实服务为测试租户隔离版本
+# 租户感知适配器 - 用于替换真实服务为测试租户隔离版本
 class TenantAwareMock:
-    """租户感知的 Mock 适配器.
+    """租户感知的资源名称包装器.
 
-    自动为所有资源添加租户前缀。
+    自动为所有资源名称添加租户前缀，无任何 mock 行为。
     """
 
     def __init__(self, tenant: TestTenant):
         self.tenant = tenant
-        self._mocks: dict[str, Any] = {}
 
     def wrap_queue_name(self, base_queue: str) -> str:
         """包装队列名."""
@@ -1282,7 +1283,7 @@ async def _cleanup_tenant_resources(
     """清理租户相关资源.
 
     注意：
-    - 清理失败只记录 warning，不阻断测试
+    - 清理失败使用 logging.error() 记录，不阻断测试
     - 真正的资源泄漏风险由 setup 时清理和定期 CI 清理兜底
     """
     tenant = context.tenant
@@ -1300,7 +1301,10 @@ async def _cleanup_tenant_resources(
         mgmt_pass = config.rabbitmq_password
         base_url = f"http://{mgmt_host}:{mgmt_port}/api"
 
-        auth = aiohttp.BasicAuth(mgmt_user, mgmt_pass)
+        auth = aiohttp.BasicAuth(
+            mgmt_user if mgmt_user else "guest",
+            mgmt_pass if mgmt_pass else "guest",
+        )
         timeout = aiohttp.ClientTimeout(total=10)
 
         async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
@@ -1453,14 +1457,23 @@ async def _cleanup_tenant_resources(
             ) as resp:
                 if resp.status in (200, 201):
                     result = await resp.json()
-                    # ✅ R3: Neo4j 5.x HTTP API — summary 在顶层，不在 results[0] 内
+                    # ✅ R3/D3: Neo4j 5.x HTTP API — summary 在顶层，不在 results[0] 内
                     # 响应结构: {"results": [...], "errors": [], "summary": {"counters": {...}}}
-                    summary = result.get("summary", {})
-                    counters = summary.get("counters", {})
-                    deleted_nodes = counters.get("nodesDeleted", 0)
-                    deleted_rels = counters.get("relationshipsDeleted", 0)
-                    if deleted_nodes > 0 or deleted_rels > 0:
-                        print(f"Neo4j: deleted {deleted_nodes} nodes, {deleted_rels} rels")
+                    # D3: Neo4j 可能返回 200 但同时有 application-level 错误
+                    errors = result.get("errors", [])
+                    if errors:
+                        cleanup_errors.append(
+                            f"Neo4j Cypher errors: {[e.get('message', str(e)) for e in errors]}"
+                        )
+                        # 有错误时跳过数据删除（已通过错误日志记录）
+                        pass
+                    else:
+                        summary = result.get("summary", {})
+                        counters = summary.get("counters", {})
+                        deleted_nodes = counters.get("nodesDeleted", 0)
+                        deleted_rels = counters.get("relationshipsDeleted", 0)
+                        if deleted_nodes > 0 or deleted_rels > 0:
+                            print(f"Neo4j: deleted {deleted_nodes} nodes, {deleted_rels} rels")
                 elif resp.status == 401:
                     cleanup_errors.append("Neo4j auth failed (check NEO4J_USERNAME/PASSWORD)")
                 elif resp.status == 404:
@@ -1854,7 +1867,7 @@ Worker 进程 A                         Worker 进程 B
 
 ---
 
-### tests/acceptance/ 重构清单
+### Phase 5: tests/acceptance/ 重构清单
 
 **现状**：12 个 BDD 验收测试文件，使用真实服务（RabbitMQ/Redis/Qdrant 等）
 
@@ -1890,7 +1903,7 @@ Worker 进程 A                         Worker 进程 B
 
 ---
 
-### tests/integration/ 重构清单
+### Phase 6: tests/integration/ 重构清单
 
 **现状**：15 个集成测试文件，使用 fakeredis mock
 
@@ -1912,7 +1925,7 @@ Worker 进程 A                         Worker 进程 B
 
 ---
 
-### tests/integration_real/ 重构清单
+### Phase 7: tests/integration_real/ 重构清单
 
 **现状**：6 个真实服务集成测试文件
 
@@ -1939,7 +1952,7 @@ Worker 进程 A                         Worker 进程 B
 
 ---
 
-### tests/unit/ 重构清单
+### Phase 8: tests/unit/ 重构清单
 
 **现状**：70 个单元测试文件，分布在 7 个子目录
 
