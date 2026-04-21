@@ -181,7 +181,7 @@ WORKDIR /app
 RUN chown -R sisys:sisys /app
 
 # 复制入口脚本
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY deploy/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     chown sisys:sisys /usr/local/bin/entrypoint.sh
 

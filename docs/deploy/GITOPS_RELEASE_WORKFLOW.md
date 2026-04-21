@@ -280,7 +280,7 @@ echo "v1.1.0" > VERSION
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/dockerfile.app
+          file: ./deploy/docker/dockerfile.app
           push: true
           tags: |
             # === 稳定标签（latest 指向最新开发版）===

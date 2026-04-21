@@ -384,11 +384,11 @@ jobs:
         with:
           filters: |
             l2:
-              - 'docker/dockerfile.l2'
+              - 'deploy/docker/dockerfile.l2'
               - 'pyproject.toml'
               - 'poetry.lock'
             l3:
-              - 'docker/dockerfile.app'
+              - 'deploy/docker/dockerfile.app'
               - 'src/**'
               - 'tests/**'
               - 'configs/**'
@@ -563,7 +563,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/dockerfile.l2
+          file: ./deploy/docker/dockerfile.l2
           push: true
           tags: |
             ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -595,7 +595,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/dockerfile.app
+          file: ./deploy/docker/dockerfile.app
           push: true
           tags: |
             ${{ steps.meta.outputs.image_tag_l3 }}
@@ -629,7 +629,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/dockerfile.app
+          file: ./deploy/docker/dockerfile.app
           push: true
           tags: |
             ${{ steps.meta.outputs.image_tag_l3 }}

@@ -120,8 +120,8 @@ harbor.sisys.local/sisys/dependency:abc123
 | **CI/CD** | CI Pipeline | ✅ | `.gitea/workflows/ci.yaml` |
 | | CD Pipeline | ✅ | `.gitea/workflows/cd.yaml` |
 | | 依赖镜像 | ✅ | `.gitea/workflows/build-dependency-image.yml` |
-| **Docker** | Layer 2 Dockerfile | ✅ | `docker/dockerfile.l2` |
-| | Layer 3 Dockerfile | ✅ | `docker/dockerfile.app` |
+| **Docker** | Layer 2 Dockerfile | ✅ | `deploy/docker/dockerfile.l2` |
+| | Layer 3 Dockerfile | ✅ | `deploy/docker/dockerfile.app` |
 | **K8s** | Deployment | ✅ | `deploy/kubernetes/k8s/deployment.yaml` |
 | | Service | ✅ | `deploy/kubernetes/k8s/service.yaml` |
 

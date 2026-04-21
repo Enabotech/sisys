@@ -24,7 +24,7 @@ So that **团队可以高效协作开发**。
 
 ## Implementation Tasks
 
-- [x] 创建 `docker/docker-compose.yml` 文件，配置以下服务： ✅
+- [x] 创建 `deploy/app/docker-compose.yml` 文件，配置以下服务： ✅
   - PostgreSQL 15+
   - Redis 7.0+
   - Qdrant 1.7+

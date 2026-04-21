@@ -342,34 +342,6 @@ db-init: db-migrate
 	@echo "✅ 数据库初始化完成"
 
 # -----------------------------------------------------------------------------
-# Docker 环境
-# -----------------------------------------------------------------------------
-.PHONY: docker-up docker-down docker-build docker-logs docker-clean
-
-docker-up:
-	@echo "🐳 启动 Docker 环境..."
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml up -d
-	@echo "✅ Docker 环境已启动"
-
-docker-down:
-	@echo "🛑 停止 Docker 环境..."
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down
-
-docker-build:
-	@echo "🔨 构建 Docker 镜像..."
-	$(DOCKER) build -f docker/dockerfile.prod -t sisys:prod .
-	@echo "✅ Docker 镜像构建完成"
-
-docker-logs:
-	@echo "📋 查看 Docker 日志..."
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml logs -f
-
-docker-clean:
-	@echo "🧹 清理 Docker 容器..."
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down -v
-	@echo "✅ Docker 环境已清理"
-
-# -----------------------------------------------------------------------------
 # Docker 基础依赖镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
 # 标签命名规范：docs/architecture/image-tagging-strategy.md
 # -----------------------------------------------------------------------------
@@ -411,7 +383,7 @@ docker-build-l1:
 	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
-	$(DOCKER) build -f docker/dockerfile.l1 \
+	$(DOCKER) build -f deploy/docker/dockerfile.l1 \
 		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L1_TAG) \
 		--progress=plain \
 		--build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -485,7 +457,7 @@ docker-build-l2:
 	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
-	$(DOCKER) build -f docker/dockerfile.l2 \
+	$(DOCKER) build -f deploy/docker/dockerfile.l2 \
 		-t $(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG) \
 		--progress=plain \
 		--build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -560,7 +532,7 @@ docker-build-l3:
 	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
-	$(DOCKER) build -f docker/dockerfile.app \
+	$(DOCKER) build -f deploy/docker/dockerfile.app \
 		-t $(DOCKER_REGISTRY)/app:$(L3_TAG) \
 		--progress=plain \
 		--build-arg BUILDKIT_INLINE_CACHE=1 \

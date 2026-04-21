@@ -8,7 +8,7 @@
 
 前置条件:
     - Redis 服务已部署并运行在 localhost:6379
-    - 使用 deploy/docker-compose.yml 部署
+    - 使用 deploy/app/docker-compose.yml 部署
 """
 
 from __future__ import annotations

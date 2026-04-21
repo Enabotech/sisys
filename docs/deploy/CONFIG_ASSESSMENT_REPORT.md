@@ -164,8 +164,8 @@ kubectl run gpu-test --rm -ti --image=nvidia/cuda:12.8.0-base-ubuntu22.04 --rest
 | `.gitea/workflows/ci.yaml` | ✅ | CI Pipeline (7 阶段) |
 | `.gitea/workflows/cd.yaml` | ✅ | CD Pipeline (测试 + 生产) |
 | `.gitea/workflows/build-dependency-image.yml` | ✅ | 依赖镜像构建 |
-| `docker/dockerfile.l2` | ✅ | Layer 2 依赖镜像 |
-| `docker/dockerfile.app` | ✅ | Layer 3 应用镜像 |
+| `deploy/docker/dockerfile.l2` | ✅ | Layer 2 依赖镜像 |
+| `deploy/docker/dockerfile.app` | ✅ | Layer 3 应用镜像 |
 | `deploy/kubernetes/k8s/deployment.yaml` | ✅ | K8s 部署配置 (含 GPU) |
 | `deploy/kubernetes/k8s/service.yaml` | ✅ | K8s 服务配置 |
 

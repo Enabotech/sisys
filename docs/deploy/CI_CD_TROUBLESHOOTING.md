@@ -129,10 +129,10 @@ concurrency:
 docker pull harbor.sisys.local/sisys/dependency:latest
 
 # 2. 检查 Dockerfile 语法
-docker build -f docker/dockerfile.app --no-cache .
+docker build -f deploy/docker/dockerfile.app --no-cache .
 
 # 3. 查看构建日志
-docker build -f docker/dockerfile.app . 2>&1 | tee build.log
+docker build -f deploy/docker/dockerfile.app . 2>&1 | tee build.log
 ```
 
 ### 2. 镜像推送失败

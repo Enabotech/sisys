@@ -134,7 +134,7 @@ so that **所有项目可以复用最佳实践，确保代码质量、安全性�
   - [x] Subtask 4.4: 创建 Secrets 配置指南
 
 - [x] Task 5: 预构建镜像系统 (AC: 6) **新增**
-  - [x] Subtask 5.1: 创建 `docker/dockerfile.l2` (Layer 2)
+  - [x] Subtask 5.1: 创建 `deploy/docker/dockerfile.l2` (Layer 2)
   - [x] Subtask 5.2: 创建 `.gitea/workflows/build-dependency-image.yml`
   - [x] Subtask 5.3: 配置定时触发 (每周日 18 点)
   - [x] Subtask 5.4: 配置依赖变更触发
@@ -424,8 +424,8 @@ Qwen Code (AI 高级开发者 - BMad Method Story Context Engine)
 - `.gitea/workflows/build-dependency-image.yml` - 依赖镜像构建 ✅
 
 **Docker 配置:**
-- `docker/dockerfile.l2` - Layer 2 依赖镜像 ✅
-- `docker/dockerfile.app` - Layer 3 应用镜像 ✅
+- `deploy/docker/dockerfile.l2` - Layer 2 依赖镜像 ✅
+- `deploy/docker/dockerfile.app` - Layer 3 应用镜像 ✅
 
 **文档:**
 - `docs/deploy/CI_CD_PIPELINE_TEMPLATE.md` - 使用指南 ✅
