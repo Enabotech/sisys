@@ -130,88 +130,31 @@
 - [ ] **无 P0/P1 级别问题**（代码审查）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
-#### 测试隔离与数据清理约束
+#### 测试隔离约束
 
 > ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
-
-**数据库测试隔离规则：**
-
-| 规则 | 要求 | 实现方式 |
-|------|------|----------|
-| **事务隔离** | 每个测试在独立 transaction 中执行 | pytest fixture + `session.begin_nested()` 或 `begin_rollback` |
-| **自动回滚** | 测试结束后自动 rollback | fixture `yield` 后执行 `await session.rollback()` |
-| **Schema 自创建** | 测试不依赖外部迁移 | fixture 内调用 `Base.metadata.create_all()` 或 alembic fallback |
-| **外部服务隔离** | Redis/Neo4j/Qdrant 等需清理或用 fakeredis | fixture 内清理或 scope="module" 复用 |
-
-**事务回滚标准模式（必须遵守）：**
-
-```python
-# ✅ 正确：使用 transaction rollback 清理
-@pytest.fixture
-async def session(db_engine: DatabaseEngine) -> AsyncGenerator[AsyncSession, None]:
-    async with db_engine.get_async_session() as sess:
-        # 开启嵌套事务
-        async with sess.begin_nested():
-            yield sess
-        # 测试结束后自动 rollback（嵌套事务退出时执行）
-
-# ❌ 错误：手动删除数据（不可靠，且破坏数据完整性约束）
-#    await session.execute(delete(UserModel).where(...))
-```
-
-**Schema 初始化标准模式：**
-
-```python
-# ✅ 正确：测试 fixture 内确保 schema 存在
-@pytest.fixture(scope="module")
-def ensure_schema(pg_config: PostgreSQLConfig):
-    """Ensure schema exists before tests run."""
-    try:
-        # 优先 alembic 迁移
-        run_alembic_upgrade(pg_config)
-    except Exception:
-        # Fallback: 直接用 SQLAlchemy 创建
-        engine = DatabaseEngine(pg_config)
-        Base.metadata.create_all(engine.get_sync_engine())
-    yield  # 测试运行
-    # 无需清理：事务回滚处理
-```
-
-**违反约束的后果：**
-
-- ❌ 测试间相互影响（数据泄漏导致随机失败）
-- ❌ 测试依赖执行顺序（违反 pytest 独立性原则）
-- ❌ CI 环境与本地环境不一致（外部状态差异）
-- ❌ 并行测试失败（共享数据竞争）
-
-**检查清单：**
-
-- [ ] **集成测试使用 transaction rollback**，禁止手动 `delete`/`truncate`
-- [ ] **Schema 初始化在 fixture 内完成**，不依赖外部迁移命令
-- [ ] **外部服务（Redis/Neo4j/Qdrant）测试前清理或使用 fakeredis**
-- [ ] **每个测试创建自己的测试数据**，不依赖预置数据
-- [ ] **测试数据使用唯一标识符**（如 `uuid4()`），避免 ID 冲突
-
-### 5.3 并行测试隔离约束
-
-> **核心原则：并行测试必须隔离资源、禁止全局清理依赖、显式声明 Fixture 依赖。**
 
 **约束规则：**
 
 | 约束类型 | 规则 | 违反后果 |
 |---------|------|---------|
-| **资源隔离** | 并行测试必须使用唯一标识符（UUID）前缀隔离资源 | 资源冲突导致随机失败 |
-| **清理粒度** | 每个测试只清理自己创建的资源，禁止 autouse fixture 删除全局共享资源 | 误删其他测试资源 |
-| **依赖声明** | Fixture 依赖清理操作必须显式声明，不得假设执行顺序 | 并行时清理顺序不确定 |
-| **asyncio 上下文** | asyncio.Lock 必须是类变量；处理 thread.ident 可能为 None | 锁失效或类型错误 |
-| **pytest-asyncio** | 删除所有 scope=module/event_loop 的 event_loop fixture | 与 auto mode 冲突 |
-| **外部客户端** | 第三方客户端 API 调用必须验证方法存在性 | AttributeError |
+| **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
+| **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
+| **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
+| **外部服务隔离** | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
+| **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
+| **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
+| **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
-- ❌ autouse fixture 删除 `test_*`、`uuid_*` 等全局匹配的资源
-- ❌ Fixture 假设 autouse cleanup 会先执行（并行时顺序不确定）
-- ❌ asyncio.Lock 使用实例变量（field(default_factory=...）
-- ❌ scope=module 的 event_loop fixture（与 pytest-asyncio auto mode 冲突）
+- ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
+- ❌ autouse fixture 删除全局匹配资源（如 `test_*`）
+- ❌ Fixture 假设清理顺序（必须显式声明依赖）
+- ❌ asyncio.Lock 使用实例变量
+- ❌ scope=module 的 event_loop fixture
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 4` 通过
