@@ -425,3 +425,256 @@ class CrossBorderApproval:
         if deadline.tzinfo is None:
             deadline = deadline.replace(tzinfo=UTC)
         return now > deadline
+
+
+# =============================================================================
+# 等保 2.0 Level 3 Compliance Models (Story 1.12)
+# =============================================================================
+
+
+class MFAChallengeType(str, Enum):
+    """MFA challenge types supported in 等保 2.0."""
+
+    TOTP = "totp"  # Time-based One-Time Password (RFC 6238)
+    HOTP = "hotp"  # HMAC-based One-Time Password (RFC 4226)
+
+
+class MFAChallengeStatus(str, Enum):
+    """MFA challenge status."""
+
+    PENDING = "pending"
+    VERIFIED = "verified"
+    EXPIRED = "expired"
+    FAILED = "failed"
+
+
+class BackupType(str, Enum):
+    """Backup types supported."""
+
+    FULL = "full"  # Full backup
+    INCREMENTAL = "incremental"  # Incremental backup
+    DIFFERENTIAL = "differential"  # Differential backup
+
+
+class BackupStatus(str, Enum):
+    """Backup operation status."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class IntegrityStatus(str, Enum):
+    """Data integrity verification status."""
+
+    VERIFIED = "verified"
+    VIOLATED = "violated"
+    UNKNOWN = "unknown"
+
+
+class HashAlgorithm(str, Enum):
+    """Hash algorithms for integrity verification."""
+
+    SHA256 = "sha256"
+    SHA512 = "sha512"
+    MD5 = "md5"  # Deprecated but supported for legacy data
+
+
+@dataclass
+class MFAChallenge:
+    """MFA challenge model for multi-factor authentication.
+
+    Represents a TOTP/HOTP challenge issued to a user during
+    MFA setup or verification.
+
+    Attributes:
+        id: Unique challenge identifier.
+        user_id: UUID of the user this challenge is for.
+        challenge_type: Type of MFA challenge (TOTP/HOTP).
+        secret: Base32-encoded secret key for TOTP/HOTP.
+        attempts: Number of verification attempts made.
+        max_attempts: Maximum allowed verification attempts.
+        expires_at: Challenge expiration timestamp.
+        status: Current challenge status.
+        created_at: Challenge creation timestamp.
+    """
+
+    id: UUID = field(default_factory=uuid4)
+    user_id: UUID = field(default_factory=uuid4)
+    challenge_type: MFAChallengeType = MFAChallengeType.TOTP
+    secret: str = ""  # Base32-encoded secret
+    attempts: int = 0
+    max_attempts: int = 3  # 等保 2.0 requires max 3 attempts
+    expires_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    status: MFAChallengeStatus = MFAChallengeStatus.PENDING
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def is_expired(self) -> bool:
+        """Check if the challenge has expired.
+
+        Returns:
+            bool: True if challenge is expired.
+        """
+        now = datetime.now(UTC)
+        exp = self.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=UTC)
+        return now > exp
+
+    def is_max_attempts_reached(self) -> bool:
+        """Check if max verification attempts have been reached.
+
+        Returns:
+            bool: True if max attempts reached.
+        """
+        return self.attempts >= self.max_attempts
+
+    def increment_attempts(self) -> None:
+        """Increment the attempt counter."""
+        self.attempts += 1
+
+    def mark_verified(self) -> None:
+        """Mark the challenge as verified."""
+        self.status = MFAChallengeStatus.VERIFIED
+
+    def mark_failed(self) -> None:
+        """Mark the challenge as failed."""
+        self.status = MFAChallengeStatus.FAILED
+
+    def mark_expired(self) -> None:
+        """Mark the challenge as expired."""
+        self.status = MFAChallengeStatus.EXPIRED
+
+
+@dataclass
+class BackupRecord:
+    """Backup record for tracking backup operations.
+
+    Attributes:
+        id: Unique backup record identifier.
+        backup_type: Type of backup (full/incremental/differential).
+        start_time: Backup operation start timestamp.
+        end_time: Backup operation end timestamp (None if in progress).
+        status: Current backup status.
+        size_bytes: Total size of backed up data in bytes.
+        checksum: SHA-256 checksum of the backup.
+        location: Storage location of the backup.
+        user_id: UUID of user who initiated the backup.
+        description: Optional description of the backup.
+    """
+
+    id: UUID = field(default_factory=uuid4)
+    backup_type: BackupType = BackupType.FULL
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    end_time: datetime | None = None
+    status: BackupStatus = BackupStatus.PENDING
+    size_bytes: int = 0
+    checksum: str = ""  # SHA-256 checksum
+    location: str = ""  # MinIO/S3 location path
+    user_id: UUID = field(default_factory=uuid4)
+    description: str = ""
+
+    def duration_seconds(self) -> float | None:
+        """Calculate backup duration in seconds.
+
+        Returns:
+            float | None: Duration in seconds, or None if backup not completed.
+        """
+        if self.end_time is None:
+            return None
+        start = self.start_time
+        end = self.end_time
+        if start.tzinfo is not None:
+            start = start.replace(tzinfo=None)
+        if end.tzinfo is not None:
+            end = end.replace(tzinfo=None)
+        return (end - start).total_seconds()
+
+    def is_completed(self) -> bool:
+        """Check if backup completed successfully.
+
+        Returns:
+            bool: True if status is COMPLETED.
+        """
+        return self.status == BackupStatus.COMPLETED
+
+
+@dataclass
+class IntegrityCheck:
+    """Data integrity check record.
+
+    Records the result of a data integrity verification operation.
+
+    Attributes:
+        id: Unique check record identifier.
+        data_type: Type of data checked (document, config, etc.).
+        data_id: UUID of the data object checked.
+        hash_value: Expected hash value.
+        algorithm: Hash algorithm used (sha256, sha512, etc.).
+        verified_at: Timestamp of verification.
+        status: Verification status (verified/violated/unknown).
+        source: Where the data is stored/accessed from.
+    """
+
+    id: UUID = field(default_factory=uuid4)
+    data_type: str = ""
+    data_id: UUID = field(default_factory=uuid4)
+    hash_value: str = ""
+    algorithm: HashAlgorithm = HashAlgorithm.SHA256
+    verified_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    status: IntegrityStatus = IntegrityStatus.UNKNOWN
+    source: str = ""  # MinIO path, PostgreSQL table, etc.
+
+    def is_verified(self) -> bool:
+        """Check if integrity was verified successfully.
+
+        Returns:
+            bool: True if status is VERIFIED.
+        """
+        return self.status == IntegrityStatus.VERIFIED
+
+    def is_violated(self) -> bool:
+        """Check if integrity violation was detected.
+
+        Returns:
+            bool: True if status is VIOLATED.
+        """
+        return self.status == IntegrityStatus.VIOLATED
+
+
+@dataclass
+class ThreatScore:
+    """Threat score for security risk assessment.
+
+    Attributes:
+        id: Unique threat score identifier.
+        source_ip: IP address being scored.
+        threat_type: Type of threat detected.
+        score: Threat score (0-100, higher = more severe).
+        factors: List of contributing factors.
+        assessed_at: Assessment timestamp.
+    """
+
+    id: UUID = field(default_factory=uuid4)
+    source_ip: str = ""
+    threat_type: str = ""
+    score: float = 0.0  # 0-100
+    factors: list[str] = field(default_factory=list)
+    assessed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def severity_level(self) -> str:
+        """Get severity level based on score.
+
+        Returns:
+            str: Severity level (low/medium/high/critical).
+        """
+        if self.score >= 80:
+            return "critical"
+        elif self.score >= 60:
+            return "high"
+        elif self.score >= 40:
+            return "medium"
+        else:
+            return "low"
