@@ -303,10 +303,6 @@ src/
       docker_compose_service.py      # Docker Compose 服务控制
       port_detector.py               # 端口检测实现（socket）
       service_controller.py          # 服务启停实现
-    templates/
-      docker-compose.dev.yml         # 开发模式模板
-      docker-compose.demo.yml        # 演示模式模板
-      docker-compose.prod.yml        # 生产模式模板（V1）
 
   interfaces/
     cli/
@@ -663,16 +659,12 @@ sisys/
 │   │       ├── config_request.py
 │   │       └── config_response.py
 │   ├── infrastructure/
-│   │   ├── adapters/
-│   │   │   ├── yaml_config_repository.py     # YAML 仓储实现（L4 MVP 退化）
-│   │   │   ├── postgres_config_repository.py # PostgreSQL 仓储实现（V1）
-│   │   │   ├── docker_compose_service.py
-│   │   │   ├── port_detector.py
-│   │   │   └── service_controller.py
-│   │   └── templates/
-│   │       ├── docker-compose.dev.yml
-│   │       ├── docker-compose.demo.yml
-│   │       └── docker-compose.prod.yml      # V1
+│   │   └── adapters/
+│   │       ├── yaml_config_repository.py     # YAML 仓储实现（L4 MVP 退化）
+│   │       ├── postgres_config_repository.py # PostgreSQL 仓储实现（V1）
+│   │       ├── docker_compose_service.py
+│   │       ├── port_detector.py
+│   │       └── service_controller.py
 │   └── interfaces/
 │       ├── cli/
 │       │   └── setup_commands.py            # CLI 入口

@@ -654,23 +654,6 @@ db-revision:
 	$(ALEMBIC) revision -m "$(message)"
 
 # -----------------------------------------------------------------------------
-# Docker 环境
-# -----------------------------------------------------------------------------
-.PHONY: docker-up docker-down docker-build docker-logs
-
-docker-up:
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml up -d
-
-docker-down:
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml down
-
-docker-build:
-	$(DOCKER) build -f docker/dockerfile.dev -t sisys:dev .
-
-docker-logs:
-	$(DOCKER_COMPOSE) -f docker/docker-compose.dev.yml logs -f
-
-# -----------------------------------------------------------------------------
 # 服务管理
 # -----------------------------------------------------------------------------
 .PHONY: run-server run-worker run-scheduler

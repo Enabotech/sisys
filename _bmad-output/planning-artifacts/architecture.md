@@ -2468,19 +2468,6 @@ docs/
 
 ---
 
-### 13.11 Docker 配置目录结构 (docker/)
-
-```
-docker/
-├── Dockerfile                                             # 主 Dockerfile
-├── dockerfile.dev                                         # 开发环境 Dockerfile
-├── docker-compose.dev.yml                                 # 开发环境 Compose
-├── docker-compose.prod.yml                                # sisys产品交付 Compose
-└── docker-compose.test.yml                                # 测试环境 Compose
-```
-
----
-
 ### 13.12 Gitea Actions 目录结构 (.gitea/workflows/)
 
 ```
@@ -2574,7 +2561,6 @@ sisys/
 | **configs/** | ✅ | ✅ | ✅ 完整 |
 | **scripts/** | ✅ | ✅ | ✅ 完整（新增 tools 子目录） |
 | **docs/** | ✅ | ✅ | ✅ 完整（新增 operations 子目录） |
-| **docker/** | ✅ | ✅ | ✅ 完整（新增 dockerfile.dev） |
 | **.gitea/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
 | **requirements/** | ✅ | ✅ | ✅ 完整（新增 test.txt/docs.txt） |
 | **根目录配置** | 🟡 部分 | ✅ | ✅ 已补充完整 |

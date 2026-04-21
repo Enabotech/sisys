@@ -223,7 +223,7 @@ kubectl get secret harbor-secret -n sisys
 
 ```bash
 # 检查缓存命中
-docker build --progress=plain -f docker/dockerfile.l2 .
+docker build --progress=plain -f deploy/docker/dockerfile.l2 .
 
 # 查看层缓存
 docker history harbor.sisys.local/sisys/dependency:latest

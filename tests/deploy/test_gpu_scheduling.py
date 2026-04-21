@@ -181,7 +181,7 @@ class TestCIPipelineGPU:
 
 #     def test_pytorch_base_image(self):
 #         """测试 PyTorch 基础镜像配置"""
-#         dockerfile_path = Path("docker/dockerfile.l2")
+#         dockerfile_path = Path("deploy/docker/dockerfile.l2")
 
 #         if not dockerfile_path.exists():
 #             pytest.skip("Dependency Dockerfile not found")
@@ -194,7 +194,7 @@ class TestCIPipelineGPU:
 
 #     def test_gpu_verification_step(self):
 #         """测试 GPU 验证步骤"""
-#         dockerfile_path = Path("docker/dockerfile.l2")
+#         dockerfile_path = Path("deploy/docker/dockerfile.l2")
 
 #         if not dockerfile_path.exists():
 #             pytest.skip("Dependency Dockerfile not found")

@@ -246,8 +246,8 @@ cp .gitea/workflows/cd.yaml /path/to/your-project/.gitea/workflows/
 cp .gitea/workflows/build-dependency-image.yml /path/to/your-project/.gitea/workflows/
 
 # 复制 Docker 配置
-cp docker/dockerfile.l2 /path/to/your-project/docker/
-cp docker/dockerfile.app /path/to/your-project/docker/
+cp deploy/docker/dockerfile.l2 /path/to/your-project/docker/
+cp deploy/docker/dockerfile.app /path/to/your-project/docker/
 
 # 复制 K8s 配置
 cp deploy/kubernetes/k8s/deployment.yaml /path/to/your-project/deploy/kubernetes/k8s/
@@ -362,7 +362,7 @@ trivy fs --format sarif --output reports/security/trivy-fs.sarif
 
 ```bash
 # 构建命令
-docker build -f docker/dockerfile.app \
+docker build -f deploy/docker/dockerfile.app \
   --build-arg DEPENDENCY_IMAGE=harbor.sisys.local/sisys/dependency:${GIT_SHA} \
   -t harbor.sisys.local/sisys/app:${GIT_SHA} .
 ```
