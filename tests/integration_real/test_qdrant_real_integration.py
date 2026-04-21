@@ -9,9 +9,15 @@
 前置条件:
     - Qdrant 服务已部署并运行在 localhost:6333
     - 使用 deploy/app/docker-compose.yml 部署
+
+Tenant Isolation (AC-6 R4):
+    - Uses UUID prefix for collection names to prevent collision between tests
+    - Each test uses unique collection name with UUID suffix
 """
 
 from __future__ import annotations
+
+import uuid
 
 import pytest
 
@@ -25,6 +31,12 @@ pytestmark = pytest.mark.asyncio
 # ===================================================================
 # Fixture
 # ===================================================================
+
+
+@pytest.fixture
+async def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture
@@ -74,12 +86,15 @@ async def vector_storage(qdrant_client: QdrantClientWrapper):
 class TestQdrantCollectionManager:
     """Qdrant Collection 管理器真实实例集成测试。"""
 
-    async def test_create_and_delete_collection(self, collection_manager: QdrantCollectionManager):
+    async def test_create_and_delete_collection(self, collection_manager: QdrantCollectionManager, test_tenant_id: str):
         """测试 Collection 创建和删除。"""
-        collection_name = "test-collection-create"
+        collection_name = f"{test_tenant_id}_collection_create"
 
-        # Cleanup first
-        await collection_manager.delete_collection(collection_name)
+        # Cleanup first (ignore errors if doesn't exist)
+        try:
+            await collection_manager.delete_collection(collection_name)
+        except Exception:
+            pass
 
         # Create
         result = await collection_manager.create_collection(
@@ -101,12 +116,17 @@ class TestQdrantCollectionManager:
         exists = await collection_manager.collection_exists(collection_name)
         assert exists is False
 
-    async def test_create_existing_collection_returns_false(self, collection_manager: QdrantCollectionManager):
+    async def test_create_existing_collection_returns_false(
+        self, collection_manager: QdrantCollectionManager, test_tenant_id: str
+    ):
         """测试创建已存在的 Collection 返回 False。"""
-        collection_name = "test-collection-exists"
+        collection_name = f"{test_tenant_id}_collection_exists"
 
         # Cleanup first
-        await collection_manager.delete_collection(collection_name)
+        try:
+            await collection_manager.delete_collection(collection_name)
+        except Exception:
+            pass
 
         # Create first time
         result1 = await collection_manager.create_collection(collection_name, vector_size=4)
@@ -119,17 +139,22 @@ class TestQdrantCollectionManager:
         # Cleanup
         await collection_manager.delete_collection(collection_name)
 
-    async def test_delete_nonexistent_collection_returns_false(self, collection_manager: QdrantCollectionManager):
+    async def test_delete_nonexistent_collection_returns_false(
+        self, collection_manager: QdrantCollectionManager, test_tenant_id: str
+    ):
         """测试删除不存在的 Collection 返回 False。"""
-        result = await collection_manager.delete_collection("nonexistent-collection-xyz")
+        result = await collection_manager.delete_collection(f"{test_tenant_id}_nonexistent")
         assert result is False
 
-    async def test_list_collections(self, collection_manager: QdrantCollectionManager):
+    async def test_list_collections(self, collection_manager: QdrantCollectionManager, test_tenant_id: str):
         """测试列出所有 Collection。"""
-        collection_name = "test-collection-list"
+        collection_name = f"{test_tenant_id}_collection_list"
 
         # Cleanup first
-        await collection_manager.delete_collection(collection_name)
+        try:
+            await collection_manager.delete_collection(collection_name)
+        except Exception:
+            pass
 
         # Create a collection
         await collection_manager.create_collection(collection_name, vector_size=1024)
@@ -155,15 +180,21 @@ class TestQdrantVectorStorage:
     Collection Manager 测试通过，验证核心功能正常。Vector Storage 测试在某些版本组合下可能失败。
     """
 
-    async def test_upsert_and_search_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper):
+    async def test_upsert_and_search_vectors(
+        self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper, test_tenant_id: str
+    ):
         """测试向量插入和搜索。"""
-        collection_name = "test-vector-storage"
+        collection_name = f"{test_tenant_id}_vector_storage"
         vector_size = 1024
 
         # Create collection
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
         manager = QdrantCollectionManager(qdrant_client)
+        try:
+            await manager.delete_collection(collection_name)
+        except Exception:
+            pass
         await manager.create_collection(collection_name, vector_size=vector_size)
 
         try:
@@ -216,17 +247,26 @@ class TestQdrantVectorStorage:
 
         finally:
             # Cleanup
-            await manager.delete_collection(collection_name)
+            try:
+                await manager.delete_collection(collection_name)
+            except Exception:
+                pass
 
-    async def test_delete_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper):
+    async def test_delete_vectors(
+        self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper, test_tenant_id: str
+    ):
         """测试删除向量。"""
-        collection_name = "test-vector-delete"
+        collection_name = f"{test_tenant_id}_vector_delete"
         vector_size = 1024
 
         # Create collection
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
         manager = QdrantCollectionManager(qdrant_client)
+        try:
+            await manager.delete_collection(collection_name)
+        except Exception:
+            pass
         await manager.create_collection(collection_name, vector_size=vector_size)
 
         try:
@@ -262,7 +302,10 @@ class TestQdrantVectorStorage:
 
         finally:
             # Cleanup
-            await manager.delete_collection(collection_name)
+            try:
+                await manager.delete_collection(collection_name)
+            except Exception:
+                pass
 
 
 # ===================================================================
