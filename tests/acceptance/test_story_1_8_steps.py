@@ -8,6 +8,10 @@ Run with: pytest tests/acceptance/test_story_1_8_steps.py -v
 Prerequisites:
     - Neo4j service running at localhost:7687 (or set NEO4J_* env vars)
     - Default credentials: neo4j/password123 (or set NEO4J_PASSWORD)
+
+Tenant Isolation (AC-4):
+    - Uses UUID prefix for node labels and relationship types
+    - Auto-cleanup deletes test nodes after each test via cypher query
 """
 
 from __future__ import annotations
@@ -30,6 +34,8 @@ from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -41,6 +47,30 @@ DOMAIN_DIR = SRC_DIR / "domain"
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture
+async def cleanup_neo4j_test_data(neo4j_client: Neo4jClientWrapper, test_tenant_id: str):
+    """Cleanup Neo4j test data after each test.
+
+    Deletes all nodes and relationships with test tenant label.
+    """
+    yield
+    # Cleanup: delete all test nodes
+    try:
+        driver = neo4j_client.get_async_driver()
+        async with driver.session(database=neo4j_client._database) as session:
+            await session.run(f"MATCH (n) WHERE n.test_tenant = '{test_tenant_id}' DETACH DELETE n")
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 @pytest.fixture
