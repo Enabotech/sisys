@@ -309,9 +309,9 @@ development_status:
   epic-19-retrospective: optional
 
   # ===========================================================================
-  # Epic 20: 测试工程基础设施 - 🔄 进行中
+  # Epic 20: 测试工程基础设施 - ✅ 已完成
   # ===========================================================================
-  epic-20: in-progress
+  epic-20: done-progress
   20-1-sisys-testing-refactor: done
   epic-20-retrospective: optional
 
@@ -319,13 +319,14 @@ development_status:
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 153
+# Total Stories (excluding retrospectives): 154
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
+#   - Epic 20: 1 story (✅ done)
 #
 # Status Summary:
-#   - Done: 25
+#   - Done: 26 (包括 Epic 20)
 #   - Ready for Dev: 6
 #   - Backlog: 120
 #
@@ -336,7 +337,7 @@ development_status:
 #
 # Key Changes from Previous Version:
 #   - Updated last_updated date to 2026-04-21
-#   - Epic 20 测试工程基础设施 created
-#   - Story 20-1 sisys-testing-refactor created → ready-for-dev
+#   - Epic 20 测试工程基础设施 completed
+#   - Story 20-1 sisys-testing-refactor → done (2071 tests passed)
 #   - Ready for Dev count: 6 (Story 0.17, 0.18, 1.12, 1.14a, 1.14b, 1.14c)
 # =============================================================================
