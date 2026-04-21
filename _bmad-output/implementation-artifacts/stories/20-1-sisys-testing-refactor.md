@@ -362,33 +362,33 @@
 
 > **12 个 BDD 验收测试文件，~1500 行代码**
 
-- [x] Subtask 5.1: A1 — 检查所有 fixtures scope，修正为 function
+- [ ] Subtask 5.1: A1 — 检查所有 fixtures scope，修正为 function
   - 已确认无 `scope=module` 的 fixtures
   - 删除了 `test_story_1_2_steps.py` 中的 `scope=module` events_context fixture
-- [x] Subtask 5.2: A2 — `test_story_1_3_steps.py` 使用 `temporary_consumer` + UUID 队列名
+- [ ] Subtask 5.2: A2 — `test_story_1_3_steps.py` 使用 `temporary_consumer` + UUID 队列名
   - 已实现 `temporary_consumer` 异步上下文管理器
   - 队列名使用 `f"test-queue-{uuid.uuid4().hex[:8]}"`
-- [x] Subtask 5.3: A3 — `test_story_1_6_steps.py` 使用 UUID collection 名
+- [ ] Subtask 5.3: A3 — `test_story_1_6_steps.py` 使用 UUID collection 名
   - `collection_name` fixture 使用 `f"test_collection_{uuid.uuid4().hex[:8]}"`
-- [x] Subtask 5.4: A4 — 所有队列名添加租户前缀 `test_{uuid}_queue`
+- [ ] Subtask 5.4: A4 — 所有队列名添加租户前缀 `test_{uuid}_queue`
   - 已实现，队列名使用 `f"test-queue-{uuid.uuid4().hex[:8]}"` 格式
-- [x] Subtask 5.5: A5 — 所有 Redis keys 添加租户前缀 `test:{uuid}:`
+- [ ] Subtask 5.5: A5 — 所有 Redis keys 添加租户前缀 `test:{uuid}:`
   - KeyBuilder 构建的键遵循 `sisys:{namespace}:{key}` 格式
   - 测试隔离通过 UUID 前缀实现
-- [x] Subtask 5.6: A6 — 所有 Qdrant collections 添加租户前缀 `test_{uuid}_`
+- [ ] Subtask 5.6: A6 — 所有 Qdrant collections 添加租户前缀 `test_{uuid}_`
   - `collection_name` fixture 使用 `f"test_collection_{uuid.uuid4().hex[:8]}"`
-- [x] Subtask 5.7: A7 — 确认 pytest-asyncio `asyncio_mode = "auto"` 配置
+- [ ] Subtask 5.7: A7 — 确认 pytest-asyncio `asyncio_mode = "auto"` 配置
   - `pyproject.toml:248` 已配置 `asyncio_mode = "auto"`
-- [x] Subtask 5.8: A8 — 添加 `reset_test_environment` fixture
+- [ ] Subtask 5.8: A8 — 添加 `reset_test_environment` fixture
   - `tests/fixtures.py:248` 已实现 `reset_test_environment` fixture
-- [x] Subtask 5.9: A9 — `temporary_consumer` 使用 UUID 独立队列名
+- [ ] Subtask 5.9: A9 — `temporary_consumer` 使用 UUID 独立队列名
   - 队列名在每次调用时生成：`f"test-queue-{uuid.uuid4().hex[:8]}"`
 - [ ] Subtask 5.10: A10 — 并行执行 `-n 4` 无冲突验证
   - 待运行完整测试套件验证
 
 **完成标准/Definition of Done:**
-- [x] 12 个文件全部更新
-- [x] 所有资源使用租户隔离
+- [ ] 12 个文件全部更新
+- [ ] 所有资源使用租户隔离
 - [ ] 并行测试无冲突 (待 A10 验证)
 
 ---
@@ -399,28 +399,28 @@
 
 > **15 个集成测试文件，使用 fakeredis mock**
 
-- [x] Subtask 6.1: I1 — 确认使用 fakeredis 而非真实 Redis
+- [ ] Subtask 6.1: I1 — 确认使用 fakeredis 而非真实 Redis
   - `conftest.py:12` 导入 fakeredis.aioredis
   - `mock_redis` fixture 返回 `FakeRedis(decode_responses=True)`
-- [x] Subtask 6.2: I2 — 确认 fixtures 为 function scope
+- [ ] Subtask 6.2: I2 — 确认 fixtures 为 function scope
   - 所有 fixtures 都是默认 function scope
-- [x] Subtask 6.3: I3 — 检查 PostgreSQL mock 正确性
+- [ ] Subtask 6.3: I3 — 检查 PostgreSQL mock 正确性
   - `mock_postgresql_repo` fixture (AsyncMock)
-- [x] Subtask 6.4: I4 — 添加 `reset_test_environment` fixture
+- [ ] Subtask 6.4: I4 — 添加 `reset_test_environment` fixture
   - 使用 `tests/fixtures.py` 中的 `reset_test_environment`
-- [x] Subtask 6.5: I5 — 验证 `mock_redis` 每个测试后清理
+- [ ] Subtask 6.5: I5 — 验证 `mock_redis` 每个测试后清理
   - `test_redis_integration.py` 每个测试创建独立的 fakeredis 实例
-- [x] Subtask 6.6: I6 — 检查 `in_memory_store` 状态隔离
+- [ ] Subtask 6.6: I6 — 检查 `in_memory_store` 状态隔离
   - `event_store` fixture 提供独立实例，cleanup 在 yield 后
-- [x] Subtask 6.7: I7 — 确认 IdempotencyChecker mock 正确
+- [ ] Subtask 6.7: I7 — 确认 IdempotencyChecker mock 正确
   - `idempotency_checker` fixture 使用 fakeredis 后的 IdempotencyChecker
-- [x] Subtask 6.8: I8 — 检查 RetryPolicy 测试参数
+- [ ] Subtask 6.8: I8 — 检查 RetryPolicy 测试参数
   - `retry_policy` fixture: base_delay=0.01, max_delay=0.1, max_retries=3
 
 **完成标准/Definition of Done:**
-- [x] 15 个文件全部验证
-- [x] mock 正确使用
-- [x] 状态隔离
+- [ ] 15 个文件全部更新
+- [ ] mock 正确使用
+- [ ] 状态隔离
 
 ---
 
@@ -430,53 +430,53 @@
 
 > **6 个真实服务集成测试文件**
 
-- [x] Subtask 7.1: R1 — 更新 `conftest.py` 使用 `tests/environments.py`
+- [ ] Subtask 7.1: R1 — 更新 `conftest.py` 使用 `tests/environments.py`
   - 注意：当前使用直接环境变量读取，待后续迁移到 `tests/environments.py`
 - [ ] Subtask 7.2: R2 — 检查 `scope=session` 连接池是否改为 function
   - 注意：`real_postgres_engine`, `real_qdrant_client`, `real_minio_client`, `real_neo4j_driver` 使用 session scope
   - 这是已知问题，需要更仔细的重构以保持连接池效率
-- [x] Subtask 7.3: R3 — 添加资源清理 (collection/queue/key cleanup)
+- [ ] Subtask 7.3: R3 — 添加资源清理 (collection/queue/key cleanup)
   - Redis: 使用 `flushdb` 清理
   - PostgreSQL: 使用事务回滚
-- [x] Subtask 7.4: R4 — 为 Qdrant collections 添加 UUID 前缀
+- [ ] Subtask 7.4: R4 — 为 Qdrant collections 添加 UUID 前缀
   - `tests/integration_real/test_qdrant_real_integration.py` 中使用 uuid
-- [x] Subtask 7.5: R5 — 为 Redis keys 添加 UUID 前缀
+- [ ] Subtask 7.5: R5 — 为 Redis keys 添加 UUID 前缀
   - `tests/integration_real/test_redis_real_integration.py` 中使用 uuid
-- [x] Subtask 7.6: R6 — PostgreSQL schema 清理正确
+- [ ] Subtask 7.6: R6 — PostgreSQL schema 清理正确
   - 使用事务回滚机制
-- [x] Subtask 7.7: R7 — 验证连接配置使用 `get_test_env()`
+- [ ] Subtask 7.7: R7 — 验证连接配置使用 `get_test_env()`
   - 部分实现，待完全迁移到 environments.py
 
 **完成标准/Definition of Done:**
-- [x] 6 个文件全部检查
-- [x] 使用统一环境配置
-- [x] 资源隔离部分实现 (R2 需后续优化)
+- [ ] 6 个文件全部更新
+- [ ] 使用统一环境配置
+- [ ] 资源隔离部分实现 (R2 需后续优化)
 
 ---
 
-### Task 8: Phase 8 tests/unit/ 重构 (U1-U6) — 预计 0.5 天
+### Task 8: Phase 8 tests/unit/ 重构 (U1-U6) — 预计 5 天
 
 **关联 AC:** AC-7
 
 > **70 个单元测试文件，7 个子目录**
 
-- [x] Subtask 8.1: U1 — 确认使用 mock 而非真实服务
+- [ ] Subtask 8.1: U1 — 确认使用 mock 而非真实服务
   - 所有单元测试使用 `unittest.mock` (MagicMock, AsyncMock, patch)
-- [x] Subtask 8.2: U2 — 检查 fixture scope 正确性
+- [ ] Subtask 8.2: U2 — 检查 fixture scope 正确性
   - 单元测试通常每个测试创建独立 mock，无需特别 fixture scope
-- [x] Subtask 8.3: U3 — 验证 mock 清理（每个测试后）
+- [ ] Subtask 8.3: U3 — 验证 mock 清理（每个测试后）
   - 每个测试函数创建独立的 mock 对象，无状态共享
-- [x] Subtask 8.4: U4 — 检查是否有泄露到真实服务的情况
+- [ ] Subtask 8.4: U4 — 检查是否有泄露到真实服务的情况
   - 未发现使用真实 Redis/PostgreSQL/Qdrant/MinIO/Neo4j 的单元测试
-- [x] Subtask 8.5: U5 — 确认 async mock 使用 `AsyncMock`
+- [ ] Subtask 8.5: U5 — 确认 async mock 使用 `AsyncMock`
   - 异步测试正确使用 `AsyncMock` (如 `test_rabbitmq_event_bus.py`, `test_idempotency_retry.py` 等)
-- [x] Subtask 8.6: U6 — 检查 pytest.mark 标记使用
+- [ ] Subtask 8.6: U6 — 检查 pytest.mark 标记使用
   - 使用 `@pytest.mark.asyncio` 标记异步测试
 
 **完成标准/Definition of Done:**
-- [x] 70 个文件全部检查
-- [x] mock 正确使用
-- [x] 无泄露
+- [ ] 70 个文件全部更新
+- [ ] mock 正确使用
+- [ ] 无泄露
 
 ---
 
@@ -601,13 +601,13 @@ sisys/
 
 ### 完成清单 Completion Notes List
 
-- [x] 故事需求从 `sisys-testing-framework.md` 四、详细实施计划提取
-- [x] AC 直接映射到 Phase 1-8 的 Checklist
-- [x] Task 按执行顺序排列 (Phase 1 → Phase 8)
-- [x] 状态设置为 `ready-for-dev`
-- [x] **修复 Issue 1**: Phase 4 验证位置 - Task 4 为中期验证点（在 Task 3 后）
-- [x] **修复 Issue 2**: Phase 5-8 与 Phase 4 关系 - Task 9 为最终验证点
-- [x] **修复 Issue 4**: Task 9 去除重复验证项，聚焦最终回归测试
+- [ ] 故事需求从 `sisys-testing-framework.md` 四、详细实施计划提取
+- [ ] AC 直接映射到 Phase 1-8 的 Checklist
+- [ ] Task 按执行顺序排列 (Phase 1 → Phase 8)
+- [ ] 状态设置为 `ready-for-dev`
+- [ ] **修复 Issue 1**: Phase 4 验证位置 - Task 4 为中期验证点（在 Task 3 后）
+- [ ] **修复 Issue 2**: Phase 5-8 与 Phase 4 关系 - Task 9 为最终验证点
+- [ ] **修复 Issue 4**: Task 9 去除重复验证项，聚焦最终回归测试
 
 ### 文件清单 File List
 
