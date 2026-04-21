@@ -68,13 +68,6 @@ class TestAuthIntegration:
     """Integration tests for authentication flow."""
 
     @pytest.fixture(scope="class")
-    def event_loop(self):
-        """Create event loop for async tests."""
-        loop = asyncio.new_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest.fixture(scope="class")
     def db_engine(self) -> DatabaseEngine:
         """Get database engine and ensure schema exists."""
         from src.infrastructure.config.postgresql import PostgreSQLConfig

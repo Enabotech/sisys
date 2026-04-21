@@ -104,7 +104,7 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
             redis_client.delete(*keys)
             logger.debug(f"Cleaned {len(keys)} Redis keys for tenant {tenant.id}")
     except Exception as e:
-        logger.warning(f"Redis cleanup failed for tenant {tenant.id}: {e}")
+        logger.error(f"Redis cleanup failed for tenant {tenant.id}: {e}")
 
     # PostgreSQL 清理
     try:
@@ -168,15 +168,15 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
         driver = GraphDatabase.driver(
             "bolt://localhost:7687",
-            auth=("neo4j", "password123"),
+            auth=("neo4j", "password123"),  # pragma: allowlist secret (test credentials)
         )
         with driver.session() as session:
-            # 删除租户相关的所有节点和关系
-            session.run(f"MATCH (n) WHERE n.tenant_id = '{tenant.id}' DETACH DELETE n")
+            # 使用参数化查询避免注入
+            session.run("MATCH (n) WHERE n.tenant_id = $tenant_id DETACH DELETE n", tenant_id=tenant.id)
             logger.debug(f"Cleaned Neo4j data for tenant {tenant.id}")
         driver.close()
     except Exception as e:
-        logger.warning(f"Neo4j cleanup failed for tenant {tenant.id}: {e}")
+        logger.error(f"Neo4j cleanup failed for tenant {tenant.id}: {e}")
 
     # RabbitMQ 清理
     try:
@@ -189,26 +189,43 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
         # 列出所有队列并删除匹配前缀的队列
         prefix = tenant.rabbitmq_queue_prefix
-        # 注意：这里只是演示，实际需要遍历并删除匹配的队列
-        # 真实实现需要调用 _channel.queue_delete()
+        result = _channel.queue_declare("", passive=True)
+        for q in result:
+            if q.name.startswith(prefix):
+                _channel.queue_delete(q.name)
+                logger.debug(f"Cleaned RabbitMQ queue {q.name} for tenant {tenant.id}")
 
         connection.close()
     except Exception as e:
-        logger.warning(f"RabbitMQ cleanup failed for tenant {tenant.id}: {e}")
+        logger.error(f"RabbitMQ cleanup failed for tenant {tenant.id}: {e}")
 
 
 def _cleanup_tenant_resources_sync(tenant: TestTenant) -> None:
     """同步版本的清理函数"""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # 如果已经在运行中，创建新任务
-            loop.run_until_complete(_cleanup_tenant_resources(tenant))
-        else:
-            loop.run_until_complete(_cleanup_tenant_resources(tenant))
+        # 获取当前运行中的循环
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        # 没有事件循环
+        # 没有运行中的循环，创建新的
         asyncio.run(_cleanup_tenant_resources(tenant))
+        return
+
+    # 有运行中的循环，使用 create_task 方式
+    async def _run_cleanup():
+        await _cleanup_tenant_resources(tenant)
+
+    try:
+        # 创建一个 future 并在当前循环中运行
+        task = loop.create_task(_run_cleanup())
+        # 等待任务完成（阻塞）
+        loop.run_until_complete(task)
+    except RuntimeError:
+        # 作为最后的手段，使用线程池
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, _cleanup_tenant_resources(tenant))
+            future.result()
 
 
 @pytest.fixture

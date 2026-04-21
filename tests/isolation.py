@@ -70,7 +70,7 @@ class TenantContext:
     """
 
     _tenants: dict[int, TestTenant] = {}
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _lock: asyncio.Lock = asyncio.Lock()  # 类变量，所有实例共享
 
     @classmethod
     def get_current_tenant(cls) -> TestTenant | None:
@@ -99,13 +99,16 @@ class TenantContext:
                 # 不在异步上下文中，使用线程 ID
                 import threading
 
-                return threading.current_thread().ident or 0
-            return id(task)  # asyncio.current_task().ident
+                tid = threading.current_thread().ident
+                return tid if tid is not None else 0
+            # 使用 id(task) 获取任务唯一标识，兼容性好
+            return id(task)
         except RuntimeError:
             #  outside of event loop, use thread identity
             import threading
 
-            return threading.current_thread().ident or 0
+            tid = threading.current_thread().ident
+            return tid if tid is not None else 0
 
     @classmethod
     async def _async_set(cls, tenant: TestTenant) -> None:
@@ -168,19 +171,24 @@ class TenantAwareMock:
             return name
 
         # 根据资源类型添加不同前缀
-        if name.startswith("queue:") or name.startswith("test_"):
-            # RabbitMQ 队列
-            return f"{self._tenant.rabbitmq_queue_prefix}{name}"
-        elif name.startswith("collection:") or name.startswith("test_"):
-            # Qdrant collection
-            return f"{self._tenant.qdrant_collection_prefix}{name}"
-        elif name.startswith("key:") or ":" in name:
-            # Redis key
-            return f"{self._tenant.redis_key_prefix}{name}"
+        if name.startswith("queue:"):
+            # RabbitMQ 队列: queue:xxx -> test_{uuid}_queue_{xxx}
+            return f"{self._tenant.rabbitmq_queue_prefix}{name[6:]}"
+        elif name.startswith("collection:"):
+            # Qdrant collection: collection:xxx -> test_{uuid}_{xxx}
+            return f"{self._tenant.qdrant_collection_prefix}{name[11:]}"
+        elif name.startswith("redis:"):
+            # Redis key: redis:xxx -> test:{uuid}:{xxx}
+            return f"{self._tenant.redis_key_prefix}{name[6:]}"
         elif name.startswith("schema:"):
-            # PostgreSQL schema
-            return f"{self._tenant.postgres_schema}.{name}"
+            # PostgreSQL schema: schema:xxx -> test_{uuid}.{xxx}
+            return f"{self._tenant.postgres_schema}.{name[7:]}"
+        elif name.startswith("bucket:"):
+            # MinIO bucket: bucket:xxx -> test-{uuid}/{xxx}
+            return f"{self._tenant.minio_bucket}/{name[7:]}"
         else:
+            # 默认：直接添加 uuid 前缀
+            return f"{self._tenant.id}_{name}"
             return f"{self._tenant.id}_{name}"
 
 

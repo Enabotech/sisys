@@ -34,9 +34,27 @@ from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Module-level test state for UUID isolation
+_test_session_ids = {
+    "session-001": None,
+    "session-002": None,
+    "session-003": None,
+}
+
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+
+@pytest.fixture(autouse=True)
+def init_test_session_ids():
+    """Initialize unique session IDs for each test."""
+    for key in _test_session_ids:
+        _test_session_ids[key] = f"{key}-{uuid.uuid4().hex[:8]}"
+    yield
+    # Cleanup after test
+    for key in _test_session_ids:
+        _test_session_ids[key] = None
 
 
 @pytest.fixture
@@ -186,7 +204,7 @@ def save_session(session_storage: RedisSessionStorage, event_loop):
 
     async def _save():
         await session_storage.save(
-            session_id="session-001",
+            session_id=_test_session_ids["session-001"],
             agent_id="agent-001",
             state={"status": "active", "step": 1},
             ttl=3600,
@@ -202,7 +220,7 @@ def load_session(session_storage: RedisSessionStorage, event_loop):
 
     async def _load():
         nonlocal loaded
-        loaded = await session_storage.load("session-001")
+        loaded = await session_storage.load(_test_session_ids["session-001"])
 
     event_loop.run_until_complete(_load())
     return loaded
@@ -211,9 +229,11 @@ def load_session(session_storage: RedisSessionStorage, event_loop):
 @then("返回的会话状态与保存的一致")
 def verify_session_consistency(session_storage: RedisSessionStorage, event_loop):
     """Verify loaded session matches saved session."""
-    loaded = event_loop.run_until_complete(session_storage.load("session-001"))
+    session_id = _test_session_ids["session-001"]
+    assert session_id is not None, "Session ID should not be None"
+    loaded = event_loop.run_until_complete(session_storage.load(session_id))
     assert loaded is not None, "Session should be loaded"
-    assert loaded["session_id"] == "session-001"
+    assert loaded["session_id"] == _test_session_ids["session-001"]
     assert loaded["agent_id"] == "agent-001"
     assert loaded["state"]["status"] == "active"
     assert loaded["state"]["step"] == 1
@@ -234,7 +254,7 @@ def session_002_saved(session_storage: RedisSessionStorage, event_loop):
 
     async def _save():
         await session_storage.save(
-            session_id="session-002",
+            session_id=_test_session_ids["session-002"],
             agent_id="agent-002",
             state={"status": "pending"},
         )
@@ -247,7 +267,7 @@ def delete_session(session_storage: RedisSessionStorage, event_loop):
     """Delete session."""
 
     async def _delete():
-        await session_storage.delete("session-002")
+        await session_storage.delete(_test_session_ids["session-002"])
 
     event_loop.run_until_complete(_delete())
 
@@ -259,7 +279,7 @@ def load_deleted_session(session_storage: RedisSessionStorage, event_loop):
 
     async def _load():
         nonlocal result
-        result = await session_storage.load("session-002")
+        result = await session_storage.load(_test_session_ids["session-002"])
 
     event_loop.run_until_complete(_load())
     return result
@@ -270,7 +290,7 @@ def verify_load_returns_none(session_storage: RedisSessionStorage, event_loop):
     """Verify loading deleted session returns None."""
 
     async def _load():
-        result = await session_storage.load("session-002")
+        result = await session_storage.load(_test_session_ids["session-002"])
         assert result is None
 
     event_loop.run_until_complete(_load())
@@ -291,7 +311,7 @@ def session_003_saved_with_ttl(session_storage: RedisSessionStorage, event_loop)
 
     async def _save():
         await session_storage.save(
-            session_id="session-003",
+            session_id=_test_session_ids["session-003"],
             agent_id="agent-003",
             state={"status": "temporary"},
             ttl=1,  # 1 second TTL
@@ -313,7 +333,7 @@ def load_expired_session(session_storage: RedisSessionStorage, event_loop):
 
     async def _load():
         nonlocal result
-        result = await session_storage.load("session-003")
+        result = await session_storage.load(_test_session_ids["session-003"])
 
     event_loop.run_until_complete(_load())
     return result
@@ -324,7 +344,7 @@ def verify_expired_session_returns_none(session_storage: RedisSessionStorage, ev
     """Verify expired session returns None."""
 
     async def _load():
-        result = await session_storage.load("session-003")
+        result = await session_storage.load(_test_session_ids["session-003"])
         assert result is None
 
     event_loop.run_until_complete(_load())
