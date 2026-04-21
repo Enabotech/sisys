@@ -157,9 +157,10 @@
 - ❌ scope=module 的 event_loop fixture
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 4` 通过
+- [ ] 并行测试 `pytest tests/ -n 8` 通过
 - [ ] 连续5次运行无随机失败
-- [ ] mypy 类型检查通过
+- [ ] poetry run ruff 检查通过
+- [ ] poetry run mypy 检查通过
 
 ---
 
