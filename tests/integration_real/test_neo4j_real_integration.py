@@ -9,9 +9,15 @@
 前置条件:
     - Neo4j 服务已部署并运行在 localhost:7687
     - 使用 deploy/app/docker-compose.yml 部署
+
+Tenant Isolation (AC-6 R3):
+    - Uses UUID prefix for node IDs to prevent collision between tests
+    - Cleanup deletes all test nodes after each test
 """
 
 from __future__ import annotations
+
+import uuid
 
 import pytest
 
@@ -19,12 +25,20 @@ from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
 from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship, RelationshipType
 
+# Import reset_test_environment for test isolation (AC-6)
+
 pytestmark = pytest.mark.asyncio
 
 
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture
@@ -87,8 +101,8 @@ class TestNeo4jConnection:
 # ===================================================================
 
 
-def make_test_node(node_id: str, name: str) -> GraphNode:
-    """Helper to create a valid test node with required properties."""
+def make_test_node(node_id: str, name: str, tenant_id: str) -> GraphNode:
+    """Helper to create a valid test node with required properties and tenant ID."""
     return GraphNode(
         id=node_id,
         labels=["TestLabel"],
@@ -97,6 +111,7 @@ def make_test_node(node_id: str, name: str) -> GraphNode:
             "business_domain": "test",
             "entity_type": "test_entity",
             "content_hash": f"hash-{node_id}",
+            "test_tenant": tenant_id,  # Add tenant ID for cleanup isolation
         },
     )
 
@@ -104,25 +119,27 @@ def make_test_node(node_id: str, name: str) -> GraphNode:
 class TestNeo4jNodeOperations:
     """Neo4j 节点操作真实实例测试。"""
 
-    async def test_create_and_get_node(self, graph_manager: Neo4jGraphManager):
+    async def test_create_and_get_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
         """测试节点创建和获取。"""
-        node = make_test_node("test-node-create-1", "test-node")
+        node_id = f"{test_tenant_id}_node_create_1"
+        node = make_test_node(node_id, "test-node", test_tenant_id)
 
         # Create node
         created = await graph_manager.create_node(node)
         assert created is True
 
         # Get node
-        retrieved = await graph_manager.get_node("test-node-create-1")
+        retrieved = await graph_manager.get_node(node_id)
         assert retrieved is not None
-        assert retrieved["id"] == "test-node-create-1"
+        assert retrieved["id"] == node_id
 
         # Cleanup
-        await graph_manager.delete_node("test-node-create-1")
+        await graph_manager.delete_node(node_id)
 
-    async def test_create_duplicate_node(self, graph_manager: Neo4jGraphManager):
+    async def test_create_duplicate_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
         """测试创建重复节点（应返回 False）。"""
-        node = make_test_node("test-node-dup-1", "duplicate")
+        node_id = f"{test_tenant_id}_node_dup_1"
+        node = make_test_node(node_id, "duplicate", test_tenant_id)
 
         # Create first
         created1 = await graph_manager.create_node(node)
@@ -134,21 +151,22 @@ class TestNeo4jNodeOperations:
         assert isinstance(created2, bool)
 
         # Cleanup
-        await graph_manager.delete_node("test-node-dup-1")
+        await graph_manager.delete_node(node_id)
 
-    async def test_delete_node(self, graph_manager: Neo4jGraphManager):
+    async def test_delete_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
         """测试删除节点。"""
-        node = make_test_node("test-node-delete-1", "to-delete")
+        node_id = f"{test_tenant_id}_node_delete_1"
+        node = make_test_node(node_id, "to-delete", test_tenant_id)
 
         # Create
         await graph_manager.create_node(node)
 
         # Delete
-        deleted = await graph_manager.delete_node("test-node-delete-1")
+        deleted = await graph_manager.delete_node(node_id)
         assert deleted is True
 
         # Verify deleted
-        retrieved = await graph_manager.get_node("test-node-delete-1")
+        retrieved = await graph_manager.get_node(node_id)
         assert retrieved is None
 
 
@@ -160,18 +178,20 @@ class TestNeo4jNodeOperations:
 class TestNeo4jRelationshipOperations:
     """Neo4j 关系操作真实实例测试。"""
 
-    async def test_create_and_delete_relationship(self, graph_manager: Neo4jGraphManager):
+    async def test_create_and_delete_relationship(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
         """测试关系创建和删除。"""
-        # Create two nodes
-        node1 = make_test_node("test-rel-node-1", "node1")
-        node2 = make_test_node("test-rel-node-2", "node2")
+        # Create two nodes with tenant-isolated IDs
+        node1_id = f"{test_tenant_id}_rel_node_1"
+        node2_id = f"{test_tenant_id}_rel_node_2"
+        node1 = make_test_node(node1_id, "node1", test_tenant_id)
+        node2 = make_test_node(node2_id, "node2", test_tenant_id)
         await graph_manager.create_node(node1)
         await graph_manager.create_node(node2)
 
         # Create relationship
         rel = GraphRelationship(
-            start_node_id="test-rel-node-1",
-            end_node_id="test-rel-node-2",
+            start_node_id=node1_id,
+            end_node_id=node2_id,
             relationship_type=RelationshipType.RELATES_TO,
             properties={},
         )
@@ -179,12 +199,12 @@ class TestNeo4jRelationshipOperations:
         assert created is True
 
         # Delete relationship
-        deleted = await graph_manager.delete_relationship("test-rel-node-1", "test-rel-node-2", "RELATES_TO")
+        deleted = await graph_manager.delete_relationship(node1_id, node2_id, "RELATES_TO")
         assert deleted is True
 
         # Cleanup nodes
-        await graph_manager.delete_node("test-rel-node-1")
-        await graph_manager.delete_node("test-rel-node-2")
+        await graph_manager.delete_node(node1_id)
+        await graph_manager.delete_node(node2_id)
 
 
 # ===================================================================

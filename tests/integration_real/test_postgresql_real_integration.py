@@ -10,6 +10,10 @@
     - PostgreSQL 服务已部署并运行在 localhost:5432
     - 数据库已创建（sisu0）
     - 用户有权限
+
+Tenant Isolation (AC-6 R6):
+    - Uses TEMP tables which are automatically cleaned up after session ends
+    - Each test gets isolated transaction via session scope
 """
 
 from __future__ import annotations
@@ -23,7 +27,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 
+# Import reset_test_environment for test isolation (AC-6)
+
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid4().hex[:8]}"
 
 
 @pytest.fixture
