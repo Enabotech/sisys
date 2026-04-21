@@ -202,7 +202,7 @@ class DomainEvent:
 
         # Extract subclass-specific fields from payload
         extra_kwargs: dict[str, Any] = {}
-        if target_class is not cls and is_dataclass(target_class):
+        if target_class is not DomainEvent and is_dataclass(target_class):
             for f in fields(target_class):
                 if f.name in _CORE_FIELD_NAMES or not f.init:
                     continue
