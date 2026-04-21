@@ -94,6 +94,9 @@ tests/
 
 ### 2.1 核心设计原则
 
+> ⚠️ **简化说明**：原设计中的 TOR (测试编排层) 已由 pytest-xdist + pytest fixture 机制解决，
+> 本方案仅保留 TEM (测试环境管理层) 和 TIL (测试隔离层)。
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                        多用户并发测试工程系统架构                               │
@@ -133,17 +136,13 @@ tests/
 │  │  │  • Session 级清理 (session scope)                                 │  │ │
 │  │  └──────────────────────────────────────────────────────────────────┘  │ │
 │  └──────────────────────────────────────────────────────────────────────────┘ │
-│                                 │                                               │
-│                                 ▼                                               │
-│  ┌──────────────────────────────────────────────────────────────────────────┐ │
-│  │                        测试编排层 (TOR)                                    │ │
-│  │  ┌──────────────────────────────────────────────────────────────────┐  │ │
-│  │  │  Test Orchestrator                                                │  │ │
-│  │  │  • 串行/并行执行控制                                               │  │ │
-│  │  │  • 依赖声明与拓扑排序                                              │  │ │
-│  │  │  • 失败隔离与恢复                                                  │  │ │
-│  │  └──────────────────────────────────────────────────────────────────┘  │ │
-│  └──────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │  执行层 (由 pytest-xdist + pytest fixture 机制提供)                     │ │
+│  │  • 串行/并行执行: pytest-xdist                                         │ │
+│  │  • 依赖声明: pytest fixture 依赖图                                      │ │
+│  │  • 失败隔离: fixture scope 控制                                        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -210,7 +209,9 @@ async def temporary_consumer(consumer, queue_name, routing_key, handler, timeout
     # 轮询等待消费者真正开始消费（替代硬编码 sleep）
     # 这样在慢速环境下也能正常工作
     try:
-        await asyncio.wait_for(_wait_for_consumer_ready(consumer), timeout=timeout)
+        await asyncio.wait_for(
+            _wait_for_consumer_ready(consumer, queue_name), timeout=timeout
+        )
     except asyncio.TimeoutError:
         consume_task.cancel()
         await consume_task
@@ -250,11 +251,17 @@ async def temporary_consumer(consumer, queue_name, routing_key, handler, timeout
             pass  # 忽略关闭时的错误
 
 
-async def _wait_for_consumer_ready(consumer, poll_interval=0.1, max_polls=50):
-    """轮询等待消费者就绪.
+async def _wait_for_consumer_ready(
+    consumer,
+    queue_name: str,
+    poll_interval=0.1,
+    max_polls=50,
+):
+    """轮询等待消费者真正开始消费.
 
     Args:
         consumer: AsyncRabbitMQConsumer 实例
+        queue_name: 队列名称，用于被动检查队列是否存在
         poll_interval: 轮询间隔（秒）
         max_polls: 最大轮询次数
 
@@ -265,15 +272,21 @@ async def _wait_for_consumer_ready(consumer, poll_interval=0.1, max_polls=50):
         asyncio.TimeoutError: 超过最大轮询次数
     """
     for _ in range(max_polls):
-        # AsyncRabbitMQConsumer 没有公共 is_ready() 方法
-        # 使用私有属性判断：_connection 和 _channel
-        if consumer._connection is not None and not consumer._connection.is_closed:
-            return True
+        # ✅ 修复 #1: 通过 declare_queue passive=True 检查队列是否已声明
+        # 这是判断消费者真正绑定队列的最可靠方式
         if consumer._channel is not None:
-            return True
+            try:
+                # 被动声明队列，如果队列存在则成功，不存在则抛异常
+                await consumer._channel.declare_queue(queue_name, passive=True)
+                return True  # 队列存在，说明消费者已绑定
+            except Exception:
+                pass  # 队列不存在，继续等待
         await asyncio.sleep(poll_interval)
 
-    raise asyncio.TimeoutError("Consumer not ready after maximum polls")
+    raise asyncio.TimeoutError(
+        f"Consumer not ready after {max_polls} polls. "
+        f"Queue '{queue_name}' was not declared."
+    )
 
 
 @then("异步消费者应该接收到该事件")
@@ -433,7 +446,7 @@ if await self.collection_exists(name):
 
 import os
 import socket
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -452,20 +465,29 @@ class TestEnvConfig:
     # 主机连接
     redis_host: str
     redis_port: int
+    redis_password: str | None = None  # ✅ 修复 #R1: Redis 清理需要认证密码
     postgres_host: str
     postgres_port: int
+    postgres_database: str  # ✅ 修复 #G: 添加缺失字段
+    postgres_username: str  # ✅ 修复 #D: 添加认证字段
+    postgres_password: str  # ✅ 修复 #D: 添加认证字段
     qdrant_host: str
     qdrant_port: int
     qdrant_grpc_port: int
+    qdrant_api_key: str | None = None  # ✅ 修复 #H: 添加 Qdrant api_key
     minio_host: str
     minio_port: int
     minio_console_port: int
+    minio_access_key: str | None = None  # ✅ 修复 #N2: MinIO 清理需要认证
+    minio_secret_key: str | None = None  # ✅ 修复 #N2: MinIO 清理需要认证
     neo4j_host: str
     neo4j_http_port: int
     neo4j_bolt_port: int
     rabbitmq_host: str
     rabbitmq_port: int
     rabbitmq_mgmt_port: int
+    rabbitmq_username: str  # ✅ 修复 #E: 添加 RabbitMQ 认证
+    rabbitmq_password: str  # ✅ 修复 #E: 添加 RabbitMQ 认证
 
     # 环境标识
     env_type: TestEnvironment
@@ -479,6 +501,75 @@ class TestEnvConfig:
         if self.k8s_namespace is None:
             raise ValueError("K8s namespace not configured")
         return f"{service}.{self.k8s_namespace}.svc.cluster.local"
+
+    @classmethod
+    def from_env(
+        cls,
+        env_file: str | None = None,
+        test_tenant_id: str | None = None,
+    ) -> TestEnvConfig:
+        """从环境变量或 .env 文件创建配置（与开发环境共用同一份配置）。
+
+        使用 load_dotenv() 加载 .env 文件，读取与 src.infrastructure.config
+        各模块相同的标准环境变量名，支持直接复用开发环境的配置。
+
+        注意：此方法始终返回 `env_type=TestEnvironment.LOCAL`，适用于本地开发调试。
+        CI/K8s 环境请使用 `resolve_env()` 函数，它会根据环境自动检测连接参数。
+
+        Args:
+            env_file: 可选，.env 文件路径。默认为 ./.env 或上级目录的 .env。
+            test_tenant_id: 可选，测试租户 ID，用于隔离。为 None 时自动生成。
+
+        Returns:
+            TestEnvConfig 实例（env_type 固定为 LOCAL）
+        """
+        import uuid
+        from pathlib import Path
+        from dotenv import load_dotenv
+
+        # 加载 .env 文件（默认查找当前目录及上级目录）
+        if env_file:
+            load_dotenv(env_file, override=True)
+        else:
+            # 尝试从 tests/ 目录向上查找 .env
+            env_path = Path(__file__).parent.parent.parent / ".env"
+            if env_path.exists():
+                load_dotenv(env_path, override=True)
+            else:
+                load_dotenv(override=True)  # 只加载已设置的环境变量
+
+        tenant_id = test_tenant_id or f"test_{uuid.uuid4().hex[:8]}"
+
+        return cls(
+            redis_host=os.getenv("REDIS_HOST", "localhost"),
+            redis_port=int(os.getenv("REDIS_PORT", "6379")),
+            redis_password=os.getenv("REDIS_PASSWORD"),
+            postgres_host=os.getenv("POSTGRES_HOST", "localhost"),
+            postgres_port=int(os.getenv("POSTGRES_PORT", "5432")),
+            postgres_database=os.getenv("POSTGRES_DATABASE", "sisys"),
+            postgres_username=os.getenv("POSTGRES_USERNAME", "postgres"),
+            postgres_password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+            qdrant_host=os.getenv("QDRANT_HOST", "localhost"),
+            qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
+            qdrant_grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
+            minio_host=os.getenv("MINIO_HOST", "localhost"),
+            minio_port=int(os.getenv("MINIO_API_PORT", "9000")),
+            minio_console_port=int(os.getenv("MINIO_CONSOLE_PORT", "9001")),
+            minio_access_key=os.getenv("MINIO_ROOT_USER"),
+            minio_secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+            neo4j_host=os.getenv("NEO4J_HOST", "localhost"),
+            neo4j_http_port=int(os.getenv("NEO4J_HTTP_PORT", "7474")),
+            neo4j_bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
+            rabbitmq_host=os.getenv("RABBITMQ_HOST", "localhost"),
+            rabbitmq_port=int(os.getenv("RABBITMQ_PORT", "5672")),
+            rabbitmq_mgmt_port=int(os.getenv("RABBITMQ_MGMT_PORT", "15672")),
+            rabbitmq_username=os.getenv("RABBITMQ_USERNAME", "guest"),
+            rabbitmq_password=os.getenv("RABBITMQ_PASSWORD", "guest"),
+            env_type=TestEnvironment.LOCAL,
+            test_tenant_id=tenant_id,
+            k8s_namespace=None,
+        )
 
 
 # K8s namespace 到服务 DNS 后缀的映射
@@ -590,12 +681,13 @@ def resolve_env(
         env_type: 环境类型，AUTO 时自动检测
         test_tenant_id: 测试租户 ID，用于隔离。为 None 时自动生成。
     """
+    import uuid
+
     if isinstance(env_type, str):
         env_type = TestEnvironment(env_type.lower())
     elif env_type == TestEnvironment.AUTO:
         env_type = _detect_environment()
 
-    import uuid
     tenant_id = test_tenant_id or f"test_{uuid.uuid4().hex[:8]}"
 
     # 本地开发环境
@@ -603,20 +695,29 @@ def resolve_env(
         return TestEnvConfig(
             redis_host=os.getenv("REDIS_HOST", "localhost"),
             redis_port=int(os.getenv("REDIS_PORT", "6379")),
+            redis_password=os.getenv("REDIS_PASSWORD"),
             postgres_host=os.getenv("POSTGRES_HOST", "localhost"),
             postgres_port=int(os.getenv("POSTGRES_PORT", "5432")),
+            postgres_database=os.getenv("POSTGRES_DATABASE", "sisys"),
+            postgres_username=os.getenv("POSTGRES_USERNAME", "postgres"),
+            postgres_password=os.getenv("POSTGRES_PASSWORD", "postgres"),
             qdrant_host=os.getenv("QDRANT_HOST", "localhost"),
             qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
             qdrant_grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
             minio_host=os.getenv("MINIO_HOST", "localhost"),
             minio_port=int(os.getenv("MINIO_API_PORT", "9000")),
             minio_console_port=int(os.getenv("MINIO_CONSOLE_PORT", "9001")),
+            minio_access_key=os.getenv("MINIO_ROOT_USER"),
+            minio_secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
             neo4j_host=os.getenv("NEO4J_HOST", "localhost"),
             neo4j_http_port=int(os.getenv("NEO4J_HTTP_PORT", "7474")),
             neo4j_bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
             rabbitmq_host=os.getenv("RABBITMQ_HOST", "localhost"),
             rabbitmq_port=int(os.getenv("RABBITMQ_PORT", "5672")),
             rabbitmq_mgmt_port=int(os.getenv("RABBITMQ_MGMT_PORT", "15672")),
+            rabbitmq_username=os.getenv("RABBITMQ_USERNAME", "guest"),
+            rabbitmq_password=os.getenv("RABBITMQ_PASSWORD", "guest"),
             env_type=env_type,
             test_tenant_id=tenant_id,
             k8s_namespace=None,
@@ -627,20 +728,29 @@ def resolve_env(
         return TestEnvConfig(
             redis_host=os.getenv("REDIS_HOST", "host.docker.internal"),
             redis_port=int(os.getenv("REDIS_PORT", "6380")),
+            redis_password=os.getenv("REDIS_PASSWORD"),
             postgres_host=os.getenv("POSTGRES_HOST", "host.docker.internal"),
             postgres_port=int(os.getenv("POSTGRES_PORT", "5432")),
+            postgres_database=os.getenv("POSTGRES_DATABASE", "sisys"),
+            postgres_username=os.getenv("POSTGRES_USERNAME", "postgres"),
+            postgres_password=os.getenv("POSTGRES_PASSWORD", "postgres"),
             qdrant_host=os.getenv("QDRANT_HOST", "host.docker.internal"),
             qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
             qdrant_grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
             minio_host=os.getenv("MINIO_HOST", "host.docker.internal"),
             minio_port=int(os.getenv("MINIO_API_PORT", "9000")),
             minio_console_port=int(os.getenv("MINIO_CONSOLE_PORT", "9001")),
+            minio_access_key=os.getenv("MINIO_ROOT_USER"),
+            minio_secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
             neo4j_host=os.getenv("NEO4J_HOST", "host.docker.internal"),
             neo4j_http_port=int(os.getenv("NEO4J_HTTP_PORT", "7474")),
             neo4j_bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
             rabbitmq_host=os.getenv("RABBITMQ_HOST", "host.docker.internal"),
             rabbitmq_port=int(os.getenv("RABBITMQ_PORT", "5672")),
             rabbitmq_mgmt_port=int(os.getenv("RABBITMQ_MGMT_PORT", "15672")),
+            rabbitmq_username=os.getenv("RABBITMQ_USERNAME", "guest"),
+            rabbitmq_password=os.getenv("RABBITMQ_PASSWORD", "guest"),
             env_type=env_type,
             test_tenant_id=tenant_id,
             k8s_namespace=None,
@@ -656,20 +766,29 @@ def resolve_env(
         return TestEnvConfig(
             redis_host=os.getenv("REDIS_HOST", k8s_host("redis")),
             redis_port=int(os.getenv("REDIS_PORT", "6379")),
+            redis_password=os.getenv("REDIS_PASSWORD"),
             postgres_host=os.getenv("POSTGRES_HOST", k8s_host("postgres")),
             postgres_port=int(os.getenv("POSTGRES_PORT", "5432")),
+            postgres_database=os.getenv("POSTGRES_DATABASE", "sisys"),
+            postgres_username=os.getenv("POSTGRES_USERNAME", "postgres"),
+            postgres_password=os.getenv("POSTGRES_PASSWORD", "postgres"),
             qdrant_host=os.getenv("QDRANT_HOST", k8s_host("qdrant")),
             qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
             qdrant_grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
+            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
             minio_host=os.getenv("MINIO_HOST", k8s_host("minio")),
             minio_port=int(os.getenv("MINIO_API_PORT", "9000")),
             minio_console_port=int(os.getenv("MINIO_CONSOLE_PORT", "9001")),
+            minio_access_key=os.getenv("MINIO_ROOT_USER"),
+            minio_secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
             neo4j_host=os.getenv("NEO4J_HOST", k8s_host("neo4j")),
             neo4j_http_port=int(os.getenv("NEO4J_HTTP_PORT", "7474")),
             neo4j_bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
             rabbitmq_host=os.getenv("RABBITMQ_HOST", k8s_host("rabbitmq")),
             rabbitmq_port=int(os.getenv("RABBITMQ_PORT", "5672")),
             rabbitmq_mgmt_port=int(os.getenv("RABBITMQ_MGMT_PORT", "15672")),
+            rabbitmq_username=os.getenv("RABBITMQ_USERNAME", "guest"),
+            rabbitmq_password=os.getenv("RABBITMQ_PASSWORD", "guest"),
             env_type=env_type,
             test_tenant_id=tenant_id,
             k8s_namespace=k8s_namespace,
@@ -886,12 +1005,10 @@ volumes:
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, TypeVar
-from unittest.mock import AsyncMock, patch
+from typing import Callable, TypeVar
 
 import pytest
 
@@ -905,8 +1022,8 @@ T = TypeVar("T")
 class TestTenant:
     """测试租户 - 提供隔离的资源前缀."""
 
-    id: str  # 租户唯一标识 (UUID)
-    prefix: str  # 资源前缀 (简短版)
+    id: str  # 租户唯一标识 (UUID)，用于 seed resolve_env(test_tenant_id=...) 确保租户 ID 一致
+    prefix: str  # 资源前缀 (与 id 相同，8 字符 hex UUID)
 
     # 队列名称
     @property
@@ -936,15 +1053,7 @@ class TenantContext:
 
     tenant: TestTenant
     config: TestEnvConfig
-    _resources: list[str] = field(default_factory=list)
-    _cleanup_tasks: list[Callable] = field(default_factory=list)
-
-    def register_resource(self, resource_id: str, cleanup_fn: Callable | None = None) -> str:
-        """注册需要清理的资源."""
-        self._resources.append(resource_id)
-        if cleanup_fn:
-            self._cleanup_tasks.append(cleanup_fn)
-        return resource_id
+    _cleanup_tasks: list[Callable[[], None]] = field(default_factory=list)
 
     async def cleanup(self) -> None:
         """清理租户所有资源."""
@@ -958,7 +1067,6 @@ class TenantContext:
             except Exception as e:
                 errors.append(e)
 
-        self._resources.clear()
         self._cleanup_tasks.clear()
 
         if errors:
@@ -970,21 +1078,21 @@ class TenantContext:
 
 # 全局租户上下文存储
 # key 类型为 int：asyncio.current_task().ident 返回 int
-# 使用 | None 处理边界情况（task 无 ident 时）
-_tenant_contexts: dict[int | None, TenantContext] = {}
+_tenant_contexts: dict[int, TenantContext] = {}
 
 
 def _get_task_id() -> int:
     """获取当前 asyncio task 的唯一标识符.
 
-    处理边界情况：task.ident 可能为 None（如 event loop 未启动）。
-    此时使用 object id 作为 fallback。
+    注意：不再使用 id(task) 作为 fallback，因为 id(None) 在同一进程内
+    始终返回相同地址，多 worker 进程场景下会导致 key 碰撞。
+    若 task.ident 为 None，使用 uuid.uuid4().int 生成随机 key。
     """
     task = asyncio.current_task()
     task_id = task.ident if task else None
     if task_id is None:
-        # Fallback: 使用 task 对象 id（进程内唯一）
-        return id(task)  # type: ignore[return-value]
+        # ✅ S1: 使用 uuid 替代 id(task)，避免跨 pytest-xdist worker 进程碰撞
+        return uuid.uuid4().int
     return task_id
 
 
@@ -1002,19 +1110,6 @@ def generate_test_tenant() -> TestTenant:
         id=tenant_id,
         prefix=tenant_id,
     )
-
-
-def get_current_tenant() -> TestTenant | None:
-    """获取当前租户 (如果存在)."""
-    task_id = _get_task_id()
-    context = _tenant_contexts.get(task_id)
-    return context.tenant if context else None
-
-
-def get_current_context() -> TenantContext | None:
-    """获取当前上下文 (如果存在)."""
-    task_id = _get_task_id()
-    return _tenant_contexts.get(task_id)
 
 
 @asynccontextmanager
@@ -1109,8 +1204,6 @@ class TenantAwareMock:
 from __future__ import annotations
 
 import asyncio
-import os
-from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import pytest
@@ -1119,7 +1212,6 @@ from tests.environments import TestEnvConfig, get_test_env
 from tests.isolation import (
     TenantContext,
     generate_test_tenant,
-    get_current_tenant,
     isolated_tenant_context,
 )
 
@@ -1159,17 +1251,22 @@ def isolated_tenant() -> "TestTenant":
 @pytest.fixture(scope="function")
 async def tenant_context(
     isolated_tenant: "TestTenant",
-    fresh_test_env_config: TestEnvConfig,
 ) -> AsyncGenerator[TenantContext, None]:
     """Async context manager 提供隔离的租户上下文.
 
     测试结束后自动清理资源。
+
+    ✅ 修复 #C: resolve_env() 复用 isolated_tenant.id，确保租户 ID 一致
     """
+    from tests.environments import resolve_env
     from tests.isolation import TenantContext
+
+    # ✅ 复用 isolated_tenant 的 ID，确保与租户前缀一致
+    config = resolve_env(test_tenant_id=isolated_tenant.id)
 
     context = TenantContext(
         tenant=isolated_tenant,
-        config=fresh_test_env_config,
+        config=config,
     )
 
     yield context
@@ -1182,28 +1279,75 @@ async def _cleanup_tenant_resources(
     context: TenantContext,
     config: TestEnvConfig,
 ) -> None:
-    """清理租户相关资源."""
+    """清理租户相关资源.
+
+    注意：
+    - 清理失败只记录 warning，不阻断测试
+    - 真正的资源泄漏风险由 setup 时清理和定期 CI 清理兜底
+    """
     tenant = context.tenant
+    cleanup_errors: list[str] = []
 
     # 清理 RabbitMQ 队列
+    # ✅ 修复 #1: 使用 Management HTTP API 列出并删除匹配队列
     try:
-        import aio_pika
-        connection = await aio_pika.connect_robust(
-            host=config.rabbitmq_host,
-            port=config.rabbitmq_port,
-        )
-        channel = await connection.channel()
-        await connection.close()
+        import aiohttp
+        import urllib.parse
+
+        mgmt_host = config.rabbitmq_host
+        mgmt_port = config.rabbitmq_mgmt_port
+        mgmt_user = config.rabbitmq_username
+        mgmt_pass = config.rabbitmq_password
+        base_url = f"http://{mgmt_host}:{mgmt_port}/api"
+
+        auth = aiohttp.BasicAuth(mgmt_user, mgmt_pass)
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
+            # GET /api/queues - 列出所有队列
+            async with session.get(f"{base_url}/queues") as resp:
+                if resp.status == 200:
+                    queues = await resp.json()
+                    for q in queues:
+                        # 匹配测试租户前缀的队列: test_{prefix}_*
+                        if q.get("name", "").startswith(f"test_{tenant.prefix}_"):
+                            vhost = urllib.parse.quote(q.get("vhost", "/"), safe="")
+                            qname = urllib.parse.quote(q["name"], safe="")
+                            async with session.delete(
+                                f"{base_url}/queues/{vhost}/{qname}"
+                            ) as del_resp:
+                                if del_resp.status == 204:
+                                    print(f"RabbitMQ: deleted queue {q['name']}")
+                                else:
+                                    cleanup_errors.append(
+                                        f"RabbitMQ delete queue {q['name']} failed: {del_resp.status}"
+                                    )
+                elif resp.status == 401:
+                    cleanup_errors.append(
+                        f"RabbitMQ management API auth failed (check RABBITMQ_USERNAME/PASSWORD)"
+                    )
+                else:
+                    cleanup_errors.append(
+                        f"RabbitMQ management API returned {resp.status}"
+                    )
+    except aiohttp.ClientError as e:
+        # Management API 不可用时跳过，不算 cleanup error
+        print(f"RabbitMQ management API unavailable ({e}), skipping queue cleanup")
     except Exception as e:
-        print(f"RabbitMQ cleanup error: {e}")
+        cleanup_errors.append(f"RabbitMQ cleanup error: {e}")
 
     # 清理 Qdrant Collections
+    # ✅ 修复 #H/#N4: 使用与 QdrantClientWrapper._create_client() 一致的参数
     try:
         from qdrant_client import AsyncQdrantClient
 
         client = AsyncQdrantClient(
             host=config.qdrant_host,
             port=config.qdrant_port,
+            grpc_port=config.qdrant_grpc_port,
+            api_key=config.qdrant_api_key,
+            https=False,
+            prefer_grpc=False,
         )
 
         collections = await client.get_collections()
@@ -1211,12 +1355,12 @@ async def _cleanup_tenant_resources(
             if col.name.startswith(f"test_{tenant.prefix}_"):
                 try:
                     await client.delete_collection(col.name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    cleanup_errors.append(f"Qdrant delete collection {col.name} error: {e}")
 
         await client.close()
     except Exception as e:
-        print(f"Qdrant cleanup error: {e}")
+        cleanup_errors.append(f"Qdrant cleanup error: {e}")
 
     # 清理 Redis keys
     try:
@@ -1225,43 +1369,139 @@ async def _cleanup_tenant_resources(
         r = redis.Redis(
             host=config.redis_host,
             port=config.redis_port,
+            password=config.redis_password,
             decode_responses=True,
         )
 
         pattern = f"test:{tenant.prefix}:*"
         cursor = 0
+        deleted_count = 0
         while True:
             cursor, keys = await r.scan(cursor=cursor, match=pattern, count=100)
             if keys:
+                deleted_count += len(keys)
                 await r.delete(*keys)
             if cursor == 0:
                 break
 
         await r.close()
+        if deleted_count > 0:
+            print(f"Redis: deleted {deleted_count} keys matching {pattern}")
     except Exception as e:
-        print(f"Redis cleanup error: {e}")
+        cleanup_errors.append(f"Redis cleanup error: {e}")
+
+    # 清理 MinIO buckets
+    # ✅ 修复 #N2/#R2/#R5: 修正 async iteration + 处理 versioned + incomplete uploads
+    try:
+        from minio import AsyncMinio
+        from minio.error import S3Error
+
+        minio_client = AsyncMinio(
+            endpoint=f"{config.minio_host}:{config.minio_port}",
+            access_key=config.minio_access_key or "minioadmin",
+            secret_key=config.minio_secret_key or "minioadmin",
+            secure=False,
+        )
+
+        # 列出所有 buckets，删除匹配测试租户前缀的
+        buckets = await minio_client.list_buckets()
+        for bucket in buckets:
+            if bucket.name.startswith(f"test-{tenant.prefix}-"):
+                try:
+                    # 删除所有对象（包括 versioned 和普通对象）
+                    # ✅ R2: async for 迭代 list_objects（异步生成器）
+                    async for obj in minio_client.list_objects(bucket.name, recursive=True):
+                        await minio_client.remove_object(bucket.name, obj.object_name)
+                    # ✅ R5: 处理未完成的分段上传
+                    async for upload in minio_client.list_incomplete_uploads(bucket.name, recursive=True):
+                        await minio_client.abort_multipart_upload(
+                            bucket.name, upload.object_name, upload.upload_id
+                        )
+                    # 再删除空 bucket
+                    await minio_client.remove_bucket(bucket.name)
+                    print(f"MinIO: deleted bucket {bucket.name}")
+                except S3Error as e:
+                    cleanup_errors.append(f"MinIO delete bucket {bucket.name} error: {e}")
+
+        await minio_client.close()
+    except Exception as e:
+        cleanup_errors.append(f"MinIO cleanup error: {e}")
+
+    # 清理 Neo4j graphs
+    # ✅ 修复 #N1: 添加 Neo4j graph 清理（通过 HTTP API /db/neo4j/tx/commit）
+    try:
+        import aiohttp
+
+        neo4j_http_url = f"http://{config.neo4j_host}:{config.neo4j_http_port}"
+        auth = aiohttp.BasicAuth(
+            config.neo4j_username or "neo4j",
+            config.neo4j_password or "password123",
+        )
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
+            # ✅ R6: 必须检查 test_tenant 属性存在，否则 null = 'value' 返回 null 而非 false
+            # 会导致所有节点被误删！
+            cypher = (
+                f"MATCH (n) "
+                f"WHERE n.test_tenant IS NOT NULL AND n.test_tenant = 'test_{tenant.prefix}' "
+                f"DETACH DELETE n"
+            )
+            async with session.post(
+                f"{neo4j_http_url}/db/neo4j/tx/commit",
+                json={"statements": [{"statement": cypher}]},
+            ) as resp:
+                if resp.status in (200, 201):
+                    result = await resp.json()
+                    # ✅ R3: Neo4j 5.x HTTP API — summary 在顶层，不在 results[0] 内
+                    # 响应结构: {"results": [...], "errors": [], "summary": {"counters": {...}}}
+                    summary = result.get("summary", {})
+                    counters = summary.get("counters", {})
+                    deleted_nodes = counters.get("nodesDeleted", 0)
+                    deleted_rels = counters.get("relationshipsDeleted", 0)
+                    if deleted_nodes > 0 or deleted_rels > 0:
+                        print(f"Neo4j: deleted {deleted_nodes} nodes, {deleted_rels} rels")
+                elif resp.status == 401:
+                    cleanup_errors.append("Neo4j auth failed (check NEO4J_USERNAME/PASSWORD)")
+                elif resp.status == 404:
+                    print(f"Neo4j: database 'neo4j' not found, skipping graph cleanup")
+                else:
+                    cleanup_errors.append(f"Neo4j cleanup POST returned {resp.status}")
+    except aiohttp.ClientError as e:
+        print(f"Neo4j HTTP API unavailable ({e}), skipping graph cleanup")
+    except Exception as e:
+        cleanup_errors.append(f"Neo4j cleanup error: {e}")
 
     # 清理 PostgreSQL schema
+    # ✅ S3: 使用 async with 确保连接无论是否异常都正确释放
     try:
         import asyncpg
 
-        conn = await asyncpg.connect(
+        async with asyncpg.create_pool(
             host=config.postgres_host,
             port=config.postgres_port,
             database=config.postgres_database or "sisys",
-            user=config.postgres_username or "postgres",
-            password=config.postgres_password or "postgres",
-        )
-
-        schema_name = f"test_{tenant.prefix}"
-        try:
-            await conn.execute(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE')
-        except Exception:
-            pass
-
-        await conn.close()
+            user=config.postgres_username if config.postgres_username else "postgres",
+            password=config.postgres_password if config.postgres_password is not None else "postgres",
+            min_size=1,
+            max_size=1,
+        ) as pool:
+            schema_name = f"test_{tenant.prefix}"
+            try:
+                async with pool.acquire() as conn:
+                    await conn.execute(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE')
+            except Exception as e:
+                cleanup_errors.append(f"PostgreSQL drop schema error: {e}")
     except Exception as e:
-        print(f"PostgreSQL cleanup error: {e}")
+        cleanup_errors.append(f"PostgreSQL cleanup error: {e}")
+
+    # ✅ S5: 清理失败应记录 error 而非 warning（资源泄漏风险）
+    # 注意：pytest.skip() 在 fixture teardown 中无效，会跳过下一个测试而非当前测试
+    if len(cleanup_errors) > 0:
+        error_msg = f"Tenant cleanup had {len(cleanup_errors)} error(s): {'; '.join(cleanup_errors)}"
+        print(error_msg)
+        import logging
+        logging.error(error_msg)
 
 
 # ===================================================================
@@ -1275,6 +1515,56 @@ async def _cleanup_tenant_resources(
 # ===================================================================
 # 测试前/后钩子
 # ===================================================================
+
+# ✅ 修复 #7: 添加 setup 时清理机制，降低中途失败时脏数据累积风险
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def cleanup_old_test_resources():
+    """Session 级清理：测试会话开始前清理旧的 test_* 资源.
+
+    这是一个兜底机制，用于处理：
+    1. 测试中途失败导致 teardown 未执行的情况
+    2. 历史遗留的脏数据
+    3. 上次 CI 运行未清理的资源
+
+    注意：
+    - session 级的 async fixture 由 pytest-asyncio 管理 event loop
+    - setup 时清理的是"上一次 CI 运行的脏数据"
+    - 当前会话的租户在 fixture 执行时才创建，不受影响
+    """
+    from tests.environments import get_test_env
+
+    config = get_test_env()
+    import redis.asyncio as redis
+
+    try:
+        r = redis.Redis(
+            host=config.redis_host,
+            port=config.redis_port,
+            password=config.redis_password,
+            decode_responses=True,
+        )
+
+        # ✅ 修复 #A: 真正删除所有 test:* keys
+        # session 开始时清理上一次运行的脏数据
+        cursor = 0
+        deleted = 0
+        while True:
+            cursor, keys = await r.scan(cursor=cursor, match="test:*", count=100)
+            if keys:
+                deleted += len(keys)
+                await r.delete(*keys)
+            if cursor == 0:
+                break
+
+        await r.close()
+        if deleted > 0:
+            print(f"Setup cleanup: deleted {deleted} legacy test keys")
+    except Exception as e:
+        print(f"Setup cleanup warning: {e}")
+
+    yield  # session 级 fixture，yield 后不执行 teardown
 
 
 @pytest.fixture(autouse=True)
