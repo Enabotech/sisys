@@ -192,135 +192,31 @@ def ensure_schema(pg_config: PostgreSQLConfig):
 - [ ] **每个测试创建自己的测试数据**，不依赖预置数据
 - [ ] **测试数据使用唯一标识符**（如 `uuid4()`），避免 ID 冲突
 
-### 5.3 并行测试隔离规则（Story 20-1 实战新增）
+### 5.3 并行测试隔离约束
 
-> **核心规则：并行测试必须使用 UUID 前缀隔离资源，禁止 autouse fixture 删除全局共享资源。**
+> **核心原则：并行测试必须隔离资源、禁止全局清理依赖、显式声明 Fixture 依赖。**
 
-**资源隔离前缀规范：**
+**约束规则：**
 
-| 资源类型 | 前缀格式 | 示例 |
-|---------|---------|------|
-| Redis keys | `test:{uuid}:` | `test:a1b2c3d4:session:001` |
-| RabbitMQ queues | `test_{uuid}_queue_` | `test_a1b2c3d4_queue_docs` |
-| Qdrant collections | `test_{uuid}_` | `test_a1b2c3d4_documents` |
-| PostgreSQL schemas | `test_{uuid}` | `test_a1b2c3d4` |
-| MinIO buckets | `test-{uuid}` | `test-a1b2c3d4` |
+| 约束类型 | 规则 | 违反后果 |
+|---------|------|---------|
+| **资源隔离** | 并行测试必须使用唯一标识符（UUID）前缀隔离资源 | 资源冲突导致随机失败 |
+| **清理粒度** | 每个测试只清理自己创建的资源，禁止 autouse fixture 删除全局共享资源 | 误删其他测试资源 |
+| **依赖声明** | Fixture 依赖清理操作必须显式声明，不得假设执行顺序 | 并行时清理顺序不确定 |
+| **asyncio 上下文** | asyncio.Lock 必须是类变量；处理 thread.ident 可能为 None | 锁失效或类型错误 |
+| **pytest-asyncio** | 删除所有 scope=module/event_loop 的 event_loop fixture | 与 auto mode 冲突 |
+| **外部客户端** | 第三方客户端 API 调用必须验证方法存在性 | AttributeError |
 
-**Fixture 依赖管理（关键）：**
+**禁止行为：**
+- ❌ autouse fixture 删除 `test_*`、`uuid_*` 等全局匹配的资源
+- ❌ Fixture 假设 autouse cleanup 会先执行（并行时顺序不确定）
+- ❌ asyncio.Lock 使用实例变量（field(default_factory=...）
+- ❌ scope=module 的 event_loop fixture（与 pytest-asyncio auto mode 冲突）
 
-```python
-# ✅ 正确：显式依赖确保清理顺序
-@pytest.fixture
-async def semantic_cache(redis_config: RedisConfig, flush_redis_before_test: None):
-    """Depends on flush_redis_before_test to ensure clean state before test."""
-    cache = RedisSemanticCache(redis_config)
-    yield cache
-    await cache.close()
-
-# ❌ 错误：假设 autouse 会先执行（并行时顺序不确定）
-@pytest.fixture
-async def semantic_cache(redis_config: RedisConfig):
-    cache = RedisSemanticCache(redis_config)
-    yield cache
-    await cache.close()
-```
-
-**autouse cleanup 陷阱：**
-
-```python
-# ❌ 错误：删除所有 test_* 资源会误删其他测试的资源
-@pytest.fixture(autouse=True)
-async def cleanup_test_collections(qdrant_client):
-    yield
-    # 删除所有 test_* collection → 并行时可能误删其他测试的 collection！
-    for coll in await manager.list_collections():
-        if coll.startswith("test_"):
-            await manager.delete_collection(coll)
-
-# ✅ 正确：每个测试只清理自己创建的资源
-@pytest.fixture(autouse=True)
-async def init_test_collection_names():
-    for key in _test_collection_names:
-        _test_collection_names[key] = f"test_{uuid.uuid4().hex[:8]}"
-    yield
-    # 只清理自己创建的 collection
-    for key in _test_collection_names:
-        if _test_collection_names[key]:
-            try:
-                await manager.delete_collection(_test_collection_names[key])
-            except Exception:
-                pass
-```
-
-**asyncio 上下文规则：**
-
-```python
-# ✅ 正确：asyncio.Lock 是类变量
-class TenantContext:
-    _lock: asyncio.Lock = asyncio.Lock()  # 类变量，所有实例共享
-
-# ❌ 错误：实例变量会导致锁无效
-class TenantContext:
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # 实例变量
-
-# ✅ 正确：处理 threading.current_thread().ident 可能为 None
-tid = threading.current_thread().ident
-return tid if tid is not None else 0
-
-# ❌ 错误：or 0 无法处理 None
-return threading.current_thread().ident or 0  # Any type error
-```
-
-**pytest-asyncio auto mode 配置：**
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-```
-
-```python
-# ❌ 错误：scope=module 与 auto mode 冲突
-@pytest.fixture(scope="module")
-def event_loop():
-    ...
-
-# ✅ 正确：删除所有 scope=module 的 event_loop fixture
-```
-
-**Real Neo4j Client 使用：**
-
-```python
-# ✅ 正确：使用 get_async_driver().session()
-driver = neo4j_client.get_async_driver()
-async with driver.session(database=neo4j_client._database) as session:
-    await session.run("MATCH (n) DETACH DELETE n")
-
-# ❌ 错误：Neo4jClientWrapper 没有 session() 方法
-async with neo4j_client.session() as session:  # AttributeError!
-```
-
-### 5.4 并行测试验证要求
-
-> **每个 Story 必须验证并行执行（`pytest -n 4`）无冲突，这是 DoD 的一部分。**
-
-**验证命令：**
-```bash
-# 并行测试稳定性验证（连续5次）
-for i in {1..5}; do
-  echo "Run $i:"
-  poetry run pytest tests/ -n 4 --tb=no -q
-done
-
-# mypy 类型检查（必须通过）
-poetry run mypy tests/
-```
-
-**DoD 并行测试检查项：**
-- [ ] `pytest tests/ -n 4` 通过（2071 passed）
+**验证要求：**
+- [ ] 并行测试 `pytest tests/ -n 4` 通过
 - [ ] 连续5次运行无随机失败
 - [ ] mypy 类型检查通过
-- [ ] 无资源被误删（collection/queue/key）
 
 ---
 
