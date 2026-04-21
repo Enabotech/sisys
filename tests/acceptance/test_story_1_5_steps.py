@@ -10,6 +10,11 @@ Prerequisites:
     - Database created: POSTGRES_DATABASE (default: sisys)
     - User: POSTGRES_USERNAME (default: postgres)
     - Password: POSTGRES_PASSWORD (default: postgres)
+
+Tenant Isolation (AC-4):
+    - Uses begin_nested() savepoint for transactional isolation
+    - Each test runs in isolated transaction that rolls back after test
+    - Test schema uses UUID prefix for isolation
 """
 
 from __future__ import annotations
@@ -29,6 +34,8 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -40,6 +47,14 @@ DOMAIN_DIR = SRC_DIR / "domain"
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture

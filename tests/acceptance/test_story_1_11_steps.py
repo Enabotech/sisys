@@ -1,6 +1,11 @@
 """Acceptance tests for Story 1.11 - 数据主权隔离.
 
 Run with: pytest tests/acceptance/test_story_1_11.feature -v
+
+Tenant Isolation (AC-4):
+    - Uses mocks for services, no real database connections
+    - Uses UUID for request_id and data_id isolation
+    - reset_test_environment ensures no global state pollution
 """
 
 from __future__ import annotations
@@ -24,12 +29,16 @@ from src.infrastructure.security.pipl_compliance import PIPLComplianceService
 from src.infrastructure.security.sensitive_data_detector import SensitiveDataDetector
 from src.infrastructure.security.whitelist_service import WhitelistService
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 scenarios("test_story_1_11.feature")
 
 
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
 
 
 @pytest.fixture

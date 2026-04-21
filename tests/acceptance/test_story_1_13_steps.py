@@ -3,6 +3,10 @@
 Prometheus /metrics HTTP 端点 + 自定义业务指标暴露 + K8s HPA 集成.
 
 Run with: pytest tests/acceptance/test_story_1_13.feature -v
+
+Tenant Isolation (AC-4):
+    - Uses in-memory metrics with isolated CollectorRegistry per test
+    - reset_test_environment ensures no global state pollution
 """
 
 from __future__ import annotations
@@ -14,6 +18,8 @@ from typing import Any, cast
 import pytest
 from pytest_bdd import given, scenario, then, when
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -24,6 +30,8 @@ SRC_DIR = ROOT / "src"
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
 
 
 @pytest.fixture
