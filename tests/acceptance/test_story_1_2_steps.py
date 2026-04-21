@@ -108,7 +108,7 @@ def test_routing_decided_event():
 # --- Fixtures ---
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def events_context():
     """Shared context for all event scenarios."""
     return {

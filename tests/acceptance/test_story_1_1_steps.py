@@ -74,7 +74,7 @@ def _check_method_exists(module_path: str, class_name: str, method_name: str) ->
 # --- Shared context fixture ---
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def arch_context():
     """Shared context for all architecture scenarios."""
     return {

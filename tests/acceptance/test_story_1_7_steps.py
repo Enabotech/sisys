@@ -51,14 +51,6 @@ _test_object_key = None
 _test_content = None
 
 
-@pytest.fixture(scope="module")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest.fixture(autouse=True)
 def reset_test_state():
     """Reset module-level test state before each test."""

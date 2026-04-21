@@ -12,6 +12,7 @@ import asyncio
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -49,17 +50,72 @@ _idempotency_second_result = None
 # Shared state for redis pub/sub channel tracking
 _redis_published_channel = None
 
+
+# ===================================================================
+# Helper Functions for P1 Fix: async_consume() Blocking Issue
+# ===================================================================
+
+
+async def _wait_for_consumer_ready(
+    consumer,
+    queue_name: str,
+    poll_interval=0.1,
+    max_polls=50,
+):
+    """Poll until consumer is truly bound to queue.
+
+    Uses passive declare_queue check to verify the queue exists,
+    which confirms the consumer has properly bound to it.
+    """
+    for _ in range(max_polls):
+        if consumer._channel is not None:
+            try:
+                await consumer._channel.declare_queue(queue_name, passive=True)
+                return True
+            except Exception:
+                pass
+        await asyncio.sleep(poll_interval)
+    raise asyncio.TimeoutError(f"Consumer not ready after {max_polls} polls. " f"Queue '{queue_name}' was not declared.")
+
+
+@asynccontextmanager
+async def temporary_consumer(consumer, queue_name, routing_key, handler, timeout=5.0):
+    """Temporary consumer context manager - 同步版本用于 step 调用。
+
+    不使用 create_task，直接在 with 块内 await consume。
+    适用于同步 step + event_loop.run_until_complete 模式。
+    """
+    event_type = queue_name.split("-")[-1]
+    consumer.register_handler(event_type, handler)
+    await consumer.bind_queue(queue_name, routing_key)
+
+    # 直接 await consume，不使用 create_task
+    consume_task = asyncio.create_task(consumer.async_consume(queue_name))
+
+    try:
+        await asyncio.wait_for(_wait_for_consumer_ready(consumer, queue_name), timeout=timeout)
+    except asyncio.TimeoutError:
+        consume_task.cancel()
+        await consume_task
+        raise RuntimeError(f"Consumer failed to start within {timeout}s")
+
+    try:
+        yield
+    finally:
+        # 取消 consume 任务
+        if not consume_task.done():
+            consume_task.cancel()
+            try:
+                await asyncio.wait_for(consume_task, timeout=1.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                pass
+
+        await consumer.close()
+
+
 # ===================================================================
 # Fixtures
 # ===================================================================
-
-
-@pytest.fixture(scope="module")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -372,37 +428,54 @@ def publish_agentdecided_to_rabbitmq(rabbitmq_publisher: AsyncRabbitMQPublisher,
 
 
 @then("异步消费者应该接收到该事件")
-def verify_rabbitmq_consumer_receives(
-    rabbitmq_publisher: AsyncRabbitMQPublisher,
-    rabbitmq_consumer: AsyncRabbitMQConsumer,
-    event_loop,
+@pytest.mark.asyncio
+async def verify_rabbitmq_consumer_receives(
+    rabbitmq_config: RabbitMQConfig,
+    redis_config: RedisConfig,
 ):
-    """Verify async consumer receives the event."""
+    """Verify async consumer receives the event.
+
+    使用 @pytest.mark.asyncio 让 pytest-asyncio 处理 async step。
+    fixture 只提供配置，step 控制连接和执行。
+    """
+    from src.infrastructure.idempotency import IdempotencyChecker
+
     received_events = []
-    event_type = "DocumentProcessed"
-    queue_name = f"test-queue-{uuid.uuid4().hex[:8]}"
-    routing_key = f"{RABBITMQ_ROUTING_PREFIX}{event_type}"
 
-    async def _setup_consumer():
-        async def handler(event: DomainEvent):
-            received_events.append(event)
+    # Step 控制连接
+    publisher = AsyncRabbitMQPublisher(rabbitmq_config)
+    await publisher.connect()
 
-        rabbitmq_consumer.register_handler(event_type, handler)
-        await rabbitmq_consumer.bind_queue(queue_name, routing_key)
-        await rabbitmq_consumer.async_consume(queue_name)
+    idempotency = IdempotencyChecker(
+        host=redis_config.host,
+        port=redis_config.port,
+        db=redis_config.db,
+        password=redis_config.password,
+    )
+    consumer = AsyncRabbitMQConsumer(rabbitmq_config, idempotency_checker=idempotency)
+    await consumer.connect()
 
-    async def _publish_and_wait():
-        event = DocumentProcessed(
-            document_id=uuid.uuid4(),
-            parse_result={"pages": 5},
-            embedding=[0.1, 0.2],
-        )
-        await asyncio.sleep(0.5)  # Give consumer time to set up
-        await rabbitmq_publisher.async_publish(event, routing_key)
-        await asyncio.sleep(2.0)  # Wait for message to be delivered
+    try:
+        event_type = "DocumentProcessed"
+        queue_name = f"test-queue-{uuid.uuid4().hex[:8]}"
+        routing_key = f"{RABBITMQ_ROUTING_PREFIX}{event_type}"
 
-    event_loop.run_until_complete(_setup_consumer())
-    event_loop.run_until_complete(_publish_and_wait())
+        async def handler(evt: DomainEvent):
+            received_events.append(evt)
+
+        async with temporary_consumer(consumer, queue_name, routing_key, handler, timeout=10.0):
+            event = DocumentProcessed(
+                document_id=uuid.uuid4(),
+                parse_result={"pages": 5},
+                embedding=[0.1, 0.2],
+            )
+            await asyncio.sleep(1.0)
+            await publisher.async_publish(event, routing_key)
+            await asyncio.sleep(3.0)
+    finally:
+        await publisher.close()
+        await consumer.close()
+
     assert len(received_events) > 0, "Consumer did not receive event"
 
 

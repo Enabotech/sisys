@@ -11,7 +11,6 @@ Prerequisites:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import uuid
 from pathlib import Path
@@ -36,14 +35,6 @@ DOMAIN_DIR = SRC_DIR / "domain"
 # ===================================================================
 # Fixtures
 # ===================================================================
-
-
-@pytest.fixture(scope="module")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -367,7 +358,17 @@ def collection_has_different_domains(
 ):
     """Collection contains vectors with different business domains."""
 
-    async def _insert():
+    async def _setup():
+        # P2 Fix: Create collection before inserting points
+        try:
+            await collection_manager.create_collection(
+                name="sisys_documents_finance",
+                vector_size=1024,
+                distance="Cosine",
+            )
+        except Exception:
+            pass  # Ignore if already exists
+
         # Insert vectors with different business_domain values
         for domain in ["report", "analysis", "summary"]:
             for i in range(10):
@@ -383,7 +384,7 @@ def collection_has_different_domains(
                 ]
                 await vector_storage.upsert_points("sisys_documents_finance", points)
 
-    event_loop.run_until_complete(_insert())
+    event_loop.run_until_complete(_setup())
 
 
 @when('我执行 Dense 检索并过滤 business_domain="report"')
