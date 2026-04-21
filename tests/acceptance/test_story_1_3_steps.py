@@ -28,6 +28,8 @@ from src.infrastructure.events.redis_publisher import RedisEventPublisher
 from src.infrastructure.events.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.idempotency import IdempotencyChecker
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -49,6 +51,17 @@ _idempotency_second_result = None
 
 # Shared state for redis pub/sub channel tracking
 _redis_published_channel = None
+
+
+# ===================================================================
+# Fixtures
+# ===================================================================
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 # ===================================================================

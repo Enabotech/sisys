@@ -1,6 +1,11 @@
 """Acceptance tests for Story 1.10 - 统一审计日志.
 
 Run with: pytest tests/acceptance/test_story_1_10.feature -v
+
+Tenant Isolation (AC-4):
+    - Uses mocks for services, no real database connections
+    - Uses UUID for correlation_id and log_id isolation
+    - reset_test_environment ensures no global state pollution
 """
 
 from __future__ import annotations
@@ -18,12 +23,16 @@ from src.infrastructure.audit.audit_service import AuditServiceImpl
 from src.infrastructure.audit.event_listener import AuditEventListener
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 scenarios("test_story_1_10.feature")
 
 
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
 
 
 @pytest.fixture

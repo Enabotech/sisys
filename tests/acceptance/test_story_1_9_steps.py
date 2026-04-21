@@ -1,6 +1,10 @@
 """Acceptance tests for Story 1.9 - RBAC 权限管理系统.
 
 Run with: pytest tests/acceptance/test_story_1_9.feature -v
+
+Tenant Isolation (AC-4):
+    - Uses mocks for services, no real database connections
+    - reset_test_environment ensures no global state pollution
 """
 
 from __future__ import annotations
@@ -23,12 +27,16 @@ from src.infrastructure.security.jwt_service import (
 )
 from src.infrastructure.security.models import Role
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 scenarios("test_story_1_9.feature")
 
 
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+# Import reset_test_environment for test isolation (AC-4 A8)
 
 
 @pytest.fixture

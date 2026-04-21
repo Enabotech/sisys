@@ -32,6 +32,8 @@ from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -49,6 +51,12 @@ _test_bucket_name = None
 _test_bucket_type_part = None
 _test_object_key = None
 _test_content = None
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture(autouse=True)
