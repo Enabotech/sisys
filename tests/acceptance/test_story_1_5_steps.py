@@ -42,7 +42,7 @@ DOMAIN_DIR = SRC_DIR / "domain"
 # ===================================================================
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def pg_config() -> PostgreSQLConfig:
     """Real PostgreSQL configuration from environment."""
     return PostgreSQLConfig(
@@ -61,14 +61,6 @@ def db_engine(pg_config: PostgreSQLConfig) -> DatabaseEngine:
     """Real database engine instance."""
     engine = DatabaseEngine(pg_config)
     return engine
-
-
-@pytest.fixture(scope="module")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -137,7 +129,7 @@ def database_connection_normal():
 _migration_run = False
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def ensure_alembic_migration(pg_config: PostgreSQLConfig):
     """Ensure database schema exists before tests.
 
