@@ -28,6 +28,8 @@ from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
 from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -44,6 +46,12 @@ _test_session_ids = {
 # ===================================================================
 # Fixtures
 # ===================================================================
+
+
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture(autouse=True)
@@ -91,24 +99,38 @@ async def flush_redis_before_test(redis_config: RedisConfig):
 
 
 @pytest.fixture
-async def session_storage(redis_config: RedisConfig) -> AsyncGenerator[RedisSessionStorage, None]:
-    """Real Redis session storage instance."""
+async def session_storage(
+    redis_config: RedisConfig, flush_redis_before_test: None
+) -> AsyncGenerator[RedisSessionStorage, None]:
+    """Real Redis session storage instance.
+
+    Depends on flush_redis_before_test to ensure clean Redis state
+    before test runs (critical for parallel test execution).
+    """
     storage = RedisSessionStorage(redis_config)
     yield storage
     await storage.close()
 
 
 @pytest.fixture
-async def semantic_cache(redis_config: RedisConfig) -> AsyncGenerator[RedisSemanticCache, None]:
-    """Real Redis semantic cache instance."""
+async def semantic_cache(redis_config: RedisConfig, flush_redis_before_test: None) -> AsyncGenerator[RedisSemanticCache, None]:
+    """Real Redis semantic cache instance.
+
+    Depends on flush_redis_before_test to ensure clean Redis state
+    before test runs (critical for parallel test execution).
+    """
     cache = RedisSemanticCache(redis_config)
     yield cache
     await cache.close()
 
 
 @pytest.fixture
-async def redis_cleanup(redis_config: RedisConfig) -> AsyncGenerator[RedisCleanup, None]:
-    """Real Redis cleanup utility instance."""
+async def redis_cleanup(redis_config: RedisConfig, flush_redis_before_test: None) -> AsyncGenerator[RedisCleanup, None]:
+    """Real Redis cleanup utility instance.
+
+    Depends on flush_redis_before_test to ensure clean Redis state
+    before test runs (critical for parallel test execution).
+    """
     cleanup = RedisCleanup(redis_config)
     yield cleanup
     await cleanup.close()

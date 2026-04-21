@@ -24,6 +24,8 @@ from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectio
 from src.infrastructure.storage.qdrant.models import VectorPoint
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
+# Import reset_test_environment for test isolation (AC-4 A8)
+
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -33,7 +35,7 @@ SRC_DIR = ROOT / "src"
 DOMAIN_DIR = SRC_DIR / "domain"
 
 # Module-level test state for UUID isolation
-_test_collection_names = {
+_test_collection_names: dict[str, str | None] = {
     "finance": None,
     "hr": None,
 }
@@ -43,15 +45,30 @@ _test_collection_names = {
 # ===================================================================
 
 
+@pytest.fixture
+def test_tenant_id() -> str:
+    """Generate unique tenant ID for test isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
+
+
 @pytest.fixture(autouse=True)
-def init_test_collection_names():
-    """Initialize unique collection names for each test."""
+async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
+    """Initialize unique collection names for each test with async cleanup."""
     for key in _test_collection_names:
         _test_collection_names[key] = f"sisys_documents_{key}_{uuid.uuid4().hex[:8]}"
     yield
-    # Cleanup after test
+    # Cleanup after test - delete all created collections
+    from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
+
+    manager = QdrantCollectionManager(qdrant_client)
     for key in _test_collection_names:
-        _test_collection_names[key] = None
+        name = _test_collection_names[key]
+        if name:
+            try:
+                await manager.delete_collection(name)
+            except Exception:
+                pass  # Ignore errors during cleanup
+            _test_collection_names[key] = None
 
 
 @pytest.fixture
@@ -146,7 +163,7 @@ def verify_collection_exists(collection_manager: QdrantCollectionManager, event_
     """Verify collection exists."""
 
     async def _check():
-        exists = await collection_manager.collection_exists("sisys_documents_finance")
+        exists = await collection_manager.collection_exists(_test_collection_names["finance"])
         assert exists, "Collection sisys_documents_finance should exist"
 
     event_loop.run_until_complete(_check())
@@ -157,7 +174,7 @@ def delete_collection(collection_manager: QdrantCollectionManager, event_loop):
     """Delete collection."""
 
     async def _delete():
-        await collection_manager.delete_collection("sisys_documents_finance")
+        await collection_manager.delete_collection(_test_collection_names["finance"])
 
     event_loop.run_until_complete(_delete())
 
@@ -167,7 +184,7 @@ def verify_collection_not_exists(collection_manager: QdrantCollectionManager, ev
     """Verify collection does not exist."""
 
     async def _check():
-        exists = await collection_manager.collection_exists("sisys_documents_finance")
+        exists = await collection_manager.collection_exists(_test_collection_names["finance"])
         assert not exists, "Collection should not exist after deletion"
 
     event_loop.run_until_complete(_check())
@@ -227,7 +244,7 @@ def insert_ten_vectors(
                     },
                 )
             )
-        await vector_storage.upsert_points("sisys_documents_finance", points)
+        await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
     event_loop.run_until_complete(_insert())
 
@@ -249,7 +266,7 @@ def query_point_vector_storage(
 
     async def _query():
         nonlocal result
-        result = await vector_storage.get_point("sisys_documents_finance", "1")
+        result = await vector_storage.get_point(_test_collection_names["finance"], "1")
 
     event_loop.run_until_complete(_query())
     return result
@@ -311,7 +328,7 @@ def collection_contains_100_vectors(
                     },
                 )
             )
-        await vector_storage.upsert_points("sisys_documents_finance", points)
+        await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
     event_loop.run_until_complete(_insert())
 
@@ -328,7 +345,7 @@ def perform_dense_search(
         nonlocal results
         query_vector = [0.05] * 1024
         results = await vector_storage.search(
-            "sisys_documents_finance",
+            _test_collection_names["finance"],
             query_vector,
             limit=10,
         )
@@ -399,7 +416,7 @@ def collection_has_different_domains(
                         },
                     )
                 ]
-                await vector_storage.upsert_points("sisys_documents_finance", points)
+                await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
     event_loop.run_until_complete(_setup())
 
@@ -416,7 +433,7 @@ def perform_filtered_search(
         nonlocal results
         query_vector = [0.1] * 1024
         results = await vector_storage.search(
-            "sisys_documents_finance",
+            _test_collection_names["finance"],
             query_vector,
             limit=10,
             filter_payload={"business_domain": "report"},
@@ -487,7 +504,7 @@ def collection_has_text_vectors(
                     },
                 )
             ]
-            await vector_storage.upsert_points("sisys_documents_finance", points)
+            await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
     event_loop.run_until_complete(_insert())
 
@@ -505,7 +522,7 @@ def perform_bm25_search(
         nonlocal results
         sparse_vector = bm25_builder.build_sparse_vector("financial report analysis")
         results = await vector_storage.search_sparse(
-            "sisys_documents_finance",
+            _test_collection_names["finance"],
             sparse_vector,
         )
 
@@ -581,7 +598,7 @@ def insert_to_finance_collection(
                 payload={"document_id": "finance-doc-1"},
             )
         ]
-        await vector_storage.upsert_points("sisys_documents_finance", points)
+        await vector_storage.upsert_points(_test_collection_names["finance"], points)
 
     event_loop.run_until_complete(_insert())
 
@@ -594,7 +611,7 @@ def verify_hr_collection_isolated(
     """Verify HR collection does not contain finance vectors."""
 
     async def _check():
-        point = await vector_storage.get_point("sisys_documents_hr", "1")
+        point = await vector_storage.get_point(_test_collection_names["hr"], "1")
         assert point is None, "HR collection should not contain finance vectors"
 
     event_loop.run_until_complete(_check())
