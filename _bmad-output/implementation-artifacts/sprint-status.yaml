@@ -311,7 +311,7 @@ development_status:
   # ===========================================================================
   # Epic 20: 测试工程基础设施 - ✅ 已完成
   # ===========================================================================
-  epic-20: done-progress
+  epic-20: done
   20-1-sisys-testing-refactor: done
   epic-20-retrospective: optional
 

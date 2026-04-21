@@ -507,15 +507,15 @@
   poetry run pytest tests/ -n 4
   ```
   - ✅ 已通过：2071 passed, 32 skipped
-- [ ] Subtask 9.5: CI pipeline 完整验证
+- [x] Subtask 9.5: CI pipeline 完整验证
   ```bash
   git push && 等待 CI pipeline 完成
   ```
-  - ⏳ 待 CI 运行验证
+  - ✅ 已通过：代码检查19s + 单元测试34s + 集成测试28s + 安全扫描16s + 变更检测3s + 构建镜像
 
 **完成标准/Definition of Done:**
 - [x] 本地测试 100% 通过 (2071 passed)
-- [ ] CI 测试 100% 通过 (待验证)
+- [x] CI 测试 100% 通过
 - [x] 并行测试无冲突
 - [x] 完整回归测试通过
 
