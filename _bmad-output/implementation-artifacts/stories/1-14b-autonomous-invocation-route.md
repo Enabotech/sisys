@@ -65,8 +65,8 @@
 - [ ] 语义嵌入向量计算（使用 bge-m3 模型，Story 1.6 已集成）
 - [ ] 候选 Agent/工具相似度计算（余弦相似度）
 - [ ] 语义路由选择逻辑
-- [ ] 语义路由匹配度≥95%（基于人工标注测试集：100+ 样本，评估路由目标与人工标注一致率）
-- [ ] 语义路由延迟 P95<50ms
+- [ ] 语义路由匹配度≥95%（相对于人工标注基准，随机路由基准约 30-40%，100+ 样本测试集）
+- [ ] 语义路由延迟 P95<50ms（基准测试方法：1000 次连续请求，预热 100 次）
 
 ### AC-3: 路由决策日志
 
@@ -104,9 +104,9 @@
 **And** 吞吐量支持 1000 decisions/second
 
 **验证标准/Validation Criteria:**
-- [ ] 路由决策延迟 P95<50ms（基准测试）
-- [ ] 吞吐量 1000 decisions/second（负载测试）
-- [ ] 语义路由缓存（如语义相似度结果）
+- [ ] 路由决策延迟 P95<50ms（基准测试：1000 次连续请求，预热 100 次，统计 P95）
+- [ ] 吞吐量 1000 decisions/second（负载测试：10 秒持续压力，稳定状态测量）
+- [ ] 语义路由缓存（如语义相似度结果，使用 Redis mock）
 - [ ] 路由决策幂等性（相同输入产生相同输出）
 
 ---
@@ -190,6 +190,7 @@
 | **TDD 单元测试** | RouteService | 哈希路由 | `test_route_service.py` | Task 1 |
 | **TDD 单元测试** | HashRouter | 一致性哈希 | `test_hash_router.py` | Task 1 |
 | **TDD 单元测试** | SemanticRouter | 语义相似度 | `test_semantic_router.py` | Task 2 |
+| **TDD 单元测试** | SemanticRouter | 语义路由缓存（Redis mock） | `test_semantic_router_cache.py` | Task 2 |
 | **TDD 单元测试** | RoutingDecisionLog | 路由决策日志 | `test_routing_decision_log.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.14b.feature` | Task 0 |
 | **SDD 架构验证** | 路由解耦 | 六边形架构约束 | `test_route_architecture.py` | Task 3 |
@@ -206,6 +207,7 @@
 | AC-1 | 哈希路由机制 | Task 1 | Subtask 1.1-1.3（HashRouter 红→绿→重构） | `test_hash_router.py` |
 | AC-1 | RouteService 事件监听 | Task 1 | Subtask 1.4-1.6（RouteService 红→绿→重构） | `test_route_service.py` |
 | AC-2 | 语义路由机制 | Task 2 | Subtask 2.1-2.3（SemanticRouter 红→绿→重构） | `test_semantic_router.py` |
+| AC-2 | 语义路由缓存 | Task 2 | Subtask 2.7-2.9（Redis mock 缓存测试） | `test_semantic_router_cache.py` |
 | AC-3 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由与 execute 解耦 | Task 3 | Subtask 3.1-3.3（六边形架构验证 红→绿→重构） | `test_route_architecture.py` |
 | AC-5 | 路由性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_route_performance.py` |
@@ -307,10 +309,25 @@
 - [ ] Subtask 2.5: 🟢 绿 — 实现 RoutingDecisionLog 实体
 - [ ] Subtask 2.6: 🔄 重构 — 验证 WORM 归档标识
 
+#### TDD 循环 [C]：语义路由缓存（Redis mock）
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/routing/test_semantic_router_cache.py`（验证缓存命中/未命中，使用 mock Redis） |
+| 🟢 绿 | 实现缓存逻辑（Redis TTL=24h，缓存失效策略：TTL + 事件驱动 + 版本感知） |
+| 🔄 重构 | 验证缓存失效策略 |
+
+- [ ] Subtask 2.7: 🔴 红 — 编写 SemanticRouter 缓存失败测试（mock Redis）
+- [ ] Subtask 2.8: 🟢 绿 — 实现语义路由缓存逻辑
+- [ ] Subtask 2.9: 🔄 重构 — 验证缓存失效策略
+
+> **测试隔离约束：** SemanticRouter 缓存测试使用 `pytest-mock` 或 `fakeredis` 模拟 Redis，遵循 sdd-tdd-checklist.md 外部服务隔离规则
+
 **完成标准/Definition of Done:**
 - [ ] SemanticRouter 实现完成（bge-m3 语义嵌入 + 余弦相似度）
+- [ ] SemanticRouter 缓存测试完成（Redis mock，遵循测试隔离约束）
 - [ ] RoutingDecisionLog 实现完成
-- [ ] 语义路由匹配度≥95%（基于人工标注测试集验证）
+- [ ] 语义路由匹配度≥95%（相对于人工标注基准，随机路由基准约 30-40%）
 - [ ] TDD 循环全部通过
 
 ---
@@ -553,6 +570,7 @@ sisys/
 - `tests/unit/domain/entities/test_routing_decision_log.py` - RoutingDecisionLog 单元测试
 - `tests/unit/infrastructure/routing/test_hash_router.py` - HashRouter 单元测试
 - `tests/unit/infrastructure/routing/test_semantic_router.py` - SemanticRouter 单元测试
+- `tests/unit/infrastructure/routing/test_semantic_router_cache.py` - SemanticRouter 缓存测试（Redis mock）
 - `tests/unit/architecture/test_route_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_route_performance.py` - 性能基准测试
 - `tests/integration/test_route_integration.py` - 集成测试
@@ -643,6 +661,9 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 7 | "语义路由准确率≥95%"缺乏评估方法 | P2 | 补充"基于人工标注测试集：100+ 样本"评估方法定义 | ✅ 已修复 |
 | 8 | ADR 表格"路由准确性"与正文"匹配度"不一致 | P2 | 统一为"匹配度"，修正语义路由采用理由 | ✅ 已修复 |
 | 9 | Gherkin 未覆盖混合路由组合场景 | P2 | SDD Task 0 补充"混合路由 trigger → route"场景 | ✅ 已修复 |
+| 10 | 语义匹配度基准不明确 | P2 | 明确 95% 相对于人工标注基准，随机路由基准约 30-40% | ✅ 本次修复 |
+| 11 | 性能基准测试覆盖不完整 | P3 | 补充测试方法定义（1000 次请求预热 100 次，10 秒持续压力） | ✅ 本次修复 |
+| 12 | Redis 缓存隔离未明确 | P3 | 新增 TDD 循环 [C] 语义路由缓存，使用 mock Redis，遵循测试隔离约束 | ✅ 本次修复 |
 
 ### 下一步 Next Steps
 
@@ -667,7 +688,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.1.0
+**模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-20
-**最后更新/Last Updated:** 2026-04-20
-**更新说明:** Story 1.14b 完整版本 - 实现 session_id 哈希/语义路由机制：(1) HashRouter 一致性哈希环; (2) SemanticRouter 语义路由; (3) RoutingDecisionLog 路由决策日志; (4) 六边形架构验证; (5) 性能基准测试 P95<50ms；修复问题：准确性术语修正为一致性保证、补充语义路由评估方法定义、补充混合路由组合场景 Gherkin
+**最后更新/Last Updated:** 2026-04-21
+**更新说明:** Story 1.14b 完整版本 - 实现 session_id 哈希/语义路由机制：(1) HashRouter 一致性哈希环; (2) SemanticRouter 语义路由; (3) SemanticRouter 缓存（Redis mock）；(4) RoutingDecisionLog 路由决策日志; (5) 六边形架构验证; (6) 性能基准测试 P95<50ms；本次更新：明确语义匹配度基准（人工标注基准 95% vs 随机基准 30-40%）、补充性能基准测试方法定义、新增 TDD 循环 [C] 语义路由缓存（遵循测试隔离约束）
