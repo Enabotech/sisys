@@ -91,7 +91,7 @@ development_status:
   1-11-data-sovereignty-isolation: done  # ✅ 代码审查完成，Critical/Major patch已修复
   1-12-equilibrium-level-3-compliance: ready-for-dev
   # 价值组 5: or.md 系统公理实现
-  1-14a-autonomous-invocation-trigger: ready-for-dev  # ✅ Story 文件已创建
+  1-14a-autonomous-invocation-trigger: done  # ✅ 开发完成
   1-14b-autonomous-invocation-route: ready-for-dev  # ✅ Story 文件已创建
   1-14c-autonomous-invocation-execute: ready-for-dev  # ✅ Story 文件已创建
   1-15a-externalized-memory-context-compression: backlog

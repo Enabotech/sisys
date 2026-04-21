@@ -13,6 +13,7 @@ from .planning_events import StrategicDeviationWarning
 from .publisher import EventPublisher
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
+from .trigger_events import Triggered
 
 __all__ = [
     "DomainEvent",
@@ -26,6 +27,7 @@ __all__ = [
     "HeartbeatTriggered",
     "IsolationLevelSwitched",
     "RoutingDecided",
+    "Triggered",
     "EventPublisher",
     "DeviationLevel",
     "DeviationType",
