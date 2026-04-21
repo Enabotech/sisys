@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -43,6 +44,30 @@ def mock_publisher() -> AsyncMock:
 def trigger_service(mock_publisher: AsyncMock) -> TriggerService:
     """Create TriggerService with mock publisher."""
     return TriggerService(publisher=mock_publisher)
+
+
+# ===================================================================
+# Test Isolation - must use pytest-asyncio auto mode
+# ===================================================================
+
+
+@pytest.fixture(autouse=True)
+async def reset_tenant_context() -> AsyncGenerator[None, None]:
+    """Reset tenant context before each test to ensure isolation.
+
+    Required for concurrent test execution with pytest-xdist.
+    """
+    try:
+        from tests.isolation import TenantContext
+
+        TenantContext.clear_current_tenant()
+    except ImportError:
+        pass  # isolation module not available
+    yield
+    try:
+        TenantContext.clear_current_tenant()
+    except ImportError:
+        pass
 
 
 # ===================================================================
