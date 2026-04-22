@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -44,30 +43,6 @@ def mock_publisher() -> AsyncMock:
 def trigger_service(mock_publisher: AsyncMock) -> TriggerService:
     """Create TriggerService with mock publisher."""
     return TriggerService(publisher=mock_publisher)
-
-
-# ===================================================================
-# Test Isolation - must use pytest-asyncio auto mode
-# ===================================================================
-
-
-@pytest.fixture(autouse=True)
-async def reset_tenant_context() -> AsyncGenerator[None, None]:
-    """Reset tenant context before each test to ensure isolation.
-
-    Required for concurrent test execution with pytest-xdist.
-    """
-    try:
-        from tests.isolation import TenantContext
-
-        TenantContext.clear_current_tenant()
-    except ImportError:
-        pass  # isolation module not available
-    yield
-    try:
-        TenantContext.clear_current_tenant()
-    except ImportError:
-        pass
 
 
 # ===================================================================
@@ -153,32 +128,28 @@ def given_trigger_service_with_publisher(context: dict, trigger_service: Trigger
 
 
 @when("TriggerService 监听并接收该事件")
-def when_trigger_service_receives_event(context: dict) -> None:
+def when_trigger_service_receives_event(context: dict, event_loop) -> None:
     """TriggerService receives the event."""
-    import asyncio
 
     event = context.get("event")
     trigger_service = context.get("trigger_service")
     if event and trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_domain_event(event))
 
 
 @when("TriggerService 处理该事件")
-def when_trigger_service_processes_event(context: dict) -> None:
+def when_trigger_service_processes_event(context: dict, event_loop) -> None:
     """TriggerService processes the event."""
-    import asyncio
 
     event = context.get("event")
     trigger_service = context.get("trigger_service")
     if event and trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_domain_event(event))
 
 
 @when("我发布每种事件类型到事件总线")
-def when_publish_each_event_type(context: dict) -> None:
+def when_publish_each_event_type(context: dict, event_loop) -> None:
     """Publish each event type to event bus."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     event_types = [
         "DocumentProcessed",
@@ -204,20 +175,19 @@ def when_publish_each_event_type(context: dict) -> None:
                     "agent_id": "agent-test",
                 },
             )
-            triggered = asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+            triggered = event_loop.run_until_complete(trigger_service.on_domain_event(event))
             results.append(triggered)
     context["triggered_results"] = results
 
 
 @when("TriggerService 发布 Triggered 事件")
-def when_trigger_service_publishes(context: dict) -> None:
+def when_trigger_service_publishes(context: dict, event_loop) -> None:
     """TriggerService publishes Triggered event."""
-    import asyncio
 
     event = context.get("event")
     trigger_service = context.get("trigger_service")
     if event and trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_domain_event(event))
 
 
 # ===================================================================
@@ -338,10 +308,8 @@ def given_heartbeat_30s(context: dict) -> None:
 
 
 @when("心跳定时器触发（间隔 60 秒到期）")
-def when_heartbeat_fires(context: dict) -> None:
+def when_heartbeat_fires(context: dict, event_loop) -> None:
     """Heartbeat timer fires."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -351,7 +319,7 @@ def when_heartbeat_fires(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 @when("启动 HeartbeatScheduler")
@@ -362,10 +330,8 @@ def when_start_heartbeat_scheduler(context: dict) -> None:
 
 
 @when("wake_reason 为 scheduled")
-def when_wake_reason_scheduled(context: dict) -> None:
+def when_wake_reason_scheduled(context: dict, event_loop) -> None:
     """Wake reason is scheduled."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -375,14 +341,12 @@ def when_wake_reason_scheduled(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 @when("wake_reason 为 user_request")
-def when_wake_reason_user_request(context: dict) -> None:
+def when_wake_reason_user_request(context: dict, event_loop) -> None:
     """Wake reason is user_request."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -392,14 +356,12 @@ def when_wake_reason_user_request(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 @when("wake_reason 为 system_recovery")
-def when_wake_reason_system_recovery(context: dict) -> None:
+def when_wake_reason_system_recovery(context: dict, event_loop) -> None:
     """Wake reason is system_recovery."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -409,14 +371,12 @@ def when_wake_reason_system_recovery(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 @when("HeartbeatScheduler 生成 HeartbeatTriggered（包含 todo_items: task1, task2, task3）")
-def when_heartbeat_with_todo_items(context: dict) -> None:
+def when_heartbeat_with_todo_items(context: dict, event_loop) -> None:
     """HeartbeatScheduler generates HeartbeatTriggered with todo_items."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -426,14 +386,12 @@ def when_heartbeat_with_todo_items(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 @when("HeartbeatScheduler 生成 HeartbeatTriggered（包含 cost_budget: 250.0）")
-def when_heartbeat_with_budget(context: dict) -> None:
+def when_heartbeat_with_budget(context: dict, event_loop) -> None:
     """HeartbeatScheduler generates HeartbeatTriggered with cost_budget."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     heartbeat_event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -443,7 +401,7 @@ def when_heartbeat_with_budget(context: dict) -> None:
     )
     context["heartbeat_event"] = heartbeat_event
     if trigger_service:
-        context["triggered"] = asyncio.get_event_loop().run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
+        context["triggered"] = event_loop.run_until_complete(trigger_service.on_heartbeat_event(heartbeat_event))
 
 
 # ===================================================================
@@ -731,13 +689,13 @@ def given_check_trigger_service_impl(context: dict) -> None:
 
 
 @when("发布 Triggered 事件")
-async def when_publish_triggered_event(context: dict, trigger_service: TriggerService) -> None:
+def when_publish_triggered_event(context: dict, trigger_service: TriggerService, event_loop) -> None:
     """Publish Triggered event."""
     event = DomainEvent(
         event_type="ToolExecuted",
         payload={"session_id": "session-publish"},
     )
-    context["triggered"] = await trigger_service.on_domain_event(event)
+    context["triggered"] = event_loop.run_until_complete(trigger_service.on_domain_event(event))
 
 
 # ===================================================================
@@ -852,10 +810,8 @@ def given_10000_deserializations(context: dict) -> None:
 
 
 @when("TriggerService 处理每个事件")
-def when_process_1000_events(context: dict) -> None:
+def when_process_1000_events(context: dict, event_loop) -> None:
     """TriggerService processes each event."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     times_ms = []
     if trigger_service:
@@ -865,7 +821,7 @@ def when_process_1000_events(context: dict) -> None:
                 payload={"session_id": "session-latency"},
             )
             start = time.perf_counter()
-            asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+            event_loop.run_until_complete(trigger_service.on_domain_event(event))
             elapsed = (time.perf_counter() - start) * 1000
             times_ms.append(elapsed)
         times_ms.sort()
@@ -874,10 +830,8 @@ def when_process_1000_events(context: dict) -> None:
 
 
 @when("TriggerService 持续处理这些事件")
-def when_process_continuous(context: dict) -> None:
+def when_process_continuous(context: dict, event_loop) -> None:
     """TriggerService processes events continuously."""
-    import asyncio
-
     trigger_service = context.get("trigger_service")
     start = time.perf_counter()
     count = 0
@@ -887,7 +841,7 @@ def when_process_continuous(context: dict) -> None:
                 event_type="ToolExecuted",
                 payload={"session_id": f"session-{count}"},
             )
-            asyncio.get_event_loop().run_until_complete(trigger_service.on_domain_event(event))
+            event_loop.run_until_complete(trigger_service.on_domain_event(event))
             count += 1
     context["events_processed"] = count
 
