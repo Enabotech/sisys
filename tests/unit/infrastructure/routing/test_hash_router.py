@@ -183,6 +183,6 @@ class TestHashRouter:
         assert heavy_count > light_count, "Heavy node should receive more routes"
 
         # Ratio should be roughly 3:1
-        if light_count > 0:
-            ratio = heavy_count / light_count
-            assert 2.0 <= ratio <= 4.0, f"Expected ratio ~3, got {ratio:.2f}"
+        assert light_count > 0, "light_count should not be zero for valid weighted test"
+        ratio = heavy_count / light_count
+        assert 2.0 <= ratio <= 4.0, f"Expected ratio ~3, got {ratio:.2f}"
