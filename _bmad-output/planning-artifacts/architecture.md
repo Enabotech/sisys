@@ -119,19 +119,21 @@ completedAt: '2026-02-26'
 
 **定义：** 系统遵循 `LLM 上下文=缓存`、`磁盘记忆=真相源` 的记忆分离原则
 
-| 存储层 | 技术选型 | 存储内容 | TTL | 容量规划 |
-|--------|---------|---------|-----|---------|
-| **L1 高速缓存层** | Redis 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d | 10GB |
-| **L2 关系存储层** | PostgreSQL 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 | 100GB |
-| **L3 向量存储层** | Qdrant 1.7+ | 嵌入向量、混合检索 payload | 永久 | 500GB |
-| **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 7 年 | 10TB |
-| **L5 图存储层** | Neo4j 5.x | 知识图谱、实体关系、依赖图 | 永久 | 50GB |
+| 层级 | 技术选型 | 存储内容 | TTL | 容量规划 | 作用 |
+|--------|---------|---------|-----|---------|------|
+| **L0 记忆入口层** | 文件系统 | MEMORY.md 索引 + 路由 | 永久 | 10GB | 记忆系统入口 |
+| **L1 高速缓存层** | Redis 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d | 10GB | 短期记忆缓存 |
+| **L2 关系存储层** | PostgreSQL 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 | 100GB | 中期结构化 |
+| **L3 向量存储层** | Qdrant 1.7+ | 嵌入向量、混合检索 payload | 永久 | 500GB | 长期语义化 |
+| **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 7 年 | 10TB | 历史归档证据 |
+| **L5 图存储层(可选)** | Neo4j 5.x | 知识图谱、实体关系、依赖图 | 永久 | 50GB | 按需启用 |
 
 **关键机制：**
-- **战略档案库**：第 9 章 StrategicArchive 实体（五层存储协同）
+- **战略档案库**：第 9 章 StrategicArchive 实体（六层存储协同）
 - **上下文压缩**：LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
 - **检索 - 压缩循环**：第 17.1.5 节 混合检索（Dense+Sparse+Graph→RRF 融合→ColBERT 重排序）
 - **持久化笔记**：压缩前必须执行持久化（第 8.2.1 节 CheckpointSnapshot 序列化）
+- **L0 记忆入口**：MEMORY.md 作为统一入口，索引驱动各层存储访问
 
 **验收标准：**
 - 上下文压缩率≥70%
@@ -147,7 +149,7 @@ completedAt: '2026-02-26'
 | **领域至上** | 领域层不依赖任何外部技术实现 | 六边形架构 + 依赖倒置 | 领域层零外部依赖 |
 | **事件驱动流转** | 核心业务逻辑通过领域事件触发 | RabbitMQ + Redis 双通道 | 事件溯源 100% 覆盖 |
 | **双核引擎分离** | Prefect 负责确定性数据流，LangGraph 负责认知推理 | 编排服务协调 | 引擎解耦 |
-| **记忆分离** | LLM 上下文=缓存，磁盘记忆=真相源 | 五层存储架构 | 上下文压缩率≥70% |
+| **记忆分离** | LLM 上下文=缓存，磁盘记忆=真相源 | 六层存储架构（L0-L5） | 上下文压缩率≥70% |
 | **动态模型路由** | 本地优先 80%，云端兜底，成本优化 50% | UDMR 三层决策 | 路由延迟 P95<50ms |
 | **弹性隔离** | 四级隔离等级动态调整，合规内建 | EIP 协议 | 隔离切换审计 100% |
 | **可追溯决策** | 所有决策可追溯至原始数据和假设 | 事件溯源 + WORM 存储 | 7 年审计追踪 |
@@ -265,7 +267,7 @@ graph TB
             Tool["工具实体<br/>23 种战略工具"]
             StrategicPlan["战略规划实体<br/>SP/BP"]
             Checkpoint["检查点实体<br/>双模式恢复"]
-            StrategicArchive["战略档案实体<br/>五层存储"]
+            StrategicArchive["战略档案实体<br/>六层存储"]
             RoutingLog["路由决策日志<br/>UDMR 审计"]
             IsolationLog["隔离切换日志<br/>EIP 审计"]
         end
@@ -328,7 +330,7 @@ graph TB
             EventBus["事件总线<br/>Event Bus"]
         end
 
-        subgraph "五层存储架构"
+        subgraph "六层存储架构"
             Cache_Storage["高速缓存层<br/>Redis 7.0+"]
             Relational_Storage["关系存储层<br/>PostgreSQL 15+"]
             Vector_Storage["向量存储层<br/>Qdrant 1.7+"]
@@ -395,7 +397,7 @@ graph TB
     RAGService -- "33. Graph 检索" --> Graph_Storage
     RAGService -- "34. RRF 融合+ 重排序" --> QueryHandler
 
-    %% 流程 35-38: 结果生成与五层存储协同
+    %% 流程 35-38: 结果生成与六层存储协同
     PlanningUC -- "35. 生成 PDF 报告" --> PrefectEngine
     PrefectEngine -- "36. 执行报告生成流程" --> ReportFlow
     ReportFlow -- "37. 元数据保存" --> Relational_Storage
@@ -429,7 +431,7 @@ graph TB
     Outbox -- "54. 轮询发布" --> RabbitMQ
     RabbitMQ -- "55. 死信事件" --> DLQ
 
-    %% 流程 56-61: 五层存储协同（单向依赖链 + 异步缓存更新）
+    %% 流程 56-61: 六层存储协同（单向依赖链 + 异步缓存更新）
     Cache_Storage -. "56. 会话状态" .-> Relational_Storage
     Relational_Storage -. "57. 元数据引用" .-> Vector_Storage
     Vector_Storage -. "58. 嵌入向量 payload" .-> Object_Storage
@@ -444,7 +446,7 @@ graph TB
     EventBus -- "65. CUSUM 漂移检测" --> Producer
 ```
 
-**五层存储依赖说明**：
+**六层存储依赖说明**：
 - ✅ **单向依赖链**：Cache → Relational → Vector → Object → Graph（无循环）
 - ✅ **异步缓存更新**：Graph 存储通过事件总线异步更新缓存，打破循环依赖
 - ✅ **流程 60**：Graph 存储的图遍历结果通过事件总线发布，不直接依赖 Cache
@@ -502,15 +504,16 @@ class OrchestrationService:
 
 ---
 
-### 3.4 决策 4 (ADR-004): 五层存储架构
+### 3.4 决策 4 (ADR-004): 六层存储架构
 
-| 层级 | 技术选型 | 存储内容 | TTL | 容量规划 |
-|------|---------|---------|-----|---------|
-| **L1 高速缓存层** | Redis 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d | 10GB |
-| **L2 关系存储层** | PostgreSQL 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 | 100GB |
-| **L3 向量存储层** | Qdrant 1.7+ | 嵌入向量、混合检索 payload | 永久 | 500GB |
-| **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 7 年 (WORM) | 10TB |
-| **L5 图存储层** | Neo4j 5.x | 知识图谱、实体关系、依赖图 | 永久 | 50GB |
+| 层级 | 技术选型 | 存储内容 | TTL | 容量规划 | 作用 |
+|------|---------|---------|-----|---------|------|
+| **L0 记忆入口层** | 文件系统 | MEMORY.md 索引 + 路由 | 永久 | 10GB | 记忆系统入口 |
+| **L1 高速缓存层** | Redis 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d | 10GB | 短期记忆缓存 |
+| **L2 关系存储层** | PostgreSQL 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 | 100GB | 中期结构化 |
+| **L3 向量存储层** | Qdrant 1.7+ | 嵌入向量、混合检索 payload | 永久 | 500GB | 长期语义化 |
+| **L4 对象存储层** | MinIO WORM | 原始文档、证据包、审计归档 | 7 年 (WORM) | 10TB | 历史归档证据 |
+| **L5 图存储层(可选)** | Neo4j 5.x | 知识图谱、实体关系、依赖图 | 永久 | 50GB | 按需启用 |
 
 ---
 
@@ -1594,7 +1597,7 @@ class WormArchiver:
 | **StrategicPlan** | SP 实体（BLM 六阶段） | L2+L4 | id, plan_type, blm_stage, checkpoints, evidence_package |
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
-| **StrategicArchive** | 战略档案实体（五层存储） | L1-L5 | id, metadata, embedding, blob_ref, graph_ref |
+| **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding, blob_ref, graph_ref |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
 
@@ -1693,15 +1696,16 @@ class EventListener:
 
 ## 11. 存储架构设计
 
-### 11.1 五层存储详细设计
+### 11.1 六层存储详细设计
 
 | 层级 | 技术 | 内容 | 关键设计 |
 |------|------|------|---------|
+| **L0 记忆入口** | 文件系统 | MEMORY.md 索引、路由策略 | 文本扫描、正则匹配 |
 | **L1 高速缓存** | Redis 7.0+ | 会话状态、语义缓存 | Hash/Vector/Sorted Set |
 | **L2 关系存储** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | pgvector、JSONB、event_outbox |
 | **L3 向量存储** | Qdrant 1.7+ | 嵌入向量、混合检索 | Dense+Sparse+Payload 过滤 |
 | **L4 对象存储** | MinIO WORM | 原始文档、证据包 | Object Lock COMPLIANCE 模式 7 年 |
-| **L5 图存储** | Neo4j 5.x | 知识图谱、实体关系 | Cypher、图遍历、Parent-Child 索引 |
+| **L5 图存储(可选)** | Neo4j 5.x | 知识图谱、实体关系 | Cypher、图遍历、Parent-Child 索引 |
 
 ### 11.2 语义缓存层设计
 
@@ -1842,7 +1846,7 @@ src/domain/
 │   ├── strategic_plan.py                                  # SP 实体（BLM 六阶段）
 │   ├── business_plan.py                                   # BP 实体（BEM 六阶段）
 │   ├── checkpoint.py                                      # 检查点实体（双模式恢复）
-│   ├── strategic_archive.py                               # 战略档案实体（五层存储）
+│   ├── strategic_archive.py                               # 战略档案实体（六层存储）
 │   ├── routing_log.py                                     # 路由决策日志实体 ⭐
 │   └── isolation_log.py                                   # 隔离切换日志实体 ⭐
 │
@@ -3170,7 +3174,7 @@ class PersistentNoteTaker:
             timestamp=datetime.utcnow()
         )
 
-        # 1. 提取关键实体与关系 → 写入 StrategicArchive（L1-L5 五层存储）
+        # 1. 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）
         entities = await self.entity_extractor.extract(retrieved_docs)
         note.entities = entities
         await self.strategic_archive.save_entities(entities)
@@ -6543,7 +6547,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 六边形架构 + 事件驱动 | ✅ 兼容 | 领域事件通过仓储接口发布，基础设施层实现事件总线 |
 | Prefect + LangGraph | ✅ 兼容 | 编排服务协调两者，Prefect 负责数据管道，LangGraph 负责 Agent 状态机 |
 | Redis + RabbitMQ | ✅ 兼容 | Redis 用于实时缓存/发布订阅，RabbitMQ 用于持久化事件 +Outbox 保证可靠性 |
-| PostgreSQL + Qdrant + Neo4j | ✅ 兼容 | 五层存储各司其职，通过应用层服务协调 |
+| PostgreSQL + Qdrant + Neo4j | ✅ 兼容 | 六层存储各司其职，通过应用层服务协调 |
 | UDMR + LiteLLM + Ollama | ✅ 兼容 | UDMR 通过 LiteLLM 统一接口路由到云端或本地 Ollama |
 | EIP + LangGraph | ✅ 兼容 | EIP 隔离等级通过 LangGraph 状态管理实现 |
 | Checkpoint + Redis | ✅ 兼容 | Checkpoint 快照存储在 Redis Hash，TTL 24 小时 -30 天 |
@@ -6599,7 +6603,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 六边形架构 | `src/domain/`, `src/application/`, `src/infrastructure/`, `src/interfaces/` | ✅ 对齐 |
 | CQRS | `commands/`, `queries/`, `handlers/` 分离 | ✅ 对齐 |
 | 事件驱动 | `events/`, `messaging/`, `outbox/` | ✅ 对齐 |
-| 五层存储 | `persistence/repositories/`, `vector_store/`, `cache/`, `graph_store/` | ✅ 对齐 |
+| 六层存储 | `persistence/repositories/`, `vector_store/`, `cache/`, `graph_store/` | ✅ 对齐 |
 | UDMR/EIP | `routing_service.py`, `isolation_service.py`, `routing_log/`, `isolation_log/` | ✅ 对齐 |
 
 ---
@@ -6620,7 +6624,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | **UI** 用户交互与报告 | 13 | 13 | 100% | CLI+REST API，PDF/HTML 报告生成 |
 | **SC** 系统管理与合规 | 14 | 14 | 100% | RBAC, WORM 存储，审计日志 |
 | **CP** 成本与性能优化 | 12 | 12 | 100% | UDMR 路由，语义缓存，本地优先 |
-| **SA** 战略档案库 | 10 | 10 | 100% | 五层存储，长期记忆 |
+| **SA** 战略档案库 | 10 | 10 | 100% | 六层存储，长期记忆 |
 | **AR** 架构约束 | 4 | 4 | 100% | 六边形架构，事件驱动，双核引擎 |
 | **合计** | **122** | **122** | **100%** | ✅ 全覆盖 |
 
@@ -6704,7 +6708,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 架构哲学 | 1 | 1 | N/A | ✅ 六边形架构 |
 | 核心机制 | 8 | 8 | ✅ | UDMR/EIP/修正分级/SYS/辩论/Checkpoint/Outbox/CUSUM |
 | 技术选型 | 12 | 12 | ✅ | 所有组件版本明确 |
-| 存储架构 | 5 | 5 | ✅ | 五层存储完整定义 |
+| 存储架构 | 6 | 6 | ✅ | 六层存储完整定义 |
 | 安全合规 | 4 | 4 | ✅ | OAuth 2.1/WORM/加密/沙箱 |
 | **合计** | **30** | **30** | **✅** | 完整 |
 
@@ -6715,7 +6719,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | ADR-001 | 六边形架构 | ✅ 已采纳 | 2026-02-25 |
 | ADR-002 | 双核引擎架构 | ✅ 已采纳 | 2026-02-25 |
 | ADR-003 | 双通道事件总线 | ✅ 已采纳 | 2026-02-25 |
-| ADR-004 | 五层存储架构 | ✅ 已采纳 | 2026-02-25 |
+| ADR-004 | 六层存储架构 | ✅ 已采纳 | 2026-02-25 |
 | ADR-005 | UDMR 统一动态模型路由 | ✅ 已采纳 | 2026-02-25 |
 | ADR-006 | EIP 弹性视角隔离协议 | ✅ 已采纳 | 2026-02-25 |
 | ADR-007 | 修正分级判定体系 | ✅ 已采纳 | 2026-02-25 |
@@ -6747,7 +6751,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 |---------|--------|--------|------|
 | API 边界 | ✅ | 7 个公共端点明确 | ✅ 完整 |
 | 组件边界 | ✅ | 四层依赖规则清晰 | ✅ 完整 |
-| 数据边界 | ✅ | 五层存储职责明确 | ✅ 完整 |
+| 数据边界 | ✅ | 六层存储职责明确 | ✅ 完整 |
 | 事件边界 | ✅ | Redis vs RabbitMQ 区分 | ✅ 完整 |
 
 #### 19.3.3 模式完整性
@@ -6985,12 +6989,12 @@ pytest tests/unit/domain/
 - **决策：** Redis 发布/订阅用于实时事件，RabbitMQ 用于持久化事件 +Outbox
 - **理由：** 实时性与可靠性兼顾
 
-### ADR-004: 五层存储架构
+### ADR-004: 六层存储架构
 
 - **状态：** 已采纳
 - **日期：** 2026-02-25
-- **决策：** L1 缓存 (Redis)+L2 关系 (PostgreSQL)+L3 向量 (Qdrant)+L4 对象 (MinIO)+L5 图 (Neo4j)
-- **理由：** 每层独立优化，协同工作
+- **决策：** L0 入口 (文件系统)+L1 缓存 (Redis)+L2 关系 (PostgreSQL)+L3 向量 (Qdrant)+L4 对象 (MinIO)+L5 图 (Neo4j 可选)
+- **理由：** L0 作为统一入口，六层各司其职，可按需启用 L5 图存储
 
 ### ADR-005: UDMR 统一动态模型路由
 
