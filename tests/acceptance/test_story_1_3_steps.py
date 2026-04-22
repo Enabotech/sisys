@@ -38,6 +38,7 @@ SRC_DIR = ROOT / "src"
 DOMAIN_DIR = SRC_DIR / "domain"
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
+# Use UUID suffix for parallel test isolation
 REDIS_CHANNEL_PREFIX = "sisys:rt:"
 
 # RabbitMQ routing key convention: sisys.events.reliable.<event_type>
@@ -271,7 +272,8 @@ def publish_documentprocessed_to_redis_channel(
     bdd_context: BDDContext,
 ):
     """Publish DocumentProcessed event to Redis channel."""
-    channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    # Use unique channel per test for parallel isolation
+    channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed:{bdd_context.test_uuid}"
     bdd_context.redis_published_channel = channel
 
     event = DocumentProcessed(
@@ -293,7 +295,8 @@ def publish_heartbeattriggered_to_redis_channel(
     bdd_context: BDDContext,
 ):
     """Publish HeartbeatTriggered event to Redis channel."""
-    channel = f"{REDIS_CHANNEL_PREFIX}heartbeattriggered"
+    # Use unique channel per test for parallel isolation
+    channel = f"{REDIS_CHANNEL_PREFIX}heartbeattriggered:{bdd_context.test_uuid}"
     bdd_context.redis_published_channel = channel
 
     event = HeartbeatTriggered(
