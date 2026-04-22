@@ -6,7 +6,10 @@
 
 set -e
 
-LOG_DIR="/tmp/tmp_pytest_continuous"
+BASE_DIR="/tmp/tmp_pytest_continuous"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_DIR="${BASE_DIR}_${TIMESTAMP}"
+
 mkdir -p "$LOG_DIR"
 
 ROUND=0
