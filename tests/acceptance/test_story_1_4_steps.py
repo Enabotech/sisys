@@ -131,12 +131,16 @@ def redis_config() -> RedisConfig:
     )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def redis_cleaner(redis_config: RedisConfig):
     """Redis cleaner - runs before and after each test.
 
     Uses synchronous Redis client to ensure flushdb completes
     before test proceeds.
+
+    NOT autouse=True because flushdb clears ALL Redis data,
+    which would interfere with other tests (e.g., story_1.3's
+    idempotency locks) running in parallel.
     """
     import redis
 
@@ -166,7 +170,7 @@ def redis_cleaner(redis_config: RedisConfig):
 
 
 @pytest.fixture
-async def session_storage(redis_config: RedisConfig) -> AsyncGenerator[RedisSessionStorage, None]:
+async def session_storage(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisSessionStorage, None]:
     """Real Redis session storage instance."""
     storage = RedisSessionStorage(redis_config)
     yield storage
@@ -174,7 +178,7 @@ async def session_storage(redis_config: RedisConfig) -> AsyncGenerator[RedisSess
 
 
 @pytest.fixture
-async def semantic_cache(redis_config: RedisConfig) -> AsyncGenerator[RedisSemanticCache, None]:
+async def semantic_cache(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisSemanticCache, None]:
     """Real Redis semantic cache instance."""
     cache = RedisSemanticCache(redis_config)
     yield cache
@@ -182,7 +186,7 @@ async def semantic_cache(redis_config: RedisConfig) -> AsyncGenerator[RedisSeman
 
 
 @pytest.fixture
-async def redis_cleanup(redis_config: RedisConfig) -> AsyncGenerator[RedisCleanup, None]:
+async def redis_cleanup(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisCleanup, None]:
     """Real Redis cleanup utility instance."""
     cleanup = RedisCleanup(redis_config)
     yield cleanup

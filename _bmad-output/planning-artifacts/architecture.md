@@ -1043,7 +1043,7 @@ class CheckpointSnapshot:
 │     │  输出：state_data, raw_context (LLM 原始上下文，~50K tokens)      │
 │     ▼                                                                   │
 │  2. 持久化笔记步骤 ← 压缩前必须执行！                                    │
-│     │  2.1 提取关键实体（Top-20）→ StrategicArchive（L1-L5）            │
+│     │  2.1 提取关键实体（Top-20）→ StrategicArchive（L0-L5）            │
 │     │  2.2 生成结构化摘要 → PostgreSQL（L2）                            │
 │     │  2.3 记录血缘 → 审计日志 + WORM 归档（L2+L4）                      │
 │     │  输出：PersistentNote (note_id, entities, summary, lineage)       │
@@ -1597,7 +1597,7 @@ class WormArchiver:
 | **StrategicPlan** | SP 实体（BLM 六阶段） | L2+L4 | id, plan_type, blm_stage, checkpoints, evidence_package |
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
-| **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding, blob_ref, graph_ref |
+| **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding_ref, blob_ref, graph_ref |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
 
@@ -3113,7 +3113,7 @@ class HybridRetriever(RAGService):
 │     ▼                                                                   │
 │  2. 持久化笔记（Persistent Note-Taking）← 压缩前必须执行！               │
 │     │  步骤：                                                           │
-│     │  2.1 提取关键实体与关系 → 写入 StrategicArchive                   │
+│     │  2.1 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）    │
 │     │  2.2 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL           │
 │     │  2.3 记录检索血缘（query/top_k/时间戳/用户 ID）→ 审计日志          │
 │     │  验收标准：持久化完成后才允许压缩                                 │
@@ -3160,7 +3160,7 @@ class PersistentNoteTaker:
         执行持久化笔记步骤
 
         步骤：
-        1. 提取关键实体与关系 → 写入 StrategicArchive
+        1. 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）
         2. 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL
         3. 记录检索血缘 → 审计日志
 
@@ -4125,12 +4125,22 @@ eip_config:
     - "agent_cmo"
 
 memory_config:
+  L0_entry:
+    type: "filesystem"
+    index: "MEMORY.md"
+    description: "记忆系统统一入口，索引驱动各层访问"
   short_term:
     type: "redis"
     ttl: 3600
+    description: "会话状态、语义缓存"
   long_term:
     type: "strategic_archive"
     retention_days: 2555  # 7 年
+    description: "六层存储协同，长期语义记忆"
+  L5_graph:
+    enabled: false  # 可选，按需启用
+    type: "neo4j"
+    description: "知识图谱、实体关系"
 
 prompts:
   system_prompt: "prompts/ceo_system.md"
