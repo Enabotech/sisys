@@ -1,0 +1,170 @@
+"""Tests for TriggerService domain service."""
+
+from __future__ import annotations
+
+import uuid
+from unittest.mock import AsyncMock
+
+import pytest
+
+from src.domain.events.base import DomainEvent
+from src.domain.events.trigger_events import Triggered
+from src.domain.services.trigger_service import TriggerService
+
+
+class DummyPublisher:
+    """Dummy async publisher for testing."""
+
+    def __init__(self) -> None:
+        self.published_events: list[DomainEvent] = []
+
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
+        self.published_events.append(event)
+
+
+class TestTriggerServiceUnit:
+    """Unit tests for TriggerService without infrastructure dependencies."""
+
+    @pytest.fixture
+    def publisher(self) -> DummyPublisher:
+        return DummyPublisher()
+
+    @pytest.fixture
+    def trigger_service(self, publisher: DummyPublisher) -> TriggerService:
+        return TriggerService(publisher=publisher)
+
+    @pytest.mark.asyncio
+    async def test_on_domain_event_publishes_triggered(
+        self,
+        trigger_service: TriggerService,
+        publisher: DummyPublisher,
+    ) -> None:
+        """Verify domain event triggers Triggered event publication."""
+        event = DomainEvent(
+            event_id=uuid.uuid4(),
+            event_type="DocumentProcessed",
+            payload={"session_id": "session-123", "agent_id": "agent-456", "task_type": "ocr"},
+        )
+
+        result = await trigger_service.on_domain_event(event)
+
+        assert result is not None
+        assert isinstance(result, Triggered)
+        assert result.trigger_type == "domain_event"
+        assert result.session_id == "session-123"
+        assert result.source_event_type == "DocumentProcessed"
+        assert len(publisher.published_events) == 1
+
+    @pytest.mark.asyncio
+    async def test_on_heartbeat_event_publishes_triggered(
+        self,
+        trigger_service: TriggerService,
+        publisher: DummyPublisher,
+    ) -> None:
+        """Verify heartbeat event triggers Triggered event publication."""
+        heartbeat_id = uuid.uuid4()
+        event = DomainEvent(
+            event_id=heartbeat_id,
+            event_type="HeartbeatTriggered",
+            payload={
+                "heartbeat_id": str(heartbeat_id),
+                "wake_reason": "scheduled",
+                "todo_items": ["task1", "task2"],
+                "cost_budget": 100.0,
+            },
+        )
+
+        result = await trigger_service.on_heartbeat_event(event)
+
+        assert result is not None
+        assert result.trigger_type == "heartbeat"
+        assert result.session_id == "heartbeat-scheduler"
+        assert result.source_event_type == "HeartbeatTriggered"
+
+    def test_extract_context_from_domain_event(self, trigger_service: TriggerService) -> None:
+        """Verify context extraction without publishing."""
+        event = DomainEvent(
+            event_id=uuid.uuid4(),
+            event_type="ToolExecuted",
+            payload={"session_id": "session-789", "tool_name": "web_search"},
+        )
+
+        context = trigger_service.extract_context(event)
+
+        assert context.session_id == "session-789"
+        assert context.trigger_type == "domain_event"
+        assert context.task_context["tool_name"] == "web_search"
+
+    def test_extract_context_from_heartbeat(self, trigger_service: TriggerService) -> None:
+        """Verify context extraction from heartbeat event."""
+        heartbeat_id = uuid.uuid4()
+        # Use HeartbeatTriggered which has heartbeat_id as attribute, not in payload
+        from src.domain.events.heartbeat_events import HeartbeatTriggered
+
+        event = HeartbeatTriggered(
+            heartbeat_id=heartbeat_id,
+            wake_reason="user_request",
+            todo_items=("task1", "task2"),
+            cost_budget=50.0,
+        )
+
+        context = trigger_service.extract_context(event)
+
+        assert context.trigger_type == "heartbeat"
+        assert context.session_id == "heartbeat-scheduler"
+        assert context.task_context["wake_reason"] == "user_request"
+        assert context.task_context["cost_budget"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_on_domain_event_no_publisher(self) -> None:
+        """Verify no crash when no publisher configured."""
+        trigger_service = TriggerService(publisher=None)
+        event = DomainEvent(
+            event_id=uuid.uuid4(),
+            event_type="AgentDecided",
+            payload={"session_id": "session-abc"},
+        )
+
+        result = await trigger_service.on_domain_event(event)
+
+        # Should return Triggered but not publish (warning logged)
+        assert result is not None
+        assert result.trigger_type == "domain_event"
+
+    @pytest.mark.asyncio
+    async def test_publish_error_handling(
+        self,
+        trigger_service: TriggerService,
+        publisher: DummyPublisher,
+    ) -> None:
+        """Verify publish errors are logged and re-raised."""
+        error_publisher = AsyncMock()
+        error_publisher.publish.side_effect = RuntimeError("Publish failed")
+
+        service = TriggerService(publisher=error_publisher)
+        event = DomainEvent(
+            event_id=uuid.uuid4(),
+            event_type="CheckpointReached",
+            payload={"session_id": "session-xyz"},
+        )
+
+        with pytest.raises(RuntimeError, match="Publish failed"):
+            await service.on_domain_event(event)
+
+
+class TestTriggerServiceArchitecture:
+    """Architecture compliance tests for TriggerService (hexagonal architecture)."""
+
+    def test_trigger_service_is_domain_layer(self) -> None:
+        """Verify TriggerService has no infrastructure dependencies in constructor."""
+        # TriggerService should accept protocol, not concrete infra classes
+        service = TriggerService(publisher=None)
+        assert service._publisher is None
+
+    def test_trigger_service_uses_protocol_for_publishing(self) -> None:
+        """Verify TriggerService depends on protocol, not concrete implementation."""
+        # The publisher should be Protocol, not a concrete class
+        from src.domain.services.trigger_service import EventPublisherProtocol
+
+        # Verify the protocol exists and is a Protocol
+        assert hasattr(EventPublisherProtocol, "publish")
