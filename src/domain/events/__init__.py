@@ -11,6 +11,7 @@ from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
 from .planning_events import StrategicDeviationWarning
 from .publisher import EventPublisher
+from .route_events import Routed
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
 from .trigger_events import Triggered
@@ -27,6 +28,7 @@ __all__ = [
     "HeartbeatTriggered",
     "IsolationLevelSwitched",
     "RoutingDecided",
+    "Routed",
     "Triggered",
     "EventPublisher",
     "DeviationLevel",
