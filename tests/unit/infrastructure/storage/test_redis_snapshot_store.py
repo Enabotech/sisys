@@ -98,3 +98,101 @@ class TestRedisSnapshotStore:
         result = await store.exists("nonexistent-session")
 
         assert result is False
+
+    def test_set_ttl_rejects_invalid_ttl(self) -> None:
+        """Coverage: set_ttl validation (lines 48-50)."""
+        store = RedisSnapshotStore(redis_client=None)
+
+        with pytest.raises(ValueError) as exc_info:
+            store.set_ttl(30)  # Below minimum of 60
+
+        assert "TTL must be between" in str(exc_info.value)
+
+        with pytest.raises(ValueError):
+            store.set_ttl(3000000)  # Above maximum
+
+    def test_set_ttl_accepts_valid_ttl(self) -> None:
+        """Coverage: set_ttl accepts valid values."""
+        store = RedisSnapshotStore(redis_client=None)
+        store.set_ttl(3600)  # 1 hour
+
+        assert store._ttl_seconds == 3600
+
+    @pytest.mark.asyncio
+    async def test_save_handles_redis_none(self) -> None:
+        """Coverage: save early return when redis is None (lines 62-63)."""
+        store = RedisSnapshotStore(redis_client=None)
+        snapshot = CheckpointSnapshot(
+            session_id="test-session",
+            stage_id="test",
+            state_version=1,
+            state_data={"key": "value"},
+        )
+
+        # Should not raise, just return
+        await store.save(snapshot)
+
+    @pytest.mark.asyncio
+    async def test_save_handles_exception(self, mock_redis: MagicMock) -> None:
+        """Coverage: save exception handler (lines 85-87)."""
+        store = RedisSnapshotStore(redis_client=mock_redis)
+        mock_redis.hset = AsyncMock(side_effect=Exception("redis error"))
+        snapshot = CheckpointSnapshot(
+            session_id="test-session",
+            stage_id="test",
+            state_version=1,
+            state_data={"key": "value"},
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await store.save(snapshot)
+
+        assert "Failed to save snapshot" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_load_handles_redis_none(self) -> None:
+        """Coverage: load early return when redis is None (lines 102-103)."""
+        store = RedisSnapshotStore(redis_client=None)
+
+        result = await store.load("any-session")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_handles_exception(self, mock_redis: MagicMock) -> None:
+        """Coverage: load exception handler (lines 125-127)."""
+        store = RedisSnapshotStore(redis_client=mock_redis)
+        mock_redis.hget = AsyncMock(side_effect=Exception("redis error"))
+
+        result = await store.load("test-session")
+
+        # Should return None instead of raising
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_delete_handles_redis_none(self) -> None:
+        """Coverage: delete early return when redis is None (lines 139-140)."""
+        store = RedisSnapshotStore(redis_client=None)
+
+        # Should not raise
+        await store.delete("any-session")
+
+    @pytest.mark.asyncio
+    async def test_delete_handles_exception(self, mock_redis: MagicMock) -> None:
+        """Coverage: delete exception handler (lines 148-150)."""
+        store = RedisSnapshotStore(redis_client=mock_redis)
+        mock_redis.delete = AsyncMock(side_effect=Exception("redis error"))
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await store.delete("test-session")
+
+        assert "Failed to delete snapshot" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_exists_handles_redis_none(self) -> None:
+        """Coverage: exists early return when redis is None (line 162)."""
+        store = RedisSnapshotStore(redis_client=None)
+
+        result = await store.exists("any-session")
+
+        assert result is False
