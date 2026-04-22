@@ -151,10 +151,10 @@
 - ❌ scope=module 的 event_loop fixture
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 8` 通过
-- [ ] 连续5次运行无随机失败
-- [ ] poetry run ruff 检查通过
-- [ ] poetry run mypy 检查通过
+- [x] 并行测试 `pytest tests/ -n 8` 通过
+- [x] 连续5次运行无随机失败
+- [x] poetry run ruff 检查通过
+- [x] poetry run mypy 检查通过
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -427,7 +427,7 @@
 实现复杂度 | 低 | 中 | 低
 与现有事件总线集成 | 需适配 | 原生 | 原生
 可测试性 | 高 | 中 | 高
-依赖引入 | APScheduler | 无新依赖 | Prefect 已引入
+依赖引入 | APScheduler（新增） | 无新依赖 | Prefect 已引入
 **采用** | ❌ 不采用 | **✅ 已选择** | ❌ 不采用（太重）
 
 **决策**: 使用 **asyncio + threading + Redis** 实现心跳调度，原因：
@@ -665,11 +665,11 @@ TriggerService (监听)
 
 | 提交 | 主题 | 关键模式 |
 |------|------|---------|
-| `c02aef1` | build: automatic update of sisys-app-dev | 自动化构建 |
-| `944d33f` | fix: auth.py refresh_token endpoint uses Form() | 表单解析修复 |
-| `b982e6a` | build: automatic update of sisys-app-dev | 自动化构建 |
-| `dce3ffa` | build: automatic update of sisys-app-dev | 自动化构建 |
-| `6a2c23d` | update | - |
+| `f1deabf` | fix(test): resolve test isolation issues and eliminate warnings | 测试隔离修复 |
+| `3511078` | fix(test): add autouse fixture for TenantContext isolation | Fixture 隔离 |
+| `1c7f314` | feat(story): implement Story 1.14a autonomous invocation trigger | 触发器实现 |
+| `b56ad06` | build: automatic update of sisys-app-dev [skip actions] | 自动化构建 |
+| `e6e3b52` | feat(story): create story | Story 创建 |
 
 **可应用模式:**
 1. **六边形架构严格分层** — domain/infrastructure/interfaces 层严格分离
@@ -677,36 +677,6 @@ TriggerService (监听)
 3. **事件驱动解耦** — 通过事件总线通信，不直接调用
 
 ---
-
-## 🤖 开发代理记录 Dev Agent Record
-
-### 使用模型 Agent Model Used
-
-| 配置项 | 值 |
-|--------|-----|
-| **Model** | Claude Code (create-story workflow) |
-| **Version** | create-story workflow v1.0 |
-| **Execution Date** | 2026-04-20 |
-
-### 调试日志引用 Debug Log References
-
-| 配置项 | 路径 |
-|--------|------|
-| **Workflow Config** | `_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml` |
-| **Instructions** | `_bmad/bmm/workflows/4-implementation/create-story/instructions.xml` |
-| **Template** | `_bmad/bmm/workflows/4-implementation/create-story/template.md` |
-| **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md` |
-| **架构文档** | `_bmad-output/planning-artifacts/architecture.md` |
-| **前一个 Story** | `_bmad-output/implementation-artifacts/stories/1-13-k8s-auto-scaling.md` |
-| **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
-
-### 完成总结 Completion Summary
-
-1. [x] All tasks defined 所有任务定义完成
-2. [x] All acceptance criteria specified 所有验收标准已定义
-3. [x] Architecture constraints extracted 架构约束已提取
-4. [x] Previous story learnings integrated 前一个故事学习经验已整合
-5. [x] Sprint status synced to `ready-for-dev`
 
 ## 🤖 开发代理记录 Dev Agent Record
 
