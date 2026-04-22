@@ -116,6 +116,23 @@ class TestSemanticRouter:
         assert score == 0.0
 
     @pytest.mark.asyncio
+    async def test_route_with_empty_task_context(self) -> None:
+        """Route with empty task context returns empty target."""
+        router = SemanticRouter(
+            candidates=[
+                Candidate(
+                    candidate_id="agent-1",
+                    name="Agent 1",
+                    description="Test agent",
+                    embedding=[0.5] * 1024,
+                )
+            ]
+        )
+        target, score = await router.route({})
+        assert target == ""
+        assert score == 0.0
+
+    @pytest.mark.asyncio
     async def test_route_with_embedding_model(
         self,
         cfo_candidate: Candidate,

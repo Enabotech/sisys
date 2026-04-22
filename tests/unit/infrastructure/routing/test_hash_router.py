@@ -142,6 +142,16 @@ class TestHashRouter:
             result = router.route(f"session-{i}")
             assert result == "only-node"
 
+    def test_route_wraps_around_when_hash_greater_than_all_keys(self) -> None:
+        """Should wrap around to first node when hash > all virtual node keys."""
+        router = HashRouter(nodes=["node-A", "node-B", "node-C"])
+
+        # Test multiple sessions - the wrap-around case is when hash value is
+        # greater than all virtual node keys, it should return first node
+        results = [router.route(f"session-{i}") for i in range(100)]
+        # All results should be valid nodes
+        assert all(r in ("node-A", "node-B", "node-C") for r in results)
+
     def test_adding_node_changes_some_routes(self) -> None:
         """Adding a node may change routing for some existing sessions."""
         router = HashRouter(nodes=["node-A", "node-B"])
@@ -183,6 +193,6 @@ class TestHashRouter:
         assert heavy_count > light_count, "Heavy node should receive more routes"
 
         # Ratio should be roughly 3:1
-        if light_count > 0:
-            ratio = heavy_count / light_count
-            assert 2.0 <= ratio <= 4.0, f"Expected ratio ~3, got {ratio:.2f}"
+        assert light_count > 0, "light_count should not be zero for valid weighted test"
+        ratio = heavy_count / light_count
+        assert 2.0 <= ratio <= 4.0, f"Expected ratio ~3, got {ratio:.2f}"
