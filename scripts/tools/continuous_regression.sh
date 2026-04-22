@@ -39,10 +39,10 @@ while [[ $stop_flag -eq 0 ]]; do
     echo "[$(date)] ===== Round $ROUND started =====" | tee -a "$LOG_DIR/continuous.log"
 
     # Start both regressions in parallel
-    poetry run pytest tests/unit -n 4 -v > "$LOG_DIR/run1.log" 2>&1 &
+    poetry run pytest tests/acceptance tests/unit -n 4 -v > "$LOG_DIR/run1.log" 2>&1 &
     PID1=$!
 
-    poetry run pytest tests/unit -n 4 -v > "$LOG_DIR/run2.log" 2>&1 &
+    poetry run pytest tests/unit tests/acceptance -n 4 -v > "$LOG_DIR/run2.log" 2>&1 &
     PID2=$!
 
     # Wait for both to complete
