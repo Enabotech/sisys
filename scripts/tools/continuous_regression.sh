@@ -64,7 +64,7 @@ while [[ $stop_flag -eq 0 ]]; do
     RESULT1=$(grep -E "(passed|failed|skipped)" "$LOG_DIR/run1.log" | tail -1)
     RESULT2=$(grep -E "(passed|failed|skipped)" "$LOG_DIR/run2.log" | tail -1)
 
-    echo "[$(date)] Round $ROUND: Run1=$STATUS1 ($RESULT1), Run2=$STATUS2 ($RESULT2)" | tee -a "$LOG_DIR/continuous.log"
+    echo -e "[$(date)] Round $ROUND:\nRun1=$STATUS1 ($RESULT1)\nRun2=$STATUS2 ($RESULT2)" | tee -a "$LOG_DIR/continuous.log"
 
     # Check for failures
     if echo "$RESULT1" | grep -q "failed" || echo "$RESULT2" | grep -q "failed"; then
