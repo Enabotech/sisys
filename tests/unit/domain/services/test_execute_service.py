@@ -122,3 +122,69 @@ class TestExecuteService:
 
         assert result is not None
         assert result.state_version == 4
+
+    @pytest.mark.asyncio
+    async def test_on_routed_event_handles_exception(self) -> None:
+        """Coverage: on_routed_event exception handler (lines 163-179)."""
+        mock_sandbox = AsyncMock()
+        mock_sandbox.start_container = AsyncMock()
+        mock_sandbox.execute_code = AsyncMock(side_effect=Exception("execution failed"))
+        service = ExecuteService(sandbox=mock_sandbox)
+
+        routed_event = Routed(
+            session_id="error-session",
+            task_context={"code": "print('test')", "business_event_type": "ToolExecuted"},
+            route_target="test-agent",
+            route_score=0.9,
+            route_type="hash",
+        )
+
+        # Should return Executed event with failure status, not raise
+        result = await service.on_routed_event(routed_event)
+
+        assert result is not None
+        assert result.session_id == "error-session"
+        assert result.execution_result["status"] == "failed"
+        assert "execution failed" in result.execution_result["error"]
+
+    @pytest.mark.asyncio
+    async def test_restore_snapshot_returns_none_when_no_repo(self) -> None:
+        """Coverage: restore_snapshot when no repo configured (lines 226-227)."""
+        service = ExecuteService(snapshot_repo=None)
+
+        result = await service.restore_snapshot("any-session")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_restore_snapshot_returns_none_when_not_found(self) -> None:
+        """Coverage: restore_snapshot when no snapshot exists (lines 232-233)."""
+        mock_repo = AsyncMock()
+        mock_repo.load = AsyncMock(return_value=None)
+        service = ExecuteService(snapshot_repo=mock_repo)
+
+        result = await service.restore_snapshot("nonexistent")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_on_routed_event_returns_executed_when_sandbox_fails(self) -> None:
+        """Coverage: on_routed_event returns Executed even if sandbox.execute_code fails."""
+        mock_sandbox = AsyncMock()
+        mock_sandbox.start_container = AsyncMock()
+        mock_sandbox.execute_code = AsyncMock(side_effect=Exception("execution failed"))
+        service = ExecuteService(sandbox=mock_sandbox)
+
+        routed_event = Routed(
+            session_id="exec-fail-session",
+            task_context={"code": "raise_error()", "business_event_type": "ToolExecuted"},
+            route_target="test-agent",
+            route_score=0.8,
+            route_type="hash",
+        )
+
+        result = await service.on_routed_event(routed_event)
+
+        assert result is not None
+        assert result.session_id == "exec-fail-session"
+        assert result.execution_result["status"] == "failed"
