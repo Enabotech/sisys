@@ -235,3 +235,26 @@ class TestRouteService:
         assert service._publisher is None
         assert service._hash_router is None
         assert service._semantic_router is None
+
+    @pytest.mark.asyncio
+    async def test_on_triggered_event_publisher_exception(
+        self,
+        mock_hash_router: MagicMock,
+    ) -> None:
+        """RouteService should propagate exception when publisher fails."""
+        mock_publisher = AsyncMock()
+        mock_publisher.publish.side_effect = RuntimeError("Publisher failed")
+
+        route_service = RouteService(
+            publisher=mock_publisher,
+            hash_router=mock_hash_router,
+        )
+
+        triggered = Triggered(
+            event_type="Triggered",
+            session_id="session-pub-error",
+            task_context={},
+        )
+
+        with pytest.raises(RuntimeError, match="Publisher failed"):
+            await route_service.on_triggered_event(triggered)
