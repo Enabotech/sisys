@@ -54,8 +54,20 @@ class SessionBDDContext:
 class SemanticCacheTestContext:
     """BDD step 共享 context for semantic cache tests."""
 
-    query_vector: list[float] = field(default_factory=lambda: [float(uuid.uuid4().int % 100) / 100.0 + 0.1] * 1024)
-    cached_result: dict = field(default_factory=lambda: {"document_id": f"doc-{uuid.uuid4().hex[:8]}", "text": "cached result"})
+    query_vector: list[float] = field(default_factory=list)
+    cached_result: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Generate unique values per instance, not at class definition time."""
+        if not self.query_vector:
+            # Generate unique vector with random base value
+            base = float(uuid.uuid4().int % 100) / 100.0 + 0.1
+            self.query_vector = [base] * 1024
+        if not self.cached_result:
+            self.cached_result = {
+                "document_id": f"doc-{uuid.uuid4().hex[:8]}",
+                "text": "cached result",
+            }
 
 
 @pytest.fixture
