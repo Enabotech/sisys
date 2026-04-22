@@ -274,12 +274,12 @@ def test_session_save_and_load(session_storage: RedisSessionStorage, event_loop)
 
 
 @when('调用 SessionStorage.save 保存会话 "session-001"')
-def save_session(session_storage: RedisSessionStorage, event_loop, unique_session_id: str):
+def save_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
     """Save session state."""
 
     async def _save():
         await session_storage.save(
-            session_id=unique_session_id,
+            session_id=session_bdd_context.session_id,
             agent_id="agent-001",
             state={"status": "active", "step": 1},
             ttl=3600,
@@ -289,25 +289,25 @@ def save_session(session_storage: RedisSessionStorage, event_loop, unique_sessio
 
 
 @when('调用 SessionStorage.load 加载会话 "session-001"')
-def load_session(session_storage: RedisSessionStorage, event_loop, unique_session_id: str):
+def load_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
     """Load session state."""
     loaded = None
 
     async def _load():
         nonlocal loaded
-        loaded = await session_storage.load(unique_session_id)
+        loaded = await session_storage.load(session_bdd_context.session_id)
 
     event_loop.run_until_complete(_load())
     return loaded
 
 
 @then("返回的会话状态与保存的一致")
-def verify_session_consistency(session_storage: RedisSessionStorage, event_loop, unique_session_id: str):
+def verify_session_consistency(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
     """Verify loaded session matches saved session."""
-    assert unique_session_id is not None, "Session ID should not be None"
-    loaded = event_loop.run_until_complete(session_storage.load(unique_session_id))
+    assert session_bdd_context.session_id is not None, "Session ID should not be None"
+    loaded = event_loop.run_until_complete(session_storage.load(session_bdd_context.session_id))
     assert loaded is not None, "Session should be loaded"
-    assert loaded["session_id"] == unique_session_id
+    assert loaded["session_id"] == session_bdd_context.session_id
     assert loaded["agent_id"] == "agent-001"
     assert loaded["state"]["status"] == "active"
     assert loaded["state"]["step"] == 1
