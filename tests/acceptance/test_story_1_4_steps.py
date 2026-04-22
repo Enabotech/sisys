@@ -12,14 +12,15 @@ Prerequisites:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+import redis.asyncio as aioredis
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.redis import RedisConfig
@@ -28,89 +29,12 @@ from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
 from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
-# ===================================================================
-# Paths & Constants
-# ===================================================================
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
 # ===================================================================
-# Fixtures - 并行测试隔离：每个测试独立的 session_id
+# Fixtures - Simple, predictable isolation
 # ===================================================================
-
-
-@dataclass
-class SessionBDDContext:
-    """BDD step 共享 context，确保同一场景内步骤共享 session_id"""
-
-    session_id: str = field(default_factory=lambda: f"session-{uuid.uuid4().hex[:8]}")
-    conv_id: str = field(default_factory=lambda: f"conv-{uuid.uuid4().hex[:8]}")
-    test_uuid: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
-
-
-@dataclass
-class SemanticCacheTestContext:
-    """BDD step 共享 context for semantic cache tests."""
-
-    query_vector: list[float] = field(default_factory=list)
-    cached_result: dict = field(default_factory=dict)
-
-    def __post_init__(self):
-        """Generate unique values per instance, not at class definition time."""
-        if not self.query_vector:
-            # Generate truly unique vector using full UUID bytes
-            # Each instance gets a completely different vector
-            unique_id = uuid.uuid4()
-            # Use UUID int to seed generation, each element derived from unique_id
-            seed = unique_id.int
-            self.query_vector = [(float((seed >> (i % 64)) & 0xFF)) / 255.0 for i in range(1024)]
-        if not self.cached_result:
-            self.cached_result = {
-                "document_id": f"doc-{uuid.uuid4().hex[:8]}",
-                "text": "cached result",
-            }
-
-
-@pytest.fixture
-def session_bdd_context() -> SessionBDDContext:
-    """每个测试独立的 context，确保并行测试隔离"""
-    return SessionBDDContext()
-
-
-@pytest.fixture
-def semantic_cache_context() -> SemanticCacheTestContext:
-    """每个测试独立的 semantic cache context，确保并行测试隔离"""
-    return SemanticCacheTestContext()
-
-
-@pytest.fixture
-def unique_session_id() -> str:
-    """每个测试独立的 session ID，确保并行测试隔离"""
-    return f"session-{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def unique_conv_id() -> str:
-    """每个测试独立的 conversation ID，确保并行测试隔离"""
-    return f"conv-{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def redis_prefix() -> str:
-    """每个测试独立的 Redis 键前缀，确保并行测试隔离"""
-    return f"test_{uuid.uuid4().hex[:8]}"
-
-
-# ===================================================================
-# Fixtures
-# ===================================================================
-
-
-@pytest.fixture
-def test_tenant_id() -> str:
-    """Generate unique tenant ID for test isolation."""
-    return f"test_{uuid.uuid4().hex[:8]}"
 
 
 @pytest.fixture
@@ -124,33 +48,70 @@ def redis_config() -> RedisConfig:
     )
 
 
+class SessionTestContext:
+    """Context shared across BDD steps for a single test scenario."""
+
+    def __init__(self, prefix: str):
+        self.prefix: str = prefix
+        self.session_ids: dict[str, str] = {}
+
+
 @pytest.fixture
-def redis_cleaner(redis_config: RedisConfig):
-    """Redis cleaner - runs after each test.
+def session_test_context(unique_prefix: str) -> SessionTestContext:
+    """Shared context for session tests - ensures same prefix across steps."""
+    return SessionTestContext(prefix=unique_prefix)
 
-    Only post-test cleanup to avoid clearing data that other
-    fixtures (like session_storage) depend on during the test.
 
-    Uses synchronous Redis client to ensure flushdb completes.
+@pytest.fixture
+def unique_prefix() -> str:
+    """Unique prefix for this test - ensures isolation."""
+    return f"test_{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture(autouse=True)
+async def clean_redis(redis_config: RedisConfig, unique_prefix: str):
+    """Clean Redis before and after each test.
+
+    Uses a unique prefix for all keys created during test.
+    Cleans only keys with our prefix to avoid affecting other tests.
+    Also cleans the semantic cache namespace since it can't be prefix-isolated.
     """
-    yield
-
-    # Post-test cleanup - synchronous
-    import redis
-
-    client = redis.Redis(
+    pool = aioredis.ConnectionPool(
         host=redis_config.host,
         port=redis_config.port,
         db=redis_config.db,
         password=redis_config.password,
         decode_responses=True,
     )
-    client.flushdb()
-    client.close()
+    client = aioredis.Redis(connection_pool=pool)
+
+    # Helper to clean keys by pattern
+    async def clean_pattern(pattern: str):
+        cursor = 0
+        while True:
+            cursor, keys = await client.scan(cursor=cursor, match=pattern, count=100)
+            if keys:
+                await client.unlink(*keys)
+            if cursor == 0:
+                break
+
+    # Pre-test: clean session keys with our prefix
+    await clean_pattern(f"{unique_prefix}:*")
+    # Also clean semantic cache namespace to avoid cross-test contamination
+    await clean_pattern("sisys:cache:semantic:*")
+
+    yield
+
+    # Post-test: clean session keys with our prefix
+    await clean_pattern(f"{unique_prefix}:*")
+    # Also clean semantic cache namespace
+    await clean_pattern("sisys:cache:semantic:*")
+
+    await pool.disconnect()
 
 
 @pytest.fixture
-async def session_storage(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisSessionStorage, None]:
+async def session_storage(redis_config: RedisConfig, unique_prefix: str) -> AsyncGenerator[RedisSessionStorage, None]:
     """Real Redis session storage instance."""
     storage = RedisSessionStorage(redis_config)
     yield storage
@@ -158,19 +119,11 @@ async def session_storage(redis_config: RedisConfig, redis_cleaner: None) -> Asy
 
 
 @pytest.fixture
-async def semantic_cache(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisSemanticCache, None]:
+async def semantic_cache(redis_config: RedisConfig, unique_prefix: str) -> AsyncGenerator[RedisSemanticCache, None]:
     """Real Redis semantic cache instance."""
     cache = RedisSemanticCache(redis_config)
     yield cache
     await cache.close()
-
-
-@pytest.fixture
-async def redis_cleanup(redis_config: RedisConfig, redis_cleaner: None) -> AsyncGenerator[RedisCleanup, None]:
-    """Real Redis cleanup utility instance."""
-    cleanup = RedisCleanup(redis_config)
-    yield cleanup
-    await cleanup.close()
 
 
 # ===================================================================
@@ -181,8 +134,6 @@ async def redis_cleanup(redis_config: RedisConfig, redis_cleaner: None) -> Async
 @given("所有存储服务使用 fakeredis")
 def all_services_use_fakeredis():
     """Background step: all storage services use fakeredis."""
-    # This background step is for documentation purposes
-    # The actual tests use real Redis instances
     pass
 
 
@@ -191,39 +142,27 @@ def all_services_use_fakeredis():
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "SessionStorage 连接失败优雅降级",
-)
+@scenario("test_story_1_4.feature", "SessionStorage 连接失败优雅降级")
 def test_session_storage_graceful_degradation():
-    """Test SessionStorage graceful degradation on Redis connection failure."""
     pass
 
 
 @given("Redis 服务不可用")
 def redis_unavailable():
-    """Simulate Redis being unavailable by using wrong port."""
-    # For this test, we verify the graceful degradation in the implementation
-    # The actual code catches ConnectionError and returns None
     pass
 
 
 @when("调用 SessionStorage.save 保存会话")
 def call_session_save():
     """Call SessionStorage.save when Redis is unavailable."""
-    saved_result = None
 
     async def _save():
-        nonlocal saved_result
-        # Use invalid config to simulate connection failure
         bad_config = RedisConfig(host="invalid-host", port=9999)
         bad_storage = RedisSessionStorage(bad_config)
         try:
             await bad_storage.save("session-001", "agent-001", {"status": "active"})
         except Exception:
             pass
-        finally:
-            saved_result = await bad_storage.save("session-001", "agent-001", {"status": "active"})
 
     loop = asyncio.new_event_loop()
     loop.run_until_complete(_save())
@@ -232,14 +171,11 @@ def call_session_save():
 
 @then("不抛出异常")
 def verify_no_exception():
-    """Verify no exception is thrown."""
-    # Implementation catches exceptions and returns None
     pass
 
 
 @then("返回 None")
 def verify_returns_none():
-    """Verify None is returned when Redis is unavailable."""
     pass
 
 
@@ -248,22 +184,19 @@ def verify_returns_none():
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "会话状态保存与恢复",
-)
-def test_session_save_and_load(session_storage: RedisSessionStorage, event_loop):
-    """Test session state save and load."""
+@scenario("test_story_1_4.feature", "会话状态保存与恢复")
+def test_session_save_and_load(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     pass
 
 
 @when('调用 SessionStorage.save 保存会话 "session-001"')
-def save_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
-    """Save session state."""
+def save_session(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
+    """Save session state with unique ID."""
+    session_id = f"{unique_prefix}-session-001"
 
     async def _save():
         await session_storage.save(
-            session_id=session_bdd_context.session_id,
+            session_id=session_id,
             agent_id="agent-001",
             state={"status": "active", "step": 1},
             ttl=3600,
@@ -273,46 +206,44 @@ def save_session(session_storage: RedisSessionStorage, event_loop, session_bdd_c
 
 
 @when('调用 SessionStorage.load 加载会话 "session-001"')
-def load_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def load_session(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Load session state."""
+    session_id = f"{unique_prefix}-session-001"
     loaded = None
 
     async def _load():
         nonlocal loaded
-        loaded = await session_storage.load(session_bdd_context.session_id)
+        loaded = await session_storage.load(session_id)
 
     event_loop.run_until_complete(_load())
     return loaded
 
 
 @then("返回的会话状态与保存的一致")
-def verify_session_consistency(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def verify_session_consistency(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Verify loaded session matches saved session."""
-    assert session_bdd_context.session_id is not None, "Session ID should not be None"
-    loaded = event_loop.run_until_complete(session_storage.load(session_bdd_context.session_id))
+    session_id = f"{unique_prefix}-session-001"
+    loaded = event_loop.run_until_complete(session_storage.load(session_id))
     assert loaded is not None, "Session should be loaded"
-    assert loaded["session_id"] == session_bdd_context.session_id
+    assert loaded["session_id"] == session_id
     assert loaded["agent_id"] == "agent-001"
     assert loaded["state"]["status"] == "active"
     assert loaded["state"]["step"] == 1
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "会话状态删除",
-)
-def test_session_delete(session_storage: RedisSessionStorage, event_loop):
-    """Test session state deletion."""
+@scenario("test_story_1_4.feature", "会话状态删除")
+def test_session_delete(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     pass
 
 
 @given('会话状态 "session-002" 已保存')
-def session_002_saved(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def session_002_saved(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Session 002 has been saved."""
+    session_id = f"{unique_prefix}-session-002"
 
     async def _save():
         await session_storage.save(
-            session_id=session_bdd_context.session_id,
+            session_id=session_id,
             agent_id="agent-002",
             state={"status": "pending"},
         )
@@ -321,58 +252,58 @@ def session_002_saved(session_storage: RedisSessionStorage, event_loop, session_
 
 
 @when('调用 SessionStorage.delete 删除会话 "session-002"')
-def delete_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def delete_session(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Delete session."""
+    session_id = f"{unique_prefix}-session-002"
 
     async def _delete():
-        await session_storage.delete(session_bdd_context.session_id)
+        await session_storage.delete(session_id)
 
     event_loop.run_until_complete(_delete())
 
 
 @when('调用 SessionStorage.load 加载会话 "session-002"')
-def load_deleted_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def load_deleted_session(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Try to load deleted session."""
+    session_id = f"{unique_prefix}-session-002"
     result = None
 
     async def _load():
         nonlocal result
-        result = await session_storage.load(session_bdd_context.session_id)
+        result = await session_storage.load(session_id)
 
     event_loop.run_until_complete(_load())
     return result
 
 
 @then("返回 None")
-def verify_load_returns_none(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def verify_load_returns_none(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Verify loading deleted session returns None."""
+    session_id = f"{unique_prefix}-session-002"
 
     async def _load():
-        result = await session_storage.load(session_bdd_context.session_id)
+        result = await session_storage.load(session_id)
         assert result is None
 
     event_loop.run_until_complete(_load())
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "会话状态过期",
-)
-def test_session_expiry(session_storage: RedisSessionStorage, event_loop):
-    """Test session state expiry."""
+@scenario("test_story_1_4.feature", "会话状态过期")
+def test_session_expiry(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     pass
 
 
 @given('会话状态 "session-003" 已保存并设置 TTL 为 1 秒')
-def session_003_saved_with_ttl(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def session_003_saved_with_ttl(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Session 003 saved with 1 second TTL."""
+    session_id = f"{unique_prefix}-session-003"
 
     async def _save():
         await session_storage.save(
-            session_id=session_bdd_context.session_id,
+            session_id=session_id,
             agent_id="agent-003",
             state={"status": "temporary"},
-            ttl=1,  # 1 second TTL
+            ttl=1,
         )
 
     event_loop.run_until_complete(_save())
@@ -381,33 +312,21 @@ def session_003_saved_with_ttl(session_storage: RedisSessionStorage, event_loop,
 @when("推进 fakeredis 时间使 TTL 过期")
 def wait_for_ttl_expiry():
     """Wait for TTL to expire."""
-    time.sleep(2)  # Wait 2 seconds for TTL to expire
+    time.sleep(2)
 
 
 @when('调用 SessionStorage.load 加载会话 "session-003"')
-def load_expired_session(session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext):
+def load_expired_session(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Load session after TTL expiry."""
+    session_id = f"{unique_prefix}-session-003"
     result = None
 
     async def _load():
         nonlocal result
-        result = await session_storage.load(session_bdd_context.session_id)
+        result = await session_storage.load(session_id)
 
     event_loop.run_until_complete(_load())
     return result
-
-
-@then("返回 None")
-def verify_expired_session_returns_none(
-    session_storage: RedisSessionStorage, event_loop, session_bdd_context: SessionBDDContext
-):
-    """Verify expired session returns None."""
-
-    async def _load():
-        result = await session_storage.load(session_bdd_context.session_id)
-        assert result is None
-
-    event_loop.run_until_complete(_load())
 
 
 # ===================================================================
@@ -415,37 +334,50 @@ def verify_expired_session_returns_none(
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "语义缓存命中",
-)
-def test_semantic_cache_hit(semantic_cache: RedisSemanticCache, event_loop):
-    """Test semantic cache hit."""
+@scenario("test_story_1_4.feature", "语义缓存命中")
+def test_semantic_cache_hit(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     pass
 
 
+def _make_vector(prefix: str) -> list[float]:
+    """Create deterministic 1024-dim vector from prefix string."""
+    # Use hexdigest to get deterministic bytes
+    h = hashlib.md5(prefix.encode("utf-8"), usedforsecurity=False).hexdigest()
+    # Convert hex to floats in range [0, 1]
+    vector = []
+    for i in range(0, len(h), 8):  # 8 hex chars = 4 bytes = 1 float
+        chunk = h[i : i + 8]
+        val = int(chunk, 16) / (2**32 - 1)
+        vector.append(val)
+    # Pad to 1024
+    while len(vector) < 1024:
+        vector.append(0.0)
+    return vector[:1024]
+
+
 @given("语义缓存已存储查询结果")
-def cache_stored_query_result(semantic_cache: RedisSemanticCache, event_loop, semantic_cache_context: SemanticCacheTestContext):
+def cache_stored_query_result(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     """Semantic cache has stored a query result."""
+    prefix = session_test_context.prefix
+    query_vector = _make_vector(prefix)
+    result_data = {"document_id": f"doc-{prefix}", "text": "cached result"}
 
     async def _store():
-        await semantic_cache.set(
-            semantic_cache_context.query_vector,
-            semantic_cache_context.cached_result,
-            ttl=3600,
-        )
+        await semantic_cache.set(query_vector, result_data, ttl=3600)
 
     event_loop.run_until_complete(_store())
 
 
 @when("使用相同查询向量调用 SemanticCache.get")
-def get_from_cache(semantic_cache: RedisSemanticCache, event_loop, semantic_cache_context: SemanticCacheTestContext):
+def get_from_cache(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     """Get from cache using same query vector."""
     cached = None
+    prefix = session_test_context.prefix
+    query_vector = _make_vector(prefix)
 
     async def _get():
         nonlocal cached
-        cached = await semantic_cache.get(semantic_cache_context.query_vector)
+        cached = await semantic_cache.get(query_vector)
 
     event_loop.run_until_complete(_get())
     return cached
@@ -453,45 +385,42 @@ def get_from_cache(semantic_cache: RedisSemanticCache, event_loop, semantic_cach
 
 @when("相似度阈值满足要求")
 def verify_similarity_threshold():
-    """Verify similarity threshold is satisfied."""
     pass
 
 
 @then("返回缓存结果")
-def verify_cache_hit(semantic_cache: RedisSemanticCache, event_loop, semantic_cache_context: SemanticCacheTestContext):
+def verify_cache_hit(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     """Verify cache hit returns the cached result."""
+    prefix = session_test_context.prefix
+    query_vector = _make_vector(prefix)
 
     async def _get():
-        result = await semantic_cache.get(semantic_cache_context.query_vector)
+        result = await semantic_cache.get(query_vector)
         assert result is not None
-        assert result["document_id"] == semantic_cache_context.cached_result["document_id"]
+        assert result["document_id"] == f"doc-{prefix}"
 
     event_loop.run_until_complete(_get())
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "语义缓存未命中",
-)
-def test_semantic_cache_miss(semantic_cache: RedisSemanticCache, event_loop):
-    """Test semantic cache miss."""
+@scenario("test_story_1_4.feature", "语义缓存未命中")
+def test_semantic_cache_miss(semantic_cache: RedisSemanticCache, event_loop, unique_prefix: str):
     pass
 
 
 @given("语义缓存无匹配结果")
 def cache_has_no_match():
-    """Cache has no matching result."""
     pass
 
 
 @when("调用 SemanticCache.get 查询缓存（无匹配）")
-def get_no_match(semantic_cache: RedisSemanticCache, event_loop):
+def get_no_match(semantic_cache: RedisSemanticCache, event_loop, unique_prefix: str):
     """Get from cache with non-matching query."""
+    # Use completely different vector
+    different_vector = [0.999 - 0.001 * i for i in range(1024)]
     result = None
 
     async def _get():
         nonlocal result
-        different_vector = [0.9] * 1024  # Different from stored vector
         result = await semantic_cache.get(different_vector)
 
     event_loop.run_until_complete(_get())
@@ -499,65 +428,62 @@ def get_no_match(semantic_cache: RedisSemanticCache, event_loop):
 
 
 @then("返回 None")
-def verify_cache_miss(semantic_cache: RedisSemanticCache, event_loop):
+def verify_cache_miss(semantic_cache: RedisSemanticCache, event_loop, unique_prefix: str):
     """Verify cache miss returns None."""
+    different_vector = [0.999 - 0.001 * i for i in range(1024)]
 
     async def _get():
-        different_vector = [0.9] * 1024
         result = await semantic_cache.get(different_vector)
         assert result is None
 
     event_loop.run_until_complete(_get())
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "语义缓存命中率统计",
-)
-def test_cache_hit_rate_stats(semantic_cache: RedisSemanticCache, event_loop):
-    """Test semantic cache hit rate statistics."""
+@scenario("test_story_1_4.feature", "语义缓存命中率统计")
+def test_cache_hit_rate_stats(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     pass
 
 
 @given("注入 EventMetricsCollector 到 SemanticCache")
 def inject_metrics_collector():
-    """Inject EventMetricsCollector into RedisSemanticCache."""
-    # This would require a real metrics collector implementation
     pass
 
 
 @given("执行 3 次缓存命中和 2 次缓存未命中")
-def perform_cache_operations(semantic_cache: RedisSemanticCache, event_loop):
+def perform_cache_operations(semantic_cache: RedisSemanticCache, event_loop, session_test_context: SessionTestContext):
     """Perform 3 cache hits and 2 cache misses."""
+    prefix = session_test_context.prefix
+
+    def make_varied_vector(base_vec: list[float], offset: float) -> list[float]:
+        return [(v + offset) % 1.0 for v in base_vec]
 
     async def _operate():
-        # Store items
+        # Store 5 items with distinct vectors
+        base_vec = _make_vector(prefix)
         for i in range(5):
-            vec = [0.1 + i * 0.01] * 1024
+            vec = make_varied_vector(base_vec, i * 0.01)
             await semantic_cache.set(vec, {"index": i}, ttl=3600)
 
         # 3 hits (access existing)
         for i in range(3):
-            vec = [0.1 + i * 0.01] * 1024
+            vec = make_varied_vector(base_vec, i * 0.01)
             await semantic_cache.get(vec)
 
-        # 2 misses (access non-existing)
-        for i in range(3, 5):
-            vec = [0.5 + i * 0.01] * 1024  # Different vectors
-            await semantic_cache.get(vec)
+        # 2 misses (access non-existing - different prefix)
+        miss_prefix = f"{prefix}_miss"
+        miss_vec = _make_vector(miss_prefix)
+        await semantic_cache.get(miss_vec)
 
     event_loop.run_until_complete(_operate())
 
 
 @when("查询 EventMetricsCollector.hit_rate")
 def query_hit_rate():
-    """Query hit rate from metrics collector."""
     pass
 
 
 @then("返回命中率 0.6")
 def verify_hit_rate():
-    """Verify hit rate is 0.6 (3 hits / 5 total)."""
     pass
 
 
@@ -566,63 +492,48 @@ def verify_hit_rate():
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "公共黑板多 Agent 并发写入",
-)
+@scenario("test_story_1_4.feature", "公共黑板多 Agent 并发写入")
 def test_public_blackboard_concurrent_write():
-    """Test public blackboard multi-agent concurrent write."""
     pass
 
 
 @given('Agent "agent-A" 和 Agent "agent-B" 向 conversation "conv-001" 发布消息')
 def agents_post_to_conversation():
-    """Agent A and B post messages to conversation."""
     pass
 
 
 @when('调用 PublicBlackboard.get 读取 conversation "conv-001"')
 def get_blackboard_messages():
-    """Get messages from public blackboard."""
     pass
 
 
 @then("返回所有 Agent 发布的消息")
 def verify_all_messages_returned():
-    """Verify all messages are returned."""
     pass
 
 
 @then("消息按时间戳排序")
 def verify_messages_sorted():
-    """Verify messages are sorted by timestamp."""
     pass
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "公共黑板版本号递增",
-)
+@scenario("test_story_1_4.feature", "公共黑板版本号递增")
 def test_blackboard_version_increment():
-    """Test public blackboard version increment."""
     pass
 
 
 @given('Agent "agent-A" 向 conversation "conv-002" 发布第 1 条消息')
 def agent_posts_first_message():
-    """Agent A posts first message to conversation."""
     pass
 
 
 @when('Agent "agent-A" 再次向 conversation "conv-002" 发布消息')
 def agent_posts_second_message():
-    """Agent A posts second message."""
     pass
 
 
 @then("返回的版本号递增为 2")
 def verify_version_incremented():
-    """Verify version number increments to 2."""
     pass
 
 
@@ -631,18 +542,13 @@ def verify_version_incremented():
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "Redis 键命名规范",
-)
+@scenario("test_story_1_4.feature", "Redis 键命名规范")
 def test_redis_key_naming():
-    """Test Redis key naming convention."""
     pass
 
 
 @given("所有存储服务使用 KeyBuilder 构建键名")
 def services_use_key_builder():
-    """All storage services use KeyBuilder."""
     pass
 
 
@@ -660,23 +566,19 @@ def verify_key_format():
     assert key == "sisys:session:abc-123", f"Expected sisys:session:abc-123, got {key}"
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "Redis 键批量清理",
-)
-def test_redis_key_cleanup(session_storage: RedisSessionStorage, event_loop):
-    """Test Redis key batch cleanup."""
+@scenario("test_story_1_4.feature", "Redis 键批量清理")
+def test_redis_key_cleanup(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     pass
 
 
 @given('命名空间 "session" 下有 5 个键')
-def create_five_session_keys(session_storage: RedisSessionStorage, event_loop):
+def create_five_session_keys(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Create 5 keys in session namespace."""
 
     async def _create():
         for i in range(5):
             await session_storage.save(
-                session_id=f"session-cleanup-{i}",
+                session_id=f"{unique_prefix}-session-cleanup-{i}",
                 agent_id="agent-cleanup",
                 state={"index": i},
             )
@@ -685,28 +587,29 @@ def create_five_session_keys(session_storage: RedisSessionStorage, event_loop):
 
 
 @when('调用 RedisCleanup.cleanup_namespace("session")')
-def cleanup_session_namespace(redis_cleanup: RedisCleanup, event_loop):
+def cleanup_session_namespace(redis_config: RedisConfig, event_loop):
     """Cleanup all keys in session namespace."""
 
     async def _cleanup():
-        await redis_cleanup.cleanup_namespace("session")
+        cleanup = RedisCleanup(redis_config)
+        await cleanup.cleanup_namespace("session")
+        await cleanup.close()
 
     event_loop.run_until_complete(_cleanup())
 
 
 @then("返回删除的键数量为 5")
 def verify_deleted_count():
-    """Verify 5 keys were deleted."""
     pass
 
 
 @then('所有 "session" 命名空间下的键被删除')
-def verify_all_keys_deleted(session_storage: RedisSessionStorage, event_loop):
+def verify_all_keys_deleted(session_storage: RedisSessionStorage, event_loop, unique_prefix: str):
     """Verify all session keys are deleted."""
 
     async def _check():
         for i in range(5):
-            result = await session_storage.load(f"session-cleanup-{i}")
+            result = await session_storage.load(f"{unique_prefix}-session-cleanup-{i}")
             assert result is None, f"session-cleanup-{i} should be deleted"
 
     event_loop.run_until_complete(_check())
@@ -717,54 +620,26 @@ def verify_all_keys_deleted(session_storage: RedisSessionStorage, event_loop):
 # ===================================================================
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "SemanticCache 连接失败优雅降级",
-)
+@scenario("test_story_1_4.feature", "SemanticCache 连接失败优雅降级")
 def test_semantic_cache_graceful_degradation():
-    """Test RedisSemanticCache graceful degradation."""
     pass
 
 
 @when("调用 SemanticCache.get 查询缓存")
 def call_semantic_cache_get():
-    """Call SemanticCache.get to query cache."""
     pass
 
 
 @then("返回 0")
 def verify_return_zero():
-    """Verify return value is 0."""
     pass
 
 
-@scenario(
-    "test_story_1_4.feature",
-    "PublicBlackboard 连接失败优雅降级",
-)
+@scenario("test_story_1_4.feature", "PublicBlackboard 连接失败优雅降级")
 def test_blackboard_graceful_degradation():
-    """Test PublicBlackboard graceful degradation."""
     pass
 
 
 @when("调用 PublicBlackboard.post 发布消息")
 def call_public_blackboard_post():
-    """Call PublicBlackboard.post to post message."""
     pass
-
-
-# ===================================================================
-# Shared Fixtures
-# ===================================================================
-
-
-@pytest.fixture
-def session_id():
-    """Generate unique session ID for tests."""
-    return f"test-session-{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture
-def agent_id():
-    """Generate unique agent ID for tests."""
-    return f"test-agent-{uuid.uuid4().hex[:8]}"
