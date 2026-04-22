@@ -443,7 +443,7 @@ def then_accuracy_95_percent(context: dict) -> None:
     pass
 
 
-@then("应该返回空目标和大海捞针")
+@then("应该返回空目标和大零分")
 def then_return_empty(context: dict) -> None:
     """Should return empty target and zero score."""
     target = context.get("route_target", "")
@@ -906,7 +906,7 @@ def given_identical_triggered_events(context: dict) -> None:
 
 
 @when("连续执行 10 次路由决策")
-def when_10_consecutive_decisions(context: dict, event_loop: Any) -> None:
+def when_10_consecutive_decisions(context: dict, event_loop) -> None:
     """Execute 10 consecutive routing decisions."""
     event = context.get("identical_event")
     results = []

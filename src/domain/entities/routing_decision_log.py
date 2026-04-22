@@ -33,11 +33,8 @@ class RoutingDecisionLog:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     worm_storage_ref: str = ""  # WORM storage reference for compliance
 
-    def validate(self) -> bool:
+    def validate(self) -> None:
         """Validate invariant constraints.
-
-        Returns:
-            True if all invariants are satisfied.
 
         Raises:
             ValueError: If any invariant is violated.
@@ -56,4 +53,3 @@ class RoutingDecisionLog:
             raise ValueError(f"cost_estimate must be non-negative. Got: {self.cost_estimate}")
         if self.latency_ms < 0:
             raise ValueError(f"latency_ms must be non-negative. Got: {self.latency_ms}")
-        return True

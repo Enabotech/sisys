@@ -15,9 +15,9 @@ class HashNode:
 
 
 class HashRouter:
-    """Consistent hash router using murmurhash3 for session-based routing.
+    """Consistent hash router using FNV-1a hash for session-based routing.
 
-    Provides O(1) routing with minimal rebalancing when nodes are added/removed.
+    Provides O(log n) routing with minimal rebalancing when nodes are added/removed.
     Uses virtual nodes to ensure even distribution.
     """
 
