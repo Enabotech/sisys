@@ -198,6 +198,41 @@
 
 ---
 
+#### 测试隔离约束（必须遵守）
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+> 参考 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md) §5.5 测试隔离约束。
+
+**约束规则：**
+
+| 约束类型 | 规则 | 违反后果 |
+|---------|------|---------|
+| **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
+| **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
+| **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
+| **外部服务隔离** | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
+| **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
+| **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
+| **asyncio 上下文** | asyncio.Lock 使用类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
+
+**禁止行为：**
+- ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
+- ❌ autouse fixture 删除全局匹配资源（如 `test_*`）
+- ❌ Fixture 假设清理顺序（必须显式声明依赖）
+- ❌ asyncio.Lock 使用实例变量
+- ❌ scope=module 的 event_loop fixture
+
+**验证要求：**
+- [ ] 并行测试 `pytest tests/ -n 8` 通过
+- [ ] 连续5次运行无随机失败
+- [ ] `ruff check` 通过
+- [ ] `mypy` 通过
+
+---
+
 ## 📊 AC → Task → Subtask 追溯矩阵
 
 > **目的：** 确保每个 AC 都有明确的 Task 和 Subtask 对应，避免遗漏或重复。
