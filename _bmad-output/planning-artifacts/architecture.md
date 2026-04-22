@@ -1707,7 +1707,145 @@ class EventListener:
 | **L4 对象存储** | MinIO WORM | 原始文档、证据包 | Object Lock COMPLIANCE 模式 7 年 |
 | **L5 图存储(可选)** | Neo4j 5.x | 知识图谱、实体关系 | Cypher、图遍历、Parent-Child 索引 |
 
-### 11.2 语义缓存层设计
+### 11.2 L0 记忆入口层（MEMORY.md）设计
+
+#### 11.2.1 设计原则
+
+**遵循系统公理二**：`LLM 上下文 = 缓存`，`磁盘记忆 = 真相源`
+
+- Agent 的 MEMORY.md 是**启动时一次性加载的配置**，不是动态索引的记忆系统
+- Agent 的"学习"体现在系统级 StrategicArchive 的演进
+- 经验复用通过 RAG 检索系统级长期记忆实现
+
+#### 11.2.2 单层 MEMORY.md 架构
+
+SISYS 记忆系统只有**一层 MEMORY.md**：
+
+| 组件 | 位置 | 职责 | 性质 |
+|------|------|------|------|
+| **MEMORY.md** | `~/.sisys/memory/` | 系统记忆统一入口 | 动态索引 |
+| **Agent 配置集** | Agent 工作目录 | 身份/工具/状态配置 | 静态配置（启动时一次性加载） |
+
+```
+~/.sisys/memory/（系统级记忆）
+├── MEMORY.md            ← 索引入口
+├── user_*.md           ← 用户偏好/知识
+├── feedback_*.md        ← 用户规则
+├── project_*.md         ← 项目上下文
+└── reference_*.md       ← 外部引用
+
+Agent 工作目录（Agent 配置集）
+├── IDENTITY.md         ← 启动时加载（角色定义）
+├── CODE.md             ← 启动时加载（行为准则）
+├── SOUL.md             ← 启动时加载（价值观）
+├── TOOLS.md            ← 启动时加载（工具箱注册）
+├── USER.md             ← 启动时加载（用户偏好）
+├── MEMORY.md           ← 启动时加载（来自系统级，无独立索引）
+└── HEARTBEAT.md        ← 启动时加载（心跳配置）
+```
+
+#### 11.2.3 系统级 MEMORY.md 工作原理
+
+**索引格式**（每行一条引用）：
+```markdown
+- [Title](file.md) — one-line hook
+```
+
+**驱动流程**：
+```
+系统级 MEMORY.md → 索引驱动 → 加载相关 .md 文件 → 注入 LLM 上下文
+                                              ↓
+                                   StrategicArchive 按需持久化
+                                              ↓
+                                   RAG 检索长期记忆
+```
+
+#### 11.2.4 Agent 配置集加载流程
+
+```
+会话初始化
+    ├── 加载系统级 MEMORY.md → 索引 → user/project/feedback/reference
+    │                          ↓
+    └── 加载 Agent 配置集（IDENTITY/CODE/SOUL/TOOLS/USER/MEMORY/HEARTBEAT）
+         │
+         └── Agent 实例化 → 合并上下文 → 任务执行
+                                              ↓
+                              Checkpoint/会话结束 → 持久化至 StrategicArchive
+```
+
+#### 11.2.5 与六层存储的关系
+
+| 记忆类型 | 存储层 | 说明 |
+|---------|--------|------|
+| 系统级 user/project/feedback | L2 PostgreSQL | 结构化元数据 |
+| 系统级 reference | L2 PostgreSQL | 外部引用指针 |
+| 嵌入向量 | L3 Qdrant | 语义检索 |
+| 原始文档/证据包 | L4 MinIO WORM | 7年归档 |
+| 知识图谱 | L5 Neo4j（可选） | 图检索 |
+| Agent 配置集 | L0 文件系统 | 启动时读取 |
+| Agent 会话状态 | L1 Redis | 24h-30d TTL |
+
+#### 11.2.6 管理流程
+
+| 操作 | 触发时机 | 执行动作 |
+|------|---------|---------|
+| **系统记忆保存** | 用户确认/纠正/自我介绍 | 写入 `~/.sisys/memory/` 独立 .md + 更新系统 MEMORY.md |
+| **系统记忆读取** | 会话开始/上下文需要 | 读取系统 MEMORY.md → 加载相关 .md → 注入上下文 |
+| **Agent 配置集** | Agent 启动 | 一次性加载，运行时存在于 LLM 上下文 |
+
+#### 11.2.7 核心约定
+
+**系统级 MEMORY.md 条目格式**：
+```markdown
+---
+name: {{memory name}}
+description: {{one-line description}}
+type: {{user, feedback, project, reference}}
+---
+
+{{memory content}}
+```
+
+**Agent 配置集文件**（无独立 MEMORY.md 索引，内容来自系统级）：
+- IDENTITY.md / CODE.md / SOUL.md / TOOLS.md / USER.md / MEMORY.md / HEARTBEAT.md
+- 启动时一次性加载，不在运行时动态更新
+- Agent 的"学习"通过 StrategicArchive 持久化实现
+
+---
+
+### 11.3 语义缓存层设计
+
+```markdown
+---
+name: {{memory name}}
+description: {{one-line description}}
+type: {{user, feedback, project, reference}}
+---
+
+{{memory content}}
+```
+
+**type 分类**：
+- `user` — 用户角色、偏好、知识
+- `feedback` — 用户指导的规则（包含 Why/How to apply）
+- `project` — 项目上下文、目标、deadline
+- `reference` — 外部系统指针（Linear/Grafana 等 URL）
+
+#### 11.2.4 与 L1-L5 的关系
+
+```
+用户输入 → 评估是否值得记忆 → 写入 L0 .md 文件 → 更新 MEMORY.md 索引
+                                          ↓
+                                    L1-L5 按需存取
+```
+
+- **L0 是入口**：MEMORY.md 索引驱动，不存储实际数据
+- **L1-L5 是存储**：按类型分发至 Redis/PG/Qdrant/MinIO/Neo4j
+- **跨会话持久化**：MEMORY.md 和 .md 文件在磁盘，跨会话保留
+
+---
+
+### 11.3 语义缓存层设计
 
 ```python
 class SemanticCache:
@@ -3799,7 +3937,7 @@ class AgentWorkflow:
         # 1. 初始化
         await self.initialize(task)
         # - 加载身份档案（IDENTITY.md）
-        # - 加载工具集（TOOLS.md）
+        # - 加载记忆（MEMORY.md）
         # - 实例化沙箱与记忆容器
 
         # 2. 感知
@@ -4129,14 +4267,20 @@ memory_config:
     type: "filesystem"
     index: "MEMORY.md"
     description: "记忆系统统一入口，索引驱动各层访问"
-  short_term:
+  L1_cache:
     type: "redis"
     ttl: 3600
     description: "会话状态、语义缓存"
-  long_term:
-    type: "strategic_archive"
-    retention_days: 2555  # 7 年
-    description: "六层存储协同，长期语义记忆"
+  L2_relational:
+    type: "postgresql"
+    description: "用户/RBAC、审计元数据、业务实体"
+  L3_vector:
+    type: "qdrant"
+    description: "嵌入向量、混合检索 payload"
+  L4_object:
+    type: "minio"
+    worm_retention_days: 2555  # 7 年
+    description: "原始文档、证据包、审计归档"
   L5_graph:
     enabled: false  # 可选，按需启用
     type: "neo4j"
