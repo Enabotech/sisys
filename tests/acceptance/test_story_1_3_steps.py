@@ -3,7 +3,7 @@
 Real instance integration tests using Redis Pub/Sub + RabbitMQ + Outbox Pattern.
 No mocks - uses real service instances.
 
-Run with: pytest tests/acceptance/test_story_1_3_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_story_1_3_steps.py -v
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import os
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -28,8 +29,6 @@ from src.infrastructure.events.redis_publisher import RedisEventPublisher
 from src.infrastructure.events.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.idempotency import IdempotencyChecker
 
-# Import reset_test_environment for test isolation (AC-4 A8)
-
 # ===================================================================
 # Paths & Constants
 # ===================================================================
@@ -44,13 +43,27 @@ REDIS_CHANNEL_PREFIX = "sisys:rt:"
 # RabbitMQ routing key convention: sisys.events.reliable.<event_type>
 RABBITMQ_ROUTING_PREFIX = "sisys.events.reliable."
 
-# Shared state for idempotency test
-_idempotency_event_id = None
-_idempotency_first_result = None
-_idempotency_second_result = None
 
-# Shared state for redis pub/sub channel tracking
-_redis_published_channel = None
+# ===================================================================
+# Test Context - 替代全局状态，实现并行测试隔离
+# ===================================================================
+
+
+@dataclass
+class BDDContext:
+    """BDD step 共享 context，通过 fixture 注入，实现并行测试隔离"""
+
+    test_uuid: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
+    idempotency_event_id: str | None = None
+    idempotency_first_result: bool | None = None
+    idempotency_second_result: bool | None = None
+    redis_published_channel: str | None = None
+
+
+@pytest.fixture
+def bdd_context() -> BDDContext:
+    """每个测试独立的 context，确保并行测试隔离"""
+    return BDDContext()
 
 
 # ===================================================================
@@ -252,11 +265,14 @@ def redis_available(redis_config: RedisConfig):
 
 
 @when("我发布一个 DocumentProcessed 事件到 Redis channel")
-def publish_documentprocessed_to_redis_channel(redis_publisher: RedisEventPublisher, event_loop):
+def publish_documentprocessed_to_redis_channel(
+    redis_publisher: RedisEventPublisher,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Publish DocumentProcessed event to Redis channel."""
-    global _redis_published_channel
     channel = f"{REDIS_CHANNEL_PREFIX}documentprocessed"
-    _redis_published_channel = channel
+    bdd_context.redis_published_channel = channel
 
     event = DocumentProcessed(
         document_id=uuid.uuid4(),
@@ -271,11 +287,14 @@ def publish_documentprocessed_to_redis_channel(redis_publisher: RedisEventPublis
 
 
 @when("我发布一个 HeartbeatTriggered 事件到 Redis channel")
-def publish_heartbeattriggered_to_redis_channel(redis_publisher: RedisEventPublisher, event_loop):
+def publish_heartbeattriggered_to_redis_channel(
+    redis_publisher: RedisEventPublisher,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Publish HeartbeatTriggered event to Redis channel."""
-    global _redis_published_channel
     channel = f"{REDIS_CHANNEL_PREFIX}heartbeattriggered"
-    _redis_published_channel = channel
+    bdd_context.redis_published_channel = channel
 
     event = HeartbeatTriggered(
         heartbeat_id=uuid.uuid4(),
@@ -291,14 +310,19 @@ def publish_heartbeattriggered_to_redis_channel(redis_publisher: RedisEventPubli
 
 
 @then("订阅者应该接收到该事件")
-def verify_subscriber_receives_event(redis_subscriber: RedisEventSubscriber, redis_publisher: RedisEventPublisher, event_loop):
+def verify_subscriber_receives_event(
+    redis_subscriber: RedisEventSubscriber,
+    redis_publisher: RedisEventPublisher,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Verify subscriber receives the event."""
     received_events = []
 
     def handler(event_data: dict) -> None:
         received_events.append(event_data)
 
-    channel = _redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    channel = bdd_context.redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
     redis_subscriber.subscribe(channel, handler)
 
     async def _test():
@@ -316,14 +340,19 @@ def verify_subscriber_receives_event(redis_subscriber: RedisEventSubscriber, red
 
 
 @then("事件应该被正确序列化为 JSON")
-def verify_event_serialized_as_json(redis_subscriber: RedisEventSubscriber, redis_publisher: RedisEventPublisher, event_loop):
+def verify_event_serialized_as_json(
+    redis_subscriber: RedisEventSubscriber,
+    redis_publisher: RedisEventPublisher,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Verify event is correctly serialized as JSON."""
     received_data = {}
 
     def handler(event_data: dict) -> None:
         received_data.update(event_data)
 
-    channel = _redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
+    channel = bdd_context.redis_published_channel or f"{REDIS_CHANNEL_PREFIX}documentprocessed"
     redis_subscriber.subscribe(channel, handler)
 
     async def _test():
@@ -591,55 +620,62 @@ def test_ac4_idempotency():
     pass
 
 
-@when('我首次处理 event_id "550e8400-e29b-41d4-a716-446655440000" 的事件')
-def process_event_first_time(rabbitmq_consumer: AsyncRabbitMQConsumer, event_loop):
+@when("我首次处理一个事件")
+def process_event_first_time(
+    rabbitmq_consumer: AsyncRabbitMQConsumer,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Process an event for the first time."""
-    global _idempotency_event_id, _idempotency_first_result
-
-    # Use a unique event_id for each test run to avoid stale state
-    _idempotency_event_id = uuid.uuid4()
+    # 动态生成唯一 event_id，确保并行测试隔离
+    bdd_context.idempotency_event_id = str(uuid.uuid4())
 
     async def _test():
-        global _idempotency_first_result
         # Simulate processing
-        _idempotency_first_result = await rabbitmq_consumer._idempotency.try_acquire(_idempotency_event_id)
+        bdd_context.idempotency_first_result = await rabbitmq_consumer._idempotency.try_acquire(
+            bdd_context.idempotency_event_id
+        )
 
     event_loop.run_until_complete(_test())
-    assert _idempotency_first_result is True, "First try_acquire should return True"
+    assert bdd_context.idempotency_first_result is True, "First try_acquire should return True"
 
 
 @then("try_acquire 应该返回 True")
-def try_acquire_returns_true():
+def try_acquire_returns_true(bdd_context: BDDContext):
     """Verify try_acquire returns True on first attempt."""
-    assert _idempotency_first_result is True
+    assert bdd_context.idempotency_first_result is True
 
 
-@when('我第二次处理相同 event_id "550e8400-e29b-41d4-a716-446655440000" 的事件')
-def process_event_second_time(rabbitmq_consumer: AsyncRabbitMQConsumer, event_loop):
+@when("我第二次处理相同事件")
+def process_event_second_time(
+    rabbitmq_consumer: AsyncRabbitMQConsumer,
+    event_loop,
+    bdd_context: BDDContext,
+):
     """Process the same event ID a second time."""
-    global _idempotency_second_result
-    # Use the same event_id as the first attempt
 
+    # 使用与首次处理相同的 event_id
     async def _test():
-        global _idempotency_second_result
         # Try to acquire the same event_id again
-        _idempotency_second_result = await rabbitmq_consumer._idempotency.try_acquire(_idempotency_event_id)
+        bdd_context.idempotency_second_result = await rabbitmq_consumer._idempotency.try_acquire(
+            bdd_context.idempotency_event_id
+        )
 
     event_loop.run_until_complete(_test())
-    assert _idempotency_second_result is False, "Second try_acquire should return False"
+    assert bdd_context.idempotency_second_result is False, "Second try_acquire should return False"
 
 
 @then("try_acquire 应该返回 False")
-def try_acquire_returns_false():
+def try_acquire_returns_false(bdd_context: BDDContext):
     """Verify try_acquire returns False on second attempt."""
-    assert _idempotency_second_result is False
+    assert bdd_context.idempotency_second_result is False
 
 
 # Handle the "当" interpretation of the And step in feature file
 @when("try_acquire 应该返回 False")
-def and_try_acquire_returns_false():
+def and_try_acquire_returns_false(bdd_context: BDDContext):
     """Verify try_acquire returns False on second attempt (feature file syntax quirk)."""
-    assert _idempotency_second_result is False
+    assert bdd_context.idempotency_second_result is False
 
 
 @then("事件应该只被处理一次")
