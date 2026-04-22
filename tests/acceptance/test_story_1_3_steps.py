@@ -309,7 +309,7 @@ def verify_subscriber_receives_event(redis_subscriber: RedisEventSubscriber, red
             embedding=[0.1, 0.2, 0.3],
         )
         await redis_publisher.publish(event, channel)
-        await asyncio.sleep(1.0)  # Give time for event to be delivered
+        await asyncio.sleep(2.0)  # Give time for event to be delivered (2s for parallel safety)
 
     event_loop.run_until_complete(asyncio.wait_for(_test(), timeout=5.0))
     assert len(received_events) > 0, "Subscriber did not receive any event"
@@ -446,16 +446,11 @@ async def verify_rabbitmq_consumer_receives(
     rabbitmq_config: RabbitMQConfig,
     redis_config: RedisConfig,
 ):
-    """Verify async consumer receives the event.
-
-    使用 @pytest.mark.asyncio 让 pytest-asyncio 处理 async step。
-    fixture 只提供配置，step 控制连接和执行。
-    """
+    """Verify async consumer receives the event."""
     from src.infrastructure.idempotency import IdempotencyChecker
 
     received_events = []
 
-    # Step 控制连接
     publisher = AsyncRabbitMQPublisher(rabbitmq_config)
     await publisher.connect()
 
@@ -484,10 +479,10 @@ async def verify_rabbitmq_consumer_receives(
             )
             await asyncio.sleep(1.0)
             await publisher.async_publish(event, routing_key)
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(4.0)
     finally:
-        await publisher.close()
         await consumer.close()
+        await publisher.close()
 
     assert len(received_events) > 0, "Consumer did not receive event"
 
