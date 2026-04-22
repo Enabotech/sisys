@@ -128,10 +128,15 @@ def sync_engine(pg_config, request):
 @pytest.fixture(scope="module")
 def async_engine(pg_config, request):
     """Create async engine for tests with worker-specific schema."""
+    schema = get_schema_name()
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
     )
-    engine = create_async_engine(url, echo=False)
+    engine = create_async_engine(
+        url,
+        echo=False,
+        connect_args={"server_settings": {"search_path": schema}},
+    )
     yield engine
     engine.dispose()
 
@@ -141,15 +146,18 @@ async def db_session(pg_config, sync_engine):
     """Create an async session for a test with worker-specific schema."""
     schema = get_schema_name()
     # Create a new engine per session to avoid connection conflicts
+    # Use server_settings to set search_path at connection level (not session level)
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
     )
-    engine = create_async_engine(url, echo=False)
+    engine = create_async_engine(
+        url,
+        echo=False,
+        connect_args={"server_settings": {"search_path": schema}},
+    )
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        # Set schema for this session
-        await session.execute(text(f"SET search_path TO {schema}"))
         yield session
         await session.rollback()
 

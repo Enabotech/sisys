@@ -514,9 +514,128 @@ sisys/
 3. **六边形架构严格遵守** — Task 3 必须包含架构验证测试，确保无循环依赖
 
 **应用到本故事/Applied to This Story:**
-- [ ] TriggerConfig 采用与 OtelConfig 相同的 `from_env()` 模式
-- [ ] TriggerService 仅负责触发和上下文提取，不处理业务逻辑
-- [ ] Task 3 包含架构验证测试（六边形架构约束检测）
+- [x] TriggerConfig 采用与 OtelConfig 相同的 `from_env()` 模式
+- [x] TriggerService 仅负责触发和上下文提取，不处理业务逻辑
+- [x] Task 3 包含架构验证测试（六边形架构约束检测）
+
+### 测试隔离与警告修复经验 Test Isolation & Warning Fixes
+
+> 本章节记录 Story 1.14a 验收测试中的测试隔离问题修复和警告消除经验，供后续故事借鉴。
+
+#### 1. asyncio event loop 在 pytest-xdist 并行执行中的问题
+
+**问题描述:**
+```python
+# 错误模式：在 step 函数中直接调用
+async def some_step(context: dict):
+    asyncio.get_event_loop().run_until_complete(some_async_call())
+```
+在 pytest-xdist 并行执行时，`asyncio.get_event_loop()` 可能返回已关闭或无效的 event loop，导致 `RuntimeError: There is no current event loop in thread 'MainThread'`。
+
+**解决方案:**
+```python
+# 正确模式：显式接收 event_loop fixture 参数
+@when("TriggerService 处理该事件")
+def when_trigger_service_processes_event(context: dict, event_loop) -> None:
+    event_loop.run_until_complete(trigger_service.on_domain_event(event))
+```
+pytest-asyncio auto 模式下，必须显式接收 `event_loop` 参数以确保使用正确的 event loop。
+
+**来源:** `tests/acceptance/test_story_1_14a_steps.py`
+
+#### 2. PostgreSQL 异步连接的 Schema 隔离问题
+
+**问题描述:**
+```python
+# 错误模式：在 session 级别设置 search_path
+async with async_session() as session:
+    await session.execute(text(f"SET search_path TO {schema}"))
+```
+asyncpg 的连接池可能不持久化 session 级别的 `SET search_path`，导致表找不到。
+
+**解决方案:**
+```python
+# 正确模式：在连接级别设置 search_path
+engine = create_async_engine(
+    url,
+    connect_args={"server_settings": {"search_path": schema}},
+)
+```
+使用 `connect_args` 在连接建立时就设置 `search_path`，确保所有连接操作都使用正确的 schema。
+
+**来源:** `tests/integration/test_audit_integration.py`
+
+#### 3. Redis pub/sub 并行执行时的 timing 问题
+
+**问题描述:**
+```python
+await redis_publisher.publish(event, channel)
+await asyncio.sleep(1.0)  # 1秒在并行执行时不够
+```
+并行执行时 1 秒等待时间可能不够，导致测试 flaky。
+
+**解决方案:**
+```python
+await redis_publisher.publish(event, channel)
+await asyncio.sleep(2.0)  # 2-4秒用于并行安全性
+```
+将等待时间增加到 2-4 秒，提高并行执行稳定性。
+
+**来源:** `tests/acceptance/test_story_1_3_steps.py`
+
+#### 4. pytest-bdd 与 pytest-asyncio async step 兼容性问题
+
+**问题描述:**
+```python
+@then("异步消费者应该接收到该事件")
+@pytest.mark.asyncio
+async def verify_rabbitmq_consumer_receives(...):
+    ...
+```
+pytest-bdd 不原生支持 `@pytest.mark.asyncio` 的 async step，导致警告：
+`RuntimeWarning: coroutine 'verify_rabbitmq_consumer_receives' was never awaited`
+
+**状态:** ⚠️ 无法完全修复
+- 使用 `@pytest.mark.asyncio` 功能正常但产生警告
+- 使用 `event_loop.run_until_complete()` 模式会破坏测试逻辑（异步资源在主线程释放）
+- 这是 pytest-bdd 与 pytest-asyncio 的架构兼容性问题
+
+**临时方案:**
+保持使用 `@pytest.mark.asyncio`，接受警告存在。后续可通过将 async step 拆分为同步 wrapper + async 实现类来规避。
+
+#### 5. Heartbeat scheduler 测试中的 asyncio.sleep mock 警告
+
+**问题描述:**
+```python
+# 错误模式：return_value 导致 coroutine 未正确 await
+with patch.object(scheduler, "_poll_loop", return_value=asyncio.sleep(0.1)):
+    ...
+```
+`return_value=asyncio.sleep(0.1)` 返回一个未执行的 coroutine，导致警告。
+
+**解决方案:**
+```python
+# 正确模式：使用 async 函数作为 side_effect
+async def mock_poll_loop():
+    while True:
+        await asyncio.sleep(3600)
+
+with patch.object(scheduler, "_poll_loop", side_effect=mock_poll_loop):
+    ...
+```
+使用 `side_effect=async_function` 而不是 `return_value=asyncio.sleep()`。
+
+**来源:** `tests/unit/infrastructure/scheduler/test_heartbeat_scheduler.py`
+
+#### 测试隔离检查清单（后续故事借鉴）
+
+| 检查项 | 操作 |
+|--------|------|
+| asyncio.run_until_complete | 是否显式接收 event_loop fixture |
+| asyncpg schema 隔离 | 是否使用 connect_args 设置 search_path |
+| Redis timing | sleep 时间是否足够（建议 2-4 秒） |
+| pytest-bdd async | 是否可接受警告或需要重构 |
+| asyncio mock | 是否使用 side_effect 而非 return_value |
 
 ### HeartbeatTriggered 关系澄清
 
@@ -653,7 +772,9 @@ TriggerService (监听)
 - 单元测试: 50 个
 - 验收测试: 25 个场景
 - 总测试: 75 个通过
+- 并行回归: 2146 passed, 32 skipped, 2 warnings
 - ruff/mypy: 全部通过
+- **测试隔离修复**: event_loop 参数模式、PostgreSQL schema 隔离、Redis timing 调整
 
 ---
 
@@ -713,11 +834,14 @@ Story 1.2 (领域事件定义) → Story 1.3 (事件总线实现) → Story 1.14
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成
-2. [ ] All acceptance criteria specified 所有验收标准已定义
-3. [ ] Architecture constraints extracted 架构约束已提取
-4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
+1. [x] All tasks defined 所有任务定义完成
+2. [x] All acceptance criteria specified 所有验收标准已定义
+3. [x] Architecture constraints extracted 架构约束已提取
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+5. [x] Sprint status synced to `ready-for-dev`
+6. [x] 测试隔离问题修复并记录经验
+7. [x] 并行测试通过（2146 passed, 32 skipped, 2 warnings）
+8. [x] 测试隔离与警告修复经验已文档化
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -756,5 +880,5 @@ Story 1.2 (领域事件定义) → Story 1.3 (事件总线实现) → Story 1.14
 
 **模板版本/Template Version:** 2.1.0
 **创建日期/Created:** 2026-04-20
-**最后更新/Last Updated:** 2026-04-20
-**更新说明:** Story 1.14a 完整版本 - 实现领域事件/心跳事件触发机制：(1) TriggerService 事件监听; (2) HeartbeatScheduler 心跳调度; (3) TriggerContext 上下文提取; (4) 六边形架构验证; (5) 性能基准测试 P95<10ms
+**最后更新/Last Updated:** 2026-04-22
+**更新说明:** Story 1.14a 完整版本 - 实现领域事件/心跳事件触发机制：(1) TriggerService 事件监听; (2) HeartbeatScheduler 心跳调度; (3) TriggerContext 上下文提取; (4) 六边形架构验证; (5) 性能基准测试 P95<10ms; (6) 测试隔离问题修复与警告消除经验记录

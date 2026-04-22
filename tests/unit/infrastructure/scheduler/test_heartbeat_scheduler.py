@@ -46,8 +46,13 @@ class TestHeartbeatSchedulerLifecycle:
         config = RedisConfig()
         scheduler = HeartbeatScheduler(redis_config=config)
 
+        async def mock_poll_loop():
+            # Mock async _poll_loop to do nothing
+            while True:
+                await asyncio.sleep(2000)
+
         # Mock _schedule_next and _poll_loop to prevent actual task creation
-        with patch.object(scheduler, "_schedule_next"), patch.object(scheduler, "_poll_loop", return_value=asyncio.sleep(0.1)):
+        with patch.object(scheduler, "_schedule_next"), patch.object(scheduler, "_poll_loop", side_effect=mock_poll_loop):
             scheduler._poll_task = None
             await scheduler.start()
 
@@ -73,7 +78,12 @@ class TestHeartbeatSchedulerLifecycle:
         config = RedisConfig()
         scheduler = HeartbeatScheduler(redis_config=config)
 
-        with patch.object(scheduler, "_schedule_next"), patch.object(scheduler, "_poll_loop", return_value=asyncio.sleep(0.1)):
+        async def mock_poll_loop():
+            # Mock async _poll_loop to do nothing
+            while True:
+                await asyncio.sleep(2000)
+
+        with patch.object(scheduler, "_schedule_next"), patch.object(scheduler, "_poll_loop", side_effect=mock_poll_loop):
             scheduler._poll_task = None
             await scheduler.start()
             await scheduler.start()
