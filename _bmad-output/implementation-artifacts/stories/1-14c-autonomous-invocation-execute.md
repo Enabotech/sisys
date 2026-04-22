@@ -1,6 +1,6 @@
 # Story 1.14c: 自主调用循环 - execute 实现
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -292,20 +292,20 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [ ] Subtask 0.1: 定义 Executed 技术事件 Schema（`src/domain/events/execute_events.py`）
-- [ ] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
-- [ ] Subtask 0.3: 定义 ExecuteService 服务接口（`src/domain/services/execute_service.py`）
-- [ ] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
-- [ ] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
-- [ ] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
-- [ ] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
-- [ ] Subtask 0.8: 定义 ExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
-- [ ] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14c.feature`（Dev agent 创建）
-- [ ] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 Executed 技术事件 Schema（`src/domain/events/execute_events.py`）
+- [x] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
+- [x] Subtask 0.3: 定义 ExecuteService 服务接口（`src/domain/services/execute_service.py`）
+- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
+- [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
+- [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
+- [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
+- [x] Subtask 0.8: 定义 ExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
+- [x] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14c.feature`（Dev agent 创建）
+- [x] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -323,9 +323,9 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现 `src/interfaces/sandbox/sandbox_port.py`（端口接口）和 `src/infrastructure/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 SandboxExecutor 端口接口和 DockerSandboxAdapter
-- [ ] Subtask 1.3: 🔄 重构 — 优化沙箱资源限制
+- [x] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 SandboxExecutor 端口接口和 DockerSandboxAdapter
+- [x] Subtask 1.3: 🔄 重构 — 优化沙箱资源限制
 
 #### TDD 循环 [B]：ExecuteService 事件监听
 
@@ -335,15 +335,15 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现 `src/domain/services/execute_service.py` - ExecuteService 类 |
 | 🔄 重构 | 添加类型注解和文档字符串 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 ExecuteService 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 ExecuteService（监听 Routed 事件，执行任务）
-- [ ] Subtask 1.6: 🔄 重构 — 优化事件处理逻辑
+- [x] Subtask 1.4: 🔴 红 — 编写 ExecuteService 失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现 ExecuteService（监听 Routed 事件，执行任务）
+- [x] Subtask 1.6: 🔄 重构 — 优化事件处理逻辑
 
 **完成标准/Definition of Done:**
-- [ ] DockerSandboxAdapter 实现完成（沙箱隔离）
-- [ ] ExecuteService 实现完成
-- [ ] 沙箱隔离 100%（无状态泄漏）
-- [ ] TDD 循环全部通过
+- [x] DockerSandboxAdapter 实现完成（沙箱隔离）
+- [x] ExecuteService 实现完成
+- [x] 沙箱隔离 100%（无状态泄漏）
+- [x] TDD 循环全部通过
 
 ---
 
@@ -361,9 +361,9 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现 `src/domain/entities/checkpoint_snapshot.py` - CheckpointSnapshot 实体 |
 | 🔄 重构 | 优化序列化格式和验证逻辑 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 CheckpointSnapshot 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 CheckpointSnapshot 实体（状态序列化）
-- [ ] Subtask 2.3: 🔄 重构 — 验证快照完整性
+- [x] Subtask 2.1: 🔴 红 — 编写 CheckpointSnapshot 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 CheckpointSnapshot 实体（状态序列化）
+- [x] Subtask 2.3: 🔄 重构 — 验证快照完整性
 
 #### TDD 循环 [B]：RedisSnapshotStore 存储实现
 
@@ -373,9 +373,9 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现 `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore |
 | 🔄 重构 | 添加主从复制支持和 TTL 管理 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 RedisSnapshotStore 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 RedisSnapshotStore（Redis Hash + TTL）
-- [ ] Subtask 2.6: 🔄 重构 — 验证主从复制支持
+- [x] Subtask 2.4: 🔴 红 — 编写 RedisSnapshotStore 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 RedisSnapshotStore（Redis Hash + TTL）
+- [x] Subtask 2.6: 🔄 重构 — 验证主从复制支持
 
 #### TDD 循环 [C]：Executed 事件定义
 
@@ -385,16 +385,16 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现 `src/domain/events/execute_events.py` - Executed 事件类 |
 | 🔄 重构 | 验证事件继承和子事件类型 |
 
-- [ ] Subtask 2.7: 🔴 红 — 编写 Executed 事件失败测试
-- [ ] Subtask 2.8: 🟢 绿 — 实现 Executed 事件 Schema（DocumentProcessed/ToolExecuted/AgentDecided）
-- [ ] Subtask 2.9: 🔄 重构 — 验证事件发布逻辑
+- [x] Subtask 2.7: 🔴 红 — 编写 Executed 事件失败测试
+- [x] Subtask 2.8: 🟢 绿 — 实现 Executed 事件 Schema（DocumentProcessed/ToolExecuted/AgentDecided）
+- [x] Subtask 2.9: 🔄 重构 — 验证事件发布逻辑
 
 **完成标准/Definition of Done:**
-- [ ] CheckpointSnapshot 实现完成
-- [ ] RedisSnapshotStore 实现完成（主从复制 + TTL）
-- [ ] Executed 事件定义完成
-- [ ] 快照延迟 P95<50ms
-- [ ] TDD 循环全部通过
+- [x] CheckpointSnapshot 实现完成
+- [x] RedisSnapshotStore 实现完成（主从复制 + TTL）
+- [x] Executed 事件定义完成
+- [x] 快照延迟 P95<50ms
+- [x] TDD 循环全部通过
 
 ---
 
@@ -412,9 +412,9 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现架构验证逻辑（循环依赖检测、依赖方向检测） |
 | 🔄 重构 | 优化架构验证器 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写架构验证失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现架构验证逻辑
-- [ ] Subtask 3.3: 🔄 重构 — 验证器优化
+- [x] Subtask 3.1: 🔴 红 — 编写架构验证失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现架构验证逻辑
+- [x] Subtask 3.3: 🔄 重构 — 验证器优化
 
 #### TDD 循环 [B]：性能基准测试
 
@@ -424,29 +424,29 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 🟢 绿 | 实现性能优化（沙箱预热、连接池复用） |
 | 🔄 重构 | 性能调优 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写性能基准失败测试
+- [x] Subtask 3.4: 🔴 红 — 编写性能基准失败测试
   - 沙箱启动延迟测试（`test_sandbox_startup_latency`）
   - 状态快照延迟测试（`test_snapshot_latency`）
   - 吞吐量负载测试（`test_execution_throughput`）
   - 执行幂等性测试（`test_execution_idempotency`）
-- [ ] Subtask 3.5: 🟢 绿 — 实现性能优化
+- [x] Subtask 3.5: 🟢 绿 — 实现性能优化
   - 沙箱连接池复用（Docker SDK connection pooling）
   - Redis 连接池配置（`max_connections=50`）
   - 沙箱预热机制（空闲时保持最小容器实例）
-- [ ] Subtask 3.6: 🔄 重构 — 性能调优
+- [x] Subtask 3.6: 🔄 重构 — 性能调优
   - 运行 `pytest-benchmark --compare` 对比优化前后性能
   - 确认 P95 延迟达标
 
 #### 集成测试
 
-- [ ] Subtask 3.7: 创建 `tests/integration/test_execute_integration.py`（端到端执行流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_execute_integration.py`（端到端执行流程）
 
 **完成标准/Definition of Done:**
-- [ ] 六边形架构验证通过（无循环依赖）
-- [ ] 沙箱启动延迟 P95<100ms
-- [ ] 状态快照延迟 P95<50ms
-- [ ] 吞吐量 100 executions/second
-- [ ] 集成测试通过
+- [x] 六边形架构验证通过（无循环依赖）
+- [x] 沙箱启动延迟 P95<100ms
+- [x] 状态快照延迟 P95<50ms
+- [x] 吞吐量 100 executions/second
+- [x] 集成测试通过
 
 ---
 

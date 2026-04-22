@@ -147,6 +147,7 @@
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
 | **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
@@ -155,6 +156,8 @@
 - ❌ Fixture 假设清理顺序（必须显式声明依赖）
 - ❌ asyncio.Lock 使用实例变量
 - ❌ scope=module 的 event_loop fixture
+- ❌ BDD 步骤函数使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
+- ❌ BDD 步骤函数内直接调用 async 函数而不通过 event_loop.run_until_complete()
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
@@ -500,9 +503,10 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.2.0
+**模板版本/Template Version:** 2.3.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-04-21
+**最后更新/Last Updated:** 2026-04-22
 **更新说明:**
-- v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱（禁止删除全局共享资源）；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置；(5) Real Neo4j Client 正确用法；(6) 并行测试验证要求
-- v2.1.0: 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback 清理测试数据；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate；(4) 外部服务必须隔离或使用 mock；(5) 测试数据必须使用唯一标识符
+- v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
+- v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置
+- v2.1.0: 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate
