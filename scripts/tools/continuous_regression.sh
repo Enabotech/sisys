@@ -19,8 +19,11 @@ stop_flag=0
 cleanup() {
     echo ""
     echo ""
-    echo "🛑 Stopping continuous regression after current round..."
+    echo "🛑 Stopping continuous regression..."
     stop_flag=1
+    # Send SIGTERM to child processes if still running
+    [[ -n "$PID1" ]] && kill -TERM $PID1 2>/dev/null || true
+    [[ -n "$PID2" ]] && kill -TERM $PID2 2>/dev/null || true
 }
 trap cleanup SIGINT SIGTERM
 
