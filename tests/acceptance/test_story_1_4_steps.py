@@ -133,31 +133,18 @@ def redis_config() -> RedisConfig:
 
 @pytest.fixture
 def redis_cleaner(redis_config: RedisConfig):
-    """Redis cleaner - runs before and after each test.
+    """Redis cleaner - runs after each test.
 
-    Uses synchronous Redis client to ensure flushdb completes
-    before test proceeds.
+    Only post-test cleanup to avoid clearing data that other
+    fixtures (like session_storage) depend on during the test.
 
-    NOT autouse=True because flushdb clears ALL Redis data,
-    which would interfere with other tests (e.g., story_1.3's
-    idempotency locks) running in parallel.
+    Uses synchronous Redis client to ensure flushdb completes.
     """
-    import redis
-
-    # Pre-test cleanup - synchronous
-    client = redis.Redis(
-        host=redis_config.host,
-        port=redis_config.port,
-        db=redis_config.db,
-        password=redis_config.password,
-        decode_responses=True,
-    )
-    client.flushdb()
-    client.close()
-
     yield
 
     # Post-test cleanup - synchronous
+    import redis
+
     client = redis.Redis(
         host=redis_config.host,
         port=redis_config.port,
