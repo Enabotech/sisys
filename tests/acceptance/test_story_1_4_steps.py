@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-import redis.asyncio as aioredis
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.redis import RedisConfig
@@ -54,20 +53,30 @@ class SessionBDDContext:
 class SemanticCacheTestContext:
     """BDD step 共享 context for semantic cache tests."""
 
+    # Use class variables to track per-instance unique data
+    _instance_counter: int = 0
+    _counter_lock: asyncio.Lock = None  # type: ignore
+
     query_vector: list[float] = field(default_factory=list)
     cached_result: dict = field(default_factory=dict)
+    test_marker: int = 0
 
     def __post_init__(self):
         """Generate unique values per instance, not at class definition time."""
         if not self.query_vector:
-            # Generate unique vector with random base value
-            base = float(uuid.uuid4().int % 100) / 100.0 + 0.1
-            self.query_vector = [base] * 1024
+            # Use counter + uuid to ensure truly unique vector
+            SemanticCacheTestContext._instance_counter += 1
+            counter = SemanticCacheTestContext._instance_counter
+            unique_base = uuid.uuid4().int % 1000
+            # Generate vector where each element depends on counter and position
+            self.query_vector = [float((unique_base + counter + i) % 1000) / 1000.0 for i in range(1024)]
         if not self.cached_result:
             self.cached_result = {
                 "document_id": f"doc-{uuid.uuid4().hex[:8]}",
                 "text": "cached result",
             }
+        if self.test_marker == 0:
+            self.test_marker = SemanticCacheTestContext._instance_counter
 
 
 @pytest.fixture
@@ -123,34 +132,37 @@ def redis_config() -> RedisConfig:
 
 
 @pytest.fixture(autouse=True)
-async def redis_cleaner(redis_config: RedisConfig):
+def redis_cleaner(redis_config: RedisConfig):
     """Redis cleaner - runs before and after each test.
 
-    autouse=True ensures this runs for ALL tests, not just ones
-    that explicitly depend on it.
+    Uses synchronous Redis client to ensure flushdb completes
+    before test proceeds.
     """
-    # Pre-test cleanup
-    pool = aioredis.ConnectionPool(
+    import redis
+
+    # Pre-test cleanup - synchronous
+    client = redis.Redis(
         host=redis_config.host,
         port=redis_config.port,
         db=redis_config.db,
         password=redis_config.password,
         decode_responses=True,
     )
-    try:
-        async with aioredis.Redis(connection_pool=pool) as client:
-            await client.flushdb()
-    finally:
-        await pool.disconnect()
+    client.flushdb()
+    client.close()
 
     yield
 
-    # Post-test cleanup
-    try:
-        async with aioredis.Redis(connection_pool=pool) as client:
-            await client.flushdb()
-    finally:
-        await pool.disconnect()
+    # Post-test cleanup - synchronous
+    client = redis.Redis(
+        host=redis_config.host,
+        port=redis_config.port,
+        db=redis_config.db,
+        password=redis_config.password,
+        decode_responses=True,
+    )
+    client.flushdb()
+    client.close()
 
 
 @pytest.fixture
