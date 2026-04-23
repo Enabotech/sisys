@@ -340,39 +340,18 @@ sisys/
 **关键学习/Key Learnings:**
 
 1. **根据测试场景选择正确的并发测试手段**
-   - **独立脚本/单进程测试：** `asyncio.run()` 是正确选择（创建自己的事件循环）
-   - **pytest-xdist 并行测试 - BDD 步骤函数：** 使用 `event_loop` fixture + `run_until_complete()`
-   - **真正的并发测试：** 在 async 函数内使用 `asyncio.gather()` 测试并发正确性
-   - `asyncio.run()` 本身没问题，问题在于并行测试场景下的使用方式
+   - 独立脚本/单进程测试：`asyncio.run()` 是正确选择
+   - pytest-xdist 并行测试 BDD 步骤函数：使用 `event_loop` fixture + `run_until_complete()`
+   - 真正并发测试：在 async 函数内使用 `asyncio.gather()`
 
 2. **pytest-xdist 并行测试中 asyncio.run() 的风险**
    - pytest-xdist 每个 worker 有独立进程和事件循环
-   - `asyncio.run()` 创建→运行→关闭事件循环
-   - 在并行测试中可能关闭错误循环，导致 "Event loop is closed"
-   - **解决方案：** BDD 步骤函数注入 `event_loop` fixture 参数
+   - `asyncio.run()` 在并行测试中可能关闭错误循环，导致 "Event loop is closed"
+   - 解决方案：BDD 步骤函数注入 `event_loop` fixture 参数
 
-3. **BDD 步骤函数的异步处理模式**
-   ```python
-   # pytest-xdist 并行测试：正确方式
-   @given("调用 SessionStorage.save 保存会话")
-   def given_call_session_save(
-       context: dict,
-       session_storage: RedisSessionStorage,
-       unique_session_id: str,
-       event_loop,  # 注入 pytest-asyncio 的 event_loop
-   ) -> None:
-       async def _save():
-           await session_storage.save(unique_session_id, "agent", {"data": "test"})
-       event_loop.run_until_complete(_save())
-
-   # 单进程测试：asyncio.run() 完全正确
-   result = asyncio.run(async_operation())  # 独立脚本用这个没问题
-   ```
-
-4. **Feature 文件语法要与 steps 实现严格匹配**
+3. **Feature 文件语法要与 steps 实现严格匹配**
    - BDD 场景第一步必须是 `假如`（Given），不能是 `当`（When）
    - 每个步骤文本都必须有对应的步骤函数实现
-   - 建议先用 `pytest --collect-only` 验证步骤解析
 
 **应用到本故事/Applied to This Story:**
 - [ ] 所有 async 步骤函数使用 `event_loop.run_until_complete()` 而非 `asyncio.run()`
