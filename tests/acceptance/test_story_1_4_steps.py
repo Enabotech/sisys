@@ -11,7 +11,6 @@ Prerequisites:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import uuid
 from typing import Any
@@ -106,22 +105,6 @@ def redis_cleanup(redis_config: RedisConfig) -> RedisCleanup:
     return RedisCleanup(redis_config)
 
 
-@pytest.fixture(autouse=True)
-def flush_redis_before_test(redis_config: RedisConfig) -> None:
-    """Flush Redis before each test to ensure isolation."""
-    import redis
-
-    client = redis.Redis(
-        host=redis_config.host,
-        port=redis_config.port,
-        db=redis_config.db,
-        password=redis_config.password,
-        decode_responses=True,
-    )
-    client.flushdb()
-    client.close()
-
-
 # ===================================================================
 # Background Steps
 # ===================================================================
@@ -153,6 +136,7 @@ def given_call_session_save(
     context: dict,
     session_storage: RedisSessionStorage,
     unique_session_id: str,
+    event_loop,
 ) -> None:
     """Save session using SessionStorage."""
     context["session_id"] = unique_session_id
@@ -164,13 +148,14 @@ def given_call_session_save(
             state={"status": "active", "data": "test"},
         )
 
-    asyncio.run(_save())
+    event_loop.run_until_complete(_save())
 
 
 @when("调用 SessionStorage.load 加载会话")
 def when_call_session_load(
     context: dict,
     session_storage: RedisSessionStorage,
+    event_loop,
 ) -> None:
     """Load session using SessionStorage."""
     session_id = context.get("session_id")
@@ -178,8 +163,7 @@ def when_call_session_load(
     async def _load():
         return await session_storage.load(session_id)
 
-    result = asyncio.run(_load())
-    context["loaded_state"] = result
+    context["loaded_state"] = event_loop.run_until_complete(_load())
 
 
 @then("返回的会话状态与保存的一致")
@@ -203,6 +187,7 @@ def given_session_saved(
     context: dict,
     session_storage: RedisSessionStorage,
     unique_session_id: str,
+    event_loop,
 ) -> None:
     """Save a session state."""
     context["session_id"] = unique_session_id
@@ -214,13 +199,14 @@ def given_session_saved(
             state={"status": "active"},
         )
 
-    asyncio.run(_save())
+    event_loop.run_until_complete(_save())
 
 
 @when("调用 SessionStorage.delete 删除会话")
 def when_call_session_delete(
     context: dict,
     session_storage: RedisSessionStorage,
+    event_loop,
 ) -> None:
     """Delete session using SessionStorage."""
     session_id = context.get("session_id")
@@ -228,7 +214,7 @@ def when_call_session_delete(
     async def _delete():
         await session_storage.delete(session_id)
 
-    asyncio.run(_delete())
+    event_loop.run_until_complete(_delete())
 
 
 @then("返回 None")
@@ -249,6 +235,7 @@ def given_session_saved_with_ttl(
     context: dict,
     session_storage: RedisSessionStorage,
     unique_session_id: str,
+    event_loop,
 ) -> None:
     """Save a session state with 1 second TTL."""
     context["session_id"] = unique_session_id
@@ -261,7 +248,7 @@ def given_session_saved_with_ttl(
             ttl=1,
         )
 
-    asyncio.run(_save())
+    event_loop.run_until_complete(_save())
 
 
 @when("推进 fakeredis 时间使 TTL 过期")
@@ -293,6 +280,7 @@ def given_semantic_cache_stored(
     context: dict,
     semantic_cache: RedisSemanticCache,
     unique_cache_key: str,
+    event_loop,
 ) -> None:
     """Store query result in semantic cache."""
     context["cache_key"] = unique_cache_key
@@ -305,7 +293,7 @@ def given_semantic_cache_stored(
             ttl=3600,
         )
 
-    asyncio.run(_set())
+    event_loop.run_until_complete(_set())
     context["query_embedding"] = embedding
 
 
@@ -313,6 +301,7 @@ def given_semantic_cache_stored(
 def when_call_semantic_cache_get(
     context: dict,
     semantic_cache: RedisSemanticCache,
+    event_loop,
 ) -> None:
     """Get from semantic cache using same query vector."""
     embedding = context.get("query_embedding", [0.1, 0.2, 0.3])
@@ -320,7 +309,7 @@ def when_call_semantic_cache_get(
     async def _get():
         return await semantic_cache.get(embedding, threshold=0.9)
 
-    result = asyncio.run(_get())
+    result = event_loop.run_until_complete(_get())
     context["cache_result"] = result
 
 
@@ -348,6 +337,7 @@ def given_semantic_cache_no_match(context: dict) -> None:
 def when_call_semantic_cache_get_miss(
     context: dict,
     semantic_cache: RedisSemanticCache,
+    event_loop,
 ) -> None:
     """Query semantic cache with non-matching vector."""
     different_embedding = [0.9, 0.9, 0.9]
@@ -355,7 +345,7 @@ def when_call_semantic_cache_get_miss(
     async def _get():
         return await semantic_cache.get(different_embedding, threshold=0.9)
 
-    result = asyncio.run(_get())
+    result = event_loop.run_until_complete(_get())
     context["cache_result"] = result
 
 
@@ -386,6 +376,7 @@ def given_inject_metrics_collector(
 def when_execute_cache_hits_and_misses(
     context: dict,
     semantic_cache: RedisSemanticCache,
+    event_loop,
 ) -> None:
     """Execute multiple cache hits and misses."""
     metrics = context.get("metrics")
@@ -404,7 +395,7 @@ def when_execute_cache_hits_and_misses(
             if metrics:
                 metrics.record_cache_miss()
 
-    asyncio.run(_test())
+    event_loop.run_until_complete(_test())
 
 
 @then("查询 EventMetricsCollector.hit_rate")
@@ -435,6 +426,7 @@ def given_agent_posts_message(
     public_blackboard: RedisPublicBlackboard,
     unique_conversation_id: str,
     unique_agent_id: str,
+    event_loop,
 ) -> None:
     """Agent posts a message to blackboard."""
     context["conversation_id"] = unique_conversation_id
@@ -448,7 +440,7 @@ def given_agent_posts_message(
             confidence=0.9,
         )
 
-    version = asyncio.run(_post())
+    version = event_loop.run_until_complete(_post())
     context["version"] = version
 
 
@@ -456,6 +448,7 @@ def given_agent_posts_message(
 def when_call_blackboard_get(
     context: dict,
     public_blackboard: RedisPublicBlackboard,
+    event_loop,
 ) -> None:
     """Get messages from public blackboard."""
     conversation_id = context.get("conversation_id")
@@ -463,7 +456,7 @@ def when_call_blackboard_get(
     async def _get():
         return await public_blackboard.get(conversation_id)
 
-    messages = asyncio.run(_get())
+    messages = event_loop.run_until_complete(_get())
     context["messages"] = messages
 
 
@@ -495,6 +488,7 @@ def given_agent_posts_first_message(
     public_blackboard: RedisPublicBlackboard,
     unique_conversation_id: str,
     unique_agent_id: str,
+    event_loop,
 ) -> None:
     """Agent posts first message."""
     context["conversation_id"] = unique_conversation_id
@@ -508,7 +502,7 @@ def given_agent_posts_first_message(
             confidence=0.9,
         )
 
-    version = asyncio.run(_post())
+    version = event_loop.run_until_complete(_post())
     context["first_version"] = version
 
 
@@ -516,6 +510,7 @@ def given_agent_posts_first_message(
 def when_agent_posts_again(
     context: dict,
     public_blackboard: RedisPublicBlackboard,
+    event_loop,
 ) -> None:
     """Agent posts message again."""
     conversation_id = context.get("conversation_id")
@@ -529,7 +524,7 @@ def when_agent_posts_again(
             confidence=0.85,
         )
 
-    version = asyncio.run(_post())
+    version = event_loop.run_until_complete(_post())
     context["second_version"] = version
 
 
@@ -561,6 +556,7 @@ def given_redis_unavailable(context: dict) -> None:
 @when("调用 SessionStorage.save 保存会话")
 def when_call_session_save_degraded(
     context: dict,
+    event_loop,
 ) -> None:
     """Try to save session when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
@@ -569,7 +565,7 @@ def when_call_session_save_degraded(
     async def _save():
         return await storage.save("session-test", "agent-test", {"data": "test"})
 
-    result = asyncio.run(_save())
+    result = event_loop.run_until_complete(_save())
     context["save_result"] = result
 
 
@@ -588,6 +584,7 @@ def test_semantic_cache_graceful_degradation():
 @when("调用 SemanticCache.get 查询缓存")
 def when_call_semantic_cache_get_degraded(
     context: dict,
+    event_loop,
 ) -> None:
     """Try to get from cache when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
@@ -596,7 +593,7 @@ def when_call_semantic_cache_get_degraded(
     async def _get():
         return await cache.get([0.1, 0.2, 0.3], threshold=0.9)
 
-    result = asyncio.run(_get())
+    result = event_loop.run_until_complete(_get())
     context["cache_result"] = result
 
 
@@ -616,6 +613,7 @@ def test_public_blackboard_graceful_degradation():
 @when("调用 PublicBlackboard.post 发布消息")
 def when_call_blackboard_post_degraded(
     context: dict,
+    event_loop,
 ) -> None:
     """Try to post to blackboard when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
@@ -628,7 +626,7 @@ def when_call_blackboard_post_degraded(
             content={"text": "test"},
         )
 
-    result = asyncio.run(_post())
+    result = event_loop.run_until_complete(_post())
     context["post_result"] = result
 
 
@@ -686,6 +684,7 @@ def given_multiple_keys_in_namespace(
     context: dict,
     session_storage: RedisSessionStorage,
     redis_cleanup: RedisCleanup,
+    event_loop,
 ) -> None:
     """Create multiple keys in a namespace."""
     prefix = f"test-{uuid.uuid4().hex[:8]}"
@@ -699,7 +698,7 @@ def given_multiple_keys_in_namespace(
                 state={"index": i},
             )
 
-    asyncio.run(_setup())
+    event_loop.run_until_complete(_setup())
     context["cleanup_prefix"] = prefix
     context["cleanup_namespace"] = "session"
 
@@ -708,6 +707,7 @@ def given_multiple_keys_in_namespace(
 def when_call_cleanup_namespace(
     context: dict,
     redis_cleanup: RedisCleanup,
+    event_loop,
 ) -> None:
     """Call cleanup_namespace to delete keys."""
     namespace = context.get("cleanup_namespace", "session")
@@ -715,7 +715,7 @@ def when_call_cleanup_namespace(
     async def _cleanup():
         return await redis_cleanup.cleanup_namespace(namespace)
 
-    deleted_count = asyncio.run(_cleanup())
+    deleted_count = event_loop.run_until_complete(_cleanup())
     context["deleted_count"] = deleted_count
 
 

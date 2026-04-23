@@ -1777,14 +1777,48 @@ Agent 工作目录（Agent 配置集）
 
 **存储设计原则**：
 - L0 文件系统存储**实际记忆内容**（.md 文件）
-- L2 PostgreSQL 存储**元数据索引**（name/description/type/mtime/path）
+- L2 PostgreSQL 存储**元数据索引和变更历史**
 - L1-L5 按需响应 L0 驱动，不存储实际记忆内容
+
+**L2 PostgreSQL 表设计**：
+```sql
+-- 记忆元数据索引（当前状态快照）
+CREATE TABLE memory_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL,  -- 'user'/'feedback'/'project'/'reference'
+    path VARCHAR(500) NOT NULL,  -- 文件路径，如 'feedback_bun_npm.md'
+    version INTEGER NOT NULL DEFAULT 1,
+    mtime TIMESTAMP NOT NULL,     -- 文件修改时间
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(name)
+);
+
+-- 记忆变更历史（append-only，不可变）
+CREATE TABLE memory_change_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    memory_name VARCHAR(255) NOT NULL,
+    version INTEGER NOT NULL,
+    changed_at TIMESTAMP DEFAULT NOW(),
+    changed_by VARCHAR(255),  -- user_id 或 'system'
+    change_type VARCHAR(50),  -- 'create'/'update'/'delete'
+    changed_fields JSONB,     -- {"name": ["旧值", "新值"], "content": [...]}
+    diff_summary TEXT,         -- 变更摘要，如 "name: foo -> bar"
+    archived_ref VARCHAR(500)  -- L4 归档引用（可选）
+);
+-- 备注：memory_change_history 是 append-only，用于追溯，不存储当前状态
+```
 
 | 记忆类型 | 存储层 | 说明 |
 |---------|--------|------|
-| 记忆文件内容 | L0 文件系统 | `~/.sisys/memory/*.md` |
-| MEMORY.md 索引 | L0 文件系统 | 索引入口，最多 200 行 |
-| 记忆元数据索引 | L2 PostgreSQL | name/description/type/mtime/path |
+| 记忆文件内容（private） | L0 文件系统 | `~/.sisys/memory/*.md` |
+| 记忆文件内容（team） | L0 文件系统 | `~/.sisys/memory/team/*.md`（团队共享） |
+| MEMORY.md 索引（private） | L0 文件系统 | 索引入口，最多 200 行 |
+| MEMORY.md 索引（team） | L0 文件系统 | `~/.sisys/memory/team/MEMORY.md`，团队共享 |
+| 记忆元数据索引 | L2 memory_metadata | name/description/type/path/version/mtime（当前状态） |
+| 记忆变更历史 | L2 memory_change_history | 每次变更的 diff（历史追溯） |
 | 记忆文件内容缓存 | L1 Redis | 高频访问加速 |
 | 记忆文件 embedding | L3 Qdrant | 文件>500时启用向量检索 |
 | Checkpoint 证据包 | L4 MinIO WORM | 7年归档 |
@@ -1792,13 +1826,36 @@ Agent 工作目录（Agent 配置集）
 | Agent 配置集 | L0 文件系统 | 启动时读取 |
 | Agent 会话状态 | L1 Redis | 24h-30d TTL |
 
+**多租户隔离说明**：
+- private 记忆：仅当前用户可见，存储在 `~/.sisys/memory/` 根目录
+- team 记忆：项目团队共享，存储在 `~/.sisys/memory/team/`
+- 两者的 MEMORY.md 索引独立，team 记忆有独立的 entrypoint
+- RBAC 校验在 L2 PostgreSQL 层执行，team 成员有读取权限，private 仅自己可写
+
 #### 11.2.6 管理流程
 
 | 操作 | 触发时机 | 执行动作 |
 |------|---------|---------|
 | **系统记忆保存** | 用户确认/纠正/自我介绍 | 写入 `~/.sisys/memory/` 独立 .md + 更新系统 MEMORY.md |
 | **系统记忆读取** | 会话开始/上下文需要 | 读取系统 MEMORY.md → 加载相关 .md → 注入上下文 |
+| **系统记忆更新** | 用户纠正/修改记忆 | 写入新版本 + version 递增 + mtime 更新 + 记录变更历史 |
+| **系统记忆删除** | 用户明确要求"忘记这个" | 删除 .md 文件 + 从 MEMORY.md 移除索引 + 记录 delete 历史 |
+| **版本冲突处理** | 并发更新同一记忆 | 抛出 VersionConflictError，用户确认后强制覆盖（version 递增） |
+| **多用户并发冲突** | 多用户同时修改同一记忆 | 后写入者检测到 version 不匹配，等待或强制覆盖 |
 | **Agent 配置集** | Agent 启动 | 一次性加载，运行时存在于 LLM 上下文 |
+
+**多用户并发冲突处理策略**：
+- **乐观锁**：写入时检查 version，version 不匹配则拒绝
+- **冲突解决**：用户确认后强制覆盖（version 递增，change_type='force_update'）
+- **历史保留**：覆盖前将旧版本 diff 记录到 memory_change_history
+- **审计追溯**：所有冲突解决均记录 changed_by 和 diff_summary
+
+**记忆更新历史记录（MVP 阶段）**：
+- 记忆文件只保留当前状态（Claude Code 模式）
+- 版本号（version）用于乐观锁冲突检测
+- 变更时间通过 mtime 追踪，用于 memoryAge 新鲜度警告
+- 变更历史通过 L2 PostgreSQL `memory_change_history` 表记录每次变更的 diff
+- Checkpoint 快照提供完整的会话状态历史追溯
 
 #### 11.2.7 核心约定
 
@@ -1808,10 +1865,15 @@ Agent 工作目录（Agent 配置集）
 name: {{memory name}}
 description: {{one-line description}}
 type: {{user, feedback, project, reference}}
+version: {{递增版本号}}  # 乐观锁，用于冲突检测
+created_at: {{ISO时间戳}}
+updated_at: {{ISO时间戳}}  # 每次更新修改
 ---
 
 {{memory content}}
 ```
+
+**说明**：`memory_change_history` 表结构见 11.2.5 L2 PostgreSQL 表设计。
 
 **Agent 配置集文件**（无独立 MEMORY.md 索引，内容来自系统级）：
 - IDENTITY.md / CODE.md / SOUL.md / TOOLS.md / USER.md / MEMORY.md / HEARTBEAT.md
@@ -1828,16 +1890,62 @@ type: {{user, feedback, project, reference}}
     │
     ├─→ L0 文件系统
     │   ├── 写入 ~/.sisys/memory/xxx.md（实际内容）
+    │   ├── version 递增
     │   └── 追加到 MEMORY.md 索引
     │
     ├─→ L2 PostgreSQL（异步）
-    │   └── 写入元数据索引（name/description/type/mtime/path）
+    │   ├── 写入元数据索引（name/description/type/mtime/path）
+    │   └── 记录 memory_change_history（diff + changed_fields）
     │
     ├─→ L3 Qdrant（异步，文件>500时启用）
     │   └── 生成 embedding（Dense+Sparse）
     │
     ├─→ L5 Neo4j（可选，按需）
     │   └── 构建关系（project→reference）
+    │
+    └─→ 完成
+```
+
+**更新流程**：
+```
+用户修改记忆（如纠正错误偏好）
+    │
+    ├─→ L0 读取当前版本
+    │   ├── 检查 version 冲突
+    │   └── 若冲突，抛出 VersionConflictError
+    │
+    ├─→ L0 写入新版本
+    │   ├── version + 1
+    │   ├── updated_at 更新
+    │   └── 保持同一文件名
+    │
+    ├─→ L2 PostgreSQL（异步）
+    │   ├── UPSERT memory_metadata（version + 1, updated_at = NOW()）
+    │   └── 记录 memory_change_history（change_type='update'）
+    │
+    └─→ 完成
+```
+
+**删除流程**：
+```
+用户明确要求"忘记这个"（如说"不要记住这个"）
+    │
+    ├─→ L0 文件系统
+    │   ├── 删除 ~/.sisys/memory/xxx.md 文件
+    │   └── 从 MEMORY.md 索引移除对应行
+    │
+    ├─→ L1 Redis（异步）
+    │   └── 删除缓存（如 redis.del("memory:xxx.md")）
+    │
+    ├─→ L2 PostgreSQL（异步）
+    │   ├── INSERT memory_change_history（change_type='delete'，记录最终状态）
+    │   └── DELETE FROM memory_metadata WHERE name = 'xxx'
+    │
+    ├─→ L3 Qdrant（异步）
+    │   └── 删除 embedding（如 qdrant.delete(collection='memory', point_id=xxx)）
+    │
+    ├─→ L5 Neo4j（异步，可选）
+    │   └── 删除关系节点（如 MATCH (n {name:'xxx'}) DELETE n）
     │
     └─→ 完成
 ```
@@ -1899,7 +2007,7 @@ type: {{user, feedback, project, reference}}
        description: User prefers bun over npm for package management
        type: feedback
        ---
-       
+
        User prefers bun over npm.
 
 3. L0 更新索引
@@ -1908,8 +2016,12 @@ type: {{user, feedback, project, reference}}
 
 4. L2 异步同步
    └── INSERT INTO memory_metadata
-       (name, description, type, mtime, path)
-       VALUES ('bun over npm', '...', 'feedback', NOW(), 'feedback_bun_npm.md')
+       (name, description, type, mtime, path, version, created_at, updated_at)
+       VALUES ('bun over npm', 'User prefers bun', 'feedback', NOW(), 'feedback_bun_npm.md', 1, NOW(), NOW())
+
+   INSERT INTO memory_change_history
+       (memory_name, version, changed_at, changed_by, change_type, changed_fields, diff_summary)
+       VALUES ('bun over npm', 1, NOW(), 'user:xxx', 'create', '{"name": [null, "bun over npm"], "type": [null, "feedback"]}', 'create memory: bun over npm')
 
 5. L3 异步向量化（若文件>500）
    └── 发送至向量化队列
