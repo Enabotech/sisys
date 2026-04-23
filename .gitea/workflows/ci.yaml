@@ -286,12 +286,12 @@ jobs:
           source ./.env
           set +a
           # Override HOST variables to use host.docker.internal for CI
-          # export REDIS_HOST=host.docker.internal
-          # export POSTGRES_HOST=host.docker.internal
-          # export QDRANT_HOST=host.docker.internal
-          # export MINIO_HOST=host.docker.internal
-          # export NEO4J_HOST=host.docker.internal
-          # export RABBITMQ_HOST=host.docker.internal
+          export REDIS_HOST=host.docker.internal
+          export POSTGRES_HOST=host.docker.internal
+          export QDRANT_HOST=host.docker.internal
+          export MINIO_HOST=host.docker.internal
+          export NEO4J_HOST=host.docker.internal
+          export RABBITMQ_HOST=host.docker.internal
           mkdir -p reports/integration
           poetry run pytest tests/integration tests/integration_real tests/acceptance \
             --junitxml=reports/integration/integration-tests.xml \
