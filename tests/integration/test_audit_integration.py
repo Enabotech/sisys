@@ -64,15 +64,19 @@ def sync_engine(pg_config, request):
     """Create synchronous engine for setup/teardown with worker-specific schema."""
     schema = get_schema_name()
     url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
-    engine = create_engine(url, echo=False)
+    engine = create_engine(
+        url,
+        echo=False,
+        connect_args={"options": f"-csearch_path={schema}"},
+    )
 
     # Create schema for this worker
     with engine.connect() as conn:
         conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
         conn.commit()
 
-        # Create tables in this schema
+    # Create tables using explicit schema prefix
+    with engine.connect() as conn:
         conn.execute(
             text(
                 f"""
@@ -122,6 +126,22 @@ def sync_engine(pg_config, request):
     with engine.connect() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
+    engine.dispose()
+
+
+@pytest.fixture(scope="module")
+def async_engine(pg_config, request):
+    """Create async engine for tests with worker-specific schema."""
+    schema = get_schema_name()
+    url = (
+        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
+    )
+    engine = create_async_engine(
+        url,
+        echo=False,
+        connect_args={"server_settings": {"search_path": f"{schema},public"}},
+    )
+    yield engine
     engine.dispose()
 
 
