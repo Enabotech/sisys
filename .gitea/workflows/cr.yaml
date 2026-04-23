@@ -134,6 +134,8 @@ jobs:
 
       - name: 解析配置
         id: parse_config
+        env:
+          INPUT_FAIL_FAST: ${{ github.event.inputs.fail_fast }}
         run: |
           # 解析输入参数，使用默认值（与 ci.yaml 保持一致的模式）
           TEST_DIRS="${{ github.event.inputs.test_dirs || env.DEFAULT_TEST_DIRS }}"
@@ -142,7 +144,9 @@ jobs:
           MODE="${{ github.event.inputs.mode || env.DEFAULT_MODE }}"
           MAX_ROUNDS="${{ github.event.inputs.max_rounds || env.DEFAULT_MAX_ROUNDS }}"
           INTERVAL="${{ github.event.inputs.interval || env.DEFAULT_INTERVAL }}"
-          if ${{ github.event.inputs.fail_fast || false }}; then
+
+          # 正确处理布尔值（workflow_dispatch boolean 输入是字符串 "true"/"false"）
+          if [ "$INPUT_FAIL_FAST" = "true" ]; then
             FAIL_FAST="true"
           else
             FAIL_FAST="false"
@@ -153,7 +157,7 @@ jobs:
             FAIL_FAST="true"
           fi
 
-          # 输出配置（使用 ::set-output 语法）
+          # 输出配置
           echo "test_dirs=$TEST_DIRS" >> $GITHUB_OUTPUT
           echo "processes=$PROCESSES" >> $GITHUB_OUTPUT
           echo "threads=$THREADS" >> $GITHUB_OUTPUT
@@ -189,145 +193,35 @@ jobs:
     runs-on: gpu
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root
+      options: --user root --add-host=host.docker.internal:host-gateway
     needs: setup
     timeout-minutes: 30
 
-    services:
-      redis:
-        image: redis:7.2-alpine
-        ports:
-          - "6380:6379"
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 3
-
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: sisys
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres   # pragma: allowlist secret
-        ports:
-          - "5433:5432"
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 3
-
-      qdrant:
-        image: qdrant/qdrant:v1.7.1
-        ports:
-          - "6334:6333"
-          - "6335:6334"
-        options: >-
-          --health-cmd "wget -qO- http://localhost:6333/healthz"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin   # pragma: allowlist secret
-        ports:
-          - "9002:9000"
-          - "9003:9001"
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-        args: server /data --console-address ":9001"
-
-      neo4j:
-        image: neo4j:5.15
-        env:
-          NEO4J_AUTH: neo4j/password123
-          NEO4J_PLUGINS: '["apoc"]'
-        ports:
-          - "7475:7474"
-          - "7688:7687"
-        options: >-
-          --health-cmd "curl -sf http://localhost:7474/"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
-
-      rabbitmq:
-        image: rabbitmq:3.13-management-alpine
-        env:
-          RABBITMQ_DEFAULT_USER: guest
-          RABBITMQ_DEFAULT_PASS: guest
-        ports:
-          - "5673:5672"
-          - "15673:15672"
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 3
-
     steps:
-      - name: 等待服务就绪
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 启动测试服务
+        shell: bash
         run: |
-          echo "等待服务启动（使用 services 自带健康检查）..."
-          # services 容器自带 --health-cmd，Actions 会自动等待 healthy 状态
-          # 这里额外等待确保容器完全启动
+          set -a
+          source ./.env
+          set +a
+          docker network create sisys-network 2>/dev/null || true
+          docker compose -f ./deploy/app/docker-compose.yml up -d
+
+          total=$(docker compose -f ./deploy/app/docker-compose.yml ps --services | wc -l)
+          echo "检测到 $total 个服务，等待所有服务健康..."
           for i in {1..60}; do
-            READY=0
-
-            # 检查 Redis
-            if nc -z localhost 6380 && redis-cli -p 6380 ping > /dev/null 2>&1; then
-              echo "✅ Redis 已就绪"
-              READY=$((READY + 1))
+            healthy=$(docker compose -f ./deploy/app/docker-compose.yml ps 2>/dev/null | grep -c -i '\(healthy\)' || true)
+            if [ "$healthy" -ge "$total" ]; then
+              echo "✅ 所有服务已就绪 ($healthy/$total)"
+              break
             fi
-
-            # 检查 PostgreSQL
-            if nc -z localhost 5433 && pg_isready -p 5433 -U postgres > /dev/null 2>&1; then
-              echo "✅ PostgreSQL 已就绪"
-              READY=$((READY + 1))
-            fi
-
-            # 检查 Qdrant
-            if curl -sf http://localhost:6334/healthz > /dev/null 2>&1; then
-              echo "✅ Qdrant 已就绪"
-              READY=$((READY + 1))
-            fi
-
-            # 检查 MinIO
-            if curl -sf http://localhost:9002/minio/health/live > /dev/null 2>&1; then
-              echo "✅ MinIO 已就绪"
-              READY=$((READY + 1))
-            fi
-
-            # 检查 Neo4j
-            if nc -z localhost 7475 && curl -sf http://localhost:7475/ > /dev/null 2>&1; then
-              echo "✅ Neo4j 已就绪"
-              READY=$((READY + 1))
-            fi
-
-            # 检查 RabbitMQ
-            if nc -z localhost 5673 && rabbitmq-diagnostics -q ping > /dev/null 2>&1; then
-              echo "✅ RabbitMQ 已就绪"
-              READY=$((READY + 1))
-            fi
-
-            if [ "$READY" -ge 6 ]; then
-              echo ""
-              echo "🎉 所有服务已就绪！"
-              exit 0
-            fi
-
-            echo "等待服务... ($i/60) - 当前就绪: $READY/6"
+            echo "等待服务健康... ($i/60) - 当前: $healthy/$total"
             sleep 3
           done
-
-          echo "⚠️ 部分服务可能未就绪，继续执行..."
+          docker compose -f ./deploy/app/docker-compose.yml ps
 
   # ===========================================================================
   # 阶段 3: 运行持续回归测试
@@ -366,30 +260,23 @@ jobs:
 
       - name: 配置测试环境
         run: |
-          # 加载项目根目录 .env 文件（与 ci.yaml 保持一致）
+          # 与 ci.yaml 保持一致：从 .env 加载环境变量
           set -a
           source ./.env
           set +a
 
-          # 覆盖为 CI 环境需要的 localhost 地址（services job 使用 localhost 端口映射）
-          export REDIS_HOST=localhost
-          export REDIS_PORT=6380
-          export POSTGRES_HOST=localhost
-          export POSTGRES_PORT=5433
-          export QDRANT_HOST=localhost
-          export QDRANT_PORT=6334
-          export QDRANT_GRPC_PORT=6335
-          export MINIO_HOST=localhost
-          export MINIO_API_PORT=9002
-          export MINIO_CONSOLE_PORT=9003
-          export NEO4J_HOST=localhost
-          export NEO4J_HTTP_PORT=7475
-          export NEO4J_BOLT_PORT=7688
-          export RABBITMQ_HOST=localhost
-          export RABBITMQ_PORT=5673
-          export RABBITMQ_MGMT_PORT=15673
+          # CI 环境标识，让 environments.py 自动使用测试端口
           export SISYS_TEST_ENV=ci
           export SISYS_USE_TEST_PORTS=true
+
+          # 使用 host.docker.internal 访问宿主机上由 docker compose 映射的端口
+          # 与 ci.yaml 集成测试保持一致
+          export REDIS_HOST=host.docker.internal
+          export POSTGRES_HOST=host.docker.internal
+          export QDRANT_HOST=host.docker.internal
+          export MINIO_HOST=host.docker.internal
+          export NEO4J_HOST=host.docker.internal
+          export RABBITMQ_HOST=host.docker.internal
 
           # 从 setup job 获取配置
           TEST_DIRS="${{ needs.setup.outputs.test_dirs }}"
@@ -474,13 +361,15 @@ jobs:
             FAILED_PROCS=()
 
             for ((i=1; i<=PROCESSES; i++)); do
-              # 轮转分配测试目录（每轮重新分配，确保均衡）
-              DIR_INDEX=$(( (i - 1) % ${#TEST_DIR_ARRAY[@]} ))
-              TEST_DIR="${TEST_DIR_ARRAY[$DIR_INDEX]}"
+              # 每行分配一个测试目录（支持重复以充分利用多进程）
+              # 当目录数 < 进程数时，某些目录会被分配给多个进程
+              ROW=$(( (i - 1) / ${#TEST_DIR_ARRAY[@]} ))
+              COL=$(( (i - 1) % ${#TEST_DIR_ARRAY[@]} ))
+              TEST_DIR="${TEST_DIR_ARRAY[$COL]}"
 
               LOG_FILE="${LOG_DIR}/round${ROUND}_proc${i}.log"
 
-              echo "进程 $i -> 测试: $TEST_DIR (日志: $LOG_FILE)"
+              echo "进程 $i -> 测试: $TEST_DIR (行$ROW)"
 
               # 后台运行测试
               poetry run pytest "$TEST_DIR" -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
@@ -636,7 +525,6 @@ jobs:
 
       - name: 下载日志
         uses: actions/download-artifact@v4
-        if: needs.regression.result != 'skipped'
         with:
           name: regression-logs-${{ needs.setup.outputs.timestamp }}
           path: /tmp/regression-logs
