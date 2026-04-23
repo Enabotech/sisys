@@ -49,8 +49,7 @@ env:
   POETRY_VERSION: "2.3.2"
 
   # 测试配置 - 让 environments.py 自动检测为 CI 环境
-  # SISYS_TEST_ENV: ci
-  SISYS_TEST_ENV: LOCAL
+  SISYS_TEST_ENV: ci
   SISYS_USE_TEST_PORTS: "true"
 
   # 测试服务主机地址（使用 docker compose 服务名）
@@ -287,12 +286,12 @@ jobs:
           source ./.env
           set +a
           # Override HOST variables to use host.docker.internal for CI
-          export REDIS_HOST=host.docker.internal
-          export POSTGRES_HOST=host.docker.internal
-          export QDRANT_HOST=host.docker.internal
-          export MINIO_HOST=host.docker.internal
-          export NEO4J_HOST=host.docker.internal
-          export RABBITMQ_HOST=host.docker.internal
+          # export REDIS_HOST=host.docker.internal
+          # export POSTGRES_HOST=host.docker.internal
+          # export QDRANT_HOST=host.docker.internal
+          # export MINIO_HOST=host.docker.internal
+          # export NEO4J_HOST=host.docker.internal
+          # export RABBITMQ_HOST=host.docker.internal
           mkdir -p reports/integration
           poetry run pytest tests/integration tests/integration_real tests/acceptance \
             --junitxml=reports/integration/integration-tests.xml \
