@@ -1328,6 +1328,12 @@ As a **存储工程师**,
 I want **实现 Redis 高速缓存层（会话状态、语义缓存、公共黑板）**,
 So that **支持低延迟会话管理和语义缓存**。
 
+**L1 Redis 缓存职责说明**：
+- **会话状态缓存**：Agent 会话状态（TTL 24h-30d），由 Story 6.3 Checkpoint 写入
+- **语义缓存**：RAG 检索加速（相似度>0.9 命中，TTL 24h），由 Epic 3 实现
+- **公共黑板**：多 Agent 共享中间状态（TTL 1h），由 Epic 5 Agent 协作写入
+- **注意**：记忆系统 L1 缓存由 Story 1.15b 独立管理（memory:xxx key）
+
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
@@ -1989,13 +1995,15 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** 用户通过 CLI 执行 `sisys memory save "记住以后用 bun"`
+**Given** 用户通过 CLI 执行以下命令：
+  - private 记忆：`sisys memory save "记住以后用 bun" --type feedback`
+  - group 记忆：`sisys memory save "记住团队用 docker" --type feedback --group team-A`
 **When** 六层存储协同机制执行
 **Then** 执行步骤：
-  1. 验证用户 RBAC 权限
-  2. 写入 ~/.sisys/memory/feedback_bun.md（实际内容）
-  3. 更新 MEMORY.md 索引（追加一行）
-  4. 异步写入 memory_metadata（version=1, mtime=NOW()）
+  1. 验证用户 RBAC 权限（private 验证所有者，group 验证成员）
+  2. 写入记忆文件（private: ~/.sisys/memory/*.md, group: ~/.sisys/memory/group/*.md）
+  3. 更新 MEMORY.md 索引（private 或 group 独立索引）
+  4. 异步写入 memory_metadata（version=1, mtime=NOW(), owner/group_id）
   5. 异步写入 memory_change_history（change_type='create'）
   6. L1 Redis 缓存新记忆内容（TTL 24h-30d）
 **And** L0→L2 元数据同步延迟 <100ms
