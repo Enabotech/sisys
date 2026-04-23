@@ -268,26 +268,16 @@ def test_ac2_rabbitmq_agentdecided():
 
 @given("RabbitMQ 服务可用")
 def rabbitmq_available(rabbitmq_config: RabbitMQConfig) -> None:
-    """Check RabbitMQ is available."""
-    import pika
+    """Check RabbitMQ is available via socket connection."""
+    import socket
 
     try:
-        credentials = pika.PlainCredentials(
-            rabbitmq_config.username,
-            rabbitmq_config.password,
-        )
-        parameters = pika.ConnectionParameters(
-            host=rabbitmq_config.host,
-            port=rabbitmq_config.port,
-            virtual_host=rabbitmq_config.virtual_host,
-            credentials=credentials,
-            connection_attempts=1,
-            retry_delay=0,
-            socket_timeout=5,
-        )
-        connection = pika.BlockingConnection(parameters)
-        connection.close()
-    except pika.exceptions.AMQPConnectionError:
+        with socket.create_connection(
+            (rabbitmq_config.host, rabbitmq_config.port),
+            timeout=5,
+        ):
+            pass
+    except OSError:
         pytest.skip(f"RabbitMQ not available at {rabbitmq_config.host}:{rabbitmq_config.port}")
 
 
