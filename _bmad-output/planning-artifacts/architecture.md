@@ -1598,7 +1598,7 @@ class WormArchiver:
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
 | **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding_ref, blob_ref, graph_ref |
-| **MemoryMetadata** | 用户记忆元数据索引 | L2 | name, description, type, path, version, mtime |
+| **MemoryMetadata** | 用户记忆元数据索引 | L2 | name, description, type, path, version, mtime, **owner, group_id** |
 | **MemoryChangeHistory** | 用户记忆变更历史 | L2 | memory_name, version, change_type, changed_fields, diff_summary |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
@@ -1626,6 +1626,9 @@ class WormArchiver:
 | **RoutingDecided** | 路由决策完成 | RabbitMQ | WORM 归档 |
 | **IsolationLevelSwitched** | 隔离等级切换 | RabbitMQ | WORM 归档 |
 | **ArbitrationCompleted** | SYS AGENT 裁决完成 | RabbitMQ | 7 年存储 |
+| **MemoryChanged** | 记忆系统变更（保存/更新/删除） | RabbitMQ | 7 年存储 |
+| **StrategicDeviationWarning** | 战略偏差预警触发 | RabbitMQ | 7 年存储 |
+| **HeartbeatTriggered** | 心跳唤醒事件触发 | RabbitMQ | 7 年存储 |
 
 ### 10.2 事件 Schema 标准
 
@@ -1676,6 +1679,7 @@ CREATE TABLE event_outbox (
 | IsolationLevelSwitched | IsolationSwitchedListener | 公共黑板权限更新、协作状态同步 | [4] 隔离切换事件流转 |
 | CheckpointRecovered | CheckpointRecoveredListener | 档案库版本更新、分支管理 | [6] Checkpoint 恢复事件流转 |
 | RoutingDecided | RoutingDecidedListener | 路由决策日志存储、成本监控 | [7] 路由决策事件流转 |
+| MemoryChanged | MemoryChangedListener | 元数据索引更新、历史记录、缓存失效 | - |
 
 **幂等性保证：**
 

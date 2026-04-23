@@ -86,28 +86,28 @@ Gitea Pod
 
 ### 检查 Traefik 状态
 ```bash
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl get pods -n traefik
+echo "your-pwd" | sudo -S k3s kubectl get pods -n traefik
 ```
 
 ### 检查 Gitea 状态
 ```bash
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl get pods -n gitea
+echo "your-pwd" | sudo -S k3s kubectl get pods -n gitea
 ```
 
 ### 检查 Ingress 状态
 ```bash
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl get ingress -n gitea
+echo "your-pwd" | sudo -S k3s kubectl get ingress -n gitea
 ```
 
 ### 查看 Traefik 日志
 ```bash
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl logs -n traefik -l app.kubernetes.io/name=traefik --tail=50
+echo "your-pwd" | sudo -S k3s kubectl logs -n traefik -l app.kubernetes.io/name=traefik --tail=50
 ```
 
 ### 测试内部连接
 ```bash
 # 从 Traefik Pod 测试到 Gitea 的连接
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl exec -n traefik $(sudo k3s kubectl get pod -n traefik -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].metadata.name}') -- curl -I http://gitea-http.gitea.svc.cluster.local:3000
+echo "your-pwd" | sudo -S k3s kubectl exec -n traefik $(sudo k3s kubectl get pod -n traefik -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].metadata.name}') -- curl -I http://gitea-http.gitea.svc.cluster.local:3000
 ```
 
 ---

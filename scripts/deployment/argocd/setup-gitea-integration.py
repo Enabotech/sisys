@@ -26,7 +26,7 @@ TOKEN_NAME = f"argocd-webhook-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}
 
 def get_sudo_password():
     """获取 sudo 密码"""
-    return "H9yglwH7sdyj"
+    return "your-pwd"
 
 
 def run_kubectl(args):

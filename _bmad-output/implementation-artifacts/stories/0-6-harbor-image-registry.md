@@ -1395,7 +1395,7 @@ job.batch/create-robot-account created (dry run)
 
 1. **立即执行:** 应用 NetworkPolicy 配置
    ```bash
-   echo 'H9yglwH7sdyj' | sudo -S kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml
+   echo 'your-pwd' | sudo -S kubectl apply -f deploy/kubernetes/harbor/networkpolicy.yaml
    ```
 
 2. **Story 0.7 完成后:** 验证 Harbor → ArgoCD 集成 (AC-7)

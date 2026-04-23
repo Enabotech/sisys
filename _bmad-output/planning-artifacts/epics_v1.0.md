@@ -1861,6 +1861,13 @@ As a **系统架构师**,
 I want **实现 LLM 上下文压缩机制**,
 So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下文爆炸**。
 
+**核心实现内容：**
+- **压缩前持久化**：遵循系统公理二，压缩前必须执行持久化笔记步骤（PersistentNoteTaker）
+- **两种记忆机制**：
+  - StrategicArchive：Checkpoint 持久化（自动），由 PersistentNoteTaker 写入
+  - MemoryMetadata/MemoryChangeHistory：用户主动记忆（手动），由用户确认后写入
+- **压缩率要求**：≥70%（50K tokens → ~2K tokens）
+
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
@@ -1868,7 +1875,8 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
 1. **架构测试**
    - [ ] 上下文压缩测试 - 验证压缩机制
    - [ ] 压缩率测试 - 验证压缩率≥70%
-   - [ ] 持久化测试 - 验证持久化笔记
+   - [ ] 持久化测试 - 验证 PersistentNoteTaker 持久化笔记
+   - [ ] StrategicArchive vs MemoryMetadata 职责分离测试
 
 2. **性能要求**
    - [ ] 压缩率≥70%
@@ -1894,7 +1902,8 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
 **Given** LLM 任务执行需要访问记忆
 **When** 上下文压缩机制执行
 **Then** LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
-**And** 压缩前执行持久化笔记步骤（存储至 Story 1.15b）
+**And** 压缩前执行持久化笔记步骤（PersistentNoteTaker → StrategicArchive）
+**And** MemoryChanged 事件发布，触发 L2 元数据同步
 
 ### Story 1.15b: 外部化记忆 - L0 记忆入口 + 六层存储协同实现
 
@@ -1903,22 +1912,32 @@ I want **实现 L0 MEMORY.md 记忆入口与 L1-L5 六层存储协同**,
 So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 
 **核心实现内容：**
-- **L0 MEMORY.md**：索引入口、路由策略、文本扫描
-- **六层协同**：L0→L1→L2→L3→L4→L5 单向依赖链
+- **L0 MEMORY.md**：索引入口（最多 200 行）、路由策略、文本扫描
+- **Private/Group 记忆分离**：
+  - private 记忆：`~/.sisys/memory/*.md`（仅当前用户可见）
+  - group 记忆：`~/.sisys/memory/group/*.md`（团队共享）
+- **L2 PostgreSQL 表设计**：
+  - `memory_metadata`：记忆元数据索引（name, description, type, path, version, mtime, owner, group_id）
+  - `memory_change_history`：记忆变更历史（append-only，change_type: create/update/delete）
+- **CRUD 操作**：完整创建/读取/更新/删除，带版本冲突处理（乐观锁）
+- **事件驱动**：MemoryChanged 事件触发元数据同步、缓存失效
 
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
 
 1. **架构测试**
-   - [ ] L0 MEMORY.md 测试 - 验证索引、路由、文本扫描
+   - [ ] L0 MEMORY.md 测试 - 验证索引、路由、文本扫描（最多 200 行）
    - [ ] 六层存储测试 - 验证各层存储
    - [ ] 协同测试 - 验证层间单向依赖链
-   - [ ] 持久化测试 - 验证持久化机制
+   - [ ] Private/Group 分离测试 - 验证权限隔离
+   - [ ] CRUD 测试 - 验证完整记忆操作
+   - [ ] 版本冲突测试 - 验证乐观锁处理
 
 2. **性能要求**
    - [ ] Redis TTL 24h-30d
    - [ ] MinIO WORM 7 年
+   - [ ] L0→L2 元数据同步延迟 <100ms
    - [ ] 持久化成功率 100%
 
 3. **覆盖率要求**
@@ -1933,6 +1952,7 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_six_layer_storage.py` - 单元测试
    - [ ] `tests/integration/test_storage_integration.py` - 集成测试
+   - [ ] `tests/unit/architecture/test_memory_crud.py` - CRUD 测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
@@ -1948,6 +1968,8 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
   - L5 Neo4j（知识图谱、实体关系，永久，可选）
 **And** 压缩前执行持久化笔记步骤防止信息丢失
 **And** MEMORY.md 索引驱动各层存储访问
+**And** Private 记忆仅用户自己可写，Group 记忆团队共享
+**And** MemoryChanged 事件触发 L2 元数据同步
 
 ### Story 1.16: 集成测试框架
 

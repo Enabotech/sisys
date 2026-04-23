@@ -96,7 +96,7 @@ curl http://<WSL2_IP>:nodeport
 
 ```bash
 # 在 WSL2 中运行
-echo "H9yglwH7sdyj" | sudo -S k3s kubectl get svc -n traefik
+echo "your-pwd" | sudo -S k3s kubectl get svc -n traefik
 # 确认 NodePort 配置
 ```
 

@@ -15,7 +15,7 @@ result = subprocess.run(
     [
         "bash",
         "-c",
-        "echo 'H9yglwH7sdyj' | sudo -S kubectl get secret argocd-gitea-token -n argocd -o jsonpath='{.data.token}' | base64 -d",
+        "echo 'your-pwd' | sudo -S kubectl get secret argocd-gitea-token -n argocd -o jsonpath='{.data.token}' | base64 -d",
     ],
     capture_output=True,
     text=True,
