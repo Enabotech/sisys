@@ -148,8 +148,8 @@
 | **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
 | **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
-| **asyncio.run() 使用场景** | 独立脚本用 asyncio.run()；pytest-xdist 并行测试中 BDD 步骤函数用 event_loop.run_until_complete() | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
-| **并发测试手段选择** | 单进程测试用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture；真正并发测试在 async 函数内用 asyncio.gather() | 根据测试场景选择正确手段 |
+| **asyncio.run 使用** | 独立脚本用 asyncio.run()；pytest-xdist 并行测试中 BDD 步骤函数用 event_loop.run_until_complete() | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
+| **并发测试方法** | 单进程测试用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture；真正并发测试在 async 函数内用 asyncio.gather() | 根据场景正确选择否则失败 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
@@ -335,28 +335,17 @@ sisys/
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
-**来源:** [Story 1.4-Redis 缓存层](./1-4-redis-cache-layer.md)
+**来源:** [Story [编号]-[名称]](./[编号]-[name].md)
 
 **关键学习/Key Learnings:**
-
-1. **根据测试场景选择正确的并发测试手段**
-   - 独立脚本/单进程测试：`asyncio.run()` 是正确选择
-   - pytest-xdist 并行测试 BDD 步骤函数：使用 `event_loop` fixture + `run_until_complete()`
-   - 真正并发测试：在 async 函数内使用 `asyncio.gather()`
-
-2. **pytest-xdist 并行测试中 asyncio.run() 的风险**
-   - pytest-xdist 每个 worker 有独立进程和事件循环
-   - `asyncio.run()` 在并行测试中可能关闭错误循环，导致 "Event loop is closed"
-   - 解决方案：BDD 步骤函数注入 `event_loop` fixture 参数
-
-3. **Feature 文件语法要与 steps 实现严格匹配**
-   - BDD 场景第一步必须是 `假如`（Given），不能是 `当`（When）
-   - 每个步骤文本都必须有对应的步骤函数实现
+- [学习点 1]
+- [学习点 2]
+- [学习点 3]
 
 **应用到本故事/Applied to This Story:**
-- [ ] 所有 async 步骤函数使用 `event_loop.run_until_complete()` 而非 `asyncio.run()`
-- [ ] 验证并行测试 `pytest -n 8` 能通过
-- [ ] Feature 文件步骤文本与 steps.py 实现严格一一对应
+- [ ] [应用点 1]
+- [ ] [应用点 2]
+- [ ] [应用点 3]
 
 ---
 

@@ -1814,9 +1814,9 @@ CREATE TABLE memory_change_history (
 | 记忆类型 | 存储层 | 说明 |
 |---------|--------|------|
 | 记忆文件内容（private） | L0 文件系统 | `~/.sisys/memory/*.md` |
-| 记忆文件内容（team） | L0 文件系统 | `~/.sisys/memory/team/*.md`（团队共享） |
+| 记忆文件内容（group） | L0 文件系统 | `~/.sisys/memory/group/*.md`（团队共享） |
 | MEMORY.md 索引（private） | L0 文件系统 | 索引入口，最多 200 行 |
-| MEMORY.md 索引（team） | L0 文件系统 | `~/.sisys/memory/team/MEMORY.md`，团队共享 |
+| MEMORY.md 索引（group） | L0 文件系统 | `~/.sisys/memory/group/MEMORY.md`，团队共享 |
 | 记忆元数据索引 | L2 memory_metadata | name/description/type/path/version/mtime（当前状态） |
 | 记忆变更历史 | L2 memory_change_history | 每次变更的 diff（历史追溯） |
 | 记忆文件内容缓存 | L1 Redis | 高频访问加速 |
@@ -1828,9 +1828,9 @@ CREATE TABLE memory_change_history (
 
 **多租户隔离说明**：
 - private 记忆：仅当前用户可见，存储在 `~/.sisys/memory/` 根目录
-- team 记忆：项目团队共享，存储在 `~/.sisys/memory/team/`
-- 两者的 MEMORY.md 索引独立，team 记忆有独立的 entrypoint
-- RBAC 校验在 L2 PostgreSQL 层执行，team 成员有读取权限，private 仅自己可写
+- group 记忆：项目团队共享，存储在 `~/.sisys/memory/group/`
+- 两者的 MEMORY.md 索引独立，group 记忆有独立的 entrypoint
+- RBAC 校验在 L2 PostgreSQL 层执行，group 成员有读取权限，private 仅自己可写
 
 #### 11.2.6 管理流程
 
@@ -1955,18 +1955,19 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
 用户 Query
     │
     ├─→ L0 scanMemoryFiles()
-    │   ├── 扫描 ~/.sisys/memory/*.md
-    │   └── 获取文件列表（最新 200 个）
+    │   ├── 扫描 ~/.sisys/memory/*.md（private，当前用户）
+    │   ├── 扫描 ~/.sisys/memory/group/*.md（group，成员权限）
+    │   └── 获取文件列表（最新 200 个，合并去重）
     │
     ├─→ LLM 语义选择
     │   ├── findRelevantMemories() 调用 Sonnet
-    │   └── 选择 Top 5 相关记忆
+    │   └── 选择 Top 5 相关记忆（来自 private + group）
     │
     ├─→ L1 Redis（检查缓存）
     │   └── 缓存命中？直接返回
     │
     ├─→ L2 PostgreSQL（RBAC 校验）
-    │   └── 权限检查，无权限过滤
+    │   └── 权限检查，过滤无权限记忆
     │
     ├─→ L3 Qdrant（文件>500时启用）
     │   ├── 向量检索扩展候选
@@ -2027,28 +2028,36 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
    └── 发送至向量化队列
 ```
 
-**完整检索示例**：
+**完整检索示例（private + group 合并）**：
 ```
 用户说："以后用什么包管理器？"
 
 1. L0 扫描
-   └── scanMemoryFiles(~/.sisys/memory/) → 20 个 .md 文件
+   ├── scanMemoryFiles(~/.sisys/memory/) → 15 个 .md 文件（private）
+   ├── scanMemoryFiles(~/.sisys/memory/group/) → 5 个 .md 文件（group，有权限）
+   └── 合并去重 → 20 个 .md 文件
 
 2. LLM 选择
    └── "用户说以后用什么包管理器"
-       → 模型选择 "feedback_bun_npm.md"
+       → 模型选择 "feedback_bun_npm.md"（来自 private）
+       → 模型选择 "group_feedback_docker.md"（来自 group）
 
-3. L1 检查
-   └── redis.get("memory:feedback_bun_npm.md") → NULL（首次未命中）
+3. L2 RBAC 校验
+   ├── private 记忆 → 验证当前用户是所有者 → 通过
+   └── group 记忆 → 验证当前用户是 group 成员 → 通过
 
-4. L0 读取
-   └── 读取文件内容 → "User prefers bun over npm"
+4. L1 检查
+   ├── redis.get("memory:feedback_bun_npm.md") → NULL（首次未命中）
+   └── redis.get("memory:group_feedback_docker.md") → HIT（缓存命中）
 
-5. L1 缓存
+5. L0 读取（仅 private 缓存未命中）
+   └── 读取 feedback_bun_npm.md → "User prefers bun over npm"
+
+6. L1 缓存（仅新读取的内容）
    └── redis.setex("memory:feedback_bun_npm.md", ..., content)
 
-6. 返回结果
-   └── "根据记忆，您偏好使用 bun 而不是 npm"
+7. 返回结果
+   └── "根据记忆，您偏好使用 bun 而不是 npm；团队使用 docker 作为容器方案"
 ```
 
 #### 11.2.10 验收标准
