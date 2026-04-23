@@ -22,7 +22,7 @@ def get_sudo_password() -> str:
         content = qwem_path.read_text(encoding="utf-8")
         for line in content.split("\n"):
             if "sudo 密码" in line:
-                # 提取密码部分（格式：sudo 密码 H9yglwH7sdyj）
+                # 提取密码部分（格式：sudo 密码 your-pwd）
                 return line.replace("sudo 密码", "").strip()
     return ""
 
