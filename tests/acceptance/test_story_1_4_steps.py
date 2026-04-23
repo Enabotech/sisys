@@ -284,7 +284,9 @@ def given_semantic_cache_stored(
 ) -> None:
     """Store query result in semantic cache."""
     context["cache_key"] = unique_cache_key
-    embedding = [0.1, 0.2, 0.3]
+    # 使用 unique_cache_key 生成不同的 embedding 实现并行隔离
+    key_part = int(unique_cache_key.split("-")[1][:4], 16) / 65535.0
+    embedding = [0.1 + key_part * 0.1, 0.2 + key_part * 0.05, 0.3 + key_part * 0.02]
 
     async def _set():
         await semantic_cache.set(
