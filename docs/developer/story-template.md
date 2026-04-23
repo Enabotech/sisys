@@ -148,8 +148,8 @@
 | **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
 | **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
-| **asyncio.run() 陷阱** | 禁止在测试中调用 asyncio.run()，它会创建→运行→关闭事件循环，并行测试时关闭错误循环导致 "Event loop is closed" | 并行测试随机失败；正确做法：使用 event_loop fixture + run_until_complete() |
-| **并发正确性验证** | event_loop.run_until_complete() 完全能验证并发正确性，async 函数内使用 asyncio.gather() 实现真正并发测试 | 测试隔离 vs 并发验证是两回事，都能正确处理 |
+| **asyncio.run() 使用场景** | 独立脚本用 asyncio.run()；pytest-xdist 并行测试中 BDD 步骤函数用 event_loop.run_until_complete() | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
+| **并发测试手段选择** | 单进程测试用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture；真正并发测试在 async 函数内用 asyncio.gather() | 根据测试场景选择正确手段 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
@@ -159,7 +159,7 @@
 - ❌ asyncio.Lock 使用实例变量
 - ❌ scope=module 的 event_loop fixture
 - ❌ BDD 步骤函数使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
-- ❌ BDD 步骤函数内直接调用 async 函数而不通过 event_loop.run_until_complete()
+- ❌ pytest-xdist 并行测试时，BDD 步骤函数内使用 asyncio.run()（应使用 event_loop fixture）
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
@@ -339,20 +339,21 @@ sisys/
 
 **关键学习/Key Learnings:**
 
-1. **asyncio.run() 是测试杀手**
-   - `asyncio.run()` 创建新事件循环 → 运行协程 → **关闭事件循环**
-   - 并行测试时（pytest-xdist），不同 worker 有独立进程和事件循环
-   - `asyncio.run()` 可能关闭错误的循环，导致 "Event loop is closed" 错误
-   - **解决方案：** 使用 `event_loop` fixture 参数 + `event_loop.run_until_complete()`
+1. **根据测试场景选择正确的并发测试手段**
+   - **独立脚本/单进程测试：** `asyncio.run()` 是正确选择（创建自己的事件循环）
+   - **pytest-xdist 并行测试 - BDD 步骤函数：** 使用 `event_loop` fixture + `run_until_complete()`
+   - **真正的并发测试：** 在 async 函数内使用 `asyncio.gather()` 测试并发正确性
+   - `asyncio.run()` 本身没问题，问题在于并行测试场景下的使用方式
 
-2. **event_loop.run_until_complete() 完全能验证并发正确性**
-   - 这不是测试隔离问题，是**测试代码的异步调用方式**问题
-   - 在 async 函数内部使用 `asyncio.gather()` 可以测试真正的并发场景
-   - Redis 缓存层（aioredis）实现本身是正确的，问题在于测试代码的错误调用方式
+2. **pytest-xdist 并行测试中 asyncio.run() 的风险**
+   - pytest-xdist 每个 worker 有独立进程和事件循环
+   - `asyncio.run()` 创建→运行→关闭事件循环
+   - 在并行测试中可能关闭错误循环，导致 "Event loop is closed"
+   - **解决方案：** BDD 步骤函数注入 `event_loop` fixture 参数
 
 3. **BDD 步骤函数的异步处理模式**
    ```python
-   # ✅ 正确：使用 event_loop fixture
+   # pytest-xdist 并行测试：正确方式
    @given("调用 SessionStorage.save 保存会话")
    def given_call_session_save(
        context: dict,
@@ -364,8 +365,8 @@ sisys/
            await session_storage.save(unique_session_id, "agent", {"data": "test"})
        event_loop.run_until_complete(_save())
 
-   # ❌ 错误：asyncio.run() 会破坏事件循环
-   result = asyncio.run(_save())  # 并行测试时会关闭错误的事件循环
+   # 单进程测试：asyncio.run() 完全正确
+   result = asyncio.run(async_operation())  # 独立脚本用这个没问题
    ```
 
 4. **Feature 文件语法要与 steps 实现严格匹配**
@@ -541,7 +542,7 @@ sisys/
 **创建日期/Created:** 2026-03-04
 **最后更新/Last Updated:** 2026-04-23
 **更新说明:**
-- v2.4.0: 补充 asyncio.run() 危害说明（Story 1.4 实战经验）：(1) asyncio.run() 创建→运行→关闭事件循环，并行测试时关闭错误循环；(2) event_loop.run_until_complete() 完全能验证并发正确性；(3) Feature 文件语法必须与 steps 实现严格匹配
+- v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
 - v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置
 - v2.1.0: 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate
