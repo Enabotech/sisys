@@ -441,7 +441,7 @@ delivery/tests/
 - [Source: _bmad-output/planning-artifacts/epics_v1.0.md#Story 0.17] - Epic 文档中的 Story 定义
 - [Source: _bmad-output/planning-artifacts/epic0-design.md#轨道 2: 产品交付系统详细架构 - 自动诊断架构] - 产品交付系统自动诊断架构
 - [Source: _bmad-output/implementation-artifacts/stories/0-16-linux-installer.md] - Story 0-16 Linux 一键脚本（前置依赖，需集成诊断引擎）
-- [Source: _bmad-output/planning-artifacts/architecture.md §1.2] - 系统公理二：五层存储架构
+- [Source: _bmad-output/planning-artifacts/architecture.md §1.2] - 系统公理二：六层存储架构
 - [Source: docs/delivery/AUTO_DIAGNOSE_AND_FIX.md] - 自动检测与修复参考指南
 
 ## Dev Agent Record

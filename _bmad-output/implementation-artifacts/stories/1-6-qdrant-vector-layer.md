@@ -24,7 +24,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的第三个故事，在 Story 1.5（PostgreSQL 关系存储层）基础上实现 L3 向量存储层。Qdrant 作为五层存储架构的向量存储核心，承担以下关键职责：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的第三个故事，在 Story 1.5（PostgreSQL 关系存储层）基础上实现 L3 向量存储层。Qdrant 作为六层存储架构的向量存储核心，承担以下关键职责：
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -34,7 +34,7 @@
 | **混合检索基础** | Dense + Sparse 双路召回基座，为 Story 3.1/3.4 提供基础 | RRF 融合排序基础设施 |
 | **多租户隔离** | 按业务域分离 Collection，数据隔离 | Collection 级别访问控制 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 六层存储架构
 
 **覆盖 FR:**
 - FR-AR-04: 仓储模式（通过 VectorStorage 接口实现）
@@ -532,7 +532,7 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L3 向量存储层（Qdrant 1.7+）存储嵌入向量、混合检索 payload
+- **六层存储架构:** L3 向量存储层（Qdrant 1.7+）存储嵌入向量、混合检索 payload
 - **向量维度:** 1024 维（bge-m3 嵌入模型），COSINE 相似度度量
 - **Collection 命名规范:** `sisys:{collection_type}:{namespace}`（如 `sisys:documents:finance`）
 - **HNSW 索引配置:** `m=16`, `ef_construct=128`, `full_scan_threshold=10000`
@@ -542,7 +542,7 @@
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 五层存储架构
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -669,7 +669,7 @@ sisys/
 | **File** | `_bmad-output/implementation-artifacts/stories/1-6-qdrant-vector-layer.md` |
 | **Status** | `ready-for-dev` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P0 |
 | **覆盖 FR** | FR-AR-04（仓储模式）, NFR-PERF-01（检索延迟） |
 
@@ -677,7 +677,7 @@ sisys/
 
 1. [x] All tasks defined 所有任务定义完成（Task 0-6，含 SDD 规范 + TDD 循环）
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
-3. [x] Architecture constraints extracted 架构约束已提取（五层存储、HNSW 配置、多租户隔离）
+3. [x] Architecture constraints extracted 架构约束已提取（六层存储、HNSW 配置、多租户隔离）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、懒初始化）
 5. [x] Sprint status synced to `ready-for-dev`（已与 sprint-status.yaml 同步）
 

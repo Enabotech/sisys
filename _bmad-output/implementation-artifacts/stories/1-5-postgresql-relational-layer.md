@@ -23,7 +23,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的第二个故事，在 Story 1.4（Redis 缓存层）基础上实现 L2 关系存储层。PostgreSQL 作为五层存储架构的关系存储核心，承担以下关键职责：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的第二个故事，在 Story 1.4（Redis 缓存层）基础上实现 L2 关系存储层。PostgreSQL 作为六层存储架构的关系存储核心，承担以下关键职责：
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -33,7 +33,7 @@
 | **事务发件箱（Outbox）** | PostgreSQL `event_outbox` 表存储待发布事件，与业务操作同事务提交 | 事务原子性，最终一致性 |
 | **Alembic 迁移管理** | 数据库 schema 版本控制，支持向前迁移与回滚 | 迁移可重复执行，幂等性 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 六层存储架构
 
 ---
 
@@ -627,7 +627,7 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L2 关系存储层（PostgreSQL 15+）存储用户/RBAC、审计元数据、业务实体
+- **六层存储架构:** L2 关系存储层（PostgreSQL 15+）存储用户/RBAC、审计元数据、业务实体
 - **事务管理:** ACID 事务保证、外键约束、唯一约束、检查约束
 - **Alembic 迁移:** 数据库 schema 版本控制，支持向前迁移与回滚
 - **Outbox Pattern:** PostgreSQL `event_outbox` 表存储待发布事件，与业务操作同事务提交
@@ -635,7 +635,7 @@
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 五层存储架构
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -838,7 +838,7 @@ sisys/
 | **File** | `_bmad-output/implementation-artifacts/stories/1-5-postgresql-relational-layer.md` |
 | **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P0-5（基础架构，用户/RBAC/Outbox 持久化基础） |
 | **覆盖 FR** | FR-AR-03（跨存储事务）、FR-AR-04（仓储模式）、FR-SC-01（用户认证与 RBAC）、FR-SC-02（审计日志）、FR-SC-03（WORM 存储引用）、FR-CP-01（路由决策日志） |
 

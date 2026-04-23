@@ -206,12 +206,12 @@ so that **无需专业技术知识即可完成部署并使用系统**。
 ### 架构合规要求
 
 **来源:**
-- [Source: _bmad-output/planning-artifacts/architecture.md#12-外部化记忆] - 五层存储架构
+- [Source: _bmad-output/planning-artifacts/architecture.md#12-外部化记忆] - 六层存储架构
 - [Source: _bmad-output/planning-artifacts/architecture.md#15-CLI+Skills-核心设计原则] - CLI 优先原则
 - [Source: _bmad-output/planning-artifacts/architecture.md#33-决策-3-ADR-003] - 双通道事件总线
 - [Source: _bmad-output/planning-artifacts/prd.md#MVP-功能集合] - MVP 功能需求
 
-**五层存储架构在 Mac 部署中的映射：**
+**六层存储架构在 Mac 部署中的映射：**
 - L1 Redis: Docker 容器内运行，数据持久化到本地卷 `redis-data`
 - L2 PostgreSQL: Docker 容器内运行，数据持久化到本地卷 `postgres-data`
 - L3 Qdrant: Docker 容器内运行，数据持久化到本地卷 `qdrant-data`

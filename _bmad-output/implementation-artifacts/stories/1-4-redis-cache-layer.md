@@ -23,7 +23,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的第一个故事，在 Story 1.3（事件总线实现）基础上实现 L1 高速缓存层。Redis 作为五层存储架构的最上层，承担以下关键职责：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的第一个故事，在 Story 1.3（事件总线实现）基础上实现 L1 高速缓存层。Redis 作为六层存储架构的最上层，承担以下关键职责：
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -32,7 +32,7 @@
 | **公共黑板** | 多 Agent 协作时交换中间结论，支持 MVCC 并发控制 | 读写延迟 P95<50ms |
 | **键命名与清理** | 统一 Redis 键管理，支持运维批量清理 | `sisys:{namespace}:{key}` 格式 + SCAN 清理 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 六层存储架构
 
 ---
 
@@ -490,7 +490,7 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L1 高速缓存层（Redis 7.0+）存储会话状态、语义缓存、公共黑板
+- **六层存储架构:** L1 高速缓存层（Redis 7.0+）存储会话状态、语义缓存、公共黑板
 - **TTL 规划:** 会话状态 24h-30d，语义缓存 24h，公共黑板 7d，幂等性检查 7d
 - **容量规划:** Redis 10GB（MVP），可根据实际使用情况扩容
 - **Redis 连接池:** 连接池共享，最大连接数可配置，socket_timeout 可配置
@@ -498,7 +498,7 @@
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 五层存储架构
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -722,7 +722,7 @@ sisys/
 | **File** | `_bmad-output/implementation-artifacts/stories/1-4-redis-cache-layer.md` |
 | **Status** | `ready-for-dev` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P0 |
 | **职责** | **会话状态缓存** + **语义缓存** + **公共黑板** + **键命名与清理** |
 | **覆盖 FR** | FR-AR-04 (仓储模式), FR-SA-01 (永久存储基础) |

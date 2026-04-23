@@ -12,7 +12,7 @@
 > 3. **节点/关系命名规范** — 节点标签: `sisys:{entity_type}`（如 `sisys:Document`, `sisys:Entity`, `sisys:Agent`）
 > 4. **Neo4j 客户端库** — PyPI 包名 `neo4j`，Python 导入 `neo4j.AsyncGraphDatabase`
 > 5. **多租户隔离** — 按业务域使用节点属性隔离，支持权限过滤
-> 6. **五层存储单向依赖链** — Graph 存储是依赖链末端（Cache → Relational → Vector → Object → Graph），Graph 不依赖其他存储层；图遍历结果通过事件总线异步发布缓存更新事件，由 Cache 层监听刷新（非 Graph 直接依赖 Cache）
+> 6. **六层存储单向依赖链** — Graph 存储是依赖链末端（Cache → Relational → Vector → Object → Graph），Graph 不依赖其他存储层；图遍历结果通过事件总线异步发布缓存更新事件，由 Cache 层监听刷新（非 Graph 直接依赖 Cache）
 
 ---
 
@@ -24,7 +24,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的第五个也是最后一个故事，在 Story 1.4-1.7（Redis/PostgreSQL/Qdrant/MinIO）基础上实现 L5 图存储层。Neo4j 作为五层存储架构的图存储核心，承担以下关键职责：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的第五个也是最后一个故事，在 Story 1.4-1.7（Redis/PostgreSQL/Qdrant/MinIO）基础上实现 L5 图存储层。Neo4j 作为六层存储架构的图存储核心，承担以下关键职责：
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -34,7 +34,7 @@
 | **依赖图管理** | 工具链 DAG、Agent 协作依赖图存储 | 依赖关系查询，拓扑排序支持 |
 | **多租户隔离** | 按业务域属性隔离节点数据，支持权限过滤 | 节点属性 `business_domain` 过滤 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 六层存储架构
 
 **覆盖 FR:**
 - FR-AR-02: 领域事件发布（部分覆盖 — 图遍历结果通过事件总线异步发布缓存更新事件）
@@ -166,7 +166,7 @@
 **When** 运行架构约束验证测试
 **Then** 领域层不依赖任何 Neo4j 实现
 **And** 依赖方向正确（基础设施层→应用层→领域层）
-**And** 五层存储单向依赖链正确（Graph→EventBus→Cache，无循环）
+**And** 六层存储单向依赖链正确（Graph→EventBus→Cache，无循环）
 **And** Ruff 检查通过（严重错误=0）
 **And** MyPy 类型检查通过（错误率<5%）
 
@@ -174,7 +174,7 @@
 - [ ] 领域层无 Neo4j 导入验证（扫描 `src/domain/` 目录）
 - [ ] 依赖方向测试通过（使用 `import-linter`）
 - [ ] 节点/关系命名规范验证（所有节点遵循 `sisys:{type}` 标签）
-- [ ] 五层存储循环依赖验证（Graph 存储不直接依赖 Cache 层）
+- [ ] 六层存储循环依赖验证（Graph 存储不直接依赖 Cache 层）
 - [ ] Ruff 检查通过（0 错误）
 - [ ] MyPy 类型检查通过（0 问题）
 
@@ -553,7 +553,7 @@
 - [x] Subtask: 实现领域层零 Neo4j 依赖验证（扫描 `src/domain/` 目录）
 - [x] Subtask: 实现依赖方向验证（使用 `import-linter`）
 - [x] Subtask: 实现节点/关系命名规范验证（所有节点遵循 `sisys:{type}` 标签）
-- [x] Subtask: 实现五层存储循环依赖验证（Graph 存储不直接依赖 Cache 层）
+- [x] Subtask: 实现六层存储循环依赖验证（Graph 存储不直接依赖 Cache 层）
 - [x] Subtask: 运行 Ruff 检查（`ruff check src/`，0 错误）
 - [x] Subtask: 运行 MyPy 类型检查（`mypy src/`，0 问题）
 
@@ -570,14 +570,14 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L5 图存储层（Neo4j 5.x）存储知识图谱、实体关系、依赖图
+- **六层存储架构:** L5 图存储层（Neo4j 5.x）存储知识图谱、实体关系、依赖图
 - **容量规划:** 50GB（V2 目标），MVP 10GB，V1 30GB
 - **节点标签规范:** `sisys:{entity_type}`（如 `sisys:Entity`, `sisys:Document`, `sisys:Agent`）
 - **关系类型:** MENTIONS, DEPENDS_ON, RELATES_TO, PART_OF, INFLUENCES, CONTRADICTS
 - **延迟预算:** 简单查询 P95<200ms，复杂查询 P95<800ms
 - **多租户隔离:** 按业务域属性隔离节点数据（`business_domain` 属性过滤）
 - **领域层零依赖:** 领域层仅定义接口，不依赖任何 Neo4j 实现细节
-- **五层存储单向依赖链:** Cache → Relational → Vector → Object → Graph（无循环），Graph 通过事件总线异步发布缓存更新事件，由 Cache 层监听刷新
+- **六层存储单向依赖链:** Cache → Relational → Vector → Object → Graph（无循环），Graph 通过事件总线异步发布缓存更新事件，由 Cache 层监听刷新
 
 #### 双接口设计说明
 
@@ -622,7 +622,7 @@ FR-SA-01 要求"永久存储历年 SP/BP 的关键假设变量、决策依据、
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 五层存储架构
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -691,7 +691,7 @@ sisys/
 2. **领域层接口与基础设施层实现分离** — 领域层定义同步接口（Protocol），基础设施层实现
 3. **懒初始化连接池** — 首次调用时创建客户端，避免启动时连接失败阻塞业务
 4. **多租户隔离策略** — 属性级别隔离（与 Qdrant Collection 级别、PostgreSQL Schema 级别一致）
-5. **五层存储单向依赖链** — Graph 存储通过事件总线异步更新缓存，不直接依赖 Cache 层（避免循环依赖）
+5. **六层存储单向依赖链** — Graph 存储通过事件总线异步更新缓存，不直接依赖 Cache 层（避免循环依赖）
 6. **架构约束验证** — 领域层零外部依赖是硬约束，必须在架构验证测试中覆盖
 
 **应用到本故事/Applied to This Story:**
@@ -699,7 +699,7 @@ sisys/
 - [ ] GraphManager/GraphStorage 接口定义在领域层（Protocol），实现在基础设施层
 - [ ] Neo4jClient 采用懒初始化模式（与 Story 1.5-1.7 一致）
 - [ ] 节点标签规范统一为 `sisys:{type}`，与其他存储层命名规范保持一致
-- [ ] 五层存储循环依赖验证确保 Graph→EventBus→Cache 异步更新，无直接依赖
+- [ ] 六层存储循环依赖验证确保 Graph→EventBus→Cache 异步更新，无直接依赖
 - [ ] 架构约束测试验证领域层无 Neo4j 导入
 
 ---
@@ -763,7 +763,7 @@ sisys/
 | **File** | `_bmad-output/implementation-artifacts/stories/1-8-neo4j-graph-layer.md` |
 | **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P0 |
 | **覆盖 FR** | FR-AR-02（部分覆盖）, FR-AR-04（仓储模式）, FR-SA-01（永久存储） |
 | **覆盖 NFR** | NFR-PERF-07（图遍历查询延迟） |
@@ -773,7 +773,7 @@ sisys/
 
 1. [x] All tasks defined 所有任务定义完成（Task 0-6，含 SDD 规范 + TDD 循环）
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
-3. [x] Architecture constraints extracted 架构约束已提取（五层存储、节点/关系规范、多租户隔离、单向依赖链）
+3. [x] Architecture constraints extracted 架构约束已提取（六层存储、节点/关系规范、多租户隔离、单向依赖链）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、懒初始化、循环依赖避免）
 5. [x] Sprint status synced to `done`（已与 sprint-status.yaml 同步）
 6. [x] 全部 80 个测试通过，0 失败

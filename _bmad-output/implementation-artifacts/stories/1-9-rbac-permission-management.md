@@ -695,7 +695,7 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L2 关系存储层（PostgreSQL 15+）存储用户/RBAC/审计元数据
+- **六层存储架构:** L2 关系存储层（PostgreSQL 15+）存储用户/RBAC/审计元数据
 - **安全技术要求:**
   - 传输加密：TLS 1.3
   - 存储加密：AES-256
@@ -820,7 +820,7 @@ sisys/
 1. **配置模式复用** — Story 1.4-1.8 已建立 `XxxConfig` + `from_env()` 模式，本 Story 沿用
 2. **领域层接口与基础设施层实现分离** — 领域层定义同步接口（Protocol），基础设施层实现
 3. **懒初始化连接池** — 首次调用时创建客户端，避免启动时连接失败阻塞业务
-4. **五层存储单向依赖链** — 安全服务依赖 L2 关系存储层（PostgreSQL）
+4. **六层存储单向依赖链** — 安全服务依赖 L2 关系存储层（PostgreSQL）
 5. **架构约束验证** — 领域层零外部依赖是硬约束，必须在架构验证测试中覆盖
 
 **应用到本故事/Applied to This Story:**

@@ -78,7 +78,7 @@ development_status:
   1-2-domain-event-definition: done
   1-3-event-bus-implementation: done
   1-16-integration-test-framework: done
-  # 价值组 3: 五层存储架构
+  # 价值组 3: 六层存储架构
   1-4-redis-cache-layer: done
   1-5-postgresql-relational-layer: done
   1-6-qdrant-vector-layer: done
