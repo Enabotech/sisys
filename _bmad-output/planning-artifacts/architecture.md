@@ -1775,13 +1775,20 @@ Agent 工作目录（Agent 配置集）
 
 #### 11.2.5 与六层存储的关系
 
+**存储设计原则**：
+- L0 文件系统存储**实际记忆内容**（.md 文件）
+- L2 PostgreSQL 存储**元数据索引**（name/description/type/mtime/path）
+- L1-L5 按需响应 L0 驱动，不存储实际记忆内容
+
 | 记忆类型 | 存储层 | 说明 |
 |---------|--------|------|
-| 系统级 user/project/feedback | L2 PostgreSQL | 结构化元数据 |
-| 系统级 reference | L2 PostgreSQL | 外部引用指针 |
-| 嵌入向量 | L3 Qdrant | 语义检索 |
-| 原始文档/证据包 | L4 MinIO WORM | 7年归档 |
-| 知识图谱 | L5 Neo4j（可选） | 图检索 |
+| 记忆文件内容 | L0 文件系统 | `~/.sisys/memory/*.md` |
+| MEMORY.md 索引 | L0 文件系统 | 索引入口，最多 200 行 |
+| 记忆元数据索引 | L2 PostgreSQL | name/description/type/mtime/path |
+| 记忆文件内容缓存 | L1 Redis | 高频访问加速 |
+| 记忆文件 embedding | L3 Qdrant | 文件>500时启用向量检索 |
+| Checkpoint 证据包 | L4 MinIO WORM | 7年归档 |
+| 记忆间关系图谱 | L5 Neo4j（可选） | project→reference 关系 |
 | Agent 配置集 | L0 文件系统 | 启动时读取 |
 | Agent 会话状态 | L1 Redis | 24h-30d TTL |
 
@@ -1811,41 +1818,151 @@ type: {{user, feedback, project, reference}}
 - 启动时一次性加载，不在运行时动态更新
 - Agent 的"学习"通过 StrategicArchive 持久化实现
 
+#### 11.2.8 L0 驱动各层协同机制
+
+**设计原则**：L0 是入口，驱动 L1-L5 各层按需协同工作。L0 文件系统存储实际记忆内容，其他各层按需响应。
+
+**写入流程**：
+```
+用户确认记忆
+    │
+    ├─→ L0 文件系统
+    │   ├── 写入 ~/.sisys/memory/xxx.md（实际内容）
+    │   └── 追加到 MEMORY.md 索引
+    │
+    ├─→ L2 PostgreSQL（异步）
+    │   └── 写入元数据索引（name/description/type/mtime/path）
+    │
+    ├─→ L3 Qdrant（异步，文件>500时启用）
+    │   └── 生成 embedding（Dense+Sparse）
+    │
+    ├─→ L5 Neo4j（可选，按需）
+    │   └── 构建关系（project→reference）
+    │
+    └─→ 完成
+```
+
+**检索流程**：
+```
+用户 Query
+    │
+    ├─→ L0 scanMemoryFiles()
+    │   ├── 扫描 ~/.sisys/memory/*.md
+    │   └── 获取文件列表（最新 200 个）
+    │
+    ├─→ LLM 语义选择
+    │   ├── findRelevantMemories() 调用 Sonnet
+    │   └── 选择 Top 5 相关记忆
+    │
+    ├─→ L1 Redis（检查缓存）
+    │   └── 缓存命中？直接返回
+    │
+    ├─→ L2 PostgreSQL（RBAC 校验）
+    │   └── 权限检查，无权限过滤
+    │
+    ├─→ L3 Qdrant（文件>500时启用）
+    │   ├── 向量检索扩展候选
+    │   └── RRF 融合重排序
+    │
+    └─→ 返回结果 + memoryAge 新鲜度警告
+```
+
+**Checkpoint 持久化流程**（系统公理二约束）：
+```
+压缩前必须归档
+    │
+    ├─→ L4 MinIO WORM
+    │   ├── 原始快照写入 Object Lock COMPLIANCE 模式
+    │   └── 7年 retention（2555天）
+    │
+    ├─→ L2 PostgreSQL
+    │   └── 更新 checkpoint.archived_ref
+    │
+    ├─→ L1 Redis
+    │   └── 压缩上下文写入 Hash（TTL 24h-30d）
+    │
+    └─→ Checkpoint 创建完成
+```
+
+#### 11.2.9 数据流完整示例
+
+**完整写入示例**：
+```
+用户说："记住，以后用 bun 而不是 npm"
+
+1. 评估 → feedback 类型
+
+2. L0 写入
+   └── 写入 ~/.sisys/memory/feedback_bun_npm.md
+       ---
+       name: bun over npm
+       description: User prefers bun over npm for package management
+       type: feedback
+       ---
+       
+       User prefers bun over npm.
+
+3. L0 更新索引
+   └── MEMORY.md 追加：
+       - [bun over npm](feedback_bun_npm.md) — User prefers bun
+
+4. L2 异步同步
+   └── INSERT INTO memory_metadata
+       (name, description, type, mtime, path)
+       VALUES ('bun over npm', '...', 'feedback', NOW(), 'feedback_bun_npm.md')
+
+5. L3 异步向量化（若文件>500）
+   └── 发送至向量化队列
+```
+
+**完整检索示例**：
+```
+用户说："以后用什么包管理器？"
+
+1. L0 扫描
+   └── scanMemoryFiles(~/.sisys/memory/) → 20 个 .md 文件
+
+2. LLM 选择
+   └── "用户说以后用什么包管理器"
+       → 模型选择 "feedback_bun_npm.md"
+
+3. L1 检查
+   └── redis.get("memory:feedback_bun_npm.md") → NULL（首次未命中）
+
+4. L0 读取
+   └── 读取文件内容 → "User prefers bun over npm"
+
+5. L1 缓存
+   └── redis.setex("memory:feedback_bun_npm.md", ..., content)
+
+6. 返回结果
+   └── "根据记忆，您偏好使用 bun 而不是 npm"
+```
+
+#### 11.2.10 验收标准
+
+| 层级 | 验收标准 | 测量方式 |
+|------|---------|---------|
+| L0 | MEMORY.md 最多 200 行，超出自动截断 | 行数统计 |
+| L0→L2 | 写入时 L2 元数据同步延迟 <100ms | 性能监控 |
+| L0→L1 | 缓存命中率 >80%（高频记忆） | 缓存指标 |
+| L0→L3 | 文件>500时自动启用向量检索，P95<300ms | 检索延迟 |
+| L0→L4 | Checkpoint 必须先归档再压缩（系统公理二） | 约束验证 |
+| L5 | 图谱构建是可选的，按需启用 | 功能开关 |
+| 端到端 | 检索延迟 P95<800ms（MVP） | 性能测试 |
+
+#### 11.2.11 与 Story 1.15a/1.15b 对齐
+
+| Story | 需求 | §11 实现 |
+|-------|------|---------|
+| Story 1.15a | 上下文压缩率≥70%，压缩前持久化 | 11.2.8 Checkpoint 持久化流程（必须先归档） |
+| Story 1.15b | L0 MEMORY.md 入口 + 六层协同 | 11.2.8-11.2.9 完整协同机制 |
+
 ---
 
 ### 11.3 语义缓存层设计
 
-```markdown
----
-name: {{memory name}}
-description: {{one-line description}}
-type: {{user, feedback, project, reference}}
----
-
-{{memory content}}
-```
-
-**type 分类**：
-- `user` — 用户角色、偏好、知识
-- `feedback` — 用户指导的规则（包含 Why/How to apply）
-- `project` — 项目上下文、目标、deadline
-- `reference` — 外部系统指针（Linear/Grafana 等 URL）
-
-#### 11.2.4 与 L1-L5 的关系
-
-```
-用户输入 → 评估是否值得记忆 → 写入 L0 .md 文件 → 更新 MEMORY.md 索引
-                                          ↓
-                                    L1-L5 按需存取
-```
-
-- **L0 是入口**：MEMORY.md 索引驱动，不存储实际数据
-- **L1-L5 是存储**：按类型分发至 Redis/PG/Qdrant/MinIO/Neo4j
-- **跨会话持久化**：MEMORY.md 和 .md 文件在磁盘，跨会话保留
-
----
-
-### 11.3 语义缓存层设计
+**说明**：本节描述的是 L1 层语义缓存，用于 RAG/文档检索加速，不是记忆系统的核心组件。记忆系统的 L1 层主要是会话状态缓存（如 Checkpoint working_memory）。
 
 ```python
 class SemanticCache:
@@ -1867,6 +1984,11 @@ class SemanticCache:
         await self.redis.setex(f"cache:{query}", self.TTL, result.serialize())
         return CacheResult(value=result, hit=False)
 ```
+
+**与记忆系统的关系**：
+- 语义缓存服务于 RAG 检索（Epic 3），不是记忆系统的一部分
+- 记忆系统的 L1 层由 Checkpoint 和会话状态缓存组成
+- 两者都使用 Redis，但职责不同
 
 ---
 

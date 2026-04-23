@@ -13,20 +13,20 @@
   # =========================================================================
 
   场景: 会话状态保存与恢复
-    当 调用 SessionStorage.save 保存会话 "session-001"
-    并且 调用 SessionStorage.load 加载会话 "session-001"
+    当 调用 SessionStorage.save 保存会话
+    并且 调用 SessionStorage.load 加载会话
     那么 返回的会话状态与保存的一致
 
   场景: 会话状态删除
-    假如 会话状态 "session-002" 已保存
-    当 调用 SessionStorage.delete 删除会话 "session-002"
-    并且 调用 SessionStorage.load 加载会话 "session-002"
+    假如 会话状态已保存
+    当 调用 SessionStorage.delete 删除会话
+    并且 调用 SessionStorage.load 加载会话
     那么 返回 None
 
   场景: 会话状态过期
-    假如 会话状态 "session-003" 已保存并设置 TTL 为 1 秒
+    假如 会话状态已保存并设置 TTL 为 1 秒
     当 推进 fakeredis 时间使 TTL 过期
-    并且 调用 SessionStorage.load 加载会话 "session-003"
+    并且 调用 SessionStorage.load 加载会话
     那么 返回 None
 
   # =========================================================================
@@ -41,29 +41,28 @@
 
   场景: 语义缓存未命中
     假如 语义缓存无匹配结果
-    当 调用 SemanticCache.get 查询缓存（无匹配）
+    当 调用 SemanticCache.get 查询缓存
     那么 返回 None
 
   场景: 语义缓存命中率统计
     假如 注入 EventMetricsCollector 到 SemanticCache
-    并且 执行 3 次缓存命中和 2 次缓存未命中
-    当 查询 EventMetricsCollector.hit_rate
-    那么 返回命中率 0.6
+    当 执行多次缓存命中和未命中
+    那么 查询 EventMetricsCollector.hit_rate
 
   # =========================================================================
   # AC-4: 公共黑板服务
   # =========================================================================
 
   场景: 公共黑板多 Agent 并发写入
-    假如 Agent "agent-A" 和 Agent "agent-B" 向 conversation "conv-001" 发布消息
-    当 调用 PublicBlackboard.get 读取 conversation "conv-001"
+    假如 Agent 发布消息
+    当 调用 PublicBlackboard.get 读取会话
     那么 返回所有 Agent 发布的消息
     并且 消息按时间戳排序
 
   场景: 公共黑板版本号递增
-    假如 Agent "agent-A" 向 conversation "conv-002" 发布第 1 条消息
-    当 Agent "agent-A" 再次向 conversation "conv-002" 发布消息
-    那么 返回的版本号递增为 2
+    假如 Agent 向会话发布第 1 条消息
+    当 Agent 再次向会话发布消息
+    那么 返回的版本号递增
 
   # =========================================================================
   # AC-1: 优雅降级（细化为 3 个子场景）
@@ -93,11 +92,10 @@
 
   场景: Redis 键命名规范
     假如 所有存储服务使用 KeyBuilder 构建键名
-    当 构建键名 namespace="session", key="abc-123"
-    那么 键名遵循 "sisys:{namespace}:{key}" 格式
+    当 构建键名 namespace
+    那么 键名遵循格式
 
   场景: Redis 键批量清理
-    假如 命名空间 "session" 下有 5 个键
-    当 调用 RedisCleanup.cleanup_namespace("session")
-    那么 返回删除的键数量为 5
-    并且 所有 "session" 命名空间下的键被删除
+    假如 命名空间下有多个键
+    当 调用 RedisCleanup.cleanup_namespace
+    那么 返回删除的键数量
