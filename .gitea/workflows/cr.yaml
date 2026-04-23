@@ -261,7 +261,6 @@ jobs:
           export SISYS_USE_TEST_PORTS=true
 
           # 使用 host.docker.internal 访问宿主机上由 docker compose 映射的端口
-          # 与 ci.yaml 集成测试保持一致
           export REDIS_HOST=host.docker.internal
           export POSTGRES_HOST=host.docker.internal
           export QDRANT_HOST=host.docker.internal
@@ -269,24 +268,15 @@ jobs:
           export NEO4J_HOST=host.docker.internal
           export RABBITMQ_HOST=host.docker.internal
 
-          # 从 setup job 获取配置
-          TEST_DIRS="${{ needs.setup.outputs.test_dirs }}"
-          PROCESSES="${{ needs.setup.outputs.processes }}"
-          THREADS="${{ needs.setup.outputs.threads }}"
-          MODE="${{ needs.setup.outputs.mode }}"
-          MAX_ROUNDS="${{ needs.setup.outputs.max_rounds }}"
-          INTERVAL="${{ needs.setup.outputs.interval }}"
-          FAIL_FAST="${{ needs.setup.outputs.fail_fast }}"
-          TIMESTAMP="${{ needs.setup.outputs.timestamp }}"
-
-          echo "TEST_DIRS=$TEST_DIRS" >> $GITHUB_ENV
-          echo "PROCESSES=$PROCESSES" >> $GITHUB_ENV
-          echo "THREADS=$THREADS" >> $GITHUB_ENV
-          echo "MODE=$MODE" >> $GITHUB_ENV
-          echo "MAX_ROUNDS=$MAX_ROUNDS" >> $GITHUB_ENV
-          echo "INTERVAL=$INTERVAL" >> $GITHUB_ENV
-          echo "FAIL_FAST=$FAIL_FAST" >> $GITHUB_ENV
-          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+          # 从 setup job 获取配置，输出到 GITHUB_ENV
+          echo "TEST_DIRS=${{ needs.setup.outputs.test_dirs }}" >> $GITHUB_ENV
+          echo "PROCESSES=${{ needs.setup.outputs.processes }}" >> $GITHUB_ENV
+          echo "THREADS=${{ needs.setup.outputs.threads }}" >> $GITHUB_ENV
+          echo "MODE=${{ needs.setup.outputs.mode }}" >> $GITHUB_ENV
+          echo "MAX_ROUNDS=${{ needs.setup.outputs.max_rounds }}" >> $GITHUB_ENV
+          echo "INTERVAL=${{ needs.setup.outputs.interval }}" >> $GITHUB_ENV
+          echo "FAIL_FAST=${{ needs.setup.outputs.fail_fast }}" >> $GITHUB_ENV
+          echo "TIMESTAMP=${{ needs.setup.outputs.timestamp }}" >> $GITHUB_ENV
 
       - name: 显示配置
         run: |
