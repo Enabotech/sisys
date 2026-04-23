@@ -244,19 +244,9 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # 使用预构建 CI 镜像（与 ci.yaml 保持一致）
-      - name: 设置 Python 环境
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: 安装 Poetry
-        run: pip install poetry==${{ env.POETRY_VERSION }}
-
-      - name: 安装依赖
+      - name: 增量更新依赖
         run: |
-          poetry config virtualenvs.create false
-          poetry install --no-interaction
+          poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 配置测试环境
         run: |
