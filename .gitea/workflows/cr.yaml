@@ -321,16 +321,15 @@ jobs:
             FAILED_PROCS=()
 
             for ((i=1; i<=PROCESSES; i++)); do
-              # 每行分配一个测试目录（支持重复以充分利用多进程）
-              COL=$(( (i - 1) % ${#TEST_DIR_ARRAY[@]} ))
-              TEST_DIR="${TEST_DIR_ARRAY[$COL]}"
+              # 随机打乱目录顺序，每个进程都运行全部目录
+              TEST_DIRS_SHUFFLED=$(echo "$TEST_DIRS" | tr ',' '\n' | shuf | tr '\n' ',' | sed 's/,$//')
 
               LOG_FILE="${LOG_DIR}/round${ROUND}_proc${i}.log"
 
-              echo "进程 $i -> 测试: $TEST_DIR"
+              echo "进程 $i -> 测试: $TEST_DIRS_SHUFFLED"
 
-              # 后台运行测试
-              poetry run pytest "$TEST_DIR" -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
+              # 后台运行测试（每个进程运行全部目录）
+              poetry run pytest $TEST_DIRS_SHUFFLED -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
               PID=$!
               PIDS+=($PID)
               echo "  启动 PID: $PID"
