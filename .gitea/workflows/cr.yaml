@@ -186,16 +186,21 @@ jobs:
           echo "触发者: ${{ github.actor }}"
 
   # ===========================================================================
-  # 阶段 2: 启动测试服务
+  # 阶段 2: 运行持续回归测试
   # ===========================================================================
-  services:
-    name: "🚀 启动服务"
+  regression:
+    name: "🔥 持续回归测试"
     runs-on: gpu
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root --add-host=host.docker.internal:host-gateway
-    needs: setup
-    timeout-minutes: 30
+    needs: [setup]
+    timeout-minutes: 240  # 4小时超时，防止无限运行
+
+    outputs:
+      total_rounds: ${{ steps.run_regression.outputs.total_rounds }}
+      total_passed: ${{ steps.run_regression.outputs.total_passed }}
+      total_failed: ${{ steps.run_regression.outputs.total_failed }}
 
     steps:
       - name: 检出代码
@@ -222,27 +227,6 @@ jobs:
             sleep 3
           done
           docker compose -f ./deploy/app/docker-compose.yml ps
-
-  # ===========================================================================
-  # 阶段 3: 运行持续回归测试
-  # ===========================================================================
-  regression:
-    name: "🔥 持续回归测试"
-    runs-on: gpu
-    container:
-      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root --add-host=host.docker.internal:host-gateway
-    needs: [setup, services]
-    timeout-minutes: 240  # 4小时超时，防止无限运行
-
-    outputs:
-      total_rounds: ${{ steps.run_regression.outputs.total_rounds }}
-      total_passed: ${{ steps.run_regression.outputs.total_passed }}
-      total_failed: ${{ steps.run_regression.outputs.total_failed }}
-
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
 
       - name: 增量更新依赖
         run: |
@@ -463,7 +447,7 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 4: 生成报告
+  # 阶段 3: 生成报告
   # ===========================================================================
   report:
     name: "📊 测试报告"
