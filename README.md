@@ -45,7 +45,7 @@ sisys/
 ├── src/                          # 六边形架构核心
 │   ├── domain/                   # 领域层（零外部依赖 - FR-AR-01）
 │   ├── application/              # 应用层（用例编排）
-│   ├── infrastructure/           # 基础设施层（五层存储/消息总线）
+│   ├── infrastructure/           # 基础设施层（六层存储/消息总线）
 │   └── interfaces/               # 接口层（CLI/REST API）
 ├── tests/                        # 测试（unit/integration/e2e）
 ├── scripts/                      # 脚本（database/deployment/testing/monitoring）
@@ -58,7 +58,7 @@ sisys/
 **关键架构约束：**
 - ✅ 领域层不依赖任何外部框架（FR-AR-01）
 - ✅ 基础设施层实现领域层接口
-- ✅ 五层存储：Redis → PostgreSQL → Qdrant → MinIO → Neo4j
+- ✅ 六层存储：Redis → PostgreSQL → Qdrant → MinIO → Neo4j
 - ✅ 事件驱动：RabbitMQ + Redis 双通道总线
 
 ---

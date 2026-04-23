@@ -1,7 +1,7 @@
 version: "3.8"
 
 # SISYS 企业应用 Docker Compose 编排配置
-# 部署内容：SISYS App + 五层存储（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）+ Traefik
+# 部署内容：SISYS App + 六层存储（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）+ Traefik
 
 networks:
   sisys-network:

@@ -549,7 +549,7 @@ sisys/
 - 🔄 Story 1.3（事件总线实现）- `InMemoryOutboxRepository`、`IdempotencyChecker`、`RetryPolicy`（review 状态，功能基本可用）
 
 **本 Story 不依赖的故事（使用 Mock 替代）：**
-- Story 1.4-1.8（五层存储实现）- 使用 `unittest.mock.AsyncMock` 模拟
+- Story 1.4-1.8（六层存储实现）- 使用 `unittest.mock.AsyncMock` 模拟
 - Story 1.9-1.12（安全与合规）- 不影响集成测试
 - Story 1.13+（其他机制）- 不影响基础集成测试
 - Story 7.x（CLI/API 接口）- 使用应用层骨架替代

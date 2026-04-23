@@ -163,7 +163,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 | `docker/docker-compose.test.yml` | 测试编排 | 自动清理测试数据 |
 | `scripts/testing/run_tests.sh` | 测试运行 | 单元/集成/E2E 测试 |
 | `scripts/testing/run_coverage.sh` | 覆盖率报告 | HTML/XML 生成 |
-| `scripts/testing/clean_test_data.py` | 清理工具 | 五层存储数据清理 |
+| `scripts/testing/clean_test_data.py` | 清理工具 | 六层存储数据清理 |
 | `.pre-commit-config.yaml` | Pre-commit | 代码质量钩子 |
 | `docs/developer/testing_guide.md` | 测试指南 | 使用文档 |
 | `docs/developer/cicd_quick_reference.md` | CI/CD 参考 | 快速参考卡片 |
@@ -180,7 +180,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 **关键架构约束验证（CI 流水线职责）：**
 1. ✅ **领域层零依赖**（FR-AR-01）：CI 应运行导入检查，确保 `src/domain/` 仅依赖 Python 标准库
 2. ✅ **事件驱动架构**（FR-AR-02）：集成测试验证领域事件发布至事件总线
-3. ✅ **五层存储依赖方向**：`L1→L2→L3→L4→L5` 单向依赖（architecture.md 第 11 章）
+3. ✅ **六层存储依赖方向**：`L1→L2→L3→L4→L5` 单向依赖（architecture.md 第 11 章）
 4. ✅ **UDMR/EIP 审计日志**：验证路由决策日志和隔离切换日志归档至 MinIO WORM
 
 ### 2026 CI/CD 最佳实践（来自网络研究）
@@ -265,7 +265,7 @@ make tdd-refactor TARGET=domain/entities # 重构阶段：优化代码
 ### Completion Notes List
 
 - ✅ 故事需求从 epics_v1.0.md 提取
-- ✅ 架构约束从 architecture.md 提取（六边形架构、五层存储、事件驱动）
+- ✅ 架构约束从 architecture.md 提取（六边形架构、六层存储、事件驱动）
 - ✅ 前一个故事学习经验整合（Story 0.1 开发环境搭建）
 - ✅ 2026 CI/CD 最佳实践研究（GitHub Actions、Docker 生产部署）
 - ✅ 项目结构对齐统一项目结构

@@ -36,7 +36,7 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
 
 **产品交付系统定位：** 本 Story 属于"轨道 2：产品交付系统"，面向客户部署 **SISYS 企业应用本身**（非开发 CI/CD 工具链）。
 
-**部署内容：** SISYS 核心应用 + 五层存储基础设施（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）+ Traefik 反向代理。
+**部署内容：** SISYS 核心应用 + 六层存储基础设施（Redis/PostgreSQL/Qdrant/MinIO/Neo4j）+ Traefik 反向代理。
 
 **与已完成 Story 的区别：**
 - Story 0-4 ~ 0-9 部署的是**开发 CI/CD 工具链**（K3s/Gitea/Harbor/ArgoCD）— 面向开发团队
@@ -94,7 +94,7 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
    **And** 启动 Docker 服务并设置开机自启
    **And** 已安装 Docker 时跳过安装并验证版本
 
-5. **Given** 需要拉取 SISYS 应用及五层存储组件的 Docker 镜像
+5. **Given** 需要拉取 SISYS 应用及六层存储组件的 Docker 镜像
    **When** 脚本执行镜像拉取
    **Then** 优先尝试配置的国内镜像源（阿里云 ACR / 腾讯云镜像仓库）
    **And** 主镜像源失败时自动切换备用源（Docker Hub 官方源）
@@ -132,7 +132,7 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
    | MinIO Console | 9001 | MinIO 管理控制台 | 9002-9011 |
    | Neo4j | 7687 | L5 图存储 | 7688-7697 |
 
-7. **Given** SISYS 依赖五层存储
+7. **Given** SISYS 依赖六层存储
    **When** Docker Compose 启动服务
    **Then** 每个存储组件都配置 Docker Volume 或 Bind Mount 实现数据持久化
    **And** 数据目录创建于 `/opt/sisys/data/<component>/`
@@ -269,7 +269,7 @@ so that **无需手动配置即可让高管团队使用 SISYS 进行战略规划
     - **实施日期**: 2026-04-11
     - **版本锁定**: RELEASE.2024-01-16T16-07-38Z
   - [x] T2.5: 定义 Neo4j 服务（L5 图存储，Volume 持久化，健康检查 Bolt 端口）✅
-  - [x] T2.6: 定义 SISYS App 服务（依赖五层存储，环境变量配置，健康检查 `/health`）✅
+  - [x] T2.6: 定义 SISYS App 服务（依赖六层存储，环境变量配置，健康检查 `/health`）✅
   - [x] T2.7: 定义 Traefik 服务（反向代理，HTTP→HTTPS 重定向，Docker Provider，健康检查 `/ping`）✅
   - [x] T2.8: 配置 Docker 网络（sisys-network，组件间内部通信）✅
   - [x] T2.9: 创建 .env.example 模板（端口、密码、镜像仓库地址）✅
@@ -346,8 +346,8 @@ sisys/delivery/
 
 **来源:** [Source: _bmad-output/planning-artifacts/architecture.md §1.2 系统公理二] + [Source: _bmad-output/planning-artifacts/epic0-design.md#轨道 2: 产品交付系统详细架构]
 
-1. **产品交付系统定位：** Linux 一键脚本部署的是 **SISYS 企业应用 + 五层存储**，面向客户使用
-2. **五层存储协同：** 必须按架构文档定义的 L1-L5 部署，TTL 和容量规划需符合架构要求
+1. **产品交付系统定位：** Linux 一键脚本部署的是 **SISYS 企业应用 + 六层存储**，面向客户使用
+2. **六层存储协同：** 必须按架构文档定义的 L1-L5 部署，TTL 和容量规划需符合架构要求
 3. **领域层零依赖：** SISYS App 容器内部的领域层代码不依赖外部框架（仅 Python 标准库）
 4. **事件驱动基础：** Redis 发布/订阅（MVP），RabbitMQ 延至 V1
 5. **安全约束：** 所有外部端口通过 Traefik 统一暴露，组件间内部网络隔离
@@ -492,7 +492,7 @@ deploy/tests/
 
 - [Source: _bmad-output/planning-artifacts/epics_v1.0.md#Story 0.16] - Epic 文档中的 Story 定义
 - [Source: _bmad-output/planning-artifacts/epic0-design.md#轨道 2: 产品交付系统详细架构] - 产品交付系统架构
-- [Source: _bmad-output/planning-artifacts/architecture.md §1.2] - 系统公理二：五层存储架构
+- [Source: _bmad-output/planning-artifacts/architecture.md §1.2] - 系统公理二：六层存储架构
 - [Source: _bmad-output/planning-artifacts/architecture.md §4] - UDMR 统一动态模型路由
 - [Source: _bmad-output/planning-artifacts/architecture.md §11] - 存储架构设计
 - [Source: docs/delivery/LINUX_INSTALLER.md] - Linux 安装程序制作参考指南

@@ -23,7 +23,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的第四个存储 Story，实现 L4 对象存储层。MinIO 对象存储是系统的关键基础设施，负责：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的第四个存储 Story，实现 L4 对象存储层。MinIO 对象存储是系统的关键基础设施，负责：
 
 1. **原始文档 BLOB 存储** - 支持 17 种格式文档的持久化存储，Bucket 命名规范（documents/audit-logs/versions/backups）
 2. **版本快照与断点续传** - MinIO 版本控制启用，分片上传（基于总大小 20GB 动态批次），断点续传记录上传 ID 与分片 ETag
@@ -533,7 +533,7 @@
 
 ### 关键架构决策
 
-**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 五层存储架构
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - 决策 4 (ADR-004): 六层存储架构
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
@@ -646,7 +646,7 @@ sisys/
 ### 完成清单 Completion Notes List
 
 - [x] 故事需求从 `epics_v1.0.md` 提取（Story 1.7: MinIO 对象存储层）
-- [x] 架构约束从 `architecture.md` 提取（五层存储架构、L4 对象存储层）
+- [x] 架构约束从 `architecture.md` 提取（六层存储架构、L4 对象存储层）
 - [x] 前一个故事学习经验整合
 - [x] 状态设置为 `done`
 - [x] SDD+TDD 融合开发要求定义完成
@@ -690,7 +690,7 @@ sisys/
 | **File** | `_bmad-output/implementation-artifacts/stories/1-7-minio-object-layer.md` |
 | **Status** | `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P0-7 |
 | **覆盖 FR** | FR-SC-03, FR-SA-01 |
 | **覆盖 NFR** | NFR-COMP-02, NFR-COMP-05 |
@@ -699,7 +699,7 @@ sisys/
 
 1. [x] All tasks defined 所有任务定义完成
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 至 AC-4）
-3. [x] Architecture constraints extracted 架构约束已提取（五层存储、L4 对象存储层、WORM 合规）
+3. [x] Architecture constraints extracted 架构约束已提取（六层存储、L4 对象存储层、WORM 合规）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `done`
 6. [x] 105 测试全部通过（0 失败）

@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（五层存储架构）的最后一个故事，在 Story 1.4/1.5（Redis/PostgreSQL 层）完成后实现 K8s 动态扩缩容能力。核心价值：
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 3（六层存储架构）的最后一个故事，在 Story 1.4/1.5（Redis/PostgreSQL 层）完成后实现 K8s 动态扩缩容能力。核心价值：
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -25,7 +25,7 @@
 | **扩缩容响应时间** | 流量高峰时快速扩容 | 响应时间<5 分钟（K8s HPA 指标采集+决策+执行） |
 | **HPA 资源指标** | 补充 CPU/内存利用率监控 | 指标与 K8s metrics-server 协同 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 五层存储架构，Story 1.13
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 3: 六层存储架构，Story 1.13
 
 **NFR 追溯:** NFR-SCALE-03（Agent 动态扩缩容，基于负载自动伸缩，响应时间<5 分钟）
 
@@ -668,7 +668,7 @@ Story 0.4 (K3S 集群) → Story 1.13 (K8s 扩缩容)
 | **File** | `_bmad-output/implementation-artifacts/stories/1-13-k8s-auto-scaling.md` |
 | **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 3: 五层存储架构 |
+| **价值组** | 价值组 3: 六层存储架构 |
 | **优先级** | P1-13（NFR-SCALE-03） |
 | **覆盖 FR** | NFR-SCALE-03（Agent 动态扩缩容，响应时间<5 分钟） |
 | **依赖 Story** | Story 1.3（EventMetricsCollector），Story 1.4（Redis 缓存层） |

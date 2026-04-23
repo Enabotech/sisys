@@ -87,15 +87,22 @@ sisys 是面向大中型企业高管团队、企业战略与市场体系人员�
 | **模型路由** | LiteLLM | 最新 | 统一 LLM 代理 |
 | **嵌入模型** | bge-m3 | 最新 | 向量嵌入（1024 维） |
 
-### 2.2 存储层（五层架构）
+### 2.2 存储层（六层架构）
 
 | 层级 | 技术 | 版本 | 存储内容 | TTL |
 |------|------|------|---------|-----|
-| **L1 高速缓存** | Redis | 7.0+ | 会话状态、语义缓存、公共黑板 | 24h-30d |
-| **L2 关系存储** | PostgreSQL | 15+ | 用户/RBAC、审计元数据、业务实体 | 永久 |
-| **L3 向量存储** | Qdrant | 1.7+ | 嵌入向量、混合检索 payload | 永久 |
-| **L4 对象存储** | MinIO | 最新 | 原始文档、证据包、审计归档 | 7 年 (WORM) |
+| **L0 记忆入口** | 文件系统 | - | MEMORY.md 索引、路由策略 | 永久 |
+| **L1 高速缓存** | Redis | 7.0+ | 会话状态、语义缓存、公共黑板、记忆缓存 | 24h-30d |
+| **L2 关系存储** | PostgreSQL | 15+ | 用户/RBAC、审计元数据、**memory_metadata**、**memory_change_history** | 永久 |
+| **L3 向量存储** | Qdrant | 1.7+ | 嵌入向量、混合检索 payload、记忆 embedding | 永久 |
+| **L4 对象存储** | MinIO | 最新 | 原始文档、证据包、审计归档、**StrategicArchive** | 7 年 (WORM) |
 | **L5 图存储** | Neo4j | 5.x | 知识图谱、实体关系、依赖图 | 永久 |
+
+**L1 Redis 缓存职责分离**：
+- 会话状态缓存：Agent 会话状态（TTL 24h-30d），由 Story 6.3 Checkpoint 写入
+- 语义缓存：RAG 检索加速（相似度>0.9 命中，TTL 24h），由 Epic 3 实现
+- 公共黑板：多 Agent 共享中间状态（TTL 1h），由 Epic 5 Agent 协作写入
+- 记忆缓存：memory:xxx key（TTL 24h-30d），由 Story 1.15b 管理
 
 ### 2.3 消息与事件
 
@@ -198,6 +205,16 @@ trigger(事件) → route(路由) → execute(执行)
 - **压缩前必须持久化**：防止信息丢失
 - **上下文压缩率目标**：≥70%
 - **循环流程**：检索->持久化笔记->压缩->LLM 上下文注入->生成与验证->反馈与演进
+
+**两种记忆机制（职责分离）**：
+
+| 机制 | 触发 | 实现 | 存储目标 |
+|------|------|------|---------|
+| **StrategicArchive** | Checkpoint 创建（自动） | Epic 6 / Story 6.3 | L0-L5 六层 |
+| **MemoryMetadata** | 用户确认记忆（手动） | Epic 1 / Story 1.15a/b | L0 文件系统 + L2 PostgreSQL |
+
+- StrategicArchive：PersistentNoteTaker.take_notes() 持久化笔记，关联 CheckpointSnapshot
+- MemoryMetadata：用户主动保存的记忆，触发 MemoryChanged(is_automatic=False) 事件
 
 ### 3.3 事件驱动架构
 
@@ -377,7 +394,7 @@ sisys/
 │       ├── repositories/          # 仓储实现
 │       ├── external_services/     # 外部服务适配器
 │       ├── message_bus/           # 消息总线实现
-│       ├── storage/               # 五层存储实现
+│       ├── storage/               # 六层存储实现
 │       └── workflow_engines/      # Prefect/LangGraph 包装器
 ├── tests/
 │   ├── unit/                      # 单元测试
@@ -666,6 +683,8 @@ bandit -r src/                           # 安全扫描
 | **StrategicArchive** | 关键假设、决策依据、执行偏差 | 向量+对象存储协同、不可变存储 |
 | **RoutingDecisionLog** | 任务 ID、评分、选定模型、成本 | WORM 存储 7 年 |
 | **IsolationSwitchLog** | Agent ID、隔离等级、触发原因 | WORM 存储 7 年 |
+| **MemoryMetadata** | user_id、memory_type、content_hash、embedding_ref、L0_ref、L2_ref | 用户手动确认的记忆，private/group 分离 |
+| **MemoryChangeHistory** | memory_id、change_type、old/new_value、actor、timestamp | 记忆变更历史，不可变追加 |
 
 ---
 
@@ -685,6 +704,7 @@ bandit -r src/                           # 安全扫描
 | **IsolationLevelSwitched** | Agent ID、原/目标等级、触发原因 | 公共黑板更新、状态同步 |
 | **CheckpointRecovered** | Checkpoint ID、恢复模式、修改内容 | 战略档案更新、分支管理 |
 | **RoutingDecided** | 任务 ID、评分、选定模型 | 路由决策日志存储、成本监控 |
+| **MemoryChanged** | memory_id、user_id、change_type、is_automatic、old/new_value | L0 MEMORY.md 更新、L2 history 追加 |
 
 ---
 
@@ -960,6 +980,7 @@ class SAPMessage(BaseModel):
 | IsolationLevelSwitched | 公共黑板权限更新、协作状态同步 |
 | CheckpointRecovered | 战略档案库版本更新、分支管理 |
 | RoutingDecided | 路由决策日志存储、成本监控 |
+| MemoryChanged | L0 MEMORY.md 更新、L2 memory_change_history 追加、RBAC 校验 |
 
 **事件处理幂等性保证：**
 

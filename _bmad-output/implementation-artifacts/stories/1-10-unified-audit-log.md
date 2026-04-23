@@ -11,7 +11,7 @@
 > 2. **复用 Story 1.9 AuthService/PermissionService** — 审计日志记录 actor 信息来源
 > 3. **事务发件箱模式** — 审计事件与业务操作同事务提交，保证可靠性
 > 4. **双通道事件总线** — RabbitMQ + WORM 归档用于审计事件（架构 ADR-003）
-> 5. **五层存储架构** — 审计元数据存 L2 (PostgreSQL)，完整审计归档存 L4 (MinIO WORM)
+> 5. **六层存储架构** — 审计元数据存 L2 (PostgreSQL)，完整审计归档存 L4 (MinIO WORM)
 > 6. **等保 2.0 + SOX 合规** — 审计日志 7 年不可变存储
 
 ---
@@ -586,7 +586,7 @@
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
 
-- **五层存储架构:** L2 关系存储层（PostgreSQL 15+）存储审计元数据，L4 对象存储层（MinIO WORM）存储完整审计归档
+- **六层存储架构:** L2 关系存储层（PostgreSQL 15+）存储审计元数据，L4 对象存储层（MinIO WORM）存储完整审计归档
 - **双通道事件总线:**
   - 实时通知型: Redis 发布/订阅
   - 业务状态型: RabbitMQ + Outbox
