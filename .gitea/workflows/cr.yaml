@@ -358,7 +358,7 @@ jobs:
 
                 if [ -f "$LOG_FILE" ]; then
                   echo "    失败详情:"
-                  grep -E "(FAILED|ERROR|AssertionError)" "$LOG_FILE" | head -5 || true
+                  tail -20 "$LOG_FILE"
                 fi
               fi
             done
