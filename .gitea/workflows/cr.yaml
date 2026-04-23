@@ -321,15 +321,15 @@ jobs:
             FAILED_PROCS=()
 
             for ((i=1; i<=PROCESSES; i++)); do
-              # 随机打乱目录顺序，每个进程都运行全部目录
-              TEST_DIRS_SHUFFLED=$(echo "$TEST_DIRS" | tr ',' '\n' | shuf | tr '\n' ',' | sed 's/,$//')
+              # 随机打乱目录顺序，每个进程都运行全部目录（空格分隔）
+              TEST_DIRS_SHUFFLED=$(echo "$TEST_DIRS" | tr ',' '\n' | shuf | tr '\n' ' ' | sed 's/ $//')
 
               LOG_FILE="${LOG_DIR}/round${ROUND}_proc${i}.log"
 
               echo "进程 $i -> 测试: $TEST_DIRS_SHUFFLED"
 
-              # 后台运行测试（每个进程运行全部目录，禁用 coverage 避免多进程冲突）
-              poetry run pytest $TEST_DIRS_SHUFFLED -n "$THREADS" -v --tb=short --no-cov > "$LOG_FILE" 2>&1 &
+              # 后台运行测试（每个进程运行全部目录）
+              poetry run pytest $TEST_DIRS_SHUFFLED -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
               PID=$!
               PIDS+=($PID)
               echo "  启动 PID: $PID"
@@ -358,7 +358,7 @@ jobs:
 
                 if [ -f "$LOG_FILE" ]; then
                   echo "    失败详情:"
-                  tail -20 "$LOG_FILE"
+                  grep -E "(FAILED|ERROR|AssertionError)" "$LOG_FILE" | head -5 || true
                 fi
               fi
             done
