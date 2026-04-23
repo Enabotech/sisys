@@ -728,8 +728,8 @@ Story 0.3 (测试框架搭建):
 | Story 1.14a | **自主调用循环 - trigger** | 实现领域事件/心跳事件触发机制 | 依赖 Story 1.2/1.3 | **P0-14a（or.md 系统公理一）** |
 | Story 1.14b | **自主调用循环 - route** | 实现 session_id 哈希/语义路由 | 依赖 Story 1.14a | **P0-14b（or.md 系统公理一）** |
 | Story 1.14c | **自主调用循环 - execute** | 实现会话命名空间执行与状态快照 | 依赖 Story 1.14b | **P0-14c（or.md 系统公理一）** |
-| Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4 | **P0-15a（or.md 系统公理二）** |
-| Story 1.15b | **外部化记忆 - L0 入口 + 六层存储协同** | 实现 L0 MEMORY.md 入口与 L1-L5 六层存储协同 | 依赖 Story 1.15a, 1.4-1.8 | **P0-15b（or.md 系统公理二）** |
+| Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4（提供 L1 Redis、L2 PostgreSQL）+ Story 1.14c（提供 Checkpoint 创建上下文） | **P0-15a（or.md 系统公理二）** |
+| Story 1.15b | **外部化记忆 - L0 入口 + 六层存储协同** | 实现 L0 MEMORY.md 入口与 L1-L5 六层存储协同 | 依赖 Story 1.15a（提供压缩前持久化）+ Story 1.4（提供 L0 文件系统、L1 Redis、L2 PostgreSQL 基础表结构） | **P0-15b（or.md 系统公理二）** |
 
 **📦 价值组 6: MVP 关键机制增强（Party Mode 评审新增）**
 > 加强 Additional Requirements 覆盖率，验证 MVP 商业假设
@@ -1867,6 +1867,29 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
   - StrategicArchive：Checkpoint 持久化（自动），由 PersistentNoteTaker 写入
   - MemoryMetadata/MemoryChangeHistory：用户主动记忆（手动），由用户确认后写入
 - **压缩率要求**：≥70%（50K tokens → ~2K tokens）
+- **PersistentNoteTaker 执行步骤**：
+  1. 提取关键实体（Top-20）→ StrategicArchive（L0-L5）
+  2. 生成结构化摘要 → PostgreSQL（L2）
+  3. 记录血缘 → 审计日志 + WORM 归档（L2+L4）
+  4. 输出：PersistentNote (note_id, entities, summary, lineage)
+
+**StrategicArchive vs MemoryMetadata 数据流**：
+
+```
+用户主动记忆（手动）：
+  用户确认 → MemoryService.save() → 写入 ~/.sisys/memory/*.md
+                                        ↓
+                                  更新 MEMORY.md 索引
+                                        ↓
+                                  发布 MemoryChanged(is_automatic=False)
+
+Checkpoint 持久化（自动）：
+  Checkpoint 创建 → PersistentNoteTaker.take_notes() → StrategicArchive
+                                        ↓
+                                  关联 persistent_note_ref
+                                        ↓
+                                  发布 MemoryChanged(is_automatic=True)
+```
 
 **Acceptance Criteria:**
 
@@ -1874,14 +1897,14 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
 
 1. **架构测试**
    - [ ] 上下文压缩测试 - 验证压缩机制
-   - [ ] 压缩率测试 - 验证压缩率≥70%
+   - [ ] 压缩率测试 - 验证压缩率≥70%（允许误差 -5%）
    - [ ] 持久化测试 - 验证 PersistentNoteTaker 持久化笔记
    - [ ] StrategicArchive vs MemoryMetadata 职责分离测试
 
 2. **性能要求**
-   - [ ] 压缩率≥70%
-   - [ ] 压缩延迟 P95<20ms
-   - [ ] 持久化成功率 100%
+   - [ ] 压缩率≥70%（50K tokens → ~2K tokens，允许误差 -5%）
+   - [ ] 压缩延迟 P95<20ms（测量方式：LLM 任务中采样 100 次）
+   - [ ] 持久化成功率 100%（无 persistent_note_ref 不允许序列化）
 
 3. **覆盖率要求**
    - [ ] 架构层覆盖率≥85%
@@ -1899,11 +1922,15 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** LLM 任务执行需要访问记忆
+**Given** 用户说"记住，以后用 bun 而不是 npm"
 **When** 上下文压缩机制执行
-**Then** LLM 上下文仅保留当前任务必需的压缩信息（压缩率≥70%）
+**Then** 执行步骤：
+  1. PersistentNoteTaker.take_notes() 持久化原始上下文
+  2. 压缩上下文（50K → ~2K tokens，压缩率≥70%）
+  3. 创建 CheckpointSnapshot（persistent_note_ref 不为空）
+  4. MemoryChanged 事件发布（is_automatic=True）
+**And** LLM 上下文仅保留压缩后的 ~2K tokens
 **And** 压缩前执行持久化笔记步骤（PersistentNoteTaker → StrategicArchive）
-**And** MemoryChanged 事件发布，触发 L2 元数据同步
 
 ### Story 1.15b: 外部化记忆 - L0 记忆入口 + 六层存储协同实现
 
@@ -1922,6 +1949,28 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 - **CRUD 操作**：完整创建/读取/更新/删除，带版本冲突处理（乐观锁）
 - **事件驱动**：MemoryChanged 事件触发元数据同步、缓存失效
 
+**MemoryChanged 事件下游用例**：
+  - MemoryChangedListener 触发：
+    1. 写入 memory_metadata（UPSERT，version + 1）
+    2. 写入 memory_change_history（append-only）
+    3. 失效 L1 Redis 缓存（redis.del("memory:{name}")）
+    4. 可选：更新 L3 Qdrant 向量索引（文件>500时）
+
+**RBAC 校验**：
+  - private 记忆（group_id=NULL）：
+    - 读取：验证当前用户是所有者（owner == user_id）
+    - 写入：验证当前用户是所有者
+  - group 记忆（group_id != NULL）：
+    - 读取：验证当前用户是 group 成员
+    - 写入：验证当前用户是 group 成员或有管理员权限
+  - 校验失败：抛出 MemoryAccessDeniedError
+
+**错误处理**：
+  - VersionConflictError：并发更新同一记忆时，提示用户确认后强制覆盖
+  - MemoryAccessDeniedError：RBAC 校验失败
+  - MemoryNotFoundError：删除或更新不存在的记忆
+  - StorageWriteError：L0/L2 写入失败，保留重试机制（最多 3 次）
+
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
@@ -1935,10 +1984,10 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
    - [ ] 版本冲突测试 - 验证乐观锁处理
 
 2. **性能要求**
-   - [ ] Redis TTL 24h-30d
-   - [ ] MinIO WORM 7 年
-   - [ ] L0→L2 元数据同步延迟 <100ms
-   - [ ] 持久化成功率 100%
+   - [ ] Redis TTL 24h-30d（测量方式：redis TTL 命令验证）
+   - [ ] MinIO WORM 7 年（测量方式：Object Lock 配置验证）
+   - [ ] L0→L2 元数据同步延迟 <100ms（异步写入，不阻塞主流程）
+   - [ ] 持久化成功率 100%（测量方式：Checkpoint 创建时 persistent_note_ref 不为空）
 
 3. **覆盖率要求**
    - [ ] 架构层覆盖率≥85%
@@ -1957,17 +2006,16 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** LLM 任务执行需要持久化记忆
+**Given** 用户通过 CLI 执行 `sisys memory save "记住以后用 bun"`
 **When** 六层存储协同机制执行
-**Then** 会话状态与推理轨迹持久化存储至六层存储：
-  - L0 文件系统（MEMORY.md 索引，永久）
-  - L1 Redis（会话状态、语义缓存，TTL 24h-30d）
-  - L2 PostgreSQL（用户/RBAC、审计元数据、业务实体，永久）
-  - L3 Qdrant（嵌入向量、混合检索 payload，永久）
-  - L4 MinIO（原始文档、证据包、审计归档，7 年 WORM）
-  - L5 Neo4j（知识图谱、实体关系，永久，可选）
-**And** 压缩前执行持久化笔记步骤防止信息丢失
-**And** MEMORY.md 索引驱动各层存储访问
+**Then** 执行步骤：
+  1. 验证用户 RBAC 权限
+  2. 写入 ~/.sisys/memory/feedback_bun.md（实际内容）
+  3. 更新 MEMORY.md 索引（追加一行）
+  4. 异步写入 memory_metadata（version=1, mtime=NOW()）
+  5. 异步写入 memory_change_history（change_type='create'）
+  6. L1 Redis 缓存新记忆内容（TTL 24h-30d）
+**And** L0→L2 元数据同步延迟 <100ms
 **And** Private 记忆仅用户自己可写，Group 记忆团队共享
 **And** MemoryChanged 事件触发 L2 元数据同步
 
@@ -5243,6 +5291,7 @@ graph TD
     S1_3 --> S1_14a
     S1_14a --> S1_14b
     S1_14b --> S1_14c
+    S1_4 --> S1_15a
     S1_14c --> S1_15a
     S1_15a --> S1_15b
 
