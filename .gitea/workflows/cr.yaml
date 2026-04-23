@@ -295,6 +295,7 @@ jobs:
 
       - name: 运行持续回归测试
         id: run_regression
+        shell: bash
         run: |
           # 初始化统计
           TOTAL_ROUNDS=0
