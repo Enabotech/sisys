@@ -279,6 +279,7 @@ jobs:
           echo "TIMESTAMP=${{ needs.setup.outputs.timestamp }}" >> $GITHUB_ENV
 
       - name: 显示配置
+        shell: bash
         run: |
           echo "=========================================="
           echo "   持续回归测试开始"
