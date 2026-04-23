@@ -328,8 +328,8 @@ jobs:
 
               echo "进程 $i -> 测试: $TEST_DIRS_SHUFFLED"
 
-              # 后台运行测试（每个进程运行全部目录）
-              poetry run pytest $TEST_DIRS_SHUFFLED -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
+              # 后台运行测试（每个进程运行全部目录，禁用 coverage 避免多进程冲突）
+              poetry run pytest $TEST_DIRS_SHUFFLED -n "$THREADS" -v --tb=short --no-cov > "$LOG_FILE" 2>&1 &
               PID=$!
               PIDS+=($PID)
               echo "  启动 PID: $PID"
