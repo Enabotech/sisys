@@ -248,7 +248,8 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
-      - name: 配置测试环境
+      - name: 运行持续回归测试
+        id: run_regression
         shell: bash
         run: |
           # 与 ci.yaml 保持一致：从 .env 加载环境变量
@@ -268,19 +269,16 @@ jobs:
           export NEO4J_HOST=host.docker.internal
           export RABBITMQ_HOST=host.docker.internal
 
-          # 从 setup job 获取配置，输出到 GITHUB_ENV
-          echo "TEST_DIRS=${{ needs.setup.outputs.test_dirs }}" >> $GITHUB_ENV
-          echo "PROCESSES=${{ needs.setup.outputs.processes }}" >> $GITHUB_ENV
-          echo "THREADS=${{ needs.setup.outputs.threads }}" >> $GITHUB_ENV
-          echo "MODE=${{ needs.setup.outputs.mode }}" >> $GITHUB_ENV
-          echo "MAX_ROUNDS=${{ needs.setup.outputs.max_rounds }}" >> $GITHUB_ENV
-          echo "INTERVAL=${{ needs.setup.outputs.interval }}" >> $GITHUB_ENV
-          echo "FAIL_FAST=${{ needs.setup.outputs.fail_fast }}" >> $GITHUB_ENV
-          echo "TIMESTAMP=${{ needs.setup.outputs.timestamp }}" >> $GITHUB_ENV
+          # 从 setup job 获取配置
+          TEST_DIRS="${{ needs.setup.outputs.test_dirs }}"
+          PROCESSES="${{ needs.setup.outputs.processes }}"
+          THREADS="${{ needs.setup.outputs.threads }}"
+          MODE="${{ needs.setup.outputs.mode }}"
+          MAX_ROUNDS="${{ needs.setup.outputs.max_rounds }}"
+          INTERVAL="${{ needs.setup.outputs.interval }}"
+          FAIL_FAST="${{ needs.setup.outputs.fail_fast }}"
+          TIMESTAMP="${{ needs.setup.outputs.timestamp }}"
 
-      - name: 显示配置
-        shell: bash
-        run: |
           echo "=========================================="
           echo "   持续回归测试开始"
           echo "=========================================="
@@ -293,10 +291,6 @@ jobs:
           echo "Fail-Fast: $FAIL_FAST"
           echo "=========================================="
 
-      - name: 运行持续回归测试
-        id: run_regression
-        shell: bash
-        run: |
           # 初始化统计
           TOTAL_ROUNDS=0
           TOTAL_PASSED=0
@@ -338,36 +332,29 @@ jobs:
 
             # 启动并行进程 - 真正并行执行
             declare -a PIDS=()
-            declare -a PROC_STATUS=()
             PASSED_THIS_ROUND=0
             FAILED_THIS_ROUND=0
             FAILED_PROCS=()
 
             for ((i=1; i<=PROCESSES; i++)); do
               # 每行分配一个测试目录（支持重复以充分利用多进程）
-              # 当目录数 < 进程数时，某些目录会被分配给多个进程
-              ROW=$(( (i - 1) / ${#TEST_DIR_ARRAY[@]} ))
               COL=$(( (i - 1) % ${#TEST_DIR_ARRAY[@]} ))
               TEST_DIR="${TEST_DIR_ARRAY[$COL]}"
 
               LOG_FILE="${LOG_DIR}/round${ROUND}_proc${i}.log"
 
-              echo "进程 $i -> 测试: $TEST_DIR (行$ROW)"
+              echo "进程 $i -> 测试: $TEST_DIR"
 
               # 后台运行测试
               poetry run pytest "$TEST_DIR" -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
               PID=$!
               PIDS+=($PID)
-              PROC_STATUS+=("running")
               echo "  启动 PID: $PID"
             done
 
             echo ""
             echo "等待所有进程完成..."
 
-            # 真正并行：先收集所有 PID，然后统一等待
-            # 使用数组记录每个进程的退出状态
-            declare -a EXIT_CODES=()
             ANY_FAILED=0
 
             for ((i=0; i<${#PIDS[@]}; i++)); do
@@ -375,21 +362,17 @@ jobs:
               PROC_NUM=$((i + 1))
               LOG_FILE="${LOG_DIR}/round${ROUND}_proc${PROC_NUM}.log"
 
-              # 等待单个进程
               if wait $PID; then
-                EXIT_CODES+=(0)
                 PASSED_THIS_ROUND=$((PASSED_THIS_ROUND + 1))
                 TOTAL_PASSED=$((TOTAL_PASSED + 1))
                 echo "  ✅ 进程 $PROC_NUM (PID: $PID): 通过"
               else
-                EXIT_CODES+=(1)
                 FAILED_THIS_ROUND=$((FAILED_THIS_ROUND + 1))
                 TOTAL_FAILED=$((TOTAL_FAILED + 1))
                 FAILED_PROCS+=($PROC_NUM)
                 ANY_FAILED=1
                 echo "  ❌ 进程 $PROC_NUM (PID: $PID): 失败"
 
-                # 显示失败摘要
                 if [ -f "$LOG_FILE" ]; then
                   echo "    失败详情:"
                   grep -E "(FAILED|ERROR|AssertionError)" "$LOG_FILE" | head -5 || true
@@ -397,10 +380,8 @@ jobs:
               fi
             done
 
-            # 清空 PIDS
             unset PIDS
 
-            # 输出轮次结果
             echo ""
             if [ "$ANY_FAILED" -eq 0 ]; then
               echo "✅ 第 ${ROUND} 轮: 全部通过 (通过: $PASSED_THIS_ROUND, 失败: $FAILED_THIS_ROUND)"
@@ -409,14 +390,12 @@ jobs:
               echo "   失败进程: ${FAILED_PROCS[*]}"
             fi
 
-            # 检查失败和 fail-fast
             if [ "$ANY_FAILED" -eq 1 ]; then
               if [ "$FAIL_FAST" = "true" ]; then
                 echo ""
                 echo "=========================================="
                 echo "⚠️  Fail-Fast 模式: 检测到失败，停止所有测试"
                 echo "=========================================="
-                # 保存失败日志到上传目录
                 mkdir -p /tmp/failure-logs
                 for proc in "${FAILED_PROCS[@]}"; do
                   LOG_FILE="${LOG_DIR}/round${ROUND}_proc${proc}.log"
@@ -428,19 +407,16 @@ jobs:
               fi
             fi
 
-            # oneshot 模式只运行一轮
             if [ "$MODE" = "oneshot" ]; then
               echo "oneshot 模式完成"
               break
             fi
 
-            # burnin 模式失败时停止
             if [ "$MODE" = "burnin" ] && [ "$ANY_FAILED" -eq 1 ]; then
               echo ""
               echo "=========================================="
               echo "🔥 Burn-in 模式: 检测到失败，停止回归"
               echo "=========================================="
-              # 保存失败日志
               mkdir -p /tmp/failure-logs
               for proc in "${FAILED_PROCS[@]}"; do
                 LOG_FILE="${LOG_DIR}/round${ROUND}_proc${proc}.log"
@@ -451,13 +427,11 @@ jobs:
               exit 1
             fi
 
-            # 间隔
             echo ""
             echo "⏱️  等待 ${INTERVAL}s 后开始下一轮..."
             sleep "$INTERVAL"
           done
 
-          # 最终结果
           echo ""
           echo "=========================================="
           echo "   持续回归测试完成"
@@ -468,7 +442,6 @@ jobs:
           echo "日志目录: $LOG_DIR"
           echo "=========================================="
 
-          # 输出统计结果（用于 report job）
           echo "total_rounds=$TOTAL_ROUNDS" >> $GITHUB_OUTPUT
           echo "total_passed=$TOTAL_PASSED" >> $GITHUB_OUTPUT
           echo "total_failed=$TOTAL_FAILED" >> $GITHUB_OUTPUT
