@@ -728,8 +728,8 @@ Story 0.3 (测试框架搭建):
 | Story 1.14a | **自主调用循环 - trigger** | 实现领域事件/心跳事件触发机制 | 依赖 Story 1.2/1.3 | **P0-14a（or.md 系统公理一）** |
 | Story 1.14b | **自主调用循环 - route** | 实现 session_id 哈希/语义路由 | 依赖 Story 1.14a | **P0-14b（or.md 系统公理一）** |
 | Story 1.14c | **自主调用循环 - execute** | 实现会话命名空间执行与状态快照 | 依赖 Story 1.14b | **P0-14c（or.md 系统公理一）** |
-| Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4（提供 L1 Redis、L2 PostgreSQL 基础） | **P0-15a（or.md 系统公理二）** |
-| Story 1.15b | **外部化记忆 - L0 入口 + 六层存储协同** | 实现 L0 MEMORY.md 入口与 L1-L5 六层存储协同 | 依赖 Story 1.15a（提供压缩前持久化）+ Story 1.4（提供 L0 文件系统、L1 Redis、L2 PostgreSQL 基础表结构） | **P0-15b（or.md 系统公理二）** |
+| Story 1.15a | **外部化记忆 - L1 显式确认压缩** | 用户主动记忆持久化，压缩率≥70% | 依赖 Story 1.4（提供 L1 Redis）、Story 1.5（提供 L2 PostgreSQL 基础） | **P0-15a（or.md 系统公理二）** |
+| Story 1.15b | **外部化记忆 - L0 入口 + 六层存储协同** | 实现 L0 MEMORY.md 入口与 L1-L5 六层存储协同 | 依赖 Story 1.15a + Story 1.4（提供 L0 文件系统、L1 Redis）、Story 1.5（提供 L2 PostgreSQL 基础表结构） | **P0-15b（or.md 系统公理二）** |
 
 **📦 价值组 6: MVP 关键机制增强（Party Mode 评审新增）**
 > 加强 Additional Requirements 覆盖率，验证 MVP 商业假设
@@ -1861,36 +1861,46 @@ So that **任务在隔离环境中执行，状态可持久化和恢复**。
 **And** 状态快照序列化至 Redis Hash（支持主从复制与故障转移，TTL 24h-30d）
 **And** 执行完成后发布领域事件（DocumentProcessed/ToolExecuted/AgentDecided）
 
-### Story 1.15a: 外部化记忆 - 上下文压缩实现
+### Story 1.15a: 外部化记忆 - L1 显式确认压缩实现
 
 As a **系统架构师**,
-I want **实现 LLM 上下文压缩机制**,
-So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下文爆炸**。
+I want **实现 L1 显式确认压缩机制（用户主动说"记住..."）**,
+So that **用户主动记忆得到持久化，上下文压缩率≥70%**。
+
+**三层触发机制概述**（详见 architecture.md §11.2.6）：
+
+| 层次 | 触发类型 | 触发条件 | 写入目标 | 版本 |
+|------|---------|---------|---------|------|
+| **L1 显式确认** | 用户主动 | 用户说"记住..."、"以后用 X" | L0 + L2 | **MVP（本 Story）** |
+| **L2 语义建议** | 系统建议+用户确认 | 检测重复偏好 | L0 草稿（待确认） | V2 |
+| **L3 压缩触发** | 系统自动 | Checkpoint 创建 | StrategicArchive | **Epic 6/Story 6.3** |
 
 **核心实现内容：**
-- **用户主动记忆**：用户确认后保存的记忆（MemoryMetadata/MemoryChangeHistory）
-- **上下文压缩**：50K tokens → ~2K tokens（压缩率≥70%）
-- **记忆写入流程**：
-  1. 用户确认记忆 → MemoryService.save()
-  2. 写入 ~/.sisys/memory/*.md（实际内容）
-  3. 更新 MEMORY.md 索引
-  4. 发布 MemoryChanged(is_automatic=False)
-  5. 异步写入 L2 PostgreSQL（memory_metadata + memory_change_history）
+- **用户主动记忆（L1）**：用户说"记住 X"时触发
+  1. 提取"记住 X"中的 X 作为记忆核心内容（轻量级提取，≤500 字）
+  2. 压缩 X 至 ~150 字（保留核心语义，压缩率≥70%）
+  3. 写入 ~/.sisys/memory/*.md
+  4. 更新 MEMORY.md 索引
+  5. 发布 MemoryChanged(is_automatic=False)
+  6. 异步写入 L2 PostgreSQL（memory_metadata + memory_change_history）
+- **L1 操作类型**：保存（记住）、删除（不要记住）、修改（改成）、查询（你记得什么）
+- **L1 vs L3 分离**：L1 是用户主动触发（"记住..."），L3 是 Checkpoint 自动触发（Epic 6/Story 6.3）
 
-**注意**：Checkpoint 持久化由 Epic 6 / Story 6.3 实现，不在本故事范围内。
+**注意**：L3 Checkpoint 压缩由 Epic 6 / Story 6.3 实现（50K tokens → ~2K tokens），不在本故事范围内。
 
 **Acceptance Criteria:**
 
 **TDD 测试要求:**
 
 1. **架构测试**
-   - [ ] 上下文压缩测试 - 验证压缩机制
+   - [ ] L1 压缩测试 - 验证用户说"记住 X"时触发压缩
    - [ ] 压缩率测试 - 验证压缩率≥70%（允许误差 -5%）
    - [ ] 用户主动记忆流程测试 - 验证 MemoryService.save()
    - [ ] MemoryChanged 事件发布测试（is_automatic=False）
+   - [ ] L1 四种操作测试 - 验证保存/删除/修改/查询
 
 2. **性能要求**
-   - [ ] 压缩率≥70%（50K tokens → ~2K tokens，允许误差 -5%）
+   - [ ] L1 压缩率≥70%（用户输入≤500 字 → 压缩后≥150 字，允许误差 -5%）
    - [ ] 压缩延迟 P95<20ms（测量方式：LLM 任务中采样 100 次）
    - [ ] 记忆保存成功率 100%
 
@@ -1911,15 +1921,16 @@ So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 用户说"记住，以后用 bun 而不是 npm"
-**When** 用户主动记忆触发上下文压缩
+**When** 用户主动记忆触发 L1 显式确认压缩
 **Then** 执行步骤：
   1. MemoryService.save() 保存用户记忆
-  2. 压缩上下文（50K → ~2K tokens，压缩率≥70%）
-  3. 写入 ~/.sisys/memory/*.md（实际内容）
-  4. 更新 MEMORY.md 索引
-  5. MemoryChanged 事件发布（is_automatic=False）
-**And** LLM 上下文仅保留压缩后的 ~2K tokens
+  2. 提取"以后用 bun 而不是 npm"作为记忆核心（≤500 字）
+  3. 压缩 X 至 ~150 字（压缩率≥70%）
+  4. 写入 ~/.sisys/memory/*.md（实际内容）
+  5. 更新 MEMORY.md 索引
+  6. MemoryChanged 事件发布（is_automatic=False）
 **And** 记忆持久化至 L0 文件系统 + L2 PostgreSQL
+**And** LLM 上下文仅保留压缩后的相关信息
 
 ### Story 1.15b: 外部化记忆 - L0 记忆入口 + 六层存储协同实现
 
@@ -1927,15 +1938,23 @@ As a **系统架构师**,
 I want **实现 L0 MEMORY.md 记忆入口与 L1-L5 六层存储协同**,
 So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 
+**三层触发机制概述**（详见 architecture.md §11.2.6）：
+
+| 层次 | 触发类型 | 触发条件 | 写入目标 | 版本 |
+|------|---------|---------|---------|------|
+| **L1 显式确认** | 用户主动 | 用户说"记住..."、"以后用 X" | L0 + L2 | **MVP（本 Story 聚焦 L1 CRUD）** |
+| **L2 语义建议** | 系统建议+用户确认 | 检测重复偏好 | L0 草稿（待确认） | **V2（不在本 Story 范围）** |
+| **L3 压缩触发** | 系统自动 | Checkpoint 创建 | StrategicArchive | **Epic 6/Story 6.3** |
+
 **核心实现内容：**
-- **L0 MEMORY.md**：索引入口（最多 200 行）、路由策略、文本扫描
+- **L0 MEMORY.md**：索引入口（最多 200 行，超出自动截断保留最新）、路由策略、文本扫描
 - **Private/Group 记忆分离**：
   - private 记忆：`~/.sisys/memory/*.md`（仅当前用户可见）
   - group 记忆：`~/.sisys/memory/group/*.md`（团队共享）
 - **L2 PostgreSQL 表设计**：
   - `memory_metadata`：记忆元数据索引（name, description, type, path, version, mtime, owner, group_id）
   - `memory_change_history`：记忆变更历史（append-only，change_type: create/update/delete）
-- **CRUD 操作**：完整创建/读取/更新/删除，带版本冲突处理（乐观锁）
+- **L1 CRUD 操作**：完整创建/读取/更新/删除，带版本冲突处理（乐观锁）
 - **事件驱动**：MemoryChanged 事件触发元数据同步、缓存失效
 
 **MemoryChanged 事件下游用例**：
@@ -1965,7 +1984,8 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 **TDD 测试要求:**
 
 1. **架构测试**
-   - [ ] L0 MEMORY.md 测试 - 验证索引、路由、文本扫描（最多 200 行）
+   - [ ] L0 MEMORY.md 测试 - 验证索引、路由、文本扫描
+   - [ ] L0 MEMORY.md 截断测试 - 验证超出 200 行时自动截断（保留最新 200 条，按 updated_at 倒序）
    - [ ] 六层存储测试 - 验证各层存储
    - [ ] 协同测试 - 验证层间单向依赖链
    - [ ] Private/Group 分离测试 - 验证权限隔离
@@ -5551,8 +5571,8 @@ Story 1.4 (Redis)
 | **1.14a** (trigger) | 1.3 | 1.14b | Hard | ✅ |
 | **1.14b** (route) | 1.14a | 1.14c, 1.17 | Hard | ✅ |
 | **1.14c** (execute) | 1.14b | 1.15a | Hard | ✅ |
-| **1.15a** (上下文压缩) | 1.14c | 1.15b | Hard | ❌ |
-| **1.15b** (六层协同) | 1.15a | - | Hard | ❌ |
+| **1.15a** (L1 显式确认压缩) | 1.4, 1.5 | 1.15b | Hard | ❌ |
+| **1.15b** (六层协同) | 1.15a, 1.4, 1.5 | - | Hard | ❌ |
 
 **Epic 1 价值组 6 (关键机制) 依赖矩阵**
 

@@ -1845,21 +1845,127 @@ CREATE TABLE memory_change_history (
 - 两者的 MEMORY.md 索引独立，group 记忆有独立的 entrypoint
 - RBAC 校验在 L2 PostgreSQL 层执行，group 成员有读取权限，private 仅自己可写
 
-#### 11.2.6 管理流程
+#### 11.2.6 三层记忆更新触发机制（修订）
 
-| 操作 | 触发时机 | 执行动作 |
-|------|---------|---------|
-| **系统记忆保存** | 用户确认/纠正/自我介绍 | 写入 `~/.sisys/memory/` 独立 .md + 更新系统 MEMORY.md |
-| **系统记忆读取** | 会话开始/上下文需要 | 读取系统 MEMORY.md → 加载相关 .md → 注入上下文 |
-| **系统记忆更新** | 用户纠正/修改记忆 | 写入新版本 + version 递增 + mtime 更新 + 记录变更历史 |
-| **系统记忆删除** | 用户明确要求"忘记这个" | 删除 .md 文件 + 从 MEMORY.md 移除索引 + 记录 delete 历史 |
-| **版本冲突处理** | 并发更新同一记忆 | 抛出 VersionConflictError，用户确认后强制覆盖（version 递增） |
-| **多用户并发冲突** | 多用户同时修改同一记忆 | 后写入者检测到 version 不匹配，等待或强制覆盖 |
-| **Agent 配置集** | Agent 启动 | 一次性加载，运行时存在于 LLM 上下文 |
+**设计原则**：参照业界最佳实践（Claude 显式确认、ChatGPT 隐式检测、Gemini 混合），结合 SISYS 系统公理二（压缩前必须持久化），采用三层触发机制。
+
+| 层次 | 触发类型 | 触发条件 | 写入目标 | is_automatic | 版本 |
+|------|---------|---------|---------|--------------|------|
+| **L1 显式确认** | 用户主动 | 用户说"记住..."、"以后用 X" | L0 + L2 | `False` | MVP |
+| **L2 语义建议** | 系统建议+用户确认 | 检测到重复偏好/关键决策/规则约束 | L0 草稿（待确认） | `True` (待确认) | **V2** |
+| **L3 压缩触发** | 系统自动 | Checkpoint 创建时 | StrategicArchive | `True` (自动) | MVP |
+
+**L1 显式确认触发（用户主导 - MVP）**：
+```
+触发条件：用户输入匹配以下模式
+  保存类: "记住", "note that", "always use", "以后用"
+    → MemoryService.save(is_automatic=False)
+      1. 提取"记住 X"中的 X 作为记忆核心内容（≤500 字）
+         说明：这是轻量级提取，不需要调用 PersistentNoteTaker（无需生成 note_id/entities/summary/lineage）
+      2. 压缩 X 至 ~150 字（保留核心语义，压缩率≥70%）
+         说明：压缩输入=用户输入 X（≤500 字），输出=~150 字（小规模压缩）
+      3. 写入 ~/.sisys/memory/xxx.md
+      4. 更新 MEMORY.md 索引
+      5. 发布 MemoryChanged(is_automatic=False)
+
+  删除类: "不要记住", "忘了这个", "不要记"
+    → MemoryService.delete(memory_name, is_automatic=False)
+      1. 删除 ~/.sisys/memory/xxx.md 文件
+      2. 从 MEMORY.md 移除索引
+      3. 发布 MemoryChanged(is_automatic=False)
+
+  修改类: "改成", "更正为", "改为"
+    → MemoryService.update(memory_name, new_content, is_automatic=False)
+      1. 读取当前版本（检查 version 冲突）
+      2. 写入新版本（version + 1）
+      3. 更新 MEMORY.md 索引
+      4. 发布 MemoryChanged(is_automatic=False)
+
+  查询类: "你记得什么", "我的记忆有哪些"
+    → MemoryService.list()
+      返回记忆列表（不触发压缩，不发布事件）
+```
+
+**L1 vs L3 vs §17.1.5.1 压缩场景区分**：
+
+| 场景 | 触发源 | 输入规模 | 输出规模 | 压缩率 | 是否需要 PersistentNote |
+|------|--------|---------|---------|--------|------------------------|
+| **L1 显式确认** | 用户说"记住 X" | X（≤500 字） | ~150 字 | ≥70% | 否（轻量提取，直接压缩） |
+| **L3 Checkpoint** | Checkpoint 创建 | raw_context（~50K tokens） | ~2K tokens | ≥70%（实际~96%） | 是（persistent_note_ref 写入快照） |
+| **§17.1.5.1 RAG** | 检索循环 | retrieved_docs（~50K tokens） | ~2K tokens | ≥70%（实际~96%） | 是（用于质量评估和血缘追踪） |
+
+**L2 语义建议触发（系统辅助 - V2）**：
+```
+检测条件（V2 实现）：
+- 重复偏好检测：同一偏好内容在对话中出现 ≥3 次
+- 关键决策检测：检测到 "决定用 X" / "选择 A 而不是 B"
+- 规则约束检测：检测到 "X 比 Y 好" / "必须用 A"
+- 语义相似度 > 0.85 的跨 session 记忆重复
+    ↓
+MemorySuggestionService 生成建议: "要记住这个吗？"
+    ↓
+┌─────────────────────────────────────┐
+│ 用户确认 → MemoryService.save()    │ is_automatic=False
+│ 用户拒绝 → 忽略（不记录）            │
+│ 用户忽略 → 24h 后重新提示（最多3次）  │
+│ 同一内容已确认 → 不再提示              │ ← 去重机制
+└─────────────────────────────────────┘
+```
+
+**L3 压缩触发（Checkpoint 内部自动 - MVP）**：
+```
+触发条件：CheckpointSnapshot.create_with_persistent_note()
+    ↓
+PersistentNoteTaker.take_notes()  [持久化笔记 - 系统公理二，需要生成 note_id/entities/summary/lineage]
+ContextCompressor.compress()       [上下文压缩 - 大规模压缩，输入~50K tokens，输出~2K tokens]
+    ↓
+StrategicArchive 持久化（内部流程，不发布 MemoryChanged）
+```
+
+**L1 与 L3 的压缩关系**：
+- **L1 显式确认的压缩**：用户在"记住 X"时触发（轻量压缩，不需要 PersistentNote）
+- **L3 Checkpoint 压缩**：Checkpoint 创建时自动触发（重量压缩，必须先执行持久化笔记）
+- **两者独立**：L1 压缩是用户主动记忆的副作用，L3 压缩是 Checkpoint 的强制步骤
+
+**L2 去重机制（V2）**：
+| 场景 | 处理 | 说明 |
+|------|------|------|
+| L1 已触发相同记忆 | L2 不再提示 | 避免重复打扰 |
+| L2 提示后用户确认 | L2 标记为"已确认"，不再提示 | 用户已授权 |
+| L2 提示后用户拒绝 | L2 标记为"已拒绝"，相同内容 7 天后再提示 | 冷却期设计：7天=1个业务周期（用户可能改变主意） |
+| L2 提示后用户忽略 | 24h 后重新提示，最多 3 次 | 见下方 UI 交互定义 |
+
+**L2 UI 交互定义（V2）**：
+| 交互 | 含义 | 行为 |
+|------|------|------|
+| 点击 toast 上的"✓"或"确认" | 明确确认 | 立即保存记忆，标记为"已确认" |
+| 点击 toast 上的"✕"或"拒绝" | 明确拒绝 | 不保存记忆，标记为"已拒绝"，7 天冷却期后再检测 |
+| 滑动 toast 或不操作等待消失 | 被动忽略 | 24h 后重新提示，最多 3 次；3 次后降级为"已拒绝" |
+
+**与业界对标（修订）**：
+
+| 特性 | Claude | ChatGPT | Gemini | **SISYS MVP** | **SISYS V2** |
+|------|--------|---------|--------|--------------|--------------|
+| 显式触发 | ✅ | ❌ | ✅ | ✅ L1 | ✅ L1 |
+| 隐式检测 | ❌ | ✅ | ❌ | ❌ | ✅ L2 |
+| 用户控制 | 100% | 部分 | 100% | 100% | 100% |
+| 压缩优先 | N/A | N/A | N/A | ✅ L1+L3 | ✅ L1+L2+L3 |
+
+#### 11.2.7 管理流程
+
+| 操作 | 触发层次 | 触发时机 | 执行动作 |
+|------|---------|---------|---------|
+| **系统记忆保存** | L1 显式确认 | 用户说"记住..." | 轻量级提取 X → 压缩至 ~150 字 → 写入 `~/.sisys/memory/` → 更新 MEMORY.md → 发布 MemoryChanged(is_automatic=False) |
+| **系统记忆建议** | L2 语义建议 | 检测到关键信息（V2） | 生成建议 toast，用户确认后执行保存流程（与 L1 相同） |
+| **系统记忆修改** | L1 显式确认 | 用户说"改成"、"更正为" | 检查 version 冲突 → 写入新版本（version+1）→ 更新索引 → 发布 MemoryChanged(is_automatic=False) |
+| **系统记忆删除** | L1 显式确认 | 用户说"不要记住"、"忘了" | 删除文件 → 从 MEMORY.md 移除索引 → 发布 MemoryChanged(is_automatic=False) |
+| **系统记忆查询** | L1 显式确认 | 用户说"你记得什么" | 返回记忆列表（不触发压缩，不发布事件） |
+| **Checkpoint 持久化** | L3 压缩触发 | Checkpoint 创建 | 持久化笔记 → 上下文压缩 → StrategicArchive 持久化（内部，不发布事件） |
+| **版本冲突处理** | - | 并发更新同一记忆 | 抛出 VersionConflictError，用户确认后强制覆盖（version 递增） |
 
 **多用户并发冲突处理策略**：
 - **乐观锁**：写入时检查 version，version 不匹配则拒绝
-- **冲突解决**：用户确认后强制覆盖（version 递增，change_type='force_update'）
+- **冲突解决**：向用户展示冲突内容，用户确认后强制覆盖（version 递增，change_type='force_update'）
 - **历史保留**：覆盖前将旧版本 diff 记录到 memory_change_history
 - **审计追溯**：所有冲突解决均记录 changed_by 和 diff_summary
 
@@ -1870,7 +1976,7 @@ CREATE TABLE memory_change_history (
 - 变更历史通过 L2 PostgreSQL `memory_change_history` 表记录每次变更的 diff
 - Checkpoint 快照提供完整的会话状态历史追溯
 
-#### 11.2.7 核心约定
+#### 11.2.8 核心约定
 
 **系统级 MEMORY.md 条目格式**：
 ```markdown
@@ -1902,7 +2008,7 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
   - StrategicArchive（Checkpoint 持久化，自动）
   - MemoryMetadata/MemoryChangeHistory（用户主动记忆，手动）
 
-#### 11.2.8 L0 驱动各层协同机制
+#### 11.2.9 L0 驱动各层协同机制
 
 **设计原则**：L0 是入口，驱动 L1-L5 各层按需协同工作。L0 文件系统存储实际记忆内容，其他各层按需响应。
 
@@ -2015,7 +2121,7 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
     └─→ Checkpoint 创建完成
 ```
 
-#### 11.2.9 数据流完整示例
+#### 11.2.10 数据流完整示例
 
 **完整写入示例**：
 ```
@@ -2082,26 +2188,36 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
    └── "根据记忆，您偏好使用 bun 而不是 npm；团队使用 docker 作为容器方案"
 ```
 
-#### 11.2.10 验收标准
+#### 11.2.11 验收标准
 
 | 层级 | 验收标准 | 测量方式 |
 |------|---------|---------|
-| L0 | MEMORY.md 最多 200 行，超出自动截断 | 行数统计 |
+| L0 | MEMORY.md 最多 200 行，超出自动截断（保留最新 200 条，按 updated_at 倒序） | 行数统计 |
 | L0→L2 | 写入时 L2 元数据同步延迟 <100ms | 性能监控 |
 | L0→L1 | 缓存命中率 >80%（高频记忆） | 缓存指标 |
 | L0→L3 | 文件>500时自动启用向量检索，P95<300ms | 检索延迟 |
 | L0→L4 | Checkpoint 必须先归档再压缩（系统公理二） | 约束验证 |
 | L5 | 图谱构建是可选的，按需启用 | 功能开关 |
+| L1 压缩 | 用户输入≤500 字 → 压缩后≥150 字（压缩率≥70%） | 压缩率统计 |
+| L3/§17.1.5.1 压缩 | ~50K tokens → ~2K tokens（压缩率≥70%，实际~96%） | 压缩率统计 |
 | 端到端 | 检索延迟 P95<800ms（MVP） | 性能测试 |
 
-#### 11.2.11 与 Story 1.15a/1.15b 对齐
+#### 11.2.12 与 Story 1.15a/1.15b 对齐
 
 | Story | 需求 | §11 实现 |
 |-------|------|---------|
-| Story 1.15a | 上下文压缩率≥70%，用户主动记忆保存 | 11.2.6 记忆写入流程 + 11.2.7 核心约定 |
-| Story 1.15b | L0 MEMORY.md 入口 + 六层协同 | 11.2.8-11.2.9 完整协同机制 |
+| Story 1.15a | 上下文压缩率≥70%，用户主动记忆保存 | 11.2.6 三层触发机制 + 11.2.8 核心约定 |
+| Story 1.15b | L0 MEMORY.md 入口 + 六层协同 | 11.2.7 管理流程 + 11.2.9-11.2.10 协同机制 |
 
 **注意**：Checkpoint 持久化由 Epic 6 / Story 6.3 实现，详见 §8.2.1。
+
+**压缩场景区分（重要）**：
+
+| 场景 | 触发源 | 输入规模 | 输出规模 | 压缩率 | 是否需要 PersistentNote |
+|------|--------|---------|---------|--------|------------------------|
+| **L1 显式确认（Story 1.15a）** | 用户说"记住 X" | X（≤500 字） | ~150 字 | ≥70% | 否（轻量提取，直接压缩） |
+| **L3 Checkpoint（Story 6.3）** | Checkpoint 创建 | raw_context（~50K tokens） | ~2K tokens | ≥70%（实际~96%） | 是（persistent_note_ref 写入快照） |
+| **§17.1.5.1 RAG（Story 3.x）** | 检索循环 | retrieved_docs（~50K tokens） | ~2K tokens | ≥70%（实际~96%） | 是（用于质量评估和血缘追踪） |
 
 ---
 
@@ -3517,18 +3633,21 @@ class HybridRetriever(RAGService):
 │     │  延迟预算：P95<500ms（初检 200ms+ 融合 50ms+ 精排 250ms）           │
 │     ▼                                                                   │
 │  2. 持久化笔记（Persistent Note-Taking）← 压缩前必须执行！               │
+│     │  输入：retrieved_docs（与步骤 3 共享）                             │
 │     │  步骤：                                                           │
 │     │  2.1 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）    │
 │     │  2.2 生成结构化摘要（JSON Schema 强制）→ 写入 PostgreSQL           │
 │     │  2.3 记录检索血缘（query/top_k/时间戳/用户 ID）→ 审计日志          │
-│     │  验收标准：持久化完成后才允许压缩                                 │
+│     │  输出：PersistentNote（note_id, entities, summary, lineage）        │
+│     │  注意：此步骤为压缩的前置条件，但与步骤 3 共享输入数据             │
 │     ▼                                                                   │
 │  3. 压缩（Compression）                                                  │
-│     │  输入：Top-100 候选文档 + 用户查询                                │
+│     │  输入：retrieved_docs + query + persistent_note（来自步骤 2）       │
 │     │  算法：LLM 摘要生成（Temperature=0.3） + 关键信息抽取             │
 │     │  压缩目标：100 文档（~50K tokens）→ 压缩至 5-10 个关键段落（~2K tokens）│
-│     │  压缩率：≥70%（验收标准）                                         │
+│     │  压缩率：≥70%（验收标准，实际~96%）                                │
 │     │  质量评估：信息熵 + 关键实体覆盖率（评分<0.7 触发二次生成）        │
+│     │  注意：压缩使用 persistent_note 中的 entities 作为关键信息抽取依据  │
 │     ▼                                                                   │
 │  4. LLM 上下文注入（Context Injection）                                  │
 │     │  输入：压缩后的关键段落（~2K tokens）                             │

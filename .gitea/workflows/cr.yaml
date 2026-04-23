@@ -27,12 +27,12 @@ on:
       test_dirs:
         description: '测试目录（逗号分隔）'
         required: false
-        default: 'tests/acceptance,tests/integration,tests/unit'
+        default: 'tests/acceptance,tests/integration_real,tests/integration,tests/unit'
         type: string
       processes:
         description: '并行进程数'
         required: false
-        default: '3'
+        default: '2'
         type: string
       threads:
         description: '每个进程的线程数'
