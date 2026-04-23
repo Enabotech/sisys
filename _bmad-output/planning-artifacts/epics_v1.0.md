@@ -728,7 +728,7 @@ Story 0.3 (测试框架搭建):
 | Story 1.14a | **自主调用循环 - trigger** | 实现领域事件/心跳事件触发机制 | 依赖 Story 1.2/1.3 | **P0-14a（or.md 系统公理一）** |
 | Story 1.14b | **自主调用循环 - route** | 实现 session_id 哈希/语义路由 | 依赖 Story 1.14a | **P0-14b（or.md 系统公理一）** |
 | Story 1.14c | **自主调用循环 - execute** | 实现会话命名空间执行与状态快照 | 依赖 Story 1.14b | **P0-14c（or.md 系统公理一）** |
-| Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4（提供 L1 Redis、L2 PostgreSQL）+ Story 1.14c（提供 Checkpoint 创建上下文） | **P0-15a（or.md 系统公理二）** |
+| Story 1.15a | **外部化记忆 - 上下文压缩** | LLM 上下文仅保留压缩信息（压缩率≥70%） | 依赖 Story 1.4（提供 L1 Redis、L2 PostgreSQL 基础） | **P0-15a（or.md 系统公理二）** |
 | Story 1.15b | **外部化记忆 - L0 入口 + 六层存储协同** | 实现 L0 MEMORY.md 入口与 L1-L5 六层存储协同 | 依赖 Story 1.15a（提供压缩前持久化）+ Story 1.4（提供 L0 文件系统、L1 Redis、L2 PostgreSQL 基础表结构） | **P0-15b（or.md 系统公理二）** |
 
 **📦 价值组 6: MVP 关键机制增强（Party Mode 评审新增）**
@@ -1862,34 +1862,16 @@ I want **实现 LLM 上下文压缩机制**,
 So that **LLM 上下文仅保留当前任务必需的压缩信息，防止上下文爆炸**。
 
 **核心实现内容：**
-- **压缩前持久化**：遵循系统公理二，压缩前必须执行持久化笔记步骤（PersistentNoteTaker）
-- **两种记忆机制**：
-  - StrategicArchive：Checkpoint 持久化（自动），由 PersistentNoteTaker 写入
-  - MemoryMetadata/MemoryChangeHistory：用户主动记忆（手动），由用户确认后写入
-- **压缩率要求**：≥70%（50K tokens → ~2K tokens）
-- **PersistentNoteTaker 执行步骤**：
-  1. 提取关键实体（Top-20）→ StrategicArchive（L0-L5）
-  2. 生成结构化摘要 → PostgreSQL（L2）
-  3. 记录血缘 → 审计日志 + WORM 归档（L2+L4）
-  4. 输出：PersistentNote (note_id, entities, summary, lineage)
+- **用户主动记忆**：用户确认后保存的记忆（MemoryMetadata/MemoryChangeHistory）
+- **上下文压缩**：50K tokens → ~2K tokens（压缩率≥70%）
+- **记忆写入流程**：
+  1. 用户确认记忆 → MemoryService.save()
+  2. 写入 ~/.sisys/memory/*.md（实际内容）
+  3. 更新 MEMORY.md 索引
+  4. 发布 MemoryChanged(is_automatic=False)
+  5. 异步写入 L2 PostgreSQL（memory_metadata + memory_change_history）
 
-**StrategicArchive vs MemoryMetadata 数据流**：
-
-```
-用户主动记忆（手动）：
-  用户确认 → MemoryService.save() → 写入 ~/.sisys/memory/*.md
-                                        ↓
-                                  更新 MEMORY.md 索引
-                                        ↓
-                                  发布 MemoryChanged(is_automatic=False)
-
-Checkpoint 持久化（自动）：
-  Checkpoint 创建 → PersistentNoteTaker.take_notes() → StrategicArchive
-                                        ↓
-                                  关联 persistent_note_ref
-                                        ↓
-                                  发布 MemoryChanged(is_automatic=True)
-```
+**注意**：Checkpoint 持久化由 Epic 6 / Story 6.3 实现，不在本故事范围内。
 
 **Acceptance Criteria:**
 
@@ -1898,13 +1880,13 @@ Checkpoint 持久化（自动）：
 1. **架构测试**
    - [ ] 上下文压缩测试 - 验证压缩机制
    - [ ] 压缩率测试 - 验证压缩率≥70%（允许误差 -5%）
-   - [ ] 持久化测试 - 验证 PersistentNoteTaker 持久化笔记
-   - [ ] StrategicArchive vs MemoryMetadata 职责分离测试
+   - [ ] 用户主动记忆流程测试 - 验证 MemoryService.save()
+   - [ ] MemoryChanged 事件发布测试（is_automatic=False）
 
 2. **性能要求**
    - [ ] 压缩率≥70%（50K tokens → ~2K tokens，允许误差 -5%）
    - [ ] 压缩延迟 P95<20ms（测量方式：LLM 任务中采样 100 次）
-   - [ ] 持久化成功率 100%（无 persistent_note_ref 不允许序列化）
+   - [ ] 记忆保存成功率 100%
 
 3. **覆盖率要求**
    - [ ] 架构层覆盖率≥85%
@@ -1923,14 +1905,15 @@ Checkpoint 持久化（自动）：
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 **Given** 用户说"记住，以后用 bun 而不是 npm"
-**When** 上下文压缩机制执行
+**When** 用户主动记忆触发上下文压缩
 **Then** 执行步骤：
-  1. PersistentNoteTaker.take_notes() 持久化原始上下文
+  1. MemoryService.save() 保存用户记忆
   2. 压缩上下文（50K → ~2K tokens，压缩率≥70%）
-  3. 创建 CheckpointSnapshot（persistent_note_ref 不为空）
-  4. MemoryChanged 事件发布（is_automatic=True）
+  3. 写入 ~/.sisys/memory/*.md（实际内容）
+  4. 更新 MEMORY.md 索引
+  5. MemoryChanged 事件发布（is_automatic=False）
 **And** LLM 上下文仅保留压缩后的 ~2K tokens
-**And** 压缩前执行持久化笔记步骤（PersistentNoteTaker → StrategicArchive）
+**And** 记忆持久化至 L0 文件系统 + L2 PostgreSQL
 
 ### Story 1.15b: 外部化记忆 - L0 记忆入口 + 六层存储协同实现
 
@@ -1987,7 +1970,7 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
    - [ ] Redis TTL 24h-30d（测量方式：redis TTL 命令验证）
    - [ ] MinIO WORM 7 年（测量方式：Object Lock 配置验证）
    - [ ] L0→L2 元数据同步延迟 <100ms（异步写入，不阻塞主流程）
-   - [ ] 持久化成功率 100%（测量方式：Checkpoint 创建时 persistent_note_ref 不为空）
+   - [ ] 记忆保存成功率 100%（测量方式：memory_metadata 记录存在）
 
 3. **覆盖率要求**
    - [ ] 架构层覆盖率≥85%
@@ -3944,13 +3927,31 @@ As a **企业战略人员**,
 I want **系统创建 Checkpoint 快照（阶段标识、完成状态、用户反馈、修正记录）**,
 So that **支持阶段审批和中断恢复**。
 
+**核心实现内容**：
+- **Checkpoint 创建流程**（遵循系统公理二：压缩前必须持久化）：
+  1. BLM 阶段完成 → 触发 Checkpoint 创建
+  2. PersistentNoteTaker.take_notes() 持久化原始上下文
+     - 提取关键实体（Top-20）→ StrategicArchive（L0-L5）
+     - 生成结构化摘要 → PostgreSQL（L2）
+     - 记录血缘 → 审计日志 + WORM 归档（L2+L4）
+  3. 上下文压缩（50K → ~2K tokens，压缩率≥70%）
+  4. CheckpointSnapshot 创建（persistent_note_ref 关联持久化笔记）
+  5. 状态快照序列化至 Redis Hash（TTL 30 天）
+- **双模式恢复**：
+  - Replay 模式：影响≥2 个后续 Checkpoint，强一致性
+  - Override 模式：影响<2 个后续 Checkpoint，需人工确认
+
 **Acceptance Criteria:**
 
 **Given** BLM 阶段完成
 **When** 到达 Checkpoint
-**Then** 创建快照（阶段标识、完成状态、用户反馈请求、恢复点引用）
-**Then** 状态快照序列化至 Redis Hash
-**And** 支持用户修正关键参数
+**Then** 执行步骤：
+  1. PersistentNoteTaker.take_notes() 持久化原始上下文
+  2. 上下文压缩（50K → ~2K tokens，压缩率≥70%）
+  3. 创建 CheckpointSnapshot（persistent_note_ref 不为空）
+  4. 状态快照序列化至 Redis Hash
+  5. StrategicArchive 存储持久化笔记
+**And** 支持用户修正关键参数后恢复
 
 **TDD 测试要求:**
 
@@ -3958,10 +3959,13 @@ So that **支持阶段审批和中断恢复**。
    - [ ] Checkpoint 创建测试 - 验证快照正确序列化至 Redis Hash
    - [ ] Checkpoint 恢复测试 - 验证从快照恢复状态
    - [ ] 用户修正测试 - 验证修正关键参数后正确恢复
+   - [ ] PersistentNoteTaker 测试 - 验证持久化笔记步骤
+   - [ ] StrategicArchive 存储测试 - 验证 L0-L5 存储
+   - [ ] 压缩率测试 - 验证压缩率≥70%
 
 2. **性能要求**
    - [ ] Checkpoint 创建延迟 P95<100ms
-   - [ ] Checkpoint 恢复延迟 P95<60s
+   - [ ] Checkpoint 恢复延迟 P95<60s（Replay）/ P95<15s（Override）
    - [ ] 快照持久化成功率 100%
 
 3. **覆盖率要求**
@@ -5292,7 +5296,6 @@ graph TD
     S1_14a --> S1_14b
     S1_14b --> S1_14c
     S1_4 --> S1_15a
-    S1_14c --> S1_15a
     S1_15a --> S1_15b
 
     %% Epic 1 内部依赖 (价值组 6: 关键机制)
