@@ -1,0 +1,675 @@
+# =============================================================================
+# 持续回归测试工作流 - Continuous Regression Workflow
+# =============================================================================
+# 描述: 多进程、多线程并行持续循环回归测试 Gitea Actions 工作流
+# 功能:
+#   - 支持指定多个测试目录并行回归（多选）
+#   - 支持配置进程数和每个进程的线程数
+#   - 支持多种运行模式（continuous/oneshot/burnin）
+#   - 实时状态监控和失败检测
+#   - 完整的日志收集和报告生成
+#
+# 触发方式:
+#   - 手动触发 (workflow_dispatch)
+#   - 定时触发 (schedule) - 建议用于持续回归
+#
+# 使用示例:
+#   手动触发后在 Gitea Actions 页面查看实时日志
+#   失败时自动停止（burnin 模式）或继续运行（continuous 模式）
+# =============================================================================
+
+name: Continuous Regression
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      test_dirs:
+        description: '测试目录（逗号分隔）'
+        required: false
+        default: 'tests/acceptance,tests/integration,tests/unit'
+        type: string
+      processes:
+        description: '并行进程数'
+        required: false
+        default: '3'
+        type: string
+      threads:
+        description: '每个进程的线程数'
+        required: false
+        default: '2'
+        type: string
+      mode:
+        description: '运行模式'
+        required: false
+        default: 'continuous'
+        type: choice
+        options:
+          - continuous
+          - oneshot
+          - burnin
+      max_rounds:
+        description: '最大循环轮数（0=无限）'
+        required: false
+        default: '0'
+        type: string
+      interval:
+        description: '每轮间隔秒数'
+        required: false
+        default: '2'
+        type: string
+      fail_fast:
+        description: '失败时立即停止'
+        required: false
+        default: 'false'
+        type: boolean
+
+  # 定时触发 - 每周一到周五凌晨2点运行持续回归
+  schedule:
+    - cron: '0 2 * * 1-5'
+
+# ===========================================================================
+# 环境变量配置
+# ===========================================================================
+env:
+  # Python 配置
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "2.3.2"
+
+  # 测试配置 - 让 environments.py 自动检测为 CI 环境
+  SISYS_TEST_ENV: ci
+  SISYS_USE_TEST_PORTS: "true"
+
+  # 默认配置（可被 workflow_dispatch inputs 覆盖）
+  DEFAULT_TEST_DIRS: tests/acceptance,tests/integration,tests/unit
+  DEFAULT_PROCESSES: "3"
+  DEFAULT_THREADS: "2"
+  DEFAULT_MODE: continuous
+  DEFAULT_MAX_ROUNDS: "0"
+  DEFAULT_INTERVAL: "2"
+
+# ===========================================================================
+# 并发控制
+# ===========================================================================
+concurrency:
+  group: continuous-regression-${{ inputs.mode || 'scheduled' }}
+  cancel-in-progress: false  # 不取消正在运行的回归测试
+
+jobs:
+  # ===========================================================================
+  # 阶段 1: 准备环境
+  # ===========================================================================
+  setup:
+    name: "🔧 环境准备"
+    runs-on: gpu
+    timeout-minutes: 10
+
+    outputs:
+      test_dirs: ${{ steps.parse_config.outputs.test_dirs }}
+      processes: ${{ steps.parse_config.outputs.processes }}
+      threads: ${{ steps.parse_config.outputs.threads }}
+      mode: ${{ steps.parse_config.outputs.mode }}
+      max_rounds: ${{ steps.parse_config.outputs.max_rounds }}
+      interval: ${{ steps.parse_config.outputs.interval }}
+      fail_fast: ${{ steps.parse_config.outputs.fail_fast }}
+      timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 生成时间戳
+        id: timestamp
+        run: echo "timestamp=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: 解析配置
+        id: parse_config
+        run: |
+          # 解析输入参数，使用默认值（与 ci.yaml 保持一致的模式）
+          TEST_DIRS="${{ github.event.inputs.test_dirs || env.DEFAULT_TEST_DIRS }}"
+          PROCESSES="${{ github.event.inputs.processes || env.DEFAULT_PROCESSES }}"
+          THREADS="${{ github.event.inputs.threads || env.DEFAULT_THREADS }}"
+          MODE="${{ github.event.inputs.mode || env.DEFAULT_MODE }}"
+          MAX_ROUNDS="${{ github.event.inputs.max_rounds || env.DEFAULT_MAX_ROUNDS }}"
+          INTERVAL="${{ github.event.inputs.interval || env.DEFAULT_INTERVAL }}"
+          if ${{ github.event.inputs.fail_fast || false }}; then
+            FAIL_FAST="true"
+          else
+            FAIL_FAST="false"
+          fi
+
+          # burnin 模式自动启用 fail-fast
+          if [ "$MODE" = "burnin" ]; then
+            FAIL_FAST="true"
+          fi
+
+          # 输出配置（使用 ::set-output 语法）
+          echo "test_dirs=$TEST_DIRS" >> $GITHUB_OUTPUT
+          echo "processes=$PROCESSES" >> $GITHUB_OUTPUT
+          echo "threads=$THREADS" >> $GITHUB_OUTPUT
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "max_rounds=$MAX_ROUNDS" >> $GITHUB_OUTPUT
+          echo "interval=$INTERVAL" >> $GITHUB_OUTPUT
+          echo "fail_fast=$FAIL_FAST" >> $GITHUB_OUTPUT
+
+          # 打印配置
+          echo "=========================================="
+          echo "   持续回归测试配置"
+          echo "=========================================="
+          echo "测试目录: $TEST_DIRS"
+          echo "进程数:   $PROCESSES"
+          echo "线程数:   $THREADS"
+          echo "运行模式: $MODE"
+          echo "最大轮数: $MAX_ROUNDS"
+          echo "间隔:     ${INTERVAL}s"
+          echo "Fail-Fast: $FAIL_FAST"
+          echo "=========================================="
+
+      - name: 显示触发信息
+        if: github.event.schedule != ''
+        run: |
+          echo "⏰ 定时触发: ${{ github.event.schedule }}"
+          echo "触发者: ${{ github.actor }}"
+
+  # ===========================================================================
+  # 阶段 2: 启动测试服务
+  # ===========================================================================
+  services:
+    name: "🚀 启动服务"
+    runs-on: gpu
+    needs: setup
+    timeout-minutes: 30
+
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - "6380:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sisys
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres   # pragma: allowlist secret
+        ports:
+          - "5433:5432"
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
+
+      qdrant:
+        image: qdrant/qdrant:v1.7.1
+        ports:
+          - "6334:6333"
+          - "6335:6334"
+        options: >-
+          --health-cmd "wget -qO- http://localhost:6333/healthz"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin   # pragma: allowlist secret
+        ports:
+          - "9002:9000"
+          - "9003:9001"
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+        args: server /data --console-address ":9001"
+
+      neo4j:
+        image: neo4j:5.15
+        env:
+          NEO4J_AUTH: neo4j/password123
+          NEO4J_PLUGINS: '["apoc"]'
+        ports:
+          - "7475:7474"
+          - "7688:7687"
+        options: >-
+          --health-cmd "curl -sf http://localhost:7474/"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - "5673:5672"
+          - "15673:15672"
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
+
+    steps:
+      - name: 等待服务就绪
+        run: |
+          echo "等待服务启动（使用 services 自带健康检查）..."
+          # services 容器自带 --health-cmd，Actions 会自动等待 healthy 状态
+          # 这里额外等待确保容器完全启动
+          for i in {1..60}; do
+            READY=0
+
+            # 检查 Redis
+            if nc -z localhost 6380 && redis-cli -p 6380 ping > /dev/null 2>&1; then
+              echo "✅ Redis 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            # 检查 PostgreSQL
+            if nc -z localhost 5433 && pg_isready -p 5433 -U postgres > /dev/null 2>&1; then
+              echo "✅ PostgreSQL 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            # 检查 Qdrant
+            if curl -sf http://localhost:6334/healthz > /dev/null 2>&1; then
+              echo "✅ Qdrant 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            # 检查 MinIO
+            if curl -sf http://localhost:9002/minio/health/live > /dev/null 2>&1; then
+              echo "✅ MinIO 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            # 检查 Neo4j
+            if nc -z localhost 7475 && curl -sf http://localhost:7475/ > /dev/null 2>&1; then
+              echo "✅ Neo4j 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            # 检查 RabbitMQ
+            if nc -z localhost 5673 && rabbitmq-diagnostics -q ping > /dev/null 2>&1; then
+              echo "✅ RabbitMQ 已就绪"
+              READY=$((READY + 1))
+            fi
+
+            if [ "$READY" -ge 6 ]; then
+              echo ""
+              echo "🎉 所有服务已就绪！"
+              exit 0
+            fi
+
+            echo "等待服务... ($i/60) - 当前就绪: $READY/6"
+            sleep 3
+          done
+
+          echo "⚠️ 部分服务可能未就绪，继续执行..."
+
+  # ===========================================================================
+  # 阶段 3: 运行持续回归测试
+  # ===========================================================================
+  regression:
+    name: "🔥 持续回归测试"
+    runs-on: gpu
+    needs: [setup, services]
+    timeout-minutes: 240  # 4小时超时，防止无限运行
+
+    outputs:
+      total_rounds: ${{ steps.run_regression.outputs.total_rounds }}
+      total_passed: ${{ steps.run_regression.outputs.total_passed }}
+      total_failed: ${{ steps.run_regression.outputs.total_failed }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 使用预构建 CI 镜像（与 ci.yaml 保持一致）
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 安装 Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: 安装依赖
+        run: |
+          poetry config virtualenvs.create false
+          poetry install --no-interaction
+
+      - name: 配置测试环境
+        run: |
+          # 加载项目根目录 .env 文件（与 ci.yaml 保持一致）
+          set -a
+          source ./.env
+          set +a
+
+          # 覆盖为 CI 环境需要的 localhost 地址（services job 使用 localhost 端口映射）
+          export REDIS_HOST=localhost
+          export REDIS_PORT=6380
+          export POSTGRES_HOST=localhost
+          export POSTGRES_PORT=5433
+          export QDRANT_HOST=localhost
+          export QDRANT_PORT=6334
+          export QDRANT_GRPC_PORT=6335
+          export MINIO_HOST=localhost
+          export MINIO_API_PORT=9002
+          export MINIO_CONSOLE_PORT=9003
+          export NEO4J_HOST=localhost
+          export NEO4J_HTTP_PORT=7475
+          export NEO4J_BOLT_PORT=7688
+          export RABBITMQ_HOST=localhost
+          export RABBITMQ_PORT=5673
+          export RABBITMQ_MGMT_PORT=15673
+          export SISYS_TEST_ENV=ci
+          export SISYS_USE_TEST_PORTS=true
+
+          # 从 setup job 获取配置
+          TEST_DIRS="${{ needs.setup.outputs.test_dirs }}"
+          PROCESSES="${{ needs.setup.outputs.processes }}"
+          THREADS="${{ needs.setup.outputs.threads }}"
+          MODE="${{ needs.setup.outputs.mode }}"
+          MAX_ROUNDS="${{ needs.setup.outputs.max_rounds }}"
+          INTERVAL="${{ needs.setup.outputs.interval }}"
+          FAIL_FAST="${{ needs.setup.outputs.fail_fast }}"
+          TIMESTAMP="${{ needs.setup.outputs.timestamp }}"
+
+          echo "TEST_DIRS=$TEST_DIRS" >> $GITHUB_ENV
+          echo "PROCESSES=$PROCESSES" >> $GITHUB_ENV
+          echo "THREADS=$THREADS" >> $GITHUB_ENV
+          echo "MODE=$MODE" >> $GITHUB_ENV
+          echo "MAX_ROUNDS=$MAX_ROUNDS" >> $GITHUB_ENV
+          echo "INTERVAL=$INTERVAL" >> $GITHUB_ENV
+          echo "FAIL_FAST=$FAIL_FAST" >> $GITHUB_ENV
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+      - name: 显示配置
+        run: |
+          echo "=========================================="
+          echo "   持续回归测试开始"
+          echo "=========================================="
+          echo "测试目录: $TEST_DIRS"
+          echo "进程数:   $PROCESSES"
+          echo "线程数:   $THREADS"
+          echo "运行模式: $MODE"
+          echo "最大轮数: $MAX_ROUNDS"
+          echo "间隔:     ${INTERVAL}s"
+          echo "Fail-Fast: $FAIL_FAST"
+          echo "=========================================="
+
+      - name: 运行持续回归测试
+        id: run_regression
+        run: |
+          # 初始化统计
+          TOTAL_ROUNDS=0
+          TOTAL_PASSED=0
+          TOTAL_FAILED=0
+
+          # 创建日志目录
+          LOG_DIR="/tmp/sisys_regression_${TIMESTAMP}"
+          mkdir -p "$LOG_DIR"
+
+          echo "日志目录: $LOG_DIR"
+
+          # 解析测试目录数组
+          IFS=',' read -ra TEST_DIR_ARRAY <<< "$TEST_DIRS"
+
+          # 打印测试目录
+          echo "测试目录列表:"
+          for dir in "${TEST_DIR_ARRAY[@]}"; do
+            echo "  - $dir"
+          done
+          echo ""
+
+          # 主循环
+          while true; do
+            # 检查是否达到最大轮数
+            if [ "$MAX_ROUNDS" != "0" ] && [ "$TOTAL_ROUNDS" -ge "$MAX_ROUNDS" ]; then
+              echo "已达到最大轮数 ${MAX_ROUNDS}"
+              break
+            fi
+
+            # 增加轮次
+            TOTAL_ROUNDS=$((TOTAL_ROUNDS + 1))
+            ROUND=$TOTAL_ROUNDS
+
+            echo ""
+            echo "=========================================="
+            echo "   第 ${ROUND} 轮回归测试"
+            echo "=========================================="
+            echo "进程数: $PROCESSES, 线程数: $THREADS"
+
+            # 启动并行进程 - 真正并行执行
+            declare -a PIDS=()
+            declare -a PROC_STATUS=()
+            PASSED_THIS_ROUND=0
+            FAILED_THIS_ROUND=0
+            FAILED_PROCS=()
+
+            for ((i=1; i<=PROCESSES; i++)); do
+              # 轮转分配测试目录（每轮重新分配，确保均衡）
+              DIR_INDEX=$(( (i - 1) % ${#TEST_DIR_ARRAY[@]} ))
+              TEST_DIR="${TEST_DIR_ARRAY[$DIR_INDEX]}"
+
+              LOG_FILE="${LOG_DIR}/round${ROUND}_proc${i}.log"
+
+              echo "进程 $i -> 测试: $TEST_DIR (日志: $LOG_FILE)"
+
+              # 后台运行测试
+              poetry run pytest "$TEST_DIR" -n "$THREADS" -v --tb=short > "$LOG_FILE" 2>&1 &
+              PID=$!
+              PIDS+=($PID)
+              PROC_STATUS+=("running")
+              echo "  启动 PID: $PID"
+            done
+
+            echo ""
+            echo "等待所有进程完成..."
+
+            # 真正并行：先收集所有 PID，然后统一等待
+            # 使用数组记录每个进程的退出状态
+            declare -a EXIT_CODES=()
+            ANY_FAILED=0
+
+            for ((i=0; i<${#PIDS[@]}; i++)); do
+              PID=${PIDS[$i]}
+              PROC_NUM=$((i + 1))
+              LOG_FILE="${LOG_DIR}/round${ROUND}_proc${PROC_NUM}.log"
+
+              # 等待单个进程
+              if wait $PID; then
+                EXIT_CODES+=(0)
+                PASSED_THIS_ROUND=$((PASSED_THIS_ROUND + 1))
+                TOTAL_PASSED=$((TOTAL_PASSED + 1))
+                echo "  ✅ 进程 $PROC_NUM (PID: $PID): 通过"
+              else
+                EXIT_CODES+=(1)
+                FAILED_THIS_ROUND=$((FAILED_THIS_ROUND + 1))
+                TOTAL_FAILED=$((TOTAL_FAILED + 1))
+                FAILED_PROCS+=($PROC_NUM)
+                ANY_FAILED=1
+                echo "  ❌ 进程 $PROC_NUM (PID: $PID): 失败"
+
+                # 显示失败摘要
+                if [ -f "$LOG_FILE" ]; then
+                  echo "    失败详情:"
+                  grep -E "(FAILED|ERROR|AssertionError)" "$LOG_FILE" | head -5 || true
+                fi
+              fi
+            done
+
+            # 清空 PIDS
+            unset PIDS
+
+            # 输出轮次结果
+            echo ""
+            if [ "$ANY_FAILED" -eq 0 ]; then
+              echo "✅ 第 ${ROUND} 轮: 全部通过 (通过: $PASSED_THIS_ROUND, 失败: $FAILED_THIS_ROUND)"
+            else
+              echo "❌ 第 ${ROUND} 轮: 有失败 (通过: $PASSED_THIS_ROUND, 失败: $FAILED_THIS_ROUND)"
+              echo "   失败进程: ${FAILED_PROCS[*]}"
+            fi
+
+            # 检查失败和 fail-fast
+            if [ "$ANY_FAILED" -eq 1 ]; then
+              if [ "$FAIL_FAST" = "true" ]; then
+                echo ""
+                echo "=========================================="
+                echo "⚠️  Fail-Fast 模式: 检测到失败，停止所有测试"
+                echo "=========================================="
+                # 保存失败日志到上传目录
+                mkdir -p /tmp/failure-logs
+                for proc in "${FAILED_PROCS[@]}"; do
+                  LOG_FILE="${LOG_DIR}/round${ROUND}_proc${proc}.log"
+                  if [ -f "$LOG_FILE" ]; then
+                    cp "$LOG_FILE" "/tmp/failure-logs/round${ROUND}_proc${proc}.log"
+                  fi
+                done
+                exit 1
+              fi
+            fi
+
+            # oneshot 模式只运行一轮
+            if [ "$MODE" = "oneshot" ]; then
+              echo "oneshot 模式完成"
+              break
+            fi
+
+            # burnin 模式失败时停止
+            if [ "$MODE" = "burnin" ] && [ "$ANY_FAILED" -eq 1 ]; then
+              echo ""
+              echo "=========================================="
+              echo "🔥 Burn-in 模式: 检测到失败，停止回归"
+              echo "=========================================="
+              # 保存失败日志
+              mkdir -p /tmp/failure-logs
+              for proc in "${FAILED_PROCS[@]}"; do
+                LOG_FILE="${LOG_DIR}/round${ROUND}_proc${proc}.log"
+                if [ -f "$LOG_FILE" ]; then
+                  cp "$LOG_FILE" "/tmp/failure-logs/round${ROUND}_proc${proc}.log"
+                fi
+              done
+              exit 1
+            fi
+
+            # 间隔
+            echo ""
+            echo "⏱️  等待 ${INTERVAL}s 后开始下一轮..."
+            sleep "$INTERVAL"
+          done
+
+          # 最终结果
+          echo ""
+          echo "=========================================="
+          echo "   持续回归测试完成"
+          echo "=========================================="
+          echo "总轮数:   $TOTAL_ROUNDS"
+          echo "总通过:   $TOTAL_PASSED"
+          echo "总失败:   $TOTAL_FAILED"
+          echo "日志目录: $LOG_DIR"
+          echo "=========================================="
+
+          # 输出统计结果（用于 report job）
+          echo "total_rounds=$TOTAL_ROUNDS" >> $GITHUB_OUTPUT
+          echo "total_passed=$TOTAL_PASSED" >> $GITHUB_OUTPUT
+          echo "total_failed=$TOTAL_FAILED" >> $GITHUB_OUTPUT
+
+      - name: 收集测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs-${{ needs.setup.outputs.timestamp }}
+          path: /tmp/sisys_regression_${{ needs.setup.outputs.timestamp }}/
+          retention-days: 7
+
+      - name: 上传失败日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ needs.setup.outputs.timestamp }}
+          path: /tmp/failure-logs/
+          retention-days: 30
+
+  # ===========================================================================
+  # 阶段 4: 生成报告
+  # ===========================================================================
+  report:
+    name: "📊 测试报告"
+    runs-on: gpu
+    needs: [setup, regression]
+    if: always()
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 下载日志
+        uses: actions/download-artifact@v4
+        if: needs.regression.result != 'skipped'
+        with:
+          name: regression-logs-${{ needs.setup.outputs.timestamp }}
+          path: /tmp/regression-logs
+          continue-on-error: true
+
+      - name: 生成测试报告
+        run: |
+          echo "=========================================="
+          echo "   持续回归测试报告"
+          echo "=========================================="
+          echo "配置:"
+          echo "  测试目录: ${{ needs.setup.outputs.test_dirs }}"
+          echo "  进程数:   ${{ needs.setup.outputs.processes }}"
+          echo "  线程数:   ${{ needs.setup.outputs.threads }}"
+          echo "  运行模式: ${{ needs.setup.outputs.mode }}"
+          echo ""
+
+          # 从 regression job 的结果判断
+          REGRESSION_RESULT="${{ needs.regression.result }}"
+
+          if [ "$REGRESSION_RESULT" = "failure" ]; then
+            echo "结果: ❌ 测试失败"
+            echo "  总轮数:   ${{ needs.regression.outputs.total_rounds || 'N/A' }}"
+            echo "  总通过:   ${{ needs.regression.outputs.total_passed || 'N/A' }}"
+            echo "  总失败:   ${{ needs.regression.outputs.total_failed || 'N/A' }}"
+            echo ""
+            echo "状态: 🔴 持续回归测试失败"
+            exit 1
+          elif [ "$REGRESSION_RESULT" = "success" ]; then
+            echo "结果: ✅ 全部通过"
+            echo "  总轮数:   ${{ needs.regression.outputs.total_rounds || 'N/A' }}"
+            echo "  总通过:   ${{ needs.regression.outputs.total_passed || 'N/A' }}"
+            echo "  总失败:   ${{ needs.regression.outputs.total_failed || 'N/A' }}"
+            echo ""
+            echo "状态: 🟢 持续回归测试成功"
+            exit 0
+          else
+            echo "结果: ⚠️ 测试未正常运行 (结果: $REGRESSION_RESULT)"
+            echo "状态: 🟡 测试状态异常"
+            exit 1
+          fi
+
+      - name: 显示最终状态
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "   持续回归测试工作流完成"
+          echo "=========================================="
+          echo "触发方式: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "定时触发: ${{ github.event.schedule }}"
+          fi
+          echo "执行时间: $(date)"
+          echo "=========================================="
