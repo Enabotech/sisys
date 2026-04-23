@@ -146,18 +146,20 @@ async def db_session(pg_config, sync_engine):
     """Create an async session for a test with worker-specific schema."""
     schema = get_schema_name()
     # Create a new engine per session to avoid connection conflicts
-    # Use server_settings to set search_path at connection level (not session level)
+    # Use server_settings to set search_path at connection level
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
     )
     engine = create_async_engine(
         url,
         echo=False,
-        connect_args={"server_settings": {"search_path": schema}},
+        connect_args={"server_settings": {"search_path": f"{schema},public"}},
     )
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
+        # Verify schema exists by setting it explicitly for this session
+        await session.execute(text(f"SET search_path TO {schema}"))
         yield session
         await session.rollback()
 
