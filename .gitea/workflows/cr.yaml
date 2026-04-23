@@ -72,6 +72,13 @@ on:
 # 环境变量配置
 # ===========================================================================
 env:
+  # Harbor 配置
+  HARBOR_REGISTRY: harbor.sisys.local
+  HARBOR_PROJECT: sisys
+
+  # CI 镜像标签（与 ci.yaml 保持一致）
+  IMAGE_TAG_L2_LATEST: l2-latest
+
   # Python 配置
   PYTHON_VERSION: "3.11"
   POETRY_VERSION: "2.3.2"
@@ -102,6 +109,9 @@ jobs:
   setup:
     name: "🔧 环境准备"
     runs-on: gpu
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
     timeout-minutes: 10
 
     outputs:
@@ -177,6 +187,9 @@ jobs:
   services:
     name: "🚀 启动服务"
     runs-on: gpu
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
     needs: setup
     timeout-minutes: 30
 
@@ -322,6 +335,9 @@ jobs:
   regression:
     name: "🔥 持续回归测试"
     runs-on: gpu
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
     needs: [setup, services]
     timeout-minutes: 240  # 4小时超时，防止无限运行
 
@@ -607,6 +623,9 @@ jobs:
   report:
     name: "📊 测试报告"
     runs-on: gpu
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
     needs: [setup, regression]
     if: always()
     timeout-minutes: 10
