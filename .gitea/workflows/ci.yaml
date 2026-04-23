@@ -49,7 +49,8 @@ env:
   POETRY_VERSION: "2.3.2"
 
   # 测试配置 - 让 environments.py 自动检测为 CI 环境
-  SISYS_TEST_ENV: ci
+  # SISYS_TEST_ENV: ci
+  SISYS_TEST_ENV: LOCAL
   SISYS_USE_TEST_PORTS: "true"
 
   # 测试服务主机地址（使用 docker compose 服务名）
