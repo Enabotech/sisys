@@ -249,6 +249,7 @@ jobs:
           poetry install --no-interaction || echo "依赖更新完成"
 
       - name: 配置测试环境
+        shell: bash
         run: |
           # 与 ci.yaml 保持一致：从 .env 加载环境变量
           set -a
