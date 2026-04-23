@@ -1598,8 +1598,17 @@ class WormArchiver:
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
 | **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding_ref, blob_ref, graph_ref |
+| **MemoryMetadata** | 用户记忆元数据索引 | L2 | name, description, type, path, version, mtime |
+| **MemoryChangeHistory** | 用户记忆变更历史 | L2 | memory_name, version, change_type, changed_fields, diff_summary |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
+
+**战略档案与记忆系统关系说明**：
+- **StrategicArchive**：Checkpoint 持久化笔记的存储实体（自动生成），由 PersistentNoteTaker 写入
+- **MemoryMetadata + MemoryChangeHistory**：用户主动保存的记忆元数据（手动保存），由用户确认后写入
+- 两者共同构成六层存储（L0-L5）的记忆子系统，职责划分清晰：
+  - StrategicArchive = Checkpoint 快照前的强制持久化（自动）
+  - MemoryMetadata/MemoryChangeHistory = 用户主动记忆（手动）
 
 ---
 
@@ -1875,10 +1884,19 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
 
 **说明**：`memory_change_history` 表结构见 11.2.5 L2 PostgreSQL 表设计。
 
+**术语说明**：
+- **记忆保存**：用户主动确认后保存的记忆（user/feedback/project/reference 类型），写入 `~/.sisys/memory/*.md`
+- **Checkpoint 持久化**：Checkpoint 快照前的强制步骤（见第8章），由 PersistentNoteTaker 自动执行
+- 两者都遵循系统公理二"磁盘记忆=真相源"，但职责不同：
+  - 记忆保存 = 用户主动（手动）
+  - Checkpoint 持久化 = 系统自动（自动）
+
 **Agent 配置集文件**（无独立 MEMORY.md 索引，内容来自系统级）：
 - IDENTITY.md / CODE.md / SOUL.md / TOOLS.md / USER.md / MEMORY.md / HEARTBEAT.md
 - 启动时一次性加载，不在运行时动态更新
-- Agent 的"学习"通过 StrategicArchive 持久化实现
+- Agent 的"学习"通过两层机制实现：
+  - StrategicArchive（Checkpoint 持久化，自动）
+  - MemoryMetadata/MemoryChangeHistory（用户主动记忆，手动）
 
 #### 11.2.8 L0 驱动各层协同机制
 
