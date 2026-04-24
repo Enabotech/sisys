@@ -172,8 +172,8 @@
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
 - [ ] 连续5次运行无随机失败
-- [ ] poetry run ruff 检查通过
-- [ ] poetry run mypy 检查通过
+- [ ] `poetry run ruff check` 通过
+- [ ] `poetry run mypy` 通过
 
 ---
 
