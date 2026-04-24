@@ -405,6 +405,10 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | FR-AC-04 | EIP 基础 | Epic 5 | Story 5.4 | P0 |
 | FR-AC-05 | 三重硬隔离 | Epic 5 | Story 5.5 | P0 |
 | FR-AC-06 | 隔离切换日志 | Epic 5 | Story 5.6 | P0 |
+| FR-EV-01 | Phoenix Evaluation Harness 全链路追踪 | Epic 5 | Story 5.7 | P0 |
+| FR-EV-02 | Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准） | Epic 5 | Story 5.8 | P0 |
+| FR-EV-03 | CUSUM 漂移检测与触发重校准 | Epic 5 | Story 5.9 | P1 |
+| FR-EV-04 | CheckpointWithEvaluation 集成 | Epic 5 | Story 5.10 | P1 |
 | **战略规划流程 (SP) - 4 项** |
 | FR-SP-01 | BLM 前两阶段 | Epic 6 | Story 6.1 | P0 |
 | FR-SP-02 | 市场洞察六子步骤 | Epic 6 | Story 6.2 | P0 |
@@ -590,7 +594,7 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | Epic 2 | 文档与数据管理 | P0 | DM-01~08 | 9 | 用户可以上传和管理 17 种格式文档 |
 | Epic 3 | 智能检索与知识发现 | P0 | SR-01~08, CP-02, SA-02/03 | 13 | 用户可以检索文档并溯源至原始坐标点 |
 | Epic 4 | 战略工具箱 | P0 | ST-01~05 | 5 | 用户可以执行 23 种战略工具分析 |
-| Epic 5 | Agent 协作系统 | P0 | AC-01~06 | 6 | 用户可以通过 CEO Agent 执行战略规划 |
+| Epic 5 | Agent 协作系统 | P0 | AC-01~06, EV-01~04 | 10 | 用户可以通过 CEO Agent 执行战略规划 |
 | Epic 6 | 战略规划流程 (BLM 前两阶段) | P0 | SP-01~04, UI-04/05/06/07 | 12 | 用户可以生成战略规划并审批 |
 | Epic 7 | **多触点用户界面与 API 集成** | P0 | UI-01/02/03, CP-03 | 8 | 用户可以通过 CLI/API/仪表盘操作系统 |
 | Epic 8 | **用户权限管理与审计合规** | P0 | SC-04/05/06 | 6 | 管理员可以管理权限和审计日志 |
@@ -3558,9 +3562,15 @@ So that **MVP 阶段支持基础的多视角分析**。
 
 ## Epic 5: Agent 协作系统
 
-**目标：** 实现单 Agent 执行、EIP 弹性隔离和隔离切换审计。
+**目标：** 实现单 Agent 执行、EIP 弹性隔离、隔离切换审计、Agent 评估与可观测性。
 
 **包含 FR：** AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
+
+**新增 FR（评估与可观测性 - EV 系列）：**
+- FR-EV-01: Phoenix Evaluation Harness 全链路追踪
+- FR-EV-02: Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准）
+- FR-EV-03: CUSUM 漂移检测与触发重校准
+- FR-EV-04: CheckpointWithEvaluation 集成
 
 **📦 价值组：单 Agent 战略规划能力**
 > 用户可以通过 CEO Agent 执行战略规划
@@ -3573,6 +3583,10 @@ So that **MVP 阶段支持基础的多视角分析**。
 | Story 5.4 | EIP 弹性隔离协议基础 | MVP 阶段支持 Agent 隔离 | 依赖 Story 5.1 | P0-4 |
 | Story 5.5 | Agent 三重硬隔离保证 | 防止 Agent 间信息泄露和视角越界 | 依赖 Story 5.4 | P0-5 |
 | Story 5.6 | 隔离切换日志记录 | 满足审计追踪要求 | 依赖 Story 5.4, Epic 1 Story 1.10 | P1-6 |
+| Story 5.7 | Phoenix Evaluation Harness 基础 | 全链路追踪基础设施，@trace 装饰器自动记录 span | 依赖 Story 5.3 | P0-7 |
+| Story 5.8 | Agent 输出质量评估 | 幻觉检测、上下文相关性、置信度校准 | 依赖 Story 5.7 | P0-8 |
+| Story 5.9 | CUSUM 漂移检测与触发重校准 | 自动检测模型性能漂移并触发重校准 | 依赖 Story 5.8 | P1-9 |
+| Story 5.10 | CheckpointWithEvaluation 集成 | 评估历史存入 Checkpoint，支持漂移趋势追踪 | 依赖 Story 5.8, Epic 6 Story 6.3 | P1-10 |
 
 **✅ 依赖关系验证：**
 - Epic 5 依赖 Epic 1 的缓存层（Story 1.4）和审计日志（Story 1.10）
@@ -3826,6 +3840,193 @@ So that **满足审计追踪要求**。
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例 + 安全层测试示例
+
+### Story 5.7: Phoenix Evaluation Harness 基础（全链路追踪）
+
+As a **可观测性工程师**,
+I want **实现 Phoenix Evaluation Harness 全链路追踪基础设施（@trace 装饰器）**,
+So that **Agent 执行过程自动记录 span，支持全链路追踪和性能分析**。
+
+**核心实现内容（详见 architecture.md §17.3.8）：**
+- **PhoenixTracer**：全链路追踪，@trace 装饰器自动 span 记录
+- **项目配置**：PhoenixTracer(project_name="sisys-agent")
+- **span 生命周期**：
+  - agent_execution span：追踪整个 Agent 执行过程
+  - eval.hallucination_score：评估完成后写入
+  - eval.context_relevance：评估完成后写入
+  - drift.detected：漂移检测完成后写入
+
+**Acceptance Criteria:**
+
+**Given** Agent 工作流已配置
+**When** Agent 执行任务时
+**Then** @trace 装饰器自动记录 span（agent_execution）
+**And** span 包含 eval.hallucination_score、eval.context_relevance 属性
+**And** 漂移检测完成后 span 设置 drift.detected 属性
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] PhoenixTracer 实例化测试 - 验证 project_name 配置
+   - [ ] @trace 装饰器测试 - 验证 span 自动创建
+   - [ ] span 属性测试 - 验证属性记录
+
+2. **性能要求**
+   - [ ] span 记录延迟 P95<5ms
+   - [ ] 追踪开销<1%（测量方式：对比有无 @trace 的执行时间）
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_phoenix_tracer.py` - 单元测试
+   - [ ] `tests/integration/test_phoenix_tracer_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+### Story 5.8: Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准）
+
+As a **可观测性工程师**,
+I want **实现 Agent 输出质量评估（幻觉检测、上下文相关性、置信度校准）**,
+So that **评估 Agent 输出质量，支持基于评估结果的质量改进**。
+
+**核心实现内容（详见 architecture.md §17.3.8）：**
+- **幻觉检测**：llm_eval_binary_classifier 判断回答是否存在幻觉（通过 UDMR 动态路由选择评估模型）
+- **上下文相关性**：compute_context_relevance() 计算证据包相关性
+- **置信度校准**：compute_confidence_accuracy() 计算预测置信度与实际质量的偏差
+
+**Acceptance Criteria:**
+
+**Given** Agent 执行完成并输出结果
+**When** 调用 EvaluationHarness.evaluate(result)
+**Then** 返回 EvaluationResult(hallucination_score, context_relevance, confidence_accuracy, overall_score)
+**And** 评估指标写入 span 属性
+**And** 评估模型通过 UDMR 动态路由获取（非硬编码）
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] 幻觉检测测试 - 验证 llm_eval_binary_classifier 调用
+   - [ ] 上下文相关性测试 - 验证 compute_context_relevance()
+   - [ ] 置信度校准测试 - 验证 compute_confidence_accuracy()
+   - [ ] EvaluationResult 模型测试 - 验证字段完整性
+   - [ ] UDMR 路由测试 - 验证评估模型通过 UDMR 获取（非硬编码）
+
+2. **性能要求**
+   - [ ] 评估延迟 P95<500ms
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_evaluation_harness.py` - 单元测试
+   - [ ] `tests/integration/test_evaluation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+### Story 5.9: CUSUM 漂移检测与触发重校准
+
+As a **可观测性工程师**,
+I want **实现 CUSUM 漂移检测与触发重校准机制**,
+So that **自动检测模型性能漂移并触发重校准，保证输出质量稳定**。
+
+**核心实现内容（详见 architecture.md §17.3.8）：**
+- **CUSUMDriftDetector**：累积和漂移检测算法
+- **漂移判定**：is_drifted() 返回 True 时触发 recalibration
+- **重校准触发**：trigger_recalibration() 更新模型配置或提示人工介入
+
+**Acceptance Criteria:**
+
+**Given** 连续多次评估结果
+**When** CUSUMDriftDetector.is_drifted() 检测到漂移
+**Then** 触发 trigger_recalibration()
+**And** span 设置 drift.detected=True
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] CUSUM 检测器测试 - 验证累积和计算
+   - [ ] 漂移判定测试 - 验证 is_drifted() 逻辑
+   - [ ] 重校准触发测试 - 验证 trigger_recalibration() 调用
+
+2. **性能要求**
+   - [ ] 检测延迟 P99<100ms
+   - [ ] 漂移检测准确率≥85%（V2 指标，回测历史数据验证）
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_cusum_detector.py` - 单元测试
+   - [ ] `tests/integration/test_drift_detection_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
+
+### Story 5.10: CheckpointWithEvaluation 集成（评估历史存入 Checkpoint）
+
+As a **可观测性工程师**,
+I want **实现 CheckpointWithEvaluation 集成（评估历史存入 CheckpointSnapshot）**,
+So that **支持评估历史追踪和漂移趋势分析**。
+
+**核心实现内容（详见 architecture.md §17.3.8）：**
+- **CheckpointWithEvaluation**：Checkpoint 快照 + 评估数据
+- **评估历史**：eval_history、hallucination_trend、confidence_accuracy_trend
+- **Checkpoint 集成**：to_checkpoint_snapshot() 方法返回带评估的快照
+
+**Acceptance Criteria:**
+
+**Given** Checkpoint 创建时
+**When** 包含评估数据
+**Then** CheckpointSnapshot 包含 evaluation_history、hallucination_trend、confidence_accuracy_trend
+**And** 支持从 Checkpoint 恢复评估历史
+
+**TDD 测试要求:**
+
+1. **架构测试**
+   - [ ] CheckpointWithEvaluation 测试 - 验证评估数据封装
+   - [ ] to_checkpoint_snapshot 测试 - 验证快照转换
+   - [ ] 评估历史恢复测试 - 验证从 Checkpoint 恢复评估历史
+
+2. **性能要求**
+   - [ ] 快照创建延迟 P95<100ms
+   - [ ] 评估历史查询延迟 P95<50ms
+
+3. **覆盖率要求**
+   - [ ] 架构层覆盖率≥85%
+   - [ ] 集成测试覆盖率≥75%
+
+4. **代码质量**
+   - [ ] Ruff 检查通过
+   - [ ] MyPy 类型检查通过
+   - [ ] 架构约束验证
+
+5. **测试文件**
+   - [ ] `tests/unit/architecture/test_checkpoint_evaluation.py` - 单元测试
+   - [ ] `tests/integration/test_checkpoint_evaluation_integration.py` - 集成测试
+
+**实施指南:**
+参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
 ---
 
@@ -5179,7 +5380,7 @@ So that **确保 MVP 无高危漏洞**。
 - Epic 2: 9 个（Story 2.1-2.8，Story 2.2 拆分为 2.2a/2.2b）
 - Epic 3: 13 个（Story 3.1-3.12，Story 3.1 拆分为 3.1a/3.1b）
 - Epic 4: 5 个
-- Epic 5: 6 个
+- Epic 5: 10 个（Story 5.1-5.10，Story 5.7-5.10 新增评估与可观测性）
 - Epic 6: 12 个（Story 6.1-6.11，Story 6.5 拆分为 6.5a/6.5b）
 - Epic 7: 8 个（新增 Story 7.5-7.8）
 - Epic 8: 6 个
