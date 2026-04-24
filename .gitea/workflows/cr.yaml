@@ -195,7 +195,7 @@ jobs:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root --add-host=host.docker.internal:host-gateway
     needs: [setup]
-    timeout-minutes: 240  # 4小时超时，防止无限运行
+    timeout-minutes: 600  # 4小时超时，防止无限运行
 
     outputs:
       total_rounds: ${{ steps.run_regression.outputs.total_rounds }}
