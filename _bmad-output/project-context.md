@@ -206,12 +206,24 @@ trigger(事件) → route(路由) → execute(执行)
 - **上下文压缩率目标**：≥70%
 - **循环流程**：检索->持久化笔记->压缩->LLM 上下文注入->生成与验证->反馈与演进
 
+**三层触发机制（记忆更新）**：
+
+| 层次 | 触发类型 | 触发条件 | 写入目标 | 版本 |
+|------|---------|---------|---------|------|
+| **L1 显式确认** | 用户主动 | 用户说"记住..."、"以后用 X" | L0 + L2 | **MVP（Story 1.15a）** |
+| **L2 语义建议** | 系统建议+用户确认 | 检测到重复偏好/关键决策 | L0 草稿（待确认） | **V2** |
+| **L3 压缩触发** | 系统自动 | Checkpoint 创建 | StrategicArchive | **MVP（Story 6.3）** |
+
+**L1 vs L3 区别**：
+- **L1 显式确认**：轻量级提取（≤500字→~150字），无需 PersistentNote，直接压缩
+- **L3 Checkpoint**：重量级压缩（~50K tokens→~2K tokens），需要 PersistentNoteTaker 生成 note_id/entities/summary/lineage
+
 **两种记忆机制（职责分离）**：
 
 | 机制 | 触发 | 实现 | 存储目标 |
 |------|------|------|---------|
-| **StrategicArchive** | Checkpoint 创建（自动） | Epic 6 / Story 6.3 | L0-L5 六层 |
-| **MemoryMetadata** | 用户确认记忆（手动） | Epic 1 / Story 1.15a/b | L0 文件系统 + L2 PostgreSQL |
+| **StrategicArchive** | Checkpoint 创建（L3 自动） | Epic 6 / Story 6.3 | L0-L5 六层 |
+| **MemoryMetadata** | 用户确认记忆（L1 手动） | Epic 1 / Story 1.15a/b | L0 文件系统 + L2 PostgreSQL |
 
 - StrategicArchive：PersistentNoteTaker.take_notes() 持久化笔记，关联 CheckpointSnapshot
 - MemoryMetadata：用户主动保存的记忆，触发 MemoryChanged(is_automatic=False) 事件
@@ -365,6 +377,39 @@ L1 合规性网关 → L2 任务复杂度评估 → L3 路由决策执行
 - 0.75≤得分<0.85 → L1
 - 0.60≤得分<0.75 → L2
 - 得分<0.60 → L3
+
+### 3.9 Agent 生命周期与评估
+
+**Agent 生命周期状态机：**
+
+| 状态 | 说明 | 可中断 |
+|------|------|--------|
+| **INIT** | 初始化完成 | 否 |
+| **RUNNING** | 运行中（9 步原子循环执行） | 是 |
+| **CHECKPOINTED** | 已保存快照（可恢复） | - |
+| **WAITING** | 等待外部输入（如用户确认） | - |
+| **COMPLETED** | 正常结束 | - |
+| **FAILED** | 异常终止 | - |
+
+**状态机与原子循环关系：**
+- 状态机决定"何时停/何时恢复"
+- 原子循环定义 RUNNING 状态下的业务逻辑
+- Checkpoint 在 WAITING 状态保存
+
+**评估与可观测性（Phoenix + CUSUM）：**
+
+| 组件 | 用途 | 关键指标 |
+|------|------|---------|
+| **PhoenixTracer** | 全链路追踪（@trace 装饰器） | span 记录 agent_execution、eval.*、drift.detected |
+| **EvaluationHarness** | 输出质量评估 | hallucination_score、context_relevance、confidence_accuracy |
+| **CUSUMDriftDetector** | 漂移检测 | is_drifted()、trigger_recalibration() |
+
+**评估模型路由：**
+- 评估模型通过 UDMR 动态路由获取（非硬编码）
+- Story 5.7: Phoenix 全链路追踪
+- Story 5.8: 幻觉检测、上下文相关性、置信度校准
+- Story 5.9: CUSUM 漂移检测
+- Story 5.10: CheckpointWithEvaluation 集成
 
 ---
 
