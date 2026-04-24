@@ -10,6 +10,12 @@ Requires: PostgreSQL database with audit tables created via migration 002_audit_
 
 Run with: pytest tests/integration/test_audit_integration.py -v
 Parallel execution: Supported via worker-specific schemas
+
+Test isolation strategy:
+- Each test uses worker-specific schema (pytest-xdist worker ID)
+- Schema auto-created in fixture before tables
+- Transaction rollback after each test
+- UUID-based test data isolation
 """
 
 from __future__ import annotations
@@ -20,11 +26,13 @@ from pathlib import Path
 
 import pytest
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
+from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
 
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
@@ -45,12 +53,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
-def pg_config():
-    """Get PostgreSQL configuration from environment."""
-    return PostgreSQLConfig.from_env()
-
-
 def get_schema_name():
     """Get schema name based on worker ID for parallel execution safety."""
     import os
@@ -59,23 +61,77 @@ def get_schema_name():
     return f"audit_test_{worker_id.replace('-', '_')}"
 
 
-@pytest.fixture(scope="module")
-def sync_engine(pg_config, request):
-    """Create synchronous engine for setup/teardown with worker-specific schema."""
+def get_unique_id():
+    """Generate a unique ID for test isolation."""
+    return uuid.uuid4().hex[:8]
+
+
+@pytest.fixture
+async def db_engine(pg_config):
+    """Create an async engine with worker-specific schema using schema_translate_map.
+
+    This ensures all table references are prefixed with the correct schema.
+    Uses schema_translate_map on engine level (more reliable than server_settings).
+    """
     schema = get_schema_name()
-    url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
-    engine = create_engine(
+    url = (
+        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
+    )
+
+    engine = create_async_engine(
         url,
+        echo=False,
+        execution_options={"schema_translate_map": {None: schema}},
+    )
+
+    yield engine
+
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    """Create an async session with transaction rollback isolation.
+
+    Each test gets a clean transaction that is rolled back after the test,
+    ensuring no data pollution between tests.
+    """
+    async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        yield session
+        await session.rollback()
+
+
+@pytest.fixture(scope="module")
+def pg_config():
+    """Get PostgreSQL configuration from environment."""
+    return PostgreSQLConfig.from_env()
+
+
+@pytest.fixture(scope="module", autouse=True)
+async def setup_schema(pg_config):
+    """Create schema and tables once per worker module.
+
+    Uses sync connection for DDL to avoid asyncpg issues.
+    """
+    schema = get_schema_name()
+    sync_url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
+
+    from sqlalchemy import create_engine
+
+    engine = create_engine(
+        sync_url,
         echo=False,
         connect_args={"options": f"-csearch_path={schema}"},
     )
 
-    # Create schema for this worker
+    # Create schema
     with engine.connect() as conn:
         conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
         conn.commit()
 
-    # Create tables using explicit schema prefix
+    # Create tables
     with engine.connect() as conn:
         conn.execute(
             text(
@@ -120,54 +176,22 @@ def sync_engine(pg_config, request):
         )
         conn.commit()
 
-    yield engine
+    engine.dispose()
 
-    # Cleanup: drop schema
-    with engine.connect() as conn:
+    yield
+
+    # Cleanup after all tests in module
+    from sqlalchemy import create_engine
+
+    cleanup_engine = create_engine(
+        sync_url,
+        echo=False,
+        connect_args={"options": f"-csearch_path={schema}"},
+    )
+    with cleanup_engine.connect() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
-    engine.dispose()
-
-
-@pytest.fixture(scope="module")
-def async_engine(pg_config, request):
-    """Create async engine for tests with worker-specific schema."""
-    schema = get_schema_name()
-    url = (
-        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
-    )
-    engine = create_async_engine(
-        url,
-        echo=False,
-        connect_args={"server_settings": {"search_path": schema}},
-    )
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-async def db_session(pg_config, sync_engine):
-    """Create an async session for a test with worker-specific schema.
-
-    Each test gets its own engine to avoid event loop conflicts.
-    Uses schema_translate_map on engine to prefix all table references with the worker schema.
-    """
-    schema = get_schema_name()
-    url = (
-        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
-    )
-    engine = create_async_engine(
-        url,
-        echo=False,
-        execution_options={"schema_translate_map": {None: schema}},
-    )
-
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-        await session.rollback()
-
-    await engine.dispose()
+    cleanup_engine.dispose()
 
 
 class TestAuditLogModelIntegration:
@@ -175,9 +199,7 @@ class TestAuditLogModelIntegration:
 
     @pytest.mark.asyncio
     async def test_create_audit_log_entry(self, db_session):
-        """Can create and persist an audit log entry."""
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-
+        """Can create and persist an audit log entry with all required fields."""
         log_id = uuid.uuid4()
         timestamp = datetime.now(UTC)
 
@@ -199,15 +221,19 @@ class TestAuditLogModelIntegration:
 
         result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.log_id == log_id))
         fetched = result.scalar_one_or_none()
+
         assert fetched is not None
+        assert fetched.log_id == log_id
         assert fetched.actor == "user-123"
         assert fetched.action_type == "document:upload"
+        assert fetched.target_resource == "document/doc-456"
+        assert fetched.old_value == {"status": "draft"}
+        assert fetched.new_value == {"status": "published"}
+        assert fetched.correction_level == 0
 
     @pytest.mark.asyncio
-    async def test_checksum_persistence(self, db_session):
-        """Checksum is correctly computed and persisted."""
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-
+    async def test_checksum_auto_computed(self, db_session):
+        """Checksum is automatically computed on model creation."""
         log_id = uuid.uuid4()
         timestamp = datetime.now(UTC)
 
@@ -228,15 +254,13 @@ class TestAuditLogModelIntegration:
 
         result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.log_id == log_id))
         fetched = result.scalar_one_or_none()
+
         assert fetched is not None
-        assert len(fetched.checksum) == 64
-        assert fetched.verify_checksum() is True
+        assert len(fetched.checksum) == 64  # SHA256 hex length
 
     @pytest.mark.asyncio
-    async def test_tamper_detection(self, db_session):
-        """Tampering with audit log entry is detected via checksum."""
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-
+    async def test_verify_checksum_valid(self, db_session):
+        """verify_checksum returns True when data has not been tampered."""
         log_id = uuid.uuid4()
         entry = AuditLogModel(
             log_id=log_id,
@@ -251,18 +275,37 @@ class TestAuditLogModelIntegration:
         db_session.add(entry)
         await db_session.commit()
 
+        assert entry.verify_checksum() is True
+
+    @pytest.mark.asyncio
+    async def test_verify_checksum_detects_tamper(self, db_session):
+        """verify_checksum returns False when audit log has been tampered."""
+        log_id = uuid.uuid4()
+        entry = AuditLogModel(
+            log_id=log_id,
+            timestamp=datetime.now(UTC),
+            actor="user-123",
+            action_type="document:upload",
+            target_resource="document/doc-456",
+            old_value={},
+            new_value={},
+        )
+
+        db_session.add(entry)
+        await db_session.commit()
+
+        # Tamper with the data
         entry.actor = "tampered-actor"
+
         assert entry.verify_checksum() is False
 
 
-class TestAuditOutboxIntegration:
+class TestAuditOutboxModelIntegration:
     """Integration tests for AuditOutboxModel."""
 
     @pytest.mark.asyncio
     async def test_create_outbox_entry(self, db_session):
-        """Can create and persist outbox entry."""
-        from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
-
+        """Can create and persist an outbox entry with pending status."""
         event_id = uuid.uuid4()
         entry = AuditOutboxModel(
             event_id=event_id,
@@ -276,15 +319,15 @@ class TestAuditOutboxIntegration:
 
         result = await db_session.execute(select(AuditOutboxModel).where(AuditOutboxModel.event_id == event_id))
         fetched = result.scalar_one_or_none()
+
         assert fetched is not None
         assert fetched.status == "pending"
         assert fetched.retry_count == 0
+        assert fetched.event_type == "AuditEvent"
 
     @pytest.mark.asyncio
     async def test_mark_published(self, db_session):
-        """Can mark outbox entry as published."""
-        from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
-
+        """mark_published updates status and sets processed_at."""
         event_id = uuid.uuid4()
         entry = AuditOutboxModel(
             event_id=event_id,
@@ -301,14 +344,14 @@ class TestAuditOutboxIntegration:
 
         result = await db_session.execute(select(AuditOutboxModel).where(AuditOutboxModel.event_id == event_id))
         fetched = result.scalar_one_or_none()
+
+        assert fetched is not None
         assert fetched.status == "published"
         assert fetched.processed_at is not None
 
     @pytest.mark.asyncio
     async def test_mark_failed_increments_retry(self, db_session):
-        """Mark failed increments retry_count."""
-        from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
-
+        """mark_failed updates status, increments retry_count, and sets error_message."""
         event_id = uuid.uuid4()
         entry = AuditOutboxModel(
             event_id=event_id,
@@ -325,27 +368,47 @@ class TestAuditOutboxIntegration:
 
         result = await db_session.execute(select(AuditOutboxModel).where(AuditOutboxModel.event_id == event_id))
         fetched = result.scalar_one_or_none()
+
+        assert fetched is not None
         assert fetched.status == "failed"
         assert fetched.retry_count == 1
         assert fetched.error_message == "Connection timeout"
 
+    @pytest.mark.asyncio
+    async def test_can_retry(self, db_session):
+        """can_retry returns True when retry_count < max_retries."""
+        event_id = uuid.uuid4()
+        entry = AuditOutboxModel(
+            event_id=event_id,
+            payload={"action": "test"},
+            retry_count=0,
+            max_retries=3,
+        )
+
+        db_session.add(entry)
+        await db_session.commit()
+
+        assert entry.can_retry() is True
+
+        # Exhaust retries
+        entry.retry_count = 3
+        assert entry.can_retry() is False
+
 
 class TestAuditQueryIntegration:
-    """Integration tests for audit log queries."""
+    """Integration tests for audit log multi-dimensional query."""
 
     @pytest.mark.asyncio
     async def test_query_by_time_range(self, db_session):
-        """Can query audit logs by time range."""
-        # Clear existing data first
-        from sqlalchemy import delete
+        """Can query audit logs by timestamp range."""
+        now = datetime.now(UTC)
+        older = now - timedelta(days=7)
 
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+        # Clear any existing data
+        from sqlalchemy import delete
 
         await db_session.execute(delete(AuditLogModel))
         await db_session.commit()
-
-        now = datetime.now(UTC)
-        older = now - timedelta(days=7)
 
         entry1 = AuditLogModel(
             log_id=uuid.uuid4(),
@@ -375,17 +438,18 @@ class TestAuditQueryIntegration:
             select(AuditLogModel).where(AuditLogModel.timestamp >= older).where(AuditLogModel.timestamp <= now)
         )
         results = result.scalars().all()
+
         assert len(results) == 2
 
     @pytest.mark.asyncio
     async def test_query_by_actor(self, db_session):
-        """Can query audit logs by actor."""
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+        """Can query audit logs by actor field."""
+        unique_actor = f"specific-user-{get_unique_id()}"
 
         entry = AuditLogModel(
             log_id=uuid.uuid4(),
             timestamp=datetime.now(UTC),
-            actor="specific-user",
+            actor=unique_actor,
             action_type="document:upload",
             target_resource="doc-1",
             old_value={},
@@ -397,16 +461,41 @@ class TestAuditQueryIntegration:
 
         from sqlalchemy import select
 
-        result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.actor == "specific-user"))
+        result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.actor == unique_actor))
         results = result.scalars().all()
+
         assert len(results) == 1
-        assert results[0].actor == "specific-user"
+        assert results[0].actor == unique_actor
+
+    @pytest.mark.asyncio
+    async def test_query_by_action_type(self, db_session):
+        """Can query audit logs by action_type field."""
+        unique_action = f"custom:action-{get_unique_id()}"
+
+        entry = AuditLogModel(
+            log_id=uuid.uuid4(),
+            timestamp=datetime.now(UTC),
+            actor="user-123",
+            action_type=unique_action,
+            target_resource="doc-1",
+            old_value={},
+            new_value={},
+        )
+
+        db_session.add(entry)
+        await db_session.commit()
+
+        from sqlalchemy import select
+
+        result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.action_type == unique_action))
+        results = result.scalars().all()
+
+        assert len(results) == 1
+        assert results[0].action_type == unique_action
 
     @pytest.mark.asyncio
     async def test_query_by_correction_level(self, db_session):
         """Can query audit logs by correction_level (FR-SC-04)."""
-        from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
-
         entries = [
             AuditLogModel(
                 log_id=uuid.uuid4(),
@@ -437,5 +526,32 @@ class TestAuditQueryIntegration:
 
         result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.correction_level == 2))
         results = result.scalars().all()
+
         assert len(results) == 1
         assert results[0].correction_level == 2
+
+    @pytest.mark.asyncio
+    async def test_query_by_target_resource(self, db_session):
+        """Can query audit logs by target_resource field."""
+        unique_resource = f"document/custom-doc-{get_unique_id()}"
+
+        entry = AuditLogModel(
+            log_id=uuid.uuid4(),
+            timestamp=datetime.now(UTC),
+            actor="user-123",
+            action_type="document:upload",
+            target_resource=unique_resource,
+            old_value={},
+            new_value={},
+        )
+
+        db_session.add(entry)
+        await db_session.commit()
+
+        from sqlalchemy import select
+
+        result = await db_session.execute(select(AuditLogModel).where(AuditLogModel.target_resource == unique_resource))
+        results = result.scalars().all()
+
+        assert len(results) == 1
+        assert results[0].target_resource == unique_resource
