@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-22
+last_updated: 2026-04-24
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -95,7 +95,7 @@ development_status:
   1-14b-autonomous-invocation-route: done
   1-14c-autonomous-invocation-execute: done
   1-15a-externalized-memory-context-compression: ready-for-dev
-  1-15b-externalized-memory-five-layer-storage: backlog
+  1-15b-externalized-memory-five-layer-storage: ready-for-dev
   # 价值组 6: MVP 关键机制增强
   1-17-udmr-basic-routing: backlog
   1-18a-prefect-workflow-integration: backlog
@@ -333,11 +333,9 @@ development_status:
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
 #   2. Execute Epic 0 Iteration 1 剩余 Stories (0.17/18) - 产品交付系统依赖Epic 1
-#   3. Start Epic 1 Story 1.6 (Qdrant Vector Layer), Story 1.7 (MinIO Object Layer), or Story 1.8 (Neo4j Graph Layer)
+#   3. Developping Epic 1
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-04-21
-#   - Epic 20 测试工程基础设施 completed
-#   - Story 20-1 sisys-testing-refactor → done (2071 tests passed)
-#   - Ready for Dev count: 6 (Story 0.17, 0.18, 1.12, 1.14a, 1.14b, 1.14c)
+#   - Updated last_updated date to 2026-04-24
+#   - Story 1.15b 创建完成 → ready-for-dev
 # =============================================================================
