@@ -92,7 +92,7 @@ data:
       file: /data/.runner
       workdir: /data/workdir
       tempdir: /data/tmp
-      timeout: 30m
+      timeout: 60m
 
     log:
       level: info

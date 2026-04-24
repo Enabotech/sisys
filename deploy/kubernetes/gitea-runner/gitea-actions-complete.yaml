@@ -141,7 +141,7 @@ data:
       # 临时目录
       tempdir: /data/tmp
       # 超时设置
-      timeout: 20m
+      timeout: 720m
 
     # 日志配置
     log:
