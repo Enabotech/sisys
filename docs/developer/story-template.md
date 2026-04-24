@@ -62,8 +62,14 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_story_x_y_steps.py`（BDD 步骤实现）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
+
+**BDD 步骤实现约束：**
+- 步骤函数使用 `event_loop.run_until_complete()` 运行 async 测试
+- 同一中文文本可能需要同时支持 given/when 装饰器
+- 不要使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -98,6 +104,7 @@
 | **TDD 单元测试** | [组件 A] | [验证内容描述] | `test_[component_a].py` | Task [N] |
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_x_y_steps.py` | Task 0 |
 | **SDD 架构验证** | [架构约束] | [约束描述] | `test_[architecture].py` | Task [N] |
 | **集成测试** | [层间协作] | [协作描述] | `test_[integration].py` | Task [N] |
 
@@ -201,6 +208,7 @@
 - [ ] Subtask [m.n]: 定义数据模型（[关键属性]）
 - [ ] Subtask [m.n]: 创建/更新 `docs/api/openapi.yaml`
 - [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_story_x_y.feature`
+- [ ] Subtask [m.n]: 编写 BDD 步骤实现 `tests/acceptance/test_story_x_y_steps.py`
 - [ ] Subtask [m.n]: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -328,7 +336,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_[integration].py # 集成测试
 │   └── acceptance/
-│       └── test_story_x_y.feature # 验收测试
+│       ├── test_story_x_y.feature   # Gherkin 场景
+│       └── test_story_x_y_steps.py  # BDD 步骤实现
 └── docs/
     └── [layer]/
         └── [component]_guide.md # 实施指南
@@ -507,10 +516,11 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.4.0
+**模板版本/Template Version:** 2.5.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-04-23
+**最后更新/Last Updated:** 2026-04-24
 **更新说明:**
+- v2.5.0: 新增 BDD 步骤实现文件 `test_story_x_y_steps.py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
 - v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置
