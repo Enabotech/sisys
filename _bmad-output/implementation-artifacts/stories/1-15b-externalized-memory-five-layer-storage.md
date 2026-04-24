@@ -194,6 +194,7 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.15b.feature`（由 Dev agent 在 Task 0 创建）
+- [ ] 步骤实现文件：`tests/acceptance/test_story_1.15b_steps.py`（BDD 步骤函数）
 - [ ] 覆盖场景:
   - Private/Group 记忆分离
   - L1 CRUD 操作
@@ -236,6 +237,7 @@
 | **TDD 单元测试** | MemoryMetadataRepository | L2 存储 | `test_memory_metadata_repository.py` | Task 2 |
 | **TDD 单元测试** | VectorIndexRepository | L3 向量索引 | `test_vector_index_port.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.15b.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_1.15b_steps.py` | Task 0 |
 | **SDD 架构验证** | 架构约束 | 六层存储约束 | `test_six_layer_storage.py` | Task 3 |
 | **集成测试** | 端到端流程 | 六层存储协同 | `test_storage_integration.py` | Task 3 |
 
@@ -305,7 +307,8 @@
 - [ ] Subtask 0.3: 定义 VectorIndexRepository 端口接口（`src/interfaces/search/vector_index_port.py`）
 - [ ] Subtask 0.4: 定义 MemoryChangedListener 四个监听器接口
 - [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15b.feature`（Dev agent 创建）
-- [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_story_1.15b_steps.py`
+- [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
