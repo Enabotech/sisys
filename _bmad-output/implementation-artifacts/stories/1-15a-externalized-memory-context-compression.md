@@ -147,9 +147,9 @@
   - 字段: memory_id, user_id, content, compressed_content, memory_type (enum: private/group), group_id, name, description, version, created_at, updated_at
 
 #### L0 文件系统存储 (L0 Storage)
-- [ ] L0MemoryStore 端口接口（`src/interfaces/storage/l0_memory_port.py`）
+- [ ] L0MemoryStore 端口接口（`src/domain/ports/l0_memory_port.py`）
   - 接口方法: `save(memory_id, content)`, `load(memory_id) -> str`, `delete(memory_id)`, `update_index(memory_entries: List[MemoryIndexEntry])`, `load_index() -> List[MemoryIndexEntry]`
-  - 定义在 interfaces 层（作为六边形架构的"端口"）
+  - 定义在 domain/ports 层（符合六边形架构：领域层定义端口，基础设施层实现）
 - [ ] FileSystemMemoryAdapter 实现（`src/infrastructure/storage/file_system_memory_adapter.py`）
   - 实现 L0MemoryStore 端口接口
   - 路径: ~/.sisys/memory/
@@ -167,9 +167,9 @@
   - append-only 模式，不可更新或删除
 
 #### 压缩器 (Compressor)
-- [ ] MemoryCompressor 端口接口（`src/interfaces/compression/memory_compressor_port.py`）
+- [ ] MemoryCompressor 端口接口（`src/domain/ports/memory_compressor_port.py`）
   - 接口方法: `compress(content, max_length) -> str`, `calculate_compression_ratio(original, compressed) -> float`
-  - 定义在 interfaces 层
+  - 定义在 domain/ports 层（符合六边形架构：领域层定义端口，基础设施层实现）
 - [ ] LLMCompressionAdapter 实现（`src/infrastructure/compression/llm_compression_adapter.py`）
   - 实现 MemoryCompressor 端口接口
   - 使用 LLM 进行语义压缩
@@ -234,16 +234,20 @@
 **约束规则：**
 
 | 约束类型 | 规则 | 违反后果 |
-|---------|------|----------|
+|---------|------|---------|
 | **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
 | **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
 | **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
 | **外部服务隔离** | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
-| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源；语义缓存测试用不同 embedding 向量 | 资源冲突导致并行失败 |
+| **语义缓存隔离** | 语义缓存基于向量相似度，多测试用相同 embedding 会互相覆盖缓存 | 需要用 unique_cache_key 生成不同 embedding |
 | **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
-| **asyncio 上下文** | asyncio.Lock 使用类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
+| **asyncio.run 使用** | 独立脚本用 asyncio.run()；pytest-xdist 并行测试中 BDD 步骤函数用 event_loop.run_until_complete() | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
+| **并发测试方法** | 单进程测试用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture；真正并发测试在 async 函数内用 asyncio.gather() | 根据场景正确选择否则失败 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
@@ -252,6 +256,8 @@
 - ❌ Fixture 假设清理顺序（必须显式声明依赖）
 - ❌ asyncio.Lock 使用实例变量
 - ❌ scope=module 的 event_loop fixture
+- ❌ BDD 步骤函数使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
+- ❌ pytest-xdist 并行测试时，BDD 步骤函数内使用 asyncio.run()（应使用 event_loop fixture）
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
@@ -289,9 +295,9 @@
 - [ ] Subtask 0.1: 定义 MemoryChanged 事件 Schema（`src/domain/events/memory_events.py`）
 - [ ] Subtask 0.2: 定义 Memory 实体（`src/domain/entities/memory.py`）
 - [ ] Subtask 0.3: 定义 MemoryService 服务接口（`src/domain/services/memory_service.py`）
-- [ ] Subtask 0.4: 定义 L0MemoryStore 端口接口（`src/interfaces/storage/l0_memory_port.py`）
+- [ ] Subtask 0.4: 定义 L0MemoryStore 端口接口（`src/domain/ports/l0_memory_port.py`）
 - [ ] Subtask 0.5: 定义 FileSystemMemoryAdapter 实现（`src/infrastructure/storage/file_system_memory_adapter.py`）
-- [ ] Subtask 0.6: 定义 MemoryCompressor 端口接口（`src/interfaces/compression/memory_compressor_port.py`）
+- [ ] Subtask 0.6: 定义 MemoryCompressor 端口接口（`src/domain/ports/memory_compressor_port.py`）
 - [ ] Subtask 0.7: 定义 LLMCompressionAdapter 实现（`src/infrastructure/compression/llm_compression_adapter.py`）
 - [ ] Subtask 0.8: 定义 MemoryMetadataRepository 仓储接口（`src/domain/repositories/memory_metadata_repository.py`）
 - [ ] Subtask 0.9: 定义 MemoryChangeHistoryRepository 仓储接口（`src/domain/repositories/memory_change_history_repository.py`）
@@ -514,6 +520,9 @@ sisys/
 │   ├── domain/
 │   │   ├── events/
 │   │   │   └── memory_events.py      # MemoryChanged 事件（新实现）
+│   │   ├── ports/
+│   │   │   ├── l0_memory_port.py     # L0MemoryStore 端口接口（domain/ports 层）
+│   │   │   └── memory_compressor_port.py # MemoryCompressor 端口接口（domain/ports 层）
 │   │   ├── services/
 │   │   │   └── memory_service.py     # MemoryService（核心逻辑）
 │   │   ├── entities/
@@ -528,14 +537,8 @@ sisys/
 │   │   │   └── memory.py            # MemoryConfig 配置（新实现）
 │   │   ├── compression/
 │   │   │   └── llm_compression_adapter.py # LLMCompressionAdapter
-│   │   └── repositories/
-│   │       ├── memory_metadata_repository_impl.py      # MemoryMetadataRepository 实现
-│   │       └── memory_change_history_repository_impl.py # MemoryChangeHistoryRepository 实现
-│   └── interfaces/
-│       ├── storage/
-│       │   └── l0_memory_port.py     # L0MemoryStore 端口接口（六边形架构）
-│       └── compression/
-│           └── memory_compressor_port.py # MemoryCompressor 端口接口
+│   │   └── storage/
+│   │       └── file_system_memory_adapter.py # FileSystemMemoryAdapter 实现
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
@@ -549,7 +552,9 @@ sisys/
 │   │   │   └── repositories/
 │   │   │       ├── test_memory_metadata_repository.py
 │   │   │       └── test_memory_change_history_repository.py
-│   │   ├── interfaces/
+│   │   ├── infrastructure/
+│   │   │   ├── compression/
+│   │   │   │   └── test_llm_compression_adapter.py
 │   │   │   └── storage/
 │   │   │       └── test_file_system_memory_adapter.py
 │   │   └── architecture/
@@ -580,8 +585,8 @@ sisys/
 - [ ] MemoryConfig 采用与 OtelConfig 相同的 `from_env()` 模式
 - [ ] MemoryService 仅负责 L1 压缩和事件发布，不处理存储细节
 - [ ] Task 3 包含架构验证测试（六边形架构约束检测）
-- [ ] L0MemoryStore 端口在 interfaces 层，实现在 infrastructure 层（FileSystemMemoryAdapter）
-- [ ] MemoryCompressor 端口在 interfaces 层，实现在 infrastructure 层（LLMCompressionAdapter）
+- [ ] L0MemoryStore 端口在 domain/ports 层，实现在 infrastructure 层（FileSystemMemoryAdapter）
+- [ ] MemoryCompressor 端口在 domain/ports 层，实现在 infrastructure 层（LLMCompressionAdapter）
 - [ ] 测试隔离约束显式强调（asyncio.Lock 类变量、pytest-asyncio auto mode）
 - [ ] 压缩延迟 P95<20ms 基准测试验证
 
@@ -653,8 +658,8 @@ sisys/
 - `src/domain/services/memory_service.py` - MemoryService
 - `src/domain/repositories/memory_metadata_repository.py` - MemoryMetadataRepository 接口（领域层定义）
 - `src/domain/repositories/memory_change_history_repository.py` - MemoryChangeHistoryRepository 接口（领域层定义）
-- `src/interfaces/storage/l0_memory_port.py` - L0MemoryStore 端口接口（interfaces 层）
-- `src/interfaces/compression/memory_compressor_port.py` - MemoryCompressor 端口接口（interfaces 层）
+- `src/domain/ports/l0_memory_port.py` - L0MemoryStore 端口接口（domain/ports 层）
+- `src/domain/ports/memory_compressor_port.py` - MemoryCompressor 端口接口（domain/ports 层）
 - `src/infrastructure/config/memory.py` - MemoryConfig
 - `src/infrastructure/compression/llm_compression_adapter.py` - LLMCompressionAdapter（infrastructure 层实现）
 - `src/infrastructure/storage/file_system_memory_adapter.py` - FileSystemMemoryAdapter（infrastructure 层实现）
