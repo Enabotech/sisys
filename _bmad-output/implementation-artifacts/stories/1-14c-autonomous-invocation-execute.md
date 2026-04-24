@@ -261,8 +261,8 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
 - [ ] 连续5次运行无随机失败
-- [ ] `ruff check` 通过
-- [ ] `mypy` 通过
+- [ ] `poetry run ruff check` 通过
+- [ ] `poetry run mypy` 通过
 
 ---
 
