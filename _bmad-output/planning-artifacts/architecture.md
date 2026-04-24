@@ -4315,10 +4315,97 @@ class AgentIdentity:
 
 #### 17.3.2 Agent 标准工作流（9 步原子循环）
 
+**状态机与原子循环的关系**：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent State Machine                         │
+│  ┌──────┐   ┌────────┐   ┌──────────┐   ┌────────┐   ┌──────┐ │
+│  │ INIT │ → │RUNNING│ → │CHECKPOINT│ → │WAITING │ → │ END  │ │
+│  └──────┘   └────────┘   └──────────┘   └────────┘   └──────┘ │
+│                  ↓              ↑                            │
+│           ┌─────────────┐       │                            │
+│           │  9步原子循环 │ ←←←←←┘                            │
+│           │ (仅在RUNNING状态执行)  │                            │
+│           └─────────────┘                                    │
+└─────────────────────────────────────────────────────────────────┘
+
+状态机：定义 Agent 生命周期（start→running→checkpoint→resume→end）
+原子循环：定义 RUNNING 状态下的业务逻辑（感知→规划→执行→...）
+关系：状态机决定"何时停/何时恢复"，原子循环决定"停的时候做什么"
+```
+
+**Agent 生命周期状态机**：
+
+```python
+class AgentState(Enum):
+    """Agent 生命周期状态 - 与 Checkpoint 机制协同"""
+    INIT = "initialized"           # 初始化完成
+    RUNNING = "running"             # 运行中（可中断）
+    CHECKPOINTED =checkpointed"     # 已保存（可恢复）
+    WAITING = "waiting"             # 等待外部输入（如用户确认）
+    COMPLETED = "completed"         # 正常结束
+    FAILED = "failed"               # 异常终止
+
+class AgentLifecycle:
+    """Agent 生命周期管理器"""
+
+    def __init__(self, workflow: AgentWorkflow):
+        self.workflow = workflow
+        self.state = AgentState.INIT
+        self.checkpoint_manager = CheckpointManager()
+
+    async def run(self, task: AgentTask) -> AgentResult:
+        """主循环：状态机驱动 9 步原子循环"""
+        try:
+            self.state = AgentState.RUNNING
+
+            while self.state == AgentState.RUNNING:
+                # 原子循环执行（步骤 1-9）
+                result = await self.workflow.execute(task)
+
+                # 状态转换判断
+                if result.status == "success":
+                    self.state = AgentState.COMPLETED
+                elif result.status == "waiting_user_confirm":
+                    self.state = AgentState.WAITING
+                    await self.save_checkpoint()
+                elif result.status == "error_recoverable":
+                    self.state = AgentState.RUNNING  # 重试
+                else:
+                    self.state = AgentState.FAILED
+
+            return result
+
+        except Exception as e:
+            self.state = AgentState.FAILED
+            raise
+
+    async def save_checkpoint(self):
+        """断点保存：ATOMIC 地将运行状态写入 CheckpointSnapshot"""
+        checkpoint = CheckpointSnapshot(
+            state=self.state,
+            workflow_state=self.workflow.get_state(),
+            timestamp=datetime.now()
+        )
+        await self.checkpoint_manager.save(checkpoint)
+        self.state = AgentState.CHECKPOINTED
+
+    async def resume(self, checkpoint_id: UUID) -> AgentResult:
+        """断点恢复：从 CheckpointSnapshot 恢复到 RUNNING 状态"""
+        checkpoint = await self.checkpoint_manager.load(checkpoint_id)
+        self.workflow.restore_state(checkpoint.workflow_state)
+        self.state = AgentState.RUNNING
+        return await self.run(checkpoint.pending_task)
+```
+
+**9 步原子循环（仅在 RUNNING 状态执行）**：
+
 ```python
 class AgentWorkflow:
     """Agent 标准工作流 - 9 步原子循环"""
 
+    @trace  # Phoenix 全链路追踪装饰器
     async def execute(self, task: AgentTask) -> AgentResult:
         # 1. 初始化
         await self.initialize(task)
@@ -4769,6 +4856,116 @@ class SAPMessage(BaseModel):
     isolation_level: str = "L4"
     blackboard_visible: bool = False  # 是否对公共黑板可见
 ```
+
+#### 17.3.8 Agent 评估与可观测性
+
+**设计原则：** 以开源为首选，不考虑商业方案。评估框架是横切关注点，覆盖整个 Agent 生命周期。
+
+**技术选型：** Phoenix (Arize) - 完全开源（Apache 2.0），LLM 原生可观测性平台
+
+```python
+from phoenix.tracing import trace
+from phoenix.evals import llm_eval_binary_classifier
+
+class EvaluationHarness:
+    """
+    Agent 评估与可观测性 - 基于 Phoenix (Arize) 开源方案
+    支持：全链路追踪、评估指标、漂移检测（CUSUM）
+    """
+
+    def __init__(self, agent_workflow: AgentWorkflow):
+        self.workflow = agent_workflow
+        self.tracer = PhoenixTracer(project_name="sisys-agent")
+        self.cusum_detector = CUSUMDriftDetector()
+
+    @trace
+    async def run_with_evaluation(self, task: AgentTask) -> AgentResult:
+        """运行 Agent + 评估 + 追踪"""
+        # 1. Phoenix 追踪（自动 span 记录）
+        with self.tracer.start_span("agent_execution") as span:
+            result = await self.workflow.execute(task)
+
+        # 2. 评估输出质量
+        eval_result = await self.evaluate(result)
+        span.set_attribute("eval.hallucination_score", eval_result.hallucination_score)
+        span.set_attribute("eval.context_relevance", eval_result.context_relevance)
+
+        # 3. CUSUM 漂移检测
+        self.cusum_detector.update(eval_result.overall_score)
+        if self.cusum_detector.is_drifted():
+            span.set_attribute("drift.detected", True)
+            await self.trigger_recalibration()
+
+        return result
+
+    async def evaluate(self, result: AgentResult) -> EvaluationResult:
+        """评估 Agent 输出质量"""
+        # 幻觉检测
+        hallucination_score = await llm_eval_binary_classifier(
+            prompt=f"判断以下回答是否存在幻觉：{result.output}",
+            model="gpt-4"
+        )
+
+        # 上下文相关性
+        context_relevance = self.compute_context_relevance(
+            result.evidence_package
+        )
+
+        # 置信度校准
+        confidence_accuracy = self.compute_confidence_accuracy(
+            predicted=result.confidence,
+            actual=eval_result.quality_score
+        )
+
+        return EvaluationResult(
+            hallucination_score=hallucination_score,
+            context_relevance=context_relevance,
+            confidence_accuracy=confidence_accuracy,
+            overall_score=self.weighted_sum(...)
+        )
+
+    def compute_confidence_accuracy(
+        self,
+        predicted: float,
+        actual: float
+    ) -> float:
+        """计算置信度校准准确度（用于 CUSUM 漂移检测）"""
+        error = abs(predicted - actual)
+        return 1.0 - min(error, 1.0)  # 误差越小，校准越准确
+```
+
+**与 Checkpoint 机制集成：**
+
+```python
+class CheckpointWithEvaluation:
+    """Checkpoint 快照 + 评估数据"""
+
+    def to_checkpoint_snapshot(self) -> CheckpointSnapshot:
+        return CheckpointSnapshot(
+            checkpoint_id=self.checkpoint_id,
+            state_data=self.state_data,
+            evaluation_history=self.eval_history,  # 评估历史（CUSUM 用）
+            hallucination_trend=self.cusum_detector.get_trend(),
+            confidence_accuracy_trend=self.confidence_accuracy_history
+        )
+```
+
+**技术优势：**
+
+- ✅ 完全开源（Apache 2.0，无使用限制）
+- ✅ 与 LangGraph/LangChain 官方集成
+- ✅ 内置幻觉检测、上下文相关性评估
+- ✅ 支持自定义评估指标
+- ✅ 自托管（不依赖云服务，数据自主可控）
+
+**与 §2.5 监控基础设施集成：**
+
+| 组件 | 技术 | 用途 |
+|------|------|------|
+| 追踪 | PhoenixTracer | 全链路 span 记录（@trace 装饰器） |
+| 指标 | Prometheus | 评估指标导出（hallucination_score、context_relevance、confidence_accuracy） |
+| 可视化 | Grafana | 评估仪表盘、漂移告警 |
+| 分布式追踪 | OpenTelemetry | Phoenix 与 SISYS 追踪系统对接 |
 
 ---
 
