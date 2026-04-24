@@ -249,16 +249,20 @@
 **约束规则：**
 
 | 约束类型 | 规则 | 违反后果 |
-|---------|------|----------|
+|---------|------|---------|
 | **事务隔离** | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
 | **Schema 自创建** | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
 | **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
 | **外部服务隔离** | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
-| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源；语义缓存测试用不同 embedding 向量 | 资源冲突导致并行失败 |
+| **语义缓存隔离** | 语义缓存基于向量相似度，多测试用相同 embedding 会互相覆盖缓存 | 需要用 unique_cache_key 生成不同 embedding |
 | **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
-| **asyncio 上下文** | asyncio.Lock 使用类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
+| **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
+| **asyncio.run 使用** | 独立脚本用 asyncio.run()；pytest-xdist 并行测试中 BDD 步骤函数用 event_loop.run_until_complete() | asyncio.run() 创建新循环，并行测试时可能关闭错误循环 |
+| **并发测试方法** | 单进程测试用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture；真正并发测试在 async 函数内用 asyncio.gather() | 根据场景正确选择否则失败 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
 
 **禁止行为：**
@@ -267,6 +271,8 @@
 - ❌ Fixture 假设清理顺序（必须显式声明依赖）
 - ❌ asyncio.Lock 使用实例变量
 - ❌ scope=module 的 event_loop fixture
+- ❌ BDD 步骤函数使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
+- ❌ pytest-xdist 并行测试时，BDD 步骤函数内使用 asyncio.run()（应使用 event_loop fixture）
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过

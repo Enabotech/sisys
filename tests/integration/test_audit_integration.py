@@ -114,6 +114,7 @@ async def setup_schema(pg_config):
     """Create schema and tables once per worker module.
 
     Uses sync connection for DDL to avoid asyncpg issues.
+    Drop schema first to ensure clean state (handles failed previous runs).
     """
     schema = get_schema_name()
     sync_url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
@@ -126,9 +127,14 @@ async def setup_schema(pg_config):
         connect_args={"options": f"-csearch_path={schema}"},
     )
 
+    # Drop schema first to ensure clean state (handles failed previous runs)
+    with engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+
     # Create schema
     with engine.connect() as conn:
-        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
         conn.commit()
 
     # Create tables
@@ -136,7 +142,7 @@ async def setup_schema(pg_config):
         conn.execute(
             text(
                 f"""
-            CREATE TABLE IF NOT EXISTS {schema}.audit_log (
+            CREATE TABLE {schema}.audit_log (
                 id BIGSERIAL PRIMARY KEY,
                 log_id UUID NOT NULL UNIQUE,
                 timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -159,7 +165,7 @@ async def setup_schema(pg_config):
         conn.execute(
             text(
                 f"""
-            CREATE TABLE IF NOT EXISTS {schema}.audit_outbox (
+            CREATE TABLE {schema}.audit_outbox (
                 id BIGSERIAL PRIMARY KEY,
                 event_id UUID NOT NULL UNIQUE,
                 event_type VARCHAR(100) NOT NULL,
