@@ -149,8 +149,8 @@ def async_engine(pg_config, request):
 async def db_session(pg_config, sync_engine):
     """Create an async session for a test with worker-specific schema.
 
-    Uses scope="function" to avoid event loop issues with module-scoped async fixtures.
-    Creates its own engine with proper search_path configuration.
+    Each test gets its own engine to avoid event loop conflicts.
+    Schema is already created by sync_engine fixture.
     """
     schema = get_schema_name()
     url = (
