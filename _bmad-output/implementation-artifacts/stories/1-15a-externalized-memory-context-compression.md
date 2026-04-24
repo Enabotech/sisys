@@ -147,9 +147,9 @@
   - 字段: memory_id, user_id, content, compressed_content, memory_type (enum: private/group), group_id, name, description, version, created_at, updated_at
 
 #### L0 文件系统存储 (L0 Storage)
-- [ ] L0MemoryStore 端口接口（`src/domain/ports/l0_memory_port.py`）
+- [ ] L0MemoryStore 仓储接口（`src/domain/repositories/l0_memory_port.py`）
   - 接口方法: `save(memory_id, content)`, `load(memory_id) -> str`, `delete(memory_id)`, `update_index(memory_entries: List[MemoryIndexEntry])`, `load_index() -> List[MemoryIndexEntry]`
-  - 定义在 domain/ports 层（符合六边形架构：领域层定义端口，基础设施层实现）
+  - 定义在 domain/repositories 层（符合六边形架构：领域层定义仓储接口，基础设施层实现）
 - [ ] FileSystemMemoryAdapter 实现（`src/infrastructure/storage/file_system_memory_adapter.py`）
   - 实现 L0MemoryStore 端口接口
   - 路径: ~/.sisys/memory/
@@ -167,9 +167,9 @@
   - append-only 模式，不可更新或删除
 
 #### 压缩器 (Compressor)
-- [ ] MemoryCompressor 端口接口（`src/domain/ports/memory_compressor_port.py`）
+- [ ] MemoryCompressor 服务接口（`src/domain/services/memory_compressor_port.py`）
   - 接口方法: `compress(content, max_length) -> str`, `calculate_compression_ratio(original, compressed) -> float`
-  - 定义在 domain/ports 层（符合六边形架构：领域层定义端口，基础设施层实现）
+  - 定义在 domain/services 层（符合六边形架构：领域层定义服务接口，基础设施层实现）
 - [ ] LLMCompressionAdapter 实现（`src/infrastructure/compression/llm_compression_adapter.py`）
   - 实现 MemoryCompressor 端口接口
   - 使用 LLM 进行语义压缩
@@ -295,9 +295,9 @@
 - [ ] Subtask 0.1: 定义 MemoryChanged 事件 Schema（`src/domain/events/memory_events.py`）
 - [ ] Subtask 0.2: 定义 Memory 实体（`src/domain/entities/memory.py`）
 - [ ] Subtask 0.3: 定义 MemoryService 服务接口（`src/domain/services/memory_service.py`）
-- [ ] Subtask 0.4: 定义 L0MemoryStore 端口接口（`src/domain/ports/l0_memory_port.py`）
+- [ ] Subtask 0.4: 定义 L0MemoryStore 仓储接口（`src/domain/repositories/l0_memory_port.py`）
 - [ ] Subtask 0.5: 定义 FileSystemMemoryAdapter 实现（`src/infrastructure/storage/file_system_memory_adapter.py`）
-- [ ] Subtask 0.6: 定义 MemoryCompressor 端口接口（`src/domain/ports/memory_compressor_port.py`）
+- [ ] Subtask 0.6: 定义 MemoryCompressor 服务接口（`src/domain/services/memory_compressor_port.py`）
 - [ ] Subtask 0.7: 定义 LLMCompressionAdapter 实现（`src/infrastructure/compression/llm_compression_adapter.py`）
 - [ ] Subtask 0.8: 定义 MemoryMetadataRepository 仓储接口（`src/domain/repositories/memory_metadata_repository.py`）
 - [ ] Subtask 0.9: 定义 MemoryChangeHistoryRepository 仓储接口（`src/domain/repositories/memory_change_history_repository.py`）
@@ -520,18 +520,17 @@ sisys/
 │   ├── domain/
 │   │   ├── events/
 │   │   │   └── memory_events.py      # MemoryChanged 事件（新实现）
-│   │   ├── ports/
-│   │   │   ├── l0_memory_port.py     # L0MemoryStore 端口接口（domain/ports 层）
-│   │   │   └── memory_compressor_port.py # MemoryCompressor 端口接口（domain/ports 层）
 │   │   ├── services/
-│   │   │   └── memory_service.py     # MemoryService（核心逻辑）
+│   │   │   ├── memory_service.py     # MemoryService（核心逻辑）
+│   │   │   └── memory_compressor_port.py # MemoryCompressor 服务接口
 │   │   ├── entities/
 │   │   │   └── memory.py             # Memory 实体
-│   │   ├── value_objects/
-│   │   │   └── memory_index_entry.py # MemoryIndexEntry 值对象（MEMORY.md 索引条目）
-│   │   └── repositories/
-│   │       ├── memory_metadata_repository.py      # MemoryMetadataRepository 接口（领域层定义）
-│   │       └── memory_change_history_repository.py # MemoryChangeHistoryRepository 接口（领域层定义）
+│   │   ├── repositories/
+│   │   │   ├── l0_memory_port.py     # L0MemoryStore 仓储接口
+│   │   │   ├── memory_metadata_repository.py      # MemoryMetadataRepository 仓储接口
+│   │   │   └── memory_change_history_repository.py # MemoryChangeHistoryRepository 仓储接口
+│   │   └── value_objects/
+│   │       └── memory_index_entry.py # MemoryIndexEntry 值对象（MEMORY.md 索引条目）
 │   ├── infrastructure/
 │   │   ├── config/
 │   │   │   └── memory.py            # MemoryConfig 配置（新实现）
@@ -552,11 +551,6 @@ sisys/
 │   │   │   └── repositories/
 │   │   │       ├── test_memory_metadata_repository.py
 │   │   │       └── test_memory_change_history_repository.py
-│   │   ├── infrastructure/
-│   │   │   ├── compression/
-│   │   │   │   └── test_llm_compression_adapter.py
-│   │   │   └── storage/
-│   │   │       └── test_file_system_memory_adapter.py
 │   │   └── architecture/
 │   │       └── test_memory_architecture.py
 │   ├── integration/
@@ -585,8 +579,8 @@ sisys/
 - [ ] MemoryConfig 采用与 OtelConfig 相同的 `from_env()` 模式
 - [ ] MemoryService 仅负责 L1 压缩和事件发布，不处理存储细节
 - [ ] Task 3 包含架构验证测试（六边形架构约束检测）
-- [ ] L0MemoryStore 端口在 domain/ports 层，实现在 infrastructure 层（FileSystemMemoryAdapter）
-- [ ] MemoryCompressor 端口在 domain/ports 层，实现在 infrastructure 层（LLMCompressionAdapter）
+- [ ] L0MemoryStore 仓储在 domain/repositories 层，实现在 infrastructure 层（FileSystemMemoryAdapter）
+- [ ] MemoryCompressor 服务在 domain/services 层，实现在 infrastructure 层（LLMCompressionAdapter）
 - [ ] 测试隔离约束显式强调（asyncio.Lock 类变量、pytest-asyncio auto mode）
 - [ ] 压缩延迟 P95<20ms 基准测试验证
 
@@ -658,8 +652,8 @@ sisys/
 - `src/domain/services/memory_service.py` - MemoryService
 - `src/domain/repositories/memory_metadata_repository.py` - MemoryMetadataRepository 接口（领域层定义）
 - `src/domain/repositories/memory_change_history_repository.py` - MemoryChangeHistoryRepository 接口（领域层定义）
-- `src/domain/ports/l0_memory_port.py` - L0MemoryStore 端口接口（domain/ports 层）
-- `src/domain/ports/memory_compressor_port.py` - MemoryCompressor 端口接口（domain/ports 层）
+- `src/domain/repositories/l0_memory_port.py` - L0MemoryStore 仓储接口
+- `src/domain/services/memory_compressor_port.py` - MemoryCompressor 服务接口
 - `src/infrastructure/config/memory.py` - MemoryConfig
 - `src/infrastructure/compression/llm_compression_adapter.py` - LLMCompressionAdapter（infrastructure 层实现）
 - `src/infrastructure/storage/file_system_memory_adapter.py` - FileSystemMemoryAdapter（infrastructure 层实现）
