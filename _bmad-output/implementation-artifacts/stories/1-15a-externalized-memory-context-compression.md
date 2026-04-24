@@ -705,11 +705,12 @@ sisys/
 | 2 | Task 1 DoD 中 MemoryChanged 引用 Subtask 1.13-1.15 不存在 | P1 | 修正为 Subtask 1.7-1.9 |
 | 3 | 项目结构缺少 MemoryIndexEntry 值对象 | P2 | 添加 `src/domain/value_objects/memory_index_entry.py` |
 | 4 | AC-1 缺少触发模式识别说明 | P2 | 添加触发正则模式和提取逻辑 |
+| 5 | MemoryIndexEntry 位置与项目结构描述不符 | P2 | 已重构：将 MemoryIndexEntry 从 `l0_memory_port.py` 移至 `domain/value_objects/memory_index_entry.py` |
 
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [x] Story 审查完成，修复 2 个 P1 问题、2 个 P2 问题
+- [x] Story 审查完成，修复 2 个 P1 问题、3 个 P2 问题
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `validate-create-story` 质量检查
@@ -792,6 +793,7 @@ sisys/
 **创建日期/Created:** 2026-03-04
 **最后更新/Last Updated:** 2026-04-24
 **更新说明:**
+- v2.6.0: MemoryIndexEntry 重构：从 `l0_memory_port.py` 移至 `domain/value_objects/memory_index_entry.py`
 - v2.5.0: 修复 AC→Task 追溯矩阵 Subtask 编号错误；添加触发模式识别逻辑和 MemoryIndexEntry 值对象
 - v2.4.0: 新增 LLM 压缩适配器测试隔离规则（Story 1.15a 实战经验）
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则
