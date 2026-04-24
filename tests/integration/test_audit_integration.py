@@ -404,27 +404,21 @@ class TestAuditQueryIntegration:
         now = datetime.now(UTC)
         older = now - timedelta(days=7)
 
-        # Clear any existing data
-        from sqlalchemy import delete
-
-        await db_session.execute(delete(AuditLogModel))
-        await db_session.commit()
-
         entry1 = AuditLogModel(
             log_id=uuid.uuid4(),
             timestamp=older,
-            actor="user-123",
+            actor=f"user-time-{get_unique_id()}",
             action_type="document:upload",
-            target_resource="doc-1",
+            target_resource="doc-time-1",
             old_value={},
             new_value={},
         )
         entry2 = AuditLogModel(
             log_id=uuid.uuid4(),
             timestamp=now,
-            actor="user-123",
+            actor=f"user-time-{get_unique_id()}",
             action_type="document:download",
-            target_resource="doc-2",
+            target_resource="doc-time-2",
             old_value={},
             new_value={},
         )
