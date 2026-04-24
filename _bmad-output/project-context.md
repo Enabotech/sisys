@@ -10,6 +10,7 @@ source_documents:
   - ux-design-specification.md (UX 设计规格)
   - architecture.md (架构设计文档)
   - interface-design.md (接口设计规范)
+  - story-template.md (故事模板)
   - sdd-tdd-checklist.md (SDD+TDD 融合模式检查清单)
   - epics_v1.0.md (Epic 和用户故事分解)
   - sprint-status.yaml (Sprint 状态追踪)
