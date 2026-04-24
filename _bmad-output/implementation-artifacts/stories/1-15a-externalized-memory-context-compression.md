@@ -42,6 +42,9 @@
 **Given** 用户说"记住 X"或"以后用 X"
 **When** L1 显式确认压缩触发
 **Then** 执行以下步骤：
+0. **触发模式识别** — 识别以下用户指令模式：
+   - `"记住..."` `"以后用..."` `"别忘了..."` `"这很重要，记住..."`
+   - 正则匹配：`r'(记住|以后用|别忘了|这很重要，记住)\s*(.+)'` 提取 X
 1. 提取"记住 X"中的 X 作为记忆核心内容（轻量级提取，≤500 字）
 2. 压缩 X 至 ~150 字（保留核心语义，压缩率≥70%）
 3. 写入 ~/.sisys/memory/*.md
@@ -265,9 +268,9 @@
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | L1 显式确认压缩触发 | Task 1 | Subtask 1.1-1.6（MemoryService 红→绿→重构） | `test_memory_service.py` |
-| AC-2 | L1 四种操作类型 | Task 1 | Subtask 1.7-1.12（四种操作 红→绿→重构） | `test_memory_service.py` |
+| AC-2 | L1 四种操作类型 | Task 1 | Subtask 1.4-1.6（四种操作 红→绿→重构） | `test_memory_service.py` |
 | AC-3 | 压缩率验证 | Task 2 | Subtask 2.1-2.3（LLMCompressionAdapter 红→绿→重构） | `test_llm_compression_adapter.py` |
-| AC-4 | MemoryChanged 事件发布 | Task 1 | Subtask 1.13-1.15（MemoryChanged 事件 红→绿→重构） | `test_memory_events.py` |
+| AC-4 | MemoryChanged 事件发布 | Task 1 | Subtask 1.7-1.9（MemoryChanged 事件 红→绿→重构） | `test_memory_events.py` |
 | AC-5 | L0 文件系统存储 | Task 2 | Subtask 2.4-2.6（FileSystemMemoryAdapter 红→绿→重构） | `test_file_system_memory_adapter.py` |
 | AC-6 | L2 PostgreSQL 存储 | Task 2 | Subtask 2.7-2.9（MemoryMetadataRepository 红→绿→重构） | `test_memory_metadata_repository.py` |
 
@@ -345,7 +348,7 @@
 - [ ] Subtask 1.9: 🔄 重构 — 验证事件发布逻辑
 
 **完成标准/Definition of Done:**
-- [ ] MemoryService 实现完成（四种操作）
+- [ ] MemoryService 实现完成（四种操作：save/delete/update/list）
 - [ ] MemoryChanged 事件定义完成
 - [ ] 记忆保存成功率 100%
 - [ ] TDD 循环全部通过
@@ -515,6 +518,8 @@ sisys/
 │   │   │   └── memory_service.py     # MemoryService（核心逻辑）
 │   │   ├── entities/
 │   │   │   └── memory.py             # Memory 实体
+│   │   ├── value_objects/
+│   │   │   └── memory_index_entry.py # MemoryIndexEntry 值对象（MEMORY.md 索引条目）
 │   │   └── repositories/
 │   │       ├── memory_metadata_repository.py      # MemoryMetadataRepository 接口（领域层定义）
 │   │       └── memory_change_history_repository.py # MemoryChangeHistoryRepository 接口（领域层定义）
@@ -633,6 +638,9 @@ sisys/
 - [x] L1 与 L3 分离关系已澄清
 - [x] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
 - [x] 压缩延迟基准测试方法明确（P95<20ms）
+- [x] AC→Task 追溯矩阵 Subtask 编号修正完成
+- [x] 触发模式识别逻辑添加完成
+- [x] MemoryIndexEntry 值对象添加到项目结构
 
 ### 文件清单 File List
 
@@ -694,11 +702,15 @@ sisys/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| - | - | - | - |
+| 1 | AC→Task 追溯矩阵 Subtask 编号错误（AC-2 显示 Subtask 1.7-1.12 但 Task 1 只有 1.1-1.9） | P1 | 修正为 Subtask 1.4-1.6 |
+| 2 | Task 1 DoD 中 MemoryChanged 引用 Subtask 1.13-1.15 不存在 | P1 | 修正为 Subtask 1.7-1.9 |
+| 3 | 项目结构缺少 MemoryIndexEntry 值对象 | P2 | 添加 `src/domain/value_objects/memory_index_entry.py` |
+| 4 | AC-1 缺少触发模式识别说明 | P2 | 添加触发正则模式和提取逻辑 |
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
+- [x] Story created with `ready-for-dev` status
+- [x] Story 审查完成，修复 2 个 P1 问题、2 个 P2 问题
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `validate-create-story` 质量检查
@@ -781,6 +793,7 @@ sisys/
 **创建日期/Created:** 2026-03-04
 **最后更新/Last Updated:** 2026-04-24
 **更新说明:**
+- v2.5.0: 修复 AC→Task 追溯矩阵 Subtask 编号错误；添加触发模式识别逻辑和 MemoryIndexEntry 值对象
 - v2.4.0: 新增 LLM 压缩适配器测试隔离规则（Story 1.15a 实战经验）
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则
 - v2.2.0: 新增并行测试隔离规则（UUID 前缀隔离资源）
