@@ -150,7 +150,7 @@ async def db_session(pg_config, sync_engine):
     """Create an async session for a test with worker-specific schema.
 
     Each test gets its own engine to avoid event loop conflicts.
-    Uses server_settings for search_path (asyncpg uses this, not options).
+    Uses schema_translate_map on engine to prefix all table references with the worker schema.
     """
     schema = get_schema_name()
     url = (
@@ -159,7 +159,7 @@ async def db_session(pg_config, sync_engine):
     engine = create_async_engine(
         url,
         echo=False,
-        connect_args={"server_settings": {"search_path": f"{schema},public"}},
+        execution_options={"schema_translate_map": {None: schema}},
     )
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
