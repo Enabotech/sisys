@@ -189,7 +189,7 @@ jobs:
   # 阶段 2: 运行持续回归测试
   # ===========================================================================
   regression:
-    name: "🔥 持续回归测试"
+    name: "🔥 持续回归"
     runs-on: gpu
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -241,18 +241,6 @@ jobs:
           source ./.env
           set +a
 
-          # CI 环境标识，让 environments.py 自动使用测试端口
-          export SISYS_TEST_ENV=ci
-          export SISYS_USE_TEST_PORTS=true
-
-          # 使用 host.docker.internal 访问宿主机上由 docker compose 映射的端口
-          export REDIS_HOST=host.docker.internal
-          export POSTGRES_HOST=host.docker.internal
-          export QDRANT_HOST=host.docker.internal
-          export MINIO_HOST=host.docker.internal
-          export NEO4J_HOST=host.docker.internal
-          export RABBITMQ_HOST=host.docker.internal
-
           # 从 setup job 获取配置
           TEST_DIRS="${{ needs.setup.outputs.test_dirs }}"
           PROCESSES="${{ needs.setup.outputs.processes }}"
@@ -262,6 +250,14 @@ jobs:
           INTERVAL="${{ needs.setup.outputs.interval }}"
           FAIL_FAST="${{ needs.setup.outputs.fail_fast }}"
           TIMESTAMP="${{ needs.setup.outputs.timestamp }}"
+
+          # 使用 host.docker.internal 访问宿主机上由 docker compose 映射的端口
+          export REDIS_HOST=host.docker.internal
+          export POSTGRES_HOST=host.docker.internal
+          export QDRANT_HOST=host.docker.internal
+          export MINIO_HOST=host.docker.internal
+          export NEO4J_HOST=host.docker.internal
+          export RABBITMQ_HOST=host.docker.internal
 
           echo "=========================================="
           echo "   持续回归测试开始"
