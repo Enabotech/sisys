@@ -67,10 +67,10 @@ def get_unique_id():
 
 
 @pytest.fixture
-async def db_engine(pg_config):
+async def db_engine(pg_config, setup_schema):
     """Create an async engine with worker-specific schema using schema_translate_map.
 
-    This ensures all table references are prefixed with the correct schema.
+    Depends on setup_schema to ensure schema and tables exist before engine creation.
     Uses schema_translate_map on engine level (more reliable than server_settings).
     """
     schema = get_schema_name()
