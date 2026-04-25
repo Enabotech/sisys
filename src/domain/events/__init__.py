@@ -9,6 +9,7 @@ from .document_events import DocumentProcessed
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
 from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
+from .memory_events import MemoryChanged
 from .planning_events import StrategicDeviationWarning
 from .publisher import EventPublisher
 from .route_events import Routed
@@ -38,4 +39,5 @@ __all__ = [
     "RecoveryMode",
     "AuditEvent",
     "AuditActionType",
+    "MemoryChanged",
 ]
