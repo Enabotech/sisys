@@ -111,7 +111,7 @@ def pg_config():
     return PostgreSQLConfig.from_env()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="module")
 async def setup_schema(pg_config):
     """Create schema and tables once per worker module.
 
