@@ -432,10 +432,16 @@ class TestAuditQueryIntegration:
         db_session.add_all([entry1, entry2])
         await db_session.commit()
 
+        # Force expire to ensure fresh data from database
+        db_session.expire_all()
+
         from sqlalchemy import select
 
+        # Only query entries with actor starting with "user-time-" to isolate this test
         result = await db_session.execute(
-            select(AuditLogModel).where(AuditLogModel.timestamp >= older).where(AuditLogModel.timestamp <= now)
+            select(AuditLogModel).where(
+                AuditLogModel.timestamp >= older, AuditLogModel.timestamp <= now, AuditLogModel.actor.like("user-time-%")
+            )
         )
         results = result.scalars().all()
 
