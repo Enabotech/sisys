@@ -216,9 +216,19 @@
     - type: `user/` | `feedback/` | `project/` | `reference/`（类型隔离文件夹）
     - memory_id: UUID v4 格式（如 `550e8400-e29b-41d4-a716-446655440000.md`）
     - **设计原理**: 类型文件夹隔离语义，memory_id (UUID) 保证唯一性（避免冲突），符合架构 §11.2.2 描述
+  - **MD 文件内容模板**:
+    ```yaml
+    ---
+    name: {语义名称}
+    description: {一句话描述（用作 MEMORY.md hook）}
+    type: {user|feedback|project|reference}
+    originSessionId: {UUID}
+    ---
+    {完整记忆内容（用户输入的原始或压缩后内容，不超过 200 行}
+    ```
   - **MEMORY.md 索引**:
     - 位置: `{base_path}/MEMORY.md`
-    - 格式: `- [{name}]({type}/{memory_id}.md) — {one_line_hook}`（符合架构 §11.2.3 Markdown 链接格式）
+    - 格式: `- [{name}]({type}/{memory_id}.md) — {description}`（符合架构 §11.2.3 Markdown 链接格式）
     - 截断策略: 超过 200 行时保留最新 200 行
     - 更新时机: 每次 save/update/delete 后更新索引
     - 一致性保证: 读取时从文件加载，索引仅用于快速扫描
