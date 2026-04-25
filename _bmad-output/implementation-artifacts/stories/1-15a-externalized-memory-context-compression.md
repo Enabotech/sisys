@@ -82,7 +82,7 @@
 **And** 下游监听器触发：
   1. 写入 memory_metadata（UPSERT，version + 1）
   2. 写入 memory_change_history（append-only）
-  3. 失效 L1 Redis 缓存（redis.del("memory:{name}")）
+  3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{memory_name}")`）
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
@@ -91,6 +91,10 @@
   - is_automatic=False（标识用户主动操作）
 - [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）
 - [ ] 事务发件箱模式（MemoryChanged 事件与业务操作同事务提交）
+  - 复用现有 `OutboxModel`（`src/infrastructure/storage/postgresql/models/outbox.py`）
+  - 字段: id, event_id, event_type, payload, status, created_at, published_at, retry_count, max_retries, error_message
+  - status: pending → published / failed
+  - 后台处理器: 复用 `OutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
 - [ ] 事件发布成功率 ≥99%
 - [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{memory_name}`
 
@@ -111,6 +115,8 @@
 - [ ] MemoryService.list() 查询操作
 - [ ] 所有 CRUD 操作通过 MemoryChanged 事件同步
 - [ ] 版本冲突处理（乐观锁，version + 1 on update）
+  - 检测到冲突后：重试最多 3 次，每次重新读取最新 version
+  - 3 次仍冲突：抛出 `MemoryVersionConflictError`
 
 ### AC-5: 性能要求
 
@@ -121,9 +127,9 @@
 **And** 记忆保存成功率 100%
 
 **验证标准/Validation Criteria:**
-- [ ] 压缩率测试（`test_compression_ratio`）
-- [ ] 压缩延迟 P95<20ms（使用 `pytest-benchmark` 测量，1000 次采样）
-- [ ] 记忆保存成功率 100%（1000 次连续保存测试）
+- [ ] 压缩率测试（`test_compression_ratio`）- 使用 mock LLM 返回固定压缩结果
+- [ ] 压缩延迟 P95<20ms（使用 `pytest-benchmark` 测量，1000 次采样；CI 环境使用 mock跳过）
+- [ ] 记忆保存成功率 100%（1000 次连续保存测试；CI 环境使用 mock LLM）
 
 ### AC-6: L1 vs L3 分离
 
@@ -165,7 +171,7 @@
   - version 字段用于乐观锁（version + 1 on update）
 - [ ] MemoryChangeHistory 实体（`src/domain/entities/memory_change_history.py`）
   - 字段: history_id, memory_id, change_type, old_value, new_value, actor, timestamp
-  - append-only（不可变）
+  - append-only（历史记录不可删除/修改，但 delete 操作本身会作为新条目记录，change_type='delete'）
 - [ ] MemoryService 服务类（`src/domain/services/memory_service.py`）
   - 方法: save(), delete(), update(), list()
   - 职责: 接收用户记忆请求、执行压缩、双层写入、发布 MemoryChanged 事件
@@ -189,13 +195,17 @@
 
 #### 存储适配器 (Storage Adapters)
 - [ ] FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
-  - 写入 `~/.sisys/memory/` 或 `$XDG_CONFIG_HOME/sisys/memory/`（遵循 XDG 规范）
+  - **路径优先级**:
+    1. `$XDG_CONFIG_HOME/sisys/memory/`（若 XDG_CONFIG_HOME 已设置）
+    2. `$HOME/.config/sisys/memory/`（XDG 默认路径）
+    3. `$HOME/.sisys/memory/`（向后兼容旧版本）
   - **文件命名**: `{memory_id}.md`（UUID 格式）
   - **MEMORY.md 索引**:
-    - 位置: `~/.sisys/memory/MEMORY.md`
+    - 位置: `{memory_base_path}/MEMORY.md`
     - 格式: 每行 `| memory_id | name | type | mtime |`
     - 截断策略: 超过 200 行时保留最新 200 行
     - 更新时机: 每次 save/update/delete 后更新索引
+    - 一致性保证: 读取时从文件加载，索引仅用于快速扫描
 - [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
 - [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
 
@@ -537,8 +547,15 @@
 
 **决策**: MVP 使用**混合压缩**：
 1. 第一步：规则压缩（正则去除停用词、重复空格等，P95<5ms）
-2. 第二步：LLM 压缩（仅对规则压缩后 >200 字的内容，P95<20ms）
+2. 第二步：判断规则压缩后内容长度
+   - 若 ≤200 字：直接使用规则压缩结果（无需 LLM）
+   - 若 >200 字：LLM 压缩至 ~150 字（P95<20ms）
 3. 目标：整体压缩率≥70%，延迟 P95<20ms
+4. **LLM 压缩提示词**（必须严格遵守）:
+   ```
+   system: "你是一个文本压缩助手。请将以下内容压缩至约150字，保留核心语义，去除冗余描述。"
+   user: "{原始文本}"
+   ```
 
 **LLM 压缩优化**（若 Story 1.17 未完成，则使用 LiteLLM 默认配置）:
 - 使用 LiteLLM 统一接口（依赖 Story 1.17 UDMR 路由完成后）
@@ -672,13 +689,18 @@ sisys/
 9. **混合压缩技术选型** — 规则压缩 + LLM 压缩混合，目标压缩率≥70%，延迟 P95<20ms
 
 **应用到本故事/Applied to This Story:**
-- [ ] MemoryConfig 采用与 OtelConfig 相同的 `from_env()` 模式
-- [ ] MemoryService 仅负责记忆 CRUD，不处理 L3 压缩逻辑
-- [ ] Task 3 包含架构验证测试（L1/L3 分离检测）
-- [ ] 性能基准测试验证压缩率≥70%、压缩延迟 P95<20ms
-- [ ] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
-- [ ] MemoryChanged 事件 is_automatic=False 标识用户主动操作
-- [ ] 双层存储异步写入（L0 同步 + L2 异步）
+- [x] MemoryConfig 采用与 OtelConfig 相同的 `from_env()` 模式
+- [x] MemoryService 仅负责记忆 CRUD，不处理 L3 压缩逻辑
+- [x] Task 3 包含架构验证测试（L1/L3 分离检测）
+- [x] 性能基准测试验证压缩率≥70%、压缩延迟 P95<20ms（CI 使用 mock）
+- [x] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
+- [x] MemoryChanged 事件 is_automatic=False 标识用户主动操作
+- [x] 双层存储异步写入（L0 同步 + L2 异步）
+- [x] Redis 缓存 key 格式统一为 `memory:user:{user_id}:{memory_name}`
+- [x] XDG 路径规范正确实现（$XDG_CONFIG_HOME > $HOME/.config > $HOME/.sisys）
+- [x] 混合压缩边界条件明确（≤200字直接规则压缩，>200字 LLM 压缩）
+- [x] LLM 压缩提示词已定义
+- [x] 版本冲突重试策略明确（3次重试后抛异常）
 
 ### Git Intelligence Summary
 
@@ -768,9 +790,6 @@ sisys/
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/repositories/memory_change_history_repository.py` - MemoryChangeHistoryRepository L2 历史记录仓储
 - `tests/unit/infrastructure/repositories/test_memory_change_history_repository.py` - MemoryChangeHistoryRepository 单元测试
-- `tests/unit/infrastructure/repositories/test_memory_metadata_repository.py` - MemoryMetadataRepository 单元测试
-
-**注意**: MemoryChangeHistoryRepository 在 Task 0 已定义规范（SDD），在 Task 2 创建实现和测试
 
 **更新的文件/Updated Files:**
 - `src/domain/events/__init__.py` - 添加 MemoryChanged 事件导出
@@ -866,14 +885,22 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 > 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有修复项。
 
-| # | 问题 | 严重度 | 修复方案 |
-|---|------|--------|----------|
-| 1 | L1 vs L3 分离不明确 | P1 | 添加"L1 vs L3 分离澄清"章节，明确区分两种压缩机制 |
-| 2 | MemoryChanged 事件 is_automatic 未明确 | P1 | 明确 MemoryChanged 事件 is_automatic=False 标识用户主动操作 |
-| 3 | 双层存储同步策略未明确 | P2 | 添加 ADR 存储同步策略决策，明确 L0 同步 + L2 异步 |
-| 4 | L1 压缩技术选型未明确 | P2 | 添加 ADR L1 压缩技术选型决策，明确混合压缩方案 |
-| 5 | 测试隔离约束未显式强调 | P2 | 添加"测试隔离约束"章节，明确 asyncio.Lock 类变量、pytest-asyncio auto mode 等规则 |
-| 6 | 性能指标未与其他 Story 统一 | P2 | 统一性能指标：压缩率≥70%，压缩延迟 P95<20ms |
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|----------|------|
+| 1 | L1 vs L3 分离不明确 | P1 | 添加"L1 vs L3 分离澄清"章节，明确区分两种压缩机制 | ✅ |
+| 2 | MemoryChanged 事件 is_automatic 未明确 | P1 | 明确 MemoryChanged 事件 is_automatic=False 标识用户主动操作 | ✅ |
+| 3 | Redis 缓存 key 格式不一致 | P1 | 统一为 `memory:user:{user_id}:{memory_name}` | ✅ |
+| 4 | XDG 路径规范错误 | P1 | 修正为正确优先级：XDG_CONFIG_HOME > .config > .sisys | ✅ |
+| 5 | 双层存储同步策略未明确 | P2 | 添加 ADR 存储同步策略决策，明确 L0 同步 + L2 异步 | ✅ |
+| 6 | L1 压缩技术选型未明确 | P2 | 添加 ADR L1 压缩技术选型决策，明确混合压缩方案 | ✅ |
+| 7 | 混合压缩边界条件未定义 | P2 | 明确 ≤200字直接规则压缩，>200字 LLM 压缩 | ✅ |
+| 8 | LLM 压缩提示词缺失 | P2 | 添加具体 system prompt 定义 | ✅ |
+| 9 | 文件清单重复 | P2 | 清理重复的 MemoryMetadataRepository 条目 | ✅ |
+| 10 | MemoryChangeHistory append-only 矛盾 | P2 | 澄清 delete 操作记录为新条目，change_type='delete' | ✅ |
+| 11 | 性能基准测试 CI 可行性 | P2 | 明确 CI 使用 mock LLM，跳过真实 API 调用 | ✅ |
+| 12 | 版本冲突处理策略缺失 | P2 | 明确 3 次重试后抛出 MemoryVersionConflictError | ✅ |
+| 13 | 事务发件箱实现细节缺失 | P2 | 添加发件箱表结构和后台处理器说明 | ✅ |
+| 14 | 测试隔离约束未显式强调 | P2 | 添加"测试隔离约束"章节，明确 asyncio.Lock 类变量、pytest-asyncio auto mode 等规则 | ✅ |
 
 ### 下一步 Next Steps
 
@@ -898,8 +925,9 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.5.0
+**模板版本/Template Version:** 2.5.1
 **创建日期/Created:** 2026-04-24
-**最后更新/Last Updated:** 2026-04-24
+**最后更新/Last Updated:** 2026-04-25
 **更新说明:**
+- v2.5.1: 修复 P1/P2 审查问题：(1) Redis key 格式统一；(2) XDG 路径规范修正；(3) 混合压缩边界条件明确；(4) LLM 压缩提示词定义；(5) 版本冲突重试策略；(6) 事务发件箱细节；(7) CI mock 策略
 - v2.5.0: Story 1.15a 完整版本 - 实现 L1 显式确认压缩：(1) L1TextExtractor 文本提取器 + L1Compressor 压缩器（压缩率≥70%）；(2) MemoryService CRUD 操作（save/delete/update/list）；(3) FileMemoryAdapter L0 文件系统 + MemoryMetadataRepository L2 PostgreSQL 双层存储；(4) MemoryChanged 事件发布（is_automatic=False）；(5) 六边形架构验证（L1/L3 分离）；(6) 性能基准测试 P95<20ms；(7) 混合压缩技术选型（规则压缩 + LLM 压缩）
