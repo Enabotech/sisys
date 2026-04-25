@@ -66,13 +66,13 @@ def get_unique_id():
     return uuid.uuid4().hex[:8]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def pg_config():
     """Get PostgreSQL configuration from environment."""
     return PostgreSQLConfig.from_env()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def setup_schema(pg_config):
     """Create schema and tables once per worker module.
 
