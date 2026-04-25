@@ -212,13 +212,17 @@
     1. `$XDG_CONFIG_HOME/sisys/memory/`（若 XDG_CONFIG_HOME 已设置）
     2. `$HOME/.config/sisys/memory/`（XDG 默认路径）
     3. `$HOME/.sisys/memory/`（向后兼容旧版本）
-  - **文件命名**: `{memory_id}.md`（UUID 格式）
+  - **目录结构**: `{base_path}/{type}/{memory_id}.md`
+    - type: `user/` | `feedback/` | `project/` | `reference/`（类型隔离文件夹）
+    - memory_id: UUID v4 格式（如 `550e8400-e29b-41d4-a716-446655440000.md`）
+    - **设计原理**: 类型文件夹隔离语义，memory_id (UUID) 保证唯一性（避免冲突），符合架构 §11.2.2 描述
   - **MEMORY.md 索引**:
-    - 位置: `{memory_base_path}/MEMORY.md`
-    - 格式: 每行 `| memory_id | name | type | mtime |`
+    - 位置: `{base_path}/MEMORY.md`
+    - 格式: `- [{name}]({type}/{memory_id}.md) — {one_line_hook}`（符合架构 §11.2.3 Markdown 链接格式）
     - 截断策略: 超过 200 行时保留最新 200 行
     - 更新时机: 每次 save/update/delete 后更新索引
     - 一致性保证: 读取时从文件加载，索引仅用于快速扫描
+  - **多租户隔离**: private 记忆存储于 `{base_path}/private/{type}/`，group 记忆存储于 `{base_path}/group/{type}/`
 - [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
 - [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
 
@@ -940,10 +944,11 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.6.0
+**模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-04-24
 **最后更新/Last Updated:** 2026-04-25
 **更新说明:**
+- v2.7.0: 修复 P1 架构一致性问题：(1) L0 文件命名采用方案 C（类型文件夹 + UUID：`{type}/{uuid}.md`）；(2) MEMORY.md 索引格式统一为 Markdown 链接格式 `- [name](type/uuid.md) — hook`（符合架构 §11.2.3）；(3) 补充多租户隔离（private/group 路径）
 - v2.6.0: 修复一致性/命名规范问题：(1) MemoryChanged 事件命名遵循现有模式（event_type field + __post_init__）；(2) OutboxEntity 路径修正为 src/infrastructure/entities/outbox.py（遵循 Story 1.3 方案 A）；(3) 补充 OutboxRepository 接口引用
 - v2.5.1: 修复 P1/P2 审查问题：(1) Redis key 格式统一；(2) XDG 路径规范修正；(3) 混合压缩边界条件明确；(4) LLM 压缩提示词定义；(5) 版本冲突重试策略；(6) 事务发件箱细节；(7) CI mock 策略
 - v2.5.0: Story 1.15a 完整版本 - 实现 L1 显式确认压缩：(1) L1TextExtractor 文本提取器 + L1Compressor 压缩器（压缩率≥70%）；(2) MemoryService CRUD 操作（save/delete/update/list）；(3) FileMemoryAdapter L0 文件系统 + MemoryMetadataRepository L2 PostgreSQL 双层存储；(4) MemoryChanged 事件发布（is_automatic=False）；(5) 六边形架构验证（L1/L3 分离）；(6) 性能基准测试 P95<20ms；(7) 混合压缩技术选型（规则压缩 + LLM 压缩）
