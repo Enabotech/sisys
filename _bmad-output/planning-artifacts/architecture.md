@@ -1598,8 +1598,8 @@ class WormArchiver:
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
 | **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding_ref, blob_ref, graph_ref |
-| **MemoryMetadata** | 用户记忆元数据索引 | L2 | name, description, type, path, version, mtime, **owner, group_id** |
-| **MemoryChangeHistory** | 用户记忆变更历史 | L2 | memory_name, version, change_type, changed_fields, diff_summary |
+| **MemoryMetadata** | 用户记忆元数据索引 | L2 | id, user_id, name, description, type, path, version, mtime, owner, group_id |
+| **MemoryChangeHistory** | 用户记忆变更历史 | L2 | id, memory_id, version, change_type, changed_fields, diff_summary |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
 
@@ -1797,13 +1797,16 @@ Agent 工作目录（Agent 配置集）
 ```sql
 -- 记忆元数据索引（当前状态快照）
 CREATE TABLE memory_metadata (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- 主键不再使用 memory_id 命名，直接用 id
+    user_id VARCHAR(255),  -- 多租户隔离：用户标识
     name VARCHAR(255) NOT NULL,
     description TEXT,
     type VARCHAR(50) NOT NULL,  -- 'user'/'feedback'/'project'/'reference'
-    path VARCHAR(500) NOT NULL,  -- 文件路径，如 'feedback_bun_npm.md'
+    path VARCHAR(500) NOT NULL,  -- 文件路径，格式：'{type}/{id}.md'，如 'feedback/a1b2c3d4.md'
     version INTEGER NOT NULL DEFAULT 1,
     mtime TIMESTAMP NOT NULL,     -- 文件修改时间
+    owner VARCHAR(255),  -- 文件所有者（用于多租户隔离）
+    group_id VARCHAR(255),  -- 组标识（用于团队共享记忆）
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(name)
@@ -1812,7 +1815,7 @@ CREATE TABLE memory_metadata (
 -- 记忆变更历史（append-only，不可变）
 CREATE TABLE memory_change_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    memory_name VARCHAR(255) NOT NULL,
+    memory_id UUID NOT NULL,  -- 外键引用 memory_metadata.id（稳定 UUID，非按值外键）
     version INTEGER NOT NULL,
     changed_at TIMESTAMP DEFAULT NOW(),
     changed_by VARCHAR(255),  -- user_id 或 'system'
@@ -1822,6 +1825,7 @@ CREATE TABLE memory_change_history (
     archived_ref VARCHAR(500)  -- L4 归档引用（可选）
 );
 -- 备注：memory_change_history 是 append-only，用于追溯，不存储当前状态
+-- 重要：使用 UUID 外键（memory_id）而非 VARCHAR(memory_name)，确保引用稳定不变
 ```
 
 | 记忆类型 | 存储层 | 说明 |
@@ -1869,13 +1873,13 @@ CREATE TABLE memory_change_history (
       5. 发布 MemoryChanged(is_automatic=False)
 
   删除类: "不要记住", "忘了这个", "不要记"
-    → MemoryService.delete(memory_name, is_automatic=False)
+    → MemoryService.delete(memory_id, is_automatic=False)
       1. 删除 ~/.sisys/memory/xxx.md 文件
       2. 从 MEMORY.md 移除索引
       3. 发布 MemoryChanged(is_automatic=False)
 
   修改类: "改成", "更正为", "改为"
-    → MemoryService.update(memory_name, new_content, is_automatic=False)
+    → MemoryService.update(memory_id, new_content, is_automatic=False)
       1. 读取当前版本（检查 version 冲突）
       2. 写入新版本（version + 1）
       3. 更新 MEMORY.md 索引
@@ -2145,12 +2149,12 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
 
 4. L2 异步同步
    └── INSERT INTO memory_metadata
-       (name, description, type, mtime, path, version, created_at, updated_at)
-       VALUES ('bun over npm', 'User prefers bun', 'feedback', NOW(), 'feedback_bun_npm.md', 1, NOW(), NOW())
+       (id, user_id, name, description, type, mtime, path, version, created_at, updated_at)
+       VALUES (gen_random_uuid(), 'user:xxx', 'bun over npm', 'User prefers bun', 'feedback', NOW(), 'feedback/{uuid}.md', 1, NOW(), NOW())
 
    INSERT INTO memory_change_history
-       (memory_name, version, changed_at, changed_by, change_type, changed_fields, diff_summary)
-       VALUES ('bun over npm', 1, NOW(), 'user:xxx', 'create', '{"name": [null, "bun over npm"], "type": [null, "feedback"]}', 'create memory: bun over npm')
+       (id, memory_id, version, changed_at, changed_by, change_type, changed_fields, diff_summary)
+       VALUES (gen_random_uuid(), '{memory_id}', 1, NOW(), 'user:xxx', 'create', '{"name": [null, "bun over npm"], "type": [null, "feedback"]}', 'create memory: bun over npm')
 
 5. L3 异步向量化（若文件>500）
    └── 发送至向量化队列
