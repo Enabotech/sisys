@@ -103,7 +103,7 @@ class TestOutboxRepositoryBehavior:
         """async_get_unpublished 应返回列表。"""
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(mock_outbox_repo.async_get_unpublished(limit=10))
+        result = asyncio.run(mock_outbox_repo.async_get_unpublished(limit=10))
         assert isinstance(result, list)
 
     def test_async_mark_published_accepts_uuid(self, mock_outbox_repo):
@@ -111,7 +111,7 @@ class TestOutboxRepositoryBehavior:
         import asyncio
 
         event_id = uuid4()
-        asyncio.get_event_loop().run_until_complete(mock_outbox_repo.async_mark_published(event_id))
+        asyncio.run(mock_outbox_repo.async_mark_published(event_id))
 
     def test_async_mark_failed_accepts_uuid_and_string(self, mock_outbox_repo):
         """async_mark_failed 应接受 UUID 和字符串错误信息。"""
@@ -119,7 +119,7 @@ class TestOutboxRepositoryBehavior:
 
         event_id = uuid4()
         error_message = "Test error"
-        asyncio.get_event_loop().run_until_complete(mock_outbox_repo.async_mark_failed(event_id, error_message))
+        asyncio.run(mock_outbox_repo.async_mark_failed(event_id, error_message))
 
 
 @pytest.fixture
