@@ -6,6 +6,7 @@ RED PHASE: 验证 MemoryService CRUD 操作。
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -247,3 +248,128 @@ class TestMemoryServiceVersionConflict:
 
         updated = run_async(service.get(memory.memory_id))
         assert updated.version == 4  # 1 + 3
+
+
+class TestMemoryServiceL0Integration:
+    """MemoryService L0 文件系统集成验证"""
+
+    def test_save_with_file_adapter_writes_to_l0(self):
+        """验证 save 调用 FileMemoryAdapter 写入 L0"""
+        mock_adapter = MagicMock()
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=mock_adapter,
+        )
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="test-l0",
+            content="记住，测试 L0 写入",
+            memory_type="user",
+            description="L0 集成测试",
+        )
+        run_async(service.save(request))
+
+        # 验证 write 方法被调用
+        assert mock_adapter.write.called, "FileMemoryAdapter.write() should be called"
+        call_args = mock_adapter.write.call_args
+        assert call_args is not None
+        # 验证参数：memory_id, memory_type, content
+        assert len(call_args[0]) >= 3
+        memory_id, memory_type, content = call_args[0][:3]
+        assert memory_type == "user"
+        # MD 文件包含 YAML frontmatter 和提取后的内容
+        assert "---" in content
+        assert "name: test-l0" in content
+        assert "L0 写入" in content or "测试" in content
+
+        # 验证 update_index 被调用
+        assert mock_adapter.update_index.called, "FileMemoryAdapter.update_index() should be called"
+
+    def test_update_with_file_adapter_writes_to_l0(self):
+        """验证 update 调用 FileMemoryAdapter 更新 L0"""
+        mock_adapter = MagicMock()
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=mock_adapter,
+        )
+        # 先创建
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="original",
+            content="记住原始内容",
+        )
+        memory = run_async(service.save(request))
+
+        # 重置 mock
+        mock_adapter.reset_mock()
+
+        # 再更新
+        update_request = MemoryUpdateRequest(
+            memory_id=memory.memory_id,
+            user_id="user123",
+            content="改成新内容",
+        )
+        run_async(service.update(update_request))
+
+        # 验证 write 方法被调用（更新文件）
+        assert mock_adapter.write.called, "FileMemoryAdapter.write() should be called"
+
+    def test_delete_with_file_adapter_deletes_from_l0(self):
+        """验证 delete 调用 FileMemoryAdapter 删除 L0"""
+        mock_adapter = MagicMock()
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=mock_adapter,
+        )
+        # 先创建
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="to-delete",
+            content="记住要删除的内容",
+        )
+        memory = run_async(service.save(request))
+
+        # 重置 mock
+        mock_adapter.reset_mock()
+
+        # 再删除
+        delete_request = MemoryDeleteRequest(
+            memory_id=memory.memory_id,
+            user_id="user123",
+        )
+        run_async(service.delete(delete_request))
+
+        # 验证 delete 方法被调用
+        assert mock_adapter.delete.called, "FileMemoryAdapter.delete() should be called"
+        call_args = mock_adapter.delete.call_args
+        assert call_args is not None
+        memory_id, memory_type = call_args[0][:2]
+        assert memory_type == "user"
+
+    def test_service_without_file_adapter_still_works(self):
+        """验证没有 FileMemoryAdapter 时服务仍正常工作"""
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=None,  # 不提供 file_adapter
+        )
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="no-file-adapter",
+            content="记住，没有文件适配器",
+            memory_type="user",
+        )
+        memory = run_async(service.save(request))
+        assert memory.name == "no-file-adapter"
+        assert memory.version == 1

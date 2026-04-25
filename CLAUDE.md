@@ -31,6 +31,27 @@
 
 **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
 
+### 六边形架构约束
+所有代码必须遵循六边形架构约束：
+
+**领域层零依赖原则**
+- 领域层（src/domain/）仅使用 Python 标准库
+- 禁止导入：langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
+
+**四层架构定义**
+| 层次 | 目录 | 职责 |
+|------|------|------|
+| domain | src/domain/ | 核心业务逻辑，零外部依赖 |
+| application | src/application/ | 用例编排 |
+| interfaces | src/interfaces/ | 适配器 |
+| infrastructure | src/infrastructure/ | 技术实现 |
+
+**依赖方向规则**
+- 领域层 → 应用/接口/基础设施层：✗ 禁止
+- 应用层 → 接口层：✗ 禁止
+- 应用层 → 基础设施层：✓ 允许
+- 接口层/基础设施层 → 应用层/领域层：✓ 允许
+
 ## 记忆系统架构参考
 - MEMORY.md: 索引文件，每行一个内存条目
 - 内存文件: 独立文件存储，前置matter + 结构化正文
