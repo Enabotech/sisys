@@ -82,7 +82,7 @@
 **And** 下游监听器触发：
   1. 写入 memory_metadata（UPSERT，version + 1）
   2. 写入 memory_change_history（append-only）
-  3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{memory_name}")`）
+  3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
@@ -99,7 +99,7 @@
   - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
   - **重要**：领域层通过 `OutboxRepository` 接口（`src/domain/repositories/outbox.py`）操作，不直接引用 OutboxEntity
 - [ ] 事件发布成功率 ≥99%
-- [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{memory_name}`
+- [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{name}`
 
 ### AC-4: L1 四种操作 CRUD
 
@@ -733,7 +733,7 @@ sisys/
 - [x] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
 - [x] MemoryChanged 事件 is_automatic=False 标识用户主动操作
 - [x] 双层存储异步写入（L0 同步 + L2 异步）
-- [x] Redis 缓存 key 格式统一为 `memory:user:{user_id}:{memory_name}`
+- [x] Redis 缓存 key 格式统一为 `memory:user:{user_id}:{name}`
 - [x] XDG 路径规范正确实现（$XDG_CONFIG_HOME > $HOME/.config > $HOME/.sisys）
 - [x] 混合压缩边界条件明确（≤200字直接规则压缩，>200字 LLM 压缩）
 - [x] LLM 压缩提示词已定义
@@ -928,7 +928,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 |---|------|--------|----------|------|
 | 1 | L1 vs L3 分离不明确 | P1 | 添加"L1 vs L3 分离澄清"章节，明确区分两种压缩机制 | ✅ |
 | 2 | MemoryChanged 事件 is_automatic 未明确 | P1 | 明确 MemoryChanged 事件 is_automatic=False 标识用户主动操作 | ✅ |
-| 3 | Redis 缓存 key 格式不一致 | P1 | 统一为 `memory:user:{user_id}:{memory_name}` | ✅ |
+| 3 | Redis 缓存 key 格式不一致 | P1 | 统一为 `memory:user:{user_id}:{name}` | ✅ |
 | 4 | XDG 路径规范错误 | P1 | 修正为正确优先级：XDG_CONFIG_HOME > .config > .sisys | ✅ |
 | 5 | 双层存储同步策略未明确 | P2 | 添加 ADR 存储同步策略决策，明确 L0 同步 + L2 异步 | ✅ |
 | 6 | L1 压缩技术选型未明确 | P2 | 添加 ADR L1 压缩技术选型决策，明确混合压缩方案 | ✅ |
@@ -968,7 +968,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 **创建日期/Created:** 2026-04-24
 **最后更新/Last Updated:** 2026-04-25
 **更新说明:**
-- v2.9.0: MemoryChangeHistory.memory_name 改为 memory_id (UUID) 外键引用，避免按值外键不稳定问题
+- v2.9.0: MemoryChangeHistory.name 改为 memory_id (UUID) 外键引用，避免按值外键不稳定问题
 - v2.8.0: 修复 P1 数据模型与架构 DDL 对齐：MemoryMetadata/MemoryChangeHistory Schema 对齐架构 §11.2.5；MemoryService 添加 EventPublisherProtocol 依赖注入说明
 - v2.7.0: 修复 P1 架构一致性问题：(1) L0 文件命名采用方案 C（类型文件夹 + UUID：`{type}/{uuid}.md`）；(2) MEMORY.md 索引格式统一为 Markdown 链接格式 `- [name](type/uuid.md) — hook`（符合架构 §11.2.3）；(3) 补充多租户隔离（private/group 路径）
 - v2.6.0: 修复一致性/命名规范问题：(1) MemoryChanged 事件命名遵循现有模式（event_type field + __post_init__）；(2) OutboxEntity 路径修正为 src/infrastructure/entities/outbox.py（遵循 Story 1.3 方案 A）；(3) 补充 OutboxRepository 接口引用
