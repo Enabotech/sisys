@@ -112,10 +112,10 @@ def pg_config():
 
 
 @pytest.fixture(scope="module")
-async def setup_schema(pg_config):
+def setup_schema(pg_config):
     """Create schema and tables once per worker module.
 
-    Uses sync connection for DDL to avoid asyncpg issues.
+    Uses sync connection for DDL - no async involved, avoids pytest-asyncio timing issues.
     Drop schema first to ensure clean state (handles failed previous runs).
     """
     schema = get_schema_name()
