@@ -968,7 +968,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 **创建日期/Created:** 2026-04-24
 **最后更新/Last Updated:** 2026-04-25
 **更新说明:**
-- v2.10.0: 架构 §11.2.5 DDL 同步更新：memory_metadata 添加 user_id/owner/group_id，path 格式改为 '{type}/{id}.md'；memory_change_history.memory_name → memory_id (UUID)；同步更新实体表字段和 L1 触发流程接口
+- v2.10.0: 架构 §11.2.5 DDL 同步更新：memory_metadata 添加 user_id/owner/group_id，path 格式改为 '{type}/{memory_id}.md'；memory_change_history.memory_name → memory_id (UUID)；同步更新实体表字段和 L1 触发流程接口
 - v2.9.0: MemoryChangeHistory.memory_name 改为 memory_id (UUID) 外键引用，避免按值外键不稳定问题
 - v2.8.0: 修复 P1 数据模型与架构 DDL 对齐：MemoryMetadata/MemoryChangeHistory Schema 对齐架构 §11.2.5；MemoryService 添加 EventPublisherProtocol 依赖注入说明
 - v2.7.0: 修复 P1 架构一致性问题：(1) L0 文件命名采用方案 C（类型文件夹 + UUID：`{type}/{uuid}.md`）；(2) MEMORY.md 索引格式统一为 Markdown 链接格式 `- [name](type/uuid.md) — hook`（符合架构 §11.2.3）；(3) 补充多租户隔离（private/group 路径）
