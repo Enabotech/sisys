@@ -373,3 +373,93 @@ class TestMemoryServiceL0Integration:
         memory = run_async(service.save(request))
         assert memory.name == "no-file-adapter"
         assert memory.version == 1
+
+
+class TestMemoryServiceL0RealFileSystem:
+    """MemoryService L0 真实文件系统集成测试"""
+
+    def test_save_writes_real_file_to_l0(self, tmp_path):
+        """验证 save 真实写入 L0 文件系统"""
+        from src.infrastructure.config.memory import MemoryConfig
+        from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+
+        config = MemoryConfig(memory_l0_path=str(tmp_path))
+        file_adapter = FileMemoryAdapter(config)
+
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=file_adapter,
+        )
+
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="test-real-file",
+            content="记住，以后用 bun 而不是 npm",
+            memory_type="user",
+            description="包管理器偏好",
+        )
+        memory = run_async(service.save(request))
+
+        # 验证文件被创建
+        memory_file = tmp_path / "user" / f"{memory.memory_id}.md"
+        assert memory_file.exists(), f"Memory file should exist: {memory_file}"
+
+        # 验证文件内容
+        content = memory_file.read_text()
+        assert "name: test-real-file" in content
+        assert "description: 包管理器偏好" in content
+        assert "type: user" in content
+        assert "bun" in content
+
+        # 验证索引被更新
+        index_file = tmp_path / "MEMORY.md"
+        assert index_file.exists()
+        index_content = index_file.read_text()
+        assert "test-real-file" in index_content
+
+    def test_delete_removes_real_file_from_l0(self, tmp_path):
+        """验证 delete 真实删除 L0 文件"""
+        from src.infrastructure.config.memory import MemoryConfig
+        from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+
+        config = MemoryConfig(memory_l0_path=str(tmp_path))
+        file_adapter = FileMemoryAdapter(config)
+
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            file_adapter=file_adapter,
+        )
+
+        # 先创建
+        request = MemorySaveRequest(
+            user_id="user123",
+            name="to-delete-real",
+            content="记住要删除的内容",
+            memory_type="user",
+        )
+        memory = run_async(service.save(request))
+
+        # 验证文件存在
+        memory_file = tmp_path / "user" / f"{memory.memory_id}.md"
+        assert memory_file.exists()
+
+        # 再删除
+        delete_request = MemoryDeleteRequest(
+            memory_id=memory.memory_id,
+            user_id="user123",
+        )
+        run_async(service.delete(delete_request))
+
+        # 验证文件被删除
+        assert not memory_file.exists(), f"Memory file should be deleted: {memory_file}"
+
+        # 验证索引被更新
+        index_file = tmp_path / "MEMORY.md"
+        index_content = index_file.read_text()
+        assert "to-delete-real" not in index_content
