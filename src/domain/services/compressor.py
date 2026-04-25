@@ -1,4 +1,4 @@
-"""CompressorProtocol — 压缩接口（领域层）。
+"""Compressor — 压缩接口（领域层）。
 
 用于依赖倒置：MemoryService 通过此协议注入 L1Compressor 实现。
 """

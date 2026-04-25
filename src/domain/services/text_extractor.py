@@ -1,4 +1,4 @@
-"""TextExtractorProtocol — 文本提取接口（领域层）。
+"""TextExtractor — 文本提取接口（领域层）。
 
 用于依赖倒置：MemoryService 通过此协议注入 L1TextExtractor 实现。
 """
