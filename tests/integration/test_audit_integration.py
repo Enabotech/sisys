@@ -66,45 +66,6 @@ def get_unique_id():
     return uuid.uuid4().hex[:8]
 
 
-@pytest.fixture
-async def db_engine(pg_config, setup_schema):
-    """Create an async engine with worker-specific schema.
-
-    Depends on setup_schema to ensure schema and tables exist before engine creation.
-    Uses BOTH schema_translate_map (SQLAlchemy ORM layer) and search_path (PostgreSQL layer)
-    to ensure reliable routing regardless of query type.
-    """
-    schema = get_schema_name()
-    url = (
-        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
-    )
-
-    engine = create_async_engine(
-        url,
-        echo=False,
-        connect_args={"server_settings": {"search_path": schema}},
-        execution_options={"schema_translate_map": {None: schema}},
-    )
-
-    yield engine
-
-    await engine.dispose()
-
-
-@pytest.fixture
-async def db_session(db_engine):
-    """Create an async session with transaction rollback isolation.
-
-    Each test gets a clean transaction that is rolled back after the test,
-    ensuring no data pollution between tests.
-    """
-    async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with async_session() as session:
-        yield session
-        await session.rollback()
-
-
 @pytest.fixture(scope="module")
 def pg_config():
     """Get PostgreSQL configuration from environment."""
@@ -200,6 +161,45 @@ def setup_schema(pg_config):
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
     cleanup_engine.dispose()
+
+
+@pytest.fixture
+async def db_engine(pg_config, setup_schema):
+    """Create an async engine with worker-specific schema.
+
+    Depends on setup_schema to ensure schema and tables exist before engine creation.
+    Uses BOTH schema_translate_map (SQLAlchemy ORM layer) and search_path (PostgreSQL layer)
+    to ensure reliable routing regardless of query type.
+    """
+    schema = get_schema_name()
+    url = (
+        f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
+    )
+
+    engine = create_async_engine(
+        url,
+        echo=False,
+        connect_args={"server_settings": {"search_path": schema}},
+        execution_options={"schema_translate_map": {None: schema}},
+    )
+
+    yield engine
+
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    """Create an async session with transaction rollback isolation.
+
+    Each test gets a clean transaction that is rolled back after the test,
+    ensuring no data pollution between tests.
+    """
+    async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        yield session
+        await session.rollback()
 
 
 class TestAuditLogModelIntegration:
