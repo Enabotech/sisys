@@ -174,10 +174,16 @@
   - append-only（历史记录不可删除/修改，但 delete 操作本身会作为新条目记录，change_type='delete'）
 - [ ] MemoryService 服务类（`src/domain/services/memory_service.py`）
   - 方法: save(), delete(), update(), list()
-  - 职责: 接收用户记忆请求、执行压缩、双层写入、发布 MemoryChanged 事件
+  - 职责: 接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件
+  - **依赖倒置**: 通过 TextExtractorProtocol 和 CompressorProtocol 注入压缩逻辑，不直接依赖 application 层
 
 #### L1 压缩处理 (L1 Compression)
+- [ ] **协议定义（领域层）**:
+  - TextExtractorProtocol（`src/domain/services/text_extractor_protocol.py`）- 文本提取接口
+  - CompressorProtocol（`src/domain/services/compressor_protocol.py`）- 压缩接口
+  - 使用 Protocol 实现依赖倒置（复用 TriggerService 模式）
 - [ ] L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
+  - 实现 TextExtractorProtocol
   - 从"记住 X"中提取 X 作为记忆核心内容
   - 输入限制: ≤500 字
   - **支持模式**:
@@ -190,6 +196,7 @@
     - "不要记住 X" → 触发删除操作
   - **提取策略**: 正则优先 + LLM fallback（边界情况如"记住abc"无空格）
 - [ ] L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
+  - 实现 CompressorProtocol
   - 轻量级压缩: X → ~150 字（压缩率≥70%）
   - 目标: 保留核心语义，去除冗余
 
@@ -767,6 +774,8 @@ sisys/
 - `src/domain/entities/memory_change_history.py` - MemoryChangeHistory 实体
 - `src/domain/services/memory_service.py` - MemoryService
 - `src/domain/repositories/memory_repository.py` - MemoryRepository 接口（领域层定义）
+- `src/domain/services/text_extractor_protocol.py` - TextExtractorProtocol（文本提取接口，用于依赖倒置）
+- `src/domain/services/compressor_protocol.py` - CompressorProtocol（压缩接口，用于依赖倒置）
 - `src/application/text_processing/l1_text_extractor.py` - L1TextExtractor
 - `src/application/text_processing/l1_compressor.py` - L1Compressor
 - `src/infrastructure/config/memory.py` - MemoryConfig
@@ -794,7 +803,7 @@ sisys/
 **更新的文件/Updated Files:**
 - `src/domain/events/__init__.py` - 添加 MemoryChanged 事件导出
 - `src/domain/entities/__init__.py` - 添加 MemoryMetadata, MemoryChangeHistory 导出
-- `src/domain/services/__init__.py` - 添加 MemoryService 导出
+- `src/domain/services/__init__.py` - 添加 MemoryService, TextExtractorProtocol, CompressorProtocol 导出
 - `src/domain/repositories/__init__.py` - 添加 MemoryRepository 导出
 - `src/application/text_processing/__init__.py` - 添加 L1TextExtractor, L1Compressor 导出
 - `src/infrastructure/config/__init__.py` - 添加 MemoryConfig 导出
