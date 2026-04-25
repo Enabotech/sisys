@@ -360,12 +360,12 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [ ] Subtask 0.1: 定义 MemoryChanged 事件 Schema（`src/domain/events/memory_events.py`）
-- [ ] Subtask 0.2: 定义 MemoryMetadata 实体（`src/domain/entities/memory_metadata.py`）
-- [ ] Subtask 0.3: 定义 MemoryChangeHistory 实体（`src/domain/entities/memory_change_history.py`）
-- [ ] Subtask 0.4: 定义 MemoryService 服务接口（`src/domain/services/memory_service.py`）
-- [ ] Subtask 0.5: 定义 L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
-- [ ] Subtask 0.6: 定义 L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
+- [x] Subtask 0.1: 定义 MemoryChanged 事件 Schema（`src/domain/events/memory_events.py`）
+- [x] Subtask 0.2: 定义 MemoryMetadata 实体（`src/domain/entities/memory_metadata.py`）
+- [x] Subtask 0.3: 定义 MemoryChangeHistory 实体（`src/domain/entities/memory_change_history.py`）
+- [x] Subtask 0.4: 定义 MemoryService 服务接口（`src/domain/services/memory_service.py`）
+- [x] Subtask 0.5: 定义 L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
+- [x] Subtask 0.6: 定义 L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
 - [ ] Subtask 0.7: 定义 FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
 - [ ] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
 - [ ] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
@@ -374,8 +374,8 @@
 - [ ] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -393,9 +393,9 @@
 | 🟢 绿 | 实现 `src/application/text_processing/l1_text_extractor.py` - L1TextExtractor |
 | 🔄 重构 | 优化提取逻辑，支持多种表达方式 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 L1TextExtractor 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 L1TextExtractor（从"记住 X"中提取 X）
-- [ ] Subtask 1.3: 🔄 重构 — 优化提取逻辑
+- [x] Subtask 1.1: 🔴 红 — 编写 L1TextExtractor 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 L1TextExtractor（从"记住 X"中提取 X）
+- [x] Subtask 1.3: 🔄 重构 — 优化提取逻辑
 
 #### TDD 循环 [B]：L1Compressor 压缩器
 
@@ -405,9 +405,9 @@
 | 🟢 绿 | 实现 `src/application/text_processing/l1_compressor.py` - L1Compressor |
 | 🔄 重构 | 优化压缩算法，验证压缩率稳定性 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 L1Compressor 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 L1Compressor（压缩率≥70%）
-- [ ] Subtask 1.6: 🔄 重构 — 验证压缩率稳定性
+- [x] Subtask 1.4: 🔴 红 — 编写 L1Compressor 失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现 L1Compressor（压缩率≥70%）
+- [x] Subtask 1.6: 🔄 重构 — 验证压缩率稳定性
 
 #### TDD 循环 [C]：MemoryService CRUD
 
@@ -417,15 +417,15 @@
 | 🟢 绿 | 实现 `src/domain/services/memory_service.py` - MemoryService |
 | 🔄 重构 | 优化事件发布逻辑，添加版本冲突处理 |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写 MemoryService 失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 实现 MemoryService（save/delete/update/list）
-- [ ] Subtask 1.9: 🔄 重构 — 添加版本冲突处理（乐观锁）
+- [x] Subtask 1.7: 🔴 红 — 编写 MemoryService 失败测试
+- [x] Subtask 1.8: 🟢 绿 — 实现 MemoryService（save/delete/update/list）
+- [x] Subtask 1.9: 🔄 重构 — 添加版本冲突处理（乐观锁）
 
 **完成标准/Definition of Done:**
-- [ ] L1TextExtractor 实现完成
-- [ ] L1Compressor 实现完成（压缩率≥70%）
-- [ ] MemoryService 实现完成（四种 CRUD 操作）
-- [ ] TDD 循环全部通过
+- [x] L1TextExtractor 实现完成
+- [x] L1Compressor 实现完成（压缩率≥70%）
+- [x] MemoryService 实现完成（四种 CRUD 操作）
+- [x] TDD 循环全部通过
 
 ---
 
