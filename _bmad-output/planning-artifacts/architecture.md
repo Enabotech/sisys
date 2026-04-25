@@ -1598,7 +1598,7 @@ class WormArchiver:
 | **BusinessPlan** | BP 实体（BEM 六阶段） | L2+L4 | id, sp_ref, bem_stage, checkpoints, evidence_package |
 | **Checkpoint** | 检查点实体（双模式恢复） | L1+L4 | id, stage_id, state_snapshot, recovery_mode, branch_id |
 | **StrategicArchive** | 战略档案实体（六层存储） | L0-L5 | id, metadata, embedding_ref, blob_ref, graph_ref |
-| **MemoryMetadata** | 用户记忆元数据索引 | L2 | id, user_id, name, description, type, path, version, mtime, owner, group_id |
+| **MemoryMetadata** | 用户记忆元数据索引 | L2 | memory_id, user_id, name, description, type, path, version, mtime, owner, group_id |
 | **MemoryChangeHistory** | 用户记忆变更历史 | L2 | id, memory_id, version, change_type, changed_fields, diff_summary |
 | **RoutingDecisionLog** | 路由决策日志（UDMR 审计） | L2+L4 | id, task_id, l1_result, l2_scores, l3_decision, worm_ref |
 | **IsolationSwitchLog** | 隔离切换日志（EIP 审计） | L2+L4 | id, agent_id, from_level, to_level, trigger, worm_ref |
@@ -1797,7 +1797,7 @@ Agent 工作目录（Agent 配置集）
 ```sql
 -- 记忆元数据索引（当前状态快照）
 CREATE TABLE memory_metadata (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- 主键不再使用 memory_id 命名，直接用 id
+    memory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- 主键使用 memory_id 而非 id
     user_id VARCHAR(255),  -- 多租户隔离：用户标识
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -1815,7 +1815,7 @@ CREATE TABLE memory_metadata (
 -- 记忆变更历史（append-only，不可变）
 CREATE TABLE memory_change_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    memory_id UUID NOT NULL,  -- 外键引用 memory_metadata.id（稳定 UUID，非按值外键）
+    memory_id UUID NOT NULL,  -- 外键引用 memory_metadata.memory_id（稳定 UUID 外键）
     version INTEGER NOT NULL,
     changed_at TIMESTAMP DEFAULT NOW(),
     changed_by VARCHAR(255),  -- user_id 或 'system'
