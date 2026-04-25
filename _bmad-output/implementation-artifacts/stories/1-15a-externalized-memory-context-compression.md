@@ -86,15 +86,18 @@
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
+  - 遵循现有事件命名规范：`event_type: str = field(default="MemoryChanged", init=False)`
+  - 实现 `__post_init__` 设置 aggregate_id 和 aggregate_type
   - 字段: event_id, memory_id, user_id, change_type, is_automatic, old_value, new_value, timestamp
   - change_type: create/update/delete
   - is_automatic=False（标识用户主动操作）
 - [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）
 - [ ] 事务发件箱模式（MemoryChanged 事件与业务操作同事务提交）
-  - 复用现有 `OutboxModel`（`src/infrastructure/storage/postgresql/models/outbox.py`）
+  - 复用现有 `OutboxEntity`（`src/infrastructure/entities/outbox.py`）- 遵循 Story 1.3 方案 A 彻底隔离
   - 字段: id, event_id, event_type, payload, status, created_at, published_at, retry_count, max_retries, error_message
   - status: pending → published / failed
-  - 后台处理器: 复用 `OutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
+  - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
+  - **重要**：领域层通过 `OutboxRepository` 接口（`src/domain/repositories/outbox.py`）操作，不直接引用 OutboxEntity
 - [ ] 事件发布成功率 ≥99%
 - [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{memory_name}`
 
@@ -160,6 +163,9 @@
 
 #### 领域事件 Schema (Domain Events)
 - [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
+  - **命名规范**：遵循现有事件模式
+    - `event_type: str = field(default="MemoryChanged", init=False)` — 事件类型字段
+    - 实现 `__post_init__` 设置 aggregate_id 和 aggregate_type（如 `object.__setattr__(self, "aggregate_id", self.memory_id)`）
   - 字段: event_id, memory_id, user_id, change_type, is_automatic, old_value, new_value, timestamp
   - change_type: create/update/delete
   - is_automatic=False（标识用户主动操作）
@@ -934,9 +940,10 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.5.1
+**模板版本/Template Version:** 2.6.0
 **创建日期/Created:** 2026-04-24
 **最后更新/Last Updated:** 2026-04-25
 **更新说明:**
+- v2.6.0: 修复一致性/命名规范问题：(1) MemoryChanged 事件命名遵循现有模式（event_type field + __post_init__）；(2) OutboxEntity 路径修正为 src/infrastructure/entities/outbox.py（遵循 Story 1.3 方案 A）；(3) 补充 OutboxRepository 接口引用
 - v2.5.1: 修复 P1/P2 审查问题：(1) Redis key 格式统一；(2) XDG 路径规范修正；(3) 混合压缩边界条件明确；(4) LLM 压缩提示词定义；(5) 版本冲突重试策略；(6) 事务发件箱细节；(7) CI mock 策略
 - v2.5.0: Story 1.15a 完整版本 - 实现 L1 显式确认压缩：(1) L1TextExtractor 文本提取器 + L1Compressor 压缩器（压缩率≥70%）；(2) MemoryService CRUD 操作（save/delete/update/list）；(3) FileMemoryAdapter L0 文件系统 + MemoryMetadataRepository L2 PostgreSQL 双层存储；(4) MemoryChanged 事件发布（is_automatic=False）；(5) 六边形架构验证（L1/L3 分离）；(6) 性能基准测试 P95<20ms；(7) 混合压缩技术选型（规则压缩 + LLM 压缩）
