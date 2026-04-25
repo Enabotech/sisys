@@ -131,14 +131,14 @@ class TestFileMemoryAdapterList:
             memory_id = str(uuid.uuid4())
             adapter.write(memory_id, "user", f"内容 {i}")
 
-        memories = adapter.list("user")
+        memories = adapter.list_memories("user")
         assert len(memories) == 3
 
     def test_list_empty_type(self, tmp_path):
         """验证列出空类型返回空列表"""
         adapter = FileMemoryAdapter(MemoryConfig(memory_l0_path=str(tmp_path)))
 
-        memories = adapter.list("nonexistent")
+        memories = adapter.list_memories("nonexistent")
         assert memories == []
 
 
