@@ -219,16 +219,18 @@
   - **MD 文件内容模板**:
     ```yaml
     ---
-    name: {语义名称}
-    description: {一句话描述（用作 MEMORY.md hook）}
+    name: {语义名称（≤6 英文单词，'-'分割，如 feedback-poetry-env）}
+    description: {一句话描述（≤50 字，用作 MEMORY.md hook）}
     type: {user|feedback|project|reference}
     originSessionId: {UUID}
     ---
-    {完整记忆内容（用户输入的原始或压缩后内容，不超过 200 行}
+    {完整记忆内容（用户输入的原始或压缩后内容，不超过 200 行）}
     ```
   - **MEMORY.md 索引**:
     - 位置: `{base_path}/MEMORY.md`
-    - 格式: `- [{name}]({type}/{memory_id}.md) — {description}`（符合架构 §11.2.3 Markdown 链接格式）
+    - 格式: `- [{name}]({type}/{memory_id}.md) — {description}`
+    - name: ≤6 英文单词，`-` 分割（如 `feedback-poetry-env`）
+    - description: ≤50 字
     - 截断策略: 超过 200 行时保留最新 200 行
     - 更新时机: 每次 save/update/delete 后更新索引
     - 一致性保证: 读取时从文件加载，索引仅用于快速扫描
