@@ -6,6 +6,10 @@
 - TextExtractorProtocol：文本提取接口
 - CompressorProtocol：压缩接口
 - EventPublisherProtocol：事件发布接口（可选）
+- MemoryMetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
+- MemoryChangeHistoryRepositoryProtocol：记忆变更历史仓储
+
+架构来源: architecture.md §11.2.5
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 if TYPE_CHECKING:
     from src.domain.events.memory_events import MemoryChanged
@@ -23,16 +28,24 @@ if TYPE_CHECKING:
 class MemoryVersionConflictError(Exception):
     """版本冲突异常。"""
 
-    memory_id: str
+    memory_id: UUID
     message: str = "版本冲突"
+
+    def __init__(self, memory_id: UUID, message: str = "版本冲突"):
+        self.memory_id = memory_id
+        super().__init__(message)
 
 
 @dataclass
 class MemoryNotFoundError(Exception):
     """记忆不存在异常。"""
 
-    memory_id: str
+    memory_id: UUID
     message: str = "记忆不存在"
+
+    def __init__(self, memory_id: UUID, message: str = "记忆不存在"):
+        self.memory_id = memory_id
+        super().__init__(message)
 
 
 @dataclass
@@ -50,7 +63,7 @@ class MemorySaveRequest:
 class MemoryUpdateRequest:
     """记忆更新请求。"""
 
-    memory_id: str
+    memory_id: UUID
     user_id: str
     content: str | None = None
     name: str | None = None
@@ -61,7 +74,7 @@ class MemoryUpdateRequest:
 class MemoryDeleteRequest:
     """记忆删除请求。"""
 
-    memory_id: str
+    memory_id: UUID
     user_id: str
 
 
@@ -69,7 +82,7 @@ class MemoryDeleteRequest:
 class Memory:
     """记忆聚合根。"""
 
-    memory_id: str
+    memory_id: UUID
     user_id: str
     name: str
     content: str
@@ -84,14 +97,16 @@ class Memory:
 class MemoryService:
     """记忆服务（领域层）。
 
-    协调 L1 压缩、存储写入、事件发布。
-    使用依赖倒置注入 TextExtractor 和 Compressor。
+    协调 L1 压缩、存储写入（L2 PostgreSQL）、事件发布。
+    使用依赖倒置注入 TextExtractor、Compressor 和 Repositories。
     """
 
     def __init__(
         self,
         text_extractor,  # TextExtractorProtocol
         compressor,  # CompressorProtocol
+        metadata_repository,  # MemoryMetadataRepositoryProtocol
+        history_repository,  # MemoryChangeHistoryRepositoryProtocol
         event_publisher=None,  # EventPublisherProtocol | None
     ):
         """初始化 MemoryService。
@@ -99,16 +114,17 @@ class MemoryService:
         Args:
             text_extractor: 文本提取器（依赖倒置）
             compressor: 压缩器（依赖倒置）
+            metadata_repository: 记忆元数据仓储（PostgreSQL L2 持久化）
+            history_repository: 记忆变更历史仓储（append-only）
             event_publisher: 事件发布器（可选）
         """
         self._text_extractor = text_extractor
         self._compressor = compressor
+        self._metadata_repository = metadata_repository
+        self._history_repository = history_repository
         self._event_publisher = event_publisher
 
-        # 内部状态：存储的记忆（实际实现应使用仓储）
-        self._memories: dict[str, Memory] = {}
-
-    def save(self, request: MemorySaveRequest) -> Memory:
+    async def save(self, request: MemorySaveRequest) -> Memory:
         """保存记忆。
 
         Args:
@@ -127,7 +143,7 @@ class MemoryService:
         compression = self._compressor.compress(extraction.content)
 
         # 3. 创建记忆
-        memory_id = str(uuid.uuid4())
+        memory_id = uuid.uuid4()
         path = f"{request.memory_type}/{memory_id}.md"
         memory = Memory(
             memory_id=memory_id,
@@ -140,11 +156,34 @@ class MemoryService:
             version=1,
         )
 
-        # 4. 存储
-        self._memories[memory_id] = memory
+        # 4. 写入 L2 PostgreSQL（通过仓储）
+        from src.domain.entities.memory_change_history import MemoryChangeHistory
+        from src.domain.entities.memory_metadata import MemoryMetadata
 
-        # 5. 发布事件
-        self._publish_memory_changed(
+        metadata = MemoryMetadata(
+            memory_id=memory_id,
+            name=request.name,
+            type=request.memory_type,
+            user_id=request.user_id,
+            description=request.description,
+            path=path,
+            version=1,
+        )
+        await self._metadata_repository.save(metadata)
+
+        # 5. 记录历史（append-only）
+        history = MemoryChangeHistory.create(
+            memory_id=memory_id,
+            version=1,
+            change_type="create",
+            changed_by=request.user_id,
+            changed_fields={"name": request.name, "content": compression.compressed},
+            diff_summary=f"创建记忆: {request.name}",
+        )
+        await self._history_repository.save(history)
+
+        # 6. 发布事件
+        await self._publish_memory_changed(
             memory_id=memory_id,
             user_id=request.user_id,
             name=request.name,
@@ -156,7 +195,7 @@ class MemoryService:
 
         return memory
 
-    def update(self, request: MemoryUpdateRequest) -> Memory:
+    async def update(self, request: MemoryUpdateRequest) -> Memory:
         """更新记忆。
 
         Args:
@@ -169,40 +208,71 @@ class MemoryService:
             MemoryNotFoundError: 如果记忆不存在
             MemoryVersionConflictError: 如果版本冲突
         """
-        if request.memory_id not in self._memories:
+        # 获取现有记忆
+        metadata = await self._metadata_repository.get_by_id(request.memory_id)
+        if metadata is None:
             raise MemoryNotFoundError(request.memory_id)
 
-        memory = self._memories[request.memory_id]
-        old_value = {"name": memory.name, "content": memory.content}
+        old_value = {"name": metadata.name, "content": ""}
 
         # 重新提取和压缩（如果内容变更）
         if request.content is not None:
             extraction = self._text_extractor.extract(request.content)
             compression = self._compressor.compress(extraction.content)
-            memory.content = compression.compressed
+            metadata.description = compression.compressed
+            new_content = compression.compressed
+        else:
+            new_content = metadata.description
 
         if request.name is not None:
-            memory.name = request.name
+            metadata.name = request.name
 
         if request.description is not None:
-            memory.description = request.description
+            metadata.description = request.description
 
-        memory.version += 1
-        memory.updated_at = datetime.now(UTC)
+        # 递增版本
+        metadata.bump_version()
 
-        self._publish_memory_changed(
+        # 更新仓储
+        await self._metadata_repository.save(metadata)
+
+        # 记录历史
+        from src.domain.entities.memory_change_history import MemoryChangeHistory
+
+        history = MemoryChangeHistory.create(
+            memory_id=request.memory_id,
+            version=metadata.version,
+            change_type="update",
+            changed_by=request.user_id,
+            changed_fields={"name": [old_value["name"], metadata.name], "content": [old_value["content"], new_content]},
+            diff_summary=f"更新记忆: {old_value['name']} -> {metadata.name}",
+        )
+        await self._history_repository.save(history)
+
+        await self._publish_memory_changed(
             memory_id=request.memory_id,
             user_id=request.user_id,
-            name=memory.name,
+            name=metadata.name,
             change_type="update",
             is_automatic=False,
             old_value=old_value,
-            new_value={"name": memory.name, "content": memory.content},
+            new_value={"name": metadata.name, "content": new_content},
         )
 
-        return memory
+        return Memory(
+            memory_id=metadata.memory_id,
+            user_id=metadata.user_id,
+            name=metadata.name,
+            content=new_content or "",
+            memory_type=metadata.type,
+            description=metadata.description,
+            path=metadata.path,
+            version=metadata.version,
+            created_at=metadata.created_at,
+            updated_at=metadata.updated_at,
+        )
 
-    def delete(self, request: MemoryDeleteRequest) -> None:
+    async def delete(self, request: MemoryDeleteRequest) -> None:
         """删除记忆。
 
         Args:
@@ -211,25 +281,39 @@ class MemoryService:
         Raises:
             MemoryNotFoundError: 如果记忆不存在
         """
-        if request.memory_id not in self._memories:
+        metadata = await self._metadata_repository.get_by_id(request.memory_id)
+        if metadata is None:
             raise MemoryNotFoundError(request.memory_id)
 
-        memory = self._memories[request.memory_id]
-        old_value = {"name": memory.name, "path": memory.path}
+        old_value = {"name": metadata.name, "path": metadata.path}
 
-        del self._memories[request.memory_id]
+        # 软删除
+        await self._metadata_repository.delete(request.memory_id)
 
-        self._publish_memory_changed(
+        # 记录历史（append-only，delete 操作也记录）
+        from src.domain.entities.memory_change_history import MemoryChangeHistory
+
+        history = MemoryChangeHistory.create(
+            memory_id=request.memory_id,
+            version=metadata.version + 1,
+            change_type="delete",
+            changed_by=request.user_id,
+            changed_fields=None,
+            diff_summary=f"删除记忆: {metadata.name}",
+        )
+        await self._history_repository.save(history)
+
+        await self._publish_memory_changed(
             memory_id=request.memory_id,
             user_id=request.user_id,
-            name=memory.name,
+            name=metadata.name,
             change_type="delete",
             is_automatic=False,
             old_value=old_value,
             new_value=None,
         )
 
-    def list(self, user_id: str) -> list[Memory]:
+    async def list(self, user_id: str) -> list[Memory]:
         """列出用户所有记忆。
 
         Args:
@@ -238,9 +322,35 @@ class MemoryService:
         Returns:
             list[Memory]：记忆列表
         """
-        return [m for m in self._memories.values() if m.user_id == user_id]
+        metadata_list = await self._metadata_repository.list_by_user(user_id)
+        memories = []
+        for metadata in metadata_list:
+            histories = await self._history_repository.get_by_memory_id(metadata.memory_id)
+            # 获取最新内容（从历史记录中查找）
+            latest_content = ""
+            for h in reversed(histories):
+                if h.change_type == "create":
+                    latest_content = h.changed_fields.get("content", "")
+                    break
+                elif h.change_type == "update":
+                    latest_content = h.changed_fields.get("content", [""])[-1]
+            memories.append(
+                Memory(
+                    memory_id=metadata.memory_id,
+                    user_id=metadata.user_id,
+                    name=metadata.name,
+                    content=latest_content,
+                    memory_type=metadata.type,
+                    description=metadata.description,
+                    path=metadata.path,
+                    version=metadata.version,
+                    created_at=metadata.created_at,
+                    updated_at=metadata.updated_at,
+                )
+            )
+        return memories
 
-    def get(self, memory_id: str) -> Memory:
+    async def get(self, memory_id: UUID) -> Memory:
         """获取记忆。
 
         Args:
@@ -252,13 +362,35 @@ class MemoryService:
         Raises:
             MemoryNotFoundError: 如果记忆不存在
         """
-        if memory_id not in self._memories:
+        metadata = await self._metadata_repository.get_by_id(memory_id)
+        if metadata is None:
             raise MemoryNotFoundError(memory_id)
-        return self._memories[memory_id]
 
-    def _publish_memory_changed(
+        histories = await self._history_repository.get_by_memory_id(memory_id)
+        latest_content = ""
+        for h in reversed(histories):
+            if h.change_type == "create":
+                latest_content = h.changed_fields.get("content", "")
+                break
+            elif h.change_type == "update":
+                latest_content = h.changed_fields.get("content", [""])[-1]
+
+        return Memory(
+            memory_id=metadata.memory_id,
+            user_id=metadata.user_id,
+            name=metadata.name,
+            content=latest_content,
+            memory_type=metadata.type,
+            description=metadata.description,
+            path=metadata.path,
+            version=metadata.version,
+            created_at=metadata.created_at,
+            updated_at=metadata.updated_at,
+        )
+
+    async def _publish_memory_changed(
         self,
-        memory_id: str,
+        memory_id: UUID,
         user_id: str,
         name: str,
         change_type: str,
@@ -266,22 +398,12 @@ class MemoryService:
         old_value: dict | None,
         new_value: dict | None,
     ) -> None:
-        """发布 MemoryChanged 事件。
-
-        Args:
-            memory_id: 记忆 ID
-            user_id: 用户 ID
-            name: 记忆名称
-            change_type: 变更类型
-            is_automatic: 是否自动触发
-            old_value: 旧值
-            new_value: 新值
-        """
+        """发布 MemoryChanged 事件。"""
         if self._event_publisher is None:
             return
 
         event = MemoryChanged(
-            memory_id=memory_id,
+            memory_id=str(memory_id),
             user_id=user_id,
             name=name,
             change_type=change_type,

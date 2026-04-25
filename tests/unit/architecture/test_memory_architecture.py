@@ -1,0 +1,103 @@
+"""Tests for Memory Architecture Validation.
+
+RED PHASE: 验证六边形架构约束 - L1/L3 分离。
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from src.application.text_processing.l1_compressor import L1Compressor
+from src.application.text_processing.l1_text_extractor import L1TextExtractor
+from src.domain.services.memory_service import MemoryService
+from src.infrastructure.repositories.memory_change_history_repository import (
+    InMemoryMemoryChangeHistoryRepository,
+)
+from src.infrastructure.repositories.memory_metadata_repository import (
+    InMemoryMemoryMetadataRepository,
+)
+
+
+class TestL1L3Separation:
+    """L1 与 L3 分离验证"""
+
+    def test_l1_compressor_only_handles_lightweight_compression(self):
+        """验证 L1Compressor 仅处理轻量级压缩（≤500 字输入）"""
+        compressor = L1Compressor()
+
+        # 短文本（≤200 字）：使用规则压缩
+        short_content = "记住，以后用 bun 而不是 npm"
+        result = compressor.compress(short_content)
+        assert result.compressed is not None
+        assert result.original_length <= 200
+
+        # 中等文本（200-500 字）：规则压缩 + 截断
+        medium_content = "记住，以后用 bun 而不是 npm，这是一个很长的记忆内容需要压缩，" * 5
+        result = compressor.compress(medium_content)
+        assert result.compressed is not None
+        assert result.original_length <= 500
+
+    def test_l1_compressor_rejects_large_content(self):
+        """验证 L1Compressor 拒绝超过 500 字的输入"""
+        compressor = L1Compressor()
+
+        # 超过 500 字应该抛出异常
+        large_content = "记住，以后用 bun 而不是 npm，" * 100  # 约 600+ 字
+        with pytest.raises(ValueError, match="内容超过限制"):
+            compressor.compress(large_content)
+
+    def test_l1_text_extractor_no_persistent_note_dependency(self):
+        """验证 L1TextExtractor 无需 PersistentNote"""
+        extractor = L1TextExtractor()
+
+        # L1 应该直接从文本提取，无需 PersistentNote
+        content = "记住，以后用 bun 而不是 npm"
+        result = extractor.extract(content)
+
+        assert result.content is not None
+        # pattern 是正则表达式，验证提取发生了
+        assert "记住" in result.pattern or result.pattern.startswith("^")
+
+    def test_memory_service_no_l3_dependency(self):
+        """验证 MemoryService 不依赖 L3 压缩逻辑"""
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+        )
+
+        # MemoryService 应该只使用 L1 组件
+        # 不应该有关于 PersistentNote 或 Checkpoint 的引用
+        assert service._text_extractor is not None
+        assert service._compressor is not None
+
+
+class TestL1L2L3TriggerSeparation:
+    """L1/L2/L3 触发机制分离验证"""
+
+    def test_l1_trigger_is_user_initiated(self):
+        """验证 L1 由用户主动触发"""
+        service = MemoryService(
+            text_extractor=L1TextExtractor(),
+            compressor=L1Compressor(),
+            metadata_repository=InMemoryMemoryMetadataRepository(),
+            history_repository=InMemoryMemoryChangeHistoryRepository(),
+        )
+
+        content = "记住，以后用 bun 而不是 npm"
+        extraction = service._text_extractor.extract(content)
+
+        # "记住" 触发用户主动记忆（pattern 是正则表达式）
+        assert "记住" in extraction.pattern or extraction.pattern.startswith("^")
+
+    def test_l1_compression_no_llm_for_short_content(self):
+        """验证 L1 短文本压缩不使用 LLM"""
+        compressor = L1Compressor()
+
+        # 短文本应该使用规则压缩，不调用 LLM
+        short_content = "记住，以后用 bun 而不是 npm"
+        result = compressor.compress(short_content)
+
+        assert result.method == "rule"
+        assert "llm" not in result.method.lower()

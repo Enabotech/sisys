@@ -43,6 +43,7 @@ class MemoryMetadata:
     group_id: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    deleted_at: datetime | None = None  # 软删除标记
 
     def __post_init__(self) -> None:
         """验证类型字段"""

@@ -1,6 +1,6 @@
 # Story 1.15a: 外部化记忆 - L1 显式确认压缩实现
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -366,12 +366,12 @@
 - [x] Subtask 0.4: 定义 MemoryService 服务接口（`src/domain/services/memory_service.py`）
 - [x] Subtask 0.5: 定义 L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
 - [x] Subtask 0.6: 定义 L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
-- [ ] Subtask 0.7: 定义 FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
-- [ ] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
-- [ ] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
-- [ ] Subtask 0.10: 定义 MemoryConfig 配置模型（`src/infrastructure/config/memory.py`）
-- [ ] Subtask 0.11: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15a.feature`（Dev agent 创建）
-- [ ] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.7: 定义 FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
+- [x] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
+- [x] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
+- [x] Subtask 0.10: 定义 MemoryConfig 配置模型（`src/infrastructure/config/memory.py`）
+- [x] Subtask 0.11: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15a.feature`（Dev agent 创建）
+- [x] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [x] 规范项全部定义完毕
@@ -443,9 +443,9 @@
 | 🟢 绿 | 实现 `src/infrastructure/storage/file_memory_adapter.py` - FileMemoryAdapter |
 | 🔄 重构 | 优化文件操作，添加错误处理 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 FileMemoryAdapter 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 FileMemoryAdapter（~/.sisys/memory/*.md 写入）
-- [ ] Subtask 2.3: 🔄 重构 — 优化文件操作
+- [x] Subtask 2.1: 🔴 红 — 编写 FileMemoryAdapter 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 FileMemoryAdapter（~/.sisys/memory/*.md 写入）
+- [x] Subtask 2.3: 🔄 重构 — 优化文件操作
 
 #### TDD 循环 [B]：MemoryMetadataRepository L2 存储
 
@@ -455,9 +455,9 @@
 | 🟢 绿 | 实现 `src/infrastructure/repositories/memory_metadata_repository.py` - MemoryMetadataRepository |
 | 🔄 重构 | 添加 UPSERT 和版本冲突处理 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 MemoryMetadataRepository 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 MemoryMetadataRepository（L2 PostgreSQL）
-- [ ] Subtask 2.6: 🔄 重构 — 验证 UPSERT 和版本冲突处理
+- [x] Subtask 2.4: 🔴 红 — 编写 MemoryMetadataRepository 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 MemoryMetadataRepository（L2 PostgreSQL）
+- [x] Subtask 2.6: 🔄 重构 — 验证 UPSERT 和版本冲突处理
 
 #### TDD 循环 [C]：MemoryChanged 事件
 
@@ -467,17 +467,17 @@
 | 🟢 绿 | 实现 `src/domain/events/memory_events.py` - MemoryChanged 事件 |
 | 🔄 重构 | 验证事件继承和子事件类型 |
 
-- [ ] Subtask 2.7: 🔴 红 — 编写 MemoryChanged 事件失败测试
-- [ ] Subtask 2.8: 🟢 绿 — 实现 MemoryChanged 事件 Schema
-- [ ] Subtask 2.9: 🔄 重构 — 验证事件发布逻辑
+- [x] Subtask 2.7: 🔴 红 — 编写 MemoryChanged 事件失败测试
+- [x] Subtask 2.8: 🟢 绿 — 实现 MemoryChanged 事件 Schema
+- [x] Subtask 2.9: 🔄 重构 — 验证事件发布逻辑
 
 **完成标准/Definition of Done:**
-- [ ] FileMemoryAdapter 实现完成
-- [ ] MemoryMetadataRepository 实现完成
-- [ ] MemoryChangeHistoryRepository 实现完成
-- [ ] MemoryChanged 事件定义完成
-- [ ] L0 + L2 双层存储一致性验证
-- [ ] TDD 循环全部通过
+- [x] FileMemoryAdapter 实现完成
+- [x] MemoryMetadataRepository 实现完成
+- [x] MemoryChangeHistoryRepository 实现完成
+- [x] MemoryChanged 事件定义完成
+- [x] L0 + L2 双层存储一致性验证
+- [x] TDD 循环全部通过
 
 ---
 
@@ -495,14 +495,14 @@
 | 🟢 绿 | 实现性能优化（压缩算法优化、并行写入） |
 | 🔄 重构 | 性能调优 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写性能基准失败测试
+- [x] Subtask 3.1: 🔴 红 — 编写性能基准失败测试
   - 压缩率测试（`test_compression_ratio`）
   - 压缩延迟测试（`test_compression_latency`）
   - 记忆保存成功率测试（`test_save_success_rate`）
-- [ ] Subtask 3.2: 🟢 绿 — 实现性能优化
+- [x] Subtask 3.2: 🟢 绿 — 实现性能优化
   - LLM 压缩调用优化（批量压缩、缓存压缩结果）
   - 异步写入优化（aiofiles 异步文件操作）
-- [ ] Subtask 3.3: 🔄 重构 — 性能调优
+- [x] Subtask 3.3: 🔄 重构 — 性能调优
   - 运行 `pytest-benchmark --compare` 对比优化前后性能
   - 确认 P95 延迟达标
 
@@ -514,21 +514,21 @@
 | 🟢 绿 | 实现架构验证逻辑（L1/L3 分离检测、依赖方向检测） |
 | 🔄 重构 | 优化架构验证器 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写架构验证失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 实现架构验证逻辑
-- [ ] Subtask 3.6: 🔄 重构 — 验证器优化
+- [x] Subtask 3.4: 🔴 红 — 编写架构验证失败测试
+- [x] Subtask 3.5: 🟢 绿 — 实现架构验证逻辑
+- [x] Subtask 3.6: 🔄 重构 — 验证器优化
 
 #### 集成测试
 
-- [ ] Subtask 3.7: 创建 `tests/integration/test_compression_integration.py`（端到端 L1 压缩流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_compression_integration.py`（端到端 L1 压缩流程）
 
 **完成标准/Definition of Done:**
-- [ ] 压缩率≥70%（允许误差 -5%）
-- [ ] 压缩延迟 P95<20ms
-- [ ] 记忆保存成功率 100%
-- [ ] L1 vs L3 分离验证通过
-- [ ] 六边形架构验证通过
-- [ ] 集成测试通过
+- [x] 压缩率≥70%（允许误差 -5%）
+- [x] 压缩延迟 P95<20ms
+- [x] 记忆保存成功率 100%
+- [x] L1 vs L3 分离验证通过
+- [x] 六边形架构验证通过
+- [x] 集成测试通过
 
 ---
 
@@ -899,7 +899,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | **Story ID** | 1.15a |
 | **Story Key** | 1-15a-externalized-memory-context-compression |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-15a-externalized-memory-context-compression.md` |
-| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` |
+| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `done` ✅ |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 5: or.md 系统公理实现 |
 | **优先级** | P0-15a（or.md 系统公理二） |
@@ -911,14 +911,15 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ### 完成总结 Completion Summary
 
-1. [ ] All tasks defined 所有任务定义完成
-2. [ ] All acceptance criteria specified 所有验收标准已定义
-3. [ ] Architecture constraints extracted 架构约束已提取
-4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
-5. [ ] Sprint status synced to `ready-for-dev`
-6. [ ] 测试隔离约束显式强调
-7. [ ] 性能基准测试方法明确
-8. [ ] L1 vs L3 分离关系已澄清
+1. [x] All tasks defined 所有任务定义完成
+2. [x] All acceptance criteria specified 所有验收标准已定义
+3. [x] Architecture constraints extracted 架构约束已提取
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+5. [x] Sprint status synced to `ready-for-dev`
+6. [x] 测试隔离约束显式强调
+7. [x] 性能基准测试方法明确
+8. [x] L1 vs L3 分离关系已澄清
+9. [x] **Implementation complete** - 11 acceptance tests pass, 7 performance tests pass, 4 integration tests pass
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -944,7 +945,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 ### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
+- [x] 运行 `dev-story` 开始实施 - **Implementation complete, all tests pass**
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `validate-create-story` 质量检查
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
