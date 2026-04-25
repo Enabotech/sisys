@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from src.domain.services.text_extractor_service import ExtractionResult, TextExtractorProtocol
+from src.domain.services.text_extractor_service import ExtractionResult, TextExtractorService
 
 
 @dataclass
@@ -27,7 +27,7 @@ class L1ExtractionResult(ExtractionResult):
     operation: str = "save"  # "save" | "delete" | "update"
 
 
-class L1TextExtractor(TextExtractorProtocol):
+class L1TextExtractor(TextExtractorService):
     """L1 文本提取器。
 
     从"记住 X"等模式中提取记忆核心内容 X。
