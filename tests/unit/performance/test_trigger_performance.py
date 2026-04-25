@@ -48,7 +48,7 @@ def benchmark_operation(
     for _ in range(warmup):
         result = operation()
         if asyncio.iscoroutine(result):
-            asyncio.get_event_loop().run_until_complete(result)
+            asyncio.run(result)
 
     # Benchmark
     times_ms: list[float] = []
@@ -58,7 +58,7 @@ def benchmark_operation(
         iter_start = time.perf_counter()
         result = operation()
         if asyncio.iscoroutine(result):
-            asyncio.get_event_loop().run_until_complete(result)
+            asyncio.run(result)
         iter_end = time.perf_counter()
         times_ms.append((iter_end - iter_start) * 1000)
 
