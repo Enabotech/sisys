@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from src.domain.services.compressor_service import CompressionResult, CompressorProtocol
+from src.domain.services.compressor_service import CompressionResult, CompressorService
 
 # 停用词列表（用于规则压缩）
 STOP_WORDS = {
@@ -86,7 +86,7 @@ class L1CompressionResult(CompressionResult):
     method: str = "rule"  # "rule" | "llm"
 
 
-class L1Compressor(CompressorProtocol):
+class L1Compressor(CompressorService):
     """L1 压缩器。
 
     轻量级压缩：X → ~150 字（压缩率≥70%）

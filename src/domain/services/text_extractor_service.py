@@ -18,7 +18,7 @@ class ExtractionResult:
     pattern: str  # 匹配到的模式（如 "记住 X"）
 
 
-class TextExtractorProtocol(ABC):
+class TextExtractorService(ABC):
     """文本提取接口。
 
     实现类：L1TextExtractor（src/application/text_processing/l1_text_extractor.py）

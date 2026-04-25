@@ -19,7 +19,7 @@ class CompressionResult:
     ratio: float  # 压缩率
 
 
-class CompressorProtocol(ABC):
+class CompressorService(ABC):
     """压缩接口。
 
     实现类：L1Compressor（src/application/text_processing/l1_compressor.py）

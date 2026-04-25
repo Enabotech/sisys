@@ -3,8 +3,8 @@
 负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件。
 
 依赖倒置：
-- TextExtractorProtocol：文本提取接口
-- CompressorProtocol：压缩接口
+- TextExtractorService：文本提取接口
+- CompressorService：压缩接口
 - EventPublisherProtocol：事件发布接口（可选）
 - MemoryMetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
 - MemoryChangeHistoryRepositoryProtocol：记忆变更历史仓储
@@ -103,8 +103,8 @@ class MemoryService:
 
     def __init__(
         self,
-        text_extractor,  # TextExtractorProtocol
-        compressor,  # CompressorProtocol
+        text_extractor,  # TextExtractorService
+        compressor,  # CompressorService
         metadata_repository,  # MemoryMetadataRepositoryProtocol
         history_repository,  # MemoryChangeHistoryRepositoryProtocol
         event_publisher=None,  # EventPublisherProtocol | None
