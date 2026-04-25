@@ -1802,7 +1802,7 @@ CREATE TABLE memory_metadata (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     type VARCHAR(50) NOT NULL,  -- 'user'/'feedback'/'project'/'reference'
-    path VARCHAR(500) NOT NULL,  -- 文件路径，格式：'{type}/{id}.md'，如 'feedback/a1b2c3d4.md'
+    path VARCHAR(500) NOT NULL,  -- 文件路径，格式：'{type}/{memory_id}.md'，如 'feedback/a1b2c3d4.md'
     version INTEGER NOT NULL DEFAULT 1,
     mtime TIMESTAMP NOT NULL,     -- 文件修改时间
     owner VARCHAR(255),  -- 文件所有者（用于多租户隔离）
