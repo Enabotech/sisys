@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from src.domain.services.compressor import CompressionResult, CompressorProtocol
+from src.domain.services.compressor_service import CompressionResult, CompressorProtocol
 
 # 停用词列表（用于规则压缩）
 STOP_WORDS = {
