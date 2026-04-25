@@ -173,15 +173,22 @@
 
 #### 数据模型 (Data Models)
 - [ ] MemoryMetadata 实体（`src/domain/entities/memory_metadata.py`）
-  - 字段: memory_id, user_id, name, description, type, path, version, mtime, owner, group_id
+  - 字段: id (UUID), name, description, type, path, version, mtime, created_at, updated_at
+  - name: VARCHAR(255)，唯一约束
+  - type: `user` | `feedback` | `project` | `reference`
+  - path: `{type}/{memory_id}.md`（相对于 base_path，如 `feedback/bun-npm.md`）
   - version 字段用于乐观锁（version + 1 on update）
 - [ ] MemoryChangeHistory 实体（`src/domain/entities/memory_change_history.py`）
-  - 字段: history_id, memory_id, change_type, old_value, new_value, actor, timestamp
+  - 字段: id (UUID), memory_name, version, changed_at, changed_by, change_type, changed_fields (JSONB), diff_summary, archived_ref
   - append-only（历史记录不可删除/修改，但 delete 操作本身会作为新条目记录，change_type='delete'）
+  - changed_fields: `{"name": ["旧值", "新值"], ...}`（JSONB 格式）
+  - diff_summary: 变更摘要，如 `"name: foo -> bar"`
+  - archived_ref: L4 归档引用（可选）
 - [ ] MemoryService 服务类（`src/domain/services/memory_service.py`）
   - 方法: save(), delete(), update(), list()
   - 职责: 接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件
   - **依赖倒置**: 通过 TextExtractorProtocol 和 CompressorProtocol 注入压缩逻辑，不直接依赖 application 层
+  - **事件发布**: 通过 EventPublisherProtocol 注入（如 `EventPublisherProtocol | None = None`）
 
 #### L1 压缩处理 (L1 Compression)
 - [ ] **协议定义（领域层）**:
