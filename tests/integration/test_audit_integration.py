@@ -68,10 +68,10 @@ def get_unique_id():
 
 @pytest.fixture
 async def db_engine(pg_config, setup_schema):
-    """Create an async engine with worker-specific schema using schema_translate_map.
+    """Create an async engine with worker-specific schema using search_path.
 
     Depends on setup_schema to ensure schema and tables exist before engine creation.
-    Uses schema_translate_map on engine level (more reliable than server_settings).
+    Uses search_path on the connection so both DDL and queries use the same schema.
     """
     schema = get_schema_name()
     url = (
@@ -81,7 +81,7 @@ async def db_engine(pg_config, setup_schema):
     engine = create_async_engine(
         url,
         echo=False,
-        execution_options={"schema_translate_map": {None: schema}},
+        connect_args={"server_settings": {"search_path": schema}},
     )
 
     yield engine
