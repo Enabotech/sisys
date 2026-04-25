@@ -92,6 +92,7 @@
 - [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）
 - [ ] 事务发件箱模式（MemoryChanged 事件与业务操作同事务提交）
 - [ ] 事件发布成功率 ≥99%
+- [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{memory_name}`
 
 ### AC-4: L1 四种操作 CRUD
 
@@ -173,14 +174,28 @@
 - [ ] L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
   - 从"记住 X"中提取 X 作为记忆核心内容
   - 输入限制: ≤500 字
+  - **支持模式**:
+    - "记住 X" → 提取 X
+    - "记住了 X" → 提取 X
+    - "以后用 X" → 提取 X
+    - "要记住 X" → 提取 X
+    - "别忘了 X" → 提取 X
+    - "改成 X" → 提取 X（用于修改操作）
+    - "不要记住 X" → 触发删除操作
+  - **提取策略**: 正则优先 + LLM fallback（边界情况如"记住abc"无空格）
 - [ ] L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
   - 轻量级压缩: X → ~150 字（压缩率≥70%）
   - 目标: 保留核心语义，去除冗余
 
 #### 存储适配器 (Storage Adapters)
 - [ ] FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
-  - 写入 ~/.sisys/memory/*.md
-  - 更新 MEMORY.md 索引
+  - 写入 `~/.sisys/memory/` 或 `$XDG_CONFIG_HOME/sisys/memory/`（遵循 XDG 规范）
+  - **文件命名**: `{memory_id}.md`（UUID 格式）
+  - **MEMORY.md 索引**:
+    - 位置: `~/.sisys/memory/MEMORY.md`
+    - 格式: 每行 `| memory_id | name | type | mtime |`
+    - 截断策略: 超过 200 行时保留最新 200 行
+    - 更新时机: 每次 save/update/delete 后更新索引
 - [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）
 - [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）
 
@@ -525,8 +540,8 @@
 2. 第二步：LLM 压缩（仅对规则压缩后 >200 字的内容，P95<20ms）
 3. 目标：整体压缩率≥70%，延迟 P95<20ms
 
-**LLM 压缩优化**:
-- 使用 LiteLLM 统一接口（Story 1.17 UDMR 路由）
+**LLM 压缩优化**（若 Story 1.17 未完成，则使用 LiteLLM 默认配置）:
+- 使用 LiteLLM 统一接口（依赖 Story 1.17 UDMR 路由完成后）
 - 压缩结果缓存（相同内容不重复压缩）
 - 批量压缩（多条记忆一次 LLM 调用）
 
@@ -753,6 +768,9 @@ sisys/
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/repositories/memory_change_history_repository.py` - MemoryChangeHistoryRepository L2 历史记录仓储
 - `tests/unit/infrastructure/repositories/test_memory_change_history_repository.py` - MemoryChangeHistoryRepository 单元测试
+- `tests/unit/infrastructure/repositories/test_memory_metadata_repository.py` - MemoryMetadataRepository 单元测试
+
+**注意**: MemoryChangeHistoryRepository 在 Task 0 已定义规范（SDD），在 Task 2 创建实现和测试
 
 **更新的文件/Updated Files:**
 - `src/domain/events/__init__.py` - 添加 MemoryChanged 事件导出
