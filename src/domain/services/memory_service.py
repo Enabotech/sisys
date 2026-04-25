@@ -5,15 +5,17 @@
 依赖倒置：
 - TextExtractorService：文本提取接口
 - CompressorService：压缩接口
-- EventPublisherProtocol：事件发布接口（可选）
+- FileMemoryAdapter：L0 文件系统适配器（可选，用于双层存储）
 - MemoryMetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
 - MemoryChangeHistoryRepositoryProtocol：记忆变更历史仓储
+- EventPublisherProtocol：事件发布接口（可选）
 
 架构来源: architecture.md §11.2.5
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -107,6 +109,7 @@ class MemoryService:
         compressor,  # CompressorService
         metadata_repository,  # MemoryMetadataRepositoryProtocol
         history_repository,  # MemoryChangeHistoryRepositoryProtocol
+        file_adapter=None,  # FileMemoryAdapter | None
         event_publisher=None,  # EventPublisherProtocol | None
     ):
         """初始化 MemoryService。
@@ -116,12 +119,14 @@ class MemoryService:
             compressor: 压缩器（依赖倒置）
             metadata_repository: 记忆元数据仓储（PostgreSQL L2 持久化）
             history_repository: 记忆变更历史仓储（append-only）
+            file_adapter: L0 文件系统适配器（可选，用于双层存储）
             event_publisher: 事件发布器（可选）
         """
         self._text_extractor = text_extractor
         self._compressor = compressor
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
+        self._file_adapter = file_adapter
         self._event_publisher = event_publisher
 
     async def save(self, request: MemorySaveRequest) -> Memory:
@@ -182,7 +187,10 @@ class MemoryService:
         )
         await self._history_repository.save(history)
 
-        # 6. 发布事件
+        # 6. 写入 L0 文件系统（双层存储）
+        await self._write_to_l0(memory_id, request.memory_type, compression.compressed, request.name, request.description)
+
+        # 7. 发布事件
         await self._publish_memory_changed(
             memory_id=memory_id,
             user_id=request.user_id,
@@ -249,6 +257,9 @@ class MemoryService:
         )
         await self._history_repository.save(history)
 
+        # 写入 L0 文件系统（双层存储）
+        await self._write_to_l0(request.memory_id, metadata.type, new_content or "", metadata.name, metadata.description)
+
         await self._publish_memory_changed(
             memory_id=request.memory_id,
             user_id=request.user_id,
@@ -302,6 +313,9 @@ class MemoryService:
             diff_summary=f"删除记忆: {metadata.name}",
         )
         await self._history_repository.save(history)
+
+        # 删除 L0 文件系统（双层存储）
+        await self._delete_from_l0(request.memory_id, metadata.type)
 
         await self._publish_memory_changed(
             memory_id=request.memory_id,
@@ -387,6 +401,154 @@ class MemoryService:
             created_at=metadata.created_at,
             updated_at=metadata.updated_at,
         )
+
+    async def _write_to_l0(
+        self,
+        memory_id: UUID,
+        memory_type: str,
+        content: str,
+        name: str,
+        description: str,
+    ) -> None:
+        """写入 L0 文件系统（双层存储）。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+            content: 记忆内容
+            name: 记忆名称
+            description: 记忆描述
+        """
+        if self._file_adapter is None:
+            return
+
+        # 构建 MD 文件内容
+        md_content = self._build_md_content(name, description, memory_type, content)
+
+        # 在线程池中执行同步文件写入，避免阻塞事件循环
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: self._file_adapter.write(str(memory_id), memory_type, md_content),
+        )
+
+        # 更新 MEMORY.md 索引
+        await loop.run_in_executor(
+            None,
+            lambda: self._update_l0_index(memory_id, memory_type, name, description),
+        )
+
+    def _build_md_content(self, name: str, description: str, memory_type: str, content: str) -> str:
+        """构建 MD 文件内容。
+
+        Args:
+            name: 记忆名称
+            description: 记忆描述
+            memory_type: 记忆类型
+            content: 记忆内容
+
+        Returns:
+            MD 格式文件内容
+        """
+        import uuid
+
+        lines = [
+            "---",
+            f"name: {name}",
+            f"description: {description}",
+            f"type: {memory_type}",
+            f"originSessionId: {uuid.uuid4()}",
+            "---",
+            content,
+        ]
+        return "\n".join(lines)
+
+    def _update_l0_index(
+        self,
+        memory_id: UUID,
+        memory_type: str,
+        name: str,
+        description: str,
+    ) -> None:
+        """更新 MEMORY.md 索引。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+            name: 记忆名称
+            description: 记忆描述
+        """
+        if self._file_adapter is None:
+            return
+
+        # 读取现有索引
+        entries = self._file_adapter.read_index()
+
+        # 查找是否已存在该记忆
+        memory_id_str = str(memory_id)
+        existing_index = -1
+        for i, entry in enumerate(entries):
+            if entry["memory_id"] == memory_id_str:
+                existing_index = i
+                break
+
+        # 更新或添加条目
+        new_entry = {
+            "name": name,
+            "type": memory_type,
+            "memory_id": memory_id_str,
+            "description": description,
+        }
+
+        if existing_index >= 0:
+            entries[existing_index] = new_entry
+        else:
+            entries.append(new_entry)
+
+        # 写回索引
+        self._file_adapter.update_index(entries)
+
+    async def _delete_from_l0(self, memory_id: UUID, memory_type: str) -> None:
+        """从 L0 文件系统删除（双层存储）。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+        """
+        if self._file_adapter is None:
+            return
+
+        # 在线程池中执行同步文件删除
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: self._file_adapter.delete(str(memory_id), memory_type),
+        )
+
+        # 从 MEMORY.md 索引中移除
+        await loop.run_in_executor(
+            None,
+            lambda: self._remove_from_l0_index(memory_id),
+        )
+
+    def _remove_from_l0_index(self, memory_id: UUID) -> None:
+        """从 MEMORY.md 索引中移除记忆。
+
+        Args:
+            memory_id: 记忆 ID
+        """
+        if self._file_adapter is None:
+            return
+
+        # 读取现有索引
+        entries = self._file_adapter.read_index()
+
+        # 移除该记忆的条目
+        memory_id_str = str(memory_id)
+        entries = [e for e in entries if e["memory_id"] != memory_id_str]
+
+        # 写回索引
+        self._file_adapter.update_index(entries)
 
     async def _publish_memory_changed(
         self,

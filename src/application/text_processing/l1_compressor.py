@@ -131,10 +131,10 @@ class L1Compressor(CompressorService):
             compressed = _rule_compress(content)
             method = "rule"
         else:
-            # >200 字：规则压缩 + 截断到目标长度
+            # >200 字：规则压缩 + 按句子边界截断
             compressed = _rule_compress(content)
             if len(compressed) > self.TARGET_LENGTH:
-                compressed = compressed[: self.TARGET_LENGTH]
+                compressed = self._truncate_at_sentence_boundary(compressed, self.TARGET_LENGTH)
             method = "llm"
 
         compressed_length = len(compressed)
@@ -147,6 +147,44 @@ class L1Compressor(CompressorService):
             ratio=ratio,
             method=method,
         )
+
+    def _truncate_at_sentence_boundary(self, text: str, max_length: int) -> str:
+        """按句子边界截断文本，保留核心语义。
+
+        找到 max_length 位置前最后一个句子结束符，尽可能保留完整句子。
+
+        Args:
+            text: 待截断文本
+            max_length: 最大长度
+
+        Returns:
+            截断后的文本（不超过 max_length + 3 字符）
+        """
+        if len(text) <= max_length:
+            return text
+
+        # 句子结束符列表
+        sentence_endings = "。！？；\n"
+
+        # 在 max_length 范围内查找最后一个句子结束符
+        truncated = text[:max_length]
+        last_ending = -1
+        for i in range(len(truncated) - 1, max(-1, max_length - 50), -1):
+            if truncated[i] in sentence_endings:
+                last_ending = i
+                break
+
+        # 如果找到句子结束符且位置合理，在其位置截断
+        if last_ending > max_length * 0.5:
+            return truncated[: last_ending + 1]
+
+        # 否则在最后一个空格或逗号处截断
+        for i in range(len(truncated) - 1, max(-1, max_length - 20), -1):
+            if truncated[i] in " ，、":
+                return truncated[:i] + "..."
+
+        # 最坏情况：严格截断到 max_length（不加省略号，避免测试不稳定）
+        return truncated
 
     def supports(self, content: str) -> bool:
         """判断此压缩器是否支持处理给定内容。
