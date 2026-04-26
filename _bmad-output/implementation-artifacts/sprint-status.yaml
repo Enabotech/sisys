@@ -88,7 +88,7 @@ development_status:
   1-14b-autonomous-invocation-route: done
   1-14c-autonomous-invocation-execute: done
   1-15a-externalized-memory-context-compression: done
-  1-15b-externalized-memory-five-layer-storage: ready-for-dev
+  1-15b-externalized-memory-five-layer-storage: in-progress
   # 价值组 6: MVP 关键机制增强
   1-17-udmr-basic-routing: ready-for-dev
   1-18a-prefect-workflow-integration: backlog
