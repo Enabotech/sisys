@@ -153,12 +153,12 @@ def setup_schema(pg_config):
         cleanup_engine.dispose()
 
 
-@pytest.fixture(scope="session")
-def db_engine(pg_config):
-    """Create async engine for the worker session.
+@pytest.fixture
+def db_engine(pg_config, setup_schema):
+    """Create async engine for each test.
 
-    Session-scoped to match setup_schema. Uses explicit schema in
-    schema_translate_map for ORM queries.
+    Function-scoped to ensure fresh connection pool per test,
+    avoiding connection state issues in parallel execution.
     """
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
