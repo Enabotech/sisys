@@ -1,6 +1,6 @@
 # Story 1.15b: 外部化记忆 - L0 记忆入口 + 六层存储协同实现
 
-**Status:** `backlog` → `ready-for-dev` → `in-development` → `completed`
+**Status:** `backlog` → `ready-for-dev` → `in-development` → `completed` → `review`
 
 > **Note:** 本 Story 是 Story 1.15a 的后续实现，承接 L1 显式确认压缩后的存储协同。
 > 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
@@ -12,7 +12,7 @@
 > - Task 3（六边形架构验证）✅ 完成
 > - Subtask 3.7（集成测试）✅ 完成 - 18 个测试全部通过
 >
-> **验收测试状态：** 1935 个单元测试 + 18 个集成测试全部通过
+> **验收测试状态：** 1953 个测试全部通过（1935 单元测试 + 18 集成测试）
 
 ---
 
