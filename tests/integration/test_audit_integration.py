@@ -158,14 +158,14 @@ def setup_schema(pg_config):
 
 
 @pytest.fixture
-def db_engine(pg_config):
+def db_engine(pg_config, setup_schema):
     """Create async engine for each test.
 
     Function-scoped to ensure fresh connection pool per test,
     avoiding connection state issues in parallel execution.
 
-    NOTE: Does NOT depend on setup_schema because setup_schema has
-    autouse=True, guaranteeing it runs before any test.
+    Explicitly depends on setup_schema to guarantee schema creation
+    completes before engine creation in pytest-xdist environments.
     """
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"

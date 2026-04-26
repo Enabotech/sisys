@@ -61,6 +61,9 @@
 **When** 记忆按可见性分类
 **Then** Private 记忆存储于 `~/.sisys/memory/{type}/`
 **And** Group 记忆存储于 `~/.sisys/memory/group/{type}/`
+**And** L2 memory_metadata.path 格式：
+  - Private: `'{type}/{memory_id}.md'`（如 `user/abc123.md`）
+  - Group: `'group/{type}/{memory_id}.md'`（如 `group/user/abc123.md`）
 **And** RBAC 校验：
   - private 记忆（group_id=NULL）：读取/写入验证 owner == user_id
   - group 记忆（group_id != NULL）：读取/写入验证用户是 group 成员或有管理员权限
@@ -68,6 +71,8 @@
 **验证标准/Validation Criteria:**
 - [ ] Private 路径策略（`~/.sisys/memory/{type}/`）
 - [ ] Group 路径策略（`~/.sisys/memory/group/{type}/`）
+- [ ] Private L2 path 格式（`{type}/{memory_id}.md`）
+- [ ] Group L2 path 格式（`group/{type}/{memory_id}.md`）
 - [ ] Private RBAC 校验（owner == user_id）
 - [ ] Group RBAC 校验（group 成员或管理员）
 - [ ] MemoryAccessDeniedError 抛出条件正确
@@ -78,9 +83,9 @@
 **When** 六层存储协同执行
 **Then** 各层按职责存储：
   - L0 文件系统：实际记忆内容（.md 文件）+ MEMORY.md 索引
-  - L1 Redis：记忆缓存（TTL 24h-30d，key 格式 `memory:user:{user_id}:{name}`）
+  - L1 Redis：记忆缓存（TTL 24h-30d，key 格式 `sisys:memory:private:{user_id}:{name}` 或 `sisys:memory:group:{group_id}:{name}`）
   - L2 PostgreSQL：memory_metadata + memory_change_history
-  - L3 Qdrant：嵌入向量（文件 >500 字时）
+  - L3 Qdrant：嵌入向量（压缩后内容 >500 tokens 时）
   - L4 MinIO：StrategicArchive（7 年 WORM）
   - L5 Neo4j：知识图谱关系
 
@@ -90,7 +95,7 @@
 - [ ] L2 PostgreSQL 元数据（memory_metadata UPSERT）
 - [ ] L2 历史记录（memory_change_history append-only）
 - [ ] 层间单向依赖验证（L0 → L2，不存在反向依赖）
-- [ ] 六层存储架构测试（`test_six_layer_storage.py`）
+- [ ] 六层存储架构测试（`test_six_layer_storage_coordinator.py`）
 
 ### AC-4: MemoryChanged 事件下游处理
 
@@ -100,14 +105,14 @@
   1. 写入 memory_metadata（UPSERT，version + 1）
   2. 写入 memory_change_history（append-only）
   3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
-  4. 可选：更新 L3 Qdrant 向量索引（文件 >500 字时）
+  4. 可选：更新 L3 Qdrant 向量索引（压缩后内容 >500 tokens 时）
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）- Story 1.15a 已实现
 - [ ] MemoryMetadataRepository UPSERT（`src/infrastructure/repositories/memory_metadata_repository.py`）- Story 1.15a 已实现
 - [ ] MemoryChangeHistoryRepository append-only（`src/infrastructure/repositories/memory_change_history_repository.py`）- Story 1.15a 已实现
 - [ ] Redis 缓存失效（L1）
-- [ ] 事件处理成功率 ≥99%
+- [ ] 事件处理成功率 ≥99%（测量方式：统计 10000 次 MemoryChanged 事件中成功处理的比率，P95 延迟 <50ms）
 
 ### AC-5: 记忆操作触发索引与缓存
 
@@ -191,27 +196,87 @@
 
 #### RBAC 校验 (Access Control)
 - [ ] **MemoryAccessControl 访问控制**（`src/infrastructure/security/memory_access_control.py`）
-  - Private 记忆校验：owner == user_id
-  - Group 记忆校验：用户是 group 成员或有管理员权限
+  - Private 记忆校验：owner == user_id（读取/写入均需验证）
+  - Group 记忆校验：
+    - 读取：验证 user_id 是 group 成员（通过 group_members 表查询）
+    - 写入：验证 user_id 是 group 成员或有管理员权限（role='admin'）
+    - 管理员判断：通过 role_service 检查用户角色是否为 'admin'（复用 `RoleService.get_user_roles()`）
+  - **group_members 表设计**（本 Story 需要设计）：
+    - 表名: `memory_group_members`
+    - 字段: `group_id (VARCHAR)`, `user_id (VARCHAR)`, `role (VARCHAR)` - 角色：member/admin
+    - 索引: `(group_id, user_id)` 唯一索引
+    - 查询: `SELECT role FROM memory_group_members WHERE group_id=? AND user_id=?`
   - 异常类型：MemoryAccessDeniedError
+    ```python
+    class MemoryAccessDeniedError(Exception):
+        def __init__(self, user_id: str, memory_id: str, action: str, reason: str):
+            self.user_id = user_id
+            self.memory_id = memory_id
+            self.action = action  # 'read' | 'write'
+            self.reason = reason  # 'not_owner' | 'not_group_member' | 'not_admin'
+    ```
 
 #### 存储适配器 (Storage Adapters)
 - [ ] FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现
+  - **并发安全**：update_index() 需要添加文件锁（fcntl.flock）或原子操作（rename）防止竞态
+  - **原子性保证**：读取索引→修改→写入采用 write→rename 模式确保一致性
 - [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）- Story 1.15a 已实现
 - [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）- Story 1.15a 已实现
 - [ ] RedisMemoryCache L1 缓存（`src/infrastructure/cache/redis_memory_cache.py`）
-  - Key 格式：`memory:user:{user_id}:{name}`
-  - TTL：24h-30d（随机值避免雪崩）
-  - 失效：MemoryChanged 事件触发
-- [ ] QdrantMemoryVector L3 向量存储（`src/infrastructure/vector/qdrant_memory_vector.py`）
-  - 嵌入向量生成（文件 >500 字时）
-  - 混合检索支持
-- [ ] StrategicArchiveStorage L4 对象存储（`src/infrastructure/storage/strategic_archive_storage.py`）
-  - MinIO WORM 存储（7 年）
-  - Checkpoint 归档
-- [ ] KnowledgeGraphStorage L5 图存储（`src/infrastructure/graph/knowledge_graph_storage.py`）
-  - Neo4j 知识图谱
-  - 实体关系存储
+  - Key 格式（使用 `build_key()` 函数）：
+    - Private: `sisys:memory:private:{user_id}:{name}`
+    - Group: `sisys:memory:group:{group_id}:{name}`
+  - TTL：24h-30d（随机值避免雪崩，如 86400 + random(0, 21600)）
+  - API 方法：
+    - `get(memory_type, owner_id, name)` → 获取缓存的记忆内容（memory_type: 'private'|'group'）
+    - `set(memory_type, owner_id, name, content, ttl)` → 设置缓存
+    - `delete(memory_type, owner_id, name)` → 删除单个缓存
+    - `invalidate_pattern(memory_type, owner_id)` → 按 memory_type+owner_id pattern 删除用户所有缓存（用于清理）
+  - **失效职责**：
+    - `delete(memory_type, owner_id, name)`：单条记忆失效，由 SixLayerStorageCoordinator 在 update/delete 时调用
+    - `invalidate_pattern(memory_type, owner_id)`：用户全部缓存失效，由 SixLayerStorageCoordinator 在清空用户数据时调用
+#### 存储协同服务 (Storage Coordination)
+- [ ] **SixLayerStorageCoordinator 六层存储协同服务**（`src/application/services/six_layer_storage_coordinator.py`）
+  - **职责**：协调 L0-L5 各层存储的读写，作为 MemoryService 与各层存储之间的协调层
+  - **与 MemoryService 关系**：增强而非替代
+    - MemoryService（领域层）负责 L0+L2 基础存储（Story 1.15a 已实现）
+    - SixLayerStorageCoordinator（应用层）负责 L1/L3/L4/L5 层间协同和缓存管理
+    - 两者通过事件驱动解耦：MemoryService 发布 MemoryChanged 事件，SixLayerStorageCoordinator 监听并处理跨层同步
+  - **API 方法**：
+    - `save(memory_id, content, layer, memory_type)` → 写入指定层（memory_type: 'private'|'group'）
+    - `read(memory_id, layer, memory_type)` → 读取指定层
+    - `invalidate(memory_id, layer, memory_type)` → 失效指定层缓存
+    - `sync_to_layer(memory_id, target_layer, memory_type)` → 内部方法，由事件驱动调用（不对外暴露）
+    - `get_layer_status(memory_id, memory_type)` → 获取各层存储状态
+  - **使用现有存储实现**：
+    - L0：FileMemoryAdapter（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现（由 MemoryService 直接调用）
+    - L1：RedisMemoryCache（`src/infrastructure/cache/redis_memory_cache.py`）- 本 Story 新实现（由 Coordinator 管理）
+    - L2：MemoryMetadataRepository + MemoryChangeHistoryRepository - Story 1.15a 已实现
+    - L3：QdrantVectorStorage（`src/infrastructure/storage/qdrant/vector_storage.py`）- Story 1.6 已实现
+    - L4：MinIORepository（`src/infrastructure/storage/minio/__init__.py`）- Story 1.7 已实现
+    - L5：Neo4jGraphStorage（`src/infrastructure/storage/neo4j/graph_storage.py`）- Story 1.8 已实现
+  - **缓存失效职责**：缓存失效由 SixLayerStorageCoordinator 调用 RedisMemoryCache.delete() 或 invalidate_pattern() 实现
+  - **事件驱动同步**：sync_to_layer 是内部方法，由 MemoryChanged 事件处理器调用，不对外暴露 API
+  - **触发条件**：
+    - L3 Qdrant：压缩后内容 >500 tokens 时触发（Story 6.3 实现）
+    - L4 MinIO：Checkpoint 创建时触发（Story 6.3 实现）
+    - L5 Neo4j：实体关系提取后触发，通过 `EntityExtractorService` 协议接口调用 LLM 分析（协议定义在本 Story，实现由后续 LLM 集成 Story 提供）
+  - **EntityExtractorService 协议定义**（`src/domain/services/entity_extractor_service.py`）：
+    - 接口方法: `extract_entities(content: str) -> list[Entity]`
+    - 实体类型: `Entity(id, type, name, properties)`
+    - 遵循 `XxxService(Protocol)` 命名模式
+    - 由 Story 1.17 UDMR 路由或专门 LLM 集成 Story 实现
+  - **SixLayerStorageCoordinatorService 协议接口**（`src/domain/services/six_layer_storage_coordinator_service.py`）：
+    - 定义在领域层，由领域层 MemoryService 通过依赖注入持有
+    - 六边形架构：领域层定义端口（协议），应用层实现适配器
+    - 遵循 `XxxService(Protocol)` 命名模式
+  - **与 MemoryService 关系调整**：
+    - MemoryService.save()/update() 需要传入 is_group 参数以生成正确的 L2 path
+    - L2 path 生成逻辑：`Private='{type}/{id}.md'`，`Group='group/{type}/{id}.md'`
+    - SixLayerStorageCoordinator API 添加 `memory_type` 参数以区分 private/group 缓存
+    - 定义在领域层，由领域层 MemoryService 通过依赖注入持有
+    - 六边形架构：领域层定义端口（协议），应用层实现适配器
+    - 遵循 `XxxService(Protocol)` 命名模式
 
 #### 配置模型 (Configuration Models)
 - [ ] MemoryConfig 配置（`src/infrastructure/config/memory.py`）- Story 1.15a 已实现
@@ -257,7 +322,7 @@
 | **TDD 单元测试** | MemoryRouter | 路由策略 | `test_memory_router.py` | Task 1 |
 | **TDD 单元测试** | MemoryAccessControl | RBAC 校验 | `test_memory_access_control.py` | Task 1 |
 | **TDD 单元测试** | RedisMemoryCache | L1 缓存 | `test_redis_memory_cache.py` | Task 2 |
-| **TDD 单元测试** | SixLayerStorage | 六层协同 | `test_six_layer_storage.py` | Task 2 |
+| **TDD 单元测试** | SixLayerStorageCoordinator | 六层协同 | `test_six_layer_storage_coordinator.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.15b.feature` | Task 0 |
 | **SDD 架构验证** | 六层架构 | 依赖方向验证 | `test_memory_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端存储流程 | `test_storage_integration.py` | Task 3 |
@@ -304,7 +369,7 @@
 | AC-1 | L0 MEMORY.md 入口 | Task 1 | Subtask 1.1-1.3（MemoryIndex 红→绿→重构） | `test_memory_index.py` |
 | AC-1 | MemoryRouter 路由策略 | Task 1 | Subtask 1.4-1.6（MemoryRouter 红→绿→重构） | `test_memory_router.py` |
 | AC-2 | RBAC 访问控制 | Task 1 | Subtask 1.7-1.9（MemoryAccessControl 红→绿→重构） | `test_memory_access_control.py` |
-| AC-3 | 六层存储协同 | Task 2 | Subtask 2.1-2.3（SixLayerStorage 红→绿→重构） | `test_six_layer_storage.py` |
+| AC-3 | 六层存储协同 | Task 2 | Subtask 2.1-2.3（SixLayerStorageCoordinator 红→绿→重构） | `test_six_layer_storage_coordinator.py` |
 | AC-4 | RedisMemoryCache L1 缓存 | Task 2 | Subtask 2.4-2.6（RedisMemoryCache 红→绿→重构） | `test_redis_memory_cache.py` |
 | AC-5 | 记忆操作触发索引与缓存 | Task 1, Task 2 | Subtask 1.7-1.9 + 2.4-2.6 | `test_memory_index.py` + `test_redis_memory_cache.py` |
 | AC-6 | 性能要求 | Task 3 | Subtask 3.1-3.3（性能基准测试 红→绿→重构） | `test_storage_performance.py` |
@@ -388,17 +453,17 @@
 
 **关联 AC:** AC-3, AC-4
 
-> **职责边界:** Task 2 负责 SixLayerStorage（六层协同）、RedisMemoryCache（L1 缓存）
+> **职责边界:** Task 2 负责 SixLayerStorageCoordinator（六层协同）、RedisMemoryCache（L1 缓存）
 
-#### TDD 循环 [A]：SixLayerStorage 六层协同
+#### TDD 循环 [A]：SixLayerStorageCoordinator 六层协同
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/architecture/test_six_layer_storage.py`（验证层间依赖） |
-| 🟢 绿 | 实现六层存储协同逻辑 |
+| 🔴 红 | 编写 `tests/unit/application/services/test_six_layer_storage_coordinator.py`（验证层间依赖和协同） |
+| 🟢 绿 | 实现 `src/application/services/six_layer_storage_coordinator.py` - SixLayerStorageCoordinator |
 | 🔄 重构 | 验证层间单向依赖链 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 SixLayerStorage 失败测试
+- [ ] Subtask 2.1: 🔴 红 — 编写 SixLayerStorageCoordinator 失败测试
 - [ ] Subtask 2.2: 🟢 绿 — 实现六层存储协同
 - [ ] Subtask 2.3: 🔄 重构 — 验证层间依赖方向
 
@@ -415,7 +480,7 @@
 - [ ] Subtask 2.6: 🔄 重构 — 验证 TTL 和失效逻辑
 
 **完成标准/Definition of Done:**
-- [ ] SixLayerStorage 实现完成（层间协同）
+- [ ] SixLayerStorageCoordinator 实现完成（层间协同）
 - [ ] RedisMemoryCache 实现完成（L1 缓存）
 - [ ] TDD 循环全部通过
 
@@ -453,12 +518,26 @@
 | 🔄 重构 | 优化架构验证器 |
 
 - [ ] Subtask 3.4: 🔴 红 — 编写架构验证失败测试
+  - 检测领域层不导入应用层/基础设施层
+  - 检测领域层不直接依赖外部框架（langgraph, fastapi, pydantic 等）
+  - 检测协议定义在领域层，实现放在应用层/基础设施层
 - [ ] Subtask 3.5: 🟢 绿 — 实现架构验证逻辑
+  - 依赖方向检测：domain → application/infrastructure 正确
+  - 禁止反向依赖检测
 - [ ] Subtask 3.6: 🔄 重构 — 验证器优化
 
 #### 集成测试
 
 - [ ] Subtask 3.7: 创建 `tests/integration/test_storage_integration.py`（端到端六层存储流程）
+
+**集成测试检查点（必须验证）：**
+- [ ] L0 文件系统：临时目录 fixture，验证索引创建/更新/删除
+- [ ] L1 Redis：UUID 前缀隔离，验证缓存写入/失效
+- [ ] L2 PostgreSQL：transaction rollback，验证 metadata/history 写入
+- [ ] L3 Qdrant：collection 前缀隔离，验证向量写入
+- [ ] L4 MinIO：bucket 前缀隔离，验证归档写入
+- [ ] L5 Neo4j：label 前缀隔离，验证图谱写入
+- [ ] 并行测试：`pytest tests/ -n 8` 通过
 
 **测试策略：**
 | 层级 | 测试方式 | 说明 |
@@ -499,7 +578,7 @@
   - L0 文件系统：MEMORY.md 索引 + 实际记忆文件
   - L1 Redis：会话状态、语义缓存、公共黑板（TTL 24h-30d）
   - L2 PostgreSQL：memory_metadata + memory_change_history
-  - L3 Qdrant：嵌入向量（文件 >500 字时）
+  - L3 Qdrant：嵌入向量（压缩后内容 >500 tokens 时）
   - L4 MinIO：StrategicArchive（7 年 WORM）
   - L5 Neo4j：知识图谱关系
 - **设计约束:**
@@ -588,28 +667,36 @@ sisys/
 │   │   └── repositories/
 │   │       └── memory_repository.py # MemoryRepository 接口（领域层定义）
 │   ├── application/
-│   │   └── text_processing/
-│   │       ├── l1_text_extractor.py # L1TextExtractor（Story 1.15a 已实现）
-│   │       └── l1_compressor.py     # L1Compressor（Story 1.15a 已实现）
+│   │   ├── text_processing/
+│   │   │   ├── l1_text_extractor.py # L1TextExtractor（Story 1.15a 已实现）
+│   │   │   └── l1_compressor.py     # L1Compressor（Story 1.15a 已实现）
+│   │   └── services/
+│   │       └── six_layer_storage_coordinator.py # SixLayerStorageCoordinator 协同服务（新实现）
 │   ├── infrastructure/
 │   │   ├── config/
 │   │   │   └── memory.py            # MemoryConfig（Story 1.15a 已实现）
 │   │   ├── storage/
 │   │   │   ├── file_memory_adapter.py # FileMemoryAdapter L0（Story 1.15a 已实现）
 │   │   │   ├── memory_index.py      # MemoryIndex 索引管理（新实现）
-│   │   │   └── memory_router.py     # MemoryRouter 路由策略（新实现）
+│   │   │   ├── memory_router.py     # MemoryRouter 路由策略（新实现）
+│   │   │   ├── qdrant/              # QdrantVectorStorage（L3，Story 1.6 已实现）
+│   │   │   └── minio/              # MinIORepository（L4，Story 1.7 已实现）
 │   │   ├── cache/
 │   │   │   └── redis_memory_cache.py # RedisMemoryCache L1 缓存（新实现）
 │   │   ├── security/
 │   │   │   └── memory_access_control.py # MemoryAccessControl RBAC（新实现）
-│   │   └── repositories/
-│   │       ├── memory_metadata_repository.py # MemoryMetadataRepository L2（Story 1.15a 已实现）
-│   │       └── memory_change_history_repository.py # MemoryChangeHistoryRepository L2（Story 1.15a 已实现）
+│   │   ├── repositories/
+│   │   │   ├── memory_metadata_repository.py # MemoryMetadataRepository L2（Story 1.15a 已实现）
+│   │   │   └── memory_change_history_repository.py # MemoryChangeHistoryRepository L2（Story 1.15a 已实现）
+│   │   └── neo4j/
+│   │       └── graph_storage.py    # Neo4jGraphStorage（L5，Story 1.8 已实现）
 │   └── interfaces/
 │       └── event_listeners/
 │           └── memory_changed_listener.py # MemoryChangedListener（Story 1.15a 已实现）
 ├── tests/
 │   ├── unit/
+│   │   ├── application/services/
+│   │   │   └── test_six_layer_storage_coordinator.py # SixLayerStorageCoordinator 单元测试
 │   │   ├── infrastructure/
 │   │   │   ├── storage/
 │   │   │   │   ├── test_memory_index.py      # MemoryIndex 单元测试
@@ -620,7 +707,6 @@ sisys/
 │   │   │   └── security/
 │   │   │       └── test_memory_access_control.py # MemoryAccessControl 单元测试
 │   │   ├── architecture/
-│   │   │   ├── test_six_layer_storage.py    # 六层存储单元测试
 │   │   │   └── test_memory_architecture.py   # 架构验证测试
 │   │   └── performance/
 │   │       └── test_storage_performance.py  # 性能基准测试
@@ -706,11 +792,11 @@ sisys/
 - [x] 前一个故事学习经验已整合
 - [x] L0/L1/L3 分离关系已澄清
 - [x] 测试隔离约束显式强调（asyncio.Lock/pytest-asyncio）
-- [x] 六层存储架构已明确
+- [x] 六层存储架构已明确（L1-L5 使用现有存储实现）
 - [x] Redis TTL 随机值策略已定义
 - [x] L0 截断策略已明确（按写入顺序）
 - [x] XDG 路径规范已添加
-- [x] L3/L4/L5 依赖标注已完成
+- [x] SixLayerStorageCoordinator 协同服务已定义
 - [x] AC-5 职责已聚焦（触发索引/缓存协同）
 - [x] 集成测试策略已明确
 
@@ -721,16 +807,12 @@ sisys/
 - `src/infrastructure/storage/memory_router.py` - MemoryRouter 路由策略
 - `src/infrastructure/security/memory_access_control.py` - MemoryAccessControl RBAC
 - `src/infrastructure/cache/redis_memory_cache.py` - RedisMemoryCache L1 缓存
-- `src/infrastructure/vector/qdrant_memory_vector.py` - QdrantMemoryVector L3 向量存储
-- `src/infrastructure/storage/strategic_archive_storage.py` - StrategicArchiveStorage L4 对象存储
-- `src/infrastructure/graph/knowledge_graph_storage.py` - KnowledgeGraphStorage L5 图存储
+- `src/application/services/six_layer_storage_coordinator.py` - SixLayerStorageCoordinator 六层存储协同
 - `tests/unit/infrastructure/storage/test_memory_index.py` - MemoryIndex 单元测试
 - `tests/unit/infrastructure/storage/test_memory_router.py` - MemoryRouter 单元测试
 - `tests/unit/infrastructure/security/test_memory_access_control.py` - MemoryAccessControl 单元测试
 - `tests/unit/infrastructure/cache/test_redis_memory_cache.py` - RedisMemoryCache 单元测试
-- `tests/unit/vector/test_qdrant_memory_vector.py` - QdrantMemoryVector 单元测试
-- `tests/unit/infrastructure/storage/test_strategic_archive_storage.py` - StrategicArchiveStorage 单元测试
-- `tests/unit/graph/test_knowledge_graph_storage.py` - KnowledgeGraphStorage 单元测试
+- `tests/unit/application/services/test_six_layer_storage_coordinator.py` - SixLayerStorageCoordinator 单元测试
 - `tests/unit/architecture/test_six_layer_storage.py` - 六层存储单元测试
 - `tests/unit/architecture/test_memory_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_storage_performance.py` - 性能基准测试
@@ -742,8 +824,7 @@ sisys/
 - `src/infrastructure/storage/__init__.py` - 添加 MemoryIndex, MemoryRouter 导出
 - `src/infrastructure/security/__init__.py` - 添加 MemoryAccessControl 导出
 - `src/infrastructure/cache/__init__.py` - 添加 RedisMemoryCache 导出
-- `src/infrastructure/vector/__init__.py` - 添加 QdrantMemoryVector 导出
-- `src/infrastructure/graph/__init__.py` - 添加 KnowledgeGraphStorage 导出
+- `src/application/services/__init__.py` - 添加 SixLayerStorageCoordinator 导出
 
 **已存在的文件（来自 Story 1.15a）:**
 - `src/domain/events/memory_events.py` - MemoryChanged 事件
@@ -830,12 +911,23 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合
 5. [x] Sprint status synced to `ready-for-dev`
 6. [x] 测试隔离约束显式强调
-7. [x] 六层存储架构已明确
+7. [x] 六层存储架构已明确（L1-L5 使用现有存储实现）
 8. [x] L0 截断策略已明确（按写入顺序）
 9. [x] XDG 路径规范已添加
-10. [x] L3/L4/L5 依赖已标注
+10. [x] SixLayerStorageCoordinator 协同服务已定义
 11. [x] AC-5 职责已聚焦（触发索引/缓存协同）
 12. [x] 集成测试策略已明确
+13. [x] 测试文件命名已统一（SixLayerStorageCoordinator）
+14. [x] 六边形架构关系澄清（依赖注入而非内部组件）
+15. [x] L3/L4/L5 触发条件明确（tokens + 来源Story）
+16. [x] FileMemoryAdapter 并发安全说明已添加
+17. [x] Redis 缓存失效职责已细化
+18. [x] L5 EntityExtractorProtocol 协议定义已添加
+19. [x] group_members 表设计已澄清
+20. [x] L3 触发条件统一为"压缩后 >500 tokens"
+21. [x] AC-2 添加 L2 path 格式说明（Private/Group）
+22. [x] SixLayerStorageCoordinator 定义为增强而非替代
+23. [x] SixLayerStorageCoordinatorProtocol 协议接口已添加
 
 ---
 
@@ -852,10 +944,19 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.12.0
+**模板版本/Template Version:** 2.18.5
 **创建日期/Created:** 2026-04-26
 **最后更新/Last Updated:** 2026-04-26
 **更新说明:**
+- v2.18.5: 修复 Redis key 格式：添加 `sisys:` 前缀，符合 `build_key()` 规范（`sisys:memory:private:{user_id}:{name}`）
+- v2.18.4: 修复一致性：(1) EntityExtractorProtocol → EntityExtractorService；(2) Redis key 格式区分 private/group；(3) SixLayerStorageCoordinator API 添加 memory_type 参数；(4) 六边形架构验证具体内容
+- v2.18.3: 修复命名问题：EntityExtractorProtocol → EntityExtractorService（遵循 XxxService 模式）
+- v2.18.2: 修复命名问题：遵循 `XxxService(Protocol)` 模式
+- v2.18.1: 修复命名问题：SixLayerStorageCoordinatorProtocol → StorageCoordinatorProtocol
+- v2.18.0: 修复架构问题：移至领域层，符合六边形架构端口定义规则
+- v2.16.0: 补充调查结论修复：(1) L5 EntityExtractorProtocol 协议定义（由后续LLM集成Story实现）；(2) group_members表设计澄清（复用RoleService.get_user_roles()）
+- v2.15.0: 修复对抗性审查问题（基于1.15a实际实现）：(1) 修正SixLayerStorageCoordinator与MemoryService关系（通过依赖注入而非内部组件）；(2) 统一L3触发条件为tokens并明确来源Story；(3) 明确sync_to_layer为事件驱动内部方法；(4) 添加FileMemoryAdapter并发安全说明（文件锁/原子操作）；(5) 细化RedisMemoryCache失效职责（delete vs invalidate_pattern）
+- v2.13.0: 修正 L3/L4/L5 使用现有存储实现，添加 SixLayerStorageCoordinator 协同服务，移除误导性的"待创建"适配器
 - v2.12.0: 修正 L1-L5 为必选层（不是可选），添加 L3/L4/L5 存储适配器定义，更新测试策略为真实服务测试
 - v2.11.0: 修复审查问题：(1) 截断策略明确为"按写入顺序"；(2) 添加 XDG 路径规范；(3) L3/L4/L5 标注依赖 Story；(4) AC-5 聚焦索引协同和缓存管理；(5) 添加集成测试策略说明；(6) 更新追溯矩阵
 - v2.10.0: 初始版本 - Story 1.15b L0 入口 + 六层存储协同实现，基于 Story 1.15a 和架构文档创建
