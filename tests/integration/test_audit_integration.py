@@ -178,12 +178,11 @@ def db_engine(pg_config):
     asyncio.run(engine.dispose())
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def db_session(db_engine):
     """Create async session with transaction rollback isolation.
 
-    Session-scoped to match db_engine and ensure consistent connection
-    context for the entire test session.
+    Function-scoped to avoid connection conflicts between tests.
     """
     async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
