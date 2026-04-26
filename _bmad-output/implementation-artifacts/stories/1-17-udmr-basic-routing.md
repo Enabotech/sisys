@@ -81,7 +81,7 @@
 **Given** 路由决策完成
 **When** UDMRouter 发布路由决策事件
 **Then** 记录路由决策日志至 PostgreSQL（Story 1.14b 已实现）
-**And** 日志包含：任务 ID、路由类型（local/cloud）、选定模型、成本预估、成本实际、延迟、切换原因
+**And** 日志包含：任务 ID、路由类型（route_type）、选定模型（selected_model）、成本预估（cost_estimate）、成本实际（cost_actual）、延迟、切换原因（fallback_reason）
 
 > 📝 **RoutingDecisionLog 扩展字段说明**：
 > 基于 Story 1.14b 已有的 `RoutingDecisionLog` 实体，本 Story 添加以下字段：
@@ -322,7 +322,7 @@
 | 🔄 重构 | 验证 WORM 归档标识 |
 
 - [ ] Subtask 2.4: 🔴 红 — 编写 RoutingDecisionLog 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 扩展 RoutingDecisionLog 实体（添加 route_type, selected_model, cost_estimate, cost_actual, fallback_reason）
+- [ ] Subtask 2.5: 🟢 绿 — 扩展 RoutingDecisionLog 实体（添加 route_type, selected_model, cost_estimate, cost_actual, fallback_reason 五个字段）
 - [ ] Subtask 2.6: 🔄 重构 — 验证 WORM 归档标识
 
 **完成标准/Definition of Done:**
@@ -429,10 +429,12 @@ Triggered 事件（Story 1.14a）
     ↓
 RouteService（语义路由）→ 选择目标 Agent/工具
     ↓ 发布 Routed 事件
-UDMRouter（UDMR 路由）→ 选择本地/云端模型 ← 本 Story
+UDMRouter（UDMR 路由）→ 接收 Routed 事件，选择本地/云端模型 ← 本 Story
     ↓
 Execute（Story 1.14c）→ 执行任务
 ```
+
+> **UDMRouter 输入说明**：UDMRouter 接收 `Routed` 事件（两-tier 路由模式：语义路由→模型路由）。MVP 可选优化：支持直接调用 UDMRouter 进行单次路由决策（绕过事件驱动），适用于批量场景或极致性能要求。
 
 ### 项目结构说明 Project Structure
 
@@ -622,7 +624,7 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 5: or.md 系统公理实现 |
 | **优先级** | P0-17（MVP，ARCH UDMR 基础） |
-| **覆盖 FR** | or.md 系统公理一（route 阶段）、FR-CP-01（路由决策日志）、FR-CP-05（UDMR 三层决策）、FR-CP-06（四因子评分） |
+| **覆盖 FR** | or.md 系统公理一（route 阶段）、FR-CP-01（路由决策日志）、FR-CP-05（UDMR L3 静态路由，完整三层架构→Story 11.1/11.2）、FR-CP-06（四因子评分→Story 11.2） |
 | **依赖 Story** | Story 1.14a（trigger 实现）、Story 1.14b（语义路由 + 路由日志） |
 | **前置条件** | Triggered/Routed 事件已定义（Story 1.14a/b），路由决策日志基础设施（Story 1.14b） |
 | **后续 Story** | Story 1.19（CFO ROI 验证，Token 消耗追踪、成本统计） |
