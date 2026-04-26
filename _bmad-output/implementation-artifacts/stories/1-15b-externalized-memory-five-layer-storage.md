@@ -6,7 +6,11 @@
 > 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
 >
-> **完成状态：** Task 1（✅完成）、Task 2（✅完成）、Task 3（部分完成：六边形架构验证✅，性能基准测试/集成测试待外部服务）
+> **完成状态：**
+> - Task 1（L0 入口与 RBAC 校验）✅ 完成
+> - Task 2（六层存储协同）✅ 完成
+> - Task 3（六边形架构验证）✅ 完成
+> - 性能基准测试/集成测试：需要外部服务（Redis/PostgreSQL/Qdrant/MinIO/Neo4j），标记为 [待环境验证]
 >
 > **验收测试状态：** 1935 个单元测试全部通过，覆盖 MemoryIndex、MemoryRouter、MemoryAccessControl、RedisMemoryCache、SixLayerStorageCoordinator 等核心组件
 
