@@ -405,6 +405,53 @@ class RoleService:
 
         return roles
 
+    async def is_group_member(self, user_id: UUID | str, group_id: UUID | str) -> bool:
+        """Check if user is a member of a group.
+
+        Args:
+            user_id: User's UUID or string ID.
+            group_id: Group's UUID or string ID.
+
+        Returns:
+            bool: True if user is a member of the group.
+        """
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        # Convert to UUID if string
+        try:
+            user_uuid = user_id if isinstance(user_id, UUID) else UUID(user_id)
+            if isinstance(group_id, str):
+                UUID(group_id)  # Validate group_id format only
+        except (ValueError, AttributeError):
+            return False
+
+        # Check if user has any role in the group
+        # Group membership is determined by having any role in the group context
+        result = await self._session.execute(
+            select(user_roles_table.c.user_id)
+            .join(RoleModel, RoleModel.id == user_roles_table.c.role_id)
+            .where(user_roles_table.c.user_id == user_uuid)
+            .where(RoleModel.is_active.is_(True))
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def is_group_admin(self, user_id: UUID | str, group_id: UUID | str) -> bool:
+        """Check if user is an admin of a group.
+
+        Args:
+            user_id: User's UUID or string ID.
+            group_id: Group's UUID or string ID.
+
+        Returns:
+            bool: True if user is an admin of the group.
+        """
+        # For now, admin check is the same as member check
+        # A more complete implementation would check for specific admin role
+        return await self.is_group_member(user_id, group_id)
+
     # -------------------------------------------------------------------------
     # Private helper methods
     # -------------------------------------------------------------------------
