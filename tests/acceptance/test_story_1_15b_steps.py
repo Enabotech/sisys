@@ -51,16 +51,17 @@ def group_created(group_name: str):
 class MemoryTestContext:
     """记忆测试上下文 - 在 steps 间共享数据"""
 
-    def __init__(self):
-        self.owner_id: str = ""  # 创建记忆的用户
-        self.other_user_id: str = ""  # 其他用户
-        self.group_id: str = ""  # 群组 ID
-        self.current_memory_id: str = ""  # 当前操作的记忆 ID
-        self.current_memory_owner: str = ""  # 当前记忆的所有者
-        self.current_memory_is_group: bool = False  # 是否为 group 记忆
-        self.current_memory_group_id: str | None = None  # group 记忆的群组 ID
-        self.created_memories: list = []  # 所有创建的记忆
-        self.last_exception: Exception | None = None  # 最后捕获的异常
+    def __init__(self) -> None:
+        self.owner_id: str = ""
+        self.other_user_id: str = ""
+        self.group_id: str = ""
+        self.current_memory_id: str = ""
+        self.current_memory_name: str = ""
+        self.current_memory_owner: str = ""
+        self.current_memory_is_group: bool = False
+        self.current_memory_group_id: str | None = None
+        self.created_memories: list = []
+        self.last_exception: Exception | None = None
 
 
 @pytest.fixture
@@ -133,6 +134,32 @@ def memory_access_control() -> MemoryAccessControl:
 
 
 # ==============================================================================
+# Helper Functions
+# ==============================================================================
+
+
+def build_redis_key(
+    memory_id: str,
+    owner_id: str,
+    is_group: bool,
+    group_id: str | None,
+    name: str | None = None,
+) -> str:
+    """Build Redis key based on memory type.
+
+    Format per spec:
+    - Private: memory:user:{user_id}:{name}
+    - Group:   memory:group:{group_id}:{name}
+    """
+    if is_group and group_id and name:
+        return f"memory:group:{group_id}:{name}"
+    else:
+        # For private memories, we use memory_id as name if not provided
+        key_name = name if name else memory_id
+        return f"memory:user:{owner_id}:{key_name}"
+
+
+# ==============================================================================
 # AC-1: L0 MEMORY.md 入口
 # ==============================================================================
 
@@ -153,10 +180,11 @@ def create_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, re
     file_adapter.write(memory_id, "user", content)
     # 写入 L1 Redis 缓存
     owner_id = "test-user"
-    redis_key = f"memory:user:{owner_id}:{memory_id}"
+    redis_key = build_redis_key(memory_id, owner_id, False, None, "test-memory")
     redis_client.setex(redis_key, 86400, content)
     # 设置上下文
     test_context.current_memory_id = memory_id
+    test_context.current_memory_name = "test-memory"
     test_context.current_memory_owner = owner_id
     test_context.current_memory_is_group = False
     test_context.current_memory_group_id = None
@@ -175,6 +203,7 @@ def create_memory_named(name: str, memory_type: str, memory_index: MemoryIndex, 
     }
     memory_index.update_entry(entry)
     test_context.current_memory_id = memory_id
+    test_context.current_memory_name = name
     test_context.current_memory_owner = "test-user"
     test_context.current_memory_is_group = False
     test_context.current_memory_group_id = None
@@ -278,6 +307,7 @@ def create_private_memory(
     memory_name: str,
     memory_index: MemoryIndex,
     file_adapter: FileMemoryAdapter,
+    redis_client,
     test_context: MemoryTestContext,
 ):
     """创建 Private 记忆"""
@@ -298,10 +328,14 @@ def create_private_memory(
         f"这是 {user_name} 的私有记忆内容。"
     )
     file_adapter.write(memory_id, "user", content)
+    # 写入 L1 Redis 缓存
+    redis_key = build_redis_key(memory_id, user_name, False, None, memory_name)
+    redis_client.setex(redis_key, 86400, content)
     # 设置上下文 - 该记忆由 user_name (即 Alice) 创建
     test_context.owner_id = user_name
-    test_context.other_user_id = f"other-{user_name}"  # 其他用户
+    test_context.other_user_id = str(uuid.uuid4())  # 使用 UUID 避免冲突
     test_context.current_memory_id = memory_id
+    test_context.current_memory_name = memory_name
     test_context.current_memory_owner = user_name
     test_context.current_memory_is_group = False
     test_context.current_memory_group_id = None
@@ -315,6 +349,7 @@ def create_group_memory_with_user(
     group_name: str,
     memory_index: MemoryIndex,
     file_adapter: FileMemoryAdapter,
+    redis_client,
     test_context: MemoryTestContext,
 ):
     """创建 Group 记忆（带用户名）"""
@@ -335,11 +370,15 @@ def create_group_memory_with_user(
         f"这是群组 {group_name} 的共享记忆。"
     )
     file_adapter.write(memory_id, "group/user", content)
+    # 写入 L1 Redis 缓存 (Group 记忆使用 memory:group:{group_id}:{name} 格式)
+    redis_key = build_redis_key(memory_id, group_name, True, group_name, memory_name)
+    redis_client.setex(redis_key, 86400, content)
     # 设置上下文
     test_context.group_id = group_name
     test_context.owner_id = group_name  # group 记忆的 owner 是 group
-    test_context.other_user_id = "non-member-user"
+    test_context.other_user_id = str(uuid.uuid4())  # 使用 UUID 避免冲突
     test_context.current_memory_id = memory_id
+    test_context.current_memory_name = memory_name
     test_context.current_memory_owner = group_name
     test_context.current_memory_is_group = True
     test_context.current_memory_group_id = group_name
@@ -352,6 +391,7 @@ def create_group_memory(
     group_name: str,
     memory_index: MemoryIndex,
     file_adapter: FileMemoryAdapter,
+    redis_client,
     test_context: MemoryTestContext,
 ):
     """创建 Group 记忆（不带用户名，用于 AC-2-2）"""
@@ -372,11 +412,15 @@ def create_group_memory(
         f"这是群组 {group_name} 的共享记忆。"
     )
     file_adapter.write(memory_id, "group/user", content)
+    # 写入 L1 Redis 缓存 (Group 记忆使用 memory:group:{group_id}:{name} 格式)
+    redis_key = build_redis_key(memory_id, group_name, True, group_name, memory_name)
+    redis_client.setex(redis_key, 86400, content)
     # 设置上下文
     test_context.group_id = group_name
     test_context.owner_id = group_name  # group 记忆的 owner 是 group
-    test_context.other_user_id = "non-member-user"
+    test_context.other_user_id = str(uuid.uuid4())  # 使用 UUID 避免冲突
     test_context.current_memory_id = memory_id
+    test_context.current_memory_name = memory_name
     test_context.current_memory_owner = group_name
     test_context.current_memory_is_group = True
     test_context.current_memory_group_id = group_name
@@ -462,8 +506,10 @@ def check_redis_cache_exists(redis_client, test_context: MemoryTestContext):
     """检查 Redis 缓存存在"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    # key format: memory:user:{owner_id}:{memory_id}
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     exists = redis_client.exists(key)
     assert exists, f"Redis cache key not found: {key}"
 
@@ -473,7 +519,10 @@ def check_ttl_range_with_prefix(min, max, redis_client, test_context: MemoryTest
     """检查 TTL 范围 (AC-3-2)"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     ttl = redis_client.ttl(key)
     min_val = int(min)
     max_val = int(max)
@@ -485,7 +534,10 @@ def check_ttl_range_no_prefix(min, max, redis_client, test_context: MemoryTestCo
     """检查 TTL 范围 (AC-6-1)"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     ttl = redis_client.ttl(key)
     min_val = int(min)
     max_val = int(max)
@@ -509,21 +561,30 @@ def check_cache_written(redis_client, test_context: MemoryTestContext):
     """检查 Redis 缓存已写入"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     exists = redis_client.exists(key)
     assert exists, f"Redis cache not written for memory {memory_id}"
 
 
 @when("用户删除记忆")
-def delete_memory(memory_index: MemoryIndex, redis_client, test_context: MemoryTestContext):
-    """删除记忆 - 从索引和 Redis 移除"""
+def delete_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, redis_client, test_context: MemoryTestContext):
+    """删除记忆 - 从索引、文件和 Redis 移除"""
     # 获取当前记忆
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
     # 从索引移除
     memory_index.remove_entry(memory_id)
+    # 从 L0 文件删除 (根据 is_group 确定类型)
+    memory_type = "group/user" if is_group else "user"
+    file_adapter.delete(memory_id, memory_type)
     # 从 Redis 缓存删除
-    redis_key = f"memory:user:{owner_id}:{memory_id}"
+    redis_key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     redis_client.delete(redis_key)
     test_context.current_memory_id = memory_id  # 保留ID用于后续验证
 
@@ -542,7 +603,10 @@ def check_cache_invalidated(redis_client, test_context: MemoryTestContext):
     """检查 Redis 缓存已失效"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     exists = redis_client.exists(key)
     assert not exists, f"Redis cache still exists for memory {memory_id}"
 
@@ -557,7 +621,10 @@ def check_redis_ttl_range(min, max, redis_client, test_context: MemoryTestContex
     """检查 Redis TTL 范围"""
     memory_id = test_context.current_memory_id
     owner_id = test_context.current_memory_owner
-    key = f"memory:user:{owner_id}:{memory_id}"
+    is_group = test_context.current_memory_is_group
+    group_id = test_context.current_memory_group_id
+    name = test_context.current_memory_name
+    key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     ttl = redis_client.ttl(key)
     min_val = int(min)
     max_val = int(max)
