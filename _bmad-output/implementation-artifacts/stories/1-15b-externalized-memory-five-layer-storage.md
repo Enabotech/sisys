@@ -962,6 +962,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 - v2.18.10: 修复 FileMemoryAdapter/MemoryIndex 职责描述：将 update_index() 并发安全描述移至 MemoryIndex（L197-198），与"FileMemoryAdapter 不含索引逻辑"一致
 - v2.18.9: 修复验证标准：AC-5 验证标准改为"MemoryChanged 事件触发 SixLayerStorageCoordinator"替代"MemoryService 直接触发"
 - v2.18.7: 修复架构设计：明确 FileMemoryAdapter 只负责 .md 文件 CRUD，MemoryIndex 通过 MemoryChanged 事件驱动更新（六边形架构职责分离）
+- v2.18.5: 修复 Redis key 格式：添加 `sisys:` 前缀，符合 `build_key()` 规范（`sisys:memory:private:{user_id}:{name}`）
 - v2.18.4: 修复一致性：(1) EntityExtractorProtocol → EntityExtractorService；(2) Redis key 格式区分 private/group；(3) SixLayerStorageCoordinator API 添加 memory_type 参数；(4) 六边形架构验证具体内容
 - v2.18.3: 修复命名问题：EntityExtractorProtocol → EntityExtractorService（遵循 XxxService 模式）
 - v2.18.2: 修复命名问题：遵循 `XxxService(Protocol)` 模式
