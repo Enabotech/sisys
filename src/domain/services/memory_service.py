@@ -432,11 +432,7 @@ class MemoryService:
             lambda: self._file_adapter.write(str(memory_id), memory_type, md_content),
         )
 
-        # 更新 MEMORY.md 索引
-        await loop.run_in_executor(
-            None,
-            lambda: self._update_l0_index(memory_id, memory_type, name, description),
-        )
+        # 注意：MEMORY.md 索引更新由 MemoryChangedListener 事件驱动，不再在此处同步更新
 
     def _build_md_content(self, name: str, description: str, memory_type: str, content: str) -> str:
         """构建 MD 文件内容。
@@ -463,51 +459,6 @@ class MemoryService:
         ]
         return "\n".join(lines)
 
-    def _update_l0_index(
-        self,
-        memory_id: UUID,
-        memory_type: str,
-        name: str,
-        description: str,
-    ) -> None:
-        """更新 MEMORY.md 索引。
-
-        Args:
-            memory_id: 记忆 ID
-            memory_type: 记忆类型
-            name: 记忆名称
-            description: 记忆描述
-        """
-        if self._file_adapter is None:
-            return
-
-        # 读取现有索引
-        entries = self._file_adapter.read_index()
-
-        # 查找是否已存在该记忆
-        memory_id_str = str(memory_id)
-        existing_index = -1
-        for i, entry in enumerate(entries):
-            if entry["memory_id"] == memory_id_str:
-                existing_index = i
-                break
-
-        # 更新或添加条目
-        new_entry = {
-            "name": name,
-            "type": memory_type,
-            "memory_id": memory_id_str,
-            "description": description,
-        }
-
-        if existing_index >= 0:
-            entries[existing_index] = new_entry
-        else:
-            entries.append(new_entry)
-
-        # 写回索引
-        self._file_adapter.update_index(entries)
-
     async def _delete_from_l0(self, memory_id: UUID, memory_type: str) -> None:
         """从 L0 文件系统删除（双层存储）。
 
@@ -525,30 +476,7 @@ class MemoryService:
             lambda: self._file_adapter.delete(str(memory_id), memory_type),
         )
 
-        # 从 MEMORY.md 索引中移除
-        await loop.run_in_executor(
-            None,
-            lambda: self._remove_from_l0_index(memory_id),
-        )
-
-    def _remove_from_l0_index(self, memory_id: UUID) -> None:
-        """从 MEMORY.md 索引中移除记忆。
-
-        Args:
-            memory_id: 记忆 ID
-        """
-        if self._file_adapter is None:
-            return
-
-        # 读取现有索引
-        entries = self._file_adapter.read_index()
-
-        # 移除该记忆的条目
-        memory_id_str = str(memory_id)
-        entries = [e for e in entries if e["memory_id"] != memory_id_str]
-
-        # 写回索引
-        self._file_adapter.update_index(entries)
+        # 注意：MEMORY.md 索引移除由 MemoryChangedListener 事件驱动，不再在此处同步更新
 
     async def _publish_memory_changed(
         self,

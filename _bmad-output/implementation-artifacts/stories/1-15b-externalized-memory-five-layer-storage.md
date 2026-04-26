@@ -83,7 +83,7 @@
 **When** 六层存储协同执行
 **Then** 各层按职责存储：
   - L0 文件系统：实际记忆内容（.md 文件）+ MEMORY.md 索引
-  - L1 Redis：记忆缓存（TTL 24h-30d，key 格式 `sisys:memory:private:{user_id}:{name}` 或 `sisys:memory:group:{group_id}:{name}`）
+  - L1 Redis：记忆缓存（TTL 24h-30d，key 格式 `memory:user:{user_id}:{name}` 或 `memory:group:{group_id}:{name}`）
   - L2 PostgreSQL：memory_metadata + memory_change_history
   - L3 Qdrant：嵌入向量（压缩后内容 >500 tokens 时）
   - L4 MinIO：StrategicArchive（7 年 WORM）
@@ -104,13 +104,15 @@
 **Then** 下游监听器触发：
   1. 写入 memory_metadata（UPSERT，version + 1）
   2. 写入 memory_change_history（append-only）
-  3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
-  4. 可选：更新 L3 Qdrant 向量索引（压缩后内容 >500 tokens 时）
+  3. 更新 L0 MemoryIndex 索引（MemoryChangedListener 调用 MemoryIndex）
+  4. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
+  5. 可选：更新 L3 Qdrant 向量索引（压缩后内容 >500 tokens 时）
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）- Story 1.15a 已实现
 - [ ] MemoryMetadataRepository UPSERT（`src/infrastructure/repositories/memory_metadata_repository.py`）- Story 1.15a 已实现
 - [ ] MemoryChangeHistoryRepository append-only（`src/infrastructure/repositories/memory_change_history_repository.py`）- Story 1.15a 已实现
+- [ ] MemoryIndex 索引更新（`src/infrastructure/storage/memory_index.py`）- Story 1.15b 新实现
 - [ ] Redis 缓存失效（L1）
 - [ ] 事件处理成功率 ≥99%（测量方式：统计 10000 次 MemoryChanged 事件中成功处理的比率，P95 延迟 <50ms）
 
@@ -124,17 +126,20 @@
   - 更新（update）：触发 MemoryIndex 索引更新 + Redis 缓存失效 + MemoryChanged 事件
   - 删除（delete）：触发 MemoryIndex 索引清理 + Redis 缓存失效 + MemoryChanged 事件
 
-**说明：** MemoryService CRUD 操作已在 Story 1.15a 实现，本 AC 聚焦于 CRUD 触发后的索引协同和缓存管理。
+**说明：** MemoryService CRUD 操作已在 Story 1.15a 实现，通过 MemoryChanged 事件解耦下游组件。本 AC 聚焦于事件驱动的索引协同和缓存管理。
+
+**事件驱动架构：**
+```
+MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → MemoryIndex.update_entry()
+                                                 → SixLayerStorageCoordinator.invalidate()
+```
 
 **验证标准/Validation Criteria:**
-- [ ] MemoryService.save() 触发 MemoryIndex 更新
-- [ ] MemoryService.save() 触发 Redis 缓存写入
-- [ ] MemoryService.list() 从 MemoryIndex 获取路由
+- [ ] MemoryChanged 事件触发 MemoryIndex 更新
+- [ ] MemoryChanged 事件触发 SixLayerStorageCoordinator 写入 Redis 缓存
+- [ ] MemoryService.list() 从 MemoryIndex 读取路由（通过事件监听后的 MemoryIndex）
 - [ ] MemoryService.list() 从 Redis 缓存获取（缓存命中）
-- [ ] MemoryService.update() 触发 MemoryIndex 更新
-- [ ] MemoryService.update() 触发 Redis 缓存失效
-- [ ] MemoryService.delete() 触发 MemoryIndex 清理
-- [ ] MemoryService.delete() 触发 Redis 缓存失效
+- [ ] MemoryChanged 事件触发 SixLayerStorageCoordinator 失效 Redis 缓存
 - [ ] 版本冲突处理（重试最多 3 次，3 次仍冲突抛出 MemoryVersionConflictError）
 
 ### AC-6: 性能要求
@@ -174,7 +179,13 @@
 - [ ] MemoryService 服务类（`src/domain/services/memory_service.py`）- Story 1.15a 已实现
 
 #### L0 入口实现 (L0 Memory Entry)
-- [ ] **MemoryIndex 索引管理**（`src/infrastructure/storage/memory_index.py`）
+- [ ] **FileMemoryAdapter L0 文件存储适配器**（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现
+  - **职责**：只负责 .md 文件 CRUD，不含索引逻辑
+  - API: `write(memory_id, memory_type, content)` / `read(memory_id, memory_type)` / `delete(memory_id, memory_type)`
+  - **并发安全**：文件写入采用 write→rename 模式确保原子性
+- [ ] **MemoryIndex 索引管理**（`src/infrastructure/storage/memory_index.py`）- Story 1.15b 新实现
+  - **职责**：专门负责 MEMORY.md 索引维护，与文件存储分离
+  - **调用方式**：由 MemoryChangedListener 事件驱动调用（不从 MemoryService 直接调用）
   - 索引位置：`~/.sisys/memory/MEMORY.md`
   - 路径优先级（XDG 规范）：
     1. `$XDG_CONFIG_HOME/sisys/memory/`（若 XDG_CONFIG_HOME 已设置）
@@ -182,7 +193,9 @@
     3. `$HOME/.sisys/memory/`（向后兼容旧版本）
   - 索引格式：`- [Title](type/uuid.md) — one-line hook`
   - 截断策略：超过 200 行时保留最新 200 行（按写入顺序，最后写入的行在文件末尾）
-  - 更新时机：每次 save/update/delete 后更新索引
+  - 更新时机：MemoryChanged 事件触发时更新
+  - **并发安全**：update_index() 需要添加文件锁（fcntl.flock）或原子操作（rename）防止竞态
+  - **原子性保证**：读取索引→修改→写入采用 write→rename 模式确保一致性
 - [ ] **MemoryRouter 路由策略**（`src/infrastructure/storage/memory_router.py`）
   - 路径优先级（XDG 规范）：
     1. `$XDG_CONFIG_HOME/sisys/memory/`（若 XDG_CONFIG_HOME 已设置）
@@ -217,15 +230,15 @@
     ```
 
 #### 存储适配器 (Storage Adapters)
-- [ ] FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现
-  - **并发安全**：update_index() 需要添加文件锁（fcntl.flock）或原子操作（rename）防止竞态
-  - **原子性保证**：读取索引→修改→写入采用 write→rename 模式确保一致性
+- [ ] FileMemoryAdapter L0 文件存储适配器（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现
+  - **职责**：只负责 .md 文件 CRUD（不含索引逻辑），索引操作由 MemoryIndex 事件驱动调用
+  - API: `write(memory_id, memory_type, content)` / `read(memory_id, memory_type)` / `delete(memory_id, memory_type)`
 - [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/repositories/memory_metadata_repository.py`）- Story 1.15a 已实现
 - [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/repositories/memory_change_history_repository.py`）- Story 1.15a 已实现
 - [ ] RedisMemoryCache L1 缓存（`src/infrastructure/cache/redis_memory_cache.py`）
   - Key 格式（使用 `build_key()` 函数）：
-    - Private: `sisys:memory:private:{user_id}:{name}`
-    - Group: `sisys:memory:group:{group_id}:{name}`
+    - Private: `memory:user:{user_id}:{name}`
+    - Group: `memory:group:{group_id}:{name}`
   - TTL：24h-30d（随机值避免雪崩，如 86400 + random(0, 21600)）
   - API 方法：
     - `get(memory_type, owner_id, name)` → 获取缓存的记忆内容（memory_type: 'private'|'group'）
@@ -239,9 +252,10 @@
 - [ ] **SixLayerStorageCoordinator 六层存储协同服务**（`src/application/services/six_layer_storage_coordinator.py`）
   - **职责**：协调 L0-L5 各层存储的读写，作为 MemoryService 与各层存储之间的协调层
   - **与 MemoryService 关系**：增强而非替代
-    - MemoryService（领域层）负责 L0+L2 基础存储（Story 1.15a 已实现）
+    - MemoryService（领域层）负责 L0 文件写入 + L2 基础存储（Story 1.15a 已实现）
+    - MemoryIndex（基础设施层）负责 L0 索引维护（Story 1.15b 通过事件驱动调用）
     - SixLayerStorageCoordinator（应用层）负责 L1/L3/L4/L5 层间协同和缓存管理
-    - 两者通过事件驱动解耦：MemoryService 发布 MemoryChanged 事件，SixLayerStorageCoordinator 监听并处理跨层同步
+    - 三者通过事件驱动解耦：MemoryService 发布 MemoryChanged 事件，MemoryChangedListener 调用 MemoryIndex 更新索引，SixLayerStorageCoordinator 处理缓存失效
   - **API 方法**：
     - `save(memory_id, content, layer, memory_type)` → 写入指定层（memory_type: 'private'|'group'）
     - `read(memory_id, layer, memory_type)` → 读取指定层
@@ -271,12 +285,9 @@
     - 六边形架构：领域层定义端口（协议），应用层实现适配器
     - 遵循 `XxxService(Protocol)` 命名模式
   - **与 MemoryService 关系调整**：
-    - MemoryService.save()/update() 需要传入 is_group 参数以生成正确的 L2 path
+    - MemoryService.save()/update() 需要传入 is_group 参数以生成正确的 L2 path（后续 Story 实现）
     - L2 path 生成逻辑：`Private='{type}/{id}.md'`，`Group='group/{type}/{id}.md'`
     - SixLayerStorageCoordinator API 添加 `memory_type` 参数以区分 private/group 缓存
-    - 定义在领域层，由领域层 MemoryService 通过依赖注入持有
-    - 六边形架构：领域层定义端口（协议），应用层实现适配器
-    - 遵循 `XxxService(Protocol)` 命名模式
 
 #### 配置模型 (Configuration Models)
 - [ ] MemoryConfig 配置（`src/infrastructure/config/memory.py`）- Story 1.15a 已实现
@@ -944,11 +955,13 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 
 ---
 
-**模板版本/Template Version:** 2.18.5
+**模板版本/Template Version:** 2.18.10
 **创建日期/Created:** 2026-04-26
 **最后更新/Last Updated:** 2026-04-26
 **更新说明:**
-- v2.18.5: 修复 Redis key 格式：添加 `sisys:` 前缀，符合 `build_key()` 规范（`sisys:memory:private:{user_id}:{name}`）
+- v2.18.10: 修复 FileMemoryAdapter/MemoryIndex 职责描述：将 update_index() 并发安全描述移至 MemoryIndex（L197-198），与"FileMemoryAdapter 不含索引逻辑"一致
+- v2.18.9: 修复验证标准：AC-5 验证标准改为"MemoryChanged 事件触发 SixLayerStorageCoordinator"替代"MemoryService 直接触发"
+- v2.18.7: 修复架构设计：明确 FileMemoryAdapter 只负责 .md 文件 CRUD，MemoryIndex 通过 MemoryChanged 事件驱动更新（六边形架构职责分离）
 - v2.18.4: 修复一致性：(1) EntityExtractorProtocol → EntityExtractorService；(2) Redis key 格式区分 private/group；(3) SixLayerStorageCoordinator API 添加 memory_type 参数；(4) 六边形架构验证具体内容
 - v2.18.3: 修复命名问题：EntityExtractorProtocol → EntityExtractorService（遵循 XxxService 模式）
 - v2.18.2: 修复命名问题：遵循 `XxxService(Protocol)` 模式
