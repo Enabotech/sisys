@@ -74,10 +74,10 @@ def pg_config():
 
 @pytest.fixture(scope="session")
 def setup_schema(pg_config):
-    """Create schema and tables once per worker module.
+    """Create schema and tables once per worker session.
 
-    Uses sync connection for DDL - no async involved, avoids pytest-asyncio timing issues.
-    Drop schema first to ensure clean state (handles failed previous runs).
+    Uses CREATE SCHEMA IF NOT EXISTS to handle concurrent initialization.
+    Search_path ensures this runs in the correct schema context.
     """
     schema = get_schema_name()
     sync_url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
@@ -90,14 +90,14 @@ def setup_schema(pg_config):
         connect_args={"options": f"-csearch_path={schema}"},
     )
 
-    # Drop schema first to ensure clean state (handles failed previous runs)
+    # Use IF EXISTS to avoid duplicate key error from concurrent creation
+    # The CASCADE ensures clean state even if previous run left partial objects
     with engine.connect() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.commit()
 
-    # Create schema
     with engine.connect() as conn:
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
         conn.commit()
 
     # Create tables
