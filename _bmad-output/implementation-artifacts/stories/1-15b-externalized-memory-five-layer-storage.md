@@ -424,9 +424,9 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | 🟢 绿 | 实现 `src/infrastructure/storage/memory_index.py` - MemoryIndex |
 | 🔄 重构 | 优化索引更新逻辑 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 MemoryIndex 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 MemoryIndex（索引格式、截断策略）
-- [ ] Subtask 1.3: 🔄 重构 — 优化索引更新逻辑
+- [x] Subtask 1.1: 🔴 红 — 编写 MemoryIndex 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 MemoryIndex（索引格式、截断策略）
+- [x] Subtask 1.3: 🔄 重构 — 优化索引更新逻辑
 
 #### TDD 循环 [B]：MemoryRouter 路由策略
 
@@ -436,9 +436,9 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | 🟢 绿 | 实现 `src/infrastructure/storage/memory_router.py` - MemoryRouter |
 | 🔄 重构 | 优化路由逻辑 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 MemoryRouter 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 MemoryRouter（Private/Group 路径）
-- [ ] Subtask 1.6: 🔄 重构 — 验证路由逻辑
+- [x] Subtask 1.4: 🔴 红 — 编写 MemoryRouter 失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现 MemoryRouter（Private/Group 路径）
+- [x] Subtask 1.6: 🔄 重构 — 验证路由逻辑
 
 #### TDD 循环 [C]：MemoryAccessControl RBAC 校验
 
@@ -448,15 +448,15 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | 🟢 绿 | 实现 `src/infrastructure/security/memory_access_control.py` - MemoryAccessControl |
 | 🔄 重构 | 优化权限校验逻辑 |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写 MemoryAccessControl 失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 实现 MemoryAccessControl（Private/Group RBAC）
-- [ ] Subtask 1.9: 🔄 重构 — 添加 MemoryAccessDeniedError 异常处理
+- [x] Subtask 1.7: 🔴 红 — 编写 MemoryAccessControl 失败测试
+- [x] Subtask 1.8: 🟢 绿 — 实现 MemoryAccessControl（Private/Group RBAC）
+- [x] Subtask 1.9: 🔄 重构 — 添加 MemoryAccessDeniedError 异常处理
 
 **完成标准/Definition of Done:**
-- [ ] MemoryIndex 实现完成（索引格式、截断策略）
-- [ ] MemoryRouter 实现完成（Private/Group 路径）
-- [ ] MemoryAccessControl 实现完成（RBAC 校验）
-- [ ] TDD 循环全部通过
+- [x] MemoryIndex 实现完成（索引格式、截断策略）
+- [x] MemoryRouter 实现完成（Private/Group 路径）
+- [x] MemoryAccessControl 实现完成（RBAC 校验）
+- [x] TDD 循环全部通过
 
 ---
 
@@ -474,9 +474,9 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | 🟢 绿 | 实现 `src/application/services/six_layer_storage_coordinator.py` - SixLayerStorageCoordinator |
 | 🔄 重构 | 验证层间单向依赖链 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 SixLayerStorageCoordinator 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现六层存储协同
-- [ ] Subtask 2.3: 🔄 重构 — 验证层间依赖方向
+- [x] Subtask 2.1: 🔴 红 — 编写 SixLayerStorageCoordinator 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现六层存储协同
+- [x] Subtask 2.3: 🔄 重构 — 验证层间依赖方向
 
 #### TDD 循环 [B]：RedisMemoryCache L1 缓存
 
@@ -486,14 +486,14 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | 🟢 绿 | 实现 `src/infrastructure/cache/redis_memory_cache.py` - RedisMemoryCache |
 | 🔄 重构 | 优化缓存 TTL 和失效逻辑 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 RedisMemoryCache 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 RedisMemoryCache（L1 缓存）
-- [ ] Subtask 2.6: 🔄 重构 — 验证 TTL 和失效逻辑
+- [x] Subtask 2.4: 🔴 红 — 编写 RedisMemoryCache 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 RedisMemoryCache（L1 缓存）
+- [x] Subtask 2.6: 🔄 重构 — 验证 TTL 和失效逻辑
 
 **完成标准/Definition of Done:**
-- [ ] SixLayerStorageCoordinator 实现完成（层间协同）
-- [ ] RedisMemoryCache 实现完成（L1 缓存）
-- [ ] TDD 循环全部通过
+- [x] SixLayerStorageCoordinator 实现完成（层间协同）
+- [x] RedisMemoryCache 实现完成（L1 缓存）
+- [x] TDD 循环全部通过
 
 ---
 
