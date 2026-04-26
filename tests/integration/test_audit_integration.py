@@ -13,7 +13,7 @@ Parallel execution: Supported via worker-specific schemas
 
 Test isolation strategy:
 - Each test uses worker-specific schema (pytest-xdist worker ID)
-- Schema auto-created in session-scoped fixture
+- Schema auto-created via autouse=True session-scoped fixture
 - Transaction rollback after each test
 - UUID-based test data isolation
 """
@@ -76,6 +76,9 @@ def setup_schema(pg_config):
 
     This is session-scoped with autouse=True, ensuring it runs exactly once
     before any tests in this worker process. Uses sync connection for DDL.
+
+    CRITICAL: autouse=True ensures this runs BEFORE any test, regardless of
+    whether other fixtures properly depend on it.
     """
     sync_url = f"postgresql://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
 
@@ -84,7 +87,6 @@ def setup_schema(pg_config):
     engine = create_engine(sync_url, echo=False)
 
     try:
-        # Use search_path in connection options, not separate schema objects
         with engine.connect() as conn:
             conn.execute(text(f"DROP SCHEMA IF EXISTS {_SCHEMA_NAME} CASCADE"))
             conn.commit()
@@ -108,7 +110,8 @@ def setup_schema(pg_config):
                     old_value JSONB NOT NULL DEFAULT '{{}}',
                     new_value JSONB NOT NULL DEFAULT '{{}}',
                     correction_level INTEGER CHECK (
-                        correction_level IS NULL OR (correction_level >= 0 AND correction_level <= 3)
+                        correction_level IS NULL OR
+                        (correction_level >= 0 AND correction_level <= 3)
                     ),
                     checksum VARCHAR(64) NOT NULL,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -127,7 +130,8 @@ def setup_schema(pg_config):
                     event_id UUID NOT NULL UNIQUE,
                     event_type VARCHAR(100) NOT NULL,
                     payload JSONB NOT NULL DEFAULT '{{}}',
-                    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'published', 'failed')),
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'published', 'failed')),
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     processed_at TIMESTAMP WITH TIME ZONE,
                     retry_count INTEGER NOT NULL DEFAULT 0,
@@ -143,7 +147,7 @@ def setup_schema(pg_config):
 
     yield
 
-    # Cleanup
+    # Cleanup after session ends
     cleanup_engine = create_engine(sync_url, echo=False)
     try:
         with cleanup_engine.connect() as conn:
@@ -154,11 +158,14 @@ def setup_schema(pg_config):
 
 
 @pytest.fixture
-def db_engine(pg_config, setup_schema):
+def db_engine(pg_config):
     """Create async engine for each test.
 
     Function-scoped to ensure fresh connection pool per test,
     avoiding connection state issues in parallel execution.
+
+    NOTE: Does NOT depend on setup_schema because setup_schema has
+    autouse=True, guaranteeing it runs before any test.
     """
     url = (
         f"postgresql+asyncpg://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
@@ -428,7 +435,9 @@ class TestAuditQueryIntegration:
 
         result = await db_session.execute(
             select(AuditLogModel).where(
-                AuditLogModel.timestamp >= older, AuditLogModel.timestamp <= now, AuditLogModel.actor.like("user-time-%")
+                AuditLogModel.timestamp >= older,
+                AuditLogModel.timestamp <= now,
+                AuditLogModel.actor.like("user-time-%"),
             )
         )
         results = result.scalars().all()
