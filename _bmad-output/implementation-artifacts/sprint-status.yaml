@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-25
+last_updated: 2026-04-26
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -87,8 +87,8 @@ development_status:
   1-14a-autonomous-invocation-trigger: done
   1-14b-autonomous-invocation-route: done
   1-14c-autonomous-invocation-execute: done
-  1-15a-externalized-memory-context-compression: in-progress
-  1-15b-externalized-memory-five-layer-storage: backlog
+  1-15a-externalized-memory-context-compression: done
+  1-15b-externalized-memory-five-layer-storage: ready-for-dev
   # 价值组 6: MVP 关键机制增强
   1-17-udmr-basic-routing: ready-for-dev
   1-18a-prefect-workflow-integration: backlog
