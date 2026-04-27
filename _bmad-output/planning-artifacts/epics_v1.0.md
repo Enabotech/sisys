@@ -1883,10 +1883,14 @@ So that **用户主动记忆得到持久化，上下文压缩率≥70%**。
 - **用户主动记忆（L1）**：用户说"记住 X"时触发
   1. 提取"记住 X"中的 X 作为记忆核心内容（轻量级提取，≤500 字）
   2. 压缩 X 至 ~150 字（保留核心语义，压缩率≥70%）
-  3. 写入 ~/.sisys/memory/*.md
-  4. 更新 MEMORY.md 索引
-  5. 发布 MemoryChanged(is_automatic=False)
-  6. 异步写入 L2 PostgreSQL（memory_metadata + memory_change_history）
+  3. **L0 文件系统写入**（同步，强一致）：写入 ~/.sisys/memory/*.md
+  4. **L0 索引更新**（同步）：更新 MEMORY.md 索引
+  5. **发布 MemoryChanged 事件**（事务发件箱）：写入 Outbox 表（同一事务）
+  6. **MemoryChangedListener.handle() 异步消费**：
+     - L1 Redis 缓存失效（同步，立即）：保证"上下文≠缓存"公理
+     - L2 PostgreSQL 写入：`metadata_repository.upsert()` + `history_repository.append()`
+     - L3 Qdrant 向量（按需，内容>500 tokens）：`vector_store.embed()`
+     - L5 Neo4j 图谱（按需）：`entity_extractor.extract()`
 - **L1 操作类型**：保存（记住）、删除（不要记住）、修改（改成）、查询（你记得什么）
 - **L1 vs L3 分离**：L1 是用户主动触发（"记住..."），L3 是 Checkpoint 自动触发（Epic 6/Story 6.3）
 
