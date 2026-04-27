@@ -11,8 +11,8 @@ from src.domain.events import (
     DocumentProcessed,
     ToolExecuted,
 )
-from src.infrastructure.entities.outbox import OutboxEntity
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
+from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
 
 class TestEventOutboxAdapterConversion:

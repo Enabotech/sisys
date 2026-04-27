@@ -143,7 +143,7 @@ class TestEventRegistry:
 
     def test_unknown_event_type_raises_value_error(self) -> None:
         """EventOutboxAdapter should raise ValueError for unknown event_type."""
-        from src.infrastructure.entities.outbox import OutboxEntity
+        from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
         # Create an entity with an unregistered event_type
         unknown_entity = OutboxEntity()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.infrastructure.entities.session_state import SessionState
+from src.infrastructure.storage.redis.session_state import SessionState
 
 
 class TestSessionState:

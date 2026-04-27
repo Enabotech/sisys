@@ -20,7 +20,7 @@ from src.domain.events import (  # noqa: F401
     ToolExecuted,
 )
 from src.domain.events.base import DomainEvent
-from src.infrastructure.entities.outbox import OutboxEntity
+from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
 
 class EventRegistry:
