@@ -709,7 +709,7 @@ sisys/
 | **Story ID** | 20-1 |
 | **Story Key** | 20-1-sisys-testing-refactor |
 | **Status** | `in-progress` |
-| **Epic** | Epic 20: 测试工程基础设施 |
+| **Epic** | Epic 20: 重要重构 |
 | **优先级** | P0 (紧急 - 阻塞性问题) |
 | **预计工时** | 8-12 天 |
 
