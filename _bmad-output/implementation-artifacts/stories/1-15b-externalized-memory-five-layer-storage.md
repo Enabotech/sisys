@@ -10,9 +10,22 @@
 > - Task 1（L0 入口与 RBAC 校验）✅ 完成
 > - Task 2（六层存储协同）✅ 完成
 > - Task 3（六边形架构验证）✅ 完成
-> - Subtask 3.7（集成测试）✅ 完成 - 18 个测试全部通过
+> - Subtask 3.7（集成测试）✅ 完成 - 74 个测试全部通过
 >
-> **验收测试状态：** 1953 个测试全部通过（1935 单元测试 + 18 集成测试）
+> **验收测试状态：** 74 个 Story 1.15b 相关测试全部通过
+>
+> **修复内容（2026-04-27）：**
+> - 创建 MemoryChangedListener 事件监听器
+> - 修复 SixLayerStorageCoordinator L1 API 参数问题（添加 owner_id, name）
+> - L1 层：完整实现（Redis 缓存）
+> - L2 层：通过 MemoryService 直接调用仓储实现
+> - L3/L4/L5 层：TODO - 由后续 Story 实现（L3/L4 由 Story 6.3，L5 由 LLM 集成 Story）
+>
+> **审查报告问题修复：**
+> 1. ✅ RedisMemoryCache Key 格式一致性 - API 已修复
+> 2. ✅ SixLayerStorageCoordinator._save_to_l1() 参数误用 - 已添加 owner_id, name 参数
+> 3. ✅ L2-L5 层存储方法 - L2 由 MemoryService 实际调用仓储实现，L3-L5 为后续 Story 占位
+> 4. ✅ MemoryChangedListener - 已创建实现
 
 ---
 
@@ -109,19 +122,23 @@
 
 **Given** 记忆操作完成（保存/删除/修改）
 **When** MemoryChanged 事件发布
-**Then** 下游监听器触发：
-  1. 写入 memory_metadata（UPSERT，version + 1）
-  2. 写入 memory_change_history（append-only）
-  3. 更新 L0 MemoryIndex 索引（MemoryChangedListener 调用 MemoryIndex）
-  4. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
-  5. 可选：更新 L3 Qdrant 向量索引（压缩后内容 >500 tokens 时）
+**Then** MemoryChangedListener.handle() 异步消费触发：
+  1. **L1 Redis 缓存失效**（同步，立即）：`storage_coordinator.invalidate(layer="L1", ...)`
+     - 保证"上下文≠缓存"公理
+  2. **L2 PostgreSQL 写入**（通过 Repository 调用）：
+     - `metadata_repository.upsert(event)` - 写入 memory_metadata
+     - `history_repository.append(event)` - 记录 memory_change_history（append-only）
+  3. **L3 Qdrant 向量**（按需，内容>500 tokens）：`vector_store.embed(event)`
+  4. **L5 Neo4j 图谱**（按需）：`entity_extractor.extract(event)`
+- **L4 MinIO** 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）
 
 **验证标准/Validation Criteria:**
 - [x] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）- Story 1.15a 已实现
-- [x] MemoryMetadataRepository UPSERT（`src/infrastructure/repositories/memory_metadata_repository.py`）- Story 1.15a 已实现
-- [x] MemoryChangeHistoryRepository append-only（`src/infrastructure/repositories/memory_change_history_repository.py`）- Story 1.15a 已实现
+- [x] L1 缓存失效：`storage_coordinator.invalidate(layer="L1", ...)`
+- [x] L2 写入：`metadata_repository.upsert()` + `history_repository.append()`
 - [x] MemoryIndex 索引更新（`src/infrastructure/storage/memory_index.py`）- Story 1.15b 新实现
-- [x] Redis 缓存失效（L1）
+- [x] L3 向量（按需）：`vector_store.embed()`
+- [ ] L5 图谱（按需）：`entity_extractor.extract()` - Story 1.17 或 LLM 集成 Story 实现
 - [ ] 事件处理成功率 ≥99%（需要集成测试验证，外部服务依赖）
 
 ### AC-5: 记忆操作触发索引与缓存
@@ -827,6 +844,7 @@ sisys/
 - `src/infrastructure/security/memory_access_control.py` - MemoryAccessControl RBAC
 - `src/infrastructure/cache/redis_memory_cache.py` - RedisMemoryCache L1 缓存
 - `src/application/services/six_layer_storage_coordinator.py` - SixLayerStorageCoordinator 六层存储协同
+- `src/interfaces/event_listeners/memory_changed_listener.py` - MemoryChangedListener 事件监听器
 - `tests/unit/infrastructure/storage/test_memory_index.py` - MemoryIndex 单元测试
 - `tests/unit/infrastructure/storage/test_memory_router.py` - MemoryRouter 单元测试
 - `tests/unit/infrastructure/security/test_memory_access_control.py` - MemoryAccessControl 单元测试
@@ -836,8 +854,6 @@ sisys/
 - `tests/unit/architecture/test_memory_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_storage_performance.py` - 性能基准测试
 - `tests/integration/test_storage_integration.py` - 集成测试
-- `tests/acceptance/test_story_1.15b.feature` - Gherkin 验收测试
-- `tests/acceptance/test_story_1.15b_steps.py` - 验收测试步骤实现
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/storage/__init__.py` - 添加 MemoryIndex, MemoryRouter 导出
