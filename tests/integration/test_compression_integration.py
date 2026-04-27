@@ -15,19 +15,20 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from dotenv import load_dotenv
 
 from src.application.text_processing.l1_compressor import L1Compressor
 from src.application.text_processing.l1_text_extractor import L1TextExtractor
+from src.domain.entities.memory_metadata import MemoryMetadata
+from src.domain.repositories.memory_repository import (
+    MemoryChangeHistoryRepositoryProtocol,
+    MemoryMetadataRepositoryProtocol,
+)
 from src.domain.services.memory_service import MemorySaveRequest, MemoryService, MemoryUpdateRequest
-from src.infrastructure.repositories.memory_change_history_repository import (
-    InMemoryMemoryChangeHistoryRepository,
-)
-from src.infrastructure.repositories.memory_metadata_repository import (
-    InMemoryMemoryMetadataRepository,
-)
 
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
@@ -49,6 +50,63 @@ def is_postgresql_available():
         return False
 
 
+# Store for mock repository state
+_mock_metadata_store: dict[str, MemoryMetadata] = {}
+
+
+def _create_mock_metadata_repo():
+    """Create a mock metadata repository with stateful behavior."""
+    mock = AsyncMock(spec=MemoryMetadataRepositoryProtocol)
+
+    async def mock_save(metadata: MemoryMetadata) -> None:
+        _mock_metadata_store[str(metadata.memory_id)] = metadata
+
+    async def mock_get_by_id(memory_id: UUID) -> MemoryMetadata | None:
+        return _mock_metadata_store.get(str(memory_id))
+
+    async def mock_get_by_name(name: str) -> MemoryMetadata | None:
+        for m in _mock_metadata_store.values():
+            if m.name == name:
+                return m
+        return None
+
+    async def mock_delete(memory_id: UUID) -> None:
+        if str(memory_id) in _mock_metadata_store:
+            del _mock_metadata_store[str(memory_id)]
+
+    async def mock_list_by_user(user_id: str) -> list[MemoryMetadata]:
+        return [m for m in _mock_metadata_store.values() if m.user_id == user_id]
+
+    async def mock_list_by_type(memory_type: str) -> list[MemoryMetadata]:
+        return [m for m in _mock_metadata_store.values() if m.type == memory_type]
+
+    async def mock_list_all() -> list[MemoryMetadata]:
+        return list(_mock_metadata_store.values())
+
+    mock.save = mock_save
+    mock.get_by_id = mock_get_by_id
+    mock.get_by_name = mock_get_by_name
+    mock.delete = mock_delete
+    mock.list_by_user = mock_list_by_user
+    mock.list_by_type = mock_list_by_type
+    mock.list_all = mock_list_all
+    return mock
+
+
+def _create_mock_history_repo():
+    """Create a mock history repository."""
+    mock = AsyncMock(spec=MemoryChangeHistoryRepositoryProtocol)
+    mock.save = AsyncMock()
+    mock.get_by_memory_id = AsyncMock(return_value=[])
+    mock.get_by_id = AsyncMock(return_value=None)
+    return mock
+
+
+def _clear_mock_stores():
+    """Clear mock stores before each test."""
+    _mock_metadata_store.clear()
+
+
 # Skip if PostgreSQL not available
 pytestmark = pytest.mark.skipif(not is_postgresql_available(), reason="PostgreSQL not available")
 
@@ -56,13 +114,17 @@ pytestmark = pytest.mark.skipif(not is_postgresql_available(), reason="PostgreSQ
 class TestCompressionIntegration:
     """L1 压缩流程集成测试"""
 
+    def setup_method(self):
+        """Clear mock stores before each test."""
+        _clear_mock_stores()
+
     def test_save_triggers_extraction_and_compression(self):
         """验证 save 触发提取和压缩"""
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
-            metadata_repository=InMemoryMemoryMetadataRepository(),
-            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            metadata_repository=_create_mock_metadata_repo(),
+            history_repository=_create_mock_history_repo(),
         )
 
         request = MemorySaveRequest(
@@ -104,8 +166,8 @@ class TestCompressionIntegration:
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
-            metadata_repository=InMemoryMemoryMetadataRepository(),
-            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            metadata_repository=_create_mock_metadata_repo(),
+            history_repository=_create_mock_history_repo(),
         )
 
         memories = []
@@ -129,8 +191,8 @@ class TestCompressionIntegration:
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
-            metadata_repository=InMemoryMemoryMetadataRepository(),
-            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            metadata_repository=_create_mock_metadata_repo(),
+            history_repository=_create_mock_history_repo(),
         )
 
         memory = run_async(

@@ -1,10 +1,10 @@
 # infrastructure 层架构对齐重构方案
 
-**状态:** 待执行
+**状态:** 部分执行（Phase 6 已完成）
 **创建日期:** 2026-04-27
 **最后更新:** 2026-04-27
-**版本:** 4.0
-**核心修正:** 保持 `storage/` 作为统一存储抽象层；`idempotency/` 作为幂等模块合并到 `messaging/`；`cache/` 合并到 `storage/redis/`
+**版本:** 5.0
+**核心修正:** 保持 `storage/` 作为统一存储抽象层；`idempotency/` 作为幂等模块合并到 `messaging/`；`cache/` 合并到 `storage/redis/`；**`repositories/` 中的 InMemory 测试替身已删除，测试改用 unittest.mock**
 
 ---
 
@@ -84,7 +84,16 @@ storage/                              # 统一存储抽象层 ⭐
 | `audit/` | 审计服务 |
 | `entities/` | 实体定义 |
 | `utils/` | 工具函数 |
-| `repositories/` | 仓储服务 |
+| `repositories/` | **已清空 InMemory 测试替身**（真实实现见 `storage/postgresql/`） |
+
+### 2.4 Phase 6: 删除 repositories/ 中的 InMemory 测试替身
+
+| 操作 | 说明 |
+|------|------|
+| 删除 | `src/infrastructure/repositories/` 中的 InMemory 实现 |
+| 原因 | 业界最佳实践：InMemory 测试替身不应放在生产代码中 |
+| 测试更新 | 所有测试改用 `unittest.mock.MagicMock` / `AsyncMock` |
+| 领域层 | 协议接口保留在 `src/domain/repositories/` |
 
 ---
 
@@ -542,7 +551,7 @@ src/infrastructure/
 ├── config/                             # ✅ 不变
 ├── audit/                              # ✅ 不变
 ├── entities/                           # ✅ 不变
-├── repositories/                        # ✅ 不变
+├── repositories/                        # ✅ 已清空 InMemory 测试替身
 └── utils/                             # ✅ 不变
 ```
 
@@ -554,6 +563,7 @@ src/infrastructure/
 - ✅ `storage/` 保持统一存储抽象层
 - ✅ `cache/` 合并到 `storage/redis/`，减少顶层目录
 - ✅ 符合六边形架构分层
+- ✅ `repositories/` InMemory 测试替身已删除，测试改用 mock（符合业界最佳实践）
 
 ---
 
@@ -570,6 +580,24 @@ src/infrastructure/
 
 ---
 
-**执行状态:** 待执行
-**版本:** 4.0
+## 10. Phase 6 执行记录（2026-04-27）
+
+### 10.1 执行内容
+- 删除 `src/infrastructure/repositories/` 中的 InMemory 测试替身
+- 更新测试文件使用 `unittest.mock` 替代
+
+### 10.2 受影响文件
+- `tests/integration/test_compression_integration.py` - 添加有状态 mock
+- `tests/integration/test_memory_service_integration.py` - 已有有状态 mock
+- `tests/unit/infrastructure/events/test_outbox_pattern.py` - 添加 `_create_mock_repo()` 辅助函数
+- `src/application/services/six_layer_storage_coordinator.py` - 修复导入路径
+
+### 10.3 验证结果
+- mypy: ✅ 481 源文件检查通过
+- pytest: ✅ 2741 测试通过
+
+---
+
+**执行状态:** 部分执行（Phase 6 已完成）
+**版本:** 5.0
 **建议:** 分模块执行，每步验证后进入下一步

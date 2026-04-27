@@ -5,17 +5,39 @@ RED PHASE: 验证六边形架构约束 - L1/L3 分离。
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from src.application.text_processing.l1_compressor import L1Compressor
 from src.application.text_processing.l1_text_extractor import L1TextExtractor
+from src.domain.repositories.memory_repository import (
+    MemoryChangeHistoryRepositoryProtocol,
+    MemoryMetadataRepositoryProtocol,
+)
 from src.domain.services.memory_service import MemoryService
-from src.infrastructure.repositories.memory_change_history_repository import (
-    InMemoryMemoryChangeHistoryRepository,
-)
-from src.infrastructure.repositories.memory_metadata_repository import (
-    InMemoryMemoryMetadataRepository,
-)
+
+
+def _create_mock_metadata_repo():
+    """Create a mock metadata repository."""
+    mock = AsyncMock(spec=MemoryMetadataRepositoryProtocol)
+    mock.save = AsyncMock()
+    mock.get_by_id = AsyncMock(return_value=None)
+    mock.get_by_name = AsyncMock(return_value=None)
+    mock.delete = AsyncMock()
+    mock.list_by_user = AsyncMock(return_value=[])
+    mock.list_by_type = AsyncMock(return_value=[])
+    mock.list_all = AsyncMock(return_value=[])
+    return mock
+
+
+def _create_mock_history_repo():
+    """Create a mock history repository."""
+    mock = AsyncMock(spec=MemoryChangeHistoryRepositoryProtocol)
+    mock.save = AsyncMock()
+    mock.get_by_memory_id = AsyncMock(return_value=[])
+    mock.get_by_id = AsyncMock(return_value=None)
+    return mock
 
 
 class TestL1L3Separation:
@@ -63,8 +85,8 @@ class TestL1L3Separation:
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
-            metadata_repository=InMemoryMemoryMetadataRepository(),
-            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            metadata_repository=_create_mock_metadata_repo(),
+            history_repository=_create_mock_history_repo(),
         )
 
         # MemoryService 应该只使用 L1 组件
@@ -81,8 +103,8 @@ class TestL1L2L3TriggerSeparation:
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
-            metadata_repository=InMemoryMemoryMetadataRepository(),
-            history_repository=InMemoryMemoryChangeHistoryRepository(),
+            metadata_repository=_create_mock_metadata_repo(),
+            history_repository=_create_mock_history_repo(),
         )
 
         content = "记住，以后用 bun 而不是 npm"
