@@ -6,7 +6,7 @@ Provides Mock services, test data factories, and test isolation fixtures.
 from __future__ import annotations
 
 from collections.abc import Generator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import fakeredis.aioredis
@@ -108,15 +108,15 @@ def event_list(event_id: UUID) -> list[DomainEvent]:
 
 
 @pytest.fixture
-def outbox_repo() -> AsyncMock:
+def outbox_repo() -> MagicMock:
     """Provide a mock OutboxRepository for test isolation.
 
-    Uses unittest.mock.AsyncMock to avoid production InMemory test doubles.
+    Uses unittest.mock.MagicMock to avoid production InMemory test doubles.
     """
     from src.domain.repositories.outbox import OutboxRepository
 
-    mock = AsyncMock(spec=OutboxRepository)
-    mock.get_unpublished = AsyncMock(return_value=[])
+    mock = MagicMock(spec=OutboxRepository)
+    mock.get_unpublished.return_value = []
     return mock
 
 
