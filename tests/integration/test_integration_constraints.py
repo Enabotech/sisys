@@ -2,7 +2,6 @@
 
 Verifies integration-test-specific architectural constraints:
 - Mock objects do not leak into production code (src/)
-- Test isolation works correctly (each test gets independent repo)
 - pytest-timeout is configured and working
 """
 
@@ -44,52 +43,7 @@ class TestMockNonLeakage:
 
 
 # ===================================================================
-# Constraint 2: Test Isolation
-# ===================================================================
-
-
-class TestTestIsolation:
-    """Verify test isolation mechanisms work correctly."""
-
-    def test_fixture_provides_independent_repo(self) -> None:
-        """Each fixture call should return a new repo instance."""
-        from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
-
-        repo1 = InMemoryOutboxRepository()
-        repo2 = InMemoryOutboxRepository()
-
-        assert repo1 is not repo2
-        assert repo1._entities is not repo2._entities
-
-    def test_repo_clear_isolates_tests(self) -> None:
-        """Calling clear on repo should not affect other instances."""
-        from uuid import uuid4
-
-        from src.domain.events.base import DomainEvent
-        from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
-
-        repo1 = InMemoryOutboxRepository()
-        repo2 = InMemoryOutboxRepository()
-
-        # Add data to repo1
-        repo1.save(
-            DomainEvent(
-                event_id=uuid4(),
-                event_type="TestEvent",
-                source="test",
-                aggregate_id=uuid4(),
-                aggregate_type="Test",
-                version=1,
-                payload={},
-            )
-        )
-
-        # repo2 should be unaffected
-        assert len(repo2.get_unpublished(limit=10)) == 0
-
-
-# ===================================================================
-# Constraint 3: Timeout Configuration
+# Constraint 2: Timeout Configuration
 # ===================================================================
 
 

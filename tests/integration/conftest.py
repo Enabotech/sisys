@@ -30,7 +30,6 @@ from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
 from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.messaging.message_serializer import InMemoryEventStore
-from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # Import reset_test_environment from tests.fixtures for test isolation
 # Note: reset_test_environment in tests/fixtures.py is already autouse=True
@@ -109,13 +108,16 @@ def event_list(event_id: UUID) -> list[DomainEvent]:
 
 
 @pytest.fixture
-def outbox_repo() -> InMemoryOutboxRepository:
-    """Provide a fresh InMemoryOutboxRepository instance per test.
+def outbox_repo() -> AsyncMock:
+    """Provide a mock OutboxRepository for test isolation.
 
-    Each test gets its own isolated repo instance.
-    No need for explicit clear() — fresh instance = clean state.
+    Uses unittest.mock.AsyncMock to avoid production InMemory test doubles.
     """
-    return InMemoryOutboxRepository()
+    from src.domain.repositories.outbox import OutboxRepository
+
+    mock = AsyncMock(spec=OutboxRepository)
+    mock.get_unpublished = AsyncMock(return_value=[])
+    return mock
 
 
 @pytest.fixture

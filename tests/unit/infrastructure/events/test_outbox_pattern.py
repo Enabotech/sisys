@@ -11,7 +11,6 @@ from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
 from src.infrastructure.messaging.outbox.outbox import InvalidStateTransitionError, OutboxEntity
-from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 
 def _make_event() -> DomainEvent:
@@ -159,114 +158,12 @@ class TestOutboxRepositoryInterface:
 
 
 # ============================================================================
-# TDD Cycle C: InMemoryOutboxRepository
+# TDD Cycle C: Domain Layer Zero Dependency
 # ============================================================================
 
 
-class TestInMemoryOutboxRepository:
-    """InMemoryOutboxRepository tests."""
-
-    @pytest.mark.asyncio
-    async def test_save_adds_event(self):
-        """save should add event to memory store."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
-        assert unpublished[0].event_id == event.event_id
-
-    @pytest.mark.asyncio
-    async def test_get_unpublished_returns_pending(self):
-        """get_unpublished should return only pending events."""
-        repo = InMemoryOutboxRepository()
-        event1 = _make_event()
-        event2 = DocumentProcessed(
-            document_id=uuid4(),
-            parse_result={"pages": 5},
-            embedding=[0.2] * 1024,
-        )
-        repo.save(event1)
-        repo.save(event2)
-
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 2
-
-    @pytest.mark.asyncio
-    async def test_get_unpublished_respects_limit(self):
-        """get_unpublished should respect limit parameter."""
-        repo = InMemoryOutboxRepository()
-        for i in range(5):
-            repo.save(
-                DocumentProcessed(
-                    document_id=uuid4(),
-                    parse_result={"pages": i},
-                    embedding=[float(i)] * 1024,
-                )
-            )
-
-        unpublished = repo.get_unpublished(limit=3)
-        assert len(unpublished) == 3
-
-    @pytest.mark.asyncio
-    async def test_mark_published(self):
-        """mark_published should mark event as published."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-        repo.mark_published(event.event_id)
-
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0
-
-    @pytest.mark.asyncio
-    async def test_mark_failed(self):
-        """mark_failed should mark event as failed."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-        repo.mark_failed(event.event_id, "publish error")
-
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0
-
-    @pytest.mark.asyncio
-    async def test_async_get_unpublished_entities(self):
-        """_get_unpublished_entities should return OutboxEntity list."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-
-        entities = await repo._get_unpublished_entities(limit=10)
-        assert len(entities) == 1
-        assert isinstance(entities[0], OutboxEntity)
-
-    @pytest.mark.asyncio
-    async def test_async_mark_published_entity(self):
-        """_mark_published_entity should mark entity as published."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-
-        entities = await repo._get_unpublished_entities(limit=10)
-        await repo._mark_published_entity(entities[0])
-
-        remaining = await repo._get_unpublished_entities(limit=10)
-        assert len(remaining) == 0
-
-    @pytest.mark.asyncio
-    async def test_async_mark_failed_entity(self):
-        """_mark_failed_entity should mark entity as failed."""
-        repo = InMemoryOutboxRepository()
-        event = _make_event()
-        repo.save(event)
-
-        entities = await repo._get_unpublished_entities(limit=10)
-        await repo._mark_failed_entity(entities[0], "error")
-
-        remaining = await repo._get_unpublished_entities(limit=10)
-        assert len(remaining) == 0
+class TestDomainLayerIsolation:
+    """Verify domain layer has zero infrastructure dependencies."""
 
     def test_domain_layer_zero_outbox_entity_dependency(self):
         """Domain layer should not import OutboxEntity."""
@@ -286,41 +183,49 @@ class TestInMemoryOutboxRepository:
 
 
 # ============================================================================
-# TDD Cycle D: AsyncOutboxPoller
+# TDD Cycle D: AsyncOutboxPoller (using mocks)
 # ============================================================================
 
 
 class TestAsyncOutboxPoller:
-    """AsyncOutboxPoller tests."""
+    """AsyncOutboxPoller tests using mocks."""
 
     @pytest.mark.asyncio
     async def test_poll_once_publishes_pending_events(self):
         """poll_once should publish pending events."""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        from src.domain.repositories.outbox import OutboxRepository
 
-        repo = InMemoryOutboxRepository()
+        repo = AsyncMock(spec=OutboxRepository)
+        event = _make_event()
+        repo.get_unpublished.return_value = [event]
+
         mock_publisher = AsyncMock()
+
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
             poll_interval=0.1,
         )
-
-        event = _make_event()
-        repo.save(event)
 
         await poller.poll_once()
 
         mock_publisher.async_publish.assert_called_once()
+        repo.mark_published.assert_called_once_with(event.event_id)
 
     @pytest.mark.asyncio
-    async def test_poll_once_marks_published(self):
-        """poll_once should mark events as published after successful publish."""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+    async def test_poll_once_marks_published_after_success(self):
+        """poll_once should mark event as published after successful publish."""
+        from src.domain.repositories.outbox import OutboxRepository
 
-        repo = InMemoryOutboxRepository()
+        repo = AsyncMock(spec=OutboxRepository)
+        event = _make_event()
+        repo.get_unpublished.return_value = [event]
+
         mock_publisher = AsyncMock()
+
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
@@ -328,22 +233,23 @@ class TestAsyncOutboxPoller:
             poll_interval=0.1,
         )
 
-        event = _make_event()
-        repo.save(event)
-
         await poller.poll_once()
 
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0
+        repo.mark_published.assert_called_once_with(event.event_id)
 
     @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(self):
         """poll_once should mark events as failed on publish error."""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        from src.domain.repositories.outbox import OutboxRepository
 
-        repo = InMemoryOutboxRepository()
+        repo = AsyncMock(spec=OutboxRepository)
+        event = _make_event()
+        repo.get_unpublished.return_value = [event]
+
         mock_publisher = AsyncMock()
         mock_publisher.async_publish.side_effect = RuntimeError("publish failed")
+
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
@@ -351,21 +257,24 @@ class TestAsyncOutboxPoller:
             poll_interval=0.1,
         )
 
-        event = _make_event()
-        repo.save(event)
-
         await poller.poll_once()
 
-        unpublished = repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0  # Marked as failed, not pending
+        repo.mark_failed.assert_called_once()
+        call_args = repo.mark_failed.call_args
+        assert call_args[0][0] == event.event_id
+        assert "publish failed" in call_args[0][1]
 
     @pytest.mark.asyncio
     async def test_poller_runs_loop(self):
         """run should execute poll_once at least once before stopped."""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        from src.domain.repositories.outbox import OutboxRepository
 
-        repo = InMemoryOutboxRepository()
+        repo = AsyncMock(spec=OutboxRepository)
+        repo.get_unpublished.return_value = []
+
         mock_publisher = AsyncMock()
+
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
@@ -373,21 +282,19 @@ class TestAsyncOutboxPoller:
             poll_interval=0.05,
         )
 
-        # Add an event so poll_once has something to do
-        event = _make_event()
-        repo.save(event)
-
         # Run poll_once directly to verify it works
         await poller.poll_once()
-        assert mock_publisher.async_publish.call_count == 1
+        repo.get_unpublished.assert_called()
 
     @pytest.mark.asyncio
     async def test_poller_graceful_stop(self):
         """stop should gracefully stop the polling loop."""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        from src.domain.repositories.outbox import OutboxRepository
 
-        repo = InMemoryOutboxRepository()
+        repo = AsyncMock(spec=OutboxRepository)
         mock_publisher = AsyncMock()
+
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         poller = AsyncOutboxPoller(
             outbox_repository=repo,

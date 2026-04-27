@@ -1,4 +1,4 @@
-"""Smoke tests for domain event pipeline (publish → in-memory outbox → query).
+"""Smoke tests for domain event pipeline (event registry, idempotency, retry).
 
 Verifies Story 1.2/1.3 event infrastructure works end-to-end at a basic level.
 Does NOT test full RabbitMQ routing — that's Story 1.3 AC-3 scope.
@@ -14,101 +14,9 @@ from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
 from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
-from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # ===================================================================
-# TDD Cycle A: Event Publish → In-Memory Outbox
-# ===================================================================
-
-
-class TestEventPublishToOutbox:
-    """Verify events can be published to InMemoryOutboxRepository."""
-
-    def test_save_event_to_outbox(self, outbox_repo: InMemoryOutboxRepository) -> None:
-        """Event should be saved to outbox and retrievable."""
-        event = DomainEvent(
-            event_id=uuid4(),
-            event_type="DocumentProcessed",
-            source="test",
-            aggregate_id=uuid4(),
-            aggregate_type="Document",
-            version=1,
-            payload={"doc_id": "test-1"},
-        )
-        outbox_repo.save(event)
-
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
-        assert unpublished[0].event_type == "DocumentProcessed"
-
-    def test_save_multiple_events_fifo(self, outbox_repo: InMemoryOutboxRepository) -> None:
-        """Multiple events should be saved and returned in FIFO order."""
-        events = [
-            DomainEvent(
-                event_id=uuid4(),
-                event_type="ToolExecuted",
-                source="test",
-                aggregate_id=uuid4(),
-                aggregate_type="Tool",
-                version=i,
-                payload={"tool_id": f"tool-{i}"},
-            )
-            for i in range(3)
-        ]
-        for e in events:
-            outbox_repo.save(e)
-
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 3
-        # FIFO order
-        assert unpublished[0].version == 0
-        assert unpublished[1].version == 1
-        assert unpublished[2].version == 2
-
-    def test_mark_published_event(self, outbox_repo: InMemoryOutboxRepository) -> None:
-        """After marking published, event should not appear in unpublished."""
-        event = DomainEvent(
-            event_id=uuid4(),
-            event_type="AgentDecided",
-            source="test",
-            aggregate_id=uuid4(),
-            aggregate_type="Agent",
-            version=1,
-            payload={},
-        )
-        outbox_repo.save(event)
-        outbox_repo.mark_published(event.event_id)
-
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0
-
-    def test_event_format_standard(self, outbox_repo: InMemoryOutboxRepository) -> None:
-        """Published event should have all standard fields."""
-        event_id = uuid4()
-        aggregate_id = uuid4()
-        event = DomainEvent(
-            event_id=event_id,
-            event_type="CheckpointReached",
-            source="test",
-            aggregate_id=aggregate_id,
-            aggregate_type="Checkpoint",
-            version=1,
-            payload={"stage": "market_insight"},
-        )
-        outbox_repo.save(event)
-
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
-        evt = unpublished[0]
-        assert evt.event_id == event_id
-        assert evt.event_type == "CheckpointReached"
-        assert evt.aggregate_id == aggregate_id
-        assert evt.aggregate_type == "Checkpoint"
-        assert evt.version == 1
-
-
-# ===================================================================
-# TDD Cycle B: Event Type Registry
+# TDD Cycle A: Event Type Registry
 # ===================================================================
 
 
@@ -156,7 +64,7 @@ class TestEventRegistry:
 
 
 # ===================================================================
-# TDD Cycle C: Idempotency & Retry Smoke
+# TDD Cycle B: Idempotency & Retry Smoke
 # ===================================================================
 
 
