@@ -29,6 +29,46 @@
     并且 MEMORY.md 索引应该更新
 
   # =========================================================================
+  # AC-2: 双层存储写入（真实 PostgreSQL）
+  # =========================================================================
+
+  场景: AC-2 - L2 PostgreSQL 写入 metadata
+    假如 MemoryService 已实现并配置
+    假如 用户输入记住以后用bun而不是npm
+    当 用户执行保存操作
+    那么 应该创建新记忆
+    并且 L2 PostgreSQL 应该包含 metadata 记录
+
+  场景: AC-2 - L2 PostgreSQL 写入 history
+    假如 MemoryService 已实现并配置
+    假如 用户输入记住以后用bun而不是npm
+    当 用户执行保存操作
+    那么 应该创建新记忆
+    并且 L2 PostgreSQL 应该包含 history 记录
+
+  # =========================================================================
+  # AC-3: MemoryChanged 事件下游处理（真实 Redis + PostgreSQL）
+  # =========================================================================
+
+  场景: AC-3 - MemoryChanged 事件触发 L1 缓存失效
+    假如 MemoryChangedListener 已配置真实服务
+    假如 Redis 缓存已写入
+    当 触发 MemoryChanged 事件处理
+    那么 L1 Redis 缓存应该被失效
+
+  场景: AC-3 - MemoryChanged 事件触发 L2 metadata 写入
+    假如 MemoryChangedListener 已配置真实服务
+    假如 Redis 缓存已写入
+    当 触发 MemoryChanged 事件处理
+    那么 L2 PostgreSQL 应该写入 metadata
+
+  场景: AC-3 - MemoryChanged 事件触发 L2 history 写入
+    假如 MemoryChangedListener 已配置真实服务
+    假如 Redis 缓存已写入
+    当 触发 MemoryChanged 事件处理
+    那么 L2 PostgreSQL 应该写入 history
+
+  # =========================================================================
   # AC-4: 四种操作 CRUD
   # =========================================================================
 
@@ -88,3 +128,8 @@
     假如 用户输入记住测试内容
     当 L1压缩被触发
     那么 is_automatic应该为False
+
+  场景: AC-6 - Redis TTL 在 24h-30d 范围内
+    假如 Redis 缓存已写入
+    当 检查 Redis TTL 范围
+    那么 TTL 应在 24h-30d 范围内

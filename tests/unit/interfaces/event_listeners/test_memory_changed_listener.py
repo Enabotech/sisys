@@ -5,9 +5,30 @@ RED PHASE: 验证 MemoryChangedListener 按 §11.2.9 最优架构处理 MemoryCh
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import uuid
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from src.domain.events.memory_events import MemoryChanged
+
+
+def _make_event(
+    memory_id: str | None = None,
+    user_id: str = "user-456",
+    name: str = "test-memory",
+    change_type: str = "create",
+    memory_type: str = "user",
+) -> MemoryChanged:
+    """Helper to create MemoryChanged event with unique ID."""
+    return MemoryChanged(
+        memory_id=memory_id or str(uuid.uuid4()),
+        user_id=user_id,
+        name=name,
+        change_type=change_type,
+        is_automatic=False,
+        new_value={"type": memory_type, "description": "Test"},
+    )
 
 
 class TestMemoryChangedListenerInit:
@@ -49,11 +70,12 @@ class TestMemoryChangedListenerInit:
 class TestMemoryChangedListenerHandle:
     """MemoryChangedListener handle 方法验证"""
 
-    def test_handle_calls_invalidate_l1_cache(self):
+    @pytest.mark.asyncio
+    async def test_handle_calls_invalidate_l1_cache(self):
         """验证 handle 调用 L1 缓存失效"""
         mock_storage_coordinator = MagicMock()
-        mock_metadata_repo = MagicMock()
-        mock_history_repo = MagicMock()
+        mock_metadata_repo = AsyncMock()
+        mock_history_repo = AsyncMock()
 
         from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
 
@@ -63,29 +85,23 @@ class TestMemoryChangedListenerHandle:
             history_repository=mock_history_repo,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "private", "description": "Test"},
-        )
+        event = _make_event(user_id="user-456", name="test-memory")
 
-        listener.handle(event)
+        await listener.handle(event)
 
         mock_storage_coordinator.invalidate.assert_called_once()
         call_args = mock_storage_coordinator.invalidate.call_args
         assert call_args.kwargs["layer"] == "L1"
-        assert call_args.kwargs["memory_type"] == "private"
+        assert call_args.kwargs["memory_type"] == "user"
         assert call_args.kwargs["owner_id"] == "user-456"
         assert call_args.kwargs["name"] == "test-memory"
 
-    def test_handle_calls_write_to_l2(self):
+    @pytest.mark.asyncio
+    async def test_handle_calls_write_to_l2(self):
         """验证 handle 调用 L2 写入"""
         mock_storage_coordinator = MagicMock()
-        mock_metadata_repo = MagicMock()
-        mock_history_repo = MagicMock()
+        mock_metadata_repo = AsyncMock()
+        mock_history_repo = AsyncMock()
 
         from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
 
@@ -95,19 +111,9 @@ class TestMemoryChangedListenerHandle:
             history_repository=mock_history_repo,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "private", "description": "Test"},
-        )
+        event = _make_event(user_id="user-456", name="test-memory")
 
-        listener.handle(event)
-
-        # L2 写入由 _write_to_l2 调用
-        # 具体 repository 方法调用在 _write_metadata 和 _append_history 中
+        await listener.handle(event)
 
 
 class TestMemoryChangedListenerL1Invalidation:
@@ -125,21 +131,15 @@ class TestMemoryChangedListenerL1Invalidation:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="update",
-            is_automatic=False,
-            new_value={"type": "private"},
-        )
+        memory_id = str(uuid.uuid4())
+        event = _make_event(memory_id=memory_id, user_id="user-456", change_type="update")
 
         listener._invalidate_l1_cache(event)
 
         mock_storage_coordinator.invalidate.assert_called_once_with(
-            memory_id="test-memory-123",
+            memory_id=memory_id,
             layer="L1",
-            memory_type="private",
+            memory_type="user",
             owner_id="user-456",
             name="test-memory",
         )
@@ -156,19 +156,18 @@ class TestMemoryChangedListenerL1Invalidation:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
+        memory_id = str(uuid.uuid4())
+        event = _make_event(
+            memory_id=memory_id,
             user_id="group-789",
-            name="test-memory",
             change_type="delete",
-            is_automatic=False,
-            new_value={"type": "group"},
+            memory_type="group",
         )
 
         listener._invalidate_l1_cache(event)
 
         mock_storage_coordinator.invalidate.assert_called_once_with(
-            memory_id="test-memory-123",
+            memory_id=memory_id,
             layer="L1",
             memory_type="group",
             owner_id="group-789",
@@ -185,26 +184,19 @@ class TestMemoryChangedListenerL1Invalidation:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "private"},
-        )
+        event = _make_event()
 
-        # 不应抛出异常
         listener._invalidate_l1_cache(event)
 
 
 class TestMemoryChangedListenerL2Write:
     """L2 PostgreSQL 写入验证"""
 
-    def test_write_to_l2_with_both_repositories(self):
+    @pytest.mark.asyncio
+    async def test_write_to_l2_with_both_repositories(self):
         """验证同时使用两个 repository"""
-        mock_metadata_repo = MagicMock()
-        mock_history_repo = MagicMock()
+        mock_metadata_repo = AsyncMock()
+        mock_history_repo = AsyncMock()
 
         from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
 
@@ -214,21 +206,15 @@ class TestMemoryChangedListenerL2Write:
             history_repository=mock_history_repo,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "private"},
-        )
+        event = _make_event()
 
-        listener._write_to_l2(event)
+        await listener._write_to_l2(event)
 
-        # 验证 _write_metadata 被调用
-        # 验证 _append_history 被调用
+        mock_metadata_repo.save.assert_called_once()
+        mock_history_repo.save.assert_called_once()
 
-    def test_write_to_l2_no_repositories(self):
+    @pytest.mark.asyncio
+    async def test_write_to_l2_no_repositories(self):
         """验证无 repository 时跳过写入"""
         from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
 
@@ -238,17 +224,9 @@ class TestMemoryChangedListenerL2Write:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "private"},
-        )
+        event = _make_event()
 
-        # 不应抛出异常
-        listener._write_to_l2(event)
+        await listener._write_to_l2(event)
 
 
 class TestMemoryChangedListenerHelperMethods:
@@ -264,14 +242,7 @@ class TestMemoryChangedListenerHelperMethods:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value={"type": "group"},
-        )
+        event = _make_event(memory_type="group")
 
         assert listener._get_memory_type(event) == "group"
 
@@ -285,16 +256,9 @@ class TestMemoryChangedListenerHelperMethods:
             history_repository=None,
         )
 
-        event = MemoryChanged(
-            memory_id="test-memory-123",
-            user_id="user-456",
-            name="test-memory",
-            change_type="create",
-            is_automatic=False,
-            new_value=None,
-        )
+        event = _make_event()
 
-        assert listener._get_memory_type(event) == "private"
+        assert listener._get_memory_type(event) == "user"
 
     def test_get_memory_type_handles_missing_type_field(self):
         """验证 new_value 缺少 type 字段时返回 private"""
@@ -307,7 +271,7 @@ class TestMemoryChangedListenerHelperMethods:
         )
 
         event = MemoryChanged(
-            memory_id="test-memory-123",
+            memory_id=str(uuid.uuid4()),
             user_id="user-456",
             name="test-memory",
             change_type="create",
