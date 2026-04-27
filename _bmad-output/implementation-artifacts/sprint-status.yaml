@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-26
+last_updated: 2026-04-27
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -88,10 +88,10 @@ development_status:
   1-14b-autonomous-invocation-route: done
   1-14c-autonomous-invocation-execute: done
   1-15a-externalized-memory-context-compression: done
-  1-15b-externalized-memory-five-layer-storage: in-progress
+  1-15b-externalized-memory-five-layer-storage: in-progress  # TODO: L3/L4/L5 由后续 Story 实现
   # 价值组 6: MVP 关键机制增强
-  1-17-udmr-basic-routing: ready-for-dev
-  1-18a-prefect-workflow-integration: backlog
+  1-17-udmr-basic-routing: done
+  1-18a-prefect-workflow-integration: ready-for-dev
   1-18b-langgraph-agent-orchestration: backlog
   1-19-cost-metrics-basic: backlog
   epic-1-retrospective: optional
@@ -154,7 +154,7 @@ development_status:
   # ===========================================================================
   6-1-blm-first-two-phases: backlog
   6-2-market-insight-six-substeps: backlog
-  6-3-checkpoint-snapshot-creation: backlog
+  6-3-checkpoint-snapshot-creation: backlog  # TODO: 实现 1.15b L3(Qdrant)/L4(MinIO) 触发
   6-4-json-chain-of-thought-output: backlog
   6-5a-markdown-report-basic: backlog
   6-5b-pdf-report-citation-index: backlog
@@ -232,7 +232,7 @@ development_status:
   12-2-query-routing-engine: backlog
   12-3-summary-quality-evaluation: backlog
   12-4-auto-remediation-mechanism: backlog
-  12-5-knowledge-graph-construction-graphrag: backlog
+  12-5-knowledge-graph-construction-graphrag: backlog  # TODO: 基于 1.17 EntityExtractorService 构建知识图谱
   12-6-entity-relationship-query: backlog
   epic-12-retrospective: optional
 
