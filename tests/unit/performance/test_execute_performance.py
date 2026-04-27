@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.domain.services.execute_service import ExecuteService
+from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
 
 
@@ -100,9 +100,9 @@ class TestExecutePerformanceBenchmarks:
         adapter.reset_all_containers()
 
     @pytest.fixture
-    def execute_service(self, sandbox: DockerSandboxAdapter) -> ExecuteService:
-        """Create ExecuteService with sandbox for benchmarking."""
-        return ExecuteService(sandbox=sandbox, snapshot_repo=None)
+    def execute_service(self, sandbox: DockerSandboxAdapter) -> AutoExecuteService:
+        """Create AutoExecuteService with sandbox for benchmarking."""
+        return AutoExecuteService(sandbox=sandbox, snapshot_repo=None)
 
     def test_sandbox_startup_latency(self, sandbox: DockerSandboxAdapter) -> None:
         """Benchmark sandbox container startup latency.
@@ -174,19 +174,19 @@ class TestExecutePerformanceBenchmarks:
         assert p95_time < 100.0, f"Sandbox startup P95 too high: {p95_time:.4f}ms (requirement: <100ms)"
 
     @pytest.mark.asyncio
-    async def test_execute_service_execution_latency(self, execute_service: ExecuteService) -> None:
-        """Benchmark ExecuteService task execution latency.
+    async def test_execute_service_execution_latency(self, execute_service: AutoExecuteService) -> None:
+        """Benchmark AutoExecuteService task execution latency.
 
         AC-5: P95 execution latency should be < 200ms (includes sandbox + snapshot).
         """
-        from src.domain.events.route_events import Routed
+        from src.domain.events.auto_route_events import AutoRouted
 
-        event = Routed(
+        event = AutoRouted(
             route_type="hash",
             session_id=f"exec-latency-{uuid.uuid4().hex[:8]}",
             task_context={
                 "code": "print('hello')",
-                "business_event_type": "ToolExecuted",
+                "business_event_type": "ToolAutoExecuted",
             },
             route_target="docker-sandbox",
             route_score=0.95,
@@ -216,7 +216,7 @@ class TestExecutePerformanceBenchmarks:
         p95_time = sorted_times[p95_index]
         throughput = iterations / total_time if total_time > 0 else 0
 
-        print("\n  ExecuteService Execution Latency:")
+        print("\n  AutoExecuteService Execution Latency:")
         print(f"    Iterations: {iterations}")
         print(f"    Total time: {total_time:.4f}s")
         print(f"    Avg time: {avg_time:.4f}ms")
@@ -227,7 +227,7 @@ class TestExecutePerformanceBenchmarks:
         assert p95_time < 200.0, f"Execution P95 too high: {p95_time:.4f}ms (requirement: <200ms)"
 
     @pytest.mark.asyncio
-    async def test_snapshot_creation_latency(self, execute_service: ExecuteService) -> None:
+    async def test_snapshot_creation_latency(self, execute_service: AutoExecuteService) -> None:
         """Benchmark CheckpointSnapshot creation latency.
 
         AC-5: P95 snapshot latency should be < 50ms.
@@ -274,20 +274,20 @@ class TestExecutePerformanceBenchmarks:
         assert p95_time < 50.0, f"Snapshot P95 too high: {p95_time:.4f}ms (requirement: <50ms)"
 
     @pytest.mark.asyncio
-    async def test_execution_throughput_100_per_second(self, execute_service: ExecuteService) -> None:
+    async def test_execution_throughput_100_per_second(self, execute_service: AutoExecuteService) -> None:
         """Benchmark execute throughput.
 
         AC-5: System should support 100 executions/second.
         """
-        from src.domain.events.route_events import Routed
+        from src.domain.events.auto_route_events import AutoRouted
 
         async def process_event(idx: int) -> None:
-            event = Routed(
+            event = AutoRouted(
                 route_type="hash",
                 session_id=f"throughput-{uuid.uuid4().hex[:8]}",
                 task_context={
                     "code": "print('hello')",
-                    "business_event_type": "ToolExecuted",
+                    "business_event_type": "ToolAutoExecuted",
                 },
                 route_target="docker-sandbox",
                 route_score=0.95,
@@ -315,20 +315,20 @@ class TestExecutePerformanceBenchmarks:
         assert throughput >= 100, f"Throughput too low: {throughput:.0f}/sec (requirement: >=100/sec)"
 
     @pytest.mark.asyncio
-    async def test_execution_idempotency(self, execute_service: ExecuteService) -> None:
+    async def test_execution_idempotency(self, execute_service: AutoExecuteService) -> None:
         """Benchmark execution idempotency - same input produces same output.
 
         AC-5: Execution should be idempotent (10 consecutive runs produce same result).
         """
-        from src.domain.events.route_events import Routed
+        from src.domain.events.auto_route_events import AutoRouted
 
         session_id = f"idempotent-{uuid.uuid4().hex[:8]}"
-        event = Routed(
+        event = AutoRouted(
             route_type="hash",
             session_id=session_id,
             task_context={
                 "code": "x = 1 + 1; result = x",
-                "business_event_type": "ToolExecuted",
+                "business_event_type": "ToolAutoExecuted",
             },
             route_target="docker-sandbox",
             route_score=0.95,
@@ -358,22 +358,22 @@ class TestExecutePerformanceBenchmarks:
 
     @pytest.mark.asyncio
     async def test_executed_event_serialization_latency(self) -> None:
-        """Benchmark Executed event serialization.
+        """Benchmark AutoExecuted event serialization.
 
         Should be fast (< 0.5ms per event).
         """
-        from src.domain.events.execute_events import Executed
+        from src.domain.events.auto_execute_events import AutoExecuted
 
-        event = Executed(
+        event = AutoExecuted(
             session_id=f"serial-{uuid.uuid4().hex[:8]}",
             task_context={
                 "code": "print('test')",
-                "business_event_type": "ToolExecuted",
+                "business_event_type": "ToolAutoExecuted",
             },
             execution_result={"status": "completed", "output": "test"},
             cost_estimate=0.01,
             latency_ms=50.0,
-            business_event_type="ToolExecuted",
+            business_event_type="ToolAutoExecuted",
             route_target="docker-sandbox",
             route_score=0.95,
         )
@@ -383,7 +383,7 @@ class TestExecutePerformanceBenchmarks:
 
         result = benchmark_operation(serialize_event, iterations=10000, warmup=100)
 
-        print("\n  Executed Event Serialization:")
+        print("\n  AutoExecuted Event Serialization:")
         print(f"    Iterations: {result.iterations}")
         print(f"    Avg time: {result.avg_time_ms:.4f}ms")
         print(f"    P95 time: {result.p95_ms:.4f}ms")

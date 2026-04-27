@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 import pytest
 
+from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
-from src.domain.events.trigger_events import Triggered
-from src.domain.services.trigger_service import TriggerService
+from src.domain.services.auto_trigger_service import AutoTriggerService
 
 
 @dataclass
@@ -91,11 +91,11 @@ class TestTriggerPerformanceBenchmarks:
     """
 
     @pytest.fixture
-    def trigger_service(self) -> TriggerService:
-        """Create TriggerService with no-op publisher for benchmarking."""
-        return TriggerService(publisher=None)
+    def trigger_service(self) -> AutoTriggerService:
+        """Create AutoTriggerService with no-op publisher for benchmarking."""
+        return AutoTriggerService(publisher=None)
 
-    def test_trigger_context_creation_latency(self, trigger_service: TriggerService) -> None:
+    def test_trigger_context_creation_latency(self, trigger_service: AutoTriggerService) -> None:
         """Benchmark TriggerContext creation from domain event.
 
         AC-5: Trigger context extraction should be < 1ms per event.
@@ -127,11 +127,11 @@ class TestTriggerPerformanceBenchmarks:
 
     @pytest.mark.asyncio
     async def test_trigger_service_event_processing_latency(self) -> None:
-        """Benchmark TriggerService event processing end-to-end.
+        """Benchmark AutoTriggerService event processing end-to-end.
 
         AC-5: P95 trigger latency should be < 10ms.
         """
-        service = TriggerService(publisher=None)
+        service = AutoTriggerService(publisher=None)
 
         event = DomainEvent(
             event_type="ToolExecuted",
@@ -143,7 +143,7 @@ class TestTriggerPerformanceBenchmarks:
             },
         )
 
-        async def process_event() -> Triggered | None:
+        async def process_event() -> AutoTriggered | None:
             return await service.on_domain_event(event)
 
         # Run benchmark
@@ -171,7 +171,7 @@ class TestTriggerPerformanceBenchmarks:
         p95_time = sorted_times[p95_index]
         throughput = iterations / total_time if total_time > 0 else 0
 
-        print("\n  TriggerService Event Processing:")
+        print("\n  AutoTriggerService Event Processing:")
         print(f"    Iterations: {iterations}")
         print(f"    Total time: {total_time:.4f}s")
         print(f"    Avg time: {avg_time:.4f}ms")
@@ -187,7 +187,7 @@ class TestTriggerPerformanceBenchmarks:
 
         AC-5: System should support 1000 events/second.
         """
-        service = TriggerService(publisher=None)
+        service = AutoTriggerService(publisher=None)
 
         event = DomainEvent(
             event_type="AgentDecided",
@@ -198,7 +198,7 @@ class TestTriggerPerformanceBenchmarks:
             },
         )
 
-        async def process_event() -> Triggered | None:
+        async def process_event() -> AutoTriggered | None:
             return await service.on_domain_event(event)
 
         # Run for 1 second and count events
@@ -222,11 +222,11 @@ class TestTriggerPerformanceBenchmarks:
         assert throughput >= 1000, f"Throughput too low: {throughput:.0f}/sec (requirement: >=1000/sec)"
 
     def test_triggered_event_serialization_latency(self) -> None:
-        """Benchmark Triggered event serialization.
+        """Benchmark AutoTriggered event serialization.
 
         Should be very fast (< 0.5ms per event).
         """
-        event = Triggered(
+        event = AutoTriggered(
             trigger_type="domain_event",
             session_id="session-serialization-test",
             agent_id="agent-004",
@@ -244,7 +244,7 @@ class TestTriggerPerformanceBenchmarks:
 
         result = benchmark_operation(serialize_event, iterations=10000, warmup=100)
 
-        print("\n  Triggered Event Serialization:")
+        print("\n  AutoTriggered Event Serialization:")
         print(f"    Iterations: {result.iterations}")
         print(f"    Avg time: {result.avg_time_ms:.4f}ms")
         print(f"    P95 time: {result.p95_ms:.4f}ms")
@@ -253,11 +253,11 @@ class TestTriggerPerformanceBenchmarks:
         assert result.avg_time_ms < 0.5, f"Serialization too slow: {result.avg_time_ms:.4f}ms"
 
     def test_triggered_event_deserialization_latency(self) -> None:
-        """Benchmark Triggered event deserialization.
+        """Benchmark AutoTriggered event deserialization.
 
         Should be fast (< 1ms per event).
         """
-        original = Triggered(
+        original = AutoTriggered(
             trigger_type="heartbeat",
             session_id="session-deserialization-test",
             task_context={
@@ -272,12 +272,12 @@ class TestTriggerPerformanceBenchmarks:
 
         serialized = original.to_dict()
 
-        def deserialize_event() -> Triggered:
-            return Triggered.from_dict(serialized)  # type: ignore[return-value]
+        def deserialize_event() -> AutoTriggered:
+            return AutoTriggered.from_dict(serialized)  # type: ignore[return-value]
 
         result = benchmark_operation(deserialize_event, iterations=10000, warmup=100)
 
-        print("\n  Triggered Event Deserialization:")
+        print("\n  AutoTriggered Event Deserialization:")
         print(f"    Iterations: {result.iterations}")
         print(f"    Avg time: {result.avg_time_ms:.4f}ms")
         print(f"    P95 time: {result.p95_ms:.4f}ms")

@@ -14,18 +14,19 @@ class TestExecuteArchitecture:
     """
 
     def test_execute_service_in_domain_layer(self) -> None:
-        """ExecuteService must be in domain layer."""
-        execute_service_path = Path("src/domain/services/execute_service.py")
+        """AutoExecuteService must be in domain layer."""
+        execute_service_path = Path("src/domain/services/auto_execute_service.py")
 
-        assert execute_service_path.exists(), "ExecuteService must exist in domain/services/"
+        assert execute_service_path.exists(), "AutoExecuteService must exist in domain/services/"
 
         content = execute_service_path.read_text()
 
         # Should not import from infrastructure directly
-        assert "from src.infrastructure" not in content, "ExecuteService must not import infrastructure directly - use ports"
+        msg = "AutoExecuteService must not import infrastructure directly - use ports"
+        assert "from src.infrastructure" not in content, msg
         assert (
             "from src.interfaces" not in content or "Protocol" in content
-        ), "ExecuteService must only import interfaces.Protocol for ports"
+        ), "AutoExecuteService must only import interfaces.Protocol for ports"
 
     def test_sandbox_executor_port_in_interfaces_layer(self) -> None:
         """SandboxExecutor port must be in interfaces layer."""
@@ -40,10 +41,10 @@ class TestExecuteArchitecture:
         assert adapter_path.exists(), "DockerSandboxAdapter must exist in infrastructure/sandbox/"
 
     def test_executed_event_in_domain_events(self) -> None:
-        """Executed event must be in domain/events layer."""
-        event_path = Path("src/domain/events/execute_events.py")
+        """AutoExecuted event must be in domain/events layer."""
+        event_path = Path("src/domain/events/auto_execute_events.py")
 
-        assert event_path.exists(), "Executed event must exist in domain/events/"
+        assert event_path.exists(), "AutoExecuted event must exist in domain/events/"
 
     def test_checkpoint_snapshot_in_domain_entities(self) -> None:
         """CheckpointSnapshot must be in domain/entities layer."""
@@ -55,8 +56,8 @@ class TestExecuteArchitecture:
         """Verify no circular dependencies between execute mechanism files."""
         # Check that domain layer files don't import from infrastructure
         domain_files = [
-            "src/domain/services/execute_service.py",
-            "src/domain/events/execute_events.py",
+            "src/domain/services/auto_execute_service.py",
+            "src/domain/events/auto_execute_events.py",
             "src/domain/entities/checkpoint_snapshot.py",
         ]
 

@@ -9,23 +9,23 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.domain.events.execute_events import Executed
-from src.domain.events.route_events import Routed
-from src.domain.services.execute_service import ExecuteService
+from src.domain.events.auto_execute_events import AutoExecuted
+from src.domain.events.auto_route_events import AutoRouted
+from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
-from src.interfaces.event_listeners.execute_completed_listener import ExecuteCompletedListener
+from src.interfaces.event_listeners.auto_execute_completed_listener import AutoExecuteCompletedListener
 
 
 class TestExecuteIntegration:
     """End-to-end integration tests for execute mechanism.
 
     Tests the complete flow:
-    1. Routed event arrives at ExecuteService
-    2. ExecuteService starts Docker sandbox for session
-    3. ExecuteService executes task in sandbox
-    4. ExecuteService creates CheckpointSnapshot
-    5. ExecuteService publishes Executed event
-    6. ExecuteCompletedListener publishes downstream domain event
+    1. AutoRouted event arrives at AutoExecuteService
+    2. AutoExecuteService starts Docker sandbox for session
+    3. AutoExecuteService executes task in sandbox
+    4. AutoExecuteService creates CheckpointSnapshot
+    5. AutoExecuteService publishes AutoExecuted event
+    6. AutoExecuteCompletedListener publishes downstream domain event
     """
 
     @pytest.fixture
@@ -41,24 +41,24 @@ class TestExecuteIntegration:
         adapter.reset_all_containers()
 
     @pytest.fixture
-    def execute_service(self, sandbox: DockerSandboxAdapter) -> ExecuteService:
-        """Create ExecuteService with sandbox."""
-        return ExecuteService(sandbox=sandbox, snapshot_repo=None)
+    def execute_service(self, sandbox: DockerSandboxAdapter) -> AutoExecuteService:
+        """Create AutoExecuteService with sandbox."""
+        return AutoExecuteService(sandbox=sandbox, snapshot_repo=None)
 
     @pytest.fixture
-    def execute_listener(self, mock_publisher: AsyncMock) -> ExecuteCompletedListener:
-        """Create ExecuteCompletedListener with mock publisher."""
-        return ExecuteCompletedListener(publisher=mock_publisher)
+    def execute_listener(self, mock_publisher: AsyncMock) -> AutoExecuteCompletedListener:
+        """Create AutoExecuteCompletedListener with mock publisher."""
+        return AutoExecuteCompletedListener(publisher=mock_publisher)
 
     @pytest.mark.asyncio
     async def test_routed_to_executed_flow(
         self,
-        execute_service: ExecuteService,
+        execute_service: AutoExecuteService,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify Routed event flows through ExecuteService to Executed event."""
-        # Create a Routed event
-        routed_event = Routed(
+        """Verify AutoRouted event flows through AutoExecuteService to AutoExecuted event."""
+        # Create a AutoRouted event
+        routed_event = AutoRouted(
             route_type="hash",
             session_id=f"integration-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -72,9 +72,9 @@ class TestExecuteIntegration:
         # Process through execute service
         executed = await execute_service.on_routed_event(routed_event)
 
-        # Verify Executed event was created
+        # Verify AutoExecuted event was created
         assert executed is not None
-        assert isinstance(executed, Executed)
+        assert isinstance(executed, AutoExecuted)
         assert executed.session_id == routed_event.session_id
         assert executed.business_event_type == "ToolExecuted"
         assert executed.route_target == "docker-sandbox"
@@ -127,13 +127,13 @@ class TestExecuteIntegration:
     @pytest.mark.asyncio
     async def test_executed_to_downstream_event_flow(
         self,
-        execute_service: ExecuteService,
-        execute_listener: ExecuteCompletedListener,
+        execute_service: AutoExecuteService,
+        execute_listener: AutoExecuteCompletedListener,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify Executed event triggers downstream domain event publication."""
-        # Create a Routed event
-        routed_event = Routed(
+        """Verify AutoExecuted event triggers downstream domain event publication."""
+        # Create a AutoRouted event
+        routed_event = AutoRouted(
             route_type="hash",
             session_id=f"downstream-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -161,12 +161,12 @@ class TestExecuteIntegration:
     @pytest.mark.asyncio
     async def test_executed_with_document_processed_type(
         self,
-        execute_service: ExecuteService,
-        execute_listener: ExecuteCompletedListener,
+        execute_service: AutoExecuteService,
+        execute_listener: AutoExecuteCompletedListener,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify Executed with DocumentProcessed type triggers DocumentProcessed domain event."""
-        routed_event = Routed(
+        """Verify AutoExecuted with DocumentProcessed type triggers DocumentProcessed domain event."""
+        routed_event = AutoRouted(
             route_type="semantic",
             session_id=f"doc-process-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -192,12 +192,12 @@ class TestExecuteIntegration:
     @pytest.mark.asyncio
     async def test_executed_with_agent_decided_type(
         self,
-        execute_service: ExecuteService,
-        execute_listener: ExecuteCompletedListener,
+        execute_service: AutoExecuteService,
+        execute_listener: AutoExecuteCompletedListener,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify Executed with AgentDecided type triggers AgentDecided domain event."""
-        routed_event = Routed(
+        """Verify AutoExecuted with AgentDecided type triggers AgentDecided domain event."""
+        routed_event = AutoRouted(
             route_type="mixed",
             session_id=f"agent-decided-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -223,13 +223,13 @@ class TestExecuteIntegration:
     @pytest.mark.asyncio
     async def test_execute_without_sandbox(
         self,
-        execute_service: ExecuteService,
+        execute_service: AutoExecuteService,
     ) -> None:
-        """Verify ExecuteService works without sandbox (returns result with status)."""
+        """Verify AutoExecuteService works without sandbox (returns result with status)."""
         # Create service without sandbox
-        service_no_sandbox = ExecuteService(sandbox=None, snapshot_repo=None)
+        service_no_sandbox = AutoExecuteService(sandbox=None, snapshot_repo=None)
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             route_type="hash",
             session_id=f"no-sandbox-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -242,7 +242,7 @@ class TestExecuteIntegration:
 
         executed = await service_no_sandbox.on_routed_event(routed_event)
 
-        # Should still return an Executed event
+        # Should still return an AutoExecuted event
         assert executed is not None
         assert executed.session_id == routed_event.session_id
 
@@ -251,7 +251,7 @@ class TestExecuteIntegration:
         self,
         sandbox: DockerSandboxAdapter,
     ) -> None:
-        """Verify ExecuteService creates CheckpointSnapshot when repo is configured."""
+        """Verify AutoExecuteService creates CheckpointSnapshot when repo is configured."""
         # Create mock snapshot repo
         snapshots: list[CheckpointSnapshot] = []
 
@@ -265,9 +265,9 @@ class TestExecuteIntegration:
             async def delete(self, session_id: str) -> None:
                 pass
 
-        service = ExecuteService(sandbox=sandbox, snapshot_repo=MockSnapshotRepo())
+        service = AutoExecuteService(sandbox=sandbox, snapshot_repo=MockSnapshotRepo())
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             route_type="hash",
             session_id=f"snapshot-test-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -312,7 +312,7 @@ class TestExecuteIntegration:
             async def delete(self, session_id: str) -> None:
                 pass
 
-        service = ExecuteService(sandbox=sandbox, snapshot_repo=MockSnapshotRepo())
+        service = AutoExecuteService(sandbox=sandbox, snapshot_repo=MockSnapshotRepo())
 
         restored = await service.restore_snapshot(session_id)
 
@@ -328,11 +328,11 @@ class TestExecuteIntegration:
         """Verify concurrent execution requests for same session are handled correctly."""
         session_id = f"concurrent-{uuid.uuid4().hex[:8]}"
 
-        service = ExecuteService(sandbox=sandbox, snapshot_repo=None)
+        service = AutoExecuteService(sandbox=sandbox, snapshot_repo=None)
 
         # Create multiple routed events for same session
         events = [
-            Routed(
+            AutoRouted(
                 route_type="hash",
                 session_id=session_id,
                 task_context={
@@ -356,10 +356,10 @@ class TestExecuteIntegration:
     @pytest.mark.asyncio
     async def test_executed_event_contains_full_context(
         self,
-        execute_service: ExecuteService,
+        execute_service: AutoExecuteService,
     ) -> None:
-        """Verify Executed event contains all required fields from execution."""
-        routed_event = Routed(
+        """Verify AutoExecuted event contains all required fields from execution."""
+        routed_event = AutoRouted(
             route_type="hash",
             session_id=f"context-{uuid.uuid4().hex[:8]}",
             task_context={
@@ -390,14 +390,14 @@ class TestExecuteIntegration:
     async def test_execution_creates_new_container_for_new_session(
         self,
         sandbox: DockerSandboxAdapter,
-        execute_service: ExecuteService,
+        execute_service: AutoExecuteService,
     ) -> None:
         """Verify new session creates new container, existing session reuses container."""
         session_1 = f"new-session-{uuid.uuid4().hex[:8]}"
         session_2 = f"new-session-{uuid.uuid4().hex[:8]}"
 
         # First execution - should start new container
-        event1 = Routed(
+        event1 = AutoRouted(
             route_type="hash",
             session_id=session_1,
             task_context={"code": "task1", "business_event_type": "ToolExecuted"},
@@ -408,7 +408,7 @@ class TestExecuteIntegration:
         assert result1 is not None
 
         # Second session - should also start new container
-        event2 = Routed(
+        event2 = AutoRouted(
             route_type="hash",
             session_id=session_2,
             task_context={"code": "task2", "business_event_type": "ToolExecuted"},

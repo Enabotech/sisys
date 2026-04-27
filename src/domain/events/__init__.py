@@ -2,6 +2,8 @@
 
 from .agent_events import AgentDecided
 from .audit_events import AuditActionType, AuditEvent
+from .auto_route_events import AutoRouted
+from .auto_trigger_events import AutoTriggered
 from .base import DomainEvent
 from .checkpoint_events import CheckpointReached, CheckpointRecovered
 from .correction_events import CorrectionApproved
@@ -12,10 +14,8 @@ from .isolation_events import IsolationLevelSwitched
 from .memory_events import MemoryChanged
 from .planning_events import StrategicDeviationWarning
 from .publisher import EventPublisher
-from .route_events import Routed
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
-from .trigger_events import Triggered
 
 __all__ = [
     "DomainEvent",
@@ -29,8 +29,8 @@ __all__ = [
     "HeartbeatTriggered",
     "IsolationLevelSwitched",
     "RoutingDecided",
-    "Routed",
-    "Triggered",
+    "AutoRouted",
+    "AutoTriggered",
     "EventPublisher",
     "DeviationLevel",
     "DeviationType",

@@ -1,4 +1,4 @@
-"""TriggerContext value object — extracted context from domain/heartbeat events."""
+"""AutoTriggerContext value object — extracted context from domain/heartbeat events."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class TriggerContext:
-    """Context extracted from trigger events for downstream route/execute stages.
+class AutoTriggerContext:
+    """Context extracted from auto-trigger events for downstream auto-route/auto-execute stages.
 
-    Used by TriggerService to pass session_id, agent_id, and task context to Story 1.14b (route).
+    Used by AutoTriggerService to pass session_id, agent_id, and task context to Story 1.14b (auto-route).
     """
 
     session_id: str
@@ -34,8 +34,8 @@ class TriggerContext:
         event_type: str,
         payload: dict[str, Any],
         event_id: str | None = None,
-    ) -> TriggerContext:
-        """Factory: extract TriggerContext from a domain event payload.
+    ) -> AutoTriggerContext:
+        """Factory: extract AutoTriggerContext from a domain event payload.
 
         Args:
             event_type: The domain event type (e.g., "DocumentProcessed")
@@ -43,7 +43,7 @@ class TriggerContext:
             event_id: Optional event ID
 
         Returns:
-            TriggerContext with extracted fields
+            AutoTriggerContext with extracted fields
         """
         # Extract session_id from various possible locations
         session_id = (
@@ -93,8 +93,8 @@ class TriggerContext:
         wake_reason: str = "",
         todo_items: tuple[str, ...] | None = None,
         cost_budget: float = 0.0,
-    ) -> TriggerContext:
-        """Factory: extract TriggerContext from a heartbeat event.
+    ) -> AutoTriggerContext:
+        """Factory: extract AutoTriggerContext from a heartbeat event.
 
         Args:
             heartbeat_id: Unique heartbeat identifier
@@ -103,7 +103,7 @@ class TriggerContext:
             cost_budget: Cost budget cap
 
         Returns:
-            TriggerContext derived from heartbeat
+            AutoTriggerContext derived from heartbeat
         """
         return cls(
             session_id="heartbeat-scheduler",

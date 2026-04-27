@@ -1,7 +1,7 @@
-"""TriggerEventListener — Event listener adapter for trigger mechanism.
+"""AutoTriggerListener — Event listener adapter for auto-trigger mechanism.
 
 Listens to domain events from the event bus and passes them
-to TriggerService for processing.
+to AutoTriggerService for processing.
 
 Reference: Story 1.14a SDD规范定义
 Reference: or.md 系统公理一 (trigger→route→execute)
@@ -17,37 +17,37 @@ from collections.abc import Callable
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import EventListener
-from src.domain.services.trigger_service import TriggerService
+from src.domain.services.auto_trigger_service import AutoTriggerService
 
 logger = logging.getLogger(__name__)
 
 
-class TriggerEventListener:
-    """Event listener that bridges event bus to TriggerService.
+class AutoTriggerListener:
+    """Event listener that bridges event bus to AutoTriggerService.
 
     Registers handlers for domain events and delegates processing
-    to the TriggerService domain service.
+    to the AutoTriggerService domain service.
 
     This is the infrastructure adapter layer - it adapts the event bus
-    interface to the TriggerService interface while maintaining
+    interface to the AutoTriggerService interface while maintaining
     hexagonal architecture compliance (domain layer remains isolated).
 
     Implementation uses a background thread with its own event loop
-    to safely bridge synchronous event handlers to async TriggerService.
+    to safely bridge synchronous event handlers to async AutoTriggerService.
     """
 
     def __init__(
         self,
-        trigger_service: TriggerService,
+        auto_trigger_service: AutoTriggerService,
         event_listener: EventListener,
     ) -> None:
-        """Initialize TriggerEventListener.
+        """Initialize AutoTriggerListener.
 
         Args:
-            trigger_service: The domain service for processing triggers.
+            auto_trigger_service: The domain service for processing triggers.
             event_listener: The event listener for registering handlers.
         """
-        self._trigger_service = trigger_service
+        self._auto_trigger_service = auto_trigger_service
         self._event_listener = event_listener
         self._registered_event_types = [
             "DocumentProcessed",
@@ -71,7 +71,7 @@ class TriggerEventListener:
     def register_handlers(self) -> None:
         """Register handlers for all supported domain event types.
 
-        Each handler delegates to the appropriate TriggerService method
+        Each handler delegates to the appropriate AutoTriggerService method
         based on event type.
         """
         self._running = True
@@ -142,15 +142,15 @@ class TriggerEventListener:
                 from src.domain.events.heartbeat_events import HeartbeatTriggered
 
                 heartbeat_event = HeartbeatTriggered.from_dict(event.to_dict())
-                triggered = await self._trigger_service.on_heartbeat_event(heartbeat_event)
+                triggered = await self._auto_trigger_service.on_heartbeat_event(heartbeat_event)
             else:
                 # Standard domain event processing
-                triggered = await self._trigger_service.on_domain_event(event)
+                triggered = await self._auto_trigger_service.on_domain_event(event)
 
             if triggered is not None:
                 logger.info(f"Trigger processed: type={triggered.trigger_type}, " f"session_id={triggered.session_id}")
             else:
-                logger.warning(f"TriggerService returned None for event: {event_type}")
+                logger.warning(f"AutoTriggerService returned None for event: {event_type}")
 
         except Exception as e:
             logger.error(f"Failed to process event {event_type}: {e}")

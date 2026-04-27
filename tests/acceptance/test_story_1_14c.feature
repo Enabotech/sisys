@@ -76,19 +76,19 @@
 
   场景: AC-3 - 下游监听器发布 ToolExecuted
     假如 business_event_type 为 "ToolExecuted"
-    假如 ExecuteCompletedListener 收到 Executed 事件
+    假如 AutoExecuteCompletedListener 收到 Executed 事件
     当 监听器处理该事件
     那么 应该发布 ToolExecuted 领域事件
 
   场景: AC-3 - 下游监听器发布 DocumentProcessed
     假如 business_event_type 为 "DocumentProcessed"
-    假如 ExecuteCompletedListener 收到 Executed 事件
+    假如 AutoExecuteCompletedListener 收到 Executed 事件
     当 监听器处理该事件
     那么 应该发布 DocumentProcessed 领域事件
 
   场景: AC-3 - 下游监听器发布 AgentDecided
     假如 business_event_type 为 "AgentDecided"
-    假如 ExecuteCompletedListener 收到 Executed 事件
+    假如 AutoExecuteCompletedListener 收到 Executed 事件
     假如 监听器处理该事件
     那么 应该发布 AgentDecided 领域事件
 

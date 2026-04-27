@@ -1,4 +1,4 @@
-"""Unit tests for RouteService — domain service for routing decisions."""
+"""Unit tests for AutoRouteService — domain service for routing decisions."""
 
 from __future__ import annotations
 
@@ -6,18 +6,18 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.events.route_events import Routed
-from src.domain.events.trigger_events import Triggered
-from src.domain.services.route_service import (
+from src.domain.events.auto_route_events import AutoRouted
+from src.domain.events.auto_trigger_events import AutoTriggered
+from src.domain.services.auto_route_service import (
+    AutoRouteService,
     EventPublisherProtocol,
     HashRouterProtocol,
-    RouteService,
     SemanticRouterProtocol,
 )
 
 
-class TestRouteService:
-    """Test suite for RouteService."""
+class TestAutoRouteService:
+    """Test suite for AutoRouteService."""
 
     @pytest.fixture
     def mock_publisher(self) -> AsyncMock:
@@ -44,9 +44,9 @@ class TestRouteService:
         mock_publisher: AsyncMock,
         mock_hash_router: MagicMock,
         mock_semantic_router: AsyncMock,
-    ) -> RouteService:
-        """Create RouteService with mocks."""
-        return RouteService(
+    ) -> AutoRouteService:
+        """Create AutoRouteService with mocks."""
+        return AutoRouteService(
             publisher=mock_publisher,
             hash_router=mock_hash_router,
             semantic_router=mock_semantic_router,
@@ -55,12 +55,12 @@ class TestRouteService:
     @pytest.mark.asyncio
     async def test_on_triggered_event_publishes_routed(
         self,
-        route_service: RouteService,
+        route_service: AutoRouteService,
         mock_publisher: AsyncMock,
     ) -> None:
-        """RouteService should publish Routed event when receiving Triggered event."""
-        triggered = Triggered(
-            event_type="Triggered",
+        """AutoRouteService should publish AutoRouted event when receiving AutoTriggered event."""
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-123",
             task_context={"task_type": "financial_analysis"},
         )
@@ -68,7 +68,7 @@ class TestRouteService:
         result = await route_service.on_triggered_event(triggered)
 
         assert result is not None
-        assert isinstance(result, Routed)
+        assert isinstance(result, AutoRouted)
         assert result.session_id == "session-123"
         mock_publisher.publish.assert_called_once()
 
@@ -79,21 +79,21 @@ class TestRouteService:
         mock_semantic_router: AsyncMock,
         mock_publisher: AsyncMock,
     ) -> None:
-        """RouteService should use hash router for session consistency."""
+        """AutoRouteService should use hash router for session consistency."""
         hash_router = MagicMock(spec=HashRouterProtocol)
         hash_router.route.return_value = "node-A"
 
         semantic_router = AsyncMock(spec=SemanticRouterProtocol)
         semantic_router.route.return_value = ("", 0.0)  # No semantic routing
 
-        route_service = RouteService(
+        route_service = AutoRouteService(
             publisher=mock_publisher,
             hash_router=hash_router,
             semantic_router=semantic_router,
         )
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-hash-test",
             task_context={},
         )
@@ -112,21 +112,21 @@ class TestRouteService:
         mock_semantic_router: AsyncMock,
         mock_publisher: AsyncMock,
     ) -> None:
-        """RouteService should use semantic router when available."""
+        """AutoRouteService should use semantic router when available."""
         hash_router = MagicMock(spec=HashRouterProtocol)
         hash_router.route.return_value = "node-A"
 
         semantic_router = AsyncMock(spec=SemanticRouterProtocol)
         semantic_router.route.return_value = ("cfo-agent", 0.95)
 
-        route_service = RouteService(
+        route_service = AutoRouteService(
             publisher=mock_publisher,
             hash_router=hash_router,
             semantic_router=semantic_router,
         )
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-semantic-test",
             task_context={"task_type": "financial"},
         )
@@ -144,15 +144,15 @@ class TestRouteService:
         mock_hash_router: MagicMock,
         mock_semantic_router: AsyncMock,
     ) -> None:
-        """RouteService without publisher should not raise, just log warning."""
-        route_service = RouteService(
+        """AutoRouteService without publisher should not raise, just log warning."""
+        route_service = AutoRouteService(
             publisher=None,
             hash_router=mock_hash_router,
             semantic_router=mock_semantic_router,
         )
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-no-pub",
             task_context={},
         )
@@ -166,21 +166,21 @@ class TestRouteService:
         self,
         mock_publisher: AsyncMock,
     ) -> None:
-        """RouteService with both routers should prefer higher score (mixed mode)."""
+        """AutoRouteService with both routers should prefer higher score (mixed mode)."""
         hash_router = MagicMock(spec=HashRouterProtocol)
         hash_router.route.return_value = "node-A"
 
         semantic_router = AsyncMock(spec=SemanticRouterProtocol)
         semantic_router.route.return_value = ("cfo-agent", 0.95)  # Higher score
 
-        route_service = RouteService(
+        route_service = AutoRouteService(
             publisher=mock_publisher,
             hash_router=hash_router,
             semantic_router=semantic_router,
         )
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-mixed",
             task_context={"task_type": "financial"},
         )
@@ -196,11 +196,11 @@ class TestRouteService:
         self,
         mock_publisher: AsyncMock,
     ) -> None:
-        """RouteService without routers should use defaults."""
-        route_service = RouteService(publisher=mock_publisher)
+        """AutoRouteService without routers should use defaults."""
+        route_service = AutoRouteService(publisher=mock_publisher)
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-no-routers",
             task_context={},
         )
@@ -213,12 +213,12 @@ class TestRouteService:
         assert result.route_score == 0.0
 
     def test_route_service_initialization(self) -> None:
-        """RouteService should initialize with all dependencies."""
+        """AutoRouteService should initialize with all dependencies."""
         publisher = AsyncMock(spec=EventPublisherProtocol)
         hash_router = MagicMock(spec=HashRouterProtocol)
         semantic_router = AsyncMock(spec=SemanticRouterProtocol)
 
-        service = RouteService(
+        service = AutoRouteService(
             publisher=publisher,
             hash_router=hash_router,
             semantic_router=semantic_router,
@@ -229,8 +229,8 @@ class TestRouteService:
         assert service._semantic_router is semantic_router
 
     def test_route_service_with_none_dependencies(self) -> None:
-        """RouteService should handle None dependencies gracefully."""
-        service = RouteService(publisher=None)
+        """AutoRouteService should handle None dependencies gracefully."""
+        service = AutoRouteService(publisher=None)
 
         assert service._publisher is None
         assert service._hash_router is None
@@ -241,17 +241,17 @@ class TestRouteService:
         self,
         mock_hash_router: MagicMock,
     ) -> None:
-        """RouteService should propagate exception when publisher fails."""
+        """AutoRouteService should propagate exception when publisher fails."""
         mock_publisher = AsyncMock()
         mock_publisher.publish.side_effect = RuntimeError("Publisher failed")
 
-        route_service = RouteService(
+        route_service = AutoRouteService(
             publisher=mock_publisher,
             hash_router=mock_hash_router,
         )
 
-        triggered = Triggered(
-            event_type="Triggered",
+        triggered = AutoTriggered(
+            event_type="AutoTriggered",
             session_id="session-pub-error",
             task_context={},
         )

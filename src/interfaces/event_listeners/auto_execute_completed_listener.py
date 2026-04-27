@@ -1,6 +1,6 @@
-"""ExecuteCompletedListener — event listener that publishes downstream domain events.
+"""AutoExecuteCompletedListener — event listener that publishes downstream domain events.
 
-Listens for Executed events and publishes corresponding domain events
+Listens for AutoExecuted events and publishes corresponding domain events
 (DocumentProcessed/ToolExecuted/AgentDecided) based on business_event_type.
 """
 
@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
+from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
-from src.domain.events.execute_events import Executed
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +22,11 @@ class EventPublisherProtocol(Protocol):
         ...
 
 
-class ExecuteCompletedListener:
-    """Event listener that handles Executed events.
+class AutoExecuteCompletedListener:
+    """Event listener that handles AutoExecuted events.
 
     Responsible for:
-    - Listening to Executed events from ExecuteService
+    - Listening to AutoExecuted events from AutoExecuteService
     - Publishing corresponding domain events based on business_event_type:
       - "DocumentProcessed" -> DocumentProcessed event
       - "ToolExecuted" -> ToolExecuted event
@@ -36,23 +36,23 @@ class ExecuteCompletedListener:
     """
 
     def __init__(self, publisher: EventPublisherProtocol | None = None):
-        """Initialize ExecuteCompletedListener.
+        """Initialize AutoExecuteCompletedListener.
 
         Args:
             publisher: Event publisher port. None for standalone testing.
         """
         self._publisher = publisher
 
-    async def on_executed(self, event: Executed) -> None:
-        """Handle Executed event: publish downstream domain event.
+    async def on_executed(self, event: AutoExecuted) -> None:
+        """Handle AutoExecuted event: publish downstream domain event.
 
         Args:
-            event: Executed event from ExecuteService
+            event: AutoExecuted event from ExecuteService
         """
         business_event_type = event.business_event_type or "ToolExecuted"
 
         logger.info(
-            "Processing Executed event: session_id=%s business_event_type=%s",
+            "Processing AutoExecuted event: session_id=%s business_event_type=%s",
             event.session_id,
             business_event_type,
         )
@@ -68,7 +68,7 @@ class ExecuteCompletedListener:
             logger.warning("Unknown business_event_type: %s, defaulting to ToolExecuted", business_event_type)
             await self._publish_tool_executed(event)
 
-    async def _publish_document_processed(self, event: Executed) -> None:
+    async def _publish_document_processed(self, event: AutoExecuted) -> None:
         """Publish DocumentProcessed domain event."""
         from src.domain.events.document_events import DocumentProcessed
 
@@ -80,7 +80,7 @@ class ExecuteCompletedListener:
         await self._publish(domain_event, "domain:DocumentProcessed")
         logger.info("Published DocumentProcessed: document_id=%s", domain_event.document_id)
 
-    async def _publish_tool_executed(self, event: Executed) -> None:
+    async def _publish_tool_executed(self, event: AutoExecuted) -> None:
         """Publish ToolExecuted domain event."""
         from src.domain.events.tool_events import ToolExecuted
 
@@ -93,7 +93,7 @@ class ExecuteCompletedListener:
         await self._publish(domain_event, "domain:ToolExecuted")
         logger.info("Published ToolExecuted: tool_id=%s", domain_event.tool_id)
 
-    async def _publish_agent_decided(self, event: Executed) -> None:
+    async def _publish_agent_decided(self, event: AutoExecuted) -> None:
         """Publish AgentDecided domain event."""
         from src.domain.events.agent_events import AgentDecided
 

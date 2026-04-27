@@ -563,7 +563,7 @@ updateReason: '记忆系统重构 - 六层存储（L0 入口 + L5 可选）+ 单
 | Story 0.1-0.3 | Iteration 0（开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
 | Story 0.4-0.9/0.14-0.18 | Iteration 1（重构开发环境/CI/CD/测试框架） | 基础设施准备 | 技术使能 Story |
 | Story 1.13 | K8s 动态扩缩容 | NFR-SCALE-03（可扩展性） | NFR Story |
-| Story 1.14a/b/c | 自主调用循环（trigger/route/execute） | or.md 系统公理一 | or.md 追溯 |
+| Story 1.14a/b/c | 自主调用循环（auto-trigger/auto-route/auto-execute） | or.md 系统公理一 | or.md 追溯 |
 | Story 1.15a/b | 外部化记忆（上下文压缩/六层存储协同） | or.md 系统公理二 | or.md 追溯 |
 | Story 1.16 | 集成测试框架 | 测试基础设施 | 测试 Story |
 | Story 6.9 | 分析师视图 | UX 三视图（分析师） | UX Story |
@@ -757,7 +757,7 @@ Story 0.3 (测试框架搭建):
 - **Story 0.4-0.9/0.14-0.18**：Iteration 1（开发环境、CI/CD、测试框架），必须在 Story 1 前完成
 - **Story 0.2**：CI/CD 流水线是所有 Epic 的前置依赖（自动化构建、测试、部署）
 - **Story 1.13**：覆盖 NFR-SCALE-03（Agent 动态扩缩容，基于负载自动伸缩，响应时间<5 分钟）
-- **Story 1.14a/b/c**：覆盖 or.md 系统公理一（自主调用：trigger→route→execute）
+- **Story 1.14a/b/c**：覆盖 or.md 系统公理一（自主调用：auto-trigger→auto-route→auto-execute）
 - **Story 1.15a/b**：覆盖 or.md 系统公理二（外部化记忆：LLM 上下文=缓存，磁盘记忆=真相源）
 - **Story 1.16**：集成测试框架，支持所有 Epic 的集成测试和 E2E 测试
 - **Story 1.17**：覆盖 ARCH UDMR 基础路由（本地优先静态配置，成本优化基础）

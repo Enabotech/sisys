@@ -1,4 +1,4 @@
-"""RouteConfig — configuration for route mechanism."""
+"""AutoRouteConfig — configuration for auto-route mechanism."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 
 @dataclass
-class RouteConfig:
-    """Configuration for route mechanism.
+class AutoRouteConfig:
+    """Configuration for auto-route mechanism.
 
     Environment variables follow OtelConfig pattern (from_env() class method).
     """
@@ -20,18 +20,18 @@ class RouteConfig:
     cache_ttl_seconds: int = 86400  # 24 hours
 
     @classmethod
-    def from_env(cls) -> RouteConfig:
+    def from_env(cls) -> AutoRouteConfig:
         """Load configuration from environment variables.
 
         Environment variables:
-            ROUTE_ENABLED: Enable route mechanism (default: true)
+            ROUTE_ENABLED: Enable auto-route mechanism (default: true)
             ROUTE_TYPE: Routing type - hash/semantic/mixed (default: mixed)
             SEMANTIC_THRESHOLD: Minimum similarity for semantic routing (default: 0.7)
             HASH_RING_SIZE: Virtual nodes per physical node (default: 150)
             ROUTE_CACHE_TTL: Cache TTL in seconds (default: 86400)
 
         Returns:
-            RouteConfig instance with values from environment
+            AutoRouteConfig instance with values from environment
         """
         enabled_str = os.getenv("ROUTE_ENABLED", "true").lower()
         route_type_str = os.getenv("ROUTE_TYPE", "mixed").lower()

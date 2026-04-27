@@ -23,7 +23,7 @@
 | **哈希路由** | 基于 session_id 哈希一致性路由，保证同 session 任务路由到同一处理节点 | 相同 session_id 始终路由到同一节点（一致性保证 100%） |
 | **语义路由** | 基于任务语义相似度路由至最合适的 Agent 或工具 | 语义路由匹配度≥95%（基于人工标注测试集评估） |
 | **路由决策日志** | 记录路由决策过程，支持审计和成本追踪 | 路由决策日志 WORM 归档 |
-| **路由解耦** | route 机制与 trigger/execute 解耦，通过 Triggered 事件接收输入，通过 Routed 事件输出 | 六边形架构合规，无循环依赖 |
+| **路由解耦** | route 机制与 trigger/execute 解耦，通过 Triggered 事件接收输入，通过 AutoRouted 事件输出 | 六边形架构合规，无循环依赖 |
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 5: or.md 系统公理实现，Story 1.14b
 
@@ -40,23 +40,23 @@
 ### AC-1: 哈希路由机制
 
 **Given** Triggered 事件（包含 session_id 和任务上下文）
-**When** RouteService 接收 Triggered 事件
+**When** AutoRouteService 接收 Triggered 事件
 **Then** 基于 session_id 计算一致性哈希值
 **And** 根据哈希值选择目标处理节点或 Agent 实例
-**And** 发布 Routed 事件至下游 execute 机制（Story 1.14c）
+**And** 发布 AutoRouted 事件至下游 execute 机制（Story 1.14c）
 
 **验证标准/Validation Criteria:**
-- [ ] RouteService 事件监听器注册（`src/domain/services/route_service.py`）
+- [ ] AutoRouteService 事件监听器注册（`src/domain/services/auto_route_service.py`）
 - [ ] session_id 一致性哈希算法实现（murmurhash3 或类似）
 - [ ] 节点选择逻辑（哈希环/哈希槽）
-- [ ] Routed 事件定义与发布
+- [ ] AutoRouted 事件定义与发布
 - [ ] 相同 session_id 始终路由到同一节点（一致性保证 100%）
 - [ ] 路由决策延迟 P95<50ms
 
 ### AC-2: 语义路由机制
 
 **Given** Triggered 事件（包含 task_context 和任务类型）
-**When** RouteService 执行语义路由
+**When** AutoRouteService 执行语义路由
 **Then** 基于任务上下文计算语义嵌入向量
 **And** 计算与候选 Agent/工具的相似度
 **And** 选择相似度最高的候选者作为路由目标
@@ -71,7 +71,7 @@
 ### AC-3: 路由决策日志
 
 **Given** 路由决策完成
-**When** RouteService 发布 Routed 事件
+**When** AutoRouteService 发布 AutoRouted 事件
 **Then** 记录路由决策日志至 PostgreSQL（Story 1.5 已实现）
 **And** 日志包含：任务 ID、session_id、路由类型（hash/semantic）、路由目标、评分、时间戳、成本预估
 
@@ -85,21 +85,21 @@
 ### AC-4: 路由与 trigger/execute 解耦
 
 **Given** route 机制完成路由决策
-**When** 发布 Routed 事件
+**When** 发布 AutoRouted 事件
 **Then** route 阶段不直接调用 execute 阶段，通过事件总线解耦
 **And** 符合六边形架构依赖方向
 
 **验证标准/Validation Criteria:**
-- [ ] Routed 事件定义（`src/domain/events/route_events.py`）
-- [ ] RouteService 仅发布事件，不调用 execute
+- [ ] AutoRouted 事件定义（`src/domain/events/auto_route_events.py`）
+- [ ] AutoRouteService 仅发布事件，不调用 execute
 - [ ] 无循环依赖（六边形架构检测）
-- [ ] RouteService 位于领域层或应用层（不位于基础设施层直接调用）
-- [ ] 依赖倒置：RouteService 定义事件监听接口，基础设施层实现
+- [ ] AutoRouteService 位于领域层或应用层（不位于基础设施层直接调用）
+- [ ] 依赖倒置：AutoRouteService 定义事件监听接口，基础设施层实现
 
 ### AC-5: 路由性能要求
 
-**Given** Triggered 事件到达 RouteService
-**When** RouteService 处理路由决策
+**Given** Triggered 事件到达 AutoRouteService
+**When** AutoRouteService 处理路由决策
 **Then** 端到端路由决策延迟 P95<50ms
 **And** 吞吐量支持 1000 decisions/second
 
@@ -121,15 +121,15 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] Routed 事件定义（`src/domain/events/route_events.py`）
+- [ ] AutoRouted 事件定义（`src/domain/events/auto_route_events.py`）
   - 字段: event_id, session_id, task_context, route_type, route_target, route_score, timestamp
-  - 事件类型自动设置: `event_type = "Routed"`
+  - 事件类型自动设置: `event_type = "AutoRouted"`
 - [ ] Triggered 事件监听接口（接收来自 Story 1.14a 的 Triggered 事件）
 
 #### 数据模型 (Data Models)
-- [ ] RouteService 服务类（`src/domain/services/route_service.py`）
+- [ ] AutoRouteService 服务类（`src/domain/services/auto_route_service.py`）
   - 方法: `on_triggered_event(event)`, `hash_route(session_id) -> RouteTarget`, `semantic_route(task_context) -> RouteTarget`
-  - 职责: 接收 Triggered 事件、执行路由决策、发布 Routed 事件
+  - 职责: 接收 Triggered 事件、执行路由决策、发布 AutoRouted 事件
 - [ ] RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
   - 字段: log_id, task_id, session_id, route_type, route_target, route_score, cost_estimate, latency_ms, timestamp
   - Story 1.10 审计日志已实现，可复用或扩展
@@ -146,7 +146,7 @@
 - [ ] 语义路由缓存（如 Redis 缓存）
 
 #### 配置模型 (Configuration Models)
-- [ ] RouteConfig 配置（`src/infrastructure/config/route.py`）
+- [ ] AutoRouteConfig 配置（`src/infrastructure/config/route.py`）
   - 环境变量: `ROUTE_ENABLED`, `ROUTE_TYPE`（hash/semantic/mixed）, `SEMANTIC_THRESHOLD`, `HASH_RING_SIZE`
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
@@ -187,7 +187,7 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | RouteService | 哈希路由 | `test_route_service.py` | Task 1 |
+| **TDD 单元测试** | AutoRouteService | 哈希路由 | `test_auto_route_service.py` | Task 1 |
 | **TDD 单元测试** | HashRouter | 一致性哈希 | `test_hash_router.py` | Task 1 |
 | **TDD 单元测试** | SemanticRouter | 语义相似度 | `test_semantic_router.py` | Task 2 |
 | **TDD 单元测试** | SemanticRouter | 语义路由缓存（Redis mock） | `test_semantic_router_cache.py` | Task 2 |
@@ -240,7 +240,7 @@
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 哈希路由机制 | Task 1 | Subtask 1.1-1.3（HashRouter 红→绿→重构） | `test_hash_router.py` |
-| AC-1 | RouteService 事件监听 | Task 1 | Subtask 1.4-1.6（RouteService 红→绿→重构） | `test_route_service.py` |
+| AC-1 | AutoRouteService 事件监听 | Task 1 | Subtask 1.4-1.6（AutoRouteService 红→绿→重构） | `test_auto_route_service.py` |
 | AC-2 | 语义路由机制 | Task 2 | Subtask 2.1-2.3（SemanticRouter 红→绿→重构） | `test_semantic_router.py` |
 | AC-2 | 语义路由缓存 | Task 2 | Subtask 2.7-2.9（Redis mock 缓存测试） | `test_semantic_router_cache.py` |
 | AC-3 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
@@ -259,12 +259,12 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [ ] Subtask 0.1: 定义 Routed 领域事件 Schema（`src/domain/events/route_events.py`）
+- [ ] Subtask 0.1: 定义 AutoRouted 领域事件 Schema（`src/domain/events/auto_route_events.py`）
 - [ ] Subtask 0.2: 定义 RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
-- [ ] Subtask 0.3: 定义 RouteService 服务接口（`src/domain/services/route_service.py`）
+- [ ] Subtask 0.3: 定义 AutoRouteService 服务接口（`src/domain/services/auto_route_service.py`）
 - [ ] Subtask 0.4: 定义 HashRouter 路由算法（`src/infrastructure/routing/hash_router.py`）
 - [ ] Subtask 0.5: 定义 SemanticRouter 路由（`src/infrastructure/routing/semantic_router.py`）
-- [ ] Subtask 0.6: 定义 RouteConfig 配置模型（`src/infrastructure/config/route.py`）
+- [ ] Subtask 0.6: 定义 AutoRouteConfig 配置模型（`src/infrastructure/config/route.py`）
 - [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14b.feature`（Dev agent 创建）
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -274,11 +274,11 @@
 
 ---
 
-### Task 1: 哈希路由与 RouteService
+### Task 1: 哈希路由与 AutoRouteService
 
 **关联 AC:** AC-1
 
-> **职责边界:** Task 1 负责 HashRouter（一致性哈希算法）和 RouteService（事件监听、路由决策）
+> **职责边界:** Task 1 负责 HashRouter（一致性哈希算法）和 AutoRouteService（事件监听、路由决策）
 
 #### TDD 循环 [A]：HashRouter 一致性哈希
 
@@ -292,21 +292,21 @@
 - [ ] Subtask 1.2: 🟢 绿 — 实现 HashRouter（murmurhash3 哈希环）
 - [ ] Subtask 1.3: 🔄 重构 — 优化哈希环节点管理
 
-#### TDD 循环 [B]：RouteService 事件监听
+#### TDD 循环 [B]：AutoRouteService 事件监听
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/services/test_route_service.py`（验证 Triggered 事件监听） |
-| 🟢 绿 | 实现 `src/domain/services/route_service.py` - RouteService 类 |
+| 🔴 红 | 编写 `tests/unit/domain/services/test_auto_route_service.py`（验证 Triggered 事件监听） |
+| 🟢 绿 | 实现 `src/domain/services/auto_route_service.py` - AutoRouteService 类 |
 | 🔄 重构 | 添加类型注解和文档字符串 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 RouteService 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 RouteService（监听 Triggered 事件，执行哈希路由）
+- [ ] Subtask 1.4: 🔴 红 — 编写 AutoRouteService 失败测试
+- [ ] Subtask 1.5: 🟢 绿 — 实现 AutoRouteService（监听 Triggered 事件，执行哈希路由）
 - [ ] Subtask 1.6: 🔄 重构 — 优化事件处理逻辑
 
 **完成标准/Definition of Done:**
 - [ ] HashRouter 实现完成（一致性哈希环）
-- [ ] RouteService 实现完成
+- [ ] AutoRouteService 实现完成
 - [ ] 相同 session_id 始终路由到同一节点（一致性保证 100%）
 - [ ] TDD 循环全部通过
 
@@ -437,9 +437,9 @@
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
-| **RouteService 位于领域层** | 符合六边形架构，领域逻辑与技术解耦 | 需要依赖倒置 | ✅ 9/10 |
-| RouteService 位于应用层 | 实现简单 | 领域逻辑泄漏 | 6/10 |
-| RouteService 位于基础设施层 | 实现最简单 | 违反六边形架构 | 3/10 |
+| **AutoRouteService 位于领域层** | 符合六边形架构，领域逻辑与技术解耦 | 需要依赖倒置 | ✅ 9/10 |
+| AutoRouteService 位于应用层 | 实现简单 | 领域逻辑泄漏 | 6/10 |
+| AutoRouteService 位于基础设施层 | 实现最简单 | 违反六边形架构 | 3/10 |
 
 ### ADR: 路由类型选型决策
 
@@ -463,15 +463,15 @@
 
 | 路由类型 | 职责 | 位置 | 依赖 |
 |---------|------|------|------|
-| **语义路由（Story 1.14b）** | 基于任务语义将任务路由至目标 Agent/工具 | RouteService | Story 1.6（bge-m3） |
+| **语义路由（Story 1.14b）** | 基于任务语义将任务路由至目标 Agent/工具 | AutoRouteService | Story 1.6（bge-m3） |
 | **UDMR 路由（Story 1.17）** | 基于 L1/L2/L3 三层决策选择本地/云端模型 | UDMR 框架 | Story 1.14b（路由日志） |
 
 **数据流**:
 ```
 Triggered 事件（Story 1.14a）
     ↓
-RouteService（语义路由）→ 选择目标 Agent/工具
-    ↓ 发布 Routed 事件
+AutoRouteService（语义路由）→ 选择目标 Agent/工具
+    ↓ 发布 AutoRouted 事件
 UDMR（Story 1.17）→ 选择本地/云端模型
     ↓
 Execute（Story 1.14c）→ 执行任务
@@ -484,25 +484,25 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── events/
-│   │   │   └── route_events.py        # Routed 事件（新实现）
+│   │   │   └── auto_route_events.py        # AutoRouted 事件（新实现）
 │   │   ├── services/
-│   │   │   └── route_service.py       # RouteService（核心逻辑）
+│   │   │   └── auto_route_service.py       # AutoRouteService（核心逻辑）
 │   │   └── entities/
 │   │       └── routing_decision_log.py # RoutingDecisionLog（复用 Story 1.10）
 │   ├── infrastructure/
 │   │   ├── config/
-│   │   │   └── route.py              # RouteConfig 配置（新实现）
+│   │   │   └── route.py              # AutoRouteConfig 配置（新实现）
 │   │   └── routing/
 │   │       ├── hash_router.py         # HashRouter（一致性哈希）
 │   │       └── semantic_router.py     # SemanticRouter（语义路由）
 │   └── interfaces/
 │       └── event_listeners/
-│           └── route_listener.py       # 事件监听适配器（复用 Story 1.3）
+│           └── auto_route_listener.py       # 事件监听适配器（复用 Story 1.3）
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
 │   │   │   ├── services/
-│   │   │   │   └── test_route_service.py
+│   │   │   │   └── test_auto_route_service.py
 │   │   │   └── entities/
 │   │   │       └── test_routing_decision_log.py
 │   │   ├── infrastructure/
@@ -528,14 +528,14 @@ sisys/
 **来源:** [Story 1.14a: 自主调用循环 - trigger](./1-14a-autonomous-invocation-trigger.md)
 
 **关键学习/Key Learnings:**
-1. **配置模式复用** — OtelConfig.from_env() 模式应复用，RouteConfig 采用相同 `from_env()` 类方法
-2. **事件驱动解耦** — TriggerService 仅负责触发和上下文提取，不处理业务逻辑；RouteService 应遵循相同模式
+1. **配置模式复用** — OtelConfig.from_env() 模式应复用，AutoRouteConfig 采用相同 `from_env()` 类方法
+2. **事件驱动解耦** — TriggerService 仅负责触发和上下文提取，不处理业务逻辑；AutoRouteService 应遵循相同模式
 3. **六边形架构严格遵守** — Task 3 必须包含架构验证测试，确保无循环依赖
 4. **性能基准测试** — trigger 性能要求 P95<10ms，route 性能要求 P95<50ms，需独立基准测试
 
 **应用到本故事/Applied to This Story:**
-- [ ] RouteConfig 采用与 OtelConfig 相同的 `from_env()` 模式
-- [ ] RouteService 仅负责路由决策，不处理 execute 逻辑
+- [ ] AutoRouteConfig 采用与 OtelConfig 相同的 `from_env()` 模式
+- [ ] AutoRouteService 仅负责路由决策，不处理 execute 逻辑
 - [ ] Task 3 包含架构验证测试（六边形架构约束检测）
 - [ ] 性能基准测试验证 P95<50ms
 
@@ -595,13 +595,13 @@ sisys/
 
 **创建的文件/Created Files:**
 - `_bmad-output/implementation-artifacts/stories/1-14b-autonomous-invocation-route.md`
-- `src/domain/events/route_events.py` - Routed 事件
-- `src/domain/services/route_service.py` - RouteService
+- `src/domain/events/auto_route_events.py` - AutoRouted 事件
+- `src/domain/services/auto_route_service.py` - AutoRouteService
 - `src/domain/entities/routing_decision_log.py` - RoutingDecisionLog（复用 Story 1.10 模式）
-- `src/infrastructure/config/route.py` - RouteConfig
+- `src/infrastructure/config/route.py` - AutoRouteConfig
 - `src/infrastructure/routing/hash_router.py` - HashRouter（murmurhash3 哈希环）
 - `src/infrastructure/routing/semantic_router.py` - SemanticRouter（bge-m3 语义嵌入）
-- `tests/unit/domain/services/test_route_service.py` - RouteService 单元测试
+- `tests/unit/domain/services/test_auto_route_service.py` - AutoRouteService 单元测试
 - `tests/unit/domain/entities/test_routing_decision_log.py` - RoutingDecisionLog 单元测试
 - `tests/unit/infrastructure/routing/test_hash_router.py` - HashRouter 单元测试
 - `tests/unit/infrastructure/routing/test_semantic_router.py` - SemanticRouter 单元测试
@@ -614,14 +614,14 @@ sisys/
 - `docs/developer/route_mechanism_guide.md` - 路由机制实施指南
 
 **更新的文件/Updated Files:**
-- `src/domain/events/__init__.py` - 添加 Routed 事件导出
-- `src/domain/services/__init__.py` - 添加 RouteService 导出
+- `src/domain/events/__init__.py` - 添加 AutoRouted 事件导出
+- `src/domain/services/__init__.py` - 添加 AutoRouteService 导出
 - `src/domain/entities/__init__.py` - 添加 RoutingDecisionLog 导出
-- `src/infrastructure/config/__init__.py` - 添加 RouteConfig 导出
+- `src/infrastructure/config/__init__.py` - 添加 AutoRouteConfig 导出
 - `src/infrastructure/routing/__init__.py` - 添加 HashRouter, SemanticRouter 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/interfaces/event_listeners/route_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
+- `src/interfaces/event_listeners/auto_route_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
 
 ---
 

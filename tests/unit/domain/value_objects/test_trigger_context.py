@@ -1,19 +1,19 @@
-"""Tests for TriggerContext value object."""
+"""Tests for AutoTriggerContext value object."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.domain.value_objects.trigger_context import TriggerContext
+from src.domain.value_objects.auto_trigger_context import AutoTriggerContext
 
 
-class TestTriggerContextCreation:
-    """Test TriggerContext factory methods."""
+class TestAutoTriggerContextCreation:
+    """Test AutoTriggerContext factory methods."""
 
     def test_from_domain_event_basic(self) -> None:
         """Verify basic domain event context extraction."""
         payload = {"session_id": "session-123", "agent_id": "agent-456", "task_type": "doc_processing"}
-        context = TriggerContext.from_domain_event(
+        context = AutoTriggerContext.from_domain_event(
             event_type="DocumentProcessed",
             payload=payload,
             event_id="evt-001",
@@ -29,7 +29,7 @@ class TestTriggerContextCreation:
     def test_from_domain_event_nested_payload(self) -> None:
         """Verify nested payload extraction for session_id."""
         payload = {"payload": {"session_id": "nested-session", "priority": "high"}}
-        context = TriggerContext.from_domain_event(
+        context = AutoTriggerContext.from_domain_event(
             event_type="ToolExecuted",
             payload=payload,
         )
@@ -39,7 +39,7 @@ class TestTriggerContextCreation:
     def test_from_domain_event_default_session(self) -> None:
         """Verify default session when none provided."""
         payload = {"tool_name": "web_search"}
-        context = TriggerContext.from_domain_event(
+        context = AutoTriggerContext.from_domain_event(
             event_type="ToolExecuted",
             payload=payload,
         )
@@ -48,7 +48,7 @@ class TestTriggerContextCreation:
 
     def test_from_heartbeat_basic(self) -> None:
         """Verify heartbeat context extraction."""
-        context = TriggerContext.from_heartbeat(
+        context = AutoTriggerContext.from_heartbeat(
             heartbeat_id="hb-001",
             wake_reason="scheduled",
             todo_items=("task1", "task2"),
@@ -65,7 +65,7 @@ class TestTriggerContextCreation:
 
     def test_from_heartbeat_empty_todo_items(self) -> None:
         """Verify heartbeat with no todo items."""
-        context = TriggerContext.from_heartbeat(
+        context = AutoTriggerContext.from_heartbeat(
             heartbeat_id="hb-002",
             wake_reason="user_request",
         )
@@ -74,7 +74,7 @@ class TestTriggerContextCreation:
         assert context.task_context["cost_budget"] == 0.0
 
 
-class TestTriggerContextTaskFields:
+class TestAutoTriggerContextTaskFields:
     """Test task context field extraction from domain events."""
 
     @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ class TestTriggerContextTaskFields:
         expected_fields: list[str],
     ) -> None:
         """Verify correct fields are extracted to task_context."""
-        context = TriggerContext.from_domain_event(event_type=event_type, payload=payload_keys)
+        context = AutoTriggerContext.from_domain_event(event_type=event_type, payload=payload_keys)
 
         for field in expected_fields:
             assert field in context.task_context, f"Expected {field} in task_context for {event_type}"

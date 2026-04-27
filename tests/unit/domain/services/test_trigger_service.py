@@ -1,4 +1,4 @@
-"""Tests for TriggerService domain service."""
+"""Tests for AutoTriggerService domain service."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
-from src.domain.events.trigger_events import Triggered
-from src.domain.services.trigger_service import TriggerService
+from src.domain.services.auto_trigger_service import AutoTriggerService
 
 
 class DummyPublisher:
@@ -22,21 +22,21 @@ class DummyPublisher:
         self.published_events.append(event)
 
 
-class TestTriggerServiceUnit:
-    """Unit tests for TriggerService without infrastructure dependencies."""
+class TestAutoTriggerServiceUnit:
+    """Unit tests for AutoTriggerService without infrastructure dependencies."""
 
     @pytest.fixture
     def publisher(self) -> DummyPublisher:
         return DummyPublisher()
 
     @pytest.fixture
-    def trigger_service(self, publisher: DummyPublisher) -> TriggerService:
-        return TriggerService(publisher=publisher)
+    def trigger_service(self, publisher: DummyPublisher) -> AutoTriggerService:
+        return AutoTriggerService(publisher=publisher)
 
     @pytest.mark.asyncio
     async def test_on_domain_event_publishes_triggered(
         self,
-        trigger_service: TriggerService,
+        trigger_service: AutoTriggerService,
         publisher: DummyPublisher,
     ) -> None:
         """Verify domain event triggers Triggered event publication."""
@@ -49,7 +49,7 @@ class TestTriggerServiceUnit:
         result = await trigger_service.on_domain_event(event)
 
         assert result is not None
-        assert isinstance(result, Triggered)
+        assert isinstance(result, AutoTriggered)
         assert result.trigger_type == "domain_event"
         assert result.session_id == "session-123"
         assert result.source_event_type == "DocumentProcessed"
@@ -58,7 +58,7 @@ class TestTriggerServiceUnit:
     @pytest.mark.asyncio
     async def test_on_heartbeat_event_publishes_triggered(
         self,
-        trigger_service: TriggerService,
+        trigger_service: AutoTriggerService,
         publisher: DummyPublisher,
     ) -> None:
         """Verify heartbeat event triggers Triggered event publication."""
@@ -81,7 +81,7 @@ class TestTriggerServiceUnit:
         assert result.session_id == "heartbeat-scheduler"
         assert result.source_event_type == "HeartbeatTriggered"
 
-    def test_extract_context_from_domain_event(self, trigger_service: TriggerService) -> None:
+    def test_extract_context_from_domain_event(self, trigger_service: AutoTriggerService) -> None:
         """Verify context extraction without publishing."""
         event = DomainEvent(
             event_id=uuid.uuid4(),
@@ -95,7 +95,7 @@ class TestTriggerServiceUnit:
         assert context.trigger_type == "domain_event"
         assert context.task_context["tool_name"] == "web_search"
 
-    def test_extract_context_from_heartbeat(self, trigger_service: TriggerService) -> None:
+    def test_extract_context_from_heartbeat(self, trigger_service: AutoTriggerService) -> None:
         """Verify context extraction from heartbeat event."""
         heartbeat_id = uuid.uuid4()
         # Use HeartbeatTriggered which has heartbeat_id as attribute, not in payload
@@ -118,7 +118,7 @@ class TestTriggerServiceUnit:
     @pytest.mark.asyncio
     async def test_on_domain_event_no_publisher(self) -> None:
         """Verify no crash when no publisher configured."""
-        trigger_service = TriggerService(publisher=None)
+        trigger_service = AutoTriggerService(publisher=None)
         event = DomainEvent(
             event_id=uuid.uuid4(),
             event_type="AgentDecided",
@@ -127,21 +127,21 @@ class TestTriggerServiceUnit:
 
         result = await trigger_service.on_domain_event(event)
 
-        # Should return Triggered but not publish (warning logged)
+        # Should return AutoTriggered but not publish (warning logged)
         assert result is not None
         assert result.trigger_type == "domain_event"
 
     @pytest.mark.asyncio
     async def test_publish_error_handling(
         self,
-        trigger_service: TriggerService,
+        trigger_service: AutoTriggerService,
         publisher: DummyPublisher,
     ) -> None:
         """Verify publish errors are logged and re-raised."""
         error_publisher = AsyncMock()
         error_publisher.publish.side_effect = RuntimeError("Publish failed")
 
-        service = TriggerService(publisher=error_publisher)
+        service = AutoTriggerService(publisher=error_publisher)
         event = DomainEvent(
             event_id=uuid.uuid4(),
             event_type="CheckpointReached",
@@ -152,19 +152,19 @@ class TestTriggerServiceUnit:
             await service.on_domain_event(event)
 
 
-class TestTriggerServiceArchitecture:
-    """Architecture compliance tests for TriggerService (hexagonal architecture)."""
+class TestAutoTriggerServiceArchitecture:
+    """Architecture compliance tests for AutoTriggerService (hexagonal architecture)."""
 
     def test_trigger_service_is_domain_layer(self) -> None:
-        """Verify TriggerService has no infrastructure dependencies in constructor."""
-        # TriggerService should accept protocol, not concrete infra classes
-        service = TriggerService(publisher=None)
+        """Verify AutoTriggerService has no infrastructure dependencies in constructor."""
+        # AutoTriggerService should accept protocol, not concrete infra classes
+        service = AutoTriggerService(publisher=None)
         assert service._publisher is None
 
     def test_trigger_service_uses_protocol_for_publishing(self) -> None:
-        """Verify TriggerService depends on protocol, not concrete implementation."""
+        """Verify AutoTriggerService depends on protocol, not concrete implementation."""
         # The publisher should be Protocol, not a concrete class
-        from src.domain.services.trigger_service import EventPublisherProtocol
+        from src.domain.services.auto_trigger_service import EventPublisherProtocol
 
         # Verify the protocol exists and is a Protocol
         assert hasattr(EventPublisherProtocol, "publish")

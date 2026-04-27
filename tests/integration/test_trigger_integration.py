@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
 from src.domain.events.heartbeat_events import HeartbeatTriggered
-from src.domain.events.trigger_events import Triggered
-from src.domain.services.trigger_service import TriggerService
-from src.domain.value_objects.trigger_context import TriggerContext
+from src.domain.services.auto_trigger_service import AutoTriggerService
+from src.domain.value_objects.auto_trigger_context import AutoTriggerContext
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
 
@@ -24,17 +24,17 @@ class TestTriggerIntegration:
         return AsyncMock()
 
     @pytest.fixture
-    def trigger_service(self, mock_publisher: AsyncMock) -> TriggerService:
-        """Create TriggerService with mock publisher."""
-        return TriggerService(publisher=mock_publisher)
+    def trigger_service(self, mock_publisher: AsyncMock) -> AutoTriggerService:
+        """Create AutoTriggerService with mock publisher."""
+        return AutoTriggerService(publisher=mock_publisher)
 
     @pytest.mark.asyncio
     async def test_domain_event_to_triggered_flow(
         self,
-        trigger_service: TriggerService,
+        trigger_service: AutoTriggerService,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify domain event flows through TriggerService to Triggered event."""
+        """Verify domain event flows through AutoTriggerService to AutoTriggered event."""
         # Create a domain event
         domain_event = DomainEvent(
             event_type="DocumentProcessed",
@@ -49,9 +49,9 @@ class TestTriggerIntegration:
         # Process through trigger service
         triggered = await trigger_service.on_domain_event(domain_event)
 
-        # Verify Triggered event was created and published
+        # Verify AutoTriggered event was created and published
         assert triggered is not None
-        assert isinstance(triggered, Triggered)
+        assert isinstance(triggered, AutoTriggered)
         assert triggered.trigger_type == "domain_event"
         assert triggered.session_id == "session-integration-test"
         assert triggered.source_event_type == "DocumentProcessed"
@@ -62,10 +62,10 @@ class TestTriggerIntegration:
     @pytest.mark.asyncio
     async def test_heartbeat_to_triggered_flow(
         self,
-        trigger_service: TriggerService,
+        trigger_service: AutoTriggerService,
         mock_publisher: AsyncMock,
     ) -> None:
-        """Verify heartbeat event flows through TriggerService to Triggered event."""
+        """Verify heartbeat event flows through AutoTriggerService to AutoTriggered event."""
         import uuid
 
         # Create heartbeat event
@@ -79,9 +79,9 @@ class TestTriggerIntegration:
         # Process through trigger service
         triggered = await trigger_service.on_heartbeat_event(heartbeat_event)
 
-        # Verify Triggered event was created
+        # Verify AutoTriggered event was created
         assert triggered is not None
-        assert isinstance(triggered, Triggered)
+        assert isinstance(triggered, AutoTriggered)
         assert triggered.trigger_type == "heartbeat"
         assert triggered.session_id == "heartbeat-scheduler"
 
@@ -89,7 +89,7 @@ class TestTriggerIntegration:
         mock_publisher.publish.assert_called_once()
 
     def test_trigger_context_extraction_from_domain_event(self) -> None:
-        """Verify TriggerContext correctly extracts from domain event payload."""
+        """Verify AutoTriggerContext correctly extracts from domain event payload."""
         payload = {
             "session_id": "session-123",
             "agent_id": "agent-456",
@@ -98,7 +98,7 @@ class TestTriggerIntegration:
             "tool_name": "web_search",
         }
 
-        context = TriggerContext.from_domain_event(
+        context = AutoTriggerContext.from_domain_event(
             event_type="ToolExecuted",
             payload=payload,
             event_id="test-event-id",
@@ -112,8 +112,8 @@ class TestTriggerIntegration:
         assert context.task_context["tool_name"] == "web_search"
 
     def test_trigger_context_extraction_from_heartbeat(self) -> None:
-        """Verify TriggerContext correctly extracts from heartbeat event."""
-        context = TriggerContext.from_heartbeat(
+        """Verify AutoTriggerContext correctly extracts from heartbeat event."""
+        context = AutoTriggerContext.from_heartbeat(
             heartbeat_id="hb-123",
             wake_reason="user_request",
             todo_items=("task_a", "task_b", "task_c"),
@@ -147,10 +147,10 @@ class TestTriggerIntegration:
 
     @pytest.mark.asyncio
     async def test_triggered_event_serialization_roundtrip(self) -> None:
-        """Verify Triggered event can serialize and deserialize correctly."""
+        """Verify AutoTriggered event can serialize and deserialize correctly."""
         import uuid
 
-        original = Triggered(
+        original = AutoTriggered(
             trigger_type="domain_event",
             session_id="session-roundtrip-test",
             agent_id="agent-789",
@@ -165,13 +165,13 @@ class TestTriggerIntegration:
 
         # Serialize
         serialized = original.to_dict()
-        assert serialized["event_type"] == "Triggered"
+        assert serialized["event_type"] == "AutoTriggered"
         assert serialized["payload"]["trigger_type"] == "domain_event"
         assert serialized["payload"]["session_id"] == "session-roundtrip-test"
 
         # Deserialize
-        restored = Triggered.from_dict(serialized)
-        assert restored.event_type == "Triggered"
+        restored = AutoTriggered.from_dict(serialized)
+        assert restored.event_type == "AutoTriggered"
         assert getattr(restored, "trigger_type") == "domain_event"
         assert getattr(restored, "session_id") == "session-roundtrip-test"
         assert getattr(restored, "agent_id") == "agent-789"
