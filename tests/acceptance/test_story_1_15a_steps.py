@@ -39,9 +39,9 @@ from src.domain.services.memory_service import (
     MemoryService,
     MemoryUpdateRequest,
 )
-from src.infrastructure.cache.redis_memory_cache import RedisMemoryCache
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
 
 scenarios("test_story_1_15a.feature")
