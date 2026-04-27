@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.infrastructure.entities.cache_entry import CacheEntry
+from src.infrastructure.storage.redis.cache_entry import CacheEntry
 
 
 class TestCacheEntry:

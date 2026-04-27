@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.infrastructure.entities.blackboard_entry import BlackboardEntry
+from src.infrastructure.storage.redis.blackboard_entry import BlackboardEntry
 
 
 class TestBlackboardEntry:

@@ -9,8 +9,8 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.infrastructure.entities.outbox import InvalidStateTransitionError, OutboxEntity
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
+from src.infrastructure.messaging.outbox.outbox import InvalidStateTransitionError, OutboxEntity
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 
