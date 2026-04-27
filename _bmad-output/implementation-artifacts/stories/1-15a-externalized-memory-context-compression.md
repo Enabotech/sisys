@@ -62,16 +62,24 @@
 
 **Given** L1 压缩完成
 **When** 压缩后记忆准备写入
-**Then** 同时写入 L0 文件系统和 L2 PostgreSQL
-**And** L0 写入：~/.sisys/memory/*.md（实际内容）+ MEMORY.md 索引
-**And** L2 异步写入：memory_metadata + memory_change_history
+**Then** 执行以下步骤：
+  1. **L0 文件系统写入**（同步，强一致）：写入 ~/.sisys/memory/*.md（实际内容）
+  2. **L0 索引更新**（同步）：更新 MEMORY.md 索引
+  3. **发布 MemoryChanged 事件**（事务发件箱）：写入 Outbox 表（同一事务）
+  4. **MemoryChangedListener.handle() 异步消费**：
+     - L1 Redis 缓存失效（同步，立即）：保证"上下文≠缓存"公理
+     - L2 PostgreSQL 写入：`metadata_repository.upsert()` + `history_repository.append()`
+     - L3 Qdrant 向量（按需，内容>500 tokens）：`vector_store.embed()`
+     - L5 Neo4j 图谱（按需）：`entity_extractor.extract()`
 
 **验证标准/Validation Criteria:**
 - [ ] FileMemoryAdapter 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
+- [ ] MemoryIndex 索引管理（`src/infrastructure/storage/memory_index.py`）
 - [ ] MemoryMetadataRepository L2 存储（`src/infrastructure/repositories/memory_metadata_repository.py`）
 - [ ] MemoryChangeHistoryRepository L2 历史记录（`src/infrastructure/repositories/memory_change_history_repository.py`）
-- [ ] L0 写入成功率 100%
-- [ ] L2 异步写入成功率 ≥99%
+- [ ] L0 写入成功率 100%（同步，强一致）
+- [ ] L0 索引更新成功率 100%（同步）
+- [ ] MemoryChanged 事件发布成功率 ≥99%
 - [ ] 记忆保存成功率 100%
 
 ### AC-3: MemoryChanged 事件发布
@@ -79,10 +87,15 @@
 **Given** 记忆操作完成（保存/删除/修改）
 **When** MemoryService 发布 MemoryChanged 事件
 **Then** 事件携带 is_automatic=False
-**And** 下游监听器触发：
-  1. 写入 memory_metadata（UPSERT，version + 1）
-  2. 写入 memory_change_history（append-only）
-  3. 失效 L1 Redis 缓存（`redis.del("memory:user:{user_id}:{name}")`）
+**And** MemoryChangedListener.handle() 异步消费触发：
+  1. **L1 Redis 缓存失效**（同步，立即）：`storage_coordinator.invalidate(layer="L1", ...)`
+     - 保证"上下文≠缓存"公理
+  2. **L2 PostgreSQL 写入**（通过 Repository 调用）：
+     - `metadata_repository.upsert(event)` - 写入 memory_metadata
+     - `history_repository.append(event)` - 记录 memory_change_history（append-only）
+  3. **L3 Qdrant 向量**（按需，内容>500 tokens）：`vector_store.embed(event)`
+  4. **L5 Neo4j 图谱**（按需）：`entity_extractor.extract(event)`
+- **L4 MinIO** 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）
 
 **验证标准/Validation Criteria:**
 - [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
@@ -98,7 +111,8 @@
   - status: pending → published / failed
   - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
   - **重要**：领域层通过 `OutboxRepository` 接口（`src/domain/repositories/outbox.py`）操作，不直接引用 OutboxEntity
-- [ ] 事件发布成功率 ≥99%
+- [ ] L1 缓存失效：`storage_coordinator.invalidate(layer="L1", ...)`
+- [ ] L2 写入：`metadata_repository.upsert()` + `history_repository.append()`
 - [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{name}`
 
 ### AC-4: L1 四种操作 CRUD
