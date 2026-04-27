@@ -2651,53 +2651,39 @@ src/infrastructure/
 │           ├── dspy_optimizer.py
 │           └── prompt_tuning.py
 │
+├── storage/                                               # 统一存储抽象层
+│   ├── __init__.py
+│   ├── file_memory_adapter.py                             # L0 文件系统适配器
+│   ├── memory_index.py                                    # L0 记忆索引管理
+│   ├── memory_router.py                                   # L0 记忆路由策略
+│   ├── redis_snapshot_store.py                            # Redis 快照存储
+│   ├── minio/                                             # L4 对象存储
+│   ├── neo4j/                                             # L5 图存储
+│   ├── postgresql/                                        # L2 关系存储
+│   ├── qdrant/                                            # L3 向量存储
+│   └── redis/                                             # L1 缓存
+│
 ├── messaging/                                             # 消息系统
 │   ├── __init__.py
-│   ├── event_bus.py                                       # 事件总线实现
-│   ├── rabbitmq_adapter.py                                # RabbitMQ 适配器
-│   ├── redis_adapter.py                                   # Redis 适配器
+│   ├── adapters/                                          # 适配器
+│   │   ├── __init__.py
+│   │   ├── event_outbox_adapter.py
+│   │   └── sqlalchemy_event_outbox_adapter.py
+│   ├── event_bus.py                                       # 事件总线
+│   ├── idempotency/                                       # 幂等性
+│   │   ├── __init__.py
+│   │   ├── checker.py
+│   │   └── retry_policy.py
 │   ├── message_serializer.py                              # 消息序列化
-│   └── outbox/                                            # 事务发件箱
-│       ├── __init__.py
-│       ├── outbox_processor.py                            # Outbox 处理器
-│       └── dead_letter_queue.py                           # 死信队列处理
-│
-├── persistence/                                           # 持久化实现
-│   ├── __init__.py
-│   ├── repositories/                                      # 仓储实现
+│   ├── outbox/                                            # 事务发件箱
 │   │   ├── __init__.py
-│   │   ├── document_repository_impl.py
-│   │   ├── agent_repository_impl.py
-│   │   ├── tool_repository_impl.py
-│   │   ├── plan_repository_impl.py
-│   │   ├── checkpoint_repository_impl.py
-│   │   ├── routing_log_repository_impl.py                 # ⭐
-│   │   ├── isolation_log_repository_impl.py               # ⭐
-│   │   └── archive_repository_impl.py
-│   ├── database/                                          # 数据库配置
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── connection_factory.py
-│   │   └── migrations/                                    # Alembic 迁移
-│   │       ├── __init__.py
-│   │       ├── alembic.ini
-│   │       └── versions/
-│   ├── vector_store/                                      # 向量存储
-│   │   ├── __init__.py
-│   │   ├── qdrant_client.py
-│   │   ├── vector_store_factory.py
-│   │   └── embedding_manager.py
-│   ├── cache/                                             # 缓存
-│   │   ├── __init__.py
-│   │   ├── redis_cache.py
-│   │   ├── cache_manager.py
-│   │   ├── semantic_cache.py                              # 语义缓存 ⭐
-│   │   └── cache_strategies.py
-│   └── graph_store/                                       # 图存储
-│       ├── __init__.py
-│       ├── neo4j_client.py
-│       ├── graph_store_factory.py
-│       └── entity_extractor.py                            # 实体抽取器
+│   │   ├── dead_letter_queue.py
+│   │   ├── outbox.py
+│   │   └── outbox_processor.py
+│   ├── rabbitmq_consumer.py
+│   ├── rabbitmq_publisher.py
+│   ├── redis_publisher.py
+│   └── redis_subscriber.py
 │
 ├── external_services/                                     # 外部服务适配器
 │   ├── __init__.py
@@ -2726,6 +2712,8 @@ src/infrastructure/
 │   │   └── document_parser_factory.py
 │   └── sandbox/                                           # 沙箱执行
 │       ├── __init__.py
+│       ├── docker_sandbox_adapter.py                      # DockerSandboxAdapter（实现）
+│       ├── session_namespace_manager.py                   # 会话命名空间管理
 │       ├── docker_sandbox.py
 │       ├── code_executor.py
 │       └── security_validator.py
@@ -2740,22 +2728,26 @@ src/infrastructure/
 │       ├── pestel_output_v1.json
 │       └── ... (共 23 种工具)
 │
-├── security/                                              # 安全
-│   ├── __init__.py
-│   ├── auth_service.py                                    # 认证服务
-│   ├── permission_service.py                              # 权限服务
-│   ├── encryption_service.py                              # 加密服务
-│   ├── audit_logger.py                                    # 审计日志
-│   └── shield_cortex.py                                   # 提示注入检测 ⭐
+├── config/                                               # 配置管理
 │
-└── monitoring/                                            # 监控
+├── security/                                              # 安全服务
+│
+├── audit/                                                 # 审计服务
+│
+├── monitoring/                                            # 监控服务
+│   ├── __init__.py
+│   ├── aggregator.py
+│   ├── business_metrics.py
+│   ├── event_metrics.py
+│   └── otel_config.py
+│
+├── routing/                                               # 路由服务
+│
+├── scheduler/                                             # 调度服务
+│
+└── utils/                                                 # 工具函数
     ├── __init__.py
-    ├── metrics_collector.py                               # 指标收集器
-    ├── performance_monitor.py                             # 性能监控
-    ├── health_checker.py                                  # 健康检查
-    ├── logger_config.py                                   # 日志配置
-    ├── tracing_config.py                                  # 链路追踪配置
-    └── cusum_detector.py                                  # CUSUM 漂移检测 ⭐
+    └── json_ser.py
 ```
 
 ---
