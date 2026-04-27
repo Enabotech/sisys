@@ -1,15 +1,15 @@
-"""RouteService — domain service that processes Triggered events and emits Routed events."""
+"""AutoRouteService — domain service that processes AutoTriggered events and emits AutoRouted events."""
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Protocol
 
+from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.base import DomainEvent
-from src.domain.events.route_events import Routed
 
 if TYPE_CHECKING:
-    from src.domain.events.trigger_events import Triggered
+    from src.domain.events.auto_trigger_events import AutoTriggered
 
 
 logger = logging.getLogger(__name__)
@@ -52,13 +52,13 @@ class SemanticRouterProtocol(Protocol):
         ...
 
 
-class RouteService:
-    """Domain service that listens to Triggered events, makes routing decisions, and emits Routed events.
+class AutoRouteService:
+    """Domain service that listens to AutoTriggered events, makes routing decisions, and emits AutoRouted events.
 
     Responsibilities:
-    - Listen to Triggered events from TriggerService (Story 1.14a)
+    - Listen to AutoTriggered events from AutoTriggerService (Story 1.14a)
     - Make routing decisions using hash routing (session consistency) and/or semantic routing (target matching)
-    - Publish Routed events to downstream execute stage (Story 1.14c)
+    - Publish AutoRouted events to downstream execute stage (Story 1.14c)
     - Log routing decisions to RoutingDecisionLog
 
     Architecture: Domain layer (no external dependencies), uses port/protocol for routing and publishing.
@@ -70,7 +70,7 @@ class RouteService:
         hash_router: HashRouterProtocol | None = None,
         semantic_router: SemanticRouterProtocol | None = None,
     ):
-        """Initialize RouteService.
+        """Initialize AutoRouteService.
 
         Args:
             publisher: Event publisher port (infrastructure implements). None for standalone testing.
@@ -81,21 +81,21 @@ class RouteService:
         self._hash_router = hash_router
         self._semantic_router = semantic_router
 
-    async def on_triggered_event(self, event: Triggered) -> Routed | None:
-        """Handle a Triggered event: make routing decision and emit Routed.
+    async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted | None:
+        """Handle a AutoTriggered event: make routing decision and emit AutoRouted.
 
         Args:
-            event: Triggered event from trigger stage (Story 1.14a)
+            event: AutoTriggered event from trigger stage (Story 1.14a)
 
         Returns:
-            Routed event if routing decision was made and published, None otherwise
+            AutoRouted event if routing decision was made and published, None otherwise
         """
-        logger.debug("Processing Triggered event: session_id=%s", event.session_id)
+        logger.debug("Processing AutoTriggered event: session_id=%s", event.session_id)
 
         # Determine route type and target based on available routers
         route_type, route_target, route_score = await self._make_routing_decision(event)
 
-        routed = Routed(
+        routed = AutoRouted(
             route_type=route_type,
             session_id=event.session_id,
             task_context=event.task_context,
@@ -108,11 +108,11 @@ class RouteService:
         await self._publish(routed)
         return routed
 
-    async def _make_routing_decision(self, event: Triggered) -> tuple[str, str, float]:
+    async def _make_routing_decision(self, event: AutoTriggered) -> tuple[str, str, float]:
         """Make routing decision based on available routers.
 
         Args:
-            event: Triggered event
+            event: AutoTriggered event
 
         Returns:
             Tuple of (route_type, route_target, route_score)
@@ -159,25 +159,25 @@ class RouteService:
 
         return route_type, route_target, route_score
 
-    async def _publish(self, event: Routed) -> None:
-        """Publish Routed event via configured publisher.
+    async def _publish(self, event: AutoRouted) -> None:
+        """Publish AutoRouted event via configured publisher.
 
         Args:
-            event: Routed event to publish
+            event: AutoRouted event to publish
         """
         if self._publisher is None:
-            logger.warning("No publisher configured, Routed event not published: %s", event.event_id)
+            logger.warning("No publisher configured, AutoRouted event not published: %s", event.event_id)
             return
 
         try:
-            await self._publisher.publish(event, channel="rt:Routed")
+            await self._publisher.publish(event, channel="rt:AutoRouted")
             logger.info(
-                "Published Routed event: session_id=%s route_type=%s route_target=%s score=%.3f",
+                "Published AutoRouted event: session_id=%s route_type=%s route_target=%s score=%.3f",
                 event.session_id,
                 event.route_type,
                 event.route_target,
                 event.route_score,
             )
         except Exception as e:
-            logger.error("Failed to publish Routed event: %s", e)
+            logger.error("Failed to publish AutoRouted event: %s", e)
             raise

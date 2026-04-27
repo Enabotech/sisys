@@ -1,26 +1,26 @@
-"""Tests for Executed domain event."""
+"""Tests for AutoExecuted domain event."""
 
 import uuid
 
-from src.domain.events.execute_events import Executed
+from src.domain.events.auto_execute_events import AutoExecuted
 
 
-class TestExecutedEvent:
-    """TDD tests for Executed domain event."""
+class TestAutoExecutedEvent:
+    """TDD tests for AutoExecuted domain event."""
 
     def test_create_executed_event_with_required_fields(self) -> None:
-        """RED: Executed event should be creatable with session_id."""
+        """RED: AutoExecuted event should be creatable with session_id."""
         session_id = "test-session-123"
-        event = Executed(session_id=session_id)
+        event = AutoExecuted(session_id=session_id)
 
         assert event.session_id == session_id
-        assert event.event_type == "Executed"
+        assert event.event_type == "AutoExecuted"
         assert event.event_id is not None
         assert isinstance(event.event_id, uuid.UUID)
 
     def test_executed_event_has_business_event_type(self) -> None:
-        """RED: Executed event should have business_event_type field."""
-        event = Executed(
+        """RED: AutoExecuted event should have business_event_type field."""
+        event = AutoExecuted(
             session_id="test-session",
             business_event_type="ToolExecuted",
         )
@@ -28,9 +28,9 @@ class TestExecutedEvent:
         assert event.business_event_type == "ToolExecuted"
 
     def test_executed_event_carries_task_context(self) -> None:
-        """RED: Executed event should carry task_context dict."""
+        """RED: AutoExecuted event should carry task_context dict."""
         task_context = {"task_id": "task-1", "code": "print('hello')", "priority": "high"}
-        event = Executed(
+        event = AutoExecuted(
             session_id="test-session",
             task_context=task_context,
         )
@@ -39,9 +39,9 @@ class TestExecutedEvent:
         assert event.task_context["task_id"] == "task-1"
 
     def test_executed_event_carries_execution_result(self) -> None:
-        """RED: Executed event should carry execution_result dict."""
+        """RED: AutoExecuted event should carry execution_result dict."""
         result = {"status": "completed", "output": "hello world", "error": None}
-        event = Executed(
+        event = AutoExecuted(
             session_id="test-session",
             execution_result=result,
         )
@@ -50,8 +50,8 @@ class TestExecutedEvent:
         assert event.execution_result["status"] == "completed"
 
     def test_executed_event_tracks_cost_and_latency(self) -> None:
-        """RED: Executed event should track cost_estimate and latency_ms."""
-        event = Executed(
+        """RED: AutoExecuted event should track cost_estimate and latency_ms."""
+        event = AutoExecuted(
             session_id="test-session",
             cost_estimate=0.05,
             latency_ms=150.5,
@@ -61,8 +61,8 @@ class TestExecutedEvent:
         assert event.latency_ms == 150.5
 
     def test_executed_event_carries_route_info(self) -> None:
-        """RED: Executed event should carry route_target and route_score."""
-        event = Executed(
+        """RED: AutoExecuted event should carry route_target and route_score."""
+        event = AutoExecuted(
             session_id="test-session",
             route_target="ceo-agent",
             route_score=0.95,
@@ -72,8 +72,8 @@ class TestExecutedEvent:
         assert event.route_score == 0.95
 
     def test_executed_event_serialization(self) -> None:
-        """RED: Executed event should serialize to dict correctly."""
-        event = Executed(
+        """RED: AutoExecuted event should serialize to dict correctly."""
+        event = AutoExecuted(
             session_id="test-session",
             task_context={"task": "test"},
             execution_result={"status": "ok"},
@@ -86,7 +86,7 @@ class TestExecutedEvent:
 
         data = event.to_dict()
 
-        assert data["event_type"] == "Executed"
+        assert data["event_type"] == "AutoExecuted"
         assert data["payload"]["session_id"] == "test-session"
         assert data["payload"]["business_event_type"] == "ToolExecuted"
         assert data["payload"]["route_target"] == "tool-1"

@@ -1,4 +1,4 @@
-"""Triggered domain event — emitted after trigger extracts context from domain/heartbeat events."""
+"""AutoTriggered domain event — emitted after auto-trigger extracts context from domain/heartbeat events."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from .base import DomainEvent
 
 
 @dataclass(frozen=True)
-class Triggered(DomainEvent):
-    """Event emitted when trigger mechanism extracts context from domain or heartbeat events.
+class AutoTriggered(DomainEvent):
+    """Event emitted when auto-trigger mechanism extracts context from domain or heartbeat events.
 
-    This event flows to Story 1.14b (route) for session-aware routing decisions.
+    This event flows to Story 1.14b (auto-route) for session-aware routing decisions.
     """
 
     # Note: event_type is inherited from DomainEvent (init=True, default="")
-    # The actual event_type value "Triggered" is set via __post_init__
+    # The actual event_type value "AutoTriggered" is set via __post_init__
     trigger_type: str = ""  # "domain_event" | "heartbeat"
     session_id: str = ""
     agent_id: str | None = None
@@ -28,12 +28,12 @@ class Triggered(DomainEvent):
         """Set event_type, aggregate_id, and aggregate_type for event tracking."""
         # Set event_type to class name if not already set
         if not self.event_type:
-            object.__setattr__(self, "event_type", "Triggered")
+            object.__setattr__(self, "event_type", "AutoTriggered")
         if self.aggregate_id is None and self.event_id:
             object.__setattr__(self, "aggregate_id", self.event_id)
         if not self.aggregate_type:
-            object.__setattr__(self, "aggregate_type", "Trigger")
+            object.__setattr__(self, "aggregate_type", "AutoTrigger")
 
 
-# Register Triggered after class definition (manual registration needed due to init=False on event_type)
-DomainEvent._registry["Triggered"] = Triggered
+# Register AutoTriggered after class definition (manual registration needed due to init=False on event_type)
+DomainEvent._registry["AutoTriggered"] = AutoTriggered

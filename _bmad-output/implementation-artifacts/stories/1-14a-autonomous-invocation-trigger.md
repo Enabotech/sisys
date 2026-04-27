@@ -40,17 +40,17 @@
 ### AC-1: 领域事件触发机制
 
 **Given** 领域事件（DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CheckpointRecovered/CorrectionClassified/CorrectionApproved/RoutingDecided/IsolationLevelSwitched/HeartbeatTriggered/StrategicDeviationWarning/AuditEvent）发布到事件总线
-**When** TriggerService 监听并接收事件
+**When** AutoTriggerService 监听并接收事件
 **Then** 解析事件类型，提取 session_id 和任务上下文
-**And** 发布 Triggered 事件至下游 route 机制（Story 1.14b）
+**And** 发布 AutoTriggered 事件至下游 route 机制（Story 1.14b）
 
 **验证标准/Validation Criteria:**
-- [x] TriggerService 事件监听器注册（`src/domain/services/trigger_service.py`）
+- [x] AutoTriggerService 事件监听器注册（`src/domain/services/auto_trigger_service.py`）
 - [x] 支持 12 种领域事件类型监听（DocumentProcessed/ToolExecuted/AgentDecided/CheckpointReached/CheckpointRecovered/CorrectionClassified/CorrectionApproved/RoutingDecided/IsolationLevelSwitched/HeartbeatTriggered/StrategicDeviationWarning/AuditEvent）
 - [x] 事件类型解析逻辑（从 event_type 字段）
 - [x] session_id 提取逻辑（从 payload 或 aggregate_id）
 - [x] 任务上下文提取（event payload 完整传递）
-- [x] Triggered 事件定义与发布
+- [x] AutoTriggered 事件定义与发布
 - [x] 触发延迟 P95<10ms
 - [x] 触发器无循环依赖检测
 
@@ -74,7 +74,7 @@
 ### AC-3: 会话上下文提取
 
 **Given** 领域事件或心跳事件
-**When** TriggerService 解析事件
+**When** AutoTriggerService 解析事件
 **Then** 提取以下上下文字段：
 - session_id：从 payload.session_id 或 aggregate_id 获取
 - agent_id：从 payload.agent_id 获取
@@ -87,27 +87,27 @@
 - [x] agent_id 提取（从 payload.agent_id）
 - [x] task_context 提取（payload.task_type, payload.priority 等）
 - [x] trigger_type 分类（domain_event / heartbeat）
-- [x] TriggerContext 数据类定义（`src/domain/value_objects/trigger_context.py`）
+- [x] AutoTriggerContext 数据类定义（`src/domain/value_objects/auto_trigger_context.py`）
 - [x] 上下文完整性校验（session_id 必填，缺省时使用 default session）
 
 ### AC-4: 触发器与路由解耦
 
 **Given** trigger 机制完成上下文提取
-**When** 发布 Triggered 事件
+**When** 发布 AutoTriggered 事件
 **Then** trigger 阶段不直接调用 route 阶段，通过事件总线解耦
 **And** 符合六边形架构依赖方向
 
 **验证标准/Validation Criteria:**
-- [x] Triggered 事件定义（`src/domain/events/trigger_events.py`）
-- [x] TriggerService 仅发布事件，不调用 route
+- [x] AutoTriggered 事件定义（`src/domain/events/auto_trigger_events.py`）
+- [x] AutoTriggerService 仅发布事件，不调用 route
 - [x] 无循环依赖（六边形架构检测）
-- [x] TriggerService 位于领域层或应用层（不位于基础设施层直接调用）
-- [x] 依赖倒置：TriggerService 定义事件监听接口，基础设施层实现
+- [x] AutoTriggerService 位于领域层或应用层（不位于基础设施层直接调用）
+- [x] 依赖倒置：AutoTriggerService 定义事件监听接口，基础设施层实现
 
 ### AC-5: 触发器性能要求
 
 **Given** 领域事件到达事件总线
-**When** TriggerService 处理事件
+**When** AutoTriggerService 处理事件
 **Then** 端到端触发延迟 P95<10ms
 **And** 吞吐量支持 1000 events/second
 
@@ -161,24 +161,24 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [x] Triggered 事件定义（`src/domain/events/trigger_events.py`）
+- [x] AutoTriggered 事件定义（`src/domain/events/auto_trigger_events.py`）
   - 字段: event_id, trigger_type, session_id, agent_id, task_context, source_event, timestamp
-  - 事件类型自动设置: `event_type = "Triggered"`
-- [x] TriggerContext 值对象（`src/domain/value_objects/trigger_context.py`）
+  - 事件类型自动设置: `event_type = "AutoTriggered"`
+- [x] AutoTriggerContext 值对象（`src/domain/value_objects/auto_trigger_context.py`）
   - 字段: session_id, agent_id, task_context, trigger_type, timestamp
 - [x] 事件继承 DomainEvent 基类
 
 #### 数据模型 (Data Models)
-- [x] TriggerService 服务类（`src/domain/services/trigger_service.py`）
-  - 方法: `on_domain_event(event)`, `on_heartbeat_event(event)`, `extract_context(event) -> TriggerContext`
-  - 职责: 事件监听、上下文提取、Triggered 事件发布
+- [x] AutoTriggerService 服务类（`src/domain/services/auto_trigger_service.py`）
+  - 方法: `on_domain_event(event)`, `on_heartbeat_event(event)`, `extract_context(event) -> AutoTriggerContext`
+  - 职责: 事件监听、上下文提取、AutoTriggered 事件发布
 - [x] HeartbeatScheduler 调度器（`src/infrastructure/scheduler/heartbeat_scheduler.py`）
   - 方法: `start()`, `stop()`, `schedule_heartbeat()`
   - 实现: 使用 Redis sorted set 实现延迟调度（ZADD/ZRANGEBYSCORE）
   - 依赖: Redis 连接（Story 1.4 已实现）、EventPublisher（Story 1.3 已实现）
 
 #### 配置模型 (Configuration Models)
-- [x] TriggerConfig 配置（`src/infrastructure/config/trigger.py`）
+- [x] AutoTriggerConfig 配置（`src/infrastructure/config/trigger.py`）
   - 环境变量: `TRIGGER_ENABLED`, `HEARTBEAT_INTERVAL_SECONDS`, `TRIGGER_MAX_RETRIES`
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
@@ -218,9 +218,9 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | TriggerService | 领域事件触发 | `test_trigger_service.py` | Task 1 |
+| **TDD 单元测试** | AutoTriggerService | 领域事件触发 | `test_auto_trigger_service.py` | Task 1 |
 | **TDD 单元测试** | HeartbeatScheduler | 心跳调度 | `test_heartbeat_scheduler.py` | Task 2 |
-| **TDD 单元测试** | TriggerContext | 上下文提取 | `test_trigger_context.py` | Task 1 |
+| **TDD 单元测试** | AutoTriggerContext | 上下文提取 | `test_auto_trigger_context.py` | Task 1 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.14a.feature` | Task 0 |
 | **SDD 架构验证** | 触发器解耦 | 六边形架构约束 | `test_trigger_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端触发流程 | `test_trigger_integration.py` | Task 3 |
@@ -233,10 +233,10 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 领域事件触发机制 | Task 1 | Subtask 1.1-1.3（TriggerService 红→绿→重构） | `test_trigger_service.py` |
-| AC-1 | Triggered 事件定义 | Task 1 | Subtask 1.4-1.6（Triggered 事件 红→绿→重构） | `test_trigger_events.py` |
+| AC-1 | 领域事件触发机制 | Task 1 | Subtask 1.1-1.3（AutoTriggerService 红→绿→重构） | `test_auto_trigger_service.py` |
+| AC-1 | AutoTriggered 事件定义 | Task 1 | Subtask 1.4-1.6（AutoTriggered 事件 红→绿→重构） | `test_auto_trigger_events.py` |
 | AC-2 | 心跳事件触发机制 | Task 2 | Subtask 2.1-2.3（HeartbeatScheduler 红→绿→重构） | `test_heartbeat_scheduler.py` |
-| AC-3 | 会话上下文提取 | Task 1 | Subtask 1.7-1.9（TriggerContext 红→绿→重构） | `test_trigger_context.py` |
+| AC-3 | 会话上下文提取 | Task 1 | Subtask 1.7-1.9（AutoTriggerContext 红→绿→重构） | `test_auto_trigger_context.py` |
 | AC-4 | 触发器与路由解耦 | Task 3 | Subtask 3.1-3.3（六边形架构验证 红→绿→重构） | `test_trigger_architecture.py` |
 | AC-5 | 触发器性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_trigger_performance.py` |
 
@@ -252,11 +252,11 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。
 
-- [x] Subtask 0.1: 定义 Triggered 领域事件 Schema（`src/domain/events/trigger_events.py`）
-- [x] Subtask 0.2: 定义 TriggerContext 值对象（`src/domain/value_objects/trigger_context.py`）
-- [x] Subtask 0.3: 定义 TriggerService 服务接口（`src/domain/services/trigger_service.py`）
+- [x] Subtask 0.1: 定义 AutoTriggered 领域事件 Schema（`src/domain/events/auto_trigger_events.py`）
+- [x] Subtask 0.2: 定义 AutoTriggerContext 值对象（`src/domain/value_objects/auto_trigger_context.py`）
+- [x] Subtask 0.3: 定义 AutoTriggerService 服务接口（`src/domain/services/auto_trigger_service.py`）
 - [x] Subtask 0.4: 定义 HeartbeatScheduler 调度器（`src/infrastructure/scheduler/heartbeat_scheduler.py`）
-- [x] Subtask 0.5: 定义 TriggerConfig 配置模型（`src/infrastructure/config/trigger.py`）
+- [x] Subtask 0.5: 定义 AutoTriggerConfig 配置模型（`src/infrastructure/config/trigger.py`）
 - [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14a.feature`
 - [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -270,48 +270,48 @@
 
 **关联 AC:** AC-1, AC-3
 
-> **职责边界:** Task 1 负责 TriggerService（事件监听、上下文提取）和 Triggered 事件发布
+> **职责边界:** Task 1 负责 AutoTriggerService（事件监听、上下文提取）和 AutoTriggered 事件发布
 
-#### TDD 循环 [A]：TriggerService 事件监听
+#### TDD 循环 [A]：AutoTriggerService 事件监听
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/services/test_trigger_service.py`（验证领域事件触发） |
-| 🟢 绿 | 实现 `src/domain/services/trigger_service.py` - TriggerService 类 |
+| 🔴 红 | 编写 `tests/unit/domain/services/test_auto_trigger_service.py`（验证领域事件触发） |
+| 🟢 绿 | 实现 `src/domain/services/auto_trigger_service.py` - AutoTriggerService 类 |
 | 🔄 重构 | 添加类型注解和文档字符串 |
 
-- [x] Subtask 1.1: 🔴 红 — 编写 TriggerService 失败测试
-- [x] Subtask 1.2: 🟢 绿 — 实现 TriggerService（事件监听、上下文提取）
+- [x] Subtask 1.1: 🔴 红 — 编写 AutoTriggerService 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 AutoTriggerService（事件监听、上下文提取）
 - [x] Subtask 1.3: 🔄 重构 — 优化事件处理逻辑
 
-#### TDD 循环 [B]：Triggered 事件定义
+#### TDD 循环 [B]：AutoTriggered 事件定义
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/events/test_trigger_events.py`（验证 Triggered 事件 Schema） |
-| 🟢 绿 | 实现 `src/domain/events/trigger_events.py` - Triggered 事件类 |
+| 🔴 红 | 编写 `tests/unit/domain/events/test_auto_trigger_events.py`（验证 AutoTriggered 事件 Schema） |
+| 🟢 绿 | 实现 `src/domain/events/auto_trigger_events.py` - AutoTriggered 事件类 |
 | 🔄 重构 | 验证事件继承 DomainEvent 基类 |
 
-- [x] Subtask 1.4: 🔴 红 — 编写 Triggered 事件失败测试
-- [x] Subtask 1.5: 🟢 绿 — 实现 Triggered 事件 Schema
+- [x] Subtask 1.4: 🔴 红 — 编写 AutoTriggered 事件失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现 AutoTriggered 事件 Schema
 - [x] Subtask 1.6: 🔄 重构 — 验证事件完整性
 
-#### TDD 循环 [C]：TriggerContext 上下文提取
+#### TDD 循环 [C]：AutoTriggerContext 上下文提取
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_trigger_context.py`（验证上下文提取） |
-| 🟢 绿 | 实现 `src/domain/value_objects/trigger_context.py` - TriggerContext 值对象 |
+| 🔴 红 | 编写 `tests/unit/domain/value_objects/test_auto_trigger_context.py`（验证上下文提取） |
+| 🟢 绿 | 实现 `src/domain/value_objects/auto_trigger_context.py` - AutoTriggerContext 值对象 |
 | 🔄 重构 | 优化上下文提取逻辑 |
 
-- [x] Subtask 1.7: 🔴 红 — 编写 TriggerContext 失败测试
-- [x] Subtask 1.8: 🟢 绿 — 实现 TriggerContext 值对象
+- [x] Subtask 1.7: 🔴 红 — 编写 AutoTriggerContext 失败测试
+- [x] Subtask 1.8: 🟢 绿 — 实现 AutoTriggerContext 值对象
 - [x] Subtask 1.9: 🔄 重构 — 验证上下文提取准确性
 
 **完成标准/Definition of Done:**
-- [x] TriggerService 实现完成
-- [x] Triggered 事件定义完成
-- [x] TriggerContext 值对象完成
+- [x] AutoTriggerService 实现完成
+- [x] AutoTriggered 事件定义完成
+- [x] AutoTriggerContext 值对象完成
 - [x] session_id 提取准确率 100%
 - [x] TDD 循环全部通过
 
@@ -414,9 +414,9 @@
 
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
-| **TriggerService 位于领域层** | 符合六边形架构，领域逻辑与技术解耦 | 需要依赖倒置 | ✅ 9/10 |
-| TriggerService 位于应用层 | 实现简单 | 领域逻辑泄漏 | 6/10 |
-| TriggerService 位于基础设施层 | 实现最简单 | 违反六边形架构 | 3/10 |
+| **AutoTriggerService 位于领域层** | 符合六边形架构，领域逻辑与技术解耦 | 需要依赖倒置 | ✅ 9/10 |
+| AutoTriggerService 位于应用层 | 实现简单 | 领域逻辑泄漏 | 6/10 |
+| AutoTriggerService 位于基础设施层 | 实现最简单 | 违反六边形架构 | 3/10 |
 
 ### ADR: 心跳调度技术选型决策
 
@@ -447,7 +447,7 @@
 
 **问题**: trigger 阶段是否直接调用 route 阶段，还是通过事件总线解耦？
 
-**已选择方案**: 通过 Triggered 事件解耦
+**已选择方案**: 通过 AutoTriggered 事件解耦
 
 | 评估维度 | 方案A: 事件解耦 | 方案B: 直接调用 | 方案C: 共享状态 |
 |----------|----------------|----------------|----------------|
@@ -464,29 +464,29 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── events/
-│   │   │   ├── trigger_events.py        # Triggered 事件（新实现）
+│   │   │   ├── auto_trigger_events.py        # AutoTriggered 事件（新实现）
 │   │   │   └── heartbeat_events.py      # HeartbeatTriggered（Story 1.3 已定义）
 │   │   ├── services/
-│   │   │   └── trigger_service.py       # TriggerService（核心逻辑）
+│   │   │   └── auto_trigger_service.py       # AutoTriggerService（核心逻辑）
 │   │   └── value_objects/
-│   │       └── trigger_context.py       # TriggerContext 值对象（新实现）
+│   │       └── auto_trigger_context.py       # AutoTriggerContext 值对象（新实现）
 │   ├── infrastructure/
 │   │   ├── config/
-│   │   │   └── trigger.py              # TriggerConfig 配置（新实现）
+│   │   │   └── trigger.py              # AutoTriggerConfig 配置（新实现）
 │   │   └── scheduler/
 │   │       └── heartbeat_scheduler.py   # HeartbeatScheduler（asyncio+Redis sorted set）
 │   └── interfaces/
 │       └── event_listeners/
-│           └── trigger_listener.py      # 事件监听适配器（复用 Story 1.3）
+│           └── auto_trigger_listener.py      # 事件监听适配器（复用 Story 1.3）
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
 │   │   │   ├── events/
-│   │   │   │   └── test_trigger_events.py
+│   │   │   │   └── test_auto_trigger_events.py
 │   │   │   ├── services/
-│   │   │   │   └── test_trigger_service.py
+│   │   │   │   └── test_auto_trigger_service.py
 │   │   │   └── value_objects/
-│   │   │       └── test_trigger_context.py
+│   │   │       └── test_auto_trigger_context.py
 │   │   ├── infrastructure/
 │   │   │   └── scheduler/
 │   │   │       └── test_heartbeat_scheduler.py
@@ -509,13 +509,13 @@ sisys/
 **来源:** [Story 1.13: K8s 动态扩缩容](./1-13-k8s-auto-scaling.md)
 
 **关键学习/Key Learnings:**
-1. **配置模式复用** — OtelConfig.from_env() 模式应复用，TriggerConfig 采用相同 `from_env()` 类方法
-2. **指标与逻辑分离** — EventMetricsCollector 是纯内存计数器，不暴露 HTTP 端点；TriggerService 仅负责触发，不处理业务逻辑
+1. **配置模式复用** — OtelConfig.from_env() 模式应复用，AutoTriggerConfig 采用相同 `from_env()` 类方法
+2. **指标与逻辑分离** — EventMetricsCollector 是纯内存计数器，不暴露 HTTP 端点；AutoTriggerService 仅负责触发，不处理业务逻辑
 3. **六边形架构严格遵守** — Task 3 必须包含架构验证测试，确保无循环依赖
 
 **应用到本故事/Applied to This Story:**
-- [x] TriggerConfig 采用与 OtelConfig 相同的 `from_env()` 模式
-- [x] TriggerService 仅负责触发和上下文提取，不处理业务逻辑
+- [x] AutoTriggerConfig 采用与 OtelConfig 相同的 `from_env()` 模式
+- [x] AutoTriggerService 仅负责触发和上下文提取，不处理业务逻辑
 - [x] Task 3 包含架构验证测试（六边形架构约束检测）
 
 ### 测试隔离与警告修复经验 Test Isolation & Warning Fixes
@@ -535,9 +535,9 @@ async def some_step(context: dict):
 **解决方案:**
 ```python
 # 正确模式：显式接收 event_loop fixture 参数
-@when("TriggerService 处理该事件")
-def when_trigger_service_processes_event(context: dict, event_loop) -> None:
-    event_loop.run_until_complete(trigger_service.on_domain_event(event))
+@when("AutoTriggerService 处理该事件")
+def when_auto_trigger_service_processes_event(context: dict, event_loop) -> None:
+    event_loop.run_until_complete(auto_trigger_service.on_domain_event(event))
 ```
 pytest-asyncio auto 模式下，必须显式接收 `event_loop` 参数以确保使用正确的 event loop。
 
@@ -644,7 +644,7 @@ with patch.object(scheduler, "_poll_loop", side_effect=mock_poll_loop):
 | 角色 | 职责 | 位置 |
 |------|------|------|
 | **HeartbeatScheduler** | **生产者** - 生成 HeartbeatTriggered 事件并发布到事件总线 | `src/infrastructure/scheduler/` |
-| **TriggerService** | **消费者** - 监听并消费 HeartbeatTriggered 事件 | `src/domain/services/` |
+| **AutoTriggerService** | **消费者** - 监听并消费 HeartbeatTriggered 事件 | `src/domain/services/` |
 
 **数据流**:
 ```
@@ -652,12 +652,12 @@ HeartbeatScheduler (定时器到期)
     ↓ 生成 HeartbeatTriggered 事件
 事件总线 (Redis PubSub)
     ↓ 发布
-TriggerService (监听)
+AutoTriggerService (监听)
     ↓ 消费，提取上下文
-发布 Triggered 事件 → Story 1.14b (route)
+发布 AutoTriggered 事件 → Story 1.14b (route)
 ```
 
-**注意**：HeartbeatScheduler 和 TriggerService 都涉及 HeartbeatTriggered，但分别在事件流的不同阶段，不存在循环依赖。
+**注意**：HeartbeatScheduler 和 AutoTriggerService 都涉及 HeartbeatTriggered，但分别在事件流的不同阶段，不存在循环依赖。
 
 ### Git Intelligence Summary
 
@@ -715,21 +715,21 @@ TriggerService (监听)
 
 | 文件路径 | 状态 | 说明 |
 |---------|------|------|
-| `src/domain/events/trigger_events.py` | ✅ 完成 | Triggered 事件定义 |
-| `src/domain/value_objects/trigger_context.py` | ✅ 完成 | TriggerContext 值对象 |
-| `src/domain/services/trigger_service.py` | ✅ 完成 | TriggerService 服务类 |
-| `src/infrastructure/config/trigger.py` | ✅ 完成 | TriggerConfig 配置 |
+| `src/domain/events/auto_trigger_events.py` | ✅ 完成 | AutoTriggered 事件定义 |
+| `src/domain/value_objects/auto_trigger_context.py` | ✅ 完成 | AutoTriggerContext 值对象 |
+| `src/domain/services/auto_trigger_service.py` | ✅ 完成 | AutoTriggerService 服务类 |
+| `src/infrastructure/config/trigger.py` | ✅ 完成 | AutoTriggerConfig 配置 |
 | `src/infrastructure/scheduler/heartbeat_scheduler.py` | ✅ 完成 | HeartbeatScheduler 调度器（asyncio+Redis sorted set） |
-| `src/interfaces/event_listeners/trigger_listener.py` | ✅ 完成 | TriggerEventListener 事件监听适配器（background thread + queue 模式） |
+| `src/interfaces/event_listeners/auto_trigger_listener.py` | ✅ 完成 | TriggerEventListener 事件监听适配器（background thread + queue 模式） |
 | `src/interfaces/event_listeners/__init__.py` | ✅ 完成 | 添加 TriggerEventListener 导出 |
-| `src/domain/events/__init__.py` | ✅ 完成 | 添加 Triggered 事件导出 |
-| `src/domain/services/__init__.py` | ✅ 完成 | 添加 TriggerService 导出 |
-| `src/domain/value_objects/__init__.py` | ✅ 完成 | 添加 TriggerContext 导出 |
-| `src/infrastructure/config/__init__.py` | ✅ 完成 | 添加 TriggerConfig 导出 |
+| `src/domain/events/__init__.py` | ✅ 完成 | 添加 AutoTriggered 事件导出 |
+| `src/domain/services/__init__.py` | ✅ 完成 | 添加 AutoTriggerService 导出 |
+| `src/domain/value_objects/__init__.py` | ✅ 完成 | 添加 AutoTriggerContext 导出 |
+| `src/infrastructure/config/__init__.py` | ✅ 完成 | 添加 AutoTriggerConfig 导出 |
 | `src/infrastructure/scheduler/__init__.py` | ✅ 完成 | 添加 HeartbeatScheduler 导出 |
-| `tests/unit/domain/events/test_trigger_events.py` | ✅ 完成 | Triggered 事件单元测试 |
-| `tests/unit/domain/value_objects/test_trigger_context.py` | ✅ 完成 | TriggerContext 单元测试 |
-| `tests/unit/domain/services/test_trigger_service.py` | ✅ 完成 | TriggerService 单元测试 |
+| `tests/unit/domain/events/test_auto_trigger_events.py` | ✅ 完成 | AutoTriggered 事件单元测试 |
+| `tests/unit/domain/value_objects/test_auto_trigger_context.py` | ✅ 完成 | AutoTriggerContext 单元测试 |
+| `tests/unit/domain/services/test_auto_trigger_service.py` | ✅ 完成 | AutoTriggerService 单元测试 |
 | `tests/unit/infrastructure/scheduler/test_heartbeat_scheduler.py` | ✅ 完成 | HeartbeatScheduler 单元测试 |
 | `tests/unit/architecture/test_trigger_architecture.py` | ✅ 完成 | 六边形架构验证测试 |
 | `tests/unit/performance/test_trigger_performance.py` | ✅ 完成 | 性能基准测试 |
@@ -851,4 +851,4 @@ Story 1.2 (领域事件定义) → Story 1.3 (事件总线实现) → Story 1.14
 **模板版本/Template Version:** 2.1.0
 **创建日期/Created:** 2026-04-20
 **最后更新/Last Updated:** 2026-04-22
-**更新说明:** Story 1.14a 完整版本 - 实现领域事件/心跳事件触发机制：(1) TriggerService 事件监听; (2) HeartbeatScheduler 心跳调度; (3) TriggerContext 上下文提取; (4) 六边形架构验证; (5) 性能基准测试 P95<10ms; (6) 测试隔离问题修复与警告消除经验记录
+**更新说明:** Story 1.14a 完整版本 - 实现领域事件/心跳事件触发机制：(1) AutoTriggerService 事件监听; (2) HeartbeatScheduler 心跳调度; (3) AutoTriggerContext 上下文提取; (4) 六边形架构验证; (5) 性能基准测试 P95<10ms; (6) 测试隔离问题修复与警告消除经验记录

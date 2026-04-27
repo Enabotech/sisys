@@ -1,7 +1,7 @@
-"""ExecuteConfig — configuration for execute mechanism.
+"""AutoExecuteConfig — configuration for auto-execute mechanism.
 
 Environment variables:
-- EXECUTE_ENABLED: Enable/disable execute mechanism (default: true)
+- EXECUTE_ENABLED: Enable/disable auto-execute mechanism (default: true)
 - SANDBOX_TYPE: Sandbox type: docker/gvisor (default: docker)
 - SNAPSHOT_TTL_SECONDS: Snapshot TTL in seconds (default: 86400 = 24h)
 - RESOURCE_LIMITS: JSON string with resource limits
@@ -16,13 +16,13 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class ExecuteConfig:
-    """Configuration for the execute mechanism.
+class AutoExecuteConfig:
+    """Configuration for the auto-execute mechanism.
 
     Uses from_env() class method pattern (same as OtelConfig).
 
     Attributes:
-        enabled: Whether execute mechanism is enabled
+        enabled: Whether auto-execute mechanism is enabled
         sandbox_type: Type of sandbox (docker/gvisor)
         snapshot_ttl_seconds: TTL for state snapshots (default 24h)
         resource_limits: Resource limit configuration
@@ -34,11 +34,11 @@ class ExecuteConfig:
     resource_limits: dict[str, Any] | None = None
 
     @classmethod
-    def from_env(cls) -> ExecuteConfig:
+    def from_env(cls) -> AutoExecuteConfig:
         """Load configuration from environment variables.
 
         Returns:
-            ExecuteConfig instance with values from environment
+            AutoExecuteConfig instance with values from environment
         """
         enabled = os.getenv("EXECUTE_ENABLED", "true").lower() in ("true", "1", "yes")
         sandbox_type = os.getenv("SANDBOX_TYPE", "docker")

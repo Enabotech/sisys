@@ -12,7 +12,7 @@
 
 **As a** 系统架构师,
 **I want** 实现应用启动与事件监听器注册机制,
-**So that** 多种 EventListener（MemoryChangedListener、TriggerEventListener、ExecuteCompletedListener 等）能够通过 AsyncRabbitMQConsumer 异步消费对应的事件。
+**So that** 多种 EventListener（MemoryChangedListener、TriggerEventListener、AutoExecuteCompletedListener 等）能够通过 AsyncRabbitMQConsumer 异步消费对应的事件。
 
 ### 业务价值
 
@@ -35,9 +35,9 @@
 |-----------|---------|-------|------|
 | MemoryChangedListener | MemoryChanged | 1.15a | ✅ 已实现 |
 | TriggerEventListener | Triggered | 1.14a | ✅ 已实现 |
-| ExecuteCompletedListener | Executed | 1.14c | ✅ 已实现 |
+| AutoExecuteCompletedListener | Executed | 1.14c | ✅ 已实现 |
 
-**前置依赖:** Story 1.3 (AsyncRabbitMQConsumer ✅), Story 1.14a (TriggerEventListener ✅), Story 1.14c (ExecuteCompletedListener ✅), Story 1.15a (MemoryChangedListener ✅)
+**前置依赖:** Story 1.3 (AsyncRabbitMQConsumer ✅), Story 1.14a (TriggerEventListener ✅), Story 1.14c (AutoExecuteCompletedListener ✅), Story 1.15a (MemoryChangedListener ✅)
 
 **后续依赖:** Story 1.15b（六层存储协同）、Story 6.3（Checkpoint 快照创建 - L3 压缩触发）
 
@@ -106,7 +106,7 @@
 **Then** 注册所有事件监听器到 AsyncRabbitMQConsumer：
   - MemoryChangedListener → 处理 memory.changed 队列
   - TriggerEventListener → 处理 trigger.triggered 队列
-  - ExecuteCompletedListener → 处理 execute.completed 队列
+  - AutoExecuteCompletedListener → 处理 execute.completed 队列
 
 **And** Consumer 接收消息时：
   - 反序列化事件
@@ -403,8 +403,9 @@ sisys/
 │   └── interfaces/
 │       └── event_listeners/
 │           ├── memory_changed_listener.py  # [EXISTING] 已实现
-│           ├── trigger_listener.py        # [EXISTING] 已实现
-│           └── execute_completed_listener.py  # [EXISTING] 已实现
+│           ├── auto_route_listener.py        # [EXISTING] 已实现
+│           ├── auto_trigger_listener.py        # [EXISTING] 已实现
+│           └── auto_execute_completed_listener.py  # [EXISTING] 已实现
 ├── tests/
 │   ├── unit/application/
 │   │   └── test_app.py            # App 单元测试

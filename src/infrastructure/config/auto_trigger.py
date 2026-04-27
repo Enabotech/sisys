@@ -1,4 +1,4 @@
-"""TriggerConfig — configuration for trigger mechanism."""
+"""AutoTriggerConfig — configuration for auto-trigger mechanism."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 
 @dataclass
-class TriggerConfig:
-    """Configuration for trigger mechanism.
+class AutoTriggerConfig:
+    """Configuration for auto-trigger mechanism.
 
     Environment variables follow OtelConfig pattern (from_env() class method).
     """
@@ -18,16 +18,16 @@ class TriggerConfig:
     trigger_max_retries: int = 3
 
     @classmethod
-    def from_env(cls) -> TriggerConfig:
+    def from_env(cls) -> AutoTriggerConfig:
         """Load configuration from environment variables.
 
         Environment variables:
-            TRIGGER_ENABLED: Enable trigger mechanism (default: true)
+            TRIGGER_ENABLED: Enable auto-trigger mechanism (default: true)
             HEARTBEAT_INTERVAL_SECONDS: Heartbeat interval in seconds (default: 60)
             TRIGGER_MAX_RETRIES: Max retry attempts on failure (default: 3)
 
         Returns:
-            TriggerConfig instance with values from environment
+            AutoTriggerConfig instance with values from environment
         """
         enabled_str = os.getenv("TRIGGER_ENABLED", "true").lower()
         interval_str = os.getenv("HEARTBEAT_INTERVAL_SECONDS", "60")

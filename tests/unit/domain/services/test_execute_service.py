@@ -1,40 +1,40 @@
-"""Tests for ExecuteService domain service."""
+"""Tests for AutoExecuteService domain service."""
 
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.events.execute_events import Executed
-from src.domain.events.route_events import Routed
-from src.domain.services.execute_service import ExecuteService
+from src.domain.events.auto_execute_events import AutoExecuted
+from src.domain.events.auto_route_events import AutoRouted
+from src.domain.services.auto_execute_service import AutoExecuteService
 
 
-class TestExecuteService:
-    """TDD tests for ExecuteService domain service."""
+class TestAutoExecuteService:
+    """TDD tests for AutoExecuteService domain service."""
 
     def test_service_initialization(self) -> None:
-        """RED: ExecuteService should initialize with optional dependencies."""
-        service = ExecuteService()
+        """RED: AutoExecuteService should initialize with optional dependencies."""
+        service = AutoExecuteService()
 
         assert service._sandbox is None
         assert service._snapshot_repo is None
 
     def test_service_with_sandbox_and_repo(self) -> None:
-        """RED: ExecuteService should accept sandbox and repo dependencies."""
+        """RED: AutoExecuteService should accept sandbox and repo dependencies."""
         mock_sandbox = MagicMock()
         mock_repo = MagicMock()
 
-        service = ExecuteService(sandbox=mock_sandbox, snapshot_repo=mock_repo)
+        service = AutoExecuteService(sandbox=mock_sandbox, snapshot_repo=mock_repo)
 
         assert service._sandbox is mock_sandbox
         assert service._snapshot_repo is mock_repo
 
     @pytest.mark.asyncio
     async def test_on_routed_event_returns_executed_event(self) -> None:
-        """RED: on_routed_event should return Executed event on success."""
-        service = ExecuteService()
+        """RED: on_routed_event should return AutoExecuted event on success."""
+        service = AutoExecuteService()
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             session_id="test-session",
             task_context={"task": "test", "code": "print('hello')"},
             route_target="tool-1",
@@ -45,15 +45,15 @@ class TestExecuteService:
         result = await service.on_routed_event(routed_event)
 
         assert result is not None
-        assert isinstance(result, Executed)
+        assert isinstance(result, AutoExecuted)
         assert result.session_id == "test-session"
 
     @pytest.mark.asyncio
     async def test_on_routed_event_without_session_id_returns_none(self) -> None:
         """RED: on_routed_event should return None if session_id is missing."""
-        service = ExecuteService()
+        service = AutoExecuteService()
 
-        routed_event = Routed(session_id="", task_context={})
+        routed_event = AutoRouted(session_id="", task_context={})
 
         result = await service.on_routed_event(routed_event)
 
@@ -62,14 +62,14 @@ class TestExecuteService:
     @pytest.mark.asyncio
     async def test_on_routed_event_publishes_executed_event(self) -> None:
         """RED: on_routed_event should populate all fields correctly."""
-        service = ExecuteService()
+        service = AutoExecuteService()
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             session_id="test-session-123",
             task_context={
                 "task": "analysis",
                 "code": "x = 1 + 1",
-                "business_event_type": "ToolExecuted",
+                "business_event_type": "ToolAutoExecuted",
             },
             route_target="ceo-agent",
             route_score=0.95,
@@ -81,7 +81,7 @@ class TestExecuteService:
         assert result is not None
         assert result.session_id == "test-session-123"
         assert result.task_context["task"] == "analysis"
-        assert result.business_event_type == "ToolExecuted"
+        assert result.business_event_type == "ToolAutoExecuted"
         assert result.route_target == "ceo-agent"
         assert result.route_score == 0.95
 
@@ -91,7 +91,7 @@ class TestExecuteService:
         mock_repo = AsyncMock()
         mock_repo.load = AsyncMock(return_value=None)
         mock_repo.save = AsyncMock()
-        service = ExecuteService(snapshot_repo=mock_repo)
+        service = AutoExecuteService(snapshot_repo=mock_repo)
 
         result = await service.create_snapshot(
             session_id="test-session",
@@ -113,7 +113,7 @@ class TestExecuteService:
         mock_repo = AsyncMock()
         mock_repo.load = AsyncMock(return_value=existing_snapshot)
         mock_repo.save = AsyncMock()
-        service = ExecuteService(snapshot_repo=mock_repo)
+        service = AutoExecuteService(snapshot_repo=mock_repo)
 
         result = await service.create_snapshot(
             session_id="test-session",
@@ -129,17 +129,17 @@ class TestExecuteService:
         mock_sandbox = AsyncMock()
         mock_sandbox.start_container = AsyncMock()
         mock_sandbox.execute_code = AsyncMock(side_effect=Exception("execution failed"))
-        service = ExecuteService(sandbox=mock_sandbox)
+        service = AutoExecuteService(sandbox=mock_sandbox)
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             session_id="error-session",
-            task_context={"code": "print('test')", "business_event_type": "ToolExecuted"},
+            task_context={"code": "print('test')", "business_event_type": "ToolAutoExecuted"},
             route_target="test-agent",
             route_score=0.9,
             route_type="hash",
         )
 
-        # Should return Executed event with failure status, not raise
+        # Should return AutoExecuted event with failure status, not raise
         result = await service.on_routed_event(routed_event)
 
         assert result is not None
@@ -150,7 +150,7 @@ class TestExecuteService:
     @pytest.mark.asyncio
     async def test_restore_snapshot_returns_none_when_no_repo(self) -> None:
         """Coverage: restore_snapshot when no repo configured (lines 226-227)."""
-        service = ExecuteService(snapshot_repo=None)
+        service = AutoExecuteService(snapshot_repo=None)
 
         result = await service.restore_snapshot("any-session")
 
@@ -161,7 +161,7 @@ class TestExecuteService:
         """Coverage: restore_snapshot when no snapshot exists (lines 232-233)."""
         mock_repo = AsyncMock()
         mock_repo.load = AsyncMock(return_value=None)
-        service = ExecuteService(snapshot_repo=mock_repo)
+        service = AutoExecuteService(snapshot_repo=mock_repo)
 
         result = await service.restore_snapshot("nonexistent")
 
@@ -169,15 +169,15 @@ class TestExecuteService:
 
     @pytest.mark.asyncio
     async def test_on_routed_event_returns_executed_when_sandbox_fails(self) -> None:
-        """Coverage: on_routed_event returns Executed even if sandbox.execute_code fails."""
+        """Coverage: on_routed_event returns AutoExecuted even if sandbox.execute_code fails."""
         mock_sandbox = AsyncMock()
         mock_sandbox.start_container = AsyncMock()
         mock_sandbox.execute_code = AsyncMock(side_effect=Exception("execution failed"))
-        service = ExecuteService(sandbox=mock_sandbox)
+        service = AutoExecuteService(sandbox=mock_sandbox)
 
-        routed_event = Routed(
+        routed_event = AutoRouted(
             session_id="exec-fail-session",
-            task_context={"code": "raise_error()", "business_event_type": "ToolExecuted"},
+            task_context={"code": "raise_error()", "business_event_type": "ToolAutoExecuted"},
             route_target="test-agent",
             route_score=0.8,
             route_type="hash",

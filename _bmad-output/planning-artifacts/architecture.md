@@ -199,9 +199,9 @@ completedAt: '2026-02-26'
 | **规则 2** | CLI 命令到应用层用例的精确映射 | `sisys document`→DocumentProcessingUseCase / `sisys tool`→StrategicAnalysisUseCase / `sisys agent`→AgentCollaborationUseCase / `sisys plan`→PlanningGenerationUseCase / `sisys system`→SystemOperationsUseCase |
 | **规则 3** | Skills 在 DDD 架构中的精确位置 | L1 TOOLS.md（应用层元数据清单，Agent 实例化时加载）→ L2 SKILL.md（应用层操作手册，任务匹配后加载）→ L3 scripts/references（基础设施层资源，按需加载） |
 | **规则 4** | CLI 同步响应与事件异步处理协调 | CLI 响应不阻塞下游事件处理；`--wait-for-events` 参数可选等待特定事件完成（超时默认 30 秒，V1 可选增强，MVP 不实现） |
-| **规则 5** | 系统公理一与 CLI 的关系 | CLI 是"点火开关"（外部触发器），领域事件是"引擎血液"（内部触发器），trigger→route→execute 是"引擎运转逻辑" |
+| **规则 5** | 系统公理一与 CLI 的关系 | CLI 是"点火开关"（外部触发器），领域事件是"引擎血液"（内部触发器），auto-trigger→auto-route→auto-execute 是"引擎运转逻辑" |
 
-**CLI 是"点火开关"，领域事件是"引擎血液"，trigger→route→execute 是"引擎运转逻辑"。**
+**CLI 是"点火开关"，领域事件是"引擎血液"，auto-trigger→auto-route→auto-execute 是"引擎运转逻辑"。**
 
 ---
 

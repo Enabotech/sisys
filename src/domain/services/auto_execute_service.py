@@ -1,10 +1,10 @@
-"""ExecuteService — domain service that executes tasks in isolated session namespaces.
+"""AutoExecuteService — domain service that executes tasks in isolated session namespaces.
 
 Responsibilities:
-- Listen to Routed events from Story 1.14b
+- Listen to AutoRouted events from Story 1.14b
 - Execute tasks in sandboxed environment (Docker/gVisor)
 - Create state snapshots for recovery
-- Publish Executed events to downstream listeners
+- Publish AutoExecuted events to downstream listeners
 
 Architecture: Domain layer (no external dependencies), uses port/protocol for
 sandbox execution and snapshot storage.
@@ -16,8 +16,8 @@ import logging
 from typing import Any, Protocol
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
+from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
-from src.domain.events.execute_events import Executed
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +54,14 @@ class SnapshotRepositoryProtocol(Protocol):
         ...
 
 
-class ExecuteService:
-    """Domain service that executes tasks from Routed events.
+class AutoExecuteService:
+    """Domain service that executes tasks from AutoRouted events.
 
     Responsibilities:
-    - Listen to Routed events (from Story 1.14b route mechanism)
+    - Listen to AutoRouted events (from Story 1.14b route mechanism)
     - Execute tasks in isolated sandbox (Docker/gVisor)
     - Create state snapshots for recovery
-    - Publish Executed events to downstream listeners
+    - Publish AutoExecuted events to downstream listeners
 
     Architecture: Domain layer, uses port/protocol for infrastructure adapters.
     """
@@ -71,7 +71,7 @@ class ExecuteService:
         sandbox: SandboxExecutorProtocol | None = None,
         snapshot_repo: SnapshotRepositoryProtocol | None = None,
     ):
-        """Initialize ExecuteService.
+        """Initialize AutoExecuteService.
 
         Args:
             sandbox: Sandbox executor port. None for standalone testing.
@@ -80,18 +80,18 @@ class ExecuteService:
         self._sandbox = sandbox
         self._snapshot_repo = snapshot_repo
 
-    async def on_routed_event(self, event: DomainEvent) -> Executed | None:
-        """Handle a Routed event: execute task and publish Executed event.
+    async def on_routed_event(self, event: DomainEvent) -> AutoExecuted | None:
+        """Handle a AutoRouted event: execute task and publish AutoExecuted event.
 
         Args:
-            event: Routed event from Story 1.14b
+            event: AutoRouted event from Story 1.14b
 
         Returns:
-            Executed event if execution was successful, None otherwise
+            AutoExecuted event if execution was successful, None otherwise
         """
-        logger.debug("Processing Routed event: session_id=%s", getattr(event, "session_id", "unknown"))
+        logger.debug("Processing AutoRouted event: session_id=%s", getattr(event, "session_id", "unknown"))
 
-        # Extract fields from Routed event
+        # Extract fields from AutoRouted event
         session_id = getattr(event, "session_id", "")
         task_context = getattr(event, "task_context", {})
         route_target = getattr(event, "route_target", "")
@@ -99,7 +99,7 @@ class ExecuteService:
         route_type = getattr(event, "route_type", "")
 
         if not session_id:
-            logger.warning("Routed event missing session_id, skipping execution")
+            logger.warning("AutoRouted event missing session_id, skipping execution")
             return None
 
         # Start sandbox if not already running
@@ -141,7 +141,7 @@ class ExecuteService:
             # Determine business event type from task context
             business_event_type = task_context.get("business_event_type", "ToolExecuted")
 
-            executed = Executed(
+            executed = AutoExecuted(
                 session_id=session_id,
                 task_context=task_context,
                 execution_result=execution_result,
@@ -165,8 +165,8 @@ class ExecuteService:
             logger.error("Execution failed: session_id=%s error=%s", session_id, e)
             execution_result = {"status": "failed", "error": str(e)}
 
-            # Still publish Executed event with failure status
-            executed = Executed(
+            # Still publish AutoExecuted event with failure status
+            executed = AutoExecuted(
                 session_id=session_id,
                 task_context=task_context,
                 execution_result=execution_result,
