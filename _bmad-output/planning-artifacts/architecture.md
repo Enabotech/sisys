@@ -1868,9 +1868,13 @@ CREATE TABLE memory_change_history (
          说明：这是轻量级提取，不需要调用 PersistentNoteTaker（无需生成 note_id/entities/summary/lineage）
       2. 压缩 X 至 ~150 字（保留核心语义，压缩率≥70%）
          说明：压缩输入=用户输入 X（≤500 字），输出=~150 字（小规模压缩）
-      3. 写入 ~/.sisys/memory/xxx.md
+      3. 写入 ~/.sisys/memory/xxx.md（L0 同步，强一致）
       4. 更新 MEMORY.md 索引
-      5. 发布 MemoryChanged(is_automatic=False)
+      5. 发布 MemoryChanged(is_automatic=False)（事务发件箱）
+
+      MemoryChangedListener.handle()（异步消费）
+      6. L1 Redis 缓存失效（立即，保证"上下文≠缓存"）
+      7. L2 PostgreSQL 写入 memory_metadata + memory_change_history（异步）
 
   删除类: "不要记住", "忘了这个", "不要记"
     → MemoryService.delete(memory_id, is_automatic=False)
@@ -1878,12 +1882,20 @@ CREATE TABLE memory_change_history (
       2. 从 MEMORY.md 移除索引
       3. 发布 MemoryChanged(is_automatic=False)
 
+      MemoryChangedListener.handle()（异步消费）
+      4. L1 Redis 缓存失效
+      5. L2 记录 history + 软删除 metadata
+
   修改类: "改成", "更正为", "改为"
     → MemoryService.update(memory_id, new_content, is_automatic=False)
       1. 读取当前版本（检查 version 冲突）
       2. 写入新版本（version + 1）
       3. 更新 MEMORY.md 索引
       4. 发布 MemoryChanged(is_automatic=False)
+
+      MemoryChangedListener.handle()（异步消费）
+      5. L1 Redis 缓存失效
+      6. L2 更新 metadata + 记录 history
 
   查询类: "你记得什么", "我的记忆有哪些"
     → MemoryService.list()
@@ -1967,6 +1979,20 @@ StrategicArchive 持久化（内部流程，不发布 MemoryChanged）
 | **Checkpoint 持久化** | L3 压缩触发 | Checkpoint 创建 | 持久化笔记 → 上下文压缩 → StrategicArchive 持久化（内部，不发布事件） |
 | **版本冲突处理** | - | 并发更新同一记忆 | 抛出 VersionConflictError，用户确认后强制覆盖（version 递增） |
 
+**异步消费说明（MemoryChangedListener）**：
+所有"发布 MemoryChanged"的操作都会触发异步消费，流程如下：
+```
+MemoryChanged 事件发布（事务发件箱）
+    ↓
+AsyncOutboxPoller 轮询（后台）
+    ↓
+MemoryChangedListener.handle()
+    ├─→ L1 Redis 缓存失效（立即，保证"上下文≠缓存"）
+    ├─→ L2 PostgreSQL 元数据/历史写入（异步）
+    ├─→ L3 Qdrant 向量（按需，内容>500 tokens）
+    └─→ L5 Neo4j 图谱（按需，EntityExtractor）
+```
+
 **多用户并发冲突处理策略**：
 - **乐观锁**：写入时检查 version，version 不匹配则拒绝
 - **冲突解决**：向用户展示冲突内容，用户确认后强制覆盖（version 递增，change_type='force_update'）
@@ -2014,33 +2040,67 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
 
 #### 11.2.9 L0 驱动各层协同机制
 
-**设计原则**：L0 是入口，驱动 L1-L5 各层按需协同工作。L0 文件系统存储实际记忆内容，其他各层按需响应。
+**设计原则**：
+- **L0 文件系统 = 真相源**：同步写入，强一致，用户感知即成功
+- **系统公理二**：`LLM 上下文 = 缓存，磁盘记忆 = 真相源`
+- **保证"上下文≠缓存"**：写入时必须失效 L1 缓存，保证 LLM 从真相源读取最新数据
 
-**写入流程**：
+**事件驱动架构**：
+```
+MemoryService.save()
+    │
+    ├─→ L0 文件系统（同步，强一致）
+    │   ├── 写入 ~/.sisys/memory/xxx.md
+    │   ├── 追加到 MEMORY.md 索引
+    │   └── 返回用户成功
+    │
+    └─→ 发布 MemoryChanged 事件（事务发件箱）
+        ├── 写入 Outbox 表（同一事务）
+        └── 事务提交
+
+AsyncOutboxPoller 发布事件（后台）
+    │
+    └─→ MemoryChangedListener.handle()（在 Listener 中执行）
+            │
+            ├─→ L1 Redis 缓存失效（同步，立即）
+            │   └── storage_coordinator.invalidate(layer="L1", ...)
+            │   └── 保证"上下文≠缓存"公理
+            │
+            ├─→ L2 PostgreSQL（通过 Repository 调用）
+            │   ├── metadata_repository.upsert(event)
+            │   └── history_repository.append(event)
+            │
+            ├─→ L3 Qdrant（按需，内容>500 tokens）
+            │   └── vector_store.embed(event)
+            │
+            └─→ L5 Neo4j（按需，EntityExtractor）
+                └── entity_extractor.extract(event)
+```
+
+**写入流程（MemoryService.save）**：
 ```
 用户确认记忆
     │
-    ├─→ L0 文件系统
-    │   ├── 写入 ~/.sisys/memory/xxx.md（实际内容）
+    ├─→ L0 文件系统（同步）
+    │   ├── 写入 ~/.sisys/memory/xxx.md
     │   ├── version 递增
     │   └── 追加到 MEMORY.md 索引
     │
-    ├─→ L2 PostgreSQL（异步）
-    │   ├── 写入元数据索引（name/description/type/mtime/path）
-    │   └── 记录 memory_change_history（diff + changed_fields）
-    │
-    ├─→ L3 Qdrant（异步，文件>500时启用）
-    │   └── 生成 embedding（Dense+Sparse）
-    │
-    ├─→ L5 Neo4j（可选，按需）
-    │   └── 构建关系（project→reference）
-    │
-    └─→ 完成
+    └─→ 发布 MemoryChanged 事件（事务发件箱）
+            ↓
+    AsyncOutboxPoller（后台）
+            ↓
+    MemoryChangedListener.handle()
+            │
+            ├─→ L1 缓存失效（同步）
+            ├─→ L2 元数据写入（metadata_repository.upsert）
+            ├─→ L3 向量（按需，>500 tokens）
+            └─→ L5 图谱（按需，EntityExtractor）
 ```
 
-**更新流程**：
+**更新流程（MemoryService.update）**：
 ```
-用户修改记忆（如纠正错误偏好）
+用户修改记忆
     │
     ├─→ L0 读取当前版本
     │   ├── 检查 version 冲突
@@ -2048,55 +2108,47 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
     │
     ├─→ L0 写入新版本
     │   ├── version + 1
-    │   ├── updated_at 更新
-    │   └── 保持同一文件名
+    │   └── updated_at 更新
     │
-    ├─→ L2 PostgreSQL（异步）
-    │   ├── UPSERT memory_metadata（version + 1, updated_at = NOW()）
-    │   └── 记录 memory_change_history（change_type='update'）
-    │
-    └─→ 完成
+    └─→ 发布 MemoryChanged 事件（事务发件箱）
+            ↓
+    MemoryChangedListener.handle()
+            │
+            ├─→ L1 缓存失效（同步）
+            ├─→ L2 元数据更新（metadata_repository.upsert）
+            └─→ 完成
 ```
 
-**删除流程**：
+**删除流程（MemoryService.delete）**：
 ```
-用户明确要求"忘记这个"（如说"不要记住这个"）
+用户明确要求"忘记这个"
     │
     ├─→ L0 文件系统
-    │   ├── 删除 ~/.sisys/memory/xxx.md 文件
-    │   └── 从 MEMORY.md 索引移除对应行
+    │   ├── 删除 ~/.sisys/memory/xxx.md
+    │   └── 从 MEMORY.md 移除索引
     │
-    ├─→ L1 Redis（异步）
-    │   └── 删除缓存（如 redis.del("memory:xxx.md")）
-    │
-    ├─→ L2 PostgreSQL（异步）
-    │   ├── INSERT memory_change_history（change_type='delete'，记录最终状态）
-    │   └── DELETE FROM memory_metadata WHERE name = 'xxx'
-    │
-    ├─→ L3 Qdrant（异步）
-    │   └── 删除 embedding（如 qdrant.delete(collection='memory', point_id=xxx)）
-    │
-    ├─→ L5 Neo4j（异步，可选）
-    │   └── 删除关系节点（如 MATCH (n {name:'xxx'}) DELETE n）
-    │
-    └─→ 完成
+    └─→ 发布 MemoryChanged 事件（事务发件箱）
+            ↓
+    MemoryChangedListener.handle()
+            │
+            ├─→ L1 缓存失效（同步）
+            ├─→ L2 历史记录（history_repository.append）+ 软删除
+            ├─→ L3 向量删除（按需）
+            └─→ L5 图谱删除（按需）
 ```
 
 **检索流程**：
 ```
 用户 Query
     │
-    ├─→ L0 scanMemoryFiles()
+    ├─→ L0 scanMemoryFiles()（真相源）
     │   ├── 扫描 ~/.sisys/memory/*.md（private，当前用户）
     │   ├── 扫描 ~/.sisys/memory/group/*.md（group，成员权限）
     │   └── 获取文件列表（最新 200 个，合并去重）
     │
-    ├─→ LLM 语义选择
-    │   ├── findRelevantMemories() 调用 Sonnet
-    │   └── 选择 Top 5 相关记忆（来自 private + group）
-    │
-    ├─→ L1 Redis（检查缓存）
-    │   └── 缓存命中？直接返回
+    ├─→ L1 Redis（可选加速）
+    │   └── 仅用于高频访问加速，不作为真相源
+    │       注意：缓存可能过期，读操作以 L0 为准
     │
     ├─→ L2 PostgreSQL（RBAC 校验）
     │   └── 权限检查，过滤无权限记忆
@@ -2107,6 +2159,11 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
     │
     └─→ 返回结果 + memoryAge 新鲜度警告
 ```
+
+**L1 缓存使用策略**：
+- **写入时失效**：MemoryChanged 事件触发 `redis.del()`，保证缓存不包含过期数据
+- **读取时加速**：高频访问可先查 L1，L1 未命中则查 L0
+- **不作为真相源**：LLM 决策时以 L0 为准，L1 仅作性能优化
 
 **Checkpoint 持久化流程**（系统公理二约束）：
 ```
@@ -2147,17 +2204,16 @@ updated_at: {{ISO时间戳}}  # 每次更新修改
    └── MEMORY.md 追加：
        - [bun over npm](feedback_bun_npm.md) — User prefers bun
 
-4. L2 异步同步
-   └── INSERT INTO memory_metadata
-       (id, user_id, name, description, type, mtime, path, version, created_at, updated_at)
-       VALUES (gen_random_uuid(), 'user:xxx', 'bun over npm', 'User prefers bun', 'feedback', NOW(), 'feedback/{uuid}.md', 1, NOW(), NOW())
+4. 发布 MemoryChanged 事件（事务发件箱）
+   └── 写入 outbox 表（同一事务）
+       事务提交后，AsyncOutboxPoller 发布事件
 
-   INSERT INTO memory_change_history
-       (id, memory_id, version, changed_at, changed_by, change_type, changed_fields, diff_summary)
-       VALUES (gen_random_uuid(), '{memory_id}', 1, NOW(), 'user:xxx', 'create', '{"name": [null, "bun over npm"], "type": [null, "feedback"]}', 'create memory: bun over npm')
-
-5. L3 异步向量化（若文件>500）
-   └── 发送至向量化队列
+5. MemoryChangedListener 异步消费
+   ├── L1 Redis 缓存失效（立即）
+   ├── L2 PostgreSQL 写入（异步）
+   │   └── INSERT INTO memory_metadata + memory_change_history
+   └── L3 Qdrant 向量（按需，内容>500 tokens）
+       └── 发送至向量化队列
 ```
 
 **完整检索示例（private + group 合并）**：
