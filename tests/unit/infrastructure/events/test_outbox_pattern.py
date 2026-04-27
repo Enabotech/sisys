@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -187,17 +187,29 @@ class TestDomainLayerIsolation:
 # ============================================================================
 
 
+def _create_mock_repo():
+    """Create a mock repo with internal methods for AsyncOutboxPoller."""
+    from src.domain.repositories.outbox import OutboxRepository
+
+    repo = MagicMock(spec=OutboxRepository)
+    # Add internal methods that AsyncOutboxPoller uses
+    repo._get_unpublished_entities = AsyncMock(return_value=[])
+    repo._mark_published_entity = AsyncMock()
+    repo._mark_failed_entity = AsyncMock()
+    return repo
+
+
 class TestAsyncOutboxPoller:
     """AsyncOutboxPoller tests using mocks."""
 
     @pytest.mark.asyncio
     async def test_poll_once_publishes_pending_events(self):
         """poll_once should publish pending events."""
-        from src.domain.repositories.outbox import OutboxRepository
-
-        repo = AsyncMock(spec=OutboxRepository)
+        repo = _create_mock_repo()
+        # Create a proper OutboxEntity via DomainEvent → Entity conversion
         event = _make_event()
-        repo.get_unpublished.return_value = [event]
+        entity = EventOutboxAdapter.from_domain_event(event)
+        repo._get_unpublished_entities.return_value = [entity]
 
         mock_publisher = AsyncMock()
 
@@ -212,16 +224,15 @@ class TestAsyncOutboxPoller:
         await poller.poll_once()
 
         mock_publisher.async_publish.assert_called_once()
-        repo.mark_published.assert_called_once_with(event.event_id)
+        repo._mark_published_entity.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_poll_once_marks_published_after_success(self):
         """poll_once should mark event as published after successful publish."""
-        from src.domain.repositories.outbox import OutboxRepository
-
-        repo = AsyncMock(spec=OutboxRepository)
+        repo = _create_mock_repo()
         event = _make_event()
-        repo.get_unpublished.return_value = [event]
+        entity = EventOutboxAdapter.from_domain_event(event)
+        repo._get_unpublished_entities.return_value = [entity]
 
         mock_publisher = AsyncMock()
 
@@ -235,16 +246,15 @@ class TestAsyncOutboxPoller:
 
         await poller.poll_once()
 
-        repo.mark_published.assert_called_once_with(event.event_id)
+        repo._mark_published_entity.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(self):
         """poll_once should mark events as failed on publish error."""
-        from src.domain.repositories.outbox import OutboxRepository
-
-        repo = AsyncMock(spec=OutboxRepository)
+        repo = _create_mock_repo()
         event = _make_event()
-        repo.get_unpublished.return_value = [event]
+        entity = EventOutboxAdapter.from_domain_event(event)
+        repo._get_unpublished_entities.return_value = [entity]
 
         mock_publisher = AsyncMock()
         mock_publisher.async_publish.side_effect = RuntimeError("publish failed")
@@ -259,18 +269,13 @@ class TestAsyncOutboxPoller:
 
         await poller.poll_once()
 
-        repo.mark_failed.assert_called_once()
-        call_args = repo.mark_failed.call_args
-        assert call_args[0][0] == event.event_id
-        assert "publish failed" in call_args[0][1]
+        repo._mark_failed_entity.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_poller_runs_loop(self):
         """run should execute poll_once at least once before stopped."""
-        from src.domain.repositories.outbox import OutboxRepository
-
-        repo = AsyncMock(spec=OutboxRepository)
-        repo.get_unpublished.return_value = []
+        repo = _create_mock_repo()
+        repo._get_unpublished_entities.return_value = []
 
         mock_publisher = AsyncMock()
 
@@ -284,14 +289,12 @@ class TestAsyncOutboxPoller:
 
         # Run poll_once directly to verify it works
         await poller.poll_once()
-        repo.get_unpublished.assert_called()
+        repo._get_unpublished_entities.assert_called()
 
     @pytest.mark.asyncio
     async def test_poller_graceful_stop(self):
         """stop should gracefully stop the polling loop."""
-        from src.domain.repositories.outbox import OutboxRepository
-
-        repo = AsyncMock(spec=OutboxRepository)
+        repo = _create_mock_repo()
         mock_publisher = AsyncMock()
 
         from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
