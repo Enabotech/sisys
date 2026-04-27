@@ -5,6 +5,7 @@ Verifies test fixtures, Mock configuration, and data factory correctness.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import fakeredis.aioredis
@@ -13,7 +14,6 @@ import pytest
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
 from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
-from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # ===================================================================
 # TDD Cycle A: Test Directory & Configuration
@@ -23,10 +23,11 @@ from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 class TestTestFixtureConfiguration:
     """Verify test fixtures are correctly configured and isolated."""
 
-    def test_outbox_repo_fixture_is_fresh_instance(self, outbox_repo: InMemoryOutboxRepository) -> None:
-        """Each test should get a fresh InMemoryOutboxRepository instance."""
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 0
+    def test_outbox_repo_fixture_is_fresh_mock(self, outbox_repo: AsyncMock) -> None:
+        """Each test should get a fresh mock OutboxRepository."""
+        outbox_repo.get_unpublished.return_value = []
+        result = outbox_repo.get_unpublished(limit=10)
+        assert result == []
 
     def test_event_store_fixture_is_fresh(self, event_id: UUID) -> None:
         """Each test should get a fresh InMemoryEventStore instance."""

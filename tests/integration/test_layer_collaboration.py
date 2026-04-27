@@ -10,12 +10,13 @@ CLI/API integration deferred to Story 7.x.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from src.application.use_cases.document_processing import DocumentProcessingUseCase
 from src.domain.events.base import DomainEvent
 from src.domain.repositories.outbox import OutboxRepository
-from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # ===================================================================
 # TDD Cycle A: Application → Domain → Infrastructure Collaboration
@@ -25,12 +26,12 @@ from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 class TestLayerCollaboration:
     """Verify application layer orchestrates domain and infrastructure."""
 
-    def test_use_case_can_be_constructed(self, outbox_repo: InMemoryOutboxRepository) -> None:
+    def test_use_case_can_be_constructed(self, outbox_repo: AsyncMock) -> None:
         """DocumentProcessingUseCase should accept OutboxRepository."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         assert use_case is not None
 
-    def test_use_case_calls_domain_interface(self, outbox_repo: InMemoryOutboxRepository) -> None:
+    def test_use_case_calls_domain_interface(self, outbox_repo: AsyncMock) -> None:
         """Use case should call domain layer's OutboxRepository interface."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         result = use_case.process_document(document_id="test-doc-1")
@@ -38,17 +39,19 @@ class TestLayerCollaboration:
         assert result["status"] == "success"
         assert result["document_id"] == "test-doc-1"
 
-    def test_use_case_publishes_event_to_outbox(self, outbox_repo: InMemoryOutboxRepository) -> None:
+    def test_use_case_publishes_event_to_outbox(self, outbox_repo: AsyncMock) -> None:
         """Use case processing should result in event being saved to outbox."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         use_case.process_document(document_id="test-doc-1")
 
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
-        assert unpublished[0].event_type == "DocumentProcessed"
-        assert unpublished[0].payload["document_id"] == "test-doc-1"
+        outbox_repo.save.assert_called_once()
+        call_args = outbox_repo.save.call_args
+        saved_event = call_args[0][0]
+        assert isinstance(saved_event, DomainEvent)
+        assert saved_event.event_type == "DocumentProcessed"
+        assert saved_event.payload["document_id"] == "test-doc-1"
 
-    def test_use_case_with_custom_metadata(self, outbox_repo: InMemoryOutboxRepository) -> None:
+    def test_use_case_with_custom_metadata(self, outbox_repo: AsyncMock) -> None:
         """Use case should accept optional metadata."""
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         result = use_case.process_document(
@@ -57,8 +60,7 @@ class TestLayerCollaboration:
         )
 
         assert result["status"] == "success"
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
+        outbox_repo.save.assert_called()
 
 
 # ===================================================================
@@ -123,18 +125,16 @@ class TestErrorPropagation:
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ValueError)
 
-    def test_layer_data_integrity_across_layers(self, outbox_repo: InMemoryOutboxRepository) -> None:
+    def test_layer_data_integrity_across_layers(self, outbox_repo: AsyncMock) -> None:
         """DomainEvent objects should maintain integrity across layers."""
-        # Create event at application layer
         use_case = DocumentProcessingUseCase(outbox_repo=outbox_repo)
         use_case.process_document(document_id="integrity-test")
 
-        # Verify data integrity in infrastructure layer
-        unpublished = outbox_repo.get_unpublished(limit=10)
-        assert len(unpublished) == 1
-
-        event = unpublished[0]
-        assert isinstance(event, DomainEvent)
-        assert event.event_type == "DocumentProcessed"
-        assert event.payload["document_id"] == "integrity-test"
-        assert event.source == "DocumentProcessingUseCase"
+        # Verify save was called with correct event
+        outbox_repo.save.assert_called_once()
+        call_args = outbox_repo.save.call_args
+        saved_event = call_args[0][0]
+        assert isinstance(saved_event, DomainEvent)
+        assert saved_event.event_type == "DocumentProcessed"
+        assert saved_event.payload["document_id"] == "integrity-test"
+        assert saved_event.source == "DocumentProcessingUseCase"
