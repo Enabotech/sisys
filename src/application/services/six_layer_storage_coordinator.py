@@ -16,8 +16,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.infrastructure.repositories.memory_change_history_repository import MemoryChangeHistoryRepository
-    from src.infrastructure.repositories.memory_metadata_repository import MemoryMetadataRepository
+    from src.domain.repositories.memory_repository import (
+        MemoryChangeHistoryRepositoryProtocol,
+        MemoryMetadataRepositoryProtocol,
+    )
     from src.infrastructure.storage.minio.minio_repository import MinIORepository
     from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
     from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
@@ -47,7 +49,7 @@ class SixLayerStorageCoordinator:
     def __init__(
         self,
         redis_cache: RedisMemoryCache,
-        l2_repository: MemoryMetadataRepository | MemoryChangeHistoryRepository | None = None,
+        l2_repository: MemoryMetadataRepositoryProtocol | MemoryChangeHistoryRepositoryProtocol | None = None,
         l3_vector_store: QdrantVectorStorage | None = None,
         l4_object_store: MinIORepository | None = None,
         l5_graph_store: Neo4jGraphStorage | None = None,
