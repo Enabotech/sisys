@@ -10,11 +10,15 @@ L4 MinIO 不在本流程范围内，由 Checkpoint 持久化流程独立触发�
 
 架构来源: architecture.md §11.2.9
 Story: 1.15a
+
+调用方式：被 AsyncRabbitMQConsumer 通过 await handler(event) 调用，必须是 async def。
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -51,7 +55,7 @@ class MemoryChangedListener:
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
 
-    def handle(self, event: MemoryChanged) -> None:
+    async def handle(self, event: MemoryChanged) -> None:
         """处理 MemoryChanged 事件。
 
         §11.2.9 最优架构：在 Listener.handle() 中执行 L1/L2/L3/L5 处理。
@@ -69,7 +73,7 @@ class MemoryChangedListener:
 
         # 2. L2 PostgreSQL 写入（通过 Repository 调用）
         # metadata_repository.upsert() + history_repository.append()
-        self._write_to_l2(event)
+        await self._write_to_l2(event)
 
         # 3. L3 Qdrant 向量（按需，内容>500 tokens）
         # TODO: Story 6.3 实现
@@ -103,7 +107,7 @@ class MemoryChangedListener:
             logger.error(f"Failed to invalidate L1 cache: {e}")
             raise
 
-    def _write_to_l2(self, event: MemoryChanged) -> None:
+    async def _write_to_l2(self, event: MemoryChanged) -> None:
         """写入 L2 PostgreSQL（通过 Repository 调用）。
 
         Args:
@@ -113,44 +117,40 @@ class MemoryChangedListener:
             logger.warning("No L2 repositories configured, skipping L2 write")
             return
 
-        try:
-            # 写入 memory_metadata（UPSERT）
-            if self._metadata_repository is not None:
-                self._write_metadata(event)
-                logger.debug(f"L2 metadata written: memory_id={event.memory_id}")
+        from src.domain.entities.memory_change_history import MemoryChangeHistory
+        from src.domain.entities.memory_metadata import MemoryMetadata
 
-            # 记录 memory_change_history（append-only）
-            if self._history_repository is not None:
-                self._append_history(event)
-                logger.debug(f"L2 history recorded: memory_id={event.memory_id}")
+        memory_type = self._get_memory_type(event)
+        metadata = MemoryMetadata(
+            memory_id=uuid.UUID(event.memory_id),
+            name=event.name,
+            type=memory_type,
+            path=f"{memory_type}/{event.memory_id}.md",
+            user_id=event.user_id,
+            description=event.new_value.get("description", "") if event.new_value else "",
+            owner=event.new_value.get("owner", "") if event.new_value else "",
+            version=1,
+            mtime=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
 
-        except Exception as e:
-            logger.error(f"Failed to write to L2: {e}")
-            raise
+        history = MemoryChangeHistory.create(
+            memory_id=uuid.UUID(event.memory_id),
+            version=1,
+            change_type=event.change_type,
+            changed_by=event.user_id,
+            changed_fields={"is_automatic": event.is_automatic},
+        )
 
-    def _write_metadata(self, event: MemoryChanged) -> None:
-        """写入 memory_metadata。
+        # 顺序执行：metadata 必须先写入（FK 约束）
+        if self._metadata_repository is not None:
+            await self._metadata_repository.save(metadata)
+            logger.debug(f"L2 metadata written: memory_id={event.memory_id}")
 
-        Args:
-            event: MemoryChanged 事件
-        """
-        if self._metadata_repository is None:
-            return
-
-        # 从 new_value 提取 metadata 字段，构建 MemoryMetadata
-        # 注意：具体实现依赖注入的 repository
-        logger.debug(f"Writing metadata for memory_id={event.memory_id}")
-
-    def _append_history(self, event: MemoryChanged) -> None:
-        """记录 memory_change_history。
-
-        Args:
-            event: MemoryChanged 事件
-        """
-        if self._history_repository is None:
-            return
-
-        logger.debug(f"Appending history for memory_id={event.memory_id}, change_type={event.change_type}")
+        if self._history_repository is not None:
+            await self._history_repository.save(history)
+            logger.debug(f"L2 history recorded: memory_id={event.memory_id}")
 
     def _get_memory_type(self, event: MemoryChanged) -> str:
         """从 new_value 中提取 memory_type。

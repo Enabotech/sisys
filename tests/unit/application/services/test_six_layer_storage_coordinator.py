@@ -56,12 +56,14 @@ class TestSixLayerStorageCoordinatorSave:
         )
 
         memory_id = str(uuid.uuid4())
+        owner_id = "user-123"
+        name = "test-memory"
         content = "test memory content"
         memory_type = "private"
 
-        coordinator.save(memory_id, content, layer="L1", memory_type=memory_type)
+        coordinator.save(memory_id, content, layer="L1", memory_type=memory_type, owner_id=owner_id, name=name)
 
-        mock_cache.set.assert_called_once()
+        mock_cache.set.assert_called_once_with(memory_type, owner_id, name, content)
 
 
 class TestSixLayerStorageCoordinatorRead:
@@ -86,10 +88,12 @@ class TestSixLayerStorageCoordinatorRead:
         )
 
         memory_id = str(uuid.uuid4())
-        result = coordinator.read(memory_id, layer="L1", memory_type="private")
+        owner_id = "user-123"
+        name = "test-memory"
+        result = coordinator.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         assert result == "cached content"
-        mock_cache.get.assert_called_once()
+        mock_cache.get.assert_called_once_with("private", owner_id, name)
 
 
 class TestSixLayerStorageCoordinatorInvalidate:
@@ -112,9 +116,11 @@ class TestSixLayerStorageCoordinatorInvalidate:
         )
 
         memory_id = str(uuid.uuid4())
-        coordinator.invalidate(memory_id, layer="L1", memory_type="private")
+        owner_id = "user-123"
+        name = "test-memory"
+        coordinator.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
-        mock_cache.delete.assert_called_once()
+        mock_cache.delete.assert_called_once_with("private", owner_id, name)
 
 
 class TestSixLayerStorageCoordinatorLayerStatus:

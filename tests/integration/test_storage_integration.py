@@ -270,12 +270,14 @@ class TestL1L2Coordination:
     def test_coordinator_save_to_l1(self, coordinator_with_redis, real_redis):
         """Verify coordinator saves to L1 Redis cache."""
         memory_id = str(uuid.uuid4())
+        owner_id = f"user-{uuid.uuid4().hex[:8]}"
+        name = "test-memory"
         content = "Test memory content"
 
-        coordinator_with_redis.save(memory_id, content, layer="L1", memory_type="private")
+        coordinator_with_redis.save(memory_id, content, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
-        # Verify via real Redis (key format: memory:user:{id}:{id})
-        key = f"memory:user:{memory_id}:{memory_id}"
+        # Verify via real Redis (key format: memory:user:{owner_id}:{name})
+        key = f"memory:user:{owner_id}:{name}"
         stored = real_redis.get(key)
         assert stored == content
 
@@ -285,13 +287,15 @@ class TestL1L2Coordination:
     def test_coordinator_read_from_l1(self, coordinator_with_redis, real_redis):
         """Verify coordinator reads from L1 Redis cache."""
         memory_id = str(uuid.uuid4())
+        owner_id = f"user-{uuid.uuid4().hex[:8]}"
+        name = "test-memory"
         content = "Test memory content"
 
         # Pre-populate
-        key = f"memory:user:{memory_id}:{memory_id}"
+        key = f"memory:user:{owner_id}:{name}"
         real_redis.setex(key, 86400, content)
 
-        result = coordinator_with_redis.read(memory_id, layer="L1", memory_type="private")
+        result = coordinator_with_redis.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
         assert result == content
 
         # Cleanup
@@ -300,12 +304,14 @@ class TestL1L2Coordination:
     def test_coordinator_invalidate_l1(self, coordinator_with_redis, real_redis):
         """Verify coordinator invalidates L1 cache."""
         memory_id = str(uuid.uuid4())
+        owner_id = f"user-{uuid.uuid4().hex[:8]}"
+        name = "test-memory"
         content = "Test memory"
 
-        key = f"memory:user:{memory_id}:{memory_id}"
+        key = f"memory:user:{owner_id}:{name}"
         real_redis.setex(key, 86400, content)
 
-        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private")
+        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         assert real_redis.get(key) is None
 
@@ -353,28 +359,34 @@ class TestErrorHandling:
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
         memory_id = str(uuid.uuid4())
+        owner_id = "user-123"
+        name = "test-memory"
 
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.save(memory_id, "content", layer="L99", memory_type="private")
+            coordinator_with_redis.save(memory_id, "content", layer="L99", memory_type="private", owner_id=owner_id, name=name)
 
     def test_coordinator_read_raises_for_invalid_layer(self, coordinator_with_redis):
         """Verify coordinator read raises error for invalid layer."""
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
         memory_id = str(uuid.uuid4())
+        owner_id = "user-123"
+        name = "test-memory"
 
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.read(memory_id, layer="L99", memory_type="private")
+            coordinator_with_redis.read(memory_id, layer="L99", memory_type="private", owner_id=owner_id, name=name)
 
     def test_coordinator_invalidate_raises_for_unsupported_layer(self, coordinator_with_redis):
         """Verify coordinator invalidate raises error for non-L1 layers."""
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
         memory_id = str(uuid.uuid4())
+        owner_id = "user-123"
+        name = "test-memory"
 
         # L1 should work
-        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private")
+        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         # L2 should raise
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.invalidate(memory_id, layer="L2", memory_type="private")
+            coordinator_with_redis.invalidate(memory_id, layer="L2", memory_type="private", owner_id=owner_id, name=name)
