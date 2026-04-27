@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-ROOT_DIR = Path("/home/agimtech/sisys")
+ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
 class TestUDMRArchitecture:
