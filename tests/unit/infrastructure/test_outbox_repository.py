@@ -47,7 +47,7 @@ class TestPostgreSQLOutboxRepository:
     @pytest.mark.asyncio
     async def test_async_get_unpublished(self, repository, mock_session):
         """测试异步获取未发布事件。"""
-        from src.infrastructure.adapters.event_outbox_adapter import EventRegistry
+        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 
         # 注册测试事件类型
         EventRegistry.register("TestEvent", DomainEvent)

@@ -11,8 +11,8 @@ import fakeredis.aioredis
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.idempotency.checker import IdempotencyChecker
-from src.infrastructure.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # ===================================================================
@@ -30,7 +30,7 @@ class TestTestFixtureConfiguration:
 
     def test_event_store_fixture_is_fresh(self, event_id: UUID) -> None:
         """Each test should get a fresh InMemoryEventStore instance."""
-        from src.infrastructure.events.in_memory_store import InMemoryEventStore
+        from src.infrastructure.messaging.in_memory_store import InMemoryEventStore
 
         store = InMemoryEventStore()
         events = store.get_events(event_id)
@@ -148,7 +148,7 @@ class TestRetryPolicy:
         """Delay should increase with retry count (exponential backoff)."""
         # Mock jitter to fixed 1.0 so ordering is deterministic.
         # Without this, random.uniform(0.5, 1.5) can make delay_1 < delay_0.
-        monkeypatch.setattr("src.infrastructure.idempotency.retry_policy.random.uniform", lambda a, b: 1.0)
+        monkeypatch.setattr("src.infrastructure.messaging.idempotency.retry_policy.random.uniform", lambda a, b: 1.0)
 
         delay_0 = retry_policy.get_delay(0)
         delay_1 = retry_policy.get_delay(1)

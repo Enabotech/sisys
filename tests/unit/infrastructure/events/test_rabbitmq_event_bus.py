@@ -88,7 +88,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_connect_declares_exchange(self):
         """Connect should declare exchange on channel."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -114,7 +114,7 @@ class TestAsyncRabbitMQPublisher:
         """async_publish should send message with correct routing key."""
         import aio_pika
 
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -138,7 +138,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_async_publish_sends_with_retry_count(self):
         """async_publish should include retry_count in message headers."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -155,7 +155,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_async_publish_raises_if_not_connected(self):
         """async_publish should raise RuntimeError if not connected."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -167,7 +167,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_close_connection(self):
         """close should close connection."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -182,7 +182,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_close_skips_if_already_closed(self):
         """close should not raise if connection already closed."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -194,7 +194,7 @@ class TestAsyncRabbitMQPublisher:
     @pytest.mark.asyncio
     async def test_close_skips_if_no_connection(self):
         """close should not raise if no connection set."""
-        from src.infrastructure.events.async_rabbitmq_publisher import AsyncRabbitMQPublisher
+        from src.infrastructure.messaging.rabbitmq_publisher import AsyncRabbitMQPublisher
 
         config = RabbitMQConfig()
         publisher = AsyncRabbitMQPublisher(config)
@@ -211,7 +211,7 @@ class TestAsyncRabbitMQConsumer:
 
     def test_consumer_instantiation(self):
         """Consumer should be instantiable with all dependencies."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(
@@ -226,7 +226,7 @@ class TestAsyncRabbitMQConsumer:
 
     def test_register_handler(self):
         """register_handler should add handler to dict."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -240,7 +240,7 @@ class TestAsyncRabbitMQConsumer:
 
     def test_register_handler_multiple(self):
         """register_handler should support multiple handlers per queue."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -258,7 +258,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_connect_sets_channel_and_qos(self):
         """connect should create channel and set QoS."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -277,8 +277,8 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_acks_on_success_with_handler(self):
         """_on_message should ack when handler succeeds."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -314,8 +314,8 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_acks_duplicate_event(self):
         """_on_message should ack when try_acquire returns False (duplicate)."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -346,9 +346,9 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_nacks_on_handler_failure_with_retry(self):
         """_on_message should nack(requeue=True) when handler fails and retry available."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
-        from src.infrastructure.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -383,9 +383,9 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_nacks_to_dlq_when_max_retries_exceeded(self):
         """_on_message should nack(requeue=False) and enqueue to DLQ when retries exhausted."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
-        from src.infrastructure.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -423,8 +423,8 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_nacks_to_dlq_when_no_retry_policy(self):
         """_on_message should nack(requeue=False) and enqueue to DLQ when no retry policy configured."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -457,7 +457,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_nacks_unknown_event_type(self):
         """_on_message should nack(requeue=False) for unknown event_type."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -473,7 +473,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_nacks_invalid_json(self):
         """_on_message should nack(requeue=False) for invalid JSON."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -489,8 +489,8 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_records_metrics_on_success(self):
         """_on_message should record metrics on successful processing."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
         config = RabbitMQConfig()
@@ -523,9 +523,9 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_records_retry_metric(self):
         """_on_message should record retry metric when retrying."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
-        from src.infrastructure.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
         config = RabbitMQConfig()
@@ -563,9 +563,9 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_records_dlq_metric(self):
         """_on_message should record DLQ metric when event goes to DLQ."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
-        from src.infrastructure.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
         config = RabbitMQConfig()
@@ -604,8 +604,8 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_no_handler_acks_message(self):
         """_on_message should ack when no handler is registered (event silently dropped)."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -633,9 +633,9 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_on_message_handles_non_numeric_retry_header(self):
         """_on_message should handle non-numeric x-retry-count header gracefully."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
-        from src.infrastructure.idempotency.checker import IdempotencyChecker
-        from src.infrastructure.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+        from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
@@ -671,7 +671,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_close_connection(self):
         """close should close connection."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -686,7 +686,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_close_skips_if_already_closed(self):
         """close should not raise if connection already closed."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)
@@ -700,7 +700,7 @@ class TestAsyncRabbitMQConsumer:
     @pytest.mark.asyncio
     async def test_close_skips_if_no_connection(self):
         """close should not raise if no connection set."""
-        from src.infrastructure.events.async_rabbitmq_consumer import AsyncRabbitMQConsumer
+        from src.infrastructure.messaging.rabbitmq_consumer import AsyncRabbitMQConsumer
 
         config = RabbitMQConfig()
         consumer = AsyncRabbitMQConsumer(config)

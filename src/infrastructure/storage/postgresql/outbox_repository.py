@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
 from src.domain.repositories.outbox import OutboxRepository
-from src.infrastructure.adapters.sqlalchemy_event_outbox_adapter import (
+from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter import (
     SQLAlchemyEventOutboxAdapter,
 )
 from src.infrastructure.storage.postgresql.models import OutboxModel

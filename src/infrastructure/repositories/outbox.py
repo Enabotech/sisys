@@ -19,8 +19,8 @@ from uuid import UUID
 
 from src.domain.events.base import DomainEvent
 from src.domain.repositories.outbox import OutboxRepository
-from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.entities.outbox import OutboxEntity
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 
 
 class InMemoryOutboxRepository(OutboxRepository):

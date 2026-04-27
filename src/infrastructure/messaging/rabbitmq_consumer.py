@@ -17,8 +17,8 @@ import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractIncomingMessage, AbstractQueue
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.adapters.event_outbox_adapter import EventRegistry
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 
 logger = logging.getLogger(__name__)
 
