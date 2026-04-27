@@ -16,12 +16,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.infrastructure.cache.redis_memory_cache import RedisMemoryCache
     from src.infrastructure.repositories.memory_change_history_repository import MemoryChangeHistoryRepository
     from src.infrastructure.repositories.memory_metadata_repository import MemoryMetadataRepository
     from src.infrastructure.storage.minio.minio_repository import MinIORepository
     from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
     from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
+    from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 
 
 class LayerNotFoundError(Exception):

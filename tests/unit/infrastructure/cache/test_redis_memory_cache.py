@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
-from src.infrastructure.cache.redis_memory_cache import RedisMemoryCache
+from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 
 
 class TestRedisMemoryCacheInit:
