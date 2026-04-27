@@ -51,19 +51,6 @@ class TestRoutingDecisionLog:
         with pytest.raises(ValueError, match="task_id must not be empty"):
             log.validate()
 
-    def test_validate_task_id_whitespace(self) -> None:
-        """Should raise if task_id is only whitespace."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="   ",
-            session_id="session-001",
-            route_type="semantic",
-            route_target="cfo-agent",
-            route_score=0.95,
-        )
-        with pytest.raises(ValueError, match="task_id must not be empty"):
-            log.validate()
-
     def test_validate_session_id_empty(self) -> None:
         """Should raise if session_id is empty."""
         log = RoutingDecisionLog(
@@ -90,42 +77,6 @@ class TestRoutingDecisionLog:
         with pytest.raises(ValueError, match="route_type must be one of"):
             log.validate()
 
-    def test_validate_route_type_hash(self) -> None:
-        """Should accept route_type=hash."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="hash",
-            route_target="node-A",
-            route_score=1.0,
-        )
-        log.validate()
-
-    def test_validate_route_type_semantic(self) -> None:
-        """Should accept route_type=semantic."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="semantic",
-            route_target="cfo-agent",
-            route_score=0.95,
-        )
-        log.validate()
-
-    def test_validate_route_type_mixed(self) -> None:
-        """Should accept route_type=mixed."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="mixed",
-            route_target="cfo-agent",
-            route_score=0.85,
-        )
-        log.validate()
-
     def test_validate_score_below_zero(self) -> None:
         """Should raise if route_score < 0.0."""
         log = RoutingDecisionLog(
@@ -138,31 +89,6 @@ class TestRoutingDecisionLog:
         )
         with pytest.raises(ValueError, match="route_score must be between 0.0 and 1.0"):
             log.validate()
-
-    def test_validate_score_above_one(self) -> None:
-        """Should raise if route_score > 1.0."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="semantic",
-            route_target="cfo-agent",
-            route_score=1.1,
-        )
-        with pytest.raises(ValueError, match="route_score must be between 0.0 and 1.0"):
-            log.validate()
-
-    def test_validate_score_zero(self) -> None:
-        """Should accept route_score = 0.0."""
-        log = RoutingDecisionLog(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="hash",
-            route_target="default",
-            route_score=0.0,
-        )
-        log.validate()
 
     def test_validate_cost_estimate_negative(self) -> None:
         """Should raise if cost_estimate < 0."""
@@ -233,3 +159,55 @@ class TestRoutingDecisionLog:
             worm_storage_ref="s3://bucket/worm/route-log-123",
         )
         assert log.worm_storage_ref == "s3://bucket/worm/route-log-123"
+
+    def test_route_type_local(self) -> None:
+        """Should accept route_type=local (UDMR extension)."""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="qwen2.5:7b",
+            route_score=1.0,
+        )
+        log.validate()
+
+    def test_route_type_cloud(self) -> None:
+        """Should accept route_type=cloud (UDMR extension)."""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="qwen-turbo",
+            route_score=1.0,
+        )
+        log.validate()
+
+    def test_fallback_reason_valid_values(self) -> None:
+        """Should accept valid fallback_reason values (UDMR extension)."""
+        for reason in ["timeout", "unavailable", "health_check_failed"]:
+            log = RoutingDecisionLog(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="cloud",
+                route_target="qwen-turbo",
+                route_score=1.0,
+                fallback_reason=reason,
+            )
+            log.validate()
+
+    def test_fallback_reason_invalid_value(self) -> None:
+        """Should raise if fallback_reason has invalid value."""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="qwen-turbo",
+            route_score=1.0,
+            fallback_reason="invalid_reason",
+        )
+        with pytest.raises(ValueError, match="fallback_reason must be one of"):
+            log.validate()

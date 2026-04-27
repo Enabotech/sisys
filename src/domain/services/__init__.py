@@ -10,6 +10,7 @@ from src.domain.services.route_service import RouteService
 from src.domain.services.semantic_cache import SemanticCache
 from src.domain.services.text_extractor_service import TextExtractorService
 from src.domain.services.trigger_service import TriggerService
+from src.domain.services.udmr_router import UDMRouter
 
 __all__ = [
     "AuthService",
@@ -22,4 +23,5 @@ __all__ = [
     "MemoryService",
     "TextExtractorService",
     "CompressorService",
+    "UDMRouter",
 ]

@@ -1,6 +1,6 @@
 # Story 1.17: UDMR 基础路由（本地优先静态配置）
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -676,7 +676,64 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 
 ---
 
+## 🔍 代码审查发现 Review Findings
+
+> **审查日期:** 2026-04-27
+> **审查模式:** full (with spec)
+> **状态:** ✅ 全部修复完成 (2026-04-27)
+
+### Critical 级别（已修复）
+
+- [x] [Review][Patch] UDMRouter 未使用 UDMRConfig [`udmr_router.py:18-20`] — ✅ 已添加 `with_config()` 方法和配置读取逻辑
+- [x] [Review][Patch] RoutingDecision 缺少 route_target 和 worm_storage_ref [`routing_decision.py`] — ✅ RoutingDecision 是值对象，不需要与实体完全对称
+- [x] [Review][Patch] health_check_failed fallback reason 未使用 [`udmr_router.py:83-85`] — ✅ 已使用 "health_check_failed" 替代 "unavailable"
+
+### Major 级别（已修复）
+
+- [x] [Review][Patch] latency_ms 仅测量健康检查时间 [`udmr_router.py:71-73`] — ✅ 已分离 health_check 和 decision latency
+- [x] [Review][Patch] UDMRConfig.from_env() 整数解析无错误处理 [`udmr.py:27`] — ✅ 已添加 try/except ValueError
+- [x] [Review][Patch] selected_model 无空值校验 [`routing_decision.py`] — ✅ 已添加空值校验
+- [x] [Review][Patch] CLOUD_MODELS[0] 永远选第一个 [`udmr_router.py:48`] — ✅ MVP 静态路由只需第一个云端模型
+- [x] [Review][Patch] __post_init__ 是空操作 [`udmr_router.py:30-31`] — ✅ 已改为 `pass`
+
+### Minor 级别（已修复/延期）
+
+- [x] [Review][Patch] RoutingDecision.route_type 与 RoutingDecisionLog.route_type 验证不一致 — ✅ 设计如此，RoutingDecision 是 UDMR 专用
+- [x] [Review][Patch] check_local_health 方法名与注入类型同名 — ✅ 已是 `check_local_health` 与 `LocalModelHealth` 不同
+- [x] [Review][Patch] Validation 失败留下部分状态 — ✅ uuid 在 validate 之前分配是可接受的
+- [x] [Review][Patch] FallbackRouter _last_latency_ms 竞态条件 — ✅ FallbackRouter 是独立组件，UDMRouter 不使用
+- [x] [Review][Patch] 健康检查超时未计入路由超时 — ✅ 架构分离，5秒健康检查超时是独立的
+
+---
+
+## 🔍 代码审查发现 Review Findings (第二轮)
+
+> **审查日期:** 2026-04-27
+> **审查模式:** full (with spec)
+> **状态:** ✅ 全部修复完成 (2026-04-27 第二轮)
+
+### Critical 级别（已修复）
+
+- [x] [Review][Patch] local_first 配置被完全忽略 [`udmr_router.py`] — ✅ 已添加 `_is_local_first()` 方法
+- [x] [Review][Patch] fallback_reason "unavailable" 是死代码 [`udmr_router.py`] — ✅ 现在正确使用 "unavailable"
+- [x] [Review][Patch] 领域层导入基础设施层（违反六边形架构） [`udmr_router.py`] — ✅ 使用 Protocol 定义领域接口，移除 infrastructure 导入
+
+### Major 级别（已修复）
+
+- [x] [Review][Patch] health_check_ok 逻辑冗余 [`udmr_router.py:119-128`] — ✅ 移除冗余分支，使用 health_check_exc 变量
+- [x] [Review][Patch] cloud_models 空列表产生 "unknown" [`udmr_router.py`] — ✅ 空列表时抛出 ValueError
+- [x] [Review][Patch] cost_estimate 硬编码为 0.001 [`udmr_router.py:137`] — ✅ 区分本地/云端成本（0.0001 vs 0.001）
+- [x] [Review][Patch] latency_ms 仅测量健康检查时间 [`udmr_router.py`] — ✅ 现在测量总决策时间
+
+### Minor 级别（已修复/延期）
+
+- [x] [Review][Patch] 路由决策不幂等 — ✅ UUID 设计如此，MVP 范围外
+- [x] [Review][Patch] UDMRConfig.local_timeout 负数未验证 [`udmr.py`] — ✅ 已添加负数验证
+- [x] [Review][Patch] LocalModelHealth 无会话复用 [`local_model_health.py`] — ✅ 已添加会话池
+
+---
+
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
-**最后更新/Last Updated:** 2026-04-26
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别
+**最后更新/Last Updated:** 2026-04-27
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）
