@@ -36,7 +36,7 @@ class TestExecuteArchitecture:
 
     def test_docker_sandbox_adapter_in_infrastructure_layer(self) -> None:
         """DockerSandboxAdapter must be in infrastructure layer."""
-        adapter_path = Path("src/infrastructure/sandbox/docker_sandbox_adapter.py")
+        adapter_path = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
 
         assert adapter_path.exists(), "DockerSandboxAdapter must exist in infrastructure/sandbox/"
 
@@ -90,7 +90,7 @@ class TestExecuteArchitecture:
 
     def test_infrastructure_implements_ports(self) -> None:
         """Infrastructure layer must implement interfaces layer ports."""
-        adapter_file = Path("src/infrastructure/sandbox/docker_sandbox_adapter.py")
+        adapter_file = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
 
         content = adapter_file.read_text()
 

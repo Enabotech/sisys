@@ -30,7 +30,7 @@ class TestTestFixtureConfiguration:
 
     def test_event_store_fixture_is_fresh(self, event_id: UUID) -> None:
         """Each test should get a fresh InMemoryEventStore instance."""
-        from src.infrastructure.messaging.in_memory_store import InMemoryEventStore
+        from src.infrastructure.messaging.message_serializer import InMemoryEventStore
 
         store = InMemoryEventStore()
         events = store.get_events(event_id)
