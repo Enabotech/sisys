@@ -29,7 +29,7 @@ from src.domain.events import (  # noqa: F401, E402
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
 from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
-from src.infrastructure.messaging.in_memory_store import InMemoryEventStore
+from src.infrastructure.messaging.message_serializer import InMemoryEventStore
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # Import reset_test_environment from tests.fixtures for test isolation
