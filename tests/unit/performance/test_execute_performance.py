@@ -13,7 +13,7 @@ import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.services.auto_execute_service import AutoExecuteService
-from src.infrastructure.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
+from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
 
 
 @dataclass

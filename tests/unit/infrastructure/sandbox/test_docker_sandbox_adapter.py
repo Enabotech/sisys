@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.infrastructure.sandbox.docker_sandbox_adapter import (
+from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import (
     ContainerStartError,
     ContainerStopError,
     DockerSandboxAdapter,
@@ -131,7 +131,7 @@ class TestDockerSandboxAdapter:
         """
         from unittest.mock import MagicMock
 
-        from src.infrastructure.sandbox import docker_sandbox_adapter as dsa_module
+        from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
         adapter = DockerSandboxAdapter()
         original_logger = dsa_module.logger
@@ -157,7 +157,7 @@ class TestDockerSandboxAdapter:
         """
         from unittest.mock import MagicMock
 
-        from src.infrastructure.sandbox import docker_sandbox_adapter as dsa_module
+        from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
         adapter = DockerSandboxAdapter()
         await adapter.start_container("session-exc")
@@ -185,7 +185,7 @@ class TestDockerSandboxAdapter:
         """
         from unittest.mock import MagicMock
 
-        from src.infrastructure.sandbox import docker_sandbox_adapter as dsa_module
+        from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
         adapter = DockerSandboxAdapter()
         await adapter.start_container("session-stop")
