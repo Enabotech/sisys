@@ -1,41 +1,40 @@
-"""RoutingDecisionLog domain entity."""
+"""RoutingDecision value object for UDMRouter."""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Literal
 
 
 @dataclass
-class RoutingDecisionLog:
-    """Log entry for routing decisions.
+class RoutingDecision:
+    """Value object representing a routing decision for UDMRouter.
 
-    Stores routing decision details for audit and cost tracking.
-    WORM storage required (7-year retention per compliance requirements).
-
-    Invariant constraints:
-    - log_id must be a valid UUID
-    - task_id must not be empty
-    - session_id must not be empty
-    - route_type must be one of: "hash", "semantic", "mixed", "local", "cloud"
-    - route_score must be between 0.0 and 1.0
+    Attributes:
+        log_id: Unique identifier for the routing decision log
+        task_id: The task identifier this decision applies to
+        session_id: The session identifier
+        route_type: Type of routing - "local" or "cloud"
+        selected_model: The model selected for routing
+        cost_estimate: Estimated cost in USD
+        cost_actual: Actual cost in USD (default 0)
+        latency_ms: Routing decision latency in milliseconds
+        fallback_reason: Reason for fallback to cloud (optional)
+        timestamp: Decision timestamp
     """
 
     log_id: uuid.UUID
     task_id: str
     session_id: str
-    route_type: str  # "hash" | "semantic" | "mixed" | "local" | "cloud"
-    route_target: str  # Target Agent or tool ID or model name
-    route_score: float  # Routing confidence/score (0.0 to 1.0)
-    cost_estimate: float = 0.0  # Estimated cost in USD
-    latency_ms: float = 0.0  # Routing decision latency in milliseconds
+    route_type: Literal["local", "cloud"]
+    selected_model: str
+    cost_estimate: float = 0.0
+    cost_actual: float = 0.0
+    latency_ms: float = 0.0
+    fallback_reason: str | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
-    worm_storage_ref: str = ""  # WORM storage reference for compliance
-    # UDMR extension fields
-    selected_model: str = ""  # Selected model for UDMR (local/cloud)
-    cost_actual: float = 0.0  # Actual cost in USD
-    fallback_reason: str | None = None  # Fallback reason for UDMR
 
     def validate(self) -> None:
         """Validate invariant constraints.
@@ -49,16 +48,16 @@ class RoutingDecisionLog:
             raise ValueError("task_id must not be empty")
         if not self.session_id or not self.session_id.strip():
             raise ValueError("session_id must not be empty")
-        if self.route_type not in ("hash", "semantic", "mixed", "local", "cloud"):
-            raise ValueError(f"route_type must be one of: hash, semantic, mixed, local, cloud. Got: {self.route_type}")
-        if not (0.0 <= self.route_score <= 1.0):
-            raise ValueError(f"route_score must be between 0.0 and 1.0. Got: {self.route_score}")
+        if self.route_type not in ("local", "cloud"):
+            raise ValueError(f"route_type must be one of: local, cloud. Got: {self.route_type}")
         if self.cost_estimate < 0:
             raise ValueError(f"cost_estimate must be non-negative. Got: {self.cost_estimate}")
         if self.cost_actual < 0:
             raise ValueError(f"cost_actual must be non-negative. Got: {self.cost_actual}")
         if self.latency_ms < 0:
             raise ValueError(f"latency_ms must be non-negative. Got: {self.latency_ms}")
+        if not self.selected_model or not self.selected_model.strip():
+            raise ValueError("selected_model must not be empty")
         if self.fallback_reason is not None and self.fallback_reason not in (
             "timeout",
             "unavailable",
