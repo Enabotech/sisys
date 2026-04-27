@@ -1961,12 +1961,16 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 - **L1 CRUD 操作**：完整创建/读取/更新/删除，带版本冲突处理（乐观锁）
 - **事件驱动**：MemoryChanged 事件触发元数据同步、缓存失效
 
-**MemoryChanged 事件下游用例**：
-  - MemoryChangedListener 触发：
-    1. 写入 memory_metadata（UPSERT，version + 1）
-    2. 写入 memory_change_history（append-only）
-    3. 失效 L1 Redis 缓存（redis.del("memory:{name}")）
-    4. 可选：更新 L3 Qdrant 向量索引（文件>500时）
+**MemoryChanged 事件下游用例（MemoryChangedListener.handle()）**：
+  - 在 Listener.handle() 中执行：
+    1. **L1 Redis 缓存失效**（同步，立即）：`storage_coordinator.invalidate(layer="L1", ...)`
+       - 保证"上下文≠缓存"公理
+    2. **L2 PostgreSQL 写入**（通过 Repository 调用）：
+       - `metadata_repository.upsert(event)` - 写入 memory_metadata
+       - `history_repository.append(event)` - 记录 memory_change_history（append-only）
+    3. **L3 Qdrant 向量**（按需，内容>500 tokens）：`vector_store.embed(event)`
+    4. **L5 Neo4j 图谱**（按需，EntityExtractor）：`entity_extractor.extract(event)`
+  - **L4 MinIO** 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）
 
 **RBAC 校验**：
   - private 记忆（group_id=NULL）：
