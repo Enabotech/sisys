@@ -9,8 +9,8 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
 from src.infrastructure.entities.outbox import InvalidStateTransitionError, OutboxEntity
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 
@@ -296,7 +296,7 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_poll_once_publishes_pending_events(self):
         """poll_once should publish pending events."""
-        from src.infrastructure.events.async_outbox_poller import AsyncOutboxPoller
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         repo = InMemoryOutboxRepository()
         mock_publisher = AsyncMock()
@@ -317,7 +317,7 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_poll_once_marks_published(self):
         """poll_once should mark events as published after successful publish."""
-        from src.infrastructure.events.async_outbox_poller import AsyncOutboxPoller
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         repo = InMemoryOutboxRepository()
         mock_publisher = AsyncMock()
@@ -339,7 +339,7 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(self):
         """poll_once should mark events as failed on publish error."""
-        from src.infrastructure.events.async_outbox_poller import AsyncOutboxPoller
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         repo = InMemoryOutboxRepository()
         mock_publisher = AsyncMock()
@@ -362,7 +362,7 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_poller_runs_loop(self):
         """run should execute poll_once at least once before stopped."""
-        from src.infrastructure.events.async_outbox_poller import AsyncOutboxPoller
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         repo = InMemoryOutboxRepository()
         mock_publisher = AsyncMock()
@@ -384,7 +384,7 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_poller_graceful_stop(self):
         """stop should gracefully stop the polling loop."""
-        from src.infrastructure.events.async_outbox_poller import AsyncOutboxPoller
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         repo = InMemoryOutboxRepository()
         mock_publisher = AsyncMock()

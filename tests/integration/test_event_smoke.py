@@ -11,9 +11,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter
-from src.infrastructure.idempotency.checker import IdempotencyChecker
-from src.infrastructure.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
+from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # ===================================================================
@@ -129,7 +129,7 @@ class TestEventRegistry:
         )
 
         # Serialize to entity
-        from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter
+        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 
         entity = EventOutboxAdapter.from_domain_event(event)
         assert entity.event_id == event_id

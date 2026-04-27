@@ -177,7 +177,7 @@ class TestOutboxEventLifecycle:
     async def test_get_unpublished_events(self, mock_session):
         """获取未发布事件列表。"""
         from src.domain.events.base import DomainEvent
-        from src.infrastructure.adapters.event_outbox_adapter import EventRegistry
+        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
         from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
 
         # 注册事件类型

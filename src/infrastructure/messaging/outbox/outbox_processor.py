@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import Any
 
-from src.infrastructure.adapters.event_outbox_adapter import EventOutboxAdapter
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 
 logger = logging.getLogger(__name__)
 

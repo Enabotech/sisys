@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.document_events import DocumentProcessed
-from src.infrastructure.adapters.sqlalchemy_event_outbox_adapter import SQLAlchemyEventOutboxAdapter
+from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter import SQLAlchemyEventOutboxAdapter
 from src.infrastructure.storage.postgresql.models import OutboxModel
 
 

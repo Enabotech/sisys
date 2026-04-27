@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.adapters.event_outbox_adapter import EventRegistry
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 from src.infrastructure.storage.postgresql.models import OutboxModel
 
 

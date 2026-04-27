@@ -27,9 +27,9 @@ from src.domain.events import (  # noqa: F401, E402
     ToolExecuted,
 )
 from src.domain.events.base import DomainEvent
-from src.infrastructure.events.in_memory_store import InMemoryEventStore
-from src.infrastructure.idempotency.checker import IdempotencyChecker
-from src.infrastructure.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
+from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.in_memory_store import InMemoryEventStore
 from src.infrastructure.repositories.outbox import InMemoryOutboxRepository
 
 # Import reset_test_environment from tests.fixtures for test isolation
