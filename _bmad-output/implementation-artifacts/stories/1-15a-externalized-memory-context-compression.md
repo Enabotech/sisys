@@ -98,22 +98,22 @@
 - **L4 MinIO** 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）
 
 **验证标准/Validation Criteria:**
-- [ ] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
+- [x] MemoryChanged 事件定义（`src/domain/events/memory_events.py`）
   - 遵循现有事件命名规范：`event_type: str = field(default="MemoryChanged", init=False)`
   - 实现 `__post_init__` 设置 aggregate_id 和 aggregate_type
   - 字段: event_id, memory_id, user_id, change_type, is_automatic, old_value, new_value, timestamp
   - change_type: create/update/delete
   - is_automatic=False（标识用户主动操作）
-- [ ] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）
-- [ ] 事务发件箱模式（MemoryChanged 事件与业务操作同事务提交）
+- [x] MemoryChangedListener 下游监听器（`src/interfaces/event_listeners/memory_changed_listener.py`）
+- [x] 事务发件箱模式（MemoryChanged 事件与业务操作同事务提交）
   - 复用现有 `OutboxEntity`（`src/infrastructure/entities/outbox.py`）- 遵循 Story 1.3 方案 A 彻底隔离
   - 字段: id, event_id, event_type, payload, status, created_at, published_at, retry_count, max_retries, error_message
   - status: pending → published / failed
   - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
   - **重要**：领域层通过 `OutboxRepository` 接口（`src/domain/repositories/outbox.py`）操作，不直接引用 OutboxEntity
-- [ ] L1 缓存失效：`storage_coordinator.invalidate(layer="L1", ...)`
-- [ ] L2 写入：`metadata_repository.upsert()` + `history_repository.append()`
-- [ ] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{name}`
+- [x] L1 缓存失效：`storage_coordinator.invalidate(layer="L1", ...)`
+- [x] L2 写入：`metadata_repository.upsert()` + `history_repository.append()`
+- [x] L1 Redis 缓存 key 格式: `memory:user:{user_id}:{name}`
 
 ### AC-4: L1 四种操作 CRUD
 
