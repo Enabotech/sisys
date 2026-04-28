@@ -23,7 +23,7 @@ class TestServiceMonitorConfig:
     @pytest.fixture
     def servicemonitor_path(self):
         """Get ServiceMonitor config path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/prometheus-servicemonitor.yaml"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/prometheus-servicemonitor.yaml"
 
     def test_servicemonitor_file_exists(self, servicemonitor_path):
         """🔴 RED: ServiceMonitor configuration file should exist."""
@@ -84,7 +84,7 @@ class TestServiceAnnotations:
     @pytest.fixture
     def service_path(self):
         """Get Service config path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/service.yaml"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/service.yaml"
 
     def test_service_has_prometheus_annotations(self, service_path):
         """🔴 RED: Service should have Prometheus scrape annotations."""
@@ -112,7 +112,7 @@ class TestHPAConfig:
     @pytest.fixture
     def hpa_path(self):
         """Get HPA config path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/hpa.yaml"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/hpa.yaml"
 
     def test_hpa_file_exists(self, hpa_path):
         """🔴 RED: HPA configuration file should exist."""
@@ -172,7 +172,7 @@ class TestGrafanaDashboard:
     @pytest.fixture
     def dashboard_path(self):
         """Get Grafana Dashboard config path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
 
     def test_dashboard_file_exists(self, dashboard_path):
         """🔴 RED: Grafana Dashboard JSON should exist."""

@@ -20,12 +20,12 @@ class TestGrafanaDashboardConfiguration:
     @pytest.fixture
     def dashboard_path(self):
         """Get Grafana Dashboard config path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
 
     @pytest.fixture
     def dashboard_configmap_path(self):
         """Get Grafana Dashboard ConfigMap provisioning path."""
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml"
 
     def test_dashboard_json_exists(self, dashboard_path):
         """✅ GREEN: Grafana Dashboard JSON should exist."""
@@ -67,7 +67,7 @@ class TestGrafanaDashboardPanels:
 
     @pytest.fixture
     def dashboard_path(self):
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard.json"
 
     @pytest.fixture
     def dashboard(self, dashboard_path):
@@ -145,7 +145,7 @@ class TestGrafanaDashboardConfigMap:
 
     @pytest.fixture
     def dashboard_configmap_path(self):
-        return Path(__file__).resolve().parents[3] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml"
+        return Path(__file__).resolve().parents[4] / "deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml"
 
     def test_configmap_is_valid_yaml(self, dashboard_configmap_path):
         """✅ GREEN: ConfigMap should be valid YAML."""
