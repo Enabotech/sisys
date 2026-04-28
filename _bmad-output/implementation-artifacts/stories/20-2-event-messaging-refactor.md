@@ -55,7 +55,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `RedisRetryQueue` 实现 (`src/infrastructure/messaging/retry/redis_retry_queue.py`)
-- [ ] 重构 `AsyncOutboxPoller` 使用延迟重试队列
+- [ ] 重构 `AsyncOutboxPoller` 使用延迟重试队列（失败事件进入延迟重试队列）
 - [ ] 移除 `RabbitMQConsumer._handle_failure` 中的 `nack(requeue=True)`
 - [ ] 单元测试
 
@@ -87,15 +87,15 @@
 ### AC-5: EventListenerAsync 异步扩展
 
 **Given** 生产环境需要异步事件处理能力
-**When** 扩展现有 EventListener 接口
+**When** 创建 EventListenerAsync 接口
 **Then** 支持异步 `async_handle()` 方法
-**And** 不破坏现有同步接口兼容性
+**And** 独立接口，不继承 EventListener（避免强制实现同步方法）
 
 **验证标准/Validation Criteria:**
-- [ ] `EventListenerAsync` 接口 (`src/domain/events/listener.py`)
-- [ ] 继承原有 `EventListener` 接口
-- [ ] `async_handle(event) -> None` 异步处理方法
-- [ ] 现有实现兼容性（向后兼容）
+- [ ] `EventListenerAsync` 独立接口 (`src/domain/events/listener.py`)
+- [ ] `async_handle(event: DomainEvent) -> None` 异步处理方法
+- [ ] `RabbitMQConsumer` 实现 `EventListenerAsync` 接口
+- [ ] 现有 `EventListener` 保持不变（向后兼容）
 - [ ] 单元测试
 
 ### AC-6: UnitOfWork 统一事务边界
@@ -124,17 +124,18 @@
 - [ ] `get_events_by_type(event_type, start_time, end_time) -> list[DomainEvent]` 方法
 - [ ] 单元测试 + 集成测试
 
-### AC-8: RabbitMQ EventListener 适配
+### AC-8: RabbitMQ EventListener 实现
 
 **Given** 生产环境需要可靠的事件消费
-**When** 将 RabbitMQConsumer 适配为 EventListenerAsync
-**Then** RabbitMQConsumer 实现 EventListenerAsync 接口
+**When** 实现 RabbitMQEventListener
+**Then** 实现 EventListenerAsync 接口
 **And** 支持手动 ACK/NACK 和死信队列
 
 **验证标准/Validation Criteria:**
-- [ ] `RabbitMQConsumer` 重构实现 `EventListenerAsync` 接口
+- [ ] `RabbitMQEventListener` 实现 (`src/infrastructure/messaging/rabbitmq_listener.py`)
+- [ ] 实现 `EventListenerAsync` 接口
 - [ ] `async_handle(event) -> None` 异步处理方法
-- [ ] 继承 RabbitMQConsumer 的幂等性和重试机制
+- [ ] 集成 `IdempotencyChecker` 和重试机制
 - [ ] 集成 `PostgresDeadLetterQueue` 处理失败事件
 - [ ] 单元测试
 
@@ -192,7 +193,7 @@
 | **TDD 单元测试** | EventListenerAsync | `test_event_listener_async.py` | Task 5 |
 | **TDD 单元测试** | UnitOfWork | `test_unit_of_work.py` | Task 6 |
 | **TDD 单元测试** | PostgreSQLEventStore | `test_event_store.py` | Task 7 |
-| **TDD 单元测试** | RabbitMQEventListener 适配 | `test_rabbitmq_event_listener.py` | Task 8 |
+| **TDD 单元测试** | RabbitMQEventListener | `test_rabbitmq_event_listener.py` | Task 8 |
 | **TDD 单元测试** | AsyncOutboxPoller 重构 | `test_async_outbox_poller.py` | Task 9 |
 | **SDD 架构验证** | 架构约束测试 | `test_architecture.py` | Task 10 |
 
@@ -235,7 +236,7 @@
 | AC-5 | EventListenerAsync 异步扩展 | Task 5 | `test_event_listener_async.py` |
 | AC-6 | UnitOfWork 统一事务 | Task 6 | `test_unit_of_work.py` |
 | AC-7 | PostgreSQL EventStore | Task 7 | `test_event_store.py` |
-| AC-8 | RabbitMQ EventListener 适配 | Task 8 | `test_rabbitmq_event_listener.py` |
+| AC-8 | RabbitMQEventListener | Task 8 | `test_rabbitmq_event_listener.py` |
 | AC-9 | AsyncOutboxPoller 内部方法文档化 | Task 9 | `test_async_outbox_poller.py` |
 | AC-10 | 架构约束验证 | Task 10 | `test_architecture.py` |
 
@@ -292,13 +293,13 @@
 
 - [ ] Subtask 2.1: 🔴 红 — 编写 RedisRetryQueue 失败测试
 - [ ] Subtask 2.2: 🟢 绿 — 实现 RedisRetryQueue 最小代码
-- [ ] Subtask 2.3: 🟢 绿 — 重构 AsyncOutboxPoller 使用延迟重试
+- [ ] Subtask 2.3: 🟢 绿 — 重构 AsyncOutboxPoller 使用延迟重试（失败事件入队）
 - [ ] Subtask 2.4: 🟢 绿 — 重构 RabbitMQConsumer 移除 nack(requeue=True)
 - [ ] Subtask 2.5: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
 - [ ] RedisRetryQueue 实现完成
-- [ ] AsyncOutboxPoller 重构完成
+- [ ] AsyncOutboxPoller 重构完成（使用延迟重试队列）
 - [ ] RabbitMQConsumer 重构完成
 
 ---
@@ -356,15 +357,15 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_event_listener_async.py` |
-| 🟢 绿 | 扩展 EventListener 接口添加异步支持 |
+| 🟢 绿 | 创建独立 EventListenerAsync 接口 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 EventListenerAsync 失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 扩展 EventListener 接口添加 async_handle()
+- [ ] Subtask 5.2: 🟢 绿 — 创建 EventListenerAsync 独立接口（不继承 EventListener）
 - [ ] Subtask 5.3: 🔄 重构 — 验证向后兼容性
 
 **完成标准/Definition of Done:**
-- [ ] EventListenerAsync 扩展完成
+- [ ] EventListenerAsync 接口创建完成
 - [ ] 向后兼容性验证通过
 
 ---
@@ -415,26 +416,27 @@
 
 ---
 
-### Task 8: RabbitMQ EventListener 适配
+### Task 8: RabbitMQ EventListener 实现
 
 **关联 AC:** AC-8
 
-#### TDD 循环 A：RabbitMQEventListener 适配
+#### TDD 循环 A：RabbitMQEventListener
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_rabbitmq_event_listener.py` |
-| 🟢 绿 | 重构 RabbitMQConsumer 实现 EventListenerAsync |
+| 🟢 绿 | 实现 `RabbitMQEventListener` |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 8.1: 🔴 红 — 编写 RabbitMQEventListener 失败测试
-- [ ] Subtask 8.2: 🟢 绿 — RabbitMQConsumer 实现 EventListenerAsync
-- [ ] Subtask 8.3: 🟢 绿 — 集成 PostgresDeadLetterQueue 处理失败
-- [ ] Subtask 8.4: 🔄 重构 — 优化代码
+- [ ] Subtask 8.2: 🟢 绿 — RabbitMQEventListener 实现 EventListenerAsync
+- [ ] Subtask 8.3: 🟢 绿 — 集成 IdempotencyChecker 和重试机制
+- [ ] Subtask 8.4: 🟢 绿 — 集成 PostgresDeadLetterQueue 处理失败
+- [ ] Subtask 8.5: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [ ] RabbitMQEventListener 适配完成
-- [ ] 与 RabbitMQConsumer 机制兼容
+- [ ] RabbitMQEventListener 实现完成
+- [ ] 与 EventListenerAsync 接口兼容
 
 ---
 
@@ -498,7 +500,7 @@
 | **PostgreSQL DLQ** | 持久化、可恢复 | 增加 DB 负载 | ✅ 9/10 |
 | **Redis ZSET 延迟重试** | 高性能、精确延迟 | Redis 单点 | ✅ 8/10 |
 | **双写幂等性** | 高可用、持久化 | 复杂度增加 | ✅ 8/10 |
-| **EventListenerAsync 扩展** | 不破坏现有接口，向后兼容 | 增加接口复杂度 | ✅ 9/10 |
+| **EventListenerAsync 独立接口** | 简洁，不强制同步实现 | 需要分别注册 | ✅ 9/10 |
 | **Poller 内部方法文档化** | 保持架构边界，不引入领域层污染 | 内部方法无接口契约保护 | ✅ 8/10 |
 
 ### 项目结构说明 Project Structure
@@ -508,7 +510,7 @@ src/
 ├── domain/
 │   ├── events/
 │   │   ├── base.py              # DomainEvent 基类（增强）
-│   │   └── listener.py         # EventListener + EventListenerAsync（扩展）
+│   │   └── listener.py         # EventListener + EventListenerAsync（独立接口）
 │   └── repositories/
 │       ├── outbox.py           # OutboxRepository 接口（面向业务代码）
 │       └── unit_of_work.py     # UnitOfWork（新建）
@@ -522,7 +524,8 @@ src/
 │   │   │   └── dual_idempotency_checker.py     # 新建
 │   │   ├── outbox/
 │   │   │   └── outbox_processor.py             # 保持现状（使用内部方法）
-│   │   ├── rabbitmq_consumer.py               # 修改（实现EventListenerAsync + 移除nack requeue）
+│   │   ├── rabbitmq_listener.py               # 新建（实现EventListenerAsync）
+│   │   ├── rabbitmq_consumer.py               # 修改（移除nack requeue）
 │   │   └── event_bus.py                         # 保持 InMemory（仅开发测试用）
 │   └── storage/postgresql/
 │       ├── event_store.py                      # 新建
@@ -554,19 +557,15 @@ src/
 
 **核心结论：Redis 仅用于缓存和分布式锁，不适合作为事件传输通道。**
 
-### 架构决策：Poller 内部方法的处理
+### 接口设计决策：EventListenerAsync 独立接口
 
-**问题：** AsyncOutboxPoller 需要操作 OutboxModel 的 `retry_count`、`error_message` 等字段，但领域层接口不应依赖基础设施层类型。
-
-**分析：**
-- 领域层 `OutboxRepository` 接口使用 `DomainEvent`，面向业务代码
-- Poller 是基础设施层内部组件，需要操作 `OutboxModel`
-- 将 Poller 内部方法暴露到领域层接口会违反六边形架构
+**问题：** 如果 EventListenerAsync 继承 EventListener，RabbitMQConsumer 需要同时实现同步和异步方法。
 
 **决策：**
-- 保持现有设计：领域层接口面向业务代码，Poller 使用内部方法
-- 在内部方法上添加 `# @poller_only` 注释标记
-- 在架构验证测试中验证领域层不导入 `src.infrastructure.storage.postgresql.models`
+- EventListenerAsync 作为独立接口，不继承 EventListener
+- EventListenerAsync 仅定义 `async_handle(event) -> None`
+- EventListener 保持不变，现有代码兼容
+- RabbitMQConsumer 实现 EventListenerAsync，无需实现 EventListener 的同步方法
 
 ---
 
@@ -598,10 +597,8 @@ src/
 - [x] 前一个故事学习经验整合
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
-- [x] AC-9 修复架构冲突：改为内部方法文档化，不暴露到领域层接口
-- [x] AC-4 DomainEvent 增强字段明确定义为顶层字段（非 payload）
-- [x] AC-8 RabbitMQEventListener 改为 RabbitMQConsumer 适配 EventListenerAsync
-- [x] 明确 InMemoryEventBus 仅用于 dev/test
+- [x] AC-5 修复：EventListenerAsync 改为独立接口（不继承 EventListener）
+- [x] AC-2/AC-9 统一：Task 2 重构 AsyncOutboxPoller 使用延迟重试，Task 9 文档化内部方法
 
 ### 文件清单 File List
 
@@ -613,6 +610,7 @@ src/
 | `src/infrastructure/messaging/dlq/postgres_dead_letter_queue.py` | PostgreSQL DLQ |
 | `src/infrastructure/messaging/retry/redis_retry_queue.py` | Redis 延迟重试 |
 | `src/infrastructure/messaging/idempotency/dual_idempotency_checker.py` | 双写幂等性 |
+| `src/infrastructure/messaging/rabbitmq_listener.py` | RabbitMQEventListener（实现EventListenerAsync） |
 | `src/infrastructure/storage/postgresql/event_store.py` | PostgreSQL EventStore |
 | `tests/unit/infrastructure/messaging/dlq/test_postgres_dead_letter_queue.py` | DLQ 测试 |
 | `tests/unit/infrastructure/messaging/retry/test_redis_retry_queue.py` | 重试队列测试 |
@@ -629,9 +627,10 @@ src/
 | 文件 | 说明 |
 |------|------|
 | `src/domain/events/base.py` | 增强 DomainEvent（correlation_id, causation_id, metadata 顶层字段） |
-| `src/domain/events/listener.py` | 扩展 EventListenerAsync 接口 |
+| `src/domain/events/listener.py` | 添加 EventListenerAsync 独立接口 |
+| `src/infrastructure/messaging/outbox/outbox_processor.py` | 重构使用 RedisRetryQueue |
+| `src/infrastructure/messaging/rabbitmq_consumer.py` | 移除 nack(requeue=True) |
 | `src/infrastructure/storage/postgresql/outbox_repository.py` | 添加 @poller_only 注释标记内部方法 |
-| `src/infrastructure/messaging/rabbitmq_consumer.py` | 实现 EventListenerAsync + 移除 nack(requeue=True) |
 
 ---
 
@@ -662,10 +661,12 @@ src/
 |---|------|--------|----------|
 | 1 | AC-9 架构冲突：接口返回 OutboxModel 违反领域层零依赖 | P0 | 改为内部方法文档化，保持架构边界 |
 | 2 | AC-4 DomainEvent 字段定义不清 | P0 | 明确为顶层字段（UUID \| None），非 payload |
-| 3 | AC-8 RabbitMQEventListener 与 RabbitMQConsumer 关系不清 | P1 | 改为 RabbitMQConsumer 适配 EventListenerAsync |
-| 4 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
-| 5 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
-| 6 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
+| 3 | AC-5 EventListenerAsync 继承导致需要实现同步方法 | P0 | 改为独立接口，不继承 EventListener |
+| 4 | AC-2/AC-9 执行顺序冲突 | P1 | Task 2 重构 AsyncOutboxPoller，Task 9 文档化内部方法 |
+| 5 | AC-8 RabbitMQEventListener 与 RabbitMQConsumer 关系不清 | P1 | 独立实现 EventListenerAsync 接口 |
+| 6 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
+| 7 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
+| 8 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
 
 ### 下一步 Next Steps
 
