@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.interfaces.sandbox.sandbox_port import SandboxExecutor
+from src.interfaces.cli.commands.sandbox_port import SandboxExecutor
 
 logger = logging.getLogger(__name__)
 

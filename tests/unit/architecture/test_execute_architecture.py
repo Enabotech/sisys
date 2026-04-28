@@ -30,15 +30,15 @@ class TestExecuteArchitecture:
 
     def test_sandbox_executor_port_in_interfaces_layer(self) -> None:
         """SandboxExecutor port must be in interfaces layer."""
-        port_path = Path("src/interfaces/sandbox/sandbox_port.py")
+        port_path = Path("src/interfaces/cli/commands/sandbox_port.py")
 
-        assert port_path.exists(), "SandboxExecutor port must exist in interfaces/sandbox/"
+        assert port_path.exists(), "SandboxExecutor port must exist in interfaces/cli/commands/"
 
     def test_docker_sandbox_adapter_in_infrastructure_layer(self) -> None:
         """DockerSandboxAdapter must be in infrastructure layer."""
         adapter_path = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
 
-        assert adapter_path.exists(), "DockerSandboxAdapter must exist in infrastructure/sandbox/"
+        assert adapter_path.exists(), "DockerSandboxAdapter must exist in infrastructure/external_services/sandbox/"
 
     def test_executed_event_in_domain_events(self) -> None:
         """AutoExecuted event must be in domain/events layer."""
@@ -78,7 +78,7 @@ class TestExecuteArchitecture:
 
     def test_interfaces_layer_defines_ports(self) -> None:
         """Interfaces layer must define ports (abstract interfaces)."""
-        port_file = Path("src/interfaces/sandbox/sandbox_port.py")
+        port_file = Path("src/interfaces/cli/commands/sandbox_port.py")
 
         content = port_file.read_text()
 
@@ -96,5 +96,5 @@ class TestExecuteArchitecture:
 
         # Adapter should import from interfaces
         assert (
-            "from src.interfaces.sandbox.sandbox_port import" in content
-        ), "DockerSandboxAdapter must import from interfaces.sandbox.sandbox_port"
+            "from src.interfaces.cli.commands.sandbox_port import" in content
+        ), "DockerSandboxAdapter must import from interfaces.cli.commands.sandbox_port"
