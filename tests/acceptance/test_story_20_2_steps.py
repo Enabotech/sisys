@@ -403,11 +403,13 @@ def given_dlq_has_pending_entries(context: dict, pg_session: AsyncSession, event
             '"document_id": "test-doc"}'
         )
         await pg_session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dead_letter_queue
                 (id, event_id, event_type, payload, error_message, retry_count, status)
                 VALUES (:id, :event_id, :event_type, :payload, :error_message, :retry_count, 'pending')
-            """),
+            """
+            ),
             {
                 "id": str(entry_id),
                 "event_id": str(event_id),
