@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.application.text_processing.l1_compressor import L1Compressor
+from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 
 
 class TestL1CompressorCompression:

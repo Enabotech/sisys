@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.text_processing.l1_compressor import L1Compressor
-from src.application.text_processing.l1_text_extractor import L1TextExtractor
+from src.application.use_cases.text_processing.l1_compressor import L1Compressor
+from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
 from src.domain.repositories.memory_repository import (
     MemoryChangeHistoryRepositoryProtocol,
     MemoryMetadataRepositoryProtocol,

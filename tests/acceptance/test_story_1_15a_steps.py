@@ -30,8 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
 )
-from src.application.text_processing.l1_compressor import L1Compressor
-from src.application.text_processing.l1_text_extractor import L1TextExtractor
+from src.application.use_cases.text_processing.l1_compressor import L1Compressor
+from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
 from src.domain.events.memory_events import MemoryChanged
 from src.domain.services.memory_service import (
     MemoryDeleteRequest,
