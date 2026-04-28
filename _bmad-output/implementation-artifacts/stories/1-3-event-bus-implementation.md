@@ -1822,30 +1822,30 @@ sisys/
 ### 文件清单 File List
 
 **创建的文件/Created Files:**
-- `src/infrastructure/entities/outbox.py` - OutboxEntity 定义 + InvalidStateTransitionError
-- `src/infrastructure/entities/__init__.py` - 导出 OutboxEntity
-- `src/infrastructure/adapters/event_outbox_adapter.py` - EventOutboxAdapter + EventRegistry
-- `src/infrastructure/adapters/__init__.py` - 导出 EventOutboxAdapter
+- `src/infrastructure/messaging/outbox/outbox.py` - OutboxEntity 定义 + InvalidStateTransitionError
+- `src/infrastructure/messaging/outbox/__init__.py` - 导出 OutboxEntity
+- `src/infrastructure/messaging/adapters/event_outbox_adapter.py` - EventOutboxAdapter + EventRegistry
+- `src/infrastructure/messaging/adapters/__init__.py` - 导出 EventOutboxAdapter
 - `src/domain/repositories/outbox.py` - OutboxRepository 接口（使用 DomainEvent）
 - `src/domain/repositories/__init__.py` - 更新导出 OutboxRepository
 - `src/infrastructure/config/redis.py` - RedisConfig 配置模型
 - `src/infrastructure/config/rabbitmq.py` - RabbitMQConfig 配置模型
 - `src/infrastructure/config/__init__.py` - 导出配置
-- `src/infrastructure/events/redis_publisher.py` - RedisEventPublisher 实现
-- `src/infrastructure/events/redis_subscriber.py` - RedisEventSubscriber 实现
-- `src/infrastructure/events/async_rabbitmq_publisher.py` - AsyncRabbitMQPublisher 实现
-- `src/infrastructure/events/async_rabbitmq_consumer.py` - AsyncRabbitMQConsumer 实现
-- `src/infrastructure/events/async_outbox_poller.py` - AsyncOutboxPoller 实现
-- `src/infrastructure/events/__init__.py` - 更新导出所有事件总线组件
-- `src/infrastructure/repositories/` - **已删除 InMemory 测试替身**，真实实现见 `src/infrastructure/storage/postgresql/outbox_repository.py`
-- `src/infrastructure/idempotency/checker.py` - IdempotencyChecker
-- `src/infrastructure/idempotency/retry_policy.py` - RetryPolicy
-- `src/infrastructure/idempotency/dead_letter_queue.py` - DeadLetterQueue + InMemoryDeadLetterQueue
-- `src/infrastructure/idempotency/__init__.py` - 导出幂等性组件
+- `src/infrastructure/messaging/redis_publisher.py` - RedisEventPublisher 实现
+- `src/infrastructure/messaging/redis_subscriber.py` - RedisEventSubscriber 实现
+- `src/infrastructure/messaging/rabbitmq_publisher.py` - AsyncRabbitMQPublisher 实现
+- `src/infrastructure/messaging/rabbitmq_consumer.py` - AsyncRabbitMQConsumer 实现
+- `src/infrastructure/messaging/outbox/outbox_processor.py` - AsyncOutboxPoller 实现
+- `src/infrastructure/messaging/__init__.py` - 更新导出所有事件总线组件
+- `src/infrastructure/storage/postgresql/outbox_repository.py` - **真实 PostgreSQL 实现**
+- `src/infrastructure/messaging/idempotency/checker.py` - IdempotencyChecker
+- `src/infrastructure/messaging/idempotency/retry_policy.py` - RetryPolicy
+- `src/infrastructure/messaging/outbox/dead_letter_queue.py` - DeadLetterQueue + InMemoryDeadLetterQueue
+- `src/infrastructure/messaging/idempotency/__init__.py` - 导出幂等性组件
 - `src/infrastructure/monitoring/event_metrics.py` - EventMetrics + EventMetricsCollector + OpenTelemetryTracer
 - `src/infrastructure/monitoring/otel_config.py` - OtelConfig + BatchExportConfig + initialize_otel (Task 5.4 OTLP 导出器)
 - `src/infrastructure/monitoring/__init__.py` - 导出监控组件（含 OTLP 配置）
-- `tests/unit/infrastructure/entities/test_outbox_entity.py` - OutboxEntity + EventOutboxAdapter 测试
+- `tests/unit/infrastructure/events/test_outbox_entity.py` - OutboxEntity + EventOutboxAdapter 测试
 - `tests/unit/infrastructure/adapters/test_event_outbox_adapter.py` - EventOutboxAdapter 转换测试
 - `tests/unit/infrastructure/events/test_redis_event_bus.py` - Redis Pub/Sub 测试
 - `tests/unit/infrastructure/events/test_rabbitmq_event_bus.py` - RabbitMQ 测试
