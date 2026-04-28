@@ -302,11 +302,13 @@ development_status:
   19-3-predictive-strategic-alert-cusum-drift: backlog
   epic-19-retrospective: optional
 
+    # ===========================================================================
+  # Epic 20: 重大重构 - 🔄 进行中
   # ===========================================================================
-  # Epic 20: 重大重构 - ✅ 已完成
-  # ===========================================================================
-  epic-20: done
+  epic-20: in-progress
   20-1-sisys-testing-refactor: done
+  20-2-event-messaging-refactor: ready-for-dev
+  epic-20-retrospective: optional
   epic-20-retrospective: optional
 
 # =============================================================================
