@@ -1210,7 +1210,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 | 🟢 绿 | 实现 `InMemoryOutboxRepository`(MVP 占位，基础设施层，内部使用 OutboxEntity) |
 | 🔄 重构 | 添加 asyncio.Lock 保护（async 上下文安全）、按状态过滤 |
 
-- [x] Subtask: 创建 `src/infrastructure/repositories/outbox.py`
+- [x] Subtask: 创建 `src/infrastructure/repositories/outbox.py` → **已删除**，真实实现见 `src/infrastructure/storage/postgresql/outbox_repository.py`
 - [x] Subtask: 🔴 红 — 编写 `InMemoryOutboxRepository` 失败测试
 - [x] Subtask: 🟢 绿 — 实现 `InMemoryOutboxRepository`(内部使用 OutboxEntity，对外暴露 DomainEvent)
 - [x] Subtask: 🔄 重构 — 添加线程安全、按状态过滤
@@ -1837,8 +1837,7 @@ sisys/
 - `src/infrastructure/events/async_rabbitmq_consumer.py` - AsyncRabbitMQConsumer 实现
 - `src/infrastructure/events/async_outbox_poller.py` - AsyncOutboxPoller 实现
 - `src/infrastructure/events/__init__.py` - 更新导出所有事件总线组件
-- `src/infrastructure/repositories/outbox.py` - InMemoryOutboxRepository 实现
-- `src/infrastructure/repositories/__init__.py` - 更新导出
+- `src/infrastructure/repositories/` - **已删除 InMemory 测试替身**，真实实现见 `src/infrastructure/storage/postgresql/outbox_repository.py`
 - `src/infrastructure/idempotency/checker.py` - IdempotencyChecker
 - `src/infrastructure/idempotency/retry_policy.py` - RetryPolicy
 - `src/infrastructure/idempotency/dead_letter_queue.py` - DeadLetterQueue + InMemoryDeadLetterQueue
