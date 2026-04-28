@@ -260,7 +260,7 @@ async def _wait_for_consumer_ready(
     """轮询等待消费者真正开始消费.
 
     Args:
-        consumer: AsyncRabbitMQConsumer 实例
+        consumer: RabbitMQConsumer 实例
         queue_name: 队列名称，用于被动检查队列是否存在
         poll_interval: 轮询间隔（秒）
         max_polls: 最大轮询次数
@@ -291,8 +291,8 @@ async def _wait_for_consumer_ready(
 
 @then("异步消费者应该接收到该事件")
 def verify_rabbitmq_consumer_receives(
-    rabbitmq_publisher: AsyncRabbitMQPublisher,
-    rabbitmq_consumer: AsyncRabbitMQConsumer,
+    rabbitmq_publisher: RabbitMQPublisher,
+    rabbitmq_consumer: RabbitMQConsumer,
     event_loop,
 ):
     """Verify async consumer receives the event."""
@@ -330,7 +330,7 @@ def verify_rabbitmq_consumer_receives(
 | 任务取消 | 直接 `cancel()` 可能丢消息 | 先 `stop_consuming()` 再取消 |
 | 异常处理 | 无 | 分层异常处理，层层保障 |
 
-**实现验证**（`AsyncRabbitMQConsumer` 私有属性）：
+**实现验证**（`RabbitMQConsumer` 私有属性）：
 ```python
 # 第 60-61 行
 self._connection: AbstractConnection | None = None

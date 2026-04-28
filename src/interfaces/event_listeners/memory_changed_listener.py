@@ -11,7 +11,7 @@ L4 MinIO 不在本流程范围内，由 Checkpoint 持久化流程独立触发�
 架构来源: architecture.md §11.2.9
 Story: 1.15a
 
-调用方式：被 AsyncRabbitMQConsumer 通过 await handler(event) 调用，必须是 async def。
+调用方式：被 RabbitMQConsumer 通过 await handler(event) 调用，必须是 async def。
 """
 
 from __future__ import annotations

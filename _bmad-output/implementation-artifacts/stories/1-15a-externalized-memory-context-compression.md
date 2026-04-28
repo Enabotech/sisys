@@ -109,7 +109,7 @@
   - 复用现有 `OutboxEntity`（`src/infrastructure/entities/outbox.py`）- 遵循 Story 1.3 方案 A 彻底隔离
   - 字段: id, event_id, event_type, payload, status, created_at, published_at, retry_count, max_retries, error_message
   - status: pending → published / failed
-  - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/async_outbox_poller.py`）
+  - 后台处理器: 复用 `AsyncOutboxPoller`（`src/infrastructure/events/outbox_processor.py`）
   - **重要**：领域层通过 `OutboxRepository` 接口（`src/domain/repositories/outbox.py`）操作，不直接引用 OutboxEntity
 - [x] L1 缓存失效：`storage_coordinator.invalidate(layer="L1", ...)`
 - [x] L2 写入：`metadata_repository.upsert()` + `history_repository.append()`

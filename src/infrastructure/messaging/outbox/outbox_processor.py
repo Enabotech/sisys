@@ -33,7 +33,7 @@ class AsyncOutboxPoller:
 
         Args:
             outbox_repository: InMemoryOutboxRepository 实例
-            publisher: AsyncRabbitMQPublisher 实例
+            publisher: RabbitMQPublisher 实例
             poll_interval: 轮询间隔（秒）
             batch_size: 每批处理数量
         """

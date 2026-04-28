@@ -12,7 +12,7 @@
 
 **As a** 系统架构师,
 **I want** 实现应用启动与事件监听器注册机制,
-**So that** 多种 EventListener（MemoryChangedListener、AutoTriggerListener、AutoRouteListener、AutoExecuteCompletedListener 等）能够通过 AsyncRabbitMQConsumer 异步消费对应的事件。
+**So that** 多种 EventListener（MemoryChangedListener、AutoTriggerListener、AutoRouteListener、AutoExecuteCompletedListener 等）能够通过 RabbitMQConsumer 异步消费对应的事件。
 
 ### 业务价值
 
@@ -42,11 +42,11 @@
 
 | 组件 | 功能 | 状态 |
 |------|------|------|
-| AsyncRabbitMQConsumer | 异步 RabbitMQ 消费者 | ✅ 已实现 |
-| AsyncRabbitMQPublisher | 异步 RabbitMQ 发布者 | ✅ 已实现 |
+| RabbitMQConsumer | 异步 RabbitMQ 消费者 | ✅ 已实现 |
+| RabbitMQPublisher | 异步 RabbitMQ 发布者 | ✅ 已实现 |
 | RabbitMQConfig | RabbitMQ 配置 | ✅ 已实现 |
 
-**前置依赖:** Story 1.3 (AsyncRabbitMQConsumer ✅), Story 1.14a (AutoTriggerListener ✅), Story 1.14b (AutoRouteListener ✅), Story 1.14c (AutoExecuteCompletedListener ✅), Story 1.15a (MemoryChangedListener ✅)
+**前置依赖:** Story 1.3 (RabbitMQConsumer ✅), Story 1.14a (AutoTriggerListener ✅), Story 1.14b (AutoRouteListener ✅), Story 1.14c (AutoExecuteCompletedListener ✅), Story 1.15a (MemoryChangedListener ✅)
 
 **后续依赖:** Story 1.15b（六层存储协同）、Story 6.3（Checkpoint 快照创建 - L3 压缩触发）
 
@@ -60,7 +60,7 @@
 **When** 应用初始化时
 **Then** 创建并配置以下组件：
   - 初始化 RabbitMQ 配置（从环境变量或配置文件）
-  - 创建 `AsyncRabbitMQConsumer` 实例
+  - 创建 `RabbitMQConsumer` 实例
   - 创建所有 EventListener 实例（注入对应依赖）
   - 调用 `consumer.register_handler(queue, listener.handle)` 注册事件处理器
   - 调用 `consumer.async_consume(queue)` 启动消费
@@ -115,7 +115,7 @@
 **Given** 领域服务（如 MemoryService）发布事件
 **When** 事件发布时
 **Then** 根据配置选择发布路径：
-  - 如果配置了 `AsyncRabbitMQPublisher`：通过 RabbitMQ 发布（生产路径）
+  - 如果配置了 `RabbitMQPublisher`：通过 RabbitMQ 发布（生产路径）
   - 如果未配置：降级到 `InMemoryEventBus`（开发/MVP 路径）
 
 **验证标准/Validation Criteria:**
@@ -338,7 +338,7 @@
 
 **关联 AC:** AC-3, AC-4
 
-> **[集成验证]** 本 Task 验证 EventListenerRegistry 与 AsyncRabbitMQConsumer 的集成。
+> **[集成验证]** 本 Task 验证 EventListenerRegistry 与 RabbitMQConsumer 的集成。
 
 #### TDD 循环 [A]：事件发布路径
 
@@ -427,7 +427,7 @@ sisys/
 │   │   └── listener_registry.py    # EventListenerRegistry - 监听器注册表
 │   ├── infrastructure/
 │   │   └── events/
-│   │       └── async_rabbitmq_consumer.py  # [EXISTING] 已实现 (Story 1.3)
+│   │       └── rabbitmq_consumer.py  # [EXISTING] 已实现 (Story 1.3)
 │   └── interfaces/
 │       └── event_listeners/        # [EXISTING] 已实现 (Story 1.14a/b/c, 1.15a)
 │           ├── memory_changed_listener.py

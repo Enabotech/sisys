@@ -18,7 +18,7 @@ from src.infrastructure.config.rabbitmq import RabbitMQConfig
 logger = logging.getLogger(__name__)
 
 
-class AsyncRabbitMQPublisher:
+class RabbitMQPublisher:
     """异步 RabbitMQ 事件发布器。
 
     使用 aio-pika connect_robust 实现自动重连。
@@ -26,7 +26,7 @@ class AsyncRabbitMQPublisher:
     """
 
     def __init__(self, config: RabbitMQConfig):
-        """初始化 AsyncRabbitMQPublisher。
+        """初始化 RabbitMQPublisher。
 
         Args:
             config: RabbitMQ 连接配置

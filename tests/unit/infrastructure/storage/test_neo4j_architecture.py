@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 # 项目根目录
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DOMAIN_DIR = PROJECT_ROOT / "src" / "domain"
 INFRASTRUCTURE_DIR = PROJECT_ROOT / "src" / "infrastructure"
 
