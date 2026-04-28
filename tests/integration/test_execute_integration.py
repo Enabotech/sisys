@@ -13,7 +13,7 @@ from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
-from src.interfaces.event_listeners.auto_execute_completed_listener import AutoExecuteCompletedListener
+from src.interfaces.event_listeners.listeners.auto_execute_completed_listener import AutoExecuteCompletedListener
 
 
 class TestExecuteIntegration:

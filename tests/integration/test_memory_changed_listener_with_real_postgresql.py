@@ -30,7 +30,7 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
-from src.interfaces.event_listeners.memory_changed_listener import MemoryChangedListener
+from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
 
 # ===================================================================
 # Fixtures

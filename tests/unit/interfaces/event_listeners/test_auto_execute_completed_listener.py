@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.events.auto_execute_events import AutoExecuted
-from src.interfaces.event_listeners.auto_execute_completed_listener import AutoExecuteCompletedListener
+from src.interfaces.event_listeners.listeners.auto_execute_completed_listener import AutoExecuteCompletedListener
 
 
 class TestAutoExecuteCompletedListener:
