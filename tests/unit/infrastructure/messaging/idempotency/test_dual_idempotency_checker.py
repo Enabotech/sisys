@@ -30,8 +30,9 @@ async def redis_client():
 def mock_session():
     """Mock AsyncSession for testing."""
     session = mock.AsyncMock(spec=AsyncSession)
-    session.execute = mock.AsyncMock()
-    session.execute.return_value.rowcount = 1
+    execute_mock = mock.MagicMock()
+    execute_mock.fetchone.return_value = (1,)  # Truthy row for successful insert
+    session.execute = mock.AsyncMock(return_value=execute_mock)
     return session
 
 
