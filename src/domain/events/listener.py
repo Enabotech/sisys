@@ -89,3 +89,27 @@ class InMemoryEventListener(EventListener):
     def registered_event_types(self) -> list[str]:
         """Return list of event types that have registered handlers."""
         return list(self._handlers.keys())
+
+
+# =============================================================================
+# AC-5: EventListenerAsync - 异步事件处理器接口
+# =============================================================================
+
+
+class EventListenerAsync(ABC):
+    """Abstract async event listener interface.
+
+    用于异步事件消费场景（RabbitMQEventListener 实现）。
+    与同步 EventListener 接口独立，不继承以避免强制实现同步方法。
+    """
+
+    @abstractmethod
+    async def async_handle(self, event: DomainEvent) -> None:
+        """异步处理事件。
+
+        Args:
+            event: 要处理的事件
+
+        Raises:
+            NotImplementedError: Always, since this is an abstract interface.
+        """
