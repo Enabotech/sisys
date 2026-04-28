@@ -27,7 +27,7 @@
 | **EventListener 同步局限** | 仅支持同步 `handle()` 方法 | 生产环境无法处理异步事件 | EventListenerAsync 异步扩展 |
 | **事务边界不清** | Outbox 与业务操作无原子性保证 | 数据一致性风险 | UnitOfWork 统一事务 |
 | **EventStore 无持久化** | `InMemoryEventStore` 内存实现 | 进程重启丢失，无法重建聚合 | PostgreSQL EventStore |
-| **AsyncOutboxPoller 接口污染** | 直接调用 Repository 私有方法 | 违反依赖倒置 | 重构为使用异步公开接口 |
+| **AsyncOutboxPoller 接口污染** | 直接调用 Repository 私有方法 | 违反依赖倒置 | 标记 Poller 专用方法，不暴露到领域层接口 |
 | **EventBus 幂等性无持久化** | `processed_event_ids` 内存存储 | 进程重启后重复分发 | 明确 InMemoryEventBus 仅用于测试 |
 
 ---
@@ -138,22 +138,19 @@
 - [ ] 集成 `PostgresDeadLetterQueue` 处理失败事件
 - [ ] 单元测试
 
-### AC-9: AsyncOutboxPoller 异步接口重构
+### AC-9: AsyncOutboxPoller 内部方法文档化
 
-**Given** AsyncOutboxPoller 使用 OutboxRepository
-**When** 实现重构
-**Then** 使用异步公开接口方法
-**And** 符合依赖倒置原则
+**Given** AsyncOutboxPoller 使用 OutboxRepository 内部方法
+**When** 重构实施
+**Then** 内部方法保持不变，添加 `@poller_only` 注释标记
+**And** 明确领域层接口与基础设施层实现分离
 
 **验证标准/Validation Criteria:**
-- [ ] `OutboxRepository` 接口新增异步方法:
-  - `async_get_unpublished_entities(limit: int) -> list[OutboxModel]` (返回实体模型供 Poller 操作)
-  - `async_mark_published_by_event_id(event_id: UUID) -> None`
-  - `async_mark_failed_by_event_id(event_id: UUID, error: str) -> None`
-- [ ] `AsyncOutboxPoller` 重构使用异步公开方法
-- [ ] `PostgreSQLOutboxRepository` 实现新增的异步方法
-- [ ] 保留原有同步接口方法（向后兼容业务代码）
-- [ ] 单元测试
+- [ ] `OutboxRepository` 接口保持现有设计（使用 DomainEvent）
+- [ ] 内部方法 `_get_unpublished_entities()` 等添加 `# @poller_only` 注释
+- [ ] `AsyncOutboxPoller` 继续使用内部方法（无需修改）
+- [ ] 文档说明：领域层接口面向业务代码，Poller 专用接口在基础设施层
+- [ ] 单元测试（测试 Poller 行为而非接口契约）
 
 ### AC-10: 架构约束验证
 
@@ -163,6 +160,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] 领域层零外部依赖
+- [ ] 领域层不导入 `src.infrastructure.storage.postgresql.models`
 - [ ] Ruff + MyPy 检查通过
 - [ ] Story 1.3 集成测试回归通过
 
@@ -238,7 +236,7 @@
 | AC-6 | UnitOfWork 统一事务 | Task 6 | `test_unit_of_work.py` |
 | AC-7 | PostgreSQL EventStore | Task 7 | `test_event_store.py` |
 | AC-8 | RabbitMQ EventListener 适配 | Task 8 | `test_rabbitmq_event_listener.py` |
-| AC-9 | AsyncOutboxPoller 异步接口重构 | Task 9 | `test_async_outbox_poller.py` |
+| AC-9 | AsyncOutboxPoller 内部方法文档化 | Task 9 | `test_async_outbox_poller.py` |
 | AC-10 | 架构约束验证 | Task 10 | `test_architecture.py` |
 
 ---
@@ -440,27 +438,26 @@
 
 ---
 
-### Task 9: AsyncOutboxPoller 异步接口重构
+### Task 9: AsyncOutboxPoller 内部方法文档化
 
 **关联 AC:** AC-9
 
-#### TDD 循环 A：AsyncOutboxPoller 异步接口重构
+#### TDD 循环 A：AsyncOutboxPoller 内部方法文档化
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_async_outbox_poller.py` |
-| 🟢 绿 | 重构 OutboxRepository 异步接口和 AsyncOutboxPoller |
+| 🟢 绿 | 添加 @poller_only 注释，验证 Poller 行为 |
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 9.1: 🔴 红 — 编写 AsyncOutboxPoller 失败测试
-- [ ] Subtask 9.2: 🟢 绿 — 扩展 OutboxRepository 接口添加异步方法
-- [ ] Subtask 9.3: 🟢 绿 — PostgreSQLOutboxRepository 实现异步方法
-- [ ] Subtask 9.4: 🟢 绿 — 重构 AsyncOutboxPoller 使用异步公开方法
-- [ ] Subtask 9.5: 🔄 重构 — 优化代码
+- [ ] Subtask 9.1: 🔴 红 — 编写 AsyncOutboxPoller 行为测试
+- [ ] Subtask 9.2: 🟢 绿 — 添加 @poller_only 注释标记内部方法
+- [ ] Subtask 9.3: 🟢 绿 — 创建架构验证测试验证领域层边界
+- [ ] Subtask 9.4: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [ ] AsyncOutboxPoller 异步接口重构完成
-- [ ] 依赖倒置原则验证通过
+- [ ] AsyncOutboxPoller 内部方法文档化完成
+- [ ] 架构边界验证通过
 
 ---
 
@@ -502,7 +499,7 @@
 | **Redis ZSET 延迟重试** | 高性能、精确延迟 | Redis 单点 | ✅ 8/10 |
 | **双写幂等性** | 高可用、持久化 | 复杂度增加 | ✅ 8/10 |
 | **EventListenerAsync 扩展** | 不破坏现有接口，向后兼容 | 增加接口复杂度 | ✅ 9/10 |
-| **AsyncOutboxPoller 异步接口** | 符合依赖倒置，支持异步 | 需要重构现有接口 | ✅ 9/10 |
+| **Poller 内部方法文档化** | 保持架构边界，不引入领域层污染 | 内部方法无接口契约保护 | ✅ 8/10 |
 
 ### 项目结构说明 Project Structure
 
@@ -513,7 +510,7 @@ src/
 │   │   ├── base.py              # DomainEvent 基类（增强）
 │   │   └── listener.py         # EventListener + EventListenerAsync（扩展）
 │   └── repositories/
-│       ├── outbox.py           # OutboxRepository 接口（扩展异步方法）
+│       ├── outbox.py           # OutboxRepository 接口（面向业务代码）
 │       └── unit_of_work.py     # UnitOfWork（新建）
 ├── infrastructure/
 │   ├── messaging/
@@ -524,12 +521,12 @@ src/
 │   │   ├── idempotency/
 │   │   │   └── dual_idempotency_checker.py     # 新建
 │   │   ├── outbox/
-│   │   │   └── outbox_processor.py             # 修改（使用异步接口）
+│   │   │   └── outbox_processor.py             # 保持现状（使用内部方法）
 │   │   ├── rabbitmq_consumer.py               # 修改（实现EventListenerAsync + 移除nack requeue）
 │   │   └── event_bus.py                         # 保持 InMemory（仅开发测试用）
 │   └── storage/postgresql/
 │       ├── event_store.py                      # 新建
-│       └── outbox_repository.py                # 修改（实现异步方法）
+│       └── outbox_repository.py                # 保持现状（内部方法用 # @poller_only 标记）
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -557,20 +554,19 @@ src/
 
 **核心结论：Redis 仅用于缓存和分布式锁，不适合作为事件传输通道。**
 
-### 与 Story 1.3/1.5 的接口设计协调
+### 架构决策：Poller 内部方法的处理
 
-**Story 1.3 原始设计：**
-- `AsyncOutboxPoller` 使用内部方法 `_get_unpublished_entities()` / `_mark_published_entity()` / `_mark_failed_entity()` 直接操作 `OutboxEntity`
+**问题：** AsyncOutboxPoller 需要操作 OutboxModel 的 `retry_count`、`error_message` 等字段，但领域层接口不应依赖基础设施层类型。
 
-**Story 1.5 PostgreSQLOutboxRepository 复用：**
-- `PostgreSQLOutboxRepository` 保留同名内部方法供 `AsyncOutboxPoller` 复用
+**分析：**
+- 领域层 `OutboxRepository` 接口使用 `DomainEvent`，面向业务代码
+- Poller 是基础设施层内部组件，需要操作 `OutboxModel`
+- 将 Poller 内部方法暴露到领域层接口会违反六边形架构
 
-**本 Story (20.2) 修复方案：**
-- 扩展 `OutboxRepository` 接口添加异步公开方法
-- `async_get_unpublished_entities(limit) -> list[OutboxModel]` — 返回实体模型供 Poller 操作
-- `async_mark_published_by_event_id(event_id)` — 通过 event_id 标记
-- `async_mark_failed_by_event_id(event_id, error)` — 通过 event_id 标记
-- 内部方法保留供 PostgreSQLOutboxRepository 实现，但通过接口暴露
+**决策：**
+- 保持现有设计：领域层接口面向业务代码，Poller 使用内部方法
+- 在内部方法上添加 `# @poller_only` 注释标记
+- 在架构验证测试中验证领域层不导入 `src.infrastructure.storage.postgresql.models`
 
 ---
 
@@ -602,10 +598,10 @@ src/
 - [x] 前一个故事学习经验整合
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
-- [x] AC-9 AsyncOutboxPoller 异步接口重构（修复 P0 接口不匹配问题）
-- [x] AC-8 RabbitMQEventListener 改为 RabbitMQConsumer 适配 EventListenerAsync
+- [x] AC-9 修复架构冲突：改为内部方法文档化，不暴露到领域层接口
 - [x] AC-4 DomainEvent 增强字段明确定义为顶层字段（非 payload）
-- [x] 明确 InMemoryEventBus 仅用于 dev/test（移除不切实际的 RedisEventBus）
+- [x] AC-8 RabbitMQEventListener 改为 RabbitMQConsumer 适配 EventListenerAsync
+- [x] 明确 InMemoryEventBus 仅用于 dev/test
 
 ### 文件清单 File List
 
@@ -634,10 +630,8 @@ src/
 |------|------|
 | `src/domain/events/base.py` | 增强 DomainEvent（correlation_id, causation_id, metadata 顶层字段） |
 | `src/domain/events/listener.py` | 扩展 EventListenerAsync 接口 |
-| `src/domain/repositories/outbox.py` | 扩展 OutboxRepository 异步公开方法接口 |
-| `src/infrastructure/messaging/outbox/outbox_processor.py` | 重构使用异步公开方法 |
+| `src/infrastructure/storage/postgresql/outbox_repository.py` | 添加 @poller_only 注释标记内部方法 |
 | `src/infrastructure/messaging/rabbitmq_consumer.py` | 实现 EventListenerAsync + 移除 nack(requeue=True) |
-| `src/infrastructure/storage/postgresql/outbox_repository.py` | 实现异步公开方法 |
 
 ---
 
@@ -666,9 +660,9 @@ src/
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
-| 1 | AC-9 AsyncOutboxPoller 接口与实现不匹配（Poller 需要 OutboxModel） | P0 | 扩展 OutboxRepository 接口添加异步方法 `async_get_unpublished_entities()` |
+| 1 | AC-9 架构冲突：接口返回 OutboxModel 违反领域层零依赖 | P0 | 改为内部方法文档化，保持架构边界 |
 | 2 | AC-4 DomainEvent 字段定义不清 | P0 | 明确为顶层字段（UUID \| None），非 payload |
-| 3 | AC-8 RabbitMQEventListener 与 RabbitMQConsumer 关系不清 | P1 | 改为 RabbitMQConsumer 适配 EventListenerAsync 接口 |
+| 3 | AC-8 RabbitMQEventListener 与 RabbitMQConsumer 关系不清 | P1 | 改为 RabbitMQConsumer 适配 EventListenerAsync |
 | 4 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
 | 5 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
 | 6 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
