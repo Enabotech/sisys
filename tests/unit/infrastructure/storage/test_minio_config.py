@@ -42,8 +42,8 @@ class TestMinIOConfigInit:
         assert config.host == "minio.example.com"
         assert config.port == 9000
         assert config.endpoint == "minio.example.com:9000"
-        assert config.access_key == "my-access"
-        assert config.secret_key == "my-secret"
+        assert config.access_key == "my-access"  # pragma: allowlist secret
+        assert config.secret_key == "my-secret"  # pragma: allowlist secret
         assert config.secure is True
         assert config.bucket_prefix == "my-project"
 
@@ -80,8 +80,8 @@ class TestMinIOConfigFromEnv:
             },
         ):
             config = MinIOConfig.from_env()
-            assert config.access_key == "test-key"
-            assert config.secret_key == "test-secret"
+            assert config.access_key == "test-key"  # pragma: allowlist secret
+            assert config.secret_key == "test-secret"  # pragma: allowlist secret
 
     def test_from_env_secure_flag(self):
         """Secure 标志环境变量。"""

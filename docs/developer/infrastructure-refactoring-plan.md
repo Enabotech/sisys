@@ -195,9 +195,9 @@ poetry run pytest tests/ -x -q -k "workflow" 2>/dev/null || echo "No workflow te
 ```
 events/
 ├── __init__.py
-├── async_outbox_poller.py
-├── async_rabbitmq_consumer.py
-├── async_rabbitmq_publisher.py
+├── outbox_processor.py
+├── rabbitmq_consumer.py
+├── rabbitmq_publisher.py
 ├── in_memory_bus.py
 ├── in_memory_store.py
 ├── redis_publisher.py
@@ -223,8 +223,8 @@ idempotency/
 messaging/
 ├── __init__.py
 ├── event_bus.py              # ← in_memory_bus.py
-├── rabbitmq_consumer.py     # ← async_rabbitmq_consumer.py
-├── rabbitmq_publisher.py     # ← async_rabbitmq_publisher.py
+├── rabbitmq_consumer.py     # ← rabbitmq_consumer.py
+├── rabbitmq_publisher.py     # ← rabbitmq_publisher.py
 ├── redis_publisher.py        # ← redis_publisher.py
 ├── redis_subscriber.py       # ← redis_subscriber.py
 ├── message_serializer.py     # ← in_memory_store.py
@@ -234,7 +234,7 @@ messaging/
 │   └── sqlalchemy_event_outbox_adapter.py
 ├── outbox/
 │   ├── __init__.py
-│   ├── outbox_processor.py   # ← async_outbox_poller.py
+│   ├── outbox_processor.py   # ← outbox_processor.py
 │   └── dead_letter_queue.py  # ← idempotency/dead_letter_queue.py
 └── idempotency/              # ← 幂等模块
     ├── __init__.py
@@ -251,8 +251,8 @@ mkdir -p messaging/adapters messaging/outbox messaging/idempotency
 
 # 2. 移动并重命名文件
 mv events/in_memory_bus.py messaging/event_bus.py
-mv events/async_rabbitmq_consumer.py messaging/rabbitmq_consumer.py
-mv events/async_rabbitmq_publisher.py messaging/rabbitmq_publisher.py
+mv events/rabbitmq_consumer.py messaging/rabbitmq_consumer.py
+mv events/rabbitmq_publisher.py messaging/rabbitmq_publisher.py
 mv events/redis_publisher.py messaging/redis_publisher.py
 mv events/redis_subscriber.py messaging/redis_subscriber.py
 mv events/in_memory_store.py messaging/message_serializer.py
@@ -262,7 +262,7 @@ mv adapters/event_outbox_adapter.py messaging/adapters/
 mv adapters/sqlalchemy_event_outbox_adapter.py messaging/adapters/
 
 # 4. 移动 outbox
-mv events/async_outbox_poller.py messaging/outbox/outbox_processor.py
+mv events/outbox_processor.py messaging/outbox/outbox_processor.py
 mv idempotency/dead_letter_queue.py messaging/outbox/
 
 # 5. 移动 idempotency

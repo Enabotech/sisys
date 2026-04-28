@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 EventProcessor = Callable[[DomainEvent], Any]
 
 
-class AsyncRabbitMQConsumer:
+class RabbitMQConsumer:
     """异步 RabbitMQ 事件消费者。
 
     使用手动 ACK/NACK 策略：
@@ -43,7 +43,7 @@ class AsyncRabbitMQConsumer:
         dlq: Any = None,
         retry_policy: Any = None,
     ):
-        """初始化 AsyncRabbitMQConsumer。
+        """初始化 RabbitMQConsumer。
 
         Args:
             config: RabbitMQ 连接配置
@@ -72,7 +72,7 @@ class AsyncRabbitMQConsumer:
         )
         self._channel = await self._connection.channel()
         await self._channel.set_qos(prefetch_count=self._config.prefetch_count)
-        logger.info("AsyncRabbitMQConsumer connected")
+        logger.info("RabbitMQConsumer connected")
 
     def register_handler(self, queue_name: str, handler: EventProcessor) -> None:
         """注册事件处理器。
@@ -214,4 +214,4 @@ class AsyncRabbitMQConsumer:
         """关闭连接。"""
         if self._connection and not self._connection.is_closed:
             await self._connection.close()
-            logger.info("AsyncRabbitMQConsumer connection closed")
+            logger.info("RabbitMQConsumer connection closed")
