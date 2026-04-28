@@ -69,7 +69,8 @@
 **验证标准/Validation Criteria:**
 - [ ] `DualIdempotencyChecker` 实现 (`src/infrastructure/messaging/idempotency/dual_idempotency_checker.py`)
 - [ ] Redis SET NX + 异步同步 PostgreSQL
-- [ ] **替代** 现有 `IdempotencyChecker`（Story 1.3 实现），供 RabbitMQConsumer 使用
+- [ ] **新增** DualIdempotencyChecker（与现有 IdempotencyChecker **并存**）
+- [ ] RabbitMQEventListener（AC-8）使用 DualIdempotencyChecker 替代 IdempotencyChecker
 - [ ] 并发安全测试 + 故障注入测试
 
 ### AC-4: 增强 DomainEvent 基类
@@ -85,7 +86,7 @@
 - [ ] 现有子类兼容性（向后兼容，通过 payload 传递）
 - [ ] 单元测试
 
-### AC-5: EventListenerAsync 异步扩展
+### AC-5: EventListenerAsync 异步事件处理器接口
 
 **Given** 生产环境需要异步事件处理能力
 **When** 创建 EventListenerAsync 接口
@@ -95,7 +96,8 @@
 **验证标准/Validation Criteria:**
 - [ ] `EventListenerAsync` 独立接口 (`src/domain/events/listener.py`)
 - [ ] `async_handle(event: DomainEvent) -> None` 异步处理方法
-- [ ] 现有 `EventListener` 保持不变（向后兼容）
+- [ ] **使用场景：** RabbitMQEventListener 实现此接口用于异步事件消费
+- [ ] 现有 `EventListener` 保持不变（用于同步事件分发场景）
 - [ ] 单元测试
 
 ### AC-6: UnitOfWork 统一事务边界
@@ -134,9 +136,10 @@
 **验证标准/Validation Criteria:**
 - [ ] `RabbitMQEventListener` 实现 (`src/infrastructure/messaging/rabbitmq_listener.py`)
 - [ ] 实现 `EventListenerAsync` 接口（`async_handle(event) -> None`）
-- [ ] **基于现有 `RabbitMQConsumer` 重构**，复用其 aio-pika 连接管理和消息处理逻辑
-- [ ] 集成 `DualIdempotencyChecker`（替代现有 IdempotencyChecker）
-- [ ] 集成 `RedisRetryQueue` 和 `PostgresDeadLetterQueue`
+- [ ] **重构内容：** 从 RabbitMQConsumer 提取公共逻辑，但独立实现
+- [ ] 使用 `DualIdempotencyChecker`（替代 IdempotencyChecker）
+- [ ] 使用 `RedisRetryQueue` 处理重试（替代 nack requeue）
+- [ ] 使用 `PostgresDeadLetterQueue` 处理死信（替代 InMemoryDeadLetterQueue）
 - [ ] 单元测试
 
 ### AC-9: AsyncOutboxPoller 内部方法文档化
@@ -323,7 +326,6 @@
 **完成标准/Definition of Done:**
 - [ ] DualIdempotencyChecker 实现完成
 - [ ] 并发安全测试通过
-- [ ] 替代现有 IdempotencyChecker
 
 ---
 
@@ -430,10 +432,9 @@
 | 🔄 重构 | 优化代码，运行 `ruff` + `mypy` |
 
 - [ ] Subtask 8.1: 🔴 红 — 编写 RabbitMQEventListener 失败测试
-- [ ] Subtask 8.2: 🟢 绿 — RabbitMQEventListener 基于 RabbitMQConsumer 重构
-- [ ] Subtask 8.3: 🟢 绿 — 实现 EventListenerAsync 接口（async_handle）
-- [ ] Subtask 8.4: 🟢 绿 — 集成 DualIdempotencyChecker、RedisRetryQueue、PostgresDeadLetterQueue
-- [ ] Subtask 8.5: 🔄 重构 — 优化代码
+- [ ] Subtask 8.2: 🟢 绿 — RabbitMQEventListener 实现 EventListenerAsync
+- [ ] Subtask 8.3: 🟢 绿 — 集成 DualIdempotencyChecker、RedisRetryQueue、PostgresDeadLetterQueue
+- [ ] Subtask 8.4: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
 - [ ] RabbitMQEventListener 实现完成
@@ -522,7 +523,8 @@ src/
 │   │   ├── retry/
 │   │   │   └── redis_retry_queue.py            # 新建
 │   │   ├── idempotency/
-│   │   │   └── dual_idempotency_checker.py     # 新建（替代 IdempotencyChecker）
+│   │   │   ├── checker.py        # 现有 IdempotencyChecker（保持）
+│   │   │   └── dual_idempotency_checker.py     # 新建（并存）
 │   │   ├── outbox/
 │   │   │   └── outbox_processor.py             # 保持现状（使用内部方法）
 │   │   ├── rabbitmq_listener.py               # 新建（实现EventListenerAsync）
@@ -558,13 +560,21 @@ src/
 
 **核心结论：Redis 仅用于缓存和分布式锁，不适合作为事件传输通道。**
 
+### 接口设计决策：EventListenerAsync 独立接口
+
+| 接口 | 使用场景 | 方法 |
+|------|---------|------|
+| **EventListener** | 同步事件分发（内部使用） | `on_event()`, `dispatch()` |
+| **EventListenerAsync** | 异步事件消费（RabbitMQEventListener 实现） | `async_handle()` |
+
 ### 与 Story 1.3/1.5 的组件关系
 
 | 组件 | Story 1.3 | Story 20.2 | 关系 |
 |------|-----------|-----------|------|
-| `IdempotencyChecker` | Redis SET NX | `DualIdempotencyChecker` | **替代** |
-| `RabbitMQConsumer` | 基础实现 | `RabbitMQEventListener` | **重构扩展** |
-| `DeadLetterQueue` | InMemory | `PostgresDeadLetterQueue` | **替代** |
+| `IdempotencyChecker` | Redis SET NX | `DualIdempotencyChecker` | **并存**（Dual 替代 Consumer 使用） |
+| `RabbitMQConsumer` | 基础实现 | 重构 | **重构**（移除 nack requeue） |
+| `RabbitMQEventListener` | — | 新实现 | **新建**（实现 EventListenerAsync） |
+| `DeadLetterQueue` | InMemory | `PostgresDeadLetterQueue` | **并存**（DLQ 替代 Consumer 使用） |
 | `AsyncOutboxPoller` | 内部方法调用 | 内部方法文档化 | **保持** |
 
 ---
@@ -597,7 +607,7 @@ src/
 - [x] 前一个故事学习经验整合
 - [x] 状态设置为 `ready-for-dev`
 - [x] SDD+TDD 融合开发要求定义完成
-- [x] 四次审查修复：AC-5/AC-8 命名统一，AC-3 与 1.3 关系明确
+- [x] 五次审查修复：明确组件并存关系、接口使用场景
 
 ### 文件清单 File List
 
@@ -608,8 +618,8 @@ src/
 | `src/domain/repositories/unit_of_work.py` | UnitOfWork |
 | `src/infrastructure/messaging/dlq/postgres_dead_letter_queue.py` | PostgreSQL DLQ |
 | `src/infrastructure/messaging/retry/redis_retry_queue.py` | Redis 延迟重试 |
-| `src/infrastructure/messaging/idempotency/dual_idempotency_checker.py` | 双写幂等性（替代 IdempotencyChecker） |
-| `src/infrastructure/messaging/rabbitmq_listener.py` | RabbitMQEventListener（实现EventListenerAsync） |
+| `src/infrastructure/messaging/idempotency/dual_idempotency_checker.py` | 双写幂等性（与 IdempotencyChecker 并存） |
+| `src/infrastructure/messaging/rabbitmq_listener.py` | RabbitMQEventListener（实现 EventListenerAsync） |
 | `src/infrastructure/storage/postgresql/event_store.py` | PostgreSQL EventStore |
 | `tests/unit/infrastructure/messaging/dlq/test_postgres_dead_letter_queue.py` | DLQ 测试 |
 | `tests/unit/infrastructure/messaging/retry/test_redis_retry_queue.py` | 重试队列测试 |
@@ -628,7 +638,7 @@ src/
 | `src/domain/events/base.py` | 增强 DomainEvent（correlation_id, causation_id, metadata 顶层字段） |
 | `src/domain/events/listener.py` | 添加 EventListenerAsync 独立接口 |
 | `src/infrastructure/messaging/outbox/outbox_processor.py` | 重构使用 RedisRetryQueue |
-| `src/infrastructure/messaging/rabbitmq_consumer.py` | 重构：移除 nack(requeue=True)，提取 RabbitMQEventListener |
+| `src/infrastructure/messaging/rabbitmq_consumer.py` | 重构：移除 nack(requeue=True) |
 | `src/infrastructure/storage/postgresql/outbox_repository.py` | 添加 @poller_only 注释标记内部方法 |
 
 ---
@@ -662,11 +672,13 @@ src/
 | 2 | AC-4 DomainEvent 字段定义不清 | P0 | 明确为顶层字段（UUID \| None），非 payload |
 | 3 | AC-5 EventListenerAsync 继承导致需要实现同步方法 | P0 | 改为独立接口，不继承 EventListener |
 | 4 | AC-2/AC-9 执行顺序冲突 | P1 | Task 2 重构 AsyncOutboxPoller，Task 9 文档化内部方法 |
-| 5 | AC-5/AC-8 命名冲突：RabbitMQConsumer vs RabbitMQEventListener | P1 | 明确：RabbitMQEventListener 基于 RabbitMQConsumer 重构扩展 |
-| 6 | AC-3 与 Story 1.3 IdempotencyChecker 关系不清 | P1 | 明确：DualIdempotencyChecker 替代现有 IdempotencyChecker |
-| 7 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
-| 8 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
-| 9 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
+| 5 | AC-5/AC-8 命名冲突 | P1 | RabbitMQEventListener 基于 RabbitMQConsumer 重构 |
+| 6 | AC-3 与 Story 1.3 IdempotencyChecker 关系不清 | P1 | 明确并存关系，RabbitMQEventListener 使用 DualIdempotencyChecker |
+| 7 | AC-8 重构目标模糊 | P1 | 明确重构内容：使用新组件替代旧组件 |
+| 8 | EventListenerAsync 与 EventListener 功能重复 | P1 | 明确使用场景：EventListener 同步分发，EventListenerAsync 异步消费 |
+| 9 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
+| 10 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
+| 11 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
 
 ### 下一步 Next Steps
 
