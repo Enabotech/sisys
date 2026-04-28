@@ -21,7 +21,7 @@ from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from tests.environments import get_test_env  # noqa: E402
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 # ===================================================================
 # Redis Fixtures (Real Instance)

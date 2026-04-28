@@ -12,8 +12,8 @@ import fakeredis.aioredis
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
-from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
 # ===================================================================
 # TDD Cycle A: Test Directory & Configuration
@@ -149,7 +149,7 @@ class TestRetryPolicy:
         """Delay should increase with retry count (exponential backoff)."""
         # Mock jitter to fixed 1.0 so ordering is deterministic.
         # Without this, random.uniform(0.5, 1.5) can make delay_1 < delay_0.
-        monkeypatch.setattr("src.infrastructure.messaging.idempotency.retry_policy.random.uniform", lambda a, b: 1.0)
+        monkeypatch.setattr("src.infrastructure.messaging.retry.retry_policy.random.uniform", lambda a, b: 1.0)
 
         delay_0 = retry_policy.get_delay(0)
         delay_1 = retry_policy.get_delay(1)

@@ -62,7 +62,7 @@ class TestOutboxRepositoryInternalMethods:
 
     def test_internal_methods_have_poller_only_comment(self):
         """Internal methods should have @poller_only comment."""
-        from src.infrastructure.storage.postgresql.outbox_repository import (
+        from src.infrastructure.messaging.outbox.outbox_repository import (
             PostgreSQLOutboxRepository,
         )
 

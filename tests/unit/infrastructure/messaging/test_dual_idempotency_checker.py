@@ -10,7 +10,7 @@ import pytest
 import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.messaging.idempotency.dual_idempotency_checker import (
+from src.infrastructure.messaging.retry.dual_idempotency_checker import (
     DEFAULT_TTL,
     IDEMPOTENCY_TABLE,
     DualIdempotencyChecker,

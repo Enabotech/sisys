@@ -740,7 +740,7 @@ class TestHarborRobotAccount:
         from pathlib import Path
 
         # 使用项目根目录路径
-        config_path = Path(__file__).parent.parent.parent / "deployments" / "harbor" / "robot-account.yaml"
+        config_path = Path(__file__).parents[2] / "deployments" / "harbor" / "robot-account.yaml"
         if not os.path.exists(config_path):
             pytest.skip(f"Robot Account 配置文件不存在：{config_path}，这是 Story 0.6 的待办事项")
 
@@ -770,9 +770,9 @@ class TestHarborRobotAccount:
             # Windows 格式路径（用户提供的）
             Path("/home/agimtech/sisys/deploy/kubernetes/harbor/robot$robot_test_deployment.json"),
             # 标准 Linux 格式路径
-            Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot$robot_test_deployment.json",
+            Path(__file__).parents[2] / "deploy" / "kubernetes" / "harbor" / "robot$robot_test_deployment.json",
             # 备用路径
-            Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot_test_deployment.json",
+            Path(__file__).parents[2] / "deploy" / "kubernetes" / "harbor" / "robot_test_deployment.json",
         ]
 
         json_path = None
@@ -783,7 +783,7 @@ class TestHarborRobotAccount:
 
         if not json_path:
             # 尝试 YAML 配置文件
-            yaml_path = Path(__file__).parent.parent.parent / "deploy" / "kubernetes" / "harbor" / "robot-account.yaml"
+            yaml_path = Path(__file__).parents[2] / "deploy" / "kubernetes" / "harbor" / "robot-account.yaml"
             if yaml_path.exists():
                 pytest.skip("Robot Account 配置已创建 (YAML)，但缺少 JSON 导出文件，跳过认证测试")
             else:
@@ -852,7 +852,7 @@ class TestGiteaHarborIntegration:
         from pathlib import Path
 
         # 使用项目根目录路径
-        webhook_path = Path(__file__).parent.parent.parent / "deployments" / "harbor" / "webhook-config.yaml"
+        webhook_path = Path(__file__).parents[2] / "deployments" / "harbor" / "webhook-config.yaml"
         if not os.path.exists(webhook_path):
             pytest.skip(f"Gitea Webhook 配置文件不存在：{webhook_path}，这是 Story 0.6/0.7 的待办事项")
 

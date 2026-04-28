@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.event_store import (
+from src.infrastructure.messaging.event_store import (
     EVENT_STORE_TABLE,
     EventStoreModel,
     PostgreSQLEventStore,
@@ -123,7 +123,7 @@ class TestPostgreSQLEventStore:
     async def test_append_with_optimistic_locking(self, event_store, mock_session):
         """append should raise error on version conflict."""
         from src.domain.events import DocumentProcessed
-        from src.infrastructure.storage.postgresql.event_store import VersionError
+        from src.infrastructure.messaging.event_store import VersionError
 
         event = DocumentProcessed(
             document_id=uuid4(),

@@ -32,7 +32,7 @@ from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 

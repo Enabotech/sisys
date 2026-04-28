@@ -158,7 +158,7 @@ class TestOutboxEventLifecycle:
     async def test_save_event_to_outbox(self, mock_session):
         """保存事件到发件箱。"""
         from src.domain.events.base import DomainEvent
-        from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+        from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         event = DomainEvent(
             event_id=uuid4(),
@@ -178,7 +178,7 @@ class TestOutboxEventLifecycle:
         """获取未发布事件列表。"""
         from src.domain.events.base import DomainEvent
         from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
-        from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+        from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         # 注册事件类型
         EventRegistry.register("TestEvent", DomainEvent)
@@ -195,7 +195,7 @@ class TestOutboxEventLifecycle:
     @pytest.mark.asyncio
     async def test_mark_event_published(self, mock_session):
         """标记事件已发布。"""
-        from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+        from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
         mock_result = mock.Mock()
@@ -211,7 +211,7 @@ class TestOutboxEventLifecycle:
     @pytest.mark.asyncio
     async def test_mark_event_failed(self, mock_session):
         """标记事件发布失败。"""
-        from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+        from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
         mock_model.retry_count = 0
@@ -328,7 +328,7 @@ class TestTransactionRollback:
     def test_save_does_not_auto_commit(self, mock_session):
         """save 方法不应自动提交（依赖外部事务管理）。"""
         from src.domain.events.base import DomainEvent
-        from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+        from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         event = DomainEvent(
             event_id=uuid4(),

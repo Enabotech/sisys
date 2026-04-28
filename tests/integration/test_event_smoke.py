@@ -12,8 +12,8 @@ import pytest
 
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
-from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
-from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
+from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
 # ===================================================================
 # TDD Cycle A: Event Type Registry

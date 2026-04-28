@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.dlq.postgres_dead_letter_queue import (
+from src.infrastructure.messaging.outbox.postgres_dead_letter_queue import (
     DeadLetterQueueEntry,
     DeadLetterQueueModel,
     PostgresDeadLetterQueue,

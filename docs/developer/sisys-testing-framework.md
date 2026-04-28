@@ -532,7 +532,7 @@ class TestEnvConfig:
             load_dotenv(env_file, override=True)
         else:
             # 尝试从 tests/ 目录向上查找 .env
-            env_path = Path(__file__).parent.parent.parent / ".env"
+            env_path = Path(__file__).parents[2] / ".env"
             if env_path.exists():
                 load_dotenv(env_path, override=True)
             else:

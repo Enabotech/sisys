@@ -25,7 +25,7 @@ from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 # Import reset_test_environment for test isolation (AC-6)
 

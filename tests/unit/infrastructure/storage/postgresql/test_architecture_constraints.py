@@ -14,7 +14,7 @@ class TestArchitectureConstraints:
 
     def test_domain_layer_no_sqlalchemy_imports(self):
         """测试领域层无SQLAlchemy导入。"""
-        domain_dir = Path(__file__).parent.parent.parent.parent / "src" / "domain"
+        domain_dir = Path(__file__).parents[3] / "src" / "domain"
 
         violations = []
         for py_file in domain_dir.rglob("*.py"):
@@ -26,7 +26,7 @@ class TestArchitectureConstraints:
 
     def test_dependency_direction(self):
         """测试依赖方向正确（基础设施层不直接导入领域层实现）。"""
-        infra_dir = Path(__file__).parent.parent.parent.parent / "src" / "infrastructure"
+        infra_dir = Path(__file__).parents[3] / "src" / "infrastructure"
 
         # 允许基础设施层导入领域层接口
         # 但不允许循环依赖
@@ -42,16 +42,8 @@ class TestArchitectureConstraints:
 
     def test_all_models_have_tests(self):
         """测试所有模型都有对应的单元测试。"""
-        models_dir = Path(__file__).parent.parent.parent.parent / "src" / "infrastructure" / "storage" / "postgresql" / "models"
-        tests_dir = (
-            Path(__file__).parent.parent.parent.parent
-            / "tests"
-            / "unit"
-            / "infrastructure"
-            / "storage"
-            / "postgresql"
-            / "models"
-        )
+        models_dir = Path(__file__).parents[3] / "src" / "infrastructure" / "storage" / "postgresql" / "models"
+        tests_dir = Path(__file__).parents[3] / "tests" / "unit" / "infrastructure" / "storage" / "postgresql" / "models"
 
         model_files = {f.stem for f in models_dir.glob("*.py") if f.stem != "__init__"}
         test_files = {f.stem.replace("test_", "") for f in tests_dir.glob("test_*.py")}
@@ -67,7 +59,7 @@ class TestArchitectureConstraints:
 
     def test_alembic_migration_syntax(self):
         """测试Alembic迁移脚本语法正确。"""
-        versions_dir = Path(__file__).parent.parent.parent.parent / "alembic" / "versions"
+        versions_dir = Path(__file__).parents[3] / "alembic" / "versions"
 
         for py_file in versions_dir.glob("*.py"):
             content = py_file.read_text()
