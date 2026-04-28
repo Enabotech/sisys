@@ -307,7 +307,7 @@ development_status:
   # ===========================================================================
   epic-20: in-progress
   20-1-sisys-testing-refactor: done
-  20-2-event-messaging-refactor: ready-for-dev
+  20-2-event-messaging-refactor: in-progress
   epic-20-retrospective: optional
 
 # =============================================================================

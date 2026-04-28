@@ -650,7 +650,7 @@ src/
 |--------|-----|
 | **Story ID** | 20.2 |
 | **Story Key** | 20-2-event-messaging-refactor |
-| **File** | `_bmad-output/implementation-artifacts/stories/20-2-event-messaging-refactor.md` |
+| **File** | `src/infrastructure/messaging/20-2-event-messaging-refactor.md` |
 | **Status** | `ready-for-dev` |
 | **Epic** | Epic 20: 重大重构 |
 | **优先级** | P0 |
@@ -679,7 +679,7 @@ src/
 | 8 | EventListenerAsync 与 EventListener 功能重复 | P1 | 明确使用场景：EventListener 同步分发，EventListenerAsync 异步消费 |
 | 9 | InMemoryEventBus 幂等性无持久化 | P1 | 明确标注仅用于 dev/test，不追求生产完善 |
 | 10 | SchemaMigrator 属于 YAGNI | P2 | 已移除，推迟到未来 Epic |
-| 11 | RedisEventBus 不符合业界最佳实践 | P0 | 已移除，Redis 仅用于缓存/Lock |
+| 11 | RedisEventBus 不符合业界最佳实践 | P0 | **结论错误已修正**：Redis Pub/Sub 是 HeartbeatTriggered 等实时通知事件的正确通道（ADR-003），RedisEventBus 保留用于实时通知通道 |
 
 ### 下一步 Next Steps
 
