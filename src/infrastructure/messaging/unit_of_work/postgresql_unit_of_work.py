@@ -1,44 +1,46 @@
-"""UnitOfWork — 工作单元模式接口。
+"""PostgreSQL UnitOfWork 实现 — 基础设施层。
 
-用于统一事务边界，保证业务操作与 Outbox 写入原子性。
-仅定义抽象接口，无外部依赖。
+基于 SQLAlchemy AsyncSession 的工作单元模式实现。
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
-    pass  # 类型提示使用，不导入实现
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class UnitOfWork(ABC):
-    """抽象工作单元接口。
+class PostgreSQLUnitOfWork:
+    """PostgreSQL 工作单元实现。
 
-    定义事务边界：begin(), commit(), rollback(), close()。
-    支持异步上下文管理器协议。
+    使用 SQLAlchemy AsyncSession 管理事务。
+    实现领域层 UnitOfWork 接口（通过 TYPE_CHECKING 避免循环依赖）。
     """
 
-    @abstractmethod
+    def __init__(self, session: AsyncSession) -> None:
+        """初始化 PostgreSQLUnitOfWork。
+
+        Args:
+            session: SQLAlchemy 异步会话
+        """
+        self._session = session
+
     async def begin(self) -> None:
         """开始事务。"""
-        raise NotImplementedError
+        await self._session.begin()
 
-    @abstractmethod
     async def commit(self) -> None:
         """提交事务。"""
-        raise NotImplementedError
+        await self._session.commit()
 
-    @abstractmethod
     async def rollback(self) -> None:
         """回滚事务。"""
-        raise NotImplementedError
+        await self._session.rollback()
 
-    @abstractmethod
     async def close(self) -> None:
         """关闭会话。"""
-        raise NotImplementedError
+        await self._session.close()
 
     async def __aenter__(self) -> Self:
         """异步上下文管理器入口。"""
