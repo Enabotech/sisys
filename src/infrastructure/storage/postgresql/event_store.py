@@ -1,0 +1,237 @@
+"""PostgreSQL EventStore — 事件溯源存储实现。
+
+使用 PostgreSQL 存储领域事件，支持：
+- 事件追加（带乐观锁版本检查）
+- 按聚合 ID 查询事件
+- 按事件类型和时间范围查询
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.domain.events.base import DomainEvent
+
+logger = logging.getLogger(__name__)
+
+# Default event store table name
+EVENT_STORE_TABLE = "event_store"
+
+
+class VersionError(Exception):
+    """Version conflict error for optimistic locking."""
+
+
+class EventStoreModel:
+    """Simple data class for event store records (not a SQLAlchemy model).
+
+    This is a plain Python class since we use raw SQL for event store operations.
+    The actual table schema is managed via raw SQL in create_table_sql().
+    """
+
+    __tablename__ = EVENT_STORE_TABLE
+
+    def __init__(
+        self,
+        event_id: str,
+        aggregate_id: str,
+        aggregate_type: str,
+        version: int,
+        event_type: str,
+        payload: dict,
+        timestamp: datetime,
+        metadata: dict | None = None,
+        id: int | None = None,
+    ):
+        self.id = id
+        self.event_id = event_id
+        self.aggregate_id = aggregate_id
+        self.aggregate_type = aggregate_type
+        self.version = version
+        self.event_type = event_type
+        self.payload = payload
+        self.timestamp = timestamp
+        self.metadata = metadata
+
+    @classmethod
+    def create_table_sql(cls) -> str:
+        """Return SQL to create the event store table."""
+        return f"""
+        CREATE TABLE IF NOT EXISTS {cls.__tablename__} (
+            id SERIAL PRIMARY KEY,
+            event_id VARCHAR(36) NOT NULL,
+            aggregate_id VARCHAR(36) NOT NULL,
+            aggregate_type VARCHAR(255) NOT NULL,
+            version INTEGER NOT NULL,
+            event_type VARCHAR(255) NOT NULL,
+            payload JSONB NOT NULL,
+            timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            metadata JSONB,
+            UNIQUE (aggregate_id, version)
+        )
+        CREATE INDEX IF NOT EXISTS idx_event_store_aggregate_id ON {cls.__tablename__} (aggregate_id)
+        CREATE INDEX IF NOT EXISTS idx_event_store_event_type ON {cls.__tablename__} (event_type)
+        CREATE INDEX IF NOT EXISTS idx_event_store_timestamp ON {cls.__tablename__} (timestamp)
+        """
+
+
+class PostgreSQLEventStore:
+    """PostgreSQL EventStore 实现。
+
+    使用原始 SQL 实现事件存储：
+    - append() 追加事件（带乐观锁版本检查）
+    - get_events() 获取聚合的所有事件
+    - get_events_by_type() 按事件类型和时间范围查询
+    """
+
+    def __init__(self, session: AsyncSession):
+        """初始化 PostgreSQLEventStore。
+
+        Args:
+            session: SQLAlchemy 异步会话
+        """
+        self._session = session
+
+    async def append(self, event: DomainEvent) -> None:
+        """追加事件到存储（带乐观锁版本检查）。
+
+        Args:
+            event: 领域事件
+
+        Raises:
+            VersionError: 版本冲突（已存在相同 aggregate_id 和 version 的事件）
+        """
+        # 先检查是否已存在版本冲突
+        check_stmt = text(
+            """
+            SELECT id FROM event_store
+            WHERE aggregate_id = :aggregate_id AND version = :version
+            LIMIT 1
+            """
+        )
+        result = await self._session.execute(
+            check_stmt,
+            {"aggregate_id": str(event.aggregate_id), "version": event.version},
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing is not None:
+            raise VersionError(f"Version conflict for aggregate {event.aggregate_id}, version {event.version}")
+
+        # 插入新事件
+        insert_stmt = text(
+            """
+            INSERT INTO event_store
+            (event_id, aggregate_id, aggregate_type, version, event_type, payload, timestamp, metadata)
+            VALUES (:event_id, :aggregate_id, :aggregate_type, :version, :event_type, :payload, :timestamp, :metadata)
+            """
+        )
+        await self._session.execute(
+            insert_stmt,
+            {
+                "event_id": str(event.event_id),
+                "aggregate_id": str(event.aggregate_id),
+                "aggregate_type": event.aggregate_type,
+                "version": event.version,
+                "event_type": event.event_type,
+                "payload": json.dumps(event.payload),
+                "timestamp": event.timestamp,
+                "metadata": json.dumps(event.metadata) if event.metadata else None,
+            },
+        )
+
+    async def get_events(self, aggregate_id: UUID) -> list[DomainEvent]:
+        """获取指定聚合的所有事件。
+
+        Args:
+            aggregate_id: 聚合 ID
+
+        Returns:
+            事件列表（按 version 排序）
+        """
+        stmt = text(
+            """
+            SELECT event_id, aggregate_id, aggregate_type, version, event_type, payload, timestamp, metadata
+            FROM event_store
+            WHERE aggregate_id = :aggregate_id
+            ORDER BY version
+            """
+        )
+        result = await self._session.execute(stmt, {"aggregate_id": str(aggregate_id)})
+        rows = result.fetchall()
+
+        events = []
+        for row in rows:
+            metadata_val = json.loads(row.metadata) if row.metadata and isinstance(row.metadata, str) else (row.metadata or {})
+            event_data = {
+                "event_id": row.event_id,
+                "event_type": row.event_type,
+                "timestamp": row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp),
+                "payload": json.loads(row.payload) if isinstance(row.payload, str) else row.payload,
+                "aggregate_id": row.aggregate_id,
+                "aggregate_type": row.aggregate_type,
+                "version": row.version,
+                "metadata": metadata_val,
+            }
+            events.append(DomainEvent.from_dict(event_data))
+
+        return events
+
+    async def get_events_by_type(
+        self,
+        event_type: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[DomainEvent]:
+        """按事件类型和时间范围查询事件。
+
+        Args:
+            event_type: 事件类型
+            start_time: 开始时间
+            end_time: 结束时间
+
+        Returns:
+            匹配的事件列表
+        """
+        stmt = text(
+            """
+            SELECT event_id, aggregate_id, aggregate_type, version, event_type, payload, timestamp, metadata
+            FROM event_store
+            WHERE event_type = :event_type
+            AND timestamp >= :start_time
+            AND timestamp <= :end_time
+            ORDER BY timestamp
+            """
+        )
+        result = await self._session.execute(
+            stmt,
+            {
+                "event_type": event_type,
+                "start_time": start_time,
+                "end_time": end_time,
+            },
+        )
+        rows = result.fetchall()
+
+        events = []
+        for row in rows:
+            metadata_val = json.loads(row.metadata) if row.metadata and isinstance(row.metadata, str) else (row.metadata or {})
+            event_data = {
+                "event_id": row.event_id,
+                "event_type": row.event_type,
+                "timestamp": row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp),
+                "payload": json.loads(row.payload) if isinstance(row.payload, str) else row.payload,
+                "aggregate_id": row.aggregate_id,
+                "aggregate_type": row.aggregate_type,
+                "version": row.version,
+                "metadata": metadata_val,
+            }
+            events.append(DomainEvent.from_dict(event_data))
+
+        return events
