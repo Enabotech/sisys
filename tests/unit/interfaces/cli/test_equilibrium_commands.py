@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from src.interfaces.cli.equilibrium_commands import (
+from src.interfaces.cli.commands.equilibrium_commands import (
     EQUILIBRIUM_COMMANDS,
     BackupCreateCommand,
     BackupRestoreCommand,

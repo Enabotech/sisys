@@ -47,7 +47,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] AutoExecuteService 事件监听器注册（`src/domain/services/auto_execute_service.py`）
-- [ ] DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
+- [ ] DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
 - [ ] 会话命名空间管理（session_id → namespace 映射）
 - [ ] 资源限制配置（CPU/内存/超时）
 - [ ] 沙箱隔离 100%（无状态泄漏、资源隔离）
@@ -81,7 +81,7 @@
 - [ ] AutoExecuted 事件定义（`src/domain/events/auto_execute_events.py`）
   - 字段: event_id, session_id, task_context, execution_result, cost_estimate, latency_ms, timestamp, business_event_type
   - business_event_type 字段标识下游应发布的具体领域事件（DocumentProcessed/ToolAutoExecuted/AgentDecided）
-- [ ] 下游监听器（`src/interfaces/event_listeners/auto_execute_completed_listener.py`）根据 business_event_type 发布对应领域事件
+- [ ] 下游监听器（`src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py`）根据 business_event_type 发布对应领域事件
 - [ ] 事件携带执行结果、成本审计、耗时信息
 - [ ] 事件发布成功率 ≥99%（RabbitMQ 持久化）
 - [ ] 事务发件箱模式（AutoExecuted 事件与业务操作同事务提交）
@@ -160,13 +160,13 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
   - 继承系统公理二（外部化记忆）模式
 
 #### 沙箱执行 (Sandbox Execution)
-- [ ] SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
+- [ ] SandboxExecutor 端口接口（`src/interfaces/cli/commands/sandbox_port.py`）
   - 接口方法: `start_container()`, `execute_code()`, `stop_container()`
   - 定义在 interfaces 层（作为六边形架构的"端口"）
-- [ ] DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
+- [ ] DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
   - 实现 SandboxExecutor 端口接口
   - Docker 沙箱隔离
-- [ ] SessionNamespaceManager 会话命名空间管理（`src/infrastructure/sandbox/session_namespace_manager.py`）
+- [ ] SessionNamespaceManager 会话命名空间管理（`src/infrastructure/external_services/sandbox/session_namespace_manager.py`）
   - session_id → namespace 映射
   - 资源限制配置
 
@@ -295,8 +295,8 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [x] Subtask 0.1: 定义 AutoExecuted 技术事件 Schema（`src/domain/events/auto_execute_events.py`）
 - [x] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
 - [x] Subtask 0.3: 定义 AutoExecuteService 服务接口（`src/domain/services/auto_execute_service.py`）
-- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/sandbox/sandbox_port.py`）
-- [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/sandbox/docker_sandbox_adapter.py`）
+- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/cli/commands/sandbox_port.py`）
+- [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
 - [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
 - [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
 - [x] Subtask 0.8: 定义 AutoExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
@@ -320,7 +320,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
-| 🟢 绿 | 实现 `src/interfaces/sandbox/sandbox_port.py`（端口接口）和 `src/infrastructure/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
+| 🟢 绿 | 实现 `src/interfaces/cli/commands/sandbox_port.py`（端口接口）和 `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
 - [x] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
@@ -543,27 +543,31 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── events/
-│   │   │   └── auto_execute_events.py      # AutoExecuted 技术事件（新实现）
+│   │   │   └── auto_execute_events.py      # AutoExecuted 技术事件
 │   │   ├── services/
 │   │   │   └── auto_execute_service.py     # AutoExecuteService（核心逻辑）
 │   │   ├── entities/
-│   │   │   └── checkpoint_snapshot.py # CheckpointSnapshot（状态快照）
+│   │   │   └── checkpoint_snapshot.py      # CheckpointSnapshot（状态快照）
 │   │   └── repositories/
-│   │       └── snapshot_repository.py # SnapshotRepository 接口（领域层定义）
+│   │       └── snapshot_repository.py     # SnapshotRepository 接口（领域层定义）
 │   ├── infrastructure/
 │   │   ├── config/
-│   │   │   └── execute.py            # AutoExecuteConfig 配置（新实现）
-│   │   ├── sandbox/
-│   │   │   ├── docker_sandbox_adapter.py # DockerSandboxAdapter（实现）
-│   │   │   └── session_namespace_manager.py # 会话命名空间管理
+│   │   │   └── execute.py                  # AutoExecuteConfig 配置
+│   │   ├── external_services/
+│   │   │   └── sandbox/
+│   │   │       ├── docker_sandbox_adapter.py  # DockerSandboxAdapter（实现）
+│   │   │       └── session_namespace_manager.py # 会话命名空间管理
 │   │   └── storage/
-│   │       └── redis_snapshot_store.py # RedisSnapshotStore
+│   │       └── redis_snapshot_store.py     # RedisSnapshotStore
 │   └── interfaces/
-│       ├── sandbox/
-│       │   └── sandbox_port.py       # SandboxExecutor 端口接口（六边形架构）
+│       ├── cli/
+│       │   └── commands/
+│       │       └── sandbox_ports.py        # SandboxExecutor 端口接口（六边形架构 CLI 端口）
 │       └── event_listeners/
-│           ├── execute_listener.py     # Routed 事件监听适配器（复用 Story 1.3）
-│           └── auto_execute_completed_listener.py # AutoExecuted → 下游领域事件监听器
+│           ├── listeners/
+│           │   ├── auto_execute_completed_listener.py # AutoExecuted → 下游领域事件监听器
+│           │   └── execute_listener.py     # Routed 事件监听适配器（复用 Story 1.3）
+│           └── converters/
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
@@ -572,14 +576,11 @@ sisys/
 │   │   │   └── entities/
 │   │   │       └── test_checkpoint_snapshot.py
 │   │   ├── infrastructure/
-│   │   │   ├── sandbox/
-│   │   │   │   └── test_docker_sandbox_adapter.py
 │   │   │   └── storage/
 │   │   │       └── test_redis_snapshot_store.py
-│   │   ├── architecture/
-│   │   │   └── test_execute_architecture.py
-│   │   └── performance/
-│   │       └── test_execute_performance.py
+│   │   └── external_services/
+│   │       └── sandbox/
+│   │           └── test_docker_sandbox_adapter.py
 │   ├── integration/
 │   │   └── test_execute_integration.py
 │   └── acceptance/
@@ -681,11 +682,11 @@ sisys/
 - `src/domain/entities/checkpoint_snapshot.py` - CheckpointSnapshot
 - `src/domain/repositories/snapshot_repository.py` - SnapshotRepository 接口（领域层定义）
 - `src/infrastructure/config/execute.py` - AutoExecuteConfig
-- `src/interfaces/sandbox/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
-- `src/infrastructure/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
-- `src/infrastructure/sandbox/session_namespace_manager.py` - SessionNamespaceManager
+- `src/interfaces/cli/commands/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
+- `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
+- `src/infrastructure/external_services/sandbox/session_namespace_manager.py` - SessionNamespaceManager
 - `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
-- `src/interfaces/event_listeners/auto_execute_completed_listener.py` - AutoExecuted → 下游领域事件监听器
+- `src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py` - AutoExecuted → 下游领域事件监听器
 - `tests/unit/domain/services/test_auto_execute_service.py` - AutoExecuteService 单元测试
 - `tests/unit/domain/entities/test_checkpoint_snapshot.py` - CheckpointSnapshot 单元测试
 - `tests/unit/domain/events/test_auto_execute_events.py` - AutoExecuted 事件单元测试
@@ -704,10 +705,10 @@ sisys/
 - `src/domain/entities/__init__.py` - 添加 CheckpointSnapshot 导出
 - `src/domain/repositories/__init__.py` - 添加 SnapshotRepository 导出
 - `src/infrastructure/config/__init__.py` - 添加 AutoExecuteConfig 导出
-- `src/infrastructure/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
+- `src/infrastructure/external_services/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
 - `src/infrastructure/storage/__init__.py` - 添加 RedisSnapshotStore 导出
-- `src/interfaces/sandbox/__init__.py` - 添加 SandboxPort 导出
-- `src/interfaces/event_listeners/__init__.py` - 添加 auto_execute_completed_listener 导出
+- `src/interfaces/cli/commands/sandbox_port.py` - 添加 SandboxPort 导出
+- `src/interfaces/event_listeners/listeners/__init__.py` - 添加 auto_execute_completed_listener 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/interfaces/event_listeners/execute_listener.py` - Routed 事件监听适配器（复用 Story 1.3 模式）

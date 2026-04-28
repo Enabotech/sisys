@@ -7,7 +7,7 @@ Reference: Story 1.11 Data Sovereignty Isolation.
 from __future__ import annotations
 
 from src.infrastructure.security.models import ApprovalStatus, WhitelistStatus
-from src.interfaces.cli.sovereignty_commands import (
+from src.interfaces.cli.commands.sovereignty_commands import (
     ApprovalApproveCommand,
     ApprovalListCommand,
     ApprovalRejectCommand,
