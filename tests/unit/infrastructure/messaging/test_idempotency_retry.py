@@ -11,12 +11,12 @@ import pytest
 import redis.asyncio as aioredis
 
 from src.domain.events import DocumentProcessed
-from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
-from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.messaging.outbox.dead_letter_queue import (
     DeadLetterQueue,
     InMemoryDeadLetterQueue,
 )
+from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
 
 def _make_event():

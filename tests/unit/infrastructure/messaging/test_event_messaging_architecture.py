@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 # Get root directory (project root)
-ROOT_DIR = Path(__file__).parent.parent.parent.parent
+ROOT_DIR = Path(__file__).parents[4]
 
 
 class TestArchitectureConstraints:
@@ -128,11 +128,11 @@ class TestEventMessagingComponents:
 
     def test_new_components_exist(self):
         """验证新组件文件已创建。"""
-        assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "dlq" / "postgres_dead_letter_queue.py").exists()
+        assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "outbox" / "postgres_dead_letter_queue.py").exists()
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "retry" / "redis_retry_queue.py").exists()
-        assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "idempotency" / "dual_idempotency_checker.py").exists()
+        assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "retry" / "dual_idempotency_checker.py").exists()
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "rabbitmq_listener.py").exists()
-        assert (ROOT_DIR / "src" / "infrastructure" / "storage" / "postgresql" / "event_store.py").exists()
+        assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "event_store.py").exists()
 
     def test_new_domain_interfaces_exist(self):
         """验证新领域接口文件已创建。"""

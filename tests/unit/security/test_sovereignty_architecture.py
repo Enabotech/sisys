@@ -43,7 +43,7 @@ class TestArchitectureConstraints:
     @pytest.fixture
     def src_root(self) -> Path:
         """Get src directory path."""
-        return Path(__file__).parent.parent.parent.parent / "src"
+        return Path(__file__).parents[3] / "src"
 
     def test_domain_events_no_pydantic(self, src_root):
         """Domain events should not import pydantic."""

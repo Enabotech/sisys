@@ -17,7 +17,7 @@ def get_sudo_password() -> str:
         sudo 密码，如果未找到则返回空字符串
     """
     # 从 QWEN.md 读取密码
-    qwem_path = Path(__file__).parent.parent.parent / "QWEN.md"
+    qwem_path = Path(__file__).parents[2] / "QWEN.md"
     if qwem_path.exists():
         content = qwem_path.read_text(encoding="utf-8")
         for line in content.split("\n"):

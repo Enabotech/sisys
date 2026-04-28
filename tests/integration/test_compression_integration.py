@@ -31,7 +31,7 @@ from src.domain.repositories.memory_repository import (
 from src.domain.services.memory_service import MemorySaveRequest, MemoryService, MemoryUpdateRequest
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 
 def run_async(coro):

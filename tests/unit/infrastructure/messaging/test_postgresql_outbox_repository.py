@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.storage.postgresql.outbox_repository import PostgreSQLOutboxRepository
+from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
 
 @pytest.fixture

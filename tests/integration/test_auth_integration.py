@@ -28,7 +28,7 @@ from src.infrastructure.storage.postgresql.role_repository import RoleRepository
 from src.infrastructure.storage.postgresql.user_repository import UserRepository
 
 # Load .env file from project root
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env")
 
 
 def is_postgres_available() -> bool:

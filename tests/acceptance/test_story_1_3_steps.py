@@ -26,11 +26,11 @@ from src.domain.events.heartbeat_events import HeartbeatTriggered
 from src.domain.events.tool_events import ToolExecuted
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.config.redis import RedisConfig
-from src.infrastructure.messaging.idempotency.checker import IdempotencyChecker
-from src.infrastructure.messaging.idempotency.retry_policy import RetryPolicy
 from src.infrastructure.messaging.outbox.dead_letter_queue import InMemoryDeadLetterQueue
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
+from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
 scenarios("test_story_1_3.feature")

@@ -119,7 +119,7 @@
 **And** 支持事件追加、聚合重建、按时间范围查询
 
 **验证标准/Validation Criteria:**
-- [ ] `PostgreSQLEventStore` 实现 (`src/infrastructure/storage/postgresql/event_store.py`)
+- [ ] `PostgreSQLEventStore` 实现 (`src/infrastructure/messaging/event_store.py`)
 - [ ] `event_store` 表结构: id, aggregate_id, aggregate_type, version, event_type, payload (JSONB), timestamp, metadata (JSONB)
 - [ ] `append(event) -> None` 方法（乐观锁版本检查）
 - [ ] `get_events(aggregate_id) -> list[DomainEvent]` 方法
@@ -526,13 +526,13 @@ src/
 │   │   │   ├── checker.py        # 现有 IdempotencyChecker（保持）
 │   │   │   └── dual_idempotency_checker.py     # 新建（并存）
 │   │   ├── outbox/
-│   │   │   └── outbox_processor.py             # 保持现状（使用内部方法）
+│   │   │   ├── outbox_processor.py             # 保持现状（使用内部方法）
+│   │   │   └── outbox_repository.py           # 保持现状（内部方法用 # @poller_only 标记）
+│   │   ├── event_store.py                     # 新建（事件溯源）
 │   │   ├── rabbitmq_listener.py               # 新建（实现EventListenerAsync）
 │   │   ├── rabbitmq_consumer.py               # 重构（移除nack requeue）
 │   │   └── event_bus.py                         # 保持 InMemory（仅开发测试用）
 │   └── storage/postgresql/
-│       ├── event_store.py                      # 新建
-│       └── outbox_repository.py                # 保持现状（内部方法用 # @poller_only 标记）
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -616,17 +616,17 @@ src/
 | 文件 | 说明 |
 |------|------|
 | `src/domain/repositories/unit_of_work.py` | UnitOfWork |
-| `src/infrastructure/messaging/dlq/postgres_dead_letter_queue.py` | PostgreSQL DLQ |
+| `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` | PostgreSQL DLQ |
 | `src/infrastructure/messaging/retry/redis_retry_queue.py` | Redis 延迟重试 |
-| `src/infrastructure/messaging/idempotency/dual_idempotency_checker.py` | 双写幂等性（与 IdempotencyChecker 并存） |
+| `src/infrastructure/messaging/retry/dual_idempotency_checker.py` | 双写幂等性（与 IdempotencyChecker 并存） |
 | `src/infrastructure/messaging/rabbitmq_listener.py` | RabbitMQEventListener（实现 EventListenerAsync） |
-| `src/infrastructure/storage/postgresql/event_store.py` | PostgreSQL EventStore |
-| `tests/unit/infrastructure/messaging/dlq/test_postgres_dead_letter_queue.py` | DLQ 测试 |
-| `tests/unit/infrastructure/messaging/retry/test_redis_retry_queue.py` | 重试队列测试 |
-| `tests/unit/infrastructure/messaging/idempotency/test_dual_idempotency_checker.py` | 幂等性测试 |
+| `src/infrastructure/messaging/event_store.py` | PostgreSQL EventStore |
+| `tests/unit/infrastructure/messaging/test_postgres_dead_letter_queue.py` | DLQ 测试 |
+| `tests/unit/infrastructure/messaging/test_redis_retry_queue.py` | 重试队列测试 |
+| `tests/unit/infrastructure/messaging/test_dual_idempotency_checker.py` | 幂等性测试 |
 | `tests/unit/domain/events/test_event_listener_async.py` | EventListenerAsync 测试 |
 | `tests/unit/domain/repositories/test_unit_of_work.py` | UnitOfWork 测试 |
-| `tests/unit/infrastructure/storage/test_event_store.py` | EventStore 测试 |
+| `tests/unit/infrastructure/messaging/test_event_store.py` | EventStore 测试 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | RabbitMQEventListener 测试 |
 | `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | AsyncOutboxPoller 测试 |
 | `tests/unit/infrastructure/test_architecture.py` | 架构验证测试 |
@@ -639,7 +639,7 @@ src/
 | `src/domain/events/listener.py` | 添加 EventListenerAsync 独立接口 |
 | `src/infrastructure/messaging/outbox/outbox_processor.py` | 重构使用 RedisRetryQueue |
 | `src/infrastructure/messaging/rabbitmq_consumer.py` | 重构：移除 nack(requeue=True) |
-| `src/infrastructure/storage/postgresql/outbox_repository.py` | 添加 @poller_only 注释标记内部方法 |
+| `src/infrastructure/messaging/outbox/outbox_repository.py` | 添加 @poller_only 注释标记内部方法 |
 
 ---
 

@@ -18,7 +18,7 @@ from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractQueue
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import EventListenerAsync
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
-from src.infrastructure.messaging.idempotency.dual_idempotency_checker import (
+from src.infrastructure.messaging.retry.dual_idempotency_checker import (
     DualIdempotencyChecker,
 )
 from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
