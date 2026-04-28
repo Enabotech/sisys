@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.application.text_processing.l1_text_extractor import L1ExtractionResult, L1TextExtractor
+from src.application.use_cases.text_processing.l1_text_extractor import L1ExtractionResult, L1TextExtractor
 
 
 class TestL1TextExtractorPatterns:
