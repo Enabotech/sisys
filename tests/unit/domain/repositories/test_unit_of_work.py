@@ -46,7 +46,7 @@ class TestPostgreSQLUnitOfWork:
         """PostgreSQLUnitOfWork can be instantiated with session."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
@@ -56,7 +56,7 @@ class TestPostgreSQLUnitOfWork:
         """begin() should start a transaction."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
@@ -70,7 +70,7 @@ class TestPostgreSQLUnitOfWork:
         """commit() should commit the transaction."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
@@ -84,7 +84,7 @@ class TestPostgreSQLUnitOfWork:
         """rollback() should roll back the transaction."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
@@ -98,7 +98,7 @@ class TestPostgreSQLUnitOfWork:
         """close() should close the session."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
@@ -112,7 +112,7 @@ class TestPostgreSQLUnitOfWork:
         """UnitOfWork should support context manager protocol."""
         from unittest import mock
 
-        from src.domain.repositories.unit_of_work import PostgreSQLUnitOfWork
+        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
         uow = PostgreSQLUnitOfWork(session=mock_session)
