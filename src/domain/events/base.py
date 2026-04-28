@@ -27,6 +27,9 @@ _CORE_FIELD_NAMES = frozenset(
         "aggregate_type",
         "version",
         "payload",
+        "correlation_id",
+        "causation_id",
+        "metadata",
     }
 )
 
@@ -59,6 +62,10 @@ class DomainEvent:
     aggregate_type: str = ""
     version: int = 0
     payload: dict[str, Any] = field(default_factory=dict)
+    # AC-4: Enhanced traceability fields
+    correlation_id: uuid.UUID | None = None
+    causation_id: uuid.UUID | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Event type registry for polymorphic deserialization
     _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
@@ -126,6 +133,13 @@ class DomainEvent:
         if self.aggregate_type:
             result["aggregate_type"] = self.aggregate_type
         result["version"] = self.version
+        # AC-4: Traceability fields (only include when set)
+        if self.correlation_id is not None:
+            result["correlation_id"] = str(self.correlation_id)
+        if self.causation_id is not None:
+            result["causation_id"] = str(self.causation_id)
+        if self.metadata:
+            result["metadata"] = self.metadata
 
         try:
             json.dumps(merged_payload)
@@ -221,6 +235,10 @@ class DomainEvent:
             aggregate_type=data.get("aggregate_type", ""),
             version=data.get("version", 0),
             payload=payload,
+            # AC-4: Traceability fields
+            correlation_id=uuid.UUID(data["correlation_id"]) if data.get("correlation_id") else None,
+            causation_id=uuid.UUID(data["causation_id"]) if data.get("causation_id") else None,
+            metadata=data.get("metadata", {}),
             **extra_kwargs,
         )
 
