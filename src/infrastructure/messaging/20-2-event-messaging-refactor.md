@@ -198,7 +198,7 @@
 | **TDD 单元测试** | PostgreSQLEventStore | `test_event_store.py` | Task 7 |
 | **TDD 单元测试** | RabbitMQEventListener | `test_rabbitmq_event_listener.py` | Task 8 |
 | **TDD 单元测试** | AsyncOutboxPoller 重构 | `test_async_outbox_poller.py` | Task 9 |
-| **SDD 架构验证** | 架构约束测试 | `test_architecture.py` | Task 10 |
+| **SDD 架构验证** | 架构约束测试 | `test_event_messaging_architecture.py` | Task 10 |
 
 ---
 
@@ -241,7 +241,7 @@
 | AC-7 | PostgreSQL EventStore | Task 7 | `test_event_store.py` |
 | AC-8 | RabbitMQEventListener | Task 8 | `test_rabbitmq_event_listener.py` |
 | AC-9 | AsyncOutboxPoller 内部方法文档化 | Task 9 | `test_async_outbox_poller.py` |
-| AC-10 | 架构约束验证 | Task 10 | `test_architecture.py` |
+| AC-10 | 架构约束验证 | Task 10 | `test_event_messaging_architecture.py` |
 
 ---
 
