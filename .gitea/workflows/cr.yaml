@@ -27,7 +27,7 @@ on:
       test_dirs:
         description: '测试目录（逗号分隔）'
         required: false
-        default: 'tests/acceptance,tests/integration_real,tests/integration,tests/unit'
+        default: 'tests/acceptance,tests/integration,tests/unit'
         type: string
       processes:
         description: '并行进程数'
@@ -51,7 +51,7 @@ on:
       max_rounds:
         description: '最大循环轮数（0=无限）'
         required: false
-        default: '0'
+        default: '20'
         type: string
       interval:
         description: '每轮间隔秒数'
@@ -89,10 +89,10 @@ env:
 
   # 默认配置（可被 workflow_dispatch inputs 覆盖）
   DEFAULT_TEST_DIRS: tests/acceptance,tests/integration,tests/unit
-  DEFAULT_PROCESSES: "3"
+  DEFAULT_PROCESSES: "2"
   DEFAULT_THREADS: "2"
   DEFAULT_MODE: continuous
-  DEFAULT_MAX_ROUNDS: "0"
+  DEFAULT_MAX_ROUNDS: "20"
   DEFAULT_INTERVAL: "2"
 
 # ===========================================================================
