@@ -1616,19 +1616,25 @@ class WormArchiver:
 
 ### 10.1 领域事件完整列表
 
-| 事件 | 触发条件 | 通道 | 持久化 |
-|------|---------|------|--------|
-| **DocumentProcessed** | 文档处理完成 | RabbitMQ | WORM 归档 |
-| **ToolExecuted** | 工具执行完成 | RabbitMQ | 7 年存储 |
-| **AgentDecided** | Agent 决策完成 | RabbitMQ | 7 年存储 |
-| **CheckpointReached** | 检查点到达 | RabbitMQ | 7 年存储 |
-| **CorrectionClassified** | 修正分级判定完成 | RabbitMQ | 7 年存储 |
-| **RoutingDecided** | 路由决策完成 | RabbitMQ | WORM 归档 |
-| **IsolationLevelSwitched** | 隔离等级切换 | RabbitMQ | WORM 归档 |
-| **ArbitrationCompleted** | SYS AGENT 裁决完成 | RabbitMQ | 7 年存储 |
-| **MemoryChanged** | 记忆系统变更（保存/更新/删除） | RabbitMQ | 7 年存储 |
-| **StrategicDeviationWarning** | 战略偏差预警触发 | RabbitMQ | 7 年存储 |
-| **HeartbeatTriggered** | 心跳唤醒事件触发 | RabbitMQ | 7 年存储 |
+| 事件 | 触发条件 | 通道 | 持久化 | 说明 |
+|------|---------|------|--------|------|
+| **HeartbeatTriggered** | 心跳唤醒事件触发 | Redis Pub/Sub | 不持久化 | 实时通知型（<10ms，允许丢失） |
+| **DocumentProcessed** | 文档处理完成 | RabbitMQ + Outbox | WORM 归档 | 审计合规型 |
+| **ToolExecuted** | 工具执行完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **AgentDecided** | Agent 决策完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **RoutingDecided** | 路由决策完成 | RabbitMQ + Outbox | WORM 归档 | 审计合规型 |
+| **ArbitrationCompleted** | SYS AGENT 裁决完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **CheckpointReached** | 检查点到达 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **CorrectionClassified** | 修正分级判定完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **IsolationLevelSwitched** | 隔离等级切换 | RabbitMQ + Outbox | WORM 归档 | 业务状态型 |
+| **MemoryChanged** | 记忆系统变更（保存/更新/删除） | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **StrategicDeviationWarning** | 战略偏差预警触发 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **CheckpointRecovered** | 检查点恢复完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+
+> **事件通道分类说明：**
+> - **Redis Pub/Sub（实时通知型）**：用于心跳等高频、低延迟、允许丢失的场景（<10ms）
+> - **RabbitMQ + Outbox（业务状态型）**：用于需要可靠传递的业务状态事件
+> - **RabbitMQ + Outbox + WORM（审计合规型）**：用于需要 7 年归档的审计/合规事件
 
 ### 10.2 事件 Schema 标准
 
