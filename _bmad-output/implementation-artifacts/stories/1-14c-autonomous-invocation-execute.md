@@ -319,7 +319,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
+| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
 | 🟢 绿 | 实现 `src/interfaces/sandbox/sandbox_port.py`（端口接口）和 `src/infrastructure/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
@@ -689,7 +689,7 @@ sisys/
 - `tests/unit/domain/services/test_auto_execute_service.py` - AutoExecuteService 单元测试
 - `tests/unit/domain/entities/test_checkpoint_snapshot.py` - CheckpointSnapshot 单元测试
 - `tests/unit/domain/events/test_auto_execute_events.py` - AutoExecuted 事件单元测试
-- `tests/unit/infrastructure/sandbox/test_docker_sandbox_adapter.py` - DockerSandboxAdapter 单元测试
+- `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py` - DockerSandboxAdapter 单元测试
 - `tests/unit/infrastructure/storage/test_redis_snapshot_store.py` - RedisSnapshotStore 单元测试
 - `tests/unit/architecture/test_execute_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_execute_performance.py` - 性能基准测试
