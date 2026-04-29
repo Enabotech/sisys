@@ -85,12 +85,12 @@ class HeartbeatScheduler:
             self._timer.cancel()
             self._timer = None
 
-        # Cancel poll task and wait for it to finish
+        # Cancel poll task
         if self._poll_task:
             self._poll_task.cancel()
             try:
-                await asyncio.wait_for(self._poll_task, timeout=1.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+                await self._poll_task
+            except asyncio.CancelledError:
                 pass
             self._poll_task = None
 
