@@ -8,11 +8,12 @@ Harbor 架构合规验证测试套件
 import socket
 import ssl
 import subprocess
+from typing import Any
 
 import pytest
 import requests
 import urllib3
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 # 从统一配置模块加载
 from config import HARBOR_NODE_IP, HARBOR_NODEPORT, TestConfig  # type: ignore[import-not-found]
@@ -44,9 +45,7 @@ def run_kubectl_command(command: list, namespace: str = HARBOR_NAMESPACE) -> tup
         return -1, "", str(e)
 
 
-def get_k8s_resource(
-    resource_type: str, name: str = "", namespace: str = HARBOR_NAMESPACE, output: str = "yaml"
-) -> dict | str | None:  # type: ignore[misc]
+def get_k8s_resource(resource_type: str, name: str = "", namespace: str = HARBOR_NAMESPACE, output: str = "yaml") -> Any:
     """获取 Kubernetes 资源"""
     cmd = ["get", resource_type]
     if name:
@@ -58,7 +57,7 @@ def get_k8s_resource(
         return None
 
     if output == "yaml":
-        return yaml.safe_load(stdout)  # type: ignore[no-any-return]
+        return yaml.safe_load(stdout)
     return stdout
 
 
