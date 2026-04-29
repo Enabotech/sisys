@@ -2,10 +2,11 @@
 
 > 基于 SISYS 双通道架构（Redis + RabbitMQ）的事件发布统一抽象
 
-**文档版本**: 1.3.0
+**文档版本**: 1.3.1
 **创建日期**: 2026-04-29
 **状态**: 设计方案（已评审）
 **变更记录**:
+- v1.3.1: 修复 create_for_testing、snake_case 边界情况、迁移计划、测试导入
 - v1.3.0: 修复 P0/P1/P2 问题：健康检查接口、重试退避、mock 断言、snake_case 等
 - v1.2.0: 修复未注册事件警告、添加并行发布选项、健康检查、死信重试
 - v1.1.0: 修复异常处理、死信队列、测试隔离等 P0 问题
@@ -352,10 +353,12 @@ class EventChannelRegistry:
     def create_for_testing(cls) -> EventChannelRegistry:
         """创建测试用注册表（干净状态，无默认映射）。
 
+        P1-3 修复：使用 object.__new__ 避免 __init__ 验证逻辑干扰。
+
         Returns:
             新的空注册表实例
         """
-        instance = cls.__new__(cls)
+        instance = object.__new__(cls)
         instance._mappings = {}
         instance._overrides = {}
         return instance
@@ -652,17 +655,22 @@ class DualChannelEventBus(EventBus):
 
     @staticmethod
     def _snake_case(name: str) -> str:
-        """驼峰转蛇形（P2 修复：处理连续大写字母如 XMLParser）。
+        """驼峰转蛇形（P1-5 修复：正确处理连续大写字母和边界情况）。
 
         例如：
             - AutoRouted -> auto_routed
             - XMLParser -> xml_parser (而非 xmlparser)
             - DocumentID -> document_id
+            - _HelloWorld -> hello_world (前导下划线被清理)
         """
         import re
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
         s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
-        return s2.lower().replace('__', '_')
+        s3 = s2.lower()
+        # 合并多个连续下划线，清理首尾下划线
+        s4 = re.sub('_+', '_', s3)
+        s5 = s4.strip('_')
+        return s5
 
     async def health_check(self) -> dict[str, bool]:
         """检查事件总线健康状态。
@@ -1327,6 +1335,7 @@ v1.2.0 修复：
 """
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
@@ -1576,12 +1585,12 @@ class TestDualChannelEventBus:
 ### Phase 3: 死信队列（第 3-4 天）
 
 - [x] 实现 `DeadLetterQueue` 类（异步文件 IO）
-- [ ] 集成到 `DualChannelEventBus`
-- [ ] 实现重试逻辑（`retry_dead_letters`）
+- [x] 集成到 `DualChannelEventBus`
+- [x] 实现重试逻辑（`retry_dead_letters`）
 
 ### Phase 4: 服务集成（第 5-6 天）
 
-- [ ] 创建 `EventBusFactory` 工厂类
+- [x] 创建 `EventBusFactory` 工厂类
 - [ ] 改造 `AutoRouteService` 使用 `EventBus` 接口
 - [ ] 改造 `AutoTriggerService` 使用 `EventBus` 接口
 - [ ] 改造 `AutoExecuteCompletedListener` 使用 `EventBus` 接口
