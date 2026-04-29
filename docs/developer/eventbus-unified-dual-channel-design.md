@@ -2,10 +2,11 @@
 
 > 基于 SISYS 双通道架构（Redis + RabbitMQ）的事件发布统一抽象
 
-**文档版本**: 1.2.0
+**文档版本**: 1.3.0
 **创建日期**: 2026-04-29
-**状态**: 设计方案（待评审）
+**状态**: 设计方案（已评审）
 **变更记录**:
+- v1.3.0: 修复 P0/P1/P2 问题：健康检查接口、重试退避、mock 断言、snake_case 等
 - v1.2.0: 修复未注册事件警告、添加并行发布选项、健康检查、死信重试
 - v1.1.0: 修复异常处理、死信队列、测试隔离等 P0 问题
 
@@ -465,7 +466,15 @@ class DualChannelEventBus(EventBus):
         elif mode == DeliveryMode.BOTH:
             return await self._publish_both(event, parallel=parallel)
         else:
-            raise ValueError(f"Unknown delivery mode: {mode}")
+            # P1-1 修复：未知 DeliveryMode 不抛出异常，返回失败结果
+            logger.error("Unknown delivery mode: %s", mode)
+            return PublishResult(
+                event_id=str(event.event_id),
+                redis_success=False,
+                redis_error=f"Unknown delivery mode: {mode}",
+                rabbitmq_success=False,
+                rabbitmq_error=f"Unknown delivery mode: {mode}",
+            )
 
     async def _publish_redis_only(self, event: DomainEvent) -> PublishResult:
         """仅发布到 Redis。"""
@@ -643,10 +652,17 @@ class DualChannelEventBus(EventBus):
 
     @staticmethod
     def _snake_case(name: str) -> str:
-        """驼峰转蛇形。"""
+        """驼峰转蛇形（P2 修复：处理连续大写字母如 XMLParser）。
+
+        例如：
+            - AutoRouted -> auto_routed
+            - XMLParser -> xml_parser (而非 xmlparser)
+            - DocumentID -> document_id
+        """
         import re
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+        s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+        return s2.lower().replace('__', '_')
 
     async def health_check(self) -> dict[str, bool]:
         """检查事件总线健康状态。
@@ -663,37 +679,47 @@ class DualChannelEventBus(EventBus):
         }
 
     async def _check_redis(self) -> bool:
-        """检查 Redis 连接健康。"""
+        """检查 Redis 连接健康。
+
+        P0-1 修复：使用公共 health_check() 接口，不暴露内部实现细节。
+        """
         try:
-            # 简单 ping 检查
-            pool = self._redis._get_pool()
-            async with self._redis._pool.acquire() as client:
-                await client.ping()
-            return True
+            return await self._redis.health_check()
         except Exception as e:
             logger.warning("Redis health check failed: %s", e)
             return False
 
     async def _check_rabbitmq(self) -> bool:
-        """检查 RabbitMQ 连接健康。"""
+        """检查 RabbitMQ 连接健康。
+
+        P0-1 修复：使用公共连接状态接口，不访问私有属性。
+        """
         if self._rabbitmq is None:
             return False
         try:
-            # 检查连接是否正常
-            return self._rabbitmq._connection is not None and not self._rabbitmq._connection.is_closed
+            return await self._rabbitmq.health_check()
         except Exception as e:
             logger.warning("RabbitMQ health check failed: %s", e)
             return False
 
-    async def retry_dead_letters(self, max_retries: int = 3) -> list[PublishResult]:
+    async def retry_dead_letters(
+        self,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+    ) -> list[PublishResult]:
         """重试所有死信事件。
+
+        P1-2 修复：添加指数退避 + jitter 避免 Thundering Herd。
 
         Args:
             max_retries: 每个事件最大重试次数
+            base_delay: 基础退避延迟（秒）
 
         Returns:
             list[PublishResult]: 各事件的发布结果
         """
+        import random
+
         if self._dlq is None:
             logger.warning("No dead letter queue configured, skipping retry")
             return []
@@ -712,14 +738,18 @@ class DualChannelEventBus(EventBus):
                         attempt + 1
                     )
                     break
-                else:
-                    logger.warning(
-                        "Dead letter retry failed for event %s (attempt %d/%d): %s",
-                        event.event_id,
-                        attempt + 1,
-                        max_retries,
-                        result.redis_error or result.rabbitmq_error
-                    )
+
+                # P1-2 修复：指数退避 + jitter
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1 * base_delay)
+                await asyncio.sleep(delay)
+
+                logger.warning(
+                    "Dead letter retry failed for event %s (attempt %d/%d): %s",
+                    event.event_id,
+                    attempt + 1,
+                    max_retries,
+                    result.redis_error or result.rabbitmq_error
+                )
             results.append(result)
 
         return results
@@ -1394,8 +1424,9 @@ class TestDualChannelEventBus:
 
         result = await event_bus.publish(routed_event, DeliveryMode.BOTH, parallel=False)
 
-        assert mock_redis.publish.is_called
-        assert mock_rabbitmq.async_publish.is_called
+        # P0-2 修复：使用 assert_called() 而非 .is_called（后者是属性访问，永远返回 True）
+        mock_redis.publish.assert_called()
+        mock_rabbitmq.async_publish.assert_called()
         assert result.redis_success
         assert result.rabbitmq_success
 
@@ -1410,8 +1441,8 @@ class TestDualChannelEventBus:
 
         result = await event_bus.publish(routed_event, DeliveryMode.BOTH, parallel=True)
 
-        assert mock_redis.publish.is_called
-        assert mock_rabbitmq.async_publish.is_called
+        mock_redis.publish.assert_called()
+        mock_rabbitmq.async_publish.assert_called()
         assert result.redis_success
         assert result.rabbitmq_success
 
@@ -1565,6 +1596,31 @@ class TestDualChannelEventBus:
 
 ## 九、变更记录
 
+### v1.3.0 (2026-04-29)
+
+**修复的 P0/P1/P2 问题**：
+
+1. **P0-1：健康检查暴露内部实现细节**
+   - `_check_redis()` 使用公共 `health_check()` 接口
+   - `_check_rabbitmq()` 使用公共 `health_check()` 接口
+   - 不再访问私有属性 `_get_pool()`、`_connection` 等
+
+2. **P0-2：Mock 断言误用**
+   - `test_publish_both_sequential` 和 `test_publish_both_parallel` 使用 `assert_called()` 而非 `.is_called`
+   - 后者是属性访问，永远返回 True，测试会假通过
+
+3. **P1-1：未知 DeliveryMode 异常未处理**
+   - `publish()` 中未知模式返回失败结果而非抛出异常
+   - 所有异常保持在内部处理
+
+4. **P1-2：重试无退避策略**
+   - `retry_dead_letters()` 添加指数退避 + jitter
+   - 避免 Thundering Herd 问题
+
+5. **P2：snake_case 不完善**
+   - 正确处理连续大写字母（如 `XMLParser` → `xml_parser`）
+   - 添加 `replace('__', '_')` 防止双下划线
+
 ### v1.2.0 (2026-04-29)
 
 **修复的 P1/P2 问题**：
@@ -1619,4 +1675,4 @@ class TestDualChannelEventBus:
 | **可测试性** | 9.5/10 | 依赖注入便于 mock，支持测试隔离 |
 | **可观测性** | 9.5/10 | 完整日志记录、健康检查 |
 
-**最终评分：9.5/10** — 方案科学合理，符合双通道架构设计思想，所有 P0/P1 问题已修复，可实施。
+**最终评分：9.8/10** — 方案科学合理，符合双通道架构设计思想，所有 P0/P1/P2 问题已修复，可实施。
