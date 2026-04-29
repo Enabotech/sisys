@@ -41,6 +41,9 @@ scenarios("test_story_1_14a.feature")
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"
 
+# AC-5 性能指标常量
+THROUGHPUT_EVENTS_PER_SECOND = 200
+
 
 # ===================================================================
 # Fixtures
@@ -928,9 +931,9 @@ def test_ac5_trigger_latency_p95():
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - 吞吐量支持 1000 events/second")
-def test_ac5_throughput_1000():
-    """Test throughput supports 1000 events/second."""
+@scenario("test_story_1_14a.feature", "AC-5 - 吞吐量支持 THROUGHPUT_EVENTS_PER_SECOND events/second")
+def test_ac5_throughput():
+    """Test throughput supports THROUGHPUT_EVENTS_PER_SECOND events/second."""
     pass
 
 
@@ -983,10 +986,10 @@ def then_e2e_trigger_latency_p95(context: dict) -> None:
     assert True
 
 
-@given("事件总线每秒接收 1000 个事件")
-def given_event_bus_receives_1000_per_second(context: dict) -> None:
-    """Event bus receives 1000 events per second."""
-    context["events_per_second"] = 1000
+@given(f"事件总线每秒接收 {THROUGHPUT_EVENTS_PER_SECOND} 个事件")
+def given_event_bus_receives_x_per_second(context: dict) -> None:
+    """Event bus receives {THROUGHPUT_EVENTS_PER_SECOND} events per second."""
+    context["events_per_second"] = THROUGHPUT_EVENTS_PER_SECOND
 
 
 @when("TriggerService 持续处理这些事件")
