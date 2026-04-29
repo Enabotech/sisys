@@ -57,10 +57,9 @@ class TestEventListenerAsyncConcrete:
 
         listener = TrackingAsyncListener()
         event = DomainEvent(event_type="TestEvent")
-        # Run the async handle method
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(listener.async_handle(event))
+        asyncio.run(listener.async_handle(event))
         assert len(handled_events) == 1
         assert handled_events[0].event_type == "TestEvent"
 
@@ -77,6 +76,6 @@ class TestEventListenerAsyncConcrete:
         event = DomainEvent(event_type="TestEvent")
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(listener.async_handle(event))
-        asyncio.get_event_loop().run_until_complete(listener.async_handle(event))
+        asyncio.run(listener.async_handle(event))
+        asyncio.run(listener.async_handle(event))
         assert call_count == 2
