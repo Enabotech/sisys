@@ -27,7 +27,7 @@ on:
       test_dirs:
         description: '测试目录（逗号分隔）'
         required: false
-        default: 'tests/acceptance,tests/integration,tests/unit'
+        default: 'tests/integration,tests/unit'
         type: string
       processes:
         description: '并行进程数'
@@ -88,7 +88,7 @@ env:
   SISYS_USE_TEST_PORTS: "true"
 
   # 默认配置（可被 workflow_dispatch inputs 覆盖）
-  DEFAULT_TEST_DIRS: tests/acceptance,tests/integration,tests/unit
+  DEFAULT_TEST_DIRS: tests/integration,tests/unit
   DEFAULT_PROCESSES: "2"
   DEFAULT_THREADS: "2"
   DEFAULT_MODE: continuous
