@@ -295,7 +295,7 @@ class EventRegistry:
     def _recurse_subclasses(cls, parent: type) -> None:
         """递归收集所有子类"""
         for subclass in parent.__subclasses__():
-            cls._registry[subclass.__name__] = subclass  # type: ignore[index]
+            cls._registry[subclass.__name__] = subclass
             cls._recurse_subclasses(subclass)
 
     @classmethod
@@ -303,7 +303,7 @@ class EventRegistry:
         """根据 event_type 获取事件类"""
         if cls._registry is None:
             cls._build_registry()
-        event_class = cls._registry.get(event_type)  # type: ignore[union-attr]
+        event_class = cls._registry.get(event_type)
         if not event_class:
             raise ValueError(f"Unknown event_type: {event_type}")
         return event_class

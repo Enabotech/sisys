@@ -17,7 +17,7 @@ import pytest
 import requests
 
 # 从统一配置模块加载
-from config import TestConfig  # type: ignore[import-not-found]
+from tests.deploy.config import TestConfig
 
 
 class TestGiteaDeployment:

@@ -27,7 +27,7 @@ import requests
 import urllib3
 
 # 从统一配置模块加载
-from config import TestConfig  # type: ignore[import-not-found]
+from tests.deploy.config import TestConfig
 
 # 抑制自签名证书的 InsecureRequestWarning（开发环境使用）
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
