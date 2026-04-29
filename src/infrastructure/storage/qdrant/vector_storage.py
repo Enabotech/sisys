@@ -211,10 +211,10 @@ class QdrantVectorStorage:
             操作成功返回 True
         """
         client = self._get_client()
-        converted_ids: list[int | str] = [self._normalize_point_id(pid) if isinstance(pid, int) else pid for pid in point_ids]
+        converted_ids = [self._normalize_point_id(pid) for pid in point_ids]
         await client.delete(
             collection_name=collection,
-            points_selector=cast(Any, PointIdsList(points=converted_ids)),
+            points_selector=PointIdsList(points=cast(Any, converted_ids)),
         )
         return True
 
