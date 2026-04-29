@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 # Get root directory (project root)
-ROOT_DIR = Path(__file__).parents[4]
+ROOT_DIR = Path(__file__).parents[3]
 
 
 class TestArchitectureConstraints:
