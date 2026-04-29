@@ -196,13 +196,17 @@ class TestComplianceEvents:
         """MFAChallengeIssuedEvent should have required fields."""
         from uuid import uuid4
 
-        from src.domain.events.compliance_events import MFAChallengeIssuedEvent
+        from src.domain.events.compliance_events import (
+            MFAChallengeIssuedEvent,
+            MFAChallengeStatus,
+            MFAChallengeType,
+        )
 
         event = MFAChallengeIssuedEvent(
             challenge_id=uuid4(),
             user_id=uuid4(),
-            challenge_type="totp",
-            status="pending",
+            challenge_type=MFAChallengeType.TOTP,
+            status=MFAChallengeStatus.PENDING,
         )
 
         assert hasattr(event, "event_id")
@@ -215,14 +219,19 @@ class TestComplianceEvents:
         """IntrusionDetectedEvent should have required fields."""
         from uuid import uuid4
 
-        from src.domain.events.compliance_events import IntrusionDetectedEvent
+        from src.domain.events.compliance_events import (
+            AttackType,
+            IntrusionAction,
+            IntrusionDetectedEvent,
+            IntrusionSeverity,
+        )
 
         event = IntrusionDetectedEvent(
             intrusion_id=uuid4(),
             source_ip="192.168.1.1",
-            attack_type="sql_injection",
-            severity="high",
-            action_taken="blocked",
+            attack_type=AttackType.SQL_INJECTION,
+            severity=IntrusionSeverity.HIGH,
+            action_taken=IntrusionAction.BLOCKED,
         )
 
         assert hasattr(event, "event_id")

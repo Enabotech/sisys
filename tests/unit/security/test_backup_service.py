@@ -164,3 +164,128 @@ class TestBackupService:
 
         record = await service.get_latest_full_backup()
         assert record is None
+
+
+class TestRecoveryService:
+    """Tests for Recovery Service."""
+
+    @pytest.fixture
+    def recovery_service(self):
+        """Create recovery service instance."""
+        from src.infrastructure.security.backup_service import RecoveryService
+
+        return RecoveryService()
+
+    @pytest.fixture
+    def backup_and_recovery_services(self):
+        """Create backup and recovery services."""
+        from src.infrastructure.security.backup_service import BackupService, RecoveryService
+
+        backup = BackupService()
+        recovery = RecoveryService(backup_service=backup)
+        return backup, recovery
+
+    @pytest.mark.asyncio
+    async def test_recover_from_backup_success(self, backup_and_recovery_services):
+        """Should recover from backup successfully."""
+        backup_service, recovery_service = backup_and_recovery_services
+        user_id = uuid4()
+
+        backup = await backup_service.create_full_backup(user_id=user_id, description="Test backup")
+
+        result = await recovery_service.recover_from_backup(backup.id)
+
+        assert result["status"] == "success"
+        assert result["backup_id"] == str(backup.id)
+        assert result["size_bytes"] == backup.size_bytes
+
+    @pytest.mark.asyncio
+    async def test_recover_from_backup_not_found(self, recovery_service):
+        """Should raise error when backup not found."""
+        from src.infrastructure.security.backup_service import BackupNotFoundError
+
+        with pytest.raises(BackupNotFoundError):
+            await recovery_service.recover_from_backup(uuid4())
+
+    @pytest.mark.asyncio
+    async def test_recover_from_backup_incomplete_raises(self, backup_and_recovery_services):
+        """Should raise error when backup is not completed."""
+        from src.infrastructure.security.backup_service import RecoveryError
+
+        backup_service, recovery_service = backup_and_recovery_services
+        user_id = uuid4()
+
+        # Create a backup record manually that's in progress
+        record = await backup_service.create_full_backup(user_id=user_id)
+        # Set status to IN_PROGRESS (not COMPLETED)
+        backup_service._backup_records[record.id].status = BackupStatus.IN_PROGRESS
+
+        with pytest.raises(RecoveryError):
+            await recovery_service.recover_from_backup(record.id)
+
+    @pytest.mark.asyncio
+    async def test_recover_incremental_chain(self, backup_and_recovery_services):
+        """Should recover incremental backup chain."""
+        backup_service, recovery_service = backup_and_recovery_services
+        user_id = uuid4()
+
+        full_backup = await backup_service.create_full_backup(user_id=user_id, description="Full backup")
+        await backup_service.create_incremental_backup(
+            user_id=user_id,
+            base_backup_id=full_backup.id,
+            description="Incremental 1",
+        )
+        await backup_service.create_incremental_backup(
+            user_id=user_id,
+            base_backup_id=full_backup.id,
+            description="Incremental 2",
+        )
+
+        result = await recovery_service.recover_incremental_chain(full_backup.id)
+
+        assert result["status"] == "success"
+        assert result["base_backup_id"] == str(full_backup.id)
+        assert result["incremental_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_recover_incremental_chain_base_not_found(self, recovery_service):
+        """Should raise error when base backup not found."""
+        from src.infrastructure.security.backup_service import BackupNotFoundError
+
+        with pytest.raises(BackupNotFoundError):
+            await recovery_service.recover_incremental_chain(uuid4())
+
+    @pytest.mark.asyncio
+    async def test_estimate_recovery_time(self, backup_and_recovery_services):
+        """Should estimate recovery time correctly."""
+        backup_service, recovery_service = backup_and_recovery_services
+        user_id = uuid4()
+
+        backup = await backup_service.create_full_backup(user_id=user_id)
+
+        estimated = await recovery_service.estimate_recovery_time(backup.id)
+
+        # 100MB at 10MB/s = 10 seconds
+        assert estimated == 10.0
+
+    @pytest.mark.asyncio
+    async def test_estimate_recovery_time_not_found(self, recovery_service):
+        """Should return 0 when backup not found."""
+        estimated = await recovery_service.estimate_recovery_time(uuid4())
+
+        assert estimated == 0.0
+
+    @pytest.mark.asyncio
+    async def test_recovery_includes_target_path(self, backup_and_recovery_services):
+        """Should include target path in recovery result."""
+        backup_service, recovery_service = backup_and_recovery_services
+        user_id = uuid4()
+
+        backup = await backup_service.create_full_backup(user_id=user_id)
+
+        result = await recovery_service.recover_from_backup(
+            backup.id,
+            target_path="/custom/path",
+        )
+
+        assert result["target_path"] == "/custom/path"
