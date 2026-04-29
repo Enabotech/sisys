@@ -19,11 +19,9 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from src.domain.events.memory_events import MemoryChanged
+from src.domain.events.memory_events import MemoryChanged
 
 
 @dataclass
