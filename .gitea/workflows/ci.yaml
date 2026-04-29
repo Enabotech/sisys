@@ -114,6 +114,7 @@ jobs:
     outputs:
       l2: ${{ steps.filter.outputs.l2 }}
       l3: ${{ steps.filter.outputs.l3 }}
+      src: ${{ steps.filter.outputs.src }}
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
