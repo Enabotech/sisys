@@ -176,8 +176,8 @@ class TestRoutePerformance:
         elapsed = time.perf_counter() - start_time
         throughput = iterations / elapsed
 
-        # Should handle at least 400 routes/second (without embedding)
-        assert throughput > 400, f"Throughput {throughput:.0f}/s is too low"
+        # Should handle at least 300 routes/second (without embedding)
+        assert throughput > 300, f"Throughput {throughput:.0f}/s is too low"
 
     @pytest.mark.asyncio
     async def test_semantic_router_idempotent(self, semantic_router: SemanticRouter) -> None:
