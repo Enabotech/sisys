@@ -103,10 +103,62 @@ concurrency:
 
 jobs:
   # ===========================================================================
-  # 阶段 1: 代码质量门禁 (Ruff + MyPy)
+  # 阶段 1: 文件变更检测 (精准触发 L2/L3 构建)
+  # ===========================================================================
+  detect-changes:
+    name: "🔀 变更检测"
+    runs-on: gpu
+    container:
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
+    outputs:
+      l2: ${{ steps.filter.outputs.l2 }}
+      l3: ${{ steps.filter.outputs.l3 }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 检测相关文件变更
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            l2:
+              - 'deploy/docker/dockerfile.l2'
+              - 'pyproject.toml'
+              - 'poetry.lock'
+            l3:
+              - 'deploy/docker/dockerfile.app'
+              - 'src/**'
+              - 'tests/**'
+              - 'configs/**'
+              - '.env'
+              - '.env.example'
+              - 'scripts/entrypoint.sh'
+            src:
+              - '.gitea/**'
+              - 'configs/**'
+              - 'delivery/**'
+              - 'deploy/**'
+              - 'src/**'
+              - 'tests/**'
+              - '.env'
+              - 'pyproject.toml'
+              - 'poetry.lock'
+
+  # ===========================================================================
+  # 阶段 2: 代码质量门禁 (Ruff + MyPy)
   # ===========================================================================
   code-quality:
     name: "🔍 代码检查"
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
+        || (github.event_name != 'workflow_dispatch' && (
+          needs.detect-changes.outputs.src == 'true'
+        ))
+      }}
     runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -152,10 +204,18 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 2: 单元测试 (pytest + 覆盖率) - 支持 GPU
+  # 阶段 3: 单元测试 (pytest + 覆盖率) - 支持 GPU
   # ===========================================================================
   unit-tests:
     name: "🧪 单元测试"
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
+        || (github.event_name != 'workflow_dispatch' && (
+          needs.detect-changes.outputs.src == 'true'
+        ))
+      }}
     runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -229,7 +289,7 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 3: 集成测试 (Docker Compose) - 宿主机 Runner
+  # 阶段 4: 集成测试 (Docker Compose) - 宿主机 Runner
   # ===========================================================================
   # 说明:
   #   - runs-on: gpu 指向 gitea-org-runner (K8s StatefulSet)
@@ -309,7 +369,7 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 4: 验收测试 (Docker Compose) - 宿主机 Runner
+  # 阶段 5: 验收测试 (Docker Compose) - 宿主机 Runner
   # ===========================================================================
   # 说明:
   #   - runs-on: gpu 指向 gitea-org-runner (K8s StatefulSet)
@@ -389,10 +449,18 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # 阶段 5: 安全扫描 (Trivy + Bandit)
+  # 阶段 6: 安全扫描 (Trivy + Bandit)
   # ===========================================================================
   security-scan:
     name: "🛡️ 安全扫描"
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
+        || (github.event_name != 'workflow_dispatch' && (
+          needs.detect-changes.outputs.src == 'true'
+        ))
+      }}
     runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -454,50 +522,10 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
-  # 阶段 6: 文件变更检测 (精准触发 L2/L3 构建)
-  # ===========================================================================
-  detect-changes:
-    name: "🔀 变更检测"
-    runs-on: gpu
-    needs: [code-quality]
-    container:
-      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root
-    outputs:
-      l2: ${{ steps.filter.outputs.l2 }}
-      l3: ${{ steps.filter.outputs.l3 }}
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 检测相关文件变更
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            l2:
-              - 'deploy/docker/dockerfile.l2'
-              - 'pyproject.toml'
-              - 'poetry.lock'
-            l3:
-              - 'deploy/docker/dockerfile.app'
-              - 'src/**'
-              - 'tests/**'
-              - 'configs/**'
-              - '.env.example'
-              - 'scripts/entrypoint.sh'
-
-  # ===========================================================================
   # 阶段 7: 镜像构建 (Docker Build 多阶段) — L2/L3 精准触发
   # ===========================================================================
   build-images:
     name: "🏗️ 构建镜像"
-    runs-on: buildx
-    timeout-minutes: 60
-    needs: [detect-changes, integration-tests, acceptance-tests, security-scan, code-quality]
-    # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
-    # ✅ Tag 推送 (release 发布) 强制构建生产镜像
-    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
     if: >-
       ${{
         (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
@@ -507,6 +535,12 @@ jobs:
           || needs.detect-changes.outputs.l3 == 'true'
         ))
       }}
+    runs-on: buildx
+    timeout-minutes: 60
+    needs: [detect-changes, integration-tests, acceptance-tests, security-scan, code-quality]
+    # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
+    # ✅ Tag 推送 (release 发布) 强制构建生产镜像
+    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
       options: --user root --privileged
@@ -677,12 +711,12 @@ jobs:
 
       # Dev 构建（main / feature）— 仅推 dev 标签
       - name: 构建 L3 镜像（Dev）
-        id: build-l3-dev
         if: >-
           ${{
             startsWith(github.ref, 'refs/heads/main') ||
             startsWith(github.ref, 'refs/heads/feature/')
           }}
+        id: build-l3-dev
         needs: [detect-changes, integration-tests, security-scan, code-quality]
         uses: docker/build-push-action@v5
         with:
@@ -711,12 +745,12 @@ jobs:
 
       # Release/Tag 构建 — 推 SemVer + test，Tag 推送额外推 latest
       - name: 构建 L3 镜像（Release/Tag）
-        id: build-l3-release
         if: >-
           ${{
             startsWith(github.ref, 'refs/heads/release') ||
             startsWith(github.ref, 'refs/tags/')
           }}
+        id: build-l3-release
         needs: [detect-changes, integration-tests, security-scan, code-quality]
         uses: docker/build-push-action@v5
         with:
