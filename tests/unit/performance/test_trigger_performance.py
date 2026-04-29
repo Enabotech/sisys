@@ -273,7 +273,9 @@ class TestTriggerPerformanceBenchmarks:
         serialized = original.to_dict()
 
         def deserialize_event() -> AutoTriggered:
-            return AutoTriggered.from_dict(serialized)  # type: ignore[return-value]
+            deserialized = AutoTriggered.from_dict(serialized)
+            assert isinstance(deserialized, AutoTriggered)
+            return deserialized
 
         result = benchmark_operation(deserialize_event, iterations=10000, warmup=100)
 

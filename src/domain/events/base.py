@@ -273,7 +273,7 @@ class DomainEvent:
         if target_type is datetime and isinstance(value, str):
             return datetime.fromisoformat(value)
         if isinstance(target_type, type) and issubclass(target_type, Enum) and isinstance(value, str):
-            return target_type(value)  # type: ignore[operator]
+            return target_type(value)
         if origin is list and isinstance(value, list):
             item_type = args[0] if args else Any
             return [cls._deserialize_value(item, item_type) for item in value]

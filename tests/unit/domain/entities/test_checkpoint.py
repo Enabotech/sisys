@@ -1,6 +1,7 @@
 """Tests for Checkpoint domain entity."""
 
 import uuid
+from typing import cast
 
 import pytest
 
@@ -45,7 +46,7 @@ class TestCheckpointValidation:
     def test_invalid_id_fails(self):
         """Checkpoint with non-UUID id fails validation."""
         cp = _make_checkpoint()
-        cp.checkpoint_id = "not-a-uuid"  # type: ignore
+        object.__setattr__(cp, "checkpoint_id", cast(uuid.UUID, "not-a-uuid"))
         with pytest.raises(ValueError, match="checkpoint_id must be a valid UUID"):
             cp.validate()
 
@@ -58,7 +59,7 @@ class TestCheckpointValidation:
     def test_invalid_status_fails(self):
         """Checkpoint with invalid status fails validation."""
         cp = _make_checkpoint()
-        cp.status = "invalid_status"  # type: ignore
+        object.__setattr__(cp, "status", cast(CheckpointStatus, "invalid_status"))
         with pytest.raises(ValueError, match="status must be a valid CheckpointStatus"):
             cp.validate()
 

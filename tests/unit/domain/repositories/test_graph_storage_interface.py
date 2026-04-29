@@ -27,7 +27,7 @@ class TestGraphManagerInterface:
     def test_cannot_instantiate_graph_manager(self):
         """无法直接实例化 GraphManager。"""
         with pytest.raises(TypeError):
-            GraphManager()  # type: ignore[abstract]
+            GraphManager()
 
 
 class TestGraphStorageInterface:
@@ -50,4 +50,4 @@ class TestGraphStorageInterface:
     def test_cannot_instantiate_graph_storage(self):
         """无法直接实例化 GraphStorage。"""
         with pytest.raises(TypeError):
-            GraphStorage()  # type: ignore[abstract]
+            GraphStorage()

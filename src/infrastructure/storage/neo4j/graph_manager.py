@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
@@ -84,7 +84,7 @@ class Neo4jGraphManager:
             record = await result.single()
             if record is None:
                 return False
-            return record["deleted"] > 0  # type: ignore[no-any-return]
+            return cast(bool, record["deleted"] > 0)
 
     async def get_node(self, node_id: str) -> dict | None:
         """获取节点。
@@ -164,4 +164,4 @@ class Neo4jGraphManager:
             record = await result.single()
             if record is None:
                 return False
-            return record["deleted"] > 0  # type: ignore[no-any-return]
+            return cast(bool, record["deleted"] > 0)

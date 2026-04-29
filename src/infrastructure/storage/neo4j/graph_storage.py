@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
@@ -45,8 +45,8 @@ class Neo4jGraphStorage:
         query_params = params or {}
         async with driver.session(database=self._database) as session:
             result = await session.run(cypher, **query_params)
-            records = await result.data()
-            return records  # type: ignore[no-any-return]
+            records = cast(list[dict[str, Any]], await result.data())
+            return records
 
     async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
         """执行写入 Cypher 查询。
@@ -62,8 +62,8 @@ class Neo4jGraphStorage:
         query_params = params or {}
         async with driver.session(database=self._database) as session:
             result = await session.run(cypher, **query_params)
-            records = await result.data()
-            return records  # type: ignore[no-any-return]
+            records = cast(list[dict[str, Any]], await result.data())
+            return records
 
     async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]:
         """查找两个节点之间的路径。

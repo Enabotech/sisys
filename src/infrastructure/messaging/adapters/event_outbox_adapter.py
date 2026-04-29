@@ -55,7 +55,7 @@ class EventRegistry:
     def _recurse_subclasses(cls, parent: type) -> None:
         """递归收集所有子类。"""
         for subclass in parent.__subclasses__():
-            cls._registry[subclass.__name__] = subclass  # type: ignore[index]
+            cls._registry[subclass.__name__] = subclass
             cls._recurse_subclasses(subclass)
 
     @classmethod

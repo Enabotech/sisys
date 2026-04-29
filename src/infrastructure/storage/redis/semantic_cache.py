@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import math
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 
@@ -224,7 +225,7 @@ class RedisSemanticCache:
     async def close(self) -> None:
         """异步关闭连接池。"""
         if self._pool:
-            await self._pool.aclose()  # type: ignore[attr-defined]
+            await cast(Any, self._pool).aclose()
             self._pool = None
             logger.debug("Redis connection pool closed")
 

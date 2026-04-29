@@ -5,11 +5,14 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     FieldCondition,
     Filter,
     MatchValue,
+    NamedSparseVector,
     PointIdsList,
     PointStruct,
     Range,
@@ -111,7 +114,7 @@ class QdrantVectorStorage:
         client = self._get_client()
         query_filter: Filter | None = None
         if filter_payload:
-            conditions: list[FieldCondition] = []
+            conditions: list[Any] = []
             for key, value in filter_payload.items():
                 if isinstance(value, str | bool):
                     conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
@@ -127,9 +130,7 @@ class QdrantVectorStorage:
                 else:
                     conditions.append(FieldCondition(key=key, match=MatchValue(value=str(value))))
             if conditions:
-                query_filter = Filter(
-                    must=conditions  # type: ignore[arg-type]
-                )
+                query_filter = Filter(must=conditions)
 
         response = await client.search(
             collection_name=collection,
@@ -168,23 +169,22 @@ class QdrantVectorStorage:
         client = self._get_client()
         query_filter: Filter | None = None
         if filter_payload:
-            conditions: list[FieldCondition] = []
+            conditions: list[Any] = []
             for key, value in filter_payload.items():
                 conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
             if conditions:
-                query_filter = Filter(
-                    must=conditions  # type: ignore[arg-type]
-                )
+                query_filter = Filter(must=conditions)
 
         try:
             qdrant_sparse = QdrantSparseVector(
                 indices=sparse_vector.indices,
                 values=sparse_vector.values,
             )
+            named_sparse = NamedSparseVector(name="sparse", vector=qdrant_sparse)
             # 使用 search 方法，支持 NamedSparseVector
             response = await client.search(
                 collection_name=collection,
-                query_vector=qdrant_sparse,  # type: ignore[arg-type]
+                query_vector=named_sparse,
                 query_filter=query_filter,
                 limit=limit,
                 with_payload=True,
@@ -211,10 +211,10 @@ class QdrantVectorStorage:
             操作成功返回 True
         """
         client = self._get_client()
-        converted_ids = [self._normalize_point_id(pid) for pid in point_ids]
+        converted_ids: list[int | str] = [self._normalize_point_id(pid) if isinstance(pid, int) else pid for pid in point_ids]
         await client.delete(
             collection_name=collection,
-            points_selector=PointIdsList(points=converted_ids),  # type: ignore[arg-type]
+            points_selector=cast(Any, PointIdsList(points=converted_ids)),
         )
         return True
 

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import pytest
 
@@ -64,15 +65,15 @@ class TestStrategicPlanValidation:
     def test_plan_with_invalid_id_fails(self):
         """Plan with non-UUID id fails validation."""
         plan = _make_plan()
-        plan.plan_id = "not-a-uuid"  # type: ignore
+        object.__setattr__(plan, "plan_id", cast(uuid.UUID, "not-a-uuid"))
         with pytest.raises(ValueError, match="plan_id must be a valid UUID"):
             plan.validate()
 
     def test_plan_timestamps_valid(self):
         """created_at must be before or equal to updated_at."""
         plan = _make_plan()
-        plan.created_at = datetime.now(UTC) + timedelta(days=1)
-        plan.updated_at = datetime.now(UTC)
+        object.__setattr__(plan, "created_at", datetime.now(UTC) + timedelta(days=1))
+        object.__setattr__(plan, "updated_at", datetime.now(UTC))
         with pytest.raises(ValueError, match="created_at must be before"):
             plan.validate()
 

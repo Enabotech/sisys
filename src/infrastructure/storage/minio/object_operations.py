@@ -9,7 +9,7 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from minio.error import S3Error
 
@@ -375,7 +375,7 @@ class ObjectOperations:
                         break
 
                     if part_number not in completed_part_numbers:
-                        etag = client._put_object(  # type: ignore[call-arg]
+                        etag = cast(Any, client)._put_object(
                             bucket_name,
                             object_key,
                             data,

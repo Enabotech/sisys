@@ -275,9 +275,9 @@ class TestRoutePerformance:
 
         first = results[0]
         for i, result in enumerate(results[1:], 1):
-            assert result.route_type == first.route_type, f"Result {i} route_type differs"  # type: ignore[union-attr]
-            assert result.route_target == first.route_target, f"Result {i} route_target differs"  # type: ignore[union-attr]
-            assert result.route_score == first.route_score, f"Result {i} route_score differs"  # type: ignore[union-attr]
+            assert result.route_type == first.route_type, f"Result {i} route_type differs"
+            assert result.route_target == first.route_target, f"Result {i} route_target differs"
+            assert result.route_score == first.route_score, f"Result {i} route_score differs"
 
     # ===================================================================
     # Concurrent Performance

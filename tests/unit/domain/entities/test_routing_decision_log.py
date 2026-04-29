@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 
@@ -28,7 +29,7 @@ class TestRoutingDecisionLog:
     def test_validate_log_id_must_be_uuid(self) -> None:
         """Should raise if log_id is not a UUID."""
         log = RoutingDecisionLog(
-            log_id="not-a-uuid",  # type: ignore
+            log_id=cast(uuid.UUID, "not-a-uuid"),
             task_id="task-001",
             session_id="session-001",
             route_type="semantic",

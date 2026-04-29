@@ -55,6 +55,5 @@ class TestPublicBlackboardInterface:
 
     def test_protocol_is_protocol(self) -> None:
         """PublicBlackboard 应是 Protocol 类型。"""
-        from typing import Protocol
-
-        assert issubclass(PublicBlackboard, Protocol)  # type: ignore[arg-type]
+        # Protocol classes have _is_protocol flag
+        assert getattr(PublicBlackboard, "_is_protocol", False) is True

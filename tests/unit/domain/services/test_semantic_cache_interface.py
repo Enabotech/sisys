@@ -45,6 +45,5 @@ class TestSemanticCacheInterface:
 
     def test_protocol_is_protocol(self) -> None:
         """SemanticCache 应是 Protocol 类型。"""
-        from typing import Protocol
-
-        assert issubclass(SemanticCache, Protocol)  # type: ignore[arg-type]
+        # Protocol classes have _is_protocol flag
+        assert getattr(SemanticCache, "_is_protocol", False) is True

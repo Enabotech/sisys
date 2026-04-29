@@ -14,7 +14,7 @@ class TestBaseRepositoryAbstract:
     def test_cannot_instantiate_base_repository_directly(self):
         """BaseRepository is abstract and cannot be instantiated."""
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
-            BaseRepository()  # type: ignore
+            BaseRepository()
 
     def test_cannot_instantiate_unimplemented_subclass(self):
         """A subclass that doesn't implement all methods cannot be instantiated."""
@@ -23,7 +23,7 @@ class TestBaseRepositoryAbstract:
             pass
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
-            IncompleteRepo()  # type: ignore
+            IncompleteRepo()
 
     def test_can_instantiate_fully_implemented_subclass(self):
         """A subclass that implements all methods can be instantiated."""

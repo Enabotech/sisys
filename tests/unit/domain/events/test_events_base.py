@@ -49,7 +49,7 @@ class TestDomainEventCreation:
             event_type="TestEvent",
         )
         with pytest.raises(Exception):  # FrozenInstanceError
-            event.event_type = "Changed"  # type: ignore
+            event.event_type = "Changed"
 
 
 class TestDomainEventSerialization:

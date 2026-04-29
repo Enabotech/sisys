@@ -15,7 +15,7 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class OtelConfig:
         return cls(
             trace_enabled=trace_enabled,
             endpoint=endpoint,
-            protocol=protocol,  # type: ignore[arg-type]
+            protocol=cast(OtlpProtocol, protocol),
             service_name=service_name,
             deployment_environment=deployment_env,
             sampler_ratio=sampler_ratio,
