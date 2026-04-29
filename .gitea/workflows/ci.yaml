@@ -151,6 +151,13 @@ jobs:
   # ===========================================================================
   code-quality:
     name: "🔍 代码检查"
+    runs-on: gpu
+    needs: [detect-changes]
+    container:
+      # ✅ 使用预构建 CI 镜像 (Layer 2)
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
+
     if: >-
       ${{
         (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
@@ -159,11 +166,6 @@ jobs:
           needs.detect-changes.outputs.src == 'true'
         ))
       }}
-    runs-on: gpu
-    container:
-      # ✅ 使用预构建 CI 镜像 (Layer 2)
-      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root
 
     steps:
       - name: 检出代码
@@ -208,6 +210,13 @@ jobs:
   # ===========================================================================
   unit-tests:
     name: "🧪 单元测试"
+    runs-on: gpu
+    needs: [detect-changes]
+    container:
+      # ✅ 使用预构建 CI 镜像 (Layer 2)
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root --gpus all
+
     if: >-
       ${{
         ((github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
@@ -217,11 +226,6 @@ jobs:
         ))) &&
         !(vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[no gpu]'))
       }}
-    runs-on: gpu
-    container:
-      # ✅ 使用预构建 CI 镜像 (Layer 2)
-      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root --gpus all
 
     steps:
       - name: 检出代码
@@ -451,6 +455,13 @@ jobs:
   # ===========================================================================
   security-scan:
     name: "🛡️ 安全扫描"
+    runs-on: gpu
+    needs: [detect-changes]
+    container:
+      # ✅ 使用预构建 CI 镜像 (Layer 2)
+      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
+      options: --user root
+
     if: >-
       ${{
         (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
@@ -459,11 +470,6 @@ jobs:
           needs.detect-changes.outputs.src == 'true'
         ))
       }}
-    runs-on: gpu
-    container:
-      # ✅ 使用预构建 CI 镜像 (Layer 2)
-      image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
-      options: --user root
 
     steps:
       - name: 检出代码
@@ -524,18 +530,9 @@ jobs:
   # ===========================================================================
   build-images:
     name: "🏗️ 构建镜像"
-    if: >-
-      ${{
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-        || startsWith(github.ref, 'refs/tags/')
-        || (github.event_name != 'workflow_dispatch' && (
-          needs.detect-changes.outputs.l2 == 'true'
-          || needs.detect-changes.outputs.l3 == 'true'
-        ))
-      }}
     runs-on: buildx
-    timeout-minutes: 60
     needs: [detect-changes, integration-tests, acceptance-tests, security-scan, code-quality]
+    timeout-minutes: 60
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
     # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
@@ -545,6 +542,16 @@ jobs:
       credentials:
         username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
         password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
+
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
+        || (github.event_name != 'workflow_dispatch' && (
+          needs.detect-changes.outputs.l2 == 'true'
+          || needs.detect-changes.outputs.l3 == 'true'
+        ))
+      }}
 
     steps:
       - name: 检出代码
