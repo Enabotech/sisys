@@ -83,7 +83,9 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
     @pytest.fixture
     def mock_session(self):
         """Mock AsyncSession."""
-        return AsyncMock()
+        mock = AsyncMock()
+        mock.add = MagicMock()
+        return mock
 
     @pytest.fixture
     def repo(self, mock_session):
@@ -148,7 +150,9 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
     @pytest.fixture
     def mock_session(self):
         """Mock AsyncSession."""
-        return AsyncMock()
+        mock = AsyncMock()
+        mock.add = MagicMock()
+        return mock
 
     @pytest.fixture
     def repo(self, mock_session):
@@ -215,7 +219,9 @@ class TestPostgreSQLMemoryMetadataRepositoryDelete:
     @pytest.fixture
     def mock_session(self):
         """Mock AsyncSession."""
-        return AsyncMock()
+        mock = AsyncMock()
+        mock.add = MagicMock()
+        return mock
 
     @pytest.fixture
     def repo(self, mock_session):
@@ -240,7 +246,9 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
     @pytest.fixture
     def mock_session(self):
         """Mock AsyncSession."""
-        return AsyncMock()
+        mock = AsyncMock()
+        mock.add = MagicMock()
+        return mock
 
     @pytest.fixture
     def repo(self, mock_session):
@@ -349,7 +357,9 @@ class TestPostgreSQLMemoryMetadataRepositoryConverters:
     @pytest.fixture
     def mock_session(self):
         """Mock AsyncSession."""
-        return AsyncMock()
+        mock = AsyncMock()
+        mock.add = MagicMock()
+        return mock
 
     @pytest.fixture
     def repo(self, mock_session):
