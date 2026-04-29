@@ -354,7 +354,21 @@ class SignatureService:
             timestamp = signed_data["timestamp"]
             signature = signed_data["signature"]
 
-            data_to_verify = f"{base64.b64encode(data.encode() if isinstance(data, str) else data).decode()}.{timestamp}"
+            # sign_data_with_timestamp encoding logic:
+            # - bytes input: base64.b64encode(data).decode() stored in data field
+            # - str input: data stored as-is (plain string)
+            #
+            # To reverse (re-create data_to_sign):
+            # - If data contains space or newline: it's a plain string, encode it
+            # - Otherwise: treat as base64 encoded bytes from a bytes input
+            if isinstance(data, bytes):
+                data_to_verify = f"{base64.b64encode(data).decode()}.{timestamp}"
+            elif " " in data or "\n" in data or "\t" in data:
+                # Plain string input (contains whitespace that base64 never has)
+                data_to_verify = f"{base64.b64encode(data.encode('utf-8')).decode()}.{timestamp}"
+            else:
+                # Base64 encoded bytes input (no whitespace chars)
+                data_to_verify = f"{data}.{timestamp}"
 
             return self.verify(data_to_verify, signature)
         except Exception:
