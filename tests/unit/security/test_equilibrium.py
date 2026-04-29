@@ -234,6 +234,7 @@ class TestMFAService:
 
         # Manually expire the challenge
         challenge = service.get_challenge(event.challenge_id)
+        assert challenge is not None
         challenge.expires_at = datetime.now(UTC) - timedelta(minutes=10)
 
         from src.infrastructure.security.mfa_service import MFAChallengeExpiredError

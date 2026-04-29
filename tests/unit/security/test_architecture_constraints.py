@@ -149,17 +149,21 @@ class TestRBACModels:
 
     def test_role_wildcard_permission(self):
         """Role with *:* should match any permission."""
+        from uuid import uuid4
+
         from src.infrastructure.security.models import Role
 
-        role = Role(id=None, name="admin", permissions=["*:*"])
+        role = Role(id=uuid4(), name="admin", permissions=["*:*"])
 
         assert role.has_permission("anything", "any_action") is True
 
     def test_role_resource_wildcard(self):
         """Role with resource:* should match any action on that resource."""
+        from uuid import uuid4
+
         from src.infrastructure.security.models import Role
 
-        role = Role(id=None, name="doc_admin", permissions=["document:*"])
+        role = Role(id=uuid4(), name="doc_admin", permissions=["document:*"])
 
         assert role.has_permission("document", "read") is True
         assert role.has_permission("document", "write") is True
@@ -168,9 +172,11 @@ class TestRBACModels:
 
     def test_user_account_locking(self):
         """User should be lockable after failed login attempts."""
+        from uuid import uuid4
+
         from src.infrastructure.security.models import User
 
-        user = User(id=None, username="test", email="test@test.com")
+        user = User(id=uuid4(), username="test", email="test@test.com")
 
         assert user.is_locked() is False
 

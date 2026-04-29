@@ -213,7 +213,7 @@ class TestSensitiveDataDetector:
             ("今天天气不错", False, None, None),
         ]
 
-        correct = 0
+        correct: float = 0
         total = len(test_cases)
         for text, expected_sensitive, expected_type, expected_label in test_cases:
             result = detector.detect(text)
