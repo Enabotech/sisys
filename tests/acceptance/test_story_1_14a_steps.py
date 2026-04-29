@@ -42,7 +42,7 @@ scenarios("test_story_1_14a.feature")
 REDIS_CHANNEL_PREFIX = "sisys:rt:"
 
 # AC-5 性能指标常量
-THROUGHPUT_EVENTS_PER_SECOND = 200
+THROUGHPUT_EVENTS_PER_SECOND = 1000
 
 
 # ===================================================================
