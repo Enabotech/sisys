@@ -235,6 +235,7 @@ def given_hash_router_abc(context: dict) -> None:
 def when_hash_router_route(context: dict) -> None:
     """Execute hash routing 10 times for same session."""
     router = context.get("hash_router")
+    assert router is not None
     session_id = context.get("session_id", "default-session")
     results = []
     for _ in range(10):
@@ -511,6 +512,7 @@ def when_semantic_router_routes(context: dict) -> None:
 def when_execute_semantic_routing(context: dict) -> None:
     """Execute semantic routing for accuracy test."""
     router = context.get("semantic_router_10")
+    assert router is not None
     samples = context.get("test_samples", [])
 
     correct = 0
