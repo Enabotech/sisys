@@ -31,7 +31,7 @@ class RedisConfig:
             REDIS_PORT: Redis 端口 (默认: 6379)
             REDIS_DB: Redis 数据库号 (默认: 0)
             REDIS_PASSWORD: Redis 密码 (默认: None)
-            REDIS_MAX_CONNECTIONS: 最大连接数 (默认: 50)
+            REDIS_MAX_CONNECTIONS: 最大连接数 (默认: 100)
             REDIS_SOCKET_TIMEOUT: Socket 超时秒数 (默认: 5.0)
             REDIS_RETRY_ON_TIMEOUT: 超时时重试 (默认: true)
             REDIS_DEFAULT_TTL: 默认 TTL 秒数 (默认: 86400)
@@ -58,7 +58,7 @@ class RedisConfig:
             port=int(os.getenv("REDIS_PORT", "6379")),
             db=int(os.getenv("REDIS_DB", "0")),
             password=os.getenv("REDIS_PASSWORD") or None,
-            max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
+            max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "100")),
             socket_timeout=socket_timeout,
             retry_on_timeout=retry_on_timeout_env in ("true", "1", "yes"),
             default_ttl=default_ttl,
