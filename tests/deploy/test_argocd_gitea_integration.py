@@ -268,7 +268,7 @@ class TestArgoCDGiteaWebhook:
 
     def test_webhook_config_yaml_valid(self, webhook_config_path: str):
         """验证 Webhook 配置文件 YAML 格式正确"""
-        import yaml  # type: ignore[import-untyped]
+        import yaml
 
         with open(webhook_config_path, encoding="utf-8") as f:
             try:

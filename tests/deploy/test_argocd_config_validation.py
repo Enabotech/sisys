@@ -7,7 +7,7 @@ ArgoCD 配置验证测试
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -26,7 +26,7 @@ class TestGiteaCredentialsConfig:
             # 找到 Secret 文档
             for doc in docs:
                 if doc and doc.get("kind") == "Secret":
-                    return doc  # type: ignore[no-any-return]
+                    return cast(dict[str, Any], doc)
             raise FileNotFoundError("Gitea Credentials Secret not found")
 
     def test_secret_exists(self, gitea_credentials):
@@ -73,7 +73,7 @@ class TestAdminSecretConfig:
             docs = list(yaml.safe_load_all(f))
             for doc in docs:
                 if doc and doc.get("kind") == "Secret" and doc.get("metadata", {}).get("name") == "argocd-initial-admin-secret":
-                    return doc  # type: ignore[no-any-return]
+                    return cast(dict[str, Any], doc)
             raise FileNotFoundError("Admin Secret not found")
 
     def test_secret_exists(self, admin_secret):

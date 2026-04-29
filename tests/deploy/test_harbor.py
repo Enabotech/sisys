@@ -186,7 +186,7 @@ def get_hsts_header(url: str) -> str | None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
             response = requests.head(url, verify=False, timeout=10)  # nosec B501
-        return response.headers.get("Strict-Transport-Security")  # type: ignore[no-any-return]
+        return response.headers.get("Strict-Transport-Security")
     except Exception:
         return None
 

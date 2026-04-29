@@ -8,7 +8,7 @@ Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
 import json
 import os
 import subprocess
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -531,7 +531,7 @@ class TestArgoCDHarborIntegration:
         returncode, stdout, stderr = self._run_kubectl_command(args)
         if returncode != 0:
             raise subprocess.CalledProcessError(returncode, args, stderr)
-        return json.loads(stdout)  # type: ignore[no-any-return]
+        return cast(dict[str, Any], json.loads(stdout))
 
 
 # =============================================================================

@@ -108,7 +108,7 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
     # PostgreSQL 清理
     try:
-        import psycopg2  # type: ignore[import-untyped]
+        import psycopg2
 
         conn = psycopg2.connect(
             host="localhost",
@@ -180,7 +180,9 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
     # RabbitMQ 清理
     try:
-        import pika
+        import importlib
+
+        pika = importlib.import_module("pika")
 
         credentials = pika.PlainCredentials("guest", "guest")
         parameters = pika.ConnectionParameters(host="localhost", port=5672, credentials=credentials)
