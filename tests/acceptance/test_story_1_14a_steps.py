@@ -931,9 +931,9 @@ def test_ac5_trigger_latency_p95():
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - 吞吐量支持 THROUGHPUT_EVENTS_PER_SECOND events/second")
+@scenario("test_story_1_14a.feature", "AC-5 - 吞吐量性能测试")
 def test_ac5_throughput():
-    """Test throughput supports THROUGHPUT_EVENTS_PER_SECOND events/second."""
+    """Test throughput performance."""
     pass
 
 
