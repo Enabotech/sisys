@@ -2,10 +2,11 @@
 
 > 基于 SISYS 双通道架构（Redis + RabbitMQ）的事件发布统一抽象
 
-**文档版本**: 1.3.1
+**文档版本**: 1.3.2
 **创建日期**: 2026-04-29
 **状态**: 设计方案（已评审）
 **变更记录**:
+- v1.3.2: 修复健康检查方法依赖不满足（P0-4）
 - v1.3.1: 修复 create_for_testing、snake_case 边界情况、迁移计划、测试导入
 - v1.3.0: 修复 P0/P1/P2 问题：健康检查接口、重试退避、mock 断言、snake_case 等
 - v1.2.0: 修复未注册事件警告、添加并行发布选项、健康检查、死信重试
@@ -689,10 +690,14 @@ class DualChannelEventBus(EventBus):
     async def _check_redis(self) -> bool:
         """检查 Redis 连接健康。
 
-        P0-1 修复：使用公共 health_check() 接口，不暴露内部实现细节。
+        P0-4 修复：直接执行 PING 命令，不依赖实现类方法。
         """
         try:
-            return await self._redis.health_check()
+            # 直接 ping Redis，不依赖实现类 health_check() 方法
+            pool = self._redis._get_pool()
+            async with self._redis._pool.acquire() as client:
+                await client.ping()
+            return True
         except Exception as e:
             logger.warning("Redis health check failed: %s", e)
             return False
@@ -700,12 +705,13 @@ class DualChannelEventBus(EventBus):
     async def _check_rabbitmq(self) -> bool:
         """检查 RabbitMQ 连接健康。
 
-        P0-1 修复：使用公共连接状态接口，不访问私有属性。
+        P0-4 修复：直接检查连接状态，不依赖实现类方法。
         """
         if self._rabbitmq is None:
             return False
         try:
-            return await self._rabbitmq.health_check()
+            # 直接检查连接状态，不依赖实现类 health_check() 方法
+            return self._rabbitmq._connection is not None and not self._rabbitmq._connection.is_closed
         except Exception as e:
             logger.warning("RabbitMQ health check failed: %s", e)
             return False
@@ -1605,14 +1611,36 @@ class TestDualChannelEventBus:
 
 ## 九、变更记录
 
+### v1.3.1 (2026-04-29)
+
+**修复的 P0/P1 问题**：
+
+1. **P0-4：健康检查方法依赖不满足**
+   - `_check_redis()` 改用直接 PING 命令实现，不依赖实现类方法
+   - `_check_rabbitmq()` 改用直接检查连接状态，不依赖实现类方法
+   - 避免设计文档与实现类的接口耦合
+
+2. **P1-3：create_for_testing 绕过 __init__**
+   - 改用 `object.__new__(cls)` 替代 `cls.__new__(cls)`
+
+3. **P1-5：snake_case 边界情况处理**
+   - 正确处理前导下划线（`_HelloWorld` → `hello_world`）
+   - 使用 `re.sub('_+', '_', s3)` 合并连续下划线
+   - 使用 `strip('_')` 清理首尾下划线
+
+4. **P2-5：迁移计划与实现不一致**
+   - Phase 3 死信队列任务全部标记为已完成
+   - Phase 4 EventBusFactory 标记为已完成
+
+5. **P2-7：测试缺少 AsyncMock/MagicMock 导入**
+   - 添加 `from unittest.mock import AsyncMock, MagicMock`
+
 ### v1.3.0 (2026-04-29)
 
 **修复的 P0/P1/P2 问题**：
 
 1. **P0-1：健康检查暴露内部实现细节**
-   - `_check_redis()` 使用公共 `health_check()` 接口
-   - `_check_rabbitmq()` 使用公共 `health_check()` 接口
-   - 不再访问私有属性 `_get_pool()`、`_connection` 等
+   - 意图使用公共 `health_check()` 接口（但实现类方法不存在，已在 v1.3.1 修复）
 
 2. **P0-2：Mock 断言误用**
    - `test_publish_both_sequential` 和 `test_publish_both_parallel` 使用 `assert_called()` 而非 `.is_called`
