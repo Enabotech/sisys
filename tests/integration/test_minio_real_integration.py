@@ -4,7 +4,7 @@
 使用真实的 MinIO 部署（localhost:9000），不使用 mock。
 
 运行方式:
-    pytest tests/integration_real/test_minio_real_integration.py -v
+    pytest tests/integration/test_minio_real_integration.py -v
 
 前置条件:
     - MinIO 服务已部署并运行在 localhost:9000

@@ -293,7 +293,7 @@ jobs:
           export NEO4J_HOST=host.docker.internal
           export RABBITMQ_HOST=host.docker.internal
           mkdir -p reports/integration
-          poetry run pytest tests/integration tests/integration_real \
+          poetry run pytest tests/integration \
             --junitxml=reports/integration/integration-tests.xml \
             --html=reports/integration/integration-tests.html \
             --self-contained-html \
@@ -392,7 +392,7 @@ jobs:
   # 阶段 5: 安全扫描 (Trivy + Bandit)
   # ===========================================================================
   security-scan:
-    name: "🔒 安全扫描"
+    name: "🛡️ 安全扫描"
     runs-on: gpu
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -457,7 +457,7 @@ jobs:
   # 阶段 6: 文件变更检测 (精准触发 L2/L3 构建)
   # ===========================================================================
   detect-changes:
-    name: "🔎 变更检测"
+    name: "🔀 变更检测"
     runs-on: gpu
     needs: [code-quality]
     container:

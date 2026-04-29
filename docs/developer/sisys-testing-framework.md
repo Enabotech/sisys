@@ -21,7 +21,7 @@ tests/
 │   └── test_story_*.feature     # Gherkin 场景定义
 ├── integration/              # 集成测试（使用 fakeredis mock）
 │   └── conftest.py          # 提供 mock fixtures (scope=function)
-├── integration_real/         # 真实服务集成测试
+├── integration/         # 真实服务集成测试
 │   └── conftest.py          # 从 .env 读取连接参数 (scope=session)
 └── fixtures/                 # 空目录（预留）
 ```
@@ -29,7 +29,7 @@ tests/
 **CI 测试执行流程** (`.gitea/workflows/ci.yaml` lines 240-289):
 1. 启动 `deploy/app/docker-compose.yml` 服务，等待 `healthy`
 2. 设置 `SISYS_TEST_ENV=ci` 环境变量（让 `environments.py` 自动检测）
-3. 运行：`pytest tests/integration tests/integration_real tests/acceptance`
+3. 运行：`pytest tests/integration tests/integration tests/acceptance`
 
 **注意**：不要使用 `export REDIS_HOST=host.docker.internal` 覆盖已有环境变量。这样会与 `.env` 读取冲突。应设置 `SISYS_TEST_ENV=ci` 让自动检测逻辑生效。
 
@@ -44,12 +44,12 @@ tests/
 |------|--------|---------|------|
 | `tests/acceptance/` | 12 | BDD 验收测试 | 真实服务 + Gherkin |
 | `tests/integration/` | 15 | 集成测试 | fakeredis mock |
-| `tests/integration_real/` | 6 | 真实服务集成测试 | 真实存储服务 |
+| `tests/integration/` | 6 | 真实服务集成测试 | 真实存储服务 |
 | `tests/unit/` | 70 | 单元测试 | mock + 快速执行 |
 
 ### 1.3 服务依赖分析
 
-| 服务 | acceptance | integration | integration_real | unit | 优先级 |
+| 服务 | acceptance | integration | integration | unit | 优先级 |
 |------|------------|-------------|------------------|------|--------|
 | Redis | 89 | 84 | 43 | 58 | 🔴 高 |
 | Neo4j | 61 | 13 | 20 | 58 | 🔴 高 |
@@ -1705,7 +1705,7 @@ def reset_test_environment():
 
 - [ ] **4.4** 创建全局单例 `get_test_env()` 和 `reset_test_env()`
 
-- [ ] **4.5** 更新 `tests/integration_real/conftest.py` 使用 `environments.py`
+- [ ] **4.5** 更新 `tests/integration/conftest.py` 使用 `environments.py`
   ```python
   from tests.environments import get_test_env
   config = get_test_env()
@@ -1732,7 +1732,7 @@ def reset_test_environment():
 - [ ] **5.4** 验证：测试连接到测试环境
   ```bash
   export SISYS_TEST_ENV=local
-  poetry run pytest tests/integration_real/ -v
+  poetry run pytest tests/integration/ -v
   ```
 
 ---
@@ -1925,7 +1925,7 @@ Worker 进程 A                         Worker 进程 B
 
 ---
 
-### Phase 7: tests/integration_real/ 重构清单
+### Phase 7: tests/integration/ 重构清单
 
 **现状**：6 个真实服务集成测试文件
 
@@ -1990,8 +1990,8 @@ Worker 进程 A                         Worker 进程 B
 
 优先级 2 (高 - 隔离性问题):
 ├── A4-A6: acceptance 租户隔离添加
-├── R1-R3: integration_real 环境标准化
-└── R4-R7: integration_real 资源隔离
+├── R1-R3: integration 环境标准化
+└── R4-R7: integration 资源隔离
 
 优先级 3 (中 - 优化项):
 ├── A7-A10: acceptance 配置优化
@@ -2009,7 +2009,7 @@ Worker 进程 A                         Worker 进程 B
 |----------|---------|---------|----------|
 | `tests/acceptance/` | 大（12 个文件，~1500 行代码） | 🔴 高 | 3-4 天 |
 | `tests/integration/` | 小（mock 验证为主） | 🟡 中 | 0.5 天 |
-| `tests/integration_real/` | 中（6 个文件，连接配置） | 🟡 中 | 1-2 天 |
+| `tests/integration/` | 中（6 个文件，连接配置） | 🟡 中 | 1-2 天 |
 | `tests/unit/` | 小（70 个文件，但大部分已隔离） | 🟢 低 | 0.5 天 |
 
 ---
@@ -2025,7 +2025,7 @@ Step 3: 建立 tests/isolation.py + tests/fixtures.py (Phase 3)
         ↓
 Step 4: 应用租户隔离到 acceptance/ (A4-A6)
         ↓
-Step 5: 更新 integration_real/conftest.py (R1-R3)
+Step 5: 更新 integration/conftest.py (R1-R3)
         ↓
 Step 6: 验证 integration/ mock 正确性 (I1-I8)
         ↓

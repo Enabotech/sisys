@@ -108,10 +108,10 @@
 
 ---
 
-### AC-6: Phase 7 tests/integration_real/ 重构 - 6 个真实服务文件标准化
+### AC-6: Phase 7 tests/integration/ 重构 - 6 个真实服务文件标准化
 
 **Given** 真实服务集成测试目录重构
-**When** 运行 `tests/integration_real/` 全部测试
+**When** 运行 `tests/integration/` 全部测试
 **Then** 使用统一环境配置，资源隔离
 
 **验证标准/Validation Criteria:**
@@ -426,23 +426,23 @@
 
 ---
 
-### Task 7: Phase 7 tests/integration_real/ 重构 (R1-R7) — 预计 1-2 天
+### Task 7: Phase 7 tests/integration/ 重构 (R1-R7) — 预计 1-2 天
 
 **关联 AC:** AC-6
 
 > **6 个真实服务集成测试文件**
 
 - [x] Subtask 7.1: R1 — 更新 `conftest.py` 使用 `tests/environments.py`
-  - ✅ 已完成：`tests/integration_real/conftest.py` 使用 `get_test_env()`
+  - ✅ 已完成：`tests/integration/conftest.py` 使用 `get_test_env()`
 - [x] Subtask 7.2: R2 — 检查 `scope=session` 连接池是否改为 function
   - ✅ 已完成：所有连接池改为 function scope
 - [x] Subtask 7.3: R3 — 添加资源清理 (collection/queue/key cleanup)
   - Redis: 使用 `flushdb` 清理
   - PostgreSQL: 使用事务回滚
 - [x] Subtask 7.4: R4 — 为 Qdrant collections 添加 UUID 前缀
-  - ✅ 已完成：`tests/integration_real/test_qdrant_real_integration.py` 使用 `test_tenant_id`
+  - ✅ 已完成：`tests/integration/test_qdrant_real_integration.py` 使用 `test_tenant_id`
 - [x] Subtask 7.5: R5 — 为 Redis keys 添加 UUID 前缀
-  - ✅ 已完成：`tests/integration_real/test_redis_real_integration.py` 使用 uuid
+  - ✅ 已完成：`tests/integration/test_redis_real_integration.py` 使用 uuid
 - [x] Subtask 7.6: R6 — PostgreSQL schema 清理正确
   - 使用事务回滚机制
 - [x] Subtask 7.7: R7 — 验证连接配置使用 `get_test_env()`
@@ -494,7 +494,7 @@
   - ✅ 已通过：13 passed
 - [x] Subtask 9.2: 运行完整集成测试套件（本地）
   ```bash
-  poetry run pytest tests/integration/ tests/integration_real/ -v --tb=short
+  poetry run pytest tests/integration/ tests/integration/ -v --tb=short
   ```
   - ✅ 已通过：32+ passed
 - [x] Subtask 9.3: 运行单元测试套件
@@ -549,7 +549,7 @@ sisys/
 │   │   ├── test_story_1_3_steps.py   # [更新] P1 修复 async_consume
 │   │   └── test_story_1_6_steps.py    # [更新] P2 修复 collection 创建
 │   ├── integration/              # [更新] Phase 6 - 15 个 mock 文件
-│   ├── integration_real/         # [更新] Phase 7 - 6 个真实服务文件
+│   ├── integration/         # [更新] Phase 7 - 6 个真实服务文件
 │   └── unit/                    # [检查] Phase 8 - 70 个单元测试
 └── deploy/app/
     └── docker-compose.test.yml  # [新建] Phase 2 - 测试专用 docker-compose
@@ -617,7 +617,7 @@ sisys/
   - 从 `tests.fixtures` 导入 `reset_test_environment` fixture
 
 **Task 7 (Phase 7 R1, R2):**
-- [x] 更新 `tests/integration_real/conftest.py` 使用 `tests/environments.py` (AC-6 R1, R7)
+- [x] 更新 `tests/integration/conftest.py` 使用 `tests/environments.py` (AC-6 R1, R7)
   - 导入 `get_test_env()` 替代直接 `load_dotenv`
   - 所有 fixtures 使用 `config = get_test_env()` 获取配置
 - [x] 将 session scope 连接池改为 function scope (AC-6 R2)
@@ -663,14 +663,14 @@ sisys/
 
 **本次Session更新的文件:**
 - `tests/integration/conftest.py` - 添加 reset_test_environment 导入 (I4 修复)
-- `tests/integration_real/conftest.py` - 使用 get_test_env() + function scope (R1, R2 修复)
+- `tests/integration/conftest.py` - 使用 get_test_env() + function scope (R1, R2 修复)
 
 **Phase 1-3 已完成文件 (历史):**
 - `tests/acceptance/test_story_1_3_steps.py` - P1 修复 (temporary_consumer), P6 修复 (删除 event_loop fixture)
 - `tests/acceptance/test_story_1_6_steps.py` - P2 修复 (添加 create_collection), P6 修复 (删除 event_loop fixture)
 - `tests/acceptance/*.py` - A1-A10 租户隔离
 - `tests/integration/*.py` - I1-I8 mock 验证
-- `tests/integration_real/*.py` - R1-R7 环境标准化 (本次修复 R1, R2)
+- `tests/integration/*.py` - R1-R7 环境标准化 (本次修复 R1, R2)
 - `tests/unit/**/*.py` - U1-U6 mock 检查
 - `.gitea/workflows/ci.yaml` - 使用测试环境
 

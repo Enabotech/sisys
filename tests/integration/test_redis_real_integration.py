@@ -4,7 +4,7 @@
 使用真实的 Redis 部署（localhost:6379），不使用 fakeredis 或 mock。
 
 运行方式:
-    pytest tests/integration_real/ -v
+    pytest tests/integration/ -v
 
 前置条件:
     - Redis 服务已部署并运行在 localhost:6379
