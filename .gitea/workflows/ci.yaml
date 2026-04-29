@@ -318,7 +318,7 @@ jobs:
   #   - 使用根目录 .env 文件配置服务连接参数
   # ===========================================================================
   acceptance-tests:
-    name: "🚀 验收测试"
+    name: "🏁 验收测试"
     runs-on: gpu
     needs: [unit-tests]
     container:
