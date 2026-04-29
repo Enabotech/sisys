@@ -1,6 +1,7 @@
 """Tests for Tool domain entity."""
 
 import uuid
+from typing import cast
 
 import pytest
 
@@ -41,7 +42,7 @@ class TestToolValidation:
     def test_invalid_id_fails(self):
         """Tool with non-UUID id fails validation."""
         tool = _make_tool()
-        tool.tool_id = "not-a-uuid"  # type: ignore
+        object.__setattr__(tool, "tool_id", cast(uuid.UUID, "not-a-uuid"))
         with pytest.raises(ValueError, match="tool_id must be a valid UUID"):
             tool.validate()
 
@@ -54,13 +55,13 @@ class TestToolValidation:
     def test_invalid_input_schema_fails(self):
         """Tool with non-dict input_schema fails validation."""
         tool = _make_tool()
-        tool.input_schema = "not a dict"  # type: ignore
+        object.__setattr__(tool, "input_schema", cast(dict, "not a dict"))
         with pytest.raises(ValueError, match="input_schema must be a dict"):
             tool.validate()
 
     def test_invalid_output_schema_fails(self):
         """Tool with non-dict output_schema fails validation."""
         tool = _make_tool()
-        tool.output_schema = "not a dict"  # type: ignore
+        object.__setattr__(tool, "output_schema", cast(dict, "not a dict"))
         with pytest.raises(ValueError, match="output_schema must be a dict"):
             tool.validate()

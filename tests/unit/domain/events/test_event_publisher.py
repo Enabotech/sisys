@@ -1,6 +1,7 @@
 """Tests for event publisher and InMemoryEventBus (Story 1.2)."""
 
 import uuid
+from typing import cast
 
 import pytest
 
@@ -18,7 +19,7 @@ class TestEventPublisherInterface:
         from src.domain.events.publisher import EventPublisher
 
         with pytest.raises(TypeError):
-            EventPublisher()  # type: ignore
+            EventPublisher()
 
 
 class TestInMemoryEventBusPublish:
@@ -56,7 +57,7 @@ class TestInMemoryEventBusPublish:
         """Publishing None raises ValueError."""
         bus = InMemoryEventBus()
         with pytest.raises(ValueError, match="event must not be None"):
-            bus.publish(None)  # type: ignore
+            bus.publish(cast(DomainEvent, None))
 
 
 class TestInMemoryEventBusIdempotency:

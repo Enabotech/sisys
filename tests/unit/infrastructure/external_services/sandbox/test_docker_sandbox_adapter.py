@@ -1,6 +1,9 @@
 """Tests for DockerSandboxAdapter infrastructure implementation."""
 
 
+import logging
+from typing import cast
+
 import pytest
 
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import (
@@ -142,7 +145,7 @@ class TestDockerSandboxAdapter:
         mock_logger.debug = original_logger.debug
         mock_logger.error = original_logger.error
 
-        dsa_module.logger = mock_logger  # type: ignore
+        dsa_module.logger = cast(logging.Logger, mock_logger)
         try:
             with pytest.raises(ContainerStartError):
                 await adapter.start_container("session-exc")
@@ -170,7 +173,7 @@ class TestDockerSandboxAdapter:
         mock_logger.info = original_logger.info
         mock_logger.error = original_logger.error
 
-        dsa_module.logger = mock_logger  # type: ignore
+        dsa_module.logger = cast(logging.Logger, mock_logger)
         try:
             with pytest.raises(ExecutionError):
                 await adapter.execute_code("session-exc", "print('test')")
@@ -198,7 +201,7 @@ class TestDockerSandboxAdapter:
         mock_logger.debug = original_logger.debug
         mock_logger.error = original_logger.error
 
-        dsa_module.logger = mock_logger  # type: ignore
+        dsa_module.logger = cast(logging.Logger, mock_logger)
         try:
             with pytest.raises(ContainerStopError):
                 await adapter.stop_container("session-stop")

@@ -67,7 +67,7 @@ class TestObjectStorageRepositoryIsAbstract:
         from src.domain.repositories.storage import ObjectStorageRepository
 
         with pytest.raises(TypeError):
-            ObjectStorageRepository()  # type: ignore[abstract]
+            ObjectStorageRepository()
 
 
 class TestComplianceLockErrorInDomain:

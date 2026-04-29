@@ -60,7 +60,7 @@ class TestGraphManagerInterface:
         from src.domain.repositories.graph_storage import GraphManager
 
         with pytest.raises(TypeError):
-            GraphManager()  # type: ignore[abstract]
+            GraphManager()
 
 
 class TestGraphStorageInterface:
@@ -89,7 +89,7 @@ class TestGraphStorageInterface:
         from src.domain.repositories.graph_storage import GraphStorage
 
         with pytest.raises(TypeError):
-            GraphStorage()  # type: ignore[abstract]
+            GraphStorage()
 
 
 class TestInfrastructureImplementsInterface:

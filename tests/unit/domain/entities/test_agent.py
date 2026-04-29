@@ -1,6 +1,7 @@
 """Tests for Agent domain entity."""
 
 import uuid
+from typing import cast
 
 import pytest
 
@@ -46,7 +47,7 @@ class TestAgentValidation:
     def test_invalid_id_fails(self):
         """Agent with non-UUID id fails validation."""
         agent = _make_agent()
-        agent.agent_id = "not-a-uuid"  # type: ignore
+        object.__setattr__(agent, "agent_id", cast(uuid.UUID, "not-a-uuid"))
         with pytest.raises(ValueError, match="agent_id must be a valid UUID"):
             agent.validate()
 
@@ -59,7 +60,7 @@ class TestAgentValidation:
     def test_invalid_role_fails(self):
         """Agent with non-AgentRole role fails validation."""
         agent = _make_agent()
-        agent.role = "invalid_role"  # type: ignore
+        object.__setattr__(agent, "role", cast(AgentRole, "invalid_role"))
         with pytest.raises(ValueError, match="role must be a valid AgentRole"):
             agent.validate()
 

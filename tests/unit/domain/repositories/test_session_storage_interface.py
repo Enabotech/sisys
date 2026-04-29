@@ -57,6 +57,5 @@ class TestSessionStorageInterface:
         """SessionStorage 是 Protocol，不能直接实例化。"""
         # Protocol 不应能直接实例化（运行时不报错但类型检查会警告）
         # 这里只验证它是 Protocol 类型
-        from typing import Protocol
-
-        assert issubclass(SessionStorage, Protocol)  # type: ignore[arg-type]
+        # Protocol classes have _is_protocol flag
+        assert getattr(SessionStorage, "_is_protocol", False) is True

@@ -1,6 +1,7 @@
 """Tests for EventStore and InMemoryEventStore (Story 1.2)."""
 
 import uuid
+from typing import cast
 
 import pytest
 
@@ -16,7 +17,7 @@ class TestEventStoreInterface:
     def test_cannot_instantiate_abstract_store(self):
         """Cannot instantiate EventStore directly (ABC)."""
         with pytest.raises(TypeError):
-            EventStore()  # type: ignore
+            EventStore()
 
 
 class TestInMemoryEventStoreSave:
@@ -27,7 +28,7 @@ class TestInMemoryEventStoreSave:
         store = InMemoryEventStore()
         event = DocumentProcessed(document_id=uuid.uuid4())
         store.save_events([event])
-        retrieved = store.get_events(event.aggregate_id)  # type: ignore
+        retrieved = store.get_events(cast(uuid.UUID, event.aggregate_id))
         assert len(retrieved) == 1
         assert retrieved[0].event_id == event.event_id
 

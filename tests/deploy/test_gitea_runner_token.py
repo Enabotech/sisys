@@ -7,6 +7,7 @@ Test Gitea Runner Token Configuration.
 import base64
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -89,7 +90,7 @@ class TestKubernetesSecretStorage:
         """测试 Secret YAML 结构。"""
         token_value = "test_token_12345"
 
-        secret_yaml = {
+        secret_yaml: dict[str, Any] = {
             "apiVersion": "v1",
             "kind": "Secret",
             "metadata": {
@@ -105,8 +106,8 @@ class TestKubernetesSecretStorage:
         # 验证 Secret 结构
         assert secret_yaml["apiVersion"] == "v1"
         assert secret_yaml["kind"] == "Secret"
-        assert secret_yaml["metadata"]["name"] == "gitea-runner-token"  # type: ignore[index]
-        assert secret_yaml["metadata"]["namespace"] == "gitea-actions"  # type: ignore[index]
+        assert secret_yaml["metadata"]["name"] == "gitea-runner-token"
+        assert secret_yaml["metadata"]["namespace"] == "gitea-actions"
         assert secret_yaml["type"] == "Opaque"
         assert "token" in secret_yaml["data"]
 

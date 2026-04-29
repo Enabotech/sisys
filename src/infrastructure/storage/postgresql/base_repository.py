@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,9 +41,7 @@ class BaseRepository(Generic[T]):
         Returns:
             实体实例，如果不存在则返回 None
         """
-        result = await self._session.execute(
-            select(self._model_class).where(self._model_class.id == id)  # type: ignore[attr-defined]
-        )
+        result = await self._session.execute(select(self._model_class).where(cast(Any, self._model_class).id == id))
         return result.scalar_one_or_none()
 
     async def save(self, entity: T) -> T:

@@ -180,7 +180,7 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
     # RabbitMQ 清理
     try:
-        import pika  # type: ignore[import-not-found]
+        import pika
 
         credentials = pika.PlainCredentials("guest", "guest")
         parameters = pika.ConnectionParameters(host="localhost", port=5672, credentials=credentials)

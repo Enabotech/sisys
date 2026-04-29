@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 
@@ -158,6 +158,6 @@ class RedisEventSubscriber:
         self._handlers.clear()
         self._error_handlers.clear()
         if self._pool:
-            await self._pool.aclose()  # type: ignore[attr-defined]
+            await cast(Any, self._pool).aclose()
             self._pool = None
         logger.info("RedisEventSubscriber closed")

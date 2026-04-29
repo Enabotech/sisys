@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 from unittest.mock import MagicMock
 
-from src.domain.services.udmr_router import UDMRouter
+from src.domain.services.udmr_router import HealthChecker, UDMRouter
 from src.domain.value_objects.routing_decision import RoutingDecision
 from src.infrastructure.routing.fallback_router import FallbackRouter
 
@@ -18,7 +19,7 @@ class TestUDMRIntegration:
         router = UDMRouter()
         mock_health = MagicMock()
         mock_health.check.return_value = True
-        router._health_checker = mock_health  # type: ignore
+        router._health_checker = cast(HealthChecker | None, mock_health)
 
         task_context = {
             "task_id": "integration-001",
@@ -36,7 +37,7 @@ class TestUDMRIntegration:
         router = UDMRouter()
         mock_health = MagicMock()
         mock_health.check.return_value = False
-        router._health_checker = mock_health  # type: ignore
+        router._health_checker = cast(HealthChecker | None, mock_health)
 
         task_context = {
             "task_id": "integration-002",
