@@ -81,7 +81,7 @@ class AutoRouteService:
         self._hash_router = hash_router
         self._semantic_router = semantic_router
 
-    async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted | None:
+    async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
         """Handle a AutoTriggered event: make routing decision and emit AutoRouted.
 
         Args:

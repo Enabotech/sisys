@@ -13,6 +13,7 @@ Prerequisites:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 import uuid
@@ -105,10 +106,18 @@ def heartbeat_scheduler(
     redis_publisher: RedisEventPublisher,
 ) -> HeartbeatScheduler:
     """HeartbeatScheduler instance with real publisher for acceptance testing."""
+
+    def publish_heartbeat(event: HeartbeatTriggered) -> asyncio.Future[Any]:
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        asyncio.ensure_future(redis_publisher.publish(event))
+        future.set_result(None)
+        return future
+
     return HeartbeatScheduler(
         redis_config=redis_config,
         interval_seconds=60,
-        publisher=redis_publisher,
+        publisher=publish_heartbeat,
     )
 
 
@@ -283,6 +292,7 @@ def when_trigger_service_receives_event(
 ) -> None:
     """TriggerService listens and receives the event."""
     event = context.get("event")
+    assert event is not None
     result = event_loop.run_until_complete(trigger_service.on_domain_event(event))
     context["triggered_event"] = result
 
@@ -295,6 +305,7 @@ def when_trigger_service_processes_event(
 ) -> None:
     """TriggerService processes the event."""
     event = context.get("event")
+    assert event is not None
     result = event_loop.run_until_complete(trigger_service.on_domain_event(event))
     context["triggered_event"] = result
 
@@ -644,6 +655,7 @@ def when_trigger_service_parses_event(
 ) -> None:
     """TriggerService parses the event."""
     event = context.get("event")
+    assert event is not None
     context_data = trigger_service.extract_context(event)
     context["extracted_context"] = context_data
 
@@ -728,6 +740,7 @@ def when_trigger_service_extracts_context(
 ) -> None:
     """TriggerService extracts context from event."""
     event = context.get("event")
+    assert event is not None
     context_data = trigger_service.extract_context(event)
     context["extracted_context"] = context_data
 
@@ -765,17 +778,20 @@ def then_extract_timestamp(context: dict) -> None:
     assert context_data.timestamp is not None
 
 
+_HEARTBEAT_TEST_UUID = uuid.UUID("00000000-0000-0000-0000-000000000123")
+
+
 @given("系统接收到 HeartbeatTriggered 事件（heartbeat_id: hb-123, wake_reason: user_request）")
 def given_heartbeat_event_with_context(context: dict) -> None:
     """System receives HeartbeatTriggered event with context."""
     event = HeartbeatTriggered(
-        heartbeat_id="hb-123",
+        heartbeat_id=_HEARTBEAT_TEST_UUID,
         wake_reason="user_request",
         todo_items=(),
         cost_budget=0.0,
     )
     context["event"] = event
-    context["heartbeat_id"] = "hb-123"
+    context["heartbeat_id"] = str(_HEARTBEAT_TEST_UUID)
     context["wake_reason"] = "user_request"
 
 
@@ -801,8 +817,9 @@ def then_task_context_contains_heartbeat_fields(context: dict) -> None:
     context_data = context.get("extracted_context")
     assert context_data is not None
     task_ctx = context_data.task_context
-    assert task_ctx.get("heartbeat_id") == "hb-123"
-    assert task_ctx.get("wake_reason") == "user_request"
+    # heartbeat_id is stored as string representation of UUID
+    assert task_ctx.get("heartbeat_id") == context.get("heartbeat_id")
+    assert task_ctx.get("wake_reason") == context.get("wake_reason")
 
 
 # ===================================================================

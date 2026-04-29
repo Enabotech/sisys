@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import inspect
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -162,10 +163,17 @@ class TestRouteHexagonalArchitecture:
 
         # Try importing route service - should not raise circular dependency error
         try:
-            from src.domain.events.auto_route_events import AutoRouted
-            from src.domain.services.auto_route_service import AutoRouteService
-            from src.infrastructure.routing.hash_router import HashRouter
-            from src.infrastructure.routing.semantic_router import SemanticRouter
+            import importlib.util
+
+            for module_name in [
+                "src.domain.events.auto_route_events",
+                "src.domain.services.auto_route_service",
+                "src.infrastructure.routing.hash_router",
+                "src.infrastructure.routing.semantic_router",
+            ]:
+                spec = importlib.util.find_spec(module_name)
+                if spec is None:
+                    pytest.fail(f"Module {module_name} not found")
         except ImportError as e:
             if "circular" in str(e).lower():
                 pytest.fail(f"Circular dependency detected: {e}")
@@ -193,7 +201,7 @@ class TestRouteHexagonalArchitecture:
         from src.domain.entities.routing_decision_log import RoutingDecisionLog
 
         log = RoutingDecisionLog(
-            log_id=None,
+            log_id=uuid4(),
             task_id="test",
             session_id="test",
             route_type="hash",
@@ -231,8 +239,8 @@ class TestRouteDecoupling:
         assert hasattr(AutoRouteService, "_publish"), "AutoRouteService should have _publish method"
 
         # on_triggered_event should return AutoRouted, not execute anything
-        sig = inspect.signature(AutoRouteService.on_triggered_event)
-        # Should return AutoRouted | None
+        _sig = inspect.signature(AutoRouteService.on_triggered_event)
+        # Should return AutoRouted
         # Should not have side effects beyond publishing
 
     def test_auto_routed_event_does_not_reference_execute(self) -> None:

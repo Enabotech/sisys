@@ -14,7 +14,7 @@ Test Isolation:
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -72,10 +72,12 @@ def given_user_logged_in(context: dict[str, Any]):
 def given_mfa_enabled(context: dict[str, Any]):
     """Setup MFA enabled user."""
     # Use existing mfa_service from context, don't create new one
-    mfa_service: MFAService = context.get("mfa_service")
+    mfa_service = context.get("mfa_service")
     if mfa_service is None:
         mfa_service = MFAService()
         context["mfa_service"] = mfa_service
+    else:
+        mfa_service = cast(MFAService, mfa_service)
 
     # Ensure user_id is consistent
     if "user_id" not in context:
@@ -92,10 +94,12 @@ def given_mfa_enabled(context: dict[str, Any]):
 def given_mfa_challenge_created(context: dict[str, Any]):
     """Setup MFA challenge created."""
     # Use existing mfa_service from context, don't create new one
-    mfa_service: MFAService = context.get("mfa_service")
+    mfa_service = context.get("mfa_service")
     if mfa_service is None:
         mfa_service = MFAService()
         context["mfa_service"] = mfa_service
+    else:
+        mfa_service = cast(MFAService, mfa_service)
 
     # Ensure user_id is consistent with other steps
     if "user_id" not in context:
@@ -262,9 +266,9 @@ def then_user_can_scan_qr_code(context: dict[str, Any]):
 @then("系统验证 MFA 设置成功")
 def then_system_verifies_mfa_setup_success(context: dict[str, Any]):
     """System verifies MFA setup success."""
-    mfa_service: MFAService = context.get("mfa_service")
-    user_id = context.get("user_id")
-    setup_result = context.get("mfa_setup_result")
+    mfa_service = cast(MFAService, context.get("mfa_service"))
+    user_id = cast(uuid.UUID, context.get("user_id"))
+    setup_result = cast(Any, context.get("mfa_setup_result"))
 
     # Generate a valid TOTP code
     generator = TOTPGenerator()
@@ -279,7 +283,7 @@ def then_system_verifies_mfa_setup_success(context: dict[str, Any]):
 @when("用户提交 TOTP 验证码")
 def when_user_submits_totp_code(context: dict[str, Any]):
     """User submits TOTP code."""
-    mfa_service: MFAService = context.get("mfa_service")
+    mfa_service = cast(MFAService, context.get("mfa_service"))
     user_id = context.get("user_id", uuid.uuid4())
     mfa_secret = context.get("mfa_secret")
 
@@ -294,7 +298,7 @@ def when_user_submits_totp_code(context: dict[str, Any]):
     # Generate a valid TOTP code
     generator = TOTPGenerator()
     counter = TOTPGenerator.get_current_counter(30)
-    code = generator.generate(mfa_secret, counter)
+    code = generator.generate(cast(str, mfa_secret), counter)
 
     context["submitted_code"] = code
     context["verification_result"] = mfa_service.verify_challenge(challenge_id, code)
@@ -319,8 +323,8 @@ def then_verification_allows_continuation(context: dict[str, Any]):
 @when("用户提交错误验证码")
 def when_user_submits_invalid_code(context: dict[str, Any]):
     """User submits invalid TOTP code."""
-    mfa_service: MFAService = context.get("mfa_service")
-    challenge_id = context.get("challenge_id")
+    mfa_service = cast(MFAService, context.get("mfa_service"))
+    challenge_id = cast(uuid.UUID, context.get("challenge_id"))
 
     # Use an invalid code to simulate wrong code
     invalid_code = "000000"
@@ -384,7 +388,7 @@ def then_detector_marks_sql_injection(context: dict[str, Any]):
 @then("系统记录安全事件")
 def then_system_records_security_event(context: dict[str, Any]):
     """System records security event."""
-    detector: IntrusionDetector = context.get("intrusion_detector")
+    detector = cast(IntrusionDetector, context.get("intrusion_detector"))
     attacks = context.get("detected_attacks", [])
     content = context.get("attack_content", "")
 
@@ -545,9 +549,9 @@ def then_system_returns_hash(context: dict[str, Any]):
 @then("后续可以验证数据未被篡改")
 def then_data_can_be_verified(context: dict[str, Any]):
     """Data can be verified against tampering."""
-    verifier: IntegrityVerifier = context.get("integrity_verifier", IntegrityVerifier())
+    verifier = context.get("integrity_verifier", IntegrityVerifier())
     data = context.get("test_data", b"Test data")
-    stored_hash = context.get("hash_sha256")
+    stored_hash = cast(str, context.get("hash_sha256"))
 
     is_valid = verifier.verify_hash(data, stored_hash, HashAlgorithm.SHA256)
     assert is_valid is True
@@ -578,9 +582,9 @@ def then_system_returns_signature(context: dict[str, Any]):
 @then("验证方可以使用公钥验证签名")
 def then_verifier_can_verify_signature(context: dict[str, Any]):
     """Verifier can verify signature with public key."""
-    sig_service: SignatureService = context.get("sig_service", SignatureService())
+    sig_service = context.get("sig_service", SignatureService())
     data = context.get("test_data", b"Test data")
-    signature = context.get("signature")
+    signature = cast(str, context.get("signature"))
 
     is_valid = sig_service.verify(data, signature)
     assert is_valid is True
@@ -604,8 +608,8 @@ def when_system_signs_data_with_timestamp(context: dict[str, Any]):
 @then("验证方可以确认数据未被篡改且时间有效")
 def then_verifier_confirms_integrity_and_time(context: dict[str, Any]):
     """Verifier confirms data integrity and timestamp."""
-    sig_service: SignatureService = context.get("sig_service", SignatureService())
-    signed_result = context.get("timestamped_signature")
+    sig_service = context.get("sig_service", SignatureService())
+    signed_result = cast(dict[str, Any], context.get("timestamped_signature"))
 
     is_valid = sig_service.verify_data_with_timestamp(signed_result)
     assert is_valid is True
@@ -646,7 +650,7 @@ def given_admin_requests_backup(context: dict[str, Any]):
 @then("系统创建完整数据备份")
 def then_system_creates_full_backup(context: dict[str, Any]):
     """System creates complete data backup."""
-    record: BackupRecord = context.get("backup_record")
+    record = cast(BackupRecord, context.get("backup_record"))
     assert record is not None
     assert record.backup_type == BackupType.FULL
 
@@ -654,7 +658,7 @@ def then_system_creates_full_backup(context: dict[str, Any]):
 @then("备份包含校验和用于验证")
 def then_backup_includes_checksum(context: dict[str, Any]):
     """Backup includes checksum for verification."""
-    record: BackupRecord = context.get("backup_record")
+    record = cast(BackupRecord, context.get("backup_record"))
     assert record is not None
     assert record.checksum is not None
     assert len(record.checksum) > 0
@@ -684,7 +688,7 @@ def when_admin_requests_incremental_backup(context: dict[str, Any]):
 @then("系统仅备份自上次备份以来的变更")
 def then_system_backups_only_changes(context: dict[str, Any]):
     """System backs up only changes since last backup."""
-    record: BackupRecord = context.get("incremental_record")
+    record = cast(BackupRecord, context.get("incremental_record"))
     assert record is not None
     assert record.backup_type == BackupType.INCREMENTAL
     assert record.base_backup_id is not None
@@ -693,7 +697,7 @@ def then_system_backups_only_changes(context: dict[str, Any]):
 @then("增量备份链接到基础全量备份")
 def then_incremental_links_to_full(context: dict[str, Any]):
     """Incremental backup links to base full backup."""
-    record: BackupRecord = context.get("incremental_record")
+    record = cast(BackupRecord, context.get("incremental_record"))
     base_id = context.get("full_backup_id")
     assert record is not None
     assert record.base_backup_id == base_id
@@ -736,9 +740,9 @@ def when_admin_requests_point_in_time_restore(context: dict[str, Any]):
     """Admin requests point-in-time restore."""
     import asyncio
 
-    recovery_service: RecoveryService = context.get("recovery_service")
+    recovery_service = cast(RecoveryService, context.get("recovery_service"))
 
-    full_backup_id = context.get("full_backup_id")
+    full_backup_id = cast(uuid.UUID, context.get("full_backup_id"))
 
     # Use recover_incremental_chain for point-in-time restore
     # This restores both full and all incremental backups in order

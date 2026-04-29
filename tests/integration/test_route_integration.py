@@ -439,11 +439,6 @@ async def test_hash_router_node_rebalancing(
     """Test hash router node add/remove rebalancing."""
     # Start with 2 nodes
     router = HashRouter(nodes=["node-A", "node-B"])
-    service = AutoRouteService(
-        publisher=redis_publisher,
-        hash_router=router,
-        semantic_router=None,
-    )
 
     # Route 50 sessions
     sessions_before = [f"rebalance-test-{i}" for i in range(50)]

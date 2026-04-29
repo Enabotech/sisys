@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import time
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +76,7 @@ def redis_config() -> RedisConfig:
 
 
 @pytest.fixture
-def real_redis(redis_test_prefix: str) -> redis.Redis:
+def real_redis(redis_test_prefix: str) -> Generator[redis.Redis, None, None]:
     """Provide real Redis client. Skip if not available."""
     try:
         client = redis.Redis(
@@ -98,7 +98,7 @@ def real_redis(redis_test_prefix: str) -> redis.Redis:
 
 
 @pytest.fixture
-def sandbox() -> DockerSandboxAdapter:
+def sandbox() -> Generator[DockerSandboxAdapter, None, None]:
     """Create DockerSandboxAdapter for testing."""
     adapter = DockerSandboxAdapter()
     yield adapter
@@ -143,7 +143,7 @@ async def async_redis_client() -> AsyncGenerator[redis.asyncio.Redis, None]:
         )
         await client.ping()
         yield client
-        await client.aclose()
+        await client.close()
     except redis.ConnectionError:
         pytest.skip("Redis not available")
 
@@ -551,6 +551,7 @@ def then_original_state_restored(context: dict) -> None:
     original = context.get("original_snapshot")
 
     assert restored is not None, "Snapshot should be restored"
+    assert original is not None, "Original snapshot should exist"
     assert restored.session_id == original.session_id
     assert restored.state_data.get("original_key") == "original_value"
 
@@ -606,6 +607,7 @@ def then_new_snapshot_version_is_2(context: dict) -> None:
     existing = context.get("existing_snapshot")
 
     assert new_snapshot is not None
+    assert existing is not None
     assert new_snapshot.state_version == existing.state_version + 1
 
 
@@ -904,6 +906,7 @@ def then_should_use_protocol_not_implementation(context: dict) -> None:
     """Verify protocol is used instead of concrete implementation."""
     # Check that __init__ accepts Protocol, not concrete DockerSandboxAdapter
     sig = context.get("execute_service_init_signature")
+    assert sig is not None
     params = sig.parameters
 
     # sandbox parameter should be type-hinted as Protocol or base type
@@ -914,6 +917,7 @@ def then_should_use_protocol_not_implementation(context: dict) -> None:
 def then_should_use_snapshot_repo_protocol(context: dict) -> None:
     """Verify SnapshotRepositoryProtocol is used."""
     sig = context.get("execute_service_init_signature")
+    assert sig is not None
     params = sig.parameters
 
     assert "snapshot_repo" in params or len(params) >= 3
