@@ -907,6 +907,6 @@ sisys/
 
 | 文件 | 修改 |
 |------|------|
-| `tests/integration_real/test_postgresql_real_integration.py` | `engine.close()` → `await engine.close()`（close 是 async 方法） |
+| `tests/integration/test_postgresql_real_integration.py` | `engine.close()` → `await engine.close()`（close 是 async 方法） |
 
 **测试结果：** 1353 passed, 0 warnings

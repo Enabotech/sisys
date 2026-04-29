@@ -91,7 +91,7 @@ class TestCIPipeline:
         assert "security-scan" in jobs
 
         security_scan = jobs["security-scan"]
-        assert security_scan["name"] == "🔒 安全扫描"
+        assert security_scan["name"] == "🛡️ 安全扫描"
 
         # 检查步骤
         steps = [s["name"] for s in security_scan["steps"]]

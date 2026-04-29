@@ -4,7 +4,7 @@
 使用真实的 Neo4j 部署（localhost:7687），不使用 mock。
 
 运行方式:
-    pytest tests/integration_real/test_neo4j_real_integration.py -v
+    pytest tests/integration/test_neo4j_real_integration.py -v
 
 前置条件:
     - Neo4j 服务已部署并运行在 localhost:7687

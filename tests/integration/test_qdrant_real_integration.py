@@ -4,7 +4,7 @@
 使用真实的 Qdrant 部署（localhost:6333），不使用 mock。
 
 运行方式:
-    pytest tests/integration_real/test_qdrant_real_integration.py -v
+    pytest tests/integration/test_qdrant_real_integration.py -v
 
 前置条件:
     - Qdrant 服务已部署并运行在 localhost:6333

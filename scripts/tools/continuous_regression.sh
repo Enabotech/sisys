@@ -48,7 +48,7 @@ while [[ $stop_flag -eq 0 ]]; do
     poetry run pytest tests/acceptance tests/unit -n 1 -v > "$LOG_DIR/run1.log" 2>&1 &
     PID1=$!
 
-    poetry run pytest tests/unit tests/integration_real/ tests/acceptance -n 2 -v > "$LOG_DIR/run2.log" 2>&1 &
+    poetry run pytest tests/unit tests/integration/ tests/acceptance -n 2 -v > "$LOG_DIR/run2.log" 2>&1 &
     PID2=$!
 
     poetry run pytest tests/integration tests/unit tests/acceptance -n 1 -v > "$LOG_DIR/run3.log" 2>&1 &
