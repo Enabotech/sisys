@@ -575,6 +575,7 @@ class BackupRecord:
     location: str = ""  # MinIO/S3 location path
     user_id: UUID = field(default_factory=uuid4)
     description: str = ""
+    base_backup_id: UUID | None = None  # For incremental backups, reference to base full backup
 
     def duration_seconds(self) -> float | None:
         """Calculate backup duration in seconds.

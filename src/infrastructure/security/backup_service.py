@@ -155,6 +155,7 @@ class BackupService:
             status=BackupStatus.IN_PROGRESS,
             user_id=user_id,
             description=description or "Incremental backup",
+            base_backup_id=base_backup_id,
         )
 
         # In production: perform actual incremental backup

@@ -795,6 +795,7 @@ sisys/
 - `src/infrastructure/security/recovery_service.py` - 恢复服务（AC-6）
 - `src/infrastructure/security/integrity_service.py` - 完整性验证/数字签名（AC-5）
 - `src/infrastructure/security/encryption_service.py` - 密码哈希+AES-256加密（完善AC-5）
+- `src/infrastructure/security/compliance_service.py` - 合规报告服务（AC-7）
 - `src/infrastructure/config/equilibrium.py` - 等保配置（Task 13）
 - `src/interfaces/cli/equilibrium_commands.py` - CLI 命令（Task 13）
 - `src/interfaces/api/equilibrium_endpoints.py` - API 端点模型（Task 13）
