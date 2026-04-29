@@ -134,8 +134,8 @@ class AutoRouteService:
         # Determine final route type and target
         if hash_target and semantic_target:
             # In mixed mode, prefer semantic routing (more intelligent matching)
-            # when it returns a valid target with meaningful score
-            if semantic_score > 0:
+            # when it returns a valid target
+            if semantic_target:
                 route_type = "mixed"
                 route_target = semantic_target
                 route_score = semantic_score
