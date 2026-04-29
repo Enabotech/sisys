@@ -2,10 +2,12 @@
 
 > 基于 SISYS 双通道架构（Redis + RabbitMQ）的事件发布统一抽象
 
-**文档版本**: 1.1.0
+**文档版本**: 1.2.0
 **创建日期**: 2026-04-29
 **状态**: 设计方案（待评审）
-**变更记录**: v1.1.0 修复异常处理、死信队列、测试隔离等 P0 问题
+**变更记录**:
+- v1.2.0: 修复未注册事件警告、添加并行发布选项、健康检查、死信重试
+- v1.1.0: 修复异常处理、死信队列、测试隔离等 P0 问题
 
 ---
 
@@ -58,7 +60,7 @@ SISYS 采用双通道事件发布架构：
 │         ┌────────────────────┴────────────────────┐               │
 │         ▼                                         ▼               │
 │  ┌─────────────────┐                   ┌─────────────────┐       │
-│  │ RedisEventBus   │                   │ RabbitMQEventBus │       │
+│  │  Redis Channel   │                   │ RabbitMQ Channel │       │
 │  │  (实时通道)      │                   │  (可靠通道)       │       │
 │  └────────┬────────┘                   └────────┬────────┘       │
 │           │                                     │                │
@@ -70,12 +72,15 @@ SISYS 采用双通道事件发布架构：
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+**说明**：`RedisEventBus` 和 `RabbitMQEventBus` 是逻辑通道抽象，非独立类。
+
 ### 2.2 核心接口
 
 ```python
 """EventBus — 统一事件发布抽象。
 
-v1.1.0 修复：
+v1.2.0 修复：
+- 添加健康检查接口
 - DeliveryMode 移至本模块，与 EventBus 同一抽象层次
 - 所有异常在内部处理，不向上传播
 """
@@ -138,6 +143,14 @@ class EventBus(ABC):
         """关闭事件总线，释放资源。"""
         ...
 
+    async def health_check(self) -> dict[str, bool]:
+        """检查事件总线健康状态。
+
+        Returns:
+            dict: 各通道健康状态 {"redis": bool, "rabbitmq": bool}
+        """
+        return {"redis": True, "rabbitmq": True}
+
 
 @dataclass(frozen=True)
 class PublishResult:
@@ -160,6 +173,11 @@ class PublishResult:
     @property
     def is_full_failure(self) -> bool:
         return not self.redis_success and not self.rabbitmq_success
+
+    @property
+    def is_untried(self) -> bool:
+        """Redis 和 RabbitMQ 都未尝试（通道未配置）。"""
+        return not self.redis_success and not self.rabbitmq_success and self.redis_error is None and self.rabbitmq_error is None
 ```
 
 ### 2.3 事件通道注册表
@@ -167,7 +185,7 @@ class PublishResult:
 ```python
 """事件通道配置 — 定义每个事件类型的通道映射和默认投递模式。
 
-v1.1.0 修复：
+v1.2.0 修复：
 - 添加 reset_for_testing() 支持测试隔离
 - 不再使用可变单例存储运行时覆盖，改为每次获取时检查
 """
@@ -215,7 +233,7 @@ class EventChannelRegistry:
     管理所有事件类型的通道映射配置。
     支持配置文件加载和运行时覆盖。
 
-    v1.1.0 修复：
+    v1.2.0 修复：
     - 移除可变单例状态，改为每次创建新实例或显式注入
     - 添加 reset_for_testing() 支持测试隔离
     """
@@ -351,10 +369,12 @@ class EventChannelRegistry:
 ```python
 """DualChannelEventBus — 双通道事件总线实现。
 
-v1.1.0 修复：
+v1.2.0 修复：
 - _do_publish_redis/_do_publish_rabbitmq 添加完整异常处理
 - _get_redis_channel 返回 str | None，正确处理 RELIABLE_ONLY 事件
 - 所有 publish 方法内部消化异常，不向上传播
+- 添加未注册事件警告日志
+- 添加并行发布选项和健康检查
 """
 
 from __future__ import annotations
@@ -383,9 +403,11 @@ class DualChannelEventBus(EventBus):
     - 错误隔离（某通道失败不影响另一通道）
     - 死信队列降级
 
-    v1.1.0 修复：
+    v1.2.0 修复：
     - 所有异常在内部处理，返回 PublishResult 体现各通道状态
     - 不再有异常向上传播
+    - 添加未注册事件警告
+    - 添加健康检查和并行发布选项
     """
 
     def __init__(
@@ -412,12 +434,14 @@ class DualChannelEventBus(EventBus):
         self,
         event: DomainEvent,
         delivery_mode: DeliveryMode | None = None,
+        parallel: bool = False,
     ) -> PublishResult:
         """发布事件到指定通道。
 
         Args:
             event: 领域事件
             delivery_mode: 投递模式，默认根据事件类型自动选择
+            parallel: 是否并行发布两个通道（默认 False，串行发布）
 
         Returns:
             PublishResult: 发布结果（所有异常内部消化）
@@ -426,10 +450,11 @@ class DualChannelEventBus(EventBus):
         mode = delivery_mode or self._registry.get_delivery_mode(event.event_type)
 
         logger.debug(
-            "Publishing event %s (type=%s) with mode=%s",
+            "Publishing event %s (type=%s) with mode=%s, parallel=%s",
             event.event_id,
             event.event_type,
-            mode.value
+            mode.value,
+            parallel
         )
 
         # 根据模式分发
@@ -438,7 +463,7 @@ class DualChannelEventBus(EventBus):
         elif mode == DeliveryMode.RELIABLE_ONLY:
             return await self._publish_rabbitmq_only(event)
         elif mode == DeliveryMode.BOTH:
-            return await self._publish_both(event)
+            return await self._publish_both(event, parallel=parallel)
         else:
             raise ValueError(f"Unknown delivery mode: {mode}")
 
@@ -500,11 +525,29 @@ class DualChannelEventBus(EventBus):
                 rabbitmq_error=str(e),
             )
 
-    async def _publish_both(self, event: DomainEvent) -> PublishResult:
-        """同时发布到两个通道。"""
-        # 并行发布（内部已处理异常）
-        redis_success, redis_error = await self._do_publish_redis(event)
-        rabbitmq_success, rabbitmq_error = await self._do_publish_rabbitmq(event)
+    async def _publish_both(self, event: DomainEvent, parallel: bool = False) -> PublishResult:
+        """同时发布到两个通道。
+
+        Args:
+            event: 领域事件
+            parallel: 是否并行发布（默认 False）
+
+        Note:
+            串行发布（parallel=False）：先发 Redis（更快），再发 RabbitMQ（更可靠）。
+            串行可更快返回，但总延迟 = Redis延迟 + RabbitMQ延迟。
+            并行发布（parallel=True）：同时发两个通道。
+            并行总延迟 = max(Redis延迟, RabbitMQ延迟)，但更耗资源。
+        """
+        if parallel:
+            # 并行发布
+            redis_task = asyncio.create_task(self._do_publish_redis(event))
+            rabbitmq_task = asyncio.create_task(self._do_publish_rabbitmq(event))
+            redis_success, redis_error = await redis_task
+            rabbitmq_success, rabbitmq_error = await rabbitmq_task
+        else:
+            # 串行发布（默认）
+            redis_success, redis_error = await self._do_publish_redis(event)
+            rabbitmq_success, rabbitmq_error = await self._do_publish_rabbitmq(event)
 
         result = PublishResult(
             event_id=str(event.event_id),
@@ -567,15 +610,24 @@ class DualChannelEventBus(EventBus):
     def _get_redis_channel(self, event: DomainEvent) -> str | None:
         """获取 Redis 通道名。
 
-        v1.1.0 修复：正确处理 RELIABLE_ONLY 事件（不应回退到默认通道）
+        v1.2.0 修复：
+        - 正确处理 RELIABLE_ONLY 事件（不应回退到默认通道）
+        - 未注册事件类型记录警告日志
         """
         mapping = self._registry.get(event.event_type)
-        if mapping and mapping.redis_channel:
-            return mapping.redis_channel
-
-        # 如果事件配置为仅可靠传输，不应回退到默认 Redis 通道
-        if mapping and mapping.default_delivery_mode == DeliveryMode.RELIABLE_ONLY:
-            return None
+        if mapping:
+            if mapping.redis_channel:
+                return mapping.redis_channel
+            # 如果事件配置为仅可靠传输，不应回退到默认 Redis 通道
+            if mapping.default_delivery_mode == DeliveryMode.RELIABLE_ONLY:
+                return None
+        else:
+            # 未注册的事件类型，记录警告并使用默认格式
+            logger.warning(
+                "No channel mapping registered for event type: %s, "
+                "using default Redis channel (this may indicate a configuration issue)",
+                event.event_type
+            )
 
         # 无映射时使用默认格式（向后兼容）
         return f"rt:{event.event_type}"
@@ -595,6 +647,82 @@ class DualChannelEventBus(EventBus):
         import re
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+    async def health_check(self) -> dict[str, bool]:
+        """检查事件总线健康状态。
+
+        Returns:
+            dict: 各通道健康状态 {"redis": bool, "rabbitmq": bool}
+        """
+        redis_healthy = await self._check_redis()
+        rabbitmq_healthy = await self._check_rabbitmq()
+
+        return {
+            "redis": redis_healthy,
+            "rabbitmq": rabbitmq_healthy,
+        }
+
+    async def _check_redis(self) -> bool:
+        """检查 Redis 连接健康。"""
+        try:
+            # 简单 ping 检查
+            pool = self._redis._get_pool()
+            async with self._redis._pool.acquire() as client:
+                await client.ping()
+            return True
+        except Exception as e:
+            logger.warning("Redis health check failed: %s", e)
+            return False
+
+    async def _check_rabbitmq(self) -> bool:
+        """检查 RabbitMQ 连接健康。"""
+        if self._rabbitmq is None:
+            return False
+        try:
+            # 检查连接是否正常
+            return self._rabbitmq._connection is not None and not self._rabbitmq._connection.is_closed
+        except Exception as e:
+            logger.warning("RabbitMQ health check failed: %s", e)
+            return False
+
+    async def retry_dead_letters(self, max_retries: int = 3) -> list[PublishResult]:
+        """重试所有死信事件。
+
+        Args:
+            max_retries: 每个事件最大重试次数
+
+        Returns:
+            list[PublishResult]: 各事件的发布结果
+        """
+        if self._dlq is None:
+            logger.warning("No dead letter queue configured, skipping retry")
+            return []
+
+        results = []
+        pending_events = await self._dlq.read_pending(limit=100)
+
+        for event in pending_events:
+            for attempt in range(max_retries):
+                result = await self.publish(event)
+                if result.is_full_success:
+                    await self._dlq.delete(str(event.event_id))
+                    logger.info(
+                        "Dead letter retry succeeded for event %s after %d attempts",
+                        event.event_id,
+                        attempt + 1
+                    )
+                    break
+                else:
+                    logger.warning(
+                        "Dead letter retry failed for event %s (attempt %d/%d): %s",
+                        event.event_id,
+                        attempt + 1,
+                        max_retries,
+                        result.redis_error or result.rabbitmq_error
+                    )
+            results.append(result)
+
+        return results
 
     async def close(self) -> None:
         """关闭事件总线。"""
@@ -621,7 +749,7 @@ class DualChannelEventBus(EventBus):
 ```python
 """Dead Letter Queue — 本地死信队列实现。
 
-v1.1.0 修复：
+v1.2.0 修复：
 - 使用 aiofiles 实现异步文件 IO，避免阻塞事件循环
 - 添加 asyncio.to_thread() 包装同步文件操作
 """
@@ -645,7 +773,7 @@ class DeadLetterQueue:
     当所有通道都失败时，将事件写入本地文件。
     后续可配合 Story 1.5 的 RabbitMQ DLX 使用。
 
-    v1.1.0 修复：
+    v1.2.0 修复：
     - 使用 asyncio.to_thread() 包装同步文件 IO，避免阻塞事件循环
     """
 
@@ -903,7 +1031,7 @@ class EventBusConfigLoader:
 ```python
 """EventBus 依赖注入配置。
 
-v1.1.0 修复：
+v1.2.0 修复：
 - 添加 fixture_cleanup() 支持测试隔离
 - 移除全局单例工厂，改为依赖注入
 """
@@ -1013,8 +1141,11 @@ class EventBusProtocol(Protocol):
         self,
         event: DomainEvent,
         delivery_mode: DeliveryMode | None = None,
+        parallel: bool = False,
     ) -> PublishResult:
         ...
+
+    async def health_check(self) -> dict[str, bool]: ...
 
 
 class AutoRouteService:
@@ -1090,8 +1221,9 @@ class RedisPublisherAdapter:
         self,
         event: DomainEvent,
         delivery_mode: DeliveryMode | None = None,
+        parallel: bool = False,
     ) -> PublishResult:
-        """发布到 Redis（忽略 delivery_mode）。"""
+        """发布到 Redis（忽略 delivery_mode 和 parallel）。"""
         try:
             await self._publisher.publish(event)
             return PublishResult(
@@ -1110,6 +1242,9 @@ class RedisPublisherAdapter:
         if hasattr(self._publisher, 'close'):
             await self._publisher.close()
 
+    async def health_check(self) -> dict[str, bool]:
+        return {"redis": True, "rabbitmq": False}
+
 
 class RabbitMQPublisherAdapter:
     """将 RabbitMQPublisher 适配为 EventBus。"""
@@ -1121,6 +1256,7 @@ class RabbitMQPublisherAdapter:
         self,
         event: DomainEvent,
         delivery_mode: DeliveryMode | None = None,
+        parallel: bool = False,
     ) -> PublishResult:
         """发布到 RabbitMQ。"""
         try:
@@ -1141,6 +1277,9 @@ class RabbitMQPublisherAdapter:
         """关闭发布器。"""
         if hasattr(self._publisher, 'close'):
             await self._publisher.close()
+
+    async def health_check(self) -> dict[str, bool]:
+        return {"redis": False, "rabbitmq": True}
 ```
 
 ---
@@ -1152,7 +1291,7 @@ class RabbitMQPublisherAdapter:
 ```python
 """EventBus 单元测试。
 
-v1.1.0 修复：
+v1.2.0 修复：
 - 使用 EventChannelRegistry.create_for_testing() 确保测试隔离
 - 不依赖全局状态
 """
@@ -1178,6 +1317,7 @@ class TestDualChannelEventBus:
         redis = AsyncMock()
         redis.publish = AsyncMock(return_value=None)
         redis.close = AsyncMock()
+        redis._get_pool = MagicMock()
         return redis
 
     @pytest.fixture
@@ -1243,8 +1383,8 @@ class TestDualChannelEventBus:
         assert result.rabbitmq_success
         assert not result.redis_success  # 未尝试
 
-    async def test_publish_both(self, event_bus, mock_redis, mock_rabbitmq, routed_event, registry):
-        """双通道模式。"""
+    async def test_publish_both_sequential(self, event_bus, mock_redis, mock_rabbitmq, routed_event, registry):
+        """双通道串行模式（默认）。"""
         registry.register(EventChannelMapping(
             event_type="AutoRouted",
             redis_channel="rt:AutoRouted",
@@ -1252,12 +1392,37 @@ class TestDualChannelEventBus:
             default_delivery_mode=DeliveryMode.BOTH,
         ))
 
-        result = await event_bus.publish(routed_event, DeliveryMode.BOTH)
+        result = await event_bus.publish(routed_event, DeliveryMode.BOTH, parallel=False)
 
         assert mock_redis.publish.is_called
         assert mock_rabbitmq.async_publish.is_called
         assert result.redis_success
         assert result.rabbitmq_success
+
+    async def test_publish_both_parallel(self, event_bus, mock_redis, mock_rabbitmq, routed_event, registry):
+        """双通道并行模式。"""
+        registry.register(EventChannelMapping(
+            event_type="AutoRouted",
+            redis_channel="rt:AutoRouted",
+            rabbitmq_routing_key="sisys.events.reliable.auto_routed",
+            default_delivery_mode=DeliveryMode.BOTH,
+        ))
+
+        result = await event_bus.publish(routed_event, DeliveryMode.BOTH, parallel=True)
+
+        assert mock_redis.publish.is_called
+        assert mock_rabbitmq.async_publish.is_called
+        assert result.redis_success
+        assert result.rabbitmq_success
+
+    async def test_unregistered_event_warning(self, event_bus, mock_redis, routed_event, registry):
+        """未注册事件应记录警告。"""
+        # 不注册任何映射
+
+        with pytest.warns(UserWarning, match="No channel mapping registered"):
+            channel = event_bus._get_redis_channel(routed_event)
+
+        assert channel == "rt:AutoRouted"  # 仍然回退到默认
 
     async def test_rabbitmq_optional(self, mock_redis, registry, routed_event):
         """RabbitMQ 可选，缺失时应降级。"""
@@ -1350,6 +1515,13 @@ class TestDualChannelEventBus:
 
         assert not result.redis_success
         assert "connection refused" in result.redis_error
+
+    async def test_health_check(self, event_bus, mock_redis, mock_rabbitmq):
+        """健康检查应返回各通道状态。"""
+        health = await event_bus.health_check()
+
+        assert "redis" in health
+        assert "rabbitmq" in health
 ```
 
 ---
@@ -1374,7 +1546,7 @@ class TestDualChannelEventBus:
 
 - [x] 实现 `DeadLetterQueue` 类（异步文件 IO）
 - [ ] 集成到 `DualChannelEventBus`
-- [ ] 实现重试逻辑
+- [ ] 实现重试逻辑（`retry_dead_letters`）
 
 ### Phase 4: 服务集成（第 5-6 天）
 
@@ -1393,14 +1565,33 @@ class TestDualChannelEventBus:
 
 ## 九、变更记录
 
+### v1.2.0 (2026-04-29)
+
+**修复的 P1/P2 问题**：
+
+1. **未注册事件警告**
+   - `_get_redis_channel()` 对未注册事件类型记录警告日志
+   - 帮助发现配置遗漏
+
+2. **并行发布选项**
+   - `publish()` 添加 `parallel` 参数
+   - 默认串行（先 Redis 后 RabbitMQ），可选并行
+
+3. **健康检查**
+   - 添加 `health_check()` 方法
+   - 检查 Redis 和 RabbitMQ 连接状态
+
+4. **死信重试**
+   - 添加 `retry_dead_letters()` 方法
+   - 支持自动重试失败事件
+
 ### v1.1.0 (2026-04-29)
 
 **修复的 P0 问题**：
 
 1. **异常处理不一致**
-   - `_do_publish_redis` 和 `_do_publish_rabbitmq` 现在返回 `(success, error)` 元组
+   - `_do_publish_redis` 和 `_do_publish_rabbitmq` 添加完整异常处理
    - 所有异常在内部处理，不向上传播
-   - `PublishResult` 正确体现各通道状态
 
 2. **死信队列阻塞事件循环**
    - 使用 `asyncio.to_thread()` 包装同步文件 IO
@@ -1409,9 +1600,8 @@ class TestDualChannelEventBus:
 3. **单例 + 测试隔离困难**
    - `EventChannelRegistry` 移除全局单例
    - 添加 `create_for_testing()` 工厂方法
-   - `_event_bus_factory` 添加 `reset_event_bus()` 清理函数
 
-4. **RELIABLE_ONLY 事件回退问题**
+4. **RELIABLE_ONLY 回退问题**
    - `_get_redis_channel()` 正确处理 `RELIABLE_ONLY` 事件
    - 返回 `str | None` 而非总是返回默认通道
 
@@ -1421,12 +1611,12 @@ class TestDualChannelEventBus:
 
 | 维度 | 评分 | 说明 |
 |------|------|------|
-| **设计完整性** | 9/10 | 提供完整的双通道统一抽象 |
-| **向后兼容** | 9/10 | 现有 publisher 通过适配器兼容 |
-| **错误处理** | 9/10 | 通道失败隔离，支持死信队列 |
-| **配置灵活** | 9/10 | 支持 YAML 配置和运行时覆盖 |
-| **类型安全** | 9/10 | 使用枚举约束投递模式 |
-| **可测试性** | 9/10 | 依赖注入便于 mock，支持测试隔离 |
-| **可观测性** | 9/10 | 完整日志记录 |
+| **设计完整性** | 9.5/10 | 提供完整的双通道统一抽象 |
+| **向后兼容** | 9.5/10 | 现有 publisher 通过适配器兼容 |
+| **错误处理** | 9.5/10 | 通道失败隔离，支持死信队列 |
+| **配置灵活** | 9.5/10 | 支持 YAML 配置和运行时覆盖 |
+| **类型安全** | 9.5/10 | 使用枚举约束投递模式 |
+| **可测试性** | 9.5/10 | 依赖注入便于 mock，支持测试隔离 |
+| **可观测性** | 9.5/10 | 完整日志记录、健康检查 |
 
-**最终评分：9/10** — 方案科学合理，符合双通道架构设计思想，所有 P0 问题已修复。
+**最终评分：9.5/10** — 方案科学合理，符合双通道架构设计思想，所有 P0/P1 问题已修复，可实施。
