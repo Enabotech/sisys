@@ -19,7 +19,7 @@
     假如 沙箱适配器是 DockerSandboxAdapter
     假如 系统接收到 Routed 事件（session_id: test-session-123）
     当 ExecuteService 处理该 Routed 事件
-    那么 应该为 session "test-session-123" 启动沙箱容器
+    那么 应该为 session test-session-123 启动沙箱容器
     并且 任务应该在沙箱中执行
     并且 执行后容器应该停止
 
@@ -50,7 +50,6 @@
   场景: AC-2 - 快照延迟 P95 小于 50ms
     假如 CheckpointSnapshot 已准备好保存
     假如 我执行 1000 次快照保存操作
-    当 保存到 Redis
     那么 P95 延迟应该小于 50ms
 
   场景: AC-2 - 快照可恢复
@@ -75,21 +74,21 @@
     并且 事件应该包含 business_event_type
 
   场景: AC-3 - 下游监听器发布 ToolExecuted
-    假如 business_event_type 为 "ToolExecuted"
+    假如 business_event_type 为 ToolExecuted
     假如 AutoExecuteCompletedListener 收到 Executed 事件
     当 监听器处理该事件
     那么 应该发布 ToolExecuted 领域事件
 
   场景: AC-3 - 下游监听器发布 DocumentProcessed
-    假如 business_event_type 为 "DocumentProcessed"
+    假如 business_event_type 为 DocumentProcessed
     假如 AutoExecuteCompletedListener 收到 Executed 事件
     当 监听器处理该事件
     那么 应该发布 DocumentProcessed 领域事件
 
   场景: AC-3 - 下游监听器发布 AgentDecided
-    假如 business_event_type 为 "AgentDecided"
+    假如 business_event_type 为 AgentDecided
     假如 AutoExecuteCompletedListener 收到 Executed 事件
-    假如 监听器处理该事件
+    当 监听器处理该事件
     那么 应该发布 AgentDecided 领域事件
 
   场景: AC-3 - Executed 携带完整执行上下文
@@ -127,13 +126,11 @@
 
   场景: AC-5 - 沙箱启动延迟 P95 小于 100ms
     假如 我执行 1000 次沙箱启动操作
-    当 测量启动延迟
-    那么 P95 延迟应该小于 100ms
+    那么 沙箱启动延迟 P95 应该小于 100ms
 
   场景: AC-5 - 状态快照延迟 P95 小于 50ms
     假如 我执行 1000 次快照保存操作
-    当 测量保存延迟
-    那么 P95 延迟应该小于 50ms
+    那么 状态快照延迟 P95 应该小于 50ms
 
   场景: AC-5 - 吞吐量支持 100 executions/second
     假如 事件总线每秒发送 100 个 Routed 事件
