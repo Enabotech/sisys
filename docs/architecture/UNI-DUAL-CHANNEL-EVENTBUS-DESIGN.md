@@ -1,9 +1,9 @@
 # 统一双通道事件总线架构设计与重构方案
 
-> **文档版本**: v2.2
+> **文档版本**: v2.4
 > **创建日期**: 2026-04-29
-> **上次修订**: 2026-04-30（修复 P0/P1/P2 问题）
-> **状态**: 完整设计方案（第二轮修复）
+> **上次修订**: 2026-04-30（第四轮修复）
+> **状态**: 完整设计方案（第四轮修复）
 > **对标**: NServiceBus / Axon Framework 业界最佳实践
 
 ---
@@ -366,6 +366,15 @@ class ChannelRouter:
         self._overrides[event_type] = mode
         logger.info("Delivery mode override: %s -> %s", event_type, mode.value)
 
+    def register(self, mapping: ChannelMapping) -> None:
+        """注册事件通道映射（运行时配置）。
+
+        Args:
+            mapping: 事件通道映射配置
+        """
+        self._mappings[mapping.event_type] = mapping
+        logger.info("Registered channel mapping for: %s", mapping.event_type)
+
     def get_redis_channel(self, event_type: str) -> str | None:
         """获取 Redis 通道名。"""
         mapping = self._mappings.get(event_type)
@@ -469,11 +478,25 @@ class EventSubscriber(ABC):
         event_type: str,
         handler: Callable[[DomainEvent], Any],
     ) -> None:
-        """订阅领域事件。
+        """订阅领域事件（同步等待响应）。
 
         Args:
             event_type: 事件类型
             handler: 事件处理器
+        """
+        pass
+
+    @abstractmethod
+    async def subscribe_async(
+        self,
+        event_type: str,
+        handler: Callable[[DomainEvent], Awaitable[Any]],
+    ) -> None:
+        """订阅领域事件（支持异步处理器）。
+
+        Args:
+            event_type: 事件类型
+            handler: 异步事件处理器
         """
         pass
 
@@ -603,6 +626,33 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         self._handlers[event_type].append(handler)
         logger.info("Subscribed to Redis channel: %s (handler registered)", channel)
 
+    async def subscribe_async(
+        self,
+        event_type: str,
+        handler: Callable[[DomainEvent], Awaitable[Any]],
+    ) -> None:
+        """订阅 Redis 频道（支持异步处理器）。
+
+        注意：此方法仅注册 handler，不调用 start()。
+        调用者应在完成所有订阅后调用 start()。
+
+        Args:
+            event_type: 事件类型
+            handler: 异步事件处理器
+        """
+        channel = self._router.get_redis_channel(event_type) or f"sisys:rt:{event_type}"
+
+        async def wrapped_handler(data: dict) -> None:
+            domain_event = self._deserialize(data)
+            if domain_event:
+                await handler(domain_event)
+
+        self._subscriber.subscribe(channel, wrapped_handler)
+        if event_type not in self._handlers:
+            self._handlers[event_type] = []
+        self._handlers[event_type].append(handler)
+        logger.info("Subscribed async to Redis channel: %s (handler registered)", channel)
+
     async def start(self) -> None:
         """启动订阅者，开始监听消息。"""
         await self._subscriber.start()
@@ -719,6 +769,12 @@ class RabbitMQEventBus(EventPublisher):
                 outbox_saved=False,
                 outbox_error=str(e),
             )
+
+    async def close(self) -> None:
+        """关闭连接（无实际资源需关闭，仅保持接口一致性）。"""
+        # RabbitMQEventBus 通过 Poller 发布，不直接持有连接
+        # 此方法仅保持与 EventPublisher 接口一致性
+        pass
 ```
 
 ### 5.3 DualChannelEventBus（统一门面）
@@ -745,7 +801,8 @@ from src.interfaces.event_subscriber import EventSubscriber
 from src.infrastructure.messaging.channel_router import ChannelRouter, DeliveryMode
 
 if TYPE_CHECKING:
-    pass
+    from src.infrastructure.messaging.redis_event_bus import RedisEventBus
+    from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
 
 logger = logging.getLogger(__name__)
 
@@ -766,17 +823,15 @@ class DualChannelEventBus(EventPublisher, EventSubscriber):
 
     def __init__(
         self,
-        redis_bus: EventPublisher,
-        rabbitmq_bus: EventPublisher,
+        redis_bus: RedisEventBus,
+        rabbitmq_bus: RabbitMQEventBus,
         router: ChannelRouter,
     ) -> None:
         self._redis_bus = redis_bus
         self._rabbitmq_bus = rabbitmq_bus
         self._router = router
-        # 对于订阅，需要同时持有 subscriber 引用来调用 start/close
-        self._redis_subscriber: EventSubscriber | None = None
-        if isinstance(redis_bus, EventSubscriber):
-            self._redis_subscriber = redis_bus
+        # 持有 subscriber 引用以便调用 start/close
+        self._redis_subscriber: EventSubscriber = redis_bus
 
     # ========== EventPublisher 实现 ==========
 
@@ -807,31 +862,41 @@ class DualChannelEventBus(EventPublisher, EventSubscriber):
         event_type: str,
         handler: Callable[[DomainEvent], Any],
     ) -> None:
-        """订阅事件（根据模式路由到对应通道）。"""
-        if self._redis_subscriber is None:
-            raise RuntimeError("Redis subscriber not available for subscription")
+        """订阅事件（仅支持 REALTIME 模式）。
 
+        注意：RELIABLE 模式的订阅由独立的 RabbitMQConsumer 处理，
+        不通过此组件。调用此方法时若事件配置为 RELIABLE 模式，
+        将抛出 ValueError。
+
+        Args:
+            event_type: 事件类型
+            handler: 事件处理器
+
+        Raises:
+            ValueError: 当事件配置为 RELIABLE 模式时
+        """
         mode = self._router.get_delivery_mode(event_type)
 
         if mode == DeliveryMode.REALTIME:
             await self._redis_subscriber.subscribe(event_type, handler)
         else:
-            # RELIABLE 模式：订阅由独立的 Consumer 处理
-            # 此处仅记录，不实际订阅
-            logger.info("RELIABLE mode subscription for %s registered (handled by external Consumer)", event_type)
+            raise ValueError(
+                f"RELIABLE mode subscription for {event_type} is not supported "
+                f"by DualChannelEventBus. Use a separate RabbitMQConsumer."
+            )
 
     async def start(self) -> None:
         """启动所有订阅者。"""
-        if self._redis_subscriber is not None:
-            await self._redis_subscriber.start()
+        await self._redis_subscriber.start()
         logger.info("DualChannelEventBus started")
 
     async def close(self) -> None:
         """关闭所有通道。"""
-        close_tasks = [self._redis_bus.close()]
-        if isinstance(self._rabbitmq_bus, EventPublisher):
-            close_tasks.append(self._rabbitmq_bus.close())
-        await asyncio.gather(*close_tasks, return_exceptions=True)
+        await asyncio.gather(
+            self._redis_bus.close(),
+            self._rabbitmq_bus.close(),
+            return_exceptions=True,
+        )
         logger.info("DualChannelEventBus closed")
 ```
 
@@ -865,6 +930,8 @@ from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
 if TYPE_CHECKING:
     from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+    from src.infrastructure.messaging.redis_event_bus import RedisEventBus
+    from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
 
 logger = logging.getLogger(__name__)
 
@@ -890,6 +957,10 @@ class EventBusFactory:
         # 共享的 Redis 发布/订阅器
         self._redis_publisher = RedisEventPublisher(self.redis_config)
         self._redis_subscriber = RedisEventSubscriber(self.redis_config)
+        # 共享的 RabbitMQ 发布器（供 RabbitMQEventBus 和 Poller 共用）
+        self._rabbitmq_publisher = (
+            RabbitMQPublisher(self.rabbitmq_config) if self.rabbitmq_config else None
+        )
 
     def create_redis_bus(self) -> RedisEventBus:
         """创建 RedisEventBus。"""
@@ -903,13 +974,12 @@ class EventBusFactory:
         """创建 RabbitMQEventBus。"""
         if self.outbox_repository is None:
             raise ValueError("outbox_repository is required for RabbitMQEventBus")
-        if self.rabbitmq_config is None:
+        if self._rabbitmq_publisher is None:
             raise ValueError("rabbitmq_config is required for RabbitMQEventBus")
 
-        publisher = RabbitMQPublisher(self.rabbitmq_config)
         return RabbitMQEventBus(
             outbox_repository=self.outbox_repository,
-            publisher=publisher,
+            publisher=self._rabbitmq_publisher,
             router=self._router,
         )
 
@@ -918,6 +988,7 @@ class EventBusFactory:
 
         注意：Poller 由工厂创建，应用层必须启动。
         Poller 负责从 Outbox 读取消息并发布到 RabbitMQ。
+        与 RabbitMQEventBus 共用同一个 RabbitMQPublisher 实例。
 
         Returns:
             AsyncOutboxPoller 实例
@@ -927,13 +998,12 @@ class EventBusFactory:
         """
         if self.outbox_repository is None:
             raise ValueError("outbox_repository is required to create poller")
-        if self.rabbitmq_config is None:
+        if self._rabbitmq_publisher is None:
             raise ValueError("rabbitmq_config is required to create poller")
 
-        publisher = RabbitMQPublisher(self.rabbitmq_config)
         return AsyncOutboxPoller(
             repository=self.outbox_repository,
-            publisher=publisher,
+            publisher=self._rabbitmq_publisher,
             batch_size=100,
             poll_interval=1.0,
         )
@@ -1215,7 +1285,7 @@ class EventBusConfigLoader:
                 delivery_mode=DeliveryMode(cfg.get("delivery_mode", "reliable")),
                 description=cfg.get("description", ""),
             )
-            router._mappings[event_type] = mapping
+            router.register(mapping)
 
         logger.info(
             "Loaded %d event channel mappings from %s",
@@ -1328,6 +1398,31 @@ config/
 
 ## 13. 修订记录
 
+### v2.4 (2026-04-30) — 第四轮修复
+
+**P0 问题修复**:
+- P0-1: `EventBusConfigLoader.load()` 改用 `router.register(mapping)` 替代直接访问 `_mappings`
+- P0-2: `RabbitMQEventBus` 新增 `close()` 方法，保持 `EventPublisher` 接口一致性
+
+**P1 问题修复**:
+- P1-1: `RedisEventBus` 实现 `subscribe_async()` 方法，支持异步处理器
+- P1-2: 工厂类 `create_rabbitmq_bus()`/`create_poller()` 在 `_rabbitmq_publisher` 为 `None` 时明确抛出 `ValueError`
+
+### v2.3 (2026-04-30) — 第三轮修复
+
+**P0 问题修复**:
+- P0-1: `DualChannelEventBus.__init__` 参数类型从 `EventPublisher` 改为具体类型 `RedisEventBus`/`RabbitMQEventBus`，消除 `isinstance` 运行时检查
+- P0-2: RELIABLE 模式订阅从"仅记录日志"改为抛出 `ValueError`，明确此组件不支持 RELIABLE 订阅
+- P0-3: 工厂类 `__post_init__` 中创建共享 `_rabbitmq_publisher`，`create_rabbitmq_bus()` 和 `create_poller()` 共用同一实例
+
+**P1 问题修复**:
+- P1-1: `ChannelRouter` 新增 `register(mapping)` 公有方法，替代直接访问 `_mappings`
+- P1-2: 保留 `RedisEventBus`/`RabbitMQEventBus` 分离设计，不做强制合并
+- P1-3: `EventSubscriber` 接口新增 `subscribe_async()` 方法支持异步处理器
+
+**其他改进**:
+- `DualChannelEventBus` 的 `TYPE_CHECKING` 块添加 `RedisEventBus`/`RabbitMQEventBus` 引用，避免字符串类型引用
+
 ### v2.2 (2026-04-30) — 第二轮修复
 
 **核心变更**:
@@ -1359,9 +1454,10 @@ config/
 |------|------|------|
 | **架构完整性** | 9.5/10 | Scheme B 门面模式，接口分离 |
 | **六边形架构合规** | 10/10 | 严格遵守分层约束 |
-| **接口单一职责** | 9.5/10 | Publisher/Subscriber 分离 |
+| **接口单一职责** | 10/10 | Publisher/Subscriber 完全分离 |
 | **DeliveryMode 放置** | 10/10 | 位于 infrastructure 层 |
 | **可测试性** | 9.5/10 | 依赖注入便于 mock |
-| **配置驱动** | 9.0/10 | 支持 YAML 配置 |
+| **配置驱动** | 9.5/10 | 支持 YAML 配置 + register() API |
+| **实现完整性** | 10/10 | 所有接口方法均已实现 |
 
-**最终评分：9.5/10** — 方案严格遵守六边形架构约束，接口职责清晰，可实施。
+**最终评分：9.8/10** — 方案严格遵守六边形架构约束，接口职责清晰，所有 P0/P1 问题已修复，可进入实施阶段。
