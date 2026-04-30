@@ -1,6 +1,6 @@
 # Story 20.3: 统一双通道事件总线实现
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -38,10 +38,10 @@
 **Then** 返回包含 `event_id`, `redis_success`, `outbox_saved` 等字段的 PublishResult
 
 **验证标准:**
-- [ ] `src/domain/events/publish_result.py` 实现
-- [ ] 字段：`event_id: str`, `redis_success: bool`, `redis_error: str | None`, `outbox_saved: bool`, `outbox_error: str | None`
-- [ ] 属性：`is_success`, `is_full_failure`, `partial_error`
-- [ ] 领域层零外部依赖（仅用 dataclass + typing）
+- [x] `src/domain/events/publish_result.py` 实现
+- [x] 字段：`event_id: str`, `redis_success: bool`, `redis_error: str | None`, `outbox_saved: bool`, `outbox_error: str | None`
+- [x] 属性：`is_success`, `is_full_failure`, `partial_error`
+- [x] 领域层零外部依赖（仅用 dataclass + typing）
 
 ### AC-2: EventPublisher 接口（异步）
 
@@ -50,10 +50,10 @@
 **Then** 调用 `EventPublisher.publish()` 返回 `PublishResult`
 
 **验证标准:**
-- [ ] `src/interfaces/event_publisher.py` 定义接口
-- [ ] `async def publish(event: DomainEvent) -> PublishResult`
-- [ ] ABC 抽象类，领域层零依赖
-- [ ] 六边形架构正确（接口层不依赖领域层）
+- [x] `src/interfaces/event_publisher.py` 定义接口
+- [x] `async def publish(event: DomainEvent) -> PublishResult`
+- [x] ABC 抽象类，领域层零依赖
+- [x] 六边形架构正确（接口层不依赖领域层）
 
 ### AC-3: EventSubscriber 接口
 
@@ -62,9 +62,9 @@
 **Then** 调用 `subscribe()` 或 `subscribe_async()` 方法
 
 **验证标准:**
-- [ ] `src/interfaces/event_subscriber.py` 定义接口
-- [ ] 方法：`subscribe()`, `subscribe_async()`, `start()`, `close()`
-- [ ] ABC 抽象类
+- [x] `src/interfaces/event_subscriber.py` 定义接口
+- [x] 方法：`subscribe()`, `subscribe_async()`, `start()`, `close()`
+- [x] ABC 抽象类
 
 ### AC-4: ChannelRouter 通道路由
 
@@ -73,13 +73,13 @@
 **Then** 根据配置返回 REALTIME 或 RELIABLE
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/channel_router.py` 实现
-- [ ] `DeliveryMode` 枚举：`REALTIME`, `RELIABLE`
-- [ ] `ChannelMapping` 数据类
-- [ ] `DEFAULT_MAPPINGS` 预定义 AutoTriggered/AutoRouted/DocumentProcessed 等
-- [ ] `register()` 公有方法
-- [ ] `set_override()` 运行时覆盖
-- [ ] `get_redis_channel()` / `get_rabbitmq_routing_key()` 查询方法
+- [x] `src/infrastructure/messaging/channel_router.py` 实现
+- [x] `DeliveryMode` 枚举：`REALTIME`, `RELIABLE`
+- [x] `ChannelMapping` 数据类
+- [x] `DEFAULT_MAPPINGS` 预定义 AutoTriggered/AutoRouted/DocumentProcessed 等
+- [x] `register()` 公有方法
+- [x] `set_override()` 运行时覆盖
+- [x] `get_redis_channel()` / `get_rabbitmq_routing_key()` 查询方法
 
 ### AC-5: RedisEventBus REALTIME 通道
 
@@ -88,11 +88,11 @@
 **Then** 事件直接发布到 Redis Pub/Sub
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/redis_event_bus.py` 实现
-- [ ] 实现 `EventPublisher` + `EventSubscriber` 双接口
-- [ ] `publish()` 直接推送到 Redis 通道
-- [ ] `subscribe()` / `subscribe_async()` 注册处理器
-- [ ] `start()` / `close()` 生命周期管理
+- [x] `src/infrastructure/messaging/redis_event_bus.py` 实现
+- [x] 实现 `EventPublisher` + `EventSubscriber` 双接口
+- [x] `publish()` 直接推送到 Redis 通道
+- [x] `subscribe()` / `subscribe_async()` 注册处理器
+- [x] `start()` / `close()` 生命周期管理
 
 ### AC-6: RabbitMQEventBus RELIABLE 通道
 
@@ -101,10 +101,10 @@
 **Then** 事件保存至 Outbox，由 Poller 异步发布
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/rabbitmq_event_bus.py` 实现
-- [ ] 实现 `EventPublisher` 接口
-- [ ] `publish()` 调用 `OutboxRepository.save()`
-- [ ] `close()` 空实现（保持接口一致性）
+- [x] `src/infrastructure/messaging/rabbitmq_event_bus.py` 实现
+- [x] 实现 `EventPublisher` 接口
+- [x] `publish()` 调用 `OutboxRepository.save()`
+- [x] `close()` 空实现（保持接口一致性）
 
 ### AC-7: DualChannelEventBus 统一门面
 
@@ -113,11 +113,11 @@
 **Then** 根据 ChannelRouter 路由到对应通道
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/dual_channel_event_bus.py` 实现
-- [ ] 构造函数参数类型 `RedisEventBus`, `RabbitMQEventBus`（非 EventPublisher 接口）
-- [ ] `publish()` 根据 DeliveryMode 路由
-- [ ] `subscribe()` 仅支持 REALTIME，RELIABLE 抛出 `ValueError`
-- [ ] `start()` / `close()` 生命周期管理
+- [x] `src/infrastructure/messaging/dual_channel_event_bus.py` 实现
+- [x] 构造函数参数类型 `RedisEventBus`, `RabbitMQEventBus`（非 EventPublisher 接口）
+- [x] `publish()` 根据 DeliveryMode 路由
+- [x] `subscribe()` 仅支持 REALTIME，RELIABLE 抛出 `ValueError`
+- [x] `start()` / `close()` 生命周期管理
 
 ### AC-8: EventBusFactory 依赖注入
 
@@ -126,11 +126,11 @@
 **Then** 返回配置好的 DualChannelEventBus 和 AsyncOutboxPoller
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/event_bus_factory.py` 实现
-- [ ] `__post_init__` 创建共享组件（ChannelRouter, Redis, RabbitMQPublisher）
-- [ ] `create_dual_channel_bus()` 返回元组
-- [ ] 复用同一 RabbitMQPublisher 实例
-- [ ] `configure_event_bus()` / `get_event_bus()` 全局配置函数
+- [x] `src/infrastructure/messaging/event_bus_factory.py` 实现
+- [x] `__post_init__` 创建共享组件（ChannelRouter, Redis, RabbitMQPublisher）
+- [x] `create_dual_channel_bus()` 返回元组
+- [x] 复用同一 RabbitMQPublisher 实例
+- [x] `configure_event_bus()` / `get_event_bus()` 全局配置函数
 
 ### AC-9: EventBusConfigLoader 配置加载
 
@@ -139,10 +139,10 @@
 **Then** 返回配置好的 ChannelRouter
 
 **验证标准:**
-- [ ] `src/infrastructure/messaging/event_bus_config_loader.py` 实现
-- [ ] 使用 `router.register()` 而非直接访问私有属性
-- [ ] `config/event_channels.yaml` 配置文件
-- [ ] `from_default_path()` 类方法
+- [x] `src/infrastructure/messaging/event_bus_config_loader.py` 实现
+- [x] 使用 `router.register()` 而非直接访问私有属性
+- [x] `config/event_channels.yaml` 配置文件
+- [x] `from_default_path()` 类方法
 
 ### AC-10: Story 1.3 集成测试
 
@@ -151,9 +151,9 @@
 **Then** AC-3 约束（可靠传输走 Outbox → RabbitMQ）满足
 
 **验证标准:**
-- [ ] REALTIME 事件直接发布到 Redis
-- [ ] RELIABLE 事件写入 Outbox
-- [ ] Poller 正确将 Outbox 事件发布到 RabbitMQ
+- [x] REALTIME 事件直接发布到 Redis
+- [x] RELIABLE 事件写入 Outbox
+- [x] Poller 正确将 Outbox 事件发布到 RabbitMQ
 
 ### AC-11: 架构约束验证
 
@@ -162,9 +162,9 @@
 **Then** 六边形架构约束满足
 
 **验证标准:**
-- [ ] 领域层零外部依赖
-- [ ] `DeliveryMode` 位于 infrastructure 层
-- [ ] Ruff + MyPy 检查通过
+- [x] 领域层零外部依赖
+- [x] `DeliveryMode` 位于 infrastructure 层
+- [x] Ruff + MyPy 检查通过
 
 ---
 
@@ -188,8 +188,8 @@
 
 **关联 AC:** 全部 AC
 
-- [ ] Subtask 0.1: 确认架构文档 v2.5 版本
-- [ ] Subtask 0.2: 验证所有组件设计符合六边形架构约束
+- [x] Subtask 0.1: 确认架构文档 v2.5 版本
+- [x] Subtask 0.2: 验证所有组件设计符合六边形架构约束
 
 ---
 
@@ -203,14 +203,14 @@
 | 🟢 绿 | 实现 `PublishResult` 数据类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 event_id, redis_success, redis_error, outbox_saved, outbox_error
-- [ ] Subtask 1.3: 🟢 绿 — 实现 is_success, is_full_failure, partial_error 属性
-- [ ] Subtask 1.4: 🔄 重构 — 验证领域层零依赖
+- [x] Subtask 1.1: 🔴 红 — 编写失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 event_id, redis_success, redis_error, outbox_saved, outbox_error
+- [x] Subtask 1.3: 🟢 绿 — 实现 is_success, is_full_failure, partial_error 属性
+- [x] Subtask 1.4: 🔄 重构 — 验证领域层零依赖
 
 **完成标准:**
-- [ ] PublishResult 实现完成
-- [ ] TDD 循环全部通过
+- [x] PublishResult 实现完成
+- [x] TDD 循环全部通过
 
 ---
 
@@ -224,13 +224,13 @@
 | 🟢 绿 | 实现 `EventPublisher` 接口 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写接口失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `async def publish(event: DomainEvent) -> PublishResult`
-- [ ] Subtask 2.3: 🔄 重构 — 验证六边形架构约束
+- [x] Subtask 2.1: 🔴 红 — 编写接口失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 `async def publish(event: DomainEvent) -> PublishResult`
+- [x] Subtask 2.3: 🔄 重构 — 验证六边形架构约束
 
 **完成标准:**
-- [ ] EventPublisher 接口实现完成
-- [ ] 六边形架构验证通过
+- [x] EventPublisher 接口实现完成
+- [x] 六边形架构验证通过
 
 ---
 
@@ -244,13 +244,13 @@
 | 🟢 绿 | 实现 `EventSubscriber` 接口 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写接口失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 subscribe(), subscribe_async(), start(), close()
-- [ ] Subtask 3.3: 🔄 重构 — 验证接口正确性
+- [x] Subtask 3.1: 🔴 红 — 编写接口失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现 subscribe(), subscribe_async(), start(), close()
+- [x] Subtask 3.3: 🔄 重构 — 验证接口正确性
 
 **完成标准:**
-- [ ] EventSubscriber 接口实现完成
-- [ ] 所有方法验证通过
+- [x] EventSubscriber 接口实现完成
+- [x] 所有方法验证通过
 
 ---
 
@@ -264,16 +264,16 @@
 | 🟢 绿 | 实现 `ChannelRouter` + `DeliveryMode` |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 ChannelRouter 失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现 DeliveryMode 枚举和 ChannelMapping 数据类
-- [ ] Subtask 4.3: 🟢 绿 — 实现 DEFAULT_MAPPINGS 配置
-- [ ] Subtask 4.4: 🟢 绿 — 实现 get_delivery_mode(), register(), set_override()
-- [ ] Subtask 4.5: 🔄 重构 — 实现 get_redis_channel(), get_rabbitmq_routing_key()
+- [x] Subtask 4.1: 🔴 红 — 编写 ChannelRouter 失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现 DeliveryMode 枚举和 ChannelMapping 数据类
+- [x] Subtask 4.3: 🟢 绿 — 实现 DEFAULT_MAPPINGS 配置
+- [x] Subtask 4.4: 🟢 绿 — 实现 get_delivery_mode(), register(), set_override()
+- [x] Subtask 4.5: 🔄 重构 — 实现 get_redis_channel(), get_rabbitmq_routing_key()
 
 **完成标准:**
-- [ ] ChannelRouter 实现完成
-- [ ] DeliveryMode 位于 infrastructure 层
-- [ ] 所有查询方法验证通过
+- [x] ChannelRouter 实现完成
+- [x] DeliveryMode 位于 infrastructure 层
+- [x] 所有查询方法验证通过
 
 ---
 
@@ -396,15 +396,15 @@
 | 🟢 绿 | 实现完整的事件发布订阅流程 |
 | 🔄 重构 | 验证 AC-3 约束满足 |
 
-- [ ] Subtask 10.1: 🔴 红 — 编写 REALTIME 事件发布到 Redis 的集成测试
-- [ ] Subtask 10.2: 🟢 绿 — 验证 RedisEventBus.publish() 直接发布
-- [ ] Subtask 10.3: 🔴 红 — 编写 RELIABLE 事件走 Outbox 的集成测试
-- [ ] Subtask 10.4: 🟢 绿 — 验证 RabbitMQEventBus.publish() 写入 Outbox
-- [ ] Subtask 10.5: 🔄 重构 — 验证 Poller 正确发布到 RabbitMQ
+- [x] Subtask 10.1: 🔴 红 — 编写 REALTIME 事件发布到 Redis 的集成测试
+- [x] Subtask 10.2: 🟢 绿 — 验证 RedisEventBus.publish() 直接发布
+- [x] Subtask 10.3: 🔴 红 — 编写 RELIABLE 事件走 Outbox 的集成测试
+- [x] Subtask 10.4: 🟢 绿 — 验证 RabbitMQEventBus.publish() 写入 Outbox
+- [x] Subtask 10.5: 🔄 重构 — 验证 Poller 正确发布到 RabbitMQ
 
 **完成标准:**
-- [ ] 集成测试全部通过
-- [ ] AC-3 约束验证通过
+- [x] 集成测试全部通过
+- [x] AC-3 约束验证通过
 
 ---
 
@@ -418,15 +418,15 @@
 | 🟢 绿 | 修复架构违规 |
 | 🔄 重构 | 最终验证 |
 
-- [ ] Subtask 11.1: 🔴 红 — 运行 ruff check src/domain/
-- [ ] Subtask 11.2: 🟢 绿 — 修复领域层外部依赖
-- [ ] Subtask 11.3: 🟢 绿 — 运行 mypy src/infrastructure/messaging/
-- [ ] Subtask 11.4: 🔄 重构 — 最终验证所有测试通过
+- [x] Subtask 11.1: 🔴 红 — 运行 ruff check src/domain/
+- [x] Subtask 11.2: 🟢 绿 — 修复领域层外部依赖
+- [x] Subtask 11.3: 🟢 绿 — 运行 mypy src/infrastructure/messaging/
+- [x] Subtask 11.4: 🔄 重构 — 最终验证所有测试通过
 
 **完成标准:**
-- [ ] Ruff 检查通过
-- [ ] MyPy 类型检查通过
-- [ ] 所有测试通过
+- [x] Ruff 检查通过
+- [x] MyPy 类型检查通过
+- [x] 所有测试通过
 
 ---
 
@@ -568,27 +568,27 @@
 
 | 文件 | 说明 |
 |------|------|
-| `src/domain/events/publish_result.py` | PublishResult 领域层类型 |
-| `src/interfaces/event_publisher.py` | EventPublisher 异步接口 |
-| `src/interfaces/event_subscriber.py` | EventSubscriber 接口 |
-| `src/infrastructure/messaging/channel_router.py` | ChannelRouter + DeliveryMode |
-| `src/infrastructure/messaging/redis_event_bus.py` | RedisEventBus REALTIME 通道 |
-| `src/infrastructure/messaging/rabbitmq_event_bus.py` | RabbitMQEventBus RELIABLE 通道 |
-| `src/infrastructure/messaging/dual_channel_event_bus.py` | DualChannelEventBus 统一门面 |
-| `src/infrastructure/messaging/event_bus_factory.py` | EventBusFactory 工厂 |
-| `src/infrastructure/messaging/event_bus_config_loader.py` | EventBusConfigLoader 配置加载 |
-| `config/event_channels.yaml` | 事件通道配置文件 |
-| `tests/unit/domain/events/test_publish_result.py` | PublishResult 测试 |
-| `tests/unit/interfaces/test_event_publisher.py` | EventPublisher 接口测试 |
-| `tests/unit/interfaces/test_event_subscriber.py` | EventSubscriber 接口测试 |
-| `tests/unit/infrastructure/messaging/test_channel_router.py` | ChannelRouter 测试 |
-| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | RedisEventBus 测试 |
-| `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | RabbitMQEventBus 测试 |
-| `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | DualChannelEventBus 测试 |
-| `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | EventBusFactory 测试 |
-| `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | EventBusConfigLoader 测试 |
-| `tests/integration/test_event_bus_integration.py` | 集成测试 |
-| `tests/unit/infrastructure/test_architecture_constraints.py` | 架构约束测试 |
+| `src/domain/events/publish_result.py` | PublishResult 领域层类型 | ✅ |
+| `src/interfaces/event_publisher.py` | EventPublisher 异步接口 | ✅ |
+| `src/interfaces/event_subscriber.py` | EventSubscriber 接口 | ✅ |
+| `src/infrastructure/messaging/channel_router.py` | ChannelRouter + DeliveryMode | ✅ |
+| `src/infrastructure/messaging/redis_event_bus.py` | RedisEventBus REALTIME 通道 | ✅ |
+| `src/infrastructure/messaging/rabbitmq_event_bus.py` | RabbitMQEventBus RELIABLE 通道 | ✅ |
+| `src/infrastructure/messaging/dual_channel_event_bus.py` | DualChannelEventBus 统一门面 | ✅ |
+| `src/infrastructure/messaging/event_bus_factory.py` | EventBusFactory 工厂 | ✅ |
+| `src/infrastructure/messaging/event_bus_config_loader.py` | EventBusConfigLoader 配置加载 | ✅ |
+| `config/event_channels.yaml` | 事件通道配置文件 | ✅ |
+| `tests/unit/domain/events/test_publish_result.py` | PublishResult 测试 | ✅ |
+| `tests/unit/interfaces/test_event_publisher.py` | EventPublisher 接口测试 | ✅ |
+| `tests/unit/interfaces/test_event_subscriber.py` | EventSubscriber 接口测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_channel_router.py` | ChannelRouter 测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | RedisEventBus 测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | RabbitMQEventBus 测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | DualChannelEventBus 测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | EventBusFactory 测试 | ✅ |
+| `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | EventBusConfigLoader 测试 | ✅ |
+| `tests/integration/test_event_bus_integration.py` | 集成测试 | ✅ |
+| `tests/unit/infrastructure/test_architecture_constraints.py` | 架构约束测试 | ✅ |
 
 ---
 

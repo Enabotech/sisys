@@ -308,7 +308,7 @@ development_status:
   epic-20: in-progress
   20-1-sisys-testing-refactor: done
   20-2-event-messaging-refactor: done
-  20-3-uni-dual-channel-eventbus: in-progress
+  20-3-uni-dual-channel-eventbus: done
   epic-20-retrospective: optional
 
 # =============================================================================
@@ -319,10 +319,10 @@ development_status:
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
-#   - Epic 20: 2 stories (✅ done)
+#   - Epic 20: 3 stories (✅ done)
 #
 # Status Summary:
-#   - Done: 27 (包括 Epic 20)
+#   - Done: 28 (包括 Epic 20)
 #   - Ready for Dev: 5
 #   - Backlog: 121
 #
@@ -334,5 +334,6 @@ development_status:
 # Key Changes from Previous Version:
 #   - Updated last_updated date to 2026-04-30
 #   - Story 20-2 (event-messaging-refactor) 已完成 → done
+#   - Story 20-3 (uni-dual-channel-eventbus) 已完成 → done
 #   - Updated Epic 20 story count and total done count
 # =============================================================================
