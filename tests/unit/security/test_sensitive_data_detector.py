@@ -6,16 +6,21 @@ Reference: Story 1.11 Data Sovereignty Isolation - AC-1.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from src.infrastructure.security.models import SensitiveDataType
+
+if TYPE_CHECKING:
+    from src.infrastructure.security.sensitive_data_detector import SensitiveDataDetector
 
 
 class TestSensitiveDataDetector:
     """SensitiveDataDetector tests for PII and sensitive data detection."""
 
     @pytest.fixture
-    def detector(self):
+    def detector(self) -> SensitiveDataDetector:
         """Create detector instance."""
         from src.infrastructure.security.sensitive_data_detector import SensitiveDataDetector
 
@@ -199,7 +204,7 @@ class TestSensitiveDataDetector:
         result = detector.detect(text)
         assert result.is_sensitive is False
 
-    def test_detection_accuracy(self, detector):
+    def test_detection_accuracy(self, detector: SensitiveDataDetector) -> None:
         """Detection accuracy should be >= 95% as per NFR."""
         # Test dataset with known sensitive data
         # Note: Trade secret test uses 4 keywords for >= 0.95 confidence
