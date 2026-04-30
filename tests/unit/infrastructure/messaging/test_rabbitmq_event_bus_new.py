@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -62,7 +62,7 @@ class TestRabbitMQEventBusPublish:
         """publish should call outbox_repository.save with the event."""
         router = ChannelRouter()
         outbox_repo = MagicMock()
-        outbox_repo.save = AsyncMock(return_value=True)
+        outbox_repo.save = MagicMock(return_value=True)
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)
@@ -85,7 +85,7 @@ class TestRabbitMQEventBusPublish:
         )
         router.register(mapping)
         outbox_repo = MagicMock()
-        outbox_repo.save = AsyncMock(return_value=True)
+        outbox_repo.save = MagicMock(return_value=True)
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)
