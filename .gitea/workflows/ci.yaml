@@ -484,11 +484,16 @@ jobs:
       - name: 密钥泄露检测 (detect-secrets)
         run: |
           mkdir -p reports/security
-          # 使用 sarif 格式输出，便于 Gitea/GH 集成
-          poetry run detect-secrets-hook . \
+          # 1. 阻断性检查：任何新 secret 都导致 CI 失败
+          poetry run detect-secrets-hook . --baseline .secrets.baseline
+
+      - name: 密钥检测报告
+        run: |
+          mkdir -p reports/security
+          poetry run detect-secrets scan . \
             --baseline .secrets.baseline \
-            --sarif \
-            --output reports/security/detect-secrets.sarif
+            --all-files \
+            > reports/security/detect-secrets-report.json 2>&1 || true
 
       - name: 代码安全扫描 ( Bandit )
         run: |
