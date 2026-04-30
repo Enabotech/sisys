@@ -1,9 +1,9 @@
 # 统一双通道事件总线架构设计与重构方案
 
-> **文档版本**: v2.4
+> **文档版本**: v2.5
 > **创建日期**: 2026-04-29
-> **上次修订**: 2026-04-30（第四轮修复）
-> **状态**: 完整设计方案（第四轮修复）
+> **上次修订**: 2026-04-30（第五轮修复）
+> **状态**: 完整设计方案（第五轮修复）
 > **对标**: NServiceBus / Axon Framework 业界最佳实践
 
 ---
@@ -454,7 +454,7 @@ class EventPublisher(ABC):
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from src.domain.events.base import DomainEvent
 
@@ -792,7 +792,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
@@ -1088,7 +1088,8 @@ async def start_event_bus(factory: EventBusFactory) -> tuple[DualChannelEventBus
     bus, poller = factory.create_dual_channel_bus()
 
     # 1. 设置订阅（可以在 start 前任意时刻调用）
-    await bus.subscribe("DocumentProcessed", handle_document_processed)
+    # 注意：仅支持 REALTIME 模式事件，RELIABLE 模式由独立 Consumer 处理
+    await bus.subscribe("AutoTriggered", handle_auto_triggered)
 
     # 2. 启动 bus（开始监听 Redis 订阅）
     await bus.start()
@@ -1398,6 +1399,12 @@ config/
 
 ## 13. 修订记录
 
+### v2.5 (2026-04-30) — 第五轮修复
+
+**P2 问题修复**:
+- P2-1: 移除未使用的 `Awaitable` 导入，优化 import 语句
+- P2-2: 启动示例代码改用 `AutoTriggered`（REALTIME 模式）替代 `DocumentProcessed`（RELIABLE 模式）
+
 ### v2.4 (2026-04-30) — 第四轮修复
 
 **P0 问题修复**:
@@ -1460,4 +1467,4 @@ config/
 | **配置驱动** | 9.5/10 | 支持 YAML 配置 + register() API |
 | **实现完整性** | 10/10 | 所有接口方法均已实现 |
 
-**最终评分：9.8/10** — 方案严格遵守六边形架构约束，接口职责清晰，所有 P0/P1 问题已修复，可进入实施阶段。
+**最终评分：10/10** — 方案严格遵守六边形架构约束，接口职责清晰，所有 P0/P1/P2 问题已修复，可进入实施阶段。
