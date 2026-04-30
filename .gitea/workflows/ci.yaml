@@ -481,7 +481,7 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
-      - name: 密钥泄露检测 (detect-secrets)
+      - name: 密钥泄露检测 ( detect-secrets )
         run: |
           mkdir -p reports/security
           poetry run detect-secrets-hook . --baseline .secrets.baseline
