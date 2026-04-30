@@ -119,7 +119,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 检测相关文件变更
+      - name: 变更检测
         uses: dorny/paths-filter@v3
         id: filter
         with:
