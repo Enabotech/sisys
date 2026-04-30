@@ -484,7 +484,6 @@ jobs:
       - name: 密钥泄露检测 (detect-secrets)
         run: |
           mkdir -p reports/security
-          # 1. 阻断性检查：任何新 secret 都导致 CI 失败
           poetry run detect-secrets-hook . --baseline .secrets.baseline
 
       - name: 密钥检测报告
