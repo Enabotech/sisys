@@ -481,6 +481,15 @@ jobs:
         run: |
           poetry install --no-interaction || echo "依赖更新完成"
 
+      - name: 密钥泄露检测 (detect-secrets)
+        run: |
+          mkdir -p reports/security
+          # 使用 sarif 格式输出，便于 Gitea/GH 集成
+          poetry run detect-secrets-hook . \
+            --baseline .secrets.baseline \
+            --sarif \
+            --output reports/security/detect-secrets.sarif
+
       - name: 代码安全扫描 ( Bandit )
         run: |
           mkdir -p reports/security
