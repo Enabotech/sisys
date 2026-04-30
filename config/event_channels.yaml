@@ -1,0 +1,34 @@
+# Event Channel Configuration
+# Maps event types to their delivery channels
+
+event_channels:
+  AutoTriggered:
+    redis_channel: "sisys:rt:auto_triggered"
+    delivery_mode: "realtime"
+    description: "Trigger event, real-time notification"
+
+  AutoRouted:
+    redis_channel: "sisys:rt:auto_routed"
+    delivery_mode: "realtime"
+    description: "Routing decision completed"
+
+  DocumentProcessed:
+    redis_channel: "sisys:rt:document_processed"
+    rabbitmq_routing_key: "sisys.events.reliable.document_processed"
+    delivery_mode: "reliable"
+    description: "Document processing completed"
+
+  MemoryChanged:
+    rabbitmq_routing_key: "sisys.events.reliable.memory_changed"
+    delivery_mode: "reliable"
+    description: "Memory changed"
+
+  CheckpointReached:
+    rabbitmq_routing_key: "sisys.events.reliable.checkpoint_reached"
+    delivery_mode: "reliable"
+    description: "Checkpoint reached"
+
+  AuditEvent:
+    rabbitmq_routing_key: "audit.audit_event"
+    delivery_mode: "reliable"
+    description: "Audit event"

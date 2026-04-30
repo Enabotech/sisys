@@ -308,7 +308,7 @@ development_status:
   epic-20: in-progress
   20-1-sisys-testing-refactor: done
   20-2-event-messaging-refactor: done
-  20-3-uni-dual-channel-eventbus: ready-for-dev
+  20-3-uni-dual-channel-eventbus: in-progress
   epic-20-retrospective: optional
 
 # =============================================================================
