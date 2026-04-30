@@ -51,14 +51,14 @@ class MockCompressor:
 class MockEventPublisher:
     """Mock event publisher."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.published_events: list = []
 
     def publish(self, event: Any) -> None:
         self.published_events.append(event)
 
 
-def run_async(coro):
+def run_async(coro: Any) -> Any:
     """Run async coroutine synchronously for tests."""
     return asyncio.run(coro)
 
