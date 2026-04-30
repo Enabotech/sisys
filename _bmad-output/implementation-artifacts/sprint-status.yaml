@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-27
+last_updated: 2026-04-30
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -307,7 +307,7 @@ development_status:
   # ===========================================================================
   epic-20: in-progress
   20-1-sisys-testing-refactor: done
-  20-2-event-messaging-refactor: in-progress
+  20-2-event-messaging-refactor: done
   epic-20-retrospective: optional
 
 # =============================================================================
@@ -318,10 +318,10 @@ development_status:
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
-#   - Epic 20: 1 story (✅ done)
+#   - Epic 20: 2 stories (✅ done)
 #
 # Status Summary:
-#   - Done: 26 (包括 Epic 20)
+#   - Done: 27 (包括 Epic 20)
 #   - Ready for Dev: 5
 #   - Backlog: 121
 #
@@ -331,7 +331,7 @@ development_status:
 #   3. Developping Epic 1
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-04-24
-#   - Story 1.15b 创建完成 → ready-for-dev
-#   - Story 1.17 创建完成 → ready-for-dev
+#   - Updated last_updated date to 2026-04-30
+#   - Story 20-2 (event-messaging-refactor) 已完成 → done
+#   - Updated Epic 20 story count and total done count
 # =============================================================================
