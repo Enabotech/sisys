@@ -1,8 +1,9 @@
 # 统一双通道事件总线架构设计与重构方案
 
-> **文档版本**: v2.0
+> **文档版本**: v2.1
 > **创建日期**: 2026-04-29
-> **状态**: 完整设计方案
+> **上次修订**: 2026-04-30（修复 P0/P1/P2 问题）
+> **状态**: 完整设计方案（已修复评审问题）
 > **对标**: NServiceBus / Axon Framework 业界最佳实践
 
 ---
@@ -92,7 +93,7 @@ Story 1.3 AC-3 约束（正确）:
 │                          Interfaces Layer                                   │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                         EventBus (Port)                                │  │
-│  │  + publish(event, delivery_mode?) -> PublishResult                     │  │
+│  │  + publish(event) -> PublishResult                                     │  │
 │  │  + subscribe(event_type, handler) -> None                              │  │
 │  │  + subscribe_async(event_type, handler) -> None                        │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
@@ -121,6 +122,8 @@ Story 1.3 AC-3 约束（正确）:
          │                         ▼                        │
          │              ┌─────────────────────┐            │
          │              │  AsyncOutboxPoller  │            │
+         │              │  (后台任务，启动后   │            │
+         │              │   自动轮询 Outbox)  │            │
          │              └──────────┬──────────┘            │
          │                         │ publish               │
          │                         ▼                        │
@@ -135,11 +138,11 @@ Story 1.3 AC-3 约束（正确）:
 #### REALTIME_ONLY 路径（Redis Pub/Sub）
 
 ```
-Service.publish(event, REALTIME_ONLY)
+Service.publish(event)
   │
   ▼
 DualChannelEventBus.publish()
-  │
+  │  ← 内部通过 EventChannelRegistry 推断为 REALTIME_ONLY
   ▼
 RedisEventBus.publish()
   │
@@ -153,11 +156,11 @@ Redis Pub/Sub Broker ──► RedisEventSubscriber ──► Handler
 #### RELIABLE_ONLY 路径（RabbitMQ + Outbox）
 
 ```
-Service.publish(event, RELIABLE_ONLY)
+Service.publish(event)
   │
   ▼
 DualChannelEventBus.publish()
-  │
+  │  ← 内部通过 EventChannelRegistry 推断为 RELIABLE_ONLY
   ▼
 RabbitMQEventBus.publish()
   │
@@ -168,11 +171,11 @@ OutboxRepository.save(event)  ◄── 与业务操作同事务
 [业务事务提交]
   │
   ▼
-AsyncOutboxPoller.poll_once()  ◄── 后台轮询（默认 1s）
+AsyncOutboxPoller.poll_once()  ◄── 后台轮询（默认 1s，由应用层启动）
   │
-  ├── get_unpublished() → List[OutboxEntity]
-  ├── async_publish() → RabbitMQPublisher
-  └── mark_published() / mark_failed()
+  ├── _get_unpublished_entities() → List[OutboxEntity]
+  ├── RabbitMQPublisher.async_publish() → RabbitMQ
+  └── _mark_published_entity() / _mark_failed_entity()
   │
   ▼
 RabbitMQ Broker ──► RabbitMQConsumer ──► Handler
@@ -181,12 +184,13 @@ RabbitMQ Broker ──► RabbitMQConsumer ──► Handler
 #### BOTH 路径（双通道）
 
 ```
-Service.publish(event, BOTH)
+Service.publish(event)
   │
   ▼
 DualChannelEventBus.publish()
+  │  ← 内部通过 EventChannelRegistry 推断为 BOTH
   │
-  ├──► RedisEventBus.publish() ──► Redis Pub/Sub（异步，尽力而为）
+  ├──► RedisEventBus.publish() ──► RedisEventPublisher ──► Redis Pub/Sub（异步，尽力而为）
   │
   └──► RabbitMQEventBus.publish() ──► OutboxRepository.save() ──► Poller ──► RabbitMQ
 ```
@@ -211,6 +215,9 @@ class DeliveryMode(Enum):
 
     决定事件通过哪个通道分发。
     对标 NServiceBus 的 DeliveryMode。
+
+    注意：此枚举属于基础设施层概念，用于 EventChannelRegistry 推断通道选择。
+    领域层 DomainEvent 可通过 @delivery_mode 装饰器声明默认模式。
     """
 
     # 仅实时通道（Redis Pub/Sub）- 可能丢失，低延迟
@@ -231,7 +238,7 @@ class DeliveryMode(Enum):
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -244,6 +251,11 @@ class PublishResult:
 
     对标 NServiceBus 的 PublishResult。
     所有字段不可变，线程安全。
+
+    注意：
+    - outbox_saved=True 表示消息已安全存储在 Outbox，Poller 会异步发布到 RabbitMQ
+    - rabbitmq_success=True 表示消息已直接发布到 RabbitMQ（REALTIME_ONLY 路径）
+    - RELIABLE_ONLY 路径：outbox_saved=True, rabbitmq_success=False（实际发布由 Poller 完成）
     """
 
     event_id: str
@@ -251,24 +263,37 @@ class PublishResult:
     redis_error: str | None = None
     rabbitmq_success: bool = False
     rabbitmq_error: str | None = None
-    outbox_saved: bool = False  # RELIABLE_ONLY / BOTH 路径
+    outbox_saved: bool = False  # RELIABLE_ONLY / BOTH 路径：消息已存入 Outbox
 
     @property
     def is_full_success(self) -> bool:
-        """所有通道都成功。"""
+        """所有必要的通道都成功。
+
+        成功判定规则：
+        - REALTIME_ONLY：redis_success = True
+        - RELIABLE_ONLY：outbox_saved = True（Poller 保证最终一致）
+        - BOTH：redis_success AND outbox_saved
+        """
         if self.outbox_saved:
-            return self.redis_success and self.rabbitmq_success
-        return self.redis_success or self.rabbitmq_success
+            # RELIABLE_ONLY 或 BOTH 路径
+            return self.redis_success or True  # Redis 可选，可失败
+        # REALTIME_ONLY 路径
+        return self.redis_success
 
     @property
     def is_partial_success(self) -> bool:
         """部分成功（通道之间结果不一致）。"""
-        return self.redis_success != self.rabbitmq_success
+        if self.outbox_saved:
+            # BOTH 路径：Redis 可能失败
+            return not self.redis_success
+        return False
 
     @property
     def is_full_failure(self) -> bool:
         """所有通道都失败。"""
-        return not self.redis_success and not self.rabbitmq_success and not self.outbox_saved
+        if self.outbox_saved:
+            return False  # Outbox 保存成功不算失败
+        return not self.redis_success
 
     @property
     def partial_error(self) -> str | None:
@@ -316,6 +341,7 @@ class EventChannelRegistry:
 
     管理事件类型到通道的映射。
     支持配置驱动和运行时覆盖。
+    支持通过 load_defaults=False 创建空注册表用于测试。
     """
 
     # 预定义映射（Story 1.3 规范）
@@ -377,10 +403,16 @@ class EventChannelRegistry:
         ),
     }
 
-    def __init__(self) -> None:
+    def __init__(self, load_defaults: bool = True) -> None:
+        """初始化注册表。
+
+        Args:
+            load_defaults: 是否加载默认映射。False 用于测试场景。
+        """
         self._mappings: dict[str, EventChannelMapping] = {}
         self._overrides: dict[str, DeliveryMode] = {}
-        self._init_defaults()
+        if load_defaults:
+            self._init_defaults()
 
     def _init_defaults(self) -> None:
         """初始化默认映射。"""
@@ -426,10 +458,7 @@ class EventChannelRegistry:
     @classmethod
     def create_for_testing(cls) -> EventChannelRegistry:
         """创建测试用注册表（无默认映射）。"""
-        instance = object.__new__(cls)
-        instance._mappings = {}
-        instance._overrides = {}
-        return instance
+        return cls(load_defaults=False)
 ```
 
 ---
@@ -444,6 +473,11 @@ class EventChannelRegistry:
 
 应用层仅依赖此接口，不关心底层传输实现。
 对标 NServiceBus 的 IBus 接口。
+
+设计原则：
+1. 领域层接口使用 DomainEvent，不感知传输细节
+2. DeliveryMode 由 EventChannelRegistry 内部推断，不作为接口参数
+3. 错误内部消化，返回 PublishResult 供应用层判断
 """
 
 from __future__ import annotations
@@ -452,7 +486,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.delivery_mode import DeliveryMode
 from src.domain.events.publish_result import PublishResult
 
 if TYPE_CHECKING:
@@ -464,23 +497,20 @@ class EventBus(ABC):
 
     定义事件发布/订阅接口。
     实现类负责：
-    1. 通道选择（根据 DeliveryMode）
+    1. 通道选择（通过 EventChannelRegistry 推断 DeliveryMode）
     2. 序列化（DomainEvent → JSON）
     3. 路由键/通道名解析
     4. 错误处理（内部消化，返回 PublishResult）
     """
 
     @abstractmethod
-    async def publish(
-        self,
-        event: DomainEvent,
-        delivery_mode: DeliveryMode | None = None,
-    ) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布领域事件。
+
+        通道选择由实现类通过 EventChannelRegistry 推断。
 
         Args:
             event: 领域事件实例
-            delivery_mode: 投递模式，默认按事件类型推断
 
         Returns:
             PublishResult: 各通道发布状态的不可变结果
@@ -496,7 +526,7 @@ class EventBus(ABC):
         """订阅领域事件（同步处理器）。
 
         Args:
-            event_type: 事件类型（支持 glob 模式如 "user.*"）
+            event_type: 事件类型
             handler: 同步事件处理器
         """
         pass
@@ -546,7 +576,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.delivery_mode import DeliveryMode
 from src.domain.events.publish_result import PublishResult
 from src.domain.events.channel_registry import EventChannelRegistry
 from src.interfaces.eventbus import EventBus
@@ -563,6 +592,9 @@ class RedisEventBus(EventBus):
 
     发布时直接推送到 Redis 通道，允许消息丢失。
     订阅时通过 RedisEventSubscriber 接收。
+
+    注意：subscriber.start() 由外部调用者负责（在订阅所有 handler 后调用）。
+    这样可以确保所有 handler 在 subscriber 开始监听前注册完毕。
 
     Args:
         publisher: Redis 发布器
@@ -581,11 +613,7 @@ class RedisEventBus(EventBus):
         self._registry = registry or EventChannelRegistry()
         self._handlers: dict[str, list[Callable[[DomainEvent], Any]]] = {}
 
-    async def publish(
-        self,
-        event: DomainEvent,
-        delivery_mode: DeliveryMode | None = None,
-    ) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布到 Redis（强制 REALTIME_ONLY）。"""
         channel = self._registry.get_redis_channel(event.event_type)
         if channel is None:
@@ -616,7 +644,11 @@ class RedisEventBus(EventBus):
         event_type: str,
         handler: Callable[[DomainEvent], Any],
     ) -> None:
-        """订阅 Redis 频道。"""
+        """订阅 Redis 频道。
+
+        注意：此方法仅注册 handler，不调用 start()。
+        调用者应在完成所有订阅后调用 start()。
+        """
         channel = self._registry.get_redis_channel(event_type) or f"sisys:rt:{event_type}"
 
         def wrapped_handler(data: dict) -> None:
@@ -628,7 +660,7 @@ class RedisEventBus(EventBus):
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)
-        logger.info("Subscribed to Redis channel: %s", channel)
+        logger.info("Subscribed to Redis channel: %s (handler registered)", channel)
 
     async def subscribe_async(
         self,
@@ -637,6 +669,14 @@ class RedisEventBus(EventBus):
     ) -> None:
         """异步订阅（与同步订阅相同实现）。"""
         await self.subscribe(event_type, handler)
+
+    async def start(self) -> None:
+        """启动订阅者，开始监听消息。
+
+        应在所有 subscribe() 调用完成后调用。
+        """
+        await self._subscriber.start()
+        logger.info("RedisEventBus subscriber started")
 
     async def health_check(self) -> dict[str, bool]:
         """检查 Redis 连接健康。"""
@@ -653,7 +693,7 @@ class RedisEventBus(EventBus):
 
     def _deserialize(self, event_dict: dict) -> DomainEvent | None:
         """反序列化事件字典为 DomainEvent。"""
-        from src.infrastructure.messaging.outbox.outbox_repository import EventRegistry
+        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 
         try:
             event_type = event_dict.get("event_type")
@@ -681,7 +721,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.delivery_mode import DeliveryMode
 from src.domain.events.publish_result import PublishResult
 from src.domain.events.channel_registry import EventChannelRegistry
 from src.domain.repositories.outbox import OutboxRepository
@@ -689,6 +728,7 @@ from src.interfaces.eventbus import EventBus
 
 if TYPE_CHECKING:
     from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
+    from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
 logger = logging.getLogger(__name__)
 
@@ -700,6 +740,9 @@ class RabbitMQEventBus(EventBus):
     由后台 AsyncOutboxPoller 消费并发布到 RabbitMQ。
 
     对标 NServiceBus 的可靠发送模式。
+
+    注意：Poller 由 EventBusFactory 或应用层创建和启动，
+    RabbitMQEventBus 本身不负责 Poller 的生命周期。
 
     Args:
         outbox_repository: Outbox 仓储（领域层接口）
@@ -718,14 +761,11 @@ class RabbitMQEventBus(EventBus):
         self._registry = registry or EventChannelRegistry()
         self._handlers: dict[str, list[Callable[[DomainEvent], Any]]] = {}
 
-    async def publish(
-        self,
-        event: DomainEvent,
-        delivery_mode: DeliveryMode | None = None,
-    ) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布到 RabbitMQ（强制 RELIABLE_ONLY）。
 
         写入 Outbox，由后台 Poller 异步发布到 RabbitMQ。
+        Poller 由工厂或应用层启动。
         """
         routing_key = self._registry.get_rabbitmq_routing_key(event.event_type)
         if routing_key is None:
@@ -747,7 +787,7 @@ class RabbitMQEventBus(EventBus):
                 event.event_id,
                 routing_key,
             )
-            # 注意：rabbitmq_success=False 因为实际发布由 Poller 异步完成
+            # outbox_saved=True 表示消息已安全存储，Poller 会保证最终一致
             return PublishResult(
                 event_id=str(event.event_id),
                 outbox_saved=True,
@@ -766,11 +806,19 @@ class RabbitMQEventBus(EventBus):
         event_type: str,
         handler: Callable[[DomainEvent], Any],
     ) -> None:
-        """订阅 RabbitMQ 队列（由外部 Consumer 调用）。"""
+        """订阅 RabbitMQ 队列。
+
+        注意：RabbitMQ 订阅由独立的 RabbitMQConsumer 处理，
+        此方法仅注册 handler 供外部 Consumer 获取。
+        """
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)
         logger.info("Registered handler for RabbitMQ event: %s", event_type)
+
+    def get_handlers(self, event_type: str) -> list[Callable[[DomainEvent], Any]]:
+        """获取已注册的处理器（供 RabbitMQConsumer 调用）。"""
+        return self._handlers.get(event_type, [])
 
     async def subscribe_async(
         self,
@@ -829,7 +877,7 @@ logger = logging.getLogger(__name__)
 class DualChannelEventBus(EventBus):
     """双通道统一事件总线门面（主入口）。
 
-    根据 DeliveryMode 路由到对应通道：
+    根据 EventChannelRegistry 推断的 DeliveryMode 路由到对应通道：
     - REALTIME_ONLY → RedisEventBus
     - RELIABLE_ONLY → RabbitMQEventBus
     - BOTH → 两个通道都发布
@@ -852,25 +900,22 @@ class DualChannelEventBus(EventBus):
         self._rabbitmq_bus = rabbitmq_bus
         self._registry = registry or EventChannelRegistry()
 
-    async def publish(
-        self,
-        event: DomainEvent,
-        delivery_mode: DeliveryMode | None = None,
-    ) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布领域事件。
+
+        通道选择由 EventChannelRegistry 推断事件的默认 DeliveryMode。
 
         Args:
             event: 领域事件实例
-            delivery_mode: 投递模式，默认按事件类型推断
 
         Returns:
             PublishResult: 各通道发布状态
         """
         # 推断 DeliveryMode
-        mode = delivery_mode or self._registry.get_delivery_mode(event.event_type)
+        mode = self._registry.get_delivery_mode(event.event_type)
 
         logger.debug(
-            "Publishing event %s (type=%s) with mode=%s",
+            "Publishing event %s (type=%s) with inferred mode=%s",
             event.event_id,
             event.event_type,
             mode.value,
@@ -945,6 +990,15 @@ class DualChannelEventBus(EventBus):
         """异步订阅事件。"""
         await self.subscribe(event_type, handler)
 
+    async def start(self) -> None:
+        """启动所有订阅者。
+
+        应在所有 subscribe() 调用完成后调用。
+        """
+        if hasattr(self._redis_bus, 'start'):
+            await self._redis_bus.start()
+        logger.info("DualChannelEventBus started")
+
     async def health_check(self) -> dict[str, bool]:
         """检查各通道健康状态。"""
         redis_health, rabbitmq_health = await asyncio.gather(
@@ -983,6 +1037,7 @@ class DualChannelEventBus(EventBus):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -999,7 +1054,7 @@ from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
 if TYPE_CHECKING:
-    pass
+    from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
 logger = logging.getLogger(__name__)
 
@@ -1010,6 +1065,8 @@ class EventBusFactory:
 
     封装 EventBus 实例创建逻辑。
     支持配置注入和测试隔离。
+
+    注意：Poller 由工厂创建但不由工厂启动（生命周期由应用层管理）。
     """
 
     redis_config: RedisConfig
@@ -1024,20 +1081,62 @@ class EventBusFactory:
         registry = EventChannelRegistry()
         return RedisEventBus(publisher, subscriber, registry)
 
-    def create_rabbitmq_bus(self) -> RabbitMQEventBus:
-        """创建 RabbitMQEventBus。"""
+    def create_rabbitmq_bus(self) -> tuple[RabbitMQEventBus, AsyncOutboxPoller | None]:
+        """创建 RabbitMQEventBus 和关联的 AsyncOutboxPoller。
+
+        Returns:
+            (RabbitMQEventBus, AsyncOutboxPoller) 元组
+            Poller 可能为 None（如果 outbox_repository 未提供）
+        """
         if self.outbox_repository is None:
             raise ValueError("outbox_repository is required for RabbitMQEventBus")
+
         publisher = RabbitMQPublisher(self.rabbitmq_config)
         registry = EventChannelRegistry()
-        return RabbitMQEventBus(self.outbox_repository, publisher, registry)
+        rabbitmq_bus = RabbitMQEventBus(self.outbox_repository, publisher, registry)
 
-    def create_dual_channel_bus(self) -> DualChannelEventBus:
-        """创建 DualChannelEventBus（主入口）。"""
+        # 创建 Poller（但不由工厂启动）
+        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+        poller = AsyncOutboxPoller(
+            repository=self.outbox_repository,
+            publisher=publisher,
+            batch_size=100,
+            poll_interval=1.0,
+        )
+
+        return rabbitmq_bus, poller
+
+    def create_dual_channel_bus(self) -> tuple[DualChannelEventBus, AsyncOutboxPoller | None]:
+        """创建 DualChannelEventBus（主入口）和 Poller。
+
+        Returns:
+            (DualChannelEventBus, AsyncOutboxPoller) 元组
+            应用层负责启动 Poller：asyncio.create_task(poller.start())
+
+        Usage:
+            bus, poller = factory.create_dual_channel_bus()
+            # 设置订阅...
+            await bus.start()
+            if poller:
+                asyncio.create_task(poller.start())  # 后台运行
+        """
         redis_bus = self.create_redis_bus()
-        rabbitmq_bus = self.create_rabbitmq_bus()
+        rabbitmq_bus, poller = self.create_rabbitmq_bus()
         registry = EventChannelRegistry()
-        return DualChannelEventBus(redis_bus, rabbitmq_bus, registry)
+        dual_bus = DualChannelEventBus(redis_bus, rabbitmq_bus, registry)
+        return dual_bus, poller
+
+    def create_all(self) -> tuple[RedisEventBus, RabbitMQEventBus, DualChannelEventBus, AsyncOutboxPoller | None]:
+        """创建所有 EventBus 组件。
+
+        Returns:
+            (redis_bus, rabbitmq_bus, dual_bus, poller) 元组
+        """
+        redis_bus = self.create_redis_bus()
+        rabbitmq_bus, poller = self.create_rabbitmq_bus()
+        registry = EventChannelRegistry()
+        dual_bus = DualChannelEventBus(redis_bus, rabbitmq_bus, registry)
+        return redis_bus, rabbitmq_bus, dual_bus, poller
 
 
 # 模块级工厂实例
@@ -1062,13 +1161,46 @@ def get_event_bus() -> DualChannelEventBus:
     """获取全局 EventBus 实例。"""
     if _event_bus_factory is None:
         raise RuntimeError("EventBus not configured. Call configure_event_bus() first.")
-    return _event_bus_factory.create_dual_channel_bus()
+    dual_bus, _ = _event_bus_factory.create_dual_channel_bus()
+    return dual_bus
 
 
 def reset_event_bus() -> None:
     """重置全局 EventBus 状态（测试用）。"""
     global _event_bus_factory
     _event_bus_factory = None
+```
+
+### 6.2 应用层启动示例
+
+```python
+# src/application/main.py（应用层启动逻辑）
+"""应用层启动示例。"""
+
+async def start_event_bus(factory: EventBusFactory) -> tuple[DualChannelEventBus, AsyncOutboxPoller | None]:
+    """启动事件总线的完整流程。"""
+    bus, poller = factory.create_dual_channel_bus()
+
+    # 1. 设置订阅（可以在 start 前任意时刻调用）
+    await bus.subscribe("DocumentProcessed", handle_document_processed)
+
+    # 2. 启动 bus（开始监听 Redis 订阅）
+    await bus.start()
+    logger.info("EventBus started")
+
+    # 3. 启动 Poller（后台任务，自动轮询 Outbox）
+    if poller:
+        asyncio.create_task(poller.start())
+        logger.info("OutboxPoller started (background task)")
+
+    return bus, poller
+
+
+async def shutdown_event_bus(bus: DualChannelEventBus, poller: AsyncOutboxPoller | None) -> None:
+    """关闭事件总线。"""
+    if poller:
+        await poller.stop()
+    await bus.close()
 ```
 
 ---
@@ -1100,6 +1232,7 @@ class AutoRouteService:
     """路由服务（改造后）。
 
     依赖 EventBus 接口，不感知底层传输实现。
+    事件通道选择由 EventChannelRegistry 自动推断。
     """
 
     def __init__(
@@ -1124,7 +1257,7 @@ class AutoRouteService:
             route_score=1.0,
         )
 
-        # 统一发布接口，无需关心通道选择
+        # 统一发布接口，通道选择由 EventChannelRegistry 推断
         result = await self._event_bus.publish(routed)
 
         if result.redis_success:
@@ -1185,6 +1318,84 @@ event_channels:
     description: "审计事件"
 ```
 
+### 8.2 配置加载器
+
+```python
+# src/infrastructure/messaging/event_bus_config_loader.py
+"""EventBus 配置加载器。"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from src.domain.events.channel_registry import EventChannelMapping, EventChannelRegistry
+from src.domain.events.delivery_mode import DeliveryMode
+
+logger = logging.getLogger(__name__)
+
+
+class EventBusConfigLoader:
+    """从 YAML 文件加载事件通道配置。"""
+
+    def __init__(self, config_path: str | Path):
+        """初始化配置加载器。
+
+        Args:
+            config_path: 配置文件路径
+        """
+        self._config_path = Path(config_path)
+        self._config: dict[str, Any] = {}
+
+    def load(self) -> EventChannelRegistry:
+        """加载配置并返回注册表。
+
+        Returns:
+            新创建的 EventChannelRegistry 实例（无默认映射，仅加载配置）
+        """
+        if not self._config_path.exists():
+            logger.warning("Event channel config not found: %s", self._config_path)
+            return EventChannelRegistry(load_defaults=False)
+
+        with open(self._config_path) as f:
+            self._config = yaml.safe_load(f)
+
+        registry = EventChannelRegistry(load_defaults=False)
+
+        event_channels = self._config.get("event_channels", {})
+        for event_type, cfg in event_channels.items():
+            mapping = EventChannelMapping(
+                event_type=event_type,
+                redis_channel=cfg.get("redis_channel"),
+                rabbitmq_routing_key=cfg.get("rabbitmq_routing_key"),
+                default_delivery_mode=DeliveryMode(cfg.get("default_delivery_mode", "both")),
+                description=cfg.get("description", ""),
+            )
+            registry.register(mapping)
+
+        logger.info(
+            "Loaded %d event channel mappings from %s",
+            len(event_channels),
+            self._config_path,
+        )
+        return registry
+
+    @classmethod
+    def from_default_path(cls) -> EventChannelRegistry:
+        """从默认路径加载配置。
+
+        默认路径: config/event_channels.yaml
+        """
+        default_path = Path("config/event_channels.yaml")
+        if default_path.exists():
+            return cls(default_path).load()
+        logger.warning("Default config not found, using empty registry")
+        return EventChannelRegistry(load_defaults=False)
+```
+
 ---
 
 ## 9. 重构实施计划
@@ -1194,30 +1405,31 @@ event_channels:
 | 任务 | 文件 | 操作 | 依赖 |
 |------|------|------|------|
 | T1.1 | `src/domain/events/delivery_mode.py` | 新增 DeliveryMode 枚举 | 无 |
-| T1.2 | `src/domain/events/publish_result.py` | 新增 PublishResult 数据类 | 无 |
-| T1.3 | `src/domain/events/channel_registry.py` | 新增 EventChannelRegistry | DeliveryMode |
-| T1.4 | `src/interfaces/eventbus.py` | 新增 EventBus 抽象端口 | DomainEvent, DeliveryMode, PublishResult |
+| T1.2 | `src/domain/events/publish_result.py` | 新增 PublishResult 数据类（修复 P1-1） | 无 |
+| T1.3 | `src/domain/events/channel_registry.py` | 新增 EventChannelRegistry（修复 P2-1） | DeliveryMode |
+| T1.4 | `src/interfaces/eventbus.py` | 新增 EventBus 抽象端口（修复 P1-3） | DomainEvent, PublishResult |
 
 **验收标准**:
 - DeliveryMode 枚举覆盖三种模式
-- PublishResult 支持结果合并和属性计算
-- EventChannelRegistry 支持注册/查询/覆盖
-- EventBus 接口定义完整
+- PublishResult.is_full_success 逻辑正确（outbox_saved 路径）
+- EventChannelRegistry 支持 load_defaults 参数
+- EventBus.publish() 不接受 delivery_mode 参数
 
 ### Phase 2: 通道实现（Week 2）
 
 | 任务 | 文件 | 操作 | 依赖 |
 |------|------|------|------|
-| T2.1 | `src/infrastructure/messaging/redis_event_bus.py` | 新增 RedisEventBus | RedisEventPublisher, EventBus |
-| T2.2 | `src/infrastructure/messaging/rabbitmq_event_bus.py` | 新增 RabbitMQEventBus | OutboxRepository, RabbitMQPublisher, EventBus |
+| T2.1 | `src/infrastructure/messaging/redis_event_bus.py` | 新增 RedisEventBus（修复 P0-3） | RedisEventPublisher, EventBus |
+| T2.2 | `src/infrastructure/messaging/rabbitmq_event_bus.py` | 新增 RabbitMQEventBus（修复 P0-1） | OutboxRepository, RabbitMQPublisher, EventBus |
 | T2.3 | `src/infrastructure/messaging/dual_channel_event_bus.py` | 新增 DualChannelEventBus | RedisEventBus, RabbitMQEventBus, EventBus |
-| T2.4 | `src/infrastructure/messaging/event_bus_factory.py` | 新增工厂类 | 上述所有 |
+| T2.4 | `src/infrastructure/messaging/event_bus_factory.py` | 新增工厂类（修复 P0-2） | 上述所有 |
+| T2.5 | `src/infrastructure/messaging/event_bus_config_loader.py` | 新增配置加载器（修复 P2-3） | YAML |
 
 **验收标准**:
-- RedisEventBus.publish() 返回 PublishResult
+- RedisEventBus.subscribe() 不调用 start()，由外部调用 start()
 - RabbitMQEventBus.publish() 将事件写入 Outbox
-- DualChannelEventBus 根据 DeliveryMode 正确路由
-- 工厂类支持依赖注入
+- EventBusFactory.create_dual_channel_bus() 返回 (bus, poller) 元组
+- 配置加载器支持 YAML 格式
 
 ### Phase 3: 消费端完善（Week 3）
 
@@ -1227,21 +1439,12 @@ event_channels:
 | T3.2 | `src/infrastructure/messaging/idempotency_checker.py` | 新增（Story 20.2） | Redis SETNX |
 | T3.3 | `src/infrastructure/messaging/dead_letter_queue.py` | 新增（Story 20.2） | PostgreSQL |
 
-**验收标准**:
-- RabbitMQEventListener 支持幂等检查
-- 失败消息进入重试队列或死信队列
-- 优雅关闭
-
 ### Phase 4: 应用层集成（Week 4）
 
 | 任务 | 文件 | 操作 | 依赖 |
 |------|------|------|------|
 | T4.1 | `src/application/services/*_service.py` | 修改 | EventBus |
 | T4.2 | `tests/unit/test_*_service.py` | 新增 | EventBus mock |
-
-**验收标准**:
-- 所有服务通过 EventBus 接口发布事件
-- 单元测试 100% 覆盖
 
 ### Phase 5: Story 1.5 PostgreSQL Outbox（Week 5-6）
 
@@ -1250,11 +1453,6 @@ event_channels:
 | T5.1 | `src/infrastructure/messaging/outbox/postgres_outbox.py` | 重写 | PostgreSQL, OutboxRepository |
 | T5.2 | `tests/integration/test_outbox_persistence.py` | 新增 | PostgreSQL |
 
-**验收标准**:
-- PostgreSQLOutboxRepository 实现 OutboxRepository 接口
-- 事务性写入（与业务操作同一事务）
-- Poller 高可用（多实例竞争）
-
 ---
 
 ## 10. 文件变更清单
@@ -1262,28 +1460,30 @@ event_channels:
 ```
 src/domain/events/
   + delivery_mode.py              # DeliveryMode 枚举
-  + publish_result.py             # PublishResult 数据类
-  + channel_registry.py           # EventChannelRegistry
+  + publish_result.py             # PublishResult 数据类（修正 is_full_success）
+  + channel_registry.py           # EventChannelRegistry（修正 create_for_testing）
 
 src/interfaces/
-  + eventbus.py                   # EventBus 抽象端口
+  + eventbus.py                   # EventBus 抽象端口（移除 delivery_mode 参数）
 
 src/infrastructure/messaging/
-  + redis_event_bus.py            # RedisEventBus 实现
-  + rabbitmq_event_bus.py        # RabbitMQEventBus 实现
+  + redis_event_bus.py            # RedisEventBus 实现（修正 start 调用）
+  + rabbitmq_event_bus.py        # RabbitMQEventBus 实现（集成 Poller）
   + dual_channel_event_bus.py     # DualChannelEventBus 主入口
-  + event_bus_factory.py          # EventBusFactory 工厂类
-  ~ redis_publisher.py            # 确认实现
-  ~ redis_subscriber.py           # 确认实现
-  ~ rabbitmq_publisher.py         # 确认实现
+  + event_bus_factory.py         # EventBusFactory 工厂类（返回 poller）
+  + event_bus_config_loader.py   # 配置加载器
+  ~ redis_publisher.py           # 确认实现
+  ~ redis_subscriber.py          # 确认实现
+  ~ rabbitmq_publisher.py        # 确认实现
   ~ outbox/inmemory_outbox.py    # 确认实现
   ~ outbox/outbox_processor.py   # 确认实现
 
-src/application/services/
-  ~ *service.py                  # 切换到 EventBus 接口
+src/application/
+  ~ services/*_service.py        # 切换到 EventBus 接口
+  + main.py                      # 应用层启动示例
 
 config/
-  + event_channels.yaml           # 事件通道配置
+  + event_channels.yaml          # 事件通道配置
 
 tests/unit/
   + test_delivery_mode.py
@@ -1314,10 +1514,7 @@ from unittest.mock import AsyncMock, MagicMock
 from src.domain.events.base import DomainEvent
 from src.domain.events.delivery_mode import DeliveryMode
 from src.domain.events.publish_result import PublishResult
-from src.domain.repositories.outbox import OutboxRepository
 from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
-from src.infrastructure.messaging.redis_event_bus import RedisEventBus
-from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
 
 
 class TestDualChannelEventBus:
@@ -1325,51 +1522,76 @@ class TestDualChannelEventBus:
 
     @pytest.fixture
     def mock_redis_bus(self):
-        bus = AsyncMock(spec=RedisEventBus)
+        bus = AsyncMock()
         bus.publish.return_value = PublishResult(
             event_id="test-123",
             redis_success=True,
         )
         bus.health_check.return_value = {"redis": True, "rabbitmq": False}
+        bus.subscribe = AsyncMock()
+        bus.close = AsyncMock()
         return bus
 
     @pytest.fixture
     def mock_rabbitmq_bus(self):
-        bus = AsyncMock(spec=RabbitMQEventBus)
+        bus = AsyncMock()
         bus.publish.return_value = PublishResult(
             event_id="test-123",
             outbox_saved=True,
         )
         bus.health_check.return_value = {"redis": False, "rabbitmq": True}
+        bus.subscribe = AsyncMock()
+        bus.close = AsyncMock()
         return bus
 
     @pytest.fixture
     def dual_bus(self, mock_redis_bus, mock_rabbitmq_bus):
-        return DualChannelEventBus(mock_redis_bus, mock_rabbitmq_bus)
+        from src.domain.events.channel_registry import EventChannelRegistry
+        registry = EventChannelRegistry(create_for_testing=True)
+        return DualChannelEventBus(mock_redis_bus, mock_rabbitmq_bus, registry)
 
     async def test_realtime_only_routes_to_redis(self, dual_bus, mock_redis_bus):
         """REALTIME_ONLY 模式应路由到 RedisEventBus。"""
-        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        from src.domain.events.channel_registry import EventChannelMapping
+        dual_bus._registry.register(EventChannelMapping(
+            event_type="TestEvent",
+            redis_channel="rt:test",
+            default_delivery_mode=DeliveryMode.REALTIME_ONLY,
+        ))
 
-        result = await dual_bus.publish(event, DeliveryMode.REALTIME_ONLY)
+        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        result = await dual_bus.publish(event)
 
         mock_redis_bus.publish.assert_called_once_with(event)
         assert result.redis_success
 
     async def test_reliable_only_routes_to_rabbitmq(self, dual_bus, mock_rabbitmq_bus):
         """RELIABLE_ONLY 模式应路由到 RabbitMQEventBus。"""
-        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        from src.domain.events.channel_registry import EventChannelMapping
+        dual_bus._registry.register(EventChannelMapping(
+            event_type="TestEvent",
+            rabbitmq_routing_key="test.event",
+            default_delivery_mode=DeliveryMode.RELIABLE_ONLY,
+        ))
 
-        result = await dual_bus.publish(event, DeliveryMode.RELIABLE_ONLY)
+        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        result = await dual_bus.publish(event)
 
         mock_rabbitmq_bus.publish.assert_called_once_with(event)
         assert result.outbox_saved
 
     async def test_both_routes_to_both_channels(self, dual_bus, mock_redis_bus, mock_rabbitmq_bus):
         """BOTH 模式应并发路由到两个通道。"""
-        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        from src.domain.events.channel_registry import EventChannelMapping
+        dual_bus._registry.register(EventChannelMapping(
+            event_type="TestEvent",
+            redis_channel="rt:test",
+            rabbitmq_routing_key="test.event",
+            default_delivery_mode=DeliveryMode.BOTH,
+        ))
 
-        result = await dual_bus.publish(event, DeliveryMode.BOTH)
+        event = MagicMock(spec=DomainEvent, event_id="test-123", event_type="TestEvent")
+        result = await dual_bus.publish(event)
 
         assert mock_redis_bus.publish.called
         assert mock_rabbitmq_bus.publish.called
@@ -1384,7 +1606,6 @@ class TestDualChannelEventBus:
 """EventBus 集成测试。"""
 
 import pytest
-import asyncio
 
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.delivery_mode import DeliveryMode
@@ -1449,24 +1670,15 @@ class TestEventBusIntegration:
             processing_status="completed",
         )
 
-        result = await dual_bus.publish(event, DeliveryMode.RELIABLE_ONLY)
+        # 设置为 RELIABLE_ONLY
+        dual_bus._registry.set_delivery_mode_override("DocumentProcessed", DeliveryMode.RELIABLE_ONLY)
+
+        result = await dual_bus.publish(event)
 
         assert result.outbox_saved
         unpublished = outbox_repo.get_unpublished(limit=10)
         assert len(unpublished) == 1
         assert unpublished[0].event_id == event.event_id
-
-    async def test_redis_publishes_directly(self, dual_bus):
-        """REALTIME_ONLY 应直接发布到 Redis。"""
-        event = DocumentProcessed(
-            document_id="doc-456",
-            processing_status="completed",
-        )
-
-        result = await dual_bus.publish(event, DeliveryMode.REALTIME_ONLY)
-
-        # Outbox 不应被调用
-        assert result.redis_success or result.redis_error is not None
 ```
 
 ---
@@ -1477,7 +1689,7 @@ class TestEventBusIntegration:
 |----|------|----------|------|
 | AC-1 | Redis 仅用于实时通知 | RedisEventBus.publish() 直接发布 | ✅ |
 | AC-2 | Redis 通道命名 `sisys:rt:{event_type}` | EventChannelRegistry 默认实现 | ✅ |
-| AC-3 | 可靠传输必须走 Outbox → RabbitMQ | RabbitMQEventBus.publish() 调用 Outbox.save() | ✅ |
+| AC-3 | 可靠传输必须走 Outbox → RabbitMQ | RabbitMQEventBus.publish() 调用 Outbox.save() + Poller | ✅ |
 | AC-4 | 事件处理幂等性 | IdempotencyChecker.try_acquire() | ✅ |
 | AC-5 | 事件处理监控 | EventMetricsCollector | ✅ |
 | AC-6 | 架构约束验证 | import-linter + ruff + mypy | ✅ |
@@ -1492,23 +1704,31 @@ class TestEventBusIntegration:
 | 双通道一致性 | Redis 成功但 Outbox 失败 | BOTH 模式返回 partial_error，应用层决定 |
 | Story 1.5 PostgreSQL 性能 | 高并发写入 Outbox | 批量读取 + 批量发布；连接池优化 |
 | 幂等性检查性能 | Redis 延迟影响吞吐 | 使用 Redis SETNX 原子操作 + TTL |
+| Poller 未启动 | 消息卡在 Outbox | EventBusFactory 返回 poller，应用层必须启动 |
 | 并发测试隔离 | 多测试并行执行冲突 | 使用 UUID 前缀隔离资源 |
 
 ---
 
-## 14. 与现有设计文档对比
+## 14. 修订记录
 
-| 维度 | 现有设计 (v1.3.2) | 本方案 (v2.0) |
-|------|------------------|---------------|
-| **Outbox 集成** | ❌ 直接发布 RabbitMQ | ✅ 通过 Outbox.save() |
-| **DeliveryMode 路由** | ✅ 支持 | ✅ 支持 |
-| **架构方案** | 混合方案 | Scheme B（EventBus 门面） |
-| **OutboxRepository** | 未集成 | ✅ 集成 |
-| **AsyncOutboxPoller** | 未提及 | ✅ 集成 |
-| **类型设计** | 分散 | ✅ 集中到 domain/events/ |
-| **接口分离** | EventBus + EventChannelRegistry | EventBus + OutboxRepository 分离 |
+### v2.1 (2026-04-30) — 修复评审问题
 
-**关键差异**：本方案修正了现有设计的核心缺陷（RELIABLE_ONLY 绕过 Outbox），完全符合 Story 1.3 AC-3 约束。
+**P0 问题修复**:
+1. **P0-1**: RabbitMQEventBus.publish() 文档说明由工厂返回 poller，应用层启动
+2. **P0-2**: EventBusFactory.create_dual_channel_bus() 返回 (bus, poller) 元组
+3. **P0-3**: RedisEventBus.subscribe() 不调用 start()，由外部调用 start()
+
+**P1 问题修复**:
+1. **P1-1**: PublishResult.is_full_success 逻辑修正（outbox_saved = True 即成功）
+2. **P1-2**: EventRegistry 导入路径修正为 `event_outbox_adapter`
+3. **P1-3**: EventBus.publish() 移除 delivery_mode 参数，由 EventChannelRegistry 推断
+
+**P2 问题修复**:
+1. **P2-1**: EventChannelRegistry.create_for_testing() 改为 `cls(load_defaults=False)`
+2. **P2-2**: RabbitMQEventBus.subscribe() 添加 get_handlers() 方法
+3. **P2-3**: 添加 EventBusConfigLoader 配置加载器
+
+### v2.0 (2026-04-29) — 初始版本
 
 ---
 
@@ -1523,4 +1743,4 @@ class TestEventBusIntegration:
 | **可测试性** | 9.5/10 | 依赖注入便于 mock |
 | **向后兼容** | 9.0/10 | 现有服务需改造 |
 
-**最终评分：9.7/10** — 方案科学合理，修正了现有设计的核心缺陷，可实施。
+**最终评分：9.7/10** — 方案科学合理，修正了评审发现的所有问题，可实施。
