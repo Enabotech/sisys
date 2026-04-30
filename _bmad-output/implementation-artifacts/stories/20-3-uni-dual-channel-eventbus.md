@@ -287,15 +287,15 @@
 | 🟢 绿 | 实现 `RedisEventBus` 类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 RedisEventBus 失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现 EventPublisher + EventSubscriber 双接口
-- [ ] Subtask 5.3: 🟢 绿 — 实现 publish() 直接推送 Redis
-- [ ] Subtask 5.4: 🟢 绿 — 实现 subscribe() / subscribe_async()
-- [ ] Subtask 5.5: 🔄 重构 — 实现 start() / close() 生命周期
+- [x] Subtask 5.1: 🔴 红 — 编写 RedisEventBus 失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现 EventPublisher + EventSubscriber 双接口
+- [x] Subtask 5.3: 🟢 绿 — 实现 publish() 直接推送 Redis
+- [x] Subtask 5.4: 🟢 绿 — 实现 subscribe() / subscribe_async()
+- [x] Subtask 5.5: 🔄 重构 — 实现 start() / close() 生命周期
 
 **完成标准:**
-- [ ] RedisEventBus 实现完成
-- [ ] 双接口实现验证通过
+- [x] RedisEventBus 实现完成
+- [x] 双接口实现验证通过
 
 ---
 
@@ -309,15 +309,15 @@
 | 🟢 绿 | 实现 `RabbitMQEventBus` 类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 RabbitMQEventBus 失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 实现 EventPublisher 接口
-- [ ] Subtask 6.3: 🟢 绿 — 实现 publish() 调用 OutboxRepository.save()
-- [ ] Subtask 6.4: 🟢 绿 — 实现 close() 空方法
-- [ ] Subtask 6.5: 🔄 重构 — 验证与 OutboxRepository 集成
+- [x] Subtask 6.1: 🔴 红 — 编写 RabbitMQEventBus 失败测试
+- [x] Subtask 6.2: 🟢 绿 — 实现 EventPublisher 接口
+- [x] Subtask 6.3: 🟢 绿 — 实现 publish() 调用 OutboxRepository.save()
+- [x] Subtask 6.4: 🟢 绿 — 实现 close() 空方法
+- [x] Subtask 6.5: 🔄 重构 — 验证与 OutboxRepository 集成
 
 **完成标准:**
-- [ ] RabbitMQEventBus 实现完成
-- [ ] Outbox 集成验证通过
+- [x] RabbitMQEventBus 实现完成
+- [x] Outbox 集成验证通过
 
 ---
 
@@ -331,15 +331,15 @@
 | 🟢 绿 | 实现 `DualChannelEventBus` 类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 DualChannelEventBus 失败测试
-- [ ] Subtask 7.2: 🟢 绿 — 实现构造函数（类型提示 RedisEventBus/RabbitMQEventBus）
-- [ ] Subtask 7.3: 🟢 绿 — 实现 publish() 根据 DeliveryMode 路由
-- [ ] Subtask 7.4: 🟢 绿 — 实现 subscribe() 仅支持 REALTIME
-- [ ] Subtask 7.5: 🔄 重构 — 实现 start() / close() 生命周期
+- [x] Subtask 7.1: 🔴 红 — 编写 DualChannelEventBus 失败测试
+- [x] Subtask 7.2: 🟢 绿 — 实现构造函数（类型提示 RedisEventBus/RabbitMQEventBus）
+- [x] Subtask 7.3: 🟢 绿 — 实现 publish() 根据 DeliveryMode 路由
+- [x] Subtask 7.4: 🟢 绿 — 实现 subscribe() 仅支持 REALTIME
+- [x] Subtask 7.5: 🔄 重构 — 实现 start() / close() 生命周期
 
 **完成标准:**
-- [ ] DualChannelEventBus 实现完成
-- [ ] RELIABLE 订阅抛出 ValueError 验证通过
+- [x] DualChannelEventBus 实现完成
+- [x] RELIABLE 订阅抛出 ValueError 验证通过
 
 ---
 
@@ -353,15 +353,15 @@
 | 🟢 绿 | 实现 `EventBusFactory` 类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 8.1: 🔴 红 — 编写 EventBusFactory 失败测试
-- [ ] Subtask 8.2: 🟢 绿 — 实现 __post_init__ 创建共享组件
-- [ ] Subtask 8.3: 🟢 绿 — 实现 create_redis_bus(), create_rabbitmq_bus(), create_poller()
-- [ ] Subtask 8.4: 🟢 绿 — 实现 create_dual_channel_bus() 返回元组
-- [ ] Subtask 8.5: 🔄 重构 — 添加全局配置函数
+- [x] Subtask 8.1: 🔴 红 — 编写 EventBusFactory 失败测试
+- [x] Subtask 8.2: 🟢 绿 — 实现 __post_init__ 创建共享组件
+- [x] Subtask 8.3: 🟢 绿 — 实现 create_redis_bus(), create_rabbitmq_bus(), create_poller()
+- [x] Subtask 8.4: 🟢 绿 — 实现 create_dual_channel_bus() 返回元组
+- [x] Subtask 8.5: 🔄 重构 — 添加全局配置函数
 
 **完成标准:**
-- [ ] EventBusFactory 实现完成
-- [ ] 共享实例复用验证通过
+- [x] EventBusFactory 实现完成
+- [x] 共享实例复用验证通过
 
 ---
 
@@ -372,17 +372,17 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_event_bus_config_loader.py` |
-| 🟢 绿 | 实现 `EventBusConfigLoader` 类 |
+| 🟢 绿 — 实现 `EventBusConfigLoader` 类 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 9.1: 🔴 红 — 编写 EventBusConfigLoader 失败测试
-- [ ] Subtask 9.2: 🟢 绿 — 实现 load() 使用 register()
-- [ ] Subtask 9.3: 🟢 绿 — 实现 from_default_path()
-- [ ] Subtask 9.4: 🔄 重构 — 创建 config/event_channels.yaml
+- [x] Subtask 9.1: 🔴 红 — 编写 EventBusConfigLoader 失败测试
+- [x] Subtask 9.2: 🟢 绿 — 实现 load() 使用 register()
+- [x] Subtask 9.3: 🟢 绿 — 实现 from_default_path()
+- [x] Subtask 9.4: 🔄 重构 — 创建 config/event_channels.yaml
 
 **完成标准:**
-- [ ] EventBusConfigLoader 实现完成
-- [ ] YAML 配置加载验证通过
+- [x] EventBusConfigLoader 实现完成
+- [x] YAML 配置加载验证通过
 
 ---
 
