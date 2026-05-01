@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.3）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.4）
 
 **生成日期**: 2026-05-01
-**版本**: v1.3（第三轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 三轮审查反馈
+**版本**: v1.4（第四轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 四轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -293,12 +293,12 @@ class IntegrityPort(ABC):
         pass
 
     @abstractmethod
-    def compute_hash(self, data: str | bytes, algorithm: Literal["sha256", "sha512", "md5"] | None = None) -> str:
+    def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
         """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
         Args:
             data: 数据
-            algorithm: 算法（sha256/sha512/md5）
+            algorithm: 算法字符串（"sha256"/"sha512"/"md5"），None 使用默认算法
 
         Returns:
             十六进制编码的哈希值
@@ -310,14 +310,14 @@ class IntegrityPort(ABC):
         self,
         data: str | bytes,
         expected_hash: str,
-        algorithm: Literal["sha256", "sha512", "md5"] | None = None,
+        algorithm: str | None = None,
     ) -> bool:
         """验证数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
         Args:
             data: 数据
             expected_hash: 期望的哈希值
-            algorithm: 算法
+            algorithm: 算法字符串（"sha256"/"sha512"/"md5"），None 使用默认算法
 
         Returns:
             True 如果哈希匹配
@@ -501,23 +501,33 @@ class IntegrityVerifier(IntegrityPort):
         return await asyncio.to_thread(_read_and_verify)
 
     # CPU 密集型：sync 方法，事件循环中直接调用不阻塞
-    def compute_hash(self, data: str | bytes, algorithm: HashAlgorithm | None = None) -> str:
-        """计算数据哈希（CPU 密集型）。"""
+    def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
+        """计算数据哈希（CPU 密集型）。
+
+        注意：Port 接口使用 str 类型以避免 Domain 层依赖 infrastructure 层。
+        实现内部将字符串转换为 HashAlgorithm enum。
+        """
+        # 字符串到 enum 的转换
         if algorithm is None:
-            algorithm = self._default_algorithm
+            algo = self._default_algorithm
+        else:
+            from src.infrastructure.security.models import HashAlgorithm
+            algo = HashAlgorithm(algorithm)
+
         if isinstance(data, str):
             data = data.encode("utf-8")
-        if algorithm == HashAlgorithm.SHA256:
+
+        if algo == HashAlgorithm.SHA256:
             return hashlib.sha256(data).hexdigest()
-        elif algorithm == HashAlgorithm.SHA512:
+        elif algo == HashAlgorithm.SHA512:
             return hashlib.sha512(data).hexdigest()
-        elif algorithm == HashAlgorithm.MD5:
+        elif algo == HashAlgorithm.MD5:
             return hashlib.md5(data, usedforsecurity=False).hexdigest()
         else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
+            raise ValueError(f"Unsupported algorithm: {algo}")
 
     # CPU 密集型：sync 方法
-    def verify_hash(self, data: str | bytes, expected_hash: str, algorithm: HashAlgorithm | None = None) -> bool:
+    def verify_hash(self, data: str | bytes, expected_hash: str, algorithm: str | None = None) -> bool:
         """验证数据哈希（CPU 密集型）。"""
         actual_hash = self.compute_hash(data, algorithm)
         return hmac.compare_digest(actual_hash.lower(), expected_hash.lower())
@@ -644,7 +654,7 @@ class SixLayerStorageCoordinator:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属 - v1.3修正版）                    │
+│               宗师级设计六原则（方案B专属 - v1.4修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
@@ -830,10 +840,11 @@ Phase 6: 集成验证（2d）
 | v1.1 | **第一轮审查修正**：<br>- 移除 `ObjectOperationsPort`（与 `ObjectStorageRepository` 职责重叠）<br>- 修正 `IntegrityPort`：`compute_hash`/`verify_hash` 保留 sync（CPU 密集型）<br>- 修正 `download_object`：使用 `run_in_executor` 包装同步读取<br>- 工时修正：13d → 10.75d |
 | v1.2 | **第二轮审查修正**：<br>- 添加 L1CachePort 可选优化说明<br>- 明确"目标状态"vs"当前状态"描述 |
 | v1.3 | **第三轮审查修正**：<br>- §4.2 移除 L1CachePort 引用，标注为预留接口<br>- IntegrityPort 使用 `Literal` 类型避免 domain 层依赖 infrastructure<br>- LocalModelHealth → OllamaHealthAdapter 重命名说明<br>- download_object 添加性能说明<br>- Phase 2 MemoryIndex 工时调整：1.5d → 2d<br>- 添加调用链风险评估<br>- 添加 Mock 实现准备说明<br>- 工时调整：10.75d → 11.25d |
+| v1.4 | **第四轮审查修正**：<br>- IntegrityPort 接口类型从 `Literal["sha256", "sha512", "md5"]` 改为 `str \| None`<br>- 实现内部处理字符串到 HashAlgorithm enum 的转换<br>- 符合 Domain 层零依赖原则 |
 
 ---
 
-**方案B v1.3 核心价值**：
+**方案B v1.4 核心价值**：
 1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
 2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
 3. 避免 Port 职责重叠，遵循单一职责原则
