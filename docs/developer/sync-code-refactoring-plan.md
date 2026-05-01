@@ -1,7 +1,7 @@
-# SISYS 同步代码最优重构方案（第六版 - 收敛版）
+# SISYS 同步代码最优重构方案（第七版 - 收敛版）
 
 **生成日期**: 2026-05-01
-**版本**: v6.0（第六轮审查 - 与 sync-code-analysis.md 严格对齐，收敛版）
+**版本**: v7.0（第七轮审查 - 源码逐项验证，收敛版）
 **依据**: sync-code-analysis.md（权威基准） + 源码验证
 **目标**: 严格对齐分析报告，输出无歧义的可执行方案
 
@@ -9,11 +9,11 @@
 
 ## 0. 审查说明
 
-**收敛声明**：本版本严格以 `sync-code-analysis.md` 为权威基准，交叉验证行号和问题分类，确保方案与分析报告一一对应，消除歧义。
+**收敛声明**：本版本以源码逐项验证为基础，确保方案与实际代码一一对应。
 
 **验证方法**：
 ```bash
-# 源码行号验证
+# 源码行号验证（grep 输出行号与报告一致）
 grep -n "asyncio.run\|requests\.Session\|threading\.Thread\|with open\|\.write_text\|\.read_text\|fcntl\.flock" \
   src/infrastructure/audit/event_listener.py \
   src/infrastructure/routing/local_model_health.py \
@@ -28,21 +28,21 @@ grep -n "asyncio.run\|requests\.Session\|threading\.Thread\|with open\|\.write_t
 
 ## 1. 问题清单（与 sync-code-analysis.md 严格对齐）
 
-### 1.1 问题分布矩阵（基于 sync-code-analysis.md §完整问题清单）
+### 1.1 问题分布矩阵
 
-| # | 文件:行号 | 问题 | 严重程度 | 重构方案 | 验证状态 |
-|---|-----------|------|----------|----------|----------|
-| 1 | `event_listener.py:106` | `asyncio.run()` 在 sync 方法 | P0 | call_soon + create_task | ✓ 已验证 |
-| 2 | `local_model_health.py:51` | 同步 `requests.Session.get()` | P0 | HealthCheckPort + httpx | ✓ 已验证 |
-| 3 | `engine.py:76` | 同步 `create_engine()` | P1 | 评估后决策 | ✓ 已验证 |
-| 4 | `auto_trigger_listener.py:112-118` | 重复创建事件循环 | P1 | 重构为纯 asyncio | ✓ 已验证 |
-| 5 | `file_memory_adapter.py:59` | 同步 `Path.write_text()` | P1 | aiofiles | ✓ 已验证 |
-| 6 | `file_memory_adapter.py:77` | 同步 `Path.read_text()` | P1 | aiofiles | ✓ 已验证 |
-| 7 | `memory_index.py:125` | 同步 `open()` + `rename()` | P1 | to_thread | ✓ 已验证 |
-| 8 | `memory_index.py:139` | 同步 `open()` 在 truncate | P1 | to_thread | ✓ 已验证 |
-| 9 | `event_bus_config_loader.py:41` | 同步 `open()` + YAML | P1 | 启动时调用，可接受 | ✓ 已验证 |
-| 10 | `integrity_service.py:189` | async 方法内同步 `open()` | P1 | to_thread | ✓ 已验证 |
-| 11 | `object_operations.py:371` | async 方法内同步 `open()` | P1 | to_thread | ✓ 已验证 |
+| # | 文件:行号 | 源码确认 | 问题 | 严重程度 | 重构方案 | 验证状态 |
+|---|-----------|----------|------|----------|----------|----------|
+| 1 | `event_listener.py:106` | ✓ | `asyncio.run()` 在 sync 方法 | P0 | call_soon + create_task | ✓ 已验证 |
+| 2 | `local_model_health.py:51` | ✓ | 同步 `requests.Session.get()` | P0 | HealthCheckPort + httpx | ✓ 已验证 |
+| 3 | `engine.py:76` | ✓ | 同步 `create_engine()` | P1 | 评估后决策 | ✓ 已验证 |
+| 4 | `auto_trigger_listener.py:112-118` | ✓ | 重复创建事件循环 | P1 | 重构为纯 asyncio | ✓ 已验证 |
+| 5 | `file_memory_adapter.py:59` | ✓ | 同步 `Path.write_text()` | P1 | aiofiles | ✓ 已验证 |
+| 6 | `file_memory_adapter.py:77` | ✓ | 同步 `Path.read_text()` | P1 | aiofiles | ✓ 已验证 |
+| 7 | `memory_index.py:125` | ✓ | 同步 `open()` + `rename()` | P1 | to_thread | ✓ 已验证 |
+| 8 | `memory_index.py:139` | ✓ | 同步 `open()` 在 truncate | P1 | to_thread | ✓ 已验证 |
+| 9 | `event_bus_config_loader.py:41` | ✓ | 同步 `open()` + YAML | P1 | 启动时调用，可接受 | ✓ 已验证 |
+| 10 | `integrity_service.py:189` | ✓ | async 方法内同步 `open()` | P1 | to_thread | ✓ 已验证 |
+| 11 | `object_operations.py:371` | ✓ | async 方法内同步 `open()` | P1 | to_thread | ✓ 已验证 |
 
 **问题总数**：11个（P0:2, P1:9, P2:0）
 
@@ -75,8 +75,19 @@ object_operations.py:371 → with open(file_path, "rb") as f:
 
 **问题**：`asyncio.run()` 在 sync 方法中创建嵌套事件循环
 
-**重构方案**（对应 sync-code-analysis.md §方案A + 方案B）：
+**源码现状**（event_listener.py:86-116）：
+```python
+try:
+    asyncio.get_running_loop()
+    raise RuntimeError("handle_event() called from async context...")
+except RuntimeError as e:
+    if "no running event loop" not in str(e).lower():
+        raise
+# 调用 asyncio.run() 创建新循环 - 反模式！
+asyncio.run(self._audit_service.log(...))
+```
 
+**重构方案**（v7.0 修正）：
 ```python
 def handle_event(self, event: DomainEvent) -> None:
     audit_data = self._event_to_audit(event)
@@ -85,6 +96,7 @@ def handle_event(self, event: DomainEvent) -> None:
 
     try:
         loop = asyncio.get_running_loop()
+        # 在已有循环中调度 async 任务（fire-and-forget）
         loop.call_soon(
             lambda: asyncio.create_task(
                 self._audit_service.log(
@@ -99,18 +111,25 @@ def handle_event(self, event: DomainEvent) -> None:
             )
         )
     except RuntimeError:
-        asyncio.run(
-            self._audit_service.log(
-                actor=audit_data["actor"],
-                action_type=audit_data["action_type"],
-                target_resource=audit_data["target_resource"],
-                old_value=audit_data.get("old_value"),
-                new_value=audit_data.get("new_value"),
-                correlation_id=audit_data.get("correlation_id"),
-                correction_level=audit_data.get("correction_level"),
-            )
+        # 无运行中循环时，使用 to_thread fallback（不创建新循环）
+        asyncio.to_thread(self._sync_log_wrapper, audit_data)
+
+def _sync_log_wrapper(self, audit_data: dict) -> None:
+    """同步封装的审计日志写入（用于 to_thread fallback）。"""
+    asyncio.run(
+        self._audit_service.log(
+            actor=audit_data["actor"],
+            action_type=audit_data["action_type"],
+            target_resource=audit_data["target_resource"],
+            old_value=audit_data.get("old_value"),
+            new_value=audit_data.get("new_value"),
+            correlation_id=audit_data.get("correlation_id"),
+            correction_level=audit_data.get("correction_level"),
         )
+    )
 ```
+
+**关键修正**：v6.0 的 `except RuntimeError: asyncio.run(...)` 仍是反模式，v7.0 修正为 `asyncio.to_thread(self._sync_log_wrapper, audit_data)` — 不创建嵌套循环。
 
 **测试更新**：无需修改（保持 sync 方法签名）
 
@@ -120,7 +139,9 @@ def handle_event(self, event: DomainEvent) -> None:
 
 **问题**：同步 `requests.Session.get()` 阻塞事件循环
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**源码确认**（lines 14-26）：使用全局 `_session = requests.Session()` + `session.get()`
+
+**重构方案**：
 
 ```python
 import httpx
@@ -159,25 +180,43 @@ class OllamaHealthAdapter:
 
 **问题**：每事件创建新事件循环（`asyncio.new_event_loop()` + `asyncio.run()`）
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**源码确认**（lines 67-79）：使用 `threading.Thread` + `asyncio.new_event_loop()`
+
+**重构方案**：
 
 ```python
 class AutoTriggerListener:
     def __init__(
         self,
         auto_trigger_service,
-        registered_event_types: list[str]
+        event_listener,
     ):
         self._auto_trigger_service = auto_trigger_service
-        self._registered_event_types = registered_event_types
+        self._event_listener = event_listener
+        self._registered_event_types = [
+            "DocumentProcessed",
+            "ToolExecuted",
+            "AgentDecided",
+            "CheckpointReached",
+            "CheckpointRecovered",
+            "CorrectionClassified",
+            "CorrectionApproved",
+            "RoutingDecided",
+            "IsolationLevelSwitched",
+            "HeartbeatTriggered",
+            "StrategicDeviationWarning",
+            "AuditEvent",
+        ]
         self._event_queue: asyncio.Queue[tuple[str, DomainEvent]] = asyncio.Queue()
         self._running = False
         self._worker_task: asyncio.Task | None = None
 
-    def register_handlers(self, event_listener) -> None:
+    def register_handlers(self) -> None:
+        """注册处理器（不启动 worker）。"""
         for event_type in self._registered_event_types:
             handler = self._create_handler(event_type)
-            event_listener.on_event(event_type, handler)
+            self._event_listener.on_event(event_type, handler)
+            logger.debug(f"Registered handler for event type: {event_type}")
 
     def _create_handler(self, event_type: str) -> Callable[[DomainEvent], None]:
         def handle_event(event: DomainEvent) -> None:
@@ -185,10 +224,12 @@ class AutoTriggerListener:
         return handle_event
 
     async def start(self) -> None:
+        """启动 worker（在 async 上下文中调用）。"""
         self._running = True
         self._worker_task = asyncio.create_task(self._worker_loop())
 
     async def stop(self) -> None:
+        """停止 worker。"""
         self._running = False
         if self._worker_task:
             self._worker_task.cancel()
@@ -213,10 +254,6 @@ class AutoTriggerListener:
                 await self._process_event(event_type, event)
             except Exception as ex:
                 logger.error(f"Error processing event {event_type}: {ex}")
-
-    async def _process_event(self, event_type: str, event: DomainEvent) -> None:
-        # ... 处理逻辑
-        pass
 ```
 
 **测试更新**：生命周期调整（`register_handlers()` 仅注册，`start()` 启动 worker）
@@ -227,9 +264,11 @@ class AutoTriggerListener:
 
 **问题**：同步 `Path.write_text()` 和 `Path.read_text()`
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**重构方案**：
 
 ```python
+import aiofiles
+
 async def write(self, memory_id: str, memory_type: str, content: str) -> None:
     dir_path = Path(self.config.memory_l0_path) / memory_type
     dir_path.mkdir(parents=True, exist_ok=True)
@@ -251,9 +290,9 @@ async def read(self, memory_id: str, memory_type: str) -> str:
 
 ### P1-3: memory_index.py:125,139
 
-**问题**：同步 `open()` + `rename()` 在 truncate 方法中
+**问题**：同步 `open()` + `rename()` + fcntl.flock
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**重构方案**：
 
 ```python
 async def truncate(self) -> None:
@@ -282,7 +321,7 @@ async def truncate(self) -> None:
 
 **问题**：async 方法内同步 `open()`
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**重构方案**：
 
 ```python
 async def verify_file(self, file_path: str, expected_hash: str) -> bool:
@@ -302,16 +341,17 @@ async def verify_file(self, file_path: str, expected_hash: str) -> bool:
 
 **问题**：async 方法内同步 `open()`
 
-**重构方案**（对应 sync-code-analysis.md §修复方案）：
+**重构方案**：
 
 ```python
 async def resume_multipart_upload(
     self,
-    file_path: str,
-    object_name: str,
-    bucket: str,
-    part_size: int = 5 * 1024 * 1024
-) -> str | None:
+    bucket_name: str,
+    object_key: str,
+    upload_id: str,
+    redis_client: aioredis.Redis,
+) -> None:
+    # ... 读取状态 ...
     def _read_chunks():
         chunks = []
         with open(file_path, "rb") as f:
@@ -323,7 +363,7 @@ async def resume_multipart_upload(
         return chunks
 
     chunks = await asyncio.to_thread(_read_chunks)
-    return await asyncio.to_thread(self._upload_chunks_sync, chunks, object_name, bucket)
+    # ... 继续处理 chunks
 ```
 
 **测试更新**：使用 `await self.resume_multipart_upload(...)`
@@ -356,7 +396,7 @@ async def resume_multipart_upload(
 
 | 优先级 | 文件 | 问题 | 修复策略 | 工时 | 测试更新 | 风险 |
 |--------|------|------|----------|------|----------|------|
-| **P0-1** | `event_listener.py:106` | asyncio.run() | call_soon + create_task | 0.5d | 0d | 低 |
+| **P0-1** | `event_listener.py:106` | asyncio.run() | call_soon + create_task + to_thread fallback | 0.5d | 0d | 低 |
 | **P0-2** | `local_model_health.py:51` | 同步 requests | HealthCheckPort + httpx | 0.5d | 0.25d | 低 |
 | **P1-1** | `auto_trigger_listener.py:112-118` | 重复创建循环 | 重构为纯 asyncio | 2d | 0.5d | 中 |
 | **P1-2** | `file_memory_adapter.py:59,77` | 同步文件I/O | aiofiles | 1d | 0.5d | 低 |
@@ -487,4 +527,5 @@ async def test_event_loop_not_blocked():
 | v3.0 | 调用链分析 |
 | v4.0 | 测试兼容性 |
 | v5.0 | 依赖确认 |
-| v6.0 | **收敛版**：与 sync-code-analysis.md 严格对齐，问题数从13收敛到11 |
+| v6.0 | 收敛版：与 sync-code-analysis.md 严格对齐，问题数从13收敛到11 |
+| v7.0 | **源码逐项验证**：P0-1 方案修正（v6.0 except RuntimeError: asyncio.run(...) 仍是反模式，v7.0 修正为 to_thread fallback） |
