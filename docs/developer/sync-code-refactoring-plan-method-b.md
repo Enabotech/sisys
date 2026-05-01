@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.1）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.2）
 
 **生成日期**: 2026-05-01
-**版本**: v1.1（第一轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 第一轮审查反馈
+**版本**: v1.2（第二轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 两轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -49,9 +49,12 @@
 |------|------|----------|
 | Repository Ports | 10 | L2 Metadata/History, Vector, Graph, Object Storage, Session Storage ✓ |
 | Domain Service Ports | 9 | Auth, Audit, Permission, Semantic Cache ✓ |
-| **缺失 Port** | **3** | L0Storage, L1Cache, IndexManager（PathResolver 合并） |
+| **本次方案缺失 Port** | **4** | L0Storage, L1Cache, IndexManager, PathResolver |
 
-**注**：方案B v1.0 原计划新增 `ObjectOperationsPort`，经审查发现与现有 `ObjectStorageRepository` 职责重叠，已移除。`ObjectOperations` 的 sync I/O 问题通过直接改造实现类解决。
+**注**：
+1. 方案B v1.0 原计划新增 `ObjectOperationsPort`，经审查发现与现有 `ObjectStorageRepository` 职责重叠，已移除。`ObjectOperations` 的 sync I/O 问题通过直接改造实现类解决。
+2. **L1CachePort** 属于可选优化（当前 `RedisMemoryCache` 已被 `SixLayerStorageCoordinator` 内部使用，不直接暴露给 Domain 层），本次方案不包含。如需 Domain 层完全解耦，可后续扩展。
+3. 本文档中所有"改造后"代码描述的是**目标状态**（async 方法），而非当前源码状态（sync 方法）。
 
 ---
 
