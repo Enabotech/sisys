@@ -316,10 +316,8 @@ jobs:
         || (github.event_name != 'workflow_dispatch' && (
           needs.detect-changes.outputs.src == 'true'
         ))) &&
-        # ✅ 逻辑: 除非 (GPU 开启 且 消息包含 [no gpu])，否则都运行
         !(vars.GPU_ENABLED == 'true' && contains(github.event.head_commit.message, '[no gpu]'))
       }}
-
 
     steps:
       - name: 检出代码
