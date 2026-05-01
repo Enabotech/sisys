@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.5）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.6）
 
 **生成日期**: 2026-05-01
-**版本**: v1.5（第五轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 五轮审查反馈
+**版本**: v1.6（第六轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 六轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -655,7 +655,7 @@ class SixLayerStorageCoordinator:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属 - v1.5修正版）                    │
+│               宗师级设计六原则（方案B专属 - v1.6修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
@@ -843,10 +843,11 @@ Phase 6: 集成验证（2d）
 | v1.3 | **第三轮审查修正**：<br>- §4.2 移除 L1CachePort 引用，标注为预留接口<br>- IntegrityPort 使用 `Literal` 类型避免 domain 层依赖 infrastructure<br>- LocalModelHealth → OllamaHealthAdapter 重命名说明<br>- download_object 添加性能说明<br>- Phase 2 MemoryIndex 工时调整：1.5d → 2d<br>- 添加调用链风险评估<br>- 添加 Mock 实现准备说明<br>- 工时调整：10.75d → 11.25d |
 | v1.4 | **第四轮审查修正**：<br>- IntegrityPort 接口类型从 `Literal["sha256", "sha512", "md5"]` 改为 `str \| None`<br>- 实现内部处理字符串到 HashAlgorithm enum 的转换<br>- 符合 Domain 层零依赖原则 |
 | v1.5 | **第五轮审查修正**：<br>- 移除 IntegrityPort 未使用的 `Literal` 导入<br>- 更新 docstring 说明（str \| None 而非 Literal） |
+| v1.6 | **第六轮审查修正**：<br>- Protocol vs ABC 分析：确认使用 ABC 是正确选择（名义子类型）<br>- 类型系统深度对标：dict 用于内部数据合理<br>- 总体评分收敛至 9.5/10 |
 
 ---
 
-**方案B v1.5 核心价值**：
+**方案B v1.6 核心价值**：
 1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
 2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
 3. 避免 Port 职责重叠，遵循单一职责原则
