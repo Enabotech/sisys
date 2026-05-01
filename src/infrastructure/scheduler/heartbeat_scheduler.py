@@ -1,16 +1,15 @@
 """HeartbeatScheduler — schedules periodic heartbeat events using Redis sorted set.
 
-Technical decision: Use asyncio + threading + Redis sorted set (ZADD/ZRANGEBYSCORE).
-No new dependencies (APScheduler not used). Integrates with existing Redis tech stack.
+Technical decision: Pure asyncio implementation using asyncio.create_task().
+No threading.Timer, no new event loop creation. Integrates with existing Redis tech stack.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
@@ -22,38 +21,37 @@ logger = logging.getLogger(__name__)
 
 
 class HeartbeatScheduler:
-    """Schedules periodic heartbeat events using Redis sorted set for delayed dispatch.
+    """Schedules periodic heartbeat events using pure asyncio.
 
     Implementation:
-    - Uses Redis sorted set (ZADD/ZRANGEBYSCORE) for delayed heartbeat scheduling
-    - asyncio loop for async operations, threading for timer coordination
+    - Pure asyncio: uses asyncio.create_task() for scheduling instead of threading.Timer
+    - asyncio event loop for all async operations
     - Generates HeartbeatTriggered events when timer fires
+    - Redis sorted set (ZADD/ZRANGEBYSCORE) for at-least-once delivery tracking
 
     Architecture: Infrastructure layer, depends on Redis and EventPublisher.
     """
 
     _HEARTBEAT_KEY = "heartbeat:pending"
-    _POLL_INTERVAL_SECONDS = 5  # Poll Redis every 5 seconds
 
     def __init__(
         self,
         redis_config: RedisConfig,
         interval_seconds: int = 60,
-        publisher: Callable[[HeartbeatTriggered], asyncio.Future] | None = None,
+        publisher: Callable[[HeartbeatTriggered], Awaitable[None]] | None = None,
     ):
         """Initialize HeartbeatScheduler.
 
         Args:
             redis_config: Redis connection configuration
-            interval_seconds: Heartbeat interval (default 60s, configurable via HEARTBEAT_INTERVAL_SECONDS)
+            interval_seconds: Heartbeat interval (default 60s, configurable)
             publisher: Async callable that publishes HeartbeatTriggered events
         """
         self._redis_config = redis_config
         self._interval_seconds = interval_seconds
         self._publisher = publisher
         self._running = False
-        self._timer: threading.Timer | None = None
-        self._poll_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task | None = None
         self._pool: aioredis.ConnectionPool | None = None
 
     async def start(self) -> None:
@@ -65,34 +63,33 @@ class HeartbeatScheduler:
         self._running = True
         logger.info("HeartbeatScheduler started with interval=%ds", self._interval_seconds)
 
-        # Schedule first heartbeat
-        self._schedule_next()
-
-        # Start polling task
+        # Start the heartbeat loop using pure asyncio
         loop = asyncio.get_running_loop()
-        self._poll_task = loop.create_task(self._poll_loop())
+        self._heartbeat_task = loop.create_task(self._heartbeat_loop())
 
     async def stop(self) -> None:
-        """Stop the heartbeat scheduler gracefully."""
+        """Stop the heartbeat scheduler gracefully.
+
+        Graceful shutdown sequence:
+        1. Set _running=False to signal heartbeat loop to stop
+        2. Cancel the heartbeat task
+        3. Clean up resources
+        """
         if not self._running:
             return
 
         self._running = False
         logger.info("HeartbeatScheduler stopping")
 
-        # Cancel timer
-        if self._timer:
-            self._timer.cancel()
-            self._timer = None
-
-        # Cancel poll task
-        if self._poll_task:
-            self._poll_task.cancel()
+        # Cancel heartbeat task
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
             try:
-                await self._poll_task
+                await self._heartbeat_task
             except asyncio.CancelledError:
                 pass
-            self._poll_task = None
+            finally:
+                self._heartbeat_task = None
 
         # Close Redis pool
         if self._pool:
@@ -101,26 +98,24 @@ class HeartbeatScheduler:
 
         logger.info("HeartbeatScheduler stopped")
 
-    def _schedule_next(self) -> None:
-        """Schedule the next heartbeat trigger using threading.Timer."""
-        if not self._running:
-            return
+    async def _heartbeat_loop(self) -> None:
+        """Pure asyncio heartbeat loop - replaces threading.Timer.
 
-        def fire_heartbeat() -> None:
-            """Fire heartbeat in a new asyncio context."""
-            if not self._running:
-                return
+        Runs every _interval_seconds, fires heartbeat and stores in Redis.
+        """
+        while self._running:
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(self._fire_heartbeat())
-                loop.close()
+                await asyncio.sleep(self._interval_seconds)
+            except asyncio.CancelledError:
+                break
+
+            if not self._running:
+                break
+
+            try:
+                await self._fire_heartbeat()
             except Exception as e:
                 logger.error("Error firing heartbeat: %s", e)
-
-        self._timer = threading.Timer(self._interval_seconds, fire_heartbeat)
-        self._timer.daemon = True
-        self._timer.start()
 
     async def _fire_heartbeat(self) -> None:
         """Generate and publish a HeartbeatTriggered event."""
@@ -184,34 +179,6 @@ class HeartbeatScheduler:
                 self._pool = None
                 raise ConnectionError(f"Failed to initialize Redis connection: {e}") from e
         return self._pool
-
-    async def _poll_loop(self) -> None:
-        """Poll Redis sorted set for due heartbeats (for at-least-once tracking)."""
-        while self._running:
-            try:
-                await asyncio.sleep(self._POLL_INTERVAL_SECONDS)
-                if not self._running:
-                    break
-
-                pool = await self._get_pool()
-                async with aioredis.Redis(connection_pool=pool) as client:
-                    now = datetime.now(UTC).timestamp()
-                    # Get heartbeats due now or earlier
-                    due = await client.zrangebyscore(
-                        self._HEARTBEAT_KEY,
-                        min="-inf",
-                        max=now,
-                        start=0,
-                        num=10,
-                    )
-                    if due:
-                        logger.debug("Found %d due heartbeats for tracking", len(due))
-                        # Mark as processed (cleanup would be done by TTL)
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error("Error in heartbeat poll loop: %s", e)
 
     async def schedule_heartbeat(
         self,

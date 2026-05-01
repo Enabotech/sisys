@@ -13,10 +13,10 @@ Prerequisites:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import time
 import uuid
+from collections.abc import Generator
 from typing import Any
 
 import pytest
@@ -107,21 +107,33 @@ def trigger_service(redis_publisher: RedisEventPublisher) -> AutoTriggerService:
 def heartbeat_scheduler(
     redis_config: RedisConfig,
     redis_publisher: RedisEventPublisher,
-) -> HeartbeatScheduler:
+    event_loop,
+) -> Generator[HeartbeatScheduler, None, None]:
     """HeartbeatScheduler instance with real publisher for acceptance testing."""
 
-    def publish_heartbeat(event: HeartbeatTriggered) -> asyncio.Future[Any]:
-        loop = asyncio.get_event_loop()
-        future = loop.create_future()
-        asyncio.ensure_future(redis_publisher.publish(event))
-        future.set_result(None)
-        return future
+    async def publish_heartbeat(event: HeartbeatTriggered) -> None:
+        await redis_publisher.publish(event)
 
-    return HeartbeatScheduler(
+    scheduler = HeartbeatScheduler(
         redis_config=redis_config,
         interval_seconds=60,
         publisher=publish_heartbeat,
     )
+
+    yield scheduler
+
+    # Cleanup: ensure scheduler is properly stopped (pure asyncio version)
+    if scheduler._running:
+        try:
+            # Signal stop
+            scheduler._running = False
+
+            # Cancel heartbeat task
+            if scheduler._heartbeat_task:
+                scheduler._heartbeat_task.cancel()
+                scheduler._heartbeat_task = None
+        except Exception:
+            pass
 
 
 # ===================================================================
@@ -475,6 +487,7 @@ def then_heartbeat_miss_rate_zero(context: dict) -> None:
 def given_configure_heartbeat_30_seconds(
     context: dict,
     redis_config: RedisConfig,
+    event_loop,
 ) -> HeartbeatScheduler:
     """Configure heartbeat interval to 30 seconds."""
     scheduler = HeartbeatScheduler(
@@ -502,6 +515,11 @@ def then_heartbeat_every_30_seconds(context: dict) -> None:
     """Verify heartbeat triggers every 30 seconds."""
     scheduler = context.get("heartbeat_scheduler")
     if scheduler:
+        # Cleanup: stop scheduler if still running
+        if scheduler._running:
+            scheduler._running = False
+            if scheduler._heartbeat_task:
+                scheduler._heartbeat_task.cancel()
         assert scheduler._interval_seconds == 30
 
 
