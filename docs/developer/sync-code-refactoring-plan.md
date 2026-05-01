@@ -1,8 +1,8 @@
-# SISYS 同步代码最优重构方案（完善版）
+# SISYS 同步代码最优重构方案（第三版）
 
 **生成日期**: 2026-05-01
-**版本**: v2.0（基于代码实地审查的完善版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + sync-code-design-mastery.md + 源码实地审查
+**版本**: v3.0（第二轮审查 - 深入分析调用链与依赖关系）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + sync-code-design-mastery.md + 源码实地审查 + 调用链分析
 **目标**: 宗师级架构设计，给出可执行的最优重构路径
 
 ---
@@ -21,240 +21,120 @@
 
 ---
 
-## 1. 当前问题全景（基于源码审查）
+## 1. 当前问题全景（第二轮审查校正）
 
-### 1.1 问题分布矩阵（校正）
+### 1.1 问题分布矩阵
 
 | 层级 | P0（阻塞循环） | P1（性能风险） | P2（可接受） |
 |------|---------------|---------------|-------------|
-| Infrastructure | 3 | 4 | 4 |
+| Infrastructure | 4 | 4 | 4 |
 | Interfaces | 1 | 0 | 0 |
-| **总计** | **4** | **4** | **4** |
+| **总计** | **5** | **4** | **4** |
 
-**重要发现**：通过源码实地审查，发现 P0 问题比原分析多 2 处：
-1. `integrity_service.py:189` - async 方法内的同步 `open()`
-2. `object_operations.py:371` - async 方法内的同步 `open()`
+### 1.2 关键发现：调用链分析揭示更深层问题
 
-### 1.2 问题根因分类（校正）
+通过源码审查和调用链分析，发现以下深层问题：
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   问题根因分类（源码审查版）                             │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Type-A: 上下文错配                                                      │
-│   ├── event_listener.py:106  — asyncio.run() 在 sync 方法               │
-│   └── local_model_health.py:51 — requests.Session 同步调用             │
-│                                                                         │
-│ Type-B: 混合架构（Thread + asyncio.run）                                │
-│   └── auto_trigger_listener.py:112-118 — 每事件创建新循环               │
-│                                                                         │
-│ Type-C: 异步方法内的同步 I/O                                            │
-│   ├── file_memory_adapter.py — Path.write_text/read_text               │
-│   ├── memory_index.py — open() + rename() + fcntl.flock               │
-│   ├── integrity_service.py:189 — open() 在 async 方法内                 │
-│   └── object_operations.py:371 — open() 在 async 方法内                 │
-│                                                                         │
-│ Type-D: 启动时调用（可接受）                                            │
-│   └── event_bus_config_loader.py                                       │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+#### 发现1：event_listener.py 的设计悖论
 
-### 1.3 关键发现（源码 vs 文档差异）
+**源码位置**：`src/infrastructure/audit/event_listener.py:74-121`
 
-| 文件 | 原分析描述 | 源码实际情况 | 差异 |
-|------|------------|--------------|------|
-| `event_listener.py:106` | `asyncio.run(self._audit_service.log(...))` | 确认存在，有检测 running loop 的防护代码 | 无差异 |
-| `local_model_health.py` | 同步 requests | 确认使用 `requests.Session` + `HTTPAdapter` | 无差异 |
-| `auto_trigger_listener.py` | Thread + asyncio.run | 确认使用 `threading.Thread` + `asyncio.new_event_loop()` | 无差异 |
-| `file_memory_adapter.py` | 同步 write/read | 确认 `Path.write_text()` 和 `Path.read_text()` | 无差异 |
-| `memory_index.py` | 同步 open + rename | 确认 `open()` + `temp_path.rename()` + `fcntl.flock` | ⚠️ 增加了文件锁问题 |
-| `integrity_service.py:189` | async 内同步 open | 确认 `with open(file_path, "rb") as f` 在 async 方法内 | ⚠️ 原分析遗漏 |
-| `object_operations.py:371` | async 内同步 open | 确认 `with open(file_path, "rb") as f` 在 async 方法内 | ⚠️ 原分析遗漏 |
-
----
-
-## 2. 分阶段重构路径
-
-### Phase 0: 紧急修复（P0 - 必须立即修复）
-
-#### P0-1: `event_listener.py` - 消除 asyncio.run() 反模式
-
-**当前问题**（源码确认）：
+**当前设计问题**：
 ```python
-# src/infrastructure/audit/event_listener.py:106
-asyncio.run(
-    self._audit_service.log(
+def handle_event(self, event: DomainEvent) -> None:
+    # 1. 检测是否在 async 上下文
+    try:
+        asyncio.get_running_loop()
+        raise RuntimeError("handle_event() called from async context")
+    except RuntimeError as e:
+        if "no running event loop" not in str(e).lower():
+            raise
+
+    # 2. 如果在 sync 上下文，使用 asyncio.run()
+    asyncio.run(self._audit_service.log(...))  # 问题！
+```
+
+**悖论**：
+- `AuditService.log()` 是 `async` 方法（见 `src/domain/services/audit_service.py:34`）
+- `handle_event()` 被设计为 sync 方法，但需要调用 async 方法
+- `asyncio.run()` 创建新事件循环会阻塞调用线程
+
+**深层问题**：
+- 如果从 async 上下文调用 `handle_event()`，会抛出 RuntimeError（这不是优雅降级）
+- 原方案中的 `_sync_wrapper` 内部又创建事件循环，与原问题相同
+
+**正确解决方案**：
+
+```python
+# 方案A：从主事件循环调度任务（推荐）
+def handle_event(self, event: DomainEvent) -> None:
+    """同步入口 - 在 sync 上下文中安全调用。"""
+    audit_data = self._extract_audit_data(event)
+    try:
+        loop = asyncio.get_running_loop()
+        # 在已有事件循环中调度任务（不阻塞）
+        loop.call_soon(
+            lambda: asyncio.create_task(
+                self._audit_service.log(
+                    actor=audit_data["actor"],
+                    action_type=audit_data["action_type"],
+                    target_resource=audit_data["target_resource"],
+                    old_value=audit_data.get("old_value"),
+                    new_value=audit_data.get("new_value"),
+                    correlation_id=audit_data.get("correlation_id"),
+                    correction_level=audit_data.get("correction_level"),
+                )
+            )
+        )
+    except RuntimeError:
+        # 没有运行中的事件循环，使用 to_thread
+        asyncio.to_thread(self._async_log_wrapper, audit_data)
+
+async def _async_log_wrapper(self, audit_data: dict[str, Any]) -> None:
+    """Async 包装器 - 在 to_thread 上下文中执行。"""
+    await self._audit_service.log(
         actor=audit_data["actor"],
-        ...
+        action_type=audit_data["action_type"],
+        target_resource=audit_data["target_resource"],
+        old_value=audit_data.get("old_value"),
+        new_value=audit_data.get("new_value"),
+        correlation_id=audit_data.get("correlation_id"),
+        correction_level=audit_data.get("correction_level"),
     )
-)
 ```
 
-**原方案问题**：原方案中的 `_run_sync_log` 内部又创建了新的事件循环，与原问题相同。
-
-**最优设计**：
-
-```python
-# src/infrastructure/audit/event_listener.py（重构后）
-
-import asyncio
-from typing import Any
-
-class AuditEventListener:
-    def __init__(self, audit_service: AuditService):
-        self._audit_service = audit_service
-
-    def handle_event(self, event: DomainEvent) -> None:
-        """同步入口 - 委托到线程池，避免阻塞事件循环。
-
-        使用 asyncio.to_thread() 而非 asyncio.run()，
-        因为后者会在已运行的事件循环中创建嵌套循环。
-        """
-        audit_data = self._extract_audit_data(event)
-        # 方案A：如果 AuditService.log 是 async 方法，使用 to_thread
-        asyncio.to_thread(
-            self._sync_wrapper,
-            audit_data["actor"],
-            audit_data["action_type"],
-            audit_data["target_resource"],
-            audit_data
-        )
-
-    def _sync_wrapper(
-        self,
-        actor: str,
-        action_type: str,
-        target_resource: str,
-        audit_data: dict[str, Any]
-    ) -> None:
-        """同步包装器 - 在线程中执行。
-
-        注意：这里不使用 asyncio.run()，
-        因为 to_thread 已经将同步函数委托到线程池。
-        如果 audit_service 需要 async 调用，可以使用事件循环参数传递。
-        """
-        # 如果 audit_service 支持同步调用，直接调用
-        # 否则需要通过其他机制（如队列）传递到主事件循环
-        pass
-
-    async def handle_event_async(self, event: DomainEvent) -> None:
-        """异步入口 - 在 asyncio 上下文中直接 await。"""
-        audit_data = self._extract_audit_data(event)
-        await self._audit_service.log(
-            actor=audit_data["actor"],
-            action_type=audit_data["action_type"],
-            target_resource=audit_data["target_resource"],
-            old_value=audit_data.get("old_value"),
-            new_value=audit_data.get("new_value"),
-            correlation_id=audit_data.get("correlation_id"),
-            correction_level=audit_data.get("correction_level"),
-        )
-```
-
-**宗师级设计要点**：
-1. **禁止在 `asyncio.to_thread()` 回调内再次调用 `asyncio.run()`**
-2. 如果 AuditService 只有 async 方法，应该：
-   - 方案A：使用 `asyncio.get_event_loop().create_task()` 从主循环发起
-   - 方案B：接受 sync 方法签名，在服务层提供同步版本
+**宗师级要点**：
+- `loop.call_soon()` 将任务调度到事件循环，不阻塞
+- 在 to_thread 中执行 async 函数需要新的事件循环，但这是隔离的
 
 ---
 
-#### P0-2: `local_model_health.py` - 同步 HTTP 改异步
+#### 发现2：auto_trigger_listener.py 的双层反模式
 
-**当前问题**（源码确认）：
+**源码位置**：`src/interfaces/event_listeners/listeners/auto_trigger_listener.py:110-124`
+
+**源码确认的问题**：
 ```python
-# src/infrastructure/routing/local_model_health.py:14-26
-_session = None
-
-def _get_session() -> requests.Session:
-    global _session
-    if _session is None:
-        _session = requests.Session()
-        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=Retry(total=0))
-        _session.mount("http://", adapter)
-        _session.mount("https://", adapter)
-    return _session
-
-def check(self) -> bool:
-    session = _get_session()
-    response = session.get(self.endpoint, timeout=5)  # 阻塞！
-```
-
-**重构方案**（确认可行）：
-
-```python
-# src/infrastructure/routing/local_model_health.py
-
-import httpx
-from typing import Protocol
-
-class HealthCheckPort(Protocol):
-    """健康检查端口抽象 - 六边形架构接口层"""
-    async def check(self) -> bool: ...
-
-class OllamaHealthAdapter(HealthCheckPort):
-    """Ollama 模型服务健康检查适配器"""
-    _client: httpx.AsyncClient | None = None
-
-    def __init__(
-        self,
-        endpoint: str = "http://localhost:11434/api/health",
-        timeout: float = 5.0
-    ):
-        self._endpoint = endpoint
-        self._timeout = timeout
-
-    @classmethod
-    async def check(cls) -> bool:
-        """类方法检查 - 检查 Ollama 服务是否可用。"""
-        if cls._client is None:
-            cls._client = httpx.AsyncClient(timeout=cls._timeout)
-        try:
-            response = await cls._client.get(cls._endpoint)
-            return response.status_code == 200
-        except (httpx.RequestError, httpx.TimeoutException):
-            return False
-
-    @classmethod
-    async def close(cls) -> None:
-        """关闭 HTTP 客户端。"""
-        if cls._client:
-            await cls._client.aclose()
-            cls._client = None
-```
-
-**调用方适配**：
-```python
-# 原调用
-health = LocalModelHealth()
-is_healthy = health.check()  # 同步
-
-# 重构后调用
-is_healthy = await OllamaHealthAdapter.check()  # 异步
-```
-
----
-
-#### P0-3: `auto_trigger_listener.py` - 消除 Thread + asyncio.run()
-
-**当前问题**（源码确认）：
-```python
-# src/interfaces/event_listeners/listeners/auto_trigger_listener.py:110-124
 def _worker_loop(self) -> None:
-    loop = asyncio.new_event_loop()  # 每事件创建新循环（反模式！）
+    loop = asyncio.new_event_loop()      # 问题1：每事件创建新循环
     asyncio.set_event_loop(loop)
     try:
         while self._running:
             try:
                 event_type, event = self._event_queue.get(timeout=0.1)
-                asyncio.run(self._process_event(event_type, event))  # 反模式！
+                asyncio.run(self._process_event(event_type, event))  # 问题2：嵌套 asyncio.run()
             except queue.Empty:
                 continue
     finally:
         loop.close()
 ```
 
-**重构方案**（修正原方案的 bug）：
+**问题分析**：
+1. 外层是后台线程，每次创建新的事件循环
+2. 在这个新循环中调用 `asyncio.run()` 处理事件
+3. 每次处理事件都重复这个模式
+
+**重构方案**：
 
 ```python
 # src/interfaces/event_listeners/listeners/auto_trigger_listener.py
@@ -267,34 +147,46 @@ from src.domain.events.base import DomainEvent
 class AutoTriggerListener:
     """自动触发监听器 - 纯 asyncio 实现。
 
-    重构要点：
-    1. 使用 asyncio.Queue 替代 threading.Queue
-    2. 使用 asyncio.create_task() 替代新事件循环
-    3. 单一事件循环，无嵌套
+    架构变更：
+    - 移除 threading.Thread
+    - 使用 asyncio.Queue 作为事件队列
+    - 使用 asyncio.create_task() 处理事件
+    - 单一事件循环，无嵌套
     """
     def __init__(
         self,
         auto_trigger_service,  # AutoTriggerService 实例
-        handler_map: dict[str, Callable[..., Awaitable[None]]]
+        registered_event_types: list[str]
     ):
         self._auto_trigger_service = auto_trigger_service
-        self._handler_map = handler_map
+        self._registered_event_types = registered_event_types
         self._event_queue: asyncio.Queue[tuple[str, DomainEvent]] = asyncio.Queue()
         self._running = False
         self._worker_task: asyncio.Task | None = None
+        self._handler_map: dict[str, Callable[..., Awaitable[None]]] = {}
 
-    def register_handlers(self) -> None:
-        """注册处理器 - 从同步上下文调用。
-
-        注意：这是一个同步方法，但内部启动的是异步任务。
-        调用者应在适当的 async 上下文中调用。
-        """
+    def register_handlers(self, event_listener) -> None:
+        """注册处理器 - 从同步上下文调用。"""
         self._running = True
-        # 创建工作循环任务（不阻塞）
+        # 创建工作循环任务
         self._worker_task = asyncio.create_task(self._worker_loop())
 
+        for event_type in self._registered_event_types:
+            handler = self._create_handler(event_type)
+            event_listener.on_event(event_type, handler)
+            logger.debug(f"Registered handler for event type: {event_type}")
+
+    def _create_handler(self, event_type: str) -> Callable[[DomainEvent], None]:
+        """创建处理器函数。"""
+        def handle_event(event: DomainEvent) -> None:
+            try:
+                self._event_queue.put_nowait((event_type, event))
+            except Exception as e:
+                logger.error(f"Failed to queue event {event_type}: {e}")
+        return handle_event
+
     async def stop(self) -> None:
-        """停止监听器 - 从 async 上下文调用。"""
+        """停止监听器。"""
         self._running = False
         if self._worker_task:
             self._worker_task.cancel()
@@ -302,13 +194,6 @@ class AutoTriggerListener:
                 await self._worker_task
             except asyncio.CancelledError:
                 pass
-
-    def enqueue(self, event_type: str, event: DomainEvent) -> None:
-        """入队方法 - 可从同步上下文调用。
-
-        使用 put_nowait 确保不阻塞。
-        """
-        self._event_queue.put_nowait((event_type, event))
 
     async def _worker_loop(self) -> None:
         """工作循环 - 纯 asyncio，无嵌套事件循环。"""
@@ -324,34 +209,203 @@ class AutoTriggerListener:
                 break
 
             try:
-                handler = self._handler_map.get(event_type)
-                if handler:
-                    await handler(event)
+                await self._process_event(event_type, event)
             except Exception as ex:
                 logger.error(f"Error processing event {event_type}: {ex}")
 
-    @property
-    def registered_event_types(self) -> list[str]:
-        """返回注册的处理器类型列表。"""
-        return list(self._handler_map.keys())
-```
+    async def _process_event(self, event_type: str, event: DomainEvent) -> None:
+        """处理事件 - 直接在主事件循环中 await。"""
+        try:
+            if event_type == "HeartbeatTriggered":
+                from src.domain.events.heartbeat_events import HeartbeatTriggered
+                heartbeat_event = HeartbeatTriggered.from_dict(event.to_dict())
+                triggered = await self._auto_trigger_service.on_heartbeat_event(heartbeat_event)
+            else:
+                triggered = await self._auto_trigger_service.on_domain_event(event)
 
-**原方案 bug 修正**：
-- 原方案中 `self._process_callback` 被定义了两次（参数名和类方法名冲突）
-- 重构方案使用 `self._handler_map` 替代，通过字典解耦
+            if triggered:
+                logger.info(f"Trigger processed: type={triggered.trigger_type}, session_id={triggered.session_id}")
+        except Exception as e:
+            logger.error(f"Failed to process event {event_type}: {e}")
+```
 
 ---
 
-### Phase 1: 架构统一（P1 - 高优先级）
+#### 发现3：调用方约束决定重构方案
+
+通过分析 `EventListener.dispatch()` 的实现：
+
+```python
+# src/domain/events/listener.py:67-86
+def dispatch(self, event: DomainEvent) -> None:
+    """Dispatch an event to all registered handlers.
+
+    Each handler is wrapped in try/except to prevent one handler's
+    failure from blocking subsequent handlers.
+    """
+    errors: list[Exception] = []
+    for handler in self._handlers.get(event.event_type, []):
+        try:
+            handler(event)  # 调用同步 handler
+        except Exception as e:
+            errors.append(e)
+```
+
+**约束**：
+- `EventListener.dispatch()` 调用同步 `handler(event)`
+- handler 必须是 `Callable[[DomainEvent], None]`
+- 如果 handler 内需要调用 async 方法，必须有桥接机制
+
+**因此**：
+- `handle_event()` 必须是同步方法
+- 但它需要调用 `AuditService.log()` 这个 async 方法
+- 这就是为什么需要 `asyncio.run()` 或类似的桥接机制
+
+---
+
+## 2. 分阶段重构路径
+
+### Phase 0: 紧急修复（P0）
+
+#### P0-1: `event_listener.py` - asyncio.run() 反模式
+
+**问题根因**：sync 方法调用 async 方法，需要桥接机制
+
+**最优重构方案**：
+
+```python
+# src/infrastructure/audit/event_listener.py
+
+import asyncio
+from typing import Any
+
+class AuditEventListener:
+    def __init__(self, audit_service: AuditService):
+        self._audit_service = audit_service
+
+    def handle_event(self, event: DomainEvent) -> None:
+        """同步入口 - 用于 EventListener.sync_dispatch() 场景。
+
+        策略：根据上下文选择合适的桥接方式
+        1. 如果有运行中的事件循环，使用 call_soon 调度任务
+        2. 如果没有事件循环（在 to_thread 中），创建新循环执行
+        """
+        audit_data = self._extract_audit_data(event)
+        if audit_data is None:
+            logger.debug(f"Event {event.event_type} filtered, not recording audit")
+            return
+
+        try:
+            loop = asyncio.get_running_loop()
+            # 已在事件循环中，使用 call_soon 调度
+            loop.call_soon(
+                lambda: asyncio.create_task(
+                    self._audit_service.log(
+                        actor=audit_data["actor"],
+                        action_type=audit_data["action_type"],
+                        target_resource=audit_data["target_resource"],
+                        old_value=audit_data.get("old_value"),
+                        new_value=audit_data.get("new_value"),
+                        correlation_id=audit_data.get("correlation_id"),
+                        correction_level=audit_data.get("correction_level"),
+                    )
+                )
+            )
+        except RuntimeError:
+            # 不在事件循环中（在 to_thread 回调中），创建新循环
+            asyncio.run(self._audit_service.log(
+                actor=audit_data["actor"],
+                action_type=audit_data["action_type"],
+                target_resource=audit_data["target_resource"],
+                old_value=audit_data.get("old_value"),
+                new_value=audit_data.get("new_value"),
+                correlation_id=audit_data.get("correlation_id"),
+                correction_level=audit_data.get("correction_level"),
+            ))
+
+    async def handle_event_async(self, event: DomainEvent) -> None:
+        """异步入口 - 用于 RabbitMQ consumer 等 async 场景。"""
+        audit_data = self._event_to_audit(event)
+        if audit_data is None:
+            logger.debug(f"Event {event.event_type} filtered, not recording audit")
+            return
+
+        await self._audit_service.log(
+            actor=audit_data["actor"],
+            action_type=audit_data["action_type"],
+            target_resource=audit_data["target_resource"],
+            old_value=audit_data.get("old_value"),
+            new_value=audit_data.get("new_value"),
+            correlation_id=audit_data.get("correlation_id"),
+            correction_level=audit_data.get("correction_level"),
+        )
+```
+
+**宗师级要点**：
+- 使用 `loop.call_soon()` + `create_task()` 在已有循环中调度，不阻塞
+- 只有在真正没有循环时才用 `asyncio.run()`（to_thread 回调场景）
+- 消除原设计中"检测到循环就报错"的悖论设计
+
+---
+
+#### P0-2: `local_model_health.py` - 同步 HTTP 改异步
+
+**当前问题**：使用同步 `requests.Session`
+
+**重构方案**：
+
+```python
+# src/infrastructure/routing/local_model_health.py
+
+import httpx
+from typing import Protocol
+
+class HealthCheckPort(Protocol):
+    """健康检查端口抽象"""
+    async def check(self) -> bool: ...
+
+class OllamaHealthAdapter(HealthCheckPort):
+    """Ollama 模型健康检查适配器"""
+    _client: httpx.AsyncClient | None = None
+
+    def __init__(
+        self,
+        endpoint: str = "http://localhost:11434/api/health",
+        timeout: float = 5.0
+    ):
+        self._endpoint = endpoint
+        self._timeout = timeout
+
+    @classmethod
+    async def check(cls) -> bool:
+        if cls._client is None:
+            cls._client = httpx.AsyncClient(timeout=cls._timeout)
+        try:
+            response = await cls._client.get(cls._endpoint)
+            return response.status_code == 200
+        except (httpx.RequestError, httpx.TimeoutException):
+            return False
+
+    @classmethod
+    async def close(cls) -> None:
+        if cls._client:
+            await cls._client.aclose()
+            cls._client = None
+```
+
+---
+
+#### P0-3: `auto_trigger_listener.py` - 消除 Thread + asyncio.run()
+
+**问题**：后台线程 + 每事件创建新事件循环
+
+**重构方案**：见上方"发现2"
+
+---
+
+### Phase 1: 架构统一（P1）
 
 #### P1-1: `file_memory_adapter.py` - 文件 I/O 异步化
-
-**当前问题**（源码确认）：
-```python
-# src/infrastructure/storage/file_memory_adapter.py:59,77
-file_path.write_text(content, encoding="utf-8")  # 同步阻塞
-return file_path.read_text(encoding="utf-8")  # 同步阻塞
-```
 
 **重构方案**：
 
@@ -369,15 +423,15 @@ class FileMemoryAdapter:
     """L0 文件系统适配器 - 异步版本。"""
     def __init__(self, config: MemoryConfig):
         self.config = config
-        self._ensure_base_path()
+        self._ensure_base_path()  # 启动时调用，可接受
 
     def _ensure_base_path(self) -> None:
-        """同步确保路径存在（启动时调用，可接受）。"""
+        """同步确保路径存在。"""
         base_path = Path(self.config.memory_l0_path)
         base_path.mkdir(parents=True, exist_ok=True)
 
     async def write(self, memory_id: str, memory_type: str, content: str) -> None:
-        """异步写入记忆文件。"""
+        """异步写入。"""
         dir_path = Path(self.config.memory_l0_path) / memory_type
         dir_path.mkdir(parents=True, exist_ok=True)
         file_path = dir_path / f"{memory_id}.md"
@@ -385,7 +439,7 @@ class FileMemoryAdapter:
             await f.write(content)
 
     async def read(self, memory_id: str, memory_type: str) -> str:
-        """异步读取记忆文件。"""
+        """异步读取。"""
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():
             raise FileNotFoundError(f"Memory file not found: {file_path}")
@@ -393,40 +447,22 @@ class FileMemoryAdapter:
             return await f.read()
 
     async def delete(self, memory_id: str, memory_type: str) -> None:
-        """异步删除记忆文件。"""
+        """异步删除。"""
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if file_path.exists():
             file_path.unlink()
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查文件是否存在。"""
+        """检查是否存在。"""
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         return file_path.exists()
 ```
 
-**调用方修改**：
-```python
-# 原调用
-self._file_adapter.write(memory_id, memory_type, content)
-
-# 重构后
-await self._file_adapter.write(memory_id, memory_type, content)
-```
-
 ---
 
-#### P1-2: `memory_index.py` - 索引操作异步化（含文件锁处理）
+#### P1-2: `memory_index.py` - 索引操作异步化（含文件锁）
 
-**当前问题**（源码确认）：
-```python
-# src/infrastructure/storage/memory_index.py:125-141
-with open(self._index_path, encoding="utf-8") as f:  # 同步 I/O
-    lines = f.readlines()
-temp_path.rename(self._index_path)  # 同步 rename
-# 以及 fcntl.flock 文件锁
-```
-
-**关键发现**：存在 `fcntl.flock` 文件锁，这是线程级别的锁，不是 asyncio 锁。
+**问题**：`fcntl.flock` 文件锁 + 同步 I/O
 
 **重构方案**：
 
@@ -444,9 +480,8 @@ if TYPE_CHECKING:
 class MemoryIndex:
     """记忆索引管理器 - 异步版本。
 
-    重要：fcntl.flock 是线程级锁，不是 asyncio 锁。
-    使用 asyncio.to_thread() 将带锁操作封装到线程池，
-    这样可以保留锁的语义，同时不阻塞事件循环。
+    fcntl.flock 是线程级锁，使用 asyncio.to_thread() 封装到线程池，
+    保留锁的原子性语义，同时不阻塞事件循环。
     """
     MAX_INDEX_LINES = 200
 
@@ -456,19 +491,18 @@ class MemoryIndex:
         self._lock_path = self._index_path.with_suffix(".lock")
 
     async def truncate(self) -> None:
-        """截断索引到最大行数 - 在线程池中执行。"""
+        """截断索引 - 在线程池中执行。"""
         def _truncate():
             with open(self._index_path, encoding="utf-8") as f:
                 lines = f.readlines()
             content_lines = [line for line in lines if line.strip() and not line.startswith("#")]
             if len(content_lines) <= self.MAX_INDEX_LINES:
-                return None
+                return
             lines_to_keep = lines[-self.MAX_INDEX_LINES:]
             temp_path = self._index_path.with_suffix(".tmp")
             with open(temp_path, "w", encoding="utf-8") as f:
                 f.writelines(lines_to_keep)
             temp_path.rename(self._index_path)
-            return True
 
         await asyncio.to_thread(_truncate)
 
@@ -478,12 +512,8 @@ class MemoryIndex:
             entries = self._read_entries_locked_sync()
             memory_id = entry["memory_id"]
             entries = [e for e in entries if e["memory_id"] != memory_id]
-            # 构建 path
             is_group = entry.get("is_group", False)
-            if is_group:
-                path = f"group/{entry['type']}/{memory_id}.md"
-            else:
-                path = f"{entry['type']}/{memory_id}.md"
+            path = f"group/{entry['type']}/{memory_id}.md" if is_group else f"{entry['type']}/{memory_id}.md"
             entries.append({
                 "name": entry["name"],
                 "type": entry["type"],
@@ -497,12 +527,10 @@ class MemoryIndex:
 
     async def read_entries(self) -> list[dict]:
         """读取所有索引条目 - 在线程池中执行。"""
-        def _read():
-            return self._read_entries_locked_sync()
-        return await asyncio.to_thread(_read)
+        return await asyncio.to_thread(self._read_entries_locked_sync)
 
     def _read_entries_locked_sync(self) -> list[dict]:
-        """同步带锁读取（线程内执行）。"""
+        """同步带锁读取。"""
         if not self._index_path.exists():
             return []
         self._ensure_lock_file()
@@ -515,7 +543,7 @@ class MemoryIndex:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _write_entries_locked_sync(self, entries: list[dict]) -> None:
-        """同步带锁写入（线程内执行）。"""
+        """同步带锁写入。"""
         self._ensure_lock_file()
         self._index_path.parent.mkdir(parents=True, exist_ok=True)
         temp_path = self._index_path.with_suffix(".tmp")
@@ -528,25 +556,52 @@ class MemoryIndex:
                 temp_path.rename(self._index_path)
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-```
 
-**宗师级设计要点**：
-- `fcntl.flock` 是进程级文件锁，必须在单一线程内完成 lock→操作→unlock
-- 使用 `asyncio.to_thread()` 将整个锁操作封装到线程池
-- 线程池内的锁操作是原子的，不会阻塞事件循环
+    def _ensure_lock_file(self) -> None:
+        """确保锁文件存在。"""
+        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock_path.touch(exist_ok=True)
+
+    def _parse_index(self, content: str) -> list[dict]:
+        """解析索引内容。"""
+        import re
+        INDEX_LINE_PATTERN = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")
+        entries = []
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            match = INDEX_LINE_PATTERN.match(line)
+            if match:
+                name, path, desc = match.groups()
+                parts = Path(path).parts
+                if len(parts) >= 2:
+                    is_group = parts[0] == "group"
+                    mem_type = parts[1] if is_group else parts[0]
+                    mem_id = Path(path).stem
+                    entries.append({
+                        "name": name,
+                        "type": mem_type,
+                        "memory_id": mem_id,
+                        "description": desc,
+                        "is_group": is_group,
+                    })
+        return entries
+
+    def _format_entries(self, entries: list[dict]) -> str:
+        """格式化索引条目。"""
+        lines = []
+        for entry in entries:
+            path = entry.get("path")
+            if not path:
+                path = f"group/{entry['type']}/{entry['memory_id']}.md" if entry.get("is_group") else f"{entry['type']}/{entry['memory_id']}.md"
+            lines.append(f"- [{entry['name']}]({path}) — {entry.get('description', '')}")
+        return "\n".join(lines) + "\n"
+```
 
 ---
 
 #### P1-3: `integrity_service.py` - async 方法内同步 I/O
-
-**当前问题**（源码确认）：
-```python
-# src/infrastructure/security/integrity_service.py:177-191
-async def verify_file(self, file_path: str, expected_hash: str) -> bool:
-    with open(file_path, "rb") as f:  # 同步阻塞！
-        content = f.read()
-    return self.verify_hash(content, expected_hash)
-```
 
 **重构方案**：
 
@@ -572,17 +627,6 @@ class IntegrityVerifier:
 
 #### P1-4: `object_operations.py` - async 方法内同步 I/O
 
-**当前问题**（源码确认）：
-```python
-# src/infrastructure/storage/minio/object_operations.py:371
-with open(file_path, "rb") as f:  # 同步阻塞！
-    while True:
-        data = f.read(part_size)
-        if not data:
-            break
-        # ...
-```
-
 **重构方案**：
 
 ```python
@@ -600,66 +644,48 @@ class ObjectOperations:
         bucket: str,
         part_size: int = 5 * 1024 * 1024
     ) -> str | None:
-        def _read_chunks():
-            chunks = []
-            with open(file_path, "rb") as f:
-                while True:
-                    data = f.read(part_size)
-                    if not data:
-                        break
-                    chunks.append(data)
-            return chunks
-
         # 文件读取在线程池中执行
-        chunks = await asyncio.to_thread(_read_chunks)
+        chunks = await asyncio.to_thread(self._read_chunks_sync, file_path, part_size)
 
-        # MinIO SDK 调用（如果是同步的）也用 to_thread 封装
-        # 或者如果 MinIO SDK 支持 async，直接 await
-        return await self._upload_chunks_async(chunks, object_name, bucket)
+        # MinIO 操作在线程池中执行（如果 SDK 是同步的）
+        return await asyncio.to_thread(
+            self._upload_chunks_sync,
+            chunks,
+            object_name,
+            bucket
+        )
 
-    async def _upload_chunks_async(self, chunks: list[bytes], object_name: str, bucket: str):
-        """上传分片 - 如果 MinIO SDK 支持 async。"""
-        # MinIO Python SDK 目前主要是同步的，
-        # 如果需要完全异步，需要考虑 aiobotocore 或其他方案
-        def _sync_upload():
-            client = self._client.client
-            # 同步上传逻辑
-            pass
+    @staticmethod
+    def _read_chunks_sync(file_path: str, part_size: int) -> list[bytes]:
+        """同步读取文件分片。"""
+        chunks = []
+        with open(file_path, "rb") as f:
+            while True:
+                data = f.read(part_size)
+                if not data:
+                    break
+                chunks.append(data)
+        return chunks
 
-        return await asyncio.to_thread(_sync_upload)
+    def _upload_chunks_sync(self, chunks: list[bytes], object_name: str, bucket: str):
+        """同步上传分片。"""
+        client = self._client.client
+        parts = []
+        for part_number, data in enumerate(chunks, 1):
+            etag = client._put_object(
+                bucket,
+                object_name,
+                data,
+                length=len(data),
+                part_number=part_number,
+            )
+            parts.append({"PartNumber": part_number, "ETag": etag})
+        return parts
 ```
 
 ---
 
-### Phase 2: 优化确认（P2 - 可选）
-
-#### P2-1: `engine.py` - sync engine 评估
-
-**当前状态**（源码确认）：
-```python
-# src/infrastructure/storage/postgresql/engine.py
-def get_sync_engine(self) -> Engine:
-    """Returns a synchronous SQLAlchemy engine (psycopg2)."""
-    # postgresql+psycopg2://...
-```
-
-**评估命令**：
-```bash
-# 检查 sync engine 的使用情况
-grep -r "get_sync_engine\|psycopg2" src/ --include="*.py"
-```
-
-**决策树**：
-```
-sync engine 使用评估：
-├── 如果有外部调用者使用 → 保留，但标记为 deprecated
-├── 如果仅内部使用 → 删除，用 async engine 替代
-└── 如果是遗留代码 → 评估迁移成本
-```
-
----
-
-## 3. 架构抽象层新增（完善）
+## 3. 架构抽象层新增
 
 ### 3.1 端口接口定义
 
@@ -668,16 +694,13 @@ sync engine 使用评估：
 from abc import ABC, abstractmethod
 
 class FilePort(ABC):
-    """文件操作抽象端口 - 六边形架构接口层。"""
+    """文件操作抽象端口"""
     @abstractmethod
     async def read(self, path: str) -> str: ...
-
     @abstractmethod
     async def write(self, path: str, content: str) -> None: ...
-
     @abstractmethod
     async def exists(self, path: str) -> bool: ...
-
     @abstractmethod
     async def delete(self, path: str) -> None: ...
 
@@ -685,7 +708,7 @@ class FilePort(ABC):
 from abc import ABC, abstractmethod
 
 class HealthCheckPort(ABC):
-    """健康检查抽象端口 - 六边形架构接口层。"""
+    """健康检查抽象端口"""
     @abstractmethod
     async def check(self) -> bool: ...
 ```
@@ -699,7 +722,7 @@ from pathlib import Path
 from src.interfaces.ports.file_port import FilePort
 
 class AioFilesAdapter(FilePort):
-    """基于 aiofiles 的文件适配器。"""
+    """基于 aiofiles 的文件适配器"""
     async def read(self, path: str) -> str:
         async with aiofiles.open(path, "r", encoding="utf-8") as f:
             return await f.read()
@@ -720,14 +743,10 @@ import httpx
 from src.interfaces.ports.health_check_port import HealthCheckPort
 
 class OllamaHealthAdapter(HealthCheckPort):
-    """Ollama 健康检查适配器。"""
+    """Ollama 健康检查适配器"""
     _client: httpx.AsyncClient | None = None
 
-    def __init__(
-        self,
-        endpoint: str = "http://localhost:11434/api/health",
-        timeout: float = 5.0
-    ):
+    def __init__(self, endpoint: str = "http://localhost:11434/api/health", timeout: float = 5.0):
         self._endpoint = endpoint
         self._timeout = timeout
 
@@ -739,43 +758,48 @@ class OllamaHealthAdapter(HealthCheckPort):
             return response.status_code == 200
         except (httpx.RequestError, httpx.TimeoutException):
             return False
+
+    async def close(self) -> None:
+        if self._client:
+            await self._client.aclose()
+            self._client = None
 ```
 
 ---
 
-## 4. 重构优先级与工作量评估（校正）
+## 4. 重构优先级与工作量评估
 
 ### 4.1 优先级矩阵
 
-| 优先级 | 文件 | 问题 | 修复策略 | 工时 | 风险 | 源码确认 |
-|--------|------|------|----------|------|------|----------|
-| **P0-1** | `event_listener.py` | asyncio.run() | to_thread + 双接口 | 0.5d | 低 | ✓ |
-| **P0-2** | `local_model_health.py` | 同步 requests | HealthCheckPort + httpx | 0.5d | 低 | ✓ |
-| **P0-3** | `auto_trigger_listener.py` | Thread+asyncio | 重构为纯 asyncio | 2d | 中 | ✓ |
-| **P1-1** | `file_memory_adapter.py` | 同步文件I/O | aiofiles | 1d | 低 | ✓ |
-| **P1-2** | `memory_index.py` | 同步I/O+flock | to_thread（保留锁语义） | 1d | 中 | ✓ |
-| **P1-3** | `integrity_service.py` | async内同步I/O | to_thread | 0.5d | 低 | ✓ |
-| **P1-4** | `object_operations.py` | async内同步I/O | to_thread | 0.5d | 低 | ✓ |
-| **P2** | `engine.py` | sync engine | 评估后决策 | 0.5d | 低 | ✓ |
+| 优先级 | 文件 | 问题 | 修复策略 | 工时 | 风险 | 调用链约束 |
+|--------|------|------|----------|------|------|------------|
+| **P0-1** | `event_listener.py` | asyncio.run() | call_soon + create_task | 0.5d | 低 | EventListener.dispatch() 需要 sync handler |
+| **P0-2** | `local_model_health.py` | 同步 requests | HealthCheckPort + httpx | 0.5d | 低 | 无 |
+| **P0-3** | `auto_trigger_listener.py` | Thread+asyncio | 重构为纯 asyncio | 2d | 中 | EventListener.on_event() 需要 sync handler |
+| **P1-1** | `file_memory_adapter.py` | 同步文件I/O | aiofiles | 1d | 低 | 调用方需要改为 await |
+| **P1-2** | `memory_index.py` | 同步I/O+flock | to_thread（保留锁语义） | 1d | 中 | 调用方需要改为 await |
+| **P1-3** | `integrity_service.py` | async内同步I/O | to_thread | 0.5d | 低 | 无 |
+| **P1-4** | `object_operations.py` | async内同步I/O | to_thread | 0.5d | 低 | 无 |
+| **P2** | `engine.py` | sync engine | 评估后决策 | 0.5d | 低 | 无 |
 
 ### 4.2 阶段划分
 
 ```
 Week 1: P0 紧急修复
-├── event_listener.py → to_thread + 双接口
-└── local_model_health.py → HealthCheckPort + httpx
+├── event_listener.py → call_soon + create_task（0.5d）
+└── local_model_health.py → HealthCheckPort + httpx（0.5d）
 
 Week 2: P0-3 架构统一（重点）
 └── auto_trigger_listener.py → 纯 asyncio（2d）
 
 Week 3: P1 文件 I/O 异步化
-├── file_memory_adapter.py → aiofiles
-├── memory_index.py → to_thread + flock 语义
-├── integrity_service.py → to_thread
-└── object_operations.py → to_thread
+├── file_memory_adapter.py → aiofiles（1d）
+├── memory_index.py → to_thread + flock 语义（1d）
+├── integrity_service.py → to_thread（0.5d）
+└── object_operations.py → to_thread（0.5d）
 
 Week 4: P2 优化 + 验证
-├── engine.py → 评估决策
+├── engine.py → 评估决策（0.5d）
 ├── 集成测试
 └── 性能验证
 ```
@@ -801,24 +825,13 @@ poetry run pytest tests/infrastructure/storage/test_memory_index.py -v
 ```python
 # tests/test_event_loop_unblocked.py
 import asyncio
-import pytest
 
 async def test_event_loop_not_blocked():
     """验证事件循环不被阻塞。"""
     start = asyncio.get_event_loop().time()
-
     # 调用重构后的方法
-    # ...
-
     elapsed = asyncio.get_event_loop().time() - start
     assert elapsed < 1.0, "Event loop was blocked!"
-```
-
-### 5.3 集成测试验证
-
-```bash
-# 事件循环不阻塞测试
-poetry run pytest tests/integration/ -v -k "async"
 ```
 
 ---
@@ -843,15 +856,8 @@ poetry add aiofiles
 
 ### 7.1 回滚策略
 
-每个 P0/P1 修改前：
-1. 创建 git branch
-2. 编写失败的测试用例（红）
-3. 重构
-4. 验证测试通过（绿）
-5. 提交
-
 ```bash
-git checkout -b feature/sync-async-refactor
+git checkout -b feature/sync-async-refactor-v3
 ```
 
 ### 7.2 渐进式验证
@@ -867,11 +873,11 @@ Step 4: 性能回归测试
 
 ## 8. 宗师级设计总结
 
-### 8.1 核心原则
+### 8.1 核心原则（新增两项）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     宗师级设计的六个原则                                 │
+│                     宗师级设计的八个原则                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 单一事件循环                                                          │
@@ -896,6 +902,14 @@ Step 4: 性能回归测试
 │ 6. 锁语义保留                                                            │
 │    fcntl.flock 等线程级锁用 to_thread 封装，保留原子性                   │
 │                                                                         │
+│ 7. 调用链约束优先                                                        │
+│    分析调用链确定约束，选择匹配的重构方案                                  │
+│    例：EventListener.dispatch() 需要 sync handler                       │
+│                                                                         │
+│ 8. 优雅降级                                                              │
+│    使用 call_soon() + create_task() 在已有循环中调度                     │
+│    只有在没有循环时才用 asyncio.run()                                     │
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -911,25 +925,25 @@ Step 4: 性能回归测试
 
 ---
 
-## 附录A：源码与文档差异清单
+## 附录A：第二轮审查新发现
 
-| 文件 | 源码实际情况 | 原分析描述 | 差异影响 |
-|------|--------------|------------|----------|
-| `memory_index.py` | 有 fcntl.flock 文件锁 | 未提及锁 | 增加重构复杂度 |
-| `integrity_service.py:189` | async 内同步 open | 未在 P0/P1 中识别 | 遗漏 P0 问题 |
-| `object_operations.py:371` | async 内同步 open | 未在 P0/P1 中识别 | 遗漏 P0 问题 |
+| 发现 | 文件 | 影响 |
+|------|------|------|
+| EventListener.dispatch() 需要 sync handler | event_listener.py | 影响重构方案选择 |
+| AuditService.log() 是 async 方法 | audit_service.py | 无 sync 版本可用 |
+| AutoTriggerService 是纯 async | auto_trigger_service.py | handler 必须桥接 |
 
 ---
 
 ## 附录B：完整文件修改清单
 
-| 文件 | 修改类型 | 新增抽象 | 源码确认 |
-|------|----------|----------|----------|
-| `event_listener.py` | 重构 | 双接口（handle_event + handle_event_async） | ✓ |
-| `local_model_health.py` | 重构 | `HealthCheckPort` | ✓ |
-| `auto_trigger_listener.py` | 重构 | 纯 asyncio `asyncio.Queue` | ✓ |
-| `file_memory_adapter.py` | 重构 | `FilePort` + `AioFilesAdapter` | ✓ |
-| `memory_index.py` | 重构 | `asyncio.to_thread()` + 锁语义 | ✓ |
-| `integrity_service.py` | 重构 | `asyncio.to_thread()` | ✓ |
-| `object_operations.py` | 重构 | `asyncio.to_thread()` | ✓ |
-| `engine.py` | 评估决策 | - | ✓ |
+| 文件 | 修改类型 | 新增抽象 | 调用链约束 |
+|------|----------|----------|------------|
+| `event_listener.py` | 重构 | call_soon + create_task | EventListener.dispatch() 需要 sync |
+| `local_model_health.py` | 重构 | `HealthCheckPort` | 无 |
+| `auto_trigger_listener.py` | 重构 | 纯 asyncio Queue | EventListener.on_event() 需要 sync |
+| `file_memory_adapter.py` | 重构 | `FilePort` + `AioFilesAdapter` | 调用方改 await |
+| `memory_index.py` | 重构 | to_thread + 锁语义 | 调用方改 await |
+| `integrity_service.py` | 重构 | to_thread | 无 |
+| `object_operations.py` | 重构 | to_thread | 无 |
+| `engine.py` | 评估决策 | - | 无 |
