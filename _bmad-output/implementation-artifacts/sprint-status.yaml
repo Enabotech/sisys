@@ -309,21 +309,22 @@ development_status:
   20-1-sisys-testing-refactor: done
   20-2-event-messaging-refactor: done
   20-3-uni-dual-channel-eventbus: done
+  20-4-uni-async-refactor: ready-for-dev
   epic-20-retrospective: optional
 
 # =============================================================================
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 154
+# Total Stories (excluding retrospectives): 155
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
-#   - Epic 20: 3 stories (✅ done)
+#   - Epic 20: 4 stories (✅ 3 done, 🔄 1 ready-for-dev)
 #
 # Status Summary:
 #   - Done: 28 (包括 Epic 20)
-#   - Ready for Dev: 5
+#   - Ready for Dev: 6
 #   - Backlog: 121
 #
 # Next Steps:
