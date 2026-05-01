@@ -280,9 +280,9 @@ class TestJobDependencies:
                 # integration-tests 的 needs 可以是字符串或列表
                 int_test_needs = jobs.get("integration-tests", {}).get("needs", [])
                 if isinstance(int_test_needs, str):
-                    assert int_test_needs == "unit-tests", "integration-tests 应依赖 unit-tests"
+                    assert int_test_needs == "detect-changes", "integration-tests 应依赖 detect-changes"
                 else:
-                    assert "unit-tests" in int_test_needs, "integration-tests 应依赖 unit-tests"
+                    assert "detect-changes" in int_test_needs, "integration-tests 应依赖 detect-changes"
 
                 # build-images 的 needs 应该是列表
                 build_needs = jobs.get("build-images", {}).get("needs", [])

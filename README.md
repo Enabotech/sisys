@@ -4,8 +4,6 @@
 
 AI-driven strategic planning and decision intelligence platform for enterprises.
 
-**最新版本：** Epic 0 重构完成 (2026-03-05) ✅
-
 ---
 
 ## 📋 导航 Navigation
@@ -19,8 +17,6 @@ AI-driven strategic planning and decision intelligence platform for enterprises.
 | 文档 | 用途 | 目标读者 | 阅读时间 |
 |------|------|---------|---------|
 | [**WSL2_QUICK_REFERENCE.md**](docker/WSL2_QUICK_REFERENCE.md) | WSL 2 快速参考卡片 | WSL 2 用户 | 2 分钟 |
-| [**Qwen + Git Worktree 并行开发指南**](docs/developer/qwen-git-worktree-parallel-dev-guide.md) | Qwen Code + Worktree 多任务并行开发 | 所有开发者 | 30 分钟 |
-| [**Qwen + Worktree 快速参考**](docs/developer/qwen-git-worktree-quick-reference.md) | 快速命令查询卡片 | 所有开发者 | 5 分钟 |
 
 ### 架构文档
 | 文档 | 用途 | 目标读者 | 阅读时间 |
