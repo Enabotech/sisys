@@ -1,19 +1,19 @@
-# SISYS 同步代码最优重构方案（第八版 - 收敛版）
+# SISYS 同步代码最优重构方案（第九版 - 收敛版）
 
 **生成日期**: 2026-05-01
-**版本**: v8.0（第八轮审查 - 调用链交叉验证，收敛版）
-**依据**: sync-code-analysis.md（权威基准） + 源码验证 + 调用链分析
+**版本**: v9.0（第九轮审查 - 深度调用链验证 + 边界情况分析，收敛版）
+**依据**: sync-code-analysis.md（权威基准） + 源码验证 + 调用链分析 + 边界情况分析
 **目标**: 严格对齐分析报告，输出无歧义的可执行方案
 
 ---
 
 ## 0. 审查说明
 
-**收敛声明**：本版本通过调用链交叉验证，确保方案与实际调用关系一一对应，消除"方案正确但调用方无法使用"的歧义。
+**收敛声明**：本版本通过深度调用链验证，区分"被包装调用"与"直接调用"，避免误标问题。同时分析边界情况，确保方案在所有场景下可执行。
 
 **验证方法**：
 ```bash
-# 源码行号验证
+# 1. 源码行号验证
 grep -n "asyncio.run\|requests\.Session\|threading\.Thread\|with open\|\.write_text\|\.read_text\|fcntl\.flock" \
   src/infrastructure/audit/event_listener.py \
   src/infrastructure/routing/local_model_health.py \
@@ -23,8 +23,11 @@ grep -n "asyncio.run\|requests\.Session\|threading\.Thread\|with open\|\.write_t
   src/infrastructure/security/integrity_service.py \
   src/infrastructure/storage/minio/object_operations.py
 
-# 调用链验证
-grep -rn "LocalModelHealth\|AuditEventListener\|AutoTriggerListener" src/ --include="*.py"
+# 2. 调用链验证：区分"被包装调用"vs"直接调用"
+grep -rn "asyncio.to_thread" src/ --include="*.py" -A2
+
+# 3. 验证 sync 方法是否已被 to_thread 包装
+grep -rn "upload_object\|get_object_metadata\|delete_object" src/infrastructure/storage/minio/minio_repository.py
 ```
 
 ---
@@ -49,9 +52,21 @@ grep -rn "LocalModelHealth\|AuditEventListener\|AutoTriggerListener" src/ --incl
 
 **问题总数**：11个（P0:2, P1:9, P2:0）
 
+### 1.2 重要澄清：sync 方法的调用包装
+
+| 方法 | 调用方式 | 是否阻塞事件循环 |
+|------|----------|------------------|
+| `ObjectOperations.upload_object()` | `asyncio.to_thread()` 包装 | ✗ 不直接阻塞（已被包装） |
+| `ObjectOperations._single_upload()` | 仅内部调用 | ✗ 不直接暴露 |
+| `ObjectOperations._multipart_upload()` | 仅内部调用 | ✗ 不直接暴露 |
+| `ObjectOperations.get_object_metadata()` | `asyncio.to_thread()` 包装 | ✗ 不直接阻塞 |
+| `ObjectOperations.delete_object()` | `asyncio.to_thread()` 包装 | ✗ 不直接阻塞 |
+
+**结论**：`object_operations.py` 中 `upload_object`、`get_object_metadata`、`delete_object` 等 sync 方法已被 `minio_repository.py` 通过 `asyncio.to_thread()` 包装，不直接在事件循环中阻塞。sync-code-analysis.md §问题11 指的 `with open()` 位于 `resume_multipart_upload()` 方法内部（async 方法），这是真正的 P1 问题。
+
 ---
 
-### 1.2 源码行号验证结果
+### 1.3 源码行号验证结果
 
 ```bash
 # 经验证的行号
@@ -76,10 +91,9 @@ object_operations.py:371 → with open(file_path, "rb") as f:
 
 **问题**：`asyncio.run()` 在 sync 方法中创建嵌套事件循环
 
-**调用链确认**：
-- `handle_event()` 是外部调用的入口点（sync 方法签名）
-- `handle_event_async()` 是 async 入口点（内部已实现）
-- 源码已有 RuntimeError 检查，但 `asyncio.run()` 仍是反模式
+**边界情况分析**：
+- 场景A：有运行中事件循环 → 使用 `call_soon()` + `create_task()` fire-and-forget
+- 场景B：无运行中事件循环（如单元测试） → 使用 `asyncio.to_thread()` 委托到线程池
 
 **重构方案**：
 ```python
@@ -107,6 +121,11 @@ def handle_event(self, event: DomainEvent) -> None:
         asyncio.to_thread(self._sync_log_wrapper, audit_data)
 
 def _sync_log_wrapper(self, audit_data: dict) -> None:
+    """同步封装的审计日志写入（用于 to_thread fallback）。
+
+    注意：在线程池线程中调用 asyncio.run() 是正确的，
+    因为 to_thread 创建的是独立线程，不与主事件循环冲突。
+    """
     asyncio.run(
         self._audit_service.log(
             actor=audit_data["actor"],
@@ -120,11 +139,6 @@ def _sync_log_wrapper(self, audit_data: dict) -> None:
     )
 ```
 
-**关键点**：
-- `call_soon()` + `create_task()`：在已有循环中调度 fire-and-forget 任务
-- `asyncio.to_thread()` fallback：在无循环时委托到线程池（不创建嵌套循环）
-- `_sync_log_wrapper` 内部用 `asyncio.run()`：这是正确的，因为在线程池线程中创建新循环是允许的
-
 **测试更新**：无需修改（保持 sync 方法签名）
 
 ---
@@ -132,10 +146,6 @@ def _sync_log_wrapper(self, audit_data: dict) -> None:
 ### P0-2: local_model_health.py:51
 
 **问题**：同步 `requests.Session.get()` 阻塞事件循环
-
-**调用链确认**：
-- `LocalModelHealth.check()` 被 `LocalModelHealthCheckPort` 调用
-- 重构后需更新调用方
 
 **重构方案**：
 
@@ -168,8 +178,6 @@ class OllamaHealthAdapter:
             self._client = None
 ```
 
-**调用方更新**：原调用 `LocalModelHealth().check()` 改为 `await OllamaHealthAdapter().check()`
-
 **测试更新**：更新调用方为 `await adapter.check()`
 
 ---
@@ -177,10 +185,6 @@ class OllamaHealthAdapter:
 ### P1-1: auto_trigger_listener.py:112-118
 
 **问题**：每事件创建新事件循环（`asyncio.new_event_loop()` + `asyncio.run()`）
-
-**调用链确认**：
-- `register_handlers()` 在初始化时调用
-- `stop()` 在关闭时调用
 
 **重构方案**：
 
@@ -264,9 +268,6 @@ class AutoTriggerListener:
 
 **问题**：同步 `Path.write_text()` 和 `Path.read_text()`
 
-**调用链确认**：
-- `write()` / `read()` 被 `FileMemoryService` 调用
-
 **重构方案**：
 
 ```python
@@ -294,10 +295,6 @@ async def read(self, memory_id: str, memory_type: str) -> str:
 ### P1-3: memory_index.py:125,139
 
 **问题**：同步 `open()` + `rename()` + fcntl.flock
-
-**调用链确认**：
-- `truncate()` 是公开方法，被外部调用
-- `_read_entries_locked()` / `_write_entries_locked()` 是内部方法
 
 **重构方案**：
 
@@ -532,4 +529,5 @@ async def test_event_loop_not_blocked():
 | v5.0 | 依赖确认 |
 | v6.0 | 收敛版：与 sync-code-analysis.md 严格对齐，问题数从13收敛到11 |
 | v7.0 | 源码逐项验证：P0-1 方案修正（to_thread fallback） |
-| v8.0 | **调用链交叉验证**：确认所有调用方存在且方案可执行，解决"方案正确但调用方无法使用"的问题 |
+| v8.0 | 调用链交叉验证：确认所有调用方存在且方案可执行 |
+| v9.0 | **深度调用链验证**：区分"被 to_thread 包装的 sync 方法"与"直接暴露的 sync 方法"，修正 P1-5 分析边界 |
