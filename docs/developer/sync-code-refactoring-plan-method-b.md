@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.2）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.3）
 
 **生成日期**: 2026-05-01
-**版本**: v1.2（第二轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 两轮审查反馈
+**版本**: v1.3（第三轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 三轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -267,7 +267,7 @@ class IndexManagerPort(ABC):
 """IntegrityPort — 数据完整性验证抽象端口。"""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 class IntegrityPort(ABC):
     """数据完整性验证抽象端口。
@@ -275,6 +275,8 @@ class IntegrityPort(ABC):
     设计原则：
     - verify_file(): I/O 密集型 → async + to_thread
     - compute_hash()/verify_hash(): CPU 密集型 → sync（事件循环中直接调用不阻塞）
+
+    注意：使用 Literal 类型定义算法，避免引入 infrastructure 层依赖。
     """
 
     @abstractmethod
@@ -291,7 +293,7 @@ class IntegrityPort(ABC):
         pass
 
     @abstractmethod
-    def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
+    def compute_hash(self, data: str | bytes, algorithm: Literal["sha256", "sha512", "md5"] | None = None) -> str:
         """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
         Args:
@@ -308,7 +310,7 @@ class IntegrityPort(ABC):
         self,
         data: str | bytes,
         expected_hash: str,
-        algorithm: str | None = None,
+        algorithm: Literal["sha256", "sha512", "md5"] | None = None,
     ) -> bool:
         """验证数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
@@ -382,6 +384,8 @@ class FileMemoryAdapter(L0StoragePort):
 ### 3.2 OllamaHealthAdapter → HealthCheckPort 实现
 
 **文件**: `src/infrastructure/routing/local_model_health.py`
+
+**重要说明**：现有类 `LocalModelHealth` 需要重命名为 `OllamaHealthAdapter`，以符合 Port 接口实现类的命名规范（具体技术 + Adapter）。
 
 **改造前**（sync requests）：
 ```python
@@ -576,6 +580,8 @@ async def download_object(
         response.release_conn()
 ```
 
+**性能说明**：`download_object` 每个 chunk 调用一次 `run_in_executor`。对于大文件（如 100MB），会有约 12,800 次 executor 调用。但网络 I/O 等待时间远大于线程切换开销，此设计在生产环境中可接受。
+
 ---
 
 ## 4. 调用链重构
@@ -615,8 +621,8 @@ class SixLayerStorageCoordinator:
         # L0 存储注入（Port + 实现）
         self._l0_storage: L0StoragePort = FileMemoryAdapter(config)
 
-        # L1 缓存注入（待创建 Port）
-        self._l1_cache: L1CachePort = RedisMemoryCache(redis_client)
+        # L1 缓存：当前由 SixLayerStorageCoordinator 内部使用，不直接暴露给 Domain 层
+        # 如需 Domain 层完全解耦，可后续扩展 L1CachePort（不在本次方案范围内）
 
         # L2-L5 已有 Port 实现
         self._metadata_repo: MemoryMetadataRepositoryProtocol = ...
@@ -625,13 +631,20 @@ class SixLayerStorageCoordinator:
         self._graph_storage: GraphStorage = ...
 ```
 
+**风险评估**：调用链重构影响以下组件：
+| 调用方 | 改造内容 | 风险等级 | 备注 |
+|--------|----------|----------|------|
+| `MemoryService` | 依赖 `L0StoragePort` 替代 `FileMemoryAdapter` | 中 | 需修改构造函数签名 |
+| `SixLayerStorageCoordinator` | 显式注入 `L0StoragePort` | 低 | |
+| `MemoryChangedListener` | 依赖 `IndexManagerPort` 替代 `MemoryIndex` | 中 | 需确认注入点 |
+
 ---
 
 ## 5. 宗师级设计原则（修正版）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属 - v1.1修正版）                    │
+│               宗师级设计六原则（方案B专属 - v1.3修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
@@ -685,18 +698,18 @@ class SixLayerStorageCoordinator:
 |--------|----------|------|----------|
 | `FileMemoryAdapter` | 实现 L0StoragePort + aiofiles | 1d | 0.5d |
 | `OllamaHealthAdapter` | 实现 HealthCheckPort + httpx | 0.5d | 0.25d |
-| `MemoryIndex` | 实现 IndexManagerPort + to_thread | 1d | 0.5d |
+| `MemoryIndex` | 实现 IndexManagerPort + to_thread（5个公开方法+锁） | 1.5d | 0.5d |
 | `IntegrityVerifier` | 实现 IntegrityPort | 0.5d | 0.25d |
 | `ObjectOperations` | 修复 download_object + resume_multipart_upload | 0.5d | 0.25d |
 
-**实现改造总计**: 3.5d + 1.75d 测试
+**实现改造总计**: 4d + 1.75d 测试
 
 ### 6.3 调用链重构
 
 | 调用方 | 改造内容 | 工时 |
 |--------|----------|------|
 | `MemoryService` | 改为依赖 L0StoragePort | 0.5d |
-| `SixLayerStorageCoordinator` | 注入 L0StoragePort/L1CachePort | 0.5d |
+| `SixLayerStorageCoordinator` | 注入 L0StoragePort | 0.5d |
 | `MemoryChangedListener` | 改为依赖 IndexManagerPort | 0.5d |
 
 **调用链重构总计**: 1.5d
@@ -706,12 +719,12 @@ class SixLayerStorageCoordinator:
 | 阶段 | 内容 | 工时 |
 |------|------|------|
 | **Phase 1** | 4 个 Port 接口定义 | 2d |
-| **Phase 2** | 5 个 Infrastructure 实现改造 | 3.5d |
+| **Phase 2** | 5 个 Infrastructure 实现改造 | 4d |
 | **Phase 3** | 测试更新 | 1.75d |
 | **Phase 4** | 调用链重构 | 1.5d |
 | **Phase 5** | 集成验证 + 测试基础设施 | 2d |
 
-**方案B 总工时**: 10.75d（修正后，原 13d）
+**方案B 总工时**: 11.25d（v1.3修正后，原 10.75d）
 
 ---
 
@@ -724,17 +737,18 @@ Phase 1: Port 接口定义（2d）
 ├── IndexManagerPort（0.5d）
 └── IntegrityPort（0.5d）
 
-Phase 2: Infrastructure 实现改造（3.5d）
+Phase 2: Infrastructure 实现改造（4d）
 ├── FileMemoryAdapter → L0StoragePort 实现（1.5d）
 ├── OllamaHealthAdapter → HealthCheckPort 实现（0.75d）
-├── MemoryIndex → IndexManagerPort 实现（1.5d）
+├── MemoryIndex → IndexManagerPort 实现（2d，含锁逻辑）
 └── IntegrityVerifier → IntegrityPort 实现（0.75d）
 
 Phase 3: ObjectOperations 改造（0.75d）
 └── 修复 download_object + resume_multipart_upload（0.75d）
 
 Phase 4: 测试更新（1.75d）
-└── 所有 async 方法测试 + TDD 循环
+├── 所有 async 方法测试 + TDD 循环
+└── Mock 实现准备（FakeL0StorageAdapter, FakeMemoryIndex, FakeHealthAdapter, FakeIntegrityVerifier）
 
 Phase 5: 调用链重构（1.5d）
 ├── MemoryService 依赖注入调整（0.5d）
@@ -814,11 +828,13 @@ Phase 6: 集成验证（2d）
 |------|----------|
 | v1.0 | 初始方案 |
 | v1.1 | **第一轮审查修正**：<br>- 移除 `ObjectOperationsPort`（与 `ObjectStorageRepository` 职责重叠）<br>- 修正 `IntegrityPort`：`compute_hash`/`verify_hash` 保留 sync（CPU 密集型）<br>- 修正 `download_object`：使用 `run_in_executor` 包装同步读取<br>- 工时修正：13d → 10.75d |
+| v1.2 | **第二轮审查修正**：<br>- 添加 L1CachePort 可选优化说明<br>- 明确"目标状态"vs"当前状态"描述 |
+| v1.3 | **第三轮审查修正**：<br>- §4.2 移除 L1CachePort 引用，标注为预留接口<br>- IntegrityPort 使用 `Literal` 类型避免 domain 层依赖 infrastructure<br>- LocalModelHealth → OllamaHealthAdapter 重命名说明<br>- download_object 添加性能说明<br>- Phase 2 MemoryIndex 工时调整：1.5d → 2d<br>- 添加调用链风险评估<br>- 添加 Mock 实现准备说明<br>- 工时调整：10.75d → 11.25d |
 
 ---
 
-**方案B v1.1 核心价值**：
+**方案B v1.3 核心价值**：
 1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
 2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
 3. 避免 Port 职责重叠，遵循单一职责原则
-4. 总工时 10.75d，实现完全六边形架构合规
+4. 总工时 11.25d，实现完全六边形架构合规
