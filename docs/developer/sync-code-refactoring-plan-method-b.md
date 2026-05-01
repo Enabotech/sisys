@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.6）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.7）
 
 **生成日期**: 2026-05-01
-**版本**: v1.6（第六轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 六轮审查反馈
+**版本**: v1.7（第七轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 七轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -649,13 +649,15 @@ class SixLayerStorageCoordinator:
 | `SixLayerStorageCoordinator` | 显式注入 `L0StoragePort` | 低 | |
 | `MemoryChangedListener` | 依赖 `IndexManagerPort` 替代 `MemoryIndex` | 中 | 需确认注入点 |
 
+**实施前准备**：调用链重构前必须搜索所有 `MemoryService(` 实例化点，评估改造影响范围。
+
 ---
 
 ## 5. 宗师级设计原则（修正版）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属 - v1.6修正版）                    │
+│               宗师级设计六原则（方案B专属 - v1.7修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
@@ -723,7 +725,7 @@ class SixLayerStorageCoordinator:
 | `SixLayerStorageCoordinator` | 注入 L0StoragePort | 0.5d |
 | `MemoryChangedListener` | 改为依赖 IndexManagerPort | 0.5d |
 
-**调用链重构总计**: 1.5d
+**调用链重构总计**: 2d（含实例化点搜索）
 
 ### 6.4 总工时汇总
 
@@ -732,10 +734,10 @@ class SixLayerStorageCoordinator:
 | **Phase 1** | 4 个 Port 接口定义 | 2d |
 | **Phase 2** | 5 个 Infrastructure 实现改造 | 4d |
 | **Phase 3** | 测试更新 | 1.75d |
-| **Phase 4** | 调用链重构 | 1.5d |
+| **Phase 4** | 调用链重构 | 2d |
 | **Phase 5** | 集成验证 + 测试基础设施 | 2d |
 
-**方案B 总工时**: 11.25d（v1.3修正后，原 10.75d）
+**方案B 总工时**: 11.75d（v1.7修正后，原 10.75d）
 
 ---
 
@@ -761,10 +763,11 @@ Phase 4: 测试更新（1.75d）
 ├── 所有 async 方法测试 + TDD 循环
 └── Mock 实现准备（FakeL0StorageAdapter, FakeMemoryIndex, FakeHealthAdapter, FakeIntegrityVerifier）
 
-Phase 5: 调用链重构（1.5d）
+Phase 5: 调用链重构（2d）
 ├── MemoryService 依赖注入调整（0.5d）
 ├── SixLayerStorageCoordinator 调整（0.5d）
-└── MemoryChangedListener 调整（0.5d）
+├── MemoryChangedListener 调整（0.5d）
+└── 实例化点搜索与改造验证（0.5d）
 
 Phase 6: 集成验证（2d）
 ├── 端到端测试
@@ -844,11 +847,12 @@ Phase 6: 集成验证（2d）
 | v1.4 | **第四轮审查修正**：<br>- IntegrityPort 接口类型从 `Literal["sha256", "sha512", "md5"]` 改为 `str \| None`<br>- 实现内部处理字符串到 HashAlgorithm enum 的转换<br>- 符合 Domain 层零依赖原则 |
 | v1.5 | **第五轮审查修正**：<br>- 移除 IntegrityPort 未使用的 `Literal` 导入<br>- 更新 docstring 说明（str \| None 而非 Literal） |
 | v1.6 | **第六轮审查修正**：<br>- Protocol vs ABC 分析：确认使用 ABC 是正确选择（名义子类型）<br>- 类型系统深度对标：dict 用于内部数据合理<br>- 总体评分收敛至 9.5/10 |
+| v1.7 | **第七轮审查修正**：<br>- 添加 MemoryService 实例化点搜索要求<br>- Phase 5 调用链重构工时：1.5d → 2d（含实例化点搜索）<br>- 总工时调整：11.25d → 11.75d |
 
 ---
 
-**方案B v1.6 核心价值**：
+**方案B v1.7 核心价值**：
 1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
 2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
 3. 避免 Port 职责重叠，遵循单一职责原则
-4. 总工时 11.25d，实现完全六边形架构合规
+4. 总工时 11.75d，实现完全六边形架构合规
