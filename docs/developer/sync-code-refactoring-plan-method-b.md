@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.1）
 
 **生成日期**: 2026-05-01
-**版本**: v1.0（方案B - 宗师级）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践
+**版本**: v1.1（第一轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 第一轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -37,7 +37,6 @@
 │  L5: Neo4jGraph ──────────→ GraphStorage Protocol ✓                        │
 │                                                                             │
 │  IntegrityService ───────→ [缺失 Port] ────→ 文件哈希验证                  │
-│  ObjectOperations ───────→ [缺失 Port] ────→ MinIO 对象操作               │
 │  AuditEventListener ─────→ [缺失 Port] ────→ 审计事件记录                  │
 │  LocalModelHealth ───────→ [缺失 Port] ────→ Ollama 健康检查              │
 │  AutoTriggerListener ────→ [缺失 Port] ────→ 自动触发监听                 │
@@ -50,9 +49,9 @@
 |------|------|----------|
 | Repository Ports | 10 | L2 Metadata/History, Vector, Graph, Object Storage, Session Storage ✓ |
 | Domain Service Ports | 9 | Auth, Audit, Permission, Semantic Cache ✓ |
-| **缺失 Port** | **4** | L0Storage, L1Cache, IndexManager, PathResolver |
+| **缺失 Port** | **3** | L0Storage, L1Cache, IndexManager（PathResolver 合并） |
 
-**端口抽象覆盖率**: ~70%（7/10 核心存储类已有 Port）
+**注**：方案B v1.0 原计划新增 `ObjectOperationsPort`，经审查发现与现有 `ObjectStorageRepository` 职责重叠，已移除。`ObjectOperations` 的 sync I/O 问题通过直接改造实现类解决。
 
 ---
 
@@ -60,21 +59,25 @@
 
 ### 1.1 问题 → Port 映射矩阵
 
-| 问题编号 | 文件:行号 | 问题描述 | 需要创建的 Port | 抽象级别 |
-|----------|-----------|----------|-----------------|----------|
-| P0-1 | `event_listener.py:106` | `asyncio.run()` 在 sync 方法 | `AuditService` 已存在，无需新 Port | 修复调用方式 |
-| P0-2 | `local_model_health.py:51` | 同步 `requests.Session` | `HealthCheckPort` | 新增 |
-| P1-1 | `auto_trigger_listener.py:112-118` | 重复创建事件循环 | `EventSubscriberPort` | 已有/重构 |
-| P1-2 | `file_memory_adapter.py:59,77` | 同步 `Path.write/read_text` | `L0StoragePort` | 新增 |
-| P1-3 | `memory_index.py:125,139` | 同步 `open()` + `rename()` | `IndexManagerPort` | 新增 |
-| P1-4 | `integrity_service.py:189` | async 内同步 `open()` | `IntegrityPort` | 新增 |
-| P1-5 | `object_operations.py:371` | async 内同步 `open()` | `ObjectOperationsPort` | 新增 |
-| P2 | `engine.py:76` | 同步 `create_engine()` | 无 | 保持现状 |
-| P2 | `event_bus_config_loader.py:41` | 同步 `open()` + YAML | 无 | 保持现状 |
+| 问题编号 | 文件:行号 | 问题描述 | 需要创建的 Port | 抽象级别 | 审查修正 |
+|----------|-----------|----------|-----------------|----------|----------|
+| P0-1 | `event_listener.py:106` | `asyncio.run()` 在 sync 方法 | `AuditService` 已存在 | 修复调用方式 | 无需修改 |
+| P0-2 | `local_model_health.py:51` | 同步 `requests.Session` | `HealthCheckPort` | 新增 | 无需修改 |
+| P1-1 | `auto_trigger_listener.py:112-118` | 重复创建事件循环 | `EventSubscriberPort` | 已有/重构 | 无需修改 |
+| P1-2 | `file_memory_adapter.py:59,77` | 同步 `Path.write/read_text` | `L0StoragePort` | 新增 | 无需修改 |
+| P1-3 | `memory_index.py:125,139` | 同步 `open()` + `rename()` | `IndexManagerPort` | 新增 | 无需修改 |
+| P1-4 | `integrity_service.py:189` | async 内同步 `open()` | `IntegrityPort` | 新增 | **修正** |
+| P1-5 | `object_operations.py:371` | async 内同步 `open()` | **无需新 Port** | 直接改造 | **移除 Port** |
+| P2 | `engine.py:76` | 同步 `create_engine()` | 无 | 保持现状 | 无需修改 |
+| P2 | `event_bus_config_loader.py:41` | 同步 `open()` + YAML | 无 | 保持现状 | 无需修改 |
+
+**审查修正说明**：
+- P1-4 `IntegrityPort`：将 `compute_hash`/`verify_hash` 保留为 sync 方法（CPU 密集型，不阻塞事件循环），仅将 `verify_file` 定义为 async
+- P1-5：`ObjectOperationsPort` 与 `ObjectStorageRepository` 职责重叠，移除新 Port，直接改造 `ObjectOperations`
 
 ---
 
-## 2. 新增 Port 接口定义
+## 2. 新增 Port 接口定义（修正版）
 
 ### 2.1 HealthCheckPort
 
@@ -125,7 +128,7 @@ class L0StoragePort(ABC):
 
     @abstractmethod
     async def write(self, memory_id: str, memory_type: str, content: str) -> None:
-        """写入记忆文件。
+        """写入记忆文件（I/O 密集型）。
 
         Args:
             memory_id: 记忆 ID（UUID）
@@ -139,7 +142,7 @@ class L0StoragePort(ABC):
 
     @abstractmethod
     async def read(self, memory_id: str, memory_type: str) -> str:
-        """读取记忆文件。
+        """读取记忆文件（I/O 密集型）。
 
         Args:
             memory_id: 记忆 ID
@@ -155,20 +158,17 @@ class L0StoragePort(ABC):
 
     @abstractmethod
     async def delete(self, memory_id: str, memory_type: str) -> None:
-        """删除记忆文件。
+        """删除记忆文件（快速同步操作，可用 to_thread 封装）。
 
         Args:
             memory_id: 记忆 ID
             memory_type: 记忆类型
-
-        Raises:
-            FileNotFoundError: 如果文件不存在
         """
         pass
 
     @abstractmethod
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查记忆文件是否存在。
+        """检查记忆文件是否存在（快速同步操作）。
 
         Args:
             memory_id: 记忆 ID
@@ -256,7 +256,7 @@ class IndexManagerPort(ABC):
         pass
 ```
 
-### 2.4 IntegrityPort
+### 2.4 IntegrityPort（修正版）
 
 **文件**: `src/domain/repositories/integrity.py`
 
@@ -269,13 +269,14 @@ from typing import Any
 class IntegrityPort(ABC):
     """数据完整性验证抽象端口。
 
-    用于验证文件、数据的完整性和数字签名。
-    所有完整性验证实现必须实现此端口。
+    设计原则：
+    - verify_file(): I/O 密集型 → async + to_thread
+    - compute_hash()/verify_hash(): CPU 密集型 → sync（事件循环中直接调用不阻塞）
     """
 
     @abstractmethod
     async def verify_file(self, file_path: str, expected_hash: str) -> bool:
-        """验证文件完整性。
+        """验证文件完整性（I/O 密集型）。
 
         Args:
             file_path: 文件路径
@@ -288,7 +289,7 @@ class IntegrityPort(ABC):
 
     @abstractmethod
     def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
-        """计算数据哈希。
+        """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
         Args:
             data: 数据
@@ -306,7 +307,7 @@ class IntegrityPort(ABC):
         expected_hash: str,
         algorithm: str | None = None,
     ) -> bool:
-        """验证数据哈希。
+        """验证数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
         Args:
             data: 数据
@@ -319,123 +320,6 @@ class IntegrityPort(ABC):
         pass
 ```
 
-### 2.5 ObjectOperationsPort
-
-**文件**: `src/domain/repositories/object_operations.py`
-
-```python
-"""ObjectOperationsPort — MinIO 对象操作抽象端口。"""
-
-from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
-from typing import Any
-
-class ObjectOperationsPort(ABC):
-    """MinIO 对象操作抽象端口。
-
-    提供流式上传/下载、分片上传、断点续传等对象操作。
-    所有对象存储操作实现必须实现此端口。
-    """
-
-    @abstractmethod
-    async def upload_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        file_path: str,
-        content_type: str,
-        tags: dict[str, str] | None = None,
-    ) -> str:
-        """上传对象，大文件自动分片。
-
-        Args:
-            bucket_name: Bucket 名称
-            object_key: 对象键
-            file_path: 本地文件路径
-            content_type: MIME 类型
-            tags: 对象标签
-
-        Returns:
-            version_id: 对象版本 ID
-        """
-        pass
-
-    @abstractmethod
-    async def download_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> AsyncIterator[bytes]:
-        """流式下载对象。
-
-        Args:
-            bucket_name: Bucket 名称
-            object_key: 对象键
-            version_id: 可选版本 ID
-
-        Yields:
-            字节流数据块
-        """
-        pass
-
-    @abstractmethod
-    async def get_object_metadata(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> dict[str, Any]:
-        """获取对象元数据。
-
-        Args:
-            bucket_name: Bucket 名称
-            object_key: 对象键
-            version_id: 可选版本 ID
-
-        Returns:
-            对象元数据字典
-        """
-        pass
-
-    @abstractmethod
-    async def delete_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> bool:
-        """删除对象。
-
-        Args:
-            bucket_name: Bucket 名称
-            object_key: 对象键
-            version_id: 可选版本 ID
-
-        Returns:
-            是否删除成功
-        """
-        pass
-
-    @abstractmethod
-    async def resume_multipart_upload(
-        self,
-        bucket_name: str,
-        object_key: str,
-        upload_id: str,
-        redis_client: Any,
-    ) -> None:
-        """恢复分片上传。
-
-        Args:
-            bucket_name: Bucket 名称
-            object_key: 对象键
-            upload_id: 分片上传 ID
-            redis_client: Redis 客户端
-        """
-        pass
-```
-
 ---
 
 ## 3. Infrastructure 实现类改造
@@ -444,18 +328,14 @@ class ObjectOperationsPort(ABC):
 
 **文件**: `src/infrastructure/storage/file_memory_adapter.py`
 
-**改造前**（sync）：
-```python
-def write(self, memory_id: str, memory_type: str, content: str) -> None:
-    file_path.write_text(content, encoding="utf-8")
+**改造要点**：
+- `write()`/`read()`：使用 `aiofiles`（I/O 密集型）
+- `delete()`/`exists()`/`list_memories()`：使用 `asyncio.to_thread()`（快速同步操作）
 
-def read(self, memory_id: str, memory_type: str) -> str:
-    return file_path.read_text(encoding="utf-8")
-```
-
-**改造后**（async + aiofiles）：
 ```python
 import aiofiles
+import asyncio
+from pathlib import Path
 from src.domain.repositories.l0_storage import L0StoragePort
 
 class FileMemoryAdapter(L0StoragePort):
@@ -476,19 +356,24 @@ class FileMemoryAdapter(L0StoragePort):
             return await f.read()
 
     async def delete(self, memory_id: str, memory_type: str) -> None:
-        file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
-        if file_path.exists():
-            file_path.unlink()
+        def _delete():
+            path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
+            if path.exists():
+                path.unlink()
+        await asyncio.to_thread(_delete)
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
-        return file_path.exists()
+        def _check():
+            return (Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md").exists()
+        return await asyncio.to_thread(_check)
 
     async def list_memories(self, memory_type: str) -> list[str]:
-        dir_path = Path(self.config.memory_l0_path) / memory_type
-        if not dir_path.exists():
-            return []
-        return [file_path.stem for file_path in dir_path.glob("*.md")]
+        def _list():
+            dir_path = Path(self.config.memory_l0_path) / memory_type
+            if not dir_path.exists():
+                return []
+            return [p.stem for p in dir_path.glob("*.md")]
+        return await asyncio.to_thread(_list)
 ```
 
 ### 3.2 OllamaHealthAdapter → HealthCheckPort 实现
@@ -539,15 +424,6 @@ class OllamaHealthAdapter(HealthCheckPort):
 ### 3.3 MemoryIndex → IndexManagerPort 实现
 
 **文件**: `src/infrastructure/storage/memory_index.py`
-
-**改造前**（sync + fcntl.flock）：
-```python
-def truncate(self) -> None:
-    with open(self._index_path, encoding="utf-8") as f:
-        lines = f.readlines()
-    # ... 处理 ...
-    temp_path.rename(self._index_path)
-```
 
 **改造后**（async + to_thread 保留锁语义）：
 ```python
@@ -602,7 +478,7 @@ class MemoryIndex(IndexManagerPort):
 
 **文件**: `src/infrastructure/security/integrity_service.py`
 
-**改造后**：
+**改造后**（CPU 密集型保持 sync，I/O 密集型用 to_thread）：
 ```python
 from src.domain.repositories.integrity import IntegrityPort
 
@@ -617,84 +493,84 @@ class IntegrityVerifier(IntegrityPort):
 
         return await asyncio.to_thread(_read_and_verify)
 
+    # CPU 密集型：sync 方法，事件循环中直接调用不阻塞
     def compute_hash(self, data: str | bytes, algorithm: HashAlgorithm | None = None) -> str:
-        # ... 现有实现 ...
-        pass
+        """计算数据哈希（CPU 密集型）。"""
+        if algorithm is None:
+            algorithm = self._default_algorithm
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        if algorithm == HashAlgorithm.SHA256:
+            return hashlib.sha256(data).hexdigest()
+        elif algorithm == HashAlgorithm.SHA512:
+            return hashlib.sha512(data).hexdigest()
+        elif algorithm == HashAlgorithm.MD5:
+            return hashlib.md5(data, usedforsecurity=False).hexdigest()
+        else:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
 
+    # CPU 密集型：sync 方法
     def verify_hash(self, data: str | bytes, expected_hash: str, algorithm: HashAlgorithm | None = None) -> bool:
-        # ... 现有实现 ...
-        pass
+        """验证数据哈希（CPU 密集型）。"""
+        actual_hash = self.compute_hash(data, algorithm)
+        return hmac.compare_digest(actual_hash.lower(), expected_hash.lower())
 ```
 
-### 3.5 ObjectOperations → ObjectOperationsPort 实现
+### 3.5 ObjectOperations 改造（移除 P1-5 问题）
 
 **文件**: `src/infrastructure/storage/minio/object_operations.py`
 
-**改造后**：
+**说明**：经审查，`ObjectOperations` 的 sync 方法已被 `MinIORepository` 通过 `asyncio.to_thread()` 包装，不直接暴露给 Domain 层。`P1-5` 问题（`with open()` at line 371）通过直接改造解决，无需新增 Port。
+
+**改造要点**：
+- `resume_multipart_upload()` 内的 `with open()` 用 `to_thread` 封装
+- `download_object()` 的 `response.read()` 循环用 `to_thread` 包装
+
 ```python
-from src.domain.repositories.object_operations import ObjectOperationsPort
+async def resume_multipart_upload(
+    self,
+    bucket_name: str,
+    object_key: str,
+    upload_id: str,
+    redis_client: aioredis.Redis,
+) -> None:
+    # ... 读取状态 ...
+    def _read_chunks():
+        chunks = []
+        with open(file_path, "rb") as f:
+            while True:
+                data = f.read(part_size)
+                if not data:
+                    break
+                chunks.append(data)
+        return chunks
 
-class ObjectOperations(ObjectOperationsPort):
-    """MinIO 对象操作 - 实现 ObjectOperationsPort。"""
+    chunks = await asyncio.to_thread(_read_chunks)
+    # ... 继续处理 chunks
 
-    async def upload_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        file_path: str,
-        content_type: str,
-        tags: dict[str, str] | None = None,
-    ) -> str:
-        # ... 使用 asyncio.to_thread 包装 sync 方法 ...
-        return await asyncio.to_thread(
-            self._sync_upload_object,
-            bucket_name, object_key, file_path, content_type, tags
-        )
+async def download_object(
+    self,
+    bucket_name: str,
+    object_key: str,
+    version_id: str | None = None,
+) -> AsyncIterator[bytes]:
+    """流式下载对象（修正版：使用 to_thread 避免阻塞）。"""
+    loop = asyncio.get_running_loop()
+    client = self._client.client
+    response = client.get_object(bucket_name, object_key, version_id=version_id)
 
-    async def download_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> AsyncIterator[bytes]:
-        # ... 流式下载（已有 async 实现）...
-        pass
+    def _read_chunk():
+        return response.read(8192)
 
-    async def get_object_metadata(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> dict[str, Any]:
-        return await asyncio.to_thread(
-            self._sync_get_metadata,
-            bucket_name, object_key, version_id
-        )
-
-    async def delete_object(
-        self,
-        bucket_name: str,
-        object_key: str,
-        version_id: str | None = None,
-    ) -> bool:
-        return await asyncio.to_thread(
-            self._sync_delete_object,
-            bucket_name, object_key, version_id
-        )
-
-    async def resume_multipart_upload(
-        self,
-        bucket_name: str,
-        object_key: str,
-        upload_id: str,
-        redis_client: Any,
-    ) -> None:
-        def _read_chunks():
-            # ... 现有实现 ...
-            pass
-
-        chunks = await asyncio.to_thread(_read_chunks)
-        # ... 继续处理 ...
+    try:
+        while True:
+            data = await loop.run_in_executor(None, _read_chunk)
+            if not data:
+                break
+            yield data
+    finally:
+        response.close()
+        response.release_conn()
 ```
 
 ---
@@ -704,27 +580,6 @@ class ObjectOperations(ObjectOperationsPort):
 ### 4.1 MemoryService 重构
 
 **文件**: `src/domain/services/memory_service.py`
-
-**改造前**（直接依赖 FileMemoryAdapter）：
-```python
-def __init__(
-    self,
-    text_extractor,
-    compressor,
-    metadata_repository,
-    history_repository,
-    file_adapter,  # 直接依赖实现类
-    event_publisher,
-):
-    self._file_adapter = file_adapter
-
-async def _write_to_l0(self, memory_id, memory_type, content, ...):
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(
-        None,
-        lambda: self._file_adapter.write(str(memory_id), memory_type, md_content),
-    )
-```
 
 **改造后**（依赖 Port 接口）：
 ```python
@@ -769,20 +624,21 @@ class SixLayerStorageCoordinator:
 
 ---
 
-## 5. 宗师级设计原则
+## 5. 宗师级设计原则（修正版）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属）                              │
+│               宗师级设计六原则（方案B专属 - v1.1修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
 │    所有外部依赖通过 Domain 层 Port 接口隔离                              │
 │    Infrastructure 实现 Port 接口，Domain 层 只依赖 Port                 │
 │                                                                         │
-│ 2. 纯异步接口                                                            │
-│    所有 Port 方法定义为 async，由实现类使用 aiofiles/httpx 等           │
-│    禁止在 Port 接口中出现 sync 方法签名                                  │
+│ 2. 纯异步接口（修正）                                                    │
+│    - I/O 密集型方法：async + aiofiles / to_thread                     │
+│    - CPU 密集型方法：sync 直接调用（不阻塞事件循环）                     │
+│    - 禁止在已运行循环中调用 asyncio.run()                                │
 │                                                                         │
 │ 3. 单一事件循环                                                          │
 │    禁止在已运行循环中调用 asyncio.run()                                │
@@ -798,24 +654,27 @@ class SixLayerStorageCoordinator:
 │ 6. 启动时调用可接受                                                       │
 │    engine.py, event_bus_config_loader.py 等启动时调用不阻塞事件循环     │
 │                                                                         │
+│ 7. 职责单一（新增）                                                       │
+│    每个 Port 只抽象一组相关操作，避免职责重叠                              │
+│    ObjectStorageRepository 已覆盖对象存储，不重复创建 ObjectOperationsPort│
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 6. 工时评估
+## 6. 工时评估（修正版）
 
 ### 6.1 新增 Port 接口
 
 | Port | 文件 | 工时 | 复杂度 |
 |------|------|------|--------|
 | `HealthCheckPort` | `src/domain/repositories/health_check.py` | 0.5d | 低 |
-| `L0StoragePort` | `src/domain/repositories/l0_storage.py` | 1d | 中 |
-| `IndexManagerPort` | `src/domain/repositories/index_manager.py` | 1d | 中 |
+| `L0StoragePort` | `src/domain/repositories/l0_storage.py` | 0.5d | 低 |
+| `IndexManagerPort` | `src/domain/repositories/index_manager.py` | 0.5d | 低 |
 | `IntegrityPort` | `src/domain/repositories/integrity.py` | 0.5d | 低 |
-| `ObjectOperationsPort` | `src/domain/repositories/object_operations.py` | 1d | 中 |
 
-**新增 Port 总计**: 4d
+**新增 Port 总计**: 2d（原 4d，移除 ObjectOperationsPort）
 
 ### 6.2 Infrastructure 实现改造
 
@@ -825,9 +684,9 @@ class SixLayerStorageCoordinator:
 | `OllamaHealthAdapter` | 实现 HealthCheckPort + httpx | 0.5d | 0.25d |
 | `MemoryIndex` | 实现 IndexManagerPort + to_thread | 1d | 0.5d |
 | `IntegrityVerifier` | 实现 IntegrityPort | 0.5d | 0.25d |
-| `ObjectOperations` | 实现 ObjectOperationsPort | 1d | 0.5d |
+| `ObjectOperations` | 修复 download_object + resume_multipart_upload | 0.5d | 0.25d |
 
-**实现改造总计**: 4.5d + 2d 测试
+**实现改造总计**: 3.5d + 1.75d 测试
 
 ### 6.3 调用链重构
 
@@ -843,45 +702,47 @@ class SixLayerStorageCoordinator:
 
 | 阶段 | 内容 | 工时 |
 |------|------|------|
-| **Phase 1** | 新增 5 个 Port 接口定义 | 4d |
-| **Phase 2** | 5 个 Infrastructure 实现改造 | 4.5d |
-| **Phase 3** | 测试更新 | 2d |
+| **Phase 1** | 4 个 Port 接口定义 | 2d |
+| **Phase 2** | 5 个 Infrastructure 实现改造 | 3.5d |
+| **Phase 3** | 测试更新 | 1.75d |
 | **Phase 4** | 调用链重构 | 1.5d |
-| **Phase 5** | 集成验证 | 1d |
+| **Phase 5** | 集成验证 + 测试基础设施 | 2d |
 
-**方案B 总工时**: 13d（相比方案A 5.5d 增加 7.5d，但实现完全六边形架构合规）
+**方案B 总工时**: 10.75d（修正后，原 13d）
 
 ---
 
 ## 7. 阶段划分
 
 ```
-Phase 1: Port 接口定义（4d）
+Phase 1: Port 接口定义（2d）
 ├── HealthCheckPort（0.5d）
-├── L0StoragePort（1d）
-├── IndexManagerPort（1d）
-├── IntegrityPort（0.5d）
-└── ObjectOperationsPort（1d）
+├── L0StoragePort（0.5d）
+├── IndexManagerPort（0.5d）
+└── IntegrityPort（0.5d）
 
-Phase 2: Infrastructure 实现改造（4.5d）
+Phase 2: Infrastructure 实现改造（3.5d）
 ├── FileMemoryAdapter → L0StoragePort 实现（1.5d）
 ├── OllamaHealthAdapter → HealthCheckPort 实现（0.75d）
 ├── MemoryIndex → IndexManagerPort 实现（1.5d）
-├── IntegrityVerifier → IntegrityPort 实现（0.75d）
-└── ObjectOperations → ObjectOperationsPort 实现（1.5d）
+└── IntegrityVerifier → IntegrityPort 实现（0.75d）
 
-Phase 3: 测试更新（2d）
+Phase 3: ObjectOperations 改造（0.75d）
+└── 修复 download_object + resume_multipart_upload（0.75d）
+
+Phase 4: 测试更新（1.75d）
 └── 所有 async 方法测试 + TDD 循环
 
-Phase 4: 调用链重构（1.5d）
+Phase 5: 调用链重构（1.5d）
 ├── MemoryService 依赖注入调整（0.5d）
 ├── SixLayerStorageCoordinator 调整（0.5d）
 └── MemoryChangedListener 调整（0.5d）
 
-Phase 5: 集成验证（1d）
+Phase 6: 集成验证（2d）
 ├── 端到端测试
 ├── 事件循环阻塞验证
-└── 性能回归测试
+├── 性能回归测试
+└── 测试基础设施准备
 ```
 
 ---
@@ -891,7 +752,8 @@ Phase 5: 集成验证（1d）
 | 指标 | 目标 | 验证方式 |
 |------|------|----------|
 | Port 接口覆盖 | 100%（所有外部依赖通过 Port） | 代码审查 |
-| 纯异步接口 | 100%（Port 方法全部为 async） | mypy 检查 |
+| I/O 方法 async | 100%（I/O 密集型方法为 async） | mypy 检查 |
+| CPU 方法 sync | 100%（CPU 密集型方法为 sync） | 代码审查 |
 | asyncio.run 反模式 | 0 处 | ruff check |
 | 事件循环阻塞 | 0 次 | 性能测试 |
 | 六边形架构合规 | 100% | 依赖注入审查 |
@@ -932,16 +794,28 @@ Phase 5: 集成验证（1d）
 | `PermissionService` | `domain/services/permission_service.py` | `PermissionServiceImpl` |
 | `EventPublisherProtocol` | `domain/services/auto_route_service.py` | `DualChannelEventBus` |
 
-### 10.2 方案B 新增 Port
+### 10.2 方案B 新增/修改 Port
 
-| Port | 定义位置 | 实现类 |
-|------|----------|--------|
-| `HealthCheckPort` | `domain/repositories/health_check.py` | `OllamaHealthAdapter` |
-| `L0StoragePort` | `domain/repositories/l0_storage.py` | `FileMemoryAdapter` |
-| `IndexManagerPort` | `domain/repositories/index_manager.py` | `MemoryIndex` |
-| `IntegrityPort` | `domain/repositories/integrity.py` | `IntegrityVerifier` |
-| `ObjectOperationsPort` | `domain/repositories/object_operations.py` | `ObjectOperations` |
+| Port | 定义位置 | 实现类 | 变更说明 |
+|------|----------|--------|----------|
+| `HealthCheckPort` | `domain/repositories/health_check.py` | `OllamaHealthAdapter` | **新增** |
+| `L0StoragePort` | `domain/repositories/l0_storage.py` | `FileMemoryAdapter` | **新增** |
+| `IndexManagerPort` | `domain/repositories/index_manager.py` | `MemoryIndex` | **新增** |
+| `IntegrityPort` | `domain/repositories/integrity.py` | `IntegrityVerifier` | **新增**（CPU 方法保留 sync） |
 
 ---
 
-**方案B 核心价值**：通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦，所有外部依赖通过 Port 接口隔离，达到六边形架构的宗师级标准。
+## 11. 审查修正记录
+
+| 版本 | 变更说明 |
+|------|----------|
+| v1.0 | 初始方案 |
+| v1.1 | **第一轮审查修正**：<br>- 移除 `ObjectOperationsPort`（与 `ObjectStorageRepository` 职责重叠）<br>- 修正 `IntegrityPort`：`compute_hash`/`verify_hash` 保留 sync（CPU 密集型）<br>- 修正 `download_object`：使用 `run_in_executor` 包装同步读取<br>- 工时修正：13d → 10.75d |
+
+---
+
+**方案B v1.1 核心价值**：
+1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
+2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
+3. 避免 Port 职责重叠，遵循单一职责原则
+4. 总工时 10.75d，实现完全六边形架构合规
