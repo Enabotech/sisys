@@ -1,8 +1,8 @@
-# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.7）
+# SISYS 同步代码重构方案B（Port+Adapter 宗师级重构 - v1.8）
 
 **生成日期**: 2026-05-01
-**版本**: v1.7（第七轮审查修正版）
-**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 七轮审查反馈
+**版本**: v1.8（第八轮审查修正版）
+**依据**: sync-code-analysis.md + sisys-sync-architecture.md + 源码调研 + 端口抽象最佳实践 + 八轮审查反馈
 **目标**: 通过端口抽象实现完全六边形架构合规，消除 sync/async 混用
 
 ---
@@ -62,19 +62,21 @@
 
 ### 1.1 问题 → Port 映射矩阵
 
-| 问题编号 | 文件:行号 | 问题描述 | 需要创建的 Port | 抽象级别 | 审查修正 |
+| 问题编号 | 文件:行号 | 问题描述 | 需要创建的 Port | 抽象级别 | 边界说明 |
 |----------|-----------|----------|-----------------|----------|----------|
-| P0-1 | `event_listener.py:106` | `asyncio.run()` 在 sync 方法 | `AuditService` 已存在 | 修复调用方式 | 无需修改 |
-| P0-2 | `local_model_health.py:51` | 同步 `requests.Session` | `HealthCheckPort` | 新增 | 无需修改 |
-| P1-1 | `auto_trigger_listener.py:112-118` | 重复创建事件循环 | `EventSubscriberPort` | 已有/重构 | 无需修改 |
-| P1-2 | `file_memory_adapter.py:59,77` | 同步 `Path.write/read_text` | `L0StoragePort` | 新增 | 无需修改 |
-| P1-3 | `memory_index.py:125,139` | 同步 `open()` + `rename()` | `IndexManagerPort` | 新增 | 无需修改 |
-| P1-4 | `integrity_service.py:189` | async 内同步 `open()` | `IntegrityPort` | 新增 | **修正** |
-| P1-5 | `object_operations.py:371` | async 内同步 `open()` | **无需新 Port** | 直接改造 | **移除 Port** |
-| P2 | `engine.py:76` | 同步 `create_engine()` | 无 | 保持现状 | 无需修改 |
-| P2 | `event_bus_config_loader.py:41` | 同步 `open()` + YAML | 无 | 保持现状 | 无需修改 |
+| P0-1 | `event_listener.py:106` | `asyncio.run()` 在 sync 方法 | `AuditService` 已存在 | 修复调用方式 | ⚠️ 实施前确认 AuditEventListener 调用方 |
+| P0-2 | `local_model_health.py:51` | 同步 `requests.Session` | `HealthCheckPort` | 新增 | ✓ HealthCheckPort 替换 |
+| P1-1 | `auto_trigger_listener.py:112-118` | 重复创建事件循环 | `EventSubscriberPort` | 已有/重构 | ⚠️ 后台任务，影响可控 |
+| P1-2 | `file_memory_adapter.py:59,77` | 同步 `Path.write/read_text` | `L0StoragePort` | 新增 | ✓ L0StoragePort + aiofiles |
+| P1-3 | `memory_index.py:125,139` | 同步 `open()` + `rename()` | `IndexManagerPort` | 新增 | ✓ IndexManagerPort + to_thread |
+| P1-4 | `integrity_service.py:189` | async 内同步 `open()` | `IntegrityPort` | 新增 | ✓ IntegrityPort + to_thread |
+| P1-5 | `object_operations.py:371` | async 内同步 `open()` | **无需新 Port** | 直接改造 | ✓ 直接改造 ObjectOperations |
+| P2 | `engine.py:76` | 同步 `create_engine()` | 无 | 保持现状 | ✓ 启动时调用 |
+| P2 | `event_bus_config_loader.py:41` | 同步 `open()` + YAML | 无 | 保持现状 | ✓ 启动时调用 |
 
-**审查修正说明**：
+**边界条件说明**：
+- P0-1：src/ 内未搜索到 AuditEventListener 实例化点，需确认调用方。如果调用方使用 `handle_event_async()` 则问题不会触发。
+- P1-1：后台任务 `_worker_loop()` 每线程创建新事件循环，影响范围可控。后续可通过 EventSubscriberPort 重构，非本次方案范围。
 - P1-4 `IntegrityPort`：将 `compute_hash`/`verify_hash` 保留为 sync 方法（CPU 密集型，不阻塞事件循环），仅将 `verify_file` 定义为 async
 - P1-5：`ObjectOperationsPort` 与 `ObjectStorageRepository` 职责重叠，移除新 Port，直接改造 `ObjectOperations`
 
@@ -657,7 +659,7 @@ class SixLayerStorageCoordinator:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│               宗师级设计六原则（方案B专属 - v1.7修正版）                    │
+│               宗师级设计六原则（方案B专属 - v1.8修正版）                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │ 1. 端口抽象                                                              │
@@ -848,10 +850,11 @@ Phase 6: 集成验证（2d）
 | v1.5 | **第五轮审查修正**：<br>- 移除 IntegrityPort 未使用的 `Literal` 导入<br>- 更新 docstring 说明（str \| None 而非 Literal） |
 | v1.6 | **第六轮审查修正**：<br>- Protocol vs ABC 分析：确认使用 ABC 是正确选择（名义子类型）<br>- 类型系统深度对标：dict 用于内部数据合理<br>- 总体评分收敛至 9.5/10 |
 | v1.7 | **第七轮审查修正**：<br>- 添加 MemoryService 实例化点搜索要求<br>- Phase 5 调用链重构工时：1.5d → 2d（含实例化点搜索）<br>- 总工时调整：11.25d → 11.75d |
+| v1.8 | **第八轮审查修正**：<br>- P0-1/P1-1 问题矩阵添加边界说明<br>- P0-1：实施前确认 AuditEventListener 调用方<br>- P1-1：后台任务，影响可控，标注为非本次方案范围<br>- 总体评分收敛至 9.2/10 |
 
 ---
 
-**方案B v1.7 核心价值**：
+**方案B v1.8 核心价值**：
 1. 通过端口抽象实现 Domain 层与 Infrastructure 层的完全解耦
 2. 区分 I/O 密集型（async）与 CPU 密集型（sync）方法设计
 3. 避免 Port 职责重叠，遵循单一职责原则
