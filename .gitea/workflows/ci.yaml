@@ -718,8 +718,8 @@ jobs:
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-            || ( startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/feature')
-                  && (needs.detect-changes.outputs.l3 == 'true')
+            || ((startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/feature'))
+                  && ( needs.detect-changes.outputs.l3 == 'true')
                )
           }}
         id: build-l3-dev
@@ -753,8 +753,8 @@ jobs:
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-            || ( startsWith(github.ref, 'refs/heads/release') || startsWith(github.ref, 'refs/heads/tags')
-                  && (needs.detect-changes.outputs.l3 == 'true')
+            || ((startsWith(github.ref, 'refs/heads/release') || startsWith(github.ref, 'refs/heads/tags'))
+                  && ( needs.detect-changes.outputs.l3 == 'true')
                )
           }}
         id: build-l3-release
