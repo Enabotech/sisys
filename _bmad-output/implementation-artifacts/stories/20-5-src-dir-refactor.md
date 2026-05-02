@@ -321,6 +321,7 @@
 **完成标准/Definition of Done:**
 - [ ] `DomainEvent` 类无 `to_dict` 方法
 - [ ] `DomainEvent` 类无 `from_dict` 方法
+- [ ] 调用方使用 `application/events/adapters.py` 中的 pydantic TypeAdapter 进行序列化
 - [ ] `ruff check src/domain/events/base.py` 通过
 
 ---
@@ -541,3 +542,4 @@
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.7 创建
 - v1.1.0: 修复Task 6 DoD缺少models.py不存在验证项；Status更新为ready-for-dev
 - v1.2.0: 修复Task 7 DoD缺少security/value_objects.py导入验证项
+- v1.3.0: 修复Task 5 DoD缺少TypeAdapter验证项
