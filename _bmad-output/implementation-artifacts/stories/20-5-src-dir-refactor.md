@@ -366,6 +366,7 @@
 **完成标准/Definition of Done:**
 - [ ] `domain/value_objects/sensitive_data.py` 包含 `SensitiveDataType`, `DataResidency` 等
 - [ ] `infrastructure/config/sovereignty.py` 从 `domain.value_objects` 导入
+- [ ] `infrastructure/security/value_objects.py` 从 `domain.value_objects` 导入
 
 ---
 
@@ -539,3 +540,4 @@
 **更新说明:**
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.7 创建
 - v1.1.0: 修复Task 6 DoD缺少models.py不存在验证项；Status更新为ready-for-dev
+- v1.2.0: 修复Task 7 DoD缺少security/value_objects.py导入验证项
