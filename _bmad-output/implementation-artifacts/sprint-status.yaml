@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-04-30
+last_updated: 2026-05-02
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -310,22 +310,23 @@ development_status:
   20-2-event-messaging-refactor: done
   20-3-uni-dual-channel-eventbus: done
   20-4-uni-async-refactor: review
+  20-5-src-dir-refactor: ready-for-dev
   epic-20-retrospective: optional
 
 # =============================================================================
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 155
+# Total Stories (excluding retrospectives): 156
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
-#   - Epic 20: 4 stories (✅ 3 done, 🔄 1 ready-for-dev)
+#   - Epic 20: 5 stories (✅ 3 done, 🔄 2 ready-for-dev)
 #
 # Status Summary:
 #   - Done: 28 (包括 Epic 20)
-#   - Ready for Dev: 6
-#   - Backlog: 121
+#   - Ready for Dev: 7
+#   - Backlog: 120
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
@@ -333,7 +334,8 @@ development_status:
 #   3. Developping Epic 1
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-04-30
+#   - Updated last_updated date to 2026-05-02
+#   - Story 20-5 (src-dir-refactor) 已创建 → ready-for-dev
 #   - Story 20-2 (event-messaging-refactor) 已完成 → done
 #   - Story 20-3 (uni-dual-channel-eventbus) 已完成 → done
 #   - Updated Epic 20 story count and total done count

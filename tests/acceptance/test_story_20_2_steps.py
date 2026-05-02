@@ -1315,7 +1315,7 @@ def when_add_poller_only_annotation(context: dict) -> None:
 @then("领域层接口与基础设施层实现应该分离")
 def then_domain_infra_separation(context: dict) -> None:
     """Verify domain interface and infrastructure implementation separation."""
-    from src.domain.repositories.outbox import OutboxRepository as DomainOutboxRepo
+    from src.domain.ports.outbox import OutboxRepository as DomainOutboxRepo
 
     assert DomainOutboxRepo is not None
 

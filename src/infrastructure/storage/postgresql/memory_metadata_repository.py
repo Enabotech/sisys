@@ -18,7 +18,7 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
-from src.domain.repositories.memory_repository import MemoryMetadataRepositoryProtocol
+from src.domain.ports.memory_repository import MemoryMetadataRepositoryProtocol
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
 
 

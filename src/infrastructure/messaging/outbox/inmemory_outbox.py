@@ -18,7 +18,7 @@ from datetime import UTC
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 

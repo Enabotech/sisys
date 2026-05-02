@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.integrity import IntegrityPort
+from src.domain.ports.integrity import IntegrityPort
 
 
 class TestIntegrityPort:

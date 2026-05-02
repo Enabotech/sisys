@@ -41,13 +41,13 @@ class TestGraphManagerInterface:
         """GraphManager 继承自 ABC。"""
         from abc import ABC
 
-        from src.domain.repositories.graph_storage import GraphManager
+        from src.domain.ports.graph_storage import GraphManager
 
         assert issubclass(GraphManager, ABC), "GraphManager must inherit from ABC"
 
     def test_graph_manager_has_abstract_methods(self):
         """GraphManager 定义了所有抽象方法。"""
-        from src.domain.repositories.graph_storage import GraphManager
+        from src.domain.ports.graph_storage import GraphManager
 
         expected_methods = {"create_node", "delete_node", "get_node", "create_relationship", "delete_relationship"}
         actual_abstract = {
@@ -57,7 +57,7 @@ class TestGraphManagerInterface:
 
     def test_cannot_instantiate_graph_manager(self):
         """无法直接实例化 GraphManager。"""
-        from src.domain.repositories.graph_storage import GraphManager
+        from src.domain.ports.graph_storage import GraphManager
 
         with pytest.raises(TypeError):
             GraphManager()
@@ -70,13 +70,13 @@ class TestGraphStorageInterface:
         """GraphStorage 继承自 ABC。"""
         from abc import ABC
 
-        from src.domain.repositories.graph_storage import GraphStorage
+        from src.domain.ports.graph_storage import GraphStorage
 
         assert issubclass(GraphStorage, ABC), "GraphStorage must inherit from ABC"
 
     def test_graph_storage_has_abstract_methods(self):
         """GraphStorage 定义了所有抽象方法。"""
-        from src.domain.repositories.graph_storage import GraphStorage
+        from src.domain.ports.graph_storage import GraphStorage
 
         expected_methods = {"execute_query", "execute_write_query", "find_path", "get_neighbors"}
         actual_abstract = {
@@ -86,7 +86,7 @@ class TestGraphStorageInterface:
 
     def test_cannot_instantiate_graph_storage(self):
         """无法直接实例化 GraphStorage。"""
-        from src.domain.repositories.graph_storage import GraphStorage
+        from src.domain.ports.graph_storage import GraphStorage
 
         with pytest.raises(TypeError):
             GraphStorage()

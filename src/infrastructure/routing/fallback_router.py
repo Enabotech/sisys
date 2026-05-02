@@ -6,7 +6,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.domain.repositories.health_check import HealthCheckPort
+    from src.domain.ports.health_check import HealthCheckPort
 
 
 TIMEOUT_THRESHOLD_MS = 30000  # 30 seconds

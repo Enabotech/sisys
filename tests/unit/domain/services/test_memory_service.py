@@ -16,7 +16,7 @@ import pytest
 from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.entities.memory_metadata import MemoryMetadata
 from src.domain.events.memory_events import MemoryChanged
-from src.domain.repositories.memory_repository import (
+from src.domain.ports.memory_repository import (
     MemoryChangeHistoryRepositoryProtocol,
     MemoryMetadataRepositoryProtocol,
 )

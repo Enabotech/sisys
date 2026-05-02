@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
-from src.domain.repositories.storage import (
+from src.domain.ports.storage import (
     ObjectStorageRepository,
 )
 from src.infrastructure.storage.minio.bucket_manager import BucketManager

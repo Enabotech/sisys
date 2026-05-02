@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.graph_storage import GraphManager, GraphStorage
+from src.domain.ports.graph_storage import GraphManager, GraphStorage
 
 
 class TestGraphManagerInterface:

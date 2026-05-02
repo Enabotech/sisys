@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 
 
 class TestOutboxRepositoryInterface:

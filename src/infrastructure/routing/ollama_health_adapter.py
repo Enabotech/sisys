@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import httpx
 
-from src.domain.repositories.health_check import HealthCheckPort
+from src.domain.ports.health_check import HealthCheckPort
 
 DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/health"
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 
-from src.domain.repositories.session_storage import SessionStorage
+from src.domain.ports.session_storage import SessionStorage
 
 
 class TestSessionStorageInterface:

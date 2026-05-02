@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.domain.events.base import DomainEvent
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 
 
 class DocumentProcessingUseCase:
