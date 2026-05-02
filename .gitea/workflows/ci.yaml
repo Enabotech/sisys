@@ -530,7 +530,7 @@ jobs:
   build-images:
     name: "🏗️ 构建镜像"
     runs-on: buildx
-    needs: [detect-changes, integration-tests, acceptance-tests, security-scan, code-quality]
+    needs: [code-quality, unit-tests, acceptance-tests, security-scan]
     timeout-minutes: 60
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
