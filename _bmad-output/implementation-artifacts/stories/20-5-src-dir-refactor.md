@@ -346,6 +346,7 @@
 - [ ] `security/value_objects.py` 存在
 - [ ] `security/models.py` 不存在
 - [ ] 所有导入路径已更新
+- [ ] 相关测试通过
 
 ---
 
@@ -545,3 +546,4 @@
 - v1.2.0: 修复Task 7 DoD缺少security/value_objects.py导入验证项
 - v1.3.0: 修复Task 5 DoD缺少TypeAdapter验证项
 - v1.4.0: 修复Subtask 5.2描述与AC-5状态一致；Task 2 DoD补全旧文件不存在验证
+- v1.5.0: Task 6 DoD添加测试通过验证项，与AC-6保持一致
