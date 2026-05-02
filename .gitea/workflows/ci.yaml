@@ -717,10 +717,10 @@ jobs:
       - name: 构建 L3 镜像( Dev )
         if: >-
           ${{
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true') ||
-            ((needs.detect-changes.outputs.l3 == 'true') &&
-              (startsWith(github.ref, 'refs/heads/main') ||
-               startsWith(github.ref, 'refs/heads/feature')))
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+            || ( startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/feature')
+                  && (needs.detect-changes.outputs.l3 == 'true')
+               )
           }}
         id: build-l3-dev
         uses: docker/build-push-action@v5
@@ -752,10 +752,10 @@ jobs:
       - name: 构建 L3 镜像( Release/Tag )
         if: >-
           ${{
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true') ||
-            ((needs.detect-changes.outputs.l3 == 'true') &&
-              (startsWith(github.ref, 'refs/heads/release') ||
-               startsWith(github.ref, 'refs/heads/tags')))
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+            || ( startsWith(github.ref, 'refs/heads/release') || startsWith(github.ref, 'refs/heads/tags')
+                  && (needs.detect-changes.outputs.l3 == 'true')
+               )
           }}
         id: build-l3-release
         uses: docker/build-push-action@v5
