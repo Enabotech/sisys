@@ -430,6 +430,11 @@ unit_of_work/
   postgresql_unit_of_work.py
 ```
 
+#### 4.4.2 infrastructure/events/ — 新目录
+
+```
+event_store.py  # 从 domain/events/store.py 移动
+```
 **注意**: `event_store.py` (237行) 是已存在的实现，`event_store_domain.py` (66行) 是 ABC 接口，应合并或重命名。
 
 #### 4.4.3 其他 infrastructure/ 子目录 — 无变化
@@ -440,6 +445,22 @@ unit_of_work/
 | config/ | 14 | 配置（需审查 sovereignty.py 跨模块导入） |
 | external_services/ | 2 | 外部服务 |
 | monitoring/ | 4 | 监控 |
+
+#### 4.4.4 infrastructure/routing/ 审查方案
+
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| local_model_health.py | **已废弃** — 仅做向后兼容导入 | **保留但标记废弃** — 不再新增使用 |
+
+**审查标准**:
+- `local_model_health.py` 是兼容性别名模块，实际实现为 `OllamaHealthAdapter`
+- 已有 `HealthCheckPort` 定义在 `domain/ports/health_check.py`
+- 所有新代码应直接使用 `HealthCheckPort` 接口
+
+**验收条件**:
+- [ ] 新代码不导入 `local_model_health.LocalModelHealth`
+- [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
+- [ ] 后续 Story 可完全移除 local_model_health.py
 
 #### 4.4.5 infrastructure/config/ 审查方案
 
@@ -460,22 +481,6 @@ unit_of_work/
 | storage/ | 30+ | 存储适配器 |
 | utils/ | 1 | 工具 |
 | workflow/ | 1 | 工作流 |
-
-#### 4.4.4 infrastructure/routing/ 审查方案
-
-| 文件 | 问题 | 处理方案 |
-|------|------|----------|
-| local_model_health.py | **已废弃** — 仅做向后兼容导入 | **保留但标记废弃** — 不再新增使用 |
-
-**审查标准**:
-- `local_model_health.py` 是兼容性别名模块，实际实现为 `OllamaHealthAdapter`
-- 已有 `HealthCheckPort` 定义在 `domain/ports/health_check.py`
-- 所有新代码应直接使用 `HealthCheckPort` 接口
-
-**验收条件**:
-- [ ] 新代码不导入 `local_model_health.LocalModelHealth`
-- [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
-- [ ] 后续 Story 可完全移除 local_model_health.py
 
 ---
 
