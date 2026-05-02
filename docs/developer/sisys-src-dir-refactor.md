@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.4 |
+| 版本 | v2.5 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -108,22 +108,22 @@ src/
 | unit_of_work.py | UnitOfWork ABC | Port ✅ |
 | vector_storage.py | CollectionManager, VectorStorage Protocol | Port ✅ |
 
-#### 2.2.4 services/ — 混合 Protocol 与具体服务（14 files）
+#### 2.2.4 services/ — 混合 Protocol 与具体服务（12 files）
 
 | 文件 | 定义 | 类型 | 目标位置 |
 |------|------|------|----------|
 | audit_service.py | AuditService Protocol | Protocol ❌ | application/ports/ |
 | auth_service.py | AuthService Protocol | Protocol ❌ | application/ports/ |
-| auto_execute_service.py | AutoExecuteService (concrete) + SandboxExecutorProtocol/SnapshotRepositoryProtocol (nested) | **具体服务** ✅ | domain/services/ |
-| auto_route_service.py | AutoRouteService (concrete) + EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol (nested) | **具体服务** ✅ | domain/services/ |
+| auto_execute_service.py | AutoExecuteService + SandboxExecutorProtocol/SnapshotRepositoryProtocol (nested, stay) | **具体服务** ✅ | domain/services/ |
+| auto_route_service.py | AutoRouteService + EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol (nested, stay) | **具体服务** ✅ | domain/services/ |
 | auto_trigger_service.py | AutoTriggerService | **具体服务** ✅ | domain/services/ |
-| compressor_service.py | CompressorService ABC, CompressionResult | Protocol ❌ | application/ports/ |
-| memory_service.py | MemoryService, Memory, MemoryVersionConflictError, MemoryNotFoundError, Request dataclasses | **具体服务** ✅ | domain/services/ |
+| compressor_service.py | CompressorService ABC | Protocol ❌ | application/ports/ |
+| memory_service.py | MemoryService, Memory, MemoryVersionConflictError, MemoryNotFoundError | **具体服务** ✅ | domain/services/ |
 | permission_service.py | PermissionService Protocol | Protocol ❌ | application/ports/ |
 | public_blackboard.py | PublicBlackboard Protocol | Protocol ❌ | application/ports/ |
 | semantic_cache.py | SemanticCache Protocol | Protocol ❌ | application/ports/ |
-| text_extractor_service.py | TextExtractorService ABC, ExtractionResult | Protocol ❌ | application/ports/ |
-| udmr_router.py | UDMRouter (concrete) + HealthChecker/RouterConfig Protocols (nested) | **具体服务** ✅ | domain/services/ |
+| text_extractor_service.py | TextExtractorService ABC | Protocol ❌ | application/ports/ |
+| udmr_router.py | UDMRouter + HealthChecker/RouterConfig (nested, stay) | **具体服务** ✅ | domain/services/ |
 
 #### 2.2.5 value_objects/ — ✅ 正确（2 files）
 
@@ -151,7 +151,7 @@ src/
 │   ├── events/                     # 17 files — 领域事件（移除基础设施前：21 files）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
 │   ├── services/                   # 5 files — 具体业务逻辑
-│   ├── value_objects/              # 3 files — 值对象（含 sensitive_data.py）
+│   ├── value_objects/              # 2 files — 值对象（sensitive_data.py 待新建）
 │   └── exceptions/                 # 2 files — 领域异常
 │
 ├── application/                     # ✅ 应用层（用例编排）
