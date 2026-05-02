@@ -162,12 +162,11 @@ src/
 │
 ├── infrastructure/                  # ✅ 基础设施层
 │   ├── audit/                      # 审计服务
-│   ├── config/                     # 配置
-│   ├── events/                     # 事件存储基础设施（接收移动的 store.py）
+│   ├── config/                     # 配置（需审查 sovereignty.py 跨模块导入）
 │   ├── external_services/          # 外部服务适配器
-│   ├── messaging/                 # 消息基础设施（接收移动的 publisher/listener）
+│   ├── messaging/                 # 消息基础设施（含 event_store 实现）
 │   ├── monitoring/                # 监控
-│   ├── routing/                   # 路由实现
+│   ├── routing/                   # 路由实现（需审查 local_model_health.py）
 │   ├── scheduler/                  # 调度器
 │   ├── security/                   # 安全服务
 │   ├── storage/                   # 存储适配器（L0-L5）
@@ -232,11 +231,14 @@ EOF
 
 ```bash
 mkdir -p src/infrastructure/messaging/
-mkdir -p src/infrastructure/events/
+
+# 注意：infrastructure/messaging/event_store.py 已存在（237行实现）
+# 移动 domain/events/store.py（66行 ABC接口）到 infrastructure/messaging/event_store_domain.py
+# 并更新 infrastructure/messaging/event_store.py 的导入
 
 mv src/domain/events/publisher.py src/infrastructure/messaging/event_publisher.py
 mv src/domain/events/listener.py src/infrastructure/messaging/event_listener.py
-mv src/domain/events/store.py src/infrastructure/events/event_store.py
+mv src/domain/events/store.py src/infrastructure/messaging/event_store_domain.py
 mv src/domain/events/publish_result.py src/infrastructure/messaging/publish_result.py
 ```
 
@@ -357,11 +359,20 @@ tool.py
 |------|------|
 | six_layer_storage_coordinator.py | SixLayerStorageCoordinator |
 
-#### 4.3.3 application/events/ — 需审查（1 file）
+#### 4.3.3 application/events/ — adapters.py 处理方案
 
-| 文件 | 问题 |
-|------|------|
-| adapters.py | 使用 pydantic，需验证必要性 |
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| adapters.py | 使用 pydantic (TypeAdapter) | **审查后保留** — pydantic 用于应用层 DTO 转换，在边界处使用可接受 |
+
+**审查标准**:
+- 验证 pydantic 仅用于外部 API 边界
+- 确认不属于领域层逻辑
+- 如果内部只用 domain entities/values，应移除 pydantic
+
+**验收条件**:
+- [ ] adapters.py 不导入 domain 实体以外的外部依赖
+- [ ] pydantic 使用仅限于 DTO 转换
 
 #### 4.3.4 application/use_cases/ — 无变化（3 files）
 
@@ -388,9 +399,10 @@ dual_channel_event_bus.py
 event_bus.py
 event_bus_config_loader.py
 event_bus_factory.py
-event_listener.py          # 从 domain/events/listener.py 移动
-event_publisher.py        # 从 domain/events/publisher.py 移动
-event_store.py             # 从 domain/events/store.py 移动
+event_store.py              # 已存在（实现）
+event_store_domain.py       # 从 domain/events/store.py 移动（ABC接口）
+event_listener.py           # 从 domain/events/listener.py 移动
+event_publisher.py          # 从 domain/events/publisher.py 移动
 message_serializer.py
 outbox/
   __init__.py
@@ -400,7 +412,7 @@ outbox/
   outbox_processor.py
   outbox_repository.py
   postgres_dead_letter_queue.py
-publish_result.py          # 从 domain/events/publish_result.py 移动
+publish_result.py           # 从 domain/events/publish_result.py 移动
 rabbitmq_consumer.py
 rabbitmq_event_bus.py
 rabbitmq_listener.py
@@ -418,11 +430,7 @@ unit_of_work/
   postgresql_unit_of_work.py
 ```
 
-#### 4.4.2 infrastructure/events/ — 新目录
-
-```
-event_store.py  # 从 domain/events/store.py 移动
-```
+**注意**: `event_store.py` (237行) 是已存在的实现，`event_store_domain.py` (66行) 是 ABC 接口，应合并或重命名。
 
 #### 4.4.3 其他 infrastructure/ 子目录 — 无变化
 
@@ -432,22 +440,56 @@ event_store.py  # 从 domain/events/store.py 移动
 | config/ | 14 | 配置（需审查 sovereignty.py 跨模块导入） |
 | external_services/ | 2 | 外部服务 |
 | monitoring/ | 4 | 监控 |
-| routing/ | 5 | 路由（需审查 local_model_health.py） |
+
+#### 4.4.5 infrastructure/config/ 审查方案
+
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| sovereignty.py | 导入 `infrastructure.security.models` | **审查** — 配置层不应依赖安全服务层 |
+
+**审查标准**:
+- `infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`
+- 这是 infrastructure 内部跨层导入，应重构为配置内聚
+
+**验收条件**:
+- [ ] `infrastructure/config/` 不导入 `infrastructure/security/`
+- [ ] 配置类自包含，不依赖其他 infrastructure 子目录
+| routing/ | 5 | 路由（需审查 local_model_health.py 已废弃） |
 | scheduler/ | 1 | 调度器 |
 | security/ | 21 | 安全服务 |
 | storage/ | 30+ | 存储适配器 |
 | utils/ | 1 | 工具 |
 | workflow/ | 1 | 工作流 |
 
+#### 4.4.4 infrastructure/routing/ 审查方案
+
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| local_model_health.py | **已废弃** — 仅做向后兼容导入 | **保留但标记废弃** — 不再新增使用 |
+
+**审查标准**:
+- `local_model_health.py` 是兼容性别名模块，实际实现为 `OllamaHealthAdapter`
+- 已有 `HealthCheckPort` 定义在 `domain/ports/health_check.py`
+- 所有新代码应直接使用 `HealthCheckPort` 接口
+
+**验收条件**:
+- [ ] 新代码不导入 `local_model_health.LocalModelHealth`
+- [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
+- [ ] 后续 Story 可完全移除 local_model_health.py
+
 ---
 
-### 4.5 Interfaces 层 — 无变化
+#### 4.5 Interfaces 层
 
 | 目录 | 文件数 | 说明 |
 |------|--------|------|
-| api/ | 6 | FastAPI 端点（预期依赖 FastAPI） |
+| api/ | 6 | FastAPI 端点 |
 | cli/ | 3 | Typer 命令 |
 | event_listeners/ | 4 | 事件监听器实现 |
+| event_publisher.py | 1 | 接口层事件发布器 |
+| event_subscriber.py | 1 | 接口层事件订阅器 |
+
+**注意**: `interfaces/event_publisher.py` 和 `interfaces/event_subscriber.py` 是接口层实现，应保留在 interfaces/ 层。
 
 ---
 
@@ -563,20 +605,22 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ### A. 移动文件清单
 
-| 原路径 | 目标路径 |
-|--------|----------|
-| domain/repositories/ | domain/ports/ |
-| domain/events/publisher.py | infrastructure/messaging/event_publisher.py |
-| domain/events/listener.py | infrastructure/messaging/event_listener.py |
-| domain/events/store.py | infrastructure/events/event_store.py |
-| domain/events/publish_result.py | infrastructure/messaging/publish_result.py |
-| domain/services/audit_service.py | application/ports/audit_port.py |
-| domain/services/auth_service.py | application/ports/auth_port.py |
-| domain/services/permission_service.py | application/ports/permission_port.py |
-| domain/services/public_blackboard.py | application/ports/public_blackboard_port.py |
-| domain/services/semantic_cache.py | application/ports/semantic_cache_port.py |
-| domain/services/compressor_service.py | application/ports/compressor_port.py |
-| domain/services/text_extractor_service.py | application/ports/text_extractor_port.py |
+| 原路径 | 目标路径 | 说明 |
+|--------|----------|------|
+| domain/repositories/ | domain/ports/ | 目录重命名 |
+| domain/events/publisher.py | infrastructure/messaging/event_publisher.py | 事件基础设施 |
+| domain/events/listener.py | infrastructure/messaging/event_listener.py | 事件基础设施 |
+| domain/events/store.py | infrastructure/messaging/event_store_domain.py | 事件基础设施（ABC接口） |
+| domain/events/publish_result.py | infrastructure/messaging/publish_result.py | 事件基础设施 |
+| domain/services/audit_service.py | application/ports/audit_port.py | Protocol |
+| domain/services/auth_service.py | application/ports/auth_port.py | Protocol |
+| domain/services/permission_service.py | application/ports/permission_port.py | Protocol |
+| domain/services/public_blackboard.py | application/ports/public_blackboard_port.py | Protocol |
+| domain/services/semantic_cache.py | application/ports/semantic_cache_port.py | Protocol |
+| domain/services/compressor_service.py | application/ports/compressor_port.py | Protocol |
+| domain/services/text_extractor_service.py | application/ports/text_extractor_port.py | Protocol |
+
+**注意**: `infrastructure/messaging/event_store.py` (237行) 已存在，是实现文件。移动的是 ABC 接口 `store.py` (66行)，重命名为 `event_store_domain.py`。
 
 ### B. 新建文件清单
 
