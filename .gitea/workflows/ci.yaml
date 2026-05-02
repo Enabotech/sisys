@@ -52,7 +52,7 @@ env:
   SISYS_TEST_ENV: ci
   SISYS_USE_TEST_PORTS: "true"
 
-  # 测试服务主机地址（使用 docker compose 服务名）
+  # 测试服务主机地址( 使用 docker compose 服务名 )
   REDIS_HOST: redis
   POSTGRES_HOST: postgres
   QDRANT_HOST: qdrant
@@ -541,7 +541,7 @@ jobs:
 
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
-    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
+    # ✅ workflow_dispatch 不选 force_rebuild 时不构建( 避免 paths-filter 回退到全分支对比 )
     # if: >-
     #   ${{
     #     (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
@@ -634,7 +634,7 @@ jobs:
               ;;
           esac
 
-          # 提取提交作者（清理换行和多余空格）
+          # 提取提交作者( 清理换行和多余空格 )
           AUTHOR=$(git log -1 --pretty=format:'%an' | tr -d '[:space:]')
 
           echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
@@ -666,7 +666,7 @@ jobs:
             echo "image_tag_l3=${IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
           fi
 
-          # 测试标签（仅 release/Tag 推送时生成）
+          # 测试标签( 仅 release/Tag 推送时生成 )
           echo "image_tag_test=${IMAGE}:test-${VERSION}-${GIT_SHA}" >> $GITHUB_OUTPUT
 
           echo "✅ 版本: ${VERSION}"
@@ -713,8 +713,8 @@ jobs:
 
       # ---------- L3 构建 ----------
 
-      # Dev 构建（main / feature）— 仅推 dev 标签
-      - name: 构建 L3 镜像（Dev）
+      # Dev 构建( main / feature )— 仅推 dev 标签
+      - name: 构建 L3 镜像( Dev )
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true') ||
@@ -749,7 +749,7 @@ jobs:
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
       # Release/Tag 构建 — 推 SemVer + test，Tag 推送额外推 latest
-      - name: 构建 L3 镜像（Release/Tag）
+      - name: 构建 L3 镜像( Release/Tag )
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true') ||
@@ -789,7 +789,7 @@ jobs:
           build-args: |
             DEPENDENCY_IMAGE=${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
 
-      # 记录 Digest 信息（用于 Kustomize 写回 + 审计追溯）
+      # 记录 Digest 信息( 用于 Kustomize 写回 + 审计追溯 )
       - name: 记录 Digest 信息
         if: always() && (steps.build-l3-dev.outputs.digest != '' || steps.build-l3-release.outputs.digest != '')
         run: |
