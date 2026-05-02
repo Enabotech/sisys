@@ -718,9 +718,9 @@ jobs:
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-            || ((startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/feature'))
-                  && ( needs.detect-changes.outputs.l3 == 'true')
-               )
+            || ((needs.detect-changes.outputs.l3 == 'true') && (
+                  startsWith(github.ref, 'refs/heads/main') ||
+                  startsWith(github.ref, 'refs/heads/feature')))
           }}
         id: build-l3-dev
         uses: docker/build-push-action@v5
@@ -753,9 +753,9 @@ jobs:
         if: >-
           ${{
             (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-            || ((startsWith(github.ref, 'refs/heads/release') || startsWith(github.ref, 'refs/heads/tags'))
-                  && ( needs.detect-changes.outputs.l3 == 'true')
-               )
+            || ((needs.detect-changes.outputs.l3 == 'true') && (
+                  startsWith(github.ref, 'refs/heads/release') ||
+                  startsWith(github.ref, 'refs/heads/tags')))
           }}
         id: build-l3-release
         uses: docker/build-push-action@v5
