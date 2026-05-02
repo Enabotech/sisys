@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.5 |
+| 版本 | v2.6 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -359,20 +359,20 @@ tool.py
 |------|------|
 | six_layer_storage_coordinator.py | SixLayerStorageCoordinator |
 
-#### 4.3.3 application/events/ — adapters.py 处理方案
+#### 4.3.3 application/events/ — adapters.py 审查结论
 
-| 文件 | 问题 | 处理方案 |
-|------|------|----------|
-| adapters.py | 使用 pydantic (TypeAdapter) | **审查后保留** — pydantic 用于应用层 DTO 转换，在边界处使用可接受 |
+| 文件 | 结论 |
+|------|------|
+| adapters.py | **保留** — pydantic TypeAdapter 用于 JSON 边界转换，在应用层使用可接受 |
 
-**审查标准**:
-- 验证 pydantic 仅用于外部 API 边界
-- 确认不属于领域层逻辑
-- 如果内部只用 domain entities/values，应移除 pydantic
+**审查结论**:
+- pydantic 仅用于 `dict ↔ JSON` 转换（应用层边界）
+- 不在领域层使用，符合架构约束
+- 符合"序列化是适配器责任"原则
 
 **验收条件**:
-- [ ] adapters.py 不导入 domain 实体以外的外部依赖
-- [ ] pydantic 使用仅限于 DTO 转换
+- [ ] adapters.py 不导入 domain 实体以外的外部依赖 ✅
+- [ ] pydantic 使用仅限于 dict/JSON 转换 ✅
 
 #### 4.3.4 application/use_cases/ — 无变化（3 files）
 
@@ -430,20 +430,9 @@ unit_of_work/
   postgresql_unit_of_work.py
 ```
 
-#### 4.4.2 infrastructure/events/ — 目录不存在
-
-```
-# 文档描述存在此目录，但实际不存在
-# 移动 domain/events/store.py 应创建此目录
-```
-
-**问题**：`4.4.2 infrastructure/events/` 章节描述目录存在，但实际不存在。`event_store.py` 位于 `infrastructure/messaging/`。
-
-**修正**：移除 4.4.2 章节，`domain/events/store.py`（ABC 接口）应移动到 `infrastructure/messaging/event_store_domain.py`。
-
 ---
 
-#### 4.4.3 其他 infrastructure/ 子目录 — 无变化
+#### 4.4.2 其他 infrastructure/ 子目录 — 无变化
 
 | 目录 | 文件数 | 说明 |
 |------|--------|------|
