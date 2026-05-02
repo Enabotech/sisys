@@ -33,7 +33,7 @@ class TestIntegrityPort:
 class ConcreteIntegrityAdapter(IntegrityPort):
     """Concrete implementation for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._hashes: dict[str, str] = {}
 
     async def verify_file(self, file_path: str, expected_hash: str) -> bool:

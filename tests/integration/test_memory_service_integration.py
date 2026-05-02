@@ -309,12 +309,14 @@ class TestMemoryServiceVersionConflict:
     def test_update_with_file_adapter_writes_to_l0(self):
         """验证 update 调用 FileMemoryAdapter 更新 L0"""
         mock_adapter = MagicMock()
+        mock_adapter.write = AsyncMock()
+        mock_adapter.delete = AsyncMock()
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
             metadata_repository=_create_mock_metadata_repo(),
             history_repository=_create_mock_history_repo(),
-            file_adapter=mock_adapter,
+            l0_storage=mock_adapter,
         )
         # 先创建
         request = MemorySaveRequest(
@@ -341,12 +343,14 @@ class TestMemoryServiceVersionConflict:
     def test_delete_with_file_adapter_deletes_from_l0(self):
         """验证 delete 调用 FileMemoryAdapter 删除 L0"""
         mock_adapter = MagicMock()
+        mock_adapter.write = AsyncMock()
+        mock_adapter.delete = AsyncMock()
         service = MemoryService(
             text_extractor=L1TextExtractor(),
             compressor=L1Compressor(),
             metadata_repository=_create_mock_metadata_repo(),
             history_repository=_create_mock_history_repo(),
-            file_adapter=mock_adapter,
+            l0_storage=mock_adapter,
         )
         # 先创建
         request = MemorySaveRequest(
@@ -380,7 +384,7 @@ class TestMemoryServiceVersionConflict:
             compressor=L1Compressor(),
             metadata_repository=_create_mock_metadata_repo(),
             history_repository=_create_mock_history_repo(),
-            file_adapter=None,  # 不提供 file_adapter
+            l0_storage=None,  # 不提供 file_adapter
         )
         request = MemorySaveRequest(
             user_id="user123",

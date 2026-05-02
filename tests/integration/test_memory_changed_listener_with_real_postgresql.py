@@ -165,7 +165,7 @@ def redis_cache(real_redis) -> RedisMemoryCache:
 def storage_coordinator(redis_cache) -> SixLayerStorageCoordinator:
     """Create SixLayerStorageCoordinator with real L1 Redis."""
     return SixLayerStorageCoordinator(
-        redis_cache=redis_cache,
+        l1_cache=redis_cache,
         l2_repository=None,
         l3_vector_store=None,
         l4_object_store=None,

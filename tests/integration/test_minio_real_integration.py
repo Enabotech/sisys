@@ -64,7 +64,10 @@ async def minio_client(minio_config: MinIOConfig):
 @pytest.fixture
 async def bucket_manager(minio_config: MinIOConfig):
     """Provide BucketManager with real MinIO client."""
-    return BucketManager(minio_config)
+    try:
+        return BucketManager(minio_config)
+    except Exception as e:
+        pytest.skip(f"MinIO not available: {e}")
 
 
 # ===================================================================

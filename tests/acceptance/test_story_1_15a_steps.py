@@ -197,7 +197,7 @@ def compressor() -> L1Compressor:
 def storage_coordinator(redis_cache) -> SixLayerStorageCoordinator:
     """Create SixLayerStorageCoordinator with real L1 Redis."""
     return SixLayerStorageCoordinator(
-        redis_cache=redis_cache,
+        l1_cache=redis_cache,
         l2_repository=None,
         l3_vector_store=None,
         l4_object_store=None,
@@ -359,17 +359,19 @@ def when_compression_ready_to_write(context: dict):
 
 
 @then("FileMemoryAdapter 应该写入文件系统")
-def then_file_memory_adapter_write(context: dict, tmp_path: Any):
+def then_file_memory_adapter_write(context: dict, tmp_path: Any, event_loop):
     from src.infrastructure.config.memory import MemoryConfig
     from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
 
     config = MemoryConfig(memory_l0_path=str(tmp_path))
     adapter = FileMemoryAdapter(config)
 
-    adapter.write(
-        memory_id=str(uuid.uuid4()),
-        memory_type="user",
-        content="test content",
+    event_loop.run_until_complete(
+        adapter.write(
+            memory_id=str(uuid.uuid4()),
+            memory_type="user",
+            content="test content",
+        )
     )
 
     assert (tmp_path / "user").exists()

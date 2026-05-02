@@ -43,8 +43,8 @@ class TestIndexManagerPort:
 class ConcreteIndexManagerAdapter(IndexManagerPort):
     """Concrete implementation for testing."""
 
-    def __init__(self):
-        self._entries: list[dict] = []
+    def __init__(self) -> None:
+        self._entries: list[dict[str, str]] = []
 
     async def update_entry(self, entry: dict) -> None:
         self._entries = [e for e in self._entries if e.get("memory_id") != entry.get("memory_id")]

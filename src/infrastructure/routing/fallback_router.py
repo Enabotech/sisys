@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.infrastructure.routing.local_model_health import LocalModelHealth
+    from src.domain.repositories.health_check import HealthCheckPort
 
 
 TIMEOUT_THRESHOLD_MS = 30000  # 30 seconds
@@ -19,11 +20,12 @@ class FallbackRouter:
     - Local model response exceeds timeout threshold
     """
 
-    def __init__(self, health_checker: LocalModelHealth | None = None) -> None:
+    def __init__(self, health_checker: HealthCheckPort | None = None) -> None:
         """Initialize FallbackRouter with optional health checker.
 
         Args:
-            health_checker: Optional LocalModelHealth instance for dependency injection.
+            health_checker: Optional HealthCheckPort instance for dependency injection.
+                           Supports any health check adapter (Ollama, vLLM, etc.)
         """
         self._health_checker = health_checker
         self._last_latency_ms: float = 0.0
@@ -44,13 +46,18 @@ class FallbackRouter:
         return fallback_model
 
     def _is_healthy(self) -> bool:
-        """Check if primary model (local Ollama) is healthy.
+        """Check if primary model is healthy via health checker.
 
         Returns:
             True if healthy, False otherwise.
         """
         if self._health_checker is not None:
-            return self._health_checker.check()
+            checker = self._health_checker
+            # HealthCheckPort.check() is async, use asyncio.run for compatibility
+            result = checker.check()
+            if asyncio.iscoroutine(result):
+                return asyncio.run(result)
+            return result
         return True
 
     def _is_timeout(self) -> bool:

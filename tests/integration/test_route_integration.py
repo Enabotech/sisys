@@ -52,13 +52,19 @@ def unique_prefix() -> str:
 @pytest.fixture
 def redis_publisher(redis_config: RedisConfig) -> RedisEventPublisher:
     """Real Redis event publisher."""
-    return RedisEventPublisher(redis_config)
+    try:
+        return RedisEventPublisher(redis_config)
+    except Exception as e:
+        pytest.skip(f"Redis not available: {e}")
 
 
 @pytest.fixture
 def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
     """Real Redis event subscriber."""
-    return RedisEventSubscriber(redis_config)
+    try:
+        return RedisEventSubscriber(redis_config)
+    except Exception as e:
+        pytest.skip(f"Redis not available: {e}")
 
 
 @pytest.fixture

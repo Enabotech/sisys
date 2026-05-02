@@ -25,21 +25,21 @@ class TestSixLayerStorageCoordinatorInit:
         mock_l5_store = MagicMock()
 
         coordinator = SixLayerStorageCoordinator(
-            redis_cache=mock_cache,
+            l1_cache=mock_cache,
             l2_repository=mock_l2_repo,
             l3_vector_store=mock_l3_store,
             l4_object_store=mock_l4_store,
             l5_graph_store=mock_l5_store,
         )
 
-        assert coordinator._redis_cache is not None
+        assert coordinator._l1_cache is not None
         assert coordinator._l2_repository is not None
 
 
 class TestSixLayerStorageCoordinatorSave:
     """SixLayerStorageCoordinator save 方法验证"""
 
-    def test_save_to_l1_redis_cache(self):
+    def test_save_to_l1_l1_cache(self):
         """验证保存到 L1 Redis 缓存"""
         mock_cache = MagicMock()
         mock_l2_repo = MagicMock()
@@ -48,7 +48,7 @@ class TestSixLayerStorageCoordinatorSave:
         mock_l5_store = MagicMock()
 
         coordinator = SixLayerStorageCoordinator(
-            redis_cache=mock_cache,
+            l1_cache=mock_cache,
             l2_repository=mock_l2_repo,
             l3_vector_store=mock_l3_store,
             l4_object_store=mock_l4_store,
@@ -69,7 +69,7 @@ class TestSixLayerStorageCoordinatorSave:
 class TestSixLayerStorageCoordinatorRead:
     """SixLayerStorageCoordinator read 方法验证"""
 
-    def test_read_from_l1_redis_cache(self):
+    def test_read_from_l1_l1_cache(self):
         """验证从 L1 Redis 缓存读取"""
         mock_cache = MagicMock()
         mock_cache.get.return_value = "cached content"
@@ -80,7 +80,7 @@ class TestSixLayerStorageCoordinatorRead:
         mock_l5_store = MagicMock()
 
         coordinator = SixLayerStorageCoordinator(
-            redis_cache=mock_cache,
+            l1_cache=mock_cache,
             l2_repository=mock_l2_repo,
             l3_vector_store=mock_l3_store,
             l4_object_store=mock_l4_store,
@@ -108,7 +108,7 @@ class TestSixLayerStorageCoordinatorInvalidate:
         mock_l5_store = MagicMock()
 
         coordinator = SixLayerStorageCoordinator(
-            redis_cache=mock_cache,
+            l1_cache=mock_cache,
             l2_repository=mock_l2_repo,
             l3_vector_store=mock_l3_store,
             l4_object_store=mock_l4_store,
@@ -135,7 +135,7 @@ class TestSixLayerStorageCoordinatorLayerStatus:
         mock_l5_store = MagicMock()
 
         coordinator = SixLayerStorageCoordinator(
-            redis_cache=mock_cache,
+            l1_cache=mock_cache,
             l2_repository=mock_l2_repo,
             l3_vector_store=mock_l3_store,
             l4_object_store=mock_l4_store,
