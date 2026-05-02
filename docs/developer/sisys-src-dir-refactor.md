@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.1 |
+| 版本 | v2.2 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -435,6 +435,7 @@ unit_of_work/
 ```
 event_store.py  # 从 domain/events/store.py 移动
 ```
+
 **注意**: `event_store.py` (237行) 是已存在的实现，`event_store_domain.py` (66行) 是 ABC 接口，应合并或重命名。
 
 #### 4.4.3 其他 infrastructure/ 子目录 — 无变化
@@ -445,6 +446,12 @@ event_store.py  # 从 domain/events/store.py 移动
 | config/ | 14 | 配置（需审查 sovereignty.py 跨模块导入） |
 | external_services/ | 2 | 外部服务 |
 | monitoring/ | 4 | 监控 |
+| routing/ | 5 | 路由（需审查 local_model_health.py 已废弃） |
+| scheduler/ | 1 | 调度器 |
+| security/ | 21 | 安全服务 |
+| storage/ | 30+ | 存储适配器 |
+| utils/ | 1 | 工具 |
+| workflow/ | 1 | 工作流 |
 
 #### 4.4.4 infrastructure/routing/ 审查方案
 
@@ -462,86 +469,36 @@ event_store.py  # 从 domain/events/store.py 移动
 - [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
 - [ ] 后续 Story 可完全移除 local_model_health.py
 
-### 2. 重大不一致：DomainEvent 序列化未移除
+#### 4.4.5 infrastructure/config/ 审查方案
 
-**问题**：`domain/events/base.py` (285行) 仍包含 `to_dict()`/`from_dict()` 方法，但文档要求移除序列化。
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| sovereignty.py | 导入 `infrastructure.security.models` | **修复** — 配置层不应依赖安全服务层 |
 
-**当前状态**：
-```python
-# line 97-148: to_dict() 方法仍然存在
-def to_dict(self) -> dict[str, Any]:
-    ...
+**修正方案**（见第5章）:
+- 新建 `domain/value_objects/sensitive_data.py`
+- 重命名 `security/models.py` → `security/value_objects.py`
+- 更新 `sovereignty.py` 导入路径
 
-# line 167-243: from_dict() 方法仍然存在
-@classmethod
-def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
-    ...
-```
+#### 4.4.6 infrastructure/security/ 命名修正
 
-**修正方案**：移除序列化方法，DomainEvent 仅保留数据属性定义。序列化由 `infrastructure/messaging/` 适配器负责。
+| 文件 | 问题 | 处理方案 |
+|------|------|----------|
+| models.py | 文件名暗示 SQLAlchemy 模型，实际是纯值对象 | **重命名** → `value_objects.py` |
 
-### 3. domain/exceptions/ 仍为空
+---
 
-**问题**：`src/domain/exceptions/__init__.py` 仅包含注释，无异常导出。
+### 4.5 Interfaces 层审查
 
-**修正**：
-```bash
-# 创建 memory_exceptions.py
-cat > src/domain/exceptions/memory_exceptions.py << 'EOF'
-"""Memory domain exceptions."""
+| 目录 | 文件数 | 说明 |
+|------|--------|------|
+| api/ | 6 | FastAPI 端点 |
+| cli/ | 3 | Typer 命令 |
+| event_listeners/ | 4 | 事件监听器实现 |
+| event_publisher.py | 1 | 接口层事件发布器 |
+| event_subscriber.py | 1 | 接口层事件订阅器 |
 
-class MemoryNotFoundError(Exception):
-    """Raised when a memory entity is not found."""
-    pass
-
-class MemoryVersionConflictError(Exception):
-    """Raised when memory version conflict occurs during update."""
-    pass
-EOF
-
-# 更新 __init__.py
-cat > src/domain/exceptions/__init__.py << 'EOF'
-"""Domain exceptions."""
-
-from src.domain.exceptions.memory_exceptions import (
-    MemoryNotFoundError,
-    MemoryVersionConflictError,
-)
-
-__all__ = [
-    "MemoryNotFoundError",
-    "MemoryVersionConflictError",
-]
-EOF
-```
-
-### 4. sovereignty.py 跨层导入问题未解决
-
-**问题**：4.4.5 条审查方案要求修复 `infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`，但代码仍包含：
-
-```python
-# infrastructure/config/sovereignty.py line 14
-from ..security.models import DataResidency, SensitiveDataType
-```
-
-**修正方案**：将安全相关值对象移至独立文件：
-
-| 操作 | 原路径 | 新路径 |
-|------|--------|--------|
-| 新建 | `domain/value_objects/sensitive_data.py` | SensitiveDataType, DataResidency enum |
-| 修改 | `infrastructure/config/sovereignty.py` | 从 domain/value_objects/ 导入 |
-| 删除 | `infrastructure/security/models.py` | 内容已迁移 |
-
-### 5. security/models.py 命名混淆
-
-**问题**：文件名暗示 SQLAlchemy 模型，实际是纯值对象（dataclass + enum），与 `infrastructure/storage/postgresql/models/` 中的 ORM 模型冲突。
-
-**修正方案**：
-
-| 操作 | 原路径 | 新路径 |
-|------|--------|--------|
-| 重命名 | `infrastructure/security/models.py` | `infrastructure/security/value_objects.py` |
-| 更新 | 所有导入 `security.models` 的文件 | 改为导入 `security.value_objects` |
+**注意**: `interfaces/event_publisher.py` 和 `interfaces/event_subscriber.py` 是接口层实现，应保留在 interfaces/ 层。
 
 ---
 
@@ -567,58 +524,47 @@ from ..security.models import DataResidency, SensitiveDataType
 
 ---
 
-## 6. Interfaces 层审查
+## 6. 影响范围
 
-| 目录 | 文件数 | 说明 |
-|------|--------|------|
-| api/ | 6 | FastAPI 端点 |
-| cli/ | 3 | Typer 命令 |
-| event_listeners/ | 4 | 事件监听器实现 |
-| event_publisher.py | 1 | 接口层事件发布器 |
-| event_subscriber.py | 1 | 接口层事件订阅器 |
-
-**注意**: `interfaces/event_publisher.py` 和 `interfaces/event_subscriber.py` 是接口层实现，应保留在 interfaces/ 层。
-
----
-
-## 7. 影响范围
-
-### 7.1 文件操作统计
+### 6.1 文件操作统计
 
 | 操作 | 数量 |
 |------|------|
 | 重命名目录 | 1 (`repositories/` → `ports/`) |
 | 移动文件 | 15 |
-| 新建文件 | 2 |
-| 修改文件 | 1 (`base.py` 移除序列化) |
+| 新建文件 | 3 |
+| 修改文件 | 2 (`base.py` 移除序列化, `security/models.py` → `value_objects.py`) |
 
-### 7.2 需更新的导入路径
+### 6.2 需更新的导入路径
 
 | 层级 | 影响文件数（估计） |
 |------|-------------------|
 | domain/ | ~25 |
 | application/ | ~15 |
-| infrastructure/ | ~40 |
+| infrastructure/ | ~45 |
 | interfaces/ | ~20 |
 | tests/ | ~50 |
-| **总计** | **~150 files** |
+| **总计** | **~155 files** |
 
 ---
 
-## 8. 验收标准
+## 7. 验收标准
 
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
 - [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
 - [ ] 4 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`
 - [ ] `DomainEvent` 类不包含 `to_dict()` / `from_dict()` 方法
 - [ ] `domain/exceptions/` 包含 `MemoryNotFoundError` 和 `MemoryVersionConflictError`
+- [ ] `domain/value_objects/sensitive_data.py` 包含敏感数据类型定义
+- [ ] `infrastructure/security/models.py` 重命名为 `value_objects.py`
+- [ ] `infrastructure/config/sovereignty.py` 从 `domain.value_objects` 导入
 - [ ] 所有测试通过
 - [ ] `mypy .` 无错误
 - [ ] `ruff check .` 无错误
 
 ---
 
-## 9. 六边形架构图
+## 8. 六边形架构图
 
 ```
                         ┌─────────────────────────────────────────────────────────┐
@@ -675,7 +621,7 @@ from ..security.models import DataResidency, SensitiveDataType
 
 ---
 
-## 10. 关键原则总结
+## 9. 关键原则总结
 
 | 原则 | 说明 |
 |------|------|
@@ -686,10 +632,11 @@ from ..security.models import DataResidency, SensitiveDataType
 | **序列化是适配器责任** | DomainEvent 不含 to_dict/from_dict |
 | **异常集中定义** | domain/exceptions/ 统一管理领域异常 |
 | **目录命名准确** | repositories/ → ports/（反映本质） |
+| **值对象命名清晰** | security/models.py → security/value_objects.py |
 
 ---
 
-## 11. 附录
+## 10. 附录
 
 ### A. 移动文件清单
 
@@ -707,6 +654,7 @@ from ..security.models import DataResidency, SensitiveDataType
 | domain/services/semantic_cache.py | application/ports/semantic_cache_port.py | Protocol |
 | domain/services/compressor_service.py | application/ports/compressor_port.py | Protocol |
 | domain/services/text_extractor_service.py | application/ports/text_extractor_port.py | Protocol |
+| infrastructure/security/models.py | infrastructure/security/value_objects.py | 重命名 |
 
 **注意**: `infrastructure/messaging/event_store.py` (237行) 已存在，是实现文件。移动的是 ABC 接口 `store.py` (66行)，重命名为 `event_store_domain.py`。
 
@@ -717,7 +665,6 @@ from ..security.models import DataResidency, SensitiveDataType
 | domain/exceptions/__init__.py | 导出异常 |
 | domain/exceptions/memory_exceptions.py | MemoryNotFoundError, MemoryVersionConflictError |
 | domain/value_objects/sensitive_data.py | SensitiveDataType, DataResidency, WhitelistStatus, ApprovalStatus 等值对象 |
-| infrastructure/security/value_objects.py | 安全值对象（从 models.py 重命名） |
 
 ### C. 修改文件清单
 
@@ -726,7 +673,7 @@ from ..security.models import DataResidency, SensitiveDataType
 | domain/events/base.py | 移除 to_dict()/from_dict() 序列化方法 |
 | domain/services/memory_service.py | 从 domain/exceptions/ 导入异常 |
 | infrastructure/config/sovereignty.py | 改为从 domain.value_objects.sensitive_data 导入 |
-| infrastructure/security/models.py | 重命名为 value_objects.py |
+| infrastructure/security/value_objects.py | 重命名自 models.py |
 
 ### D. 命名规范
 
@@ -736,5 +683,6 @@ from ..security.models import DataResidency, SensitiveDataType
 | Repository 接口 | `XxxRepositoryProtocol` | `MemoryMetadataRepositoryProtocol` |
 | 领域服务 | `XxxService` | `MemoryService`, `AutoRouteService` |
 | 领域异常 | `XxxError` | `MemoryNotFoundError` |
-| 值对象 | `XxxContext` / `XxxDecision` | `AutoTriggerContext`, `RoutingDecision` |
+| 值对象 | `XxxContext` / `XxxDecision` / `XxxType` | `AutoTriggerContext`, `RoutingDecision`, `SensitiveDataType` |
 | 事件基础设施 | `XxxPublisher` / `XxxListener` | `EventPublisher`, `EventListener` |
+| 安全值对象 | `xxx_objects.py` | `value_objects.py`（非 models.py） |
