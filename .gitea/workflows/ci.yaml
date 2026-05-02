@@ -390,7 +390,7 @@ jobs:
   acceptance-tests:
     name: "🏁 验收测试"
     runs-on: [gpu]
-    needs: [integration-tests]
+    needs: [unit-tests, integration-tests]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
@@ -530,7 +530,7 @@ jobs:
   build-images:
     name: "🏗️ 构建镜像"
     runs-on: buildx
-    needs: [code-quality, unit-tests, acceptance-tests, security-scan]
+    needs: [code-quality, acceptance-tests, security-scan]
     timeout-minutes: 60
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
@@ -547,8 +547,8 @@ jobs:
         (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
         || startsWith(github.ref, 'refs/tags/')
         || (github.event_name != 'workflow_dispatch' && (
-          needs.detect-changes.outputs.l2 == 'true'
-          || needs.detect-changes.outputs.l3 == 'true'
+            needs.detect-changes.outputs.l2 == 'true'
+        || needs.detect-changes.outputs.l3 == 'true'
         ))
       }}
 

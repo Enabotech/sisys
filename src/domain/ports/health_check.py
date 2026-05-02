@@ -1,7 +1,7 @@
-"""HealthCheckPort — 健康检查抽象端口。
+"""HealthCheckPort — 健康检查抽象端口
 
-用于检查外部服务（Ollama、Redis 等）的可用性。
-所有健康检查实现必须实现此端口。
+用于检查外部服务（Ollama、Redis 等）的可用性
+所有健康检查实现必须实现此端口
 
 设计原则：
 - 纯异步接口：async def check() 和 async def close()
@@ -15,15 +15,15 @@ from abc import ABC, abstractmethod
 
 
 class HealthCheckPort(ABC):
-    """健康检查抽象端口。
+    """健康检查抽象端口
 
-    用于检查外部服务（Ollama、Redis 等）的可用性。
-    所有健康检查实现必须实现此端口。
+    用于检查外部服务（Ollama、Redis 等）的可用性
+    所有健康检查实现必须实现此端口
     """
 
     @abstractmethod
     async def check(self) -> bool:
-        """检查服务是否可用。
+        """检查服务是否可用
 
         Returns:
             True 如果服务健康，False 否则。
@@ -32,5 +32,5 @@ class HealthCheckPort(ABC):
 
     @abstractmethod
     async def close(self) -> None:
-        """关闭健康检查连接，释放资源。"""
+        """关闭健康检查连接，释放资源"""
         pass
