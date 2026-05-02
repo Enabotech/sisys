@@ -97,9 +97,9 @@
 **Then** `DomainEvent` 不包含 `to_dict()` / `from_dict()` 方法
 
 **验证标准:**
-- [ ] `DomainEvent` 类无 `to_dict` 方法
-- [ ] `DomainEvent` 类无 `from_dict` 方法
-- [ ] 所有序列化逻辑移至 `application/events/adapters.py` 或基础设施层
+- [ ] `DomainEvent` 类无 `to_dict` 方法（直接删除）
+- [ ] `DomainEvent` 类无 `from_dict` 方法（直接删除）
+- [ ] 调用方使用 `application/events/adapters.py` 中的 pydantic TypeAdapter 进行序列化
 - [ ] `ruff check src/domain/` 无错误
 
 ### AC-6: 安全值对象重命名
@@ -156,6 +156,8 @@
 ## 📋 Tasks / Subtasks 任务分解
 
 > ⚠️ **TDD 循环内化原则：** 每个 Task 必须独立完成 红→绿→重构 循环。
+>
+> ⚠️ **前置条件：** Task 0 完成后，Task 1-8 可**并行执行**（相互无依赖）
 
 ---
 
@@ -302,7 +304,7 @@
 |------|------|
 | 🔴 红 | 验证 `DomainEvent` 无 `to_dict`/`from_dict` 方法 |
 | 🟢 绿 | 移除 `base.py` 中的序列化方法 |
-| 🔄 重构 | 验证序列化逻辑移至应用层 |
+| 🔄 重构 | 验证调用方使用 adapters.py 的 TypeAdapter 替代 to_dict/from_dict |
 
 - [ ] Subtask 5.1: 🔴 红 — 编写 `tests/unit/domain/test_domain_event_no_serialization.py`
 - [ ] Subtask 5.2: 🟢 绿 — 移除 `to_dict`/`from_dict` 方法
@@ -364,7 +366,7 @@
 #### 架构验证测试实现
 
 - [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_hexagonal_compliance.py`
-- [ ] Subtask 8.2: 实现循环依赖检测（使用 ruff isort）
+- [ ] Subtask 8.2: 运行 `ruff check --select I --isort src/` 检测循环依赖
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
