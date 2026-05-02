@@ -254,6 +254,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] `infrastructure/messaging/event_publisher.py` 等 4 个文件存在
+- [ ] `domain/events/publisher.py`、`.listener.py`、`.store.py`、`.publish_result.py` 不存在
 - [ ] `domain/events/` 仅包含 17 个领域事件文件
 - [ ] 事件基础设施导入测试通过
 
@@ -315,8 +316,8 @@
 | 🟢 绿 | 移除 `base.py` 中的序列化方法 |
 | 🔄 重构 | 验证调用方使用 adapters.py 的 TypeAdapter 替代 to_dict/from_dict |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 `tests/unit/domain/test_domain_event_no_serialization.py`
-- [ ] Subtask 5.2: 🟢 绿 — 移除 `to_dict`/`from_dict` 方法
+- [ ] Subtask 5.1: 🔴 红 — 验证 `DomainEvent` 无 `to_dict`/`from_dict` 方法
+- [ ] Subtask 5.2: 🟢 绿 — 验证 adapters.py 中 TypeAdapter 替代方案可用
 
 **完成标准/Definition of Done:**
 - [ ] `DomainEvent` 类无 `to_dict` 方法
@@ -543,3 +544,4 @@
 - v1.1.0: 修复Task 6 DoD缺少models.py不存在验证项；Status更新为ready-for-dev
 - v1.2.0: 修复Task 7 DoD缺少security/value_objects.py导入验证项
 - v1.3.0: 修复Task 5 DoD缺少TypeAdapter验证项
+- v1.4.0: 修复Subtask 5.2描述与AC-5状态一致；Task 2 DoD补全旧文件不存在验证
