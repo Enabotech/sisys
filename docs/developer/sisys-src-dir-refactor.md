@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.3 |
+| 版本 | v2.4 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -65,7 +65,7 @@ src/
 | strategic_plan.py | StrategicPlan 实体, BLMPhase/PlanStatus 枚举 | ✅ |
 | tool.py | Tool 实体, ToolStatus/ToolCategory 枚举 | ✅ |
 
-#### 2.2.2 events/ — ⚠️ 混合基础设施（20 files）
+#### 2.2.2 events/ — ⚠️ 混合基础设施（21 files）
 
 | 文件 | 定义 | 应在 |
 |------|------|------|
@@ -148,7 +148,7 @@ src/
 src/
 ├── domain/                         # ✅ 领域层（零外部依赖）
 │   ├── entities/                   # 9 files — 领域实体
-│   ├── events/                     # 17 files — 领域事件（移除基础设施前：20 files）
+│   ├── events/                     # 17 files — 领域事件（移除基础设施前：21 files）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
 │   ├── services/                   # 5 files — 具体业务逻辑
 │   ├── value_objects/              # 3 files — 值对象（含 sensitive_data.py）
