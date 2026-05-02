@@ -114,8 +114,8 @@ src/
 |------|------|------|----------|
 | audit_service.py | AuditService Protocol | Protocol ❌ | application/ports/ |
 | auth_service.py | AuthService Protocol | Protocol ❌ | application/ports/ |
-| auto_execute_service.py | AutoExecuteService, SandboxExecutorProtocol, SnapshotRepositoryProtocol | Protocol ❌ | application/ports/ |
-| auto_route_service.py | AutoRouteService, EventPublisherProtocol, HashRouterProtocol, SemanticRouterProtocol | Protocol ❌ | application/ports/ |
+| auto_execute_service.py | AutoExecuteService (concrete) + SandboxExecutorProtocol/SnapshotRepositoryProtocol (nested) | **具体服务** ✅ | domain/services/ |
+| auto_route_service.py | AutoRouteService (concrete) + EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol (nested) | **具体服务** ✅ | domain/services/ |
 | auto_trigger_service.py | AutoTriggerService | **具体服务** ✅ | domain/services/ |
 | compressor_service.py | CompressorService ABC, CompressionResult | Protocol ❌ | application/ports/ |
 | memory_service.py | MemoryService, Memory, MemoryVersionConflictError, MemoryNotFoundError, Request dataclasses | **具体服务** ✅ | domain/services/ |
@@ -123,7 +123,7 @@ src/
 | public_blackboard.py | PublicBlackboard Protocol | Protocol ❌ | application/ports/ |
 | semantic_cache.py | SemanticCache Protocol | Protocol ❌ | application/ports/ |
 | text_extractor_service.py | TextExtractorService ABC, ExtractionResult | Protocol ❌ | application/ports/ |
-| udmr_router.py | UDMRouter, HealthChecker/RouterConfig Protocols | **具体服务** ✅ | domain/services/ |
+| udmr_router.py | UDMRouter (concrete) + HealthChecker/RouterConfig Protocols (nested) | **具体服务** ✅ | domain/services/ |
 
 #### 2.2.5 value_objects/ — ✅ 正确（2 files）
 
@@ -150,12 +150,12 @@ src/
 │   ├── entities/                   # 9 files — 领域实体
 │   ├── events/                     # 14 files — 领域事件（无基础设施）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
-│   ├── services/                   # 3 files — 具体业务逻辑
+│   ├── services/                   # 5 files — 具体业务逻辑
 │   ├── value_objects/              # 2 files — 值对象
 │   └── exceptions/                 # 2 files — 领域异常
 │
 ├── application/                     # ✅ 应用层（用例编排）
-│   ├── ports/                      # 9 files — 应用层 Protocol（移动自 domain/services/）
+│   ├── ports/                      # 7 files — 应用层 Protocol（移动自 domain/services/）
 │   ├── services/                   # 1 file — SixLayerStorageCoordinator
 │   ├── events/                     # 1 file — adapters.py（需审查 pydantic）
 │   └── use_cases/                  # 3 files — 用例
@@ -252,8 +252,6 @@ mv src/domain/services/public_blackboard.py src/application/ports/public_blackbo
 mv src/domain/services/semantic_cache.py src/application/ports/semantic_cache_port.py
 mv src/domain/services/compressor_service.py src/application/ports/compressor_port.py
 mv src/domain/services/text_extractor_service.py src/application/ports/text_extractor_port.py
-mv src/domain/services/auto_execute_service.py src/application/ports/auto_execute_port.py
-mv src/domain/services/auto_route_service.py src/application/ports/auto_route_port.py
 ```
 
 ---
@@ -313,13 +311,15 @@ tool.py
 | unit_of_work.py | UnitOfWork |
 | vector_storage.py | CollectionManager, VectorStorage |
 
-#### 4.2.4 domain/services/ — 仅保留具体服务（3 files）
+#### 4.2.4 domain/services/ — 仅保留具体服务（5 files）
 
 | 文件 | 定义 |
 |------|------|
 | memory_service.py | MemoryService, Memory, Request/Response dataclasses |
 | auto_trigger_service.py | AutoTriggerService |
-| udmr_router.py | UDMRouter, HealthChecker/RouterConfig Protocols |
+| auto_execute_service.py | AutoExecuteService, SandboxExecutorProtocol, SnapshotRepositoryProtocol |
+| auto_route_service.py | AutoRouteService, EventPublisherProtocol, HashRouterProtocol, SemanticRouterProtocol |
+| udmr_router.py | UDMRouter, HealthChecker, RouterConfig |
 
 #### 4.2.5 domain/value_objects/ — 无变化（2 files）
 
@@ -339,7 +339,7 @@ tool.py
 
 ### 4.3 Application 层最终状态
 
-#### 4.3.1 application/ports/ — 移动自 domain/services/（9 files）
+#### 4.3.1 application/ports/ — 移动自 domain/services/（7 files）
 
 | 文件 | 原位置 | 定义 |
 |------|--------|------|
@@ -350,8 +350,6 @@ tool.py
 | semantic_cache_port.py | domain/services/semantic_cache.py | SemanticCache Protocol |
 | compressor_port.py | domain/services/compressor_service.py | CompressorService ABC |
 | text_extractor_port.py | domain/services/text_extractor_service.py | TextExtractorService ABC |
-| auto_execute_port.py | domain/services/auto_execute_service.py | AutoExecuteService, Protocols |
-| auto_route_port.py | domain/services/auto_route_service.py | AutoRouteService, Protocols |
 
 #### 4.3.2 application/services/ — 无变化（1 file）
 
@@ -460,7 +458,7 @@ event_store.py  # 从 domain/events/store.py 移动
 | 操作 | 数量 |
 |------|------|
 | 重命名目录 | 1 (`repositories/` → `ports/`) |
-| 移动文件 | 17 |
+| 移动文件 | 15 |
 | 新建文件 | 2 |
 | 修改文件 | 1 (`base.py` 移除序列化) |
 
@@ -468,19 +466,19 @@ event_store.py  # 从 domain/events/store.py 移动
 
 | 层级 | 影响文件数（估计） |
 |------|-------------------|
-| domain/ | ~30 |
+| domain/ | ~25 |
 | application/ | ~15 |
 | infrastructure/ | ~40 |
 | interfaces/ | ~20 |
 | tests/ | ~50 |
-| **总计** | **~155 files** |
+| **总计** | **~150 files** |
 
 ---
 
 ## 6. 验收标准
 
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
-- [ ] 9 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
+- [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
 - [ ] 4 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`
 - [ ] `DomainEvent` 类不包含 `to_dict()` / `from_dict()` 方法
 - [ ] `domain/exceptions/` 包含 `MemoryNotFoundError` 和 `MemoryVersionConflictError`
@@ -579,8 +577,6 @@ event_store.py  # 从 domain/events/store.py 移动
 | domain/services/semantic_cache.py | application/ports/semantic_cache_port.py |
 | domain/services/compressor_service.py | application/ports/compressor_port.py |
 | domain/services/text_extractor_service.py | application/ports/text_extractor_port.py |
-| domain/services/auto_execute_service.py | application/ports/auto_execute_port.py |
-| domain/services/auto_route_service.py | application/ports/auto_route_port.py |
 
 ### B. 新建文件清单
 
