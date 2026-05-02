@@ -530,7 +530,7 @@ jobs:
   build-images:
     name: "🏗️ 构建镜像"
     runs-on: buildx
-    needs: [code-quality, acceptance-tests, security-scan]
+    needs: [detect-changes, code-quality, acceptance-tests, security-scan]
     timeout-minutes: 60
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
