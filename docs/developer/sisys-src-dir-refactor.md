@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.6 |
+| 版本 | v2.7 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -437,13 +437,13 @@ unit_of_work/
 | 目录 | 文件数 | 说明 |
 |------|--------|------|
 | audit/ | 4 | 审计服务 |
-| config/ | 14 | 配置（需审查 sovereignty.py 跨模块导入） |
+| config/ | 17 | 配置（需审查 sovereignty.py 跨模块导入） |
 | external_services/ | 2 | 外部服务 |
 | monitoring/ | 4 | 监控 |
 | routing/ | 5 | 路由（需审查 local_model_health.py 已废弃） |
 | scheduler/ | 1 | 调度器 |
-| security/ | 21 | 安全服务 |
-| storage/ | 30+ | 存储适配器 |
+| security/ | 20 | 安全服务 |
+| storage/ | 51 | 存储适配器 |
 | utils/ | 1 | 工具 |
 | workflow/ | 1 | 工作流 |
 
