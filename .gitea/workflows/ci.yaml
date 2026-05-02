@@ -532,9 +532,6 @@ jobs:
     runs-on: buildx
     needs: [code-quality, acceptance-tests, security-scan]
     timeout-minutes: 60
-    # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
-    # ✅ Tag 推送 (release 发布) 强制构建生产镜像
-    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L1_LATEST }}
       options: --user root --privileged
@@ -542,15 +539,18 @@ jobs:
         username: ${{ secrets.HARBOR_ROBOT_USERNAME }}
         password: ${{ secrets.HARBOR_ROBOT_PASSWORD }}
 
-    if: >-
-      ${{
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-        || startsWith(github.ref, 'refs/tags/')
-        || (github.event_name != 'workflow_dispatch' && (
-              needs.detect-changes.outputs.l2 == 'true'
-                || needs.detect-changes.outputs.l3 == 'true'
-           ))
-      }}
+    # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
+    # ✅ Tag 推送 (release 发布) 强制构建生产镜像
+    # ✅ workflow_dispatch 不选 force_rebuild 时不构建（避免 paths-filter 回退到全分支对比）
+    # if: >-
+    #   ${{
+    #     (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+    #     || startsWith(github.ref, 'refs/tags/')
+    #     || (github.event_name != 'workflow_dispatch' && (
+    #           needs.detect-changes.outputs.l2 == 'true'
+    #             || needs.detect-changes.outputs.l3 == 'true'
+    #        ))
+    #   }}
 
     steps:
       - name: 检出代码
@@ -717,11 +717,12 @@ jobs:
       - name: 构建 L3 镜像（Dev）
         if: >-
           ${{
-            startsWith(github.ref, 'refs/heads/main') ||
-            startsWith(github.ref, 'refs/heads/feature/')
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+            || ( startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/feature/')
+                  && (github.event_name != 'workflow_dispatch' && ( needs.detect-changes.outputs.l3 == 'true'))
+               )
           }}
         id: build-l3-dev
-        needs: [detect-changes, integration-tests, security-scan, code-quality]
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -755,7 +756,6 @@ jobs:
             startsWith(github.ref, 'refs/tags/')
           }}
         id: build-l3-release
-        needs: [detect-changes, integration-tests, security-scan, code-quality]
         uses: docker/build-push-action@v5
         with:
           context: .
