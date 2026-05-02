@@ -447,7 +447,7 @@ unit_of_work/
 | utils/ | 1 | 工具 |
 | workflow/ | 1 | 工作流 |
 
-#### 4.4.4 infrastructure/routing/ 审查方案
+#### 4.4.3 infrastructure/routing/ 审查方案
 
 | 文件 | 问题 | 处理方案 |
 |------|------|----------|
@@ -463,7 +463,7 @@ unit_of_work/
 - [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
 - [ ] 后续 Story 可完全移除 local_model_health.py
 
-#### 4.4.5 infrastructure/config/ 审查方案
+#### 4.4.4 infrastructure/config/ 审查方案
 
 | 文件 | 问题 | 处理方案 |
 |------|------|----------|
@@ -474,7 +474,7 @@ unit_of_work/
 - 重命名 `security/models.py` → `security/value_objects.py`
 - 更新 `sovereignty.py` 导入路径
 
-#### 4.4.6 infrastructure/security/ 命名修正
+#### 4.4.5 infrastructure/security/ 命名修正
 
 | 文件 | 问题 | 处理方案 |
 |------|------|----------|
