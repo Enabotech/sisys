@@ -12,6 +12,7 @@ Implements data integrity verification for 等保 2.0 Level 3:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 from datetime import UTC
@@ -22,6 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 
+from src.domain.repositories.integrity import IntegrityPort
 from src.infrastructure.security.models import (
     HashAlgorithm,
     IntegrityCheck,
@@ -50,8 +52,13 @@ class SignatureError(IntegrityError):
     pass
 
 
-class IntegrityVerifier:
+class IntegrityVerifier(IntegrityPort):
     """Data Integrity Verifier using hash algorithms.
+
+    实现 IntegrityPort 接口。
+    设计原则：
+    - verify_file(): I/O 密集型 → async + to_thread
+    - compute_hash()/verify_hash(): CPU 密集型 → sync
 
     Implements hash-based integrity verification following 等保 2.0 Level 3:
     - SHA-256 (default)
@@ -75,50 +82,90 @@ class IntegrityVerifier:
     def compute_hash(
         self,
         data: str | bytes,
-        algorithm: HashAlgorithm | None = None,
+        algorithm: str | None = None,
     ) -> str:
-        """Compute hash of data.
+        """Compute hash of data (CPU 密集型，同步方法）。
 
         Args:
             data: Data to hash.
-            algorithm: Hash algorithm to use. If None, uses default.
+            algorithm: Algorithm string ("sha256"/"sha512"/"md5"). If None, uses default.
 
         Returns:
             str: Hex-encoded hash value.
         """
-        if algorithm is None:
-            algorithm = self._default_algorithm
+        # Convert string algorithm to enum
+        algo = self._resolve_algorithm(algorithm)
 
         if isinstance(data, str):
             data = data.encode("utf-8")
 
-        if algorithm == HashAlgorithm.SHA256:
+        if algo == HashAlgorithm.SHA256:
             return hashlib.sha256(data).hexdigest()
-        elif algorithm == HashAlgorithm.SHA512:
+        elif algo == HashAlgorithm.SHA512:
             return hashlib.sha512(data).hexdigest()
-        elif algorithm == HashAlgorithm.MD5:
+        elif algo == HashAlgorithm.MD5:
             return hashlib.md5(data, usedforsecurity=False).hexdigest()
         else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
+            raise ValueError(f"Unsupported algorithm: {algo}")
 
     def verify_hash(
         self,
         data: str | bytes,
         expected_hash: str,
-        algorithm: HashAlgorithm | None = None,
+        algorithm: str | None = None,
     ) -> bool:
-        """Verify data against expected hash.
+        """Verify data against expected hash (CPU 密集型，同步方法）。
 
         Args:
             data: Data to verify.
             expected_hash: Expected hash value.
-            algorithm: Hash algorithm to use. If None, uses default.
+            algorithm: Algorithm string. If None, uses default.
 
         Returns:
             bool: True if hash matches.
         """
         actual_hash = self.compute_hash(data, algorithm)
         return hmac.compare_digest(actual_hash.lower(), expected_hash.lower())
+
+    async def verify_file(self, file_path: str, expected_hash: str) -> bool:
+        """Verify file integrity (I/O 密集型，使用 to_thread）。
+
+        Args:
+            file_path: Path to file.
+            expected_hash: Expected hash value.
+
+        Returns:
+            bool: True if hash matches.
+        """
+
+        def _do_verify():
+            with open(file_path, "rb") as f:
+                content = f.read()
+            return self.verify_hash(content, expected_hash)
+
+        return await asyncio.to_thread(_do_verify)
+
+    def _resolve_algorithm(self, algorithm: str | None) -> HashAlgorithm:
+        """Resolve string algorithm to HashAlgorithm enum.
+
+        Args:
+            algorithm: Algorithm string ("sha256"/"sha512"/"md5") or None.
+
+        Returns:
+            HashAlgorithm enum value.
+        """
+        if algorithm is None:
+            return self._default_algorithm
+
+        algo_upper = algorithm.upper()
+        if algo_upper == "SHA256" or algo_upper == "sha256":
+            return HashAlgorithm.SHA256
+        elif algo_upper == "SHA512" or algo_upper == "sha512":
+            return HashAlgorithm.SHA512
+        elif algo_upper == "MD5" or algo_upper == "md5":
+            return HashAlgorithm.MD5
+        else:
+            raise ValueError(f"Unsupported algorithm string: {algorithm}")
 
     async def verify_and_record(
         self,
@@ -127,7 +174,7 @@ class IntegrityVerifier:
         expected_hash: str,
         data_type: str = "",
         source: str = "",
-        algorithm: HashAlgorithm | None = None,
+        algorithm: str | None = None,
     ) -> IntegrityCheck:
         """Verify data integrity and record the check.
 
@@ -137,12 +184,12 @@ class IntegrityVerifier:
             expected_hash: Expected hash value.
             data_type: Type of data (document, config, etc.).
             source: Storage location.
-            algorithm: Hash algorithm to use.
+            algorithm: Algorithm string. If None, uses default.
 
         Returns:
             IntegrityCheck: Record of the verification check.
         """
-        algorithm = algorithm or self._default_algorithm
+        algo = self._resolve_algorithm(algorithm)
         actual_hash = self.compute_hash(data, algorithm)
 
         # Verify
@@ -154,7 +201,7 @@ class IntegrityVerifier:
             data_type=data_type,
             data_id=data_id,
             hash_value=expected_hash,
-            algorithm=algorithm,
+            algorithm=algo,
             status=IntegrityStatus.VERIFIED if matches else IntegrityStatus.VIOLATED,
             source=source,
         )
@@ -173,22 +220,6 @@ class IntegrityVerifier:
             IntegrityCheck | None: Check record if found.
         """
         return self._integrity_records.get(check_id)
-
-    async def verify_file(self, file_path: str, expected_hash: str) -> bool:
-        """Verify file integrity.
-
-        Args:
-            file_path: Path to file.
-            expected_hash: Expected hash value.
-
-        Returns:
-            bool: True if hash matches.
-        """
-        # In production, read file and compute hash
-        # For now, simulate
-        with open(file_path, "rb") as f:
-            content = f.read()
-        return self.verify_hash(content, expected_hash)
 
 
 class SignatureService:

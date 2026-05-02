@@ -1,54 +1,40 @@
-"""Local model health check for Ollama."""
+"""Local model health check for Ollama.
+
+.. deprecated::
+    此类已被 :class:`OllamaHealthAdapter` 取代。
+    请使用 OllamaHealthAdapter 获取异步健康检查能力。
+"""
 
 from __future__ import annotations
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+import warnings
 
-DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/health"
+# 向后兼容导入
+from src.infrastructure.routing.ollama_health_adapter import (
+    DEFAULT_OLLAMA_ENDPOINT,
+    LocalModelHealth,
+    OllamaHealthAdapter,
+    _get_session,
+)
 
+# 保留旧版 global session 用于向后兼容
 _session = None
 
+__all__ = [
+    "OllamaHealthAdapter",
+    "LocalModelHealth",
+    "_get_session",
+    "DEFAULT_OLLAMA_ENDPOINT",
+]
 
-def _get_session() -> requests.Session:
-    """Get or create a shared session for connection pooling."""
-    global _session
-    if _session is None:
-        _session = requests.Session()
-        adapter = HTTPAdapter(
-            pool_connections=10,
-            pool_maxsize=10,
-            max_retries=Retry(total=0),
+
+def __getattr__(name: str):
+    """支持旧代码直接导入 LocalModelHealth 类。"""
+    if name == "LocalModelHealth":
+        warnings.warn(
+            "LocalModelHealth is deprecated, use OllamaHealthAdapter instead",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        _session.mount("http://", adapter)
-        _session.mount("https://", adapter)
-    return _session
-
-
-class LocalModelHealth:
-    """Health check for local Ollama model.
-
-    Checks if Ollama service is available and responding.
-    """
-
-    def __init__(self, endpoint: str | None = None) -> None:
-        """Initialize with optional custom endpoint.
-
-        Args:
-            endpoint: Custom Ollama health endpoint. Defaults to localhost:11434.
-        """
-        self.endpoint = endpoint or DEFAULT_OLLAMA_ENDPOINT
-
-    def check(self) -> bool:
-        """Check if local model is healthy.
-
-        Returns:
-            True if Ollama is available, False otherwise.
-        """
-        try:
-            session = _get_session()
-            response = session.get(self.endpoint, timeout=5)
-            return response.status_code == 200
-        except Exception:
-            return False
+        return OllamaHealthAdapter
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

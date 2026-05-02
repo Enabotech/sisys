@@ -5,7 +5,7 @@
 依赖倒置：
 - TextExtractorService：文本提取接口
 - CompressorService：压缩接口
-- FileMemoryAdapter：L0 文件系统适配器（可选，用于双层存储）
+- L0StoragePort：L0 文件系统存储端口（可选，用于双层存储）
 - MemoryMetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
 - MemoryChangeHistoryRepositoryProtocol：记忆变更历史仓储
 - EventPublisherProtocol：事件发布接口（可选）
@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -107,7 +106,7 @@ class MemoryService:
         compressor,  # CompressorService
         metadata_repository,  # MemoryMetadataRepositoryProtocol
         history_repository,  # MemoryChangeHistoryRepositoryProtocol
-        file_adapter=None,  # FileMemoryAdapter | None
+        l0_storage=None,  # L0StoragePort | None
         event_publisher=None,  # EventPublisherProtocol | None
     ):
         """初始化 MemoryService。
@@ -117,14 +116,14 @@ class MemoryService:
             compressor: 压缩器（依赖倒置）
             metadata_repository: 记忆元数据仓储（PostgreSQL L2 持久化）
             history_repository: 记忆变更历史仓储（append-only）
-            file_adapter: L0 文件系统适配器（可选，用于双层存储）
+            l0_storage: L0 文件系统适配器端口（可选，用于双层存储）
             event_publisher: 事件发布器（可选）
         """
         self._text_extractor = text_extractor
         self._compressor = compressor
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
-        self._file_adapter = file_adapter
+        self._l0_storage = l0_storage
         self._event_publisher = event_publisher
 
     async def save(self, request: MemorySaveRequest) -> Memory:
@@ -417,18 +416,14 @@ class MemoryService:
             name: 记忆名称
             description: 记忆描述
         """
-        if self._file_adapter is None:
+        if self._l0_storage is None:
             return
 
         # 构建 MD 文件内容
         md_content = self._build_md_content(name, description, memory_type, content)
 
-        # 在线程池中执行同步文件写入，避免阻塞事件循环
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: self._file_adapter.write(str(memory_id), memory_type, md_content),
-        )
+        # 直接调用异步接口，由 L0StoragePort 实现处理异步 I/O
+        await self._l0_storage.write(str(memory_id), memory_type, md_content)
 
         # 注意：MEMORY.md 索引更新由 MemoryChangedListener 事件驱动，不再在此处同步更新
 
@@ -464,15 +459,11 @@ class MemoryService:
             memory_id: 记忆 ID
             memory_type: 记忆类型
         """
-        if self._file_adapter is None:
+        if self._l0_storage is None:
             return
 
-        # 在线程池中执行同步文件删除
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: self._file_adapter.delete(str(memory_id), memory_type),
-        )
+        # 直接调用异步接口，由 L0StoragePort 实现处理异步 I/O
+        await self._l0_storage.delete(str(memory_id), memory_type)
 
         # 注意：MEMORY.md 索引移除由 MemoryChangedListener 事件驱动，不再在此处同步更新
 
