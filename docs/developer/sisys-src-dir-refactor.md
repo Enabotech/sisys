@@ -74,7 +74,7 @@ src/
 | auto_execute_events.py | AutoExecuted | domain/events/ ✅ |
 | auto_route_events.py | AutoRouted | domain/events/ ✅ |
 | auto_trigger_events.py | AutoTriggered | domain/events/ ✅ |
-| base.py | DomainEvent 基类（带序列化） | domain/events/（移除序列化）|
+| base.py | DomainEvent 基类（带序列化） | domain/events/（移除序列化） ✅ |
 | checkpoint_events.py | CheckpointReached, CheckpointRecovered | domain/events/ ✅ |
 | compliance_events.py | MFAChallengeIssuedEvent 等 | domain/events/ ✅ |
 | correction_events.py | CorrectionApproved | domain/events/ ✅ |
@@ -88,7 +88,7 @@ src/
 | tool_events.py | ToolExecuted | domain/events/ ✅ |
 | publisher.py | EventPublisher ABC | infrastructure/messaging/ ❌ |
 | listener.py | EventListener, InMemoryEventListener, EventListenerAsync | infrastructure/messaging/ ❌ |
-| store.py | EventStore ABC | infrastructure/events/ ❌ |
+| store.py | EventStore ABC | infrastructure/messaging/ ❌ |
 | publish_result.py | PublishResult dataclass | infrastructure/messaging/ ❌ |
 
 #### 2.2.3 repositories/ → ports/ — 重命名（12 files）
@@ -148,7 +148,7 @@ src/
 src/
 ├── domain/                         # ✅ 领域层（零外部依赖）
 │   ├── entities/                   # 9 files — 领域实体
-│   ├── events/                     # 14 files — 领域事件（无基础设施）
+│   ├── events/                     # 17 files — 领域事件（移除基础设施前：20 files）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
 │   ├── services/                   # 5 files — 具体业务逻辑
 │   ├── value_objects/              # 3 files — 值对象（含 sensitive_data.py）
@@ -274,7 +274,7 @@ strategic_plan.py
 tool.py
 ```
 
-#### 4.2.2 domain/events/ — 移除基础设施（14 files）
+#### 4.2.2 domain/events/ — 移除基础设施（17 files）
 
 | 文件 | 说明 |
 |------|------|
