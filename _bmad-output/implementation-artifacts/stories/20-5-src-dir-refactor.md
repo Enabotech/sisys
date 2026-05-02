@@ -1,6 +1,6 @@
 # Story 20-5: SISYS 源码目录结构重构
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -342,6 +342,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] `security/value_objects.py` 存在
+- [ ] `security/models.py` 不存在
 - [ ] 所有导入路径已更新
 
 ---
@@ -469,6 +470,7 @@
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] AC → Task → Subtask 追溯矩阵定义完成
 - [x] AC-1 (repositories→ports) 在故事创建时同步完成 (commit 74cbc62)
+- [x] Task 0 SDD规范定义完成，Gherkin验收测试已创建
 
 ### 文件清单 File List
 
@@ -536,3 +538,4 @@
 **创建日期/Created:** 2026-05-02
 **更新说明:**
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.7 创建
+- v1.1.0: 修复Task 6 DoD缺少models.py不存在验证项；Status更新为ready-for-dev
