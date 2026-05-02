@@ -542,15 +542,15 @@ jobs:
     # ✅ 精准触发: 仅 push/PR 有文件变更时构建，或手动强制重建
     # ✅ Tag 推送 (release 发布) 强制构建生产镜像
     # ✅ workflow_dispatch 不选 force_rebuild 时不构建( 避免 paths-filter 回退到全分支对比 )
-    # if: >-
-    #   ${{
-    #     (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
-    #     || startsWith(github.ref, 'refs/tags/')
-    #     || (github.event_name != 'workflow_dispatch' && (
-    #           needs.detect-changes.outputs.l2 == 'true'
-    #             || needs.detect-changes.outputs.l3 == 'true'
-    #        ))
-    #   }}
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.force_rebuild == 'true')
+        || startsWith(github.ref, 'refs/tags/')
+        || (github.event_name != 'workflow_dispatch' && (
+              needs.detect-changes.outputs.l2 == 'true'
+                || needs.detect-changes.outputs.l3 == 'true'
+           ))
+      }}
 
     steps:
       - name: 检出代码
