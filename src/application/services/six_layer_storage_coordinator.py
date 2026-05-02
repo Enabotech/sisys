@@ -16,8 +16,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.domain.repositories.l0_storage import L0StoragePort
-    from src.domain.repositories.memory_repository import (
+    from src.domain.ports.l0_storage import L0StoragePort
+    from src.domain.ports.memory_repository import (
         MemoryChangeHistoryRepositoryProtocol,
         MemoryMetadataRepositoryProtocol,
     )

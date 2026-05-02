@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter import (
     SQLAlchemyEventOutboxAdapter,
 )

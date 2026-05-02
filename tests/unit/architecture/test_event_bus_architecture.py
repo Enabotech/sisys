@@ -80,7 +80,7 @@ class TestEventBusArchitecture:
         """OutboxRepository 接口应使用 DomainEvent 而非 OutboxEntity。"""
         import inspect
 
-        from src.domain.repositories.outbox import OutboxRepository
+        from src.domain.ports.outbox import OutboxRepository
 
         # Check save method signature uses DomainEvent
         sig = inspect.signature(OutboxRepository.save)

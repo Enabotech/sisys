@@ -131,7 +131,7 @@ def outbox_repo() -> MagicMock:
 
     Uses unittest.mock.MagicMock to avoid production InMemory test doubles.
     """
-    from src.domain.repositories.outbox import OutboxRepository
+    from src.domain.ports.outbox import OutboxRepository
 
     mock = MagicMock(spec=OutboxRepository)
     mock.get_unpublished.return_value = []

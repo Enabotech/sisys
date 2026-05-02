@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from src.domain.repositories.base import BaseRepository
+from src.domain.ports.base import BaseRepository
 
 
 class TestBaseRepositoryAbstract:

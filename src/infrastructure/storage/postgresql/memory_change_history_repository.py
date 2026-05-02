@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
-from src.domain.repositories.memory_repository import MemoryChangeHistoryRepositoryProtocol
+from src.domain.ports.memory_repository import MemoryChangeHistoryRepositoryProtocol
 from src.infrastructure.storage.postgresql.models.memory import MemoryChangeHistoryModel
 
 

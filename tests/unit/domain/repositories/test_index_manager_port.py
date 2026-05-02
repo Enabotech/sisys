@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.index_manager import IndexManagerPort
+from src.domain.ports.index_manager import IndexManagerPort
 
 
 class TestIndexManagerPort:

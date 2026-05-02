@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
 

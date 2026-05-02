@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from src.domain.repositories.index_manager import IndexManagerPort
+from src.domain.ports.index_manager import IndexManagerPort
 
 if TYPE_CHECKING:
     from src.infrastructure.config.memory import MemoryConfig

@@ -136,7 +136,7 @@ class TestEventMessagingComponents:
 
     def test_new_domain_interfaces_exist(self):
         """验证新领域接口文件已创建。"""
-        assert (ROOT_DIR / "src" / "domain" / "repositories" / "unit_of_work.py").exists()
+        assert (ROOT_DIR / "src" / "domain" / "ports" / "unit_of_work.py").exists()
         listener_file = ROOT_DIR / "src" / "domain" / "events" / "listener.py"
         assert listener_file.exists()
         # Verify EventListenerAsync is defined

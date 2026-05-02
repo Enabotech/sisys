@@ -102,7 +102,7 @@ class TestCPUBoundMethodsNotBlocking:
 
     def test_integrity_compute_hash_is_sync(self):
         """验证 IntegrityPort.compute_hash 是同步的（CPU 密集型）"""
-        from src.domain.repositories.integrity import IntegrityPort
+        from src.domain.ports.integrity import IntegrityPort
 
         # compute_hash 应该是同步方法
         # 注意：这只是验证接口签名，实际实现在 Infrastructure 层
@@ -110,14 +110,14 @@ class TestCPUBoundMethodsNotBlocking:
 
     def test_integrity_verify_hash_is_sync(self):
         """验证 IntegrityPort.verify_hash 是同步的（CPU 密集型）"""
-        from src.domain.repositories.integrity import IntegrityPort
+        from src.domain.ports.integrity import IntegrityPort
 
         # verify_hash 应该是同步方法
         assert not asyncio.iscoroutinefunction(IntegrityPort.verify_hash)
 
     def test_health_check_close_is_async(self):
         """验证 HealthCheckPort.close 是异步的（I/O 密集型）"""
-        from src.domain.repositories.health_check import HealthCheckPort
+        from src.domain.ports.health_check import HealthCheckPort
 
         # close 应该是异步方法
         assert asyncio.iscoroutinefunction(HealthCheckPort.close)

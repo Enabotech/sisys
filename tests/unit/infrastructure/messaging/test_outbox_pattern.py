@@ -142,7 +142,7 @@ class TestOutboxRepositoryInterface:
 
     def test_interface_exists(self):
         """OutboxRepository should be an abstract class."""
-        from src.domain.repositories.outbox import OutboxRepository
+        from src.domain.ports.outbox import OutboxRepository
 
         assert hasattr(OutboxRepository, "save")
         assert hasattr(OutboxRepository, "get_unpublished")
@@ -151,7 +151,7 @@ class TestOutboxRepositoryInterface:
 
     def test_cannot_instantiate_abstract(self):
         """Should not be able to instantiate abstract interface."""
-        from src.domain.repositories.outbox import OutboxRepository
+        from src.domain.ports.outbox import OutboxRepository
 
         with pytest.raises(TypeError):
             OutboxRepository()
@@ -189,7 +189,7 @@ class TestDomainLayerIsolation:
 
 def _create_mock_repo():
     """Create a mock repo with internal methods for AsyncOutboxPoller."""
-    from src.domain.repositories.outbox import OutboxRepository
+    from src.domain.ports.outbox import OutboxRepository
 
     repo = MagicMock(spec=OutboxRepository)
     # Add internal methods that AsyncOutboxPoller uses

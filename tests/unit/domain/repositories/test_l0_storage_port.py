@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.l0_storage import L0StoragePort
+from src.domain.ports.l0_storage import L0StoragePort
 
 
 class TestL0StoragePort:

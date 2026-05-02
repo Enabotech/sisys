@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.health_check import HealthCheckPort
-from src.domain.repositories.index_manager import IndexManagerPort
-from src.domain.repositories.integrity import IntegrityPort
-from src.domain.repositories.l0_storage import L0StoragePort
+from src.domain.ports.health_check import HealthCheckPort
+from src.domain.ports.index_manager import IndexManagerPort
+from src.domain.ports.integrity import IntegrityPort
+from src.domain.ports.l0_storage import L0StoragePort
 
 
 class FakeL0StorageAdapter(L0StoragePort):

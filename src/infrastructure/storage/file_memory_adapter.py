@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, cast
 
 import aiofiles
 
-from src.domain.repositories.l0_storage import L0StoragePort
+from src.domain.ports.l0_storage import L0StoragePort
 
 if TYPE_CHECKING:
     from src.infrastructure.config.memory import MemoryConfig

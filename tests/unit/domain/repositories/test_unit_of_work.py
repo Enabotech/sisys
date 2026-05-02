@@ -12,31 +12,31 @@ class TestUnitOfWorkInterface:
 
     def test_unit_of_work_is_abc(self):
         """UnitOfWork should be an abstract base class."""
-        from src.domain.repositories.unit_of_work import UnitOfWork
+        from src.domain.ports.unit_of_work import UnitOfWork
 
         assert issubclass(UnitOfWork, ABC)
 
     def test_unit_of_work_has_begin_method(self):
         """UnitOfWork should declare begin() method."""
-        from src.domain.repositories.unit_of_work import UnitOfWork
+        from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "begin")
 
     def test_unit_of_work_has_commit_method(self):
         """UnitOfWork should declare commit() method."""
-        from src.domain.repositories.unit_of_work import UnitOfWork
+        from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "commit")
 
     def test_unit_of_work_has_rollback_method(self):
         """UnitOfWork should declare rollback() method."""
-        from src.domain.repositories.unit_of_work import UnitOfWork
+        from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "rollback")
 
     def test_unit_of_work_has_close_method(self):
         """UnitOfWork should declare close() method."""
-        from src.domain.repositories.unit_of_work import UnitOfWork
+        from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "close")
 

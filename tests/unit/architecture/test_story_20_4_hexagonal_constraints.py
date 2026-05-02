@@ -4,8 +4,8 @@
 
 验证标准（AC-14）:
 - [ ] ruff check src/domain/ 无外部依赖违规
-- [ ] mypy src/domain/repositories/ 类型检查通过
-- [ ] Port 接口位于 src/domain/repositories/
+- [ ] mypy src/domain/ports/ 类型检查通过
+- [ ] Port 接口位于 src/domain/ports/
 - [ ] 实现类位于 src/infrastructure/
 """
 
@@ -31,9 +31,9 @@ class TestHexagonalArchitectureConstraints:
         assert result.returncode == 0, f"Domain layer has violations: {result.stdout}\n{result.stderr}"
 
     def test_domain_repositories_type_check(self):
-        """验证 domain/repositories 类型检查通过"""
+        """验证 domain/ports 类型检查通过"""
         result = subprocess.run(
-            ["poetry", "run", "mypy", "src/domain/repositories/", "--ignore-missing-imports"],
+            ["poetry", "run", "mypy", "src/domain/ports/", "--ignore-missing-imports"],
             capture_output=True,
             text=True,
         )
@@ -41,8 +41,8 @@ class TestHexagonalArchitectureConstraints:
         assert "error" not in result.stdout.lower() or result.returncode == 0, f"Type check failed: {result.stdout}"
 
     def test_port_interfaces_in_domain_repositories(self):
-        """验证 Port 接口位于 src/domain/repositories/"""
-        domain_repos = Path("src/domain/repositories")
+        """验证 Port 接口位于 src/domain/ports/"""
+        domain_repos = Path("src/domain/ports")
 
         # 检查必需的 Port 接口存在
         required_ports = [
@@ -54,7 +54,7 @@ class TestHexagonalArchitectureConstraints:
 
         for port_file in required_ports:
             port_path = domain_repos / port_file
-            assert port_path.exists(), f"Port interface {port_file} not found in domain/repositories/"
+            assert port_path.exists(), f"Port interface {port_file} not found in domain/ports/"
 
     def test_implementation_classes_in_infrastructure(self):
         """验证实现类位于 src/infrastructure/"""
@@ -73,8 +73,8 @@ class TestHexagonalArchitectureConstraints:
             assert impl_path.exists(), f"Implementation {impl} not found in infrastructure/"
 
     def test_domain_repositories_not_importing_infrastructure(self):
-        """验证 domain/repositories 不导入 infrastructure 层"""
-        domain_repos = Path("src/domain/repositories")
+        """验证 domain/ports 不导入 infrastructure 层"""
+        domain_repos = Path("src/domain/ports")
 
         for py_file in domain_repos.glob("*.py"):
             content = py_file.read_text()
@@ -91,7 +91,7 @@ class TestPortInterfaceCompliance:
     def test_l0_storage_port_has_required_methods(self):
         """验证 L0StoragePort 接口有所需方法"""
 
-        from src.domain.repositories.l0_storage import L0StoragePort
+        from src.domain.ports.l0_storage import L0StoragePort
 
         methods = ["write", "read", "delete", "exists", "list_memories"]
         for method in methods:
@@ -100,7 +100,7 @@ class TestPortInterfaceCompliance:
     def test_index_manager_port_has_required_methods(self):
         """验证 IndexManagerPort 接口有所需方法"""
 
-        from src.domain.repositories.index_manager import IndexManagerPort
+        from src.domain.ports.index_manager import IndexManagerPort
 
         methods = ["update_entry", "remove_entry", "read_entries", "search", "truncate"]
         for method in methods:
@@ -108,7 +108,7 @@ class TestPortInterfaceCompliance:
 
     def test_health_check_port_has_required_methods(self):
         """验证 HealthCheckPort 接口有所需方法"""
-        from src.domain.repositories.health_check import HealthCheckPort
+        from src.domain.ports.health_check import HealthCheckPort
 
         methods = ["check", "close"]
         for method in methods:
@@ -116,7 +116,7 @@ class TestPortInterfaceCompliance:
 
     def test_integrity_port_has_required_methods(self):
         """验证 IntegrityPort 接口有所需方法"""
-        from src.domain.repositories.integrity import IntegrityPort
+        from src.domain.ports.integrity import IntegrityPort
 
         methods = ["verify_file", "compute_hash", "verify_hash"]
         for method in methods:

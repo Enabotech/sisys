@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.repositories.health_check import HealthCheckPort
+from src.domain.ports.health_check import HealthCheckPort
 
 
 class TestHealthCheckPort:

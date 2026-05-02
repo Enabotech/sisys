@@ -16,7 +16,7 @@ import pytest
 
 from src.application.use_cases.document_processing import DocumentProcessingUseCase
 from src.domain.events.base import DomainEvent
-from src.domain.repositories.outbox import OutboxRepository
+from src.domain.ports.outbox import OutboxRepository
 
 # ===================================================================
 # TDD Cycle A: Application → Domain → Infrastructure Collaboration

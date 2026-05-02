@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 
-from src.domain.repositories.integrity import IntegrityPort
+from src.domain.ports.integrity import IntegrityPort
 from src.infrastructure.security.models import (
     HashAlgorithm,
     IntegrityCheck,

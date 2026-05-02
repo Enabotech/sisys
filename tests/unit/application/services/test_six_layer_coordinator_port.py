@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
 )
-from src.domain.repositories.l0_storage import L0StoragePort
+from src.domain.ports.l0_storage import L0StoragePort
 
 
 class TestSixLayerStorageCoordinatorL0Port:

@@ -533,7 +533,7 @@ def test_repository_interface_defined():
 def check_repository_interface(arch_context):
     """Check BaseRepository interface exists and has required methods."""
     try:
-        module = importlib.import_module("src.domain.repositories.base")
+        module = importlib.import_module("src.domain.ports.base")
         assert hasattr(module, "BaseRepository"), "BaseRepository class not found"
         arch_context["repository_class"] = getattr(module, "BaseRepository")
 

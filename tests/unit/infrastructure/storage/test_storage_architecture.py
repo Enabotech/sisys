@@ -48,13 +48,13 @@ class TestObjectStorageRepositoryIsAbstract:
         """ObjectStorageRepository 继承自 ABC。"""
         from abc import ABC
 
-        from src.domain.repositories.storage import ObjectStorageRepository
+        from src.domain.ports.storage import ObjectStorageRepository
 
         assert issubclass(ObjectStorageRepository, ABC), "ObjectStorageRepository must inherit from ABC"
 
     def test_repository_has_abstract_methods(self):
         """ObjectStorageRepository 定义了所有抽象方法。"""
-        from src.domain.repositories.storage import ObjectStorageRepository
+        from src.domain.ports.storage import ObjectStorageRepository
 
         expected_methods = {"store", "retrieve", "delete", "get_metadata", "list_objects", "archive"}
         actual_abstract = {
@@ -64,7 +64,7 @@ class TestObjectStorageRepositoryIsAbstract:
 
     def test_cannot_instantiate_repository_directly(self):
         """无法直接实例化 ObjectStorageRepository。"""
-        from src.domain.repositories.storage import ObjectStorageRepository
+        from src.domain.ports.storage import ObjectStorageRepository
 
         with pytest.raises(TypeError):
             ObjectStorageRepository()
@@ -75,13 +75,13 @@ class TestComplianceLockErrorInDomain:
 
     def test_compliance_lock_error_in_domain(self):
         """ComplianceLockError 定义在领域层 storage.py 中。"""
-        from src.domain.repositories.storage import ComplianceLockError
+        from src.domain.ports.storage import ComplianceLockError
 
         assert issubclass(ComplianceLockError, Exception), "ComplianceLockError must be an Exception subclass"
 
     def test_compliance_lock_error_message(self):
         """ComplianceLockError 可以携带错误消息。"""
-        from src.domain.repositories.storage import ComplianceLockError
+        from src.domain.ports.storage import ComplianceLockError
 
         error = ComplianceLockError("Object is WORM locked")
         assert str(error) == "Object is WORM locked"
