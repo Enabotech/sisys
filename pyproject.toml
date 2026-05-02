@@ -92,6 +92,7 @@ pylint = "^4.0.5"
 pydantic-extra-types = "^2.11.1"
 pyotp = "^2.9.0"
 types-psycopg2 = "^2.9.21.20260422"
+types-aiofiles = "^25.1.0.20250115"
 aiofiles = "^25.1.0"
 
 [tool.poetry.group.test.dependencies]
