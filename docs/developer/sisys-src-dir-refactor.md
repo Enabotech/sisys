@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.0 |
+| 版本 | v2.1 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -151,7 +151,7 @@ src/
 │   ├── events/                     # 14 files — 领域事件（无基础设施）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
 │   ├── services/                   # 5 files — 具体业务逻辑
-│   ├── value_objects/              # 2 files — 值对象
+│   ├── value_objects/              # 3 files — 值对象（含 sensitive_data.py）
 │   └── exceptions/                 # 2 files — 领域异常
 │
 ├── application/                     # ✅ 应用层（用例编排）
@@ -462,29 +462,112 @@ event_store.py  # 从 domain/events/store.py 移动
 - [ ] 使用 `domain.ports.health_check.HealthCheckPort` 替代
 - [ ] 后续 Story 可完全移除 local_model_health.py
 
-#### 4.4.5 infrastructure/config/ 审查方案
+### 2. 重大不一致：DomainEvent 序列化未移除
 
-| 文件 | 问题 | 处理方案 |
-|------|------|----------|
-| sovereignty.py | 导入 `infrastructure.security.models` | **审查** — 配置层不应依赖安全服务层 |
+**问题**：`domain/events/base.py` (285行) 仍包含 `to_dict()`/`from_dict()` 方法，但文档要求移除序列化。
 
-**审查标准**:
-- `infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`
-- 这是 infrastructure 内部跨层导入，应重构为配置内聚
+**当前状态**：
+```python
+# line 97-148: to_dict() 方法仍然存在
+def to_dict(self) -> dict[str, Any]:
+    ...
 
-**验收条件**:
-- [ ] `infrastructure/config/` 不导入 `infrastructure/security/`
-- [ ] 配置类自包含，不依赖其他 infrastructure 子目录
-| routing/ | 5 | 路由（需审查 local_model_health.py 已废弃） |
-| scheduler/ | 1 | 调度器 |
-| security/ | 21 | 安全服务 |
-| storage/ | 30+ | 存储适配器 |
-| utils/ | 1 | 工具 |
-| workflow/ | 1 | 工作流 |
+# line 167-243: from_dict() 方法仍然存在
+@classmethod
+def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
+    ...
+```
+
+**修正方案**：移除序列化方法，DomainEvent 仅保留数据属性定义。序列化由 `infrastructure/messaging/` 适配器负责。
+
+### 3. domain/exceptions/ 仍为空
+
+**问题**：`src/domain/exceptions/__init__.py` 仅包含注释，无异常导出。
+
+**修正**：
+```bash
+# 创建 memory_exceptions.py
+cat > src/domain/exceptions/memory_exceptions.py << 'EOF'
+"""Memory domain exceptions."""
+
+class MemoryNotFoundError(Exception):
+    """Raised when a memory entity is not found."""
+    pass
+
+class MemoryVersionConflictError(Exception):
+    """Raised when memory version conflict occurs during update."""
+    pass
+EOF
+
+# 更新 __init__.py
+cat > src/domain/exceptions/__init__.py << 'EOF'
+"""Domain exceptions."""
+
+from src.domain.exceptions.memory_exceptions import (
+    MemoryNotFoundError,
+    MemoryVersionConflictError,
+)
+
+__all__ = [
+    "MemoryNotFoundError",
+    "MemoryVersionConflictError",
+]
+EOF
+```
+
+### 4. sovereignty.py 跨层导入问题未解决
+
+**问题**：4.4.5 条审查方案要求修复 `infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`，但代码仍包含：
+
+```python
+# infrastructure/config/sovereignty.py line 14
+from ..security.models import DataResidency, SensitiveDataType
+```
+
+**修正方案**：将安全相关值对象移至独立文件：
+
+| 操作 | 原路径 | 新路径 |
+|------|--------|--------|
+| 新建 | `domain/value_objects/sensitive_data.py` | SensitiveDataType, DataResidency enum |
+| 修改 | `infrastructure/config/sovereignty.py` | 从 domain/value_objects/ 导入 |
+| 删除 | `infrastructure/security/models.py` | 内容已迁移 |
+
+### 5. security/models.py 命名混淆
+
+**问题**：文件名暗示 SQLAlchemy 模型，实际是纯值对象（dataclass + enum），与 `infrastructure/storage/postgresql/models/` 中的 ORM 模型冲突。
+
+**修正方案**：
+
+| 操作 | 原路径 | 新路径 |
+|------|--------|--------|
+| 重命名 | `infrastructure/security/models.py` | `infrastructure/security/value_objects.py` |
+| 更新 | 所有导入 `security.models` 的文件 | 改为导入 `security.value_objects` |
 
 ---
 
-#### 4.5 Interfaces 层
+## 5. sovereignty.py 跨层导入修复方案
+
+**问题**：`infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`，违反 infrastructure 内部分层原则。
+
+**根本原因**：`security/models.py` 包含 `SensitiveDataType`、`DataResidency` 等值对象，这些本应属于领域层或独立值对象。
+
+**修复方案**：
+
+| 操作 | 路径 | 说明 |
+|------|------|------|
+| 新建 | `src/domain/value_objects/sensitive_data.py` | 迁移 SensitiveDataType, DataResidency, WhitelistStatus, ApprovalStatus |
+| 重命名 | `infrastructure/security/models.py` → `infrastructure/security/value_objects.py` | 避免与 ORM models 混淆 |
+| 修改 | `infrastructure/config/sovereignty.py` | 改为从 `domain.value_objects.sensitive_data` 导入 |
+| 修改 | `infrastructure/security/` 下所有文件 | 改为从 `security.value_objects` 导入 |
+
+**验收条件**：
+- [ ] `infrastructure/config/` 不导入 `infrastructure/security/`
+- [ ] `security/value_objects.py` 不导入其他 infrastructure 子目录
+- [ ] 领域层值对象位于 `domain/value_objects/`
+
+---
+
+## 6. Interfaces 层审查
 
 | 目录 | 文件数 | 说明 |
 |------|--------|------|
@@ -498,9 +581,9 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ---
 
-## 5. 影响范围
+## 7. 影响范围
 
-### 5.1 文件操作统计
+### 7.1 文件操作统计
 
 | 操作 | 数量 |
 |------|------|
@@ -509,7 +592,7 @@ event_store.py  # 从 domain/events/store.py 移动
 | 新建文件 | 2 |
 | 修改文件 | 1 (`base.py` 移除序列化) |
 
-### 5.2 需更新的导入路径
+### 7.2 需更新的导入路径
 
 | 层级 | 影响文件数（估计） |
 |------|-------------------|
@@ -522,7 +605,7 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ---
 
-## 6. 验收标准
+## 8. 验收标准
 
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
 - [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
@@ -535,7 +618,7 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ---
 
-## 7. 六边形架构图
+## 9. 六边形架构图
 
 ```
                         ┌─────────────────────────────────────────────────────────┐
@@ -592,7 +675,7 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ---
 
-## 8. 关键原则总结
+## 10. 关键原则总结
 
 | 原则 | 说明 |
 |------|------|
@@ -606,7 +689,7 @@ event_store.py  # 从 domain/events/store.py 移动
 
 ---
 
-## 9. 附录
+## 11. 附录
 
 ### A. 移动文件清单
 
@@ -633,6 +716,8 @@ event_store.py  # 从 domain/events/store.py 移动
 |------|------|
 | domain/exceptions/__init__.py | 导出异常 |
 | domain/exceptions/memory_exceptions.py | MemoryNotFoundError, MemoryVersionConflictError |
+| domain/value_objects/sensitive_data.py | SensitiveDataType, DataResidency, WhitelistStatus, ApprovalStatus 等值对象 |
+| infrastructure/security/value_objects.py | 安全值对象（从 models.py 重命名） |
 
 ### C. 修改文件清单
 
@@ -640,6 +725,8 @@ event_store.py  # 从 domain/events/store.py 移动
 |------|----------|
 | domain/events/base.py | 移除 to_dict()/from_dict() 序列化方法 |
 | domain/services/memory_service.py | 从 domain/exceptions/ 导入异常 |
+| infrastructure/config/sovereignty.py | 改为从 domain.value_objects.sensitive_data 导入 |
+| infrastructure/security/models.py | 重命名为 value_objects.py |
 
 ### D. 命名规范
 
