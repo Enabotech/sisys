@@ -194,6 +194,7 @@ jobs:
       - name: 类型检查 ( MyPy )
         run: |
           mkdir -p reports/mypy
+          poetry run mypy --install-types --non-interactive
           poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt
 
       - name: 上传质量报告
