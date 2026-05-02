@@ -41,8 +41,9 @@ class MemoryChangedListener:
     def __init__(
         self,
         storage_coordinator,  # SixLayerStorageCoordinator | None
-        metadata_repository,  # MemoryMetadataRepositoryProtocol | None
-        history_repository,  # MemoryChangeHistoryRepositoryProtocol | None
+        metadata_repository=None,  # MemoryMetadataRepositoryProtocol | None
+        history_repository=None,  # MemoryChangeHistoryRepositoryProtocol | None
+        index_manager=None,  # IndexManagerPort | None
     ):
         """初始化监听器。
 
@@ -50,10 +51,12 @@ class MemoryChangedListener:
             storage_coordinator: SixLayerStorageCoordinator（L1 缓存失效）
             metadata_repository: L2 元数据仓储（可选）
             history_repository: L2 历史记录仓储（可选）
+            index_manager: 索引管理器（可选，用于更新 MEMORY.md 索引）
         """
         self._storage_coordinator = storage_coordinator
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
+        self._index_manager = index_manager
 
     async def handle(self, event: MemoryChanged) -> None:
         """处理 MemoryChanged 事件。
@@ -74,6 +77,10 @@ class MemoryChangedListener:
         # 2. L2 PostgreSQL 写入（通过 Repository 调用）
         # metadata_repository.upsert() + history_repository.append()
         await self._write_to_l2(event)
+
+        # 2.5. 更新索引（IndexManagerPort）
+        if self._index_manager is not None:
+            await self._update_index(event)
 
         # 3. L3 Qdrant 向量（按需，内容>500 tokens）
         # TODO: Story 6.3 实现
@@ -151,6 +158,30 @@ class MemoryChangedListener:
         if self._history_repository is not None:
             await self._history_repository.save(history)
             logger.debug(f"L2 history recorded: memory_id={event.memory_id}")
+
+    async def _update_index(self, event: MemoryChanged) -> None:
+        """更新 MEMORY.md 索引（通过 IndexManagerPort）。
+
+        Args:
+            event: MemoryChanged 事件
+        """
+        if self._index_manager is None:
+            return
+
+        try:
+            memory_type = self._get_memory_type(event)
+            entry = {
+                "memory_id": event.memory_id,
+                "name": event.name,
+                "type": memory_type,
+                "description": event.new_value.get("description", "") if event.new_value else "",
+                "is_group": memory_type == "group",
+            }
+            await self._index_manager.update_entry(entry)
+            logger.debug(f"Index updated: memory_id={event.memory_id}")
+        except Exception as e:
+            logger.error(f"Failed to update index: {e}")
+            # 不抛出异常，索引更新失败不影响主流程
 
     def _get_memory_type(self, event: MemoryChanged) -> str:
         """从 new_value 中提取 memory_type。

@@ -165,7 +165,13 @@ def build_redis_key(
 
 
 @given("用户创建记忆")
-def create_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, redis_client, test_context: MemoryTestContext):
+def create_memory(
+    memory_index: MemoryIndex,
+    file_adapter: FileMemoryAdapter,
+    redis_client,
+    test_context: MemoryTestContext,
+    event_loop,
+):
     """创建记忆"""
     memory_id = str(uuid.uuid4())
     entry = {
@@ -174,10 +180,10 @@ def create_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, re
         "memory_id": memory_id,
         "description": "测试记忆",
     }
-    memory_index.update_entry(entry)
+    event_loop.run_until_complete(memory_index.update_entry(entry))
     # 写入 L0 文件
     content = "---\nname: test-memory\ndescription: 测试记忆\ntype: user\n---\n这是测试记忆内容。"
-    file_adapter.write(memory_id, "user", content)
+    event_loop.run_until_complete(file_adapter.write(memory_id, "user", content))
     # 写入 L1 Redis 缓存
     owner_id = "test-user"
     redis_key = build_redis_key(memory_id, owner_id, False, None, "test-memory")
@@ -192,7 +198,7 @@ def create_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, re
 
 
 @given(parsers.parse('用户创建记忆 "{name}" 类型为 "{memory_type}"'))
-def create_memory_named(name: str, memory_type: str, memory_index: MemoryIndex, test_context: MemoryTestContext):
+def create_memory_named(name: str, memory_type: str, memory_index: MemoryIndex, test_context: MemoryTestContext, event_loop):
     """创建指定名称和类型的记忆"""
     memory_id = str(uuid.uuid4())
     entry = {
@@ -201,7 +207,7 @@ def create_memory_named(name: str, memory_type: str, memory_index: MemoryIndex, 
         "memory_id": memory_id,
         "description": f"{name} 的描述",
     }
-    memory_index.update_entry(entry)
+    event_loop.run_until_complete(memory_index.update_entry(entry))
     test_context.current_memory_id = memory_id
     test_context.current_memory_name = name
     test_context.current_memory_owner = "test-user"
@@ -217,9 +223,9 @@ def memory_saved():
 
 
 @then(parsers.parse('MEMORY.md 索引包含条目 "- [{name}]({path}) — {description}"'))
-def check_index_entry(name: str, path: str, description: str, memory_index: MemoryIndex):
+def check_index_entry(name: str, path: str, description: str, memory_index: MemoryIndex, event_loop):
     """检查索引包含指定条目"""
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     # path like "user/uuid.md" - uuid is literal, path prefix should match
     path_parts = path.rsplit("/", 1)
     path_prefix = path_parts[0] if len(path_parts) == 2 else ""
@@ -232,18 +238,18 @@ def check_index_entry(name: str, path: str, description: str, memory_index: Memo
 
 
 @when("读取 MEMORY.md 索引")
-def read_memory_index(memory_index: MemoryIndex):
+def read_memory_index(memory_index: MemoryIndex, event_loop):
     """读取 MEMORY.md 索引"""
-    return memory_index.read_entries()
+    return event_loop.run_until_complete(memory_index.read_entries())
 
 
 @then("每行格式为 '- [Title](type/uuid.md) — description'")
-def check_index_format(memory_index: MemoryIndex):
+def check_index_format(memory_index: MemoryIndex, event_loop):
     """检查索引格式"""
     import re
 
     pattern = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) > 0, "索引为空"
     for entry in entries:
         path = f"{entry['type']}/{entry['memory_id']}.md"
@@ -251,7 +257,7 @@ def check_index_format(memory_index: MemoryIndex):
 
 
 @given(parsers.parse("创建 {count:d} 条记忆"))
-def create_many_memories(count: int, memory_index: MemoryIndex, test_context: MemoryTestContext):
+def create_many_memories(count: int, memory_index: MemoryIndex, test_context: MemoryTestContext, event_loop):
     """创建多条记忆"""
     for i in range(count):
         memory_id = str(uuid.uuid4())
@@ -261,21 +267,21 @@ def create_many_memories(count: int, memory_index: MemoryIndex, test_context: Me
             "memory_id": memory_id,
             "description": f"描述 {i}",
         }
-        memory_index.update_entry(entry)
+        event_loop.run_until_complete(memory_index.update_entry(entry))
         test_context.created_memories.append(entry)
 
 
 @then("MEMORY.md 索引正好 200 行")
-def check_index_200_lines(memory_index: MemoryIndex):
+def check_index_200_lines(memory_index: MemoryIndex, event_loop):
     """检查索引正好 200 行"""
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) == 200, f"索引行数应为 200，实际为 {len(entries)}"
 
 
 @then("最新 200 条记忆被保留")
-def check_latest_200_preserved(memory_index: MemoryIndex, test_context: MemoryTestContext):
+def check_latest_200_preserved(memory_index: MemoryIndex, test_context: MemoryTestContext, event_loop):
     """检查最新 200 条记忆被保留"""
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) == 200
     # 创建 200 条记忆时，最新 200 条就是全部（因为不超过 200 行不会截断）
     # 顺序按写入顺序：memory-0 到 memory-199
@@ -289,9 +295,9 @@ def check_latest_200_preserved(memory_index: MemoryIndex, test_context: MemoryTe
 
 
 @then(parsers.parse('记忆文件位于 "{path_pattern}"'))
-def check_memory_file_path(path_pattern: str, memory_index: MemoryIndex):
+def check_memory_file_path(path_pattern: str, memory_index: MemoryIndex, event_loop):
     """检查记忆文件路径"""
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) > 0, "索引为空"
     # 路径模式如 "user/" 或 "group/user/"
     for entry in entries:
@@ -309,6 +315,7 @@ def create_private_memory(
     file_adapter: FileMemoryAdapter,
     redis_client,
     test_context: MemoryTestContext,
+    event_loop,
 ):
     """创建 Private 记忆"""
     memory_id = str(uuid.uuid4())
@@ -319,7 +326,7 @@ def create_private_memory(
         "description": f"Private memory for {user_name}",
         "is_group": False,  # Private
     }
-    memory_index.update_entry(entry)
+    event_loop.run_until_complete(memory_index.update_entry(entry))
     # 写入 L0 文件
     content = (
         f"---\nname: {memory_name}\n"
@@ -327,10 +334,10 @@ def create_private_memory(
         f"type: user\n---\n"
         f"这是 {user_name} 的私有记忆内容。"
     )
-    file_adapter.write(memory_id, "user", content)
+    event_loop.run_until_complete(file_adapter.write(memory_id, "user", content))
     # 写入 L1 Redis 缓存
     redis_key = build_redis_key(memory_id, user_name, False, None, memory_name)
-    redis_client.setex(redis_key, 86400, content)
+    redis_client.setex(redis_key, 86400, content.encode())
     # 设置上下文 - 该记忆由 user_name (即 Alice) 创建
     test_context.owner_id = user_name
     test_context.other_user_id = str(uuid.uuid4())  # 使用 UUID 避免冲突
@@ -351,6 +358,7 @@ def create_group_memory_with_user(
     file_adapter: FileMemoryAdapter,
     redis_client,
     test_context: MemoryTestContext,
+    event_loop,
 ):
     """创建 Group 记忆（带用户名）"""
     memory_id = str(uuid.uuid4())
@@ -361,7 +369,7 @@ def create_group_memory_with_user(
         "description": f"Group memory for {group_name}",
         "is_group": True,  # Group
     }
-    memory_index.update_entry(entry)
+    event_loop.run_until_complete(memory_index.update_entry(entry))
     # 写入 L0 文件
     content = (
         f"---\nname: {memory_name}\n"
@@ -369,10 +377,10 @@ def create_group_memory_with_user(
         f"type: user\n---\n"
         f"这是群组 {group_name} 的共享记忆。"
     )
-    file_adapter.write(memory_id, "group/user", content)
+    event_loop.run_until_complete(file_adapter.write(memory_id, "group/user", content))
     # 写入 L1 Redis 缓存 (Group 记忆使用 memory:group:{group_id}:{name} 格式)
     redis_key = build_redis_key(memory_id, group_name, True, group_name, memory_name)
-    redis_client.setex(redis_key, 86400, content)
+    redis_client.setex(redis_key, 86400, content.encode())
     # 设置上下文
     test_context.group_id = group_name
     test_context.owner_id = group_name  # group 记忆的 owner 是 group
@@ -393,6 +401,7 @@ def create_group_memory(
     file_adapter: FileMemoryAdapter,
     redis_client,
     test_context: MemoryTestContext,
+    event_loop,
 ):
     """创建 Group 记忆（不带用户名，用于 AC-2-2）"""
     memory_id = str(uuid.uuid4())
@@ -403,7 +412,7 @@ def create_group_memory(
         "description": f"Group memory for {group_name}",
         "is_group": True,  # Group
     }
-    memory_index.update_entry(entry)
+    event_loop.run_until_complete(memory_index.update_entry(entry))
     # 写入 L0 文件
     content = (
         f"---\nname: {memory_name}\n"
@@ -411,10 +420,10 @@ def create_group_memory(
         f"type: user\n---\n"
         f"这是群组 {group_name} 的共享记忆。"
     )
-    file_adapter.write(memory_id, "group/user", content)
+    event_loop.run_until_complete(file_adapter.write(memory_id, "group/user", content))
     # 写入 L1 Redis 缓存 (Group 记忆使用 memory:group:{group_id}:{name} 格式)
     redis_key = build_redis_key(memory_id, group_name, True, group_name, memory_name)
-    redis_client.setex(redis_key, 86400, content)
+    redis_client.setex(redis_key, 86400, content.encode())
     # 设置上下文
     test_context.group_id = group_name
     test_context.owner_id = group_name  # group 记忆的 owner 是 group
@@ -486,11 +495,11 @@ def check_error_reason(reason: str, test_context: MemoryTestContext):
 
 
 @then("L0 文件系统存在 .md 文件")
-def check_l0_file_exists(memory_index: MemoryIndex):
+def check_l0_file_exists(memory_index: MemoryIndex, event_loop):
     """检查 L0 文件系统存在 .md 文件"""
     from pathlib import Path
 
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) > 0, "索引为空"
     for entry in entries:
         # 构建文件路径
@@ -550,9 +559,9 @@ def check_ttl_range_no_prefix(min, max, redis_client, test_context: MemoryTestCo
 
 
 @then("MemoryIndex 索引已更新")
-def check_index_updated(memory_index: MemoryIndex):
+def check_index_updated(memory_index: MemoryIndex, event_loop):
     """检查索引已更新"""
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     assert len(entries) > 0, "索引未更新"
 
 
@@ -570,7 +579,13 @@ def check_cache_written(redis_client, test_context: MemoryTestContext):
 
 
 @when("用户删除记忆")
-def delete_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, redis_client, test_context: MemoryTestContext):
+def delete_memory(
+    memory_index: MemoryIndex,
+    file_adapter: FileMemoryAdapter,
+    redis_client,
+    test_context: MemoryTestContext,
+    event_loop,
+):
     """删除记忆 - 从索引、文件和 Redis 移除"""
     # 获取当前记忆
     memory_id = test_context.current_memory_id
@@ -579,10 +594,10 @@ def delete_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, re
     group_id = test_context.current_memory_group_id
     name = test_context.current_memory_name
     # 从索引移除
-    memory_index.remove_entry(memory_id)
+    event_loop.run_until_complete(memory_index.remove_entry(memory_id))
     # 从 L0 文件删除 (根据 is_group 确定类型)
     memory_type = "group/user" if is_group else "user"
-    file_adapter.delete(memory_id, memory_type)
+    event_loop.run_until_complete(file_adapter.delete(memory_id, memory_type))
     # 从 Redis 缓存删除
     redis_key = build_redis_key(memory_id, owner_id, is_group, group_id, name)
     redis_client.delete(redis_key)
@@ -590,10 +605,10 @@ def delete_memory(memory_index: MemoryIndex, file_adapter: FileMemoryAdapter, re
 
 
 @then("MemoryIndex 条目已移除")
-def check_index_entry_removed(memory_index: MemoryIndex, test_context: MemoryTestContext):
+def check_index_entry_removed(memory_index: MemoryIndex, test_context: MemoryTestContext, event_loop):
     """检查索引条目已移除"""
     memory_id = test_context.current_memory_id
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     for entry in entries:
         assert entry["memory_id"] != memory_id, f"Memory {memory_id} still in index"
 
@@ -632,7 +647,7 @@ def check_redis_ttl_range(min, max, redis_client, test_context: MemoryTestContex
 
 
 @then("L0 写入成功后 100ms 内 L2 写入完成")
-def check_l0_l2_sync_latency(memory_index: MemoryIndex):
+def check_l0_l2_sync_latency(memory_index: MemoryIndex, event_loop):
     """检查 L0→L2 同步延迟
 
     注：L0 和 L2 都是文件系统操作，在此测试环境中不需要真实 L2 服务。
@@ -642,7 +657,7 @@ def check_l0_l2_sync_latency(memory_index: MemoryIndex):
 
     start = time.perf_counter()
     # 验证 L0 索引更新
-    entries = memory_index.read_entries()
+    entries = event_loop.run_until_complete(memory_index.read_entries())
     elapsed_ms = (time.perf_counter() - start) * 1000
     assert len(entries) > 0, "索引未更新"
     assert elapsed_ms < 100, f"L0 写入延迟 {elapsed_ms:.2f}ms > 100ms"

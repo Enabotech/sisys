@@ -89,7 +89,7 @@ def coordinator_with_redis(redis_cache) -> SixLayerStorageCoordinator:
     mock_l4 = MagicMock()
     mock_l5 = MagicMock()
     return SixLayerStorageCoordinator(
-        redis_cache=redis_cache,
+        l1_cache=redis_cache,
         l2_repository=mock_l2,
         l3_vector_store=mock_l3,
         l4_object_store=mock_l4,
@@ -105,13 +105,14 @@ def coordinator_with_redis(redis_cache) -> SixLayerStorageCoordinator:
 class TestL0FileSystem:
     """L0 file system integration tests using real files."""
 
-    def test_memory_index_creates_index_file(self, memory_config, temp_memory_dir: Path):
+    @pytest.mark.asyncio
+    async def test_memory_index_creates_index_file(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex creates MEMORY.md index file."""
         memory_index = MemoryIndex(memory_config)
         index_path = temp_memory_dir / "MEMORY.md"
         assert not index_path.exists()
 
-        memory_index.update_entry(
+        await memory_index.update_entry(
             {
                 "memory_id": "test-id",
                 "name": "test-memory",
@@ -122,14 +123,15 @@ class TestL0FileSystem:
 
         assert index_path.exists()
 
-    def test_memory_index_truncates_over_200_lines(self, memory_config, temp_memory_dir: Path):
+    @pytest.mark.asyncio
+    async def test_memory_index_truncates_over_200_lines(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex truncates to 200 lines when exceeded."""
         memory_index = MemoryIndex(memory_config)
         index_path = temp_memory_dir / "MEMORY.md"
 
         # Add 250 entries
         for i in range(250):
-            memory_index.update_entry(
+            await memory_index.update_entry(
                 {
                     "memory_id": f"id-{i}",
                     "name": f"memory-{i}",
@@ -139,18 +141,19 @@ class TestL0FileSystem:
             )
 
         # Truncate
-        memory_index.truncate()
+        await memory_index.truncate()
 
         # Verify
         lines = index_path.read_text().strip().split("\n")
         assert len(lines) <= 200
 
-    def test_memory_index_read_entries(self, memory_config, temp_memory_dir: Path):
+    @pytest.mark.asyncio
+    async def test_memory_index_read_entries(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex can read entries."""
         memory_index = MemoryIndex(memory_config)
 
         for i in range(5):
-            memory_index.update_entry(
+            await memory_index.update_entry(
                 {
                     "memory_id": f"id-{i}",
                     "name": f"memory-{i}",
@@ -159,15 +162,16 @@ class TestL0FileSystem:
                 }
             )
 
-        entries = memory_index.read_entries()
+        entries = await memory_index.read_entries()
         assert len(entries) == 5
 
-    def test_memory_index_search(self, memory_config, temp_memory_dir: Path):
+    @pytest.mark.asyncio
+    async def test_memory_index_search(self, memory_config, temp_memory_dir: Path):
         """Verify MemoryIndex search functionality."""
         memory_index = MemoryIndex(memory_config)
 
         for i in range(10):
-            memory_index.update_entry(
+            await memory_index.update_entry(
                 {
                     "memory_id": f"id-{i}",
                     "name": f"bun-npm-{i}",
@@ -176,7 +180,7 @@ class TestL0FileSystem:
                 }
             )
 
-        results = memory_index.search("bun")
+        results = await memory_index.search("bun")
         assert len(results) >= 5
 
 

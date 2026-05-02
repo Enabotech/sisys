@@ -43,7 +43,7 @@ class TestL0StoragePort:
 class ConcreteL0StorageAdapter(L0StoragePort):
     """Concrete implementation for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._memories: dict[str, dict[str, str]] = {}
 
     async def write(self, memory_id: str, memory_type: str, content: str) -> None:

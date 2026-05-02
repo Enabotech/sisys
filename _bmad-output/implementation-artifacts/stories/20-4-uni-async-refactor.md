@@ -1,6 +1,6 @@
 # Story 20-4: 统一异步 Port 适配器重构（集成验证）
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -473,14 +473,14 @@
 | 🟢 绿 | 改造 SixLayerStorageCoordinator |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 10.1: 🔴 红 — 编写 SixLayerStorageCoordinator 失败测试
-- [ ] Subtask 10.2: 🟢 绿 — 创建 `FileMemoryAdapter` 实例
-- [ ] Subtask 10.3: 🟢 绿 — 传递给 `MemoryService` 构造函数
-- [ ] Subtask 10.4: 🔄 重构 — 验证依赖注入链完整
+- [x] Subtask 10.1: 🔴 红 — 编写 SixLayerStorageCoordinator 失败测试
+- [x] Subtask 10.2: 🟢 绿 — 创建 `FileMemoryAdapter` 实例
+- [x] Subtask 10.3: 🟢 绿 — 传递给 `MemoryService` 构造函数
+- [x] Subtask 10.4: 🔄 重构 — 验证依赖注入链完整
 
 **完成标准:**
-- [ ] SixLayerStorageCoordinator 调整完成
-- [ ] 依赖注入链验证通过
+- [x] SixLayerStorageCoordinator 调整完成
+- [x] 依赖注入链验证通过
 
 ---
 
@@ -494,13 +494,13 @@
 | 🟢 绿 | 改造 MemoryChangedListener 构造函数 |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 11.1: 🔴 红 — 编写 MemoryChangedListener 依赖注入失败测试
-- [ ] Subtask 11.2: 🟢 绿 — 改造构造函数接收 `index_manager: IndexManagerPort`
-- [ ] Subtask 11.3: 🔄 重构 — 搜索并更新所有实例化点
+- [x] Subtask 11.1: 🔴 红 — 编写 MemoryChangedListener 依赖注入失败测试
+- [x] Subtask 11.2: 🟢 绿 — 改造构造函数接收 `index_manager: IndexManagerPort`
+- [x] Subtask 11.3: 🔄 重构 — 搜索并更新所有实例化点
 
 **完成标准:**
-- [ ] MemoryChangedListener 依赖调整完成
-- [ ] 调用链重构验证通过
+- [x] MemoryChangedListener 依赖调整完成
+- [x] 调用链重构验证通过
 
 ---
 
@@ -514,16 +514,16 @@
 | 🟢 绿 | 补充缺失 Mock |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 12.1: 🔴 红 — 确认 FakeL0StorageAdapter 存在
-- [ ] Subtask 12.2: 🔴 红 — 确认 FakeMemoryIndex 存在
-- [ ] Subtask 12.3: 🔴 红 — 确认 FakeHealthAdapter 存在
-- [ ] Subtask 12.4: 🔴 红 — 确认 FakeIntegrityVerifier 存在
-- [ ] Subtask 12.5: 🟢 绿 — 补充缺失的 Mock 实现
-- [ ] Subtask 12.6: 🔄 重构 — 运行 Mock 测试验证
+- [x] Subtask 12.1: 🔴 红 — 确认 FakeL0StorageAdapter 存在
+- [x] Subtask 12.2: 🔴 红 — 确认 FakeMemoryIndex 存在
+- [x] Subtask 12.3: 🔴 红 — 确认 FakeHealthAdapter 存在
+- [x] Subtask 12.4: 🔴 红 — 确认 FakeIntegrityVerifier 存在
+- [x] Subtask 12.5: 🟢 绿 — 补充缺失的 Mock 实现
+- [x] Subtask 12.6: 🔄 重构 — 运行 Mock 测试验证
 
 **完成标准:**
-- [ ] 所有 Mock 实现就绪
-- [ ] Mock 测试通过
+- [x] 所有 Mock 实现就绪
+- [x] Mock 测试通过
 
 ---
 
@@ -537,16 +537,16 @@
 | 🟢 绿 | 实现完整调用链测试 |
 | 🔄 重构 | 运行集成测试 |
 
-- [ ] Subtask 13.1: 🔴 红 — 编写异步文件操作集成测试
-- [ ] Subtask 13.2: 🟢 绿 — 验证 write/read/delete 异步操作
-- [ ] Subtask 13.3: 🔴 红 — 编写索引操作集成测试
-- [ ] Subtask 13.4: 🟢 绿 — 验证 update_entry/search/truncate 异步操作
-- [ ] Subtask 13.5: 🔴 红 — 编写健康检查集成测试
-- [ ] Subtask 13.6: 🟢 绿 — 验证 OllamaHealthAdapter 异步调用
-- [ ] Subtask 13.7: 🔄 重构 — 验证端到端调用链
+- [x] Subtask 13.1: 🔴 红 — 编写异步文件操作集成测试
+- [x] Subtask 13.2: 🟢 绿 — 验证 write/read/delete 异步操作
+- [x] Subtask 13.3: 🔴 红 — 编写索引操作集成测试
+- [x] Subtask 13.4: 🟢 绿 — 验证 update_entry/search/truncate 异步操作
+- [x] Subtask 13.5: 🔴 红 — 编写健康检查集成测试
+- [x] Subtask 13.6: 🟢 绿 — 验证 OllamaHealthAdapter 异步调用
+- [x] Subtask 13.7: 🔄 重构 — 验证端到端调用链
 
 **完成标准:**
-- [ ] 端到端集成测试全部通过
+- [x] 端到端集成测试全部通过
 
 ---
 
@@ -560,13 +560,13 @@
 | 🟢 绿 | 修复发现的问题 |
 | 🔄 重构 | 最终验证 |
 
-- [ ] Subtask 14.1: 🔴 红 — 检查 `asyncio.run()` 反模式
-- [ ] Subtask 14.2: 🟢 绿 — 修复发现的事件循环问题
-- [ ] Subtask 14.3: 🔄 重构 — 运行性能测试验证无阻塞
+- [x] Subtask 14.1: 🔴 红 — 检查 `asyncio.run()` 反模式
+- [x] Subtask 14.2: 🟢 绿 — 修复发现的事件循环问题
+- [x] Subtask 14.3: 🔄 重构 — 运行性能测试验证无阻塞
 
 **完成标准:**
-- [ ] 事件循环阻塞验证通过
-- [ ] 0 次事件循环阻塞
+- [x] 事件循环阻塞验证通过
+- [x] 0 次事件循环阻塞
 
 ---
 
@@ -580,15 +580,15 @@
 | 🟢 绿 | 修复架构违规 |
 | 🔄 重构 | 最终验证 |
 
-- [ ] Subtask 15.1: 🔴 红 — 运行 `ruff check src/domain/`
-- [ ] Subtask 15.2: 🟢 绿 — 修复领域层外部依赖
-- [ ] Subtask 15.3: 🟢 绿 — 运行 `mypy src/domain/repositories/`
-- [ ] Subtask 15.4: 🔄 重构 — 最终验证所有测试通过
+- [x] Subtask 15.1: 🔴 红 — 运行 `ruff check src/domain/`
+- [x] Subtask 15.2: 🟢 绿 — 修复领域层外部依赖
+- [x] Subtask 15.3: 🟢 绿 — 运行 `mypy src/domain/repositories/`
+- [x] Subtask 15.4: 🔄 重构 — 最终验证所有测试通过
 
 **完成标准:**
-- [ ] Ruff 检查通过
-- [ ] MyPy 类型检查通过
-- [ ] 所有测试通过
+- [x] Ruff 检查通过
+- [x] MyPy 类型检查通过
+- [x] 所有测试通过
 
 ---
 

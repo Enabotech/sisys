@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from src.domain.repositories.l0_storage import L0StoragePort
     from src.domain.repositories.memory_repository import (
         MemoryChangeHistoryRepositoryProtocol,
         MemoryMetadataRepositoryProtocol,
@@ -48,7 +49,8 @@ class SixLayerStorageCoordinator:
 
     def __init__(
         self,
-        redis_cache: RedisMemoryCache,
+        l1_cache: RedisMemoryCache,
+        l0_storage: L0StoragePort | None = None,
         l2_repository: MemoryMetadataRepositoryProtocol | MemoryChangeHistoryRepositoryProtocol | None = None,
         l3_vector_store: QdrantVectorStorage | None = None,
         l4_object_store: MinIORepository | None = None,
@@ -57,13 +59,15 @@ class SixLayerStorageCoordinator:
         """初始化协调器。
 
         Args:
-            redis_cache: L1 Redis 缓存
+            l1_cache: L1 Redis 缓存
+            l0_storage: L0 文件系统存储端口（可选）
             l2_repository: L2 PostgreSQL 仓储
             l3_vector_store: L3 Qdrant 向量存储
             l4_object_store: L4 MinIO 对象存储
             l5_graph_store: L5 Neo4j 图存储
         """
-        self._redis_cache = redis_cache
+        self._l1_cache = l1_cache
+        self._l0_storage = l0_storage
         self._l2_repository = l2_repository
         self._l3_vector_store = l3_vector_store
         self._l4_object_store = l4_object_store
@@ -193,9 +197,9 @@ class SixLayerStorageCoordinator:
             owner_id: 所有者 ID (user_id 或 group_id)
             name: 记忆名称
         """
-        if self._redis_cache is None:
+        if self._l1_cache is None:
             return
-        self._redis_cache.set(memory_type, owner_id, name, content)
+        self._l1_cache.set(memory_type, owner_id, name, content)
 
     def _save_to_l2(
         self,
@@ -312,9 +316,9 @@ class SixLayerStorageCoordinator:
         Returns:
             记忆内容，不存在则返回 None
         """
-        if self._redis_cache is None:
+        if self._l1_cache is None:
             return None
-        return self._redis_cache.get(memory_type, owner_id, name)
+        return self._l1_cache.get(memory_type, owner_id, name)
 
     def _read_from_l2(self, memory_id: str) -> str | None:
         """从 L2 PostgreSQL 读取。"""
@@ -337,9 +341,9 @@ class SixLayerStorageCoordinator:
             owner_id: 所有者 ID (user_id 或 group_id)
             name: 记忆名称
         """
-        if self._redis_cache is None:
+        if self._l1_cache is None:
             return
-        self._redis_cache.delete(memory_type, owner_id, name)
+        self._l1_cache.delete(memory_type, owner_id, name)
 
     def _check_l1_exists(
         self,
@@ -359,11 +363,11 @@ class SixLayerStorageCoordinator:
         Returns:
             L1 缓存是否存在
         """
-        if self._redis_cache is None:
+        if self._l1_cache is None:
             return False
         if owner_id is None or name is None:
             return False  # 无法检查，没有足够信息构建 key
-        return self._redis_cache.get(memory_type, owner_id, name) is not None
+        return self._l1_cache.get(memory_type, owner_id, name) is not None
 
     def _check_l2_exists(self, memory_id: str) -> bool:
         """检查 L2 是否存在。"""
