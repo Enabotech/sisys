@@ -144,7 +144,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 目录重命名 repositories → ports | Task 1 | 1.1-1.4 | `test_domain_ports_rename.py` |
+| AC-1 | 目录重命名 repositories → ports | Task 1 | 1.1-1.3 | `test_domain_ports_rename.py` |
 | AC-2 | 事件基础设施移动到 infrastructure | Task 2 | 2.1-2.6 | `test_event_infrastructure_move.py` |
 | AC-3 | Protocol 文件移动到 application/ports | Task 3 | 3.1-3.3 | `test_protocol_move.py` |
 | AC-4 | 领域异常集中管理 | Task 4 | 4.1-4.2 | `test_domain_exceptions.py` |
