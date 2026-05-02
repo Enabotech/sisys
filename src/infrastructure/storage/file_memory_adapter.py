@@ -1,5 +1,12 @@
 """FileMemoryAdapter — L0 文件系统适配器。
 
+实现 L0StoragePort 接口，提供异步文件操作能力。
+
+设计原则：
+- write/read: 使用 aiofiles（I/O 密集型）
+- delete/exists/list_memories: 使用 asyncio.to_thread()（快速同步操作）
+- 保留原有同步方法用于向后兼容
+
 路径优先级（XDG 规范）：
 1. $XDG_CONFIG_HOME/sisys/memory/（若 XDG_CONFIG_HOME 已设置）
 2. $HOME/.config/sisys/memory/（XDG 默认路径）
@@ -10,9 +17,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import aiofiles
+
+from src.domain.repositories.l0_storage import L0StoragePort
 
 if TYPE_CHECKING:
     from src.infrastructure.config.memory import MemoryConfig
@@ -21,10 +33,11 @@ if TYPE_CHECKING:
 INDEX_PATTERN = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")
 
 
-class FileMemoryAdapter:
+class FileMemoryAdapter(L0StoragePort):
     """L0 文件系统适配器。
 
-    负责 ~/.sisys/memory/*.md 文件的读写操作。
+    实现 L0StoragePort 接口，负责 ~/.sisys/memory/*.md 文件的异步读写操作。
+    保留原有同步方法用于向后兼容。
     """
 
     def __init__(self, config: MemoryConfig):
@@ -41,8 +54,12 @@ class FileMemoryAdapter:
         base_path = Path(self.config.memory_l0_path)
         base_path.mkdir(parents=True, exist_ok=True)
 
-    def write(self, memory_id: str, memory_type: str, content: str) -> None:
-        """写入记忆文件。
+    # ========================================================================
+    # L0StoragePort 实现（异步方法）
+    # ========================================================================
+
+    async def write(self, memory_id: str, memory_type: str, content: str) -> None:
+        """写入记忆文件（I/O 密集型，使用 aiofiles）。
 
         Args:
             memory_id: 记忆 ID（UUID）
@@ -56,10 +73,11 @@ class FileMemoryAdapter:
         dir_path.mkdir(parents=True, exist_ok=True)
 
         file_path = dir_path / f"{memory_id}.md"
-        file_path.write_text(content, encoding="utf-8")
+        async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+            await f.write(content)
 
-    def read(self, memory_id: str, memory_type: str) -> str:
-        """读取记忆文件。
+    async def read(self, memory_id: str, memory_type: str) -> str:
+        """读取记忆文件（I/O 密集型，使用 aiofiles）。
 
         Args:
             memory_id: 记忆 ID
@@ -74,42 +92,26 @@ class FileMemoryAdapter:
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():
             raise FileNotFoundError(f"Memory file not found: {file_path}")
-        return file_path.read_text(encoding="utf-8")
+        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            return await f.read()
 
-    def delete(self, memory_id: str, memory_type: str) -> None:
-        """删除记忆文件。
+    async def delete(self, memory_id: str, memory_type: str) -> None:
+        """删除记忆文件（快速同步操作，使用 to_thread）。
 
         Args:
             memory_id: 记忆 ID
             memory_type: 记忆类型
-
-        Raises:
-            FileNotFoundError: 如果文件不存在
         """
-        file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
-        if file_path.exists():
-            file_path.unlink()
 
-    def list_memories(self, memory_type: str) -> list[str]:
-        """列出指定类型的记忆文件。
+        def _do_delete():
+            file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
+            if file_path.exists():
+                file_path.unlink()
 
-        Args:
-            memory_type: 记忆类型
+        await asyncio.to_thread(_do_delete)
 
-        Returns:
-            记忆 ID 列表
-        """
-        dir_path = Path(self.config.memory_l0_path) / memory_type
-        if not dir_path.exists():
-            return []
-
-        memory_ids = []
-        for file_path in dir_path.glob("*.md"):
-            memory_ids.append(file_path.stem)
-        return memory_ids
-
-    def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查记忆文件是否存在。
+    async def exists(self, memory_id: str, memory_type: str) -> bool:
+        """检查记忆文件是否存在（快速同步操作，使用 to_thread）。
 
         Args:
             memory_id: 记忆 ID
@@ -118,11 +120,58 @@ class FileMemoryAdapter:
         Returns:
             True 如果存在，False 否则
         """
+
+        def _do_check():
+            return (Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md").exists()
+
+        return await asyncio.to_thread(_do_check)
+
+    async def list_memories(self, memory_type: str) -> list[str]:
+        """列出指定类型的记忆文件（快速同步操作，使用 to_thread）。
+
+        Args:
+            memory_type: 记忆类型
+
+        Returns:
+            记忆 ID 列表
+        """
+
+        def _do_list():
+            dir_path = Path(self.config.memory_l0_path) / memory_type
+            if not dir_path.exists():
+                return []
+            return [p.stem for p in dir_path.glob("*.md")]
+
+        return await asyncio.to_thread(_do_list)
+
+    # ========================================================================
+    # 向后兼容的同步方法（已废弃，不推荐使用）
+    # ========================================================================
+
+    def write_sync(self, memory_id: str, memory_type: str, content: str) -> None:
+        """同步写入记忆文件（向后兼容，不推荐使用）。
+
+        .. deprecated::
+            请使用 async write() 方法。
+        """
+        dir_path = Path(self.config.memory_l0_path) / memory_type
+        dir_path.mkdir(parents=True, exist_ok=True)
+        file_path = dir_path / f"{memory_id}.md"
+        file_path.write_text(content, encoding="utf-8")
+
+    def read_sync(self, memory_id: str, memory_type: str) -> str:
+        """同步读取记忆文件（向后兼容，不推荐使用）。
+
+        .. deprecated::
+            请使用 async read() 方法。
+        """
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
-        return file_path.exists()
+        if not file_path.exists():
+            raise FileNotFoundError(f"Memory file not found: {file_path}")
+        return file_path.read_text(encoding="utf-8")
 
     def update_index(self, entries: list[dict]) -> None:
-        """更新 MEMORY.md 索引。
+        """更新 MEMORY.md 索引（同步方法，向后兼容）。
 
         格式: - [{name}]({type}/{memory_id}.md) — {description}
 
@@ -142,7 +191,7 @@ class FileMemoryAdapter:
         index_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def read_index(self) -> list[dict]:
-        """读取 MEMORY.md 索引。
+        """读取 MEMORY.md 索引（同步方法，向后兼容）。
 
         Returns:
             索引条目列表，每条包含 name, type, memory_id, description
@@ -175,8 +224,8 @@ class FileMemoryAdapter:
                     )
         return entries
 
-    def get_memory_ids_by_type(self, memory_type: str) -> list[str]:
-        """获取指定类型的所有记忆 ID。
+    async def get_memory_ids_by_type(self, memory_type: str) -> list[str]:
+        """获取指定类型的所有记忆 ID（异步版本）。
 
         Args:
             memory_type: 记忆类型
@@ -184,7 +233,7 @@ class FileMemoryAdapter:
         Returns:
             记忆 ID 列表
         """
-        return self.list_memories(memory_type)
+        return await self.list_memories(memory_type)
 
     def get_path(self, memory_id: str, memory_type: str) -> str:
         """获取记忆文件完整路径。

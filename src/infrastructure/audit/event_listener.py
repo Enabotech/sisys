@@ -101,8 +101,6 @@ class AuditEventListener:
                 return
 
             # Record the audit log synchronously via asyncio.run
-            import asyncio
-
             asyncio.run(
                 self._audit_service.log(
                     actor=audit_data["actor"],

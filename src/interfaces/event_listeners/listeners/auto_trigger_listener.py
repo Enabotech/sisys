@@ -34,7 +34,18 @@ class AutoTriggerListener:
 
     Implementation uses a background thread with its own event loop
     to safely bridge synchronous event handlers to async AutoTriggerService.
+
+    Concurrency Configuration:
+        MAX_CONCURRENT_TASKS: Maximum parallel tasks (default 100)
+        TASK_TIMEOUT: Per-task timeout in seconds (default 300)
     """
+
+    # Concurrency control parameters
+    MAX_CONCURRENT_TASKS: int = 100
+    """Maximum number of concurrent event processing tasks."""
+
+    TASK_TIMEOUT: float = 300.0
+    """Timeout for each event processing task in seconds."""
 
     def __init__(
         self,
@@ -108,19 +119,60 @@ class AutoTriggerListener:
         return handle_event
 
     def _worker_loop(self) -> None:
-        """Background worker loop that processes events asynchronously."""
+        """Background worker loop that processes events concurrently.
+
+        Uses create_task() + gather() for high-throughput event processing.
+        Controls concurrency via MAX_CONCURRENT_TASKS to prevent resource exhaustion.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        pending_tasks: set[asyncio.Task] = set()
+
         try:
             while self._running:
                 try:
+                    # 从队列获取事件（非阻塞，timeout=0.1）
                     event_type, event = self._event_queue.get(timeout=0.1)
-                    asyncio.run(self._process_event(event_type, event))
+
+                    # 等待如果达到最大并发
+                    if len(pending_tasks) >= self.MAX_CONCURRENT_TASKS:
+                        done, pending_tasks = loop.run_until_complete(
+                            asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
+                        )
+                        for task in done:
+                            exc = task.exception()
+                            if exc:
+                                logger.error(f"Task failed: {exc}")
+
+                    # 创建带超时的新任务
+                    async def _process_with_timeout():
+                        return await asyncio.wait_for(
+                            self._process_event(event_type, event),
+                            timeout=self.TASK_TIMEOUT,
+                        )
+
+                    task = loop.create_task(_process_with_timeout())
+                    pending_tasks.add(task)
+
                 except queue.Empty:
-                    continue
+                    # 队列空时等待已提交的任务完成
+                    if pending_tasks:
+                        done, pending_tasks = loop.run_until_complete(
+                            asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
+                        )
+                        for task in done:
+                            exc = task.exception()
+                            if exc:
+                                logger.error(f"Task failed: {exc}")
                 except Exception as e:
                     logger.error(f"Error in worker loop: {e}")
         finally:
+            # 取消所有待完成的任务
+            for task in pending_tasks:
+                task.cancel()
+            # 等待所有任务完成（最多 5 秒）
+            if pending_tasks:
+                loop.run_until_complete(asyncio.wait(pending_tasks, timeout=5.0))
             loop.close()
 
     def stop(self) -> None:

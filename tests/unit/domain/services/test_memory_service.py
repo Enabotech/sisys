@@ -119,10 +119,10 @@ class TestMemoryServiceInit:
             compressor=MockCompressor(),
             metadata_repository=mock_repo,
             history_repository=mock_history,
-            file_adapter=mock_adapter,
+            l0_storage=mock_adapter,
             event_publisher=mock_publisher,
         )
-        assert service._file_adapter is not None
+        assert service._l0_storage is not None
         assert service._event_publisher is not None
 
     def test_service_without_optional_adapters(self):
@@ -134,10 +134,10 @@ class TestMemoryServiceInit:
             compressor=MockCompressor(),
             metadata_repository=mock_repo,
             history_repository=mock_history,
-            file_adapter=None,
+            l0_storage=None,
             event_publisher=None,
         )
-        assert service._file_adapter is None
+        assert service._l0_storage is None
         assert service._event_publisher is None
 
 
@@ -161,21 +161,21 @@ class TestMemoryServiceSave:
         return mock
 
     @pytest.fixture
-    def mock_file_adapter(self):
-        """Mock file adapter."""
-        mock = MagicMock()
-        mock.write = MagicMock()
+    def mock_l0_storage(self):
+        """Mock L0 storage adapter."""
+        mock = AsyncMock()
+        mock.write = AsyncMock()
         return mock
 
     @pytest.fixture
-    def service(self, mock_metadata_repo, mock_history_repo, mock_file_adapter):
+    def service(self, mock_metadata_repo, mock_history_repo, mock_l0_storage):
         """Create service with mocks."""
         return MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
 
@@ -194,7 +194,7 @@ class TestMemoryServiceSave:
         assert mock_metadata_repo.save.called
         assert mock_history_repo.save.called
 
-    def test_save_with_event_publisher(self, mock_metadata_repo, mock_history_repo, mock_file_adapter):
+    def test_save_with_event_publisher(self, mock_metadata_repo, mock_history_repo, mock_l0_storage):
         """验证 save 发布事件。"""
         publisher = MockEventPublisher()
         service = MemoryService(
@@ -202,7 +202,7 @@ class TestMemoryServiceSave:
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=publisher,
         )
         request = MemorySaveRequest(
@@ -218,14 +218,14 @@ class TestMemoryServiceSave:
         assert event.change_type == "create"
         assert event.is_automatic is False
 
-    def test_save_writes_to_l0(self, mock_metadata_repo, mock_history_repo, mock_file_adapter):
+    def test_save_writes_to_l0(self, mock_metadata_repo, mock_history_repo, mock_l0_storage):
         """验证 save 写入 L0 文件系统。"""
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
         request = MemorySaveRequest(
@@ -236,7 +236,7 @@ class TestMemoryServiceSave:
         )
         run_async(service.save(request))
 
-        assert mock_file_adapter.write.called
+        assert mock_l0_storage.write.called
 
 
 class TestMemoryServiceUpdate:
@@ -268,20 +268,20 @@ class TestMemoryServiceUpdate:
         return mock
 
     @pytest.fixture
-    def mock_file_adapter(self):
-        """Mock file adapter."""
-        mock = MagicMock()
-        mock.write = MagicMock()
+    def mock_l0_storage(self):
+        """Mock L0 storage adapter."""
+        mock = AsyncMock()
+        mock.write = AsyncMock()
         return mock
 
-    def test_update_modifies_memory(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_update_modifies_memory(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证 update 修改记忆。"""
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
@@ -296,7 +296,7 @@ class TestMemoryServiceUpdate:
         assert updated.name == "updated"
         assert updated.version == 2
 
-    def test_update_raises_not_found(self, mock_history_repo, mock_file_adapter):
+    def test_update_raises_not_found(self, mock_history_repo, mock_l0_storage):
         """验证更新不存在的记忆抛出异常。"""
         mock_repo = AsyncMock(spec=MemoryMetadataRepositoryProtocol)
         mock_repo.get_by_id = AsyncMock(return_value=None)
@@ -305,7 +305,7 @@ class TestMemoryServiceUpdate:
             compressor=MockCompressor(),
             metadata_repository=mock_repo,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
         )
         request = MemoryUpdateRequest(
             memory_id=uuid4(),
@@ -314,14 +314,14 @@ class TestMemoryServiceUpdate:
         with pytest.raises(MemoryNotFoundError):
             run_async(service.update(request))
 
-    def test_update_content_only_changes_content(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_update_content_only_changes_content(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证仅更新内容时其他字段不变。"""
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
@@ -334,14 +334,14 @@ class TestMemoryServiceUpdate:
         # content 被压缩后存储在 description 字段
         assert "compressed" in updated.description
 
-    def test_update_name_only(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_update_name_only(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证仅更新名称。"""
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
@@ -353,7 +353,7 @@ class TestMemoryServiceUpdate:
         updated = run_async(service.update(request))
         assert updated.name == "new-name-only"
 
-    def test_update_with_event_publisher(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_update_with_event_publisher(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证 update 发布事件。"""
         publisher = MockEventPublisher()
         service = MemoryService(
@@ -361,7 +361,7 @@ class TestMemoryServiceUpdate:
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=publisher,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
@@ -405,20 +405,20 @@ class TestMemoryServiceDelete:
         return mock
 
     @pytest.fixture
-    def mock_file_adapter(self):
-        """Mock file adapter."""
-        mock = MagicMock()
-        mock.delete = MagicMock()
+    def mock_l0_storage(self):
+        """Mock L0 storage adapter."""
+        mock = AsyncMock()
+        mock.delete = AsyncMock()
         return mock
 
-    def test_delete_removes_memory(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_delete_removes_memory(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证 delete 删除记忆。"""
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=None,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
@@ -429,9 +429,9 @@ class TestMemoryServiceDelete:
         run_async(service.delete(request))
 
         assert mock_metadata_repo_with_data.delete.called
-        assert mock_file_adapter.delete.called
+        assert mock_l0_storage.delete.called
 
-    def test_delete_raises_not_found(self, mock_history_repo, mock_file_adapter):
+    def test_delete_raises_not_found(self, mock_history_repo, mock_l0_storage):
         """验证删除不存在的记忆抛出异常。"""
         mock_repo = AsyncMock(spec=MemoryMetadataRepositoryProtocol)
         mock_repo.get_by_id = AsyncMock(return_value=None)
@@ -440,7 +440,7 @@ class TestMemoryServiceDelete:
             compressor=MockCompressor(),
             metadata_repository=mock_repo,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
         )
         request = MemoryDeleteRequest(
             memory_id=uuid4(),
@@ -449,7 +449,7 @@ class TestMemoryServiceDelete:
         with pytest.raises(MemoryNotFoundError):
             run_async(service.delete(request))
 
-    def test_delete_with_event_publisher(self, mock_metadata_repo_with_data, mock_history_repo, mock_file_adapter):
+    def test_delete_with_event_publisher(self, mock_metadata_repo_with_data, mock_history_repo, mock_l0_storage):
         """验证 delete 发布事件。"""
         publisher = MockEventPublisher()
         service = MemoryService(
@@ -457,7 +457,7 @@ class TestMemoryServiceDelete:
             compressor=MockCompressor(),
             metadata_repository=mock_metadata_repo_with_data,
             history_repository=mock_history_repo,
-            file_adapter=mock_file_adapter,
+            l0_storage=mock_l0_storage,
             event_publisher=publisher,
         )
         memory_id = mock_metadata_repo_with_data.get_by_id.return_value.memory_id
