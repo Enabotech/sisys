@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.2 |
+| 版本 | v2.3 |
 | 日期 | 2026-05-02 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -430,13 +430,18 @@ unit_of_work/
   postgresql_unit_of_work.py
 ```
 
-#### 4.4.2 infrastructure/events/ — 新目录
+#### 4.4.2 infrastructure/events/ — 目录不存在
 
 ```
-event_store.py  # 从 domain/events/store.py 移动
+# 文档描述存在此目录，但实际不存在
+# 移动 domain/events/store.py 应创建此目录
 ```
 
-**注意**: `event_store.py` (237行) 是已存在的实现，`event_store_domain.py` (66行) 是 ABC 接口，应合并或重命名。
+**问题**：`4.4.2 infrastructure/events/` 章节描述目录存在，但实际不存在。`event_store.py` 位于 `infrastructure/messaging/`。
+
+**修正**：移除 4.4.2 章节，`domain/events/store.py`（ABC 接口）应移动到 `infrastructure/messaging/event_store_domain.py`。
+
+---
 
 #### 4.4.3 其他 infrastructure/ 子目录 — 无变化
 
@@ -495,10 +500,13 @@ event_store.py  # 从 domain/events/store.py 移动
 | api/ | 6 | FastAPI 端点 |
 | cli/ | 3 | Typer 命令 |
 | event_listeners/ | 4 | 事件监听器实现 |
-| event_publisher.py | 1 | 接口层事件发布器 |
-| event_subscriber.py | 1 | 接口层事件订阅器 |
+| event_publisher.py | 1 | 接口层事件发布器（依赖 domain.events） |
+| event_subscriber.py | 1 | 接口层事件订阅器（依赖 domain.events） |
 
-**注意**: `interfaces/event_publisher.py` 和 `interfaces/event_subscriber.py` 是接口层实现，应保留在 interfaces/ 层。
+**说明**:
+- `interfaces/event_publisher.py` 依赖 `DomainEvent` 和 `PublishResult`，这是允许的（interfaces → domain 方向正确）
+- `PublishResult` 移动到 `infrastructure/messaging/` 后，interfaces 层仍可正常导入
+- `event_publisher.py` 和 `event_subscriber.py` 是接口层抽象，不属于领域定义
 
 ---
 
