@@ -1,7 +1,7 @@
 """HealthCheckPort — 健康检查抽象端口
 
 用于检查外部服务（Ollama、Redis 等）的可用性
-所有健康检查实现必须实现此端口
+所有健康检查实现必须实现此端口.
 
 设计原则：
 - 纯异步接口：async def check() 和 async def close()
