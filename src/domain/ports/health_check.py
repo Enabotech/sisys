@@ -26,7 +26,7 @@ class HealthCheckPort(ABC):
         """检查服务是否可用
 
         Returns:
-            True 如果服务健康，False 否则。
+            True 如果服务健康，False 否则
         """
         pass
 
