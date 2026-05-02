@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import aiofiles
 
@@ -93,7 +93,8 @@ class FileMemoryAdapter(L0StoragePort):
         if not file_path.exists():
             raise FileNotFoundError(f"Memory file not found: {file_path}")
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-            return await f.read()
+            content: str = await f.read()
+            return cast(str, content)
 
     async def delete(self, memory_id: str, memory_type: str) -> None:
         """删除记忆文件（快速同步操作，使用 to_thread）。

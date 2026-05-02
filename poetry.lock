@@ -10753,6 +10753,23 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 reference = "tsinghua"
 
 [[package]]
+name = "types-aiofiles"
+version = "25.1.0.20260409"
+description = "Typing stubs for aiofiles"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "types_aiofiles-25.1.0.20260409-py3-none-any.whl", hash = "sha256:923fedb532c772cc0f62e0ce4282725afa82ca5b41cabd9857f06b55e5eee8de"},
+    {file = "types_aiofiles-25.1.0.20260409.tar.gz", hash = "sha256:49e67d72bdcf9fe406f5815758a78dc34a1249bb5aa2adba78a80aec0a775435"},
+]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "tsinghua"
+
+[[package]]
 name = "types-cffi"
 version = "2.0.0.20260408"
 description = "Typing stubs for cffi"
@@ -12168,4 +12185,4 @@ reference = "tsinghua"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "cfd3510e064492899bcd38748f5c4c27528b86629fd8ff24aeb2afa1ad0e7c53"
+content-hash = "484273dbacfebe7b962b53e3b98ec12db9b60b731a01570decfce501d277d0d8"

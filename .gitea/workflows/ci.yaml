@@ -107,7 +107,7 @@ jobs:
   # ===========================================================================
   detect-changes:
     name: "🔀 变更检测"
-    runs-on: gpu
+    runs-on: [gpu]
     container:
       image: ${{ vars.HARBOR_REGISTRY }}/${{ vars.HARBOR_PROJECT }}/dependency:${{ env.IMAGE_TAG_L2_LATEST }}
       options: --user root
@@ -152,7 +152,7 @@ jobs:
   # ===========================================================================
   code-quality:
     name: "🔍 代码检查"
-    runs-on: gpu
+    runs-on: [gpu]
     needs: [detect-changes]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -194,7 +194,6 @@ jobs:
       - name: 类型检查 ( MyPy )
         run: |
           mkdir -p reports/mypy
-          poetry run mypy --install-types --non-interactive
           poetry run mypy src/ tests/ --txt-report reports/mypy/mypy-report.txt
 
       - name: 上传质量报告
@@ -212,7 +211,7 @@ jobs:
   # ===========================================================================
   unit-tests:
     name: "🧪 单元测试"
-    runs-on: gpu
+    runs-on: [gpu]
     needs: [detect-changes]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -296,14 +295,14 @@ jobs:
   # 阶段 4: 集成测试 (Docker Compose) - 宿主机 Runner
   # ===========================================================================
   # 说明:
-  #   - runs-on: gpu 指向 gitea-org-runner (K8s StatefulSet)
+  #   - runs-on: [gpu] 指向 gitea-org-runner (K8s StatefulSet)
   #   - Runner 通过 hostPath 挂载 /var/run/docker.sock 到 Job 容器
   #   - Job 容器内可直接运行 docker compose 命令
   #   - 使用根目录 .env 文件配置服务连接参数
   # ===========================================================================
   integration-tests:
     name: "🔗 集成测试"
-    runs-on: gpu
+    runs-on: [gpu]
     needs: [detect-changes]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -383,14 +382,14 @@ jobs:
   # 阶段 5: 验收测试 (Docker Compose) - 宿主机 Runner
   # ===========================================================================
   # 说明:
-  #   - runs-on: gpu 指向 gitea-org-runner (K8s StatefulSet)
+  #   - runs-on: [gpu] 指向 gitea-org-runner (K8s StatefulSet)
   #   - Runner 通过 hostPath 挂载 /var/run/docker.sock 到 Job 容器
   #   - Job 容器内可直接运行 docker compose 命令
   #   - 使用根目录 .env 文件配置服务连接参数
   # ===========================================================================
   acceptance-tests:
     name: "🏁 验收测试"
-    runs-on: gpu
+    runs-on: [gpu]
     needs: [integration-tests]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
@@ -442,7 +441,7 @@ jobs:
   # ===========================================================================
   security-scan:
     name: "🛡️ 安全扫描"
-    runs-on: gpu
+    runs-on: [gpu]
     needs: [detect-changes]
     container:
       # ✅ 使用预构建 CI 镜像 (Layer 2)
