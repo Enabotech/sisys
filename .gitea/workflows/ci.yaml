@@ -673,6 +673,11 @@ jobs:
           echo "✅ Feature: ${FEATURE}"
           echo "✅ SHA: ${GIT_SHA}"
 
+      - name: debug
+        run: |
+          echo "l3=${{ needs.detect-changes.outputs.l3 }}"
+          echo "l2=${{ needs.detect-changes.outputs.l2 }}"
+
       # ---------- L2 构建 ----------
       # - name: 同步 Lock 文件 (L2)
       #   if: >-
