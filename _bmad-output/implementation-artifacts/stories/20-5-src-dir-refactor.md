@@ -151,7 +151,7 @@
 | AC-5 | DomainEvent 移除序列化方法 | Task 5 | 5.1-5.2 | `test_domain_event_serialization.py` |
 | AC-6 | 安全值对象重命名 | Task 6 | 6.1-6.2 | `test_security_rename.py` |
 | AC-7 | 敏感数据值对象创建 | Task 7 | 7.1-7.3 | `test_sensitive_data_vo.py` |
-| AC-8 | 架构验证测试 | Task 8 | 8.1-8.2 | `test_architecture_compliance.py` |
+| AC-8 | 架构验证测试 | Task 8 | 8.1-8.3 | `test_architecture_compliance.py` |
 
 ---
 
@@ -159,7 +159,7 @@
 
 > ⚠️ **TDD 循环内化原则：** 每个 Task 必须独立完成 红→绿→重构 循环。
 >
-> ⚠️ **前置条件：** Task 0 完成后，Task 1-8 可**并行执行**（相互无依赖）
+> ⚠️ **执行顺序：** Task 0 是 SDD 规范定义，是必选前置步骤。Task 0 完成后，Task 1-8 之间可**并行执行**（相互无依赖）。
 
 ---
 
@@ -170,27 +170,27 @@
 > **目的：** 定义重构后的架构规范，验证目录结构和导入关系。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] 事件定义位于 `src/domain/events/`
-- [ ] 事件基础设施位于 `src/infrastructure/messaging/`
-- [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `AgentDecided`）
+- [ ] 0.1 事件定义位于 `src/domain/events/`
+- [ ] 0.2 事件基础设施位于 `src/infrastructure/messaging/`
+- [ ] 0.3 事件命名符合规范（`[Aggregate][EventName]`，如 `AgentDecided`）
 
 #### 端口接口 (Ports)
-- [ ] Port 接口位于 `src/domain/ports/`
-- [ ] 应用层协议位于 `src/application/ports/`
-- [ ] 命名符合规范（`XxxPort`, `XxxProtocol`）
+- [ ] 0.4 Port 接口位于 `src/domain/ports/`
+- [ ] 0.5 应用层协议位于 `src/application/ports/`
+- [ ] 0.6 命名符合规范（`XxxPort`, `XxxProtocol`）
 
 #### 异常定义 (Exceptions)
-- [ ] 领域异常位于 `src/domain/exceptions/`
-- [ ] 异常命名符合规范（`XxxError`）
+- [ ] 0.7 领域异常位于 `src/domain/exceptions/`
+- [ ] 0.8 异常命名符合规范（`XxxError`）
 
 #### 值对象 (Value Objects)
-- [ ] 领域值对象位于 `src/domain/value_objects/`
-- [ ] 安全值对象位于 `src/infrastructure/security/value_objects.py`
-- [ ] 敏感数据值对象位于 `src/domain/value_objects/sensitive_data.py`
+- [ ] 0.9 领域值对象位于 `src/domain/value_objects/`
+- [ ] 0.10 安全值对象位于 `src/infrastructure/security/value_objects.py`
+- [ ] 0.11 敏感数据值对象位于 `src/domain/value_objects/sensitive_data.py`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_20_5.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_story_20_5_steps.py`
+- [ ] 0.12 功能测试文件：`tests/acceptance/test_story_20_5.feature`
+- [ ] 0.13 步骤实现文件：`tests/acceptance/test_story_20_5_steps.py`
 
 **Task 0 完成标志：**
 - [ ] 上述规范项全部定义完毕
@@ -245,6 +245,10 @@
 | 🔴 红 | 验证 `domain/events/` 仅包含领域事件 |
 | 🟢 绿 | 确保 17 个领域事件文件存在 |
 | 🔄 重构 | 验证架构约束 |
+
+- [ ] Subtask 2.4: 🔴 红 — 验证 `domain/events/` 包含 21 个文件（清洁前）
+- [ ] Subtask 2.5: 🟢 绿 — 确保移除后 `domain/events/` 包含 17 个文件
+- [ ] Subtask 2.6: 🔄 重构 — 验证 4 个事件基础设施文件已移动
 
 **完成标准/Definition of Done:**
 - [ ] `infrastructure/messaging/event_publisher.py` 等 4 个文件存在
@@ -366,10 +370,17 @@
 
 **关联 AC:** AC-8
 
-#### 架构验证测试实现
+#### TDD 循环 [A]：架构验证测试实现
 
-- [ ] Subtask 8.1: 创建 `tests/unit/architecture/test_hexagonal_compliance.py`
-- [ ] Subtask 8.2: 运行 `ruff check --select I --isort src/` 检测循环依赖
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写测试验证六边形架构合规性（依赖方向、层约束） |
+| 🟢 绿 | 创建 `test_hexagonal_compliance.py` 并验证通过 |
+| 🔄 重构 | 运行 ruff isort 检测循环依赖 |
+
+- [ ] Subtask 8.1: 🔴 红 — 编写 `tests/unit/architecture/test_hexagonal_compliance.py`
+- [ ] Subtask 8.2: 🟢 绿 — 创建测试并验证通过
+- [ ] Subtask 8.3: 🔄 重构 — 运行 `ruff check --select I --isort src/` 检测循环依赖
 
 **完成标准/Definition of Done:**
 - [ ] 所有架构/约束测试通过
