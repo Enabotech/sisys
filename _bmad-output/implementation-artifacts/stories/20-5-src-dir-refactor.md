@@ -281,25 +281,32 @@
 
 | 阶段 | Task | 依赖说明 |
 |------|------|----------|
-| **阶段一：文件迁移** | Task 1-3 | 可并行执行文件移动操作 |
-| **阶段二：序列化框架** | Task 4-11 | 依赖阶段一完成（`domain/ports/`, `application/ports/` 目录已存在） |
-| **阶段三：收尾** | Task 12-15 | 依赖序列化框架完成 |
+| **阶段一：文件迁移** | Task 1, 2, 3 | 可并行执行文件移动操作 |
+| **阶段二：基础框架** | Task 4, 7, 12, 13 | Serializable Protocol + SerializationPort + 异常定义 + sensitive_data 迁移 |
+| **阶段三：序列化实现** | Task 5, 6, 8, 9, 10, 11, 14, 15 | 依赖阶段二完成 |
 
-**依赖链：**
+**依赖链（修正版）：**
 ```
-Task 1 (目录重命名) ─┬─→ Task 4 (Serializable Protocol) ─→ Task 5 → Task 6
-                     │                                       ↓
-Task 2 (事件基础设施)─┤           Task 7 (SerializationPort) ←←←←←←←←┘
-                     │                   ↓
-Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
-                            ↓
-                     Task 9 (TypeRegistry) ─→ Task 10 → Task 11
-                                                    ↓
-                     Task 12 (exceptions) ← Task 13 (sovereignty)
-                            ↓
-                     Task 14 (调用方改造)
-                            ↓
-                     Task 15 (架构验证)
+阶段一（可并行）:
+Task 1 (目录重命名) ─┐
+Task 2 (事件基础设施) ─┤
+Task 3 (Protocol移动) ─┘
+
+阶段二（顺序执行）:
+Task 4 (Serializable Protocol) ─→ Task 5 → Task 6
+        ↓
+Task 7 (SerializationPort) ──────────────→ Task 8 (StandardSerializeRules)
+                                             ↓
+                                      Task 9 (TypeRegistry)
+                                             ↓
+Task 12 (domain/exceptions) ← Task 13 (sovereignty)
+
+阶段三（顺序执行）:
+Task 10 (JsonSerializer) → Task 11 (RedisHashSerializer)
+        ↓
+Task 14 (调用方改造)
+        ↓
+Task 15 (架构验证)
 ```
 
 ---
@@ -310,7 +317,7 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 
 **关联 AC:** 全部 AC
 
-- [ ] Subtask 0.1: 确认方案文档 v2.17 版本
+- [ ] Subtask 0.1: 确认方案文档 v2.18 版本
 - [ ] Subtask 0.2: 确认 9 个文件移动方案符合六边形架构约束
 - [ ] Subtask 0.3: 确认 9 个新建文件符合序列化框架设计
 - [ ] Subtask 0.4: 编写 Gherkin 验收测试 `tests/acceptance/test_story_20_5.feature`
@@ -900,3 +907,4 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.17 创建
 - v1.1.0: 第二轮审查修复 — 更新 AC-1 和 Task 1 描述，明确"目录已存在则跳过"处理逻辑（P0-4）
 - v1.2.0: 第三轮审查修复 — 新增 Task 2/3 的"目录已存在"说明（P0-5）
+- v1.3.0: 第四轮宗师级审查修复 — P1-1延迟注册模式、P1-2 Union类型处理、P1-3任务执行顺序、P2-1~4架构验证补充

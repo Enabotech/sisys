@@ -5,9 +5,9 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.17 |
+| 版本 | v2.18 |
 | 日期 | 2026-05-03 |
-| 状态 | 待评审 |
+| 状态 | 评审通过 |
 | 关联 Story | Epic 20 架构重构 |
 
 ---
@@ -970,7 +970,8 @@ class JsonSerializer(SerializationPort[T]):
 
     def _deserialize_union(self, value: Any, union_type: Any) -> Any:
         """处理 Union 类型（如 UUID | None）"""
-        import types
+        if value is None:
+            return None  # 显式处理 None，避免静默丢失
         for arg in union_type.__args__ if hasattr(union_type, '__args__') else []:
             if arg is type(None):
                 continue
@@ -978,7 +979,7 @@ class JsonSerializer(SerializationPort[T]):
                 return UUID(value)
             if arg is datetime and isinstance(value, str):
                 return datetime.fromisoformat(value)
-        return value
+        raise ValueError(f"Cannot deserialize {value!r} to {union_type}")  # 明确报错
 
     def _resolve_type(self, type_id: str) -> type:
         """从类型注册表解析类型标识符"""
@@ -1082,6 +1083,8 @@ class RedisHashSerializer(SerializationPort[T]):
 
     def _deserialize_union(self, value: Any, union_type: Any) -> Any:
         """处理 Union 类型（如 UUID | None）"""
+        if value is None:
+            return None  # 显式处理 None，避免静默丢失
         for arg in union_type.__args__ if hasattr(union_type, '__args__') else []:
             if arg is type(None):
                 continue
@@ -1089,7 +1092,7 @@ class RedisHashSerializer(SerializationPort[T]):
                 return UUID(value)
             if arg is datetime and isinstance(value, str):
                 return datetime.fromisoformat(value)
-        return value
+        raise ValueError(f"Cannot deserialize {value!r} to {union_type}")  # 明确报错
 
     def _resolve_type(self, type_id: str) -> type:
         """从类型注册表解析类型标识符"""
@@ -1104,25 +1107,31 @@ class RedisHashSerializer(SerializationPort[T]):
 
 **问题**：现有 `DomainEvent` 通过 `__init_subclass__` + `_registry` 实现子类自动注册，新方案使用 `TypeRegistry`，两者需正确衔接。
 
-**解决方案**：在 `DomainEvent.__init_subclass__` 中自动向 `TypeRegistry` 注册，使用 `event_type` 字段值作为类型标识符：
+**解决方案**：采用**延迟注册模式**，避免领域层直接导入 application 层模块。
+
+> ⚠️ **关键约束**：领域层只能使用 Python 标准库。`DomainEvent.__init_subclass__` 中不能直接导入 `TypeRegistry`，否则违反"领域层零外部依赖"原则。
+
+**设计方案**：
 
 ```python
 # domain/events/base.py（改造后）
 
 def __init_subclass__(cls, **kwargs: Any) -> None:
-    """自动注册子类（向 DomainEvent._registry 和 TypeRegistry）"""
+    """自动注册子类（仅向 DomainEvent._registry）"""
     super().__init_subclass__(**kwargs)
     if is_dataclass(cls):
         for f in fields(cls):
             if f.name == "event_type" and not f.init:
                 if f.default is not MISSING:
-                    # 向 DomainEvent._registry 注册（用于 from_dict 兼容）
+                    # 只向 DomainEvent._registry 注册（领域层内部）
                     DomainEvent._registry[f.default] = cls
-                    # 向 TypeRegistry 注册（使用 event_type 值作为类型标识符）
-                    from src.application.ports.type_registry import TypeRegistry
-                    TypeRegistry.register(f.default, cls)
                 break
 ```
+
+**说明**：
+- `DomainEvent._registry` 保留在领域层，用于从 dict 反序列化（向后兼容）
+- `TypeRegistry` 注册由应用启动时统一完成（见下节）
+- 两者通过相同的 `event_type` 值关联
 
 **event_type 值与类映射**：
 
@@ -1133,15 +1142,25 @@ def __init_subclass__(cls, **kwargs: Any) -> None:
 | `StrategicDeviationWarning` | `"StrategicDeviationWarning"` |
 | ... | ... |
 
-**说明**：子类通过 `event_type` 字段的 `default` 值自动注册，无需额外 `get_serialization_type()` 方法。
-
-**应用启动时初始化**：
+**应用启动时初始化（延迟注册）**：
 ```python
 # application/ports/type_registry.py
 
-# 应用启动时调用（确保所有 DomainEvent 子类已被注册）
-TypeRegistry.auto_register_domain_events()
+def auto_register_domain_events() -> None:
+    """应用启动时调用，将 DomainEvent._registry 同步到 TypeRegistry。
+
+    必须在所有 DomainEvent 子类加载完成后调用。
+    """
+    from src.domain.events.base import DomainEvent
+    for event_type, event_class in DomainEvent._registry.items():
+        if event_type:  # 跳过空字符串（基类）
+            TypeRegistry.register(event_type, event_class)
 ```
+
+**调用时机**：
+- 在应用启动时（如 `main.py` 或 lifespan 事件中）调用
+- 或在序列化器首次使用前调用
+- 确保所有 DomainEvent 子类已被加载到 `DomainEvent._registry`
 ```
 
 ### 5.7 序列化格式与存储介质映射
