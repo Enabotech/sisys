@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.13 |
+| 版本 | v2.14 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -615,6 +615,7 @@ class SerializationField:
     is_uuid: bool = False
     is_datetime: bool = False
     is_nested_dataclass: bool = False
+    is_union: bool = False  # 支持 UnionType（如 UUID | None）
 
 
 class Serializable:
@@ -786,12 +787,12 @@ class DomainEvent:
             SerializationField("timestamp", datetime, is_datetime=True),
             SerializationField("source", str),
             SerializationField("schema_version", str),
-            SerializationField("aggregate_id", UUID | None, is_uuid=True),
+            SerializationField("aggregate_id", UUID | None, is_uuid=True, is_union=True),
             SerializationField("aggregate_type", str),
             SerializationField("version", int),
             SerializationField("payload", dict),
-            SerializationField("correlation_id", UUID | None, is_uuid=True),
-            SerializationField("causation_id", UUID | None, is_uuid=True),
+            SerializationField("correlation_id", UUID | None, is_uuid=True, is_union=True),
+            SerializationField("causation_id", UUID | None, is_uuid=True, is_union=True),
             SerializationField("metadata", dict),
         ]
 
@@ -801,7 +802,7 @@ class DomainEvent:
         cls._registry[event_type] = event_class
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """自动注册子类"""
+        """自动注册子类（向 DomainEvent._registry 和 TypeRegistry）"""
         super().__init_subclass__(**kwargs)
         if is_dataclass(cls):
             for f in fields(cls):
@@ -809,6 +810,10 @@ class DomainEvent:
                     if f.default is not MISSING:
                         DomainEvent._registry[f.default] = cls
                     break
+            # 向 TypeRegistry 注册（用于新序列化器）
+            if hasattr(cls, "get_serialization_type"):
+                from src.application.ports.type_registry import TypeRegistry
+                TypeRegistry.register(cls.get_serialization_type(), cls)
 ```
 
 **关键变更**：
@@ -816,16 +821,102 @@ class DomainEvent:
 - 改为实现 `Serializable` Protocol，提供字段元数据
 - 序列化逻辑由 `JsonSerializer` 接管（见 5.4.1 节）
 
-### 5.4 序列化器实现（基础设施层）
+### 5.4 序列化规则与类型注册表
 
-#### 5.4.1 JSON 序列化器
+#### 5.4.1 StandardSerializeRules 实现
+
+```python
+# application/ports/serialization_rules.py
+
+from dataclasses import fields, is_dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any, get_args, get_origin, Union
+from uuid import UUID
+
+
+class StandardSerializeRules:
+    """标准类型转换规则（应用层定义）"""
+
+    @staticmethod
+    def serialize_dataclass(obj: Any) -> dict[str, Any]:
+        """将 dataclass 实例序列化为字典"""
+        if not is_dataclass(obj):
+            raise TypeError(f"Expected dataclass, got {type(obj)}")
+
+        result = {}
+        for f in fields(obj):
+            value = getattr(obj, f.name)
+            result[f.name] = StandardSerializeRules._serialize_value(value)
+        return result
+
+    @staticmethod
+    def _serialize_value(value: Any) -> Any:
+        """递归序列化单个值"""
+        if value is None:
+            return None
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, (list, tuple)):
+            return [StandardSerializeRules._serialize_value(item) for item in value]
+        if isinstance(value, dict):
+            return {k: StandardSerializeRules._serialize_value(v) for k, v in value.items()}
+        return value
+```
+
+#### 5.4.2 TypeRegistry 实现
+
+```python
+# application/ports/type_registry.py
+
+from typing import Type
+
+
+class TypeRegistry:
+    """类型注册表，用于反序列化时路由到具体类型"""
+
+    _registry: dict[str, type] = {}
+
+    @classmethod
+    def register(cls, type_id: str, typ: type) -> None:
+        """注册类型映射"""
+        cls._registry[type_id] = typ
+
+    @classmethod
+    def resolve(cls, type_id: str) -> type | None:
+        """根据类型标识符解析类型"""
+        return cls._registry.get(type_id)
+
+    @classmethod
+    def register_from_class(cls, typ: type) -> None:
+        """从类自动注册（类需实现 Serializable）"""
+        if hasattr(typ, "get_serialization_type"):
+            cls.register(typ.get_serialization_type(), typ)
+
+    @classmethod
+    def auto_register_domain_events(cls) -> None:
+        """自动注册所有 DomainEvent 子类"""
+        from src.domain.events.base import DomainEvent
+        for event_type, event_class in DomainEvent._registry.items():
+            cls.register(event_type, event_class)
+```
+
+### 5.5 序列化器实现（基础设施层）
+
+#### 5.5.1 JSON 序列化器
 
 ```python
 # infrastructure/serialization/json_serializer.py
 
 import json
 from dataclasses import is_dataclass
+from datetime import datetime
 from typing import Any, TypeVar
+from uuid import UUID
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
@@ -867,6 +958,8 @@ class JsonSerializer(SerializationPort[T]):
     def _deserialize_value(self, value: Any, field_meta: SerializationField) -> Any:
         if value is None:
             return field_meta.default
+        if field_meta.is_union:
+            return self._deserialize_union(value, field_meta.type)
         if field_meta.is_uuid:
             return UUID(value) if isinstance(value, str) else value
         if field_meta.is_datetime:
@@ -877,19 +970,37 @@ class JsonSerializer(SerializationPort[T]):
             return self._dict_to_dataclass(value, field_meta.type)
         return value
 
+    def _deserialize_union(self, value: Any, union_type: Any) -> Any:
+        """处理 Union 类型（如 UUID | None）"""
+        import types
+        for arg in union_type.__args__ if hasattr(union_type, '__args__') else []:
+            if arg is type(None):
+                continue
+            if arg is UUID and isinstance(value, str):
+                return UUID(value)
+            if arg is datetime and isinstance(value, str):
+                return datetime.fromisoformat(value)
+        return value
+
     def _resolve_type(self, type_id: str) -> type:
-        # 从类型注册表查找（见 5.5 节）
-        ...
+        """从类型注册表解析类型标识符"""
+        from src.application.ports.type_registry import TypeRegistry
+        resolved = TypeRegistry.resolve(type_id)
+        if resolved is None:
+            raise ValueError(f"Unknown type id: {type_id}")
+        return resolved
 ```
 
-#### 5.4.2 Redis Hash 序列化器
+#### 5.5.2 Redis Hash 序列化器
 
 ```python
 # infrastructure/serialization/redis_hash_serializer.py
 
 import json
 from dataclasses import is_dataclass
+from datetime import datetime
 from typing import Any, TypeVar
+from uuid import UUID
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
@@ -959,6 +1070,8 @@ class RedisHashSerializer(SerializationPort[T]):
     def _deserialize_value(self, value: Any, field_meta: SerializationField) -> Any:
         if value is None:
             return field_meta.default
+        if field_meta.is_union:
+            return self._deserialize_union(value, field_meta.type)
         if field_meta.is_uuid:
             return UUID(value) if isinstance(value, str) else value
         if field_meta.is_datetime:
@@ -969,50 +1082,69 @@ class RedisHashSerializer(SerializationPort[T]):
             return self._dict_to_dataclass(value, field_meta.type)
         return value
 
+    def _deserialize_union(self, value: Any, union_type: Any) -> Any:
+        """处理 Union 类型（如 UUID | None）"""
+        for arg in union_type.__args__ if hasattr(union_type, '__args__') else []:
+            if arg is type(None):
+                continue
+            if arg is UUID and isinstance(value, str):
+                return UUID(value)
+            if arg is datetime and isinstance(value, str):
+                return datetime.fromisoformat(value)
+        return value
+
     def _resolve_type(self, type_id: str) -> type:
-        ...
+        """从类型注册表解析类型标识符"""
+        from src.application.ports.type_registry import TypeRegistry
+        resolved = TypeRegistry.resolve(type_id)
+        if resolved is None:
+            raise ValueError(f"Unknown type id: {type_id}")
+        return resolved
 ```
 
-### 5.5 类型注册表
+### 5.6 DomainEvent 多态反序列化衔接
 
+**问题**：现有 `DomainEvent` 通过 `__init_subclass__` + `_registry` 实现子类自动注册，新方案使用 `Serializable.get_serialization_type()` + `TypeRegistry`，两者需正确衔接。
+
+**解决方案**：在 `DomainEvent.__init_subclass__` 中自动向 `TypeRegistry` 注册：
+
+```python
+# domain/events/base.py（改造后）
+
+def __init_subclass__(cls, **kwargs: Any) -> None:
+    """自动注册子类用于多态反序列化"""
+    super().__init_subclass__(**kwargs)
+    if is_dataclass(cls):
+        # 向 DomainEvent._registry 注册（用于 from_dict 兼容）
+        for f in fields(cls):
+            if f.name == "event_type" and not f.init:
+                if f.default is not MISSING:
+                    DomainEvent._registry[f.default] = cls
+                break
+        # 向 TypeRegistry 注册（用于新序列化器）
+        if hasattr(cls, "get_serialization_type"):
+            from src.application.ports.type_registry import TypeRegistry
+            TypeRegistry.register(cls.get_serialization_type(), cls)
+```
+
+**子类 `get_serialization_type()` 返回值**：
+
+| 子类 | `get_serialization_type()` 返回值 |
+|------|-------------------------------------|
+| `DomainEvent` | `"DomainEvent"` |
+| `DocumentProcessed` | `"DocumentProcessed"` |
+| `StrategicDeviationWarning` | `"StrategicDeviationWarning"` |
+| ... | ... |
+
+**初始化时自动注册**：
 ```python
 # application/ports/type_registry.py
 
-from typing import Type
-
-
-class TypeRegistry:
-    """类型注册表，用于反序列化时路由到具体类型"""
-
-    _registry: dict[str, type] = {}
-
-    @classmethod
-    def register(cls, type_id: str, typ: type) -> None:
-        cls._registry[type_id] = typ
-
-    @classmethod
-    def resolve(cls, type_id: str) -> type | None:
-        return cls._registry.get(type_id)
-
-    @classmethod
-    def register_from_class(cls, typ: type) -> None:
-        """从类自动注册（类需实现 Serializable）"""
-        if hasattr(typ, "get_serialization_type"):
-            cls.register(typ.get_serialization_type(), typ)
-
-
-# 自动注册所有领域实体
-from src.domain.entities import *
-from src.domain.events import *
-
-for _module in [entities, events]:
-    for _name in dir(_module):
-        _cls = getattr(_module, _name)
-        if isinstance(_cls, type) and hasattr(_cls, "get_serialization_type"):
-            TypeRegistry.register_from_class(_cls)
+# 应用启动时调用
+TypeRegistry.auto_register_domain_events()
 ```
 
-### 5.6 序列化格式与存储介质映射
+### 5.7 序列化格式与存储介质映射
 
 | 存储介质 | 序列化器 | 值类型处理 |
 |----------|----------|------------|
@@ -1022,7 +1154,7 @@ for _module in [entities, events]:
 | RabbitMQ Message | `JsonSerializer` | JSON 字符串 |
 | Memory (测试) | `DictSerializer` | Python dict |
 
-### 5.7 目录结构更新
+### 5.8 目录结构更新
 
 ```
 src/
@@ -1055,7 +1187,7 @@ src/
 │   └── ...
 ```
 
-### 5.8 向后兼容性与调用方改造
+### 5.9 向后兼容性与调用方改造
 
 **问题**：改造 `CheckpointSnapshot` 后，现有调用方 `RedisSnapshotStore` 直接调用 `to_redis_hash()` 方法。
 
@@ -1109,7 +1241,7 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 - [ ] `CheckpointSnapshot` 移除 `to_redis_hash()` / `from_redis_hash()` 方法
 - [ ] 序列化器正确处理 `state_data: dict[str, Any]` 字段（嵌套字典的 JSON 序列化）
 
-### 5.9 新建文件清单（序列化框架）
+### 5.10 新建文件清单（序列化框架）
 
 | 路径 | 说明 |
 |------|------|
@@ -1183,6 +1315,10 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 - [ ] `application/ports/serialization.py` 定义 `SerializationPort` 抽象接口
 - [ ] `application/ports/serialization_rules.py` 定义 `StandardSerializeRules`
 - [ ] `application/ports/type_registry.py` 定义 `TypeRegistry`
+- [ ] `JsonSerializer._resolve_type()` 完整实现（调用 TypeRegistry.resolve）
+- [ ] `RedisHashSerializer._resolve_type()` 完整实现（调用 TypeRegistry.resolve）
+- [ ] 序列化器处理 `UUID | None` 等 Union Types（`is_union=True` 字段）
+- [ ] `DomainEvent.__init_subclass__` 自动向 `TypeRegistry` 注册子类
 - [ ] `infrastructure/serialization/` 包含 JSON 和 Redis Hash 序列化器实现
 - [ ] `domain/exceptions/` 包含 `MemoryNotFoundError` 和 `MemoryVersionConflictError`
 - [ ] `domain/value_objects/sensitive_data.py` 包含敏感数据类型定义
