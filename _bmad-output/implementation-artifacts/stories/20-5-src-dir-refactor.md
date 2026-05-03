@@ -351,6 +351,8 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 
 **关联 AC:** AC-2
 
+> ⚠️ **目录已存在的处理：** `infrastructure/messaging/` 目录已存在（包含 PostgreSQLEventStore 等实现），直接移动文件到该目录。
+
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_event_infra_move.py` |
@@ -373,6 +375,8 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 ### Task 3: Protocol 文件移动到 application/ports
 
 **关联 AC:** AC-3
+
+> ⚠️ **目录已存在的处理：** `application/ports/` 目录已存在但为空，直接移动文件到这里。
 
 | 阶段 | 动作 |
 |------|------|
@@ -877,6 +881,7 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 | 6 | P2-2: AC-13 验证标准不完整 | P2 | 补充值对象迁移验证和导入方更新验证 |
 | 7 | P2-3: AC-14 缺少 RedisSnapshotStore 引用验证 | P2 | 补充 `RedisSnapshotStore` 引用 `infrastructure/serialization/redis_hash_serializer.py` 验证 |
 | 8 | P0-4: Story 描述与项目当前状态不一致 | P0 | 更新 AC-1 和 Task 1，明确"目录已存在则跳过"处理逻辑 |
+| 9 | P0-5: Task 2/3 缺少目录已存在说明 | P0 | 新增 Task 2/3 的"目录已存在的处理"说明 |
 
 ### 下一步 Next Steps
 
@@ -894,3 +899,4 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 **更新说明:**
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.17 创建
 - v1.1.0: 第二轮审查修复 — 更新 AC-1 和 Task 1 描述，明确"目录已存在则跳过"处理逻辑（P0-4）
+- v1.2.0: 第三轮审查修复 — 新增 Task 2/3 的"目录已存在"说明（P0-5）
