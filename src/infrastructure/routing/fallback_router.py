@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,7 +29,7 @@ class FallbackRouter:
         self._health_checker = health_checker
         self._last_latency_ms: float = 0.0
 
-    def route(self, task_id: str, primary_model: str, fallback_model: str) -> str:
+    async def route(self, task_id: str, primary_model: str, fallback_model: str) -> str:
         """Route to primary model or fallback based on health and timeout.
 
         Args:
@@ -41,23 +40,18 @@ class FallbackRouter:
         Returns:
             Selected model name
         """
-        if self._is_healthy() and not self._is_timeout():
+        if await self._is_healthy() and not self._is_timeout():
             return primary_model
         return fallback_model
 
-    def _is_healthy(self) -> bool:
+    async def _is_healthy(self) -> bool:
         """Check if primary model is healthy via health checker.
 
         Returns:
             True if healthy, False otherwise.
         """
         if self._health_checker is not None:
-            checker = self._health_checker
-            # HealthCheckPort.check() is async, use asyncio.run for compatibility
-            result = checker.check()
-            if asyncio.iscoroutine(result):
-                return asyncio.run(result)
-            return result
+            return await self._health_checker.check()
         return True
 
     def _is_timeout(self) -> bool:

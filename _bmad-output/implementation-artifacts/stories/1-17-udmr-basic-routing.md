@@ -733,7 +733,34 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 
 ---
 
+## 🔍 代码审查发现 Review Findings (第三轮 - 2026-05-03)
+
+> **审查日期:** 2026-05-03
+> **审查模式:** full (with spec)
+> **关联 Story:** Story 20-4（统一异步 Port 适配器重构）
+
+### 关联变更说明
+
+**来源:** Story 20-4 异步适配器重构，发现 FallbackRouter 的 `route()` 方法设计问题并修复。
+
+| 问题 | 修复方案 | 状态 |
+|------|----------|------|
+| FallbackRouter.route() 使用 `asyncio.run()` 反模式 | 改为纯 async def，直接 await health_checker.check() | ✅ 已完成 |
+
+**技术细节:**
+- `route()` 改为 `async def route()`
+- `_is_healthy()` 改为 `async def _is_healthy()`
+- 测试更新为 async，使用 `AsyncMock`
+- 移除 `asyncio.run()` 调用，无事件循环阻塞
+
+**影响范围:**
+- `src/infrastructure/routing/fallback_router.py` — 已更新
+- `tests/unit/infrastructure/routing/test_fallback_router.py` — 已更新
+- `tests/integration/test_udmr_integration.py` — 已更新
+
+---
+
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
-**最后更新/Last Updated:** 2026-04-27
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）
+**最后更新/Last Updated:** 2026-05-03
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式
