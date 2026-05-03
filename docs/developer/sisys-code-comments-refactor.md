@@ -159,8 +159,8 @@ class <ClassName>:
     详细说明（可选）: <使用场景、设计决策、约束条件>
 
     Attributes:
-        attr1: <类型> — <描述>
-        attr2: <类型> — <描述>
+        name: type — description
+        value: type — description
 
     Raises:
         ExceptionType: <何时抛出>
@@ -201,11 +201,11 @@ class <ServiceName>Protocol:
     """Protocol for <服务职责描述>.
 
     This protocol defines the contract for <服务名称>.
-    Implementations must satisfy all method signatures and semantics defined here.
+    Implementations must satisfy all method signatures and semantics.
 
     Example:
         >>> class MyService(<ServiceName>Protocol):
-        ...     async def method(self, arg: str) -> dict:
+        ...     def method(self, arg: str) -> dict:
         ...         ...
     """
 
@@ -213,7 +213,7 @@ class <ServiceName>Protocol:
         """Handle <操作>.
 
         Args:
-            arg: Description of arg.
+            arg: str — Description of arg.
 
         Returns:
             dict: Description of return value.
@@ -393,14 +393,20 @@ poetry run ruff check src/ --select=D
 
 ### 2. Ruff — Docstring 自动修复
 
-Ruff 提供部分自动修复能力：
+Ruff 的 `--fix` 可自动修复部分 D 规则。完整修复能力以实际运行结果为准。
 
 | 规则 | 自动修复 | 说明 |
 |------|----------|------|
 | D200 | ✅ | 将 docstring 压缩到一行（如果符合） |
+| D203 | ✅ | 类前添加空行 |
+| D204 | ✅ | 类后添加空行 |
 | D205 | ✅ | 摘要后添加空行 |
 | D400 | ✅ | 末尾添加句号 |
+| D401 | ✅ | 改为祈使语气 |
 | 其他 | ❌ | 需手动修复 |
+
+> **注意**：运行 `ruff check --select=D --fix --diff` 可预览自动修复的差异，
+> 避免直接修改文件造成不可预期的变更。
 
 **批量自动修复**：
 
@@ -554,7 +560,7 @@ echo "=========================================="
 
 ### 5. Ruff 配置推荐（pyproject.toml）
 
-> **⚠️ 配置合并说明**：以下配置是**追加**到现有 `[tool.ruff]` 配置的，保留原有的 select 规则，只添加 `D` 和 `PI`。
+> **⚠️ 配置合并说明**：以下配置是**追加**到现有 `[tool.ruff]` 配置的，保留原有的 select 规则，只添加 `D`。
 
 **推荐配置（追加到现有配置）**：
 
@@ -562,8 +568,8 @@ echo "=========================================="
 # 在现有 [tool.ruff] 配置中追加以下内容：
 
 [tool.ruff]
-# 在原有 select 基础上追加 D 和 PI
-select = ["E", "F", "I", "N", "W", "UP", "D", "PI"]  # 添加 D(pydocstyle) 和 PI(pep8-import)
+# 在原有 select 基础上追加 D
+select = ["E", "F", "I", "N", "W", "UP", "D"]
 
 # 在原有 ignore 基础上追加
 extend-ignore = [
@@ -634,8 +640,10 @@ poetry run ruff check src/ --select=D100,D101,D102,D103 --output-format=short
 **Phase 2 验收命令**：
 ```bash
 poetry run ruff check src/ --select=D100,D101,D102,D103,D107,D417 --output-format=short
-# 期望：D100/D101/D102/D103 无 ERROR；D107/D417 允许有 WARNING（既有代码渐进修复）
-# 新增代码必须通过 D100/D101/D102/D103/D107/D417 全部检查
+
+# 说明：
+# - D100/D101/D102/D103: 必须无 ERROR（所有代码）
+# - D107/D417: 新增代码必须无 ERROR，既有代码允许有 WARNING（渐进修复）
 ```
 
 **CI 配置（完整示例）**：
@@ -660,18 +668,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip packages
+      - name: Install poetry
+        run: pip install poetry
+
+      - name: Cache poetry dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/poetry.lock') }}
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-poetry-
 
       - name: Install dependencies
-        run: |
-          pip install poetry
-          poetry install --with dev
+        run: poetry install --with dev
 
       - name: Run docstring checks (Phase 1)
         run: |
