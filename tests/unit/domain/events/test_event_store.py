@@ -7,7 +7,7 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.domain.events.store import EventStore
+from src.domain.events.event_store import EventStore
 from src.infrastructure.messaging.message_serializer import InMemoryEventStore
 
 

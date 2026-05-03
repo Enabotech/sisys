@@ -155,7 +155,7 @@ class TestEventModuleStructure:
         expected_files = [
             "src/domain/events/publisher.py",
             "src/domain/events/listener.py",
-            "src/domain/events/store.py",
+            "src/domain/events/event_store.py",
         ]
 
         for file_path in expected_files:
