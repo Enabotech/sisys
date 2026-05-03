@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from src.domain.services.udmr_router import HealthChecker, UDMRouter
 from src.domain.value_objects.routing_decision import RoutingDecision
@@ -50,25 +50,25 @@ class TestUDMRIntegration:
         assert decision.selected_model == "qwen-turbo"
         assert decision.fallback_reason == "unavailable"
 
-    def test_fallback_router_with_healthy_local(self) -> None:
+    async def test_fallback_router_with_healthy_local(self) -> None:
         """Test FallbackRouter with healthy local model."""
         router = FallbackRouter()
         mock_health = MagicMock()
-        mock_health.check.return_value = True
+        mock_health.check = AsyncMock(return_value=True)
         router._health_checker = mock_health
 
-        result = router.route("test-task", primary_model="qwen2.5:7b", fallback_model="qwen-turbo")
+        result = await router.route("test-task", primary_model="qwen2.5:7b", fallback_model="qwen-turbo")
 
         assert result == "qwen2.5:7b"
 
-    def test_fallback_router_with_unhealthy_local(self) -> None:
+    async def test_fallback_router_with_unhealthy_local(self) -> None:
         """Test FallbackRouter with unhealthy local model."""
         router = FallbackRouter()
         mock_health = MagicMock()
-        mock_health.check.return_value = False
+        mock_health.check = AsyncMock(return_value=False)
         router._health_checker = mock_health
 
-        result = router.route("test-task", primary_model="qwen2.5:7b", fallback_model="qwen-turbo")
+        result = await router.route("test-task", primary_model="qwen2.5:7b", fallback_model="qwen-turbo")
 
         assert result == "qwen-turbo"
 
@@ -98,11 +98,11 @@ class TestUDMRIntegration:
             session_id="test-session-002",
             route_type="cloud",
             selected_model="qwen-turbo",
-            cost_estimate=0.005,
-            cost_actual=0.0,
-            latency_ms=0.0,
-            fallback_reason="timeout",
+            cost_estimate=0.01,
+            cost_actual=0.009,
+            latency_ms=100.0,
+            fallback_reason="unavailable",
         )
 
+        assert decision.fallback_reason == "unavailable"
         assert decision.route_type == "cloud"
-        assert decision.fallback_reason == "timeout"
