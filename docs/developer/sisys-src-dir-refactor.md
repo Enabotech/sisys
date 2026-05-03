@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.12 |
+| 版本 | v2.13 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -825,7 +825,7 @@ class DomainEvent:
 
 import json
 from dataclasses import is_dataclass
-from typing import Any, TypeVar, Type, get_args
+from typing import Any, TypeVar
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
@@ -889,7 +889,7 @@ class JsonSerializer(SerializationPort[T]):
 
 import json
 from dataclasses import is_dataclass
-from typing import Any, TypeVar, Type
+from typing import Any, TypeVar
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
