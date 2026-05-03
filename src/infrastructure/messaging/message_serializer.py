@@ -10,7 +10,7 @@ from collections import defaultdict
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.store import EventStore
+from src.domain.events.event_store import EventStore
 
 
 class InMemoryEventStore(EventStore):
