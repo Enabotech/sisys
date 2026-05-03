@@ -116,7 +116,7 @@ Architecture:
 """
 ```
 
-**示例（infrastructure 层）：**
+**示例（domain 层）**：
 
 ```python
 """MemoryService — 记忆服务领域接口.
@@ -135,7 +135,7 @@ Note:
 """
 ```
 
-**示例（infrastructure 层）：**
+**示例（infrastructure 层）**：
 
 ```python
 """Neo4jConfig — Neo4j 图数据库连接配置模型.
@@ -154,24 +154,23 @@ References:
 
 ```python
 class <ClassName>:
-    """<职责简述>.
+    """<一句话职责描述>.
 
-    使用场景: <何时使用、如何创建实例>
-
-    与其他组件的关系:
-        - 依赖: <依赖的组件>
-        - 被依赖: <依赖此类的组件>
-
-    状态机/约束: <如适用>
+    详细说明（可选）: <使用场景、设计决策、约束条件>
 
     Attributes:
-        <attr1>: <类型> — <描述>
-        <attr2>: <类型> — <描述>
+        attr1: <类型> — <描述>
+        attr2: <类型> — <描述>
 
     Raises:
-        <Exception>: <何时抛出>
+        ExceptionType: <何时抛出>
     """
 ```
+
+> **Note**：中文标签（使用场景、与其他组件的关系、状态机/约束）是项目定制，
+> 便于快速理解架构关系。pydoclint 扫描时建议使用 `--ignore=D417` 或配置
+> `notation = "google"` 并忽略非标准节名。
+> 如需完全符合 Google 标准，可改用 `Attributes:`、`Raises:` 英文标签。
 
 ### 模板 3：方法 docstring（强制标准）
 
@@ -198,20 +197,35 @@ def <method>(self, <args>) -> <return_type>:
 ### 模板 4：Protocol/抽象类 docstring
 
 ```python
-class <ServiceName>Protocol(Protocol):
-    """<服务接口名称> — <接口职责>.
+class <ServiceName>Protocol:
+    """Protocol for <服务职责描述>.
 
-    此接口定义 <服务> 的核心操作契约。
-    实现类必须满足此接口定义的所有方法语义。
+    This protocol defines the contract for <服务名称>.
+    Implementations must satisfy all method signatures and semantics defined here.
 
-    Args:
-        <common_init_args>: <类型> — <描述>
-
-    Methods:
-        <method_name>(<args>) -> <return_type>:
-            <方法职责一句话>
+    Example:
+        >>> class MyService(<ServiceName>Protocol):
+        ...     async def method(self, arg: str) -> dict:
+        ...         ...
     """
+
+    def method(self, arg: str) -> dict:
+        """Handle <操作>.
+
+        Args:
+            arg: Description of arg.
+
+        Returns:
+            dict: Description of return value.
+
+        Raises:
+            SomeError: Description of when exception is raised.
+        """
+        ...
 ```
+
+> **Note**：Protocol 中的方法需要定义签名和文档契约，实现类继承后应保持语义一致。
+> Google 风格中 Protocol 类文档描述整体契约，具体方法在类级别描述。
 
 ---
 
@@ -407,6 +421,8 @@ poetry run ruff check src/ --select=D --show-fixes
 - 参数类型检查（与实际签名对照）
 - Returns/Yields/Raises 完整性检查
 
+> **⚠️ 规则说明**：以下为常用规则子集（共 70+ 条），完整规则见 [pydoclint 官方文档](https://pydoclint.readthedocs.io/)。
+
 **规则集**：
 
 | 规则 | 说明 |
@@ -452,13 +468,16 @@ poetry run pydoclint src/
 
 ```bash
 #!/bin/bash
-# 检测缺少标准文件头的模块
+# 检测缺少标准文件头的模块（限制搜索深度）
 echo "=== 缺少标准文件头的文件 (检查 Architecture: 关键字) ==="
-for f in $(find src -name "*.py" -type f); do
-    if ! grep -q "Architecture:" "$f"; then
-        echo "$f"
+MISSING=0
+for f in $(find src -maxdepth 4 -name "*.py" -type f 2>/dev/null); do
+    if ! grep -q "Architecture:" "$f" 2>/dev/null; then
+        echo "  MISSING: $f"
+        MISSING=$((MISSING + 1))
     fi
 done
+echo "  总计: $MISSING 个文件缺少 Architecture 头"
 ```
 
 #### 检测文档缺失（D100-D107）
@@ -466,10 +485,10 @@ done
 ```bash
 #!/bin/bash
 echo "=== 缺少文档的公共定义 ==="
-poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107
+poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short
 
 echo "=== 缺少参数文档的方法 ==="
-poetry run ruff check src/ --select=D417
+poetry run ruff check src/ --select=D417 --output-format=short
 ```
 
 #### 检测 docstring 格式问题
@@ -477,10 +496,10 @@ poetry run ruff check src/ --select=D417
 ```bash
 #!/bin/bash
 echo "=== docstring 格式问题 ==="
-poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205 --output-format=text
+poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205 --output-format=short
 
 echo "=== 内容规范问题 ==="
-poetry run ruff check src/ --select=D400,D401,D402,D403 --output-format=text
+poetry run ruff check src/ --select=D400,D401,D402,D403 --output-format=short
 ```
 
 #### 综合检测脚本
@@ -493,31 +512,31 @@ echo "=========================================="
 echo "sisys 代码注释规范性检测"
 echo "=========================================="
 
-# 1. 检查缺少文档的公共定义（不阻塞，显示前 50 行）
+# 1. 检查缺少文档的公共定义
 echo ""
 echo "[1/5] 检查缺少文档的公共定义..."
-poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short 2>&1 | head -50 || true
+poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short 2>&1 || true
 
 # 2. 检查缺少 __init__ 文档
 echo ""
 echo "[2/5] 检查缺少 __init__ 文档..."
-poetry run ruff check src/ --select=D107 --output-format=short 2>&1 | head -50 || true
+poetry run ruff check src/ --select=D107 --output-format=short 2>&1 || true
 
 # 3. 检查缺少参数文档
 echo ""
 echo "[3/5] 检查缺少参数文档..."
-poetry run ruff check src/ --select=D417 --output-format=short 2>&1 | head -100 || true
+poetry run ruff check src/ --select=D417 --output-format=short 2>&1 || true
 
 # 4. 检查 docstring 格式问题
 echo ""
 echo "[4/5] 检查 docstring 格式问题..."
-poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205,D400,D401 --output-format=short 2>&1 | head -50 || true
+poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205,D400,D401 --output-format=short 2>&1 || true
 
 # 5. 检查缺少标准文件头（无 Architecture 关键字）
 echo ""
 echo "[5/5] 检查缺少标准文件头..."
 MISSING=0
-for f in $(find src -name "*.py" -type f); do
+for f in $(find src -maxdepth 4 -name "*.py" -type f 2>/dev/null); do
     if ! grep -q "Architecture:" "$f" 2>/dev/null; then
         echo "  MISSING: $f"
         MISSING=$((MISSING + 1))
@@ -615,7 +634,8 @@ poetry run ruff check src/ --select=D100,D101,D102,D103 --output-format=short
 **Phase 2 验收命令**：
 ```bash
 poetry run ruff check src/ --select=D100,D101,D102,D103,D107,D417 --output-format=short
-# 期望：无 ERROR 输出（新增代码必须遵守）
+# 期望：D100/D101/D102/D103 无 ERROR；D107/D417 允许有 WARNING（既有代码渐进修复）
+# 新增代码必须通过 D100/D101/D102/D103/D107/D417 全部检查
 ```
 
 **CI 配置（完整示例）**：
@@ -639,6 +659,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
