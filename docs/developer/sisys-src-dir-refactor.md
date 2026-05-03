@@ -5,8 +5,8 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.7 |
-| 日期 | 2026-05-02 |
+| 版本 | v2.8 |
+| 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
 
@@ -31,7 +31,7 @@
 | **目录命名不准确** | `domain/repositories/` 实际是 Port 接口，应为 `domain/ports/` |
 | **事件基础设施混入领域** | `publisher.py`, `listener.py`, `store.py` 是技术实现，不是领域概念 |
 | **Protocol 定义错位** | 纯接口（`AuditService`, `CompressorService` 等）混入 `domain/services/`，应属应用层 |
-| **序列化职责混乱** | `DomainEvent.to_dict()/from_dict()` 在领域层，应属适配器 |
+| **序列化职责混乱** | `DomainEvent`、`CheckpointSnapshot` 等直接在领域层实现序列化，缺乏统一抽象 |
 | **异常定义分散** | `MemoryNotFoundError` 定义在 `memory_service.py` 中 |
 | **应用层混乱** | `application/events/adapters.py` 使用 pydantic，需审查 |
 
@@ -223,9 +223,26 @@ __all__ = [
 EOF
 ```
 
-#### 4.1.3 修改 domain/events/base.py
+#### 4.1.3 序列化框架重构：移除领域层序列化方法
 
-移除 `to_dict()` / `from_dict()` 序列化方法，保留纯业务属性。
+**问题**：
+- `domain/events/base.py` 的 `to_dict()/from_dict()` 违反领域层零依赖原则
+- `domain/entities/checkpoint_snapshot.py` 的 `to_redis_hash()/from_redis_hash()` 领域层感知基础设施
+- 各基础设施层实体重复实现相似的 `to_dict()/from_dict()` 模式
+
+**解决方案**：采用 **Serializable Protocol** 方案
+
+| 层级 | 职责 | 示例 |
+|------|------|------|
+| **Domain** | 实现 `Serializable` Protocol，提供字段元数据 | `CheckpointSnapshot`, `DomainEvent` |
+| **Application** | 定义 `SerializationPort` 抽象接口 | `application/ports/serialization.py` |
+| **Infrastructure** | 实现具体序列化器 | `JsonSerializer`, `RedisHashSerializer` |
+
+**重构步骤**：
+
+1. **创建应用层序列化端口**（见 4.6 节）
+2. **改造领域实体**：移除序列化方法，实现 `Serializable` Protocol
+3. **基础设施层实现序列化器**：见 4.6 节
 
 #### 4.1.4 移动事件基础设施
 
@@ -499,7 +516,489 @@ unit_of_work/
 
 ---
 
-## 5. sovereignty.py 跨层导入修复方案
+## 5. 通用序列化框架设计（Serializable Protocol 方案）
+
+### 5.1 架构概述
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              domain/                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  领域实体实现 Serializable Protocol                               │   │
+│  │  • get_serialization_type() → 类型标识符                         │   │
+│  │  • get_fields() → 字段元数据列表                                 │   │
+│  │  无任何序列化方法，仅持有纯业务数据                                │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │ 依赖倒置
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           application/                                   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  SerializationPort (抽象接口)                                     │   │
+│  │  • serialize(obj) → Any                                          │   │
+│  │  • deserialize(data, target_type) → obj                           │   │
+│  │  • can_handle(obj_or_type) → bool                                │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  StandardSerializeRules (标准类型转换规则)                        │   │
+│  │  UUID ↔ str, datetime ↔ ISO 8601, Enum ↔ value                   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │ 实现
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          infrastructure/                                 │
+│  ┌───────────────────────┐  ┌───────────────────────┐                   │
+│  │   JsonSerializer     │  │  RedisHashSerializer  │                   │
+│  │   → JSON string     │  │  → dict[str, str]     │                   │
+│  └───────────────────────┘  └───────────────────────┘                   │
+│  ┌───────────────────────┐  ┌───────────────────────┐                   │
+│  │   JsonbSerializer    │  │   DictSerializer     │                   │
+│  │   → PostgreSQL JSONB │  │   → Python dict      │                   │
+│  └───────────────────────┘  └───────────────────────┘                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Serializable Protocol 定义
+
+```python
+# application/ports/serialization.py
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, TypeVar, Protocol, runtime_checkable
+
+T = TypeVar("T")
+
+
+@runtime_checkable
+class Serializable(Protocol):
+    """可序列化类型协议（由领域层实现）"""
+
+    @classmethod
+    def get_serialization_type(cls) -> str:
+        """返回类型标识符，用于反序列化时路由"""
+        ...
+
+    @classmethod
+    def get_fields(cls) -> list["SerializationField"]:
+        """返回所有需要序列化的字段元数据"""
+        ...
+
+
+@dataclass(frozen=True)
+class SerializationField:
+    """字段序列化元数据"""
+    name: str
+    type: type
+    default: Any = None
+    is_enum: bool = False
+    is_uuid: bool = False
+    is_datetime: bool = False
+    is_nested_dataclass: bool = False
+
+
+class SerializationPort(ABC, Generic[T]):
+    """序列化抽象端口（应用层定义，基础设施实现）"""
+
+    @abstractmethod
+    def serialize(self, obj: T) -> Any:
+        """将对象序列化为目标格式"""
+        ...
+
+    @abstractmethod
+    def deserialize(self, data: Any, target_type: type[T] | str) -> T:
+        """从目标格式反序列化为对象"""
+        ...
+
+    @abstractmethod
+    def can_handle(self, obj_or_type: Any) -> bool:
+        """判断是否能处理该类型"""
+        ...
+```
+
+### 5.3 领域实体改造示例
+
+#### 5.3.1 CheckpointSnapshot 改造
+
+**改造前**（违反架构）：
+```python
+# domain/entities/checkpoint_snapshot.py（改造前）
+def to_redis_hash(self) -> dict[str, str]:
+    return {"snapshot_id": str(self.snapshot_id), "state_data": json.dumps(self.state_data)}
+
+def from_redis_hash(cls, data): ...
+```
+
+**改造后**（正确架构）：
+```python
+# domain/entities/checkpoint_snapshot.py（改造后）
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID
+
+from src.application.ports.serialization import Serializable, SerializationField
+
+
+@dataclass(frozen=True)
+class CheckpointSnapshot:
+    """领域实体：会话快照（无序列化逻辑）"""
+
+    snapshot_id: UUID
+    session_id: str
+    stage_id: str
+    state_version: int
+    state_data: dict[str, Any]
+    timestamp: datetime
+    ttl_seconds: int = 86400
+
+    @classmethod
+    def get_serialization_type(cls) -> str:
+        return "CheckpointSnapshot"
+
+    @classmethod
+    def get_fields(cls) -> list[SerializationField]:
+        from uuid import UUID
+        from datetime import datetime
+        return [
+            SerializationField("snapshot_id", UUID, is_uuid=True),
+            SerializationField("session_id", str),
+            SerializationField("stage_id", str),
+            SerializationField("state_version", int),
+            SerializationField("state_data", dict),
+            SerializationField("timestamp", datetime, is_datetime=True),
+            SerializationField("ttl_seconds", int, default=86400),
+        ]
+
+    def with_updated_state(self, state_data: dict[str, Any], new_version: int | None = None) -> CheckpointSnapshot:
+        """创建新快照（领域逻辑，不涉及序列化）"""
+        return CheckpointSnapshot(
+            snapshot_id=uuid.uuid4(),
+            session_id=self.session_id,
+            stage_id=self.stage_id,
+            state_version=new_version if new_version is not None else self.state_version + 1,
+            state_data={**self.state_data, **state_data},
+            timestamp=datetime.now(UTC),
+            ttl_seconds=self.ttl_seconds,
+        )
+```
+
+#### 5.3.2 DomainEvent 改造
+
+**改造前**（存在问题）：
+```python
+# domain/events/base.py（改造前）
+def to_dict(self) -> dict[str, Any]: ...
+def from_dict(cls, data): ...
+```
+
+**改造后**（正确架构）：
+```python
+# domain/events/base.py（改造后）
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID
+
+from src.application.ports.serialization import Serializable, SerializationField
+
+
+@dataclass(frozen=True)
+class DomainEvent:
+    """领域事件基类（无序列化逻辑）"""
+
+    event_id: UUID = field(default_factory=uuid.uuid4)
+    event_type: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source: str = ""
+    schema_version: str = "1.0.0"
+    aggregate_id: UUID | None = None
+    aggregate_type: str = ""
+    version: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
+    correlation_id: UUID | None = None
+    causation_id: UUID | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    _registry: dict[str, type["DomainEvent"]] = {}
+
+    @classmethod
+    def get_serialization_type(cls) -> str:
+        return "DomainEvent"
+
+    @classmethod
+    def get_fields(cls) -> list[SerializationField]:
+        return [
+            SerializationField("event_id", UUID, is_uuid=True),
+            SerializationField("event_type", str),
+            SerializationField("timestamp", datetime, is_datetime=True),
+            SerializationField("source", str),
+            SerializationField("schema_version", str),
+            SerializationField("aggregate_id", UUID | None, is_uuid=True),
+            SerializationField("aggregate_type", str),
+            SerializationField("version", int),
+            SerializationField("payload", dict),
+            SerializationField("correlation_id", UUID | None, is_uuid=True),
+            SerializationField("causation_id", UUID | None, is_uuid=True),
+            SerializationField("metadata", dict),
+        ]
+
+    @classmethod
+    def register(cls, event_type: str, event_class: type["DomainEvent"]) -> None:
+        """注册子类用于多态反序列化"""
+        cls._registry[event_type] = event_class
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """自动注册子类"""
+        super().__init_subclass__(**kwargs)
+        if is_dataclass(cls):
+            for f in fields(cls):
+                if f.name == "event_type" and not f.init:
+                    if f.default is not MISSING:
+                        DomainEvent._registry[f.default] = cls
+                    break
+```
+
+### 5.4 序列化器实现（基础设施层）
+
+#### 5.4.1 JSON 序列化器
+
+```python
+# infrastructure/serialization/json_serializer.py
+
+import json
+from dataclasses import fields, is_dataclass
+from typing import Any, TypeVar, Type, get_args
+
+from src.application.ports.serialization import SerializationPort
+from src.application.ports.serialization_rules import StandardSerializeRules
+
+
+T = TypeVar("T")
+
+
+class JsonSerializer(SerializationPort[T]):
+    """JSON 字符串序列化器"""
+
+    def __init__(self, *, indent: int | None = None, ensure_ascii: bool = False):
+        self._indent = indent
+        self._ensure_ascii = ensure_ascii
+
+    def serialize(self, obj: T) -> str:
+        """对象 → JSON 字符串"""
+        data = StandardSerializeRules.serialize_dataclass(obj)
+        return json.dumps(data, indent=self._indent, ensure_ascii=self._ensure_ascii)
+
+    def deserialize(self, data: str | bytes, target_type: type[T] | str) -> T:
+        """JSON 字符串 → 对象"""
+        parsed = json.loads(data) if isinstance(data, (str, bytes)) else data
+        if isinstance(target_type, str):
+            target_type = self._resolve_type(target_type)
+        return self._dict_to_dataclass(parsed, target_type)
+
+    def can_handle(self, obj_or_type: Any) -> bool:
+        return is_dataclass(obj_or_type) if isinstance(obj_or_type, type) else is_dataclass(obj_or_type)
+
+    def _dict_to_dataclass(self, data: dict[str, Any], target_type: type[T]) -> T:
+        kwargs = {}
+        for f_meta in target_type.get_fields():
+            if f_meta.name in data:
+                kwargs[f_meta.name] = self._deserialize_value(data[f_meta.name], f_meta)
+        return target_type(**kwargs)
+
+    def _deserialize_value(self, value: Any, field_meta: SerializationField) -> Any:
+        if value is None:
+            return field_meta.default
+        if field_meta.is_uuid:
+            return UUID(value) if isinstance(value, str) else value
+        if field_meta.is_datetime:
+            return datetime.fromisoformat(value) if isinstance(value, str) else value
+        if field_meta.is_enum:
+            return field_meta.type(value)
+        if field_meta.is_nested_dataclass:
+            return self._dict_to_dataclass(value, field_meta.type)
+        return value
+
+    def _resolve_type(self, type_id: str) -> type:
+        # 从类型注册表查找（见 5.5 节）
+        ...
+```
+
+#### 5.4.2 Redis Hash 序列化器
+
+```python
+# infrastructure/serialization/redis_hash_serializer.py
+
+import json
+from dataclasses import fields
+from typing import Any, TypeVar, Type
+
+from src.application.ports.serialization import SerializationPort
+from src.application.ports.serialization_rules import StandardSerializeRules
+
+
+T = TypeVar("T")
+
+
+class RedisHashSerializer(SerializationPort[T]):
+    """Redis Hash 序列化器（所有值为 string）"""
+
+    def serialize(self, obj: T) -> dict[str, str]:
+        """对象 → Redis Hash"""
+        data = StandardSerializeRules.serialize_dataclass(obj)
+        return self._to_redis_hash(data)
+
+    def _to_redis_hash(self, data: dict[str, Any]) -> dict[str, str]:
+        result = {}
+        for key, value in data.items():
+            if value is None:
+                result[key] = ""
+            elif isinstance(value, bool):
+                result[key] = str(value)
+            elif isinstance(value, (int, float)):
+                result[key] = str(value)
+            elif isinstance(value, str):
+                result[key] = value
+            else:
+                result[key] = json.dumps(value)
+        return result
+
+    def deserialize(self, data: dict[str, str], target_type: type[T] | str) -> T:
+        """Redis Hash → 对象"""
+        if isinstance(target_type, str):
+            target_type = self._resolve_type(target_type)
+        dict_data = self._from_redis_hash(data)
+        return self._dict_to_dataclass(dict_data, target_type)
+
+    def _from_redis_hash(self, data: dict[str, str]) -> dict[str, Any]:
+        result = {}
+        for key, value in data.items():
+            if not value:
+                result[key] = None
+                continue
+            try:
+                result[key] = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                if value.lower() in ("true", "false"):
+                    result[key] = value.lower() == "true"
+                elif value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+                    result[key] = int(value)
+                else:
+                    result[key] = value
+        return result
+
+    def can_handle(self, obj_or_type: Any) -> bool:
+        return is_dataclass(obj_or_type) if isinstance(obj_or_type, type) else is_dataclass(obj_or_type)
+
+    def _dict_to_dataclass(self, data: dict[str, Any], target_type: type[T]) -> T:
+        kwargs = {}
+        for f in fields(target_type):
+            if f.name in data:
+                kwargs[f.name] = self._coerce_type(data[f.name], f.type)
+        return target_type(**kwargs)
+
+    def _coerce_type(self, value: Any, target_type: type) -> Any:
+        if value is None:
+            return None
+        if target_type.__name__ == "UUID":
+            return UUID(value) if isinstance(value, str) else value
+        if target_type.__name__ == "datetime":
+            return datetime.fromisoformat(value) if isinstance(value, str) else value
+        return value
+
+    def _resolve_type(self, type_id: str) -> type:
+        ...
+```
+
+### 5.5 类型注册表
+
+```python
+# application/ports/type_registry.py
+
+from typing import Type
+
+
+class TypeRegistry:
+    """类型注册表，用于反序列化时路由到具体类型"""
+
+    _registry: dict[str, type] = {}
+
+    @classmethod
+    def register(cls, type_id: str, typ: type) -> None:
+        cls._registry[type_id] = typ
+
+    @classmethod
+    def resolve(cls, type_id: str) -> type | None:
+        return cls._registry.get(type_id)
+
+    @classmethod
+    def register_from_class(cls, typ: type) -> None:
+        """从类自动注册（类需实现 Serializable）"""
+        if hasattr(typ, "get_serialization_type"):
+            cls.register(typ.get_serialization_type(), typ)
+
+
+# 自动注册所有领域实体
+from src.domain.entities import *
+from src.domain.events import *
+
+for _module in [entities, events]:
+    for _name in dir(_module):
+        _cls = getattr(_module, _name)
+        if isinstance(_cls, type) and hasattr(_cls, "get_serialization_type"):
+            TypeRegistry.register_from_class(_cls)
+```
+
+### 5.6 序列化格式与存储介质映射
+
+| 存储介质 | 序列化器 | 值类型处理 |
+|----------|----------|------------|
+| Redis Hash | `RedisHashSerializer` | 所有值为 string |
+| Redis String | `JsonSerializer` | JSON 字符串 |
+| PostgreSQL JSONB | `JsonSerializer` | JSON 对象 |
+| RabbitMQ Message | `JsonSerializer` | JSON 字符串 |
+| Memory (测试) | `DictSerializer` | Python dict |
+
+### 5.7 目录结构更新
+
+```
+src/
+├── domain/                         # ✅ 领域层（零外部依赖）
+│   ├── entities/
+│   │   ├── checkpoint_snapshot.py  # ✅ 实现 Serializable Protocol
+│   │   └── ...
+│   ├── events/
+│   │   ├── base.py                # ✅ 实现 Serializable Protocol
+│   │   └── ...
+│   └── ...
+│
+├── application/                     # ✅ 应用层
+│   ├── ports/
+│   │   ├── __init__.py
+│   │   ├── serialization.py       # SerializationPort, Serializable
+│   │   ├── serialization_rules.py  # StandardSerializeRules
+│   │   └── type_registry.py        # TypeRegistry
+│   └── ...
+│
+├── infrastructure/                  # ✅ 基础设施层
+│   └── serialization/               # 新建目录
+│       ├── __init__.py
+│       ├── json_serializer.py       # JsonSerializer
+│       ├── redis_hash_serializer.py # RedisHashSerializer
+│       ├── dict_serializer.py       # DictSerializer (测试用)
+│       └── jsonb_serializer.py     # JsonbSerializer
+│   └── ...
+```
+
+---
+
+## 6. sovereignty.py 跨层导入修复方案
 
 **问题**：`infrastructure/config/sovereignty.py` 导入 `infrastructure/security/models.py`，违反 infrastructure 内部分层原则。
 
@@ -521,18 +1020,18 @@ unit_of_work/
 
 ---
 
-## 6. 影响范围
+## 7. 影响范围
 
-### 6.1 文件操作统计
+### 7.1 文件操作统计
 
 | 操作 | 数量 |
 |------|------|
 | 重命名目录 | 1 (`repositories/` → `ports/`) |
 | 移动文件 | 15 |
-| 新建文件 | 3 |
-| 修改文件 | 2 (`base.py` 移除序列化, `security/models.py` → `value_objects.py`) |
+| 新建文件 | 5（序列化框架：serialization.py, serialization_rules.py, type_registry.py, json_serializer.py, redis_hash_serializer.py） |
+| 修改文件 | 2（`base.py` 改造为 Serializable Protocol, `checkpoint_snapshot.py` 移除序列化） |
 
-### 6.2 需更新的导入路径
+### 7.2 需更新的导入路径
 
 | 层级 | 影响文件数（估计） |
 |------|-------------------|
@@ -545,12 +1044,15 @@ unit_of_work/
 
 ---
 
-## 7. 验收标准
+## 8. 验收标准
 
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
 - [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
 - [ ] 4 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`
-- [ ] `DomainEvent` 类不包含 `to_dict()` / `from_dict()` 方法
+- [ ] `DomainEvent` 类实现 `Serializable` Protocol，无 `to_dict()` / `from_dict()` 方法
+- [ ] `CheckpointSnapshot` 类实现 `Serializable` Protocol，无 `to_redis_hash()` / `from_redis_hash()` 方法
+- [ ] `application/ports/serialization.py` 定义 `SerializationPort` 和 `Serializable` Protocol
+- [ ] `infrastructure/serialization/` 包含 JSON 和 Redis Hash 序列化器实现
 - [ ] `domain/exceptions/` 包含 `MemoryNotFoundError` 和 `MemoryVersionConflictError`
 - [ ] `domain/value_objects/sensitive_data.py` 包含敏感数据类型定义
 - [ ] `infrastructure/security/models.py` 重命名为 `value_objects.py`
@@ -561,7 +1063,7 @@ unit_of_work/
 
 ---
 
-## 8. 六边形架构图
+## 9. 六边形架构图
 
 ```
                         ┌─────────────────────────────────────────────────────────┐
@@ -578,6 +1080,7 @@ unit_of_work/
                         │  ┌─────────────────────────────────────────────────┐    │
                         │  │      Application Ports (Protocols)             │    │
                         │  │  AuditService  AuthService  CompressorService   │    │
+                        │  │  SerializationPort                              │    │
                         │  └─────────────────────────────────────────────────┘    │
                         └────────────────────────┬────────────────────────────────┘
                                                  │
@@ -591,6 +1094,7 @@ unit_of_work/
 │  ┌─────────────────────────────────────────────▼─────────────────────────────────────────────┐       │
 │  │                          Entities / Events / Value Objects                                   │       │
 │  │   Agent  Checkpoint  Document  MemoryMetadata  StrategicPlan  (Domain Events)  (VO)         │       │
+│  │   [实现 Serializable Protocol]                                                              │       │
 │  └─────────────────────────────────────────────┬─────────────────────────────────────────────┘       │
 │                                                │                                                         │
 │  ┌─────────────────────────────────────────────▼─────────────────────────────────────────────┐       │
@@ -607,6 +1111,9 @@ unit_of_work/
 │  │  │PostgreSQL│  │  Redis  │  │  MinIO  │  │ Qdrant  │  │  Neo4j  │  │  File   │            │       │
 │  │  │   Repo  │  │  Cache  │  │ Object  │  │ Vector  │  │  Graph  │  │  L0     │            │       │
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │       │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐      │       │
+│  │  │  Serializers: JsonSerializer  RedisHashSerializer  JsonbSerializer          │      │       │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘      │       │
 │  └────────────────────────────┬───────────────────────────────────────────────────────────────┘       │
 │                               │                                                               │
 │  ┌────────────────────────────▼───────────────────────────────────────────────────────────────┐       │
@@ -618,7 +1125,7 @@ unit_of_work/
 
 ---
 
-## 9. 关键原则总结
+## 10. 关键原则总结
 
 | 原则 | 说明 |
 |------|------|
@@ -626,14 +1133,15 @@ unit_of_work/
 | **Port 接口在 domain** | 接口定义与实现分离，依赖倒置 |
 | **事件基础设施在 infrastructure** | 发布-订阅是技术机制，不是领域概念 |
 | **Protocol 定义分离** | 纯接口移到 application/ports/ |
-| **序列化是适配器责任** | DomainEvent 不含 to_dict/from_dict |
+| **序列化是适配器责任** | 领域实体实现 Serializable Protocol，序列化器在 infrastructure 层 |
+| **通用序列化框架** | 通过 SerializationPort 支持多种序列化格式（JSON/Redis Hash/JSONB） |
 | **异常集中定义** | domain/exceptions/ 统一管理领域异常 |
 | **目录命名准确** | repositories/ → ports/（反映本质） |
 | **值对象命名清晰** | security/models.py → security/value_objects.py |
 
 ---
 
-## 10. 附录
+## 11. 附录
 
 ### A. 移动文件清单
 
@@ -662,15 +1170,22 @@ unit_of_work/
 | domain/exceptions/__init__.py | 导出异常 |
 | domain/exceptions/memory_exceptions.py | MemoryNotFoundError, MemoryVersionConflictError |
 | domain/value_objects/sensitive_data.py | SensitiveDataType, DataResidency, WhitelistStatus, ApprovalStatus 等值对象 |
+| application/ports/serialization.py | SerializationPort, Serializable Protocol, SerializationField |
+| application/ports/serialization_rules.py | StandardSerializeRules 标准类型转换规则 |
+| application/ports/type_registry.py | TypeRegistry 类型注册表 |
+| infrastructure/serialization/__init__.py | 序列化模块导出 |
+| infrastructure/serialization/json_serializer.py | JsonSerializer 实现 |
+| infrastructure/serialization/redis_hash_serializer.py | RedisHashSerializer 实现 |
 
 ### C. 修改文件清单
 
 | 路径 | 修改内容 |
 |------|----------|
-| domain/events/base.py | 移除 to_dict()/from_dict() 序列化方法 |
+| domain/events/base.py | 改造为实现 Serializable Protocol（移除 to_dict/from_dict） |
+| domain/entities/checkpoint_snapshot.py | 改造为实现 Serializable Protocol（移除 to_redis_hash/from_redis_hash） |
 | domain/services/memory_service.py | 从 domain/exceptions/ 导入异常 |
 | infrastructure/config/sovereignty.py | 改为从 domain.value_objects.sensitive_data 导入 |
-| infrastructure/security/value_objects.py | 重命名自 models.py |
+| infrastructure/security/value_objects.py | 重命名自 models.py | |
 
 ### D. 命名规范
 
@@ -683,3 +1198,6 @@ unit_of_work/
 | 值对象 | `XxxContext` / `XxxDecision` / `XxxType` | `AutoTriggerContext`, `RoutingDecision`, `SensitiveDataType` |
 | 事件基础设施 | `XxxPublisher` / `XxxListener` | `EventPublisher`, `EventListener` |
 | 安全值对象 | `xxx_objects.py` | `value_objects.py`（非 models.py） |
+| 序列化器 | `XxxSerializer` | `JsonSerializer`, `RedisHashSerializer` |
+| 序列化端口 | `SerializationPort` | `SerializationPort[T]` |
+| 可序列化类型 | 实现 `Serializable` Protocol | `DomainEvent`, `CheckpointSnapshot` |
