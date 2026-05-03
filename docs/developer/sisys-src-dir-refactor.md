@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.10 |
+| 版本 | v2.11 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -89,7 +89,7 @@ src/
 | publisher.py | EventPublisher ABC | infrastructure/messaging/ ❌ |
 | listener.py | EventListener, InMemoryEventListener, EventListenerAsync | infrastructure/messaging/ ❌ |
 | event_store.py | EventStore ABC | domain/events/ ✅（Port 接口，保留在 domain） |
-| publish_result.py | PublishResult dataclass | infrastructure/messaging/ ❌ |
+| publish_result.py | PublishResult dataclass | infrastructure/messaging/ ❌（虽为纯数据类，但因与 EventPublisher 强耦合而移动） |
 
 #### 2.2.3 repositories/ → ports/ — 重命名（12 files）
 
@@ -268,9 +268,11 @@ mv src/domain/events/publish_result.py src/infrastructure/messaging/publish_resu
 
 | 文件 | 位置 | 原因 |
 |------|------|------|
-| `EventStore` ABC | `domain/events/event_store.py` | Port 接口定义，领域层概念 |
+| `EventStore` ABC | `domain/events/event_store.py` | Port 接口定义，与 DomainEvent 紧密相关，保持内聚 |
 | `InMemoryEventStore` | `tests/` | 测试实现 |
 | `PostgreSQLEventStore` | `infrastructure/messaging/event_store.py` | 基础设施实现 |
+
+**说明**：EventStore 放在 `domain/events/` 而非 `domain/ports/`，是因为它与 DomainEvent 紧密耦合（事件溯源核心概念），保持内聚性。
 
 **关键约束**：
 - Port 接口（ABC）在 domain 层
@@ -676,6 +678,7 @@ def from_redis_hash(cls, data): ...
 ```python
 # domain/entities/checkpoint_snapshot.py（改造后）
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -948,18 +951,22 @@ class RedisHashSerializer(SerializationPort[T]):
 
     def _dict_to_dataclass(self, data: dict[str, Any], target_type: type[T]) -> T:
         kwargs = {}
-        for f in fields(target_type):
-            if f.name in data:
-                kwargs[f.name] = self._coerce_type(data[f.name], f.type)
+        for f_meta in target_type.get_fields():
+            if f_meta.name in data:
+                kwargs[f_meta.name] = self._deserialize_value(data[f_meta.name], f_meta)
         return target_type(**kwargs)
 
-    def _coerce_type(self, value: Any, target_type: type) -> Any:
+    def _deserialize_value(self, value: Any, field_meta: SerializationField) -> Any:
         if value is None:
-            return None
-        if target_type.__name__ == "UUID":
+            return field_meta.default
+        if field_meta.is_uuid:
             return UUID(value) if isinstance(value, str) else value
-        if target_type.__name__ == "datetime":
+        if field_meta.is_datetime:
             return datetime.fromisoformat(value) if isinstance(value, str) else value
+        if field_meta.is_enum:
+            return field_meta.type(value)
+        if field_meta.is_nested_dataclass:
+            return self._dict_to_dataclass(value, field_meta.type)
         return value
 
     def _resolve_type(self, type_id: str) -> type:
@@ -1215,6 +1222,7 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 │  ┌─────────────────────────────────────────────▼─────────────────────────────────────────────┐       │
 │  │                              Ports (interfaces)                                             │       │
 │  │  HealthCheckPort  IntegrityPort  L0StoragePort  VectorStorage  GraphStorage  ...          │       │
+│  │  [Serializable Protocol ← 领域实体实现]                                                   │       │
 │  └─────────────────────────────────────────────┬─────────────────────────────────────────────┘       │
 │                                                │                                                         │
 │  ┌─────────────────────────────────────────────▼─────────────────────────────────────────────┐       │
