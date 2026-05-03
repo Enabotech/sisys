@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.15 |
+| 版本 | v2.16 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -776,6 +776,11 @@ class DomainEvent:
     _registry: ClassVar[dict[str, type["DomainEvent"]]] = {}
 
     @classmethod
+    def get_serialization_type(cls) -> str:
+        """返回 event_type 字段值作为类型标识符"""
+        return cls.event_type if cls.event_type else "DomainEvent"
+
+    @classmethod
     def get_fields(cls) -> list[SerializationField]:
         return [
             SerializationField("event_id", UUID, is_uuid=True),
@@ -826,7 +831,7 @@ class DomainEvent:
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, get_args, get_origin, Union
+from typing import Any
 from uuid import UUID
 
 
@@ -1106,7 +1111,6 @@ class RedisHashSerializer(SerializationPort[T]):
 ```python
 # domain/events/base.py（改造后）
 
-@classmethod
 def __init_subclass__(cls, **kwargs: Any) -> None:
     """自动注册子类（向 DomainEvent._registry 和 TypeRegistry）"""
     super().__init_subclass__(**kwargs)
