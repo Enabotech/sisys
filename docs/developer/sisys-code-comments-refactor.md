@@ -88,7 +88,7 @@ def create_access_token(...):
 
 Architecture:
     Layer: <domain|application|infrastructure|interfaces>
-    Depends: <允许的外部依赖（仅 domain 层需声明标准库）>
+    Depends: <允许的外部依赖（仅 domain 层需声明仅用标准库）>
     Constraints: <特殊约束或限制>
 
 References:
@@ -101,7 +101,22 @@ Note:
 """
 ```
 
-**示例（domain 层）：**
+**⚠️ 领域层约束（硬性要求）**：
+```python
+# domain 层文件头必须明确声明标准库依赖
+"""MemoryService — 记忆服务领域接口.
+
+Architecture:
+    Layer: domain
+    Depends: uuid, datetime (stdlib only)
+    Constraints: 领域层零外部依赖 — 仅允许 Python 标准库
+                 禁止导入：langgraph, prefect, fastapi, pydantic, sqlalchemy,
+                 redis, qdrant, minio, neo4j, aio_pika, litellm 等
+...
+"""
+```
+
+**示例（infrastructure 层）：**
 
 ```python
 """MemoryService — 记忆服务领域接口.
@@ -474,40 +489,41 @@ poetry run ruff check src/ --select=D400,D401,D402,D403 --output-format=text
 #!/bin/bash
 # sisys 代码注释综合检测脚本
 
-set -e
-
 echo "=========================================="
 echo "sisys 代码注释规范性检测"
 echo "=========================================="
 
-# 1. 检查缺少文档的公共定义
+# 1. 检查缺少文档的公共定义（不阻塞，显示前 50 行）
 echo ""
 echo "[1/5] 检查缺少文档的公共定义..."
-poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short 2>/dev/null || true
+poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short 2>&1 | head -50 || true
 
 # 2. 检查缺少 __init__ 文档
 echo ""
 echo "[2/5] 检查缺少 __init__ 文档..."
-poetry run ruff check src/ --select=D107 --output-format=short 2>/dev/null || true
+poetry run ruff check src/ --select=D107 --output-format=short 2>&1 | head -50 || true
 
 # 3. 检查缺少参数文档
 echo ""
 echo "[3/5] 检查缺少参数文档..."
-poetry run ruff check src/ --select=D417 --output-format=short 2>/dev/null || true
+poetry run ruff check src/ --select=D417 --output-format=short 2>&1 | head -100 || true
 
 # 4. 检查 docstring 格式问题
 echo ""
 echo "[4/5] 检查 docstring 格式问题..."
-poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205,D400,D401 --output-format=short 2>/dev/null || true
+poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205,D400,D401 --output-format=short 2>&1 | head -50 || true
 
 # 5. 检查缺少标准文件头（无 Architecture 关键字）
 echo ""
 echo "[5/5] 检查缺少标准文件头..."
+MISSING=0
 for f in $(find src -name "*.py" -type f); do
-    if ! grep -q "Architecture:" "$f"; then
+    if ! grep -q "Architecture:" "$f" 2>/dev/null; then
         echo "  MISSING: $f"
+        MISSING=$((MISSING + 1))
     fi
 done
+echo "  总计: $MISSING 个文件缺少 Architecture 头"
 
 echo ""
 echo "=========================================="
@@ -519,29 +535,20 @@ echo "=========================================="
 
 ### 5. Ruff 配置推荐（pyproject.toml）
 
+> **⚠️ 配置合并说明**：以下配置是**追加**到现有 `[tool.ruff]` 配置的，保留原有的 select 规则，只添加 `D` 和 `PI`。
+
+**推荐配置（追加到现有配置）**：
+
 ```toml
-# ============================================
-# sisys - Ruff 配置
-# ============================================
+# 在现有 [tool.ruff] 配置中追加以下内容：
 
 [tool.ruff]
-line-length = 128
-target-version = "py311"
+# 在原有 select 基础上追加 D 和 PI
+select = ["E", "F", "I", "N", "W", "UP", "D", "PI"]  # 添加 D(pydocstyle) 和 PI(pep8-import)
 
-# 启用规则
-select = [
-    "E",    # pycodestyle errors
-    "F",    # pyflakes
-    "I",    # isort
-    "N",    # pep8-naming
-    "W",    # pycodestyle warnings
-    "UP",   # pyupgrade
-    "D",    # pydocstyle (docstring)
-    "PI",   # pep8-impiort (，禁止绝对导入)
-]
-
-# 忽略规则
-ignore = [
+# 在原有 ignore 基础上追加
+extend-ignore = [
+    # 原有 ignore 项...
     # Docstring 格式（允许灵活格式）
     "D200",   # 允许单行 docstring
     "D203",   # 允许类前无额外空行
@@ -552,48 +559,101 @@ ignore = [
     "N803",   # 参数名大小写
 ]
 
-# 排除目录
-extend-exclude = [
-    ".claude/",
-    ".qwen/",
-    "_bmad/",
-    ".git/",
-    "__pycache__/",
-    "*.egg-info/",
-    ".venv/",
-    "venv/",
-]
-
 [tool.ruff.pydocstyle]
 convention = "google"  # 指定 Google 风格作为默认
+```
+
+**⚠️ pydoclint 需单独安装**：
+
+pydoclint 不是项目依赖，需手动安装后使用：
+
+```bash
+poetry add --group dev pydoclint
+poetry run pydoclint src/
 ```
 
 ---
 
 ### 6. 实施建议
 
-**Phase 1: 接入工具（1 天）**
-1. 在 `pyproject.toml` 中添加 Ruff D 规则
+**Phase 1: 接入工具 + 问题分析（1-2 天）**
+1. 在 `pyproject.toml` 中追加 Ruff D 规则
 2. 运行 `poetry run ruff check src/ --select=D > issues.txt`
-3. 评估问题数量和严重性
+3. 分析问题数量和分布（哪些文件/模块问题最多）
 
-**Phase 2: 批量修复（2-3 天）**
-1. 使用 `ruff check --fix` 自动修复可修复问题
-2. 手动修复 D417（缺少参数文档）
-3. 补充缺失的 docstring
+**Phase 2: 自动修复 + 分批修复计划（2-3 天）**
+1. 使用 `ruff check --fix` 自动修复可修复问题（D200/D205/D400 等）
+2. 评估 D417（缺少参数文档）数量，制定手动修复计划
+3. 按模块分批修复（如 domain/entities → domain/services → infrastructure/config）
 
-**Phase 3: CI 集成**
-```yaml
-# .github/workflows/lint.yml
-- name: Run Ruff docstring checks
-  run: poetry run ruff check src/ --select=D --output-format=github
+**Phase 3: 手动修复 D417（5-7 天，分批次）**
+- D417 涉及大量现有方法，需要逐个补充 Args 文档
+- 建议按优先级：domain 层 > application 层 > infrastructure 层
+
+**Phase 4: CI 集成 + 监控（1 天）**
+- 配置 GitHub Actions workflow（见上方 CI 配置示例）
+- 设置增量检查（仅检查变更文件）
+
+**⚠️ 注意事项**：
+- 既有代码修复**不阻塞**新功能开发，新代码**必须遵守**规范
+- D107（`__init__` 文档）和 D417（参数文档）验收渐进式推进
+- 建议每修复一批文件后运行检测，确认问题减少
+
+**验收标准（分阶段）**：
+
+| 阶段 | 验收规则 | 说明 |
+|------|----------|------|
+| Phase 1 | D100, D101, D102, D103 | 模块/类/公共方法/函数文档缺失（ERROR） |
+| Phase 2 | D107, D417 | `__init__` 文档 + 参数文档（新增代码强制，既有代码渐进修复） |
+
+**Phase 1 验收命令**：
+```bash
+poetry run ruff check src/ --select=D100,D101,D102,D103 --output-format=short
+# 期望：无 ERROR 输出
 ```
 
-**验收标准**：
-- ✅ `ruff check src/ --select=D100,D101,D102,D103,D107,D417` 无输出
-- ✅ 所有公共模块/类/方法有文档
-- ✅ 所有参数有 Args 说明
-- ✅ 所有 Returns/Raises 有说明
+**Phase 2 验收命令**：
+```bash
+poetry run ruff check src/ --select=D100,D101,D102,D103,D107,D417 --output-format=short
+# 期望：无 ERROR 输出（新增代码必须遵守）
+```
+
+**CI 配置（完整示例）**：
+```yaml
+# .github/workflows/docstring-check.yml
+name: Docstring Check
+
+on:
+  push:
+    paths: ['src/**/*.py']
+  pull_request:
+    paths: ['src/**/*.py']
+
+jobs:
+  ruff-docstring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry install --with dev
+
+      - name: Run docstring checks (Phase 1)
+        run: |
+          poetry run ruff check src/ --select=D100,D101,D102,D103 --output-format=github
+
+      - name: Run all docstring checks (Phase 2)
+        run: |
+          poetry run ruff check src/ --select=D100,D101,D102,D103,D107,D417 --output-format=github
+        continue-on-error: true  # Phase 2 暂不阻塞，仅警告
+```
 
 ---
 
@@ -645,10 +705,35 @@ def func(arg1):
 
 ---
 
-## 八、实施建议
+## 八、评审检查清单
 
-1. **优先修复 P0 问题**：Protocol 实现类、`__post_init__`、异常类
-2. **统一风格**：建议 infrastructure 层使用英文，domain 层使用中文（保持领域术语一致性）
-3. **添加 Architecture 信息**：所有文件头添加层和依赖说明
-4. **批量修复**：使用脚本批量处理重复性问题
-5. **Code Review 门槛**：将注释规范性纳入 PR review 检查清单
+### 代码审查时检查注释规范
+
+**文件头检查**：
+- [ ] 文件头包含 `Architecture:` 字段，明确标注层级
+- [ ] domain 层文件头包含 `Constraints: 领域层零外部依赖`
+- [ ] 文件头包含 `References:` 引用（如有 ADR/Story/SDD）
+
+**类 docstring 检查**：
+- [ ] 公共类有 docstring（使用 Google 风格）
+- [ ] 包含 `Attributes:` 说明（适用于 dataclass/实体类）
+- [ ] 包含 `Raises:` 说明（如有抛出异常）
+
+**方法 docstring 检查**：
+- [ ] 公共方法有 docstring
+- [ ] 包含 `Args:` 说明所有参数
+- [ ] 包含 `Returns:` 说明返回值
+- [ ] 包含 `Raises:` 说明可能抛出的异常
+
+**特殊情况检查**：
+- [ ] `__init__` 方法有 docstring（D107）
+- [ ] `__post_init__` 方法有 docstring（手动补充）
+- [ ] Protocol/抽象类有完整接口文档
+- [ ] 异常类有 docstring 说明何时抛出
+
+### CI 检查项
+
+- [ ] Ruff D 规则已添加到 `pyproject.toml`
+- [ ] GitHub Actions 配置了 docstring 检查
+- [ ] Phase 1 验收通过（D100/D101/D102/D103 无 ERROR）
+- [ ] 新代码 PR 必须通过 D100/D101/D102/D103 检查
