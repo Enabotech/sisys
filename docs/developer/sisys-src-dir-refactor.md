@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.8 |
+| 版本 | v2.9 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -65,7 +65,7 @@ src/
 | strategic_plan.py | StrategicPlan 实体, BLMPhase/PlanStatus 枚举 | ✅ |
 | tool.py | Tool 实体, ToolStatus/ToolCategory 枚举 | ✅ |
 
-#### 2.2.2 events/ — ⚠️ 混合基础设施（21 files）
+#### 2.2.2 events/ — ⚠️ 混合基础设施（21 files → 18 files 改造后）
 
 | 文件 | 定义 | 应在 |
 |------|------|------|
@@ -88,7 +88,7 @@ src/
 | tool_events.py | ToolExecuted | domain/events/ ✅ |
 | publisher.py | EventPublisher ABC | infrastructure/messaging/ ❌ |
 | listener.py | EventListener, InMemoryEventListener, EventListenerAsync | infrastructure/messaging/ ❌ |
-| store.py | EventStore ABC | infrastructure/messaging/ ❌ |
+| store.py | EventStore ABC | domain/events/ ✅（Port 接口，保留在 domain） |
 | publish_result.py | PublishResult dataclass | infrastructure/messaging/ ❌ |
 
 #### 2.2.3 repositories/ → ports/ — 重命名（12 files）
@@ -148,14 +148,14 @@ src/
 src/
 ├── domain/                         # ✅ 领域层（零外部依赖）
 │   ├── entities/                   # 9 files — 领域实体
-│   ├── events/                     # 17 files — 领域事件（移除基础设施前：21 files）
+│   ├── events/                     # 18 files — 领域事件（移除基础设施前：21 files）
 │   ├── ports/                      # 12 files — 端口接口（repositories/ 重命名）
 │   ├── services/                   # 5 files — 具体业务逻辑
 │   ├── value_objects/              # 2 files — 值对象（sensitive_data.py 待新建）
 │   └── exceptions/                 # 2 files — 领域异常
 │
 ├── application/                     # ✅ 应用层（用例编排）
-│   ├── ports/                      # 7 files — 应用层 Protocol（移动自 domain/services/）
+│   ├── ports/                      # 10 files — 应用层 Protocol（7个移动 + 3个序列化框架）
 │   ├── services/                   # 1 file — SixLayerStorageCoordinator
 │   ├── events/                     # 1 file — adapters.py（需审查 pydantic）
 │   └── use_cases/                  # 3 files — 用例
@@ -226,38 +226,56 @@ EOF
 #### 4.1.3 序列化框架重构：移除领域层序列化方法
 
 **问题**：
-- `domain/events/base.py` 的 `to_dict()/from_dict()` 违反领域层零依赖原则
-- `domain/entities/checkpoint_snapshot.py` 的 `to_redis_hash()/from_redis_hash()` 领域层感知基础设施
+- `domain/events/base.py` 的 `to_dict()/from_dict()` 违反六边形架构（领域层不应包含序列化实现）
+- `domain/entities/checkpoint_snapshot.py` 的 `to_redis_hash()/from_redis_hash()` 领域层感知基础设施细节
 - 各基础设施层实体重复实现相似的 `to_dict()/from_dict()` 模式
 
 **解决方案**：采用 **Serializable Protocol** 方案
 
-| 层级 | 职责 | 示例 |
+| 层级 | 职责 | 位置 |
 |------|------|------|
-| **Domain** | 实现 `Serializable` Protocol，提供字段元数据 | `CheckpointSnapshot`, `DomainEvent` |
+| **Domain** | 实现 `Serializable` Protocol，提供字段元数据 | `domain/ports/serialization.py` |
 | **Application** | 定义 `SerializationPort` 抽象接口 | `application/ports/serialization.py` |
-| **Infrastructure** | 实现具体序列化器 | `JsonSerializer`, `RedisHashSerializer` |
+| **Infrastructure** | 实现具体序列化器 | `infrastructure/serialization/*.py` |
 
 **重构步骤**：
 
-1. **创建应用层序列化端口**（见 4.6 节）
-2. **改造领域实体**：移除序列化方法，实现 `Serializable` Protocol
-3. **基础设施层实现序列化器**：见 4.6 节
+1. **创建 `domain/ports/serialization.py`**：定义 `Serializable` Protocol 和 `SerializationField`
+2. **创建 `application/ports/serialization.py`**：定义 `SerializationPort` 抽象接口
+3. **改造领域实体**：移除序列化方法，实现 `Serializable` Protocol
+4. **基础设施层实现序列化器**：见 5.4 节
 
 #### 4.1.4 移动事件基础设施
+
+**说明**：`EventStore` ABC 是领域层定义的 Port 接口，应保留在 `domain/events/` 目录，不应移动到 infrastructure。
 
 ```bash
 mkdir -p src/infrastructure/messaging/
 
 # 注意：infrastructure/messaging/event_store.py 已存在（237行实现）
-# 移动 domain/events/store.py（66行 ABC接口）到 infrastructure/messaging/event_store_domain.py
-# 并更新 infrastructure/messaging/event_store.py 的导入
+# 这是 PostgreSQLEventStore 实现，不是 ABC 接口
 
+# 以下文件移动到 infrastructure/messaging/
 mv src/domain/events/publisher.py src/infrastructure/messaging/event_publisher.py
 mv src/domain/events/listener.py src/infrastructure/messaging/event_listener.py
-mv src/domain/events/store.py src/infrastructure/messaging/event_store_domain.py
 mv src/domain/events/publish_result.py src/infrastructure/messaging/publish_result.py
+
+# EventStore ABC 保留在 domain/events/（是领域层 Port 定义）
+# 不要移动 store.py 到 infrastructure/
 ```
+
+**EventStore 接口的正确位置**：
+
+| 文件 | 位置 | 原因 |
+|------|------|------|
+| `EventStore` ABC | `domain/events/store.py` | Port 接口定义，领域层概念 |
+| `InMemoryEventStore` | `tests/` | 测试实现 |
+| `PostgreSQLEventStore` | `infrastructure/messaging/event_store.py` | 基础设施实现 |
+
+**关键约束**：
+- Port 接口（ABC）在 domain 层
+- 具体实现在 infrastructure 层
+- `PostgreSQLEventStore` 实现中调用 `DomainEvent.from_dict()` 的问题需通过序列化器解决（见 5.8 节）
 
 #### 4.1.5 移动 Protocol 文件到 application/ports/
 
@@ -291,11 +309,11 @@ strategic_plan.py
 tool.py
 ```
 
-#### 4.2.2 domain/events/ — 移除基础设施（17 files）
+#### 4.2.2 domain/events/ — 移除基础设施（18 files）
 
 | 文件 | 说明 |
 |------|------|
-| base.py | DomainEvent（移除序列化） |
+| base.py | DomainEvent（移除序列化，实现 Serializable Protocol） |
 | enums.py | 领域枚举 |
 | agent_events.py | AgentDecided |
 | audit_events.py | AuditEvent |
@@ -312,6 +330,7 @@ tool.py
 | planning_events.py | StrategicDeviationWarning |
 | routing_events.py | RoutingDecided |
 | tool_events.py | ToolExecuted |
+| store.py | EventStore ABC（Port 接口，保留在 domain） |
 
 #### 4.2.3 domain/ports/ — 重命名自 repositories/（12 files）
 
@@ -524,7 +543,12 @@ unit_of_work/
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              domain/                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  领域实体实现 Serializable Protocol                               │   │
+│  │  ports/serialization.py                                        │   │
+│  │  • Serializable Protocol (领域层定义)                           │   │
+│  │  • SerializationField (字段元数据)                              │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  领域实体实现 Serializable Protocol                              │   │
 │  │  • get_serialization_type() → 类型标识符                         │   │
 │  │  • get_fields() → 字段元数据列表                                 │   │
 │  │  无任何序列化方法，仅持有纯业务数据                                │   │
@@ -534,16 +558,19 @@ unit_of_work/
                                     │ 依赖倒置
                                     │
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           application/                                   │
+│                           application/                                  │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  SerializationPort (抽象接口)                                     │   │
-│  │  • serialize(obj) → Any                                          │   │
-│  │  • deserialize(data, target_type) → obj                           │   │
-│  │  • can_handle(obj_or_type) → bool                                │   │
+│  │  ports/serialization.py                                         │   │
+│  │  • SerializationPort (抽象接口)                                  │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  StandardSerializeRules (标准类型转换规则)                        │   │
-│  │  UUID ↔ str, datetime ↔ ISO 8601, Enum ↔ value                   │   │
+│  │  ports/serialization_rules.py                                    │   │
+│  │  • StandardSerializeRules (标准类型转换规则)                    │   │
+│  │  • UUID ↔ str, datetime ↔ ISO 8601, Enum ↔ value               │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  ports/type_registry.py                                          │   │
+│  │  • TypeRegistry (类型注册表)                                     │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ▲
@@ -562,36 +589,24 @@ unit_of_work/
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Serializable Protocol 定义
+**架构要点**：
+- `Serializable Protocol` 定义在 `domain/ports/`，由领域实体实现
+- `SerializationPort` 定义在 `application/ports/`，由基础设施实现
+- `StandardSerializeRules` 和 `TypeRegistry` 在 `application/ports/`，为序列化器提供通用规则
+- 依赖方向：`domain` ← `application` ← `infrastructure`（符合六边形架构）
+
+### 5.2 Serializable Protocol 定义（domain 层）
 
 ```python
-# application/ports/serialization.py
+# domain/ports/serialization.py
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, TypeVar, Protocol, runtime_checkable
-
-T = TypeVar("T")
-
-
-@runtime_checkable
-class Serializable(Protocol):
-    """可序列化类型协议（由领域层实现）"""
-
-    @classmethod
-    def get_serialization_type(cls) -> str:
-        """返回类型标识符，用于反序列化时路由"""
-        ...
-
-    @classmethod
-    def get_fields(cls) -> list["SerializationField"]:
-        """返回所有需要序列化的字段元数据"""
-        ...
+from typing import Any
 
 
 @dataclass(frozen=True)
 class SerializationField:
-    """字段序列化元数据"""
+    """字段序列化元数据（领域层定义）"""
     name: str
     type: type
     default: Any = None
@@ -599,6 +614,31 @@ class SerializationField:
     is_uuid: bool = False
     is_datetime: bool = False
     is_nested_dataclass: bool = False
+
+
+class Serializable:
+    """可序列化类型协议（由领域实体实现）"""
+
+    @classmethod
+    def get_serialization_type(cls) -> str:
+        """返回类型标识符，用于反序列化时路由"""
+        ...
+
+    @classmethod
+    def get_fields(cls) -> list[SerializationField]:
+        """返回所有需要序列化的字段元数据"""
+        ...
+```
+
+### 5.2.1 SerializationPort 定义（application 层）
+
+```python
+# application/ports/serialization.py
+
+from abc import ABC, abstractmethod
+from typing import Any, TypeVar, Generic
+
+T = TypeVar("T")
 
 
 class SerializationPort(ABC, Generic[T]):
@@ -642,7 +682,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from src.application.ports.serialization import Serializable, SerializationField
+from src.domain.ports.serialization import Serializable, SerializationField
 
 
 @dataclass(frozen=True)
@@ -663,8 +703,6 @@ class CheckpointSnapshot:
 
     @classmethod
     def get_fields(cls) -> list[SerializationField]:
-        from uuid import UUID
-        from datetime import datetime
         return [
             SerializationField("snapshot_id", UUID, is_uuid=True),
             SerializationField("session_id", str),
@@ -688,6 +726,11 @@ class CheckpointSnapshot:
         )
 ```
 
+**关键变更**：
+- `to_redis_hash()` / `from_redis_hash()` 方法被移除
+- 改为实现 `Serializable` Protocol，提供字段元数据
+- 序列化逻辑由 `RedisHashSerializer` 接管（见 5.4.2 节）
+
 #### 5.3.2 DomainEvent 改造
 
 **改造前**（存在问题）：
@@ -706,7 +749,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from src.application.ports.serialization import Serializable, SerializationField
+from src.domain.ports.serialization import Serializable, SerializationField
 
 
 @dataclass(frozen=True)
@@ -726,7 +769,7 @@ class DomainEvent:
     causation_id: UUID | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    _registry: dict[str, type["DomainEvent"]] = {}
+    _registry: ClassVar[dict[str, type["DomainEvent"]]] = {}
 
     @classmethod
     def get_serialization_type(cls) -> str:
@@ -765,6 +808,11 @@ class DomainEvent:
                     break
 ```
 
+**关键变更**：
+- `to_dict()` / `from_dict()` 方法被移除
+- 改为实现 `Serializable` Protocol，提供字段元数据
+- 序列化逻辑由 `JsonSerializer` 接管（见 5.4.1 节）
+
 ### 5.4 序列化器实现（基础设施层）
 
 #### 5.4.1 JSON 序列化器
@@ -778,6 +826,7 @@ from typing import Any, TypeVar, Type, get_args
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
+from src.domain.ports.serialization import SerializationField
 
 
 T = TypeVar("T")
@@ -841,6 +890,7 @@ from typing import Any, TypeVar, Type
 
 from src.application.ports.serialization import SerializationPort
 from src.application.ports.serialization_rules import StandardSerializeRules
+from src.domain.ports.serialization import SerializationField
 
 
 T = TypeVar("T")
@@ -976,18 +1026,20 @@ src/
 │   ├── events/
 │   │   ├── base.py                # ✅ 实现 Serializable Protocol
 │   │   └── ...
+│   ├── ports/
+│   │   └── serialization.py        # ✅ Serializable Protocol, SerializationField
 │   └── ...
 │
 ├── application/                     # ✅ 应用层
 │   ├── ports/
 │   │   ├── __init__.py
-│   │   ├── serialization.py       # SerializationPort, Serializable
-│   │   ├── serialization_rules.py  # StandardSerializeRules
-│   │   └── type_registry.py        # TypeRegistry
+│   │   ├── serialization.py       # ✅ SerializationPort (抽象接口)
+│   │   ├── serialization_rules.py  # ✅ StandardSerializeRules
+│   │   └── type_registry.py        # ✅ TypeRegistry
 │   └── ...
 │
 ├── infrastructure/                  # ✅ 基础设施层
-│   └── serialization/               # 新建目录
+│   └── serialization/               # ✅ 序列化器实现
 │       ├── __init__.py
 │       ├── json_serializer.py       # JsonSerializer
 │       ├── redis_hash_serializer.py # RedisHashSerializer
@@ -995,6 +1047,74 @@ src/
 │       └── jsonb_serializer.py     # JsonbSerializer
 │   └── ...
 ```
+
+### 5.8 向后兼容性与调用方改造
+
+**问题**：改造 `CheckpointSnapshot` 后，现有调用方 `RedisSnapshotStore` 直接调用 `to_redis_hash()` 方法。
+
+**现有调用方**（`redis_snapshot_store.py`）：
+```python
+# 改造前
+hash_data = snapshot.to_redis_hash()
+snapshot = CheckpointSnapshot.from_redis_hash(hash_data)
+```
+
+**改造后方案**：
+序列化器接管后，调用方应改为使用序列化器：
+
+```python
+# 改造后
+from src.infrastructure.serialization.redis_hash_serializer import RedisHashSerializer
+
+serializer = RedisHashSerializer()
+
+# 保存时
+hash_data = serializer.serialize(snapshot)
+
+# 加载时
+snapshot = serializer.deserialize(hash_data, CheckpointSnapshot)
+```
+
+**PostgreSQLEventStore 改造说明**：
+
+当前 `infrastructure/messaging/event_store.py` 中 `PostgreSQLEventStore.get_events()` 直接调用 `DomainEvent.from_dict()`：
+
+```python
+# 当前实现（存在问题）
+events.append(DomainEvent.from_dict(event_data))
+```
+
+改造后，`DomainEvent.from_dict()` 将被移除，改为使用序列化器：
+
+```python
+# 改造后
+from src.infrastructure.serialization.json_serializer import JsonSerializer
+from src.application.ports.type_registry import TypeRegistry
+
+serializer = JsonSerializer()
+events.append(serializer.deserialize(event_data, DomainEvent))
+```
+
+**验收条件**：
+- [ ] `PostgreSQLEventStore` 使用 `JsonSerializer` 而非直接调用 `DomainEvent.from_dict()`
+- [ ] `RedisSnapshotStore` 使用 `RedisHashSerializer` 而非直接调用实体方法
+- [ ] `DomainEvent.from_dict()` 方法被移除
+- [ ] `CheckpointSnapshot` 移除 `to_redis_hash()` / `from_redis_hash()` 方法
+- [ ] 序列化器正确处理 `state_data: dict[str, Any]` 字段（嵌套字典的 JSON 序列化）
+
+### 5.9 新建文件清单（序列化框架）
+
+| 路径 | 说明 |
+|------|------|
+| `domain/ports/serialization.py` | Serializable Protocol, SerializationField |
+| `application/ports/serialization.py` | SerializationPort 抽象接口 |
+| `application/ports/serialization_rules.py` | StandardSerializeRules |
+| `application/ports/type_registry.py` | TypeRegistry |
+| `infrastructure/serialization/__init__.py` | 模块导出 |
+| `infrastructure/serialization/json_serializer.py` | JsonSerializer |
+| `infrastructure/serialization/redis_hash_serializer.py` | RedisHashSerializer |
+| `infrastructure/serialization/dict_serializer.py` | DictSerializer（测试用） |
+| `infrastructure/serialization/jsonb_serializer.py` | JsonbSerializer |
 
 ---
 
@@ -1027,8 +1147,8 @@ src/
 | 操作 | 数量 |
 |------|------|
 | 重命名目录 | 1 (`repositories/` → `ports/`) |
-| 移动文件 | 15 |
-| 新建文件 | 5（序列化框架：serialization.py, serialization_rules.py, type_registry.py, json_serializer.py, redis_hash_serializer.py） |
+| 移动文件 | 14（事件基础设施3个 + Protocol 7个 + security 重命名1个 + 新建 domain/ports/serialization.py 1个 + 新建 application/ports/ 3个） |
+| 新建文件 | 9（序列化框架：domain/ports/serialization.py, application/ports/serialization.py, application/ports/serialization_rules.py, application/ports/type_registry.py, infrastructure/serialization/*.py） |
 | 修改文件 | 2（`base.py` 改造为 Serializable Protocol, `checkpoint_snapshot.py` 移除序列化） |
 
 ### 7.2 需更新的导入路径
@@ -1048,15 +1168,21 @@ src/
 
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
 - [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
-- [ ] 4 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`
+- [ ] 3 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`（publisher.py, listener.py, publish_result.py）
+- [ ] `EventStore` ABC 保留在 `domain/events/store.py`（是领域层 Port 接口）
 - [ ] `DomainEvent` 类实现 `Serializable` Protocol，无 `to_dict()` / `from_dict()` 方法
 - [ ] `CheckpointSnapshot` 类实现 `Serializable` Protocol，无 `to_redis_hash()` / `from_redis_hash()` 方法
-- [ ] `application/ports/serialization.py` 定义 `SerializationPort` 和 `Serializable` Protocol
+- [ ] `domain/ports/serialization.py` 定义 `Serializable` Protocol 和 `SerializationField`
+- [ ] `application/ports/serialization.py` 定义 `SerializationPort` 抽象接口
+- [ ] `application/ports/serialization_rules.py` 定义 `StandardSerializeRules`
+- [ ] `application/ports/type_registry.py` 定义 `TypeRegistry`
 - [ ] `infrastructure/serialization/` 包含 JSON 和 Redis Hash 序列化器实现
 - [ ] `domain/exceptions/` 包含 `MemoryNotFoundError` 和 `MemoryVersionConflictError`
 - [ ] `domain/value_objects/sensitive_data.py` 包含敏感数据类型定义
 - [ ] `infrastructure/security/models.py` 重命名为 `value_objects.py`
 - [ ] `infrastructure/config/sovereignty.py` 从 `domain.value_objects` 导入
+- [ ] `RedisSnapshotStore` 使用 `RedisHashSerializer` 而非直接调用实体方法
+- [ ] `PostgreSQLEventStore` 使用 `JsonSerializer` 而非直接调用 `DomainEvent.from_dict()`
 - [ ] 所有测试通过
 - [ ] `mypy .` 无错误
 - [ ] `ruff check .` 无错误
@@ -1150,7 +1276,6 @@ src/
 | domain/repositories/ | domain/ports/ | 目录重命名 |
 | domain/events/publisher.py | infrastructure/messaging/event_publisher.py | 事件基础设施 |
 | domain/events/listener.py | infrastructure/messaging/event_listener.py | 事件基础设施 |
-| domain/events/store.py | infrastructure/messaging/event_store_domain.py | 事件基础设施（ABC接口） |
 | domain/events/publish_result.py | infrastructure/messaging/publish_result.py | 事件基础设施 |
 | domain/services/audit_service.py | application/ports/audit_port.py | Protocol |
 | domain/services/auth_service.py | application/ports/auth_port.py | Protocol |
@@ -1161,7 +1286,9 @@ src/
 | domain/services/text_extractor_service.py | application/ports/text_extractor_port.py | Protocol |
 | infrastructure/security/models.py | infrastructure/security/value_objects.py | 重命名 |
 
-**注意**: `infrastructure/messaging/event_store.py` (237行) 已存在，是实现文件。移动的是 ABC 接口 `store.py` (66行)，重命名为 `event_store_domain.py`。
+**注意**：
+- `EventStore` ABC 保留在 `domain/events/store.py`（是领域层 Port 接口）
+- `infrastructure/messaging/event_store.py` (237行) 是 `PostgreSQLEventStore` 实现，无需移动
 
 ### B. 新建文件清单
 
@@ -1170,7 +1297,8 @@ src/
 | domain/exceptions/__init__.py | 导出异常 |
 | domain/exceptions/memory_exceptions.py | MemoryNotFoundError, MemoryVersionConflictError |
 | domain/value_objects/sensitive_data.py | SensitiveDataType, DataResidency, WhitelistStatus, ApprovalStatus 等值对象 |
-| application/ports/serialization.py | SerializationPort, Serializable Protocol, SerializationField |
+| domain/ports/serialization.py | Serializable Protocol, SerializationField |
+| application/ports/serialization.py | SerializationPort 抽象接口 |
 | application/ports/serialization_rules.py | StandardSerializeRules 标准类型转换规则 |
 | application/ports/type_registry.py | TypeRegistry 类型注册表 |
 | infrastructure/serialization/__init__.py | 序列化模块导出 |
