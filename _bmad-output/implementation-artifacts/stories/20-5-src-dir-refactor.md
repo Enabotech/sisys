@@ -208,8 +208,10 @@
 
 **验证标准:**
 - [ ] 新建 `domain/value_objects/sensitive_data.py`
-- [ ] `infrastructure/security/models.py` 重命名为 `value_objects.py`
+- [ ] `domain/value_objects/sensitive_data.py` 包含 `SensitiveDataType`, `DataResidency`, `WhitelistStatus`, `ApprovalStatus` 等值对象
+- [ ] `infrastructure/security/models.py` 重命名为 `infrastructure/security/value_objects.py`
 - [ ] `infrastructure/config/sovereignty.py` 从 `domain.value_objects.sensitive_data` 导入
+- [ ] 所有导入 `security/value_objects.py` 的文件已更新
 
 ### AC-14: 调用方改造
 
@@ -220,6 +222,7 @@
 **验证标准:**
 - [ ] `PostgreSQLEventStore` 使用 `JsonSerializer` 而非 `DomainEvent.from_dict()`
 - [ ] `RedisSnapshotStore` 使用 `RedisHashSerializer` 而非 `CheckpointSnapshot.to_redis_hash()`
+- [ ] `RedisSnapshotStore` 引用 `infrastructure/serialization/redis_hash_serializer.py`
 - [ ] 所有测试通过
 
 ### AC-15: 六边形架构约束验证
@@ -258,19 +261,46 @@
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 目录重命名 repositories → ports | Task 1 | Subtask 1.1-1.4 | `test_domain_ports_rename.py` |
 | AC-2 | 事件基础设施移动到 infrastructure | Task 2 | Subtask 2.1-2.5 | `test_event_infra_move.py` |
-| AC-3 | Protocol 文件移动到 application/ports | Task 3 | Subtask 3.1-3.8 | `test_protocol_file_move.py` |
+| AC-3 | Protocol 文件移动到 application/ports | Task 3 | Subtask 3.1-3.9 | `test_protocol_file_move.py` |
 | AC-4 | Serializable Protocol 定义 | Task 4 | Subtask 4.1-4.3 | `test_serializable_protocol.py` |
-| AC-5 | DomainEvent 实现 Serializable Protocol | Task 5 | Subtask 5.1-5.4 | `test_domain_event_serialization.py` |
-| AC-6 | CheckpointSnapshot 实现 Serializable Protocol | Task 6 | Subtask 6.1-6.4 | `test_checkpoint_snapshot_serialization.py` |
+| AC-5 | DomainEvent 实现 Serializable Protocol | Task 5 | Subtask 5.1-5.6 | `test_domain_event_serialization.py` |
+| AC-6 | CheckpointSnapshot 实现 Serializable Protocol | Task 6 | Subtask 6.1-6.5 | `test_checkpoint_snapshot_serialization.py` |
 | AC-7 | SerializationPort 定义 | Task 7 | Subtask 7.1-7.3 | `test_serialization_port.py` |
 | AC-8 | StandardSerializeRules 实现 | Task 8 | Subtask 8.1-8.3 | `test_serialize_rules.py` |
-| AC-9 | TypeRegistry 实现 | Task 9 | Subtask 9.1-9.4 | `test_type_registry.py` |
-| AC-10 | JsonSerializer 实现 | Task 10 | Subtask 10.1-10.4 | `test_json_serializer.py` |
-| AC-11 | RedisHashSerializer 实现 | Task 11 | Subtask 11.1-11.4 | `test_redis_hash_serializer.py` |
-| AC-12 | domain/exceptions/ 集中管理异常 | Task 12 | Subtask 12.1-12.3 | `test_domain_exceptions.py` |
+| AC-9 | TypeRegistry 实现 | Task 9 | Subtask 9.1-9.5 | `test_type_registry.py` |
+| AC-10 | JsonSerializer 实现 | Task 10 | Subtask 10.1-10.5 | `test_json_serializer.py` |
+| AC-11 | RedisHashSerializer 实现 | Task 11 | Subtask 11.1-11.5 | `test_redis_hash_serializer.py` |
+| AC-12 | domain/exceptions/ 集中管理异常 | Task 12 | Subtask 12.1-12.4 | `test_domain_exceptions.py` |
 | AC-13 | sovereignty.py 跨层导入修复 | Task 13 | Subtask 13.1-13.4 | `test_sovereignty_fix.py` |
-| AC-14 | 调用方改造 | Task 14 | Subtask 14.1-14.3 | `test_caller_refactor.py` |
-| AC-15 | 六边形架构约束验证 | Task 15 | Subtask 15.1-15.3 | `test_hexagonal_constraints.py` |
+| AC-14 | 调用方改造 | Task 14 | Subtask 14.1-14.4 | `test_caller_refactor.py` |
+| AC-15 | 六边形架构约束验证 | Task 15 | Subtask 15.1-15.5 | `test_hexagonal_constraints.py` |
+
+### Task 执行顺序与依赖关系
+
+> ⚠️ **重要约束：** 虽然每个 Task 内部独立完成 TDD 循环，但 Task 之间存在依赖关系，必须按顺序执行。
+
+| 阶段 | Task | 依赖说明 |
+|------|------|----------|
+| **阶段一：文件迁移** | Task 1-3 | 可并行执行文件移动操作 |
+| **阶段二：序列化框架** | Task 4-11 | 依赖阶段一完成（`domain/ports/`, `application/ports/` 目录已存在） |
+| **阶段三：收尾** | Task 12-15 | 依赖序列化框架完成 |
+
+**依赖链：**
+```
+Task 1 (目录重命名) ─┬─→ Task 4 (Serializable Protocol) ─→ Task 5 → Task 6
+                     │                                       ↓
+Task 2 (事件基础设施)─┤           Task 7 (SerializationPort) ←←←←←←←←┘
+                     │                   ↓
+Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
+                            ↓
+                     Task 9 (TypeRegistry) ─→ Task 10 → Task 11
+                                                    ↓
+                     Task 12 (exceptions) ← Task 13 (sovereignty)
+                            ↓
+                     Task 14 (调用方改造)
+                            ↓
+                     Task 15 (架构验证)
+```
 
 ---
 
@@ -841,6 +871,9 @@
 | 2 | P0-2: EventStore ABC 位置确认 | P0 | 保留在 domain/events/，是 Port 接口定义 |
 | 3 | P1-1: PostgreSQLEventStore 改造依赖序列化器 | P1 | Task 10/11 先完成，Task 14 后执行 |
 | 4 | P2-1: DomainEvent 多态反序列化衔接 | P2 | `__init_subclass__` 自动向 TypeRegistry 注册 |
+| 5 | P0-3: Task 执行顺序与依赖关系未明确 | P0 | 新增"Task 执行顺序与依赖关系"章节，明确三阶段执行流程 |
+| 6 | P2-2: AC-13 验证标准不完整 | P2 | 补充值对象迁移验证和导入方更新验证 |
+| 7 | P2-3: AC-14 缺少 RedisSnapshotStore 引用验证 | P2 | 补充 `RedisSnapshotStore` 引用 `infrastructure/serialization/redis_hash_serializer.py` 验证 |
 
 ### 下一步 Next Steps
 
@@ -848,7 +881,7 @@
 - [ ] 运行 `dev-story 20-5` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
 - [ ] 运行 `validate-create-story` 质量检查
-- [ ] 实施顺序建议：Task 0 → Task 1-3（文件移动）→ Task 4-11（序列化框架）→ Task 12-15（收尾）
+- [ ] 实施顺序：**阶段一**（Task 1-3 文件迁移）→ **阶段二**（Task 4-11 序列化框架）→ **阶段三**（Task 12-15 收尾）
 
 ---
 
