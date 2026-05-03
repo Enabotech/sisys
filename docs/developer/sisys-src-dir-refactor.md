@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.14 |
+| 版本 | v2.15 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -776,10 +776,6 @@ class DomainEvent:
     _registry: ClassVar[dict[str, type["DomainEvent"]]] = {}
 
     @classmethod
-    def get_serialization_type(cls) -> str:
-        return "DomainEvent"
-
-    @classmethod
     def get_fields(cls) -> list[SerializationField]:
         return [
             SerializationField("event_id", UUID, is_uuid=True),
@@ -809,11 +805,10 @@ class DomainEvent:
                 if f.name == "event_type" and not f.init:
                     if f.default is not MISSING:
                         DomainEvent._registry[f.default] = cls
+                        # 向 TypeRegistry 注册（使用 event_type 值作为类型标识符）
+                        from src.application.ports.type_registry import TypeRegistry
+                        TypeRegistry.register(f.default, cls)
                     break
-            # 向 TypeRegistry 注册（用于新序列化器）
-            if hasattr(cls, "get_serialization_type"):
-                from src.application.ports.type_registry import TypeRegistry
-                TypeRegistry.register(cls.get_serialization_type(), cls)
 ```
 
 **关键变更**：
@@ -1104,44 +1099,47 @@ class RedisHashSerializer(SerializationPort[T]):
 
 ### 5.6 DomainEvent 多态反序列化衔接
 
-**问题**：现有 `DomainEvent` 通过 `__init_subclass__` + `_registry` 实现子类自动注册，新方案使用 `Serializable.get_serialization_type()` + `TypeRegistry`，两者需正确衔接。
+**问题**：现有 `DomainEvent` 通过 `__init_subclass__` + `_registry` 实现子类自动注册，新方案使用 `TypeRegistry`，两者需正确衔接。
 
-**解决方案**：在 `DomainEvent.__init_subclass__` 中自动向 `TypeRegistry` 注册：
+**解决方案**：在 `DomainEvent.__init_subclass__` 中自动向 `TypeRegistry` 注册，使用 `event_type` 字段值作为类型标识符：
 
 ```python
 # domain/events/base.py（改造后）
 
+@classmethod
 def __init_subclass__(cls, **kwargs: Any) -> None:
-    """自动注册子类用于多态反序列化"""
+    """自动注册子类（向 DomainEvent._registry 和 TypeRegistry）"""
     super().__init_subclass__(**kwargs)
     if is_dataclass(cls):
-        # 向 DomainEvent._registry 注册（用于 from_dict 兼容）
         for f in fields(cls):
             if f.name == "event_type" and not f.init:
                 if f.default is not MISSING:
+                    # 向 DomainEvent._registry 注册（用于 from_dict 兼容）
                     DomainEvent._registry[f.default] = cls
+                    # 向 TypeRegistry 注册（使用 event_type 值作为类型标识符）
+                    from src.application.ports.type_registry import TypeRegistry
+                    TypeRegistry.register(f.default, cls)
                 break
-        # 向 TypeRegistry 注册（用于新序列化器）
-        if hasattr(cls, "get_serialization_type"):
-            from src.application.ports.type_registry import TypeRegistry
-            TypeRegistry.register(cls.get_serialization_type(), cls)
 ```
 
-**子类 `get_serialization_type()` 返回值**：
+**event_type 值与类映射**：
 
-| 子类 | `get_serialization_type()` 返回值 |
-|------|-------------------------------------|
-| `DomainEvent` | `"DomainEvent"` |
+| 子类 | event_type 默认值 |
+|------|-------------------|
+| `DomainEvent` | `""`（基类不注册） |
 | `DocumentProcessed` | `"DocumentProcessed"` |
 | `StrategicDeviationWarning` | `"StrategicDeviationWarning"` |
 | ... | ... |
 
-**初始化时自动注册**：
+**说明**：子类通过 `event_type` 字段的 `default` 值自动注册，无需额外 `get_serialization_type()` 方法。
+
+**应用启动时初始化**：
 ```python
 # application/ports/type_registry.py
 
-# 应用启动时调用
+# 应用启动时调用（确保所有 DomainEvent 子类已被注册）
 TypeRegistry.auto_register_domain_events()
+```
 ```
 
 ### 5.7 序列化格式与存储介质映射
