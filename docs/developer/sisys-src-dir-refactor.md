@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.9 |
+| 版本 | v2.10 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -29,7 +29,7 @@
 | 问题 | 描述 |
 |------|------|
 | **目录命名不准确** | `domain/repositories/` 实际是 Port 接口，应为 `domain/ports/` |
-| **事件基础设施混入领域** | `publisher.py`, `listener.py`, `store.py` 是技术实现，不是领域概念 |
+| **事件基础设施混入领域** | `publisher.py`, `listener.py`, `event_store.py` 是技术实现，不是领域概念 |
 | **Protocol 定义错位** | 纯接口（`AuditService`, `CompressorService` 等）混入 `domain/services/`，应属应用层 |
 | **序列化职责混乱** | `DomainEvent`、`CheckpointSnapshot` 等直接在领域层实现序列化，缺乏统一抽象 |
 | **异常定义分散** | `MemoryNotFoundError` 定义在 `memory_service.py` 中 |
@@ -88,7 +88,7 @@ src/
 | tool_events.py | ToolExecuted | domain/events/ ✅ |
 | publisher.py | EventPublisher ABC | infrastructure/messaging/ ❌ |
 | listener.py | EventListener, InMemoryEventListener, EventListenerAsync | infrastructure/messaging/ ❌ |
-| store.py | EventStore ABC | domain/events/ ✅（Port 接口，保留在 domain） |
+| event_store.py | EventStore ABC | domain/events/ ✅（Port 接口，保留在 domain） |
 | publish_result.py | PublishResult dataclass | infrastructure/messaging/ ❌ |
 
 #### 2.2.3 repositories/ → ports/ — 重命名（12 files）
@@ -252,7 +252,7 @@ EOF
 ```bash
 mkdir -p src/infrastructure/messaging/
 
-# 注意：infrastructure/messaging/event_store.py 已存在（237行实现）
+# 注意：infrastructure/messaging/event_store.py 已存在（PostgreSQLEventStore 实现）
 # 这是 PostgreSQLEventStore 实现，不是 ABC 接口
 
 # 以下文件移动到 infrastructure/messaging/
@@ -260,15 +260,15 @@ mv src/domain/events/publisher.py src/infrastructure/messaging/event_publisher.p
 mv src/domain/events/listener.py src/infrastructure/messaging/event_listener.py
 mv src/domain/events/publish_result.py src/infrastructure/messaging/publish_result.py
 
-# EventStore ABC 保留在 domain/events/（是领域层 Port 定义）
-# 不要移动 store.py 到 infrastructure/
+# EventStore ABC 保留在 domain/events/event_store.py（是领域层 Port 定义）
+# 不要移动 event_store.py 到 infrastructure/
 ```
 
 **EventStore 接口的正确位置**：
 
 | 文件 | 位置 | 原因 |
 |------|------|------|
-| `EventStore` ABC | `domain/events/store.py` | Port 接口定义，领域层概念 |
+| `EventStore` ABC | `domain/events/event_store.py` | Port 接口定义，领域层概念 |
 | `InMemoryEventStore` | `tests/` | 测试实现 |
 | `PostgreSQLEventStore` | `infrastructure/messaging/event_store.py` | 基础设施实现 |
 
@@ -330,7 +330,7 @@ tool.py
 | planning_events.py | StrategicDeviationWarning |
 | routing_events.py | RoutingDecided |
 | tool_events.py | ToolExecuted |
-| store.py | EventStore ABC（Port 接口，保留在 domain） |
+| event_store.py | EventStore ABC（Port 接口，保留在 domain） |
 
 #### 4.2.3 domain/ports/ — 重命名自 repositories/（12 files）
 
@@ -435,8 +435,7 @@ dual_channel_event_bus.py
 event_bus.py
 event_bus_config_loader.py
 event_bus_factory.py
-event_store.py              # 已存在（实现）
-event_store_domain.py       # 从 domain/events/store.py 移动（ABC接口）
+event_store.py              # PostgreSQLEventStore 实现
 event_listener.py           # 从 domain/events/listener.py 移动
 event_publisher.py          # 从 domain/events/publisher.py 移动
 message_serializer.py
@@ -744,9 +743,10 @@ def from_dict(cls, data): ...
 ```python
 # domain/events/base.py（改造后）
 
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID
 
 from src.domain.ports.serialization import Serializable, SerializationField
@@ -1169,7 +1169,7 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 - [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
 - [ ] 7 个 Protocol 文件从 `domain/services/` 移至 `application/ports/`
 - [ ] 3 个事件基础设施文件从 `domain/events/` 移至 `infrastructure/`（publisher.py, listener.py, publish_result.py）
-- [ ] `EventStore` ABC 保留在 `domain/events/store.py`（是领域层 Port 接口）
+- [ ] `EventStore` ABC 保留在 `domain/events/event_store.py`（是领域层 Port 接口）
 - [ ] `DomainEvent` 类实现 `Serializable` Protocol，无 `to_dict()` / `from_dict()` 方法
 - [ ] `CheckpointSnapshot` 类实现 `Serializable` Protocol，无 `to_redis_hash()` / `from_redis_hash()` 方法
 - [ ] `domain/ports/serialization.py` 定义 `Serializable` Protocol 和 `SerializationField`
@@ -1287,8 +1287,8 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 | infrastructure/security/models.py | infrastructure/security/value_objects.py | 重命名 |
 
 **注意**：
-- `EventStore` ABC 保留在 `domain/events/store.py`（是领域层 Port 接口）
-- `infrastructure/messaging/event_store.py` (237行) 是 `PostgreSQLEventStore` 实现，无需移动
+- `EventStore` ABC 保留在 `domain/events/event_store.py`（是领域层 Port 接口）
+- `infrastructure/messaging/event_store.py` 是 `PostgreSQLEventStore` 实现，无需移动
 
 ### B. 新建文件清单
 
