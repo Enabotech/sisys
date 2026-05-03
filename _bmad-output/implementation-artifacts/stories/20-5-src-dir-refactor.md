@@ -53,7 +53,7 @@
 **Then** 所有导入路径更新，代码无断裂
 
 **验证标准:**
-- [ ] `domain/repositories/` 目录重命名为 `domain/ports/`
+- [ ] `domain/ports/` 目录存在（如已存在则跳过重命名）
 - [ ] 所有 `from src.domain.repositories` 导入更新为 `from src.domain.ports`
 - [ ] `__init__.py` 导出正确
 - [ ] `ruff check src/domain/` 通过
@@ -327,14 +327,16 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 
 **关联 AC:** AC-1
 
+> ⚠️ **目录已存在的处理：** 如果 `domain/ports/` 目录已存在（部分重构已完成），跳过重命名步骤，直接执行导入路径更新。
+
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_domain_ports_rename.py` |
-| 🟢 绿 | 执行 `mv src/domain/repositories/ src/domain/ports/` |
+| 🟢 绿 | 验证/创建 `domain/ports/` 目录 |
 | 🔄 重构 | 更新所有导入路径 |
 
 - [ ] Subtask 1.1: 🔴 红 — 编写测试验证 `domain/ports/` 存在
-- [ ] Subtask 1.2: 🟢 绿 — 执行目录重命名
+- [ ] Subtask 1.2: 🟢 绿 — 验证 `domain/ports/` 已存在或执行重命名
 - [ ] Subtask 1.3: 🟢 绿 — 更新 `__init__.py` 导出
 - [ ] Subtask 1.4: 🔄 重构 — 运行 `ruff check src/domain/` 验证
 
@@ -874,6 +876,7 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 | 5 | P0-3: Task 执行顺序与依赖关系未明确 | P0 | 新增"Task 执行顺序与依赖关系"章节，明确三阶段执行流程 |
 | 6 | P2-2: AC-13 验证标准不完整 | P2 | 补充值对象迁移验证和导入方更新验证 |
 | 7 | P2-3: AC-14 缺少 RedisSnapshotStore 引用验证 | P2 | 补充 `RedisSnapshotStore` 引用 `infrastructure/serialization/redis_hash_serializer.py` 验证 |
+| 8 | P0-4: Story 描述与项目当前状态不一致 | P0 | 更新 AC-1 和 Task 1，明确"目录已存在则跳过"处理逻辑 |
 
 ### 下一步 Next Steps
 
@@ -890,3 +893,4 @@ Task 3 (Protocol移动)─┴─→ Task 8 (StandardSerializeRules)
 **最后更新/Last Updated:** 2026-05-03
 **更新说明:**
 - v1.0.0: 初始版本，基于 sisys-src-dir-refactor.md v2.17 创建
+- v1.1.0: 第二轮审查修复 — 更新 AC-1 和 Task 1 描述，明确"目录已存在则跳过"处理逻辑（P0-4）
