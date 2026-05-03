@@ -5,7 +5,7 @@
 | 字段 | 值 |
 |------|-----|
 | 文档编号 | SISYS-GLOBAL-DIR-REFACTOR |
-| 版本 | v2.16 |
+| 版本 | v2.17 |
 | 日期 | 2026-05-03 |
 | 状态 | 待评审 |
 | 关联 Story | Epic 20 架构重构 |
@@ -872,8 +872,6 @@ class StandardSerializeRules:
 
 ```python
 # application/ports/type_registry.py
-
-from typing import Type
 
 
 class TypeRegistry:
