@@ -316,86 +316,284 @@ class Agent:
 
 ---
 
-## 六、批量修复工具
+## 六、业界成熟工具选型与配置
 
-### 1. 检测脚本
+### 1. Ruff — Docstring 检查（推荐）
+
+**规则集**：pydocstyle (D)
+
+| 规则 | 说明 | 严重级别 |
+|------|------|----------|
+| D100-D107 | 文档缺失检查（模块/类/方法/函数/包/嵌套类/__init__） | Error |
+| D200-D215 | 格式规范（空白行、缩进、摘要位置） | Warning |
+| D300-D301 | 引号转义 | Error |
+| D400-D416 | 内容规范（首字母大写、标点、节名称格式） | Warning |
+| D417 | 参数未文档化 | Error |
+
+**启用方式**：
+
+在 `pyproject.toml` 中添加：
+
+```toml
+[tool.ruff]
+line-length = 128
+target-version = "py311"
+select = ["E", "F", "I", "N", "W", "UP", "D"]  # 添加 D 规则集
+```
+
+**推荐配置**（选择性启用避免噪音）：
+
+```toml
+[tool.ruff]
+select = ["D", "D100", "D101", "D102", "D103", "D107", "D417"]  # 聚焦文档缺失
+extend-ignore = [
+    "D200",  # 允许单行 docstring
+    "D203",  # 允许类前无空白行
+    "D213",  # 允许多行 docstring 第二行在左侧
+    "D405",  # 允许节名首字母大写
+]
+```
+
+**运行检查**：
+
+```bash
+poetry run ruff check src/ --select=D
+```
+
+---
+
+### 2. Ruff — Docstring 自动修复
+
+Ruff 提供部分自动修复能力：
+
+| 规则 | 自动修复 | 说明 |
+|------|----------|------|
+| D200 | ✅ | 将 docstring 压缩到一行（如果符合） |
+| D205 | ✅ | 摘要后添加空行 |
+| D400 | ✅ | 末尾添加句号 |
+| 其他 | ❌ | 需手动修复 |
+
+**批量自动修复**：
+
+```bash
+# 只修复有自动修复能力的规则
+poetry run ruff check src/ --select=D --fix --unsafe-fixes
+
+# 查看可修复的问题
+poetry run ruff check src/ --select=D --show-fixes
+```
+
+---
+
+### 3. pydoclint — 深度 docstring 检查
+
+**特点**：
+- Google/NumPy docstring 格式强制检查
+- 参数类型检查（与实际签名对照）
+- Returns/Yields/Raises 完整性检查
+
+**规则集**：
+
+| 规则 | 说明 |
+|------|------|
+| DOC101 | Summary 不以动词第三人称单数结尾 |
+| DOC102 | Summary 首字母大写 |
+| DOC103 | Summary 末以句号结尾 |
+| DOC201 | Args 缺少文档 |
+| DOC202 | Returns 缺少文档 |
+| DOC203 | Yields 缺少文档 |
+| DOC204 | Raises 缺少文档 |
+| DOC205 | Sections 缩进不正确 |
+| DOC206 | Sections 之间有空行 |
+| DOC207 | 节名称不以冒号结尾 |
+| DOC208 | Section 内容为空 |
+
+**安装**：
+
+```bash
+poetry add --group dev pydoclint
+```
+
+**配置**（pyproject.toml）：
+
+```toml
+[tool.pydoclint]
+verification_timeout = 120
+notation = "google"  # 或 "numpy"
+exclude = ["tests/", "**/__init__.py"]
+```
+
+**运行**：
+
+```bash
+poetry run pydoclint src/
+```
+
+---
+
+### 4. 检测脚本（基于 Ruff/pydoclint）
+
+#### 检测缺少文件头的模块
 
 ```bash
 #!/bin/bash
 # 检测缺少标准文件头的模块
-echo "=== 缺少标准文件头的文件 ==="
+echo "=== 缺少标准文件头的文件 (检查 Architecture: 关键字) ==="
 for f in $(find src -name "*.py" -type f); do
     if ! grep -q "Architecture:" "$f"; then
         echo "$f"
     fi
 done
+```
 
-# 检测 Protocol 实现类无 docstring
-echo "=== Protocol 实现类无 docstring ==="
-grep -rn "class.*Impl\|class.*Async" src --include="*.py" | while read line; do
-    file=$(echo "$line" | cut -d: -f1)
-    class=$(echo "$line" | grep -oP "class \K[^:]+")
-    # 检查下一行是否有 docstring
-    line_num=$(echo "$line" | cut -d: -f2)
-    next_line=$((line_num + 1))
-    if ! sed -n "${next_line}p" "$file" | grep -q '"""'; then
-        echo "$file: $class"
+#### 检测文档缺失（D100-D107）
+
+```bash
+#!/bin/bash
+echo "=== 缺少文档的公共定义 ==="
+poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107
+
+echo "=== 缺少参数文档的方法 ==="
+poetry run ruff check src/ --select=D417
+```
+
+#### 检测 docstring 格式问题
+
+```bash
+#!/bin/bash
+echo "=== docstring 格式问题 ==="
+poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205 --output-format=text
+
+echo "=== 内容规范问题 ==="
+poetry run ruff check src/ --select=D400,D401,D402,D403 --output-format=text
+```
+
+#### 综合检测脚本
+
+```bash
+#!/bin/bash
+# sisys 代码注释综合检测脚本
+
+set -e
+
+echo "=========================================="
+echo "sisys 代码注释规范性检测"
+echo "=========================================="
+
+# 1. 检查缺少文档的公共定义
+echo ""
+echo "[1/5] 检查缺少文档的公共定义..."
+poetry run ruff check src/ --select=D100,D101,D102,D103,D104,D105,D106,D107 --output-format=short 2>/dev/null || true
+
+# 2. 检查缺少 __init__ 文档
+echo ""
+echo "[2/5] 检查缺少 __init__ 文档..."
+poetry run ruff check src/ --select=D107 --output-format=short 2>/dev/null || true
+
+# 3. 检查缺少参数文档
+echo ""
+echo "[3/5] 检查缺少参数文档..."
+poetry run ruff check src/ --select=D417 --output-format=short 2>/dev/null || true
+
+# 4. 检查 docstring 格式问题
+echo ""
+echo "[4/5] 检查 docstring 格式问题..."
+poetry run ruff check src/ --select=D200,D201,D202,D203,D204,D205,D400,D401 --output-format=short 2>/dev/null || true
+
+# 5. 检查缺少标准文件头（无 Architecture 关键字）
+echo ""
+echo "[5/5] 检查缺少标准文件头..."
+for f in $(find src -name "*.py" -type f); do
+    if ! grep -q "Architecture:" "$f"; then
+        echo "  MISSING: $f"
     fi
 done
+
+echo ""
+echo "=========================================="
+echo "检测完成"
+echo "=========================================="
 ```
 
-### 2. 修复脚本（示例）
+---
 
-```python
-#!/usr/bin/env python3
-"""注释标准化修复脚本."""
+### 5. Ruff 配置推荐（pyproject.toml）
 
-import re
-from pathlib import Path
+```toml
+# ============================================
+# sisys - Ruff 配置
+# ============================================
 
-STANDARD_HEADER = '''"""{{module_name}} — {{description}}.
+[tool.ruff]
+line-length = 128
+target-version = "py311"
 
-Architecture:
-    Layer: {{layer}}
-    Depends: {{depends}}
-    Constraints: {{constraints}}
+# 启用规则
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "D",    # pydocstyle (docstring)
+    "PI",   # pep8-impiort (，禁止绝对导入)
+]
 
-References:
-{{references}}
+# 忽略规则
+ignore = [
+    # Docstring 格式（允许灵活格式）
+    "D200",   # 允许单行 docstring
+    "D203",   # 允许类前无额外空行
+    "D213",   # 允许多行 docstring 第二行在左侧
+    "D215",   # 允许节 underline 超过内容
+    # Naming（部分太严格）
+    "N802",   # 方法名大小写（已有代码风格）
+    "N803",   # 参数名大小写
+]
 
-Note:
-    {{note}}
-"""
-'''
+# 排除目录
+extend-exclude = [
+    ".claude/",
+    ".qwen/",
+    "_bmad/",
+    ".git/",
+    "__pycache__/",
+    "*.egg-info/",
+    ".venv/",
+    "venv/",
+]
 
-def fix_file_header(filepath: Path, layer: str, depends: str, constraints: str = ""):
-    content = filepath.read_text()
-
-    # 检查是否有标准文件头
-    if "Architecture:" not in content:
-        # 生成新的文件头
-        module_name = filepath.stem
-        description = content.split('"""')[1].split('\n')[0] if '"""' in content else "模块说明"
-
-        new_header = f'''"""{module_name} — {description}.
-
-Architecture:
-    Layer: {layer}
-    Depends: {depends}
-    Constraints: {constraints}
-
-Note:
-    None
-"""
-
-'''
-        # 替换现有文件头
-        if content.startswith('"""'):
-            end = content.find('"""', 3)
-            content = new_header + content[end+3:]
-
-        filepath.write_text(content)
+[tool.ruff.pydocstyle]
+convention = "google"  # 指定 Google 风格作为默认
 ```
+
+---
+
+### 6. 实施建议
+
+**Phase 1: 接入工具（1 天）**
+1. 在 `pyproject.toml` 中添加 Ruff D 规则
+2. 运行 `poetry run ruff check src/ --select=D > issues.txt`
+3. 评估问题数量和严重性
+
+**Phase 2: 批量修复（2-3 天）**
+1. 使用 `ruff check --fix` 自动修复可修复问题
+2. 手动修复 D417（缺少参数文档）
+3. 补充缺失的 docstring
+
+**Phase 3: CI 集成**
+```yaml
+# .github/workflows/lint.yml
+- name: Run Ruff docstring checks
+  run: poetry run ruff check src/ --select=D --output-format=github
+```
+
+**验收标准**：
+- ✅ `ruff check src/ --select=D100,D101,D102,D103,D107,D417` 无输出
+- ✅ 所有公共模块/类/方法有文档
+- ✅ 所有参数有 Args 说明
+- ✅ 所有 Returns/Raises 有说明
 
 ---
 
