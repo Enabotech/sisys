@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 
-from src.domain.services.semantic_cache import SemanticCache
+from src.application.ports.semantic_cache import SemanticCache
 
 
 class TestSemanticCacheInterface:

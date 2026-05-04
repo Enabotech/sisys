@@ -98,13 +98,14 @@ class TestArchitectureConstraints:
 
         assert len(violations) == 0, f"Security models found in domain layer: {violations}"
 
-    def test_security_services_protocol_in_domain(self):
-        """AuthService and PermissionService protocols should be in domain layer."""
-        auth_service_path = Path("src/domain/services/auth_service.py")
-        permission_service_path = Path("src/domain/services/permission_service.py")
+    def test_security_services_protocol_in_application_layer(self):
+        """AuthService and PermissionService protocols should be in application layer."""
+        # After refactoring, protocols are in application/ports
+        auth_service_path = Path("src/application/ports/auth_service.py")
+        permission_service_path = Path("src/application/ports/permission_service.py")
 
-        assert auth_service_path.exists(), "auth_service.py should exist in domain services"
-        assert permission_service_path.exists(), "permission_service.py should exist in domain services"
+        assert auth_service_path.exists(), "auth_service.py should exist in application/ports"
+        assert permission_service_path.exists(), "permission_service.py should exist in application/ports"
 
         # Check they define Protocol classes
         auth_content = auth_service_path.read_text()

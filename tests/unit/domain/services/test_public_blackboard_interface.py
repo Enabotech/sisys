@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 
-from src.domain.services.public_blackboard import PublicBlackboard
+from src.application.ports.public_blackboard import PublicBlackboard
 
 
 class TestPublicBlackboardInterface:

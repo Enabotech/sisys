@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from src.application.ports.audit_service import AuditService
 from src.domain.events.base import DomainEvent
-from src.domain.services.audit_service import AuditService
 
 if TYPE_CHECKING:
     pass

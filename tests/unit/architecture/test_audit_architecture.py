@@ -15,10 +15,10 @@ from pathlib import Path
 
 
 class TestDomainLayerNoInfraDependencies:
-    """Verify domain layer has no infrastructure dependencies."""
+    """Verify domain layer has no infrastructure dependencies (reverse dependency check)."""
 
-    def test_domain_events_has_no_infrastructure_imports(self):
-        """Domain events module should not import infrastructure modules."""
+    def test_domain_events_no_infrastructure_imports(self):
+        """Domain events should not import infrastructure modules (reverse dependency)."""
         domain_events_path = Path("src/domain/events/audit_events.py")
         assert domain_events_path.exists(), "AuditEvent should be defined in domain layer"
 
@@ -37,12 +37,13 @@ class TestDomainLayerNoInfraDependencies:
 
         assert len(infra_imports) == 0, f"Domain layer should not import infrastructure: {infra_imports}"
 
-    def test_domain_services_has_no_infrastructure_imports(self):
-        """Domain services (Protocol) should not import infrastructure modules."""
-        domain_services_path = Path("src/domain/services/audit_service.py")
-        assert domain_services_path.exists(), "AuditService Protocol should be defined in domain layer"
+    def test_audit_service_protocol_no_infrastructure_imports(self):
+        """AuditService Protocol in application/ports should not import infrastructure."""
+        # Protocol is in application/ports per refactoring
+        app_ports_path = Path("src/application/ports/audit_service.py")
+        assert app_ports_path.exists(), "AuditService Protocol should be in application/ports"
 
-        content = domain_services_path.read_text()
+        content = app_ports_path.read_text()
         tree = ast.parse(content)
 
         infra_imports = []
@@ -55,14 +56,14 @@ class TestDomainLayerNoInfraDependencies:
                 if node.module and "infrastructure" in node.module:
                     infra_imports.append(node.module)
 
-        assert len(infra_imports) == 0, f"Domain services should not import infrastructure: {infra_imports}"
+        assert len(infra_imports) == 0, f"AuditService Protocol should not import infrastructure: {infra_imports}"
 
 
-class TestDependencyDirection:
-    """Verify dependency direction is from infrastructure to domain."""
+class TestInfrastructureImportsInnerLayers:
+    """Verify infrastructure can import domain and application (correct dependency direction)."""
 
-    def test_infrastructure_audit_imports_domain_not_vice_versa(self):
-        """Infrastructure audit module can import domain, but domain cannot import infrastructure."""
+    def test_infrastructure_audit_can_import_domain(self):
+        """Infrastructure audit module can import domain layer (correct outward dependency)."""
         infra_audit_path = Path("src/infrastructure/audit/audit_service.py")
         if infra_audit_path.exists():
             content = infra_audit_path.read_text()
@@ -79,7 +80,7 @@ class TestDependencyDirection:
                     if node.module and "domain" in node.module:
                         domain_imports.append(node.module)
 
-            # These imports are expected and correct
+            # Infrastructure importing domain is expected and correct
             assert "domain" in str(domain_imports) or len(domain_imports) >= 0
 
 
@@ -122,11 +123,11 @@ class TestInfrastructureImplementation:
         assert impl_path.exists(), "AuditEventListener should exist in infrastructure layer"
 
 
-class TestNoCircularDependencies:
-    """Verify no circular dependencies exist."""
+class TestReverseDependencyCheck:
+    """Verify inner layers (domain, application) don't import outer layer (infrastructure)."""
 
-    def test_no_circular_dependencies(self):
-        """Domain should not depend on infrastructure."""
+    def test_inner_layers_no_infrastructure_imports(self):
+        """Domain and application should not import infrastructure (reverse dependency check)."""
         # Check domain events doesn't import from infrastructure
         domain_events = Path("src/domain/events/audit_events.py").read_text()
 
@@ -134,7 +135,7 @@ class TestNoCircularDependencies:
         assert "from src.infrastructure" not in domain_events
         assert "import src.infrastructure" not in domain_events
 
-        # Check domain services doesn't import from infrastructure
-        domain_services = Path("src/domain/services/audit_service.py").read_text()
-        assert "from src.infrastructure" not in domain_services
-        assert "import src.infrastructure" not in domain_services
+        # Protocol now in application/ports per refactoring
+        app_ports = Path("src/application/ports/audit_service.py").read_text()
+        assert "from src.infrastructure" not in app_ports
+        assert "import src.infrastructure" not in app_ports

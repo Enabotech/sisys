@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from src.domain.services.text_extractor_service import ExtractionResult, TextExtractorService
+from src.application.ports.text_extractor_service import ExtractionResult, TextExtractorService
 
 
 @dataclass
