@@ -35,13 +35,6 @@
  (纯转换)              (调用领域)              (零依赖)
 ```
 
-| 约束 | 规则 |
-|------|------|
-| 接口层 → 领域层 | ✅ 允许 |
-| 应用层 → 领域层 | ✅ 允许 |
-| 领域层 → 应用/接口 | ❌ 禁止 |
-| 领域层 → 外部依赖 | ❌ 禁止 |
-
 **领域层零依赖原则**
 - 领域层（src/domain/）仅使用 Python 标准库
 - 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
@@ -953,6 +946,14 @@ poetry run pytest tests/ -n 8 -v
 | `interfaces/` | `application/`, `domain/` | 无 |
 | `application/` | `domain/` | `interfaces/` |
 | `domain/` | 仅 Python 标准库 | `application/`, `interfaces/`, 外部依赖 |
+
+**依赖方向规则**
+- 领域层 → 应用/接口/基础设施层：✗ 禁止
+- 应用层 → 接口层/基础设施层：✗ 禁止
+- 接口层      → 应用层/领域层 ✓ 允许
+- 应用层      → 领域层 ✓ 允许
+- 基础设施层  → 应用层/领域层 ✓ 允许
+- 领域层      → 仅标准库 ✓ 允许
 
 ### 5.2 纸壳适配器规则验证
 

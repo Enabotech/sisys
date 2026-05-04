@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-05-03
+last_updated: 2026-05-04
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -85,9 +85,9 @@ development_status:
   1-11-data-sovereignty-isolation: backlog
   1-12-equilibrium-level-3-compliance: backlog
   # 价值组 5: or.md 系统公理实现
-  1-14a-autonomous-invocation-trigger: in-progress
-  1-14b-autonomous-invocation-route: in-progress
-  1-14c-autonomous-invocation-execute: in-progress
+  1-14a-autonomous-invocation-trigger: done
+  1-14b-autonomous-invocation-route: done
+  1-14c-autonomous-invocation-execute: done
   1-15a-externalized-memory-context-compression: done
   1-15b-externalized-memory-five-layer-storage: in-progress  # TODO: L3/L4/L5 由后续 Story 实现
   # 价值组 6: MVP 关键机制增强
@@ -310,7 +310,6 @@ development_status:
   20-2-event-messaging-refactor: done
   20-3-uni-dual-channel-eventbus: done
   20-4-uni-async-refactor: done
-  20-5-src-dir-refactor: ready-for-dev
   epic-20-retrospective: optional
 
 # =============================================================================
@@ -319,14 +318,14 @@ development_status:
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
 # Total Stories (excluding retrospectives): 156
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
-#   - Epic 0 Iteration 1: 11 stories (✅ 9 done, 🔄 2 ready-for-dev)
-#   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev)
-#   - Epic 20: 5 stories (✅ 3 done, 🔄 2 ready-for-dev)
+#   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 🔄 3 ready-for-dev)
+#   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev , 🔄 1 in-progress)
+#   - Epic 20: 5 stories (✅ 4 done, 🔄 1 ready-for-dev)
 #
 # Status Summary:
-#   - Done: 28 (包括 Epic 20)
-#   - Ready for Dev: 7
-#   - Backlog: 120
+#   - Done: 31 (包括 Epic 20)
+#   - Ready for Dev: 5
+#   - Backlog: 121
 #
 # Next Steps:
 #   1. Follow SDD+TDD mode for all stories: docs/developer/sdd-tdd-checklist.md
@@ -334,9 +333,7 @@ development_status:
 #   3. Developping Epic 1
 #
 # Key Changes from Previous Version:
-#   - Updated last_updated date to 2026-05-02
-#   - Story 20-5 (src-dir-refactor) 已创建 → ready-for-dev
-#   - Story 20-2 (event-messaging-refactor) 已完成 → done
-#   - Story 20-3 (uni-dual-channel-eventbus) 已完成 → done
-#   - Updated Epic 20 story count and total done count
+#   - Updated last_updated date to 2026-05-04
+#   - Story 20-5 (intf-listener-refactor) created → ready-for-dev
+#   - Updated Epic 20 story count and summary counts
 # =============================================================================
