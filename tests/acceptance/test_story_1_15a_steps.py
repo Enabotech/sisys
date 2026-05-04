@@ -27,7 +27,7 @@ from pytest_bdd import given, scenarios, then, when
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
+from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
 )
@@ -239,7 +239,7 @@ async def listener_with_real_services(storage_coordinator, pg_session: AsyncSess
     metadata_repo = PostgreSQLMemoryMetadataRepository(pg_session)
     history_repo = PostgreSQLMemoryChangeHistoryRepository(pg_session)
 
-    return MemoryChangedListener(
+    return MemoryChangedHandler(
         storage_coordinator=storage_coordinator,
         metadata_repository=metadata_repo,
         history_repository=history_repo,

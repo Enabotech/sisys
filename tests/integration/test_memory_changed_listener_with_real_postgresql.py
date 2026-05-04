@@ -22,7 +22,7 @@ import redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
+from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
 )
@@ -223,7 +223,7 @@ def history_repository(pg_session: AsyncSession):
 @pytest.fixture
 def listener_with_real_services(storage_coordinator, metadata_repository, history_repository, memory_index):
     """Create MemoryChangedListener with REAL L1 + L2 services."""
-    return MemoryChangedListener(
+    return MemoryChangedHandler(
         storage_coordinator=storage_coordinator,
         metadata_repository=metadata_repository,
         history_repository=history_repository,

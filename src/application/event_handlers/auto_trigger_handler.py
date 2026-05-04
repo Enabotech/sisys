@@ -22,7 +22,7 @@ from src.domain.services.auto_trigger_service import AutoTriggerService
 logger = logging.getLogger(__name__)
 
 
-class AutoTriggerListener:
+class AutoTriggerHandler:
     """Event listener that bridges event bus to AutoTriggerService.
 
     Registers handlers for domain events and delegates processing

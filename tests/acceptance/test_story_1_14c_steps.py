@@ -28,8 +28,8 @@ import pytest
 import redis
 from pytest_bdd import given, scenarios, then, when
 
-from src.application.event_handlers.auto_execute_completed_listener import (
-    AutoExecuteCompletedListener,
+from src.application.event_handlers.auto_execute_completed_handler import (
+    AutoExecuteCompletedHandler,
 )
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
@@ -720,7 +720,7 @@ def when_listener_processes_event(
         password=os.getenv("REDIS_PASSWORD") or None,
     )
     publisher = RedisEventPublisher(config)
-    listener = AutoExecuteCompletedListener(publisher=publisher)
+    listener = AutoExecuteCompletedHandler(publisher=publisher)
 
     executed = context.get("executed_event_for_listener")
 
