@@ -75,17 +75,21 @@
 **And** JWT 令牌包含用户 ID、角色、过期时间
 
 **验证标准/Validation Criteria:**
-- [x] 用户登录接口 `/api/v1/auth/login` 实现 ✅
+- [ ] 用户登录接口 `/api/v1/auth/login` 实现
   - 请求体: `{ "username": str, "password": str }`
   - 响应体: `{ "access_token": str, "token_type": "bearer", "expires_in": int, "user": {...} }`
-- [x] JWT 令牌生成（使用 `python-jose` 或 `PyJWT`）✅
+- [ ] JWT 令牌生成（使用 `python-jose` 或 `PyJWT`）
   - 字段: `sub` (用户 ID), `roles` (角色列表), `exp` (过期时间), `iat` (签发时间)
   - 签名算法: HS256 (MVP)，RS256 (V1+)
   - 过期时间: 24 小时（可配置）
-- [x] 密码验证（使用 `passlib` + `bcrypt`）✅
+- [ ] 密码验证（使用 `passlib` + `bcrypt`）
   - 密码哈希存储（禁止明文）
   - 盐值自动生成（bcrypt 自动处理）
-- [x] 单元测试覆盖正常登录、密码错误、用户不存在场景 ✅
+- [ ] 单元测试覆盖正常登录、密码错误、用户不存在场景
+
+> **六边形架构约束：**
+> - JWT 令牌生成和验证逻辑必须在 `src/infrastructure/security/jwt_service.py`（实现层）
+> - `src/domain/ports/auth_service.py` 接口只能声明方法签名，不能导入 `python-jose`
 
 ### AC-2: 角色管理 (Role Management)
 
@@ -95,23 +99,28 @@
 **And** 角色变更记录至审计日志
 
 **验证标准/Validation Criteria:**
-- [x] 角色 CRUD 接口实现 ✅
+- [ ] 角色 CRUD 接口实现
   - `POST /api/v1/roles` - 创建角色
   - `GET /api/v1/roles` - 获取角色列表
   - `GET /api/v1/roles/{id}` - 获取角色详情
   - `PUT /api/v1/roles/{id}` - 修改角色
   - `DELETE /api/v1/roles/{id}` - 删除角色（软删除）
-- [x] 角色数据模型 ✅
+- [ ] 角色数据模型
   - 字段: `id`, `name`, `description`, `permissions`, `created_at`, `updated_at`, `is_active`
   - 权限格式: `resource:action` 列表（如 `document:read`, `document:write`, `agent:execute`）
-- [x] 预定义角色（MVP）✅
+- [ ] 预定义角色（MVP）
   - `admin`: 系统管理员（所有权限）
   - `analyst`: 分析师（文档读取、工具执行）
   - `viewer`: 查看者（只读权限）
-- [x] 权限验证中间件 ✅
+- [ ] 权限验证中间件
   - 基于 FastAPI 依赖注入
   - 检查用户角色是否包含所需权限
-- [x] 单元测试覆盖角色 CRUD、权限验证场景 ✅
+- [ ] 单元测试覆盖角色 CRUD、权限验证场景
+
+> **六边形架构约束：**
+> - Role 数据模型在 `src/infrastructure/security/models.py`（SQLAlchemy 模型）
+> - RoleService 实现在 `src/infrastructure/security/role_service.py`
+> - 禁止在领域层直接使用 SQLAlchemy 模型
 
 ### AC-3: 权限控制 (Permission Control)
 
@@ -122,18 +131,23 @@
 **And** 拒绝访问返回 403 Forbidden
 
 **验证标准/Validation Criteria:**
-- [x] 权限装饰器/中间件实现 ✅
+- [ ] 权限装饰器/中间件实现
   - `@require_permission("resource:action")` 装饰器
   - 基于 FastAPI 依赖注入的权限检查
-- [x] RBAC 数据模型 ✅
+- [ ] RBAC 数据模型
   - 用户-角色关联（多对多）
   - 角色-权限关联（多对多）
   - 支持继承（角色可以继承其他角色权限）
-- [x] 权限层级结构 ✅
+- [ ] 权限层级结构
   - 系统级: `system:*`
   - 资源级: `document:*`, `tool:*`, `agent:*`, `plan:*`
   - 操作级: `*:read`, `*:write`, `*:delete`, `*:execute`
-- [x] 单元测试覆盖权限检查、越权访问拒绝场景 ✅
+- [ ] 单元测试覆盖权限检查、越权访问拒绝场景
+
+> **六边形架构约束：**
+> - PermissionService 接口在 `src/domain/ports/permission_service.py`（仅标准库）
+> - PermissionService 实现在 `src/infrastructure/security/permission_service.py`
+> - PermissionMiddleware 在 `src/infrastructure/security/permission_middleware.py`
 
 ### AC-4: 越权访问防护 (Privilege Escalation Prevention)
 
@@ -143,16 +157,20 @@
 **And** 记录越权访问尝试至审计日志
 
 **验证标准/Validation Criteria:**
-- [x] 越权访问测试 0 次成功 ✅
-- [x] 水平越权防护（同级用户间数据隔离）✅
+- [ ] 越权访问测试 0 次成功
+- [ ] 水平越权防护（同级用户间数据隔离）
   - 用户只能访问属于自己的数据
   - 跨用户访问被拒绝
-- [x] 垂直越权防护（低权限用户访问高权限资源）✅
+- [ ] 垂直越权防护（低权限用户访问高权限资源）
   - 低权限用户无法访问高权限资源
   - 权限提升尝试被拒绝
-- [x] 审计日志记录所有越权尝试 ✅
+- [ ] 审计日志记录所有越权尝试
   - 待 Story 1.10 (Unified Audit Log) 完成后完全集成
-- [x] 架构约束验证测试就绪 ✅
+- [ ] 架构约束验证测试就绪
+
+> **六边形架构约束：**
+> - 越权防护逻辑在 `src/infrastructure/security/` 实现
+> - 禁止在领域层直接处理认证/授权逻辑
 
 ### AC-5: 等保 2.0 合规 (Deng Bao 2.0 Compliance)
 
@@ -161,20 +179,24 @@
 **Then** 所有测评项通过
 
 **验证标准/Validation Criteria:**
-- [x] 身份鉴别要求 ✅
+- [ ] 身份鉴别要求
   - 用户名/密码认证，密码复杂度要求（8位以上，大小写字母+数字+特殊字符）
   - 认证失败锁定（连续 5 次失败锁定 30 分钟）
   - 会话超时（30 分钟无操作会话失效）
-- [x] 访问控制要求 ✅
+- [ ] 访问控制要求
   - 基于角色的访问控制（RBAC）
   - 最小权限原则（默认拒绝，仅授予必要权限）
   - 敏感操作二次验证（删除、导出等高风险操作）
-- [x] 安全审计要求 ✅
+- [ ] 安全审计要求
   - 登录/登出事件记录
   - 权限变更事件记录
   - 越权访问事件记录（成功和失败）
   - 待 Story 1.10 (Unified Audit Log) 完成后完全集成
-- [x] 架构约束验证测试就绪 ✅
+- [ ] 架构约束验证测试就绪
+
+> **六边形架构约束：**
+> - 合规性验证逻辑在 `src/infrastructure/security/` 实现
+> - 禁止在领域层处理密码复杂度、认证锁定等合规逻辑
 
 ---
 
@@ -188,31 +210,284 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 配置模型 (Configuration Models)
-- [x] AuthConfig 定义（`src/infrastructure/config/auth.py`）✅
+- [ ] AuthConfig 定义（`src/infrastructure/config/auth.py`）
   - 字段: `jwt_secret_key`, `jwt_algorithm`, `jwt_expiration_hours`, `password_min_length`, `max_login_attempts`, `lockout_duration_minutes`
 
 #### 数据模型 (Data Models) — 基础设施层
-- [x] User 模型（PostgreSQL 表扩展，来自 Story 1.5）✅
-- [x] Role 模型（`src/infrastructure/security/models.py`）✅
+- [ ] User 模型（PostgreSQL 表扩展，来自 Story 1.5）
+- [ ] Role 模型（`src/infrastructure/security/models.py`）
   - 字段: `id`, `name`, `description`, `permissions` (JSON), `is_active`, `created_at`, `updated_at`
-- [x] Permission 模型（`src/infrastructure/security/models.py`）✅
+- [ ] Permission 模型（`src/infrastructure/security/models.py`）
   - 字段: `id`, `resource`, `action`, `description`
-- [x] UserRole 关联模型（多对多关系）✅
+- [ ] UserRole 关联模型（多对多关系）
 
 #### 安全服务接口 (Security Service Interfaces)
-- [x] AuthService 接口（`src/domain/services/auth_service.py`）✅
-  - 方法: `authenticate(username, password) -> JWT token`
-  - 方法: `verify_token(token) -> User`
-  - 方法: `refresh_token(token) -> JWT token`
-- [x] PermissionService 接口（`src/domain/services/permission_service.py`）✅
-  - 方法: `check_permission(user_id, resource, action) -> bool`
-  - 方法: `get_user_permissions(user_id) -> list[Permission]`
-  - 方法: `assign_role(user_id, role_id) -> bool`
-  - 方法: `revoke_role(user_id, role_id) -> bool`
+
+> ⚠️ **六边形架构约束：安全服务接口必须遵循依赖倒置原则**
+> - 接口定义在 `src/domain/ports/`（使用 `ABC`，**仅依赖标准库**）
+> - 实现类在 `src/infrastructure/security/`（可导入 python-jose、passlib、sqlalchemy 等）
+> - **禁止在领域层导入任何外部依赖**
+> - **禁止直接导入 SQLAlchemy 模型，必须通过 Repository Port 抽象访问**
+
+**1. AuthService 接口（`src/domain/ports/auth_service.py`）**
+```python
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+class AuthenticationError(Exception):
+    """认证失败异常"""
+    pass
+
+class AuthServicePort(ABC):
+    """认证服务端口（领域层定义，仅使用 ABC + 标准库）"""
+
+    @abstractmethod
+    async def authenticate(self, username: str, password: str) -> str:
+        """用户认证
+
+        Args:
+            username: 用户名
+            password: 密码
+
+        Returns:
+            JWT token
+
+        Raises:
+            AuthenticationError: 认证失败时抛出
+        """
+        ...
+
+    @abstractmethod
+    async def verify_token(self, token: str) -> dict:
+        """验证 JWT token
+
+        Args:
+            token: JWT token
+
+        Returns:
+            用户信息字典，包含 user_id, username, roles
+
+        Raises:
+            AuthenticationError: token 无效或过期
+        """
+        ...
+
+    @abstractmethod
+    async def refresh_token(self, refresh_token: str) -> str:
+        """刷新 JWT token
+
+        Args:
+            refresh_token: 刷新令牌
+
+        Returns:
+            新的访问令牌
+
+        Raises:
+            AuthenticationError: 刷新令牌无效
+        """
+        ...
+
+    @abstractmethod
+    async def logout(self, token: str) -> None:
+        """用户登出
+
+        Args:
+            token: 要撤销的 JWT token
+        """
+        ...
+```
+
+**2. PermissionService 接口（`src/domain/ports/permission_service.py`）**
+```python
+class PermissionServicePort(ABC):
+    """权限服务端口（领域层定义，仅使用 ABC + 标准库）
+
+    注意：角色分配/撤销是应用层 UseCase，不是领域层服务
+    """
+
+    @abstractmethod
+    async def check_permission(
+        self,
+        user_id: UUID,
+        resource: str,
+        action: str,
+        resource_id: UUID | None = None
+    ) -> bool:
+        """检查用户权限
+
+        Args:
+            user_id: 用户 ID
+            resource: 资源类型（如 "document", "agent"）
+            action: 操作类型（如 "read", "write", "execute"）
+            resource_id: 资源实例 ID（可选，用于实例级权限控制）
+
+        Returns:
+            True 如果有权限，False 否则
+        """
+        ...
+
+    @abstractmethod
+    async def get_user_permissions(self, user_id: UUID) -> list[str]:
+        """获取用户所有权限
+
+        Args:
+            user_id: 用户 ID
+
+        Returns:
+            权限字符串列表（如 ["document:read", "document:write"]）
+        """
+        ...
+```
+
+**3. UserRepositoryPort 接口（`src/domain/ports/user_repository.py`）**
+> ⚠️ **关键约束：领域层绝对不能直接导入 SQLAlchemy 模型**
+```python
+class UserRepositoryPort(ABC):
+    """用户仓储端口（领域层定义，仅使用 ABC + 标准库）"""
+
+    @abstractmethod
+    async def get_by_username(self, username: str) -> "User" | None:
+        """根据用户名获取用户
+
+        Returns:
+            User 领域实体，或 None
+        """
+        ...
+
+    @abstractmethod
+    async def get_by_id(self, user_id: UUID) -> "User" | None:
+        """根据 ID 获取用户
+
+        Returns:
+            User 领域实体，或 None
+        """
+        ...
+```
+
+**4. RoleRepositoryPort 接口（`src/domain/ports/role_repository.py`）**
+```python
+class RoleRepositoryPort(ABC):
+    """角色仓储端口（领域层定义，仅使用 ABC + 标准库）
+
+    负责角色的数据访问，不包含业务逻辑
+    """
+
+    @abstractmethod
+    async def get_by_id(self, role_id: UUID) -> "Role" | None:
+        """根据 ID 获取角色"""
+        ...
+
+    @abstractmethod
+    async def get_by_name(self, name: str) -> "Role" | None:
+        """根据名称获取角色"""
+        ...
+
+    @abstractmethod
+    async def list_all(self) -> list["Role"]:
+        """获取所有角色"""
+        ...
+
+    @abstractmethod
+    async def save(self, role: "Role") -> "Role":
+        """保存角色（创建或更新）"""
+        ...
+
+    @abstractmethod
+    async def delete(self, role_id: UUID) -> bool:
+        """删除角色"""
+        ...
+```
+
+**5. UserRoleRepositoryPort 接口（`src/domain/ports/user_role_repository.py`）**
+```python
+class UserRoleRepositoryPort(ABC):
+    """用户-角色关联仓储端口（领域层定义，仅使用 ABC + 标准库）
+
+    负责用户和角色之间的关联关系
+    """
+
+    @abstractmethod
+    async def assign_role(self, user_id: UUID, role_id: UUID) -> bool:
+        """分配角色给用户"""
+        ...
+
+    @abstractmethod
+    async def revoke_role(self, user_id: UUID, role_id: UUID) -> bool:
+        """撤销用户的角色"""
+        ...
+
+    @abstractmethod
+    async def get_user_roles(self, user_id: UUID) -> list["Role"]:
+        """获取用户的所有角色"""
+        ...
+
+    @abstractmethod
+    async def get_role_users(self, role_id: UUID) -> list["UUID"]:
+        """获取拥有某角色的所有用户 ID"""
+        ...
+```
+
+**6. 应用层 UseCase（`src/application/use_cases/role_management.py`）**
+```python
+# 角色创建 UseCase
+class CreateRoleUseCase:
+    def __init__(self, role_repo: RoleRepositoryPort):
+        self._role_repo = role_repo
+
+    async def execute(self, name: str, permissions: list[str]) -> Role:
+        """创建新角色"""
+        existing = await self._role_repo.get_by_name(name)
+        if existing:
+            raise RoleAlreadyExistsError(name)
+        role = Role(name=name, permissions=permissions)
+        return await self._role_repo.save(role)
+
+# 角色删除 UseCase
+class DeleteRoleUseCase:
+    def __init__(self, role_repo: RoleRepositoryPort):
+        self._role_repo = role_repo
+
+    async def execute(self, role_id: UUID) -> bool:
+        """删除角色"""
+        role = await self._role_repo.get_by_id(role_id)
+        if not role:
+            raise RoleNotFoundError(role_id)
+        if role.is_system_reserved:
+            raise CannotDeleteSystemRoleError(role_id)
+        return await self._role_repo.delete(role_id)
+
+# 分配角色 UseCase
+class AssignRoleUseCase:
+    def __init__(self, user_role_repo: UserRoleRepositoryPort):
+        self._user_role_repo = user_role_repo
+
+    async def execute(self, user_id: UUID, role_id: UUID) -> bool:
+        """分配角色给用户"""
+        return await self._user_role_repo.assign_role(user_id, role_id)
+
+# 撤销角色 UseCase
+class RevokeRoleUseCase:
+    def __init__(self, user_role_repo: UserRoleRepositoryPort):
+        self._user_role_repo = user_role_repo
+
+    async def execute(self, user_id: UUID, role_id: UUID) -> bool:
+        """撤销用户的角色"""
+        return await self._user_role_repo.revoke_role(user_id, role_id)
+```
+
+#### 数据模型说明
+
+| 模型类型 | 位置 | 说明 |
+|----------|------|------|
+| **领域实体** | `src/domain/entities/` | User, Role, Permission（纯 Python 类，仅含业务属性） |
+| **领域端口** | `src/domain/ports/` | AuthServicePort, PermissionServicePort, UserRepositoryPort, RoleRepositoryPort, UserRoleRepositoryPort |
+| **应用层用例** | `src/application/use_cases/` | CreateRoleUseCase, DeleteRoleUseCase, AssignRoleUseCase, RevokeRoleUseCase |
+| **持久化模型** | `src/infrastructure/storage/postgresql/models/` | SQLAlchemy 模型，关联数据库表 |
+| **服务实现** | `src/infrastructure/security/` | 实现 AuthServicePort、PermissionServicePort |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_story_1.9.feature` ✅
-- [x] 覆盖场景: ✅
+- [ ] 功能测试文件：`tests/acceptance/test_story_1.9.feature`
+- [ ] 覆盖场景:
   - 用户登录成功/失败
   - JWT 令牌生成和验证
   - 角色创建/修改/删除
@@ -221,9 +496,9 @@
   - 等保 2.0 合规验证
 
 **Task 0 完成标志：**
-- [x] 上述规范项全部定义完毕 ✅
-- [x] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）✅
-- [x] 规范文档通过人工评审或自动化校验 ✅
+- [ ] 上述规范项全部定义完毕
+- [ ] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）
+- [ ] 规范文档通过人工评审或自动化校验
 
 ---
 
@@ -764,37 +1039,45 @@ User (n) --< UserRole >-- (n) Role (n) --< RolePermission >-- (n) Permission
 
 ### 项目结构说明 Project Structure
 
-> **📌 架构说明:** `src/infrastructure/security/` 遵循六边形架构的依赖倒置原则。
-> - 领域层 (`src/domain/services/`) 定义安全服务接口（AuthService, PermissionService）
-> - 基础设施层 (`src/infrastructure/security/`) 实现安全服务接口
-> - 架构文档中的 `src/security/` 是早期设计，本 Story 采用更规范的六边形架构分层
+> **📌 六边形架构约束:** 安全服务遵循依赖倒置原则
+> - 领域层 (`src/domain/ports/`) 定义**端口接口**（仅 ABC + 标准库）
+> - 应用层 (`src/application/use_cases/`) 定义**用例**（业务编排）
+> - 基础设施层 (`src/infrastructure/`) 实现端口（可导入外部库）
+> - **禁止**在领域层导入任何外部依赖（python-jose、passlib、bcrypt 等）
 
 ```
 sisys/
 ├── src/
 │   ├── domain/
-│   │   └── services/
+│   │   ├── entities/
+│   │   │   ├── user.py                 # User 领域实体
+│   │   │   └── role.py                 # Role 领域实体
+│   │   └── ports/
 │   │       ├── __init__.py
-│   │       ├── auth_service.py          # AuthService 接口（Protocol）
-│   │       └── permission_service.py     # PermissionService 接口（Protocol）
-│   └── infrastructure/
-│       ├── config/
-│       │   └── auth.py                  # AuthConfig 配置模型
-│       └── security/
-│           ├── __init__.py
-│           ├── auth_service.py          # AuthService 实现
-│           ├── jwt_service.py           # JWT Service 实现
-│           ├── role_service.py          # RoleService 实现
-│           ├── permission_service.py    # PermissionService 实现
-│           ├── permission_middleware.py # 权限验证中间件
-│           ├── models.py                # Role/Permission 数据模型
-│           └── encryption_service.py    # 加密服务
+│   │       ├── auth_service.py          # AuthServicePort（ABC）
+│   │       ├── permission_service.py     # PermissionServicePort（ABC）
+│   │       ├── user_repository.py       # UserRepositoryPort（ABC）
+│   │       ├── role_repository.py        # RoleRepositoryPort（ABC）
+│   │       └── user_role_repository.py   # UserRoleRepositoryPort（ABC）
+│   ├── application/
+│   │   └── use_cases/
+│   │       └── role_management.py      # CreateRoleUseCase, DeleteRoleUseCase, AssignRoleUseCase, RevokeRoleUseCase
+│   ├── infrastructure/
+│   │   ├── config/
+│   │   │   └── auth.py                  # AuthConfig 配置模型
+│   │   └── security/
+│   │       ├── __init__.py
+│   │       ├── auth_service_impl.py     # AuthServicePort 实现
+│   │       ├── jwt_service.py           # JWT Service 实现
+│   │       ├── permission_service_impl.py # PermissionServicePort 实现
+│   │       ├── permission_middleware.py  # 权限验证中间件
+│   │       ├── models.py               # SQLAlchemy 模型（Role, Permission, UserRole）
+│   │       └── encryption_service.py    # 加密服务（passlib/bcrypt）
 ├── tests/
 │   ├── unit/
 │   │   └── security/
 │   │       ├── test_auth_service.py
 │   │       ├── test_jwt_service.py
-│   │       ├── test_role_service.py
 │   │       ├── test_permission_service.py
 │   │       ├── test_permission_middleware.py
 │   │       ├── test_horizontal_privilege_escalation.py
@@ -803,6 +1086,10 @@ sisys/
 │   │       ├── test_dengbao_identity_compliance.py
 │   │       ├── test_dengbao_access_control_compliance.py
 │   │       └── test_architecture_constraints.py
+│   ├── unit/
+│   │   └── application/
+│   │       └── use_cases/
+│   │           └── test_role_management.py # Role UseCase 测试
 │   ├── integration/
 │   │   └── test_auth_integration.py
 │   └── acceptance/
@@ -860,96 +1147,70 @@ sisys/
 - [x] Story 需求从 `epics_v1.0.md` 提取 ✅
 - [x] 架构约束从 `architecture.md` 提取 ✅
 - [x] 前一个故事学习经验整合 ✅
-- [x] 状态设置为 `ready-for-dev` ✅
+- [x] 状态设置为 `backlog` ✅ (已更新)
 - [x] SDD+TDD 融合开发要求定义完成 ✅
-- [x] 项目结构对齐统一规范 ✅
-- [x] Task 0 SDD 规范定义完成 ✅
-- [x] Task 1 用户认证服务实现完成 ✅
-- [x] Task 2 角色管理服务实现完成 ✅
-- [x] Task 3 权限控制服务实现完成 ✅
-- [x] Task 4 越权访问防护实现完成 ✅
-- [x] Task 5 等保 2.0 合规验证完成 ✅
-- [x] Task 6 端到端集成测试完成 ✅
-- [x] Task 7 架构约束验证完成 ✅
+- [x] 项目结构对齐统一规范 ✅ (六边形架构约束已修正)
+- [ ] Task 0 SDD 规范定义待完成
+- [ ] Task 1 用户认证服务待实现
+- [ ] Task 2 角色管理服务待实现
+- [ ] Task 3 权限控制服务待实现
+- [ ] Task 4 越权访问防护待实现
+- [ ] Task 5 等保 2.0 合规待验证
+- [ ] Task 6 端到端集成测试待实现
+- [ ] Task 7 架构约束验证待实现
 
-### 开发完成总结 Implementation Summary
+### 待开发功能 Implementation Summary
 
-**实现的功能:**
+**待实现的功能:**
 1. **AuthConfig** - JWT认证和授权配置模型，支持环境变量加载
-2. **AuthService** - 用户认证服务，支持用户名密码认证、JWT令牌生成和验证
+2. **AuthService** - 用户认证服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`)
 3. **JWTService** - JWT令牌服务，支持访问令牌和刷新令牌
 4. **RoleService** - 角色管理服务，支持角色CRUD和权限分配
-5. **PermissionService** - 权限控制服务，支持细粒度权限检查
+5. **PermissionService** - 权限控制服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`)
 6. **PermissionMiddleware** - FastAPI权限验证中间件，支持装饰器和依赖注入
 7. **EncryptionService** - 密码加密服务，支持bcrypt哈希和复杂度验证
 8. **REST API** - 完整的认证和角色管理API端点
 
-**架构约束遵循:**
-- 领域层零依赖：领域服务接口仅定义Protocol，不依赖外部包
-- 安全服务位于基础设施层
-- JWT认证使用python-jose库
-- 密码哈希使用passlib+bcrypt
+**六边形架构约束遵循:**
+- 领域层零依赖：端口接口仅定义ABC Protocol，不依赖外部包
+- 安全服务实现位于 `src/infrastructure/security/`（可导入 python-jose、passlib）
+- JWT认证使用 python-jose 库
+- 密码哈希使用 passlib + bcrypt
 - 遵循六边形架构模式
 
-**测试覆盖:**
+**测试覆盖目标:**
 - 单元测试覆盖所有安全服务
 - 架构约束测试验证领域层零依赖
 - 等保2.0合规测试覆盖密码复杂度、账户锁定、权限控制
 
 ---
 
-## 🔍 Review Findings 代码审查发现
+## 🔍 六边形架构约束审查发现
 
-> **审查日期:** 2026-04-18
-> **审查模式:** Full (含 Spec 对照)
-> **审查层:** Blind Hunter + Edge Case Hunter + Acceptance Auditor
+> **审查日期:** 2026-05-04
+> **审查模式:** Hexagonal Architecture Compliance Review
+> **审查层:** 架构约束验证
 
-### CRITICAL 严重问题 (需立即修复)
+### 六边形架构约束问题 (需修正)
 
-- [x] [Review][Patch] **Refresh token 不绑定原始角色，存在角色撤销后绕过风险** [auth_service.py:237-242] ✅ 已修复
-  - token 刷新时获取的是当前角色，而非发行时的角色快照
-- [x] [Review][Patch] **登录失败计数存在竞态条件，锁机制可被绕过** [auth_service.py:129-141] ✅ 已修复
-  - 并发请求可在计数更新前通过 lock 检查
-- [x] [Review][Patch] **Refresh token 刷新后不失效，存在重放攻击风险** [auth_service.py:200-253] ✅ 已修复
-  - 无 token rotation 机制
-- [x] [Review][Patch] **预定义角色未初始化到数据库** [auth.py:47-58] ✅ 已修复
-  - AC-2 要求: admin/analyst/viewer 预定义角色未创建
-- [x] [Review][Patch] **审计日志未实现** [全文件] ✅ 已修复
-  - AC-5 要求: 登录/登出/权限变更/越权访问事件记录缺失
+> ⚠️ **故事文件与实际代码不一致：** 故事文件声称实现完成，但代码不存在。
 
-### HIGH 高优先级问题
+- [ ] [架构约束] **AuthService 接口位置错误** — 应在 `src/domain/ports/auth_service.py`，非 `src/domain/services/`
+  - 领域层只能使用标准库，不能导入 `python-jose`
+- [ ] [架构约束] **PermissionService 接口位置错误** — 应在 `src/domain/ports/permission_service.py`
+- [ ] [架构约束] **安全服务实现位置** — 应在 `src/infrastructure/security/`
+- [ ] [待开发] **Refresh token 安全问题** — 角色撤销后绕过风险、token rotation 缺失
+- [ ] [待开发] **并发安全问题** — 登录失败计数竞态条件
+- [ ] [待开发] **审计日志** — 登录/登出/权限变更/越权访问事件记录缺失
 
-- [x] [Review][Patch] **无 token 撤销/黑名单机制** [auth_service.py] ✅ 已修复
-  - compromised tokens 无法撤销
-- [x] [Review][Patch] **JWT sub claim 缺少 UUID 验证** [permission_middleware.py:169] ✅ 已修复
-  - `UUID(current_user["user_id"])` 抛出 ValueError 未捕获
-- [x] [Review][Patch] **登录端点无速率限制** [auth.py:149-199] ✅ 已修复
-  - brute force 攻击风险
-- [x] [Review][Patch] **会话超时未服务端强制执行** [auth.py] ✅ 已修复
-  - `session_timeout_minutes` 配置未使用，JWT 过期时间 24h
-- [x] [Review][Patch] **无 logout 端点** [auth.py] ✅ 已修复
-  - 无法结束会话和记录登出事件
+### 六边形架构合规要求
 
-### MEDIUM 中优先级问题
-
-- [x] [Review][Patch] **datetime.utcnow() 已废弃** [auth_service.py:120,139,149], [models.py:178,196] ✅ 已修复
-  - Python 3.12+ 废弃，应使用 `datetime.now(UTC)`
-- [x] [Review][Patch] **权限字符串格式未严格校验** [role_service.py:426] ✅ 已修复
-  - `":"` 可创建空 resource/action，`"ab:c:d"` 被解析为 `resource=ab, action=c:d`
-- [x] [Review][Patch] **Admin 角色 bypass 硬编码检查** [permission_middleware.py:172-174] ✅ 已修复
-  - JWT roles claim 未验证合法性
-- [x] [Review][Patch] **认证流程无显式事务边界** [auth_service.py:84-178] ✅ 已修复
-  - 多数据库操作无显式事务
-- [x] [Review][Patch] **用户角色数无上限** [role_service.py:318-358] ✅ 已修复
-  - potential DoS
-
-### LOW 低优先级 / 可延迟
-
-- [x] [Review][Defer] **越权访问未记录审计日志** — 依赖 CRITICAL 审计日志实现
-- [x] [Review][Defer] **预定义角色 seed** — 需应用启动时执行，可后续实现
-- [x] [Review][Defer] **logout 端点** — 依赖 token 撤销机制
-- [x] [Review][Defer] **会话超时服务端强制** — 需结合 Redis session store
-- [x] [Review][Defer] **速率限制** — 依赖 API Gateway 层实现
+| 约束 | 要求 | 当前状态 |
+|------|------|---------|
+| 领域层零依赖 | `src/domain/ports/` 仅使用 ABC + 标准库 | 待实现 |
+| 依赖倒置 | 接口在领域层，实现在基础设施层 | 待实现 |
+| 安全服务位置 | `src/infrastructure/security/` | 待实现 |
+| 禁止跨层依赖 | domain → infrastructure 禁止 | 待验证 |
 
 ---
 
@@ -961,39 +1222,53 @@ sisys/
 | 2026-04-19 | Task 8 实现完成：auth.py 覆盖率 50%→100%，新增 test_auth_endpoint_exceptions.py (21 tests) 和 test_auth_api_integration.py (22 tests) | ✅ 完成 |
 | 2026-04-19 | Bug 修复：refresh_token endpoint `str` → `Form(...)`，覆盖率 93%→100% | ✅ 完成 |
 | 2026-04-20 | 新增 `tests/acceptance/test_story_1_9_steps.py`（34 BDD 验收测试步骤定义），所有测试通过 | ✅ 完成 |
+| 2026-05-04 | 六边形架构约束审查：代码不存在，重置为 backlog；确认接口设计（ABC、AuthenticationError、资源实例级权限）；状态更新为 ready-for-dev | ✅ 完成 |
 
 ### 文件清单 File List
 
-**创建的文件/Created Files:**
-- `src/infrastructure/config/auth.py` - AuthConfig 配置模型 ✅
-- `src/domain/services/auth_service.py` - AuthService 接口 ✅
-- `src/domain/services/permission_service.py` - PermissionService 接口 ✅
-- `src/infrastructure/security/__init__.py` - 安全包初始化 ✅
-- `src/infrastructure/security/auth_service.py` - AuthService 实现 ✅
-- `src/infrastructure/security/jwt_service.py` - JWT Service 实现 ✅
-- `src/infrastructure/security/role_service.py` - RoleService 实现 ✅
-- `src/infrastructure/security/permission_service.py` - PermissionService 实现 ✅
-- `src/infrastructure/security/permission_middleware.py` - 权限验证中间件 ✅
-- `src/infrastructure/security/models.py` - Role/Permission 数据模型 ✅
-- `src/infrastructure/security/encryption_service.py` - 加密服务 ✅
-- `src/interfaces/api/auth.py` - 认证授权 API 路由 ✅
-- `tests/unit/security/test_jwt_service.py` - JWT 服务测试 ✅
-- `tests/unit/security/test_auth_service.py` - 认证服务测试 ✅
-- `tests/unit/security/test_encryption_service.py` - 加密服务测试 ✅
-- `tests/unit/security/test_security_models.py` - 安全模型测试 ✅
-- `tests/unit/security/test_permission_middleware.py` - 权限中间件测试 ✅
-- `tests/unit/security/test_role_service.py` - 角色服务测试 ✅
-- `tests/unit/security/test_permission_service.py` - 权限服务测试 ✅
-- `tests/unit/security/test_architecture_constraints.py` - 架构约束测试 ✅
-- `tests/unit/security/test_dengbao_compliance.py` - 等保合规测试 ✅
-- `tests/integration/test_auth_integration.py` - 集成测试 ✅
-- `tests/acceptance/test_story_1.9.feature` - 验收测试 Gherkin 场景 ✅
-- `tests/acceptance/test_story_1_9_steps.py` - 验收测试步骤定义（34 tests）✅
-- `tests/unit/interfaces/api/test_auth_endpoint_exceptions.py` - API 异常处理测试 ✅
-- `tests/unit/interfaces/api/test_auth_api_integration.py` - API 集成测试 ✅
+**待创建的文件/To Be Created:**
 
-**待完成/Pending:**
-- `docs/security/rbac_permission_management_guide.md` - 实施指南
+#### 领域层实体 (Domain Entities)
+- `src/domain/entities/user.py` - User 领域实体
+- `src/domain/entities/role.py` - Role 领域实体
+
+#### 领域层端口 (Domain Ports)
+- `src/domain/ports/__init__.py`
+- `src/domain/ports/auth_service.py` - AuthServicePort（ABC）
+- `src/domain/ports/permission_service.py` - PermissionServicePort（ABC）
+- `src/domain/ports/user_repository.py` - UserRepositoryPort（ABC）
+- `src/domain/ports/role_repository.py` - RoleRepositoryPort（ABC）
+- `src/domain/ports/user_role_repository.py` - UserRoleRepositoryPort（ABC）
+
+#### 应用层用例 (Application Use Cases)
+- `src/application/use_cases/__init__.py`
+- `src/application/use_cases/role_management.py` - CreateRole/DeleteRole/AssignRole/RevokeRole UseCase
+
+#### 基础设施层 (Infrastructure)
+- `src/infrastructure/config/auth.py` - AuthConfig 配置模型
+- `src/infrastructure/security/__init__.py`
+- `src/infrastructure/security/auth_service_impl.py` - AuthServicePort 实现
+- `src/infrastructure/security/jwt_service.py` - JWT Service 实现
+- `src/infrastructure/security/permission_service_impl.py` - PermissionServicePort 实现
+- `src/infrastructure/security/permission_middleware.py` - 权限验证中间件
+- `src/infrastructure/security/models.py` - SQLAlchemy 模型（Role, Permission, UserRole）
+- `src/infrastructure/security/encryption_service.py` - 加密服务（passlib/bcrypt）
+
+#### 接口层 (Interfaces)
+- `src/interfaces/api/auth.py` - 认证授权 API 路由
+
+#### 测试文件 (Tests)
+- `tests/unit/domain/ports/test_auth_service_port.py` - AuthServicePort 测试
+- `tests/unit/domain/ports/test_permission_service_port.py` - PermissionServicePort 测试
+- `tests/unit/application/use_cases/test_role_management.py` - Role UseCase 测试
+- `tests/unit/security/test_jwt_service.py` - JWT Service 测试
+- `tests/unit/security/test_encryption_service.py` - 加密服务测试
+- `tests/unit/security/test_permission_middleware.py` - 权限中间件测试
+- `tests/unit/security/test_architecture_constraints.py` - 架构约束测试
+- `tests/unit/security/test_dengbao_compliance.py` - 等保合规测试
+- `tests/integration/test_auth_integration.py` - 集成测试
+- `tests/acceptance/test_story_1.9.feature` - 验收测试 Gherkin 场景
+- `tests/acceptance/test_story_1_9_steps.py` - 验收测试步骤定义
 
 ---
 
@@ -1004,13 +1279,13 @@ sisys/
 | **Story ID** | 1.9 |
 | **Story Key** | 1-9-rbac-permission-management |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-9-rbac-permission-management.md` |
-| **Status** | `done` ✅ |
+| **Status** | `backlog` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 4: 安全与合规基础 |
 | **优先级** | P0 |
 | **覆盖 FR** | FR-SC-01（用户认证与 RBAC） |
 | **覆盖 NFR** | NFR-SEC-01（身份鉴别）、NFR-SEC-02（访问控制） |
-| **层类型** | 安全层（auth.py 覆盖率 100%） |
+| **层类型** | 安全层 |
 
 ### 完成总结 Completion Summary
 
@@ -1018,16 +1293,14 @@ sisys/
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
 3. [x] Architecture constraints extracted 架构约束已提取（RBAC 模型、JWT 认证、等保 2.0 合规）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、架构约束验证）
-5. [x] Sprint status synced to `done`
+5. [ ] Sprint status synced to `backlog` (待更新)
 
-### 下一步 Next Steps
+### 六边形架构约束更新
 
-- [x] Story completed with Task 8 API test coverage improvement
-- [x] Bug fixed: refresh_token endpoint uses `Form()` instead of plain `str`
-- [x] All 29 Subtasks (8.1-8.29) completed with [x] checkboxes
-- [x] auth.py coverage reached 100% (169/169 lines)
-- [x] 86 tests passing in test_auth_endpoint*.py files
-- [ ] Story 1.10 Unified Audit Log next (ready-for-dev)
+> **2026-05-04 审查发现：**
+> - 原故事描述 AuthService 接口在 `src/domain/services/`，修正为 `src/domain/ports/`
+> - 原故事描述 Task 1-8 已完成，但代码不存在，已重置为 backlog
+> - 六边形架构约束已明确：领域层零依赖，安全服务接口在 ports/，实现在 infrastructure/security/
 
 ---
 
