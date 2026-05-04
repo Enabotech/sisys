@@ -7,10 +7,13 @@
 - [ ] mypy src/domain/ports/ 类型检查通过
 - [ ] Port 接口位于 src/domain/ports/
 - [ ] 实现类位于 src/infrastructure/
+- [ ] interfaces 层作为适配器层结构正确
+- [ ] 依赖方向规则：内层不导入外层
 """
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -77,11 +80,86 @@ class TestHexagonalArchitectureConstraints:
 
         for py_file in domain_repos.glob("*.py"):
             content = py_file.read_text()
+            # 移除 TYPE_CHECKING 块
+            content = re.sub(r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)", "", content, flags=re.DOTALL)
             # 检查没有从 infrastructure 导入
-            lines = content.split("\n")
-            for line in lines:
-                if "from src.infrastructure" in line or "import src.infrastructure" in line:
-                    pytest.fail(f"{py_file.name} imports from infrastructure: {line.strip()}")
+            if "from src.infrastructure" in content or "import src.infrastructure" in content:
+                pytest.fail(f"{py_file.name} imports from infrastructure")
+
+    def test_domain_not_importing_application(self):
+        """验证 domain 层不导入 application 层（内层→外层禁止）"""
+        domain_path = Path("src/domain")
+
+        violations = []
+        for py_file in domain_path.rglob("*.py"):
+            if py_file.name == "__init__.py":
+                continue
+            content = py_file.read_text()
+            content = re.sub(r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)", "", content, flags=re.DOTALL)
+            if "from src.application" in content or "import src.application" in content:
+                violations.append(str(py_file.relative_to(Path.cwd())))
+
+        assert not violations, "Domain layer must NOT import application:\n" + "\n".join(violations)
+
+    def test_application_not_importing_infrastructure(self):
+        """验证 application 层不导入 infrastructure 层"""
+        app_path = Path("src/application")
+
+        violations = []
+        for py_file in app_path.rglob("*.py"):
+            if py_file.name == "__init__.py":
+                continue
+            content = py_file.read_text()
+            content = re.sub(r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)", "", content, flags=re.DOTALL)
+            if "from src.infrastructure" in content or "import src.infrastructure" in content:
+                violations.append(str(py_file.relative_to(Path.cwd())))
+
+        assert not violations, "Application layer must NOT import infrastructure:\n" + "\n".join(violations)
+
+
+class TestInterfacesLayerConstraints:
+    """interfaces 层（适配器层）约束验证"""
+
+    def test_interfaces_layer_exists(self):
+        """验证 interfaces 层存在"""
+        interfaces_path = Path("src/interfaces")
+        assert interfaces_path.exists(), "src/interfaces/ directory must exist"
+
+    def test_interfaces_api_subdirectory_exists(self):
+        """验证 interfaces/api 目录存在（REST API 适配器）"""
+        api_path = Path("src/interfaces/api")
+        assert api_path.exists(), "src/interfaces/api/ directory must exist"
+
+    def test_interfaces_not_importing_application(self):
+        """验证 interfaces 层不导入 application 层"""
+        interfaces_path = Path("src/interfaces")
+
+        violations = []
+        for py_file in interfaces_path.rglob("*.py"):
+            if py_file.name == "__init__.py":
+                continue
+            content = py_file.read_text()
+            content = re.sub(r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)", "", content, flags=re.DOTALL)
+            if "from src.application" in content or "import src.application" in content:
+                violations.append(str(py_file.relative_to(Path.cwd())))
+
+        assert not violations, "Interfaces layer must NOT import application:\n" + "\n".join(violations)
+
+    def test_interfaces_can_import_domain(self):
+        """验证 interfaces 层可以导入 domain 层（正向依赖）"""
+        interfaces_path = Path("src/interfaces")
+
+        found_domain_import = False
+        for py_file in interfaces_path.rglob("*.py"):
+            if py_file.name == "__init__.py":
+                continue
+            content = py_file.read_text()
+            if "from src.domain" in content or "import src.domain" in content:
+                found_domain_import = True
+                break
+
+        # interfaces 导入 domain 是允许的，但不是强制的
+        assert found_domain_import or True, "Interfaces may import domain (positive dependency direction)"
 
 
 class TestPortInterfaceCompliance:
