@@ -157,22 +157,52 @@ class TestDependencyRuleCompliance:
                 if f"import {forbidden}" in content or f"from {forbidden}" in content:
                     pytest.fail(f"{py_file.relative_to(domain_path)} imports {forbidden}")
 
-    def test_application_layer_respects_layer_boundaries(self):
-        """验证应用层遵守层边界"""
-        # 应用层可以导入领域层和基础设施层
+    def test_application_layer_no_infrastructure_imports(self):
+        """验证应用层不导入基础设施层（检查反向依赖）"""
         app_path = Path("src/application")
 
-        # 应用层不应该直接导入接口层（应该通过领域层端口）
-        # 这个测试比较宽松，只要没有明显违规即可
+        # 应用层不应该导入基础设施层（这是反向依赖）
+        # 简单验证路径存在即可，详细的导入检查在 test_inner_layers_no_infrastructure_imports 中
         assert app_path.exists()
 
-    def test_infrastructure_layer_imports_domain_only(self):
-        """验证基础设施层只导入领域层（不反向依赖）"""
-        infra_path = Path("src/infrastructure")
+    def test_inner_layers_no_infrastructure_imports(self):
+        """验证 domain/application 不导入 infrastructure（反向依赖检查）。
 
-        for py_file in infra_path.rglob("*.py"):
+        六边形架构依赖方向: infrastructure → application → domain
+        infrastructure 导入 application 是正向依赖 ✅
+        禁止的是 domain/application 在运行时导入 infrastructure（反向依赖）❌
+
+        TYPE_CHECKING 块内的导入是允许的（仅用于类型检查，不影响运行时依赖）。
+        """
+        import re
+
+        domain_path = Path("src/domain")
+        app_path = Path("src/application")
+
+        violations = []
+
+        def has_violating_import(content: str) -> bool:
+            """检查是否有在 TYPE_CHECKING 之外的 infrastructure 导入。"""
+            # 移除所有 TYPE_CHECKING 块的内容
+            # TYPE_CHECKING 块通常格式: if TYPE_CHECKING:\n    from ... import ...
+            pattern = r"if TYPE_CHECKING:.*?(?=\n\S|\Z)"
+            content_without_type_checking = re.sub(pattern, "", content, flags=re.DOTALL)
+
+            # 现在检查清理后的内容是否还有 infrastructure 导入
+            if "from src.infrastructure" in content_without_type_checking:
+                return True
+            if "import src.infrastructure" in content_without_type_checking:
+                return True
+            return False
+
+        for py_file in domain_path.rglob("*.py"):
             content = py_file.read_text()
+            if has_violating_import(content):
+                violations.append(f"{py_file.relative_to(domain_path)} imports infrastructure")
 
-            # 基础设施层不应该导入 application 层（反向依赖）
-            if "from src.application" in content or "import src.application" in content:
-                pytest.fail(f"{py_file.relative_to(infra_path)} imports application layer (reverse dependency)")
+        for py_file in app_path.rglob("*.py"):
+            content = py_file.read_text()
+            if has_violating_import(content):
+                violations.append(f"{py_file.relative_to(app_path)} imports infrastructure")
+
+        assert len(violations) == 0, f"Reverse dependency detected (inner layer imports outer): {violations}"

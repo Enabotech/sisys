@@ -19,8 +19,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.ports.audit_service import AuditService
 from src.domain.events.audit_events import AuditEvent
-from src.domain.services.audit_service import AuditService
 from src.infrastructure.config.audit import AuditConfig, get_audit_config
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel

@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from src.domain.services.audit_service import AuditService
+from src.application.ports.audit_service import AuditService
 
 
 class ComplianceReport:
