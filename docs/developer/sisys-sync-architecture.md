@@ -287,7 +287,7 @@ RabbitMQConsumer 接收消息
 
 ### 3.3 MemoryChanged 事件处理流程
 
-**文件路径**: `src/interfaces/event_listeners/listeners/memory_changed_listener.py`
+**文件路径**: `src/application/event_handlers/memory_changed_listener.py`
 
 ```
 MemoryChanged 事件触发
@@ -376,7 +376,7 @@ pending → processed
 | | `src/infrastructure/messaging/adapters/event_outbox_adapter.py` | 事件转换器 |
 | **Interfaces** | `src/interfaces/event_publisher.py` | 发布端口 |
 | | `src/interfaces/event_subscriber.py` | 订阅端口 |
-| | `src/interfaces/event_listeners/listeners/memory_changed_listener.py` | MemoryChanged 监听器 |
+| | `src/application/event_handlers/memory_changed_listener.py` | MemoryChanged 监听器 |
 
 ---
 

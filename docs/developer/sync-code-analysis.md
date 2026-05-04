@@ -117,7 +117,7 @@ def get_sync_engine(self) -> Engine:
 
 ### 4. 后台线程创建新事件循环
 
-**文件**: `src/interfaces/event_listeners/listeners/auto_trigger_listener.py:110-124`
+**文件**: `src/application/event_handlers/auto_trigger_listener.py:110-124`
 
 ```python
 def _worker_loop(self) -> None:

@@ -428,8 +428,8 @@ sisys/
 │   ├── infrastructure/
 │   │   └── events/
 │   │       └── rabbitmq_consumer.py  # [EXISTING] 已实现 (Story 1.3)
-│   └── interfaces/
-│       └── event_listeners/        # [EXISTING] 已实现 (Story 1.14a/b/c, 1.15a)
+│   └── application/
+│       └── event_handlers/        # [EXISTING] 已实现 (Story 1.14a/b/c, 1.15a)
 │           ├── memory_changed_listener.py
 │           ├── auto_trigger_listener.py
 │           ├── auto_route_listener.py

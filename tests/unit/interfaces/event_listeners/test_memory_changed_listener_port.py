@@ -15,10 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.ports.index_manager import IndexManagerPort
-from src.interfaces.event_listeners.listeners.memory_changed_listener import (
+from src.application.event_handlers.memory_changed_listener import (
     MemoryChangedListener,
 )
+from src.domain.ports.index_manager import IndexManagerPort
 
 
 class TestMemoryChangedListenerIndexManagerPort:

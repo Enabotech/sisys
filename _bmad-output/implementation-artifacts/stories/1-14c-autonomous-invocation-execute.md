@@ -81,7 +81,7 @@
 - [ ] AutoExecuted 事件定义（`src/domain/events/auto_execute_events.py`）
   - 字段: event_id, session_id, task_context, execution_result, cost_estimate, latency_ms, timestamp, business_event_type
   - business_event_type 字段标识下游应发布的具体领域事件（DocumentProcessed/ToolAutoExecuted/AgentDecided）
-- [ ] 下游监听器（`src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py`）根据 business_event_type 发布对应领域事件
+- [ ] 下游监听器（`src/application/event_handlers/auto_execute_completed_listener.py`）根据 business_event_type 发布对应领域事件
 - [ ] 事件携带执行结果、成本审计、耗时信息
 - [ ] 事件发布成功率 ≥99%（RabbitMQ 持久化）
 - [ ] 事务发件箱模式（AutoExecuted 事件与业务操作同事务提交）
@@ -686,7 +686,7 @@ sisys/
 - `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
 - `src/infrastructure/external_services/sandbox/session_namespace_manager.py` - SessionNamespaceManager
 - `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
-- `src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py` - AutoExecuted → 下游领域事件监听器
+- `src/application/event_handlers/auto_execute_completed_listener.py` - AutoExecuted → 下游领域事件监听器
 - `tests/unit/domain/services/test_auto_execute_service.py` - AutoExecuteService 单元测试
 - `tests/unit/domain/entities/test_checkpoint_snapshot.py` - CheckpointSnapshot 单元测试
 - `tests/unit/domain/events/test_auto_execute_events.py` - AutoExecuted 事件单元测试
@@ -708,7 +708,7 @@ sisys/
 - `src/infrastructure/external_services/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
 - `src/infrastructure/storage/__init__.py` - 添加 RedisSnapshotStore 导出
 - `src/interfaces/cli/commands/sandbox_port.py` - 添加 SandboxPort 导出
-- `src/interfaces/event_listeners/listeners/__init__.py` - 添加 auto_execute_completed_listener 导出
+- `src/application/event_handlers/__init__.py` - 添加 auto_execute_completed_listener 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/interfaces/event_listeners/execute_listener.py` - Routed 事件监听适配器（复用 Story 1.3 模式）
