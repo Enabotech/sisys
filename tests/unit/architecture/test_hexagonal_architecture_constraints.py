@@ -462,6 +462,19 @@ class TestDependencyDirectionRules:
 
         assert not violations, "Infrastructure must NOT import interfaces:\n" + "\n".join(violations)
 
+    def test_interfaces_not_importing_infrastructure(self):
+        """Interfaces must NOT import infrastructure (reverse dependency)."""
+        files = _get_python_files(LAYERS["interfaces"])
+        violations = []
+
+        for f in files:
+            content = f.read_text()
+            content = _remove_type_checking_blocks(content)
+            if "from src.infrastructure" in content or "import src.infrastructure" in content:
+                violations.append(str(f.relative_to(ROOT)))
+
+        assert not violations, "Interfaces must NOT import infrastructure:\n" + "\n".join(violations)
+
 
 # =============================================================================
 # Interfaces Layer Specific Tests
