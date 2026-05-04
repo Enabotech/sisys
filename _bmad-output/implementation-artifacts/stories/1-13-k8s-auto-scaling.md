@@ -590,6 +590,7 @@ sisys/
 - [x] Task 1: Prometheus /metrics HTTP 端点实现完成
 - [x] Task 2: BusinessMetricsCollector 和 MetricsAggregator 实现完成
 - [x] Task 3: K8s HPA 集成配置完成
+- [x] 六边形架构重构: interfaces/api/monitoring.py 使用 MetricsPort
 - [x] 状态设置为 `review`
 
 ### 文件清单 File List
@@ -615,8 +616,13 @@ sisys/
 
 **更新的文件/Updated Files:**
 - `src/interfaces/api/__init__.py` - 添加 monitoring 模块导出
+- `src/interfaces/api/monitoring.py` - 重构为使用 MetricsPort（应用层端口）
 - `src/infrastructure/monitoring/__init__.py` - 添加新模块导出
 - `deploy/kubernetes/apps/sisys/base/service.yaml` - 添加 Prometheus 注解
+
+**新增文件/New Files:**
+- `src/application/ports/metrics_port.py` - MetricsPort 端口定义（六边形架构）
+- `src/infrastructure/ports/metrics_port_impl.py` - MetricsPort 实现
 
 **测试结果:**
 - 121 tests passed
