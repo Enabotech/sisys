@@ -68,7 +68,7 @@ class TestInterfacesDoNotDependOnDomain:
 
     def test_event_subscriber_interface_exists(self) -> None:
         """EventSubscriber interface should exist."""
-        interface_path = Path(__file__).parents[3] / "src" / "interfaces" / "event_subscriber.py"
+        interface_path = Path(__file__).parents[3] / "src" / "application" / "ports" / "event_subscriber.py"
         assert interface_path.exists(), f"EventSubscriber interface not found: {interface_path}"
 
 
@@ -77,9 +77,9 @@ class TestInfrastructureComponentsImplementInterfaces:
 
     def test_redis_event_bus_implements_publisher_and_subscriber(self) -> None:
         """RedisEventBus should implement EventPublisher and EventSubscriber."""
+        from src.application.ports.event_subscriber import EventSubscriber
         from src.domain.ports.event_publisher import EventPublisher
         from src.infrastructure.messaging.redis_event_bus import RedisEventBus
-        from src.interfaces.event_subscriber import EventSubscriber
 
         assert issubclass(RedisEventBus, EventPublisher), "RedisEventBus should implement EventPublisher"
         assert issubclass(RedisEventBus, EventSubscriber), "RedisEventBus should implement EventSubscriber"

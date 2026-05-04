@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from src.application.ports.event_subscriber import EventSubscriber
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 from src.domain.ports.event_publisher import EventPublisher
 from src.infrastructure.messaging.channel_router import ChannelRouter
-from src.interfaces.event_subscriber import EventSubscriber
 
 if TYPE_CHECKING:
     pass
