@@ -63,7 +63,7 @@ class TestInterfacesDoNotDependOnDomain:
 
     def test_event_publisher_interface_exists(self) -> None:
         """EventPublisher interface should exist."""
-        interface_path = Path(__file__).parents[3] / "src" / "interfaces" / "event_publisher.py"
+        interface_path = Path(__file__).parents[3] / "src" / "domain" / "ports" / "event_publisher.py"
         assert interface_path.exists(), f"EventPublisher interface not found: {interface_path}"
 
     def test_event_subscriber_interface_exists(self) -> None:
@@ -77,8 +77,8 @@ class TestInfrastructureComponentsImplementInterfaces:
 
     def test_redis_event_bus_implements_publisher_and_subscriber(self) -> None:
         """RedisEventBus should implement EventPublisher and EventSubscriber."""
+        from src.domain.ports.event_publisher import EventPublisher
         from src.infrastructure.messaging.redis_event_bus import RedisEventBus
-        from src.interfaces.event_publisher import EventPublisher
         from src.interfaces.event_subscriber import EventSubscriber
 
         assert issubclass(RedisEventBus, EventPublisher), "RedisEventBus should implement EventPublisher"
@@ -86,15 +86,15 @@ class TestInfrastructureComponentsImplementInterfaces:
 
     def test_rabbitmq_event_bus_implements_publisher(self) -> None:
         """RabbitMQEventBus should implement EventPublisher."""
+        from src.domain.ports.event_publisher import EventPublisher
         from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
-        from src.interfaces.event_publisher import EventPublisher
 
         assert issubclass(RabbitMQEventBus, EventPublisher), "RabbitMQEventBus should implement EventPublisher"
 
     def test_dual_channel_event_bus_implements_publisher(self) -> None:
         """DualChannelEventBus should implement EventPublisher."""
+        from src.domain.ports.event_publisher import EventPublisher
         from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
-        from src.interfaces.event_publisher import EventPublisher
 
         assert issubclass(DualChannelEventBus, EventPublisher), "DualChannelEventBus should implement EventPublisher"
 

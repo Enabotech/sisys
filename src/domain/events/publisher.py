@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from .base import DomainEvent
 
 
-class EventPublisher(ABC):
+class InMemoryEventPublisher(ABC):
     """Abstract event publisher interface.
 
     Implementations in the infrastructure layer publish events to

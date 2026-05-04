@@ -13,7 +13,7 @@ from .heartbeat_events import HeartbeatTriggered
 from .isolation_events import IsolationLevelSwitched
 from .memory_events import MemoryChanged
 from .planning_events import StrategicDeviationWarning
-from .publisher import EventPublisher
+from .publisher import InMemoryEventPublisher
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
 
@@ -31,7 +31,7 @@ __all__ = [
     "RoutingDecided",
     "AutoRouted",
     "AutoTriggered",
-    "EventPublisher",
+    "InMemoryEventPublisher",
     "DeviationLevel",
     "DeviationType",
     "CorrectionType",

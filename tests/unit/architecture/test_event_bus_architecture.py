@@ -72,9 +72,9 @@ class TestEventBusArchitecture:
 
     def test_domain_uses_event_publisher_interface(self):
         """领域层应使用 EventPublisher 接口而非具体实现。"""
-        from src.domain.events.publisher import EventPublisher
+        from src.domain.events.publisher import InMemoryEventPublisher
 
-        assert EventPublisher is not None
+        assert InMemoryEventPublisher is not None
 
     def test_outbox_repository_interface_uses_domain_event(self):
         """OutboxRepository 接口应使用 DomainEvent 而非 OutboxEntity。"""

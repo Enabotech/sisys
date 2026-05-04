@@ -16,10 +16,10 @@ class TestEventPublisherInterface:
 
     def test_cannot_instantiate_abstract_publisher(self):
         """Cannot instantiate EventPublisher directly (ABC)."""
-        from src.domain.events.publisher import EventPublisher
+        from src.domain.events.publisher import InMemoryEventPublisher
 
         with pytest.raises(TypeError):
-            EventPublisher()
+            InMemoryEventPublisher()
 
 
 class TestInMemoryEventBusPublish:
