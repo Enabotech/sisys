@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.application.event_handlers.memory_changed_listener import (
-    MemoryChangedListener,
+from src.application.event_handlers.memory_changed_handler import (
+    MemoryChangedHandler,
 )
 from src.domain.ports.index_manager import IndexManagerPort
 
@@ -29,7 +29,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         mock_coordinator = MagicMock()
         mock_index_manager = MagicMock(spec=IndexManagerPort)
 
-        listener = MemoryChangedListener(
+        listener = MemoryChangedHandler(
             storage_coordinator=mock_coordinator,
             index_manager=mock_index_manager,
         )
@@ -41,7 +41,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         """验证 index_manager 为可选参数"""
         mock_coordinator = MagicMock()
 
-        listener = MemoryChangedListener(
+        listener = MemoryChangedHandler(
             storage_coordinator=mock_coordinator,
         )
 
@@ -55,7 +55,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         mock_index_manager = MagicMock(spec=IndexManagerPort)
         mock_index_manager.update_entry = AsyncMock()
 
-        listener = MemoryChangedListener(
+        listener = MemoryChangedHandler(
             storage_coordinator=mock_coordinator,
             index_manager=mock_index_manager,
         )
@@ -89,7 +89,7 @@ class TestMemoryChangedListenerBackwardCompatibility:
 
         # Old signature: __init__(storage_coordinator, metadata_repository, history_repository)
         # New signature adds index_manager as optional
-        listener = MemoryChangedListener(
+        listener = MemoryChangedHandler(
             storage_coordinator=mock_coordinator,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,

@@ -16,12 +16,12 @@ class TestAutoTriggerListenerCreation:
 
     def test_listener_initialization(self) -> None:
         """Verify AutoTriggerListener initializes with correct defaults."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -32,12 +32,12 @@ class TestAutoTriggerListenerCreation:
 
     def test_registered_event_types(self) -> None:
         """Verify all expected event types are registered."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -64,12 +64,12 @@ class TestAutoTriggerListenerHandlers:
 
     def test_register_handlers_creates_worker_thread(self) -> None:
         """Coverage: register_handlers starts background thread."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -85,12 +85,12 @@ class TestAutoTriggerListenerHandlers:
 
     def test_create_handler_returns_callable(self) -> None:
         """Coverage: _create_handler returns a function."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -101,12 +101,12 @@ class TestAutoTriggerListenerHandlers:
 
     def test_handler_queues_event(self) -> None:
         """Coverage: handler puts event in queue."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -133,12 +133,12 @@ class TestAutoTriggerListenerStop:
 
     def test_stop_sets_running_false(self) -> None:
         """Coverage: stop() sets _running to False."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -151,12 +151,12 @@ class TestAutoTriggerListenerStop:
 
     def test_stop_waits_for_thread(self) -> None:
         """Coverage: stop() joins worker thread."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = MagicMock(spec=AutoTriggerService)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -173,13 +173,13 @@ class TestAutoTriggerListenerProcessEvent:
     @pytest.mark.asyncio
     async def test_process_event_heartbeat_triggered(self) -> None:
         """Coverage: HeartbeatTriggered uses special handler."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = AsyncMock(spec=AutoTriggerService)
         mock_auto_trigger_service.on_heartbeat_event = AsyncMock()
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -207,13 +207,13 @@ class TestAutoTriggerListenerProcessEvent:
     @pytest.mark.asyncio
     async def test_process_event_logs_warning_on_none_trigger(self) -> None:
         """Coverage: _process_event logs warning when AutoTriggerService returns None."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = AsyncMock(spec=AutoTriggerService)
         mock_auto_trigger_service.on_domain_event = AsyncMock(return_value=None)
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )
@@ -230,13 +230,13 @@ class TestAutoTriggerListenerProcessEvent:
     @pytest.mark.asyncio
     async def test_process_event_handles_exception(self) -> None:
         """Coverage: _process_event handles exceptions gracefully."""
-        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
 
         mock_auto_trigger_service = AsyncMock(spec=AutoTriggerService)
         mock_auto_trigger_service.on_domain_event = AsyncMock(side_effect=Exception("processing failed"))
         mock_event_listener = MagicMock()
 
-        listener = AutoTriggerListener(
+        listener = AutoTriggerHandler(
             auto_trigger_service=mock_auto_trigger_service,
             event_listener=mock_event_listener,
         )

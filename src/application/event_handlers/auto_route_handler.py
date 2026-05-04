@@ -31,7 +31,7 @@ class EventPublisherProtocol(Protocol):
         ...
 
 
-class AutoRouteListener:
+class AutoRouteHandler:
     """Event listener that bridges AutoTriggered events to AutoRouteService.
 
     Responsible for:

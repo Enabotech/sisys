@@ -22,7 +22,7 @@ class EventPublisherProtocol(Protocol):
         ...
 
 
-class AutoExecuteCompletedListener:
+class AutoExecuteCompletedHandler:
     """Event listener that handles AutoExecuted events.
 
     Responsible for:

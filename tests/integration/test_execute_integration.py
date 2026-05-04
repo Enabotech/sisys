@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.event_handlers.auto_execute_completed_listener import AutoExecuteCompletedListener
+from src.application.event_handlers.auto_execute_completed_handler import AutoExecuteCompletedHandler
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
@@ -46,9 +46,9 @@ class TestExecuteIntegration:
         return AutoExecuteService(sandbox=sandbox, snapshot_repo=None)
 
     @pytest.fixture
-    def execute_listener(self, mock_publisher: AsyncMock) -> AutoExecuteCompletedListener:
+    def execute_listener(self, mock_publisher: AsyncMock) -> AutoExecuteCompletedHandler:
         """Create AutoExecuteCompletedListener with mock publisher."""
-        return AutoExecuteCompletedListener(publisher=mock_publisher)
+        return AutoExecuteCompletedHandler(publisher=mock_publisher)
 
     @pytest.mark.asyncio
     async def test_routed_to_executed_flow(
@@ -128,7 +128,7 @@ class TestExecuteIntegration:
     async def test_executed_to_downstream_event_flow(
         self,
         execute_service: AutoExecuteService,
-        execute_listener: AutoExecuteCompletedListener,
+        execute_listener: AutoExecuteCompletedHandler,
         mock_publisher: AsyncMock,
     ) -> None:
         """Verify AutoExecuted event triggers downstream domain event publication."""
@@ -162,7 +162,7 @@ class TestExecuteIntegration:
     async def test_executed_with_document_processed_type(
         self,
         execute_service: AutoExecuteService,
-        execute_listener: AutoExecuteCompletedListener,
+        execute_listener: AutoExecuteCompletedHandler,
         mock_publisher: AsyncMock,
     ) -> None:
         """Verify AutoExecuted with DocumentProcessed type triggers DocumentProcessed domain event."""
@@ -193,7 +193,7 @@ class TestExecuteIntegration:
     async def test_executed_with_agent_decided_type(
         self,
         execute_service: AutoExecuteService,
-        execute_listener: AutoExecuteCompletedListener,
+        execute_listener: AutoExecuteCompletedHandler,
         mock_publisher: AsyncMock,
     ) -> None:
         """Verify AutoExecuted with AgentDecided type triggers AgentDecided domain event."""

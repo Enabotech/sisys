@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class MemoryChangedListener:
+class MemoryChangedHandler:
     """MemoryChanged 事件监听器。
 
     事件驱动下游组件更新（§11.2.9 最优架构）：
