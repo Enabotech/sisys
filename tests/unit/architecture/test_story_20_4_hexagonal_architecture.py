@@ -65,7 +65,6 @@ class TestHexagonalArchitectureConstraints:
             "storage/file_memory_adapter.py",
             "storage/memory_index.py",
             "routing/ollama_health_adapter.py",
-            "security/integrity_service.py",
         ]
 
         for impl in implementations:

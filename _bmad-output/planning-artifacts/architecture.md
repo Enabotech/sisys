@@ -154,6 +154,29 @@ completedAt: '2026-02-26'
 | **弹性隔离** | 四级隔离等级动态调整，合规内建 | EIP 协议 | 隔离切换审计 100% |
 | **可追溯决策** | 所有决策可追溯至原始数据和假设 | 事件溯源 + WORM 存储 | 7 年审计追踪 |
 
+#### 六边形架构约束
+所有代码必须遵循六边形架构约束：
+
+**领域层零依赖原则**
+- 领域层（src/domain/）仅使用 Python 标准库
+- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
+
+**四层架构定义**
+| 层次 | 目录 | 职责 |
+|------|------|------|
+| domain | src/domain/ | 核心业务逻辑，零外部依赖 |
+| application | src/application/ | 用例编排 |
+| interfaces | src/interfaces/ | 适配器 |
+| infrastructure | src/infrastructure/ | 技术实现 |
+
+**依赖方向规则**
+- 领域层 → 应用/接口/基础设施层：✗ 禁止
+- 应用层 → 接口层/基础设施层：✗ 禁止
+- 接口层      → 应用层/领域层 ✓ 允许
+- 应用层      → 领域层 ✓ 允许
+- 基础设施层  → 应用层/领域层 ✓ 允许
+- 领域层      → 仅标准库 ✓ 允许
+
 ### 1.4 关键架构指标
 
 | 指标类别 | 指标 | MVP 目标 | V1 目标 | V2 目标 | 测量方式 |
