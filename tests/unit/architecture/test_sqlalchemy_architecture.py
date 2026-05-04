@@ -55,7 +55,7 @@ class TestArchitectureConstraints:
         _missing_tests = model_files - test_files - {"association"}
 
         # association表测试存在但命名不同
-        assert (tests_dir / "test_association_tables.py").exists() or True  # 已通过
+        assert (tests_dir / "test_association_tables.py").exists(), "test_association_tables.py should exist"
 
     def test_alembic_migration_syntax(self):
         """测试Alembic迁移脚本语法正确。"""

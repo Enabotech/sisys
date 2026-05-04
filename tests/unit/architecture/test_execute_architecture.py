@@ -24,9 +24,10 @@ class TestExecuteArchitecture:
         # Should not import from infrastructure directly
         msg = "AutoExecuteService must not import infrastructure directly - use ports"
         assert "from src.infrastructure" not in content, msg
-        assert (
-            "from src.interfaces" not in content or "Protocol" in content
-        ), "AutoExecuteService must only import interfaces.Protocol for ports"
+
+        # If importing from interfaces, must be for Protocol (port pattern)
+        if "from src.interfaces" in content:
+            assert "Protocol" in content, "AutoExecuteService must only import interfaces.Protocol for ports"
 
     def test_sandbox_executor_port_in_interfaces_layer(self) -> None:
         """SandboxExecutor port must be in interfaces layer."""
