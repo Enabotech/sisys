@@ -189,12 +189,12 @@ class TestInterfacesLayerStructure:
                 found_app_import = True
                 files_importing.append(str(py_file.relative_to(ROOT)))
 
-        # 找到 application 导入是预期的架构行为
-        assert found_app_import, (
-            "Interfaces layer SHOULD import application layer (e.g., *_adapter.py imports *_handler.py).\n"
-            "Files importing application:\n" + "\n".join(files_importing)
-            if files_importing
-            else "No imports found"
+        # interfaces 层不再需要纸壳适配器模式
+        # 正确架构: EventBus (infrastructure) → Handler (application) → domain
+        # 因此 interfaces 导入 application 不是预期行为
+        assert not found_app_import, (
+            "Interfaces layer should NOT import application layer. "
+            "Correct pattern: infrastructure → application → domain (no adapter)"
         )
 
 

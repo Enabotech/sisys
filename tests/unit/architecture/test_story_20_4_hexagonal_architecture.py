@@ -151,12 +151,13 @@ class TestInterfacesLayerConstraints:
                 except ValueError:
                     files_importing.append(str(py_file))
 
-        # 找到 application 导入是预期的架构行为
-        assert files_importing, (
-            "Interfaces layer SHOULD import application layer (e.g., *_adapter.py imports *_handler.py).\n"
+        # interfaces 层不再需要纸壳适配器模式
+        # 正确架构: EventBus (infrastructure) → Handler (application) → domain
+        # 因此 interfaces 导入 application 不是预期行为
+        assert not files_importing, (
+            "Interfaces layer should NOT import application layer. "
+            "Correct pattern: infrastructure → application → domain (no adapter)\n"
             "Files importing application:\n" + "\n".join(files_importing)
-            if files_importing
-            else "No imports found"
         )
 
     def test_interfaces_can_import_domain(self):
