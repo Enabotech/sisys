@@ -80,14 +80,14 @@ development_status:
   1-8-neo4j-graph-layer: done
   1-13-k8s-auto-scaling: done
   # 价值组 4: 安全与合规基础
-  1-9-rbac-permission-management: done
-  1-10-unified-audit-log: done
-  1-11-data-sovereignty-isolation: done
-  1-12-equilibrium-level-3-compliance: done
+  1-9-rbac-permission-management: backlog
+  1-10-unified-audit-log: backlog
+  1-11-data-sovereignty-isolation: backlog
+  1-12-equilibrium-level-3-compliance: backlog
   # 价值组 5: or.md 系统公理实现
-  1-14a-autonomous-invocation-trigger: done
-  1-14b-autonomous-invocation-route: done
-  1-14c-autonomous-invocation-execute: done
+  1-14a-autonomous-invocation-trigger: in-progress
+  1-14b-autonomous-invocation-route: in-progress
+  1-14c-autonomous-invocation-execute: in-progress
   1-15a-externalized-memory-context-compression: done
   1-15b-externalized-memory-five-layer-storage: in-progress  # TODO: L3/L4/L5 由后续 Story 实现
   # 价值组 6: MVP 关键机制增强
