@@ -40,7 +40,7 @@ class TestMemoryChangedListenerInit:
         mock_metadata_repo = MagicMock()
         mock_history_repo = MagicMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=mock_storage_coordinator,
@@ -54,7 +54,7 @@ class TestMemoryChangedListenerInit:
 
     def test_init_with_none_dependencies(self):
         """验证可选依赖可以为 None"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -77,7 +77,7 @@ class TestMemoryChangedListenerHandle:
         mock_metadata_repo = AsyncMock()
         mock_history_repo = AsyncMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=mock_storage_coordinator,
@@ -103,7 +103,7 @@ class TestMemoryChangedListenerHandle:
         mock_metadata_repo = AsyncMock()
         mock_history_repo = AsyncMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=mock_storage_coordinator,
@@ -123,7 +123,7 @@ class TestMemoryChangedListenerL1Invalidation:
         """验证 private 记忆的 L1 缓存失效"""
         mock_storage_coordinator = MagicMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=mock_storage_coordinator,
@@ -148,7 +148,7 @@ class TestMemoryChangedListenerL1Invalidation:
         """验证 group 记忆的 L1 缓存失效"""
         mock_storage_coordinator = MagicMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=mock_storage_coordinator,
@@ -176,7 +176,7 @@ class TestMemoryChangedListenerL1Invalidation:
 
     def test_invalidate_l1_cache_no_storage_coordinator(self):
         """验证无 storage_coordinator 时跳过失效"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -198,7 +198,7 @@ class TestMemoryChangedListenerL2Write:
         mock_metadata_repo = AsyncMock()
         mock_history_repo = AsyncMock()
 
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -216,7 +216,7 @@ class TestMemoryChangedListenerL2Write:
     @pytest.mark.asyncio
     async def test_write_to_l2_no_repositories(self):
         """验证无 repository 时跳过写入"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -234,7 +234,7 @@ class TestMemoryChangedListenerHelperMethods:
 
     def test_get_memory_type_from_new_value(self):
         """验证从 new_value 提取 memory_type"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -248,7 +248,7 @@ class TestMemoryChangedListenerHelperMethods:
 
     def test_get_memory_type_defaults_to_private(self):
         """验证 memory_type 默认值为 private"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,
@@ -262,7 +262,7 @@ class TestMemoryChangedListenerHelperMethods:
 
     def test_get_memory_type_handles_missing_type_field(self):
         """验证 new_value 缺少 type 字段时返回 private"""
-        from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
+        from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 
         listener = MemoryChangedListener(
             storage_coordinator=None,

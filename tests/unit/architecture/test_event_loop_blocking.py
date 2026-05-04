@@ -46,7 +46,7 @@ class TestAsyncioRunPatternElimination:
         """验证 AutoTriggerListener 中没有 asyncio.run() 反模式"""
         import inspect
 
-        from src.interfaces.event_listeners.listeners.auto_trigger_listener import AutoTriggerListener
+        from src.application.event_handlers.auto_trigger_listener import AutoTriggerListener
 
         # _worker_loop 使用 new_event_loop() + run_until_complete 是正确的
         source = inspect.getsource(AutoTriggerListener._worker_loop)

@@ -28,6 +28,9 @@ import pytest
 import redis
 from pytest_bdd import given, scenarios, then, when
 
+from src.application.event_handlers.auto_execute_completed_listener import (
+    AutoExecuteCompletedListener,
+)
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.auto_route_events import AutoRouted
@@ -35,9 +38,6 @@ from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
 from src.infrastructure.storage.redis_snapshot_store import RedisSnapshotStore
-from src.interfaces.event_listeners.listeners.auto_execute_completed_listener import (
-    AutoExecuteCompletedListener,
-)
 
 scenarios("test_story_1_14c.feature")
 

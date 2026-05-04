@@ -875,10 +875,10 @@ __all__ = [
 
 ```bash
 # 删除旧的事件监听器文件
-rm -f src/interfaces/event_listeners/listeners/auto_trigger_listener.py
-rm -f src/interfaces/event_listeners/listeners/auto_route_listener.py
-rm -f src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py
-rm -f src/interfaces/event_listeners/listeners/memory_changed_listener.py
+rm -f src/application/event_handlers/auto_trigger_listener.py
+rm -f src/application/event_handlers/auto_route_listener.py
+rm -f src/application/event_handlers/auto_execute_completed_listener.py
+rm -f src/application/event_handlers/memory_changed_listener.py
 
 # 如果 listeners/ 目录为空，删除目录
 rmdir src/interfaces/event_listeners/listeners 2>/dev/null || true
@@ -888,7 +888,7 @@ rmdir src/interfaces/event_listeners/listeners 2>/dev/null || true
 
 ```bash
 # 确认旧文件已删除
-ls -la src/interfaces/event_listeners/listeners/ 2>/dev/null || echo "Directory removed or empty"
+ls -la src/application/event_handlers/ 2>/dev/null || echo "Directory removed or empty"
 ```
 
 ---
@@ -899,10 +899,10 @@ ls -la src/interfaces/event_listeners/listeners/ 2>/dev/null || echo "Directory 
 
 | Story | 旧路径 | 新路径 |
 |-------|--------|--------|
-| 1.14a | `src/interfaces/event_listeners/listeners/auto_trigger_listener.py` | `src/interfaces/event_listeners/auto_trigger_adapter.py` + `src/application/event_handlers/auto_trigger_handler.py` |
-| 1.14b | `src/interfaces/event_listeners/listeners/auto_route_listener.py` | `src/interfaces/event_listeners/auto_route_adapter.py` + `src/application/event_handlers/auto_route_handler.py` |
-| 1.14c | `src/interfaces/event_listeners/listeners/auto_execute_completed_listener.py` | `src/interfaces/event_listeners/auto_execute_completed_adapter.py` + `src/application/event_handlers/auto_execute_completed_handler.py` |
-| 1.15a | `src/interfaces/event_listeners/listeners/memory_changed_listener.py` | `src/interfaces/event_listeners/memory_changed_adapter.py` + `src/application/event_handlers/memory_changed_handler.py` |
+| 1.14a | `src/application/event_handlers/auto_trigger_listener.py` | `src/interfaces/event_listeners/auto_trigger_adapter.py` + `src/application/event_handlers/auto_trigger_handler.py` |
+| 1.14b | `src/application/event_handlers/auto_route_listener.py` | `src/interfaces/event_listeners/auto_route_adapter.py` + `src/application/event_handlers/auto_route_handler.py` |
+| 1.14c | `src/application/event_handlers/auto_execute_completed_listener.py` | `src/interfaces/event_listeners/auto_execute_completed_adapter.py` + `src/application/event_handlers/auto_execute_completed_handler.py` |
+| 1.15a | `src/application/event_handlers/memory_changed_listener.py` | `src/interfaces/event_listeners/memory_changed_adapter.py` + `src/application/event_handlers/memory_changed_handler.py` |
 
 ---
 
@@ -1031,7 +1031,7 @@ sisys/
 
 ```bash
 # 恢复旧文件（从 git）
-git checkout HEAD -- src/interfaces/event_listeners/listeners/
+git checkout HEAD -- src/application/event_handlers/
 
 # 删除新创建的文件
 rm -rf src/application/event_handlers/

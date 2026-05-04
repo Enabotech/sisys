@@ -22,6 +22,7 @@ import redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.event_handlers.memory_changed_listener import MemoryChangedListener
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
 )
@@ -30,7 +31,6 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
-from src.interfaces.event_listeners.listeners.memory_changed_listener import MemoryChangedListener
 
 # ===================================================================
 # Fixtures
