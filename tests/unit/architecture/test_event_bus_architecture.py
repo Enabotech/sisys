@@ -72,7 +72,7 @@ class TestEventBusArchitecture:
 
     def test_domain_uses_event_publisher_interface(self):
         """领域层应使用 EventPublisher 接口而非具体实现。"""
-        from src.domain.events.publisher import InMemoryEventPublisher
+        from src.domain.ports.event_publisher import InMemoryEventPublisher
 
         assert InMemoryEventPublisher is not None
 

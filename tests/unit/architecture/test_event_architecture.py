@@ -152,7 +152,7 @@ class TestEventModuleStructure:
     def test_event_interfaces_exist(self):
         """Event interfaces (publisher, listener, store) are defined."""
         expected_files = [
-            "src/domain/events/publisher.py",
+            "src/domain/ports/event_publisher.py",
             "src/domain/events/listener.py",
             "src/domain/events/event_store.py",
         ]
