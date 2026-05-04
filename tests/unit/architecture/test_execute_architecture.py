@@ -29,11 +29,11 @@ class TestExecuteArchitecture:
         if "from src.interfaces" in content:
             assert "Protocol" in content, "AutoExecuteService must only import interfaces.Protocol for ports"
 
-    def test_sandbox_executor_port_in_interfaces_layer(self) -> None:
-        """SandboxExecutor port must be in interfaces layer."""
-        port_path = Path("src/interfaces/cli/commands/sandbox_port.py")
+    def test_sandbox_executor_port_in_application_layer(self) -> None:
+        """SandboxExecutor port must be in application layer (hexagonal port definition)."""
+        port_path = Path("src/application/ports/sandbox_port.py")
 
-        assert port_path.exists(), "SandboxExecutor port must exist in interfaces/cli/commands/"
+        assert port_path.exists(), "SandboxExecutor port must exist in application/ports/"
 
     def test_docker_sandbox_adapter_in_infrastructure_layer(self) -> None:
         """DockerSandboxAdapter must be in infrastructure layer."""
@@ -95,7 +95,7 @@ class TestExecuteArchitecture:
 
         content = adapter_file.read_text()
 
-        # Adapter should import from interfaces
+        # Adapter should import from application layer (hexagonal port pattern)
         assert (
-            "from src.interfaces.cli.commands.sandbox_port import" in content
-        ), "DockerSandboxAdapter must import from interfaces.cli.commands.sandbox_port"
+            "from src.application.ports.sandbox_port import" in content
+        ), "DockerSandboxAdapter must import from application.ports.sandbox_port"
