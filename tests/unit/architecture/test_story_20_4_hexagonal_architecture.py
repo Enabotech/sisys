@@ -157,13 +157,10 @@ class TestDependencyRuleCompliance:
                 if f"import {forbidden}" in content or f"from {forbidden}" in content:
                     pytest.fail(f"{py_file.relative_to(domain_path)} imports {forbidden}")
 
-    def test_application_layer_no_infrastructure_imports(self):
-        """验证应用层不导入基础设施层（检查反向依赖）"""
+    def test_application_layer_exists(self):
+        """验证应用层目录结构存在。"""
         app_path = Path("src/application")
-
-        # 应用层不应该导入基础设施层（这是反向依赖）
-        # 简单验证路径存在即可，详细的导入检查在 test_inner_layers_no_infrastructure_imports 中
-        assert app_path.exists()
+        assert app_path.exists(), "Application layer directory should exist"
 
     def test_inner_layers_no_infrastructure_imports(self):
         """验证 domain/application 不导入 infrastructure（反向依赖检查）。

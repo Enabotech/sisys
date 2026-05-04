@@ -60,10 +60,10 @@ class TestDomainLayerNoInfraDependencies:
 
 
 class TestInfrastructureImportsInnerLayers:
-    """Verify infrastructure can import domain and application (correct dependency direction)."""
+    """Verify infrastructure can import domain and application (correct outward-inward dependency)."""
 
-    def test_infrastructure_audit_can_import_domain(self):
-        """Infrastructure audit module can import domain layer (correct outward dependency)."""
+    def test_infrastructure_can_import_domain_layer(self):
+        """Infrastructure audit module can import domain layer (correct dependency direction)."""
         infra_audit_path = Path("src/infrastructure/audit/audit_service.py")
         if infra_audit_path.exists():
             content = infra_audit_path.read_text()

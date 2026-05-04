@@ -108,17 +108,13 @@ class TestArchitectureConstraints:
 class TestHexagonalArchitecture:
     """六边形架构依赖方向约束验证。"""
 
-    def test_application_layer_respects_dependencies(self):
-        """应用层依赖方向约束。
-
-        应用层可以导入基础设施层，但不能导入 domain 层之外的外部依赖。
-        """
-        # This is a structural test - verify file structure
+    def test_application_layer_structure_valid(self):
+        """应用层目录结构存在。"""
         app_dir = ROOT_DIR / "src" / "application"
         assert app_dir.exists(), "Application layer should exist"
 
     def test_infrastructure_layer_can_import_domain_and_application(self):
-        """基础设施层可以导入领域层和应用层。"""
+        """基础设施层可以导入领域层和应用层（正确的外向内依赖方向）。"""
         infra_dir = ROOT_DIR / "src" / "infrastructure"
         assert infra_dir.exists(), "Infrastructure layer should exist"
 
