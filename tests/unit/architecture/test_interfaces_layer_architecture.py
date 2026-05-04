@@ -92,8 +92,13 @@ class TestInterfacesLayerDependencyDirection:
                 found_app_import = True
                 break
 
-        # 这是一个信息性测试：找到 application 导入是预期的架构行为
-        assert found_app_import, "Interfaces layer should import application layer (e.g., *_adapter.py imports *_handler.py)"
+        # interfaces 层不再需要纸壳适配器模式
+        # 正确架构: EventBus (infrastructure) → Handler (application) → domain
+        # 因此 interfaces 导入 application 不是预期行为
+        assert not found_app_import, (
+            "Interfaces layer should NOT import application layer. "
+            "Correct pattern: infrastructure → application → domain (no adapter)"
+        )
 
     def test_interfaces_can_import_domain(self):
         """interfaces 层可以导入 domain 层（正向依赖）。"""
