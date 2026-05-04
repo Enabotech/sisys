@@ -33,9 +33,8 @@ class TestDomainEventsNoPydantic:
 
         assert len(pydantic_files) == 0, f"Pydantic imports found in domain/events: {pydantic_files}"
 
-    def test_domain_events_use_standard_library(self):
-        """Domain events use only standard library modules."""
-        # Check that key event files import from standard library
+    def test_domain_event_files_exist(self):
+        """Domain event files exist in the expected locations."""
         event_files = [
             "src/domain/events/base.py",
             "src/domain/events/enums.py",

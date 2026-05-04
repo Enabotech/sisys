@@ -113,8 +113,8 @@ class TestHexagonalArchitecture:
         app_dir = ROOT_DIR / "src" / "application"
         assert app_dir.exists(), "Application layer should exist"
 
-    def test_infrastructure_layer_can_import_domain_and_application(self):
-        """基础设施层可以导入领域层和应用层（正确的外向内依赖方向）。"""
+    def test_infrastructure_layer_exists(self):
+        """基础设施层目录结构存在。"""
         infra_dir = ROOT_DIR / "src" / "infrastructure"
         assert infra_dir.exists(), "Infrastructure layer should exist"
 

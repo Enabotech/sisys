@@ -126,10 +126,10 @@ class TestTriggerRouteDecoupling:
 
         # Should publish AutoTriggered event
         assert "AutoTriggered" in content, "AutoTriggerService should emit AutoTriggered event"
-        # Should not call route directly
+        # Should use event publishing pattern (publish method) not direct route calls
         assert (
-            "route" not in content.lower() or "publish" in content.lower()
-        ), "AutoTriggerService should use event publishing, not direct route calls"
+            "publish" in content.lower() and "_publish" in content.lower()
+        ), "AutoTriggerService should use event publishing pattern"
 
 
 class TestDependencyDirection:
