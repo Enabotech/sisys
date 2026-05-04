@@ -130,20 +130,34 @@ class TestInterfacesLayerConstraints:
         api_path = Path("src/interfaces/api")
         assert api_path.exists(), "src/interfaces/api/ directory must exist"
 
-    def test_interfaces_not_importing_application(self):
-        """验证 interfaces 层不导入 application 层"""
-        interfaces_path = Path("src/interfaces")
+    def test_interfaces_can_import_application(self):
+        """验证 interfaces 层可以导入 application 层。
 
-        violations = []
+        六边形架构：interfaces（外层）→ application（中间层）是正确的依赖方向。
+        例如：*_adapter.py 调用 *_handler.py
+        """
+        interfaces_path = Path("src/interfaces")
+        root_path = Path.cwd()
+
+        files_importing = []
         for py_file in interfaces_path.rglob("*.py"):
             if py_file.name == "__init__.py":
                 continue
             content = py_file.read_text()
             content = re.sub(r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)", "", content, flags=re.DOTALL)
             if "from src.application" in content or "import src.application" in content:
-                violations.append(str(py_file.relative_to(Path.cwd())))
+                try:
+                    files_importing.append(str(py_file.relative_to(root_path)))
+                except ValueError:
+                    files_importing.append(str(py_file))
 
-        assert not violations, "Interfaces layer must NOT import application:\n" + "\n".join(violations)
+        # 找到 application 导入是预期的架构行为
+        assert files_importing, (
+            "Interfaces layer SHOULD import application layer (e.g., *_adapter.py imports *_handler.py).\n"
+            "Files importing application:\n" + "\n".join(files_importing)
+            if files_importing
+            else "No imports found"
+        )
 
     def test_interfaces_can_import_domain(self):
         """验证 interfaces 层可以导入 domain 层（正向依赖）"""

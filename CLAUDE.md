@@ -25,13 +25,13 @@
 | interfaces | src/interfaces/ | 适配器 |
 | infrastructure | src/infrastructure/ | 技术实现 |
 
-**依赖方向规则**
-- 领域层 → 应用/接口/基础设施层：✗ 禁止
-- 应用层 → 接口层/基础设施层：✗ 禁止
-- 接口层      → 应用层/领域层 ✓ 允许
-- 应用层      → 领域层 ✓ 允许
-- 基础设施层  → 应用层/领域层 ✓ 允许
-- 领域层      → 仅标准库 ✓ 允许
+**依赖方向矩阵**
+| 起点 \ 终点         | domain | application | interfaces | infrastructure |
+|--------------------|--------|-------------|------------|----------------|
+| **domain**         | —      | ✗ 禁止      | ✗ 禁止     | ✗ 禁止         |
+| **application**    | ✓ 允许 | —           | ✗ 禁止     | ✗ 禁止         |
+| **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
+| **interfaces**     | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 ### TDD 开发约束
 **每个 Task 必须严格遵守 TDD 红→绿→重构循环：**
@@ -71,7 +71,45 @@
 
 **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
 
+### 代码注释规范
+
+SISYS 系统使用 **Google 风格代码注释**，所有注释**统一使用英文**。
+
+| 位置 | 规范 |
+|------|------|
+| 文件头 | Module docstring explaining purpose, author, copyright |
+| 类 | `ClassName: Brief description.` + `Attributes:` list |
+| 函数/方法 | `FuncName(args): Brief description.` + `Args:/Returns:/Raises:` sections |
+
+**Example:**
+```python
+"""SISYS Application Layer Module.
+
+Todo: Describe module functionality.
+"""
+class ExampleService:
+    """Service class for processing data.
+
+    Attributes:
+        name: Service name
+    """
+    def process(self, data: str) -> bool:
+        """Process input data.
+
+        Args:
+            data: Input data to process
+
+        Returns:
+            True if processing succeeded, False otherwise
+
+        Raises:
+            ValueError: When data is invalid
+        """
+        pass
+```
+
 ## 评审约束
+
 **评审前必须理解上下文，不要在不了解背景的情况下质疑。**
 - 先理解组件的职责边界，再判断是否存在真正的问题
 - 分清不同组件的不同职责，不要混淆
