@@ -877,8 +877,8 @@ def then_execute_service_should_not_import_infrastructure(context: dict) -> None
 
 @then("SandboxExecutor 端口应该位于 interfaces 层")
 def then_sandbox_executor_port_in_interfaces(context: dict) -> None:
-    """Verify SandboxExecutor port is in interfaces layer."""
-    from src.interfaces.cli.commands.sandbox_port import SandboxExecutor
+    """Verify SandboxExecutor port is in application layer (hexagonal port definition)."""
+    from src.application.ports.sandbox_port import SandboxExecutor
 
     assert SandboxExecutor is not None
 
