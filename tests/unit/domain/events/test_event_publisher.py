@@ -8,7 +8,7 @@ import pytest
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import InMemoryEventListener
-from src.infrastructure.messaging.event_bus import InMemoryEventBus
+from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
 
 
 class TestEventPublisherInterface:
