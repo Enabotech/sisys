@@ -6,7 +6,7 @@ from abc import ABC
 
 import pytest
 
-from src.interfaces.event_subscriber import EventSubscriber
+from src.application.ports.event_subscriber import EventSubscriber
 
 
 class TestEventSubscriberIsAbstract:

@@ -23,7 +23,7 @@ class TestRedisEventBusImplementsInterfaces:
 
     def test_implements_event_subscriber(self) -> None:
         """RedisEventBus should implement EventSubscriber."""
-        from src.interfaces.event_subscriber import EventSubscriber
+        from src.application.ports.event_subscriber import EventSubscriber
 
         assert issubclass(RedisEventBus, EventSubscriber)
 
