@@ -17,7 +17,7 @@ class TestRedisEventBusImplementsInterfaces:
 
     def test_implements_event_publisher(self) -> None:
         """RedisEventBus should implement EventPublisher."""
-        from src.interfaces.event_publisher import EventPublisher
+        from src.domain.ports.event_publisher import EventPublisher
 
         assert issubclass(RedisEventBus, EventPublisher)
 

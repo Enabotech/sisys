@@ -6,7 +6,7 @@ from abc import ABC
 
 import pytest
 
-from src.interfaces.event_publisher import EventPublisher
+from src.domain.ports.event_publisher import EventPublisher
 
 
 class TestEventPublisherIsAbstract:

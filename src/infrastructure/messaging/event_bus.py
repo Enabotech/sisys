@@ -12,10 +12,10 @@ import uuid
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import InMemoryEventListener
-from src.domain.events.publisher import EventPublisher
+from src.domain.events.publisher import InMemoryEventPublisher
 
 
-class InMemoryEventBus(EventPublisher):
+class InMemoryEventBus(InMemoryEventPublisher):
     """In-memory event bus with idempotency guarantee (MVP).
 
     Maintains a set of processed event IDs to prevent duplicate processing.

@@ -19,7 +19,7 @@ class TestDualChannelEventBusImplementsInterfaces:
 
     def test_implements_event_publisher(self) -> None:
         """DualChannelEventBus should implement EventPublisher."""
-        from src.interfaces.event_publisher import EventPublisher
+        from src.domain.ports.event_publisher import EventPublisher
 
         assert issubclass(DualChannelEventBus, EventPublisher)
 
