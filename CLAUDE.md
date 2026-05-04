@@ -15,7 +15,7 @@
 
 **领域层零依赖原则**
 - 领域层（src/domain/）仅使用 Python 标准库
-- 禁止导入：langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
+- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
 
 **四层架构定义**
 | 层次 | 目录 | 职责 |
