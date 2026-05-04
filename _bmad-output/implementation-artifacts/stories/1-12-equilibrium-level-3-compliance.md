@@ -12,6 +12,12 @@
 > 3. **集成测试覆盖率≥75%** — 验证多组件协同
 > 4. **无高风险项，中危漏洞<5个** — 通过公安部指定测评机构测评
 > 5. **等保 2.0 三级通过** — 覆盖身份鉴别/访问控制/安全审计/入侵防范/数据完整性/备份恢复
+>
+> **⚠️ 六边形架构约束（关键）：**
+> - 安全服务实现位于 `src/application/security/`（用例编排层）
+> - 安全服务接口定义在 `src/domain/ports/`（领域层接口，仅标准库）
+> - `infrastructure` 层仅包含技术适配器（存储、消息、外部服务）
+> - 禁止 `application → infrastructure` 直接依赖（通过接口解耦）
 
 ---
 
@@ -235,8 +241,10 @@
   - 字段: `event_id`, `timestamp`, `source_ip`, `attack_type`, `severity`, `action_taken`
 - [x] Subtask 0.3: 🔴 红 → 🟢 绿 — 定义 `DataIntegrityViolationEvent`
   - 字段: `event_id`, `timestamp`, `data_id`, `expected_hash`, `actual_hash`, `source`
-- [x] Subtask 0.4: 🔴 红 → 🟢 绿 — 定义 `MFAChallenge` 数据模型（`src/infrastructure/security/models.py`）
+- [x] Subtask 0.4: 🔴 红 → 🟢 绿 — 定义 MFA 配置模型
   - 字段: `id`, `user_id`, `challenge_type`, `secret`, `attempts`, `expires_at`, `status`
+  - 接口定义: `src/domain/ports/security/auth_port.py`（领域层接口，仅标准库）
+  - 模型实现: `src/application/security/mfa_models.py`（应用层模型）
 - [x] Subtask 0.5: 🔴 红 → 🟢 绿 — 定义 `BackupRecord` 和 `IntegrityCheck` 模型
 - [x] Subtask 0.6: 🔴 红 → 🟢 绿 — 定义 API 契约（OpenAPI）
   - MFA 端点: `POST /api/v1/auth/mfa/setup`, `POST /api/v1/auth/mfa/verify`
@@ -271,7 +279,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（MFAChallenge 模型测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（MFAChallenge 模型测试） |
 | 🟢 绿 | 实现 `MFAChallenge` 模型和 `MFAConfig` |
 | 🔄 重构 | 添加类型注解、优化命名 |
 
@@ -296,7 +304,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（TOTP 测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（TOTP 测试） |
 | 🟢 绿 | 实现 `TOTPGenerator` 和 `TOTPVerifier` 类 |
 | 🔄 重构 | 添加错误处理、日志和密钥轮换支持 |
 
@@ -322,7 +330,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（MFAService 测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（MFA 服务测试） |
 | 🟢 绿 | 实现 `MFAService` 类 |
 | 🔄 重构 | 添加审计日志集成（Story 1.10）、API 层预验证模式（ADR-011） |
 
@@ -348,7 +356,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（入侵检测测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（入侵检测测试） |
 | 🟢 绿 | 实现 `IntrusionDetector` 类 |
 | 🔄 重构 | 添加规则引擎、实时告警 |
 
@@ -374,7 +382,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（渗透测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（渗透测试） |
 | 🟢 绿 | 实现等保 2.0 三级渗透测试检测规则 |
 | 🔄 重构 | 添加报告生成 |
 
@@ -400,7 +408,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（威胁评分测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（威胁评分测试） |
 | 🟢 绿 | 实现 `ThreatScoringService` 类 |
 | 🔄 重构 | 添加实时告警 |
 
@@ -425,7 +433,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（加密服务测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（加密服务测试） |
 | 🟢 绿 | 实现 `EncryptionService` 类（AES-256） |
 | 🔄 重构 | 添加密钥轮换、TLS 支持 |
 
@@ -450,7 +458,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（完整性测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（完整性测试） |
 | 🟢 绿 | 实现 `IntegrityVerifier` 类 |
 | 🔄 重构 | 添加 Hash 算法选择（SHA-256/SHA-512） |
 
@@ -474,7 +482,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（签名服务测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（签名服务测试） |
 | 🟢 绿 | 实现 `SignatureService` 类 |
 | 🔄 重构 | 添加签名验证、证书管理 |
 
@@ -498,7 +506,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（备份服务测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（备份服务测试） |
 | 🟢 绿 | 实现 `BackupService` 和 `RecoveryService` 类 |
 | 🔄 重构 | 添加并发控制、进度跟踪 |
 
@@ -524,7 +532,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（合规报告测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（合规报告测试） |
 | 🟢 绿 | 实现 `ComplianceReportService` 类 |
 | 🔄 重构 | 添加报告模板、多格式导出 |
 
@@ -548,7 +556,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（RBAC 访问控制扩展测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（RBAC 访问控制扩展测试） |
 | 🟢 绿 | 实现资源级权限验证 |
 | 🔄 重构 | 优化权限检查逻辑 |
 
@@ -566,7 +574,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/security/test_equilibrium.py`（审计日志扩展测试） |
+| 🔴 红 | 编写 `tests/unit/application/security/test_equilibrium.py`（审计日志扩展测试） |
 | 🟢 绿 | 实现安全事件全覆盖 |
 | 🔄 重构 | 优化日志记录 |
 
@@ -663,7 +671,7 @@
 
 #### 架构验证测试实现
 
-- [x] Subtask 15.1: 创建 `tests/unit/security/test_equilibrium_architecture.py`（独立架构验证文件）
+- [x] Subtask 15.1: 创建 `tests/unit/application/security/test_equilibrium_architecture.py`（独立架构验证文件）
 - [x] Subtask 15.2: 实现领域层零依赖验证（安全服务仅在应用层/接口层）
 - [x] Subtask 15.3: 实现循环依赖检测（使用 ruff 的 `E` 规则）
 - [x] Subtask 15.4: 运行完整测试套件并生成报告
@@ -697,39 +705,51 @@
 
 ### 项目结构说明 Project Structure
 
+> **⚠️ 六边形架构约束：** 安全服务实现位于 `application` 层（用例编排），接口定义位于 `domain` 层（仅标准库），`infrastructure` 层仅包含技术适配器。
+
 ```
 sisys/
 ├── src/
 │   ├── domain/
-│   │   └── events/
-│   │       └── compliance_events.py    # 等保相关领域事件
+│   │   ├── events/
+│   │   │   └── compliance_events.py    # 等保相关领域事件（仅标准库）
+│   │   └── ports/                       # 领域层接口定义
+│   │       └── security/
+│   │           ├── auth_port.py         # 认证服务接口（MFA 验证）
+│   │           ├── permission_port.py   # 权限服务接口
+│   │           ├── audit_port.py        # 审计服务接口
+│   │           ├── intrusion_detection_port.py  # 入侵检测接口
+│   │           └── integrity_port.py    # 数据完整性接口
 │   ├── application/
-│   │   └── use_cases/
-│   │       └── compliance/
-│   │           ├── mfa_use_case.py
-│   │           └── integrity_use_case.py
+│   │   └── security/                    # 安全服务实现（用例编排）
+│   │       ├── mfa_use_case.py          # MFA 用例
+│   │       ├── totp_service.py         # TOTP 生成/验证
+│   │       ├── intrusion_detection_service.py  # 入侵检测服务
+│   │       ├── encryption_service.py    # 加密服务（AES-256）
+│   │       ├── integrity_service.py     # 完整性验证/数字签名
+│   │       ├── backup_service.py        # 备份服务
+│   │       └── compliance_report_service.py  # 合规报告
 │   ├── infrastructure/
-│   │   ├── security/
-│   │   │   ├── models.py               # 等保相关模型
-│   │   │   ├── mfa_service.py          # MFA 服务
-│   │   │   ├── totp_generator.py       # TOTP 生成器
-│   │   │   ├── intrusion_detector.py   # 入侵检测
-│   │   │   ├── encryption_service.py   # 加密服务
-│   │   │   ├── backup_service.py       # 备份服务
-│   │   │   └── recovery_service.py     # 恢复服务
-│   │   └── config/
-│   │       └── equilibrium.py          # 等保配置
+│   │   ├── config/
+│   │   │   └── equilibrium.py           # 等保配置（技术配置）
+│   │   └── storage/                     # 技术适配器（已存在）
+│   │       ├── postgresql/
+│   │       ├── redis/
+│   │       └── ...
 │   └── interfaces/
 │       ├── cli/
-│       │   └── equilibrium_commands.py  # CLI 命令
+│       │   └── equilibrium_commands.py  # CLI 命令（适配器）
 │       └── api/
-│           └── equilibrium_endpoints.py # API 端点
+│           └── equilibrium_endpoints.py # API 端点（适配器）
 └── tests/
-    ├── unit/security/
-    │   └── test_equilibrium.py         # 单元测试（统一文件）
+    ├── unit/
+    │   └── application/security/
+    │       └── test_equilibrium.py      # 单元测试
     └── integration/
         └── test_security_compliance_integration.py  # 集成测试
 ```
+
+> **说明：** 安全服务（MFA/入侵检测/加密）位于 `application` 层作为用例编排，而非 `infrastructure` 层。`infrastructure` 层仅包含技术实现（存储适配器、消息适配器）。这是六边形架构的核心约束。
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -787,21 +807,28 @@ sisys/
 
 **创建的文件/Created Files:**
 - `src/domain/events/compliance_events.py` - 等保领域事件（AC-1~AC-7）
-- `src/infrastructure/security/models.py` - 等保相关模型（MFAChallenge/BackupRecord/IntegrityCheck）
-- `src/infrastructure/security/totp_generator.py` - TOTP 生成器/验证器（AC-1）
-- `src/infrastructure/security/mfa_service.py` - MFA 服务（AC-1）
-- `src/infrastructure/security/intrusion_detector.py` - 入侵检测（AC-4）
-- `src/infrastructure/security/backup_service.py` - 备份服务（AC-6）
-- `src/infrastructure/security/recovery_service.py` - 恢复服务（AC-6）
-- `src/infrastructure/security/integrity_service.py` - 完整性验证/数字签名（AC-5）
-- `src/infrastructure/security/encryption_service.py` - 密码哈希+AES-256加密（完善AC-5）
-- `src/infrastructure/security/compliance_service.py` - 合规报告服务（AC-7）
-- `src/infrastructure/config/equilibrium.py` - 等保配置（Task 13）
+- `src/domain/ports/security/` - 安全服务接口定义（仅标准库）
+  - `auth_port.py` - 认证服务接口
+  - `permission_port.py` - 权限服务接口
+  - `intrusion_detection_port.py` - 入侵检测接口
+  - `integrity_port.py` - 数据完整性接口
+- `src/application/security/` - 安全服务实现（用例编排）
+  - `mfa_use_case.py` - MFA 用例（AC-1）
+  - `totp_service.py` - TOTP 生成/验证器（AC-1）
+  - `intrusion_detection_service.py` - 入侵检测（AC-4）
+  - `encryption_service.py` - 加密服务 AES-256（AC-5）
+  - `integrity_service.py` - 完整性验证/数字签名（AC-5）
+  - `backup_service.py` - 备份服务（AC-6）
+  - `recovery_service.py` - 恢复服务（AC-6）
+  - `compliance_report_service.py` - 合规报告（AC-7）
+- `src/application/security/resource_permission_service.py` - 资源级权限验证（AC-2，扩展 Story 1.9）
+- `src/application/security/audit_extension_service.py` - 审计日志扩展（AC-3，扩展 Story 1.10）
+- `src/infrastructure/config/equilibrium.py` - 等保配置（技术配置）
 - `src/interfaces/cli/equilibrium_commands.py` - CLI 命令（Task 13）
 - `src/interfaces/api/equilibrium_endpoints.py` - API 端点模型（Task 13）
 - `src/interfaces/api/equilibrium_api.py` - API 路由实现（Task 13）
-- `tests/unit/security/test_equilibrium.py` - 单元测试 43 项（Task 1-12）
-- `tests/unit/security/test_equilibrium_architecture.py` - 架构验证测试 16 项（Task 15）
+- `tests/unit/application/security/test_equilibrium.py` - 单元测试 43 项（Task 1-12）
+- `tests/unit/application/security/test_equilibrium_architecture.py` - 架构验证测试 16 项（Task 15）
 - `tests/integration/test_security_compliance_integration.py` - 集成测试 14 项（Task 14）
 - `tests/acceptance/test_story_1_12.feature` - BDD 验收测试（Gherkin）
 - `tests/acceptance/test_story_1_12_steps.py` - BDD 步骤实现
@@ -830,6 +857,10 @@ sisys/
 5. [x] Sprint status synced to `ready-for-dev`
 6. [x] AC→Task→Subtask 追溯矩阵已补充
 7. [x] Review fixes applied 审查修复已完成 (v2.2.0)
+8. [x] Hexagonal architecture compliance fixed 六边形架构约束修复 (v2.3.0)
+   - 安全服务从 `infrastructure` 层移至 `application` 层
+   - 领域层接口 `src/domain/ports/security/` 添加
+   - 文件清单和测试路径全部更新
 
 ---
 
@@ -860,7 +891,7 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.2.0
+**模板版本/Template Version:** 2.3.0
 **创建日期/Created:** 2026-04-20
-**最后更新/Last Updated:** 2026-04-21
-**更新说明:** v2.2.0 - 审查修复版本：(1) Task 0 补充完整 Subtask 0.1-0.9 分解，(2) AC-2 访问控制覆盖范围明确（资源级权限验证），(3) AC-3 审计日志覆盖明确（MFA/入侵检测/数据完整性事件），(4) 渗透测试补充 GB/T 22239-2019 标准版本号，(5) 追溯矩阵补充 Task 0 行
+**最后更新/Last Updated:** 2026-05-04
+**更新说明:** v2.3.0 - 六边形架构约束修复：(1) 安全服务从 infrastructure 层移至 application 层，(2) 领域层接口定义补充，`src/domain/ports/security/`，(3) 文件清单路径全部更新，(4) 测试路径从 `tests/unit/security/` 改为 `tests/unit/application/security/`

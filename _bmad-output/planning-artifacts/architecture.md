@@ -2478,7 +2478,7 @@ src/domain/
 │   ├── evaluation_service.py                              # 评估服务接口
 │   └── visualization_service.py                           # 可视化服务接口
 │
-├── repositories/                                          # 仓储接口
+├── ports/                                                 # 领域层端口（需要由基础设施实现的抽象）
 │   ├── __init__.py
 │   ├── document_repository.py                             # 文档仓储接口
 │   ├── agent_repository.py                                # Agent 仓储接口
@@ -2559,6 +2559,8 @@ src/application/
 │   ├── planning_commands.py                               # 规划命令
 │   ├── routing_commands.py                                # 路由命令
 │   └── system_commands.py                                 # 系统命令
+│
+├── ports/                                                 # 应用层端口（技术横切关注的抽象）
 │
 ├── queries/                                               # 查询定义
 │   ├── __init__.py

@@ -181,6 +181,14 @@
   - 扩展字段（支持 FR-SC-04 多维检索）: `correction_level`
   - 继承 `DomainEvent` 基类
 
+#### 应用层端口定义 (Application Ports)
+- [ ] AuditService Protocol 定义（`src/application/ports/audit_service.py`）
+  - 接口方法: `log(audit_event)`, `query(filters)`, `get_stats()`
+  - 定义在应用层（符合六边形架构：infrastructure 实现 application 端口）
+- [ ] AuditOutboxPort 定义（`src/application/ports/audit_outbox_port.py`）
+  - 接口方法: `write_entry(event)`, `mark_published(event_id)`, `get_pending()`
+  - 支持事务发件箱模式
+
 #### 数据模型 (Data Models) — 基础设施层
 - [ ] AuditLogModel（PostgreSQL 审计日志表，`src/infrastructure/storage/postgresql/models/audit.py`）
   - 基础字段（FR-SC-02）: `id`, `log_id`, `timestamp`, `actor`, `action_type`, `target_resource`, `old_value`, `new_value`
@@ -664,7 +672,7 @@
 
 > **📌 架构说明:** 审计日志服务遵循六边形架构的依赖倒置原则。
 > - 领域层 (`src/domain/events/`) 定义审计事件（DomainEvent 子类）
-> - 领域层 (`src/domain/services/`) 定义审计服务接口（Protocol）
+> - 应用层 (`src/application/ports/`) 定义审计服务接口（Protocol）
 > - 基础设施层 (`src/infrastructure/audit/`) 实现审计服务接口
 
 ```
@@ -676,15 +684,17 @@ sisys/
 │   │   │   ├── audit_events.py          # AuditEvent 领域事件
 │   │   │   └── ... (其他领域事件)
 │   │   └── services/
-│   │       ├── __init__.py
-│   │       └── audit_service.py          # AuditService 接口（Protocol）
+│   │       └── __init__.py
+│   ├── application/
+│   │   └── ports/
+│   │       └── audit_service.py         # AuditService 接口（Protocol）
 │   └── infrastructure/
 │       ├── config/
 │       │   └── audit.py                  # AuditConfig 配置模型
 │       ├── audit/
 │       │   ├── __init__.py
-│       │   ├── audit_service.py          # AuditService 实现
-│       │   ├── outbox_processor.py       # 事务发件箱处理器
+│       │   ├── audit_service.py         # AuditService 实现
+│       │   ├── outbox_processor.py      # 事务发件箱处理器
 │       │   ├── event_listener.py         # 事件监听器
 │       │   └── compliance_reporter.py    # 合规报告生成
 │       └── storage/
@@ -724,7 +734,7 @@ sisys/
 
 **应用到本故事/Applied to This Story:**
 - [ ] AuditConfig 采用 Story 1.4-1.9 相同的配置模式
-- [ ] AuditService 接口定义在领域层（Protocol），实现在基础设施层
+- [ ] AuditService 接口定义在应用层（Protocol），实现在基础设施层
 - [ ] 复用 Story 1.3 事件总线的 Outbox 处理器模式
 - [ ] actor 信息从 AuthService 认证上下文中获取
 - [ ] 架构约束测试验证领域层无审计实现细节
@@ -769,7 +779,8 @@ sisys/
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/domain/events/audit_events.py` - AuditEvent 领域事件
-- `src/domain/services/audit_service.py` - AuditService 接口（Protocol）
+- `src/application/ports/audit_service.py` - AuditService 接口（Protocol）
+- `src/application/ports/audit_outbox_port.py` - AuditOutboxPort 接口（Protocol）
 - `src/infrastructure/config/audit.py` - AuditConfig 配置模型
 - `src/infrastructure/audit/audit_service.py` - AuditService 实现
 - `src/infrastructure/audit/outbox_processor.py` - 事务发件箱处理器
