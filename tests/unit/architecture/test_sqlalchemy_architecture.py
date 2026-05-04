@@ -24,21 +24,21 @@ class TestArchitectureConstraints:
 
         assert len(violations) == 0, f"领域层包含SQLAlchemy导入: {violations}"
 
-    def test_dependency_direction(self):
-        """测试依赖方向正确（基础设施层不直接导入领域层实现）。"""
-        infra_dir = Path(__file__).parents[3] / "src" / "infrastructure"
+    def test_domain_layer_no_infrastructure_imports(self):
+        """验证 domain 层不导入 infrastructure（检查反向依赖）。
 
-        # 允许基础设施层导入领域层接口
-        # 但不允许循环依赖
+        正确的依赖方向: infrastructure → application → domain
+        domain 层导入 infrastructure 是反向依赖，是禁止的。
+        """
+        domain_dir = Path(__file__).parents[3] / "src" / "domain"
+
         violations = []
-        for py_file in infra_dir.rglob("*.py"):
+        for py_file in domain_dir.rglob("*.py"):
             content = py_file.read_text()
-            # 检查是否有基础设施层被领域层导入的情况
-            if "from src.domain" in content or "import src.domain" in content:
-                # 这是允许的（基础设施实现领域接口）
-                pass
+            if "from src.infrastructure" in content or "import src.infrastructure" in content:
+                violations.append(str(py_file.relative_to(domain_dir)))
 
-        assert len(violations) == 0, f"依赖方向错误: {violations}"
+        assert len(violations) == 0, f"Domain layer imports infrastructure (reverse dependency): {violations}"
 
     def test_all_models_have_tests(self):
         """测试所有模型都有对应的单元测试。"""

@@ -68,21 +68,21 @@ class TestUDMRArchitecture:
         )
         assert result.returncode == 0, f"Ruff check failed:\n{result.stderr}"
 
-    def test_infrastructure_routing_isolated(self) -> None:
-        """Infrastructure routing should not import domain services."""
-        routing_dir = ROOT_DIR / "src" / "infrastructure" / "routing"
-        domain_imports = [
-            "src.domain.services.udmr_router",
-            "src.domain.services.route_service",
+    def test_domain_routing_services_no_infrastructure_imports(self) -> None:
+        """Domain routing services should not import infrastructure (reverse dependency check)."""
+        # Domain services should NOT import infrastructure - that's the forbidden direction
+        domain_services_dir = ROOT_DIR / "src" / "domain" / "services"
+        infra_imports = [
+            "src.infrastructure",
         ]
 
         violations = []
-        for py_file in routing_dir.rglob("*.py"):
+        for py_file in domain_services_dir.glob("*.py"):
             if py_file.name == "__init__.py":
                 continue
             content = py_file.read_text()
-            for forbidden in domain_imports:
+            for forbidden in infra_imports:
                 if forbidden in content:
                     violations.append(f"{py_file.name}: imports '{forbidden}'")
 
-        assert len(violations) == 0, "Infrastructure routing violations:\n" + "\n".join(violations)
+        assert len(violations) == 0, "Domain services violations (reverse dependency):\n" + "\n".join(violations)
