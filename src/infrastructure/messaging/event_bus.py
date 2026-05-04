@@ -12,7 +12,7 @@ import uuid
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import InMemoryEventListener
-from src.domain.events.publisher import InMemoryEventPublisher
+from src.domain.ports.event_publisher import InMemoryEventPublisher
 
 
 class InMemoryEventBus(InMemoryEventPublisher):
