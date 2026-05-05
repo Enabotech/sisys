@@ -84,19 +84,19 @@
 **And** 根据敏感类型应用相应保护策略
 
 **验证标准/Validation Criteria:**
-- [x] 敏感数据类型定义
+- [ ] 敏感数据类型定义
   - PII（个人信息）：姓名、身份证、电话、邮箱、地址等
   - 商业秘密：财务报表、客户名单、技术配方等
   - 财务数据：银行账号、信用卡号、交易记录等
   - 自定义敏感类型支持扩展
-- [x] 敏感数据识别器实现
+- [ ] 敏感数据识别器实现
   - 正则匹配（身份证、电话、邮箱等）
   - 关键词匹配（商业秘密关键词库）
   - NLP 识别（可选，V2）
-- [x] 数据标记机制
+- [ ] 数据标记机制
   - 敏感标签附加到数据对象
   - 标签传播至下游处理
-- [x] 单元测试覆盖正常识别、边界识别、误识别场景
+- [ ] 单元测试覆盖正常识别、边界识别、误识别场景
 
 ### AC-2: 数据境内存储策略 (Data Residency)
 
@@ -106,18 +106,18 @@
 **And** 境外存储触发审批流程
 
 **验证标准/Validation Criteria:**
-- [x] 本地存储策略执行
+- [ ] 本地存储策略执行
   - 六层存储（L1-L5）默认境内
   - 境内优先路由决策
   - 境外存储需显式审批
-- [x] 数据主权配置
+- [ ] 数据主权配置
   - 数据驻留标签（CHINA_DOMESTIC/GLOBAL）
   - 存储位置验证
   - 跨境检测和告警
-- [x] 存储层隔离
+- [ ] 存储层隔离
   - 境内存储层与境外存储层物理隔离
   - 跨境数据同步审计
-- [x] 单元测试覆盖本地优先、跨境触发、配置验证场景
+- [ ] 单元测试覆盖本地优先、跨境触发、配置验证场景
 
 ### AC-3: 外部调用白名单机制 (External Call Whitelist)
 
@@ -127,20 +127,20 @@
 **And** 未授权调用被阻断并记录
 
 **验证标准/Validation Criteria:**
-- [x] 白名单数据模型
+- [ ] 白名单数据模型
   - 白名单规则：endpoint, provider, purpose, risk_level, approved_by, expiry_date
   - 白名单状态：active/pending/revoked/expired
-- [x] 白名单验证器
+- [ ] 白名单验证器
   - 调用前白名单校验
   - 动态白名单更新
   - 过期自动失效
-- [x] 白名单管理接口
+- [ ] 白名单管理接口
   - CLI 命令：`sisys system whitelist add/revoke/list`
   - API 端点：`/api/v1/admin/whitelist`
-- [x] 审计日志集成
+- [ ] 审计日志集成
   - 所有外部调用记录至审计日志
   - 白名单命中/未命中记录
-- [x] 单元测试覆盖白名单验证、动态更新、过期失效场景
+- [ ] 单元测试覆盖白名单验证、动态更新、过期失效场景
 
 ### AC-4: 跨境传输审批流程 (Cross-Border Transfer Approval)
 
@@ -150,21 +150,21 @@
 **And** 审批通过前阻断传输
 
 **验证标准/Validation Criteria:**
-- [x] 跨境审批流程
+- [ ] 跨境审批流程
   - 审批请求创建
   - 审批人指定（合规官）
   - 审批状态跟踪（pending/approved/rejected）
   - 审批历史记录
-- [x] 审批 SLA 管理
+- [ ] 审批 SLA 管理
   - SLA 超时告警
   - 自动升级机制
-- [x] 阻断机制
+- [ ] 阻断机制
   - 审批未通过前阻断跨境传输
   - 阻断日志记录
   - 通知机制
-- [x] CLI 命令支持
+- [ ] CLI 命令支持
   - `sisys system approval list/approve/reject`
-- [x] 单元测试覆盖审批流程、超时处理、阻断机制场景
+- [ ] 单元测试覆盖审批流程、超时处理、阻断机制场景
 
 ### AC-5: PIPL 合规 (Personal Information Protection Law)
 
@@ -174,18 +174,18 @@
 **And** 记录处理合法依据
 
 **验证标准/Validation Criteria:**
-- [x] 个人信息处理记录
+- [ ] 个人信息处理记录
   - 处理目的记录
   - 处理方式记录
   - 数据主体同意记录
-- [x] 权利保障
+- [ ] 权利保障
   - 个人信息访问权
   - 更正权删除权支持
   - 数据可携带权
-- [x] 敏感个人信息增强保护
+- [ ] 敏感个人信息增强保护
   - 生物识别信息特殊保护
   - 未成年人信息特殊保护
-- [x] 合规报告
+- [ ] 合规报告
   - PIPL 合规审计报告生成
   - 处理记录导出
 
@@ -196,11 +196,11 @@
 **Then** 所有测试项通过
 
 **验证标准/Validation Criteria:**
-- [x] 数据境内存储 100%
+- [ ] 数据境内存储 100%
   - COMP-05 测试通过
-- [x] 跨境传输审批率 100%
-- [x] 敏感数据识别准确率≥95%
-- [x] 白名单验证覆盖率 100%
+- [ ] 跨境传输审批率 100%
+- [ ] 敏感数据识别准确率≥95%
+- [ ] 白名单验证覆盖率 100%
 
 ---
 
@@ -214,10 +214,10 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [x] SensitiveDataDetectedEvent 定义（`src/domain/events/compliance_events.py`）✅
+- [ ] SensitiveDataDetectedEvent 定义（`src/domain/events/compliance_events.py`）✅
   - 字段: `event_id`, `timestamp`, `data_id`, `sensitive_type`, `confidence`, `labels`
   - 继承 `DomainEvent` 基类
-- [x] CrossBorderTransferRequestedEvent 定义 ✅
+- [ ] CrossBorderTransferRequestedEvent 定义 ✅
   - 字段: `event_id`, `timestamp`, `data_id`, `destination`, `purpose`, `approval_id`, `status`
 
 #### 数据模型 (Data Models) — 基础设施层
@@ -245,7 +245,7 @@
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.11.feature` ❌ 未实现
 
 **Task 0 完成标志：**
-- [x] 领域事件 Schema 全部定义完毕 ✅
+- [ ] 领域事件 Schema 全部定义完毕 ✅
 - [ ] 基础设施层数据模型定义 ❌ 待实现
 - [ ] API 契约定义 ❌ 待实现
 - [ ] CLI 命令定义 ❌ 待实现
@@ -657,11 +657,11 @@ sisys/
 
 ### 完成清单 Completion Notes List
 
-- [x] 故事需求从 `epics_v1.0.md` 提取
-- [x] 架构约束从 `architecture.md` 提取
-- [x] 前一个故事学习经验整合（审计日志模式复用）
-- [x] 状态设置为 `ready-for-dev`
-- [x] SDD+TDD 融合开发要求定义完成
+- [ ] 故事需求从 `epics_v1.0.md` 提取
+- [ ] 架构约束从 `architecture.md` 提取
+- [ ] 前一个故事学习经验整合（审计日志模式复用）
+- [ ] 状态设置为 `ready-for-dev`
+- [ ] SDD+TDD 融合开发要求定义完成
 
 ---
 
@@ -709,10 +709,10 @@ sisys/
 
 ### 完成总结 Completion Summary
 
-1. [x] All tasks defined 所有任务定义完成（Task 0-7）- **规划层面**
-2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-6）
-3. [x] Architecture constraints extracted 架构约束已提取
-4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+1. [ ] All tasks defined 所有任务定义完成（Task 0-7）- **规划层面**
+2. [ ] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-6）
+3. [ ] Architecture constraints extracted 架构约束已提取
+4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
 5. [ ] Sprint status synced to actual implementation state - **需要更新 sprint-status.yaml**
 6. [ ] Task 0-7 completed with TDD red-green-refactor cycles - **未实现**
 7. [ ] Unit/integration tests passed - **测试文件不存在**
@@ -756,7 +756,7 @@ sisys/
 
 ### 下一步 Next Steps
 
-- [x] Story 文件审查完成，发现实现不存在问题
+- [ ] Story 文件审查完成，发现实现不存在问题
 - [ ] 更新 sprint-status.yaml 中 1-11-data-sovereignty-isolation 状态为 `backlog`
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 实现后运行 `code-review` 进行代码审查
