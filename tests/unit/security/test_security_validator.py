@@ -6,7 +6,6 @@ Tests for horizontal and vertical privilege escalation prevention.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest import mock
 from uuid import uuid4
 

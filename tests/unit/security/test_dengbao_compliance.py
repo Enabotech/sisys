@@ -7,10 +7,6 @@ Tests for password complexity, account lockout, session timeout.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest import mock
-from uuid import uuid4
-
-import pytest
 
 
 class PasswordComplexityValidator:

@@ -6,13 +6,10 @@ Tests use mocks to isolate the service layer.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest import mock
 from uuid import uuid4
 
 import pytest
-
-from src.domain.ports.permission_service import PermissionServicePort
 
 
 class PermissionService:

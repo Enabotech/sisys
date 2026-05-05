@@ -5,19 +5,15 @@ Integration tests verifying complete authentication and authorization flow.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from unittest import mock
 from uuid import uuid4
 
 import pytest
 
-from src.application.use_cases.role_management import RoleService
 from src.application.use_cases.permission_management import PermissionService
-from src.domain.entities.user import User
+from src.application.use_cases.role_management import RoleService
 from src.domain.entities.role import Role
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.domain.ports.user_role_repository import UserRoleRepositoryPort
-from src.domain.ports.permission_service import PermissionServicePort
 
 
 class MockRoleRepository(RoleRepositoryPort):
@@ -182,8 +178,8 @@ class TestAuthIntegrationFlow:
             description="Regular user",
         )
 
-        # Create privileged role
-        admin_role = await self.role_service.create_role(
+        # Create privileged role (not assigned to any user, just for testing)
+        await self.role_service.create_role(
             name="admin",
             permissions=["*:*"],
             description="Admin",
