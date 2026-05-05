@@ -178,7 +178,7 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 128
 target-version = "py311"
-select = ["E", "F", "I", "N", "W", "UP"]
+select = ["E", "F", "I", "N", "W"]
 
 # 排除外部目录和生成文件
 extend-exclude = [

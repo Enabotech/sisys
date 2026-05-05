@@ -332,14 +332,10 @@ class TestDomainLayerZeroDependency:
         assert not violations, "Domain layer imports external packages:\n" + "\n".join(violations)
 
     def test_domain_ruff_check_passes(self):
-        """Domain layer must pass ruff check (no unused imports, etc).
+        """Domain layer must pass ruff check (no unused imports, etc)."""
 
-        Note: UP042 (StrEnum recommendation) is excluded as it's a style
-        suggestion, not a blocking error, and many existing enums use the
-        legacy str, Enum pattern.
-        """
         result = subprocess.run(
-            ["poetry", "run", "ruff", "check", "src/domain/", "--select", "E,F,I,N,W"],
+            ["poetry", "run", "ruff", "check", "src/domain/"],
             capture_output=True,
             text=True,
         )
