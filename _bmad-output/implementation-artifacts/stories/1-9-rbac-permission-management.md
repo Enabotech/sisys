@@ -1191,10 +1191,10 @@ sisys/
 
 **待实现的功能:**
 1. **AuthConfig** - JWT认证和授权配置模型，支持环境变量加载
-2. **AuthService** - 用户认证服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`)
+2. **AuthService** - 用户认证服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`）
 3. **JWTService** - JWT令牌服务，支持访问令牌和刷新令牌
 4. **RoleService** - 角色管理服务，支持角色CRUD和权限分配
-5. **PermissionService** - 权限控制服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`)
+5. **PermissionService** - 权限控制服务（接口在 `src/domain/ports/`，实现在 `src/infrastructure/security/`）
 6. **PermissionMiddleware** - FastAPI权限验证中间件，支持装饰器和依赖注入
 7. **EncryptionService** - 密码加密服务，支持bcrypt哈希和复杂度验证
 8. **REST API** - 完整的认证和角色管理API端点

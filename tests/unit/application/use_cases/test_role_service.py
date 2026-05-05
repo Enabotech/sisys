@@ -151,8 +151,22 @@ class TestRoleServiceRetrieval:
     async def test_list_roles_filters_inactive(self):
         """🔴 RED: list_roles with active_only=True should filter inactive roles."""
         roles = [
-            Role(id=uuid4(), name="admin", description="", permissions=(), is_active=True, created_at=datetime.now(UTC)),
-            Role(id=uuid4(), name="inactive_role", description="", permissions=(), is_active=False, created_at=datetime.now(UTC)),
+            Role(
+                id=uuid4(),
+                name="admin",
+                description="",
+                permissions=(),
+                is_active=True,
+                created_at=datetime.now(UTC),
+            ),
+            Role(
+                id=uuid4(),
+                name="inactive_role",
+                description="",
+                permissions=(),
+                is_active=False,
+                created_at=datetime.now(UTC),
+            ),
         ]
         self.mock_repo.list_all.return_value = roles
 
