@@ -694,9 +694,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `RoleService` 类最小代码（角色 CRUD、权限管理） |
 | 🔄 重构 | 添加权限继承、验证逻辑、错误处理 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 RoleService 失败测试 ✅
-- [ ] Subtask 2.2: 🟢 绿 — 实现 RoleService 最小代码 ✅
-- [ ] Subtask 2.3: 🔄 重构 — 优化 RoleService 代码 ✅
+- [x] Subtask 2.1: 🔴 红 — 编写 RoleService 失败测试 ✅
+- [x] Subtask 2.2: 🟢 绿 — 实现 RoleService 最小代码 ✅
+- [x] Subtask 2.3: 🔄 重构 — 优化 RoleService 代码 ✅
 
 #### TDD 循环 B：角色 CRUD 接口
 
@@ -706,13 +706,13 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现角色路由最小代码 |
 | 🔄 重构 | 添加权限检查、验证逻辑、错误处理 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写角色路由失败测试 ✅
-- [ ] Subtask 2.5: 🟢 绿 — 实现角色路由最小代码 ✅
-- [ ] Subtask 2.6: 🔄 重构 — 优化角色路由代码 ✅
+- [x] Subtask 2.4: 🔴 红 — 编写角色路由失败测试 ✅
+- [x] Subtask 2.5: 🟢 绿 — 实现角色路由最小代码 ✅
+- [x] Subtask 2.6: 🔄 重构 — 优化角色路由代码 ✅
 
 **完成标准/Definition of Done:**
-- [ ] RoleService 和角色 CRUD 接口实现完成 ✅
-- [ ] TDD 循环全部通过 ✅
+- [x] RoleService 和角色 CRUD 接口实现完成 ✅
+- [x] TDD 循环全部通过 ✅
 - [ ] 角色管理接口 `/api/v1/roles/*` 实现 ✅
 - [ ] 安全层覆盖率≥50% ✅
 
@@ -732,9 +732,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `PermissionService` 类最小代码（权限检查逻辑） |
 | 🔄 重构 | 添加权限层级、继承逻辑、缓存优化 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 PermissionService 失败测试 ✅
-- [ ] Subtask 3.2: 🟢 绿 — 实现 PermissionService 最小代码 ✅
-- [ ] Subtask 3.3: 🔄 重构 — 优化 PermissionService 代码 ✅
+- [x] Subtask 3.1: 🔴 红 — 编写 PermissionService 失败测试 ✅
+- [x] Subtask 3.2: 🟢 绿 — 实现 PermissionService 最小代码 ✅
+- [x] Subtask 3.3: 🔄 重构 — 优化 PermissionService 代码 ✅
 
 #### TDD 循环 B：权限验证中间件
 
@@ -744,13 +744,13 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `@require_permission` 装饰器和 FastAPI 依赖项 |
 | 🔄 重构 | 添加缓存、错误处理、日志记录 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写权限验证中间件失败测试 ✅
-- [ ] Subtask 3.5: 🟢 绿 — 实现权限验证中间件最小代码 ✅
-- [ ] Subtask 3.6: 🔄 重构 — 优化权限验证中间件代码 ✅
+- [x] Subtask 3.4: 🔴 红 — 编写权限验证中间件失败测试 ✅
+- [x] Subtask 3.5: 🟢 绿 — 实现权限验证中间件最小代码 ✅
+- [x] Subtask 3.6: 🔄 重构 — 优化权限验证中间件代码 ✅
 
 **完成标准/Definition of Done:**
-- [ ] PermissionService 和权限验证中间件实现完成 ✅
-- [ ] TDD 循环全部通过 ✅
+- [x] PermissionService 和权限验证中间件实现完成 ✅
+- [x] TDD 循环全部通过 ✅
 - [ ] 权限验证中间件在受保护资源上生效 ✅
 - [ ] 安全层覆盖率≥70% ✅
 
