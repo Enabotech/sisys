@@ -270,7 +270,7 @@ async def test_route_service_publishes_to_redis(
     # Wait for receipt
     try:
         await asyncio.wait_for(event_received.wait(), timeout=5.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Check if publisher is configured
         if route_service._publisher is None:
             pytest.skip("No publisher configured")
