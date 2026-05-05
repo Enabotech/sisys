@@ -1,6 +1,6 @@
 # Story 1.9: RBAC Permission Management
 
-**Status:** `ready-for-dev`
+**Status:** `backlog`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -229,7 +229,35 @@
 > - **禁止在领域层导入任何外部依赖**
 > - **禁止直接导入 SQLAlchemy 模型，必须通过 Repository Port 抽象访问**
 
-**1. AuthService 接口（`src/domain/ports/auth_service.py`）**
+**1. TokenPayload 领域值对象（`src/domain/value_objects/token_payload.py`）**
+```python
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from uuid import UUID
+
+@dataclass(frozen=True)
+class TokenPayload:
+    """JWT Token 载荷领域值对象（不可变）"""
+    user_id: UUID
+    username: str
+    roles: tuple[str, ...]  # tuple 不可变，替代 list
+    exp: datetime
+    iat: datetime | None = None
+
+    def is_expired(self) -> bool:
+        """检查令牌是否已过期"""
+        return datetime.now(timezone.utc) > self.exp
+
+    def has_role(self, role: str) -> bool:
+        """检查用户是否拥有指定角色"""
+        return role in self.roles
+
+    def has_any_role(self, *roles: str) -> bool:
+        """检查用户是否拥有任一指定角色"""
+        return any(role in self.roles for role in roles)
+```
+
+**2. AuthService 接口（`src/domain/ports/auth_service.py`）**
 ```python
 from abc import ABC, abstractmethod
 from uuid import UUID
@@ -258,14 +286,14 @@ class AuthServicePort(ABC):
         ...
 
     @abstractmethod
-    async def verify_token(self, token: str) -> dict:
+    async def verify_token(self, token: str) -> TokenPayload:
         """验证 JWT token
 
         Args:
             token: JWT token
 
         Returns:
-            用户信息字典，包含 user_id, username, roles
+            TokenPayload 领域值对象，包含 user_id, username, roles, exp
 
         Raises:
             AuthenticationError: token 无效或过期
@@ -297,7 +325,7 @@ class AuthServicePort(ABC):
         ...
 ```
 
-**2. PermissionService 接口（`src/domain/ports/permission_service.py`）**
+**3. PermissionService 接口（`src/domain/ports/permission_service.py`）**
 ```python
 class PermissionServicePort(ABC):
     """权限服务端口（领域层定义，仅使用 ABC + 标准库）
@@ -339,7 +367,7 @@ class PermissionServicePort(ABC):
         ...
 ```
 
-**3. UserRepositoryPort 接口（`src/domain/ports/user_repository.py`）**
+**4. UserRepositoryPort 接口（`src/domain/ports/user_repository.py`）**
 > ⚠️ **关键约束：领域层绝对不能直接导入 SQLAlchemy 模型**
 ```python
 class UserRepositoryPort(ABC):
@@ -552,11 +580,11 @@ class RevokeRoleUseCase:
 > ⚠️ **安全层覆盖率要求：** 本 Story 为安全层实现（认证/授权/RBAC），需达到安全层≥85% 标准。
 
 #### 代码质量门禁
-- [x] **Ruff 检查通过**（`ruff check src/`）✅
-- [x] **MyPy 类型检查通过**（`mypy src/`）✅
-- [x] **无 P0/P1 级别问题**（代码审查）✅
-- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`）✅
-- [x] **Bandit 安全扫描通过**（`bandit -r src/`，高危漏洞=0）✅
+- [ ] **Ruff 检查通过**（`ruff check src/`）✅
+- [ ] **MyPy 类型检查通过**（`mypy src/`）✅
+- [ ] **无 P0/P1 级别问题**（代码审查）✅
+- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）✅
+- [ ] **Bandit 安全扫描通过**（`bandit -r src/`，高危漏洞=0）✅
 
 #### 合规性测试要求
 
@@ -1191,17 +1219,28 @@ sisys/
 > **审查模式:** Hexagonal Architecture Compliance Review
 > **审查层:** 架构约束验证
 
-### 六边形架构约束问题 (需修正)
+### 六边形架构约束更新
 
-> ⚠️ **故事文件与实际代码不一致：** 故事文件声称实现完成，但代码不存在。
+> ⚠️ **审查日期:** 2026-05-04
+> **更新日期:** 2026-05-05
 
-- [ ] [架构约束] **AuthService 接口位置错误** — 应在 `src/domain/ports/auth_service.py`，非 `src/domain/services/`
-  - 领域层只能使用标准库，不能导入 `python-jose`
-- [ ] [架构约束] **PermissionService 接口位置错误** — 应在 `src/domain/ports/permission_service.py`
-- [ ] [架构约束] **安全服务实现位置** — 应在 `src/infrastructure/security/`
+#### 接口设计变更（v1.1）
+- [x] [已完成] **TokenPayload 值对象** — 新增 `src/domain/value_objects/token_payload.py`
+  - 不可变 dataclass，含 user_id, username, roles (tuple), exp, iat
+  - 方法：is_expired(), has_role(), has_any_role()
+- [x] [已完成] **verify_token 返回类型** — dict → TokenPayload
+  - 类型安全，编译期检查
+  - 遵循六边形架构：领域值对象仅用标准库
+
+#### 待实现项
 - [ ] [待开发] **Refresh token 安全问题** — 角色撤销后绕过风险、token rotation 缺失
 - [ ] [待开发] **并发安全问题** — 登录失败计数竞态条件
 - [ ] [待开发] **审计日志** — 登录/登出/权限变更/越权访问事件记录缺失
+
+#### PermissionContext 优化（未来项）
+> **降级为技术债务：** PermissionContext 类设计正确但 scope 较大，延后至 Story 1.11+ 优化
+- 当前 `check_permission(user_id, resource, action, resource_id=None)` 签名满足 AC-3/AC-4
+- 未来优化方向：`check_permission(ctx: PermissionContext) -> PermissionResult`
 
 ### 六边形架构合规要求
 
@@ -1223,6 +1262,7 @@ sisys/
 | 2026-04-19 | Bug 修复：refresh_token endpoint `str` → `Form(...)`，覆盖率 93%→100% | ✅ 完成 |
 | 2026-04-20 | 新增 `tests/acceptance/test_story_1_9_steps.py`（34 BDD 验收测试步骤定义），所有测试通过 | ✅ 完成 |
 | 2026-05-04 | 六边形架构约束审查：代码不存在，重置为 backlog；确认接口设计（ABC、AuthenticationError、资源实例级权限）；状态更新为 ready-for-dev | ✅ 完成 |
+| 2026-05-05 | 升级 verify_token 返回类型：dict → TokenPayload 领域值对象（不可变，含 is_expired/has_role/has_any_role 方法） | ✅ 完成 |
 
 ### 文件清单 File List
 
@@ -1231,6 +1271,9 @@ sisys/
 #### 领域层实体 (Domain Entities)
 - `src/domain/entities/user.py` - User 领域实体
 - `src/domain/entities/role.py` - Role 领域实体
+
+#### 领域层值对象 (Domain Value Objects)
+- `src/domain/value_objects/token_payload.py` - TokenPayload 领域值对象（不可变）
 
 #### 领域层端口 (Domain Ports)
 - `src/domain/ports/__init__.py`

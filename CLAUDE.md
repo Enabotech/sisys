@@ -1,116 +1,65 @@
-# 项目全局指令
+# CLAUDE.md
 
-## 用户角色
-- AI Agent 全栈设计与开发
-- 主要使用开源环境，面向企业应用
-- 可以使用高级工具如 Plan/Explore agent 进行复杂任务，不需要过多解释基础概念
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-## 核心约束
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-### Poetry 环境
-所有命令必须使用 `poetry run` 运行，不能直接调用命令。
+## 1. Think Before Coding
 
-### 六边形架构约束
-所有代码必须遵循六边形架构约束：
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-**领域层零依赖原则**
-- 领域层（src/domain/）仅使用 Python 标准库
-- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-**四层架构定义**
-| 层次 | 目录 | 职责 |
-|------|------|------|
-| domain | src/domain/ | 核心业务逻辑，零外部依赖 |
-| application | src/application/ | 用例编排 |
-| interfaces | src/interfaces/ | 适配器 |
-| infrastructure | src/infrastructure/ | 技术实现 |
+## 2. Simplicity First
 
-**依赖方向矩阵**
-| 起点 \ 终点         | domain | application | interfaces | infrastructure |
-|--------------------|--------|-------------|------------|----------------|
-| **domain**         | —      | ✗ 禁止      | ✗ 禁止     | ✗ 禁止         |
-| **application**    | ✓ 允许 | —           | ✗ 禁止     | ✗ 禁止         |
-| **interfaces**     | ✓ 允许 | ✓ 允许      | —          | ✗ 禁止         |
-| **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
+**Minimum code that solves the problem. Nothing speculative.**
 
-### TDD 开发约束
-**每个 Task 必须严格遵守 TDD 红→绿→重构循环：**
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
 
-| 阶段 | 动作 | 完成标志 |
-|------|------|----------|
-| 🔴 红 | 先写失败测试，测试文件先于实现存在 | `pytest` 运行失败，失败原因符合预期 |
-| 🟢 绿 | 最小实现让测试通过 | `pytest` 全部通过 |
-| 🔄 重构 | 优化代码（保持测试通过） | `ruff check` + `mypy` + `pytest tests/` 全部通过 |
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-**禁止行为：**
-- ❌ 先写代码后写测试
-- ❌ 看到组件已存在就直接写测试验证（验证式 ≠ TDD）
-- ❌ 跳过红阶段
-- ❌ 把"测试存在且通过"当作完成标志
+## 3. Surgical Changes
 
-**核心原则：测试先行，代码跟随** - 测试是驱动开发的，不是验证已存在代码的。
+**Touch only what you must. Clean up only your own mess.**
 
-### 测试隔离约束
-所有集成/验收测试必须遵循以下约束：
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
 
-| 约束类型 | 规则 | 违反后果 |
-|---------|------|----------|
-| 事务隔离 | 集成测试使用 transaction rollback | 数据泄漏导致随机失败 |
-| Schema 自创建 | fixture 内完成 Schema 初始化 | 依赖外部迁移，环境不一致 |
-| 资源唯一性 | 测试数据使用 UUID 等唯一标识符 | ID 冲突或状态污染 |
-| 外部服务隔离 | Redis/Neo4j/Qdrant 测试前清理或用 mock | 真实数据被污染 |
-| 并行隔离 | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
-| 语义缓存隔离 | 多测试用 unique_cache_key 生成不同 embedding | 向量相同会互相覆盖缓存 |
-| 清理粒度 | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
-| 依赖声明 | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
-| asyncio 上下文 | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
-| pytest-asyncio | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
-| BDD async 配合 | BDD 步骤函数用 event_loop.run_until_complete() | 直接用 @pytest.mark.asyncio 会导致 context 数据丢失 |
-| asyncio.run 使用 | 单进程用 asyncio.run()；pytest-xdist 并行时 BDD 步骤用 event_loop fixture | asyncio.run() 可能关闭错误循环 |
-| 并发测试 | 真正并发测试在 async 函数内用 asyncio.gather() | 根据场景正确选择 |
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
 
-**核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+The test: Every changed line should trace directly to the user's request.
 
-### 代码注释规范
+## 4. Goal-Driven Execution
 
-SISYS 系统使用 **Google 风格代码注释**，所有注释**统一使用英文**。
+**Define success criteria. Loop until verified.**
 
-| 位置 | 规范 |
-|------|------|
-| 文件头 | Module docstring explaining purpose, author, copyright |
-| 类 | `ClassName: Brief description.` + `Attributes:` list |
-| 函数/方法 | `FuncName(args): Brief description.` + `Args:/Returns:/Raises:` sections |
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
 
-**Example:**
-```python
-"""SISYS Application Layer Module.
-
-Todo: Describe module functionality.
-"""
-class ExampleService:
-    """Service class for processing data.
-
-    Attributes:
-        name: Service name
-    """
-    def process(self, data: str) -> bool:
-        """Process input data.
-
-        Args:
-            data: Input data to process
-
-        Returns:
-            True if processing succeeded, False otherwise
-
-        Raises:
-            ValueError: When data is invalid
-        """
-        pass
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-## 评审约束
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-**评审前必须理解上下文，不要在不了解背景的情况下质疑。**
-- 先理解组件的职责边界，再判断是否存在真正的问题
-- 分清不同组件的不同职责，不要混淆
-- 当用户表达不满时，如果自己的分析正确，应坚持客观判断，不为取悦而放弃正确结论
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
