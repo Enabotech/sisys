@@ -1,4 +1,4 @@
-r"""Hexagonal Architecture Constraints Test Suite.
+"""Hexagonal Architecture Constraints Test Suite.
 
 Comprehensive test suite for hexagonal (ports & adapters) architecture validation.
 Validates dependency direction rules, layer isolation, and domain zero-dependency principle.
@@ -10,7 +10,7 @@ Architecture Layers:
     infrastructure  - Technical implementations
 
 Dependency Direction Matrix:
-    From \ To      | domain | application | interfaces | infrastructure |
+    From / To      | domain | application | interfaces | infrastructure |
     ---------------|--------|-------------|------------|----------------|
     domain         |   -    |     ✗       |     ✗      |       ✗        |
     application    |   ✓    |     -       |     ✗      |       ✗        |
@@ -27,7 +27,6 @@ Core Rules:
 from __future__ import annotations
 
 import ast
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -38,105 +37,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SRC_DIR = ROOT / "src"
 
 # Standard library modules (Python 3.10+)
-STDLIB_MODULES: frozenset[str] = frozenset(
-    getattr(
-        sys,
-        "stdlib_module_names",
-        [
-            "dataclasses",
-            "datetime",
-            "uuid",
-            "enum",
-            "typing",
-            "abc",
-            "json",
-            "copy",
-            "collections",
-            "itertools",
-            "functools",
-            "operator",
-            "pathlib",
-            "os",
-            "sys",
-            "io",
-            "re",
-            "string",
-            "math",
-            "numbers",
-            "decimal",
-            "fractions",
-            "statistics",
-            "array",
-            "weakref",
-            "types",
-            "contextlib",
-            "warnings",
-            "traceback",
-            "logging",
-            "unittest",
-            "ast",
-            "dis",
-            "pickle",
-            "shelve",
-            "dbm",
-            "csv",
-            "configparser",
-            "hashlib",
-            "hmac",
-            "secrets",
-            "time",
-            "calendar",
-            "zoneinfo",
-            "textwrap",
-            "difflib",
-            "pprint",
-            "reprlib",
-            "inspect",
-            "importlib",
-            "pkgutil",
-            "sysconfig",
-            "atexit",
-            "signal",
-            "threading",
-            "multiprocessing",
-            "concurrent",
-            "subprocess",
-            "sched",
-            "queue",
-            "contextvars",
-            "_thread",
-            "socket",
-            "ssl",
-            "select",
-            "selectors",
-            "asyncio",
-            "socketserver",
-            "xml",
-            "html",
-            "webbrowser",
-            "cgi",
-            "urllib",
-            "http",
-            "ftplib",
-            "poplib",
-            "imaplib",
-            "smtplib",
-            "email",
-            "struct",
-            "codecs",
-            "unicodedata",
-            "stringprep",
-            "readline",
-            "rlcompleter",
-            "bisect",
-            "heapq",
-            "tomllib",
-            "graphlib",
-            "__future__",
-            "typing_extensions",
-        ],
-    )
-)
+STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
 
 # Forbidden imports for domain layer (external frameworks and project layers)
 FORBIDDEN_DOMAIN_IMPORTS: frozenset[str] = frozenset(
@@ -221,10 +122,28 @@ def _get_imports(file_path: Path) -> tuple[list[str], list[str]]:
             pytest.fail(f"Syntax error in {file_path}: {e}")
             return [], []
 
+    # First pass: collect all TYPE_CHECKING guard ranges
+    type_checking_ranges: list[tuple[int, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            # Check if it's `if TYPE_CHECKING:` (single test, no and/or)
+            if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+                end_line = getattr(node, "end_lineno", None) or node.lineno
+                type_checking_ranges.append((node.lineno, end_line))
+
+    def is_in_type_checking(lineno: int) -> bool:
+        for start, end in type_checking_ranges:
+            if start <= lineno <= end:
+                return True
+        return False
+
     direct_imports = []
     from_imports = []
 
     for node in ast.walk(tree):
+        # Skip imports inside TYPE_CHECKING blocks
+        if hasattr(node, "lineno") and is_in_type_checking(node.lineno):
+            continue
         if isinstance(node, ast.Import):
             for alias in node.names:
                 direct_imports.append(alias.name)
@@ -234,26 +153,22 @@ def _get_imports(file_path: Path) -> tuple[list[str], list[str]]:
     return direct_imports, from_imports
 
 
-def _remove_type_checking_blocks(content: str) -> str:
-    """Remove TYPE_CHECKING blocks from content for runtime dependency check."""
-    pattern = r"if\s+TYPE_CHECKING:.*?(?=\n\S|\Z)"
-    return re.sub(pattern, "", content, flags=re.DOTALL)
+def has_layer_import(file_path: Path, target_layer: str) -> bool:
+    """Check if file imports specific layer using AST (not string matching)."""
+    direct_imports, from_imports = _get_imports(file_path)
+
+    for imp in list(direct_imports) + list(from_imports):
+        normalized = _normalize_import(imp)
+        if normalized == target_layer or normalized.startswith(f"{target_layer}."):
+            return True
+    return False
 
 
 def _normalize_import(imp: str) -> str:
     """Normalize import name (handle 'src.layer' vs 'layer')."""
     if imp.startswith("src."):
-        return imp[4:]  # Remove 'src.' prefix
+        return imp[4:]
     return imp
-
-
-def _get_layer_from_import(imp: str) -> str | None:
-    """Get layer name from import path, or None if not a layer import."""
-    normalized = _normalize_import(imp)
-    for layer in LAYERS:
-        if normalized == layer or normalized.startswith(f"{layer}."):
-            return layer
-    return None
 
 
 # =============================================================================
@@ -363,118 +278,35 @@ class TestDependencyDirectionRules:
     Outer layers CAN import inner layers (dependency inversion).
     """
 
-    @pytest.mark.parametrize("layer", ["domain", "application", "infrastructure", "interfaces"])
-    def test_layer_not_importing_forbidden_layers(self, layer: str):
-        """Verify a layer only imports allowed layers per dependency matrix."""
+    @pytest.mark.parametrize(
+        "layer,forbidden_layers",
+        [
+            ("domain", ["application", "interfaces", "infrastructure"]),
+            ("application", ["interfaces", "infrastructure"]),
+            ("infrastructure", ["interfaces"]),
+            ("interfaces", ["infrastructure"]),
+        ],
+    )
+    def test_layer_not_importing_forbidden_layers(self, layer: str, forbidden_layers: list[str]):
+        """Verify layer only imports allowed layers per dependency matrix.
+
+        Uses AST-based import detection instead of string matching.
+        """
         layer_dir = LAYERS[layer]
         if not layer_dir.exists():
             pytest.skip(f"Layer '{layer}' does not exist")
 
         files = _get_python_files(layer_dir)
-        violations = []
+        violations: dict[str, list[str]] = {target: [] for target in forbidden_layers}
 
         for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
+            for target_layer in forbidden_layers:
+                if has_layer_import(f, target_layer):
+                    violations[target_layer].append(str(f.relative_to(ROOT)))
 
-            for target_layer, allowed in ALLOWED_DEPENDENCIES[layer].items():
-                if not allowed:
-                    target_path = f"src.{target_layer}"
-                    if target_path in content or f"import {target_layer}" in content:
-                        violations.append(f"{f.relative_to(ROOT)} imports {target_layer}")
+        failed_checks = [f"  - {target} imported by: {', '.join(viols)}" for target, viols in violations.items() if viols]
 
-        assert not violations, f"Layer '{layer}' has forbidden dependencies:\n" + "\n".join(violations)
-
-    def test_domain_not_importing_application(self):
-        """Domain must NOT import application (inner → outer forbidden)."""
-        files = _get_python_files(LAYERS["domain"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.application" in content or "import src.application" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Domain must NOT import application:\n" + "\n".join(violations)
-
-    def test_domain_not_importing_interfaces(self):
-        """Domain must NOT import interfaces (inner → outer forbidden)."""
-        files = _get_python_files(LAYERS["domain"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.interfaces" in content or "import src.interfaces" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Domain must NOT import interfaces:\n" + "\n".join(violations)
-
-    def test_domain_not_importing_infrastructure(self):
-        """Domain must NOT import infrastructure (inner → outer forbidden)."""
-        files = _get_python_files(LAYERS["domain"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.infrastructure" in content or "import src.infrastructure" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Domain must NOT import infrastructure:\n" + "\n".join(violations)
-
-    def test_application_not_importing_infrastructure(self):
-        """Application must NOT import infrastructure (middle → outer forbidden)."""
-        files = _get_python_files(LAYERS["application"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.infrastructure" in content or "import src.infrastructure" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Application must NOT import infrastructure:\n" + "\n".join(violations)
-
-    def test_application_not_importing_interfaces(self):
-        """Application must NOT import interfaces (middle → outer forbidden)."""
-        files = _get_python_files(LAYERS["application"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.interfaces" in content or "import src.interfaces" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Application must NOT import interfaces:\n" + "\n".join(violations)
-
-    def test_infrastructure_not_importing_interfaces(self):
-        """Infrastructure must NOT import interfaces (outer → outer forbidden)."""
-        files = _get_python_files(LAYERS["infrastructure"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.interfaces" in content or "import src.interfaces" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Infrastructure must NOT import interfaces:\n" + "\n".join(violations)
-
-    def test_interfaces_not_importing_infrastructure(self):
-        """Interfaces must NOT import infrastructure (reverse dependency)."""
-        files = _get_python_files(LAYERS["interfaces"])
-        violations = []
-
-        for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.infrastructure" in content or "import src.infrastructure" in content:
-                violations.append(str(f.relative_to(ROOT)))
-
-        assert not violations, "Interfaces must NOT import infrastructure:\n" + "\n".join(violations)
+        assert not failed_checks, f"Layer '{layer}' has forbidden dependencies:\n" + "\n".join(failed_checks)
 
 
 # =============================================================================
@@ -500,16 +332,14 @@ class TestInterfacesLayerConstraints:
         Example: *_adapter.py calls *_handler.py
         """
         files = _get_python_files(LAYERS["interfaces"])
-        has_app_import = any(
-            ("from src.application" in f.read_text() or "import src.application" in f.read_text()) for f in files
-        )
+        has_app_import = any(has_layer_import(f, "application") for f in files)
         if not has_app_import:
             pytest.skip("interfaces → application import pattern not implemented yet")
 
     def test_interfaces_can_import_domain(self):
         """Interfaces can import domain (outer → inner is allowed)."""
         files = _get_python_files(LAYERS["interfaces"])
-        has_domain_import = any(("from src.domain" in f.read_text() or "import src.domain" in f.read_text()) for f in files)
+        has_domain_import = any(has_layer_import(f, "domain") for f in files)
         if not has_domain_import:
             pytest.skip("interfaces → domain import pattern not implemented yet")
 
@@ -522,10 +352,12 @@ class TestInterfacesLayerConstraints:
         violations = []
 
         for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "import redis" in content or "from redis" in content:
-                violations.append(str(f.relative_to(ROOT)))
+            direct_imports, from_imports = _get_imports(f)
+            all_imports = direct_imports + from_imports
+            for imp in all_imports:
+                if imp == "redis" or imp.startswith("redis."):
+                    violations.append(str(f.relative_to(ROOT)))
+                    break
 
         assert not violations, "Interfaces must NOT import redis directly:\n" + "\n".join(violations)
 
@@ -538,10 +370,12 @@ class TestInterfacesLayerConstraints:
         violations = []
 
         for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "import sqlalchemy" in content or "from sqlalchemy" in content:
-                violations.append(str(f.relative_to(ROOT)))
+            direct_imports, from_imports = _get_imports(f)
+            all_imports = direct_imports + from_imports
+            for imp in all_imports:
+                if imp == "sqlalchemy" or imp.startswith("sqlalchemy."):
+                    violations.append(str(f.relative_to(ROOT)))
+                    break
 
         assert not violations, "Interfaces must NOT import sqlalchemy directly:\n" + "\n".join(violations)
 
@@ -569,9 +403,7 @@ class TestDomainPortsIsolation:
         violations = []
 
         for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.infrastructure" in content or "import src.infrastructure" in content:
+            if has_layer_import(f, "infrastructure"):
                 violations.append(str(f.relative_to(ROOT)))
 
         assert not violations, "Domain ports must NOT import infrastructure:\n" + "\n".join(violations)
@@ -586,9 +418,7 @@ class TestDomainPortsIsolation:
         violations = []
 
         for f in files:
-            content = f.read_text()
-            content = _remove_type_checking_blocks(content)
-            if "from src.application" in content or "import src.application" in content:
+            if has_layer_import(f, "application"):
                 violations.append(str(f.relative_to(ROOT)))
 
         assert not violations, "Domain ports must NOT import application:\n" + "\n".join(violations)
