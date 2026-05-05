@@ -80,7 +80,7 @@ development_status:
   1-8-neo4j-graph-layer: done
   1-13-k8s-auto-scaling: done
   # 价值组 4: 安全与合规基础
-  1-9-rbac-permission-management: backlog
+  1-9-rbac-permission-management: in-progress
   1-10-unified-audit-log: backlog
   1-11-data-sovereignty-isolation: backlog      # PermissionContext 优化（story 1.9 技术债）
   1-12-equilibrium-level-3-compliance: backlog

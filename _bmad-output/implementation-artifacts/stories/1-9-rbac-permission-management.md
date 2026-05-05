@@ -1,6 +1,6 @@
 # Story 1.9: RBAC Permission Management
 
-**Status:** `backlog`
+**Status:** `in-progress`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -627,17 +627,17 @@ class RevokeRoleUseCase:
 
 > **目的：** 在进入代码实现前，明确配置模型、数据模型、接口、验收标准。
 
-- [ ] Subtask 0.1: 定义 AuthConfig 配置模型 ✅
-- [ ] Subtask 0.2: 定义 Role 数据模型 ✅
-- [ ] Subtask 0.3: 定义 Permission 数据模型 ✅
-- [ ] Subtask 0.4: 定义 AuthService 接口 ✅
-- [ ] Subtask 0.5: 定义 PermissionService 接口 ✅
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.9.feature` ✅
-- [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）✅
+- [x] Subtask 0.1: 定义 AuthConfig 配置模型 ✅
+- [x] Subtask 0.2: 定义 Role 数据模型 ✅
+- [x] Subtask 0.3: 定义 Permission 数据模型 ✅
+- [x] Subtask 0.4: 定义 AuthService 接口 ✅
+- [x] Subtask 0.5: 定义 PermissionService 接口 ✅
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.9.feature` ✅
+- [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）✅
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕 ✅
-- [ ] 验收测试运行失败（预期行为，红阶段确认）✅
+- [x] 规范项全部定义完毕 ✅
+- [x] 验收测试运行失败（预期行为，红阶段确认）✅
 
 ---
 
@@ -656,9 +656,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `AuthService` 类最小代码（调用 User 模型验证密码） |
 | 🔄 重构 | 添加错误处理、日志记录、异常抛出 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 AuthService 失败测试 ✅
-- [ ] Subtask 1.2: 🟢 绿 — 实现 AuthService 最小代码 ✅
-- [ ] Subtask 1.3: 🔄 重构 — 优化 AuthService 代码 ✅
+- [x] Subtask 1.1: 🔴 红 — 编写 AuthService 失败测试 ✅
+- [x] Subtask 1.2: 🟢 绿 — 实现 AuthService 最小代码 ✅
+- [x] Subtask 1.3: 🔄 重构 — 优化 AuthService 代码 ✅
 
 #### TDD 循环 B：JWT Service 令牌服务
 
@@ -668,15 +668,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `JWTService` 类最小代码（生成和验证 JWT 令牌） |
 | 🔄 重构 | 添加算法支持、过期时间处理、错误处理 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 JWTService 失败测试 ✅
-- [ ] Subtask 1.5: 🟢 绿 — 实现 JWTService 最小代码 ✅
-- [ ] Subtask 1.6: 🔄 重构 — 优化 JWTService 代码 ✅
+- [x] Subtask 1.4: 🔴 红 — 编写 JWTService 失败测试 ✅
+- [x] Subtask 1.5: 🟢 绿 — 实现 JWTService 最小代码 ✅
+- [x] Subtask 1.6: 🔄 重构 — 优化 JWTService 代码 ✅
 
 **完成标准/Definition of Done:**
-- [ ] AuthService 和 JWTService 实现完成 ✅
-- [ ] TDD 循环全部通过 ✅
-- [ ] 登录接口 `/api/v1/auth/login` 实现 ✅
-- [ ] 安全层覆盖率≥20% ✅
+- [x] AuthService 和 JWTService 实现完成 ✅
+- [x] TDD 循环全部通过 ✅
+- [x] 登录接口 `/api/v1/auth/login` 实现 ✅
+- [x] 安全层覆盖率≥20% ✅
 
 ---
 
