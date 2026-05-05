@@ -1,6 +1,6 @@
 # Story 1.12: 等保 2.0 三级基础要求
 
-**Status:** `ready-for-dev`
+**Status:** `backlog`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -234,38 +234,38 @@
 
 #### Subtask 分解
 
-- [x] Subtask 0.1: 🔴 红 → 🟢 绿 — 定义 `MFAChallengeIssuedEvent`（`src/domain/events/compliance_events.py`）
+- [ ] Subtask 0.1: 🔴 红 → 🟢 绿 — 定义 `MFAChallengeIssuedEvent`（`src/domain/events/compliance_events.py`）
   - 字段: `event_id`, `timestamp`, `user_id`, `challenge_type`, `status`
   - 继承 `DomainEvent` 基类
-- [x] Subtask 0.2: 🔴 红 → 🟢 绿 — 定义 `IntrusionDetectedEvent`
+- [ ] Subtask 0.2: 🔴 红 → 🟢 绿 — 定义 `IntrusionDetectedEvent`
   - 字段: `event_id`, `timestamp`, `source_ip`, `attack_type`, `severity`, `action_taken`
-- [x] Subtask 0.3: 🔴 红 → 🟢 绿 — 定义 `DataIntegrityViolationEvent`
+- [ ] Subtask 0.3: 🔴 红 → 🟢 绿 — 定义 `DataIntegrityViolationEvent`
   - 字段: `event_id`, `timestamp`, `data_id`, `expected_hash`, `actual_hash`, `source`
-- [x] Subtask 0.4: 🔴 红 → 🟢 绿 — 定义 MFA 配置模型
+- [ ] Subtask 0.4: 🔴 红 → 🟢 绿 — 定义 MFA 配置模型
   - 字段: `id`, `user_id`, `challenge_type`, `secret`, `attempts`, `expires_at`, `status`
   - 接口定义: `src/domain/ports/security/auth_port.py`（领域层接口，仅标准库）
   - 模型实现: `src/application/security/mfa_models.py`（应用层模型）
-- [x] Subtask 0.5: 🔴 红 → 🟢 绿 — 定义 `BackupRecord` 和 `IntegrityCheck` 模型
-- [x] Subtask 0.6: 🔴 红 → 🟢 绿 — 定义 API 契约（OpenAPI）
+- [ ] Subtask 0.5: 🔴 红 → 🟢 绿 — 定义 `BackupRecord` 和 `IntegrityCheck` 模型
+- [ ] Subtask 0.6: 🔴 红 → 🟢 绿 — 定义 API 契约（OpenAPI）
   - MFA 端点: `POST /api/v1/auth/mfa/setup`, `POST /api/v1/auth/mfa/verify`
   - 合规状态端点: `GET /api/v1/compliance/status`
   - 备份管理端点: `GET/POST /api/v1/admin/backups`
-- [x] Subtask 0.7: 🔴 红 → 🟢 绿 — 定义 CLI 命令规范
+- [ ] Subtask 0.7: 🔴 红 → 🟢 绿 — 定义 CLI 命令规范
   - `sisys system mfa enable --user-id <id>`
   - `sisys system mfa verify --user-id <id> --code <code>`
   - `sisys compliance status --level 3`
   - `sisys system backup create --type full|incremental`
   - `sisys system backup restore --backup-id <id>`
   - `sisys system integrity check --data-type <type>`
-- [x] Subtask 0.8: 🔴 红 — 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.12.feature`（预期失败）
-- [x] Subtask 0.9: 🔴 红 → 🟢 绿 — 规范化文档结构、补充说明
+- [ ] Subtask 0.8: 🔴 红 — 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.12.feature`（预期失败）
+- [ ] Subtask 0.9: 🔴 红 → 🟢 绿 — 规范化文档结构、补充说明
 
 **完成标准/Definition of Done:**
-- [x] 领域事件 Schema 全部定义完毕（MFAChallengeIssuedEvent/IntrusionDetectedEvent/DataIntegrityViolationEvent）
-- [x] 数据模型全部定义完毕（MFAChallenge/BackupRecord/IntegrityCheck）
-- [x] API 契约全部定义完毕（OpenAPI YAML）
-- [x] CLI 命令规范全部定义完毕
-- [x] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+- [ ] 领域事件 Schema 全部定义完毕（MFAChallengeIssuedEvent/IntrusionDetectedEvent/DataIntegrityViolationEvent）
+- [ ] 数据模型全部定义完毕（MFAChallenge/BackupRecord/IntegrityCheck）
+- [ ] API 契约全部定义完毕（OpenAPI YAML）
+- [ ] CLI 命令规范全部定义完毕
+- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
 
 ---
 
@@ -283,14 +283,14 @@
 | 🟢 绿 | 实现 `MFAChallenge` 模型和 `MFAConfig` |
 | 🔄 重构 | 添加类型注解、优化命名 |
 
-- [x] Subtask 1.1: 🔴 红 — 编写 MFA 配置模型测试
-- [x] Subtask 1.2: 🟢 绿 — 实现 MFAChallenge 模型
-- [x] Subtask 1.3: 🔄 重构 — 优化代码
+- [ ] Subtask 1.1: 🔴 红 — 编写 MFA 配置模型测试
+- [ ] Subtask 1.2: 🟢 绿 — 实现 MFAChallenge 模型
+- [ ] Subtask 1.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] MFA 配置模型定义完整
-- [x] TDD 循环通过
-- [x] 单元测试覆盖率 ≥85%
+- [ ] MFA 配置模型定义完整
+- [ ] TDD 循环通过
+- [ ] 单元测试覆盖率 ≥85%
 
 ---
 
@@ -308,15 +308,15 @@
 | 🟢 绿 | 实现 `TOTPGenerator` 和 `TOTPVerifier` 类 |
 | 🔄 重构 | 添加错误处理、日志和密钥轮换支持 |
 
-- [x] Subtask 2.1: 🔴 红 — 编写 TOTP 生成器/验证器测试
-- [x] Subtask 2.2: 🟢 绿 — 实现 TOTPGenerator/TOTPVerifier
-- [x] Subtask 2.3: 🔄 重构 — 优化代码，添加密钥轮换
+- [ ] Subtask 2.1: 🔴 红 — 编写 TOTP 生成器/验证器测试
+- [ ] Subtask 2.2: 🟢 绿 — 实现 TOTPGenerator/TOTPVerifier
+- [ ] Subtask 2.3: 🔄 重构 — 优化代码，添加密钥轮换
 
 **完成标准/Definition of Done:**
-- [x] TOTP 生成/验证准确率 100%
-- [x] 支持 30 秒过期时间
-- [x] TDD 循环通过
-- [x] 单元测试覆盖率 ≥85%
+- [ ] TOTP 生成/验证准确率 100%
+- [ ] 支持 30 秒过期时间
+- [ ] TDD 循环通过
+- [ ] 单元测试覆盖率 ≥85%
 
 ---
 
@@ -334,15 +334,15 @@
 | 🟢 绿 | 实现 `MFAService` 类 |
 | 🔄 重构 | 添加审计日志集成（Story 1.10）、API 层预验证模式（ADR-011） |
 
-- [x] Subtask 3.1: 🔴 红 — 编写 MFA 服务测试
-- [x] Subtask 3.2: 🟢 绿 — 实现 MFAService
-- [x] Subtask 3.3: 🔄 重构 — 优化代码，集成审计日志（继承 Story 1.11 API 层预验证模式）
+- [ ] Subtask 3.1: 🔴 红 — 编写 MFA 服务测试
+- [ ] Subtask 3.2: 🟢 绿 — 实现 MFAService
+- [ ] Subtask 3.3: 🔄 重构 — 优化代码，集成审计日志（继承 Story 1.11 API 层预验证模式）
 
 **完成标准/Definition of Done:**
-- [x] MFA 服务实现完整
-- [x] MFA 覆盖率 100%
-- [x] TDD 循环通过
-- [x] 单元测试覆盖率 ≥85%
+- [ ] MFA 服务实现完整
+- [ ] MFA 覆盖率 100%
+- [ ] TDD 循环通过
+- [ ] 单元测试覆盖率 ≥85%
 
 ---
 
@@ -360,15 +360,15 @@
 | 🟢 绿 | 实现 `IntrusionDetector` 类 |
 | 🔄 重构 | 添加规则引擎、实时告警 |
 
-- [x] Subtask 4.1: 🔴 红 — 编写入侵检测器测试
-- [x] Subtask 4.2: 🟢 绿 — 实现 IntrusionDetector
-- [x] Subtask 4.3: 🔄 重构 — 优化代码
+- [ ] Subtask 4.1: 🔴 红 — 编写入侵检测器测试
+- [ ] Subtask 4.2: 🟢 绿 — 实现 IntrusionDetector
+- [ ] Subtask 4.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 入侵检测器实现完整
-- [x] 支持常见攻击模式检测
-- [x] TDD 循环通过
-- [x] 渗透测试覆盖率 ≥90%
+- [ ] 入侵检测器实现完整
+- [ ] 支持常见攻击模式检测
+- [ ] TDD 循环通过
+- [ ] 渗透测试覆盖率 ≥90%
 
 ---
 
@@ -386,15 +386,15 @@
 | 🟢 绿 | 实现等保 2.0 三级渗透测试检测规则 |
 | 🔄 重构 | 添加报告生成 |
 
-- [x] Subtask 5.1: 🔴 红 — 编写渗透测试用例
-- [x] Subtask 5.2: 🟢 绿 — 实现渗透测试检测规则
-- [x] Subtask 5.3: 🔄 重构 — 优化代码
+- [ ] Subtask 5.1: 🔴 红 — 编写渗透测试用例
+- [ ] Subtask 5.2: 🟢 绿 — 实现渗透测试检测规则
+- [ ] Subtask 5.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 渗透测试覆盖率 ≥90%
-- [x] 高风险项 = 0
-- [x] 中危漏洞 < 5
-- [x] TDD 循环通过
+- [ ] 渗透测试覆盖率 ≥90%
+- [ ] 高风险项 = 0
+- [ ] 中危漏洞 < 5
+- [ ] TDD 循环通过
 
 ---
 
@@ -412,14 +412,14 @@
 | 🟢 绿 | 实现 `ThreatScoringService` 类 |
 | 🔄 重构 | 添加实时告警 |
 
-- [x] Subtask 6.1: 🔴 红 — 编写威胁评分测试
-- [x] Subtask 6.2: 🟢 绿 — 实现 ThreatScoringService
-- [x] Subtask 6.3: 🔄 重构 — 优化代码
+- [ ] Subtask 6.1: 🔴 红 — 编写威胁评分测试
+- [ ] Subtask 6.2: 🟢 绿 — 实现 ThreatScoringService
+- [ ] Subtask 6.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 威胁评分服务准确率 ≥85%
-- [x] 等保 2.0 入侵防范测试通过
-- [x] TDD 循环通过
+- [ ] 威胁评分服务准确率 ≥85%
+- [ ] 等保 2.0 入侵防范测试通过
+- [ ] TDD 循环通过
 
 ---
 
@@ -437,14 +437,14 @@
 | 🟢 绿 | 实现 `EncryptionService` 类（AES-256） |
 | 🔄 重构 | 添加密钥轮换、TLS 支持 |
 
-- [x] Subtask 7.1: 🔴 红 — 编写加密服务测试
-- [x] Subtask 7.2: 🟢 绿 — 实现 EncryptionService
-- [x] Subtask 7.3: 🔄 重构 — 优化代码
+- [ ] Subtask 7.1: 🔴 红 — 编写加密服务测试
+- [ ] Subtask 7.2: 🟢 绿 — 实现 EncryptionService
+- [ ] Subtask 7.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 加密服务实现完整（AES-256）- 复用 Story 1.11 EncryptionService
-- [x] 加密覆盖率 100%
-- [x] TDD 循环通过
+- [ ] 加密服务实现完整（AES-256）- 复用 Story 1.11 EncryptionService
+- [ ] 加密覆盖率 100%
+- [ ] TDD 循环通过
 
 ---
 
@@ -462,13 +462,13 @@
 | 🟢 绿 | 实现 `IntegrityVerifier` 类 |
 | 🔄 重构 | 添加 Hash 算法选择（SHA-256/SHA-512） |
 
-- [x] Subtask 8.1: 🔴 红 — 编写完整性验证测试
-- [x] Subtask 8.2: 🟢 绿 — 实现 IntegrityVerifier
-- [x] Subtask 8.3: 🔄 重构 — 优化代码
+- [ ] Subtask 8.1: 🔴 红 — 编写完整性验证测试
+- [ ] Subtask 8.2: 🟢 绿 — 实现 IntegrityVerifier
+- [ ] Subtask 8.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 完整性验证准确率 100%
-- [x] TDD 循环通过
+- [ ] 完整性验证准确率 100%
+- [ ] TDD 循环通过
 
 ---
 
@@ -486,13 +486,13 @@
 | 🟢 绿 | 实现 `SignatureService` 类 |
 | 🔄 重构 | 添加签名验证、证书管理 |
 
-- [x] Subtask 9.1: 🔴 红 — 编写数字签名测试
-- [x] Subtask 9.2: 🟢 绿 — 实现 SignatureService
-- [x] Subtask 9.3: 🔄 重构 — 优化代码
+- [ ] Subtask 9.1: 🔴 红 — 编写数字签名测试
+- [ ] Subtask 9.2: 🟢 绿 — 实现 SignatureService
+- [ ] Subtask 9.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 数字签名服务实现完整
-- [x] TDD 循环通过
+- [ ] 数字签名服务实现完整
+- [ ] TDD 循环通过
 
 ---
 
@@ -510,15 +510,15 @@
 | 🟢 绿 | 实现 `BackupService` 和 `RecoveryService` 类 |
 | 🔄 重构 | 添加并发控制、进度跟踪 |
 
-- [x] Subtask 10.1: 🔴 红 — 编写备份恢复服务测试
-- [x] Subtask 10.2: 🟢 绿 — 实现 BackupService/RecoveryService
-- [x] Subtask 10.3: 🔄 重构 — 优化代码
+- [ ] Subtask 10.1: 🔴 红 — 编写备份恢复服务测试
+- [ ] Subtask 10.2: 🟢 绿 — 实现 BackupService/RecoveryService
+- [ ] Subtask 10.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] BackupService 支持全量/增量备份
-- [x] RecoveryService 支持快速恢复
-- [x] 恢复时间 < 1 小时
-- [x] TDD 循环通过
+- [ ] BackupService 支持全量/增量备份
+- [ ] RecoveryService 支持快速恢复
+- [ ] 恢复时间 < 1 小时
+- [ ] TDD 循环通过
 
 ---
 
@@ -536,13 +536,13 @@
 | 🟢 绿 | 实现 `ComplianceReportService` 类 |
 | 🔄 重构 | 添加报告模板、多格式导出 |
 
-- [x] Subtask 11.1: 🔴 红 — 编写合规报告服务测试
-- [x] Subtask 11.2: 🟢 绿 — 实现 ComplianceReportService
-- [x] Subtask 11.3: 🔄 重构 — 优化代码
+- [ ] Subtask 11.1: 🔴 红 — 编写合规报告服务测试
+- [ ] Subtask 11.2: 🟢 绿 — 实现 ComplianceReportService
+- [ ] Subtask 11.3: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] 合规报告服务实现完整（等保合规状态通过API端点返回）
-- [x] TDD 循环通过
+- [ ] 合规报告服务实现完整（等保合规状态通过API端点返回）
+- [ ] TDD 循环通过
 
 ---
 
@@ -560,13 +560,13 @@
 | 🟢 绿 | 实现资源级权限验证 |
 | 🔄 重构 | 优化权限检查逻辑 |
 
-- [x] Subtask 12.1: 🔴 红 — 编写资源级 RBAC 扩展测试
+- [ ] Subtask 12.1: 🔴 红 — 编写资源级 RBAC 扩展测试
   - 测试用户-角色-资源三级权限模型
   - 测试资源级最小权限原则验证
-- [x] Subtask 12.2: 🟢 绿 — 实现资源级权限验证
+- [ ] Subtask 12.2: 🟢 绿 — 实现资源级权限验证
   - 扩展 Story 1.9 PermissionService
   - 支持 `resource_type` + `resource_id` 粒度
-- [x] Subtask 12.3: 🔄 重构 — 优化代码
+- [ ] Subtask 12.3: 🔄 重构 — 优化代码
   - 验证 RBAC 覆盖率达到 100%
   - COMP-03 测试通过
 
@@ -578,23 +578,23 @@
 | 🟢 绿 | 实现安全事件全覆盖 |
 | 🔄 重构 | 优化日志记录 |
 
-- [x] Subtask 12.4: 🔴 红 — 编写安全事件审计覆盖测试
+- [ ] Subtask 12.4: 🔴 红 — 编写安全事件审计覆盖测试
   - MFA 相关安全事件（MFASetupAttempt, MFAVerifyAttempt, MFAChallengeIssued）
   - 入侵检测事件（IntrusionDetected, BruteForceAttempt）
   - 数据完整性事件（IntegrityViolation, BackupCompleted）
-- [x] Subtask 12.5: 🟢 绿 — 实现安全事件全覆盖
+- [ ] Subtask 12.5: 🟢 绿 — 实现安全事件全覆盖
   - 扩展 Story 1.10 AuditService
   - 覆盖等保 2.0 三级所有安全事件
-- [x] Subtask 12.6: 🔄 重构 — 优化日志记录
+- [ ] Subtask 12.6: 🔄 重构 — 优化日志记录
   - 验证审计日志完整性达到 100%
   - COMP-04 测试通过
 
 **完成标准/Definition of Done:**
-- [x] RBAC 覆盖率 100%（用户-角色-资源三级权限）
-- [x] 审计日志完整性 100%（覆盖 MFA/入侵检测/数据完整性事件）
-- [x] COMP-03 访问控制测试通过
-- [x] COMP-04 安全审计测试通过
-- [x] TDD 循环通过
+- [ ] RBAC 覆盖率 100%（用户-角色-资源三级权限）
+- [ ] 审计日志完整性 100%（覆盖 MFA/入侵检测/数据完整性事件）
+- [ ] COMP-03 访问控制测试通过
+- [ ] COMP-04 安全审计测试通过
+- [ ] TDD 循环通过
 
 ---
 
@@ -612,9 +612,9 @@
 | 🟢 绿 | 实现 MFA/备份/完整性 CLI 命令 |
 | 🔄 重构 | 优化命令结构 |
 
-- [x] Subtask 13.1: 🔴 红 — 编写 CLI 命令测试
-- [x] Subtask 13.2: 🟢 绿 — 实现 CLI 命令
-- [x] Subtask 13.3: 🔄 重构 — 优化代码
+- [ ] Subtask 13.1: 🔴 红 — 编写 CLI 命令测试
+- [ ] Subtask 13.2: 🟢 绿 — 实现 CLI 命令
+- [ ] Subtask 13.3: 🔄 重构 — 优化代码
 
 #### TDD 循环 [B]：API 端点实现
 
@@ -624,15 +624,15 @@
 | 🟢 绿 | 实现 MFA/合规 API 端点 |
 | 🔄 重构 | 添加请求验证 |
 
-- [x] Subtask 13.4: 🔴 红 — 编写 API 端点测试
-- [x] Subtask 13.5: 🟢 绿 — 实现 API 端点
-- [x] Subtask 13.6: 🔄 重构 — 优化代码
+- [ ] Subtask 13.4: 🔴 红 — 编写 API 端点测试
+- [ ] Subtask 13.5: 🟢 绿 — 实现 API 端点
+- [ ] Subtask 13.6: 🔄 重构 — 优化代码
 
 **完成标准/Definition of Done:**
-- [x] CLI 命令功能正常
-- [x] API 端点功能正常
-- [x] TDD 循环通过
-- [x] 单元测试覆盖率 ≥85%
+- [ ] CLI 命令功能正常
+- [ ] API 端点功能正常
+- [ ] TDD 循环通过
+- [ ] 单元测试覆盖率 ≥85%
 
 ---
 
@@ -650,16 +650,16 @@
 | 🟢 绿 | 实现集成测试用例（MFA/渗透测试/备份恢复） |
 | 🔄 重构 | 优化测试结构、添加测试隔离 |
 
-- [x] Subtask 14.1: 🔴 红 — 编写集成测试框架（预期失败）
-- [x] Subtask 14.2: 🟢 绿 — 实现 MFA 集成测试
-- [x] Subtask 14.3: 🟢 绿 — 实现渗透测试集成测试
-- [x] Subtask 14.4: 🟢 绿 — 实现备份恢复集成测试
-- [x] Subtask 14.5: 🔄 重构 — 优化测试隔离、运行 COMP-01 ~ COMP-05
+- [ ] Subtask 14.1: 🔴 红 — 编写集成测试框架（预期失败）
+- [ ] Subtask 14.2: 🟢 绿 — 实现 MFA 集成测试
+- [ ] Subtask 14.3: 🟢 绿 — 实现渗透测试集成测试
+- [ ] Subtask 14.4: 🟢 绿 — 实现备份恢复集成测试
+- [ ] Subtask 14.5: 🔄 重构 — 优化测试隔离、运行 COMP-01 ~ COMP-05
 
 **完成标准/Definition of Done:**
-- [x] 集成测试全部通过
-- [x] COMP-01 ~ COMP-05 测试通过
-- [x] 集成测试覆盖率 ≥75%
+- [ ] 集成测试全部通过
+- [ ] COMP-01 ~ COMP-05 测试通过
+- [ ] 集成测试覆盖率 ≥75%
 
 ---
 
@@ -671,16 +671,16 @@
 
 #### 架构验证测试实现
 
-- [x] Subtask 15.1: 创建 `tests/unit/application/security/test_equilibrium_architecture.py`（独立架构验证文件）
-- [x] Subtask 15.2: 实现领域层零依赖验证（安全服务仅在应用层/接口层）
-- [x] Subtask 15.3: 实现循环依赖检测（使用 ruff 的 `E` 规则）
-- [x] Subtask 15.4: 运行完整测试套件并生成报告
+- [ ] Subtask 15.1: 创建 `tests/unit/application/security/test_equilibrium_architecture.py`（独立架构验证文件）
+- [ ] Subtask 15.2: 实现领域层零依赖验证（安全服务仅在应用层/接口层）
+- [ ] Subtask 15.3: 实现循环依赖检测（使用 ruff 的 `E` 规则）
+- [ ] Subtask 15.4: 运行完整测试套件并生成报告
 
 **完成标准/Definition of Done:**
-- [x] 所有架构/约束测试通过
-- [x] 领域层无安全相关外部依赖
-- [x] 无循环依赖
-- [x] 循环依赖检测使用 ruff/isort（不引入额外工具）
+- [ ] 所有架构/约束测试通过
+- [ ] 领域层无安全相关外部依赖
+- [ ] 无循环依赖
+- [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
 
 ---
 
@@ -850,14 +850,14 @@ sisys/
 
 ### 完成总结 Completion Summary
 
-1. [x] All tasks defined 所有任务定义完成（Task 0-15）
-2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-7）
-3. [x] Architecture constraints extracted 架构约束已提取
-4. [x] Previous story learnings integrated 前一个故事学习经验已整合
-5. [x] Sprint status synced to `ready-for-dev`
-6. [x] AC→Task→Subtask 追溯矩阵已补充
-7. [x] Review fixes applied 审查修复已完成 (v2.2.0)
-8. [x] Hexagonal architecture compliance fixed 六边形架构约束修复 (v2.3.0)
+1. [ ] All tasks defined 所有任务定义完成（Task 0-15）
+2. [ ] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-7）
+3. [ ] Architecture constraints extracted 架构约束已提取
+4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
+5. [ ] Sprint status synced to `ready-for-dev`
+6. [ ] AC→Task→Subtask 追溯矩阵已补充
+7. [ ] Review fixes applied 审查修复已完成 (v2.2.0)
+8. [ ] Hexagonal architecture compliance fixed 六边形架构约束修复 (v2.3.0)
    - 安全服务从 `infrastructure` 层移至 `application` 层
    - 领域层接口 `src/domain/ports/security/` 添加
    - 文件清单和测试路径全部更新
