@@ -92,7 +92,7 @@ class FileMemoryAdapter(L0StoragePort):
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():
             raise FileNotFoundError(f"Memory file not found: {file_path}")
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+        async with aiofiles.open(file_path, encoding="utf-8") as f:
             content: str = await f.read()
             return cast(str, content)
 
