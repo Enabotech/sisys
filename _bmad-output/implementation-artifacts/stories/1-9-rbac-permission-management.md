@@ -627,17 +627,17 @@ class RevokeRoleUseCase:
 
 > **目的：** 在进入代码实现前，明确配置模型、数据模型、接口、验收标准。
 
-- [x] Subtask 0.1: 定义 AuthConfig 配置模型 ✅
-- [x] Subtask 0.2: 定义 Role 数据模型 ✅
-- [x] Subtask 0.3: 定义 Permission 数据模型 ✅
-- [x] Subtask 0.4: 定义 AuthService 接口 ✅
-- [x] Subtask 0.5: 定义 PermissionService 接口 ✅
-- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.9.feature` ✅
-- [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）✅
+- [ ] Subtask 0.1: 定义 AuthConfig 配置模型 ✅
+- [ ] Subtask 0.2: 定义 Role 数据模型 ✅
+- [ ] Subtask 0.3: 定义 Permission 数据模型 ✅
+- [ ] Subtask 0.4: 定义 AuthService 接口 ✅
+- [ ] Subtask 0.5: 定义 PermissionService 接口 ✅
+- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.9.feature` ✅
+- [ ] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）✅
 
 **完成标准/Definition of Done:**
-- [x] 规范项全部定义完毕 ✅
-- [x] 验收测试运行失败（预期行为，红阶段确认）✅
+- [ ] 规范项全部定义完毕 ✅
+- [ ] 验收测试运行失败（预期行为，红阶段确认）✅
 
 ---
 
@@ -656,9 +656,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `AuthService` 类最小代码（调用 User 模型验证密码） |
 | 🔄 重构 | 添加错误处理、日志记录、异常抛出 |
 
-- [x] Subtask 1.1: 🔴 红 — 编写 AuthService 失败测试 ✅
-- [x] Subtask 1.2: 🟢 绿 — 实现 AuthService 最小代码 ✅
-- [x] Subtask 1.3: 🔄 重构 — 优化 AuthService 代码 ✅
+- [ ] Subtask 1.1: 🔴 红 — 编写 AuthService 失败测试 ✅
+- [ ] Subtask 1.2: 🟢 绿 — 实现 AuthService 最小代码 ✅
+- [ ] Subtask 1.3: 🔄 重构 — 优化 AuthService 代码 ✅
 
 #### TDD 循环 B：JWT Service 令牌服务
 
@@ -668,15 +668,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `JWTService` 类最小代码（生成和验证 JWT 令牌） |
 | 🔄 重构 | 添加算法支持、过期时间处理、错误处理 |
 
-- [x] Subtask 1.4: 🔴 红 — 编写 JWTService 失败测试 ✅
-- [x] Subtask 1.5: 🟢 绿 — 实现 JWTService 最小代码 ✅
-- [x] Subtask 1.6: 🔄 重构 — 优化 JWTService 代码 ✅
+- [ ] Subtask 1.4: 🔴 红 — 编写 JWTService 失败测试 ✅
+- [ ] Subtask 1.5: 🟢 绿 — 实现 JWTService 最小代码 ✅
+- [ ] Subtask 1.6: 🔄 重构 — 优化 JWTService 代码 ✅
 
 **完成标准/Definition of Done:**
-- [x] AuthService 和 JWTService 实现完成 ✅
-- [x] TDD 循环全部通过 ✅
-- [x] 登录接口 `/api/v1/auth/login` 实现 ✅
-- [x] 安全层覆盖率≥20% ✅
+- [ ] AuthService 和 JWTService 实现完成 ✅
+- [ ] TDD 循环全部通过 ✅
+- [ ] 登录接口 `/api/v1/auth/login` 实现 ✅
+- [ ] 安全层覆盖率≥20% ✅
 
 ---
 
@@ -694,9 +694,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `RoleService` 类最小代码（角色 CRUD、权限管理） |
 | 🔄 重构 | 添加权限继承、验证逻辑、错误处理 |
 
-- [x] Subtask 2.1: 🔴 红 — 编写 RoleService 失败测试 ✅
-- [x] Subtask 2.2: 🟢 绿 — 实现 RoleService 最小代码 ✅
-- [x] Subtask 2.3: 🔄 重构 — 优化 RoleService 代码 ✅
+- [ ] Subtask 2.1: 🔴 红 — 编写 RoleService 失败测试 ✅
+- [ ] Subtask 2.2: 🟢 绿 — 实现 RoleService 最小代码 ✅
+- [ ] Subtask 2.3: 🔄 重构 — 优化 RoleService 代码 ✅
 
 #### TDD 循环 B：角色 CRUD 接口
 
@@ -706,15 +706,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现角色路由最小代码 |
 | 🔄 重构 | 添加权限检查、验证逻辑、错误处理 |
 
-- [x] Subtask 2.4: 🔴 红 — 编写角色路由失败测试 ✅
-- [x] Subtask 2.5: 🟢 绿 — 实现角色路由最小代码 ✅
-- [x] Subtask 2.6: 🔄 重构 — 优化角色路由代码 ✅
+- [ ] Subtask 2.4: 🔴 红 — 编写角色路由失败测试 ✅
+- [ ] Subtask 2.5: 🟢 绿 — 实现角色路由最小代码 ✅
+- [ ] Subtask 2.6: 🔄 重构 — 优化角色路由代码 ✅
 
 **完成标准/Definition of Done:**
-- [x] RoleService 和角色 CRUD 接口实现完成 ✅
-- [x] TDD 循环全部通过 ✅
-- [x] 角色管理接口 `/api/v1/roles/*` 实现 ✅
-- [x] 安全层覆盖率≥50% ✅
+- [ ] RoleService 和角色 CRUD 接口实现完成 ✅
+- [ ] TDD 循环全部通过 ✅
+- [ ] 角色管理接口 `/api/v1/roles/*` 实现 ✅
+- [ ] 安全层覆盖率≥50% ✅
 
 ---
 
@@ -732,9 +732,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `PermissionService` 类最小代码（权限检查逻辑） |
 | 🔄 重构 | 添加权限层级、继承逻辑、缓存优化 |
 
-- [x] Subtask 3.1: 🔴 红 — 编写 PermissionService 失败测试 ✅
-- [x] Subtask 3.2: 🟢 绿 — 实现 PermissionService 最小代码 ✅
-- [x] Subtask 3.3: 🔄 重构 — 优化 PermissionService 代码 ✅
+- [ ] Subtask 3.1: 🔴 红 — 编写 PermissionService 失败测试 ✅
+- [ ] Subtask 3.2: 🟢 绿 — 实现 PermissionService 最小代码 ✅
+- [ ] Subtask 3.3: 🔄 重构 — 优化 PermissionService 代码 ✅
 
 #### TDD 循环 B：权限验证中间件
 
@@ -744,15 +744,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 `@require_permission` 装饰器和 FastAPI 依赖项 |
 | 🔄 重构 | 添加缓存、错误处理、日志记录 |
 
-- [x] Subtask 3.4: 🔴 红 — 编写权限验证中间件失败测试 ✅
-- [x] Subtask 3.5: 🟢 绿 — 实现权限验证中间件最小代码 ✅
-- [x] Subtask 3.6: 🔄 重构 — 优化权限验证中间件代码 ✅
+- [ ] Subtask 3.4: 🔴 红 — 编写权限验证中间件失败测试 ✅
+- [ ] Subtask 3.5: 🟢 绿 — 实现权限验证中间件最小代码 ✅
+- [ ] Subtask 3.6: 🔄 重构 — 优化权限验证中间件代码 ✅
 
 **完成标准/Definition of Done:**
-- [x] PermissionService 和权限验证中间件实现完成 ✅
-- [x] TDD 循环全部通过 ✅
-- [x] 权限验证中间件在受保护资源上生效 ✅
-- [x] 安全层覆盖率≥70% ✅
+- [ ] PermissionService 和权限验证中间件实现完成 ✅
+- [ ] TDD 循环全部通过 ✅
+- [ ] 权限验证中间件在受保护资源上生效 ✅
+- [ ] 安全层覆盖率≥70% ✅
 
 ---
 
@@ -770,9 +770,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现数据隔离检查逻辑 |
 | 🔄 重构 | 优化隔离检查性能 |
 
-- [x] Subtask 4.1: 🔴 红 — 编写水平越权防护失败测试 ✅
-- [x] Subtask 4.2: 🟢 绿 — 实现水平越权防护最小代码 ✅
-- [x] Subtask 4.3: 🔄 重构 — 优化水平越权防护代码 ✅
+- [ ] Subtask 4.1: 🔴 红 — 编写水平越权防护失败测试 ✅
+- [ ] Subtask 4.2: 🟢 绿 — 实现水平越权防护最小代码 ✅
+- [ ] Subtask 4.3: 🔄 重构 — 优化水平越权防护代码 ✅
 
 #### TDD 循环 B：垂直越权防护
 
@@ -782,9 +782,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现权限层级检查逻辑 |
 | 🔄 重构 | 优化权限层级检查性能 |
 
-- [x] Subtask 4.4: 🔴 红 — 编写垂直越权防护失败测试 ✅
-- [x] Subtask 4.5: 🟢 绿 — 实现垂直越权防护最小代码 ✅
-- [x] Subtask 4.6: 🔄 重构 — 优化垂直越权防护代码 ✅
+- [ ] Subtask 4.4: 🔴 红 — 编写垂直越权防护失败测试 ✅
+- [ ] Subtask 4.5: 🟢 绿 — 实现垂直越权防护最小代码 ✅
+- [ ] Subtask 4.6: 🔄 重构 — 优化垂直越权防护代码 ✅
 
 #### TDD 循环 C：SQL 注入防护
 
@@ -794,15 +794,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现参数化查询和输入验证 |
 | 🔄 重构 | 优化输入验证性能 |
 
-- [x] Subtask 4.7: 🔴 红 — 编写 SQL 注入防护失败测试 ✅
-- [x] Subtask 4.8: 🟢 绿 — 实现 SQL 注入防护最小代码 ✅
-- [x] Subtask 4.9: 🔄 重构 — 优化 SQL 注入防护代码 ✅
+- [ ] Subtask 4.7: 🔴 红 — 编写 SQL 注入防护失败测试 ✅
+- [ ] Subtask 4.8: 🟢 绿 — 实现 SQL 注入防护最小代码 ✅
+- [ ] Subtask 4.9: 🔄 重构 — 优化 SQL 注入防护代码 ✅
 
 **完成标准/Definition of Done:**
-- [x] 越权访问防护实现完成 ✅
-- [x] TDD 循环全部通过 ✅
-- [x] 越权访问测试 0 次成功 ✅
-- [x] 安全层覆盖率≥80% ✅
+- [ ] 越权访问防护实现完成 ✅
+- [ ] TDD 循环全部通过 ✅
+- [ ] 越权访问测试 0 次成功 ✅
+- [ ] 安全层覆盖率≥80% ✅
 
 ---
 
@@ -821,9 +821,9 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现身份鉴别合规功能 |
 | 🔄 重构 | 优化合规检查性能 |
 
-- [x] Subtask 5.1: 🔴 红 — 编写身份鉴别合规失败测试 ✅
-- [x] Subtask 5.2: 🟢 绿 — 实现身份鉴别合规最小代码 ✅
-- [x] Subtask 5.3: 🔄 重构 — 优化身份鉴别合规代码 ✅
+- [ ] Subtask 5.1: 🔴 红 — 编写身份鉴别合规失败测试 ✅
+- [ ] Subtask 5.2: 🟢 绿 — 实现身份鉴别合规最小代码 ✅
+- [ ] Subtask 5.3: 🔄 重构 — 优化身份鉴别合规代码 ✅
 
 #### TDD 循环 B：访问控制合规
 
@@ -833,16 +833,16 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现访问控制合规功能 |
 | 🔄 重构 | 优化访问控制合规性能 |
 
-- [x] Subtask 5.4: 🔴 红 — 编写访问控制合规失败测试 ✅
-- [x] Subtask 5.5: 🟢 绿 — 实现访问控制合规最小代码 ✅
-- [x] Subtask 5.6: 🔄 重构 — 优化访问控制合规代码 ✅
+- [ ] Subtask 5.4: 🔴 红 — 编写访问控制合规失败测试 ✅
+- [ ] Subtask 5.5: 🟢 绿 — 实现访问控制合规最小代码 ✅
+- [ ] Subtask 5.6: 🔄 重构 — 优化访问控制合规代码 ✅
 
 **完成标准/Definition of Done:**
-- [x] 等保 2.0 合规功能实现完成 ✅
-- [x] TDD 循环全部通过 ✅
-- [x] 通过等保 2.0 身份鉴别和访问控制测评 ✅
-- [x] 架构约束由 Task 7 验证 ✅
-- [x] 安全层覆盖率≥85% ✅
+- [ ] 等保 2.0 合规功能实现完成 ✅
+- [ ] TDD 循环全部通过 ✅
+- [ ] 通过等保 2.0 身份鉴别和访问控制测评 ✅
+- [ ] 架构约束由 Task 7 验证 ✅
+- [ ] 安全层覆盖率≥85% ✅
 
 ---
 
@@ -854,16 +854,16 @@ class RevokeRoleUseCase:
 
 #### 集成测试实现
 
-- [x] Subtask 6.1: 创建 `tests/integration/test_auth_integration.py` ✅
-- [x] Subtask 6.2: 实现完整登录流程测试（登录→获取令牌→访问受保护资源）✅
-- [x] Subtask 6.3: 实现角色管理流程测试（创建角色→分配权限→验证权限）✅
-- [x] Subtask 6.4: 实现越权访问流程测试（正常访问→越权尝试→拒绝访问）✅
-- [x] Subtask 6.5: 实现等保 2.0 合规模流程测试（完整合规检查）✅
+- [ ] Subtask 6.1: 创建 `tests/integration/test_auth_integration.py` ✅
+- [ ] Subtask 6.2: 实现完整登录流程测试（登录→获取令牌→访问受保护资源）✅
+- [ ] Subtask 6.3: 实现角色管理流程测试（创建角色→分配权限→验证权限）✅
+- [ ] Subtask 6.4: 实现越权访问流程测试（正常访问→越权尝试→拒绝访问）✅
+- [ ] Subtask 6.5: 实现等保 2.0 合规模流程测试（完整合规检查）✅
 
 **完成标准/Definition of Done:**
-- [x] 所有集成测试通过 ✅
-- [x] 测试输出完整的流程验证报告 ✅
-- [x] 安全层覆盖率≥85% ✅
+- [ ] 所有集成测试通过 ✅
+- [ ] 测试输出完整的流程验证报告 ✅
+- [ ] 安全层覆盖率≥85% ✅
 
 ---
 
@@ -875,18 +875,18 @@ class RevokeRoleUseCase:
 
 #### 架构验证测试实现
 
-- [x] Subtask 7.1: 创建 `tests/unit/security/test_architecture_constraints.py` ✅
-- [x] Subtask 7.2: 实现领域层零安全实现验证（扫描 `src/domain/` 目录，确保无 `infrastructure`、`security`、`bcrypt` 等外部依赖导入）✅
-- [x] Subtask 7.3: 实现依赖方向验证（使用 `import-linter` 验证 `domain → infrastructure` 单向依赖）✅
-- [x] Subtask 7.4: 运行 Ruff 检查（`ruff check src/`，0 错误）✅
-- [x] Subtask 7.5: 运行 MyPy 类型检查（`mypy src/`，0 问题）✅
-- [x] Subtask 7.6: 运行 Bandit 安全扫描（`bandit -r src/`，高危漏洞=0）✅
+- [ ] Subtask 7.1: 创建 `tests/unit/security/test_architecture_constraints.py` ✅
+- [ ] Subtask 7.2: 实现领域层零安全实现验证（扫描 `src/domain/` 目录，确保无 `infrastructure`、`security`、`bcrypt` 等外部依赖导入）✅
+- [ ] Subtask 7.3: 实现依赖方向验证（使用 `import-linter` 验证 `domain → infrastructure` 单向依赖）✅
+- [ ] Subtask 7.4: 运行 Ruff 检查（`ruff check src/`，0 错误）✅
+- [ ] Subtask 7.5: 运行 MyPy 类型检查（`mypy src/`，0 问题）✅
+- [ ] Subtask 7.6: 运行 Bandit 安全扫描（`bandit -r src/`，高危漏洞=0）✅
 
 **完成标准/Definition of Done:**
-- [x] 所有架构约束测试通过 ✅
-- [x] 测试输出清晰的合规报告 ✅
-- [x] 任何违规都会导致测试失败 ✅
-- [x] 安全层覆盖率≥85%（累计 Task 1-7）✅
+- [ ] 所有架构约束测试通过 ✅
+- [ ] 测试输出清晰的合规报告 ✅
+- [ ] 任何违规都会导致测试失败 ✅
+- [ ] 安全层覆盖率≥85%（累计 Task 1-7）✅
 
 ---
 
@@ -918,14 +918,14 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现所有 4xx HTTPException 分支测试 |
 | 🔄 重构 | 验证所有异常路径被覆盖 |
 
-- [x] Subtask 8.1: 🔴 红 — 编写 LoginEndpoint 异常处理失败测试
-- [x] Subtask 8.2: 🟢 绿 — 实现 `test_login_invalid_credentials_returns_401`
-- [x] Subtask 8.3: 🟢 绿 — 实现 `test_login_account_locked_returns_423`
-- [x] Subtask 8.4: 🟢 绿 — 实现 `test_login_user_inactive_returns_401`
-- [x] Subtask 8.5: 🔴 红 — 编写 RefreshTokenEndpoint 异常处理失败测试
-- [x] Subtask 8.6: 🟢 绿 — 实现 `test_refresh_token_invalid_returns_401`
-- [x] Subtask 8.7: 🔴 红 — 编写 GetMeEndpoint 异常处理失败测试
-- [x] Subtask 8.8: 🟢 绿 — 实现 `test_get_me_user_not_found_returns_404`
+- [ ] Subtask 8.1: 🔴 红 — 编写 LoginEndpoint 异常处理失败测试
+- [ ] Subtask 8.2: 🟢 绿 — 实现 `test_login_invalid_credentials_returns_401`
+- [ ] Subtask 8.3: 🟢 绿 — 实现 `test_login_account_locked_returns_423`
+- [ ] Subtask 8.4: 🟢 绿 — 实现 `test_login_user_inactive_returns_401`
+- [ ] Subtask 8.5: 🔴 红 — 编写 RefreshTokenEndpoint 异常处理失败测试
+- [ ] Subtask 8.6: 🟢 绿 — 实现 `test_refresh_token_invalid_returns_401`
+- [ ] Subtask 8.7: 🔴 红 — 编写 GetMeEndpoint 异常处理失败测试
+- [ ] Subtask 8.8: 🟢 绿 — 实现 `test_get_me_user_not_found_returns_404`
 
 #### TDD 循环 [B]：Role CRUD 异常处理覆盖
 
@@ -935,15 +935,15 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现所有角色端点 404/409 异常分支测试 |
 | 🔄 重构 | 验证所有角色操作异常路径 |
 
-- [x] Subtask 8.9: 🔴 红 — 编写 CreateRole 异常处理失败测试
-- [x] Subtask 8.10: 🟢 绿 — 实现 `test_create_role_conflict_returns_409`
-- [x] Subtask 8.11: 🔴 红 — 编写 GetRole 异常处理失败测试
-- [x] Subtask 8.12: 🟢 绿 — 实现 `test_get_role_not_found_returns_404`
-- [x] Subtask 8.13: 🔴 红 — 编写 UpdateRole 异常处理失败测试
-- [x] Subtask 8.14: 🟢 绿 — 实现 `test_update_role_not_found_returns_404`
-- [x] Subtask 8.15: 🟢 绿 — 实现 `test_update_role_conflict_returns_409`
-- [x] Subtask 8.16: 🔴 红 — 编写 DeleteRole 异常处理失败测试
-- [x] Subtask 8.17: 🟢 绿 — 实现 `test_delete_role_not_found_returns_404`
+- [ ] Subtask 8.9: 🔴 红 — 编写 CreateRole 异常处理失败测试
+- [ ] Subtask 8.10: 🟢 绿 — 实现 `test_create_role_conflict_returns_409`
+- [ ] Subtask 8.11: 🔴 红 — 编写 GetRole 异常处理失败测试
+- [ ] Subtask 8.12: 🟢 绿 — 实现 `test_get_role_not_found_returns_404`
+- [ ] Subtask 8.13: 🔴 红 — 编写 UpdateRole 异常处理失败测试
+- [ ] Subtask 8.14: 🟢 绿 — 实现 `test_update_role_not_found_returns_404`
+- [ ] Subtask 8.15: 🟢 绿 — 实现 `test_update_role_conflict_returns_409`
+- [ ] Subtask 8.16: 🔴 红 — 编写 DeleteRole 异常处理失败测试
+- [ ] Subtask 8.17: 🟢 绿 — 实现 `test_delete_role_not_found_returns_404`
 
 #### TDD 循环 [C]：Permission 端点异常处理覆盖
 
@@ -953,12 +953,12 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 assign/revoke permission 404 异常分支测试 |
 | 🔄 重构 | 验证所有权限操作异常路径 |
 
-- [x] Subtask 8.18: 🔴 红 — 编写 AssignPermission 异常处理失败测试
-- [x] Subtask 8.19: 🟢 绿 — 实现 `test_assign_permission_role_not_found_returns_404`
-- [x] Subtask 8.20: 🔴 红 — 编写 RevokePermission 异常处理失败测试
-- [x] Subtask 8.21: 🟢 绿 — 实现 `test_revoke_permission_role_not_found_returns_404`
-- [x] Subtask 8.22: 🔴 红 — 编写 ValidatePassword 端点测试
-- [x] Subtask 8.23: 🟢 绿 — 实现 `test_validate_password_valid` 和 `test_validate_password_invalid`
+- [ ] Subtask 8.18: 🔴 红 — 编写 AssignPermission 异常处理失败测试
+- [ ] Subtask 8.19: 🟢 绿 — 实现 `test_assign_permission_role_not_found_returns_404`
+- [ ] Subtask 8.20: 🔴 红 — 编写 RevokePermission 异常处理失败测试
+- [ ] Subtask 8.21: 🟢 绿 — 实现 `test_revoke_permission_role_not_found_returns_404`
+- [ ] Subtask 8.22: 🔴 红 — 编写 ValidatePassword 端点测试
+- [ ] Subtask 8.23: 🟢 绿 — 实现 `test_validate_password_valid` 和 `test_validate_password_invalid`
 
 #### TDD 循环 [D]：TestClient 集成测试
 
@@ -968,12 +968,12 @@ class RevokeRoleUseCase:
 | 🟢 绿 | 实现 FastAPI TestClient 成功路径测试 |
 | 🔄 重构 | 添加异步 session 管理 + dependency_overrides 隔离 |
 
-- [x] Subtask 8.24: 🔴 红 — 编写 TestClient 失败测试
-- [x] Subtask 8.25: 🟢 绿 — 实现 `test_login_success_with_test_client`
-- [x] Subtask 8.26: 🟢 绿 — 实现 `test_refresh_token_success`
-- [x] Subtask 8.27: 🟢 绿 — 实现 `test_get_me_success`
-- [x] Subtask 8.28: 🟢 绿 — 实现 `test_list_roles_success`
-- [x] Subtask 8.29: 🟢 绿 — 实现 `test_create_role_success`
+- [ ] Subtask 8.24: 🔴 红 — 编写 TestClient 失败测试
+- [ ] Subtask 8.25: 🟢 绿 — 实现 `test_login_success_with_test_client`
+- [ ] Subtask 8.26: 🟢 绿 — 实现 `test_refresh_token_success`
+- [ ] Subtask 8.27: 🟢 绿 — 实现 `test_get_me_success`
+- [ ] Subtask 8.28: 🟢 绿 — 实现 `test_list_roles_success`
+- [ ] Subtask 8.29: 🟢 绿 — 实现 `test_create_role_success`
 
 #### 覆盖率目标
 
@@ -985,10 +985,10 @@ class RevokeRoleUseCase:
 | Task 8.D 完成 | 82% → 100% | +8 tests ✅ |
 
 **完成标准/Definition of Done:**
-- [x] `src/interfaces/api/auth.py` 覆盖率 ≥85% ✅ 实际 100%
-- [x] 所有 4xx 异常分支被测试覆盖 ✅
-- [x] 所有成功路径被 TestClient 测试覆盖 ✅
-- [x] `poetry run pytest tests/unit/interfaces/api/ --cov=src.interfaces.api.auth --cov-fail-under=85` 通过 ✅
+- [ ] `src/interfaces/api/auth.py` 覆盖率 ≥85% ✅ 实际 100%
+- [ ] 所有 4xx 异常分支被测试覆盖 ✅
+- [ ] 所有成功路径被 TestClient 测试覆盖 ✅
+- [ ] `poetry run pytest tests/unit/interfaces/api/ --cov=src.interfaces.api.auth --cov-fail-under=85` 通过 ✅
 
 ---
 
@@ -1139,12 +1139,12 @@ sisys/
 5. **架构约束验证** — 领域层零外部依赖是硬约束，必须在架构验证测试中覆盖
 
 **应用到本故事/Applied to This Story:**
-- [x] AuthConfig 采用 Story 1.4-1.8 相同的配置模式 ✅
-- [x] AuthService/PermissionService 接口定义在领域层（Protocol），实现在基础设施层 ✅
-- [x] JWT Service 使用 python-jose 或 PyJWT 实现 ✅
-- [x] 密码哈希使用 passlib + bcrypt ✅
-- [x] 架构约束测试验证领域层无安全实现细节 ✅
-- [x] 安全层覆盖率≥85%（安全层标准要求）✅
+- [ ] AuthConfig 采用 Story 1.4-1.8 相同的配置模式 ✅
+- [ ] AuthService/PermissionService 接口定义在领域层（Protocol），实现在基础设施层 ✅
+- [ ] JWT Service 使用 python-jose 或 PyJWT 实现 ✅
+- [ ] 密码哈希使用 passlib + bcrypt ✅
+- [ ] 架构约束测试验证领域层无安全实现细节 ✅
+- [ ] 安全层覆盖率≥85%（安全层标准要求）✅
 
 ---
 
@@ -1172,12 +1172,12 @@ sisys/
 
 ### 完成清单 Completion Notes List
 
-- [x] Story 需求从 `epics_v1.0.md` 提取 ✅
-- [x] 架构约束从 `architecture.md` 提取 ✅
-- [x] 前一个故事学习经验整合 ✅
-- [x] 状态设置为 `backlog` ✅ (已更新)
-- [x] SDD+TDD 融合开发要求定义完成 ✅
-- [x] 项目结构对齐统一规范 ✅ (六边形架构约束已修正)
+- [ ] Story 需求从 `epics_v1.0.md` 提取 ✅
+- [ ] 架构约束从 `architecture.md` 提取 ✅
+- [ ] 前一个故事学习经验整合 ✅
+- [ ] 状态设置为 `backlog` ✅ (已更新)
+- [ ] SDD+TDD 融合开发要求定义完成 ✅
+- [ ] 项目结构对齐统一规范 ✅ (六边形架构约束已修正)
 - [ ] Task 0 SDD 规范定义待完成
 - [ ] Task 1 用户认证服务待实现
 - [ ] Task 2 角色管理服务待实现
@@ -1225,10 +1225,10 @@ sisys/
 > **更新日期:** 2026-05-05
 
 #### 接口设计变更（v1.1）
-- [x] [已完成] **TokenPayload 值对象** — 新增 `src/domain/value_objects/token_payload.py`
+- [ ] [已完成] **TokenPayload 值对象** — 新增 `src/domain/value_objects/token_payload.py`
   - 不可变 dataclass，含 user_id, username, roles (tuple), exp, iat
   - 方法：is_expired(), has_role(), has_any_role()
-- [x] [已完成] **verify_token 返回类型** — dict → TokenPayload
+- [ ] [已完成] **verify_token 返回类型** — dict → TokenPayload
   - 类型安全，编译期检查
   - 遵循六边形架构：领域值对象仅用标准库
 
@@ -1336,7 +1336,7 @@ sisys/
 2. [x] All acceptance criteria specified 所有验收标准已定义（AC-1 ~ AC-5）
 3. [x] Architecture constraints extracted 架构约束已提取（RBAC 模型、JWT 认证、等保 2.0 合规）
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（配置模式复用、接口分离、架构约束验证）
-5. [ ] Sprint status synced to `backlog` (待更新)
+5. [x] Sprint status synced to `backlog` (待更新)
 
 ### 六边形架构约束更新
 
