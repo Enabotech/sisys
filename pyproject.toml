@@ -178,10 +178,8 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 128
 target-version = "py311"
-select = ["E", "F", "I", "N", "W"]
-
-# 排除外部目录和生成文件
-extend-exclude = [
+output-format = "concise"
+exclude = [
     ".claude/",
     ".qwen/",
     "_bmad/",
@@ -191,6 +189,9 @@ extend-exclude = [
     ".venv/",
     "venv/",
 ]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
 
 # Mypy Configuration
 [tool.mypy]
