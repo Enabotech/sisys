@@ -12,7 +12,6 @@ Prerequisites:
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 import uuid
 
@@ -34,12 +33,18 @@ from src.infrastructure.routing.semantic_router import Candidate, SemanticRouter
 
 @pytest.fixture
 def redis_config() -> RedisConfig:
-    """Real Redis configuration from environment."""
+    """Real Redis configuration from environment.
+
+    Uses tests/environments.py to get correct host for CI/Local.
+    """
+    from tests.environments import get_test_env
+
+    env_config = get_test_env()
     return RedisConfig(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        db=int(os.getenv("REDIS_DB", "0")),
-        password=os.getenv("REDIS_PASSWORD") or None,
+        host=env_config.redis.host,
+        port=env_config.redis.port,
+        db=env_config.redis.db,
+        password=env_config.redis.password,
     )
 
 
@@ -51,18 +56,50 @@ def unique_prefix() -> str:
 
 @pytest.fixture
 def redis_publisher(redis_config: RedisConfig) -> RedisEventPublisher:
-    """Real Redis event publisher."""
+    """Real Redis event publisher with connectivity check."""
     try:
-        return RedisEventPublisher(redis_config)
+        publisher = RedisEventPublisher(redis_config)
+        # Verify connectivity with a lightweight ping
+        import redis.asyncio as aioredis
+
+        async def verify():
+            client = aioredis.Redis(
+                host=redis_config.host,
+                port=redis_config.port,
+                db=redis_config.db,
+                password=redis_config.password,
+                socket_timeout=5,
+            )
+            await client.ping()
+            await client.close()
+
+        asyncio.run(verify())
+        return publisher
     except Exception as e:
         pytest.skip(f"Redis not available: {e}")
 
 
 @pytest.fixture
 def redis_subscriber(redis_config: RedisConfig) -> RedisEventSubscriber:
-    """Real Redis event subscriber."""
+    """Real Redis event subscriber with connectivity check."""
     try:
-        return RedisEventSubscriber(redis_config)
+        subscriber = RedisEventSubscriber(redis_config)
+        # Register a dummy handler and verify connectivity
+        import redis.asyncio as aioredis
+
+        async def verify():
+            client = aioredis.Redis(
+                host=redis_config.host,
+                port=redis_config.port,
+                db=redis_config.db,
+                password=redis_config.password,
+                socket_timeout=5,
+            )
+            await client.ping()
+            await client.close()
+
+        asyncio.run(verify())
+        return subscriber
     except Exception as e:
         pytest.skip(f"Redis not available: {e}")
 
