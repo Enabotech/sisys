@@ -59,7 +59,7 @@ class TestUserRoleRepository:
     async def test_revoke_role_success(self):
         """revoke_role returns True when delete succeeds."""
         mock_result = MagicMock()
-        mock_result.fetchall.return_value = [(1,)]  # rowcount > 0
+        mock_result.rowcount = 1  # row deleted
         mock_execute = AsyncMock(return_value=mock_result)
         self.mock_session.execute = mock_execute
         self.mock_session.flush = AsyncMock()
@@ -72,7 +72,7 @@ class TestUserRoleRepository:
     async def test_revoke_role_not_found(self):
         """revoke_role returns False when no association exists."""
         mock_result = MagicMock()
-        mock_result.fetchall.return_value = []  # rowcount = 0
+        mock_result.rowcount = 0  # no row deleted
         mock_execute = AsyncMock(return_value=mock_result)
         self.mock_session.execute = mock_execute
         self.mock_session.flush = AsyncMock()

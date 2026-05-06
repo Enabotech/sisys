@@ -5418,57 +5418,58 @@ So that **确保 MVP 无高危漏洞**。
 
 #### 总体依赖关系 (Mermaid 可视化)
 
-**更新时间：** 2026-04-12
-**更新说明：** 添加 Story 0.18 依赖关系，更新安装包状态
+**更新时间：** 2026-05-06
+**更新说明：** 基于 sprint-status.yaml（2026-05-04）更新所有 Story 状态
 
 ```mermaid
 graph TD
     %% ========== Epic 0 Iteration 0 (已完成) ==========
-    subgraph "Epic 0 Iteration 0 ✅ (已完成)"
+    subgraph "Epic 0 Iteration 0 ✅ (已完成 - 3/3)"
         S0_1["Story 0.1<br/>开发环境搭建<br/>✅ Done"]
         S0_2["Story 0.2<br/>CI/CD 流水线<br/>⚠️ 备份废弃"]
         S0_3["Story 0.3<br/>测试框架搭建<br/>✅ Done"]
     end
 
     %% ========== Epic 0 Iteration 1 (进行中) ==========
-    subgraph "Epic 0 Iteration 1 🔄 (进行中 - 9/11 完成)"
+    subgraph "Epic 0 Iteration 1 🔄 (进行中 - 9/12 完成)"
         S0_4["Story 0.4<br/>K3S 集群部署<br/>✅ Done"]
         S0_5["Story 0.5<br/>Gitea 代码托管<br/>✅ Done"]
         S0_6["Story 0.6<br/>Harbor 镜像仓库<br/>✅ Done"]
         S0_7["Story 0.7<br/>ArgoCD 持续部署<br/>✅ Done"]
         S0_8["Story 0.8<br/>Gitea Runner 配置<br/>✅ Done"]
         S0_9["Story 0.9<br/>CI/CD Pipeline 模板<br/>✅ Done"]
-        S0_14["Story 0.14<br/>Windows 安装器<br/>⚠️ 编码完成/未测试"]
-        S0_15["Story 0.15<br/>Mac 安装器<br/>⚠️ 编码完成/未测试"]
-        S0_16["Story 0.16<br/>Linux 一键脚本<br/>⚠️ 编码完成/未测试"]
+        S0_14["Story 0.14<br/>Windows 安装器<br/>✅ Done"]
+        S0_15["Story 0.15<br/>Mac 安装器<br/>✅ Done"]
+        S0_16["Story 0.16<br/>Linux 一键脚本<br/>✅ Done"]
         S0_17["Story 0.17<br/>自动诊断修复<br/>📋 ready-for-dev"]
         S0_18["Story 0.18<br/>配置向导<br/>📋 ready-for-dev"]
+        S0_30["Story 0.30<br/>应用启动集成<br/>📋 ready-for-dev"]
     end
 
-    %% ========== Epic 1 (待开始) ==========
-    subgraph "Epic 1 📋 (待开始 - 23 Stories)"
+    %% ========== Epic 1 (进行中) ==========
+    subgraph "Epic 1 🔄 (进行中 - 13/22 完成)"
         direction TB
-        S1_1["Story 1.1<br/>六边形架构脚手架<br/>📋 Backlog"]
-        S1_2["Story 1.2<br/>领域事件定义<br/>📋 Backlog"]
-        S1_3["Story 1.3<br/>事件总线实现<br/>📋 Backlog"]
-        S1_4["Story 1.4<br/>Redis 缓存层<br/>📋 Backlog"]
-        S1_5["Story 1.5<br/>PostgreSQL 存储层<br/>📋 Backlog"]
-        S1_6["Story 1.6<br/>Qdrant 向量层<br/>📋 Backlog"]
-        S1_7["Story 1.7<br/>MinIO 对象层<br/>📋 Backlog"]
-        S1_8["Story 1.8<br/>Neo4j 图层<br/>📋 Backlog"]
-        S1_9["Story 1.9<br/>RBAC 权限管理<br/>📋 Backlog"]
+        S1_1["Story 1.1<br/>六边形架构脚手架<br/>✅ Done"]
+        S1_2["Story 1.2<br/>领域事件定义<br/>✅ Done"]
+        S1_3["Story 1.3<br/>事件总线实现<br/>✅ Done"]
+        S1_4["Story 1.4<br/>Redis 缓存层<br/>✅ Done"]
+        S1_5["Story 1.5<br/>PostgreSQL 存储层<br/>✅ Done"]
+        S1_6["Story 1.6<br/>Qdrant 向量层<br/>✅ Done"]
+        S1_7["Story 1.7<br/>MinIO 对象层<br/>✅ Done"]
+        S1_8["Story 1.8<br/>Neo4j 图层<br/>✅ Done"]
+        S1_9["Story 1.9<br/>RBAC 权限管理<br/>🔄 In-Progress"]
         S1_10["Story 1.10<br/>统一审计日志<br/>📋 Backlog"]
         S1_11["Story 1.11<br/>数据主权隔离<br/>📋 Backlog"]
         S1_12["Story 1.12<br/>等保 2.0 三级<br/>📋 Backlog"]
-        S1_13["Story 1.13<br/>K8s 动态扩缩容<br/>📋 Backlog"]
-        S1_14a["Story 1.14a<br/>自主调用 trigger<br/>📋 Backlog"]
-        S1_14b["Story 1.14b<br/>自主调用 route<br/>📋 Backlog"]
-        S1_14c["Story 1.14c<br/>自主调用 execute<br/>📋 Backlog"]
-        S1_15a["Story 1.15a<br/>外部化记忆压缩<br/>📋 Backlog"]
-        S1_15b["Story 1.15b<br/>外部化记忆协同<br/>📋 Backlog"]
-        S1_16["Story 1.16<br/>集成测试框架<br/>📋 Backlog"]
-        S1_17["Story 1.17<br/>UDMR 基础路由<br/>📋 Backlog"]
-        S1_18a["Story 1.18a<br/>Prefect 工作流<br/>📋 Backlog"]
+        S1_13["Story 1.13<br/>K8s 动态扩缩容<br/>✅ Done"]
+        S1_14a["Story 1.14a<br/>自主调用 trigger<br/>✅ Done"]
+        S1_14b["Story 1.14b<br/>自主调用 route<br/>✅ Done"]
+        S1_14c["Story 1.14c<br/>自主调用 execute<br/>✅ Done"]
+        S1_15a["Story 1.15a<br/>外部化记忆压缩<br/>✅ Done"]
+        S1_15b["Story 1.15b<br/>外部化记忆协同<br/>🔄 In-Progress"]
+        S1_16["Story 1.16<br/>集成测试框架<br/>✅ Done"]
+        S1_17["Story 1.17<br/>UDMR 基础路由<br/>✅ Done"]
+        S1_18a["Story 1.18a<br/>Prefect 工作流<br/>📋 ready-for-dev"]
         S1_18b["Story 1.18b<br/>LangGraph 编排<br/>📋 Backlog"]
         S1_19["Story 1.19<br/>成本度量基础<br/>📋 Backlog"]
     end

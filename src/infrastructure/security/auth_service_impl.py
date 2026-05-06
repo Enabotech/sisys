@@ -74,7 +74,9 @@ class AuthServiceImpl(AuthServicePort):
         user = await self._user_repo.get_by_username(username)
 
         if not user:
-            # 用户不存在，也记录尝试（即使没有 user_id）
+            # 防御timing attack: 即使用户不存在也执行伪哈希计算
+            # 确保无论用户存在与否，响应时间都相似
+            self._encryption_service.verify_password(password, "$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
             await self._record_attempt(username, False, "user_not_found", None, ip_address, user_agent)
             raise AuthenticationError("Invalid credentials")
 
@@ -190,8 +192,8 @@ class AuthServiceImpl(AuthServicePort):
             if is_used:
                 # Token 被重用，可能是攻击，撤销该用户的所有 token
                 if self._token_blacklist:
-                    # 通知用户 token 被泄露，需要重新登录
-                    pass
+                    # 将当前 refresh token 加入黑名单
+                    await self._token_blacklist.add(refresh_token)
 
                 raise AuthenticationError("Refresh token reuse detected - possible attack")
             # 标记 jti 为已使用
