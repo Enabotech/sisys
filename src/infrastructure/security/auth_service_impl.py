@@ -166,8 +166,6 @@ class AuthServiceImpl(AuthServicePort):
         """
         # 检查 token 是否在黑名单中
         if self._token_blacklist and await self._token_blacklist.is_blacklisted(token):
-            from src.domain.ports.auth_service import AuthenticationError
-
             raise AuthenticationError("Token has been revoked")
         return self._jwt_service.verify_token(token)
 
@@ -194,7 +192,6 @@ class AuthServiceImpl(AuthServicePort):
                 if self._token_blacklist:
                     # 通知用户 token 被泄露，需要重新登录
                     pass
-                from src.domain.ports.auth_service import AuthenticationError
 
                 raise AuthenticationError("Refresh token reuse detected - possible attack")
             # 标记 jti 为已使用
