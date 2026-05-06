@@ -44,7 +44,7 @@ class TestAuthServiceImpl:
         mock_user = MagicMock()
         mock_user.id = uuid4()
         mock_user.username = "testuser"
-        mock_user.hashed_password = "hashed"
+        mock_user.hashed_password = "hashed"  # pragma: allowlist secret
         mock_user.is_active = True
         mock_user.is_locked = False
 
@@ -106,7 +106,7 @@ class TestAuthServiceImpl:
         mock_user = MagicMock()
         mock_user.id = uuid4()
         mock_user.username = "testuser"
-        mock_user.hashed_password = "hashed"
+        mock_user.hashed_password = "hashed"  # pragma: allowlist secret
         mock_user.is_active = True
         mock_user.is_locked = False
 

@@ -45,7 +45,7 @@ def get_current_user(
     Raises:
         HTTPException: token 无效或缺失
     """
-    if not authorization:
+    if authorization is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authorization header",

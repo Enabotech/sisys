@@ -51,6 +51,30 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 500
         assert "JWT service not configured" in str(exc_info.value.detail)
 
+    def test_empty_string_authorization_header(self):
+        """Empty string authorization header raises 401."""
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(authorization="")
+
+        assert exc_info.value.status_code == 401
+        assert "Invalid authorization header format" in str(exc_info.value.detail)
+
+    def test_whitespace_only_authorization_header(self):
+        """Whitespace-only authorization header raises 401."""
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(authorization="   ")
+
+        assert exc_info.value.status_code == 401
+        assert "Invalid authorization header format" in str(exc_info.value.detail)
+
+    def test_bearer_with_empty_token(self):
+        """Bearer with empty token raises 401."""
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(authorization="Bearer ")
+
+        assert exc_info.value.status_code == 401
+        assert "Invalid authorization header format" in str(exc_info.value.detail)
+
     def test_invalid_token(self):
         """Invalid token raises 401."""
         mock_jwt = MagicMock()
