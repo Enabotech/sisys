@@ -100,7 +100,7 @@
 **And** 支持异步 CRUD 操作（`async/await`）
 
 **验证标准/Validation Criteria:**
-- [ ] BaseRepository 抽象基类定义（`src/infrastructure/storage/postgresql/base_repository.py`）
+- [ ] BaseRepository 抽象基类定义（`src/infrastructure/storage/postgresql/repository/base_repository.py`）
   - 泛型类型参数 `[T]`（SQLAlchemy 模型类型）
   - 方法: `async get_by_id(id: UUID) -> Optional[T]`
   - 方法: `async save(entity: T) -> T`（插入或更新）
@@ -158,15 +158,15 @@
 **And** 支持角色与权限关联查询
 
 **验证标准/Validation Criteria:**
-- [ ] UserRepository 实现（`src/infrastructure/storage/postgresql/user_repository.py`）
+- [ ] UserRepository 实现（`src/infrastructure/storage/postgresql/repository/user_repository.py`）
   - 继承 `BaseRepository[UserModel]`
   - 方法: `async get_by_username(username: str) -> Optional[UserModel]`
   - 方法: `async get_by_email(email: str) -> Optional[UserModel]`
-- [ ] RoleRepository 实现（`src/infrastructure/storage/postgresql/role_repository.py`）
+- [ ] RoleRepository 实现（`src/infrastructure/storage/postgresql/repository/role_repository.py`）
   - 继承 `BaseRepository[RoleModel]`
   - 方法: `async get_by_name(name: str) -> Optional[RoleModel]`
   - 方法: `async get_permissions_for_role(role_id: UUID) -> List[PermissionModel]`
-- [ ] PermissionRepository 实现（`src/infrastructure/storage/postgresql/permission_repository.py`）
+- [ ] PermissionRepository 实现（`src/infrastructure/storage/postgresql/repository/permission_repository.py`）
   - 继承 `BaseRepository[PermissionModel]`
   - 方法: `async get_by_name(name: str) -> Optional[PermissionModel]`
 - [ ] 单元测试覆盖用户/角色/权限 CRUD 操作
@@ -783,7 +783,7 @@ sisys/
 | `src/infrastructure/config/postgresql.py` | PostgreSQLConfig 配置模型 |
 | `src/infrastructure/storage/postgresql/__init__.py` | PostgreSQL 存储层包 |
 | `src/infrastructure/storage/postgresql/engine.py` | DatabaseEngine 通用接口 |
-| `src/infrastructure/storage/postgresql/base_repository.py` | BaseRepository 抽象基类 |
+| `src/infrastructure/storage/postgresql/repository/base_repository.py` | BaseRepository 抽象基类 |
 | `src/infrastructure/storage/postgresql/models/__init__.py` | SQLAlchemy 模型导出 |
 | `src/infrastructure/storage/postgresql/models/outbox.py` | OutboxModel（event_outbox 表） |
 | `src/infrastructure/storage/postgresql/models/user.py` | UserModel（users 表） |
@@ -792,9 +792,9 @@ sisys/
 | `src/infrastructure/storage/postgresql/models/association.py` | 关联表（user_roles, role_permissions） |
 | `src/infrastructure/adapters/sqlalchemy_event_outbox_adapter.py` | SQLAlchemyEventOutboxAdapter 转换器 |
 | `src/infrastructure/storage/postgresql/outbox_repository.py` | PostgreSQLOutboxRepository |
-| `src/infrastructure/storage/postgresql/user_repository.py` | UserRepository |
-| `src/infrastructure/storage/postgresql/role_repository.py` | RoleRepository |
-| `src/infrastructure/storage/postgresql/permission_repository.py` | PermissionRepository |
+| `src/infrastructure/storage/postgresql/repository/user_repository.py` | UserRepository |
+| `src/infrastructure/storage/postgresql/repository/role_repository.py` | RoleRepository |
+| `src/infrastructure/storage/postgresql/repository/permission_repository.py` | PermissionRepository |
 | `deploy/postgresql/alembic/alembic.ini` | Alembic 配置文件 |
 | `deploy/postgresql/alembic/env.py` | Alembic 环境配置 |
 | `deploy/postgresql/alembic/script.py.mako` | Alembic 迁移模板 |

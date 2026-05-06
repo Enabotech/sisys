@@ -185,9 +185,10 @@
 - [ ] AuditService Protocol 定义（`src/domain/ports/audit_service.py`）
   - 接口方法: `log(audit_event)`, `query(filters)`, `get_stats()`
   - 定义在领域层（符合六边形架构：领域层定义接口，infrastructure 实现）
-- [ ] AuditOutboxPort 定义（`src/domain/ports/audit_outbox_port.py`）
-  - 接口方法: `write_entry(event)`, `mark_published(event_id)`, `get_pending()`
-  - 支持事务发件箱模式
+- [x] AuditOutboxPort 复用 ✅ 已完成
+  - **复用说明**: 审计发件箱复用 `src/domain/ports/outbox.py` 中的通用 `OutboxRepository` 接口
+  - 审计发件箱行为与通用发件箱完全一致，无需独立接口
+  - 无需创建 `audit_outbox_port.py`
 
 #### 数据模型 (Data Models) — 基础设施层 ✅ 已完成
 - [x] AuditLogModel（PostgreSQL 审计日志表，`src/infrastructure/storage/postgresql/models/audit.py`）✅ 已完成
@@ -352,15 +353,15 @@
   - 代码: `src/infrastructure/storage/postgresql/models/audit.py`（含 checksum 校验、索引）
 - [x] ~~Subtask 0.3: 定义 AuditOutboxModel 事务发件箱模型~~ ✅ 已完成
   - 代码: `src/infrastructure/storage/postgresql/models/audit_outbox.py`（含 mark_published/can_retry）
-- [ ] Subtask 0.4: 定义 AuditConfig 配置模型
+- [x] ~~Subtask 0.4: 定义 AuditConfig 配置模型~~ ✅ 已完成
 - [ ] Subtask 0.5: 定义 AuditService 接口协议（`src/domain/ports/audit_service.py`）
-- [ ] Subtask 0.6: 定义 AuditOutboxPort 接口协议（`src/domain/ports/audit_outbox_port.py`）
+- [x] ~~Subtask 0.6: 复用 OutboxRepository 接口~~ ✅ 已完成（复用 `src/domain/ports/outbox.py`）
 - [ ] Subtask 0.7: 创建/更新 `docs/api/openapi.yaml` 审计端点
 - [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.10.feature`
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（0.1-0.3 已完成，0.4-0.6 待定义）
+- [ ] 规范项全部定义完毕（0.1-0.6 已完成，0.7-0.9 待定义）
 - [ ] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）
 - [ ] 规范文档通过人工评审或自动化校验
 
@@ -798,7 +799,6 @@ sisys/
 
 **待创建的文件 (Dev Story 实施):**
 - `src/domain/ports/audit_service.py` - AuditService 接口（Protocol，领域层）
-- `src/domain/ports/audit_outbox_port.py` - AuditOutboxPort 接口（Protocol，领域层）
 - `src/infrastructure/config/audit.py` - AuditConfig 配置模型
 - `src/infrastructure/audit/audit_service.py` - AuditService 实现
 - `src/infrastructure/audit/outbox_processor.py` - 事务发件箱处理器
@@ -806,11 +806,14 @@ sisys/
 - `src/infrastructure/audit/compliance_reporter.py` - 合规报告生成
 - `src/interfaces/api/audit.py` - REST API 端点
 - `tests/unit/infrastructure/audit/test_audit_service.py` - 审计服务单元测试
-- `tests/unit/infrastructure/audit/test_audit_outbox.py` - 发件箱单元测试
+- `tests/unit/infrastructure/audit/test_outbox_processor.py` - 发件箱处理器单元测试
 - `tests/unit/infrastructure/audit/test_audit_event_listener.py` - 事件监听器测试
 - `tests/integration/test_audit_integration.py` - 集成测试
 - `tests/acceptance/test_story_1.10.feature` - 验收测试
 - `docs/audit/unified_audit_log_guide.md` - 实施指南
+
+**复用说明:**
+- AuditOutboxPort 复用 `src/domain/ports/outbox.py` 中的 `OutboxRepository` 接口，无需独立接口定义
 
 ---
 

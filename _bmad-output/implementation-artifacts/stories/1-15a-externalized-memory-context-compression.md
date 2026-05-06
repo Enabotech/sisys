@@ -75,8 +75,8 @@
 **验证标准/Validation Criteria:**
 - [ ] FileMemoryAdapter 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
 - [ ] MemoryIndex 索引管理（`src/infrastructure/storage/memory_index.py`）
-- [ ] MemoryMetadataRepository L2 存储（`src/infrastructure/storage/postgresql/memory_metadata_repository.py`）
-- [ ] MemoryChangeHistoryRepository L2 历史记录（`src/infrastructure/storage/postgresql/memory_change_history_repository.py`）
+- [ ] MemoryMetadataRepository L2 存储（`src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py`）
+- [ ] MemoryChangeHistoryRepository L2 历史记录（`src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py`）
 - [ ] L0 写入成功率 100%（同步，强一致）
 - [ ] L0 索引更新成功率 100%（同步）
 - [ ] MemoryChanged 事件发布成功率 ≥99%
@@ -257,8 +257,8 @@
     - 更新时机: 每次 save/update/delete 后更新索引
     - 一致性保证: 读取时从文件加载，索引仅用于快速扫描
   - **多租户隔离**: 通过 user_id 字段在 L2 PostgreSQL 层实现多租户隔离，private/group 路径隔离在 Story 1.15b 实现
-- [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/storage/postgresql/memory_metadata_repository.py`）
-- [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/memory_change_history_repository.py`）
+- [ ] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py`）
+- [ ] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py`）
 
 #### 配置模型 (Configuration Models)
 - [ ] MemoryConfig 配置（`src/infrastructure/config/memory.py`）
@@ -381,8 +381,8 @@
 - [x] Subtask 0.5: 定义 L1TextExtractor 文本提取器（`src/application/text_processing/l1_text_extractor.py`）
 - [x] Subtask 0.6: 定义 L1Compressor 压缩器（`src/application/text_processing/l1_compressor.py`）
 - [x] Subtask 0.7: 定义 FileMemoryAdapter L0 文件系统适配器（`src/infrastructure/storage/file_memory_adapter.py`）
-- [x] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/storage/postgresql/memory_metadata_repository.py`）
-- [x] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/memory_change_history_repository.py`）
+- [x] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py`）
+- [x] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py`）
 - [x] Subtask 0.10: 定义 MemoryConfig 配置模型（`src/infrastructure/config/memory.py`）
 - [x] Subtask 0.11: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15a.feature`（Dev agent 创建）
 - [x] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
@@ -466,7 +466,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/integration/test_memory_service_integration.py`（验证 L2 存储，使用 mock）|
-| 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/memory_metadata_repository.py` - MemoryMetadataRepository |
+| 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` - MemoryMetadataRepository |
 | 🔄 重构 | 添加 UPSERT 和版本冲突处理 |
 
 - [x] Subtask 2.4: 🔴 红 — 编写 MemoryMetadataRepository 失败测试
@@ -824,8 +824,8 @@ sisys/
 - `src/application/text_processing/l1_compressor.py` - L1Compressor
 - `src/infrastructure/config/memory.py` - MemoryConfig
 - `src/infrastructure/storage/file_memory_adapter.py` - FileMemoryAdapter
-- `src/infrastructure/storage/postgresql/memory_metadata_repository.py` - MemoryMetadataRepository
-- `src/infrastructure/storage/postgresql/memory_change_history_repository.py` - MemoryChangeHistoryRepository
+- `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` - MemoryMetadataRepository
+- `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` - MemoryChangeHistoryRepository
 - `src/interfaces/event_listeners/memory_changed_listener.py` - MemoryChangedListener
 - `tests/unit/domain/services/test_memory_service.py` - MemoryService 单元测试
 - `tests/unit/domain/events/test_memory_events.py` - MemoryChanged 事件单元测试

@@ -1277,7 +1277,7 @@ sisys/
 
 | 问题 | 位置 | 描述 | 修复状态 |
 |------|------|------|---------|
-| **UserRoleRepository 返回空 permissions** | `src/infrastructure/storage/postgresql/user_role_repository.py:102` | `get_user_roles()` 返回的 Role 实体 `permissions=()` 为空，导致 `PermissionServiceImpl.get_user_permissions()` 无法获取用户权限，所有权限检查会失败 | ✅ 已修复：添加 `_get_permissions_for_role()` 方法并调用 |
+| **UserRoleRepository 返回空 permissions** | `src/infrastructure/storage/postgresql/repository/user_role_repository.py:102` | `get_user_roles()` 返回的 Role 实体 `permissions=()` 为空，导致 `PermissionServiceImpl.get_user_permissions()` 无法获取用户权限，所有权限检查会失败 | ✅ 已修复：添加 `_get_permissions_for_role()` 方法并调用 |
 
 #### P1 级问题 (严重)
 
