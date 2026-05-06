@@ -73,7 +73,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
             user_roles.delete().where(user_roles.c.user_id == user_id, user_roles.c.role_id == role_id)
         )
         await self._session.flush()
-        return len(result.fetchall()) > 0  # type: ignore[no-any-return]
+        return result.rowcount > 0  # type: ignore[no-any-return, attr-defined]
 
     async def get_user_roles(self, user_id: UUID) -> list["Role"]:
         """获取用户的所有角色。
