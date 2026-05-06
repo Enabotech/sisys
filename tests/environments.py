@@ -11,6 +11,11 @@ import os
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestEnvironment(Enum):
@@ -290,6 +295,9 @@ def get_test_env() -> TestEnvConfig:
         # 双重检查锁定
         if _test_env_config is not None:
             return _test_env_config
+
+        # 加载 .env 作为基础配置
+        load_dotenv(ROOT / ".env", override=True)
 
         env = resolve_env()
 
