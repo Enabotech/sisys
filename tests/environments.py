@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -278,6 +278,11 @@ def resolve_env() -> TestEnvironment:
 def get_test_env() -> TestEnvConfig:
     """获取测试环境配置（单例）
 
+    设计原则：
+    1. .env 作为基础配置（所有环境共享的默认值）
+    2. 各环境配置（CI_CONFIG/K8S_CONFIG/LOCAL_CONFIG）在 .env 基础上差异化覆盖
+    3. 显式环境变量最高优先级（用于本地调试覆盖）
+
     支持从环境变量覆盖服务主机地址:
     - REDIS_HOST, REDIS_PORT
     - POSTGRES_HOST, POSTGRES_PORT
@@ -296,8 +301,8 @@ def get_test_env() -> TestEnvConfig:
         if _test_env_config is not None:
             return _test_env_config
 
-        # 加载 .env 作为基础配置
-        load_dotenv(ROOT / ".env", override=False)
+        # 读取 .env 原始值（不设置到环境变量）
+        env_values = dotenv_values(ROOT / ".env")
 
         env = resolve_env()
 
@@ -310,14 +315,63 @@ def get_test_env() -> TestEnvConfig:
             if os.getenv("SISYS_USE_TEST_PORTS", "").lower() in ("1", "true", "yes"):
                 base_config = TEST_CONFIG
             else:
-                base_config = LOCAL_CONFIG
+                # 本地环境用 .env 填充缺失值
+                base_config = _merge_dotenv(LOCAL_CONFIG, env_values)
         else:
             base_config = LOCAL_CONFIG
 
-        # 从环境变量覆盖主机地址
+        # 用显式环境变量覆盖（最高优先级）
         _test_env_config = _override_config_from_env(base_config)
 
         return _test_env_config
+
+
+def _merge_dotenv(base_config: TestEnvConfig, env_values) -> TestEnvConfig:
+    """用 .env 填充 base_config 中未设置的缺失值"""
+    import copy
+
+    config = copy.deepcopy(base_config)
+
+    # Redis
+    if not config.redis.host or config.redis.host == "localhost":
+        if redis_host := env_values.get("REDIS_HOST"):
+            config.redis.host = redis_host
+    if not config.redis.port or config.redis.port == 6379:
+        if redis_port := env_values.get("REDIS_PORT"):
+            config.redis.port = int(redis_port)
+
+    # PostgreSQL
+    if not config.postgres.host or config.postgres.host == "localhost":
+        if pg_host := env_values.get("POSTGRES_HOST"):
+            config.postgres.host = pg_host
+    if not config.postgres.port or config.postgres.port == 5432:
+        if pg_port := env_values.get("POSTGRES_PORT"):
+            config.postgres.port = int(pg_port)
+
+    # Qdrant
+    if not config.qdrant.host or config.qdrant.host == "localhost":
+        if qdrant_host := env_values.get("QDRANT_HOST"):
+            config.qdrant.host = qdrant_host
+    if not config.qdrant.port or config.qdrant.port == 6333:
+        if qdrant_port := env_values.get("QDRANT_PORT"):
+            config.qdrant.port = int(qdrant_port)
+
+    # MinIO
+    if not config.minio.endpoint or "localhost" in config.minio.endpoint:
+        if minio_host := env_values.get("MINIO_HOST"):
+            config.minio.endpoint = f"{minio_host}:9000"
+
+    # Neo4j
+    if not config.neo4j.host or config.neo4j.host == "localhost":
+        if neo4j_host := env_values.get("NEO4J_HOST"):
+            config.neo4j.host = neo4j_host
+
+    # RabbitMQ
+    if not config.rabbitmq.host or config.rabbitmq.host == "localhost":
+        if rmq_host := env_values.get("RABBITMQ_HOST"):
+            config.rabbitmq.host = rmq_host
+
+    return config
 
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
