@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 
 from src.domain.entities.memory_metadata import MemoryMetadata
-from src.infrastructure.storage.postgresql.memory_metadata_repository import (
+from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
     MemoryVersionConflictError,
     PostgreSQLMemoryMetadataRepository,
 )

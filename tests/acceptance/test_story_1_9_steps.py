@@ -189,8 +189,8 @@ def jwt_service(jwt_secret_key):
 def role_service(pg_session):
     """Real role service."""
     from src.application.use_cases.role_management import RoleService
-    from src.infrastructure.storage.postgresql.role_repository import RoleRepository
-    from src.infrastructure.storage.postgresql.user_role_repository import UserRoleRepository
+    from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
+    from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
     role_repo = RoleRepository(pg_session)
     user_role_repo = UserRoleRepository(pg_session)
@@ -200,7 +200,7 @@ def role_service(pg_session):
 @pytest.fixture
 def user_repository(pg_session):
     """Real user repository."""
-    from src.infrastructure.storage.postgresql.user_repository import UserRepository
+    from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
     return UserRepository(pg_session)
 
@@ -208,7 +208,7 @@ def user_repository(pg_session):
 @pytest.fixture
 def login_attempt_repository(pg_session):
     """Real login attempt repository."""
-    from src.infrastructure.storage.postgresql.login_attempt_repository import LoginAttemptRepository
+    from src.infrastructure.storage.postgresql.repository.login_attempt_repository import LoginAttemptRepository
 
     return LoginAttemptRepository(pg_session)
 
@@ -216,7 +216,7 @@ def login_attempt_repository(pg_session):
 @pytest.fixture
 def user_role_repository(pg_session):
     """Real user-role association repository."""
-    from src.infrastructure.storage.postgresql.user_role_repository import UserRoleRepository
+    from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
     return UserRoleRepository(pg_session)
 

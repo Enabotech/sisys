@@ -198,7 +198,7 @@ def temp_memory_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def metadata_repository(pg_session: AsyncSession):
     """Create real PostgreSQL MemoryMetadataRepository."""
-    from src.infrastructure.storage.postgresql.memory_metadata_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
         PostgreSQLMemoryMetadataRepository,
     )
 
@@ -208,7 +208,7 @@ def metadata_repository(pg_session: AsyncSession):
 @pytest.fixture
 def history_repository(pg_session: AsyncSession):
     """Create real PostgreSQL MemoryChangeHistoryRepository."""
-    from src.infrastructure.storage.postgresql.memory_change_history_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
     )
 
