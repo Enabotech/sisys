@@ -109,3 +109,30 @@ class LoginAttemptRepositoryPort(ABC):
             tuple[bool, int]: (是否被锁定, 剩余锁定分钟数)
         """
         ...
+
+    @abstractmethod
+    async def record_attempt_and_check_lockout(
+        self,
+        username: str,
+        success: bool,
+        failure_reason: str | None = None,
+        user_id: UUID | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, int]:
+        """记录登录尝试并检查账户锁定状态。
+
+        与 check_and_record_lockout 相同，但方法名与 AuthServiceImpl 调用保持一致。
+
+        Args:
+            username: 用户名
+            success: 是否成功
+            failure_reason: 失败原因
+            user_id: 用户 UUID（如果存在）
+            ip_address: IP 地址
+            user_agent: 用户代理字符串
+
+        Returns:
+            tuple[bool, int]: (是否被锁定, 剩余锁定分钟数)
+        """
+        ...
