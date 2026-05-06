@@ -190,9 +190,11 @@ def role_service(pg_session):
     """Real role service."""
     from src.application.use_cases.role_management import RoleService
     from src.infrastructure.storage.postgresql.role_repository import RoleRepository
+    from src.infrastructure.storage.postgresql.user_role_repository import UserRoleRepository
 
-    repo = RoleRepository(pg_session)
-    return RoleService(repo)
+    role_repo = RoleRepository(pg_session)
+    user_role_repo = UserRoleRepository(pg_session)
+    return RoleService(role_repo, user_role_repo)
 
 
 @pytest.fixture

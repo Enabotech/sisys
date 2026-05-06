@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from jose import JWTError, jwt
 
@@ -88,6 +88,7 @@ class JWTService:
         payload = {
             "sub": str(user_id),
             "type": "refresh",
+            "jti": str(uuid4()),  # JWT ID for rotation tracking
             "iat": now,
             "exp": expire,
         }
@@ -149,3 +150,18 @@ class JWTService:
 
         except JWTError as e:
             raise AuthenticationError(f"Invalid refresh token: {e}")
+
+    def get_refresh_token_jti(self, token: str) -> str | None:
+        """从 refresh token 中提取 jti。
+
+        Args:
+            token: JWT refresh token 字符串
+
+        Returns:
+            jti 字符串，如果不存在返回 None
+        """
+        try:
+            claims = jwt.decode(token, self._secret_key, algorithms=[self._algorithm])
+            return claims.get("jti")
+        except JWTError:
+            return None

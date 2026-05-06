@@ -10,6 +10,7 @@ from uuid import UUID
 
 from src.domain.entities.role import Role
 from src.domain.ports.role_repository import RoleRepositoryPort
+from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 
 
 class RoleAlreadyExistsError(Exception):
@@ -36,6 +37,15 @@ class CannotDeleteSystemRoleError(Exception):
         super().__init__(f"Cannot delete system-reserved role '{role_id}'")
 
 
+class CannotDeleteRoleWithUsersError(Exception):
+    """Raised when attempting to delete a role that has associated users."""
+
+    def __init__(self, role_id: UUID, user_count: int):
+        self.role_id = role_id
+        self.user_count = user_count
+        super().__init__(f"Cannot delete role '{role_id}' - {user_count} users are assigned to this role")
+
+
 class RoleService:
     """角色管理服务.
 
@@ -43,13 +53,19 @@ class RoleService:
     遵循六边形架构：通过 RoleRepositoryPort 端口访问数据，不直接依赖基础设施。
     """
 
-    def __init__(self, role_repo: RoleRepositoryPort):
+    def __init__(
+        self,
+        role_repo: RoleRepositoryPort,
+        user_role_repo: UserRoleRepositoryPort | None = None,
+    ):
         """初始化 RoleService.
 
         Args:
             role_repo: 角色仓储端口
+            user_role_repo: 用户角色关联仓储端口（可选，用于删除前检查）
         """
         self._role_repo = role_repo
+        self._user_role_repo = user_role_repo
 
     async def create_role(
         self,
@@ -188,12 +204,18 @@ class RoleService:
         Raises:
             RoleNotFoundError: 角色不存在
             CannotDeleteSystemRoleError: 不能删除系统保留角色
+            CannotDeleteRoleWithUsersError: 角色有关联用户
         """
         role = await self._role_repo.get_by_id(role_id)
         if not role:
             raise RoleNotFoundError(role_id)
         if role.is_system_reserved:
             raise CannotDeleteSystemRoleError(role_id)
+        # 检查关联用户
+        if self._user_role_repo:
+            associated_users = await self._user_role_repo.get_role_users(role_id)
+            if associated_users:
+                raise CannotDeleteRoleWithUsersError(role_id, len(associated_users))
         return await self._role_repo.delete(role_id)
 
     async def assign_permissions(self, role_id: UUID, permissions: list[str]) -> Role:
