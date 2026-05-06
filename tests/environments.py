@@ -128,6 +128,16 @@ class RabbitMQConfig:
 
 
 @dataclass
+class AppConfig:
+    """应用配置"""
+
+    jwt_secret_key: str = ""
+    secret_key: str = ""
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
+
+@dataclass
 class TestEnvConfig:
     """测试环境完整配置"""
 
@@ -138,6 +148,7 @@ class TestEnvConfig:
     minio: MinIOConfig = field(default_factory=MinIOConfig)
     neo4j: Neo4jConfig = field(default_factory=Neo4jConfig)
     rabbitmq: RabbitMQConfig = field(default_factory=RabbitMQConfig)
+    app: AppConfig = field(default_factory=AppConfig)
 
 
 # =============================================================================
@@ -366,6 +377,17 @@ def _apply_dotenv_if_empty(config: TestEnvConfig, env_values) -> None:
         if host := env_values.get("RABBITMQ_HOST"):
             config.rabbitmq.host = host
 
+    # 应用配置
+    if not config.app.jwt_secret_key:
+        if key := env_values.get("JWT_SECRET_KEY"):
+            config.app.jwt_secret_key = key
+    if not config.app.secret_key:
+        if key := env_values.get("SECRET_KEY"):
+            config.app.secret_key = key
+    if not config.app.algorithm or config.app.algorithm == "HS256":
+        if alg := env_values.get("ALGORITHM"):
+            config.app.algorithm = alg
+
 
 def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
     """从环境变量覆盖配置"""
@@ -407,6 +429,12 @@ def _override_config_from_env(base_config: TestEnvConfig) -> TestEnvConfig:
         config.rabbitmq.host = rmq_host
     if rmq_port := os.getenv("RABBITMQ_PORT"):
         config.rabbitmq.port = int(rmq_port)
+
+    # 应用配置
+    if jwt_key := os.getenv("JWT_SECRET_KEY"):
+        config.app.jwt_secret_key = jwt_key
+    if secret_key := os.getenv("SECRET_KEY"):
+        config.app.secret_key = secret_key
 
     return config
 

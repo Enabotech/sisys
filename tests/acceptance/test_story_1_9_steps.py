@@ -161,10 +161,10 @@ async def pg_session(db_engine, ensure_alembic_migration) -> AsyncGenerator[Asyn
 @pytest.fixture
 def jwt_secret_key() -> str:
     """Get JWT secret key from environment."""
-    key = os.getenv("JWT_SECRET_KEY")
-    if not key:
+    env = get_test_env()
+    if not env.app.jwt_secret_key:
         pytest.skip("JWT_SECRET_KEY environment variable not set")
-    return key
+    return env.app.jwt_secret_key
 
 
 @pytest.fixture
