@@ -46,13 +46,13 @@
 
 ### 依赖关系 Dependencies
 
-| 依赖 Story | 依赖类型 | 依赖原因 |
-|-----------|---------|---------|
-| Story 1-1: Hexagonal Architecture Skeleton | 硬依赖 | 六边形架构模式、依赖注入容器、领域层接口定义规范 |
-| Story 1-5: PostgreSQL Relational Layer | 硬依赖 | 审计日志元数据存储于 PostgreSQL |
-| Story 1-9: RBAC Permission Management | 硬依赖 | actor 信息（用户 ID、角色）来源于认证授权系统 |
-| Story 1-7: MinIO Object Layer | 软依赖 | WORM 存储最终目标，但 MVP 使用 PostgreSQL 审计表 |
-| Story 1.16: Integration Test Framework | 软依赖 | 集成测试框架模式复用 |
+| 依赖 Story | 依赖类型 | 依赖原因 | 状态 |
+|-----------|---------|---------|------|
+| Story 1-1: Hexagonal Architecture Skeleton | 硬依赖 | 六边形架构模式、依赖注入容器、领域层接口定义规范 | ✅ 已完成 |
+| Story 1-5: PostgreSQL Relational Layer | 硬依赖 | 审计日志元数据存储于 PostgreSQL | ✅ 已完成 |
+| Story 1-9: RBAC Permission Management | 硬依赖 | actor 信息（用户 ID、角色）来源于认证授权系统 | ⚠️ review 状态，需验证 AuditEvent 完整性 |
+| Story 1-7: MinIO Object Layer | 软依赖 | WORM 存储最终目标，但 MVP 使用 PostgreSQL 审计表 | ⏳ 待开发 |
+| Story 1.16: Integration Test Framework | 软依赖 | 集成测试框架模式复用 | ✅ 已完成 |
 
 ### 技术容量规划
 
@@ -154,8 +154,16 @@
 **Then** 审计服务自动记录相关审计日志
 
 **验证标准/Validation Criteria:**
+> ⚠️ **前置条件:** 监听的事件（AuthenticationEvent, AuthorizationEvent 等）来自 Story 1.9，需验证其存在后再实现监听器
+- [ ] 验证 Story 1.9 AuditEvent 完整性
+  - `AuthenticationEvent` 是否已定义
+  - `AuthorizationEvent` 是否已定义
+  - `DocumentProcessedEvent` 是否已定义
+  - `AgentDecidedEvent` 是否已定义
+  - `CheckpointReachedEvent` 是否已定义
+  - `CorrectionApprovedEvent` 是否已定义
 - [ ] 事件监听器实现
-  - 监听 `AuthenticationEvent`, `AuthorizationEvent`, `DocumentProcessedEvent`, `AgentDecidedEvent`, `CheckpointReachedEvent`, `CorrectionApprovedEvent`
+  - 监听上述事件（验证存在后）
   - 自动转换为审计日志
 - [ ] 事件过滤和聚合
   - 仅记录关键事件（可配置）
@@ -185,6 +193,15 @@
 - [ ] AuditService Protocol 定义（`src/domain/ports/audit_service.py`）
   - 接口方法: `log(audit_event)`, `query(filters)`, `get_stats()`
   - 定义在领域层（符合六边形架构：领域层定义接口，infrastructure 实现）
+  ```python
+  class AuditServicePort(ABC):
+      @abstractmethod
+      async def log(self, event: AuditEvent) -> UUID: ...
+      @abstractmethod
+      async def query(self, filters: AuditLogFilters) -> list[AuditLog]: ...
+      @abstractmethod
+      async def get_stats(self, start_time: datetime, end_time: datetime) -> AuditStats: ...
+  ```
 - [x] AuditOutboxPort 复用 ✅ 已完成
   - **复用说明**: 审计发件箱复用 `src/domain/ports/outbox.py` 中的通用 `OutboxRepository` 接口
   - 审计发件箱行为与通用发件箱完全一致，无需独立接口
@@ -247,9 +264,9 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 审计日志模型 | 日志创建、校验和计算 | `test_audit_model.py` | Task 1 |
+| **TDD 单元测试** | 审计日志模型 | 日志创建、校验和计算 | `test_audit_log_model.py` | Task 1 |
 | **TDD 单元测试** | 审计服务 | 日志记录、检索、统计 | `test_audit_service.py` | Task 1 |
-| **TDD 单元测试** | 事务发件箱 | Outbox 写入、发布、重试 | `test_audit_outbox.py` | Task 2 |
+| **TDD 单元测试** | 事务发件箱 | Outbox 写入、发布、重试 | `test_outbox_processor.py` | Task 2 |
 | **TDD 单元测试** | 事件监听器 | 事件转换、日志自动记录 | `test_audit_event_listener.py` | Task 3 |
 | **TDD 集成测试** | PostgreSQL 审计表 | CRUD、RLS 不可变性 | `test_audit_postgres_integration.py` | Task 4 |
 | **SDD 合规测试** | 等保 2.0 合规 | 登录/权限/敏感操作审计 | `test_dengbao_audit_compliance.py` | Task 5 |
@@ -383,7 +400,7 @@
 |------|------|
 | ✅ 代码 | `AuditLogModel` 已完整实现（含 checksum 校验、verify_checksum()） |
 | ✅ 重构 | 索引优化（ix_audit_timestamp、ix_audit_actor 等复合索引） |
-| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/audit/test_audit_model.py` 完成 TDD 循环 |
+| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/storage/test_audit_model.py` 完成 TDD 循环 |
 
 - [x] ~~Subtask 1.1: 🔴 红 — 编写 AuditLogModel 失败测试~~ ⚠️ 代码已完成，测试待补充
 - [x] ~~Subtask 1.2: 🟢 绿 — 实现 AuditLogModel 最小代码~~ ✅ 已完成
@@ -449,7 +466,7 @@
 |------|------|
 | ✅ 代码 | `AuditOutboxModel` 已完整实现（mark_published/mark_failed/can_retry） |
 | ✅ 重构 | CheckConstraint 校验（status 枚举值、retry_count 非负） |
-| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/audit/test_audit_outbox_model.py` 完成 TDD 循环 |
+| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/storage/test_audit_outbox_model.py` 完成 TDD 循环 |
 
 - [x] ~~Subtask 2.1: 🔴 红 — 编写 Outbox 模型失败测试~~ ⚠️ 代码已完成，测试待补充
 - [x] ~~Subtask 2.2: 🟢 绿 — 实现 Outbox 模型~~ ✅ 已完成
@@ -627,8 +644,9 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask 6.1: 创建 `tests/unit/security/test_audit_architecture_constraints.py`
-  - 与 Story 1.9 保持一致（`tests/unit/security/`）
+- [ ] Subtask 6.1: 创建 `tests/unit/security/audit/test_audit_architecture_constraints.py`
+  - 与 Story 1.9 的 `tests/unit/security/test_architecture_constraints.py` 分离
+  - 独立运行: `pytest tests/unit/security/audit/`
 - [ ] Subtask 6.2: 实现领域层零审计实现验证（扫描 `src/domain/` 目录，确保无 `infrastructure`、`audit` 等外部依赖导入）
 - [ ] Subtask 6.3: 实现依赖方向验证（验证 `domain → infrastructure` 单向依赖）
 - [ ] Subtask 6.4: 运行 Ruff 检查（`ruff check src/`，0 错误）
@@ -689,8 +707,8 @@
 
 > **📌 架构说明:** 审计日志服务遵循六边形架构的依赖倒置原则。
 > - 领域层 (`src/domain/events/`) 定义审计事件（DomainEvent 子类）
-> - 应用层 (`src/application/ports/`) 定义审计服务接口（Protocol）
-> - 基础设施层 (`src/infrastructure/audit/`) 实现审计服务接口
+> - 领域层 (`src/domain/ports/`) 定义审计服务接口（Protocol）
+> - 基础设施层实现接口：存储在 `src/infrastructure/storage/`，服务在 `src/infrastructure/audit/`
 
 ```
 sisys/
@@ -701,32 +719,39 @@ sisys/
 │   │   │   ├── audit_events.py          # AuditEvent 领域事件
 │   │   │   └── ... (其他领域事件)
 │   │   └── ports/
+│   │       ├── outbox.py                # OutboxRepository 接口（复用）
 │   │       └── audit_service.py         # AuditService 接口（Protocol，领域层定义）
 │   └── infrastructure/
 │       ├── config/
 │       │   └── audit.py                  # AuditConfig 配置模型
-│       ├── audit/
-│       │   ├── __init__.py
-│       │   ├── audit_service.py         # AuditService 实现
-│       │   ├── outbox_processor.py      # 事务发件箱处理器
-│       │   ├── event_listener.py         # 事件监听器
-│       │   └── compliance_reporter.py    # 合规报告生成
-│       └── storage/
-│           └── postgresql/
-│               └── models/
-│                   ├── audit.py           # AuditLogModel
-│                   └── audit_outbox.py    # AuditOutboxModel
+│       ├── storage/
+│       │   └── postgresql/
+│       │       ├── models/
+│       │       │   ├── audit.py           # AuditLogModel ✅ 已实现
+│       │       │   └── audit_outbox.py    # AuditOutboxModel ✅ 已实现
+│       │       └── repositories/
+│       │           ├── audit_log_repository.py   # 审计日志仓储（待创建）
+│       │           └── audit_outbox_repository.py # 审计发件箱仓储（待创建）
+│       └── audit/                          # 审计服务模块（待创建）
+│           ├── audit_service_impl.py     # AuditService 实现
+│           ├── outbox_processor.py       # 事务发件箱处理器
+│           ├── event_listener.py         # 事件监听器
+│           └── compliance_reporter.py    # 合规报告生成
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
 │   │   │   └── events/
 │   │   │       └── audit_events/
-│   │   │           └── test_audit_events.py  # AuditEvent 单元测试
+│   │   │           └── test_audit_events.py  # AuditEvent 单元测试 ✅ 已实现
 │   │   └── infrastructure/
+│   │       ├── storage/
+│   │       │   └── postgresql/
+│   │       │       ├── test_audit_log_model.py      # 审计日志模型测试（待创建）
+│   │       │       └── test_audit_outbox_model.py   # 发件箱模型测试（待创建）
 │   │       └── audit/
-│   │           ├── test_audit_service.py
-│   │           ├── test_audit_outbox.py
-│   │           └── test_audit_event_listener.py
+│   │           ├── test_audit_service.py       # 审计服务测试（待创建）
+│   │           ├── test_outbox_processor.py    # 发件箱处理器测试（待创建）
+│   │           └── test_audit_event_listener.py # 事件监听器测试（待创建）
 │   ├── integration/
 │   │   └── test_audit_integration.py
 │   └── acceptance/
@@ -748,11 +773,11 @@ sisys/
 5. **事务发件箱模式** — Story 1.3 事件总线已实现 Outbox 模式，复用该模式
 
 **应用到本故事/Applied to This Story:**
-- [ ] AuditConfig 采用 Story 1.4-1.9 相同的配置模式
-- [ ] AuditService 接口定义在应用层（Protocol），实现在基础设施层
-- [ ] 复用 Story 1.3 事件总线的 Outbox 处理器模式
-- [ ] actor 信息从 AuthService 认证上下文中获取
-- [ ] 架构约束测试验证领域层无审计实现细节
+- [x] AuditConfig 采用 Story 1.4-1.9 相同的配置模式
+- [x] AuditService 接口定义在领域层（Protocol），实现在基础设施层
+- [x] 复用 Story 1.3 事件总线的 Outbox 处理器模式
+- [x] actor 信息从 AuthService 认证上下文中获取
+- [x] 架构约束测试验证领域层无审计实现细节
 
 ---
 
@@ -800,14 +825,19 @@ sisys/
 **待创建的文件 (Dev Story 实施):**
 - `src/domain/ports/audit_service.py` - AuditService 接口（Protocol，领域层）
 - `src/infrastructure/config/audit.py` - AuditConfig 配置模型
-- `src/infrastructure/audit/audit_service.py` - AuditService 实现
+- `src/infrastructure/storage/postgresql/repositories/audit_log_repository.py` - 审计日志仓储
+- `src/infrastructure/storage/postgresql/repositories/audit_outbox_repository.py` - 审计发件箱仓储
+- `src/infrastructure/audit/audit_service_impl.py` - AuditService 实现
 - `src/infrastructure/audit/outbox_processor.py` - 事务发件箱处理器
 - `src/infrastructure/audit/event_listener.py` - 事件监听器
 - `src/infrastructure/audit/compliance_reporter.py` - 合规报告生成
 - `src/interfaces/api/audit.py` - REST API 端点
+- `tests/unit/infrastructure/storage/postgresql/test_audit_log_model.py` - 审计日志模型测试
+- `tests/unit/infrastructure/storage/postgresql/test_audit_outbox_model.py` - 发件箱模型测试
 - `tests/unit/infrastructure/audit/test_audit_service.py` - 审计服务单元测试
 - `tests/unit/infrastructure/audit/test_outbox_processor.py` - 发件箱处理器单元测试
 - `tests/unit/infrastructure/audit/test_audit_event_listener.py` - 事件监听器测试
+- `tests/unit/security/audit/test_audit_architecture_constraints.py` - 审计架构约束测试
 - `tests/integration/test_audit_integration.py` - 集成测试
 - `tests/acceptance/test_story_1.10.feature` - 验收测试
 - `docs/audit/unified_audit_log_guide.md` - 实施指南
