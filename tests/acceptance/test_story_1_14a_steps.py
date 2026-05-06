@@ -13,7 +13,6 @@ Prerequisites:
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from collections.abc import Generator
@@ -35,6 +34,7 @@ from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
+from tests.environments import get_test_env
 
 scenarios("test_story_1_14a.feature")
 
@@ -59,23 +59,25 @@ def context() -> dict[str, Any]:
 @pytest.fixture
 def redis_config() -> RedisConfig:
     """Real Redis configuration from environment."""
+    env = get_test_env()
     return RedisConfig(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        db=int(os.getenv("REDIS_DB", "0")),
-        password=os.getenv("REDIS_PASSWORD") or None,
+        host=env.redis.host,
+        port=env.redis.port,
+        db=env.redis.db,
+        password=env.redis.password,
     )
 
 
 @pytest.fixture
 def rabbitmq_config() -> RabbitMQConfig:
     """Real RabbitMQ configuration from environment."""
+    env = get_test_env()
     return RabbitMQConfig(
-        host=os.getenv("RABBITMQ_HOST", "localhost"),
-        port=int(os.getenv("RABBITMQ_PORT", "5672")),
-        virtual_host=os.getenv("RABBITMQ_VHOST", "/"),
-        username=os.getenv("RABBITMQ_USER", "guest"),
-        password=os.getenv("RABBITMQ_PASSWORD", "guest"),
+        host=env.rabbitmq.host,
+        port=env.rabbitmq.port,
+        virtual_host=env.rabbitmq.vhost,
+        username=env.rabbitmq.username,
+        password=env.rabbitmq.password,
     )
 
 

@@ -96,6 +96,7 @@ class Neo4jConfig:
     bolt_port: int = 7687
     username: str = "neo4j"
     password: str = "password123"
+    database: str = "neo4j"
 
     @property
     def bolt_url(self) -> str:

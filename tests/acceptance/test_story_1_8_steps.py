@@ -16,7 +16,6 @@ Tenant Isolation (AC-4):
 
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
 
@@ -29,6 +28,7 @@ from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 from src.infrastructure.storage.neo4j.graph_retriever import GraphRetriever
 from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
+from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 
@@ -137,10 +137,11 @@ def load_neo4j_config(neo4j_config: Neo4jConfig):
 @then("配置应包含正确的连接参数")
 def verify_config_connection_params(neo4j_config: Neo4jConfig):
     """Verify config has correct connection parameters."""
-    expected_uri = f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_BOLT_PORT', '7687')}"
+    env = get_test_env()
+    expected_uri = f"bolt://{env.neo4j.host}:{env.neo4j.bolt_port}"
     assert neo4j_config.uri == expected_uri
-    assert neo4j_config.username == os.getenv("NEO4J_USERNAME", "neo4j")
-    assert neo4j_config.database == os.getenv("NEO4J_DATABASE", "neo4j")
+    assert neo4j_config.username == env.neo4j.username
+    assert neo4j_config.database == env.neo4j.database
 
 
 @then("max_connection_pool_size 为 50")
