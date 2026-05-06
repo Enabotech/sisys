@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import bcrypt
 from passlib.context import CryptContext
 
 # Password hashing configuration
@@ -45,8 +46,25 @@ class EncryptionService:
         except Exception:
             return False
 
+    def timing_safe_verify(self, password: str) -> bool:
+        """执行伪密码验证以防御 timing attack。
+
+        使用随机生成的 salt，确保每次调用都执行完整的 bcrypt 计算。
+        由于使用随机 salt，验证结果永远为 False，但计算时间是一致的。
+
+        Args:
+            password: 明文密码
+
+        Returns:
+            始终返回 True（验证结果被忽略，只为执行计算）
+        """
+        # 使用随机 salt 每次生成新哈希，确保完整 bcrypt 计算
+        salt = bcrypt.gensalt(rounds=12)
+        bcrypt.hashpw(password.encode(), salt)
+        return True
+
     def needs_rehash(self, hashed_password: str) -> bool:
-        """检查密码哈希是否需要重新哈希.
+        """检查密码哈希是否需要重新哈希。
 
         当 bcrypt 版本升级或配置更改时可能需要。
 

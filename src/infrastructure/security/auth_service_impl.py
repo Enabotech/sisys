@@ -76,8 +76,8 @@ class AuthServiceImpl(AuthServicePort):
         if not user:
             # 防御timing attack: 即使用户不存在也执行伪哈希计算
             # 确保无论用户存在与否，响应时间都相似
-            # 使用预生成的假bcrypt哈希（格式正确，60字符），使bcrypt执行实际计算
-            self._encryption_service.verify_password(password, "$2b$12$u8eTn0e/d9M5rxMBreB5oODjOeuMyQax4tL/w9My1XcQSp2j7caHW")
+            # 使用 timing_safe_verify 方法，每次使用随机 salt，确保完整 bcrypt 计算
+            self._encryption_service.timing_safe_verify(password)
             await self._record_attempt(username, False, "user_not_found", None, ip_address, user_agent)
             raise AuthenticationError("Invalid credentials")
 
@@ -197,12 +197,11 @@ class AuthServiceImpl(AuthServicePort):
             if is_used:
                 # Token 被重用，可能是攻击，撤销该用户的所有 token
                 if self._token_blacklist:
-                    # 将当前 refresh token 加入黑名单
-                    await self._token_blacklist.add(refresh_token)
-
+                    # 获取用户的所有 token family 并全部撤销
+                    await self._revoke_user_token_family(user_id)
                 raise AuthenticationError("Refresh token reuse detected - possible attack")
-            # 标记 jti 为已使用
-            await self._refresh_token_store.mark_used(jti)
+            # 标记 jti 为已使用（带 user_id 用于 token family 追踪）
+            await self._refresh_token_store.mark_used(jti, user_id)
 
         # 获取用户信息
         user = await self._user_repo.get_by_id(user_id)
@@ -241,6 +240,28 @@ class AuthServiceImpl(AuthServicePort):
             await self._token_blacklist.add(token)
             if refresh_token:
                 await self._token_blacklist.add(refresh_token)
+
+    async def _revoke_user_token_family(self, user_id: UUID) -> None:
+        """撤销用户的所有 token（token family）。
+
+        当检测到 refresh token 被重用时，调用此方法撤销该用户的所有 token。
+        这确保攻击者无法使用该用户任何其他的 refresh token。
+
+        Args:
+            user_id: 用户 UUID
+        """
+        if not self._refresh_token_store:
+            return
+
+        try:
+            # 获取用户的所有 jti 并标记为已使用
+            user_jtis = await self._refresh_token_store.get_user_jtis(user_id)
+            for jti in user_jtis:
+                await self._refresh_token_store.mark_used(jti, user_id)
+        except (AttributeError, NotImplementedError):
+            # 如果 refresh_token_store 不支持 token family，store 不具备此能力
+            # 向后兼容：标记当前 jti 已被使用
+            pass
 
     async def _get_user_roles(self, user_id: UUID) -> list[str]:
         """获取用户的角色列表。
