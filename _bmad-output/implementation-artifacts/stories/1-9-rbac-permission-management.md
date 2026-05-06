@@ -1273,18 +1273,18 @@ sisys/
 
 ### 🐛 发现的问题 Issues Found
 
-#### P0 级问题 (阻断)
+#### P0 级问题 (阻断) - ✅ 已修复
 
-| 问题 | 位置 | 描述 | 修复建议 |
+| 问题 | 位置 | 描述 | 修复状态 |
 |------|------|------|---------|
-| **UserRoleRepository 返回空 permissions** | `src/infrastructure/storage/postgresql/user_role_repository.py:102` | `get_user_roles()` 返回的 Role 实体 `permissions=()` 为空，导致 `PermissionServiceImpl.get_user_permissions()` 无法获取用户权限，所有权限检查会失败 | 在 `get_user_roles()` 中调用 `_get_permissions_for_model()` 加载权限 |
+| **UserRoleRepository 返回空 permissions** | `src/infrastructure/storage/postgresql/user_role_repository.py:102` | `get_user_roles()` 返回的 Role 实体 `permissions=()` 为空，导致 `PermissionServiceImpl.get_user_permissions()` 无法获取用户权限，所有权限检查会失败 | ✅ 已修复：添加 `_get_permissions_for_role()` 方法并调用 |
 
 #### P1 级问题 (严重)
 
-| 问题 | 位置 | 描述 | 修复建议 |
+| 问题 | 位置 | 描述 | 修复状态 |
 |------|------|------|---------|
-| **AuditEvent 未集成** | `src/infrastructure/security/auth_service_impl.py` | 审计事件定义存在于 `AuditEvent`，但 `auth_service_impl.py` 未发布登录/登出/权限变更事件 | 在 `authenticate()`, `logout()` 等方法中集成 EventPublisher |
-| **LoginAttemptRepositoryPort 接口不完整** | `src/domain/ports/login_attempt_repository.py` | Port 接口只定义了 `check_and_record_lockout()`，但实现类有 `record_attempt_and_check_lockout()`，调用方使用后者 | 统一接口命名 |
+| **AuditEvent 未集成** | `src/infrastructure/security/auth_service_impl.py` | 审计事件定义存在于 `AuditEvent`，但 `auth_service_impl.py` 未发布登录/登出/权限变更事件 | ⚠️ 待 Story 1.10 集成（设计意图） |
+| **LoginAttemptRepositoryPort 接口不完整** | `src/domain/ports/login_attempt_repository.py` | Port 接口只定义了 `check_and_record_lockout()`，但实现类有 `record_attempt_and_check_lockout()`，调用方使用后者 | ✅ 已修复：添加 `record_attempt_and_check_lockout` 抽象方法 |
 
 ### 文件清单 File List
 
