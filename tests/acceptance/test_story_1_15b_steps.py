@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from tests.environments import get_test_env
+
 if TYPE_CHECKING:
     pass
 
@@ -113,7 +115,14 @@ def redis_client(redis_test_prefix):
     try:
         import redis
 
-        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        env = get_test_env()
+        client = redis.Redis(
+            host=env.redis.host,
+            port=env.redis.port,
+            db=env.redis.db,
+            password=env.redis.password,
+            decode_responses=True,
+        )
         client.ping()
         yield client
         # Cleanup only keys with this test's prefix
@@ -122,7 +131,7 @@ def redis_client(redis_test_prefix):
         if keys:
             client.delete(*keys)
     except redis.ConnectionError:
-        pytest.skip("Redis not available at localhost:6379")
+        pytest.skip("Redis not available")
 
 
 # ==============================================================================
