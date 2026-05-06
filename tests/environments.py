@@ -320,13 +320,13 @@ def get_test_env() -> TestEnvConfig:
         else:
             config = copy.deepcopy(LOCAL_CONFIG)
 
-        # 3. 加载 .env 配置（用于填充空值）
+        # 加载 .env 配置（用于填充空值）
         env_values = dotenv_values(ROOT / ".env")
 
-        # 4. 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
+        # 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
         _apply_dotenv_if_empty(config, env_values)
 
-        # 5. os环境变量最后覆盖（最高优先级）
+        # os环境变量最后覆盖（最高优先级）
         _override_config_from_env(config)
 
         _test_env_config = config
