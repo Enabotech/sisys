@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Callable
+from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -21,7 +21,6 @@ from src.application.use_cases.role_management import (
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.ports.permission_service import PermissionServicePort
 from src.domain.value_objects.token_payload import TokenPayload
-from src.infrastructure.security.permission_middleware import require_any_role
 
 
 # Request/Response Models
@@ -310,10 +309,7 @@ def create_auth_router(
     )
     async def create_role(
         request: CreateRoleRequest,
-        current_user: Annotated[
-            TokenPayload,
-            Depends(require_any_role("admin")),
-        ],
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
         """创建新角色。
 
@@ -327,6 +323,12 @@ def create_auth_router(
         Raises:
             HTTPException 409: 角色名已存在
         """
+        # Check admin role
+        if not current_user.has_any_role("admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin role required",
+            )
         try:
             role = await role_service.create_role(
                 name=request.name,
@@ -430,10 +432,7 @@ def create_auth_router(
     async def update_role(
         role_id: str,
         request: UpdateRoleRequest,
-        current_user: Annotated[
-            TokenPayload,
-            Depends(require_any_role("admin")),
-        ],
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
         """更新角色。
 
@@ -447,8 +446,13 @@ def create_auth_router(
 
         Raises:
             HTTPException 404: 角色不存在
-            HTTPException 409: 角色名冲突
+            HTTPException 403: Admin role required
         """
+        if not current_user.has_any_role("admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin role required",
+            )
         from uuid import UUID
 
         try:
@@ -491,10 +495,7 @@ def create_auth_router(
     )
     async def delete_role(
         role_id: str,
-        current_user: Annotated[
-            TokenPayload,
-            Depends(require_any_role("admin")),
-        ],
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> None:
         """删除角色（软删除）。
 
@@ -504,8 +505,13 @@ def create_auth_router(
 
         Raises:
             HTTPException 404: 角色不存在
-            HTTPException 403: 不能删除系统保留角色
+            HTTPException 403: Admin role required
         """
+        if not current_user.has_any_role("admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin role required",
+            )
         from uuid import UUID
 
         try:
@@ -532,10 +538,7 @@ def create_auth_router(
     async def assign_permissions(
         role_id: str,
         request: AssignPermissionRequest,
-        current_user: Annotated[
-            TokenPayload,
-            Depends(require_any_role("admin")),
-        ],
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
         """为角色分配权限。
 
@@ -549,7 +552,13 @@ def create_auth_router(
 
         Raises:
             HTTPException 404: 角色不存在
+            HTTPException 403: Admin role required
         """
+        if not current_user.has_any_role("admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin role required",
+            )
         from uuid import UUID
 
         role = await role_service.get_role(UUID(role_id))
@@ -590,10 +599,7 @@ def create_auth_router(
     async def revoke_permission(
         role_id: str,
         permission: str,
-        current_user: Annotated[
-            TokenPayload,
-            Depends(require_any_role("admin")),
-        ],
+        current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
         """撤销角色的指定权限。
 
@@ -607,7 +613,13 @@ def create_auth_router(
 
         Raises:
             HTTPException 404: 角色不存在
+            HTTPException 403: Admin role required
         """
+        if not current_user.has_any_role("admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin role required",
+            )
         from uuid import UUID
 
         role = await role_service.get_role(UUID(role_id))

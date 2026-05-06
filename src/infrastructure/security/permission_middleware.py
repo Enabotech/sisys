@@ -134,22 +134,28 @@ def require_permission(
     return permission_check
 
 
-def require_any_role(*roles: str) -> Callable:
+def require_any_role(
+    *roles: str,
+    get_current_user_fn: Callable | None = None,
+) -> Callable:
     """角色验证装饰器工厂.
 
     创建检查用户是否拥有任一指定角色的 FastAPI 依赖。
 
     Args:
         *roles: 允许的角色名称列表
+        get_current_user_fn: 可选的 get_current_user 函数（用于测试注入）
 
     Returns:
         FastAPI 依赖函数
     """
+    # Use provided function or default get_current_user
+    actual_get_current_user = get_current_user_fn or get_current_user
 
     async def role_check(
         current_user: Annotated[
             TokenPayload,
-            Depends(get_current_user),
+            Depends(actual_get_current_user),
         ],
     ) -> TokenPayload:
         """角色检查依赖函数."""
