@@ -27,6 +27,7 @@ from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.minio_repository import MinIORepository
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
+from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 
@@ -69,7 +70,17 @@ def reset_test_state():
 @pytest.fixture
 def minio_config() -> MinIOConfig:
     """Real MinIO configuration from environment."""
-    return MinIOConfig.from_env()
+    env = get_test_env()
+    # env.minio.endpoint is "host.docker.internal:9000" format
+    endpoint = env.minio.endpoint
+    host = endpoint.split(":")[0] if ":" in endpoint else endpoint
+    port = int(endpoint.split(":")[1]) if ":" in endpoint else 9000
+    return MinIOConfig(
+        host=host,
+        port=port,
+        access_key=env.minio.access_key,
+        secret_key=env.minio.secret_key,
+    )
 
 
 @pytest.fixture
