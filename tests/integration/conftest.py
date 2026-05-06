@@ -14,14 +14,12 @@ Use pytest markers to select which fixtures to use:
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import fakeredis.aioredis
 import pytest
 import redis.asyncio as redis
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Ensure all domain events are imported so EventRegistry is populated.
@@ -49,9 +47,6 @@ from tests.environments import get_test_env  # noqa: E402
 # Import reset_test_environment from tests.fixtures for test isolation
 # Note: reset_test_environment in tests/fixtures.py is already autouse=True
 from tests.fixtures import reset_test_environment  # noqa: F401
-
-# Load environment variables from .env file
-load_dotenv(Path(__file__).parents[2] / ".env")
 
 # ===================================================================
 # Mock Fixtures (for isolated unit-level integration tests)

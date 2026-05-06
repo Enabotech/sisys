@@ -14,12 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from pathlib import Path
 from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
-from dotenv import load_dotenv
 
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
@@ -29,9 +27,6 @@ from src.domain.ports.memory_repository import (
     MemoryMetadataRepositoryProtocol,
 )
 from src.domain.services.memory_service import MemorySaveRequest, MemoryService, MemoryUpdateRequest
-
-# Load environment variables from .env file
-load_dotenv(Path(__file__).parents[2] / ".env")
 
 
 def run_async(coro):
