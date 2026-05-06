@@ -29,7 +29,7 @@ class TestHexagonalArchitectureCompliance:
                     infrastructure_imports.append(node.module)
 
         assert not infrastructure_imports, (
-            f"AutoTriggerService (domain layer) must not import infrastructure. " f"Found: {infrastructure_imports}"
+            f"AutoTriggerService (domain layer) must not import infrastructure. Found: {infrastructure_imports}"
         )
 
     def test_trigger_events_is_domain_layer(self) -> None:
@@ -51,7 +51,7 @@ class TestHexagonalArchitectureCompliance:
                     infrastructure_imports.append(node.module)
 
         assert not infrastructure_imports, (
-            f"TriggerEvents (domain layer) must not import infrastructure. " f"Found: {infrastructure_imports}"
+            f"TriggerEvents (domain layer) must not import infrastructure. Found: {infrastructure_imports}"
         )
 
     def test_trigger_context_is_domain_layer(self) -> None:
@@ -73,7 +73,7 @@ class TestHexagonalArchitectureCompliance:
                     infrastructure_imports.append(node.module)
 
         assert not infrastructure_imports, (
-            f"TriggerContext (domain layer) must not import infrastructure. " f"Found: {infrastructure_imports}"
+            f"TriggerContext (domain layer) must not import infrastructure. Found: {infrastructure_imports}"
         )
 
     def test_trigger_service_uses_protocol_for_publisher(self) -> None:
@@ -116,7 +116,7 @@ class TestTriggerRouteDecoupling:
                     route_imports.append(node.module)
 
         assert not route_imports, (
-            f"AutoTriggerService must not import route modules (decoupling requirement). " f"Found: {route_imports}"
+            f"AutoTriggerService must not import route modules (decoupling requirement). Found: {route_imports}"
         )
 
     def test_trigger_service_publishes_triggered_event(self) -> None:
@@ -127,9 +127,9 @@ class TestTriggerRouteDecoupling:
         # Should publish AutoTriggered event
         assert "AutoTriggered" in content, "AutoTriggerService should emit AutoTriggered event"
         # Should use event publishing pattern (publish method) not direct route calls
-        assert (
-            "publish" in content.lower() and "_publish" in content.lower()
-        ), "AutoTriggerService should use event publishing pattern"
+        assert "publish" in content.lower() and "_publish" in content.lower(), (
+            "AutoTriggerService should use event publishing pattern"
+        )
 
 
 class TestDependencyDirection:
@@ -161,5 +161,5 @@ class TestDependencyDirection:
                                 problematic_imports.append(alias.name)
 
             assert not problematic_imports, (
-                f"{file_path.name} (domain layer) must not import external frameworks. " f"Found: {problematic_imports}"
+                f"{file_path.name} (domain layer) must not import external frameworks. Found: {problematic_imports}"
             )

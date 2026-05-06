@@ -73,9 +73,9 @@ class TestExecuteArchitecture:
 
             for line in import_lines:
                 # Domain should not import from infrastructure
-                assert (
-                    "src/infrastructure" not in line or "Protocol" in line
-                ), f"{file_path} must not import from infrastructure directly"
+                assert "src/infrastructure" not in line or "Protocol" in line, (
+                    f"{file_path} must not import from infrastructure directly"
+                )
 
     def test_interfaces_layer_defines_ports(self) -> None:
         """Interfaces layer must define ports (abstract interfaces)."""
@@ -96,6 +96,6 @@ class TestExecuteArchitecture:
         content = adapter_file.read_text()
 
         # Adapter should import from application layer (hexagonal port pattern)
-        assert (
-            "from src.application.ports.sandbox_port import" in content
-        ), "DockerSandboxAdapter must import from application.ports.sandbox_port"
+        assert "from src.application.ports.sandbox_port import" in content, (
+            "DockerSandboxAdapter must import from application.ports.sandbox_port"
+        )

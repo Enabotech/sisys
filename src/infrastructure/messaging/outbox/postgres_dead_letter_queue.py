@@ -87,8 +87,7 @@ class DeadLetterQueueEntry:
 
     def __repr__(self) -> str:
         return (
-            f"DeadLetterQueueEntry(id={self.id}, event_id={self.event_id}, "
-            f"event_type={self.event_type}, status={self.status})"
+            f"DeadLetterQueueEntry(id={self.id}, event_id={self.event_id}, event_type={self.event_type}, status={self.status})"
         )
 
 

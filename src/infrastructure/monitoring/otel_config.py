@@ -148,7 +148,7 @@ class BatchExportConfig:
             raise ValueError(f"max_export_batch_size must be positive, got {self.max_export_batch_size}")
         if self.max_export_batch_size > self.max_queue_size:
             raise ValueError(
-                f"max_export_batch_size ({self.max_export_batch_size}) " f"must be <= max_queue_size ({self.max_queue_size})"
+                f"max_export_batch_size ({self.max_export_batch_size}) must be <= max_queue_size ({self.max_queue_size})"
             )
         if self.schedule_delay_millis <= 0:
             raise ValueError(f"schedule_delay_millis must be positive, got {self.schedule_delay_millis}")
@@ -256,7 +256,7 @@ def init(config: OtelConfig | None = None) -> bool:
             _initialized = True
 
         logger.info(
-            "OpenTelemetry tracing initialized: " "protocol=%s, endpoint=%s, sampler_ratio=%.2f, batch_size=%d",
+            "OpenTelemetry tracing initialized: protocol=%s, endpoint=%s, sampler_ratio=%.2f, batch_size=%d",
             config.protocol,
             config.get_endpoint_for_protocol(),
             config.sampler_ratio,

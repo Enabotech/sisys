@@ -25,18 +25,18 @@ class TestRouteHexagonalArchitecture:
         from src.infrastructure.routing.hash_router import HashRouter
 
         module_path = Path(inspect.getfile(HashRouter))
-        assert "src/infrastructure/routing" in str(
-            module_path
-        ), f"HashRouter should be in infrastructure layer, found in {module_path}"
+        assert "src/infrastructure/routing" in str(module_path), (
+            f"HashRouter should be in infrastructure layer, found in {module_path}"
+        )
 
     def test_semantic_router_in_infrastructure_layer(self) -> None:
         """SemanticRouter should be in infrastructure layer."""
         from src.infrastructure.routing.semantic_router import SemanticRouter
 
         module_path = Path(inspect.getfile(SemanticRouter))
-        assert "src/infrastructure/routing" in str(
-            module_path
-        ), f"SemanticRouter should be in infrastructure layer, found in {module_path}"
+        assert "src/infrastructure/routing" in str(module_path), (
+            f"SemanticRouter should be in infrastructure layer, found in {module_path}"
+        )
 
     def test_auto_route_events_in_domain_layer(self) -> None:
         """AutoRouted event should be in domain layer."""
@@ -192,9 +192,9 @@ class TestRouteHexagonalArchitecture:
         from src.domain.entities.routing_decision_log import RoutingDecisionLog
 
         module_path = Path(inspect.getfile(RoutingDecisionLog))
-        assert "src/domain/entities" in str(
-            module_path
-        ), f"RoutingDecisionLog should be in domain layer, found in {module_path}"
+        assert "src/domain/entities" in str(module_path), (
+            f"RoutingDecisionLog should be in domain layer, found in {module_path}"
+        )
 
     def test_routing_decision_log_has_worm_field(self) -> None:
         """RoutingDecisionLog should have worm_storage_ref field."""

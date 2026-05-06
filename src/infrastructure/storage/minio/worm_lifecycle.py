@@ -214,7 +214,7 @@ class WORMManager:
                 "ObjectLockConfigurationNotFoundError",
             ):
                 raise ComplianceLockError(
-                    f"Cannot delete WORM-locked object: {bucket_name}/{object_key}. " f"Error: {e.message}"
+                    f"Cannot delete WORM-locked object: {bucket_name}/{object_key}. Error: {e.message}"
                 ) from e
             if e.code == "NoSuchKey":
                 logger.warning("Object does not exist: %s/%s", bucket_name, object_key)

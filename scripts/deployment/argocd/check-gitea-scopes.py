@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """检查 Gitea API 支持的 Token scope"""
+
 import json
 
 import requests

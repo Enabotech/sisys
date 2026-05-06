@@ -91,7 +91,7 @@ class TestArgoCDPerformance:
         # Pod 年龄超过 1 小时，无法准确测量启动时间
         if pod_age > timedelta(hours=1):
             pytest.skip(
-                rf"Pod is {pod_age.total_seconds()/3600:.1f} hours old - \ measurement only valid for fresh pods (< 1h)"
+                rf"Pod is {pod_age.total_seconds() / 3600:.1f} hours old - \ measurement only valid for fresh pods (< 1h)"
             )
 
         # 尝试获取 container 的启动时间（更精确）
@@ -126,7 +126,7 @@ class TestArgoCDPerformance:
         if startup_time is None:
             pytest.skip("Cannot determine pod startup time (missing container state or ready condition)")
 
-        print(f"Pod startup time: {startup_time:.2f}s (pod age: {pod_age.total_seconds()/60:.1f}m)")
+        print(f"Pod startup time: {startup_time:.2f}s (pod age: {pod_age.total_seconds() / 60:.1f}m)")
 
         # 分级判断逻辑：
         # - < 60s: 通过（符合 NFR-PERF-01 要求）

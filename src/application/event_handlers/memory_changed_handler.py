@@ -67,7 +67,7 @@ class MemoryChangedHandler:
             event: MemoryChanged 事件实例
         """
         logger.info(
-            f"MemoryChanged event received: memory_id={event.memory_id}, " f"change_type={event.change_type}, name={event.name}"
+            f"MemoryChanged event received: memory_id={event.memory_id}, change_type={event.change_type}, name={event.name}"
         )
 
         # 1. L1 Redis 缓存失效（同步，立即）

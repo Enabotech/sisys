@@ -455,9 +455,9 @@ class TestArgoCDHarborIntegration:
         config_str = str(config)
 
         # 验证配置中包含 Harbor 注册表配置
-        assert (
-            "harbor" in config_str.lower() or "registries" in config_str.lower()
-        ), "Image Updater 配置中缺少 Harbor 注册表配置"
+        assert "harbor" in config_str.lower() or "registries" in config_str.lower(), (
+            "Image Updater 配置中缺少 Harbor 注册表配置"
+        )
 
         # 验证 Secret 存在
         returncode, stdout, stderr = self._run_kubectl_command(

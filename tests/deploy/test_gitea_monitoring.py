@@ -107,9 +107,9 @@ class TestPipelineMetrics:
         # Documentation is optional for now
         if doc_path.exists():
             content = doc_path.read_text()
-            assert (
-                "metrics" in content.lower() or "prometheus" in content.lower()
-            ), "Metrics documentation should mention Prometheus"
+            assert "metrics" in content.lower() or "prometheus" in content.lower(), (
+                "Metrics documentation should mention Prometheus"
+            )
         else:
             pytest.skip("Monitoring documentation not created yet (optional)")
 

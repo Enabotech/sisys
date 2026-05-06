@@ -129,9 +129,9 @@ class TestArgoCDApplicationConfig:
 
             # 验证关键同步选项
             assert any("CreateNamespace=true" in opt for opt in sync_options), f"{manifest_path}: 未启用 CreateNamespace"
-            assert any(
-                "PrunePropagationPolicy=foreground" in opt for opt in sync_options
-            ), f"{manifest_path}: 未配置 PrunePropagationPolicy"
+            assert any("PrunePropagationPolicy=foreground" in opt for opt in sync_options), (
+                f"{manifest_path}: 未配置 PrunePropagationPolicy"
+            )
 
     def test_application_health_check_configured(self):
         """验证健康检查配置"""
@@ -172,9 +172,9 @@ class TestArgoCDApplicationConfig:
             source = app["spec"]["source"]
 
             # 验证仓库 URL 配置
-            assert (
-                "gitea.sisys.local" in source["repoURL"] or "sisys/sisys" in source["repoURL"]
-            ), f"{manifest_path}: 仓库 URL 未指向 Gitea sisys/sisys 仓库"
+            assert "gitea.sisys.local" in source["repoURL"] or "sisys/sisys" in source["repoURL"], (
+                f"{manifest_path}: 仓库 URL 未指向 Gitea sisys/sisys 仓库"
+            )
 
             # 验证目标分支
             assert source["targetRevision"] in [
@@ -209,9 +209,9 @@ class TestArgoCDApplicationConfig:
             ], f"{manifest_path}: 目标集群配置错误：{destination['server']}"
 
             # 验证目标命名空间
-            assert (
-                destination["namespace"] == expected_ns
-            ), f"{manifest_path}: 目标命名空间应该是 {expected_ns}，实际为：{destination['namespace']}"
+            assert destination["namespace"] == expected_ns, (
+                f"{manifest_path}: 目标命名空间应该是 {expected_ns}，实际为：{destination['namespace']}"
+            )
 
     def test_application_kustomize_config(self):
         """验证 Kustomize 配置（如果使用 Kustomize）"""

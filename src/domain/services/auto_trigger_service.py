@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 class EventPublisherProtocol(Protocol):
     """Protocol for event publishing (implemented by infrastructure)."""
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
-        ...
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> None: ...
 
 
 class AutoTriggerService:

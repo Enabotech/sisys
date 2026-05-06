@@ -213,7 +213,7 @@ class TestScalingAccuracy:
         actual_ready_pods = 3
 
         accuracy = actual_ready_pods / scale_up_decision if scale_up_decision > 0 else 1.0
-        assert accuracy == 1.0, f"Scale up accuracy {accuracy*100}% < 100%"
+        assert accuracy == 1.0, f"Scale up accuracy {accuracy * 100}% < 100%"
 
     def test_scale_down_does_not_interrupt_processing(self):
         """🔴 RED: Scale down should not interrupt tasks currently being processed."""

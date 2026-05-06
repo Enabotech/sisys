@@ -38,9 +38,9 @@ class TestGPUConfiguration:
 
                     # 检查 GPU 请求
                     if "requests" in resources:
-                        assert (
-                            "nvidia.com/gpu" in resources["requests"]
-                        ), f"GPU request not configured in {doc['metadata']['name']}"
+                        assert "nvidia.com/gpu" in resources["requests"], (
+                            f"GPU request not configured in {doc['metadata']['name']}"
+                        )
                         assert int(resources["requests"]["nvidia.com/gpu"]) >= 1, "GPU request should be at least 1"
 
     def test_gpu_resource_limits(self, deployment_config):
@@ -171,9 +171,9 @@ class TestCIPipelineGPU:
                 condition = job["if"]
                 # 检查是否包含 GPU 标记检测
                 if "gpu" in condition.lower():
-                    assert (
-                        "[gpu]" in condition or "gpu" in condition
-                    ), f"Job {job_name} should support [gpu] commit message trigger"
+                    assert "[gpu]" in condition or "gpu" in condition, (
+                        f"Job {job_name} should support [gpu] commit message trigger"
+                    )
 
 
 # class TestDockerfileGPU:
@@ -298,9 +298,9 @@ class TestGPUDocumentation:
             content = f.read()
 
         # 检查 GPU 调度章节
-        assert "GPU" in content and (
-            "调度" in content or "scheduling" in content.lower()
-        ), "CI/CD guide should have GPU scheduling section"
+        assert "GPU" in content and ("调度" in content or "scheduling" in content.lower()), (
+            "CI/CD guide should have GPU scheduling section"
+        )
 
 
 if __name__ == "__main__":

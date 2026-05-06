@@ -86,9 +86,7 @@ class StrategicPlan:
 
         # P0-01 Fix: Guard against advancing past the final phase
         if self.current_phase == BLMPhase.EXECUTION_MONITORING:
-            raise ValueError(
-                "Plan has reached the final phase (EXECUTION_MONITORING), " "no further phase advancement possible"
-            )
+            raise ValueError("Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible")
 
         phase_order = list(BLMPhase)
         current_idx = phase_order.index(self.current_phase)
@@ -116,9 +114,7 @@ class StrategicPlan:
 
         # Final phase guard — cannot complete past the final phase
         if self.current_phase == BLMPhase.EXECUTION_MONITORING:
-            raise ValueError(
-                "Plan has reached the final phase (EXECUTION_MONITORING), " "no further phase advancement possible"
-            )
+            raise ValueError("Plan has reached the final phase (EXECUTION_MONITORING), no further phase advancement possible")
 
         # P1-01 Fix: Prevent duplicate entries in completed_phases
         if self.current_phase not in self.completed_phases:

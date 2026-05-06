@@ -1,6 +1,5 @@
 """Tests for DockerSandboxAdapter infrastructure implementation."""
 
-
 import logging
 from typing import cast
 

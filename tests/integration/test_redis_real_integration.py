@@ -158,7 +158,7 @@ class TestPublicBlackboardReal:
 
         now = time.time()
         await client.zadd(key, {f"agent-a:msg1:{now}": now})
-        await client.zadd(key, {f"agent-b:msg2:{now+0.1}": now + 0.1})
+        await client.zadd(key, {f"agent-b:msg2:{now + 0.1}": now + 0.1})
 
         # ZRANGE to get all entries
         entries = await client.zrange(key, 0, -1)

@@ -57,9 +57,9 @@ class TestContainerSecurity:
 
         for doc in docs:
             kind = doc.get("kind", "") if doc else ""
-            assert (
-                kind != "PodSecurityPolicy"
-            ), "PodSecurityPolicy 已废弃 (K8s v1.25+ 移除)，应使用 Pod Security Admission (PSA)"
+            assert kind != "PodSecurityPolicy", (
+                "PodSecurityPolicy 已废弃 (K8s v1.25+ 移除)，应使用 Pod Security Admission (PSA)"
+            )
 
     def test_deployment_security_context(self):
         """验证 Deployment 安全上下文配置"""

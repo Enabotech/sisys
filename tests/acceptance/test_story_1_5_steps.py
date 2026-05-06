@@ -471,13 +471,12 @@ def verify_all_tables_created(pg_config: PostgreSQLConfig):
         try:
             # Check that event_outbox table exists
             result = await conn.fetch(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_name = 'event_outbox'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'event_outbox'"
             )
             assert len(result) > 0, "event_outbox table should exist after migration"
             # Check users table
             result = await conn.fetch(
-                "SELECT table_name FROM information_schema.tables " "WHERE table_schema = 'public' AND table_name = 'users'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'"
             )
             assert len(result) > 0, "users table should exist after migration"
         finally:

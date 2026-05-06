@@ -18,6 +18,7 @@
         def test_something(self):
             url = f"https://{TestConfig.get_harbor_node_ip()}:{TestConfig.HARBOR_NODEPORT}"
 """
+
 import os
 import subprocess
 from typing import Any

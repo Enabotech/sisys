@@ -197,9 +197,9 @@ class TestTLSConfiguration:
         # 验证 TLS 连接成功并检查加密套件
         assert "Cipher" in result.stdout or "Protocol" in result.stdout, f"TLS 连接失败：{result.stdout[:500]}"
         # 验证使用 AEAD 加密（TLS 1.3 默认使用 AEAD）
-        assert (
-            "TLSv1.3" in result.stdout or "AEAD" in result.stdout or "GCM" in result.stdout
-        ), f"未使用 AEAD 加密：{result.stdout[:500]}"
+        assert "TLSv1.3" in result.stdout or "AEAD" in result.stdout or "GCM" in result.stdout, (
+            f"未使用 AEAD 加密：{result.stdout[:500]}"
+        )
 
 
 # =============================================================================

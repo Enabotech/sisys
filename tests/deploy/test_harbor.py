@@ -381,9 +381,9 @@ class TestHarborDatabase:
                 pytest.skip(f"数据库连接测试失败：{stderr}，可能是网络策略限制")
 
         # 检查连接是否成功
-        assert (
-            "succeeded" in stdout.lower() or "open" in stdout.lower() or "Connection" in stdout or returncode == 0
-        ), f"数据库连接未成功：{stdout}"
+        assert "succeeded" in stdout.lower() or "open" in stdout.lower() or "Connection" in stdout or returncode == 0, (
+            f"数据库连接未成功：{stdout}"
+        )
 
     def test_harbor_db_no_error_logs(self):
         """
@@ -631,7 +631,7 @@ class TestHarborCosignSignature:
         # 步骤 2: 尝试 keyless 签名（需要 OIDC）
         # 注意：实际签名需要推送镜像到 Harbor 后执行
         # cosign sign harbor.sisys.local/sisys/myapp:latest
-        pytest.skip("Keyless 签名需要 OIDC 账户和已推送的镜像。" "手动测试：cosign sign harbor.sisys.local/sisys/myapp:latest")
+        pytest.skip("Keyless 签名需要 OIDC 账户和已推送的镜像。手动测试：cosign sign harbor.sisys.local/sisys/myapp:latest")
 
     def test_cosign_verify_signature(self):
         """
@@ -928,7 +928,7 @@ class TestGiteaHarborIntegration:
         注意：此测试需要完整的 CI/CD 环境（Story 0.7/0.8/0.9 完成后执行）
         """
         # 此测试需要完整的 CI/CD 环境
-        pytest.skip("需要完整的 CI/CD 环境（Story 0.7/0.8/0.9 完成后执行）。\n" "手动测试：git push → 观察完整 Pipeline 执行")
+        pytest.skip("需要完整的 CI/CD 环境（Story 0.7/0.8/0.9 完成后执行）。\n手动测试：git push → 观察完整 Pipeline 执行")
 
 
 # =============================================================================

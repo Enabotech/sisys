@@ -1,4 +1,5 @@
 """Test L0StoragePort - Red Phase (Test First)."""
+
 from __future__ import annotations
 
 import pytest

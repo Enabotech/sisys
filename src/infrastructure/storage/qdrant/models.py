@@ -81,5 +81,5 @@ class SparseVector:
         """验证 indices 和 values 长度是否匹配。"""
         if len(self.indices) != len(self.values):
             raise ValueError(
-                f"indices and values must have same length, " f"got {len(self.indices)} indices and {len(self.values)} values"
+                f"indices and values must have same length, got {len(self.indices)} indices and {len(self.values)} values"
             )
