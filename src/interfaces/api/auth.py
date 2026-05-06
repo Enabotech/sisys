@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -21,6 +21,7 @@ from src.application.use_cases.role_management import (
 from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
 from src.domain.ports.permission_service import PermissionServicePort
 from src.domain.value_objects.token_payload import TokenPayload
+from src.infrastructure.security.permission_middleware import require_any_role
 
 
 # Request/Response Models
@@ -309,7 +310,10 @@ def create_auth_router(
     )
     async def create_role(
         request: CreateRoleRequest,
-        current_user: TokenPayload = Depends(get_current_user),
+        current_user: Annotated[
+            TokenPayload,
+            Depends(require_any_role("admin")),
+        ],
     ) -> RoleResponse:
         """创建新角色。
 
@@ -426,7 +430,10 @@ def create_auth_router(
     async def update_role(
         role_id: str,
         request: UpdateRoleRequest,
-        current_user: TokenPayload = Depends(get_current_user),
+        current_user: Annotated[
+            TokenPayload,
+            Depends(require_any_role("admin")),
+        ],
     ) -> RoleResponse:
         """更新角色。
 
@@ -484,7 +491,10 @@ def create_auth_router(
     )
     async def delete_role(
         role_id: str,
-        current_user: TokenPayload = Depends(get_current_user),
+        current_user: Annotated[
+            TokenPayload,
+            Depends(require_any_role("admin")),
+        ],
     ) -> None:
         """删除角色（软删除）。
 
@@ -522,7 +532,10 @@ def create_auth_router(
     async def assign_permissions(
         role_id: str,
         request: AssignPermissionRequest,
-        current_user: TokenPayload = Depends(get_current_user),
+        current_user: Annotated[
+            TokenPayload,
+            Depends(require_any_role("admin")),
+        ],
     ) -> RoleResponse:
         """为角色分配权限。
 
@@ -577,7 +590,10 @@ def create_auth_router(
     async def revoke_permission(
         role_id: str,
         permission: str,
-        current_user: TokenPayload = Depends(get_current_user),
+        current_user: Annotated[
+            TokenPayload,
+            Depends(require_any_role("admin")),
+        ],
     ) -> RoleResponse:
         """撤销角色的指定权限。
 

@@ -25,6 +25,7 @@ class AuthServiceImpl(AuthServicePort):
         jwt_service: JWTService,
         encryption_service: EncryptionService,
         user_repository,  # UserRepositoryPort
+        user_role_repository,  # UserRoleRepositoryPort
         login_attempt_repository=None,  # LoginAttemptRepositoryPort (optional)
     ):
         """初始化认证服务.
@@ -33,11 +34,13 @@ class AuthServiceImpl(AuthServicePort):
             jwt_service: JWT 服务
             encryption_service: 加密服务
             user_repository: 用户仓储端口
+            user_role_repository: 用户角色关联仓储端口
             login_attempt_repository: 登录尝试仓储端口（可选）
         """
         self._jwt_service = jwt_service
         self._encryption_service = encryption_service
         self._user_repo = user_repository
+        self._user_role_repo = user_role_repository
         self._login_attempt_repo = login_attempt_repository
 
     async def authenticate(
@@ -90,7 +93,7 @@ class AuthServiceImpl(AuthServicePort):
                 )
 
         # 验证密码
-        if not self._encryption_service.verify_password(password, user.hashed_password):
+        if not self._encryption_service.verify_password(password, user.password_hash):
             await self._record_attempt(username, False, "invalid_password", user.id, ip_address, user_agent)
             raise AuthenticationError("Invalid credentials")
 
@@ -174,6 +177,14 @@ class AuthServiceImpl(AuthServicePort):
         if not user.is_active:
             raise AuthenticationError("Account is inactive")
 
+        if user.is_locked:
+            raise AuthenticationError("Account is locked")
+
+        if self._login_attempt_repo:
+            is_locked = await self._login_attempt_repo.is_account_locked(user.username)
+            if is_locked:
+                raise AuthenticationError("Account is locked due to multiple failed attempts")
+
         # 获取用户角色
         roles = await self._get_user_roles(user_id)
 
@@ -203,6 +214,5 @@ class AuthServiceImpl(AuthServicePort):
         Returns:
             角色名称列表
         """
-        # 这里应该调用 UserRoleRepositoryPort 获取用户角色
-        # 暂时返回空列表，后续完善
-        return []
+        roles = await self._user_role_repo.get_user_roles(user_id)
+        return [role.name for role in roles]
