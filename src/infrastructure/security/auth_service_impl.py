@@ -76,7 +76,8 @@ class AuthServiceImpl(AuthServicePort):
         if not user:
             # 防御timing attack: 即使用户不存在也执行伪哈希计算
             # 确保无论用户存在与否，响应时间都相似
-            self._encryption_service.verify_password(password, "$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+            # 使用预生成的假bcrypt哈希（格式正确，60字符），使bcrypt执行实际计算
+            self._encryption_service.verify_password(password, "$2b$12$u8eTn0e/d9M5rxMBreB5oODjOeuMyQax4tL/w9My1XcQSp2j7caHW")
             await self._record_attempt(username, False, "user_not_found", None, ip_address, user_agent)
             raise AuthenticationError("Invalid credentials")
 

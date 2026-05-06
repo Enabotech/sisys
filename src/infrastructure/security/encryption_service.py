@@ -40,7 +40,10 @@ class EncryptionService:
         Returns:
             True 如果密码匹配，False 否则
         """
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
     def needs_rehash(self, hashed_password: str) -> bool:
         """检查密码哈希是否需要重新哈希.
