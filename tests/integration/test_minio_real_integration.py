@@ -40,8 +40,25 @@ def test_tenant_id() -> str:
 
 @pytest.fixture
 async def minio_config():
-    """Provide MinIO configuration."""
-    return MinIOConfig.from_env()
+    """Provide MinIO configuration.
+
+    Uses tests/environments.py to get correct host for CI/Local.
+    """
+    from tests.environments import get_test_env
+
+    env_config = get_test_env()
+    # Convert from environments.MinIOConfig to infrastructure.config.minio.MinIOConfig
+    endpoint_parts = env_config.minio.endpoint.split(":")
+    host = endpoint_parts[0]
+    port = int(endpoint_parts[1]) if len(endpoint_parts) > 1 else 9000
+
+    return MinIOConfig(
+        host=host,
+        port=port,
+        access_key=env_config.minio.access_key,
+        secret_key=env_config.minio.secret_key,
+        secure=env_config.minio.secure,
+    )
 
 
 @pytest.fixture
@@ -58,9 +75,15 @@ async def minio_client(minio_config: MinIOConfig):
 
 @pytest.fixture
 async def bucket_manager(minio_config: MinIOConfig):
-    """Provide BucketManager with real MinIO client."""
+    """Provide BucketManager with real MinIO client and connectivity check."""
     try:
-        return BucketManager(minio_config)
+        manager = BucketManager(minio_config)
+        # Verify MinIO is actually reachable by trying a lightweight operation
+        try:
+            manager.list_buckets()
+        except Exception as e:
+            pytest.skip(f"MinIO not available: {e}")
+        return manager
     except Exception as e:
         pytest.skip(f"MinIO not available: {e}")
 
