@@ -8,6 +8,7 @@ ArgoCD Gitea 集成测试
 - k8s: 需要 Kubernetes 集群访问（需要 sudo 权限）
 - integration: 集成测试（需要实际服务运行）
 """
+
 import subprocess
 from pathlib import Path
 
@@ -301,9 +302,9 @@ class TestArgoCDGiteaWebhook:
         result = run_kubectl(["get", "secrets", "-n", argocd_namespace], check=False)
         if result.returncode == 0:
             # 检查是否包含 webhook 相关的 secret
-            assert (
-                "argocd-gitea-webhook-secret" in result.stdout or "argocd-gitea-token" in result.stdout
-            ), "Webhook Secret 未找到"
+            assert "argocd-gitea-webhook-secret" in result.stdout or "argocd-gitea-token" in result.stdout, (
+                "Webhook Secret 未找到"
+            )
         else:
             pytest.skip(f"无法访问 K8s 集群：{result.stderr}")
 

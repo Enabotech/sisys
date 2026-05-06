@@ -208,9 +208,9 @@ class TestMultiEnvironmentConfig:
             sync_policy = app["spec"]["syncPolicy"]
             has_automated = "automated" in sync_policy and sync_policy["automated"] is not None
 
-            assert (
-                has_automated == should_have_automated
-            ), f"{manifest_path}: automated 配置错误，期望 {should_have_automated}，实际 {has_automated}"
+            assert has_automated == should_have_automated, (
+                f"{manifest_path}: automated 配置错误，期望 {should_have_automated}，实际 {has_automated}"
+            )
 
 
 class TestEnvironmentPromotion:

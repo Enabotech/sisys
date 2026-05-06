@@ -698,9 +698,9 @@ def verify_exponential_backoff(context: dict, retry_policy: RetryPolicy) -> None
         delay = context.get(f"delay_retry_{retry_count}")
         expected_with_jitter_1 = min(base * (2**retry_count) * 1.0, max_delay)
         expected_with_jitter_1_5 = min(base * (2**retry_count) * 1.5, max_delay)
-        assert (
-            expected_with_jitter_1 * 0.5 <= delay <= expected_with_jitter_1_5 * 1.5
-        ), f"Delay {delay} not in expected range for retry {retry_count}"
+        assert expected_with_jitter_1 * 0.5 <= delay <= expected_with_jitter_1_5 * 1.5, (
+            f"Delay {delay} not in expected range for retry {retry_count}"
+        )
 
 
 @then("jitter 应该在 0.5 和 1.5 之间")

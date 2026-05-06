@@ -38,9 +38,7 @@ class SecurityValidator:
             True if access allowed, False otherwise
         """
         # Check basic permission first
-        has_permission = await self._permission_service.check_permission(
-            user_id, resource, action
-        )
+        has_permission = await self._permission_service.check_permission(user_id, resource, action)
         if not has_permission:
             return False
 
@@ -66,9 +64,7 @@ class SecurityValidator:
         # Only admins can assign admin roles or roles with wildcard permissions
         if target_role.is_system_reserved or self._has_wildcard_permission(target_role):
             # Check if requester has admin permission
-            has_admin = await self._permission_service.check_permission(
-                user_id, "role", "admin"
-            )
+            has_admin = await self._permission_service.check_permission(user_id, "role", "admin")
             return has_admin
         return True
 
@@ -108,9 +104,7 @@ class TestHorizontalPrivilegeEscalation:
 
         self.mock_permission_service.check_permission.return_value = True
 
-        result = await self.validator.validate_resource_access(
-            user_id, "document", "read", resource_owner_id
-        )
+        result = await self.validator.validate_resource_access(user_id, "document", "read", resource_owner_id)
 
         assert result is True
 
@@ -123,15 +117,13 @@ class TestHorizontalPrivilegeEscalation:
         user = User(
             id=user_id,
             username="testuser",
-            password_hash="hash",
+            password_hash="hash",  # pragma: allowlist secret
             is_active=True,
         )
         self.mock_user_repo.get_by_id.return_value = user
         self.mock_permission_service.check_permission.return_value = True
 
-        result = await self.validator.validate_resource_access(
-            user_id, "document", "read", resource_owner_id
-        )
+        result = await self.validator.validate_resource_access(user_id, "document", "read", resource_owner_id)
 
         assert result is False
 
@@ -147,9 +139,7 @@ class TestHorizontalPrivilegeEscalation:
         # Admin check returns True
         self.validator._user_has_admin_role = lambda u: True
 
-        result = await self.validator.validate_resource_access(
-            user_id, "document", "read", resource_owner_id
-        )
+        result = await self.validator.validate_resource_access(user_id, "document", "read", resource_owner_id)
 
         assert result is True
 
@@ -292,7 +282,7 @@ class TestSQLInjectionPrevention:
         parameterized queries as the primary defense.
         """
         # Dangerous SQL characters that could be used for injection
-        dangerous_chars = ["'", "\"", ";", "--", "/*", "*/", "xp_", "sp_"]
+        dangerous_chars = ["'", '"', ";", "--", "/*", "*/", "xp_", "sp_"]
 
         value_lower = value.lower()
         for char in dangerous_chars:

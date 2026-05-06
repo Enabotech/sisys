@@ -1,4 +1,5 @@
 """Test IntegrityPort - Red Phase (Test First)."""
+
 from __future__ import annotations
 
 import pytest

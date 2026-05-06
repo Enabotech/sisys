@@ -2,6 +2,7 @@
 """
 创建 Gitea Personal Access Token 并配置 ArgoCD 仓库集成
 """
+
 import datetime
 import subprocess
 

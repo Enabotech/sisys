@@ -184,9 +184,9 @@ class TestAsyncPatterns:
         )
 
         method = ObjectOperations.download_object
-        assert asyncio.iscoroutinefunction(method) or inspect.isasyncgenfunction(
-            method
-        ), "download_object must be an async generator or coroutine"
+        assert asyncio.iscoroutinefunction(method) or inspect.isasyncgenfunction(method), (
+            "download_object must be an async generator or coroutine"
+        )
 
 
 # ---------------------------------------------------------------------------

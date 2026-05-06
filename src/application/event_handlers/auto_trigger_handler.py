@@ -200,7 +200,7 @@ class AutoTriggerHandler:
                 triggered = await self._auto_trigger_service.on_domain_event(event)
 
             if triggered is not None:
-                logger.info(f"Trigger processed: type={triggered.trigger_type}, " f"session_id={triggered.session_id}")
+                logger.info(f"Trigger processed: type={triggered.trigger_type}, session_id={triggered.session_id}")
             else:
                 logger.warning(f"AutoTriggerService returned None for event: {event_type}")
 

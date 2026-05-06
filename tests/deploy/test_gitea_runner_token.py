@@ -275,7 +275,7 @@ class TestTokenIntegration:
     def test_secret_verification_command(self):
         """测试 Secret 验证命令。"""
         # 模拟验证命令
-        verify_cmd = "kubectl get secret gitea-runner-token -n gitea-actions " "-o jsonpath='{.data.token}' | base64 -d"
+        verify_cmd = "kubectl get secret gitea-runner-token -n gitea-actions -o jsonpath='{.data.token}' | base64 -d"
 
         # 验证命令格式
         assert "kubectl get secret" in verify_cmd

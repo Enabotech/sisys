@@ -139,9 +139,9 @@ class TestActionsReferences:
                 for action_ref in action_refs:
                     # 检查是否包含版本标签（@v* 或 @v*.*.*）
                     assert "@" in action_ref, f"Action 未固定版本：{action_ref} in {workflow_path}"
-                    assert (
-                        "@v" in action_ref or "@main" in action_ref or "@master" in action_ref
-                    ), f"Action 版本格式不正确：{action_ref} in {workflow_path}"
+                    assert "@v" in action_ref or "@main" in action_ref or "@master" in action_ref, (
+                        f"Action 版本格式不正确：{action_ref} in {workflow_path}"
+                    )
 
     def test_common_actions_available(self):
         """测试常用 Actions 可用"""
@@ -236,7 +236,7 @@ class TestSecretsReferences:
                                 context = "\n".join(lines[context_start:context_end])
 
                                 if "${{ secrets." not in context:
-                                    pytest.fail(f"可能硬编码了密钥：{line.strip()} in {workflow_path}:{i+1}")
+                                    pytest.fail(f"可能硬编码了密钥：{line.strip()} in {workflow_path}:{i + 1}")
 
     def test_required_secrets_referenced(self):
         """测试必需的密钥已引用"""
@@ -288,9 +288,9 @@ class TestJobDependencies:
                 build_needs = jobs.get("build-images", {}).get("needs", [])
                 if isinstance(build_needs, str):
                     build_needs = [build_needs]
-                assert (
-                    "integration-tests" in build_needs or "security-scan" in build_needs or "code-quality" in build_needs
-                ), "build-images 应依赖 integration-tests 和 security-scan 和 code-quality"
+                assert "integration-tests" in build_needs or "security-scan" in build_needs or "code-quality" in build_needs, (
+                    "build-images 应依赖 integration-tests 和 security-scan 和 code-quality"
+                )
 
                 # push-image 应依赖 build-image
                 # push_needs = jobs.get("push-image", {}).get("needs", [])
@@ -307,9 +307,9 @@ class TestJobDependencies:
                 jobs = workflow.get("jobs", {})
 
                 # 检查依赖关系
-                assert "pre-deployment-check" in jobs.get("deploy-test", {}).get(
-                    "needs", []
-                ), "deploy-test 应依赖 pre-deployment-check"
+                assert "pre-deployment-check" in jobs.get("deploy-test", {}).get("needs", []), (
+                    "deploy-test 应依赖 pre-deployment-check"
+                )
 
                 assert "deploy-test" in jobs.get("health-check", {}).get("needs", []), "health-check 应依赖 deploy-test"
 
