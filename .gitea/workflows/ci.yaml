@@ -352,16 +352,6 @@ jobs:
       - name: 集成测试
         shell: bash
         run: |
-          set -a
-          source ./.env
-          set +a
-          # Override HOST variables to use host.docker.internal for CI
-          export REDIS_HOST=host.docker.internal
-          export POSTGRES_HOST=host.docker.internal
-          export QDRANT_HOST=host.docker.internal
-          export MINIO_HOST=host.docker.internal
-          export NEO4J_HOST=host.docker.internal
-          export RABBITMQ_HOST=host.docker.internal
           mkdir -p reports/integration
           poetry run pytest tests/integration \
             --junitxml=reports/integration/integration-tests.xml \
@@ -410,17 +400,6 @@ jobs:
       - name: 验收测试
         shell: bash
         run: |
-          set -a
-          source ./.env
-          set +a
-          # Override HOST variables to use host.docker.internal for CI
-          export REDIS_HOST=host.docker.internal
-          export POSTGRES_HOST=host.docker.internal
-          export QDRANT_HOST=host.docker.internal
-          export MINIO_HOST=host.docker.internal
-          export NEO4J_HOST=host.docker.internal
-          export RABBITMQ_HOST=host.docker.internal
-          mkdir -p reports/acceptance
           poetry run pytest tests/acceptance \
             --junitxml=reports/acceptance/acceptance-tests.xml \
             --html=reports/acceptance/acceptance-tests.html \
