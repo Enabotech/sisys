@@ -258,8 +258,8 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 - [x] FileMemoryAdapter L0 文件存储适配器（`src/infrastructure/storage/file_memory_adapter.py`）- Story 1.15a 已实现
   - **职责**：只负责 .md 文件 CRUD（不含索引逻辑），索引操作由 MemoryIndex 事件驱动调用
   - API: `write(memory_id, memory_type, content)` / `read(memory_id, memory_type)` / `delete(memory_id, memory_type)`
-- [x] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/storage/postgresql/memory_metadata_repository.py`）- Story 1.15a 已实现
-- [x] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/memory_change_history_repository.py`）- Story 1.15a 已实现
+- [x] MemoryMetadataRepository L2 PostgreSQL 仓储（`src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py`）- Story 1.15a 已实现
+- [x] MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py`）- Story 1.15a 已实现
 - [x] **RedisMemoryCache L1 缓存**（`src/infrastructure/cache/redis_memory_cache.py`）- Story 1.15b 新实现
   - Key 格式（使用 `build_key()` 函数）：
     - Private: `memory:user:{user_id}:{name}`
@@ -874,8 +874,8 @@ sisys/
 - `src/application/text_processing/l1_compressor.py` - L1Compressor
 - `src/infrastructure/config/memory.py` - MemoryConfig
 - `src/infrastructure/storage/file_memory_adapter.py` - FileMemoryAdapter
-- `src/infrastructure/storage/postgresql/memory_metadata_repository.py` - MemoryMetadataRepository
-- `src/infrastructure/storage/postgresql/memory_change_history_repository.py` - MemoryChangeHistoryRepository
+- `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` - MemoryMetadataRepository
+- `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` - MemoryChangeHistoryRepository
 - `src/interfaces/event_listeners/memory_changed_listener.py` - MemoryChangedListener
 
 ---
