@@ -11,7 +11,6 @@ Prerequisites:
 
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
 
@@ -23,6 +22,7 @@ from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 from src.infrastructure.storage.qdrant.models import VectorPoint
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
+from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 
@@ -74,11 +74,12 @@ async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
 @pytest.fixture
 def qdrant_client() -> QdrantClientWrapper:
     """Real Qdrant client wrapper instance."""
+    env = get_test_env()
     return QdrantClientWrapper(
-        host=os.getenv("QDRANT_HOST", "localhost"),
-        port=int(os.getenv("QDRANT_PORT", "6333")),
-        grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),
-        api_key=os.getenv("QDRANT_API_KEY"),
+        host=env.qdrant.host,
+        port=env.qdrant.port,
+        grpc_port=env.qdrant.grpc_port,
+        api_key=env.qdrant.api_key,
         https=False,
         timeout=30.0,
         max_retries=3,

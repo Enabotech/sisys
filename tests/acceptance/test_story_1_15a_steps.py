@@ -14,7 +14,6 @@ Test Isolation (per sdd-tdd-checklist.md §5.5):
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -43,6 +42,7 @@ from src.domain.services.memory_service import (
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
+from tests.environments import get_test_env
 
 scenarios("test_story_1_15a.feature")
 
@@ -78,12 +78,13 @@ def redis_test_prefix():
 @pytest.fixture
 def pg_config() -> PostgreSQLConfig:
     """Real PostgreSQL configuration from environment."""
+    env = get_test_env()
     return PostgreSQLConfig(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DATABASE", "sisys"),
-        username=os.getenv("POSTGRES_USERNAME", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=env.postgres.host,
+        port=env.postgres.port,
+        database=env.postgres.database,
+        username=env.postgres.username,
+        password=env.postgres.password,
         pool_size=5,
         max_overflow=10,
     )

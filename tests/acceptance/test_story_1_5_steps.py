@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 
@@ -60,12 +61,13 @@ def test_tenant_id() -> str:
 @pytest.fixture
 def pg_config() -> PostgreSQLConfig:
     """Real PostgreSQL configuration from environment."""
+    env = get_test_env()
     return PostgreSQLConfig(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DATABASE", "sisys"),
-        username=os.getenv("POSTGRES_USERNAME", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=env.postgres.host,
+        port=env.postgres.port,
+        database=env.postgres.database,
+        username=env.postgres.username,
+        password=env.postgres.password,
         pool_size=5,
         max_overflow=10,
     )

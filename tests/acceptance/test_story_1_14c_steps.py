@@ -17,7 +17,6 @@ Test Isolation (per sdd-tdd-checklist.md §5.5):
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from collections.abc import AsyncGenerator, Generator
@@ -38,6 +37,7 @@ from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
 from src.infrastructure.storage.redis_snapshot_store import RedisSnapshotStore
+from tests.environments import get_test_env
 
 scenarios("test_story_1_14c.feature")
 
@@ -65,25 +65,15 @@ def redis_test_prefix() -> str:
 
 
 @pytest.fixture
-def redis_config() -> RedisConfig:
-    """Real Redis configuration from environment."""
-    return RedisConfig(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        db=int(os.getenv("REDIS_DB", "0")),
-        password=os.getenv("REDIS_PASSWORD") or None,
-    )
-
-
-@pytest.fixture
 def real_redis(redis_test_prefix: str) -> Generator[redis.Redis, None, None]:
     """Provide real Redis client. Skip if not available."""
     try:
+        env = get_test_env()
         client = redis.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", "6379")),
-            db=int(os.getenv("REDIS_DB", "0")),
-            password=os.getenv("REDIS_PASSWORD") or None,
+            host=env.redis.host,
+            port=env.redis.port,
+            db=env.redis.db,
+            password=env.redis.password,
             decode_responses=True,
         )
         client.ping()
@@ -95,6 +85,18 @@ def real_redis(redis_test_prefix: str) -> Generator[redis.Redis, None, None]:
             client.delete(*keys)
     except redis.ConnectionError:
         pytest.skip("Redis not available at localhost:6379")
+
+
+@pytest.fixture
+def redis_config() -> RedisConfig:
+    """Real Redis configuration from environment."""
+    env = get_test_env()
+    return RedisConfig(
+        host=env.redis.host,
+        port=env.redis.port,
+        db=env.redis.db,
+        password=env.redis.password,
+    )
 
 
 @pytest.fixture
@@ -134,11 +136,12 @@ def execute_service(
 async def async_redis_client() -> AsyncGenerator[redis.asyncio.Redis, None]:
     """Async Redis client for async operations."""
     try:
+        env = get_test_env()
         client = redis.asyncio.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", "6379")),
-            db=int(os.getenv("REDIS_DB", "0")),
-            password=os.getenv("REDIS_PASSWORD") or None,
+            host=env.redis.host,
+            port=env.redis.port,
+            db=env.redis.db,
+            password=env.redis.password,
             decode_responses=True,
         )
         await client.ping()
@@ -713,11 +716,12 @@ def when_listener_processes_event(
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
+    env = get_test_env()
     config = RedisConfig(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        db=int(os.getenv("REDIS_DB", "0")),
-        password=os.getenv("REDIS_PASSWORD") or None,
+        host=env.redis.host,
+        port=env.redis.port,
+        db=env.redis.db,
+        password=env.redis.password,
     )
     publisher = RedisEventPublisher(config)
     listener = AutoExecuteCompletedHandler(publisher=publisher)
