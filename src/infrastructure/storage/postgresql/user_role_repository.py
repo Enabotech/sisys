@@ -95,11 +95,13 @@ class UserRoleRepository(UserRoleRepositoryPort):
         # 转换为领域实体
         roles = []
         for model in role_models:
+            # 加载角色权限
+            permissions = await self._get_permissions_for_role(model.id)
             role = Role(
                 id=model.id,
                 name=model.name,
                 description=model.description or "",
-                permissions=(),  # Permissions loaded separately if needed
+                permissions=permissions,
                 is_system_reserved=model.is_system_reserved,
                 is_active=model.is_active,
                 created_at=model.created_at,
@@ -107,6 +109,27 @@ class UserRoleRepository(UserRoleRepositoryPort):
             )
             roles.append(role)
         return roles
+
+    async def _get_permissions_for_role(self, role_id: UUID) -> tuple[str, ...]:
+        """从关联表获取角色的权限字符串元组。
+
+        Args:
+            role_id: 角色 UUID
+
+        Returns:
+            权限字符串元组
+        """
+        from src.infrastructure.storage.postgresql.models import PermissionModel
+        from src.infrastructure.storage.postgresql.models.association import (
+            role_permissions_table as role_permissions,
+        )
+
+        result = await self._session.execute(
+            select(PermissionModel.name)
+            .join(role_permissions, PermissionModel.id == role_permissions.c.permission_id)
+            .where(role_permissions.c.role_id == role_id)
+        )
+        return tuple(r[0] for r in result.fetchall())
 
     async def get_role_users(self, role_id: UUID) -> list[UUID]:
         """获取拥有某角色的所有用户 ID。

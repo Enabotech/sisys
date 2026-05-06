@@ -1,6 +1,6 @@
 # Story 1.10: Unified Audit Log
 
-**Status:** `backlog`
+**Status:** `ready-for-dev` ✅
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -175,26 +175,26 @@
 
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
-#### 领域事件 Schema (Domain Events)
-- [ ] AuditEvent 定义（`src/domain/events/audit_events.py`）
+#### 领域事件 Schema (Domain Events) ✅ 已完成
+- [x] AuditEvent 定义（`src/domain/events/audit_events.py`）✅ 已完成
   - 基础字段（来自 FR-SC-02）: `log_id`, `timestamp`, `actor`, `action_type`, `target_resource`, `old_value`, `new_value`
   - 扩展字段（支持 FR-SC-04 多维检索）: `correction_level`
   - 继承 `DomainEvent` 基类
 
-#### 应用层端口定义 (Application Ports)
-- [ ] AuditService Protocol 定义（`src/application/ports/audit_service.py`）
+#### 领域层端口定义 (Domain Ports)
+- [ ] AuditService Protocol 定义（`src/domain/ports/audit_service.py`）
   - 接口方法: `log(audit_event)`, `query(filters)`, `get_stats()`
-  - 定义在应用层（符合六边形架构：infrastructure 实现 application 端口）
-- [ ] AuditOutboxPort 定义（`src/application/ports/audit_outbox_port.py`）
+  - 定义在领域层（符合六边形架构：领域层定义接口，infrastructure 实现）
+- [ ] AuditOutboxPort 定义（`src/domain/ports/audit_outbox_port.py`）
   - 接口方法: `write_entry(event)`, `mark_published(event_id)`, `get_pending()`
   - 支持事务发件箱模式
 
-#### 数据模型 (Data Models) — 基础设施层
-- [ ] AuditLogModel（PostgreSQL 审计日志表，`src/infrastructure/storage/postgresql/models/audit.py`）
+#### 数据模型 (Data Models) — 基础设施层 ✅ 已完成
+- [x] AuditLogModel（PostgreSQL 审计日志表，`src/infrastructure/storage/postgresql/models/audit.py`）✅ 已完成
   - 基础字段（FR-SC-02）: `id`, `log_id`, `timestamp`, `actor`, `action_type`, `target_resource`, `old_value`, `new_value`
   - 扩展字段: `correction_level`（支持 FR-SC-04 多维检索）
   - 系统字段: `checksum`, `created_at`
-- [ ] AuditOutboxModel（事务发件箱表）
+- [x] AuditOutboxModel（事务发件箱表）✅ 已完成
   - 字段: `id`, `event_id`, `event_type`, `payload`, `status`, `created_at`, `processed_at`
 - [ ] AuditConfig 配置模型（`src/infrastructure/config/audit.py`）
 
@@ -346,18 +346,23 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、数据模型、接口、验收标准。
 
-- [ ] Subtask 0.1: 定义 AuditEvent 领域事件 Schema
-- [ ] Subtask 0.2: 定义 AuditLogModel 数据模型（PostgreSQL 表）
-- [ ] Subtask 0.3: 定义 AuditOutboxModel 事务发件箱模型
+- [x] ~~Subtask 0.1: 定义 AuditEvent 领域事件 Schema~~ ✅ 已完成
+  - 代码: `src/domain/events/audit_events.py`（含 AuditActionType 枚举、to_audit_dict()）
+- [x] ~~Subtask 0.2: 定义 AuditLogModel 数据模型（PostgreSQL 表）~~ ✅ 已完成
+  - 代码: `src/infrastructure/storage/postgresql/models/audit.py`（含 checksum 校验、索引）
+- [x] ~~Subtask 0.3: 定义 AuditOutboxModel 事务发件箱模型~~ ✅ 已完成
+  - 代码: `src/infrastructure/storage/postgresql/models/audit_outbox.py`（含 mark_published/can_retry）
 - [ ] Subtask 0.4: 定义 AuditConfig 配置模型
-- [ ] Subtask 0.5: 定义 AuditService 接口协议
-- [ ] Subtask 0.6: 创建/更新 `docs/api/openapi.yaml` 审计端点
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.10.feature`
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.5: 定义 AuditService 接口协议（`src/domain/ports/audit_service.py`）
+- [ ] Subtask 0.6: 定义 AuditOutboxPort 接口协议（`src/domain/ports/audit_outbox_port.py`）
+- [ ] Subtask 0.7: 创建/更新 `docs/api/openapi.yaml` 审计端点
+- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.10.feature`
+- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [ ] 规范项全部定义完毕（0.1-0.3 已完成，0.4-0.6 待定义）
+- [ ] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）
+- [ ] 规范文档通过人工评审或自动化校验
 
 ---
 
@@ -368,17 +373,20 @@
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 > **📌 复用说明:** 审计配置沿用 Story 1.4-1.9 的 `XxxConfig + from_env()` 模式。
 
-#### TDD 循环 A：AuditLogModel 审计日志模型
+#### TDD 循环 A：AuditLogModel 审计日志模型 ⚠️ 实现已完成，测试待补充
+
+> 代码实现: `src/infrastructure/storage/postgresql/models/audit.py`（含校验和验证、JSON 字段处理）
+> ⚠️ 注意: `test_audit_model.py` 测试文件不存在，TDD 循环未执行，开发时需补充
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_audit_model.py`（日志创建、校验和计算、序列化） |
-| 🟢 绿 | 实现 `AuditLogModel` 类最小代码 |
-| 🔄 重构 | 添加校验和验证、JSON 字段处理 |
+| ✅ 代码 | `AuditLogModel` 已完整实现（含 checksum 校验、verify_checksum()） |
+| ✅ 重构 | 索引优化（ix_audit_timestamp、ix_audit_actor 等复合索引） |
+| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/audit/test_audit_model.py` 完成 TDD 循环 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 AuditLogModel 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 AuditLogModel 最小代码
-- [ ] Subtask 1.3: 🔄 重构 — 优化 AuditLogModel 代码
+- [x] ~~Subtask 1.1: 🔴 红 — 编写 AuditLogModel 失败测试~~ ⚠️ 代码已完成，测试待补充
+- [x] ~~Subtask 1.2: 🟢 绿 — 实现 AuditLogModel 最小代码~~ ✅ 已完成
+- [x] ~~Subtask 1.3: 🔄 重构 — 优化 AuditLogModel 代码~~ ✅ 已完成
 
 #### TDD 循环 B：AuditService 审计服务
 
@@ -431,17 +439,20 @@
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 > **📌 说明:** 事务发件箱确保审计事件与业务操作原子性提交，这是等保 2.0 合规的关键要求。
 
-#### TDD 循环 A：Outbox 模型
+#### TDD 循环 A：Outbox 模型 ⚠️ 实现已完成，测试待补充
+
+> 代码实现: `src/infrastructure/storage/postgresql/models/audit_outbox.py`（含状态管理、错误处理）
+> ⚠️ 注意: `test_audit_outbox_model.py` 测试文件不存在，TDD 循环未执行，开发时需补充
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_audit_outbox_model.py`（Outbox 表操作） |
-| 🟢 绿 | 实现 `AuditOutboxModel` 类最小代码 |
-| 🔄 重构 | 添加状态管理、错误处理 |
+| ✅ 代码 | `AuditOutboxModel` 已完整实现（mark_published/mark_failed/can_retry） |
+| ✅ 重构 | CheckConstraint 校验（status 枚举值、retry_count 非负） |
+| ⚠️ 待补 | 需编写 `tests/unit/infrastructure/audit/test_audit_outbox_model.py` 完成 TDD 循环 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 Outbox 模型失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 Outbox 模型
-- [ ] Subtask 2.3: 🔄 重构 — 优化 Outbox 模型代码
+- [x] ~~Subtask 2.1: 🔴 红 — 编写 Outbox 模型失败测试~~ ⚠️ 代码已完成，测试待补充
+- [x] ~~Subtask 2.2: 🟢 绿 — 实现 Outbox 模型~~ ✅ 已完成
+- [x] ~~Subtask 2.3: 🔄 重构 — 优化 Outbox 模型代码~~ ✅ 已完成
 
 #### TDD 循环 B：Outbox 处理器
 
@@ -521,17 +532,21 @@
 - [ ] Subtask 4.2: 🟢 绿 — 实现 RLS 策略
 - [ ] Subtask 4.3: 🔄 重构 — 验证 RLS 策略
 
-#### TDD 循环 B：校验和验证
+#### TDD 循环 B：校验和验证 ⚠️ 与 AuditLogModel 已有功能重叠
+
+> ⚠️ 注意: `AuditLogModel.verify_checksum()` 已实现，Task 4.4-4.6 应聚焦于：
+> 1. 对 `verify_checksum()` 的单元测试
+> 2. 定期校验任务的实现（非校验和算法本身）
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写校验和验证测试 |
-| 🟢 绿 | 实现校验和计算和验证逻辑 |
-| 🔄 重构 | 优化校验和算法 |
+| 🔴 红 | 编写校验和验证测试（验证 verify_checksum 正确性） |
+| 🟢 绿 | 完善校验和验证逻辑（如需要） |
+| 🔄 重构 | 添加定期校验任务 |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写校验和验证失败测试
-- [ ] Subtask 4.5: 🟢 绿 — 实现校验和逻辑
-- [ ] Subtask 4.6: 🔄 重构 — 优化校验和代码
+- [ ] Subtask 4.4: 🔴 红 — 编写校验和验证失败测试（测试 verify_checksum）
+- [ ] Subtask 4.5: 🟢 绿 — 实现校验和验证（如需要扩展）
+- [ ] Subtask 4.6: 🔄 重构 — 添加定期校验任务
 
 #### TDD 循环 C：端到端集成
 
@@ -612,6 +627,7 @@
 #### 架构验证测试实现
 
 - [ ] Subtask 6.1: 创建 `tests/unit/security/test_audit_architecture_constraints.py`
+  - 与 Story 1.9 保持一致（`tests/unit/security/`）
 - [ ] Subtask 6.2: 实现领域层零审计实现验证（扫描 `src/domain/` 目录，确保无 `infrastructure`、`audit` 等外部依赖导入）
 - [ ] Subtask 6.3: 实现依赖方向验证（验证 `domain → infrastructure` 单向依赖）
 - [ ] Subtask 6.4: 运行 Ruff 检查（`ruff check src/`，0 错误）
@@ -683,11 +699,8 @@ sisys/
 │   │   │   ├── __init__.py
 │   │   │   ├── audit_events.py          # AuditEvent 领域事件
 │   │   │   └── ... (其他领域事件)
-│   │   └── services/
-│   │       └── __init__.py
-│   ├── application/
 │   │   └── ports/
-│   │       └── audit_service.py         # AuditService 接口（Protocol）
+│   │       └── audit_service.py         # AuditService 接口（Protocol，领域层定义）
 │   └── infrastructure/
 │       ├── config/
 │       │   └── audit.py                  # AuditConfig 配置模型
@@ -706,7 +719,8 @@ sisys/
 │   ├── unit/
 │   │   ├── domain/
 │   │   │   └── events/
-│   │   │       └── test_audit_events.py
+│   │   │       └── audit_events/
+│   │   │           └── test_audit_events.py  # AuditEvent 单元测试
 │   │   └── infrastructure/
 │   │       └── audit/
 │   │           ├── test_audit_service.py
@@ -765,30 +779,32 @@ sisys/
 
 ### 完成清单 Completion Notes List
 
-- [ ] Story 需求从 `epics_v1.0.md` 提取
-- [ ] 架构约束从 `architecture.md` 提取
-- [ ] 前一个故事学习经验整合
-- [ ] 状态设置为 `ready-for-dev`
-- [ ] SDD+TDD 融合开发要求定义完成
-- [ ] 项目结构对齐统一规范
+- [x] Story 需求从 `epics_v1.0.md` 提取 ✅
+- [x] 架构约束从 `architecture.md` 提取 ✅
+- [x] 前一个故事学习经验整合 ✅
+- [ ] 状态设置为 `ready-for-dev`（待同步至 sprint-status.yaml）
+- [x] SDD+TDD 融合开发要求定义完成 ✅
+- [x] 项目结构对齐统一规范 ✅
+- [x] 已完成代码调研（AuditEvent/AuditLogModel/AuditOutboxModel 已实现）
 
 ### 文件清单 File List
 
-**创建的文件/Created Files:**
-- `_bmad-output/implementation-artifacts/stories/1-10-unified-audit-log.md`
+**已创建的文件 (已实现，无需重复开发):**
+- `src/domain/events/audit_events.py` - AuditEvent 领域事件 ✅
+- `src/infrastructure/storage/postgresql/models/audit.py` - AuditLogModel ✅
+- `src/infrastructure/storage/postgresql/models/audit_outbox.py` - AuditOutboxModel ✅
+- `deploy/postgresql/alembic/versions/002_audit_tables.py` - 数据库迁移 ✅
+- `tests/unit/domain/events/audit_events/test_audit_events.py` - 审计事件单元测试 ✅
 
-**待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/events/audit_events.py` - AuditEvent 领域事件
-- `src/application/ports/audit_service.py` - AuditService 接口（Protocol）
-- `src/application/ports/audit_outbox_port.py` - AuditOutboxPort 接口（Protocol）
+**待创建的文件 (Dev Story 实施):**
+- `src/domain/ports/audit_service.py` - AuditService 接口（Protocol，领域层）
+- `src/domain/ports/audit_outbox_port.py` - AuditOutboxPort 接口（Protocol，领域层）
 - `src/infrastructure/config/audit.py` - AuditConfig 配置模型
 - `src/infrastructure/audit/audit_service.py` - AuditService 实现
 - `src/infrastructure/audit/outbox_processor.py` - 事务发件箱处理器
 - `src/infrastructure/audit/event_listener.py` - 事件监听器
 - `src/infrastructure/audit/compliance_reporter.py` - 合规报告生成
-- `src/infrastructure/storage/postgresql/models/audit.py` - AuditLogModel
-- `src/infrastructure/storage/postgresql/models/audit_outbox.py` - AuditOutboxModel
-- `tests/unit/domain/events/test_audit_events.py` - 审计事件单元测试
+- `src/interfaces/api/audit.py` - REST API 端点
 - `tests/unit/infrastructure/audit/test_audit_service.py` - 审计服务单元测试
 - `tests/unit/infrastructure/audit/test_audit_outbox.py` - 发件箱单元测试
 - `tests/unit/infrastructure/audit/test_audit_event_listener.py` - 事件监听器测试
