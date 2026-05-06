@@ -212,7 +212,15 @@ def login_attempt_repository(pg_session):
 
 
 @pytest.fixture
-def auth_service(jwt_service, encryption_service, user_repository, login_attempt_repository):
+def user_role_repository(pg_session):
+    """Real user-role association repository."""
+    from src.infrastructure.storage.postgresql.user_role_repository import UserRoleRepository
+
+    return UserRoleRepository(pg_session)
+
+
+@pytest.fixture
+def auth_service(jwt_service, encryption_service, user_repository, user_role_repository, login_attempt_repository):
     """Real auth service with login attempt tracking."""
     from src.infrastructure.security.auth_service_impl import AuthServiceImpl
 
@@ -220,6 +228,7 @@ def auth_service(jwt_service, encryption_service, user_repository, login_attempt
         jwt_service=jwt_service,
         encryption_service=encryption_service,
         user_repository=user_repository,
+        user_role_repository=user_role_repository,
         login_attempt_repository=login_attempt_repository,
     )
 
