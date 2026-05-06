@@ -72,7 +72,14 @@ async def cleanup_neo4j_test_data(neo4j_client: Neo4jClientWrapper, test_tenant_
 @pytest.fixture
 def neo4j_config() -> Neo4jConfig:
     """Real Neo4j configuration from environment."""
-    return Neo4jConfig.from_env()
+    env = get_test_env()
+    return Neo4jConfig(
+        host=env.neo4j.host,
+        bolt_port=env.neo4j.bolt_port,
+        username=env.neo4j.username,
+        password=env.neo4j.password,
+        database=env.neo4j.database,
+    )
 
 
 @pytest.fixture
