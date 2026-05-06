@@ -52,13 +52,15 @@ class TestAuthServiceImpl:
         self.mock_encryption.verify_password.return_value = True
         self.mock_user_role_repo.get_user_roles.return_value = []
         self.mock_jwt.create_access_token.return_value = "access_token"
+        self.mock_jwt.create_refresh_token.return_value = "refresh_token"
         # Mock check_and_record_lockout to return (False, 0) - not locked
         self.mock_login_attempt_repo.check_and_record_lockout = AsyncMock(return_value=(False, 0))
         self.mock_login_attempt_repo.clear_attempts = AsyncMock()
 
         result = await self.service.authenticate("testuser", "password")
 
-        assert result == "access_token"
+        assert result.access_token == "access_token"
+        assert result.refresh_token == "refresh_token"
         self.mock_login_attempt_repo.clear_attempts.assert_called_once_with("testuser")
 
     @pytest.mark.asyncio
@@ -70,6 +72,11 @@ class TestAuthServiceImpl:
             await self.service.authenticate("nonexistent", "password")
 
         assert "Invalid credentials" in str(exc_info.value)
+        # Verify timing attack defense: verify_password was called with dummy hash
+        self.mock_encryption.verify_password.assert_called_once()
+        call_args = self.mock_encryption.verify_password.call_args
+        assert call_args[0][0] == "password"  # First arg is password
+        assert call_args[0][1].startswith("$2b$12$")  # Second arg is bcrypt hash
 
     @pytest.mark.asyncio
     async def test_authenticate_inactive_user(self):

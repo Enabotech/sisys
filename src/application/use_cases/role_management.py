@@ -216,6 +216,13 @@ class RoleService:
             associated_users = await self._user_role_repo.get_role_users(role_id)
             if associated_users:
                 raise CannotDeleteRoleWithUsersError(role_id, len(associated_users))
+        # 删除前重新验证（防御 TOCTOU 竞态条件）
+        # 在检查和删除之间，角色状态可能被其他事务修改
+        role_for_delete = await self._role_repo.get_by_id(role_id)
+        if not role_for_delete:
+            raise RoleNotFoundError(role_id)
+        if role_for_delete.is_system_reserved:
+            raise CannotDeleteSystemRoleError(role_id)
         return await self._role_repo.delete(role_id)
 
     async def assign_permissions(self, role_id: UUID, permissions: list[str]) -> Role:

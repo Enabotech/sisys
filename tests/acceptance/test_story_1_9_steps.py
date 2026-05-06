@@ -580,8 +580,10 @@ def submit_logout_request(auth_service, context, event_loop):
 @then("系统返回 JWT access_token")
 def verify_jwt_in_response(context):
     """Verify JWT access token is returned."""
-    token = context.get("auth_result")
-    assert token is not None, f"Expected token but got error: {context.get('auth_error')}"
+    auth_result = context.get("auth_result")
+    assert auth_result is not None, f"Expected token but got error: {context.get('auth_error')}"
+    # auth_result is now AuthTokens with access_token and refresh_token
+    token = getattr(auth_result, "access_token", auth_result)
     assert isinstance(token, str), f"Expected string token, got {type(token)}"
     assert len(token) > 0, "Token should not be empty"
 
@@ -589,8 +591,10 @@ def verify_jwt_in_response(context):
 @then("token 包含用户 ID")
 def verify_token_contains_user_id(context, auth_service, event_loop):
     """Verify token contains user ID."""
-    token = context.get("auth_result")
-    assert token is not None
+    auth_result = context.get("auth_result")
+    assert auth_result is not None
+    # Handle AuthTokens
+    token = getattr(auth_result, "access_token", auth_result)
 
     async def _verify():
         return await auth_service.verify_token(token)
@@ -602,8 +606,10 @@ def verify_token_contains_user_id(context, auth_service, event_loop):
 @then("token 包含角色列表")
 def verify_token_contains_roles(context, auth_service, event_loop):
     """Verify token contains roles list."""
-    token = context.get("auth_result")
-    assert token is not None
+    auth_result = context.get("auth_result")
+    assert auth_result is not None
+    # Handle AuthTokens
+    token = getattr(auth_result, "access_token", auth_result)
 
     async def _verify():
         return await auth_service.verify_token(token)
@@ -616,8 +622,10 @@ def verify_token_contains_roles(context, auth_service, event_loop):
 @then("token 包含过期时间")
 def verify_token_contains_expires_in(context, jwt_service):
     """Verify token contains expiration time."""
-    token = context.get("auth_result")
-    assert token is not None
+    auth_result = context.get("auth_result")
+    assert auth_result is not None
+    # Handle AuthTokens
+    token = getattr(auth_result, "access_token", auth_result)
     import jwt as pyjwt
 
     claims = pyjwt.decode(token, options={"verify_signature": False})
