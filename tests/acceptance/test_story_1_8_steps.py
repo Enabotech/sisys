@@ -21,7 +21,6 @@ import uuid
 from pathlib import Path
 
 import pytest
-from dotenv import load_dotenv
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.neo4j import Neo4jConfig
@@ -30,9 +29,6 @@ from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 from src.infrastructure.storage.neo4j.graph_retriever import GraphRetriever
 from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
-
-# Load environment variables from .env file
-load_dotenv(Path(__file__).parents[2] / ".env")
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 

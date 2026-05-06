@@ -20,7 +20,6 @@ import uuid
 from pathlib import Path
 
 import pytest
-from dotenv import load_dotenv
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.minio import MinIOConfig
@@ -28,9 +27,6 @@ from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.minio_repository import MinIORepository
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
-
-# Load environment variables from .env file
-load_dotenv(Path(__file__).parents[2] / ".env")
 
 # Import reset_test_environment for test isolation (AC-4 A8)
 
