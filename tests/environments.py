@@ -182,12 +182,12 @@ LOCAL_CONFIG = TestEnvConfig(
 
 CI_CONFIG = TestEnvConfig(
     env=TestEnvironment.CI,
-    redis=RedisConfig(host="redis", port=6379),
-    postgres=PostgreSQLConfig(host="postgres", port=5432),
-    qdrant=QdrantConfig(host="qdrant", port=6333, grpc_port=6334),
-    minio=MinIOConfig(endpoint="minio:9000"),
-    neo4j=Neo4jConfig(host="neo4j", http_port=7474, bolt_port=7687),
-    rabbitmq=RabbitMQConfig(host="rabbitmq", port=5672, mgmt_port=15672),
+    redis=RedisConfig(host="host.docker.internal", port=6379),
+    postgres=PostgreSQLConfig(host="host.docker.internal", port=5432),
+    qdrant=QdrantConfig(host="host.docker.internal", port=6333, grpc_port=6334),
+    minio=MinIOConfig(endpoint="host.docker.internal:9000"),
+    neo4j=Neo4jConfig(host="host.docker.internal", http_port=7474, bolt_port=7687),
+    rabbitmq=RabbitMQConfig(host="host.docker.internal", port=5672, mgmt_port=15672),
 )
 
 K8S_CONFIG = TestEnvConfig(

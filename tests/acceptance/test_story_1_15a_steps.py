@@ -164,7 +164,14 @@ async def pg_session(db_engine: DatabaseEngine, ensure_schema: str) -> AsyncGene
 def real_redis(redis_test_prefix):
     """Provide real Redis client. Skip if not available."""
     try:
-        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        env = get_test_env()
+        client = redis.Redis(
+            host=env.redis.host,
+            port=env.redis.port,
+            db=env.redis.db,
+            password=env.redis.password,
+            decode_responses=True,
+        )
         client.ping()
         yield client
         # Cleanup only keys with this test's prefix
@@ -173,7 +180,7 @@ def real_redis(redis_test_prefix):
         if keys:
             client.delete(*keys)
     except redis.ConnectionError:
-        pytest.skip("Redis not available at localhost:6379")
+        pytest.skip("Redis not available")
 
 
 @pytest.fixture
