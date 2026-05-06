@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from dotenv import dotenv_values, load_dotenv
+from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -306,10 +306,7 @@ def get_test_env() -> TestEnvConfig:
         if _test_env_config is not None:
             return _test_env_config
 
-        # 1. 加载 .env 到环境变量（仅填充缺失值）
-        load_dotenv(ROOT / ".env", override=False)
-
-        # 2. 配置差异化测试环境
+        # 配置差异化测试环境
         env = resolve_env()
         if env == TestEnvironment.CI:
             config = copy.deepcopy(CI_CONFIG)
