@@ -49,16 +49,8 @@ env:
   POETRY_VERSION: "2.3.2"
 
   # 测试配置 - 让 environments.py 自动检测为 CI 环境
+  # 注意：不要在这里设置 REDIS_HOST 等服务主机地址，CI_CONFIG 已配置 host.docker.internal
   SISYS_TEST_ENV: ci
-  SISYS_USE_TEST_PORTS: "true"
-
-  # 测试服务主机地址( 使用 docker compose 服务名 )
-  REDIS_HOST: redis
-  POSTGRES_HOST: postgres
-  QDRANT_HOST: qdrant
-  MINIO_HOST: minio
-  NEO4J_HOST: neo4j
-  RABBITMQ_HOST: rabbitmq
 
   # =======================================================================
   # 镜像标签命名规范 (参考: docs/architecture/image-tagging-strategy.md)
