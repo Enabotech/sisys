@@ -297,7 +297,7 @@ def get_test_env() -> TestEnvConfig:
             return _test_env_config
 
         # 加载 .env 作为基础配置
-        load_dotenv(ROOT / ".env", override=True)
+        load_dotenv(ROOT / ".env", override=False)
 
         env = resolve_env()
 
