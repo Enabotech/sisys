@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from dotenv import dotenv_values
+from dotenv import dotenv_values, load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -295,7 +295,10 @@ def get_test_env() -> TestEnvConfig:
         if _test_env_config is not None:
             return _test_env_config
 
-        # 1. 配置差异化测试环境
+        # 1. 加载 .env 到环境变量（仅填充缺失值）
+        load_dotenv(ROOT / ".env", override=False)
+
+        # 2. 配置差异化测试环境
         env = resolve_env()
         if env == TestEnvironment.CI:
             config = copy.deepcopy(CI_CONFIG)
@@ -309,12 +312,10 @@ def get_test_env() -> TestEnvConfig:
         else:
             config = copy.deepcopy(LOCAL_CONFIG)
 
-        # 2. 加载.env配置
+        # 3. 加载 .env 配置（用于填充空值）
         env_values = dotenv_values(ROOT / ".env")
 
         # 4. 差异化环境配置覆盖.env相关字段（仅当环境配置使用默认值时）
-        # 环境配置已经设置了正确的值，不应该被 .env 的 localhost 覆盖
-        # 只有当环境配置值为空或默认值时才用 .env 填充
         _apply_dotenv_if_empty(config, env_values)
 
         # 5. os环境变量最后覆盖（最高优先级）
