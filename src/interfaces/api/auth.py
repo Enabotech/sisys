@@ -36,6 +36,7 @@ class TokenResponse(BaseModel):
     """Token 响应模型."""
 
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
     user: "UserResponse"
@@ -187,21 +188,22 @@ def create_auth_router(
             request: 登录请求（username, password）
 
         Returns:
-            Token 响应（access_token, token_type, expires_in, user）
+            Token 响应（access_token, refresh_token, token_type, expires_in, user）
 
         Raises:
             HTTPException 401: 无效凭证
             HTTPException 423: 账户已锁定
         """
         try:
-            access_token = await auth_service.authenticate(
+            tokens = await auth_service.authenticate(
                 request.username,
                 request.password,
             )
             # Verify token to get user info
-            payload = await auth_service.verify_token(access_token)
+            payload = await auth_service.verify_token(tokens.access_token)
             return TokenResponse(
-                access_token=access_token,
+                access_token=tokens.access_token,
+                refresh_token=tokens.refresh_token,
                 token_type="bearer",
                 expires_in=86400,  # 24 hours
                 user=UserResponse(
@@ -265,17 +267,21 @@ def create_auth_router(
         status_code=status.HTTP_204_NO_CONTENT,
         response_model=None,
     )
-    async def logout(token: str = Depends(oauth2_scheme)) -> None:
+    async def logout(
+        token: str = Depends(oauth2_scheme),
+        refresh_token: str | None = None,
+    ) -> None:
         """用户登出。
 
         Args:
             token: 当前用户的 access token
+            refresh_token: refresh token（可选）
 
         Returns:
             204 No Content
         """
         if token:
-            await auth_service.logout(token)
+            await auth_service.logout(token, refresh_token)
 
     @router.get(
         "/auth/me",

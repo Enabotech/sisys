@@ -7,8 +7,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from src.domain.value_objects.token_payload import TokenPayload
+
+
+@dataclass(frozen=True)
+class AuthTokens:
+    """认证令牌领域值对象（不可变）."""
+
+    access_token: str
+    refresh_token: str
 
 
 class AuthenticationError(Exception):
@@ -25,7 +34,7 @@ class AuthServicePort(ABC):
     """
 
     @abstractmethod
-    async def authenticate(self, username: str, password: str) -> str:
+    async def authenticate(self, username: str, password: str) -> AuthTokens:
         """用户认证。
 
         Args:
@@ -33,7 +42,7 @@ class AuthServicePort(ABC):
             password: 密码（明文）
 
         Returns:
-            JWT access token 字符串
+            AuthTokens 包含 access_token 和 refresh_token
 
         Raises:
             AuthenticationError: 认证失败时抛出
@@ -75,10 +84,11 @@ class AuthServicePort(ABC):
         ...
 
     @abstractmethod
-    async def logout(self, token: str) -> None:
+    async def logout(self, token: str, refresh_token: str | None = None) -> None:
         """用户登出，撤销 JWT token。
 
         Args:
             token: 要撤销的 JWT access token
+            refresh_token: 要撤销的 refresh token（可选）
         """
         ...

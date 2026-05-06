@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from src.domain.ports.auth_service import AuthenticationError, AuthServicePort
+from src.domain.ports.auth_service import AuthenticationError, AuthServicePort, AuthTokens
 from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.security.encryption_service import EncryptionService
 from src.infrastructure.security.jwt_service import JWTService
@@ -55,7 +55,7 @@ class AuthServiceImpl(AuthServicePort):
         password: str,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> str:
+    ) -> AuthTokens:
         """用户认证.
 
         Args:
@@ -65,7 +65,7 @@ class AuthServiceImpl(AuthServicePort):
             user_agent: 用户代理（可选，用于记录）
 
         Returns:
-            JWT access token 字符串
+            AuthTokens 包含 access_token 和 refresh_token
 
         Raises:
             AuthenticationError: 认证失败时抛出
@@ -124,7 +124,11 @@ class AuthServiceImpl(AuthServicePort):
             username=user.username,
             roles=roles,
         )
-        return access_token
+
+        # 生成 refresh token
+        refresh_token = self._jwt_service.create_refresh_token(user_id=user.id)
+
+        return AuthTokens(access_token=access_token, refresh_token=refresh_token)
 
     async def _record_attempt(
         self,
@@ -226,14 +230,17 @@ class AuthServiceImpl(AuthServicePort):
             roles=roles,
         )
 
-    async def logout(self, token: str) -> None:
-        """用户登出，撤销 JWT token.
+    async def logout(self, token: str, refresh_token: str | None = None) -> None:
+        """用户登出，撤销 JWT token。
 
         Args:
             token: 要撤销的 JWT access token
+            refresh_token: 要撤销的 refresh token（可选）
         """
         if self._token_blacklist:
             await self._token_blacklist.add(token)
+            if refresh_token:
+                await self._token_blacklist.add(refresh_token)
 
     async def _get_user_roles(self, user_id: UUID) -> list[str]:
         """获取用户的角色列表。
