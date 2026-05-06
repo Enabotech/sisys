@@ -72,11 +72,10 @@ class TestAuthServiceImpl:
             await self.service.authenticate("nonexistent", "password")
 
         assert "Invalid credentials" in str(exc_info.value)
-        # Verify timing attack defense: verify_password was called with dummy hash
-        self.mock_encryption.verify_password.assert_called_once()
-        call_args = self.mock_encryption.verify_password.call_args
+        # Verify timing attack defense: timing_safe_verify was called
+        self.mock_encryption.timing_safe_verify.assert_called_once()
+        call_args = self.mock_encryption.timing_safe_verify.call_args
         assert call_args[0][0] == "password"  # First arg is password
-        assert call_args[0][1].startswith("$2b$12$")  # Second arg is bcrypt hash
 
     @pytest.mark.asyncio
     async def test_authenticate_inactive_user(self):
@@ -186,13 +185,14 @@ class TestAuthServiceImpl:
         # Mock refresh_token_store.is_used to return False (token not used yet)
         self.mock_refresh_token_store.is_used = AsyncMock(return_value=False)
         self.mock_refresh_token_store.mark_used = AsyncMock()
+        self.mock_refresh_token_store.get_user_jtis = AsyncMock(return_value=[])
         self.mock_user_repo.get_by_id.return_value = mock_user
         self.mock_user_role_repo.get_user_roles.return_value = []
 
         result = await self.service.refresh_token("valid_refresh_token")
 
         assert result == "new_access_token"
-        self.mock_refresh_token_store.mark_used.assert_called_once_with("jti_123")
+        self.mock_refresh_token_store.mark_used.assert_called_once_with("jti_123", user_id)
 
     @pytest.mark.asyncio
     async def test_refresh_token_reuse_detected(self):
@@ -201,6 +201,7 @@ class TestAuthServiceImpl:
         self.mock_jwt.verify_refresh_token.return_value = user_id
         self.mock_jwt.get_refresh_token_jti.return_value = "jti_123"
         self.mock_refresh_token_store.is_used.return_value = True
+        self.mock_refresh_token_store.get_user_jtis = AsyncMock(return_value=[])
 
         with pytest.raises(AuthenticationError) as exc_info:
             await self.service.refresh_token("reused_refresh_token")
@@ -214,6 +215,8 @@ class TestAuthServiceImpl:
         self.mock_jwt.verify_refresh_token.return_value = user_id
         self.mock_jwt.get_refresh_token_jti.return_value = "jti_123"
         self.mock_refresh_token_store.is_used.return_value = False
+        self.mock_refresh_token_store.mark_used = AsyncMock()
+        self.mock_refresh_token_store.get_user_jtis = AsyncMock(return_value=[])
         self.mock_user_repo.get_by_id.return_value = None
 
         with pytest.raises(AuthenticationError) as exc_info:

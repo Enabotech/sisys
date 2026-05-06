@@ -13,7 +13,7 @@ from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
 
 from src.application.use_cases.role_management import Role, RoleService
-from src.domain.ports.auth_service import AuthServicePort
+from src.domain.ports.auth_service import AuthServicePort, AuthTokens
 from src.domain.value_objects.token_payload import TokenPayload
 from src.interfaces.api.auth import create_auth_router
 
@@ -57,7 +57,9 @@ class TestLoginEndpoint:
         """Valid credentials return access token."""
         user_id = uuid4()
         mock_service = MagicMock(spec=AuthServicePort)
-        mock_service.authenticate = AsyncMock(return_value="valid_access_token")
+        mock_service.authenticate = AsyncMock(
+            return_value=AuthTokens(access_token="valid_access_token", refresh_token="valid_refresh_token")
+        )
         mock_service.verify_token = AsyncMock(
             return_value=TokenPayload(
                 user_id=user_id,
