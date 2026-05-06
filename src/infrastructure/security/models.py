@@ -12,8 +12,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.infrastructure.storage.postgresql.base_repository import BaseRepository
 from src.infrastructure.storage.postgresql.models.user import UserModel
+from src.infrastructure.storage.postgresql.repository.base_repository import BaseRepository
 
 
 class RoleModel(BaseRepository):

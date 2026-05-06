@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.infrastructure.storage.postgresql.user_role_repository import UserRoleRepository
+from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
 
 class TestUserRoleRepository:

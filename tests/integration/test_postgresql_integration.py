@@ -233,7 +233,7 @@ class TestUserCRUD:
     @pytest.mark.asyncio
     async def test_create_user(self, mock_session):
         """创建新用户。"""
-        from src.infrastructure.storage.postgresql.user_repository import UserRepository
+        from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository(mock_session)
         mock_user = mock.Mock()
@@ -246,7 +246,7 @@ class TestUserCRUD:
     @pytest.mark.asyncio
     async def test_get_user_by_username(self, mock_session):
         """根据用户名获取用户。"""
-        from src.infrastructure.storage.postgresql.user_repository import UserRepository
+        from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository(mock_session)
         mock_user = mock.Mock()
@@ -261,7 +261,7 @@ class TestUserCRUD:
     @pytest.mark.asyncio
     async def test_get_user_by_email(self, mock_session):
         """根据邮箱获取用户。"""
-        from src.infrastructure.storage.postgresql.user_repository import UserRepository
+        from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository(mock_session)
         mock_user = mock.Mock()
@@ -280,7 +280,7 @@ class TestRolePermissionCRUD:
     @pytest.mark.asyncio
     async def test_get_role_by_name(self, mock_session):
         """根据名称获取角色。"""
-        from src.infrastructure.storage.postgresql.role_repository import RoleRepository
+        from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
         repo = RoleRepository(mock_session)
         mock_result = mock.Mock()
@@ -294,7 +294,7 @@ class TestRolePermissionCRUD:
     @pytest.mark.asyncio
     async def test_get_role_permissions(self, mock_session):
         """获取角色的权限列表。"""
-        from src.infrastructure.storage.postgresql.role_repository import RoleRepository
+        from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
         repo = RoleRepository(mock_session)
         mock_result = mock.Mock()
@@ -308,7 +308,7 @@ class TestRolePermissionCRUD:
     @pytest.mark.asyncio
     async def test_get_permission_by_name(self, mock_session):
         """根据名称获取权限。"""
-        from src.infrastructure.storage.postgresql.permission_repository import PermissionRepository
+        from src.infrastructure.storage.postgresql.repository.permission_repository import PermissionRepository
 
         repo = PermissionRepository(mock_session)
         mock_permission = mock.Mock()

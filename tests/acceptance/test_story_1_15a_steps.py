@@ -216,10 +216,10 @@ def storage_coordinator(redis_cache) -> SixLayerStorageCoordinator:
 @pytest.fixture
 async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryService:
     """Create MemoryService with real PostgreSQL repositories."""
-    from src.infrastructure.storage.postgresql.memory_change_history_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
     )
-    from src.infrastructure.storage.postgresql.memory_metadata_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
         PostgreSQLMemoryMetadataRepository,
     )
 
@@ -237,10 +237,10 @@ async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryServ
 @pytest.fixture
 async def listener_with_real_services(storage_coordinator, pg_session: AsyncSession):
     """Create MemoryChangedListener with REAL L1 Redis + L2 PostgreSQL services."""
-    from src.infrastructure.storage.postgresql.memory_change_history_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
     )
-    from src.infrastructure.storage.postgresql.memory_metadata_repository import (
+    from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
         PostgreSQLMemoryMetadataRepository,
     )
 

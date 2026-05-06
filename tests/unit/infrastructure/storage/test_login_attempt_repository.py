@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.login_attempt_repository import (
+from src.infrastructure.storage.postgresql.repository.login_attempt_repository import (
     LoginAttemptRepository,
 )
 

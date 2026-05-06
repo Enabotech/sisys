@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.use_cases.role_management import RoleAlreadyExistsError, RoleNotFoundError
-from src.infrastructure.storage.postgresql.role_repository import RoleRepository
+from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
 
 @pytest.fixture

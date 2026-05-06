@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.user_repository import UserRepository
+from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
 
 @pytest.fixture

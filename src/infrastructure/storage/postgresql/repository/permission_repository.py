@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.base_repository import BaseRepository
 from src.infrastructure.storage.postgresql.models import PermissionModel
+from src.infrastructure.storage.postgresql.repository.base_repository import BaseRepository
 
 
 class PermissionRepository(BaseRepository[PermissionModel]):
