@@ -12,7 +12,6 @@ Run with: poetry run pytest tests/acceptance/test_story_1_16_steps.py -v
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from typing import Any
 from unittest.mock import AsyncMock
@@ -32,6 +31,7 @@ from src.infrastructure.messaging.adapters.event_outbox_adapter import (
 )
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+from tests.environments import get_test_env
 
 scenarios("test_story_1_16.feature")
 
@@ -50,11 +50,12 @@ def context() -> dict[str, Any]:
 @pytest.fixture
 def redis_config() -> dict[str, Any]:
     """Redis configuration from environment or defaults."""
+    env = get_test_env()
     return {
-        "host": os.getenv("REDIS_HOST", "localhost"),
-        "port": int(os.getenv("REDIS_PORT", "6379")),
-        "db": int(os.getenv("REDIS_DB", "0")),
-        "password": os.getenv("REDIS_PASSWORD") or None,
+        "host": env.redis.host,
+        "port": env.redis.port,
+        "db": env.redis.db,
+        "password": env.redis.password,
     }
 
 
