@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.role_repository import RoleRepositoryPort
@@ -207,14 +208,23 @@ class RoleRepository(RoleRepositoryPort):
 
         Returns:
             保存后的 Role 领域实体
+
+        Raises:
+            RoleAlreadyExistsError: 角色名已存在（数据库唯一约束违反）
         """
         model = self._to_model(role)
         if role.id is None:
             self._session.add(model)
         else:
             model = await self._session.merge(model)
-        await self._session.flush()
-        await self._session.refresh(model)
+        try:
+            await self._session.flush()
+            await self._session.refresh(model)
+        except IntegrityError:
+            await self._session.rollback()
+            from src.application.use_cases.role_management import RoleAlreadyExistsError
+
+            raise RoleAlreadyExistsError(role.name)
 
         # 保存权限关联
         if role.permissions:

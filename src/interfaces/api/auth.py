@@ -13,6 +13,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
 from src.application.use_cases.role_management import (
+    CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
     RoleAlreadyExistsError,
     RoleNotFoundError,
@@ -525,6 +526,11 @@ def create_auth_router(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot delete system-reserved role",
+            )
+        except CannotDeleteRoleWithUsersError as e:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot delete role - {e.user_count} users are assigned to this role",
             )
 
     # Permission endpoints

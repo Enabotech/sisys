@@ -82,3 +82,30 @@ class LoginAttemptRepositoryPort(ABC):
             username: 用户名
         """
         ...
+
+    @abstractmethod
+    async def check_and_record_lockout(
+        self,
+        username: str,
+        success: bool,
+        failure_reason: str | None = None,
+        user_id: UUID | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, int]:
+        """原子操作：检查账户是否锁定并记录尝试。
+
+        解决登录锁定竞态条件问题 - 在同一事务中完成检查和记录。
+
+        Args:
+            username: 用户名
+            success: 是否成功
+            failure_reason: 失败原因
+            user_id: 用户 UUID（如果存在）
+            ip_address: IP 地址
+            user_agent: 用户代理字符串
+
+        Returns:
+            tuple[bool, int]: (是否被锁定, 剩余锁定分钟数)
+        """
+        ...

@@ -158,3 +158,87 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
 
         await self._session.execute(delete(LoginAttemptModel).where(LoginAttemptModel.username == username))
         await self._session.flush()
+
+    async def check_and_record_lockout(
+        self,
+        username: str,
+        success: bool,
+        failure_reason: str | None = None,
+        user_id: UUID | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, int]:
+        """原子操作：检查账户是否锁定（基于当前已有记录，不记录新尝试）。
+
+        用于在认证流程开始前检查是否已达到锁定阈值。
+        实际的记录操作由调用方在确定时机执行。
+
+        Args:
+            username: 用户名
+            success: 是否成功（目前未使用，保留接口兼容性）
+            failure_reason: 失败原因（目前未使用，保留接口兼容性）
+            user_id: 用户 UUID（如果存在）
+            ip_address: IP 地址
+            user_agent: 用户代理字符串
+
+        Returns:
+            tuple[bool, int]: (是否被锁定, 剩余锁定分钟数)
+        """
+        # 检查现在是否被锁定（基于已记录的尝试）
+        is_locked = await self.is_account_locked(username)
+        if is_locked:
+            remaining = await self.get_lockout_remaining_minutes(username)
+            return True, remaining
+
+        return False, 0
+
+    async def record_attempt_and_check_lockout(
+        self,
+        username: str,
+        success: bool,
+        failure_reason: str | None = None,
+        user_id: UUID | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[bool, int]:
+        """原子操作：记录尝试并检查账户是否因此被锁定。
+
+        在记录新尝试后立即检查是否达到锁定阈值，解决竞态条件。
+
+        Args:
+            username: 用户名
+            success: 是否成功
+            failure_reason: 失败原因
+            user_id: 用户 UUID（如果存在）
+            ip_address: IP 地址
+            user_agent: 用户代理字符串
+
+        Returns:
+            tuple[bool, int]: (是否被锁定, 剩余锁定分钟数)
+        """
+        from src.infrastructure.storage.postgresql.models import LoginAttemptModel
+
+        # 先记录尝试
+        attempt = LoginAttemptModel(
+            username=username,
+            success=success,
+            failure_reason=failure_reason,
+            user_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        self._session.add(attempt)
+        await self._session.flush()
+
+        # 如果成功登录，清除记录
+        if success:
+            await self.clear_attempts(username)
+            return False, 0
+
+        # 检查现在是否因这次记录被锁定
+        is_locked = await self.is_account_locked(username)
+        if is_locked:
+            remaining = await self.get_lockout_remaining_minutes(username)
+            return True, remaining
+
+        return False, 0

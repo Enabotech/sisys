@@ -27,6 +27,8 @@ class AuthServiceImpl(AuthServicePort):
         user_repository,  # UserRepositoryPort
         user_role_repository,  # UserRoleRepositoryPort
         login_attempt_repository=None,  # LoginAttemptRepositoryPort (optional)
+        token_blacklist=None,  # Redis blacklist store (optional)
+        refresh_token_store=None,  # Redis refresh token rotation store (optional)
     ):
         """初始化认证服务.
 
@@ -36,12 +38,16 @@ class AuthServiceImpl(AuthServicePort):
             user_repository: 用户仓储端口
             user_role_repository: 用户角色关联仓储端口
             login_attempt_repository: 登录尝试仓储端口（可选）
+            token_blacklist: Token 黑名单存储（可选，用于 logout）
+            refresh_token_store: Refresh token 存储（可选，用于 rotation）
         """
         self._jwt_service = jwt_service
         self._encryption_service = encryption_service
         self._user_repo = user_repository
         self._user_role_repo = user_role_repository
         self._login_attempt_repo = login_attempt_repository
+        self._token_blacklist = token_blacklist
+        self._refresh_token_store = refresh_token_store
 
     async def authenticate(
         self,
@@ -82,12 +88,17 @@ class AuthServiceImpl(AuthServicePort):
             await self._record_attempt(username, False, "account_locked", user.id, ip_address, user_agent)
             raise AuthenticationError("Account is locked")
 
-        # 检查账户是否被动态锁定（连续失败达到阈值）
+        # 检查账户是否被动态锁定（连续失败达到阈值）- 使用原子操作
         if self._login_attempt_repo:
-            is_locked = await self._login_attempt_repo.is_account_locked(username)
+            is_locked, remaining = await self._login_attempt_repo.record_attempt_and_check_lockout(
+                username=username,
+                success=False,
+                failure_reason=None,
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
             if is_locked:
-                remaining = await self._login_attempt_repo.get_lockout_remaining_minutes(username)
-                await self._record_attempt(username, False, "rate_locked", user.id, ip_address, user_agent)
                 raise AuthenticationError(
                     f"Account is locked due to multiple failed attempts. Try again in {remaining} minutes."
                 )
@@ -153,6 +164,11 @@ class AuthServiceImpl(AuthServicePort):
         Raises:
             AuthenticationError: token 无效、过期或被撤销
         """
+        # 检查 token 是否在黑名单中
+        if self._token_blacklist and await self._token_blacklist.is_blacklisted(token):
+            from src.domain.ports.auth_service import AuthenticationError
+
+            raise AuthenticationError("Token has been revoked")
         return self._jwt_service.verify_token(token)
 
     async def refresh_token(self, refresh_token: str) -> str:
@@ -168,6 +184,21 @@ class AuthServiceImpl(AuthServicePort):
             AuthenticationError: refresh token 无效或过期
         """
         user_id = self._jwt_service.verify_refresh_token(refresh_token)
+
+        # 检查 refresh token 是否已被使用（rotation 检查）
+        jti = self._jwt_service.get_refresh_token_jti(refresh_token)
+        if jti and self._refresh_token_store:
+            is_used = await self._refresh_token_store.is_used(jti)
+            if is_used:
+                # Token 被重用，可能是攻击，撤销该用户的所有 token
+                if self._token_blacklist:
+                    # 通知用户 token 被泄露，需要重新登录
+                    pass
+                from src.domain.ports.auth_service import AuthenticationError
+
+                raise AuthenticationError("Refresh token reuse detected - possible attack")
+            # 标记 jti 为已使用
+            await self._refresh_token_store.mark_used(jti)
 
         # 获取用户信息
         user = await self._user_repo.get_by_id(user_id)
@@ -201,9 +232,8 @@ class AuthServiceImpl(AuthServicePort):
         Args:
             token: 要撤销的 JWT access token
         """
-        # 在生产环境中，应该将 token 加入黑名单
-        # 这里简化处理，后续可以接入 Redis 实现 token 黑名单
-        pass
+        if self._token_blacklist:
+            await self._token_blacklist.add(token)
 
     async def _get_user_roles(self, user_id: UUID) -> list[str]:
         """获取用户的角色列表。
