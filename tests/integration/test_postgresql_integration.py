@@ -283,14 +283,13 @@ class TestRolePermissionCRUD:
         from src.infrastructure.storage.postgresql.role_repository import RoleRepository
 
         repo = RoleRepository(mock_session)
-        mock_role = mock.Mock()
         mock_result = mock.Mock()
-        mock_result.scalar_one_or_none.return_value = mock_role
+        mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
-        result = await repo.get_by_name("admin")
+        result = await repo.get_by_name("nonexistent")
 
-        assert result == mock_role
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_get_role_permissions(self, mock_session):

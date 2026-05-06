@@ -124,14 +124,15 @@ class TestRoleServiceRetrieval:
         assert result.is_system_reserved is True
 
     @pytest.mark.asyncio
-    async def test_get_role_returns_none_when_not_found(self):
-        """🔴 RED: get_role should return None when role doesn't exist."""
+    async def test_get_role_raises_when_not_found(self):
+        """get_role should raise RoleNotFoundError when role doesn't exist."""
+        from src.application.use_cases.role_management import RoleNotFoundError
+
         role_id = uuid4()
         self.mock_repo.get_by_id.return_value = None
 
-        result = await self.service.get_role(role_id)
-
-        assert result is None
+        with pytest.raises(RoleNotFoundError):
+            await self.service.get_role(role_id)
 
     @pytest.mark.asyncio
     async def test_list_roles_returns_list(self):

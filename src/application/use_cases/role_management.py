@@ -87,16 +87,22 @@ class RoleService:
         )
         return await self._role_repo.save(role)
 
-    async def get_role(self, role_id: UUID) -> Role | None:
+    async def get_role(self, role_id: UUID) -> Role:
         """根据 ID 获取角色.
 
         Args:
             role_id: 角色 UUID
 
         Returns:
-            Role 领域实体，或 None（角色不存在）
+            Role 领域实体
+
+        Raises:
+            RoleNotFoundError: 角色不存在
         """
-        return await self._role_repo.get_by_id(role_id)
+        role = await self._role_repo.get_by_id(role_id)
+        if not role:
+            raise RoleNotFoundError(role_id)
+        return role
 
     async def get_role_by_name(self, name: str) -> Role | None:
         """根据名称获取角色.
