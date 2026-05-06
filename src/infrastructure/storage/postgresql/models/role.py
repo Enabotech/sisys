@@ -25,5 +25,6 @@ class RoleModel(Base):
     name: Mapped[str] = mapped_column(String(50), unique=True)
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    is_system_reserved: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

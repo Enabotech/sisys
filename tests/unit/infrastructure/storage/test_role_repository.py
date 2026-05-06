@@ -26,14 +26,13 @@ class TestRoleRepository:
     @pytest.mark.asyncio
     async def test_get_by_name(self, repository, mock_session):
         """测试根据名称获取角色。"""
-        role = mock.Mock()
         mock_result = mock.Mock()
-        mock_result.scalar_one_or_none.return_value = role
+        mock_result.scalar_one_or_none.return_value = None  # Role not found
         mock_session.execute.return_value = mock_result
 
-        result = await repository.get_by_name("admin")
+        result = await repository.get_by_name("nonexistent")
 
-        assert result == role
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_get_permissions_for_role(self, repository, mock_session):

@@ -22,6 +22,8 @@ Core Rules:
 2. Inner layers must NOT import outer layers
 3. Outer layers can import inner layers (dependency inversion)
 4. TYPE_CHECKING blocks are excluded from runtime dependency checks
+
+Inspired by hexagonal_arch_guard.py with enhanced AST parsing.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from __future__ import annotations
 import ast
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -36,12 +39,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 SRC_DIR = ROOT / "src"
 
-# Standard library modules (Python 3.10+)
+# Standard library modules (Python 3.11+)
 STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
 
 # Forbidden imports for domain layer (external frameworks and project layers)
 FORBIDDEN_DOMAIN_IMPORTS: frozenset[str] = frozenset(
-    [
+    {
         # External frameworks
         "langgraph",
         "prefect",
@@ -81,7 +84,7 @@ FORBIDDEN_DOMAIN_IMPORTS: frozenset[str] = frozenset(
         "application",
         "interfaces",
         "infrastructure",
-    ]
+    }
 )
 
 # Layer definition
@@ -92,14 +95,19 @@ LAYERS = {
     "infrastructure": SRC_DIR / "infrastructure",
 }
 
-# Dependency direction matrix (from -> to)
-# True = allowed, False = forbidden
-ALLOWED_DEPENDENCIES = {
-    "domain": {"application": False, "interfaces": False, "infrastructure": False},
-    "application": {"domain": True, "interfaces": False, "infrastructure": False},
-    "interfaces": {"domain": True, "application": True, "infrastructure": False},
-    "infrastructure": {"domain": True, "application": True, "interfaces": False},
-}
+
+@dataclass
+class ImportOccurrence:
+    """A single import statement occurrence."""
+
+    file: Path
+    lineno: int
+    raw_import: str
+    resolved_import: str | None
+    kind: str  # "import" or "from"
+    source_layer: str | None
+    target_layer: str | None
+    in_type_checking: bool = False
 
 
 def _get_python_files(directory: Path) -> list[Path]:
@@ -109,66 +117,219 @@ def _get_python_files(directory: Path) -> list[Path]:
     return [f for f in directory.rglob("*.py") if f.name != "__init__.py"]
 
 
-def _get_imports(file_path: Path) -> tuple[list[str], list[str]]:
-    """Extract all import module names from a Python file using AST.
-
-    Returns:
-        Tuple of (direct_imports, from_imports)
-    """
-    with open(file_path, encoding="utf-8") as f:
-        try:
-            tree = ast.parse(f.read(), filename=str(file_path))
-        except SyntaxError as e:
-            pytest.fail(f"Syntax error in {file_path}: {e}")
-            return [], []
-
-    # First pass: collect all TYPE_CHECKING guard ranges
-    type_checking_ranges: list[tuple[int, int]] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.If):
-            # Check if it's `if TYPE_CHECKING:` (single test, no and/or)
-            if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
-                end_line = getattr(node, "end_lineno", None) or node.lineno
-                type_checking_ranges.append((node.lineno, end_line))
-
-    def is_in_type_checking(lineno: int) -> bool:
-        for start, end in type_checking_ranges:
-            if start <= lineno <= end:
-                return True
-        return False
-
-    direct_imports = []
-    from_imports = []
-
-    for node in ast.walk(tree):
-        # Skip imports inside TYPE_CHECKING blocks
-        if hasattr(node, "lineno") and is_in_type_checking(node.lineno):
-            continue
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                direct_imports.append(alias.name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                from_imports.append(node.module)
-    return direct_imports, from_imports
-
-
-def has_layer_import(file_path: Path, target_layer: str) -> bool:
-    """Check if file imports specific layer using AST (not string matching)."""
-    direct_imports, from_imports = _get_imports(file_path)
-
-    for imp in list(direct_imports) + list(from_imports):
-        normalized = _normalize_import(imp)
-        if normalized == target_layer or normalized.startswith(f"{target_layer}."):
-            return True
-    return False
-
-
 def _normalize_import(imp: str) -> str:
     """Normalize import name (handle 'src.layer' vs 'layer')."""
     if imp.startswith("src."):
         return imp[4:]
     return imp
+
+
+def _root_import_name(import_name: str) -> str:
+    """Return the top-level package/module segment."""
+    return import_name.split(".", 1)[0]
+
+
+def _layer_for_import(import_name: str) -> str | None:
+    """Determine whether an import name belongs to one of the architecture layers."""
+    normalized = _normalize_import(import_name)
+    for layer in LAYERS:
+        if normalized == layer or normalized.startswith(f"{layer}."):
+            return layer
+    return None
+
+
+def _current_module_name(file_path: Path, src_dir: Path) -> str | None:
+    """Convert a file path into a dotted module path rooted at src/."""
+    try:
+        relative = file_path.resolve().relative_to(src_dir.resolve())
+    except ValueError:
+        return None
+
+    parts = list(relative.with_suffix("").parts)
+    if not parts:
+        return None
+
+    return "src." + ".".join(parts)
+
+
+def _module_package_parts(module_name: str) -> list[str]:
+    """Get package parts from a module name."""
+    parts = module_name.split(".")
+    if parts and parts[-1] == "__init__":
+        return parts[:-1]
+    return parts[:-1] if parts else []
+
+
+def _resolve_relative_import(
+    current_module: str,
+    level: int,
+    module: str | None,
+) -> str | None:
+    """Resolve a relative import to an absolute dotted module name.
+
+    Example:
+        current_module = "src.application.use_cases.foo"
+        from ..domain import bar  ->  "src.application.domain"
+    """
+    package_parts = _module_package_parts(current_module)
+    if level <= 0:
+        return module
+
+    # Python semantics: one leading dot means current package
+    base_len = max(0, len(package_parts) - (level - 1))
+    base_parts = package_parts[:base_len]
+
+    if module:
+        module_parts = module.split(".")
+        return ".".join([*base_parts, *module_parts]) if base_parts else module
+    return ".".join(base_parts) if base_parts else module
+
+
+def _collect_typing_aliases(tree: ast.AST) -> set[str]:
+    """Collect names that may evaluate to typing.TYPE_CHECKING.
+
+    Handles cases like:
+        import typing
+        from typing import TYPE_CHECKING
+        import typing as t
+    """
+    aliases: set[str] = {"TYPE_CHECKING"}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "typing":
+            for alias in node.names:
+                if alias.name == "TYPE_CHECKING":
+                    aliases.add(alias.asname or alias.name)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "typing":
+                    aliases.add(alias.asname or alias.name)
+
+    return aliases
+
+
+def _is_type_checking_guard(node: ast.AST, typing_aliases: set[str]) -> bool:
+    """Return True if an if-test is a typing TYPE_CHECKING guard."""
+    if isinstance(node, ast.Name):
+        return node.id in typing_aliases
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        return node.attr == "TYPE_CHECKING" and node.value.id in typing_aliases
+    return False
+
+
+def _type_checking_ranges(tree: ast.AST) -> list[tuple[int, int]]:
+    """Collect line ranges covered by TYPE_CHECKING guards."""
+    typing_aliases = _collect_typing_aliases(tree)
+    ranges: list[tuple[int, int]] = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If) and _is_type_checking_guard(node.test, typing_aliases):
+            end_lineno = getattr(node, "end_lineno", None) or node.lineno
+            ranges.append((node.lineno, end_lineno))
+
+    return ranges
+
+
+def _range_contains(ranges: list[tuple[int, int]], lineno: int) -> bool:
+    """Check if lineno falls within any of the ranges."""
+    return any(start <= lineno <= end for start, end in ranges)
+
+
+def _scan_file_imports(file_path: Path) -> list[ImportOccurrence]:
+    """Extract all runtime import occurrences from a Python file using AST.
+
+    Handles:
+    - Regular imports: import os, import src.domain
+    - From imports: from src.domain.events import Something
+    - Relative imports: from ..domain import something (with level > 0)
+    - TYPE_CHECKING blocks are excluded
+    """
+    try:
+        source = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(file_path))
+    except SyntaxError:
+        return []
+    except UnicodeDecodeError:
+        return []
+
+    type_checking_ranges = _type_checking_ranges(tree)
+    current_module = _current_module_name(file_path, SRC_DIR) or file_path.stem
+
+    imports: list[ImportOccurrence] = []
+
+    for node in ast.walk(tree):
+        if not hasattr(node, "lineno"):
+            continue
+
+        lineno = int(getattr(node, "lineno"))
+        in_type_checking = _range_contains(type_checking_ranges, lineno)
+
+        if isinstance(node, ast.Import):
+            source_layer = _layer_for_import(current_module)
+            for alias in node.names:
+                raw = alias.name
+                target_layer = _layer_for_import(raw)
+                imports.append(
+                    ImportOccurrence(
+                        file=file_path,
+                        lineno=lineno,
+                        raw_import=raw,
+                        resolved_import=raw,
+                        kind="import",
+                        source_layer=source_layer,
+                        target_layer=target_layer,
+                        in_type_checking=in_type_checking,
+                    )
+                )
+
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module
+
+            # Handle relative imports
+            if node.level and node.level > 0:
+                resolved_module = _resolve_relative_import(
+                    current_module=current_module,
+                    level=node.level,
+                    module=module,
+                )
+            else:
+                resolved_module = module
+
+            if resolved_module:
+                source_layer = _layer_for_import(current_module)
+                target_layer = _layer_for_import(resolved_module)
+                imports.append(
+                    ImportOccurrence(
+                        file=file_path,
+                        lineno=lineno,
+                        raw_import=resolved_module,
+                        resolved_import=resolved_module,
+                        kind="from",
+                        source_layer=source_layer,
+                        target_layer=target_layer,
+                        in_type_checking=in_type_checking,
+                    )
+                )
+
+    return imports
+
+
+def has_layer_import(file_path: Path, target_layer: str) -> bool:
+    """Check if file imports specific layer using AST."""
+    imports = _scan_file_imports(file_path)
+    return any(imp.target_layer == target_layer for imp in imports if not imp.in_type_checking)
+
+
+def get_layer_imports(layer: str) -> list[ImportOccurrence]:
+    """Get all imports from a specific layer."""
+    layer_dir = LAYERS.get(layer)
+    if not layer_dir or not layer_dir.exists():
+        return []
+
+    all_imports: list[ImportOccurrence] = []
+    for f in _get_python_files(layer_dir):
+        all_imports.extend(_scan_file_imports(f))
+    return all_imports
 
 
 # =============================================================================
@@ -204,13 +365,15 @@ class TestDomainLayerZeroDependency:
 
         violations = []
         for f in files:
-            direct_imports, from_imports = _get_imports(f)
-            all_imports = direct_imports + from_imports
+            for imp in _scan_file_imports(f):
+                if imp.in_type_checking:
+                    continue
+                if imp.resolved_import is None:
+                    continue
 
-            for imp in all_imports:
-                normalized = _normalize_import(imp.split(".")[0])
+                normalized = _normalize_import(imp.resolved_import.split(".")[0])
                 if normalized in FORBIDDEN_DOMAIN_IMPORTS:
-                    violations.append(f"{f.relative_to(ROOT)} imports '{normalized}'")
+                    violations.append(f"{f.relative_to(ROOT)}:{imp.lineno} imports '{normalized}'")
 
         assert not violations, "Domain layer has forbidden imports:\n" + "\n".join(violations)
 
@@ -220,35 +383,35 @@ class TestDomainLayerZeroDependency:
         violations = []
 
         for f in files:
-            direct_imports, from_imports = _get_imports(f)
-            all_imports = direct_imports + [imp.split(".")[0] for imp in from_imports]
+            for imp in _scan_file_imports(f):
+                if imp.in_type_checking:
+                    continue
+                if imp.resolved_import is None:
+                    continue
 
-            for imp in all_imports:
-                normalized = _normalize_import(imp)
-                # Skip if it's a stdlib module
+                normalized = _normalize_import(imp.resolved_import.split(".")[0])
+
+                # Skip stdlib modules
                 if normalized in STDLIB_MODULES:
                     continue
-                # Skip if it's a forbidden external (already checked above)
+                # Skip forbidden imports (already checked above)
                 if normalized in FORBIDDEN_DOMAIN_IMPORTS:
                     continue
                 # Skip relative imports and known safe imports
                 if normalized.startswith(".") or normalized in ("src", "domain"):
                     continue
-                # Check if it's a site-package (external)
-                try:
-                    import importlib.util
 
-                    spec = importlib.util.find_spec(normalized)
-                    if spec is not None and "site-packages" in str(spec.origin or ""):
-                        violations.append(f"{f.relative_to(ROOT)} imports site-package '{normalized}'")
-                except (ModuleNotFoundError, ValueError):
-                    pass
+                # Check if it's a site-package (external)
+                import importlib.util
+
+                spec = importlib.util.find_spec(normalized)
+                if spec is not None and "site-packages" in str(spec.origin or ""):
+                    violations.append(f"{f.relative_to(ROOT)}:{imp.lineno} imports site-package '{normalized}'")
 
         assert not violations, "Domain layer imports external packages:\n" + "\n".join(violations)
 
     def test_domain_ruff_check_passes(self):
         """Domain layer must pass ruff check (no unused imports, etc)."""
-
         result = subprocess.run(
             ["poetry", "run", "ruff", "check", "src/domain/"],
             capture_output=True,
@@ -300,9 +463,11 @@ class TestDependencyDirectionRules:
         violations: dict[str, list[str]] = {target: [] for target in forbidden_layers}
 
         for f in files:
-            for target_layer in forbidden_layers:
-                if has_layer_import(f, target_layer):
-                    violations[target_layer].append(str(f.relative_to(ROOT)))
+            for imp in _scan_file_imports(f):
+                if imp.in_type_checking:
+                    continue
+                if imp.target_layer in forbidden_layers:
+                    violations[imp.target_layer].append(f"{f.relative_to(ROOT)}:{imp.lineno}")
 
         failed_checks = [f"  - {target} imported by: {', '.join(viols)}" for target, viols in violations.items() if viols]
 
@@ -352,12 +517,11 @@ class TestInterfacesLayerConstraints:
         violations = []
 
         for f in files:
-            direct_imports, from_imports = _get_imports(f)
-            all_imports = direct_imports + from_imports
-            for imp in all_imports:
-                if imp == "redis" or imp.startswith("redis."):
-                    violations.append(str(f.relative_to(ROOT)))
-                    break
+            for imp in _scan_file_imports(f):
+                if imp.in_type_checking:
+                    continue
+                if imp.resolved_import and (imp.resolved_import == "redis" or imp.resolved_import.startswith("redis.")):
+                    violations.append(f"{f.relative_to(ROOT)}:{imp.lineno}")
 
         assert not violations, "Interfaces must NOT import redis directly:\n" + "\n".join(violations)
 
@@ -370,12 +534,13 @@ class TestInterfacesLayerConstraints:
         violations = []
 
         for f in files:
-            direct_imports, from_imports = _get_imports(f)
-            all_imports = direct_imports + from_imports
-            for imp in all_imports:
-                if imp == "sqlalchemy" or imp.startswith("sqlalchemy."):
-                    violations.append(str(f.relative_to(ROOT)))
-                    break
+            for imp in _scan_file_imports(f):
+                if imp.in_type_checking:
+                    continue
+                if imp.resolved_import and (
+                    imp.resolved_import == "sqlalchemy" or imp.resolved_import.startswith("sqlalchemy.")
+                ):
+                    violations.append(f"{f.relative_to(ROOT)}:{imp.lineno}")
 
         assert not violations, "Interfaces must NOT import sqlalchemy directly:\n" + "\n".join(violations)
 

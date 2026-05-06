@@ -145,7 +145,7 @@ class RedisEventSubscriber:
             self._task.cancel()
             try:
                 await asyncio.wait_for(self._task, timeout=5.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+            except (TimeoutError, asyncio.CancelledError):
                 pass
             self._task = None
         if self._pubsub:

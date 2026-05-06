@@ -21,6 +21,7 @@ class UserModel(Base):
     email: Mapped[str] = mapped_column(String(100), unique=True)
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -31,6 +32,7 @@ class UserModel(Base):
         id: UUID | None = None,
         hashed_password: str | None = None,
         is_active: bool = True,
+        is_locked: bool = False,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> None:
@@ -39,5 +41,6 @@ class UserModel(Base):
         self.email = email
         self.hashed_password = hashed_password
         self.is_active = is_active
+        self.is_locked = is_locked
         self.created_at = created_at
         self.updated_at = updated_at
