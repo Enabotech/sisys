@@ -5476,13 +5476,13 @@ graph TD
 
     %% ========== Epic 2-8 (待开始) ==========
     subgraph "Epic 2-8 📋 (待开始 - 82 Stories)"
-        E2["Epic 2<br/>文档与数据管理<br/>9 Stories"]
-        E3["Epic 3<br/>智能检索与发现<br/>13 Stories"]
-        E4["Epic 4<br/>战略工具箱<br/>5 Stories"]
-        E5["Epic 5<br/>Agent 协作<br/>6 Stories"]
-        E6["Epic 6<br/>战略规划流程<br/>12 Stories"]
-        E7["Epic 7<br/>用户界面与 API<br/>8 Stories"]
-        E8["Epic 8<br/>权限与审计<br/>6 Stories"]
+        E2["Epic 2<br/>文档与数据管理<br/>9 Stories<br/>📋 Backlog"]
+        E3["Epic 3<br/>智能检索与发现<br/>13 Stories<br/>📋 Backlog"]
+        E4["Epic 4<br/>战略工具箱<br/>5 Stories<br/>📋 Backlog"]
+        E5["Epic 5<br/>Agent 协作<br/>6 Stories<br/>📋 Backlog"]
+        E6["Epic 6<br/>战略规划流程<br/>12 Stories<br/>📋 Backlog"]
+        E7["Epic 7<br/>用户界面与 API<br/>8 Stories<br/>📋 Backlog"]
+        E8["Epic 8<br/>权限与审计<br/>6 Stories<br/>📋 Backlog"]
     end
 
     %% ========== 关键依赖关系 ==========
@@ -5566,64 +5566,71 @@ graph TD
     classDef untested fill:#FF9800,color:white,stroke:#E65100,stroke-width:2px;
     classDef ready fill:#2196F3,color:white,stroke:#0D47A1,stroke-width:2px;
     classDef backlog fill:#9E9E9E,color:white,stroke:#424242,stroke-width:2px;
+    classDef inprogress fill:#9C27B0,color:white,stroke:#6A1B9A,stroke-width:2px;
     classDef critical fill:#F44336,color:white,stroke:#B71C1C,stroke-width:3px;
 
-    class S0_1,S0_3,S0_4,S0_5,S0_6,S0_7,S0_8,S0_9 done;
-    class S0_14,S0_15,S0_16 untested;
-    class S0_17,S0_18 ready;
-    class S1_1 critical;
-    class S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_9,S1_10,S1_11,S1_12,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_15b,S1_16,S1_17,S1_18a,S1_18b,S1_19 backlog;
+    class S0_1,S0_3,S0_4,S0_5,S0_6,S0_7,S0_8,S0_9,S0_14,S0_15,S0_16 done;
+    class S0_17,S0_18,S0_30 ready;
+    class S1_1,S1_2,S1_3,S1_4,S1_5,S1_6,S1_7,S1_8,S1_13,S1_14a,S1_14b,S1_14c,S1_15a,S1_16,S1_17 done;
+    class S1_9,S1_15b inprogress;
+    class S1_18a ready;
+    class S1_10,S1_11,S1_12,S1_18b,S1_19 backlog;
     class E2,E3,E4,E5,E6,E7,E8 backlog;
 ```
 
 #### 关键路径识别
 
-**关键路径 1: Epic 0 Iteration 1 完成 (当前优先级最高) 🟥**
+**关键路径 1: Epic 0 Iteration 1 收尾 (当前冲刺) 🟡**
 
 ```
-Story 0.4 (✅ Done)
-  → Story 0.5 (Gitea)
-  → Story 0.7 (ArgoCD)
-  → Story 0.9 (Pipeline 模板)
+Story 0.17 (自动诊断修复 - ready-for-dev)
+Story 0.18 (配置向导 - ready-for-dev)
+Story 0.30 (应用启动集成 - ready-for-dev)
 ```
 
 **关键性分析:**
-- Story 0.9 是 Epic 1 的前置条件（CI/CD 基础设施）
-- 影响 Epic 1 所有 23 个 Story 的开发效率
-- 延迟 1 天 → Epic 1 延迟 1 天
-
-**资源建议:**
-- 分配 2 个 AI AGENT 并行开发 Story 0.5 和 Story 0.6
-- Story 0.7 和 Story 0.8 可并行
-- Story 0.9 需要 Story 0.7 和 Story 0.8 完成后才能开始
+- 这 3 个 Story 是 Epic 0 Iteration 1 的最后 3 个
+- 完成后 Epic 0 Iteration 1 可完全交付
+- Epic 0 Iteration 1 是 Epic 1 的前置依赖
 
 ---
 
-**关键路径 2: Epic 1 架构基础 (技术风险最高) 🟧**
+**关键路径 2: Epic 1 安全合规 (当前技术风险最高) 🟧**
 
 ```
-Story 1.1 (六边形架构)
-  → Story 1.2 (领域事件)
-  → Story 1.3 (事件总线)
-  → Story 1.18a/b (Prefect + LangGraph)
+Story 1.9 (RBAC 权限 - In-Progress)
+  → Story 1.10 (审计日志)
+  → Story 1.11 (数据主权隔离)
+  → Story 1.12 (等保 2.0 三级)
 ```
 
 **关键性分析:**
-- Story 1.1 是所有后续 Epic 的技术基础
-- Story 1.3 事件总线是系统"血液"，技术复杂度高
-- Story 1.18a/b 是双核引擎，决定系统核心能力
+- Story 1.9 是 Epic 7 (用户界面) 和 Epic 8 (权限审计) 的前置
+- RBAC 是所有安全功能的基础
+- Story 1.11 数据主权隔离依赖 PermissionContext 优化
 
 **技术风险:**
-- 六边形架构边界划分（领域层 vs 应用层）
-- 事件总线可靠性（Redis + RabbitMQ 双通道）
-- 双引擎协调（Prefect + LangGraph）
-
-**资源建议:**
-- Story 1.1 分配资深架构师 AI AGENT
-- Story 1.3 需要 2 个 AI AGENT 协作（Redis 专家 + RabbitMQ 专家）
-- Story 1.18a/b 可并行开发，但需要同一 AI AGENT 保持上下文一致性
+- RBAC 与现有 PermissionMiddleware 的集成
+- 等保 2.0 合规性认证
 
 ---
+
+**关键路径 3: Epic 1 外部化记忆与工作流引擎 (核心能力) 🟦**
+
+```
+Story 1.15b (外部化记忆协同 - In-Progress)
+  → Story 1.18a (Prefect 工作流 - ready-for-dev)
+  → Story 1.18b (LangGraph 编排)
+  → Story 1.19 (成本度量)
+```
+
+**关键性分析:**
+- Story 1.18a/b 是 Epic 4 (工具箱) 和 Epic 6 (战略规划) 的前置
+- 这两个是系统双核引擎，决定核心能力
+
+**技术风险:**
+- 六层存储协同 (L0-L5)
+- 双引擎协调 (Prefect + LangGraph)
 
 **关键路径 3: Epic 1 六层存储 (工作量最大) 🟨**
 
@@ -5738,60 +5745,66 @@ Story 1.4 (Redis)
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **0.4** (K3S) | 0.1, 0.3 | 0.5, 0.6, 0.7, 0.8, 0.14-0.18 | Hard | ✅ |
-| **0.5** (Gitea) | 0.4 | 0.7, 0.8, 0.9 | Hard | ✅ |
-| **0.6** (Harbor) | 0.4 | 0.7, 0.9 | Hard | ✅ |
-| **0.7** (ArgoCD) | 0.5, 0.6 | 0.9 | Hard | ✅ |
-| **0.8** (Runner) | 0.5 | 0.9 | Hard | ❌ |
-| **0.9** (Pipeline) | 0.7, 0.8 | Epic 1 所有 Story | Hard | ✅ |
-| **0.14-0.18** (产品交付) | 0.4 | - | Soft | ❌ |
+| **0.4** (K3S) | 0.1, 0.3 ✅ | 0.5, 0.6, 0.7, 0.8, 0.14-0.18, 0.30 | Hard | ✅ 已完成 |
+| **0.5** (Gitea) | 0.4 ✅ | 0.7, 0.8, 0.9 ✅ | Hard | ✅ 已完成 |
+| **0.6** (Harbor) | 0.4 ✅ | 0.7, 0.9 ✅ | Hard | ✅ 已完成 |
+| **0.7** (ArgoCD) | 0.5, 0.6 ✅ | 0.9 ✅ | Hard | ✅ 已完成 |
+| **0.8** (Runner) | 0.5 ✅ | 0.9 ✅ | Hard | ✅ 已完成 |
+| **0.9** (Pipeline) | 0.7, 0.8 ✅ | Epic 1 所有 Story | Hard | ✅ 已完成 |
+| **0.14** (Windows 安装器) | 0.4 ✅ | - | Soft | ✅ 已完成 |
+| **0.15** (Mac 安装器) | 0.4 ✅ | - | Soft | ✅ 已完成 |
+| **0.16** (Linux 安装器) | 0.4 ✅ | - | Soft | ✅ 已完成 |
+| **0.17** (自动诊断修复) | 0.4 ✅ | - | Soft | 🔄 当前 |
+| **0.18** (配置向导) | 0.4, 1.1 ✅ | - | Soft | 🔄 当前 |
+| **0.30** (应用启动集成) | 0.4 ✅ | - | Soft | 🔄 当前 |
 
 **Epic 1 价值组 2 (架构基础) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **1.1** (六边形架构) | 0.9 | 1.2, 1.16, Epic 2-8 | Hard | ✅ |
-| **1.2** (领域事件) | 1.1 | 1.3 | Hard | ✅ |
-| **1.3** (事件总线) | 1.2 | 1.14a, 1.18a, 1.18b | Hard | ✅ |
-| **1.16** (集成测试) | 1.1 | - | Soft | ❌ |
+| **1.1** (六边形架构) | 0.9 ✅ | 1.2, 1.16, Epic 2-8 | Hard | ✅ 已完成 |
+| **1.2** (领域事件) | 1.1 ✅ | 1.3 | Hard | ✅ 已完成 |
+| **1.3** (事件总线) | 1.2 ✅ | 1.14a, 1.18a, 1.18b | Hard | ✅ 已完成 |
+| **1.16** (集成测试) | 1.1 ✅ | - | Soft | ✅ 已完成 |
 
 **Epic 1 价值组 3 (六层存储) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **1.4** (Redis) | 0.9 | 1.5 | Hard | ✅ |
-| **1.5** (PostgreSQL) | 1.4 | 1.6, 1.9 | Hard | ✅ |
-| **1.6** (Qdrant) | 1.5 | 1.7, Epic 3 | Hard | ✅ |
-| **1.7** (MinIO) | 1.6 | 1.8 | Hard | ❌ |
-| **1.8** (Neo4j) | 1.7 | Epic 3 | Hard | ❌ |
+| **1.4** (Redis) | 0.9 ✅ | 1.5 | Hard | ✅ 已完成 |
+| **1.5** (PostgreSQL) | 1.4 ✅ | 1.6, 1.9 | Hard | ✅ 已完成 |
+| **1.6** (Qdrant) | 1.5 ✅ | 1.7, Epic 3 | Hard | ✅ 已完成 |
+| **1.7** (MinIO) | 1.6 ✅ | 1.8 | Hard | ✅ 已完成 |
+| **1.8** (Neo4j) | 1.7 ✅ | Epic 3 | Hard | ✅ 已完成 |
+| **1.13** (K8s 扩缩容) | 0.4 ✅ | - | Soft | ✅ 已完成 |
 
 **Epic 1 价值组 4 (安全合规) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **1.9** (RBAC) | 1.5 | 1.10, Epic 7 | Hard | ✅ |
-| **1.10** (审计日志) | 1.9 | 1.11, Epic 8 | Hard | ✅ |
-| **1.11** (数据主权) | 1.10 | 1.12 | Hard | ✅ |
-| **1.12** (等保 2.0) | 1.11 | - | Hard | ❌ |
+| **1.9** (RBAC) | 1.5 ✅ | 1.10, Epic 7 | Hard | 🔄 In-Progress |
+| **1.10** (审计日志) | 1.9 | 1.11, Epic 8 | Hard | 📋 Backlog |
+| **1.11** (数据主权) | 1.10 | 1.12 | Hard | 📋 Backlog |
+| **1.12** (等保 2.0) | 1.11 | - | Hard | 📋 Backlog |
 
 **Epic 1 价值组 5 (系统公理) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **1.14a** (trigger) | 1.3 | 1.14b | Hard | ✅ |
-| **1.14b** (route) | 1.14a | 1.14c, 1.17 | Hard | ✅ |
-| **1.14c** (execute) | 1.14b | 1.15a | Hard | ✅ |
-| **1.15a** (L1 显式确认压缩) | 1.4, 1.5 | 1.15b | Hard | ❌ |
-| **1.15b** (六层协同) | 1.15a, 1.4, 1.5 | - | Hard | ❌ |
+| **1.14a** (trigger) | 1.3 ✅ | 1.14b | Hard | ✅ 已完成 |
+| **1.14b** (route) | 1.14a ✅ | 1.14c, 1.17 | Hard | ✅ 已完成 |
+| **1.14c** (execute) | 1.14b ✅ | 1.15a | Hard | ✅ 已完成 |
+| **1.15a** (L1 显式确认压缩) | 1.4, 1.5 ✅ | 1.15b | Hard | ✅ 已完成 |
+| **1.15b** (六层协同) | 1.15a, 1.4, 1.5 ✅ | - | Hard | 🔄 In-Progress |
 
 **Epic 1 价值组 6 (关键机制) 依赖矩阵**
 
 | Story | 前置依赖 | 后置依赖 | 依赖类型 | 关键路径 |
 |-------|---------|---------|---------|---------|
-| **1.17** (UDMR) | 1.14b | 1.19, Epic 3 | Hard | ✅ |
-| **1.18a** (Prefect) | 1.3 | Epic 2, Epic 6 | Hard | ✅ |
-| **1.18b** (LangGraph) | 1.3 | Epic 4, Epic 5, Epic 6 | Hard | ✅ |
-| **1.19** (成本度量) | 1.17 | - | Soft | ❌ |
+| **1.17** (UDMR) | 1.14b ✅ | 1.19, Epic 3 | Hard | ✅ 已完成 |
+| **1.18a** (Prefect) | 1.3 ✅ | Epic 2, Epic 6 | Hard | 📋 ready-for-dev |
+| **1.18b** (LangGraph) | 1.3 ✅ | Epic 4, Epic 5, Epic 6 | Hard | 📋 Backlog |
+| **1.19** (成本度量) | 1.17 ✅ | - | Soft | 📋 Backlog |
 
 ---
 
