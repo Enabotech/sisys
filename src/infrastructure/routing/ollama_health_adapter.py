@@ -59,37 +59,4 @@ class OllamaHealthAdapter(HealthCheckPort):
             self._client = None
 
 
-# Backward compatibility alias
-LocalModelHealth = OllamaHealthAdapter
-
-
-def _get_session():
-    """Get or create a shared session for connection pooling.
-
-    Deprecated: 仅用于向后兼容。新代码应使用 OllamaHealthAdapter。
-    """
-    import warnings
-
-    warnings.warn(
-        "_get_session() is deprecated, use OllamaHealthAdapter instead",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    global _session
-    if _session is None:
-        import requests
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-
-        _session = requests.Session()
-        adapter = HTTPAdapter(
-            pool_connections=10,
-            pool_maxsize=10,
-            max_retries=Retry(total=0),
-        )
-        _session.mount("http://", adapter)
-        _session.mount("https://", adapter)
-    return _session
-
-
-_session = None
+__all__ = ["OllamaHealthAdapter", "DEFAULT_OLLAMA_ENDPOINT"]
