@@ -1,8 +1,13 @@
-"""LocalModelHealthFacade — 应用层门面，多模型健康检查统一入口。
+"""LocalModelHealthFacade — 应用层入口，多模型健康检查统一入口。
 
-根据配置选择具体 Adapter（Ollama/Gemini/vLLM），统一暴露给 UDMRouter。
+通过注入的 HealthCheckerFactory 创建具体 Adapter（Ollama/Gemini/vLLM），统一暴露给 UDMRouter。
 
 架构来源: Story 1.17 六边形架构设计澄清（2026-05-07）
+
+六边形约束遵守：
+- 本类是应用层服务
+- 依赖 Domain 层接口（HealthCheckerFactory, HealthCheckPort）
+- 工厂由外部注入，不在内部创建 Infrastructure 具体类
 """
 
 from __future__ import annotations
@@ -11,57 +16,44 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.domain.ports.health_check import HealthCheckPort
+    from src.domain.ports.health_check_factory import HealthCheckerFactory
     from src.infrastructure.config.udmr import UDMRConfig
 
 
 class LocalModelHealthFacade:
-    """应用层门面 — 多模型健康检查统一入口。
+    """应用层入口 — 多模型健康检查统一入口。
 
     职责：
-    - 根据配置选择具体 Adapter（Ollama/Gemini/vLLM）
+    - 根据注入的 HealthCheckerFactory 创建具体 Adapter（Ollama/Gemini/vLLM）
     - 统一暴露 async check() / close() 接口
-    - 隐藏具体实现细节
+    - 隐藏具体 Adapter 创建细节
 
     设计原则：
     - 应用层编排，不包含业务逻辑
-    - 依赖 Domain Port（HealthCheckPort）
-    - 工厂模式：根据配置创建对应 Adapter
+    - 依赖 Domain Port（HealthCheckPort, HealthCheckerFactory）
+    - 工厂由外部注入（六边形正确姿势）
     """
 
-    def __init__(self, config: UDMRConfig | None = None) -> None:
+    def __init__(
+        self,
+        factory: HealthCheckerFactory,
+        config: UDMRConfig | None = None,
+    ) -> None:
         """初始化 LocalModelHealthFacade。
 
         Args:
-            config: UDMRConfig 配置，决定使用哪个 Adapter。
-                   如果为 None，使用默认 OllamaHealthAdapter。
+            factory: HealthCheckerFactory 实例，用于创建具体 Adapter。
+            config: UDMRConfig 配置（可选，用于日志/追踪）。
         """
+        self._factory = factory
         self._config = config
         self._adapter: HealthCheckPort | None = None
-
-    def _create_adapter(self) -> HealthCheckPort:
-        """根据配置创建对应的健康检查 Adapter。
-
-        Returns:
-            HealthCheckPort 实现实例。
-        """
-        # Import here to avoid circular dependency
-        from src.infrastructure.routing.ollama_health_adapter import (
-            OllamaHealthAdapter,
-        )
-
-        if self._config is not None and self._config.local_model:
-            # Future: 可扩展为根据 model type 选择不同 Adapter
-            # e.g., if self._config.local_model_type == "gemini": ...
-            pass
-
-        # Default: 使用 OllamaHealthAdapter
-        return OllamaHealthAdapter()
 
     @property
     def _health_checker(self) -> HealthCheckPort:
         """惰性加载 Adapter。"""
         if self._adapter is None:
-            self._adapter = self._create_adapter()
+            self._adapter = self._factory.create()
         return self._adapter
 
     async def check(self) -> bool:

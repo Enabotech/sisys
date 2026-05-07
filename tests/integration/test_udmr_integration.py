@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
-from src.domain.services.udmr_router import HealthChecker, UDMRouter
+import pytest
+
+from src.domain.ports.health_check import HealthCheckPort
+from src.domain.services.udmr_router import UDMRouter
 from src.domain.value_objects.routing_decision import RoutingDecision
 from src.infrastructure.routing.fallback_router import FallbackRouter
 
@@ -14,42 +16,45 @@ from src.infrastructure.routing.fallback_router import FallbackRouter
 class TestUDMRIntegration:
     """Integration test suite for UDMRouter end-to-end flow."""
 
-    def test_end_to_end_routing_local_when_healthy(self) -> None:
+    @pytest.mark.asyncio
+    async def test_end_to_end_routing_local_when_healthy(self) -> None:
         """End-to-end test: local routing when Ollama is available."""
         router = UDMRouter()
-        mock_health = MagicMock()
+        mock_health = AsyncMock(spec=HealthCheckPort)
         mock_health.check.return_value = True
-        router._health_checker = cast(HealthChecker | None, mock_health)
+        router._health_checker = mock_health
 
         task_context = {
             "task_id": "integration-001",
             "session_id": "integration-session-001",
             "complexity": "medium",
         }
-        decision = router.route(task_context)
+        decision = await router.route_async(task_context)
 
         assert decision.route_type == "local"
         assert decision.selected_model == "qwen2.5:7b"
         assert decision.fallback_reason is None
 
-    def test_end_to_end_routing_cloud_when_unhealthy(self) -> None:
+    @pytest.mark.asyncio
+    async def test_end_to_end_routing_cloud_when_unhealthy(self) -> None:
         """End-to-end test: cloud routing when Ollama is unavailable."""
         router = UDMRouter()
-        mock_health = MagicMock()
+        mock_health = AsyncMock(spec=HealthCheckPort)
         mock_health.check.return_value = False
-        router._health_checker = cast(HealthChecker | None, mock_health)
+        router._health_checker = mock_health
 
         task_context = {
             "task_id": "integration-002",
             "session_id": "integration-session-002",
             "complexity": "high",
         }
-        decision = router.route(task_context)
+        decision = await router.route_async(task_context)
 
         assert decision.route_type == "cloud"
         assert decision.selected_model == "qwen-turbo"
         assert decision.fallback_reason == "unavailable"
 
+    @pytest.mark.asyncio
     async def test_fallback_router_with_healthy_local(self) -> None:
         """Test FallbackRouter with healthy local model."""
         router = FallbackRouter()
@@ -61,6 +66,7 @@ class TestUDMRIntegration:
 
         assert result == "qwen2.5:7b"
 
+    @pytest.mark.asyncio
     async def test_fallback_router_with_unhealthy_local(self) -> None:
         """Test FallbackRouter with unhealthy local model."""
         router = FallbackRouter()
@@ -72,7 +78,8 @@ class TestUDMRIntegration:
 
         assert result == "qwen-turbo"
 
-    def test_routing_decision_log_creation(self) -> None:
+    @pytest.mark.asyncio
+    async def test_routing_decision_log_creation(self) -> None:
         """Test that RoutingDecision can be created with all UDMR fields."""
         decision = RoutingDecision(
             log_id=uuid.uuid4(),
@@ -90,7 +97,8 @@ class TestUDMRIntegration:
         assert decision.route_type == "local"
         assert decision.selected_model == "qwen2.5:7b"
 
-    def test_routing_decision_with_fallback_reason(self) -> None:
+    @pytest.mark.asyncio
+    async def test_routing_decision_with_fallback_reason(self) -> None:
         """Test that RoutingDecision captures fallback reason correctly."""
         decision = RoutingDecision(
             log_id=uuid.uuid4(),
