@@ -160,7 +160,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
   - 继承系统公理二（外部化记忆）模式
 
 #### 沙箱执行 (Sandbox Execution)
-- [ ] SandboxExecutor 端口接口（`src/interfaces/cli/commands/sandbox_port.py`）
+- [ ] SandboxExecutor 端口接口（`src/application/ports/sandbox_port.py`）
   - 接口方法: `start_container()`, `execute_code()`, `stop_container()`
   - 定义在 interfaces 层（作为六边形架构的"端口"）
 - [ ] DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
@@ -295,7 +295,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [x] Subtask 0.1: 定义 AutoExecuted 技术事件 Schema（`src/domain/events/auto_execute_events.py`）
 - [x] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
 - [x] Subtask 0.3: 定义 AutoExecuteService 服务接口（`src/domain/services/auto_execute_service.py`）
-- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/interfaces/cli/commands/sandbox_port.py`）
+- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/application/ports/sandbox_port.py`）
 - [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
 - [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
 - [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
@@ -320,7 +320,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
-| 🟢 绿 | 实现 `src/interfaces/cli/commands/sandbox_port.py`（端口接口）和 `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
+| 🟢 绿 | 实现 `src/application/ports/sandbox_port.py`（端口接口）和 `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
 - [x] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
@@ -682,7 +682,7 @@ sisys/
 - `src/domain/entities/checkpoint_snapshot.py` - CheckpointSnapshot
 - `src/domain/repositories/snapshot_repository.py` - SnapshotRepository 接口（领域层定义）
 - `src/infrastructure/config/execute.py` - AutoExecuteConfig
-- `src/interfaces/cli/commands/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
+- `src/application/ports/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
 - `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
 - `src/infrastructure/external_services/sandbox/session_namespace_manager.py` - SessionNamespaceManager
 - `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
@@ -707,7 +707,7 @@ sisys/
 - `src/infrastructure/config/__init__.py` - 添加 AutoExecuteConfig 导出
 - `src/infrastructure/external_services/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
 - `src/infrastructure/storage/__init__.py` - 添加 RedisSnapshotStore 导出
-- `src/interfaces/cli/commands/sandbox_port.py` - 添加 SandboxPort 导出
+- `src/application/ports/sandbox_port.py` - 添加 SandboxPort 导出
 - `src/application/event_handlers/__init__.py` - 添加 auto_execute_completed_listener 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
