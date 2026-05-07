@@ -24,6 +24,7 @@ class AuditSearchCriteria:
     target_resource: str | None = None
     offset: int = 0
     limit: int = 20
+    match_any: bool = False  # True=OR条件, False=AND条件（默认）
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ class AuditRepositoryPort(ABC):
     """审计仓储端口（领域层定义，仅使用 ABC + 标准库）.
 
     定义审计日志的 CRUD 和检索接口。
-    实现类位于 infrastructure 层（可导入 SQLAlchemy 等外部库）。
+    实现类位于 infrastructure 层（可导入外部ORM框架）。
     """
 
     @abstractmethod

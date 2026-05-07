@@ -120,7 +120,7 @@
 - [x] 单元测试覆盖角色 CRUD、权限验证场景 ✅
 
 > **六边形架构约束：**
-> - Role 数据模型在 `src/infrastructure/security/models.py`（SQLAlchemy 模型）
+> - Role 数据模型在 `src/infrastructure/storage/postgresql/role.py`（SQLAlchemy 模型）
 > - RoleService 实现在 `src/infrastructure/security/role_service.py`
 > - 禁止在领域层直接使用 SQLAlchemy 模型
 
@@ -218,9 +218,9 @@
 
 #### 数据模型 (Data Models) — 基础设施层
 - [ ] User 模型（PostgreSQL 表扩展，来自 Story 1.5）
-- [ ] Role 模型（`src/infrastructure/security/models.py`）
+- [ ] Role 模型（`src/infrastructure/storage/postgresql/role.py`）
   - 字段: `id`, `name`, `description`, `permissions` (JSON), `is_active`, `created_at`, `updated_at`
-- [ ] Permission 模型（`src/infrastructure/security/models.py`）
+- [ ] Permission 模型（`src/infrastructure/storage/postgresql/models/permission.py`）
   - 字段: `id`, `resource`, `action`, `description`
 - [ ] UserRole 关联模型（多对多关系）
 
@@ -1086,7 +1086,10 @@ sisys/
 - [x] `src/infrastructure/security/jwt_service.py` - JWT Service 实现 ✅
 - [x] `src/infrastructure/security/permission_service_impl.py` - PermissionServicePort 实现 ✅
 - [x] `src/infrastructure/security/permission_middleware.py` - 权限验证中间件 ✅
-- [x] `src/infrastructure/security/models.py` - SQLAlchemy 模型（Role, Permission, UserRole）✅
+- [x] `src/infrastructure/storage/postgresql/models/role.py` - SQLAlchemy 模型（Role）✅
+- [x] `src/infrastructure/storage/postgresql/models/permission.py` - SQLAlchemy 模型（Permission）✅
+- [x] `src/infrastructure/storage/postgresql/models/user.py` - SQLAlchemy 模型（User）✅
+- [x] `src/infrastructure/storage/postgresql/models/rbac_association.py` - SQLAlchemy 模型（UserRole/RolePermission）✅
 - [x] `src/infrastructure/security/encryption_service.py` - 加密服务（passlib/bcrypt）✅
 
 #### 接口层 (Interfaces)

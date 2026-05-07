@@ -1,9 +1,5 @@
 """PostgreSQL models package."""
 
-from src.infrastructure.storage.postgresql.models.association import (
-    role_permissions_table,
-    user_roles_table,
-)
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel
 from src.infrastructure.storage.postgresql.models.login_attempt import LoginAttemptModel
@@ -17,6 +13,10 @@ from src.infrastructure.storage.postgresql.models.outbox import (
     pg_registry,
 )
 from src.infrastructure.storage.postgresql.models.permission import PermissionModel
+from src.infrastructure.storage.postgresql.models.rbac_association import (
+    role_permissions_table,
+    user_roles_table,
+)
 from src.infrastructure.storage.postgresql.models.role import RoleModel
 from src.infrastructure.storage.postgresql.models.user import UserModel
 

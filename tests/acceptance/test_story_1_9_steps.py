@@ -18,6 +18,7 @@ Test Isolation:
 
 from __future__ import annotations
 
+import ast
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -38,8 +39,6 @@ scenarios("test_story_1_9.feature")
 # ===================================================================
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT / "src"
-DOMAIN_DIR = SRC_DIR / "domain"
 
 
 # ===================================================================
@@ -1736,7 +1735,27 @@ def verify_operation_denied(context):
 @when("扫描 src/domain/ports/ 目录")
 def scan_domain_ports(context):
     """Scan domain ports directory."""
-    pass
+    domain_dir = Path(__file__).parents[4] / "src" / "domain"
+    forbidden_imports = {"python-jose", "passlib", "bcrypt"}
+
+    violations = []
+    for py_file in domain_dir.rglob("*.py"):
+        with open(py_file, encoding="utf-8") as f:
+            content = f.read()
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in forbidden_imports:
+                        violations.append(f"{py_file.name}: imports {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and any(f in node.module for f in forbidden_imports):
+                    violations.append(f"{py_file.name}: from {node.module} import ...")
+
+    context["domain_violations"] = violations
 
 
 @when("检查认证服务实现")
@@ -1748,25 +1767,46 @@ def check_auth_service_implementation(context):
 @when("检查依赖方向")
 def check_dependency_direction(context):
     """Check dependency direction."""
-    pass
+    domain_dir = Path(__file__).parents[4] / "src" / "domain"
+
+    violations = []
+    for py_file in domain_dir.rglob("*.py"):
+        with open(py_file, encoding="utf-8") as f:
+            content = f.read()
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and "infrastructure" in node.module:
+                    violations.append(f"{py_file.name}: from {node.module} import ...")
+
+    context["dependency_violations"] = violations
 
 
 @then("没有任何文件包含 python-jose 导入")
 def verify_no_python_jose_import(context):
     """Verify no python-jose imports in domain."""
-    pass
+    violations = context.get("domain_violations", [])
+    python_jose_violations = [v for v in violations if "python-jose" in v]
+    assert not python_jose_violations, f"Domain layer has python-jose imports: {python_jose_violations}"
 
 
 @then("没有任何文件包含 passlib 导入")
 def verify_no_passlib_import(context):
     """Verify no passlib imports in domain."""
-    pass
+    violations = context.get("domain_violations", [])
+    passlib_violations = [v for v in violations if "passlib" in v]
+    assert not passlib_violations, f"Domain layer has passlib imports: {passlib_violations}"
 
 
 @then("没有任何文件包含 bcrypt 导入")
 def verify_no_bcrypt_import(context):
     """Verify no bcrypt imports in domain."""
-    pass
+    violations = context.get("domain_violations", [])
+    bcrypt_violations = [v for v in violations if "bcrypt" in v]
+    assert not bcrypt_violations, f"Domain layer has bcrypt imports: {bcrypt_violations}"
 
 
 @then("AuthServicePort 在 domain/ports/")
@@ -1794,4 +1834,5 @@ def verify_infra_can_depend_domain(context):
 @then("domain 不能依赖 infrastructure")
 def verify_domain_cannot_depend_infra(context):
     """Verify domain cannot depend on infrastructure."""
-    pass
+    violations = context.get("dependency_violations", [])
+    assert not violations, f"Domain layer imports infrastructure: {violations}"

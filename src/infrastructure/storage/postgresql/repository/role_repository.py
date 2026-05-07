@@ -64,7 +64,7 @@ class RoleRepository(RoleRepositoryPort):
             权限字符串元组
         """
         from src.infrastructure.storage.postgresql.models import PermissionModel
-        from src.infrastructure.storage.postgresql.models.association import (
+        from src.infrastructure.storage.postgresql.models.rbac_association import (
             role_permissions_table as role_permissions,
         )
 
@@ -175,7 +175,7 @@ class RoleRepository(RoleRepositoryPort):
             role_id: 角色 UUID
             permissions: 权限字符串元组
         """
-        from src.infrastructure.storage.postgresql.models.association import (
+        from src.infrastructure.storage.postgresql.models.rbac_association import (
             role_permissions_table as role_permissions,
         )
 
@@ -272,7 +272,7 @@ class RoleRepository(RoleRepositoryPort):
         Returns:
             权限列表
         """
-        from src.infrastructure.storage.postgresql.models.association import (
+        from src.infrastructure.storage.postgresql.models.rbac_association import (
             role_permissions_table as role_permissions,
         )
 
