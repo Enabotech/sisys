@@ -31,15 +31,18 @@ class AuditServiceImpl(AuditServicePort):
         self,
         audit_repository: AuditRepositoryPort,
         event_publisher=None,  # EventPublisher (optional, for outbox pattern)
+        worm_manager=None,  # WORMManager (optional, for archival to MinIO WORM storage)
     ):
         """初始化审计服务.
 
         Args:
             audit_repository: 审计仓储端口
             event_publisher: 事件发布器（可选，用于发件箱模式）
+            worm_manager: WORM管理器（可选，用于归档到MinIO WORM存储）
         """
         self._audit_repo = audit_repository
         self._event_publisher = event_publisher
+        self._worm_manager = worm_manager
 
     async def record(
         self,
@@ -261,6 +264,24 @@ class AuditServiceImpl(AuditServicePort):
                         archived=True,
                         archived_at=archived_at,
                     )
+
+                    # 如果配置了WORM管理器，异步归档日志数据到MinIO WORM存储
+                    if success and self._worm_manager:
+                        try:
+                            # 构建对象键：audit/{log_id}/{timestamp}.json
+                            timestamp_str = item.get("timestamp", "").replace(":", "-").replace("+", "-")
+                            object_key = f"audit/{log_id}/{timestamp_str}.json"
+
+                            # 归档到MinIO WORM存储
+                            self._worm_manager.archive_object(
+                                bucket_name="sisys-audit-archives",
+                                object_key=object_key,
+                                retention_days=2555,  # SOX 7年保留期
+                            )
+                        except Exception:
+                            # WORM归档失败不影响主流程，仅记录
+                            pass
+
                     if success:
                         archived_count += 1
 
