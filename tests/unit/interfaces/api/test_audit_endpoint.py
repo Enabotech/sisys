@@ -1,26 +1,18 @@
-"""Tests for Audit API endpoints."""
+"""Tests for Audit API endpoints using TestClient."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from src.domain.ports.audit_repository import AuditSearchCriteria, AuditSearchResult
-from src.interfaces.api.audit import (
-    ArchiveRequest,
-    ArchiveResponse,
-    ArchiveStatusResponse,
-    AuditLogListResponse,
-    AuditLogResponse,
-    IntegrityVerifyDetail,
-    IntegrityVerifyRequest,
-    IntegrityVerifyResponse,
-    create_audit_router,
-)
+from src.domain.ports.audit_service import AuditRecord
+from src.interfaces.api.audit import create_audit_router
 
 
 class FakeAuditRepository:
@@ -40,28 +32,31 @@ class FakeAuditRepository:
 
     async def search(self, criteria: AuditSearchCriteria) -> AuditSearchResult:
         items = list(self._logs.values())
-        # Filter by criteria
+        # Apply basic filtering
         filtered = []
         for item in items:
-            timestamp = datetime.fromisoformat(item["timestamp"])
-            if criteria.start_time and timestamp < criteria.start_time:
-                continue
-            if criteria.end_time and timestamp > criteria.end_time:
-                continue
+            ts_str = item.get("timestamp", "")
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if criteria.start_time and ts < criteria.start_time:
+                        continue
+                    if criteria.end_time and ts > criteria.end_time:
+                        continue
+                except ValueError:
+                    pass
             if criteria.actor and item.get("actor") != criteria.actor:
                 continue
             if criteria.action_type and criteria.action_type not in item.get("action_type", ""):
                 continue
             filtered.append(item)
-
-        # Apply pagination
+        total = len(filtered)
         start = criteria.offset
         end = start + criteria.limit
         paginated = filtered[start:end]
-
         return AuditSearchResult(
             items=tuple(paginated),
-            total=len(filtered),
+            total=total,
             offset=criteria.offset,
             limit=criteria.limit,
         )
@@ -90,206 +85,489 @@ class FakeAuditRepository:
         }
 
 
-class TestCreateAuditRouter:
-    """Test create_audit_router factory function."""
+class FakeAuditService:
+    """Fake audit service for testing."""
 
-    def test_create_audit_router_returns_api_router(self) -> None:
-        """Test create_audit_router returns an APIRouter."""
-        router = create_audit_router(
-            get_audit_service=MagicMock,
-            get_audit_repository=MagicMock,
-        )
-        assert router is not None
-        assert router.prefix == "/audit"
-        assert len(router.routes) == 5
+    def __init__(self, repo: FakeAuditRepository) -> None:
+        self._repo = repo
 
-
-class TestAuditLogResponseModel:
-    """Test AuditLogResponse model."""
-
-    def test_audit_log_response_all_fields(self) -> None:
-        """Test AuditLogResponse with all fields."""
-        response = AuditLogResponse(
-            log_id="test-123",
-            timestamp=datetime.now(),
-            actor="user-456",
-            action_type="authentication:login",
-            target_resource="/api/v1/auth",
-            old_value={"key": "old"},
-            new_value={"key": "new"},
-            correction_level=1,
-            checksum="abc123",
-            archived=True,
-            archived_at=datetime.now(),
-            correlation_id="corr-789",
-        )
-
-        assert response.log_id == "test-123"
-        assert response.actor == "user-456"
-        assert response.archived is True
-
-    def test_audit_log_response_minimal(self) -> None:
-        """Test AuditLogResponse with minimal fields."""
-        response = AuditLogResponse(log_id="test-123")
-
-        assert response.log_id == "test-123"
-        assert response.timestamp is None
-        assert response.archived is False
-
-    def test_audit_log_response_with_isoformat_timestamp(self) -> None:
-        """Test AuditLogResponse parses isoformat timestamp correctly."""
-        ts = datetime.now()
-        response = AuditLogResponse(
-            log_id="test-123",
-            timestamp=ts,
-            actor="user-456",
-        )
-        assert response.timestamp == ts
-
-
-class TestIntegrityVerifyDetail:
-    """Test IntegrityVerifyDetail model."""
-
-    def test_integrity_verify_detail_all_fields(self) -> None:
-        """Test IntegrityVerifyDetail with all fields."""
-        detail = IntegrityVerifyDetail(
-            log_id="test-123",
-            status="passed",
-            message="Verification successful",
+    async def record(
+        self,
+        actor: str,
+        action_type: str,
+        target_resource: str,
+        old_value: dict[str, Any] | None = None,
+        new_value: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
+    ) -> AuditRecord:
+        log_id = uuid4()
+        timestamp = datetime.now(timezone.utc)
+        self._repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": timestamp.isoformat(),
+            "actor": actor,
+            "action_type": action_type,
+            "target_resource": target_resource,
+            "old_value": old_value,
+            "new_value": new_value,
+            "correction_level": 0,
+            "checksum": "a" * 64,
+            "correlation_id": correlation_id,
+        }
+        return AuditRecord(
+            log_id=log_id,
+            timestamp=timestamp,
+            actor=actor,
+            action_type=action_type,
+            target_resource=target_resource,
+            old_value=old_value or {},
+            new_value=new_value or {},
+            correction_level=0,
         )
 
-        assert detail.log_id == "test-123"
-        assert detail.status == "passed"
-        assert detail.message == "Verification successful"
+    async def verify_integrity(self, log_id: UUID) -> bool:
+        log = self._repo._logs.get(log_id)
+        if not log:
+            return False
+        return True
 
-    def test_integrity_verify_detail_minimal(self) -> None:
-        """Test IntegrityVerifyDetail with minimal fields."""
-        detail = IntegrityVerifyDetail(
-            log_id="test-123",
-            status="failed",
+    async def verify_batch(self, log_ids: list[UUID] | None) -> dict[str, Any]:
+        if log_ids is None:
+            log_ids = list(self._repo._logs.keys())
+        details = []
+        passed = 0
+        for lid in log_ids:
+            log = self._repo._logs.get(lid)
+            if log:
+                details.append({"log_id": str(lid), "status": "passed", "message": "OK"})
+                passed += 1
+            else:
+                details.append({"log_id": str(lid), "status": "failed", "message": "Not found"})
+        return {"total": len(log_ids), "passed": passed, "failed": len(log_ids) - passed, "details": details}
+
+    async def archive(self, older_than_days: int) -> int:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        count = 0
+        for log_id, log in list(self._repo._logs.items()):
+            ts_str = log.get("timestamp", "")
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if ts < cutoff:
+                        log["archived"] = True
+                        count += 1
+                except ValueError:
+                    pass
+        return count
+
+
+@pytest.fixture
+def fake_repo() -> FakeAuditRepository:
+    return FakeAuditRepository()
+
+
+@pytest.fixture
+def fake_service(fake_repo: FakeAuditRepository) -> FakeAuditService:
+    return FakeAuditService(fake_repo)
+
+
+@pytest.fixture
+def app(fake_repo: FakeAuditRepository, fake_service: FakeAuditService) -> FastAPI:
+    application = FastAPI()
+    application.include_router(
+        create_audit_router(
+            get_audit_service=lambda: fake_service,
+            get_audit_repository=lambda: fake_repo,
         )
-
-        assert detail.log_id == "test-123"
-        assert detail.status == "failed"
-        assert detail.message is None
+    )
+    return application
 
 
-class TestIntegrityVerifyResponse:
-    """Test IntegrityVerifyResponse model."""
-
-    def test_integrity_verify_response(self) -> None:
-        """Test IntegrityVerifyResponse with details."""
-        response = IntegrityVerifyResponse(
-            total=3,
-            passed=2,
-            failed=1,
-            details=[
-                IntegrityVerifyDetail(log_id="1", status="passed"),
-                IntegrityVerifyDetail(log_id="2", status="passed"),
-                IntegrityVerifyDetail(log_id="3", status="failed", message="Checksum mismatch"),
-            ],
-        )
-
-        assert response.total == 3
-        assert response.passed == 2
-        assert response.failed == 1
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)
 
 
-class TestArchiveRequest:
-    """Test ArchiveRequest model."""
+class TestSearchAuditLogs:
+    """Test GET /audit/logs endpoint."""
 
-    def test_archive_request_default(self) -> None:
-        """Test ArchiveRequest with default values."""
-        request = ArchiveRequest()
-        assert request.older_than_days == 30
+    def test_search_returns_empty_list(self, client: TestClient) -> None:
+        """Test search returns empty when no logs exist."""
+        response = client.get("/audit/logs")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["items"] == []
+        assert data["total"] == 0
 
-    def test_archive_request_custom_days(self) -> None:
-        """Test ArchiveRequest with custom days."""
-        request = ArchiveRequest(older_than_days=60)
-        assert request.older_than_days == 60
+    def test_search_returns_logs(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test search returns existing logs."""
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-123",
+            "action_type": "authentication:login",
+            "target_resource": "/api/v1/auth/login",
+            "old_value": None,
+            "new_value": {"status": "success"},
+            "correction_level": 0,
+            "checksum": "a" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": "corr-123",
+        }
 
-    def test_archive_request_invalid_days_zero(self) -> None:
-        """Test ArchiveRequest rejects zero days."""
-        from pydantic import ValidationError
+        response = client.get("/audit/logs")
 
-        with pytest.raises(ValidationError):
-            ArchiveRequest(older_than_days=0)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["actor"] == "user-123"
 
-    def test_archive_request_invalid_days_negative(self) -> None:
-        """Test ArchiveRequest rejects negative days."""
-        from pydantic import ValidationError
+    def test_search_with_actor_filter(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test search with actor filter."""
+        for i in range(3):
+            log_id = uuid4()
+            fake_repo._logs[log_id] = {
+                "log_id": str(log_id),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "actor": f"user-{i}",
+                "action_type": "authentication:login",
+                "target_resource": "/api/v1/auth/login",
+                "old_value": None,
+                "new_value": None,
+                "correction_level": 0,
+                "checksum": "b" * 64,
+                "archived": False,
+                "archived_at": None,
+                "correlation_id": None,
+            }
 
-        with pytest.raises(ValidationError):
-            ArchiveRequest(older_than_days=-1)
+        response = client.get("/audit/logs", params={"actor": "user-0"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["actor"] == "user-0"
+
+    def test_search_with_action_type_filter(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test search with action_type filter."""
+        log_id1 = uuid4()
+        log_id2 = uuid4()
+        fake_repo._logs[log_id1] = {
+            "log_id": str(log_id1),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-1",
+            "action_type": "authentication:login",
+            "target_resource": "/api/v1/auth/login",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "c" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+        fake_repo._logs[log_id2] = {
+            "log_id": str(log_id2),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-2",
+            "action_type": "document:upload",
+            "target_resource": "/api/v1/docs/doc-1",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "d" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+
+        response = client.get("/audit/logs", params={"action_type": "login"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert "login" in data["items"][0]["action_type"]
+
+    def test_search_with_pagination(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test search with offset and limit."""
+        for i in range(5):
+            log_id = uuid4()
+            fake_repo._logs[log_id] = {
+                "log_id": str(log_id),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "actor": f"user-{i}",
+                "action_type": "test:action",
+                "target_resource": f"/resource/{i}",
+                "old_value": None,
+                "new_value": None,
+                "correction_level": 0,
+                "checksum": "e" * 64,
+                "archived": False,
+                "archived_at": None,
+                "correlation_id": None,
+            }
+
+        response = client.get("/audit/logs", params={"offset": 2, "limit": 2})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 5
+        assert len(data["items"]) == 2
+        assert data["offset"] == 2
+        assert data["limit"] == 2
 
 
-class TestArchiveResponse:
-    """Test ArchiveResponse model."""
+class TestGetAuditLog:
+    """Test GET /audit/logs/{log_id} endpoint."""
 
-    def test_archive_response(self) -> None:
-        """Test ArchiveResponse model."""
-        response = ArchiveResponse(archived_count=42)
-        assert response.archived_count == 42
+    def test_get_log_success(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test get log returns log details."""
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-123",
+            "action_type": "authentication:login",
+            "target_resource": "/api/v1/auth/login",
+            "old_value": None,
+            "new_value": {"status": "success"},
+            "correction_level": 0,
+            "checksum": "f" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
 
+        response = client.get(f"/audit/logs/{log_id}")
 
-class TestArchiveStatusResponse:
-    """Test ArchiveStatusResponse model."""
+        assert response.status_code == 200
+        data = response.json()
+        assert data["log_id"] == str(log_id)
+        assert data["actor"] == "user-123"
 
-    def test_archive_status_response_archived(self) -> None:
-        """Test ArchiveStatusResponse when archived."""
-        response = ArchiveStatusResponse(
-            log_id="test-123",
-            archived=True,
-            archived_at=datetime.now(),
-            retention_days=2555,
-        )
+    def test_get_log_invalid_uuid(self, client: TestClient) -> None:
+        """Test get log with invalid UUID returns 400."""
+        response = client.get("/audit/logs/not-a-uuid")
 
-        assert response.log_id == "test-123"
-        assert response.archived is True
-        assert response.retention_days == 2555
+        assert response.status_code == 400
+        assert "Invalid log_id format" in response.json()["detail"]
 
-    def test_archive_status_response_not_archived(self) -> None:
-        """Test ArchiveStatusResponse when not archived."""
-        response = ArchiveStatusResponse(
-            log_id="test-123",
-            archived=False,
-            retention_days=2555,
-        )
+    def test_get_log_not_found(self, client: TestClient) -> None:
+        """Test get log not found returns 404."""
+        response = client.get(f"/audit/logs/{uuid4()}")
 
-        assert response.archived is False
-        assert response.archived_at is None
-
-
-class TestAuditLogListResponse:
-    """Test AuditLogListResponse model."""
-
-    def test_audit_log_list_response(self) -> None:
-        """Test AuditLogListResponse with items."""
-        response = AuditLogListResponse(
-            items=[
-                AuditLogResponse(log_id="1", actor="user-1"),
-                AuditLogResponse(log_id="2", actor="user-2"),
-            ],
-            total=10,
-            offset=0,
-            limit=20,
-        )
-
-        assert len(response.items) == 2
-        assert response.total == 10
-        assert response.offset == 0
-        assert response.limit == 20
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
 
 
-class TestIntegrityVerifyRequest:
-    """Test IntegrityVerifyRequest model."""
+class TestVerifyIntegrity:
+    """Test POST /audit/verify endpoint."""
 
-    def test_integrity_verify_request_with_log_ids(self) -> None:
-        """Test IntegrityVerifyRequest with log_ids."""
-        request = IntegrityVerifyRequest(log_ids=["id-1", "id-2"])
-        assert request.log_ids == ["id-1", "id-2"]
+    def test_verify_empty_request(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test verify with empty request verifies all."""
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-123",
+            "action_type": "test:action",
+            "target_resource": "/resource",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "g" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
 
-    def test_integrity_verify_request_empty(self) -> None:
-        """Test IntegrityVerifyRequest with empty log_ids."""
-        request = IntegrityVerifyRequest(log_ids=None)
-        assert request.log_ids is None
+        response = client.post("/audit/verify", json={})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["passed"] == 1
+
+    def test_verify_specific_log_ids(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test verify with specific log_ids."""
+        log_id1 = uuid4()
+        log_id2 = uuid4()
+        fake_repo._logs[log_id1] = {
+            "log_id": str(log_id1),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-1",
+            "action_type": "test:action",
+            "target_resource": "/resource/1",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "h" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+        fake_repo._logs[log_id2] = {
+            "log_id": str(log_id2),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-2",
+            "action_type": "test:action",
+            "target_resource": "/resource/2",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "i" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+
+        response = client.post("/audit/verify", json={"log_ids": [str(log_id1), str(log_id2)]})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert data["passed"] == 2
+
+    def test_verify_invalid_log_id_format(self, client: TestClient) -> None:
+        """Test verify with invalid log_id format returns 400."""
+        response = client.post("/audit/verify", json={"log_ids": ["not-a-uuid"]})
+
+        assert response.status_code == 400
+        assert "Invalid log_id format" in response.json()["detail"]
+
+
+class TestGetArchiveStatus:
+    """Test GET /audit/archive/status endpoint."""
+
+    def test_get_archive_status_success(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test get archive status returns status."""
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "actor": "user-123",
+            "action_type": "test:action",
+            "target_resource": "/resource",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "j" * 64,
+            "archived": True,
+            "archived_at": datetime.now(timezone.utc).isoformat(),
+            "correlation_id": None,
+        }
+
+        response = client.get("/audit/archive/status", params={"log_id": str(log_id)})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["log_id"] == str(log_id)
+        assert data["archived"] is True
+        assert data["retention_days"] == 2555
+
+    def test_get_archive_status_invalid_uuid(self, client: TestClient) -> None:
+        """Test get archive status with invalid UUID returns 400."""
+        response = client.get("/audit/archive/status", params={"log_id": "invalid"})
+
+        assert response.status_code == 400
+        assert "Invalid log_id format" in response.json()["detail"]
+
+    def test_get_archive_status_not_found(self, client: TestClient) -> None:
+        """Test get archive status not found returns 404."""
+        response = client.get("/audit/archive/status", params={"log_id": str(uuid4())})
+
+        assert response.status_code == 404
+
+
+class TestArchiveLogs:
+    """Test POST /audit/archive endpoint."""
+
+    def test_archive_default_days(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test archive with default older_than_days."""
+        # Create an old log
+        old_time = datetime.now(timezone.utc) - timedelta(days=35)
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": old_time.isoformat(),
+            "actor": "user-old",
+            "action_type": "test:action",
+            "target_resource": "/resource",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "k" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+
+        response = client.post("/audit/archive", json={})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["archived_count"] == 1
+
+    def test_archive_custom_days(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test archive with custom older_than_days."""
+        # Create a log that's 15 days old
+        old_time = datetime.now(timezone.utc) - timedelta(days=15)
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": old_time.isoformat(),
+            "actor": "user-old",
+            "action_type": "test:action",
+            "target_resource": "/resource",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "l" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+
+        response = client.post("/audit/archive", json={"older_than_days": 10})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["archived_count"] == 1
+
+    def test_archive_no_old_logs(self, client: TestClient, fake_repo: FakeAuditRepository) -> None:
+        """Test archive when no logs match criteria."""
+        # Create a recent log
+        recent_time = datetime.now(timezone.utc) - timedelta(days=5)
+        log_id = uuid4()
+        fake_repo._logs[log_id] = {
+            "log_id": str(log_id),
+            "timestamp": recent_time.isoformat(),
+            "actor": "user-recent",
+            "action_type": "test:action",
+            "target_resource": "/resource",
+            "old_value": None,
+            "new_value": None,
+            "correction_level": 0,
+            "checksum": "m" * 64,
+            "archived": False,
+            "archived_at": None,
+            "correlation_id": None,
+        }
+
+        response = client.post("/audit/archive", json={"older_than_days": 30})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["archived_count"] == 0
+
+
+class TestAuditRouterPrefix:
+    """Test router configuration."""
+
+    def test_router_has_correct_prefix(self, app: FastAPI) -> None:
+        """Test router has /audit prefix."""
+        audit_paths = [r.path for r in app.routes if hasattr(r, "path") and r.path.startswith("/audit")]
+        assert len(audit_paths) == 5  # 5 audit endpoints
