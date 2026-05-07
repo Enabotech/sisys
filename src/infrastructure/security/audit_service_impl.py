@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -231,33 +231,44 @@ class AuditServiceImpl(AuditServicePort):
         try:
             # 计算截止时间
             cutoff_time = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-            from datetime import timedelta
-
             cutoff_time = cutoff_time - timedelta(days=older_than_days)
 
-            # 搜索需要归档的日志
-            criteria = AuditSearchCriteria(
-                start_time=None,
-                end_time=cutoff_time,
-                offset=0,
-                limit=100,  # 批量处理
-            )
-
-            result = await self._audit_repo.search(criteria)
             archived_count = 0
+            offset = 0
+            batch_size = 100
 
-            for item in result.items:
-                log_id = UUID(item["log_id"])
-                archived_at = datetime.now(UTC)
-
-                # 更新归档状态
-                success = await self._audit_repo.update_archive_status(
-                    log_id=log_id,
-                    archived=True,
-                    archived_at=archived_at,
+            # 分批处理所有符合条件的数据
+            while True:
+                criteria = AuditSearchCriteria(
+                    start_time=None,
+                    end_time=cutoff_time,
+                    offset=offset,
+                    limit=batch_size,
                 )
-                if success:
-                    archived_count += 1
+
+                result = await self._audit_repo.search(criteria)
+
+                if not result.items:
+                    break
+
+                for item in result.items:
+                    log_id = UUID(item["log_id"])
+                    archived_at = datetime.now(UTC)
+
+                    # 更新归档状态
+                    success = await self._audit_repo.update_archive_status(
+                        log_id=log_id,
+                        archived=True,
+                        archived_at=archived_at,
+                    )
+                    if success:
+                        archived_count += 1
+
+                # 如果返回的数量小于批次大小，说明已经是最后一页
+                if len(result.items) < batch_size:
+                    break
+
+                offset += batch_size
 
             return archived_count
         except Exception as e:
