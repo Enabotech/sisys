@@ -326,7 +326,7 @@ def domain_does_not_depend_on_application(arch_context):
 def domain_does_not_depend_on_interfaces():
     """Domain layer must not import from interfaces layer."""
     for f in _get_python_files(DOMAIN_DIR):
-        imports = _get_imports(f)  # noqa: F841
+        imports = _get_imports(f)
         assert "src.interfaces" not in imports and "interfaces" not in imports
 
 
@@ -334,7 +334,7 @@ def domain_does_not_depend_on_interfaces():
 def domain_does_not_depend_on_infrastructure():
     """Domain layer must not import from infrastructure layer."""
     for f in _get_python_files(DOMAIN_DIR):
-        imports = _get_imports(f)  # noqa: F841
+        imports = _get_imports(f)
         assert "src.infrastructure" not in imports and "infrastructure" not in imports
 
 
@@ -344,7 +344,7 @@ def application_does_not_depend_on_interfaces():
     app_dir = SRC_DIR / "application"
     if app_dir.exists():
         for f in _get_python_files(app_dir):
-            imports = _get_imports(f)  # noqa: F841
+            imports = _get_imports(f)
             # Allow relative imports within application
             assert "src.interfaces" not in imports
 
@@ -355,7 +355,7 @@ def application_does_not_depend_on_infrastructure():
     app_dir = SRC_DIR / "application"
     if app_dir.exists():
         for f in _get_python_files(app_dir):
-            imports = _get_imports(f)  # noqa: F841
+            _ = _get_imports(f)
             # Infrastructure is a valid dependency from application in hexagonal arch
             # This test verifies the constraint is documented
             pass  # Hexagonal architecture allows application -> infrastructure
@@ -368,7 +368,7 @@ def interfaces_can_depend_on_application_and_domain():
     intf_dir = SRC_DIR / "interfaces"
     if intf_dir.exists():
         for f in _get_python_files(intf_dir):
-            imports = _get_imports(f)  # noqa: F841
+            imports = _get_imports(f)
             # Verify no invalid dependencies (like infrastructure)
             assert "src.infrastructure" not in imports
 
@@ -379,7 +379,7 @@ def infrastructure_can_depend_on_application_and_domain():
     infra_dir = SRC_DIR / "infrastructure"
     if infra_dir.exists():
         for f in _get_python_files(infra_dir):
-            imports = _get_imports(f)  # noqa: F841
+            imports = _get_imports(f)
             # Verify no invalid dependencies (like interfaces)
             assert "src.interfaces" not in imports
 
