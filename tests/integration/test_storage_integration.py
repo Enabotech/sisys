@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,10 +25,6 @@ from src.application.services.six_layer_storage_coordinator import (
 )
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
-
-if TYPE_CHECKING:
-    pass
-
 
 # ===================================================================
 # Fixtures

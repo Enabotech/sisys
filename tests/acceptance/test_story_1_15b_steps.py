@@ -6,19 +6,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from tests.environments import get_test_env
-
-if TYPE_CHECKING:
-    pass
-
 # from src.infrastructure.security.memory_access_control import MemoryAccessControl
 from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.memory_index import MemoryIndex
+from tests.environments import get_test_env
 
 scenarios("test_story_1_15b.feature")
 

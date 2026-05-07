@@ -22,12 +22,9 @@ import asyncio
 import fcntl
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from src.domain.ports.index_manager import IndexManagerPort
-
-if TYPE_CHECKING:
-    from src.infrastructure.config.memory import MemoryConfig
+from src.infrastructure.config.memory import MemoryConfig
 
 # 索引行格式正则
 INDEX_LINE_PATTERN = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")

@@ -6,13 +6,10 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import Literal, Protocol
 
+from src.domain.ports.health_check import HealthCheckPort
 from src.domain.value_objects.routing_decision import RoutingDecision
-
-if TYPE_CHECKING:
-    from src.domain.ports.health_check import HealthCheckPort
-
 
 DEFAULT_LOCAL_MODEL = "qwen2.5:7b"
 DEFAULT_CLOUD_MODELS = ["qwen-turbo", "qwen-plus", "claude-3-haiku"]
