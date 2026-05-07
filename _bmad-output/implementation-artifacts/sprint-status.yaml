@@ -81,7 +81,7 @@ development_status:
   1-13-k8s-auto-scaling: done
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: done
-  1-10-unified-audit-log: review       # 代码审查中
+  1-10-unified-audit-log: done
   1-11-data-sovereignty-isolation: backlog      # PermissionContext 待优化（story 1.9 技术债）
   1-12-equilibrium-level-3-compliance: backlog
   # 价值组 5: or.md 系统公理实现
