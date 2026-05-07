@@ -52,7 +52,7 @@
 
 #### API 契约 (API Contract)
 - [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
-- [ ] 契约测试通过（`tests/contract/test_api_contract.py`）
+- [ ] 契约测试通过（`tests/contract/test_[xxx]_api_contract.py`）
 - [ ] API 版本管理正确（`/api/v1/[resource]`）
 
 #### 数据模型 (Data Models)
@@ -331,6 +331,8 @@ sisys/
 │       ├── [component].py      # 核心实现
 │       └── __init__.py         # 模块导出
 ├── tests/
+│   ├── contract/
+│   │   └── test_[xxx]_api_contract.py # 契约测试
 │   ├── unit/[layer]/
 │   │   └── test_[component].py # 单元测试
 │   ├── integration/
