@@ -145,3 +145,25 @@ class TestRBACOpenAPISpec:
         roles_post = paths["/roles"].get("post", {})
         security = roles_post.get("security", [])
         assert len(security) > 0, "POST /roles should require authentication"
+
+    def test_delete_permission_endpoint_exists(self) -> None:
+        """验证撤销权限端点 DELETE /roles/{role_id}/permissions/{permission} 存在。"""
+        spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
+        paths = spec_dict.get("paths", {})
+
+        delete_perms = paths["/roles/{role_id}/permissions"].get("delete")
+        assert delete_perms is not None, "DELETE method not found for /roles/{role_id}/permissions"
+
+        params = delete_perms.get("parameters", [])
+        param_names = [p["name"] for p in params]
+        assert "role_id" in param_names, "role_id path parameter missing"
+        assert "permission" in param_names, "permission path parameter missing"
+
+    def test_delete_permission_endpoint_requires_auth(self) -> None:
+        """验证撤销权限端点需要认证。"""
+        spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
+        paths = spec_dict.get("paths", {})
+
+        delete_perms = paths["/roles/{role_id}/permissions"].get("delete", {})
+        security = delete_perms.get("security", [])
+        assert len(security) > 0, "DELETE /roles/{role_id}/permissions should require authentication"
