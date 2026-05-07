@@ -65,7 +65,7 @@ Story 1.3 AC-3 约束（正确）:
 
 ### 1.3 设计目标
 
-1. **Scheme B 架构**: EventBus 作为统一门面，内部协调 Outbox 和 Publisher（对标 NServiceBus）
+1. **Scheme B 架构**: EventBus 作为统一入口，内部协调 Outbox 和 Publisher（对标 NServiceBus）
 2. **Story 1.3 约束满足**: RELIABLE 强制走 Outbox → RabbitMQ
 3. **六边形架构严格遵守**: 领域层零基础设施感知，类型放置遵循分层约束
 4. **接口单一职责**: 发布与订阅接口分离，职责清晰
@@ -777,11 +777,11 @@ class RabbitMQEventBus(EventPublisher):
         pass
 ```
 
-### 5.3 DualChannelEventBus（统一门面）
+### 5.3 DualChannelEventBus（统一入口）
 
 ```python
 # src/infrastructure/messaging/dual_channel_event_bus.py
-"""DualChannelEventBus — 双通道统一事件总线门面。
+"""DualChannelEventBus — 双通道统一事件总线入口。
 
 对标 NServiceBus 的 Bus.Send/Publish 语义。
 是应用层的主入口，负责协调 RedisEventBus 和 RabbitMQEventBus。
@@ -808,7 +808,7 @@ logger = logging.getLogger(__name__)
 
 
 class DualChannelEventBus(EventPublisher, EventSubscriber):
-    """双通道统一事件总线门面（主入口）。
+    """双通道统一事件总线入口（主入口）。
 
     同时实现 EventPublisher 和 EventSubscriber 接口。
     根据 ChannelRouter 推断的 DeliveryMode 路由：

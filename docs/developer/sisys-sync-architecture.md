@@ -41,7 +41,7 @@ SISYS 系统采用**双通道事件总线架构**，通过 `DualChannelEventBus`
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      基础设施层 (Infrastructure)                         │
 │  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │              DualChannelEventBus (双通道事件总线门面)                 │ │
+│  │              DualChannelEventBus (双通道事件总线入口)                 │ │
 │  │   ├── RedisEventBus (REALTIME 实时通道)                              │ │
 │  │   └── RabbitMQEventBus (RELIABLE 可靠通道 + Outbox 模式)             │ │
 │  └─────────────────────────────────────────────────────────────────────┘ │
@@ -115,7 +115,7 @@ class OutboxRepository(ABC):
 #### 2.2.1 DualChannelEventBus
 **文件路径**: `src/infrastructure/messaging/dual_channel_event_bus.py`
 
-统一双通道事件总线门面，根据 `ChannelRouter` 推断 `DeliveryMode`:
+统一双通道事件总线入口，根据 `ChannelRouter` 推断 `DeliveryMode`:
 - `REALTIME`: 路由到 `RedisEventBus` (Redis Pub/Sub)
 - `RELIABLE`: 路由到 `RabbitMQEventBus` (Outbox 模式)
 
