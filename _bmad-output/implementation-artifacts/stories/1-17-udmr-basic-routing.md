@@ -131,6 +131,9 @@
 - [ ] HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
   - 方法: `async check() -> bool`, `async close() -> None`
   - 职责: 定义健康检查的统一接口契约（异步，零外部依赖）
+- [ ] HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
+  - 方法: `create() -> HealthCheckPort`
+  - 职责: 定义创建 HealthCheckPort 实例的工厂接口（零外部依赖）
 
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
@@ -559,7 +562,8 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── ports/
-│   │   │   └── health_check.py        # HealthCheckPort（Domain Port，异步接口）
+│   │   │   ├── health_check.py        # HealthCheckPort（Domain Port，异步接口）
+│   │   │   └── health_check_factory.py # HealthCheckerFactory（Domain 工厂接口）
 │   │   ├── services/
 │   │   │   └── udmr_router.py         # UDMRouter（Domain Service，核心逻辑）
 │   │   ├── value_objects/
@@ -568,13 +572,14 @@ sisys/
 │   │       └── routing_decision_log.py # RoutingDecisionLog（扩展）
 │   ├── application/
 │   │   └── services/
-│   │       └── local_model_health_facade.py  # LocalModelHealthFacade（Application Facade，多模型工厂）
+│   │       └── local_model_health_facade.py  # LocalModelHealthFacade（Application Facade）
 │   └── infrastructure/
 │       ├── config/
 │       │   └── udmr.py                # UDMRConfig 配置
 │       └── routing/
-│           ├── ollama_health_adapter.py  # OllamaHealthAdapter（Infrastructure Adapter，实现 HealthCheckPort）
-│           └── fallback_router.py       # FallbackRouter（故障切换）
+│           ├── ollama_health.py       # OllamaHealthAdapter + OllamaHealthCheckerFactory（配对）
+│           ├── local_model_health.py   # LocalModelHealth + create_local_model_health_facade（入口）
+│           └── fallback_router.py      # FallbackRouter（故障切换）
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
@@ -600,11 +605,15 @@ sisys/
 
 | 层级 | 目录 | 组件 | 职责 |
 |------|------|------|------|
-| **Domain（领域层）** | `domain/` | `HealthCheckPort`, `UDMRouter`, `RoutingDecision` | 定义接口契约和核心业务逻辑，零外部依赖 |
-| **Application（应用层）** | `application/services/` | `LocalModelHealthFacade` | 业务编排，根据配置选择具体 Adapter |
-| **Infrastructure（基础设施层）** | `infrastructure/routing/` | `OllamaHealthAdapter`, `FallbackRouter` | 具体技术实现，依赖外部库（httpx） |
+| **Domain（领域层）** | `domain/` | `HealthCheckPort`, `HealthCheckerFactory`, `UDMRouter`, `RoutingDecision` | 定义接口契约和核心业务逻辑，零外部依赖 |
+| **Application（应用层）** | `application/services/` | `LocalModelHealthFacade` | 业务编排，接受 factory 注入，不直接创建 Infrastructure 对象 |
+| **Infrastructure（基础设施层）** | `infrastructure/routing/` | `OllamaHealthAdapter`, `OllamaHealthCheckerFactory`, `FallbackRouter` | 具体技术实现，依赖外部库（httpx） |
 
-> ⚠️ **重要澄清（2026-05-07）：** 原 `local_model_health.py` 仅做重导出和 `__getattr__` 废弃兼容的设计是错误的。正确的设计是将其重构为 `LocalModelHealthFacade`（Application Facade），作为多模型健康检查的统一入口。
+> ⚠️ **重要澄清（2026-05-07）：** 经过四轮架构审查，最终设计确认：
+> - `HealthCheckerFactory`（Domain 层工厂接口）与 `HealthCheckPort`（Domain 层产品接口）分开定义
+> - `OllamaHealthCheckerFactory` 与 `OllamaHealthAdapter` 合并为 `ollama_health.py`（一对一配对）
+> - `create_local_model_health_facade` 根据 `model_type` 在入口函数内分发，每个具体工厂只生产一种产品
+> - 向后兼容：`LocalModelHealth` 保留为工厂函数入口
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -683,7 +692,8 @@ sisys/
 - `src/domain/value_objects/routing_decision.py` - RoutingDecision 值对象
 - `src/infrastructure/config/udmr.py` - UDMRConfig 配置模型
 - `src/application/services/local_model_health_facade.py` - LocalModelHealthFacade（新增：多模型工厂门面）
-- `src/infrastructure/routing/ollama_health_adapter.py` - OllamaHealthAdapter（实现 HealthCheckPort，删除冗余别名）
+- `src/infrastructure/routing/ollama_health.py` - OllamaHealthAdapter + OllamaHealthCheckerFactory（合并实现）
+- `src/infrastructure/routing/local_model_health.py` - LocalModelHealth + create_local_model_health_facade（入口合并）
 - `src/infrastructure/routing/fallback_router.py` - FallbackRouter 故障切换
 - `src/domain/entities/routing_decision_log.py` - RoutingDecisionLog 扩展（添加本地/云端路由字段）
 - `tests/unit/domain/services/test_udmr_router.py` - UDMRouter 单元测试
@@ -700,13 +710,13 @@ sisys/
 - `src/interfaces/event_listeners/udmr_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
 
 **更新的文件/Updated Files:**
-- `src/domain/ports/__init__.py` - 添加 HealthCheckPort 导出
+- `src/domain/ports/__init__.py` - 添加 HealthCheckPort, HealthCheckerFactory 导出
 - `src/domain/services/__init__.py` - 添加 UDMRouter 导出
 - `src/domain/value_objects/__init__.py` - 添加 RoutingDecision 导出
 - `src/domain/entities/__init__.py` - 添加 RoutingDecisionLog 导出
 - `src/application/services/__init__.py` - 添加 LocalModelHealthFacade 导出
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
-- `src/infrastructure/routing/__init__.py` - 添加 OllamaHealthAdapter, FallbackRouter 导出
+- `src/infrastructure/routing/__init__.py` - 添加 OllamaHealthAdapter, OllamaHealthCheckerFactory, LocalModelHealth, FallbackRouter 导出
 
 ---
 
@@ -898,6 +908,7 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 > **审查日期:** 2026-05-07
 > **审查模式:** 架构设计审查
 > **问题来源:** 用户反馈 local_model_health.py 和 ollama_health_adapter.py 功能重叠
+> **状态:** ✅ 全部修复完成 (2026-05-07)
 
 ### 问题分析
 
@@ -908,49 +919,59 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 | `ollama_health_adapter.py:63` | `LocalModelHealth = OllamaHealthAdapter` | 冗余别名，与 local_model_health.py 职责重叠 |
 | `UDMRouter` | 使用同步 `HealthChecker` Protocol | 与 `HealthCheckPort`（异步）不同步 |
 
-### 修复方案
+### 修复方案（最终实现）
 
 | 问题 | 修复方案 | 状态 |
 |------|----------|------|
-| local_model_health.py 架构角色错乱 | 重构为 `LocalModelHealthFacade`（Application Facade） | ⏳ 待实施 |
-| 冗余别名 `LocalModelHealth = OllamaHealthAdapter` | 删除，保留 `OllamaHealthAdapter` 即可 | ⏳ 待实施 |
-| UDMRouter 使用同步 Protocol | 改为依赖 `HealthCheckPort`（异步接口） | ⏳ 待实施 |
-| 测试文件路径不一致 | `test_local_model_health.py` 移至 `tests/unit/application/services/` | ⏳ 待实施 |
+| local_model_health.py 架构角色错乱 | 重构为 `LocalModelHealthFacade`（Application Facade） | ✅ 已完成 |
+| 冗余别名 `LocalModelHealth = OllamaHealthAdapter` | 删除，保留 `OllamaHealthAdapter` 即可 | ✅ 已完成 |
+| UDMRouter 使用同步 Protocol | 改为依赖 `HealthCheckPort`（异步接口） | ✅ 已完成 |
+| 测试文件路径不一致 | `test_local_model_health.py` 移至 `tests/unit/application/services/` | ✅ 已完成 |
+| 多模型工厂职责不清 | 根据 model_type 在入口函数内分发，不在工厂内 if-else | ✅ 已完成 |
+| Adapter+Factory 配对分离 | 合并为 `ollama_health.py`（OllamaHealthAdapter + OllamaHealthCheckerFactory） | ✅ 已完成 |
+| 入口+分发分离 | 合并为 `local_model_health.py`（LocalModelHealth + create_local_model_health_facade） | ✅ 已完成 |
 
-### 正确的六边形架构分层
+### 最终六边形架构分层
 
 ```
 Domain Layer（端口 — 零外部依赖）
 └── ports/
-    └── health_check.py          # HealthCheckPort（异步接口，ABC）
+    ├── health_check.py          # HealthCheckPort（异步接口，ABC）
+    └── health_check_factory.py   # HealthCheckerFactory（工厂接口，ABC）
 
 Application Layer（门面 — 业务编排）
 └── services/
-    └── local_model_health_facade.py   # LocalModelHealthFacade（多模型统一入口）
+    └── local_model_health_facade.py   # LocalModelHealthFacade（接受 factory 注入）
 
 Infrastructure Layer（适配器 — 具体实现）
 └── routing/
-    ├── ollama_health_adapter.py      # OllamaHealthAdapter（实现 HealthCheckPort）
-    └── gemini_health_adapter.py       # Future: Gemini 实现
+    ├── ollama_health.py          # OllamaHealthAdapter + OllamaHealthCheckerFactory 配对
+    ├── local_model_health.py      # LocalModelHealth + create_local_model_health_facade 统一入口
+    └── fallback_router.py        # FallbackRouter（故障切换）
 ```
 
 ### 影响范围（已完成）
 
 | 文件 | 操作 | 说明 | 状态 |
 |------|------|------|------|
-| `src/application/services/local_model_health_facade.py` | 新增 | 多模型工厂门面（接受注入的 HealthCheckPort） | ✅ 已完成 |
-| `src/infrastructure/routing/local_model_health.py` | 修改 | 改为 LocalModelHealth 工厂函数（避免 Application 层依赖 Infrastructure 层） | ✅ 已完成 |
-| `src/infrastructure/routing/ollama_health_adapter.py` | 修改 | 删除冗余别名和废弃的 `_get_session()` | ✅ 已完成 |
-| `src/domain/services/udmr_router.py` | 修改 | 保持同步 Protocol 兼容（`_health_checker.check()`） | ✅ 已完成 |
-| `tests/unit/infrastructure/routing/test_local_model_health.py` | 更新 | 更新测试以适配新的 LocalModelHealth 工厂函数设计 | ✅ 已完成 |
+| `src/domain/ports/health_check_factory.py` | 新增 | Domain 层工厂接口 | ✅ |
+| `src/infrastructure/routing/ollama_health.py` | 新建 | OllamaHealthAdapter + OllamaHealthCheckerFactory 配对合并 | ✅ |
+| `src/infrastructure/routing/local_model_health.py` | 重写 | LocalModelHealth + create_local_model_health_facade 入口合并 | ✅ |
+| `src/infrastructure/routing/ollama_health_adapter.py` | 删除 | 已合并至 ollama_health.py | ✅ |
+| `src/infrastructure/routing/ollama_health_checker_factory.py` | 删除 | 已合并至 ollama_health.py | ✅ |
+| `src/infrastructure/routing/local_model_health_factory.py` | 删除 | 已合并至 local_model_health.py | ✅ |
+| `src/application/services/local_model_health_facade.py` | 修改 | 接受 factory 注入，不创建 Infrastructure 对象 | ✅ |
+| `tests/unit/infrastructure/routing/test_local_model_health.py` | 更新 | 测试更新以适配新架构 | ✅ |
 
 ### 架构约束遵守情况
 
 | 约束 | 状态 | 说明 |
 |------|------|------|
-| Domain 层零外部依赖 | ✅ | HealthCheckPort 仅依赖 abc + typing |
-| Application 层不直接依赖 Infrastructure | ✅ | LocalModelHealthFacade 接受注入的 HealthCheckPort 实现 |
+| Domain 层零外部依赖 | ✅ | HealthCheckPort + HealthCheckerFactory 仅依赖 abc + typing |
+| Application 层不直接依赖 Infrastructure | ✅ | LocalModelHealthFacade 接受 factory 注入 |
 | Infrastructure 层实现 Domain 接口 | ✅ | OllamaHealthAdapter 实现 HealthCheckPort |
+| 每个具体工厂只生产一种产品 | ✅ | OllamaHealthCheckerFactory 只创建 OllamaHealthAdapter |
+| 分发逻辑在入口函数内 | ✅ | create_local_model_health_facade 根据 model_type 分发 |
 | 向后兼容 | ✅ | LocalModelHealth 工厂函数保持原有接口签名 |
 
 ---
@@ -958,4 +979,4 @@ Infrastructure Layer（适配器 — 具体实现）
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
 **最后更新/Last Updated:** 2026-05-07
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：重构 LocalModelHealth 六边形架构设计，新增 LocalModelHealthFacade（Application 层门面），LocalModelHealth 改为工厂函数（向后兼容），删除 OllamaHealthAdapter 冗余别名，所有测试通过（3076 passed），Ruff 检查通过
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：重构 LocalModelHealth 六边形架构设计，新增 LocalModelHealthFacade（Application 层门面），LocalModelHealth 改为工厂函数（向后兼容），删除 OllamaHealthAdapter 冗余别名，所有测试通过（3076 passed），Ruff 检查通过；第八轮（2026-05-07 最终）：完成多模型工厂架构重构，HealthCheckerFactory 移至 Domain 层，OllamaHealthCheckerFactory 与 OllamaHealthAdapter 合并为 ollama_health.py，create_local_model_health_facade 统一处理分发逻辑，删除 3 个冗余文件（ollama_health_adapter.py, ollama_health_checker_factory.py, local_model_health_factory.py），42 tests passed, all hooks passed
