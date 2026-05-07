@@ -26,6 +26,15 @@ class TestEventBusConfigLoaderLoad:
         finally:
             Path(config_path).unlink()
 
+    def test_load_returns_early_when_path_not_exists(self) -> None:
+        """load should return early when config path does not exist."""
+        from src.infrastructure.messaging.channel_router import ChannelRouter
+
+        router = ChannelRouter(load_defaults=False)
+        loader = EventBusConfigLoader()
+        # Should not raise, just return early
+        loader.load(router, "/nonexistent/path/to/config.yaml")
+
     def test_load_registers_channels_from_yaml(self) -> None:
         """load should register channels from YAML using router.register()."""
         from src.infrastructure.messaging.channel_router import ChannelRouter, DeliveryMode

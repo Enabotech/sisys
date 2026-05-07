@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import fakeredis.aioredis
@@ -107,6 +107,23 @@ class TestIdempotencyChecker:
 
         assert list(results).count(True) == 1
         assert list(results).count(False) == 9
+
+    def test_creates_connection_pool_when_redis_client_not_provided(self):
+        """Should create connection pool when redis_client is None."""
+        with patch("redis.asyncio.ConnectionPool") as mock_pool_class:
+            with patch("redis.asyncio.Redis") as mock_redis_class:
+                mock_pool_instance = MagicMock()
+                mock_pool_class.return_value = mock_pool_instance
+                mock_redis_class.return_value = MagicMock()
+
+                IdempotencyChecker(host="localhost", port=6379, db=0)
+
+                mock_pool_class.assert_called_once()
+                call_kwargs = mock_pool_class.call_args[1]
+                assert call_kwargs["host"] == "localhost"
+                assert call_kwargs["port"] == 6379
+                assert call_kwargs["db"] == 0
+                assert call_kwargs["decode_responses"] is True
 
 
 # ============================================================================
