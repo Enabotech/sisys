@@ -544,7 +544,7 @@ sisys/
 - [ ] Story created with `backlog` status
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `validate-create-story` 质量检查
+
 
 ---
 

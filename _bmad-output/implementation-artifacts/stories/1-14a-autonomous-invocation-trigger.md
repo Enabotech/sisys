@@ -831,7 +831,7 @@ Story 1.2 (领域事件定义) → Story 1.3 (事件总线实现) → Story 1.14
 - [x] Story created with `ready-for-dev` status
 - [x] 运行 `dev-story` 开始实施
 - [x] 运行 `code-review` 进行代码审查
-- [x] 运行 `validate-create-story` 质量检查
+
 - [x] Story 1.14a 完成，状态更新为 `done`
 
 ---

@@ -708,7 +708,7 @@ Story 0.4 (K3S 集群) → Story 1.13 (K8s 扩缩容)
 - [ ] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `validate-create-story` 质量检查
+
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---
