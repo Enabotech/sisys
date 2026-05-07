@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -65,9 +65,8 @@ class TestAutoRouteHandlerOnTriggered:
         mock_service = MagicMock()
         handler = AutoRouteHandler(auto_route_service=mock_service)
 
-        mock_event = MagicMock(spec=DomainEvent)
-        with patch("builtins.isinstance", return_value=False):
-            result = await handler.on_triggered(mock_event)
+        mock_event = MagicMock()  # Not AutoTriggered
+        result = await handler.on_triggered(mock_event)
 
         assert result is None
 
