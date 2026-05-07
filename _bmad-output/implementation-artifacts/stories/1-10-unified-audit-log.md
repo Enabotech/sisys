@@ -705,6 +705,16 @@ sisys/
 
 ---
 
+## 🔍 Review Findings (2026-05-07)
+
+### Deferred (架构级变更)
+- [x] [Review][Defer] 事务发件箱模式未实现 [audit_service_impl.py] — deferred，需 Story 1.18a 配合
+- [x] [Review][Defer] Audit API 路由处理器未实现 [src/interfaces/api/audit.py] — deferred，需新建文件
+- [x] [Review][Defer] WORM Manager 未在 archive() 中调用 [audit_service_impl.py:222-264] — deferred，需架构调整
+
+### Fixed in Round 1
+- [x] [Review][Fix] archive() 仅处理前100条记录 [audit_service_impl.py:243] — 已修复，添加分页迭代
+
 **模板版本/Template Version:** 2.0.0
 **创建日期/Created:** 2026-05-07
 **最后更新/Last Updated:** 2026-05-07
