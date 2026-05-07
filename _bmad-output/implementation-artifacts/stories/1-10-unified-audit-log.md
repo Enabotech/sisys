@@ -187,20 +187,16 @@
 #### 数据模型 (Data Models)
 - [x] AuditLogModel 已定义（`src/infrastructure/storage/postgresql/models/audit.py`）✅
 - [x] AuditOutboxModel 已定义（`src/infrastructure/storage/postgresql/models/audit_outbox.py`）✅
-- [ ] AuditLog 领域实体（`src/domain/entities/audit_log.py`）
-- [ ] AuditRepositoryPort 接口（`src/domain/ports/audit_repository.py`）
 
-#### 安全服务接口 (Security Service Interfaces)
-
-> ⚠️ **六边形架构约束：审计服务接口必须遵循依赖倒置原则**
+#### 领域层接口 (Domain Ports)
+> ⚠️ **六边形架构约束：领域层接口必须遵循依赖倒置原则**
 > - 接口定义在 `src/domain/ports/`（使用 `ABC`，**仅依赖标准库**）
-> - 实现类在 `src/infrastructure/security/`（可导入 SQLAlchemy 等）
+> - 实现类在 `src/infrastructure/`（可导入外部库）
 > - **禁止在领域层导入任何外部依赖**
 
-**接口定义（参考实现位置）：**
-- `AuditServicePort`（`src/domain/ports/audit_service.py`）：`log_event()`, `search_logs()`, `verify_integrity()`, `verify_all_integrity()`
-- `AuditRepositoryPort`（`src/domain/ports/audit_repository.py`）：`save()`, `get_by_id()`, `search()`, `count()`
-- `AuditLog` 领域实体（`src/domain/entities/audit_log.py`）
+- [ ] AuditServicePort 接口（`src/domain/ports/audit_service.py`）
+- [ ] AuditRepositoryPort 接口（`src/domain/ports/audit_repository.py`）
+- [ ] AuditLog 领域实体（`src/domain/entities/audit_log.py`）
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1_10.feature`
