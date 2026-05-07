@@ -585,11 +585,11 @@ sisys/
 4. **WORM 归档** — 7 年不可变存储，archived 标志追踪
 
 **应用到本故事/Applied to This Story:**
-- [ ] AuditService 接口定义在 `src/domain/ports/audit_service.py`（仅 ABC + 标准库）
-- [ ] AuditServiceImpl 实现在 `src/infrastructure/security/audit_service_impl.py`
-- [ ] AuthServiceImpl 集成审计事件发布
-- [ ] PermissionServiceImpl 集成审计事件发布
-- [ ] WORMManager 用于归档存储
+- [x] AuditService 接口定义在 `src/domain/ports/audit_service.py`（仅 ABC + 标准库）✅
+- [x] AuditServiceImpl 实现在 `src/infrastructure/security/audit_service_impl.py` ✅
+- [x] AuthServiceImpl 集成审计事件发布 ✅
+- [x] PermissionServiceImpl 集成审计事件发布 ✅
+- [ ] WORMManager 用于归档存储 ❌ (待 Story 1.18a 实现)
 
 ---
 
