@@ -415,6 +415,203 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ============================================================================
+  # 审计日志端点 (Audit Logging)
+  # ============================================================================
+  /audit/logs:
+    get:
+      tags:
+        - audit
+      summary: 查询审计日志
+      description: 支持多维检索（时间/actor/action_type/target_resource）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: start_time
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: 开始时间（ISO 8601）
+        - name: end_time
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: 结束时间（ISO 8601）
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 操作用户 ID
+        - name: action_type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 操作类型（如 "authentication:login"）
+        - name: target_resource
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 目标资源
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: 分页偏移
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: 每页数量
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/logs/{log_id}:
+    get:
+      tags:
+        - audit
+      summary: 获取审计日志详情
+      description: 根据 ID 获取审计日志详情
+      security:
+        - OAuth2: []
+      parameters:
+        - name: log_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 审计日志 UUID
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 日志不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/verify:
+    post:
+      tags:
+        - audit
+      summary: 批量验证日志完整性
+      description: SHA256 校验和验证，支持指定 log_ids 或全部
+      security:
+        - OAuth2: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrityVerifyRequest'
+      responses:
+        "200":
+          description: 验证完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityVerifyResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/archive/status:
+    get:
+      tags:
+        - audit
+      summary: 查询归档状态
+      description: 查询指定日志的归档状态
+      security:
+        - OAuth2: []
+      parameters:
+        - name: log_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 审计日志 UUID
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveStatusResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/archive:
+    post:
+      tags:
+        - audit
+      summary: 手动归档审计日志
+      description: 手动触发归档超过指定天数的审计日志
+      security:
+        - OAuth2: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                older_than_days:
+                  type: integer
+                  default: 30
+                  description: 归档多久之前的日志（天）
+      responses:
+        "200":
+          description: 归档完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  archived_count:
+                    type: integer
+                    description: 已归档的日志数量
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -588,6 +785,138 @@ components:
           items:
             type: string
           description: 要分配的权限列表
+
+    # --------------------------------------------------------------------------
+    # 审计相关 schemas
+    # --------------------------------------------------------------------------
+    AuditLogResponse:
+      type: object
+      required:
+        - log_id
+        - timestamp
+        - actor
+        - action_type
+        - target_resource
+        - checksum
+      properties:
+        log_id:
+          type: string
+          format: uuid
+          description: 审计日志 UUID
+        timestamp:
+          type: string
+          format: date-time
+          description: 操作时间（UTC）
+        actor:
+          type: string
+          description: 操作用户或系统组件
+        action_type:
+          type: string
+          description: 操作类型（如 "authentication:login"）
+        target_resource:
+          type: string
+          description: 目标资源
+        old_value:
+          type: object
+          description: 操作前状态（JSON）
+        new_value:
+          type: object
+          description: 操作后状态（JSON）
+        correction_level:
+          type: integer
+          nullable: true
+          description: 纠正级别（L0-L3）
+        checksum:
+          type: string
+          description: SHA256 校验和
+        archived:
+          type: boolean
+          description: 是否已归档
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 归档时间
+
+    AuditLogListResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogResponse'
+        total:
+          type: integer
+          description: 总数量
+        offset:
+          type: integer
+          description: 当前偏移
+        limit:
+          type: integer
+          description: 每页数量
+
+    IntegrityVerifyRequest:
+      type: object
+      properties:
+        log_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 要验证的日志 UUID 列表（空则验证全部）
+
+    IntegrityVerifyResponse:
+      type: object
+      required:
+        - total
+        - passed
+        - failed
+      properties:
+        total:
+          type: integer
+          description: 总验证数
+        passed:
+          type: integer
+          description: 通过数
+        failed:
+          type: integer
+          description: 失败数
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              log_id:
+                type: string
+              status:
+                type: string
+              message:
+                type: string
+
+    ArchiveStatusResponse:
+      type: object
+      required:
+        - log_id
+        - archived
+      properties:
+        log_id:
+          type: string
+          format: uuid
+          description: 审计日志 UUID
+        archived:
+          type: boolean
+          description: 是否已归档
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 归档时间
+        retention_days:
+          type: integer
+          description: 保留天数
 
     # --------------------------------------------------------------------------
     # 通用 schemas
