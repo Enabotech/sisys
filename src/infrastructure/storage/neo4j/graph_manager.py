@@ -5,11 +5,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
-if TYPE_CHECKING:
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-    from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
+from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 
 
 class Neo4jGraphManager:

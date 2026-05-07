@@ -5,15 +5,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from prometheus_client import CollectorRegistry
 
 from src.application.ports.metrics_port import MetricsPort
-
-if TYPE_CHECKING:
-    from prometheus_client import CollectorRegistry
-
-    from src.infrastructure.monitoring.aggregator import MetricsAggregator
-    from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
+from src.infrastructure.monitoring.aggregator import MetricsAggregator
+from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
 
 
 class MetricsPortImpl(MetricsPort):

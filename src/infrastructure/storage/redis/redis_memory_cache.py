@@ -12,10 +12,8 @@ TTL：24h-30h（随机值避免雪崩）
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import redis
+import redis
 
 # 默认 TTL 范围 (秒)
 DEFAULT_TTL_MIN = 86400  # 24h

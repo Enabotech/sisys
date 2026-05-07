@@ -12,13 +12,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.application.services.local_model_health_facade import (
-        LocalModelHealthFacade,
-    )
-    from src.infrastructure.config.udmr import UDMRConfig
+from src.application.services.local_model_health_facade import (
+    LocalModelHealthFacade,
+)
+from src.infrastructure.config.udmr import UDMRConfig
 
 
 def create_local_model_health_facade(config: UDMRConfig | None = None) -> LocalModelHealthFacade:

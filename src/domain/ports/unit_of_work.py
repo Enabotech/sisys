@@ -7,10 +7,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Self
-
-if TYPE_CHECKING:
-    pass  # 类型提示使用，不导入实现
+from typing import Any, Self
 
 
 class UnitOfWork(ABC):

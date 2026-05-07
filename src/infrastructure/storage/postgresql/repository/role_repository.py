@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.entities.role import Role
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.infrastructure.storage.postgresql.models import PermissionModel, RoleModel
-
-if TYPE_CHECKING:
-    from src.domain.entities.role import Role
 
 
 class RoleRepository(RoleRepositoryPort):

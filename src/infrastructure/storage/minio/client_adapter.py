@@ -6,13 +6,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from minio import Minio
 from minio.error import S3Error
 
-if TYPE_CHECKING:
-    from src.infrastructure.config.minio import MinIOConfig
+from src.infrastructure.config.minio import MinIOConfig
 
 
 class BucketNotFoundError(Exception):

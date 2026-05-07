@@ -5,10 +5,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
 
 
 class GraphRetriever:

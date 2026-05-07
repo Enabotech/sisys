@@ -7,13 +7,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
-
-if TYPE_CHECKING:
-    pass
 
 
 class EventPublisher(ABC):

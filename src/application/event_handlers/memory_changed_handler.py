@@ -19,11 +19,8 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from src.domain.events.memory_events import MemoryChanged
-
+from src.domain.events.memory_events import MemoryChanged
 
 logger = logging.getLogger(__name__)
 

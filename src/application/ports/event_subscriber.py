@@ -7,12 +7,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.domain.events.base import DomainEvent
-
-if TYPE_CHECKING:
-    pass
 
 
 class EventSubscriber(ABC):

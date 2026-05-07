@@ -7,7 +7,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+
+from redis.asyncio import Redis
 
 from src.domain.ports.storage import (
     ObjectStorageRepository,
@@ -15,9 +16,6 @@ from src.domain.ports.storage import (
 from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
-
-if TYPE_CHECKING:
-    from redis.asyncio import Redis
 
 
 class MinIORepository(ObjectStorageRepository):

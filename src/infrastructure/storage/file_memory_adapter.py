@@ -20,14 +20,12 @@ from __future__ import annotations
 import asyncio
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import aiofiles
 
 from src.domain.ports.l0_storage import L0StoragePort
-
-if TYPE_CHECKING:
-    from src.infrastructure.config.memory import MemoryConfig
+from src.infrastructure.config.memory import MemoryConfig
 
 # MEMORY.md 索引行格式
 INDEX_PATTERN = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")

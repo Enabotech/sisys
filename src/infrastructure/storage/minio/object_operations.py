@@ -9,15 +9,13 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+import redis.asyncio as aioredis
 from minio.error import S3Error
 
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
-
-if TYPE_CHECKING:
-    import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 

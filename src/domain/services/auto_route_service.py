@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from src.domain.events.auto_route_events import AutoRouted
+from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
-
-if TYPE_CHECKING:
-    from src.domain.events.auto_trigger_events import AutoTriggered
-
 
 logger = logging.getLogger(__name__)
 

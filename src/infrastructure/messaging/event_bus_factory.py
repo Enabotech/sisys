@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
 from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
 from src.infrastructure.messaging.redis_event_bus import RedisEventBus
-
-if TYPE_CHECKING:
-    pass
 
 
 class EventBusFactory:
