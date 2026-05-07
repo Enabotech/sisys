@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from openapi_spec_validator import validate  # type: ignore[import]
-from openapi_spec_validator.readers import read_from_filename  # type: ignore[import]
+from openapi_spec_validator import validate
+from openapi_spec_validator.readers import read_from_filename
 
 
 class TestAuditOpenAPISpec:

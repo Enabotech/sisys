@@ -127,10 +127,20 @@
   - 方法: `route(task_context) -> RoutingDecision`, `check_local_health() -> bool`
   - 职责: 接收任务上下文、执行本地优先路由决策、发布路由决策事件
 
+#### 端口接口 Schema (Domain Ports)
+- [ ] HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
+  - 方法: `async check() -> bool`, `async close() -> None`
+  - 职责: 定义健康检查的统一接口契约（异步，零外部依赖）
+
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
   - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`, `UDMR_CLOUD_MODELS`
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
+
+#### 应用层门面 Schema (Application Facade)
+- [ ] LocalModelHealthFacade 门面（`src/application/services/local_model_health_facade.py`）
+  - 方法: `async check() -> bool`, `async close() -> None`
+  - 职责: 根据配置选择具体 Adapter（Ollama/Gemini/vLLM），统一暴露给 UDMRouter
 
 #### 路由决策模型 (Routing Decision Model)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
@@ -224,11 +234,12 @@
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 本地优先静态路由配置 | Task 1 | Subtask 1.1-1.3（UDMRouter 红→绿→重构） | `test_udmr_router.py` |
-| AC-1 | 本地模型健康检查 | Task 1 | Subtask 1.4-1.6（LocalModelHealth 红→绿→重构） | `test_local_model_health.py` |
+| AC-1 | 本地模型健康检查 | Task 1 | Subtask 1.4-1.6（LocalModelHealthFacade 红→绿→重构） | `test_local_model_health.py` |
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-2 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由性能要求 | Task 3 | Subtask 3.1-3.3（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
 | AC-3 | 路由决策日志完整性 | Task 3 | Subtask 3.4-3.6（六边形架构验证 红→绿→重构） | `test_udmr_architecture.py` |
+| AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
 
 ---
 
@@ -245,11 +256,12 @@
 - [ ] Subtask 0.1: 定义 UDMRouter 服务类（`src/domain/services/udmr_router.py`）
 - [ ] Subtask 0.2: 定义 RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
 - [ ] Subtask 0.3: 定义 UDMRConfig 配置模型（`src/infrastructure/config/udmr.py`）
-- [ ] Subtask 0.4: 定义 LocalModelHealth 健康检查（`src/infrastructure/routing/local_model_health.py`）
-- [ ] Subtask 0.5: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
-- [ ] Subtask 0.6: 扩展 RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
+- [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层门面（`src/application/services/local_model_health_facade.py`）
+- [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
+- [ ] Subtask 0.7: 扩展 RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
+- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
+- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
 - [ ] 规范项全部定义完毕
@@ -275,16 +287,16 @@
 - [ ] Subtask 1.2: 🟢 绿 — 实现 UDMRouter（本地优先路由）
 - [ ] Subtask 1.3: 🔄 重构 — 优化路由决策逻辑
 
-#### TDD 循环 [B]：LocalModelHealth 健康检查
+#### TDD 循环 [B]：LocalModelHealthFacade 应用层门面
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/routing/test_local_model_health.py`（验证 Ollama 健康检查） |
-| 🟢 绿 | 实现 `src/infrastructure/routing/local_model_health.py` - LocalModelHealth 类 |
+| 🔴 红 | 编写 `tests/unit/application/services/test_local_model_health_facade.py`（验证多模型路由） |
+| 🟢 绿 | 实现 `src/application/services/local_model_health_facade.py` - LocalModelHealthFacade 类 |
 | 🔄 重构 | 添加类型注解和文档字符串 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 LocalModelHealth 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 LocalModelHealth（Ollama ping 检测）
+- [ ] Subtask 1.4: 🔴 红 — 编写 LocalModelHealthFacade 失败测试
+- [ ] Subtask 1.5: 🟢 绿 — 实现 LocalModelHealthFacade（多模型工厂，根据配置返回 OllamaHealthAdapter）
 - [ ] Subtask 1.6: 🔄 重构 — 优化健康检查逻辑
 
 **完成标准/Definition of Done:**
@@ -404,6 +416,100 @@
   - 云端模型: Qwen/Claude
   - 路由决策延迟目标: P95<100ms（MVP 静态配置）
 
+### LocalModelHealth 六边形架构设计澄清
+
+> ⚠️ **重要澄清（2026-05-07）：** 本 Story 原实现的 `local_model_health.py` 存在架构设计问题，已按六边形架构约束重新设计。
+
+#### 问题分析
+
+**原实现问题：**
+| 文件 | 原实现 | 问题 |
+|------|--------|------|
+| `local_model_health.py` | 仅做重导出 + `__getattr__` 废弃兼容 | 无多模型抽象，架构角色错乱 |
+| `ollama_health_adapter.py:63` | `LocalModelHealth = OllamaHealthAdapter` | 冗余别名，与 local_model_health.py 职责重叠 |
+| `UDMRouter` | 使用同步 `HealthChecker` Protocol | 与 `HealthCheckPort`（异步）不同步 |
+| `HealthCheckPort` | 异步接口 | ✅ 正确，但 UDMRouter 未使用 |
+
+#### 正确的六边形分层
+
+```
+Domain Layer（端口 — 零外部依赖）
+└── ports/
+    └── health_check.py          # HealthCheckPort（异步接口，ABC）
+
+Application Layer（门面 — 业务编排）
+└── services/
+    └── local_model_health_facade.py   # LocalModelHealthFacade（多模型统一入口）
+
+Infrastructure Layer（适配器 — 具体实现）
+└── routing/
+    ├── ollama_health_adapter.py      # OllamaHealthAdapter（实现 HealthCheckPort）
+    ├── gemini_health_adapter.py       # Future: Gemini 实现
+    └── vllm_health_adapter.py        # Future: vLLM 实现
+```
+
+#### 各层职责定义
+
+| 层级 | 组件 | 职责 | 依赖 |
+|------|------|------|------|
+| **Domain** | `HealthCheckPort` | 定义健康检查接口契约（纯异步，零外部依赖） | 仅 abc + typing |
+| **Application** | `LocalModelHealthFacade` | 根据配置选择具体 Adapter，统一暴露给 UDMRouter | 依赖 Domain Port |
+| **Infrastructure** | `OllamaHealthAdapter` | 具体实现：Ollama ping 检测 | 依赖 httpx |
+
+#### 核心设计原则
+
+1. **依赖倒置**：Domain 层定义 `HealthCheckPort` 接口，Infrastructure 层实现
+2. **Application 层门面**：`LocalModelHealthFacade` 隐藏具体 Adapter 细节，未来可扩展多模型注册表
+3. **UDMRouter 依赖**：使用 `HealthCheckPort`（异步）而非同步 Protocol
+4. **向后兼容**：`local_model_health.py` 保留作为 `LocalModelHealthFacade` 的别名入口
+
+#### 重构更新文件清单
+
+| 操作 | 文件路径 | 说明 |
+|------|---------|------|
+| **修改** | `src/domain/services/udmr_router.py` | 依赖 `HealthCheckPort` 而非同步 Protocol |
+| **修改** | `src/infrastructure/routing/local_model_health.py` | 改为 `LocalModelHealthFacade` 应用层门面 |
+| **新增** | `src/application/services/local_model_health_facade.py` | 多模型工厂，根据配置返回对应 Adapter |
+| **保留** | `src/infrastructure/routing/ollama_health_adapter.py` | 实现 `HealthCheckPort`，删除冗余别名 |
+| **保留** | `src/domain/ports/health_check.py` | 保持不变 |
+
+#### 接口契约
+
+```python
+# Domain Layer — HealthCheckPort（保持不变）
+class HealthCheckPort(ABC):
+    @abstractmethod
+    async def check(self) -> bool: ...
+
+    @abstractmethod
+    async def close(self) -> None: ...
+
+# Application Layer — LocalModelHealthFacade（新增）
+class LocalModelHealthFacade:
+    """统一入口，根据配置选择具体 Adapter（Ollama/Gemini/vLLM）"""
+
+    def __init__(self, config: UDMRConfig) -> None:
+        self._config = config
+        self._adapter: HealthCheckPort = self._create_adapter()
+
+    async def check(self) -> bool:
+        return await self._adapter.check()
+
+    async def close(self) -> None:
+        await self._adapter.close()
+
+# Infrastructure Layer — OllamaHealthAdapter（保持不变，实现 HealthCheckPort）
+class OllamaHealthAdapter(HealthCheckPort):
+    ...
+```
+
+#### 未来扩展路径
+
+本设计支持未来多模型扩展：
+- `GeminiHealthAdapter` — 实现 `HealthCheckPort`，检测 Gemini API 可用性
+- `VLLMHealthAdapter` — 实现 `HealthCheckPort`，检测 vLLM 服务可用性
+- `LocalModelRegistry` — 模型注册表，支持运行时切换默认 Adapter
+
 ### 关键架构决策
 
 **来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - ADR 相关决策
@@ -413,6 +519,16 @@
 | **UDMRouter 位于领域层** | 符合六边形架构，领域逻辑与技术解耦 | 需要依赖倒置 | ✅ 9/10 |
 | UDMRouter 位于应用层 | 实现简单 | 领域逻辑泄漏 | 6/10 |
 | UDMRouter 位于基础设施层 | 实现最简单 | 违反六边形架构 | 3/10 |
+
+### 健康检查端口架构决策（2026-05-07）
+
+**来源:** 代码审查发现 local_model_health.py 设计问题
+
+| 方案 | 优点 | 缺点 | 评分 |
+|------|------|------|------|
+| **HealthCheckPort 在 Domain 层，LocalModelHealthFacade 在 Application 层** | 符合六边形架构，Domain 零外部依赖，Application 层编排多模型切换 | 需要新增 Application 层 Facade | ✅ 9/10 |
+| HealthCheckPort 和 LocalModelHealth 都在 Infrastructure 层 | 实现简单 | 违反六边形架构，Domain 依赖外部 | 4/10 |
+| 原设计：local_model_health.py 仅做重导出 | 无需重构 | 无多模型抽象，架构角色错乱 | 2/10 |
 
 ### UDMR 与 Story 1.14b 语义路由的关系澄清
 
@@ -442,26 +558,28 @@ Execute（Story 1.14c）→ 执行任务
 sisys/
 ├── src/
 │   ├── domain/
+│   │   ├── ports/
+│   │   │   └── health_check.py        # HealthCheckPort（Domain Port，异步接口）
 │   │   ├── services/
-│   │   │   └── udmr_router.py       # UDMRouter（核心逻辑）
+│   │   │   └── udmr_router.py         # UDMRouter（Domain Service，核心逻辑）
 │   │   ├── value_objects/
-│   │   │   └── routing_decision.py   # RoutingDecision 值对象
+│   │   │   └── routing_decision.py    # RoutingDecision 值对象
 │   │   └── entities/
 │   │       └── routing_decision_log.py # RoutingDecisionLog（扩展）
-│   ├── infrastructure/
-│   │   ├── config/
-│   │   │   └── udmr.py              # UDMRConfig 配置
-│   │   └── routing/
-│   │       ├── local_model_health.py # LocalModelHealth（Ollama 检测）
-│   │       └── fallback_router.py    # FallbackRouter（故障切换）
-│   └── interfaces/
-│       └── event_listeners/
-│           └── udmr_listener.py       # 事件监听适配器（复用 Story 1.3）
+│   ├── application/
+│   │   └── services/
+│   │       └── local_model_health_facade.py  # LocalModelHealthFacade（Application Facade，多模型工厂）
+│   └── infrastructure/
+│       ├── config/
+│       │   └── udmr.py                # UDMRConfig 配置
+│       └── routing/
+│           ├── ollama_health_adapter.py  # OllamaHealthAdapter（Infrastructure Adapter，实现 HealthCheckPort）
+│           └── fallback_router.py       # FallbackRouter（故障切换）
 ├── tests/
 │   ├── unit/
 │   │   ├── domain/
-│   │   │   └── services/
-│   │   │       └── test_udmr_router.py
+│   │   │   ├── services/
+│   │   │   │   └── test_udmr_router.py
 │   │   │   └── value_objects/
 │   │   │       └── test_routing_decision.py
 │   │   └── infrastructure/
@@ -475,8 +593,18 @@ sisys/
 │       └── test_story_1.17_steps.py
 └── docs/
     └── developer/
-        └── udmr_guide.md             # UDMR 实施指南
+        └── udmr_guide.md              # UDMR 实施指南
 ```
+
+### 六边形架构分层说明
+
+| 层级 | 目录 | 组件 | 职责 |
+|------|------|------|------|
+| **Domain（领域层）** | `domain/` | `HealthCheckPort`, `UDMRouter`, `RoutingDecision` | 定义接口契约和核心业务逻辑，零外部依赖 |
+| **Application（应用层）** | `application/services/` | `LocalModelHealthFacade` | 业务编排，根据配置选择具体 Adapter |
+| **Infrastructure（基础设施层）** | `infrastructure/routing/` | `OllamaHealthAdapter`, `FallbackRouter` | 具体技术实现，依赖外部库（httpx） |
+
+> ⚠️ **重要澄清（2026-05-07）：** 原 `local_model_health.py` 仅做重导出和 `__getattr__` 废弃兼容的设计是错误的。正确的设计是将其重构为 `LocalModelHealthFacade`（Application Facade），作为多模型健康检查的统一入口。
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -551,10 +679,11 @@ sisys/
 ### 文件清单 File List
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/services/udmr_router.py` - UDMRouter 服务类
+- `src/domain/services/udmr_router.py` - UDMRouter 服务类（修改：依赖 HealthCheckPort）
 - `src/domain/value_objects/routing_decision.py` - RoutingDecision 值对象
 - `src/infrastructure/config/udmr.py` - UDMRConfig 配置模型
-- `src/infrastructure/routing/local_model_health.py` - LocalModelHealth 健康检查
+- `src/application/services/local_model_health_facade.py` - LocalModelHealthFacade（新增：多模型工厂门面）
+- `src/infrastructure/routing/ollama_health_adapter.py` - OllamaHealthAdapter（实现 HealthCheckPort，删除冗余别名）
 - `src/infrastructure/routing/fallback_router.py` - FallbackRouter 故障切换
 - `src/domain/entities/routing_decision_log.py` - RoutingDecisionLog 扩展（添加本地/云端路由字段）
 - `tests/unit/domain/services/test_udmr_router.py` - UDMRouter 单元测试
@@ -571,11 +700,13 @@ sisys/
 - `src/interfaces/event_listeners/udmr_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
 
 **更新的文件/Updated Files:**
+- `src/domain/ports/__init__.py` - 添加 HealthCheckPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRouter 导出
 - `src/domain/value_objects/__init__.py` - 添加 RoutingDecision 导出
 - `src/domain/entities/__init__.py` - 添加 RoutingDecisionLog 导出
+- `src/application/services/__init__.py` - 添加 LocalModelHealthFacade 导出
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
-- `src/infrastructure/routing/__init__.py` - 添加 LocalModelHealth, FallbackRouter 导出
+- `src/infrastructure/routing/__init__.py` - 添加 OllamaHealthAdapter, FallbackRouter 导出
 
 ---
 
@@ -638,6 +769,7 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 4. [x] Previous story learnings integrated 前一个故事学习经验已整合（Story 1.14b 配置模式、事件驱动解耦）
 5. [x] Sprint status synced to `ready-for-dev`
 6. [x] UDMR 与语义路由关系澄清（Story 1.14b vs Story 1.17）
+7. [x] LocalModelHealth 六边形架构设计澄清（2026-05-07）
 
 ### 🔍 审查自查清单（Self-Verification Checklist）
 
@@ -660,6 +792,7 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 | 13 | 后续 Story 依赖已标注 | ✅ | Story 1.19 CFO ROI |
 | 14 | UDMR 与语义路由关系已澄清 | ✅ | 两个不同路由机制 |
 | 15 | UDMR 三层架构与 MVP 范围澄清 | ✅ | MVP 仅 L3 静态，L1/L2 归 Story 11.x |
+| 16 | LocalModelHealth 六边形架构设计澄清 | ✅ | 原设计有架构角色错乱问题，已重新设计 |
 
 ---
 
@@ -760,7 +893,60 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 
 ---
 
+## 🔍 代码审查发现 Review Findings（第四轮 - 2026-05-07）
+
+> **审查日期:** 2026-05-07
+> **审查模式:** 架构设计审查
+> **问题来源:** 用户反馈 local_model_health.py 和 ollama_health_adapter.py 功能重叠
+
+### 问题分析
+
+**原实现问题：**
+| 文件 | 原实现 | 问题 |
+|------|--------|------|
+| `local_model_health.py` | 仅做重导出 + `__getattr__` 废弃兼容 | 无多模型抽象，架构角色错乱 |
+| `ollama_health_adapter.py:63` | `LocalModelHealth = OllamaHealthAdapter` | 冗余别名，与 local_model_health.py 职责重叠 |
+| `UDMRouter` | 使用同步 `HealthChecker` Protocol | 与 `HealthCheckPort`（异步）不同步 |
+
+### 修复方案
+
+| 问题 | 修复方案 | 状态 |
+|------|----------|------|
+| local_model_health.py 架构角色错乱 | 重构为 `LocalModelHealthFacade`（Application Facade） | ⏳ 待实施 |
+| 冗余别名 `LocalModelHealth = OllamaHealthAdapter` | 删除，保留 `OllamaHealthAdapter` 即可 | ⏳ 待实施 |
+| UDMRouter 使用同步 Protocol | 改为依赖 `HealthCheckPort`（异步接口） | ⏳ 待实施 |
+| 测试文件路径不一致 | `test_local_model_health.py` 移至 `tests/unit/application/services/` | ⏳ 待实施 |
+
+### 正确的六边形架构分层
+
+```
+Domain Layer（端口 — 零外部依赖）
+└── ports/
+    └── health_check.py          # HealthCheckPort（异步接口，ABC）
+
+Application Layer（门面 — 业务编排）
+└── services/
+    └── local_model_health_facade.py   # LocalModelHealthFacade（多模型统一入口）
+
+Infrastructure Layer（适配器 — 具体实现）
+└── routing/
+    ├── ollama_health_adapter.py      # OllamaHealthAdapter（实现 HealthCheckPort）
+    └── gemini_health_adapter.py       # Future: Gemini 实现
+```
+
+### 影响范围（待实施）
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/application/services/local_model_health_facade.py` | 新增 | 多模型工厂门面 |
+| `src/infrastructure/routing/local_model_health.py` | 修改 | 改为 `LocalModelHealthFacade` 别名入口 |
+| `src/infrastructure/routing/ollama_health_adapter.py` | 修改 | 删除第63行冗余别名 |
+| `src/domain/services/udmr_router.py` | 修改 | 依赖 `HealthCheckPort` 而非同步 Protocol |
+| `tests/unit/infrastructure/routing/test_local_model_health.py` | 移动 | 移至 `tests/unit/application/services/` |
+
+---
+
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
-**最后更新/Last Updated:** 2026-05-03
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式
+**最后更新/Last Updated:** 2026-05-07
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：发现 LocalModelHealth 六边形架构设计问题，澄清正确分层设计，更新 SDD 规范和文件清单

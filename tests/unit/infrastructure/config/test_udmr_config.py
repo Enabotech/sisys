@@ -48,3 +48,24 @@ class TestUDMRConfig:
         with patch.dict(os.environ, {}, clear=True):
             config = UDMRConfig.from_env()
         assert config.local_model == "qwen2.5:7b"
+
+    def test_from_env_negative_timeout_defaults_to_30(self) -> None:
+        """Negative local_timeout should default to 30."""
+        env = {"UDMR_LOCAL_TIMEOUT": "-5"}
+        with patch.dict(os.environ, env, clear=True):
+            config = UDMRConfig.from_env()
+        assert config.local_timeout == 30
+
+    def test_from_env_invalid_local_timeout_defaults_to_30(self) -> None:
+        """Invalid UDMR_LOCAL_TIMEOUT should default to 30 (no error raised)."""
+        env = {"UDMR_LOCAL_TIMEOUT": "not_a_number"}
+        with patch.dict(os.environ, env, clear=True):
+            config = UDMRConfig.from_env()
+        assert config.local_timeout == 30
+
+    def test_from_env_zero_timeout_is_allowed(self) -> None:
+        """Zero local_timeout is allowed (only negative is clamped to default)."""
+        env = {"UDMR_LOCAL_TIMEOUT": "0"}
+        with patch.dict(os.environ, env, clear=True):
+            config = UDMRConfig.from_env()
+        assert config.local_timeout == 0

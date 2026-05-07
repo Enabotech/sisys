@@ -58,3 +58,10 @@ class TestJsonToEventDict:
         assert restored.event_id == original.event_id
         assert restored.event_type == original.event_type
         assert restored.aggregate_id == original.aggregate_id
+
+    def test_dict_to_json_raises_on_serialization_error(self):
+        """dict_adapter.dump_json raises ValueError on failure."""
+        # Create a dict that can't be serialized
+        bad_dict = {"unserializable": object()}
+        with pytest.raises(ValueError, match="Failed to serialize"):
+            event_dict_to_json(bad_dict)

@@ -67,3 +67,39 @@ class TestLocalModelHealth:
         health = LocalModelHealth()
         assert "localhost" in health._endpoint
         assert "11434" in health._endpoint
+
+
+class TestLocalModelHealthDeprecation:
+    """Test LocalModelHealth deprecation warning via __getattr__."""
+
+    def test_module_has_no_attribute_raises_error(self) -> None:
+        """Accessing non-existent attribute should raise AttributeError."""
+        import src.infrastructure.routing.local_model_health as module
+
+        with pytest.raises(AttributeError):
+            getattr(module, "NonExistentClass")
+
+    def test_getattr_returns_ollama_health_adapter(self) -> None:
+        """__getattr__ should return OllamaHealthAdapter for LocalModelHealth."""
+        import sys
+        import warnings
+
+        # Remove module from cache to force __getattr__ call on next access
+        mod_name = "src.infrastructure.routing.local_model_health"
+        if mod_name in sys.modules:
+            del sys.modules[mod_name]
+
+        # Also need to re-import the submodule
+        if "src.infrastructure.routing" in sys.modules:
+            del sys.modules["src.infrastructure.routing"]
+
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            import src.infrastructure.routing.local_model_health as module
+
+            # Access LocalModelHealth via getattr to trigger __getattr__
+            cls = getattr(module, "LocalModelHealth")
+
+            from src.infrastructure.routing.ollama_health_adapter import OllamaHealthAdapter
+
+            assert cls is OllamaHealthAdapter

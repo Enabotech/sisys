@@ -46,6 +46,6 @@ class Role:
                 return True
             if ":" in p:
                 p_resource, p_action = p.split(":", 1)
-                if p_resource == resource and (p_action == "*" or p_action == action):
+                if (p_resource == "*" or p_resource == resource) and (p_action == "*" or p_action == action):
                     return True
         return False
