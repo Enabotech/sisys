@@ -624,7 +624,7 @@ sisys/
 - [ ] Story 需求从 `epics_v1.0.md` 提取
 - [ ] 架构约束从 `architecture.md` 提取
 - [ ] 前一个故事学习经验整合
-- [ ] 状态设置为 `backlog`
+- [x] 状态设置为 `ready-for-dev`
 - [ ] SDD+TDD 融合开发要求定义完成
 - [ ] 项目结构对齐统一规范
 
