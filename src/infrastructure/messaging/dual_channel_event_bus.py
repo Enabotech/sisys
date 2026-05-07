@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class DualChannelEventBus(EventPublisher):
-    """统一双通道事件总线门面。
+    """统一双通道事件总线入口。
 
     根据 ChannelRouter 推断 DeliveryMode，将事件路由到对应通道：
     - REALTIME: RedisEventBus (Redis Pub/Sub)
