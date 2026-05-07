@@ -18,7 +18,7 @@
 
 | 组件 | 现状 | 目标 |
 |------|------|------|
-| **DualChannelEventBus** | 设计未实现 | 实现为统一门面，路由发布到 Redis/RabbitMQ |
+| **DualChannelEventBus** | 设计未实现 | 实现为统一入口，路由发布到 Redis/RabbitMQ |
 | **EventPublisher 接口** | 同步接口返回 None | 异步接口返回 PublishResult |
 | **EventSubscriber 接口** | 不存在 | 新建，支持同步/异步订阅 |
 | **ChannelRouter** | 仅设计 | 实现 DeliveryMode 推断 |
@@ -106,7 +106,7 @@
 - [x] `publish()` 调用 `OutboxRepository.save()`
 - [x] `close()` 空实现（保持接口一致性）
 
-### AC-7: DualChannelEventBus 统一门面
+### AC-7: DualChannelEventBus 统一入口
 
 **Given** 应用层调用事件发布
 **When** 发布任意领域事件
@@ -321,7 +321,7 @@
 
 ---
 
-### Task 7: DualChannelEventBus 统一门面
+### Task 7: DualChannelEventBus 统一入口
 
 **关联 AC:** AC-7
 
@@ -458,7 +458,7 @@
 | AC-4 | ChannelRouter 通道路由 | Task 4 |
 | AC-5 | RedisEventBus REALTIME 通道 | Task 5 |
 | AC-6 | RabbitMQEventBus RELIABLE 通道 | Task 6 |
-| AC-7 | DualChannelEventBus 统一门面 | Task 7 |
+| AC-7 | DualChannelEventBus 统一入口 | Task 7 |
 | AC-8 | EventBusFactory 依赖注入 | Task 8 |
 | AC-9 | EventBusConfigLoader 配置加载 | Task 9 |
 | AC-10 | Story 1.3 集成测试 | Task 10 |
@@ -574,7 +574,7 @@
 | `src/infrastructure/messaging/channel_router.py` | ChannelRouter + DeliveryMode | ✅ |
 | `src/infrastructure/messaging/redis_event_bus.py` | RedisEventBus REALTIME 通道 | ✅ |
 | `src/infrastructure/messaging/rabbitmq_event_bus.py` | RabbitMQEventBus RELIABLE 通道 | ✅ |
-| `src/infrastructure/messaging/dual_channel_event_bus.py` | DualChannelEventBus 统一门面 | ✅ |
+| `src/infrastructure/messaging/dual_channel_event_bus.py` | DualChannelEventBus 统一入口 | ✅ |
 | `src/infrastructure/messaging/event_bus_factory.py` | EventBusFactory 工厂 | ✅ |
 | `src/infrastructure/messaging/event_bus_config_loader.py` | EventBusConfigLoader 配置加载 | ✅ |
 | `config/event_channels.yaml` | 事件通道配置文件 | ✅ |
