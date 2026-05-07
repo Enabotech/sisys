@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 from src.domain.value_objects.routing_decision import RoutingDecision
 
 if TYPE_CHECKING:
-    pass
+    from src.domain.ports.health_check import HealthCheckPort
 
 
 DEFAULT_LOCAL_MODEL = "qwen2.5:7b"
@@ -19,14 +19,6 @@ DEFAULT_CLOUD_MODELS = ["qwen-turbo", "qwen-plus", "claude-3-haiku"]
 DEFAULT_TIMEOUT_MS = 30000  # 30 seconds
 LOCAL_COST_ESTIMATE = 0.0001  # Local model cost per request
 CLOUD_COST_ESTIMATE = 0.001  # Cloud model cost per request
-
-
-class HealthChecker(Protocol):
-    """Protocol for health checker implementations."""
-
-    def check(self) -> bool:
-        """Check if the target is healthy."""
-        ...
 
 
 class RouterConfig(Protocol):
@@ -61,17 +53,17 @@ class UDMRouter:
 
     Responsibilities:
     - Receive task context and execute local-first routing decisions
-    - Check local model health before routing
+    - Check local model health before routing (via HealthCheckPort)
     - Fallback to cloud when local is unavailable or timeout exceeds threshold
     - Publish routing decision events
 
     Routing Logic:
-    1. Check local model health (Ollama ping)
+    1. Check local model health (Ollama ping) via HealthCheckPort
     2. If local available → route to local model
     3. If local unavailable OR timeout > 30s → fallback to cloud model
     """
 
-    _health_checker: HealthChecker | None = None
+    _health_checker: HealthCheckPort | None = None
     _config: RouterConfig | None = None
 
     def __post_init__(self) -> None:
@@ -122,8 +114,54 @@ class UDMRouter:
             return LOCAL_COST_ESTIMATE
         return CLOUD_COST_ESTIMATE
 
-    def route(self, task_context: dict | None) -> RoutingDecision:
-        """Execute routing decision based on task context.
+    async def _check_local_health_async(self) -> bool:
+        """Internal async health check implementation via HealthCheckPort.
+
+        Returns:
+            True if healthy, False otherwise.
+        """
+        if self._health_checker is not None:
+            return await self._health_checker.check()
+        return True
+
+    def _is_timeout(self, latency_ms: float, timeout_ms: int) -> bool:
+        """Check if latency exceeds timeout threshold.
+
+        Args:
+            latency_ms: Current latency in milliseconds
+            timeout_ms: Timeout threshold in milliseconds
+
+        Returns:
+            True if timeout exceeded, False otherwise.
+        """
+        return latency_ms > timeout_ms
+
+    def _build_decision(
+        self,
+        route_type: Literal["local", "cloud"],
+        selected_model: str,
+        fallback_reason: str | None,
+        latency_ms: float,
+        task_id: str,
+        session_id: str,
+    ) -> RoutingDecision:
+        """Build RoutingDecision from route parameters."""
+        log_id = uuid.uuid4()
+        cost_estimate = self._get_cost_estimate(route_type)
+        return RoutingDecision(
+            log_id=log_id,
+            task_id=task_id,
+            session_id=session_id,
+            route_type=route_type,
+            selected_model=selected_model,
+            cost_estimate=cost_estimate,
+            latency_ms=latency_ms,
+            fallback_reason=fallback_reason,
+            timestamp=datetime.now(UTC),
+        )
+
+    async def route_async(self, task_context: dict | None) -> RoutingDecision:
+        """Execute routing decision based on task context (async version).
 
         Args:
             task_context: Dictionary containing task_id, session_id, complexity
@@ -148,7 +186,7 @@ class UDMRouter:
         start_time = time.time()
         health_check_exc: Exception | None = None
         try:
-            local_healthy = self._check_local_health()
+            local_healthy = await self._check_local_health_async()
         except Exception as e:
             local_healthy = False
             health_check_exc = e
@@ -177,47 +215,38 @@ class UDMRouter:
             else:
                 fallback_reason = "unavailable"
 
-        log_id = uuid.uuid4()
-        cost_estimate = self._get_cost_estimate(route_type)
-        decision = RoutingDecision(
-            log_id=log_id,
-            task_id=task_id,
-            session_id=session_id,
-            route_type=route_type,
-            selected_model=selected_model,
-            cost_estimate=cost_estimate,
-            latency_ms=latency_ms,
-            fallback_reason=fallback_reason,
-            timestamp=datetime.now(UTC),
-        )
-        return decision
+        return self._build_decision(route_type, selected_model, fallback_reason, latency_ms, task_id, session_id)
 
-    def check_local_health(self) -> bool:
+    def route(self, task_context: dict | None) -> RoutingDecision:
+        """Execute routing decision based on task context (sync wrapper).
+
+        Args:
+            task_context: Dictionary containing task_id, session_id, complexity
+
+        Returns:
+            RoutingDecision with route_type, selected_model, cost_estimate, etc.
+
+        Raises:
+            ValueError: If task_context is None or missing required fields.
+        """
+        import asyncio
+
+        return asyncio.run(self.route_async(task_context))
+
+    async def check_local_health(self) -> bool:
         """Check if local model (Ollama) is available.
 
         Returns:
             True if local model is healthy, False otherwise.
         """
-        return self._check_local_health()
+        return await self._check_local_health_async()
 
-    def _check_local_health(self) -> bool:
-        """Internal health check implementation.
-
-        Returns:
-            True if healthy, False otherwise.
-        """
-        if self._health_checker is not None:
-            return self._health_checker.check()
-        return True
-
-    def _is_timeout(self, latency_ms: float, timeout_ms: int) -> bool:
-        """Check if latency exceeds timeout threshold.
-
-        Args:
-            latency_ms: Current latency in milliseconds
-            timeout_ms: Timeout threshold in milliseconds
+    def check_local_health_sync(self) -> bool:
+        """Check if local model (Ollama) is available (sync version).
 
         Returns:
-            True if timeout exceeded, False otherwise.
+            True if local model is healthy, False otherwise.
         """
-        return latency_ms > timeout_ms
+        import asyncio
+
+        return asyncio.run(self._check_local_health_async())

@@ -1,76 +1,159 @@
-"""Unit tests for LocalModelHealth (OllamaHealthAdapter) infrastructure service."""
+"""Unit tests for LocalModelHealthFacade and related components."""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 
-from src.infrastructure.routing.local_model_health import LocalModelHealth
+from src.application.services.local_model_health_facade import (
+    LocalModelHealthFacade,
+)
+from src.domain.ports.health_check import HealthCheckPort
+from src.domain.ports.health_check_factory import HealthCheckerFactory
+from src.infrastructure.routing.local_model_health import (
+    LocalModelHealth,
+    create_local_model_health_facade,
+)
+from src.infrastructure.routing.ollama_health import (
+    OllamaHealthAdapter,
+    OllamaHealthCheckerFactory,
+)
 
 
-class TestLocalModelHealth:
-    """Test suite for LocalModelHealth (OllamaHealthAdapter)."""
+class TestOllamaHealthCheckerFactory:
+    """Test suite for OllamaHealthCheckerFactory."""
+
+    def test_creates_ollama_health_adapter(self) -> None:
+        """Should create OllamaHealthAdapter."""
+        factory = OllamaHealthCheckerFactory(config=None)
+        adapter = factory.create()
+        assert isinstance(adapter, OllamaHealthAdapter)
+
+    def test_uses_config_local_model_as_endpoint(self) -> None:
+        """Should use config.local_model as endpoint."""
+        from src.infrastructure.config.udmr import UDMRConfig
+
+        config = UDMRConfig(local_model="http://custom:1234/health")
+        factory = OllamaHealthCheckerFactory(config=config)
+        adapter = factory.create()
+        assert "custom:1234" in getattr(adapter, "_endpoint")
+
+
+class TestLocalModelHealthFacade:
+    """Test suite for LocalModelHealthFacade."""
+
+    def test_requires_factory(self) -> None:
+        """Should require factory parameter."""
+        mock_factory = MagicMock(spec=HealthCheckerFactory)
+        mock_factory.create.return_value = MagicMock(spec=HealthCheckPort)
+        facade = LocalModelHealthFacade(factory=mock_factory)
+        assert facade._factory is mock_factory
+
+    def test_accepts_config_as_optional(self) -> None:
+        """Should accept config as optional second parameter."""
+        mock_factory = MagicMock(spec=HealthCheckerFactory)
+        mock_factory.create.return_value = MagicMock(spec=HealthCheckPort)
+        facade = LocalModelHealthFacade(factory=mock_factory, config=None)
+        assert facade._config is None
+
+    def test_creates_adapter_via_factory(self) -> None:
+        """Should create adapter via injected factory."""
+        mock_adapter = MagicMock(spec=HealthCheckPort)
+        mock_factory = MagicMock(spec=HealthCheckerFactory)
+        mock_factory.create.return_value = mock_adapter
+
+        facade = LocalModelHealthFacade(factory=mock_factory)
+        assert facade._health_checker is mock_adapter
 
     @pytest.mark.asyncio
-    async def test_check_returns_true_when_ollama_available(self) -> None:
-        """Should return True when Ollama is available."""
-        health = LocalModelHealth()
+    async def test_check_delegates_to_adapter(self) -> None:
+        """Should delegate check to adapter."""
+        mock_adapter = AsyncMock(spec=HealthCheckPort)
+        mock_adapter.check.return_value = True
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
+        mock_factory = MagicMock(spec=HealthCheckerFactory)
+        mock_factory.create.return_value = mock_adapter
 
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.aclose = AsyncMock()
-
-        with patch.object(health, "_client", mock_client):
-            result = await health.check()
+        facade = LocalModelHealthFacade(factory=mock_factory)
+        result = await facade.check()
 
         assert result is True
-        mock_client.get.assert_called_once()
+        mock_adapter.check.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_check_returns_false_when_ollama_unavailable(self) -> None:
-        """Should return False when Ollama returns non-200."""
-        health = LocalModelHealth(endpoint="http://localhost:11434/api/health", timeout=0.1)
+    async def test_close_delegates_to_adapter(self) -> None:
+        """Should delegate close to adapter."""
+        mock_adapter = AsyncMock(spec=HealthCheckPort)
+        mock_adapter.check.return_value = True
+        mock_adapter.close.return_value = None
 
-        mock_response = MagicMock()
-        mock_response.status_code = 503
+        mock_factory = MagicMock(spec=HealthCheckerFactory)
+        mock_factory.create.return_value = mock_adapter
 
-        mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
-        mock_client.aclose = AsyncMock()
+        facade = LocalModelHealthFacade(factory=mock_factory)
+        _ = facade._health_checker  # Trigger creation
+        await facade.close()
 
-        with patch.object(health, "_client", mock_client):
-            result = await health.check()
+        mock_adapter.close.assert_called_once()
 
-        assert result is False
 
-    @pytest.mark.asyncio
-    async def test_check_returns_false_on_connection_error(self) -> None:
-        """Should return False when connection fails."""
-        health = LocalModelHealth(endpoint="http://invalid-endpoint:9999/api/health", timeout=0.1)
+class TestLocalModelHealthFactoryFunction:
+    """Test suite for create_local_model_health_facade."""
 
-        mock_client = AsyncMock()
-        mock_client.get.side_effect = httpx.RequestError("Connection refused")
-        mock_client.aclose = AsyncMock()
+    def test_creates_facade_with_ollama_factory(self) -> None:
+        """Should create facade with OllamaHealthCheckerFactory."""
+        facade = create_local_model_health_facade(config=None)
+        assert isinstance(facade, LocalModelHealthFacade)
+        assert isinstance(facade._health_checker, OllamaHealthAdapter)
 
-        with patch.object(health, "_client", mock_client):
-            result = await health.check()
+    def test_uses_config_for_factory(self) -> None:
+        """Should pass config to factory."""
+        from src.infrastructure.config.udmr import UDMRConfig
 
-        assert result is False
+        config = UDMRConfig(local_model="http://custom:9999/health")
+        facade = create_local_model_health_facade(config=config)
+        assert "custom:9999" in getattr(facade._health_checker, "_endpoint")
 
-    def test_default_endpoint(self) -> None:
-        """Should use default Ollama endpoint."""
+    def test_raises_for_gemini_model_type(self) -> None:
+        """Should raise NotImplementedError for gemini model type."""
+        from src.infrastructure.config.udmr import UDMRConfig
+
+        config = UDMRConfig()
+        setattr(config, "local_model_type", "gemini")
+        with pytest.raises(NotImplementedError):
+            create_local_model_health_facade(config=config)
+
+    def test_raises_for_vllm_model_type(self) -> None:
+        """Should raise NotImplementedError for vllm model type."""
+        from src.infrastructure.config.udmr import UDMRConfig
+
+        config = UDMRConfig()
+        setattr(config, "local_model_type", "vllm")
+        with pytest.raises(NotImplementedError):
+            create_local_model_health_facade(config=config)
+
+
+class TestLocalModelHealthBackwardCompat:
+    """Test suite for LocalModelHealth backward compatibility."""
+
+    def test_returns_local_model_health_facade(self) -> None:
+        """Should return LocalModelHealthFacade instance."""
         health = LocalModelHealth()
-        assert "localhost" in health._endpoint
-        assert "11434" in health._endpoint
+        assert isinstance(health, LocalModelHealthFacade)
 
+    def test_accepts_config_parameter(self) -> None:
+        """Should accept UDMRConfig parameter."""
+        from src.infrastructure.config.udmr import UDMRConfig
 
-class TestLocalModelHealthDeprecation:
-    """Test LocalModelHealth deprecation warning via __getattr__."""
+        config = UDMRConfig()
+        health = LocalModelHealth(config=config)
+        assert isinstance(health, LocalModelHealthFacade)
+
+    def test_returns_facade_with_ollama_adapter(self) -> None:
+        """Should return facade with OllamaHealthAdapter."""
+        health = LocalModelHealth()
+        assert isinstance(health._health_checker, OllamaHealthAdapter)
 
     def test_module_has_no_attribute_raises_error(self) -> None:
         """Accessing non-existent attribute should raise AttributeError."""
@@ -78,28 +161,3 @@ class TestLocalModelHealthDeprecation:
 
         with pytest.raises(AttributeError):
             getattr(module, "NonExistentClass")
-
-    def test_getattr_returns_ollama_health_adapter(self) -> None:
-        """__getattr__ should return OllamaHealthAdapter for LocalModelHealth."""
-        import sys
-        import warnings
-
-        # Remove module from cache to force __getattr__ call on next access
-        mod_name = "src.infrastructure.routing.local_model_health"
-        if mod_name in sys.modules:
-            del sys.modules[mod_name]
-
-        # Also need to re-import the submodule
-        if "src.infrastructure.routing" in sys.modules:
-            del sys.modules["src.infrastructure.routing"]
-
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            import src.infrastructure.routing.local_model_health as module
-
-            # Access LocalModelHealth via getattr to trigger __getattr__
-            cls = getattr(module, "LocalModelHealth")
-
-            from src.infrastructure.routing.ollama_health_adapter import OllamaHealthAdapter
-
-            assert cls is OllamaHealthAdapter

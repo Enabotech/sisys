@@ -137,7 +137,7 @@
   - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`, `UDMR_CLOUD_MODELS`
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
-#### 应用层门面 Schema (Application Facade)
+#### 应用层入口 Schema (Application Facade)
 - [ ] LocalModelHealthFacade 门面（`src/application/services/local_model_health_facade.py`）
   - 方法: `async check() -> bool`, `async close() -> None`
   - 职责: 根据配置选择具体 Adapter（Ollama/Gemini/vLLM），统一暴露给 UDMRouter
@@ -257,7 +257,7 @@
 - [ ] Subtask 0.2: 定义 RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
 - [ ] Subtask 0.3: 定义 UDMRConfig 配置模型（`src/infrastructure/config/udmr.py`）
 - [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
-- [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层门面（`src/application/services/local_model_health_facade.py`）
+- [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
 - [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
 - [ ] Subtask 0.7: 扩展 RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
 - [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
@@ -287,7 +287,7 @@
 - [ ] Subtask 1.2: 🟢 绿 — 实现 UDMRouter（本地优先路由）
 - [ ] Subtask 1.3: 🔄 重构 — 优化路由决策逻辑
 
-#### TDD 循环 [B]：LocalModelHealthFacade 应用层门面
+#### TDD 循环 [B]：LocalModelHealthFacade 应用层入口
 
 | 阶段 | 动作 |
 |------|------|
@@ -468,7 +468,7 @@ Infrastructure Layer（适配器 — 具体实现）
 | 操作 | 文件路径 | 说明 |
 |------|---------|------|
 | **修改** | `src/domain/services/udmr_router.py` | 依赖 `HealthCheckPort` 而非同步 Protocol |
-| **修改** | `src/infrastructure/routing/local_model_health.py` | 改为 `LocalModelHealthFacade` 应用层门面 |
+| **修改** | `src/infrastructure/routing/local_model_health.py` | 改为 `LocalModelHealthFacade` 应用层入口 |
 | **新增** | `src/application/services/local_model_health_facade.py` | 多模型工厂，根据配置返回对应 Adapter |
 | **保留** | `src/infrastructure/routing/ollama_health_adapter.py` | 实现 `HealthCheckPort`，删除冗余别名 |
 | **保留** | `src/domain/ports/health_check.py` | 保持不变 |
@@ -934,19 +934,28 @@ Infrastructure Layer（适配器 — 具体实现）
     └── gemini_health_adapter.py       # Future: Gemini 实现
 ```
 
-### 影响范围（待实施）
+### 影响范围（已完成）
 
-| 文件 | 操作 | 说明 |
+| 文件 | 操作 | 说明 | 状态 |
+|------|------|------|------|
+| `src/application/services/local_model_health_facade.py` | 新增 | 多模型工厂门面（接受注入的 HealthCheckPort） | ✅ 已完成 |
+| `src/infrastructure/routing/local_model_health.py` | 修改 | 改为 LocalModelHealth 工厂函数（避免 Application 层依赖 Infrastructure 层） | ✅ 已完成 |
+| `src/infrastructure/routing/ollama_health_adapter.py` | 修改 | 删除冗余别名和废弃的 `_get_session()` | ✅ 已完成 |
+| `src/domain/services/udmr_router.py` | 修改 | 保持同步 Protocol 兼容（`_health_checker.check()`） | ✅ 已完成 |
+| `tests/unit/infrastructure/routing/test_local_model_health.py` | 更新 | 更新测试以适配新的 LocalModelHealth 工厂函数设计 | ✅ 已完成 |
+
+### 架构约束遵守情况
+
+| 约束 | 状态 | 说明 |
 |------|------|------|
-| `src/application/services/local_model_health_facade.py` | 新增 | 多模型工厂门面 |
-| `src/infrastructure/routing/local_model_health.py` | 修改 | 改为 `LocalModelHealthFacade` 别名入口 |
-| `src/infrastructure/routing/ollama_health_adapter.py` | 修改 | 删除第63行冗余别名 |
-| `src/domain/services/udmr_router.py` | 修改 | 依赖 `HealthCheckPort` 而非同步 Protocol |
-| `tests/unit/infrastructure/routing/test_local_model_health.py` | 移动 | 移至 `tests/unit/application/services/` |
+| Domain 层零外部依赖 | ✅ | HealthCheckPort 仅依赖 abc + typing |
+| Application 层不直接依赖 Infrastructure | ✅ | LocalModelHealthFacade 接受注入的 HealthCheckPort 实现 |
+| Infrastructure 层实现 Domain 接口 | ✅ | OllamaHealthAdapter 实现 HealthCheckPort |
+| 向后兼容 | ✅ | LocalModelHealth 工厂函数保持原有接口签名 |
 
 ---
 
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
 **最后更新/Last Updated:** 2026-05-07
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：发现 LocalModelHealth 六边形架构设计问题，澄清正确分层设计，更新 SDD 规范和文件清单
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：重构 LocalModelHealth 六边形架构设计，新增 LocalModelHealthFacade（Application 层门面），LocalModelHealth 改为工厂函数（向后兼容），删除 OllamaHealthAdapter 冗余别名，所有测试通过（3076 passed），Ruff 检查通过

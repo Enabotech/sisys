@@ -693,7 +693,7 @@ class TestImplementationLocation:
         expected_implementations = [
             "infrastructure/storage/file_memory_adapter.py",
             "infrastructure/storage/memory_index.py",
-            "infrastructure/routing/ollama_health_adapter.py",
+            "infrastructure/routing/ollama_health.py",
         ]
         for impl in expected_implementations:
             impl_path = SRC_DIR / impl
