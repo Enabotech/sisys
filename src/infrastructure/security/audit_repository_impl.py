@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.audit_repository import (
@@ -111,7 +111,10 @@ class AuditRepository(AuditRepositoryPort):
         # 构建基础查询
         query = select(AuditLogModel)
         if conditions:
-            query = query.where(and_(*conditions))
+            if criteria.match_any:
+                query = query.where(or_(*conditions))
+            else:
+                query = query.where(and_(*conditions))
 
         # 获取总数
         count_query = select(AuditLogModel)

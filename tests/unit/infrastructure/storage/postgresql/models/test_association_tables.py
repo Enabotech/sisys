@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import ForeignKey
 
-from src.infrastructure.storage.postgresql.models.association import (
+from src.infrastructure.storage.postgresql.models.rbac_association import (
     role_permissions_table,
     user_roles_table,
 )

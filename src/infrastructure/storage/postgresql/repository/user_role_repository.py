@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 from src.infrastructure.storage.postgresql.models import RoleModel, UserModel
-from src.infrastructure.storage.postgresql.models.association import user_roles_table as user_roles
+from src.infrastructure.storage.postgresql.models.rbac_association import user_roles_table as user_roles
 
 if TYPE_CHECKING:
     from src.domain.entities.role import Role
@@ -125,7 +125,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
             权限字符串元组
         """
         from src.infrastructure.storage.postgresql.models import PermissionModel
-        from src.infrastructure.storage.postgresql.models.association import (
+        from src.infrastructure.storage.postgresql.models.rbac_association import (
             role_permissions_table as role_permissions,
         )
 
