@@ -51,6 +51,10 @@ class AuditRepository(AuditRepositoryPort):
         correction_level = audit_data.get("correction_level")
         checksum = audit_data.get("checksum", "")
         correlation_id = audit_data.get("correlation_id")
+        archived = audit_data.get("archived", False)
+        archived_at = audit_data.get("archived_at")
+        if archived_at and isinstance(archived_at, str):
+            archived_at = datetime.fromisoformat(archived_at)
 
         # 创建模型实例
         audit_log = AuditLogModel(
@@ -64,6 +68,8 @@ class AuditRepository(AuditRepositoryPort):
             correction_level=correction_level,
             checksum=checksum,
             correlation_id=correlation_id,
+            archived=archived,
+            archived_at=archived_at,
         )
 
         self._session.add(audit_log)
