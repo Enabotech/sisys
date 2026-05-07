@@ -226,7 +226,7 @@
 
 #### API 契约 (API Contract)
 - [x] OpenAPI 定义位于 `docs/api/openapi.yaml` ✅
-- [ ] 契约测试通过（`tests/contract/test_api_contract.py`）
+- [ ] 契约测试通过（`tests/contract/test_rbac_api_contract.py`）
 - [x] API 版本管理正确（`/api/v1/[resource]`）✅
 
 **API 端点定义：**
