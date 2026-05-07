@@ -643,7 +643,7 @@ sisys/
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施（遵循 SDD+TDD 融合模式）
 - [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `validate-create-story` 质量检查
+
 - [ ] 可选：运行 `/bmad:tea:automate` 生成测试（如果 Test Architect 模块已安装）
 
 ---

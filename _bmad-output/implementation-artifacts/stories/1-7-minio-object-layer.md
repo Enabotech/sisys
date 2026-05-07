@@ -728,7 +728,7 @@ sisys/
 
 - [x] Story 实施完成，状态 `done`
 - [x] 运行 `code-review` 进行代码审查
-- [x] 运行 `validate-create-story` 质量检查（可选）
+（可选）
 - [x] 更新 sprint-status.yaml 中 Epic 1 进度
 - [x] 部署 minio 实例后验证集成测试（替换 mock 为真实实例）
 - [x] 部署 minio 实例后最终完成验收测试（禁止使用 mock / fake）

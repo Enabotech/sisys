@@ -17,10 +17,591 @@ servers:
   - url: http://localhost:8000/api/v1
     description: Local development server
 
-paths: {}
+paths:
+  # ============================================================================
+  # 认证端点 (Authentication)
+  # ============================================================================
+  /auth/login:
+    post:
+      tags:
+        - authentication
+      summary: 用户登录
+      description: 验证用户凭证并返回 JWT 令牌
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        "401":
+          description: 无效凭证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "423":
+          description: 账户已锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - authentication
+      summary: 刷新访问令牌
+      description: 使用 refresh token 获取新的 access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        "200":
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        "401":
+          description: Refresh token 无效或已过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - authentication
+      summary: 用户登出
+      description: 撤销 JWT token
+      security:
+        - OAuth2: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: 可选的 refresh token
+      responses:
+        "204":
+          description: 登出成功
+
+  /auth/me:
+    get:
+      tags:
+        - authentication
+      summary: 获取当前用户信息
+      description: 返回当前认证用户的信息
+      security:
+        - OAuth2: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # 角色管理端点 (Role Management)
+  # ============================================================================
+  /roles:
+    get:
+      tags:
+        - roles
+      summary: 获取角色列表
+      description: 返回所有角色（需认证）
+      security:
+        - OAuth2: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - roles
+      summary: 创建角色
+      description: 创建新角色（需 admin 角色）
+      security:
+        - OAuth2: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: 角色名已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /roles/{role_id}:
+    get:
+      tags:
+        - roles
+      summary: 获取角色详情
+      description: 根据 ID 获取角色详情
+      security:
+        - OAuth2: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 角色 UUID
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - roles
+      summary: 更新角色
+      description: 更新角色信息（需 admin 角色）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 角色 UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: 角色名冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - roles
+      summary: 删除角色
+      description: 删除角色（软删除，需 admin 角色，系统保留角色不可删除）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 角色 UUID
+      responses:
+        "204":
+          description: 删除成功
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: 需要管理员角色或角色为系统保留
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: 无法删除（仍有用户关联到此角色）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /roles/{role_id}/permissions:
+    post:
+      tags:
+        - roles
+      summary: 为角色分配权限
+      description: 添加权限到角色（需 admin 角色）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 角色 UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignPermissionRequest'
+      responses:
+        "200":
+          description: 分配成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - roles
+      summary: 撤销角色权限
+      description: 从角色移除指定权限（需 admin 角色）
+      security:
+        - OAuth2: []
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 角色 UUID
+        - name: permission
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 权限字符串（如 "document:read"）
+      responses:
+        "200":
+          description: 撤销成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
-  schemas: {}
+  schemas:
+    # --------------------------------------------------------------------------
+    # 认证相关 schemas
+    # --------------------------------------------------------------------------
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 用户名
+        password:
+          type: string
+          minLength: 1
+          description: 密码
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+        - user
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          nullable: true
+          description: Refresh token（可选）
+        token_type:
+          type: string
+          default: bearer
+          description: Token 类型
+        expires_in:
+          type: integer
+          description: 过期时间（秒）
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - username
+        - roles
+      properties:
+        id:
+          type: string
+          description: 用户 UUID
+        username:
+          type: string
+          description: 用户名
+        roles:
+          type: array
+          items:
+            type: string
+          description: 角色列表
+
+    # --------------------------------------------------------------------------
+    # 角色相关 schemas
+    # --------------------------------------------------------------------------
+    CreateRoleRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 角色名
+        description:
+          type: string
+          default: ""
+          description: 角色描述
+        permissions:
+          type: array
+          items:
+            type: string
+          default: []
+          description: 权限列表（如 ["document:read", "document:write"]）
+        is_system_reserved:
+          type: boolean
+          default: false
+          description: 是否为系统保留角色
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 角色名
+        description:
+          type: string
+          nullable: true
+          description: 角色描述
+        permissions:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 权限列表
+        is_active:
+          type: boolean
+          nullable: true
+          description: 是否激活
+
+    RoleResponse:
+      type: object
+      required:
+        - id
+        - name
+        - permissions
+        - is_system_reserved
+        - is_active
+      properties:
+        id:
+          type: string
+          description: 角色 UUID
+        name:
+          type: string
+          description: 角色名
+        description:
+          type: string
+          description: 角色描述
+        permissions:
+          type: array
+          items:
+            type: string
+          description: 权限列表
+        is_system_reserved:
+          type: boolean
+          description: 是否为系统保留角色
+        is_active:
+          type: boolean
+          description: 是否激活
+        created_at:
+          type: string
+          nullable: true
+          description: 创建时间（ISO 8601）
+        updated_at:
+          type: string
+          nullable: true
+          description: 更新时间（ISO 8601）
+
+    AssignPermissionRequest:
+      type: object
+      required:
+        - permissions
+      properties:
+        permissions:
+          type: array
+          items:
+            type: string
+          description: 要分配的权限列表
+
+    # --------------------------------------------------------------------------
+    # 通用 schemas
+    # --------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: 错误详情
+
   securitySchemes:
     OAuth2:
       type: oauth2
@@ -29,3 +610,8 @@ components:
           authorizationUrl: https://auth.example.com/authorize
           tokenUrl: https://auth.example.com/token
           scopes: {}
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token 认证

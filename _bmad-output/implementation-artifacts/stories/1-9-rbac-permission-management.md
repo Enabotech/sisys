@@ -224,6 +224,41 @@
   - 字段: `id`, `resource`, `action`, `description`
 - [ ] UserRole 关联模型（多对多关系）
 
+#### API 契约 (API Contract)
+- [x] OpenAPI 定义位于 `docs/api/openapi.yaml` ✅
+- [ ] 契约测试通过（`tests/contract/test_api_contract.py`）
+- [x] API 版本管理正确（`/api/v1/[resource]`）✅
+
+**API 端点定义：**
+
+| 端点 | 方法 | 路径 | 描述 | 认证 |
+|------|------|------|------|------|
+| 登录 | POST | `/api/v1/auth/login` | 用户登录 | 否 |
+| 刷新令牌 | POST | `/api/v1/auth/refresh` | 刷新访问令牌 | 否 |
+| 登出 | POST | `/api/v1/auth/logout` | 用户登出 | Bearer |
+| 当前用户 | GET | `/api/v1/auth/me` | 获取当前用户信息 | Bearer |
+| 角色列表 | GET | `/api/v1/roles` | 获取所有角色 | Bearer |
+| 创建角色 | POST | `/api/v1/roles` | 创建新角色 | Bearer (admin) |
+| 角色详情 | GET | `/api/v1/roles/{role_id}` | 获取角色详情 | Bearer |
+| 更新角色 | PUT | `/api/v1/roles/{role_id}` | 更新角色 | Bearer (admin) |
+| 删除角色 | DELETE | `/api/v1/roles/{role_id}` | 删除角色（软删除） | Bearer (admin) |
+| 分配权限 | POST | `/api/v1/roles/{role_id}/permissions` | 为角色分配权限 | Bearer (admin) |
+| 撤销权限 | DELETE | `/api/v1/roles/{role_id}/permissions/{permission}` | 撤销角色权限 | Bearer (admin) |
+
+**请求/响应模型：**
+
+| Schema | 用途 | 关键字段 |
+|--------|------|---------|
+| `LoginRequest` | 登录请求 | `username`, `password` |
+| `RefreshTokenRequest` | 刷新令牌请求 | `refresh_token` |
+| `TokenResponse` | 令牌响应 | `access_token`, `refresh_token`, `token_type`, `expires_in`, `user` |
+| `UserResponse` | 用户信息 | `id`, `username`, `roles` |
+| `CreateRoleRequest` | 创建角色 | `name`, `description`, `permissions`, `is_system_reserved` |
+| `UpdateRoleRequest` | 更新角色 | `name`, `description`, `permissions`, `is_active` |
+| `RoleResponse` | 角色响应 | `id`, `name`, `description`, `permissions`, `is_system_reserved`, `is_active`, `created_at`, `updated_at` |
+| `AssignPermissionRequest` | 分配权限请求 | `permissions` |
+| `ErrorResponse` | 错误响应 | `detail` |
+
 #### 安全服务接口 (Security Service Interfaces)
 
 > ⚠️ **六边形架构约束：安全服务接口必须遵循依赖倒置原则**

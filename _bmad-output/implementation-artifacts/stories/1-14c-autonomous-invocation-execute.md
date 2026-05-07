@@ -808,7 +808,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `validate-create-story` 质量检查
+
 - [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
 
 ---

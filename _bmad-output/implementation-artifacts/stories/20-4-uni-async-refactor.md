@@ -813,7 +813,7 @@
 - [ ] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story 20-4` 开始实施
 - [ ] 运行 `code-review` 进行代码审查
-- [ ] 运行 `validate-create-story` 质量检查
+
 - [ ] 实施前完成 3 个检查项：
   1. 搜索 `MemoryService(` 所有实例化点
   2. 确认 AuditEventListener 调用方
