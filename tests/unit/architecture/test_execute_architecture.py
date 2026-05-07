@@ -79,7 +79,7 @@ class TestExecuteArchitecture:
 
     def test_interfaces_layer_defines_ports(self) -> None:
         """Interfaces layer must define ports (abstract interfaces)."""
-        port_file = Path("src/interfaces/cli/commands/sandbox_port.py")
+        port_file = Path("src/application/ports/sandbox_port.py")
 
         content = port_file.read_text()
 
