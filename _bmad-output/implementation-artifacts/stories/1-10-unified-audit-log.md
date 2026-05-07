@@ -191,7 +191,7 @@
 #### 领域层接口 (Domain Ports)
 > ⚠️ **六边形架构约束：领域层接口必须遵循依赖倒置原则**
 > - 接口定义在 `src/domain/ports/`（使用 `ABC`，**仅依赖标准库**）
-> - 实现类在 `src/infrastructure/`（可导入外部库）
+> - 实现类在 `src/infrastructure/security/`（可导入外部库）
 > - **禁止在领域层导入任何外部依赖**
 
 - [ ] AuditServicePort 接口（`src/domain/ports/audit_service.py`）
@@ -623,6 +623,34 @@ sisys/
 - [x] 状态设置为 `ready-for-dev`
 - [ ] SDD+TDD 融合开发要求定义完成
 - [ ] 项目结构对齐统一规范
+
+---
+
+### 文件清单 File List
+
+**创建的文件/Created Files:**
+- `_bmad-output/implementation-artifacts/stories/1-10-unified-audit-log.md` - Story 1.10 故事文件
+
+**待创建的文件/To Be Created (Dev Story 实施):**
+- `src/domain/ports/audit_service.py` - AuditServicePort 接口
+- `src/domain/ports/audit_repository.py` - AuditRepositoryPort 接口
+- `src/domain/entities/audit_log.py` - AuditLog 领域实体
+- `src/infrastructure/security/audit_service_impl.py` - AuditServicePort 实现
+- `src/infrastructure/security/audit_repository_impl.py` - AuditRepositoryPort 实现
+- `src/infrastructure/storage/postgresql/models/audit.py` - AuditLogModel（已存在）
+- `src/infrastructure/storage/postgresql/models/audit_outbox.py` - AuditOutboxModel（已存在）
+- `src/interfaces/api/audit.py` - 审计 API 路由
+- `tests/unit/security/test_audit_service.py` - AuditService 单元测试
+- `tests/unit/security/test_audit_repository.py` - AuditRepository 单元测试
+- `tests/unit/security/test_integrity_verification.py` - 完整性验证测试
+- `tests/unit/security/test_worm_archival.py` - WORM 归档测试
+- `tests/unit/security/test_audit_architecture_constraints.py` - 架构约束测试
+- `tests/integration/test_audit_rbac_integration.py` - RBAC 集成测试
+- `tests/integration/test_audit_api_endpoints.py` - API 端点测试
+- `tests/acceptance/test_story_1_10.feature` - Gherkin 验收测试
+- `tests/acceptance/test_story_1_10_steps.py` - BDD 步骤实现
+- `tests/contract/test_audit_api_contract.py` - API 契约测试
+- `docs/security/audit_log_guide.md` - 审计日志实施指南
 
 ---
 
