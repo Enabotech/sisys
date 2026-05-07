@@ -69,11 +69,16 @@ class UserRoleRepository(UserRoleRepositoryPort):
         Returns:
             True 撤销成功，False 关联不存在
         """
-        result = await self._session.execute(
-            user_roles.delete().where(user_roles.c.user_id == user_id, user_roles.c.role_id == role_id)
-        )
+        from typing import cast
+
+        from sqlalchemy import delete
+        from sqlalchemy.engine import CursorResult
+
+        stmt = delete(user_roles).where(user_roles.c.user_id == user_id, user_roles.c.role_id == role_id)
+        result = await self._session.execute(stmt)
         await self._session.flush()
-        return result.rowcount > 0  # type: ignore[no-any-return, attr-defined]
+        cursor_result = cast(CursorResult, result)
+        return cursor_result.rowcount > 0
 
     async def get_user_roles(self, user_id: UUID) -> list["Role"]:
         """获取用户的所有角色。

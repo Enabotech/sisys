@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import is_dataclass
 
-import pytest
-
 from src.domain.events.publish_result import PublishResult
 
 
@@ -123,17 +121,14 @@ class TestPublishResultProperties:
 class TestPublishResultImmutability:
     """Test that PublishResult is immutable (frozen dataclass)."""
 
-    def test_cannot_modify_event_id(self) -> None:
-        """Should not be able to modify event_id after creation."""
-        result = PublishResult(event_id="test-123")
-        with pytest.raises(AttributeError):
-            result.event_id = "new-id"  # type: ignore[misc]
+    def test_is_frozen(self) -> None:
+        """PublishResult should be a frozen dataclass."""
+        import dataclasses
 
-    def test_cannot_modify_redis_success(self) -> None:
-        """Should not be able to modify redis_success after creation."""
-        result = PublishResult(event_id="test-123")
-        with pytest.raises(AttributeError):
-            result.redis_success = True  # type: ignore[misc]
+        assert dataclasses.is_dataclass(PublishResult)
+        params = getattr(PublishResult, "__dataclass_params__", None)
+        assert params is not None
+        assert params.frozen is True
 
 
 class TestPublishResultDomainLayerZeroDependency:

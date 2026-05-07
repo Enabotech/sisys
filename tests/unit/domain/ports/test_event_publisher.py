@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from abc import ABC
 
-import pytest
-
 from src.domain.ports.event_publisher import EventPublisher
 
 
@@ -16,10 +14,9 @@ class TestEventPublisherIsAbstract:
         """EventPublisher should be an ABC."""
         assert issubclass(EventPublisher, ABC)
 
-    def test_cannot_instantiate_directly(self) -> None:
-        """EventPublisher cannot be instantiated directly."""
-        with pytest.raises(TypeError):
-            EventPublisher()  # type: ignore[abstract]
+    def test_has_abstract_publish(self) -> None:
+        """EventPublisher has abstract publish method."""
+        assert getattr(EventPublisher.publish, "__isabstractmethod__", False)
 
 
 class TestEventPublisherHasPublishMethod:

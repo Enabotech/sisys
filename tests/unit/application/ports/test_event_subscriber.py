@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from abc import ABC
 
-import pytest
-
 from src.application.ports.event_subscriber import EventSubscriber
 
 
@@ -16,10 +14,11 @@ class TestEventSubscriberIsAbstract:
         """EventSubscriber should be an ABC."""
         assert issubclass(EventSubscriber, ABC)
 
-    def test_cannot_instantiate_directly(self) -> None:
-        """EventSubscriber cannot be instantiated directly."""
-        with pytest.raises(TypeError):
-            EventSubscriber()  # type: ignore[abstract]
+    def test_all_methods_are_abstract(self) -> None:
+        """All EventSubscriber methods should be abstract."""
+        for method_name in ["subscribe", "subscribe_async", "start", "close"]:
+            method = getattr(EventSubscriber, method_name)
+            assert getattr(method, "__isabstractmethod__", False), f"{method_name} should be abstract"
 
 
 class TestEventSubscriberMethods:
