@@ -198,7 +198,7 @@ class TestArgoCDPerformance:
         # Measure 10 times
         for i in range(10):
             start = time.time()
-            response = session.get(f"{argocd_url}/", timeout=10, headers={"Host": "argocd.sisys.local"})  # noqa: F841
+            response = session.get(f"{argocd_url}/", timeout=10, headers={"Host": "argocd.sisys.local"})
             elapsed = time.time() - start
             times.append(elapsed)
 
