@@ -29,6 +29,7 @@ class AuthServiceImpl(AuthServicePort):
         login_attempt_repository=None,  # LoginAttemptRepositoryPort (optional)
         token_blacklist=None,  # Redis blacklist store (optional)
         refresh_token_store=None,  # Redis refresh token rotation store (optional)
+        event_publisher=None,  # EventPublisher (optional, for audit events)
     ):
         """初始化认证服务.
 
@@ -40,6 +41,7 @@ class AuthServiceImpl(AuthServicePort):
             login_attempt_repository: 登录尝试仓储端口（可选）
             token_blacklist: Token 黑名单存储（可选，用于 logout）
             refresh_token_store: Refresh token 存储（可选，用于 rotation）
+            event_publisher: 事件发布器（可选，用于审计事件）
         """
         self._jwt_service = jwt_service
         self._encryption_service = encryption_service
@@ -48,6 +50,7 @@ class AuthServiceImpl(AuthServicePort):
         self._login_attempt_repo = login_attempt_repository
         self._token_blacklist = token_blacklist
         self._refresh_token_store = refresh_token_store
+        self._event_publisher = event_publisher
 
     async def authenticate(
         self,
@@ -128,7 +131,51 @@ class AuthServiceImpl(AuthServicePort):
         # 生成 refresh token
         refresh_token = self._jwt_service.create_refresh_token(user_id=user.id)
 
+        # 发布审计事件 - 登录成功
+        await self._publish_audit_event(
+            action_type="authentication:login",
+            actor=str(user.id),
+            target_resource="/api/v1/auth/login",
+            old_value=None,
+            new_value={"username": username, "ip_address": ip_address, "user_agent": user_agent},
+        )
+
         return AuthTokens(access_token=access_token, refresh_token=refresh_token)
+
+    async def _publish_audit_event(
+        self,
+        action_type: str,
+        actor: str,
+        target_resource: str,
+        old_value: dict | None = None,
+        new_value: dict | None = None,
+    ) -> None:
+        """发布审计事件。
+
+        Args:
+            action_type: 操作类型
+            actor: 操作用户 ID
+            target_resource: 目标资源
+            old_value: 操作前状态
+            new_value: 操作后状态
+        """
+        if self._event_publisher is None:
+            return
+
+        try:
+            from src.domain.events.audit_events import AuditEvent
+
+            event = AuditEvent(
+                actor=actor,
+                action_type=action_type,
+                target_resource=target_resource,
+                old_value=old_value or {},
+                new_value=new_value or {},
+            )
+            await self._event_publisher.publish(event)
+        except Exception:
+            # 审计事件发布失败不应影响主流程
+            pass
 
     async def _record_attempt(
         self,
@@ -157,6 +204,21 @@ class AuthServiceImpl(AuthServicePort):
                 user_id=user_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
+            )
+
+        # 发布审计事件 - 登录失败
+        if not success:
+            await self._publish_audit_event(
+                action_type="authentication:failed",
+                actor=str(user_id) if user_id else username,
+                target_resource="/api/v1/auth/login",
+                old_value=None,
+                new_value={
+                    "username": username,
+                    "failure_reason": failure_reason,
+                    "ip_address": ip_address,
+                    "user_agent": user_agent,
+                },
             )
 
     async def verify_token(self, token: str) -> TokenPayload:
@@ -240,6 +302,15 @@ class AuthServiceImpl(AuthServicePort):
             await self._token_blacklist.add(token)
             if refresh_token:
                 await self._token_blacklist.add(refresh_token)
+
+        # 发布审计事件 - 登出
+        await self._publish_audit_event(
+            action_type="authentication:logout",
+            actor="system",  # Will be overridden by actual user ID if available
+            target_resource="/api/v1/auth/logout",
+            old_value={"token_revoked": True},
+            new_value={"refresh_token_revoked": refresh_token is not None},
+        )
 
     async def _revoke_user_token_family(self, user_id: UUID) -> None:
         """撤销用户的所有 token（token family）。

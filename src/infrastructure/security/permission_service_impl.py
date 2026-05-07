@@ -23,15 +23,18 @@ class PermissionServiceImpl(PermissionServicePort):
         self,
         user_role_repo: UserRoleRepositoryPort,
         role_repo: RoleRepositoryPort,
+        event_publisher=None,  # EventPublisher (optional, for audit events)
     ):
         """初始化权限服务.
 
         Args:
             user_role_repo: 用户-角色关联仓储端口
             role_repo: 角色仓储端口
+            event_publisher: 事件发布器（可选，用于审计事件）
         """
         self._user_role_repo = user_role_repo
         self._role_repo = role_repo
+        self._event_publisher = event_publisher
 
     async def check_permission(
         self,
@@ -106,3 +109,86 @@ class PermissionServiceImpl(PermissionServicePort):
             if perm_resource == resource and (perm_action == "*" or perm_action == action):
                 return True
         return False
+
+    async def assign_role(self, user_id: UUID, role_id: UUID, grant_actor: str) -> bool:
+        """分配角色给用户。
+
+        Args:
+            user_id: 用户 ID
+            role_id: 角色 ID
+            grant_actor: 授权操作者 ID
+
+        Returns:
+            True 如果成功
+        """
+        result = await self._user_role_repo.assign_role(user_id, role_id)
+
+        # 发布审计事件 - 角色授予
+        await self._publish_audit_event(
+            action_type="authorization:grant",
+            actor=grant_actor,
+            target_resource=f"user/{user_id}/role/{role_id}",
+            old_value={"user_id": str(user_id), "role_id": str(role_id)},
+            new_value={"user_id": str(user_id), "role_id": str(role_id), "granted": result},
+        )
+
+        return result
+
+    async def revoke_role(self, user_id: UUID, role_id: UUID, revoke_actor: str) -> bool:
+        """撤销用户的角色。
+
+        Args:
+            user_id: 用户 ID
+            role_id: 角色 ID
+            revoke_actor: 撤销操作者 ID
+
+        Returns:
+            True 如果成功
+        """
+        result = await self._user_role_repo.revoke_role(user_id, role_id)
+
+        # 发布审计事件 - 角色撤销
+        await self._publish_audit_event(
+            action_type="authorization:revoke",
+            actor=revoke_actor,
+            target_resource=f"user/{user_id}/role/{role_id}",
+            old_value={"user_id": str(user_id), "role_id": str(role_id), "revoked": result},
+            new_value=None,
+        )
+
+        return result
+
+    async def _publish_audit_event(
+        self,
+        action_type: str,
+        actor: str,
+        target_resource: str,
+        old_value: dict | None = None,
+        new_value: dict | None = None,
+    ) -> None:
+        """发布审计事件。
+
+        Args:
+            action_type: 操作类型
+            actor: 操作用户 ID
+            target_resource: 目标资源
+            old_value: 操作前状态
+            new_value: 操作后状态
+        """
+        if self._event_publisher is None:
+            return
+
+        try:
+            from src.domain.events.audit_events import AuditEvent
+
+            event = AuditEvent(
+                actor=actor,
+                action_type=action_type,
+                target_resource=target_resource,
+                old_value=old_value or {},
+                new_value=new_value or {},
+            )
+            await self._event_publisher.publish(event)
+        except Exception:
+            # 审计事件发布失败不应影响主流程
+            pass
