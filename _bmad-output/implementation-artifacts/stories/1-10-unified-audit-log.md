@@ -681,11 +681,6 @@ sisys/
 
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施（从 Task 0 SDD 规范定义开始）
-- [ ] Task 0.4: 定义 AuditServicePort 接口
-- [ ] Task 0.5: 定义 AuditRepositoryPort 接口
-- [ ] Task 0.6: 定义 AuditLog 领域实体
-- [ ] Task 0.7: 在 openapi.yaml 中定义 audit API 端点
-- [ ] Task 0.8-0.12: 契约测试 + 验收测试
 
 ---
 
