@@ -637,7 +637,7 @@ sisys/
 | **Story ID** | 1.10 |
 | **Story Key** | 1-10-unified-audit-log |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-10-unified-audit-log.md` |
-| **Status** | `backlog` |
+| **Status** | `ready-for-dev` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 4: 安全与合规基础 |
 | **优先级** | P0 |
