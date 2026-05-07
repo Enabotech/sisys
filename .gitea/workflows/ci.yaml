@@ -253,7 +253,7 @@ jobs:
       - name: 运行单元测试
         run: |
           mkdir -p reports/coverage reports/pytest
-          poetry run pytest tests/unit \
+          poetry run pytest tests/unit tests/contract \
             --cov=src \
             --cov-report=xml:reports/coverage/coverage.xml \
             --cov-report=html:reports/coverage/coverage.html \
