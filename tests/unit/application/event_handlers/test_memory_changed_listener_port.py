@@ -26,11 +26,11 @@ class TestMemoryChangedListenerIndexManagerPort:
 
     def test_init_accepts_index_manager(self):
         """验证 MemoryChangedListener 构造函数接受 index_manager 参数"""
-        mock_coordinator = AsyncMock()
+        mock_l1_cache = AsyncMock()
         mock_index_manager = MagicMock(spec=IndexManagerPort)
 
         listener = MemoryChangedHandler(
-            storage_coordinator=mock_coordinator,
+            l1_cache=mock_l1_cache,
             index_manager=mock_index_manager,
         )
 
@@ -39,10 +39,10 @@ class TestMemoryChangedListenerIndexManagerPort:
 
     def test_init_without_index_manager_is_valid(self):
         """验证 index_manager 为可选参数"""
-        mock_coordinator = AsyncMock()
+        mock_l1_cache = AsyncMock()
 
         listener = MemoryChangedHandler(
-            storage_coordinator=mock_coordinator,
+            l1_cache=mock_l1_cache,
         )
 
         # index_manager 允许为 None（向后兼容）
@@ -51,12 +51,12 @@ class TestMemoryChangedListenerIndexManagerPort:
     @pytest.mark.asyncio
     async def test_handle_updates_index_on_memory_change(self):
         """验证 handle() 方法调用 index_manager.update_entry()"""
-        mock_coordinator = AsyncMock()
+        mock_l1_cache = AsyncMock()
         mock_index_manager = MagicMock(spec=IndexManagerPort)
         mock_index_manager.update_entry = AsyncMock()
 
         listener = MemoryChangedHandler(
-            storage_coordinator=mock_coordinator,
+            l1_cache=mock_l1_cache,
             index_manager=mock_index_manager,
         )
 
@@ -83,18 +83,18 @@ class TestMemoryChangedListenerBackwardCompatibility:
 
     def test_init_with_legacy_params_still_works(self):
         """验证旧参数仍然有效（向后兼容）"""
-        mock_coordinator = AsyncMock()
+        mock_l1_cache = AsyncMock()
         mock_metadata_repo = MagicMock()
         mock_history_repo = MagicMock()
 
-        # Old signature: __init__(storage_coordinator, metadata_repository, history_repository)
+        # Old signature: __init__(l1_cache, metadata_repository, history_repository)
         # New signature adds index_manager as optional
         listener = MemoryChangedHandler(
-            storage_coordinator=mock_coordinator,
+            l1_cache=mock_l1_cache,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
 
-        assert listener._storage_coordinator is mock_coordinator
+        assert listener._l1_cache is mock_l1_cache
         assert listener._metadata_repository is mock_metadata_repo
         assert listener._history_repository is mock_history_repo

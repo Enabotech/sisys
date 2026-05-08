@@ -27,9 +27,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
-from src.application.services.six_layer_storage_coordinator import (
-    SixLayerStorageCoordinator,
-)
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
 from src.domain.events.memory_events import MemoryChanged
@@ -216,18 +213,6 @@ def compressor() -> L1Compressor:
 
 
 @pytest.fixture
-def storage_coordinator(redis_cache) -> SixLayerStorageCoordinator:
-    """Create SixLayerStorageCoordinator with real L1 Redis."""
-    return SixLayerStorageCoordinator(
-        l1_cache=redis_cache,
-        l2_repository=None,
-        l3_vector_store=None,
-        l4_object_store=None,
-        l5_graph_store=None,
-    )
-
-
-@pytest.fixture
 async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryService:
     """Create MemoryService with real PostgreSQL repositories."""
     from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
@@ -249,7 +234,7 @@ async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryServ
 
 
 @pytest.fixture
-async def listener_with_real_services(storage_coordinator, pg_session: AsyncSession):
+async def listener_with_real_services(redis_cache, pg_session: AsyncSession):
     """Create MemoryChangedListener with REAL L1 Redis + L2 PostgreSQL services."""
     from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
@@ -262,7 +247,7 @@ async def listener_with_real_services(storage_coordinator, pg_session: AsyncSess
     history_repo = PostgreSQLMemoryChangeHistoryRepository(pg_session)
 
     return MemoryChangedHandler(
-        storage_coordinator=storage_coordinator,
+        l1_cache=redis_cache,
         metadata_repository=metadata_repo,
         history_repository=history_repo,
     )

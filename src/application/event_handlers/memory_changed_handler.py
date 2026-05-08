@@ -37,7 +37,7 @@ class MemoryChangedHandler:
 
     def __init__(
         self,
-        storage_coordinator,  # SixLayerStorageCoordinator | None
+        l1_cache=None,  # L1CachePort | None
         metadata_repository=None,  # L2MetadataRepositoryProtocol | None
         history_repository=None,  # L2ChangeHistoryRepositoryProtocol | None
         index_manager=None,  # IndexManagerPort | None
@@ -45,12 +45,12 @@ class MemoryChangedHandler:
         """初始化监听器。
 
         Args:
-            storage_coordinator: SixLayerStorageCoordinator（L1 缓存失效）
+            l1_cache: L1 缓存端口（用于缓存失效）
             metadata_repository: L2 元数据仓储（可选）
             history_repository: L2 历史记录仓储（可选）
             index_manager: 索引管理器（可选，用于更新 MEMORY.md 索引）
         """
-        self._storage_coordinator = storage_coordinator
+        self._l1_cache = l1_cache
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
         self._index_manager = index_manager
@@ -91,21 +91,15 @@ class MemoryChangedHandler:
         Args:
             event: MemoryChanged 事件
         """
-        if self._storage_coordinator is None:
-            logger.warning("No storage_coordinator configured, skipping L1 cache invalidation")
+        if self._l1_cache is None:
+            logger.warning("No l1_cache configured, skipping L1 cache invalidation")
             return
 
         try:
             memory_type = self._get_memory_type(event)
             # owner_id 是 user_id（private 类型）或 group_id
             owner_id = event.user_id
-            await self._storage_coordinator.invalidate(
-                memory_id=event.memory_id,
-                layer="L1",
-                memory_type=memory_type,
-                owner_id=owner_id,
-                name=event.name,
-            )
+            await self._l1_cache.delete(memory_type, owner_id, event.name)
             logger.debug(f"L1 cache invalidated: memory_id={event.memory_id}")
         except Exception as e:
             logger.error(f"Failed to invalidate L1 cache: {e}")
