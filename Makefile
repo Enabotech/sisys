@@ -343,7 +343,7 @@ db-init: db-migrate
 
 # -----------------------------------------------------------------------------
 # Docker 基础依赖镜像构建（Ubuntu 22.04 + Python 3.11.15 + Node.js + Poetry 2.3.2）
-# 标签命名规范：docs/architecture/image-tagging-strategy.md
+# 标签命名规范：docs/developer/image-tagging-strategy.md
 # -----------------------------------------------------------------------------
 .PHONY: docker-build-l1 docker-push-l1 docker-build-l2 docker-push-l2 docker-build-l3 docker-push-l3
 
@@ -380,7 +380,7 @@ docker-build-l1:
 	@echo "  - NodeSource: 清华镜像 (https://mirrors.tuna.tsinghua.edu.cn/help/nodesource.com/)"
 	@echo "Git SHA: $(L1_GIT_SHA)"
 	@echo ""
-	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
+	@echo "📋 文档：docs/developer/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
 	$(DOCKER) build -f deploy/docker/dockerfile.l1 \
@@ -454,7 +454,7 @@ docker-build-l2:
 	@echo "依赖：pyproject.toml"
 	@echo "工具：Trivy v0.69.3 (安全扫描)"
 	@echo ""
-	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
+	@echo "📋 文档：docs/developer/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
 	$(DOCKER) build -f deploy/docker/dockerfile.l2 \
@@ -529,7 +529,7 @@ docker-build-l3:
 	@echo "版本：l3-v$(L3_VERSION)-$(L2_GIT_SHA)"
 	@echo "基础：$(DOCKER_REGISTRY)/$(DEP_IMAGE_NAME):$(L2_TAG)"
 	@echo ""
-	@echo "📋 文档：docs/architecture/image-tagging-strategy.md"
+	@echo "📋 文档：docs/developer/image-tagging-strategy.md"
 	@echo ""
 	@export DOCKER_BUILDKIT=1 && \
 	$(DOCKER) build -f deploy/docker/dockerfile.app \

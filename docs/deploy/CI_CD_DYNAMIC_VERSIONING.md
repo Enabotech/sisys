@@ -525,7 +525,7 @@ annotations:
 
 - [CI/CD Pipeline 模板](./CI_CD_PIPELINE_TEMPLATE.md)
 - [ArgoCD Image Updater 配置](./ARGOCD_IMAGE_UPDATER.md)
-- [镜像标签命名规范](../architecture/image-tagging-strategy.md)
+- [镜像标签命名规范](../developer/image-tagging-strategy.md)
 - [Harbor 镜像仓库指南](./HARBOR_IMAGE_PUSH_GUIDE.md)
 
 ---

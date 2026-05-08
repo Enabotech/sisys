@@ -53,7 +53,7 @@ env:
   SISYS_TEST_ENV: ci
 
   # =======================================================================
-  # 镜像标签命名规范 (参考: docs/architecture/image-tagging-strategy.md)
+  # 镜像标签命名规范 (参考: docs/developer/image-tagging-strategy.md)
   # =======================================================================
   # Layer 1: 基础依赖镜像 (Base Dependency Image)
   # 格式: l1-v{major}.{minor}.{patch}-{git_sha}
