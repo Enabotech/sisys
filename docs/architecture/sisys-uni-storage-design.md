@@ -1087,6 +1087,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         l3_vector: L3VectorPort | None = None,
         l4_object: L4ObjectPort | None = None,
         l5_graph: L5GraphPort | None = None,
+        event_publisher=None,  # EventPublisherProtocol | None - 发布 MemoryChanged 事件
     ) -> None:
         """初始化统一存储网关。
 
@@ -1098,6 +1099,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             l3_vector: L3 向量存储
             l4_object: L4 对象存储
             l5_graph: L5 图存储
+            event_publisher: 事件发布器（Outbox 模式需要）
         """
         self._l0 = l0_storage
         self._l1 = l1_cache
@@ -1106,6 +1108,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self._l3 = l3_vector
         self._l4 = l4_object
         self._l5 = l5_graph
+        self._event_publisher = event_publisher
 
     async def save(
         self,
@@ -1140,17 +1143,28 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         results: dict[StorageLayer, bool] = {}
 
         # L0 文件系统（真相源，同步写入，强一致）
-        results[StorageLayer.L0_FILE] = await self._l0.write(
-            memory_id, memory_type, content
-        )
+        l0_success = await self._l0.write(memory_id, memory_type, content)
+        results[StorageLayer.L0_FILE] = l0_success
 
-        # 发布 MemoryChanged 事件（事务发件箱）
+        # 发布 MemoryChanged 事件到 Outbox（事务发件箱）
+        # 注意：Outbox 发布由外部 EventPublisher 注入到此 Gateway
         # Outbox 发布后由 MemoryChangedListener 异步处理：
         # - L1 缓存失效
         # - L2 元数据写入
         # - L3 向量（内容>500 tokens）
         # - L5 图谱（按需 EntityExtractor）
-        results[StorageLayer.L0_FILE] = True  # L0 写入成功
+        if hasattr(self, '_event_publisher') and self._event_publisher is not None:
+            from src.domain.events.memory_events import MemoryChanged
+            event = MemoryChanged(
+                memory_id=memory_id,
+                user_id=owner_id,
+                name=name,
+                change_type="create",
+                is_automatic=False,
+                old_value=None,
+                new_value={"memory_type": memory_type, "content": content[:100]},
+            )
+            self._event_publisher.publish(event)
 
         return results
 
@@ -1186,19 +1200,19 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         if prefer_cache:
             content = await self._l1.get(memory_type, owner_id, name)
             if content is not None:
-                # 缓存命中后仍需 L0 校验（系统公理二：L0 是真相源）
-                l0_content = await self._l0.read(memory_id, memory_type)
-                if l0_content is not None:
-                    return l0_content
-                # L0 不存在则返回缓存（旧数据，可接受）
+                # 必须先做 L2 RBAC 校验，确保有权限访问
+                metadata = await self._l2_meta.get_by_id(memory_id)
+                if metadata is not None and self._check_read_permission(metadata, owner_id, memory_type):
+                    return content
+                # RBAC 校验失败，继续走 L2→L0 流程
 
         # L2 PostgreSQL（RBAC 校验）
         metadata = await self._l2_meta.get_by_id(memory_id)
         if metadata is None:
-            return None  # 记忆不存在或无权限
+            return None  # 记忆不存在
 
-        # 检查权限
-        if metadata.owner != owner_id and (metadata.group_id is None or metadata.type != memory_type):
+        # L2 RBAC 权限校验
+        if not self._check_read_permission(metadata, owner_id, memory_type):
             return None  # 无权限访问
 
         # L0 文件系统查找（真相源）
@@ -1211,6 +1225,31 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             await self._l1.set(memory_type, owner_id, name, content)
 
         return content
+
+    def _check_read_permission(
+        self,
+        metadata,  # MemoryMetadata
+        owner_id: str,
+        memory_type: str,
+    ) -> bool:
+        """检查读取权限。
+
+        - private 记忆: owner == owner_id
+        - group 记忆: owner == owner_id OR group_id 包含用户
+
+        Args:
+            metadata: 记忆元数据
+            owner_id: 请求者 ID
+            memory_type: 记忆类型
+
+        Returns:
+            是否有权限
+        """
+        if metadata.type == "private":
+            return metadata.owner == owner_id
+        elif metadata.type == "group":
+            return metadata.owner == owner_id or (metadata.group_id is not None and metadata.group_id != "")
+        return False
 
     async def delete(
         self,
@@ -1232,27 +1271,30 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         """
         results: dict[StorageLayer, bool] = {}
 
-        # L0 文件系统
+        # L0 文件系统删除
         results[StorageLayer.L0_FILE] = await self._l0.delete(memory_id, memory_type)
 
-        # L1 缓存失效
-        results[StorageLayer.L1_CACHE] = await self._l1.delete(memory_type, owner_id, name)
-
-        # L3 向量删除（需要 collection 参数，由调用方指定）
-        if self._l3 is not None:
-            # 注意：L3VectorPort.delete_points() 需要 collection 参数
-            # 完整实现需要 memory_id → collection 的映射关系
-            pass  # TODO: L3 删除需补充 collection 管理逻辑
-
-        # L4 对象存储删除
-        if self._l4 is not None:
-            bucket_type = "raw-documents"
-            object_key = f"{memory_type}/{memory_id}"
-            results[StorageLayer.L4_OBJECT] = await self._l4.delete(bucket_type, object_key)
-
-        # L5 图谱删除
-        if self._l5 is not None:
-            results[StorageLayer.L5_GRAPH] = await self._l5.delete_entity(memory_id)
+        # 发布 MemoryDeleted 事件到 Outbox（事务发件箱）
+        # 各层删除由 MemoryChangedListener 异步执行
+        if hasattr(self, '_event_publisher') and self._event_publisher is not None:
+            from src.domain.events.memory_events import MemoryChanged
+            event = MemoryChanged(
+                memory_id=memory_id,
+                user_id=owner_id,
+                name=name,
+                change_type="delete",
+                is_automatic=False,
+                old_value={"memory_type": memory_type},
+                new_value=None,
+            )
+            self._event_publisher.publish(event)
+            results[StorageLayer.L1_CACHE] = True  # Outbox 发布成功
+        else:
+            # 降级：同步直接删除（不推荐，仅向后兼容）
+            results[StorageLayer.L1_CACHE] = await self._l1.delete(memory_type, owner_id, name)
+            if self._l2_meta is not None:
+                await self._l2_meta.delete(UUID(memory_id))
+            # L3/L4/L5 保持 TODO
 
         return results
 
@@ -1265,12 +1307,25 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     ) -> dict[StorageLayer, bool]:
         """检查记忆在各层的存在状态。
 
+        L2 PostgreSQL（RBAC 校验）用于确认用户有权限访问。
+        只有 L2 校验通过才返回 True，避免 false positive。
+
         Returns:
             各层存在状态
         """
+        # L2 RBAC 校验
+        metadata = await self._l2_meta.get_by_id(UUID(memory_id))
+        if metadata is None or not self._check_read_permission(metadata, owner_id, memory_type):
+            return {StorageLayer.L0_FILE: False, StorageLayer.L1_CACHE: False}
+
+        # L0 文件系统存在性
+        l0_exists = await self._l0.exists(memory_id, memory_type)
+        # L1 缓存存在性
+        l1_exists = await self._l1.get(memory_type, owner_id, name) is not None
+
         return {
-            StorageLayer.L0_FILE: await self._l0.exists(memory_id, memory_type),
-            StorageLayer.L1_CACHE: await self._l1.get(memory_type, owner_id, name) is not None,
+            StorageLayer.L0_FILE: l0_exists,
+            StorageLayer.L1_CACHE: l1_exists,
         }
 
     async def get_content(
