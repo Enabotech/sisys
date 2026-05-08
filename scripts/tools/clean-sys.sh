@@ -654,9 +654,9 @@ clean_system() {
     run_cmd sudo find /var/tmp -maxdepth 1 -type d -name "systemd-*" -mtime +1 -exec rm -rf {} \; 2>/dev/null || true
     log_success "systemd 临时文件已清理"
 
-    log_subheader "清理 poetry cache clear --all"
-    poetry cache clear --all
-    log_success "poetry cache 已清理"
+    # log_subheader "清理 poetry cache clear --all"
+    # poetry cache clear --all
+    # log_success "poetry cache 已清理"
 
     #--------- WSL 回收站 ---------
     log_subheader "回收站清理"
