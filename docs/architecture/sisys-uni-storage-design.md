@@ -1237,9 +1237,17 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         # L1 缓存失效
         results[StorageLayer.L1_CACHE] = await self._l1.delete(memory_type, owner_id, name)
 
-        # L3 向量删除
+        # L3 向量删除（需要 collection 参数，由调用方指定）
         if self._l3 is not None:
-            results[StorageLayer.L3_VECTOR] = await self._l3.delete(memory_id)
+            # 注意：L3VectorPort.delete_points() 需要 collection 参数
+            # 完整实现需要 memory_id → collection 的映射关系
+            pass  # TODO: L3 删除需补充 collection 管理逻辑
+
+        # L4 对象存储删除
+        if self._l4 is not None:
+            bucket_type = "raw-documents"
+            object_key = f"{memory_type}/{memory_id}"
+            results[StorageLayer.L4_OBJECT] = await self._l4.delete(bucket_type, object_key)
 
         # L5 图谱删除
         if self._l5 is not None:
