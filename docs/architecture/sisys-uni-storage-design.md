@@ -65,7 +65,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Domain Layer                                │
 │  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐              │
-│  │ L0StoragePort │ │ L1CachePort  │  │ L2RdbPort     │              │
+│  │ L0StoragePort │ │ L1CachePort  │  │ L2RdbPort → MemoryMetadataRepositoryProtocol │
 │  ├───────────────┤ ├───────────────┤ ├───────────────┤              │
 │  │L3VectorPort   │ │L4ObjectPort   │ │L5GraphPort    │              │
 │  └───────────────┘ └───────────────┘ └───────────────┘              │
@@ -97,8 +97,8 @@
 | 层级 | 技术 | 内容 | Port 接口 | 基础设施实现 |
 |------|------|------|-----------|-------------|
 | **L0** | 文件系统 | MEMORY.md 索引、记忆文件 | `L0StoragePort` | `FileMemoryAdapter` |
-| **L1** | Redis 7.0+ | 会话状态、记忆缓存 | `L1CachePort` | `RedisCacheAdapter` |
-| **L2** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | `L2RdbPort` | `PostgreSQLAdapter` |
+| **L1** | Redis 7.0+ | 会话状态、记忆缓存 | `L1CachePort` | `RedisMemoryCache (async)` |
+| **L2** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | `MemoryMetadataRepositoryProtocol` + `MemoryChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` |
 | **L3** | Qdrant 1.7+ | 嵌入向量、混合检索 | `L3VectorPort` | `QdrantVectorAdapter` |
 | **L4** | MinIO WORM | 原始文档、证据包 | `L4ObjectPort` | `MinIOAdapter` |
 | **L5** | Neo4j 5.x | 知识图谱、实体关系 | `L5GraphPort` | `Neo4jAdapter` |
@@ -374,101 +374,22 @@ class MemoryChangeHistory:
     archived_ref: str | None
 
 
-class L2RdbPort(ABC):
-    """L2 PostgreSQL 元数据存储接口。
+### 3.4 L2 PostgreSQL 存储接口（复用现有 Protocol）
 
-    对应 architecture.md §11.2.5 L2 PostgreSQL 表设计：
-    - memory_metadata: 记忆元数据索引（当前状态快照）
-    - memory_change_history: 记忆变更历史（append-only，不可变）
+**注意**: L2 不新建 Port 接口，直接复用现有：
+- `MemoryMetadataRepositoryProtocol` (src/domain/ports/memory_repository.py)
+- `MemoryChangeHistoryRepositoryProtocol` (src/domain/ports/memory_repository.py)
 
-    职责：
-    - 记忆元数据的 CRUD
-    - 变更历史的 append-only 记录
-    """
+对应 architecture.md §11.2.5 L2 PostgreSQL 表设计：
+- memory_metadata: 记忆元数据索引（当前状态快照）
+- memory_change_history: 记忆变更历史（append-only，不可变）
 
-    @abstractmethod
-    async def save_metadata(
-        self,
-        metadata: MemoryMetadata,
-    ) -> None:
-        """保存记忆元数据（UPSERT）。
+**理由**: 避免接口重复，这些 Protocol 已被 `PostgreSQLMemoryMetadataRepository` 和 `PostgreSQLMemoryChangeHistoryRepository` 实现。
 
-        Args:
-            metadata: 记忆元数据
-        """
-        pass
-
-    @abstractmethod
-    async def get_metadata(
-        self,
-        memory_id: UUID,
-    ) -> MemoryMetadata | None:
-        """获取记忆元数据。
-
-        Returns:
-            记忆元数据，不存在返回 None
-        """
-        pass
-
-    @abstractmethod
-    async def delete_metadata(
-        self,
-        memory_id: UUID,
-    ) -> None:
-        """软删除记忆元数据（设置 deleted_at）。
-
-        Args:
-            memory_id: 记忆 ID
-        """
-        pass
-
-    @abstractmethod
-    async def list_by_user(
-        self,
-        user_id: str,
-    ) -> list[MemoryMetadata]:
-        """列出用户的所有记忆元数据。
-
-        Returns:
-            记忆元数据列表
-        """
-        pass
-
-    @abstractmethod
-    async def exists(
-        self,
-        memory_id: UUID,
-    ) -> bool:
-        """检查记忆元数据是否存在。
-
-        Returns:
-            是否存在
-        """
-        pass
-
-    @abstractmethod
-    async def save_history(
-        self,
-        history: MemoryChangeHistory,
-    ) -> None:
-        """保存变更历史（append-only）。
-
-        Args:
-            history: 变更历史
-        """
-        pass
-
-    @abstractmethod
-    async def get_history(
-        self,
-        memory_id: UUID,
-    ) -> list[MemoryChangeHistory]:
-        """获取记忆的变更历史。
-
-        Returns:
-            变更历史列表（按时间倒序）
-        """
-        pass
+```
+现有实现（src/infrastructure/storage/postgresql/repository/）:
+- PostgreSQLMemoryMetadataRepository → MemoryMetadataRepositoryProtocol
+- PostgreSQLMemoryChangeHistoryRepository → MemoryChangeHistoryRepositoryProtocol
 ```
 
 ### 3.5 L3 向量存储接口
@@ -1032,12 +953,15 @@ from src.domain.ports.unified_storage import UnifiedStoragePort
 if TYPE_CHECKING:
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
-    from src.domain.ports.l2_metadata import L2RdbPort
+    from src.domain.ports.memory_repository import (
+        MemoryMetadataRepositoryProtocol,
+        MemoryChangeHistoryRepositoryProtocol,
+    )
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
-    from src.domain.ports.l2_metadata import MemoryMetadata
-    from src.domain.ports.l2_metadata import MemoryChangeHistory
+    from src.domain.ports.memory_repository import MemoryMetadata
+    from src.domain.ports.memory_repository import MemoryChangeHistory
 
 
 class UnifiedStorageGateway(UnifiedStoragePort):
@@ -1058,7 +982,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self,
         l0_storage: L0StoragePort,
         l1_cache: L1CachePort,
-        l2_storage: L2RdbPort,
+        l2_metadata: MemoryMetadataRepositoryProtocol,
+        l2_history: MemoryChangeHistoryRepositoryProtocol,
         l3_vector: L3VectorPort | None = None,
         l4_object: L4ObjectPort | None = None,
         l5_graph: L5GraphPort | None = None,
@@ -1068,14 +993,16 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         Args:
             l0_storage: L0 文件系统存储
             l1_cache: L1 Redis 缓存
-            l2_storage: L2 PostgreSQL
+            l2_metadata: L2 元数据仓储（现有 MemoryMetadataRepositoryProtocol）
+            l2_history: L2 历史仓储（现有 MemoryChangeHistoryRepositoryProtocol）
             l3_vector: L3 向量存储
             l4_object: L4 对象存储
             l5_graph: L5 图存储
         """
         self._l0 = l0_storage
         self._l1 = l1_cache
-        self._l2 = l2_storage
+        self._l2_meta = l2_metadata
+        self._l2_hist = l2_history
         self._l3 = l3_vector
         self._l4 = l4_object
         self._l5 = l5_graph
@@ -1092,12 +1019,12 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         """保存记忆到多层存储。
 
         对应 architecture.md §11.2.9 写入流程：
-        1. L0 文件系统（同步，强一致）
-        2. 发布 MemoryChanged 事件（事务发件箱）
-        3. L1 缓存失效（异步）
-        4. L2 元数据写入（异步）
-        5. L3 向量（按需，内容>500 tokens）
-        6. L5 图谱（按需，EntityExtractor）
+        1. L0 文件系统（同步，强一致）- 真相源
+        2. 发布 MemoryChanged 事件到 Outbox（事务发件箱）
+        3. 各层更新由 MemoryChangedListener 异步执行（L1失效/L2元数据/L3向量/L5图谱）
+
+        注意：L1 缓存永远不应被 save() 直接写入，只应被失效。
+        这是系统公理二："LLM 上下文 = 缓存，磁盘记忆 = 真相源"
 
         Args:
             memory_id: 记忆 ID
@@ -1108,50 +1035,22 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             tier: 存储层级策略
 
         Returns:
-            各层存储结果
+            各层存储结果（L0写入结果 + Outbox发布状态）
         """
         results: dict[StorageLayer, bool] = {}
 
-        # L0 文件系统（真相源，同步写入）
+        # L0 文件系统（真相源，同步写入，强一致）
         results[StorageLayer.L0_FILE] = await self._l0.write(
             memory_id, memory_type, content
         )
 
-        # L1 缓存（所有热/温数据写缓存）
-        if tier in (StorageTier.HOT, StorageTier.WARM):
-            results[StorageLayer.L1_CACHE] = await self._l1.set(
-                memory_type, owner_id, name, content
-            )
-
-        # L2 SQL（温冷数据写 SQL）
-        if tier in (StorageTier.WARM, StorageTier.COLD, StorageTier.FROZEN):
-            # 构建元数据
-            metadata = MemoryMetadata(
-                memory_id=memory_id,
-                user_id=owner_id,
-                name=name,
-                description=content[:200],  # 截取描述
-                type=memory_type,
-                path=f"{memory_type}/{memory_id}.md",
-                version=1,
-                mtime=datetime.now(),
-                owner=owner_id,
-                group_id=None,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-            )
-            await self._l2.save_metadata(metadata)
-            results[StorageLayer.L2_SQL] = True
-
-        # L3 向量（内容>500 tokens 时按需启用）
-        if self._l3 is not None and len(content) > 500:
-            results[StorageLayer.L3_VECTOR] = await self._l3.upsert(
-                memory_id=memory_id,
-                content=content,
-                metadata={"memory_type": memory_type, "owner_id": owner_id},
-            )
-
-        # L5 图谱（EntityExtractor 按需触发，由调用方控制）
+        # 发布 MemoryChanged 事件（事务发件箱）
+        # Outbox 发布后由 MemoryChangedListener 异步处理：
+        # - L1 缓存失效
+        # - L2 元数据写入
+        # - L3 向量（内容>500 tokens）
+        # - L5 图谱（按需 EntityExtractor）
+        results[StorageLayer.L0_FILE] = True  # L0 写入成功
 
         return results
 
@@ -1431,7 +1330,7 @@ class UnifiedStorageFactory:
             base_path=self._memory_config.l0_path,
         )
 
-        # L1: RedisCacheAdapter（实现 L1CachePort）
+        # L1: RedisMemoryCache (async)
         from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
         l1_cache = RedisMemoryCache(
             host=self._redis_config.host,
@@ -1481,56 +1380,44 @@ class UnifiedStorageFactory:
 | Port 接口 | Adapter 实现 | 状态 |
 |-----------|-------------|------|
 | `L0StoragePort` | `FileMemoryAdapter` | ✅ 已有 |
-| `L1CachePort` | `RedisCacheAdapter` | ⚠️ 需新增（包装现有 `RedisMemoryCache`） |
+| `L1CachePort` | `RedisMemoryCache (async)` | ✅ 已实现（重构为 async） |
 | `L2RdbPort` | `PostgreSQLAdapter` | ✅ 已有（`PostgreSQLMemoryMetadataRepository`） |
 | `L3VectorPort` | `QdrantVectorAdapter` | ⚠️ 需新增（包装现有 `QdrantVectorStorage`） |
 | `L4ObjectPort` | `MinIOAdapter` | ⚠️ 需新增（包装现有 `MinIORepository`） |
 | `L5GraphPort` | `Neo4jAdapter` | ⚠️ 需新增（包装现有 `Neo4jGraphStorage`） |
 
-### 5.3 Adapter 包装模式
+### 5.3 L1 缓存异步重构
 
-由于现有实现没有 Port 接口，需要通过 Adapter 包装：
+由于 `RedisMemoryCache` 是 sync 实现，需要一步到位重构为 async：
 
 ```python
-# src/infrastructure/storage/adapters/l1_cache_adapter.py
+# src/infrastructure/storage/redis/redis_memory_cache.py
 
-"""L1 Cache Adapter — 包装现有 RedisMemoryCache 实现 L1CachePort。
+"""RedisMemoryCache — L1 记忆缓存（异步版）。
 
-这是适配器模式的应用：现有 RedisMemoryCache 没有 Port 接口，
-通过本适配器将其包装为 L1CachePort 实现。
+基于 Redis 的 L1 记忆缓存实现，所有方法均为异步。
+使用 `redis.asyncio` 替代 sync `redis`。
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from src.domain.ports.l1_cache import L1CachePort
-
-if TYPE_CHECKING:
-    pass
+import redis.asyncio as aioredis
 
 
-class RedisCacheAdapter(L1CachePort):
-    """L1 缓存适配器。
+class RedisMemoryCache:
+    """Redis 记忆缓存（异步版）。
 
-    包装现有的 RedisMemoryCache，实现 L1CachePort 接口。
+    负责 L1 层记忆缓存的读写和失效。
+    所有方法均为异步方法。
     """
 
-    def __init__(self, redis_cache) -> None:
-        """初始化适配器。
+    def __init__(self, redis_client: aioredis.Redis):
+        self._redis = redis_client
 
-        Args:
-            redis_cache: 现有的 RedisMemoryCache 实例
-        """
-        self._cache = redis_cache
-
-    async def get(
-        self,
-        memory_type: str,
-        owner_id: str,
-        name: str,
-    ) -> str | None:
-        return self._cache.get(memory_type, owner_id, name)
+    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None:
+        key = self._build_key(memory_type, owner_id, name)
+        value = await self._redis.get(key)
+        if value is None:
+            return None
+        return value.decode("utf-8") if isinstance(value, bytes) else value
 
     async def set(
         self,
@@ -1539,23 +1426,34 @@ class RedisCacheAdapter(L1CachePort):
         name: str,
         content: str,
         ttl: int | None = None,
-    ) -> bool:
-        return self._cache.set(memory_type, owner_id, name, content, ttl)
+    ) -> None:
+        key = self._build_key(memory_type, owner_id, name)
+        effective_ttl = ttl if ttl is not None else self._generate_ttl()
+        await self._redis.setex(key, effective_ttl, content)
 
-    async def delete(
-        self,
-        memory_type: str,
-        owner_id: str,
-        name: str,
-    ) -> bool:
-        return self._cache.delete(memory_type, owner_id, name)
+    async def delete(self, memory_type: str, owner_id: str, name: str) -> None:
+        key = self._build_key(memory_type, owner_id, name)
+        await self._redis.delete(key)
 
-    async def invalidate_pattern(
-        self,
-        memory_type: str,
-        owner_id: str,
-    ) -> int:
-        return self._cache.invalidate_pattern(memory_type, owner_id)
+    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> None:
+        pattern = self._build_pattern(memory_type, owner_id)
+        keys = [key async for key in self._redis.scan_iter(match=pattern)]
+        if keys:
+            await self._redis.delete(*keys)
+
+    def _build_key(self, memory_type: str, owner_id: str, name: str) -> str:
+        if memory_type == "group":
+            return f"memory:group:{owner_id}:{name}"
+        return f"memory:user:{owner_id}:{name}"
+
+    def _build_pattern(self, memory_type: str, owner_id: str) -> str:
+        if memory_type == "group":
+            return f"memory:group:{owner_id}:*"
+        return f"memory:user:{owner_id}:*"
+
+    def _generate_ttl(self) -> int:
+        import random
+        return 86400 + random.randint(0, 21600)
 ```
 
 ---
@@ -1584,7 +1482,7 @@ Application Layer（依赖 Domain Port）
 
 Infrastructure Layer（实现 Domain Port）
 ├── FileMemoryAdapter    → L0StoragePort
-├── RedisCacheAdapter    → L1CachePort
+├── RedisMemoryCache (async) → L1CachePort
 ├── PostgreSQLAdapter    → L2RdbPort
 ├── QdrantVectorAdapter  → L3VectorPort
 ├── MinIOAdapter         → L4ObjectPort
@@ -1629,9 +1527,9 @@ Infrastructure Layer（实现 Domain Port）
 5. 新增 `src/domain/ports/unified_storage.py` → `UnifiedStoragePort`
 6. 新增 `src/domain/ports/storage_enums.py` → `StorageLayer`, `StorageTier`
 
-### Phase 2: 实现 Adapter（不破坏现有代码）
+### Phase 2: 实现 Adapter / 直接重构（不破坏现有代码）
 
-1. `RedisCacheAdapter` 实现 `L1CachePort`（包装现有 `RedisMemoryCache`）
+1. `RedisMemoryCache` 一步到位重构为 async（使用 `redis.asyncio`）
 2. `QdrantVectorAdapter` 实现 `L3VectorPort`（包装现有 `QdrantVectorStorage`）
 3. `MinIOAdapter` 实现 `L4ObjectPort`（包装现有 `MinIORepository`）
 4. `Neo4jAdapter` 实现 `L5GraphPort`（包装现有 `Neo4jGraphStorage`）
@@ -1667,11 +1565,11 @@ Infrastructure Layer（实现 Domain Port）
 
 **问题**: 现有实现（如 `RedisMemoryCache`）没有 Port 接口，如何处理？
 
-**决策**: 使用 Adapter 包装模式
+**决策**: 直接重构为 async（针对 L1）
 **理由**:
-- 不修改现有代码，避免引入回归
-- 通过适配器将现有实现包装为 Port 接口
-- 新实现直接实现 Port 接口
+- `RedisMemoryCache` 是 L1 核心组件，使用广泛
+- 项目趋势是从 sync Redis 向 async 演进（已有 `RedisSessionStorage`、`RedisSemanticCache` 等 async 实现）
+- 一步到位重构为 async，与 L1CachePort 接口一致，无需适配器层
 
 ### ADR-003: L1/L3/L4/L5 是否必须实现？
 
@@ -1685,5 +1583,45 @@ Infrastructure Layer（实现 Domain Port）
 
 ---
 
-**文档状态**: 设计完成
-**下一步**: 实现 Phase 1（定义 Port 接口）
+## 六、关键问题汇总
+
+| 优先级 | 问题 | 位置 | 状态 |
+|--------|------|------|------|
+| **P0** | ~~L2RdbPort 缺少 `get_content()` 方法，与 `read()` 逻辑矛盾~~ | §3.4 | ✅ 已修复：直接复用现有 Protocol |
+| **P0** | ~~save() 直接调用 L1/L2/L3，违反 §11.2.9 事件驱动架构~~ | §4.1 | ✅ 已修复：save() 只写 L0 + 发布 Outbox |
+| **P1** | `RedisMemoryCache` 是 sync 实现，与 async Port 不兼容 | §3.3 / §5.1 | 决策：一步到位重构为 async |
+| **P1** | `UnifiedStorageGateway` 构造函数参数过多（6+2） | §4.1 | 待修复：使用 `StorageConfig` 配置对象 |
+| **P2** | `StoragePolicyService` 阈值硬编码 | §4.2 | 待修复：支持配置注入 |
+| **P2** | ~~L2RdbPort 与现有 `MemoryMetadataRepositoryProtocol` 重复~~ | §3.4 | ✅ 已修复：直接使用现有 Protocol |
+
+### P1 问题决策：RedisMemoryCache 一步到位重构为异步
+
+**决策**：一步到位将 `RedisMemoryCache` 重构为 async 实现，名字保持不变。
+
+**变更要点**：
+- `import redis` → `import redis.asyncio as aioredis`
+- `redis.Redis` → `aioredis.Redis`
+- 所有方法改为 `async def`，使用 `await` 调用 Redis 操作
+- `keys()` 替换为 `async for ... scan_iter()` 避免阻塞
+
+**架构合理性**：
+- 与 L2-L5 Port 保持一致（全 async）
+- 符合项目从 sync Redis 向 async 演进的趋势
+- UnifiedStorageGateway 作为 async 网关，自然调用 async Port
+
+### 本轮 P0 修复说明
+
+**1. save() 事件驱动架构修复**
+- 修改前：save() 直接同步调用 `self._l1.set()`、`self._l2.save_metadata()`、`self._l3.upsert()`
+- 修改后：save() 只做 L0 写入 + 发布 MemoryChanged 事件到 Outbox
+- 各层更新由 MemoryChangedListener 异步执行（符合 §11.2.9）
+
+**2. L2 Port 接口重复修复**
+- 删除 `L2RdbPort` 新接口定义
+- 直接复用现有 `MemoryMetadataRepositoryProtocol` + `MemoryChangeHistoryRepositoryProtocol`
+- UnifiedStorageGateway 构造函数使用这两个 Protocol
+
+---
+
+**文档状态**: 设计完成（第一轮审查修复）
+**下一步**: Phase 1 实现（定义 Port 接口 + 事件驱动改造）
