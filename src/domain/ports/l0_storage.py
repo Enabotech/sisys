@@ -21,13 +21,16 @@ class L0StoragePort(ABC):
     """
 
     @abstractmethod
-    async def write(self, memory_id: str, memory_type: str, content: str) -> None:
+    async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         """写入记忆文件（I/O 密集型）。
 
         Args:
             memory_id: 记忆 ID（UUID）
             memory_type: 记忆类型（user/feedback/project/reference）
             content: 记忆内容
+
+        Returns:
+            True 如果写入成功，False 否则
 
         Raises:
             OSError: 如果写入失败
@@ -51,12 +54,15 @@ class L0StoragePort(ABC):
         pass
 
     @abstractmethod
-    async def delete(self, memory_id: str, memory_type: str) -> None:
+    async def delete(self, memory_id: str, memory_type: str) -> bool:
         """删除记忆文件（快速同步操作，可用 to_thread 封装）。
 
         Args:
             memory_id: 记忆 ID
             memory_type: 记忆类型
+
+        Returns:
+            True 如果删除成功，False 如果文件不存在
         """
         pass
 

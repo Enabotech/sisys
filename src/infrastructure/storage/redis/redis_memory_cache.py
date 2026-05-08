@@ -1,6 +1,8 @@
-"""RedisMemoryCache — L1 记忆缓存。
+"""RedisMemoryCache — L1 记忆缓存（异步版）。
 
-基于 Redis 的 L1 记忆缓存实现。
+基于 Redis 的 L1 记忆缓存实现，所有方法均为异步。
+使用 `redis.asyncio` 替代 sync `redis`。
+
 Key 格式：
 - Private: `memory:user:{user_id}:{name}`
 - Group: `memory:group:{group_id}:{name}`
@@ -12,29 +14,38 @@ TTL：24h-30h（随机值避免雪崩）
 from __future__ import annotations
 
 import random
+from typing import TYPE_CHECKING
 
-import redis
+import redis.asyncio as aioredis
+
+from src.domain.ports.l1_cache import L1CachePort
+
+if TYPE_CHECKING:
+    pass
 
 # 默认 TTL 范围 (秒)
 DEFAULT_TTL_MIN = 86400  # 24h
 DEFAULT_TTL_MAX = 108000  # 30h
 
 
-class RedisMemoryCache:
-    """Redis 记忆缓存。
+class RedisMemoryCache(L1CachePort):
+    """Redis 记忆缓存（异步版）。
 
     负责 L1 层记忆缓存的读写和失效。
+    所有方法均为异步方法。
+
+    实现了 L1CachePort 接口。
     """
 
-    def __init__(self, redis_client: redis.Redis):
+    def __init__(self, redis_client: aioredis.Redis):
         """初始化缓存。
 
         Args:
-            redis_client: Redis 客户端实例
+            redis_client: Redis 异步客户端实例
         """
         self._redis = redis_client
 
-    def get(self, memory_type: str, owner_id: str, name: str) -> str | None:
+    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None:
         """获取缓存的记忆内容。
 
         Args:
@@ -46,12 +57,19 @@ class RedisMemoryCache:
             缓存的记忆内容，不存在则返回 None
         """
         key = self._build_key(memory_type, owner_id, name)
-        value = self._redis.get(key)
+        value = await self._redis.get(key)
         if value is None:
             return None
         return value.decode("utf-8") if isinstance(value, bytes) else value
 
-    def set(self, memory_type: str, owner_id: str, name: str, content: str, ttl: int | None = None) -> None:
+    async def set(
+        self,
+        memory_type: str,
+        owner_id: str,
+        name: str,
+        content: str,
+        ttl: int | None = None,
+    ) -> bool:
         """设置缓存的记忆内容。
 
         Args:
@@ -60,33 +78,45 @@ class RedisMemoryCache:
             name: 记忆名称
             content: 记忆内容
             ttl: TTL 秒数（默认随机 24h-30h）
+
+        Returns:
+            是否成功
         """
         key = self._build_key(memory_type, owner_id, name)
         effective_ttl = ttl if ttl is not None else self._generate_ttl()
-        self._redis.setex(key, effective_ttl, content)
+        await self._redis.setex(key, effective_ttl, content)
+        return True
 
-    def delete(self, memory_type: str, owner_id: str, name: str) -> None:
+    async def delete(self, memory_type: str, owner_id: str, name: str) -> bool:
         """删除单个缓存的记忆。
 
         Args:
             memory_type: 记忆类型 ('private' | 'group')
             owner_id: 所有者 ID
             name: 记忆名称
+
+        Returns:
+            是否成功
         """
         key = self._build_key(memory_type, owner_id, name)
-        self._redis.delete(key)
+        result = await self._redis.delete(key)
+        return result > 0
 
-    def invalidate_pattern(self, memory_type: str, owner_id: str) -> None:
+    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> int:
         """按 pattern 删除用户所有缓存。
 
         Args:
             memory_type: 记忆类型 ('private' | 'group')
             owner_id: 所有者 ID
+
+        Returns:
+            失效的 key 数量
         """
         pattern = self._build_pattern(memory_type, owner_id)
-        keys = self._redis.keys(pattern)
+        keys = [key async for key in self._redis.scan_iter(match=pattern)]
         if keys:
-            self._redis.delete(*keys)
+            await self._redis.delete(*keys)
+        return len(keys)
 
     def _build_key(self, memory_type: str, owner_id: str, name: str) -> str:
         """构建缓存 key。

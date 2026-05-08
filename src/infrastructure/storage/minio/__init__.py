@@ -14,6 +14,7 @@ from src.infrastructure.storage.minio.client_adapter import (
     PermissionDeniedError,
 )
 from src.infrastructure.storage.minio.entities import LifecycleRule, ObjectMetadata
+from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
 from src.infrastructure.storage.minio.minio_repository import MinIORepository
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
@@ -23,6 +24,7 @@ __all__ = [
     "BucketNotFoundError",
     "ComplianceLockError",
     "LifecycleRule",
+    "MinIOAdapter",
     "MinIOConnectionError",
     "MinIORepository",
     "MinioClientAdapter",
