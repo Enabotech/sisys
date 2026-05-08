@@ -400,6 +400,9 @@ class MemoryChangeHistory:
 from abc import ABC, abstractmethod
 from typing import Any
 
+# VectorPoint 和 SparseVector 定义在 src.infrastructure.storage.qdrant.models
+# 由调用方或 Adapter 负责构造正确的点结构
+
 
 class L3VectorPort(ABC):
     """L3 Qdrant 向量存储端口接口。
@@ -412,6 +415,7 @@ class L3VectorPort(ABC):
     - 与现有 VectorStorage ABC 语义完全兼容
     - embedding 生成职责归于上游服务，不耦合在此层
     - collection 参数明确传递（由调用方管理）
+    - points 参数使用 list[dict]（兼容 duck typing），实际 VectorPoint 由 Adapter 转换
 
     与 VectorStorage ABC 的关系：
     - 本质上与 VectorStorage 是同一接口
@@ -423,13 +427,14 @@ class L3VectorPort(ABC):
     async def upsert_points(
         self,
         collection: str,
-        points: list[Any],
+        points: list[dict],
     ) -> bool:
         """批量插入或更新向量点。
 
         Args:
             collection: Collection 名称
-            points: 向量点列表，每个点需包含 id, vector, payload
+            points: 向量点列表，每个点是 dict，需包含 id, vector, payload 字段
+                   示例: [{"id": "mem-123", "vector": [0.1, 0.2], "payload": {...}}, ...]
 
         Returns:
             操作成功返回 True
@@ -491,7 +496,7 @@ class L3VectorPort(ABC):
     async def search_sparse(
         self,
         collection: str,
-        sparse_vector: Any,
+        sparse_vector: dict,
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
@@ -501,7 +506,8 @@ class L3VectorPort(ABC):
 
         Args:
             collection: Collection 名称
-            sparse_vector: 稀疏向量
+            sparse_vector: 稀疏向量 dict，需包含 indices 和 values 字段
+                          示例: {"indices": [0, 5, 10], "values": [1.0, 0.5, 0.8]}
             limit: 返回结果数量限制
             filter_payload: Payload 过滤条件
 
@@ -594,16 +600,19 @@ class L4ObjectPort(ABC):
         bucket_type: str,
         object_key: str,
         version_id: str | None = None,
-    ) -> dict | None:
+    ) -> dict:
         """获取对象元数据。
 
+        注意：MinIO SDK 对不存在的对象会抛出异常，此方法不返回 None。
+        调用方应使用 try/catch 处理异常。
+
         Returns:
-            元数据字典，不存在返回 None
+            元数据字典（对象不存在时 SDK 抛出异常）
         """
         pass
 
     @abstractmethod
-    async def archive_with_retention(
+    async def archive(
         self,
         bucket_type: str,
         object_key: str,
@@ -644,6 +653,10 @@ class L5GraphPort(ABC):
     - 本接口是高级语义层，内部委托给 GraphStorage（低级 Cypher 执行）
     - 使用 memory_id 作为实体主键（id 属性）
     - 保留 execute_query/execute_write_query 入口以支持灵活查询
+
+    **重要**: L5GraphPort 定义的是高级语义方法（create_entity 等），
+    现有 Neo4jGraphStorage 只提供低级 Cypher 执行接口。
+    需要新增 Neo4jAdapter 实现这些高级语义方法，或在 Neo4jGraphStorage 中添加委托实现。
     """
 
     @abstractmethod
@@ -1046,6 +1059,7 @@ class SemanticCachePort(ABC):
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from src.domain.ports.storage_enums import StorageLayer, StorageTier
 from src.domain.ports.unified_storage import UnifiedStoragePort
