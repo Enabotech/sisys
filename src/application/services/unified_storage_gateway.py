@@ -202,14 +202,19 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     ) -> bool:
         """检查读取权限。
 
-        - private 记忆: owner == owner_id
-        - group 记忆: owner == owner_id OR group_id 包含用户
+        可见性由 group_id 区分（不是 type 字段）：
+        - group_id == NULL/empty → private 记忆，仅 owner 可读
+        - group_id != NULL/empty → group 记忆，owner 或 group 成员可读
+
+        type 字段（user/feedback/project/reference）只是记忆分类，不是可见性。
         """
-        if metadata.type == "private":
-            return metadata.owner == owner_id
-        elif metadata.type == "group":
+        is_group_memory = metadata.group_id is not None and metadata.group_id != ""
+        if is_group_memory:
+            # Group 记忆：owner 或 group 成员可读
             return metadata.owner == owner_id or (metadata.group_id is not None and metadata.group_id != "")
-        return False
+        else:
+            # Private 记忆：仅 owner 可读
+            return metadata.owner == owner_id
 
     async def delete(
         self,

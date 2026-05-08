@@ -88,10 +88,10 @@ def real_redis_sync(redis_test_prefix):
 @pytest.fixture
 def l0_storage(temp_memory_dir: Path) -> L0StoragePort:
     """Create L0 file system storage adapter."""
+    from src.infrastructure.config.memory import MemoryConfig
     from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
 
-    config = MagicMock()
-    config.get_base_path.return_value = str(temp_memory_dir)
+    config = MemoryConfig(memory_l0_path=str(temp_memory_dir))
     return FileMemoryAdapter(config)
 
 
@@ -252,9 +252,8 @@ class TestL1RedisCache:
         result = await redis_cache.get(memory_type, owner_id, name)
         assert result == content
 
-        # Cleanup
-        key = f"memory:{memory_type}:{owner_id}:{name}"
-        real_redis_sync.delete(key)
+        # Cleanup via adapter
+        await redis_cache.delete(memory_type, owner_id, name)
 
     @pytest.mark.asyncio
     async def test_redis_cache_delete(self, redis_cache, real_redis, real_redis_sync):
@@ -283,8 +282,8 @@ class TestL1RedisCache:
         ttl = real_redis_sync.ttl(key)
         assert 86400 <= ttl <= 108000
 
-        # Cleanup
-        real_redis_sync.delete(key)
+        # Cleanup via adapter
+        await redis_cache.delete(memory_type, owner_id, name)
 
     @pytest.mark.asyncio
     async def test_redis_cache_get_returns_none_when_not_cached(self, redis_cache):
@@ -364,9 +363,8 @@ class TestL0L1Coordination:
         result = await redis_cache.get(memory_type, owner_id, name)
         assert result == content
 
-        # Cleanup
-        key = f"memory:{memory_type}:{owner_id}:{name}"
-        real_redis_sync.delete(key)
+        # Cleanup via adapter
+        await redis_cache.delete(memory_type, owner_id, name)
 
 
 # ===================================================================
