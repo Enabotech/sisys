@@ -28,6 +28,7 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
+from tests.environments import get_test_env
 
 # ===================================================================
 # Fixtures
@@ -142,10 +143,12 @@ def real_redis(redis_test_prefix):
     try:
         import redis.asyncio as aioredis
 
-        client = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
+        env = get_test_env()
+        client = aioredis.Redis(host=env.redis.host, port=env.redis.port, decode_responses=True)
         yield client
     except Exception:
-        pytest.skip("Redis not available at localhost:6379")
+        env = get_test_env()
+        pytest.skip(f"Redis not available at {env.redis.host}:{env.redis.port}")
 
 
 @pytest.fixture
@@ -158,11 +161,13 @@ def redis_cache(real_redis) -> RedisMemoryCache:
 def real_redis_sync(redis_test_prefix):
     """Provide sync Redis client for cleanup operations. Skip if not available."""
     try:
-        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        env = get_test_env()
+        client = redis.Redis(host=env.redis.host, port=env.redis.port, decode_responses=True)
         client.ping()
         yield client
     except redis.ConnectionError:
-        pytest.skip("Redis not available at localhost:6379")
+        env = get_test_env()
+        pytest.skip(f"Redis not available at {env.redis.host}:{env.redis.port}")
 
 
 @pytest.fixture
