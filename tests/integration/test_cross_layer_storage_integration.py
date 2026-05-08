@@ -357,7 +357,7 @@ class TestL0L1L2CrossLayer:
         assert l2_meta is not None
         assert l2_meta.name == name
 
-        # Cleanup
+        # Cleanup L0, L1
         await l0_storage.delete(memory_id, memory_type)
         await redis_cache.delete(memory_type, owner_id, name)
         await metadata_repository.delete(UUID(memory_id))
@@ -394,6 +394,7 @@ class TestL0L1Coordination:
         assert result == "cached content", "L1 cache should survive L0 write"
 
         # Cleanup
+        await l0_storage.delete(memory_id, memory_type)
         await redis_cache.delete(memory_type, owner_id, name)
 
     @pytest.mark.asyncio

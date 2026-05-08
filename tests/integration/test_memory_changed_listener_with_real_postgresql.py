@@ -307,7 +307,6 @@ class TestMemoryChangedListenerCompleteFlow:
     async def test_save_memory_triggers_listener_and_l2_write(
         self,
         listener_with_real_services,
-        storage_coordinator,
         metadata_repository,
         history_repository,
         pg_session,
