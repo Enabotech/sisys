@@ -31,7 +31,7 @@
 │                                                                             │
 │  L0: FileMemoryAdapter ────→ [缺失 Port] ────→ .md 文件 CRUD              │
 │  L1: RedisMemoryCache ────→ [缺失 Port] ────→ Redis 缓存                  │
-│  L2: PostgreSQL ─────────→ MemoryMetadataRepositoryProtocol ✓            │
+│  L2: PostgreSQL ─────────→ L2MetadataRepositoryProtocol ✓            │
 │  L3: QdrantVector ───────→ VectorStorage Protocol ✓                       │
 │  L4: MinIO ──────────────→ ObjectStorageRepository ✓                      │
 │  L5: Neo4jGraph ──────────→ GraphStorage Protocol ✓                        │
@@ -638,7 +638,7 @@ class SixLayerStorageCoordinator:
         # 如需 Domain 层完全解耦，可后续扩展 L1CachePort（不在本次方案范围内）
 
         # L2-L5 已有 Port 实现
-        self._metadata_repo: MemoryMetadataRepositoryProtocol = ...
+        self._metadata_repo: L2MetadataRepositoryProtocol = ...
         self._vector_storage: VectorStorage = ...
         self._object_storage: ObjectStorageRepository = ...
         self._graph_storage: GraphStorage = ...
@@ -813,8 +813,8 @@ Phase 6: 集成验证（2d）
 
 | Port | 定义位置 | 实现类 |
 |------|----------|--------|
-| `MemoryMetadataRepositoryProtocol` | `domain/repositories/memory_repository.py` | `PostgreSQLMemoryMetadataRepository` |
-| `MemoryChangeHistoryRepositoryProtocol` | `domain/repositories/memory_repository.py` | `PostgreSQLMemoryChangeHistoryRepository` |
+| `L2MetadataRepositoryProtocol` | `domain/ports/l2_rdb.py` | `PostgreSQLMemoryMetadataRepository` |
+| `L2ChangeHistoryRepositoryProtocol` | `domain/ports/l2_rdb.py` | `PostgreSQLMemoryChangeHistoryRepository` |
 | `VectorStorage` | `domain/repositories/vector_storage.py` | `QdrantVectorStorage` |
 | `CollectionManager` | `domain/repositories/vector_storage.py` | `QdrantCollectionManager` |
 | `ObjectStorageRepository` | `domain/repositories/storage.py` | `MinIORepository` |

@@ -17,8 +17,8 @@
 | L0索引 | 文件系统 | `IndexManagerPort` | `MemoryIndex` | ✅ 已实现 |
 | L1 | Redis缓存 | ❌ 无接口 | `RedisMemoryCache` | ⚠️ 违反六边形 |
 | L1语义 | Redis | ❌ 无接口 | `RedisSemanticCache` | ⚠️ 违反六边形 |
-| L2 | PostgreSQL | ✅ `MemoryMetadataRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` | ✅ 已实现 |
-| L2历史 | PostgreSQL | ✅ `MemoryChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryChangeHistoryRepository` | ✅ 已实现 |
+| L2 | PostgreSQL | ✅ `L2MetadataRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` | ✅ 已实现 |
+| L2历史 | PostgreSQL | ✅ `L2ChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryChangeHistoryRepository` | ✅ 已实现 |
 | L3 | Qdrant | ✅ `VectorStorage` (Protocol) | `QdrantVectorStorage` | ✅ 已实现 |
 | L4 | MinIO | ✅ `ObjectStorageRepository` | `MinIORepository` | ✅ 已实现 |
 | L5 | Neo4j | ✅ `GraphStorage`, `GraphManager` | `Neo4jGraphStorage`, `Neo4jGraphManager` | ✅ 已实现 |

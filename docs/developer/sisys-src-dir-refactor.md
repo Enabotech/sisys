@@ -101,7 +101,7 @@ src/
 | index_manager.py | IndexManagerPort ABC | Port ✅ |
 | integrity.py | IntegrityPort ABC | Port ✅ |
 | l0_storage.py | L0StoragePort ABC | Port ✅ |
-| memory_repository.py | MemoryMetadataRepositoryProtocol, MemoryChangeHistoryRepositoryProtocol | Port ✅ |
+| l2_rdb.py | L2MetadataRepositoryProtocol, L2ChangeHistoryRepositoryProtocol | Port ✅ |
 | outbox.py | OutboxRepository ABC | Port ✅ |
 | session_storage.py | SessionStorage Protocol | Port ✅ |
 | storage.py | ObjectStorageRepository ABC | Port ✅ |
@@ -344,7 +344,7 @@ tool.py
 | index_manager.py | IndexManagerPort |
 | integrity.py | IntegrityPort |
 | l0_storage.py | L0StoragePort |
-| memory_repository.py | MemoryMetadataRepositoryProtocol, MemoryChangeHistoryRepositoryProtocol |
+| l2_rdb.py | L2MetadataRepositoryProtocol, L2ChangeHistoryRepositoryProtocol |
 | outbox.py | OutboxRepository |
 | session_storage.py | SessionStorage |
 | storage.py | ObjectStorageRepository |
@@ -1483,7 +1483,7 @@ events.append(serializer.deserialize(event_data, DomainEvent))
 | 类型 | 规范 | 示例 |
 |------|------|------|
 | Port 接口 | `XxxPort` 或 `XxxProtocol` | `HealthCheckPort`, `IntegrityPort` |
-| Repository 接口 | `XxxRepositoryProtocol` | `MemoryMetadataRepositoryProtocol` |
+| Repository 接口 | `XxxRepositoryProtocol` | `L2MetadataRepositoryProtocol` |
 | 领域服务 | `XxxService` | `MemoryService`, `AutoRouteService` |
 | 领域异常 | `XxxError` | `MemoryNotFoundError` |
 | 值对象 | `XxxContext` / `XxxDecision` / `XxxType` | `AutoTriggerContext`, `RoutingDecision`, `SensitiveDataType` |

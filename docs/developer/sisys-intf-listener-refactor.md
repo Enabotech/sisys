@@ -665,13 +665,13 @@ class StorageCoordinatorProtocol(Protocol):
     async def invalidate(self, layer: str, key: str) -> None: ...
 
 
-class MemoryMetadataRepositoryProtocol(Protocol):
+class L2MetadataRepositoryProtocol(Protocol):
     """Protocol for L2 PostgreSQL memory metadata operations."""
 
     async def upsert(self, event: MemoryChanged) -> None: ...
 
 
-class MemoryChangeHistoryRepositoryProtocol(Protocol):
+class L2ChangeHistoryRepositoryProtocol(Protocol):
     """Protocol for L2 PostgreSQL memory change history."""
 
     async def append(self, event: MemoryChanged) -> None: ...
@@ -706,8 +706,8 @@ class MemoryChangedHandler:
     def __init__(
         self,
         storage_coordinator: StorageCoordinatorProtocol | None = None,
-        metadata_repo: MemoryMetadataRepositoryProtocol | None = None,
-        history_repo: MemoryChangeHistoryRepositoryProtocol | None = None,
+        metadata_repo: L2MetadataRepositoryProtocol | None = None,
+        history_repo: L2ChangeHistoryRepositoryProtocol | None = None,
         vector_store: VectorStoreProtocol | None = None,
         entity_extractor: EntityExtractorProtocol | None = None,
     ) -> None:

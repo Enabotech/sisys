@@ -65,7 +65,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Domain Layer                                │
 │  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐              │
-│  │ L0StoragePort │ │ L1CachePort  │  │ L2RdbPort → MemoryMetadataRepositoryProtocol │
+│  │ L0StoragePort │ │ L1CachePort  │  │ L2RdbPort → L2MetadataRepositoryProtocol │
 │  ├───────────────┤ ├───────────────┤ ├───────────────┤              │
 │  │L3VectorPort   │ │L4ObjectPort   │ │L5GraphPort    │              │
 │  └───────────────┘ └───────────────┘ └───────────────┘              │
@@ -98,7 +98,7 @@
 |------|------|------|-----------|-------------|
 | **L0** | 文件系统 | MEMORY.md 索引、记忆文件 | `L0StoragePort` | `FileMemoryAdapter` |
 | **L1** | Redis 7.0+ | 会话状态、记忆缓存 | `L1CachePort` | `RedisMemoryCache (async)` |
-| **L2** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | `MemoryMetadataRepositoryProtocol` + `MemoryChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` |
+| **L2** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | `L2MetadataRepositoryProtocol` + `L2ChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` |
 | **L3** | Qdrant 1.7+ | 嵌入向量、混合检索 | `L3VectorPort` | `QdrantVectorAdapter` |
 | **L4** | MinIO WORM | 原始文档、证据包 | `L4ObjectPort` | `MinIOAdapter` |
 | **L5** | Neo4j 5.x | 知识图谱、实体关系 | `L5GraphPort` | `Neo4jAdapter` |
@@ -377,8 +377,8 @@ class MemoryChangeHistory:
 ### 3.4 L2 PostgreSQL 存储接口（复用现有 Protocol）
 
 **注意**: L2 不新建 Port 接口，直接复用现有：
-- `MemoryMetadataRepositoryProtocol` (src/domain/ports/memory_repository.py)
-- `MemoryChangeHistoryRepositoryProtocol` (src/domain/ports/memory_repository.py)
+- `L2MetadataRepositoryProtocol` (src/domain/ports/l2_rdb.py)
+- `L2ChangeHistoryRepositoryProtocol` (src/domain/ports/l2_rdb.py)
 
 对应 architecture.md §11.2.5 L2 PostgreSQL 表设计：
 - memory_metadata: 记忆元数据索引（当前状态快照）
@@ -388,8 +388,8 @@ class MemoryChangeHistory:
 
 ```
 现有实现（src/infrastructure/storage/postgresql/repository/）:
-- PostgreSQLMemoryMetadataRepository → MemoryMetadataRepositoryProtocol
-- PostgreSQLMemoryChangeHistoryRepository → MemoryChangeHistoryRepositoryProtocol
+- PostgreSQLMemoryMetadataRepository → L2MetadataRepositoryProtocol
+- PostgreSQLMemoryChangeHistoryRepository → L2ChangeHistoryRepositoryProtocol
 ```
 
 ### 3.5 L3 向量存储接口
@@ -1052,15 +1052,15 @@ from src.domain.ports.unified_storage import UnifiedStoragePort
 if TYPE_CHECKING:
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
-    from src.domain.ports.memory_repository import (
-        MemoryMetadataRepositoryProtocol,
-        MemoryChangeHistoryRepositoryProtocol,
+    from src.domain.ports.l2_rdb import (
+        L2MetadataRepositoryProtocol,
+        L2ChangeHistoryRepositoryProtocol,
     )
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
-    from src.domain.ports.memory_repository import MemoryMetadata
-    from src.domain.ports.memory_repository import MemoryChangeHistory
+    from src.domain.entities.memory_metadata import MemoryMetadata
+    from src.domain.entities.memory_change_history import MemoryChangeHistory
 
 
 class UnifiedStorageGateway(UnifiedStoragePort):
@@ -1081,8 +1081,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self,
         l0_storage: L0StoragePort,
         l1_cache: L1CachePort,
-        l2_metadata: MemoryMetadataRepositoryProtocol,
-        l2_history: MemoryChangeHistoryRepositoryProtocol,
+        l2_metadata: L2MetadataRepositoryProtocol,
+        l2_history: L2ChangeHistoryRepositoryProtocol,
         l3_vector: L3VectorPort | None = None,
         l4_object: L4ObjectPort | None = None,
         l5_graph: L5GraphPort | None = None,
@@ -1092,8 +1092,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         Args:
             l0_storage: L0 文件系统存储
             l1_cache: L1 Redis 缓存
-            l2_metadata: L2 元数据仓储（现有 MemoryMetadataRepositoryProtocol）
-            l2_history: L2 历史仓储（现有 MemoryChangeHistoryRepositoryProtocol）
+            l2_metadata: L2 元数据仓储（现有 L2MetadataRepositoryProtocol）
+            l2_history: L2 历史仓储（现有 L2ChangeHistoryRepositoryProtocol）
             l3_vector: L3 向量存储
             l4_object: L4 对象存储
             l5_graph: L5 图存储
@@ -1779,7 +1779,7 @@ MemoryChangedListener.handle()
 | **P1** | `UnifiedStorageGateway` 构造函数参数过多（6+2） | §4.1 | 待修复：使用 `StorageConfig` 配置对象 |
 | **P1** | L3/L4/L5 Port 接口与实际实现语义不兼容 | §3.5-3.7 | 待修复：重新设计接口适配现有实现 |
 | **P2** | `StoragePolicyService` 阈值硬编码 | §4.2 | 待修复：支持配置注入 |
-| **P2** | ~~L2RdbPort 与现有 `MemoryMetadataRepositoryProtocol` 重复~~ | §3.4 | ✅ 已修复：直接使用现有 Protocol |
+| **P2** | ~~L2RdbPort 与现有 `L2MetadataRepositoryProtocol` 重复~~ | §3.4 | ✅ 已修复：直接使用现有 Protocol |
 
 ### P1 问题决策：RedisMemoryCache 一步到位重构为异步
 
@@ -1805,7 +1805,7 @@ MemoryChangedListener.handle()
 
 **2. L2 Port 接口重复修复**
 - 删除 `L2RdbPort` 新接口定义
-- 直接复用现有 `MemoryMetadataRepositoryProtocol` + `MemoryChangeHistoryRepositoryProtocol`
+- 直接复用现有 `L2MetadataRepositoryProtocol` + `L2ChangeHistoryRepositoryProtocol`
 - UnifiedStorageGateway 构造函数使用这两个 Protocol
 
 **3. read() 完整流程修复**
