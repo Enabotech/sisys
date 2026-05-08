@@ -1459,11 +1459,17 @@ class UnifiedStorageFactory:
             password=self._redis_config.password,
         )
 
-        # L2: PostgreSQL（实现 L2RdbPort）
+        # L2: PostgreSQL（两个独立 Repository）
         from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
             PostgreSQLMemoryMetadataRepository,
         )
-        l2_storage = PostgreSQLMemoryMetadataRepository(
+        from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
+            PostgreSQLMemoryChangeHistoryRepository,
+        )
+        l2_metadata = PostgreSQLMemoryMetadataRepository(
+            dsn=self._postgresql_config.dsn,
+        )
+        l2_history = PostgreSQLMemoryChangeHistoryRepository(
             dsn=self._postgresql_config.dsn,
         )
 
@@ -1488,7 +1494,8 @@ class UnifiedStorageFactory:
         return UnifiedStorageGateway(
             l0_storage=l0_storage,
             l1_cache=l1_cache,
-            l2_storage=l2_storage,
+            l2_metadata=l2_metadata,
+            l2_history=l2_history,
             l3_vector=l3_vector,
             l4_object=l4_object,
             l5_graph=l5_graph,
@@ -1647,12 +1654,20 @@ Infrastructure Layer（实现 Domain Port）
 5. 新增 `src/domain/ports/unified_storage.py` → `UnifiedStoragePort`
 6. 新增 `src/domain/ports/storage_enums.py` → `StorageLayer`, `StorageTier`
 
+### Phase 1.5: Outbox 事件驱动基础设施（新增）
+
+1. 确认 Outbox 表 schema 与现有 `event_outbox` 模型对齐
+2. 确认 `OutboxRepository` 实现（已有 `src/domain/ports/outbox.py`）
+3. 确认 `AsyncOutboxPoller` 与 EventBus 对接方式
+4. **关键**：确认 `MemoryChangedHandler` 直接持有 `L1CachePort`，移除对 `SixLayerStorageCoordinator` 的依赖
+
 ### Phase 2: 实现 Adapter / 直接重构（不破坏现有代码）
 
 1. `RedisMemoryCache` 一步到位重构为 async（使用 `redis.asyncio`）
-2. `QdrantVectorAdapter` 实现 `L3VectorPort`（包装现有 `QdrantVectorStorage`）
-3. `MinIOAdapter` 实现 `L4ObjectPort`（包装现有 `MinIORepository`）
-4. `Neo4jAdapter` 实现 `L5GraphPort`（包装现有 `Neo4jGraphStorage`）
+2. **同步修改** `SixLayerStorageCoordinator` 的 L1 调用方式或废弃之
+3. `QdrantVectorAdapter` 实现 `L3VectorPort`（包装现有 `QdrantVectorStorage`）
+4. `MinIOAdapter` 实现 `L4ObjectPort`（包装现有 `MinIORepository`）
+5. `Neo4jAdapter` 实现 `L5GraphPort`（包装现有 `Neo4jGraphStorage`）
 
 ### Phase 3: 创建网关（不破坏现有代码）
 
@@ -1702,6 +1717,46 @@ Infrastructure Layer（实现 Domain Port）
 - L0-L2 是核心（真相源 + 缓存 + 元数据）
 - L3-L5 是扩展（向量检索、对象存储、图谱）
 - 通过 Optional 参数支持可选实现
+
+### ADR-004: Outbox 事件驱动架构
+
+**状态**: Accepted
+**日期**: 2026-05-08
+
+**问题**: save() 方法声称"发布 MemoryChanged 事件到 Outbox"，但具体实现未定义。
+
+**决策**: 完整实现 Outbox 模式
+**理由**:
+- architecture.md §11.2.9 明确要求事件驱动架构
+- MemoryChanged 事件通过事务发件箱确保可靠性
+- 各层更新（L1失效/L2元数据/L3向量/L5图谱）由 MemoryChangedListener 异步执行
+
+**Outbox 处理流程**（符合 §11.2.9）:
+```
+MemoryService.save()
+  ├─→ L0 文件系统（同步，强一致）
+  └─→ 发布 MemoryChanged 事件（事务发件箱）
+        ↓
+AsyncOutboxPoller（后台轮询）
+        ↓
+MemoryChangedListener.handle()
+  ├─→ L1 缓存失效（同步）
+  ├─→ L2 元数据写入
+  ├─→ L3 向量（按需）
+  └─→ L5 图谱（按需）
+```
+
+**Phase 1.5 已纳入迁移路径**，确保与现有 Outbox 实现对齐。
+
+### ADR-005: StorageConfig 配置对象（待实现）
+
+**问题**: UnifiedStorageGateway 构造函数参数过多（7个），违反业界最佳实践。
+
+**决策**: 引入 StorageConfig 配置对象
+**理由**:
+- 超过 4 个参数应使用 Parameter Object Pattern（Martin Fowler）
+- 配置对象封装核心参数（L0-L2）和可选参数（L3-L5）
+- 向后兼容：通过 from_kwargs 保留现有调用方式
 
 ---
 
