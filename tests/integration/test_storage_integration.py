@@ -56,17 +56,13 @@ def redis_test_prefix():
 
 @pytest.fixture
 def real_redis(redis_test_prefix):
-    """Provide real Redis client. Skip if not available."""
+    """Provide real async Redis client. Skip if not available."""
     try:
-        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
-        client.ping()
+        import redis.asyncio as aioredis
+
+        client = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
         yield client
-        # Cleanup only keys with this test's prefix
-        pattern = f"{redis_test_prefix}*"
-        keys = client.keys(pattern)
-        if keys:
-            client.delete(*keys)
-    except redis.ConnectionError:
+    except Exception:
         pytest.skip("Redis not available at localhost:6379")
 
 
@@ -74,6 +70,17 @@ def real_redis(redis_test_prefix):
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real Redis."""
     return RedisMemoryCache(real_redis)
+
+
+@pytest.fixture
+def real_redis_sync(redis_test_prefix):
+    """Provide sync Redis client for cleanup operations. Skip if not available."""
+    try:
+        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        client.ping()
+        yield client
+    except redis.ConnectionError:
+        pytest.skip("Redis not available at localhost:6379")
 
 
 @pytest.fixture
@@ -187,74 +194,79 @@ class TestL0FileSystem:
 class TestL1RedisCache:
     """L1 Redis cache integration tests using real Redis."""
 
-    def test_redis_cache_set_and_get(self, redis_cache, real_redis):
+    @pytest.mark.asyncio
+    async def test_redis_cache_set_and_get(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache set and get operations."""
         memory_type = "user"
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
         name = "test-memory"
         content = "Test memory content"
 
-        redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set(memory_type, owner_id, name, content)
 
-        result = redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get(memory_type, owner_id, name)
         assert result == content
 
         # Cleanup
         key = f"memory:{memory_type}:{owner_id}:{name}"
-        real_redis.delete(key)
+        real_redis_sync.delete(key)
 
-    def test_redis_cache_delete(self, redis_cache, real_redis):
+    @pytest.mark.asyncio
+    async def test_redis_cache_delete(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache delete operation."""
         memory_type = "user"
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
         name = "test-memory"
 
-        redis_cache.set(memory_type, owner_id, name, "content")
-        redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.set(memory_type, owner_id, name, "content")
+        await redis_cache.delete(memory_type, owner_id, name)
 
-        result = redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get(memory_type, owner_id, name)
         assert result is None
 
-    def test_redis_cache_ttl_range(self, redis_cache, real_redis):
+    @pytest.mark.asyncio
+    async def test_redis_cache_ttl_range(self, redis_cache, real_redis, real_redis_sync):
         """Verify Redis cache TTL is in 24h-30h range."""
         memory_type = "user"
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
         name = "test-memory"
         content = "Test content"
 
-        redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set(memory_type, owner_id, name, content)
 
         key = f"memory:{memory_type}:{owner_id}:{name}"
-        ttl = real_redis.ttl(key)
+        ttl = real_redis_sync.ttl(key)
         assert 86400 <= ttl <= 108000
 
         # Cleanup
-        real_redis.delete(key)
+        real_redis_sync.delete(key)
 
-    def test_redis_cache_get_returns_none_when_not_cached(self, redis_cache):
+    @pytest.mark.asyncio
+    async def test_redis_cache_get_returns_none_when_not_cached(self, redis_cache):
         """Verify Redis cache get returns None when not cached."""
-        result = redis_cache.get("user", "nonexistent-owner", "nonexistent")
+        result = await redis_cache.get("user", "nonexistent-owner", "nonexistent")
         assert result is None
 
-    def test_redis_cache_invalidate_pattern(self, redis_cache, real_redis):
+    @pytest.mark.asyncio
+    async def test_redis_cache_invalidate_pattern(self, redis_cache, real_redis, real_redis_sync):
         """Verify invalidate_pattern deletes all matching keys."""
         memory_type = "user"
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
 
         # Set multiple memories
         for i in range(3):
-            redis_cache.set(memory_type, owner_id, f"memory-{i}", f"content-{i}")
+            await redis_cache.set(memory_type, owner_id, f"memory-{i}", f"content-{i}")
 
         # Verify they exist
         pattern = f"memory:{memory_type}:{owner_id}:*"
-        keys_before = real_redis.keys(pattern)
+        keys_before = real_redis_sync.keys(pattern)
         assert len(keys_before) >= 3
 
         # Invalidate all
-        redis_cache.invalidate_pattern(memory_type, owner_id)
+        await redis_cache.invalidate_pattern(memory_type, owner_id)
 
         # Verify all deleted
-        keys_after = real_redis.keys(pattern)
+        keys_after = real_redis_sync.keys(pattern)
         assert len(keys_after) == 0
 
 
@@ -266,24 +278,26 @@ class TestL1RedisCache:
 class TestL1L2Coordination:
     """Test L1 cache and L2 repository coordination."""
 
-    def test_coordinator_save_to_l1(self, coordinator_with_redis, real_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_save_to_l1(self, coordinator_with_redis, real_redis_sync):
         """Verify coordinator saves to L1 Redis cache."""
         memory_id = str(uuid.uuid4())
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
         name = "test-memory"
         content = "Test memory content"
 
-        coordinator_with_redis.save(memory_id, content, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        await coordinator_with_redis.save(memory_id, content, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         # Verify via real Redis (key format: memory:user:{owner_id}:{name})
         key = f"memory:user:{owner_id}:{name}"
-        stored = real_redis.get(key)
+        stored = real_redis_sync.get(key)
         assert stored == content
 
         # Cleanup
-        real_redis.delete(key)
+        real_redis_sync.delete(key)
 
-    def test_coordinator_read_from_l1(self, coordinator_with_redis, real_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_read_from_l1(self, coordinator_with_redis, real_redis_sync):
         """Verify coordinator reads from L1 Redis cache."""
         memory_id = str(uuid.uuid4())
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
@@ -292,15 +306,16 @@ class TestL1L2Coordination:
 
         # Pre-populate
         key = f"memory:user:{owner_id}:{name}"
-        real_redis.setex(key, 86400, content)
+        real_redis_sync.setex(key, 86400, content)
 
-        result = coordinator_with_redis.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        result = await coordinator_with_redis.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
         assert result == content
 
         # Cleanup
-        real_redis.delete(key)
+        real_redis_sync.delete(key)
 
-    def test_coordinator_invalidate_l1(self, coordinator_with_redis, real_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_invalidate_l1(self, coordinator_with_redis, real_redis_sync):
         """Verify coordinator invalidates L1 cache."""
         memory_id = str(uuid.uuid4())
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
@@ -308,11 +323,11 @@ class TestL1L2Coordination:
         content = "Test memory"
 
         key = f"memory:user:{owner_id}:{name}"
-        real_redis.setex(key, 86400, content)
+        real_redis_sync.setex(key, 86400, content)
 
-        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        await coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
-        assert real_redis.get(key) is None
+        assert real_redis_sync.get(key) is None
 
 
 # ===================================================================
@@ -323,11 +338,12 @@ class TestL1L2Coordination:
 class TestLayerCoordination:
     """Test coordination across L0, L1, L2 layers."""
 
-    def test_get_layer_status_returns_all_layers(self, coordinator_with_redis):
+    @pytest.mark.asyncio
+    async def test_get_layer_status_returns_all_layers(self, coordinator_with_redis):
         """Verify get_layer_status returns status for all layers."""
         memory_id = str(uuid.uuid4())
 
-        status = coordinator_with_redis.get_layer_status(memory_id, memory_type="private")
+        status = await coordinator_with_redis.get_layer_status(memory_id, memory_type="private")
 
         assert "L0" in status
         assert "L1" in status
@@ -336,11 +352,12 @@ class TestLayerCoordination:
         assert "L4" in status
         assert "L5" in status
 
-    def test_layer_status_l0_always_true(self, coordinator_with_redis):
+    @pytest.mark.asyncio
+    async def test_layer_status_l0_always_true(self, coordinator_with_redis):
         """Verify L0 is always reported as existing (file system)."""
         memory_id = str(uuid.uuid4())
 
-        status = coordinator_with_redis.get_layer_status(memory_id, memory_type="private")
+        status = await coordinator_with_redis.get_layer_status(memory_id, memory_type="private")
 
         assert status["L0"] is True
 
@@ -353,7 +370,8 @@ class TestLayerCoordination:
 class TestErrorHandling:
     """Test error handling across layers."""
 
-    def test_coordinator_raises_for_invalid_layer(self, coordinator_with_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_raises_for_invalid_layer(self, coordinator_with_redis):
         """Verify coordinator raises error for invalid layer."""
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
@@ -362,9 +380,12 @@ class TestErrorHandling:
         name = "test-memory"
 
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.save(memory_id, "content", layer="L99", memory_type="private", owner_id=owner_id, name=name)
+            await coordinator_with_redis.save(
+                memory_id, "content", layer="L99", memory_type="private", owner_id=owner_id, name=name
+            )
 
-    def test_coordinator_read_raises_for_invalid_layer(self, coordinator_with_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_read_raises_for_invalid_layer(self, coordinator_with_redis):
         """Verify coordinator read raises error for invalid layer."""
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
@@ -373,9 +394,10 @@ class TestErrorHandling:
         name = "test-memory"
 
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.read(memory_id, layer="L99", memory_type="private", owner_id=owner_id, name=name)
+            await coordinator_with_redis.read(memory_id, layer="L99", memory_type="private", owner_id=owner_id, name=name)
 
-    def test_coordinator_invalidate_raises_for_unsupported_layer(self, coordinator_with_redis):
+    @pytest.mark.asyncio
+    async def test_coordinator_invalidate_raises_for_unsupported_layer(self, coordinator_with_redis):
         """Verify coordinator invalidate raises error for non-L1 layers."""
         from src.application.services.six_layer_storage_coordinator import LayerNotFoundError
 
@@ -384,8 +406,8 @@ class TestErrorHandling:
         name = "test-memory"
 
         # L1 should work
-        coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        await coordinator_with_redis.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         # L2 should raise
         with pytest.raises(LayerNotFoundError):
-            coordinator_with_redis.invalidate(memory_id, layer="L2", memory_type="private", owner_id=owner_id, name=name)
+            await coordinator_with_redis.invalidate(memory_id, layer="L2", memory_type="private", owner_id=owner_id, name=name)

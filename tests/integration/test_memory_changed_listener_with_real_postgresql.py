@@ -141,17 +141,13 @@ def redis_test_prefix():
 
 @pytest.fixture
 def real_redis(redis_test_prefix):
-    """Provide real Redis client. Skip if not available."""
+    """Provide real async Redis client. Skip if not available."""
     try:
-        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
-        client.ping()
+        import redis.asyncio as aioredis
+
+        client = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
         yield client
-        # Cleanup only keys with this test's prefix
-        pattern = f"{redis_test_prefix}*"
-        keys = client.keys(pattern)
-        if keys:
-            client.delete(*keys)
-    except redis.ConnectionError:
+    except Exception:
         pytest.skip("Redis not available at localhost:6379")
 
 
@@ -159,6 +155,17 @@ def real_redis(redis_test_prefix):
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real Redis."""
     return RedisMemoryCache(real_redis)
+
+
+@pytest.fixture
+def real_redis_sync(redis_test_prefix):
+    """Provide sync Redis client for cleanup operations. Skip if not available."""
+    try:
+        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        client.ping()
+        yield client
+    except redis.ConnectionError:
+        pytest.skip("Redis not available at localhost:6379")
 
 
 @pytest.fixture
@@ -320,7 +327,7 @@ class TestMemoryChangedListenerCompleteFlow:
         history_repository,
         pg_session,
         redis_cache,
-        real_redis,
+        real_redis_sync,
         temp_memory_dir,
     ):
         """Test complete flow: MemoryService.save() -> MemoryChanged -> Listener -> L2 write.
@@ -340,9 +347,9 @@ class TestMemoryChangedListenerCompleteFlow:
         memory_type = "user"
 
         # Step 1: Pre-populate L1 cache
-        redis_cache.set(memory_type, owner_id, name, "test content")
+        await redis_cache.set(memory_type, owner_id, name, "test content")
         redis_key = f"memory:user:{owner_id}:{name}"
-        assert real_redis.exists(redis_key) == 1, "Cache should be populated before listener"
+        assert real_redis_sync.exists(redis_key) == 1, "Cache should be populated before listener"
 
         # Step 2: Create MemoryChanged event (simulating what MemoryService.save() would publish)
         event = MemoryChanged(
@@ -362,7 +369,7 @@ class TestMemoryChangedListenerCompleteFlow:
         await listener_with_real_services.handle(event)
 
         # Step 4: Verify L1 cache was invalidated
-        assert real_redis.exists(redis_key) == 0, "L1 cache should be invalidated after listener.handle()"
+        assert real_redis_sync.exists(redis_key) == 0, "L1 cache should be invalidated after listener.handle()"
 
         # Step 5: Verify L2 metadata was written (query the database directly)
         from uuid import UUID
