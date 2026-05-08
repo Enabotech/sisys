@@ -73,7 +73,7 @@ class SixLayerStorageCoordinator:
         self._l4_object_store = l4_object_store
         self._l5_graph_store = l5_graph_store
 
-    def save(
+    async def save(
         self,
         memory_id: str,
         content: str,
@@ -93,7 +93,7 @@ class SixLayerStorageCoordinator:
             name: 记忆名称
         """
         if layer == "L1":
-            self._save_to_l1(memory_id, content, memory_type, owner_id, name)
+            await self._save_to_l1(memory_id, content, memory_type, owner_id, name)
         elif layer == "L2":
             self._save_to_l2(memory_id, content, memory_type, owner_id, name)
         elif layer == "L3":
@@ -105,7 +105,7 @@ class SixLayerStorageCoordinator:
         else:
             raise LayerNotFoundError(layer)
 
-    def read(
+    async def read(
         self,
         memory_id: str,
         layer: str,
@@ -126,13 +126,13 @@ class SixLayerStorageCoordinator:
             记忆内容，不存在则返回 None
         """
         if layer == "L1":
-            return self._read_from_l1(memory_id, memory_type, owner_id, name)
+            return await self._read_from_l1(memory_id, memory_type, owner_id, name)
         elif layer == "L2":
             return self._read_from_l2(memory_id)
         else:
             raise LayerNotFoundError(layer)
 
-    def invalidate(
+    async def invalidate(
         self,
         memory_id: str,
         layer: str,
@@ -150,11 +150,11 @@ class SixLayerStorageCoordinator:
             name: 记忆名称
         """
         if layer == "L1":
-            self._invalidate_l1(memory_id, memory_type, owner_id, name)
+            await self._invalidate_l1(memory_id, memory_type, owner_id, name)
         else:
             raise LayerNotFoundError(layer)
 
-    def get_layer_status(
+    async def get_layer_status(
         self,
         memory_id: str,
         memory_type: str,
@@ -173,14 +173,14 @@ class SixLayerStorageCoordinator:
             各层是否存在 {layer: exists}
         """
         status = {"L0": True}  # L0 始终存在（文件系统）
-        status["L1"] = self._check_l1_exists(memory_id, memory_type, owner_id, name)
+        status["L1"] = await self._check_l1_exists(memory_id, memory_type, owner_id, name)
         status["L2"] = self._check_l2_exists(memory_id)
         status["L3"] = self._check_l3_exists(memory_id) if self._l3_vector_store else False
         status["L4"] = self._check_l4_exists(memory_id) if self._l4_object_store else False
         status["L5"] = self._check_l5_exists(memory_id) if self._l5_graph_store else False
         return status
 
-    def _save_to_l1(
+    async def _save_to_l1(
         self,
         memory_id: str,
         content: str,
@@ -199,7 +199,7 @@ class SixLayerStorageCoordinator:
         """
         if self._l1_cache is None:
             return
-        self._l1_cache.set(memory_type, owner_id, name, content)
+        await self._l1_cache.set(memory_type, owner_id, name, content)
 
     def _save_to_l2(
         self,
@@ -298,7 +298,7 @@ class SixLayerStorageCoordinator:
         # TODO: L5 知识图谱由后续 LLM 集成 Story 实现
         # 需要通过 EntityExtractorService 提取实体关系
 
-    def _read_from_l1(
+    async def _read_from_l1(
         self,
         memory_id: str,
         memory_type: str,
@@ -318,7 +318,7 @@ class SixLayerStorageCoordinator:
         """
         if self._l1_cache is None:
             return None
-        return self._l1_cache.get(memory_type, owner_id, name)
+        return await self._l1_cache.get(memory_type, owner_id, name)
 
     def _read_from_l2(self, memory_id: str) -> str | None:
         """从 L2 PostgreSQL 读取。"""
@@ -326,7 +326,7 @@ class SixLayerStorageCoordinator:
             return None
         return None
 
-    def _invalidate_l1(
+    async def _invalidate_l1(
         self,
         memory_id: str,
         memory_type: str,
@@ -343,9 +343,9 @@ class SixLayerStorageCoordinator:
         """
         if self._l1_cache is None:
             return
-        self._l1_cache.delete(memory_type, owner_id, name)
+        await self._l1_cache.delete(memory_type, owner_id, name)
 
-    def _check_l1_exists(
+    async def _check_l1_exists(
         self,
         memory_id: str,
         memory_type: str,
@@ -367,7 +367,7 @@ class SixLayerStorageCoordinator:
             return False
         if owner_id is None or name is None:
             return False  # 无法检查，没有足够信息构建 key
-        return self._l1_cache.get(memory_type, owner_id, name) is not None
+        return await self._l1_cache.get(memory_type, owner_id, name) is not None
 
     def _check_l2_exists(self, memory_id: str) -> bool:
         """检查 L2 是否存在。"""

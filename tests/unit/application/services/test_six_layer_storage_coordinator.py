@@ -6,7 +6,9 @@ RED PHASE: 验证 SixLayerStorageCoordinator 六层存储协同功能。
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from src.application.services.six_layer_storage_coordinator import (
     SixLayerStorageCoordinator,
@@ -18,7 +20,7 @@ class TestSixLayerStorageCoordinatorInit:
 
     def test_init_with_dependencies(self):
         """验证使用依赖初始化"""
-        mock_cache = MagicMock()
+        mock_cache = AsyncMock()
         mock_l2_repo = MagicMock()
         mock_l3_store = MagicMock()
         mock_l4_store = MagicMock()
@@ -39,9 +41,10 @@ class TestSixLayerStorageCoordinatorInit:
 class TestSixLayerStorageCoordinatorSave:
     """SixLayerStorageCoordinator save 方法验证"""
 
-    def test_save_to_l1_l1_cache(self):
+    @pytest.mark.asyncio
+    async def test_save_to_l1_l1_cache(self):
         """验证保存到 L1 Redis 缓存"""
-        mock_cache = MagicMock()
+        mock_cache = AsyncMock()
         mock_l2_repo = MagicMock()
         mock_l3_store = MagicMock()
         mock_l4_store = MagicMock()
@@ -61,7 +64,7 @@ class TestSixLayerStorageCoordinatorSave:
         content = "test memory content"
         memory_type = "private"
 
-        coordinator.save(memory_id, content, layer="L1", memory_type=memory_type, owner_id=owner_id, name=name)
+        await coordinator.save(memory_id, content, layer="L1", memory_type=memory_type, owner_id=owner_id, name=name)
 
         mock_cache.set.assert_called_once_with(memory_type, owner_id, name, content)
 
@@ -69,9 +72,10 @@ class TestSixLayerStorageCoordinatorSave:
 class TestSixLayerStorageCoordinatorRead:
     """SixLayerStorageCoordinator read 方法验证"""
 
-    def test_read_from_l1_l1_cache(self):
+    @pytest.mark.asyncio
+    async def test_read_from_l1_l1_cache(self):
         """验证从 L1 Redis 缓存读取"""
-        mock_cache = MagicMock()
+        mock_cache = AsyncMock()
         mock_cache.get.return_value = "cached content"
 
         mock_l2_repo = MagicMock()
@@ -90,7 +94,7 @@ class TestSixLayerStorageCoordinatorRead:
         memory_id = str(uuid.uuid4())
         owner_id = "user-123"
         name = "test-memory"
-        result = coordinator.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        result = await coordinator.read(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         assert result == "cached content"
         mock_cache.get.assert_called_once_with("private", owner_id, name)
@@ -99,9 +103,10 @@ class TestSixLayerStorageCoordinatorRead:
 class TestSixLayerStorageCoordinatorInvalidate:
     """SixLayerStorageCoordinator invalidate 方法验证"""
 
-    def test_invalidate_l1_cache(self):
+    @pytest.mark.asyncio
+    async def test_invalidate_l1_cache(self):
         """验证失效 L1 缓存"""
-        mock_cache = MagicMock()
+        mock_cache = AsyncMock()
         mock_l2_repo = MagicMock()
         mock_l3_store = MagicMock()
         mock_l4_store = MagicMock()
@@ -118,7 +123,7 @@ class TestSixLayerStorageCoordinatorInvalidate:
         memory_id = str(uuid.uuid4())
         owner_id = "user-123"
         name = "test-memory"
-        coordinator.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
+        await coordinator.invalidate(memory_id, layer="L1", memory_type="private", owner_id=owner_id, name=name)
 
         mock_cache.delete.assert_called_once_with("private", owner_id, name)
 
@@ -126,9 +131,10 @@ class TestSixLayerStorageCoordinatorInvalidate:
 class TestSixLayerStorageCoordinatorLayerStatus:
     """SixLayerStorageCoordinator get_layer_status 方法验证"""
 
-    def test_get_layer_status_all_layers(self):
+    @pytest.mark.asyncio
+    async def test_get_layer_status_all_layers(self):
         """验证获取所有层状态"""
-        mock_cache = MagicMock()
+        mock_cache = AsyncMock()
         mock_l2_repo = MagicMock()
         mock_l3_store = MagicMock()
         mock_l4_store = MagicMock()
@@ -143,7 +149,7 @@ class TestSixLayerStorageCoordinatorLayerStatus:
         )
 
         memory_id = str(uuid.uuid4())
-        status = coordinator.get_layer_status(memory_id, memory_type="private")
+        status = await coordinator.get_layer_status(memory_id, memory_type="private")
 
         assert "L0" in status
         assert "L1" in status

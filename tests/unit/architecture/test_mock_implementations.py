@@ -25,17 +25,20 @@ class FakeL0StorageAdapter(L0StoragePort):
     def __init__(self):
         self._storage = {}
 
-    async def write(self, memory_id: str, memory_type: str, content: str) -> None:
+    async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         key = f"{memory_type}:{memory_id}"
         self._storage[key] = content
+        return True
 
     async def read(self, memory_id: str, memory_type: str) -> str:
         key = f"{memory_type}:{memory_id}"
         return self._storage.get(key, "") or ""
 
-    async def delete(self, memory_id: str, memory_type: str) -> None:
+    async def delete(self, memory_id: str, memory_type: str) -> bool:
         key = f"{memory_type}:{memory_id}"
+        existed = key in self._storage
         self._storage.pop(key, None)
+        return existed
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
         key = f"{memory_type}:{memory_id}"

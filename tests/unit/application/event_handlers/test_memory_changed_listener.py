@@ -73,7 +73,7 @@ class TestMemoryChangedListenerHandle:
     @pytest.mark.asyncio
     async def test_handle_calls_invalidate_l1_cache(self):
         """验证 handle 调用 L1 缓存失效"""
-        mock_storage_coordinator = MagicMock()
+        mock_storage_coordinator = AsyncMock()
         mock_metadata_repo = AsyncMock()
         mock_history_repo = AsyncMock()
 
@@ -99,7 +99,7 @@ class TestMemoryChangedListenerHandle:
     @pytest.mark.asyncio
     async def test_handle_calls_write_to_l2(self):
         """验证 handle 调用 L2 写入"""
-        mock_storage_coordinator = MagicMock()
+        mock_storage_coordinator = AsyncMock()
         mock_metadata_repo = AsyncMock()
         mock_history_repo = AsyncMock()
 
@@ -119,9 +119,10 @@ class TestMemoryChangedListenerHandle:
 class TestMemoryChangedListenerL1Invalidation:
     """L1 缓存失效验证"""
 
-    def test_invalidate_l1_cache_with_private_memory(self):
+    @pytest.mark.asyncio
+    async def test_invalidate_l1_cache_with_private_memory(self):
         """验证 private 记忆的 L1 缓存失效"""
-        mock_storage_coordinator = MagicMock()
+        mock_storage_coordinator = AsyncMock()
 
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
@@ -134,7 +135,7 @@ class TestMemoryChangedListenerL1Invalidation:
         memory_id = str(uuid.uuid4())
         event = _make_event(memory_id=memory_id, user_id="user-456", change_type="update")
 
-        listener._invalidate_l1_cache(event)
+        await listener._invalidate_l1_cache(event)
 
         mock_storage_coordinator.invalidate.assert_called_once_with(
             memory_id=memory_id,
@@ -144,9 +145,10 @@ class TestMemoryChangedListenerL1Invalidation:
             name="test-memory",
         )
 
-    def test_invalidate_l1_cache_with_group_memory(self):
+    @pytest.mark.asyncio
+    async def test_invalidate_l1_cache_with_group_memory(self):
         """验证 group 记忆的 L1 缓存失效"""
-        mock_storage_coordinator = MagicMock()
+        mock_storage_coordinator = AsyncMock()
 
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
@@ -164,7 +166,7 @@ class TestMemoryChangedListenerL1Invalidation:
             memory_type="group",
         )
 
-        listener._invalidate_l1_cache(event)
+        await listener._invalidate_l1_cache(event)
 
         mock_storage_coordinator.invalidate.assert_called_once_with(
             memory_id=memory_id,
@@ -174,7 +176,8 @@ class TestMemoryChangedListenerL1Invalidation:
             name="test-memory",
         )
 
-    def test_invalidate_l1_cache_no_storage_coordinator(self):
+    @pytest.mark.asyncio
+    async def test_invalidate_l1_cache_no_storage_coordinator(self):
         """验证无 storage_coordinator 时跳过失效"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
@@ -186,7 +189,7 @@ class TestMemoryChangedListenerL1Invalidation:
 
         event = _make_event()
 
-        listener._invalidate_l1_cache(event)
+        await listener._invalidate_l1_cache(event)
 
 
 class TestMemoryChangedListenerL2Write:

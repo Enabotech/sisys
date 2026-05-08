@@ -69,7 +69,7 @@ class MemoryChangedHandler:
 
         # 1. L1 Redis 缓存失效（同步，立即）
         # 保证"上下文≠缓存"公理
-        self._invalidate_l1_cache(event)
+        await self._invalidate_l1_cache(event)
 
         # 2. L2 PostgreSQL 写入（通过 Repository 调用）
         # metadata_repository.upsert() + history_repository.append()
@@ -85,7 +85,7 @@ class MemoryChangedHandler:
         # 4. L5 Neo4j 图谱（按需，EntityExtractor）
         # TODO: Story 1.17 或 LLM 集成 Story 实现
 
-    def _invalidate_l1_cache(self, event: MemoryChanged) -> None:
+    async def _invalidate_l1_cache(self, event: MemoryChanged) -> None:
         """失效 L1 Redis 缓存（同步，立即）。
 
         Args:
@@ -99,7 +99,7 @@ class MemoryChangedHandler:
             memory_type = self._get_memory_type(event)
             # owner_id 是 user_id（private 类型）或 group_id
             owner_id = event.user_id
-            self._storage_coordinator.invalidate(
+            await self._storage_coordinator.invalidate(
                 memory_id=event.memory_id,
                 layer="L1",
                 memory_type=memory_type,
