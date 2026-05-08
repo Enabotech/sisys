@@ -56,13 +56,16 @@ class FileMemoryAdapter(L0StoragePort):
     # L0StoragePort 实现（异步方法）
     # ========================================================================
 
-    async def write(self, memory_id: str, memory_type: str, content: str) -> None:
+    async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         """写入记忆文件（I/O 密集型，使用 aiofiles）。
 
         Args:
             memory_id: 记忆 ID（UUID）
             memory_type: 记忆类型（user/feedback/project/reference）
             content: 记忆内容
+
+        Returns:
+            True 如果写入成功，False 否则
 
         Raises:
             OSError: 如果写入失败
@@ -73,6 +76,7 @@ class FileMemoryAdapter(L0StoragePort):
         file_path = dir_path / f"{memory_id}.md"
         async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
             await f.write(content)
+        return True
 
     async def read(self, memory_id: str, memory_type: str) -> str:
         """读取记忆文件（I/O 密集型，使用 aiofiles）。
@@ -94,20 +98,25 @@ class FileMemoryAdapter(L0StoragePort):
             content: str = await f.read()
             return cast(str, content)
 
-    async def delete(self, memory_id: str, memory_type: str) -> None:
+    async def delete(self, memory_id: str, memory_type: str) -> bool:
         """删除记忆文件（快速同步操作，使用 to_thread）。
 
         Args:
             memory_id: 记忆 ID
             memory_type: 记忆类型
+
+        Returns:
+            True 如果删除成功，False 如果文件不存在
         """
 
         def _do_delete():
             file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
             if file_path.exists():
                 file_path.unlink()
+                return True
+            return False
 
-        await asyncio.to_thread(_do_delete)
+        return await asyncio.to_thread(_do_delete)
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
         """检查记忆文件是否存在（快速同步操作，使用 to_thread）。
