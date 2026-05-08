@@ -47,10 +47,11 @@ class ConcreteL0StorageAdapter(L0StoragePort):
     def __init__(self) -> None:
         self._memories: dict[str, dict[str, str]] = {}
 
-    async def write(self, memory_id: str, memory_type: str, content: str) -> None:
+    async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         if memory_type not in self._memories:
             self._memories[memory_type] = {}
         self._memories[memory_type][memory_id] = content
+        return True
 
     async def read(self, memory_id: str, memory_type: str) -> str:
         if memory_type not in self._memories:
@@ -59,9 +60,11 @@ class ConcreteL0StorageAdapter(L0StoragePort):
             raise FileNotFoundError(f"Memory {memory_id} not found")
         return self._memories[memory_type][memory_id]
 
-    async def delete(self, memory_id: str, memory_type: str) -> None:
+    async def delete(self, memory_id: str, memory_type: str) -> bool:
         if memory_type in self._memories and memory_id in self._memories[memory_type]:
             del self._memories[memory_type][memory_id]
+            return True
+        return False
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
         return memory_type in self._memories and memory_id in self._memories[memory_type]

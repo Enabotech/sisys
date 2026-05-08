@@ -26,7 +26,7 @@ class TestMemoryChangedListenerIndexManagerPort:
 
     def test_init_accepts_index_manager(self):
         """验证 MemoryChangedListener 构造函数接受 index_manager 参数"""
-        mock_coordinator = MagicMock()
+        mock_coordinator = AsyncMock()
         mock_index_manager = MagicMock(spec=IndexManagerPort)
 
         listener = MemoryChangedHandler(
@@ -39,7 +39,7 @@ class TestMemoryChangedListenerIndexManagerPort:
 
     def test_init_without_index_manager_is_valid(self):
         """验证 index_manager 为可选参数"""
-        mock_coordinator = MagicMock()
+        mock_coordinator = AsyncMock()
 
         listener = MemoryChangedHandler(
             storage_coordinator=mock_coordinator,
@@ -51,7 +51,7 @@ class TestMemoryChangedListenerIndexManagerPort:
     @pytest.mark.asyncio
     async def test_handle_updates_index_on_memory_change(self):
         """验证 handle() 方法调用 index_manager.update_entry()"""
-        mock_coordinator = MagicMock()
+        mock_coordinator = AsyncMock()
         mock_index_manager = MagicMock(spec=IndexManagerPort)
         mock_index_manager.update_entry = AsyncMock()
 
@@ -83,7 +83,7 @@ class TestMemoryChangedListenerBackwardCompatibility:
 
     def test_init_with_legacy_params_still_works(self):
         """验证旧参数仍然有效（向后兼容）"""
-        mock_coordinator = MagicMock()
+        mock_coordinator = AsyncMock()
         mock_metadata_repo = MagicMock()
         mock_history_repo = MagicMock()
 
