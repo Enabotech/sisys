@@ -397,10 +397,11 @@ class MemoryChangeHistory:
 ```python
 # src/domain/ports/l3_vector.py
 
-from typing import Any, Protocol
+from abc import ABC, abstractmethod
+from typing import Any
 
 
-class L3VectorPort(Protocol):
+class L3VectorPort(ABC):
     """L3 Qdrant 向量存储端口接口。
 
     对应 architecture.md §11.1：
@@ -408,16 +409,17 @@ class L3VectorPort(Protocol):
     - 支持 Dense+Sparse+Payload 过滤
 
     设计说明：
-    - 与现有 VectorStorage Protocol 语义完全兼容
+    - 与现有 VectorStorage ABC 语义完全兼容
     - embedding 生成职责归于上游服务，不耦合在此层
     - collection 参数明确传递（由调用方管理）
 
-    与 VectorStorage Protocol 的关系：
-    - 本质上与 VectorStorage Protocol 是同一接口
+    与 VectorStorage ABC 的关系：
+    - 本质上与 VectorStorage 是同一接口
     - L3VectorPort 是分层视角的命名（强调 L3 层级）
     - VectorStorage 是职责视角的命名（强调向量存储能力）
     """
 
+    @abstractmethod
     async def upsert_points(
         self,
         collection: str,
@@ -432,8 +434,8 @@ class L3VectorPort(Protocol):
         Returns:
             操作成功返回 True
         """
-        ...
 
+    @abstractmethod
     async def delete_points(
         self,
         collection: str,
@@ -448,8 +450,8 @@ class L3VectorPort(Protocol):
         Returns:
             删除成功返回 True
         """
-        ...
 
+    @abstractmethod
     async def get_point(
         self,
         collection: str,
@@ -464,8 +466,8 @@ class L3VectorPort(Protocol):
         Returns:
             向量点数据 {id, vector, payload}，不存在返回 None
         """
-        ...
 
+    @abstractmethod
     async def search(
         self,
         collection: str,
@@ -484,8 +486,8 @@ class L3VectorPort(Protocol):
         Returns:
             检索结果列表 [{id, score, payload}, ...]
         """
-        ...
 
+    @abstractmethod
     async def search_sparse(
         self,
         collection: str,
@@ -506,7 +508,6 @@ class L3VectorPort(Protocol):
         Returns:
             检索结果列表 [{id, score, payload}, ...]
         """
-        ...
 ```
 
 ### 3.6 L4 对象存储接口
