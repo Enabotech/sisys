@@ -65,7 +65,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Domain Layer                                │
 │  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐              │
-│  │ L0StoragePort │ │ L1CachePort  │  │ L2RdbPort → L2MetadataRepositoryProtocol │
+│  │ L0StoragePort │ │ L1CachePort  │  │ L2MetadataRepositoryProtocol │
 │  ├───────────────┤ ├───────────────┤ ├───────────────┤              │
 │  │L3VectorPort   │ │L4ObjectPort   │ │L5GraphPort    │              │
 │  └───────────────┘ └───────────────┘ └───────────────┘              │
@@ -334,47 +334,7 @@ class L1CachePort(ABC):
         pass
 ```
 
-### 3.4 L2 元数据存储接口
-
-```python
-# src/domain/ports/l2_metadata.py
-
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any
-from uuid import UUID
-
-
-class MemoryMetadata:
-    """记忆元数据值对象。"""
-    memory_id: UUID
-    user_id: str
-    name: str
-    description: str | None
-    type: str  # 'user'/'feedback'/'project'/'reference'
-    path: str
-    version: int
-    mtime: datetime
-    owner: str | None
-    group_id: str | None
-    created_at: datetime
-    updated_at: datetime
-
-
-class MemoryChangeHistory:
-    """记忆变更历史值对象。"""
-    id: UUID
-    memory_id: UUID
-    version: int
-    changed_at: datetime
-    changed_by: str
-    change_type: str  # 'create'/'update'/'delete'/'force_update'
-    changed_fields: dict[str, Any] | None
-    diff_summary: str | None
-    archived_ref: str | None
-```
-
-### 3.4 L2 PostgreSQL 存储接口（复用现有 Protocol）
+### 3.5 L2 PostgreSQL 存储接口（复用现有 Protocol）
 
 **注意**: L2 不新建 Port 接口，直接复用现有：
 - `L2MetadataRepositoryProtocol` (src/domain/ports/l2_rdb.py)
@@ -849,7 +809,10 @@ from src.domain.ports.storage_enums import StorageLayer, StorageTier
 if TYPE_CHECKING:
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
-    from src.domain.ports.l2_metadata import L2RdbPort
+    from src.domain.ports.l2_rdb import (
+        L2MetadataRepositoryProtocol,
+        L2ChangeHistoryRepositoryProtocol,
+    )
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
     from src.domain.ports.l5_graph import L5GraphPort
@@ -1607,7 +1570,8 @@ class UnifiedStorageFactory:
 |-----------|-------------|------|
 | `L0StoragePort` | `FileMemoryAdapter` | ✅ 已有 |
 | `L1CachePort` | `RedisMemoryCache (async)` | ✅ 已实现（重构为 async） |
-| `L2RdbPort` | `PostgreSQLAdapter` | ✅ 已有（`PostgreSQLMemoryMetadataRepository`） |
+| `L2MetadataRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` | ✅ 已有 |
+| `L2ChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryChangeHistoryRepository` | ✅ 已有 |
 | `L3VectorPort` | `QdrantVectorAdapter` | ⚠️ 需新增（包装现有 `QdrantVectorStorage`） |
 | `L4ObjectPort` | `MinIOAdapter` | ⚠️ 需新增（包装现有 `MinIORepository`） |
 | `L5GraphPort` | `Neo4jAdapter` | ⚠️ 需新增（包装现有 `Neo4jGraphStorage`） |
@@ -1692,7 +1656,8 @@ class RedisMemoryCache:
 Domain Layer（零外部依赖）
 ├── L0StoragePort        ← abc.ABC
 ├── L1CachePort          ← abc.ABC
-├── L2RdbPort       ← abc.ABC, datetime, typing, uuid
+├── L2MetadataRepositoryProtocol ← abc.ABC, datetime, typing, uuid
+├── L2ChangeHistoryRepositoryProtocol ← abc.ABC, datetime, typing, uuid
 ├── L3VectorPort         ← abc.ABC, typing
 ├── L4ObjectPort         ← abc.ABC, typing
 ├── L5GraphPort          ← abc.ABC, typing
@@ -1703,13 +1668,15 @@ Application Layer（依赖 Domain Port）
 └── UnifiedStorageGateway
     ├── 依赖 L0StoragePort（Domain）
     ├── 依赖 L1CachePort（Domain）
-    ├── 依赖 L2RdbPort（Domain）
+    ├── 依赖 L2MetadataRepositoryProtocol（Domain）
+    ├── 依赖 L2ChangeHistoryRepositoryProtocol（Domain）
     └── 不直接依赖 Infrastructure
 
 Infrastructure Layer（实现 Domain Port）
 ├── FileMemoryAdapter    → L0StoragePort
 ├── RedisMemoryCache (async) → L1CachePort
-├── PostgreSQLAdapter    → L2RdbPort
+├── PostgreSQLMemoryMetadataRepository → L2MetadataRepositoryProtocol
+├── PostgreSQLMemoryChangeHistoryRepository → L2ChangeHistoryRepositoryProtocol
 ├── QdrantVectorAdapter  → L3VectorPort
 ├── MinIOAdapter         → L4ObjectPort
 └── Neo4jAdapter         → L5GraphPort
