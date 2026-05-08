@@ -161,8 +161,8 @@ async def pg_session(db_engine: DatabaseEngine, ensure_schema: str) -> AsyncGene
 
 
 @pytest.fixture
-def real_redis(redis_test_prefix):
-    """Provide real Redis client. Skip if not available."""
+def real_redis_sync(redis_test_prefix):
+    """Provide sync Redis client for cleanup operations. Skip if not available."""
     try:
         env = get_test_env()
         client = redis.Redis(
@@ -174,18 +174,32 @@ def real_redis(redis_test_prefix):
         )
         client.ping()
         yield client
-        # Cleanup only keys with this test's prefix
-        pattern = f"{redis_test_prefix}*"
-        keys = client.keys(pattern)
-        if keys:
-            client.delete(*keys)
     except redis.ConnectionError:
         pytest.skip("Redis not available")
 
 
 @pytest.fixture
+def real_redis(redis_test_prefix):
+    """Provide async Redis client. Skip if not available."""
+    try:
+        import redis.asyncio as aioredis
+
+        env = get_test_env()
+        client = aioredis.Redis(
+            host=env.redis.host,
+            port=env.redis.port,
+            db=env.redis.db,
+            password=env.redis.password,
+            decode_responses=True,
+        )
+        yield client
+    except Exception:
+        pytest.skip("Redis not available")
+
+
+@pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
-    """Create RedisMemoryCache with real Redis."""
+    """Create RedisMemoryCache with real async Redis."""
     return RedisMemoryCache(real_redis)
 
 
@@ -449,7 +463,7 @@ def when_memory_changed_event_processed(
     context: dict,
     listener_with_real_services,
     redis_cache,
-    real_redis,
+    real_redis_sync,
     redis_test_prefix,
     pg_session: AsyncSession,
     event_loop,
@@ -461,10 +475,10 @@ def when_memory_changed_event_processed(
     owner_id = user_id
     memory_type = "user"
 
-    # Pre-populate L1 cache (before event)
-    redis_cache.set(memory_type, owner_id, name, "cached content")
+    # Pre-populate L1 cache (before event) - async call
+    event_loop.run_until_complete(redis_cache.set(memory_type, owner_id, name, "cached content"))
     redis_key = f"memory:{memory_type}:{owner_id}:{name}"
-    assert real_redis.exists(redis_key) == 1, "Cache should be populated before listener"
+    assert real_redis_sync.exists(redis_key) == 1, "Cache should be populated before listener"
 
     # Create event
     event = MemoryChanged(
@@ -492,9 +506,9 @@ def when_memory_changed_event_processed(
 
 
 @then("L1 Redis 缓存应该被失效")
-def then_l1_cache_invalidated(context: dict, real_redis):
+def then_l1_cache_invalidated(context: dict, real_redis_sync):
     """Verify L1 Redis cache was invalidated after listener.handle()."""
-    assert real_redis.exists(context["redis_key"]) == 0, "L1 cache should be invalidated after listener.handle()"
+    assert real_redis_sync.exists(context["redis_key"]) == 0, "L1 cache should be invalidated after listener.handle()"
 
 
 @then("L2 PostgreSQL 应该写入 metadata")
@@ -786,24 +800,25 @@ def then_is_automatic_false(context: dict):
 
 
 @given("Redis 缓存已写入")
-def given_redis_cache_written(context: dict, redis_cache, real_redis, redis_test_prefix):
+def given_redis_cache_written(context: dict, redis_cache, real_redis_sync, redis_test_prefix, event_loop):
     memory_type = "user"
     owner_id = f"user-{uuid.uuid4().hex[:8]}"
     name = "test-memory"
     content = "Test content"
 
-    redis_cache.set(memory_type, owner_id, name, content)
+    # Async set
+    event_loop.run_until_complete(redis_cache.set(memory_type, owner_id, name, content))
 
     # Build key in same format as RedisMemoryCache
     key = f"memory:{memory_type}:{owner_id}:{name}"
     context["redis_key"] = key
-    context["ttl"] = real_redis.ttl(key)
+    context["ttl"] = real_redis_sync.ttl(key)
 
 
 @when("检查 Redis TTL 范围")
-def when_check_redis_ttl(context: dict, real_redis):
+def when_check_redis_ttl(context: dict, real_redis_sync):
     key = context["redis_key"]
-    context["ttl"] = real_redis.ttl(key)
+    context["ttl"] = real_redis_sync.ttl(key)
 
 
 @then("TTL 应在 24h-30d 范围内")
