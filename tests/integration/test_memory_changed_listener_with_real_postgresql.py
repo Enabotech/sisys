@@ -23,9 +23,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
-from src.application.services.six_layer_storage_coordinator import (
-    SixLayerStorageCoordinator,
-)
 from src.domain.events.memory_events import MemoryChanged
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.memory_index import MemoryIndex
@@ -169,18 +166,6 @@ def real_redis_sync(redis_test_prefix):
 
 
 @pytest.fixture
-def storage_coordinator(redis_cache) -> SixLayerStorageCoordinator:
-    """Create SixLayerStorageCoordinator with real L1 Redis."""
-    return SixLayerStorageCoordinator(
-        l1_cache=redis_cache,
-        l2_repository=None,
-        l3_vector_store=None,
-        l4_object_store=None,
-        l5_graph_store=None,
-    )
-
-
-@pytest.fixture
 def memory_index(temp_memory_dir: Path):
     """Create MemoryIndex with temp directory."""
     from src.infrastructure.config.memory import MemoryConfig
@@ -228,10 +213,10 @@ def history_repository(pg_session: AsyncSession):
 
 
 @pytest.fixture
-def listener_with_real_services(storage_coordinator, metadata_repository, history_repository, memory_index):
+def listener_with_real_services(redis_cache, metadata_repository, history_repository, memory_index):
     """Create MemoryChangedListener with REAL L1 + L2 services."""
     return MemoryChangedHandler(
-        storage_coordinator=storage_coordinator,
+        l1_cache=redis_cache,
         metadata_repository=metadata_repository,
         history_repository=history_repository,
     )
