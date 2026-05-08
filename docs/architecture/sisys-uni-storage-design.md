@@ -372,7 +372,7 @@ class MemoryChangeHistory:
     changed_fields: dict[str, Any] | None
     diff_summary: str | None
     archived_ref: str | None
-
+```
 
 ### 3.4 L2 PostgreSQL 存储接口（复用现有 Protocol）
 
@@ -397,85 +397,116 @@ class MemoryChangeHistory:
 ```python
 # src/domain/ports/l3_vector.py
 
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol
 
 
-class L3VectorPort(ABC):
-    """L3 Qdrant 向量存储接口。
+class L3VectorPort(Protocol):
+    """L3 Qdrant 向量存储端口接口。
 
     对应 architecture.md §11.1：
     - 内容 >500 tokens 时启用向量检索
     - 支持 Dense+Sparse+Payload 过滤
 
-    职责：
-    - 向量嵌入存储
-    - 相似度检索
+    设计说明：
+    - 与现有 VectorStorage Protocol 语义完全兼容
+    - embedding 生成职责归于上游服务，不耦合在此层
+    - collection 参数明确传递（由调用方管理）
+
+    与 VectorStorage Protocol 的关系：
+    - 本质上与 VectorStorage Protocol 是同一接口
+    - L3VectorPort 是分层视角的命名（强调 L3 层级）
+    - VectorStorage 是职责视角的命名（强调向量存储能力）
     """
 
-    @abstractmethod
-    async def upsert(
+    async def upsert_points(
         self,
-        memory_id: str,
-        content: str,
-        vector: list[float] | None = None,
-        metadata: dict[str, Any] | None = None,
+        collection: str,
+        points: list[Any],
     ) -> bool:
-        """插入或更新向量。
+        """批量插入或更新向量点。
 
         Args:
-            memory_id: 记忆 ID
-            content: 文本内容
-            vector: 嵌入向量，None 表示使用 content 生成
-            metadata: 元数据（memory_type, owner_id 等）
+            collection: Collection 名称
+            points: 向量点列表，每个点需包含 id, vector, payload
 
         Returns:
-            是否成功
+            操作成功返回 True
         """
-        pass
+        ...
 
-    @abstractmethod
+    async def delete_points(
+        self,
+        collection: str,
+        point_ids: list[str],
+    ) -> bool:
+        """批量删除向量点。
+
+        Args:
+            collection: Collection 名称
+            point_ids: 要删除的向量点 ID 列表
+
+        Returns:
+            删除成功返回 True
+        """
+        ...
+
+    async def get_point(
+        self,
+        collection: str,
+        point_id: str,
+    ) -> dict | None:
+        """获取单个向量点。
+
+        Args:
+            collection: Collection 名称
+            point_id: 向量点 ID
+
+        Returns:
+            向量点数据 {id, vector, payload}，不存在返回 None
+        """
+        ...
+
     async def search(
         self,
+        collection: str,
         query_vector: list[float],
         limit: int = 10,
-        filter_metadata: dict[str, Any] | None = None,
+        filter_payload: dict | None = None,
     ) -> list[dict]:
-        """向量相似度搜索。
+        """Dense 语义检索。
 
         Args:
-            query_vector: 查询向量
-            limit: 返回数量
-            filter_metadata: 元数据过滤条件
+            collection: Collection 名称
+            query_vector: 查询向量（通常由 embedding service 生成）
+            limit: 返回结果数量限制
+            filter_payload: Payload 过滤条件
 
         Returns:
-            搜索结果列表 [{memory_id, score, payload}, ...]
+            检索结果列表 [{id, score, payload}, ...]
         """
-        pass
+        ...
 
-    @abstractmethod
-    async def delete(
+    async def search_sparse(
         self,
-        memory_id: str,
-    ) -> bool:
-        """删除向量。
+        collection: str,
+        sparse_vector: Any,
+        limit: int = 10,
+        filter_payload: dict | None = None,
+    ) -> list[dict]:
+        """BM25 稀疏检索。
+
+        对应 architecture.md §11.1 "Dense+Sparse+Payload 过滤"。
+
+        Args:
+            collection: Collection 名称
+            sparse_vector: 稀疏向量
+            limit: 返回结果数量限制
+            filter_payload: Payload 过滤条件
 
         Returns:
-            是否成功
+            检索结果列表 [{id, score, payload}, ...]
         """
-        pass
-
-    @abstractmethod
-    async def get(
-        self,
-        memory_id: str,
-    ) -> dict | None:
-        """获取向量数据。
-
-        Returns:
-            向量数据 {id, vector, payload}，不存在返回 None
-        """
-        pass
+        ...
 ```
 
 ### 3.6 L4 对象存储接口
@@ -484,7 +515,7 @@ class L3VectorPort(ABC):
 # src/domain/ports/l4_object.py
 
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 
 class L4ObjectPort(ABC):
@@ -494,56 +525,62 @@ class L4ObjectPort(ABC):
     - 原始文档、证据包存储
     - Object Lock COMPLIANCE 模式 7 年 retention
 
-    职责：
-    - Checkpoint 快照归档
-    - WORM 合规存储
+    设计说明：
+    - 与 ObjectStorageRepository Protocol 语义完全兼容
+    - 使用 file_path 流式上传（防 OOM）
+    - WORM 合规存储通过 archive_with_retention 实现
     """
 
     @abstractmethod
     async def store(
         self,
-        memory_id: str,
-        content: bytes,
+        bucket_type: str,
+        object_key: str,
+        file_path: str,
         content_type: str = "application/octet-stream",
-        metadata: dict | None = None,
+        tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象。
+        """存储对象（流式，防 OOM）。
 
         Args:
-            memory_id: 记忆 ID
-            content: 对象内容
+            bucket_type: Bucket 类型（如 "raw-documents"）
+            object_key: 对象键（路径）
+            file_path: 本地文件路径
             content_type: MIME 类型
-            metadata: 元数据
+            tags: 对象标签
 
         Returns:
-            对象版本 ID 或 ETag
+            版本 ID 或 ETag
         """
         pass
 
     @abstractmethod
-    async def retrieve(
+    def retrieve(
         self,
-        memory_id: str,
+        bucket_type: str,
+        object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """检索对象。
+        """流式下载对象（防 OOM）。
 
         Args:
-            memory_id: 记忆 ID
-            version_id: 版本 ID，None 获取最新
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
 
-        Returns:
-            对象内容流
+        Yields:
+            字节流数据块
         """
         pass
 
     @abstractmethod
     async def delete(
         self,
-        memory_id: str,
+        bucket_type: str,
+        object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象（仅在 retention 到期后）。
+        """删除对象（WORM 锁定对象抛出 ComplianceLockError）。
 
         Returns:
             是否成功
@@ -553,7 +590,8 @@ class L4ObjectPort(ABC):
     @abstractmethod
     async def get_metadata(
         self,
-        memory_id: str,
+        bucket_type: str,
+        object_key: str,
         version_id: str | None = None,
     ) -> dict | None:
         """获取对象元数据。
@@ -566,19 +604,21 @@ class L4ObjectPort(ABC):
     @abstractmethod
     async def archive_with_retention(
         self,
-        memory_id: str,
-        content: bytes,
+        bucket_type: str,
+        object_key: str,
+        content: bytes | None = None,
         retention_days: int = 2555,  # 7 年
     ) -> str:
-        """归档对象（带 retention）。
+        """归档对象（带 WORM retention）。
 
         Args:
-            memory_id: 记忆 ID
-            content: 对象内容
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            content: 对象内容（bytes），None 表示只设置 retention
             retention_days: retention 天数（默认 2555 = 7 年）
 
         Returns:
-            对象 ID
+            对象 ID 或 ETag
         """
         pass
 ```
@@ -593,16 +633,16 @@ from typing import Any
 
 
 class L5GraphPort(ABC):
-    """L5 Neo4j 图存储接口。
+    """L5 Neo4j 图存储接口（高级实体语义）。
 
     对应 architecture.md §11.1：
     - 知识图谱、实体关系
     - Cypher、图遍历、Parent-Child 索引
 
-    职责：
-    - 实体节点管理
-    - 关系边管理
-    - 关联查询
+    设计说明：
+    - 本接口是高级语义层，内部委托给 GraphStorage（低级 Cypher 执行）
+    - 使用 memory_id 作为实体主键（id 属性）
+    - 保留 execute_query/execute_write_query 入口以支持灵活查询
     """
 
     @abstractmethod
@@ -612,12 +652,42 @@ class L5GraphPort(ABC):
         entity_type: str,
         properties: dict[str, Any],
     ) -> bool:
-        """创建实体节点。
+        """创建实体节点（MERGE 语义）。
 
         Args:
-            memory_id: 关联的记忆 ID
-            entity_type: 实体类型
+            memory_id: 关联的记忆 ID（主键）
+            entity_type: 实体类型（如 'project', 'reference'）
             properties: 实体属性
+
+        Returns:
+            是否成功（MERGE 语义：已存在返回 True）
+        """
+        pass
+
+    @abstractmethod
+    async def get_entity(
+        self,
+        memory_id: str,
+    ) -> dict | None:
+        """获取实体。
+
+        Args:
+            memory_id: 实体主键
+
+        Returns:
+            实体数据 {id, type, properties}，不存在返回 None
+        """
+        pass
+
+    @abstractmethod
+    async def delete_entity(
+        self,
+        memory_id: str,
+    ) -> bool:
+        """删除实体及关联边。
+
+        Args:
+            memory_id: 实体主键
 
         Returns:
             是否成功
@@ -632,12 +702,12 @@ class L5GraphPort(ABC):
         relationship_type: str,
         properties: dict[str, Any] | None = None,
     ) -> bool:
-        """创建关系边。
+        """创建关系边（MERGE 语义）。
 
         Args:
-            source_memory_id: 源记忆 ID
-            target_memory_id: 目标记忆 ID
-            relationship_type: 关系类型
+            source_memory_id: 源实体 ID
+            target_memory_id: 目标实体 ID
+            relationship_type: 关系类型（如 'DEPENDS_ON'）
             properties: 关系属性
 
         Returns:
@@ -646,14 +716,21 @@ class L5GraphPort(ABC):
         pass
 
     @abstractmethod
-    async def get_entity(
+    async def delete_relationship(
         self,
-        memory_id: str,
-    ) -> dict | None:
-        """获取实体。
+        source_memory_id: str,
+        target_memory_id: str,
+        relationship_type: str,
+    ) -> bool:
+        """删除关系边。
+
+        Args:
+            source_memory_id: 源实体 ID
+            target_memory_id: 目标实体 ID
+            relationship_type: 关系类型
 
         Returns:
-            实体数据 {type, properties}，不存在返回 None
+            是否成功
         """
         pass
 
@@ -664,11 +741,11 @@ class L5GraphPort(ABC):
         max_depth: int = 2,
         relationship_type: str | None = None,
     ) -> list[dict]:
-        """查找关联实体。
+        """查找关联实体（多跳遍历）。
 
         Args:
             memory_id: 起始实体 ID
-            max_depth: 最大遍历深度
+            max_depth: 最大遍历深度（默认 2）
             relationship_type: 过滤关系类型，None 表示所有
 
         Returns:
@@ -677,14 +754,36 @@ class L5GraphPort(ABC):
         pass
 
     @abstractmethod
-    async def delete_entity(
+    async def execute_query(
         self,
-        memory_id: str,
-    ) -> bool:
-        """删除实体及关联边。
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行只读 Cypher 查询。
+
+        Args:
+            cypher: Cypher 查询语句
+            params: 查询参数字典
 
         Returns:
-            是否成功
+            查询结果列表（字典列表）
+        """
+        pass
+
+    @abstractmethod
+    async def execute_write_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行写入 Cypher 查询。
+
+        Args:
+            cypher: Cypher 查询语句
+            params: 查询参数字典
+
+        Returns:
+            查询结果列表（字典列表）
         """
         pass
 ```
@@ -1582,15 +1681,17 @@ Infrastructure Layer（实现 Domain Port）
 - 网关提供统一的读写抽象
 - 符合 architecture.md §11.2.9 L0 驱动协同机制
 
-### ADR-002: Adapter 包装 vs 直接实现
+### ADR-002: L1/L3/L4/L5 实现策略
 
-**问题**: 现有实现（如 `RedisMemoryCache`）没有 Port 接口，如何处理？
+**问题**: 现有实现如何适配 Port 接口？
 
-**决策**: 直接重构为 async（针对 L1）
+**决策**:
+- **L1**: 直接重构为 async（一步到位，无需适配器）
+- **L3/L4/L5**: 使用 Adapter 模式包装现有实现
+
 **理由**:
-- `RedisMemoryCache` 是 L1 核心组件，使用广泛
-- 项目趋势是从 sync Redis 向 async 演进（已有 `RedisSessionStorage`、`RedisSemanticCache` 等 async 实现）
-- 一步到位重构为 async，与 L1CachePort 接口一致，无需适配器层
+- `RedisMemoryCache` 是 L1 核心组件，项目已有从 sync 向 async 演进的趋势
+- L3/L4/L5 Port 接口与现有实现存在语义差异（collection 参数、file_path vs bytes、execute_query 入口），需要适配器层做转换
 
 ### ADR-003: L1/L3/L4/L5 是否必须实现？
 
