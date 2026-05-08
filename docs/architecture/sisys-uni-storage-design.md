@@ -1124,6 +1124,17 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self._l5 = l5_graph
         self._event_publisher = event_publisher
 
+        # StoragePolicyService 用于动态决定存储层级（可选）
+        self._policy = None  # 延迟初始化，避免循环导入
+
+    @property
+    def _storage_policy(self):
+        """延迟加载 StoragePolicyService。"""
+        if self._policy is None:
+            from src.domain.services.storage_tier_strategy import StoragePolicyService
+            self._policy = StoragePolicyService()
+        return self._policy
+
     async def save(
         self,
         memory_id: str,
@@ -1131,7 +1142,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         memory_type: str,
         owner_id: str,
         name: str,
-        tier: StorageTier = StorageTier.WARM,
+        tier: StorageTier | None = None,
     ) -> dict[StorageLayer, bool]:
         """保存记忆到多层存储。
 
@@ -1149,12 +1160,22 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             memory_type: 记忆类型
             owner_id: 所有者 ID
             name: 记忆名称
-            tier: 存储层级策略
+            tier: 存储层级策略（None 表示由 StoragePolicyService 自动决定）
 
         Returns:
             各层存储结果（L0写入结果 + Outbox发布状态）
         """
         results: dict[StorageLayer, bool] = {}
+
+        # 通过 StoragePolicyService 动态决定存储层级
+        effective_tier = tier
+        if effective_tier is None:
+            decision = self._storage_policy.decide_tier(
+                access_frequency=0,  # 新记忆无历史，默认为 WARM
+                content_size=len(content.encode('utf-8')),
+                is_checkpoint=False,
+            )
+            effective_tier = decision.tier
 
         # L0 文件系统（真相源，同步写入，强一致）
         l0_success = await self._l0.write(memory_id, memory_type, content)
@@ -1717,7 +1738,9 @@ Infrastructure Layer（实现 Domain Port）
 | L0→L3 向量检索 P95 | <300ms（内容>500 tokens） | L3 可选启用 |
 | L0→L4 Checkpoint | 必须先归档再压缩（系统公理二） | `StoragePolicyService.is_checkpoint` |
 | L1 压缩率 | ≥70%（用户输入≤500字→≥150字） | 已有实现 |
-| 端到端检索 P95 | <800ms | 设计目标 |
+| L3/§17.1.5.1 压缩率 | ~96%（~50K tokens → ~2K tokens） | L1Compressor 已有实现 |
+| L5 图谱 | 可选启用（按需，实体关系提取后） | `L5GraphPort` 可选 |
+| 端到端检索 P95 | <800ms（MVP） | 设计目标 |
 
 ---
 
@@ -1766,6 +1789,9 @@ Infrastructure Layer（实现 Domain Port）
 
 ### ADR-001: 是否需要统一存储网关？
 
+**状态**: Accepted
+**日期**: 2026-05-08
+
 **问题**: 是否需要 `UnifiedStorageGateway` 还是直接使用各层存储？
 
 **决策**: 需要统一网关
@@ -1775,6 +1801,9 @@ Infrastructure Layer（实现 Domain Port）
 - 符合 architecture.md §11.2.9 L0 驱动协同机制
 
 ### ADR-002: L1/L3/L4/L5 实现策略
+
+**状态**: Accepted
+**日期**: 2026-05-08
 
 **问题**: 现有实现如何适配 Port 接口？
 
@@ -1787,6 +1816,9 @@ Infrastructure Layer（实现 Domain Port）
 - L3/L4/L5 Port 接口与现有实现存在语义差异（collection 参数、file_path vs bytes、execute_query 入口），需要适配器层做转换
 
 ### ADR-003: L1/L3/L4/L5 是否必须实现？
+
+**状态**: Accepted
+**日期**: 2026-05-08
 
 **问题**: SixLayerStorageCoordinator 中 L3-L5 是 TODO 状态，是否必须实现？
 
@@ -1826,7 +1858,10 @@ MemoryChangedListener.handle()
 
 **Phase 1.5 已纳入迁移路径**，确保与现有 Outbox 实现对齐。
 
-### ADR-005: StorageConfig 配置对象（待实现）
+### ADR-005: StorageConfig 配置对象
+
+**状态**: Proposed
+**日期**: 2026-05-08
 
 **问题**: UnifiedStorageGateway 构造函数参数过多（7个），违反业界最佳实践。
 
