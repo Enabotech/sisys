@@ -17,9 +17,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.domain.ports.l0_storage import L0StoragePort
-    from src.domain.ports.memory_repository import (
-        MemoryChangeHistoryRepositoryProtocol,
-        MemoryMetadataRepositoryProtocol,
+    from src.domain.ports.l2_rdb import (
+        L2ChangeHistoryRepositoryProtocol,
+        L2MetadataRepositoryProtocol,
     )
     from src.infrastructure.storage.minio.minio_repository import MinIORepository
     from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
@@ -51,7 +51,7 @@ class SixLayerStorageCoordinator:
         self,
         l1_cache: RedisMemoryCache,
         l0_storage: L0StoragePort | None = None,
-        l2_repository: MemoryMetadataRepositoryProtocol | MemoryChangeHistoryRepositoryProtocol | None = None,
+        l2_repository: L2MetadataRepositoryProtocol | L2ChangeHistoryRepositoryProtocol | None = None,
         l3_vector_store: QdrantVectorStorage | None = None,
         l4_object_store: MinIORepository | None = None,
         l5_graph_store: Neo4jGraphStorage | None = None,
