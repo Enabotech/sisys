@@ -15,9 +15,9 @@ import pytest
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
 from src.domain.entities.memory_metadata import MemoryMetadata
-from src.domain.ports.memory_repository import (
-    MemoryChangeHistoryRepositoryProtocol,
-    MemoryMetadataRepositoryProtocol,
+from src.domain.ports.l2_rdb import (
+    L2ChangeHistoryRepositoryProtocol,
+    L2MetadataRepositoryProtocol,
 )
 from src.domain.services.memory_service import (
     MemoryDeleteRequest,
@@ -40,7 +40,7 @@ _mock_history_store: list = []
 
 def _create_mock_metadata_repo():
     """Create a mock metadata repository with stateful behavior."""
-    mock = AsyncMock(spec=MemoryMetadataRepositoryProtocol)
+    mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
 
     async def mock_save(metadata: MemoryMetadata) -> None:
         _mock_metadata_store[str(metadata.memory_id)] = metadata
@@ -79,7 +79,7 @@ def _create_mock_metadata_repo():
 
 def _create_mock_history_repo():
     """Create a mock history repository."""
-    mock = AsyncMock(spec=MemoryChangeHistoryRepositoryProtocol)
+    mock = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
     mock.save = AsyncMock()
     mock.get_by_memory_id = AsyncMock(return_value=[])
     mock.get_by_id = AsyncMock(return_value=None)
