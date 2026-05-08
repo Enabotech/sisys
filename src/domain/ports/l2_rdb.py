@@ -1,4 +1,4 @@
-"""MemoryRepository 协议定义（领域层）。
+"""L2 关系型数据库存储端口协议定义（领域层）。
 
 依赖倒置：领域层定义接口，基础设施层实现。
 """
@@ -12,8 +12,8 @@ from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.entities.memory_metadata import MemoryMetadata
 
 
-class MemoryMetadataRepositoryProtocol(ABC):
-    """MemoryMetadata 仓储协议。
+class L2MetadataRepositoryProtocol(ABC):
+    """L2 记忆元数据仓储协议。
 
     领域层定义接口，基础设施层实现。
     MVP 阶段使用 InMemoryMemoryMetadataRepository，
@@ -92,8 +92,8 @@ class MemoryMetadataRepositoryProtocol(ABC):
         """
 
 
-class MemoryChangeHistoryRepositoryProtocol(ABC):
-    """MemoryChangeHistory 仓储协议。
+class L2ChangeHistoryRepositoryProtocol(ABC):
+    """L2 记忆变更历史仓储协议。
 
     领域层定义接口，基础设施层实现。
     """

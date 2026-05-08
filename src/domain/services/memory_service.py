@@ -6,8 +6,8 @@
 - TextExtractorService：文本提取接口
 - CompressorService：压缩接口
 - L0StoragePort：L0 文件系统存储端口（可选，用于双层存储）
-- MemoryMetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
-- MemoryChangeHistoryRepositoryProtocol：记忆变更历史仓储
+- L2MetadataRepositoryProtocol：记忆元数据仓储（使用 PostgreSQL L2 持久化）
+- L2ChangeHistoryRepositoryProtocol：记忆变更历史仓储
 - EventPublisherProtocol：事件发布接口（可选）
 
 架构来源: architecture.md §11.2.5
@@ -104,8 +104,8 @@ class MemoryService:
         self,
         text_extractor,  # TextExtractorService
         compressor,  # CompressorService
-        metadata_repository,  # MemoryMetadataRepositoryProtocol
-        history_repository,  # MemoryChangeHistoryRepositoryProtocol
+        metadata_repository,  # L2MetadataRepositoryProtocol
+        history_repository,  # L2ChangeHistoryRepositoryProtocol
         l0_storage=None,  # L0StoragePort | None
         event_publisher=None,  # EventPublisherProtocol | None
     ):
