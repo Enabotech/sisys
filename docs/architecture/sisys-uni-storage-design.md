@@ -1064,9 +1064,13 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     ) -> str | None:
         """读取记忆。
 
-        读取策略：
-        - prefer_cache=True: L1 → L0（缓存优先）
-        - prefer_cache=False: L0（直接读取真相源）
+        对应 architecture.md §11.2.9 检索流程：
+        - prefer_cache=True: L1 → L2 (RBAC校验) → L0（缓存优先）
+        - prefer_cache=False: L2 (RBAC校验) → L0（直接读取持久层）
+
+        读取策略（来自 architecture.md §11.2.9）：
+        - L2 PostgreSQL（RBAC 校验）用于权限检查，过滤无权限记忆
+        - L0 文件系统是真相源，最终以 L0 为准
 
         Args:
             memory_id: 记忆 ID
@@ -1078,17 +1082,34 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         Returns:
             记忆内容，不存在返回 None
         """
-        # L1 缓存查找
+        # L1 缓存查找（可选加速）
         if prefer_cache:
             content = await self._l1.get(memory_type, owner_id, name)
             if content is not None:
-                return content
+                # 缓存命中后仍需 L0 校验（系统公理二：L0 是真相源）
+                l0_content = await self._l0.read(memory_id, memory_type)
+                if l0_content is not None:
+                    return l0_content
+                # L0 不存在则返回缓存（旧数据，可接受）
+
+        # L2 PostgreSQL（RBAC 校验）
+        metadata = await self._l2_meta.get_by_id(memory_id)
+        if metadata is None:
+            return None  # 记忆不存在或无权限
+
+        # 检查权限
+        if metadata.owner != owner_id and (metadata.group_id is None or metadata.type != memory_type):
+            return None  # 无权限访问
 
         # L0 文件系统查找（真相源）
         content = await self._l0.read(memory_id, memory_type)
-        if content is not None and prefer_cache:
-            # 回填 L1 缓存
+        if content is None:
+            return None
+
+        # 回填 L1 缓存（可选）
+        if prefer_cache:
             await self._l1.set(memory_type, owner_id, name, content)
+
         return content
 
     async def delete(
@@ -1589,8 +1610,10 @@ Infrastructure Layer（实现 Domain Port）
 |--------|------|------|------|
 | **P0** | ~~L2RdbPort 缺少 `get_content()` 方法，与 `read()` 逻辑矛盾~~ | §3.4 | ✅ 已修复：直接复用现有 Protocol |
 | **P0** | ~~save() 直接调用 L1/L2/L3，违反 §11.2.9 事件驱动架构~~ | §4.1 | ✅ 已修复：save() 只写 L0 + 发布 Outbox |
+| **P0** | ~~read() 遗漏 L2 RBAC 校验和 L0 真相源校验~~ | §4.1 | ✅ 已修复：read() 实现 L1→L2→L0 完整流程 |
 | **P1** | `RedisMemoryCache` 是 sync 实现，与 async Port 不兼容 | §3.3 / §5.1 | 决策：一步到位重构为 async |
 | **P1** | `UnifiedStorageGateway` 构造函数参数过多（6+2） | §4.1 | 待修复：使用 `StorageConfig` 配置对象 |
+| **P1** | L3/L4/L5 Port 接口与实际实现语义不兼容 | §3.5-3.7 | 待修复：重新设计接口适配现有实现 |
 | **P2** | `StoragePolicyService` 阈值硬编码 | §4.2 | 待修复：支持配置注入 |
 | **P2** | ~~L2RdbPort 与现有 `MemoryMetadataRepositoryProtocol` 重复~~ | §3.4 | ✅ 已修复：直接使用现有 Protocol |
 
@@ -1621,7 +1644,12 @@ Infrastructure Layer（实现 Domain Port）
 - 直接复用现有 `MemoryMetadataRepositoryProtocol` + `MemoryChangeHistoryRepositoryProtocol`
 - UnifiedStorageGateway 构造函数使用这两个 Protocol
 
+**3. read() 完整流程修复**
+- 修改前：只实现 L1 → L0 二层读取
+- 修改后：实现 L1 → L2(RBAC校验) → L0 完整流程
+- 增加 L0 真相源校验（缓存命中后仍需 L0 校验）
+
 ---
 
-**文档状态**: 设计完成（第一轮审查修复）
-**下一步**: Phase 1 实现（定义 Port 接口 + 事件驱动改造）
+**文档状态**: 第二轮审查修复完成
+**下一步**: Phase 1 实现（定义 Port 接口 + 事件驱动改造 + L3/L4/L5 接口重新设计）
