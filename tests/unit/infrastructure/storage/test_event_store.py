@@ -94,6 +94,49 @@ class TestEventStoreModel:
         assert "aggregate_id" in sql
         assert "payload" in sql
 
+    def test_init_stores_all_fields(self):
+        """EventStoreModel.__init__ should store all fields (lines 52-60)."""
+        timestamp = datetime.now(UTC)
+        model = EventStoreModel(
+            event_id="evt-123",
+            aggregate_id="agg-456",
+            aggregate_type="Document",
+            version=1,
+            event_type="DocumentProcessed",
+            payload={"key": "value"},
+            timestamp=timestamp,
+            metadata={"meta": "data"},
+            id=999,
+        )
+        assert model.id == 999
+        assert model.event_id == "evt-123"
+        assert model.aggregate_id == "agg-456"
+        assert model.aggregate_type == "Document"
+        assert model.version == 1
+        assert model.event_type == "DocumentProcessed"
+        assert model.payload == {"key": "value"}
+        assert model.timestamp == timestamp
+        assert model.metadata == {"meta": "data"}
+
+    def test_init_with_defaults(self):
+        """EventStoreModel.__init__ with minimal args uses defaults."""
+        timestamp = datetime.now(UTC)
+        model = EventStoreModel(
+            event_id="evt-789",
+            aggregate_id="agg-abc",
+            aggregate_type="Agent",
+            version=2,
+            event_type="AgentDecided",
+            payload={},
+            timestamp=timestamp,
+        )
+        assert model.id is None
+        assert model.metadata is None
+
+    def test_tablename_constant(self):
+        """EventStoreModel.__tablename__ should equal EVENT_STORE_TABLE."""
+        assert EventStoreModel.__tablename__ == EVENT_STORE_TABLE
+
 
 class TestPostgreSQLEventStore:
     """PostgreSQLEventStore tests."""
