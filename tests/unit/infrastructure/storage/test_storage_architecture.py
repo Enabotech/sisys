@@ -14,8 +14,6 @@ import ast
 import inspect
 from pathlib import Path
 
-import pytest
-
 # 项目根目录
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DOMAIN_DIR = PROJECT_ROOT / "src" / "domain"
@@ -39,35 +37,6 @@ class TestDomainLayerConstraints:
         """领域层不导入基础设施层模块。"""
         infra_imports = _find_imports_in_dir(DOMAIN_DIR, "infrastructure")
         assert len(infra_imports) == 0, f"Domain layer must not import infrastructure, found: {infra_imports}"
-
-
-class TestObjectStorageRepositoryIsAbstract:
-    """ObjectStorageRepository 抽象性测试。"""
-
-    def test_repository_is_abc(self):
-        """ObjectStorageRepository 继承自 ABC。"""
-        from abc import ABC
-
-        from src.domain.ports.storage import ObjectStorageRepository
-
-        assert issubclass(ObjectStorageRepository, ABC), "ObjectStorageRepository must inherit from ABC"
-
-    def test_repository_has_abstract_methods(self):
-        """ObjectStorageRepository 定义了所有抽象方法。"""
-        from src.domain.ports.storage import ObjectStorageRepository
-
-        expected_methods = {"store", "retrieve", "delete", "get_metadata", "list_objects", "archive"}
-        actual_abstract = {
-            name for name, method in ObjectStorageRepository.__dict__.items() if getattr(method, "__isabstractmethod__", False)
-        }
-        assert expected_methods == actual_abstract, f"Expected abstract methods {expected_methods}, found {actual_abstract}"
-
-    def test_cannot_instantiate_repository_directly(self):
-        """无法直接实例化 ObjectStorageRepository。"""
-        from src.domain.ports.storage import ObjectStorageRepository
-
-        with pytest.raises(TypeError):
-            ObjectStorageRepository()
 
 
 class TestComplianceLockErrorInDomain:

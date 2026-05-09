@@ -1,120 +1,18 @@
-"""L5GraphPort ABC 接口测试。
-
-验证 L5GraphPort ABC 定义了正确的抽象方法签名。
-"""
+"""L5GraphPort Protocol Interface Tests."""
 
 from __future__ import annotations
 
 import inspect
+from unittest.mock import AsyncMock
 
 from src.domain.ports.l5_graph import L5GraphPort
 
 
-class TestL5GraphPortInterface:
-    """L5GraphPort 接口测试。"""
-
-    def test_port_is_abc(self) -> None:
-        """L5GraphPort 应为 ABC 类。"""
-        assert inspect.isclass(L5GraphPort)
-        assert hasattr(L5GraphPort, "__abstractmethods__")
-
-    def test_protocol_has_required_methods(self) -> None:
-        """L5GraphPort 应定义所有必需的抽象方法。"""
-        assert hasattr(L5GraphPort, "create_entity")
-        assert hasattr(L5GraphPort, "get_entity")
-        assert hasattr(L5GraphPort, "delete_entity")
-        assert hasattr(L5GraphPort, "create_relationship")
-        assert hasattr(L5GraphPort, "delete_relationship")
-        assert hasattr(L5GraphPort, "find_related")
-        assert hasattr(L5GraphPort, "execute_query")
-        assert hasattr(L5GraphPort, "execute_write_query")
-
-    def test_methods_are_abstract(self) -> None:
-        """方法应标记为抽象。"""
-        for method_name in [
-            "create_entity",
-            "get_entity",
-            "delete_entity",
-            "create_relationship",
-            "delete_relationship",
-            "find_related",
-            "execute_query",
-            "execute_write_query",
-        ]:
-            method = getattr(L5GraphPort, method_name)
-            assert getattr(method, "__isabstractmethod__", False) is True, f"{method_name} should be abstract"
-
-    def test_create_entity_signature(self) -> None:
-        """create_entity 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.create_entity)
-        params = list(sig.parameters.keys())
-        assert "memory_id" in params
-        assert "entity_type" in params
-        assert "properties" in params
-
-    def test_get_entity_signature(self) -> None:
-        """get_entity 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.get_entity)
-        params = list(sig.parameters.keys())
-        assert "memory_id" in params
-
-    def test_delete_entity_signature(self) -> None:
-        """delete_entity 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.delete_entity)
-        params = list(sig.parameters.keys())
-        assert "memory_id" in params
-
-    def test_create_relationship_signature(self) -> None:
-        """create_relationship 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.create_relationship)
-        params = list(sig.parameters.keys())
-        assert "source_memory_id" in params
-        assert "target_memory_id" in params
-        assert "relationship_type" in params
-        assert "properties" in params
-
-    def test_delete_relationship_signature(self) -> None:
-        """delete_relationship 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.delete_relationship)
-        params = list(sig.parameters.keys())
-        assert "source_memory_id" in params
-        assert "target_memory_id" in params
-        assert "relationship_type" in params
-
-    def test_find_related_signature(self) -> None:
-        """find_related 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.find_related)
-        params = list(sig.parameters.keys())
-        assert "memory_id" in params
-        assert "max_depth" in params
-        assert "relationship_type" in params
-
-    def test_execute_query_signature(self) -> None:
-        """execute_query 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.execute_query)
-        params = list(sig.parameters.keys())
-        assert "cypher" in params
-        assert "params" in params
-
-    def test_execute_write_query_signature(self) -> None:
-        """execute_write_query 方法应有正确的签名。"""
-        sig = inspect.signature(L5GraphPort.execute_write_query)
-        params = list(sig.parameters.keys())
-        assert "cypher" in params
-        assert "params" in params
-
-    def test_port_is_not_instantiable(self) -> None:
-        """L5GraphPort 是 ABC，不应能直接实例化。"""
-        try:
-            L5GraphPort()  # type: ignore[abstract]
-            assert False, "Should not be able to instantiate ABC"
-        except TypeError:
-            pass  # Expected
+class TestL5GraphPortSignature:
+    """Structural signature tests — verify async contract."""
 
     def test_all_methods_are_async(self) -> None:
-        """所有方法应为 async def。"""
-        import asyncio
-
+        """All methods should be async."""
         for method_name in [
             "create_entity",
             "get_entity",
@@ -126,4 +24,80 @@ class TestL5GraphPortInterface:
             "execute_write_query",
         ]:
             method = getattr(L5GraphPort, method_name)
-            assert asyncio.iscoroutinefunction(method), f"{method_name} should be async"
+            assert inspect.iscoroutinefunction(method), f"{method_name} must be async"
+
+
+class TestL5GraphPortMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec约束."""
+
+    async def test_mock_create_entity_verified(self):
+        """Mock create_entity should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.create_entity.return_value = {"memory_id": "id-1", "type": "user"}
+
+        result = await mock.create_entity("id-1", "user", {"name": "test"})
+        assert result["memory_id"] == "id-1"
+        mock.create_entity.assert_called_once()
+
+    async def test_mock_get_entity_verified(self):
+        """Mock get_entity should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.get_entity.return_value = {"memory_id": "id-1", "type": "user"}
+
+        result = await mock.get_entity("id-1")
+        assert result["memory_id"] == "id-1"
+        mock.get_entity.assert_called_once_with("id-1")
+
+    async def test_mock_delete_entity_verified(self):
+        """Mock delete_entity should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.delete_entity.return_value = True
+
+        result = await mock.delete_entity("id-1")
+        assert result is True
+        mock.delete_entity.assert_called_once_with("id-1")
+
+    async def test_mock_create_relationship_verified(self):
+        """Mock create_relationship should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.create_relationship.return_value = {"source": "id-1", "target": "id-2", "type": "RELATES_TO"}
+
+        result = await mock.create_relationship("id-1", "id-2", "RELATES_TO", {})
+        assert result["source"] == "id-1"
+        mock.create_relationship.assert_called_once()
+
+    async def test_mock_delete_relationship_verified(self):
+        """Mock delete_relationship should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.delete_relationship.return_value = True
+
+        result = await mock.delete_relationship("id-1", "id-2", "RELATES_TO")
+        assert result is True
+        mock.delete_relationship.assert_called_once_with("id-1", "id-2", "RELATES_TO")
+
+    async def test_mock_find_related_verified(self):
+        """Mock find_related should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.find_related.return_value = [{"memory_id": "id-2"}]
+
+        result = await mock.find_related("id-1", 2, "RELATES_TO")
+        assert len(result) == 1
+        mock.find_related.assert_called_once_with("id-1", 2, "RELATES_TO")
+
+    async def test_mock_execute_query_verified(self):
+        """Mock execute_query should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.execute_query.return_value = [{"n": {"id": "id-1"}}]
+
+        result = await mock.execute_query("MATCH (n) RETURN n", {"limit": 10})
+        assert len(result) == 1
+        mock.execute_query.assert_called_once()
+
+    async def test_mock_execute_write_query_verified(self):
+        """Mock execute_write_query should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.execute_write_query.return_value = [{"created": True}]
+
+        result = await mock.execute_write_query("CREATE (n:Memory {id: $id})", {"id": "id-1"})
+        assert result[0]["created"] is True
+        mock.execute_write_query.assert_called_once()

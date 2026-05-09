@@ -19,9 +19,20 @@ from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutb
 class TestOutboxRepositoryInterface:
     """验证 PostgreSQLOutboxRepository 实现领域层接口。"""
 
-    def test_is_subclass_of_domain_interface(self):
-        """PostgreSQLOutboxRepository 应继承自 OutboxRepository。"""
-        assert issubclass(PostgreSQLOutboxRepository, OutboxRepository)
+    def test_outbox_repository_has_required_methods(self):
+        """PostgreSQLOutboxRepository should have OutboxRepository methods."""
+        for method_name in (
+            "save",
+            "get_unpublished",
+            "async_get_unpublished",
+            "mark_published",
+            "async_mark_published",
+            "mark_failed",
+            "async_mark_failed",
+        ):
+            assert hasattr(PostgreSQLOutboxRepository, method_name), (
+                f"PostgreSQLOutboxRepository must have {method_name} method"
+            )
 
     def test_save_method_exists(self):
         """save 方法必须存在。"""
