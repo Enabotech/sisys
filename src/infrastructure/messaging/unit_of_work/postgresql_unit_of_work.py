@@ -7,15 +7,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Self
 
+from src.domain.ports.unit_of_work import UnitOfWork
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class PostgreSQLUnitOfWork:
+class PostgreSQLUnitOfWork(UnitOfWork):
     """PostgreSQL 工作单元实现。
 
     使用 SQLAlchemy AsyncSession 管理事务。
-    实现领域层 UnitOfWork 接口（通过 TYPE_CHECKING 避免循环依赖）。
+    实现领域层 UnitOfWork 接口。
     """
 
     def __init__(self, session: AsyncSession) -> None:
