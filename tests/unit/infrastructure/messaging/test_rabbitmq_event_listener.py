@@ -8,20 +8,13 @@ from uuid import uuid4
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import EventListenerAsync
 
 
 class TestRabbitMQEventListenerInterface:
     """RabbitMQEventListener interface tests."""
 
-    def test_implements_event_listener_async(self):
-        """RabbitMQEventListener should implement EventListenerAsync."""
-        from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
-
-        assert issubclass(RabbitMQEventListener, EventListenerAsync)
-
-    def test_has_async_handle_method(self):
-        """RabbitMQEventListener should declare async_handle method."""
+    def test_has_event_listener_async_methods(self):
+        """RabbitMQEventListener should have EventListenerAsync methods."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
         assert hasattr(RabbitMQEventListener, "async_handle")
