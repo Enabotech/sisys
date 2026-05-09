@@ -39,7 +39,6 @@ from src.domain.ports.l0_storage import L0StoragePort
 from src.infrastructure.config.memory import MemoryConfig
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.config.qdrant import QdrantConfig
 from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
@@ -217,15 +216,15 @@ def qdrant_adapter():
         from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
-        config = QdrantConfig.from_env()
+        env = get_test_env()
         client = QdrantClientWrapper(
-            host=config.host,
-            port=config.port,
-            grpc_port=config.grpc_port,
-            api_key=config.api_key,
-            https=config.https,
-            timeout=config.timeout,
-            max_retries=config.max_retries,
+            host=env.qdrant.host,
+            port=env.qdrant.port,
+            grpc_port=env.qdrant.grpc_port,
+            api_key=env.qdrant.api_key,
+            https=env.qdrant.https,
+            timeout=env.qdrant.timeout,
+            max_retries=3,
         )
         storage = QdrantVectorStorage(client)
         return QdrantVectorAdapter(storage)
@@ -240,15 +239,15 @@ def qdrant_collection_manager():
         from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-        config = QdrantConfig.from_env()
+        env = get_test_env()
         client = QdrantClientWrapper(
-            host=config.host,
-            port=config.port,
-            grpc_port=config.grpc_port,
-            api_key=config.api_key,
-            https=config.https,
-            timeout=config.timeout,
-            max_retries=config.max_retries,
+            host=env.qdrant.host,
+            port=env.qdrant.port,
+            grpc_port=env.qdrant.grpc_port,
+            api_key=env.qdrant.api_key,
+            https=env.qdrant.https,
+            timeout=env.qdrant.timeout,
+            max_retries=3,
         )
         return QdrantCollectionManager(client)
     except Exception:
