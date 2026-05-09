@@ -7,6 +7,7 @@ Suitable for testing and MVP; replace with PostgreSQL for production.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
@@ -27,7 +28,7 @@ class InMemoryEventStore(EventStore):
         """Initialize the event store with empty storage."""
         self._events_by_aggregate: dict[UUID, list[DomainEvent]] = defaultdict(list)
 
-    def save_events(self, events: list[DomainEvent]) -> None:
+    def save_events(self, events: Sequence[DomainEvent]) -> None:
         """Persist a list of domain events to memory.
 
         Events are appended to the aggregate's event list in order.
