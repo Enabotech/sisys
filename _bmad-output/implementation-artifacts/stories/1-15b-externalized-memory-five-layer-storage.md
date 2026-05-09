@@ -928,7 +928,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 |--------|-----|
 | **Story ID** | 1.15b |
 | **Story Key** | 1-15b-externalized-memory-five-layer-storage |
-| **File** | `_bmad-output/implementation-artifacts/stories/1-15b-externalized-memory-five-layer-storage.md` |
+| **File** | `_bmad-output/implementation-artifacts/stories/1-15b-externalized-memory-six-layer-storage.md` |
 | **Status** | `backlog` → `ready-for-dev` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 5: or.md 系统公理实现 |

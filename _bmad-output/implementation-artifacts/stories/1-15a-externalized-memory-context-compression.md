@@ -973,7 +973,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | [SDD+TDD 实施检查清单](./sdd-tdd-checklist.md) | 实施步骤检查 |
 | [or.md 系统公理二](../planning-artifacts/or.md) | 系统公理定义 |
 | [Story 1.14c: 自主调用循环 - execute](./1-14c-autonomous-invocation-execute.md) | 前置 Story |
-| [Story 1.15b: 外部化记忆 - L0 入口](./1-15b-externalized-memory-five-layer-storage.md) | 后续 Story（待创建） |
+| [Story 1.15b: 外部化记忆 - L0 入口](./1-15b-externalized-memory-six-layer-storage.md) | 后续 Story（待创建） |
 | [Story 6.3: Checkpoint 快照创建](../planning-artifacts/) | L3 压缩触发 Story（待创建） |
 
 ---
