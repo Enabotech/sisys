@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
 
@@ -29,14 +28,13 @@ class GraphRelationship(Protocol):
     created_at: Any
 
 
-class GraphManager(ABC):
+class GraphManager(Protocol):
     """图管理器接口（领域层）。
 
     提供低级别图操作（节点/关系的 CRUD）。
     使用者：应用层用例，直接操作图谱。
     """
 
-    @abstractmethod
     async def create_node(self, node: Any) -> bool:
         """创建节点。
 
@@ -47,7 +45,6 @@ class GraphManager(ABC):
             创建成功返回 True，已存在返回 False（MERGE 语义）
         """
 
-    @abstractmethod
     async def delete_node(self, node_id: str) -> bool:
         """删除节点。
 
@@ -58,7 +55,6 @@ class GraphManager(ABC):
             删除成功返回 True，不存在返回 False
         """
 
-    @abstractmethod
     async def get_node(self, node_id: str) -> Any | None:
         """获取节点。
 
@@ -69,7 +65,6 @@ class GraphManager(ABC):
             图节点对象，不存在返回 None
         """
 
-    @abstractmethod
     async def create_relationship(self, relationship: Any) -> bool:
         """创建关系。
 
@@ -80,7 +75,6 @@ class GraphManager(ABC):
             创建成功返回 True
         """
 
-    @abstractmethod
     async def delete_relationship(self, start_node_id: str, end_node_id: str, relationship_type: str) -> bool:
         """删除关系。
 
@@ -94,14 +88,13 @@ class GraphManager(ABC):
         """
 
 
-class GraphStorage(ABC):
+class GraphStorage(Protocol):
     """图存储接口（领域层）。
 
     提供高级别图查询（Cypher 执行、图遍历、检索）。
     使用者：应用层用例，执行复杂查询。
     """
 
-    @abstractmethod
     async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
         """执行只读 Cypher 查询。
 
@@ -113,7 +106,6 @@ class GraphStorage(ABC):
             查询结果列表（字典列表）
         """
 
-    @abstractmethod
     async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
         """执行写入 Cypher 查询。
 
@@ -125,7 +117,6 @@ class GraphStorage(ABC):
             查询结果列表（字典列表）
         """
 
-    @abstractmethod
     async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]:
         """查找两个节点之间的路径。
 
@@ -138,7 +129,6 @@ class GraphStorage(ABC):
             路径列表（每个路径包含节点和关系）
         """
 
-    @abstractmethod
     async def get_neighbors(
         self,
         node_id: str,
