@@ -297,21 +297,21 @@ def minio_adapter():
 def neo4j_adapter():
     """L5 Neo4j adapter."""
     try:
-        import os
-
         from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
+        env = get_test_env()
         wrapper = Neo4jClientWrapper(
-            uri=f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_BOLT_PORT', '7687')}",
-            username=os.getenv("NEO4J_USERNAME", "neo4j"),
-            password=os.getenv("NEO4J_PASSWORD", "password123"),
-            database=os.getenv("NEO4J_DATABASE", "neo4j"),
+            uri=f"bolt://{env.neo4j.host}:{env.neo4j.bolt_port}",
+            username=env.neo4j.username,
+            password=env.neo4j.password,
+            database=env.neo4j.database,
         )
         storage = Neo4jGraphStorage(wrapper)
         return Neo4jAdapter(storage)
     except Exception:
-        pytest.skip("Neo4j not available")
+        env = get_test_env()
+        pytest.skip(f"Neo4j not available at {env.neo4j.host}:{env.neo4j.bolt_port}")
 
 
 @pytest.fixture
