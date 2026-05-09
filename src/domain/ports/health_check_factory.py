@@ -11,23 +11,21 @@ Application 层通过此接口创建健康检查 Adapter，不直接引用 Infra
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 from src.domain.ports.health_check import HealthCheckPort
 
 
-class HealthCheckerFactory(ABC):
+class HealthCheckerFactory(Protocol):
     """HealthCheckPort 创建工厂接口。
 
     Application 层通过此接口获取 HealthCheckPort 实例，
     具体实现由 Infrastructure 层提供。
     """
 
-    @abstractmethod
     def create(self) -> HealthCheckPort:
         """创建 HealthCheckPort 实例。
 
         Returns:
             HealthCheckPort 实现实例。
         """
-        pass

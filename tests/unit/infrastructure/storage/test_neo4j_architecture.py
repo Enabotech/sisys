@@ -12,8 +12,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
 # 项目根目录
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DOMAIN_DIR = PROJECT_ROOT / "src" / "domain"
@@ -35,61 +33,45 @@ class TestDomainLayerConstraints:
 
 
 class TestGraphManagerInterface:
-    """GraphManager 接口测试。"""
+    """GraphManager 接口测试 — Protocol 契约验证。"""
 
-    def test_graph_manager_is_abstract(self):
-        """GraphManager 继承自 ABC。"""
-        from abc import ABC
+    def test_graph_manager_has_required_methods(self):
+        """GraphManager 应有所需方法。"""
+        from src.domain.ports.graph_storage import GraphManager
+
+        for method_name in ("create_node", "delete_node", "get_node", "create_relationship", "delete_relationship"):
+            assert hasattr(GraphManager, method_name), f"GraphManager must have {method_name}"
+
+    def test_all_methods_are_async(self):
+        """GraphManager 所有方法应为 async。"""
+        import inspect
 
         from src.domain.ports.graph_storage import GraphManager
 
-        assert issubclass(GraphManager, ABC), "GraphManager must inherit from ABC"
-
-    def test_graph_manager_has_abstract_methods(self):
-        """GraphManager 定义了所有抽象方法。"""
-        from src.domain.ports.graph_storage import GraphManager
-
-        expected_methods = {"create_node", "delete_node", "get_node", "create_relationship", "delete_relationship"}
-        actual_abstract = {
-            name for name, method in GraphManager.__dict__.items() if getattr(method, "__isabstractmethod__", False)
-        }
-        assert expected_methods == actual_abstract, f"Expected abstract methods {expected_methods}, found {actual_abstract}"
-
-    def test_cannot_instantiate_graph_manager(self):
-        """无法直接实例化 GraphManager。"""
-        from src.domain.ports.graph_storage import GraphManager
-
-        with pytest.raises(TypeError):
-            GraphManager()
+        for method_name in ("create_node", "delete_node", "get_node", "create_relationship", "delete_relationship"):
+            method = getattr(GraphManager, method_name)
+            assert inspect.iscoroutinefunction(method), f"{method_name} must be async"
 
 
 class TestGraphStorageInterface:
-    """GraphStorage 接口测试。"""
+    """GraphStorage 接口测试 — Protocol 契约验证。"""
 
-    def test_graph_storage_is_abstract(self):
-        """GraphStorage 继承自 ABC。"""
-        from abc import ABC
+    def test_graph_storage_has_required_methods(self):
+        """GraphStorage 应有所需方法。"""
+        from src.domain.ports.graph_storage import GraphStorage
+
+        for method_name in ("execute_query", "execute_write_query", "find_path", "get_neighbors"):
+            assert hasattr(GraphStorage, method_name), f"GraphStorage must have {method_name}"
+
+    def test_all_methods_are_async(self):
+        """GraphStorage 所有方法应为 async。"""
+        import inspect
 
         from src.domain.ports.graph_storage import GraphStorage
 
-        assert issubclass(GraphStorage, ABC), "GraphStorage must inherit from ABC"
-
-    def test_graph_storage_has_abstract_methods(self):
-        """GraphStorage 定义了所有抽象方法。"""
-        from src.domain.ports.graph_storage import GraphStorage
-
-        expected_methods = {"execute_query", "execute_write_query", "find_path", "get_neighbors"}
-        actual_abstract = {
-            name for name, method in GraphStorage.__dict__.items() if getattr(method, "__isabstractmethod__", False)
-        }
-        assert expected_methods == actual_abstract, f"Expected abstract methods {expected_methods}, found {actual_abstract}"
-
-    def test_cannot_instantiate_graph_storage(self):
-        """无法直接实例化 GraphStorage。"""
-        from src.domain.ports.graph_storage import GraphStorage
-
-        with pytest.raises(TypeError):
-            GraphStorage()
+        for method_name in ("execute_query", "execute_write_query", "find_path", "get_neighbors"):
+            method = getattr(GraphStorage, method_name)
+            assert inspect.iscoroutinefunction(method), f"{method_name} must be async"
 
 
 class TestInfrastructureImplementsInterface:

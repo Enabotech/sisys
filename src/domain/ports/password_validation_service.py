@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
 class PasswordValidationError(Exception):
@@ -18,7 +18,7 @@ class PasswordValidationError(Exception):
         super().__init__(message)
 
 
-class PasswordValidationServicePort(ABC):
+class PasswordValidationServicePort(Protocol):
     """密码验证服务端口（领域层定义，仅使用 ABC + 标准库）
 
     负责密码复杂度验证，满足等保 2.0 三级要求：
@@ -28,7 +28,6 @@ class PasswordValidationServicePort(ABC):
     - 包含特殊字符
     """
 
-    @abstractmethod
     def validate(self, password: str) -> None:
         """验证密码复杂度。
 
@@ -40,7 +39,6 @@ class PasswordValidationServicePort(ABC):
         """
         ...
 
-    @abstractmethod
     def get_requirements(self) -> dict[str, str]:
         """获取密码复杂度要求描述。
 
