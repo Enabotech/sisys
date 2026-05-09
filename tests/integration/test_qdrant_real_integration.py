@@ -24,6 +24,7 @@ import pytest
 from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
+from tests.environments import get_test_env
 
 pytestmark = pytest.mark.asyncio
 
@@ -42,17 +43,15 @@ async def test_tenant_id() -> str:
 @pytest.fixture
 async def qdrant_client():
     """Provide a real Qdrant client connection."""
-    from src.infrastructure.config.qdrant import QdrantConfig
-
-    config = QdrantConfig.from_env()
+    env = get_test_env()
     wrapper = QdrantClientWrapper(
-        host=config.host,
-        port=config.port,
-        grpc_port=config.grpc_port,
-        api_key=config.api_key,
-        https=config.https,
-        timeout=config.timeout,
-        max_retries=config.max_retries,
+        host=env.qdrant.host,
+        port=env.qdrant.port,
+        grpc_port=env.qdrant.grpc_port,
+        api_key=env.qdrant.api_key,
+        https=env.qdrant.https,
+        timeout=env.qdrant.timeout,
+        max_retries=3,
     )
 
     # Verify connection

@@ -12,7 +12,6 @@ Run with: pytest tests/integration/test_memory_changed_listener_with_real_postgr
 
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -50,12 +49,13 @@ def test_schema() -> str:
 @pytest.fixture
 def pg_config() -> PostgreSQLConfig:
     """Real PostgreSQL configuration from environment."""
+    env = get_test_env()
     return PostgreSQLConfig(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DATABASE", "sisys"),
-        username=os.getenv("POSTGRES_USERNAME", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=env.postgres.host,
+        port=env.postgres.port,
+        database=env.postgres.database,
+        username=env.postgres.username,
+        password=env.postgres.password,
         pool_size=5,
         max_overflow=10,
     )
