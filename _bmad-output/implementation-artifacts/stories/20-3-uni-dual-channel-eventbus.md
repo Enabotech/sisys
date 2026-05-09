@@ -12,7 +12,7 @@
 
 **As a** 系统架构师,
 **I want** 实现统一双通道事件总线架构,
-**So that** 基于 `docs/architecture/UNI-DUAL-CHANNEL-EVENTBUS-DESIGN.md` v2.5 架构设计，实现 Redis REALTIME + RabbitMQ RELIABLE 双通道事件发布订阅机制，满足 Story 1.3 AC-3 约束。
+**So that** 基于 `docs/architecture/sisys-uni-dual-channel-eventbus-design.md` v2.5 架构设计，实现 Redis REALTIME + RabbitMQ RELIABLE 双通道事件发布订阅机制，满足 Story 1.3 AC-3 约束。
 
 ### 业务价值
 
@@ -178,7 +178,7 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 **Task 0 完成标志：**
-- [ ] 确认 `docs/architecture/UNI-DUAL-CHANNEL-EVENTBUS-DESIGN.md` v2.5 作为唯一规范来源
+- [ ] 确认 `docs/architecture/sisys-uni-dual-channel-eventbus-design.md` v2.5 作为唯一规范来源
 
 ---
 
@@ -522,7 +522,7 @@
 
 ## 📚 参考资料
 
-- [Source: docs/architecture/UNI-DUAL-CHANNEL-EVENTBUS-DESIGN.md] — v2.5 架构设计文档
+- [Source: docs/architecture/sisys-uni-dual-channel-eventbus-design.md] — v2.5 架构设计文档
 - [Source: src/domain/repositories/outbox.py] — OutboxRepository 接口
 - [Source: src/domain/events/publisher.py] — 旧 EventPublisher 接口（待替代）
 - [Source: src/infrastructure/messaging/outbox/outbox_processor.py] — AsyncOutboxPoller
@@ -552,7 +552,7 @@
 | **架构文档** | `_bmad-output/planning-artifacts/architecture.md` |
 | **前一个 Story** | `_bmad-output/implementation-artifacts/stories/20-2-event-messaging-refactor.md` |
 | **Sprint 状态** | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
-| **事件总线架构** | `docs/architecture/UNI-DUAL-CHANNEL-EVENTBUS-DESIGN.md` |
+| **事件总线架构** | `docs/architecture/sisys-uni-dual-channel-eventbus-design.md` |
 
 ### 完成清单 Completion Notes List
 
