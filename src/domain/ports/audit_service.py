@@ -6,10 +6,9 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 
@@ -33,14 +32,13 @@ class AuditRecord:
     correction_level: int | None = None
 
 
-class AuditServicePort(ABC):
+class AuditServicePort(Protocol):
     """审计服务端口（领域层定义，仅使用 ABC + 标准库）.
 
     定义审计日志记录、检索、完整性验证的接口。
     实现类位于 infrastructure 层（可导入外部库）。
     """
 
-    @abstractmethod
     async def record(
         self,
         actor: str,
@@ -66,9 +64,7 @@ class AuditServicePort(ABC):
         Raises:
             AuditError: 记录失败时抛出
         """
-        ...
 
-    @abstractmethod
     async def verify_integrity(self, log_id: UUID) -> bool:
         """验证单条审计日志的完整性。
 
@@ -81,9 +77,7 @@ class AuditServicePort(ABC):
         Raises:
             AuditError: 验证过程出错时抛出
         """
-        ...
 
-    @abstractmethod
     async def verify_batch(self, log_ids: list[UUID] | None = None) -> dict[str, Any]:
         """批量验证审计日志完整性。
 
@@ -93,9 +87,7 @@ class AuditServicePort(ABC):
         Returns:
             dict 包含 total, passed, failed, details
         """
-        ...
 
-    @abstractmethod
     async def archive(self, older_than_days: int = 30) -> int:
         """归档旧的审计日志到 WORM 存储。
 
@@ -105,4 +97,3 @@ class AuditServicePort(ABC):
         Returns:
             int 已归档的日志数量
         """
-        ...

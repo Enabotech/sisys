@@ -22,10 +22,10 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class L3VectorPort(ABC):
+class L3VectorPort(Protocol):
     """L3 Qdrant 向量存储端口接口。
 
     对应 architecture.md §11.1：
@@ -33,7 +33,6 @@ class L3VectorPort(ABC):
     - 支持 Dense+Sparse+Payload 过滤
     """
 
-    @abstractmethod
     async def upsert_points(
         self,
         collection: str,
@@ -49,9 +48,7 @@ class L3VectorPort(ABC):
         Returns:
             操作成功返回 True
         """
-        pass
 
-    @abstractmethod
     async def delete_points(
         self,
         collection: str,
@@ -66,9 +63,7 @@ class L3VectorPort(ABC):
         Returns:
             删除成功返回 True
         """
-        pass
 
-    @abstractmethod
     async def get_point(
         self,
         collection: str,
@@ -83,9 +78,7 @@ class L3VectorPort(ABC):
         Returns:
             向量点数据 {id, vector, payload}，不存在返回 None
         """
-        pass
 
-    @abstractmethod
     async def search(
         self,
         collection: str,
@@ -104,9 +97,7 @@ class L3VectorPort(ABC):
         Returns:
             检索结果列表 [{id, score, payload}, ...]
         """
-        pass
 
-    @abstractmethod
     async def search_sparse(
         self,
         collection: str,
@@ -128,4 +119,3 @@ class L3VectorPort(ABC):
         Returns:
             检索结果列表 [{id, score, payload}, ...]
         """
-        pass

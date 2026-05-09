@@ -12,8 +12,8 @@ from uuid import uuid4
 
 from src.domain.ports.l0_storage import L0StoragePort
 from src.domain.ports.l2_rdb import (
-    L2ChangeHistoryRepositoryProtocol,
-    L2MetadataRepositoryProtocol,
+    L2ChangeHistoryRepositoryPort,
+    L2MetadataRepositoryPort,
 )
 from src.domain.services.memory_service import (
     MemoryDeleteRequest,
@@ -55,8 +55,8 @@ class TestMemoryServiceL0StoragePortInjection:
 
     def test_constructor_accepts_l0_storage_port(self) -> None:
         """验证构造函数接受 L0StoragePort 类型参数。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
         mock_l0 = AsyncMock(spec=L0StoragePort)
 
         service = MemoryService(
@@ -68,12 +68,15 @@ class TestMemoryServiceL0StoragePortInjection:
         )
 
         assert service._l0_storage is not None
-        assert isinstance(service._l0_storage, L0StoragePort)
+        # Verify it has the required methods (Protocol structural typing)
+        assert hasattr(service._l0_storage, "write"), "l0_storage should have write method"
+        assert hasattr(service._l0_storage, "read"), "l0_storage should have read method"
+        assert hasattr(service._l0_storage, "delete"), "l0_storage should have delete method"
 
     def test_constructor_l0_storage_is_optional(self) -> None:
         """验证 l0_storage 参数是可选的。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
 
         service = MemoryService(
             text_extractor=MockTextExtractor(),
@@ -86,10 +89,10 @@ class TestMemoryServiceL0StoragePortInjection:
 
     def test_l0_storage_write_called_when_saving(self, tmp_path: Any) -> None:
         """验证保存记忆时调用 L0StoragePort.write()。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_repo.save = AsyncMock()
         mock_repo.get_by_id = AsyncMock(return_value=None)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
         mock_history.save = AsyncMock()
         mock_history.get_by_memory_id = AsyncMock(return_value=[])
 
@@ -119,8 +122,8 @@ class TestMemoryServiceL0StoragePortInjection:
 
     def test_l0_storage_delete_called_when_deleting(self, tmp_path: Any) -> None:
         """验证删除记忆时调用 L0StoragePort.delete()。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
 
         mock_l0 = AsyncMock(spec=L0StoragePort)
 

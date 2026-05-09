@@ -11,11 +11,10 @@ Hexagonal Architecture:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol
 
 
-class SandboxExecutor(ABC):
+class SandboxExecutor(Protocol):
     """Port interface for sandbox execution.
 
     Implementations:
@@ -26,7 +25,6 @@ class SandboxExecutor(ABC):
     Infrastructure layer provides concrete implementations.
     """
 
-    @abstractmethod
     async def start_container(self, session_id: str) -> None:
         """Start a sandbox container for the given session.
 
@@ -36,9 +34,7 @@ class SandboxExecutor(ABC):
         Raises:
             SandboxError: If container fails to start
         """
-        ...
 
-    @abstractmethod
     async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
         """Execute code in the sandbox.
 
@@ -52,9 +48,7 @@ class SandboxExecutor(ABC):
         Raises:
             SandboxError: If execution fails
         """
-        ...
 
-    @abstractmethod
     async def stop_container(self, session_id: str) -> None:
         """Stop and cleanup the sandbox container.
 
@@ -64,9 +58,7 @@ class SandboxExecutor(ABC):
         Raises:
             SandboxError: If container fails to stop
         """
-        ...
 
-    @abstractmethod
     async def is_container_running(self, session_id: str) -> bool:
         """Check if a container is running for the session.
 
@@ -76,7 +68,6 @@ class SandboxExecutor(ABC):
         Returns:
             True if container is running, False otherwise
         """
-        ...
 
 
 class SandboxError(Exception):

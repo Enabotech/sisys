@@ -17,8 +17,8 @@ from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.entities.memory_metadata import MemoryMetadata
 from src.domain.events.memory_events import MemoryChanged
 from src.domain.ports.l2_rdb import (
-    L2ChangeHistoryRepositoryProtocol,
-    L2MetadataRepositoryProtocol,
+    L2ChangeHistoryRepositoryPort,
+    L2MetadataRepositoryPort,
 )
 from src.domain.services.memory_service import (
     MemoryDeleteRequest,
@@ -96,8 +96,8 @@ class TestMemoryServiceInit:
 
     def test_service_initialization(self):
         """验证服务正确初始化。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
@@ -110,8 +110,8 @@ class TestMemoryServiceInit:
 
     def test_service_with_optional_adapters(self):
         """验证服务支持可选适配器。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
         mock_adapter = MagicMock()
         mock_publisher = MockEventPublisher()
         service = MemoryService(
@@ -127,8 +127,8 @@ class TestMemoryServiceInit:
 
     def test_service_without_optional_adapters(self):
         """验证服务可在没有可选适配器时工作。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),
@@ -147,7 +147,7 @@ class TestMemoryServiceSave:
     @pytest.fixture
     def mock_metadata_repo(self):
         """Mock metadata repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.save = AsyncMock()
         mock.get_by_id = AsyncMock(return_value=None)
         return mock
@@ -155,7 +155,7 @@ class TestMemoryServiceSave:
     @pytest.fixture
     def mock_history_repo(self):
         """Mock history repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.save = AsyncMock()
         mock.get_by_memory_id = AsyncMock(return_value=[])
         return mock
@@ -245,7 +245,7 @@ class TestMemoryServiceUpdate:
     @pytest.fixture
     def mock_metadata_repo_with_data(self):
         """Mock metadata repository with existing data."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         existing_metadata = MemoryMetadata(
             memory_id=uuid4(),
             name="original",
@@ -262,7 +262,7 @@ class TestMemoryServiceUpdate:
     @pytest.fixture
     def mock_history_repo(self):
         """Mock history repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.save = AsyncMock()
         mock.get_by_memory_id = AsyncMock(return_value=[])
         return mock
@@ -298,7 +298,7 @@ class TestMemoryServiceUpdate:
 
     def test_update_raises_not_found(self, mock_history_repo, mock_l0_storage):
         """验证更新不存在的记忆抛出异常。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_repo.get_by_id = AsyncMock(return_value=None)
         service = MemoryService(
             text_extractor=MockTextExtractor(),
@@ -382,7 +382,7 @@ class TestMemoryServiceDelete:
     @pytest.fixture
     def mock_metadata_repo_with_data(self):
         """Mock metadata repository with existing data."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         existing_metadata = MemoryMetadata(
             memory_id=uuid4(),
             name="to-delete",
@@ -399,7 +399,7 @@ class TestMemoryServiceDelete:
     @pytest.fixture
     def mock_history_repo(self):
         """Mock history repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.save = AsyncMock()
         mock.get_by_memory_id = AsyncMock(return_value=[])
         return mock
@@ -433,7 +433,7 @@ class TestMemoryServiceDelete:
 
     def test_delete_raises_not_found(self, mock_history_repo, mock_l0_storage):
         """验证删除不存在的记忆抛出异常。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_repo.get_by_id = AsyncMock(return_value=None)
         service = MemoryService(
             text_extractor=MockTextExtractor(),
@@ -477,14 +477,14 @@ class TestMemoryServiceList:
     @pytest.fixture
     def mock_metadata_repo(self):
         """Mock metadata repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.list_by_user = AsyncMock(return_value=[])
         return mock
 
     @pytest.fixture
     def mock_history_repo(self):
         """Mock history repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         return mock
 
     def test_list_returns_empty_for_new_user(self, mock_metadata_repo, mock_history_repo):
@@ -501,7 +501,7 @@ class TestMemoryServiceList:
     def test_list_returns_user_memories(self, mock_history_repo):
         """验证 list 返回用户记忆。"""
         memory_id = uuid4()
-        mock_metadata_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_metadata_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_metadata_repo.list_by_user = AsyncMock(
             return_value=[
                 MemoryMetadata(
@@ -545,14 +545,14 @@ class TestMemoryServiceGet:
     @pytest.fixture
     def mock_metadata_repo(self):
         """Mock metadata repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         mock.get_by_id = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
     def mock_history_repo(self):
         """Mock history repository."""
-        mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock = AsyncMock(spec=L2MetadataRepositoryPort)
         return mock
 
     def test_get_raises_not_found(self, mock_metadata_repo, mock_history_repo):
@@ -569,7 +569,7 @@ class TestMemoryServiceGet:
     def test_get_returns_memory(self):
         """验证 get 返回记忆。"""
         memory_id = uuid4()
-        mock_metadata_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_metadata_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_metadata_repo.get_by_id = AsyncMock(
             return_value=MemoryMetadata(
                 memory_id=memory_id,
@@ -581,7 +581,7 @@ class TestMemoryServiceGet:
                 version=1,
             )
         )
-        mock_history_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_history_repo = AsyncMock(spec=L2MetadataRepositoryPort)
         mock_history_repo.get_by_memory_id = AsyncMock(
             return_value=[
                 MemoryChangeHistory.create(
@@ -611,8 +611,8 @@ class TestMemoryServiceBuildMdContent:
 
     def test_build_md_content_format(self):
         """验证 MD 内容格式。"""
-        mock_repo = AsyncMock(spec=L2MetadataRepositoryProtocol)
-        mock_history = AsyncMock(spec=L2MetadataRepositoryProtocol)
+        mock_repo = AsyncMock(spec=L2MetadataRepositoryPort)
+        mock_history = AsyncMock(spec=L2MetadataRepositoryPort)
         service = MemoryService(
             text_extractor=MockTextExtractor(),
             compressor=MockCompressor(),

@@ -78,13 +78,13 @@ class TestExecuteArchitecture:
                 )
 
     def test_interfaces_layer_defines_ports(self) -> None:
-        """Interfaces layer must define ports (abstract interfaces)."""
+        """Interfaces layer must define ports (Protocol interfaces)."""
         port_file = Path("src/application/ports/sandbox_port.py")
 
         content = port_file.read_text()
 
-        # Port should define abstract methods
-        assert "ABC" in content or "abstractmethod" in content, "Port must define abstract methods"
+        # Port should define methods using Protocol
+        assert "Protocol" in content, "Port must use Protocol for interface definition"
         assert "async def start_container" in content, "Port must define start_container method"
         assert "async def execute_code" in content, "Port must define execute_code method"
         assert "async def stop_container" in content, "Port must define stop_container method"

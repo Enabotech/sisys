@@ -10,10 +10,10 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class IntegrityPort(ABC):
+class IntegrityPort(Protocol):
     """数据完整性验证抽象端口。
 
     设计原则：
@@ -24,7 +24,6 @@ class IntegrityPort(ABC):
     实现内部将字符串转换为 HashAlgorithm enum。
     """
 
-    @abstractmethod
     async def verify_file(self, file_path: str, expected_hash: str) -> bool:
         """验证文件完整性（I/O 密集型）。
 
@@ -35,9 +34,7 @@ class IntegrityPort(ABC):
         Returns:
             True 如果哈希匹配，False 否则
         """
-        pass
 
-    @abstractmethod
     def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
         """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
 
@@ -48,9 +45,7 @@ class IntegrityPort(ABC):
         Returns:
             十六进制编码的哈希值
         """
-        pass
 
-    @abstractmethod
     def verify_hash(
         self,
         data: str | bytes,
@@ -67,4 +62,3 @@ class IntegrityPort(ABC):
         Returns:
             True 如果哈希匹配
         """
-        pass

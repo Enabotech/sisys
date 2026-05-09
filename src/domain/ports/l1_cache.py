@@ -12,10 +12,10 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class L1CachePort(ABC):
+class L1CachePort(Protocol):
     """L1 缓存存储接口。
 
     对应 architecture.md §11.2.9 L1 缓存策略：
@@ -28,7 +28,6 @@ class L1CachePort(ABC):
     - 语义缓存（RedisSemanticCache）→ 独立接口，见 semantic_cache.py
     """
 
-    @abstractmethod
     async def get(
         self,
         memory_type: str,
@@ -45,9 +44,7 @@ class L1CachePort(ABC):
         Returns:
             缓存内容，不存在返回 None
         """
-        pass
 
-    @abstractmethod
     async def set(
         self,
         memory_type: str,
@@ -68,9 +65,7 @@ class L1CachePort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def delete(
         self,
         memory_type: str,
@@ -82,9 +77,7 @@ class L1CachePort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def invalidate_pattern(
         self,
         memory_type: str,
@@ -99,4 +92,3 @@ class L1CachePort(ABC):
         Returns:
             失效的 key 数量
         """
-        pass

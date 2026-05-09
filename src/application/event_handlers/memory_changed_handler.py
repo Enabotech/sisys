@@ -38,8 +38,8 @@ class MemoryChangedHandler:
     def __init__(
         self,
         l1_cache=None,  # L1CachePort | None
-        metadata_repository=None,  # L2MetadataRepositoryProtocol | None
-        history_repository=None,  # L2ChangeHistoryRepositoryProtocol | None
+        metadata_repository=None,  # L2MetadataRepositoryPort | None
+        history_repository=None,  # L2ChangeHistoryRepositoryPort | None
         index_manager=None,  # IndexManagerPort | None
     ):
         """初始化监听器。

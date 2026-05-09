@@ -12,11 +12,11 @@ from __future__ import annotations
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.ports.l2_rdb import L2GroupMemberRepositoryProtocol
+from src.domain.ports.l2_rdb import L2GroupMemberRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryGroupMemberModel
 
 
-class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryProtocol):
+class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
     """PostgreSQL 群组成员关系仓储。
 
     使用 AsyncSession 提供异步、线程安全的数据库操作。

@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from typing import Protocol
 
 
 class ComplianceLockError(Exception):
@@ -17,14 +17,13 @@ class ComplianceLockError(Exception):
     """
 
 
-class ObjectStorageRepository(ABC):
+class ObjectStorageRepository(Protocol):
     """对象存储领域仓储接口。
 
     定义领域操作（store/retrieve/delete/archive），
     不暴露 S3 原生概念（bucket/key/ETag 等）。
     """
 
-    @abstractmethod
     async def store(
         self,
         bucket_type: str,
@@ -46,7 +45,6 @@ class ObjectStorageRepository(ABC):
             version_id: 对象版本 ID（启用版本控制时）
         """
 
-    @abstractmethod
     def retrieve(
         self,
         bucket_type: str,
@@ -64,7 +62,6 @@ class ObjectStorageRepository(ABC):
             字节流数据块
         """
 
-    @abstractmethod
     async def delete(
         self,
         bucket_type: str,
@@ -85,7 +82,6 @@ class ObjectStorageRepository(ABC):
             ComplianceLockError: 尝试删除 WORM 锁定对象
         """
 
-    @abstractmethod
     async def get_metadata(
         self,
         bucket_type: str,
@@ -103,7 +99,6 @@ class ObjectStorageRepository(ABC):
             对象元数据字典
         """
 
-    @abstractmethod
     async def list_objects(
         self,
         bucket_type: str,
@@ -121,7 +116,6 @@ class ObjectStorageRepository(ABC):
             对象元数据列表
         """
 
-    @abstractmethod
     async def archive(
         self,
         bucket_type: str,

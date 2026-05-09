@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass
@@ -18,13 +18,12 @@ class ExtractionResult:
     pattern: str  # 匹配到的模式（如 "记住 X"）
 
 
-class TextExtractorService(ABC):
+class TextExtractorService(Protocol):
     """文本提取接口。
 
     实现类：L1TextExtractor（src/application/text_processing/l1_text_extractor.py）
     """
 
-    @abstractmethod
     def extract(self, user_input: str) -> ExtractionResult:
         """从用户输入中提取记忆内容。
 
@@ -38,7 +37,6 @@ class TextExtractorService(ABC):
             ValueError: 如果输入无法提取
         """
 
-    @abstractmethod
     def supports(self, user_input: str) -> bool:
         """判断此提取器是否支持处理给定输入。
 

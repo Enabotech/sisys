@@ -16,11 +16,10 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol
 
 
-class L5GraphPort(ABC):
+class L5GraphPort(Protocol):
     """L5 Neo4j 图存储接口（高级实体语义）。
 
     对应 architecture.md §11.1：
@@ -28,7 +27,6 @@ class L5GraphPort(ABC):
     - Cypher、图遍历、Parent-Child 索引
     """
 
-    @abstractmethod
     async def create_entity(
         self,
         memory_id: str,
@@ -45,9 +43,7 @@ class L5GraphPort(ABC):
         Returns:
             是否成功（MERGE 语义：已存在返回 True）
         """
-        pass
 
-    @abstractmethod
     async def get_entity(
         self,
         memory_id: str,
@@ -60,9 +56,7 @@ class L5GraphPort(ABC):
         Returns:
             实体数据 {id, type, properties}，不存在返回 None
         """
-        pass
 
-    @abstractmethod
     async def delete_entity(
         self,
         memory_id: str,
@@ -75,9 +69,7 @@ class L5GraphPort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def create_relationship(
         self,
         source_memory_id: str,
@@ -96,9 +88,7 @@ class L5GraphPort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def delete_relationship(
         self,
         source_memory_id: str,
@@ -115,9 +105,7 @@ class L5GraphPort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def find_related(
         self,
         memory_id: str,
@@ -134,9 +122,7 @@ class L5GraphPort(ABC):
         Returns:
             关联实体列表 [{memory_id, type, properties, path}, ...]
         """
-        pass
 
-    @abstractmethod
     async def execute_query(
         self,
         cypher: str,
@@ -151,9 +137,7 @@ class L5GraphPort(ABC):
         Returns:
             查询结果列表（字典列表）
         """
-        pass
 
-    @abstractmethod
     async def execute_write_query(
         self,
         cypher: str,
@@ -168,4 +152,3 @@ class L5GraphPort(ABC):
         Returns:
             查询结果列表（字典列表）
         """
-        pass
