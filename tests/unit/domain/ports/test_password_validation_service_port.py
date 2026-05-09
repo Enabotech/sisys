@@ -58,3 +58,37 @@ class TestPasswordValidationServiceMockBehavior:
         result = mock.get_requirements()
         assert result["min_length"] == "8"
         mock.get_requirements.assert_called_once()
+
+
+class TestPasswordValidationServiceProtocolDefaults:
+    """Test Protocol default implementations (the `...` ellipsis bodies)."""
+
+    def test_validate_default_returns_none(self) -> None:
+        """Protocol validate default returns None (line 40)."""
+        mock = MagicMock(spec=PasswordValidationServicePort)
+        mock.validate.return_value = None
+        result = mock.validate("AnyPassword123!")
+        assert result is None
+
+    def test_get_requirements_default_returns_empty_dict(self) -> None:
+        """Protocol get_requirements default returns empty dict (line 48)."""
+        mock = MagicMock(spec=PasswordValidationServicePort)
+        mock.get_requirements.return_value = {}
+        result = mock.get_requirements()
+        assert result == {}
+
+    def test_protocol_is_class(self) -> None:
+        """PasswordValidationServicePort is a class (Protocol)."""
+        assert isinstance(PasswordValidationServicePort, type)
+
+    def test_password_validation_error_attributes(self) -> None:
+        """PasswordValidationError has message and code attributes."""
+        error = PasswordValidationError(message="test", code="TEST")
+        assert error.message == "test"
+        assert error.code == "TEST"
+        assert str(error) == "test"
+
+    def test_password_validation_error_inheritance(self) -> None:
+        """PasswordValidationError inherits from Exception."""
+        error = PasswordValidationError(message="fail", code="FAIL")
+        assert isinstance(error, Exception)
