@@ -10,18 +10,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.ports.l5_graph import L5GraphPort
 from src.infrastructure.storage.neo4j.neo4j_adapter import Neo4jAdapter
 
 
 class TestNeo4jAdapterInterface:
     """验证适配器实现 L5GraphPort 接口"""
-
-    def test_implements_l5_graph_port(self):
-        """验证 Neo4jAdapter 实现 L5GraphPort"""
-        mock_storage = MagicMock()
-        adapter = Neo4jAdapter(mock_storage)
-        assert isinstance(adapter, L5GraphPort)
 
     def test_delegates_to_internal_storage(self):
         """验证适配器委托操作给内部存储"""

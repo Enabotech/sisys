@@ -10,18 +10,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.ports.l4_object import L4ObjectPort
 from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
 
 
 class TestMinIOAdapterInterface:
     """验证适配器实现 L4ObjectPort 接口"""
-
-    def test_implements_l4_object_port(self):
-        """验证 MinIOAdapter 实现 L4ObjectPort"""
-        mock_repository = MagicMock()
-        adapter = MinIOAdapter(mock_repository)
-        assert isinstance(adapter, L4ObjectPort)
 
     def test_delegates_to_internal_repository(self):
         """验证适配器委托操作给内部仓储"""

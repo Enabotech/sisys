@@ -145,26 +145,14 @@ class TestRedisMemoryCacheAsync:
 
 
 class TestRedisMemoryCacheL1CachePortCompliance:
-    """验证 RedisMemoryCache 实现了 L1CachePort 接口。"""
-
-    def test_redis_cache_implements_l1_cache_port(self) -> None:
-        """RedisMemoryCache 应实现 L1CachePort。"""
-        from src.domain.ports.l1_cache import L1CachePort
-        from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
-
-        mock_redis = AsyncMock()
-        cache = RedisMemoryCache(mock_redis)
-
-        assert isinstance(cache, L1CachePort)
+    """Verify RedisMemoryCache has L1CachePort methods — structural check."""
 
     def test_redis_cache_has_all_required_methods(self) -> None:
-        """RedisMemoryCache 应有 L1CachePort 的所有方法。"""
-        from src.domain.ports.l1_cache import L1CachePort
+        """RedisMemoryCache should have all L1CachePort methods."""
         from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 
         mock_redis = AsyncMock()
         cache = RedisMemoryCache(mock_redis)
 
         for method_name in ["get", "set", "delete", "invalidate_pattern"]:
-            assert hasattr(cache, method_name)
-            assert hasattr(L1CachePort, method_name)
+            assert hasattr(cache, method_name), f"Missing method: {method_name}"

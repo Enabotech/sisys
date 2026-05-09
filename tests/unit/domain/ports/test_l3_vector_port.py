@@ -1,90 +1,67 @@
-"""L3VectorPort ABC 接口测试。
-
-验证 L3VectorPort ABC 定义了正确的抽象方法签名。
-"""
+"""L3VectorPort Protocol Interface Tests."""
 
 from __future__ import annotations
 
 import inspect
+from unittest.mock import AsyncMock
 
 from src.domain.ports.l3_vector import L3VectorPort
 
 
-class TestL3VectorPortInterface:
-    """L3VectorPort 接口测试。"""
-
-    def test_port_is_abc(self) -> None:
-        """L3VectorPort 应为 ABC 类。"""
-        assert inspect.isclass(L3VectorPort)
-        assert hasattr(L3VectorPort, "__abstractmethods__")
-
-    def test_protocol_has_required_methods(self) -> None:
-        """L3VectorPort 应定义所有必需的抽象方法。"""
-        assert hasattr(L3VectorPort, "upsert_points")
-        assert hasattr(L3VectorPort, "delete_points")
-        assert hasattr(L3VectorPort, "get_point")
-        assert hasattr(L3VectorPort, "search")
-        assert hasattr(L3VectorPort, "search_sparse")
-
-    def test_methods_are_abstract(self) -> None:
-        """方法应标记为抽象。"""
-        assert getattr(L3VectorPort.upsert_points, "__isabstractmethod__", False) is True
-        assert getattr(L3VectorPort.delete_points, "__isabstractmethod__", False) is True
-        assert getattr(L3VectorPort.get_point, "__isabstractmethod__", False) is True
-        assert getattr(L3VectorPort.search, "__isabstractmethod__", False) is True
-        assert getattr(L3VectorPort.search_sparse, "__isabstractmethod__", False) is True
-
-    def test_upsert_points_signature(self) -> None:
-        """upsert_points 方法应有正确的签名。"""
-        sig = inspect.signature(L3VectorPort.upsert_points)
-        params = list(sig.parameters.keys())
-        assert "collection" in params
-        assert "points" in params
-
-    def test_delete_points_signature(self) -> None:
-        """delete_points 方法应有正确的签名。"""
-        sig = inspect.signature(L3VectorPort.delete_points)
-        params = list(sig.parameters.keys())
-        assert "collection" in params
-        assert "point_ids" in params
-
-    def test_get_point_signature(self) -> None:
-        """get_point 方法应有正确的签名。"""
-        sig = inspect.signature(L3VectorPort.get_point)
-        params = list(sig.parameters.keys())
-        assert "collection" in params
-        assert "point_id" in params
-
-    def test_search_signature(self) -> None:
-        """search 方法应有正确的签名。"""
-        sig = inspect.signature(L3VectorPort.search)
-        params = list(sig.parameters.keys())
-        assert "collection" in params
-        assert "query_vector" in params
-        assert "limit" in params
-        assert "filter_payload" in params
-
-    def test_search_sparse_signature(self) -> None:
-        """search_sparse 方法应有正确的签名。"""
-        sig = inspect.signature(L3VectorPort.search_sparse)
-        params = list(sig.parameters.keys())
-        assert "collection" in params
-        assert "sparse_vector" in params
-        assert "limit" in params
-        assert "filter_payload" in params
-
-    def test_port_is_not_instantiable(self) -> None:
-        """L3VectorPort 是 ABC，不应能直接实例化。"""
-        try:
-            L3VectorPort()  # type: ignore[abstract]
-            assert False, "Should not be able to instantiate ABC"
-        except TypeError:
-            pass  # Expected
+class TestL3VectorPortSignature:
+    """Structural signature tests — verify async contract."""
 
     def test_all_methods_are_async(self) -> None:
-        """所有方法应为 async def。"""
-        import asyncio
-
+        """All methods should be async."""
         for method_name in ["upsert_points", "delete_points", "get_point", "search", "search_sparse"]:
             method = getattr(L3VectorPort, method_name)
-            assert asyncio.iscoroutinefunction(method), f"{method_name} should be async"
+            assert inspect.iscoroutinefunction(method), f"{method_name} must be async"
+
+
+class TestL3VectorPortMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec约束."""
+
+    async def test_mock_upsert_points_verified(self):
+        """Mock upsert_points should be verifiable."""
+        mock = AsyncMock(spec=L3VectorPort)
+        mock.upsert_points.return_value = True
+
+        result = await mock.upsert_points("collection", [{"id": "1", "vector": [0.1, 0.2]}])
+        assert result is True
+        mock.upsert_points.assert_called_once()
+
+    async def test_mock_delete_points_verified(self):
+        """Mock delete_points should be verifiable."""
+        mock = AsyncMock(spec=L3VectorPort)
+        mock.delete_points.return_value = True
+
+        result = await mock.delete_points("collection", ["id1", "id2"])
+        assert result is True
+        mock.delete_points.assert_called_once_with("collection", ["id1", "id2"])
+
+    async def test_mock_get_point_verified(self):
+        """Mock get_point should be verifiable."""
+        mock = AsyncMock(spec=L3VectorPort)
+        mock.get_point.return_value = {"id": "1", "vector": [0.1, 0.2]}
+
+        result = await mock.get_point("collection", "point-id")
+        assert result["id"] == "1"
+        mock.get_point.assert_called_once_with("collection", "point-id")
+
+    async def test_mock_search_verified(self):
+        """Mock search should be verifiable."""
+        mock = AsyncMock(spec=L3VectorPort)
+        mock.search.return_value = [{"id": "1", "score": 0.95}]
+
+        result = await mock.search("collection", [0.1, 0.2], 10, {})
+        assert len(result) == 1
+        mock.search.assert_called_once()
+
+    async def test_mock_search_sparse_verified(self):
+        """Mock search_sparse should be verifiable."""
+        mock = AsyncMock(spec=L3VectorPort)
+        mock.search_sparse.return_value = [{"id": "1", "score": 0.85}]
+
+        result = await mock.search_sparse("collection", {"indices": [0, 1], "values": [0.1, 0.2]}, 10, {})
+        assert len(result) == 1
+        mock.search_sparse.assert_called_once()

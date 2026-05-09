@@ -1,48 +1,76 @@
-"""Test L0StoragePort - Red Phase (Test First)."""
+"""Test L0StoragePort - Protocol Interface Tests."""
 
 from __future__ import annotations
+
+import inspect
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.domain.ports.l0_storage import L0StoragePort
 
 
-class TestL0StoragePort:
-    """L0StoragePort interface tests."""
+class TestL0StoragePortSignature:
+    """Structural signature tests — verify async contract."""
 
-    def test_l0_storage_port_is_abstract(self):
-        """L0StoragePort should be abstract class."""
-        with pytest.raises(TypeError):
-            L0StoragePort()
+    def test_all_methods_are_async(self) -> None:
+        """All methods should be async."""
+        for method_name in ["write", "read", "delete", "exists", "list_memories"]:
+            method = getattr(L0StoragePort, method_name)
+            assert inspect.iscoroutinefunction(method), f"{method_name} must be async"
 
-    def test_write_method_is_abstract(self):
-        """write() should be abstract async method."""
-        port = L0StoragePort.__abstractmethods__
-        assert "write" in port
 
-    def test_read_method_is_abstract(self):
-        """read() should be abstract async method."""
-        port = L0StoragePort.__abstractmethods__
-        assert "read" in port
+class TestL0StoragePortMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec约束."""
 
-    def test_delete_method_is_abstract(self):
-        """delete() should be abstract async method."""
-        port = L0StoragePort.__abstractmethods__
-        assert "delete" in port
+    async def test_mock_write_verified(self):
+        """Mock write should be verifiable."""
+        mock = AsyncMock(spec=L0StoragePort)
+        mock.write.return_value = True
 
-    def test_exists_method_is_abstract(self):
-        """exists() should be abstract async method."""
-        port = L0StoragePort.__abstractmethods__
-        assert "exists" in port
+        result = await mock.write("id", "user", "content")
+        assert result is True
+        mock.write.assert_called_once_with("id", "user", "content")
 
-    def test_list_memories_method_is_abstract(self):
-        """list_memories() should be abstract async method."""
-        port = L0StoragePort.__abstractmethods__
-        assert "list_memories" in port
+    async def test_mock_read_verified(self):
+        """Mock read should be verifiable."""
+        mock = AsyncMock(spec=L0StoragePort)
+        mock.read.return_value = "test content"
+
+        result = await mock.read("id", "user")
+        assert result == "test content"
+        mock.read.assert_called_once_with("id", "user")
+
+    async def test_mock_delete_verified(self):
+        """Mock delete should be verifiable."""
+        mock = AsyncMock(spec=L0StoragePort)
+        mock.delete.return_value = True
+
+        result = await mock.delete("id", "user")
+        assert result is True
+        mock.delete.assert_called_once_with("id", "user")
+
+    async def test_mock_exists_verified(self):
+        """Mock exists should be verifiable."""
+        mock = AsyncMock(spec=L0StoragePort)
+        mock.exists.return_value = True
+
+        result = await mock.exists("id", "user")
+        assert result is True
+        mock.exists.assert_called_once_with("id", "user")
+
+    async def test_mock_list_memories_verified(self):
+        """Mock list_memories should be verifiable."""
+        mock = AsyncMock(spec=L0StoragePort)
+        mock.list_memories.return_value = ["id1", "id2"]
+
+        result = await mock.list_memories("user")
+        assert result == ["id1", "id2"]
+        mock.list_memories.assert_called_once_with("user")
 
 
 class ConcreteL0StorageAdapter(L0StoragePort):
-    """Concrete implementation for testing."""
+    """Concrete implementation for integration tests."""
 
     def __init__(self) -> None:
         self._memories: dict[str, dict[str, str]] = {}

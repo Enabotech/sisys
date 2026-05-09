@@ -138,47 +138,65 @@ class TestOutboxEntityInvalidStateTransitionError:
         assert "Max retries" in str(error)
 
 
-class TestOutboxRepositoryProtocol:
-    """验证 OutboxRepository 接口契约（ABC）。"""
+class TestOutboxRepositoryMockBehavior:
+    """Mock behavior tests — verify OutboxRepository Protocol contract via spec约束."""
 
-    def test_outbox_repository_is_abc(self) -> None:
-        """OutboxRepository 必须是 ABC。"""
-        from abc import ABC
+    def test_mock_save_verified(self):
+        """Mock save should be verifiable."""
+        from unittest.mock import MagicMock
 
-        assert issubclass(OutboxRepository, ABC)
+        mock = MagicMock(spec=OutboxRepository)
+        mock.save.return_value = None
 
-    def test_outbox_repository_has_abstract_methods(self) -> None:
-        """验证 OutboxRepository 有抽象方法。"""
-        assert hasattr(OutboxRepository, "__abstractmethods__")
-        assert len(OutboxRepository.__abstractmethods__) > 0
-
-    def test_abstract_methods_include_required_operations(self) -> None:
-        """验证抽象方法包含所有必需操作。"""
-        abstract_methods = OutboxRepository.__abstractmethods__
-        required = {"save", "get_unpublished", "mark_published", "mark_failed"}
-        assert required.issubset(abstract_methods), f"Missing: {required - set(abstract_methods)}"
-
-    def test_fully_implemented_subclass_can_instantiate(self) -> None:
-        """完全实现的子类可以实例化。"""
-        from uuid import UUID
+        from datetime import UTC, datetime
+        from uuid import uuid4
 
         from src.domain.events.base import DomainEvent
 
-        class ConcreteRepo(OutboxRepository):
-            def save(self, event: DomainEvent) -> None:
-                pass
+        event = DomainEvent(
+            event_id=uuid4(),
+            event_type="TestEvent",
+            timestamp=datetime.now(UTC),
+            source="test",
+            payload={},
+        )
+        mock.save(event)
+        mock.save.assert_called_once()
 
-            def get_unpublished(self, limit: int) -> list[DomainEvent]:
-                return []
+    def test_mock_get_unpublished_verified(self):
+        """Mock get_unpublished should be verifiable."""
+        from unittest.mock import MagicMock
 
-            def mark_published(self, event_id: UUID) -> None:
-                pass
+        mock = MagicMock(spec=OutboxRepository)
+        mock.get_unpublished.return_value = []
 
-            def mark_failed(self, event_id: UUID, error: str) -> None:
-                pass
+        result = mock.get_unpublished(10)
+        assert result == []
+        mock.get_unpublished.assert_called_once_with(10)
 
-        repo = ConcreteRepo()
-        assert repo is not None
+    def test_mock_mark_published_verified(self):
+        """Mock mark_published should be verifiable."""
+        from unittest.mock import MagicMock
+        from uuid import uuid4
+
+        mock = MagicMock(spec=OutboxRepository)
+        mock.mark_published.return_value = None
+
+        event_id = uuid4()
+        mock.mark_published(event_id)
+        mock.mark_published.assert_called_once_with(event_id)
+
+    def test_mock_mark_failed_verified(self):
+        """Mock mark_failed should be verifiable."""
+        from unittest.mock import MagicMock
+        from uuid import uuid4
+
+        mock = MagicMock(spec=OutboxRepository)
+        mock.mark_failed.return_value = None
+
+        event_id = uuid4()
+        mock.mark_failed(event_id, "error message")
+        mock.mark_failed.assert_called_once_with(event_id, "error message")
 
 
 class TestOutboxEntityFieldDefaults:

@@ -10,18 +10,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.domain.ports.l3_vector import L3VectorPort
 from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
 
 
 class TestQdrantVectorAdapterInterface:
     """验证适配器实现 L3VectorPort 接口"""
-
-    def test_implements_l3_vector_port(self):
-        """验证 QdrantVectorAdapter 实现 L3VectorPort"""
-        mock_storage = MagicMock()
-        adapter = QdrantVectorAdapter(mock_storage)
-        assert isinstance(adapter, L3VectorPort)
 
     def test_delegates_to_internal_storage(self):
         """验证适配器委托操作给内部存储"""

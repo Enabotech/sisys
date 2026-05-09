@@ -538,12 +538,6 @@ class TestAuditServiceImpl:
 class TestAuditServiceInterface:
     """Test AuditService port interface compliance."""
 
-    def test_audit_service_is_abstract(self) -> None:
-        """AuditService should be an abstract base class."""
-        from abc import ABC
-
-        assert issubclass(AuditServicePort, ABC)
-
     def test_audit_service_has_required_methods(self) -> None:
         """AuditService should have record, verify_integrity, verify_batch, archive methods."""
         assert hasattr(AuditServicePort, "record")
@@ -551,31 +545,27 @@ class TestAuditServiceInterface:
         assert hasattr(AuditServicePort, "verify_batch")
         assert hasattr(AuditServicePort, "archive")
 
-    def test_record_is_async_abstract_method(self) -> None:
-        """record should be an async abstract method."""
+    def test_record_is_async(self) -> None:
+        """record should be an async method."""
         import inspect
 
         assert hasattr(AuditServicePort, "record")
         assert inspect.iscoroutinefunction(AuditServicePort.record)
-        assert getattr(AuditServicePort.record, "__isabstractmethod__", False)
 
-    def test_verify_integrity_is_async_abstract_method(self) -> None:
-        """verify_integrity should be an async abstract method."""
+    def test_verify_integrity_is_async(self) -> None:
+        """verify_integrity should be an async method."""
         import inspect
 
         assert inspect.iscoroutinefunction(AuditServicePort.verify_integrity)
-        assert getattr(AuditServicePort.verify_integrity, "__isabstractmethod__", False)
 
-    def test_verify_batch_is_async_abstract_method(self) -> None:
-        """verify_batch should be an async abstract method."""
+    def test_verify_batch_is_async(self) -> None:
+        """verify_batch should be an async method."""
         import inspect
 
         assert inspect.iscoroutinefunction(AuditServicePort.verify_batch)
-        assert getattr(AuditServicePort.verify_batch, "__isabstractmethod__", False)
 
-    def test_archive_is_async_abstract_method(self) -> None:
-        """archive should be an async abstract method."""
+    def test_archive_is_async(self) -> None:
+        """archive should be an async method."""
         import inspect
 
         assert inspect.iscoroutinefunction(AuditServicePort.archive)
-        assert getattr(AuditServicePort.archive, "__isabstractmethod__", False)
