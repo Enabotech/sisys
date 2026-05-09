@@ -127,3 +127,54 @@ class L2ChangeHistoryRepositoryProtocol(ABC):
         Returns:
             MemoryChangeHistory 如果存在，否则 None
         """
+
+
+class L2GroupMemberRepositoryProtocol(ABC):
+    """L2 群组成员关系仓储协议。
+
+    领域层定义接口，基础设施层实现。
+    用于验证 group 记忆的访问权限。
+    """
+
+    @abstractmethod
+    async def is_group_member(self, group_id: str, user_id: str) -> bool:
+        """检查用户是否是群组成员。
+
+        Args:
+            group_id: 群组 ID
+            user_id: 用户 ID
+
+        Returns:
+            True 如果用户是群组成员，否则 False
+        """
+
+    @abstractmethod
+    async def is_group_admin(self, group_id: str, user_id: str) -> bool:
+        """检查用户是否是群组管理员。
+
+        Args:
+            group_id: 群组 ID
+            user_id: 用户 ID
+
+        Returns:
+            True 如果用户是群组管理员，否则 False
+        """
+
+    @abstractmethod
+    async def add_member(self, group_id: str, user_id: str, role: str = "member") -> None:
+        """添加群组成员。
+
+        Args:
+            group_id: 群组 ID
+            user_id: 用户 ID
+            role: 角色（member/admin）
+        """
+
+    @abstractmethod
+    async def remove_member(self, group_id: str, user_id: str) -> None:
+        """移除群组成员。
+
+        Args:
+            group_id: 群组 ID
+            user_id: 用户 ID
+        """

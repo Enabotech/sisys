@@ -34,26 +34,26 @@
   # AC-2: Private/Group 记忆分离
   # ================================================================================
 
-  # 场景: AC-2-1 - Private 记忆存储在正确路径
-  #   假设用户 "Alice" 创建 Private 记忆 "private-note"
-  #   当记忆保存成功
-  #   那么记忆文件位于 "user/"
+  场景: AC-2-1 - Private 记忆存储在正确路径
+    假设用户 "Alice" 创建 Private 记忆 "private-note"
+    当记忆保存成功
+    那么记忆文件位于 'user/'
 
-  # 场景: AC-2-2 - Group 记忆存储在正确路径
-  #   假设用户创建 Group 记忆 "team-doc" 属于群组 "DevTeam"
-  #   当记忆保存成功
-  #   那么记忆文件位于 "group/user/"
+  场景: AC-2-2 - Group 记忆存储在正确路径
+    假设用户创建 Group 记忆 "team-doc" 属于群组 "DevTeam"
+    当记忆保存成功
+    那么记忆文件位于 'group/user/'
 
-  # 场景: AC-2-3 - Private 记忆只能所有者读取
-  #   假设用户 "Alice" 创建 Private 记忆 "secret"
-  #   当其他用户尝试读取该记忆
-  #   那么读取被拒绝，抛出 MemoryAccessDeniedError
-  #   而且错误原因为 "not_owner"
+  场景: AC-2-3 - Private 记忆只能所有者读取
+    假设用户 "Alice" 创建 Private 记忆 "secret"
+    当其他用户尝试读取该记忆
+    那么读取被拒绝，抛出 MemoryAccessDeniedError
+    而且错误原因为 'not_owner'
 
-  # 场景: AC-2-4 - Group 记忆成员可读取
-  #   假设用户 "Alice" 创建 Group 记忆 "team-note" 属于群组 "DevTeam"
-  #   当用户 "Alice" 尝试读取该记忆
-  #   那么读取被拒绝，抛出 MemoryAccessDeniedError
+  场景: AC-2-4 - Group 记忆成员可读取
+    假设用户创建 Group 记忆 "team-note" 属于群组 "DevTeam"
+    当用户 "Alice" 尝试读取该记忆
+    那么读取被拒绝，抛出 MemoryAccessDeniedError
 
   # ================================================================================
   # AC-3: 六层存储协同
