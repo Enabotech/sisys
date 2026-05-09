@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 from src.infrastructure.config.redis import RedisConfig
 
 
@@ -72,3 +74,47 @@ class TestRedisConfigExtension:
             # 新字段使用默认值
             assert config.retry_on_timeout is True
             assert config.default_ttl == 86400
+
+    def test_from_env_invalid_socket_timeout(self) -> None:
+        """from_env() 解析无效 socket_timeout 时抛出 ValueError。"""
+        with patch.dict(
+            os.environ,
+            {"REDIS_SOCKET_TIMEOUT": "not_a_number"},
+            clear=False,
+        ):
+            with pytest.raises(ValueError, match="Invalid REDIS_SOCKET_TIMEOUT"):
+                RedisConfig.from_env()
+
+    def test_from_env_invalid_default_ttl(self) -> None:
+        """from_env() 解析无效 default_ttl 时抛出 ValueError。"""
+        with patch.dict(
+            os.environ,
+            {"REDIS_DEFAULT_TTL": "not_an_integer"},
+            clear=False,
+        ):
+            with pytest.raises(ValueError, match="Invalid REDIS_DEFAULT_TTL"):
+                RedisConfig.from_env()
+
+    def test_from_env_password_none(self) -> None:
+        """from_env() 解析空密码返回 None。"""
+        with patch.dict(
+            os.environ,
+            {"REDIS_PASSWORD": ""},
+            clear=False,
+        ):
+            config = RedisConfig.from_env()
+            assert config.password is None
+
+    def test_from_env_various_retry_on_timeout_values(self) -> None:
+        """验证 retry_on_timeout 解析各种真值。"""
+        for true_val in ("true", "1", "yes"):
+            with patch.dict(os.environ, {"REDIS_RETRY_ON_TIMEOUT": true_val}, clear=False):
+                config = RedisConfig.from_env()
+                assert config.retry_on_timeout is True, f"Failed for {true_val}"
+
+    def test_from_env_retry_on_timeout_false_values(self) -> None:
+        """验证 retry_on_timeout 解析各种假值。"""
+        for false_val in ("false", "0", "no", "anything_else"):
+            with patch.dict(os.environ, {"REDIS_RETRY_ON_TIMEOUT": false_val}, clear=False):
+                config = RedisConfig.from_env()
+                assert config.retry_on_timeout is False, f"Failed for {false_val}"

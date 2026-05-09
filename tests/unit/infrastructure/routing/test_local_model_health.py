@@ -21,6 +21,105 @@ from src.infrastructure.routing.ollama_health import (
 )
 
 
+class TestOllamaHealthAdapter:
+    """Test suite for OllamaHealthAdapter."""
+
+    def test_default_endpoint(self) -> None:
+        """Should use default Ollama endpoint."""
+        from src.infrastructure.routing.ollama_health import DEFAULT_OLLAMA_ENDPOINT
+
+        adapter = OllamaHealthAdapter()
+        assert adapter._endpoint == DEFAULT_OLLAMA_ENDPOINT
+
+    def test_custom_endpoint(self) -> None:
+        """Should accept custom endpoint."""
+        adapter = OllamaHealthAdapter(endpoint="http://custom:9999/api/health")
+        assert adapter._endpoint == "http://custom:9999/api/health"
+
+    def test_custom_timeout(self) -> None:
+        """Should accept custom timeout."""
+        adapter = OllamaHealthAdapter(timeout=10.0)
+        assert adapter._timeout == 10.0
+
+    @pytest.mark.asyncio
+    async def test_check_returns_true_on_healthy_response(self) -> None:
+        """Should return True when Ollama returns 200."""
+        from unittest.mock import AsyncMock, patch
+
+        adapter = OllamaHealthAdapter()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+
+        with patch.object(adapter, "_client", None):
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            adapter._client = mock_client
+
+            result = await adapter.check()
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_check_returns_false_on_unhealthy_response(self) -> None:
+        """Should return False when Ollama returns non-200."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        adapter = OllamaHealthAdapter()
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        adapter._client = mock_client
+
+        result = await adapter.check()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_returns_false_on_request_error(self) -> None:
+        """Should return False when request fails."""
+        import httpx
+
+        adapter = OllamaHealthAdapter()
+        adapter._client = AsyncMock()
+        adapter._client.get = AsyncMock(side_effect=httpx.RequestError("Connection failed"))
+
+        result = await adapter.check()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_returns_false_on_timeout(self) -> None:
+        """Should return False when request times out."""
+        import httpx
+
+        adapter = OllamaHealthAdapter()
+        adapter._client = AsyncMock()
+        adapter._client.get = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+
+        result = await adapter.check()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_close_resets_client(self) -> None:
+        """Should reset client to None after close."""
+        from unittest.mock import AsyncMock
+
+        adapter = OllamaHealthAdapter()
+        mock_client = AsyncMock()
+        adapter._client = mock_client
+
+        await adapter.close()
+        assert adapter._client is None
+
+    @pytest.mark.asyncio
+    async def test_close_handles_none_client(self) -> None:
+        """Should handle close when client is None."""
+        adapter = OllamaHealthAdapter()
+        adapter._client = None
+
+        await adapter.close()
+        assert adapter._client is None
+
+
 class TestOllamaHealthCheckerFactory:
     """Test suite for OllamaHealthCheckerFactory."""
 

@@ -51,3 +51,27 @@ class TestRoleModel:
     def test_inherits_from_declarative_base(self):
         """RoleModel should inherit from a DeclarativeBase."""
         assert issubclass(RoleModel, DeclarativeBase) or hasattr(RoleModel, "__mapper__")
+
+    def test_has_is_active_column(self):
+        """Should have is_active column with default True."""
+        columns = {c.name: c for c in RoleModel.__table__.columns}
+        assert "is_active" in columns
+
+    def test_has_is_system_reserved_column(self):
+        """Should have is_system_reserved column with default False."""
+        columns = {c.name: c for c in RoleModel.__table__.columns}
+        assert "is_system_reserved" in columns
+
+    def test_has_updated_at_column(self):
+        """Should have updated_at column as nullable DateTime."""
+        columns = {c.name: c for c in RoleModel.__table__.columns}
+        assert "updated_at" in columns
+        assert columns["updated_at"].nullable
+
+    def test_updated_at_nullable(self):
+        """updated_at should be None when not set."""
+        instance = RoleModel(
+            name="nullable_updated_at",
+            description="Test nullable updated_at",
+        )
+        assert instance.updated_at is None
