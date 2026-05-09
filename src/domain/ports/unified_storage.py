@@ -12,8 +12,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from src.domain.ports.storage_enums import StorageLayer, StorageTier
 
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
     pass
 
 
-class UnifiedStoragePort(ABC):
+class UnifiedStoragePort(Protocol):
     """统一存储入口接口。
 
     定义存储系统的统一操作契约。
@@ -33,7 +32,6 @@ class UnifiedStoragePort(ABC):
     - 读取遵循缓存优先策略（L1 → L0）
     """
 
-    @abstractmethod
     async def save(
         self,
         memory_id: str,
@@ -64,9 +62,7 @@ class UnifiedStoragePort(ABC):
         Returns:
             各层存储结果 {layer: success}
         """
-        pass
 
-    @abstractmethod
     async def read(
         self,
         memory_id: str,
@@ -91,9 +87,7 @@ class UnifiedStoragePort(ABC):
         Returns:
             记忆内容，不存在返回 None
         """
-        pass
 
-    @abstractmethod
     async def delete(
         self,
         memory_id: str,
@@ -112,9 +106,7 @@ class UnifiedStoragePort(ABC):
         Returns:
             各层删除结果
         """
-        pass
 
-    @abstractmethod
     async def exists(
         self,
         memory_id: str,
@@ -133,4 +125,3 @@ class UnifiedStoragePort(ABC):
         Returns:
             各层存在状态 {layer: exists}
         """
-        pass

@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
 from src.domain.ports.l2_rdb import (
-    L2ChangeHistoryRepositoryProtocol,
-    L2MetadataRepositoryProtocol,
+    L2ChangeHistoryRepositoryPort,
+    L2MetadataRepositoryPort,
 )
 from src.domain.services.memory_service import MemorySaveRequest, MemoryService
 
@@ -25,7 +25,7 @@ def run_async(coro):
 
 def _create_mock_metadata_repo():
     """Create a mock metadata repository."""
-    mock = AsyncMock(spec=L2MetadataRepositoryProtocol)
+    mock = AsyncMock(spec=L2MetadataRepositoryPort)
     mock.save = AsyncMock()
     mock.get_by_id = AsyncMock(return_value=None)
     mock.get_by_name = AsyncMock(return_value=None)
@@ -38,7 +38,7 @@ def _create_mock_metadata_repo():
 
 def _create_mock_history_repo():
     """Create a mock history repository."""
-    mock = AsyncMock(spec=L2ChangeHistoryRepositoryProtocol)
+    mock = AsyncMock(spec=L2ChangeHistoryRepositoryPort)
     mock.save = AsyncMock()
     mock.get_by_memory_id = AsyncMock(return_value=[])
     mock.get_by_id = AsyncMock(return_value=None)

@@ -5,14 +5,13 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Protocol
 
 from src.domain.events.base import DomainEvent
 
 
-class EventSubscriber(ABC):
+class EventSubscriber(Protocol):
     """事件订阅抽象端口。
 
     定义事件订阅接口。
@@ -22,7 +21,6 @@ class EventSubscriber(ABC):
     3. 分发到注册的 handler
     """
 
-    @abstractmethod
     async def subscribe(
         self,
         event_type: str,
@@ -34,9 +32,7 @@ class EventSubscriber(ABC):
             event_type: 事件类型
             handler: 事件处理器
         """
-        pass
 
-    @abstractmethod
     async def subscribe_async(
         self,
         event_type: str,
@@ -48,17 +44,12 @@ class EventSubscriber(ABC):
             event_type: 事件类型
             handler: 异步事件处理器
         """
-        pass
 
-    @abstractmethod
     async def start(self) -> None:
         """启动订阅者，开始监听消息。
 
         应在所有 subscribe() 调用完成后调用。
         """
-        pass
 
-    @abstractmethod
     async def close(self) -> None:
         """关闭订阅者，释放资源。"""
-        pass

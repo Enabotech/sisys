@@ -6,10 +6,9 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 
@@ -37,14 +36,13 @@ class AuditSearchResult:
     limit: int
 
 
-class AuditRepositoryPort(ABC):
+class AuditRepositoryPort(Protocol):
     """审计仓储端口（领域层定义，仅使用 ABC + 标准库）.
 
     定义审计日志的 CRUD 和检索接口。
     实现类位于 infrastructure 层（可导入外部ORM框架）。
     """
 
-    @abstractmethod
     async def save(self, audit_data: dict[str, Any]) -> UUID:
         """保存审计日志。
 
@@ -54,9 +52,7 @@ class AuditRepositoryPort(ABC):
         Returns:
             UUID 保存的审计日志 ID
         """
-        ...
 
-    @abstractmethod
     async def get_by_id(self, log_id: UUID) -> dict[str, Any] | None:
         """根据 ID 获取审计日志。
 
@@ -66,9 +62,7 @@ class AuditRepositoryPort(ABC):
         Returns:
             dict 审计日志数据，或 None
         """
-        ...
 
-    @abstractmethod
     async def search(self, criteria: AuditSearchCriteria) -> AuditSearchResult:
         """搜索审计日志。
 
@@ -78,9 +72,7 @@ class AuditRepositoryPort(ABC):
         Returns:
             AuditSearchResult 包含 items, total, offset, limit
         """
-        ...
 
-    @abstractmethod
     async def update_archive_status(
         self,
         log_id: UUID,
@@ -97,9 +89,7 @@ class AuditRepositoryPort(ABC):
         Returns:
             True 如果更新成功
         """
-        ...
 
-    @abstractmethod
     async def get_archive_status(self, log_id: UUID) -> dict[str, Any] | None:
         """获取归档状态。
 
@@ -109,4 +99,3 @@ class AuditRepositoryPort(ABC):
         Returns:
             dict 包含 archived, archived_at 等字段，或 None
         """
-        ...

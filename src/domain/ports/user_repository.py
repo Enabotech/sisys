@@ -6,16 +6,15 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 from uuid import UUID
 
 from src.domain.entities.user import User
 
 
-class UserRepositoryPort(ABC):
+class UserRepositoryPort(Protocol):
     """用户仓储端口（领域层定义，仅使用 ABC + 标准库）"""
 
-    @abstractmethod
     async def get_by_username(self, username: str) -> User | None:
         """根据用户名获取用户。
 
@@ -25,9 +24,7 @@ class UserRepositoryPort(ABC):
         Returns:
             User 领域实体，或 None（用户不存在）
         """
-        ...
 
-    @abstractmethod
     async def get_by_id(self, user_id: UUID) -> User | None:
         """根据 ID 获取用户。
 
@@ -37,4 +34,3 @@ class UserRepositoryPort(ABC):
         Returns:
             User 领域实体，或 None（用户不存在）
         """
-        ...

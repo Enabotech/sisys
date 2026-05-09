@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass
@@ -19,7 +19,7 @@ class CompressionResult:
     ratio: float  # 压缩率
 
 
-class CompressorService(ABC):
+class CompressorService(Protocol):
     """压缩接口。
 
     实现类：L1Compressor（src/application/text_processing/l1_compressor.py）
@@ -29,7 +29,6 @@ class CompressorService(ABC):
     - >200 字：LLM 压缩至约 150 字
     """
 
-    @abstractmethod
     def compress(self, content: str) -> CompressionResult:
         """压缩内容至约 150 字，压缩率≥70%。
 
@@ -43,7 +42,6 @@ class CompressorService(ABC):
             ValueError: 如果内容超过限制
         """
 
-    @abstractmethod
     def supports(self, content: str) -> bool:
         """判断此压缩器是否支持处理给定内容。
 

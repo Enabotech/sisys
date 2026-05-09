@@ -18,7 +18,7 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
-from src.domain.ports.l2_rdb import L2MetadataRepositoryProtocol
+from src.domain.ports.l2_rdb import L2MetadataRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
 
 
@@ -31,7 +31,7 @@ class MemoryVersionConflictError(Exception):
         super().__init__(self.message)
 
 
-class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryProtocol):
+class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
     """PostgreSQL 记忆元数据仓储。
 
     使用 AsyncSession 提供异步、线程安全的数据库操作。

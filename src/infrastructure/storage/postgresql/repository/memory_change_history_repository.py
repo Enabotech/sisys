@@ -16,11 +16,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
-from src.domain.ports.l2_rdb import L2ChangeHistoryRepositoryProtocol
+from src.domain.ports.l2_rdb import L2ChangeHistoryRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryChangeHistoryModel
 
 
-class PostgreSQLMemoryChangeHistoryRepository(L2ChangeHistoryRepositoryProtocol):
+class PostgreSQLMemoryChangeHistoryRepository(L2ChangeHistoryRepositoryPort):
     """PostgreSQL 记忆变更历史仓储。
 
     使用 AsyncSession 提供异步、线程安全的数据库操作。

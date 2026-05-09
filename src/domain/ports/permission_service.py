@@ -6,18 +6,17 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 from uuid import UUID
 
 
-class PermissionServicePort(ABC):
+class PermissionServicePort(Protocol):
     """权限服务端口（领域层定义，仅使用 ABC + 标准库）
 
     注意：角色分配/撤销是应用层 UseCase，不是领域层服务。
     本接口仅负责权限检查，不包含角色管理逻辑。
     """
 
-    @abstractmethod
     async def check_permission(self, user_id: UUID, resource: str, action: str, resource_id: UUID | None = None) -> bool:
         """检查用户权限。
 
@@ -30,9 +29,7 @@ class PermissionServicePort(ABC):
         Returns:
             True 如果有权限，False 否则
         """
-        ...
 
-    @abstractmethod
     async def get_user_permissions(self, user_id: UUID) -> list[str]:
         """获取用户所有权限。
 
@@ -42,4 +39,3 @@ class PermissionServicePort(ABC):
         Returns:
             权限字符串列表（如 ["document:read", "document:write", "agent:execute"]）
         """
-        ...

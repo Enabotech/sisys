@@ -16,11 +16,11 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from typing import Protocol
 
 
-class L4ObjectPort(ABC):
+class L4ObjectPort(Protocol):
     """L4 MinIO WORM 对象存储接口。
 
     对应 architecture.md §11.1：
@@ -28,7 +28,6 @@ class L4ObjectPort(ABC):
     - Object Lock COMPLIANCE 模式 7 年 retention
     """
 
-    @abstractmethod
     async def store(
         self,
         bucket_type: str,
@@ -49,9 +48,7 @@ class L4ObjectPort(ABC):
         Returns:
             版本 ID 或 ETag
         """
-        pass
 
-    @abstractmethod
     def retrieve(
         self,
         bucket_type: str,
@@ -68,9 +65,7 @@ class L4ObjectPort(ABC):
         Yields:
             字节流数据块
         """
-        pass
 
-    @abstractmethod
     async def delete(
         self,
         bucket_type: str,
@@ -82,9 +77,7 @@ class L4ObjectPort(ABC):
         Returns:
             是否成功
         """
-        pass
 
-    @abstractmethod
     async def get_metadata(
         self,
         bucket_type: str,
@@ -99,9 +92,7 @@ class L4ObjectPort(ABC):
         Returns:
             元数据字典（对象不存在时 SDK 抛出异常）
         """
-        pass
 
-    @abstractmethod
     async def archive(
         self,
         bucket_type: str,
@@ -120,4 +111,3 @@ class L4ObjectPort(ABC):
         Returns:
             对象 ID 或 ETag
         """
-        pass

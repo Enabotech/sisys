@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
     from src.domain.ports.l2_rdb import (
-        L2ChangeHistoryRepositoryProtocol,
-        L2GroupMemberRepositoryProtocol,
-        L2MetadataRepositoryProtocol,
+        L2ChangeHistoryRepositoryPort,
+        L2GroupMemberRepositoryPort,
+        L2MetadataRepositoryPort,
     )
     from src.domain.ports.l3_vector import L3VectorPort
     from src.domain.ports.l4_object import L4ObjectPort
@@ -49,9 +49,9 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self,
         l0_storage: L0StoragePort,
         l1_cache: L1CachePort,
-        l2_metadata: L2MetadataRepositoryProtocol,
-        l2_history: L2ChangeHistoryRepositoryProtocol,
-        l2_group_member: L2GroupMemberRepositoryProtocol | None = None,
+        l2_metadata: L2MetadataRepositoryPort,
+        l2_history: L2ChangeHistoryRepositoryPort,
+        l2_group_member: L2GroupMemberRepositoryPort | None = None,
         l3_vector: L3VectorPort | None = None,
         l4_object: L4ObjectPort | None = None,
         l5_graph: L5GraphPort | None = None,
@@ -62,8 +62,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         Args:
             l0_storage: L0 文件系统存储
             l1_cache: L1 Redis 缓存
-            l2_metadata: L2 元数据仓储（现有 L2MetadataRepositoryProtocol）
-            l2_history: L2 历史仓储（现有 L2ChangeHistoryRepositoryProtocol）
+            l2_metadata: L2 元数据仓储（现有 L2MetadataRepositoryPort）
+            l2_history: L2 历史仓储（现有 L2ChangeHistoryRepositoryPort）
             l3_vector: L3 向量存储
             l4_object: L4 对象存储
             l5_graph: L5 图存储

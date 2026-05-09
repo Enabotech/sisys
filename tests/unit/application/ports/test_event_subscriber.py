@@ -1,24 +1,25 @@
-"""Tests for EventSubscriber interface."""
+"""Tests for EventSubscriber interface - Protocol version."""
 
 from __future__ import annotations
 
-from abc import ABC
+import inspect
 
 from src.application.ports.event_subscriber import EventSubscriber
 
 
-class TestEventSubscriberIsAbstract:
-    """Test that EventSubscriber is an abstract class."""
+class TestEventSubscriberIsProtocol:
+    """Test that EventSubscriber is a Protocol."""
 
-    def test_is_abc(self) -> None:
-        """EventSubscriber should be an ABC."""
-        assert issubclass(EventSubscriber, ABC)
+    def test_is_protocol(self) -> None:
+        """EventSubscriber should be a Protocol."""
+        assert inspect.isclass(EventSubscriber)
+        assert hasattr(EventSubscriber, "_is_protocol")
 
-    def test_all_methods_are_abstract(self) -> None:
-        """All EventSubscriber methods should be abstract."""
-        for method_name in ["subscribe", "subscribe_async", "start", "close"]:
-            method = getattr(EventSubscriber, method_name)
-            assert getattr(method, "__isabstractmethod__", False), f"{method_name} should be abstract"
+    def test_has_required_methods(self) -> None:
+        """EventSubscriber should have all required methods."""
+        required = ["subscribe", "subscribe_async", "start", "close"]
+        for method_name in required:
+            assert hasattr(EventSubscriber, method_name), f"Missing method: {method_name}"
 
 
 class TestEventSubscriberMethods:
@@ -40,36 +41,44 @@ class TestEventSubscriberMethods:
         """EventSubscriber should have close method."""
         assert hasattr(EventSubscriber, "close")
 
-    def test_all_methods_are_abstract(self) -> None:
-        """All methods should be abstract."""
-        for method_name in ["subscribe", "subscribe_async", "start", "close"]:
-            method = getattr(EventSubscriber, method_name)
-            assert getattr(method, "__isabstractmethod__", False), f"{method_name} should be abstract"
-
 
 class TestEventSubscriberSignatures:
     """Test EventSubscriber method signatures."""
 
+    def test_subscribe_signature(self) -> None:
+        """subscribe should have correct signature."""
+        sig = inspect.signature(EventSubscriber.subscribe)
+        params = list(sig.parameters.keys())
+        assert "event_type" in params
+        assert "handler" in params
+
+    def test_subscribe_async_signature(self) -> None:
+        """subscribe_async should have correct signature."""
+        sig = inspect.signature(EventSubscriber.subscribe_async)
+        params = list(sig.parameters.keys())
+        assert "event_type" in params
+        assert "handler" in params
+
     def test_subscribe_is_async(self) -> None:
         """subscribe should be an async method."""
-        import inspect
+        import asyncio
 
-        assert inspect.iscoroutinefunction(EventSubscriber.subscribe)
+        assert asyncio.iscoroutinefunction(EventSubscriber.subscribe)
 
     def test_subscribe_async_is_async(self) -> None:
         """subscribe_async should be an async method."""
-        import inspect
+        import asyncio
 
-        assert inspect.iscoroutinefunction(EventSubscriber.subscribe_async)
+        assert asyncio.iscoroutinefunction(EventSubscriber.subscribe_async)
 
     def test_start_is_async(self) -> None:
         """start should be an async method."""
-        import inspect
+        import asyncio
 
-        assert inspect.iscoroutinefunction(EventSubscriber.start)
+        assert asyncio.iscoroutinefunction(EventSubscriber.start)
 
     def test_close_is_async(self) -> None:
         """close should be an async method."""
-        import inspect
+        import asyncio
 
-        assert inspect.iscoroutinefunction(EventSubscriber.close)
+        assert asyncio.iscoroutinefunction(EventSubscriber.close)

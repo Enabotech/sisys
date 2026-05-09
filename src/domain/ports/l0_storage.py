@@ -10,17 +10,16 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class L0StoragePort(ABC):
+class L0StoragePort(Protocol):
     """L0 文件系统存储抽象端口。
 
     负责 ~/.sisys/memory/*.md 文件的异步读写操作。
     所有 L0 存储实现必须实现此端口。
     """
 
-    @abstractmethod
     async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         """写入记忆文件（I/O 密集型）。
 
@@ -35,9 +34,7 @@ class L0StoragePort(ABC):
         Raises:
             OSError: 如果写入失败
         """
-        pass
 
-    @abstractmethod
     async def read(self, memory_id: str, memory_type: str) -> str:
         """读取记忆文件（I/O 密集型）。
 
@@ -51,9 +48,7 @@ class L0StoragePort(ABC):
         Raises:
             FileNotFoundError: 如果文件不存在
         """
-        pass
 
-    @abstractmethod
     async def delete(self, memory_id: str, memory_type: str) -> bool:
         """删除记忆文件（快速同步操作，可用 to_thread 封装）。
 
@@ -64,9 +59,7 @@ class L0StoragePort(ABC):
         Returns:
             True 如果删除成功，False 如果文件不存在
         """
-        pass
 
-    @abstractmethod
     async def exists(self, memory_id: str, memory_type: str) -> bool:
         """检查记忆文件是否存在（快速同步操作）。
 
@@ -77,9 +70,7 @@ class L0StoragePort(ABC):
         Returns:
             True 如果存在，False 否则
         """
-        pass
 
-    @abstractmethod
     async def list_memories(self, memory_type: str) -> list[str]:
         """列出指定类型的记忆文件。
 
@@ -89,4 +80,3 @@ class L0StoragePort(ABC):
         Returns:
             记忆 ID 列表
         """
-        pass

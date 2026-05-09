@@ -5,22 +5,21 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 from uuid import UUID
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.entities.memory_metadata import MemoryMetadata
 
 
-class L2MetadataRepositoryProtocol(ABC):
-    """L2 记忆元数据仓储协议。
+class L2MetadataRepositoryPort(Protocol):
+    """L2 记忆元数据仓储端口。
 
     领域层定义接口，基础设施层实现。
     MVP 阶段使用 InMemoryMemoryMetadataRepository，
     生产环境替换为 PostgreSQL 实现。
     """
 
-    @abstractmethod
     async def save(self, metadata: MemoryMetadata) -> None:
         """保存或更新记忆元数据（UPSERT）。
 
@@ -31,7 +30,6 @@ class L2MetadataRepositoryProtocol(ABC):
             Exception: 版本冲突时抛出
         """
 
-    @abstractmethod
     async def get_by_id(self, memory_id: UUID) -> MemoryMetadata | None:
         """通过 ID 获取记忆元数据。
 
@@ -42,7 +40,6 @@ class L2MetadataRepositoryProtocol(ABC):
             MemoryMetadata 如果存在，否则 None
         """
 
-    @abstractmethod
     async def get_by_name(self, name: str) -> MemoryMetadata | None:
         """通过名称获取记忆元数据。
 
@@ -53,7 +50,6 @@ class L2MetadataRepositoryProtocol(ABC):
             MemoryMetadata 如果存在，否则 None
         """
 
-    @abstractmethod
     async def delete(self, memory_id: UUID) -> None:
         """删除记忆元数据。
 
@@ -61,7 +57,6 @@ class L2MetadataRepositoryProtocol(ABC):
             memory_id: 记忆 ID
         """
 
-    @abstractmethod
     async def list_by_user(self, user_id: str) -> list[MemoryMetadata]:
         """列出用户的所有记忆元数据。
 
@@ -72,7 +67,6 @@ class L2MetadataRepositoryProtocol(ABC):
             记忆元数据列表
         """
 
-    @abstractmethod
     async def list_by_type(self, memory_type: str) -> list[MemoryMetadata]:
         """列出指定类型的所有记忆元数据。
 
@@ -83,7 +77,6 @@ class L2MetadataRepositoryProtocol(ABC):
             记忆元数据列表
         """
 
-    @abstractmethod
     async def list_all(self) -> list[MemoryMetadata]:
         """列出所有记忆元数据。
 
@@ -92,13 +85,12 @@ class L2MetadataRepositoryProtocol(ABC):
         """
 
 
-class L2ChangeHistoryRepositoryProtocol(ABC):
-    """L2 记忆变更历史仓储协议。
+class L2ChangeHistoryRepositoryPort(Protocol):
+    """L2 记忆变更历史仓储端口。
 
     领域层定义接口，基础设施层实现。
     """
 
-    @abstractmethod
     async def save(self, history: MemoryChangeHistory) -> None:
         """保存历史记录（append-only）。
 
@@ -106,7 +98,6 @@ class L2ChangeHistoryRepositoryProtocol(ABC):
             history: 变更历史记录
         """
 
-    @abstractmethod
     async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]:
         """获取记忆的所有历史记录。
 
@@ -117,7 +108,6 @@ class L2ChangeHistoryRepositoryProtocol(ABC):
             变更历史列表（按时间排序）
         """
 
-    @abstractmethod
     async def get_by_id(self, history_id: UUID) -> MemoryChangeHistory | None:
         """通过 ID 获取历史记录。
 
@@ -129,14 +119,13 @@ class L2ChangeHistoryRepositoryProtocol(ABC):
         """
 
 
-class L2GroupMemberRepositoryProtocol(ABC):
-    """L2 群组成员关系仓储协议。
+class L2GroupMemberRepositoryPort(Protocol):
+    """L2 群组成员关系仓储端口。
 
     领域层定义接口，基础设施层实现。
     用于验证 group 记忆的访问权限。
     """
 
-    @abstractmethod
     async def is_group_member(self, group_id: str, user_id: str) -> bool:
         """检查用户是否是群组成员。
 
@@ -148,7 +137,6 @@ class L2GroupMemberRepositoryProtocol(ABC):
             True 如果用户是群组成员，否则 False
         """
 
-    @abstractmethod
     async def is_group_admin(self, group_id: str, user_id: str) -> bool:
         """检查用户是否是群组管理员。
 
@@ -160,7 +148,6 @@ class L2GroupMemberRepositoryProtocol(ABC):
             True 如果用户是群组管理员，否则 False
         """
 
-    @abstractmethod
     async def add_member(self, group_id: str, user_id: str, role: str = "member") -> None:
         """添加群组成员。
 
@@ -170,7 +157,6 @@ class L2GroupMemberRepositoryProtocol(ABC):
             role: 角色（member/admin）
         """
 
-    @abstractmethod
     async def remove_member(self, group_id: str, user_id: str) -> None:
         """移除群组成员。
 

@@ -6,13 +6,13 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 
 
-class EventPublisher(ABC):
+class EventPublisher(Protocol):
     """事件发布抽象端口。
 
     定义事件发布接口。
@@ -22,7 +22,6 @@ class EventPublisher(ABC):
     3. 错误处理（内部消化，返回 PublishResult）
     """
 
-    @abstractmethod
     async def publish(self, event: DomainEvent) -> PublishResult:
         """发布领域事件。
 
@@ -34,19 +33,17 @@ class EventPublisher(ABC):
         Returns:
             PublishResult: 发布结果的不可变数据类
         """
-        pass
 
 
-class InMemoryEventPublisher(ABC):
+class InMemoryEventPublisher(Protocol):
     """Abstract event publisher interface.
 
     Implementations in the infrastructure layer publish events to
     the appropriate message bus (RabbitMQ, Redis pub/sub, etc.).
 
-    P1-07 Fix: Use ABC to prevent direct instantiation.
+    P1-07 Fix: Use Protocol to prevent direct instantiation (structural typing).
     """
 
-    @abstractmethod
     def publish(self, event: DomainEvent) -> None:
         """Publish a domain event.
 

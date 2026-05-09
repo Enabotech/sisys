@@ -6,25 +6,22 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class TokenBlacklistPort(ABC):
+class TokenBlacklistPort(Protocol):
     """Token 黑名单仓储端口（领域层定义，仅使用 ABC + 标准库）
 
     负责存储已撤销的 JWT token。
     """
 
-    @abstractmethod
     async def add(self, token: str) -> None:
         """将 token 加入黑名单。
 
         Args:
             token: JWT token 字符串
         """
-        ...
 
-    @abstractmethod
     async def is_blacklisted(self, token: str) -> bool:
         """检查 token 是否在黑名单中。
 
@@ -34,4 +31,3 @@ class TokenBlacklistPort(ABC):
         Returns:
             True 如果 token 已被撤销
         """
-        ...
