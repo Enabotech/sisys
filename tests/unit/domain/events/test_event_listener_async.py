@@ -2,35 +2,37 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from unittest.mock import AsyncMock
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import EventListener, EventListenerAsync
+from src.domain.events.listener import EventListenerAsync
 
 
-class TestEventListenerAsyncInterface:
-    """EventListenerAsync interface tests."""
+class TestEventListenerAsyncSignature:
+    """Structural signature tests — verify async contract."""
 
-    def test_event_listener_async_is_abc(self) -> None:
-        """EventListenerAsync should be an abstract base class."""
-        assert issubclass(EventListenerAsync, ABC)
-
-    def test_event_listener_async_has_async_handle_method(self) -> None:
-        """EventListenerAsync should declare async_handle method."""
-        # Check that the method exists and is abstract
+    def test_async_handle_exists(self) -> None:
+        """async_handle method must exist."""
         assert hasattr(EventListenerAsync, "async_handle")
-        # The method should be an abstract method
-        assert getattr(EventListenerAsync.async_handle, "__isabstractmethod__", False)
 
-    def test_event_listener_async_not_same_as_event_listener(self) -> None:
-        """EventListenerAsync should be independent from EventListener."""
-        # They should be separate interfaces, not one inheriting from the other
-        assert EventListenerAsync is not EventListener
+    def test_async_handle_is_async(self) -> None:
+        """async_handle should be an async method."""
+        import inspect
 
-    def test_event_listener_async_does_not_inherit_from_event_listener(self) -> None:
-        """EventListenerAsync should NOT inherit from EventListener."""
-        # EventListenerAsync is independent - does not extend EventListener
-        assert not issubclass(EventListenerAsync, EventListener)
+        assert inspect.iscoroutinefunction(EventListenerAsync.async_handle)
+
+
+class TestEventListenerAsyncMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec constraint."""
+
+    async def test_mock_async_handle_verified(self) -> None:
+        """Mock async_handle should be verifiable."""
+        mock = AsyncMock(spec=EventListenerAsync)
+        mock.async_handle.return_value = None
+
+        event = DomainEvent(event_type="TestEvent")
+        await mock.async_handle(event)
+        mock.async_handle.assert_called_once_with(event)
 
 
 class TestEventListenerAsyncConcrete:

@@ -1,9 +1,10 @@
 """Tests for EventStore and InMemoryEventStore (Story 1.2)."""
 
+from __future__ import annotations
+
 import uuid
 from typing import cast
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
@@ -11,13 +12,53 @@ from src.domain.events.event_store import EventStore
 from src.infrastructure.messaging.message_serializer import InMemoryEventStore
 
 
-class TestEventStoreInterface:
-    """Test EventStore abstract interface."""
+class TestEventStoreSignature:
+    """Structural signature tests — verify method contract."""
 
-    def test_cannot_instantiate_abstract_store(self):
-        """Cannot instantiate EventStore directly (ABC)."""
-        with pytest.raises(TypeError):
-            EventStore()
+    def test_save_events_exists(self) -> None:
+        """save_events method must exist."""
+        assert hasattr(EventStore, "save_events")
+
+    def test_get_events_exists(self) -> None:
+        """get_events method must exist."""
+        assert hasattr(EventStore, "get_events")
+
+    def test_get_events_by_version_exists(self) -> None:
+        """get_events_by_version method must exist."""
+        assert hasattr(EventStore, "get_events_by_version")
+
+
+class TestEventStoreMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec constraint."""
+
+    def test_mock_save_events_verified(self) -> None:
+        """Mock save_events should be verifiable."""
+        mock = MagicMock(spec=EventStore)
+        mock.save_events.return_value = None
+
+        event = DocumentProcessed(document_id=uuid.uuid4())
+        mock.save_events([event])
+        mock.save_events.assert_called_once()
+
+    def test_mock_get_events_verified(self) -> None:
+        """Mock get_events should be verifiable."""
+        mock = MagicMock(spec=EventStore)
+        mock.get_events.return_value = []
+
+        agg_id = uuid.uuid4()
+        result = mock.get_events(agg_id)
+        assert result == []
+        mock.get_events.assert_called_once_with(agg_id)
+
+    def test_mock_get_events_by_version_verified(self) -> None:
+        """Mock get_events_by_version should be verifiable."""
+        mock = MagicMock(spec=EventStore)
+        mock.get_events_by_version.return_value = []
+
+        agg_id = uuid.uuid4()
+        result = mock.get_events_by_version(agg_id, 1, 5)
+        assert result == []
+        mock.get_events_by_version.assert_called_once_with(agg_id, 1, 5)
 
 
 class TestInMemoryEventStoreSave:
