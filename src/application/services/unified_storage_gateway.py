@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from src.domain.ports.l1_cache import L1CachePort
     from src.domain.ports.l2_rdb import (
         L2ChangeHistoryRepositoryProtocol,
+        L2GroupMemberRepositoryProtocol,
         L2MetadataRepositoryProtocol,
     )
     from src.domain.ports.l3_vector import L3VectorPort
@@ -50,6 +51,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         l1_cache: L1CachePort,
         l2_metadata: L2MetadataRepositoryProtocol,
         l2_history: L2ChangeHistoryRepositoryProtocol,
+        l2_group_member: L2GroupMemberRepositoryProtocol | None = None,
         l3_vector: L3VectorPort | None = None,
         l4_object: L4ObjectPort | None = None,
         l5_graph: L5GraphPort | None = None,
@@ -65,6 +67,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             l3_vector: L3 向量存储
             l4_object: L4 对象存储
             l5_graph: L5 图存储
+            l2_group_member: L2 群组成员关系仓储（可选，用于 group 记忆 RBAC 校验）
             event_publisher: 事件发布器（Outbox 模式需要）
         """
         self._l0 = l0_storage
@@ -74,6 +77,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self._l3 = l3_vector
         self._l4 = l4_object
         self._l5 = l5_graph
+        self._l2_group_member = l2_group_member
         self._event_publisher = event_publisher
 
         self._policy = None  # 延迟初始化
@@ -175,14 +179,14 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             content = await self._l1.get(memory_type, owner_id, name)
             if content is not None:
                 metadata = await self._l2_meta.get_by_id(UUID(memory_id))
-                if metadata is not None and self._check_read_permission(metadata, owner_id, memory_type):
+                if metadata is not None and await self._check_read_permission(metadata, owner_id, memory_type):
                     return content
 
         metadata = await self._l2_meta.get_by_id(UUID(memory_id))
         if metadata is None:
             return None
 
-        if not self._check_read_permission(metadata, owner_id, memory_type):
+        if not await self._check_read_permission(metadata, owner_id, memory_type):
             return None
 
         content = await self._l0.read(memory_id, memory_type)
@@ -194,7 +198,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
         return content
 
-    def _check_read_permission(
+    async def _check_read_permission(
         self,
         metadata: MemoryMetadata,
         owner_id: str,
@@ -211,7 +215,12 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         is_group_memory = metadata.group_id is not None and metadata.group_id != ""
         if is_group_memory:
             # Group 记忆：owner 或 group 成员可读
-            return metadata.owner == owner_id or (metadata.group_id is not None and metadata.group_id != "")
+            if metadata.owner == owner_id:
+                return True
+            # 检查是否是 group 成员
+            if self._l2_group_member is not None:
+                return await self._l2_group_member.is_group_member(metadata.group_id, owner_id)
+            return False
         else:
             # Private 记忆：仅 owner 可读
             return metadata.owner == owner_id
@@ -272,7 +281,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             各层存在状态
         """
         metadata = await self._l2_meta.get_by_id(UUID(memory_id))
-        if metadata is None or not self._check_read_permission(metadata, owner_id, memory_type):
+        if metadata is None or not await self._check_read_permission(metadata, owner_id, memory_type):
             return {StorageLayer.L0_FILE: False, StorageLayer.L1_CACHE: False}
 
         l0_exists = await self._l0.exists(memory_id, memory_type)

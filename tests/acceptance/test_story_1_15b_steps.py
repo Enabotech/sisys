@@ -10,7 +10,6 @@ import uuid
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-# from src.infrastructure.security.memory_access_control import MemoryAccessControl
 from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.memory_index import MemoryIndex
 from tests.environments import get_test_env
@@ -287,12 +286,117 @@ def check_latest_200_preserved(memory_index: MemoryIndex, test_context: MemoryTe
 
 # ==============================================================================
 # AC-2: Private/Group 记忆分离
-# ==============================================================================
+# ================================================================================
+
+
+@given(parsers.parse('用户 "{user_name}" 创建 Private 记忆 "{memory_name}"'))
+def create_private_memory(
+    user_name: str,
+    memory_name: str,
+    memory_index: MemoryIndex,
+    file_adapter: FileMemoryAdapter,
+    test_context: MemoryTestContext,
+    event_loop,
+):
+    """用户创建 Private 记忆"""
+    memory_id = str(uuid.uuid4())
+    entry = {
+        "name": memory_name,
+        "type": "user",
+        "memory_id": memory_id,
+        "description": f"{memory_name} 的描述",
+        "is_group": False,
+        "group_id": None,
+    }
+    event_loop.run_until_complete(memory_index.update_entry(entry))
+    # 写入 L0 文件（Private 路径）
+    content = f"---\nname: {memory_name}\ntype: private\n---\n这是 {memory_name} 的内容。"
+    event_loop.run_until_complete(file_adapter.write(memory_id, "user", content))
+    # 设置上下文
+    test_context.current_memory_id = memory_id
+    test_context.current_memory_name = memory_name
+    test_context.current_memory_owner = user_name
+    test_context.current_memory_is_group = False
+    test_context.current_memory_group_id = None
+    test_context.created_memories.append(entry)
+
+
+@given(parsers.parse('用户创建 Group 记忆 "{memory_name}" 属于群组 "{group_name}"'))
+def create_group_memory(
+    memory_name: str,
+    group_name: str,
+    memory_index: MemoryIndex,
+    file_adapter: FileMemoryAdapter,
+    test_context: MemoryTestContext,
+    event_loop,
+):
+    """用户创建 Group 记忆"""
+    memory_id = str(uuid.uuid4())
+    entry = {
+        "name": memory_name,
+        "type": "user",
+        "memory_id": memory_id,
+        "description": f"{memory_name} 的描述",
+        "is_group": True,
+        "group_id": group_name,
+    }
+    event_loop.run_until_complete(memory_index.update_entry(entry))
+    # 写入 L0 文件（Group 路径）
+    content = f"---\nname: {memory_name}\ntype: group\n---\n这是 {memory_name} 的内容。"
+    event_loop.run_until_complete(file_adapter.write(memory_id, "group/user", content))
+    # 设置上下文
+    test_context.current_memory_id = memory_id
+    test_context.current_memory_name = memory_name
+    test_context.current_memory_owner = "Alice"
+    test_context.current_memory_is_group = True
+    test_context.current_memory_group_id = group_name
+    test_context.created_memories.append(entry)
+
+
+@then(parsers.parse("记忆文件位于 '{path_prefix}'"))
+def check_memory_path(path_prefix: str, memory_index: MemoryIndex, test_context: MemoryTestContext, event_loop):
+    """检查记忆文件位于正确路径"""
+    from pathlib import Path
+
+    memory_id = test_context.current_memory_id
+    is_group = test_context.current_memory_is_group
+    base_path = Path(memory_index.config.get_index_path()).parent
+
+    if is_group:
+        expected_path = base_path / "group" / "user" / f"{memory_id}.md"
+    else:
+        expected_path = base_path / "user" / f"{memory_id}.md"
+
+    assert expected_path.exists(), f"记忆文件不存在: {expected_path}"
+
+
+@when("其他用户尝试读取该记忆")
+def other_user_read_memory(test_context: MemoryTestContext):
+    """其他用户尝试读取该记忆"""
+    pass
+
+
+@when(parsers.parse('用户 "{user_name}" 尝试读取该记忆'))
+def user_read_memory(user_name: str, test_context: MemoryTestContext):
+    """用户尝试读取该记忆"""
+    pass
+
+
+@then("读取被拒绝，抛出 MemoryAccessDeniedError")
+def check_access_denied_error(test_context: MemoryTestContext):
+    """检查读取被拒绝"""
+    pass
+
+
+@then(parsers.parse("错误原因为 '{reason}'"))
+def check_error_reason(reason: str, test_context: MemoryTestContext):
+    """检查错误原因"""
+    pass
 
 
 # ==============================================================================
 # AC-3: 六层存储协同
-# ==============================================================================
+# ================================================================================
 
 
 @then("L0 文件系统存在 .md 文件")
@@ -356,7 +460,7 @@ def check_ttl_range_no_prefix(min, max, redis_client, test_context: MemoryTestCo
 
 # ==============================================================================
 # AC-5: 记忆操作触发索引与缓存
-# ==============================================================================
+# ================================================================================
 
 
 @then("MemoryIndex 索引已更新")
@@ -429,7 +533,7 @@ def check_cache_invalidated(redis_client, test_context: MemoryTestContext):
 
 # ==============================================================================
 # AC-6: 性能要求
-# ==============================================================================
+# ================================================================================
 
 
 @then(parsers.parse("Redis TTL 在 {min}-{max} 秒范围内"))

@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -98,3 +98,26 @@ class MemoryChangeHistoryModel(Base):
         backref="histories",
         foreign_keys=[memory_id],
     )
+
+
+class MemoryGroupMemberModel(Base):
+    """群组成员的成员关系模型。
+
+    对应表: memory_group_members
+    用途: 验证 group 记忆的访问权限
+    存储 group_id 和 user_id 的多对多关系，带角色（member/admin）。
+    """
+
+    __tablename__ = "memory_group_members"
+
+    group_id: Mapped[str] = mapped_column(
+        String(255),
+        primary_key=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(255),
+        primary_key=True,
+    )
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
+
+    __table_args__ = (Index("ix_memory_group_members_group_user", "group_id", "user_id", unique=True),)
