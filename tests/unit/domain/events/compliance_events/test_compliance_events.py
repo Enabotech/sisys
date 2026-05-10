@@ -75,7 +75,7 @@ class TestMFAChallengeIssuedEvent:
         """Test MFAChallengeIssuedEvent is frozen."""
         event = MFAChallengeIssuedEvent(user_id=uuid.uuid4())
         with pytest.raises(Exception):
-            event.challenge_id = uuid.uuid4()  # type: ignore
+            event.challenge_id = uuid.uuid4()
 
 
 class TestIntrusionDetectedEvent:
