@@ -392,6 +392,38 @@ class VersionError(ConflictError):
     code = "EXCEPTION_203"
     message = "Version conflict"
 
+
+# Sandbox 异常（来自 src/application/ports/sandbox_port.py）
+class SandboxError(ExternalException):
+    """沙箱基础异常."""
+    code = "EXCEPTION_301"
+    message = "Sandbox error"
+
+
+class ContainerStartError(SandboxError):
+    """容器启动失败异常."""
+    code = "EXCEPTION_301"
+    message = "Container start error"
+
+
+class ExecutionError(SandboxError):
+    """代码执行失败异常."""
+    code = "EXCEPTION_301"
+    message = "Execution error"
+
+
+class ContainerStopError(SandboxError):
+    """容器停止失败异常."""
+    code = "EXCEPTION_301"
+    message = "Container stop error"
+
+
+# 权限中间件异常（来自 src/infrastructure/security/permission_middleware.py）
+class InsufficientTokenError(PermissionDeniedError):
+    """Token 信息不足异常."""
+    code = "EXCEPTION_204"
+    message = "Insufficient token"
+
 __all__ = [
     # 基类和三层异常
     "BaseException",
@@ -447,6 +479,23 @@ from src.domain.exceptions import (
     SystemException,
     BusinessException,
     ExternalException,
+    NotFoundError,
+    PermissionDeniedError,
+    AuthenticationError,
+    ConflictError,
+    ValidationError,
+    InvalidStateError,
+    InvalidStateTransitionError,
+    BusinessRuleViolationError,
+    ThirdPartyError,
+    TimeoutError,
+    ServiceUnavailableError,
+    NetworkError,
+    StorageError,
+    MessageBusError,
+    ConfigurationError,
+    SandboxError,
+    UnknownError,
 )
 
 # 异常类型 → HTTP 状态码映射表（唯一真相源）
@@ -464,6 +513,12 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     InvalidStateError: status.HTTP_409_CONFLICT,
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,
     BusinessRuleViolationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    ThirdPartyError: status.HTTP_502_BAD_GATEWAY,
+    NetworkError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    StorageError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    MessageBusError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ConfigurationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    SandboxError: status.HTTP_502_BAD_GATEWAY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
     ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
     UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -495,11 +550,12 @@ class ExceptionHandlers:
 
         注意：具体异常处理器必须先于基类处理器注册，
         FastAPI 按注册顺序查找匹配，精确匹配优先。
+        注意：Exception 必须在 BaseException 之前注册，否则 BaseException 会先匹配。
         """
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
-        self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
+        self._app.add_exception_handler(BaseException, self._handle_exception)
 
     async def _handle_exception(
         self, request: Request, exc: BaseException
