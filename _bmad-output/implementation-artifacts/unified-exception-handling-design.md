@@ -92,13 +92,13 @@ BaseException (抽象根)
 ```python
 # src/domain/exceptions/__init__.py
 
-class SisysBaseException(Exception):
-    """SISYS 异常层次结构根类.
+class BaseException(Exception):
+    """异常层次结构根类.
 
     注意：此基类定义在领域层（src/domain/exceptions/），仅使用Python标准库。
     HTTP状态码等Web层关注点不在此定义，由接口层异常处理器负责映射。
     """
-    code: str = "SISYS_000"
+    code: str = "EXCEPTION_000"
     message: str = "Unknown error"
 
     def __init__(
@@ -121,104 +121,104 @@ class SisysBaseException(Exception):
 
 
 # === 系统级异常（System）===
-class SystemException(SisysBaseException):
+class SystemException(BaseException):
     """系统级异常，基础设施故障."""
-    code = "SISYS_1XX"
+    code = "EXCEPTION_1XX"
 
 
 class ConfigurationError(SystemException):
     """配置错误."""
-    code = "SISYS_101"
+    code = "EXCEPTION_101"
     message = "Configuration error"
 
 
 class NetworkError(SystemException):
     """网络故障."""
-    code = "SISYS_102"
+    code = "EXCEPTION_102"
     message = "Network error"
 
 
 class StorageError(SystemException):
     """存储服务故障."""
-    code = "SISYS_103"
+    code = "EXCEPTION_103"
     message = "Storage error"
 
 
 class MessageBusError(SystemException):
     """消息总线故障."""
-    code = "SISYS_104"
+    code = "EXCEPTION_104"
     message = "Message bus error"
 
 
 # === 业务级异常（Business）===
-class BusinessException(SisysBaseException):
+class BusinessException(BaseException):
     """业务级异常，业务规则违反."""
-    code = "SISYS_2XX"
+    code = "EXCEPTION_2XX"
 
 
 class ValidationError(BusinessException):
     """验证失败."""
-    code = "SISYS_201"
+    code = "EXCEPTION_201"
     message = "Validation error"
 
 
 class NotFoundError(BusinessException):
     """资源不存在."""
-    code = "SISYS_202"
+    code = "EXCEPTION_202"
     message = "Resource not found"
 
 
 class ConflictError(BusinessException):
     """资源冲突（版本冲突、状态冲突等）."""
-    code = "SISYS_203"
+    code = "EXCEPTION_203"
     message = "Resource conflict"
 
 
 class PermissionDeniedError(BusinessException):
     """权限不足."""
-    code = "SISYS_204"
+    code = "EXCEPTION_204"
     message = "Permission denied"
 
 
 class AuthenticationError(BusinessException):
     """认证失败."""
-    code = "SISYS_205"
+    code = "EXCEPTION_205"
     message = "Authentication failed"
 
 
 class InvalidStateError(BusinessException):
     """无效状态."""
-    code = "SISYS_206"
+    code = "EXCEPTION_206"
     message = "Invalid state"
 
 
 class BusinessRuleViolationError(BusinessException):
     """业务规则违反."""
-    code = "SISYS_207"
+    code = "EXCEPTION_207"
     message = "Business rule violation"
 
 
 # === 外部服务异常（External）===
-class ExternalException(SisysBaseException):
+class ExternalException(BaseException):
     """外部服务异常."""
-    code = "SISYS_3XX"
+    code = "EXCEPTION_3XX"
 
 
 class ThirdPartyError(ExternalException):
     """第三方服务错误."""
-    code = "SISYS_301"
+    code = "EXCEPTION_301"
     message = "Third party service error"
 
 
 class TimeoutError(ExternalException):
     """外部服务超时."""
-    code = "SISYS_302"
+    code = "EXCEPTION_302"
     message = "External service timeout"
 
 
 class ServiceUnavailableError(ExternalException):
     """外部服务不可用."""
-    code = "SISYS_303"
+    code = "EXCEPTION_303"
     message = "Service unavailable"
 
 
@@ -229,9 +229,9 @@ class SystemExceptionMeta(type):
         cls = super().__new__(mcs, name, bases, namespace)
         # 中间类（SystemException本身）不需要具体码
         if bases and name != "SystemException":
-            if not hasattr(cls, 'code') or cls.code == "SISYS_1XX":
+            if not hasattr(cls, 'code') or cls.code == "EXCEPTION_1XX":
                 if name not in ('SystemException', 'BusinessException', 'ExternalException'):
-                    raise TypeError(f"{name} must define a concrete code like 'SISYS_1XX'")
+                    raise TypeError(f"{name} must define a concrete code like 'EXCEPTION_1XX'")
         return cls
 ```
 
@@ -244,7 +244,7 @@ class SystemExceptionMeta(type):
 覆盖所有现有异常类，确保迁移过程无破坏性变更。
 """
 from src.domain.exceptions import (
-    SisysBaseException,
+    BaseException,
     SystemException,
     BusinessException,
     NotFoundError,
@@ -308,7 +308,7 @@ VersionError = ConflictError
 
 __all__ = [
     # 基类和三层异常
-    "SisysBaseException",
+    "BaseException",
     "SystemException",
     "BusinessException",
     "ExternalException",
@@ -357,14 +357,14 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 from src.domain.exceptions import (
-    SisysBaseException,
+    BaseException,
     SystemException,
     BusinessException,
     ExternalException,
 )
 
 # 异常类型 → HTTP 状态码映射表（唯一真相源）
-EXCEPTION_HTTP_MAP: dict[type[SisysBaseException], int] = {
+EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     # 三层基类
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
     BusinessException: status.HTTP_400_BAD_REQUEST,
@@ -380,7 +380,7 @@ EXCEPTION_HTTP_MAP: dict[type[SisysBaseException], int] = {
 }
 
 
-def _get_http_status(exc: SisysBaseException) -> int:
+def _get_http_status(exc: BaseException) -> int:
     """获取异常对应的HTTP状态码，优先使用具体异常映射."""
     # 精确匹配优先
     for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
@@ -402,15 +402,15 @@ class ExceptionHandlers:
 
     def _register_handlers(self) -> None:
         """注册全局异常处理器."""
-        self._app.add_exception_handler(SisysBaseException, self._handle_sisys_exception)
+        self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
-    async def _handle_sisys_exception(
-        self, request: Request, exc: SisysBaseException
+    async def _handle_exception(
+        self, request: Request, exc: BaseException
     ) -> JSONResponse:
-        """处理 SISYS 异常."""
+        """处理异常."""
         # 安全获取 request_id，不依赖特定中间件
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
@@ -422,13 +422,13 @@ class ExceptionHandlers:
                     status_code=status.HTTP_423_LOCKED,
                     content={
                         "error": {
-                            "code": getattr(exc, 'code', "SISYS_205"),
+                            "code": getattr(exc, 'code', "EXCEPTION_205"),
                             "message": "Account is locked",
                             "context": context,
                         },
                         "request_id": request_id,
                     },
-                    headers={"X-Error-Code": str(getattr(exc, 'code', "SISYS_205") or "SISYS_205")},
+                    headers={"X-Error-Code": str(getattr(exc, 'code', "EXCEPTION_205") or "EXCEPTION_205")},
                 )
 
         try:
@@ -436,7 +436,7 @@ class ExceptionHandlers:
         except Exception:
             # to_dict() 失败时的降级处理
             error_dict = {
-                "code": str(getattr(exc, 'code', "SISYS_999") or "SISYS_999"),
+                "code": str(getattr(exc, 'code', "EXCEPTION_999") or "EXCEPTION_999"),
                 "message": str(exc)[:500],
                 "context": {},
             }
@@ -449,7 +449,7 @@ class ExceptionHandlers:
         return JSONResponse(
             status_code=_get_http_status(exc),
             content=content,
-            headers={"X-Error-Code": str(getattr(exc, 'code', "SISYS_999") or "SISYS_999")},
+            headers={"X-Error-Code": str(getattr(exc, 'code', "EXCEPTION_999") or "EXCEPTION_999")},
         )
 
     async def _handle_validation_error(
@@ -470,13 +470,13 @@ class ExceptionHandlers:
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "error": {
-                    "code": "SISYS_201",
+                    "code": "EXCEPTION_201",
                     "message": "Validation error",
                     "context": {"validation_errors": errors},
                 },
                 "request_id": request_id,
             },
-            headers={"X-Error-Code": "SISYS_201"},
+            headers={"X-Error-Code": "EXCEPTION_201"},
         )
 
     async def _handle_pydantic_error(
@@ -488,7 +488,7 @@ class ExceptionHandlers:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "error": {
-                    "code": "SISYS_201",
+                    "code": "EXCEPTION_201",
                     "message": "Data validation error",
                     "context": {"errors": exc.errors()},
                 },
@@ -509,11 +509,11 @@ class ExceptionHandlers:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": {
-                    "code": "SISYS_999",
+                    "code": "EXCEPTION_999",
                     "message": "Internal server error",
                 },
             },
-            headers={"X-Error-Code": "SISYS_999"},
+            headers={"X-Error-Code": "EXCEPTION_999"},
         )
 
 
@@ -532,7 +532,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 ```python
 # src/infrastructure/messaging/error_mapper.py
 
-"""外部 SDK 错误到 SISYS 异常的标准化映射.
+"""外部 SDK 错误到异常的标准化映射.
 
 注意：优先使用类型匹配（isinstance）而非字符串匹配。
 对于 MinIO S3Error，应使用 error.code 属性直接映射（见 map_s3_error）。
@@ -573,7 +573,7 @@ class ErrorMapper:
     """
 
     # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
-    S3_ERROR_MAP: dict[str, type[SisysBaseException]] = {
+    S3_ERROR_MAP: dict[str, type[BaseException]] = {
         "NoSuchBucket": NotFoundError,
         "NoSuchKey": NotFoundError,
         "BucketAlreadyExists": ConflictError,
@@ -592,14 +592,14 @@ class ErrorMapper:
     }
 
     # RabbitMQ 错误映射
-    RABBITMQ_ERROR_MAP: dict[str, type[SisysBaseException]] = {
+    RABBITMQ_ERROR_MAP: dict[str, type[BaseException]] = {
         "ConnectionError": NetworkError,
         "ChannelError": MessageBusError,
         "TimeoutError": TimeoutError,
     }
 
     # Redis 错误映射
-    REDIS_ERROR_MAP: dict[str, type[SisysBaseException]] = {
+    REDIS_ERROR_MAP: dict[str, type[BaseException]] = {
         "ConnectionError": NetworkError,
         "TimeoutError": TimeoutError,
         "ClusterDownError": ServiceUnavailableError,
@@ -614,7 +614,7 @@ class ErrorMapper:
             message: 原始错误消息
 
         Returns:
-            对应的 SISYS 异常实例
+            对应的异常实例
         """
         exc_class = cls.S3_ERROR_MAP.get(code, ThirdPartyError)
         return exc_class(message=message or f"S3 error: {code}")
@@ -638,7 +638,7 @@ class ErrorMapper:
         target_exc_class: type[ExternalException],
         context: dict | None = None,
     ) -> ExternalException:
-        """包装外部错误为 SISYS 异常.
+        """包装外部错误为异常.
 
         推荐用法（替代装饰器）：
             try:
@@ -699,7 +699,7 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any
 
-from src.domain.exceptions import SisysBaseException
+from src.domain.exceptions import BaseException
 
 
 class ExceptionJsonFormatter(logging.Formatter):
@@ -708,12 +708,12 @@ class ExceptionJsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         if record.exc_info and record.exc_info[0]:
             exc = record.exc_info[1]
-            if isinstance(exc, SisysBaseException):
-                return self._format_sisys_exception(record, exc)
+            if isinstance(exc, BaseException):
+                return self._format_exception(record, exc)
         return self._format_standard(record)
 
-    def _format_sisys_exception(
-        self, record: logging.LogRecord, exc: SisysBaseException
+    def _format_exception(
+        self, record: logging.LogRecord, exc: BaseException
     ) -> str:
         log_entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -740,7 +740,7 @@ def configure_exception_logging() -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(ExceptionJsonFormatter())
 
-    logger = logging.getLogger("sisys")
+    logger = logging.getLogger("exception")
     logger.addHandler(handler)
     logger.setLevel(logging.ERROR)
 ```
