@@ -113,11 +113,17 @@ class BaseException(Exception):
         super().__init__(self.message)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "code": self.code,
             "message": self.message,
             "context": self.context,
         }
+        if self.cause:
+            result["cause"] = {
+                "type": type(self.cause).__name__,
+                "message": str(self.cause),
+            }
+        return result
 
 
 # === 系统级异常（System）===
@@ -192,6 +198,22 @@ class InvalidStateError(BusinessException):
     message = "Invalid state"
 
 
+class InvalidStateTransitionError(InvalidStateError):
+    """状态转换异常（保留 from_status/to_status 接口）.
+
+    用于 Outbox 等状态机的状态转换验证。
+    """
+    def __init__(
+        self,
+        from_status: str,
+        to_status: str,
+        message: str | None = None,
+    ) -> None:
+        self.from_status = from_status
+        self.to_status = to_status
+        super().__init__(message or f"Invalid transition from {from_status} to {to_status}")
+
+
 class BusinessRuleViolationError(BusinessException):
     """业务规则违反."""
     code = "EXCEPTION_207"
@@ -227,11 +249,12 @@ class SystemExceptionMeta(type):
     """确保 SystemException 子类定义了具体错误码."""
     def __new__(mcs, name, bases, namespace):
         cls = super().__new__(mcs, name, bases, namespace)
-        # 中间类（SystemException本身）不需要具体码
         if bases and name != "SystemException":
-            if not hasattr(cls, 'code') or cls.code == "EXCEPTION_1XX":
+            # 占位码集合（中间类的标记值）
+            placeholder_codes = {"EXCEPTION_1XX", "EXCEPTION_2XX", "EXCEPTION_3XX"}
+            if not hasattr(cls, 'code') or cls.code in placeholder_codes:
                 if name not in ('SystemException', 'BusinessException', 'ExternalException'):
-                    raise TypeError(f"{name} must define a concrete code like 'EXCEPTION_1XX'")
+                    raise TypeError(f"{name} must define a concrete code")
         return cls
 ```
 
@@ -252,7 +275,9 @@ from src.domain.exceptions import (
     AuthenticationError,
     ValidationError,
     ConflictError,
-    InvalidStateError as DomainInvalidStateError,
+    InvalidStateError,
+    InvalidStateTransitionError,
+    BusinessRuleViolationError,
     ExternalException,
     NetworkError,
     TimeoutError,
@@ -262,11 +287,10 @@ from src.domain.exceptions import (
 
 # === 领域层异常 ===
 
-# 审计错误是系统级基础设施问题（非业务规则违反）
-AuditError = SystemException
+AuditError = BusinessException  # 审计错误是业务级（谁在何时做了什么）
 
 PasswordValidationError = ValidationError
-ComplianceLockError = BusinessException  # 合规锁定是业务规则违反
+ComplianceLockError = BusinessRuleViolationError  # 合规锁定是业务规则违反
 
 # 领域服务异常
 MemoryVersionConflictError = ConflictError  # 版本冲突是冲突类
@@ -279,16 +303,15 @@ RoleNotFoundError = NotFoundError
 CannotDeleteSystemRoleError = BusinessRuleViolationError
 CannotDeleteRoleWithUsersError = ConflictError
 
-# 沙箱异常
+# 沙箱异常（保留继承层次）
 SandboxError = ExternalException
-ContainerStartError = ExternalException
-ExecutionError = ExternalException
-ContainerStopError = ExternalException
+ContainerStartError = SandboxError
+ExecutionError = SandboxError
+ContainerStopError = SandboxError
 
 # === 基础设施层异常 ===
 
-InvalidStateTransitionError = DomainInvalidStateError  # 合并到已有状态异常
-VersionError = SystemException
+VersionError = ConflictError  # 乐观锁冲突是冲突类
 
 # MinIO 异常
 BucketNotFoundError = NotFoundError
@@ -296,15 +319,6 @@ MinIOConnectionError = NetworkError
 
 # 权限异常
 InsufficientTokenError = AuthenticationError
-
-# ComplianceLockError 归类为业务规则违反
-ComplianceLockError = BusinessRuleViolationError
-
-# InvalidStateTransitionError 保留原始接口，继承自 InvalidStateError
-InvalidStateTransitionError = InvalidStateError  # 接口兼容：from_status, to_status
-
-# VersionError 是乐观锁冲突，不是系统错误
-VersionError = ConflictError
 
 __all__ = [
     # 基类和三层异常
@@ -318,8 +332,9 @@ __all__ = [
     "AuthenticationError",
     "ValidationError",
     "ConflictError",
-    "DomainInvalidStateError",
-    "BusinessException",
+    "InvalidStateError",
+    "InvalidStateTransitionError",
+    "BusinessRuleViolationError",
     # 遗留别名
     "AuditError",
     "PasswordValidationError",
@@ -334,7 +349,6 @@ __all__ = [
     "ContainerStartError",
     "ExecutionError",
     "ContainerStopError",
-    "InvalidStateTransitionError",
     "VersionError",
     "BucketNotFoundError",
     "MinIOConnectionError",
@@ -544,6 +558,7 @@ from functools import wraps
 from typing import Callable, TypeVar
 
 from src.domain.exceptions import (
+    BaseException,
     ExternalException,
     ThirdPartyError,
     TimeoutError,
@@ -554,6 +569,8 @@ from src.domain.exceptions import (
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
+    ValidationError,
+    BusinessRuleViolationError,
     MessageBusError,
 )
 
@@ -573,6 +590,7 @@ class ErrorMapper:
     """
 
     # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
+    # 注意：UnknownError 作为兜底返回，确保始终返回领域异常而非原始 S3Error
     S3_ERROR_MAP: dict[str, type[BaseException]] = {
         "NoSuchBucket": NotFoundError,
         "NoSuchKey": NotFoundError,
@@ -580,14 +598,14 @@ class ErrorMapper:
         "BucketAlreadyOwnedByYou": ConflictError,
         "AccessDenied": PermissionDeniedError,
         "Forbidden": PermissionDeniedError,
-        "InvalidObjectState": SystemException,
-        "ObjectLockConfigurationNotFoundError": SystemException,
+        "InvalidObjectState": BusinessRuleViolationError,  # WORM 合规锁定是业务规则违反
+        "ObjectLockConfigurationNotFoundError": BusinessRuleViolationError,  # WORM 合规锁定是业务规则违反
         "RequestTimeout": TimeoutError,
         "ServiceUnavailable": ServiceUnavailableError,
-        "InternalError": SystemException,
+        "InternalError": ThirdPartyError,  # S3 内部错误，非业务错误
         "NoSuchUpload": NotFoundError,
         "EntityTooLarge": ValidationError,
-        "MethodNotAllowed": BusinessException,
+        "MethodNotAllowed": ThirdPartyError,  # S3 层面方法限制是外部服务错误
         "SlowDown": ServiceUnavailableError,
     }
 
