@@ -37,7 +37,7 @@ from src.domain.exceptions.system_exceptions import NetworkError, SystemExceptio
 class AuditError(SystemException):
     """审计操作异常."""
 
-    code = "EXCEPTION_101"
+    code = "EXCEPTION_105"
     message = "Audit operation failed"
 
 
@@ -47,9 +47,9 @@ class PasswordValidationError(ValidationError):
 
     code = "EXCEPTION_201"
 
-    def __init__(self, message: str, code: str) -> None:
+    def __init__(self, message: str, code: str | None = None) -> None:
         self.message = message
-        self.code = code
+        self.code = code or self.__class__.code
         super().__init__(message)
 
 
