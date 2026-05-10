@@ -1,12 +1,13 @@
 # SISYS EDA + UnitOfWork 宗师级设计方案
 
-> **文档版本：** 1.0.2
+> **文档版本：** 1.0.3
 > **创建日期：** 2026-05-10
-> **状态：** 已批准（Round 2 审查后修订）
+> **状态：** 已批准（Round 3 审查后修订）
 > **维护者：** Agimtech
 > **修订记录**：
 > - v1.0.1: Round 1 审查修复 — 修正 Eventuate Tram 产品线混淆、Axon Outbox 描述错误、补充六边形架构约束、明确 EventStore 迁移范围、修正 `__aexit__` 返回值语义
 > - v1.0.2: Round 2 审查修复 — EventHandler 依赖 UnitOfWork 接口、修正 savepoint API、补充 AsyncOutboxPoller 事务说明、明确文档 vs 实现差异、架构验证测试补强、修复领域层测试架构违规
+> - v1.0.3: Round 3 审查修复 — 修正 savepoint API 语义（移除 release_nested 不当描述）、修正 begin_nested 命名说明、补充 __aexit__ rollback 失败处理、明确 AsyncOutboxPoller 发布非事务性局限、修正 Phase 2 模板接口类型
 
 ---
 
@@ -176,20 +177,17 @@ class PostgreSQLUnitOfWork:
         self._rolled_back = True
 
     async def begin_nested(self) -> None:
-        """创建 savepoint，支持嵌套事务。
+        """创建 savepoint（嵌套事务）。
 
-        使用 SQLAlchemy 的 begin_nested() 创建命名 savepoint。
-        在嵌套操作完成后调用 release_nested() 释放。
+        使用 SQLAlchemy 的 begin_nested() 创建**未命名** savepoint。
+        savepoint 内的操作可通过 rollback() 回滚到 savepoint 点，
+        或通过外层 commit() 一起提交。
+
+        注意：SQLAlchemy 无"释放 savepoint" API。
+        调用 commit() 会提交整个事务链（包括所有 savepoint）。
+        若需回滚单个 savepoint，使用 rollback()。
         """
         await self._session.begin_nested()
-
-    async def release_nested(self) -> None:
-        """释放 savepoint，提交嵌套事务部分。
-
-        注意：SQLAlchemy 的 savepoint commit 只会提交 savepoint 内的更改，
-        不会影响外层事务。
-        """
-        await self._session.commit()
 
     # async with 协议支持
     async def __aenter__(self) -> "PostgreSQLUnitOfWork":
@@ -205,14 +203,18 @@ class PostgreSQLUnitOfWork:
         """异步上下文管理器出口。
 
         规则：
-        - 异常：rollback（即使已部分 commit）
+        - 异常：rollback（处理 rollback 失败也要 close session）
         - 正常：仅在未手动 commit/rollback 时才 commit
         - 始终 close session
         - 返回 False：不吞没异常
         """
         if exc_type is not None:
             if not self._rolled_back:
-                await self.rollback()
+                try:
+                    await self.rollback()
+                except Exception:
+                    await self.close()
+                    raise  # 回滚失败也抛出原异常
         elif not self._committed and not self._rolled_back:
             await self.commit()
         await self.close()
@@ -389,16 +391,18 @@ class TestUoWTransactionBoundary:
 2. **实现** `PostgreSQLUnitOfWork` 增强（文档 3.3 节的设计代码需实现到源码）：
    - 添加 `session` 属性访问器
    - 添加 `_committed/_rolled_back` guard 逻辑
-   - 添加 `begin_nested()/release_nested()` savepoint 支持
-   - 修正 `__aexit__` 返回 `False`
+   - 添加 `begin_nested()` savepoint 支持
+   - 修正 `__aexit__` 返回 `False` 并处理 rollback 失败
    - 实现 `InvalidStateError` 异常类
 3. 将 `PostgreSQLEventStore` 纳入事务边界管理
 4. 创建架构验证测试 `tests/unit/infrastructure/test_uow_transaction_boundary.py`
 
+> **注意**：当前 `src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py` 的实现**尚未包含**上述任何增强功能。Phase 1 的目标是实现这些功能。
+
 **完成标准**：
 - [ ] `PostgreSQLUnitOfWork` 实现包含 `session` 属性访问器
 - [ ] 重复 commit/rollback 会抛出 `InvalidStateError`
-- [ ] `__aexit__` 返回 `False`（不吞没异常）
+- [ ] `__aexit__` 返回 `False`（不吞没异常），rollback 失败时正确传播异常
 - [ ] `test_uow_provides_session_property` 和 `test_uow_prevents_double_commit` 测试通过
 - [ ] 架构验证测试通过（六边形依赖方向检查）
 - [ ] `test_event_handler_depends_on_unit_of_work_interface` 验证应用层依赖接口而非具体实现
@@ -406,13 +410,15 @@ class TestUoWTransactionBoundary:
 ### Phase 2：新增代码使用 UoW（持续）
 
 **规则**：
-- 新增 EventHandler 涉及 outbox/event store 写入时，使用 `PostgreSQLUnitOfWork` 管理事务
+- 新增 EventHandler 涉及 outbox/event store 写入时，使用 `UnitOfWork` 接口管理事务
 - EventHandler 内部通过 `uow.session` 获取 session 传入各 Repository
 
 **模板**：
 ```python
+from src.domain.ports.unit_of_work import UnitOfWork
+
 class SomeEventHandler:
-    def __init__(self, uow: PostgreSQLUnitOfWork):
+    def __init__(self, uow: UnitOfWork):  # 依赖接口，非具体实现
         self._uow = uow
         self._outbox_repo = PostgreSQLOutboxRepository(uow.session)
         self._business_repo = SomeBusinessRepo(uow.session)
@@ -433,23 +439,36 @@ class SomeEventHandler:
 
 **AsyncOutboxPoller 事务问题说明**：
 
-现有 `AsyncOutboxPoller` 实现存在事务问题：
+> **核心约束**：RabbitMQ 发布是外部网络操作，**不是**数据库事务。无法将 RabbitMQ 发布与数据库操作放在同一事务中。
+
+现有 `AsyncOutboxPoller` 实现的问题：
 
 ```python
-# 当前实现（有问题）
-await self._repo._mark_published_entity(entity)  # 发布成功后独立 commit
-# 发布和标记 published 在同一 session 但非原子操作
+# 当前实现
+await self._repo.async_publish(entity)  # 发送到 RabbitMQ（网络操作，非 DB 事务）
+self._repo._mark_published_entity(entity)  # 标记为已发布
 # 若 async_publish 成功但 _mark_published_entity 失败 → 重复发布
+# 若 DB rollback 但 async_publish 已成功 → 消息已发送无法撤回
 ```
 
-迁移方案：
+**正确方案**：使用**事务性发件箱**（Transactional Outbox）而非同步 publish：
+
 ```python
-# UoW 模式（正确）
+# 事务性 Outbox 模式
 async with uow:
-    await self._repo.async_publish(entity)  # 发布
-    self._repo._mark_published_entity(entity)  # 标记（同一事务）
-# 原子性保证：发布和标记要么同时成功，要么同时回滚
+    # 1. 在同一 DB 事务中写入 outbox 表
+    self._outbox_repo.save(entity)  # 写入 outbox 表（与业务操作同事务）
+    self._business_repo.update(...)  # 业务表更新
+
+# 2. AsyncOutboxPoller 轮询 outbox 表，发布到 RabbitMQ
+# 3. 发布成功后标记为已发布（独立事务，幂等性保证不重复发布）
 ```
+
+**幂等性保证**：RabbitMQEventListener 使用 `DualIdempotencyChecker` 基于 event_id 做幂等检查，确保重复消费不会重复处理。
+
+**UoW 在此场景的作用**：
+- UoW 管理 `outbox_repo.save()` 和 `business_repo.update()` 的**数据库事务原子性**
+- RabbitMQ 发布是**最终一致性**的，不在 UoW 事务范围内
 
 **迁移检查清单**：
 - [ ] 所有涉及 outbox/event store 写入的 EventHandler 已改造
