@@ -992,47 +992,41 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 ### 4.1 阶段一：建立基础设施（2-3 人日）
 
-1. 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
-2. 创建 `src/domain/exceptions/legacy.py` - 遗留异常别名兼容层（覆盖 25+ 异常）
-3. 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
-4. 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
-5. 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
-6. 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
+- [ ] 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
+- [ ] 创建 `src/domain/exceptions/legacy.py` - 遗留异常别名兼容层（覆盖 25+ 异常）
+- [ ] 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
+- [ ] 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
+- [ ] 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
+- [ ] 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
 
 ### 4.2 阶段二：全面迁移（8-10 人日）
 
 #### 第一批：高优先级（API 层）
 
-| 文件 | 异常数 | 描述 |
-|------|--------|------|
-| `src/domain/ports/audit_service.py` | 1 | AuditError → SystemException |
-| `src/domain/ports/auth_service.py` | 1 | AuthenticationError → BusinessException |
-| `src/infrastructure/security/permission_middleware.py` | 2 | PermissionDeniedError, InsufficientTokenError |
+- [ ] `src/domain/ports/audit_service.py` - AuditError → SystemException
+- [ ] `src/domain/ports/auth_service.py` - AuthenticationError → BusinessException
+- [ ] `src/infrastructure/security/permission_middleware.py` - PermissionDeniedError, InsufficientTokenError
 
 #### 第二批：中优先级（应用层）
 
-| 文件 | 异常数 | 描述 |
-|------|--------|------|
-| `src/application/use_cases/role_management.py` | 4 | RoleAlreadyExistsError 等 |
-| `src/application/ports/sandbox_port.py` | 4 | SandboxError 等 |
-| `src/domain/services/memory_service.py` | 2 | MemoryVersionConflictError, MemoryNotFoundError |
+- [ ] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
+- [ ] `src/application/ports/sandbox_port.py` - SandboxError 等（4个）
+- [ ] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
 
 #### 第三批：低优先级（基础设施层）
 
-| 文件 | 异常数 | 描述 |
-|------|--------|------|
-| `src/infrastructure/storage/minio/client_adapter.py` | 4 | 使用 ErrorMapper 替代私有 _map_error |
-| `src/infrastructure/messaging/outbox/outbox.py` | 1 | InvalidStateTransitionError → InvalidStateError |
-| `src/infrastructure/messaging/event_store.py` | 1 | VersionError → SystemException |
-| `src/domain/ports/password_validation_service.py` | 1 | PasswordValidationError → ValidationError |
-| `src/domain/ports/storage.py` | 1 | ComplianceLockError → BusinessException |
+- [ ] `src/infrastructure/storage/minio/client_adapter.py` - 使用 ErrorMapper 替代私有 _map_error
+- [ ] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
+- [ ] `src/infrastructure/messaging/event_store.py` - VersionError → SystemException
+- [ ] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
+- [ ] `src/domain/ports/storage.py` - ComplianceLockError → BusinessException
 
 ### 4.3 阶段三：完善与优化（3-5 人日）
 
-1. 实现结构化日志集成
-2. 实现异常监控指标
-3. 编写回归测试确保无破坏性变更
-4. 统一 ErrorMapper 与现有 _map_error 方法
+- [ ] 实现结构化日志集成
+- [ ] 实现异常监控指标
+- [ ] 编写回归测试确保无破坏性变更
+- [ ] 统一 ErrorMapper 与现有 _map_error 方法
 
 ---
 
