@@ -20,12 +20,6 @@ class AuthTokens:
     refresh_token: str
 
 
-class AuthenticationError(Exception):
-    """认证失败异常（领域层异常，无需导入外部库）."""
-
-    pass
-
-
 class AuthServicePort(Protocol):
     """认证服务端口（领域层定义，仅使用 ABC + 标准库）.
 

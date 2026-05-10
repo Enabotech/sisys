@@ -21,30 +21,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.events.memory_events import MemoryChanged
-
-
-@dataclass
-class MemoryVersionConflictError(Exception):
-    """版本冲突异常。"""
-
-    memory_id: UUID
-    message: str = "版本冲突"
-
-    def __init__(self, memory_id: UUID, message: str = "版本冲突"):
-        self.memory_id = memory_id
-        super().__init__(message)
-
-
-@dataclass
-class MemoryNotFoundError(Exception):
-    """记忆不存在异常。"""
-
-    memory_id: UUID
-    message: str = "记忆不存在"
-
-    def __init__(self, memory_id: UUID, message: str = "记忆不存在"):
-        self.memory_id = memory_id
-        super().__init__(message)
+from src.domain.exceptions.legacy import MemoryNotFoundError
 
 
 @dataclass

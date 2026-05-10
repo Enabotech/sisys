@@ -9,41 +9,14 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.entities.role import Role
+from src.domain.exceptions.legacy import (
+    CannotDeleteRoleWithUsersError,
+    CannotDeleteSystemRoleError,
+    RoleAlreadyExistsError,
+    RoleNotFoundError,
+)
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.domain.ports.user_role_repository import UserRoleRepositoryPort
-
-
-class RoleAlreadyExistsError(Exception):
-    """Raised when attempting to create a role with a name that already exists."""
-
-    def __init__(self, name: str):
-        self.name = name
-        super().__init__(f"Role with name '{name}' already exists")
-
-
-class RoleNotFoundError(Exception):
-    """Raised when a role is not found."""
-
-    def __init__(self, role_id: UUID):
-        self.role_id = role_id
-        super().__init__(f"Role with id '{role_id}' not found")
-
-
-class CannotDeleteSystemRoleError(Exception):
-    """Raised when attempting to delete a system-reserved role."""
-
-    def __init__(self, role_id: UUID):
-        self.role_id = role_id
-        super().__init__(f"Cannot delete system-reserved role '{role_id}'")
-
-
-class CannotDeleteRoleWithUsersError(Exception):
-    """Raised when attempting to delete a role that has associated users."""
-
-    def __init__(self, role_id: UUID, user_count: int):
-        self.role_id = role_id
-        self.user_count = user_count
-        super().__init__(f"Cannot delete role '{role_id}' - {user_count} users are assigned to this role")
 
 
 class RoleService:

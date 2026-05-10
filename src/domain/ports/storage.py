@@ -10,13 +10,6 @@ from collections.abc import AsyncIterator
 from typing import Protocol
 
 
-class ComplianceLockError(Exception):
-    """WORM 合规锁定异常。
-
-    尝试删除或修改处于 WORM 保留期内的对象时抛出。
-    """
-
-
 class ObjectStorageRepository(Protocol):
     """对象存储领域仓储接口。
 

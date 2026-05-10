@@ -17,18 +17,6 @@ from src.domain.value_objects.token_payload import TokenPayload
 from src.infrastructure.security.jwt_service import JWTService
 
 
-class PermissionDeniedError(Exception):
-    """权限不足异常."""
-
-    pass
-
-
-class InsufficientTokenError(Exception):
-    """Token 信息不足异常."""
-
-    pass
-
-
 def get_current_user(
     authorization: str | None = None,
     jwt_service: JWTService | None = None,
