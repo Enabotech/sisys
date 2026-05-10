@@ -5,11 +5,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
+from src.domain.exceptions.invalid_state_error import InvalidStateError
 from src.domain.ports.unit_of_work import UnitOfWork
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -27,18 +30,51 @@ class PostgreSQLUnitOfWork(UnitOfWork):
             session: SQLAlchemy 异步会话
         """
         self._session = session
+        self._committed = False
+        self._rolled_back = False
+
+    @property
+    def session(self) -> AsyncSession:
+        """获取当前事务的 session。
+
+        EventHandler 使用此属性提取 session 传入各 Repository。
+        """
+        return self._session
 
     async def begin(self) -> None:
         """开始事务。"""
         await self._session.begin()
 
     async def commit(self) -> None:
-        """提交事务。"""
+        """显式提交 + 幂等标记。"""
+        if self._committed:
+            raise InvalidStateError("Already committed")
+        if self._rolled_back:
+            raise InvalidStateError("Already rolled back")
         await self._session.commit()
+        self._committed = True
 
     async def rollback(self) -> None:
-        """回滚事务。"""
+        """回滚 + 标记。"""
+        if self._committed:
+            raise InvalidStateError("Already committed")
+        if self._rolled_back:
+            raise InvalidStateError("Already rolled back")
         await self._session.rollback()
+        self._rolled_back = True
+
+    async def begin_nested(self) -> None:
+        """创建 savepoint（嵌套事务）。
+
+        使用 SQLAlchemy 的 begin_nested() 创建未命名 savepoint。
+        savepoint 内的操作可通过 rollback() 回滚到 savepoint 点，
+        或通过外层 commit() 一起提交。
+
+        注意：SQLAlchemy 无"释放 savepoint" API。
+        调用 commit() 会提交整个事务链（包括所有 savepoint）。
+        若需回滚单个 savepoint，使用 rollback()。
+        """
+        await self._session.begin_nested()
 
     async def close(self) -> None:
         """关闭会话。"""
@@ -49,10 +85,28 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         await self.begin()
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """异步上下文管理器出口。"""
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
+        """异步上下文管理器出口。
+
+        规则：
+        - 异常：rollback（处理 rollback 失败也要 close session）
+        - 正常：仅在未手动 commit/rollback 时才 commit
+        - 始终 close session
+        - 返回 False：不吞没异常
+        """
         if exc_type is not None:
-            await self.rollback()
-        else:
+            if not self._rolled_back:
+                try:
+                    await self.rollback()
+                except Exception:
+                    await self.close()
+                    raise
+        elif not self._committed and not self._rolled_back:
             await self.commit()
         await self.close()
+        return False

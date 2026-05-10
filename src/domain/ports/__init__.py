@@ -14,6 +14,7 @@ from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.session_storage import SessionStorage
 from src.domain.ports.storage_enums import DataAccessPattern, StorageLayer, StorageTier
 from src.domain.ports.unified_storage import UnifiedStoragePort
+from src.domain.ports.unit_of_work import UnitOfWork
 
 __all__ = [
     "DataAccessPattern",
@@ -31,4 +32,5 @@ __all__ = [
     "StorageLayer",
     "StorageTier",
     "UnifiedStoragePort",
+    "UnitOfWork",
 ]

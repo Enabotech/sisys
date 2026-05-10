@@ -6,46 +6,64 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any, Self
+from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
-class UnitOfWork(ABC):
+@runtime_checkable
+class UnitOfWork(Protocol):
     """抽象工作单元接口。
 
     定义事务边界：begin(), commit(), rollback(), close()。
     支持异步上下文管理器协议。
     """
 
-    @abstractmethod
+    @property
+    def session(self) -> object:
+        """获取当前事务的 session。
+
+        EventHandler 使用此属性提取 session 传入各 Repository。
+        """
+        ...
+
     async def begin(self) -> None:
         """开始事务。"""
-        raise NotImplementedError
+        ...
 
-    @abstractmethod
     async def commit(self) -> None:
         """提交事务。"""
-        raise NotImplementedError
+        ...
 
-    @abstractmethod
     async def rollback(self) -> None:
         """回滚事务。"""
-        raise NotImplementedError
+        ...
 
-    @abstractmethod
     async def close(self) -> None:
         """关闭会话。"""
-        raise NotImplementedError
+        ...
+
+    async def begin_nested(self) -> None:
+        """创建 savepoint（嵌套事务）。"""
+        ...
 
     async def __aenter__(self) -> Self:
         """异步上下文管理器入口。"""
-        await self.begin()
-        return self
+        ...
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """异步上下文管理器出口。"""
-        if exc_type is not None:
-            await self.rollback()
-        else:
-            await self.commit()
-        await self.close()
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
+        """异步上下文管理器出口。
+
+        规则：
+        - 异常：rollback
+        - 正常：仅在未手动 commit/rollback 时才 commit
+        - 始终 close session
+        - 返回 False：不吞没异常
+        """
+        ...
