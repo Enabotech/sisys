@@ -79,10 +79,17 @@ class InvalidStateTransitionError(InvalidStateError):
     ) -> None:
         self.from_status = from_status
         self.to_status = to_status
+        context = {"from_status": from_status, "to_status": to_status}
         if message:
-            super().__init__(f"Invalid state transition: {from_status} → {to_status}: {message}")
+            super().__init__(
+                f"Invalid state transition: {from_status} → {to_status}: {message}",
+                context=context,
+            )
         else:
-            super().__init__(f"Invalid state transition: {from_status} → {to_status}")
+            super().__init__(
+                f"Invalid state transition: {from_status} → {to_status}",
+                context=context,
+            )
 
 
 __all__ = [

@@ -32,15 +32,18 @@ class BaseException(Exception):  # noqa: N818
     def to_dict(self) -> dict:
         """转换为字典格式，便于序列化和日志记录."""
         result = {
-            "code": self.code or "EXCEPTION_000",
-            "message": self.message or "Unknown error",
-            "context": self.context or {},
+            "code": self.code,
+            "message": self.message,
+            "context": self.context,
         }
         if self.cause:
-            result["cause"] = {
-                "type": type(self.cause).__name__,
-                "message": str(self.cause),
-            }
+            if isinstance(self.cause, BaseException):
+                result["cause"] = self.cause.to_dict()
+            else:
+                result["cause"] = {
+                    "type": type(self.cause).__name__,
+                    "message": str(self.cause),
+                }
         return result
 
 

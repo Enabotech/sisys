@@ -88,8 +88,8 @@ class ExceptionHandlers:
     def _register_handlers(self) -> None:
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)  # type: ignore[arg-type]
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)  # type: ignore[arg-type]
-        self._app.add_exception_handler(Exception, self._handle_unexpected_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)  # type: ignore[arg-type]
+        self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     async def _handle_exception(self, request: Request, exc: BaseException) -> JSONResponse:
         request_id = getattr(request.state, "request_id", None) or "unknown"
