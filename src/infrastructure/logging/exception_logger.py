@@ -42,7 +42,13 @@ class ExceptionJsonFormatter(logging.Formatter):
         return json.dumps(log_entry)
 
     def _format_standard(self, record: logging.LogRecord) -> str:
-        return super().format(record)
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        return json.dumps(log_entry)
 
 
 def configure_exception_logging() -> None:

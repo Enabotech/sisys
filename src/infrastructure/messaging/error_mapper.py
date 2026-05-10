@@ -127,7 +127,7 @@ class ErrorMapper:
         )
         return target_exc_class(
             message=str(error),
-            cause=error,  # type: ignore[arg-type]  # external errors may not be BaseException subclasses
+            cause=error if isinstance(error, BaseException) else None,
             context=context,
         )
 
