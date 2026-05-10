@@ -297,8 +297,14 @@ MinIOConnectionError = NetworkError
 # 权限异常
 InsufficientTokenError = AuthenticationError
 
-# 多个文件重复定义的 PermissionDeniedError 统一为 BusinessException
-PermissionDeniedError = PermissionDeniedError  # 已是新体系
+# ComplianceLockError 归类为业务规则违反
+ComplianceLockError = BusinessRuleViolationError
+
+# InvalidStateTransitionError 保留原始接口，继承自 InvalidStateError
+InvalidStateTransitionError = InvalidStateError  # 接口兼容：from_status, to_status
+
+# VersionError 是乐观锁冲突，不是系统错误
+VersionError = ConflictError
 
 __all__ = [
     # 基类和三层异常
@@ -359,10 +365,18 @@ from src.domain.exceptions import (
 
 # 异常类型 → HTTP 状态码映射表（唯一真相源）
 EXCEPTION_HTTP_MAP: dict[type[SisysBaseException], int] = {
+    # 三层基类
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
     BusinessException: status.HTTP_400_BAD_REQUEST,
     ExternalException: status.HTTP_502_BAD_GATEWAY,
-    # 具体异常覆盖
+    # 具体异常精确覆盖
+    NotFoundError: status.HTTP_404_NOT_FOUND,
+    PermissionDeniedError: status.HTTP_403_FORBIDDEN,
+    AuthenticationError: status.HTTP_401_UNAUTHORIZED,
+    ConflictError: status.HTTP_409_CONFLICT,
+    ValidationError: status.HTTP_400_BAD_REQUEST,
+    TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
+    ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
