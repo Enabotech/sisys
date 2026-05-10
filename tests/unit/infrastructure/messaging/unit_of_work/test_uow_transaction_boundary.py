@@ -34,7 +34,7 @@ class TestUoWTransactionBoundary:
         import asyncio
         from unittest.mock import AsyncMock, MagicMock
 
-        from src.domain.exceptions.invalid_state_error import InvalidStateError
+        from src.domain.exceptions import InvalidStateError
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
             PostgreSQLUnitOfWork,
         )
@@ -60,7 +60,7 @@ class TestUoWTransactionBoundary:
         import asyncio
         from unittest.mock import AsyncMock, MagicMock
 
-        from src.domain.exceptions.invalid_state_error import InvalidStateError
+        from src.domain.exceptions import InvalidStateError
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
             PostgreSQLUnitOfWork,
         )

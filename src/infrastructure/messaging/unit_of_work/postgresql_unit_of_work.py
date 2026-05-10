@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Self
 
-from src.domain.exceptions.invalid_state_error import InvalidStateError
+from src.domain.exceptions import InvalidStateError
 from src.domain.ports.unit_of_work import UnitOfWork
 
 if TYPE_CHECKING:
