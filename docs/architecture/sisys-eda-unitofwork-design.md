@@ -1,14 +1,15 @@
 # SISYS EDA + UnitOfWork 宗师级设计方案
 
-> **文档版本：** 1.0.4
+> **文档版本：** 1.0.5
 > **创建日期：** 2026-05-10
-> **状态：** 已批准（Round 4 审查后修订）
+> **状态：** 已批准（Round 5 审查后修订）
 > **维护者：** Agimtech
 > **修订记录**：
 > - v1.0.1: Round 1 审查修复
 > - v1.0.2: Round 2 审查修复
 > - v1.0.3: Round 3 审查修复
-> - v1.0.4: Round 4 审查修复 — 修正 UnitOfWork 使用 ABC 改为 Protocol、修正 OutboxRepository 同步方法与 async 调用不匹配、补充 NServiceBus Outbox 显式配置说明、补充 Eventuate Tram OutboxMonitor 轮询机制说明
+> - v1.0.4: Round 4 审查修复
+> - v1.0.5: Round 5 审查修复 — 澄清文档与实现的边界（设计文档描述目标架构，实现需 Phase 1-3 落地）；明确修订记录中"修正 UnitOfWork 使用 ABC 改为 Protocol"为**待实现**目标而非已完成
 
 ---
 
