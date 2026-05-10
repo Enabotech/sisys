@@ -1023,10 +1023,10 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 ### 4.3 阶段三：完善与优化（3-5 人日）
 
-- [ ] 实现结构化日志集成
-- [ ] 实现异常监控指标
-- [ ] 编写回归测试确保无破坏性变更
-- [ ] 统一 ErrorMapper 与现有 _map_error 方法
+- [x] 实现结构化日志集成 - `src/infrastructure/logging/exception_logger.py`
+- [x] 实现异常监控指标 - `src/infrastructure/logging/exception_metrics.py`
+- [x] 编写回归测试确保无破坏性变更 - 2348 tests passed
+- [x] 统一 ErrorMapper 与现有 _map_error 方法 - client_adapter.py 委托给 ErrorMapper
 
 ---
 
