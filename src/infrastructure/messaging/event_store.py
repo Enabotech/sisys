@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
-from src.domain.exceptions.legacy import VersionError
+from src.domain.exceptions.event_exceptions import VersionError
 
 logger = logging.getLogger(__name__)
 

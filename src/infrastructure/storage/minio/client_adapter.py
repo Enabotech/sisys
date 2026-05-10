@@ -11,9 +11,9 @@ from minio.error import S3Error
 
 from src.domain.exceptions import InvalidStateError, NotFoundError, PermissionDeniedError
 from src.domain.exceptions.external_exceptions import ThirdPartyError
-from src.domain.exceptions.legacy import (
+from src.domain.exceptions.service_exceptions import ComplianceLockError
+from src.domain.exceptions.storage_exceptions import (
     BucketNotFoundError,
-    ComplianceLockError,
     MinIOConnectionError,
 )
 from src.infrastructure.config.minio import MinIOConfig

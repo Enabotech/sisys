@@ -21,7 +21,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.events.memory_events import MemoryChanged
-from src.domain.exceptions.legacy import MemoryNotFoundError, MemoryVersionConflictError
+from src.domain.exceptions.storage_exceptions import (
+    MemoryNotFoundError,
+    MemoryVersionConflictError,
+)
 
 __all__ = ["MemoryNotFoundError", "MemoryVersionConflictError"]
 

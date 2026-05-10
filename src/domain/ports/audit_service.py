@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from src.domain.exceptions.legacy import AuditError
+from src.domain.exceptions.service_exceptions import AuditError
 
 __all__ = ["AuditError"]
 

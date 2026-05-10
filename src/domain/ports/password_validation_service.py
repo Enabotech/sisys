@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from src.domain.exceptions.legacy import PasswordValidationError
+from src.domain.exceptions.service_exceptions import PasswordValidationError
 
 __all__ = ["PasswordValidationError"]
 
