@@ -414,26 +414,42 @@ class ExceptionHandlers:
         # 安全获取 request_id，不依赖特定中间件
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
+        # 特殊处理：AuthenticationError 的 locked 状态
+        if isinstance(exc, AuthenticationError):
+            context = getattr(exc, 'context', {}) or {}
+            if context.get("locked"):
+                return JSONResponse(
+                    status_code=status.HTTP_423_LOCKED,
+                    content={
+                        "error": {
+                            "code": getattr(exc, 'code', "SISYS_205"),
+                            "message": "Account is locked",
+                            "context": context,
+                        },
+                        "request_id": request_id,
+                    },
+                    headers={"X-Error-Code": str(getattr(exc, 'code', "SISYS_205") or "SISYS_205")},
+                )
+
         try:
             error_dict = exc.to_dict()
         except Exception:
             # to_dict() 失败时的降级处理
             error_dict = {
-                "code": getattr(exc, 'code', "SISYS_999"),
-                "message": str(exc),
+                "code": str(getattr(exc, 'code', "SISYS_999") or "SISYS_999"),
+                "message": str(exc)[:500],
                 "context": {},
             }
 
         content = {
             "error": error_dict,
             "request_id": request_id,
-            "path": str(request.url),
         }
 
         return JSONResponse(
             status_code=_get_http_status(exc),
             content=content,
-            headers={"X-Error-Code": exc.code},
+            headers={"X-Error-Code": str(getattr(exc, 'code', "SISYS_999") or "SISYS_999")},
         )
 
     async def _handle_validation_error(
@@ -501,9 +517,14 @@ class ExceptionHandlers:
         )
 
 
-def register_exception_handlers(app: FastAPI) -> ExceptionHandlers:
-    """注册异常处理器到 FastAPI 应用."""
-    return ExceptionHandlers(app)
+def register_exception_handlers(app: FastAPI) -> None:
+    """注册异常处理器到 FastAPI 应用.
+
+    实例被 app 引用链持有，无需保留返回值。
+    用法：register_exception_handlers(app)  # 初始化时调用一次
+    """
+    # 实例被 add_exception_handler 内部引用持有，不会被 GC
+    ExceptionHandlers(app)
 ```
 
 ### 3.4 外部 SDK 错误映射器
