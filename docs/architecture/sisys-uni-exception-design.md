@@ -455,12 +455,6 @@ class BucketNameValidationError(ValidationError):
     code = "EXCEPTION_201"
     message = "Bucket name validation failed"
 
-
-class KubectlError(ExternalException):
-    """kubectl 操作异常（测试工具）."""
-    code = "EXCEPTION_301"
-    message = "Kubectl error"
-
 __all__ = [
     # 基类和三层异常
     "BaseException",
@@ -499,7 +493,6 @@ __all__ = [
     "DomainException",
     "LayerNotFoundError",
     "BucketNameValidationError",
-    "KubectlError",
     "NetworkError",
     "TimeoutError",
     "ServiceUnavailableError",
