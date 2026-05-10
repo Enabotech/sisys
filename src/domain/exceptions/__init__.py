@@ -23,6 +23,7 @@ from src.domain.exceptions.business_exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+from src.domain.exceptions.event_exceptions import VersionError
 from src.domain.exceptions.external_exceptions import (
     ExternalException,
     ServiceUnavailableError,
@@ -30,7 +31,32 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
-from src.domain.exceptions.legacy import SandboxError
+from src.domain.exceptions.permission_exceptions import InsufficientTokenError
+from src.domain.exceptions.role_exceptions import (
+    CannotDeleteRoleWithUsersError,
+    CannotDeleteSystemRoleError,
+    RoleAlreadyExistsError,
+    RoleNotFoundError,
+)
+from src.domain.exceptions.sandbox_exceptions import (
+    ContainerStartError,
+    ContainerStopError,
+    ExecutionError,
+    SandboxError,
+)
+from src.domain.exceptions.service_exceptions import (
+    AuditError,
+    ComplianceLockError,
+    PasswordValidationError,
+)
+from src.domain.exceptions.storage_exceptions import (
+    BucketNameValidationError,
+    BucketNotFoundError,
+    MemoryAccessDeniedError,
+    MemoryNotFoundError,
+    MemoryVersionConflictError,
+    MinIOConnectionError,
+)
 from src.domain.exceptions.system_exceptions import (
     ConfigurationError,
     MessageBusError,
@@ -64,6 +90,29 @@ __all__ = [
     "TimeoutError",
     "ServiceUnavailableError",
     "UnknownError",
-    # Sandbox（来自 legacy.py）
+    # 服务异常
+    "AuditError",
+    "PasswordValidationError",
+    "ComplianceLockError",
+    # 存储异常
+    "MemoryVersionConflictError",
+    "MemoryNotFoundError",
+    "BucketNotFoundError",
+    "MinIOConnectionError",
+    "BucketNameValidationError",
+    "MemoryAccessDeniedError",
+    # 角色管理异常
+    "RoleAlreadyExistsError",
+    "RoleNotFoundError",
+    "CannotDeleteSystemRoleError",
+    "CannotDeleteRoleWithUsersError",
+    # Sandbox异常
     "SandboxError",
+    "ContainerStartError",
+    "ExecutionError",
+    "ContainerStopError",
+    # 权限异常
+    "InsufficientTokenError",
+    # 事件异常
+    "VersionError",
 ]

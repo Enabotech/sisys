@@ -18,17 +18,9 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
+from src.domain.exceptions.legacy import MemoryVersionConflictError
 from src.domain.ports.l2_rdb import L2MetadataRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
-
-
-class MemoryVersionConflictError(Exception):
-    """版本冲突异常。"""
-
-    def __init__(self, memory_id: UUID):
-        self.memory_id = memory_id
-        self.message = f"版本冲突: memory_id={memory_id}"
-        super().__init__(self.message)
 
 
 class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
