@@ -74,11 +74,11 @@ class TestMemoryVersionConflictError:
         assert "版本冲突" in str(error)
 
     def test_exception_default_message(self):
-        """异常应有默认消息。"""
+        """异常应有默认消息（包含 memory_id）。"""
         memory_id = uuid4()
         error = MemoryVersionConflictError(memory_id=memory_id)
         assert error.memory_id == memory_id
-        assert error.message == "版本冲突"
+        assert error.message == f"版本冲突: memory_id={memory_id}"
 
 
 class TestMemoryNotFoundError:

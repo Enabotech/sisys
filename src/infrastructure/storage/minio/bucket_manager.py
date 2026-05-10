@@ -13,6 +13,7 @@ from minio.error import S3Error
 from minio.objectlockconfig import ObjectLockConfig
 from minio.versioningconfig import VersioningConfig
 
+from src.domain.exceptions.legacy import BucketNameValidationError
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
 
@@ -20,10 +21,6 @@ logger = logging.getLogger(__name__)
 
 # Bucket 命名模式: {prefix}-{type}-{tenant_id}
 BUCKET_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$")
-
-
-class BucketNameValidationError(Exception):
-    """Bucket 命名验证失败异常。"""
 
 
 class BucketManager:
