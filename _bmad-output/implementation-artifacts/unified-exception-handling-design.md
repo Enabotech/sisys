@@ -114,9 +114,9 @@ class BaseException(Exception):
 
     def to_dict(self) -> dict:
         result = {
-            "code": self.code,
-            "message": self.message,
-            "context": self.context,
+            "code": self.code or "EXCEPTION_000",
+            "message": self.message or "Unknown error",
+            "context": self.context or {},
         }
         if self.cause:
             result["cause"] = {
@@ -739,6 +739,7 @@ class ErrorMapper:
     S3_ERROR_MAP: dict[str, type[BaseException]] = {
         "nosuchbucket": NotFoundError,
         "nosuchkey": NotFoundError,
+        "nosuchlifecycleconfiguration": NotFoundError,
         "bucketalreadyexists": ConflictError,
         "bucketalreadyownedbyyou": ConflictError,
         "accessdenied": PermissionDeniedError,
@@ -905,8 +906,10 @@ class ExceptionJsonFormatter(logging.Formatter):
             },
         }
         if exc.cause:
-            log_entry["error"]["cause"] = str(exc.cause)
-            log_entry["error"]["cause_type"] = type(exc.cause).__name__
+            log_entry["error"]["cause"] = {
+                "type": type(exc.cause).__name__,
+                "message": str(exc.cause),
+            }
         return json.dumps(log_entry)
 
     def _format_standard(self, record: logging.LogRecord) -> str:
