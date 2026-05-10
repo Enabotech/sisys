@@ -30,6 +30,7 @@ from src.domain.exceptions.external_exceptions import (
     TimeoutError,
     UnknownError,
 )
+from src.domain.exceptions.legacy import SandboxError
 from src.domain.exceptions.system_exceptions import (
     ConfigurationError,
     MessageBusError,
@@ -63,4 +64,6 @@ __all__ = [
     "TimeoutError",
     "ServiceUnavailableError",
     "UnknownError",
+    # Sandbox（来自 legacy.py）
+    "SandboxError",
 ]
