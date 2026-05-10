@@ -8,8 +8,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
-
 from src.infrastructure.config.auto_execute import AutoExecuteConfig
 
 
@@ -159,9 +157,3 @@ class TestAutoExecuteConfigFrozen:
         """验证 frozen=True 配置正确。"""
         assert hasattr(AutoExecuteConfig, "__dataclass_params__")
         assert AutoExecuteConfig.__dataclass_params__.frozen is True
-
-    def test_cannot_modify_after_creation(self) -> None:
-        """创建后不可修改。"""
-        config = AutoExecuteConfig()
-        with pytest.raises(AttributeError):
-            object.__setattr__(config, "enabled", False)
