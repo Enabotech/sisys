@@ -9,7 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.domain.exceptions import AuthenticationError
 from src.domain.value_objects.token_payload import TokenPayload
+
+__all__ = ["AuthenticationError"]
 
 
 @dataclass(frozen=True)

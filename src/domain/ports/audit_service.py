@@ -11,6 +11,10 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
+from src.domain.exceptions.legacy import AuditError
+
+__all__ = ["AuditError"]
+
 
 @dataclass(frozen=True)
 class AuditRecord:

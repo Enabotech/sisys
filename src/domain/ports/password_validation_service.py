@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from src.domain.exceptions.legacy import PasswordValidationError
+
+__all__ = ["PasswordValidationError"]
+
 
 class PasswordValidationServicePort(Protocol):
     """密码验证服务端口（领域层定义，仅使用 ABC + 标准库）

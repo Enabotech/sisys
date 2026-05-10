@@ -13,6 +13,20 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from src.domain.exceptions.legacy import (
+    ContainerStartError,
+    ContainerStopError,
+    ExecutionError,
+    SandboxError,
+)
+
+__all__ = [
+    "SandboxError",
+    "ContainerStartError",
+    "ExecutionError",
+    "ContainerStopError",
+]
+
 
 class SandboxExecutor(Protocol):
     """Port interface for sandbox execution.
