@@ -9,15 +9,6 @@ from __future__ import annotations
 from typing import Protocol
 
 
-class PasswordValidationError(Exception):
-    """密码验证失败异常."""
-
-    def __init__(self, message: str, code: str):
-        self.message = message
-        self.code = code
-        super().__init__(message)
-
-
 class PasswordValidationServicePort(Protocol):
     """密码验证服务端口（领域层定义，仅使用 ABC + 标准库）
 

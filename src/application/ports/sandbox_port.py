@@ -68,27 +68,3 @@ class SandboxExecutor(Protocol):
         Returns:
             True if container is running, False otherwise
         """
-
-
-class SandboxError(Exception):
-    """Base exception for sandbox-related errors."""
-
-    pass
-
-
-class ContainerStartError(SandboxError):
-    """Raised when container fails to start."""
-
-    pass
-
-
-class ExecutionError(SandboxError):
-    """Raised when code execution fails."""
-
-    pass
-
-
-class ContainerStopError(SandboxError):
-    """Raised when container fails to stop."""
-
-    pass

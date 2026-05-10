@@ -12,12 +12,6 @@ from typing import Any, Protocol
 from uuid import UUID
 
 
-class AuditError(Exception):
-    """审计操作异常（领域层异常，无需导入外部库）."""
-
-    pass
-
-
 @dataclass(frozen=True)
 class AuditRecord:
     """审计记录领域值对象（不可变）."""

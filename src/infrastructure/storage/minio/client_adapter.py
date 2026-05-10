@@ -9,23 +9,12 @@ from __future__ import annotations
 from minio import Minio
 from minio.error import S3Error
 
+from src.domain.exceptions.legacy import (
+    BucketNotFoundError,
+    ComplianceLockError,
+    PermissionDeniedError,
+)
 from src.infrastructure.config.minio import MinIOConfig
-
-
-class BucketNotFoundError(Exception):
-    """Bucket 不存在异常。"""
-
-
-class PermissionDeniedError(Exception):
-    """权限不足异常。"""
-
-
-class ComplianceLockError(Exception):
-    """WORM 合规锁定异常。"""
-
-
-class MinIOConnectionError(Exception):
-    """MinIO 连接错误。"""
 
 
 class MinioClientAdapter:
