@@ -1063,4 +1063,4 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 - [Python Exception Hierarchy Best Practices](https://docs.python.org/3/library/exceptions.html)
 - [Spring Exception Handling](https://spring.io/blog/2013/11/01/exception-handling-in-spring-mvc)
-- [ADR-XXX: 统一异常处理决策记录](./adr-unified-exception-handling.md)
+- [ADR-XXX: 统一异常处理决策记录](./adr-unified-exception-handling.md) *(待创建)*
