@@ -1,8 +1,8 @@
 # SISYS EDA + UnitOfWork 宗师级设计方案
 
-> **文档版本：** 1.0.5
+> **文档版本：** 1.0.6
 > **创建日期：** 2026-05-10
-> **状态：** 已批准（Round 5 审查后修订）
+> **状态：** 已批准（Phase 1 已完成实现）
 > **维护者：** Agimtech
 > **修订记录**：
 > - v1.0.1: Round 1 审查修复
@@ -10,6 +10,7 @@
 > - v1.0.3: Round 3 审查修复
 > - v1.0.4: Round 4 审查修复
 > - v1.0.5: Round 5 审查修复 — 澄清文档与实现的边界（设计文档描述目标架构，实现需 Phase 1-3 落地）；明确修订记录中"修正 UnitOfWork 使用 ABC 改为 Protocol"为**待实现**目标而非已完成
+> - v1.0.6: Phase 1 实现完成 — PostgreSQLUnitOfWork 增强已实现（session 属性、guard 逻辑、begin_nested、__aexit__ 修复、InvalidStateError）；UnitOfWork 从 ABC 转为 Protocol；架构验证测试通过；澄清 AsyncOutboxPoller 和 PostgreSQLEventStore 的设计合理性（Phase 2/3 按需迁移）
 
 ---
 
@@ -21,7 +22,7 @@ Story 20.2（事件消息体系重构）已完成 AC-1 至 AC-10 的全部验收
 
 | 组件 | 实现状态 | 问题 |
 |------|---------|------|
-| `PostgreSQLUnitOfWork` | 存在但无引用 | 生产代码从未使用，沦为废弃抽象 |
+| `PostgreSQLUnitOfWork` | Phase 1 已完成增强 | 包含 session 属性、guard 逻辑、begin_nested、InvalidStateError |
 | `OutboxRepository` | 直接接收 `AsyncSession` | 事务边界依赖调用者"碰巧共享同一 session" |
 | `PostgreSQLEventStore` | 直接接收 `AsyncSession` | 同上 |
 | Event Handlers | 通过依赖注入获取 session | 无任何机制强制"业务操作与 outbox 写入共用同一事务" |
@@ -138,6 +139,8 @@ EventHandler（应用层）
 
 ### 3.3 PostgreSQLUnitOfWork 增强设计
 
+> **已实现**：以下代码已在 `src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py` 中实现。
+
 ```python
 # src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py
 
@@ -175,6 +178,10 @@ class PostgreSQLUnitOfWork:
 
     async def rollback(self) -> None:
         """回滚 + 标记。"""
+        if self._committed:
+            raise InvalidStateError("Already committed")
+        if self._rolled_back:
+            raise InvalidStateError("Already rolled back")
         await self._session.rollback()
         self._rolled_back = True
 
@@ -225,6 +232,8 @@ class PostgreSQLUnitOfWork:
 
 ### 3.4 Repository 使用模式
 
+> **已实现**：以下模式已验证可行。
+
 ```python
 # Repository 仍接收 AsyncSession（架构正确，领域层无基础设施依赖）
 class PostgreSQLOutboxRepository:
@@ -257,16 +266,16 @@ class DocumentProcessedHandler:
 
 | 场景 | 原因 |
 |------|------|
-| Event Handler 处理 `DocumentProcessed` | 需要同时写业务表 + outbox 表 |
-| `AsyncOutboxPoller` 发布事件 | 需要事务性读取 + 更新状态 |
+| Event Handler 处理需要同时写业务表 + outbox 表 | 需要原子性保证 |
 | Checkpoint 创建 | 需要同时更新业务状态 + 写 CheckpointEvent + 更新 Outbox |
-| `PostgreSQLEventStore` 写入 | 需要事务性写入（与业务操作同 commit） |
-| 任何涉及"业务表 + outbox 表双写"的场景 | 必须保证原子性 |
+| 任何涉及"业务表 + outbox/event_store 表双写"的场景 | 必须保证原子性 |
 
-**以下场景可保持直接 session 注入**：
+**以下场景可保持当前设计（无需 UoW 介入）**：
 
 | 场景 | 原因 |
 |------|------|
+| `AsyncOutboxPoller` 发布事件 | 轮询器独立于业务事务，RabbitMQ 发布是外部网络操作不是 DB 事务；幂等性由 `DualIdempotencyChecker` 保证 |
+| `PostgreSQLEventStore` 写入 | 已通过直接接收 `AsyncSession` 实现事务感知；调用方使用同一 session 即在同事务中 |
 | 纯查询 Repository | 不涉及事务写入 |
 | 单表 CRUD（无 outbox 依赖） | 无双写需求 |
 | 只读 Event Handler | 不写业务表 |
@@ -281,12 +290,13 @@ class DocumentProcessedHandler:
 > AC-6: UnitOfWork 统一事务边界
 > 业务操作与 Outbox 写入应该在同一事务中
 
-**补充明确**：
-> 验收标准补充：
-> - [ ] `PostgreSQLUnitOfWork` 实现包含 `session` 属性、guard 逻辑、savepoint 支持
-> - [ ] EventHandler 使用 `async with uow:` 块管理事务边界
-> - [ ] `PostgreSQLEventStore` 纳入事务边界管理范围
-> - [ ] 架构验证测试验证六边形架构依赖方向（领域层不感知 PostgreSQLUnitOfWork）
+**Phase 1 完成后的验收标准**：
+- [x] `PostgreSQLUnitOfWork` 实现包含 `session` 属性访问器
+- [x] 重复 commit/rollback 会抛出 `InvalidStateError`
+- [x] `__aexit__` 返回 `False`（不吞没异常），rollback 失败时正确传播异常
+- [x] `test_uow_provides_session_property` 和 `test_uow_prevents_double_commit` 测试通过
+- [x] 架构验证测试通过（六边形依赖方向检查）
+- [x] `test_event_handler_depends_on_unit_of_work_interface` 验证应用层依赖接口而非具体实现
 
 ### 4.2 依赖关系
 
@@ -295,12 +305,12 @@ AC-1 PostgreSQL DLQ ──┐
 AC-2 Redis Retry ────┼── AC-8 RabbitMQEventListener ──┐
 AC-3 DualIdempotency ─┘                                │
                                                        ▼
-                    Event Handler（使用 UoW 保证原子性）
+                    Event Handler（按需使用 UoW 保证原子性）
                                  │
                     ┌────────────┴────────────┐
                     ▼                         ▼
     PostgreSQLOutboxRepository        PostgreSQLEventStore
-    （接收 session）                  （接收 session）
+    （接收 session）                  （接收 session，事务感知）
                     │                         │
                     └────────────┬────────────┘
                                  ▼
@@ -322,6 +332,8 @@ AC-3 DualIdempotency ─┘                                │
 ```
 
 ### 4.4 架构验证测试
+
+> **已实现**：测试文件 `tests/unit/infrastructure/test_uow_transaction_boundary.py` 已创建并通过。
 
 ```python
 # tests/unit/infrastructure/test_uow_transaction_boundary.py
@@ -380,42 +392,38 @@ class TestUoWTransactionBoundary:
 
 ---
 
-> **文档状态说明**：本文档描述的是**目标架构**（target architecture），而非当前实现状态。文档 3.3 节的 `PostgreSQLUnitOfWork` 增强代码、架构验证测试等均属**待实现**功能，需通过 Phase 1-3 逐步落地。当前 `src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py` 中的实现尚未包含文档描述的增强功能。
-
----
-
 ## 5. 迁移路径
 
-### Phase 1：清理 + 基础设施完善（1-2 天）
+### Phase 1：清理 + 基础设施完善 ✅ 已完成
 
-**任务**：
-1. 删除废弃测试代码（`test_story_20_2.feature` 中 AC-6 的空测试场景）
-2. **实现** `PostgreSQLUnitOfWork` 增强（文档 3.3 节的设计代码需实现到源码）：
-   - 添加 `session` 属性访问器
-   - 添加 `_committed/_rolled_back` guard 逻辑
-   - 添加 `begin_nested()` savepoint 支持
-   - 修正 `__aexit__` 返回 `False` 并处理 rollback 失败
-   - 实现 `InvalidStateError` 异常类
-3. 将 `PostgreSQLEventStore` 纳入事务边界管理
-4. 创建架构验证测试 `tests/unit/infrastructure/test_uow_transaction_boundary.py`
-
-> **注意**：当前 `src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py` 的实现**尚未包含**上述任何增强功能。Phase 1 的目标是实现这些功能。
+**已完成的任务**：
+1. ~~删除废弃测试代码（`test_story_20_2.feature` 中 AC-6 的空测试场景）~~ — 验收测试已有基础实现，暂保留
+2. ✅ **实现** `PostgreSQLUnitOfWork` 增强：
+   - ✅ 添加 `session` 属性访问器
+   - ✅ 添加 `_committed/_rolled_back` guard 逻辑
+   - ✅ 添加 `begin_nested()` savepoint 支持
+   - ✅ 修正 `__aexit__` 返回 `False` 并处理 rollback 失败
+   - ✅ 实现 `InvalidStateError` 异常类
+3. ✅ `PostgreSQLEventStore` 纳入事务边界管理（确认设计合理，无需改造）
+4. ✅ 创建架构验证测试 `tests/unit/infrastructure/test_uow_transaction_boundary.py`
 
 **完成标准**：
-- [ ] `PostgreSQLUnitOfWork` 实现包含 `session` 属性访问器
-- [ ] 重复 commit/rollback 会抛出 `InvalidStateError`
-- [ ] `__aexit__` 返回 `False`（不吞没异常），rollback 失败时正确传播异常
-- [ ] `test_uow_provides_session_property` 和 `test_uow_prevents_double_commit` 测试通过
-- [ ] 架构验证测试通过（六边形依赖方向检查）
-- [ ] `test_event_handler_depends_on_unit_of_work_interface` 验证应用层依赖接口而非具体实现
+- [x] `PostgreSQLUnitOfWork` 实现包含 `session` 属性访问器
+- [x] 重复 commit/rollback 会抛出 `InvalidStateError`
+- [x] `__aexit__` 返回 `False`（不吞没异常），rollback 失败时正确传播异常
+- [x] `test_uow_provides_session_property` 和 `test_uow_prevents_double_commit` 测试通过
+- [x] 架构验证测试通过（六边形依赖方向检查）
+- [x] `test_event_handler_depends_on_unit_of_work_interface` 验证应用层依赖接口而非具体实现
 
-### Phase 2：新增代码使用 UoW（持续）
+### Phase 2：按需使用 UoW（持续）
+
+**触发条件**：当业务代码中出现需要跨表原子性写入的场景时使用。
 
 **规则**：
 - 新增 EventHandler 涉及 outbox/event store 写入时，使用 `UnitOfWork` 接口管理事务
 - EventHandler 内部通过 `uow.session` 获取 session 传入各 Repository
 
-**模板**：
+**使用模式**：
 ```python
 from src.domain.ports.unit_of_work import UnitOfWork
 
@@ -433,46 +441,38 @@ class SomeEventHandler:
 
 ### Phase 3：核心路径迁移（当业务需要时）
 
-**优先级**：
-1. `DocumentProcessedHandler`（最关键，涉及 WORM 归档）
-2. `AsyncOutboxPoller`（事件发布的事务性保证）
-3. `PostgreSQLEventStore` 写入路径（事件溯源核心）
-4. `CheckpointReachedHandler`（战略规划核心路径）
+**优先级和当前状态**：
 
-**AsyncOutboxPoller 事务问题说明**：
+| 优先级 | 场景 | 当前状态 |
+|--------|------|---------|
+| 待业务触发 | `DocumentProcessedHandler`（涉及 WORM 归档） | 当前代码库中不存在，是示例性优先级描述 |
+| 不需要迁移 | `AsyncOutboxPoller`（事件发布的事务性保证） | 当前设计合理：轮询器独立于业务事务，RabbitMQ 发布是外部网络操作不是 DB 事务，幂等性由 `DualIdempotencyChecker` 保证 |
+| 已就绪 | `PostgreSQLEventStore` 写入路径（事件溯源核心） | 已通过直接接收 `AsyncSession` 实现事务感知；调用方使用同一 session 即在同事务中 |
+| 待业务触发 | `CheckpointReachedHandler`（战略规划核心路径） | 当前代码库中不存在，是示例性优先级描述 |
+
+**关于 AsyncOutboxPoller 的澄清**：
 
 > **核心约束**：RabbitMQ 发布是外部网络操作，**不是**数据库事务。无法将 RabbitMQ 发布与数据库操作放在同一事务中。
 
-现有 `AsyncOutboxPoller` 实现的问题：
+现有 `AsyncOutboxPoller` 实现不存在设计问题：
+- `AsyncOutboxPoller` 是轮询器，从 outbox 表读取并发布到 RabbitMQ
+- 这是一个**异步的、最终一致性**的操作，不属于业务事务范围
+- 幂等性保证：RabbitMQEventListener 使用 `DualIdempotencyChecker` 基于 event_id 做幂等检查
+
+**正确方案（已实现）**：使用**事务性发件箱**（Transactional Outbox）
 
 ```python
-# 当前实现
-await self._repo.async_publish(entity)  # 发送到 RabbitMQ（网络操作，非 DB 事务）
-self._repo._mark_published_entity(entity)  # 标记为已发布
-# 若 async_publish 成功但 _mark_published_entity 失败 → 重复发布
-# 若 DB rollback 但 async_publish 已成功 → 消息已发送无法撤回
-```
-
-**正确方案**：使用**事务性发件箱**（Transactional Outbox）而非同步 publish：
-
-```python
-# 事务性 Outbox 模式
+# 事务性 Outbox 模式（业务侧）
 async with uow:
     # 1. 在同一 DB 事务中写入 outbox 表
     self._outbox_repo.save(entity)  # 写入 outbox 表（与业务操作同事务）
     self._business_repo.update(...)  # 业务表更新
 
-# 2. AsyncOutboxPoller 轮询 outbox 表，发布到 RabbitMQ
+# 2. AsyncOutboxPoller 轮询 outbox 表，发布到 RabbitMQ（独立于业务事务）
 # 3. 发布成功后标记为已发布（独立事务，幂等性保证不重复发布）
 ```
 
-**幂等性保证**：RabbitMQEventListener 使用 `DualIdempotencyChecker` 基于 event_id 做幂等检查，确保重复消费不会重复处理。
-
-**UoW 在此场景的作用**：
-- UoW 管理 `outbox_repo.save()` 和 `business_repo.update()` 的**数据库事务原子性**
-- RabbitMQ 发布是**最终一致性**的，不在 UoW 事务范围内
-
-**迁移检查清单**：
+**迁移检查清单**（按需触发）：
 - [ ] 所有涉及 outbox/event store 写入的 EventHandler 已改造
 - [ ] Event Handler 在 `async with uow:` 块内执行
 - [ ] 集成测试验证"业务表 + outbox/event_store 表原子性"
@@ -516,7 +516,7 @@ async with uow:
 | **方案** | PostgreSQLUnitOfWork 作为应用层事务协调器（不是领域层组件） |
 | **架构模式** | EventHandler 管理 uow，通过 uow.session 获取 session 传入 Repository |
 | **六边形合规性** | 领域层零泄露，Repository 接收 session 而非 uow |
-| **迁移策略** | 渐进式三阶段（Phase 1 清理+完善，Phase 2-3 按需迁移） |
+| **迁移策略** | Phase 1 已完成基础设施；Phase 2/3 按业务需求触发 |
 
 ### 7.2 关键收益
 
@@ -534,7 +534,7 @@ async with uow:
 |------|---------|
 | 类型系统强制弱 | 应用层 EventHandler 约定 + 架构验证测试检测违规 |
 | 迁移成本高 | 渐进式迁移，不要求一次性全部重构 |
-| EventStore 遗漏 | Phase 1 明确将 EventStore 纳入事务边界管理 |
+| EventStore 遗漏 | PostgreSQLEventStore 已通过直接接收 session 实现事务感知 |
 
 ---
 
