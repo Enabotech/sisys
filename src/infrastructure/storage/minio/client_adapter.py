@@ -9,13 +9,15 @@ from __future__ import annotations
 from minio import Minio
 from minio.error import S3Error
 
+from src.domain.exceptions import InvalidStateError, NotFoundError, PermissionDeniedError
+from src.domain.exceptions.external_exceptions import ThirdPartyError
 from src.domain.exceptions.legacy import (
     BucketNotFoundError,
     ComplianceLockError,
     MinIOConnectionError,
-    PermissionDeniedError,
 )
 from src.infrastructure.config.minio import MinIOConfig
+from src.infrastructure.messaging.error_mapper import ErrorMapper
 
 __all__ = [
     "BucketNotFoundError",
@@ -69,7 +71,7 @@ class MinioClientAdapter:
 
     @staticmethod
     def _map_error(error: S3Error) -> Exception:
-        """映射 S3 错误到领域异常。
+        """映射 S3 错误到领域异常（使用 ErrorMapper + legacy 异常）。
 
         Args:
             error: S3 原始错误
@@ -77,14 +79,23 @@ class MinioClientAdapter:
         Returns:
             映射后的领域异常
         """
-        code = error.code
-        if code == "NoSuchBucket":
-            return BucketNotFoundError(error.message or "Bucket not found")
-        if code in ("AccessDenied", "Forbidden"):
-            return PermissionDeniedError(error.message or "Access denied")
-        if code in ("ObjectLockConfigurationNotFoundError",):
-            return ComplianceLockError(error.message or "Object lock error")
-        return error
+        code = error.code or "Unknown"
+        message = error.message or f"S3 error: {code}"
+
+        # 使用 ErrorMapper 获取异常类，再实例化 legacy 异常以保持接口兼容
+        exc_class = ErrorMapper.S3_ERROR_MAP.get(code.lower(), ThirdPartyError)
+
+        # 根据异常类型选择 legacy 包装类
+        if exc_class is NotFoundError:
+            return BucketNotFoundError(message)
+        if exc_class is PermissionDeniedError:
+            return PermissionDeniedError(message)
+        if exc_class is InvalidStateError:
+            return ComplianceLockError(message)
+        if exc_class is ThirdPartyError:
+            return ThirdPartyError(message=message)
+        # 其他情况直接实例化
+        return exc_class(message=message)
 
     def health_check(self) -> bool:
         """健康检查。

@@ -10,6 +10,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from src.domain.exceptions import InvalidStateTransitionError
+
+# 重新导出，保持向后兼容
+__all__ = ["InvalidStateTransitionError", "OutboxEntity"]
+
 
 @dataclass
 class OutboxEntity:
@@ -59,15 +64,3 @@ class OutboxEntity:
         if self.status != "failed":
             raise InvalidStateTransitionError(self.status, "archived")
         self.status = "archived"
-
-
-class InvalidStateTransitionError(Exception):
-    """无效的状态转换异常。"""
-
-    def __init__(self, from_status: str, to_status: str, message: str = ""):
-        self.from_status = from_status
-        self.to_status = to_status
-        if message:
-            super().__init__(f"Invalid state transition: {from_status} → {to_status}: {message}")
-        else:
-            super().__init__(f"Invalid state transition: {from_status} → {to_status}")

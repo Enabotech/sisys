@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from minio.error import S3Error
 
+from src.domain.exceptions.external_exceptions import ThirdPartyError
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.client_adapter import (
     BucketNotFoundError,
@@ -127,7 +128,7 @@ class TestMinioClientAdapterErrorHandling:
         assert isinstance(mapped, PermissionDeniedError)
 
     def test_map_s3_error_unknown(self):
-        """映射未知错误。"""
+        """映射未知错误 - 未知错误应转换为 ThirdPartyError。"""
         error = S3Error(
             code="SomeUnknownError",
             message="Unknown",
@@ -137,7 +138,7 @@ class TestMinioClientAdapterErrorHandling:
             response=MagicMock(),
         )
         mapped = MinioClientAdapter._map_error(error)
-        assert isinstance(mapped, S3Error)
+        assert isinstance(mapped, ThirdPartyError)
 
     def test_health_check_success(self):
         """健康检查成功。"""
