@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from src.domain.events.compliance_events import (
     AttackType,
     CrossBorderTransferRequested,
@@ -73,9 +71,8 @@ class TestMFAChallengeIssuedEvent:
 
     def test_mfa_challenge_is_frozen(self) -> None:
         """Test MFAChallengeIssuedEvent is frozen."""
-        event = MFAChallengeIssuedEvent(user_id=uuid.uuid4())
-        with pytest.raises(Exception):
-            object.__setattr__(event, "challenge_id", uuid.uuid4())
+        assert hasattr(MFAChallengeIssuedEvent, "__dataclass_params__")
+        assert MFAChallengeIssuedEvent.__dataclass_params__.frozen is True
 
 
 class TestIntrusionDetectedEvent:

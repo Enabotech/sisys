@@ -390,9 +390,16 @@ class ExceptionHandlers:
         self._app.add_exception_handler(BaseException, self._handle_exception)
 
     async def _handle_exception(
-        self, request: Request, exc: BaseException
+        self, request: Request, exc: Exception
     ) -> JSONResponse:
-        """处理异常."""
+        """处理异常.
+
+        注意：Starlette add_exception_handler 要求 handler 参数类型为 Exception 或其父类，
+        不能是 Exception 的子类。因此参数使用 Exception，内部通过 isinstance 分流到 BaseException。
+        """
+        # 区分 domain exceptions 和 truly unexpected errors
+        if not isinstance(exc, BaseException):
+            return await self._handle_unexpected_error(request, exc)
         # 安全获取 request_id，不依赖特定中间件
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
