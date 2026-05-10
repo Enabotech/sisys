@@ -203,6 +203,7 @@ class InvalidStateTransitionError(InvalidStateError):
 
     用于 Outbox 等状态机的状态转换验证。
     """
+    code = "EXCEPTION_208"
     def __init__(
         self,
         from_status: str,
@@ -303,11 +304,30 @@ RoleNotFoundError = NotFoundError
 CannotDeleteSystemRoleError = BusinessRuleViolationError
 CannotDeleteRoleWithUsersError = ConflictError
 
-# 沙箱异常（保留继承层次）
-SandboxError = ExternalException
-ContainerStartError = SandboxError
-ExecutionError = SandboxError
-ContainerStopError = SandboxError
+# 沙箱异常（真实继承层次）
+class SandboxError(SystemException):
+    """沙箱执行错误."""
+    code = "EXCEPTION_104"
+    message = "Sandbox error"
+
+
+class ContainerStartError(SandboxError):
+    """容器启动错误."""
+    code = "EXCEPTION_105"
+    message = "Container start error"
+
+
+class ExecutionError(SandboxError):
+    """代码执行错误."""
+    code = "EXCEPTION_106"
+    message = "Execution error"
+
+
+class ContainerStopError(SandboxError):
+    """容器停止错误."""
+    code = "EXCEPTION_107"
+    message = "Container stop error"
+
 
 # === 基础设施层异常 ===
 
@@ -436,24 +456,31 @@ class ExceptionHandlers:
                     status_code=status.HTTP_423_LOCKED,
                     content={
                         "error": {
-                            "code": getattr(exc, 'code', "EXCEPTION_205"),
+                            "code": getattr(exc, 'code', "EXCEPTION_205") or "EXCEPTION_205",
                             "message": "Account is locked",
                             "context": context,
                         },
                         "request_id": request_id,
                     },
-                    headers={"X-Error-Code": str(getattr(exc, 'code', "EXCEPTION_205") or "EXCEPTION_205")},
+                    headers={"X-Error-Code": getattr(exc, 'code', "EXCEPTION_205") or "EXCEPTION_205"},
                 )
 
         try:
             error_dict = exc.to_dict()
         except Exception:
-            # to_dict() 失败时的降级处理
+            # to_dict() 失败时的降级处理：保留 context 和 cause 信息
             error_dict = {
-                "code": str(getattr(exc, 'code', "EXCEPTION_999") or "EXCEPTION_999"),
+                "code": getattr(exc, 'code', None) or "EXCEPTION_999",
                 "message": str(exc)[:500],
-                "context": {},
+                "context": getattr(exc, 'context', None) or {},
             }
+            # 保留 cause 信息
+            cause = getattr(exc, 'cause', None)
+            if cause:
+                error_dict["cause"] = {
+                    "type": type(cause).__name__,
+                    "message": str(cause),
+                }
 
         content = {
             "error": error_dict,
@@ -604,6 +631,7 @@ class ErrorMapper:
         "ServiceUnavailable": ServiceUnavailableError,
         "InternalError": ThirdPartyError,  # S3 内部错误，非业务错误
         "NoSuchUpload": NotFoundError,
+        "NoSuchVersion": NotFoundError,
         "EntityTooLarge": ValidationError,
         "MethodNotAllowed": ThirdPartyError,  # S3 层面方法限制是外部服务错误
         "SlowDown": ServiceUnavailableError,
@@ -624,7 +652,7 @@ class ErrorMapper:
     }
 
     @classmethod
-    def map_s3_error(cls, code: str, message: str | None = None) -> ExternalException:
+    def map_s3_error(cls, code: str, message: str | None = None) -> BaseException:
         """映射 MinIO S3 错误.
 
         Args:
