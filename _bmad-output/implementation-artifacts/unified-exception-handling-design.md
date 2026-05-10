@@ -276,7 +276,7 @@ MemoryNotFoundError = NotFoundError
 
 RoleAlreadyExistsError = ConflictError
 RoleNotFoundError = NotFoundError
-CannotDeleteSystemRoleError = BusinessException
+CannotDeleteSystemRoleError = BusinessRuleViolationError
 CannotDeleteRoleWithUsersError = ConflictError
 
 # 沙箱异常
@@ -573,7 +573,7 @@ class ErrorMapper:
     """
 
     # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
-    S3_ERROR_MAP: dict[str, type[ExternalException]] = {
+    S3_ERROR_MAP: dict[str, type[SisysBaseException]] = {
         "NoSuchBucket": NotFoundError,
         "NoSuchKey": NotFoundError,
         "BucketAlreadyExists": ConflictError,
@@ -581,20 +581,25 @@ class ErrorMapper:
         "AccessDenied": PermissionDeniedError,
         "Forbidden": PermissionDeniedError,
         "InvalidObjectState": SystemException,
+        "ObjectLockConfigurationNotFoundError": SystemException,
         "RequestTimeout": TimeoutError,
         "ServiceUnavailable": ServiceUnavailableError,
         "InternalError": SystemException,
+        "NoSuchUpload": NotFoundError,
+        "EntityTooLarge": ValidationError,
+        "MethodNotAllowed": BusinessException,
+        "SlowDown": ServiceUnavailableError,
     }
 
     # RabbitMQ 错误映射
-    RABBITMQ_ERROR_MAP: dict[str, type[ExternalException]] = {
+    RABBITMQ_ERROR_MAP: dict[str, type[SisysBaseException]] = {
         "ConnectionError": NetworkError,
         "ChannelError": MessageBusError,
         "TimeoutError": TimeoutError,
     }
 
     # Redis 错误映射
-    REDIS_ERROR_MAP: dict[str, type[SystemException]] = {
+    REDIS_ERROR_MAP: dict[str, type[SisysBaseException]] = {
         "ConnectionError": NetworkError,
         "TimeoutError": TimeoutError,
         "ClusterDownError": ServiceUnavailableError,
