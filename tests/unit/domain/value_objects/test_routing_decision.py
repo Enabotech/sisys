@@ -42,7 +42,7 @@ class TestRoutingDecisionValidation:
     def test_validate_log_id_not_uuid(self) -> None:
         """Should raise if log_id is not a UUID."""
         decision = RoutingDecision(
-            log_id="not-a-uuid",  # type: ignore
+            log_id="not-a-uuid",
             task_id="task-001",
             session_id="session-001",
             route_type="local",

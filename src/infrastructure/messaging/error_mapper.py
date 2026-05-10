@@ -128,7 +128,7 @@ class ErrorMapper:
         return target_exc_class(
             message=str(error),
             cause=error if isinstance(error, BaseException) else None,
-            context=context,
+            context={**(context or {}), "original_error_type": type(error).__name__},
         )
 
 
@@ -158,11 +158,23 @@ def with_error_mapping(
                 for key, exc_class in error_map.items():
                     if exact_match:
                         if key.lower() == error_str.lower():
-                            raise exc_class(message=str(e), cause=e) from None  # type: ignore[arg-type]
+                            raise exc_class(
+                                message=str(e),
+                                cause=e if isinstance(e, BaseException) else None,
+                                context={"original_error_type": type(e).__name__},
+                            ) from e
                     else:
                         if key.lower() in error_str.lower():
-                            raise exc_class(message=str(e), cause=e) from None  # type: ignore[arg-type]
-                raise default_exc(message=str(e), cause=e) from None  # type: ignore[arg-type]
+                            raise exc_class(
+                                message=str(e),
+                                cause=e if isinstance(e, BaseException) else None,
+                                context={"original_error_type": type(e).__name__},
+                            ) from e
+                raise default_exc(
+                    message=str(e),
+                    cause=e if isinstance(e, BaseException) else None,
+                    context={"original_error_type": type(e).__name__},
+                ) from e
 
         return wrapper
 
