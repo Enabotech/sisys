@@ -288,10 +288,10 @@ from src.domain.exceptions import (
 
 # === 领域层异常 ===
 
-AuditError = BusinessException  # 审计错误是业务级（谁在何时做了什么）
+AuditError = SystemException  # 审计操作异常（系统级基础设施）
 
-PasswordValidationError = ValidationError
-ComplianceLockError = BusinessRuleViolationError  # 合规锁定是业务规则违反
+PasswordValidationError = ValidationError  # 保留属性需在实现类中扩展
+ComplianceLockError = InvalidStateError  # 合规锁定是状态限制
 
 # 领域服务异常
 MemoryVersionConflictError = ConflictError  # 版本冲突是冲突类
@@ -307,25 +307,25 @@ CannotDeleteRoleWithUsersError = ConflictError
 # 沙箱异常（真实继承层次）
 class SandboxError(SystemException):
     """沙箱执行错误."""
-    code = "EXCEPTION_104"
+    code = "EXCEPTION_110"
     message = "Sandbox error"
 
 
 class ContainerStartError(SandboxError):
     """容器启动错误."""
-    code = "EXCEPTION_105"
+    code = "EXCEPTION_111"
     message = "Container start error"
 
 
 class ExecutionError(SandboxError):
     """代码执行错误."""
-    code = "EXCEPTION_106"
+    code = "EXCEPTION_112"
     message = "Execution error"
 
 
 class ContainerStopError(SandboxError):
     """容器停止错误."""
-    code = "EXCEPTION_107"
+    code = "EXCEPTION_113"
     message = "Container stop error"
 
 
@@ -338,7 +338,7 @@ BucketNotFoundError = NotFoundError
 MinIOConnectionError = NetworkError
 
 # 权限异常
-InsufficientTokenError = AuthenticationError
+InsufficientTokenError = PermissionDeniedError  # Token权限不足是权限问题
 
 __all__ = [
     # 基类和三层异常
@@ -625,8 +625,8 @@ class ErrorMapper:
         "BucketAlreadyOwnedByYou": ConflictError,
         "AccessDenied": PermissionDeniedError,
         "Forbidden": PermissionDeniedError,
-        "InvalidObjectState": BusinessRuleViolationError,  # WORM 合规锁定是业务规则违反
-        "ObjectLockConfigurationNotFoundError": BusinessRuleViolationError,  # WORM 合规锁定是业务规则违反
+        "InvalidObjectState": InvalidStateError,  # WORM 对象状态限制是状态错误
+        "ObjectLockConfigurationNotFoundError": InvalidStateError,  # WORM 配置缺失是状态错误
         "RequestTimeout": TimeoutError,
         "ServiceUnavailable": ServiceUnavailableError,
         "InternalError": ThirdPartyError,  # S3 内部错误，非业务错误
