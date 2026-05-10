@@ -265,14 +265,16 @@ class SystemExceptionMeta(type):
         return cls
 ```
 
-### 3.2 遗留异常兼容层
-
 ```python
 # src/domain/exceptions/legacy.py
-"""遗留异常别名，向后兼容.
+"""遗留异常包装类，向后兼容.
 
 覆盖所有现有异常类，确保迁移过程无破坏性变更。
+所有带属性的遗留异常使用真实继承而非别名，保留原有接口。
 """
+from __future__ import annotations
+from uuid import UUID
+
 from src.domain.exceptions import (
     BaseException,
     SystemException,
@@ -292,59 +294,103 @@ from src.domain.exceptions import (
     ThirdPartyError,
 )
 
-# === 领域层异常 ===
+# === 遗留异常包装类（保留原有属性）===
 
-AuditError = SystemException  # 审计操作异常（系统级基础设施）
-
-PasswordValidationError = ValidationError  # 保留属性需在实现类中扩展
-ComplianceLockError = InvalidStateError  # 合规锁定是状态限制
-
-# 领域服务异常
-MemoryVersionConflictError = ConflictError  # 版本冲突是冲突类
-MemoryNotFoundError = NotFoundError
-
-# === 应用层异常 ===
-
-RoleAlreadyExistsError = ConflictError
-RoleNotFoundError = NotFoundError
-CannotDeleteSystemRoleError = BusinessRuleViolationError
-CannotDeleteRoleWithUsersError = ConflictError
-
-# 沙箱异常（真实继承层次）
-class SandboxError(SystemException):
-    """沙箱执行错误."""
-    code = "EXCEPTION_110"
-    message = "Sandbox error"
+class AuditError(SystemException):
+    """审计操作异常."""
+    code = "EXCEPTION_101"
+    message = "Audit operation failed"
 
 
-class ContainerStartError(SandboxError):
-    """容器启动错误."""
-    code = "EXCEPTION_111"
-    message = "Container start error"
+class PasswordValidationError(ValidationError):
+    """密码验证失败异常（保留 message + code 属性）."""
+    code = "EXCEPTION_201"
+
+    def __init__(self, message: str, code: str):
+        self.message = message
+        self.code = code
+        super().__init__(message)
 
 
-class ExecutionError(SandboxError):
-    """代码执行错误."""
-    code = "EXCEPTION_112"
-    message = "Execution error"
+class ComplianceLockError(InvalidStateError):
+    """合规锁定异常."""
+    code = "EXCEPTION_206"
+    message = "Compliance lock violation"
 
 
-class ContainerStopError(SandboxError):
-    """容器停止错误."""
-    code = "EXCEPTION_113"
-    message = "Container stop error"
+class MemoryVersionConflictError(ConflictError):
+    """版本冲突异常（保留 memory_id 属性）."""
+    code = "EXCEPTION_203"
+
+    def __init__(self, memory_id: UUID, message: str = "版本冲突"):
+        self.memory_id = memory_id
+        super().__init__(message)
 
 
-# === 基础设施层异常 ===
+class MemoryNotFoundError(NotFoundError):
+    """记忆不存在异常（保留 memory_id 属性）."""
+    code = "EXCEPTION_202"
 
-VersionError = ConflictError  # 乐观锁冲突是冲突类
+    def __init__(self, memory_id: UUID, message: str = "记忆不存在"):
+        self.memory_id = memory_id
+        super().__init__(message)
+
+
+class RoleAlreadyExistsError(ConflictError):
+    """角色已存在异常（保留 name 属性）."""
+    code = "EXCEPTION_203"
+
+    def __init__(self, name: str):
+        self.name = name
+        super().__init__(f"Role with name '{name}' already exists")
+
+
+class RoleNotFoundError(NotFoundError):
+    """角色不存在异常（保留 role_id 属性）."""
+    code = "EXCEPTION_202"
+
+    def __init__(self, role_id: UUID):
+        self.role_id = role_id
+        super().__init__(f"Role with id '{role_id}' not found")
+
+
+class CannotDeleteSystemRoleError(BusinessRuleViolationError):
+    """不能删除系统保留角色异常（保留 role_id 属性）."""
+    code = "EXCEPTION_207"
+
+    def __init__(self, role_id: UUID):
+        self.role_id = role_id
+        super().__init__(f"Cannot delete system-reserved role '{role_id}'")
+
+
+class CannotDeleteRoleWithUsersError(ConflictError):
+    """不能删除有关联用户的角色异常（保留 role_id + user_count 属性）."""
+    code = "EXCEPTION_203"
+
+    def __init__(self, role_id: UUID, user_count: int):
+        self.role_id = role_id
+        self.user_count = user_count
+        super().__init__(f"Cannot delete role '{role_id}' - {user_count} users are assigned to this role")
+
 
 # MinIO 异常
-BucketNotFoundError = NotFoundError
-MinIOConnectionError = NetworkError
+class BucketNotFoundError(NotFoundError):
+    """Bucket 不存在异常."""
+    code = "EXCEPTION_202"
+    message = "Bucket not found"
 
-# 权限异常
-InsufficientTokenError = PermissionDeniedError  # Token权限不足是权限问题
+
+class MinIOConnectionError(NetworkError):
+    """MinIO 连接错误."""
+    code = "EXCEPTION_102"
+    message = "MinIO connection error"
+
+
+# 基础设施层异常
+class VersionError(ConflictError):
+    """乐观锁冲突异常."""
+    code = "EXCEPTION_203"
+    message = "Version conflict"
 
 __all__ = [
     # 基类和三层异常
