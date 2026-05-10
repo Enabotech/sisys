@@ -42,12 +42,14 @@ class TestRoutingDecisionValidation:
     def test_validate_log_id_not_uuid(self) -> None:
         """Should raise if log_id is not a UUID."""
         decision = RoutingDecision(
-            log_id="not-a-uuid",
+            log_id=uuid.uuid4(),  # Use valid UUID for construction
             task_id="task-001",
             session_id="session-001",
             route_type="local",
             selected_model="qwen2.5:7b",
         )
+        # Manually set invalid log_id to trigger validation error
+        object.__setattr__(decision, "log_id", "not-a-uuid")
         with pytest.raises(ValueError, match="log_id must be a valid UUID"):
             decision.validate()
 

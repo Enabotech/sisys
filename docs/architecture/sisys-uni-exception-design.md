@@ -1,6 +1,6 @@
 # 统一异常处理设计方案
 
-**状态：** 设计方案
+**状态：** 已实现
 **创建日期：** 2026-05-10
 **作者：** Agimtech
 **评审状态：** 待评审
@@ -265,240 +265,36 @@ class SystemExceptionMeta(type):
         return cls
 ```
 
-```python
-# src/domain/exceptions/legacy.py
-"""遗留异常包装类，向后兼容.
+### 3.2 实际实现：模块化异常结构
 
-覆盖所有现有异常类，确保迁移过程无破坏性变更。
-所有带属性的遗留异常使用真实继承而非别名，保留原有接口。
-"""
-from __future__ import annotations
-from uuid import UUID
+`legacy.py` 已废弃，异常按职责拆分为独立模块：
 
-from src.domain.exceptions import (
-    BaseException,
-    SystemException,
-    BusinessException,
-    NotFoundError,
-    PermissionDeniedError,
-    AuthenticationError,
-    ValidationError,
-    ConflictError,
-    InvalidStateError,
-    InvalidStateTransitionError,
-    BusinessRuleViolationError,
-    ExternalException,
-    NetworkError,
-    TimeoutError,
-    ServiceUnavailableError,
-    ThirdPartyError,
-)
-
-# === 遗留异常包装类（保留原有属性）===
-
-class AuditError(SystemException):
-    """审计操作异常."""
-    code = "EXCEPTION_101"
-    message = "Audit operation failed"
-
-
-class PasswordValidationError(ValidationError):
-    """密码验证失败异常（保留 message + code 属性）."""
-    code = "EXCEPTION_201"
-
-    def __init__(self, message: str, code: str):
-        self.message = message
-        self.code = code
-        super().__init__(message)
-
-
-class ComplianceLockError(InvalidStateError):
-    """合规锁定异常."""
-    code = "EXCEPTION_206"
-    message = "Compliance lock violation"
-
-
-class MemoryVersionConflictError(ConflictError):
-    """版本冲突异常（保留 memory_id 属性）."""
-    code = "EXCEPTION_203"
-
-    def __init__(self, memory_id: UUID, message: str = "版本冲突"):
-        self.memory_id = memory_id
-        super().__init__(message)
-
-
-class MemoryNotFoundError(NotFoundError):
-    """记忆不存在异常（保留 memory_id 属性）."""
-    code = "EXCEPTION_202"
-
-    def __init__(self, memory_id: UUID, message: str = "记忆不存在"):
-        self.memory_id = memory_id
-        super().__init__(message)
-
-
-class RoleAlreadyExistsError(ConflictError):
-    """角色已存在异常（保留 name 属性）."""
-    code = "EXCEPTION_203"
-
-    def __init__(self, name: str):
-        self.name = name
-        super().__init__(f"Role with name '{name}' already exists")
-
-
-class RoleNotFoundError(NotFoundError):
-    """角色不存在异常（保留 role_id 属性）."""
-    code = "EXCEPTION_202"
-
-    def __init__(self, role_id: UUID):
-        self.role_id = role_id
-        super().__init__(f"Role with id '{role_id}' not found")
-
-
-class CannotDeleteSystemRoleError(BusinessRuleViolationError):
-    """不能删除系统保留角色异常（保留 role_id 属性）."""
-    code = "EXCEPTION_207"
-
-    def __init__(self, role_id: UUID):
-        self.role_id = role_id
-        super().__init__(f"Cannot delete system-reserved role '{role_id}'")
-
-
-class CannotDeleteRoleWithUsersError(ConflictError):
-    """不能删除有关联用户的角色异常（保留 role_id + user_count 属性）."""
-    code = "EXCEPTION_203"
-
-    def __init__(self, role_id: UUID, user_count: int):
-        self.role_id = role_id
-        self.user_count = user_count
-        super().__init__(f"Cannot delete role '{role_id}' - {user_count} users are assigned to this role")
-
-
-# MinIO 异常
-class BucketNotFoundError(NotFoundError):
-    """Bucket 不存在异常."""
-    code = "EXCEPTION_202"
-    message = "Bucket not found"
-
-
-class MinIOConnectionError(NetworkError):
-    """MinIO 连接错误."""
-    code = "EXCEPTION_102"
-    message = "MinIO connection error"
-
-
-# 基础设施层异常
-class VersionError(ConflictError):
-    """乐观锁冲突异常."""
-    code = "EXCEPTION_203"
-    message = "Version conflict"
-
-
-# Sandbox 异常（来自 src/application/ports/sandbox_port.py）
-class SandboxError(ExternalException):
-    """沙箱基础异常."""
-    code = "EXCEPTION_301"
-    message = "Sandbox error"
-
-
-class ContainerStartError(SandboxError):
-    """容器启动失败异常."""
-    code = "EXCEPTION_301"
-    message = "Container start error"
-
-
-class ExecutionError(SandboxError):
-    """代码执行失败异常."""
-    code = "EXCEPTION_301"
-    message = "Execution error"
-
-
-class ContainerStopError(SandboxError):
-    """容器停止失败异常."""
-    code = "EXCEPTION_301"
-    message = "Container stop error"
-
-
-# 权限中间件异常（来自 src/infrastructure/security/permission_middleware.py）
-class InsufficientTokenError(PermissionDeniedError):
-    """Token 信息不足异常."""
-    code = "EXCEPTION_204"
-    message = "Insufficient token"
-
-
-# 其他待迁移异常
-class MemoryAccessDeniedError(PermissionDeniedError):
-    """记忆访问被拒绝异常."""
-    code = "EXCEPTION_204"
-    message = "Memory access denied"
-
-
-class DomainError(SystemException):
-    """领域层基础异常（architecture.md 定义）."""
-    code = "EXCEPTION_101"
-    message = "Domain error"
-
-
-class DomainException(SystemException):
-    """领域异常基类（architecture.md 定义）."""
-    code = "EXCEPTION_101"
-    message = "Domain exception"
-
-
-class LayerNotFoundError(NotFoundError):
-    """层级不存在异常（归档文档定义）."""
-    code = "EXCEPTION_202"
-    message = "Layer not found"
-
-
-class BucketNameValidationError(ValidationError):
-    """Bucket 名称验证失败异常."""
-    code = "EXCEPTION_201"
-    message = "Bucket name validation failed"
-
-__all__ = [
-    # 基类和三层异常
-    "BaseException",
-    "SystemException",
-    "BusinessException",
-    "ExternalException",
-    # 具体异常
-    "NotFoundError",
-    "PermissionDeniedError",
-    "AuthenticationError",
-    "ValidationError",
-    "ConflictError",
-    "InvalidStateError",
-    "InvalidStateTransitionError",
-    "BusinessRuleViolationError",
-    # 遗留别名
-    "AuditError",
-    "PasswordValidationError",
-    "ComplianceLockError",
-    "MemoryVersionConflictError",
-    "MemoryNotFoundError",
-    "RoleAlreadyExistsError",
-    "RoleNotFoundError",
-    "CannotDeleteSystemRoleError",
-    "CannotDeleteRoleWithUsersError",
-    "SandboxError",
-    "ContainerStartError",
-    "ExecutionError",
-    "ContainerStopError",
-    "VersionError",
-    "BucketNotFoundError",
-    "MinIOConnectionError",
-    "InsufficientTokenError",
-    "MemoryAccessDeniedError",
-    "DomainError",
-    "DomainException",
-    "LayerNotFoundError",
-    "BucketNameValidationError",
-    "NetworkError",
-    "TimeoutError",
-    "ServiceUnavailableError",
-    "ThirdPartyError",
-]
 ```
+src/domain/exceptions/
+├── __init__.py              # 统一导出（118行）
+├── base_exceptions.py       # BaseException, SystemException, BusinessException, ExternalException
+├── system_exceptions.py     # ConfigurationError, NetworkError, StorageError, MessageBusError
+├── business_exceptions.py   # ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ...
+├── external_exceptions.py   # ThirdPartyError, TimeoutError, ServiceUnavailableError, UnknownError
+├── service_exceptions.py    # AuditError, PasswordValidationError, ComplianceLockError
+├── storage_exceptions.py    # MemoryVersionConflictError, MemoryNotFoundError, BucketNotFoundError, ...
+├── role_exceptions.py       # RoleAlreadyExistsError, RoleNotFoundError, ...
+├── sandbox_exceptions.py    # SandboxError, ContainerStartError, ExecutionError, ...
+├── permission_exceptions.py # InsufficientTokenError
+└── event_exceptions.py      # VersionError
+```
+
+统一导出（`from src.domain.exceptions import *`）：
+- 抽象根类：`BaseException`
+- 系统级：`SystemException`, `ConfigurationError`, `NetworkError`, `StorageError`, `MessageBusError`
+- 业务级：`BusinessException`, `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionDeniedError`, `AuthenticationError`, `InvalidStateError`, `InvalidStateTransitionError`, `BusinessRuleViolationError`
+- 外部服务：`ExternalException`, `ThirdPartyError`, `TimeoutError`, `ServiceUnavailableError`, `UnknownError`
+- 服务异常：`AuditError`, `PasswordValidationError`, `ComplianceLockError`
+- 存储异常：`MemoryVersionConflictError`, `MemoryNotFoundError`, `BucketNotFoundError`, `MinIOConnectionError`, `BucketNameValidationError`, `MemoryAccessDeniedError`
+- 角色异常：`RoleAlreadyExistsError`, `RoleNotFoundError`, `CannotDeleteSystemRoleError`, `CannotDeleteRoleWithUsersError`
+- Sandbox异常：`SandboxError`, `ContainerStartError`, `ExecutionError`, `ContainerStopError`
+- 权限异常：`InsufficientTokenError`
+- 事件异常：`VersionError`
 
 ### 3.3 统一异常处理器
 
@@ -990,38 +786,38 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 ## 4. 迁移策略
 
-### 4.1 阶段一：建立基础设施（2-3 人日）
+### 4.1 阶段一：建立基础设施
 
-- [ ] 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
-- [ ] 创建 `src/domain/exceptions/legacy.py` - 遗留异常别名兼容层（覆盖 25+ 异常）
-- [ ] 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
-- [ ] 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
-- [ ] 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
-- [ ] 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
+- [x] 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
+- [x] 创建模块化异常文件（11个文件替代 legacy.py）
+- [x] 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
+- [x] 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
+- [x] 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
+- [x] 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
 
-### 4.2 阶段二：全面迁移（8-10 人日）
+### 4.2 阶段二：全面迁移
 
 #### 第一批：高优先级（API 层）
 
-- [ ] `src/domain/ports/audit_service.py` - AuditError → SystemException
-- [ ] `src/domain/ports/auth_service.py` - AuthenticationError → BusinessException
-- [ ] `src/infrastructure/security/permission_middleware.py` - PermissionDeniedError, InsufficientTokenError
+- [x] `src/domain/ports/audit_service.py` - AuditError → SystemException
+- [x] `src/domain/ports/auth_service.py` - AuthenticationError → BusinessException
+- [x] `src/infrastructure/security/permission_middleware.py` - PermissionDeniedError, InsufficientTokenError
 
 #### 第二批：中优先级（应用层）
 
-- [ ] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
-- [ ] `src/application/ports/sandbox_port.py` - SandboxError 等（4个）
-- [ ] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
+- [x] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
+- [x] `src/application/ports/sandbox_port.py` - SandboxError 等（4个）
+- [x] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
 
 #### 第三批：低优先级（基础设施层）
 
-- [ ] `src/infrastructure/storage/minio/client_adapter.py` - 使用 ErrorMapper 替代私有 _map_error
-- [ ] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
-- [ ] `src/infrastructure/messaging/event_store.py` - VersionError → SystemException
-- [ ] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
-- [ ] `src/domain/ports/storage.py` - ComplianceLockError → BusinessException
+- [x] `src/infrastructure/storage/minio/client_adapter.py` - 使用 ErrorMapper.map_s3_error
+- [x] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
+- [x] `src/infrastructure/messaging/event_store.py` - VersionError → SystemException
+- [x] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
+- [x] `src/domain/ports/storage.py` - ComplianceLockError → BusinessException
 
-### 4.3 阶段三：完善与优化（3-5 人日）
+### 4.3 阶段三：完善与优化
 
 - [x] 实现结构化日志集成 - `src/infrastructure/logging/exception_logger.py`
 - [x] 实现异常监控指标 - `src/infrastructure/logging/exception_metrics.py`
@@ -1036,12 +832,27 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
-| `src/domain/exceptions/__init__.py` | 新建 | 异常根类与三层异常体系 |
-| `src/domain/exceptions/legacy.py` | 新建 | 遗留异常别名兼容层（覆盖 25+ 异常） |
+| `src/domain/exceptions/__init__.py` | 新建 | 异常根类与三层异常体系（统一导出） |
+| `src/domain/exceptions/base_exceptions.py` | 新建 | BaseException, SystemException, BusinessException, ExternalException |
+| `src/domain/exceptions/system_exceptions.py` | 新建 | ConfigurationError, NetworkError, StorageError, MessageBusError |
+| `src/domain/exceptions/business_exceptions.py` | 新建 | ValidationError, NotFoundError, ConflictError, PermissionDeniedError, ... |
+| `src/domain/exceptions/external_exceptions.py` | 新建 | ThirdPartyError, TimeoutError, ServiceUnavailableError, UnknownError |
+| `src/domain/exceptions/service_exceptions.py` | 新建 | AuditError, PasswordValidationError, ComplianceLockError |
+| `src/domain/exceptions/storage_exceptions.py` | 新建 | Memory*, Bucket*, MinIO* 等存储相关异常 |
+| `src/domain/exceptions/role_exceptions.py` | 新建 | Role* 等角色管理异常 |
+| `src/domain/exceptions/sandbox_exceptions.py` | 新建 | SandboxError, ContainerStartError, ExecutionError, ... |
+| `src/domain/exceptions/permission_exceptions.py` | 新建 | InsufficientTokenError |
+| `src/domain/exceptions/event_exceptions.py` | 新建 | VersionError |
 | `src/interfaces/api/exception_handlers.py` | 新建 | FastAPI 统一异常处理器 |
 | `src/interfaces/api/middleware/exception_context.py` | 新建 | 异常上下文中间件 |
 | `src/infrastructure/messaging/error_mapper.py` | 新建 | SDK 错误映射器 |
 | `src/infrastructure/logging/exception_logger.py` | 新建 | 结构化日志格式化器 |
+
+### 删除文件
+
+| 文件 | 操作 | 描述 |
+|------|------|------|
+| `src/domain/exceptions/legacy.py` | 删除 | 已拆分为 11 个模块化文件 |
 
 ### 修改文件（按优先级）
 
@@ -1070,7 +881,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 | `src/infrastructure/messaging/outbox/outbox.py` | 修改 | InvalidStateTransitionError → InvalidStateError |
 | `src/infrastructure/messaging/event_store.py` | 修改 | VersionError → SystemException |
 | `src/domain/ports/password_validation_service.py` | 修改 | PasswordValidationError → ValidationError |
-| `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException |
+| `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException | |
 
 ---
 

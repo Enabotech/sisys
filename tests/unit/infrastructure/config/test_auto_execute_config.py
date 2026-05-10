@@ -164,4 +164,4 @@ class TestAutoExecuteConfigFrozen:
         """创建后不可修改。"""
         config = AutoExecuteConfig()
         with pytest.raises(AttributeError):
-            config.enabled = False
+            object.__setattr__(config, "enabled", False)

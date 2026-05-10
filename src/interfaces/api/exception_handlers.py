@@ -86,12 +86,14 @@ class ExceptionHandlers:
         self._register_handlers()
 
     def _register_handlers(self) -> None:
-        self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)  # type: ignore[arg-type]
-        self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)  # type: ignore[arg-type]
-        self._app.add_exception_handler(BaseException, self._handle_exception)  # type: ignore[arg-type]
+        self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
+        self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
+        self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
-    async def _handle_exception(self, request: Request, exc: BaseException) -> JSONResponse:
+    async def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
+        if not isinstance(exc, BaseException):
+            return await self._handle_unexpected_error(request, exc)
         request_id = getattr(request.state, "request_id", None) or "unknown"
 
         # AuthenticationError locked 状态特殊处理
@@ -137,7 +139,9 @@ class ExceptionHandlers:
             headers={"X-Error-Code": str(getattr(exc, "code", "EXCEPTION_999") or "EXCEPTION_999")},
         )
 
-    async def _handle_validation_error(self, request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def _handle_validation_error(self, request: Request, exc: Exception) -> JSONResponse:
+        if not isinstance(exc, RequestValidationError):
+            raise TypeError(f"Expected RequestValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
         errors = []
         for error in exc.errors():
@@ -162,7 +166,9 @@ class ExceptionHandlers:
             headers={"X-Error-Code": "EXCEPTION_201"},
         )
 
-    async def _handle_pydantic_error(self, request: Request, exc: PydanticValidationError) -> JSONResponse:
+    async def _handle_pydantic_error(self, request: Request, exc: Exception) -> JSONResponse:
+        if not isinstance(exc, PydanticValidationError):
+            raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
