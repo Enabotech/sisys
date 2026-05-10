@@ -1,9 +1,11 @@
 # SISYS EDA + UnitOfWork 宗师级设计方案
 
-> **文档版本：** 1.0.0
+> **文档版本：** 1.0.1
 > **创建日期：** 2026-05-10
-> **状态：** 已批准
+> **状态：** 已批准（Round 1 审查后修订）
 > **维护者：** Agimtech
+> **修订记录**：
+> - v1.0.1: Round 1 审查修复 — 修正 Eventuate Tram 产品线混淆、Axon Outbox 描述错误、补充六边形架构约束、明确 EventStore 迁移范围、修正 `__aexit__` 返回值语义
 
 ---
 
@@ -53,12 +55,14 @@ UseCase / EventHandler
 
 | 框架 | 事务管理模式 | Outbox 实现 | 评价 |
 |------|-------------|-------------|------|
-| **Axon Framework (Java)** | `UnitOfWork` + `TransactionManager` | `JpaEventStorageEngine` 同一 transaction 写入 | ✅ 事务边界显式，UnitOfWork 是一等公民 |
-| **Eventuate Local (Java)** | `AggregateRepository` 管理事务 | `EventuateTramOutbox` 同一 JDBC transaction | ✅ 教科书级 Outbox + UoW 集成 |
-| **NServiceBus (C#)** | `IUnitOfWork` 接口 | DB Outbox 表，同一 transaction | ✅ 生产级验证，业界标准 |
-| **Spring Cloud Stream** | `@Transactional` AOP 代理 | 同一 transaction 写 outbox | ⚠️ 依赖 AOP，污染侵入性较强 |
+| **Axon Framework (Java)** | `UnitOfWork` + `TransactionManager` | 无内置 Outbox（需自行实现或使用 Axon Server） | ✅ 事务边界显式，UnitOfWork 是一等公民 |
+| **Eventuate Tram (Java)** | `AggregateRepository` 管理事务 | `EventuateTramOutbox` 同一 JDBC transaction | ✅ 教科书级 Outbox + UoW 集成 |
+| **NServiceBus (.NET)** | `IUnitOfWork` 接口 | DB Outbox 表，事务边界由消息处理管道自动管理 | ✅ 生产级验证，业界标准 |
+| **Spring Cloud Stream** | `@Transactional` + 编程式事务 | 需开发者手动实现 Outbox（非仅靠 AOP） | ⚠️ AOP 侵入性较强，但 Outbox 本身是编程式实现 |
 
 **核心共识**：Outbox Pattern 的关键是**业务表 + outbox 表必须在同一数据库事务中写入**。
+
+> **实现方式**：SQLAlchemy `AsyncSession` 在 `begin()` 后，所有通过同一 session 执行的写入操作自动属于同一 transaction，直到 `commit()` 或 `rollback()`。
 
 ### 2.2 SQLAlchemy 官方推荐模式
 
@@ -71,12 +75,14 @@ async with async_session() as session:
     # 在同一 transaction 内多个 repository 共享 session
 ```
 
+参考：[SQLAlchemy 2.0 - AsyncSession](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html#using-asyncio-with-sqlalchemy-orm)
+
 **问题**：Session 通过构造器注入，无法在**编译期/类型系统**强制验证"多个 Repository 使用同一个 session"。
 
-### 2.3 Microsoft eShop 参考实现
+### 2.3 示意性代码（基于 IUnitOfWork 模式）
 
 ```csharp
-// eShop 采用 IUnitOfWork 统一事务边界
+// 基于 IUnitOfWork 模式的示意性代码（不代表 eShopOnContainers 实际实现）
 public class OrderService
 {
     public async Task PlaceOrder(IUnitOfWork unitOfWork, OrderCommand command)
@@ -103,8 +109,8 @@ public class OrderService
 | 原则 | 说明 |
 |------|------|
 | **事务边界显式化** | 所有事务操作必须通过 `PostgreSQLUnitOfWork`，禁止绕过 |
-| **类型系统强制** | Repository 构造器接收 `PostgreSQLUnitOfWork` 而非直接接收 `AsyncSession` |
-| **向后兼容** | 现有不涉及 outbox 的 Repository 保持直接 session 注入模式 |
+| **依赖方向正确** | 六边形架构：领域层定义 `UnitOfWork` 接口（Protocol），基础设施层实现 `PostgreSQLUnitOfWork` |
+| **领域层零泄露** | Repository 直接接收 `AsyncSession`（无需知道 UoW 存在）；UoW 由应用层/EventHandler 管理 |
 | **渐进式迁移** | 新增代码优先使用 UoW，不强制要求重构现有代码 |
 
 ### 3.2 架构重构
@@ -112,14 +118,19 @@ public class OrderService
 ```
 重构后：显式事务协调（安全）
 ─────────────────────────────────────────────────────
-UseCase / EventHandler
+EventHandler（应用层）
     └── async with uow:          ← 事务边界显式声明
-            ├── repo_a(uow.session)  ← 同一 session（类型系统强制）
-            ├── repo_b(uow.session)  ← 同一 session
-            └── repo_c(uow.session)  ← 同一 session
+            ├── repo_a(uow)           ← EventHandler 内部管理 uow
+            └── repo_b(uow)           ← EventHandler 内部管理 uow
                                       ↑
-                                类型系统强制保证
+                            uow 管理事务边界
+                            Repository 仍接收 session（架构正确）
 ```
+
+**关键约束**：
+- `PostgreSQLUnitOfWork` 是**应用层/基础设施层**组件，领域层（Repository 接口）不感知其存在
+- Repository 接收 `AsyncSession` 而非 `PostgreSQLUnitOfWork` — 保持六边形架构依赖方向
+- EventHandler/UseCase 负责管理 `PostgreSQLUnitOfWork` 的生命周期
 
 ### 3.3 PostgreSQLUnitOfWork 增强设计
 
@@ -131,7 +142,7 @@ class PostgreSQLUnitOfWork:
 
     职责：
     1. 管理 AsyncSession 生命周期
-    2. 提供 session 属性访问器（所有 Repository 必须通过这里获取 session）
+    2. 提供 session 属性访问器（供 EventHandler 提取 session 传入 Repository）
     3. 防止重复 commit（guard）
     4. 支持嵌套事务（savepoint）
     """
@@ -143,11 +154,14 @@ class PostgreSQLUnitOfWork:
 
     @property
     def session(self) -> AsyncSession:
-        """所有 Repository 必须通过这里获取 session"""
+        """获取当前事务的 session。
+
+        EventHandler 使用此属性提取 session 传入各 Repository。
+        """
         return self._session
 
     async def commit(self) -> None:
-        """显式提交 + 幂等标记"""
+        """显式提交 + 幂等标记。"""
         if self._committed:
             raise InvalidStateError("Already committed")
         if self._rolled_back:
@@ -156,17 +170,17 @@ class PostgreSQLUnitOfWork:
         self._committed = True
 
     async def rollback(self) -> None:
-        """回滚 + 标记"""
+        """回滚 + 标记。"""
         await self._session.rollback()
         self._rolled_back = True
 
     async def begin_nested(self) -> None:
-        """创建 savepoint，支持嵌套事务"""
+        """创建 savepoint，支持嵌套事务。"""
         await self._session.begin_nested()
 
     async def release_nested(self) -> None:
-        """释放 savepoint"""
-        await self._session.commit()  # savepoint commit
+        """释放 savepoint。"""
+        await self._session.commit()
 
     # async with 协议支持
     async def __aenter__(self) -> "PostgreSQLUnitOfWork":
@@ -177,44 +191,43 @@ class PostgreSQLUnitOfWork:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: "TracebackType | None",
+        exc_tb: TracebackType | None,
     ) -> bool:
-        """异步上下文管理器出口
+        """异步上下文管理器出口。
 
         规则：
         - 异常：rollback（即使已部分 commit）
-        - 正常：commit
+        - 正常：仅在未手动 commit/rollback 时才 commit
         - 始终 close session
+        - 返回 False：不吞没异常
         """
         if exc_type is not None:
-            await self.rollback()
+            if not self._rolled_back:
+                await self.rollback()
         elif not self._committed and not self._rolled_back:
             await self.commit()
         await self.close()
         return False  # 不吞没异常
 ```
 
-### 3.4 Repository 改造
+### 3.4 Repository 使用模式
 
 ```python
-# 旧模式（危险）- 直接接收 session
-class SomeRepository:
+# Repository 仍接收 AsyncSession（架构正确，领域层无基础设施依赖）
+class PostgreSQLOutboxRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
-# 新模式（安全）- 通过 UoW 获取 session
-class SomeRepository:
+# EventHandler 管理 UoW 并提取 session
+class DocumentProcessedHandler:
     def __init__(self, uow: PostgreSQLUnitOfWork):
-        self._session = uow.session  # 只能通过 uow 获取
+        self._uow = uow
+        self._outbox_repo = PostgreSQLOutboxRepository(uow.session)
 
-# 向后兼容模式 - 接收 session 或 uow 均可
-from typing import Union
-class SomeRepository:
-    def __init__(self, session_or_uow: Union[AsyncSession, PostgreSQLUnitOfWork]):
-        if isinstance(session_or_uow, PostgreSQLUnitOfWork):
-            self._session = session_or_uow.session
-        else:
-            self._session = session_or_uow  # 保持旧接口兼容
+    async def handle(self, event: DocumentProcessed) -> None:
+        async with self._uow:
+            await self._business_repo.update(event)
+            self._outbox_repo.save(SomeEvent.from_event(event))
 ```
 
 ### 3.5 事务边界强制点
@@ -226,6 +239,7 @@ class SomeRepository:
 | Event Handler 处理 `DocumentProcessed` | 需要同时写业务表 + outbox 表 |
 | `AsyncOutboxPoller` 发布事件 | 需要事务性读取 + 更新状态 |
 | Checkpoint 创建 | 需要同时更新业务状态 + 写 CheckpointEvent + 更新 Outbox |
+| `PostgreSQLEventStore` 写入 | 需要事务性写入（与业务操作同 commit） |
 | 任何涉及"业务表 + outbox 表双写"的场景 | 必须保证原子性 |
 
 **以下场景可保持直接 session 注入**：
@@ -248,55 +262,88 @@ class SomeRepository:
 
 **补充明确**：
 > 验收标准补充：
-> - [ ] `PostgreSQLUnitOfWork.session` 属性强制所有 Repository 通过其获取 session
-> - [ ] 涉及 outbox 写入的 Event Handler 必须使用 UoW
-> - [ ] 事务边界在 `async with uow:` 块级别显式声明
+> - [ ] `PostgreSQLUnitOfWork` 实现包含 `session` 属性、guard 逻辑、savepoint 支持
+> - [ ] EventHandler 使用 `async with uow:` 块管理事务边界
+> - [ ] `PostgreSQLEventStore` 纳入事务边界管理范围
+> - [ ] 架构验证测试验证六边形架构依赖方向（领域层不感知 PostgreSQLUnitOfWork）
 
 ### 4.2 依赖关系
 
 ```
 AC-1 PostgreSQL DLQ ──┐
-AC-2 Redis Retry ────┼── AC-8 RabbitMQEventListener ── AC-6 UoW（事务边界）
-AC-3 DualIdempotency ─┘         │
-                                 ▼
+AC-2 Redis Retry ────┼── AC-8 RabbitMQEventListener ──┐
+AC-3 DualIdempotency ─┘                                │
+                                                       ▼
                     Event Handler（使用 UoW 保证原子性）
                                  │
+                    ┌────────────┴────────────┐
+                    ▼                         ▼
+    PostgreSQLOutboxRepository        PostgreSQLEventStore
+    （接收 session）                  （接收 session）
+                    │                         │
+                    └────────────┬────────────┘
                                  ▼
-                    PostgreSQLOutboxRepository（通过 uow.session 写入）
-                    BusinessRepository（通过 uow.session 写入）
+                    PostgreSQLUnitOfWork（应用层管理）
 ```
 
-### 4.3 架构验证测试
+### 4.3 架构约束
+
+```
+【架构约束】PostgreSQLUnitOfWork 是基础设施组件，仅能被以下层级使用：
+- Application 层（UseCase、EventHandler）
+- Infrastructure 层（Repository 实现内部）
+
+禁止领域层组件（Domain Service、Entity、Value Object、Repository 接口定义）直接依赖 PostgreSQLUnitOfWork。
+
+验证方式：
+- 领域层代码不能 import src.infrastructure.messaging.unit_of_work
+- 架构验证测试检测 "PostgreSQLUnitOfWork" 仅出现在应用层和基础设施层
+```
+
+### 4.4 架构验证测试
 
 ```python
 # tests/unit/infrastructure/test_uow_transaction_boundary.py
 
 class TestUoWTransactionBoundary:
-    """验证事务边界强制：涉及 outbox 的路径必须使用 UoW"""
+    """验证事务边界强制 + 六边形架构合规"""
 
-    def test_outbox_repository_receives_uow(self):
-        """OutboxRepository 必须通过 PostgreSQLUnitOfWork 获取 session"""
+    def test_uow_provides_session_property(self):
+        """UoW 提供 session 属性供 EventHandler 提取"""
         uow = PostgreSQLUnitOfWork(session=mock_session)
-        repo = PostgreSQLOutboxRepository(uow)  # 传入 uow
-        assert repo._session is uow.session
+        assert hasattr(uow, "session")
+        assert uow.session is mock_session
+
+    def test_uow_prevents_double_commit(self):
+        """Guard 防止重复 commit"""
+        uow = PostgreSQLUnitOfWork(session=mock_session)
+        async with uow:
+            await uow.commit()
+        with pytest.raises(InvalidStateError):
+            async with uow:
+                await uow.commit()
+
+    def test_repository_receives_session_not_uow(self):
+        """架构验证：Repository 接收 session 而非 uow（领域层零泄露）"""
+        repo = PostgreSQLOutboxRepository(session=mock_session)
+        # Repository 不感知 UoW
+        assert not hasattr(repo, "_uow")
 
     def test_event_handler_uses_uow_for_atomic_write(self):
-        """EventHandler 必须使用 UoW 保证业务+outbox 原子性"""
+        """EventHandler 使用 UoW 保证业务+outbox 原子性"""
         uow = PostgreSQLUnitOfWork(session=session)
-        handler = DocumentProcessedHandler(
-            business_repo=SomeBusinessRepo(uow),
-            outbox_repo=PostgreSQLOutboxRepository(uow),
-        )
-        # 在 uow 上下文中执行
+        handler = DocumentProcessedHandler(uow=uow)
         async with uow:
             await handler.handle(event)
-        # commit/rollback 由 uow 管理
 
-    def test_no_direct_session_injection_for_outbox_paths(self):
-        """架构验证：outbox 路径禁止直接注入 session"""
-        # 检测所有接收 AsyncSession 的 Repository
-        # 筛选涉及 outbox 写入的类
-        # 验证它们都通过 uow 获取 session
+    def test_hexagonal_dependency_direction(self):
+        """验证六边形架构依赖方向：领域层不导入基础设施层"""
+        # 领域层 import 检查
+        domain_files = glob("src/domain/**/*.py")
+        for f in domain_files:
+            content = open(f).read()
+            assert "PostgreSQLUnitOfWork" not in content
+            assert "infrastructure.messaging.unit_of_work" not in content
 ```
 
 ---
@@ -307,33 +354,38 @@ class TestUoWTransactionBoundary:
 
 **任务**：
 1. 删除废弃测试代码（`test_story_20_2.feature` 中 AC-6 的空测试场景）
-2. 完善 `PostgreSQLUnitOfWork`：`session` 属性、guard 逻辑
-3. 创建 `tests/unit/infrastructure/test_uow_transaction_boundary.py`
+2. 完善 `PostgreSQLUnitOfWork`：
+   - 添加 `session` 属性访问器
+   - 添加 `_committed/_rolled_back` guard 逻辑
+   - 添加 `begin_nested()/release_nested()` savepoint 支持
+   - 修正 `__aexit__` 返回 `False`
+3. 将 `PostgreSQLEventStore` 纳入事务边界管理
+4. 创建架构验证测试
 
 **完成标准**：
 - [ ] `PostgreSQLUnitOfWork` 拥有 `session` 属性访问器
 - [ ] 重复 commit/rollback 会抛出 `InvalidStateError`
-- [ ] 架构验证测试通过
+- [ ] `__aexit__` 返回 `False`（不吞没异常）
+- [ ] 架构验证测试通过（六边形依赖方向检查）
 
 ### Phase 2：新增代码使用 UoW（持续）
 
 **规则**：
-- 新增 EventHandler 涉及 outbox 写入时，优先使用 `PostgreSQLUnitOfWork`
-- 新增 Repository 涉及双写场景时，通过 `uow.session` 获取 session
+- 新增 EventHandler 涉及 outbox/event store 写入时，使用 `PostgreSQLUnitOfWork` 管理事务
+- EventHandler 内部通过 `uow.session` 获取 session 传入各 Repository
 
 **模板**：
 ```python
-# 新增 EventHandler 模板
 class SomeEventHandler:
     def __init__(self, uow: PostgreSQLUnitOfWork):
-        self._business_repo = SomeBusinessRepo(uow)
-        self._outbox_repo = PostgreSQLOutboxRepository(uow)
+        self._uow = uow
+        self._outbox_repo = PostgreSQLOutboxRepository(uow.session)
+        self._business_repo = SomeBusinessRepo(uow.session)
 
     async def handle(self, event: DomainEvent) -> None:
-        async with self._uow:  # 事务边界
+        async with self._uow:
             await self._business_repo.update(event)
             self._outbox_repo.save(SomeEvent.from_event(event))
-        # commit on exit, rollback on exception
 ```
 
 ### Phase 3：核心路径迁移（当业务需要时）
@@ -341,19 +393,31 @@ class SomeEventHandler:
 **优先级**：
 1. `DocumentProcessedHandler`（最关键，涉及 WORM 归档）
 2. `AsyncOutboxPoller`（事件发布的事务性保证）
-3. `CheckpointReachedHandler`（战略规划核心路径）
+3. `PostgreSQLEventStore` 写入路径（事件溯源核心）
+4. `CheckpointReachedHandler`（战略规划核心路径）
 
 **迁移检查清单**：
-- [ ] 所有涉及 outbox 写入的 Repository 已改造为接收 `PostgreSQLUnitOfWork`
+- [ ] 所有涉及 outbox/event store 写入的 EventHandler 已改造
 - [ ] Event Handler 在 `async with uow:` 块内执行
-- [ ] 集成测试验证"业务表 + outbox 表原子性"
+- [ ] 集成测试验证"业务表 + outbox/event_store 表原子性"
 - [ ] 故障注入测试（session 共享失败场景）
 
 ---
 
 ## 6. 决策权衡
 
-### 6.1 为什么不用 Spring `@Transactional` 注解？
+### 6.1 为什么不用"Repository 通过 uow 获取 session"？
+
+| 维度 | Repository 直接接收 uow | Repository 接收 session（当前方案） |
+|------|------------------------|-----------------------------------|
+| 领域层依赖 | 领域层依赖基础设施层（违规） | 领域层零依赖（合规） |
+| 类型系统强制 | 强 | 弱（依赖约定） |
+| 六边形架构合规性 | 违规 | 合规 |
+| 实现复杂度 | 高（需重构所有 Repository） | 低（只需改造 EventHandler） |
+
+**当前方案选择理由**：六边形架构合规性优先于类型系统强制。EventHandler 作为应用层组件，管理 UoW 并提取 session 传入 Repository，既保证事务边界显式，又保持领域层零泄露。
+
+### 6.2 为什么不用 Spring `@Transactional` 注解？
 
 | 维度 | AOP 注解模式 | UoW 显式模式 |
 |------|-------------|-------------|
@@ -363,18 +427,7 @@ class SomeEventHandler:
 | 与六边形架构契合度 | 低（框架强耦合） | 高（接口隔离） |
 | SQLAlchemy 兼容性 | 一般 | 极佳（session 即 transaction） |
 
-**结论**：Python 无Spring 式AOP代理，UoW 模式是最契合六边形架构的选择。
-
-### 6.2 为什么不用"保持现状 + code review"？
-
-| 维度 | code review 约束 | UoW 类型系统强制 |
-|------|-----------------|-----------------|
-| 人为纪律性依赖 | 高 | 无 |
-| 新人上手难度 | 高（需要理解约定） | 低（类型系统引导） |
-| 重构安全性 | 低（容易遗漏） | 高（编译器报错） |
-| 可追溯性 | 低（约定散落各处） | 高（代码即文档） |
-
-**结论**：code review 无法捕获所有边界情况。类型系统强制是工业级最佳实践。
+**结论**：Python 无 Spring 式 AOP 代理，UoW 模式是最契合六边形架构的选择。
 
 ---
 
@@ -384,26 +437,28 @@ class SomeEventHandler:
 
 | 决策 | 选择 |
 |------|------|
-| **方案** | PostgreSQLUnitOfWork 作为核心事务协调器 |
-| **架构模式** | Repository 通过 uow.session 获取 session，EventHandler 在 async with uow 块内执行 |
-| **迁移策略** | 渐进式（Phase 1 清理 + 完善基础设施，Phase 2-3 按需迁移） |
+| **方案** | PostgreSQLUnitOfWork 作为应用层事务协调器（不是领域层组件） |
+| **架构模式** | EventHandler 管理 uow，通过 uow.session 获取 session 传入 Repository |
+| **六边形合规性** | 领域层零泄露，Repository 接收 session 而非 uow |
+| **迁移策略** | 渐进式三阶段（Phase 1 清理+完善，Phase 2-3 按需迁移） |
 
 ### 7.2 关键收益
 
 | 收益 | 说明 |
 |------|------|
-| **编译期事务边界保证** | 违反事务约定的代码无法通过类型检查 |
-| **可测试性提升** | mock 一个 uow vs mock 多个 session |
-| **架构合规性** | 符合 Axon/Eventuate/Microsoft 业界最佳实践 |
+| **六边形架构合规** | 领域层不感知 PostgreSQLUnitOfWork，依赖方向正确 |
+| **事务边界显式** | `async with uow:` 块内执行所有操作 |
+| **可测试性提升** | mock 一个 uow 即可模拟事务行为 |
+| **符合业界最佳实践** | Eventuate Tram 模式的事务边界管理 |
 | **零成本复用** | 废弃的 `PostgreSQLUnitOfWork` 正好用于此目的 |
 
 ### 7.3 风险缓解
 
 | 风险 | 缓解措施 |
 |------|---------|
+| 类型系统强制弱 | 应用层 EventHandler 约定 + 架构验证测试检测违规 |
 | 迁移成本高 | 渐进式迁移，不要求一次性全部重构 |
-| 向后兼容破坏 | Repository 支持"session 或 uow"双模式构造 |
-| 测试改造成本大 | Phase 1 同步完善架构验证测试 |
+| EventStore 遗漏 | Phase 1 明确将 EventStore 纳入事务边界管理 |
 
 ---
 
@@ -411,10 +466,9 @@ class SomeEventHandler:
 
 | 来源 | 引用 |
 |------|------|
-| Axon Framework | `UnitOfWork` + `TransactionManager` pattern |
-| Eventuate Local | `EventuateTramOutbox` + JDBC transaction |
-| NServiceBus | `IUnitOfWork` + Outbox pattern |
-| Microsoft eShop | `IUnitOfWork` + Repository pattern |
-| SQLAlchemy Docs | AsyncSession as ambient transaction context |
+| Axon Framework | `UnitOfWork` + `TransactionManager` pattern（无内置 Outbox） |
+| Eventuate Tram | `EventuateTramOutbox` + JDBC transaction |
+| NServiceBus | `IUnitOfWork` + Outbox（管道自动管理事务边界） |
+| SQLAlchemy 2.0 | AsyncSession as ambient transaction context |
 | Story 20.2 | AC-6 UnitOfWork 统一事务边界 |
 | Architecture.md | 第 10 章 事件驱动架构设计 |
