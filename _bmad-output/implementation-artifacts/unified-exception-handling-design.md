@@ -415,8 +415,12 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
     ConflictError: status.HTTP_409_CONFLICT,
     ValidationError: status.HTTP_400_BAD_REQUEST,
+    InvalidStateError: status.HTTP_409_CONFLICT,
+    InvalidStateTransitionError: status.HTTP_409_CONFLICT,
+    BusinessRuleViolationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     TimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
     ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    UnknownError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 
@@ -441,10 +445,14 @@ class ExceptionHandlers:
         self._register_handlers()
 
     def _register_handlers(self) -> None:
-        """注册全局异常处理器."""
-        self._app.add_exception_handler(BaseException, self._handle_exception)
+        """注册全局异常处理器.
+
+        注意：具体异常处理器必须先于基类处理器注册，
+        FastAPI 按注册顺序查找匹配，精确匹配优先。
+        """
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
+        self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     async def _handle_exception(
@@ -605,6 +613,7 @@ from src.domain.exceptions import (
     ValidationError,
     BusinessRuleViolationError,
     MessageBusError,
+    InvalidStateError,
 )
 
 logger = logging.getLogger(__name__)
