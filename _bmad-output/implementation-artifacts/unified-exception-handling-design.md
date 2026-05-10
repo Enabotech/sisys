@@ -93,10 +93,13 @@ BaseException (抽象根)
 # src/domain/exceptions/__init__.py
 
 class SisysBaseException(Exception):
-    """SISYS 异常层次结构根类."""
+    """SISYS 异常层次结构根类.
+
+    注意：此基类定义在领域层（src/domain/exceptions/），仅使用Python标准库。
+    HTTP状态码等Web层关注点不在此定义，由接口层异常处理器负责映射。
+    """
     code: str = "SISYS_000"
     message: str = "Unknown error"
-    http_status: int = 500
 
     def __init__(
         self,
@@ -121,7 +124,6 @@ class SisysBaseException(Exception):
 class SystemException(SisysBaseException):
     """系统级异常，基础设施故障."""
     code = "SISYS_1XX"
-    http_status = 500
 
 
 class ConfigurationError(SystemException):
@@ -134,84 +136,72 @@ class NetworkError(SystemException):
     """网络故障."""
     code = "SISYS_102"
     message = "Network error"
-    http_status = 503
 
 
 class StorageError(SystemException):
     """存储服务故障."""
     code = "SISYS_103"
     message = "Storage error"
-    http_status = 503
 
 
 class MessageBusError(SystemException):
     """消息总线故障."""
     code = "SISYS_104"
     message = "Message bus error"
-    http_status = 503
 
 
 # === 业务级异常（Business）===
 class BusinessException(SisysBaseException):
     """业务级异常，业务规则违反."""
     code = "SISYS_2XX"
-    http_status = 400
 
 
 class ValidationError(BusinessException):
     """验证失败."""
     code = "SISYS_201"
     message = "Validation error"
-    http_status = 400
 
 
 class NotFoundError(BusinessException):
     """资源不存在."""
     code = "SISYS_202"
     message = "Resource not found"
-    http_status = 404
 
 
 class ConflictError(BusinessException):
-    """资源冲突."""
+    """资源冲突（版本冲突、状态冲突等）."""
     code = "SISYS_203"
     message = "Resource conflict"
-    http_status = 409
 
 
 class PermissionDeniedError(BusinessException):
     """权限不足."""
     code = "SISYS_204"
     message = "Permission denied"
-    http_status = 403
 
 
 class AuthenticationError(BusinessException):
     """认证失败."""
     code = "SISYS_205"
     message = "Authentication failed"
-    http_status = 401
 
 
 class InvalidStateError(BusinessException):
     """无效状态."""
     code = "SISYS_206"
     message = "Invalid state"
-    http_status = 422
 
 
 class BusinessRuleViolationError(BusinessException):
     """业务规则违反."""
     code = "SISYS_207"
     message = "Business rule violation"
-    http_status = 422
 
 
 # === 外部服务异常（External）===
 class ExternalException(SisysBaseException):
     """外部服务异常."""
     code = "SISYS_3XX"
-    http_status = 502
 
 
 class ThirdPartyError(ExternalException):
@@ -224,47 +214,129 @@ class TimeoutError(ExternalException):
     """外部服务超时."""
     code = "SISYS_302"
     message = "External service timeout"
-    http_status = 504
 
 
 class ServiceUnavailableError(ExternalException):
     """外部服务不可用."""
     code = "SISYS_303"
     message = "Service unavailable"
-    http_status = 503
+
+
+# === 抽象中间类（禁止直接实例化）===
+class SystemExceptionMeta(type):
+    """确保 SystemException 子类定义了具体错误码."""
+    def __new__(mcs, name, bases, namespace):
+        cls = super().__new__(mcs, name, bases, namespace)
+        # 中间类（SystemException本身）不需要具体码
+        if bases and name != "SystemException":
+            if not hasattr(cls, 'code') or cls.code == "SISYS_1XX":
+                if name not in ('SystemException', 'BusinessException', 'ExternalException'):
+                    raise TypeError(f"{name} must define a concrete code like 'SISYS_1XX'")
+        return cls
 ```
 
 ### 3.2 遗留异常兼容层
 
 ```python
 # src/domain/exceptions/legacy.py
-"""遗留异常别名，向后兼容."""
+"""遗留异常别名，向后兼容.
+
+覆盖所有现有异常类，确保迁移过程无破坏性变更。
+"""
 from src.domain.exceptions import (
     SisysBaseException,
+    SystemException,
     BusinessException,
     NotFoundError,
     PermissionDeniedError,
     AuthenticationError,
     ValidationError,
+    ConflictError,
     InvalidStateError as DomainInvalidStateError,
+    ExternalException,
+    NetworkError,
+    TimeoutError,
+    ServiceUnavailableError,
+    ThirdPartyError,
 )
 
-# 保留原有导入路径
-AuditError = BusinessException  # 审计错误归类为业务异常
-PasswordValidationError = ValidationError  # 密码验证归类为验证异常
-ComplianceLockError = BusinessRuleViolationError  # 合规锁定归类为业务规则异常
+# === 领域层异常 ===
+
+# 审计错误是系统级基础设施问题（非业务规则违反）
+AuditError = SystemException
+
+PasswordValidationError = ValidationError
+ComplianceLockError = BusinessException  # 合规锁定是业务规则违反
+
+# 领域服务异常
+MemoryVersionConflictError = ConflictError  # 版本冲突是冲突类
+MemoryNotFoundError = NotFoundError
+
+# === 应用层异常 ===
+
+RoleAlreadyExistsError = ConflictError
+RoleNotFoundError = NotFoundError
+CannotDeleteSystemRoleError = BusinessException
+CannotDeleteRoleWithUsersError = ConflictError
+
+# 沙箱异常
+SandboxError = ExternalException
+ContainerStartError = ExternalException
+ExecutionError = ExternalException
+ContainerStopError = ExternalException
+
+# === 基础设施层异常 ===
+
+InvalidStateTransitionError = DomainInvalidStateError  # 合并到已有状态异常
+VersionError = SystemException
+
+# MinIO 异常
+BucketNotFoundError = NotFoundError
+MinIOConnectionError = NetworkError
+
+# 权限异常
+InsufficientTokenError = AuthenticationError
+
+# 多个文件重复定义的 PermissionDeniedError 统一为 BusinessException
+PermissionDeniedError = PermissionDeniedError  # 已是新体系
 
 __all__ = [
+    # 基类和三层异常
     "SisysBaseException",
+    "SystemException",
     "BusinessException",
+    "ExternalException",
+    # 具体异常
     "NotFoundError",
     "PermissionDeniedError",
     "AuthenticationError",
     "ValidationError",
+    "ConflictError",
     "DomainInvalidStateError",
+    "BusinessException",
+    # 遗留别名
     "AuditError",
     "PasswordValidationError",
     "ComplianceLockError",
+    "MemoryVersionConflictError",
+    "MemoryNotFoundError",
+    "RoleAlreadyExistsError",
+    "RoleNotFoundError",
+    "CannotDeleteSystemRoleError",
+    "CannotDeleteRoleWithUsersError",
+    "SandboxError",
+    "ContainerStartError",
+    "ExecutionError",
+    "ContainerStopError",
+    "InvalidStateTransitionError",
+    "VersionError",
+    "BucketNotFoundError",
+    "MinIOConnectionError",
+    "InsufficientTokenError",
+    "NetworkError",
+    "TimeoutError",
+    "ServiceUnavailableError",
+    "ThirdPartyError",
 ]
 ```
 
@@ -285,12 +357,26 @@ from src.domain.exceptions import (
     ExternalException,
 )
 
-# 错误码到 HTTP 状态码映射表
+# 异常类型 → HTTP 状态码映射表（唯一真相源）
 EXCEPTION_HTTP_MAP: dict[type[SisysBaseException], int] = {
     SystemException: status.HTTP_500_INTERNAL_SERVER_ERROR,
     BusinessException: status.HTTP_400_BAD_REQUEST,
     ExternalException: status.HTTP_502_BAD_GATEWAY,
+    # 具体异常覆盖
 }
+
+
+def _get_http_status(exc: SisysBaseException) -> int:
+    """获取异常对应的HTTP状态码，优先使用具体异常映射."""
+    # 精确匹配优先
+    for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
+        if type(exc) is exc_type:
+            return http_status
+    # 然后是MRO匹配
+    for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
+        if isinstance(exc, exc_type):
+            return http_status
+    return status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class ExceptionHandlers:
@@ -311,16 +397,27 @@ class ExceptionHandlers:
         self, request: Request, exc: SisysBaseException
     ) -> JSONResponse:
         """处理 SISYS 异常."""
-        request_id = request.state.__dict__.get("request_id", "unknown")
+        # 安全获取 request_id，不依赖特定中间件
+        request_id = getattr(request.state, "request_id", None) or "unknown"
+
+        try:
+            error_dict = exc.to_dict()
+        except Exception:
+            # to_dict() 失败时的降级处理
+            error_dict = {
+                "code": getattr(exc, 'code', "SISYS_999"),
+                "message": str(exc),
+                "context": {},
+            }
 
         content = {
-            "error": exc.to_dict(),
+            "error": error_dict,
             "request_id": request_id,
             "path": str(request.url),
         }
 
         return JSONResponse(
-            status_code=exc.http_status,
+            status_code=_get_http_status(exc),
             content=content,
             headers={"X-Error-Code": exc.code},
         )
@@ -329,7 +426,7 @@ class ExceptionHandlers:
         self, request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         """处理请求验证错误."""
-        request_id = request.state.__dict__.get("request_id", "unknown")
+        request_id = getattr(request.state, "request_id", None) or "unknown"
 
         errors = []
         for error in exc.errors():
@@ -356,6 +453,7 @@ class ExceptionHandlers:
         self, request: Request, exc: PydanticValidationError
     ) -> JSONResponse:
         """处理 Pydantic 验证错误."""
+        request_id = getattr(request.state, "request_id", None) or "unknown"
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
@@ -364,6 +462,7 @@ class ExceptionHandlers:
                     "message": "Data validation error",
                     "context": {"errors": exc.errors()},
                 },
+                "request_id": request_id,
             },
         )
 
@@ -398,10 +497,16 @@ def register_exception_handlers(app: FastAPI) -> ExceptionHandlers:
 ```python
 # src/infrastructure/messaging/error_mapper.py
 
-"""外部 SDK 错误到 SISYS 异常的标准化映射."""
+"""外部 SDK 错误到 SISYS 异常的标准化映射.
+
+注意：优先使用类型匹配（isinstance）而非字符串匹配。
+对于 MinIO S3Error，应使用 error.code 属性直接映射（见 map_s3_error）。
+装饰器方案仅用于无法使用类型匹配的场景。
+"""
 
 import logging
-from typing import TypeVar, Callable
+from functools import wraps
+from typing import Callable, TypeVar
 
 from src.domain.exceptions import (
     ExternalException,
@@ -411,6 +516,10 @@ from src.domain.exceptions import (
     SystemException,
     StorageError,
     NetworkError,
+    ConflictError,
+    NotFoundError,
+    PermissionDeniedError,
+    MessageBusError,
 )
 
 logger = logging.getLogger(__name__)
@@ -419,17 +528,27 @@ T = TypeVar("T")
 
 
 class ErrorMapper:
-    """外部错误标准化映射器."""
+    """外部错误标准化映射器.
 
-    # MinIO S3Error 映射
+    使用示例：
+        try:
+            await client.stat(bucket, object_key)
+        except S3Error as e:
+            raise ErrorMapper.map_s3_error(e.code, e.message) from e
+    """
+
+    # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
     S3_ERROR_MAP: dict[str, type[ExternalException]] = {
-        "NoSuchBucket": StorageError,
+        "NoSuchBucket": NotFoundError,
+        "NoSuchKey": NotFoundError,
         "BucketAlreadyExists": ConflictError,
+        "BucketAlreadyOwnedByYou": ConflictError,
         "AccessDenied": PermissionDeniedError,
         "Forbidden": PermissionDeniedError,
-        "NoSuchKey": NotFoundError,
+        "InvalidObjectState": SystemException,
         "RequestTimeout": TimeoutError,
         "ServiceUnavailable": ServiceUnavailableError,
+        "InternalError": SystemException,
     }
 
     # RabbitMQ 错误映射
@@ -448,21 +567,29 @@ class ErrorMapper:
 
     @classmethod
     def map_s3_error(cls, code: str, message: str | None = None) -> ExternalException:
-        """映射 MinIO S3 错误."""
+        """映射 MinIO S3 错误.
+
+        Args:
+            code: S3Error.code 属性值（如 "NoSuchBucket"）
+            message: 原始错误消息
+
+        Returns:
+            对应的 SISYS 异常实例
+        """
         exc_class = cls.S3_ERROR_MAP.get(code, ThirdPartyError)
-        return exc_class(message or f"S3 error: {code}")
+        return exc_class(message=message or f"S3 error: {code}")
 
     @classmethod
     def map_rabbitmq_error(cls, error_type: str, message: str | None = None) -> ExternalException:
         """映射 RabbitMQ 错误."""
         exc_class = cls.RABBITMQ_ERROR_MAP.get(error_type, MessageBusError)
-        return exc_class(message or f"RabbitMQ error: {error_type}")
+        return exc_class(message=message or f"RabbitMQ error: {error_type}")
 
     @classmethod
     def map_redis_error(cls, error_type: str, message: str | None = None) -> SystemException:
         """映射 Redis 错误."""
         exc_class = cls.REDIS_ERROR_MAP.get(error_type, SystemException)
-        return exc_class(message or f"Redis error: {error_type}")
+        return exc_class(message=message or f"Redis error: {error_type}")
 
     @classmethod
     def wrap_external_error(
@@ -471,8 +598,17 @@ class ErrorMapper:
         target_exc_class: type[ExternalException],
         context: dict | None = None,
     ) -> ExternalException:
-        """包装外部错误为 SISYS 异常."""
-        logger.warning("Wrapping external error: %s -> %s", error, target_exc_class.__name__)
+        """包装外部错误为 SISYS 异常.
+
+        推荐用法（替代装饰器）：
+            try:
+                await external_call()
+            except SomeError as e:
+                raise ErrorMapper.wrap_external_error(
+                    e, TargetException, {"operation": "xxx"}
+                ) from e
+        """
+        logger.warning("Wrapping external error: %s -> %s", type(error).__name__, target_exc_class.__name__)
         return target_exc_class(
             message=str(error),
             cause=error,
@@ -484,8 +620,19 @@ def with_error_mapping(
     error_map: dict[str, type[ExternalException]],
     default_exc: type[ExternalException] = ThirdPartyError,
 ) -> Callable:
-    """装饰器：自动映射外部错误."""
+    """装饰器：自动映射外部错误（仅用于无法使用类型匹配的场景）.
+
+    注意：这是兜底方案。优先使用 ErrorMapper.map_* 方法直接映射。
+    装饰器使用字符串子匹配，可能有误匹配风险。
+
+    推荐用法：
+        class MyAdapter:
+            @with_error_mapping({"ConnectionError": NetworkError})
+            async def connect(self):
+                ...
+    """
     def decorator(func: Callable) -> Callable:
+        @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
@@ -493,8 +640,8 @@ def with_error_mapping(
                 error_str = str(e)
                 for key, exc_class in error_map.items():
                     if key.lower() in error_str.lower():
-                        raise exc_class(message=str(e), cause=e) from e
-                raise default_exc(message=str(e), cause=e) from e
+                        raise exc_class(message=str(e), cause=e) from None
+                raise default_exc(message=str(e), cause=e) from None
         return wrapper
     return decorator
 ```
@@ -586,42 +733,93 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 ## 4. 迁移策略
 
-### 4.1 阶段一：建立基础设施
+### 4.1 阶段一：建立基础设施（2-3 人日）
 
-1. 创建 `src/domain/exceptions/` 模块
-2. 定义 `SisysBaseException` 及三层异常体系
-3. 创建 `src/interfaces/api/exception_handlers.py`
-4. 迁移 audit_service、auth_service 中的异常定义
+1. 创建 `src/domain/exceptions/__init__.py` - 异常根类与三层异常体系
+2. 创建 `src/domain/exceptions/legacy.py` - 遗留异常别名兼容层（覆盖 25+ 异常）
+3. 创建 `src/interfaces/api/exception_handlers.py` - FastAPI 统一异常处理器
+4. 创建 `src/interfaces/api/middleware/exception_context.py` - 异常上下文中间件
+5. 创建 `src/infrastructure/messaging/error_mapper.py` - SDK 错误映射器
+6. 创建 `src/infrastructure/logging/exception_logger.py` - 结构化日志格式化器
 
-### 4.2 阶段二：全面迁移
+### 4.2 阶段二：全面迁移（8-10 人日）
 
-1. 迁移所有 domain/ports 中的异常
-2. 迁移 application/use_cases 中的异常
-3. 迁移 infrastructure 中的异常
-4. 实现 ErrorMapper 标准化映射
+#### 第一批：高优先级（API 层）
 
-### 4.3 阶段三：完善与优化
+| 文件 | 异常数 | 描述 |
+|------|--------|------|
+| `src/domain/ports/audit_service.py` | 1 | AuditError → SystemException |
+| `src/domain/ports/auth_service.py` | 1 | AuthenticationError → BusinessException |
+| `src/infrastructure/security/permission_middleware.py` | 2 | PermissionDeniedError, InsufficientTokenError |
+
+#### 第二批：中优先级（应用层）
+
+| 文件 | 异常数 | 描述 |
+|------|--------|------|
+| `src/application/use_cases/role_management.py` | 4 | RoleAlreadyExistsError 等 |
+| `src/application/ports/sandbox_port.py` | 4 | SandboxError 等 |
+| `src/domain/services/memory_service.py` | 2 | MemoryVersionConflictError, MemoryNotFoundError |
+
+#### 第三批：低优先级（基础设施层）
+
+| 文件 | 异常数 | 描述 |
+|------|--------|------|
+| `src/infrastructure/storage/minio/client_adapter.py` | 4 | 使用 ErrorMapper 替代私有 _map_error |
+| `src/infrastructure/messaging/outbox/outbox.py` | 1 | InvalidStateTransitionError → InvalidStateError |
+| `src/infrastructure/messaging/event_store.py` | 1 | VersionError → SystemException |
+| `src/domain/ports/password_validation_service.py` | 1 | PasswordValidationError → ValidationError |
+| `src/domain/ports/storage.py` | 1 | ComplianceLockError → BusinessException |
+
+### 4.3 阶段三：完善与优化（3-5 人日）
 
 1. 实现结构化日志集成
 2. 实现异常监控指标
 3. 编写回归测试确保无破坏性变更
+4. 统一 ErrorMapper 与现有 _map_error 方法
 
 ---
 
-## 5. 文件变更清单
+## 5. 文件变更清单（完整版）
+
+### 新建文件
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
 | `src/domain/exceptions/__init__.py` | 新建 | 异常根类与三层异常体系 |
-| `src/domain/exceptions/legacy.py` | 新建 | 遗留异常别名兼容层 |
+| `src/domain/exceptions/legacy.py` | 新建 | 遗留异常别名兼容层（覆盖 25+ 异常） |
 | `src/interfaces/api/exception_handlers.py` | 新建 | FastAPI 统一异常处理器 |
 | `src/interfaces/api/middleware/exception_context.py` | 新建 | 异常上下文中间件 |
 | `src/infrastructure/messaging/error_mapper.py` | 新建 | SDK 错误映射器 |
 | `src/infrastructure/logging/exception_logger.py` | 新建 | 结构化日志格式化器 |
-| `src/domain/ports/audit_service.py` | 修改 | 异常引用切换到新体系 |
-| `src/domain/ports/auth_service.py` | 修改 | 异常引用切换到新体系 |
-| `src/application/use_cases/role_management.py` | 修改 | 异常定义迁移 |
-| `src/infrastructure/storage/minio/client_adapter.py` | 修改 | 使用 ErrorMapper |
+
+### 修改文件（按优先级）
+
+#### P0 - API 层异常迁移
+
+| 文件 | 操作 | 描述 |
+|------|------|------|
+| `src/domain/ports/audit_service.py` | 修改 | AuditError → SystemException |
+| `src/domain/ports/auth_service.py` | 修改 | AuthenticationError → BusinessException |
+| `src/interfaces/api/auth.py` | 修改 | 移除 try/except，改用全局异常处理器 |
+| `src/infrastructure/security/permission_middleware.py` | 修改 | PermissionDeniedError → 新体系 |
+
+#### P1 - 应用层异常迁移
+
+| 文件 | 操作 | 描述 |
+|------|------|------|
+| `src/application/use_cases/role_management.py` | 修改 | 4个角色异常类 |
+| `src/application/ports/sandbox_port.py` | 修改 | SandboxError 等 4 个 → ExternalException |
+| `src/domain/services/memory_service.py` | 修改 | MemoryVersionConflictError → ConflictError |
+
+#### P2 - 基础设施层异常迁移
+
+| 文件 | 操作 | 描述 |
+|------|------|------|
+| `src/infrastructure/storage/minio/client_adapter.py` | 修改 | 使用 ErrorMapper.map_s3_error |
+| `src/infrastructure/messaging/outbox/outbox.py` | 修改 | InvalidStateTransitionError → InvalidStateError |
+| `src/infrastructure/messaging/event_store.py` | 修改 | VersionError → SystemException |
+| `src/domain/ports/password_validation_service.py` | 修改 | PasswordValidationError → ValidationError |
+| `src/domain/ports/storage.py` | 修改 | ComplianceLockError → BusinessException |
 
 ---
 
