@@ -1,13 +1,14 @@
 # SISYS EDA + UnitOfWork 宗师级设计方案
 
-> **文档版本：** 1.0.3
+> **文档版本：** 1.0.4
 > **创建日期：** 2026-05-10
-> **状态：** 已批准（Round 3 审查后修订）
+> **状态：** 已批准（Round 4 审查后修订）
 > **维护者：** Agimtech
 > **修订记录**：
-> - v1.0.1: Round 1 审查修复 — 修正 Eventuate Tram 产品线混淆、Axon Outbox 描述错误、补充六边形架构约束、明确 EventStore 迁移范围、修正 `__aexit__` 返回值语义
-> - v1.0.2: Round 2 审查修复 — EventHandler 依赖 UnitOfWork 接口、修正 savepoint API、补充 AsyncOutboxPoller 事务说明、明确文档 vs 实现差异、架构验证测试补强、修复领域层测试架构违规
-> - v1.0.3: Round 3 审查修复 — 修正 savepoint API 语义（移除 release_nested 不当描述）、修正 begin_nested 命名说明、补充 __aexit__ rollback 失败处理、明确 AsyncOutboxPoller 发布非事务性局限、修正 Phase 2 模板接口类型
+> - v1.0.1: Round 1 审查修复
+> - v1.0.2: Round 2 审查修复
+> - v1.0.3: Round 3 审查修复
+> - v1.0.4: Round 4 审查修复 — 修正 UnitOfWork 使用 ABC 改为 Protocol、修正 OutboxRepository 同步方法与 async 调用不匹配、补充 NServiceBus Outbox 显式配置说明、补充 Eventuate Tram OutboxMonitor 轮询机制说明
 
 ---
 
@@ -58,9 +59,9 @@ UseCase / EventHandler
 | 框架 | 事务管理模式 | Outbox 实现 | 评价 |
 |------|-------------|-------------|------|
 | **Axon Framework (Java)** | `UnitOfWork` + `TransactionManager` | 无内置 Outbox（需自行实现）；Axon Server 是独立 event store/broker 产品，非 Outbox 方案 | ✅ 事务边界显式，UnitOfWork 是一等公民 |
-| **Eventuate Tram (Java)** | Outbox + AggregateRepository | `EventuateTramOutbox` 在同一 JDBC transaction 写入 outbox 表和聚合事件表 | ✅ 教科书级 Outbox + UoW 集成 |
-| **NServiceBus (.NET)** | `IUnitOfWork` 接口 | DB Outbox 表，事务边界由消息处理管道自动管理 | ✅ 生产级验证，业界标准 |
-| **Spring Cloud Stream** | `@Transactional` + 编程式事务 | 无内置 Outbox；需完整实现 Outbox 表读写逻辑，框架不提供相关构造 | ⚠️ 编程式事务侵入性较强 |
+| **Eventuate Tram (Java)** | Outbox + AggregateRepository | `EventuateTramOutbox` 在同一 JDBC transaction 写入 outbox 表和聚合事件表；消息发布由 `EventuateTramOutboxMonitor` 后台轮询实现（两阶段：写入-outbox / 轮询-发布） | ✅ 教科书级 Outbox + UoW 集成 |
+| **NServiceBus (.NET)** | `IUnitOfWork` 接口 | DB Outbox 表，需在 endpoint 配置中显式启用 `NServiceBus.Outbox`；事务边界需正确配置，框架不会自动推断 | ✅ 生产级验证，业界标准 |
+| **Spring Cloud Stream** | `@Transactional` + 编程式事务 | 无内置 Outbox；Spring Cloud Stream 仅提供消息通道抽象，事务性 outbox 写入需借助 Spring @Transactional 或 Spring Integration 自定义实现 | ⚠️ 编程式事务侵入性较强 |
 
 **核心共识**：Outbox Pattern 的关键是**业务表 + outbox 表必须在同一数据库事务中写入**。
 
@@ -426,7 +427,7 @@ class SomeEventHandler:
     async def handle(self, event: DomainEvent) -> None:
         async with self._uow:
             await self._business_repo.update(event)
-            self._outbox_repo.save(SomeEvent.from_event(event))
+            self._outbox_repo.save(SomeEvent.from_event(event))  # OutboxRepository.save() 是同步方法
 ```
 
 ### Phase 3：核心路径迁移（当业务需要时）
