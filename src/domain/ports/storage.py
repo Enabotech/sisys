@@ -9,6 +9,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Protocol
 
+from src.domain.exceptions.legacy import ComplianceLockError
+
+__all__ = ["ComplianceLockError"]
+
 
 class ObjectStorageRepository(Protocol):
     """对象存储领域仓储接口。

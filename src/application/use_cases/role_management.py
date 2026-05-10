@@ -18,6 +18,13 @@ from src.domain.exceptions.legacy import (
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 
+__all__ = [
+    "RoleAlreadyExistsError",
+    "RoleNotFoundError",
+    "CannotDeleteSystemRoleError",
+    "CannotDeleteRoleWithUsersError",
+]
+
 
 class RoleService:
     """角色管理服务.

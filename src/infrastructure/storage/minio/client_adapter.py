@@ -12,9 +12,17 @@ from minio.error import S3Error
 from src.domain.exceptions.legacy import (
     BucketNotFoundError,
     ComplianceLockError,
+    MinIOConnectionError,
     PermissionDeniedError,
 )
 from src.infrastructure.config.minio import MinIOConfig
+
+__all__ = [
+    "BucketNotFoundError",
+    "PermissionDeniedError",
+    "ComplianceLockError",
+    "MinIOConnectionError",
+]
 
 
 class MinioClientAdapter:
