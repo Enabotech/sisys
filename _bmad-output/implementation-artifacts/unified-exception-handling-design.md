@@ -424,6 +424,43 @@ class InsufficientTokenError(PermissionDeniedError):
     code = "EXCEPTION_204"
     message = "Insufficient token"
 
+
+# 其他待迁移异常
+class MemoryAccessDeniedError(PermissionDeniedError):
+    """记忆访问被拒绝异常."""
+    code = "EXCEPTION_204"
+    message = "Memory access denied"
+
+
+class DomainError(SystemException):
+    """领域层基础异常（architecture.md 定义）."""
+    code = "EXCEPTION_101"
+    message = "Domain error"
+
+
+class DomainException(SystemException):
+    """领域异常基类（architecture.md 定义）."""
+    code = "EXCEPTION_101"
+    message = "Domain exception"
+
+
+class LayerNotFoundError(NotFoundError):
+    """层级不存在异常（归档文档定义）."""
+    code = "EXCEPTION_202"
+    message = "Layer not found"
+
+
+class BucketNameValidationError(ValidationError):
+    """Bucket 名称验证失败异常."""
+    code = "EXCEPTION_201"
+    message = "Bucket name validation failed"
+
+
+class KubectlError(ExternalException):
+    """kubectl 操作异常（测试工具）."""
+    code = "EXCEPTION_301"
+    message = "Kubectl error"
+
 __all__ = [
     # 基类和三层异常
     "BaseException",
@@ -457,6 +494,12 @@ __all__ = [
     "BucketNotFoundError",
     "MinIOConnectionError",
     "InsufficientTokenError",
+    "MemoryAccessDeniedError",
+    "DomainError",
+    "DomainException",
+    "LayerNotFoundError",
+    "BucketNameValidationError",
+    "KubectlError",
     "NetworkError",
     "TimeoutError",
     "ServiceUnavailableError",
