@@ -245,6 +245,12 @@ class ServiceUnavailableError(ExternalException):
     message = "Service unavailable"
 
 
+class UnknownError(ExternalException):
+    """未知错误（未预期异常兜底）."""
+    code = "EXCEPTION_999"
+    message = "Unknown error"
+
+
 # === 抽象中间类（禁止直接实例化）===
 class SystemExceptionMeta(type):
     """确保 SystemException 子类定义了具体错误码."""
@@ -618,23 +624,24 @@ class ErrorMapper:
 
     # MinIO S3Error 映射（使用 error.code 直接查找，非字符串匹配）
     # 注意：UnknownError 作为兜底返回，确保始终返回领域异常而非原始 S3Error
+    # 使用 .get(code.lower()) 支持大小写不敏感查找
     S3_ERROR_MAP: dict[str, type[BaseException]] = {
-        "NoSuchBucket": NotFoundError,
-        "NoSuchKey": NotFoundError,
-        "BucketAlreadyExists": ConflictError,
-        "BucketAlreadyOwnedByYou": ConflictError,
-        "AccessDenied": PermissionDeniedError,
-        "Forbidden": PermissionDeniedError,
-        "InvalidObjectState": InvalidStateError,  # WORM 对象状态限制是状态错误
-        "ObjectLockConfigurationNotFoundError": InvalidStateError,  # WORM 配置缺失是状态错误
-        "RequestTimeout": TimeoutError,
-        "ServiceUnavailable": ServiceUnavailableError,
-        "InternalError": ThirdPartyError,  # S3 内部错误，非业务错误
-        "NoSuchUpload": NotFoundError,
-        "NoSuchVersion": NotFoundError,
-        "EntityTooLarge": ValidationError,
-        "MethodNotAllowed": ThirdPartyError,  # S3 层面方法限制是外部服务错误
-        "SlowDown": ServiceUnavailableError,
+        "nosuchbucket": NotFoundError,
+        "nosuchkey": NotFoundError,
+        "bucketalreadyexists": ConflictError,
+        "bucketalreadyownedbyyou": ConflictError,
+        "accessdenied": PermissionDeniedError,
+        "forbidden": PermissionDeniedError,
+        "invalidobjectstate": InvalidStateError,  # WORM 对象状态限制是状态错误
+        "objectlockconfigurationnotfound": InvalidStateError,  # WORM 配置缺失是状态错误
+        "requesttimeout": TimeoutError,
+        "serviceunavailable": ServiceUnavailableError,
+        "internalerror": ThirdPartyError,  # S3 内部错误，非业务错误
+        "nosuchupload": NotFoundError,
+        "nosuchversion": NotFoundError,
+        "entitytoolarge": ValidationError,
+        "methodnotallowed": ThirdPartyError,  # S3 层面方法限制是外部服务错误
+        "slowdown": ServiceUnavailableError,
     }
 
     # RabbitMQ 错误映射
@@ -662,7 +669,10 @@ class ErrorMapper:
         Returns:
             对应的异常实例
         """
-        exc_class = cls.S3_ERROR_MAP.get(code, ThirdPartyError)
+        # 大小写不敏感查找，支持各种大小写变体
+        exc_class = cls.S3_ERROR_MAP.get(code.lower(), ThirdPartyError)
+        if exc_class is ThirdPartyError:
+            logger.warning("Unknown S3 error code: %s, defaulting to ThirdPartyError", code)
         return exc_class(message=message or f"S3 error: {code}")
 
     @classmethod
@@ -705,15 +715,21 @@ class ErrorMapper:
 def with_error_mapping(
     error_map: dict[str, type[ExternalException]],
     default_exc: type[ExternalException] = ThirdPartyError,
+    *,
+    exact_match: bool = False,
 ) -> Callable:
     """装饰器：自动映射外部错误（仅用于无法使用类型匹配的场景）.
 
     注意：这是兜底方案。优先使用 ErrorMapper.map_* 方法直接映射。
-    装饰器使用字符串子匹配，可能有误匹配风险。
+
+    参数：
+        exact_match: 为 True 时使用精确匹配（==），避免子串误匹配。
+                   为 False（默认）时使用子串匹配（in），用于包含错误消息的场景。
 
     推荐用法：
         class MyAdapter:
-            @with_error_mapping({"ConnectionError": NetworkError})
+            # 精确匹配：用于错误码字面量比较
+            @with_error_mapping({"ConnectionError": NetworkError}, exact_match=True)
             async def connect(self):
                 ...
     """
@@ -725,8 +741,13 @@ def with_error_mapping(
             except Exception as e:
                 error_str = str(e)
                 for key, exc_class in error_map.items():
-                    if key.lower() in error_str.lower():
-                        raise exc_class(message=str(e), cause=e) from None
+                    if exact_match:
+                        if key.lower() == error_str.lower():
+                            raise exc_class(message=str(e), cause=e) from None
+                    else:
+                        # 子串匹配（仅用于错误消息包含明确错误码的场景）
+                        if key.lower() in error_str.lower():
+                            raise exc_class(message=str(e), cause=e) from None
                 raise default_exc(message=str(e), cause=e) from None
         return wrapper
     return decorator
