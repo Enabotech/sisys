@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from src.domain.exceptions.legacy import ComplianceLockError
+from src.domain.exceptions.service_exceptions import ComplianceLockError
 
 __all__ = ["ComplianceLockError"]
 

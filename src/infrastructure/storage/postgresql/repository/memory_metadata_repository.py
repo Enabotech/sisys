@@ -18,7 +18,7 @@ from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
-from src.domain.exceptions.legacy import MemoryVersionConflictError
+from src.domain.exceptions.storage_exceptions import MemoryVersionConflictError
 from src.domain.ports.l2_rdb import L2MetadataRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
 

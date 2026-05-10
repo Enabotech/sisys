@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from src.domain.exceptions.legacy import (
+from src.domain.exceptions.sandbox_exceptions import (
     ContainerStartError,
     ContainerStopError,
     ExecutionError,

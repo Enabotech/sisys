@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.entities.role import Role
-from src.domain.exceptions.legacy import (
+from src.domain.exceptions.role_exceptions import (
     CannotDeleteRoleWithUsersError,
     CannotDeleteSystemRoleError,
     RoleAlreadyExistsError,

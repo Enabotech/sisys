@@ -13,7 +13,7 @@ from minio.error import S3Error
 from minio.objectlockconfig import ObjectLockConfig
 from minio.versioningconfig import VersioningConfig
 
-from src.domain.exceptions.legacy import BucketNameValidationError
+from src.domain.exceptions.storage_exceptions import BucketNameValidationError
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
 
