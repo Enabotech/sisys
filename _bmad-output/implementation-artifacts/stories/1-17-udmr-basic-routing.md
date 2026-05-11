@@ -93,7 +93,7 @@ AutoExecuted
 
 ### AC-2: 故障切换机制
 
-**Given** 本地模型不可用或响应超时（>30秒）
+**Given** 本地模型不可用（健康检查失败）或响应超时（>30秒）
 **When** UDMRouter 执行路由决策
 **Then** 自动切换至云端模型
 **And** 记录切换原因和切换时间
@@ -188,13 +188,16 @@ AutoExecuted
 
 #### 路由决策模型 (Routing Decision Model)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
+  - 用途: UDMRouter 内部路由决策的中间值对象，与 RoutingDecisionLog 实体分离
   - 字段:
     - `route_type: Literal["local", "cloud"]` — 路由类型
     - `selected_model: str` — 选定的模型名称（非空）
     - `cost_estimate: float` — 预估成本（USD）
-    - `cost_actual: float` — 实际成本（USD）
-    - `latency_ms: float` — 延迟（毫秒）
+    - `health_check_passed: bool` — 健康检查是否通过
+    - `health_check_latency_ms: float` — 健康检查延迟（毫秒）
+    - `latency_ms: float` — 路由决策延迟（毫秒）
     - `fallback_reason: Optional[Literal["timeout", "unavailable", "health_check_failed"]]` — 切换原因
+  - 注意: `cost_actual`（实际成本）由 Story 1.19 CFO 模块在执行后填充，不在此值对象中
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.17.feature`（由 Dev agent 在 Task 0 创建）
