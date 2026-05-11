@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoutingDecisionLog:
     """Log entry for routing decisions.
 

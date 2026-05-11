@@ -203,7 +203,9 @@ class UDMRouter:
             route_type = "cloud"
             cloud_models = self._get_cloud_models()
             if not cloud_models:
-                raise ValueError("No cloud models available and local model unavailable")
+                raise ValueError(
+                    f"No cloud models available and local model unavailable (task_id={task_id}, session_id={session_id})"
+                )
             selected_model = cloud_models[0]
             if health_check_exc is not None:
                 fallback_reason = "health_check_failed"
