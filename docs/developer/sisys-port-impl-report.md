@@ -250,3 +250,224 @@ src/infrastructure/messaging/redis_event_bus.py
 2. **服务内禁止定义**: 服务文件内部不应定义 Port
 3. **统一导入**: 使用 `from src.domain.ports.xxx import XXX` 而非本地定义
 4. **依赖方向**: 领域层定义接口，基础设施层实现，依赖从外向内
+
+---
+
+## 十一、第1轮审查P0问题与系统解决方案
+
+### P0问题汇总
+
+| P0-ID | 模块 | 问题描述 | 严重程度 |
+|-------|------|----------|----------|
+| P0-1 | 服务内Protocol | `auto_route_service.py` 本地定义 `EventPublisherProtocol`，与 `event_publisher.py` 重复 | 严重 |
+| P0-2 | 服务内Protocol | `auto_trigger_service.py` 本地定义相同的 `EventPublisherProtocol` | 严重 |
+| P0-3 | 服务内Protocol | `auto_route_service.py` 本地定义 `HashRouterProtocol`、`SemanticRouterProtocol` | 严重 |
+| P0-4 | 服务内Protocol | `auto_execute_completed_handler.py` 和 `auto_route_handler.py` 各自本地定义 `EventPublisherProtocol` | 严重 |
+| P0-5 | 接口不一致 | 本地 `EventPublisherProtocol` 返回 `None`，正式 `EventPublisher` 返回 `PublishResult` | 严重 |
+| P0-6 | 事件发布 | `AutoRouteHandler.on_triggered()` 计算了 `routed` 但从未调用 `_publish(routed)` | 严重 |
+| P0-7 | 导出完整性 | `__init__.py` 仅导出17个，遗漏超过24个重要端口（BaseRepository、ObjectStorageRepository等） | 严重 |
+| P0-8 | 导出缺失 | `L0StoragePort`、`IntegrityPort`、`CollectionManager`、`VectorStorage` 等核心接口未导出 | 严重 |
+| P0-9 | application/ports | 缺少 `__init__.py`，无法统一导入 | 严重 |
+| P0-10 | 事件总线工厂 | `EventBusFactory.__init__` 初始化 `None`，运行时调用触发 `AttributeError` | 严重 |
+| P0-11 | 事件总线工厂 | `_get_outbox_repository()` 返回 `None`，`RabbitMQEventBus.publish()` 触发 `AttributeError` | 严重 |
+| P0-12 | 组件复用 | 工厂类声称"共享组件复用"但实际未实现，所有 publisher 始终为 `None` | 严重 |
+| P0-13 | Protocol不兼容 | `InMemoryEventBus.publish()` 同步返回 `None`，与 `EventPublisher` 异步返回 `PublishResult` 不兼容 | 严重 |
+| P0-14 | 接口冗余 | `VectorStorage` Protocol 与 `L3VectorPort` 语义重复 | 中等 |
+| P0-15 | 接口冗余 | `GraphManager`/`GraphStorage` Protocol 与 `L5GraphPort` 语义重复 | 中等 |
+| P0-16 | 存储层 | `CollectionManager` 无实现类，`QdrantCollectionManager` 未声明实现该接口 | 中等 |
+| P0-17 | 存储层 | `SessionStorage` 与 `L1CachePort` 功能重叠但无关联 | 中等 |
+
+### 系统解决方案
+
+#### 方案1: 删除服务内本地Protocol定义
+
+**问题根源**: 服务文件违反六边形架构"端口集中定义"原则
+
+**执行步骤**:
+1. 删除 `auto_route_service.py` 第15-18行 `EventPublisherProtocol`
+2. 删除 `auto_trigger_service.py` 第15-18行 `EventPublisherProtocol`
+3. 删除 `auto_execute_completed_handler.py` 第18-21行 `EventPublisherProtocol`
+4. 删除 `auto_route_handler.py` 第27-30行 `EventPublisherProtocol`
+5. 统一导入: `from src.domain.ports.event_publisher import EventPublisher`
+
+**代码变更示例**:
+```python
+# auto_route_service.py 删除后
+from src.domain.ports.event_publisher import EventPublisher
+
+class AutoRouteService:
+    def __init__(self, publisher: EventPublisher | None = None):
+        self._publisher = publisher
+```
+
+#### 方案2: 创建路由协议端口文件
+
+**问题根源**: `HashRouterProtocol`、`SemanticRouterProtocol` 应属于领域层端口
+
+**执行步骤**:
+1. 创建 `src/domain/ports/routing.py`
+2. 从 `auto_route_service.py` 迁移 `HashRouterProtocol`、`SemanticRouterProtocol` 定义
+3. 更新 `auto_route_service.py` 导入语句
+
+**routing.py 内容**:
+```python
+"""路由协议端口 — 六边形架构路由接口"""
+from __future__ import annotations
+from typing import Protocol
+
+class HashRouterProtocol(Protocol):
+    """基于session_id哈希的路由协议"""
+    def route(self, session_id: str) -> str: ...
+
+class SemanticRouterProtocol(Protocol):
+    """基于任务上下文语义相似度的路由协议"""
+    async def route(self, task_context: dict) -> tuple[str, float]: ...
+```
+
+#### 方案3: 补全domain/ports/__init__.py导出
+
+**问题根源**: `__all__` 仅17项，遗漏超过24个重要端口
+
+**执行步骤**:
+1. 在 `__init__.py` 添加缺失导出
+2. 按分类组织: 核心存储、合规安全、事件认证、辅助接口
+
+**导出补充**:
+```python
+# 核心存储接口
+from src.domain.ports.base import BaseRepository
+from src.domain.ports.storage import ObjectStorageRepository, ComplianceLockError
+from src.domain.ports.vector_storage import CollectionManager, VectorStorage
+from src.domain.ports.l0_storage import L0StoragePort
+from src.domain.ports.integrity import IntegrityPort
+
+# 合规安全接口
+from src.domain.ports.compliance_gateway import ComplianceGatewayPort
+from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
+from src.domain.ports.data_residency_enforcer import DataResidencyEnforcerPort
+
+# 事件认证接口
+from src.domain.ports.event_publisher import EventPublisher, InMemoryEventPublisher
+from src.domain.ports.auth_service import AuthServicePort
+from src.domain.ports.audit_service import AuditServicePort
+```
+
+#### 方案4: 创建application/ports/__init__.py
+
+**问题根源**: `application/ports/` 缺少 `__init__.py` 导致导出断裂
+
+**执行步骤**:
+1. 创建 `src/application/ports/__init__.py`
+2. 统一导出8个Protocol
+
+**__init__.py 内容**:
+```python
+"""Application ports package — 应用层端口定义"""
+from src.application.ports.metrics_port import MetricsPort
+from src.application.ports.text_extractor_service import TextExtractorService
+from src.application.ports.event_subscriber import EventSubscriber
+from src.application.ports.compressor_service import CompressorService
+from src.application.ports.exception_metrics_port import ExceptionMetricsPort
+from src.application.ports.public_blackboard import PublicBlackboard
+from src.application.ports.sandbox_port import SandboxExecutor
+from src.application.ports.semantic_cache import SemanticCache
+
+__all__ = [
+    "CompressorService",
+    "EventSubscriber",
+    "ExceptionMetricsPort",
+    "MetricsPort",
+    "PublicBlackboard",
+    "SandboxExecutor",
+    "SemanticCache",
+    "TextExtractorService",
+]
+```
+
+#### 方案5: 修复EventBusFactory初始化
+
+**问题根源**: 工厂类初始化publisher/subscriber为None，运行时失败
+
+**执行步骤**:
+1. 修改 `EventBusFactory.__init__` 接受真实组件注入
+2. 实现单例组件复用机制
+3. 添加运行时检查防止None访问
+
+**修复代码**:
+```python
+class EventBusFactory:
+    def __init__(
+        self,
+        redis_client: RedisClient | None = None,
+        rabbitmq_config: RabbitMQConfig | None = None,
+    ):
+        self._router = ChannelRouter()
+        self._redis_publisher = RedisPublisher(redis_client) if redis_client else None
+        self._redis_subscriber = RedisSubscriber(redis_client) if redis_client else None
+        self._rabbitmq_publisher = RabbitMQPublisher(rabbitmq_config) if rabbitmq_config else None
+
+    def create_redis_bus(self) -> RedisEventBus:
+        if self._redis_publisher is None or self._redis_subscriber is None:
+            raise RuntimeError("Redis client not configured")
+        return RedisEventBus(
+            publisher=self._redis_publisher,
+            subscriber=self._redis_subscriber,
+            router=self._router,
+        )
+```
+
+#### 方案6: 统一EventPublisher Protocol
+
+**问题根源**: `InMemoryEventPublisher` 与 `EventPublisher` 接口不一致
+
+**执行步骤**:
+1. 统一为单一 `EventPublisher` Protocol
+2. `InMemoryEventBus` 实现异步 `publish()` 返回 `PublishResult`
+
+**统一接口**:
+```python
+class EventPublisher(Protocol):
+    """统一事件发布端口"""
+    async def publish(self, event: DomainEvent) -> PublishResult: ...
+
+# InMemoryEventBus 实现
+class InMemoryEventBus:
+    async def publish(self, event: DomainEvent) -> PublishResult:
+        for handler in self._handlers:
+            await handler(event)
+        return PublishResult(success=True, event_id=str(event.event_id))
+```
+
+#### 方案7: 统一存储层端口
+
+**问题根源**: 存储层级端口语义重叠（VectorStorage/L3VectorPort, GraphManager/L5GraphPort）
+
+**执行步骤**:
+1. L3层统一为 `L3VectorPort`，废弃 `VectorStorage`
+2. L5层统一为 `L5GraphPort`，废弃 `GraphManager`/`GraphStorage`
+3. `QdrantCollectionManager` 声明实现 `L3VectorPort`
+
+**清理后的端口层次**:
+| 层级 | 端口 | 状态 |
+|------|------|------|
+| L0 | `L0StoragePort` | 保留 |
+| L1 | `L1CachePort` | 保留 |
+| L2 | `L2MetadataRepositoryPort`, `L2ChangeHistoryRepositoryPort`, `L2GroupMemberRepositoryPort` | 保留 |
+| L3 | `L3VectorPort` | 统一，废弃 `VectorStorage` |
+| L4 | `L4ObjectPort` | 保留 |
+| L5 | `L5GraphPort` | 统一，废弃 `GraphManager`/`GraphStorage` |
+
+### 修复优先级
+
+| 优先级 | P0-ID | 修复内容 |
+|--------|-------|----------|
+| P0 | P0-1, P0-2, P0-3, P0-4 | 删除服务内本地Protocol定义 |
+| P0 | P0-10, P0-11, P0-12 | 修复EventBusFactory初始化 |
+| P0 | P0-5, P0-6 | 修复接口不一致和事件发布缺失 |
+| P0 | P0-7, P0-8, P0-9 | 补全导出完整性 |
+| P1 | P0-13 | 统一EventPublisher Protocol |
+| P2 | P0-14, P0-15, P0-16, P0-17 | 清理冗余接口 |
+
+---
+
+*第1轮审查完成，共发现17个P0问题，制定7套系统解决方案*
