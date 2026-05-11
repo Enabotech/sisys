@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass, field
 
 DEFAULT_LOCAL_MODEL = "qwen2.5:7b"
-DEFAULT_CLOUD_MODELS = ["qwen-turbo", "qwen-plus", "claude-3-haiku"]
 DEFAULT_TIMEOUT = 30  # seconds
 
 
@@ -29,6 +28,14 @@ class CloudModelConfig:
     enabled: bool = True
 
 
+# Default cloud configs when no environment variables are set
+_DEFAULT_CLOUD_CONFIGS: list[CloudModelConfig] = [
+    CloudModelConfig(api_type="openai", model="qwen-turbo"),
+    CloudModelConfig(api_type="openai", model="qwen-plus"),
+    CloudModelConfig(api_type="openai", model="claude-3-haiku"),
+]
+
+
 @dataclass(frozen=True)
 class UDMRConfig:
     """Configuration for Unified Dynamic Model Router.
@@ -38,21 +45,27 @@ class UDMRConfig:
     - UDMR_LOCAL_FIRST: Prefer local model (default: true)
     - UDMR_LOCAL_TIMEOUT: Timeout for local model in seconds (default: 30)
     - UDMR_LOCAL_MODEL: Local model name (default: qwen2.5:7b)
-    - UDMR_CLOUD_MODELS: Comma-separated cloud model names
-    - UDMR_CLOUD_{n}_TYPE: Cloud model API type (openai | anthropic | custom)
+    - UDMR_CLOUD_{n}_API_TYPE: Cloud model API type (openai | anthropic | custom)
     - UDMR_CLOUD_{n}_ENDPOINT: Cloud model API endpoint
     - UDMR_CLOUD_{n}_API_KEY: Cloud model API key
     - UDMR_CLOUD_{n}_MODEL: Cloud model name
     - UDMR_CLOUD_{n}_ENABLED: Cloud model enabled (true | false)
+
+    Raises:
+        ValueError: If no cloud model configuration is provided and no defaults available.
     """
 
     enabled: bool = True
     local_first: bool = True
     local_timeout: int = DEFAULT_TIMEOUT
     local_model: str = DEFAULT_LOCAL_MODEL
-    cloud_models: list[str] = field(default_factory=lambda: DEFAULT_CLOUD_MODELS.copy())
     local_model_type: str | None = None  # "ollama" | "gemini" | "vllm" | None
-    cloud_configs: list[CloudModelConfig] = field(default_factory=list)  # Cloud model configurations
+    cloud_configs: list[CloudModelConfig] = field(default_factory=lambda: _DEFAULT_CLOUD_CONFIGS.copy())
+
+    @property
+    def cloud_models(self) -> list[str]:
+        """Get list of cloud model names from cloud_configs."""
+        return [c.model for c in self.cloud_configs if c.enabled]
 
     @classmethod
     def from_env(cls) -> UDMRConfig:
@@ -60,6 +73,9 @@ class UDMRConfig:
 
         Returns:
             UDMRConfig instance with values from environment.
+
+        Raises:
+            ValueError: If no cloud model configuration is provided.
         """
         enabled = os.getenv("UDMR_ENABLED", "true").lower() in ("true", "1", "yes")
         local_first = os.getenv("UDMR_LOCAL_FIRST", "true").lower() in ("true", "1", "yes")
@@ -71,13 +87,6 @@ class UDMRConfig:
             local_timeout = DEFAULT_TIMEOUT
         local_model = os.getenv("UDMR_LOCAL_MODEL", DEFAULT_LOCAL_MODEL)
         local_model_type = os.getenv("UDMR_LOCAL_MODEL_TYPE", None)
-        cloud_models_env = os.getenv("UDMR_CLOUD_MODELS")
-        if cloud_models_env is not None and cloud_models_env:
-            cloud_models = [m.strip() for m in cloud_models_env.split(",") if m.strip()]
-        elif cloud_models_env is None:
-            cloud_models = DEFAULT_CLOUD_MODELS.copy()
-        else:
-            cloud_models = []
 
         # Parse cloud_configs from UDMR_CLOUD_{n}_* environment variables
         cloud_configs: list[CloudModelConfig] = []
@@ -95,25 +104,15 @@ class UDMRConfig:
                 )
             )
 
-        # Backward compatibility: if no cloud_configs but cloud_models set, create from cloud_models
-        if not cloud_configs and cloud_models:
-            for model in cloud_models:
-                cloud_configs.append(
-                    CloudModelConfig(
-                        api_type="openai",
-                        endpoint="",
-                        api_key="",
-                        model=model,
-                        enabled=True,
-                    )
-                )
+        # Use provided cloud_configs if available, otherwise use defaults
+        if not cloud_configs:
+            cloud_configs = _DEFAULT_CLOUD_CONFIGS.copy()
 
         return cls(
             enabled=enabled,
             local_first=local_first,
             local_timeout=local_timeout,
             local_model=local_model,
-            cloud_models=cloud_models,
             local_model_type=local_model_type,
             cloud_configs=cloud_configs,
         )
