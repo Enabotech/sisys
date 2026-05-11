@@ -55,127 +55,117 @@ class TestRoutingDecisionValidation:
 
     def test_validate_task_id_empty(self) -> None:
         """Should raise if task_id is empty."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="",
-            session_id="session-001",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-        )
         with pytest.raises(ValueError, match="task_id must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="",
+                session_id="session-001",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+            )
 
     def test_validate_task_id_whitespace_only(self) -> None:
         """Should raise if task_id is whitespace only."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="   ",
-            session_id="session-001",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-        )
         with pytest.raises(ValueError, match="task_id must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="   ",
+                session_id="session-001",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+            )
 
     def test_validate_session_id_empty(self) -> None:
         """Should raise if session_id is empty."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-        )
         with pytest.raises(ValueError, match="session_id must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+            )
 
     def test_validate_session_id_whitespace_only(self) -> None:
         """Should raise if session_id is whitespace only."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="   ",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-        )
         with pytest.raises(ValueError, match="session_id must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="   ",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+            )
 
     def test_validate_cost_estimate_negative(self) -> None:
         """Should raise if cost_estimate is negative."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-            cost_estimate=-0.01,
-        )
         with pytest.raises(ValueError, match="cost_estimate must be non-negative"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+                cost_estimate=-0.01,
+            )
 
     def test_validate_cost_actual_negative(self) -> None:
         """Should raise if cost_actual is negative."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-            cost_actual=-0.01,
-        )
         with pytest.raises(ValueError, match="cost_actual must be non-negative"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+                cost_actual=-0.01,
+            )
 
     def test_validate_latency_ms_negative(self) -> None:
         """Should raise if latency_ms is negative."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="local",
-            selected_model="qwen2.5:7b",
-            latency_ms=-1.0,
-        )
         with pytest.raises(ValueError, match="latency_ms must be non-negative"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="local",
+                selected_model="qwen2.5:7b",
+                latency_ms=-1.0,
+            )
 
     def test_validate_selected_model_empty(self) -> None:
         """Should raise if selected_model is empty."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="local",
-            selected_model="",
-        )
         with pytest.raises(ValueError, match="selected_model must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="local",
+                selected_model="",
+            )
 
     def test_validate_selected_model_whitespace_only(self) -> None:
         """Should raise if selected_model is whitespace only."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="local",
-            selected_model="   ",
-        )
         with pytest.raises(ValueError, match="selected_model must not be empty"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="local",
+                selected_model="   ",
+            )
 
     def test_validate_fallback_reason_invalid_value(self) -> None:
         """Should raise if fallback_reason is not one of valid values."""
-        decision = RoutingDecision(
-            log_id=uuid.uuid4(),
-            task_id="task-001",
-            session_id="session-001",
-            route_type="cloud",
-            selected_model="qwen-turbo",
-            fallback_reason="invalid_reason",
-        )
         with pytest.raises(ValueError, match="fallback_reason must be one of"):
-            decision.validate()
+            RoutingDecision(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type="cloud",
+                selected_model="qwen-turbo",
+                fallback_reason="invalid_reason",
+            )
 
     def test_validate_fallback_reason_none_is_valid(self) -> None:
         """Should allow fallback_reason to be None."""
