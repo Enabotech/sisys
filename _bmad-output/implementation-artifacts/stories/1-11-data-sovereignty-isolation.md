@@ -75,6 +75,9 @@
 - [ ] 实体类检测金融数据（银行账号、信用卡号、保险单号、证券账户、基金账号、征信记录）
 - [ ] 生物识别数据检测（指纹、虹膜、声纹、人脸识别、DNA）（V1阶段）
 - [ ] 精确位置与行踪轨迹检测（GPS坐标、IP地址、WiFi定位）（V1阶段）
+- [ ] 医疗健康数据检测（疾病史、诊断记录、遗传信息）（V1阶段）
+- [ ] 宗教信仰数据检测（宗教信仰、政治观点）（V1阶段）
+- [ ] 未成年人数据识别（年龄<14周岁触发监护人同意）（V1阶段）
 - [ ] `SensitiveDataDetected` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 单元测试覆盖正常检测、边界情况（空数据、混淆数据）
 
@@ -90,9 +93,9 @@
 - [ ] `DataResidencyPolicy` 实体定义（allowed_regions, blocked_regions, CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS）
 - [ ] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
 - [ ] `ComplianceGateway` 合规性网关（`src/infrastructure/security/compliance_gateway_impl.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
-- [ ] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）
+- [ ] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）- async def check(task: Task) -> ComplianceResult
 - [ ] `Task` 类型定义（`src/domain/value_objects/task.py`）：input, data_residency, preferred_model, allowed_models
-- [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型）
+- [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型，通过 UDMRouter.route_async() 调用）
 - [ ] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
 - [ ] 集成测试验证本地优先策略生效
@@ -127,13 +130,15 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `CrossBorderTransferRequest` 实体定义（`src/domain/entities/cross_border_transfer.py`）
-  - 字段: `request_id`, `data_id`, `destination`, `purpose`, `status`, `requester`, `approver`, `approval_timestamp`
+  - 字段: `request_id`, `data_id`, `destination`, `purpose`, `status`, `requester`, `approver`, `approval_timestamp`, `legal_basis_type`
+  - 法律依据类型: scc(标准合同条款), adequacy_assessment(充分性认定), security_assessment(安全评估), other(法律法规其他条件)
 - [ ] `CrossBorderTransferService` 服务接口（`src/domain/ports/cross_border_transfer_service.py`）
 - [ ] `CrossBorderTransferServiceImpl` 实现（`src/infrastructure/security/cross_border_transfer_service_impl.py`）
 - [ ] 审批流程: pending → approved/rejected → executed/blocked
 - [ ] SLA 控制: 普通 4 小时，紧急 1 小时
 - [ ] `CrossBorderTransferRequested` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 审计日志集成（Story 1.10）
+- [ ] PIPL第38条合规: 安全评估/认证/SCC/其他条件四选一
 
 ### AC-5: PIPL 合规（Personal Information Protection Law）
 
@@ -313,9 +318,10 @@
 - [ ] Subtask 0.3: 定义 `ExternalAPIWhitelist` 实体
 - [ ] Subtask 0.4: 定义 `CrossBorderTransferRequest` 实体
 - [ ] Subtask 0.5: 定义 `PIPLComplianceRecord` 实体
-- [ ] Subtask 0.6: 定义服务接口（6 个 Port：SensitiveDataDetectorPort, DataResidencyEnforcerPort, WhitelistServicePort, CrossBorderTransferServicePort, PIPLComplianceServicePort, ComplianceGatewayPort）
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_11.feature`
-- [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.6: 定义值对象（ComplianceResult, Task）
+- [ ] Subtask 0.7: 定义服务接口（6 个 Port）
+- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_11.feature`
+- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准:**
 - [ ] 规范项全部定义完毕
