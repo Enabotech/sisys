@@ -216,6 +216,9 @@
 | **asyncio 上下文** | asyncio.Lock 使用类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
 | **外部客户端** | 第三方 API 必须验证方法存在性 | AttributeError |
+| **BDD async 协调** | BDD 步骤使用 `asyncio.get_event_loop()` 而非 `loop` fixture | 事件循环冲突 |
+| **asyncio.run** | 测试中避免使用 `asyncio.run()`，使用 `await` 或 `asyncio.get_event_loop().run_until_complete()` | 事件循环重复创建 |
+| **并发测试方法** | 并发测试使用 `threading` 而非 `multiprocessing`（进程隔离问题） | 资源泄漏 |
 
 **禁止行为：**
 - ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
@@ -243,7 +246,7 @@
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-2 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由性能要求 | Task 3 | Subtask 3.1-3.3（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
-| AC-3 | 路由决策日志完整性 | Task 3 | Subtask 3.4-3.6（六边形架构验证 红→绿→重构） | `test_udmr_architecture.py` |
+| AC-3 | 路由决策日志完整性 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
 
 ---
@@ -532,6 +535,7 @@ sisys/
 2. **事件驱动解耦** — RouteService 仅负责触发和上下文提取，不处理业务逻辑；UDMRouter 应遵循相同模式
 3. **六边形架构严格遵守** — Task 3 必须包含架构验证测试，确保无循环依赖
 4. **性能基准测试** — 路由性能要求 P95<100ms，需独立基准测试
+5. **AutoRouteService 命名** — 本故事正确使用 AutoRouteService，避免与 RouteService（语义路由）混淆
 
 **应用到本故事/Applied to This Story:**
 - [ ] UDMRConfig 采用与 OtelConfig 相同的 `from_env()` 模式
