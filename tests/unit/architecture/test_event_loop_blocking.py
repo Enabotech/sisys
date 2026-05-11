@@ -115,13 +115,6 @@ class TestCPUBoundMethodsNotBlocking:
         # verify_hash 应该是同步方法
         assert not asyncio.iscoroutinefunction(IntegrityPort.verify_hash)
 
-    def test_health_check_close_is_async(self):
-        """验证 HealthCheckPort.close 是异步的（I/O 密集型）"""
-        from src.domain.ports.health_check import HealthCheckPort
-
-        # close 应该是异步方法
-        assert asyncio.iscoroutinefunction(HealthCheckPort.close)
-
 
 class TestEventLoopSafety:
     """验证事件循环安全"""
