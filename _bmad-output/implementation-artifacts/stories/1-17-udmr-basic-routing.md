@@ -106,6 +106,7 @@ AutoExecuted
 
 **验证标准/Validation Criteria:**
 - [ ] 本地模型健康检查（Ollama ping，路由决策前执行）
+- [ ] 健康检查日志记录（health_check_timestamp, health_check_result, health_check_latency_ms）
 - [ ] 超时检测（30秒阈值，调用过程中执行）
 - [ ] 自动故障切换逻辑（健康检查失败 OR 调用超时 → 切换云端）
 - [ ] 切换日志记录（fallback_reason: "timeout" | "unavailable" | "health_check_failed"）
@@ -159,16 +160,21 @@ AutoExecuted
 
 #### 领域服务 Schema (Domain Services)
 - [ ] UDMRouter 服务类（`src/domain/services/udmr_router.py`）
-  - 方法: `async route(task_context) -> RoutingDecision`, `async check_local_health() -> bool`
-  - 职责: 接收任务上下文、执行本地优先路由决策、发布路由决策事件
+  - 方法: `async on_routed_event(event: AutoRouted) -> RoutingDecided`, `async check_local_health() -> bool`
+  - 职责: 接收 AutoRouted 事件（Story 1.14b），执行本地/云端二级路由决策，发布 RoutingDecided 事件
 
 #### 端口接口 Schema (Domain Ports)
-- [ ] HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
+- [ ] HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）— **已存在，验证是否符合本 Story 要求**
   - 方法: `async check() -> bool`, `async close() -> None`
   - 职责: 定义健康检查的统一接口契约（异步，零外部依赖）
 - [ ] HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
   - 方法: `async create() -> HealthCheckPort`
   - 职责: 定义创建 HealthCheckPort 实例的工厂接口（零外部依赖）
+
+#### 领域事件 Schema (Domain Events)
+- [ ] RoutingDecided 事件（`src/domain/events/routing_events.py`）— **已存在，验证是否符合 L3 静态路由要求**
+  - 现有字段: `task_id`, `l1_compliance_result`, `l2_factor_scores`, `final_routing_score`, `selected_model`, `estimated_cost`
+  - 需验证: `route_type: Literal["local", "cloud"]` 和 `fallback_reason: Optional[str]` 是否存在（L3 静态路由必需字段）
 
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
