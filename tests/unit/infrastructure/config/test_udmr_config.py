@@ -27,7 +27,6 @@ class TestUDMRConfig:
             "UDMR_LOCAL_FIRST": "false",
             "UDMR_LOCAL_TIMEOUT": "60",
             "UDMR_LOCAL_MODEL": "llama3:8b",
-            "UDMR_CLOUD_MODELS": "gpt-4,claude-3",
         }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
@@ -35,13 +34,16 @@ class TestUDMRConfig:
         assert config.local_first is False
         assert config.local_timeout == 60
         assert config.local_model == "llama3:8b"
-        assert config.cloud_models == ["gpt-4", "claude-3"]
 
-    def test_cloud_models_default(self) -> None:
-        """Should have correct default cloud models."""
+    def test_cloud_configs_default(self) -> None:
+        """Should have correct default cloud configs."""
         with patch.dict(os.environ, {}, clear=True):
             config = UDMRConfig.from_env()
-        assert len(config.cloud_models) > 0
+        assert len(config.cloud_configs) == 3
+        models = [c.model for c in config.cloud_configs]
+        assert "qwen-turbo" in models
+        assert "qwen-plus" in models
+        assert "claude-3-haiku" in models
 
     def test_local_model_default(self) -> None:
         """Should have correct default local model."""
@@ -195,42 +197,17 @@ class TestUDMRConfigCloudConfigs:
         assert len(config.cloud_configs) == 1
         assert config.cloud_configs[0].model == "gpt-4"
 
-    def test_from_env_backward_compatible_with_cloud_models(self) -> None:
-        """Should create cloud_configs from UDMR_CLOUD_MODELS when UDMR_CLOUD_0_API_TYPE not set."""
+    def test_cloud_configs_filter_enabled(self) -> None:
+        """Should filter enabled cloud configs correctly."""
         env = {
-            "UDMR_CLOUD_MODELS": "qwen-turbo,claude-3-haiku",
-        }
-        with patch.dict(os.environ, env, clear=True):
-            config = UDMRConfig.from_env()
-        assert len(config.cloud_configs) == 2
-        assert config.cloud_configs[0].api_type == "openai"
-        assert config.cloud_configs[0].model == "qwen-turbo"
-        assert config.cloud_configs[0].endpoint == ""
-        assert config.cloud_configs[0].api_key == ""
-        assert config.cloud_configs[0].enabled is True
-
-        assert config.cloud_configs[1].model == "claude-3-haiku"
-
-    def test_from_env_cloud_configs_take_precedence_over_cloud_models(self) -> None:
-        """When both cloud_configs and cloud_models set, cloud_configs takes precedence."""
-        env = {
-            "UDMR_CLOUD_MODELS": "old-model-1,old-model-2",
-            "UDMR_CLOUD_0_API_TYPE": "custom",
-            "UDMR_CLOUD_0_MODEL": "new-model",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_MODEL": "gpt-4",
             "UDMR_CLOUD_0_ENABLED": "true",
+            "UDMR_CLOUD_1_API_TYPE": "anthropic",
+            "UDMR_CLOUD_1_MODEL": "claude-3",
+            "UDMR_CLOUD_1_ENABLED": "false",
         }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
-        assert len(config.cloud_configs) == 1
-        assert config.cloud_configs[0].model == "new-model"
-        assert config.cloud_models == ["old-model-1", "old-model-2"]
-
-    def test_from_env_empty_cloud_models_and_no_cloud_configs(self) -> None:
-        """Should have empty cloud_configs when UDMR_CLOUD_MODELS set to empty and no cloud_configs."""
-        env = {
-            "UDMR_CLOUD_MODELS": "",
-        }
-        with patch.dict(os.environ, env, clear=True):
-            config = UDMRConfig.from_env()
-        assert len(config.cloud_configs) == 0
-        assert config.cloud_models == []
+        enabled_models = [c.model for c in config.cloud_configs if c.enabled]
+        assert enabled_models == ["gpt-4"]
