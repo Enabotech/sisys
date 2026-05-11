@@ -25,14 +25,13 @@
 | **路由决策日志** | 记录路由决策过程，支持审计和成本追踪 | WORM 归档 |
 | **路由性能要求** | 路由决策延迟满足性能要求 | P95<100ms（MVP） |
 
-> ⚠️ **MVP 范围澄清**：本 Story 实现 **L3 路由阈值（静态版本）**，仅包含本地优先静态配置和超时故障切换。
-> - **L1 合规性网关** → Story 11.1 范围（需要 SensitiveDataDetector、DataSovereigntyService、WhitelistValidator 集成）
-> - **L2 四因子评分** → Story 11.2 范围（需要历史成功率统计、成本模型、任务复杂度分类器）
-> - **L3 动态阈值** → Story 11.2 范围（基于 L2 评分的自适应决策）
+> ⚠️ **MVP 范围澄清**：本 Story 实现 **简化的 L3 功能（本地优先静态配置）**，属于 MVP 降级实现（不等同于 L3 动态阈值）
+> - **L3 动态阈值**（基于 L2 评分的自适应决策，阈值 0.15/0.70）→ Story 11.2 范围
+> - **本 Story 实现**：本地优先 + 超时>30s 切换云端（简化版本，无 L2 评分依赖）
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 6: MVP 关键机制增强，Story 1.17
 
-**or.md 公理追溯:** 系统公理一（自主调用：trigger→route→execute），覆盖"route"阶段的模型路由决策
+**or.md 公理追溯:** 系统公理一（自主调用：trigger→route→execute），覆盖"route"阶段的**模型路由决策子阶段**（两-tier 路由：语义路由→UDMR 模型路由）
 
 **前置依赖:** Story 1.14b（路由决策日志）、Story 1.14a（trigger 触发机制）
 
@@ -245,7 +244,7 @@
 | AC-1 | 本地模型健康检查 | Task 1 | Subtask 1.4-1.6（LocalModelHealthFacade 红→绿→重构） | `test_local_model_health.py` |
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-2 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
-| AC-4 | 路由性能要求 | Task 3 | Subtask 3.1-3.3（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
+| AC-4 | 路由性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
 | AC-3 | 路由决策日志完整性 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
 
@@ -267,7 +266,7 @@
 - [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
 - [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
 - [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
-- [ ] Subtask 0.7: 扩展 RoutingDecisionLog 实体（`src/domain/entities/routing_decision_log.py`）
+- [ ] Subtask 0.7: 验证 RoutingDecisionLog 实体（Story 1.14b 已实现扩展字段 route_type/selected_model/fallback_reason）
 - [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -383,9 +382,15 @@
 - [ ] Subtask 3.5: 🟢 绿 — 实现性能优化
 - [ ] Subtask 3.6: 🔄 重构 — 性能调优
 
-#### 集成测试
+#### TDD 循环 [C]：集成测试
 
-- [ ] Subtask 3.7: 创建 `tests/integration/test_udmr_integration.py`（端到端路由流程）
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/integration/test_udmr_integration.py`（端到端路由流程） |
+| 🟢 绿 | 实现集成测试（事件总线端到端路由流程） |
+| 🔄 重构 | 优化测试覆盖 |
+
+- [ ] Subtask 3.7: 🔴 红 — 编写集成测试失败测试
 
 **完成标准/Definition of Done:**
 - [ ] 六边形架构验证通过（无循环依赖）
