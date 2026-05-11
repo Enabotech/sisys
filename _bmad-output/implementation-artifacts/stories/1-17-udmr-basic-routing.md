@@ -251,7 +251,6 @@
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-3 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
-| AC-3 | 路由决策日志完整性 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
 
 ---
