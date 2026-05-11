@@ -841,7 +841,7 @@ User (n) --< UserRole >-- (n) Role (n) --< RolePermission >-- (n) Permission
 ### 项目结构说明 Project Structure
 
 > **📌 六边形架构约束:** 安全服务遵循依赖倒置原则
-> - 领域层 (`src/domain/ports/`) 定义**端口接口**（仅 ABC + 标准库）
+> - 领域层 (`src/domain/ports/`) 定义**端口接口**（仅标准库）
 > - 应用层 (`src/application/use_cases/`) 定义**用例**（业务编排）
 > - 基础设施层 (`src/infrastructure/`) 实现端口（可导入外部库）
 > - **禁止**在领域层导入任何外部依赖（python-jose、passlib、bcrypt 等）
@@ -1019,7 +1019,7 @@ sisys/
 
 | 约束 | 要求 | 当前状态 |
 |------|------|---------|
-| 领域层零依赖 | `src/domain/ports/` 仅使用 ABC + 标准库 | 待实现 |
+| 领域层零依赖 | `src/domain/ports/` 仅使用标准库 | 待实现 |
 | 依赖倒置 | 接口在领域层，实现在基础设施层 | 待实现 |
 | 安全服务位置 | `src/infrastructure/security/` | 待实现 |
 | 禁止跨层依赖 | domain → infrastructure 禁止 | 待验证 |

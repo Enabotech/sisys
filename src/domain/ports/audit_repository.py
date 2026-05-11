@@ -1,7 +1,7 @@
 """AuditRepository Port - 审计仓储端口.
 
 领域层接口，定义审计日志的数据访问契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class AuditSearchResult:
 
 
 class AuditRepositoryPort(Protocol):
-    """审计仓储端口（领域层定义，仅使用 ABC + 标准库）.
+    """审计仓储端口（领域层定义，仅使用标准库）.
 
     定义审计日志的 CRUD 和检索接口。
     实现类位于 infrastructure 层（可导入外部ORM框架）。

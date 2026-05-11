@@ -1,7 +1,7 @@
 """LoginAttemptRepository Port - 登录尝试仓储端口.
 
 领域层接口，定义登录尝试跟踪的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from uuid import UUID
 
 
 class LoginAttemptRepositoryPort(Protocol):
-    """登录尝试仓储端口（领域层定义，仅使用 ABC + 标准库）
+    """登录尝试仓储端口（领域层定义，仅使用标准库）
 
     负责跟踪用户登录失败尝试，用于实现账户锁定功能。
     """

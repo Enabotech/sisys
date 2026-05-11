@@ -1,7 +1,7 @@
 """AuthService Port - 认证服务端口.
 
 领域层接口，定义认证服务的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class AuthTokens:
 
 
 class AuthServicePort(Protocol):
-    """认证服务端口（领域层定义，仅使用 ABC + 标准库）.
+    """认证服务端口（领域层定义，仅使用标准库）.
 
     定义用户认证和 JWT 令牌管理的接口。
     实现类位于 infrastructure 层（可导入 python-jose 等外部库）。
