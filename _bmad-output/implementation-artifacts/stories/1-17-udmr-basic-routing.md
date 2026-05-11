@@ -267,15 +267,15 @@
 - [ ] Subtask 0.2: 定义 RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
 - [ ] Subtask 0.3: 定义 UDMRConfig 配置模型（`src/infrastructure/config/udmr.py`）
 - [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
-- [ ] Subtask 0.4a: 定义 HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
-- [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
-- [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
-- [ ] Subtask 0.7: 定义 RoutingDecisionLog 扩展字段Schema（验证 Story 1.14b 已实现的扩展字段 route_type/selected_model/fallback_reason 符合本 Story AC-3 要求）
-- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
-- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
+- [ ] Subtask 0.5: 定义 HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
+- [ ] Subtask 0.6: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
+- [ ] Subtask 0.7: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
+- [ ] Subtask 0.8: 验证 RoutingDecisionLog UDMR 扩展字段Schema（Story 1.14b 已实现的 route_type/selected_model/fallback_reason 符合本 Story AC-3 要求）
+- [ ] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
+- [ ] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕（Subtask 0.1-0.7 + 0.4a）
+- [ ] 规范项全部定义完毕（Subtask 0.1-0.8）
 - [ ] Gherkin 验收测试已编写（Subtask 0.8）
 - [ ] 验收测试运行失败（Subtask 0.9，🔴 红阶段验证）
 
@@ -342,12 +342,12 @@
 - [ ] Subtask 2.2: 🟢 绿 — 实现 FallbackRouter（超时检测 + 云端切换）
 - [ ] Subtask 2.3: 🔄 重构 — 验证切换日志
 
-#### TDD 循环 [B]：RoutingDecisionLog 路由决策日志扩展
+#### TDD 循环 [B]：RoutingDecisionLog 路由决策日志验证
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/entities/test_routing_decision_log.py`（验证日志扩展字段） |
-| 🟢 绿 | 扩展 `src/domain/entities/routing_decision_log.py` - 添加本地/云端路由字段 |
+| 🔴 红 | 编写 `tests/unit/domain/entities/test_routing_decision_log.py`（验证 UDMR 扩展字段符合 AC-3） |
+| 🟢 绿 | 验证 `src/domain/entities/routing_decision_log.py` - UDMR 扩展字段符合 AC-3 要求（route_type/selected_model/fallback_reason） |
 | 🔄 重构 | 验证 WORM 归档标识 |
 
 - [ ] Subtask 2.4: 🔴 红 — 编写 RoutingDecisionLog 失败测试
@@ -356,7 +356,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] FallbackRouter 实现完成（超时>30秒切换云端）
-- [ ] RoutingDecisionLog 扩展完成
+- [ ] RoutingDecisionLog 验证完成（UDMR 扩展字段符合 AC-3）
 - [ ] 故障切换时间<30秒
 - [ ] TDD 循环全部通过
 
