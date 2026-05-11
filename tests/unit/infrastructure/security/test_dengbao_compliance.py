@@ -90,7 +90,7 @@ class TestPasswordComplexity:
 
     def test_password_validates_successfully(self):
         """🔴 RED: Valid password should pass all checks."""
-        password = "Password123!"
+        password = "Password123!"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 
@@ -99,7 +99,7 @@ class TestPasswordComplexity:
 
     def test_password_too_short(self):
         """🔴 RED: Password shorter than min length should fail."""
-        password = "Pass1!"
+        password = "Pass1!"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 
@@ -108,7 +108,7 @@ class TestPasswordComplexity:
 
     def test_password_missing_uppercase(self):
         """🔴 RED: Password without uppercase should fail."""
-        password = "password123!"
+        password = "password123!"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 
@@ -117,7 +117,7 @@ class TestPasswordComplexity:
 
     def test_password_missing_lowercase(self):
         """🔴 RED: Password without lowercase should fail."""
-        password = "PASSWORD123!"
+        password = "PASSWORD123!"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 
@@ -126,7 +126,7 @@ class TestPasswordComplexity:
 
     def test_password_missing_digit(self):
         """🔴 RED: Password without digit should fail."""
-        password = "Password!"
+        password = "Password!"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 
@@ -135,7 +135,7 @@ class TestPasswordComplexity:
 
     def test_password_missing_special(self):
         """🔴 RED: Password without special character should fail."""
-        password = "Password123"
+        password = "Password123"  # pragma: allowlist secret
 
         is_valid, errors = self.validator.validate(password)
 

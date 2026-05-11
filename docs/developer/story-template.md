@@ -106,7 +106,7 @@
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_x_y_steps.py` | Task 0 |
 | **SDD 架构验证** | [架构约束] | [约束描述] | `test_[architecture].py` | Task [N] |
-| **集成测试** | [层间协作] | [协作描述] | `test_[integration].py` | Task [N] |
+| **集成测试** | [层间协作] | [协作描述] | `test_story_x_y_[integration].py` | Task [N] |
 
 ---
 
@@ -336,7 +336,7 @@ sisys/
 │   ├── unit/[layer]/
 │   │   └── test_[component].py # 单元测试
 │   ├── integration/
-│   │   └── test_[integration].py # 集成测试
+│   │   └── test_story_x_y_[integration].py # 集成测试
 │   └── acceptance/
 │       ├── test_story_x_y.feature   # Gherkin 场景
 │       └── test_story_x_y_steps.py  # BDD 步骤实现
@@ -400,7 +400,9 @@ sisys/
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/[layer]/[component].py` - 核心实现
 - `tests/unit/[layer]/test_[component].py` - 单元测试
-- `tests/integration/test_[integration].py` - 集成测试
+- `tests/integration/test_story_x_y_[integration].py` - 集成测试
+- `tests/acceptance/test_story_x_y.feature`   - Gherkin 场景
+- `tests/acceptance/test_story_x_y_steps.py`   - BDD 步骤实现
 - `docs/[layer]/[component]_guide.md` - 实施指南
 
 ---
