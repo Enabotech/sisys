@@ -101,15 +101,16 @@ AutoExecuted
 > 🔄 **故障切换时序**：
 > 1. **路由决策前** → LocalModelHealth 执行快速 ping 检测（健康检查）
 > 2. **本地可用** → 直接路由至本地模型
-> 3. **本地不可用/超时** → 触发故障切换，路由至云端模型
-> 4. **调用过程中** → 如果实际调用超时（>30秒），中断并切换云端
+> 3. **本地不可用** → 切换至云端模型（健康检查失败，fallback_reason="health_check_failed"）
+> 4. **调用过程中** → 如果实际调用超时（>30秒），中断并切换云端（fallback_reason="timeout"）
 
 **验证标准/Validation Criteria:**
 - [ ] 本地模型健康检查（Ollama ping，路由决策前执行）
 - [ ] 超时检测（30秒阈值，调用过程中执行）
 - [ ] 自动故障切换逻辑（健康检查失败 OR 调用超时 → 切换云端）
 - [ ] 切换日志记录（fallback_reason: "timeout" | "unavailable" | "health_check_failed"）
-- [ ] 故障切换时间<30秒
+- [ ] 健康检查失败切换时间<1秒
+- [ ] 调用超时切换时间<30秒
 
 ### AC-3: 路由决策日志
 
@@ -523,7 +524,7 @@ UDMRouter（UDMR 路由）→ 接收 AutoRouted 事件，选择本地/云端模�
 Execute（Story 1.14c）→ 执行任务
 ```
 
-> **UDMRouter 输入说明**：UDMRouter 接收 `Routed` 事件（两-tier 路由模式：语义路由→模型路由）。MVP 可选优化：支持直接调用 UDMRouter 进行单次路由决策（绕过事件驱动），适用于批量场景或极致性能要求。
+> **UDMRouter 输入说明**：UDMRouter 接收 `AutoRouted` 事件（两-tier 路由模式：语义路由→模型路由）。MVP 可选优化：支持直接调用 UDMRouter 进行单次路由决策（绕过事件驱动），适用于批量场景或极致性能要求。
 
 ### 项目结构说明 Project Structure
 
@@ -715,7 +716,7 @@ Story 1.14a (trigger) → Story 1.14b (route 语义路由) → Story 1.17 (UDMR 
 | **优先级** | P0-17（MVP，ARCH UDMR 基础） |
 | **覆盖 FR** | or.md 系统公理一（route 阶段）、FR-CP-01（路由决策日志）、FR-CP-05（UDMR L3 静态路由，完整三层架构→Story 11.1/11.2）、FR-CP-06（四因子评分→Story 11.2） |
 | **依赖 Story** | Story 1.14a（trigger 实现）、Story 1.14b（语义路由 + 路由日志） |
-| **前置条件** | Triggered/Routed 事件已定义（Story 1.14a/b），路由决策日志基础设施（Story 1.14b） |
+| **前置条件** | Triggered/AutoRouted 事件已定义（Story 1.14a/b），路由决策日志基础设施（Story 1.14b） |
 | **后续 Story** | Story 1.19（CFO ROI 验证，Token 消耗追踪、成本统计） |
 | **覆盖率要求** | 架构层≥85%，集成测试≥75% |
 
