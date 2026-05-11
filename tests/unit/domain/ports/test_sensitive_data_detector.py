@@ -1,4 +1,11 @@
-"""SensitiveDataDetectorPort Protocol Interface Tests."""
+"""SensitiveDataDetectorPort Protocol Interface Tests.
+
+Protocol 测试核心原则：
+- 行为验证（assert_called_...）代替结构检查（hasattr）
+- 用 spec 让 mock 遵循协议契约
+- 不用强制实现类，只用满足协议的 mock
+- 配合静态类型检查（mypy）达到编译期安全
+"""
 
 from __future__ import annotations
 
@@ -8,19 +15,16 @@ from src.domain.entities.sensitive_data_result import SensitiveDataResult, Sensi
 from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
 
 
-class TestSensitiveDataDetectorSignature:
-    """Structural signature tests — verify Protocol contract."""
-
-    def test_detect_sensitive_data_method_exists(self) -> None:
-        """detect_sensitive_data method should exist."""
-        assert hasattr(SensitiveDataDetectorPort, "detect_sensitive_data")
-
-
 class TestSensitiveDataDetectorMockBehavior:
-    """Mock behavior tests — verify Protocol contract via spec constraint."""
+    """Mock behavior tests — verify Protocol contract via spec constraint.
+
+    Mock(spec=Protocol) 创建成功即证明契约存在，无需 hasattr 检查。
+    行为验证通过 assert_called_* 系列方法完成。
+    """
 
     def test_mock_detect_sensitive_data_verified(self):
-        """Mock detect_sensitive_data should be verifiable."""
+        """Mock detect_sensitive_data should be verifiable via spec constraint."""
+        # spec 创建成功 = 协议契约存在（无需 hasattr 验证）
         mock = Mock(spec=SensitiveDataDetectorPort)
         mock.detect_sensitive_data.return_value = SensitiveDataResult(
             source_data_hash="test",
