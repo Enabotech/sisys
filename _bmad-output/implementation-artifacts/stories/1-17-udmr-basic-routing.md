@@ -149,7 +149,7 @@
 
 #### 路由决策模型 (Routing Decision Model)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
-  - 字段: route_type (local/cloud), selected_model, cost_estimate, latency_ms, fallback_reason
+  - 字段: route_type (local/cloud), selected_model, cost_estimate, cost_actual, latency_ms, fallback_reason
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.17.feature`（由 Dev agent 在 Task 0 创建）
