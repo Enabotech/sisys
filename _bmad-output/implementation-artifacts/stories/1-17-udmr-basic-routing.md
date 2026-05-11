@@ -137,7 +137,7 @@
 
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
-  - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`, `UDMR_CLOUD_MODELS`
+  - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`, `UDMR_LOCAL_MODEL`, `UDMR_CLOUD_{n}_API_TYPE`, `UDMR_CLOUD_{n}_ENDPOINT`, `UDMR_CLOUD_{n}_API_KEY`, `UDMR_CLOUD_{n}_MODEL`, `UDMR_CLOUD_{n}_ENABLED`
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 应用层入口 Schema (Application Facade)
@@ -974,9 +974,45 @@ Infrastructure Layer（适配器 — 具体实现）
 | 分发逻辑在入口函数内 | ✅ | create_local_model_health_facade 根据 model_type 分发 |
 | 向后兼容 | ✅ | LocalModelHealth 工厂函数保持原有接口签名 |
 
+## 🔍 代码审查发现 Review Findings（第五轮 - 2026-05-11）
+
+> **审查日期:** 2026-05-11
+> **审查模式:** 连续5轮审查
+> **状态:** ✅ 全部修复完成 (2026-05-11)
+
+### 问题修复汇总
+
+| 问题 | 严重级别 | 修复方案 | 状态 |
+|------|---------|---------|------|
+| RoutingDecision.validate() 未被调用 | P0 | 添加 `__post_init__` 调用 validate() | ✅ 已修复 |
+| from_env() docstring 错误 (ValueError vs ConfigurationError) | P0 | 更新 docstring 引用 ConfigurationError | ✅ 已修复 |
+| 测试断言错误 (validate 在构造时调用) | P1 | 修改测试，直接期望构造时抛出 ValueError | ✅ 已修复 |
+
+### 技术细节
+
+**RoutingDecision 验证时机变更:**
+```python
+# 修改前: validate() 需手动调用
+decision = RoutingDecision(...)
+decision.validate()  # 手动调用，可能忘记
+
+# 修改后: __post_init__ 自动调用
+@dataclass(frozen=True)
+class RoutingDecision:
+    def __post_init__(self) -> None:
+        self.validate()
+```
+
+### 提交记录
+
+| 提交 | 描述 |
+|------|------|
+| `b177579f` | fix(udmr): enforce RoutingDecision invariants and fix docstring mismatch |
+| `f70d48e6` | fix(test): routing_decision validation tests use direct construction |
+
 ---
 
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-26
-**最后更新/Last Updated:** 2026-05-07
-**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：重构 LocalModelHealth 六边形架构设计，新增 LocalModelHealthFacade（Application 层门面），LocalModelHealth 改为工厂函数（向后兼容），删除 OllamaHealthAdapter 冗余别名，所有测试通过（3076 passed），Ruff 检查通过；第八轮（2026-05-07 最终）：完成多模型工厂架构重构，HealthCheckerFactory 移至 Domain 层，OllamaHealthCheckerFactory 与 OllamaHealthAdapter 合并为 ollama_health.py，create_local_model_health_facade 统一处理分发逻辑，删除 3 个冗余文件（ollama_health_adapter.py, ollama_health_checker_factory.py, local_model_health_factory.py），42 tests passed, all hooks passed
+**最后更新/Last Updated:** 2026-05-11
+**更新说明:** Story 1.17 完整版本 - 实现 UDMR 基础路由（本地优先静态配置）：(1) UDMRouter 本地优先路由; (2) LocalModelHealth Ollama 健康检查; (3) FallbackRouter 故障切换（超时>30秒）; (4) RoutingDecisionLog 扩展; (5) 六边形架构验证; (6) 性能基准测试 P95<100ms；第一轮修复：明确 MVP 范围（L3 静态路由），澄清 L1/L2/L3 与 Story 11.x 的关系；第二轮修复：更新 UDMR 路由描述表为"基于本地优先静态配置"，明确 L3 静态与动态阈值的区别；第三轮：代码审查发现 13 个问题（3 Critical, 5 Major, 5 Minor）；第四轮：批量应用所有 patch，21 个测试全部通过；第五轮：第二轮审查发现 9 个新问题（2 Critical, 4 Major, 3 Minor）；第六轮：关联 Story 20-4，FallbackRouter.route() 改为纯 async，移除 asyncio.run() 反模式；第七轮（2026-05-07）：重构 LocalModelHealth 六边形架构设计，新增 LocalModelHealthFacade（Application 层门面），LocalModelHealth 改为工厂函数（向后兼容），删除 OllamaHealthAdapter 冗余别名，所有测试通过（3076 passed），Ruff 检查通过；第八轮（2026-05-07 最终）：完成多模型工厂架构重构，HealthCheckerFactory 移至 Domain 层，OllamaHealthCheckerFactory 与 OllamaHealthAdapter 合并为 ollama_health.py，create_local_model_health_facade 统一处理分发逻辑，删除 3 个冗余文件（ollama_health_adapter.py, ollama_health_checker_factory.py, local_model_health_factory.py），42 tests passed, all hooks passed；第九轮（2026-05-11）：连续5轮审查修复 - RoutingDecision 添加 __post_init__ 自动验证、配置错误改用 ConfigurationError、测试修复为构造时验证，49 tests passed, all hooks passed
