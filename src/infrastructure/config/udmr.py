@@ -10,7 +10,7 @@ DEFAULT_CLOUD_MODELS = ["qwen-turbo", "qwen-plus", "claude-3-haiku"]
 DEFAULT_TIMEOUT = 30  # seconds
 
 
-@dataclass
+@dataclass(frozen=True)
 class UDMRConfig:
     """Configuration for Unified Dynamic Model Router.
 
@@ -27,6 +27,7 @@ class UDMRConfig:
     local_timeout: int = DEFAULT_TIMEOUT
     local_model: str = DEFAULT_LOCAL_MODEL
     cloud_models: list[str] = field(default_factory=lambda: DEFAULT_CLOUD_MODELS.copy())
+    local_model_type: str | None = None  # "ollama" | "gemini" | "vllm" | None
 
     @classmethod
     def from_env(cls) -> UDMRConfig:
@@ -44,6 +45,7 @@ class UDMRConfig:
         except ValueError:
             local_timeout = DEFAULT_TIMEOUT
         local_model = os.getenv("UDMR_LOCAL_MODEL", DEFAULT_LOCAL_MODEL)
+        local_model_type = os.getenv("UDMR_LOCAL_MODEL_TYPE", None)
         cloud_models_str = os.getenv("UDMR_CLOUD_MODELS", "")
         if cloud_models_str:
             cloud_models = [m.strip() for m in cloud_models_str.split(",") if m.strip()]
@@ -56,4 +58,5 @@ class UDMRConfig:
             local_timeout=local_timeout,
             local_model=local_model,
             cloud_models=cloud_models,
+            local_model_type=local_model_type,
         )

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoutingDecision:
     """Value object representing a routing decision for UDMRouter.
 

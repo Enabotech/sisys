@@ -218,8 +218,7 @@ class TestLocalModelHealthFactoryFunction:
         """Should raise NotImplementedError for gemini model type."""
         from src.infrastructure.config.udmr import UDMRConfig
 
-        config = UDMRConfig()
-        setattr(config, "local_model_type", "gemini")
+        config = UDMRConfig(local_model_type="gemini")
         with pytest.raises(NotImplementedError):
             create_local_model_health_facade(config=config)
 
@@ -227,8 +226,7 @@ class TestLocalModelHealthFactoryFunction:
         """Should raise NotImplementedError for vllm model type."""
         from src.infrastructure.config.udmr import UDMRConfig
 
-        config = UDMRConfig()
-        setattr(config, "local_model_type", "vllm")
+        config = UDMRConfig(local_model_type="vllm")
         with pytest.raises(NotImplementedError):
             create_local_model_health_facade(config=config)
 
