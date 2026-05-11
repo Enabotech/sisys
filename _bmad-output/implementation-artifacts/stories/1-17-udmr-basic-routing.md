@@ -33,9 +33,45 @@
 
 **or.md 公理追溯:** 系统公理一（自主调用：trigger→route→execute），覆盖"route"阶段的**模型路由决策子阶段**（两-tier 路由：语义路由→UDMR 模型路由）
 
-**前置依赖:** Story 1.14b（路由决策日志）、Story 1.14a（trigger 触发机制）
+---
 
-**后续依赖:** Story 1.19（CFO ROI 验证，Token 消耗追踪、成本统计，依赖 Story 1.17 路由日志）
+## 🔗 前置依赖与现有代码继承
+
+### 依赖故事
+
+| 故事 | 组件 | 用途 |
+|------|------|------|
+| Story 1.3 | Event Bus | 事件发布基础设施 |
+| Story 1.14a | AutoTriggerService + AutoTriggered | 触发机制 |
+| Story 1.14b | AutoRouteService + AutoRouted + RoutingDecisionLog | 路由机制 + 决策日志 |
+| Story 1.14c | AutoExecuteService + AutoExecuted | 执行机制 |
+
+### 现有代码继承（必须复用，禁止重复定义）
+
+| 现有组件 | 文件路径 | 复用方式 |
+|---------|---------|---------|
+| `EventPublisher` (Protocol) | `src/domain/ports/event_publisher.py` | 事件发布接口 |
+| `RedisEventPublisher` | `src/infrastructure/messaging/redis_publisher.py` | 事件发布实现 |
+| `RoutingDecided` 事件 | `src/domain/events/routing_events.py` | 发布 UDMR 决策事件 |
+| `RoutingDecisionLog` 实体 | `src/domain/entities/routing_decision_log.py` | UDMR 扩展字段已存在 |
+| `HealthCheckPort` | `src/domain/ports/health_check.py` | 健康检查接口 |
+| `AutoRouted` 事件 | `src/domain/events/auto_route_events.py` | 接收路由事件 |
+
+### 架构位置
+
+```
+AutoTriggered (1.14a)
+       ↓
+AutoRouteService (1.14b) → 一级路由 (hash/semantic/mixed)
+       ↓
+  [UDMRouter 1.17] → 二级路由 (local/cloud) ← HERE
+       ↓
+RoutingDecided 事件 (更新 selected_model, fallback_reason)
+       ↓
+AutoExecuteService (1.14c)
+       ↓
+AutoExecuted
+```
 
 ---
 
