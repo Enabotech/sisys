@@ -89,8 +89,9 @@
 **验证标准/Validation Criteria:**
 - [ ] `DataResidencyPolicy` 实体定义（allowed_regions, blocked_regions, CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS）
 - [ ] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
-- [ ] `ComplianceGateway` 合规性网关（`src/application/services/compliance_gateway.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
-- [ ] `ComplianceGateway` 接口定义（`src/domain/ports/compliance_gateway.py`）
+- [ ] `ComplianceGateway` 合规性网关（`src/infrastructure/security/compliance_gateway_impl.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
+- [ ] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）
+- [ ] `Task` 类型定义（`src/domain/value_objects/task.py`）：input, data_residency, preferred_model, allowed_models
 - [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型）
 - [ ] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
@@ -187,6 +188,9 @@
 - [ ] `ComplianceResult` (`src/domain/value_objects/compliance_result.py`)
   - 字段: `allowed: bool`, `reason: str`, `forced_local: bool`, `violation_type: str | None`
   - 方法: `is_allowed()`, `is_violation()`, `get_violation_type()`
+- [ ] `Task` (`src/domain/value_objects/task.py`) - UDMR路由任务类型
+  - 字段: `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
+  - 方法: `is_china_domestic()`, `requires_local_processing()`
 
 **领域实体:**
 - [ ] `SensitiveDataResult` (`src/domain/entities/sensitive_data_result.py`)
@@ -304,12 +308,12 @@
 
 > **目的：** 在进入代码实现前，明确数据模型、服务接口、验收标准。
 
-- [ ] Subtask 0.1: 定义 `SensitiveDataResult` 值对象
+- [ ] Subtask 0.1: 定义 `SensitiveDataResult` 领域实体
 - [ ] Subtask 0.2: 定义 `DataResidencyPolicy` 实体
 - [ ] Subtask 0.3: 定义 `ExternalAPIWhitelist` 实体
 - [ ] Subtask 0.4: 定义 `CrossBorderTransferRequest` 实体
 - [ ] Subtask 0.5: 定义 `PIPLComplianceRecord` 实体
-- [ ] Subtask 0.6: 定义服务接口（5 个 Port）
+- [ ] Subtask 0.6: 定义服务接口（6 个 Port：SensitiveDataDetectorPort, DataResidencyEnforcerPort, WhitelistServicePort, CrossBorderTransferServicePort, PIPLComplianceServicePort, ComplianceGatewayPort）
 - [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_11.feature`
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -606,13 +610,14 @@
 | `src/domain/entities/cross_border_transfer.py` | CrossBorderTransferRequest 实体 |
 | `src/domain/entities/pipl_compliance_record.py` | PIPLComplianceRecord 实体 |
 | `src/domain/value_objects/compliance_result.py` | ComplianceResult 值对象 |
+| `src/domain/value_objects/task.py` | Task 值对象 |
 | `src/domain/ports/sensitive_data_detector.py` | SensitiveDataDetectorPort 接口 |
 | `src/domain/ports/data_residency_enforcer.py` | DataResidencyEnforcerPort 接口 |
 | `src/domain/ports/whitelist_service.py` | WhitelistServicePort 接口 |
 | `src/domain/ports/cross_border_transfer_service.py` | CrossBorderTransferServicePort 接口 |
 | `src/domain/ports/pipl_compliance_service.py` | PIPLComplianceServicePort 接口 |
 | `src/domain/ports/compliance_gateway.py` | ComplianceGatewayPort 接口 |
-| `src/application/services/compliance_gateway.py` | ComplianceGateway 应用服务 |
+| `src/infrastructure/security/compliance_gateway_impl.py` | ComplianceGatewayImpl 实现 |
 | `src/infrastructure/security/data_residency_enforcer_impl.py` | DataResidencyEnforcerImpl 实现 |
 | `src/infrastructure/security/sensitive_data_detector_impl.py` | SensitiveDataDetectorImpl 实现 |
 | `src/infrastructure/security/whitelist_service_impl.py` | WhitelistServiceImpl 实现 |
@@ -624,11 +629,11 @@
 | `tests/unit/security/test_whitelist_service.py` | WhitelistService 测试 |
 | `tests/unit/security/test_cross_border_transfer.py` | CrossBorderTransferService 测试 |
 | `tests/unit/security/test_pipl_compliance.py` | PIPLComplianceService 测试 |
-| `tests/unit/application/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
+| `tests/unit/security/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
 | `tests/acceptance/test_story_1_11.feature` | Gherkin 验收测试 |
 | `tests/architecture/test_architecture_constraints.py` | 架构约束测试 |
 
-**共计 27 个文件**
+**共计 28 个文件**
 
 ---
 
