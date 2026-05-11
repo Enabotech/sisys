@@ -69,7 +69,7 @@ class UDMRConfig:
             UDMRConfig instance with values from environment.
 
         Raises:
-            ValueError: If no cloud model configuration is provided.
+            ConfigurationError: If no cloud model configuration is provided.
         """
         enabled = os.getenv("UDMR_ENABLED", "true").lower() in ("true", "1", "yes")
         local_first = os.getenv("UDMR_LOCAL_FIRST", "true").lower() in ("true", "1", "yes")
