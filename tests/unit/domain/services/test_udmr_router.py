@@ -137,6 +137,59 @@ class TestUDMRouter:
         decision = await router.route_async(task_context)
         assert decision.fallback_reason is None
 
+    @pytest.mark.asyncio
+    async def test_route_cloud_when_local_first_disabled(self) -> None:
+        """Should route to cloud even when local healthy if local_first=False."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.local_first = False
+        mock_config.cloud_models = ["qwen-turbo"]
+        mock_config.local_model = "qwen2.5:7b"
+        mock_config.local_timeout = 30
+        router = UDMRouter().with_config(mock_config)
+
+        mock_health_checker = AsyncMock()
+        mock_health_checker.check.return_value = True
+        router._health_checker = mock_health_checker
+
+        decision = await router.route_async({"task_id": "task-001", "session_id": "session-001"})
+        assert decision.route_type == "cloud"
+        assert decision.selected_model == "qwen-turbo"
+
+    @pytest.mark.asyncio
+    async def test_route_cloud_when_health_check_fails(self) -> None:
+        """Should route to cloud with health_check_failed reason when health check raises."""
+        from src.domain.exceptions import ThirdPartyError
+
+        router = UDMRouter()
+        mock_health_checker = AsyncMock()
+        mock_health_checker.check.side_effect = ThirdPartyError("connection failed")
+        router._health_checker = mock_health_checker
+
+        decision = await router.route_async({"task_id": "task-001", "session_id": "session-001"})
+        assert decision.route_type == "cloud"
+        assert decision.fallback_reason == "health_check_failed"
+
+    @pytest.mark.asyncio
+    async def test_route_raises_when_no_cloud_models_available(self) -> None:
+        """Should raise ValueError when cloud_models empty and local unavailable."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.local_first = True
+        mock_config.cloud_models = []
+        mock_config.local_model = "qwen2.5:7b"
+        mock_config.local_timeout = 30
+        router = UDMRouter().with_config(mock_config)
+
+        mock_health_checker = AsyncMock()
+        mock_health_checker.check.return_value = False
+        router._health_checker = mock_health_checker
+
+        with pytest.raises(ValueError, match="task_id=task-001"):
+            await router.route_async({"task_id": "task-001", "session_id": "session-001"})
+
 
 class TestUDMRouterSync:
     """Test suite for UDMRouter sync methods (backward compatibility)."""
