@@ -125,7 +125,7 @@
 
 #### 领域服务 Schema (Domain Services)
 - [ ] UDMRouter 服务类（`src/domain/services/udmr_router.py`）
-  - 方法: `route(task_context) -> RoutingDecision`, `check_local_health() -> bool`
+  - 方法: `async route(task_context) -> RoutingDecision`, `async check_local_health() -> bool`
   - 职责: 接收任务上下文、执行本地优先路由决策、发布路由决策事件
 
 #### 端口接口 Schema (Domain Ports)
@@ -138,7 +138,7 @@
 
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
-  - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`, `UDMR_LOCAL_MODEL`, `UDMR_CLOUD_{n}_API_TYPE`, `UDMR_CLOUD_{n}_ENDPOINT`, `UDMR_CLOUD_{n}_API_KEY`, `UDMR_CLOUD_{n}_MODEL`, `UDMR_CLOUD_{n}_ENABLED`
+  - 环境变量: `UDMR_ENABLED`, `UDMR_LOCAL_FIRST`, `UDMR_LOCAL_TIMEOUT`（秒，30秒默认）, `UDMR_LOCAL_MODEL`, `UDMR_CLOUD_{n}_API_TYPE`, `UDMR_CLOUD_{n}_ENDPOINT`, `UDMR_CLOUD_{n}_API_KEY`, `UDMR_CLOUD_{n}_MODEL`, `UDMR_CLOUD_{n}_ENABLED`（其中 n=0,1,2，最多3个云端配置）
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 应用层入口 Schema (Application Facade)
@@ -148,7 +148,13 @@
 
 #### 路由决策模型 (Routing Decision Model)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
-  - 字段: route_type (local/cloud), selected_model, cost_estimate, cost_actual, latency_ms, fallback_reason
+  - 字段:
+    - `route_type: Literal["local", "cloud"]` — 路由类型
+    - `selected_model: str` — 选定的模型名称（非空）
+    - `cost_estimate: float` — 预估成本（USD）
+    - `cost_actual: float` — 实际成本（USD）
+    - `latency_ms: float` — 延迟（毫秒）
+    - `fallback_reason: Optional[Literal["timeout", "unavailable", "health_check_failed"]]` — 切换原因
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1.17.feature`（由 Dev agent 在 Task 0 创建）
@@ -266,7 +272,7 @@
 - [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
 - [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
 - [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
-- [ ] Subtask 0.7: 验证 RoutingDecisionLog 实体（Story 1.14b 已实现扩展字段 route_type/selected_model/fallback_reason）
+- [ ] Subtask 0.7: 定义 RoutingDecisionLog 扩展字段Schema（验证 Story 1.14b 已实现的扩展字段 route_type/selected_model/fallback_reason 符合本 Story AC-3 要求）
 - [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.17.feature`（Dev agent 创建）
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
