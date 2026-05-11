@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
+from src.domain.exceptions import ConfigurationError
+
 DEFAULT_LOCAL_MODEL = "qwen2.5:7b"
 DEFAULT_TIMEOUT = 30  # seconds
 
@@ -28,14 +30,6 @@ class CloudModelConfig:
     enabled: bool = True
 
 
-# Default cloud configs when no environment variables are set
-_DEFAULT_CLOUD_CONFIGS: list[CloudModelConfig] = [
-    CloudModelConfig(api_type="openai", model="qwen-turbo"),
-    CloudModelConfig(api_type="openai", model="qwen-plus"),
-    CloudModelConfig(api_type="openai", model="claude-3-haiku"),
-]
-
-
 @dataclass(frozen=True)
 class UDMRConfig:
     """Configuration for Unified Dynamic Model Router.
@@ -52,7 +46,7 @@ class UDMRConfig:
     - UDMR_CLOUD_{n}_ENABLED: Cloud model enabled (true | false)
 
     Raises:
-        ValueError: If no cloud model configuration is provided and no defaults available.
+        ConfigurationError: If no cloud model configuration is provided.
     """
 
     enabled: bool = True
@@ -60,7 +54,7 @@ class UDMRConfig:
     local_timeout: int = DEFAULT_TIMEOUT
     local_model: str = DEFAULT_LOCAL_MODEL
     local_model_type: str | None = None  # "ollama" | "gemini" | "vllm" | None
-    cloud_configs: list[CloudModelConfig] = field(default_factory=lambda: _DEFAULT_CLOUD_CONFIGS.copy())
+    cloud_configs: list[CloudModelConfig] = field(default_factory=list)
 
     @property
     def cloud_models(self) -> list[str]:
@@ -104,9 +98,13 @@ class UDMRConfig:
                 )
             )
 
-        # Use provided cloud_configs if available, otherwise use defaults
         if not cloud_configs:
-            cloud_configs = _DEFAULT_CLOUD_CONFIGS.copy()
+            raise ConfigurationError(
+                "No cloud model configuration found. "
+                "Set UDMR_CLOUD_0_API_TYPE, UDMR_CLOUD_0_ENDPOINT, "
+                "UDMR_CLOUD_0_API_KEY, UDMR_CLOUD_0_MODEL environment variables.",
+                context={"module": "udmr"},
+            )
 
         return cls(
             enabled=enabled,
