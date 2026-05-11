@@ -5,7 +5,6 @@ RED PHASE: 验证 Fake 实现存在。
 验证标准（Task 12）:
 - [ ] FakeL0StorageAdapter 实现 L0StoragePort
 - [ ] FakeMemoryIndex 实现 IndexManagerPort
-- [ ] FakeHealthAdapter 实现 HealthCheckPort
 - [ ] FakeIntegrityVerifier 实现 IntegrityPort
 """
 
@@ -13,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.ports.health_check import HealthCheckPort
 from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.integrity import IntegrityPort
 from src.domain.ports.l0_storage import L0StoragePort
@@ -72,19 +70,6 @@ class FakeMemoryIndex(IndexManagerPort):
 
     async def truncate(self) -> None:
         # Fake 不需要截断
-        pass
-
-
-class FakeHealthAdapter(HealthCheckPort):
-    """Fake implementation of HealthCheckPort for testing."""
-
-    def __init__(self, healthy: bool = True):
-        self._healthy = healthy
-
-    async def check(self) -> bool:
-        return self._healthy
-
-    async def close(self) -> None:
         pass
 
 
@@ -156,27 +141,6 @@ class TestFakeMemoryIndex:
         await fake.update_entry({"memory_id": "id-1", "name": "bun npm", "type": "user"})
         results = await fake.search("bun")
         assert len(results) == 1
-
-
-class TestFakeHealthAdapter:
-    """FakeHealthAdapter 实现验证"""
-
-    def test_has_health_check_port_methods(self):
-        """FakeHealthAdapter should have HealthCheckPort methods."""
-        fake = FakeHealthAdapter()
-        assert hasattr(fake, "check")
-
-    @pytest.mark.asyncio
-    async def test_check_returns_healthy(self):
-        """验证 check 返回 True"""
-        fake = FakeHealthAdapter(healthy=True)
-        assert await fake.check() is True
-
-    @pytest.mark.asyncio
-    async def test_check_returns_unhealthy(self):
-        """验证 check 返回 False"""
-        fake = FakeHealthAdapter(healthy=False)
-        assert await fake.check() is False
 
 
 class TestFakeIntegrityVerifier:
