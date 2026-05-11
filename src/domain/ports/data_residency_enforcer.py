@@ -1,22 +1,20 @@
 """DataResidencyEnforcerPort — Interface for data residency enforcement service.
 
-遵循六边形架构：端口接口定义，仅依赖 ABC 和 Python 标准库。
+遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库。
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from src.domain.entities.data_residency_policy import DataResidencyPolicy
 
 
-class DataResidencyEnforcerPort(ABC):
-    """数据驻留强制执行服务端口（抽象接口）."""
+class DataResidencyEnforcerPort(Protocol):
+    """数据驻留强制执行服务端口（协议接口）."""
 
-    @abstractmethod
-    def enforce_residency(self, data: Any, target_region: str, policy: DataResidencyPolicy) -> bool:
+    def enforce_residency(self, data, target_region: str, policy: "DataResidencyPolicy") -> bool:
         """强制数据在指定区域驻留。
 
         Args:
@@ -27,10 +25,8 @@ class DataResidencyEnforcerPort(ABC):
         Returns:
             True 如果执行成功（符合策略）
         """
-        ...
 
-    @abstractmethod
-    def check_violation(self, target_region: str, policy: DataResidencyPolicy) -> bool:
+    def check_violation(self, target_region: str, policy: "DataResidencyPolicy") -> bool:
         """检查是否存在数据驻留违规。
 
         Args:
@@ -40,4 +36,3 @@ class DataResidencyEnforcerPort(ABC):
         Returns:
             True 如果存在违规
         """
-        ...
