@@ -195,9 +195,9 @@
   - 字段: `allowed: bool`, `reason: str`, `forced_local: bool`, `violation_type: str | None`
   - 方法: `is_allowed()`, `is_violation()`, `get_violation_type()`
 - [ ] `Task` (`src/domain/value_objects/task.py`) - UDMR路由任务类型
-  - 字段: `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
+  - 字段: `task_id: UUID`, `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
   - 方法: `is_china_domestic()`, `requires_local_processing()`
-  - UDMR集成: Task -> task_context转换逻辑: `{"task_id": str(task_id), "session_id": session_id, "complexity": "high" if task.requires_local_processing() else "normal"}`
+  - UDMR集成: Task -> task_context转换逻辑: `{"task_id": str(task.task_id), "session_id": str(task.task_id), "complexity": "high" if task.requires_local_processing() else "normal"}`
 
 **领域实体:**
 - [ ] `SensitiveDataResult` (`src/domain/entities/sensitive_data_result.py`)
@@ -234,7 +234,7 @@
   - 方法: `request_transfer(data: CrossBorderTransferRequest) -> None`, `approve(transfer_id: UUID) -> None`
 - [ ] `PIPLComplianceServicePort` (`src/domain/ports/pipl_compliance_service.py`)
   - 方法: `record_access(record: PIPLComplianceRecord) -> None`, `validate_legal_basis(data_id: UUID, legal_basis: str) -> bool`
-  - 数据主体权利: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
+  - 数据主体权利: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`, `respond_to_automated_decision_request()` (PIPL第24条自动化决策拒绝权)
 - [ ] `ComplianceGatewayPort` (`src/domain/ports/compliance_gateway.py`)
   - 方法: `async def check(task: Task) -> ComplianceResult`
   - 说明: UDMR L1 合规性网关端口
