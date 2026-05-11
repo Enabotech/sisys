@@ -68,11 +68,11 @@
 **And** 触发 `SensitiveDataDetected` 事件
 
 **验证标准/Validation Criteria:**
-- [ ] 实体类 `SensitiveDataResult` 定义（`src/domain/value_objects/sensitive_data.py`）
+- [ ] 实体类 `SensitiveDataResult` 定义（`src/domain/entities/sensitive_data_result.py`）
 - [ ] `SensitiveDataDetector` 服务接口（`src/domain/ports/sensitive_data_detector.py`）
 - [ ] 正则表达式检测 PII（姓名、身份证、电话、邮箱）
 - [ ] 关键词检测商业秘密（技术配方、客户列表、战略计划）
-- [ ] 实体类检测金融数据（银行账号、信用卡号）
+- [ ] 实体类检测金融数据（银行账号、信用卡号、保险单号、证券账户、基金账号、征信记录）
 - [ ] `SensitiveDataDetected` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 单元测试覆盖正常检测、边界情况（空数据、混淆数据）
 
@@ -86,8 +86,9 @@
 
 **验证标准/Validation Criteria:**
 - [ ] `DataResidencyPolicy` 实体定义（allowed_regions, blocked_regions, CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS）
-- [ ] `DataResidencyEnforcer` 服务（`src/application/services/data_residency_enforcer.py`）
+- [ ] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
 - [ ] `ComplianceGateway` 合规性网关（`src/application/services/compliance_gateway.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
+- [ ] `ComplianceGateway` 接口定义（`src/domain/ports/compliance_gateway.py`）
 - [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型）
 - [ ] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
@@ -104,7 +105,8 @@
 **验证标准/Validation Criteria:**
 - [ ] `ExternalAPIWhitelist` 实体定义（`src/domain/entities/external_api_whitelist.py`）
   - 字段: `api_id`, `endpoint`, `provider`, `region`, `is_verified`, `risk_level`, `valid_from`, `valid_until`
-  - 风险等级: `HIGH` (高风险-需DPO审批), `MEDIUM` (中风险-需主管审批), `LOW` (低风险-自动审批)
+  - 风险等级: `HIGH` (高风险-需DPO审批+安全评估), `MEDIUM` (中风险-需主管审批), `LOW` (低风险-自动审批)
+  - 高风险审批要求: DPO审批、24小时时效、安全评估报告
 - [ ] `WhitelistService` 服务接口（`src/domain/ports/whitelist_service.py`）
 - [ ] `WhitelistServiceImpl` 实现（`src/infrastructure/security/whitelist_service_impl.py`）
 - [ ] CRUD 接口: 创建/查询/更新/删除白名单条目
@@ -142,6 +144,7 @@
 - [ ] `PIPLComplianceRecord` 实体定义（`src/domain/entities/pipl_compliance_record.py`）
   - 字段: `access_id`, `personal_data_id`, `purpose`, `legal_basis`, `consent_status`, `accessor`, `accessed_at`, `data_subject_id`
   - 法律依据: consent(同意), contract(合同), legal_obligation(法定义务), vital_interest(生命利益), public_task(公共任务), legitimate_interest(合法权益), minor_consent(未成年人监护人同意)
+  - 同意有效性: consent必须为明确同意(非默示)，需支持撤回机制
 - [ ] `PIPLComplianceService` 服务接口（`src/domain/ports/pipl_compliance_service.py`）
 - [ ] `PIPLComplianceServiceImpl` 实现（`src/infrastructure/security/pipl_compliance_service_impl.py`）
 - [ ] 数据主体权利接口: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
@@ -219,6 +222,9 @@
 - [ ] `PIPLComplianceServicePort` (`src/domain/ports/pipl_compliance_service.py`)
   - 方法: `record_access(record: PIPLComplianceRecord) -> None`, `validate_legal_basis(data_id: UUID, legal_basis: str) -> bool`
   - 数据主体权利: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
+- [ ] `ComplianceGatewayPort` (`src/domain/ports/compliance_gateway.py`)
+  - 方法: `check(task: Task) -> ComplianceResult`
+  - 说明: UDMR L1 合规性网关端口，Task 为路由任务对象
 
 #### 领域事件 (Domain Events)
 
@@ -463,14 +469,22 @@
 
 **关联 AC:** AC-6
 
-#### 架构验证测试实现
+#### TDD 循环：架构约束测试
 
-- [ ] Subtask 7.1: 运行 `ruff check src/domain/ports/`
-- [ ] Subtask 7.2: 验证领域层零依赖（无 pydantic, sqlalchemy 等）
-- [ ] Subtask 7.3: 运行 `mypy src/domain/ports/`
-- [ ] Subtask 7.4: 验证服务实现位于 `src/infrastructure/security/`
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `test_architecture_constraints.py`（验证领域层零外部依赖） |
+| 🟢 绿 | 实现满足架构约束的代码结构 |
+| 🔄 重构 | 优化架构检查逻辑 |
+
+- [ ] Subtask 7.1: 🔴 红 — 编写架构约束失败测试（领域层导入外部库检测）
+- [ ] Subtask 7.2: 🟢 绿 — 确保所有领域层文件仅使用 Python 标准库
+- [ ] Subtask 7.3: 🔴 红 — 编写端口定义位置验证失败测试
+- [ ] Subtask 7.4: 🟢 绿 — 确保端口定义在 `src/domain/ports/`
+- [ ] Subtask 7.5: 🔄 重构 — 验证服务实现在 `src/infrastructure/security/`
 
 **完成标准:**
+- [ ] `test_architecture_constraints.py` 测试通过
 - [ ] Ruff 检查通过（严重错误=0）
 - [ ] MyPy 类型检查通过（错误率<5%）
 - [ ] 领域层零外部依赖验证通过
@@ -590,8 +604,9 @@
 | `src/domain/ports/whitelist_service.py` | WhitelistServicePort 接口 |
 | `src/domain/ports/cross_border_transfer_service.py` | CrossBorderTransferServicePort 接口 |
 | `src/domain/ports/pipl_compliance_service.py` | PIPLComplianceServicePort 接口 |
-| `src/application/services/compliance_gateway.py` | ComplianceGateway 合规性网关 |
-| `src/application/services/data_residency_enforcer.py` | DataResidencyEnforcer 服务 |
+| `src/domain/ports/compliance_gateway.py` | ComplianceGatewayPort 接口 |
+| `src/application/services/compliance_gateway.py` | ComplianceGateway 应用服务 |
+| `src/infrastructure/security/data_residency_enforcer_impl.py` | DataResidencyEnforcerImpl 实现 |
 | `src/infrastructure/security/sensitive_data_detector_impl.py` | SensitiveDataDetectorImpl 实现 |
 | `src/infrastructure/security/whitelist_service_impl.py` | WhitelistServiceImpl 实现 |
 | `src/infrastructure/security/cross_border_transfer_service_impl.py` | CrossBorderTransferServiceImpl 实现 |
@@ -604,8 +619,9 @@
 | `tests/unit/security/test_pipl_compliance.py` | PIPLComplianceService 测试 |
 | `tests/unit/application/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
 | `tests/acceptance/test_story_1_11.feature` | Gherkin 验收测试 |
+| `tests/architecture/test_architecture_constraints.py` | 架构约束测试 |
 
-**共计 25 个文件**
+**共计 27 个文件**
 
 ---
 
