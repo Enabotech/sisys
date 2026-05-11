@@ -82,7 +82,7 @@ development_status:
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: done
   1-10-unified-audit-log: done
-  1-11-data-sovereignty-isolation: ready-for-dev  # PermissionContext 待优化（story 1.9 技术债）
+  1-11-data-sovereignty-isolation: in-progress  # Task 0 SDD完成，Task 1-7实现中
   1-12-equilibrium-level-3-compliance: backlog
   # 价值组 5: or.md 系统公理实现
   1-14a-autonomous-invocation-trigger: done

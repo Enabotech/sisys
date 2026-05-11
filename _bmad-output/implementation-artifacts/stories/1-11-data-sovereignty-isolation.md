@@ -632,12 +632,12 @@
 | `src/infrastructure/security/cross_border_transfer_service_impl.py` | CrossBorderTransferServiceImpl 实现 |
 | `src/infrastructure/security/pipl_compliance_service_impl.py` | PIPLComplianceServiceImpl 实现 |
 | `tests/unit/domain/entities/test_sensitive_data_result.py` | SensitiveDataResult 测试 |
-| `tests/unit/security/test_sensitive_data_detector.py` | SensitiveDataDetector 测试 |
-| `tests/unit/security/test_data_residency_enforcer.py` | DataResidencyEnforcer 测试 |
-| `tests/unit/security/test_whitelist_service.py` | WhitelistService 测试 |
-| `tests/unit/security/test_cross_border_transfer.py` | CrossBorderTransferService 测试 |
-| `tests/unit/security/test_pipl_compliance.py` | PIPLComplianceService 测试 |
-| `tests/unit/security/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
+| `tests/unit/infrastructure/security/test_sensitive_data_detector.py` | SensitiveDataDetector 测试 |
+| `tests/unit/infrastructure/security/test_data_residency_enforcer.py` | DataResidencyEnforcer 测试 |
+| `tests/unit/infrastructure/security/test_whitelist_service.py` | WhitelistService 测试 |
+| `tests/unit/infrastructure/security/test_cross_border_transfer.py` | CrossBorderTransferService 测试 |
+| `tests/unit/infrastructure/security/test_pipl_compliance.py` | PIPLComplianceService 测试 |
+| `tests/unit/infrastructure/security/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
 | `tests/acceptance/test_story_1_11.feature` | Gherkin 验收测试 |
 | `tests/architecture/test_architecture_constraints.py` | 架构约束测试 |
 
