@@ -224,6 +224,7 @@
 | **BDD async 协调** | BDD 步骤使用 `asyncio.get_event_loop()` 而非 `loop` fixture | 事件循环冲突 |
 | **asyncio.run** | 测试中避免使用 `asyncio.run()`，使用 `await` 或 `asyncio.get_event_loop().run_until_complete()` | 事件循环重复创建 |
 | **并发测试方法** | 并发测试使用 `threading` 而非 `multiprocessing`（进程隔离问题） | 资源泄漏 |
+| **语义缓存隔离** | 语义缓存基于向量相似度，多测试用相同 embedding 会互相覆盖缓存，需要用 unique_cache_key 生成不同 embedding | 缓存互相覆盖 |
 
 **禁止行为：**
 - ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
@@ -269,6 +270,7 @@
 - [ ] Subtask 0.2: 定义 RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
 - [ ] Subtask 0.3: 定义 UDMRConfig 配置模型（`src/infrastructure/config/udmr.py`）
 - [ ] Subtask 0.4: 定义 HealthCheckPort 端口接口（`src/domain/ports/health_check.py`）
+- [ ] Subtask 0.4a: 定义 HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
 - [ ] Subtask 0.5: 定义 LocalModelHealthFacade 应用层入口（`src/application/services/local_model_health_facade.py`）
 - [ ] Subtask 0.6: 定义 FallbackRouter 故障切换（`src/infrastructure/routing/fallback_router.py`）
 - [ ] Subtask 0.7: 定义 RoutingDecisionLog 扩展字段Schema（验证 Story 1.14b 已实现的扩展字段 route_type/selected_model/fallback_reason 符合本 Story AC-3 要求）
