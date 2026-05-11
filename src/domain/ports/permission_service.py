@@ -1,7 +1,7 @@
 """PermissionService Port - 权限服务端口.
 
 领域层接口，定义权限检查的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from uuid import UUID
 
 
 class PermissionServicePort(Protocol):
-    """权限服务端口（领域层定义，仅使用 ABC + 标准库）
+    """权限服务端口（领域层定义，仅使用标准库）
 
     注意：角色分配/撤销是应用层 UseCase，不是领域层服务。
     本接口仅负责权限检查，不包含角色管理逻辑。

@@ -497,12 +497,12 @@
 #### 架构验证测试实现
 
 - [x] Subtask 6.1: 创建 `tests/unit/security/test_audit_architecture_constraints.py` ✅ (领域层零依赖通过 mypy 验证)
-- [x] Subtask 6.2: 实现领域层零依赖验证 ✅ (mypy 验证通过：领域层仅依赖 ABC + 标准库)
+- [x] Subtask 6.2: 实现领域层零依赖验证 ✅ (mypy 验证通过：领域层仅依赖标准库)
 - [x] Subtask 6.3: 实现依赖方向验证 ✅ (domain → infrastructure 单向依赖)
 
 **完成标准/Definition of Done:**
 - [x] 所有架构约束测试通过 ✅ (mypy 验证通过)
-- [x] 领域层无安全实现细节 ✅ (domain 仅 ABC + 标准库)
+- [x] 领域层无安全实现细节 ✅ (domain 仅标准库)
 - [ ] 安全层覆盖率≥85% ⚠️ 待 CI 验证
 
 ---
@@ -585,7 +585,7 @@ sisys/
 4. **WORM 归档** — 7 年不可变存储，archived 标志追踪
 
 **应用到本故事/Applied to This Story:**
-- [x] AuditService 接口定义在 `src/domain/ports/audit_service.py`（仅 ABC + 标准库）✅
+- [x] AuditService 接口定义在 `src/domain/ports/audit_service.py`（仅标准库）✅
 - [x] AuditServiceImpl 实现在 `src/infrastructure/security/audit_service_impl.py` ✅
 - [x] AuthServiceImpl 集成审计事件发布 ✅
 - [x] PermissionServiceImpl 集成审计事件发布 ✅

@@ -1,7 +1,7 @@
 """AuditService Port - 审计服务端口.
 
 领域层接口，定义审计服务的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ class AuditRecord:
 
 
 class AuditServicePort(Protocol):
-    """审计服务端口（领域层定义，仅使用 ABC + 标准库）.
+    """审计服务端口（领域层定义，仅使用标准库）.
 
     定义审计日志记录、检索、完整性验证的接口。
     实现类位于 infrastructure 层（可导入外部库）。

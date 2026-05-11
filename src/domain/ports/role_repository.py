@@ -1,7 +1,7 @@
 """RoleRepository Port - 角色仓储端口.
 
 领域层接口，定义角色数据访问的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from src.domain.entities.role import Role
 
 
 class RoleRepositoryPort(Protocol):
-    """角色仓储端口（领域层定义，仅使用 ABC + 标准库）
+    """角色仓储端口（领域层定义，仅使用标准库）
 
     负责角色的数据访问，不包含业务逻辑。
     """

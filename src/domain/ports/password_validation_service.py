@@ -1,7 +1,7 @@
 """Password Validation Service Port - 密码验证服务端口.
 
 领域层接口，定义密码复杂度验证的契约。
-遵循六边形架构：领域层零依赖，仅使用 ABC + 标准库。
+遵循六边形架构：领域层零依赖，仅使用标准库。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ __all__ = ["PasswordValidationError"]
 
 
 class PasswordValidationServicePort(Protocol):
-    """密码验证服务端口（领域层定义，仅使用 ABC + 标准库）
+    """密码验证服务端口（领域层定义，仅使用标准库）
 
     负责密码复杂度验证，满足等保 2.0 三级要求：
     - 至少 8 字符
