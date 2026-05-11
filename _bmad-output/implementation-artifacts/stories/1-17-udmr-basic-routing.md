@@ -26,7 +26,7 @@
 | **路由性能要求** | 路由决策延迟满足性能要求 | P95<100ms（MVP） |
 
 > ⚠️ **MVP 范围澄清**：本 Story 实现 **简化的 L3 功能（本地优先静态配置）**，属于 MVP 降级实现（不等同于 L3 动态阈值）
-> - **L3 动态阈值**（基于 L2 评分的自适应决策，阈值 0.15/0.70）→ Story 11.2 范围
+> - **L3 动态阈值**（基于 L2 评分的自适应决策）→ Story 11.2 范围
 > - **本 Story 实现**：本地优先 + 超时>30s 切换云端（简化版本，无 L2 评分依赖）
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 6: MVP 关键机制增强，Story 1.17
@@ -83,19 +83,16 @@
 **And** 日志包含：任务 ID、路由类型（route_type）、选定模型（selected_model）、成本预估（cost_estimate）、成本实际（cost_actual）、延迟、切换原因（fallback_reason）
 
 > 📝 **RoutingDecisionLog 扩展字段说明**：
-> 基于 Story 1.14b 已有的 `RoutingDecisionLog` 实体，本 Story 添加以下字段：
-> - `route_type: Literal["local", "cloud"]` — 路由类型
-> - `selected_model: str` — 选定的模型名称
-> - `fallback_reason: Optional[str]` — 切换原因（当 route_type=cloud 时），可选值：
->   - `"timeout"` — 本地模型响应超时（>30秒）
->   - `"unavailable"` — 本地模型不可用（健康检查失败）
->   - `"health_check_failed"` — 健康检查未通过
+> Story 1.14b 已实现以下 UDMR 扩展字段，本 Story **验证**这些字段符合 AC-3 要求：
+> - `route_type: Literal["local", "cloud"]` — 路由类型（Story 1.14b 已实现，本 Story 验证）
+> - `selected_model: str` — 选定的模型名称（Story 1.14b 已实现，本 Story 验证）
+> - `fallback_reason: Optional[str]` — 切换原因（Story 1.14b 已实现，本 Story 验证）
 
 **验证标准/Validation Criteria:**
-- [ ] RoutingDecisionLog 数据模型扩展（`src/domain/entities/routing_decision_log.py`）
-  - 添加 `route_type: Literal["local", "cloud"]` 字段
-  - 添加 `selected_model: str` 字段
-  - 添加 `fallback_reason: Optional[str]` 字段
+- [ ] RoutingDecisionLog 数据模型验证（`src/domain/entities/routing_decision_log.py`）
+  - 验证 `route_type: Literal["local", "cloud"]` 字段存在且有效
+  - 验证 `selected_model: str` 字段存在且非空（当 route_type=cloud 时）
+  - 验证 `fallback_reason: Optional[str]` 字段存在且有效
 - [ ] 路由决策日志存储至 PostgreSQL
 - [ ] WORM 归档标识（RoutingDecisionLog 实体已有 worm_storage_ref 字段）
 - [ ] 日志字段完整性校验
@@ -133,7 +130,7 @@
   - 方法: `async check() -> bool`, `async close() -> None`
   - 职责: 定义健康检查的统一接口契约（异步，零外部依赖）
 - [ ] HealthCheckerFactory 工厂接口（`src/domain/ports/health_check_factory.py`）
-  - 方法: `create() -> HealthCheckPort`
+  - 方法: `async create() -> HealthCheckPort`
   - 职责: 定义创建 HealthCheckPort 实例的工厂接口（零外部依赖）
 
 #### 配置模型 (Configuration Models)
@@ -252,7 +249,7 @@
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-3 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
-| AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
+| AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.4（SDD 规范定义） | - |
 
 ---
 
@@ -278,8 +275,14 @@
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [ ] 规范项全部定义完毕（Subtask 0.1-0.7 + 0.4a）
+- [ ] Gherkin 验收测试已编写（Subtask 0.8）
+- [ ] 验收测试运行失败（Subtask 0.9，🔴 红阶段验证）
+
+> **📝 Task 0 特殊性说明**：
+> - Task 0 是 SDD 规范定义阶段，不是 TDD 实现阶段，因此**不执行绿→重构阶段**
+> - Task 0 的"红"= Gherkin 验收测试失败（BDD 层面），而 Task 1-3 的"红"= TDD 单元测试失败（代码层面）
+> - Task 0 定义的 Schema 是后续 Task 1-3 TDD 测试的契约输入
 
 ---
 
@@ -348,7 +351,7 @@
 | 🔄 重构 | 验证 WORM 归档标识 |
 
 - [ ] Subtask 2.4: 🔴 红 — 编写 RoutingDecisionLog 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 扩展 RoutingDecisionLog 实体（添加 route_type, selected_model, cost_estimate, cost_actual, fallback_reason 五个字段）
+- [ ] Subtask 2.5: 🟢 绿 — 验证 RoutingDecisionLog 实体（验证 UDMR 扩展字段 route_type/selected_model/fallback_reason 符合 AC-3 要求）
 - [ ] Subtask 2.6: 🔄 重构 — 验证 WORM 归档标识
 
 **完成标准/Definition of Done:**
@@ -477,9 +480,9 @@ Infrastructure Layer（适配器 — 具体实现）
 ```
 Triggered 事件（Story 1.14a）
     ↓
-RouteService（语义路由）→ 选择目标 Agent/工具
-    ↓ 发布 Routed 事件
-UDMRouter（UDMR 路由）→ 接收 Routed 事件，选择本地/云端模型 ← 本 Story
+AutoRouteService（语义路由）→ 选择目标 Agent/工具
+    ↓ 发布 AutoRouted 事件
+UDMRouter（UDMR 路由）→ 接收 AutoRouted 事件，选择本地/云端模型 ← 本 Story
     ↓
 Execute（Story 1.14c）→ 执行任务
 ```
@@ -616,7 +619,7 @@ sisys/
 - `tests/acceptance/test_story_1.17.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
 - `tests/acceptance/test_story_1.17_steps.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/udmr_guide.md` - UDMR 实施指南
-- `src/interfaces/event_listeners/udmr_listener.py` - 事件监听适配器（复用 Story 1.3 模式）
+- `src/application/event_listeners/` or `src/infrastructure/event_listeners/` - 事件监听适配器（复用 Story 1.3 模式）
 
 **更新的文件/Updated Files:**
 - `src/domain/ports/__init__.py` - 添加 HealthCheckPort, HealthCheckerFactory 导出
