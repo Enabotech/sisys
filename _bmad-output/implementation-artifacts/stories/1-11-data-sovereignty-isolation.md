@@ -42,7 +42,7 @@
 | Story 1-1: Hexagonal Architecture Skeleton | 硬依赖 | 六边形架构模式、依赖注入容器、领域层接口定义规范 |
 | Story 1-9: RBAC Permission Management | 硬依赖 | 权限服务接口 `PermissionServicePort` 已定义，需 RBAC 作为基础 |
 | Story 1-10: Unified Audit Log | 硬依赖 | 审计日志基础设施，数据主权违规和跨境审批需记录审计日志 |
-| Story 1-17: UDMR Basic Routing | 硬依赖 | UDMRouter.route_async()接口，合规网关通过其实现本地路由强制 |
+| Story 1-17: UDMR Basic Routing | 硬依赖 | UDMRouter.route_async()接口(见src/domain/services/udmr_router.py:160)，合规网关通过其实现本地路由强制 |
 | Story 1-15b: Externalized Memory Six-Layer Storage | 软依赖 | L1 合规性网关需感知数据驻留层实现 |
 
 ### 技术容量规划
@@ -197,7 +197,7 @@
 - [ ] `Task` (`src/domain/value_objects/task.py`) - UDMR路由任务类型
   - 字段: `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
   - 方法: `is_china_domestic()`, `requires_local_processing()`
-  - UDMR集成: Task -> task_context转换逻辑: `{"task_id": uuid, "session_id": session_id, "complexity": "high" if task.requires_local_processing() else "normal"}`
+  - UDMR集成: Task -> task_context转换逻辑: `{"task_id": str(task_id), "session_id": session_id, "complexity": "high" if task.requires_local_processing() else "normal"}`
 
 **领域实体:**
 - [ ] `SensitiveDataResult` (`src/domain/entities/sensitive_data_result.py`)
