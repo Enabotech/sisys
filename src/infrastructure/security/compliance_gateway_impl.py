@@ -7,6 +7,7 @@ UDMR L1 合规性网关，协调各子服务进行综合合规检查。
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from src.domain.ports.compliance_gateway import ComplianceGatewayPort
@@ -166,8 +167,6 @@ class ComplianceGatewayImpl(ComplianceGatewayPort):
         Returns:
             True 如果包含个人信息
         """
-        import re
-
         patterns = [
             r"身份证[\s:：]*\d{15}|\d{18}",
             r"手机[号\s:：]*1\d{10}",

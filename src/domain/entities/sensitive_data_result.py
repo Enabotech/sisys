@@ -8,8 +8,18 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 
-from src.domain.events.compliance_events import SensitiveType
+
+class SensitiveType(str, Enum):
+    """Sensitive data type classification."""
+
+    PII = "pii"  # Personally Identifiable Information
+    TRADE_SECRET = "trade_secret"  # Business trade secrets  # pragma: allowlist secret
+    FINANCIAL = "financial"  # Financial data
+    BIOMETRIC = "biometric"  # Biometric data (PIPL sensitive)
+    MINOR = "minor"  # Data about minors (PIPL enhanced protection)
+    CUSTOM = "custom"  # User-defined sensitive type
 
 
 @dataclass(frozen=True)

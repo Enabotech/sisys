@@ -33,6 +33,16 @@ class CrossBorderTransferServicePort(ABC):
         ...
 
     @abstractmethod
+    def reject(self, transfer_id: str, approver: str) -> None:
+        """审批拒绝跨境传输请求。
+
+        Args:
+            transfer_id: 传输请求 ID
+            approver: 审批者
+        """
+        ...
+
+    @abstractmethod
     def list_pending_requests(self) -> list[CrossBorderTransferRequest]:
         """列出所有待审批的请求。
 

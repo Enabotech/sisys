@@ -9,8 +9,7 @@ import hashlib
 import re
 from typing import TYPE_CHECKING
 
-from src.domain.entities.sensitive_data_result import SensitiveDataResult
-from src.domain.events.compliance_events import SensitiveType
+from src.domain.entities.sensitive_data_result import SensitiveDataResult, SensitiveType
 from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
 
 if TYPE_CHECKING:
