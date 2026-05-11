@@ -36,6 +36,10 @@ class RoutingDecision:
     fallback_reason: str | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __post_init__(self) -> None:
+        """Validate invariants after construction."""
+        self.validate()
+
     def validate(self) -> None:
         """Validate invariant constraints.
 
