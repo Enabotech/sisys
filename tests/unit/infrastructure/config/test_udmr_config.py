@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 from src.infrastructure.config.udmr import CloudModelConfig, UDMRConfig
 
 
@@ -12,8 +14,14 @@ class TestUDMRConfig:
     """Test suite for UDMRConfig."""
 
     def test_from_env_default_values(self) -> None:
-        """Should have correct default values when env vars not set."""
-        with patch.dict(os.environ, {}, clear=True):
+        """Should have correct default values when env vars set."""
+        env = {
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
+        }
+        with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
         assert config.enabled is True
         assert config.local_first is True
@@ -27,6 +35,10 @@ class TestUDMRConfig:
             "UDMR_LOCAL_FIRST": "false",
             "UDMR_LOCAL_TIMEOUT": "60",
             "UDMR_LOCAL_MODEL": "llama3:8b",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
         }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
@@ -35,39 +47,61 @@ class TestUDMRConfig:
         assert config.local_timeout == 60
         assert config.local_model == "llama3:8b"
 
-    def test_cloud_configs_default(self) -> None:
-        """Should have correct default cloud configs."""
+    def test_from_env_raises_when_no_cloud_config(self) -> None:
+        """Should raise ConfigurationError when no cloud config environment variables set."""
+        from src.domain.exceptions import ConfigurationError
+
         with patch.dict(os.environ, {}, clear=True):
-            config = UDMRConfig.from_env()
-        assert len(config.cloud_configs) == 3
-        models = [c.model for c in config.cloud_configs]
-        assert "qwen-turbo" in models
-        assert "qwen-plus" in models
-        assert "claude-3-haiku" in models
+            with pytest.raises(ConfigurationError, match="No cloud model configuration found"):
+                UDMRConfig.from_env()
 
     def test_local_model_default(self) -> None:
         """Should have correct default local model."""
-        with patch.dict(os.environ, {}, clear=True):
+        env = {
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
+        }
+        with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
         assert config.local_model == "qwen2.5:7b"
 
     def test_from_env_negative_timeout_defaults_to_30(self) -> None:
         """Negative local_timeout should default to 30."""
-        env = {"UDMR_LOCAL_TIMEOUT": "-5"}
+        env = {
+            "UDMR_LOCAL_TIMEOUT": "-5",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
+        }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
         assert config.local_timeout == 30
 
     def test_from_env_invalid_local_timeout_defaults_to_30(self) -> None:
         """Invalid UDMR_LOCAL_TIMEOUT should default to 30 (no error raised)."""
-        env = {"UDMR_LOCAL_TIMEOUT": "not_a_number"}
+        env = {
+            "UDMR_LOCAL_TIMEOUT": "not_a_number",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
+        }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
         assert config.local_timeout == 30
 
     def test_from_env_zero_timeout_is_allowed(self) -> None:
         """Zero local_timeout is allowed (only negative is clamped to default)."""
-        env = {"UDMR_LOCAL_TIMEOUT": "0"}
+        env = {
+            "UDMR_LOCAL_TIMEOUT": "0",
+            "UDMR_CLOUD_0_API_TYPE": "openai",
+            "UDMR_CLOUD_0_ENDPOINT": "https://api.example.com",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
+            "UDMR_CLOUD_0_MODEL": "test-model",
+        }
         with patch.dict(os.environ, env, clear=True):
             config = UDMRConfig.from_env()
         assert config.local_timeout == 0
@@ -94,13 +128,13 @@ class TestCloudModelConfig:
         config = CloudModelConfig(
             api_type="anthropic",
             endpoint="https://api.anthropic.com",
-            api_key="sk-ant-key",
+            api_key="sk-ant-key",  # pragma: allowlist secret
             model="claude-3-5-sonnet",
             enabled=False,
         )
         assert config.api_type == "anthropic"
         assert config.endpoint == "https://api.anthropic.com"
-        assert config.api_key == "sk-ant-key"
+        assert config.api_key == "sk-ant-key"  # pragma: allowlist secret
         assert config.model == "claude-3-5-sonnet"
         assert config.enabled is False
 
@@ -119,7 +153,7 @@ class TestUDMRConfigCloudConfigs:
         env = {
             "UDMR_CLOUD_0_API_TYPE": "custom",
             "UDMR_CLOUD_0_ENDPOINT": "https://api.minimax.chat/v1",
-            "UDMR_CLOUD_0_API_KEY": "test-key",
+            "UDMR_CLOUD_0_API_KEY": "test-key",  # pragma: allowlist secret
             "UDMR_CLOUD_0_MODEL": "MiniMax-M2.7",
             "UDMR_CLOUD_0_ENABLED": "true",
         }
@@ -129,7 +163,7 @@ class TestUDMRConfigCloudConfigs:
         cloud = config.cloud_configs[0]
         assert cloud.api_type == "custom"
         assert cloud.endpoint == "https://api.minimax.chat/v1"
-        assert cloud.api_key == "test-key"
+        assert cloud.api_key == "test-key"  # pragma: allowlist secret
         assert cloud.model == "MiniMax-M2.7"
         assert cloud.enabled is True
 
@@ -138,17 +172,17 @@ class TestUDMRConfigCloudConfigs:
         env = {
             "UDMR_CLOUD_0_API_TYPE": "custom",
             "UDMR_CLOUD_0_ENDPOINT": "https://api.minimax.chat/v1",
-            "UDMR_CLOUD_0_API_KEY": "minimax-key",
+            "UDMR_CLOUD_0_API_KEY": "minimax-key",  # pragma: allowlist secret
             "UDMR_CLOUD_0_MODEL": "MiniMax-M2.7",
             "UDMR_CLOUD_0_ENABLED": "true",
             "UDMR_CLOUD_1_API_TYPE": "openai",
             "UDMR_CLOUD_1_ENDPOINT": "https://api.deepseek.com/v1",
-            "UDMR_CLOUD_1_API_KEY": "deepseek-key",
+            "UDMR_CLOUD_1_API_KEY": "deepseek-key",  # pragma: allowlist secret
             "UDMR_CLOUD_1_MODEL": "deepseek-chat",
             "UDMR_CLOUD_1_ENABLED": "true",
             "UDMR_CLOUD_2_API_TYPE": "custom",
             "UDMR_CLOUD_2_ENDPOINT": "https://open.bigmodel.cn/api/paas/v4",
-            "UDMR_CLOUD_2_API_KEY": "glm-key",
+            "UDMR_CLOUD_2_API_KEY": "glm-key",  # pragma: allowlist secret
             "UDMR_CLOUD_2_MODEL": "glm-5.1",
             "UDMR_CLOUD_2_ENABLED": "false",
         }
@@ -173,7 +207,7 @@ class TestUDMRConfigCloudConfigs:
         env = {
             "UDMR_CLOUD_0_API_TYPE": "openai",
             "UDMR_CLOUD_0_ENDPOINT": "https://api.openai.com/v1",
-            "UDMR_CLOUD_0_API_KEY": "key",
+            "UDMR_CLOUD_0_API_KEY": "key",  # pragma: allowlist secret
             "UDMR_CLOUD_0_MODEL": "gpt-4",
             "UDMR_CLOUD_0_ENABLED": "false",
         }
