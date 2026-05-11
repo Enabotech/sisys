@@ -91,7 +91,7 @@ development_status:
   1-15a-externalized-memory-context-compression: done
   1-15b-externalized-memory-six-layer-storage: done  # ✅ RBAC bug fix: L2GroupMemberRepositoryProtocol implemented
   # 价值组 6: MVP 关键机制增强
-  1-17-udmr-basic-routing: done
+  1-17-udmr-basic-routing: ready-for-dev
   1-18a-prefect-workflow-integration: ready-for-dev
   1-18b-langgraph-agent-orchestration: backlog
   1-19-cost-metrics-basic: backlog
