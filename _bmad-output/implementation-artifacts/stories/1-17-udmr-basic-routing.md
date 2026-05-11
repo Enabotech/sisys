@@ -106,10 +106,10 @@ AutoExecuted
 
 **验证标准/Validation Criteria:**
 - [ ] 本地模型健康检查（Ollama ping，路由决策前执行）
-- [ ] 健康检查日志记录（health_check_timestamp, health_check_result, health_check_latency_ms）
+- [ ] 健康检查结果记录（`RoutingDecided` 事件携带 `health_check_passed`, `health_check_latency_ms` 字段）
 - [ ] 超时检测（30秒阈值，调用过程中执行）
 - [ ] 自动故障切换逻辑（健康检查失败 OR 调用超时 → 切换云端）
-- [ ] 切换日志记录（fallback_reason: "timeout" | "unavailable" | "health_check_failed"）
+- [ ] 切换日志记录（`RoutingDecided.fallback_reason`: "timeout" | "unavailable" | "health_check_failed"）
 - [ ] 健康检查失败切换时间<1秒
 - [ ] 调用超时切换时间<30秒
 
