@@ -470,4 +470,193 @@ class InMemoryEventBus:
 
 ---
 
+## 十二、第2轮审查P0问题与系统解决方案
+
+### 第2轮审查发现：第1轮问题未修复
+
+**检查结果**：第1轮提出的17个P0问题**均未修复**，同时发现新问题。
+
+| 问题类别 | 第1轮状态 | 第2轮状态 |
+|----------|----------|----------|
+| 服务内本地Protocol定义 | 未修复 | 新增 `auto_execute_service.py` 也有同样问题 |
+| `__init__.py` 导出缺失 | 未修复 | 问题更清晰：30个文件仅导出16个 |
+| EventBusFactory初始化 | 未修复 | 确认存在运行时失败 |
+| application/ports无__init__.py | 未修复 | 确认存在 |
+| 存储层接口冗余 | 未修复 | 确认存在 |
+
+### 第2轮P0问题汇总
+
+| P0-ID | 模块 | 问题描述 | 严重程度 |
+|-------|------|----------|----------|
+| P0-18 | 服务内Protocol | `auto_execute_service.py` 本地定义 `SandboxExecutorProtocol` 和 `SnapshotRepositoryProtocol` | 严重 |
+| P0-19 | 导出完整性 | `__init__.py` 仅导出16个，缺失超过42个重要端口 | 严重 |
+| P0-20 | 架构违规 | `SemanticCache` 和 `PublicBlackboard` 定义在 `application/ports` 而非 `domain/ports` | 严重 |
+| P0-21 | 连接断开 | `QdrantCollectionManager` 未实现 `CollectionManager` Protocol | 中等 |
+| P0-22 | 连接断开 | `RedisSessionStorage` 未实现 `SessionStorage` Protocol | 中等 |
+| P0-23 | 连接断开 | `RedisSemanticCache` 未实现 `SemanticCache` Protocol | 中等 |
+| P0-24 | 依赖倒置 | Domain层注释引用不存在的Application层接口 | 中等 |
+
+### 第2轮系统解决方案
+
+#### 方案8: 创建sandbox.py端口文件
+
+**问题根源**: `auto_execute_service.py` 违反六边形架构，在服务内定义Protocol
+
+**执行步骤**:
+1. 创建 `src/domain/ports/sandbox.py`
+2. 迁移 `SandboxExecutorProtocol` 和 `SnapshotRepositoryProtocol` 定义
+3. 更新 `auto_execute_service.py` 导入
+
+**sandbox.py 内容**:
+```python
+"""沙箱执行器端口 — 六边形架构沙箱接口"""
+from __future__ import annotations
+from typing import Protocol
+
+class SandboxExecutor(Protocol):
+    """沙箱执行器协议"""
+    async def execute(self, code: str, context: dict) -> dict: ...
+
+class SnapshotRepository(Protocol):
+    """快照仓储协议"""
+    async def save(self, snapshot: dict) -> str: ...
+    async def load(self, snapshot_id: str) -> dict | None: ...
+```
+
+#### 方案9: 完整补全domain/ports/__init__.py
+
+**问题根源**: `__init__.py` 导出缺失率超过50%
+
+**执行步骤**:
+按依赖关系分组导出，按优先级分批实施
+
+**第一批次（核心存储）**:
+```python
+from src.domain.ports.l0_storage import L0StoragePort
+from src.domain.ports.vector_storage import CollectionManager, VectorStorage
+from src.domain.ports.storage import ObjectStorageRepository, ComplianceLockError
+from src.domain.ports.integrity import IntegrityPort
+from src.domain.ports.index_manager import IndexManagerPort
+from src.domain.ports.health_check import HealthCheckPort
+```
+
+**第二批次（事件消息）**:
+```python
+from src.domain.ports.event_publisher import EventPublisher, InMemoryEventPublisher
+```
+
+**第三批次（安全合规）**:
+```python
+from src.domain.ports.auth_service import AuthServicePort, AuthTokens
+from src.domain.ports.audit_service import AuditServicePort
+from src.domain.ports.audit_repository import AuditRepositoryPort
+from src.domain.ports.permission_service import PermissionServicePort
+from src.domain.ports.compliance_gateway import ComplianceGatewayPort
+from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
+from src.domain.ports.data_residency_enforcer import DataResidencyEnforcerPort
+```
+
+**完整__all__列表**（42个符号）:
+```python
+__all__ = [
+    # L0-L5 存储层（已导出部分 + 新增）
+    "GraphManager", "GraphStorage",
+    "L0StoragePort", "L1CachePort",
+    "L2ChangeHistoryRepositoryPort", "L2GroupMemberRepositoryPort", "L2MetadataRepositoryPort",
+    "L3VectorPort", "L4ObjectPort", "L5GraphPort",
+    "CollectionManager", "VectorStorage",
+    "DataAccessPattern", "StorageLayer", "StorageTier",
+    "UnifiedStoragePort", "UnitOfWork",
+    # 事件与消息
+    "EventPublisher", "InMemoryEventPublisher", "OutboxRepository",
+    # 会话与缓存
+    "SessionStorage",
+    # 对象存储
+    "ComplianceLockError", "ObjectStorageRepository",
+    # 完整性
+    "IntegrityPort", "IndexManagerPort",
+    # 健康检查
+    "HealthCheckPort",
+    # 基础
+    "BaseRepository",
+    # 用户与认证
+    "UserRepositoryPort", "AuthServicePort", "AuthTokens",
+    # 角色与权限
+    "RoleRepositoryPort", "UserRoleRepositoryPort", "PermissionServicePort",
+    # 审计
+    "AuditRepositoryPort", "AuditServicePort",
+    # 安全
+    "LoginAttemptRepositoryPort", "TokenBlacklistPort",
+    "PasswordValidationServicePort",
+    # 合规
+    "ComplianceGatewayPort", "SensitiveDataDetectorPort",
+    "DataResidencyEnforcerPort", "WhitelistServicePort",
+    "PIPLComplianceServicePort", "CrossBorderTransferServicePort",
+]
+```
+
+#### 方案10: 迁移SemanticCache和PublicBlackboard到Domain层
+
+**问题根源**: 违反依赖倒置原则，Domain层不应依赖Application层
+
+**执行步骤**:
+1. 创建 `src/domain/ports/semantic_cache.py`
+2. 创建 `src/domain/ports/public_blackboard.py`
+3. 迁移Protocol定义
+4. 更新 `l1_cache.py` 注释
+5. 更新Infrastructure实现导入
+
+**迁移后的目录结构**:
+```
+src/domain/ports/
+├── semantic_cache.py    ← 从application/ports迁移
+├── public_blackboard.py ← 从application/ports迁移
+└── ...
+
+src/application/ports/
+├── __init__.py          ← 新建
+├── metrics_port.py
+├── event_subscriber.py
+├── compressor_service.py
+├── text_extractor_service.py
+├── exception_metrics_port.py
+└── sandbox_port.py      ← SandboxExecutor保留在application层
+```
+
+#### 方案11: 修复Protocol实现连接
+
+**问题根源**: 实现类未声明继承Protocol，导致依赖注入失效
+
+**执行步骤**:
+1. `QdrantCollectionManager` 声明实现 `CollectionManager`
+2. `RedisSessionStorage` 声明实现 `SessionStorage`
+3. `RedisSemanticCache` 声明实现 `SemanticCache`
+
+**示例修复**:
+```python
+# src/infrastructure/storage/qdrant/collection_manager.py
+from src.domain.ports.vector_storage import CollectionManager
+
+class QdrantCollectionManager(CollectionManager):
+    """实现 CollectionManager Protocol"""
+    ...
+```
+
+### 第2轮修复优先级
+
+| 优先级 | P0-ID | 修复内容 |
+|--------|-------|----------|
+| P0 | P0-1~4, P0-18 | 删除所有服务内本地Protocol定义 |
+| P0 | P0-19 | 补全 `__init__.py` 导出（42个符号） |
+| P0 | P0-20 | 迁移 SemanticCache/PublicBlackboard 到 domain 层 |
+| P0 | P0-10~12 | 修复 EventBusFactory 初始化问题 |
+| P1 | P0-21~23 | 修复 Protocol 实现连接 |
+| P2 | P0-14~17, P0-24 | 清理冗余接口 |
+
+---
+
+*第2轮审查完成，新增9个P0问题（第0-18至P0-24），累计26个P0问题，制定4套新系统解决方案*
+
+---
+
 *第1轮审查完成，共发现17个P0问题，制定7套系统解决方案*
