@@ -73,6 +73,8 @@
 - [ ] 正则表达式检测 PII（姓名、身份证、电话、邮箱）
 - [ ] 关键词检测商业秘密（技术配方、客户列表、战略计划）
 - [ ] 实体类检测金融数据（银行账号、信用卡号、保险单号、证券账户、基金账号、征信记录）
+- [ ] 生物识别数据检测（指纹、虹膜、声纹、人脸识别、DNA）（V1阶段）
+- [ ] 精确位置与行踪轨迹检测（GPS坐标、IP地址、WiFi定位）（V1阶段）
 - [ ] `SensitiveDataDetected` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 单元测试覆盖正常检测、边界情况（空数据、混淆数据）
 
@@ -224,7 +226,12 @@
   - 数据主体权利: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
 - [ ] `ComplianceGatewayPort` (`src/domain/ports/compliance_gateway.py`)
   - 方法: `check(task: Task) -> ComplianceResult`
-  - 说明: UDMR L1 合规性网关端口，Task 为路由任务对象
+  - 说明: UDMR L1 合规性网关端口
+  - Task 类型定义:
+    - `task.input`: str (待检测内容)
+    - `task.data_residency`: str (数据驻留要求: CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS)
+    - `task.preferred_model`: str (首选模型)
+    - `task.allowed_models`: list[str] (白名单允许模型列表)
 
 #### 领域事件 (Domain Events)
 
