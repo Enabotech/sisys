@@ -241,9 +241,9 @@
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 本地优先静态路由配置 | Task 1 | Subtask 1.1-1.3（UDMRouter 红→绿→重构） | `test_udmr_router.py` |
-| AC-1 | 本地模型健康检查 | Task 1 | Subtask 1.4-1.6（LocalModelHealthFacade 红→绿→重构） | `test_local_model_health.py` |
+| AC-1 | 本地模型健康检查 | Task 1 | Subtask 1.4-1.6（LocalModelHealthFacade 红→绿→重构） | `test_local_model_health_facade.py` |
 | AC-2 | 故障切换机制 | Task 2 | Subtask 2.1-2.3（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
-| AC-2 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
+| AC-3 | 路由决策日志 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-4 | 路由性能要求 | Task 3 | Subtask 3.4-3.6（性能基准测试 红→绿→重构） | `test_udmr_performance.py` |
 | AC-3 | 路由决策日志完整性 | Task 2 | Subtask 2.4-2.6（RoutingDecisionLog 红→绿→重构） | `test_routing_decision_log.py` |
 | AC-1 | HealthCheckPort 端口接口 | Task 0 | Subtask 0.1（SDD 规范定义） | - |
@@ -391,6 +391,8 @@
 | 🔄 重构 | 优化测试覆盖 |
 
 - [ ] Subtask 3.7: 🔴 红 — 编写集成测试失败测试
+- [ ] Subtask 3.8: 🟢 绿 — 实现端到端路由流程
+- [ ] Subtask 3.9: 🔄 重构 — 优化测试覆盖
 
 **完成标准/Definition of Done:**
 - [ ] 六边形架构验证通过（无循环依赖）
