@@ -6,6 +6,9 @@
     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
     </marker>
+    <marker id="arrowhead-up" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+      <polygon points="10 0, 0 3.5, 10 7" fill="#64748b"/>
+    </marker>
   </defs>
 
   <!-- Background -->
@@ -102,8 +105,8 @@
     <text x="712" y="78" text-anchor="middle" font-size="10" fill="#9d174d">服务接口</text>
   </g>
 
-  <!-- Arrow 4 -->
-  <line x1="450" y1="557" x2="450" y2="587" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <!-- Arrow 4: Infrastructure → Domain (implements interface) -->
+  <line x1="450" y1="587" x2="450" y2="557" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead-up)"/>
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
