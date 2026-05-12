@@ -18,7 +18,7 @@
 | **导出完整性** | `domain/ports/__init__.py` 仅导出16个(33.3%)，缺失24个Protocol | 基础设施层无法正确导入 |
 | **EventBusFactory** | 3个组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)初始化为None | 运行时触发AttributeError |
 | **接口冗余** | L3: VectorStorage↔L3VectorPort(缺CollectionManager); L5: GraphManager/GraphStorage↔L5GraphPort(缺get_neighbors); L4: ObjectStorageRepository↔L4ObjectPort | 架构模糊，实现混淆 |
-| **Infrastructure依赖Application** | 2处违规导入(role_repository.py的Exception导入) | 违反依赖倒置原则 |
+| **Infrastructure依赖Application** | 7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1) | 违反依赖倒置原则 |
 | **跨模块继承** | SQLAlchemy模型继承infrastructure的Base | Domain层绑定具体技术 |
 | **无统一注册机制** | 端口分散定义，无中心化管理 | 可插拔系统难以维护 |
 
@@ -29,7 +29,7 @@
 | 建立统一端口注册管理机制 | 端口分散定义 | 4层架构：契约→注册→解析→门禁 |
 | 消除服务内Protocol定义 | 5个服务文件定义6个Protocol(含重复) | 全部迁移到domain/ports/contracts/ |
 | 补全__init__.py导出 | 16/48符号已导出(33.3%) | 导出所有48个Protocol(100%) |
-| 消除Infrastructure依赖Application | 2处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
+| 消除Infrastructure依赖Application | 7处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
 | 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L4: ObjectStorageRepository↔L4ObjectPort | 统一为单一契约 |
 | 修复EventBusFactory | 3个组件为None | 延迟初始化+单例复用 |
 | 修复跨模块继承 | SQLAlchemy Base在infrastructure | 迁移Base到Domain或使用无技术绑定Base |
@@ -991,7 +991,7 @@ print(f'All {len(registry)} ports registered')
 | 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含≥48个Protocol契约 |
 | 阶段2 | P0-7, P0-8, P0-9 | registry包含≥48个Protocol |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无2处违规导入(role_repository.py的Exception导入)，AutoRouteHandler事件发布修复 |
+| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)，AutoRouteHandler事件发布修复 |
 | 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥48个Protocol |
 | 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
 
@@ -1102,7 +1102,7 @@ print(f'All {len(registry)} ports registered')
 | Phase 1 | 4-6小时 | 48个Protocol契约定义,8个从application迁移 |
 | Phase 2 | 2-3小时 | 核心基础设施开发 |
 | Phase 3 | 2-3小时 | 组合根+EventBusFactory修复 |
-| Phase 4 | 6-8小时 | 迁移服务代码+修复2处违规导入(role_repository.py的Exception导入)+跨模块继承 |
+| Phase 4 | 6-8小时 | 迁移服务代码+修复7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)+跨模块继承 |
 | Phase 5 | 3-4小时 | 48个Protocol的契约测试 |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
 | **总计** | **18-26小时** | — |
