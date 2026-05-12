@@ -84,7 +84,7 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 统一端口注册与接口治理
-- [ ] 端口契约位于 `src/domain/ports/contracts/`
+- [ ] 端口契约位于 `src/domain/ports`
 - [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口必须登记为 `PortSpec`
 - [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
 - [ ] 契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
@@ -391,7 +391,6 @@
 |   │   ├── events/                     # 领域事件定义
 |   │   ├── exceptions/                 # 领域层异常
 |   │   ├── ports/                      # 领域端口目录
-|   │   │   ├── contracts/              # 端口契约（Protocol / DTO / 错误码）
 |   │   │   ├── registry.py             # 端口注册中心
 |   │   │   ├── resolver.py             # 端口解析器
 |   │   │   └── contract_gate.py        # 契约门禁
