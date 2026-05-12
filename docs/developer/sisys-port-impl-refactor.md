@@ -28,8 +28,8 @@
 |------|------|----------|
 | 建立统一端口注册管理机制 | 端口分散定义 | 4层架构：契约→注册→解析→门禁 |
 | 消除服务内Protocol定义 | 5个服务文件定义6个Protocol(含重复) | 全部迁移到domain/ports/contracts/ |
-| 补全__init__.py导出 | 16/41符号已导出(39.0%) | 导出所有41个Protocol(100%) |
-| 消除Infrastructure依赖Application | 7处违规 | 迁移SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber到Domain层 |
+| 补全__init__.py导出 | 16/41符号已导出(39.0%) | 导出所有39个Protocol(100%)(计划目标54个) |
+| 消除Infrastructure依赖Application | 7处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
 | 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L4: ObjectStorageRepository↔L4ObjectPort | 统一为单一契约 |
 | 修复EventBusFactory | 3个组件为None | 延迟初始化+单例复用 |
 | 修复跨模块继承 | SQLAlchemy Base在infrastructure | 迁移Base到Domain或使用无技术绑定Base |
@@ -988,12 +988,12 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
-| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含全部41个Protocol契约 |
-| 阶段2 | P0-7, P0-8, P0-9 | registry包含全部41个Protocol |
+| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含≥39个Protocol契约 |
+| 阶段2 | P0-7, P0-8, P0-9 | registry包含≥39个Protocol |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~6, P0-18, V4~V6 | 服务内无Protocol定义，无7处违规导入 |
-| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖全部41个Protocol |
-| 阶段6 | P0-21~P0-24 | 实现类声明实现对应Protocol |
+| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无7处违规导入，AutoRouteHandler事件发布修复 |
+| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥39个Protocol |
+| 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
 
 ### 5.2 详细执行步骤
 
@@ -1006,17 +1006,17 @@ print(f'All {len(registry)} ports registered')
 │   └── 迁移 SandboxExecutor → contracts/sandbox.py
 ├── 1.3 定义35个核心端口契约
 ├── 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
-└── 1.5 验证: contracts/目录包含49个端口
+└── 1.5 验证: contracts/目录包含≥39个端口
 
 阶段2: 实现注册中心
 ├── 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
 ├── 2.2 实现 resolver.py (Resolver, resolve)
 ├── 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
-└── 2.4 验证: registry包含全部49个端口
+└── 2.4 验证: registry包含≥39个端口
 
 阶段3: 创建组合根 + 修复EventBusFactory
 ├── 3.1 创建 composition_root.py
-├── 3.2 注册所有41个Protocol
+├── 3.2 注册所有≥39个Protocol
 ├── 3.3 修复EventBusFactory初始化(基于实际代码分析)
 │   ├── 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
 │   │   └── 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
@@ -1073,7 +1073,15 @@ print(f'All {len(registry)} ports registered')
 ├── 4.8 修复L4ObjectPort缺少list_objects问题(如需要)
 │   └── 4.8.1 评估ObjectStorageRepository是否需合并到L4ObjectPort
 ├── 4.9 验证服务可正常解析
-└── 4.10 验证: 无Infrastructure→Application依赖(7处全部修复)
+├── 4.10 验证: 无Infrastructure→Application依赖(7处全部修复)
+├── 4.11 修复P0-6: AutoRouteHandler事件发布缺失
+│   ├── 4.11.1 检查auto_route_handler.py的on_triggered()方法
+│   ├── 4.11.2 添加缺失的_publish(routed)调用
+│   └── 4.11.3 验证: grep -A10 "on_triggered" src/domain/services/auto_route_handler.py | grep "_publish(routed)"
+└── 4.12 修复P0-24: Domain层注释引用Application层接口
+    ├── 4.12.1 检查Domain层所有注释中的application引用
+    ├── 4.12.2 更新注释指向Domain层契约
+    └── 4.12.3 验证: grep -rn "from src.application" src/domain/ | grep -v "^\s*#" 应返回空
 
 阶段5: 实现契约测试
 ├── 5.1 为每个端口创建契约测试基类
@@ -1091,11 +1099,11 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 建议时间 | 理由 |
 |-------|----------|------|
-| Phase 1 | 4-6小时 | 41个Protocol契约定义,8个从application迁移 |
+| Phase 1 | 4-6小时 | 39个Protocol契约定义,8个从application迁移 |
 | Phase 2 | 2-3小时 | 核心基础设施开发 |
 | Phase 3 | 2-3小时 | 组合根+EventBusFactory修复 |
 | Phase 4 | 6-8小时 | 迁移服务代码+修复7处违规导入+跨模块继承 |
-| Phase 5 | 3-4小时 | 41个Protocol的契约测试 |
+| Phase 5 | 3-4小时 | 39个Protocol的契约测试 |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
 | **总计** | **18-26小时** | — |
 
@@ -1116,7 +1124,7 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 所有41个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥39 |
+| 所有≥39个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥39 |
 | 无重复注册 | registry无ValueError |
 | 契约测试通过 | `poetry run pytest tests/contracts/ -v` |
 | EventBusFactory初始化正确 | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_event_bus() is not None"` 不抛RuntimeError |
