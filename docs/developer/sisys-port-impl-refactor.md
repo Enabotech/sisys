@@ -104,7 +104,7 @@
                                     │
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Layer 1: Port Contract (契约层)                                      │
-│  - 接口定义在 domain/ports/ (37个) 和 application/ports/ (7个)       │
+│  - 接口定义在 domain/ports/ (~35个) 和 application/ports/ (8个)       │
 │  - 只定义行为，不含实现                                                │
 │  - 两者各有用途，独立共存                                              │
 └─────────────────────────────────────────────────────────────────────┘
@@ -850,8 +850,8 @@ async def test_get_user(user_service, mock_user_repo):
 > **本清单是唯一合法端口来源（Single Source of Truth），不是文档而是系统约束。**
 
 **端口契约来自两个独立来源（各有用途，不需要迁移）：**
-- `src/domain/ports/` - 领域层核心端口（37个）
-- `src/application/ports/` - 应用层服务端口（7个）
+- `src/domain/ports/` - 领域层核心端口（~35个）
+- `src/application/ports/` - 应用层服务端口（8个）
 
 **所有开发必须满足以下约束：**
 
