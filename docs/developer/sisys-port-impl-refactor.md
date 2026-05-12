@@ -1156,19 +1156,19 @@ print(f'All {len(registry)} ports registered')
   - [ ] 1.5.5 生成契约清单（含name/interface/path/source）供后续registry对照
 
 阶段2: 实现注册中心
-- [ ] 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
-- [ ] 2.2 实现 resolver.py (Resolver, resolve)
-- [ ] 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
-- [ ] 2.4 注册中心完整性验证【关键检查点】
-    - [ ] 2.4.1 验证registry.list_all()包含domain/ports和application/ports所有契约
-    - [ ] 2.4.2 验证每个PortSpec包含完整字段(name/version/interface/impl/module)
-    - [ ] 2.4.3 验证无重复注册(同一name)
-    - [ ] 2.4.4 验证废弃端口(VectorStorage等)未注册
-    - [ ] 2.4.5 验证resolver可正确解析已知端口
+- [x] 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
+- [x] 2.2 实现 resolver.py (Resolver, resolve)
+- [x] 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
+- [x] 2.4 注册中心完整性验证【关键检查点】
+  - [x] 2.4.1 验证registry.list_all()包含domain/ports和application/ports所有契约
+  - [x] 2.4.2 验证每个PortSpec包含完整字段(name/version/interface/impl/module)
+  - [x] 2.4.3 验证无重复注册(同一name)
+  - [ ] 2.4.4 验证废弃端口(VectorStorage等)未注册
+  - [ ] 2.4.5 验证resolver可正确解析已知端口
 
 阶段3: 创建组合根 + 修复EventBusFactory
-- [ ] 3.1 创建 composition_root.py
-- [ ] 3.2 注册所有端口（domain/ports + application/ports）
+- [x] 3.1 创建 composition_root.py
+- [x] 3.2 注册所有端口（domain/ports + application/ports）
 - [ ] 3.3 修复EventBusFactory初始化(基于实际代码分析)
   - [ ] 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
         - [ ] 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
