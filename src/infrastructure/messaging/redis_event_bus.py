@@ -35,11 +35,12 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         self._subscriber = subscriber
         self._router = router
 
-    async def publish(self, event: DomainEvent) -> PublishResult:
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
         """发布事件到 Redis 通道。
 
         Args:
             event: 领域事件
+            channel: 事件发布通道（可选）
 
         Returns:
             PublishResult: 发布结果
