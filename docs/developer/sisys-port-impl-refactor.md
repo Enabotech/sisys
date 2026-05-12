@@ -1194,10 +1194,10 @@ print(f'All {len(registry)} ports registered')
     - [x] 验证: grep -r "from src.application" src/infrastructure/ | grep -v "ports" 应返回空
 - [x] 4.3 修复L3VectorPort缺少CollectionManager问题
   - [x] 4.3.1 L3VectorPort补充create_collection/delete_collection/collection_exists/list_collections方法
-  - [ ] 4.3.2 废弃VectorStorage
+  - [x] 4.3.2 废弃VectorStorage【已删除文件】
 - [x] 4.4 修复L5GraphPort缺少get_neighbors问题
   - [x] 4.4.1 L5GraphPort补充get_neighbors方法
-  - [ ] 4.4.2 废弃GraphManager和GraphStorage
+  - [x] 4.4.2 废弃GraphManager和GraphStorage【已删除文件】
 - [x] 4.5 修复L4ObjectPort缺少list_objects问题(如需要)
   - [x] L4ObjectPort补充list_objects方法
 - [x] 4.6 修复P0-6: AutoRouteHandler事件发布缺失
