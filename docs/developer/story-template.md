@@ -47,7 +47,7 @@
 
 #### 领域事件 Schema (Domain Events)
 - [ ] 事件定义位于 `src/domain/events/`
-- [ ] Pydantic 模型验证通过
+- [ ] 使用标准库实现领域事件校验（如 dataclass / Enum / 自定义验证），禁止在领域层依赖 Pydantic
 - [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `UserCreated`）
 
 #### API 契约 (API Contract)
@@ -59,6 +59,37 @@
 - [ ] 模型定义位于 `src/domain/entities/` 或对应层
 - [ ] [描述数据模型要求]
 - [ ] ...
+
+#### 六边形架构约束（必须遵守）
+> **执行顺序：** 所有实现 Task 仅可依赖下述层间方向。领域层不得引入任何第三方依赖。
+
+**四层架构定义**
+| 层次 | 目录 | 职责 |
+|------|------|------|
+| domain | `src/domain/` | 核心业务逻辑，零外部依赖 |
+| application | `src/application/` | 用例编排 |
+| interfaces | `src/interfaces/` | 适配器 |
+| infrastructure | `src/infrastructure/` | 技术实现 |
+
+**领域层零依赖原则**
+- 领域层（`src/domain/`）仅使用 Python 标准库
+- 禁止导入：包括且不限于 langgraph, prefect, fastapi, pydantic, sqlalchemy, typer, redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
+
+**依赖方向矩阵**
+| 起点 \ 终点         | domain | application | interfaces | infrastructure |
+|--------------------|--------|-------------|------------|----------------|
+| **domain**         | —      | ✗ 禁止      | ✗ 禁止     | ✗ 禁止         |
+| **application**    | ✓ 允许 | —           | ✗ 禁止     | ✗ 禁止         |
+| **interfaces**     | ✓ 允许 | ✓ 允许      | —          | ✗ 禁止         |
+| **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
+
+#### 统一端口注册与接口治理
+- [ ] 端口契约位于 `src/interfaces/ports/`
+- [ ] 接口命名符合单一职责，禁止同义接口重复定义
+- [ ] 端口实现仅可在 Composition Root 统一注册，禁止业务代码直接实例化具体实现
+- [ ] 端口具备唯一名称、版本、owner、兼容策略
+- [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
+- [ ] 端口变更配套契约测试与兼容性检查
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`
@@ -105,7 +136,8 @@
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_x_y_steps.py` | Task 0 |
-| **SDD 架构验证** | [架构约束] | [约束描述] | `test_[architecture].py` | Task [N] |
+| **TDD 契约测试** | 端口契约 / 接口抽象 | 端口注册、版本、兼容性、实现解析 | `test_[port]_contract.py` | Task 0 / Task [N] |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_[component]_[architecture].py` | Task [N] |
 | **集成测试** | [层间协作] | [协作描述] | `test_story_x_y_[integration].py` | Task [N] |
 
 ---
@@ -202,7 +234,7 @@
 
 **关联 AC:** [相关 AC]
 
-> **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准。这是 SDD 规范驱动的基础。
+> **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
 - [ ] Subtask [m.n]: 定义领域事件 Schema（[关键属性]）
 - [ ] Subtask [m.n]: 定义数据模型（[关键属性]）
@@ -310,6 +342,7 @@
 
 - **架构模式:** [如 CQRS、Event Sourcing、Hexagonal 等]
 - **设计约束:** [如领域层零依赖、依赖方向、仓储模式等]
+- **接口治理:** [统一端口注册、Composition Root 装配、契约优先、版本化兼容、禁止跨模块直接依赖实现类]
 - **技术栈:** [如 Python 3.11+、FastAPI 0.104+、SQLAlchemy 2.0+ 等]
 
 ### 关键架构决策
@@ -327,9 +360,52 @@
 ```
 sisys/
 ├── src/
-│   └── [layer]/
-│       ├── [component].py      # 核心实现
-│       └── __init__.py         # 模块导出
+├── __init__.py
+├── application/                # 应用层
+│   ├── __init__.py             # 模块导出
+│   ├── commands/                   # 命令定义
+│   ├── queries/                    # 查询定义
+│   ├── command_handlers/           # 应用层命令处理器
+│   ├── query_handlers/             # 应用层查询处理器
+│   ├── event_handlers/             # 应用层事件处理器
+│   ├── ports/                      # 应用层端口（技术横切关注的抽象）
+│   ├── services/                   # 应用层服务
+│   ├── skills/                     # Skills 操作手册
+│   └── use_cases/                  # 用例定义
+│
+├── domain/                     # 领域层
+│   ├── __init__.py             # 模块导出
+│   ├── entities/                   # 领域模型
+│   ├── events/                     # 领域事件定义
+│   ├── exceptions/                 # 领域层异常
+│   ├── ports/                      # 领域层端口（核心领域关注的抽象）
+│   ├── services/                   # 领域层服务接口
+│   └── value_objects/              # 值对象集合
+├── infrastructure/             # 基础设施层
+│   ├── __init__.py
+│   ├── audit/                      # 审计服务
+│   ├── config/                     # 配置管理
+│   ├── external_services/          # 外部服务适配器
+│   ├── logging/                    # 统一存储抽象层
+│   ├── messaging/                  # 事件总线与消息系统
+│   ├── monitoring/                 # 监控服务
+│   ├── routing/                    # 路由服务
+│   ├── scheduler/                  # 调度服务
+│   ├── security/                   # 安全服务
+│   ├── storage/                    # 统一存储抽象层
+│   ├── utils/                      # 工具集
+│   ├── mcp/                        # MCP 外部生态接口
+│   ├── agent_orch/                 # Agent 编排引擎
+│   └── workflow/                   # 工作流引擎
+├── interfaces                  # 接口层
+│   ├── __init__.py
+│   ├── adapters/
+│   ├── api/
+│   ├── cli/
+│   └── sap/
+├── shared                      # 必要共享模块
+│   └── __init__.py
+│
 ├── tests/
 │   ├── contract/
 │   │   └── test_[xxx]_api_contract.py # 契约测试
@@ -458,7 +534,7 @@ sisys/
 
 ### 适用场景与层类型对应关系
 
-本模板适用于所有 Story 创建。根据六边形架构和 prd.md NFR 测试覆盖计划，Story 按层类型分类，每层有不同的测试要求：
+本模板适用于所有 Story 创建。根据六边形架构约束和 prd.md NFR 测试覆盖计划，Story 按层类型分类，每层有不同的测试要求：
 
 | 层类型 | Story 类型 | Story 编号范围 | 覆盖率要求 | 测试重点 | 示例 |
 |--------|-----------|---------------|-----------|---------|------|
@@ -519,10 +595,11 @@ sisys/
 
 ---
 
-**模板版本/Template Version:** 2.5.0
+**模板版本/Template Version:** 2.6.0
 **创建日期/Created:** 2026-03-04
-**最后更新/Last Updated:** 2026-04-24
+**最后更新/Last Updated:** 2026-05-12
 **更新说明:**
+- v2.6.0: 新增六边形架构约束、统一端口注册与接口治理、端口契约测试、领域层零依赖说明
 - v2.5.0: 新增 BDD 步骤实现文件 `test_story_x_y_steps.py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
