@@ -895,7 +895,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | 修改端口 | 更新版本(semver) → 运行ContractGate兼容性检查 → 更新本清单 |
 | 废弃端口 | 标记deprecated → 更新本清单 → 扫描所有引用 → 迁移后删除 |
 
-### 2.1 契约层端口（实际统计与目标状态）
+### 2.1 契约层端口清单
 
 > **⚠️ 实际统计（Round 1调研结果）**:
 > - `src/domain/ports/*.py` 定义: **35个Python文件，~30个Protocol接口**
@@ -915,75 +915,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
 | 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol，废弃删除EventPublisherProtocol直接引用EventPublisher） |
 
-**P0问题发现（Round 1+2+3+4+5 共44项）：**
-
-| # | 问题 | 影响 | 优先级 |
-|---|------|------|--------|
-| P0-1 | L3VectorPort缺少Collection管理方法 | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
-| P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
-| P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
-| P0-4 | EventPublisherProtocol存在5处重复定义(3处services+2处handlers) | DRY违规，签名与EventPublisher冲突 | **必须修复** |
-| P0-5 | EventPublisherProtocol.publish返回None与EventPublisher.publish返回PublishResult | 签名冲突，无法直接替换 | **必须修复** |
-| P0-6 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
-| P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
-| P0-8 | RedisEventBus.publish()异常处理逻辑不可达 | publisher吞掉异常，redis_success=False永不触发 | **必须修复** |
-| P0-9 | SandboxExecutorProtocol和SnapshotRepositoryProtocol无实现类 | DockerSandboxAdapter实现的是SandboxExecutor非本Protocol | **必须修复** |
-| P0-10 | SemanticRouterProtocol.route()为async但HashRouterProtocol.route()为sync | 接口设计不一致 | **建议修复** |
-| P0-11 | memory_service.py第475行调用publish无await | async def未正确调用，事件实际不会被发布 | **必须修复** |
-| P0-12 | domain层BaseRepository为同步方法，infrastructure层BaseRepository为异步方法 | 同名但签名完全不兼容，违反DIP | **必须修复** |
-| P0-13 | RoleRepository.delete()返回bool但infrastructure BaseRepository.delete()返回None | 三者不一致 | **必须修复** |
-| P0-14 | UserRepositoryPort缺少save/delete/list_all方法 | 无法使用完整CRUD | **必须修复** |
-| P0-15 | PermissionServicePort实现添加了assign_role/revoke_role | 超出接口范围，接口注释明确说明是应用层UseCase | **必须修复** |
-| P0-16 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
-| P0-17 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
-| P0-18 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反六边形架构依赖倒置 | **必须修复** |
-| P0-19 | L4ObjectPort.archive()三处不一致(content参数丢弃/返回bool非str/GOVERNANCE非COMPLIANCE) | WORM合规问题，archive语义不可用 | **必须修复** |
-| P0-20 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
-| P0-21 | AuthServiceImpl.authenticate()存在timing attack防御缺陷 | 用户不存在vs密码错误执行不同操作，时间差异可测量 | **建议修复** |
-| P0-22 | AuthServiceImpl.authenticate()添加了ip_address/user_agent参数 | 违反接口契约，超出接口定义范围 | **必须修复** |
-| P0-23 | RabbitMQEventBus.publish()使用redis_success字段 | 语义错误，应只使用outbox_saved | **必须修复** |
-| P0-24 | AsyncOutboxPoller使用硬编码routing_key | 应咨询ChannelRouter进行正确路由 | **建议修复** |
-| P0-25 | HashRouterProtocol和SemanticRouterProtocol均有实现类 | 之前Round2记录为无实现类是错误的，已纠正 | ✅已确认 |
-| P0-26 | BaseRepository的id参数类型domain层用UUID，infrastructure层用str | 类型不一致 | **必须修复** |
-| P0-27 | UserRepositoryPort不是BaseRepository实现，无法使用标准CRUD | 接口独立定义，缺少基础方法 | **必须修复** |
-| P0-28 | OutboxRepository接口定义同步方法但PostgreSQL实现抛出NotImplementedError | 调用方无法通过接口调用，必须知道内部方法，违反DIP | **必须修复** |
-| P0-29 | RedisEventBus.subscribe()传递event_type而非channel给subscriber | 订阅事件类型与实际channel不匹配，消息无法接收 | **必须修复** |
-| P0-30 | RedisEventSubscriber缺少subscribe_async()方法但被调用 | 调用subscribe_async()将抛出AttributeError | **必须修复** |
-| P0-31 | RedisEventSubscriber传递dict而非DomainEvent到handler | 类型不匹配，所有订阅者收到dict而非DomainEvent | **必须修复** |
-| P0-32 | AsyncOutboxPoller使用_outbox_repo._get_unpublished_entities等内部方法 | 违反依赖倒置，如果注入实现类将无法工作 | **必须修复** |
-| P0-33 | EventRegistry显式导入不完整(RoutingDecided等未注册) | Outbox模式无法处理未导入的事件类型，事件发布失败 | **必须修复** |
-| P0-34 | L2ChangeHistoryRepositoryPort/L2GroupMemberRepositoryPort/L2MetadataRepositoryPort无独立契约测试 | 仅作为mock使用，无法验证port接口契约本身 | **建议修复** |
-| P0-35 | L2RDB ports未在__init__.py导出 | 无法通过from导入，必须知道具体文件路径 | **必须修复** |
-| P0-36 | RefreshTokenRequest未返回refresh_token | 未实现refresh token rotation | **必须修复** |
-| P0-37 | RoleService直接被auth.py应用层用例类耦合 | 违反六边形架构，接口层不应依赖应用层用例类 | **必须修复** |
-| P0-38 | logout端点没有使用get_current_user认证依赖 | 任何持有有效token的人都可以调用logout | **必须修复** |
-| P0-39 | EventSubscriber协议与RedisEventSubscriber实现不匹配 | EventSubscriber要求DomainEvent，RedisEventSubscriber传递dict | **必须修复** |
-| P0-40 | DualChannelEventBus缺少subscribe_async()实现 | EventSubscriber协议要求但未实现 | **必须修复** |
-| P0-41 | UserRepository和PermissionRepository继承具体BaseRepository而非实现Port接口 | 违反六边形架构DIP | **必须修复** |
-| P0-42 | archive_with_retention方法文档描述与实现不符 | 文档提到但代码中不存在此方法 | **必须修复** |
-| P0-43 | 缺少版本历史管理接口(list_object_versions) | 无法查询对象版本历史记录 | **建议修复** |
-| P0-44 | refresh_token replay攻击后audit事件actor为"system" | 无法追溯是哪个用户被攻击 | **建议修复** |
-
-**根因分类统计（Round 5分析）：**
-
-| 类别 | 数量 | 占比 |
-|------|------|------|
-| 接口设计问题 | 15 | 34.1% |
-| 实现缺陷 | 13 | 29.5% |
-| 安全问题 | 4 | 9.1% |
-| 服务内Protocol重复定义 | 5 | 11.4% |
-| 架构层面系统性风险 | 3 | 6.8% |
-| 其他 | 4 | 9.1% |
-| **合计** | **44** | **100%** |
-
-**第一优先级修复（修复后可连锁解决多个问题）：**
-1. P0-6 EventBusFactory初始化为None → 运行时不再崩溃
-2. P0-4/5 EventPublisherProtocol重复+签名冲突 → 统一接口，消除事件发布障碍
-3. P0-38 logout无认证 → 消除安全漏洞
-4. P0-28 OutboxRepository接口同步/实现异步 → Outbox模式可用
-5. P0-12 BaseRepository同步/异步冲突 → 统一仓储基类
-
-**端口状态更新（Round 5）：**
+**端口清单更新：**
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -1467,6 +1399,74 @@ poetry run python -m pylyzer src/domain/ports/
 | R8 | **Round 3审查修正**: 新增Phase 3.5(domain异常定义); 路径格式修正; 迁移风险等级标注; Section 4.5澄清(无实际违规); scripts/check_duplicate_ports.py需创建 |
 | R9 | **Round 4审查修正**: Phase 3.5执行顺序正确(在Phase3后Phase4前),时间估算上调至28-39h,契约测试渐进式建议(先测5个核心) |
 | R10 | **v4.0架构修正**: 不迁移application/ports到domain/ports/contracts/，确认双层端口契约体系 |
+
+### 审查P0问题发现（Round 1+2+3+4+5 共44项）
+
+| # | 问题 | 影响 | 优先级 |
+|---|------|------|--------|
+| P0-1 | L3VectorPort缺少Collection管理方法 | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
+| P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
+| P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
+| P0-4 | EventPublisherProtocol存在5处重复定义(3处services+2处handlers) | DRY违规，签名与EventPublisher冲突 | **必须修复** |
+| P0-5 | EventPublisherProtocol.publish返回None与EventPublisher.publish返回PublishResult | 签名冲突，无法直接替换 | **必须修复** |
+| P0-6 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
+| P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
+| P0-8 | RedisEventBus.publish()异常处理逻辑不可达 | publisher吞掉异常，redis_success=False永不触发 | **必须修复** |
+| P0-9 | SandboxExecutorProtocol和SnapshotRepositoryProtocol无实现类 | DockerSandboxAdapter实现的是SandboxExecutor非本Protocol | **必须修复** |
+| P0-10 | SemanticRouterProtocol.route()为async但HashRouterProtocol.route()为sync | 接口设计不一致 | **建议修复** |
+| P0-11 | memory_service.py第475行调用publish无await | async def未正确调用，事件实际不会被发布 | **必须修复** |
+| P0-12 | domain层BaseRepository为同步方法，infrastructure层BaseRepository为异步方法 | 同名但签名完全不兼容，违反DIP | **必须修复** |
+| P0-13 | RoleRepository.delete()返回bool但infrastructure BaseRepository.delete()返回None | 三者不一致 | **必须修复** |
+| P0-14 | UserRepositoryPort缺少save/delete/list_all方法 | 无法使用完整CRUD | **必须修复** |
+| P0-15 | PermissionServicePort实现添加了assign_role/revoke_role | 超出接口范围，接口注释明确说明是应用层UseCase | **必须修复** |
+| P0-16 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
+| P0-17 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
+| P0-18 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反六边形架构依赖倒置 | **必须修复** |
+| P0-19 | L4ObjectPort.archive()三处不一致(content参数丢弃/返回bool非str/GOVERNANCE非COMPLIANCE) | WORM合规问题，archive语义不可用 | **必须修复** |
+| P0-20 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
+| P0-21 | AuthServiceImpl.authenticate()存在timing attack防御缺陷 | 用户不存在vs密码错误执行不同操作，时间差异可测量 | **建议修复** |
+| P0-22 | AuthServiceImpl.authenticate()添加了ip_address/user_agent参数 | 违反接口契约，超出接口定义范围 | **必须修复** |
+| P0-23 | RabbitMQEventBus.publish()使用redis_success字段 | 语义错误，应只使用outbox_saved | **必须修复** |
+| P0-24 | AsyncOutboxPoller使用硬编码routing_key | 应咨询ChannelRouter进行正确路由 | **建议修复** |
+| P0-25 | HashRouterProtocol和SemanticRouterProtocol均有实现类 | 之前Round2记录为无实现类是错误的，已纠正 | ✅已确认 |
+| P0-26 | BaseRepository的id参数类型domain层用UUID，infrastructure层用str | 类型不一致 | **必须修复** |
+| P0-27 | UserRepositoryPort不是BaseRepository实现，无法使用标准CRUD | 接口独立定义，缺少基础方法 | **必须修复** |
+| P0-28 | OutboxRepository接口定义同步方法但PostgreSQL实现抛出NotImplementedError | 调用方无法通过接口调用，必须知道内部方法，违反DIP | **必须修复** |
+| P0-29 | RedisEventBus.subscribe()传递event_type而非channel给subscriber | 订阅事件类型与实际channel不匹配，消息无法接收 | **必须修复** |
+| P0-30 | RedisEventSubscriber缺少subscribe_async()方法但被调用 | 调用subscribe_async()将抛出AttributeError | **必须修复** |
+| P0-31 | RedisEventSubscriber传递dict而非DomainEvent到handler | 类型不匹配，所有订阅者收到dict而非DomainEvent | **必须修复** |
+| P0-32 | AsyncOutboxPoller使用_outbox_repo._get_unpublished_entities等内部方法 | 违反依赖倒置，如果注入实现类将无法工作 | **必须修复** |
+| P0-33 | EventRegistry显式导入不完整(RoutingDecided等未注册) | Outbox模式无法处理未导入的事件类型，事件发布失败 | **必须修复** |
+| P0-34 | L2ChangeHistoryRepositoryPort/L2GroupMemberRepositoryPort/L2MetadataRepositoryPort无独立契约测试 | 仅作为mock使用，无法验证port接口契约本身 | **建议修复** |
+| P0-35 | L2RDB ports未在__init__.py导出 | 无法通过from导入，必须知道具体文件路径 | **必须修复** |
+| P0-36 | RefreshTokenRequest未返回refresh_token | 未实现refresh token rotation | **必须修复** |
+| P0-37 | RoleService直接被auth.py应用层用例类耦合 | 违反六边形架构，接口层不应依赖应用层用例类 | **必须修复** |
+| P0-38 | logout端点没有使用get_current_user认证依赖 | 任何持有有效token的人都可以调用logout | **必须修复** |
+| P0-39 | EventSubscriber协议与RedisEventSubscriber实现不匹配 | EventSubscriber要求DomainEvent，RedisEventSubscriber传递dict | **必须修复** |
+| P0-40 | DualChannelEventBus缺少subscribe_async()实现 | EventSubscriber协议要求但未实现 | **必须修复** |
+| P0-41 | UserRepository和PermissionRepository继承具体BaseRepository而非实现Port接口 | 违反六边形架构DIP | **必须修复** |
+| P0-42 | archive_with_retention方法文档描述与实现不符 | 文档提到但代码中不存在此方法 | **必须修复** |
+| P0-43 | 缺少版本历史管理接口(list_object_versions) | 无法查询对象版本历史记录 | **建议修复** |
+| P0-44 | refresh_token replay攻击后audit事件actor为"system" | 无法追溯是哪个用户被攻击 | **建议修复** |
+
+**根因分类统计（Round 5分析）：**
+
+| 类别 | 数量 | 占比 |
+|------|------|------|
+| 接口设计问题 | 15 | 34.1% |
+| 实现缺陷 | 13 | 29.5% |
+| 安全问题 | 4 | 9.1% |
+| 服务内Protocol重复定义 | 5 | 11.4% |
+| 架构层面系统性风险 | 3 | 6.8% |
+| 其他 | 4 | 9.1% |
+| **合计** | **44** | **100%** |
+
+**第一优先级修复（修复后可连锁解决多个问题）：**
+1. P0-6 EventBusFactory初始化为None → 运行时不再崩溃
+2. P0-4/5 EventPublisherProtocol重复+签名冲突 → 统一接口，消除事件发布障碍
+3. P0-38 logout无认证 → 消除安全漏洞
+4. P0-28 OutboxRepository接口同步/实现异步 → Outbox模式可用
+5. P0-12 BaseRepository同步/异步冲突 → 统一仓储基类
 
 ---
 
