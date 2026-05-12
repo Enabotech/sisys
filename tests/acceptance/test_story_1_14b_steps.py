@@ -956,13 +956,11 @@ def then_verify_router_protocols(context: dict) -> None:
 @then("领域层定义接口，基础设施层实现")
 def then_verify_layer_architecture(context: dict) -> None:
     """Verify domain defines interfaces, infrastructure implements."""
-    from src.domain.services.auto_route_service import (
-        EventPublisherProtocol,
-        HashRouterProtocol,
-        SemanticRouterProtocol,
-    )
+    from src.domain.ports.event_publisher import EventPublisher
+    from src.domain.ports.hash_router_protocol import HashRouterProtocol
+    from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 
-    assert EventPublisherProtocol is not None
+    assert EventPublisher is not None
     assert HashRouterProtocol is not None
     assert SemanticRouterProtocol is not None
 
