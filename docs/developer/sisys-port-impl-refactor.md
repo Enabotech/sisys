@@ -915,7 +915,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
 | 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol，废弃删除EventPublisherProtocol直接引用EventPublisher） |
 
-**P0问题发现（Round 1+2+3+4 共38项）：**
+**P0问题发现（Round 1+2+3+4+5 共44项）：**
 
 | # | 问题 | 影响 | 优先级 |
 |---|------|------|--------|
@@ -937,7 +937,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | P0-16 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
 | P0-17 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
 | P0-18 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反六边形架构依赖倒置 | **必须修复** |
-| P0-19 | L4ObjectPort.archive()方法签名不一致 | MinIORepository返回bool与接口str不匹配 | **必须修复** |
+| P0-19 | L4ObjectPort.archive()三处不一致(content参数丢弃/返回bool非str/GOVERNANCE非COMPLIANCE) | WORM合规问题，archive语义不可用 | **必须修复** |
 | P0-20 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
 | P0-21 | AuthServiceImpl.authenticate()存在timing attack防御缺陷 | 用户不存在vs密码错误执行不同操作，时间差异可测量 | **建议修复** |
 | P0-22 | AuthServiceImpl.authenticate()添加了ip_address/user_agent参数 | 违反接口契约，超出接口定义范围 | **必须修复** |
@@ -951,25 +951,50 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | P0-30 | RedisEventSubscriber缺少subscribe_async()方法但被调用 | 调用subscribe_async()将抛出AttributeError | **必须修复** |
 | P0-31 | RedisEventSubscriber传递dict而非DomainEvent到handler | 类型不匹配，所有订阅者收到dict而非DomainEvent | **必须修复** |
 | P0-32 | AsyncOutboxPoller使用_outbox_repo._get_unpublished_entities等内部方法 | 违反依赖倒置，如果注入实现类将无法工作 | **必须修复** |
-| P0-33 | EventRegistry显式导入不完整，缺少部分事件类型 | Outbox模式无法处理未导入的事件类型，事件发布失败 | **必须修复** |
+| P0-33 | EventRegistry显式导入不完整(RoutingDecided等未注册) | Outbox模式无法处理未导入的事件类型，事件发布失败 | **必须修复** |
 | P0-34 | L2ChangeHistoryRepositoryPort/L2GroupMemberRepositoryPort/L2MetadataRepositoryPort无独立契约测试 | 仅作为mock使用，无法验证port接口契约本身 | **建议修复** |
 | P0-35 | L2RDB ports未在__init__.py导出 | 无法通过from导入，必须知道具体文件路径 | **必须修复** |
 | P0-36 | RefreshTokenRequest未返回refresh_token | 未实现refresh token rotation | **必须修复** |
 | P0-37 | RoleService直接被auth.py应用层用例类耦合 | 违反六边形架构，接口层不应依赖应用层用例类 | **必须修复** |
 | P0-38 | logout端点没有使用get_current_user认证依赖 | 任何持有有效token的人都可以调用logout | **必须修复** |
+| P0-39 | EventSubscriber协议与RedisEventSubscriber实现不匹配 | EventSubscriber要求DomainEvent，RedisEventSubscriber传递dict | **必须修复** |
+| P0-40 | DualChannelEventBus缺少subscribe_async()实现 | EventSubscriber协议要求但未实现 | **必须修复** |
+| P0-41 | UserRepository和PermissionRepository继承具体BaseRepository而非实现Port接口 | 违反六边形架构DIP | **必须修复** |
+| P0-42 | archive_with_retention方法文档描述与实现不符 | 文档提到但代码中不存在此方法 | **必须修复** |
+| P0-43 | 缺少版本历史管理接口(list_object_versions) | 无法查询对象版本历史记录 | **建议修复** |
+| P0-44 | refresh_token replay攻击后audit事件actor为"system" | 无法追溯是哪个用户被攻击 | **建议修复** |
 
-**端口状态更新（Round 4）：**
+**根因分类统计（Round 5分析）：**
+
+| 类别 | 数量 | 占比 |
+|------|------|------|
+| 接口设计问题 | 15 | 34.1% |
+| 实现缺陷 | 13 | 29.5% |
+| 安全问题 | 4 | 9.1% |
+| 服务内Protocol重复定义 | 5 | 11.4% |
+| 架构层面系统性风险 | 3 | 6.8% |
+| 其他 | 4 | 9.1% |
+| **合计** | **44** | **100%** |
+
+**第一优先级修复（修复后可连锁解决多个问题）：**
+1. P0-6 EventBusFactory初始化为None → 运行时不再崩溃
+2. P0-4/5 EventPublisherProtocol重复+签名冲突 → 统一接口，消除事件发布障碍
+3. P0-38 logout无认证 → 消除安全漏洞
+4. P0-28 OutboxRepository接口同步/实现异步 → Outbox模式可用
+5. P0-12 BaseRepository同步/异步冲突 → 统一仓储基类
+
+**端口状态更新（Round 5）：**
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
 | **Domain层 - 存储分层（L0-L5）** |
 | `L0StoragePort` | domain/ports/l0_storage.py | L0文件系统 | infrastructure | **✅接口完整** |
 | `L1CachePort` | domain/ports/l1_cache.py | L1 Redis缓存 | infrastructure | **✅接口完整(⚠️缺pub/sub)** |
-| `L2MetadataRepositoryPort` | domain/ports/l2_rdb.py | L2元数据 | infrastructure | **⚠️未在__init__.py导出** |
-| `L2ChangeHistoryRepositoryPort` | domain/ports/l2_rdb.py | L2变更历史 | infrastructure | **⚠️未在__init__.py导出** |
-| `L2GroupMemberRepositoryPort` | domain/ports/l2_rdb.py | L2群组成员 | infrastructure | **⚠️未在__init__.py导出** |
+| `L2MetadataRepositoryPort` | domain/ports/l2_rdb.py | L2元数据 | infrastructure | **⚠️未导出+无契约测试** |
+| `L2ChangeHistoryRepositoryPort` | domain/ports/l2_rdb.py | L2变更历史 | infrastructure | **⚠️未导出+无契约测试** |
+| `L2GroupMemberRepositoryPort` | domain/ports/l2_rdb.py | L2群组成员 | infrastructure | **⚠️未导出+无契约测试** |
 | `L3VectorPort` | domain/ports/l3_vector.py | L3向量存储 | infrastructure | **⚠️缺Collection管理方法** |
-| `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **⚠️缺list_objects方法** |
+| `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **⚠️缺list_objects+archive三处不一致** |
 | `L5GraphPort` | domain/ports/l5_graph.py | L5图存储 | infrastructure | **✅已完整** |
 | `UnifiedStoragePort` | domain/ports/unified_storage.py | 统一存储入口 | infrastructure | **待注册** |
 | `SessionStorage` | domain/ports/session_storage.py | 会话状态存储 | infrastructure | **待注册** |
@@ -981,14 +1006,14 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃** |
 | ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃** |
 | **Domain层 - 仓储** |
-| `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **⚠️缺save/delete/list_all** |
+| `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **⚠️缺CRUD+实现继承错误BaseRepository** |
 | `RoleRepositoryPort` | domain/ports/role_repository.py | 角色存储 | infrastructure | **⚠️签名不一致** |
-| `UserRoleRepositoryPort` | domain/ports/user_role_repository.py | 用户-角色关联 | infrastructure | **待注册** |
-| `LoginAttemptRepositoryPort` | domain/ports/login_attempt_repository.py | 登录尝试跟踪 | infrastructure | **待注册** |
+| `UserRoleRepositoryPort` | domain/ports/user_role_repository.py | 用户-角色关联 | infrastructure | **✅实现正确** |
+| `LoginAttemptRepositoryPort` | domain/ports/login_attempt_repository.py | 登录尝试跟踪 | infrastructure | **✅实现正确** |
 | `AuditRepositoryPort` | domain/ports/audit_repository.py | 审计日志存储 | infrastructure | **✅接口完整** |
 | `AuditServicePort` | domain/ports/audit_service.py | 审计服务 | infrastructure | **✅接口完整** |
 | **Domain层 - 认证授权** |
-| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **⚠️实现超出接口参数范围** |
+| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **⚠️实现参数超范围+timing attack缺陷** |
 | `PermissionServicePort` | domain/ports/permission_service.py | 权限检查 | infrastructure | **⚠️实现超出接口范围** |
 | `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **⚠️签名不一致** |
 | `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **✅接口完整** |
@@ -1003,7 +1028,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `PIPLComplianceServicePort` | domain/ports/pipl_compliance_service.py | PIPL合规 | infrastructure | **✅接口完整** |
 | `CrossBorderTransferServicePort` | domain/ports/cross_border_transfer_service.py | 跨境传输 | infrastructure | **⚠️实现超出接口范围** |
 | **Domain层 - 其他** |
-| `OutboxRepository` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **⚠️接口定义同步方法但PostgreSQL实现抛NotImplementedError** |
+| `OutboxRepository` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **⚠️接口同步/实现异步分裂** |
 | `UnitOfWork` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
 | `HealthCheckPort` | domain/ports/health_check.py | 健康检查 | infrastructure | **待注册** |
 | `IntegrityPort` | domain/ports/integrity.py | 完整性检查 | infrastructure | **待注册** |
