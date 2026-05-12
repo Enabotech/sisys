@@ -988,10 +988,10 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
-| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含≥48个Protocol契约 |
+| 阶段1 | P0-19, P0-20, | contracts/目录包含≥48个Protocol契约 |
 | 阶段2 | P0-7, P0-8, P0-9 | registry包含≥48个Protocol |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)，AutoRouteHandler事件发布修复 |
+| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, | 服务内无Protocol定义，无7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)，AutoRouteHandler事件发布修复 |
 | 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥48个Protocol |
 | 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
 
@@ -1169,11 +1169,27 @@ poetry run python -m pylyzer src/domain/ports/
 
 ## 七、参考文献
 
+### 核心架构理论
 1. [Dependency injection - .NET](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/overview)
 2. [Dependency injection guidelines - .NET](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/guidelines)
 3. [Hexagonal Architecture - Alistair Cockburn](https://alistair.cockburn.us/hexagonal-architecture)
 4. [ServiceLoader - Java SE 8](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html)
 5. [Inversion of Control Containers and the Dependency Injection](https://martinfowler.com/articles/injection.html)
+6. [Patterns of Enterprise Application Architecture - Martin Fowler](https://martinfowler.com/books/poea.html)
+7. [Clean Architecture - Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+
+### Python Protocol与类型系统
+8. [typing.Protocol - Python Docs](https://docs.python.org/3/library/typing.html#protocol)
+9. [PEP 544 - Protocols (Python 3.8+)](https://peps.python.org/pep-0544/)
+
+### 版本管理与兼容性
+10. [Semantic Versioning](https://semver.org/)
+
+### 架构验证工具
+11. [Import Linter](https://import-linter.readthedocs.io/)
+
+### 契约测试
+12. [Pact Framework](https://docs.pact.io/)
 
 ---
 
