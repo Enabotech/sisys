@@ -1273,6 +1273,12 @@ print(f'All {len(registry)} ports registered')
 
 ## 六、验收标准
 
+**验收前准备：** 部分验证命令依赖尚未创建的文件，需先执行Phase 1-2创建：
+- `src/domain/ports/registry.py` - 需先创建
+- `src/domain/ports/resolver.py` - 需先创建
+- `scripts/check_duplicate_ports.py` - 需先创建
+- `tests/contracts/` 目录 - 需先创建
+
 ### 6.1 注册验收
 
 | 标准 | 验证方法 |
