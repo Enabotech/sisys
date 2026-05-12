@@ -894,6 +894,562 @@ poetry run mypy src/domain/ports/ --strict
 
 ---
 
-*文档版本: v1.0*
+## 六、接口清单与合并方案
+
+### 6.1 接口清单（Domain层）
+
+| 接口名 | 文件 | 用途 | 实现类 | 状态 |
+|--------|------|------|--------|------|
+| **仓储/存储层** |
+| `BaseRepository[T]` | base.py | 通用仓储抽象（泛型） | PostgreSQLRepository | **待修复** |
+| `UnitOfWork` | unit_of_work.py | 工作单元，事务边界 | PostgreSQLUnitOfWork | OK |
+| `OutboxRepository` | outbox.py | 事务发件箱 | PostgreSQLOutboxRepository, InMemoryOutboxRepository | OK |
+| `UserRepositoryPort` | user_repository.py | 用户数据访问 | PostgreSQLUserRepository | OK |
+| `RoleRepositoryPort` | role_repository.py | 角色数据访问 | RoleRepository | OK |
+| `UserRoleRepositoryPort` | user_role_repository.py | 用户-角色关联 | UserRoleRepository | OK |
+| `LoginAttemptRepositoryPort` | login_attempt_repository.py | 登录尝试跟踪 | LoginAttemptRepository | OK |
+| `AuditRepositoryPort` | audit_repository.py | 审计日志存储 | AuditRepository | OK |
+| **存储分层端口** |
+| `L0StoragePort` | l0_storage.py | L0文件系统存储 | FileMemoryAdapter | OK |
+| `L1CachePort` | l1_cache.py | L1 Redis缓存 | RedisMemoryCache | OK |
+| `L2MetadataRepositoryPort` | l2_rdb.py | L2记忆元数据 | PostgreSQLMemoryMetadataRepository | OK |
+| `L2ChangeHistoryRepositoryPort` | l2_rdb.py | L2变更历史 | PostgreSQLMemoryChangeHistoryRepository | OK |
+| `L2GroupMemberRepositoryPort` | l2_rdb.py | L2群组成员 | PostgreSQLMemoryGroupMemberRepository | OK |
+| `L3VectorPort` | l3_vector.py | L3向量存储 | QdrantVectorAdapter | OK |
+| `L4ObjectPort` | l4_object.py | L4对象存储 | MinIOAdapter | OK |
+| `L5GraphPort` | l5_graph.py | L5图存储 | Neo4jAdapter | OK |
+| `UnifiedStoragePort` | unified_storage.py | 统一存储入口 | UnifiedStorageGateway | OK |
+| `SessionStorage` | session_storage.py | 会话状态存储 | RedisSessionStorage | OK |
+| `IndexManagerPort` | index_manager.py | MEMORY.md索引 | MemoryIndex | OK |
+| `IntegrityPort` | integrity.py | 数据完整性验证 | - | 待实现 |
+| `HealthCheckPort` | health_check.py | 健康检查 | - | 待实现 |
+| **服务/业务层端口** |
+| `AuthServicePort` | auth_service.py | 认证服务 | AuthServiceImpl | OK |
+| `AuditServicePort` | audit_service.py | 审计服务 | AuditServiceImpl | OK |
+| `PermissionServicePort` | permission_service.py | 权限检查 | PermissionServiceImpl | OK |
+| `PasswordValidationServicePort` | password_validation_service.py | 密码验证 | PasswordValidationService | OK |
+| `TokenBlacklistPort` | token_blacklist.py | JWT黑名单 | RedisTokenBlacklist | OK |
+| `EventPublisher` | event_publisher.py | 领域事件发布 | DualChannelEventBus, RabbitMQEventBus, RedisEventBus | OK |
+| `InMemoryEventPublisher` | event_publisher.py | 内存事件发布 | InMemoryEventBus | OK |
+| `SensitiveDataDetectorPort` | sensitive_data_detector.py | 敏感数据检测 | SensitiveDataDetectorImpl | OK |
+| `ComplianceGatewayPort` | compliance_gateway.py | UDMR合规检查 | ComplianceGatewayImpl | OK |
+| `DataResidencyEnforcerPort` | data_residency_enforcer.py | 数据驻留强制 | DataResidencyEnforcerImpl | OK |
+| `WhitelistServicePort` | whitelist_service.py | API白名单 | WhitelistServiceImpl | OK |
+| `PIPLComplianceServicePort` | pipl_compliance_service.py | PIPL合规服务 | PIPLComplianceServiceImpl | OK |
+| `CrossBorderTransferServicePort` | cross_border_transfer_service.py | 跨境传输 | CrossBorderTransferServiceImpl | OK |
+
+### 6.2 接口清单（Application层）
+
+| 接口名 | 文件 | 用途 | 实现类 | 状态 |
+|--------|------|------|--------|------|
+| `MetricsPort` | metrics_port.py | 指标收集 | MetricsPortImpl | **待迁移** |
+| `ExceptionMetricsPort` | exception_metrics_port.py | 异常跟踪 | ExceptionMetricsImpl | **待迁移** |
+| `EventSubscriber` | event_subscriber.py | 事件订阅 | - | **待迁移** |
+| `SandboxExecutor` | sandbox_port.py | 沙箱执行 | DockerSandboxAdapter | **待迁移** |
+| `TextExtractorService` | text_extractor_service.py | 文本提取 | L1TextExtractor | OK |
+| `CompressorService` | compressor_service.py | 文本压缩 | L1Compressor | OK |
+
+### 6.3 接口合并方案
+
+#### M1: 合并VectorStorage与L3VectorPort
+
+**问题**: L3层存在`VectorStorage`(vector_storage.py)和`L3VectorPort`(l3_vector.py)两个语义相同的接口
+
+| 接口 | 方法 | 关系 |
+|------|------|------|
+| `VectorStorage` | `upsert_points`, `search`, `search_sparse`, `delete_points`, `get_point` | 职责视角 |
+| `L3VectorPort` | `upsert_points`, `search`, `search_sparse`, `delete_points`, `get_point` | 分层视角 |
+
+**合并方案**:
+```python
+# src/domain/ports/l3_vector.py
+# 保留L3VectorPort作为统一接口，VectorStorage作为别名
+
+class L3VectorPort(Protocol):
+    """L3向量存储端口 - 统一接口"""
+
+    async def upsert_points(self, collection: str, points: list[dict]) -> None: ...
+    async def search(self, collection: str, query_vector: list[float], limit: int, filter_payload: dict | None = None) -> list[dict]: ...
+    async def search_sparse(self, collection: str, sparse_vector: dict, limit: int, filter_payload: dict | None = None) -> list[dict]: ...
+    async def delete_points(self, collection: str, point_ids: list[str]) -> None: ...
+    async def get_point(self, collection: str, point_id: str) -> dict | None: ...
+
+# src/domain/ports/vector_storage.py
+# 简化为类型别名
+from src.domain.ports.l3_vector import L3VectorPort
+
+# VectorStorage 已废弃，使用 L3VectorPort 代替
+VectorStorage = L3VectorPort  # type: ignore[misc]
+```
+
+#### M2: 合并ObjectStorageRepository与L4ObjectPort
+
+**问题**: L4层存在`ObjectStorageRepository`(storage.py)和`L4ObjectPort`(l4_object.py)功能重叠
+
+**合并方案**:
+```python
+# src/domain/ports/l4_object.py
+# 保留L4ObjectPort作为统一接口
+
+class L4ObjectPort(Protocol):
+    """L4对象存储端口 - 统一接口"""
+
+    async def store(self, bucket_type: str, object_key: str, file_path: str | None = None, content: bytes | None = None, content_type: str = "application/octet-stream", tags: dict | None = None) -> str: ...
+    async def retrieve(self, bucket_type: str, object_key: str, version_id: str | None = None) -> AsyncIterator[bytes]: ...
+    async def delete(self, bucket_type: str, object_key: str, version_id: str | None = None) -> bool: ...
+    async def get_metadata(self, bucket_type: str, object_key: str, version_id: str | None = None) -> dict: ...
+    async def archive(self, bucket_type: str, object_key: str, content: bytes | None = None, retention_days: int = 30) -> str: ...
+    async def list_objects(self, bucket_type: str, prefix: str = "") -> list[str]: ...  # 从ObjectStorageRepository迁移
+
+# src/domain/ports/storage.py
+# ObjectStorageRepository 已废弃
+```
+
+#### M3: 合并GraphManager/GraphStorage与L5GraphPort
+
+**问题**: L5层存在`GraphManager`(低级节点管理)和`GraphStorage`(低级Cypher)与`L5GraphPort`(高级语义)职责边界模糊
+
+**合并方案**:
+```python
+# src/domain/ports/l5_graph.py
+# 统一为L5GraphPort，GraphManager和GraphStorage作为内部实现细节
+
+class L5GraphPort(Protocol):
+    """L5图存储端口 - 统一接口
+
+    高级语义接口，内部委托给Neo4jAdapter。
+    低级Cypher操作通过execute_query/execute_write_query暴露。
+    """
+
+    # 高级语义操作
+    async def create_entity(self, memory_id: str, entity_type: str, properties: dict) -> dict: ...
+    async def get_entity(self, memory_id: str) -> dict | None: ...
+    async def delete_entity(self, memory_id: str) -> bool: ...
+    async def create_relationship(self, source_id: str, target_id: str, relationship_type: str, properties: dict | None = None) -> dict: ...
+    async def delete_relationship(self, source_id: str, target_id: str, relationship_type: str) -> bool: ...
+    async def find_related(self, memory_id: str, max_depth: int = 3, relationship_type: str | None = None) -> list[dict]: ...
+
+    # 低级Cypher操作（保留用于高级场景）
+    async def execute_query(self, cypher: str, params: dict | None = None) -> list[dict]: ...
+    async def execute_write_query(self, cypher: str, params: dict | None = None) -> list[dict]: ...
+```
+
+---
+
+## 七、模块依赖约束
+
+### 7.1 允许的依赖关系
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Infrastructure 层                         │
+│  (实现 Domain/Application 层定义的端口，依赖外部服务)          │
+└─────────────────────────────────────────────────────────────┘
+                              ▲ 实现
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                    Domain 层                                 │
+│  (定义端口接口，零外部依赖，纯业务逻辑)                         │
+└─────────────────────────────────────────────────────────────┘
+                              ▲ 依赖
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                   Application 层                             │
+│  (编排领域服务，实现应用用例，依赖Domain层端口)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 各模块允许的依赖
+
+| 模块 | 允许依赖 | 禁止依赖 |
+|------|---------|---------|
+| **domain/ports/** | Python标准库, typing | application/, infrastructure/, 外部服务 |
+| **domain/services/** | domain/ports/, domain/events/, domain/entities/ | application/, infrastructure/, 外部服务 |
+| **domain/events/** | domain/base/, Python标准库 | application/, infrastructure/ |
+| **application/ports/** | domain/ports/, Python标准库 | infrastructure/, 外部服务 |
+| **application/services/** | domain/ports/, application/ports/, domain/services/ | infrastructure/直接导入 |
+| **application/event_handlers/** | domain/ports/, domain/events/, domain/services/ | infrastructure/直接导入 |
+| **infrastructure/** | domain/ports/, application/ports/, 外部服务SDK | domain/services/直接导入（通过端口间接） |
+
+### 7.3 具体约束规则
+
+**规则1: 禁止跨层继承**
+```python
+# 禁止：Infrastructure层类继承Domain层具体类
+class PostgreSQLRepository(BaseRepository):  # BaseRepository是Domain端口
+    pass  # 这是允许的（实现端口）
+
+# 禁止：Infrastructure层类继承Application层具体类
+class MyService(MetricsPort):  # 禁止 - Application层端口应由Application层实现
+    pass
+```
+
+**规则2: 禁止Infrastructure直接导入Application Use Cases**
+```python
+# 禁止
+from src.application.use_cases.role_management import RoleNotFoundError
+
+# 允许：Infrastructure抛出Domain异常
+from src.domain.exceptions import DomainException
+```
+
+**规则3: 禁止Domain层导入Infrastructure**
+```python
+# 禁止
+from src.infrastructure.storage.redis import RedisClient
+
+# 允许：通过端口注入实现
+class MyService:
+    def __init__(self, cache: L1CachePort):  # 端口由外部注入
+        self._cache = cache
+```
+
+---
+
+## 八、跨模块继承修复方案
+
+### 8.1 问题识别
+
+**问题**: SQLAlchemy模型继承infrastructure层的Base类，导致Domain层绑定具体技术实现
+
+```python
+# src/infrastructure/storage/postgresql/models/base.py
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
+
+# src/infrastructure/storage/postgresql/models/user.py
+class UserModel(Base):  # 继承infrastructure的Base
+    pass
+```
+
+### 8.2 修复方案：适配器模式
+
+**将Domain实体与SQLAlchemy模型解耦**:
+
+```python
+# src/domain/entities/user.py
+"""Domain实体 - 不绑定任何基础设施"""
+
+from dataclasses import dataclass
+from uuid import UUID
+from datetime import datetime
+
+@dataclass
+class User:
+    id: UUID
+    username: str
+    email: str
+    created_at: datetime
+    is_active: bool
+```
+
+```python
+# src/infrastructure/storage/postgresql/models/user.py
+"""Infrastructure模型 - 继承SQLAlchemy Base"""
+
+from sqlalchemy import String, Boolean, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import UUID
+
+from .base import Base
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # 不再继承domain实体
+```
+
+```python
+# src/infrastructure/storage/postgresql/mappers/user_mapper.py
+"""Domain实体与Infrastructure模型映射"""
+
+from uuid import UUID
+from src.domain.entities.user import User
+from src.infrastructure.storage.postgresql.models.user import UserModel
+
+class UserMapper:
+    @staticmethod
+    def to_domain(model: UserModel) -> User:
+        return User(
+            id=model.id,
+            username=model.username,
+            email=model.email,
+            created_at=model.created_at,
+            is_active=model.is_active,
+        )
+
+    @staticmethod
+    def to_model(entity: User) -> UserModel:
+        return UserModel(
+            id=entity.id,
+            username=entity.username,
+            email=entity.email,
+            created_at=entity.created_at,
+            is_active=entity.is_active,
+        )
+```
+
+**依赖方向修正**:
+```
+Domain (User) ← 无依赖
+    ↑
+    │
+Infrastructure (UserModel + UserMapper) → 继承Base，使用Mapper转换
+```
+
+---
+
+## 九、公共接口契约测试
+
+### 9.1 契约测试框架
+
+**使用 `pytest-playwright` 或 `behave` 进行接口契约测试**
+
+### 9.2 端口契约测试模板
+
+```python
+# tests/contracts/domain/ports/test_l1_cache_port.py
+"""L1CachePort契约测试"""
+
+import pytest
+from typing import Protocol
+from src.domain.ports.l1_cache import L1CachePort
+
+class L1CachePortContract:
+    """L1CachePort契约测试套件
+
+    所有实现L1CachePort的类必须通过此测试套件。
+    """
+
+    @pytest.fixture
+    def port(self) -> L1CachePort:
+        """由子类实现，返回被测端口实例"""
+        raise NotImplementedError
+
+    async def test_get_returns_none_for_missing_key(self, port: L1CachePort):
+        """未存在的key应返回None"""
+        result = await port.get("nonexistent_type", "user123", "nonexistent")
+        assert result is None
+
+    async def test_set_and_get_returns_value(self, port: L1CachePort):
+        """设置后应能获取相同值"""
+        await port.set("memory", "user123", "test_key", "test_value", ttl=3600)
+        result = await port.get("memory", "user123", "test_key")
+        assert result == "test_value"
+
+    async def test_delete_removes_value(self, port: L1CachePort):
+        """删除后应返回None"""
+        await port.set("memory", "user123", "test_key", "test_value")
+        await port.delete("memory", "user123", "test_key")
+        result = await port.get("memory", "user123", "test_key")
+        assert result is None
+
+    async def test_invalidate_pattern_removes_matching(self, port: L1CachePort):
+        """模式失效应删除所有匹配项"""
+        await port.set("memory", "user123", "key1", "value1")
+        await port.set("memory", "user123", "key2", "value2")
+        await port.set("memory", "user123", "key3", "value3")
+        count = await port.invalidate_pattern("memory", "user123")
+        assert count == 3
+        assert await port.get("memory", "user123", "key1") is None
+
+
+class TestRedisMemoryCacheContract(L1CachePortContract):
+    """RedisMemoryCache契约测试"""
+
+    @pytest.fixture
+    def port(self) -> L1CachePort:
+        from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
+        return RedisMemoryCache()
+```
+
+### 9.3 关键端口契约测试清单
+
+| 端口 | 测试文件 | 测试项 |
+|------|---------|--------|
+| `L1CachePort` | test_l1_cache_port.py | get/set/delete/invalidate_pattern |
+| `L3VectorPort` | test_l3_vector_port.py | upsert_points/search/delete_points/get_point |
+| `EventPublisher` | test_event_publisher.py | publish返回PublishResult |
+| `OutboxRepository` | test_outbox_repository.py | save/get_unpublished/mark_published |
+| `UnifiedStoragePort` | test_unified_storage_port.py | save/read/delete/exists |
+
+### 9.4 契约测试执行
+
+```bash
+# 运行所有契约测试
+poetry run pytest tests/contracts/ -v
+
+# 运行特定端口契约测试
+poetry run pytest tests/contracts/domain/ports/test_l1_cache_port.py -v
+
+# 生成契约测试报告
+poetry run pytest tests/contracts/ --cov=src --cov-report=html
+```
+
+---
+
+## 十、架构检查规则
+
+### 10.1 检查工具配置
+
+```yaml
+# pyproject.toml 或 .archy.toml
+[tool.archi]
+rules:
+  - id: no-service-protocol
+    description: "服务文件内部禁止定义Protocol"
+    pattern: "src/domain/services/*.py"
+    check: "class.*Protocol"
+    severity: error
+
+  - id: no-infra-depends-on-app
+    description: "Infrastructure层禁止依赖Application层"
+    pattern: "src/infrastructure/**/*.py"
+    forbidden_imports:
+      - "src.application.ports"
+      - "src.application.use_cases"
+    severity: error
+
+  - id: no-domain-depends-on-infra
+    description: "Domain层禁止依赖Infrastructure层"
+    pattern: "src/domain/**/*.py"
+    forbidden_imports:
+      - "src.infrastructure"
+    severity: error
+
+  - id: port-must-be-exported
+    description: "所有端口必须在__init__.py中导出"
+    pattern: "src/domain/ports/*.py"
+    check: "class.*Port"
+    severity: warning
+```
+
+### 10.2 pre-commit检查
+
+```yaml
+# .git/hooks/pre-commit
+#!/bin/bash
+echo "Running architecture checks..."
+
+# 检查1: 服务文件无Protocol定义
+if grep -r "class.*Protocol" src/domain/services/ src/application/event_handlers/ 2>/dev/null | grep -v "from src.domain.ports"; then
+    echo "ERROR: Service files contain local Protocol definitions"
+    exit 1
+fi
+
+# 检查2: Infrastructure不依赖Application
+if grep -r "from src.application" src/infrastructure/ 2>/dev/null; then
+    echo "ERROR: Infrastructure depends on Application layer"
+    exit 1
+fi
+
+# 检查3: Domain不依赖Infrastructure
+if grep -r "from src.infrastructure" src/domain/ 2>/dev/null; then
+    echo "ERROR: Domain depends on Infrastructure layer"
+    exit 1
+fi
+
+echo "Architecture checks passed"
+```
+
+### 10.3 CI/CD架构检查
+
+```yaml
+# .github/workflows/architecture.yml
+name: Architecture Check
+
+on: [push, pull_request]
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run architecture checks
+        run: |
+          # 服务文件无Protocol定义
+          ! grep -r "class.*Protocol" src/domain/services/ src/application/event_handlers/ | grep -v "from src.domain.ports"
+
+          # Infrastructure不依赖Application
+          ! grep -r "from src.application" src/infrastructure/
+
+          # Domain不依赖Infrastructure
+          ! grep -r "from src.infrastructure" src/domain/
+```
+
+### 10.4 阻止新混乱的机制
+
+| 机制 | 触发条件 | 行为 |
+|------|---------|------|
+| pre-commit hook | git commit | 检查违规则拒绝提交 |
+| CI/CD check | PR/push | 运行架构检查，失败则阻止合并 |
+| IDE警告 | 保存.py文件 | 实时检查依赖方向 |
+| mypy严格模式 | 类型检查 | 检查导入依赖 |
+
+---
+
+## 十一、重构执行顺序（更新）
+
+```
+阶段1: 基础设施准备
+├── 1.1 创建routing.py和sandbox.py
+├── 1.2 创建domain层端口（迁移Application端口）
+└── 1.3 创建application/ports/__init__.py
+
+阶段2: 服务文件迁移
+├── 2.1 更新auto_route_service.py
+├── 2.2 更新auto_trigger_service.py
+├── 2.3 更新auto_execute_service.py
+├── 2.4 更新auto_route_handler.py
+└── 2.5 更新auto_execute_completed_handler.py
+
+阶段3: 导出补全
+└── 3.1 重写__init__.py（49个符号）
+
+阶段4: EventBusFactory修复
+└── 4.1 重构EventBusFactory（延迟初始化）
+
+阶段5: 接口合并
+├── 5.1 合并VectorStorage与L3VectorPort
+├── 5.2 合并ObjectStorageRepository与L4ObjectPort
+└── 5.3 统一GraphManager/GraphStorage与L5GraphPort
+
+阶段6: 跨模块继承修复
+├── 6.1 创建Domain实体映射器
+├── 6.2 重构BaseRepository泛型约束
+└── 6.3 替换SQLAlchemy模型继承
+
+阶段7: 契约测试
+└── 7.1 为关键端口编写契约测试
+
+阶段8: 架构检查
+├── 8.1 配置pre-commit hooks
+└── 8.2 配置CI/CD架构检查
+```
+
+---
+
+*文档版本: v1.1*
+*更新内容:*
+*- 第六章: 接口清单与合并方案*
+*- 第七章: 模块依赖约束*
+*- 第八章: 跨模块继承修复方案（适配器模式）*
+*- 第九章: 公共接口契约测试*
+*- 第十章: 架构检查规则*
+*- 第十一章: 更新执行顺序*
+
 *执行状态: 待执行*
-*前置条件: 已完成代码调研，参考sisys-port-impl-report.md*
