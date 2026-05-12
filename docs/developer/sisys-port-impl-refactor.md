@@ -18,9 +18,9 @@
 
 | 端口来源 | 目录 | 数量 | 说明 |
 |----------|------|------|------|
-| Domain层 | `src/domain/ports/` | 37 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
-| Application层 | `src/application/ports/` | 7 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
-| 服务内Protocol | `src/domain/services/` | 6 | 待迁移到 domain/ports/ |
+| Domain层 | `src/domain/ports/` | ~35 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
+| Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
+| 服务内Protocol | `src/domain/services/` | 5 | 待迁移到 domain/ports/（不含重复EventPublisherProtocol，废弃删除后为4个唯一） |
 
 **两者职责分离**：
 - **domain/ports**: 领域核心业务接口，定义业务能力边界
@@ -38,11 +38,11 @@
 
 | 问题类别 | 发现 | 影响 |
 |----------|------|------|
-| **服务内Protocol定义** | 5个服务文件本地定义了6个Protocol（含1个重复定义的EventPublisherProtocol） | 违反六边形架构，接口重复 |
+| **服务内Protocol定义** | 3个服务文件本地定义了6个Protocol（含1个重复定义的EventPublisherProtocol，共5个唯一Protocol） | 违反六边形架构，接口重复 |
 | **导出完整性** | `domain/ports/__init__.py` 仅导出16个(33.3%)，缺失24个Protocol | 基础设施层无法正确导入 |
 | **EventBusFactory** | 3个组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)初始化为None | 运行时触发AttributeError |
 | **接口冗余** | L3: VectorStorage↔L3VectorPort(缺CollectionManager); L5: GraphManager/GraphStorage↔L5GraphPort(缺get_neighbors); L4: ObjectStorageRepository↔L4ObjectPort | 架构模糊，实现混淆 |
-| **Infrastructure依赖Application** | 7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1) | 违反依赖倒置原则 |
+| **Infrastructure依赖Application** | 6处违规导入(MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1 + role_repository.py的Exception×2) | 违反依赖倒置原则 |
 | **跨模块继承** | SQLAlchemy模型继承infrastructure的Base | Domain层绑定具体技术 |
 | **无统一注册机制** | 端口分散定义，无中心化管理 | 可插拔系统难以维护 |
 
@@ -971,7 +971,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **⚠️无实现类** |
 | `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **✅已有实现(HashRouter)** |
 | `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **✅已有实现(SemanticRouter)** |
-| ~~`EventPublisherProtocol`~~ | 5处重复定义 | 事件发布 | — | **废弃-签名冲突需解决** |
+| ~~`EventPublisherProtocol`~~ | 4处重复定义(2services+2handlers) | 事件发布 | — | **废弃-签名冲突需解决** |
 | **Application层 - 服务端口（保留，不迁移）** |
 | `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
 | `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
@@ -1118,18 +1118,20 @@ print(f'All {len(registry)} ports registered')
 | 阶段1 | P0-19, P0-20 | domain/ports/ + application/ports/ 契约完整，无服务内Protocol |
 | 阶段2 | P0-7, P0-8, P0-9 | registry包含所有端口(domain+application) |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~5, P0-6, P0-18, P0-24 | 服务内无Protocol定义，Exception违规导入修复，AutoRouteHandler事件发布修复 |
-| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖所有端口 |
-| 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
+| 阶段3.5 | P0-37 | Domain异常定义创建，Exception违规导入修复 |
+| 阶段4 | P0-1~6, P0-18, P0-24 | 服务内无Protocol定义，VectorStorage/GraphManager/GraphStorage废弃 |
+| 阶段5 | P0-13~P0-17, P0-28~P0-35 | 契约测试+接口签名修复+导出修复 |
+| 阶段6 | P0-21~P0-23, P0-36~P0-38 | 实现类声明+安全修复+认证修复 |
+| 阶段7 | P0-39~P0-44 | 剩余问题修复（EventSubscriber实现+DualChannel+架构修复） |
 
 ### 5.2 详细执行步骤
 
 ```
 阶段1: 契约层结构整理
-- [ ] 1.1 整理 domain/ports/ 契约清单（37个）
+- [ ] 1.1 整理 domain/ports/ 契约清单（~35个Python文件）
   - [ ] 验证所有契约可被正确import
   - [ ] 验证契约定义无重复
-- [ ] 1.2 整理 application/ports/ 契约清单（7个）
+- [ ] 1.2 整理 application/ports/ 契约清单（8个）
   - [ ] 验证所有契约可被正确import
   - [ ] 确认不需要迁移到domain层
 - [ ] 1.3 迁移服务内Protocol到 domain/ports/
@@ -1236,36 +1238,19 @@ print(f'All {len(registry)} ports registered')
   - [ ] 检查废弃端口是否仍被使用
   - [ ] 清理未注册实现
 ```
-  - [ ] 提供 contract test
-    - [ ] 指定 owner
-- [ ] 7.3 CI 强制检查
-  - [ ] 禁止 service 内定义 Protocol
-  - [ ] 禁止 infrastructure → application
-  - [ ] 禁止未注册端口被 resolve
-  - [ ] 禁止直接实例化实现类
-    - [ ] 禁止重复端口
-- [ ] 7.4 Story模板强制要求
-  - [ ] Task 0 必须定义/引用端口
-  - [ ] 未定义端口 → 不允许开发
-    - [ ] 未通过契约测试 → 不允许合并
-- [ ] 7.5 定期治理（每周）
-    - [ ] 扫描重复接口
-    - [ ] 检查废弃端口是否仍被使用
-    - [ ] 清理未注册实现
-```
 
 ### 5.3 时间估算
 
 | Phase | 建议时间 | 理由 |
 |-------|----------|------|
-| Phase 1 | 6-8小时 | 48个Protocol契约定义,8个从application迁移 |
+| Phase 1 | 6-8小时 | ~43个Protocol契约整理,服务内Protocol迁移 |
 | Phase 1.5 | 1-2小时 | 契约层完整性验证（门禁检查） |
 | Phase 2 | 3-4小时 | 核心基础设施（registry/resolver/contract_gate） |
 | Phase 2.5 | 1-2小时 | 注册中心完整性验证（门禁检查） |
 | Phase 3 | 2-3小时 | 组合根+EventBusFactory修复 |
 | Phase 3.5 | 2小时 | Domain异常类创建 |
-| Phase 4 | 8-10小时 | 迁移服务代码+修复7处违规导入 |
-| Phase 5 | 4-6小时 | 48个Protocol的契约测试（建议渐进式，先测5个核心） |
+| Phase 4 | 10-15小时 | 迁移服务代码+修复VectorStorage/GraphManager/GraphStorage废弃+6处违规导入修复 |
+| Phase 5 | 10-15小时 | ~43个Protocol的契约测试（建议渐进式，先测5个核心） |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
 | Phase 7 | 每周60-90分钟 | 持续治理（扫描+审查+修复） |
 | **总计** | **28-39小时 + 持续治理** | 初始重构+长期维护 |
@@ -1407,7 +1392,7 @@ poetry run python -m pylyzer src/domain/ports/
 | P0-1 | L3VectorPort缺少Collection管理方法 | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
 | P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
 | P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
-| P0-4 | EventPublisherProtocol存在5处重复定义(3处services+2处handlers) | DRY违规，签名与EventPublisher冲突 | **必须修复** |
+| P0-4 | EventPublisherProtocol存在4处重复定义(2处services+2处handlers) | DRY违规，签名与EventPublisher冲突 | **必须修复** |
 | P0-5 | EventPublisherProtocol.publish返回None与EventPublisher.publish返回PublishResult | 签名冲突，无法直接替换 | **必须修复** |
 | P0-6 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
 | P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
@@ -1470,7 +1455,7 @@ poetry run python -m pylyzer src/domain/ports/
 
 ---
 
-*文档版本: v3.5*
+*文档版本: v4.0*
 *核心更新: 统一端口注册管理机制（4层架构）*
 *- Layer 1: Port Contract (契约层) - 定义在 domain/ports/ 和 application/ports/
 *- Layer 2: Registry (注册层) - 统一登记元数据
