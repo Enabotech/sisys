@@ -78,15 +78,13 @@ class TestRouteHexagonalArchitecture:
 
     def test_auto_route_service_uses_protocols(self) -> None:
         """AutoRouteService should use Protocol definitions for dependency inversion."""
-        from src.domain.services.auto_route_service import (
-            AutoRouteService,
-            EventPublisherProtocol,
-            HashRouterProtocol,
-            SemanticRouterProtocol,
-        )
+        from src.domain.ports.event_publisher import EventPublisher
+        from src.domain.ports.hash_router_protocol import HashRouterProtocol
+        from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
+        from src.domain.services.auto_route_service import AutoRouteService
 
         # Verify protocols exist
-        assert EventPublisherProtocol is not None
+        assert EventPublisher is not None
         assert HashRouterProtocol is not None
         assert SemanticRouterProtocol is not None
 

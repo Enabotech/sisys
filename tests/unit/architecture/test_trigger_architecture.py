@@ -77,13 +77,14 @@ class TestHexagonalArchitectureCompliance:
         )
 
     def test_trigger_service_uses_protocol_for_publisher(self) -> None:
-        """Verify AutoTriggerService depends on EventPublisherProtocol, not concrete implementation."""
+        """Verify AutoTriggerService depends on EventPublisher Protocol, not concrete implementation."""
         trigger_service_path = Path("src/domain/services/auto_trigger_service.py")
         content = trigger_service_path.read_text()
 
-        # AutoTriggerService should define/use a Protocol for event publishing
-        assert "Protocol" in content, "AutoTriggerService should use Protocol for dependency inversion"
-        assert "EventPublisherProtocol" in content, "AutoTriggerService should define EventPublisherProtocol"
+        # AutoTriggerService should use EventPublisher (which is a Protocol) for event publishing
+        assert "EventPublisher" in content, "AutoTriggerService should use EventPublisher for dependency inversion"
+        # Verify it imports from domain.ports.event_publisher
+        assert "from src.domain.ports.event_publisher import EventPublisher" in content
 
     def test_heartbeat_scheduler_is_infrastructure_layer(self) -> None:
         """Verify HeartbeatScheduler is in infrastructure layer."""
