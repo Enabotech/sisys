@@ -898,39 +898,53 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 ### 2.1 契约层端口（实际统计与目标状态）
 
 > **⚠️ 实际统计（Round 1调研结果）**:
-> - `src/domain/ports/*.py` 定义: **37个**
-> - `src/domain/services/*.py` 定义: **6个**（服务内Protocol，待迁移到domain/ports/）
-> - `src/application/ports/*.py` 定义: **7个**（保留，不迁移）
-> - **合计**: 37 + 6 + 7 = **50个**（含冗余）
+> - `src/domain/ports/*.py` 定义: **35个Python文件，~30个Protocol接口**
+> - `src/domain/services/*.py` 定义: **5个Protocol**（6个含1个重复EventPublisherProtocol）
+> - `src/application/ports/*.py` 定义: **8个Protocol**（不是7个）
+> - **合计**: ~43个（不含冗余）
 >
-> **目标状态**: 清理后约 **43个**（37 domain + 6 待迁移 - 废弃 = ~43）
+> **目标状态**: 清理后约 **43个**
 >
-> **差异原因**: 部分接口存在冗余定义（如VectorStorage≈L3VectorPort），需合并
+> **差异原因**: 部分接口存在冗余定义（VectorStorage≈L3VectorPort等），需合并
 
 **端口契约来源（两者各有用途，独立共存）：**
 
 | 来源 | 目录 | 端口数 | 说明 |
 |------|------|--------|------|
-| Domain层 | `src/domain/ports/` | 37 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
-| Application层 | `src/application/ports/` | 7 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
-| 服务内Protocol | `src/domain/services/` | 6 | 待迁移到domain/ports/ |
+| Domain层 | `src/domain/ports/` | ~30 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
+| Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
+| 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol） |
+
+**P0问题发现（Round 1）：**
+
+| # | 问题 | 影响 | 优先级 |
+|---|------|------|--------|
+| P0-1 | L3VectorPort缺少Collection管理方法（create_collection/delete_collection/collection_exists/list_collections） | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
+| P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
+| P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
+| P0-4 | EventPublisherProtocol在2个服务内重复定义 | 只需引用domain已有EventPublisherPort | **无需迁移** |
+| P0-5 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
 | **Domain层 - 存储分层（L0-L5）** |
 | `L0StoragePort` | domain/ports/l0_storage.py | L0文件系统 | infrastructure | **待注册** |
 | `L1CachePort` | domain/ports/l1_cache.py | L1 Redis缓存 | infrastructure | **待注册** |
-| `L2RdbPort` | domain/ports/l2_rdb.py | L2关系存储 | infrastructure | **待注册** |
-| `L3VectorPort` | domain/ports/l3_vector.py | L3向量存储 | infrastructure | **待注册** |
-| ~~`VectorStorage`~~ | domain/ports/vector_storage.py | L3向量存储 | — | **废弃→合并到L3VectorPort** |
-| `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **待注册** |
-| ~~`ObjectStorageRepository`~~ | domain/ports/storage.py | L4对象存储 | — | **废弃→合并到L4ObjectPort** |
-| `L5GraphPort` | domain/ports/l5_graph.py | L5图存储 | infrastructure | **待注册** |
-| ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃→合并到L5GraphPort** |
-| ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃→合并到L5GraphPort** |
+| `L2MetadataRepositoryPort` | domain/ports/l2_rdb.py | L2元数据 | infrastructure | **待注册** |
+| `L2ChangeHistoryRepositoryPort` | domain/ports/l2_rdb.py | L2变更历史 | infrastructure | **待注册** |
+| `L2GroupMemberRepositoryPort` | domain/ports/l2_rdb.py | L2群组成员 | infrastructure | **待注册** |
+| `L3VectorPort` | domain/ports/l3_vector.py | L3向量存储 | infrastructure | **⚠️缺Collection管理方法** |
+| `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **⚠️缺list_objects方法** |
+| `L5GraphPort` | domain/ports/l5_graph.py | L5图存储 | infrastructure | **✅已完整** |
 | `UnifiedStoragePort` | domain/ports/unified_storage.py | 统一存储入口 | infrastructure | **待注册** |
-| `SessionStoragePort` | domain/ports/session_storage.py | 会话状态存储 | infrastructure | **待注册** |
+| `SessionStorage` | domain/ports/session_storage.py | 会话状态存储 | infrastructure | **待注册** |
 | `IndexManagerPort` | domain/ports/index_manager.py | MEMORY索引 | infrastructure | **待注册** |
+| **废弃接口（待清理）** |
+| ~~`VectorStorage`~~ | domain/ports/vector_storage.py | L3向量存储 | — | **废弃**（功能已由L3VectorPort+CollectionManager覆盖） |
+| ~~`CollectionManager`~~ | domain/ports/vector_storage.py | Collection管理 | — | **废弃**（方法待补充到L3VectorPort） |
+| ~~`ObjectStorageRepository`~~ | domain/ports/storage.py | L4对象存储 | — | **废弃**（功能已由L4ObjectPort覆盖） |
+| ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃**（功能已由L5GraphPort覆盖） |
+| ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃**（功能已由L5GraphPort覆盖） |
 | **Domain层 - 仓储** |
 | `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **待注册** |
 | `RoleRepositoryPort` | domain/ports/role_repository.py | 角色存储 | infrastructure | **待注册** |
@@ -944,9 +958,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **待注册** |
 | `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **待注册** |
 | **Domain层 - 事件** |
-| `EventPublisherPort` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **待注册** |
-| ~~`EventPublisherProtocol`~~ | 4处服务内定义 | 事件发布(返回None) | — | **废弃→统一为EventPublisherPort** |
-| `InMemoryEventPublisher` | domain/ports/event_publisher.py | 内存事件发布 | — | **待废弃→合并到EventPublisherPort** |
+| `EventPublisher` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **待注册** |
 | **Domain层 - 合规服务** |
 | `ComplianceGatewayPort` | domain/ports/compliance_gateway.py | UDMR合规检查 | infrastructure | **待注册** |
 | `SensitiveDataDetectorPort` | domain/ports/sensitive_data_detector.py | 敏感数据检测 | infrastructure | **待注册** |
@@ -955,16 +967,18 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `PIPLComplianceServicePort` | domain/ports/pipl_compliance_service.py | PIPL合规 | infrastructure | **待注册** |
 | `CrossBorderTransferServicePort` | domain/ports/cross_border_transfer_service.py | 跨境传输 | infrastructure | **待注册** |
 | **Domain层 - 其他** |
-| `OutboxPort` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **待注册** |
-| `UnitOfWorkPort` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
+| `OutboxRepository` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **待注册** |
+| `UnitOfWork` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
 | `HealthCheckPort` | domain/ports/health_check.py | 健康检查 | infrastructure | **待注册** |
 | `IntegrityPort` | domain/ports/integrity.py | 完整性检查 | infrastructure | **待注册** |
-| `StorageEnums` | domain/ports/storage_enums.py | 存储枚举 | — | **参考使用** |
-| **Domain层 - 服务内Protocol（待迁移）** |
-| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **待迁移到domain/ports/** |
-| `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **待迁移到domain/ports/** |
-| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **待迁移到domain/ports/** |
-| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **待迁移到domain/ports/** |
+| `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **参考使用** |
+| `StorageLayer` | domain/ports/storage_enums.py | 存储层级枚举 | — | **参考使用** |
+| **服务内Protocol（待迁移或引用）** |
+| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **待迁移到domain/ports/sandbox_protocol.py** |
+| `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **待迁移到domain/ports/snapshot_protocol.py** |
+| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **待迁移到domain/ports/router_protocol.py** |
+| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **待迁移到domain/ports/router_protocol.py** |
+| ~~`EventPublisherProtocol`~~ | 2处服务内定义 | 事件发布 | — | **无需迁移→直接引用EventPublisher** |
 | **Application层 - 服务端口（保留，不迁移）** |
 | `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
 | `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
