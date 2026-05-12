@@ -111,3 +111,20 @@ class L4ObjectPort(Protocol):
         Returns:
             对象 ID 或 ETag
         """
+
+    async def list_objects(
+        self,
+        bucket_type: str,
+        prefix: str = "",
+        recursive: bool = True,
+    ) -> list[dict]:
+        """列出对象，支持前缀过滤。
+
+        Args:
+            bucket_type: Bucket 类型
+            prefix: 前缀过滤
+            recursive: 是否递归列出子目录
+
+        Returns:
+            对象元数据列表
+        """
