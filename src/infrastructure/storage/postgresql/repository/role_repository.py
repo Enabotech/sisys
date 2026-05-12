@@ -86,7 +86,7 @@ class RoleRepository(RoleRepositoryPort):
         """
         model = await self._session.get(RoleModel, id)
         if not model:
-            from src.application.use_cases.role_management import RoleNotFoundError
+            from src.domain.exceptions.role_exceptions import RoleNotFoundError
 
             raise RoleNotFoundError(id)
         await self._session.delete(model)
@@ -219,7 +219,7 @@ class RoleRepository(RoleRepositoryPort):
             await self._session.refresh(model)
         except IntegrityError:
             await self._session.rollback()
-            from src.application.use_cases.role_management import RoleAlreadyExistsError
+            from src.domain.exceptions.role_exceptions import RoleAlreadyExistsError
 
             raise RoleAlreadyExistsError(role.name)
 
