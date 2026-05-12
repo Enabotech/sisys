@@ -850,9 +850,17 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | 修改端口 | 更新版本(semver) → 运行ContractGate兼容性检查 → 更新本清单 |
 | 废弃端口 | 标记deprecated → 更新本清单 → 扫描所有引用 → 迁移后删除 |
 
-### 2.1 契约层端口（实际统计：40个核心 + 4个待废弃 + 8个待迁移 = 48个）
+### 2.1 契约层端口（实际统计与目标状态）
 
-> 注：实际代码统计：domain层40个 + application层8个 = 48个Protocol定义。
+> **⚠️ 实际统计（Round 1调研结果）**:
+> - `src/domain/ports/*.py` 定义: **41个**
+> - `src/domain/services/*.py` 定义: **6个**（服务内Protocol，应迁移）
+> - `src/application/ports/*.py` 定义: **7个**（应迁移到Domain）
+> - **合计**: 41 + 6 + 7 = **54个**（含冗余）
+>
+> **目标状态**: 清理后约 **48个**（40个核心 + 4个废弃 + 8个迁移）
+>
+> **差异原因**: 部分接口存在冗余定义（如VectorStorage≈L3VectorPort），需合并后才是真正的"契约清单"
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -1309,6 +1317,7 @@ poetry run python -m pylyzer src/domain/ports/
 | v2.0 | 2026-05-12 | 重构执行方案v2.0 - 消除重复矛盾 |
 | v3.0 | 2026-05-12 | 重构执行方案v3.0 - 完善P0问题与4层架构 |
 | v3.1 | 2026-05-12 | 重构执行方案v3.1 - 添加Phase 1.5/2.5关键检查点 |
+| v3.2 | 2026-05-12 | Round 1审查 - 修正Protocol统计(48→54实际/48目标) |
 
 ### 审查修复历史
 
@@ -1319,10 +1328,11 @@ poetry run python -m pylyzer src/domain/ports/
 | R3 | 5972b1e2 | 修正违规导入数量(2→7处) |
 | R4 | 89df46b7 | 消除V1~V6未定义引用并完善参考文献 |
 | R5 | — | 添加Phase 1.5/2.5关键检查点，完善Section 6.5验收标准 |
+| R6 | — | **Round 1审查修正**: Protocol统计澄清(41 domain + 6 services + 7 application = 54实际，清理后48目标) |
 
 ---
 
-*文档版本: v3.0*
+*文档版本: v3.2*
 *核心更新: 统一端口注册管理机制（4层架构）*
 *- Layer 1: Port Contract (契约层) - 只定义接口*
 *- Layer 2: Registry (注册层) - 统一登记元数据*
