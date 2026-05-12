@@ -52,7 +52,7 @@
 
 #### API 契约 (API Contract)
 - [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
-- [ ] 契约测试通过（`tests/contract/test_[xxx]_api_contract.py`）
+- [ ] 契约测试通过（`tests/contracts/test_[xxx]_api_contract.py`）
 - [ ] API 版本管理正确（`/api/v1/[resource]`）
 
 #### 数据模型 (Data Models)
@@ -84,12 +84,22 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 统一端口注册与接口治理
-- [ ] 端口契约位于 `src/interfaces/ports/`
+- [ ] 端口契约位于 `src/domain/ports/contracts/`
+- [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口必须登记为 `PortSpec`
+- [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
+- [ ] 契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
+- [ ] 端口实现仅可在 `src/composition_root.py` 统一注册，禁止业务代码直接实例化具体实现
 - [ ] 接口命名符合单一职责，禁止同义接口重复定义
-- [ ] 端口实现仅可在 Composition Root 统一注册，禁止业务代码直接实例化具体实现
 - [ ] 端口具备唯一名称、版本、owner、兼容策略
 - [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
 - [ ] 端口变更配套契约测试与兼容性检查
+- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
+
+#### 契约清单执行约束（强制）
+- [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
+- [ ] 禁止新增未登记端口，禁止语义重复端口，禁止未同步更新 registry / resolver / contract test
+- [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
+- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`
@@ -136,7 +146,7 @@
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_x_y_steps.py` | Task 0 |
-| **TDD 契约测试** | 端口契约 / 接口抽象 | 端口注册、版本、兼容性、实现解析 | `test_[port]_contract.py` | Task 0 / Task [N] |
+| **TDD 契约测试** | 端口契约 / 接口抽象 / registry / resolver / contract gate | 端口注册、版本、兼容性、实现解析、重复接口检测 | `test_[port]_contract.py` | Task 0 / Task [N] |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_[component]_[architecture].py` | Task [N] |
 | **集成测试** | [层间协作] | [协作描述] | `test_story_x_y_[integration].py` | Task [N] |
 
@@ -342,7 +352,7 @@
 
 - **架构模式:** [如 CQRS、Event Sourcing、Hexagonal 等]
 - **设计约束:** [如领域层零依赖、依赖方向、仓储模式等]
-- **接口治理:** [统一端口注册、Composition Root 装配、契约优先、版本化兼容、禁止跨模块直接依赖实现类]
+- **接口治理:** [统一端口注册、PortSpec 元数据、Registry/Resolver/ContractGate、Composition Root 装配、契约优先、版本化兼容、禁止跨模块直接依赖实现类]
 - **技术栈:** [如 Python 3.11+、FastAPI 0.104+、SQLAlchemy 2.0+ 等]
 
 ### 关键架构决策
@@ -362,6 +372,7 @@
 |
 ├── src/
 |   ├── __init__.py
+|   ├── composition_root.py        # 组合根（唯一注册入口）
 |   ├── application/                # 应用层
 |   │   ├── __init__.py             # 模块导出
 |   │   ├── commands/                   # 命令定义
@@ -379,7 +390,11 @@
 |   │   ├── entities/                   # 领域模型
 |   │   ├── events/                     # 领域事件定义
 |   │   ├── exceptions/                 # 领域层异常
-|   │   ├── ports/                      # 领域层端口（核心领域关注的抽象）
+|   │   ├── ports/                      # 领域端口目录
+|   │   │   ├── contracts/              # 端口契约（Protocol / DTO / 错误码）
+|   │   │   ├── registry.py             # 端口注册中心
+|   │   │   ├── resolver.py             # 端口解析器
+|   │   │   └── contract_gate.py        # 契约门禁
 |   │   ├── services/                   # 领域层服务接口
 |   │   └── value_objects/              # 值对象集合
 |   │
@@ -411,7 +426,7 @@
 |       └── __init__.py
 |
 └── tests/
-    │   ├── contract/
+    │   ├── contracts/
     │   │   └── test_[xxx]_api_contract.py # 契约测试
     │   ├── unit/[layer]/
     │   │   └── test_[component].py # 单元测试
@@ -599,11 +614,11 @@
 
 ---
 
-**模板版本/Template Version:** 2.6.0
+**模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-03-04
 **最后更新/Last Updated:** 2026-05-12
 **更新说明:**
-- v2.6.0: 新增六边形架构约束、统一端口注册与接口治理、端口契约测试、领域层零依赖说明
+- v2.7.0: 对齐 domain/ports/contract 契约层、Registry/Resolver/ContractGate、Composition Root 与接口清单强约束
 - v2.5.0: 新增 BDD 步骤实现文件 `test_story_x_y_steps.py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
