@@ -108,48 +108,58 @@
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
-    <rect x="0" y="0" width="800" height="120" rx="12" fill="#ede9fe" stroke="#c4b5fd" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#5b21b6">🏗️ 基础设施层</text>
+      <rect x="0" y="0" width="800" height="120" rx="12" fill="#ede9fe" stroke="#c4b5fd" stroke-width="2" filter="url(#shadow)"/>
+      <text x="20" y="28" font-size="14" font-weight="600" fill="#5b21b6">🏗️ 基础设施层</text>
 
-    <rect x="20" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="55" y="77" text-anchor="middle" font-size="9" fill="#6b21a8">📁 L0</text>
-    <text x="55" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">MEMORY</text>
+      <!-- L0 -->
+      <rect x="20" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="50" y="77" text-anchor="middle" font-size="9" fill="#6b21a8">📁 L0</text>
+      <text x="50" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">MEMORY</text>
 
-    <rect x="100" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="135" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">⚡ L1</text>
-    <text x="135" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Redis</text>
+      <!-- L1 -->
+      <rect x="90" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="120" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">⚡ L1</text>
+      <text x="120" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Redis</text>
 
-    <rect x="180" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="215" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🗄️ L2</text>
-    <text x="215" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">PostgreSQL</text>
+      <!-- L2 -->
+      <rect x="160" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="190" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🗄️ L2</text>
+      <text x="190" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">PostgreSQL</text>
 
-    <rect x="260" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="295" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🔮 L3</text>
-    <text x="295" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Qdrant</text>
+      <!-- L3 -->
+      <rect x="230" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="260" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🔮 L3</text>
+      <text x="260" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Qdrant</text>
 
-    <rect x="340" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="375" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">📦 L4</text>
-    <text x="375" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">MinIO</text>
+      <!-- L4 -->
+      <rect x="300" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="330" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">📦 L4</text>
+      <text x="330" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">MinIO</text>
 
-    <rect x="420" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="455" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🕸️ L5</text>
-    <text x="455" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Neo4j</text>
+      <!-- L5 -->
+      <rect x="370" y="55" width="60" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="400" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🕸️ L5</text>
+      <text x="400" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Neo4j</text>
 
-    <rect x="500" y="65" width="80" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="535" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🕸️ WorkFlow</text>
-    <text x="535" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Prefect</text>
+      <!-- WorkFlow -->
+      <rect x="440" y="55" width="80" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="480" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🔄 WorkFlow</text>
+      <text x="480" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Prefect</text>
 
-    <rect x="580" y="65" width="80" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="615" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🕸️ Orchestration</text>
-    <text x="615" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Langgraph</text>
+      <!-- Orchestration -->
+      <rect x="530" y="55" width="90" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="575" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🎼 Orchestration</text>
+      <text x="575" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">Langgraph</text>
 
-    <rect x="630" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="665" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🐰 EventBus</text>
-    <text x="665" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">RabbitMQ</text>
+      <!-- EventBus -->
+      <rect x="630" y="55" width="70" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="665" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🐰 EventBus</text>
+      <text x="665" y="92" text-anchor="middle" font-size="8" fill="#7c3aed">RabbitMQ</text>
 
-    <rect x="715" y="65" width="65" height="36" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="750" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🐳 Deploy</text>
-    <text x="750" y="92" text-anchor="middle" font-size="10" fill="#6b21a8"> Docker</text>
+      <!-- Deploy -->
+      <rect x="710" y="55" width="70" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="745" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🐳 Deploy</text>
+      <text x="745" y="92" text-anchor="middle" font-size="10" fill="#6b21a8"> Docker</text>
   </g>
 
 </svg>

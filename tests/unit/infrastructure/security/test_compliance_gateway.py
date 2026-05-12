@@ -13,7 +13,7 @@ class TestComplianceGatewayCheck:
     async def test_check_with_china_domestic_data(self):
         """Test compliance check with China domestic data."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -33,7 +33,7 @@ class TestComplianceGatewayCheck:
     async def test_check_with_overseas_data(self):
         """Test compliance check with overseas data."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -53,7 +53,7 @@ class TestComplianceGatewayCheck:
     async def test_check_detects_sensitive_data(self):
         """Test compliance check detects sensitive data."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -74,7 +74,7 @@ class TestComplianceGatewayCheck:
     async def test_check_with_model_not_in_whitelist(self):
         """Test compliance check fails when model not in whitelist."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -96,7 +96,7 @@ class TestComplianceGatewayCheck:
     async def test_check_respects_data_residency_for_overseas_model(self):
         """Test compliance check redirects overseas model for domestic data to local processing."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -122,7 +122,7 @@ class TestComplianceGatewayIntegration:
     async def test_check_with_pipl_consent_required(self):
         """Test compliance check requires PIPL consent for personal data."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
@@ -143,7 +143,7 @@ class TestComplianceGatewayIntegration:
     async def test_check_cross_border_transfer_required(self):
         """Test compliance check requires cross-border transfer approval."""
         from src.domain.value_objects.compliance_result import ComplianceResult
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
         from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 
         gateway = ComplianceGatewayImpl()
