@@ -1052,13 +1052,26 @@ print(f'All {len(registry)} ports registered')
 │   └── 迁移 SandboxExecutor → contracts/sandbox.py
 ├── 1.3 定义35个核心端口契约
 ├── 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
-└── 1.5 验证: contracts/目录包含≥48个端口
+└── 1.5 契约层完整性验证【关键检查点】
+    ├── 1.5.1 验证所有48个契约可被正确import
+    │   └── python -c "from src.domain.ports.contracts import *; print('OK')"
+    ├── 1.5.2 验证契约定义无重复（名称、接口）
+    │   └── python scripts/check_duplicate_ports.py
+    ├── 1.5.3 验证废弃接口(VectorStorage等)已移除
+    │   └── grep -r "class VectorStorage\|class GraphManager\|class GraphStorage" src/domain/ports/contracts/ 应返回空
+    └── 1.5.4 生成48个契约清单（含name/interface/path）供后续registry对照
 
 阶段2: 实现注册中心
 ├── 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
 ├── 2.2 实现 resolver.py (Resolver, resolve)
 ├── 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
-└── 2.4 验证: registry包含≥48个端口
+└── 2.4 注册中心完整性验证【关键检查点】
+    ├── 2.4.1 验证registry.list_all()长度≥48
+    │   └── python -c "from src.domain.ports.registry import _global_registry; assert len(_global_registry.list_all()) >= 48"
+    ├── 2.4.2 验证每个PortSpec包含完整字段(name/version/interface/impl/module)
+    ├── 2.4.3 验证无重复注册(同一name)
+    ├── 2.4.4 验证废弃端口(VectorStorage等)未注册
+    └── 2.4.5 验证resolver可正确解析已知端口
 
 阶段3: 创建组合根 + 修复EventBusFactory
 ├── 3.1 创建 composition_root.py
@@ -1243,6 +1256,15 @@ poetry run python -m pylyzer src/domain/ports/
 
 | 验证项 | 验证命令 | 触发条件 |
 |--------|----------|----------|
+| **Phase 1.5 契约层验证** | | |
+| 契约可import | `python -c "from src.domain.ports.contracts import *"` | 每次新增契约后 |
+| 无重复契约定义 | `python scripts/check_duplicate_ports.py` | 每次新增契约后 |
+| 废弃接口已移除 | `grep -r "class VectorStorage" src/domain/ports/contracts/` 应返回空 | 每次新增契约后 |
+| **Phase 2.5 注册中心验证** | | |
+| 端口数量≥48 | `python -c "assert len(_global_registry.list_all()) >= 48"` | 每次注册后 |
+| PortSpec字段完整 | 人工检查name/version/interface/impl/module | 每次注册后 |
+| 废弃端口未注册 | `python -c "assert 'VectorStorage' not in registry"` | 每次注册后 |
+| **持续治理（每次PR）** | | |
 | 无新增未登记端口 | `grep -r "Protocol" src/domain/services/` 应返回空 | 每次PR |
 | 端口数量不减少 | `python -c "assert len(registry) >= 48"` | 每次PR |
 | 无废弃接口使用 | `grep -r "VectorStorage\|GraphManager" src/` 应返回空 | 每次PR |
@@ -1286,6 +1308,7 @@ poetry run python -m pylyzer src/domain/ports/
 | v1.0 | 2026-05-12 | 初始版本 - 输出SISYS端口开发与管理重构执行方案 |
 | v2.0 | 2026-05-12 | 重构执行方案v2.0 - 消除重复矛盾 |
 | v3.0 | 2026-05-12 | 重构执行方案v3.0 - 完善P0问题与4层架构 |
+| v3.1 | 2026-05-12 | 重构执行方案v3.1 - 添加Phase 1.5/2.5关键检查点 |
 
 ### 审查修复历史
 
@@ -1295,6 +1318,7 @@ poetry run python -m pylyzer src/domain/ports/
 | R2 | d52f8490 | 基于实际代码调研修正(Protocol数量39→48) |
 | R3 | 5972b1e2 | 修正违规导入数量(2→7处) |
 | R4 | 89df46b7 | 消除V1~V6未定义引用并完善参考文献 |
+| R5 | — | 添加Phase 1.5/2.5关键检查点，完善Section 6.5验收标准 |
 
 ---
 
