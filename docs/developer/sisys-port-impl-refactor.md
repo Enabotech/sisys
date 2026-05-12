@@ -6,6 +6,40 @@
 
 ---
 
+## 重构背景
+
+### 问题发现
+
+基于 `sisys-port-impl-report.md` 全面调研，发现以下问题：
+
+| 问题类别 | 发现 | 影响 |
+|----------|------|------|
+| **服务内Protocol定义** | 5个服务文件本地定义了8个Protocol | 违反六边形架构，接口重复 |
+| **导出完整性** | `domain/ports/__init__.py` 仅导出16个(32.7%)，缺失33个 | 基础设施层无法正确导入 |
+| **EventBusFactory** | 3个组件初始化为None | 运行时触发AttributeError |
+| **接口冗余** | L3/L4/L5层存在语义重复的端口 | 架构模糊，实现混淆 |
+| **Infrastructure依赖Application** | 6处违规导入 | 违反依赖倒置原则 |
+| **跨模块继承** | SQLAlchemy模型继承infrastructure的Base | Domain层绑定具体技术 |
+
+### 核心目标
+
+| 目标 | 现状 | 目标状态 |
+|------|------|----------|
+| 消除服务内Protocol定义 | 5个服务文件定义8个Protocol | 全部迁移到domain/ports/ |
+| 补全__init__.py导出 | 16/49符号已导出(32.7%) | 导出所有41个符号(100%) |
+| 修复EventBusFactory | publisher/subscriber为None | 延迟初始化+单例复用 |
+| 消除Infrastructure依赖Application | 6处违规 | 迁移到Domain层 |
+| 合并语义重复接口 | 3组接口存在重叠 | 统一为单一接口 |
+
+### 重构原则
+
+1. **依赖倒置**: Domain层定义端口，Infrastructure层实现
+2. **端口集中**: 所有Protocol定义在domain/ports/或application/ports/
+3. **单向依赖**: 层级依赖只能从外到内
+4. **接口唯一**: 合并语义重复的端口，保持单一职责
+5. **最小变更**: 保持现有接口兼容，逐步迁移
+
+
 ## 一、接口清单
 
 ### 1.1 Domain层端口（41个）
