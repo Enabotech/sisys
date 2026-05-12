@@ -58,8 +58,8 @@ class TestApplicationLayerTypeAdapter:
     """Verify TypeAdapter is only used in application/infrastructure layer."""
 
     def test_type_adapter_in_application_layer(self):
-        """TypeAdapter is used in application/events/adapters.py."""
-        adapters_file = Path("src/application/events/adapters.py")
+        """TypeAdapter is used in src/application/event_handlers/event_dict_to_json.py."""
+        adapters_file = Path("src/application/event_handlers/event_dict_to_json.py")
         assert adapters_file.exists(), "Application adapters file missing"
 
         source = adapters_file.read_text()
