@@ -804,9 +804,55 @@ async def test_get_user(user_service, mock_user_repo):
 
 ## 二、接口清单（契约层）
 
+### 2.0 契约清单执行约束（强制）
+
+> **本清单是唯一合法端口来源（Single Source of Truth），不是文档而是系统约束。**
+
+**所有开发必须满足以下约束：**
+
+1. **禁止定义未在本清单登记的端口**
+2. **禁止新增端口未同步更新本清单**
+3. **禁止存在语义重复端口**（必须合并）
+4. **每个端口必须满足：**
+   - 已定义 contract（domain/ports/contracts）
+   - 已在 registry 注册
+   - 已有 contract test
+   - 已声明 owner + version
+
+**违反任一条 → CI 必须失败**
+
+#### 2.0.1 契约清单自动校验
+
+```bash
+# 检查1: 禁止service内定义Protocol
+grep -r "class.*Protocol" src/domain/services/ src/application/event_handlers/ && exit 1
+
+# 检查2: 禁止未注册端口被使用
+python -c "
+from src.domain.ports.registry import _global_registry
+expected = 48
+actual = len(_global_registry.list_all())
+assert actual >= expected, f'Ports {actual} < {expected}'
+"
+
+# 检查3: 禁止重复接口（名称重复）
+python scripts/check_duplicate_ports.py
+
+# 检查4: 禁止废弃接口仍被使用
+grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep -v "__pycache__" && exit 1
+```
+
+#### 2.0.2 契约变更流程
+
+| 变更类型 | 必须操作 |
+|---------|---------|
+| 新增端口 | 定义contract → 注册registry → 写contract test → 更新本清单 → 指定owner |
+| 修改端口 | 更新版本(semver) → 运行ContractGate兼容性检查 → 更新本清单 |
+| 废弃端口 | 标记deprecated → 更新本清单 → 扫描所有引用 → 迁移后删除 |
+
 ### 2.1 契约层端口（实际统计：40个核心 + 4个待废弃 + 8个待迁移 = 48个）
 
-> 注：注：实际代码统计：domain层40个 + application层8个 = 48个Protocol定义。
+> 注：实际代码统计：domain层40个 + application层8个 = 48个Protocol定义。
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -1093,6 +1139,33 @@ print(f'All {len(registry)} ports registered')
 ├── 6.2 配置CI/CD兼容性检查
 ├── 6.3 编写文档和示例
 └── 6.4 最终验证所有验收标准
+
+阶段7: 持续治理（防止回退）【新增】
+├── 7.1 接口变更必须走流程
+│   ├── 修改契约 → 更新版本（semver）
+│   ├── 更新 registry
+│   ├── 运行 ContractGate 兼容性检查
+│   └── 更新接口清单
+├── 7.2 新增接口必须满足
+│   ├── 不存在语义重复
+│   ├── 在 contracts/ 定义
+│   ├── 在 composition_root 注册
+│   ├── 提供 contract test
+│   └── 指定 owner
+├── 7.3 CI 强制检查
+│   ├── 禁止 service 内定义 Protocol
+│   ├── 禁止 infrastructure → application
+│   ├── 禁止未注册端口被 resolve
+│   ├── 禁止直接实例化实现类
+│   └── 禁止重复端口
+├── 7.4 Story模板强制要求
+│   ├── Task 0 必须定义/引用端口
+│   ├── 未定义端口 → 不允许开发
+│   └── 未通过契约测试 → 不允许合并
+└── 7.5 定期治理（每周）
+    ├── 扫描重复接口
+    ├── 检查废弃端口是否仍被使用
+    └── 清理未注册实现
 ```
 
 ### 5.3 时间估算
@@ -1105,7 +1178,8 @@ print(f'All {len(registry)} ports registered')
 | Phase 4 | 6-8小时 | 迁移服务代码+修复7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)+跨模块继承 |
 | Phase 5 | 3-4小时 | 48个Protocol的契约测试 |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
-| **总计** | **18-26小时** | — |
+| Phase 7 | 持续 | 持续治理（每周30分钟扫描） |
+| **总计** | **18-26小时 + 持续治理** | 初始重构+长期维护 |
 
 ### 5.4 验收标准补充
 
@@ -1164,6 +1238,18 @@ poetry run mypy src/domain/ports/ --strict
 # 验证无循环依赖
 poetry run python -m pylyzer src/domain/ports/
 ```
+
+### 6.5 持续治理验收（阶段7）
+
+| 验证项 | 验证命令 | 触发条件 |
+|--------|----------|----------|
+| 无新增未登记端口 | `grep -r "Protocol" src/domain/services/` 应返回空 | 每次PR |
+| 端口数量不减少 | `python -c "assert len(registry) >= 48"` | 每次PR |
+| 无废弃接口使用 | `grep -r "VectorStorage\|GraphManager" src/` 应返回空 | 每次PR |
+| 无直接实例化 | `grep -r "SqlAlchemyUserRepo()" src/` 应返回空 | 每次PR |
+| 接口变更兼容性 | `python -c "run ContractGate.check_compatibility()"` | 每次涉及契约修改的PR |
+| 每周扫描重复接口 | `python scripts/check_duplicate_ports.py` | 每周CI |
+| Story模板端口定义 | 检查story文件包含端口定义task | 每次新Story |
 
 ---
 
