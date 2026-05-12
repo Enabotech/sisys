@@ -915,34 +915,39 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
 | 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol，废弃删除EventPublisherProtocol直接引用EventPublisher） |
 
-**P0问题发现（Round 1+2 共22项）：**
+**P0问题发现（Round 1+2+3 共29项）：**
 
 | # | 问题 | 影响 | 优先级 |
 |---|------|------|--------|
 | P0-1 | L3VectorPort缺少Collection管理方法 | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
 | P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
 | P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
-| P0-4 | EventPublisherProtocol在2个服务内重复定义 | DRY违规 | **必须修复** |
-| P0-5 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
-| P0-6 | EventBusFactory核心依赖未初始化 | RedisEventBus/RabbitMQEventBus使用无效依赖 | **必须修复** |
+| P0-4 | EventPublisherProtocol存在5处重复定义(3处services+2处handlers) | DRY违规，签名与EventPublisher冲突 | **必须修复** |
+| P0-5 | EventPublisherProtocol.publish返回None与EventPublisher.publish返回PublishResult | 签名冲突，无法直接替换 | **必须修复** |
+| P0-6 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
 | P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
 | P0-8 | RedisEventBus.publish()异常处理逻辑不可达 | publisher吞掉异常，redis_success=False永不触发 | **必须修复** |
-| P0-9 | 5个Domain Services Protocol均无实现类 | 接口契约无法验证 | **必须修复** |
+| P0-9 | SandboxExecutorProtocol和SnapshotRepositoryProtocol无实现类 | DockerSandboxAdapter实现的是SandboxExecutor非本Protocol | **必须修复** |
 | P0-10 | SemanticRouterProtocol.route()为async但HashRouterProtocol.route()为sync | 接口设计不一致 | **建议修复** |
-| P0-11 | memory_service.py第475行调用publish无await | async def未正确调用 | **必须修复** |
-| P0-12 | UserRepository继承的BaseRepository与domain层BaseRepository同名不同文件 | 混淆风险 | **必须修复** |
-| P0-13 | RoleRepository.list_all()签名与RoleRepositoryPort不匹配 | 分页参数缺失 | **必须修复** |
-| P0-14 | RoleRepository.delete()返回bool但BaseRepository.delete()返回None | 三者不一致 | **必须修复** |
-| P0-15 | UserRepositoryPort缺少save/delete/list_all方法 | 无法使用完整CRUD | **必须修复** |
-| P0-16 | PermissionServicePort实现添加了assign_role/revoke_role | 超出接口范围 | **必须修复** |
-| P0-17 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
-| P0-18 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
-| P0-19 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反依赖倒置 | **必须修复** |
-| P0-20 | L4ObjectPort.archive()方法签名不一致 | MinIORepository返回bool与接口str不匹配 | **必须修复** |
-| P0-21 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
-| P0-22 | AuthServiceImpl.authenticate()存在timing attack防御逻辑缺陷 | result变量未使用 | **建议修复** |
+| P0-11 | memory_service.py第475行调用publish无await | async def未正确调用，事件实际不会被发布 | **必须修复** |
+| P0-12 | domain层BaseRepository为同步方法，infrastructure层BaseRepository为异步方法 | 同名但签名完全不兼容，违反DIP | **必须修复** |
+| P0-13 | RoleRepository.delete()返回bool但infrastructure BaseRepository.delete()返回None | 三者不一致 | **必须修复** |
+| P0-14 | UserRepositoryPort缺少save/delete/list_all方法 | 无法使用完整CRUD | **必须修复** |
+| P0-15 | PermissionServicePort实现添加了assign_role/revoke_role | 超出接口范围，接口注释明确说明是应用层UseCase | **必须修复** |
+| P0-16 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
+| P0-17 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
+| P0-18 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反六边形架构依赖倒置 | **必须修复** |
+| P0-19 | L4ObjectPort.archive()方法签名不一致 | MinIORepository返回bool与接口str不匹配 | **必须修复** |
+| P0-20 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
+| P0-21 | AuthServiceImpl.authenticate()存在timing attack防御缺陷 | 用户不存在vs密码错误执行不同操作，时间差异可测量 | **建议修复** |
+| P0-22 | AuthServiceImpl.authenticate()添加了ip_address/user_agent参数 | 违反接口契约，超出接口定义范围 | **必须修复** |
+| P0-23 | RabbitMQEventBus.publish()使用redis_success字段 | 语义错误，应只使用outbox_saved | **必须修复** |
+| P0-24 | AsyncOutboxPoller使用硬编码routing_key | 应咨询ChannelRouter进行正确路由 | **建议修复** |
+| P0-25 | HashRouterProtocol和SemanticRouterProtocol均有实现类 | 之前Round2记录为无实现类是错误的，已纠正 | ✅已确认 |
+| P0-26 | BaseRepository的id参数类型domain层用UUID，infrastructure层用str | 类型不一致 | **必须修复** |
+| P0-27 | UserRepositoryPort不是BaseRepository实现，无法使用标准CRUD | 接口独立定义，缺少基础方法 | **必须修复** |
 
-**端口状态更新（Round 2）：**
+**端口状态更新（Round 3）：**
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -972,12 +977,12 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `AuditRepositoryPort` | domain/ports/audit_repository.py | 审计日志存储 | infrastructure | **✅接口完整** |
 | `AuditServicePort` | domain/ports/audit_service.py | 审计服务 | infrastructure | **✅接口完整** |
 | **Domain层 - 认证授权** |
-| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **✅接口完整** |
+| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **⚠️实现超出接口参数范围** |
 | `PermissionServicePort` | domain/ports/permission_service.py | 权限检查 | infrastructure | **⚠️实现超出接口范围** |
 | `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **⚠️签名不一致** |
 | `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **✅接口完整** |
 | **Domain层 - 事件** |
-| `EventPublisher` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **✅接口完整** |
+| `EventPublisher` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **⚠️签名与EventPublisherProtocol冲突** |
 | **Domain层 - 合规服务** |
 | `ComplianceGatewayPort` | domain/ports/compliance_gateway.py | UDMR合规检查 | infrastructure | **✅接口完整** |
 | `SensitiveDataDetectorPort` | domain/ports/sensitive_data_detector.py | 敏感数据检测 | infrastructure | **✅接口完整** |
@@ -990,18 +995,18 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `UnitOfWork` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
 | `HealthCheckPort` | domain/ports/health_check.py | 健康检查 | infrastructure | **待注册** |
 | `IntegrityPort` | domain/ports/integrity.py | 完整性检查 | infrastructure | **待注册** |
-| `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **⚠️同名不同文件冲突** |
+| `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **⚠️同名不同步/异步冲突** |
 | `StorageLayer` | domain/ports/storage_enums.py | 存储层级枚举 | — | **参考使用** |
 | **服务内Protocol（待迁移或引用）** |
 | `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **⚠️无实现类** |
 | `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **⚠️无实现类** |
-| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **⚠️无实现类** |
-| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **⚠️无实现类** |
-| ~~`EventPublisherProtocol`~~ | 2处服务内定义 | 事件发布 | — | **废弃→直接引用EventPublisher** |
+| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **✅已有实现(HashRouter)** |
+| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **✅已有实现(SemanticRouter)** |
+| ~~`EventPublisherProtocol`~~ | 5处重复定义 | 事件发布 | — | **废弃-签名冲突需解决** |
 | **Application层 - 服务端口（保留，不迁移）** |
 | `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
 | `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
-| `SandboxExecutor` | application/ports/sandbox_port.py | 沙箱执行器 | infrastructure | **待注册** |
+| `SandboxExecutor` | application/ports/sandbox_port.py | 沙箱执行器 | infrastructure | **✅已有实现(DockerSandboxAdapter)** |
 | `MetricsPort` | application/ports/metrics_port.py | 指标端口 | infrastructure | **待注册** |
 | `ExceptionMetricsPort` | application/ports/exception_metrics_port.py | 异常指标 | infrastructure | **待注册** |
 | `EventSubscriber` | application/ports/event_subscriber.py | 事件订阅器 | infrastructure | **✅接口完整** |
