@@ -1,6 +1,9 @@
 """Domain repositories package."""
 
-from src.domain.ports.graph_storage import GraphManager, GraphStorage
+# Deprecated ports - not registered, not for new use
+# from src.domain.ports.graph_storage import GraphManager, GraphStorage  # deprecated
+# from src.domain.ports.vector_storage import VectorStorage  # deprecated
+
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.l1_cache import L1CachePort
 from src.domain.ports.l2_rdb import (
@@ -22,8 +25,6 @@ from src.domain.ports.unit_of_work import UnitOfWork
 
 __all__ = [
     "DataAccessPattern",
-    "GraphManager",
-    "GraphStorage",
     "HashRouterProtocol",
     "L1CachePort",
     "L2ChangeHistoryRepositoryPort",
