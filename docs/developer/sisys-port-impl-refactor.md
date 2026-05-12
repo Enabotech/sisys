@@ -1,8 +1,32 @@
 # SISYS 端口开发与管理重构执行方案
 
-**文档版本:** v3.5
+**文档版本:** v4.0
 **生成时间:** 2026-05-12
 **基于:** sisys-port-impl-report.md 全面调研结果
+
+---
+
+## 重要修订说明（v4.0）
+
+### 修订内容
+
+1. **不迁移 application/ports** - application/ports 和 domain/ports 各有用途，独立共存
+2. **不创建 src/domain/ports/contracts/** - 契约定义保持在原有位置
+3. **注册范围 = domain/ports + application/ports** - 两者都是端口契约的来源
+
+### 架构说明
+
+| 端口来源 | 目录 | 数量 | 说明 |
+|----------|------|------|------|
+| Domain层 | `src/domain/ports/` | 37 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
+| Application层 | `src/application/ports/` | 7 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
+| 服务内Protocol | `src/domain/services/` | 6 | 待迁移到 domain/ports/ |
+
+**两者职责分离**：
+- **domain/ports**: 领域核心业务接口，定义业务能力边界
+- **application/ports**: 应用层服务接口，定义技术实现需求
+
+---
 
 ---
 
@@ -27,12 +51,12 @@
 | 目标 | 现状 | 目标状态 |
 |------|------|----------|
 | 建立统一端口注册管理机制 | 端口分散定义 | 4层架构：契约→注册→解析→门禁 |
-| 消除服务内Protocol定义 | 5个服务文件定义6个Protocol(含重复) | 全部迁移到domain/ports/contracts/ |
-| 补全__init__.py导出 | 16/48符号已导出(33.3%) | 导出所有48个Protocol(100%) |
-| 消除Infrastructure依赖Application | 7处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
+| 消除服务内Protocol定义 | 5个服务文件本地定义了6个Protocol(含重复) | 全部迁移到domain/ports/ |
+| 补全__init__.py导出 | 16/48符号已导出(33.3%) | 导出所有Protocol(100%) |
+| 消除Infrastructure依赖Application | 7处违规导入 | 通过Domain层定义Exception解决（不迁移application/ports） |
 | 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L4: ObjectStorageRepository↔L4ObjectPort | 统一为单一契约 |
 | 修复EventBusFactory | 3个组件为None | 延迟初始化+单例复用 |
-| 修复跨模块继承 | SQLAlchemy Base在infrastructure | 迁移Base到Domain或使用无技术绑定Base |
+| 修复跨模块继承 | SQLAlchemy模型继承infrastructure的Base | Domain层使用无技术绑定Base或DeclarativeBase |
 
 ### 重构原则
 
@@ -80,39 +104,56 @@
                                     │
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Layer 1: Port Contract (契约层)                                      │
-│  - 接口、Protocol、DTO、错误码                                        │
+│  - 接口定义在 domain/ports/ (37个) 和 application/ports/ (7个)       │
 │  - 只定义行为，不含实现                                                │
+│  - 两者各有用途，独立共存                                              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2 Layer 1: Port Contract（契约层）
 
-**原则**: 只放接口、Protocol、DTO、错误码，不放业务实现。同一类能力只保留一个主契约。
+**原则**: 端口契约定义在原有位置（domain/ports/ 和 application/ports/），不放业务实现。同一类能力只保留一个主契约。
+
+**端口契约来源**：
+- `src/domain/ports/` - 领域层核心端口（存储抽象、仓储、认证授权、事件发布等）
+- `src/application/ports/` - 应用层服务端口（语义缓存、公共黑板、沙箱、指标等）
+
+两者**各有用途，独立共存**，不需要相互迁移。
 
 ```python
-# src/domain/ports/contracts/__init__.py
-"""契约层 — 领域层端口定义
+# src/domain/ports/__init__.py
+"""领域层端口 — 核心业务接口定义
 
-所有端口必须定义在此目录，按功能模块组织。
-禁止在此目录定义任何实现类。
+按功能模块组织：
+- 存储分层: l0_storage, l1_cache, l2_rdb, l3_vector, l4_object, l5_graph
+- 仓储: user_repository, role_repository, audit_repository
+- 认证授权: auth_service, permission_service, token_blacklist
+- 事件: event_publisher
+- 合规: compliance_gateway, sensitive_data_detector
 """
 
-from src.domain.ports.contracts.user_repository import UserRepositoryPort
-from src.domain.ports.contracts.cache import L1CachePort
-from src.domain.ports.contracts.event_publisher import EventPublisher
-# ... 其他端口
+# src/application/ports/__init__.py
+"""应用层端口 — 应用服务接口定义
+
+按功能模块组织：
+- 缓存: semantic_cache
+- 协作: public_blackboard
+- 沙箱: sandbox_port
+- 监控: metrics_port, exception_metrics_port
+- 文本处理: text_extractor_service, compressor_service
+- 事件: event_subscriber
+"""
 ```
 
 **契约定义规范**:
 ```python
-# src/domain/ports/contracts/user_repository.py
+# src/domain/ports/user_repository.py
 """用户仓储端口契约"""
 
 from __future__ import annotations
 
 from typing import Protocol, UUID
 from src.domain.entities.user import User
-from src.domain.ports.contracts.errors import NotFoundError
 
 
 class UserRepositoryPort(Protocol):
@@ -808,13 +849,17 @@ async def test_get_user(user_service, mock_user_repo):
 
 > **本清单是唯一合法端口来源（Single Source of Truth），不是文档而是系统约束。**
 
+**端口契约来自两个独立来源（各有用途，不需要迁移）：**
+- `src/domain/ports/` - 领域层核心端口（37个）
+- `src/application/ports/` - 应用层服务端口（7个）
+
 **所有开发必须满足以下约束：**
 
 1. **禁止定义未在本清单登记的端口**
 2. **禁止新增端口未同步更新本清单**
 3. **禁止存在语义重复端口**（必须合并）
 4. **每个端口必须满足：**
-   - 已定义 contract（domain/ports/contracts）
+   - 已定义在 domain/ports/ 或 application/ports/
    - 已在 registry 注册
    - 已有 contract test
    - 已声明 owner + version
@@ -853,64 +898,82 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 ### 2.1 契约层端口（实际统计与目标状态）
 
 > **⚠️ 实际统计（Round 1调研结果）**:
-> - `src/domain/ports/*.py` 定义: **41个**
-> - `src/domain/services/*.py` 定义: **6个**（服务内Protocol，应迁移）
-> - `src/application/ports/*.py` 定义: **7个**（应迁移到Domain）
-> - **合计**: 41 + 6 + 7 = **54个**（含冗余）
+> - `src/domain/ports/*.py` 定义: **37个**
+> - `src/domain/services/*.py` 定义: **6个**（服务内Protocol，待迁移到domain/ports/）
+> - `src/application/ports/*.py` 定义: **7个**（保留，不迁移）
+> - **合计**: 37 + 6 + 7 = **50个**（含冗余）
 >
-> **目标状态**: 清理后约 **48个**（40个核心 + 4个废弃 + 8个迁移）
+> **目标状态**: 清理后约 **43个**（37 domain + 6 待迁移 - 废弃 = ~43）
 >
-> **差异原因**: 部分接口存在冗余定义（如VectorStorage≈L3VectorPort），需合并后才是真正的"契约清单"
+> **差异原因**: 部分接口存在冗余定义（如VectorStorage≈L3VectorPort），需合并
+
+**端口契约来源（两者各有用途，独立共存）：**
+
+| 来源 | 目录 | 端口数 | 说明 |
+|------|------|--------|------|
+| Domain层 | `src/domain/ports/` | 37 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
+| Application层 | `src/application/ports/` | 7 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
+| 服务内Protocol | `src/domain/services/` | 6 | 待迁移到domain/ports/ |
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
-| **仓储基础** |
-| `UserRepositoryPort` | contracts/user_repository.py | 用户数据访问 | infrastructure/user_repo | **待注册** |
-| `UserRoleRepositoryPort` | contracts/user_role_repository.py | 用户-角色关联 | infrastructure/user_role_repo | **待注册** |
-| `LoginAttemptRepositoryPort` | contracts/login_attempt_repository.py | 登录尝试跟踪 | infrastructure/login_attempt_repo | **待注册** |
-| `AuditRepositoryPort` | contracts/audit_repository.py | 审计日志存储 | infrastructure/audit_repo | **待注册** |
-| **存储分层（L0-L5）** |
-| `L0StoragePort` | contracts/l0_storage.py | L0文件系统 | infrastructure/l0_file_adapter | **待注册** |
-| `L1CachePort` | contracts/l1_cache.py | L1 Redis缓存 | infrastructure/l1_redis_cache | **待注册** |
-| `L2MetadataRepositoryPort` | contracts/l2_metadata.py | L2元数据 | infrastructure/l2_postgresql | **待注册** |
-| `L2ChangeHistoryRepositoryPort` | contracts/l2_change_history.py | L2变更历史 | infrastructure/l2_postgresql | **待注册** |
-| `L2GroupMemberRepositoryPort` | contracts/l2_group_member.py | L2群组成员 | infrastructure/l2_postgresql | **待注册** |
-| `L3VectorPort` | contracts/l3_vector.py | L3向量存储(+CollectionManager) | infrastructure/l3_qdrant | **待注册** |
-| ~~`VectorStorage`~~ | — | L3向量存储(废弃) | — | **废弃→迁移前需先扩展L3VectorPort补充create_collection/delete_collection** |
-| `L4ObjectPort` | contracts/l4_object.py | L4对象存储(+list_objects) | infrastructure/l4_minio | **待注册** |
-| ~~`ObjectStorageRepository`~~ | — | L4对象存储(废弃) | — | **废弃→迁移前需先扩展L4ObjectPort补充list_objects** |
-| `L5GraphPort` | contracts/l5_graph.py | L5图存储 | infrastructure/l5_neo4j | **待注册** |
-| ~~`GraphManager`~~ | — | L5图管理(废弃) | — | **废弃→合并到L5GraphPort** |
-| ~~`GraphStorage`~~ | — | L5图存储(废弃) | — | **废弃→合并到L5GraphPort** |
-| `UnifiedStoragePort` | contracts/unified_storage.py | 统一存储入口 | infrastructure/unified_storage | **待注册** |
-| `SessionStoragePort` | contracts/session_storage.py | 会话状态存储 | infrastructure/session_redis | **待整合** |
-| `IndexManagerPort` | contracts/index_manager.py | MEMORY索引 | infrastructure/memory_index | **待注册** |
-| **事件发布** |
-| `EventPublisherPort` | contracts/event_publisher.py | 领域事件发布(返回PublishResult) | infrastructure/event_publisher | **待注册** |
-| ~~`EventPublisherProtocol`~~ | 4处服务内定义 | 事件发布(返回None) | — | **废弃→统一为EventPublisherPort** ⚠️返回类型不一致 |
-| `InMemoryEventPublisher` | contracts/event_publisher.py | 内存事件发布 | — | **待废弃→合并到EventPublisherPort** |
-| **服务内Protocol（待迁移）** |
-| `SandboxExecutorProtocol` | auto_execute_service.py | 沙箱执行(迁移至contracts/sandbox.py) | — | **待迁移** |
-| `SnapshotRepositoryProtocol` | auto_execute_service.py | 快照存储(迁移至contracts/snapshot.py) | — | **待迁移** |
-| `HashRouterProtocol` | auto_route_service.py | 哈希路由(迁移至contracts/routing.py) | — | **待迁移** |
-| `SemanticRouterProtocol` | auto_route_service.py | 语义路由(迁移至contracts/routing.py) | — | **待迁移** |
-| **认证授权** |
-| `AuthServicePort` | contracts/auth_service.py | 认证服务 | infrastructure/auth_service | **待注册** |
-| `PermissionServicePort` | contracts/permission_service.py | 权限检查 | infrastructure/permission_service | **待注册** |
-| `TokenBlacklistPort` | contracts/token_blacklist.py | JWT黑名单 | infrastructure/token_blacklist | **待注册** |
-| **合规服务** |
-| `ComplianceGatewayPort` | contracts/compliance_gateway.py | UDMR合规检查 | infrastructure/compliance_gateway | **待注册** |
-| `SensitiveDataDetectorPort` | contracts/sensitive_data_detector.py | 敏感数据检测 | infrastructure/sensitive_data_detector | **待注册** |
-| `DataResidencyEnforcerPort` | contracts/data_residency_enforcer.py | 数据驻留强制 | infrastructure/data_residency_enforcer | **待注册** |
-| **Application层待迁移** |
-| `SemanticCache` | contracts/semantic_cache.py | 语义缓存(从application迁移) | — | **迁移中→Domain层** |
-| `PublicBlackboard` | contracts/public_blackboard.py | 公共黑板(从application迁移) | — | **迁移中→Domain层** |
-| `SandboxExecutor` | contracts/sandbox.py | 沙箱执行器(从application迁移) | — | **迁移中→Domain层** |
-| `MetricsPort` | contracts/metrics.py | 指标端口(从application迁移) | — | **迁移中→Domain层** |
-| `ExceptionMetricsPort` | contracts/exception_metrics.py | 异常指标端口(从application迁移) | — | **迁移中→Domain层** |
-| `EventSubscriber` | contracts/event_subscriber.py | 事件订阅器(从application迁移) | — | **迁移中→Domain层** |
-| `TextExtractorService` | contracts/text_extractor.py | 文本提取服务(从application迁移) | — | **迁移中→Domain层** |
-| `CompressorService` | contracts/compressor.py | 压缩服务(从application迁移) | — | **迁移中→Domain层** |
+| **Domain层 - 存储分层（L0-L5）** |
+| `L0StoragePort` | domain/ports/l0_storage.py | L0文件系统 | infrastructure | **待注册** |
+| `L1CachePort` | domain/ports/l1_cache.py | L1 Redis缓存 | infrastructure | **待注册** |
+| `L2RdbPort` | domain/ports/l2_rdb.py | L2关系存储 | infrastructure | **待注册** |
+| `L3VectorPort` | domain/ports/l3_vector.py | L3向量存储 | infrastructure | **待注册** |
+| ~~`VectorStorage`~~ | domain/ports/vector_storage.py | L3向量存储 | — | **废弃→合并到L3VectorPort** |
+| `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **待注册** |
+| ~~`ObjectStorageRepository`~~ | domain/ports/storage.py | L4对象存储 | — | **废弃→合并到L4ObjectPort** |
+| `L5GraphPort` | domain/ports/l5_graph.py | L5图存储 | infrastructure | **待注册** |
+| ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃→合并到L5GraphPort** |
+| ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃→合并到L5GraphPort** |
+| `UnifiedStoragePort` | domain/ports/unified_storage.py | 统一存储入口 | infrastructure | **待注册** |
+| `SessionStoragePort` | domain/ports/session_storage.py | 会话状态存储 | infrastructure | **待注册** |
+| `IndexManagerPort` | domain/ports/index_manager.py | MEMORY索引 | infrastructure | **待注册** |
+| **Domain层 - 仓储** |
+| `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **待注册** |
+| `RoleRepositoryPort` | domain/ports/role_repository.py | 角色存储 | infrastructure | **待注册** |
+| `UserRoleRepositoryPort` | domain/ports/user_role_repository.py | 用户-角色关联 | infrastructure | **待注册** |
+| `LoginAttemptRepositoryPort` | domain/ports/login_attempt_repository.py | 登录尝试跟踪 | infrastructure | **待注册** |
+| `AuditRepositoryPort` | domain/ports/audit_repository.py | 审计日志存储 | infrastructure | **待注册** |
+| `AuditServicePort` | domain/ports/audit_service.py | 审计服务 | infrastructure | **待注册** |
+| **Domain层 - 认证授权** |
+| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **待注册** |
+| `PermissionServicePort` | domain/ports/permission_service.py | 权限检查 | infrastructure | **待注册** |
+| `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **待注册** |
+| `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **待注册** |
+| **Domain层 - 事件** |
+| `EventPublisherPort` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **待注册** |
+| ~~`EventPublisherProtocol`~~ | 4处服务内定义 | 事件发布(返回None) | — | **废弃→统一为EventPublisherPort** |
+| `InMemoryEventPublisher` | domain/ports/event_publisher.py | 内存事件发布 | — | **待废弃→合并到EventPublisherPort** |
+| **Domain层 - 合规服务** |
+| `ComplianceGatewayPort` | domain/ports/compliance_gateway.py | UDMR合规检查 | infrastructure | **待注册** |
+| `SensitiveDataDetectorPort` | domain/ports/sensitive_data_detector.py | 敏感数据检测 | infrastructure | **待注册** |
+| `DataResidencyEnforcerPort` | domain/ports/data_residency_enforcer.py | 数据驻留强制 | infrastructure | **待注册** |
+| `WhitelistServicePort` | domain/ports/whitelist_service.py | 白名单服务 | infrastructure | **待注册** |
+| `PIPLComplianceServicePort` | domain/ports/pipl_compliance_service.py | PIPL合规 | infrastructure | **待注册** |
+| `CrossBorderTransferServicePort` | domain/ports/cross_border_transfer_service.py | 跨境传输 | infrastructure | **待注册** |
+| **Domain层 - 其他** |
+| `OutboxPort` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **待注册** |
+| `UnitOfWorkPort` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
+| `HealthCheckPort` | domain/ports/health_check.py | 健康检查 | infrastructure | **待注册** |
+| `IntegrityPort` | domain/ports/integrity.py | 完整性检查 | infrastructure | **待注册** |
+| `StorageEnums` | domain/ports/storage_enums.py | 存储枚举 | — | **参考使用** |
+| **Domain层 - 服务内Protocol（待迁移）** |
+| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **待迁移到domain/ports/** |
+| `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **待迁移到domain/ports/** |
+| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **待迁移到domain/ports/** |
+| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **待迁移到domain/ports/** |
+| **Application层 - 服务端口（保留，不迁移）** |
+| `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
+| `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
+| `SandboxExecutor` | application/ports/sandbox_port.py | 沙箱执行器 | infrastructure | **待注册** |
+| `MetricsPort` | application/ports/metrics_port.py | 指标端口 | infrastructure | **待注册** |
+| `ExceptionMetricsPort` | application/ports/exception_metrics_port.py | 异常指标 | infrastructure | **待注册** |
+| `EventSubscriber` | application/ports/event_subscriber.py | 事件订阅器 | infrastructure | **待注册** |
+| `TextExtractorService` | application/ports/text_extractor_service.py | 文本提取 | infrastructure | **待注册** |
+| `CompressorService` | application/ports/compressor_service.py | 压缩服务 | infrastructure | **待注册** |
 
 ### 2.1.1 SessionStorage与L1CachePort协作关系
 
@@ -999,14 +1062,12 @@ print(f'All {len(registry)} ports registered')
 
 | 规则 | 违规示例 | 正确做法 |
 |------|----------|----------|
-| 禁止业务代码 import 实现 | `from infra.user_repo import SqlAlchemyUserRepo` | `from ports import UserRepositoryPort` |
-| 禁止在契约外定义接口 | `class MyPort(Protocol)` 在其他文件 | 所有接口在 `contracts/` 目录 |
-| 禁止在服务内定义Protocol | `class Service: class Port(Protocol):` | 导入已注册的端口 |
+| 禁止业务代码 import 实现 | `from infra.user_repo import SqlAlchemyUserRepo` | `from domain.ports import UserRepositoryPort` |
+| 禁止在服务内定义Protocol | `class Service: class Port(Protocol):` | 迁移到 domain/ports/ 目录 |
 | 禁止直接实例化 | `repo = SqlAlchemyUserRepo()` | `repo = resolve("user_repo")` |
-| **新增** 禁止Infrastructure导入Application | `from src.application.ports import XxxPort` | `from src.domain.ports.contracts import XxxPort` |
-| **新增** 禁止Domain层使用技术绑定Base | `class UserModel(Base)` where Base is DeclarativeBase | 使用无技术绑定Base或迁移Base到Domain |
-| **新增** 禁止使用废弃接口 | `VectorStorage`, `GraphManager`, `GraphStorage`, `ObjectStorageRepository` | 迁移到 L3VectorPort/L5GraphPort/L4ObjectPort |
-| **新增** 禁止接口返回类型不一致 | 本地Protocol返回None，正式Port返回PublishResult | 统一EventPublisherPort返回类型 |
+| 禁止Domain层使用技术绑定Base | `class UserModel(Base)` where Base is DeclarativeBase | 使用无技术绑定Base |
+| 禁止使用废弃接口 | `VectorStorage`, `GraphManager`, `GraphStorage`, `ObjectStorageRepository` | 迁移到 L3VectorPort/L5GraphPort/L4ObjectPort |
+| 禁止接口返回类型不一致 | 本地Protocol返回None，正式Port返回PublishResult | 统一EventPublisherPort返回类型 |
 
 ### 4.2 架构约束集成
 
@@ -1048,40 +1109,45 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
-| 阶段1 | P0-19, P0-20, | contracts/目录包含≥48个Protocol契约 |
-| 阶段2 | P0-7, P0-8, P0-9 | registry包含≥48个Protocol |
+| 阶段1 | P0-19, P0-20 | domain/ports/ + application/ports/ 契约完整，无服务内Protocol |
+| 阶段2 | P0-7, P0-8, P0-9 | registry包含所有端口(domain+application) |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, | 服务内无Protocol定义，无7处违规导入(role_repository.py的Exception×2 + MetricsPort×1 + ExceptionMetricsPort×1 + SandboxExecutor×2 + EventSubscriber×1)，AutoRouteHandler事件发布修复 |
-| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥48个Protocol |
+| 阶段4 | P0-1~5, P0-6, P0-18, P0-24 | 服务内无Protocol定义，Exception违规导入修复，AutoRouteHandler事件发布修复 |
+| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖所有端口 |
 | 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
 
 ### 5.2 详细执行步骤
 
 ```
-阶段1: 创建契约层结构
-- [ ] 1.1 创建 src/domain/ports/contracts/ 目录
-- [ ] 1.2 迁移application/ports定义到Domain层
-  - [ ] 迁移 SemanticCache → contracts/semantic_cache.py
-  - [ ] 迁移 PublicBlackboard → contracts/public_blackboard.py
-    - [ ] 迁移 SandboxExecutor → contracts/sandbox.py
-- [ ] 1.3 定义35个核心端口契约
+阶段1: 契约层结构整理
+- [ ] 1.1 整理 domain/ports/ 契约清单（37个）
+  - [ ] 验证所有契约可被正确import
+  - [ ] 验证契约定义无重复
+- [ ] 1.2 整理 application/ports/ 契约清单（7个）
+  - [ ] 验证所有契约可被正确import
+  - [ ] 确认不需要迁移到domain层
+- [ ] 1.3 迁移服务内Protocol到 domain/ports/
+  - [ ] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor_protocol.py
+  - [ ] 迁移 SnapshotRepositoryProtocol → domain/ports/snapshot_repository_protocol.py
+  - [ ] 迁移 EventPublisherProtocol → domain/ports/event_publisher_protocol.py（统一4处重复）
+  - [ ] 迁移 HashRouterProtocol → domain/ports/hash_router_protocol.py
+  - [ ] 迁移 SemanticRouterProtocol → domain/ports/semantic_router_protocol.py
+  - [ ] 更新各服务文件导入
+  - [ ] 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
 - [ ] 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
 - [ ] 1.5 契约层完整性验证【关键检查点】
-    - [ ] 1.5.1 验证所有48个契约可被正确import
-        - [ ] python -c "from src.domain.ports.contracts import *; print('OK')"
+    - [ ] 1.5.1 验证所有契约可被正确import（domain + application）
     - [ ] 1.5.2 验证契约定义无重复（名称、接口）
-        - [ ] python scripts/check_duplicate_ports.py
     - [ ] 1.5.3 验证废弃接口(VectorStorage等)已移除
-        - [ ] grep -r "class VectorStorage\|class GraphManager\|class GraphStorage" src/domain/ports/contracts/ 应返回空
-    - [ ] 1.5.4 生成48个契约清单（含name/interface/path）供后续registry对照
+    - [ ] 1.5.4 验证服务内无Protocol定义
+    - [ ] 1.5.5 生成契约清单（含name/interface/path/source）供后续registry对照
 
 阶段2: 实现注册中心
 - [ ] 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
 - [ ] 2.2 实现 resolver.py (Resolver, resolve)
 - [ ] 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
 - [ ] 2.4 注册中心完整性验证【关键检查点】
-    - [ ] 2.4.1 验证registry.list_all()长度≥48
-        - [ ] python -c "from src.domain.ports.registry import _global_registry; assert len(_global_registry.list_all()) >= 48"
+    - [ ] 2.4.1 验证registry.list_all()包含domain/ports和application/ports所有契约
     - [ ] 2.4.2 验证每个PortSpec包含完整字段(name/version/interface/impl/module)
     - [ ] 2.4.3 验证无重复注册(同一name)
     - [ ] 2.4.4 验证废弃端口(VectorStorage等)未注册
@@ -1089,7 +1155,7 @@ print(f'All {len(registry)} ports registered')
 
 阶段3: 创建组合根 + 修复EventBusFactory
 - [ ] 3.1 创建 composition_root.py
-- [ ] 3.2 注册所有48个Protocol
+- [ ] 3.2 注册所有端口（domain/ports + application/ports）
 - [ ] 3.3 修复EventBusFactory初始化(基于实际代码分析)
   - [ ] 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
         - [ ] 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
@@ -1103,72 +1169,33 @@ print(f'All {len(registry)} ports registered')
         - [ ] EventBusFactory.get_event_bus() 不抛出RuntimeError
         - [ ] EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
 
-阶段3.5: 创建Domain异常定义【新增 - Phase 4前置条件】
+阶段3.5: 创建Domain异常定义【Phase 4前置条件】
 - [ ] 3.5.1 创建 src/domain/exceptions/__init__.py
 - [ ] 3.5.2 创建 src/domain/exceptions/role_exceptions.py
   - [ ] RoleNotFoundError
-    - [ ] RoleAlreadyExistsError
+  - [ ] RoleAlreadyExistsError
 - [ ] 3.5.3 修复role_repository.py导入(P0级别违规)
-  - [ ] role_repository.py:89 → from domain.exceptions.role_exceptions import RoleNotFoundError
-    - [ ] role_repository.py:222 → from domain.exceptions.role_exceptions import RoleAlreadyExistsError
-- [ ] 3.5.4 验证: grep -r "from src.application" src/infrastructure/ | grep -v "__pycache__" 应返回空或仅含允许项
+  - [ ] role_repository.py → from domain.exceptions.role_exceptions import RoleNotFoundError
+  - [ ] role_repository.py → from domain.exceptions.role_exceptions import RoleAlreadyExistsError
+- [ ] 3.5.4 验证: grep -r "from src.application" src/infrastructure/ | grep -v "__pycache__" 应返回空或仅含application层端口导入
 
-阶段4: 迁移服务代码
-- [ ] 4.1 迁移服务内Protocol定义到契约层
-  - [ ] 创建 src/domain/ports/contracts/ 目录（如Phase 1未完成）
-  - [ ] 创建 src/domain/ports/contracts/sandbox.py → SandboxExecutorProtocol
-  - [ ] 创建 src/domain/ports/contracts/snapshot.py → SnapshotRepositoryProtocol
-  - [ ] 创建 src/domain/ports/contracts/event_publisher.py → EventPublisherProtocol(统一4处重复)
-  - [ ] 创建 src/domain/ports/contracts/routing.py → HashRouterProtocol + SemanticRouterProtocol
-  - [ ] 更新 auto_execute_service.py 导入 SandboxExecutorProtocol/SnapshotRepositoryProtocol
-  - [ ] 更新 auto_route_service.py 导入 EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol
-  - [ ] 更新 auto_trigger_service.py 导入 EventPublisherProtocol(避免重复定义)
-  - [ ] 更新 auto_execute_completed_handler.py 导入 EventPublisherProtocol
-  - [ ] 更新 auto_route_handler.py 导入 EventPublisherProtocol
-    - [ ] 验证: grep -r "class.*Protocol" src/domain/services/ src/application/event_handlers/ 应返回空
-- [ ] 4.2 【已在Phase 3.5完成】Exception违规导入修复
-- [ ] 4.3 创建Domain层Port契约(迁移application/ports定义)【含风险评估】
-  - [ ] 创建 src/domain/ports/metrics_port.py → MetricsPort 【高风险:跨2层引用】
-  - [ ] 创建 src/domain/ports/exception_metrics_port.py → ExceptionMetricsPort 【低风险:1处引用】
-  - [ ] 创建 src/domain/ports/sandbox_port.py → SandboxExecutor 【高风险:2处引用】
-  - [ ] 创建 src/domain/ports/event_subscriber.py → EventSubscriber 【低风险:1处引用】
-  - [ ] 创建 src/domain/ports/semantic_cache.py → SemanticCache 【中风险:需检查实现】
-  - [ ] 创建 src/domain/ports/public_blackboard.py → PublicBlackboard 【中风险:需检查实现】
-  - [ ] 创建 src/domain/ports/text_extractor.py → TextExtractorService 【低风险:application层内部】
-    - [ ] 创建 src/domain/ports/compressor.py → CompressorService 【低风险:application层内部】
-- [ ] 4.4 更新Infrastructure层导入(指向Domain层)
-  - [ ] infrastructure/monitoring/metrics_port_impl.py → from src.domain.ports.metrics_port
-  - [ ] infrastructure/logging/exception_metrics_impl.py → from src.domain.ports.exception_metrics_port
-  - [ ] infrastructure/external_services/sandbox/session_namespace_manager.py → from src.domain.ports.sandbox_port
-  - [ ] infrastructure/external_services/sandbox/docker_sandbox_adapter.py → from src.domain.ports.sandbox_port
-    - [ ] infrastructure/messaging/redis_event_bus.py → from src.domain.ports.event_subscriber
-- [ ] 4.5 修复跨模块继承【验证通过 - 无需修复】
-  - [ ] 4.5.1 ✅ 已验证: grep -r "from sqlalchemy" src/domain/ 返回空
-  - [ ] 4.5.2 ✅ Domain层实体为纯dataclass，无技术绑定
-    - [ ] 4.5.3 说明: 文档描述为预防性原则，非实际违规
-  - [ ] 4.5.1 识别SQLAlchemy模型继承infrastructure Base的位置
-  - [ ] 4.5.2 将Base迁移到Domain层或使用无技术绑定Base
-    - [ ] 4.5.3 验证: grep -r "from sqlalchemy" src/domain/ 无结果
-- [ ] 4.6 修复L3VectorPort缺少CollectionManager问题
-  - [ ] 4.6.1 L3VectorPort补充create_collection/delete_collection/collection_exists/list_collections方法
-  - [ ] 4.6.2 QdrantVectorAdapter实现委托CollectionManager
-    - [ ] 4.6.3 废弃VectorStorage但保留其CollectionManager功能
-- [ ] 4.7 修复L5GraphPort缺少get_neighbors问题
-  - [ ] 4.7.1 L5GraphPort补充get_neighbors方法
-  - [ ] 4.7.2 Neo4jGraphAdapter实现get_neighbors
-    - [ ] 4.7.3 废弃GraphManager和GraphStorage
-- [ ] 4.8 修复L4ObjectPort缺少list_objects问题(如需要)
-    - [ ] 4.8.1 评估ObjectStorageRepository是否需合并到L4ObjectPort
-- [ ] 4.9 验证服务可正常解析
-- [ ] 4.10 验证: 无Infrastructure→Application依赖(7处全部修复)
-- [ ] 4.11 修复P0-6: AutoRouteHandler事件发布缺失
-  - [ ] 4.11.1 检查auto_route_handler.py的on_triggered()方法
-  - [ ] 4.11.2 添加缺失的_publish(routed)调用
-    - [ ] 4.11.3 验证: grep -A10 "on_triggered" src/domain/services/auto_route_handler.py | grep "_publish(routed)"
-- [ ] 4.12 修复P0-24: Domain层注释引用Application层接口
-    - [ ] 4.12.1 检查Domain层所有注释中的application引用
-    - [ ] 4.12.2 更新注释指向Domain层契约
-    - [ ] 4.12.3 验证: grep -rn "from src.application" src/domain/ | grep -v "^\s*#" 应返回空
+阶段4: 服务代码整理
+- [ ] 4.1 验证服务内无Protocol定义
+    - [ ] 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
+- [ ] 4.2 验证无Exception违规导入
+    - [ ] 验证: grep -r "from src.application" src/infrastructure/ | grep -v "ports" 应返回空
+- [ ] 4.3 修复L3VectorPort缺少CollectionManager问题
+  - [ ] 4.3.1 L3VectorPort补充create_collection/delete_collection/collection_exists/list_collections方法
+  - [ ] 4.3.2 废弃VectorStorage
+- [ ] 4.4 修复L5GraphPort缺少get_neighbors问题
+  - [ ] 4.4.1 L5GraphPort补充get_neighbors方法
+  - [ ] 4.4.2 废弃GraphManager和GraphStorage
+- [ ] 4.5 修复L4ObjectPort缺少list_objects问题(如需要)
+- [ ] 4.6 修复P0-6: AutoRouteHandler事件发布缺失
+  - [ ] 4.6.1 检查auto_route_handler.py的on_triggered()方法
+  - [ ] 4.6.2 添加缺失的_publish(routed)调用
+  - [ ] 4.6.3 验证: grep -A10 "on_triggered" src/domain/services/auto_route_handler.py | grep "_publish(routed)"
+- [ ] 4.7 验证服务可正常解析
 
 阶段5: 实现契约测试
 - [ ] 5.1 为每个端口创建契约测试基类
@@ -1181,16 +1208,28 @@ print(f'All {len(registry)} ports registered')
 - [ ] 6.3 编写文档和示例
 - [ ] 6.4 最终验证所有验收标准
 
-阶段7: 持续治理（防止回退）【新增】
+阶段7: 持续治理（防止回退）
 - [ ] 7.1 接口变更必须走流程
   - [ ] 修改契约 → 更新版本（semver）
   - [ ] 更新 registry
   - [ ] 运行 ContractGate 兼容性检查
-    - [ ] 更新接口清单
+  - [ ] 更新接口清单
 - [ ] 7.2 新增接口必须满足
   - [ ] 不存在语义重复
-  - [ ] 在 contracts/ 定义
+  - [ ] 在 domain/ports/ 或 application/ports/ 定义
   - [ ] 在 composition_root 注册
+  - [ ] 提供 contract test
+  - [ ] 指定 owner
+- [ ] 7.3 CI 强制检查
+  - [ ] 禁止 service 内定义 Protocol
+  - [ ] 禁止未注册端口被 resolve
+  - [ ] 禁止直接实例化实现类
+  - [ ] 禁止重复端口
+- [ ] 7.4 定期治理（每周）
+  - [ ] 扫描重复接口
+  - [ ] 检查废弃端口是否仍被使用
+  - [ ] 清理未注册实现
+```
   - [ ] 提供 contract test
     - [ ] 指定 owner
 - [ ] 7.3 CI 强制检查
@@ -1242,7 +1281,7 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 所有48个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥48 |
+| 所有端口已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥43（37 domain + 6 services - 废弃） |
 | 无重复注册 | registry无ValueError |
 | 契约测试通过 | `poetry run pytest tests/contracts/ -v` |
 | EventBusFactory初始化正确 | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_event_bus() is not None"` 不抛RuntimeError |
@@ -1251,12 +1290,11 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 无Infrastructure→Application依赖 | `grep -r "from src.application" src/infrastructure/ src/domain/services/` 应返回空 |
 | 无服务内Protocol定义 | `grep -r "class.*Protocol" src/domain/services/` 应返回空 |
 | 契约测试覆盖所有端口 | `poetry run pytest tests/contracts/ --collect-only` |
 | Domain层无技术绑定 | `grep -r "from sqlalchemy" src/domain/` 应返回空 |
 | 接口返回类型一致性 | EventPublisherPort实现返回PublishResult而非None |
-| Protocol实现声明完整 | 实现类声明实现对应Protocol(如QdrantCollectionManager实现CollectionManager) |
+| Protocol实现声明完整 | 实现类声明实现对应Protocol |
 
 ### 6.3 接口一致性验收
 
@@ -1264,8 +1302,7 @@ print(f'All {len(registry)} ports registered')
 |------|----------|
 | EventPublisherPort返回类型统一 | `grep -r "def publish" src/domain/ports/event_publisher.py` 返回PublishResult |
 | AutoRouteHandler事件发布 | `grep -A10 "on_triggered" src/domain/services/auto_route_handler.py \| grep "_publish(routed)"` 有结果 |
-| 实现类Protocol声明 | `grep -L "implements\|Protocol)" src/infrastructure/storage/*/adapter.py` 应返回空 |
-| Domain注释无Application引用 | `grep -r "from src.application" src/domain/ \| grep -v "^\s*#"` 应返回空 |
+| 实现类Protocol声明 | 检查实现类正确声明实现对应Protocol |
 
 ### 6.4 集成验收
 
@@ -1288,16 +1325,15 @@ poetry run python -m pylyzer src/domain/ports/
 | 验证项 | 验证命令 | 触发条件 |
 |--------|----------|----------|
 | **Phase 1.5 契约层验证** | | |
-| 契约可import | `python -c "from src.domain.ports.contracts import *"` ⚠️需先创建contracts目录 | 每次新增契约后 |
-| 无重复契约定义 | `python scripts/check_duplicate_ports.py` ⚠️需先创建此脚本 | 每次新增契约后 |
-| 废弃接口已移除 | `grep -r "class VectorStorage" src/domain/ports/contracts/` 应返回空 | 每次新增契约后 |
+| 契约可import | `python -c "from src.domain.ports import *; from src.application.ports import *"` | 每次新增契约后 |
+| 无重复契约定义 | `python scripts/check_duplicate_ports.py` | 每次新增契约后 |
+| 废弃接口已移除 | `grep -r "class VectorStorage" src/domain/ports/` 应返回空 | 每次新增契约后 |
 | **Phase 2.5 注册中心验证** | | |
-| 端口数量≥48 | `python -c "assert len(_global_registry.list_all()) >= 48"` | 每次注册后 |
+| 端口数量达标 | `python -c "assert len(_global_registry.list_all()) >= 43"` | 每次注册后 |
 | PortSpec字段完整 | 人工检查name/version/interface/impl/module | 每次注册后 |
 | 废弃端口未注册 | `python -c "assert 'VectorStorage' not in registry"` | 每次注册后 |
 | **持续治理（每次PR）** | | |
 | 无新增未登记端口 | `grep -r "Protocol" src/domain/services/` 应返回空 | 每次PR |
-| 端口数量不减少 | `python -c "assert len(registry) >= 48"` | 每次PR |
 | 无废弃接口使用 | `grep -r "VectorStorage\|GraphManager" src/` 应返回空 | 每次PR |
 | 无直接实例化 | `grep -r "SqlAlchemyUserRepo()" src/` 应返回空 | 每次PR |
 | 接口变更兼容性 | `python -c "run ContractGate.check_compatibility()"` | 每次涉及契约修改的PR |
@@ -1344,6 +1380,7 @@ poetry run python -m pylyzer src/domain/ports/
 | v3.3 | 2026-05-12 | Round 2审查 - 接口合并前提条件(L3需补充CollectionManager,L4需补充list_objects) |
 | v3.4 | 2026-05-12 | Round 3审查 - 新增Phase 3.5,修正路径格式,补充迁移风险评估,澄清跨模块继承 |
 | v3.5 | 2026-05-12 | Round 4审查 - 修正Phase 3.5执行顺序,更新时间估算(18-26h→28-39h),补充契约测试框架建议 |
+| v4.0 | 2026-05-12 | **架构修正**: 不迁移application/ports，建立双层端口契约体系(domain/ports + application/ports) |
 
 ### 审查修复历史
 
@@ -1355,15 +1392,18 @@ poetry run python -m pylyzer src/domain/ports/
 | R7 | **Round 2审查修正**: L3VectorPort需补充CollectionManager,L4ObjectPort需补充list_objects; EventPublisherProtocol返回类型不一致 |
 | R8 | **Round 3审查修正**: 新增Phase 3.5(domain异常定义); 路径格式修正; 迁移风险等级标注; Section 4.5澄清(无实际违规); scripts/check_duplicate_ports.py需创建 |
 | R9 | **Round 4审查修正**: Phase 3.5执行顺序正确(在Phase3后Phase4前),时间估算上调至28-39h,契约测试渐进式建议(先测5个核心) |
+| R10 | **v4.0架构修正**: 不迁移application/ports到domain/ports/contracts/，确认双层端口契约体系 |
 
 ---
 
 *文档版本: v3.5*
 *核心更新: 统一端口注册管理机制（4层架构）*
-*- Layer 1: Port Contract (契约层) - 只定义接口*
-*- Layer 2: Registry (注册层) - 统一登记元数据*
-*- Layer 3: Resolver (解析层) - 依赖注入容器*
-*- Layer 4: Contract Gate (契约门禁层) - 契约测试+兼容性检查*
-*- Composition Root: 组合根 - 所有注册在此完成*
+*- Layer 1: Port Contract (契约层) - 定义在 domain/ports/ 和 application/ports/
+*- Layer 2: Registry (注册层) - 统一登记元数据
+*- Layer 3: Resolver (解析层) - 依赖注入容器
+*- Layer 4: Contract Gate (契约门禁层) - 契约测试+兼容性检查
+*- Composition Root: 组合根 - 所有注册在此完成
 
-> **注意**: 本文档第1-4层架构代码示例为**设计方案**，实际代码库中尚未实现。执行重构时需先创建 `src/domain/ports/registry.py`、`src/domain/ports/resolver.py`、`src/composition_root.py` 等文件。
+> **注意**: 本文档第2-4层架构代码示例为**设计方案**，实际代码库中尚未实现。执行重构时需先创建 `src/domain/ports/registry.py`、`src/domain/ports/resolver.py`、`src/composition_root.py` 等文件。
+
+> **v4.0架构说明**: 端口契约定义保持在原有位置（domain/ports/ 和 application/ports/），不迁移、不创建 contracts/ 目录。两者各有用途，独立共存。
