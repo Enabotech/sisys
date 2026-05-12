@@ -13,6 +13,7 @@ from typing import Any, cast
 import redis.asyncio as aioredis
 
 from src.domain.events.base import DomainEvent
+from src.domain.events.publish_result import PublishResult
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.utils import json_dumps
 
@@ -55,12 +56,15 @@ class RedisEventPublisher:
             )
         return self._pool
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
         """发布领域事件到 Redis 通道。
 
         Args:
             event: 领域事件实例
             channel: 通道名，默认使用事件类型
+
+        Returns:
+            PublishResult: 发布结果
         """
         if channel is None:
             channel = f"{self._NAMESPACE}:{event.event_type}"
@@ -71,12 +75,18 @@ class RedisEventPublisher:
                 payload = json_dumps(event.to_dict())
                 await client.publish(channel, payload)
                 logger.debug("Published event %s to channel %s", event.event_id, channel)
+                return PublishResult(event_id=str(event.event_id), redis_success=True)
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
             logger.error(
                 "Failed to publish event %s to Redis channel %s: %s",
                 event.event_id,
                 channel,
                 e,
+            )
+            return PublishResult(
+                event_id=str(event.event_id),
+                redis_success=False,
+                redis_error=str(e),
             )
 
     async def close(self) -> None:
