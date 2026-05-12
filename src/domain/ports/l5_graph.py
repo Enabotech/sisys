@@ -152,3 +152,20 @@ class L5GraphPort(Protocol):
         Returns:
             查询结果列表（字典列表）
         """
+
+    async def get_neighbors(
+        self,
+        memory_id: str,
+        max_depth: int = 1,
+        edge_type: str | None = None,
+    ) -> list[dict]:
+        """获取邻居节点（直接关联的实体）。
+
+        Args:
+            memory_id: 实体主键
+            max_depth: 最大深度（默认 1，只看直接邻居）
+            edge_type: 过滤边类型，None 表示所有
+
+        Returns:
+            邻居节点列表 [{memory_id, type, properties}, ...]
+        """
