@@ -81,62 +81,69 @@
 ## 🏗️ 技术架构
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
-flowchart LR
+%%{init: {'theme': 'base', 'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
+flowchart TB
     subgraph USER["👤 用户层"]
+        direction LR
         U1["🏢 高管"]:::u
         U2["📊 分析师"]:::u
         U3["💼 顾问"]:::u
-        U4["🔗 API"]:::u
+        U4["🔗 API集成"]:::u
     end
 
     subgraph IFACE["🎯 接口层"]
-        I1["🖥️ CLI · Typer"]:::i
-        I2["🌐 REST API · FastAPI"]:::i
-        I3["📋 Skills · L1/L2/L3"]:::i
+        direction LR
+        I1["🖥️ CLI"]:::i
+        I2["🌐 REST API"]:::i
+        I3["📋 Skills"]:::i
     end
 
     subgraph APP["⚙️ 应用层"]
+        direction LR
         A1["📄 文档处理"]:::a
         A2["📊 战略分析"]:::a
-        A3["🤖 Agent 协作"]:::a
+        A3["🤖 Agent协作"]:::a
         A4["📋 规划生成"]:::a
     end
 
     subgraph DOMAIN["💎 领域层"]
-        D1["Document"]:::d
-        D2["Agent · Tool · Plan"]:::d
-        D3["Checkpoint · Archive"]:::d
-        D4["RoutingLog"]:::d
-        P1["RAG · Tool · Agent · Plan · Eval"]:::p
+        direction LR
+        D1["📦 Document"]:::d
+        D2["🤖 Agent · 🔧 Tool"]:::d
+        D3["📋 Plan · Checkpoint · Archive"]:::d
+        D4["📊 RoutingLog"]:::d
+        P1["🔌 RAG · Tool · Agent · Plan · Eval"]:::p
     end
 
     subgraph INFRA["🏗️ 基础设施层"]
+        direction LR
         subgraph STACK["💾 六层存储"]
-            S1["📁 L0 · MEMORY"]:::s
-            S2["⚡ L1 · Redis"]:::s
-            S3["🗄️ L2 · PostgreSQL"]:::s
-            S4["🔮 L3 · Qdrant"]:::s
-            S5["📦 L4 · MinIO"]:::s
-            S6["🕸️ L5 · Neo4j"]:::s
+            direction TB
+            S1["📁 L0"]:::s
+            S2["⚡ L1"]:::s
+            S3["🗄️ L2"]:::s
+            S4["🔮 L3"]:::s
+            S5["📦 L4"]:::s
+            S6["🕸️ L5"]:::s
         end
         subgraph BUS["⚡ 事件与计算"]
+            direction TB
             B1["🐰 RabbitMQ"]:::b
-            B2["📡 Redis Pub/Sub"]:::b
-            B3["🐳 Docker 沙箱"]:::b
+            B2["📡 Redis"]:::b
+            B3["🐳 Docker"]:::b
             B4["🤖 LiteLLM"]:::b
         end
     end
 
     USER --> IFACE --> APP --> DOMAIN --> INFRA
 
-    classDef u fill:#f3f4f6,stroke:#6b7280,color:#374151,rx:8,ry:8
-    classDef i fill:#dbeafe,stroke:#2563eb,color:#1e40af,rx:8,ry:8
-    classDef a fill:#fef3c7,stroke:#d97706,color:#92400e,rx:8,ry:8
-    classDef d fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:8,ry:8
-    classDef p fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:8,ry:8
-    classDef s fill:#d1fae5,stroke:#059669,color:#065f46,rx:8,ry:8
-    classDef b fill:#ede9fe,stroke:#7c3aed,color:#5b21b6,rx:8,ry:8
+    classDef u fill:#f3f4f6,stroke:#6b7280,color:#374151,rx:12,ry:12,stroke-width:2
+    classDef i fill:#dbeafe,stroke:#2563eb,color:#1e40af,rx:12,ry:12,stroke-width:2
+    classDef a fill:#fef3c7,stroke:#d97706,color:#92400e,rx:12,ry:12,stroke-width:2
+    classDef d fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:12,ry:12,stroke-width:2
+    classDef p fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:12,ry:12,stroke-width:2
+    classDef s fill:#d1fae5,stroke:#059669,color:#065f46,rx:12,ry:12,stroke-width:2
+    classDef b fill:#ede9fe,stroke:#7c3aed,color:#5b21b6,rx:12,ry:12,stroke-width:2
 ```
 
 ---
