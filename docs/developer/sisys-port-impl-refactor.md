@@ -1,8 +1,30 @@
 # SISYS 端口开发与管理重构执行方案
 
-**文档版本:** v3.0
+**文档版本:** v3.5
 **生成时间:** 2026-05-12
 **基于:** sisys-port-impl-report.md 全面调研结果
+
+---
+
+## 实现状态（重要前置说明）
+
+> ⚠️ **本文档描述的是目标架构，执行前需先创建基础设施。**
+
+| 组件 | 状态 | 说明 |
+|------|------|------|
+| **契约层代码** | ⚠️ 部分存在 | `domain/ports/` 下有约41个Protocol定义，但缺少contracts/子目录 |
+| **注册中心(registry.py)** | ❌ 未实现 | 需先创建 `src/domain/ports/registry.py` |
+| **解析器(resolver.py)** | ❌ 未实现 | 需先创建 `src/domain/ports/resolver.py` |
+| **契约门禁(contract_gate.py)** | ❌ 未实现 | 需先创建 `src/domain/ports/contract_gate.py` |
+| **组合根(composition_root.py)** | ❌ 未实现 | 需先创建 `src/composition_root.py` |
+| **校验脚本** | ❌ 缺失 | 需先创建 `scripts/check_duplicate_ports.py` |
+| **契约测试基类** | ❌ 未实现 | `tests/contracts/ports/` 仅有API测试，缺Port测试 |
+| **PortContractTest基类** | ⚠️ 文档有设计 | 代码未实现，且设计有缺陷需改进 |
+
+### 前置工作量
+- 基础设施创建: **12-18小时**
+- Phase执行: **28-39小时**
+- **总工时: 40-57小时**
 
 ---
 
@@ -1344,24 +1366,23 @@ poetry run python -m pylyzer src/domain/ports/
 | v3.3 | 2026-05-12 | Round 2审查 - 接口合并前提条件(L3需补充CollectionManager,L4需补充list_objects) |
 | v3.4 | 2026-05-12 | Round 3审查 - 新增Phase 3.5,修正路径格式,补充迁移风险评估,澄清跨模块继承 |
 | v3.5 | 2026-05-12 | Round 4审查 - 修正Phase 3.5执行顺序,更新时间估算(18-26h→28-39h),补充契约测试框架建议 |
+| v3.6 | 2026-05-12 | Round 5审查 - 添加实现状态说明,澄清基础设施未实现状态,补充前置工作量估算 |
 
 ### 审查修复历史
 
-| 轮次 | 提交 | 修复内容 |
-|------|------|----------|
-| R1 | b3938d64 | 补充P0问题映射与代码示例修正 |
-| R2 | d52f8490 | 基于实际代码调研修正(Protocol数量39→48) |
-| R3 | 5972b1e2 | 修正违规导入数量(2→7处) |
-| R4 | 89df46b7 | 消除V1~V6未定义引用并完善参考文献 |
-| R5 | — | 添加Phase 1.5/2.5关键检查点，完善Section 6.5验收标准 |
-| R6 | — | **Round 1审查修正**: Protocol统计澄清(41 domain + 6 services + 7 application = 54实际，清理后48目标) |
-| R7 | — | **Round 2审查修正**: L3VectorPort需补充CollectionManager,L4ObjectPort需补充list_objects; EventPublisherProtocol返回类型不一致 |
-| R8 | — | **Round 3审查修正**: 新增Phase 3.5(domain异常定义); 路径格式修正; 迁移风险等级标注; Section 4.5澄清(无实际违规); scripts/check_duplicate_ports.py需创建 |
-| R9 | — | **Round 4审查修正**: Phase 3.5执行顺序正确(在Phase3后Phase4前),时间估算上调至28-39h,契约测试渐进式建议(先测5个核心) |
+| 轮次 | 修复内容 |
+|------|----------|
+| R1-R4 | 补充P0问题映射与代码示例修正(commit哈希略) |
+| R5 | 添加Phase 1.5/2.5关键检查点，完善Section 6.5验收标准 |
+| R6 | **Round 1审查修正**: Protocol统计澄清(41 domain + 6 services + 7 application = 54实际，清理后48目标) |
+| R7 | **Round 2审查修正**: L3VectorPort需补充CollectionManager,L4ObjectPort需补充list_objects; EventPublisherProtocol返回类型不一致 |
+| R8 | **Round 3审查修正**: 新增Phase 3.5(domain异常定义); 路径格式修正; 迁移风险等级标注; Section 4.5澄清(无实际违规); scripts/check_duplicate_ports.py需创建 |
+| R9 | **Round 4审查修正**: Phase 3.5执行顺序正确(在Phase3后Phase4前),时间估算上调至28-39h,契约测试渐进式建议(先测5个核心) |
+| R10 | **Round 5审查修正**: 添加实现状态说明,澄清基础设施未实现状态,补充前置工作量估算(12-18h基础设施+28-39h执行=40-57h总工时) |
 
 ---
 
-*文档版本: v3.5*
+*文档版本: v3.6*
 *核心更新: 统一端口注册管理机制（4层架构）*
 *- Layer 1: Port Contract (契约层) - 只定义接口*
 *- Layer 2: Registry (注册层) - 统一登记元数据*
