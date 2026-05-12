@@ -986,40 +986,63 @@ print(f'All {len(registry)} ports registered')
 阶段3: 创建组合根 + 修复EventBusFactory
 ├── 3.1 创建 composition_root.py
 ├── 3.2 注册所有41个Protocol
-├── 3.3 修复EventBusFactory初始化
-│   ├── 3.3.1 识别3个问题组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)
-│   ├── 3.3.2 修复初始化顺序(延迟初始化+单例复用)
-│   └── 3.3.3 验证: EventBusFactory.get_event_bus() 不抛出RuntimeError
-└── 3.4 验证: EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
+├── 3.3 修复EventBusFactory初始化(基于实际代码分析)
+│   ├── 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
+│   │   └── 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
+│   ├── 3.3.2 问题B: _get_outbox_repository()返回None
+│   │   └── 修复: outbox_repository从外部注入,工厂使用前校验非None
+│   ├── 3.3.3 问题C: create_dual_channel_bus()中Poller初始化问题
+│   │   └── 修复: 明确分离Poller创建逻辑,校验outbox_repository和_rabbitmq_publisher均非None
+│   ├── 3.3.4 使用@dataclass+__post_init__延迟初始化模式
+│   │   └── 构造函数接收redis_config/rabbitmq_config/outbox_repository参数
+│   └── 3.3.5 验证:
+│       ├── EventBusFactory.get_event_bus() 不抛出RuntimeError
+│       └── EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
 
 阶段4: 迁移服务代码
 ├── 4.1 迁移服务内Protocol定义到契约层
-│   ├── 迁移 auto_execute_service.py 的 SandboxExecutorProtocol/SnapshotRepositoryProtocol
-│   ├── 迁移 auto_route_service.py 的 EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol
-│   ├── 迁移 auto_trigger_service.py 的 EventPublisherProtocol(注意:已在auto_route中定义,避免重复)
+│   ├── 创建 src/domain/ports/contracts/ 目录
+│   ├── 创建 contracts/sandbox.py → SandboxExecutorPort
+│   ├── 创建 contracts/snapshot.py → SnapshotRepositoryPort
+│   ├── 创建 contracts/event_publisher.py → EventPublisherPort(统一重复定义)
+│   ├── 创建 contracts/hash_router.py → HashRouterPort
+│   ├── 创建 contracts/semantic_router.py → SemanticRouterPort
+│   ├── 更新 auto_execute_service.py 导入 SandboxExecutorPort/SnapshotRepositoryPort
+│   ├── 更新 auto_route_service.py 导入 EventPublisherPort/HashRouterPort/SemanticRouterPort
+│   ├── 更新 auto_trigger_service.py 导入 EventPublisherPort(避免重复定义)
 │   └── 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
-├── 4.2 更新Infrastructure层导入(指向Domain层)
-│   ├── 识别7处违规导入位置:
-│   │   ├── role_repository.py:89,222 (RoleNotFoundError/RoleAlreadyExistsError)
-│   │   ├── metrics_port_impl.py:10 (MetricsPort)
-│   │   ├── exception_metrics_impl.py:12 (ExceptionMetricsPort)
-│   │   ├── session_namespace_manager.py:12 (SandboxExecutor)
-│   │   ├── docker_sandbox_adapter.py:12 (SandboxExecutor等)
-│   │   └── redis_event_bus.py:7 (EventSubscriber)
-│   ├── 迁移对应Port到Domain层后更新导入路径
-│   └── 验证: grep -r "from src.application" src/infrastructure/ 应返回空
-├── 4.3 修复跨模块继承
-│   ├── 4.3.1 识别SQLAlchemy模型继承infrastructure Base的位置
-│   ├── 4.3.2 将Base迁移到Domain层或使用无技术绑定的Base
-│   └── 4.3.3 验证: grep -r "from sqlalchemy" src/domain/ 无结果
-├── 4.4 修复L3VectorPort缺少CollectionManager问题
-│   ├── 4.4.1 VectorStorage.CollectionManager迁移到L3VectorPort
-│   └── 4.4.2 废弃VectorStorage但保留其CollectionManager功能
-├── 4.5 修复L5GraphPort缺少get_neighbors问题
-│   ├── 4.5.1 GraphStorage.get_neighbors功能合并到L5GraphPort
-│   └── 4.5.2 废弃GraphManager和GraphStorage
-├── 4.6 验证服务可正常解析
-└── 4.7 验证: 无Infrastructure→Application依赖(7处全部修复)
+├── 4.2 修复Exception违规导入(P0级别,立即修复)
+│   ├── role_repository.py:89 → from domain.exceptions.role_exceptions import RoleNotFoundError
+│   └── role_repository.py:222 → from domain.exceptions.role_exceptions import RoleAlreadyExistsError
+├── 4.3 创建Domain层Port契约(迁移application/ports定义)
+│   ├── 创建 contracts/metrics_port.py → MetricsPort
+│   ├── 创建 contracts/exception_metrics_port.py → ExceptionMetricsPort
+│   ├── 创建 contracts/sandbox_port.py → SandboxExecutor(Port接口)
+│   ├── 创建 contracts/event_subscriber.py → EventSubscriber
+│   └── 创建 contracts/text_extractor.py → TextExtractorService
+│   └── 创建 contracts/compressor.py → CompressorService
+├── 4.4 更新Infrastructure层导入(指向Domain层)
+│   ├── metrics_port_impl.py:10 → from domain.ports.contracts import MetricsPort
+│   ├── exception_metrics_impl.py:12 → from domain.ports.contracts import ExceptionMetricsPort
+│   ├── session_namespace_manager.py:12 → from domain.ports.contracts import SandboxExecutor
+│   ├── docker_sandbox_adapter.py:12 → from domain.ports.contracts import SandboxExecutor
+│   └── redis_event_bus.py:7 → from domain.ports.contracts import EventSubscriber
+├── 4.5 修复跨模块继承
+│   ├── 4.5.1 识别SQLAlchemy模型继承infrastructure Base的位置
+│   ├── 4.5.2 将Base迁移到Domain层或使用无技术绑定Base
+│   └── 4.5.3 验证: grep -r "from sqlalchemy" src/domain/ 无结果
+├── 4.6 修复L3VectorPort缺少CollectionManager问题
+│   ├── 4.6.1 L3VectorPort补充create_collection/delete_collection/collection_exists/list_collections方法
+│   ├── 4.6.2 QdrantVectorAdapter实现委托CollectionManager
+│   └── 4.6.3 废弃VectorStorage但保留其CollectionManager功能
+├── 4.7 修复L5GraphPort缺少get_neighbors问题
+│   ├── 4.7.1 L5GraphPort补充get_neighbors方法
+│   ├── 4.7.2 Neo4jGraphAdapter实现get_neighbors
+│   └── 4.7.3 废弃GraphManager和GraphStorage
+├── 4.8 修复L4ObjectPort缺少list_objects问题(如需要)
+│   └── 4.8.1 评估ObjectStorageRepository是否需合并到L4ObjectPort
+├── 4.9 验证服务可正常解析
+└── 4.10 验证: 无Infrastructure→Application依赖(7处全部修复)
 
 阶段5: 实现契约测试
 ├── 5.1 为每个端口创建契约测试基类
