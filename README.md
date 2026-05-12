@@ -78,89 +78,66 @@
 - **L0-L3 四级修正分级** — 自动或人工审批
 
 ---
-
 ## 🏗️ 技术架构
 
 ```mermaid
-graph TB
-    subgraph Users["👤 用户层"]
-        Executive["🏢 高管视图"]
-        Analyst["📊 分析师视图"]
-        Consultant["💼 顾问视图"]
-        Integration["🔗 API 集成"]
+%%{init: {'theme': 'base'}}%%
+flowchart LR
+    subgraph USER["👤 用户层"]
+        U1["🏢 高管"]:::u
+        U2["📊 分析师"]:::u
+        U3["💼 顾问"]:::u
+        U4["🔗 API"]:::u
     end
 
-    subgraph Interface["🎯 接口层"]
-        CLI["🖥️ CLI · Typer"]
-        REST["🌐 REST API · FastAPI"]
-        Skills["📋 Skills · L1/L2/L3"]
+    subgraph IFACE["🎯 接口层"]
+        I1["🖥️ CLI · Typer"]:::i
+        I2["🌐 REST API · FastAPI"]:::i
+        I3["📋 Skills · L1/L2/L3"]:::i
     end
 
-    subgraph Application["⚙️ 应用层"]
-        Doc["📄 文档处理"]
-        Strategic["📊 战略分析"]
-        Agent["🤖 Agent 协作"]
-        Planning["📋 规划生成"]
+    subgraph APP["⚙️ 应用层"]
+        A1["📄 文档处理"]:::a
+        A2["📊 战略分析"]:::a
+        A3["🤖 Agent 协作"]:::a
+        A4["📋 规划生成"]:::a
     end
 
-    subgraph Domain["💎 领域层"]
-        subgraph Entities["核心实体"]
-            D[Document]
-            A[Agent]
-            T[Tool]
-            P[Plan]
-            C[Checkpoint]
-            Ar[Archive]
-            R[RoutingLog]
+    subgraph DOMAIN["💎 领域层"]
+        D1["Document"]:::d
+        D2["Agent · Tool · Plan"]:::d
+        D3["Checkpoint · Archive"]:::d
+        D4["RoutingLog"]:::d
+        P1["RAG · Tool · Agent · Plan · Eval"]:::p
+    end
+
+    subgraph INFRA["🏗️ 基础设施层"]
+        subgraph STACK["💾 六层存储"]
+            S1["📁 L0 · MEMORY"]:::s
+            S2["⚡ L1 · Redis"]:::s
+            S3["🗄️ L2 · PostgreSQL"]:::s
+            S4["🔮 L3 · Qdrant"]:::s
+            S5["📦 L4 · MinIO"]:::s
+            S6["🕸️ L5 · Neo4j"]:::s
         end
-        subgraph Services["领域服务接口"]
-            RAG[RAGService]
-            TS[ToolService]
-            AS[AgentService]
-            PS[PlanService]
-            ES[EvalService]
-        end
-    end
-
-    subgraph Infrastructure["🏗️ 基础设施层"]
-        subgraph Storage["💾 六层存储"]
-            L0["📁 L0 · MEMORY.md"]
-            L1["⚡ L1 · Redis"]
-            L2["🗄️ L2 · PostgreSQL"]
-            L3["🔮 L3 · Qdrant"]
-            L4["📦 L4 · MinIO WORM"]
-            L5["🕸️ L5 · Neo4j"]
-        end
-        subgraph Compute["⚡ 事件与计算"]
-            MQ[🐰 RabbitMQ]
-            RedisPS[📡 Redis Pub/Sub]
-            Docker[🐳 Docker 沙箱]
-            Lite[🤖 LiteLLM]
+        subgraph BUS["⚡ 事件与计算"]
+            B1["🐰 RabbitMQ"]:::b
+            B2["📡 Redis Pub/Sub"]:::b
+            B3["🐳 Docker 沙箱"]:::b
+            B4["🤖 LiteLLM"]:::b
         end
     end
 
-    Users --> Interface
-    Interface --> Application
-    Application --> Domain
-    Domain --> Infrastructure
+    USER --> IFACE --> APP --> DOMAIN --> INFRA
 
-    style Users fill:#e1f5fe,stroke:#01579b
-    style Interface fill:#e8f5e9,stroke:#2e7d32
-    style Application fill:#fff3e0,stroke:#ef6c00
-    style Domain fill:#fce4ec,stroke:#c2185b
-    style Infrastructure fill:#f3e5f5,stroke:#7b1fa2
-    style Storage fill:#e0f7fa,stroke:#00838f
-    style Compute fill:#fff8e1,stroke:#f9a825
+    classDef u fill:#f3f4f6,stroke:#6b7280,color:#374151,rx:8,ry:8
+    classDef i fill:#dbeafe,stroke:#2563eb,color:#1e40af,rx:8,ry:8
+    classDef a fill:#fef3c7,stroke:#d97706,color:#92400e,rx:8,ry:8
+    classDef d fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:8,ry:8
+    classDef p fill:#fce7f3,stroke:#db2777,color:#9d174d,rx:8,ry:8
+    classDef s fill:#d1fae5,stroke:#059669,color:#065f46,rx:8,ry:8
+    classDef b fill:#ede9fe,stroke:#7c3aed,color:#5b21b6,rx:8,ry:8
 ```
-
-| 层级 | 技术选型 | 说明 |
-|:---|:---|:---|
-| **用户层** | 高管/分析师/顾问视图 + API | 三视图架构 |
-| **接口层** | CLI + REST API + Skills | Agent 友好接口 |
-| **应用层** | 文档/战略分析/Agent协作/规划 | 用例服务 |
-| **领域层** | 7 实体 + 5 服务接口 | 六边形核心 |
-| **存储** | L0-MEMORY → L5-Neo4j | 六层分级存储 |
-| **计算** | RabbitMQ + Docker + LiteLLM | 事件驱动 |
 
 ---
 
