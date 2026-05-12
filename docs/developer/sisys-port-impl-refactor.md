@@ -875,10 +875,10 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `L2MetadataRepositoryPort` | contracts/l2_metadata.py | L2元数据 | infrastructure/l2_postgresql | **待注册** |
 | `L2ChangeHistoryRepositoryPort` | contracts/l2_change_history.py | L2变更历史 | infrastructure/l2_postgresql | **待注册** |
 | `L2GroupMemberRepositoryPort` | contracts/l2_group_member.py | L2群组成员 | infrastructure/l2_postgresql | **待注册** |
-| `L3VectorPort` | contracts/l3_vector.py | L3向量存储 | infrastructure/l3_qdrant | **待注册** |
-| ~~`VectorStorage`~~ | — | L3向量存储(废弃) | — | **废弃→合并到L3VectorPort** |
-| `L4ObjectPort` | contracts/l4_object.py | L4对象存储 | infrastructure/l4_minio | **待注册** |
-| ~~`ObjectStorageRepository`~~ | — | L4对象存储(废弃) | — | **废弃→合并到L4ObjectPort** |
+| `L3VectorPort` | contracts/l3_vector.py | L3向量存储(+CollectionManager) | infrastructure/l3_qdrant | **待注册** |
+| ~~`VectorStorage`~~ | — | L3向量存储(废弃) | — | **废弃→迁移前需先扩展L3VectorPort补充create_collection/delete_collection** |
+| `L4ObjectPort` | contracts/l4_object.py | L4对象存储(+list_objects) | infrastructure/l4_minio | **待注册** |
+| ~~`ObjectStorageRepository`~~ | — | L4对象存储(废弃) | — | **废弃→迁移前需先扩展L4ObjectPort补充list_objects** |
 | `L5GraphPort` | contracts/l5_graph.py | L5图存储 | infrastructure/l5_neo4j | **待注册** |
 | ~~`GraphManager`~~ | — | L5图管理(废弃) | — | **废弃→合并到L5GraphPort** |
 | ~~`GraphStorage`~~ | — | L5图存储(废弃) | — | **废弃→合并到L5GraphPort** |
@@ -886,8 +886,14 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `SessionStoragePort` | contracts/session_storage.py | 会话状态存储 | infrastructure/session_redis | **待整合** |
 | `IndexManagerPort` | contracts/index_manager.py | MEMORY索引 | infrastructure/memory_index | **待注册** |
 | **事件发布** |
-| `EventPublisherPort` | contracts/event_publisher.py | 领域事件发布 | infrastructure/event_publisher | **待注册**(实际名为EventPublisher) |
+| `EventPublisherPort` | contracts/event_publisher.py | 领域事件发布(返回PublishResult) | infrastructure/event_publisher | **待注册** |
+| ~~`EventPublisherProtocol`~~ | 4处服务内定义 | 事件发布(返回None) | — | **废弃→统一为EventPublisherPort** ⚠️返回类型不一致 |
 | `InMemoryEventPublisher` | contracts/event_publisher.py | 内存事件发布 | — | **待废弃→合并到EventPublisherPort** |
+| **服务内Protocol（待迁移）** |
+| `SandboxExecutorProtocol` | auto_execute_service.py | 沙箱执行(迁移至contracts/sandbox.py) | — | **待迁移** |
+| `SnapshotRepositoryProtocol` | auto_execute_service.py | 快照存储(迁移至contracts/snapshot.py) | — | **待迁移** |
+| `HashRouterProtocol` | auto_route_service.py | 哈希路由(迁移至contracts/routing.py) | — | **待迁移** |
+| `SemanticRouterProtocol` | auto_route_service.py | 语义路由(迁移至contracts/routing.py) | — | **待迁移** |
 | **认证授权** |
 | `AuthServicePort` | contracts/auth_service.py | 认证服务 | infrastructure/auth_service | **待注册** |
 | `PermissionServicePort` | contracts/permission_service.py | 权限检查 | infrastructure/permission_service | **待注册** |
@@ -1318,6 +1324,7 @@ poetry run python -m pylyzer src/domain/ports/
 | v3.0 | 2026-05-12 | 重构执行方案v3.0 - 完善P0问题与4层架构 |
 | v3.1 | 2026-05-12 | 重构执行方案v3.1 - 添加Phase 1.5/2.5关键检查点 |
 | v3.2 | 2026-05-12 | Round 1审查 - 修正Protocol统计(48→54实际/48目标) |
+| v3.3 | 2026-05-12 | Round 2审查 - 接口合并前提条件(L3需补充CollectionManager,L4需补充list_objects) |
 
 ### 审查修复历史
 
@@ -1329,10 +1336,11 @@ poetry run python -m pylyzer src/domain/ports/
 | R4 | 89df46b7 | 消除V1~V6未定义引用并完善参考文献 |
 | R5 | — | 添加Phase 1.5/2.5关键检查点，完善Section 6.5验收标准 |
 | R6 | — | **Round 1审查修正**: Protocol统计澄清(41 domain + 6 services + 7 application = 54实际，清理后48目标) |
+| R7 | — | **Round 2审查修正**: L3VectorPort需补充CollectionManager,L4ObjectPort需补充list_objects; EventPublisherProtocol返回类型不一致 |
 
 ---
 
-*文档版本: v3.2*
+*文档版本: v3.3*
 *核心更新: 统一端口注册管理机制（4层架构）*
 *- Layer 1: Port Contract (契约层) - 只定义接口*
 *- Layer 2: Registry (注册层) - 统一登记元数据*
