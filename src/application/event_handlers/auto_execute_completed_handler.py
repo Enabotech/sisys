@@ -7,18 +7,12 @@ Listens for AutoExecuted events and publishes corresponding domain events
 from __future__ import annotations
 
 import logging
-from typing import Protocol
 
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
+from src.domain.ports.event_publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
-
-
-class EventPublisherProtocol(Protocol):
-    """Protocol for event publishing (implemented by infrastructure)."""
-
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None: ...
 
 
 class AutoExecuteCompletedHandler:
@@ -34,7 +28,7 @@ class AutoExecuteCompletedHandler:
     Architecture: Interfaces layer, implements event listener pattern.
     """
 
-    def __init__(self, publisher: EventPublisherProtocol | None = None):
+    def __init__(self, publisher: EventPublisher | None = None):
         """Initialize AutoExecuteCompletedListener.
 
         Args:

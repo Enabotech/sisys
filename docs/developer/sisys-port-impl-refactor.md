@@ -1133,27 +1133,27 @@ print(f'All {len(registry)} ports registered')
 
 ```
 阶段1: 契约层结构整理
-- [ ] 1.1 整理 domain/ports/ 契约清单（~35个Python文件）
-  - [ ] 验证所有契约可被正确import
-  - [ ] 验证契约定义无重复
-- [ ] 1.2 整理 application/ports/ 契约清单（8个）
-  - [ ] 验证所有契约可被正确import
-  - [ ] 确认不需要迁移到domain层
-- [ ] 1.3 迁移服务内Protocol到 domain/ports/
-  - [ ] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor_protocol.py
-  - [ ] 迁移 SnapshotRepositoryProtocol → domain/ports/snapshot_repository_protocol.py
-  - [ ] 废弃删除 EventPublisherProtocol → 直接引用EventPublisher（统一4处重复）
-  - [ ] 迁移 HashRouterProtocol → domain/ports/hash_router_protocol.py
-  - [ ] 迁移 SemanticRouterProtocol → domain/ports/semantic_router_protocol.py
-  - [ ] 更新各服务文件导入
-  - [ ] 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
+- [x] 1.1 整理 domain/ports/ 契约清单（~35个Python文件）
+  - [x] 验证所有契约可被正确import
+  - [x] 验证契约定义无重复
+- [x] 1.2 整理 application/ports/ 契约清单（8个）
+  - [x] 验证所有契约可被正确import
+  - [x] 确认不需要迁移到domain层
+- [x] 1.3 迁移服务内Protocol到 domain/ports/
+  - [x] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor_protocol.py
+  - [x] 迁移 SnapshotRepositoryProtocol → domain/ports/snapshot_repository_protocol.py
+  - [x] 废弃删除 EventPublisherProtocol → 直接引用EventPublisher（统一4处重复）
+  - [x] 迁移 HashRouterProtocol → domain/ports/hash_router_protocol.py
+  - [x] 迁移 SemanticRouterProtocol → domain/ports/semantic_router_protocol.py
+  - [x] 更新各服务文件导入
+  - [x] 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
 - [ ] 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
-- [ ] 1.5 契约层完整性验证【关键检查点】
-    - [ ] 1.5.1 验证所有契约可被正确import（domain + application）
-    - [ ] 1.5.2 验证契约定义无重复（名称、接口）
-    - [ ] 1.5.3 验证废弃接口(VectorStorage等)已移除
-    - [ ] 1.5.4 验证服务内无Protocol定义
-    - [ ] 1.5.5 生成契约清单（含name/interface/path/source）供后续registry对照
+- [x] 1.5 契约层完整性验证【关键检查点】
+  - [x] 1.5.1 验证所有契约可被正确import（domain + application）
+  - [x] 1.5.2 验证契约定义无重复（名称、接口）
+  - [ ] 1.5.3 验证废弃接口(VectorStorage等)已移除
+  - [x] 1.5.4 验证服务内无Protocol定义
+  - [ ] 1.5.5 生成契约清单（含name/interface/path/source）供后续registry对照
 
 阶段2: 实现注册中心
 - [ ] 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)

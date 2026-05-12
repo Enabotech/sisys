@@ -9,17 +9,24 @@ import pytest
 
 from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
+from src.domain.events.publish_result import PublishResult
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.services.auto_trigger_service import AutoTriggerService
 
 
-class DummyPublisher:
+class DummyPublisher(EventPublisher):
     """Dummy async publisher for testing."""
 
     def __init__(self) -> None:
         self.published_events: list[DomainEvent] = []
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
+    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
         self.published_events.append(event)
+        return PublishResult(
+            event_id=str(event.event_id) if event.event_id else "test-event-id",
+            redis_success=True,
+            outbox_saved=True,
+        )
 
 
 class TestAutoTriggerServiceUnit:
@@ -164,7 +171,7 @@ class TestAutoTriggerServiceArchitecture:
     def test_trigger_service_uses_protocol_for_publishing(self) -> None:
         """Verify AutoTriggerService depends on protocol, not concrete implementation."""
         # The publisher should be Protocol, not a concrete class
-        from src.domain.services.auto_trigger_service import EventPublisherProtocol
+        from src.domain.ports.event_publisher import EventPublisher
 
         # Verify the protocol exists and is a Protocol
-        assert hasattr(EventPublisherProtocol, "publish")
+        assert hasattr(EventPublisher, "publish")

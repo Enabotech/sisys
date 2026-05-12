@@ -8,12 +8,10 @@ import pytest
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
-from src.domain.services.auto_route_service import (
-    AutoRouteService,
-    EventPublisherProtocol,
-    HashRouterProtocol,
-    SemanticRouterProtocol,
-)
+from src.domain.ports.event_publisher import EventPublisher
+from src.domain.ports.hash_router_protocol import HashRouterProtocol
+from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
+from src.domain.services.auto_route_service import AutoRouteService
 
 
 class TestAutoRouteService:
@@ -214,7 +212,7 @@ class TestAutoRouteService:
 
     def test_route_service_initialization(self) -> None:
         """AutoRouteService should initialize with all dependencies."""
-        publisher = AsyncMock(spec=EventPublisherProtocol)
+        publisher = AsyncMock(spec=EventPublisher)
         hash_router = MagicMock(spec=HashRouterProtocol)
         semantic_router = AsyncMock(spec=SemanticRouterProtocol)
 

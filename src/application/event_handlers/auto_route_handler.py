@@ -15,19 +15,13 @@ Reference: or.md 系统公理一 (trigger→route→execute)
 from __future__ import annotations
 
 import logging
-from typing import Protocol
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.base import DomainEvent
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.services.auto_route_service import AutoRouteService
 
 logger = logging.getLogger(__name__)
-
-
-class EventPublisherProtocol(Protocol):
-    """Protocol for event publishing (implemented by infrastructure)."""
-
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None: ...
 
 
 class AutoRouteHandler:
@@ -46,7 +40,7 @@ class AutoRouteHandler:
     def __init__(
         self,
         auto_route_service: AutoRouteService,
-        publisher: EventPublisherProtocol | None = None,
+        publisher: EventPublisher | None = None,
     ) -> None:
         """Initialize AutoRouteListener.
 

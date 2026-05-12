@@ -3,19 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol
 
 from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.events.base import DomainEvent
+from src.domain.ports.event_publisher import EventPublisher
 from src.domain.value_objects.auto_trigger_context import AutoTriggerContext
 
 logger = logging.getLogger(__name__)
-
-
-class EventPublisherProtocol(Protocol):
-    """Protocol for event publishing (implemented by infrastructure)."""
-
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None: ...
 
 
 class AutoTriggerService:
@@ -30,7 +24,7 @@ class AutoTriggerService:
     Architecture: Domain layer (no external dependencies), uses port/protocol for event publishing.
     """
 
-    def __init__(self, publisher: EventPublisherProtocol | None = None):
+    def __init__(self, publisher: EventPublisher | None = None):
         """Initialize AutoTriggerService.
 
         Args:
