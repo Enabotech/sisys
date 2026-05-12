@@ -913,26 +913,45 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 |------|------|--------|------|
 | Domain层 | `src/domain/ports/` | ~30 | 领域层核心端口（存储抽象、仓储、认证授权、事件发布等） |
 | Application层 | `src/application/ports/` | 8 | 应用层服务端口（语义缓存、公共黑板、沙箱、指标等） |
-| 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol） |
+| 服务内Protocol | `src/domain/services/` | 5 | 待迁移到domain/ports/（不含重复的EventPublisherProtocol，废弃删除EventPublisherProtocol直接引用EventPublisher） |
 
-**P0问题发现（Round 1）：**
+**P0问题发现（Round 1+2 共22项）：**
 
 | # | 问题 | 影响 | 优先级 |
 |---|------|------|--------|
-| P0-1 | L3VectorPort缺少Collection管理方法（create_collection/delete_collection/collection_exists/list_collections） | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
+| P0-1 | L3VectorPort缺少Collection管理方法 | VectorStorage可替代，但L3VectorPort不完整 | **必须修复** |
 | P0-2 | L4ObjectPort缺少list_objects方法 | ObjectStorageRepository可替代，但L4ObjectPort不完整 | **必须修复** |
 | P0-3 | L5GraphPort已完整覆盖GraphManager/GraphStorage功能 | 建议废弃后者 | 建议 |
-| P0-4 | EventPublisherProtocol在2个服务内重复定义 | 只需引用domain已有EventPublisherPort | **无需迁移** |
+| P0-4 | EventPublisherProtocol在2个服务内重复定义 | DRY违规 | **必须修复** |
 | P0-5 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
+| P0-6 | EventBusFactory核心依赖未初始化 | RedisEventBus/RabbitMQEventBus使用无效依赖 | **必须修复** |
+| P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
+| P0-8 | RedisEventBus.publish()异常处理逻辑不可达 | publisher吞掉异常，redis_success=False永不触发 | **必须修复** |
+| P0-9 | 5个Domain Services Protocol均无实现类 | 接口契约无法验证 | **必须修复** |
+| P0-10 | SemanticRouterProtocol.route()为async但HashRouterProtocol.route()为sync | 接口设计不一致 | **建议修复** |
+| P0-11 | memory_service.py第475行调用publish无await | async def未正确调用 | **必须修复** |
+| P0-12 | UserRepository继承的BaseRepository与domain层BaseRepository同名不同文件 | 混淆风险 | **必须修复** |
+| P0-13 | RoleRepository.list_all()签名与RoleRepositoryPort不匹配 | 分页参数缺失 | **必须修复** |
+| P0-14 | RoleRepository.delete()返回bool但BaseRepository.delete()返回None | 三者不一致 | **必须修复** |
+| P0-15 | UserRepositoryPort缺少save/delete/list_all方法 | 无法使用完整CRUD | **必须修复** |
+| P0-16 | PermissionServicePort实现添加了assign_role/revoke_role | 超出接口范围 | **必须修复** |
+| P0-17 | TokenBlacklistPort.add()签名不一致 | 接口add(token)实现add(token, ttl=None) | **必须修复** |
+| P0-18 | CrossBorderTransferServicePort和WhitelistServicePort实现添加了接口未定义的方法 | 接口契约破损 | **必须修复** |
+| P0-19 | 缺少EncryptionPort领域端口 | EncryptionService是具体类，违反依赖倒置 | **必须修复** |
+| P0-20 | L4ObjectPort.archive()方法签名不一致 | MinIORepository返回bool与接口str不匹配 | **必须修复** |
+| P0-21 | L1CachePort仅定义缓存操作，缺少pub/sub接口定义 | RedisPublicBlackboard未抽象为L1适配器 | **建议修复** |
+| P0-22 | AuthServiceImpl.authenticate()存在timing attack防御逻辑缺陷 | result变量未使用 | **建议修复** |
+
+**端口状态更新（Round 2）：**
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
 | **Domain层 - 存储分层（L0-L5）** |
-| `L0StoragePort` | domain/ports/l0_storage.py | L0文件系统 | infrastructure | **待注册** |
-| `L1CachePort` | domain/ports/l1_cache.py | L1 Redis缓存 | infrastructure | **待注册** |
-| `L2MetadataRepositoryPort` | domain/ports/l2_rdb.py | L2元数据 | infrastructure | **待注册** |
-| `L2ChangeHistoryRepositoryPort` | domain/ports/l2_rdb.py | L2变更历史 | infrastructure | **待注册** |
-| `L2GroupMemberRepositoryPort` | domain/ports/l2_rdb.py | L2群组成员 | infrastructure | **待注册** |
+| `L0StoragePort` | domain/ports/l0_storage.py | L0文件系统 | infrastructure | **✅接口完整** |
+| `L1CachePort` | domain/ports/l1_cache.py | L1 Redis缓存 | infrastructure | **✅接口完整(⚠️缺pub/sub)** |
+| `L2MetadataRepositoryPort` | domain/ports/l2_rdb.py | L2元数据 | infrastructure | **✅接口完整** |
+| `L2ChangeHistoryRepositoryPort` | domain/ports/l2_rdb.py | L2变更历史 | infrastructure | **✅接口完整** |
+| `L2GroupMemberRepositoryPort` | domain/ports/l2_rdb.py | L2群组成员 | infrastructure | **✅接口完整** |
 | `L3VectorPort` | domain/ports/l3_vector.py | L3向量存储 | infrastructure | **⚠️缺Collection管理方法** |
 | `L4ObjectPort` | domain/ports/l4_object.py | L4对象存储 | infrastructure | **⚠️缺list_objects方法** |
 | `L5GraphPort` | domain/ports/l5_graph.py | L5图存储 | infrastructure | **✅已完整** |
@@ -940,52 +959,52 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `SessionStorage` | domain/ports/session_storage.py | 会话状态存储 | infrastructure | **待注册** |
 | `IndexManagerPort` | domain/ports/index_manager.py | MEMORY索引 | infrastructure | **待注册** |
 | **废弃接口（待清理）** |
-| ~~`VectorStorage`~~ | domain/ports/vector_storage.py | L3向量存储 | — | **废弃**（功能已由L3VectorPort+CollectionManager覆盖） |
-| ~~`CollectionManager`~~ | domain/ports/vector_storage.py | Collection管理 | — | **废弃**（方法待补充到L3VectorPort） |
-| ~~`ObjectStorageRepository`~~ | domain/ports/storage.py | L4对象存储 | — | **废弃**（功能已由L4ObjectPort覆盖） |
-| ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃**（功能已由L5GraphPort覆盖） |
-| ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃**（功能已由L5GraphPort覆盖） |
+| ~~`VectorStorage`~~ | domain/ports/vector_storage.py | L3向量存储 | — | **废弃** |
+| ~~`CollectionManager`~~ | domain/ports/vector_storage.py | Collection管理 | — | **废弃** |
+| ~~`ObjectStorageRepository`~~ | domain/ports/storage.py | L4对象存储 | — | **废弃** |
+| ~~`GraphManager`~~ | domain/ports/graph_storage.py | L5图管理 | — | **废弃** |
+| ~~`GraphStorage`~~ | domain/ports/graph_storage.py | L5图存储 | — | **废弃** |
 | **Domain层 - 仓储** |
-| `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **待注册** |
-| `RoleRepositoryPort` | domain/ports/role_repository.py | 角色存储 | infrastructure | **待注册** |
+| `UserRepositoryPort` | domain/ports/user_repository.py | 用户数据访问 | infrastructure | **⚠️缺save/delete/list_all** |
+| `RoleRepositoryPort` | domain/ports/role_repository.py | 角色存储 | infrastructure | **⚠️签名不一致** |
 | `UserRoleRepositoryPort` | domain/ports/user_role_repository.py | 用户-角色关联 | infrastructure | **待注册** |
 | `LoginAttemptRepositoryPort` | domain/ports/login_attempt_repository.py | 登录尝试跟踪 | infrastructure | **待注册** |
-| `AuditRepositoryPort` | domain/ports/audit_repository.py | 审计日志存储 | infrastructure | **待注册** |
-| `AuditServicePort` | domain/ports/audit_service.py | 审计服务 | infrastructure | **待注册** |
+| `AuditRepositoryPort` | domain/ports/audit_repository.py | 审计日志存储 | infrastructure | **✅接口完整** |
+| `AuditServicePort` | domain/ports/audit_service.py | 审计服务 | infrastructure | **✅接口完整** |
 | **Domain层 - 认证授权** |
-| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **待注册** |
-| `PermissionServicePort` | domain/ports/permission_service.py | 权限检查 | infrastructure | **待注册** |
-| `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **待注册** |
-| `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **待注册** |
+| `AuthServicePort` | domain/ports/auth_service.py | 认证服务 | infrastructure | **✅接口完整** |
+| `PermissionServicePort` | domain/ports/permission_service.py | 权限检查 | infrastructure | **⚠️实现超出接口范围** |
+| `TokenBlacklistPort` | domain/ports/token_blacklist.py | JWT黑名单 | infrastructure | **⚠️签名不一致** |
+| `PasswordValidationServicePort` | domain/ports/password_validation_service.py | 密码验证 | infrastructure | **✅接口完整** |
 | **Domain层 - 事件** |
-| `EventPublisher` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **待注册** |
+| `EventPublisher` | domain/ports/event_publisher.py | 领域事件发布 | infrastructure | **✅接口完整** |
 | **Domain层 - 合规服务** |
-| `ComplianceGatewayPort` | domain/ports/compliance_gateway.py | UDMR合规检查 | infrastructure | **待注册** |
-| `SensitiveDataDetectorPort` | domain/ports/sensitive_data_detector.py | 敏感数据检测 | infrastructure | **待注册** |
-| `DataResidencyEnforcerPort` | domain/ports/data_residency_enforcer.py | 数据驻留强制 | infrastructure | **待注册** |
-| `WhitelistServicePort` | domain/ports/whitelist_service.py | 白名单服务 | infrastructure | **待注册** |
-| `PIPLComplianceServicePort` | domain/ports/pipl_compliance_service.py | PIPL合规 | infrastructure | **待注册** |
-| `CrossBorderTransferServicePort` | domain/ports/cross_border_transfer_service.py | 跨境传输 | infrastructure | **待注册** |
+| `ComplianceGatewayPort` | domain/ports/compliance_gateway.py | UDMR合规检查 | infrastructure | **✅接口完整** |
+| `SensitiveDataDetectorPort` | domain/ports/sensitive_data_detector.py | 敏感数据检测 | infrastructure | **✅接口完整** |
+| `DataResidencyEnforcerPort` | domain/ports/data_residency_enforcer.py | 数据驻留强制 | infrastructure | **✅接口完整** |
+| `WhitelistServicePort` | domain/ports/whitelist_service.py | 白名单服务 | infrastructure | **⚠️实现超出接口范围** |
+| `PIPLComplianceServicePort` | domain/ports/pipl_compliance_service.py | PIPL合规 | infrastructure | **✅接口完整** |
+| `CrossBorderTransferServicePort` | domain/ports/cross_border_transfer_service.py | 跨境传输 | infrastructure | **⚠️实现超出接口范围** |
 | **Domain层 - 其他** |
 | `OutboxRepository` | domain/ports/outbox.py | 事务发件箱 | infrastructure | **待注册** |
 | `UnitOfWork` | domain/ports/unit_of_work.py | 工作单元 | infrastructure | **待注册** |
 | `HealthCheckPort` | domain/ports/health_check.py | 健康检查 | infrastructure | **待注册** |
 | `IntegrityPort` | domain/ports/integrity.py | 完整性检查 | infrastructure | **待注册** |
-| `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **参考使用** |
+| `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **⚠️同名不同文件冲突** |
 | `StorageLayer` | domain/ports/storage_enums.py | 存储层级枚举 | — | **参考使用** |
 | **服务内Protocol（待迁移或引用）** |
-| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **待迁移到domain/ports/sandbox_protocol.py** |
-| `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **待迁移到domain/ports/snapshot_protocol.py** |
-| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **待迁移到domain/ports/router_protocol.py** |
-| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **待迁移到domain/ports/router_protocol.py** |
-| ~~`EventPublisherProtocol`~~ | 2处服务内定义 | 事件发布 | — | **无需迁移→直接引用EventPublisher** |
+| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **⚠️无实现类** |
+| `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **⚠️无实现类** |
+| `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **⚠️无实现类** |
+| `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **⚠️无实现类** |
+| ~~`EventPublisherProtocol`~~ | 2处服务内定义 | 事件发布 | — | **废弃→直接引用EventPublisher** |
 | **Application层 - 服务端口（保留，不迁移）** |
 | `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
 | `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
 | `SandboxExecutor` | application/ports/sandbox_port.py | 沙箱执行器 | infrastructure | **待注册** |
 | `MetricsPort` | application/ports/metrics_port.py | 指标端口 | infrastructure | **待注册** |
 | `ExceptionMetricsPort` | application/ports/exception_metrics_port.py | 异常指标 | infrastructure | **待注册** |
-| `EventSubscriber` | application/ports/event_subscriber.py | 事件订阅器 | infrastructure | **待注册** |
+| `EventSubscriber` | application/ports/event_subscriber.py | 事件订阅器 | infrastructure | **✅接口完整** |
 | `TextExtractorService` | application/ports/text_extractor_service.py | 文本提取 | infrastructure | **待注册** |
 | `CompressorService` | application/ports/compressor_service.py | 压缩服务 | infrastructure | **待注册** |
 
@@ -1143,7 +1162,7 @@ print(f'All {len(registry)} ports registered')
 - [ ] 1.3 迁移服务内Protocol到 domain/ports/
   - [ ] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor_protocol.py
   - [ ] 迁移 SnapshotRepositoryProtocol → domain/ports/snapshot_repository_protocol.py
-  - [ ] 迁移 EventPublisherProtocol → domain/ports/event_publisher_protocol.py（统一4处重复）
+  - [ ] 废弃删除 EventPublisherProtocol → 直接引用EventPublisher（统一4处重复）
   - [ ] 迁移 HashRouterProtocol → domain/ports/hash_router_protocol.py
   - [ ] 迁移 SemanticRouterProtocol → domain/ports/semantic_router_protocol.py
   - [ ] 更新各服务文件导入
