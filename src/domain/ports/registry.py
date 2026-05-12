@@ -73,10 +73,14 @@ class PortRegistry:
             spec: Port specification to register
 
         Raises:
-            ValueError: If port name already exists
+            ValueError: If port name already exists with different spec
         """
         if spec.name in self._ports:
-            raise ValueError(f"Port already registered: {spec.name}")
+            existing = self._ports[spec.name]
+            if existing != spec:
+                raise ValueError(f"Port already registered with different spec: {spec.name}")
+            # Same spec already registered - idempotent, skip
+            return
         logger.info("Registering port: %s (%s)", spec.name, spec.version)
         self._ports[spec.name] = spec
 
