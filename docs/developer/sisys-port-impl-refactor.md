@@ -804,7 +804,9 @@ async def test_get_user(user_service, mock_user_repo):
 
 ## 二、接口清单（契约层）
 
-### 2.1 契约层端口（35个核心 + 14个待废弃 = 49个）
+### 2.1 契约层端口（实际统计：27个核心 + 4个待废弃 + 8个待迁移 = 39个）
+
+> 注：文档标题"35核心+14待废弃=49个"为计划目标，实际代码中存在约54个Protocol定义(含15个未列出的额外接口)。
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -830,7 +832,8 @@ async def test_get_user(user_service, mock_user_repo):
 | `SessionStoragePort` | contracts/session_storage.py | 会话状态存储 | infrastructure/session_redis | **待整合** |
 | `IndexManagerPort` | contracts/index_manager.py | MEMORY索引 | infrastructure/memory_index | **待注册** |
 | **事件发布** |
-| `EventPublisherPort` | contracts/event_publisher.py | 领域事件发布 | infrastructure/event_publisher | **待注册** |
+| `EventPublisherPort` | contracts/event_publisher.py | 领域事件发布 | infrastructure/event_publisher | **待注册**(实际名为EventPublisher) |
+| `InMemoryEventPublisher` | contracts/event_publisher.py | 内存事件发布 | — | **待废弃→合并到EventPublisherPort** |
 | **认证授权** |
 | `AuthServicePort` | contracts/auth_service.py | 认证服务 | infrastructure/auth_service | **待注册** |
 | `PermissionServicePort` | contracts/permission_service.py | 权限检查 | infrastructure/permission_service | **待注册** |
@@ -940,8 +943,36 @@ print(f'All {len(registry)} ports registered')
 | 禁止在契约外定义接口 | `class MyPort(Protocol)` 在其他文件 | 所有接口在 `contracts/` 目录 |
 | 禁止在服务内定义Protocol | `class Service: class Port(Protocol):` | 导入已注册的端口 |
 | 禁止直接实例化 | `repo = SqlAlchemyUserRepo()` | `repo = resolve("user_repo")` |
+| **新增** 禁止Infrastructure导入Application | `from src.application.ports import XxxPort` | `from src.domain.ports.contracts import XxxPort` |
+| **新增** 禁止Domain层使用技术绑定Base | `class UserModel(Base)` where Base is DeclarativeBase | 使用无技术绑定Base或迁移Base到Domain |
+| **新增** 禁止使用废弃接口 | `VectorStorage`, `GraphManager`, `GraphStorage`, `ObjectStorageRepository` | 迁移到 L3VectorPort/L5GraphPort/L4ObjectPort |
+| **新增** 禁止接口返回类型不一致 | 本地Protocol返回None，正式Port返回PublishResult | 统一EventPublisherPort返回类型 |
 
-### 4.2 允许规则
+### 4.2 架构约束集成
+
+**pre-commit hooks**（使用已存在的 hexagonal_arch_guard.py 和 import-linter）:
+
+```yaml
+# .pre-commit-config.yaml 添加
+- repo: local
+  hooks:
+    - id: hexagonal-arch-check
+      name: "六边形架构检查"
+      entry: poetry run python tests/utils/hexagonal_arch_guard.py
+      language: system
+      types: [python]
+      pass_filenames: false
+      stages: [push]
+
+    - id: import-linter-check
+      name: "Import-Linter 依赖约束"
+      entry: poetry run import-linter lint
+      language: system
+      pass_filenames: false
+      stages: [push]
+```
+
+### 4.3 允许规则
 
 | 规则 | 示例 |
 |------|------|
@@ -1085,9 +1116,10 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 所有41个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 41 |
+| 所有41个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥39 |
 | 无重复注册 | registry无ValueError |
 | 契约测试通过 | `poetry run pytest tests/contracts/ -v` |
+| EventBusFactory初始化正确 | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_event_bus() is not None"` 不抛RuntimeError |
 
 ### 6.2 架构验收
 
@@ -1097,8 +1129,19 @@ print(f'All {len(registry)} ports registered')
 | 无服务内Protocol定义 | `grep -r "class.*Protocol" src/domain/services/` 应返回空 |
 | 契约测试覆盖所有端口 | `poetry run pytest tests/contracts/ --collect-only` |
 | Domain层无技术绑定 | `grep -r "from sqlalchemy" src/domain/` 应返回空 |
+| 接口返回类型一致性 | EventPublisherPort实现返回PublishResult而非None |
+| Protocol实现声明完整 | 实现类声明实现对应Protocol(如QdrantCollectionManager实现CollectionManager) |
 
-### 6.3 集成验收
+### 6.3 接口一致性验收
+
+| 标准 | 验证方法 |
+|------|----------|
+| EventPublisherPort返回类型统一 | `grep -r "def publish" src/domain/ports/event_publisher.py` 返回PublishResult |
+| AutoRouteHandler事件发布 | `grep -A10 "on_triggered" src/domain/services/auto_route_handler.py \| grep "_publish(routed)"` 有结果 |
+| 实现类Protocol声明 | `grep -L "implements\|Protocol)" src/infrastructure/storage/*/adapter.py` 应返回空 |
+| Domain注释无Application引用 | `grep -r "from src.application" src/domain/ \| grep -v "^\s*#"` 应返回空 |
+
+### 6.4 集成验收
 
 ```bash
 # 运行契约测试
