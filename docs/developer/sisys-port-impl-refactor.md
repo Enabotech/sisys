@@ -14,11 +14,11 @@
 
 | 问题类别 | 发现 | 影响 |
 |----------|------|------|
-| **服务内Protocol定义** | 6个服务文件本地定义了9个Protocol | 违反六边形架构，接口重复 |
-| **导出完整性** | `domain/ports/__init__.py` 仅导出16个(32.7%)，缺失≥42个 | 基础设施层无法正确导入 |
-| **EventBusFactory** | 3个组件初始化为None | 运行时触发AttributeError |
-| **接口冗余** | L3/L4/L5层存在语义重复的端口 | 架构模糊，实现混淆 |
-| **Infrastructure依赖Application** | 6处违规导入 | 违反依赖倒置原则 |
+| **服务内Protocol定义** | 5个服务文件本地定义了6个Protocol（含1个重复定义的EventPublisherProtocol） | 违反六边形架构，接口重复 |
+| **导出完整性** | `domain/ports/__init__.py` 仅导出16个(39.0%)，缺失25个Protocol | 基础设施层无法正确导入 |
+| **EventBusFactory** | 3个组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)初始化为None | 运行时触发AttributeError |
+| **接口冗余** | L3: VectorStorage↔L3VectorPort(缺CollectionManager); L5: GraphManager/GraphStorage↔L5GraphPort(缺get_neighbors); L4: ObjectStorageRepository↔L4ObjectPort | 架构模糊，实现混淆 |
+| **Infrastructure依赖Application** | 7处违规导入 | 违反依赖倒置原则 |
 | **跨模块继承** | SQLAlchemy模型继承infrastructure的Base | Domain层绑定具体技术 |
 | **无统一注册机制** | 端口分散定义，无中心化管理 | 可插拔系统难以维护 |
 
@@ -27,10 +27,10 @@
 | 目标 | 现状 | 目标状态 |
 |------|------|----------|
 | 建立统一端口注册管理机制 | 端口分散定义 | 4层架构：契约→注册→解析→门禁 |
-| 消除服务内Protocol定义 | 6个服务文件定义9个Protocol | 全部迁移到domain/ports/contracts/ |
-| 补全__init__.py导出 | 16/49符号已导出(32.7%) | 导出所有49个符号(100%) |
-| 消除Infrastructure依赖Application | 6处违规 | 迁移SemanticCache/PublicBlackboard/SandboxExecutor到Domain层 |
-| 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L1: SessionStorage↔L1CachePort | 统一为单一契约 |
+| 消除服务内Protocol定义 | 5个服务文件定义6个Protocol(含重复) | 全部迁移到domain/ports/contracts/ |
+| 补全__init__.py导出 | 16/41符号已导出(39.0%) | 导出所有41个Protocol(100%) |
+| 消除Infrastructure依赖Application | 7处违规 | 迁移SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber到Domain层 |
+| 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L4: ObjectStorageRepository↔L4ObjectPort | 统一为单一契约 |
 | 修复EventBusFactory | 3个组件为None | 延迟初始化+单例复用 |
 | 修复跨模块继承 | SQLAlchemy Base在infrastructure | 迁移Base到Domain或使用无技术绑定Base |
 
@@ -822,6 +822,7 @@ async def test_get_user(user_service, mock_user_repo):
 | `L3VectorPort` | contracts/l3_vector.py | L3向量存储 | infrastructure/l3_qdrant | **待注册** |
 | ~~`VectorStorage`~~ | — | L3向量存储(废弃) | — | **废弃→合并到L3VectorPort** |
 | `L4ObjectPort` | contracts/l4_object.py | L4对象存储 | infrastructure/l4_minio | **待注册** |
+| ~~`ObjectStorageRepository`~~ | — | L4对象存储(废弃) | — | **废弃→合并到L4ObjectPort** |
 | `L5GraphPort` | contracts/l5_graph.py | L5图存储 | infrastructure/l5_neo4j | **待注册** |
 | ~~`GraphManager`~~ | — | L5图管理(废弃) | — | **废弃→合并到L5GraphPort** |
 | ~~`GraphStorage`~~ | — | L5图存储(废弃) | — | **废弃→合并到L5GraphPort** |
@@ -842,6 +843,11 @@ async def test_get_user(user_service, mock_user_repo):
 | `SemanticCache` | contracts/semantic_cache.py | 语义缓存(从application迁移) | — | **迁移中→Domain层** |
 | `PublicBlackboard` | contracts/public_blackboard.py | 公共黑板(从application迁移) | — | **迁移中→Domain层** |
 | `SandboxExecutor` | contracts/sandbox.py | 沙箱执行器(从application迁移) | — | **迁移中→Domain层** |
+| `MetricsPort` | contracts/metrics.py | 指标端口(从application迁移) | — | **迁移中→Domain层** |
+| `ExceptionMetricsPort` | contracts/exception_metrics.py | 异常指标端口(从application迁移) | — | **迁移中→Domain层** |
+| `EventSubscriber` | contracts/event_subscriber.py | 事件订阅器(从application迁移) | — | **迁移中→Domain层** |
+| `TextExtractorService` | contracts/text_extractor.py | 文本提取服务(从application迁移) | — | **迁移中→Domain层** |
+| `CompressorService` | contracts/compressor.py | 压缩服务(从application迁移) | — | **迁移中→Domain层** |
 
 ### 2.1.1 SessionStorage与L1CachePort协作关系
 
@@ -951,11 +957,11 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
-| 阶段1 | P0-19, P0-20, V1, V2, V3 | contracts/目录包含全部49个端口契约 |
-| 阶段2 | P0-7, P0-8, P0-9 | registry包含全部49个端口 |
+| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含全部41个Protocol契约 |
+| 阶段2 | P0-7, P0-8, P0-9 | registry包含全部41个Protocol |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~6, P0-18, V4, V5, V6 | 服务内无Protocol定义，无违规导入 |
-| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖全部49个端口 |
+| 阶段4 | P0-1~6, P0-18, V4~V6 | 服务内无Protocol定义，无7处违规导入 |
+| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖全部41个Protocol |
 | 阶段6 | P0-21~P0-24 | 实现类声明实现对应Protocol |
 
 ### 5.2 详细执行步骤
@@ -979,26 +985,41 @@ print(f'All {len(registry)} ports registered')
 
 阶段3: 创建组合根 + 修复EventBusFactory
 ├── 3.1 创建 composition_root.py
-├── 3.2 注册所有49个端口
+├── 3.2 注册所有41个Protocol
 ├── 3.3 修复EventBusFactory初始化
-│   ├── 3.3.1 识别3个问题组件(publisher/subscriber/event_bus)
+│   ├── 3.3.1 识别3个问题组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)
 │   ├── 3.3.2 修复初始化顺序(延迟初始化+单例复用)
-│   └── 3.3.3 验证不再触发AttributeError
-└── 3.4 验证: EventBusFactory.get_instance() 返回非None实例
+│   └── 3.3.3 验证: EventBusFactory.get_event_bus() 不抛出RuntimeError
+└── 3.4 验证: EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
 
 阶段4: 迁移服务代码
 ├── 4.1 迁移服务内Protocol定义到契约层
-│   ├── 迁移 auto_execute_service.py 的 SandboxExecutorProtocol
-│   └── 迁移其他服务的本地Protocol
+│   ├── 迁移 auto_execute_service.py 的 SandboxExecutorProtocol/SnapshotRepositoryProtocol
+│   ├── 迁移 auto_route_service.py 的 EventPublisherProtocol/HashRouterProtocol/SemanticRouterProtocol
+│   ├── 迁移 auto_trigger_service.py 的 EventPublisherProtocol(注意:已在auto_route中定义,避免重复)
+│   └── 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
 ├── 4.2 更新Infrastructure层导入(指向Domain层)
-│   ├── grep -r "from src.application.ports" src/infrastructure/
-│   └── 更新为 "from src.domain.ports.contracts"
+│   ├── 识别7处违规导入位置:
+│   │   ├── role_repository.py:89,222 (RoleNotFoundError/RoleAlreadyExistsError)
+│   │   ├── metrics_port_impl.py:10 (MetricsPort)
+│   │   ├── exception_metrics_impl.py:12 (ExceptionMetricsPort)
+│   │   ├── session_namespace_manager.py:12 (SandboxExecutor)
+│   │   ├── docker_sandbox_adapter.py:12 (SandboxExecutor等)
+│   │   └── redis_event_bus.py:7 (EventSubscriber)
+│   ├── 迁移对应Port到Domain层后更新导入路径
+│   └── 验证: grep -r "from src.application" src/infrastructure/ 应返回空
 ├── 4.3 修复跨模块继承
 │   ├── 4.3.1 识别SQLAlchemy模型继承infrastructure Base的位置
 │   ├── 4.3.2 将Base迁移到Domain层或使用无技术绑定的Base
 │   └── 4.3.3 验证: grep -r "from sqlalchemy" src/domain/ 无结果
-├── 4.4 验证服务可正常解析
-└── 4.5 验证: 无Infrastructure→Application依赖
+├── 4.4 修复L3VectorPort缺少CollectionManager问题
+│   ├── 4.4.1 VectorStorage.CollectionManager迁移到L3VectorPort
+│   └── 4.4.2 废弃VectorStorage但保留其CollectionManager功能
+├── 4.5 修复L5GraphPort缺少get_neighbors问题
+│   ├── 4.5.1 GraphStorage.get_neighbors功能合并到L5GraphPort
+│   └── 4.5.2 废弃GraphManager和GraphStorage
+├── 4.6 验证服务可正常解析
+└── 4.7 验证: 无Infrastructure→Application依赖(7处全部修复)
 
 阶段5: 实现契约测试
 ├── 5.1 为每个端口创建契约测试基类
@@ -1016,11 +1037,11 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 建议时间 | 理由 |
 |-------|----------|------|
-| Phase 1 | 4-6小时 | 49个契约定义，部分需从application迁移 |
+| Phase 1 | 4-6小时 | 41个Protocol契约定义,8个从application迁移 |
 | Phase 2 | 2-3小时 | 核心基础设施开发 |
 | Phase 3 | 2-3小时 | 组合根+EventBusFactory修复 |
-| Phase 4 | 6-8小时 | 迁移服务代码+修复依赖+跨模块继承 |
-| Phase 5 | 3-4小时 | 49个端口的契约测试 |
+| Phase 4 | 6-8小时 | 迁移服务代码+修复7处违规导入+跨模块继承 |
+| Phase 5 | 3-4小时 | 41个Protocol的契约测试 |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
 | **总计** | **18-26小时** | — |
 
@@ -1028,9 +1049,10 @@ print(f'All {len(registry)} ports registered')
 
 | 补充标准 | 验证命令 |
 |----------|----------|
-| EventBusFactory不再为None | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_instance() is not None"` |
-| 无Infrastructure→Application依赖 | `grep -r "from src.application.ports" src/infrastructure/ src/domain/services/` 应返回空 |
+| EventBusFactory不再为None | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_event_bus() is not None"` |
+| 无Infrastructure→Application依赖 | `grep -r "from src.application" src/infrastructure/ src/domain/services/` 应返回空 |
 | Domain层无技术绑定 | `grep -r "from sqlalchemy" src/domain/` 应返回空 |
+| 服务内无Protocol定义 | `grep -r "class.*Protocol" src/domain/services/` 应返回空 |
 
 ---
 
@@ -1040,7 +1062,7 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 所有35个端口已注册 | `python -c "from src.composition_root import registry; print(len(registry))"` 输出 35 |
+| 所有41个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 41 |
 | 无重复注册 | registry无ValueError |
 | 契约测试通过 | `poetry run pytest tests/contracts/ -v` |
 
@@ -1048,9 +1070,10 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 业务代码不直接import实现 | `grep -r "from src.infrastructure" src/domain/services/` 无结果 |
-| 无服务内Protocol定义 | `grep -r "class.*Protocol" src/domain/services/` 无结果 |
+| 无Infrastructure→Application依赖 | `grep -r "from src.application" src/infrastructure/ src/domain/services/` 应返回空 |
+| 无服务内Protocol定义 | `grep -r "class.*Protocol" src/domain/services/` 应返回空 |
 | 契约测试覆盖所有端口 | `poetry run pytest tests/contracts/ --collect-only` |
+| Domain层无技术绑定 | `grep -r "from sqlalchemy" src/domain/` 应返回空 |
 
 ### 6.3 集成验收
 
