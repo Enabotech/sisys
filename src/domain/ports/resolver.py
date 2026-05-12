@@ -6,6 +6,7 @@ from the registry and managing their lifecycle.
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import logging
 from typing import Any, Type, TypeVar
@@ -102,10 +103,26 @@ class Resolver:
         if callable(spec.impl) and not isinstance(spec.impl, type):
             return spec.impl(resolver=self)
         if isinstance(spec.impl, str):
-            # String module path - placeholder for lazy loading (not yet implemented)
-            # In production, this would use importlib to dynamically load the class
-            raise NotImplementedError(f"Lazy loading via module path not yet implemented for: {spec.impl}")
+            return self._load_from_module_path(spec.impl)
         return self._auto_inject(spec.impl)
+
+    def _load_from_module_path(self, module_path: str) -> Any:
+        """Load class from module path string (lazy loading).
+
+        Args:
+            module_path: Fully qualified path like 'module.ClassName'
+
+        Returns:
+            Loaded class or instance
+        """
+        try:
+            module_name, class_name = module_path.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            cls = getattr(module, class_name)
+            # Return the class itself (not an instance) for auto_inject to handle
+            return cls
+        except (ImportError, AttributeError) as e:
+            raise RuntimeError(f"Failed to lazy-load {module_path}: {e}") from e
 
     def _auto_inject(self, cls: Type[T]) -> T:
         """Auto-inject constructor dependencies."""
