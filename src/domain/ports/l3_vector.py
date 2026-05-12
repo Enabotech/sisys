@@ -119,3 +119,55 @@ class L3VectorPort(Protocol):
         Returns:
             检索结果列表 [{id, score, payload}, ...]
         """
+
+    async def create_collection(
+        self,
+        collection: str,
+        vector_size: int,
+        vector_params: dict | None = None,
+    ) -> bool:
+        """创建 Collection。
+
+        Args:
+            collection: Collection 名称
+            vector_size: 向量维度
+            vector_params: 可选参数（如 distance、quantization 等）
+
+        Returns:
+            创建成功返回 True
+        """
+
+    async def delete_collection(
+        self,
+        collection: str,
+    ) -> bool:
+        """删除 Collection。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            删除成功返回 True
+        """
+
+    async def collection_exists(
+        self,
+        collection: str,
+    ) -> bool:
+        """检查 Collection 是否存在。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            存在返回 True
+        """
+
+    async def list_collections(
+        self,
+    ) -> list[str]:
+        """列出所有 Collection。
+
+        Returns:
+            Collection 名称列表
+        """

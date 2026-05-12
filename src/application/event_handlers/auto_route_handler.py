@@ -83,6 +83,7 @@ class AutoRouteHandler:
                     routed.route_target,
                     routed.route_score,
                 )
+                await self._publish(routed)
             else:
                 logger.warning("AutoRouteService returned None for AutoTriggered event")
 
