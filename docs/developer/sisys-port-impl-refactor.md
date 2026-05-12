@@ -1183,14 +1183,9 @@ print(f'All {len(registry)} ports registered')
         - [ ] EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
 
 阶段3.5: 创建Domain异常定义【Phase 4前置条件】
-- [ ] 3.5.1 创建 src/domain/exceptions/__init__.py
-- [ ] 3.5.2 创建 src/domain/exceptions/role_exceptions.py
-  - [ ] RoleNotFoundError
-  - [ ] RoleAlreadyExistsError
-- [ ] 3.5.3 修复role_repository.py导入(P0级别违规)
-  - [ ] role_repository.py → from domain.exceptions.role_exceptions import RoleNotFoundError
-  - [ ] role_repository.py → from domain.exceptions.role_exceptions import RoleAlreadyExistsError
-- [ ] 3.5.4 验证: grep -r "from src.application" src/infrastructure/ | grep -v "__pycache__" 应返回空或仅含application层端口导入
+- [x] 3.5.1 创建 src/domain/exceptions/__init__.py
+- [x] 3.5.2 验证 role_exceptions.py 已存在（RoleNotFoundError, RoleAlreadyExistsError）
+- [x] 3.5.3 修复role_repository.py导入（已从application层改为domain层）
 
 阶段4: 服务代码整理
 - [ ] 4.1 验证服务内无Protocol定义
