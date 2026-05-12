@@ -15,10 +15,10 @@
 | 问题类别 | 发现 | 影响 |
 |----------|------|------|
 | **服务内Protocol定义** | 5个服务文件本地定义了6个Protocol（含1个重复定义的EventPublisherProtocol） | 违反六边形架构，接口重复 |
-| **导出完整性** | `domain/ports/__init__.py` 仅导出16个(39.0%)，缺失25个Protocol | 基础设施层无法正确导入 |
+| **导出完整性** | `domain/ports/__init__.py` 仅导出16个(33.3%)，缺失24个Protocol | 基础设施层无法正确导入 |
 | **EventBusFactory** | 3个组件(_redis_publisher/_redis_subscriber/_rabbitmq_publisher)初始化为None | 运行时触发AttributeError |
 | **接口冗余** | L3: VectorStorage↔L3VectorPort(缺CollectionManager); L5: GraphManager/GraphStorage↔L5GraphPort(缺get_neighbors); L4: ObjectStorageRepository↔L4ObjectPort | 架构模糊，实现混淆 |
-| **Infrastructure依赖Application** | 7处违规导入 | 违反依赖倒置原则 |
+| **Infrastructure依赖Application** | 2处违规导入(role_repository.py的Exception导入) | 违反依赖倒置原则 |
 | **跨模块继承** | SQLAlchemy模型继承infrastructure的Base | Domain层绑定具体技术 |
 | **无统一注册机制** | 端口分散定义，无中心化管理 | 可插拔系统难以维护 |
 
@@ -28,8 +28,8 @@
 |------|------|----------|
 | 建立统一端口注册管理机制 | 端口分散定义 | 4层架构：契约→注册→解析→门禁 |
 | 消除服务内Protocol定义 | 5个服务文件定义6个Protocol(含重复) | 全部迁移到domain/ports/contracts/ |
-| 补全__init__.py导出 | 16/41符号已导出(39.0%) | 导出所有39个Protocol(100%)(计划目标54个) |
-| 消除Infrastructure依赖Application | 7处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
+| 补全__init__.py导出 | 16/48符号已导出(33.3%) | 导出所有48个Protocol(100%) |
+| 消除Infrastructure依赖Application | 2处违规 | 迁移8个Application端口到Domain层(SemanticCache/PublicBlackboard/SandboxExecutor/MetricsPort/ExceptionMetricsPort/EventSubscriber/TextExtractorService/CompressorService) |
 | 合并语义重复接口 | L3: VectorStorage↔L3VectorPort; L5: GraphManager/GraphStorage↔L5GraphPort; L4: ObjectStorageRepository↔L4ObjectPort | 统一为单一契约 |
 | 修复EventBusFactory | 3个组件为None | 延迟初始化+单例复用 |
 | 修复跨模块继承 | SQLAlchemy Base在infrastructure | 迁移Base到Domain或使用无技术绑定Base |
@@ -804,9 +804,9 @@ async def test_get_user(user_service, mock_user_repo):
 
 ## 二、接口清单（契约层）
 
-### 2.1 契约层端口（实际统计：27个核心 + 4个待废弃 + 8个待迁移 = 39个）
+### 2.1 契约层端口（实际统计：40个核心 + 4个待废弃 + 8个待迁移 = 48个）
 
-> 注：文档标题"35核心+14待废弃=49个"为计划目标，实际代码中存在约54个Protocol定义(含15个未列出的额外接口)。
+> 注：注：实际代码统计：domain层40个 + application层8个 = 48个Protocol定义。
 
 | 端口名 | 契约文件 | 用途 | 实现模块 | 状态 |
 |--------|----------|------|----------|------|
@@ -988,11 +988,11 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
-| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含≥39个Protocol契约 |
-| 阶段2 | P0-7, P0-8, P0-9 | registry包含≥39个Protocol |
+| 阶段1 | P0-19, P0-20, V1~V3 | contracts/目录包含≥48个Protocol契约 |
+| 阶段2 | P0-7, P0-8, P0-9 | registry包含≥48个Protocol |
 | 阶段3 | P0-10, P0-11, P0-12 | EventBusFactory正确初始化，3组件非None |
-| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无7处违规导入，AutoRouteHandler事件发布修复 |
-| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥39个Protocol |
+| 阶段4 | P0-1~5, P0-6, P0-18, P0-24, V4~V6 | 服务内无Protocol定义，无2处违规导入(role_repository.py的Exception导入)，AutoRouteHandler事件发布修复 |
+| 阶段5 | P0-13~P0-17 | 契约测试通过，覆盖≥48个Protocol |
 | 阶段6 | P0-21~P0-23 | 实现类声明实现对应Protocol |
 
 ### 5.2 详细执行步骤
@@ -1006,17 +1006,17 @@ print(f'All {len(registry)} ports registered')
 │   └── 迁移 SandboxExecutor → contracts/sandbox.py
 ├── 1.3 定义35个核心端口契约
 ├── 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
-└── 1.5 验证: contracts/目录包含≥39个端口
+└── 1.5 验证: contracts/目录包含≥48个端口
 
 阶段2: 实现注册中心
 ├── 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
 ├── 2.2 实现 resolver.py (Resolver, resolve)
 ├── 2.3 实现 contract_gate.py (ContractGate, PortContractTest)
-└── 2.4 验证: registry包含≥39个端口
+└── 2.4 验证: registry包含≥48个端口
 
 阶段3: 创建组合根 + 修复EventBusFactory
 ├── 3.1 创建 composition_root.py
-├── 3.2 注册所有≥39个Protocol
+├── 3.2 注册所有48个Protocol
 ├── 3.3 修复EventBusFactory初始化(基于实际代码分析)
 │   ├── 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
 │   │   └── 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
@@ -1099,11 +1099,11 @@ print(f'All {len(registry)} ports registered')
 
 | Phase | 建议时间 | 理由 |
 |-------|----------|------|
-| Phase 1 | 4-6小时 | 39个Protocol契约定义,8个从application迁移 |
+| Phase 1 | 4-6小时 | 48个Protocol契约定义,8个从application迁移 |
 | Phase 2 | 2-3小时 | 核心基础设施开发 |
 | Phase 3 | 2-3小时 | 组合根+EventBusFactory修复 |
-| Phase 4 | 6-8小时 | 迁移服务代码+修复7处违规导入+跨模块继承 |
-| Phase 5 | 3-4小时 | 39个Protocol的契约测试 |
+| Phase 4 | 6-8小时 | 迁移服务代码+修复2处违规导入(role_repository.py的Exception导入)+跨模块继承 |
+| Phase 5 | 3-4小时 | 48个Protocol的契约测试 |
 | Phase 6 | 1-2小时 | 架构检查+文档 |
 | **总计** | **18-26小时** | — |
 
@@ -1124,7 +1124,7 @@ print(f'All {len(registry)} ports registered')
 
 | 标准 | 验证方法 |
 |------|----------|
-| 所有≥39个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥39 |
+| 所有48个Protocol已注册 | `python -c "from src.domain.ports.registry import _global_registry; print(len(_global_registry.list_all()))"` 输出 ≥48 |
 | 无重复注册 | registry无ValueError |
 | 契约测试通过 | `poetry run pytest tests/contracts/ -v` |
 | EventBusFactory初始化正确 | `python -c "from src.infrastructure.messaging import EventBusFactory; assert EventBusFactory.get_event_bus() is not None"` 不抛RuntimeError |
