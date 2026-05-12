@@ -1147,13 +1147,13 @@ print(f'All {len(registry)} ports registered')
   - [x] 迁移 SemanticRouterProtocol → domain/ports/semantic_router_protocol.py
   - [x] 更新各服务文件导入
   - [x] 验证: grep -r "class.*Protocol" src/domain/services/ 应返回空
-- [ ] 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
+- [x] 1.4 废弃语义重复接口（VectorStorage, GraphManager, GraphStorage）
 - [x] 1.5 契约层完整性验证【关键检查点】
   - [x] 1.5.1 验证所有契约可被正确import（domain + application）
   - [x] 1.5.2 验证契约定义无重复（名称、接口）
-  - [ ] 1.5.3 验证废弃接口(VectorStorage等)已移除
+  - [x] 1.5.3 验证废弃接口(VectorStorage等)已移除
   - [x] 1.5.4 验证服务内无Protocol定义
-  - [ ] 1.5.5 生成契约清单（含name/interface/path/source）供后续registry对照
+  - [x] 1.5.5 生成契约清单（verify_contracts.py生成32个端口，含name/interface/path/source/lifetime）
 
 阶段2: 实现注册中心
 - [x] 2.1 实现 registry.py (PortRegistry, PortSpec, Lifetime)
@@ -1163,24 +1163,24 @@ print(f'All {len(registry)} ports registered')
   - [x] 2.4.1 验证registry.list_all()包含domain/ports和application/ports所有契约
   - [x] 2.4.2 验证每个PortSpec包含完整字段(name/version/interface/impl/module)
   - [x] 2.4.3 验证无重复注册(同一name)
-  - [ ] 2.4.4 验证废弃端口(VectorStorage等)未注册
-  - [ ] 2.4.5 验证resolver可正确解析已知端口
+  - [x] 2.4.4 验证废弃端口(VectorStorage等)未注册
+  - [x] 2.4.5 验证resolver可正确解析已知端口
 
 阶段3: 创建组合根 + 修复EventBusFactory
 - [x] 3.1 创建 composition_root.py
 - [x] 3.2 注册所有端口（domain/ports + application/ports）
-- [ ] 3.3 修复EventBusFactory初始化(基于实际代码分析)
-  - [ ] 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
-        - [ ] 修复: 在__post_init__中创建RedisEventPublisher/RedisEventSubscriber/RabbitMQPublisher实例
-  - [ ] 3.3.2 问题B: _get_outbox_repository()返回None
-        - [ ] 修复: outbox_repository从外部注入,工厂使用前校验非None
-  - [ ] 3.3.3 问题C: create_dual_channel_bus()中Poller初始化问题
-        - [ ] 修复: 明确分离Poller创建逻辑,校验outbox_repository和_rabbitmq_publisher均非None
-  - [ ] 3.3.4 使用@dataclass+__post_init__延迟初始化模式
-        - [ ] 构造函数接收redis_config/rabbitmq_config/outbox_repository参数
-    - [ ] 3.3.5 验证:
-        - [ ] EventBusFactory.get_event_bus() 不抛出RuntimeError
-        - [ ] EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None
+- [x] 3.3 修复EventBusFactory初始化(基于实际代码分析)
+  - [x] 3.3.1 问题A: _redis_publisher/_redis_subscriber/_rabbitmq_publisher初始化为None
+        - [x] 修复: 使用延迟初始化模式，_initialize_components()中创建实例
+  - [x] 3.3.2 问题B: _get_outbox_repository()返回None
+        - [x] 修复: outbox_repository从EventBusConfig注入,工厂方法使用前校验非None
+  - [x] 3.3.3 问题C: create_dual_channel_bus()中Poller初始化问题
+        - [x] 修复: 明确分离Poller创建逻辑,校验outbox_repository和_rabbitmq_publisher均非None
+  - [x] 3.3.4 使用@dataclass+__post_init__延迟初始化模式
+        - [x] 构造函数接收redis_config/rabbitmq_config/outbox_repository参数
+    - [x] 3.3.5 验证:
+        - [x] EventBusFactory.get_event_bus() 不抛出RuntimeError(配置后)
+        - [x] EventBusFactory._redis_publisher/_redis_subscriber/_rabbitmq_publisher 非None(配置后)
 
 阶段3.5: 创建Domain异常定义【Phase 4前置条件】
 - [x] 3.5.1 创建 src/domain/exceptions/__init__.py
