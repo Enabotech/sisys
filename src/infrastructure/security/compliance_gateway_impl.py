@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from src.domain.ports.compliance_gateway import ComplianceGatewayPort
 from src.domain.value_objects.compliance_result import ComplianceResult
-from src.domain.value_objects.task import UDMRTask
+from src.domain.value_objects.udmr_task import UDMRTask
 
 if TYPE_CHECKING:
     from src.domain.ports.cross_border_transfer_service import CrossBorderTransferServicePort

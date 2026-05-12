@@ -27,7 +27,7 @@ from src.domain.entities.pipl_compliance_record import (
 from src.domain.entities.sensitive_data_result import SensitiveDataResult
 from src.domain.events.compliance_events import SensitiveType
 from src.domain.value_objects.compliance_result import ComplianceResult
-from src.domain.value_objects.task import UDMRTask
+from src.domain.value_objects.udmr_task import UDMRTask
 from src.infrastructure.security.compliance_gateway_impl import ComplianceGatewayImpl
 from src.infrastructure.security.cross_border_transfer_service_impl import (
     CrossBorderTransferServiceImpl,

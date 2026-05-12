@@ -11,7 +11,7 @@ class TestTaskCreation:
         """Test creating Task with required fields."""
         import uuid
 
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task_id = uuid.uuid4()
         task = UDMRTask(
@@ -30,7 +30,7 @@ class TestTaskCreation:
 
     def test_create_with_defaults(self):
         """Test creating Task with default values."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(
             input="Test data",
@@ -46,35 +46,35 @@ class TestTaskMethods:
 
     def test_is_china_domestic_true(self):
         """Test is_china_domestic returns True for CHINA_DOMESTIC."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(data_residency="CHINA_DOMESTIC")
         assert task.is_china_domestic() is True
 
     def test_is_china_domestic_false(self):
         """Test is_china_domestic returns False for non-domestic."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(data_residency="OVERSEAS")
         assert task.is_china_domestic() is False
 
     def test_requires_local_processing_true(self):
         """Test requires_local_processing returns True for CHINA_DOMESTIC."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(data_residency="CHINA_DOMESTIC")
         assert task.requires_local_processing() is True
 
     def test_requires_local_processing_false_for_overseas(self):
         """Test requires_local_processing returns False for OVERSEAS."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(data_residency="OVERSEAS")
         assert task.requires_local_processing() is False
 
     def test_requires_local_processing_false_for_hkmo(self):
         """Test requires_local_processing returns False for CHINA_HKMO."""
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task = UDMRTask(data_residency="CHINA_HKMO")
         assert task.requires_local_processing() is False
@@ -83,7 +83,7 @@ class TestTaskMethods:
         """Test get_task_context returns correct dict for UDMR."""
         import uuid
 
-        from src.domain.value_objects.task import UDMRTask
+        from src.domain.value_objects.udmr_task import UDMRTask
 
         task_id = uuid.uuid4()
         task = UDMRTask(

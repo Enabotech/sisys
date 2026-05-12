@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from src.domain.value_objects.compliance_result import ComplianceResult
-from src.domain.value_objects.task import UDMRTask
+from src.domain.value_objects.udmr_task import UDMRTask
 
 
 class ComplianceGatewayPort(Protocol):
