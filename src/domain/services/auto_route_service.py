@@ -3,49 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
-from src.domain.events.base import DomainEvent
+from src.domain.ports.event_publisher import EventPublisher
+from src.domain.ports.hash_router_protocol import HashRouterProtocol
+from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 
 logger = logging.getLogger(__name__)
-
-
-class EventPublisherProtocol(Protocol):
-    """Protocol for event publishing (implemented by infrastructure)."""
-
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None: ...
-
-
-class HashRouterProtocol(Protocol):
-    """Protocol for hash-based routing (implemented in infrastructure)."""
-
-    def route(self, session_id: str) -> str:
-        """Route based on session_id hash.
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            Target node/agent ID
-        """
-        ...
-
-
-class SemanticRouterProtocol(Protocol):
-    """Protocol for semantic routing (implemented in infrastructure)."""
-
-    async def route(self, task_context: dict) -> tuple[str, float]:
-        """Route based on task context semantic similarity.
-
-        Args:
-            task_context: Task context dictionary
-
-        Returns:
-            Tuple of (target_id, similarity_score)
-        """
-        ...
 
 
 class AutoRouteService:
@@ -62,7 +27,7 @@ class AutoRouteService:
 
     def __init__(
         self,
-        publisher: EventPublisherProtocol | None = None,
+        publisher: EventPublisher | None = None,
         hash_router: HashRouterProtocol | None = None,
         semantic_router: SemanticRouterProtocol | None = None,
     ):

@@ -13,45 +13,15 @@ sandbox execution and snapshot storage.
 from __future__ import annotations
 
 import logging
-from typing import Any, Protocol
+from typing import Any
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
+from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
+from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 
 logger = logging.getLogger(__name__)
-
-
-class SandboxExecutorProtocol(Protocol):
-    """Protocol for sandbox execution (implemented by infrastructure)."""
-
-    async def start_container(self, session_id: str) -> None:
-        """Start a sandbox container for the given session."""
-        ...
-
-    async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
-        """Execute code in the sandbox."""
-        ...
-
-    async def stop_container(self, session_id: str) -> None:
-        """Stop the sandbox container."""
-        ...
-
-
-class SnapshotRepositoryProtocol(Protocol):
-    """Protocol for snapshot storage (implemented by infrastructure)."""
-
-    async def save(self, snapshot: CheckpointSnapshot) -> None:
-        """Save a snapshot to storage."""
-        ...
-
-    async def load(self, session_id: str) -> CheckpointSnapshot | None:
-        """Load the latest snapshot for a session."""
-        ...
-
-    async def delete(self, session_id: str) -> None:
-        """Delete snapshots for a session."""
-        ...
 
 
 class AutoExecuteService:
