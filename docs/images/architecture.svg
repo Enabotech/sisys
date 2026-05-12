@@ -6,9 +6,6 @@
     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
     </marker>
-    <marker id="arrowtail" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
-      <polygon points="10 0, 0 3.5, 10 7" fill="#64748b"/>
-    </marker>
   </defs>
 
   <!-- Background -->
@@ -37,7 +34,7 @@
   </g>
 
   <!-- Arrow 1 -->
-  <line x1="450" y1="162" x2="450" y2="192" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
+  <line x1="450" y1="162" x2="450" y2="192" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 2: Interface -->
   <g transform="translate(50, 195)">
@@ -55,7 +52,7 @@
   </g>
 
   <!-- Arrow 2 -->
-  <line x1="450" y1="287" x2="450" y2="317" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
+  <line x1="450" y1="287" x2="450" y2="317" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 3: Application -->
   <g transform="translate(50, 320)">
@@ -76,7 +73,7 @@
   </g>
 
   <!-- Arrow 3 -->
-  <line x1="450" y1="412" x2="450" y2="442" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
+  <line x1="450" y1="412" x2="450" y2="442" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 4: Domain -->
   <g transform="translate(50, 445)">
@@ -106,7 +103,7 @@
   </g>
 
   <!-- Arrow 4 -->
-  <line x1="450" y1="557" x2="450" y2="587" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
+  <line x1="450" y1="557" x2="450" y2="587" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
