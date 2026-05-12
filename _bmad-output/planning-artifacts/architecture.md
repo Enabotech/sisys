@@ -2871,24 +2871,6 @@ src/interfaces/
 │       ├── database_deps.py
 │       └── service_deps.py
 │
-├── event_listeners/                                       # 事件监听适配器 (接口层)
-│   ├── __init__.py
-│   ├── listeners/                                         # 领域事件监听器
-│   │   ├── __init__.py
-│   │   ├── document_processed_listener.py                 # → 实体抽取/图谱构建/索引构建
-│   │   ├── tool_executed_listener.py                      # → 成本聚合/技能演进/Agent 决策
-│   │   ├── agent_decided_listener.py                      # → SYS 仲裁/公共黑板更新/审计日志
-│   │   ├── checkpoint_reached_listener.py                 # → 用户反馈/状态持久化
-│   │   ├── correction_approved_listener.py                # → 自动固化/版本注册/演进日志
-│   │   ├── deviation_warning_listener.py                  # → Agent 响应/偏差分析报告
-│   │   ├── heartbeat_listener.py                          # → 周期任务检查/偏差预警/成本校验
-│   │   ├── isolation_switched_listener.py                 # → 公共黑板权限更新/协作状态同步
-│   │   ├── checkpoint_recovered_listener.py               # → 档案库版本更新/分支管理
-│   │   └── routing_decided_listener.py                    # → 路由决策日志存储/成本监控
-│   └── converters/                                        # Event → ApplicationCommand 转换器
-│       ├── __init__.py
-│       └── event_to_command_converter.py
-│
 ├── adapters/                                              # 适配器
 │   ├── __init__.py
 │   ├── inbound_adapters/                                  # 入站适配器

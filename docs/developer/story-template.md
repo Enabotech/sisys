@@ -358,67 +358,71 @@
 ### 项目结构说明 Project Structure
 
 ```
-sisys/
+.\
+|
 ├── src/
-├── __init__.py
-├── application/                # 应用层
-│   ├── __init__.py             # 模块导出
-│   ├── commands/                   # 命令定义
-│   ├── queries/                    # 查询定义
-│   ├── command_handlers/           # 应用层命令处理器
-│   ├── query_handlers/             # 应用层查询处理器
-│   ├── event_handlers/             # 应用层事件处理器
-│   ├── ports/                      # 应用层端口（技术横切关注的抽象）
-│   ├── services/                   # 应用层服务
-│   ├── skills/                     # Skills 操作手册
-│   └── use_cases/                  # 用例定义
-│
-├── domain/                     # 领域层
-│   ├── __init__.py             # 模块导出
-│   ├── entities/                   # 领域模型
-│   ├── events/                     # 领域事件定义
-│   ├── exceptions/                 # 领域层异常
-│   ├── ports/                      # 领域层端口（核心领域关注的抽象）
-│   ├── services/                   # 领域层服务接口
-│   └── value_objects/              # 值对象集合
-├── infrastructure/             # 基础设施层
-│   ├── __init__.py
-│   ├── audit/                      # 审计服务
-│   ├── config/                     # 配置管理
-│   ├── external_services/          # 外部服务适配器
-│   ├── logging/                    # 统一存储抽象层
-│   ├── messaging/                  # 事件总线与消息系统
-│   ├── monitoring/                 # 监控服务
-│   ├── routing/                    # 路由服务
-│   ├── scheduler/                  # 调度服务
-│   ├── security/                   # 安全服务
-│   ├── storage/                    # 统一存储抽象层
-│   ├── utils/                      # 工具集
-│   ├── mcp/                        # MCP 外部生态接口
-│   ├── agent_orch/                 # Agent 编排引擎
-│   └── workflow/                   # 工作流引擎
-├── interfaces                  # 接口层
-│   ├── __init__.py
-│   ├── adapters/
-│   ├── api/
-│   ├── cli/
-│   └── sap/
-├── shared                      # 必要共享模块
-│   └── __init__.py
-│
-├── tests/
-│   ├── contract/
-│   │   └── test_[xxx]_api_contract.py # 契约测试
-│   ├── unit/[layer]/
-│   │   └── test_[component].py # 单元测试
-│   ├── integration/
-│   │   └── test_story_x_y_[integration].py # 集成测试
-│   └── acceptance/
-│       ├── test_story_x_y.feature   # Gherkin 场景
-│       └── test_story_x_y_steps.py  # BDD 步骤实现
-└── docs/
-    └── [layer]/
-        └── [component]_guide.md # 实施指南
+|   ├── __init__.py
+|   ├── application/                # 应用层
+|   │   ├── __init__.py             # 模块导出
+|   │   ├── commands/                   # 命令定义
+|   │   ├── queries/                    # 查询定义
+|   │   ├── command_handlers/           # 应用层命令处理器
+|   │   ├── query_handlers/             # 应用层查询处理器
+|   │   ├── event_handlers/             # 应用层事件处理器
+|   │   ├── ports/                      # 应用层端口（技术横切关注的抽象）
+|   │   ├── services/                   # 应用层服务
+|   │   ├── skills/                     # Skills 操作手册
+|   │   └── use_cases/                  # 用例定义
+|   │
+|   ├── domain/                     # 领域层
+|   │   ├── __init__.py             # 模块导出
+|   │   ├── entities/                   # 领域模型
+|   │   ├── events/                     # 领域事件定义
+|   │   ├── exceptions/                 # 领域层异常
+|   │   ├── ports/                      # 领域层端口（核心领域关注的抽象）
+|   │   ├── services/                   # 领域层服务接口
+|   │   └── value_objects/              # 值对象集合
+|   │
+|   ├── infrastructure/             # 基础设施层
+|   │   ├── __init__.py             # 模块导出
+|   │   ├── audit/                      # 审计服务
+|   │   ├── config/                     # 配置管理
+|   │   ├── external_services/          # 外部服务适配器
+|   │   ├── logging/                    # 统一存储抽象层
+|   │   ├── messaging/                  # 事件总线与消息系统
+|   │   ├── monitoring/                 # 监控服务
+|   │   ├── routing/                    # 路由服务
+|   │   ├── scheduler/                  # 调度服务
+|   │   ├── security/                   # 安全服务
+|   │   ├── storage/                    # 统一存储抽象层
+|   │   ├── utils/                      # 工具集
+|   │   ├── mcp/                        # MCP 外部生态接口
+|   │   ├── agent_orch/                 # Agent 编排引擎
+|   │   └── workflow/                   # 工作流引擎
+|   │
+|   ├── interfaces                  # 接口层
+|   │   ├── __init__.py             # 模块导出
+|   │   ├── adapters/                   # 适配器
+|   │   ├── api/                        # REST API 接口 (FastAPI 0.104+)
+|   │   ├── cli/                        # 命令行接口 (typer 0.24+, Python 类型注解驱动)
+|   │   └── sap/                        # SAP 协议 (sisys Agent Protocol)
+|   │
+|   └── shared                      # 必要共享模块
+|       └── __init__.py
+|
+└── tests/
+    │   ├── contract/
+    │   │   └── test_[xxx]_api_contract.py # 契约测试
+    │   ├── unit/[layer]/
+    │   │   └── test_[component].py # 单元测试
+    │   ├── integration/
+    │   │   └── test_story_x_y_[integration].py # 集成测试
+    │   └── acceptance/
+    │       ├── test_story_x_y.feature   # Gherkin 场景
+    │       └── test_story_x_y_steps.py  # BDD 步骤实现
+    └── docs/
+        └── [layer]/
+            └── [component]_guide.md # 实施指南
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
