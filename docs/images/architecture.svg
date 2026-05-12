@@ -3,10 +3,12 @@
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
       <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.1"/>
     </filter>
-    <linearGradient id="arrow" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#94a3b8"/>
-      <stop offset="100%" stop-color="#cbd5e1"/>
-    </linearGradient>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+    <marker id="arrowtail" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+      <polygon points="10 0, 0 3.5, 10 7" fill="#64748b"/>
+    </marker>
   </defs>
 
   <!-- Background -->
@@ -35,8 +37,7 @@
   </g>
 
   <!-- Arrow 1 -->
-  <line x1="450" y1="160" x2="450" y2="185" stroke="url(#arrow)" stroke-width="2" stroke-dasharray="4,2"/>
-  <polygon points="450,190 445,180 455,180" fill="#94a3b8"/>
+  <line x1="450" y1="162" x2="450" y2="192" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 2: Interface -->
   <g transform="translate(50, 195)">
@@ -54,8 +55,7 @@
   </g>
 
   <!-- Arrow 2 -->
-  <line x1="450" y1="285" x2="450" y2="310" stroke="url(#arrow)" stroke-width="2" stroke-dasharray="4,2"/>
-  <polygon points="450,315 445,305 455,305" fill="#94a3b8"/>
+  <line x1="450" y1="287" x2="450" y2="317" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 3: Application -->
   <g transform="translate(50, 320)">
@@ -76,8 +76,7 @@
   </g>
 
   <!-- Arrow 3 -->
-  <line x1="450" y1="410" x2="450" y2="435" stroke="url(#arrow)" stroke-width="2" stroke-dasharray="4,2"/>
-  <polygon points="450,440 445,430 455,430" fill="#94a3b8"/>
+  <line x1="450" y1="412" x2="450" y2="442" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 4: Domain -->
   <g transform="translate(50, 445)">
@@ -107,8 +106,7 @@
   </g>
 
   <!-- Arrow 4 -->
-  <line x1="450" y1="555" x2="450" y2="580" stroke="url(#arrow)" stroke-width="2" stroke-dasharray="4,2"/>
-  <polygon points="450,585 445,575 455,575" fill="#94a3b8"/>
+  <line x1="450" y1="557" x2="450" y2="587" stroke="#64748b" stroke-width="2" marker-start="url(#arrowtail)" marker-end="url(#arrowhead)"/>
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
@@ -148,10 +146,4 @@
     <text x="725" y="87" text-anchor="middle" font-size="10" fill="#6b21a8">🐳 Docker</text>
   </g>
 
-  <!-- Legend -->
-  <g transform="translate(700, 70)">
-    <text x="0" y="0" font-size="10" fill="#64748b">🖥️ CLI</text>
-    <text x="0" y="14" font-size="10" fill="#64748b">🌐 REST API</text>
-    <text x="0" y="28" font-size="10" fill="#64748b">📋 Skills</text>
-  </g>
 </svg>
