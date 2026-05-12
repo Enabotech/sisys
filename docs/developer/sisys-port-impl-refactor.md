@@ -1111,7 +1111,12 @@ print(f'All {len(registry)} ports registered')
 
 ## 五、重构执行顺序
 
-### 5.1 Phase与P0问题映射
+**Phase编号说明**：
+- 小数点编号（如3.5）表示"介于Phase 3和Phase 4之间的独立阶段"
+- 不是父Phase的子阶段
+- 执行顺序：Phase 1 → Phase 2 → Phase 3 → Phase 3.5 → Phase 4 → Phase 5 → Phase 6 → Phase 7
+
+### 5.1 Phase与P0问题映射（按执行顺序排列）
 
 | Phase | 对应P0问题 | 验证标准 |
 |-------|-----------|----------|
