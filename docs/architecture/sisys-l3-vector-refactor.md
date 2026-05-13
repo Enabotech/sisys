@@ -1,10 +1,10 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v3.0
+**版本:** v4.0
 **日期:** 2026-05-13
-**状态:** 设计阶段
+**状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
-**修订:** 基于5轮代码审查的系统性修正
+**修订:** 基于5轮代码审查的系统性修正 + 代码验证
 
 ---
 
@@ -894,9 +894,54 @@ def test_backward_compatibility():
 | v3.0 | 2026-05-13 | QdrantL3VectorStore 组合策略 | 组合 QdrantVectorStorage + QdrantCollectionManager |
 | v3.0 | 2026-05-13 | UnifiedStorageGateway self._l3 使用 | L3 功能不再虚设 |
 | v3.0 | 2026-05-13 | L3VectorPort 接口参数统一 | collection → name, vector_params → distance |
+| v4.0 | 2026-05-13 | **代码验证发现 v3.0 计划变更未实现** | 所有 P0/P1 问题仍未修复，需开始实际代码实现 |
 
 ---
 
-**文档状态**: v3.0 已完成 5 轮审查
-**审查摘要**: 发现 4 个 P0 问题、4 个 P1 问题、3 个 P2 问题，已全部整合到本版本
-**下一步**: 开始执行实现
+## 八、Round 5 审查发现（代码验证）
+
+### 8.1 P0 问题验证结果
+
+| 问题 | 状态 | 验证方法 |
+|------|------|---------|
+| P0-1: search_sparse 异常吞没 | **未修复** | 代码检查 vector_storage.py:200 仍是 `except Exception: return []` |
+| P0-2: l3_vector 未注册 | **未修复** | composition_root.py 中无 l3_vector 注册 |
+| P0-3: self._l3 未使用 | **未修复** | UnifiedStorageGateway.save() 未调用 self._l3 |
+| P0-4: L3VectorPort 实现不完整 | **未修复** | qdrant_vector_adapter.py 缺4个 collection 方法 |
+
+### 8.2 接口签名验证结果
+
+| 接口 | 位置 | 当前签名 | 问题 |
+|------|------|---------|------|
+| L3VectorPort.create_collection | domain/ports/l3_vector.py | `collection, vector_size, vector_params` | **旧签名** |
+| QdrantCollectionManager.create_collection | infrastructure/collection_manager.py | `name, vector_size, distance, **kwargs` | **新签名** |
+
+### 8.3 新文件存在性验证
+
+| 文件（v3.0 计划创建） | 状态 |
+|----------------------|------|
+| `src/infrastructure/storage/qdrant/qdrant_l3_vector_store.py` | **不存在** |
+| `src/infrastructure/storage/qdrant/semantic_cache_store.py` | **不存在** |
+| `src/domain/ports/semantic_cache.py` | **不存在** |
+
+### 8.4 架构验证结果
+
+- Domain 层零依赖：✅ 正确（l3_vector.py 仅使用 typing.Protocol）
+- 六边形架构约束测试：✅ 27/27 通过
+- qdrant-client 1.7.1 API 兼容性：✅ 无问题
+
+### 8.5 UnifiedStorageGateway L3 使用差距
+
+| 差距项 | 严重程度 |
+|--------|---------|
+| self._l3 在 save/read/delete 中从未被调用 | P0 |
+| 缺少 _generate_embedding 方法 | P0 |
+| 缺少内容大小判断逻辑（>500 tokens） | P0 |
+| 缺少 Collection 管理 | P1 |
+| 缺少 L3 错误处理和降级策略 | P1 |
+
+---
+
+**文档状态**: v4.0 已完成 5 轮审查 + 代码验证
+**审查摘要**: 确认 v3.0 设计文档中的所有 P0 问题在代码中仍未修复
+**下一步**: 执行 P0 问题的实际代码实现
