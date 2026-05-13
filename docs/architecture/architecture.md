@@ -169,6 +169,12 @@ completedAt: '2026-02-26'
 | interfaces | src/interfaces/ | 适配器 |
 | infrastructure | src/infrastructure/ | 技术实现 |
 
+---
+
+![系统架构](../images/architecture.svg)
+
+---
+
 **依赖方向矩阵**
 | 起点 \ 终点         | domain | application | interfaces | infrastructure |
 |--------------------|--------|-------------|------------|----------------|
