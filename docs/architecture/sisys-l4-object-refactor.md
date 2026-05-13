@@ -1183,6 +1183,8 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 
 **状态：待执行**
 
+**前置依赖：** Phase 1 完成（MinIORepository 继承 L4ObjectPort 后才能正确委托）**
+
 | Checkbox | 步骤 | 任务 | 验证命令 |
 |----------|------|------|---------|
 | `[ ]` | 2.1 | 在 `MinIOAdapter.archive()` 开头添加 content 检查：`if content is not None: raise NotImplementedError(...)` | `grep "NotImplementedError" src/infrastructure/storage/minio/minio_adapter.py` |
@@ -1207,6 +1209,8 @@ if content is not None:
 
 **状态：待执行**
 
+**前置依赖：** Phase 1 完成（L4ObjectPort 稳定后 DocumentStoragePort 才能继承）**
+
 | Checkbox | 步骤 | 任务 | 验证命令 |
 |----------|------|------|---------|
 | `[ ]` | 3.1 | 创建 `src/application/ports/__init__.py`（如不存在） | `test -f src/application/ports/__init__.py && echo "exists"` |
@@ -1222,6 +1226,8 @@ if content is not None:
 **目标：** 建立 Layer 4 具体应用实现
 
 **状态：待执行**
+
+**前置依赖：** Phase 2.2 和 Phase 3.2 完成（需要 MinIOAdapter.list_objects() 和 DocumentStoragePort 接口定义）**
 
 | Checkbox | 步骤 | 任务 | 验证命令 |
 |----------|------|------|---------|
@@ -1274,6 +1280,9 @@ if content is not None:
 | R4: archive content 参数语义不清导致运行时错误 | 高 | 高 | content 被静默丢弃会导致数据丢失，必须实现 NotImplementedError | ⚠️ 维持高风险 |
 | R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | 显式声明继承方法可解决 | ✅ 风险可控 |
 | R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
+| R7: WORMManager.archive_object() 返回值恒 True | 低 | 高 | archive_object 应返回 stat_object.etag 而非固定 True | ⚠️ 待修复 |
+| R8: Acceptance 测试绕过 MinIOAdapter | 中 | 高 | 适配器层错误无法被发现，应直接测试适配器 | ⚠️ 需修复测试 |
+| R9: DocumentStoragePort/MinIODocumentStorage 文件缺失 | 高 | 中 | Phase 3/4 执行后风险消除 | ⚠️ 待执行 |
 
 **关键发现（Round 3 审查）：**
 - `ObjectStorageRepository` 未在 `__init__.py` 导出，不是公开 API
