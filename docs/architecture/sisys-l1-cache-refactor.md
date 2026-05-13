@@ -1,6 +1,6 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v2.1
+**版本:** v2.2
 **日期:** 2026-05-13
 **状态:** 设计阶段
 **审查状态:** 第1轮审查修订
@@ -18,6 +18,9 @@
 | RedisConfig默认值不一致 | P0 | 添加问题说明：class=10 vs from_env()=100 |
 | 6个Adapter独立ConnectionPool | P0 | 添加问题说明，规划Phase 1-9统一连接池 |
 | IdempotencyChecker硬编码参数 | P0 | 添加问题说明，纳入连接池统一管理 |
+| Layer 2 MemoryCachePort不存在 | P0 | 实际代码中不存在此接口 |
+| SemanticCache未继承L1CachePort | P0 | 确认问题存在，规划Phase 4修复 |
+| SessionStorage不应继承L1CachePort | P1 | 语义不同，会话管理vs键值缓存，保持独立 |
 
 ---
 
@@ -134,9 +137,9 @@ decode_responses=True  # 重复
 │  职责：继承L1CachePort，定义特定场景缓存能力                       │
 │  位置：src/application/ports/                                     │
 │  端口：                                                          │
-│    - SemanticCachePort(L1CachePort, ...) (Qdrant 负责向量存储与语义检索，Redis 负责缓存实际响应语义内容（带 TTL 管理）)│
-│    - MemoryCachePort(L1CachePort, ...) (记忆缓存)                          │
-│    - SessionStoragePort(L1CachePort, ...) (会话存储)        │
+│    - SemanticCachePort(L1CachePort, ...) ⚠️ 当前为SemanticCache，未继承│
+│    - MemoryCachePort ❌ 不存在，实际由RedisMemoryCache直接实现L1CachePort│
+│    - SessionStorage ❌ 不应继承L1CachePort（语义不同：会话管理vs缓存）│
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
