@@ -211,6 +211,128 @@ src/infrastructure/storage/postgresql/
 
 ---
 
+### 2.5 四层职责模型
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: Domain Layer - L2RdbPort（统一抽象 RDB 端口）        │
+│                                                                  │
+│  职责：定义最底层通用 RDB 接口（get_by_id/save/delete/list_all）│
+│  位置：src/domain/ports/l2_rdb.py                               │
+│  特点：领域层零依赖，纯抽象协议                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Domain Layer - 具体应用 RDB 端口                       │
+│                                                                  │
+│  职责：继承 L2RdbPort，定义特定实体数据访问契约                   │
+│  位置：src/domain/ports/                                          │
+│  端口：                                                          │
+│    - L2MetadataRepositoryPort(L2RdbPort)     (记忆系统)           │
+│    - L2ChangeHistoryRepositoryPort(L2RdbPort)                    │
+│    - L2GroupMemberRepositoryPort(L2RdbPort)                     │
+│    - UserRepositoryPort(L2RdbPort)          (用户系统)           │
+│    - RoleRepositoryPort(L2RdbPort)           (角色系统)          │
+│    - AuditRepositoryPort(L2RdbPort)           (审计系统)         │
+│    - LoginAttemptRepositoryPort(L2RdbPort)   (登录系统)          │
+│    - UserRoleRepositoryPort(L2RdbPort)        (用户角色系统)      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: Infrastructure - PostgreSQL 技术实现 + RDB 管理        │
+│                                                                  │
+│  职责：实现 L2RdbPort 接口 + 数据库连接池统一管理                 │
+│  位置：src/infrastructure/storage/postgresql/                     │
+│  组件：                                                          │
+│    - rdb_adapter.py                                             │
+│    │     PostgreSqlRdbAdapter (实现 L2RdbPort)                   │
+│    │     └── 职责：连接管理 / 会话管理 / 事务控制                  │
+│    - engine.py                                                   │
+│    │     DatabaseEngine (数据库引擎单例)                          │
+│    │     └── 职责：连接池初始化 / 健康检查 / 优雅关闭             │
+│  特点：技术可替换（未来可新增 MySqlAdapter 等）                   │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Infrastructure - 具体应用 RDB 端口实现                  │
+│                                                                  │
+│  职责：实现具体应用 RDB 端口（UserRepositoryPort 等）            │
+│  位置：src/infrastructure/storage/postgresql/repository/           │
+│  组件：                                                          │
+│    - PostgreSQLUserRepository(UserRepositoryPort)                │
+│    │     └─ 继承 BaseRepository，复用 CRUD                      │
+│    - PostgreSQLRoleRepository(RoleRepositoryPort)                │
+│    - PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort) │
+│    - PostgreSQLAuditRepository(AuditRepositoryPort)              │
+│    - PostgreSQLLoginAttemptRepository(LoginAttemptRepositoryPort)│
+│    - PostgreSQLUserRoleRepository(UserRoleRepositoryPort)       │
+│  特点：组合 PostgreSqlRdbAdapter 获取会话，委托 BaseRepository   │
+│        处理通用 CRUD，专注实现业务特定查询                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2.6 接口继承关系
+
+```python
+# Layer 1: Domain 统一抽象
+class L2RdbPort(Protocol):
+    """通用 RDB 接口 - 最底层抽象"""
+    async def get_by_id(self, id: UUID) -> Any | None: ...
+    async def save(self, entity: Any) -> Any: ...
+    async def delete(self, id: UUID) -> bool: ...
+    async def list_all(self, skip: int = 0, limit: int = 100) -> list[Any]: ...
+    async def execute_in_transaction(self, func: Callable, *args, **kwargs) -> Any: ...
+
+# Layer 2: Domain 具体应用端口
+class UserRepositoryPort(L2RdbPort, Protocol):
+    """用户仓储接口 - 继承 L2RdbPort"""
+    async def get_by_username(self, username: str) -> User | None: ...
+    async def get_by_email(self, email: str) -> User | None: ...
+
+class RoleRepositoryPort(L2RdbPort, Protocol):
+    """角色仓储接口 - 继承 L2RdbPort"""
+    pass
+
+# Layer 3: Infrastructure PostgreSQL 技术实现
+class PostgreSqlRdbAdapter(L2RdbPort):
+    """PostgreSQL RDB 适配器"""
+    def __init__(self, engine: DatabaseEngine):
+        self._engine = engine
+        self._session: AsyncSession | None = None
+
+    async def get_session(self) -> AsyncSession: ...
+
+class DatabaseEngine:
+    """数据库引擎单例"""
+    def get_async_engine(self) -> AsyncEngine: ...
+    async def get_async_session(self) -> AsyncIterator[AsyncSession]: ...
+    async def health_check(self) -> bool: ...
+
+# Layer 4: Infrastructure 具体应用实现
+class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
+    """PostgreSQL 用户仓储实现"""
+    def __init__(self, session: AsyncSession):
+        BaseRepository.__init__(self, UserModel, session)
+
+    async def get_by_username(self, username: str) -> User | None:
+        result = await self._session.execute(select(UserModel).where(...))
+        ...
+```
+
+### 2.7 与 L1 Cache 四层模型对照
+
+| 层级 | L1 Cache | L2 RDB |
+|------|----------|--------|
+| **Layer 1** | `L1CachePort` (统一缓存抽象) | `L2RdbPort` (统一 RDB 抽象) |
+| **Layer 2** | `SemanticCachePort` (语义缓存) | `UserRepositoryPort` (用户仓储) |
+| | `MemoryCachePort` (记忆缓存) | `RoleRepositoryPort` (角色仓储) |
+| | `SessionStoragePort` (会话存储) | `AuditRepositoryPort` (审计仓储) |
+| **Layer 3** | `RedisL1CacheAdapter` (Redis 实现) | `PostgreSqlRdbAdapter` (PG 适配器) |
+| | `DatabaseEngine` (连接管理) | `DatabaseEngine` (连接管理) |
+| **Layer 4** | `RedisSemanticCacheAdapter` | `PostgreSQLUserRepository` |
+
+---
+
 ## 3. 重构目标
 
 ### 3.1 架构目标

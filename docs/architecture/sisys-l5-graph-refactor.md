@@ -40,40 +40,165 @@
 
 ## 2. 架构总览
 
-### 2.1 目标架构
+### 2.1 四层职责模型
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Application Layer                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    MemoryGraphPort                            │   │
-│  │  职责: 记忆图谱领域语义（create_memory_entity, link_memories） │   │
-│  │  依赖: L5GraphPort（技术抽象）                                  │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                              │ 继承
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Domain Layer                                │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                      L5GraphPort                                │  │
-│  │  职责: 纯技术图操作（节点/关系 CRUD + 图遍历 + Cypher）          │  │
-│  │  依赖: 零外部依赖（仅 abc + typing）                              │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                              │ 实现
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Infrastructure Layer                           │
-│  ┌─────────────────────────┐  ┌───────────────────────────────┐   │
-│  │    Neo4jGraphStorage      │  │      MemoryGraphAdapter       │   │
-│  │  职责: Neo4j Cypher 执行   │  │  职责: 记忆领域逻辑实现        │   │
-│  │  实现: L5GraphPort        │  │  实现: MemoryGraphPort        │   │
-│  └─────────────────────────┘  └───────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: Domain Layer - L5GraphPort（纯技术图操作抽象）           │
+│                                                                  │
+│  职责：定义最底层通用图存储接口（节点/关系 CRUD + 图遍历 + Cypher）│
+│  位置：src/domain/ports/l5_graph.py                              │
+│  特点：领域层零依赖，纯抽象协议                                     │
+│  方法：create_node/get_node/update_node/delete_node/node_exists │
+│       create_relationship/delete_relationship/get_relationships │
+│       find_path/get_neighbors/find_related                      │
+│       execute_query/execute_write_query                         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑ 继承
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Application Layer - MemoryGraphPort（记忆领域语义）    │
+│                                                                  │
+│  职责：继承L5GraphPort，定义记忆图谱领域能力                       │
+│  位置：src/domain/ports/memory_graph.py                          │
+│  端口：MemoryGraphPort                                           │
+│    - create_memory_entity / get_memory_entity / delete_memory_entity │
+│    - link_memories / unlink_memories / get_memory_links          │
+│    - find_related_memories / get_memory_neighbors / find_memory_path │
+│  特点：绑定 memory_id，添加领域语义（Memory标签、记忆关系类型）    │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑ 实现（技术）
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: Infrastructure - Neo4j技术实现 + 图存储管理              │
+│                                                                  │
+│  职责：实现L5GraphPort接口 + Neo4j连接池统一管理                   │
+│  位置：src/infrastructure/storage/neo4j/                           │
+│  组件：                                                          │
+│    - Neo4jConnectionProvider (连接池单例)                         │
+│    - Neo4jGraphStorage (实现L5GraphPort)                         │
+│  特点：技术可替换（未来可新增TigerGraphAdapter等）                │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑ 实现（领域）
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Infrastructure - 具体应用图端口实现                      │
+│                                                                  │
+│  职责：实现具体应用图端口（MemoryGraphPort等）                     │
+│  位置：src/infrastructure/storage/neo4j/                           │
+│  组件：                                                          │
+│    - MemoryGraphAdapter (实现MemoryGraphPort)                   │
+│      └─ 组合Neo4jGraphStorage处理基础图操作                       │
+│  可扩展：AgentGraphAdapter / DocumentGraphAdapter（未来）         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 分层职责
+### 2.2 接口继承关系
+
+```python
+# Layer 1: Domain统一抽象（纯技术）
+class L5GraphPort(Protocol):
+    """纯技术图操作接口 - 最底层抽象"""
+    # 节点操作
+    async def create_node(self, node_id: str, labels: list[str], properties: dict) -> bool: ...
+    async def get_node(self, node_id: str) -> dict | None: ...
+    async def update_node(self, node_id: str, properties: dict) -> bool: ...
+    async def delete_node(self, node_id: str) -> bool: ...
+    async def node_exists(self, node_id: str) -> bool: ...
+    # 关系操作
+    async def create_relationship(self, source_id: str, target_id: str, rel_type: str, properties: dict | None = None) -> bool: ...
+    async def delete_relationship(self, source_id: str, target_id: str, rel_type: str) -> bool: ...
+    async def get_relationships(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]: ...
+    # 图遍历
+    async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]: ...
+    async def get_neighbors(self, node_id: str, max_depth: int = 1, edge_type: str | None = None) -> list[dict]: ...
+    async def find_related(self, node_id: str, max_depth: int = 2, edge_type: str | None = None) -> list[dict]: ...
+    # 低级Cypher
+    async def execute_query(self, cypher: str, params: dict | None = None) -> list[dict]: ...
+    async def execute_write_query(self, cypher: str, params: dict | None = None) -> list[dict]: ...
+
+# Layer 2: Application领域抽象（继承L5GraphPort）
+class MemoryGraphPort(L5GraphPort, Protocol):
+    """记忆图谱领域接口 - 继承L5GraphPort"""
+    # 记忆实体操作
+    async def create_memory_entity(self, memory_id: str, entity_type: str, properties: dict) -> bool: ...
+    async def get_memory_entity(self, memory_id: str) -> dict | None: ...
+    async def delete_memory_entity(self, memory_id: str) -> bool: ...
+    async def memory_entity_exists(self, memory_id: str) -> bool: ...
+    # 记忆关系操作
+    async def link_memories(self, source_id: str, target_id: str, relationship_type: str, properties: dict | None = None) -> bool: ...
+    async def unlink_memories(self, source_id: str, target_id: str, relationship_type: str) -> bool: ...
+    async def get_memory_links(self, memory_id: str, relationship_type: str | None = None) -> list[dict]: ...
+    # 记忆图遍历
+    async def find_related_memories(self, memory_id: str, max_depth: int = 2, relationship_type: str | None = None) -> list[dict]: ...
+    async def get_memory_neighbors(self, memory_id: str, max_depth: int = 1, edge_type: str | None = None) -> list[dict]: ...
+    async def find_memory_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]: ...
+    # 批量操作
+    async def batch_create_memory_entities(self, entities: list[dict]) -> list[bool]: ...
+    async def batch_link_memories(self, links: list[dict]) -> list[bool]: ...
+
+# Layer 3: Infrastructure技术实现
+class Neo4jConnectionProvider:
+    """Neo4j连接池单例提供者"""
+    @classmethod
+    def init(cls, config: Neo4jConfig) -> None: ...
+    @classmethod
+    def get_client(cls) -> Neo4jClientWrapper: ...
+    @classmethod
+    def close(cls) -> None: ...
+
+class Neo4jGraphStorage(L5GraphPort):
+    """Neo4j纯技术实现"""
+    def __init__(self, client_wrapper: Neo4jClientWrapper, database: str = "neo4j"): ...
+
+# Layer 4: Infrastructure领域实现
+class MemoryGraphAdapter(MemoryGraphPort):
+    """记忆图谱领域实现"""
+    def __init__(self, storage: L5GraphPort):
+        self._storage = storage  # 组合Neo4jGraphStorage
+
+    # 实现MemoryGraphPort所有方法
+    async def create_memory_entity(self, memory_id: str, entity_type: str, properties: dict) -> bool:
+        return await self._storage.create_node(memory_id, ["Memory", entity_type], properties)
+    # ...
+
+    # 委托实现L5GraphPort（满足继承契约）
+    async def create_node(self, node_id: str, labels: list[str], properties: dict) -> bool:
+        return await self._storage.create_node(node_id, labels, properties)
+    # ...
+```
+
+### 2.3 与 L1 缓存架构的对比
+
+| 层次 | L1缓存层 | L5图存储层 |
+|------|---------|-----------|
+| **Layer 1** | L1CachePort（通用缓存抽象） | L5GraphPort（通用图操作抽象） |
+| **Layer 2** | SemanticCachePort（语义缓存） | MemoryGraphPort（记忆图谱） |
+| **Layer 3** | RedisPoolProvider + RedisL1CacheAdapter | Neo4jConnectionProvider + Neo4jGraphStorage |
+| **Layer 4** | RedisSemanticCacheAdapter | MemoryGraphAdapter |
+| **可扩展** | MemcachedAdapter（未来） | TigerGraphAdapter / NeptuneAdapter（未来） |
+
+### 2.4 现有架构（问题版）
+
+```
+当前架构问题：
+
+Domain Layer
+└── L5GraphPort (混合接口: create_entity/memory_id + execute_query)
+    MemoryGraphPort (缺失，未独立)
+
+Infrastructure Layer
+├── Neo4jGraphStorage (已有，实现部分L5GraphPort方法)
+├── Neo4jAdapter → 硬编码Memory领域逻辑 ❌
+│     └─ create_entity(memory_id) 使用 "Memory" 标签
+│     └─ Cypher MERGE 语义嵌入适配器
+└── MemoryGraphAdapter (缺失)
+
+问题：
+1. L5GraphPort 混合技术接口与领域语义
+2. Neo4jAdapter 承担领域逻辑，违反适配器单一职责
+3. 无法复用 L5GraphPort 实现其他领域图（AgentGraph等）
+4. 无统一连接池管理，多个Adapter独立管理连接
+```
+
+### 2.5 分层职责
 
 | 层级 | 组件 | 职责 | 技术 |
 |------|------|------|------|
@@ -638,7 +763,117 @@ class MemoryGraphPort(L5GraphPort):
 
 ## 5. Infrastructure 层实现
 
-### 5.1 Neo4jGraphStorage（技术适配器）
+### 5.0 Neo4jConnectionProvider（连接池单例）
+
+```python
+# src/infrastructure/storage/neo4j/connection_provider.py
+
+"""Neo4j连接池统一提供者（单例模式）。
+
+在composition_root初始化时创建单一连接池，
+所有Adapter复用此连接池，实现资源统一管理。
+
+遵循六边形架构：
+- 资源管理封装在Infrastructure层
+- Domain层完全不感知连接池存在
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from src.infrastructure.config.neo4j import Neo4jConfig
+from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+
+if TYPE_CHECKING:
+    pass
+
+logger = logging.getLogger(__name__)
+
+
+class Neo4jConnectionProvider:
+    """Neo4j连接池统一提供者（单例模式）。
+
+    Attributes:
+        _instance: 单例实例
+        _client_wrapper: Neo4j客户端封装
+        _config: Neo4j配置
+    """
+
+    _instance: Neo4jConnectionProvider | None = None
+    _client_wrapper: Neo4jClientWrapper | None = None
+    _config: Neo4jConfig | None = None
+
+    def __new__(cls) -> Neo4jConnectionProvider:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    @classmethod
+    def init(cls, config: Neo4jConfig | None = None) -> None:
+        """初始化连接池。
+
+        Args:
+            config: Neo4j配置，默认从环境变量加载
+        """
+        if cls._client_wrapper is not None:
+            logger.warning("Neo4jConnectionProvider already initialized, skipping")
+            return
+
+        config = config or Neo4jConfig.from_env()
+        cls._config = config
+
+        cls._client_wrapper = Neo4jClientWrapper(
+            uri=config.uri,
+            username=config.username,
+            password=config.password,
+            database=config.database,
+            max_connection_pool_size=config.max_connection_pool_size,
+            connection_timeout=config.connection_timeout,
+            max_retry_time=config.max_retry_time,
+        )
+        logger.info(
+            "Neo4jConnectionProvider initialized: %s (max_connections=%d)",
+            config.uri,
+            config.max_connection_pool_size,
+        )
+
+    @classmethod
+    def get_client(cls) -> Neo4jClientWrapper:
+        """获取Neo4j客户端封装。
+
+        Returns:
+            Neo4jClientWrapper实例
+
+        Raises:
+            RuntimeError: 如果provider未初始化
+        """
+        if cls._client_wrapper is None:
+            raise RuntimeError(
+                "Neo4jConnectionProvider not initialized. "
+                "Call Neo4jConnectionProvider.init() before use."
+            )
+        return cls._client_wrapper
+
+    @classmethod
+    def is_initialized(cls) -> bool:
+        """检查provider是否已初始化。"""
+        return cls._client_wrapper is not None
+
+    @classmethod
+    async def close(cls) -> None:
+        """关闭连接池。"""
+        if cls._client_wrapper is not None:
+            await cls._client_wrapper.close()
+            cls._client_wrapper = None
+            cls._config = None
+            logger.info("Neo4jConnectionProvider closed")
+```
+
+### 5.1 Neo4jGraphStorage（技术适配器，Layer 3）
+
+**文件：** `src/infrastructure/storage/neo4j/neo4j_graph_storage.py`
 
 ```python
 # src/infrastructure/storage/neo4j/neo4j_graph_storage.py
@@ -929,7 +1164,7 @@ class Neo4jGraphStorage(L5GraphPort):
             return records
 ```
 
-### 5.2 MemoryGraphAdapter（领域适配器）
+### 5.2 MemoryGraphAdapter（领域适配器，Layer 4）
 
 ```python
 # src/infrastructure/storage/neo4j/memory_graph_adapter.py (new)
@@ -1185,7 +1420,7 @@ class MemoryGraphAdapter(MemoryGraphPort):
         return await self._storage.execute_write_query(cypher, params)
 ```
 
-### 5.3 Neo4jAdapter（向后兼容）
+### 5.3 Neo4jAdapter（向后兼容适配器）
 
 ```python
 # src/infrastructure/storage/neo4j/neo4j_adapter.py (重构)
@@ -1330,17 +1565,42 @@ class Neo4jAdapter(L5GraphPort):
 
 ### 6.1 文件变更清单
 
-| 操作 | 文件路径 | 说明 |
-|------|----------|------|
-| **修改** | `src/domain/ports/l5_graph.py` | 重构为纯技术接口 |
-| **新增** | `src/domain/ports/memory_graph.py` | MemoryGraphPort 定义 |
-| **新增** | `src/infrastructure/storage/neo4j/neo4j_graph_storage.py` | Neo4jGraphStorage 实现 |
-| **新增** | `src/infrastructure/storage/neo4j/memory_graph_adapter.py` | MemoryGraphAdapter 实现 |
-| **修改** | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 重构为委托 Neo4jGraphStorage |
-| **修改** | `src/infrastructure/storage/neo4j/__init__.py` | 导出新组件 |
-| **修改** | `src/domain/ports/__init__.py` | 导出 MemoryGraphPort |
+| 操作 | 文件路径 | 说明 | Layer |
+|------|----------|------|-------|
+| **修改** | `src/domain/ports/l5_graph.py` | 重构为纯技术接口 | L1 |
+| **新增** | `src/domain/ports/memory_graph.py` | MemoryGraphPort 定义 | L2 |
+| **新增** | `src/infrastructure/storage/neo4j/connection_provider.py` | Neo4jConnectionProvider 单例 | L3 |
+| **新增** | `src/infrastructure/storage/neo4j/neo4j_graph_storage.py` | Neo4jGraphStorage 实现 | L3 |
+| **新增** | `src/infrastructure/storage/neo4j/memory_graph_adapter.py` | MemoryGraphAdapter 实现 | L4 |
+| **修改** | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 重构为委托 Neo4jGraphStorage | L3 |
+| **修改** | `src/infrastructure/storage/neo4j/__init__.py` | 导出新组件 | - |
+| **修改** | `src/domain/ports/__init__.py` | 导出 MemoryGraphPort | - |
 
-### 6.2 导出更新
+### 6.2 Layer 3: 连接池管理（对比L1缓存架构）
+
+```python
+# L1缓存层：RedisPoolProvider
+# 位置：src/infrastructure/storage/redis/pool_provider.py
+class RedisPoolProvider:
+    _pool: aioredis.ConnectionPool
+    @classmethod
+    def init(cls, config: RedisConfig) -> None: ...
+    @classmethod
+    def get_client(cls) -> aioredis.Redis: ...
+
+# L5图存储层：Neo4jConnectionProvider
+# 位置：src/infrastructure/storage/neo4j/connection_provider.py
+class Neo4jConnectionProvider:
+    _client_wrapper: Neo4jClientWrapper
+    @classmethod
+    def init(cls, config: Neo4jConfig) -> None: ...
+    @classmethod
+    def get_client(cls) -> Neo4jClientWrapper: ...
+    @classmethod
+    async def close(cls) -> None: ...
+```
+
+### 6.3 导出更新
 
 ```python
 # src/infrastructure/storage/neo4j/__init__.py
@@ -1487,6 +1747,28 @@ __all__ = [..., "MemoryGraphPort"]
 
 ```bash
 poetry run python -c "from src.domain.ports import L5GraphPort, MemoryGraphPort"
+```
+
+### Phase 1.5: 创建连接池Provider（Layer 3）
+
+**目标：** 创建Neo4j连接池单例，与L1缓存架构的RedisPoolProvider对称
+
+**Step 1.5.1**: 创建 `src/infrastructure/storage/neo4j/connection_provider.py`
+
+```bash
+# 实现 Neo4jConnectionProvider（见 §5.0）
+```
+
+**Step 1.5.2**: 验证Provider单例
+
+```bash
+poetry run python -c "
+from src.infrastructure.storage.neo4j.connection_provider import Neo4jConnectionProvider
+p1 = Neo4jConnectionProvider()
+p2 = Neo4jConnectionProvider()
+assert p1 is p2, 'Provider应该是单例'
+print('Phase 1.5: SUCCESS')
+"
 ```
 
 ### Phase 2: Infrastructure 层实现

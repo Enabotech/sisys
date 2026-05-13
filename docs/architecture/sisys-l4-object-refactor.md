@@ -105,49 +105,231 @@ MinIORepository (组合上述组件)
 
 ## 2. 目标架构
 
-### 2.1 四层架构
+### 2.1 四层职责模型
 
 ```
-Layer 1: Domain — 通用抽象
-═══════════════════════════════════════════════════════════════════
-    L4ObjectPort (Protocol)
-        ├── store(bucket_type, object_key, file_path, content_type, tags) → str
-        ├── retrieve(bucket_type, object_key, version_id) → AsyncIterator[bytes]
-        ├── delete(bucket_type, object_key, version_id) → bool
-        ├── get_metadata(bucket_type, object_key, version_id) → dict
-        ├── archive(bucket_type, object_key, content, retention_days) → str
-        └── list_objects(bucket_type, prefix, recursive) → list[dict]
-
-Layer 2: Application — 业务语义
-═══════════════════════════════════════════════════════════════════
-    DocumentStoragePort(L4ObjectPort, Protocol)
-        ├── store_document(user_id, document_type, file_path, content_type, metadata) → str
-        ├── retrieve_document(user_id, document_type, document_id, version_id) → AsyncIterator[bytes]
-        └── list_user_documents(user_id, document_type, prefix) → list[dict]
-
-Layer 3: Infrastructure — 技术实现 + 存储管理
-═══════════════════════════════════════════════════════════════════
-    MinIOAdapter(L4ObjectPort)
-        └── 委托 MinIORepository
-
-    MinIORepository (实现 L4ObjectPort)
-        └── 内部委托:
-           ├── BucketManager          → 连接池/bucket CRUD/命名验证
-           ├── ObjectOperations       → 上传/下载/元数据/分片
-           └── WORMManager            → 合规/生命周期
-
-Layer 4: Infrastructure — 具体应用实现
-═══════════════════════════════════════════════════════════════════
-    MinIODocumentStorage(DocumentStoragePort)
-        └── 组合 MinIOAdapter，实现业务语义
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: Domain Layer - L4ObjectPort（统一抽象对象存储端口）      │
+│                                                                  │
+│  职责：定义最底层通用对象存储接口                                  │
+│        (store/retrieve/delete/archive/list_objects)             │
+│  位置：src/domain/ports/l4_object.py                             │
+│  特点：领域层零依赖，纯抽象协议，技术无关                           │
+│        （可使用 MinIO/S3/Azure Blob 等实现）                      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Application Layer - 具体应用对象存储端口                │
+│                                                                  │
+│  职责：继承 L4ObjectPort，定义特定业务场景语义                     │
+│  位置：src/application/ports/                                     │
+│  端口：                                                          │
+│    - DocumentStoragePort (文档存储) ← 本次新增                    │
+│    - AvatarStoragePort (头像存储) ← 未来扩展                       │
+│    - BackupArchivePort (备份归档) ← 未来扩展                      │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: Infrastructure - 对象存储技术实现 + 存储管理             │
+│                                                                  │
+│  职责：实现 L4ObjectPort 接口 + 连接池统一管理                     │
+│  位置：src/infrastructure/storage/minio/                          │
+│  组件：                                                          │
+│    ┌─────────────────────────────────────────────────────────┐  │
+│    │  MinIOAdapter (L4ObjectPort 实现)                        │  │
+│    │  职责：薄适配器层，委托 MinIORepository 处理所有操作      │  │
+│    │  特点：技术可替换（未来可新增 S3Adapter 等）              │  │
+│    └─────────────────────────────────────────────────────────┘  │
+│                              ↑                                   │
+│    ┌─────────────────────────────────────────────────────────┐  │
+│    │  MinIORepository (实现 L4ObjectPort)                    │  │
+│    │  职责：组合分层组件，对外提供统一仓储接口                 │  │
+│    └─────────────────────────────────────────────────────────┘  │
+│                              ↑                                   │
+│    ┌─────────────────────────────────────────────────────────┐  │
+│    │  分层组件（存储管理 + 技术实现）                         │  │
+│    │  ┌────────────────┐ ┌────────────────┐ ┌────────────┐  │  │
+│    │  │ MinioClient    │ │ BucketManager  │ │  WORM      │  │  │
+│    │  │ Adapter        │ │                │ │  Manager   │  │  │
+│    │  │ ─ 连接池管理    │ │ ─ Bucket CRUD  │ │ ─ 合规锁定 │  │  │
+│    │  │ ─ S3错误映射    │ │ ─ 命名验证     │ │ ─ 生命周期 │  │  │
+│    │  │ ─ 健康检查      │ │ ─ WORM配置     │ │            │  │  │
+│    │  └────────────────┘ └────────────────┘ └────────────┘  │  │
+│    │                         ┌────────────────┐           │  │
+│    │                         │ Object         │           │  │
+│    │                         │ Operations     │           │  │
+│    │                         │ ─ 流式上传/下载 │           │  │
+│    │                         │ ─ 分片上传      │           │  │
+│    │                         │ ─ 断点续传      │           │  │
+│    │                         └────────────────┘           │  │
+│    └─────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Infrastructure - 具体应用对象存储端口实现                │
+│                                                                  │
+│  职责：实现具体应用存储端口，提供业务语义                          │
+│  位置：src/infrastructure/storage/minio/                          │
+│  组件：                                                          │
+│    ┌─────────────────────────────────────────────────────────┐  │
+│    │  MinIODocumentStorage (DocumentStoragePort 实现)        │  │
+│    │  职责：组合 MinIOAdapter，实现文档业务语义              │  │
+│    │  能力：                                                 │  │
+│    │    - 自动路径生成 (documents/{user_id}/{type}/YYYY-MM) │  │
+│    │    - 文档元数据管理                                     │  │
+│    │    - 用户文档列表                                       │  │
+│    │  特点：复用 MinIOAdapter 的底层存储能力                │  │
+│    └─────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 关键设计原则
+### 2.2 基础设施层存储管理详解
 
-1. **依赖倒置**：Domain 层不依赖 Infrastructure 层
-2. **单一职责**：每层只负责自己的职责
-3. **可替换性**：Layer 3 可替换为 S3Adapter 等其他实现
-4. **可测试性**：每层通过 Port 接口可独立测试
+Layer 3 是整个 L4 存储架构的核心，包含 **技术适配层** 和 **存储管理层** 两个子层：
+
+#### 2.2.1 技术适配层
+
+```
+MinioClientAdapter
+├── 职责：封装 MinIO Python SDK，提供统一的客户端接口
+├── 能力：
+│   ├── 连接池管理（懒加载，每次创建新客户端实例）
+│   ├── S3 错误映射（S3Error → 领域异常）
+│   └── 健康检查（list_buckets）
+└── 特点：各组件独立 _get_client()，不引入全局连接池
+```
+
+#### 2.2.2 存储管理层
+
+**BucketManager — Bucket 生命周期管理**
+```
+├── 职责：Bucket 的创建、删除、存在性检查及命名验证
+├── 能力：
+│   ├── validate_bucket_name() — 命名规范验证（{prefix}-{type}-{tenant_id}）
+│   ├── build_bucket_name() — 构建完整 Bucket 名称
+│   ├── create_bucket() — 创建 Bucket（支持 versioning/object_lock）
+│   ├── enable_object_lock() — 启用 WORM 对象锁定
+│   ├── delete_bucket() — 删除 Bucket（支持强制清空）
+│   ├── bucket_exists() — 检查 Bucket 是否存在
+│   └── list_buckets() — 列出所有 Bucket
+└── 依赖：MinioClientAdapter
+```
+
+**ObjectOperations — 对象读写操作**
+```
+├── 职责：对象的流式上传/下载、元数据查询、分片上传
+├── 能力：
+│   ├── upload_object() — 自动分片（<100MB 不分片，>100MB 分片）
+│   │   ├── <100MB: 单次上传 (fput_object)
+│   │   ├── 100MB-1GB: 10MB 分片
+│   │   ├── 1GB-10GB: 50MB 分片
+│   │   └── >10GB: 100MB 分片
+│   ├── download_object() — 流式下载，防 OOM
+│   ├── get_object_metadata() — 获取对象元数据
+│   ├── delete_object() — 删除对象
+│   ├── resume_multipart_upload() — 断点续传（Redis 状态持久化）
+│   └── save_multipart_state() — 分片上传状态保存
+└── 依赖：MinioClientAdapter
+```
+
+**WORMManager — 合规与生命周期管理**
+```
+├── 职责：WORM 锁定、对象归档、生命周期配置
+├── 能力：
+│   ├── enable_worm_lock() — 设置 Governance 模式保留策略
+│   ├── archive_object() — 归档至 WORM 存储（2555 天 = 7 年）
+│   ├── delete_object() — 删除对象（WORM 锁定抛出 ComplianceLockError）
+│   ├── get_object_retention() — 获取对象保留策略
+│   ├── configure_lifecycle() — 配置 Bucket 生命周期规则
+│   └── list_lifecycle_rules() — 列出生命周期规则
+└── 依赖：MinioClientAdapter
+```
+
+#### 2.2.3 分层设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **单一职责** | 每个组件只负责一个领域（Bucket/Object/WORM） |
+| **依赖注入** | 各组件接受 MinioClientAdapter，不自行创建 |
+| **委托模式** | MinIORepository 组合各组件，对外提供统一接口 |
+| **可测试性** | 各组件可独立测试，Mock MinioClientAdapter |
+
+### 2.3 接口继承关系
+
+```python
+# Layer 1: Domain 统一抽象
+class L4ObjectPort(Protocol):
+    """L4 对象存储接口 - 最底层抽象"""
+    async def store(self, bucket_type: str, object_key: str, file_path: str,
+                   content_type: str, tags: dict[str, str] | None = None) -> str: ...
+    def retrieve(self, bucket_type: str, object_key: str,
+                version_id: str | None = None) -> AsyncIterator[bytes]: ...
+    async def delete(self, bucket_type: str, object_key: str,
+                    version_id: str | None = None) -> bool: ...
+    async def get_metadata(self, bucket_type: str, object_key: str,
+                          version_id: str | None = None) -> dict: ...
+    async def archive(self, bucket_type: str, object_key: str,
+                      content: bytes | None = None, retention_days: int = 2555) -> str: ...
+    async def list_objects(self, bucket_type: str, prefix: str = "",
+                          recursive: bool = True) -> list[dict]: ...
+
+# Layer 2: Application 具体应用端口
+class DocumentStoragePort(L4ObjectPort, Protocol):
+    """文档存储接口 - 继承 L4ObjectPort"""
+    async def store_document(self, user_id: str, document_type: str,
+                              file_path: str, content_type: str = "application/pdf",
+                              metadata: dict[str, str] | None = None) -> str: ...
+    def retrieve_document(self, user_id: str, document_type: str, document_id: str,
+                          version_id: str | None = None) -> AsyncIterator[bytes]: ...
+    async def list_user_documents(self, user_id: str, document_type: str | None = None,
+                                  prefix: str = "") -> list[dict]: ...
+
+# Layer 3: Infrastructure 技术实现
+class MinIOAdapter(L4ObjectPort):
+    """MinIO 通用对象存储实现"""
+    def __init__(self, repository: MinIORepository): ...
+
+# Layer 4: Infrastructure 具体应用实现
+class MinIODocumentStorage(DocumentStoragePort):
+    """MinIO 文档存储实现"""
+    def __init__(self, adapter: MinIOAdapter):
+        self._adapter = adapter
+
+    async def store_document(self, user_id, document_type, file_path, content_type, metadata=None):
+        # 自动路径生成
+        object_key = f"documents/{user_id}/{document_type}/.../{Path(file_path).name}"
+        return await self._adapter.store("documents", object_key, file_path, content_type, metadata)
+
+    # 继承 L4ObjectPort 基础方法
+    async def store(self, bucket_type, object_key, file_path, content_type, tags=None) -> str:
+        return await self._adapter.store(bucket_type, object_key, file_path, content_type, tags)
+
+    def retrieve(self, bucket_type, object_key, version_id=None) -> AsyncIterator[bytes]:
+        return self._adapter.retrieve(bucket_type, object_key, version_id)
+
+    async def delete(self, bucket_type, object_key, version_id=None) -> bool:
+        return await self._adapter.delete(bucket_type, object_key, version_id)
+
+    async def get_metadata(self, bucket_type, object_key, version_id=None) -> dict:
+        return await self._adapter.get_metadata(bucket_type, object_key, version_id)
+
+    async def archive(self, bucket_type, object_key, content=None, retention_days=2555) -> str:
+        return await self._adapter.archive(bucket_type, object_key, content, retention_days)
+
+    async def list_objects(self, bucket_type, prefix="", recursive=True) -> list[dict]:
+        return await self._adapter.list_objects(bucket_type, prefix, recursive)
+```
+
+### 2.4 与 L1 缓存层架构对照
+
+| 维度 | L1 缓存层 | L4 对象存储层 |
+|------|-----------|---------------|
+| **Layer 1** | `L1CachePort` (get/set/delete) | `L4ObjectPort` (store/retrieve/delete/archive/list) |
+| **Layer 2** | `SemanticCachePort` (语义缓存) | `DocumentStoragePort` (文档存储) |
+| **Layer 3** | `RedisL1CacheAdapter` + `RedisPoolProvider` | `MinIOAdapter` + 分层组件 (ClientAdapter/BucketManager/ObjectOperations/WORMManager) |
+| **Layer 4** | `RedisSemanticCacheAdapter` (组合 L1CacheAdapter) | `MinIODocumentStorage` (组合 MinIOAdapter) |
+| **技术栈** | Redis 7.0+ | MinIO (S3 兼容) |
+| **并发模型** | 异步 (redis.asyncio) | 同步 SDK + asyncio.to_thread |
 
 ---
 
