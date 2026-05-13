@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v9.0
+**版本:** v10.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -961,12 +961,13 @@ async def test_semantic_cache():
 
 ```python
 def test_backward_compatibility():
-    """向后兼容验证。"""
+    """向后兼容验证（渐进迁移方案）。"""
     from src.application.ports.semantic_cache import SemanticCache
-    from src.domain.ports.semantic_cache import SemanticCachePort
-    # SemanticCache 作为别名指向 SemanticCachePort
-    assert SemanticCache is SemanticCachePort
-    print("✅ 向后兼容：旧导入路径仍可用")
+    # 旧接口仍可导入，方法签名保持不变
+    assert hasattr(SemanticCache, "get")
+    assert hasattr(SemanticCache, "set")
+    assert hasattr(SemanticCache, "invalidate")
+    print("✅ 向后兼容：旧接口 get/set/invalidate 仍可用")
 ```
 
 ---
@@ -987,6 +988,7 @@ def test_backward_compatibility():
 | v7.0 | 2026-05-13 | **§3.2.2 重写为双层设计** | 修正与 §九 的架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding；添加 Redis 依赖 |
 | v8.0 | 2026-05-13 | **第3轮审查残留修正** | 更新 §2.1 Layer 4 描述；修正 §3.1.2 过时注释；更新 §九 问题表格；标记 Redis 依赖注入缺失 |
 | v9.0 | 2026-05-13 | **第4轮审查修正** | §3.3 别名方案改为渐进迁移；§九 payload 描述更新为 {cache_key, result}；添加 result 降级数据源说明 |
+| v10.0 | 2026-05-13 | **第5轮审查最终修正** | 修正 §八.1 P0 编号与 §一.3 对齐；修正 §六.3 向后兼容验证与 §3.3 一致；移除 §九.3 已解决问题 |
 
 ---
 
@@ -1019,8 +1021,7 @@ def test_backward_compatibility():
 |------|---------|------|
 | **QdrantSemanticCacheStore 不存在** | 高 | 设计文档中的实现未创建 |
 | **score_threshold 参数不支持** | 中 | `QdrantVectorStorage.search()` 签名无此参数，需后过滤 |
-| **缺少 invalidate_by_embedding** | 中 | 调用方只有 embedding 无法失效缓存（v7.0 已添加） |
-| **Redis 依赖注入缺失** | 中 | §3.4 composition_root 未展示 redis_client 如何注入 |
+| **Redis 依赖注入缺失** | 中 | §3.4 composition_root 未展示 redis_client 如何注入（建议使用工厂函数方案） |
 
 ### 9.4 一致性风险
 
@@ -1048,10 +1049,10 @@ def test_backward_compatibility():
 
 | 问题 | 状态 | 验证方法 |
 |------|------|---------|
-| P0-1: search_sparse 异常吞没 | **未修复** | 代码检查 vector_storage.py:200 仍是 `except Exception: return []` |
+| P0-1: QdrantVectorAdapter 缺 4 个 Collection 方法 | **未修复** | qdrant_vector_adapter.py 无 create_collection/delete_collection/collection_exists/list_collections |
 | P0-2: l3_vector 未注册 | **未修复** | composition_root.py 中无 l3_vector 注册 |
 | P0-3: self._l3 未使用 | **未修复** | UnifiedStorageGateway.save() 未调用 self._l3 |
-| P0-4: L3VectorPort 实现不完整 | **未修复** | qdrant_vector_adapter.py 缺4个 collection 方法 |
+| P0-4: search_sparse 异常吞没 | **未修复** | 代码检查 vector_storage.py:200 仍是 `except Exception: return []` |
 
 ### 8.2 接口签名验证结果
 
@@ -1086,11 +1087,11 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v9.0 已完成第4轮审查
+**文档状态**: v10.0 已完成5轮审查（最终版本）
 **审查摘要**:
-- §3.3 废弃声明从别名方案改为渐进迁移（双接口并存）
-- §3.2.2 和 §九 payload 描述统一为 {cache_key, result}
-- 添加 result 降级数据源说明（Redis 过期后仍可从 payload 读取）
-- §3.4 Redis 依赖注入建议使用工厂函数方案
+- 修正 §八.1 P0 编号与 §一.3 定义一致
+- 修正 §六.3 向后兼容验证（渐进迁移而非别名）
+- 移除 §九.3 已解决问题（invalidate_by_embedding 已在 v7.0 添加）
+- 所有 P0 问题仍未修复，需执行实际代码实现
 
 **下一步**: 执行 P0 问题的实际代码实现
