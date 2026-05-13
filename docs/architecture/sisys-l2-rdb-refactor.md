@@ -1,10 +1,10 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.6.0
+**版本：** 1.7.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
-**审查状态：** 第5轮审查完成（全部修正已应用）
+**审查状态：** 第6轮审查完成
 
 ---
 
@@ -122,7 +122,7 @@ src/infrastructure/storage/postgresql/
 ├── repository/
 │   ├── base_repository.py # BaseRepository（基础设施层 CRUD 基类）✅ 已实现
 │   ├── user_repository.py      # UserRepository(BaseRepository) ❌ 未实现 UserRepositoryPort
-│   ├── role_repository.py      # RoleRepository(BaseRepository) ❌ 未实现 RoleRepositoryPort
+│   ├── role_repository.py      # RoleRepository(RoleRepositoryPort) ✅ 已实现 RoleRepositoryPort
 │   └── memory_metadata_repository.py  # PostgreSQLMemoryMetadataRepository ✅ 已实现 L2MetadataRepositoryPort
 ```
 
@@ -147,12 +147,12 @@ src/infrastructure/storage/postgresql/
 | `BaseRepository` | repository/base_repository.py | Generic[T] | 无 | ✅ 已有 |
 | `UserRepository` | repository/user_repository.py | BaseRepository | ⚠️ 未声明实现 UserRepositoryPort | ⚠️ 需修复 |
 | `RoleRepository` | repository/role_repository.py | RoleRepositoryPort | ✅ RoleRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | 无 | L2MetadataRepositoryPort | ✅ 已实现 |
-| `LoginAttemptRepository` | repository/login_attempt_repository.py | 无 | LoginAttemptRepositoryPort | ✅ 已实现 |
-| `UserRoleRepository` | repository/user_role_repository.py | 无 | UserRoleRepositoryPort | ✅ 已实现 |
-| `AuditRepository` | infrastructure/security/ | 无 | AuditRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryChangeHistoryRepository` | repository/memory_change_history_repository.py | 无 | L2ChangeHistoryRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryGroupMemberRepository` | repository/memory_group_member_repository.py | 无 | L2GroupMemberRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | L2MetadataRepositoryPort | ✅ L2MetadataRepositoryPort | ✅ 已实现 |
+| `LoginAttemptRepository` | repository/login_attempt_repository.py | LoginAttemptRepositoryPort | ✅ LoginAttemptRepositoryPort | ✅ 已实现 |
+| `UserRoleRepository` | repository/user_role_repository.py | UserRoleRepositoryPort | ✅ UserRoleRepositoryPort | ✅ 已实现 |
+| `AuditRepository` | infrastructure/security/ | AuditRepositoryPort | ✅ AuditRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryChangeHistoryRepository` | repository/memory_change_history_repository.py | L2ChangeHistoryRepositoryPort | ✅ L2ChangeHistoryRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryGroupMemberRepository` | repository/memory_group_member_repository.py | L2GroupMemberRepositoryPort | ✅ L2GroupMemberRepositoryPort | ✅ 已实现 |
 | `PostgreSQLUnitOfWork` | infrastructure/messaging/unit_of_work/ | UnitOfWork | ✅ UnitOfWork | ✅ 已实现 |
 
 ### 1.5 关键发现：设计与实现脱节
@@ -169,8 +169,8 @@ src/infrastructure/storage/postgresql/
 
 | 模型 | email | 密码字段 | 锁定机制 |
 |------|-------|---------|---------|
-| User (domain) | ❌ 无 | `password_hash` | `failed_login_attempts`, `locked_until` |
-| UserModel (infrastructure) | ✅ 有 | `hashed_password` | ❌ 无 |
+| User (domain) | ❌ 无 | `password_hash` (必填) | `is_locked`, `failed_login_attempts`, `locked_until` |
+| UserModel (infrastructure) | ✅ 有 | `hashed_password` (可空) | `is_locked`（缺 `failed_login_attempts`/`locked_until`） |
 
 **需决策**：方案A添加email到User实体（需评估领域层零依赖），方案B移除UserModel的email
 
@@ -283,9 +283,9 @@ src/infrastructure/storage/postgresql/
 ```
 
 **关键原则**：
-- `L2RdbPort.execute_in_transaction()` 仅作为基础设施内部使用
-- 业务事务边界由 **应用层/UseCase** 控制
-- 遵循 DDD "事务脚本 vs 领域模型" 原则
+- 业务事务边界由 **应用层/UseCase** 通过 `PostgreSQLUnitOfWork` 控制
+- `L2RdbPort` 不包含事务方法，避免污染领域接口契约
+- Repository 只做数据访问，不感知事务边界
 
 ### 2.4 业界参考实现
 
@@ -325,18 +325,18 @@ src/infrastructure/storage/postgresql/
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: Infrastructure - PostgreSQL 技术实现 + RDB 管理        │
+│  Layer 3: Infrastructure - PostgreSQL 事务管理 + 连接管理        │
 │                                                                  │
-│  职责：实现 L2RdbPort 接口 + 数据库连接池统一管理                 │
-│  位置：src/infrastructure/storage/postgresql/                     │
+│  职责：数据库连接池管理 + 事务边界控制（由应用层编排）            │
+│  位置：src/infrastructure/                                       │
 │  组件：                                                          │
-│    - rdb_adapter.py                                             │
-│    │     PostgreSqlRdbAdapter (实现 L2RdbPort)                   │
-│    │     └── 职责：连接管理 / 会话管理 / 事务控制                  │
-│    - engine.py                                                   │
+│    - storage/postgresql/engine.py                                │
 │    │     DatabaseEngine (数据库引擎单例)                          │
 │    │     └── 职责：连接池初始化 / 健康检查 / 优雅关闭             │
-│  特点：技术可替换（未来可新增 MySqlAdapter 等）                   │
+│    - messaging/unit_of_work/postgresql_unit_of_work.py           │
+│    │     PostgreSQLUnitOfWork (实现 UnitOfWork Protocol)          │
+│    │     └── 职责：事务边界(begin/commit/rollback) / session提供  │
+│  特点：事务边界由应用层控制，Repository 不感知事务               │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
@@ -352,7 +352,7 @@ src/infrastructure/storage/postgresql/
 │    - PostgreSQLAuditRepository(AuditRepositoryPort)              │
 │    - PostgreSQLLoginAttemptRepository(LoginAttemptRepositoryPort)│
 │    - PostgreSQLUserRoleRepository(UserRoleRepositoryPort)       │
-│  特点：组合 PostgreSqlRdbAdapter 获取会话，委托 BaseRepository   │
+│  特点：通过 DatabaseEngine 获取会话，委托 BaseRepository       │
 │        处理通用 CRUD，专注实现业务特定查询                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -367,26 +367,27 @@ class L2RdbPort(Protocol):
     async def save(self, entity: Any) -> Any: ...
     async def delete(self, id: UUID) -> bool: ...
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[Any]: ...
-    async def execute_in_transaction(self, func: Callable, *args, **kwargs) -> Any: ...
 
 # Layer 2: Domain 具体应用端口
 class UserRepositoryPort(L2RdbPort, Protocol):
     """用户仓储接口 - 继承 L2RdbPort"""
     async def get_by_username(self, username: str) -> User | None: ...
-    async def get_by_email(self, email: str) -> User | None: ...
 
 class RoleRepositoryPort(L2RdbPort, Protocol):
     """角色仓储接口 - 继承 L2RdbPort"""
     pass
 
-# Layer 3: Infrastructure PostgreSQL 技术实现
-class PostgreSqlRdbAdapter(L2RdbPort):
-    """PostgreSQL RDB 适配器"""
-    def __init__(self, engine: DatabaseEngine):
-        self._engine = engine
-        self._session: AsyncSession | None = None
+# Layer 3: Infrastructure 事务管理（应用层控制）
+class PostgreSQLUnitOfWork(UnitOfWork):
+    """PostgreSQL 工作单元实现"""
+    def __init__(self, session: AsyncSession):
+        self._session = session
 
-    async def get_session(self) -> AsyncSession: ...
+    @property
+    def session(self) -> AsyncSession: ...
+    async def begin(self) -> None: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
 
 class DatabaseEngine:
     """数据库引擎单例"""
@@ -488,7 +489,7 @@ class L2RdbPort(Protocol):
     设计原则：
     - 领域层零外部依赖（仅用 Protocol + typing）
     - 通用 CRUD 操作统一定义
-    - 事务由 PostgreSqlRdbAdapter 提供，不在此接口暴露
+    - 事务由 PostgreSQLUnitOfWork 在应用层管理，不在此接口暴露
     """
 
     # === 通用 CRUD ===
@@ -556,20 +557,13 @@ T = TypeVar("T")
 class L2RdbPort(Protocol):
     """统一 RDB 存储抽象基类。
 
-    所有具体应用端口应继承此基类，获得通用 CRUD 和事务支持。
+    所有具体应用端口应继承此基类，获得通用 CRUD 契约。
     """
 
     async def get_by_id(self, id: UUID) -> T | None: ...
     async def save(self, entity: T) -> T: ...
     async def delete(self, id: UUID) -> bool: ...
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[T]: ...
-
-    async def execute_in_transaction(
-        self,
-        func: Callable[..., Any],
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any: ...
 
 
 # ============================================================================
@@ -629,6 +623,7 @@ class UserRepositoryPort(L2RdbPort, Protocol):
 
     # === 专用查询 ===
     async def get_by_username(self, username: str) -> User | None: ...
+```
 
 **注意**：`get_by_email` 方法已移除，因为 User 实体不包含 email 字段。
 
