@@ -156,6 +156,7 @@ L4ObjectPort.archive(content=bytes)
 | `test_archive_with_content` | 未验证 content 参数是否传递到 repository | 无法捕获"content 被静默丢弃"的 bug |
 | `MinIOAdapter.list_objects` | 无测试 | 接口缺失未被测试发现 |
 | `test_l4_object_port.py` | list_objects 方法未覆盖 | Protocol 测试不完整 |
+| `test_list_objects_delegates` | 无测试 | 无法验证 MinIOAdapter.list_objects 委托正确性 |
 | **Acceptance 测试** | **直接调用 MinIORepository，跳过 MinIOAdapter** | 适配器层错误无法被发现 |
 | **所有 then 步骤** | **全部为 `pass`，无实质断言** | 即使实现完全错误测试也通过 |
 
@@ -182,12 +183,19 @@ def enable_worm_lock(...) -> bool:
 | 无 ETag 返回 | `set_object_retention` 是 PUT 操作，不返回响应体 |
 | 无实际校验 | 设置 WORM 锁后没有验证是否真正生效 |
 
-**修改建议：**
+**archive_object 实现问题：**
+- `archive_object()` 只是 `enable_worm_lock()` 的薄包装，不上传任何数据
+- `enable_worm_lock()` 调用 `set_object_retention` 返回值恒为 True（成功）或抛异常（失败），无失败路径
+- 无 ETag 返回，无法返回有意义的 `str`（L4ObjectPort.archive 返回类型要求）
+- **因此 P0-3 修复需要在 WORMManager 层获取 stat_object 的 ETag**
+
+**修复建议：**
 ```python
-def archive_object(self, bucket_name, object_key, retention_days) -> dict:
-    stat = self._client.client.stat_object(bucket_name, object_key)  # 获取 ETag
+def archive_object(self, bucket_name, object_key, retention_days) -> str:
+    # 获取对象元数据以返回 ETag
+    stat = self._client.client.stat_object(bucket_name, object_key)
     self.enable_worm_lock(bucket_name, object_key, retention_days)
-    return {"version_id": stat.version_id, "etag": stat.etag}
+    return stat.etag  # 返回实际 ETag 而非 dict
 ```
 
 ### 1.8 Protocol 类型检查局限性（Round 2 新增）
