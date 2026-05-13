@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.6
+**版本:** v2.7
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.6 第2轮审查，基于全面代码调研）
+**状态:** 设计完成（v2.7 第3轮审查，基于全面代码调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -55,6 +55,18 @@
 - **P1-NEW**: L5适配器模式与L3/L4不对齐（厚适配器含Cypher vs 薄适配器纯委托）
 - **P2-NEW**: P编号跳号（P0-1、P1-5等缺失）
 - **P2-NEW**: 执行状态总览表缺少Phase 5
+
+**Changelog v2.7 (第3轮全面审查 - 4Agent并行调研):**
+- **P0-NEW**: `get_neighbors` direction="IN" Cypher语法错误（缺少关系方括号，生成无效Cypher）
+- **P0-NEW**: Neo4jAdapter与GraphManager数据模型不一致（:Memory硬编码 vs :sisys:{type}动态标签）
+- **P0-NEW**: MemoryGraphPort§4.2缺少Protocol基类（§2.2正确但§4.2遗漏）
+- **P0-NEW**: §5.1 execute_write_query仍用session.run()（§8已修复但§5未同步）
+- **P1-NEW**: `get_memory_links`字段映射错误（r.get("source",{}).get("id")始终返回None）
+- **P1-NEW**: `Neo4jConnectionProvider.init()`传递不存在的max_connection_lifetime参数（TypeError）
+- **P1-NEW**: `create_node`标签注入风险（labels通过f-string未清理）
+- **P1-NEW**: GraphRetriever绕过Port接口直连数据库驱动（死代码，架构违规）
+- **P1-NEW**: RelationshipType枚举存在但未使用（类型约束形同虚设）
+- **P1-NEW**: L5GraphPort docstring暴露Cypher实现细节（"MERGE语义"）
 
 ---
 
