@@ -149,31 +149,58 @@ L4ObjectPort.archive(content=bytes)
 
 **设计文档推荐方案 B**：在 MinIOAdapter.archive() 开头检查 content != None 并抛出 NotImplementedError。
 
-### 1.6 测试覆盖缺陷
+### 1.6 测试覆盖缺陷（Round 2 深化）
 
 | 测试 | 问题 | 影响 |
 |------|------|------|
 | `test_archive_with_content` | 未验证 content 参数是否传递到 repository | 无法捕获"content 被静默丢弃"的 bug |
 | `MinIOAdapter.list_objects` | 无测试 | 接口缺失未被测试发现 |
 | `test_l4_object_port.py` | list_objects 方法未覆盖 | Protocol 测试不完整 |
+| **Acceptance 测试** | **直接调用 MinIORepository，跳过 MinIOAdapter** | 适配器层错误无法被发现 |
+| **所有 then 步骤** | **全部为 `pass`，无实质断言** | 即使实现完全错误测试也通过 |
 
-**测试补充建议：**
+**Acceptance 测试问题详解：**
+- `tests/acceptance/test_story_1_7_steps.py` 直接调用 `minio_repository.archive()` 而非通过 `MinIOAdapter`
+- AC-8/AC-4 的 `verify_object_lock_enabled` 等验证步骤只有 `pass`
+- 无法验证 Object Lock 是否真正启用
+
+### 1.7 WORMManager archive_object 实现问题（Round 2 新增）
+
+**实现现状：**
 ```python
-# 1. test_archive_with_content 应验证 content 传递
-mock_repository.archive.assert_called_once()
-call_kwargs = mock_repository.archive.call_args[1]
-assert "content" in call_kwargs  # 当前会失败
+def archive_object(self, bucket_name, object_key, retention_days) -> bool:
+    return self.enable_worm_lock(...)  # 薄包装
 
-# 2. 添加 MinIOAdapter.list_objects 测试
-async def test_list_objects_delegates_correctly(self): ...
-
-# 3. 在 test_l4_object_port.py 添加 list_objects 测试
-async def test_mock_list_objects_verified(self): ...
+def enable_worm_lock(...) -> bool:
+    client.set_object_retention(bucket_name, object_key, retention)
+    return True  # 无条件返回 True，无任何失败路径
 ```
 
-### 1.7 架构一致性完整分析（Round 4 汇总）
+| 问题 | 描述 |
+|------|------|
+| 返回值恒 True | 成功时返回 True，失败时抛异常，永远不会返回 False |
+| 无 ETag 返回 | `set_object_retention` 是 PUT 操作，不返回响应体 |
+| 无实际校验 | 设置 WORM 锁后没有验证是否真正生效 |
 
-#### 1.7.1 接口签名对比
+**修改建议：**
+```python
+def archive_object(self, bucket_name, object_key, retention_days) -> dict:
+    stat = self._client.client.stat_object(bucket_name, object_key)  # 获取 ETag
+    self.enable_worm_lock(bucket_name, object_key, retention_days)
+    return {"version_id": stat.version_id, "etag": stat.etag}
+```
+
+### 1.8 Protocol 类型检查局限性（Round 2 新增）
+
+| 问题 | 描述 |
+|------|------|
+| 不强制完整性 | Protocol 是结构化子类型，不检查是否实现所有方法 |
+| 隐式缺失 | `list_objects` 缺失不会被编译时检测，除非调用方实际调用 |
+| cast 掩盖问题 | `cast("str", ...)` 是纯类型注解，运行时不转换，掩盖了 `bool` 转 `str` 的问题 |
+
+### 1.9 架构一致性完整分析（Round 4 汇总）
+
+#### 1.9.1 接口签名对比
 
 | 方法 | L4ObjectPort | ObjectStorageRepository | MinIOAdapter | MinIORepository |
 |------|-------------|------------------------|--------------|-----------------|
