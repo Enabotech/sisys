@@ -32,16 +32,20 @@
 | P0-1 | `MinIOAdapter.archive()` 未处理 content 参数 | 明确 content 必须为 None，否则抛出 NotImplementedError | ❌ 未执行 |
 | P0-2 | `MinIOAdapter` 缺失 `list_objects` 方法 | 添加 `list_objects()` 方法，委托 `MinIORepository` | ❌ 未执行 |
 | P0-3 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 修改返回类型为 `str` | ❌ 未执行 |
+| **P0-4** | **WORM 模式使用 GOVERNANCE 而非 COMPLIANCE** | **`worm_lifecycle.py:87` 和 `bucket_manager.py:169` 改为 `mode="COMPLIANCE"`** | ❌ **SOX 合规性违规** |
 
 **代码执行状态：**
 - ⚠️ `MinIOAdapter.archive()` 仍透传 content 参数，content 被静默丢弃
 - ⚠️ `MinIOAdapter.list_objects()` 方法缺失
 - ⚠️ `MinIORepository` 仍实现 `ObjectStorageRepository`，未迁移到 `L4ObjectPort`
+- ⚠️ **WORM 使用 GOVERNANCE 模式而非 COMPLIANCE 模式，违反 SOX 合规要求**
 - ⚠️ `DocumentStoragePort` 和 `MinIODocumentStorage` 文件不存在
 - ⚠️ `AuditServiceImpl` 绕过 Repository/Adapter 层直接调用 WORMManager（架构违规）
 - ⚠️ `UnifiedStorageGateway` 注入 `L4ObjectPort` 但从未使用（`self._l4` 是死代码）
 - ⚠️ `MinIORepository._list_objects_via_client` 访问 `BucketManager._client` 私有属性
 - ⚠️ 验收测试所有 16 个 then 步骤为空 `pass`，无实质断言
+- ⚠️ `L4ObjectPort` 未在 `composition_root.py` 中注册（无自动 DI）
+- ⚠️ `delete_object` 的 `AccessDenied` 错误未映射为 `ComplianceLockError`
 
 ---
 
@@ -192,6 +196,33 @@ def enable_worm_lock(...) -> bool:
 - `enable_worm_lock()` 调用 `set_object_retention` 返回值恒为 True（成功）或抛异常（失败），无失败路径
 - 无 ETag 返回，无法返回有意义的 `str`（L4ObjectPort.archive 返回类型要求）
 - **因此 P0-3 修复需要在 WORMManager 层获取 stat_object 的 ETag**
+
+### 1.7.1 WORM 合规性违规（Round 2 新增 P0-4）
+
+**设计要求**：Object Lock COMPLIANCE 模式 7 年 retention（`l4_object.py` 第 5 行）
+
+**实际实现**：
+- `worm_lifecycle.py:87`：`mode="GOVERNANCE"`
+- `bucket_manager.py:169`：`mode="GOVERNANCE"`
+
+| 模式 | 特权用户可删除 | SOX 合规性 |
+|------|---------------|------------|
+| **GOVERNANCE**（当前） | **可以**（root 可绕过） | **违反 SOX** |
+| **COMPLIANCE**（要求） | 不可以（任何人无法绕过） | 符合 SOX |
+
+**修复位置**：
+```python
+# worm_lifecycle.py:87 — 修改
+mode="COMPLIANCE",  # SOX 合规要求不可绕过锁定
+
+# bucket_manager.py:169 — 修改
+mode="COMPLIANCE",
+```
+
+**附带问题**：`delete_object` 的 `AccessDenied` 错误未映射为 `ComplianceLockError`
+- COMPLIANCE 模式下删除锁定对象返回 `AccessDenied`
+- 当前代码仅映射 `InvalidObjectState` 和 `ObjectLockConfigurationNotFoundError`
+- **需要在错误映射中添加 `AccessDenied`**
 
 **修复建议：**
 ```python
@@ -1319,6 +1350,8 @@ if content is not None:
 | R4: archive content 参数语义不清导致运行时错误 | 高 | 高 | content 被静默丢弃会导致数据丢失，必须实现 NotImplementedError | ⚠️ 维持高风险 |
 | R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | 显式声明继承方法可解决 | ✅ 风险可控 |
 | R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
+| **R10: WORM GOVERNANCE 模式违反 SOX 合规** | **高** | **极高** | **GOVERNANCE 模式特权用户可绕过锁定删除合规证据，违反 SOX 不可篡改要求** | **⚠️ P0 合规性违规** |
+| R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
 | R7: WORMManager.archive_object() 返回值恒 True | 低 | 高 | archive_object 应返回 stat_object.etag 而非固定 True | ⚠️ 待修复 |
 | R8: Acceptance 测试绕过 MinIOAdapter | 中 | 高 | 适配器层错误无法被发现，应直接测试适配器 | ⚠️ 需修复测试 |
 | R9: DocumentStoragePort/MinIODocumentStorage 文件缺失 | 高 | 中 | Phase 3/4 执行后风险消除 | ⚠️ 待执行 |
@@ -1397,6 +1430,8 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 | R6 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` | ❌ 待创建 |
 | R7 | 所有测试通过 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py tests/unit/domain/ports/test_l4_object_port.py -v` | ❌ 待验证 |
 | R8 | `test_archive_with_content` 测试行为与方案 B 一致 | Phase 2.1 实施后该测试应失败或被修改（方案 B 不支持 content 上传） | ❌ 待验证 |
+| R9 | WORM 模式为 COMPLIANCE（非 GOVERNANCE） | `grep -r "GOVERNANCE" --include="*.py" src/infrastructure/storage/minio/` 无结果 | ❌ **SOX 合规阻断** |
+| R10 | `delete_object` 正确映射 AccessDenied 为 ComplianceLockError | `grep "AccessDenied" src/infrastructure/storage/minio/worm_lifecycle.py` 存在映射 | ❌ 待验证 |
 
 ---
 
