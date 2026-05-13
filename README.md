@@ -1,8 +1,8 @@
 # sisys - AI 战略规划与决策智能平台
 
-[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)]()
-[![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)]()
-[![Architecture: Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-green.svg)]()
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
+[![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Architecture: Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-green.svg)](./docs/images/architecture.svg)
 
 > 面向企业高管团队、企业战略与市场体系人员，专业顾问的 **AI 驱动战略规划与决策智能平台**
 
