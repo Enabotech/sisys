@@ -876,7 +876,7 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 
 > **执行跟踪说明：** 每个任务前使用 `[ ]` 表示待完成，`[x]` 表示已完成。
 
-### Phase 1: 创建RedisPoolProvider ✅
+### Phase 1: 创建RedisPoolProvider
 
 **目标：** 创建连接池单例（Layer 3 基础设施）
 
@@ -914,7 +914,7 @@ print('Phase 1: SUCCESS')
 
 ---
 
-### Phase 3: 创建RedisL1CacheAdapter ✅
+### Phase 3: 创建RedisL1CacheAdapter
 
 **目标：** 创建通用Redis缓存适配器（Layer 3 实现）
 
@@ -935,7 +935,7 @@ print('Phase 1: SUCCESS')
 
 ---
 
-### Phase 5: 创建RedisSemanticCacheAdapter ✅
+### Phase 5: 创建RedisSemanticCacheAdapter
 
 **目标：** 创建语义缓存适配器实现（Layer 4 实现）
 
@@ -1153,5 +1153,45 @@ def shutdown() -> None:
 
 ---
 
-*文档版本: v2.0*
+## 十一、P0问题汇总与修复方案
+
+### P0问题清单
+
+| # | 问题 | 严重性 | 文件位置 |
+|---|------|--------|----------|
+| 1 | SemanticCache未继承L1CachePort，方法名不规范(get→get_by_embedding) | P0 | src/application/ports/semantic_cache.py |
+| 2 | L1CachePort仍是专用接口(memory_type/owner_id/name)，未重构为通用接口 | P0 | src/domain/ports/l1_cache.py |
+| 3 | Phase 1/3/5文件不存在(pool_provider.py, l1_cache_adapter.py, semantic_cache_adapter.py) | P0 | src/infrastructure/storage/redis/ |
+| 4 | 6个Adapter独立ConnectionPool，max_connections硬编码 | P0 | infrastructure/storage/redis/*.py |
+| 5 | RedisConfig默认值不一致(class=10 vs from_env()=100) | P0 | src/infrastructure/config/redis.py |
+| 6 | RedisSemanticCache不使用Qdrant，使用低效全表扫描O(n) | P0 | src/infrastructure/storage/redis/semantic_cache.py |
+| 7 | IdempotencyChecker硬编码连接参数，绕过RedisConfig | P0 | src/infrastructure/messaging/retry/checker.py |
+| 8 | 构造函数签名不统一(RedisMemoryCache vs RedisSemanticCache) | P1 | - |
+| 9 | SessionStorage不应继承L1CachePort（语义不同），但被列为继承候选 | P1 | 文档描述问题 |
+
+### 修复方案
+
+| # | 问题 | 修复方案 | 优先级 |
+|---|------|----------|--------|
+| 1 | SemanticCache未继承L1CachePort | 将SemanticCache重命名SemanticCachePort，继承L1CachePort，方法名改为get_by_embedding/set_with_embedding | P0 |
+| 2 | L1CachePort专用接口 | 重构为通用接口get(key)/set(key,value,ttl)/delete(key)，调用方组合key | P0 |
+| 3 | Phase文件不存在 | 创建pool_provider.py(单例连接池)、l1_cache_adapter.py、semantic_cache_adapter.py | P0 |
+| 4 | 独立ConnectionPool | 各Adapter接受外部redis_client注入，委托RedisPoolProvider获取连接 | P0 |
+| 5 | RedisConfig默认值不一致 | 统一为max_connections=100，修复from_env()逻辑 | P0 |
+| 6 | 全表扫描低效 | 接入Qdrant向量数据库做语义检索，Redis仅负责缓存内容 | P0 |
+| 7 | IdempotencyChecker硬编码 | 重构为接受RedisConfig，复用连接池管理 | P1 |
+| 8 | 构造函数签名不统一 | 统一为接受外部redis_client注入模式 | P1 |
+
+### 一致性问题（Round 5发现）
+
+| 问题 | 说明 |
+|------|------|
+| 版本号首尾不一致 | 文档头部v2.3，末尾v2.0 |
+| 执行进度总览与Phase标题矛盾 | Phase 1/3/5进度总览显示"文件不存在"但章节标题带✅ |
+| 四层模型自相矛盾 | Layer 2说MemoryCachePort不存在，Layer 4说RedisMemoryCache实现MemoryCachePort |
+| 现状vs目标状态混淆 | 接口图展示目标状态(继承)，但描述说"未继承"(现状) |
+
+---
+
+*文档版本: v2.3*
 *重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*
