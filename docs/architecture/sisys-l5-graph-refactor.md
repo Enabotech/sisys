@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.5
+**版本:** v2.6
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.5 第1轮审查，基于全面代码调研）
+**状态:** 设计完成（v2.6 第2轮审查，基于全面代码调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -42,6 +42,19 @@
 - **P1-NEW**: L5GraphPort(Protocol)掩盖缺失方法（运行时不检查）
 - **P2-NEW**: L5无内存适配器（测试需真实Neo4j）
 - **P2-NEW**: GraphManager/GraphRetriever孤立未使用
+
+**Changelog v2.6 (第2轮全面审查 - 4Agent并行调研):**
+- **P0-NEW**: `test_l5_graph_port.py` mock返回值与接口不符（create_entity返回dict而非bool）
+- **P1-NEW**: §0.5迁移策略与§8执行步骤Phase内容完全不对应（双轨制消失）
+- **P1-NEW**: `find_related`参数名跨章节不一致（edge_type vs rel_type）
+- **P1-NEW**: Neo4jGraphStorage文件路径不一致（graph_storage.py vs neo4j_graph_storage.py）
+- **P1-NEW**: MemoryGraphPort层级矛盾（标为Application层但文件在domain/ports/）
+- **P1-NEW**: §8执行状态总览表P0/P1/P2计数与实际Step标注不符
+- **P1-NEW**: Step 2.2 Neo4jGraphStorage代码仍含Memory领域语义
+- **P1-NEW**: Breaking Change表参数名简写与接口定义完整名不一致
+- **P1-NEW**: L5适配器模式与L3/L4不对齐（厚适配器含Cypher vs 薄适配器纯委托）
+- **P2-NEW**: P编号跳号（P0-1、P1-5等缺失）
+- **P2-NEW**: 执行状态总览表缺少Phase 5
 
 ---
 
@@ -2076,10 +2089,11 @@ class TestMemoryGraphAdapterEntity:
 
 | Phase | 状态 | P0修复 | P1修复 | P2修复 |
 |-------|------|--------|--------|--------|
-| Phase 1 | ⬜ 未开始 | 3 | 4 | 2 |
-| Phase 2 | ⬜ 未开始 | 2 | 3 | 2 |
-| Phase 3 | ⬜ 未开始 | 0 | 2 | 0 |
-| Phase 4 | ⬜ 未开始 | 0 | 1 | 0 |
+| Phase 1 | ⬜ 未开始 | 1 | 1 | 2 |
+| Phase 2 | ⬜ 未开始 | 3 | 2 | 1 |
+| Phase 3 | ⬜ 未开始 | 0 | 3 | 0 |
+| Phase 4 | ⬜ 未开始 | 0 | 0 | 0 |
+| Phase 5 | ⬜ 未开始 | 0 | 1 | 0 |
 
 ---
 
