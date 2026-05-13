@@ -149,6 +149,28 @@ L4ObjectPort.archive(content=bytes)
 
 **设计文档推荐方案 B**：在 MinIOAdapter.archive() 开头检查 content != None 并抛出 NotImplementedError。
 
+### 1.6 测试覆盖缺陷
+
+| 测试 | 问题 | 影响 |
+|------|------|------|
+| `test_archive_with_content` | 未验证 content 参数是否传递到 repository | 无法捕获"content 被静默丢弃"的 bug |
+| `MinIOAdapter.list_objects` | 无测试 | 接口缺失未被测试发现 |
+| `test_l4_object_port.py` | list_objects 方法未覆盖 | Protocol 测试不完整 |
+
+**测试补充建议：**
+```python
+# 1. test_archive_with_content 应验证 content 传递
+mock_repository.archive.assert_called_once()
+call_kwargs = mock_repository.archive.call_args[1]
+assert "content" in call_kwargs  # 当前会失败
+
+# 2. 添加 MinIOAdapter.list_objects 测试
+async def test_list_objects_delegates_correctly(self): ...
+
+# 3. 在 test_l4_object_port.py 添加 list_objects 测试
+async def test_mock_list_objects_verified(self): ...
+```
+
 ---
 
 ## 2. 目标架构
