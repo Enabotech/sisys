@@ -25,8 +25,9 @@
     <text x="677" y="65" text-anchor="middle" font-size="13" fill="#4d4d4d">🔗 API Integration</text>
   </g>
 
-  <line x1="450" y1="160" x2="450" y2="185" stroke="#94a3b8" stroke-width="2"/>
-  <polygon points="445,185 455,185 450,192" fill="#94a3b8"/>
+  <!-- Arrow 1 (Shifted down +2) -->
+  <line x1="450" y1="162" x2="450" y2="187" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,187 455,187 450,194" fill="#94a3b8"/>
 
   <!-- Layer 2: Interface -->
   <g transform="translate(50, 195)">
@@ -43,8 +44,9 @@
     <text x="595" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">📋 Skills · L1/L2/L3</text>
   </g>
 
-  <line x1="450" y1="285" x2="450" y2="310" stroke="#94a3b8" stroke-width="2"/>
-  <polygon points="445,310 455,310 450,317" fill="#94a3b8"/>
+  <!-- Arrow 2 (Shifted down +2) -->
+  <line x1="450" y1="287" x2="450" y2="312" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,312 455,312 450,319" fill="#94a3b8"/>
 
   <!-- Layer 3: Application -->
   <g transform="translate(50, 320)">
@@ -64,8 +66,9 @@
     <text x="655" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📋 Plan Generation</text>
   </g>
 
-  <line x1="450" y1="410" x2="450" y2="435" stroke="#94a3b8" stroke-width="2"/>
-  <polygon points="445,435 455,435 450,442" fill="#94a3b8"/>
+  <!-- Arrow 3 (Shifted down +2) -->
+  <line x1="450" y1="412" x2="450" y2="437" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,437 455,437 450,444" fill="#94a3b8"/>
 
   <!-- Layer 4: Domain -->
   <g transform="translate(50, 445)">
@@ -93,8 +96,9 @@
     <text x="708" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
   </g>
 
-  <line x1="450" y1="587" x2="450" y2="562" stroke="#94a3b8" stroke-width="2"/>
-  <polygon points="445,562 455,562 450,555" fill="#94a3b8"/>
+  <!-- Arrow 4 (Shifted down +2) -->
+  <line x1="450" y1="589" x2="450" y2="564" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,564 455,564 450,557" fill="#94a3b8"/>
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
