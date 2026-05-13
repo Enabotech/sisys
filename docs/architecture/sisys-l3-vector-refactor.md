@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v8.0
+**版本:** v9.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -491,7 +491,7 @@ class QdrantL3VectorStore(L3VectorPort):
 """QdrantSemanticCacheStore — SemanticCachePort 的 Qdrant+Redis 双层实现。
 
 双层缓存架构（对应 §九 工作流程）：
-- Qdrant: 向量存储与语义检索，payload 仅存储 cache_key
+- Qdrant: 向量存储与语义检索，payload 存储 {cache_key, result}（result 作为 Redis 过期后的降级数据源）
 - Redis: 缓存实际响应内容（带 TTL 管理）
 
 工作流程：
@@ -499,7 +499,7 @@ class QdrantL3VectorStore(L3VectorPort):
 2. Qdrant.search(embedding, limit=1, score_threshold=0.95)
    ↓命中 → payload 中获取 cache_key → Redis.GET(cache_key) → 返回缓存响应
    ↓未命中 → 调用 compute_fn → 写入 Redis(SET cache_key response EX ttl)
-                                → 写入 Qdrant(embedding + payload{cache_key})
+                                → 写入 Qdrant(embedding + payload{cache_key, result})
 """
 
 from __future__ import annotations
@@ -660,22 +660,35 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 
 ### 3.3 更新 `src/application/ports/semantic_cache.py`
 
+> **v8.0 注意**：别名方案**不可行**。旧接口 `get`/`set` 与新接口 `get_or_compute` 方法签名完全不兼容，
+> 直接替换会导致 AttributeError。需采用渐进式迁移（双接口并存），见下方方案 B。
+
+**方案 B：双接口并存（推荐）**
+
+保留旧接口不变，新建 `src/domain/ports/semantic_cache.py`，逐步迁移调用方：
+
 ```python
+# src/application/ports/semantic_cache.py — 旧接口（标注废弃，但保留方法签名）
 """SemanticCache Protocol — 应用层定义（已废弃）。
 
-⚠️ 警告：此文件已废弃，请使用 src.domain.ports.semantic_cache.SemanticCachePort
+⚠️ 警告：此接口已废弃，请迁移到 src.domain.ports.semantic_cache.SemanticCachePort
 
-迁移路径（v3.0）：
+迁移路径：
 - 旧: cache.get(embedding, threshold), cache.set(embedding, result, ttl)
 - 新: cache.get_or_compute(embedding, compute_fn)
 
-此文件仅用于向后兼容，将在后续版本中移除。
+注意：新旧方法签名不兼容，不能直接替换。请逐个迁移调用方。
+此文件将在所有调用方迁移完成后移除。
 """
 
-from src.domain.ports.semantic_cache import SemanticCachePort as SemanticCache
-from src.domain.ports.semantic_cache import CacheResult
+# 保持原有接口不变，不使用别名替换
+from typing import Protocol
 
-__all__ = ["SemanticCache", "CacheResult"]
+class SemanticCache(Protocol):
+    """旧接口 - 保留用于向后兼容。"""
+    async def get(self, query_embedding: list[float], threshold: float = 0.95) -> dict | None: ...
+    async def set(self, query_embedding: list[float], result: dict, ttl: int = 3600) -> None: ...
+    async def invalidate(self, cache_key: str) -> None: ...
 ```
 
 ### 3.4 更新 `src/composition_root.py`
@@ -973,6 +986,7 @@ def test_backward_compatibility():
 | v6.0 | 2026-05-13 | **语义缓存工作流程评审** | 确认 Qdrant+Redis 分离式设计合理；发现一致性风险；TTL 不一致；缺少 invalidate_by_embedding |
 | v7.0 | 2026-05-13 | **§3.2.2 重写为双层设计** | 修正与 §九 的架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding；添加 Redis 依赖 |
 | v8.0 | 2026-05-13 | **第3轮审查残留修正** | 更新 §2.1 Layer 4 描述；修正 §3.1.2 过时注释；更新 §九 问题表格；标记 Redis 依赖注入缺失 |
+| v9.0 | 2026-05-13 | **第4轮审查修正** | §3.3 别名方案改为渐进迁移；§九 payload 描述更新为 {cache_key, result}；添加 result 降级数据源说明 |
 
 ---
 
@@ -987,7 +1001,7 @@ def test_backward_compatibility():
 3. 获得 payload 中的 cache_key → Redis.GET(cache_key) → 返回缓存响应
    ↓未命中
 4. 调用 LLM → 生成响应 → 写入 Redis(SET cache_key response EX 3600)
-                                → 写入 Qdrant(embedding + payload{cache_key})
+                                → 写入 Qdrant(embedding + payload{cache_key, result})
 ```
 
 ### 9.2 设计合理性评估
@@ -995,6 +1009,7 @@ def test_backward_compatibility():
 | 设计点 | 评价 |
 |--------|------|
 | cache_key 存储在 Qdrant payload | ✅ 合理 - 查询效率高，避免 Redis 全表扫描 |
+| result 存储在 Qdrant payload | ✅ 合理 - Redis 过期后的降级数据源，避免"幽灵向量"问题 |
 | embedding → cache_key 生成 | ✅ 确定性哈希，同一查询生成相同 key |
 | Qdrant + Redis 分离存储 | ✅ 合理 - Qdrant 负责向量检索，Redis 负责内容缓存 |
 
@@ -1071,12 +1086,11 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v8.0 已完成第3轮审查残留修正
+**文档状态**: v9.0 已完成第4轮审查
 **审查摘要**:
-- 修正 §2.1 Layer 4 描述：添加 "+ Redis"
-- 修正 §3.1.2 过时文档注释：threshold=0.95, TTL=3600s
-- 更新 §九 问题表格：移除已修正的 TTL 不一致，添加 Redis 依赖注入缺失
-- P0 问题状态：6个全部未修复
+- §3.3 废弃声明从别名方案改为渐进迁移（双接口并存）
+- §3.2.2 和 §九 payload 描述统一为 {cache_key, result}
+- 添加 result 降级数据源说明（Redis 过期后仍可从 payload 读取）
+- §3.4 Redis 依赖注入建议使用工厂函数方案
 
 **下一步**: 执行 P0 问题的实际代码实现
-**关键设计澄清**: `SemanticCachePort` 使用**组合关系**调用 `L3VectorPort`，不是继承关系
