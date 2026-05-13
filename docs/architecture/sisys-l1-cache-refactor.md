@@ -885,7 +885,7 @@ print('Phase 1: SUCCESS')
 **目标：** 将L1CachePort从专用接口改为通用缓存接口
 
 - [ ] 2.1 重构 `L1CachePort` 接口为通用 `get(key)`/`set(key, value, ttl)`/`delete(key)`
-- [ ] 2.2 更新 `RedisMemoryCache` 实现适配新接口（可选，保持向后兼容）
+- [ ] 2.2 更新 `RedisMemoryCache` 实现适配新接口（可选）
 - [ ] 2.3 验证接口：`poetry run python -c "from src.domain.ports.l1_cache import L1CachePort; print('OK')"`
 
 **注意：** 原 `L1CachePort` 接口针对记忆缓存（memory_type/owner_id/name），重构后为通用接口（key/value）。
