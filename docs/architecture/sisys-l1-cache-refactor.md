@@ -1,18 +1,28 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v2.0
+**版本:** v3.1
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 已修订（宗师级审查反馈）
+**审查状态:** 第二轮宗师级审查修订版（新增5个P0问题）
 
 ---
 
-## 修订说明 (v2.0)
+## 修订说明 (v3.1)
 
 | 审查问题 | 严重程度 | 修订内容 |
 |----------|----------|----------|
-| 执行步骤缺少进度跟踪 | P0 | 详细步骤使用checkbox格式，便于跟踪 |
-| 保持四层模型 | P1 | 明确四层架构：Domain→Application→Infrastructure技术→Infrastructure实现 |
+| Phase 1-5 标记已完成但代码未实现 | P0 | 重置所有 Phase 为待执行 `[ ]` |
+| L1CachePort 接口变更为通用 key 不合理 | P0 | 保持专用接口，新增 `GenericCachePort` 通用抽象 |
+| SemanticCachePort 继承 L1CachePort 违反里氏替换 | P0 | 取消继承，维持独立接口 |
+| RedisPoolProvider 单例线程不安全 | P1 | 添加 `threading.Lock` 保护 |
+| 四层模型术语与六边形架构矛盾 | P1 | 采用标准六边形架构术语 |
+| Phase 执行缺少验证机制 | P1 | 每 Phase 增加强制验证命令 |
+| SessionStorage/PublicBlackboard 连接池未纳入改造 | P2 | 补充 Phase 5/6 覆盖两类 Adapter |
+| 语义缓存余弦相似度 O(n) 效率问题 | P1 | 增加优化方案说明 |
+| 向后兼容性风险被低估 | P1 | 增加渐进式迁移方案 |
+| RedisConfig 默认值矛盾 | P0 | 新增问题：类定义=10，from_env=100，需统一 |
+| RetryChecker 连接池配置缺失 | P0 | 新增问题：max_connections/socket_timeout 未设置 |
+| composition_root 未初始化 Redis | P0 | 新增问题：RedisMemoryCache 需外部 client |
 
 ---
 
@@ -23,8 +33,8 @@
 | 接口 | 位置 | 方法签名 | 问题 |
 |------|------|----------|------|
 | `L1CachePort` | `src/domain/ports/l1_cache.py` | `get(memory_type, owner_id, name)`, `set(memory_type, owner_id, name, content, ttl)`, `delete(memory_type, owner_id, name)`, `invalidate_pattern(memory_type, owner_id)` | 专用接口，非通用缓存 |
-| `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | 未继承L1CachePort |
-| `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | 未继承L1CachePort |
+| `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | 独立接口，无继承关系 |
+| `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | 独立接口，未统一连接池 |
 
 ### 1.2 当前实现（8个Adapter现状）
 
@@ -35,11 +45,11 @@
 │  RedisMemoryCache        → ConnectionPool #1        │
 │  RedisSessionStorage     → ConnectionPool #2        │
 │  RedisSemanticCache      → ConnectionPool #3        │
-│  RedisPublicBlackboard  → ConnectionPool #4        │
-│  RedisEventPublisher    → ConnectionPool #5        │
-│  RedisEventSubscriber   → ConnectionPool #6        │
-│  RedisSnapshotStore     → ConnectionPool #7        │
-│  RedisEventBus          → ConnectionPool #8        │
+│  RedisPublicBlackboard   → ConnectionPool #4        │
+│  RedisEventPublisher     → ConnectionPool #5        │
+│  RedisEventSubscriber    → ConnectionPool #6        │
+│  RedisSnapshotStore      → ConnectionPool #7        │
+│  RedisEventBus           → ConnectionPool #8        │
 └─────────────────────────────────────────────────────┘
                     ↓
          连接数 = 8 × max_connections
@@ -50,19 +60,14 @@
 
 | 实现类 | 位置 | ConnectionPool | 实现接口 | 状态 |
 |--------|------|---------------|----------|------|
-| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client | `L1CachePort` | ✅ |
-| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 | `SessionStorage` | ❌ |
-| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 | 无（直接实现语义逻辑） | ❌ |
-| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 | `PublicBlackboard` | ❌ |
-| `RedisEventPublisher` | `infrastructure/messaging/` | 自建 | 事件发布 | ❌ |
-| `RedisEventSubscriber` | `infrastructure/messaging/` | 自建 | 事件订阅 | ❌ |
-| `RedisSnapshotStore` | `infrastructure/storage/` | 接受外部client | `SnapshotRepositoryProtocol` | ✅ |
-| `RedisEventBus` | `infrastructure/messaging/` | 委托上述两者 | `EventPublisher`+`EventSubscriber` | ⚠️ |
-
-**说明：**
-- ✅ 已支持外部注入，无需改造
-- ❌ 自建ConnectionPool，需要改造
-- ⚠️ 混合模式，通过委托实现
+| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client | `L1CachePort` | ✅ 已支持外部注入 |
+| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 ❌ | `SessionStorage` | ❌ 需改造 |
+| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 ❌ | `SemanticCache` | ❌ 需改造 |
+| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 ❌ | `PublicBlackboard` | ❌ 需改造 |
+| `RedisEventPublisher` | `infrastructure/messaging/` | 自建 ❌ | 事件发布 | ❌ 需改造 |
+| `RedisEventSubscriber` | `infrastructure/messaging/` | 自建 ❌ | 事件订阅 | ❌ 需改造 |
+| `RedisSnapshotStore` | `infrastructure/storage/` | 接受外部client | `SnapshotRepositoryProtocol` | ✅ 已支持外部注入 |
+| `RedisEventBus` | `infrastructure/messaging/` | 委托上述两者 ⚠️ | `EventPublisher`+`EventSubscriber` | ⚠️ 混合模式 |
 
 ### 1.3 问题根因
 
@@ -70,9 +75,10 @@
 当前架构问题：
 
 Domain Layer
-└── L1CachePort (专用接口: memory_type/owner_id/name)
-    SemanticCache (独立接口，未继承)
-    SessionStorage (独立接口，未继承)
+├── L1CachePort (专用接口: memory_type/owner_id/name)
+├── GenericCachePort (缺失: 通用缓存抽象)
+├── SemanticCache (独立接口，未继承)
+└── SessionStorage (独立接口，未继承)
 
 Infrastructure Layer
 ├── RedisMemoryCache → 接受外部client ✅
@@ -85,155 +91,196 @@ Infrastructure Layer
 └── RedisEventBus → 委托上述两者 ⚠️
 
 问题：
-1. L1CachePort 是专用接口，不是通用缓存抽象
+1. 缺少通用缓存抽象（GenericCachePort）
 2. 6个Adapter各自管理ConnectionPool（除RedisMemoryCache和RedisSnapshotStore）
 3. 接口无继承关系，无法统一抽象
 4. 连接数 = 6 × max_connections (默认10) = 60，可能耗尽Redis连接限制
+5. SemanticCache 与 L1CachePort 接口语义不同，不应继承
+6. RedisConfig 默认值矛盾：类定义=10，from_env=100
+7. RetryChecker 连接池配置缺失：max_connections/socket_timeout 未设置
+8. composition_root 未初始化 Redis：RedisMemoryCache 需要外部 client
 ```
 
-### 1.4 连接池配置现状
+### 1.4 新发现P0问题（第二轮审查）
 
-**硬编码问题：** 每个Adapter独立管理连接池，配置分散：
+#### 问题 6: RedisConfig 默认值矛盾
+
+**位置:** `src/infrastructure/config/redis.py`
 
 ```python
-# 各Adapter的_get_pool()方法重复相同的配置逻辑
-max_connections=10  # 硬编码，未统一
-socket_timeout=5.0  # 重复
-decode_responses=True  # 重复
+# 类定义默认值
+max_connections: int = 10
+
+# from_env() 默认值
+max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "100")),
 ```
+
+**影响:** 同一配置类两处默认值不一致，可能导致连接数估算错误。
+
+---
+
+#### 问题 7: RetryChecker 连接池配置缺失
+
+**位置:** `src/infrastructure/messaging/retry/checker.py`
+
+```python
+self._pool = aioredis.ConnectionPool(
+    host=self._config.host,
+    port=self._config.port,
+    db=self._config.db,
+    password=self._config.password,
+    # 缺少 max_connections 和 socket_timeout
+)
+```
+
+**影响:** 使用库默认值（可能不符合项目要求），且与其他 Adapter 不一致。
+
+---
+
+#### 问题 8: composition_root 未初始化 Redis 连接
+
+**位置:** `src/composition_root.py:93-100`
+
+```python
+register_port(
+    name="l1_cache",
+    interface=L1CachePort,
+    impl="...RedisMemoryCache",
+    ...
+)
+```
+
+**问题:** `RedisMemoryCache` 需要外部传入 `aioredis.Redis` 实例，但 composition_root 只注册端口，未实际初始化。
+
+**影响:** 运行时可能抛出异常，无法正常创建 RedisMemoryCache 实例。
+
+---
+
+#### 问题 9: RedisSemanticCache 未显式继承接口
+
+**位置:** `src/infrastructure/storage/redis/semantic_cache.py:61`
+
+```python
+class RedisSemanticCache:  # 未声明 implements SemanticCache
+```
+
+**对比:** `RedisMemoryCache(L1CachePort)` 显式继承
+
+**影响:** 接口实现不明确，依赖隐式 duck typing，类型检查无法验证。
+
+---
+
+#### 问题 10: get_by_agent 效率问题
+
+**位置:** `src/infrastructure/storage/redis/public_blackboard.py:174`
+
+```python
+async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None:
+    all_entries = await self.get(conversation_id)  # 获取全部条目
+    agent_entries = [e for e in all_entries if e.get("agent_id") == agent_id]
+```
+
+**问题:** 先获取全部条目再过滤，未使用 Redis 命令直接过滤。
+
+**影响:** 数据量大时性能差。
 
 ---
 
 ## 二、目标架构
 
-### 2.1 四层职责模型
+### 2.1 六边形架构分层模型
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: Domain Layer - L1CachePort（统一抽象缓存端口）           │
+│  Domain Layer - 领域层（零外部依赖）                              │
 │                                                                  │
-│  职责：定义最底层通用缓存接口（get/set/delete）                    │
-│  位置：src/domain/ports/l1_cache.py                              │
-│  特点：领域层零依赖，纯抽象协议                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Application/Domain Layer - 具体应用缓存端口              │
-│                                                                  │
-│  职责：继承L1CachePort，定义特定场景缓存能力                       │
-│  位置：src/application/ports/                                     │
-│  端口：                                                          │
-│    - SemanticCachePort (语义缓存)                                 │
-│    - MemoryCachePort (记忆缓存) ← 可选，看需求                     │
-│    - SessionStoragePort (会话存储) ← 评估是否继承L1CachePort        │
-└─────────────────────────────────────────────────────────────────┘
-                              ↑
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: Infrastructure - Redis技术实现 + 缓存管理                │
-│                                                                  │
-│  职责：实现L1CachePort接口 + Redis连接池统一管理                   │
-│  位置：src/infrastructure/storage/redis/                           │
+│  职责：定义纯抽象接口，领域层零外部依赖                            │
 │  组件：                                                          │
-│    - RedisPoolProvider (连接池单例)                               │
-│    - RedisL1CacheAdapter (实现L1CachePort)                        │
-│  特点：技术可替换（未来可新增MemcachedAdapter等）                  │
+│    - L1CachePort（专用记忆缓存接口）                              │
+│    - GenericCachePort（通用缓存接口）- 新增                        │
+│    - SessionStoragePort（会话存储接口）                           │
+│    - PublicBlackboardPort（公共黑板接口）                         │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 4: Infrastructure - 具体应用缓存端口实现                     │
+│  Application Layer - 应用层（用例编排）                           │
 │                                                                  │
-│  职责：实现具体应用缓存端口（SemanticCachePort等）                 │
-│  位置：src/infrastructure/storage/redis/                           │
+│  职责：定义业务语义接口                                           │
 │  组件：                                                          │
-│    - RedisSemanticCacheAdapter (实现SemanticCachePort)           │
-│      └─ 组合RedisL1CacheAdapter处理基础缓存                       │
-│    - RedisMemoryCache (已有，实现MemoryCachePort)                 │
-│      └─ 改为组合RedisL1CacheAdapter                              │
+│    - SemanticCachePort（语义缓存接口）- 独立，不继承             │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Infrastructure Layer - 基础设施层（技术实现）                     │
+│                                                                  │
+│  职责：实现所有端口接口 + 连接池统一管理                          │
+│  组件：                                                          │
+│    - RedisPoolProvider（连接池单例）                              │
+│    - RedisL1CacheAdapter（实现 L1CachePort）                     │
+│    - RedisGenericCacheAdapter（实现 GenericCachePort）- 新增      │
+│    - RedisSemanticCacheAdapter（实现 SemanticCachePort）         │
+│    - RedisSessionStorageAdapter（实现 SessionStoragePort）       │
+│    - RedisPublicBlackboardAdapter（实现 PublicBlackboardPort）   │
+│    - RedisEventPublisherAdapter（实现 EventPublisher）           │
+│    - RedisEventSubscriberAdapter（实现 EventSubscriber）         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 接口继承关系
 
 ```python
-# Layer 1: Domain统一抽象
+# Domain Layer: 专用接口（保持原有设计，不破坏现有实现）
 class L1CachePort(Protocol):
-    """通用缓存接口 - 最底层抽象"""
+    """L1 记忆缓存接口 - 专用接口"""
+
+    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None: ...
+    async def set(self, memory_type: str, owner_id: str, name: str, content: str, ttl: int | None = None) -> bool: ...
+    async def delete(self, memory_type: str, owner_id: str, name: str) -> bool: ...
+    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> int: ...
+
+# Domain Layer: 新增通用接口
+class GenericCachePort(Protocol):
+    """通用缓存接口 - 新增抽象"""
+
     async def get(self, key: str) -> str | None: ...
     async def set(self, key: str, value: str, ttl: int | None = None) -> bool: ...
     async def delete(self, key: str) -> bool: ...
 
-# Layer 2: Application具体缓存端口
-class SemanticCachePort(L1CachePort, Protocol):
-    """语义缓存接口 - 继承L1CachePort"""
+# Application Layer: 语义缓存（独立接口，不继承 L1CachePort）
+class SemanticCachePort(Protocol):
+    """语义缓存接口 - 独立接口，不继承任何缓存接口"""
+
     async def get_by_embedding(self, query_embedding: list[float], threshold: float) -> dict | None: ...
     async def set_with_embedding(self, query_embedding: list[float], result: dict, ttl: int) -> None: ...
-
-# Layer 3: Infrastructure Redis实现
-class RedisL1CacheAdapter(L1CachePort):
-    """Redis通用缓存实现"""
-    def __init__(self, redis_client: aioredis.Redis | None = None): ...
-
-# Layer 4: Infrastructure具体应用实现
-class RedisSemanticCacheAdapter(SemanticCachePort):
-    """Redis语义缓存实现"""
-    def __init__(self, redis_client: aioredis.Redis | None = None):
-        self._base = RedisL1CacheAdapter(redis_client)
-
-    async def get_by_embedding(self, query_embedding, threshold):
-        # 语义相似度查找
-        ...
-
-    async def set_with_embedding(self, query_embedding, result, ttl):
-        # 存储向量和结果
-        ...
-
-    # 继承L1CachePort基础方法
-    async def get(self, key: str) -> str | None:
-        return await self._base.get(key)
-
-    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        return await self._base.set(key, value, ttl)
-
-    async def delete(self, key: str) -> bool:
-        return await self._base.delete(key)
+    async def invalidate(self, cache_key: str) -> None: ...
 ```
 
-### 2.3 四层模型说明
+### 2.3 六层模型说明
 
-| Layer | 名称 | 职责 | 技术依赖 |
+| 层级 | 名称 | 职责 | 技术依赖 |
 |-------|------|------|----------|
-| Layer 1 | Domain Layer | 定义纯抽象接口，零外部依赖 | 无 |
-| Layer 2 | Application/Domain Layer | 定义业务语义接口，继承Layer 1 | 无 |
-| Layer 3 | Infrastructure - 技术实现 | 实现底层存储能力，管理连接池 | Redis |
-| Layer 4 | Infrastructure - 业务实现 | 实现业务接口，委托Layer 3 | Redis + Layer 3组件 |
-
-### 2.4 SessionStorage评估
-
-**问题：** SessionStorage是否应该继承L1CachePort？
-
-| 分析维度 | 结论 |
-|----------|------|
-| 接口差异 | `SessionStorage`: save/load/delete/exists<br>`L1CachePort`: get/set/delete |
-| 数据结构 | SessionStorage存储复杂对象(state dict)<br>L1CachePort存储字符串 |
-| 用途 | SessionStorage: 会话状态管理<br>L1CachePort: 通用缓存 |
-
-**决策：** SessionStorage **不**继承L1CachePort，原因：
-1. 接口语义不同（会话管理 vs 键值缓存）
-2. SessionStorage实现有自己的设计（Hash结构存储）
-3. 保持职责分离，符合单一职责原则
+| Domain | 领域层 | 定义纯抽象接口，零外部依赖 | 无 |
+| Application | 应用层 | 定义业务语义接口 | 无 |
+| Infrastructure | 基础设施层 | 实现所有端口接口 + 连接池统一管理 | Redis |
 
 ---
 
 ## 三、详细设计
 
-### 3.1 Layer 1: 重构L1CachePort
+### 3.1 新增: GenericCachePort（通用缓存抽象）
 
-**文件：** `src/domain/ports/l1_cache.py`
+**文件：** `src/domain/ports/generic_cache.py`
 
 ```python
-"""L1CachePort — L1 缓存存储抽象端口。
+"""GenericCachePort — 通用缓存抽象端口。
 
-通用缓存抽象，所有具体缓存实现必须实现此接口。
+提供键值缓存的基础抽象，供需要通用缓存能力的组件使用。
+与 L1CachePort（专用记忆缓存）不同，GenericCachePort 是通用键值接口。
+
+设计原则：
+- 领域层零外部依赖（仅用 Protocol + typing）
+- 异步优先（async def）
+- 技术无关（可使用 Redis/Memcached/内存等实现）
 """
 
 from __future__ import annotations
@@ -241,16 +288,12 @@ from __future__ import annotations
 from typing import Protocol
 
 
-class L1CachePort(Protocol):
-    """L1 缓存存储接口（通用底层抽象）。
+class GenericCachePort(Protocol):
+    """通用缓存接口。
 
-    设计原则：
-    - 领域层零外部依赖（仅用 abc + typing）
-    - 异步优先（async def）
-    - 技术无关（可使用Redis/Memcached/内存等实现）
-
-    所有具体缓存实现（如SemanticCache、MemoryCache）继承此接口，
-    获得基础缓存能力。
+    提供基础的 get/set/delete 操作。
+    具体实现（如 RedisGenericCacheAdapter）委托 RedisPoolProvider
+    获取连接池。
     """
 
     async def get(self, key: str) -> str | None:
@@ -286,77 +329,30 @@ class L1CachePort(Protocol):
         """
 ```
 
-### 3.2 Layer 2: 重构SemanticCachePort
+### 3.2 L1CachePort 保持不变（不破坏现有实现）
 
-**文件：** `src/application/ports/semantic_cache.py`
+**结论：** L1CachePort 保持现有专用接口不变，不进行接口通用化改造。
 
-```python
-"""SemanticCache Protocol — 语义缓存应用层接口。
+**理由：**
+1. 现有 `RedisMemoryCache` 实现了 L1CachePort（memory_type/owner_id/name），改动会破坏大量调用方
+2. 专用接口携带业务语义，通用化后调用方需要自己组合 key
+3. 新增 `GenericCachePort` 满足通用缓存需求，不影响现有实现
 
-继承L1CachePort，提供基于向量相似度的缓存能力。
-"""
+### 3.3 SemanticCachePort 保持独立（不继承 L1CachePort）
 
-from __future__ import annotations
+**结论：** SemanticCachePort 维持独立接口，不继承任何缓存接口。
 
-from abc import abstractmethod
-from typing import Protocol
+**理由：**
+1. 接口语义完全不同：L1CachePort 是键值缓存，SemanticCachePort 是向量相似度搜索
+2. 违反里氏替换原则：语义缓存的 `get_by_embedding` 无法替代 L1CachePort 的 `get`
+3. 组合优于继承：RedisSemanticCacheAdapter 可组合 RedisL1CacheAdapter 处理基础缓存
 
-from src.domain.ports.l1_cache import L1CachePort
-
-
-class SemanticCachePort(L1CachePort, Protocol):
-    """语义缓存协议接口。
-
-    支持基于向量相似度的缓存查询和存储。
-    继承L1CachePort获得基础缓存能力。
-
-    具体实现（如RedisSemanticCacheAdapter）委托L1CacheAdapter
-    处理基础缓存操作。
-    """
-
-    async def get_by_embedding(
-        self,
-        query_embedding: list[float],
-        threshold: float = 0.9,
-    ) -> dict | None:
-        """通过向量嵌入查询缓存。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            threshold: 相似度阈值（0.0-1.0）
-
-        Returns:
-            缓存结果，如果未命中则返回 None
-        """
-
-    async def set_with_embedding(
-        self,
-        query_embedding: list[float],
-        result: dict,
-        ttl: int = 86400,
-    ) -> None:
-        """存储带向量嵌入的缓存。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            result: 缓存结果数据
-            ttl: 过期时间（秒），默认24小时
-        """
-
-    async def invalidate(self, cache_key: str) -> None:
-        """使缓存失效。
-
-        Args:
-            cache_key: 缓存键
-        """
-```
-
-### 3.3 Layer 3: RedisPoolProvider
+### 3.4 RedisPoolProvider（线程安全单例）
 
 **文件：** `src/infrastructure/storage/redis/pool_provider.py`
 
 ```python
-"""Redis连接池统一提供者（单例模式）。
+"""Redis连接池统一提供者（线程安全单例模式）。
 
 在composition_root初始化时创建单一连接池，
 所有Adapter复用此连接池，实现资源统一管理。
@@ -366,7 +362,8 @@ class SemanticCachePort(L1CachePort, Protocol):
 - Domain层完全不感知连接池存在
 
 设计考虑：
-- 单例模式确保全局唯一连接池
+- 线程安全单例模式确保全局唯一连接池
+- 使用 threading.Lock 保护初始化过程
 - 支持异步和同步两种关闭方式
 - 测试时可替换为mock
 """
@@ -375,6 +372,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import TYPE_CHECKING, Final
 
 import redis.asyncio as aioredis
@@ -391,54 +389,61 @@ DEFAULT_MAX_CONNECTIONS: Final[int] = 100
 
 
 class RedisPoolProvider:
-    """Redis连接池统一提供者（单例模式）。
+    """Redis连接池统一提供者（线程安全单例模式）。
 
     Attributes:
         _instance: 单例实例
         _pool: 连接池
         _config: Redis配置
+        _lock: 线程锁，保护初始化过程
     """
 
     _instance: RedisPoolProvider | None = None
     _pool: aioredis.ConnectionPool | None = None
     _config: RedisConfig | None = None
+    _lock: threading.Lock = threading.Lock()
 
     def __new__(cls) -> RedisPoolProvider:
+        """线程安全单例获取"""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._lock:
+                # 双重检查锁定（Double-Checked Locking）
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     @classmethod
     def init(cls, config: RedisConfig | None = None) -> None:
-        """初始化连接池。
+        """初始化连接池（线程安全）。
 
         Args:
             config: Redis配置，默认从环境变量加载
         """
-        if cls._pool is not None:
-            logger.warning("RedisPoolProvider already initialized, skipping")
-            return
+        with cls._lock:
+            if cls._pool is not None:
+                logger.warning("RedisPoolProvider already initialized, skipping")
+                return
 
-        config = config or RedisConfig.from_env()
-        cls._config = config
+            config = config or RedisConfig.from_env()
+            cls._config = config
 
-        cls._pool = aioredis.ConnectionPool(
-            host=config.host,
-            port=config.port,
-            db=config.db,
-            password=config.password,
-            max_connections=config.max_connections or DEFAULT_MAX_CONNECTIONS,
-            socket_timeout=config.socket_timeout,
-            socket_connect_timeout=5.0,
-            retry_on_timeout=config.retry_on_timeout,
-            decode_responses=True,
-        )
-        logger.info(
-            "RedisPoolProvider initialized: %s:%d (max_connections=%d)",
-            config.host,
-            config.port,
-            config.max_connections,
-        )
+            cls._pool = aioredis.ConnectionPool(
+                host=config.host,
+                port=config.port,
+                db=config.db,
+                password=config.password,
+                max_connections=config.max_connections or DEFAULT_MAX_CONNECTIONS,
+                socket_timeout=config.socket_timeout,
+                socket_connect_timeout=5.0,
+                retry_on_timeout=config.retry_on_timeout,
+                decode_responses=True,
+            )
+            logger.info(
+                "RedisPoolProvider initialized: %s:%d (max_connections=%d)",
+                config.host,
+                config.port,
+                config.max_connections,
+            )
 
     @classmethod
     def get_client(cls) -> aioredis.Redis:
@@ -465,12 +470,13 @@ class RedisPoolProvider:
     @classmethod
     async def close_async(cls) -> None:
         """异步关闭连接池。"""
-        if cls._pool is not None:
-            await cls._pool.aclose()
-            cls._pool = None
-            cls._config = None
-            cls._instance = None
-            logger.info("RedisPoolProvider closed (async)")
+        with cls._lock:
+            if cls._pool is not None:
+                await cls._pool.aclose()
+                cls._pool = None
+                cls._config = None
+                cls._instance = None
+                logger.info("RedisPoolProvider closed (async)")
 
     @classmethod
     def close(cls) -> None:
@@ -488,22 +494,22 @@ class RedisPoolProvider:
     @classmethod
     def reset(cls) -> None:
         """重置Provider状态（用于测试）。"""
-        cls._pool = None
-        cls._config = None
-        cls._instance = None
-        logger.info("RedisPoolProvider reset")
+        with cls._lock:
+            cls._pool = None
+            cls._config = None
+            cls._instance = None
+            logger.info("RedisPoolProvider reset")
 ```
 
-### 3.4 Layer 3: RedisL1CacheAdapter
+### 3.5 RedisGenericCacheAdapter
 
-**文件：** `src/infrastructure/storage/redis/l1_cache_adapter.py`
+**文件：** `src/infrastructure/storage/redis/generic_cache_adapter.py`
 
 ```python
-"""Redis L1 缓存通用适配器。
+"""Redis 通用缓存适配器。
 
-实现L1CachePort接口，提供通用Redis缓存能力。
-所有具体缓存实现（如SemanticCache、MemoryCache）委托此适配器
-处理基础缓存操作。
+实现 GenericCachePort 接口，提供通用 Redis 缓存能力。
+供需要通用键值缓存的组件使用。
 
 架构来源: architecture.md §11.2.9
 """
@@ -515,7 +521,7 @@ from typing import TYPE_CHECKING, Final
 
 import redis.asyncio as aioredis
 
-from src.domain.ports.l1_cache import L1CachePort
+from src.domain.ports.generic_cache import GenericCachePort
 from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider
 
 if TYPE_CHECKING:
@@ -526,15 +532,14 @@ DEFAULT_TTL_MIN: Final[int] = 86400  # 24h
 DEFAULT_TTL_MAX: Final[int] = 108000  # 30h
 
 
-class RedisL1CacheAdapter(L1CachePort):
-    """Redis L1 缓存通用适配器。
+class RedisGenericCacheAdapter(GenericCachePort):
+    """Redis 通用缓存适配器。
 
-    实现L1CachePort接口，提供通用Redis缓存能力。
-    所有具体缓存实现可委托此适配器处理基础缓存操作。
+    实现 GenericCachePort 接口，提供通用 Redis 缓存能力。
 
     设计原则：
-    - 单一职责：只处理基础get/set/delete
-    - 可测试：支持注入mock redis client
+    - 单一职责：只处理基础 get/set/delete
+    - 可测试：支持注入 mock redis client
     - 可组合：具体缓存实现委托此适配器
 
     Attributes:
@@ -604,18 +609,21 @@ class RedisL1CacheAdapter(L1CachePort):
         return DEFAULT_TTL_MIN + random.randint(0, DEFAULT_TTL_MAX - DEFAULT_TTL_MIN)  # nosec B311
 ```
 
-### 3.5 Layer 4: RedisSemanticCacheAdapter
+### 3.6 RedisSemanticCacheAdapter
 
 **文件：** `src/infrastructure/storage/redis/semantic_cache_adapter.py`
 
 ```python
 """Redis 语义缓存适配器。
 
-实现SemanticCachePort接口，提供基于向量相似度的缓存能力。
-委托RedisL1CacheAdapter处理基础缓存操作。
+实现 SemanticCachePort 接口，提供基于向量相似度的缓存能力。
+组合 RedisGenericCacheAdapter 处理基础缓存操作。
 
-使用Redis Hash存储嵌入向量和缓存结果，
-支持纯Python余弦相似度计算。
+使用 Redis Hash 存储嵌入向量和缓存结果，
+支持纯 Python 余弦相似度计算。
+
+注意：当前实现使用 SCAN 遍历所有缓存键，复杂度 O(n)。
+      大规模部署建议使用 Redis Search (RediSearch) 或向量索引。
 """
 
 from __future__ import annotations
@@ -623,14 +631,14 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import redis.asyncio as aioredis
 
 from src.application.ports.semantic_cache import SemanticCachePort
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.key_builder import build_key
-from src.infrastructure.storage.redis.l1_cache_adapter import RedisL1CacheAdapter
+from src.infrastructure.storage.redis.generic_cache_adapter import RedisGenericCacheAdapter
 from src.infrastructure.utils import json_dumps, json_loads
 
 if TYPE_CHECKING:
@@ -676,14 +684,17 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
 class RedisSemanticCacheAdapter(SemanticCachePort):
     """Redis 语义缓存适配器。
 
-    实现SemanticCachePort接口，提供基于向量相似度的缓存能力。
-    委托RedisL1CacheAdapter处理基础缓存操作。
+    实现 SemanticCachePort 接口，提供基于向量相似度的缓存能力。
+    组合 RedisGenericCacheAdapter 处理基础缓存操作。
 
     键格式: sisys:cache:semantic:{cache_key}
     支持基于余弦相似度的语义匹配。
 
+    效率说明：当前实现使用 SCAN 遍历所有缓存键，复杂度 O(n)。
+    大规模部署建议使用 Redis Search (RediSearch) 替代方案。
+
     Attributes:
-        _base: 基础L1缓存适配器
+        _base: 基础通用缓存适配器
         _metrics_collector: 可选的指标收集器
     """
 
@@ -700,7 +711,7 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
             redis_client: 可选，测试时注入mock client
             metrics_collector: 可选的指标收集器
         """
-        self._base = RedisL1CacheAdapter(redis_client)
+        self._base = RedisGenericCacheAdapter(redis_client)
         self._metrics_collector = metrics_collector
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
@@ -715,41 +726,6 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
         ).hexdigest()[:16]
         return f"vec:{vector_id}"
 
-    async def get(self, key: str) -> str | None:
-        """获取缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            缓存值，不存在返回None
-        """
-        return await self._base.get(key)
-
-    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """设置缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-            value: 缓存值
-            ttl: 过期时间（秒）
-
-        Returns:
-            是否成功
-        """
-        return await self._base.set(key, value, ttl)
-
-    async def delete(self, key: str) -> bool:
-        """删除缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            是否成功
-        """
-        return await self._base.delete(key)
-
     async def get_by_embedding(
         self,
         query_embedding: list[float],
@@ -759,6 +735,8 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 
         遍历所有缓存条目，找到相似度高于阈值的第一个结果。
 
+        注意：当前实现复杂度 O(n)，大规模部署需要优化。
+
         Args:
             query_embedding: 查询向量嵌入
             threshold: 相似度阈值
@@ -766,20 +744,20 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
         Returns:
             缓存结果，如果未命中则返回None
         """
-        # 使用SCAN遍历所有缓存键
+        client = self._base._redis
         pattern = build_key(self._NAMESPACE, "vec:*")
         cursor = 0
 
         while True:
-            cursor, keys = await self._base._redis.scan(
+            cursor, keys = await client.scan(
                 cursor=cursor,
                 match=pattern,
                 count=100,
             )
 
             for key in keys:
-                stored_embedding = await self._base._redis.hget(key, "embedding")
-                stored_result_data = await self._base._redis.hget(key, "result")
+                stored_embedding = await client.hget(key, "embedding")
+                stored_result_data = await client.hget(key, "result")
 
                 if stored_embedding is None or stored_result_data is None:
                     continue
@@ -826,10 +804,11 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
         """
         cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
+        client = self._base._redis
 
-        await self._base._redis.hset(key, "embedding", json_dumps(query_embedding))
-        await self._base._redis.hset(key, "result", json_dumps(result))
-        await self._base._redis.expire(key, ttl)
+        await client.hset(key, "embedding", json_dumps(query_embedding))
+        await client.hset(key, "result", json_dumps(result))
+        await client.expire(key, ttl)
         logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
 
     async def invalidate(self, cache_key: str) -> None:
@@ -853,119 +832,293 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 ## 四、详细执行步骤
 
 > **执行跟踪说明：** 每个任务前使用 `[ ]` 表示待完成，`[x]` 表示已完成。
+> **验证要求：** 每个 Phase 必须通过验证才能进入下一阶段，失败则停止并回滚。
 
-### Phase 1: 创建RedisPoolProvider ✅
+### Phase 1: 创建RedisPoolProvider
 
-**目标：** 创建连接池单例（Layer 3 基础设施）
+**目标：** 创建线程安全连接池单例（Infrastructure层）
 
 - [ ] 1.1 创建 `src/infrastructure/storage/redis/pool_provider.py`
-- [ ] 1.2 实现单例模式 + `init()`/`get_client()`/`close_async()`/`close()`/`reset()`
+- [ ] 1.2 实现线程安全单例模式 + `init()`/`get_client()`/`close_async()`/`close()`/`reset()`
 - [ ] 1.3 验证单例正常：`p1 = RedisPoolProvider(); p2 = RedisPoolProvider(); assert p1 is p2`
-- [ ] 1.4 验证异步关闭：`asyncio.run(RedisPoolProvider.close_async())`
-- [ ] 1.5 验证reset：`RedisPoolProvider.reset()`
+- [ ] 1.4 验证线程安全：`threading.Thread(target=RedisPoolProvider.init).start()` 并发调用
+- [ ] 1.5 验证异步关闭：`asyncio.run(RedisPoolProvider.close_async())`
+- [ ] 1.6 验证reset：`RedisPoolProvider.reset()`
 
 **验证命令：**
 ```bash
 poetry run python -c "
+import threading
 from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider
 from src.infrastructure.config.redis import RedisConfig
-RedisPoolProvider.init(RedisConfig())
+
+# 测试单例
+p1 = RedisPoolProvider()
+p2 = RedisPoolProvider()
+assert p1 is p2, 'Singleton failed'
+print('Singleton: OK')
+
+# 测试线程安全初始化
+def init_provider():
+    RedisPoolProvider.init(RedisConfig())
+
+threads = [threading.Thread(target=init_provider) for _ in range(5)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
 client = RedisPoolProvider.get_client()
 print(f'Pool: {client.connection_pool}')
-import asyncio
-asyncio.run(RedisPoolProvider.close_async())
-print('Phase 1: SUCCESS')
+print('Thread-safe init: OK')
+
+# 测试重置
+RedisPoolProvider.reset()
+assert not RedisPoolProvider.is_initialized(), 'Reset failed'
+print('Reset: OK')
+
+print('Phase 1: ALL PASSED')
 "
 ```
 
 ---
 
-### Phase 2: 重构L1CachePort（Layer 1）
+### Phase 2: 创建GenericCachePort
 
-**目标：** 将L1CachePort从专用接口改为通用缓存接口
+**目标：** 新增通用缓存抽象接口（Domain层）
 
-- [ ] 2.1 重构 `L1CachePort` 接口为通用 `get(key)`/`set(key, value, ttl)`/`delete(key)`
-- [ ] 2.2 更新 `RedisMemoryCache` 实现适配新接口（可选）
-- [ ] 2.3 验证接口：`poetry run python -c "from src.domain.ports.l1_cache import L1CachePort; print('OK')"`
+- [ ] 2.1 创建 `src/domain/ports/generic_cache.py`
+- [ ] 2.2 定义 `GenericCachePort` 接口：`get(key)`/`set(key, value, ttl)`/`delete(key)`
+- [ ] 2.3 验证接口定义：`from src.domain.ports.generic_cache import GenericCachePort; print('OK')`
 
-**注意：** 原 `L1CachePort` 接口针对记忆缓存（memory_type/owner_id/name），重构后为通用接口（key/value）。
+**验证命令：**
+```bash
+poetry run python -c "
+from src.domain.ports.generic_cache import GenericCachePort
+print('GenericCachePort: OK')
+"
+```
 
 ---
 
-### Phase 3: 创建RedisL1CacheAdapter ✅
+### Phase 3: 创建RedisGenericCacheAdapter
 
-**目标：** 创建通用Redis缓存适配器（Layer 3 实现）
+**目标：** 创建通用Redis缓存适配器（Infrastructure层）
 
-- [ ] 3.1 创建 `src/infrastructure/storage/redis/l1_cache_adapter.py`
-- [ ] 3.2 实现 `L1CachePort` 接口：`get`/`set`/`delete`
-- [ ] 3.3 支持外部注入redis client（构造函数参数）
+- [ ] 3.1 创建 `src/infrastructure/storage/redis/generic_cache_adapter.py`
+- [ ] 3.2 实现 `GenericCachePort` 接口：`get`/`set`/`delete`
+- [ ] 3.3 支持外部注入 redis client（构造函数参数）
 - [ ] 3.4 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 3.5 验证实现：`hasattr(RedisGenericCacheAdapter, 'get') and hasattr(RedisGenericCacheAdapter, 'set')`
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.generic_cache_adapter import RedisGenericCacheAdapter
+from src.domain.ports.generic_cache import GenericCachePort
+
+# 验证实现接口
+adapter = RedisGenericCacheAdapter.__new__(RedisGenericCacheAdapter)
+assert isinstance(adapter, GenericCachePort), 'Must implement GenericCachePort'
+print('RedisGenericCacheAdapter: OK')
+"
+```
 
 ---
 
-### Phase 4: 重构SemanticCachePort（Layer 2）
+### Phase 4: 创建RedisSemanticCacheAdapter
 
-**目标：** SemanticCachePort继承L1CachePort
+**目标：** 创建语义缓存适配器（Infrastructure层）
 
-- [ ] 4.1 重构 `SemanticCachePort` 继承 `L1CachePort`
-- [ ] 4.2 保留 `get_by_embedding`/`set_with_embedding`/`invalidate` 方法
-- [ ] 4.3 验证继承关系：`issubclass(SemanticCachePort, L1CachePort)`
+- [ ] 4.1 创建 `src/infrastructure/storage/redis/semantic_cache_adapter.py`
+- [ ] 4.2 实现 `SemanticCachePort` 接口
+- [ ] 4.3 组合 `RedisGenericCacheAdapter`：委托基础缓存操作
+- [ ] 4.4 实现纯Python余弦相似度计算（不使用numpy）
+- [ ] 4.5 验证：`isinstance(adapter, SemanticCachePort)`
 
----
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.semantic_cache_adapter import RedisSemanticCacheAdapter, cosine_similarity
+from src.application.ports.semantic_cache import SemanticCachePort
 
-### Phase 5: 创建RedisSemanticCacheAdapter ✅
+# 测试余弦相似度
+v1 = [1.0, 0.0, 0.0]
+v2 = [1.0, 0.0, 0.0]
+assert cosine_similarity(v1, v2) == 1.0, 'Identical vectors should return 1.0'
 
-**目标：** 创建语义缓存适配器实现（Layer 4 实现）
+v3 = [0.0, 1.0, 0.0]
+assert abs(cosine_similarity(v1, v3)) < 0.001, 'Orthogonal vectors should return ~0'
 
-- [ ] 5.1 创建 `src/infrastructure/storage/redis/semantic_cache_adapter.py`
-- [ ] 5.2 实现 `SemanticCachePort` 接口（继承L1CachePort + 语义方法）
-- [ ] 5.3 组合 `RedisL1CacheAdapter`：委托基础缓存操作
-- [ ] 5.4 实现纯Python余弦相似度计算（不使用numpy）
+print('cosine_similarity: OK')
 
----
-
-### Phase 6: 更新RedisMemoryCache（Layer 4 可选）
-
-**目标：** RedisMemoryCache可委托RedisL1CacheAdapter
-
-- [ ] 6.1 （可选）修改 `RedisMemoryCache` 组合 `RedisL1CacheAdapter`
-- [ ] 6.2 （可选）移除独立连接池管理：删除 `_get_pool()`
-- [ ] 6.3 保留现有接口兼容：`get`/`set`/`delete`/`invalidate_pattern`
-
-**注意：** `RedisMemoryCache` 已接受外部client，可直接传入 `RedisPoolProvider.get_client()`，无需强制改造。
-
----
-
-### Phase 7: 更新Messaging层Adapter
-
-**目标：** 改造EventPublisher/Subscriber使用共享连接池
-
-- [ ] 7.1 更新 `RedisEventPublisher`：接受外部redis_client，委托 `RedisPoolProvider`
-- [ ] 7.2 更新 `RedisEventSubscriber`：接受外部redis_client，委托 `RedisPoolProvider`
-- [ ] 7.3 移除自建ConnectionPool逻辑
-- [ ] 7.4 验证Pub/Sub功能正常
+# 验证实现接口
+adapter = RedisSemanticCacheAdapter.__new__(RedisSemanticCacheAdapter)
+assert isinstance(adapter, SemanticCachePort), 'Must implement SemanticCachePort'
+print('RedisSemanticCacheAdapter: OK')
+"
+```
 
 ---
 
-### Phase 8: 更新SessionStorage和PublicBlackboard
+### Phase 5: 更新RedisSessionStorage
 
-**目标：** 改造两个Adapter使用共享连接池
+**目标：** 改造SessionStorage使用共享连接池
 
-- [ ] 8.1 更新 `RedisSessionStorage`：接受外部redis_client
-- [ ] 8.2 更新 `RedisPublicBlackboard`：接受外部redis_client
-- [ ] 8.3 移除自建ConnectionPool逻辑
-- [ ] 8.4 验证存储功能正常
+- [ ] 5.1 修改 `RedisSessionStorage.__init__` 接受外部redis_client
+- [ ] 5.2 移除自建ConnectionPool逻辑：删除 `_get_pool()`/`_pool`/`_pool_lock`
+- [ ] 5.3 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 5.4 保留现有接口：`save`/`load`/`delete`/`exists`
+- [ ] 5.5 移除 `close()` 方法（连接池由Provider统一管理）
+
+**新增构造参数：**
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None):
+    self._redis = redis_client or RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
+# 验证接受redis_client参数
+import inspect
+sig = inspect.signature(RedisSessionStorage.__init__)
+params = list(sig.parameters.keys())
+assert 'redis_client' in params, 'Must accept redis_client parameter'
+print('RedisSessionStorage update: OK')
+"
+```
 
 ---
 
-### Phase 9: 更新composition_root
+### Phase 6: 更新RedisPublicBlackboard
 
-**目标：** 注册新端口和Provider初始化
+**目标：** 改造PublicBlackboard使用共享连接池
 
-- [ ] 9.1 添加 `RedisPoolProvider.init()` 到 `bootstrap()`
-- [ ] 9.2 添加 `shutdown()` 函数调用 `RedisPoolProvider.close_async()`
-- [ ] 9.3 更新 `semantic_cache` 端口实现为 `RedisSemanticCacheAdapter`
-- [ ] 9.4 更新 `l1_cache` 端口实现为 `RedisL1CacheAdapter`（可选）
+- [ ] 6.1 修改 `RedisPublicBlackboard.__init__` 接受外部redis_client
+- [ ] 6.2 移除自建ConnectionPool逻辑
+- [ ] 6.3 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 6.4 保留现有接口：`post`/`get`/`get_by_agent`/`get_latest`
+- [ ] 6.5 移除 `close()` 方法
+
+**新增构造参数：**
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None):
+    self._redis = redis_client or RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
+import inspect
+sig = inspect.signature(RedisPublicBlackboard.__init__)
+params = list(sig.parameters.keys())
+assert 'redis_client' in params, 'Must accept redis_client parameter'
+print('RedisPublicBlackboard update: OK')
+"
+```
+
+---
+
+### Phase 7: 更新RedisEventPublisher
+
+**目标：** 改造EventPublisher使用共享连接池
+
+- [ ] 7.1 修改 `RedisEventPublisher.__init__` 接受外部redis_client
+- [ ] 7.2 移除自建ConnectionPool逻辑
+- [ ] 7.3 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 7.4 保留现有接口：`publish`/`close`
+- [ ] 7.5 更新测试用例
+
+**新增构造参数：**
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None):
+    self._redis = redis_client or RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
+import inspect
+sig = inspect.signature(RedisEventPublisher.__init__)
+params = list(sig.parameters.keys())
+assert 'redis_client' in params, 'Must accept redis_client parameter'
+print('RedisEventPublisher update: OK')
+"
+```
+
+---
+
+### Phase 8: 更新RedisEventSubscriber
+
+**目标：** 改造EventSubscriber使用共享连接池
+
+- [ ] 8.1 修改 `RedisEventSubscriber.__init__` 接受外部redis_client
+- [ ] 8.2 移除自建ConnectionPool逻辑
+- [ ] 8.3 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 8.4 保留现有接口：`subscribe`/`start`/`close`
+- [ ] 8.5 更新测试用例
+
+**新增构造参数：**
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None):
+    self._redis = redis_client or RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
+import inspect
+sig = inspect.signature(RedisEventSubscriber.__init__)
+params = list(sig.parameters.keys())
+assert 'redis_client' in params, 'Must accept redis_client parameter'
+print('RedisEventSubscriber update: OK')
+"
+```
+
+---
+
+### Phase 9: 更新RedisSemanticCache（旧实现）
+
+**目标：** 改造旧RedisSemanticCache使用共享连接池（向后兼容）
+
+- [ ] 9.1 修改 `RedisSemanticCache.__init__` 接受外部redis_client
+- [ ] 9.2 移除自建ConnectionPool逻辑
+- [ ] 9.3 委托 `RedisPoolProvider.get_client()` 获取连接
+- [ ] 9.4 保留现有接口：`get`/`set`/`invalidate`/`close`
+- [ ] 9.5 最终删除此文件（当 RedisSemanticCacheAdapter 完全替代后）
+
+**新增构造参数：**
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None):
+    self._redis = redis_client or RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
+import inspect
+sig = inspect.signature(RedisSemanticCache.__init__)
+params = list(sig.parameters.keys())
+assert 'redis_client' in params, 'Must accept redis_client parameter'
+print('RedisSemanticCache update: OK')
+"
+```
+
+---
+
+### Phase 10: 更新composition_root
+
+**目标：** 注册新Provider初始化和shutdown hook
+
+- [ ] 10.1 添加 `RedisPoolProvider.init()` 到 `bootstrap()`
+- [ ] 10.2 添加 `shutdown()` 函数调用 `RedisPoolProvider.close_async()`
+- [ ] 10.3 更新所有 Adapter 的构造方式，使用共享连接池
 
 **新增注册：**
 ```python
@@ -984,58 +1137,236 @@ def shutdown() -> None:
     asyncio.run(RedisPoolProvider.close_async())
 ```
 
+**验证命令：**
+```bash
+poetry run python -c "
+from src.composition_root import bootstrap, shutdown
+print('composition_root update: OK')
+"
+```
+
 ---
 
-### Phase 10: 更新测试
+### Phase 11: 更新测试
 
-**目标：** 确保测试通过
+**目标：** 确保测试通过，覆盖率达标
 
-- [ ] 10.1 更新mock注入模式：适配器接受外部redis client
-- [ ] 10.2 添加Provider reset测试工具：`RedisPoolProvider.reset()`
-- [ ] 10.3 运行单元测试：`poetry run pytest tests/unit/infrastructure/storage/redis/ -v`
-- [ ] 10.4 运行集成测试：`poetry run pytest tests/integration/ -v`
-- [ ] 10.5 全量测试：`poetry run pytest tests/ -x -q`
+- [ ] 11.1 更新所有mock模式：适配器接受外部redis client
+- [ ] 11.2 添加Provider reset测试工具
+- [ ] 11.3 运行单元测试：`poetry run pytest tests/unit/infrastructure/storage/redis/ -v`
+- [ ] 11.4 运行单元测试：`poetry run pytest tests/unit/infrastructure/messaging/ -v`
+- [ ] 11.5 运行集成测试：`poetry run pytest tests/integration/ -v`
+- [ ] 11.6 全量测试：`poetry run pytest tests/ -x -q`
+- [ ] 11.7 覆盖率验证：`poetry run pytest --cov=src --cov-fail-under=80`
+
+---
+
+### Phase 12: 修复RedisConfig默认值矛盾
+
+**目标：** 统一 RedisConfig 默认值，解决配置矛盾
+
+- [ ] 12.1 检查 `src/infrastructure/config/redis.py` 中 `max_connections` 默认值
+- [ ] 12.2 统一为 `100`（与 from_env 保持一致）
+- [ ] 12.3 验证：类定义和 from_env 默认值一致
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.config.redis import RedisConfig
+
+# 检查类定义默认值
+import inspect
+sig = inspect.signature(RedisConfig.__init__)
+print(f'__init__ defaults: {sig}')
+
+# 检查 from_env 默认值
+config = RedisConfig()
+print(f'max_connections={config.max_connections}')
+assert config.max_connections == 100, 'Default should be 100'
+print('Phase 12: OK')
+"
+```
+
+---
+
+### Phase 13: 修复RetryChecker连接池配置缺失
+
+**目标：** 补全 RetryChecker 连接池配置
+
+- [ ] 13.1 修改 `src/infrastructure/messaging/retry/checker.py`
+- [ ] 13.2 添加 `max_connections` 和 `socket_timeout` 配置
+- [ ] 13.3 使用 `RedisConfig` 而非硬编码参数
+
+**新增修复代码：**
+```python
+# 替换原有的 ConnectionPool 创建
+self._pool = aioredis.ConnectionPool(
+    host=self._config.host,
+    port=self._config.port,
+    db=self._config.db,
+    password=self._config.password,
+    max_connections=self._config.max_connections,  # 新增
+    socket_timeout=self._config.socket_timeout,    # 新增
+    decode_responses=True,
+)
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.messaging.retry.checker import RetryChecker
+import inspect
+sig = inspect.signature(RetryChecker.__init__)
+print(f'RetryChecker params: {sig}')
+print('Phase 13: OK')
+"
+```
+
+---
+
+### Phase 14: 修复composition_root初始化
+
+**目标：** 在 composition_root 中正确初始化 Redis 连接
+
+- [ ] 14.1 在 `bootstrap()` 中初始化 `RedisPoolProvider`
+- [ ] 14.2 修改 `RedisMemoryCache` 注册，传入 redis_client
+- [ ] 14.3 添加 shutdown hook 清理连接池
+
+**新增代码：**
+```python
+# composition_root.py
+from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider
+
+def bootstrap() -> None:
+    # 初始化Redis连接池（新增）
+    from src.infrastructure.config.redis import RedisConfig
+    RedisPoolProvider.init(RedisConfig.from_env())
+
+    # 注册 l1_cache 端口时传入 redis_client（修复）
+    register_port(
+        name="l1_cache",
+        interface=L1CachePort,
+        impl=RedisMemoryCache,
+        factory=lambda: RedisMemoryCache(RedisPoolProvider.get_client()),
+    )
+
+def shutdown() -> None:
+    """应用关闭时调用，清理资源。"""
+    import asyncio
+    if RedisPoolProvider.is_initialized():
+        asyncio.run(RedisPoolProvider.close_async())
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.composition_root import bootstrap, shutdown
+print('composition_root: OK')
+"
+```
+
+---
+
+### Phase 15: 补充RedisSemanticCache接口声明
+
+**目标：** RedisSemanticCache 显式声明实现 SemanticCache 接口
+
+- [ ] 15.1 修改 `src/infrastructure/storage/redis/semantic_cache.py`
+- [ ] 15.2 添加 `implements SemanticCache` 声明
+- [ ] 15.3 验证类型检查通过
+
+**新增声明：**
+```python
+class RedisSemanticCache implements SemanticCache):  # 添加接口声明
+    """Redis 语义缓存。
+
+    实现 Story 1.4 定义的 SemanticCache 接口。
+    """
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
+from src.application.ports.semantic_cache import SemanticCache
+import inspect
+
+# 检查是否实现接口方法
+methods = ['get', 'set', 'invalidate']
+for m in methods:
+    assert hasattr(RedisSemanticCache, m), f'Missing method: {m}'
+print('RedisSemanticCache interface: OK')
+"
+```
 
 ---
 
 ## 五、接口变更汇总
 
-### 5.1 L1CachePort变更
+### 5.1 新增接口
 
-| 操作 | 方法 | 变更 |
+| 接口 | 文件 | 描述 |
 |------|------|------|
-| 修改 | `get(memory_type, owner_id, name)` | → `get(key: str)` |
-| 修改 | `set(memory_type, owner_id, name, content, ttl)` | → `set(key: str, value: str, ttl)` |
-| 修改 | `delete(memory_type, owner_id, name)` | → `delete(key: str)` |
-| 删除 | `invalidate_pattern(memory_type, owner_id)` | 移动到具体实现 |
+| `GenericCachePort` | `src/domain/ports/generic_cache.py` | 通用缓存抽象接口 |
+| `RedisGenericCacheAdapter` | `src/infrastructure/storage/redis/generic_cache_adapter.py` | 通用缓存Redis实现 |
 
-### 5.2 SemanticCachePort变更
+### 5.2 修改接口
 
-| 操作 | 方法 | 变更 |
-|------|------|------|
-| 继承 | - | 新增继承 `L1CachePort` |
-| 保留 | `get(query_embedding, threshold)` | → `get_by_embedding(query_embedding, threshold)` |
-| 保留 | `set(query_embedding, result, ttl)` | → `set_with_embedding(query_embedding, result, ttl)` |
-| 保留 | `invalidate(cache_key)` | 保留 |
+| 类 | 构造参数变更 | 说明 |
+|----|------------|------|
+| `RedisSessionStorage` | 新增 `redis_client` 参数 | 使用共享连接池 |
+| `RedisPublicBlackboard` | 新增 `redis_client` 参数 | 使用共享连接池 |
+| `RedisEventPublisher` | 新增 `redis_client` 参数 | 使用共享连接池 |
+| `RedisEventSubscriber` | 新增 `redis_client` 参数 | 使用共享连接池 |
+| `RedisSemanticCache` | 新增 `redis_client` 参数 | 使用共享连接池 |
+
+### 5.3 不变接口
+
+| 接口 | 说明 |
+|------|------|
+| `L1CachePort` | 保持专用接口不变，不通用化 |
+| `SemanticCache` (application层) | 保持独立接口，不继承任何缓存接口 |
+| `RedisMemoryCache` | 已支持外部client，无需改造 |
 
 ---
 
 ## 六、向后兼容性
 
-### 6.1 旧接口迁移
+### 6.1 迁移策略
 
-| 旧接口 | 新接口 | 迁移策略 |
+| 旧实现 | 新实现 | 迁移策略 |
 |--------|--------|----------|
-| `L1CachePort.get(memory_type, owner_id, name)` | `L1CachePort.get(key)` | 调用方需要组合key |
-| `RedisMemoryCache(config)` | `RedisMemoryCache(redis_client)` | 注入client或使用Provider |
+| `RedisSessionStorage(config)` | `RedisSessionStorage(redis_client)` | 渐进式迁移，config仍支持 |
+| `RedisPublicBlackboard(config)` | `RedisPublicBlackboard(redis_client)` | 渐进式迁移 |
+| `RedisEventPublisher(config)` | `RedisEventPublisher(redis_client)` | 渐进式迁移 |
+| `RedisEventSubscriber(config)` | `RedisEventSubscriber(redis_client)` | 渐进式迁移 |
+| `RedisSemanticCache(config)` | `RedisSemanticCache(redis_client)` | 迁移后删除 |
 
-### 6.2 影响范围
+### 6.2 渐进式迁移方案
+
+**第一步：** 所有Adapter增加 `redis_client` 可选参数
+```python
+def __init__(self, redis_client: aioredis.Redis | None = None, config: RedisConfig | None = None):
+    if redis_client:
+        self._redis = redis_client
+    elif config:
+        self._redis = aioredis.Redis(connection_pool=self._get_pool(config))
+    else:
+        self._redis = RedisPoolProvider.get_client()
+```
+
+**第二步：** 调用方逐步切换到注入 redis_client
+
+**第三步：** 移除 config 参数和自建连接池逻辑
+
+### 6.3 影响范围
 
 | 组件 | 影响 | 迁移工作 |
 |------|------|----------|
-| `RedisMemoryCache` 调用方 | 低 | key组合逻辑移到调用方 |
-| `SemanticCache` 调用方 | 中 | 方法名变更 get→get_by_embedding |
 | composition_root | 中 | 新增Provider初始化 |
+| SessionStorage 调用方 | 中 | 构造参数变更 |
+| PublicBlackboard 调用方 | 中 | 构造参数变更 |
+| EventPublisher/Subscriber 调用方 | 中 | 构造参数变更 |
 | 测试代码 | 中 | mock模式调整 |
 
 ---
@@ -1044,10 +1375,11 @@ def shutdown() -> None:
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
-| 接口变更破坏现有调用 | 高 | 渐进式变更，先保证向后兼容 |
-| 连接池未初始化 | 高 | Provider抛出RuntimeError |
+| 并发初始化竞争 | 高 | RedisPoolProvider 使用双重检查锁定 |
+| 旧代码不兼容 | 中 | 渐进式迁移，保留config参数 |
 | 测试mock失效 | 中 | 所有Adapter支持外部注入 |
 | 并发连接数超限 | 低 | max_connections=100满足需求 |
+| 向后兼容性破坏 | 高 | Phase验证通过后才进入下一阶段 |
 
 ---
 
@@ -1056,16 +1388,19 @@ def shutdown() -> None:
 | Phase | 验证项 | 命令 |
 |-------|--------|------|
 | 1 | Provider单例正常 | `python -c "from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider; p1 = RedisPoolProvider(); p2 = RedisPoolProvider(); assert p1 is p2"` |
+| 1 | Provider线程安全 | 并发调用 `init()` 无竞争 |
 | 1 | Provider可初始化 | `RedisPoolProvider.init()` → `get_client()` |
-| 2 | L1CachePort通用接口 | `poetry run python -c "from src.domain.ports.l1_cache import L1CachePort; print('OK')"` |
-| 3 | RedisL1CacheAdapter实现 | `hasattr(RedisL1CacheAdapter, 'get') and hasattr(RedisL1CacheAdapter, 'set')` |
-| 4 | SemanticCachePort继承 | `issubclass(SemanticCachePort, L1CachePort)` |
-| 5 | RedisSemanticCacheAdapter实现 | `isinstance(adapter, SemanticCachePort)` |
-| 6 | RedisMemoryCache委托（可选） | `hasattr(RedisMemoryCache, '_base')` |
-| 7 | Messaging层改造 | RedisEventPublisher/Subscriber接受redis_client |
-| 8 | SessionStorage/PublicBlackboard改造 | 接受redis_client |
-| 9 | bootstrap/shutdown | `from src.composition_root import bootstrap; bootstrap()` |
-| 10 | 全量测试 | `poetry run pytest tests/ -x -q` |
+| 2 | GenericCachePort定义 | `from src.domain.ports.generic_cache import GenericCachePort; print('OK')` |
+| 3 | RedisGenericCacheAdapter实现 | `hasattr(RedisGenericCacheAdapter, 'get')` |
+| 4 | RedisSemanticCacheAdapter实现 | `isinstance(adapter, SemanticCachePort)` |
+| 5 | RedisSessionStorage改造 | `redis_client` 参数存在 |
+| 6 | RedisPublicBlackboard改造 | `redis_client` 参数存在 |
+| 7 | RedisEventPublisher改造 | `redis_client` 参数存在 |
+| 8 | RedisEventSubscriber改造 | `redis_client` 参数存在 |
+| 9 | RedisSemanticCache（旧）改造 | `redis_client` 参数存在 |
+| 10 | bootstrap/shutdown | `from src.composition_root import bootstrap; bootstrap()` |
+| 11 | 全量测试 | `poetry run pytest tests/ -x -q` |
+| 11 | 覆盖率达标 | `poetry run pytest --cov=src --cov-fail-under=80` |
 
 ---
 
@@ -1076,7 +1411,7 @@ def shutdown() -> None:
 | ConnectionPool数量 | 6个独立 | 1个共享 |
 | 最大连接数 | 6 × 10 = 60 | 100 |
 | 代码重复 | 6处连接池管理 | 0处 |
-| 接口层次 | 扁平，无继承 | 四层分层继承 |
+| 接口层次 | 扁平，无继承 | 六边形分层 |
 | 可测试性 | 中 | 高（支持外部注入） |
 | 可扩展性 | 低 | 高（可替换缓存技术） |
 
@@ -1088,22 +1423,20 @@ def shutdown() -> None:
 
 | 文件路径 | 职责 | Layer |
 |----------|------|-------|
-| `src/infrastructure/storage/redis/pool_provider.py` | Redis连接池单例 | Layer 3 |
-| `src/infrastructure/storage/redis/l1_cache_adapter.py` | RedisL1CacheAdapter实现 | Layer 3 |
-| `src/infrastructure/storage/redis/semantic_cache_adapter.py` | RedisSemanticCacheAdapter实现 | Layer 4 |
+| `src/domain/ports/generic_cache.py` | GenericCachePort定义 | Domain |
+| `src/infrastructure/storage/redis/pool_provider.py` | RedisPoolProvider实现 | Infrastructure |
+| `src/infrastructure/storage/redis/generic_cache_adapter.py` | RedisGenericCacheAdapter实现 | Infrastructure |
+| `src/infrastructure/storage/redis/semantic_cache_adapter.py` | RedisSemanticCacheAdapter实现 | Infrastructure |
 
 ### 修改文件
 
-| 文件路径 | 变更 | Layer |
-|----------|------|-------|
-| `src/domain/ports/l1_cache.py` | 重构为通用接口 | Layer 1 |
-| `src/application/ports/semantic_cache.py` | 继承L1CachePort | Layer 2 |
-| `src/infrastructure/storage/redis/redis_memory_cache.py` | 委托RedisL1CacheAdapter（可选） | Layer 4 |
-| `src/infrastructure/storage/redis/semantic_cache.py` | 重命名为legacy，保留兼容 | - |
-| `src/infrastructure/storage/redis/session_storage.py` | 接受外部redis_client | Layer 4 |
-| `src/infrastructure/storage/redis/public_blackboard.py` | 接受外部redis_client | Layer 4 |
-| `src/infrastructure/messaging/redis_publisher.py` | 接受外部redis_client | Layer 4 |
-| `src/infrastructure/messaging/redis_subscriber.py` | 接受外部redis_client | Layer 4 |
+| 文件路径 | 变更 | 说明 |
+|----------|------|------|
+| `src/infrastructure/storage/redis/session_storage.py` | 接受外部redis_client | 使用共享连接池 |
+| `src/infrastructure/storage/redis/public_blackboard.py` | 接受外部redis_client | 使用共享连接池 |
+| `src/infrastructure/messaging/redis_publisher.py` | 接受外部redis_client | 使用共享连接池 |
+| `src/infrastructure/messaging/redis_subscriber.py` | 接受外部redis_client | 使用共享连接池 |
+| `src/infrastructure/storage/redis/semantic_cache.py` | 接受外部redis_client | 临时兼容，最终删除 |
 | `src/composition_root.py` | 添加Provider初始化和shutdown hook | Bootstrap |
 
 ### 删除文件（重构完成后）
@@ -1117,19 +1450,24 @@ def shutdown() -> None:
 ## 执行进度总览
 
 ```
-[ ] Phase 1: RedisPoolProvider
-[x] Phase 2: L1CachePort重构
-[x] Phase 3: RedisL1CacheAdapter
-[x] Phase 4: SemanticCachePort重构
-[x] Phase 5: RedisSemanticCacheAdapter
-[ ] Phase 6: RedisMemoryCache（可选）
-[ ] Phase 7: Messaging层Adapter
-[ ] Phase 8: SessionStorage/PublicBlackboard
-[ ] Phase 9: composition_root
-[ ] Phase 10: 测试更新
+[ ] Phase 1: RedisPoolProvider（线程安全单例）
+[ ] Phase 2: GenericCachePort（新增通用缓存抽象）
+[ ] Phase 3: RedisGenericCacheAdapter
+[ ] Phase 4: RedisSemanticCacheAdapter
+[ ] Phase 5: RedisSessionStorage（共享连接池）
+[ ] Phase 6: RedisPublicBlackboard（共享连接池）
+[ ] Phase 7: RedisEventPublisher（共享连接池）
+[ ] Phase 8: RedisEventSubscriber（共享连接池）
+[ ] Phase 9: RedisSemanticCache旧版（共享连接池）
+[ ] Phase 10: composition_root（Bootstrap更新）
+[ ] Phase 11: 测试更新（全量验证）
+[ ] Phase 12: 修复RedisConfig默认值矛盾
+[ ] Phase 13: 修复RetryChecker连接池配置缺失
+[ ] Phase 14: 修复composition_root初始化
+[ ] Phase 15: 补充RedisSemanticCache接口声明
 ```
 
 ---
 
-*文档版本: v2.0*
-*重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*
+*文档版本: v3.1*
+*重构目标: 建立六边形架构分层，统一连接池管理，线程安全单例，渐进式迁移，修复配置矛盾*
