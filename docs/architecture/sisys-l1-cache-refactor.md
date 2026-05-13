@@ -1,9 +1,9 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v2.2
+**版本:** v2.3
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 第1轮审查修订
+**审查状态:** 第3轮审查修订
 
 ---
 
@@ -21,6 +21,9 @@
 | Layer 2 MemoryCachePort不存在 | P0 | 实际代码中不存在此接口 |
 | SemanticCache未继承L1CachePort | P0 | 确认问题存在，规划Phase 4修复 |
 | SessionStorage不应继承L1CachePort | P1 | 语义不同，会话管理vs键值缓存，保持独立 |
+| Phase 1/3/5文件不存在 | P0 | pool_provider.py/l1_cache_adapter.py/semantic_cache_adapter.py 均不存在 |
+| Phase 2/4未完成 | P0 | L1CachePort仍是专用接口，SemanticCache未继承L1CachePort |
+| 接口变更影响12+处调用 | P0 | unified_storage_gateway.py等业务代码直接调用旧接口 |
 
 ---
 
@@ -1131,11 +1134,11 @@ def shutdown() -> None:
 ## 执行进度总览
 
 ```
-[ ] Phase 1: RedisPoolProvider
-[x] Phase 2: L1CachePort重构
-[x] Phase 3: RedisL1CacheAdapter
-[x] Phase 4: SemanticCachePort重构
-[x] Phase 5: RedisSemanticCacheAdapter
+[ ] Phase 1: RedisPoolProvider ⚠️ P0 文件不存在
+[ ] Phase 2: L1CachePort重构 ⚠️ P0 仍是memory_type/owner_id/name专用接口
+[ ] Phase 3: RedisL1CacheAdapter ⚠️ P0 文件不存在
+[ ] Phase 4: SemanticCachePort重构 ⚠️ P0 未继承L1CachePort，方法名未改
+[ ] Phase 5: RedisSemanticCacheAdapter ⚠️ P0 文件不存在
 [ ] Phase 6: RedisMemoryCache（可选）
 [ ] Phase 7: Messaging层Adapter
 [ ] Phase 8: SessionStorage/PublicBlackboard
