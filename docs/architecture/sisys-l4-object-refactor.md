@@ -1,6 +1,6 @@
 # SISYS L4 对象存储层重构详细设计
 
-**版本：** v1.4.0
+**版本：** v1.5.0
 **日期：** 2026-05-13
 **状态：** 设计完成（代码未执行，需重新审查）
 **架构师：** Claude Code
@@ -1379,11 +1379,10 @@ if content is not None:
 | R4: archive content 参数语义不清导致运行时错误 | 高 | 高 | content 被静默丢弃会导致数据丢失，必须实现 NotImplementedError | ⚠️ 维持高风险 |
 | R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | 显式声明继承方法可解决 | ✅ 风险可控 |
 | R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
-| **R10: WORM GOVERNANCE 模式违反 SOX 合规** | **高** | **极高** | **GOVERNANCE 模式特权用户可绕过锁定删除合规证据，违反 SOX 不可篡改要求** | **⚠️ P0 合规性违规** |
-| R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
 | R7: WORMManager.archive_object() 返回值恒 True | 低 | 高 | archive_object 应返回 stat_object.etag 而非固定 True | ⚠️ 待修复 |
 | R8: Acceptance 测试绕过 MinIOAdapter | 中 | 高 | 适配器层错误无法被发现，应直接测试适配器 | ⚠️ 需修复测试 |
 | R9: DocumentStoragePort/MinIODocumentStorage 文件缺失 | 高 | 中 | Phase 3/4 执行后风险消除 | ⚠️ 待执行 |
+| **R10: WORM GOVERNANCE 模式违反 SOX 合规** | **高** | **极高** | **GOVERNANCE 模式特权用户可绕过锁定删除合规证据，违反 SOX 不可篡改要求** | **⚠️ P0 合规性违规** |
 
 **关键发现（Round 3 审查）：**
 - `ObjectStorageRepository` 未在 `__init__.py` 导出，不是公开 API
@@ -1494,3 +1493,4 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 | 1.2.0 | 2026-05-13 | - | 代码审查更新：确认 P0 问题实际未执行，更新文档状态 |
 | 1.3.0 | 2026-05-13 | - | Round 1-5 审查完成：补充架构一致性分析、测试覆盖缺陷、风险重评估、相位编号修正 |
 | 1.4.0 | 2026-05-13 | - | Round 6-8 审查完成：WORMManager 实现问题、测试覆盖深化、委托矩阵分析、重复条目清理 |
+| 1.5.0 | 2026-05-13 | - | Round 1-5 新批审查：P0-4 WORM GOVERNANCE 合规违规、Phase 0 新增、DI 注册、测试兼容性修复、跨文档一致性分析 |
