@@ -1,10 +1,10 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.6.0
+**版本：** 1.7.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
-**审查状态：** 第5轮审查完成（全部修正已应用）
+**审查状态：** 第6轮审查完成
 
 ---
 
@@ -23,6 +23,7 @@
 | R-7 | UserModel 与 User 实体字段不一致 | 需领域层与基础设施层对齐（见 §1.6） |
 | R-8 | architecture.md 与本文档不一致 | 明确两文档定位：前者宏观架构，后者详细设计 |
 | R-9 | L2RdbPort 重构价值明确 | 既能提供统一契约约束（强制一致性），又为未来复用扩展提供良好基础 |
+| R-10 | PostgreSQLUnitOfWork 适配四层模型 | Layer3 设计目标为 PostgreSqlRdbAdapter，当前由 PostgreSQLUnitOfWork 承担事务管理职责，未来可演进为 Adapter |
 
 ### 0.1 业界最佳实践对照
 
@@ -122,7 +123,7 @@ src/infrastructure/storage/postgresql/
 ├── repository/
 │   ├── base_repository.py # BaseRepository（基础设施层 CRUD 基类）✅ 已实现
 │   ├── user_repository.py      # UserRepository(BaseRepository) ❌ 未实现 UserRepositoryPort
-│   ├── role_repository.py      # RoleRepository(BaseRepository) ❌ 未实现 RoleRepositoryPort
+│   ├── role_repository.py      # RoleRepository(RoleRepositoryPort) ✅ 已实现 RoleRepositoryPort
 │   └── memory_metadata_repository.py  # PostgreSQLMemoryMetadataRepository ✅ 已实现 L2MetadataRepositoryPort
 ```
 
@@ -147,12 +148,12 @@ src/infrastructure/storage/postgresql/
 | `BaseRepository` | repository/base_repository.py | Generic[T] | 无 | ✅ 已有 |
 | `UserRepository` | repository/user_repository.py | BaseRepository | ⚠️ 未声明实现 UserRepositoryPort | ⚠️ 需修复 |
 | `RoleRepository` | repository/role_repository.py | RoleRepositoryPort | ✅ RoleRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | 无 | L2MetadataRepositoryPort | ✅ 已实现 |
-| `LoginAttemptRepository` | repository/login_attempt_repository.py | 无 | LoginAttemptRepositoryPort | ✅ 已实现 |
-| `UserRoleRepository` | repository/user_role_repository.py | 无 | UserRoleRepositoryPort | ✅ 已实现 |
-| `AuditRepository` | infrastructure/security/ | 无 | AuditRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryChangeHistoryRepository` | repository/memory_change_history_repository.py | 无 | L2ChangeHistoryRepositoryPort | ✅ 已实现 |
-| `PostgreSQLMemoryGroupMemberRepository` | repository/memory_group_member_repository.py | 无 | L2GroupMemberRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | L2MetadataRepositoryPort | ✅ L2MetadataRepositoryPort | ✅ 已实现 |
+| `LoginAttemptRepository` | repository/login_attempt_repository.py | LoginAttemptRepositoryPort | ✅ LoginAttemptRepositoryPort | ✅ 已实现 |
+| `UserRoleRepository` | repository/user_role_repository.py | UserRoleRepositoryPort | ✅ UserRoleRepositoryPort | ✅ 已实现 |
+| `AuditRepository` | infrastructure/security/ | AuditRepositoryPort | ✅ AuditRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryChangeHistoryRepository` | repository/memory_change_history_repository.py | L2ChangeHistoryRepositoryPort | ✅ L2ChangeHistoryRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryGroupMemberRepository` | repository/memory_group_member_repository.py | L2GroupMemberRepositoryPort | ✅ L2GroupMemberRepositoryPort | ✅ 已实现 |
 | `PostgreSQLUnitOfWork` | infrastructure/messaging/unit_of_work/ | UnitOfWork | ✅ UnitOfWork | ✅ 已实现 |
 
 ### 1.5 关键发现：设计与实现脱节
@@ -169,8 +170,8 @@ src/infrastructure/storage/postgresql/
 
 | 模型 | email | 密码字段 | 锁定机制 |
 |------|-------|---------|---------|
-| User (domain) | ❌ 无 | `password_hash` | `failed_login_attempts`, `locked_until` |
-| UserModel (infrastructure) | ✅ 有 | `hashed_password` | ❌ 无 |
+| User (domain) | ❌ 无 | `password_hash` (必填) | `is_locked`, `failed_login_attempts`, `locked_until` |
+| UserModel (infrastructure) | ✅ 有 | `hashed_password` (可空) | `is_locked`（缺 `failed_login_attempts`/`locked_until`） |
 
 **需决策**：方案A添加email到User实体（需评估领域层零依赖），方案B移除UserModel的email
 
@@ -283,8 +284,8 @@ src/infrastructure/storage/postgresql/
 ```
 
 **关键原则**：
-- `L2RdbPort.execute_in_transaction()` 仅作为基础设施内部使用
 - 业务事务边界由 **应用层/UseCase** 控制
+- `execute_in_transaction` 是 `PostgreSqlRdbAdapter` 的方法（Layer3），不属于 `L2RdbPort`
 - 遵循 DDD "事务脚本 vs 领域模型" 原则
 
 ### 2.4 业界参考实现
@@ -367,13 +368,11 @@ class L2RdbPort(Protocol):
     async def save(self, entity: Any) -> Any: ...
     async def delete(self, id: UUID) -> bool: ...
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[Any]: ...
-    async def execute_in_transaction(self, func: Callable, *args, **kwargs) -> Any: ...
 
 # Layer 2: Domain 具体应用端口
 class UserRepositoryPort(L2RdbPort, Protocol):
     """用户仓储接口 - 继承 L2RdbPort"""
     async def get_by_username(self, username: str) -> User | None: ...
-    async def get_by_email(self, email: str) -> User | None: ...
 
 class RoleRepositoryPort(L2RdbPort, Protocol):
     """角色仓储接口 - 继承 L2RdbPort"""
@@ -417,7 +416,7 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
 | | `DatabaseEngine` (连接管理) | `DatabaseEngine` (连接管理) |
 | **Layer 4** | `RedisSemanticCacheAdapter` | `PostgreSQLUserRepository` |
 
-**注**：PostgreSqlRdbAdapter 是文档定义的重构目标，当前系统使用 PostgreSQLUnitOfWork 管理事务。
+**注**：PostgreSqlRdbAdapter 是 Layer3 的设计目标。当前系统使用 PostgreSQLUnitOfWork 管理事务，未来可演进为 PostgreSqlRdbAdapter 统一适配器。
 
 ---
 
@@ -488,7 +487,7 @@ class L2RdbPort(Protocol):
     设计原则：
     - 领域层零外部依赖（仅用 Protocol + typing）
     - 通用 CRUD 操作统一定义
-    - 事务由 PostgreSqlRdbAdapter 提供，不在此接口暴露
+    - 事务管理由 Layer3（PostgreSqlRdbAdapter/PostgreSQLUnitOfWork）提供，不在此接口暴露
     """
 
     # === 通用 CRUD ===
@@ -556,20 +555,13 @@ T = TypeVar("T")
 class L2RdbPort(Protocol):
     """统一 RDB 存储抽象基类。
 
-    所有具体应用端口应继承此基类，获得通用 CRUD 和事务支持。
+    所有具体应用端口应继承此基类，获得通用 CRUD 契约。
     """
 
     async def get_by_id(self, id: UUID) -> T | None: ...
     async def save(self, entity: T) -> T: ...
     async def delete(self, id: UUID) -> bool: ...
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[T]: ...
-
-    async def execute_in_transaction(
-        self,
-        func: Callable[..., Any],
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any: ...
 
 
 # ============================================================================
@@ -629,6 +621,7 @@ class UserRepositoryPort(L2RdbPort, Protocol):
 
     # === 专用查询 ===
     async def get_by_username(self, username: str) -> User | None: ...
+```
 
 **注意**：`get_by_email` 方法已移除，因为 User 实体不包含 email 字段。
 
