@@ -77,19 +77,19 @@
     <text x="92" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
 
     <rect x="174" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="246" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🤖 Agent · 🔧 Tool</text>
-    <text x="246" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
+    <text x="246" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🤖 Agents · 🔧 Tools</text>
+    <text x="246" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="328" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="400" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📋 Plan · Checkpoint</text>
-    <text x="400" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Plan Entities</text>
+    <text x="400" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📋 Plan · BLM · BEM</text>
+    <text x="400" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="482" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="554" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📊 Archive · RoutingLog</text>
-    <text x="554" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Archive / Log</text>
+    <text x="554" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📊 Archive · Checkpoint</text>
+    <text x="554" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="636" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Eval · Plan</text>
+    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Agent · Plan</text>
     <text x="708" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
   </g>
 
@@ -103,7 +103,7 @@
 
     <rect x="20" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
     <text x="45" y="77" text-anchor="middle" font-size="9" fill="#4a4a4a">📁 L0</text>
-    <text x="45" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">MEMORY</text>
+    <text x="45" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">FS</text>
 
     <rect x="80" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
     <text x="105" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">⚡ L1</text>
