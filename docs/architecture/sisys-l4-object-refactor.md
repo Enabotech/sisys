@@ -34,10 +34,14 @@
 | P0-3 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 修改返回类型为 `str` | ❌ 未执行 |
 
 **代码执行状态：**
-- ⚠️ `MinIOAdapter.archive()` 仍透传 content 参数，会导致 TypeError
+- ⚠️ `MinIOAdapter.archive()` 仍透传 content 参数，content 被静默丢弃
 - ⚠️ `MinIOAdapter.list_objects()` 方法缺失
 - ⚠️ `MinIORepository` 仍实现 `ObjectStorageRepository`，未迁移到 `L4ObjectPort`
 - ⚠️ `DocumentStoragePort` 和 `MinIODocumentStorage` 文件不存在
+- ⚠️ `AuditServiceImpl` 绕过 Repository/Adapter 层直接调用 WORMManager（架构违规）
+- ⚠️ `UnifiedStorageGateway` 注入 `L4ObjectPort` 但从未使用（`self._l4` 是死代码）
+- ⚠️ `MinIORepository._list_objects_via_client` 访问 `BucketManager._client` 私有属性
+- ⚠️ 验收测试所有 16 个 then 步骤为空 `pass`，无实质断言
 
 ---
 
@@ -219,7 +223,39 @@ def archive_object(self, bucket_name, object_key, retention_days) -> str:
 | archive | ❌ **content 参数丢失** | ❌ 无 content | ❌ **content 未传递** | ❌ **返回 bool** |
 | list_objects | ✅ 有定义 | ✅ 匹配 | ❌ **缺失实现** | ✅ 已实现 |
 
-#### 1.7.2 委托链问题汇总
+#### 1.9.2 调用链与架构违规（Round 5 新增）
+
+**调用链 A：UnifiedStorageGateway → L4ObjectPort → MinIOAdapter → MinIORepository**
+```
+UnifiedStorageGateway.__init__(l4_object: L4ObjectPort | None)
+    → self._l4 = l4_object  # 注入但从未使用！
+MinIOAdapter(L4ObjectPort)
+    → store/retrieve/delete/get_metadata: 正确委托
+    → archive: content 被丢弃, cast(bool→str)
+    → list_objects: 方法缺失
+MinIORepository(ObjectStorageRepository)  # 继承错误
+    → archive: 返回 bool, 无 content 参数
+```
+
+**调用链 B：AuditServiceImpl → WORMManager（绕过 Repository/Adapter 层）**
+```
+AuditServiceImpl.archive(older_than_days)
+    → self._worm_manager.archive_object(
+        bucket_name="sisys-audit-archives",  # 硬编码 bucket 名
+        object_key=f"audit/{log_id}/...",
+        retention_days=2555
+      )
+    → 同步调用阻塞事件循环
+    → except Exception: pass  # 异常静默吞掉
+```
+
+**架构违规分析：**
+1. `AuditServiceImpl` 绕过 Port/Adapter 层直接操作 WORMManager — 违反六边形架构
+2. 硬编码 `bucket_name="sisys-audit-archives"` 不符合 `{prefix}-{type}-{tenant_id}` 命名规范
+3. `worm_manager.archive_object()` 是同步方法，在 async 函数中同步调用阻塞事件循环
+4. `UnifiedStorageGateway` 注入 `L4ObjectPort` 但 `self._l4` 在任何业务方法中未被引用
+
+#### 1.9.3 委托链问题汇总
 
 ```
 L4ObjectPort (Protocol)
@@ -235,7 +271,7 @@ BucketManager / ObjectOperations / WORMManager
 1. `archive`: MinIOAdapter 接收 content 但丢弃，MinIORepository 返回 bool 而非 str
 2. `list_objects`: MinIOAdapter 完全缺失该方法，破坏 L4ObjectPort 协议完整性
 
-#### 1.7.3 验收测试覆盖分析
+#### 1.9.4 验收测试覆盖分析
 
 | L4ObjectPort 方法 | 单元测试 | Acceptance 测试 | 覆盖评估 |
 |-------------------|---------|----------------|---------|
@@ -246,7 +282,10 @@ BucketManager / ObjectOperations / WORMManager
 | archive | ✅ | AC-4, AC-8 | ⚠️ 流程存在但无验证 |
 | list_objects | ❌ | **无** | ❌ 完全未覆盖 |
 
-**AC-5/6/7 空实现问题：** 分片上传、断点续传、生命周期规则测试只有 `pass`，里程碑测试未完成。
+**验收测试严重缺陷（Round 5 确认）：**
+- `test_story_1_7_steps.py` 所有 16 个 `then` 步骤为空 `pass`，无实质断言
+- AC-5/6/7 分片上传、断点续传、生命周期测试只有 `pass`
+- `test_archive_with_content` 未验证 content 参数是否传递到 repository
 
 ### 1.10 两个 archive 接口并存的架构问题（Round 3 新增）
 
