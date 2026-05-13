@@ -1245,9 +1245,6 @@ if content is not None:
 - `unified_storage_gateway.py` 使用 `L4ObjectPort`，与 `ObjectStorageRepository` 解耦
 - 所有 archive 调用方都不依赖 bool 返回值
 - src/ 下无任何代码调用 `MinIOAdapter.list_objects()`
-| R3: list_objects 签名变更破坏调用方 | 中 | 中 | Phase 2.3 更新所有调用，Phase 7 集成测试覆盖 |
-| R4: archive content 参数语义不清导致运行时错误 | 低 | 高 | Phase 2.1 明确语义约束，文档说明 |
-| R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | Phase 4.4 显式声明继承方法 |
 
 ---
 
