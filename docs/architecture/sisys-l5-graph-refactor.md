@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.8
+**版本:** v3.0
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.8 第4轮审查，基于全面代码调研）
+**状态:** 设计完成（v3.0 五轮审查完成，含未修复P0清单和系统性不一致记录）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -79,6 +79,19 @@
 - **P2-NEW**: `batch_create_memory_entities` 串行await循环（性能不佳）
 - **P2-NEW**: §5.3 `cast` 导入未使用（冗余导入）
 - **P2-NEW**: §6.1 `l5_graph.py` 标为"修改"但实际是接口重写（低估变更风险）
+
+**Changelog v3.0 (第5轮最终验证 - 3Agent并行调研):**
+- **P0-UNFIXED**: `conftest.py` 集成测试参数不匹配 — 无修复方案
+- **P0-UNFIXED**: `MemoryChangedHandler` L5 TODO存根 — 无修复方案
+- **P0-UNFIXED**: `get_neighbors` §5和§8中Cypher均缺少`[]`中括号 — 两处代码都有错误
+- **P0-UNFIXED**: `MemoryGraphPort` §4.2和§8 Step 1.2均缺少L5GraphPort导入 — NameError
+- **P0-UNFIXED**: `BaseGraphAdapter` §6.1清单和§6.3导出均遗漏
+- **P1-SYSTEMIC**: §3-§5设计代码与§8执行步骤代码13处HIGH级不一致（执行者无法确定以哪版为准）
+- **P1-SYSTEMIC**: §0.5双轨制迁移策略在§8执行步骤中完全消失（策略与执行矛盾）
+- **P1-SYSTEMIC**: `edge_type` vs `rel_type` 在§3-§5和§8中系统性不一致
+- **P1-SYSTEMIC**: `graph_storage.py` vs `neo4j_graph_storage.py` 路径贯穿全文混淆
+- **P1-COMPAT**: `get_async_driver()` async改造影响12个调用位置（需级联await）
+- **P1-COMPAT**: `Neo4jConfig` 缺少 `max_connection_lifetime` 字段（TypeError）
 
 ---
 
