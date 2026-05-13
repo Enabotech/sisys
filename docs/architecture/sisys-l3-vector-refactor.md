@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v7.0
+**版本:** v8.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -131,7 +131,8 @@ Infrastructure Layer
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 4: Infrastructure - QdrantSemanticCacheStore             │
 │                                                                  │
-│  职责：实现 SemanticCachePort，使用 QdrantL3VectorStore          │
+│  职责：实现 SemanticCachePort，使用 QdrantL3VectorStore + Redis   │
+│       （双层架构：Qdrant 负责向量检索，Redis 负责内容缓存）       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -255,8 +256,8 @@ async def create_collection(
 定义语义缓存能力，用于 RAG 检索加速（Story 1.4 Epic 3）。
 
 设计原则：
-- 语义相似度缓存（SIMILARITY_THRESHOLD = 0.9）
-- TTL = 24h
+- 语义相似度缓存（SIMILARITY_THRESHOLD = 0.95）
+- TTL = 1h（3600s）
 - query embedding 哈希作为 cache key
 - 不继承 L3VectorPort（Redis 实现无法满足向量检索契约）
 
@@ -971,6 +972,7 @@ def test_backward_compatibility():
 | v5.0 | 2026-05-13 | **第二轮5轮审查完成** | 发现设计文档内部矛盾：SemanticVectorPort(L3VectorPort, ...) 是歧义；发现 Redis 连接池问题；确认 P0 修复依赖关系 |
 | v6.0 | 2026-05-13 | **语义缓存工作流程评审** | 确认 Qdrant+Redis 分离式设计合理；发现一致性风险；TTL 不一致；缺少 invalidate_by_embedding |
 | v7.0 | 2026-05-13 | **§3.2.2 重写为双层设计** | 修正与 §九 的架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding；添加 Redis 依赖 |
+| v8.0 | 2026-05-13 | **第3轮审查残留修正** | 更新 §2.1 Layer 4 描述；修正 §3.1.2 过时注释；更新 §九 问题表格；标记 Redis 依赖注入缺失 |
 
 ---
 
@@ -1002,8 +1004,8 @@ def test_backward_compatibility():
 |------|---------|------|
 | **QdrantSemanticCacheStore 不存在** | 高 | 设计文档中的实现未创建 |
 | **score_threshold 参数不支持** | 中 | `QdrantVectorStorage.search()` 签名无此参数，需后过滤 |
-| **TTL 不一致** | 中 | 工作流: 3600s，设计文档: 86400s |
-| **缺少 invalidate_by_embedding** | 中 | 调用方只有 embedding 无法失效缓存 |
+| **缺少 invalidate_by_embedding** | 中 | 调用方只有 embedding 无法失效缓存（v7.0 已添加） |
+| **Redis 依赖注入缺失** | 中 | §3.4 composition_root 未展示 redis_client 如何注入 |
 
 ### 9.4 一致性风险
 
@@ -1069,13 +1071,12 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v7.0 已完成第三轮第2轮审查
+**文档状态**: v8.0 已完成第3轮审查残留修正
 **审查摘要**:
-- 修正 §3.2.2 与 §九 的核心矛盾：统一为 Qdrant+Redis 双层设计
-- TTL 统一为 3600s（1小时）
-- 添加 invalidate_by_embedding 方法
-- QdrantSemanticCacheStore 构造函数增加 Redis 依赖
-- payload 结构修正：仅存 cache_key + 降级数据源
+- 修正 §2.1 Layer 4 描述：添加 "+ Redis"
+- 修正 §3.1.2 过时文档注释：threshold=0.95, TTL=3600s
+- 更新 §九 问题表格：移除已修正的 TTL 不一致，添加 Redis 依赖注入缺失
+- P0 问题状态：6个全部未修复
 
 **下一步**: 执行 P0 问题的实际代码实现
 **关键设计澄清**: `SemanticCachePort` 使用**组合关系**调用 `L3VectorPort`，不是继承关系
