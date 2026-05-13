@@ -112,11 +112,11 @@ Infrastructure Layer
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Domain Layer - SemanticCachePort（独立应用接口）        │
+│  Layer 2: Domain Layer - SemanticVectorPort                      │
 │                                                                  │
-│  职责：定义语义缓存能力（不继承 L3VectorPort）                    │
+│  职责：Qdrant 负责向量存储与语义检索，Redis 负责缓存实际响应内容（带 TTL 管理）│
 │  位置：src/domain/ports/                                         │
-│  注意：SemanticCachePort 独立于 L3VectorPort（架构约束）          │
+│  端口：SemanticVectorPort(L3VectorPort, ...)                      │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
