@@ -2052,148 +2052,1534 @@ class TestMemoryGraphAdapterEntity:
 
 ---
 
-## 8. 执行步骤
+## 8. 执行步骤（含状态跟踪）
 
-### Phase 1: Domain 层重构（不破坏现有代码）
+### 执行状态总览
 
-**Step 1.1**: 创建 `src/domain/ports/memory_graph.py`
+| Phase | 状态 | P0修复 | P1修复 | P2修复 |
+|-------|------|--------|--------|--------|
+| Phase 1 | ⬜ 未开始 | 3 | 4 | 2 |
+| Phase 2 | ⬜ 未开始 | 2 | 3 | 2 |
+| Phase 3 | ⬜ 未开始 | 0 | 2 | 0 |
+| Phase 4 | ⬜ 未开始 | 0 | 1 | 0 |
 
-```bash
-touch src/domain/ports/memory_graph.py
-# 实现 MemoryGraphPort（见 §4.2）
-```
+---
 
-**Step 1.2**: 重构 `src/domain/ports/l5_graph.py`
+### Phase 1: Domain 层重构 + P0问题修复
 
-```bash
-# 备份旧文件
-cp src/domain/ports/l5_graph.py src/domain/ports/l5_graph.py.bak
+**目标**: 重构 L5GraphPort 为纯技术接口，修复 Neo4jClientWrapper 竞态条件
 
-# 重写为纯技术接口（见 §3.2）
-```
+#### Step 1.1: 修复 `Neo4jClientWrapper` 线程安全问题（P0-5）
 
-**Step 1.3**: 更新 `src/domain/ports/__init__.py`
+- [ ] **修复位置**: `src/infrastructure/storage/neo4j/client.py`
+- [ ] **问题**: `get_async_driver()` 懒初始化存在竞态条件
+- [ ] **修复代码**:
 
 ```python
-# 添加 MemoryGraphPort 导出
+# src/infrastructure/storage/neo4j/client.py
+# 修改后的代码
+
+from __future__ import annotations
+
+import asyncio
+from neo4j import AsyncDriver, AsyncGraphDatabase
+
+class Neo4jClientWrapper:
+    def __init__(
+        self,
+        uri: str = "bolt://localhost:7687",
+        username: str = "neo4j",
+        password: str = "",
+        database: str = "neo4j",
+        max_connection_pool_size: int = 50,
+        connection_timeout: float = 30.0,
+        max_retry_time: float = 30.0,
+    ):
+        # ... 现有初始化代码保持不变 ...
+        self._driver: AsyncDriver | None = None
+        self._driver_lock = asyncio.Lock()  # 新增：线程安全锁
+
+    async def get_async_driver(self) -> AsyncDriver:
+        """获取异步驱动（线程安全的懒初始化）。
+
+        使用双检锁模式确保只有一个协程初始化 driver。
+        """
+        if self._driver is None:
+            async with self._driver_lock:
+                # 双重检查：其他协程可能在等待锁期间已创建
+                if self._driver is None:
+                    self._driver = self._create_driver()
+        return self._driver
+
+    async def health_check(self) -> bool:
+        """检查 Neo4j 服务是否可用。"""
+        try:
+            driver = await self.get_async_driver()
+            async with driver.session(database=self._database) as session:
+                result = await session.run("RETURN 1")
+                await result.single()
+            return True
+        except Exception:
+            return False
+
+    async def close(self) -> None:
+        """关闭驱动连接。"""
+        async with self._driver_lock:
+            if self._driver is not None:
+                await self._driver.close()
+                self._driver = None
+```
+
+- [ ] **验证**: `poetry run python -c "import asyncio; from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper; w = Neo4jClientWrapper(); print(asyncio.iscoroutinefunction(w.get_async_driver))"`
+
+#### Step 1.2: 创建 `src/domain/ports/memory_graph.py`（P2-3）
+
+- [ ] **创建文件**: `src/domain/ports/memory_graph.py`
+- [ ] **接口定义**:
+
+```python
+# src/domain/ports/memory_graph.py
+
+"""MemoryGraphPort — 记忆图谱领域端口（Application层）。
+
+继承 L5GraphPort，添加记忆领域语义：
+- memory_id 作为节点主键
+- 使用 Memory 标签
+- 记忆间关系语义（DEPENDS_ON, RELATED_TO 等）
+"""
+
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+if TYPE_CHECKING:
+    pass
+
+
+class MemoryGraphPort(L5GraphPort):
+    """记忆图谱端口（Application层，领域语义）。
+
+    继承 L5GraphPort，添加记忆领域语义。
+    """
+
+    async def create_memory_entity(
+        self,
+        memory_id: str,
+        entity_type: str,
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建记忆实体节点。"""
+
+    async def get_memory_entity(self, memory_id: str) -> dict | None:
+        """获取记忆实体。"""
+
+    async def delete_memory_entity(self, memory_id: str) -> bool:
+        """删除记忆实体及所有关联边。"""
+
+    async def memory_entity_exists(self, memory_id: str) -> bool:
+        """检查记忆实体是否存在。"""
+
+    async def link_memories(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """链接两个记忆（MERGE 语义）。"""
+
+    async def unlink_memories(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship_type: str,
+    ) -> bool:
+        """取消链接两个记忆。"""
+
+    async def get_memory_links(
+        self,
+        memory_id: str,
+        relationship_type: str | None = None,
+    ) -> list[dict]:
+        """获取记忆的所有链接。"""
+
+    async def find_related_memories(
+        self,
+        memory_id: str,
+        max_depth: int = 2,
+        relationship_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联记忆（多跳遍历）。"""
+
+    async def get_memory_neighbors(
+        self,
+        memory_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取记忆的直接邻居（单跳）。"""
+
+    async def find_memory_path(
+        self,
+        start_id: str,
+        end_id: str,
+        max_depth: int = 3,
+    ) -> list[dict]:
+        """查找两个记忆之间的路径。"""
+
+    async def batch_create_memory_entities(self, entities: list[dict]) -> list[bool]:
+        """批量创建记忆实体。"""
+
+    async def batch_link_memories(self, links: list[dict]) -> list[bool]:
+        """批量链接记忆。"""
+```
+
+#### Step 1.3: 重构 `src/domain/ports/l5_graph.py`（P1-6, P2-1）
+
+- [ ] **备份**: `cp src/domain/ports/l5_graph.py src/domain/ports/l5_graph.py.bak`
+- [ ] **重构为纯技术接口**:
+
+```python
+# src/domain/ports/l5_graph.py (新版本)
+
+"""L5GraphPort — L5 图存储抽象端口（Domain层）。
+
+设计原则：
+- 纯技术接口：不包含任何领域语义
+- 领域知识（如 memory_id）由 Application 层端口定义
+- 支持任意节点类型和关系类型
+"""
+
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+
+class L5GraphPort(Protocol):
+    """L5 图存储端口（Domain层，纯技术抽象）。"""
+
+    # ========================================================================
+    # 节点操作
+    # ========================================================================
+
+    async def create_node(
+        self,
+        node_id: str,
+        labels: list[str],
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建节点（MERGE 语义）。
+
+        Returns:
+            是否成功（MERGE 语义：已存在返回 True）
+        """
+
+    async def get_node(self, node_id: str) -> dict | None:
+        """获取节点。
+
+        Returns:
+            节点数据 {id, labels, properties}，不存在返回 None
+        """
+
+    async def update_node(self, node_id: str, properties: dict[str, Any]) -> bool:
+        """更新节点属性（增量更新）。
+
+        Returns:
+            是否成功
+        """
+
+    async def delete_node(self, node_id: str) -> bool:
+        """删除节点及所有关联边（DETACH DELETE）。
+
+        Returns:
+            是否成功
+        """
+
+    async def node_exists(self, node_id: str) -> bool:
+        """检查节点是否存在。
+
+        Returns:
+            是否存在
+        """
+
+    # ========================================================================
+    # 关系操作
+    # ========================================================================
+
+    async def create_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """创建关系边（MERGE 语义）。
+
+        Returns:
+            是否成功（MERGE 语义：已存在返回 True）
+        """
+
+    async def delete_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+    ) -> bool:
+        """删除关系边。
+
+        Returns:
+            是否成功
+        """
+
+    async def get_relationships(
+        self,
+        node_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取节点的关系。
+
+        Args:
+            node_id: 节点 ID
+            rel_type: 过滤关系类型，None 表示所有
+            direction: 方向（"OUT" / "IN" / "BOTH"）
+
+        Returns:
+            关系列表 [{source_id, target_id, type, properties}, ...]
+        """
+
+    # ========================================================================
+    # 图遍历
+    # ========================================================================
+
+    async def find_path(
+        self,
+        start_id: str,
+        end_id: str,
+        max_depth: int = 3,
+    ) -> list[dict]:
+        """查找两节点之间的所有路径。
+
+        Returns:
+            路径列表 [{nodes, relationships, length}, ...]
+        """
+
+    async def get_neighbors(
+        self,
+        node_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取节点的直接邻居（单跳）。
+
+        Returns:
+            直接邻居节点列表 [{id, labels, properties}, ...]
+        """
+
+    async def find_related(
+        self,
+        node_id: str,
+        max_depth: int = 2,
+        rel_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联节点（多跳遍历）。
+
+        Returns:
+            关联节点列表 [{id, labels, properties, path}, ...]
+        """
+
+    # ========================================================================
+    # 低级 Cypher（供领域适配器使用）
+    # ========================================================================
+
+    async def execute_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行只读 Cypher 查询。
+
+        Returns:
+            查询结果列表（字典列表）
+        """
+
+    async def execute_write_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行写入 Cypher 查询（使用 session.execute_write）。
+
+        Returns:
+            查询结果列表（字典列表）
+        """
+```
+
+- [ ] **更新 `src/domain/ports/__init__.py`**:
+
+```python
+from src.domain.ports.l5_graph import L5GraphPort
 from src.domain.ports.memory_graph import MemoryGraphPort
-__all__ = [..., "MemoryGraphPort"]
+
+__all__ = [
+    # ... existing ...
+    "L5GraphPort",
+    "MemoryGraphPort",
+]
 ```
 
-**Step 1.4**: 验证编译通过
+- [ ] **验证**: `poetry run python -c "from src.domain.ports import L5GraphPort, MemoryGraphPort; print('Domain层重构完成')"`
 
-```bash
-poetry run python -c "from src.domain.ports import L5GraphPort, MemoryGraphPort"
-```
+---
 
-### Phase 1.5: 创建连接池Provider（Layer 3）
+### Phase 2: Infrastructure 层实现 + P0问题修复
 
-**目标：** 创建Neo4j连接池单例，与L1缓存架构的RedisPoolProvider对称
+**目标**: 实现 Neo4jGraphStorage 完整 L5GraphPort，修复 Neo4jAdapter 非薄适配器问题
 
-**Step 1.5.1**: 创建 `src/infrastructure/storage/neo4j/connection_provider.py`
+#### Step 2.1: 修复 `Neo4jGraphStorage.execute_write_query` 事务问题（P0-4）
 
-```bash
-# 实现 Neo4jConnectionProvider（见 §5.0）
-```
-
-**Step 1.5.2**: 验证Provider单例
-
-```bash
-poetry run python -c "
-from src.infrastructure.storage.neo4j.connection_provider import Neo4jConnectionProvider
-p1 = Neo4jConnectionProvider()
-p2 = Neo4jConnectionProvider()
-assert p1 is p2, 'Provider应该是单例'
-print('Phase 1.5: SUCCESS')
-"
-```
-
-### Phase 2: Infrastructure 层实现
-
-**Step 2.1**: 创建 `src/infrastructure/storage/neo4j/neo4j_graph_storage.py`
-
-```bash
-touch src/infrastructure/storage/neo4j/neo4j_graph_storage.py
-# 实现 Neo4jGraphStorage（见 §5.1）
-```
-
-**Step 2.2**: 创建 `src/infrastructure/storage/neo4j/memory_graph_adapter.py`
-
-```bash
-touch src/infrastructure/storage/neo4j/memory_graph_adapter.py
-# 实现 MemoryGraphAdapter（见 §5.2）
-```
-
-**Step 2.3**: 重构 `src/infrastructure/storage/neo4j/neo4j_adapter.py`
-
-```bash
-# 重构为委托 Neo4jGraphStorage（见 §5.3）
-```
-
-**Step 2.4**: 更新 `src/infrastructure/storage/neo4j/__init__.py`
+- [ ] **修复位置**: `src/infrastructure/storage/neo4j/graph_storage.py`
+- [ ] **问题**: `execute_write_query` 使用 `session.run()` 而非 `session.execute_write()`
+- [ ] **修复代码**:
 
 ```python
-from src.infrastructure.storage.neo4j.neo4j_graph_storage import Neo4jGraphStorage
-from src.infrastructure.storage.neo4j.memory_graph_adapter import MemoryGraphAdapter
-__all__ = ["Neo4jAdapter", "Neo4jGraphStorage", "MemoryGraphAdapter"]
+# src/infrastructure/storage/neo4j/graph_storage.py
+# 修改 execute_write_query 方法
+
+async def execute_write_query(
+    self,
+    cypher: str,
+    params: dict[str, Any] | None = None,
+) -> list[dict]:
+    """执行写入 Cypher 查询（使用 managed transaction）。
+
+    使用 session.execute_write() 提供：
+    - 自动重试（处理 TransientTransactionErrors）
+    - 正确的事务边界
+    - 因果一致性
+
+    Args:
+        cypher: Cypher 写入语句
+        params: 查询参数字典
+
+    Returns:
+        查询结果列表（字典列表）
+    """
+    driver = self._get_driver()
+    query_params = params or {}
+
+    async def _execute_in_transaction(tx: Any) -> list[dict]:
+        result = await tx.run(cypher, **query_params)
+        return cast(list[dict[str, Any]], await result.data())
+
+    async with driver.session(database=self._database) as session:
+        return await session.execute_write(_execute_in_transaction)
+
+# 同时更新 execute_query 使用 execute_read（可选优化）
+async def execute_query(
+    self,
+    cypher: str,
+    params: dict[str, Any] | None = None,
+) -> list[dict]:
+    """执行只读 Cypher 查询。"""
+    driver = self._get_driver()
+    query_params = params or {}
+
+    async def _execute_in_transaction(tx: Any) -> list[dict]:
+        result = await tx.run(cypher, **query_params)
+        return cast(list[dict[str, Any]], await result.data())
+
+    async with driver.session(database=self._database) as session:
+        return await session.execute_read(_execute_in_transaction)
 ```
 
-**Step 2.5**: 验证编译通过
+- [ ] **修复 `get_neighbors` 返回值序列化问题（P1-2）**:
 
-```bash
-poetry run python -c "from src.infrastructure.storage.neo4j import Neo4jAdapter, Neo4jGraphStorage, MemoryGraphAdapter"
+```python
+# 在 Neo4jGraphStorage 中修复 get_neighbors 和 find_path 的返回值
+
+async def get_neighbors(
+    self,
+    node_id: str,
+    rel_type: str | None = None,
+    direction: str = "BOTH",
+) -> list[dict]:
+    """获取邻居节点（单跳）。
+
+    修复：返回 dict 而非 neo4j.Node 对象
+    """
+    if rel_type:
+        rel_type_clause = f":{rel_type}"
+    else:
+        rel_type_clause = ""
+
+    if direction == "OUT":
+        cypher = f"""
+        MATCH (n {{id: $node_id}}){rel_type_clause}->(neighbor)
+        RETURN neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+        LIMIT 50
+        """
+    elif direction == "IN":
+        cypher = f"""
+        MATCH (n {{id: $node_id}}){rel_type_clause}-(neighbor)
+        RETURN neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+        LIMIT 50
+        """
+    else:  # BOTH
+        cypher = f"""
+        MATCH (n {{id: $node_id}}){rel_type_clause}-(neighbor)
+        RETURN neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+        LIMIT 50
+        """
+
+    result = await self.execute_query(cypher, {"node_id": node_id})
+    return result
+
+async def find_path(
+    self,
+    start_id: str,
+    end_id: str,
+    max_depth: int = 3,
+) -> list[dict]:
+    """查找两节点之间的路径。
+
+    修复：返回序列化的路径信息而非 neo4j.Path 对象
+    """
+    cypher = f"""
+    MATCH path = (start {{id: $start_id}})-[*1..{max_depth}]-(end {{id: $end_id}})
+    RETURN start.id as start_id, end.id as end_id, length(path) as length,
+           [n in nodes(path) | {{id: n.id, labels: labels(n)}}] as nodes,
+           [r in relationships(path) | {{type: type(r), start: startNode(r).id, end: endNode(r).id}}] as relationships
+    LIMIT 10
+    """
+    return await self.execute_query(
+        cypher,
+        {"start_id": start_id, "end_id": end_id},
+    )
 ```
+
+- [ ] **验证**: `poetry run python -c "from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage; print('execute_write_query 事务修复完成')"`
+
+#### Step 2.2: 实现 `Neo4jGraphStorage` 完整 L5GraphPort 方法（P1-1）
+
+- [ ] **新增方法到 `Neo4jGraphStorage`**:
+
+```python
+# src/infrastructure/storage/neo4j/neo4j_graph_storage.py
+# 在现有方法后追加以下方法
+
+# ========================================================================
+# 实体操作（实现 L5GraphPort）
+# ========================================================================
+
+async def create_entity(
+    self,
+    memory_id: str,
+    entity_type: str,
+    properties: dict[str, Any],
+) -> bool:
+    """创建实体节点（MERGE 语义）。
+
+    注意：这是旧接口方法，建议使用 create_node
+    """
+    cypher = """
+    MERGE (n:Memory {id: $memory_id})
+    SET n.type = $entity_type, n += $properties
+    RETURN n
+    """
+    result = await self.execute_write_query(
+        cypher,
+        {"memory_id": memory_id, "entity_type": entity_type, "properties": properties},
+    )
+    return len(result) > 0
+
+async def get_entity(self, memory_id: str) -> dict | None:
+    """获取实体。"""
+    cypher = """
+    MATCH (n:Memory {id: $memory_id})
+    RETURN n.id as id, n.type as type, properties(n) as properties
+    """
+    result = await self.execute_query(cypher, {"memory_id": memory_id})
+    if not result:
+        return None
+    return result[0]
+
+async def delete_entity(self, memory_id: str) -> bool:
+    """删除实体及关联边。"""
+    cypher = """
+    MATCH (n:Memory {id: $memory_id})
+    DETACH DELETE n
+    """
+    await self.execute_write_query(cypher, {"memory_id": memory_id})
+    return True
+
+# ========================================================================
+# 关系操作（实现 L5GraphPort）
+# ========================================================================
+
+async def create_relationship_by_memory(
+    self,
+    source_memory_id: str,
+    target_memory_id: str,
+    relationship_type: str,
+    properties: dict[str, Any] | None = None,
+) -> bool:
+    """创建关系边（MERGE 语义）。
+
+    注意：这是旧接口方法，建议使用 create_relationship
+    """
+    props_clause = ""
+    params = {
+        "source_memory_id": source_memory_id,
+        "target_memory_id": target_memory_id,
+        "relationship_type": relationship_type,
+    }
+    if properties:
+        props_clause = ", ".join([f"r.{k} = ${k}" for k in properties.keys()])
+        if props_clause:
+            props_clause = f"SET {props_clause}"
+        params.update(properties)
+
+    cypher = f"""
+    MATCH (source:Memory {{id: $source_memory_id}})
+    MATCH (target:Memory {{id: $target_memory_id}})
+    MERGE (source)-[r:{relationship_type}]->(target)
+    {props_clause}
+    RETURN r
+    """
+    result = await self.execute_write_query(cypher, params)
+    return len(result) > 0
+
+async def delete_relationship_by_memory(
+    self,
+    source_memory_id: str,
+    target_memory_id: str,
+    relationship_type: str,
+) -> bool:
+    """删除关系边。"""
+    cypher = f"""
+    MATCH (source:Memory {{id: $source_memory_id}})-[r:{relationship_type}]->(target:Memory {{id: $target_memory_id}})
+    DELETE r
+    """
+    await self.execute_write_query(
+        cypher,
+        {"source_memory_id": source_memory_id, "target_memory_id": target_memory_id},
+    )
+    return True
+
+# ========================================================================
+# find_related 实现
+# ========================================================================
+
+async def find_related(
+    self,
+    memory_id: str,
+    max_depth: int = 2,
+    relationship_type: str | None = None,
+) -> list[dict]:
+    """查找关联实体（多跳遍历）。"""
+    if relationship_type:
+        cypher = f"""
+        MATCH path = (start:Memory {{id: $memory_id}})-[:{relationship_type}*1..{max_depth}]-(end)
+        WITH path, end
+        RETURN end.id as memory_id, end.type as type, properties(end) as properties
+        LIMIT 50
+        """
+    else:
+        cypher = f"""
+        MATCH path = (start:Memory {{id: $memory_id}})-[*1..{max_depth}]-(end)
+        WITH path, end
+        RETURN end.id as memory_id, end.type as type, properties(end) as properties
+        LIMIT 50
+        """
+    result = await self.execute_query(cypher, {"memory_id": memory_id})
+    return [
+        {
+            "memory_id": r.get("memory_id"),
+            "type": r.get("type"),
+            "properties": r.get("properties", {}),
+        }
+        for r in result
+    ]
+```
+
+- [ ] **验证**: `poetry run python -c "from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage; g = Neo4jGraphStorage.__dict__; print('create_entity' in g, 'get_entity' in g, 'delete_entity' in g, 'find_related' in g)"`
+
+#### Step 2.3: 重构 `Neo4jAdapter` 为薄适配器（P0-2, P0-3）
+
+- [ ] **修复位置**: `src/infrastructure/storage/neo4j/neo4j_adapter.py`
+- [ ] **问题**: 自己拼接 Cypher，硬编码 Memory 标签
+- [ ] **修复代码**:
+
+```python
+# src/infrastructure/storage/neo4j/neo4j_adapter.py (重构后)
+
+"""Neo4jAdapter — L5GraphPort 实现（薄适配器）。
+
+设计原则：
+- 薄适配器：只做接口转换，不含领域逻辑
+- 所有 Cypher 构造委托给 Neo4jGraphStorage
+- 移除硬编码 Memory 标签
+"""
+
+from __future__ import annotations
+
+from typing import Any, cast
+
+from src.domain.ports.l5_graph import L5GraphPort
+
+if TYPE_CHECKING:
+    pass
+
+
+class Neo4jAdapter(L5GraphPort):
+    """Neo4j 图存储适配器（薄适配器）。
+
+    委托所有操作给内部存储，不自己做 Cypher 构造。
+    """
+
+    def __init__(self, storage: Any):
+        """初始化适配器。
+
+        Args:
+            storage: Neo4jGraphStorage 实例
+        """
+        self._storage = storage
+
+    # ========================================================================
+    # 节点操作（委托）
+    # ========================================================================
+
+    async def create_node(
+        self,
+        node_id: str,
+        labels: list[str],
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建节点（委托）。"""
+        return await self._storage.create_node(node_id, labels, properties)
+
+    async def get_node(self, node_id: str) -> dict | None:
+        """获取节点（委托）。"""
+        return await self._storage.get_node(node_id)
+
+    async def update_node(self, node_id: str, properties: dict[str, Any]) -> bool:
+        """更新节点（委托）。"""
+        return await self._storage.update_node(node_id, properties)
+
+    async def delete_node(self, node_id: str) -> bool:
+        """删除节点（委托）。"""
+        return await self._storage.delete_node(node_id)
+
+    async def node_exists(self, node_id: str) -> bool:
+        """检查节点存在（委托）。"""
+        return await self._storage.node_exists(node_id)
+
+    # ========================================================================
+    # 关系操作（委托）
+    # ========================================================================
+
+    async def create_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """创建关系（委托）。"""
+        return await self._storage.create_relationship(source_id, target_id, rel_type, properties)
+
+    async def delete_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+    ) -> bool:
+        """删除关系（委托）。"""
+        return await self._storage.delete_relationship(source_id, target_id, rel_type)
+
+    async def get_relationships(
+        self,
+        node_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取关系（委托）。"""
+        return await self._storage.get_relationships(node_id, rel_type, direction)
+
+    # ========================================================================
+    # 图遍历（委托）
+    # ========================================================================
+
+    async def find_path(
+        self,
+        start_id: str,
+        end_id: str,
+        max_depth: int = 3,
+    ) -> list[dict]:
+        """查找路径（委托）。"""
+        return await self._storage.find_path(start_id, end_id, max_depth)
+
+    async def get_neighbors(
+        self,
+        node_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取邻居（委托）。"""
+        return await self._storage.get_neighbors(node_id, rel_type, direction)
+
+    async def find_related(
+        self,
+        node_id: str,
+        max_depth: int = 2,
+        rel_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联（委托）。"""
+        return await self._storage.find_related(node_id, max_depth, rel_type)
+
+    # ========================================================================
+    # 低级 Cypher（委托）
+    # ========================================================================
+
+    async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
+        """执行只读查询（委托）。"""
+        return await self._storage.execute_query(cypher, params)
+
+    async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
+        """执行写入查询（委托）。"""
+        return await self._storage.execute_write_query(cypher, params)
+
+    # ========================================================================
+    # 旧接口方法（deprecated，委托给新接口）
+    # ========================================================================
+
+    async def create_entity(
+        self,
+        memory_id: str,
+        entity_type: str,
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建实体节点。
+
+        Deprecated: 使用 create_node() 替代
+        """
+        return await self._storage.create_entity(memory_id, entity_type, properties)
+
+    async def get_entity(self, memory_id: str) -> dict | None:
+        """获取实体。
+
+        Deprecated: 使用 get_node() 替代
+        """
+        return await self._storage.get_entity(memory_id)
+
+    async def delete_entity(self, memory_id: str) -> bool:
+        """删除实体。
+
+        Deprecated: 使用 delete_node() 替代
+        """
+        return await self._storage.delete_entity(memory_id)
+
+    async def create_relationship_old(
+        self,
+        source_memory_id: str,
+        target_memory_id: str,
+        relationship_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """创建关系。
+
+        Deprecated: 使用 create_relationship() 替代
+        """
+        return await self._storage.create_relationship_by_memory(
+            source_memory_id, target_memory_id, relationship_type, properties
+        )
+
+    async def delete_relationship_old(
+        self,
+        source_memory_id: str,
+        target_memory_id: str,
+        relationship_type: str,
+    ) -> bool:
+        """删除关系。
+
+        Deprecated: 使用 delete_relationship() 替代
+        """
+        return await self._storage.delete_relationship_by_memory(
+            source_memory_id, target_memory_id, relationship_type
+        )
+
+    async def find_related_old(
+        self,
+        memory_id: str,
+        max_depth: int = 2,
+        relationship_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联实体。
+
+        Deprecated: 使用 find_related() 替代
+        """
+        return await self._storage.find_related(memory_id, max_depth, relationship_type)
+```
+
+- [ ] **验证**: `poetry run python -c "from src.infrastructure.storage.neo4j import Neo4jAdapter; print('Neo4jAdapter重构为薄适配器完成')"`
+
+#### Step 2.4: 创建 `Neo4jConnectionProvider` 单例（P2-2）
+
+- [ ] **创建文件**: `src/infrastructure/storage/neo4j/connection_provider.py`
+
+```python
+# src/infrastructure/storage/neo4j/connection_provider.py
+
+"""Neo4j 连接池统一提供者（单例模式）。
+
+在 composition_root 初始化时创建单一连接池，
+所有 Adapter 复用此连接池，实现资源统一管理。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import TYPE_CHECKING
+
+from src.infrastructure.config.neo4j import Neo4jConfig
+from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+
+if TYPE_CHECKING:
+    pass
+
+logger = logging.getLogger(__name__)
+
+
+class Neo4jConnectionProvider:
+    """Neo4j 连接池统一提供者（单例模式）。
+
+    Attributes:
+        _instance: 单例实例
+        _client_wrapper: Neo4j 客户端封装
+        _config: Neo4j 配置
+        _init_lock: 初始化锁（避免并发竞争）
+    """
+
+    _instance: Neo4jConnectionProvider | None = None
+    _client_wrapper: Neo4jClientWrapper | None = None
+    _config: Neo4jConfig | None = None
+    _init_lock: asyncio.Lock | None = None
+
+    def __new__(cls) -> Neo4jConnectionProvider:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    @classmethod
+    async def init(cls, config: Neo4jConfig | None = None) -> None:
+        """初始化连接池（线程安全）。
+
+        Args:
+            config: Neo4j 配置，默认从环境变量加载
+        """
+        if cls._init_lock is None:
+            cls._init_lock = asyncio.Lock()
+
+        async with cls._init_lock:
+            if cls._client_wrapper is not None:
+                logger.warning("Neo4jConnectionProvider already initialized, skipping")
+                return
+
+            config = config or Neo4jConfig.from_env()
+            cls._config = config
+
+            cls._client_wrapper = Neo4jClientWrapper(
+                uri=config.uri,
+                username=config.username,
+                password=config.password,
+                database=config.database,
+                max_connection_pool_size=config.max_connection_pool_size,
+                connection_timeout=config.connection_timeout,
+                max_retry_time=config.max_retry_time,
+                max_connection_lifetime=config.max_connection_lifetime,
+            )
+            logger.info(
+                "Neo4jConnectionProvider initialized: %s (max_connections=%d)",
+                config.uri,
+                config.max_connection_pool_size,
+            )
+
+    @classmethod
+    def get_client(cls) -> Neo4jClientWrapper:
+        """获取 Neo4j 客户端封装。
+
+        Returns:
+            Neo4jClientWrapper 实例
+
+        Raises:
+            RuntimeError: 如果 provider 未初始化
+        """
+        if cls._client_wrapper is None:
+            raise RuntimeError(
+                "Neo4jConnectionProvider not initialized. "
+                "Call await Neo4jConnectionProvider.init() before use."
+            )
+        return cls._client_wrapper
+
+    @classmethod
+    def is_initialized(cls) -> bool:
+        """检查 provider 是否已初始化。"""
+        return cls._client_wrapper is not None
+
+    @classmethod
+    async def health_check(cls) -> bool:
+        """双层健康检查（连接 + 池状态）。"""
+        if cls._client_wrapper is None:
+            return False
+        return await cls._client_wrapper.health_check()
+
+    @classmethod
+    async def close(cls) -> None:
+        """关闭连接池。"""
+        if cls._client_wrapper is not None:
+            await cls._client_wrapper.close()
+            cls._client_wrapper = None
+            cls._config = None
+            logger.info("Neo4jConnectionProvider closed")
+```
+
+- [ ] **验证**: `poetry run python -c "from src.infrastructure.storage.neo4j.connection_provider import Neo4jConnectionProvider; p1 = Neo4jConnectionProvider(); p2 = Neo4jConnectionProvider(); print('单例:', p1 is p2)"`
+
+---
 
 ### Phase 3: 测试更新
 
-**Step 3.1**: 更新 `tests/unit/domain/ports/test_l5_graph_port.py`
+#### Step 3.1: 更新 `test_l5_graph_port.py` mock 返回值（P1-6）
 
-```bash
-# 更新方法名列表（create_entity → create_node 等）
+- [ ] **修复位置**: `tests/unit/domain/ports/test_l5_graph_port.py`
+- [ ] **问题**: mock 返回值与接口定义不符
+- [ ] **修复代码**:
+
+```python
+# tests/unit/domain/ports/test_l5_graph_port.py
+
+# 修改前（错误）：
+mock.create_entity.return_value = {"memory_id": "id-1", "type": "user"}
+
+# 修改后（正确）：
+mock.create_entity.return_value = True  # create_entity 返回 bool
+
+# 修改前（错误）：
+mock.create_relationship.return_value = {"source": "id-1", "target": "id-2", "type": "RELATES_TO"}
+
+# 修改后（正确）：
+mock.create_relationship.return_value = True  # create_relationship 返回 bool
+
+# 完整的测试类修改：
+
+class TestL5GraphPortMockBehavior:
+    """Mock behavior tests — verify Protocol contract via spec约束。"""
+
+    async def test_mock_create_entity_verified(self):
+        """Mock create_entity should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.create_entity.return_value = True  # 修复：Protocol 返回 bool
+
+        result = await mock.create_entity("id-1", "user", {"name": "test"})
+        assert result is True  # 修复：布尔断言
+        mock.create_entity.assert_called_once()
+
+    async def test_mock_get_entity_verified(self):
+        """Mock get_entity should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.get_entity.return_value = {"id": "id-1", "type": "user", "properties": {}}  # 修复：使用 id 而非 memory_id
+
+        result = await mock.get_entity("id-1")
+        assert result["id"] == "id-1"
+        mock.get_entity.assert_called_once_with("id-1")
+
+    async def test_mock_create_relationship_verified(self):
+        """Mock create_relationship should be verifiable."""
+        mock = AsyncMock(spec=L5GraphPort)
+        mock.create_relationship.return_value = True  # 修复：返回 bool
+
+        result = await mock.create_relationship("id-1", "id-2", "RELATES_TO", {})
+        assert result is True  # 修复：布尔断言
+        mock.create_relationship.assert_called_once()
 ```
 
-**Step 3.2**: 创建 `tests/unit/infrastructure/storage/test_neo4j_graph_storage.py`
+#### Step 3.2: 添加 `test_neo4j_adapter.py` 的 `get_neighbors` 测试（P1-4）
 
-```bash
-touch tests/unit/infrastructure/storage/test_neo4j_graph_storage.py
-# 实现 Neo4jGraphStorage 单元测试
+- [ ] **添加测试类**:
+
+```python
+# tests/unit/infrastructure/storage/test_neo4j_adapter.py
+# 在现有测试类后添加
+
+class TestNeo4jAdapterGetNeighbors:
+    """get_neighbors 方法测试。"""
+
+    async def test_get_neighbors_delegates_to_storage(self):
+        """验证 get_neighbors 委托给 storage。"""
+        mock_storage = AsyncMock(spec=Neo4jGraphStorage)
+        mock_storage.get_neighbors.return_value = [
+            {"id": "neighbor-1", "labels": ["Memory"], "properties": {}}
+        ]
+
+        adapter = Neo4jAdapter(mock_storage)
+        result = await adapter.get_neighbors("node-1", rel_type="RELATES_TO", direction="OUT")
+
+        mock_storage.get_neighbors.assert_called_once_with("node-1", "RELATES_TO", "OUT")
+        assert len(result) == 1
+
+    async def test_get_neighbors_returns_neighbors(self):
+        """验证 get_neighbors 返回正确数据结构。"""
+        mock_storage = AsyncMock(spec=Neo4jGraphStorage)
+        mock_storage.get_neighbors.return_value = [
+            {"id": "neighbor-1", "labels": ["Memory", "project"], "properties": {"name": "Test"}}
+        ]
+
+        adapter = Neo4jAdapter(mock_storage)
+        result = await adapter.get_neighbors("node-1")
+
+        assert result[0]["id"] == "neighbor-1"
+        assert result[0]["labels"] == ["Memory", "project"]
+
+    async def test_get_neighbors_empty_result(self):
+        """验证 get_neighbors 无结果时返回空列表。"""
+        mock_storage = AsyncMock(spec=Neo4jGraphStorage)
+        mock_storage.get_neighbors.return_value = []
+
+        adapter = Neo4jAdapter(mock_storage)
+        result = await adapter.get_neighbors("nonexistent")
+
+        assert result == []
 ```
 
-**Step 3.3**: 创建 `tests/unit/infrastructure/storage/test_memory_graph_adapter.py`
+#### Step 3.3: 创建 `test_neo4j_graph_storage.py`（P1-1）
 
-```bash
-touch tests/unit/infrastructure/storage/test_memory_graph_adapter.py
-# 实现 MemoryGraphAdapter 单元测试
+- [ ] **创建文件**: `tests/unit/infrastructure/storage/test_neo4j_graph_storage.py`
+
+```python
+# tests/unit/infrastructure/storage/test_neo4j_graph_storage.py
+
+"""Neo4jGraphStorage 单元测试。"""
+
+from __future__ import annotations
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
+from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+
+
+class TestNeo4jGraphStorageCreateNode:
+    """create_node 方法测试。"""
+
+    @pytest.fixture
+    def mock_client(self):
+        return AsyncMock(spec=Neo4jClientWrapper)
+
+    @pytest.fixture
+    def storage(self, mock_client):
+        return Neo4jGraphStorage(mock_client, database="neo4j")
+
+    async def test_create_node_returns_bool(self, storage, mock_client):
+        """验证 create_node 返回布尔值。"""
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute_write = AsyncMock(return_value=[{"n": {}}])
+
+        mock_driver = MagicMock()
+        mock_driver.session = MagicMock(return_value=mock_session)
+        mock_client.get_async_driver = MagicMock(return_value=mock_driver)
+
+        result = await storage.create_node("node-1", ["Label"], {"key": "value"})
+        assert isinstance(result, bool)
+
+
+class TestNeo4jGraphStorageExecuteWrite:
+    """execute_write_query 事务测试。"""
+
+    @pytest.fixture
+    def mock_client(self):
+        return AsyncMock(spec=Neo4jClientWrapper)
+
+    @pytest.fixture
+    def storage(self, mock_client):
+        return Neo4jGraphStorage(mock_client, database="neo4j")
+
+    async def test_execute_write_uses_transaction(self, storage, mock_client):
+        """验证 execute_write_query 使用 session.execute_write。"""
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute_write = AsyncMock(return_value=[{"result": True}])
+
+        mock_driver = MagicMock()
+        mock_driver.session = MagicMock(return_value=mock_session)
+        mock_client.get_async_driver = MagicMock(return_value=mock_driver)
+
+        await storage.execute_write_query("CREATE (n)", {})
+        mock_session.execute_write.assert_called_once()
+
+
+class TestNeo4jGraphStorageGetNeighbors:
+    """get_neighbors 方法测试。"""
+
+    @pytest.fixture
+    def mock_client(self):
+        return AsyncMock(spec=Neo4jClientWrapper)
+
+    @pytest.fixture
+    def storage(self, mock_client):
+        return Neo4jGraphStorage(mock_client, database="neo4j")
+
+    async def test_get_neighbors_returns_dict_list(self, storage, mock_client):
+        """验证 get_neighbors 返回 dict 列表而非 neo4j.Node。"""
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.execute_read = AsyncMock(return_value=[
+            {"id": "n1", "labels": ["L1"], "properties": {"k": "v"}}
+        ])
+
+        mock_driver = MagicMock()
+        mock_driver.session = MagicMock(return_value=mock_session)
+        mock_client.get_async_driver = MagicMock(return_value=mock_driver)
+
+        result = await storage.get_neighbors("node-1", rel_type="REL", direction="OUT")
+
+        assert isinstance(result, list)
+        assert result[0]["id"] == "n1"  # 验证是 dict 而非 neo4j.Node
+        assert "labels" in result[0]
 ```
 
-**Step 3.4**: 运行所有测试
+#### Step 3.4: 运行所有测试
+
+- [ ] **执行测试**:
 
 ```bash
 poetry run pytest tests/unit/domain/ports/test_l5_graph_port.py -v
 poetry run pytest tests/unit/infrastructure/storage/test_neo4j_adapter.py -v
 poetry run pytest tests/unit/infrastructure/storage/test_neo4j_graph_storage.py -v
-poetry run pytest tests/unit/infrastructure/storage/test_memory_graph_adapter.py -v
 ```
+
+---
 
 ### Phase 4: 向后兼容验证
 
-**Step 4.1**: 验证 UnifiedStorageGateway 导入正常
+#### Step 4.1: 验证 UnifiedStorageGateway 导入正常
+
+- [ ] **验证**:
 
 ```bash
-poetry run python -c "from src.application.services.unified_storage_gateway import UnifiedStorageGateway"
+poetry run python -c "from src.application.services.unified_storage_gateway import UnifiedStorageGateway; print('UnifiedStorageGateway 导入成功')"
 ```
 
-**Step 4.2**: 运行集成测试
+#### Step 4.2: 运行集成测试
+
+- [ ] **执行集成测试**:
 
 ```bash
 poetry run pytest tests/integration/test_six_layer_complete_flow.py -v
 ```
 
-**Step 4.3**: 清理备份文件
+#### Step 4.3: 清理备份文件
+
+- [ ] **清理**:
 
 ```bash
 rm src/domain/ports/l5_graph.py.bak
 ```
+
+---
+
+### Phase 5: 创建 MemoryGraphAdapter（P1-3）
+
+#### Step 5.1: 创建 `src/infrastructure/storage/neo4j/base_graph_adapter.py`
+
+- [ ] **创建基类**:
+
+```python
+# src/infrastructure/storage/neo4j/base_graph_adapter.py
+
+"""BaseGraphAdapter — L5GraphPort 委托基类。
+
+将所有 L5GraphPort 方法委托给内部存储，
+子类只需实现领域方法，无需重复委托代码。
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from src.domain.ports.l5_graph import L5GraphPort
+
+if TYPE_CHECKING:
+    pass
+
+
+class BaseGraphAdapter(L5GraphPort):
+    """L5GraphPort 委托基类。
+
+    将所有 L5GraphPort 方法委托给内部 _storage。
+    子类继承此类后，只需实现领域特定方法。
+    """
+
+    def __init__(self, storage: L5GraphPort):
+        """初始化适配器。
+
+        Args:
+            storage: L5GraphPort 实现（如 Neo4jGraphStorage）
+        """
+        self._storage = storage
+
+    # 节点操作委托
+    async def create_node(self, node_id: str, labels: list[str], properties: dict[str, Any]) -> bool:
+        return await self._storage.create_node(node_id, labels, properties)
+
+    async def get_node(self, node_id: str) -> dict | None:
+        return await self._storage.get_node(node_id)
+
+    async def update_node(self, node_id: str, properties: dict[str, Any]) -> bool:
+        return await self._storage.update_node(node_id, properties)
+
+    async def delete_node(self, node_id: str) -> bool:
+        return await self._storage.delete_node(node_id)
+
+    async def node_exists(self, node_id: str) -> bool:
+        return await self._storage.node_exists(node_id)
+
+    # 关系操作委托
+    async def create_relationship(self, source_id: str, target_id: str, rel_type: str, properties: dict[str, Any] | None = None) -> bool:
+        return await self._storage.create_relationship(source_id, target_id, rel_type, properties)
+
+    async def delete_relationship(self, source_id: str, target_id: str, rel_type: str) -> bool:
+        return await self._storage.delete_relationship(source_id, target_id, rel_type)
+
+    async def get_relationships(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]:
+        return await self._storage.get_relationships(node_id, rel_type, direction)
+
+    # 图遍历委托
+    async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]:
+        return await self._storage.find_path(start_id, end_id, max_depth)
+
+    async def get_neighbors(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]:
+        return await self._storage.get_neighbors(node_id, rel_type, direction)
+
+    async def find_related(self, node_id: str, max_depth: int = 2, rel_type: str | None = None) -> list[dict]:
+        return await self._storage.find_related(node_id, max_depth, rel_type)
+
+    # Cypher 委托
+    async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
+        return await self._storage.execute_query(cypher, params)
+
+    async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
+        return await self._storage.execute_write_query(cypher, params)
+```
+
+#### Step 5.2: 创建 `src/infrastructure/storage/neo4j/memory_graph_adapter.py`
+
+- [ ] **创建文件**:
+
+```python
+# src/infrastructure/storage/neo4j/memory_graph_adapter.py
+
+"""MemoryGraphAdapter — MemoryGraphPort 实现（领域适配器）。
+
+继承 BaseGraphAdapter，只需实现记忆领域逻辑。
+L5GraphPort 委托由基类处理，无需重复代码。
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from src.domain.ports.l5_graph import L5GraphPort
+from src.domain.ports.memory_graph import MemoryGraphPort
+from src.infrastructure.storage.neo4j.base_graph_adapter import BaseGraphAdapter
+
+
+class MemoryGraphAdapter(MemoryGraphPort, BaseGraphAdapter):
+    """记忆图谱领域适配器。
+
+    继承 BaseGraphAdapter 处理所有 L5GraphPort 委托，
+    只需实现 MemoryGraphPort 的领域方法。
+    """
+
+    def __init__(self, storage: L5GraphPort):
+        """初始化适配器。
+
+        Args:
+            storage: L5GraphPort 实现（如 Neo4jGraphStorage）
+        """
+        super().__init__(storage)
+
+    # ========================================================================
+    # 记忆实体操作实现
+    # ========================================================================
+
+    async def create_memory_entity(
+        self,
+        memory_id: str,
+        entity_type: str,
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建记忆实体节点。"""
+        return await self._storage.create_node(
+            node_id=memory_id,
+            labels=["Memory", entity_type],
+            properties={"memory_id": memory_id, **properties},
+        )
+
+    async def get_memory_entity(self, memory_id: str) -> dict | None:
+        """获取记忆实体。"""
+        node = await self._storage.get_node(memory_id)
+        if node is None:
+            return None
+        labels = node.get("labels", [])
+        entity_type = next((l for l in labels if l != "Memory"), "unknown")
+        return {
+            "memory_id": node.get("id"),
+            "type": entity_type,
+            "properties": node.get("properties", {}),
+        }
+
+    async def delete_memory_entity(self, memory_id: str) -> bool:
+        """删除记忆实体。"""
+        return await self._storage.delete_node(memory_id)
+
+    async def memory_entity_exists(self, memory_id: str) -> bool:
+        """检查记忆实体是否存在。"""
+        return await self._storage.node_exists(memory_id)
+
+    # ========================================================================
+    # 记忆关系操作实现
+    # ========================================================================
+
+    async def link_memories(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """链接两个记忆。"""
+        return await self._storage.create_relationship(
+            source_id=source_id,
+            target_id=target_id,
+            rel_type=relationship_type,
+            properties=properties,
+        )
+
+    async def unlink_memories(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship_type: str,
+    ) -> bool:
+        """取消链接两个记忆。"""
+        return await self._storage.delete_relationship(
+            source_id=source_id,
+            target_id=target_id,
+            rel_type=relationship_type,
+        )
+
+    async def get_memory_links(
+        self,
+        memory_id: str,
+        relationship_type: str | None = None,
+    ) -> list[dict]:
+        """获取记忆的所有链接。"""
+        rels = await self._storage.get_relationships(memory_id, relationship_type, "BOTH")
+        return [
+            {
+                "source_id": r.get("source_id"),
+                "target_id": r.get("target_id"),
+                "type": r.get("type"),
+                "properties": r.get("properties", {}),
+            }
+            for r in rels
+        ]
+
+    # ========================================================================
+    # 记忆图遍历实现
+    # ========================================================================
+
+    async def find_related_memories(
+        self,
+        memory_id: str,
+        max_depth: int = 2,
+        relationship_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联记忆。"""
+        nodes = await self._storage.find_related(memory_id, max_depth, relationship_type)
+        return [
+            {
+                "memory_id": n.get("id"),
+                "type": next((l for l in n.get("labels", []) if l != "Memory"), "unknown"),
+                "properties": n.get("properties", {}),
+            }
+            for n in nodes
+        ]
+
+    async def get_memory_neighbors(
+        self,
+        memory_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取记忆的邻居（单跳）。"""
+        nodes = await self._storage.get_neighbors(memory_id, rel_type, direction)
+        return [
+            {
+                "memory_id": n.get("id"),
+                "type": next((l for l in n.get("labels", []) if l != "Memory"), "unknown"),
+                "properties": n.get("properties", {}),
+            }
+            for n in nodes
+        ]
+
+    async def find_memory_path(
+        self,
+        start_id: str,
+        end_id: str,
+        max_depth: int = 3,
+    ) -> list[dict]:
+        """查找两个记忆之间的路径。"""
+        return await self._storage.find_path(start_id, end_id, max_depth)
+
+    # ========================================================================
+    # 批量操作实现
+    # ========================================================================
+
+    async def batch_create_memory_entities(self, entities: list[dict]) -> list[bool]:
+        """批量创建记忆实体。"""
+        results = []
+        for entity in entities:
+            result = await self.create_memory_entity(
+                memory_id=entity["memory_id"],
+                entity_type=entity["entity_type"],
+                properties=entity.get("properties", {}),
+            )
+            results.append(result)
+        return results
+
+    async def batch_link_memories(self, links: list[dict]) -> list[bool]:
+        """批量链接记忆。"""
+        results = []
+        for link in links:
+            result = await self.link_memories(
+                source_id=link["source_id"],
+                target_id=link["target_id"],
+                relationship_type=link["relationship_type"],
+                properties=link.get("properties"),
+            )
+            results.append(result)
+        return results
+```
+
+- [ ] **验证**: `poetry run python -c "from src.infrastructure.storage.neo4j.memory_graph_adapter import MemoryGraphAdapter; print('MemoryGraphAdapter 创建完成')"`
 
 ---
 
