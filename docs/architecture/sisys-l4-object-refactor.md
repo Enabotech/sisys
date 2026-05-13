@@ -1096,7 +1096,7 @@ if content is not None:
 | 2.2 | 更新 `MinIOAdapter.list_objects` 委托传递 `bucket_type` | 测试通过 |
 | 2.3 | 更新所有调用 `list_objects` 的代码 | 测试通过 |
 
-### Phase 4: 创建 DocumentStoragePort
+### Phase 3: 创建 DocumentStoragePort
 
 **目标：** 建立 Layer 2 应用层端口
 
@@ -1106,8 +1106,9 @@ if content is not None:
 | 3.2 | 定义 `DocumentStoragePort(L4ObjectPort, Protocol)` | 类型检查 |
 | 3.3 | 添加文档特有方法：`store_document`, `retrieve_document`, `list_user_documents`, `get_document_metadata` | 接口检查 |
 | 3.4 | 显式声明继承的 L4ObjectPort 方法（满足类型检查器） | mypy 通过 |
+| 3.5 | 创建 `src/application/ports/__init__.py` 导出 DocumentStoragePort | 导入检查 |
 
-### Phase 5: 创建 MinIODocumentStorage
+### Phase 4: 创建 MinIODocumentStorage
 
 **目标：** 建立 Layer 4 具体应用实现
 
@@ -1117,26 +1118,18 @@ if content is not None:
 | 4.2 | 实现 `MinIODocumentStorage(DocumentStoragePort)` | 类型检查 |
 | 4.3 | 组合 `MinIOAdapter` 处理底层存储 | 委托检查 |
 | 4.4 | 实现路径自动生成（按用户/类型/日期组织） | 功能测试 |
+| 4.5 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 MinIODocumentStorage | 导入检查 |
 
-### Phase 6: 更新导出和 __init__.py
-
-**目标：** 确保新端口可被导入
-
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 5.1 | 更新 `src/application/ports/__init__.py` 导出 `DocumentStoragePort` | 导入检查 |
-| 5.2 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 `MinIODocumentStorage` | 导入检查 |
-
-### Phase 7: 回归测试
+### Phase 5: 回归测试
 
 **目标：** 确保重构不破坏现有功能
 
 | 步骤 | 任务 | 验证 |
 |------|------|------|
-| 7.1 | 运行单元测试：`pytest tests/unit/domain/ports/test_l4_object_port.py -v` | 通过 |
-| 7.2 | 运行单元测试：`pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` | 通过 |
-| 7.3 | 运行集成测试：`pytest tests/integration/ -x -q` | 通过 |
-| 7.4 | 运行架构测试：`pytest tests/unit/architecture/ -x -q` | 通过 |
+| 5.1 | 运行单元测试：`pytest tests/unit/domain/ports/test_l4_object_port.py -v` | 通过 |
+| 5.2 | 运行单元测试：`pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` | 通过 |
+| 5.3 | 运行集成测试：`pytest tests/integration/ -x -q` | 通过 |
+| 5.4 | 运行架构测试：`pytest tests/unit/architecture/ -x -q` | 通过 |
 
 ---
 
@@ -1220,13 +1213,13 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 
 | 标准 | 描述 | 测量方式 |
 |------|------|---------|
-| R1 | 所有 Domain 抽象统一到 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py"` 无结果 |
-| R2 | `MinIOAdapter` 包含 `list_objects` 方法 | 方法存在性检查 |
-| R3 | `MinIORepository.archive()` 返回 `str` | 类型检查 |
-| R4 | `MinIOAdapter.archive()` 正确处理 content 参数 | content != None 时抛出 NotImplementedError |
-| R5 | `DocumentStoragePort` 正确继承 `L4ObjectPort` | `issubclass(DocumentStoragePort, L4ObjectPort)` |
-| R6 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` |
-| R7 | 所有测试通过 | `pytest tests/ -x -q` |
+| R1 | 所有 Domain 抽象统一到 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py" src/domain/` 无结果 | ❌ 待验证 |
+| R2 | `MinIOAdapter` 包含 `list_objects` 方法 | `hasattr(MinIOAdapter, 'list_objects')` | ❌ 待实现 |
+| R3 | `MinIORepository.archive()` 返回 `str` | 类型注解检查 + 运行时验证 | ❌ 待修复 |
+| R4 | `MinIOAdapter.archive()` 正确处理 content 参数 | `content != None` 时抛出 `NotImplementedError` | ❌ 待实现 |
+| R5 | `DocumentStoragePort` 正确继承 `L4ObjectPort` | `issubclass(DocumentStoragePort, L4ObjectPort)` | ❌ 待创建 |
+| R6 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` | ❌ 待创建 |
+| R7 | 所有测试通过 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py tests/unit/domain/ports/test_l4_object_port.py -v` | ❌ 待验证 |
 
 ---
 
@@ -1258,3 +1251,4 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 | 1.0.0 | 2026-05-13 | - | 初始版本 |
 | 1.1.0 | 2026-05-13 | - | 架构审查修正：修复 archive/list_objects 方法问题 |
 | 1.2.0 | 2026-05-13 | - | 代码审查更新：确认 P0 问题实际未执行，更新文档状态 |
+| 1.3.0 | 2026-05-13 | - | Round 1-5 审查完成：补充架构一致性分析、测试覆盖缺陷、风险重评估、相位编号修正 |
