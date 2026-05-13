@@ -1,10 +1,26 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.0
+**版本:** v2.3
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.0 修复版）
+**状态:** 设计完成（v2.3 修复版，基于两轮全面调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
+
+**Changelog v2.2 (第一轮调研修复):**
+- P0: Neo4jAdapter 缺少 `get_neighbors` 实现
+- P0: Neo4jAdapter 硬编码 `Memory` 标签（5处）
+- P0: `execute_query`/`execute_write_query` 实现完全相同，无事务区分
+- P1: 测试断言与接口定义不符
+- P1: `direction` 参数在 src/ 中无实际调用方
+- P1: `find_path` 与 `get_neighbors` 返回语义不一致
+
+**Changelog v2.3 (第二轮调研修复):**
+- P0: Neo4jAdapter 不是"薄适配器"——自己拼接 Cypher（违反六边形架构）
+- P0: Memory 标签硬编码散落 8+ 处（违反 OCP）
+- P0: `execute_write_query` 使用 `session.run()` 而非 `session.execute_write()`，无事务保护
+- P1: 测试 mock 返回值与接口定义不符
+- P1: 向后兼容性影响范围广（6文件需修改）
+- P1: 新增双轨制迁移策略（create_node + deprecated create_entity）
 
 ---
 
@@ -18,15 +34,39 @@
 
 | 组件 | 位置 | 接口 | 状态 |
 |------|------|------|------|
-| `L5GraphPort` | `src/domain/ports/l5_graph.py` | `create_entity/memory_id` 风格 | 旧接口，含领域语义 |
-| `Neo4jAdapter` | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 实现旧 L5GraphPort | 待重构 |
-| `Neo4jGraphStorage` | `src/infrastructure/storage/neo4j/graph_storage.py` | 部分实现 | 缺多数方法 |
-| `Neo4jClientWrapper` | `src/infrastructure/storage/neo4j/client.py` | 连接封装 | 已有 |
+| `L5GraphPort` | `src/domain/ports/l5_graph.py` | 9个方法：`create_entity/get_entity/delete_entity` + `create_relationship/delete_relationship/find_related/get_neighbors/execute_query/execute_write_query` | 旧接口，含领域语义（memory_id），缺少 `update_node/node_exists/get_relationships` |
+| `Neo4jAdapter` | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 仅实现8个方法 | **缺少 `get_neighbors`** 实现（运行时 AttributeError），硬编码 `Memory` 标签（5处） |
+| `Neo4jGraphStorage` | `src/infrastructure/storage/neo4j/graph_storage.py` | 低级 Cypher 执行器 | 已有，实现 `execute_query/execute_write_query/find_path/get_neighbors`，但 `execute_query`/`execute_write_query` 实现完全相同（无事务区分） |
+| `Neo4jClientWrapper` | `src/infrastructure/storage/neo4j/client.py` | 连接封装 | 已有，懒初始化 driver |
+| `graph_manager.py` | `src/infrastructure/storage/neo4j/graph_manager.py` | 调用方 | 使用 Neo4jGraphStorage |
+| `graph_retriever.py` | `src/infrastructure/storage/neo4j/graph_retriever.py` | 调用方 | 使用 Neo4jGraphStorage |
 | `MemoryGraphPort` | `src/domain/ports/memory_graph.py` | ❌ 不存在 | 待创建 |
 | `Neo4jConnectionProvider` | `src/infrastructure/storage/neo4j/connection_provider.py` | ❌ 不存在 | 待创建 |
 | `MemoryGraphAdapter` | `src/infrastructure/storage/neo4j/memory_graph_adapter.py` | ❌ 不存在 | 待创建 |
 
-### 0.3 目标架构（Target）
+### 0.3 Breaking Change 声明
+
+> **⚠️ 重要**: 本次重构对 `L5GraphPort` 接口进行 **breaking change**。
+
+| 旧接口方法 | 新接口方法 | 变化类型 |
+|-----------|-----------|---------|
+| `create_entity(memory_id, entity_type, properties)` | `create_node(node_id, labels, properties)` | **重命名+语义变更** |
+| `get_entity(memory_id)` | `get_node(node_id)` | **重命名** |
+| `delete_entity(memory_id)` | `delete_node(node_id)` | **重命名** |
+| `create_relationship(src, tgt, type, props)` | `create_relationship(src_id, tgt_id, rel_type, props)` | 参数名统一 |
+| `get_neighbors(memory_id, max_depth, edge_type)` | `get_neighbors(node_id, rel_type, direction)` | **语义变更：移除 max_depth，支持 direction** |
+| - | `update_node(node_id, properties)` | **新增** |
+| - | `node_exists(node_id)` | **新增** |
+| - | `get_relationships(node_id, rel_type, direction)` | **新增** |
+
+**影响范围**:
+- `test_l5_graph_port.py` 中所有测试需要更新（方法重命名）
+- `test_neo4j_adapter.py` 中需要添加 `get_neighbors` 实现
+- `Neo4jAdapter` 需要移除硬编码 `Memory` 标签（5处修改）
+- `Neo4jGraphStorage` 需要区分 `execute_query`/`execute_write_query` 事务
+- `UnifiedStorageGateway` 声明了 `_l5: L5GraphPort` 但**从未调用**，无需修改
+
+### 0.4 目标架构（Target）
 
 | 组件 | Layer | 职责 |
 |------|-------|------|
@@ -36,15 +76,44 @@
 | `Neo4jGraphStorage` | L3 Infrastructure | 完整实现 L5GraphPort |
 | `MemoryGraphAdapter` | L4 Infrastructure | 实现 MemoryGraphPort |
 
-### 0.4 迁移策略
+### 0.5 迁移策略（双轨制）
+
+**推荐：双轨制迁移（避免 Breaking Change）**
 
 ```
-Phase 1: 创建目标接口（不破坏现有代码）
-Phase 2: 实现基础设施（Neo4jGraphStorage + ConnectionProvider）
-Phase 3: 实现领域适配器（MemoryGraphAdapter）
-Phase 4: 重构 Neo4jAdapter 委托
-Phase 5: 更新调用方，废弃旧接口
+Phase 1: Protocol 接口双轨制
+  - L5GraphPort 新增 create_node/get_node/delete_node（保持旧方法）
+  - 旧方法标记 @deprecated，委托给新方法
+
+Phase 2: Adapter 实现双轨制
+  - Neo4jAdapter 同时实现新旧方法
+  - 新方法委托给 Neo4jGraphStorage
+  - 旧方法委托给新方法
+
+Phase 3: 完善基础设施
+  - Neo4jGraphStorage 新增 create_entity/get_entity 等方法
+  - 使用 session.execute_write() 替代 session.run()
+  - 移除 Memory 标签硬编码
+
+Phase 4: 测试更新
+  - 更新 test_l5_graph_port.py（新方法 + 旧方法 deprecated 测试）
+  - 更新 test_neo4j_adapter.py
+  - 添加 get_neighbors 测试
+
+Phase 5: 清理废弃接口
+  - 移除 create_entity/get_entity/delete_entity
+  - 更新所有调用方
 ```
+
+**文件修改清单：**
+
+| 文件 | 修改数量 | 关键变更 |
+|------|----------|----------|
+| `src/domain/ports/l5_graph.py` | 6+ | Protocol 方法签名 + docstring |
+| `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 15+ | get_neighbors 实现 + Cypher 下沉 + Memory 常量化 |
+| `src/infrastructure/storage/neo4j/graph_storage.py` | 5+ | execute_write_query 事务 + 新增方法 |
+| `tests/unit/domain/ports/test_l5_graph_port.py` | 9 | mock 返回值修正 |
+| `tests/unit/infrastructure/storage/test_neo4j_adapter.py` | 12+ | 添加 get_neighbors + 修正返回值 |
 
 ---
 
@@ -57,8 +126,11 @@ Phase 5: 更新调用方，废弃旧接口
 | 问题 | 描述 | 违反原则 |
 |------|------|----------|
 | P1 | `L5GraphPort` 在 Domain 层定义，但包含 `create_entity(memory_id)` 等记忆领域语义 | 领域层应只定义技术抽象，不含领域知识 |
-| P2 | `Neo4jAdapter` 硬编码记忆领域逻辑（Cypher 中的 `Memory` 标签、MERGE 语义） | 适配器应只做接口转换，不含领域逻辑 |
+| P2 | `Neo4jAdapter` 硬编码记忆领域逻辑（`Memory` 标签散落 8+ 处） | 适配器应只做接口转换，不含领域逻辑 |
 | P3 | 未来扩展（如 `AgentGraph`、`DocumentGraph`）无法复用现有设计 | 违反 DRY 原则 |
+| P4 | `Neo4jAdapter` 自己拼接 Cypher，不是"薄适配器"（违反六边形架构） | 适配器承担基础设施职责 |
+| P5 | `execute_write_query` 使用 `session.run()` 而非事务，无重试机制 | 写操作缺乏事务保护和自动重试 |
+| P6 | `Neo4jAdapter` 缺少 `get_neighbors` 实现（运行时 AttributeError） | 接口契约缺失 |
 
 ### 1.2 设计目标
 
@@ -157,7 +229,7 @@ class L5GraphPort(Protocol):
     async def get_relationships(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]: ...
     # 图遍历
     async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]: ...
-    async def get_neighbors(self, node_id: str, max_depth: int = 1, edge_type: str | None = None) -> list[dict]: ...
+    async def get_neighbors(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]: ...
     async def find_related(self, node_id: str, max_depth: int = 2, edge_type: str | None = None) -> list[dict]: ...
     # 低级Cypher
     async def execute_query(self, cypher: str, params: dict | None = None) -> list[dict]: ...
@@ -177,7 +249,7 @@ class MemoryGraphPort(L5GraphPort, Protocol):
     async def get_memory_links(self, memory_id: str, relationship_type: str | None = None) -> list[dict]: ...
     # 记忆图遍历
     async def find_related_memories(self, memory_id: str, max_depth: int = 2, relationship_type: str | None = None) -> list[dict]: ...
-    async def get_memory_neighbors(self, memory_id: str, max_depth: int = 1, edge_type: str | None = None) -> list[dict]: ...
+    async def get_memory_neighbors(self, memory_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]: ...
     async def find_memory_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]: ...
     # 批量操作
     async def batch_create_memory_entities(self, entities: list[dict]) -> list[bool]: ...
@@ -461,7 +533,8 @@ class L5GraphPort(Protocol):
     async def get_neighbors(
         self,
         node_id: str,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
         """获取节点的直接邻居（单跳）。
 
@@ -474,7 +547,8 @@ class L5GraphPort(Protocol):
 
         Args:
             node_id: 节点 ID
-            edge_type: 过滤边类型，None 表示所有类型
+            rel_type: 过滤边类型，None 表示所有类型
+            direction: 遍历方向（"IN" / "OUT" / "BOTH"），默认 "BOTH"
 
         Returns:
             直接邻居节点列表 [{id, labels, properties}, ...]
@@ -554,7 +628,7 @@ class L5GraphPort(Protocol):
 | `create_relationship(src, tgt, type, props)` | `create_relationship(src_id, tgt_id, rel_type, props)` | 参数名统一 |
 | `delete_relationship(src, tgt, type)` | `delete_relationship(src_id, tgt_id, rel_type)` | 参数名统一 |
 | - | `get_relationships(node_id, rel_type, direction)` | **新增**：获取关系列表 |
-| `get_neighbors(memory_id, max_depth, edge_type)` | `get_neighbors(node_id, max_depth, edge_type)` | 移除 memory_id 语义 |
+| `get_neighbors(memory_id, max_depth, edge_type)` | `get_neighbors(node_id, rel_type, direction)` | 移除 memory_id 语义，支持 direction |
 | `find_related(memory_id, max_depth, rel_type)` | `find_related(node_id, max_depth, edge_type)` | 参数名统一 |
 | `execute_query(cypher, params)` | `execute_query(cypher, params)` | 不变 |
 | `execute_write_query(cypher, params)` | `execute_write_query(cypher, params)` | 不变 |
@@ -751,7 +825,8 @@ class MemoryGraphPort(L5GraphPort):
     async def get_memory_neighbors(
         self,
         memory_id: str,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
         """获取记忆的直接邻居（单跳）。
 
@@ -759,7 +834,8 @@ class MemoryGraphPort(L5GraphPort):
 
         Args:
             memory_id: 记忆 ID
-            edge_type: 过滤边类型，None 表示所有
+            rel_type: 过滤边类型，None 表示所有
+            direction: 遍历方向（"IN" / "OUT" / "BOTH"），默认 "BOTH"
 
         Returns:
             邻居记忆列表 [{memory_id, type, properties}, ...]
@@ -1138,7 +1214,16 @@ class Neo4jGraphStorage(L5GraphPort):
         rel_type: str | None = None,
         direction: str = "BOTH",
     ) -> list[dict]:
-        """获取节点的关系。"""
+        """获取节点的关系。
+
+        Args:
+            node_id: 节点 ID
+            rel_type: 过滤关系类型，None 表示所有
+            direction: 方向（"OUT" / "IN" / "BOTH"）
+
+        Returns:
+            关系列表 [{source_id, target_id, type, properties}, ...]
+        """
         if rel_type:
             rel_type_clause = f":{rel_type}"
         else:
@@ -1146,18 +1231,18 @@ class Neo4jGraphStorage(L5GraphPort):
 
         if direction == "OUT":
             cypher = f"""
-            MATCH (n {{id: $node_id}}){rel_type_clause}->(target)
-            RETURN startNode(r) as source, endNode(r) as target, type(r) as type, properties(r) as properties
+            MATCH (n {{id: $node_id}})-[r{rel_type_clause}]->(target)
+            RETURN n.id as source_id, target.id as target_id, type(r) as type, properties(r) as properties
             """
         elif direction == "IN":
             cypher = f"""
-            MATCH (n {{id: $node_id}})<{rel_type_clause}-(source)
-            RETURN startNode(r) as source, endNode(r) as target, type(r) as type, properties(r) as properties
+            MATCH (n {{id: $node_id}})<-[r{rel_type_clause}]-(source)
+            RETURN source.id as source_id, n.id as target_id, type(r) as type, properties(r) as properties
             """
-        else:
+        else:  # BOTH
             cypher = f"""
-            MATCH (n {{id: $node_id}}){rel_type_clause}-(other)
-            RETURN n as source, other as target, type(r) as type, properties(r) as properties
+            MATCH (n {{id: $node_id}})-[r{rel_type_clause}]-(other)
+            RETURN n.id as source_id, other.id as target_id, type(r) as type, properties(r) as properties
             """
 
         return await self.execute_query(cypher, {"node_id": node_id})
@@ -1186,20 +1271,42 @@ class Neo4jGraphStorage(L5GraphPort):
     async def get_neighbors(
         self,
         node_id: str,
-        max_depth: int = 1,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
-        """获取邻居节点。"""
-        if edge_type:
-            edge_clause = f":{edge_type}"
-        else:
-            edge_clause = ""
+        """获取邻居节点（单跳）。
 
-        cypher = f"""
-        MATCH (n {{id: $node_id}}){edge_clause}-(neighbor)
-        RETURN distinct neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
-        LIMIT 50
+        Args:
+            node_id: 节点 ID
+            rel_type: 过滤边类型，None 表示所有类型
+            direction: 遍历方向（"IN" / "OUT" / "BOTH"），默认 "BOTH"
+
+        Returns:
+            邻居节点列表 [{id, labels, properties}, ...]
         """
+        if rel_type:
+            rel_type_clause = f":{rel_type}"
+        else:
+            rel_type_clause = ""
+
+        if direction == "OUT":
+            cypher = f"""
+            MATCH (n {{id: $node_id}}){rel_type_clause}->(neighbor)
+            RETURN distinct neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+            LIMIT 50
+            """
+        elif direction == "IN":
+            cypher = f"""
+            MATCH (n {{id: $node_id}}){rel_type_clause}-(neighbor)
+            RETURN distinct neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+            LIMIT 50
+            """
+        else:  # BOTH
+            cypher = f"""
+            MATCH (n {{id: $node_id}}){rel_type_clause}-(neighbor)
+            RETURN distinct neighbor.id as id, labels(neighbor) as labels, properties(neighbor) as properties
+            LIMIT 50
+            """
         return await self.execute_query(cypher, {"node_id": node_id})
 
     async def find_related(
@@ -1388,10 +1495,11 @@ class BaseGraphAdapter(L5GraphPort):
     async def get_neighbors(
         self,
         node_id: str,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
         """获取邻居（委托）。"""
-        return await self._storage.get_neighbors(node_id, edge_type)
+        return await self._storage.get_neighbors(node_id, rel_type, direction)
 
     async def find_related(
         self,
@@ -1579,10 +1687,11 @@ class MemoryGraphAdapter(MemoryGraphPort, BaseGraphAdapter):
     async def get_memory_neighbors(
         self,
         memory_id: str,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
         """获取记忆的邻居（单跳）。"""
-        nodes = await self._storage.get_neighbors(memory_id, edge_type)
+        nodes = await self._storage.get_neighbors(memory_id, rel_type, direction)
         return [
             {
                 "memory_id": n.get("id"),
@@ -1748,11 +1857,11 @@ class Neo4jAdapter(L5GraphPort):
     async def get_neighbors(
         self,
         node_id: str,
-        max_depth: int = 1,
-        edge_type: str | None = None,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
     ) -> list[dict]:
-        """获取邻居。"""
-        return await self._storage.get_neighbors(node_id, max_depth, edge_type)
+        """获取邻居（委托）。"""
+        return await self._storage.get_neighbors(node_id, rel_type, direction)
 
     async def find_related(
         self,
