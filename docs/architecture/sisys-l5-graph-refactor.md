@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.4
+**版本:** v2.5
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.4 修复版，基于四轮全面调研）
+**状态:** 设计完成（v2.5 第1轮审查，基于全面代码调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -33,6 +33,16 @@
 - P2: `Neo4jConnectionProvider` 单例未实现（使用多例 Neo4jClientWrapper）
 - P2: `MemoryGraphPort` 未实现（Application 层抽象缺失）
 
+**Changelog v2.5 (第1轮全面审查 - 4Agent并行调研):**
+- **P0-NEW**: `conftest.py` 使用不存在的构造参数（TypeError，集成测试无法运行）
+- **P0-NEW**: `MemoryChangedHandler` L5 TODO存根（事件驱动路径完全缺失）
+- **P0-NEW**: §0.3 Breaking Change表格遗漏4个方法迁移（find_related/delete_relationship/execute_query/execute_write_query）
+- **P1-NEW**: 三种冗余图类（GraphStorage/GraphManager/GraphRetriever）无清晰层次结构
+- **P1-NEW**: `relationship_type` Cypher注入风险（f-string无清理）
+- **P1-NEW**: L5GraphPort(Protocol)掩盖缺失方法（运行时不检查）
+- **P2-NEW**: L5无内存适配器（测试需真实Neo4j）
+- **P2-NEW**: GraphManager/GraphRetriever孤立未使用
+
 ---
 
 ## 0. 现状与目标状态
@@ -46,14 +56,16 @@
 | 组件 | 位置 | 接口 | 状态 |
 |------|------|------|------|
 | `L5GraphPort` | `src/domain/ports/l5_graph.py` | 9个方法：`create_entity/get_entity/delete_entity` + `create_relationship/delete_relationship/find_related/get_neighbors/execute_query/execute_write_query` | 旧接口，含领域语义（memory_id），缺少 `update_node/node_exists/get_relationships` |
-| `Neo4jAdapter` | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 仅实现8个方法 | **缺少 `get_neighbors`** 实现（运行时 AttributeError），硬编码 `Memory` 标签（5处） |
-| `Neo4jGraphStorage` | `src/infrastructure/storage/neo4j/graph_storage.py` | 低级 Cypher 执行器 | 已有，实现 `execute_query/execute_write_query/find_path/get_neighbors`，但 `execute_query`/`execute_write_query` 实现完全相同（无事务区分） |
+| `Neo4jAdapter` | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 仅实现8个方法 | **缺少 `get_neighbors`** 实现（运行时 AttributeError），硬编码 `Memory` 标签（**8处**），非薄适配器（内联Cypher拼接） |
+| `Neo4jGraphStorage` | `src/infrastructure/storage/neo4j/graph_storage.py` | 低级 Cypher 执行器（4个方法） | 已有，实现 `execute_query/execute_write_query/find_path/get_neighbors`，但 `execute_query`/`execute_write_query` 实现完全相同（无事务区分），缺失 `create_entity/get_entity/delete_entity/create_relationship/delete_relationship/find_related` 6个方法 |
 | `Neo4jClientWrapper` | `src/infrastructure/storage/neo4j/client.py` | 连接封装 | 已有，懒初始化 driver |
 | `graph_manager.py` | `src/infrastructure/storage/neo4j/graph_manager.py` | 调用方 | 使用 Neo4jGraphStorage |
 | `graph_retriever.py` | `src/infrastructure/storage/neo4j/graph_retriever.py` | 调用方 | 使用 Neo4jGraphStorage |
 | `MemoryGraphPort` | `src/domain/ports/memory_graph.py` | ❌ 不存在 | 待创建 |
 | `Neo4jConnectionProvider` | `src/infrastructure/storage/neo4j/connection_provider.py` | ❌ 不存在 | 待创建 |
 | `MemoryGraphAdapter` | `src/infrastructure/storage/neo4j/memory_graph_adapter.py` | ❌ 不存在 | 待创建 |
+| `MemoryChangedHandler` | `src/application/event_handlers/memory_changed_handler.py` | L5 TODO存根 | L5事件驱动路径完全缺失（第83-86行），未注入L5端口 |
+| `conftest.py` (集成) | `tests/integration/conftest.py` | ❌ 参数不匹配 | 使用不存在的构造参数（host/http_port/bolt_port），需改为uri |
 
 ### 0.3 Breaking Change 声明
 
@@ -64,8 +76,12 @@
 | `create_entity(memory_id, entity_type, properties)` | `create_node(node_id, labels, properties)` | **重命名+语义变更** |
 | `get_entity(memory_id)` | `get_node(node_id)` | **重命名** |
 | `delete_entity(memory_id)` | `delete_node(node_id)` | **重命名** |
-| `create_relationship(src, tgt, type, props)` | `create_relationship(src_id, tgt_id, rel_type, props)` | 参数名统一 |
+| `create_relationship(source_memory_id, target_memory_id, relationship_type, properties)` | `create_relationship(src_id, tgt_id, rel_type, props)` | 参数名统一 |
+| `delete_relationship(source_memory_id, target_memory_id, relationship_type)` | `delete_relationship(src_id, tgt_id, rel_type)` | 参数名统一 |
+| `find_related(memory_id, max_depth, relationship_type)` | `find_related(node_id, max_depth, rel_type)` | 参数名统一 |
 | `get_neighbors(memory_id, max_depth, edge_type)` | `get_neighbors(node_id, rel_type, direction)` | **语义变更：移除 max_depth，支持 direction** |
+| `execute_query(cypher, params)` | `execute_query(cypher, params)` | 保留（需改用 session.execute_read） |
+| `execute_write_query(cypher, params)` | `execute_write_query(cypher, params)` | 保留（需改用 session.execute_write） |
 | - | `update_node(node_id, properties)` | **新增** |
 | - | `node_exists(node_id)` | **新增** |
 | - | `get_relationships(node_id, rel_type, direction)` | **新增** |
@@ -73,9 +89,11 @@
 **影响范围**:
 - `test_l5_graph_port.py` 中所有测试需要更新（方法重命名）
 - `test_neo4j_adapter.py` 中需要添加 `get_neighbors` 实现
-- `Neo4jAdapter` 需要移除硬编码 `Memory` 标签（5处修改）
-- `Neo4jGraphStorage` 需要区分 `execute_query`/`execute_write_query` 事务
+- `Neo4jAdapter` 需要移除硬编码 `Memory` 标签（8处修改，非文档旧版声明的5处）
+- `Neo4jGraphStorage` 需要区分 `execute_query`/`execute_write_query` 事务（改用 session.execute_read/execute_write）
 - `UnifiedStorageGateway` 声明了 `_l5: L5GraphPort` 但**从未调用**，无需修改
+- `conftest.py` 集成测试使用不存在的构造参数（host/http_port/bolt_port），需改为 uri
+- `MemoryChangedHandler` L5 路径为 TODO 存根，需在重构后实现
 
 ### 0.4 目标架构（Target）
 
