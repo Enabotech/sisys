@@ -69,6 +69,7 @@ def bootstrap() -> None:
     from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
     from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
     from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
+    from src.domain.ports.session_storage import SessionStorage
     from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
     from src.domain.ports.token_blacklist import TokenBlacklistPort
 
@@ -97,6 +98,17 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
         tags=("redis", "cache"),
+    )
+
+    register_port(
+        name="session_storage",
+        version="v1.0.0",
+        interface=SessionStorage,
+        impl="src.infrastructure.storage.redis.session_storage.RedisSessionStorage",
+        module="src.infrastructure.storage.redis.session_storage",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+        tags=("redis", "session"),
     )
 
     # === Repository Ports ===
