@@ -9,7 +9,7 @@
   <rect width="900" height="720" fill="#fafafa"/>
 
   <!-- Title -->
-  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="600" fill="#1e293b">sisys 系统架构</text>
+  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="600" fill="#1e293b">SISYS 系统架构</text>
 
   <!-- Layer 1: Users -->
   <g transform="translate(50, 70)">
@@ -159,7 +159,7 @@
       <!-- Deploy -->
       <rect x="710" y="55" width="70" height="50" rx="6" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
       <text x="745" y="77" text-anchor="middle" font-size="10" fill="#6b21a8">🐳 Deploy</text>
-      <text x="745" y="92" text-anchor="middle" font-size="10" fill="#6b21a8"> Docker</text>
+      <text x="745" y="92" text-anchor="middle" font-size="8" fill="#6b21a8"> Docker</text>
   </g>
 
 </svg>
