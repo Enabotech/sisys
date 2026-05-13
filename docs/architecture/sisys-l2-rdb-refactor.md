@@ -1,13 +1,27 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.2.0
+**版本：** 1.4.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
+**审查状态：** 第2轮审查完成（修正内容见 §0.0）
 
 ---
 
 ## 0. 方案评估结果
+
+### 0.0 审查修正说明（v1.4.0）
+
+| 问题编号 | 问题描述 | 修正方案 |
+|---------|---------|---------|
+| R-1 | `execute_in_transaction` 归属歧义 | 明确为 `PostgreSqlRdbAdapter` 的方法，非 `L2RdbPort` 接口的一部分 |
+| R-2 | `UserRepositoryPort` 接口不完整 | 补充 `save`/`delete`/`list_all` 标准 CRUD，与 `RoleRepositoryPort` 一致 |
+| R-3 | 会话管理机制不明 | 明确 `BaseRepository` 通过构造器注入 `AsyncSession` |
+| R-4 | `PostgreSqlRdbAdapter` 角色定位 | 明确其为**会话与事务管理者**，不直接实现 `L2RdbPort` 全部接口 |
+| R-5 | 系统使用 **UnitOfWork** 而非 `execute_in_transaction` | 事务边界通过 `PostgreSQLUnitOfWork` 管理，非 adapter 方法 |
+| R-6 | `get_by_email` 方法错误定义 | User 实体无 `email` 字段，移除该方法定义 |
+| R-7 | UserModel 与 User 实体字段不一致 | 需领域层与基础设施层对齐（见 §1.6） |
+| R-8 | architecture.md 与本文档不一致 | 明确两文档定位：前者宏观架构，后者详细设计 |
 
 ### 0.1 业界最佳实践对照
 
@@ -15,8 +29,9 @@
 |------|---------|---------------------------|------|
 | 统一基类 | `L2RdbPort` | `JpaRepository` | ✅ 正确 |
 | 端口继承 | 具体端口继承基类 | `XxxRepository extends JpaRepository` | ✅ 正确 |
-| 会话管理 | `PostgreSqlRdbAdapter` 统一管理 | `EntityManager` 注入 | ✅ 正确 |
+| 会话管理 | `PostgreSqlRdbAdapter` 统一管理 | `EntityManager` 注入 | ✅ 正确（修正） |
 | CRUD 复用 | `BaseRepository` | `SimpleJpaRepository` | ✅ 正确 |
+| 事务边界 | `PostgreSQLUnitOfWork` (应用层管理) | `@Transactional` 在 Service 层 | ✅ 正确（修正） |
 
 ### 0.2 事务边界决策
 
@@ -26,15 +41,19 @@
 | B. **应用层/UseCase 层** | 在用例编排层开启事务 | ⭐⭐⭐ | **✅ 采用** |
 | C. 基础设施层 Adapter | PostgreSqlRdbAdapter 统一控制 | ⭐⭐ | - |
 
-**决策理由**：符合 DDD 事务边界原则，UseCase 是业务事务的边界，Repository 只负责数据访问。
+**决策理由**：
+- 符合 DDD 事务边界原则，UseCase 是业务事务的边界，Repository 只负责数据访问
+- 实际系统使用 `PostgreSQLUnitOfWork` 作为事务边界（非 adapter 方法）
+- 不在 `L2RdbPort` 接口中暴露事务方法，避免污染领域接口契约
 
 ### 0.3 优化点说明
 
 | 优化点 | 原方案 | 优化后 | 理由 |
 |--------|-------|--------|------|
 | 命名 | - | 保持 `L2RdbPort` | 与系统 L0-L5 存储层级语义一致 |
-| 接口签名 | `execute_in_transaction(func, *args)` | 保持当前设计 | FastAPI/SQLAlchemy 生态函数式事务更灵活 |
-| 事务控制 | - | 应用层/UseCase 层 | 符合 DDD 事务边界原则 |
+| 事务控制 | 无 | `PostgreSQLUnitOfWork` | 事务边界在应用层，Repository 不感知事务 |
+| 会话管理 | - | `BaseRepository` 构造器注入 | 明确依赖，不隐藏依赖关系 |
+| 接口完整性 | `UserRepositoryPort` 缺 CRUD | 补充完整 | 与 `RoleRepositoryPort` 一致 |
 
 ### 0.4 核心架构确认
 
@@ -126,17 +145,34 @@ src/infrastructure/storage/postgresql/
 |-------|------|---------|---------|------|
 | `BaseRepository` | repository/base_repository.py | Generic[T] | 无 | ✅ 已有 |
 | `UserRepository` | repository/user_repository.py | BaseRepository | ❌无 | ❌ 未实现端口 |
-| `RoleRepository` | repository/role_repository.py | BaseRepository | ❌无 | ❌ 未实现端口 |
+| `RoleRepository` | repository/role_repository.py | RoleRepositoryPort | ✅ RoleRepositoryPort | ✅ 已实现 |
 | `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | 无 | L2MetadataRepositoryPort | ✅ 已实现 |
+| `LoginAttemptRepository` | repository/login_attempt_repository.py | 无 | LoginAttemptRepositoryPort | ✅ 已实现 |
+| `UserRoleRepository` | repository/user_role_repository.py | 无 | UserRoleRepositoryPort | ✅ 已实现 |
+| `AuditRepository` | infrastructure/security/ | 无 | AuditRepositoryPort | ✅ 已实现 |
 
 ### 1.5 关键发现：设计与实现脱节
 
 **问题根因分析：**
 
-1. **L2RdbPort 基类缺失**：文档定义了基类，但代码未创建
-2. **领域层端口未统一**：8个端口各自独立，未继承基类
-3. **基础设施层未实现端口**：BaseRepository 是 CRUD 实现，不是端口实现
-4. **无 PostgreSqlRdbAdapter**：文档定义的适配器未实现
+1. **L2RdbPort 基类缺失**：文档定义了基类，但代码未创建（是**重构目标**，非当前状态）
+2. **领域层端口未统一**：8个端口各自独立，未继承基类（是**待解决问题**）
+3. **UserRepository 未实现端口**：UserRepository 继承 BaseRepository，但未实现 UserRepositoryPort
+4. **无 PostgreSqlRdbAdapter**：文档定义的适配器未实现（但系统有 PostgreSQLUnitOfWork）
+5. **领域模型与基础设施模型不一致**：User 实体无 email 字段，但 UserModel 有
+
+### 1.6 领域模型与基础设施模型一致性问题
+
+| 模型 | email | 密码字段 | 锁定机制 |
+|------|-------|---------|---------|
+| User (domain) | ❌ 无 | `password_hash` | `failed_login_attempts`, `locked_until` |
+| UserModel (infrastructure) | ✅ 有 | `hashed_password` | ❌ 无 |
+
+**需决策**：
+- 方案A：在 User 实体中添加 `email` 字段，使领域模型与基础设施模型一致
+- 方案B：移除 UserModel 的 `email` 字段，保持领域模型的纯净性
+
+**推荐方案A**（保持与现有系统兼容，但需评估是否违反领域层零依赖原则）
 
 ---
 
@@ -404,7 +440,7 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, TypeVar, Protocol
+from typing import Any, Generic, TypeVar, Protocol
 from uuid import UUID
 
 T = TypeVar("T")
@@ -419,7 +455,7 @@ class L2RdbPort(Protocol):
     设计原则：
     - 领域层零外部依赖（仅用 Protocol + typing）
     - 通用 CRUD 操作统一定义
-    - 事务支持通过 execute_in_transaction 实现
+    - 事务由 PostgreSqlRdbAdapter 提供，不在此接口暴露
     """
 
     # === 通用 CRUD ===
@@ -463,28 +499,6 @@ class L2RdbPort(Protocol):
 
         Returns:
             实体列表
-        """
-
-    # === 事务支持 ===
-
-    async def execute_in_transaction(
-        self,
-        func: Callable[..., Any],
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any:
-        """在事务内执行操作。
-
-        Args:
-            func: 要执行的异步函数
-            *args: 位置参数
-            **kwargs: 关键字参数
-
-        Returns:
-            函数返回值
-
-        Raises:
-            事务内任意异常自动回滚
         """
 ```
 
@@ -571,11 +585,21 @@ class UserRepositoryPort(L2RdbPort, Protocol):
     """用户仓储端口（继承 L2RdbPort）。
 
     遵循六边形架构：领域层零依赖。
+    完整定义标准 CRUD + 专用查询方法。
     """
 
+    # === 标准 CRUD（继承自 L2RdbPort）===
+    async def get_by_id(self, user_id: UUID) -> User | None: ...
+    async def save(self, user: User) -> User: ...
+    async def delete(self, user_id: UUID) -> bool: ...
+    async def list_all(self, skip: int = 0, limit: int = 100) -> list[User]: ...
+
+    # === 专用查询 ===
     async def get_by_username(self, username: str) -> User | None: ...
-    async def get_by_email(self, email: str) -> User | None: ...
-```
+
+**注意**：`get_by_email` 方法已移除，因为 User 实体不包含 email 字段。
+
+**说明**：`UserRepositoryPort` 需完整实现 `L2RdbPort` 定义的 CRUD 接口，与 `RoleRepositoryPort` 保持一致性。
 
 #### 4.2.3 role_repository.py（继承 L2RdbPort）
 
@@ -605,40 +629,43 @@ class RoleRepositoryPort(L2RdbPort, Protocol):
 
 ### 4.3 基础设施层设计
 
-#### 4.3.1 rdb_adapter.py（PostgreSQL RDB 适配器）
+#### 4.3.1 rdb_adapter.py（PostgreSQL 会话与事务适配器）
 
 ```python
 # src/infrastructure/storage/postgresql/rdb_adapter.py
 
-"""PostgreSqlRdbAdapter — PostgreSQL RDB 适配器。
+"""PostgreSqlRdbAdapter — PostgreSQL 会话与事务管理适配器。
 
-实现 L2RdbPort 接口，提供统一的数据库连接和事务管理。
+职责：
+- 数据库会话生命周期管理
+- 事务控制（commit/rollback）
+- 不实现 L2RdbPort 接口，仅作为基础设施内部工具
+
+使用方式：
+- 应用层/UseCase 层通过注入的 PostgreSqlRdbAdapter 调用 execute_in_transaction
+- 具体 Repository 通过构造器注入 AsyncSession（不由此适配器提供）
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.ports.l2_rdb import L2RdbPort
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 
 T = TypeVar("T")
 
 
-class PostgreSqlRdbAdapter(L2RdbPort):
-    """PostgreSQL RDB 适配器实现。
+class PostgreSqlRdbAdapter:
+    """PostgreSQL 会话与事务管理适配器。
 
     职责：
-    - 数据库会话管理
-    - 事务控制
-    - 委托具体 Repository 执行数据操作
+    - 提供 get_session() 获取数据库会话
+    - 提供 execute_in_transaction() 执行带事务的业务逻辑
 
-    使用方式：
-    - 注入到具体 Repository
-    - 通过 execute_in_transaction 提供事务支持
+    不实现 L2RdbPort 接口，事务方法是独立的能力。
     """
 
     def __init__(self, engine: DatabaseEngine):
@@ -648,21 +675,14 @@ class PostgreSqlRdbAdapter(L2RdbPort):
             engine: 数据库引擎实例
         """
         self._engine = engine
-        self._session: AsyncSession | None = None
-
-    @property
-    def session(self) -> AsyncSession:
-        """获取当前会话（延迟初始化）。"""
-        if self._session is None:
-            raise RuntimeError("Session not initialized. Use get_session() first.")
-        return self._session
 
     async def get_session(self) -> AsyncSession:
-        """获取或创建会话。"""
-        if self._session is None:
-            async with self._engine.get_async_session() as session:
-                self._session = session
-        return self._session
+        """获取数据库会话。
+
+        Returns:
+            AsyncSession 实例
+        """
+        return self._engine.get_async_session()
 
     async def execute_in_transaction(
         self,
@@ -672,6 +692,8 @@ class PostgreSqlRdbAdapter(L2RdbPort):
     ) -> T:
         """在事务内执行操作。
 
+        应用层/UseCase 层使用此方法包装需要事务的业务逻辑。
+
         Args:
             func: 要执行的异步函数
             *args: 位置参数
@@ -679,35 +701,24 @@ class PostgreSqlRdbAdapter(L2RdbPort):
 
         Returns:
             函数返回值
+
+        Raises:
+            事务内任意异常自动回滚
         """
         async with self._engine.get_async_session() as session:
-            self._session = session
             try:
-                result = await func(*args, **kwargs)
+                result = await func(session, *args, **kwargs)
                 await session.commit()
                 return result
             except Exception:
                 await session.rollback()
                 raise
-            finally:
-                self._session = None
-
-    async def get_by_id(self, id: UUID) -> Any | None:
-        """通用 get_by_id（由具体 Repository 覆盖）。"""
-        raise NotImplementedError("Use specific repository implementation")
-
-    async def save(self, entity: Any) -> Any:
-        """通用 save（由具体 Repository 覆盖）。"""
-        raise NotImplementedError("Use specific repository implementation")
-
-    async def delete(self, id: UUID) -> bool:
-        """通用 delete（由具体 Repository 覆盖）。"""
-        raise NotImplementedError("Use specific repository implementation")
-
-    async def list_all(self, skip: int = 0, limit: int = 100) -> list[Any]:
-        """通用 list_all（由具体 Repository 覆盖）。"""
-        raise NotImplementedError("Use specific repository implementation")
 ```
+
+**说明**：
+- `PostgreSqlRdbAdapter` 不再实现 `L2RdbPort`，而是独立提供会话和事务管理
+- `execute_in_transaction` 将 `session` 作为第一个参数传递给目标函数
+- 事务边界由应用层/UseCase 层控制
 
 #### 4.3.2 base_repository.py（更新）
 
@@ -717,11 +728,11 @@ class PostgreSqlRdbAdapter(L2RdbPort):
 """BaseRepository — 通用仓储基类。
 
 所有具体仓储类继承此基类，复用 CRUD 操作。
-需要配合 PostgreSqlRdbAdapter 使用。
 
 设计原则：
 - 泛型类型参数 T 为 SQLAlchemy 模型
-- 依赖注入 PostgreSqlRdbAdapter 获取会话
+- 会话通过构造器注入，不依赖 PostgreSqlRdbAdapter
+- 具体 Repository 在构造时注入 session，实现数据访问
 """
 
 from __future__ import annotations
@@ -747,7 +758,7 @@ class BaseRepository(Generic[T]):
 
         Args:
             model_class: SQLAlchemy 模型类
-            session: 异步数据库会话
+            session: 异步数据库会话（由调用方注入，通常来自 UseCase 层）
         """
         self._model_class: type[T] = model_class
         self._session = session
@@ -817,28 +828,61 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
     """用户仓储 PostgreSQL 实现。
 
     继承关系：
-    - UserRepositoryPort (领域层接口)
-    - BaseRepository (通用 CRUD)
+    - UserRepositoryPort (领域层接口) → 定义 CRUD + 专用查询契约
+    - BaseRepository (通用 CRUD) → 提供 CRUD 实现复用
     """
 
     def __init__(self, session: AsyncSession):
         """初始化 PostgreSQLUserRepository。
 
         Args:
-            session: 异步数据库会话
+            session: 异步数据库会话（由 UseCase 层通过 PostgreSqlRdbAdapter 获取并注入）
         """
         BaseRepository.__init__(self, UserModel, session)
+
+    # === 实现 L2RdbPort 定义的 CRUD ===
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        """根据 ID 获取用户。"""
+        result = await self._session.execute(select(UserModel).where(UserModel.id == user_id))
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def save(self, user: User) -> User:
+        """保存用户（创建或更新）。"""
+        model = self._to_model(user)
+        self._session.add(model)
+        await self._session.flush()
+        await self._session.refresh(model)
+        return self._to_entity(model)
+
+    async def delete(self, user_id: UUID) -> bool:
+        """删除用户。"""
+        model = await self._session.get(UserModel, user_id)
+        if model:
+            await self._session.delete(model)
+            await self._session.flush()
+            return True
+        return False
+
+    async def list_all(self, skip: int = 0, limit: int = 100) -> list[User]:
+        """获取所有用户。"""
+        result = await self._session.execute(select(UserModel).offset(skip).limit(limit))
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
+
+    # === 实现 UserRepositoryPort 专用查询 ===
 
     def _to_entity(self, model: UserModel) -> User:
         """模型转领域实体。"""
         return User(
             id=model.id,
             username=model.username,
-            password_hash=model.password_hash,
+            password_hash=model.hashed_password or "",
             is_active=model.is_active,
             is_locked=model.is_locked,
-            failed_login_attempts=model.failed_login_attempts,
-            locked_until=model.locked_until,
+            failed_login_attempts=0,
+            locked_until=None,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -848,29 +892,25 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
         return UserModel(
             id=entity.id,
             username=entity.username,
-            password_hash=entity.password_hash,
+            hashed_password=entity.password_hash,
             is_active=entity.is_active,
             is_locked=entity.is_locked,
-            failed_login_attempts=entity.failed_login_attempts,
-            locked_until=entity.locked_until,
         )
 
     async def get_by_username(self, username: str) -> User | None:
         """根据用户名获取用户。"""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.username == username)
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def get_by_email(self, email: str) -> User | None:
-        """根据邮箱获取用户。"""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.email == email)
-        )
+        result = await self._session.execute(select(UserModel).where(UserModel.username == username))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 ```
+
+**说明**：由于 User 实体无 email 字段，模型转换时 email 字段被忽略。password_hash 与 hashed_password 字段名不一致也已在转换中处理。
+
+**说明**：
+- `PostgreSQLUserRepository` 同时继承 `UserRepositoryPort` 和 `BaseRepository`
+- `BaseRepository` 提供 CRUD 实现骨架，`UserRepositoryPort` 提供接口契约
+- `save`/`get_by_id`/`delete`/`list_all` 覆盖 `BaseRepository` 的默认实现以返回领域实体类型
+- 会话由 UseCase 层获取并通过构造器注入，不直接依赖 `PostgreSqlRdbAdapter`
 
 ---
 
@@ -1117,3 +1157,5 @@ class MockL2RdbAdapter(L2RdbPort):
 | 1.0.0 | 2026-05-13 | - | 初始版本 |
 | 1.1.0 | 2026-05-13 | - | 补充业界最佳实践对照 + 事务边界设计 |
 | 1.2.0 | 2026-05-13 | - | 补充现状审计 + 实施追踪表 + Phase 0 |
+| 1.3.0 | 2026-05-13 | - | 审查修正：明确 execute_in_transaction 归属、补充 UserRepositoryPort CRUD、澄清会话管理机制 |
+| 1.4.0 | 2026-05-13 | - | 第2轮审查：修正 UnitOfWork、移除 get_by_email、修正 UserModel/Entity 不一致、更新基础设施层状态 |
