@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v5.0
+**版本:** v6.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -897,6 +897,58 @@ def test_backward_compatibility():
 | v3.0 | 2026-05-13 | L3VectorPort 接口参数统一 | collection → name, vector_params → distance |
 | v4.0 | 2026-05-13 | **代码验证发现 v3.0 计划变更未实现** | 所有 P0/P1 问题仍未修复，需开始实际代码实现 |
 | v5.0 | 2026-05-13 | **第二轮5轮审查完成** | 发现设计文档内部矛盾：SemanticVectorPort(L3VectorPort, ...) 是歧义；发现 Redis 连接池问题；确认 P0 修复依赖关系 |
+| v6.0 | 2026-05-13 | **语义缓存工作流程评审** | 确认 Qdrant+Redis 分离式设计合理；发现一致性风险；TTL 不一致；缺少 invalidate_by_embedding |
+
+---
+
+## 九、语义缓存工作流程评审
+
+### 9.1 工作流程定义
+
+```
+1. 计算 embedding
+2. Qdrant.search(embedding, limit=1, score_threshold=0.95)
+   ↓命中
+3. 获得 payload 中的 cache_key → Redis.GET(cache_key) → 返回缓存响应
+   ↓未命中
+4. 调用 LLM → 生成响应 → 写入 Redis(SET cache_key response EX 3600)
+                                → 写入 Qdrant(embedding + payload{cache_key})
+```
+
+### 9.2 设计合理性评估
+
+| 设计点 | 评价 |
+|--------|------|
+| cache_key 存储在 Qdrant payload | ✅ 合理 - 查询效率高，避免 Redis 全表扫描 |
+| embedding → cache_key 生成 | ✅ 确定性哈希，同一查询生成相同 key |
+| Qdrant + Redis 分离存储 | ✅ 合理 - Qdrant 负责向量检索，Redis 负责内容缓存 |
+
+### 9.3 发现的问题
+
+| 问题 | 严重程度 | 说明 |
+|------|---------|------|
+| **QdrantSemanticCacheStore 不存在** | 高 | 设计文档中的实现未创建 |
+| **score_threshold 参数不支持** | 中 | `QdrantVectorStorage.search()` 签名无此参数，需后过滤 |
+| **TTL 不一致** | 中 | 工作流: 3600s，设计文档: 86400s |
+| **缺少 invalidate_by_embedding** | 中 | 调用方只有 embedding 无法失效缓存 |
+
+### 9.4 一致性风险
+
+| 场景 | 风险 | 严重程度 |
+|------|------|---------|
+| Qdrant 写入失败 + Redis 成功 | 幽灵缓存 - Qdrant 有向量但 Redis 无数据 | 高 |
+| Redis 写入失败 + Qdrant 成功 | 调用方不知道缓存未写入 | 中 |
+| Qdrant 搜索失败 | 请求直接失败，无降级 | 高 |
+| Redis 读取失败与未命中混淆 | 返回 None 无法区分两种情况 | 中 |
+
+### 9.5 改进建议
+
+1. **实现 QdrantSemanticCacheStore** - 参考 §3.2.2 的设计
+2. **扩展 QdrantVectorStorage.search()** - 添加 `score_threshold` 参数支持
+3. **统一 TTL 配置** - 建议使用 3600s（1小时）或暴露为配置参数
+4. **添加写入验证** - 写入后读取验证数据存在性
+5. **添加 invalidate_by_embedding 方法** - 支持 embedding 级别的失效
+6. **考虑 Outbox Pattern** - 确保 Qdrant 和 Redis 写入一致性
 
 ---
 
@@ -944,11 +996,10 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v5.0 已完成第二轮5轮审查 + 代码验证
+**文档状态**: v6.0 已完成语义缓存工作流程评审
 **审查摘要**:
-- 发现设计文档内部矛盾：`SemanticVectorPort(L3VectorPort, ...)` 是歧义，应为组合关系
-- 发现 Redis 连接池问题：6个 adapter 各自创建独立连接池
-- 确认 P0 修复依赖关系：P0-1 → P0-4 → P0-2 → P0-3
+- Qdrant + Redis 分离式设计合理（Qdrant 检索 + Redis 缓存内容）
+- 发现 4 个一致性风险和 5 项改进建议
 - 所有 P0 问题仍未修复
 
 **下一步**: 执行 P0 问题的实际代码实现
