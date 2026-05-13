@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v4.0
+**版本:** v5.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -65,6 +65,7 @@ src/composition_root.py       # 端口注册（l3_vector 未注册）
 | P1-2 | `QdrantCollectionManager` 已完整实现 Collection 管理，但 `QdrantVectorAdapter` 未委托给它 | `qdrant_vector_adapter.py` | 代码重复，违反 DRY |
 | P1-3 | `SemanticCache` 新接口 (`get_or_compute`) 与旧接口 (`get`/`set`) 语义不兼容 | `semantic_cache.py` | 向后兼容方案不可行 |
 | P1-4 | `arch-appendix.md` 引用无效 API `OptimizerConfig` | `arch-appendix.md` | 文档与 SDK 不符 |
+| P1-5 | 6个 Redis adapter 各自创建独立连接池 | `redis/*.py` | 连接数 = N × max_connections，RedisPoolProvider 设计文档存在但代码未实现 |
 
 #### P2 问题（建议修复）
 
@@ -112,11 +113,11 @@ Infrastructure Layer
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Domain Layer - SemanticVectorPort                      │
+│  Layer 2: Domain Layer - SemanticCachePort                        │
 │                                                                  │
 │  职责：Qdrant 负责向量存储与语义检索，Redis 负责缓存实际响应内容（带 TTL 管理）│
 │  位置：src/domain/ports/                                         │
-│  端口：SemanticVectorPort(L3VectorPort, ...)                      │
+│  注意：SemanticCachePort 是独立接口，使用组合而非继承关系来调用 L3VectorPort│
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
@@ -895,6 +896,7 @@ def test_backward_compatibility():
 | v3.0 | 2026-05-13 | UnifiedStorageGateway self._l3 使用 | L3 功能不再虚设 |
 | v3.0 | 2026-05-13 | L3VectorPort 接口参数统一 | collection → name, vector_params → distance |
 | v4.0 | 2026-05-13 | **代码验证发现 v3.0 计划变更未实现** | 所有 P0/P1 问题仍未修复，需开始实际代码实现 |
+| v5.0 | 2026-05-13 | **第二轮5轮审查完成** | 发现设计文档内部矛盾：SemanticVectorPort(L3VectorPort, ...) 是歧义；发现 Redis 连接池问题；确认 P0 修复依赖关系 |
 
 ---
 
@@ -942,6 +944,12 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v4.0 已完成 5 轮审查 + 代码验证
-**审查摘要**: 确认 v3.0 设计文档中的所有 P0 问题在代码中仍未修复
+**文档状态**: v5.0 已完成第二轮5轮审查 + 代码验证
+**审查摘要**:
+- 发现设计文档内部矛盾：`SemanticVectorPort(L3VectorPort, ...)` 是歧义，应为组合关系
+- 发现 Redis 连接池问题：6个 adapter 各自创建独立连接池
+- 确认 P0 修复依赖关系：P0-1 → P0-4 → P0-2 → P0-3
+- 所有 P0 问题仍未修复
+
 **下一步**: 执行 P0 问题的实际代码实现
+**关键设计澄清**: `SemanticCachePort` 使用**组合关系**调用 `L3VectorPort`，不是继承关系
