@@ -1,18 +1,23 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v2.0
+**版本:** v2.1
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 已修订（宗师级审查反馈）
+**审查状态:** 第1轮审查修订
 
 ---
 
-## 修订说明 (v2.0)
+## 修订说明 (v2.1)
 
 | 审查问题 | 严重程度 | 修订内容 |
 |----------|----------|----------|
 | 执行步骤缺少进度跟踪 | P0 | 详细步骤使用checkbox格式，便于跟踪 |
 | 保持四层模型 | P1 | 明确四层架构：Domain→Application→Infrastructure技术→Infrastructure实现 |
+| SemanticCache未继承L1CachePort | P0 | 确认问题存在，规划Phase 4修复 |
+| 方法命名不规范 | P1 | get→get_by_embedding, set→set_with_embedding |
+| RedisConfig默认值不一致 | P0 | 添加问题说明：class=10 vs from_env()=100 |
+| 6个Adapter独立ConnectionPool | P0 | 添加问题说明，规划Phase 1-9统一连接池 |
+| IdempotencyChecker硬编码参数 | P0 | 添加问题说明，纳入连接池统一管理 |
 
 ---
 
@@ -22,9 +27,13 @@
 
 | 接口 | 位置 | 方法签名 | 问题 |
 |------|------|----------|------|
-| `L1CachePort` | `src/domain/ports/l1_cache.py` | `get(memory_type, owner_id, name)`, `set(memory_type, owner_id, name, content, ttl)`, `delete(memory_type, owner_id, name)`, `invalidate_pattern(memory_type, owner_id)` | 专用接口，非通用缓存 |
-| `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | 未继承L1CachePort |
-| `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | 未继承L1CachePort |
+| `L1CachePort` | `src/domain/ports/l1_cache.py` | `get(key: str)`, `set(key, value, ttl)`, `delete(key)` | ✅ 通用接口 |
+| `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | ❌ 未继承L1CachePort，方法命名不规范 |
+| `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | ❌ 未继承L1CachePort |
+
+**问题说明：**
+- `SemanticCache` 应改名为 `SemanticCachePort` 并继承 `L1CachePort`
+- `get` 方法应改名为 `get_by_embedding`，`set` 应改名为 `set_with_embedding`
 
 ### 1.2 当前实现（8个Adapter现状）
 
@@ -70,8 +79,8 @@
 当前架构问题：
 
 Domain Layer
-└── L1CachePort (专用接口: memory_type/owner_id/name)
-    SemanticCache (独立接口，未继承)
+└── L1CachePort (通用接口: key/value) ✅
+    SemanticCache (独立接口，未继承) ❌
     SessionStorage (独立接口，未继承)
 
 Infrastructure Layer
@@ -85,10 +94,12 @@ Infrastructure Layer
 └── RedisEventBus → 委托上述两者 ⚠️
 
 问题：
-1. L1CachePort 是专用接口，不是通用缓存抽象
-2. 6个Adapter各自管理ConnectionPool（除RedisMemoryCache和RedisSnapshotStore）
-3. 接口无继承关系，无法统一抽象
-4. 连接数 = 6 × max_connections (默认10) = 60，可能耗尽Redis连接限制
+1. SemanticCache 未继承 L1CachePort（违反四层架构）
+2. SemanticCache 方法命名不规范（get/set 应为 get_by_embedding/set_with_embedding）
+3. 6个Adapter各自管理ConnectionPool（除RedisMemoryCache和RedisSnapshotStore）
+4. RedisConfig max_connections 默认值不一致：class=10 vs from_env()=100 ⚠️ P0
+5. IdempotencyChecker 硬编码连接参数，绕过 RedisConfig ⚠️ P0
+6. composition_root 未初始化共享连接池 ⚠️ P0
 ```
 
 ### 1.4 连接池配置现状
