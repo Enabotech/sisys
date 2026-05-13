@@ -82,70 +82,129 @@ Infrastructure Layer
 
 ## 二、目标架构
 
-### 2.1 分层架构图
+### 2.1 四层职责模型
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Domain Layer                             │
+│  Layer 1: Domain Layer - L3VectorPort（统一抽象向量存储端口）     │
 │                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                      L3VectorPort                           │ │
-│  │  (Protocol)                                                 │ │
-│  │  - upsert_points, delete_points, get_point                │ │
-│  │  - search, search_sparse                                    │ │
-│  │  - create_collection, delete_collection                    │ │
-│  │  - collection_exists, list_collections                       │ │
-│  └──────────────────────────┬──────────────────────────────────┘ │
-│                             │ 继承                               │
-│  ┌──────────────────────────┴──────────────────────────────────┐ │
-│  │                   SemanticCachePort                          │ │
-│  │  (extends L3VectorPort)                                      │ │
-│  │  - get_or_compute(query_embedding, compute_fn)              │ │
-│  │  - invalidate(cache_key)                                     │ │
-│  │  - SIMILARITY_THRESHOLD = 0.9                               │ │
-│  │  - TTL = 86400 (24h)                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
+│  职责：定义最底层通用向量存储接口（CRUD + 检索）                   │
+│  位置：src/domain/ports/l3_vector.py                             │
+│  特点：领域层零依赖，纯抽象协议                                    │
+│  方法：                                                          │
+│    - upsert_points / delete_points / get_point                  │
+│    - search / search_sparse                                      │
+│    - create_collection / delete_collection                      │
+│    - collection_exists / list_collections                       │
 └─────────────────────────────────────────────────────────────────┘
-                              │ 实现 Port
-                              ▼
+                              ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Infrastructure Layer                        │
+│  Layer 2: Domain Layer - 具体应用向量存储端口                      │
 │                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │              QdrantVectorStore → L3VectorPort               │ │
-│  │                                                              │ │
-│  │  职责：                                                       │ │
-│  │  - Qdrant 客户端管理                                         │ │
-│  │  - Collection 管理                                          │ │
-│  │  - 向量点 CRUD                                              │ │
-│  │  - Dense/Sparse 检索                                        │ │
-│  │  - Point ID 规范化                                          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
+│  职责：继承L3VectorPort，定义特定场景向量存储能力                  │
+│  位置：src/domain/ports/                                          │
+│  端口：                                                          │
+│    - SemanticCachePort (语义缓存) ← 本次重构重点                   │
+│    - MemoryVectorPort (记忆向量) ← 未来扩展                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: Infrastructure - Qdrant技术实现 + 向量存储管理            │
 │                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │         QdrantSemanticCacheStore → SemanticCachePort         │ │
-│  │                                                              │ │
-│  │  职责：                                                       │ │
-│  │  - 语义缓存业务逻辑（基于 QdrantVectorStore）                 │ │
-│  │  - 向量相似度匹配（SIMILARITY_THRESHOLD）                    │ │
-│  │  - 缓存键管理（embedding hash）                              │ │
-│  └─────────────────────────────────────────────────────────────┘ │
+│  职责：实现L3VectorPort接口 + Qdrant客户端管理                     │
+│  位置：src/infrastructure/storage/qdrant/                         │
+│  组件：                                                          │
+│    - QdrantVectorStore (实现L3VectorPort)                        │
+│    - QdrantClientWrapper (Qdrant客户端单例)                       │
+│  特点：技术可替换（未来可新增MilvusAdapter等）                     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Infrastructure - 具体应用向量存储端口实现                 │
 │                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │       RedisSemanticCacheAdapter → SemanticCachePort          │ │
-│  │                                                              │ │
-│  │  职责：                                                       │ │
-│  │  - 轻量级语义缓存（向后兼容）                                │ │
-│  │  - 余弦相似度扫描（O(n)，性能较差）                         │ │
-│  │  - 仅用于不需要 Qdrant 的场景                               │ │
-│  │                                                              │ │
-│  │  注意：Redis 不具备向量检索能力，此为过渡方案                │ │
-│  └─────────────────────────────────────────────────────────────┘ │
+│  职责：实现具体应用向量存储端口（SemanticCachePort等）             │
+│  位置：src/infrastructure/storage/qdrant/                          │
+│  组件：                                                          │
+│    - QdrantSemanticCacheStore (实现SemanticCachePort)            │
+│      └─ 组合QdrantVectorStore处理基础向量操作                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 文件结构
+### 2.3 接口继承关系
+
+```python
+# Layer 1: Domain统一抽象
+class L3VectorPort(Protocol):
+    """通用向量存储接口 - 最底层抽象"""
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool: ...
+    async def delete_points(self, collection: str, point_ids: list[str]) -> bool: ...
+    async def get_point(self, collection: str, point_id: str) -> dict | None: ...
+    async def search(self, collection: str, query_vector: list[float], limit: int, ...) -> list[dict]: ...
+    async def search_sparse(self, collection: str, sparse_vector: dict, limit: int, ...) -> list[dict]: ...
+    async def create_collection(self, collection: str, vector_size: int, ...) -> bool: ...
+    async def delete_collection(self, collection: str) -> bool: ...
+    async def collection_exists(self, collection: str) -> bool: ...
+    async def list_collections(self) -> list[str]: ...
+
+# Layer 2: Domain具体应用端口
+class SemanticCachePort(L3VectorPort, Protocol):
+    """语义缓存接口 - 继承L3VectorPort"""
+    SIMILARITY_THRESHOLD: float = 0.9
+    TTL: int = 86400
+
+    async def get_or_compute(self, query_embedding: list[float], compute_fn: Callable) -> CacheResult: ...
+    async def invalidate(self, cache_key: str) -> bool: ...
+
+@dataclass
+class CacheResult:
+    value: dict
+    hit: bool
+
+# Layer 3: Infrastructure Qdrant实现
+class QdrantVectorStore(L3VectorPort):
+    """Qdrant通用向量存储实现"""
+    def __init__(self, client_wrapper: QdrantClientWrapper): ...
+
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool: ...
+    async def search(self, collection: str, query_vector: list[float], limit: int, ...) -> list[dict]: ...
+    # ... 其他L3VectorPort方法实现
+
+# Layer 4: Infrastructure具体应用实现
+class QdrantSemanticCacheStore(SemanticCachePort):
+    """Qdrant语义缓存实现"""
+    def __init__(self, l3_vector: L3VectorPort, collection: str = "semantic_cache", ...):
+        self._l3 = l3_vector
+
+    async def get_or_compute(self, query_embedding, compute_fn):
+        # 1. 搜索相似缓存
+        results = await self._l3.search(collection=self._collection, query_vector=query_embedding, limit=1)
+        if results and results[0]["score"] >= self._threshold:
+            return CacheResult(value=results[0]["payload"]["result"], hit=True)
+        # 2. 缓存未命中，执行计算并存储
+        result = await compute_fn()
+        await self._l3.upsert_points(self._collection, [{"id": self._hash_embedding(query_embedding), ...}])
+        return CacheResult(value=result, hit=False)
+
+    # 继承L3VectorPort基础方法
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool:
+        return await self._l3.upsert_points(collection, points)
+
+    async def search(self, collection: str, query_vector: list[float], limit: int, ...) -> list[dict]:
+        return await self._l3.search(collection, query_vector, limit, ...)
+```
+
+### 2.4 与L1层缓存的对比
+
+| 维度 | L1 Cache (Redis) | L3 Vector (Qdrant) |
+|------|------------------|-------------------|
+| **基础接口** | `L1CachePort` | `L3VectorPort` |
+| **应用接口** | `SemanticCachePort` (Redis实现) | `SemanticCachePort` (Qdrant实现) |
+| **存储类型** | 键值缓存 | 向量存储 + 相似度检索 |
+| **检索方式** | 精确匹配 / 模式扫描 | 向量相似度搜索 |
+| **技术实现** | `RedisMemoryCache` | `QdrantVectorStore` |
+| **应用实现** | `RedisSemanticCacheAdapter` | `QdrantSemanticCacheStore` |
+
+### 2.5 文件结构
 
 ```
 src/domain/ports/
