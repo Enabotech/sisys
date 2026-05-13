@@ -314,14 +314,14 @@ src/infrastructure/storage/postgresql/
 │  职责：继承 L2RdbPort，定义特定实体数据访问契约                   │
 │  位置：src/domain/ports/                                          │
 │  端口：                                                          │
-│    - L2MetadataRepositoryPort(L2RdbPort)     (记忆系统)           │
-│    - L2ChangeHistoryRepositoryPort(L2RdbPort)                    │
-│    - L2GroupMemberRepositoryPort(L2RdbPort)                     │
-│    - UserRepositoryPort(L2RdbPort)          (用户系统)           │
-│    - RoleRepositoryPort(L2RdbPort)           (角色系统)          │
-│    - AuditRepositoryPort(L2RdbPort)           (审计系统)         │
-│    - LoginAttemptRepositoryPort(L2RdbPort)   (登录系统)          │
-│    - UserRoleRepositoryPort(L2RdbPort)        (用户角色系统)      │
+│    - L2MetadataRepositoryPort(L2RdbPort, ...)     (记忆系统)       │
+│    - L2ChangeHistoryRepositoryPort(L2RdbPort, ...)                │
+│    - L2GroupMemberRepositoryPort(L2RdbPort, ...)                 │
+│    - UserRepositoryPort(L2RdbPort, ...)          (用户系统)       │
+│    - RoleRepositoryPort(L2RdbPort, ...)           (角色系统)      │
+│    - AuditRepositoryPort(L2RdbPort, ...)           (审计系统)     │
+│    - LoginAttemptRepositoryPort(L2RdbPort, ...)   (登录系统)      │
+│    - UserRoleRepositoryPort(L2RdbPort, ...)        (用户角色系统) │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐

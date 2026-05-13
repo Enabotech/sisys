@@ -123,9 +123,9 @@ decode_responses=True  # 重复
 │  职责：继承L1CachePort，定义特定场景缓存能力                       │
 │  位置：src/application/ports/                                     │
 │  端口：                                                          │
-│    - SemanticCachePort(L1CachePort) (语义缓存)                                 │
-│    - MemoryCachePort(L1CachePort) (记忆缓存)                          │
-│    - SessionStoragePort(L1CachePort) (会话存储)        │
+│    - SemanticCachePort(L1CachePort, ...) (语义缓存)                                 │
+│    - MemoryCachePort(L1CachePort, ...) (记忆缓存)                          │
+│    - SessionStoragePort(L1CachePort, ...) (会话存储)        │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐

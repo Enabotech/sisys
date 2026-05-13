@@ -189,7 +189,7 @@ Phase 5: 清理废弃接口
 │                                                                  │
 │  职责：继承L5GraphPort，定义记忆图谱领域能力                       │
 │  位置：src/domain/ports/memory_graph.py                          │
-│  端口：MemoryGraphPort(L5GraphPort)                                           │
+│  端口：MemoryGraphPort(L5GraphPort, ...)                         │
 │    - create_memory_entity / get_memory_entity / delete_memory_entity │
 │    - link_memories / unlink_memories / get_memory_links          │
 │    - find_related_memories / get_memory_neighbors / find_memory_path │

@@ -339,9 +339,9 @@ MinIOAdapter 实现 L4ObjectPort，但调用的是实现 ObjectStorageRepository
 │  职责：继承 L4ObjectPort，定义特定业务场景语义                     │
 │  位置：src/application/ports/                                     │
 │  端口：                                                          │
-│    - DocumentStoragePort(L4ObjectPort) (文档存储) ← 本次新增                    │
-│    - AvatarStoragePort(L4ObjectPort) (头像存储) ← 未来扩展                       │
-│    - BackupArchivePort(L4ObjectPort) (备份归档) ← 未来扩展                      │
+│    - DocumentStoragePort(L4ObjectPort, ...) (文档存储) ← 本次新增 │
+│    - AvatarStoragePort(L4ObjectPort, ...) (头像存储) ← 未来扩展   │
+│    - BackupArchivePort(L4ObjectPort, ...) (备份归档) ← 未来扩展   │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
