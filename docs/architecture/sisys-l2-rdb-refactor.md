@@ -1,6 +1,6 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.1.0
+**版本：** 1.2.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
@@ -79,7 +79,7 @@
 
 | 问题编号 | 问题描述 | 影响范围 |
 |---------|---------|---------|
-| P1 | `l2_rdb.py` 仅包含记忆系统三个端口，缺少统一抽象基类 | 无法统一管理所有 RDB 仓储 |
+| P1 | `l2_rdb.py` 仅包含记忆系统三个端口，缺少统一抽象基类 `L2RdbPort` | 无法统一管理所有 RDB 仓储 |
 | P2 | `user_repository.py`、`role_repository.py`、`audit_repository.py` 等独立定义，未继承任何基类 | 违背 DRY 原则，无法统一管控 |
 | P3 | `base.py` 定义 `BaseRepository` Protocol，但未与 `l2_rdb.py` 关联 | 领域层与 L2 存储抽象割裂 |
 | P4 | 基础设施层 `base_repository.py` 无领域层基类对应 | 依赖倒置不完整 |
@@ -89,35 +89,54 @@
 
 ```
 src/domain/ports/
-├── l2_rdb.py              # 仅含 L2MemoryMetadataRepositoryPort 等 3 个端口
+├── l2_rdb.py              # 仅含 L2MemoryMetadataRepositoryPort 等 3 个端口，缺少 L2RdbPort 基类
 ├── base.py                # BaseRepository Protocol（未与 l2_rdb 关联）
-├── user_repository.py     # 独立定义，未继承任何基类
-├── role_repository.py     # 独立定义，未继承任何基类
-├── audit_repository.py    # 独立定义，未继承任何基类
-├── login_attempt_repository.py  # 独立定义，未继承任何基类
-└── user_role_repository.py      # 独立定义，未继承任何基类
+├── user_repository.py     # UserRepositoryPort（独立定义，未继承任何基类）
+├── role_repository.py     # RoleRepositoryPort（独立定义，未继承任何基类）
+├── audit_repository.py    # AuditRepositoryPort（独立定义，未继承任何基类）
+├── login_attempt_repository.py  # LoginAttemptRepositoryPort（独立定义，未继承任何基类）
+└── user_role_repository.py      # UserRoleRepositoryPort（独立定义，未继承任何基类）
 
 src/infrastructure/storage/postgresql/
-├── engine.py              # DatabaseEngine（数据库引擎）
+├── engine.py              # DatabaseEngine（数据库引擎）✅ 已实现
 ├── repository/
-│   ├── base_repository.py # BaseRepository（基础设施层 CRUD 基类）
-│   ├── user_repository.py      # implements UserRepositoryPort
-│   ├── role_repository.py     # implements RoleRepositoryPort
-│   └── memory_metadata_repository.py  # implements L2MetadataRepositoryPort
+│   ├── base_repository.py # BaseRepository（基础设施层 CRUD 基类）✅ 已实现
+│   ├── user_repository.py      # UserRepository(BaseRepository) ❌ 未实现 UserRepositoryPort
+│   ├── role_repository.py      # RoleRepository(BaseRepository) ❌ 未实现 RoleRepositoryPort
+│   └── memory_metadata_repository.py  # PostgreSQLMemoryMetadataRepository ✅ 已实现 L2MetadataRepositoryPort
 ```
 
-### 1.3 现有端口清单
+### 1.3 现有端口清单（代码现状）
 
-| 端口名称 | 文件位置 | 是否继承基类 | 状态 |
-|---------|---------|------------|------|
-| `L2MetadataRepositoryPort` | l2_rdb.py | 否 | 现有 |
-| `L2ChangeHistoryRepositoryPort` | l2_rdb.py | 否 | 现有 |
-| `L2GroupMemberRepositoryPort` | l2_rdb.py | 否 | 现有 |
-| `UserRepositoryPort` | user_repository.py | 否 | 现有 |
-| `RoleRepositoryPort` | role_repository.py | 否 | 现有 |
-| `AuditRepositoryPort` | audit_repository.py | 否 | 现有 |
-| `LoginAttemptRepositoryPort` | login_attempt_repository.py | 否 | 现有 |
-| `UserRoleRepositoryPort` | user_role_repository.py | 否 | 现有 |
+| 端口名称 | 文件位置 | 当前基类 | 目标基类 | 状态 |
+|---------|---------|---------|---------|------|
+| `L2RdbPort` | **不存在** | - | 统一抽象基类 | ❌ 缺失 |
+| `L2MetadataRepositoryPort` | l2_rdb.py | 无 | L2RdbPort | ❌ 待升级 |
+| `L2ChangeHistoryRepositoryPort` | l2_rdb.py | 无 | L2RdbPort | ❌ 待升级 |
+| `L2GroupMemberRepositoryPort` | l2_rdb.py | 无 | L2RdbPort | ❌ 待升级 |
+| `UserRepositoryPort` | user_repository.py | 无 | L2RdbPort | ❌ 待升级 |
+| `RoleRepositoryPort` | role_repository.py | 无 | L2RdbPort | ❌ 待升级 |
+| `AuditRepositoryPort` | audit_repository.py | 无 | L2RdbPort | ❌ 待升级 |
+| `LoginAttemptRepositoryPort` | login_attempt_repository.py | 无 | L2RdbPort | ❌ 待升级 |
+| `UserRoleRepositoryPort` | user_role_repository.py | 无 | L2RdbPort | ❌ 待升级 |
+
+### 1.4 基础设施层实现状态
+
+| 实现类 | 位置 | 继承基类 | 实现端口 | 状态 |
+|-------|------|---------|---------|------|
+| `BaseRepository` | repository/base_repository.py | Generic[T] | 无 | ✅ 已有 |
+| `UserRepository` | repository/user_repository.py | BaseRepository | ❌无 | ❌ 未实现端口 |
+| `RoleRepository` | repository/role_repository.py | BaseRepository | ❌无 | ❌ 未实现端口 |
+| `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | 无 | L2MetadataRepositoryPort | ✅ 已实现 |
+
+### 1.5 关键发现：设计与实现脱节
+
+**问题根因分析：**
+
+1. **L2RdbPort 基类缺失**：文档定义了基类，但代码未创建
+2. **领域层端口未统一**：8个端口各自独立，未继承基类
+3. **基础设施层未实现端口**：BaseRepository 是 CRUD 实现，不是端口实现
+4. **无 PostgreSqlRdbAdapter**：文档定义的适配器未实现
 
 ---
 
@@ -130,7 +149,7 @@ src/infrastructure/storage/postgresql/
 │  领域层 (Domain) - 纯抽象，无外部依赖                       │
 │                                                             │
 │  ports/                                                     │
-│  └── rdb.py                                                 │
+│  └── l2_rdb.py                                              │
 │      ├── L2RdbPort (统一抽象基类) ← 所有具体端口继承此       │
 │      ├── L2MemoryRepositoryPort(L2RdbPort)                  │
 │      ├── UserRepositoryPort(L2RdbPort)                      │
@@ -873,7 +892,7 @@ src/domain/ports/
 
 src/infrastructure/storage/postgresql/
 ├── __init__.py              # 更新：导出 PostgreSqlRdbAdapter
-├── engine.py                # 保持不变
+├── engine.py                # 保持不变 ✅
 ├── rdb_adapter.py           # ★ 新增：PostgreSqlRdbAdapter
 ├── models/                  # 保持不变
 │   ├── __init__.py
@@ -895,44 +914,62 @@ src/infrastructure/storage/postgresql/
 
 ### 6.1 阶段划分
 
-| 阶段 | 任务 | 风险 | 预计工时 |
-|------|------|------|---------|
-| Phase 1 | 设计评审与确认 | 低 | 0.5d |
-| Phase 2 | 创建 L2RdbPort 基类 | 低 | 0.5d |
-| Phase 3 | 更新领域层端口（继承基类） | 中 | 1d |
-| Phase 4 | 创建 PostgreSqlRdbAdapter | 低 | 0.5d |
-| Phase 5 | 更新基础设施层 Repository | 中 | 1d |
-| Phase 6 | 更新 __init__.py 导出 | 低 | 0.25d |
-| Phase 7 | 回归测试 | 中 | 1d |
-| Phase 8 | 文档更新 | 低 | 0.25d |
+| 阶段 | 任务 | 风险 | 预计工时 | 依赖 |
+|------|------|------|---------|------|
+| Phase 0 | 代码现状审计 | 低 | 0.25d | 无 |
+| Phase 1 | 设计评审与确认 | 低 | 0.25d | Phase 0 |
+| Phase 2 | 创建 L2RdbPort 基类 | 低 | 0.5d | Phase 1 |
+| Phase 3 | 更新领域层端口（继承基类） | 中 | 1d | Phase 2 |
+| Phase 4 | 创建 PostgreSqlRdbAdapter | 低 | 0.5d | Phase 2 |
+| Phase 5 | 更新基础设施层 Repository | 中 | 1d | Phase 3, Phase 4 |
+| Phase 6 | 更新 __init__.py 导出 | 低 | 0.25d | Phase 5 |
+| Phase 7 | 回归测试 | 中 | 1d | Phase 6 |
+| Phase 8 | 文档更新 | 低 | 0.25d | Phase 7 |
 
 ### 6.2 详细执行步骤
 
+#### Phase 0: 代码现状审计
+
+- [ ] 确认 `src/domain/ports/l2_rdb.py` 当前内容（3个端口，无基类）
+- [ ] 确认 `src/domain/ports/user_repository.py` 当前内容
+- [ ] 确认 `src/domain/ports/role_repository.py` 当前内容
+- [ ] 确认 `src/domain/ports/audit_repository.py` 当前内容
+- [ ] 确认 `src/domain/ports/login_attempt_repository.py` 当前内容
+- [ ] 确认 `src/domain/ports/user_role_repository.py` 当前内容
+- [ ] 确认 `src/infrastructure/storage/postgresql/repository/` 下实现类
+- [ ] 确认 `src/infrastructure/storage/postgresql/engine.py` 实现状态
+- [ ] 列出需要修改的所有文件清单
+
 #### Phase 1: 设计评审与确认
+
 - [ ] 评审本文档
 - [ ] 确认重构范围
 - [ ] 获取 Stakeholder 批准
 
 #### Phase 2: 创建 L2RdbPort 基类
-- [ ] 创建 `src/domain/ports/l2_rdb.py`
-- [ ] 定义 `L2RdbPort` Protocol 基类
+
+- [ ] 更新 `src/domain/ports/l2_rdb.py`
+- [ ] 添加 `L2RdbPort` Protocol 基类
 - [ ] 保留现有 `L2MetadataRepositoryPort` 等三个端口（继承基类）
 - [ ] 添加类型注解
 
 #### Phase 3: 更新领域层端口（继承基类）
-- [ ] 更新 `user_repository.py` - `UserRepositoryPort` 继承 `L2RdbPort`
-- [ ] 更新 `role_repository.py` - `RoleRepositoryPort` 继承 `L2RdbPort`
-- [ ] 更新 `audit_repository.py` - `AuditRepositoryPort` 继承 `L2RdbPort`
-- [ ] 更新 `login_attempt_repository.py` - `LoginAttemptRepositoryPort` 继承 `L2RdbPort`
-- [ ] 更新 `user_role_repository.py` - `UserRoleRepositoryPort` 继承 `L2RdbPort`
+
+- [ ] 更新 `src/domain/ports/user_repository.py` - `UserRepositoryPort` 继承 `L2RdbPort`
+- [ ] 更新 `src/domain/ports/role_repository.py` - `RoleRepositoryPort` 继承 `L2RdbPort`
+- [ ] 更新 `src/domain/ports/audit_repository.py` - `AuditRepositoryPort` 继承 `L2RdbPort`
+- [ ] 更新 `src/domain/ports/login_attempt_repository.py` - `LoginAttemptRepositoryPort` 继承 `L2RdbPort`
+- [ ] 更新 `src/domain/ports/user_role_repository.py` - `UserRoleRepositoryPort` 继承 `L2RdbPort`
 
 #### Phase 4: 创建 PostgreSqlRdbAdapter
+
 - [ ] 创建 `src/infrastructure/storage/postgresql/rdb_adapter.py`
 - [ ] 实现 `PostgreSqlRdbAdapter` 类
 - [ ] 实现 `execute_in_transaction` 方法
 - [ ] 添加会话管理逻辑
 
 #### Phase 5: 更新基础设施层 Repository
+
 - [ ] 更新 `base_repository.py` - 补充文档注释
 - [ ] 更新 `user_repository.py` - 实现 `UserRepositoryPort`
 - [ ] 更新 `role_repository.py` - 实现 `RoleRepositoryPort`
@@ -940,20 +977,40 @@ src/infrastructure/storage/postgresql/
 - [ ] 更新其他 Repository 实现
 
 #### Phase 6: 更新 __init__.py 导出
+
 - [ ] 更新 `src/domain/ports/__init__.py` - 导出 `L2RdbPort`
 - [ ] 更新 `src/infrastructure/storage/postgresql/__init__.py` - 导出 `PostgreSqlRdbAdapter`
 - [ ] 更新 `src/infrastructure/storage/postgresql/repository/__init__.py` - 导出
 
 #### Phase 7: 回归测试
+
 - [ ] 运行单元测试
 - [ ] 运行集成测试
 - [ ] 验证数据库操作正常
 - [ ] 验证事务回滚正常
 
 #### Phase 8: 文档更新
+
 - [ ] 更新 `architecture.md` 存储架构章节
 - [ ] 更新 `CLAUDE.md` 如有必要
 - [ ] 更新相关注释
+
+### 6.3 实施追踪表
+
+| 端口/实现 | 当前状态 | Phase 2 | Phase 3 | Phase 5 |
+|-----------|---------|---------|---------|---------|
+| `L2RdbPort` | ❌ 不存在 | ✅ 创建 | - | - |
+| `L2MetadataRepositoryPort` | 独立定义 | → 继承基类 | - | - |
+| `L2ChangeHistoryRepositoryPort` | 独立定义 | → 继承基类 | - | - |
+| `L2GroupMemberRepositoryPort` | 独立定义 | → 继承基类 | - | - |
+| `UserRepositoryPort` | 独立定义 | - | → 继承基类 | - |
+| `RoleRepositoryPort` | 独立定义 | - | → 继承基类 | - |
+| `AuditRepositoryPort` | 独立定义 | - | → 继承基类 | - |
+| `LoginAttemptRepositoryPort` | 独立定义 | - | → 继承基类 | - |
+| `UserRoleRepositoryPort` | 独立定义 | - | → 继承基类 | - |
+| `PostgreSqlRdbAdapter` | ❌ 不存在 | - | - | ✅ 创建 |
+| `PostgreSQLMemoryMetadataRepository` | ✅ 已实现 | - | - | → 验证 |
+| `PostgreSQLUserRepository` | 未实现端口 | - | - | → 实现端口 |
 
 ---
 
@@ -965,6 +1022,7 @@ src/infrastructure/storage/postgresql/
 | R2: 类型注解错误 | 中 | 中 | 使用 mypy 检查；IDE 类型提示验证 |
 | R3: 事务语义变化 | 低 | 高 | 详细测试事务 commit/rollback 场景 |
 | R4: 循环导入 | 低 | 中 | 遵循 Python import 顺序；类型注解使用字符串 |
+| R5: 多个端口同时修改 | 中 | 中 | 按 Phase 顺序执行；每个 Phase 独立测试 |
 
 ---
 
@@ -977,6 +1035,7 @@ src/infrastructure/storage/postgresql/
 | `L2MetadataRepositoryPort` | 接口扩展 | 保持原有方法签名 |
 | `UserRepositoryPort` | 基类变更 | 新增继承，不改变接口 |
 | 所有 Repository 实现 | 实现更新 | 保持原有方法实现 |
+| `BaseRepository` | 无变更 | 保持现有 CRUD |
 
 ### 8.2 依赖方适配
 
@@ -1057,3 +1116,4 @@ class MockL2RdbAdapter(L2RdbPort):
 |------|------|--------|------|
 | 1.0.0 | 2026-05-13 | - | 初始版本 |
 | 1.1.0 | 2026-05-13 | - | 补充业界最佳实践对照 + 事务边界设计 |
+| 1.2.0 | 2026-05-13 | - | 补充现状审计 + 实施追踪表 + Phase 0 |

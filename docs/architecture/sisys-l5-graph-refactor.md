@@ -1,10 +1,50 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v1.0
+**版本:** v2.0
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成
+**状态:** 设计完成（v2.0 修复版）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
+
+---
+
+## 0. 现状与目标状态
+
+### 0.1 文档说明
+
+**重要**: 本文档描述**目标架构**，而非当前代码状态。设计文档与实际代码存在差异，这是正常的重构流程。
+
+### 0.2 当前代码状态（Baseline）
+
+| 组件 | 位置 | 接口 | 状态 |
+|------|------|------|------|
+| `L5GraphPort` | `src/domain/ports/l5_graph.py` | `create_entity/memory_id` 风格 | 旧接口，含领域语义 |
+| `Neo4jAdapter` | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 实现旧 L5GraphPort | 待重构 |
+| `Neo4jGraphStorage` | `src/infrastructure/storage/neo4j/graph_storage.py` | 部分实现 | 缺多数方法 |
+| `Neo4jClientWrapper` | `src/infrastructure/storage/neo4j/client.py` | 连接封装 | 已有 |
+| `MemoryGraphPort` | `src/domain/ports/memory_graph.py` | ❌ 不存在 | 待创建 |
+| `Neo4jConnectionProvider` | `src/infrastructure/storage/neo4j/connection_provider.py` | ❌ 不存在 | 待创建 |
+| `MemoryGraphAdapter` | `src/infrastructure/storage/neo4j/memory_graph_adapter.py` | ❌ 不存在 | 待创建 |
+
+### 0.3 目标架构（Target）
+
+| 组件 | Layer | 职责 |
+|------|-------|------|
+| `L5GraphPort` | L1 Domain | 纯技术图操作抽象 |
+| `MemoryGraphPort` | L2 Application | 记忆图谱领域语义 |
+| `Neo4jConnectionProvider` | L3 Infrastructure | 连接池单例管理 |
+| `Neo4jGraphStorage` | L3 Infrastructure | 完整实现 L5GraphPort |
+| `MemoryGraphAdapter` | L4 Infrastructure | 实现 MemoryGraphPort |
+
+### 0.4 迁移策略
+
+```
+Phase 1: 创建目标接口（不破坏现有代码）
+Phase 2: 实现基础设施（Neo4jGraphStorage + ConnectionProvider）
+Phase 3: 实现领域适配器（MemoryGraphAdapter）
+Phase 4: 重构 Neo4jAdapter 委托
+Phase 5: 更新调用方，废弃旧接口
+```
 
 ---
 
@@ -35,6 +75,15 @@
 | sisys-uni-storage-design.md §3.7 | L5GraphPort 接口定义 | 基础层技术抽象 |
 | sisys-uni-storage-design.md §5.2 | Adapter 实现映射表 | L5 实现分层 |
 | architecture.md §11.1 | 六层存储设计 | L5 图存储层级 |
+
+### 1.4 审查修复记录（v2.0）
+
+| 问题 | 类型 | 修复方案 |
+|------|------|---------|
+| 设计文档与代码不一致 | P0 | 新增 §0 现状与目标状态，明确文档描述目标而非现状 |
+| get_neighbors 语义不清 | P1 | 限制 max_depth=1，与 find_related 职责分离 |
+| MemoryGraphAdapter 样板代码 | P1 | 新增 BaseGraphAdapter 基类减少样板 |
+| ConnectionProvider 初始化 | P2 | 明确同步初始化配置，异步驱动按需创建 |
 
 ---
 
@@ -412,18 +461,23 @@ class L5GraphPort(Protocol):
     async def get_neighbors(
         self,
         node_id: str,
-        max_depth: int = 1,
         edge_type: str | None = None,
     ) -> list[dict]:
-        """获取节点的邻居节点。
+        """获取节点的直接邻居（单跳）。
+
+        语义：只返回通过一条边直接相连的邻居节点。
+        如需多跳遍历，使用 find_related 方法。
+
+        与 find_related 的区别：
+        - get_neighbors: 单跳直接邻居（1-N 关系）
+        - find_related: 多跳可达节点（1-N-N... 关系）
 
         Args:
             node_id: 节点 ID
-            max_depth: 最大深度（默认 1，只看直接邻居）
-            edge_type: 过滤边类型，None 表示所有
+            edge_type: 过滤边类型，None 表示所有类型
 
         Returns:
-            邻居节点列表 [{id, labels, properties}, ...]
+            直接邻居节点列表 [{id, labels, properties}, ...]
         """
 
     async def find_related(
@@ -697,14 +751,14 @@ class MemoryGraphPort(L5GraphPort):
     async def get_memory_neighbors(
         self,
         memory_id: str,
-        max_depth: int = 1,
         edge_type: str | None = None,
     ) -> list[dict]:
-        """获取记忆的邻居（直接关联的记忆）。
+        """获取记忆的直接邻居（单跳）。
+
+        对应 L5GraphPort.get_neighbors，专用于记忆图谱。
 
         Args:
             memory_id: 记忆 ID
-            max_depth: 最大深度（默认 1）
             edge_type: 过滤边类型，None 表示所有
 
         Returns:
@@ -765,6 +819,17 @@ class MemoryGraphPort(L5GraphPort):
 
 ### 5.0 Neo4jConnectionProvider（连接池单例）
 
+**业界对标决策：**
+
+| 考量 | 业界常见方案 | SISYS 决策 | 原因 |
+|------|-------------|-----------|------|
+| 单例模式 | Borg / 实例化参数 | `__new__` + 类变量 | 简洁够用，无需依赖注入 |
+| 初始化安全 | 无锁 / asyncio.Lock | `asyncio.Lock` 保护 | 避免并发初始化竞争 |
+| 懒初始化 | 首次使用时 | 懒初始化 driver | 减少启动开销 |
+| 连接生命周期 | 无限制 | `max_connection_lifetime` | 防止连接老化 |
+| 健康检查 | 单一 ping | 双层检查（连接+池） | 区分连通性与池健康 |
+| 代理支持 | 常缺失 | SOCKS5 proxy 支持 | 企业环境必需 |
+
 ```python
 # src/infrastructure/storage/neo4j/connection_provider.py
 
@@ -776,10 +841,17 @@ class MemoryGraphPort(L5GraphPort):
 遵循六边形架构：
 - 资源管理封装在Infrastructure层
 - Domain层完全不感知连接池存在
+
+设计原则：
+- 线程安全：asyncio.Lock 保护初始化
+- 懒初始化：首次获取 driver 时才创建连接
+- 连接生命周期：max_connection_lifetime 防止老化连接
+- 可测试性：close() 后可重新 init()
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -799,11 +871,13 @@ class Neo4jConnectionProvider:
         _instance: 单例实例
         _client_wrapper: Neo4j客户端封装
         _config: Neo4j配置
+        _init_lock: 初始化锁（避免并发竞争）
     """
 
     _instance: Neo4jConnectionProvider | None = None
     _client_wrapper: Neo4jClientWrapper | None = None
     _config: Neo4jConfig | None = None
+    _init_lock: asyncio.Lock | None = None
 
     def __new__(cls) -> Neo4jConnectionProvider:
         if cls._instance is None:
@@ -811,33 +885,40 @@ class Neo4jConnectionProvider:
         return cls._instance
 
     @classmethod
-    def init(cls, config: Neo4jConfig | None = None) -> None:
-        """初始化连接池。
+    async def init(cls, config: Neo4jConfig | None = None) -> None:
+        """初始化连接池（线程安全）。
 
         Args:
             config: Neo4j配置，默认从环境变量加载
         """
-        if cls._client_wrapper is not None:
-            logger.warning("Neo4jConnectionProvider already initialized, skipping")
-            return
+        # 初始化锁（延迟创建，避免类加载时实例化）
+        if cls._init_lock is None:
+            cls._init_lock = asyncio.Lock()
 
-        config = config or Neo4jConfig.from_env()
-        cls._config = config
+        async with cls._init_lock:
+            if cls._client_wrapper is not None:
+                logger.warning("Neo4jConnectionProvider already initialized, skipping")
+                return
 
-        cls._client_wrapper = Neo4jClientWrapper(
-            uri=config.uri,
-            username=config.username,
-            password=config.password,
-            database=config.database,
-            max_connection_pool_size=config.max_connection_pool_size,
-            connection_timeout=config.connection_timeout,
-            max_retry_time=config.max_retry_time,
-        )
-        logger.info(
-            "Neo4jConnectionProvider initialized: %s (max_connections=%d)",
-            config.uri,
-            config.max_connection_pool_size,
-        )
+            config = config or Neo4jConfig.from_env()
+            cls._config = config
+
+            cls._client_wrapper = Neo4jClientWrapper(
+                uri=config.uri,
+                username=config.username,
+                password=config.password,
+                database=config.database,
+                max_connection_pool_size=config.max_connection_pool_size,
+                connection_timeout=config.connection_timeout,
+                max_retry_time=config.max_retry_time,
+                max_connection_lifetime=config.max_connection_lifetime,
+            )
+            logger.info(
+                "Neo4jConnectionProvider initialized: %s (max_connections=%d, max_lifetime=%ds)",
+                config.uri,
+                config.max_connection_pool_size,
+                config.max_connection_lifetime,
+            )
 
     @classmethod
     def get_client(cls) -> Neo4jClientWrapper:
@@ -852,7 +933,7 @@ class Neo4jConnectionProvider:
         if cls._client_wrapper is None:
             raise RuntimeError(
                 "Neo4jConnectionProvider not initialized. "
-                "Call Neo4jConnectionProvider.init() before use."
+                "Call await Neo4jConnectionProvider.init() before use."
             )
         return cls._client_wrapper
 
@@ -860,6 +941,17 @@ class Neo4jConnectionProvider:
     def is_initialized(cls) -> bool:
         """检查provider是否已初始化。"""
         return cls._client_wrapper is not None
+
+    @classmethod
+    async def health_check(cls) -> bool:
+        """双层健康检查（连接 + 池状态）。
+
+        Returns:
+            True 如果连接可用且池状态正常
+        """
+        if cls._client_wrapper is None:
+            return False
+        return await cls._client_wrapper.health_check()
 
     @classmethod
     async def close(cls) -> None:
@@ -1164,6 +1256,173 @@ class Neo4jGraphStorage(L5GraphPort):
             return records
 ```
 
+### 5.1.5 BaseGraphAdapter（减少样板代码）
+
+由于 `MemoryGraphPort` 继承 `L5GraphPort`，实现类需要同时实现：
+1. 领域方法（create_memory_entity 等）
+2. 技术方法委托（create_node 等，满足 L5GraphPort 契约）
+
+为减少样板代码，引入 `BaseGraphAdapter` 作为基类：
+
+```python
+# src/infrastructure/storage/neo4j/base_graph_adapter.py (new)
+
+"""BaseGraphAdapter — L5GraphPort 委托基类。
+
+将 L5GraphPort 所有方法委托给内部存储，
+子类只需实现领域方法，无需重复委托代码。
+
+使用方式：
+class MemoryGraphAdapter(BaseGraphAdapter):
+    async def create_memory_entity(self, memory_id, entity_type, properties):
+        # 只需实现领域逻辑
+        return await self._storage.create_node(...)
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from src.domain.ports.l5_graph import L5GraphPort
+
+if TYPE_CHECKING:
+    pass
+
+
+class BaseGraphAdapter(L5GraphPort):
+    """L5GraphPort 委托基类。
+
+    将所有 L5GraphPort 方法委托给内部 _storage。
+    子类继承此类后，只需实现领域特定方法。
+
+    Attributes:
+        _storage: L5GraphPort 实现（如 Neo4jGraphStorage）
+    """
+
+    def __init__(self, storage: L5GraphPort):
+        """初始化适配器。
+
+        Args:
+            storage: L5GraphPort 实现
+        """
+        self._storage = storage
+
+    # ========================================================================
+    # 节点操作委托
+    # ========================================================================
+
+    async def create_node(
+        self,
+        node_id: str,
+        labels: list[str],
+        properties: dict[str, Any],
+    ) -> bool:
+        """创建节点（委托）。"""
+        return await self._storage.create_node(node_id, labels, properties)
+
+    async def get_node(self, node_id: str) -> dict | None:
+        """获取节点（委托）。"""
+        return await self._storage.get_node(node_id)
+
+    async def update_node(
+        self,
+        node_id: str,
+        properties: dict[str, Any],
+    ) -> bool:
+        """更新节点（委托）。"""
+        return await self._storage.update_node(node_id, properties)
+
+    async def delete_node(self, node_id: str) -> bool:
+        """删除节点（委托）。"""
+        return await self._storage.delete_node(node_id)
+
+    async def node_exists(self, node_id: str) -> bool:
+        """检查节点存在（委托）。"""
+        return await self._storage.node_exists(node_id)
+
+    # ========================================================================
+    # 关系操作委托
+    # ========================================================================
+
+    async def create_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> bool:
+        """创建关系（委托）。"""
+        return await self._storage.create_relationship(source_id, target_id, rel_type, properties)
+
+    async def delete_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        rel_type: str,
+    ) -> bool:
+        """删除关系（委托）。"""
+        return await self._storage.delete_relationship(source_id, target_id, rel_type)
+
+    async def get_relationships(
+        self,
+        node_id: str,
+        rel_type: str | None = None,
+        direction: str = "BOTH",
+    ) -> list[dict]:
+        """获取关系（委托）。"""
+        return await self._storage.get_relationships(node_id, rel_type, direction)
+
+    # ========================================================================
+    # 图遍历委托
+    # ========================================================================
+
+    async def find_path(
+        self,
+        start_id: str,
+        end_id: str,
+        max_depth: int = 3,
+    ) -> list[dict]:
+        """查找路径（委托）。"""
+        return await self._storage.find_path(start_id, end_id, max_depth)
+
+    async def get_neighbors(
+        self,
+        node_id: str,
+        edge_type: str | None = None,
+    ) -> list[dict]:
+        """获取邻居（委托）。"""
+        return await self._storage.get_neighbors(node_id, edge_type)
+
+    async def find_related(
+        self,
+        node_id: str,
+        max_depth: int = 2,
+        edge_type: str | None = None,
+    ) -> list[dict]:
+        """查找关联（委托）。"""
+        return await self._storage.find_related(node_id, max_depth, edge_type)
+
+    # ========================================================================
+    # Cypher 委托
+    # ========================================================================
+
+    async def execute_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行只读查询（委托）。"""
+        return await self._storage.execute_query(cypher, params)
+
+    async def execute_write_query(
+        self,
+        cypher: str,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """执行写入查询（委托）。"""
+        return await self._storage.execute_write_query(cypher, params)
+```
+
 ### 5.2 MemoryGraphAdapter（领域适配器，Layer 4）
 
 ```python
@@ -1171,11 +1430,12 @@ class Neo4jGraphStorage(L5GraphPort):
 
 """MemoryGraphAdapter — MemoryGraphPort 实现（领域适配器）。
 
-委托 Neo4jGraphStorage 执行低级操作，在应用层组合记忆领域语义。
+继承 BaseGraphAdapter，只需实现记忆领域逻辑。
+L5GraphPort 委托由基类处理，无需重复代码。
 
-与 Neo4jGraphStorage 的关系：
-- Neo4jGraphStorage: 技术底层（执行 Cypher）
-- MemoryGraphAdapter: 领域逻辑（组合语义）
+设计分层：
+- BaseGraphAdapter: 处理 L5GraphPort 技术委托
+- MemoryGraphAdapter: 处理 MemoryGraphPort 领域逻辑
 """
 
 from __future__ import annotations
@@ -1184,13 +1444,14 @@ from typing import Any
 
 from src.domain.ports.l5_graph import L5GraphPort
 from src.domain.ports.memory_graph import MemoryGraphPort
+from src.infrastructure.storage.neo4j.base_graph_adapter import BaseGraphAdapter
 
 
-class MemoryGraphAdapter(MemoryGraphPort):
+class MemoryGraphAdapter(MemoryGraphPort, BaseGraphAdapter):
     """记忆图谱领域适配器。
 
-    实现 MemoryGraphPort，委托 L5GraphPort 执行技术操作，
-    在此层组合记忆领域语义。
+    继承 BaseGraphAdapter 处理所有 L5GraphPort 委托，
+    只需实现 MemoryGraphPort 的领域方法。
 
     使用 memory_id 作为节点主键，
     标签固定为 ["Memory", entity_type]。
@@ -1202,10 +1463,10 @@ class MemoryGraphAdapter(MemoryGraphPort):
         Args:
             storage: L5GraphPort 实现（如 Neo4jGraphStorage）
         """
-        self._storage = storage
+        super().__init__(storage)
 
     # ========================================================================
-    # 记忆实体操作实现
+    # 记忆实体操作实现（MemoryGraphPort 领域方法）
     # ========================================================================
 
     async def create_memory_entity(
@@ -1318,11 +1579,10 @@ class MemoryGraphAdapter(MemoryGraphPort):
     async def get_memory_neighbors(
         self,
         memory_id: str,
-        max_depth: int = 1,
         edge_type: str | None = None,
     ) -> list[dict]:
-        """获取记忆的邻居。"""
-        nodes = await self._storage.get_neighbors(memory_id, max_depth, edge_type)
+        """获取记忆的邻居（单跳）。"""
+        nodes = await self._storage.get_neighbors(memory_id, edge_type)
         return [
             {
                 "memory_id": n.get("id"),
@@ -1375,49 +1635,6 @@ class MemoryGraphAdapter(MemoryGraphPort):
             )
             results.append(result)
         return results
-
-    # ========================================================================
-    # 委托给底层存储（实现 L5GraphPort）
-    # ========================================================================
-
-    async def create_node(self, node_id: str, labels: list[str], properties: dict[str, Any]) -> bool:
-        return await self._storage.create_node(node_id, labels, properties)
-
-    async def get_node(self, node_id: str) -> dict | None:
-        return await self._storage.get_node(node_id)
-
-    async def update_node(self, node_id: str, properties: dict[str, Any]) -> bool:
-        return await self._storage.update_node(node_id, properties)
-
-    async def delete_node(self, node_id: str) -> bool:
-        return await self._storage.delete_node(node_id)
-
-    async def node_exists(self, node_id: str) -> bool:
-        return await self._storage.node_exists(node_id)
-
-    async def create_relationship(self, source_id: str, target_id: str, rel_type: str, properties: dict[str, Any] | None = None) -> bool:
-        return await self._storage.create_relationship(source_id, target_id, rel_type, properties)
-
-    async def delete_relationship(self, source_id: str, target_id: str, rel_type: str) -> bool:
-        return await self._storage.delete_relationship(source_id, target_id, rel_type)
-
-    async def get_relationships(self, node_id: str, rel_type: str | None = None, direction: str = "BOTH") -> list[dict]:
-        return await self._storage.get_relationships(node_id, rel_type, direction)
-
-    async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]:
-        return await self._storage.find_path(start_id, end_id, max_depth)
-
-    async def get_neighbors(self, node_id: str, max_depth: int = 1, edge_type: str | None = None) -> list[dict]:
-        return await self._storage.get_neighbors(node_id, max_depth, edge_type)
-
-    async def find_related(self, node_id: str, max_depth: int = 2, edge_type: str | None = None) -> list[dict]:
-        return await self._storage.find_related(node_id, max_depth, edge_type)
-
-    async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
-        return await self._storage.execute_query(cypher, params)
-
-    async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
-        return await self._storage.execute_write_query(cypher, params)
 ```
 
 ### 5.3 Neo4jAdapter（向后兼容适配器）
