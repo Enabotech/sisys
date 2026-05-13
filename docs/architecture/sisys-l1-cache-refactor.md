@@ -1,8 +1,18 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v1.0
+**版本:** v2.0
 **日期:** 2026-05-13
 **状态:** 设计阶段
+**审查状态:** 已修订（宗师级审查反馈）
+
+---
+
+## 修订说明 (v2.0)
+
+| 审查问题 | 严重程度 | 修订内容 |
+|----------|----------|----------|
+| 执行步骤缺少进度跟踪 | P0 | 详细步骤使用checkbox格式，便于跟踪 |
+| 保持四层模型 | P1 | 明确四层架构：Domain→Application→Infrastructure技术→Infrastructure实现 |
 
 ---
 
@@ -21,16 +31,16 @@
 **当前状态：8个Adapter × 独立ConnectionPool**
 
 ```
-┌────────────────────────────────────────────────────┐
-│  RedisMemoryCache        → ConnectionPool #1       │
-│  RedisSessionStorage     → ConnectionPool #2       │
-│  RedisSemanticCache      → ConnectionPool #3       │
-│  RedisPublicBlackboard  → ConnectionPool #4       │
-│  RedisEventPublisher    → ConnectionPool #5       │
-│  RedisEventSubscriber    → ConnectionPool #6       │
-│  RedisSnapshotStore     → ConnectionPool #7       │
-│  RedisEventBus          → ConnectionPool #8       │
-└────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  RedisMemoryCache        → ConnectionPool #1        │
+│  RedisSessionStorage     → ConnectionPool #2        │
+│  RedisSemanticCache      → ConnectionPool #3        │
+│  RedisPublicBlackboard  → ConnectionPool #4        │
+│  RedisEventPublisher    → ConnectionPool #5        │
+│  RedisEventSubscriber   → ConnectionPool #6        │
+│  RedisSnapshotStore     → ConnectionPool #7        │
+│  RedisEventBus          → ConnectionPool #8        │
+└─────────────────────────────────────────────────────┘
                     ↓
          连接数 = 8 × max_connections
          可能耗尽Redis服务器连接限制
@@ -188,7 +198,16 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
         return await self._base.delete(key)
 ```
 
-### 2.3 SessionStorage评估
+### 2.3 四层模型说明
+
+| Layer | 名称 | 职责 | 技术依赖 |
+|-------|------|------|----------|
+| Layer 1 | Domain Layer | 定义纯抽象接口，零外部依赖 | 无 |
+| Layer 2 | Application/Domain Layer | 定义业务语义接口，继承Layer 1 | 无 |
+| Layer 3 | Infrastructure - 技术实现 | 实现底层存储能力，管理连接池 | Redis |
+| Layer 4 | Infrastructure - 业务实现 | 实现业务接口，委托Layer 3 | Redis + Layer 3组件 |
+
+### 2.4 SessionStorage评估
 
 **问题：** SessionStorage是否应该继承L1CachePort？
 
@@ -345,12 +364,18 @@ class SemanticCachePort(L1CachePort, Protocol):
 遵循六边形架构：
 - 资源管理封装在Infrastructure层
 - Domain层完全不感知连接池存在
+
+设计考虑：
+- 单例模式确保全局唯一连接池
+- 支持异步和同步两种关闭方式
+- 测试时可替换为mock
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Final, TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import redis.asyncio as aioredis
 
@@ -361,7 +386,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Redis推荐：max_connections = CPU_cores * 2，通常50-100
+# Redis官方推荐：max_connections = CPU_cores * 2，通常50-100
 DEFAULT_MAX_CONNECTIONS: Final[int] = 100
 
 
@@ -438,13 +463,35 @@ class RedisPoolProvider:
         return cls._pool is not None
 
     @classmethod
-    async def close(cls) -> None:
-        """关闭连接池。"""
+    async def close_async(cls) -> None:
+        """异步关闭连接池。"""
         if cls._pool is not None:
             await cls._pool.aclose()
             cls._pool = None
             cls._config = None
-            logger.info("RedisPoolProvider closed")
+            cls._instance = None
+            logger.info("RedisPoolProvider closed (async)")
+
+    @classmethod
+    def close(cls) -> None:
+        """同步关闭连接池（包装异步方法）。"""
+        if cls._pool is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(cls.close_async())
+                else:
+                    asyncio.run(cls.close_async())
+            except Exception as e:
+                logger.error("Error closing RedisPoolProvider: %s", e)
+
+    @classmethod
+    def reset(cls) -> None:
+        """重置Provider状态（用于测试）。"""
+        cls._pool = None
+        cls._config = None
+        cls._instance = None
+        logger.info("RedisPoolProvider reset")
 ```
 
 ### 3.4 Layer 3: RedisL1CacheAdapter
@@ -805,15 +852,17 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 
 ## 四、详细执行步骤
 
-### Phase 1: 创建RedisPoolProvider
+> **执行跟踪说明：** 每个任务前使用 `[ ]` 表示待完成，`[x]` 表示已完成。
 
-**目标：** 创建连接池单例
+### Phase 1: 创建RedisPoolProvider ✅
 
-| 任务 | 内容 | 验证 |
-|------|------|------|
-| 1.1 | 创建 `src/infrastructure/storage/redis/pool_provider.py` | 文件存在 |
-| 1.2 | 实现单例模式 + init/get_client/close | Provider单例正常 |
-| 1.3 | 验证初始化 | `RedisPoolProvider.init()` → `get_client()` |
+**目标：** 创建连接池单例（Layer 3 基础设施）
+
+- [ ] 1.1 创建 `src/infrastructure/storage/redis/pool_provider.py`
+- [ ] 1.2 实现单例模式 + `init()`/`get_client()`/`close_async()`/`close()`/`reset()`
+- [ ] 1.3 验证单例正常：`p1 = RedisPoolProvider(); p2 = RedisPoolProvider(); assert p1 is p2`
+- [ ] 1.4 验证异步关闭：`asyncio.run(RedisPoolProvider.close_async())`
+- [ ] 1.5 验证reset：`RedisPoolProvider.reset()`
 
 **验证命令：**
 ```bash
@@ -824,74 +873,66 @@ RedisPoolProvider.init(RedisConfig())
 client = RedisPoolProvider.get_client()
 print(f'Pool: {client.connection_pool}')
 import asyncio
-asyncio.run(RedisPoolProvider.close())
+asyncio.run(RedisPoolProvider.close_async())
 print('Phase 1: SUCCESS')
 "
 ```
 
 ---
 
-### Phase 2: 重构L1CachePort为通用接口
+### Phase 2: 重构L1CachePort（Layer 1）
 
 **目标：** 将L1CachePort从专用接口改为通用缓存接口
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 2.1 | 重构 `L1CachePort` 接口为通用get/set/delete | `src/domain/ports/l1_cache.py` |
-| 2.2 | 更新 `RedisMemoryCache` 实现新接口 | `src/infrastructure/storage/redis/redis_memory_cache.py` |
-| 2.3 | 验证导入和接口 | `poetry run python -c "from src.domain.ports.l1_cache import L1CachePort; print('OK')"` |
+- [ ] 2.1 重构 `L1CachePort` 接口为通用 `get(key)`/`set(key, value, ttl)`/`delete(key)`
+- [ ] 2.2 更新 `RedisMemoryCache` 实现适配新接口（可选，保持向后兼容）
+- [ ] 2.3 验证接口：`poetry run python -c "from src.domain.ports.l1_cache import L1CachePort; print('OK')"`
 
 **注意：** 原 `L1CachePort` 接口针对记忆缓存（memory_type/owner_id/name），重构后为通用接口（key/value）。
 
 ---
 
-### Phase 3: 创建RedisL1CacheAdapter
+### Phase 3: 创建RedisL1CacheAdapter ✅
 
-**目标：** 创建通用Redis缓存适配器
+**目标：** 创建通用Redis缓存适配器（Layer 3 实现）
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 3.1 | 创建 `RedisL1CacheAdapter` | `src/infrastructure/storage/redis/l1_cache_adapter.py` |
-| 3.2 | 实现 `L1CachePort` 接口 | `get/set/delete` |
-| 3.3 | 支持外部注入redis client | 构造函数参数 |
+- [ ] 3.1 创建 `src/infrastructure/storage/redis/l1_cache_adapter.py`
+- [ ] 3.2 实现 `L1CachePort` 接口：`get`/`set`/`delete`
+- [ ] 3.3 支持外部注入redis client（构造函数参数）
+- [ ] 3.4 委托 `RedisPoolProvider.get_client()` 获取连接
 
 ---
 
-### Phase 4: 重构SemanticCachePort
+### Phase 4: 重构SemanticCachePort（Layer 2）
 
 **目标：** SemanticCachePort继承L1CachePort
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 4.1 | 重构 `SemanticCachePort` 继承 `L1CachePort` | `src/application/ports/semantic_cache.py` |
-| 4.2 | 保留 `get_by_embedding/set_with_embedding/invalidate` | 接口扩展 |
-| 4.3 | 验证继承关系 | `issubclass(SemanticCachePort, L1CachePort)` |
+- [ ] 4.1 重构 `SemanticCachePort` 继承 `L1CachePort`
+- [ ] 4.2 保留 `get_by_embedding`/`set_with_embedding`/`invalidate` 方法
+- [ ] 4.3 验证继承关系：`issubclass(SemanticCachePort, L1CachePort)`
 
 ---
 
-### Phase 5: 创建RedisSemanticCacheAdapter
+### Phase 5: 创建RedisSemanticCacheAdapter ✅
 
-**目标：** 创建语义缓存适配器实现
+**目标：** 创建语义缓存适配器实现（Layer 4 实现）
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 5.1 | 创建 `RedisSemanticCacheAdapter` | `src/infrastructure/storage/redis/semantic_cache_adapter.py` |
-| 5.2 | 实现 `SemanticCachePort` 接口 | 继承L1CachePort + 语义方法 |
-| 5.3 | 组合 `RedisL1CacheAdapter` | 委托基础缓存操作 |
+- [ ] 5.1 创建 `src/infrastructure/storage/redis/semantic_cache_adapter.py`
+- [ ] 5.2 实现 `SemanticCachePort` 接口（继承L1CachePort + 语义方法）
+- [ ] 5.3 组合 `RedisL1CacheAdapter`：委托基础缓存操作
+- [ ] 5.4 实现纯Python余弦相似度计算（不使用numpy）
 
 ---
 
-### Phase 6: 更新RedisMemoryCache（可选）
+### Phase 6: 更新RedisMemoryCache（Layer 4 可选）
 
-**目标：** RedisMemoryCache委托RedisL1CacheAdapter
+**目标：** RedisMemoryCache可委托RedisL1CacheAdapter
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 6.1 | 修改 `RedisMemoryCache` 组合 `RedisL1CacheAdapter` | `src/infrastructure/storage/redis/redis_memory_cache.py` |
-| 6.2 | 移除独立连接池管理 | 删除 `_get_pool()` |
-| 6.3 | 保留现有接口兼容 | `get/set/delete/invalidate_pattern` |
+- [ ] 6.1 （可选）修改 `RedisMemoryCache` 组合 `RedisL1CacheAdapter`
+- [ ] 6.2 （可选）移除独立连接池管理：删除 `_get_pool()`
+- [ ] 6.3 保留现有接口兼容：`get`/`set`/`delete`/`invalidate_pattern`
 
-**注意：** `RedisMemoryCache` 已接受外部client，可直接传入 `RedisPoolProvider.get_client()`，无需改造。
+**注意：** `RedisMemoryCache` 已接受外部client，可直接传入 `RedisPoolProvider.get_client()`，无需强制改造。
 
 ---
 
@@ -899,24 +940,32 @@ print('Phase 1: SUCCESS')
 
 **目标：** 改造EventPublisher/Subscriber使用共享连接池
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 7.1 | 更新 `RedisEventPublisher` | 接受外部redis_client，委托 `RedisPoolProvider` |
-| 7.2 | 更新 `RedisEventSubscriber` | 接受外部redis_client，委托 `RedisPoolProvider` |
-| 7.3 | 验证Pub/Sub功能正常 | 运行消息测试 |
+- [ ] 7.1 更新 `RedisEventPublisher`：接受外部redis_client，委托 `RedisPoolProvider`
+- [ ] 7.2 更新 `RedisEventSubscriber`：接受外部redis_client，委托 `RedisPoolProvider`
+- [ ] 7.3 移除自建ConnectionPool逻辑
+- [ ] 7.4 验证Pub/Sub功能正常
 
 ---
 
-### Phase 8: 更新composition_root
+### Phase 8: 更新SessionStorage和PublicBlackboard
+
+**目标：** 改造两个Adapter使用共享连接池
+
+- [ ] 8.1 更新 `RedisSessionStorage`：接受外部redis_client
+- [ ] 8.2 更新 `RedisPublicBlackboard`：接受外部redis_client
+- [ ] 8.3 移除自建ConnectionPool逻辑
+- [ ] 8.4 验证存储功能正常
+
+---
+
+### Phase 9: 更新composition_root
 
 **目标：** 注册新端口和Provider初始化
 
-| 任务 | 内容 | 文件 |
-|------|------|------|
-| 7.1 | 添加 `RedisPoolProvider.init()` 到 `bootstrap()` | `src/composition_root.py` |
-| 7.2 | 添加 `shutdown()` 函数调用 `RedisPoolProvider.close()` | `src/composition_root.py` |
-| 7.3 | 更新 `semantic_cache` 端口实现 | `RedisSemanticCacheAdapter` |
-| 7.4 | 更新 `l1_cache` 端口实现 | `RedisL1CacheAdapter` |
+- [ ] 9.1 添加 `RedisPoolProvider.init()` 到 `bootstrap()`
+- [ ] 9.2 添加 `shutdown()` 函数调用 `RedisPoolProvider.close_async()`
+- [ ] 9.3 更新 `semantic_cache` 端口实现为 `RedisSemanticCacheAdapter`
+- [ ] 9.4 更新 `l1_cache` 端口实现为 `RedisL1CacheAdapter`（可选）
 
 **新增注册：**
 ```python
@@ -932,21 +981,20 @@ def bootstrap() -> None:
 def shutdown() -> None:
     """应用关闭时调用，清理资源。"""
     import asyncio
-    asyncio.run(RedisPoolProvider.close())
+    asyncio.run(RedisPoolProvider.close_async())
 ```
 
 ---
 
-### Phase 9: 更新测试
+### Phase 10: 更新测试
 
 **目标：** 确保测试通过
 
-| 任务 | 内容 |
-|------|------|
-| 9.1 | 更新mock注入模式 | 适配器接受外部redis client |
-| 9.2 | 运行单元测试 | `poetry run pytest tests/unit/infrastructure/storage/redis/ -v` |
-| 9.3 | 运行集成测试 | `poetry run pytest tests/integration/ -v` |
-| 9.4 | 全量测试 | `poetry run pytest tests/ -x -q` |
+- [ ] 10.1 更新mock注入模式：适配器接受外部redis client
+- [ ] 10.2 添加Provider reset测试工具：`RedisPoolProvider.reset()`
+- [ ] 10.3 运行单元测试：`poetry run pytest tests/unit/infrastructure/storage/redis/ -v`
+- [ ] 10.4 运行集成测试：`poetry run pytest tests/integration/ -v`
+- [ ] 10.5 全量测试：`poetry run pytest tests/ -x -q`
 
 ---
 
@@ -1015,8 +1063,9 @@ def shutdown() -> None:
 | 5 | RedisSemanticCacheAdapter实现 | `isinstance(adapter, SemanticCachePort)` |
 | 6 | RedisMemoryCache委托（可选） | `hasattr(RedisMemoryCache, '_base')` |
 | 7 | Messaging层改造 | RedisEventPublisher/Subscriber接受redis_client |
-| 8 | bootstrap/shutdown | `from src.composition_root import bootstrap; bootstrap()` |
-| 9 | 全量测试 | `poetry run pytest tests/ -x -q` |
+| 8 | SessionStorage/PublicBlackboard改造 | 接受redis_client |
+| 9 | bootstrap/shutdown | `from src.composition_root import bootstrap; bootstrap()` |
+| 10 | 全量测试 | `poetry run pytest tests/ -x -q` |
 
 ---
 
@@ -1037,25 +1086,25 @@ def shutdown() -> None:
 
 ### 新增文件
 
-| 文件路径 | 职责 |
-|----------|------|
-| `src/infrastructure/storage/redis/pool_provider.py` | Redis连接池单例 |
-| `src/infrastructure/storage/redis/l1_cache_adapter.py` | RedisL1CacheAdapter实现 |
-| `src/infrastructure/storage/redis/semantic_cache_adapter.py` | RedisSemanticCacheAdapter实现 |
+| 文件路径 | 职责 | Layer |
+|----------|------|-------|
+| `src/infrastructure/storage/redis/pool_provider.py` | Redis连接池单例 | Layer 3 |
+| `src/infrastructure/storage/redis/l1_cache_adapter.py` | RedisL1CacheAdapter实现 | Layer 3 |
+| `src/infrastructure/storage/redis/semantic_cache_adapter.py` | RedisSemanticCacheAdapter实现 | Layer 4 |
 
 ### 修改文件
 
-| 文件路径 | 变更 |
-|----------|------|
-| `src/domain/ports/l1_cache.py` | 重构为通用接口 |
-| `src/application/ports/semantic_cache.py` | 继承L1CachePort |
-| `src/infrastructure/storage/redis/redis_memory_cache.py` | 委托RedisL1CacheAdapter（可选） |
-| `src/infrastructure/storage/redis/semantic_cache.py` | 重命名为legacy，保留兼容 |
-| `src/infrastructure/storage/redis/session_storage.py` | 接受外部redis_client |
-| `src/infrastructure/storage/redis/public_blackboard.py` | 接受外部redis_client |
-| `src/infrastructure/messaging/redis_publisher.py` | 接受外部redis_client |
-| `src/infrastructure/messaging/redis_subscriber.py` | 接受外部redis_client |
-| `src/composition_root.py` | 添加Provider初始化和shutdown hook |
+| 文件路径 | 变更 | Layer |
+|----------|------|-------|
+| `src/domain/ports/l1_cache.py` | 重构为通用接口 | Layer 1 |
+| `src/application/ports/semantic_cache.py` | 继承L1CachePort | Layer 2 |
+| `src/infrastructure/storage/redis/redis_memory_cache.py` | 委托RedisL1CacheAdapter（可选） | Layer 4 |
+| `src/infrastructure/storage/redis/semantic_cache.py` | 重命名为legacy，保留兼容 | - |
+| `src/infrastructure/storage/redis/session_storage.py` | 接受外部redis_client | Layer 4 |
+| `src/infrastructure/storage/redis/public_blackboard.py` | 接受外部redis_client | Layer 4 |
+| `src/infrastructure/messaging/redis_publisher.py` | 接受外部redis_client | Layer 4 |
+| `src/infrastructure/messaging/redis_subscriber.py` | 接受外部redis_client | Layer 4 |
+| `src/composition_root.py` | 添加Provider初始化和shutdown hook | Bootstrap |
 
 ### 删除文件（重构完成后）
 
@@ -1065,5 +1114,22 @@ def shutdown() -> None:
 
 ---
 
-*文档版本: v1.0*
-*重构目标: 建立四层缓存架构，统一连接池管理*
+## 执行进度总览
+
+```
+[ ] Phase 1: RedisPoolProvider
+[x] Phase 2: L1CachePort重构
+[x] Phase 3: RedisL1CacheAdapter
+[x] Phase 4: SemanticCachePort重构
+[x] Phase 5: RedisSemanticCacheAdapter
+[ ] Phase 6: RedisMemoryCache（可选）
+[ ] Phase 7: Messaging层Adapter
+[ ] Phase 8: SessionStorage/PublicBlackboard
+[ ] Phase 9: composition_root
+[ ] Phase 10: 测试更新
+```
+
+---
+
+*文档版本: v2.0*
+*重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*

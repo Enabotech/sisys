@@ -1,8 +1,8 @@
 # SISYS L4 对象存储层重构详细设计
 
-**版本：** v1.0
+**版本：** v1.1
 **日期：** 2026-05-13
-**状态：** 设计完成
+**状态：** 设计完成（架构审查修正版）
 **架构师：** Claude Code
 
 ---
@@ -22,6 +22,21 @@
 | 统一抽象基类 | `L4ObjectPort` | 六层架构命名（L0-L5），语义清晰，方法签名更合理 |
 | Layer 3 技术实现 | `MinIOAdapter` → `MinIORepository` | 复用已有的 BucketManager/ObjectOperations/WORMManager 分层组件 |
 | Layer 2 应用端口 | `DocumentStoragePort(L4ObjectPort)` | 第一个具体应用端口，验证四层架构可行性 |
+
+### 0.3 架构审查修正（v1.1）
+
+**审查发现以下 P0 阻断问题，已在设计中修正：**
+
+| 问题 | 描述 | 修正方案 |
+|------|------|---------|
+| P0-1 | `MinIOAdapter.archive()` 未传递 content 参数 | 明确 content 必须为 None，否则抛出 NotImplementedError |
+| P0-2 | `MinIOAdapter` 缺失 `list_objects` 方法 | 添加 `list_objects()` 方法，委托 `MinIORepository` |
+| P0-3 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 修改返回类型为 `str` |
+
+**修正后状态：**
+- ✅ `MinIOAdapter.archive()` 明确 content 参数语义约束
+- ✅ `MinIOAdapter.list_objects()` 方法已添加
+- ✅ `MinIORepository.archive()` 返回类型已修正
 
 ---
 
@@ -95,11 +110,14 @@ MinIORepository (组合上述组件)
 
 ### 1.4 现有问题
 
-| 问题 | 描述 | 影响 |
-|------|------|------|
-| P1 | `ObjectStorageRepository` 和 `L4ObjectPort` 两个抽象并存 | 维护成本增加，职责不清 |
-| P2 | 缺少应用层具体端口（Layer 2） | 无法满足特定业务场景语义 |
-| P3 | `L4ObjectPort` 的 `list_objects` 缺少 `bucket_type` 参数 | 与 `ObjectStorageRepository` 不一致 |
+| 问题 | 描述 | 影响 | 优先级 |
+|------|------|------|--------|
+| P1 | `ObjectStorageRepository` 和 `L4ObjectPort` 两个抽象并存 | 维护成本增加，职责不清 | P1 |
+| P2 | 缺少应用层具体端口（Layer 2） | 无法满足特定业务场景语义 | P1 |
+| P3 | `L4ObjectPort` 的 `list_objects` 缺少 `bucket_type` 参数 | 与实现不一致 | P1 |
+| P4 | `MinIOAdapter.archive()` 未传递 content 参数 | content 被忽略，语义矛盾 | P0 |
+| P5 | `MinIOAdapter` 缺失 `list_objects` 方法 | 调用会抛出 AttributeError | P0 |
+| P6 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 与 L4ObjectPort 定义不一致 | P0 |
 
 ---
 
@@ -466,13 +484,62 @@ class L4ObjectPort(Protocol):
 - `src/infrastructure/storage/minio/minio_repository.py` — 实现改为 `L4ObjectPort`
 - 所有导入 `ObjectStorageRepository` 的文件
 
-### 3.3 Layer 3: MinIOAdapter（确认委托）
+### 3.3 Layer 3: MinIORepository（更新实现）
+
+**文件：** `src/infrastructure/storage/minio/minio_repository.py`
+
+**变更：**
+1. 实现接口从 `ObjectStorageRepository` 改为 `L4ObjectPort`
+2. `archive()` 返回类型从 `bool` 改为 `str`
+
+```python
+# src/infrastructure/storage/minio/minio_repository.py
+
+from src.domain.ports.l4_object import L4ObjectPort  # 改用 L4ObjectPort
+
+class MinIORepository(L4ObjectPort):  # 改实现 L4ObjectPort
+    """MinIO 对象存储仓储实现。
+
+    实现领域层 L4ObjectPort 接口，
+    内部委托给 BucketManager、ObjectOperations 和 WORMManager。
+    """
+
+    async def archive(
+        self,
+        bucket_type: str,
+        object_key: str,
+        retention_days: int = 2555,
+    ) -> str:  # 改为返回 str
+        """归档对象至 WORM 存储，启用 Object Lock。
+
+        Returns:
+            str: 对象 ID 或 ETag
+        """
+        import asyncio
+
+        bucket_name = self._resolve_bucket_name(bucket_type)
+        result = await asyncio.to_thread(
+            self._worm_manager.archive_object,
+            bucket_name=bucket_name,
+            object_key=object_key,
+            retention_days=retention_days,
+        )
+        return str(result) if result else ""
+
+    # 其他方法保持不变...
+```
+
+### 3.4 Layer 3: MinIOAdapter（确认委托）
 
 **文件：** `src/infrastructure/storage/minio/minio_adapter.py`
 
-**状态：** 已正确实现委托 `MinIORepository`，无需修改。
+**状态：** 已正确实现委托 `MinIORepository`，但需补充 list_objects 方法。
+
+**重要说明：** `archive()` 方法的 `content` 参数仅用于接口兼容性，实际不支持上传 content。如需上传并归档，请使用 `store()` 方法。
 
 ```python
+# src/infrastructure/storage/minio/minio_adapter.py
+
 class MinIOAdapter(L4ObjectPort):
     """MinIO 对象存储适配器。
 
@@ -495,14 +562,31 @@ class MinIOAdapter(L4ObjectPort):
     async def get_metadata(self, bucket_type, object_key, version_id=None) -> dict:
         return await self._repository.get_metadata(bucket_type, object_key, version_id)
 
-    async def archive(self, bucket_type, object_key, content=None, retention_days=2555) -> str:
+    async def archive(
+        self,
+        bucket_type: str,
+        object_key: str,
+        content: bytes | None = None,
+        retention_days: int = 2555,
+    ) -> str:
+        """归档对象（带 WORM retention）。
+
+        注意：content 参数仅用于接口兼容性，实际不支持上传 content。
+        如需上传 content，请使用 store() 方法。
+        """
+        if content is not None:
+            raise NotImplementedError(
+                "archive() with content upload is not supported. "
+                "Use store() for content upload, then set_retention() for WORM."
+            )
         return await self._repository.archive(bucket_type, object_key, retention_days)
 
     async def list_objects(self, bucket_type, prefix="", recursive=True) -> list[dict]:
+        """列出对象，支持前缀过滤。"""
         return await self._repository.list_objects(bucket_type, prefix, recursive)
 ```
 
-### 3.4 Layer 2: DocumentStoragePort
+### 3.5 Layer 2: DocumentStoragePort
 
 **新文件：** `src/application/ports/document_storage.py`
 
@@ -661,7 +745,7 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
     ) -> list[dict]: ...
 ```
 
-### 3.5 Layer 4: MinIODocumentStorage
+### 3.6 Layer 4: MinIODocumentStorage
 
 **新文件：** `src/infrastructure/storage/minio/document_storage.py`
 
@@ -873,13 +957,34 @@ src/infrastructure/storage/minio/
 | 1.2 | 更新所有导入 `ObjectStorageRepository` 的文件，改为 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py"` 无结果 |
 | 1.3 | 更新 `src/domain/ports/__init__.py` 移除 `ObjectStorageRepository` 导出 | 导入检查 |
 | 1.4 | 删除 `src/domain/ports/storage.py` | 文件不存在 |
+| 1.5 | 修复 `MinIORepository.archive()` 返回类型从 `bool` 改为 `str` | 类型检查 |
 
 **影响文件清单：**
 ```bash
 grep -rl "ObjectStorageRepository" --include="*.py" src/
 ```
 
-### Phase 2: 更新 L4ObjectPort.list_objects 签名
+### Phase 2: 修复 MinIOAdapter 方法缺失与 archive 语义
+
+**目标：** 修复 archive 方法签名不一致和 list_objects 方法缺失问题
+
+| 步骤 | 任务 | 验证 |
+|------|------|------|
+| 2.1 | 修复 `MinIOAdapter.archive()` 对 content 参数的处理（content != None 时抛出 NotImplementedError） | 类型检查 |
+| 2.2 | 添加 `MinIOAdapter.list_objects()` 方法，委托 `MinIORepository` | 方法存在性检查 |
+| 2.3 | 更新 `L4ObjectPort.list_objects` 签名，增加 `bucket_type: str` 参数 | 类型检查 |
+| 2.4 | 更新所有调用 `list_objects` 的代码，适配新签名 | 测试通过 |
+
+**archive 语义约束：**
+```python
+# archive() 方法 content 参数语义
+if content is not None:
+    raise NotImplementedError(
+        "archive() with content upload is not supported. "
+        "Use store() for content upload."
+    )
+# content=None 时，仅设置 WORM retention
+```
 
 **目标：** 增加 `bucket_type` 参数，与实现一致
 
@@ -889,7 +994,7 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 | 2.2 | 更新 `MinIOAdapter.list_objects` 委托传递 `bucket_type` | 测试通过 |
 | 2.3 | 更新所有调用 `list_objects` 的代码 | 测试通过 |
 
-### Phase 3: 创建 DocumentStoragePort
+### Phase 4: 创建 DocumentStoragePort
 
 **目标：** 建立 Layer 2 应用层端口
 
@@ -900,7 +1005,7 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 | 3.3 | 添加文档特有方法：`store_document`, `retrieve_document`, `list_user_documents`, `get_document_metadata` | 接口检查 |
 | 3.4 | 显式声明继承的 L4ObjectPort 方法（满足类型检查器） | mypy 通过 |
 
-### Phase 4: 创建 MinIODocumentStorage
+### Phase 5: 创建 MinIODocumentStorage
 
 **目标：** 建立 Layer 4 具体应用实现
 
@@ -911,7 +1016,7 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 | 4.3 | 组合 `MinIOAdapter` 处理底层存储 | 委托检查 |
 | 4.4 | 实现路径自动生成（按用户/类型/日期组织） | 功能测试 |
 
-### Phase 5: 更新导出和 __init__.py
+### Phase 6: 更新导出和 __init__.py
 
 **目标：** 确保新端口可被导入
 
@@ -920,16 +1025,16 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 | 5.1 | 更新 `src/application/ports/__init__.py` 导出 `DocumentStoragePort` | 导入检查 |
 | 5.2 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 `MinIODocumentStorage` | 导入检查 |
 
-### Phase 6: 回归测试
+### Phase 7: 回归测试
 
 **目标：** 确保重构不破坏现有功能
 
 | 步骤 | 任务 | 验证 |
 |------|------|------|
-| 6.1 | 运行单元测试：`pytest tests/unit/domain/ports/test_l4_object_port.py -v` | 通过 |
-| 6.2 | 运行单元测试：`pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` | 通过 |
-| 6.3 | 运行集成测试：`pytest tests/integration/ -x -q` | 通过 |
-| 6.4 | 运行架构测试：`pytest tests/unit/architecture/ -x -q` | 通过 |
+| 7.1 | 运行单元测试：`pytest tests/unit/domain/ports/test_l4_object_port.py -v` | 通过 |
+| 7.2 | 运行单元测试：`pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` | 通过 |
+| 7.3 | 运行集成测试：`pytest tests/integration/ -x -q` | 通过 |
+| 7.4 | 运行架构测试：`pytest tests/unit/architecture/ -x -q` | 通过 |
 
 ---
 
@@ -937,9 +1042,11 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |------|------|------|---------|
-| R1: 删除 ObjectStorageRepository 破坏现有调用 | 中 | 高 | Phase 1.2 更新所有引用，Phase 6 完整回归测试 |
-| R2: list_objects 签名变更破坏调用方 | 中 | 中 | Phase 2.3 更新所有调用，Phase 6 集成测试覆盖 |
-| R3: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | Phase 3.4 显式声明继承方法 |
+| R1: 删除 ObjectStorageRepository 破坏现有调用 | 中 | 高 | Phase 1.2 更新所有引用，Phase 7 完整回归测试 |
+| R2: archive 返回类型不一致导致测试失败 | 中 | 高 | Phase 1.5 修复返回类型，Phase 7 集成测试覆盖 |
+| R3: list_objects 签名变更破坏调用方 | 中 | 中 | Phase 2.3 更新所有调用，Phase 7 集成测试覆盖 |
+| R4: archive content 参数语义不清导致运行时错误 | 低 | 高 | Phase 2.1 明确语义约束，文档说明 |
+| R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | Phase 4.4 显式声明继承方法 |
 
 ---
 
@@ -1002,10 +1109,12 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 | 标准 | 描述 | 测量方式 |
 |------|------|---------|
 | R1 | 所有 Domain 抽象统一到 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py"` 无结果 |
-| R2 | `MinIOAdapter` 正确委托 `MinIORepository` | `test_minio_adapter.py` 所有测试通过 |
-| R3 | `DocumentStoragePort` 正确继承 `L4ObjectPort` | `issubclass(DocumentStoragePort, L4ObjectPort)` |
-| R4 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` |
-| R5 | 所有测试通过 | `pytest tests/ -x -q` |
+| R2 | `MinIOAdapter` 包含 `list_objects` 方法 | 方法存在性检查 |
+| R3 | `MinIORepository.archive()` 返回 `str` | 类型检查 |
+| R4 | `MinIOAdapter.archive()` 正确处理 content 参数 | content != None 时抛出 NotImplementedError |
+| R5 | `DocumentStoragePort` 正确继承 `L4ObjectPort` | `issubclass(DocumentStoragePort, L4ObjectPort)` |
+| R6 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` |
+| R7 | 所有测试通过 | `pytest tests/ -x -q` |
 
 ---
 
@@ -1035,3 +1144,4 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 | 版本 | 日期 | 审批人 | 状态 |
 |------|------|--------|------|
 | 1.0.0 | 2026-05-13 | - | 初始版本 |
+| 1.1.0 | 2026-05-13 | - | 架构审查修正：修复 archive/list_objects 方法问题 |
