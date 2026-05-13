@@ -413,9 +413,11 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
 | **Layer 2** | `SemanticCachePort` (语义缓存) | `UserRepositoryPort` (用户仓储) |
 | | `MemoryCachePort` (记忆缓存) | `RoleRepositoryPort` (角色仓储) |
 | | `SessionStoragePort` (会话存储) | `AuditRepositoryPort` (审计仓储) |
-| **Layer 3** | `RedisL1CacheAdapter` (Redis 实现) | `PostgreSqlRdbAdapter` (PG 适配器) |
+| **Layer 3** | `RedisL1CacheAdapter` (Redis 实现) | `PostgreSQLUnitOfWork` (事务管理) |
 | | `DatabaseEngine` (连接管理) | `DatabaseEngine` (连接管理) |
 | **Layer 4** | `RedisSemanticCacheAdapter` | `PostgreSQLUserRepository` |
+
+**注**：PostgreSqlRdbAdapter 是文档定义的重构目标，当前系统使用 PostgreSQLUnitOfWork 管理事务。
 
 ---
 
@@ -453,10 +455,10 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
 
 | 标准 | 描述 | 测量方式 |
 |------|------|---------|
-| R1 | 所有 RDB 端口继承 `L2RdbPort` 基类 | 代码审查 |
-| R2 | 基础设施层提供统一的 `PostgreSqlRdbAdapter` | 实现验证 |
+| R1 | 所有 RDB 端口定义 L2RdbPort 基类（重构目标） | 代码审查 |
+| R2 | 事务由 PostgreSQLUnitOfWork 管理（DatabaseEngine 提供会话） | 实现验证 |
 | R3 | 现有功能保持不变 | 回归测试通过率 100% |
-| R4 | 数据库连接管理统一到 `PostgreSqlRdbAdapter` | 代码审查 |
+| R4 | 数据库会话通过 DatabaseEngine 获取，事务由 PostgreSQLUnitOfWork 管理 | 代码审查 |
 | R5 | 可扩展支持其他 RDB 实现（如 MySQL） | 架构验证 |
 | R6 | 事务边界在应用层/UseCase 层 | 代码审查 |
 
