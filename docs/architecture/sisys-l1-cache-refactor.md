@@ -1,13 +1,13 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v2.3
+**版本:** v3.0
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 第3轮审查修订
+**审查状态:** v3.0 语义缓存TTL一致性设计
 
 ---
 
-## 修订说明 (v2.1)
+## 修订说明 (v3.0)
 
 | 审查问题 | 严重程度 | 修订内容 |
 |----------|----------|----------|
@@ -19,11 +19,13 @@
 | 6个Adapter独立ConnectionPool | P0 | 添加问题说明，规划Phase 1-9统一连接池 |
 | IdempotencyChecker硬编码参数 | P0 | 添加问题说明，纳入连接池统一管理 |
 | Layer 2 MemoryCachePort不存在 | P0 | 实际代码中不存在此接口 |
-| SemanticCache未继承L1CachePort | P0 | 确认问题存在，规划Phase 4修复 |
 | SessionStorage不应继承L1CachePort | P1 | 语义不同，会话管理vs键值缓存，保持独立 |
 | Phase 1/3/5文件不存在 | P0 | pool_provider.py/l1_cache_adapter.py/semantic_cache_adapter.py 均不存在 |
 | Phase 2/4未完成 | P0 | L1CachePort仍是专用接口，SemanticCache未继承L1CachePort |
 | 接口变更影响12+处调用 | P0 | unified_storage_gateway.py等业务代码直接调用旧接口 |
+| Qdrant/Redis TTL不一致导致伪命中 | **P0** | Qdrant payload 存 {cache_key, response}，Redis过期后从payload回填 |
+| Qdrant写入失败导致孤儿Redis key | **P1** | 写入顺序：先写Qdrant再写Redis |
+| §3.5 旧实现使用全表扫描O(n) | **P0** | 替换为Qdrant ANN索引 + Redis双组件设计 |
 
 ---
 
@@ -197,16 +199,28 @@ class RedisL1CacheAdapter(L1CachePort):
 
 # Layer 4: Infrastructure具体应用实现
 class RedisSemanticCacheAdapter(SemanticCachePort):
-    """Redis语义缓存实现"""
-    def __init__(self, redis_client: aioredis.Redis | None = None):
+    """语义缓存适配器 - Qdrant + Redis 双组件设计"""
+    def __init__(
+        self,
+        qdrant_client: QdrantClient,
+        redis_client: aioredis.Redis | None = None,
+    ):
+        self._qdrant = qdrant_client
         self._base = RedisL1CacheAdapter(redis_client)
 
     async def get_by_embedding(self, query_embedding, threshold):
-        # 语义相似度查找
+        # 1. Qdrant.search(embedding, limit=1, score_threshold) → 命中
+        # 2. 从 payload 获取 cache_key → Redis.GET(cache_key)
+        #    - Redis 命中 → 直接返回（热路径）
+        #    - Redis 未命中 → 从 payload 取 response 回填 Redis → 返回
+        # 3. Qdrant 未命中 → 返回 None
         ...
 
     async def set_with_embedding(self, query_embedding, result, ttl):
-        # 存储向量和结果
+        # 写入顺序：先写 Qdrant → 再写 Redis（避免 Qdrant 失败产生孤儿 key）
+        # 1. 生成 cache_key
+        # 2. Qdrant.upsert(embedding, payload={cache_key, response})
+        # 3. Redis.SET(cache_key, response, EX=ttl)
         ...
 
     # 继承L1CachePort基础方法
@@ -219,6 +233,49 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
     async def delete(self, key: str) -> bool:
         return await self._base.delete(key)
 ```
+
+### 2.2.1 语义缓存工作流程
+
+```
+新请求 → 计算 embedding
+       → Qdrant.search(embedding, limit=1, score_threshold=0.95)
+           ↓命中
+           从 payload 获取 {cache_key, response}
+           ├─ Redis.GET(cache_key) 命中 → 直接返回缓存响应（热路径，低延迟）
+           └─ Redis.GET(cache_key) 未命中 → 从 payload 取 response
+                → 回填 Redis(SET cache_key response EX ttl)
+                → 返回缓存响应
+           ↓未命中
+           调用 LLM → 生成响应
+                → 写入 Qdrant(embedding, payload={cache_key, response})
+                → 写入 Redis(SET cache_key response EX ttl)
+```
+
+**Qdrant payload 存储方案：** `{cache_key, response}`（而非仅存 `cache_key`）
+
+| 字段 | 说明 |
+|------|------|
+| `cache_key` | Redis key，用于热路径加速查询 |
+| `response` | 完整缓存响应，用于 Redis 过期后的降级回填 |
+
+### 2.2.2 TTL 一致性设计
+
+**问题：** Redis 有 TTL 自动过期，Qdrant 向量点无过期机制，导致"幽灵向量"（指向已过期 Redis key 的向量点）。
+
+**解决方案：** Qdrant payload 同时存储 `cache_key + response`，作为降级数据源。
+
+| 场景 | 处理方式 |
+|------|----------|
+| Redis 命中 + Qdrant 命中 | 直接返回 Redis 内容（热路径，低延迟） |
+| Redis 未命中 + Qdrant 命中 | 从 payload 取 response 回填 Redis，返回缓存响应 |
+| Redis 未命中 + Qdrant 未命中 | 调用 LLM，写入 Qdrant + Redis |
+
+**写入顺序：** 先写 Qdrant → 再写 Redis
+
+| 顺序 | 失败场景 | 影响 |
+|------|----------|------|
+| 先 Qdrant 后 Redis | Redis 写入失败 | Qdrant 有完整 payload，下次仍可命中并回填 |
+| 先 Redis 后 Qdrant | Qdrant 写入失败 | Redis 有数据但无法被语义检索（孤儿 key） |
 
 ### 2.3 四层模型说明
 
@@ -630,244 +687,189 @@ class RedisL1CacheAdapter(L1CachePort):
 
 **文件：** `src/infrastructure/storage/redis/semantic_cache_adapter.py`
 
+**设计核心：** Qdrant + Redis 双组件（§2.2.1 工作流程，§2.2.2 TTL一致性设计）
+
 ```python
-"""Redis 语义缓存适配器。
+"""语义缓存适配器 — Qdrant + Redis 双组件设计。
 
 实现SemanticCachePort接口，提供基于向量相似度的缓存能力。
-委托RedisL1CacheAdapter处理基础缓存操作。
 
-使用Redis Hash存储嵌入向量和缓存结果，
-支持纯Python余弦相似度计算。
+组件职责：
+- Qdrant: 向量存储与语义检索（ANN索引，高性能）
+- Redis: 缓存实际响应内容（带TTL管理，热路径加速）
+
+TTL一致性（§2.2.2）：
+- Qdrant payload 存储 {cache_key, response}，作为降级数据源
+- Redis 过期后从 payload 回填，避免"幽灵向量"问题
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-import math
 from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as aioredis
 
 from src.application.ports.semantic_cache import SemanticCachePort
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
-from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.l1_cache_adapter import RedisL1CacheAdapter
 from src.infrastructure.utils import json_dumps, json_loads
 
 if TYPE_CHECKING:
-    pass
+    from qdrant_client import QdrantClient
 
 logger = logging.getLogger(__name__)
 
-
-def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """计算两个向量的余弦相似度（纯Python实现，不使用numpy）。
-
-    Args:
-        vec1: 第一个向量
-        vec2: 第二个向量
-
-    Returns:
-        余弦相似度值（-1.0到1.0），零向量或空向量返回0.0
-    """
-    if len(vec1) != len(vec2):
-        raise ValueError(f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
-    if not vec1:
-        return 0.0
-
-    dot_product = 0.0
-    norm1 = 0.0
-    norm2 = 0.0
-
-    for v1, v2 in zip(vec1, vec2):
-        dot_product += v1 * v2
-        norm1 += v1 * v1
-        norm2 += v2 * v2
-
-    norm1 = math.sqrt(norm1)
-    norm2 = math.sqrt(norm2)
-
-    if norm1 == 0.0 or norm2 == 0.0:
-        return 0.0
-
-    sim = dot_product / (norm1 * norm2)
-    return max(-1.0, min(1.0, sim))
+COLLECTION_NAME = "semantic_cache"
 
 
 class RedisSemanticCacheAdapter(SemanticCachePort):
-    """Redis 语义缓存适配器。
+    """语义缓存适配器 — Qdrant + Redis 双组件。
 
-    实现SemanticCachePort接口，提供基于向量相似度的缓存能力。
-    委托RedisL1CacheAdapter处理基础缓存操作。
-
-    键格式: sisys:cache:semantic:{cache_key}
-    支持基于余弦相似度的语义匹配。
-
-    Attributes:
-        _base: 基础L1缓存适配器
-        _metrics_collector: 可选的指标收集器
+    Components:
+        _qdrant: Qdrant client (向量存储与语义检索)
+        _base: RedisL1CacheAdapter (基础缓存，带TTL管理)
     """
 
     _NAMESPACE = "cache:semantic"
 
     def __init__(
         self,
+        qdrant_client: QdrantClient,
         redis_client: aioredis.Redis | None = None,
         metrics_collector: EventMetricsCollector | None = None,
     ):
-        """初始化Redis语义缓存适配器。
-
-        Args:
-            redis_client: 可选，测试时注入mock client
-            metrics_collector: 可选的指标收集器
-        """
+        self._qdrant = qdrant_client
         self._base = RedisL1CacheAdapter(redis_client)
         self._metrics_collector = metrics_collector
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
-        """根据查询向量生成缓存键。
-
-        使用MD5哈希向量的量化版本作为键标识。
-        """
+        """Generate cache key from embedding vector."""
         quantized = [round(v, 6) for v in query_embedding[:10]]
         vector_id = hashlib.md5(
             str(quantized).encode(),
             usedforsecurity=False,
         ).hexdigest()[:16]
-        return f"vec:{vector_id}"
+        return f"{self._NAMESPACE}:vec:{vector_id}"
+
+    # --- L1CachePort inherited methods (delegate to _base) ---
 
     async def get(self, key: str) -> str | None:
-        """获取缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            缓存值，不存在返回None
-        """
         return await self._base.get(key)
 
     async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """设置缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-            value: 缓存值
-            ttl: 过期时间（秒）
-
-        Returns:
-            是否成功
-        """
         return await self._base.set(key, value, ttl)
 
     async def delete(self, key: str) -> bool:
-        """删除缓存（继承自L1CachePort）。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            是否成功
-        """
         return await self._base.delete(key)
+
+    # --- SemanticCachePort methods ---
 
     async def get_by_embedding(
         self,
         query_embedding: list[float],
-        threshold: float = 0.9,
+        threshold: float = 0.95,
     ) -> dict | None:
-        """通过向量嵌入查询缓存。
+        """Semantic cache lookup: Qdrant search → Redis GET → payload fallback.
 
-        遍历所有缓存条目，找到相似度高于阈值的第一个结果。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            threshold: 相似度阈值
-
-        Returns:
-            缓存结果，如果未命中则返回None
+        Flow (§2.2.1):
+        1. Qdrant.search(embedding, limit=1, score_threshold)
+        2. Hit → get cache_key from payload → Redis.GET(cache_key)
+           - Redis hit → return (hot path, low latency)
+           - Redis miss → get response from payload → backfill Redis → return
+        3. Miss → return None
         """
-        # 使用SCAN遍历所有缓存键
-        pattern = build_key(self._NAMESPACE, "vec:*")
-        cursor = 0
+        # Step 1: Qdrant semantic search
+        search_results = self._qdrant.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_embedding,
+            limit=1,
+            score_threshold=threshold,
+        )
 
-        while True:
-            cursor, keys = await self._base._redis.scan(
-                cursor=cursor,
-                match=pattern,
-                count=100,
+        if not search_results:
+            if self._metrics_collector:
+                self._metrics_collector.record_cache_miss()
+            logger.debug("Semantic cache miss")
+            return None
+
+        hit = search_results[0]
+        payload = hit.payload or {}
+
+        # Step 2a: Try Redis hot path
+        cache_key = payload.get("cache_key")
+        if cache_key:
+            redis_value = await self._base.get(cache_key)
+            if redis_value is not None:
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_hit()
+                logger.debug(
+                    "Semantic cache hit (Redis hot path, score=%.4f)", hit.score
+                )
+                return json_loads(redis_value)
+
+        # Step 2b: Fallback to Qdrant payload (Redis expired)
+        response_data = payload.get("response")
+        if response_data is not None:
+            # Backfill Redis for next hot path hit
+            if cache_key:
+                ttl = payload.get("ttl", 3600)
+                await self._base.set(cache_key, json_dumps(response_data), ttl=ttl)
+            if self._metrics_collector:
+                self._metrics_collector.record_cache_hit()
+            logger.debug(
+                "Semantic cache hit (Qdrant fallback + Redis backfill, score=%.4f)",
+                hit.score,
             )
+            return response_data
 
-            for key in keys:
-                stored_embedding = await self._base._redis.hget(key, "embedding")
-                stored_result_data = await self._base._redis.hget(key, "result")
-
-                if stored_embedding is None or stored_result_data is None:
-                    continue
-
-                try:
-                    stored_vec: list[float] = json_loads(stored_embedding)
-                    raw_result = json_loads(stored_result_data)
-                except (json.JSONDecodeError, TypeError) as e:
-                    logger.warning("Corrupt data in cache key %s: %s", key, e)
-                    continue
-
-                if not isinstance(stored_vec, list) or not isinstance(raw_result, dict):
-                    logger.warning("Unexpected data types in cache key %s", key)
-                    continue
-
-                similarity = cosine_similarity(query_embedding, stored_vec)
-
-                if similarity >= threshold:
-                    if self._metrics_collector:
-                        self._metrics_collector.record_cache_hit()
-                    logger.debug("Cache hit with similarity %.4f", similarity)
-                    return raw_result
-
-            if cursor == 0:
-                break
-
-        if self._metrics_collector:
-            self._metrics_collector.record_cache_miss()
-        logger.debug("Cache miss")
+        # Payload corrupt
+        logger.warning("Qdrant hit but payload missing cache_key and response")
         return None
 
     async def set_with_embedding(
         self,
         query_embedding: list[float],
         result: dict,
-        ttl: int = 86400,
+        ttl: int = 3600,
     ) -> None:
-        """存储带向量嵌入的缓存。
+        """Store semantic cache: Qdrant first → Redis second (§2.2.2 write order).
 
-        Args:
-            query_embedding: 查询向量嵌入
-            result: 缓存结果数据
-            ttl: 过期时间（秒）
+        Write order rationale:
+        - Qdrant failure → skip caching entirely (no orphan data)
+        - Redis failure → Qdrant has full payload, next hit can backfill
         """
         cache_key = self._build_cache_key(query_embedding)
-        key = build_key(self._NAMESPACE, cache_key)
 
-        await self._base._redis.hset(key, "embedding", json_dumps(query_embedding))
-        await self._base._redis.hset(key, "result", json_dumps(result))
-        await self._base._redis.expire(key, ttl)
-        logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
+        # Step 1: Write Qdrant (payload stores cache_key + response for TTL consistency)
+        self._qdrant.upsert(
+            collection_name=COLLECTION_NAME,
+            points=[{
+                "id": cache_key,
+                "vector": query_embedding,
+                "payload": {
+                    "cache_key": cache_key,
+                    "response": result,
+                    "ttl": ttl,
+                },
+            }],
+        )
+
+        # Step 2: Write Redis (hot path acceleration with TTL)
+        await self._base.set(cache_key, json_dumps(result), ttl=ttl)
+        logger.debug("Semantic cache stored: key=%s, ttl=%d", cache_key, ttl)
 
     async def invalidate(self, cache_key: str) -> None:
-        """使缓存失效。
-
-        Args:
-            cache_key: 缓存键
-        """
-        prefix = build_key(self._NAMESPACE, "")
-        if cache_key.startswith(prefix):
-            key = cache_key
-        else:
-            key = build_key(self._NAMESPACE, cache_key)
-
-        await self._base.delete(key)
-        logger.debug("Invalidated cache key %s", cache_key)
+        """Invalidate cache in both Qdrant and Redis."""
+        # Delete from Redis
+        await self._base.delete(cache_key)
+        # Delete from Qdrant
+        self._qdrant.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=[cache_key],
+        )
+        logger.debug("Semantic cache invalidated: %s", cache_key)
 ```
 
 ---
@@ -1070,6 +1072,8 @@ def shutdown() -> None:
 | 连接池未初始化 | 高 | Provider抛出RuntimeError |
 | 测试mock失效 | 中 | 所有Adapter支持外部注入 |
 | 并发连接数超限 | 低 | max_connections=100满足需求 |
+| Qdrant/Redis TTL不一致导致伪命中 | 高 | Qdrant payload 存 {cache_key, response}，Redis过期后从payload回填（§2.2.2） |
+| Qdrant写入失败导致孤儿Redis key | 中 | 写入顺序：先写Qdrant再写Redis（§2.2.2） |
 
 ---
 
@@ -1193,5 +1197,5 @@ def shutdown() -> None:
 
 ---
 
-*文档版本: v2.3*
+*文档版本: v3.0*
 *重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*
