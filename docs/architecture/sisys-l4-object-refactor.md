@@ -46,6 +46,11 @@
 - ⚠️ 验收测试所有 16 个 then 步骤为空 `pass`，无实质断言
 - ⚠️ `L4ObjectPort` 未在 `composition_root.py` 中注册（无自动 DI）
 - ⚠️ `delete_object` 的 `AccessDenied` 错误未映射为 `ComplianceLockError`
+- ⚠️ `_resolve_bucket_name` 未验证生成的 bucket 名称合法性（S3 命名规则）
+- ⚠️ `_list_objects_via_client` 缺少 S3Error 错误处理
+- ⚠️ `test_worm_and_lifecycle.py` 硬编码断言 `mode == "GOVERNANCE"`（P0-4 修复后需同步更新）
+- ⚠️ `test_storage_architecture.py` 从 `storage.py` 导入 `ComplianceLockError`（删除 storage.py 后导入失败）
+- ⚠️ `test_l4_object_port.py` 签名测试未覆盖 `list_objects`
 
 ---
 
@@ -1339,12 +1344,13 @@ if content is not None:
 
 | Checkbox | 步骤 | 任务 | 验证命令 |
 |----------|------|------|---------|
-| `[ ]` | 5.1 | 运行 L4ObjectPort 单元测试 | `pytest tests/unit/domain/ports/test_l4_object_port.py -v` |
-| `[ ]` | 5.2 | 运行 MinIOAdapter 单元测试 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
-| `[ ]` | 5.3 | 运行集成测试 | `pytest tests/integration/ -x -q` |
-| `[ ]` | 5.4 | 运行架构测试 | `pytest tests/unit/architecture/ -x -q` |
-| `[ ]` | 5.5 | 运行 mypy 类型检查 | `mypy src/infrastructure/storage/minio/ src/application/ports/document_storage.py` |
-| `[ ]` | 5.6 | 验证 P0 问题全部修复（R1-R7 验收标准） | 见验收标准章节 |
+| `[ ]` | 5.1 | 运行 L4ObjectPort 单元测试（确认 list_objects 已覆盖） | `pytest tests/unit/domain/ports/test_l4_object_port.py -v` |
+| `[ ]` | 5.2 | 运行 MinIOAdapter 单元测试（确认 archive content 和 list_objects 修复） | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
+| `[ ]` | 5.3 | 运行 WORM 单元测试（确认 COMPLIANCE 模式和 AccessDenied 映射） | `pytest tests/unit/infrastructure/storage/test_worm_and_lifecycle.py -v` |
+| `[ ]` | 5.4 | 更新 `test_storage_architecture.py` 中 `ComplianceLockError` 导入路径（从 `service_exceptions` 导入） | `pytest tests/unit/infrastructure/storage/test_storage_architecture.py -v` |
+| `[ ]` | 5.5 | 运行集成测试 | `pytest tests/integration/ -x -q` |
+| `[ ]` | 5.6 | 运行 mypy 类型检查 | `mypy src/infrastructure/storage/minio/` |
+| `[ ]` | 5.7 | 验证 P0-4 WORM 模式为 COMPLIANCE（`grep -r "GOVERNANCE" --include="*.py" src/infrastructure/storage/minio/` 无结果） | 验收标准 R9 |
 
 ---
 
@@ -1357,9 +1363,9 @@ if content is not None:
 | Phase 2 | `[ ]` 待执行 | 0/4 | 2.1, 2.2, 2.3, 2.4 |
 | Phase 3 | `[ ]` 待执行 | 0/5 | 3.1, 3.2, 3.3, 3.4, 3.5 |
 | Phase 4 | `[ ]` 待执行 | 0/8 | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 |
-| Phase 5 | `[ ]` 待执行 | 0/3 | 5.1, 5.2, 5.3 |
+| Phase 5 | `[ ]` 待执行 | 0/7 | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7 |
 
-**总计：0/32 步骤已完成**
+> **总计：0/36 步骤已完成**（Phase 0: 0/6, Phase 1: 0/6, Phase 2: 0/4, Phase 3: 0/5, Phase 4: 0/8, Phase 5: 0/7）
 
 ---
 
