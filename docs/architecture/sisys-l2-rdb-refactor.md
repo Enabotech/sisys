@@ -1,10 +1,10 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.8.0
+**版本：** 1.9.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
-**审查状态：** 第7轮审查完成
+**审查状态：** 第8轮审查完成
 
 ---
 
@@ -24,6 +24,7 @@
 | R-8 | architecture.md 与本文档不一致 | 明确两文档定位：前者宏观架构，后者详细设计 |
 | R-9 | L2RdbPort 重构价值明确 | 既能提供统一契约约束（强制一致性），又为未来复用扩展提供良好基础 |
 | R-10 | PostgreSQLUnitOfWork 适配四层模型 | Layer3 设计目标为 PostgreSqlRdbAdapter，当前由 PostgreSQLUnitOfWork 承担事务管理职责，未来可演进为 Adapter |
+| R-11 | L2RdbPort 与 BaseRepository 类型冲突 | 领域层 `BaseRepository` Protocol 使用 `UUID`/返回 `None`，基础设施层 `BaseRepository` 使用 `str`/返回 `T`/`None`。L2RdbPort 继承前者签名，具体 Repository 必须完全覆盖 BaseRepository 的 CRUD 方法，复用价值有限 |
 
 ### 0.1 业界最佳实践对照
 
@@ -550,7 +551,7 @@ class L2RdbPort(Protocol):
 
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Protocol, TypeVar
 from uuid import UUID
 
 T = TypeVar("T")
@@ -585,7 +586,10 @@ class L2MetadataRepositoryPort(L2RdbPort, Protocol):
 
 class L2ChangeHistoryRepositoryPort(L2RdbPort, Protocol):
     """L2 记忆变更历史仓储端口。"""
-    pass
+
+    async def save(self, history: "MemoryChangeHistory") -> None: ...
+    async def get_by_memory_id(self, memory_id: UUID) -> list["MemoryChangeHistory"]: ...
+    async def get_by_id(self, history_id: UUID) -> "MemoryChangeHistory | None": ...
 
 
 class L2GroupMemberRepositoryPort(L2RdbPort, Protocol):
