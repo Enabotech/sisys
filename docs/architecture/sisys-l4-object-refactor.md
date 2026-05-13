@@ -171,6 +171,55 @@ async def test_list_objects_delegates_correctly(self): ...
 async def test_mock_list_objects_verified(self): ...
 ```
 
+### 1.7 架构一致性完整分析（Round 4 汇总）
+
+#### 1.7.1 接口签名对比
+
+| 方法 | L4ObjectPort | ObjectStorageRepository | MinIOAdapter | MinIORepository |
+|------|-------------|------------------------|--------------|-----------------|
+| store | ✅ 匹配 | ✅ 匹配 | ✅ | ✅ |
+| retrieve | ✅ 匹配 | ✅ 匹配 | ✅ | ✅ |
+| delete | ✅ 匹配 | ✅ 匹配 | ✅ | ✅ |
+| get_metadata | ✅ 匹配 | ✅ 匹配 | ✅ | ✅ |
+| archive | ❌ **content 参数丢失** | ❌ 无 content | ❌ **content 未传递** | ❌ **返回 bool** |
+| list_objects | ✅ 有定义 | ✅ 匹配 | ❌ **缺失实现** | ✅ 已实现 |
+
+#### 1.7.2 委托链问题汇总
+
+```
+L4ObjectPort (Protocol)
+    ↓ 实现
+MinIOAdapter
+    ↓ 委托 ⚠️ 问题
+MinIORepository (实现 ObjectStorageRepository)
+    ↓ 组合
+BucketManager / ObjectOperations / WORMManager
+```
+
+**委托链问题：**
+1. `archive`: MinIOAdapter 接收 content 但丢弃，MinIORepository 返回 bool 而非 str
+2. `list_objects`: MinIOAdapter 完全缺失该方法，破坏 L4ObjectPort 协议完整性
+
+#### 1.7.3 验收测试覆盖分析
+
+| L4ObjectPort 方法 | 单元测试 | Acceptance 测试 | 覆盖评估 |
+|-------------------|---------|----------------|---------|
+| store | ✅ | AC-2 | ✅ 已覆盖 |
+| retrieve | ✅ | AC-3 | ⚠️ 触发但无验证 |
+| delete | ✅ | AC-4 | ⚠️ 仅错误路径 |
+| get_metadata | ✅ | **无** | ❌ 未覆盖 |
+| archive | ✅ | AC-4, AC-8 | ⚠️ 流程存在但无验证 |
+| list_objects | ❌ | **无** | ❌ 完全未覆盖 |
+
+**AC-5/6/7 空实现问题：** 分片上传、断点续传、生命周期规则测试只有 `pass`，里程碑测试未完成。
+
+#### 1.7.4 关键结论
+
+1. **Protocol 实现滞后**：MinIOAdapter 漏实现了 `list_objects`，导致 L4ObjectPort 协议不完整
+2. **archive 语义断裂**：content 参数在调用链中完全未被处理，导致数据丢失
+3. **类型系统失效**：MinIOAdapter 用 `cast("str", ...)` 掩盖了 MinIORepository 返回 bool 的问题
+4. **测试覆盖不足**：6 个方法中 3 个无实质验证，1 个完全未覆盖
+
 ---
 
 ## 2. 目标架构
