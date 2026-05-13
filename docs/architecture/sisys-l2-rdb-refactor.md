@@ -1,10 +1,10 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.7.0
+**版本：** 1.8.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
-**审查状态：** 第6轮审查完成
+**审查状态：** 第7轮审查完成
 
 ---
 
@@ -14,10 +14,10 @@
 
 | 问题编号 | 问题描述 | 修正方案 |
 |---------|---------|---------|
-| R-1 | `execute_in_transaction` 归属歧义 | 明确为 `PostgreSqlRdbAdapter` 的方法，非 `L2RdbPort` 接口的一部分 |
+| R-1 | `execute_in_transaction` 归属歧义 | 该方法在代码库中**完全不存在**，原文档描述了未实现的功能；修正为删除相关描述（见§4.2.1） |
 | R-2 | `UserRepositoryPort` 接口不完整 | 补充 `save`/`delete`/`list_all` 标准 CRUD，与 `RoleRepositoryPort` 一致 |
 | R-3 | 会话管理机制不明 | 明确 `BaseRepository` 通过构造器注入 `AsyncSession` |
-| R-4 | `PostgreSqlRdbAdapter` 角色定位 | 明确其为**会话与事务管理者**，不直接实现 `L2RdbPort` 全部接口 |
+| R-4 | `PostgreSqlRdbAdapter` 角色定位 | `PostgreSqlRdbAdapter` 在代码库中**不存在**，是可选重构目标；当前系统使用 `PostgreSQLUnitOfWork` 管理事务 |
 | R-5 | 系统使用 **UnitOfWork** 而非 `execute_in_transaction` | 事务边界通过 `PostgreSQLUnitOfWork` 管理，非 adapter 方法 |
 | R-6 | `get_by_email` 方法错误定义 | User 实体无 `email` 字段，移除该方法定义 |
 | R-7 | UserModel 与 User 实体字段不一致 | 需领域层与基础设施层对齐（见 §1.6） |
@@ -442,13 +442,14 @@ class PostgreSQLUserRepository(UserRepositoryPort, BaseRepository[UserModel]):
 │      ├── LoginAttemptRepositoryPort(L2RdbPort)             │
 │      └── UserRoleRepositoryPort(L2RdbPort)                  │
 │                                                             │
-│  src/infrastructure/storage/postgresql/                     │
-│  ├── rdb_adapter.py          # PostgreSqlRdbAdapter(L2RdbPort)│
-│  └── repository/                                             │
-│      ├── base_repository.py  # BaseRepository               │
-│      ├── memory_metadata_repository.py                    │
-│      ├── user_repository.py                                │
-│      └── role_repository.py                                │
+│  src/infrastructure/
+│  ├── messaging/unit_of_work/
+│  │   └── postgresql_unit_of_work.py  # PostgreSQLUnitOfWork ✅ 已实现
+│  └── storage/postgresql/repository/  # Repository 实现
+│      ├── base_repository.py  # BaseRepository
+│      ├── memory_metadata_repository.py
+│      ├── user_repository.py
+│      └── role_repository.py
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -657,96 +658,42 @@ class RoleRepositoryPort(L2RdbPort, Protocol):
 
 ### 4.3 基础设施层设计
 
-#### 4.3.1 rdb_adapter.py（PostgreSQL 会话与事务适配器）
+#### 4.3.1 PostgreSQLUnitOfWork（已实现）
 
 ```python
-# src/infrastructure/storage/postgresql/rdb_adapter.py
+# src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py
 
-"""PostgreSqlRdbAdapter — PostgreSQL 会话与事务管理适配器。
+"""PostgreSQLUnitOfWork - PostgreSQL 工作单元实现。
 
 职责：
-- 数据库会话生命周期管理
-- 事务控制（commit/rollback）
-- 不实现 L2RdbPort 接口，仅作为基础设施内部工具
-
-使用方式：
-- 应用层/UseCase 层通过注入的 PostgreSqlRdbAdapter 调用 execute_in_transaction
-- 具体 Repository 通过构造器注入 AsyncSession（不由此适配器提供）
+- 事务控制（begin/commit/rollback）
+- 提供 session 属性供 Repository 使用
 """
-
-from __future__ import annotations
-
-from typing import Any, Callable, TypeVar
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
 
-T = TypeVar("T")
+class PostgreSQLUnitOfWork(UnitOfWork):
+    """PostgreSQL 工作单元实现。"""
 
+    def __init__(self, session: AsyncSession):
+        self._session = session
+        self._committed = False
+        self._rolled_back = False
 
-class PostgreSqlRdbAdapter:
-    """PostgreSQL 会话与事务管理适配器。
+    @property
+    def session(self) -> AsyncSession: ...
 
-    职责：
-    - 提供 get_session() 获取数据库会话
-    - 提供 execute_in_transaction() 执行带事务的业务逻辑
-
-    不实现 L2RdbPort 接口，事务方法是独立的能力。
-    """
-
-    def __init__(self, engine: DatabaseEngine):
-        """初始化 PostgreSqlRdbAdapter。
-
-        Args:
-            engine: 数据库引擎实例
-        """
-        self._engine = engine
-
-    async def get_session(self) -> AsyncSession:
-        """获取数据库会话。
-
-        Returns:
-            AsyncSession 实例
-        """
-        return self._engine.get_async_session()
-
-    async def execute_in_transaction(
-        self,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
-    ) -> T:
-        """在事务内执行操作。
-
-        应用层/UseCase 层使用此方法包装需要事务的业务逻辑。
-
-        Args:
-            func: 要执行的异步函数
-            *args: 位置参数
-            **kwargs: 关键字参数
-
-        Returns:
-            函数返回值
-
-        Raises:
-            事务内任意异常自动回滚
-        """
-        async with self._engine.get_async_session() as session:
-            try:
-                result = await func(session, *args, **kwargs)
-                await session.commit()
-                return result
-            except Exception:
-                await session.rollback()
-                raise
+    async def begin(self) -> None: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
+    async def begin_nested(self) -> None: ...
 ```
 
 **说明**：
-- `PostgreSqlRdbAdapter` 不再实现 `L2RdbPort`，而是独立提供会话和事务管理
-- `execute_in_transaction` 将 `session` 作为第一个参数传递给目标函数
-- 事务边界由应用层/UseCase 层控制
+- 实现 `UnitOfWork` Protocol（`src/domain/ports/unit_of_work.py`）
+- 事务边界由应用层控制，幂等性防护防止重复操作
+- **PostgreSqlRdbAdapter（可选重构目标）**：在代码库中不存在，与 PostgreSQLUnitOfWork 职责重叠，当前不计划实施
 
 #### 4.3.2 base_repository.py（更新）
 
@@ -958,10 +905,11 @@ src/domain/ports/
 ├── user_role_repository.py   # ★ 更新：继承 L2RdbPort
 └── ...
 
-src/infrastructure/storage/postgresql/
-├── __init__.py              # 更新：导出 PostgreSqlRdbAdapter
+src/infrastructure/
+├── messaging/unit_of_work/
+│   └── postgresql_unit_of_work.py  # PostgreSQLUnitOfWork ✅ 已实现
+├── storage/postgresql/
 ├── engine.py                # 保持不变 ✅
-├── rdb_adapter.py           # ★ 新增：PostgreSqlRdbAdapter
 ├── models/                  # 保持不变
 │   ├── __init__.py
 │   ├── user.py
@@ -1079,7 +1027,7 @@ src/infrastructure/storage/postgresql/
 | `AuditRepositoryPort` | 独立定义 | - | → 继承基类 | - |
 | `LoginAttemptRepositoryPort` | 独立定义 | - | → 继承基类 | - |
 | `UserRoleRepositoryPort` | 独立定义 | - | → 继承基类 | - |
-| `PostgreSqlRdbAdapter` | ❌ 不存在 | - | - | ✅ 创建 |
+| `PostgreSqlRdbAdapter` | ❌ 不存在（可选重构目标） | - | - | 不计划实施 |
 | `PostgreSQLMemoryMetadataRepository` | ✅ 已实现 | - | - | → 验证 |
 | `PostgreSQLUserRepository` | 未实现端口 | - | - | → 实现端口 |
 
@@ -1125,18 +1073,17 @@ src/infrastructure/storage/postgresql/
 ### 9.1 支持其他 RDB 实现
 
 ```python
-# MySQL 适配器示例（未来扩展）
+# MySQL UnitOfWork 示例（未来扩展）
 
-class MySqlRdbAdapter(L2RdbPort):
-    """MySQL RDB 适配器实现。"""
+class MySqlUnitOfWork(UnitOfWork):
+    """MySQL 工作单元实现。"""
 
-    def __init__(self, config: MySQLConfig):
-        self._config = config
-        # MySQL 连接逻辑
+    def __init__(self, session):
+        self._session = session
 
-    async def execute_in_transaction(self, func: Callable, *args, **kwargs) -> Any:
-        # MySQL 事务逻辑
-        pass
+    async def begin(self) -> None: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
 ```
 
 ### 9.2 单元测试 Mock
@@ -1169,7 +1116,7 @@ class MockL2RdbAdapter(L2RdbPort):
 | 术语 | 定义 |
 |------|------|
 | L2RdbPort | 统一 RDB 存储抽象基类 |
-| PostgreSqlRdbAdapter | PostgreSQL 的 L2RdbPort 实现 |
+| PostgreSqlRdbAdapter | 可选重构目标，在代码库中不存在，当前不计划实施 |
 | BaseRepository | 基础设施层通用 CRUD 基类 |
 | 六边形架构 | 领域驱动架构模式，又名端口与适配器 |
 
