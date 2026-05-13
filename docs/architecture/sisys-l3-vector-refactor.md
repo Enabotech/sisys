@@ -1,6 +1,6 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v6.0
+**版本:** v7.0
 **日期:** 2026-05-13
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
@@ -154,11 +154,12 @@ class L3VectorPort(Protocol):
 # Layer 2: Domain 应用接口（SemanticCachePort - 独立）
 class SemanticCachePort(Protocol):
     """语义缓存接口 - 应用层抽象"""
-    SIMILARITY_THRESHOLD: float = 0.9
-    TTL: int = 86400
+    SIMILARITY_THRESHOLD: float = 0.95
+    TTL: int = 3600
 
     async def get_or_compute(self, query_embedding: list[float], compute_fn: Callable) -> CacheResult: ...
     async def invalidate(self, cache_key: str) -> bool: ...
+    async def invalidate_by_embedding(self, query_embedding: list[float]) -> bool: ...
 
 @dataclass
 class CacheResult:
@@ -275,8 +276,8 @@ from typing import Callable, Protocol
 class SemanticCachePort(Protocol):
     """语义缓存端口。"""
 
-    SIMILARITY_THRESHOLD: float = 0.9
-    TTL: int = 86400
+    SIMILARITY_THRESHOLD: float = 0.95
+    TTL: int = 3600
 
     @abstractmethod
     async def get_or_compute(
@@ -482,35 +483,59 @@ class QdrantL3VectorStore(L3VectorPort):
 
 #### 3.2.2 新建 `src/infrastructure/storage/qdrant/semantic_cache_store.py`
 
-```python
-"""QdrantSemanticCacheStore — SemanticCachePort 的 Qdrant 实现。
+> **v6.0 修正**：原设计（纯 Qdrant）与 §九 工作流程（Qdrant+Redis 双层）矛盾，
+> 已统一为双层设计：Qdrant 负责向量检索，Redis 负责缓存实际响应内容（带 TTL）。
 
-使用 Qdrant 向量检索实现语义缓存，支持相似度匹配。
+```python
+"""QdrantSemanticCacheStore — SemanticCachePort 的 Qdrant+Redis 双层实现。
+
+双层缓存架构（对应 §九 工作流程）：
+- Qdrant: 向量存储与语义检索，payload 仅存储 cache_key
+- Redis: 缓存实际响应内容（带 TTL 管理）
+
+工作流程：
+1. 计算 embedding
+2. Qdrant.search(embedding, limit=1, score_threshold=0.95)
+   ↓命中 → payload 中获取 cache_key → Redis.GET(cache_key) → 返回缓存响应
+   ↓未命中 → 调用 compute_fn → 写入 Redis(SET cache_key response EX ttl)
+                                → 写入 Qdrant(embedding + payload{cache_key})
 """
 
 from __future__ import annotations
 
 import hashlib
-from typing import Callable
+import json
+import logging
+from typing import TYPE_CHECKING, Callable
+
+import redis.asyncio as aioredis
 
 from src.domain.ports.l3_vector import L3VectorPort
 from src.domain.ports.semantic_cache import CacheResult, SemanticCachePort
 
+if TYPE_CHECKING:
+    pass
+
+logger = logging.getLogger(__name__)
+
 
 class QdrantSemanticCacheStore(SemanticCachePort):
-    """语义缓存的 Qdrant 实现。"""
+    """语义缓存的 Qdrant+Redis 双层实现。"""
 
     _CACHE_COLLECTION = "semantic_cache"
-    _CACHE_VECTOR_SIZE = 1536
+    _CACHE_VECTOR_SIZE = 1024  # bge-m3 向量维度
+    _CACHE_PREFIX = "sem_cache:"
 
     def __init__(
         self,
         l3_vector: L3VectorPort,
+        redis_client: aioredis.Redis,
         collection: str = _CACHE_COLLECTION,
-        similarity_threshold: float = 0.9,
-        ttl: int = 86400,
+        similarity_threshold: float = 0.95,
+        ttl: int = 3600,
     ):
         self._l3 = l3_vector
+        self._redis = redis_client
         self._collection = collection
         self._threshold = similarity_threshold
         self._ttl = ttl
@@ -520,38 +545,85 @@ class QdrantSemanticCacheStore(SemanticCachePort):
         query_embedding: list[float],
         compute_fn: Callable,
     ) -> CacheResult:
-        """获取或计算缓存结果。"""
-        results = await self._l3.search(
-            collection=self._collection,
-            query_vector=query_embedding,
-            limit=1,
-            filter_payload=None,
-        )
+        """获取或计算缓存结果（双层：Qdrant 检索 + Redis 内容缓存）。"""
+        # Step 1: Qdrant 向量检索
+        try:
+            results = await self._l3.search(
+                collection=self._collection,
+                query_vector=query_embedding,
+                limit=1,
+            )
+        except Exception as e:
+            logger.warning("Qdrant search failed, fallback to compute: %s", e)
+            results = []
 
-        if results and results[0]["score"] >= self._threshold:
+        # Step 2: 命中 → 从 payload 获取 cache_key → Redis.GET
+        if results and results[0].get("score", 0) >= self._threshold:
             payload = results[0].get("payload", {})
-            return CacheResult(value=payload.get("result", {}), hit=True)
+            cache_key = payload.get("cache_key")
+            if cache_key:
+                try:
+                    cached = await self._redis.get(f"{self._CACHE_PREFIX}{cache_key}")
+                    if cached:
+                        return CacheResult(value=json.loads(cached), hit=True)
+                except Exception as e:
+                    logger.warning("Redis GET failed, use payload fallback: %s", e)
+                    return CacheResult(value=payload.get("result", {}), hit=True)
 
+        # Step 3: 未命中 → 调用 compute_fn
         result = await compute_fn()
         cache_key = self._hash_embedding(query_embedding)
-        await self._l3.upsert_points(
-            self._collection,
-            [{
-                "id": cache_key,
-                "vector": query_embedding,
-                "payload": {
-                    "query_embedding": query_embedding,
-                    "result": result,
-                },
-            }],
-        )
+
+        # Step 4: 写入 Redis（带 TTL）
+        try:
+            await self._redis.setex(
+                f"{self._CACHE_PREFIX}{cache_key}",
+                self._ttl,
+                json.dumps(result),
+            )
+        except Exception as e:
+            logger.warning("Redis SET failed: %s", e)
+
+        # Step 5: 写入 Qdrant（payload 仅存 cache_key）
+        try:
+            await self._l3.upsert_points(
+                self._collection,
+                [{
+                    "id": cache_key,
+                    "vector": query_embedding,
+                    "payload": {
+                        "cache_key": cache_key,
+                        "result": result,  # 降级数据源（Redis 过期后仍可从 payload 读取）
+                    },
+                }],
+            )
+        except Exception as e:
+            logger.warning("Qdrant upsert failed: %s", e)
 
         return CacheResult(value=result, hit=False)
 
     async def invalidate(self, cache_key: str) -> bool:
-        """失效缓存。"""
-        await self._l3.delete_points(self._collection, [cache_key])
-        return True
+        """失效缓存（双删：Qdrant + Redis）。"""
+        success = True
+        try:
+            await self._l3.delete_points(self._collection, [cache_key])
+        except Exception as e:
+            logger.warning("Qdrant delete failed: %s", e)
+            success = False
+        try:
+            await self._redis.delete(f"{self._CACHE_PREFIX}{cache_key}")
+        except Exception as e:
+            logger.warning("Redis DELETE failed: %s", e)
+            success = False
+        return success
+
+    async def invalidate_by_embedding(
+        self,
+        query_embedding: list[float],
+    ) -> bool:
+        """基于 embedding 使缓存失效。"""
+        cache_key = self._hash_embedding(query_embedding)
+        return await self.invalidate(cache_key)
 
     def _hash_embedding(self, embedding: list[float]) -> str:
         """计算 embedding 的哈希作为缓存键。"""
@@ -898,6 +970,7 @@ def test_backward_compatibility():
 | v4.0 | 2026-05-13 | **代码验证发现 v3.0 计划变更未实现** | 所有 P0/P1 问题仍未修复，需开始实际代码实现 |
 | v5.0 | 2026-05-13 | **第二轮5轮审查完成** | 发现设计文档内部矛盾：SemanticVectorPort(L3VectorPort, ...) 是歧义；发现 Redis 连接池问题；确认 P0 修复依赖关系 |
 | v6.0 | 2026-05-13 | **语义缓存工作流程评审** | 确认 Qdrant+Redis 分离式设计合理；发现一致性风险；TTL 不一致；缺少 invalidate_by_embedding |
+| v7.0 | 2026-05-13 | **§3.2.2 重写为双层设计** | 修正与 §九 的架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding；添加 Redis 依赖 |
 
 ---
 
@@ -996,11 +1069,13 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v6.0 已完成语义缓存工作流程评审
+**文档状态**: v7.0 已完成第三轮第2轮审查
 **审查摘要**:
-- Qdrant + Redis 分离式设计合理（Qdrant 检索 + Redis 缓存内容）
-- 发现 4 个一致性风险和 5 项改进建议
-- 所有 P0 问题仍未修复
+- 修正 §3.2.2 与 §九 的核心矛盾：统一为 Qdrant+Redis 双层设计
+- TTL 统一为 3600s（1小时）
+- 添加 invalidate_by_embedding 方法
+- QdrantSemanticCacheStore 构造函数增加 Redis 依赖
+- payload 结构修正：仅存 cache_key + 降级数据源
 
 **下一步**: 执行 P0 问题的实际代码实现
 **关键设计澄清**: `SemanticCachePort` 使用**组合关系**调用 `L3VectorPort`，不是继承关系
