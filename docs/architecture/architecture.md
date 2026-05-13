@@ -5757,7 +5757,7 @@ class UDMRService:
 ```json
 {
   "data": {
-    "id": "plan_01hx8z9q2p3y4r5t6w7v8m0n1k",
+    "id": "plan_01hx8z9q2p3y4r5t6w7v8m0n1k",        /* pragma: allowlist secret */
     "type": "strategic_plan",
     "attributes": {
       "plan_type": "SP",
