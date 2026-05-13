@@ -1,8 +1,8 @@
 # SISYS L4 对象存储层重构详细设计
 
-**版本：** v1.1
+**版本：** v1.2
 **日期：** 2026-05-13
-**状态：** 设计完成（架构审查修正版）
+**状态：** 设计完成（代码未执行，需重新审查）
 **架构师：** Claude Code
 
 ---
@@ -23,20 +23,21 @@
 | Layer 3 技术实现 | `MinIOAdapter` → `MinIORepository` | 复用已有的 BucketManager/ObjectOperations/WORMManager 分层组件 |
 | Layer 2 应用端口 | `DocumentStoragePort(L4ObjectPort)` | 第一个具体应用端口，验证四层架构可行性 |
 
-### 0.3 架构审查修正（v1.1）
+### 0.3 架构审查修正（v1.1 → v1.2）
 
-**审查发现以下 P0 阻断问题，已在设计中修正：**
+**审查发现以下 P0 阻断问题，已在设计中修正。代码实际执行状态待更新：**
 
-| 问题 | 描述 | 修正方案 |
-|------|------|---------|
-| P0-1 | `MinIOAdapter.archive()` 未传递 content 参数 | 明确 content 必须为 None，否则抛出 NotImplementedError |
-| P0-2 | `MinIOAdapter` 缺失 `list_objects` 方法 | 添加 `list_objects()` 方法，委托 `MinIORepository` |
-| P0-3 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 修改返回类型为 `str` |
+| 问题 | 描述 | 修正方案 | 代码状态 |
+|------|------|---------|---------|
+| P0-1 | `MinIOAdapter.archive()` 未处理 content 参数 | 明确 content 必须为 None，否则抛出 NotImplementedError | ❌ 未执行 |
+| P0-2 | `MinIOAdapter` 缺失 `list_objects` 方法 | 添加 `list_objects()` 方法，委托 `MinIORepository` | ❌ 未执行 |
+| P0-3 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 修改返回类型为 `str` | ❌ 未执行 |
 
-**修正后状态：**
-- ✅ `MinIOAdapter.archive()` 明确 content 参数语义约束
-- ✅ `MinIOAdapter.list_objects()` 方法已添加
-- ✅ `MinIORepository.archive()` 返回类型已修正
+**代码执行状态：**
+- ⚠️ `MinIOAdapter.archive()` 仍透传 content 参数，会导致 TypeError
+- ⚠️ `MinIOAdapter.list_objects()` 方法缺失
+- ⚠️ `MinIORepository` 仍实现 `ObjectStorageRepository`，未迁移到 `L4ObjectPort`
+- ⚠️ `DocumentStoragePort` 和 `MinIODocumentStorage` 文件不存在
 
 ---
 
@@ -115,9 +116,38 @@ MinIORepository (组合上述组件)
 | P1 | `ObjectStorageRepository` 和 `L4ObjectPort` 两个抽象并存 | 维护成本增加，职责不清 | P1 |
 | P2 | 缺少应用层具体端口（Layer 2） | 无法满足特定业务场景语义 | P1 |
 | P3 | `L4ObjectPort` 的 `list_objects` 缺少 `bucket_type` 参数 | 与实现不一致 | P1 |
-| P4 | `MinIOAdapter.archive()` 未传递 content 参数 | content 被忽略，语义矛盾 | P0 |
-| P5 | `MinIOAdapter` 缺失 `list_objects` 方法 | 调用会抛出 AttributeError | P0 |
-| P6 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 与 L4ObjectPort 定义不一致 | P0 |
+| P4 | `MinIOAdapter.archive()` 未处理 content 参数 | content 被静默丢弃，语义矛盾：设计文档描述"归档对象（带 WORM retention）"，但实际只设置 retention 策略，不上传任何对象数据 | P0 |
+| P5 | `MinIOAdapter` 缺失 `list_objects` 方法 | 调用会抛出 AttributeError，破坏 L4ObjectPort 协议完整性 | P0 |
+| P6 | `MinIORepository.archive()` 返回 `bool` 而非 `str` | 与 L4ObjectPort 定义不一致，导致类型不匹配 | P0 |
+
+### 1.5 archive() 方法语义矛盾（新增）
+
+**调用链分析：**
+
+```
+L4ObjectPort.archive(content=bytes)
+    → MinIOAdapter.archive(content=bytes)  # 收到 content，但设计文档说"仅用于接口兼容性"
+        → self._repository.archive(...)     # content 参数被静默丢弃
+            → MinIORepository.archive(retention_days)  # 无 content 参数
+                → WORMManager.archive_object(...) # 根本没有 content 参数
+                    → enable_worm_lock(...)       # 只有 retention，没有数据上传
+```
+
+**关键发现：**
+- `L4ObjectPort.archive()` 声明支持 `content: bytes | None` 参数，暗示可以直接上传内容并设置 WORM retention
+- 但整个实现链路（MinIOAdapter → MinIORepository → WORMManager）完全没有处理 content 上传
+- `WORMManager.archive_object()` 实际上只是调用 `enable_worm_lock()` 设置 retention 元数据，没有 put_object 操作
+- **这意味着 `content` 参数在当前架构下根本无法使用**，传入 content 会导致数据丢失
+
+**修正方案选择：**
+
+| 方案 | 描述 | 优点 | 缺点 |
+|------|------|------|------|
+| A | 保持现状，明确文档说明 content 必须为 None | 改动最小 | 接口语义与实现不符 |
+| B | 修改 MinIOAdapter.archive()，当 content != None 时抛出 NotImplementedError | 明确接口约束，防止静默数据丢失 | 需要修改接口契约 |
+| C | 完整实现 content 上传 + WORM retention（需要较大架构变更） | 功能完整 | 工作量大，超出本次重构范围 |
+
+**设计文档推荐方案 B**：在 MinIOAdapter.archive() 开头检查 content != None 并抛出 NotImplementedError。
 
 ---
 
@@ -508,6 +538,7 @@ class MinIORepository(L4ObjectPort):  # 改实现 L4ObjectPort
         self,
         bucket_type: str,
         object_key: str,
+        content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:  # 改为返回 str
         """归档对象至 WORM 存储，启用 Object Lock。
@@ -975,13 +1006,13 @@ grep -rl "ObjectStorageRepository" --include="*.py" src/
 | 2.3 | 更新 `L4ObjectPort.list_objects` 签名，增加 `bucket_type: str` 参数 | 类型检查 |
 | 2.4 | 更新所有调用 `list_objects` 的代码，适配新签名 | 测试通过 |
 
-**archive 语义约束：**
+**archive 语义约束（方案 B）：**
 ```python
 # archive() 方法 content 参数语义
 if content is not None:
     raise NotImplementedError(
         "archive() with content upload is not supported. "
-        "Use store() for content upload."
+        "Use store() for content upload, then set_retention() for WORM."
     )
 # content=None 时，仅设置 WORM retention
 ```
@@ -1145,3 +1176,4 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 |------|------|--------|------|
 | 1.0.0 | 2026-05-13 | - | 初始版本 |
 | 1.1.0 | 2026-05-13 | - | 架构审查修正：修复 archive/list_objects 方法问题 |
+| 1.2.0 | 2026-05-13 | - | 代码审查更新：确认 P0 问题实际未执行，更新文档状态 |
