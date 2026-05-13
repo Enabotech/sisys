@@ -993,7 +993,7 @@ src/infrastructure/storage/postgresql/
 | Phase 1 | 设计评审与确认 | 低 | 0.25d | Phase 0 |
 | Phase 2 | 创建 L2RdbPort 基类 | 低 | 0.5d | Phase 1 |
 | Phase 3 | 更新领域层端口（继承基类） | 中 | 1d | Phase 2 |
-| Phase 4 | 创建 PostgreSqlRdbAdapter | 低 | 0.5d | Phase 2 |
+| Phase 4 | 验证 PostgreSQLUnitOfWork 已实现 | 低 | 0.25d | Phase 2 |
 | Phase 5 | 更新基础设施层 Repository | 中 | 1d | Phase 3, Phase 4 |
 | Phase 6 | 更新 __init__.py 导出 | 低 | 0.25d | Phase 5 |
 | Phase 7 | 回归测试 | 中 | 1d | Phase 6 |
@@ -1034,12 +1034,15 @@ src/infrastructure/storage/postgresql/
 - [ ] 更新 `src/domain/ports/login_attempt_repository.py` - `LoginAttemptRepositoryPort` 继承 `L2RdbPort`
 - [ ] 更新 `src/domain/ports/user_role_repository.py` - `UserRoleRepositoryPort` 继承 `L2RdbPort`
 
-#### Phase 4: 创建 PostgreSqlRdbAdapter
+#### Phase 4: 验证 PostgreSQLUnitOfWork 已实现
 
-- [ ] 创建 `src/infrastructure/storage/postgresql/rdb_adapter.py`
-- [ ] 实现 `PostgreSqlRdbAdapter` 类
-- [ ] 实现 `execute_in_transaction` 方法
-- [ ] 添加会话管理逻辑
+**注**：PostgreSqlRdbAdapter 文档定义为重构目标，但实际系统使用 PostgreSQLUnitOfWork 管理事务。
+
+- [x] 确认 `src/infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py` 已存在
+- [x] 验证 `PostgreSQLUnitOfWork` 实现 `UnitOfWork` 接口
+- [x] 验证 `begin()`/`commit()`/`rollback()` 事务方法实现
+- [x] 验证 UnitOfWork 提供 `session` 属性给 Repository 使用
+- [ ] （可选）如需统一存储适配器接口，创建 `PostgreSqlRdbAdapter` 包装现有 UnitOfWork
 
 #### Phase 5: 更新基础设施层 Repository
 
