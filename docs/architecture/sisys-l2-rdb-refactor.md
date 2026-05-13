@@ -1,10 +1,10 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.4.0
+**版本：** 1.5.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
-**审查状态：** 第2轮审查完成（修正内容见 §0.0）
+**审查状态：** 第4轮审查完成（修正内容见 §0.0，重大发现见 §1.7）
 
 ---
 
@@ -22,6 +22,7 @@
 | R-6 | `get_by_email` 方法错误定义 | User 实体无 `email` 字段，移除该方法定义 |
 | R-7 | UserModel 与 User 实体字段不一致 | 需领域层与基础设施层对齐（见 §1.6） |
 | R-8 | architecture.md 与本文档不一致 | 明确两文档定位：前者宏观架构，后者详细设计 |
+| R-9 | L2RdbPort 重构价值存疑 | 三个L2端口共同方法仅save，强行抽象违背DDD原则 |
 
 ### 0.1 业界最佳实践对照
 
@@ -29,7 +30,7 @@
 |------|---------|---------------------------|------|
 | 统一基类 | `L2RdbPort` | `JpaRepository` | ✅ 正确 |
 | 端口继承 | 具体端口继承基类 | `XxxRepository extends JpaRepository` | ✅ 正确 |
-| 会话管理 | `PostgreSqlRdbAdapter` 统一管理 | `EntityManager` 注入 | ✅ 正确（修正） |
+| 会话管理 | `DatabaseEngine` + `PostgreSQLUnitOfWork` | `EntityManager` 注入 | ✅ 正确（修正） |
 | CRUD 复用 | `BaseRepository` | `SimpleJpaRepository` | ✅ 正确 |
 | 事务边界 | `PostgreSQLUnitOfWork` (应用层管理) | `@Transactional` 在 Service 层 | ✅ 正确（修正） |
 
@@ -144,21 +145,24 @@ src/infrastructure/storage/postgresql/
 | 实现类 | 位置 | 继承基类 | 实现端口 | 状态 |
 |-------|------|---------|---------|------|
 | `BaseRepository` | repository/base_repository.py | Generic[T] | 无 | ✅ 已有 |
-| `UserRepository` | repository/user_repository.py | BaseRepository | ❌无 | ❌ 未实现端口 |
+| `UserRepository` | repository/user_repository.py | BaseRepository | ⚠️ 未声明实现 UserRepositoryPort | ⚠️ 需修复 |
 | `RoleRepository` | repository/role_repository.py | RoleRepositoryPort | ✅ RoleRepositoryPort | ✅ 已实现 |
 | `PostgreSQLMemoryMetadataRepository` | repository/memory_metadata_repository.py | 无 | L2MetadataRepositoryPort | ✅ 已实现 |
 | `LoginAttemptRepository` | repository/login_attempt_repository.py | 无 | LoginAttemptRepositoryPort | ✅ 已实现 |
 | `UserRoleRepository` | repository/user_role_repository.py | 无 | UserRoleRepositoryPort | ✅ 已实现 |
 | `AuditRepository` | infrastructure/security/ | 无 | AuditRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryChangeHistoryRepository` | repository/memory_change_history_repository.py | 无 | L2ChangeHistoryRepositoryPort | ✅ 已实现 |
+| `PostgreSQLMemoryGroupMemberRepository` | repository/memory_group_member_repository.py | 无 | L2GroupMemberRepositoryPort | ✅ 已实现 |
+| `PostgreSQLUnitOfWork` | infrastructure/messaging/unit_of_work/ | UnitOfWork | ✅ UnitOfWork | ✅ 已实现 |
 
 ### 1.5 关键发现：设计与实现脱节
 
 **问题根因分析：**
 
 1. **L2RdbPort 基类缺失**：文档定义了基类，但代码未创建（是**重构目标**，非当前状态）
-2. **领域层端口未统一**：8个端口各自独立，未继承基类（是**待解决问题**）
-3. **UserRepository 未实现端口**：UserRepository 继承 BaseRepository，但未实现 UserRepositoryPort
-4. **无 PostgreSqlRdbAdapter**：文档定义的适配器未实现（但系统有 PostgreSQLUnitOfWork）
+2. **领域层端口未统一**：8个端口各自独立，未继承基类（是**待解决问题**，但价值存疑）
+3. **UserRepository 未声明实现端口**：继承 BaseRepository 但未声明实现 UserRepositoryPort
+4. **PostgreSqlRdbAdapter 不存在**：文档定义的适配器未实现（但系统有 PostgreSQLUnitOfWork）
 5. **领域模型与基础设施模型不一致**：User 实体无 email 字段，但 UserModel 有
 
 ### 1.6 领域模型与基础设施模型一致性问题
@@ -167,6 +171,33 @@ src/infrastructure/storage/postgresql/
 |------|-------|---------|---------|
 | User (domain) | ❌ 无 | `password_hash` | `failed_login_attempts`, `locked_until` |
 | UserModel (infrastructure) | ✅ 有 | `hashed_password` | ❌ 无 |
+
+**需决策**：方案A添加email到User实体（需评估领域层零依赖），方案B移除UserModel的email
+
+### 1.7 重构价值评估（Round 4 新增）
+
+**评估结论：L2RdbPort 基类重构价值存疑**
+
+| 维度 | 分析 |
+|------|------|
+| 共同方法 | 三个L2记忆端口共同方法仅1个（save），不足以构成基类 |
+| 业务语义 | L2MetadataRepositoryPort(完整CRUD)、L2ChangeHistoryRepositoryPort(仅追加)、L2GroupMemberRepositoryPort(权限管理) 完全不同 |
+| 重构成本 | 5人天 |
+| 收益 | 形式统一，无实际业务价值 |
+
+**推荐方案**：保持现状，仅修复已确认的bug（R-6 get_by_email、R-7 模型不一致、UserRepository 声明实现端口）
+
+### 1.8 端口-实现完整映射（Round 4 新增）
+
+| 端口 | 定义 | 实现 | 状态 |
+|------|------|------|------|
+| L0StoragePort → FileMemoryAdapter | ✅ | ✅ |
+| L1CachePort → RedisMemoryCache | ✅ | ✅ |
+| L2MetadataRepositoryPort → PostgreSQLMemoryMetadataRepository | ✅ | ✅ |
+| L2ChangeHistoryRepositoryPort → PostgreSQLMemoryChangeHistoryRepository | ✅ | ✅ |
+| L2GroupMemberRepositoryPort → PostgreSQLMemoryGroupMemberRepository | ✅ | ✅ |
+| UnitOfWork → PostgreSQLUnitOfWork | ✅ | ✅ |
+| UserRepositoryPort → ⚠️ UserRepository (未声明实现) | ✅ | ⚠️ |
 
 **需决策**：
 - 方案A：在 User 实体中添加 `email` 字段，使领域模型与基础设施模型一致
