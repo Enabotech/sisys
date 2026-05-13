@@ -24,11 +24,14 @@
 
 **Changelog v2.4 (第三四轮调研修复):**
 - P0: `get_async_driver()` 懒初始化存在竞态条件（非线程安全）
+- P0: 接口映射完整度仅 22%（Neo4jGraphStorage 缺失 5/9 方法）
 - P1: `find_path`/`get_neighbors` 返回 Neo4j 原生对象而非 dict（虚假 cast）
 - P1: `BaseGraphAdapter` 仅存在于设计文档，实际代码未实现
 - P1: `test_neo4j_adapter.py` 完全缺失 `get_neighbors` 测试
 - P1: `Neo4jGraphStorage` 未实现 L5GraphPort 协议（缺少 create_entity 等）
 - P2: `create_node` 接口在 GraphManager 和 L5GraphPort 中语义不同
+- P2: `Neo4jConnectionProvider` 单例未实现（使用多例 Neo4jClientWrapper）
+- P2: `MemoryGraphPort` 未实现（Application 层抽象缺失）
 
 ---
 
