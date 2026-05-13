@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.7
+**版本:** v2.8
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.7 第3轮审查，基于全面代码调研）
+**状态:** 设计完成（v2.8 第4轮审查，基于全面代码调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -67,6 +67,18 @@
 - **P1-NEW**: GraphRetriever绕过Port接口直连数据库驱动（死代码，架构违规）
 - **P1-NEW**: RelationshipType枚举存在但未使用（类型约束形同虚设）
 - **P1-NEW**: L5GraphPort docstring暴露Cypher实现细节（"MERGE语义"）
+
+**Changelog v2.8 (第4轮全面审查 - 3Agent并行调研):**
+- **P0-NEW**: `get_neighbors` 所有分支 `rel_type_clause` 缺少 `[]` 中括号，生成无效Cypher（影响所有带rel_type调用）
+- **P0-NEW**: `MemoryGraphPort` §4.2缺少 `L5GraphPort` 导入语句（NameError导入即崩溃）
+- **P0-NEW**: `BaseGraphAdapter` 未列入 §6.1 文件变更清单（MemoryGraphAdapter依赖缺失）
+- **P0-NEW**: §6.3 `__init__.py` 导出缺少 `Neo4jConnectionProvider` 和 `BaseGraphAdapter`
+- **P1-NEW**: `get_relationships` BOTH分支 `source_id` 始终返回 `n.id`，方向语义错误
+- **P1-NEW**: `create_relationship` 参数名冲突风险（properties键名与保留参数重叠）
+- **P1-NEW**: `find_path` 的 `max_depth` 缺少边界校验（0或负数生成无效Cypher）
+- **P2-NEW**: `batch_create_memory_entities` 串行await循环（性能不佳）
+- **P2-NEW**: §5.3 `cast` 导入未使用（冗余导入）
+- **P2-NEW**: §6.1 `l5_graph.py` 标为"修改"但实际是接口重写（低估变更风险）
 
 ---
 
