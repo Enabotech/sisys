@@ -1143,89 +1143,116 @@ src/infrastructure/storage/minio/
 
 ---
 
-## 5. 执行步骤
+## 5. 执行步骤（带 checkbox 执行状态跟踪）
+
+> **说明**：每个步骤前的 `[ ]` 表示执行状态，`[ ]` = 待执行，`[x]` = 已完成。执行后更新此文档。
 
 ### Phase 1: 删除 ObjectStorageRepository，迁移到 L4ObjectPort
 
 **目标：** 统一 Domain 层抽象，消除并存接口
 
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 1.1 | 更新 `src/infrastructure/storage/minio/minio_repository.py` 实现 `L4ObjectPort`（而非 `ObjectStorageRepository`） | 导入检查 |
-| 1.2 | 更新所有导入 `ObjectStorageRepository` 的文件，改为 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py"` 无结果 |
-| 1.3 | 更新 `src/domain/ports/__init__.py` 移除 `ObjectStorageRepository` 导出 | 导入检查 |
-| 1.4 | 删除 `src/domain/ports/storage.py` | 文件不存在 |
-| 1.5 | 修复 `MinIORepository.archive()` 返回类型从 `bool` 改为 `str` | 类型检查 |
+**状态：待执行**
 
-**影响文件清单：**
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 1.1 | 更新 `minio_repository.py` 继承 `L4ObjectPort`（而非 `ObjectStorageRepository`） | `grep "class MinIORepository" src/infrastructure/storage/minio/minio_repository.py` |
+| `[ ]` | 1.2 | 修改导入：`from src.domain.ports.l4_object import L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py" src/infrastructure/` 无结果 |
+| `[ ]` | 1.3 | 更新 `src/domain/ports/__init__.py` 移除 `ObjectStorageRepository` 导出 | 导入检查 |
+| `[ ]` | 1.4 | 删除 `src/domain/ports/storage.py` | `test -f src/domain/ports/storage.py && echo "exists" \|\| echo "deleted"` |
+| `[ ]` | 1.5 | 修复 `MinIORepository.archive()` 返回类型从 `bool` 改为 `str`，增加 `content: bytes \| None = None` 参数 | `grep "def archive" src/infrastructure/storage/minio/minio_repository.py` |
+| `[ ]` | 1.6 | 验证所有测试通过 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
+
+**影响文件：**
 ```bash
 grep -rl "ObjectStorageRepository" --include="*.py" src/
 ```
+
+---
 
 ### Phase 2: 修复 MinIOAdapter 方法缺失与 archive 语义
 
 **目标：** 修复 archive 方法签名不一致和 list_objects 方法缺失问题
 
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 2.1 | 修复 `MinIOAdapter.archive()` 对 content 参数的处理（content != None 时抛出 NotImplementedError） | 类型检查 |
-| 2.2 | 添加 `MinIOAdapter.list_objects()` 方法，委托 `MinIORepository` | 方法存在性检查 |
-| 2.3 | 更新 `L4ObjectPort.list_objects` 签名，增加 `bucket_type: str` 参数 | 类型检查 |
-| 2.4 | 更新所有调用 `list_objects` 的代码，适配新签名 | 测试通过 |
+**状态：待执行**
+
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 2.1 | 在 `MinIOAdapter.archive()` 开头添加 content 检查：`if content is not None: raise NotImplementedError(...)` | `grep "NotImplementedError" src/infrastructure/storage/minio/minio_adapter.py` |
+| `[ ]` | 2.2 | 添加 `MinIOAdapter.list_objects()` 方法，委托 `MinIORepository.list_objects()` | `grep "def list_objects" src/infrastructure/storage/minio/minio_adapter.py` |
+| `[ ]` | 2.3 | 验证 `MinIOAdapter` 实现 `L4ObjectPort` 完整接口 | `python -c "from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter; print('OK')"` |
+| `[ ]` | 2.4 | 运行 `test_minio_adapter.py` 验证 archive 和 list_objects | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
 
 **archive 语义约束（方案 B）：**
 ```python
-# archive() 方法 content 参数语义
 if content is not None:
     raise NotImplementedError(
         "archive() with content upload is not supported. "
         "Use store() for content upload, then set_retention() for WORM."
     )
-# content=None 时，仅设置 WORM retention
 ```
 
-**目标：** 增加 `bucket_type` 参数，与实现一致
-
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 2.1 | 更新 `L4ObjectPort.list_objects` 签名，增加 `bucket_type: str` 参数 | 类型检查 |
-| 2.2 | 更新 `MinIOAdapter.list_objects` 委托传递 `bucket_type` | 测试通过 |
-| 2.3 | 更新所有调用 `list_objects` 的代码 | 测试通过 |
+---
 
 ### Phase 3: 创建 DocumentStoragePort
 
 **目标：** 建立 Layer 2 应用层端口
 
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 3.1 | 创建 `src/application/ports/document_storage.py` | 文件存在 |
-| 3.2 | 定义 `DocumentStoragePort(L4ObjectPort, Protocol)` | 类型检查 |
-| 3.3 | 添加文档特有方法：`store_document`, `retrieve_document`, `list_user_documents`, `get_document_metadata` | 接口检查 |
-| 3.4 | 显式声明继承的 L4ObjectPort 方法（满足类型检查器） | mypy 通过 |
-| 3.5 | 创建 `src/application/ports/__init__.py` 导出 DocumentStoragePort | 导入检查 |
+**状态：待执行**
+
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 3.1 | 创建 `src/application/ports/__init__.py`（如不存在） | `test -f src/application/ports/__init__.py && echo "exists"` |
+| `[ ]` | 3.2 | 创建 `src/application/ports/document_storage.py`，定义 `DocumentStoragePort(L4ObjectPort, Protocol)` | `test -f src/application/ports/document_storage.py` |
+| `[ ]` | 3.3 | 实现 `store_document`, `retrieve_document`, `list_user_documents`, `get_document_metadata` 方法 | `grep "def store_document" src/application/ports/document_storage.py` |
+| `[ ]` | 3.4 | 显式声明继承的 L4ObjectPort 方法（满足类型检查） | `mypy src/application/ports/document_storage.py` |
+| `[ ]` | 3.5 | 更新 `src/application/ports/__init__.py` 导出 `DocumentStoragePort` | `grep "DocumentStoragePort" src/application/ports/__init__.py` |
+
+---
 
 ### Phase 4: 创建 MinIODocumentStorage
 
 **目标：** 建立 Layer 4 具体应用实现
 
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 4.1 | 创建 `src/infrastructure/storage/minio/document_storage.py` | 文件存在 |
-| 4.2 | 实现 `MinIODocumentStorage(DocumentStoragePort)` | 类型检查 |
-| 4.3 | 组合 `MinIOAdapter` 处理底层存储 | 委托检查 |
-| 4.4 | 实现路径自动生成（按用户/类型/日期组织） | 功能测试 |
-| 4.5 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 MinIODocumentStorage | 导入检查 |
+**状态：待执行**
+
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 4.1 | 创建 `src/infrastructure/storage/minio/document_storage.py` | `test -f src/infrastructure/storage/minio/document_storage.py` |
+| `[ ]` | 4.2 | 实现 `MinIODocumentStorage(DocumentStoragePort)`，组合 `MinIOAdapter` | `grep "class MinIODocumentStorage" src/infrastructure/storage/minio/document_storage.py` |
+| `[ ]` | 4.3 | 实现路径自动生成：`documents/{user_id}/{document_type}/YYYY-MM/{filename}` | `grep "object_key" src/infrastructure/storage/minio/document_storage.py` |
+| `[ ]` | 4.4 | 实现文档特有方法和 L4ObjectPort 继承方法委托 | `mypy src/infrastructure/storage/minio/document_storage.py` |
+| `[ ]` | 4.5 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 `MinIODocumentStorage` | `grep "MinIODocumentStorage" src/infrastructure/storage/minio/__init__.py` |
+
+---
 
 ### Phase 5: 回归测试
 
 **目标：** 确保重构不破坏现有功能
 
-| 步骤 | 任务 | 验证 |
-|------|------|------|
-| 5.1 | 运行单元测试：`pytest tests/unit/domain/ports/test_l4_object_port.py -v` | 通过 |
-| 5.2 | 运行单元测试：`pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` | 通过 |
-| 5.3 | 运行集成测试：`pytest tests/integration/ -x -q` | 通过 |
-| 5.4 | 运行架构测试：`pytest tests/unit/architecture/ -x -q` | 通过 |
+**状态：待执行**
+
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 5.1 | 运行 L4ObjectPort 单元测试 | `pytest tests/unit/domain/ports/test_l4_object_port.py -v` |
+| `[ ]` | 5.2 | 运行 MinIOAdapter 单元测试 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
+| `[ ]` | 5.3 | 运行集成测试 | `pytest tests/integration/ -x -q` |
+| `[ ]` | 5.4 | 运行架构测试 | `pytest tests/unit/architecture/ -x -q` |
+| `[ ]` | 5.5 | 运行 mypy 类型检查 | `mypy src/infrastructure/storage/minio/ src/application/ports/document_storage.py` |
+| `[ ]` | 5.6 | 验证 P0 问题全部修复（R1-R7 验收标准） | 见验收标准章节 |
+
+---
+
+### 执行状态汇总
+
+| Phase | 状态 | 已完成步骤 | 待执行步骤 |
+|-------|------|-----------|------------|
+| Phase 1 | `[ ]` 待执行 | 0/6 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6 |
+| Phase 2 | `[ ]` 待执行 | 0/4 | 2.1, 2.2, 2.3, 2.4 |
+| Phase 3 | `[ ]` 待执行 | 0/5 | 3.1, 3.2, 3.3, 3.4, 3.5 |
+| Phase 4 | `[ ]` 待执行 | 0/5 | 4.1, 4.2, 4.3, 4.4, 4.5 |
+| Phase 5 | `[ ]` 待执行 | 0/6 | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 |
+
+**总计：0/26 步骤已完成**
 
 ---
 
