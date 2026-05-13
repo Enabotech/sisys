@@ -124,8 +124,8 @@ decode_responses=True  # 重复
 │  位置：src/application/ports/                                     │
 │  端口：                                                          │
 │    - SemanticCachePort (语义缓存)                                 │
-│    - MemoryCachePort (记忆缓存) ← 可选，看需求                     │
-│    - SessionStoragePort (会话存储) ← 评估是否继承L1CachePort        │
+│    - MemoryCachePort (记忆缓存)                          │
+│    - SessionStoragePort (会话存储)        │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
