@@ -1,13 +1,13 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v3.2
+**版本:** v3.3
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 第三轮宗师级审查修订版（新增4个P0问题，共14个问题）
+**审查状态:** 第四轮宗师级审查修订版（新增5个架构问题）
 
 ---
 
-## 修订说明 (v3.1)
+## 修订说明 (v3.2)
 
 | 审查问题 | 严重程度 | 修订内容 |
 |----------|----------|----------|
@@ -26,6 +26,16 @@
 | IdempotencyChecker 连接池配置缺失 | P0 | 新增问题：硬编码 ConnectionPool，未使用 RedisConfig |
 | PortSpec.impl 字符串路径无实例化机制 | P0 | 新增问题：l1_cache 注册为字符串但无法创建实例 |
 | SemanticCache 接口位置不符合六边形架构 | P1 | 新增问题：位于 application/ports 而非 domain/ports |
+
+## 修订说明 (v3.3)
+
+| 审查问题 | 严重程度 | 修订内容 |
+|----------|----------|----------|
+| Infrastructure 层导入 Application 层端口 | P0 | 新增问题：5处违规，违反六边形架构 |
+| __init__ 签名模式不一致 | P1 | 新增问题：4种模式混用（config/redis_client/复合/组件） |
+| EventSubscriber 注册路径不一致 | P1 | 新增问题：RedisEventSubscriber vs DualChannelEventBus |
+| EventBusFactory 存在但未使用 | P2 | 新增问题：两套创建路径并行 |
+| L2-L5 存储层端口未注册 | P0 | 新增问题：12个端口缺失 registration |
 
 ---
 
@@ -251,6 +261,105 @@ def _get_pool(self) -> aioredis.ConnectionPool:
 **问题:** `_pool_lock` 定义但未使用，高并发时可能重复创建连接池。
 
 **影响:** 竞态条件，资源浪费。
+
+---
+
+#### 问题 15: Infrastructure 层导入 Application 层端口（5处违规）
+
+**位置:** 多个文件
+
+```python
+# src/infrastructure/monitoring/metrics_port_impl.py
+from src.application.ports.metrics_port import MetricsPort  # 违规
+
+# src/infrastructure/messaging/redis_event_bus.py
+from src.application.ports.event_subscriber import EventSubscriber  # 违规
+
+# src/infrastructure/external_services/sandbox/session_namespace_manager.py
+from src.application.ports.sandbox_port import SandboxExecutor  # 违规
+
+# src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py
+from src.application.ports.sandbox_port import ...  # 违规
+
+# src/infrastructure/logging/exception_metrics_impl.py
+from src.application.ports.exception_metrics_port import ExceptionMetricsPort  # 违规
+```
+
+**问题:** Infrastructure 层（最外层）依赖 Application 层，违反六边形架构。
+
+**影响:** 架构侵蚀，模块耦合增强，难以替换基础设施实现。
+
+---
+
+#### 问题 16: __init__ 签名模式不一致
+
+**位置:** 各 Redis Adapter
+
+| 模式 | 类 | 参数 |
+|------|-----|------|
+| Pattern A | RedisSessionStorage, RedisSemanticCache, RedisPublicBlackboard, RedisCleanup, RedisEventPublisher, RedisEventSubscriber | `config: RedisConfig` |
+| Pattern B | RedisMemoryCache, RedisRetryQueue | `redis_client: aioredis.Redis` |
+| Pattern C | DualIdempotencyChecker | `redis_client + session` |
+| Pattern D | RedisEventBus | `publisher + subscriber + router` |
+
+**问题:** 4种模式混用，无法统一抽象。
+
+**影响:** 调用方需要知道每种类的构造方式，增加耦合。
+
+---
+
+#### 问题 17: EventSubscriber 注册路径不一致
+
+**位置:** `src/composition_root.py`
+
+```python
+# 两条独立路径
+register_port(name="event_subscriber", impl="...RedisEventSubscriber")  # 独立订阅
+register_port(name="event_publisher", impl="...DualChannelEventBus")   # 门面订阅
+```
+
+**问题:** `event_subscriber` 和 `event_publisher` 独立注册，但 `DualChannelEventBus` 内部也组合了 `RedisEventSubscriber`。
+
+**影响:** 生命周期管理不一致，可能导致重复订阅或消息丢失。
+
+---
+
+#### 问题 18: EventBusFactory 存在但未使用
+
+**位置:** `src/infrastructure/messaging/event_bus_factory.py`
+
+```python
+def create_dual_channel_bus() -> (DualChannelEventBus, AsyncOutboxPoller)
+    # 工厂方法存在，但 composition_root 直接注册具体类
+```
+
+**问题:** 工厂方法与直接注册两条路径并行。
+
+**影响:** 难以通过配置替换实现，维护成本增加。
+
+---
+
+#### 问题 19: L2-L5 存储层端口未注册
+
+**位置:** `src/domain/ports/` 多个接口
+
+| 未注册端口 | 文件 |
+|-----------|------|
+| `L2MetadataRepositoryPort` | l2_rdb.py |
+| `L2ChangeHistoryRepositoryPort` | l2_rdb.py |
+| `L2GroupMemberRepositoryPort` | l2_rdb.py |
+| `L3VectorPort` | l3_vector.py |
+| `L4ObjectPort` | l4_object.py |
+| `L5GraphPort` | l5_graph.py |
+| `UnifiedStoragePort` | unified_storage.py |
+| `UnitOfWork` | unit_of_work.py |
+| `IndexManagerPort` | index_manager.py |
+| `IntegrityPort` | integrity.py |
+| `ObjectStorageRepository` | storage.py |
+
+**问题:** 12个 Domain 端口在 composition_root 中未注册。
+
+**影响:** 无法通过端口注册机制统一管理，依赖散乱。
 
 ---
 
@@ -1554,6 +1663,117 @@ print('_pool_lock protection: OK')
 
 ---
 
+### Phase 20: 修复Infrastructure层架构违规
+
+**目标：** 将 Application 层端口上移至 Domain 层
+
+- [ ] 20.1 移动 `MetricsPort` 从 `application/ports/` 到 `domain/ports/`
+- [ ] 20.2 移动 `EventSubscriber` 从 `application/ports/` 到 `domain/ports/`
+- [ ] 20.3 移动 `SandboxExecutor` 从 `application/ports/` 到 `domain/ports/`
+- [ ] 20.4 移动 `ExceptionMetricsPort` 从 `application/ports/` 到 `domain/ports/`
+- [ ] 20.5 更新所有 Infrastructure 层导入
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.domain.ports.metrics_port import MetricsPort
+from src.domain.ports.event_subscriber import EventSubscriber
+from src.domain.ports.sandbox_port import SandboxExecutor
+from src.domain.ports.exception_metrics_port import ExceptionMetricsPort
+print('Infrastructure -> Domain port migration: OK')
+"
+```
+
+---
+
+### Phase 21: 统一Adapter初始化模式
+
+**目标：** 所有 Redis Adapter 支持统一初始化模式
+
+- [ ] 21.1 定义 `AdapterFactory` 统一创建接口
+- [ ] 21.2 所有 Adapter 支持 `redis_client` 或 `config` 参数
+- [ ] 21.3 所有 Adapter 实现 `__aenter__`/`__aexit__`
+
+**统一初始化协议：**
+```python
+def __init__(
+    self,
+    redis_client: aioredis.Redis | None = None,
+    config: RedisConfig | None = None,
+):
+    if redis_client:
+        self._redis = redis_client
+    elif config:
+        self._redis = aioredis.Redis(connection_pool=self._get_pool(config))
+    else:
+        self._redis = RedisPoolProvider.get_client()
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
+from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
+# 验证支持统一初始化
+import inspect
+for cls in [RedisSessionStorage, RedisPublicBlackboard]:
+    sig = inspect.signature(cls.__init__)
+    params = list(sig.parameters.keys())
+    assert 'redis_client' in params or 'config' in params
+print('Adapter initialization: OK')
+"
+```
+
+---
+
+### Phase 22: 统一EventBus注册路径
+
+**目标：** 修复 EventSubscriber 和 EventPublisher 注册不一致
+
+- [ ] 22.1 删除独立的 `event_subscriber` 注册
+- [ ] 22.2 通过 `DualChannelEventBus` 统一提供订阅能力
+- [ ] 22.3 更新 `EventBusFactory` 并在 composition_root 中使用
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.messaging.event_bus_factory import EventBusFactory
+factory = EventBusFactory()
+bus, poller = factory.create_dual_channel_bus()
+assert hasattr(bus, 'subscribe'), 'Must support subscribe'
+print('EventBus factory: OK')
+"
+```
+
+---
+
+### Phase 23: 注册L2-L5存储层端口
+
+**目标：** 在 composition_root 中注册所有存储层端口
+
+- [ ] 23.1 注册 `L2MetadataRepositoryPort`
+- [ ] 23.2 注册 `L2ChangeHistoryRepositoryPort`
+- [ ] 23.3 注册 `L2GroupMemberRepositoryPort`
+- [ ] 23.4 注册 `L3VectorPort`
+- [ ] 23.5 注册 `L4ObjectPort`
+- [ ] 23.6 注册 `L5GraphPort`
+- [ ] 23.7 其他缺失端口
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.composition_root import bootstrap, _global_registry
+bootstrap()
+registered = [name for name in _global_registry.list_all().keys()]
+expected = ['l2_metadata', 'l3_vector', 'l4_object', 'l5_graph']
+for e in expected:
+    assert e in registered, f'Missing: {e}'
+print(f'Registered {len(registered)} ports')
+"
+```
+
+---
+
 ## 五、接口变更汇总
 
 ### 5.1 新增接口
@@ -1722,9 +1942,13 @@ def __init__(self, redis_client: aioredis.Redis | None = None, config: RedisConf
 [ ] Phase 17: 修复PortSpec.impl实例化机制
 [ ] Phase 18: 移动SemanticCache到domain层
 [ ] Phase 19: 修复_get_pool竞态条件
+[ ] Phase 20: 修复Infrastructure层架构违规
+[ ] Phase 21: 统一Adapter初始化模式
+[ ] Phase 22: 统一EventBus注册路径
+[ ] Phase 23: 注册L2-L5存储层端口
 ```
 
 ---
 
-*文档版本: v3.2*
-*重构目标: 建立六边形架构分层，统一连接池管理，线程安全单例，渐进式迁移，修复配置矛盾，新增4个P0问题修复*
+*文档版本: v3.3*
+*重构目标: 建立六边形架构分层，统一连接池管理，线程安全单例，渐进式迁移，修复配置矛盾，修复5个架构违规问题*
