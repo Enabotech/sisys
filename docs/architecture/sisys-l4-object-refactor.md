@@ -1091,12 +1091,22 @@ if content is not None:
 
 ---
 
-## 6. 风险评估与缓解
+## 6. 风险评估与缓解（v1.2 审查更新）
 
-| 风险 | 概率 | 影响 | 缓解措施 |
-|------|------|------|---------|
-| R1: 删除 ObjectStorageRepository 破坏现有调用 | 中 | 高 | Phase 1.2 更新所有引用，Phase 7 完整回归测试 |
-| R2: archive 返回类型不一致导致测试失败 | 中 | 高 | Phase 1.5 修复返回类型，Phase 7 集成测试覆盖 |
+| 风险 | 概率 | 影响 | 缓解措施 | 审查更新 |
+|------|------|------|---------|---------|
+| R1: 删除 ObjectStorageRepository 破坏现有调用 | 低 | 高 | ObjectStorageRepository 未公开导出，实际无调用方 | ✅ 风险下调 |
+| R2: archive 返回类型不一致导致测试失败 | 低 | 高 | 无调用方依赖 bool 返回值，测试已期望 str | ✅ 风险下调 |
+| R3: list_objects 签名变更破坏调用方 | 低 | 中 | src/ 下无调用 MinIOAdapter.list_objects()，无破坏风险 | ✅ 风险下调 |
+| R4: archive content 参数语义不清导致运行时错误 | 高 | 高 | content 被静默丢弃会导致数据丢失，必须实现 NotImplementedError | ⚠️ 维持高风险 |
+| R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | 显式声明继承方法可解决 | ✅ 风险可控 |
+| R6: WORMManager 返回值修改影响审计服务 | 低 | 低 | 审计服务调用 worm_manager.archive_object()，不经过 L4ObjectPort | ✅ 无影响 |
+
+**关键发现（Round 3 审查）：**
+- `ObjectStorageRepository` 未在 `__init__.py` 导出，不是公开 API
+- `unified_storage_gateway.py` 使用 `L4ObjectPort`，与 `ObjectStorageRepository` 解耦
+- 所有 archive 调用方都不依赖 bool 返回值
+- src/ 下无任何代码调用 `MinIOAdapter.list_objects()`
 | R3: list_objects 签名变更破坏调用方 | 中 | 中 | Phase 2.3 更新所有调用，Phase 7 集成测试覆盖 |
 | R4: archive content 参数语义不清导致运行时错误 | 低 | 高 | Phase 2.1 明确语义约束，文档说明 |
 | R5: DocumentStoragePort 继承关系不满足类型检查 | 低 | 中 | Phase 4.4 显式声明继承方法 |
