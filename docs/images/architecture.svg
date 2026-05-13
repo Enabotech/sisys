@@ -89,7 +89,7 @@
     <text x="554" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="636" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Agent · Plan</text>
+    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Agents · Plan</text>
     <text x="708" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
   </g>
 
