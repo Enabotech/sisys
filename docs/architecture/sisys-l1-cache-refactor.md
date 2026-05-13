@@ -65,14 +65,19 @@
 
 | 实现类 | 位置 | ConnectionPool | 实现接口 | 状态 |
 |--------|------|---------------|----------|------|
-| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client | `L1CachePort` | ✅ |
-| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 | `SessionStorage` | ❌ |
-| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 | 无（直接实现语义逻辑） | ❌ |
-| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 | `PublicBlackboard` | ❌ |
-| `RedisEventPublisher` | `infrastructure/messaging/` | 自建 | 事件发布 | ❌ |
-| `RedisEventSubscriber` | `infrastructure/messaging/` | 自建 | 事件订阅 | ❌ |
-| `RedisSnapshotStore` | `infrastructure/storage/` | 接受外部client | `SnapshotRepositoryProtocol` | ✅ |
-| `RedisEventBus` | `infrastructure/messaging/` | 委托上述两者 | `EventPublisher`+`EventSubscriber` | ⚠️ |
+| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client ✅ | `L1CachePort` | ✅ |
+| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 ❌ | `SessionStorage` | ❌ |
+| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 ❌ | 无（直接实现语义逻辑） | ❌ |
+| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 ❌ | `PublicBlackboard` | ❌ |
+| `RedisEventPublisher` | `infrastructure/messaging/` | 自建 ❌ | 事件发布 | ❌ |
+| `RedisEventSubscriber` | `infrastructure/messaging/` | 自建 ❌ | 事件订阅 | ❌ |
+| `RedisSnapshotStore` | `infrastructure/storage/` | 接受外部client ✅ | `SnapshotRepositoryProtocol` | ✅ |
+| `RedisEventBus` | `infrastructure/messaging/` | 委托上述两者 ⚠️ | `EventPublisher`+`EventSubscriber` | ⚠️ |
+
+**P0问题补充（Round 4发现）：**
+- `RedisSemanticCache` 不使用 Qdrant，使用纯 Python 全表扫描 + 余弦相似度计算，性能极差（O(n)）
+- `RedisSemanticCache` 无 `RedisL1CacheAdapter` 组合关系，直接管理连接池
+- 构造函数签名不统一：`RedisMemoryCache(redis_client)` vs `RedisSemanticCache(config)`
 
 **说明：**
 - ✅ 已支持外部注入，无需改造
