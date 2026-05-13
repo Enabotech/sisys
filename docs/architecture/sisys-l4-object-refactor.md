@@ -1155,11 +1155,11 @@ src/infrastructure/storage/minio/
 
 | Checkbox | 步骤 | 任务 | 验证命令 |
 |----------|------|------|---------|
-| `[ ]` | 1.1 | 更新 `minio_repository.py` 继承 `L4ObjectPort`（而非 `ObjectStorageRepository`） | `grep "class MinIORepository" src/infrastructure/storage/minio/minio_repository.py` |
+| `[ ]` | 1.1 | 更新 `minio_repository.py` 继承 `L4ObjectPort`（而非 `ObjectStorageRepository`） | `python -c "from src.infrastructure.storage.minio.minio_repository import MinIORepository; from src.domain.ports.l4_object import L4ObjectPort; print('OK' if issubclass(MinIORepository, L4ObjectPort) else 'FAIL')"` |
 | `[ ]` | 1.2 | 修改导入：`from src.domain.ports.l4_object import L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py" src/infrastructure/` 无结果 |
 | `[ ]` | 1.3 | 更新 `src/domain/ports/__init__.py` 移除 `ObjectStorageRepository` 导出 | 导入检查 |
 | `[ ]` | 1.4 | 删除 `src/domain/ports/storage.py` | `test -f src/domain/ports/storage.py && echo "exists" \|\| echo "deleted"` |
-| `[ ]` | 1.5 | 修复 `MinIORepository.archive()` 返回类型从 `bool` 改为 `str`，增加 `content: bytes \| None = None` 参数 | `grep "def archive" src/infrastructure/storage/minio/minio_repository.py` |
+| `[ ]` | 1.5 | 修复 `MinIORepository.archive()` 返回类型从 `bool` 改为 `str`，增加 `content: bytes \| None = None` 参数 | `grep -A2 "async def archive" src/infrastructure/storage/minio/minio_repository.py \| grep "-> str"` |
 | `[ ]` | 1.6 | 验证所有测试通过 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py -v` |
 
 **影响文件：**
@@ -1333,13 +1333,14 @@ class AvatarStoragePort(L4ObjectPort, Protocol):
 
 | 标准 | 描述 | 测量方式 |
 |------|------|---------|
-| R1 | 所有 Domain 抽象统一到 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py" src/domain/` 无结果 | ❌ 待验证 |
-| R2 | `MinIOAdapter` 包含 `list_objects` 方法 | `hasattr(MinIOAdapter, 'list_objects')` | ❌ 待实现 |
+| R1 | 所有 Domain/Infra 抽象统一到 `L4ObjectPort` | `grep -r "ObjectStorageRepository" --include="*.py" src/` 无结果（排除 tests/） | ❌ 待验证 |
+| R2 | `MinIOAdapter` 包含 `list_objects` 方法 | `grep "def list_objects" src/infrastructure/storage/minio/minio_adapter.py` | ❌ 待实现 |
 | R3 | `MinIORepository.archive()` 返回 `str` | 类型注解检查 + 运行时验证 | ❌ 待修复 |
-| R4 | `MinIOAdapter.archive()` 正确处理 content 参数 | `content != None` 时抛出 `NotImplementedError` | ❌ 待实现 |
+| R4 | `MinIOAdapter.archive()` 正确处理 content 参数 | `content != None` 时抛出 `NotImplementedError`（代码检查 + 运行时测试） | ❌ 待实现 |
 | R5 | `DocumentStoragePort` 正确继承 `L4ObjectPort` | `issubclass(DocumentStoragePort, L4ObjectPort)` | ❌ 待创建 |
 | R6 | `MinIODocumentStorage` 实现 `DocumentStoragePort` | `isinstance(storage, DocumentStoragePort)` | ❌ 待创建 |
 | R7 | 所有测试通过 | `pytest tests/unit/infrastructure/storage/test_minio_adapter.py tests/unit/domain/ports/test_l4_object_port.py -v` | ❌ 待验证 |
+| R8 | `test_archive_with_content` 测试行为与方案 B 一致 | Phase 2.1 实施后该测试应失败或被修改（方案 B 不支持 content 上传） | ❌ 待验证 |
 
 ---
 
