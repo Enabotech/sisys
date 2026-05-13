@@ -16,14 +16,43 @@
 | `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | 未继承L1CachePort |
 | `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | 未继承L1CachePort |
 
-### 1.2 当前实现
+### 1.2 当前实现（8个Adapter现状）
 
-| 实现类 | 位置 | ConnectionPool | 实现接口 |
-|--------|------|----------------|----------|
-| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client | `L1CachePort` ✅ |
-| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 | 无（直接实现语义逻辑）❌ |
-| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 | `PublicBlackboard` |
-| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 | `SessionStorage` |
+**当前状态：8个Adapter × 独立ConnectionPool**
+
+```
+┌────────────────────────────────────────────────────┐
+│  RedisMemoryCache        → ConnectionPool #1       │
+│  RedisSessionStorage     → ConnectionPool #2       │
+│  RedisSemanticCache      → ConnectionPool #3       │
+│  RedisPublicBlackboard  → ConnectionPool #4       │
+│  RedisEventPublisher    → ConnectionPool #5       │
+│  RedisEventSubscriber    → ConnectionPool #6       │
+│  RedisSnapshotStore     → ConnectionPool #7       │
+│  RedisEventBus          → ConnectionPool #8       │
+└────────────────────────────────────────────────────┘
+                    ↓
+         连接数 = 8 × max_connections
+         可能耗尽Redis服务器连接限制
+```
+
+**详细实现清单：**
+
+| 实现类 | 位置 | ConnectionPool | 实现接口 | 状态 |
+|--------|------|---------------|----------|------|
+| `RedisMemoryCache` | `infrastructure/storage/redis/` | 接受外部client | `L1CachePort` | ✅ |
+| `RedisSessionStorage` | `infrastructure/storage/redis/` | 自建 | `SessionStorage` | ❌ |
+| `RedisSemanticCache` | `infrastructure/storage/redis/` | 自建 | 无（直接实现语义逻辑） | ❌ |
+| `RedisPublicBlackboard` | `infrastructure/storage/redis/` | 自建 | `PublicBlackboard` | ❌ |
+| `RedisEventPublisher` | `infrastructure/messaging/` | 自建 | 事件发布 | ❌ |
+| `RedisEventSubscriber` | `infrastructure/messaging/` | 自建 | 事件订阅 | ❌ |
+| `RedisSnapshotStore` | `infrastructure/storage/` | 接受外部client | `SnapshotRepositoryProtocol` | ✅ |
+| `RedisEventBus` | `infrastructure/messaging/` | 委托上述两者 | `EventPublisher`+`EventSubscriber` | ⚠️ |
+
+**说明：**
+- ✅ 已支持外部注入，无需改造
+- ❌ 自建ConnectionPool，需要改造
+- ⚠️ 混合模式，通过委托实现
 
 ### 1.3 问题根因
 
@@ -39,12 +68,28 @@ Infrastructure Layer
 ├── RedisMemoryCache → 接受外部client ✅
 ├── RedisSemanticCache → 自建ConnectionPool ❌
 ├── RedisPublicBlackboard → 自建ConnectionPool ❌
-└── RedisSessionStorage → 自建ConnectionPool ❌
+├── RedisSessionStorage → 自建ConnectionPool ❌
+├── RedisEventPublisher → 自建ConnectionPool ❌
+├── RedisEventSubscriber → 自建ConnectionPool ❌
+├── RedisSnapshotStore → 接受外部client ✅
+└── RedisEventBus → 委托上述两者 ⚠️
 
 问题：
 1. L1CachePort 是专用接口，不是通用缓存抽象
-2. 6个Adapter各自管理ConnectionPool，资源浪费
+2. 6个Adapter各自管理ConnectionPool（除RedisMemoryCache和RedisSnapshotStore）
 3. 接口无继承关系，无法统一抽象
+4. 连接数 = 6 × max_connections (默认10) = 60，可能耗尽Redis连接限制
+```
+
+### 1.4 连接池配置现状
+
+**硬编码问题：** 每个Adapter独立管理连接池，配置分散：
+
+```python
+# 各Adapter的_get_pool()方法重复相同的配置逻辑
+max_connections=10  # 硬编码，未统一
+socket_timeout=5.0  # 重复
+decode_responses=True  # 重复
 ```
 
 ---
@@ -836,7 +881,7 @@ print('Phase 1: SUCCESS')
 
 ---
 
-### Phase 6: 更新RedisMemoryCache
+### Phase 6: 更新RedisMemoryCache（可选）
 
 **目标：** RedisMemoryCache委托RedisL1CacheAdapter
 
@@ -846,9 +891,23 @@ print('Phase 1: SUCCESS')
 | 6.2 | 移除独立连接池管理 | 删除 `_get_pool()` |
 | 6.3 | 保留现有接口兼容 | `get/set/delete/invalidate_pattern` |
 
+**注意：** `RedisMemoryCache` 已接受外部client，可直接传入 `RedisPoolProvider.get_client()`，无需改造。
+
 ---
 
-### Phase 7: 更新composition_root
+### Phase 7: 更新Messaging层Adapter
+
+**目标：** 改造EventPublisher/Subscriber使用共享连接池
+
+| 任务 | 内容 | 文件 |
+|------|------|------|
+| 7.1 | 更新 `RedisEventPublisher` | 接受外部redis_client，委托 `RedisPoolProvider` |
+| 7.2 | 更新 `RedisEventSubscriber` | 接受外部redis_client，委托 `RedisPoolProvider` |
+| 7.3 | 验证Pub/Sub功能正常 | 运行消息测试 |
+
+---
+
+### Phase 8: 更新composition_root
 
 **目标：** 注册新端口和Provider初始化
 
@@ -878,16 +937,16 @@ def shutdown() -> None:
 
 ---
 
-### Phase 8: 更新测试
+### Phase 9: 更新测试
 
 **目标：** 确保测试通过
 
 | 任务 | 内容 |
 |------|------|
-| 8.1 | 更新mock注入模式 | 适配器接受外部redis client |
-| 8.2 | 运行单元测试 | `poetry run pytest tests/unit/infrastructure/storage/redis/ -v` |
-| 8.3 | 运行集成测试 | `poetry run pytest tests/integration/ -v` |
-| 8.4 | 全量测试 | `poetry run pytest tests/ -x -q` |
+| 9.1 | 更新mock注入模式 | 适配器接受外部redis client |
+| 9.2 | 运行单元测试 | `poetry run pytest tests/unit/infrastructure/storage/redis/ -v` |
+| 9.3 | 运行集成测试 | `poetry run pytest tests/integration/ -v` |
+| 9.4 | 全量测试 | `poetry run pytest tests/ -x -q` |
 
 ---
 
@@ -954,9 +1013,10 @@ def shutdown() -> None:
 | 3 | RedisL1CacheAdapter实现 | `hasattr(RedisL1CacheAdapter, 'get') and hasattr(RedisL1CacheAdapter, 'set')` |
 | 4 | SemanticCachePort继承 | `issubclass(SemanticCachePort, L1CachePort)` |
 | 5 | RedisSemanticCacheAdapter实现 | `isinstance(adapter, SemanticCachePort)` |
-| 6 | RedisMemoryCache委托 | `hasattr(RedisMemoryCache, '_base')` |
-| 7 | bootstrap初始化 | `from src.composition_root import bootstrap; bootstrap()` |
-| 8 | 全量测试 | `poetry run pytest tests/ -x -q` |
+| 6 | RedisMemoryCache委托（可选） | `hasattr(RedisMemoryCache, '_base')` |
+| 7 | Messaging层改造 | RedisEventPublisher/Subscriber接受redis_client |
+| 8 | bootstrap/shutdown | `from src.composition_root import bootstrap; bootstrap()` |
+| 9 | 全量测试 | `poetry run pytest tests/ -x -q` |
 
 ---
 
@@ -989,11 +1049,15 @@ def shutdown() -> None:
 |----------|------|
 | `src/domain/ports/l1_cache.py` | 重构为通用接口 |
 | `src/application/ports/semantic_cache.py` | 继承L1CachePort |
-| `src/infrastructure/storage/redis/redis_memory_cache.py` | 委托RedisL1CacheAdapter |
+| `src/infrastructure/storage/redis/redis_memory_cache.py` | 委托RedisL1CacheAdapter（可选） |
 | `src/infrastructure/storage/redis/semantic_cache.py` | 重命名为legacy，保留兼容 |
-| `src/composition_root.py` | 添加Provider初始化 |
+| `src/infrastructure/storage/redis/session_storage.py` | 接受外部redis_client |
+| `src/infrastructure/storage/redis/public_blackboard.py` | 接受外部redis_client |
+| `src/infrastructure/messaging/redis_publisher.py` | 接受外部redis_client |
+| `src/infrastructure/messaging/redis_subscriber.py` | 接受外部redis_client |
+| `src/composition_root.py` | 添加Provider初始化和shutdown hook |
 
-### 删除文件（Phase X之后）
+### 删除文件（重构完成后）
 
 | 文件路径 | 原因 |
 |----------|------|
