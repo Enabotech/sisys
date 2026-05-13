@@ -1,9 +1,75 @@
 # SISYS L2 RDB 重构详细设计
 
-**版本：** 1.0.0
+**版本：** 1.1.0
 **状态：** 设计中
 **日期：** 2026-05-13
 **架构师：** Claude Code
+
+---
+
+## 0. 方案评估结果
+
+### 0.1 业界最佳实践对照
+
+| 维度 | 方案设计 | 业界实践（Spring Data JPA） | 评估 |
+|------|---------|---------------------------|------|
+| 统一基类 | `L2RdbPort` | `JpaRepository` | ✅ 正确 |
+| 端口继承 | 具体端口继承基类 | `XxxRepository extends JpaRepository` | ✅ 正确 |
+| 会话管理 | `PostgreSqlRdbAdapter` 统一管理 | `EntityManager` 注入 | ✅ 正确 |
+| CRUD 复用 | `BaseRepository` | `SimpleJpaRepository` | ✅ 正确 |
+
+### 0.2 事务边界决策
+
+| 选项 | 描述 | 推荐度 | 本系统选择 |
+|------|------|--------|-----------|
+| A. Repository 层 | 每个 Repository 方法自己管理事务 | ⭐⭐ | - |
+| B. **应用层/UseCase 层** | 在用例编排层开启事务 | ⭐⭐⭐ | **✅ 采用** |
+| C. 基础设施层 Adapter | PostgreSqlRdbAdapter 统一控制 | ⭐⭐ | - |
+
+**决策理由**：符合 DDD 事务边界原则，UseCase 是业务事务的边界，Repository 只负责数据访问。
+
+### 0.3 优化点说明
+
+| 优化点 | 原方案 | 优化后 | 理由 |
+|--------|-------|--------|------|
+| 命名 | - | 保持 `L2RdbPort` | 与系统 L0-L5 存储层级语义一致 |
+| 接口签名 | `execute_in_transaction(func, *args)` | 保持当前设计 | FastAPI/SQLAlchemy 生态函数式事务更灵活 |
+| 事务控制 | - | 应用层/UseCase 层 | 符合 DDD 事务边界原则 |
+
+### 0.4 核心架构确认
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Spring Data JPA 模式 (业界标准)                          │
+│                                                             │
+│  Repository (marker)                                        │
+│      ↓                                                     │
+│  CrudRepository<T, ID>  ← 提供 CRUD 基石                    │
+│      ↓                                                     │
+│  PagingAndSortingRepository  ← 分页排序支持                 │
+│      ↓                                                     │
+│  JpaRepository<T, ID>  ← JPA 特定能力（flush/batch）        │
+│                                                             │
+│  具体业务仓储继承：                                          │
+│  UserRepository extends JpaRepository<User, Long>           │
+└─────────────────────────────────────────────────────────────┘
+
+                          ↕ 对应本系统
+
+┌─────────────────────────────────────────────────────────────┐
+│  本系统 L2RdbPort 模式                                    │
+│                                                             │
+│  L2RdbPort (统一抽象基类)  ← 等同于 CrudRepository        │
+│      ↓                                                     │
+│  L2MemoryRepositoryPort(L2RdbPort)  ← 等同于 JpaRepository │
+│      ↓                                                     │
+│  PostgreSQLMemoryMetadataRepository  ← 具体实现              │
+│                                                             │
+│  具体业务仓储继承：                                          │
+│  UserRepositoryPort(L2RdbPort)                            │
+│  PostgreSQLUserRepository(UserRepositoryPort)              │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -93,8 +159,49 @@ src/infrastructure/storage/postgresql/
 | **单一职责** | 每个端口只负责一种实体的数据访问 | 按实体类型分离端口 |
 | **开闭原则** | 对扩展开放，对修改关闭 | 新增端口只需继承 `L2RdbPort` |
 | **接口隔离** | 专用接口优于通用接口 | 保持专用端口，仅共享基类契约 |
+| **事务边界** | 业务事务边界在应用层/UseCase 层 | Repository 只做数据访问 |
 
-### 2.3 业界参考实现
+### 2.3 事务边界设计
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  应用层 (Application Layer)                                 │
+│                                                             │
+│  UseCase / Service                                          │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │ async def create_user(cmd: CreateUserCommand):        │ │
+│  │     async with unit_of_work.transaction():           │ │
+│  │         user = await user_repo.get_by_username(...)  │ │
+│  │         await user_repo.save(user)                   │ │
+│  │         await audit_repo.save(...)                   │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                      ↑                                     │
+│              事务边界在此层                               │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  领域层 (Domain Layer)                                     │
+│                                                             │
+│  Repository Port (L2RdbPort)  ← 仅定义接口，不管理事务    │
+│  ├── get_by_id()                                          │
+│  ├── save()                                               │
+│  └── delete()                                              │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  基础设施层 (Infrastructure Layer)                          │
+│                                                             │
+│  PostgreSQLUserRepository  ← 实现接口，不管理事务          │
+│  BaseRepository  ← 通用 CRUD                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**关键原则**：
+- `L2RdbPort.execute_in_transaction()` 仅作为基础设施内部使用
+- 业务事务边界由 **应用层/UseCase** 控制
+- 遵循 DDD "事务脚本 vs 领域模型" 原则
+
+### 2.4 业界参考实现
 
 | 参考项目 | 模式 | 本系统适配 |
 |---------|------|----------|
@@ -143,6 +250,7 @@ src/infrastructure/storage/postgresql/
 | R3 | 现有功能保持不变 | 回归测试通过率 100% |
 | R4 | 数据库连接管理统一到 `PostgreSqlRdbAdapter` | 代码审查 |
 | R5 | 可扩展支持其他 RDB 实现（如 MySQL） | 架构验证 |
+| R6 | 事务边界在应用层/UseCase 层 | 代码审查 |
 
 ---
 
@@ -825,4 +933,5 @@ class MockL2RdbAdapter(L2RdbPort):
 
 | 版本 | 日期 | 审批人 | 状态 |
 |------|------|--------|------|
-| 1.0.0 | 2026-05-13 | - | 评审中 |
+| 1.0.0 | 2026-05-13 | - | 初始版本 |
+| 1.1.0 | 2026-05-13 | - | 补充业界最佳实践对照 + 事务边界设计 |
