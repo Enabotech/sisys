@@ -158,7 +158,7 @@ class TestSensitiveDataResultImmutability:
 
         result = SensitiveDataResult()
         with pytest.raises(AttributeError):
-            result.confidence = 0.5  # type: ignore
+            result.confidence = 0.5
 
     def test_result_id_not_modifiable(self):
         """Test result_id cannot be modified after creation."""
@@ -166,4 +166,4 @@ class TestSensitiveDataResultImmutability:
 
         result = SensitiveDataResult()
         with pytest.raises(AttributeError):
-            result.result_id = None  # type: ignore
+            result.result_id = None

@@ -127,7 +127,7 @@ class TestDataResidencyPolicyImmutability:
 
         policy = DataResidencyPolicy()
         with pytest.raises(AttributeError):
-            policy.enforcement_level = None  # type: ignore
+            policy.enforcement_level = None
 
     def test_policy_id_not_modifiable(self):
         """Test policy_id cannot be modified after creation."""
@@ -135,4 +135,4 @@ class TestDataResidencyPolicyImmutability:
 
         policy = DataResidencyPolicy()
         with pytest.raises(AttributeError):
-            policy.policy_id = None  # type: ignore
+            policy.policy_id = None

@@ -5,6 +5,8 @@ Tests that HashRouter implementation satisfies the HashRouterProtocol.
 
 from __future__ import annotations
 
+from typing import Any
+
 from src.composition_root import bootstrap
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.registry import _global_registry
@@ -20,12 +22,12 @@ class TestHashRouterContract:
         return "hash_router"
 
     @classmethod
-    def get_implementation(cls) -> type:
+    def get_implementation(cls) -> Any:
         """Get the registered implementation class."""
         from src.domain.ports.resolver import Resolver
 
         resolver = Resolver()
-        return resolver.resolve("hash_router")  # type: ignore[no-any-return]
+        return resolver.resolve("hash_router")
 
     def test_port_is_registered(self) -> None:
         """Port must be registered in global registry."""

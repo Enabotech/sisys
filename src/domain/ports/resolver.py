@@ -66,7 +66,7 @@ class Resolver:
 
         return self._create_instance(spec)
 
-    def resolve_by_interface(self, interface: Type[T]) -> T:
+    def resolve_by_interface(self, interface: Type[T]) -> Any:
         """Resolve a port by its interface type.
 
         Args:
@@ -81,7 +81,7 @@ class Resolver:
         spec = self._registry.get_by_interface(interface)
         if spec is None:
             raise KeyError(f"Port not found for interface: {interface.__name__}")
-        return self._create_instance(spec)  # type: ignore[no-any-return]
+        return self._create_instance(spec)
 
     def _create_instance(self, spec: PortSpec) -> Any:
         """Create an instance based on lifecycle."""

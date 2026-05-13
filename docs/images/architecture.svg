@@ -5,144 +5,144 @@
     </filter>
   </defs>
 
-  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="600" fill="#450a0a">SISYS System Architecture</text>
+  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="600" fill="#37352f">SISYS System Architecture</text>
 
   <!-- Layer 1: Users -->
   <g transform="translate(50, 70)">
-    <rect x="0" y="0" width="800" height="90" rx="12" fill="#fef2f2" stroke="#fecaca" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#450a0a">👤 User Layer</text>
+    <rect x="0" y="0" width="800" height="90" rx="12" fill="#f7f6f3" stroke="#e0ddd6" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#37352f">👤 User Layer</text>
 
-    <rect x="20" y="40" width="170" height="40" rx="8" fill="#fafafa" stroke="#fca5a5" stroke-width="1.5"/>
-    <text x="105" y="65" text-anchor="middle" font-size="13" fill="#7f1d1d">🏢 Executive View</text>
+    <rect x="20" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#e0ddd6" stroke-width="1.5"/>
+    <text x="105" y="65" text-anchor="middle" font-size="13" fill="#4d4d4d">🏢 Executive View</text>
 
-    <rect x="205" y="40" width="170" height="40" rx="8" fill="#fafafa" stroke="#fca5a5" stroke-width="1.5"/>
-    <text x="290" y="65" text-anchor="middle" font-size="13" fill="#7f1d1d">📊 Analyst View</text>
+    <rect x="205" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#e0ddd6" stroke-width="1.5"/>
+    <text x="290" y="65" text-anchor="middle" font-size="13" fill="#4d4d4d">📊 Analyst View</text>
 
-    <rect x="390" y="40" width="170" height="40" rx="8" fill="#fafafa" stroke="#fca5a5" stroke-width="1.5"/>
-    <text x="475" y="65" text-anchor="middle" font-size="13" fill="#7f1d1d">💼 Consultant View</text>
+    <rect x="390" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#e0ddd6" stroke-width="1.5"/>
+    <text x="475" y="65" text-anchor="middle" font-size="13" fill="#4d4d4d">💼 Consultant View</text>
 
-    <rect x="575" y="40" width="205" height="40" rx="8" fill="#fafafa" stroke="#fca5a5" stroke-width="1.5"/>
-    <text x="677" y="65" text-anchor="middle" font-size="13" fill="#7f1d1d">🔗 API Integration</text>
+    <rect x="575" y="40" width="205" height="40" rx="8" fill="#ffffff" stroke="#e0ddd6" stroke-width="1.5"/>
+    <text x="677" y="65" text-anchor="middle" font-size="13" fill="#4d4d4d">🔗 API Integration</text>
   </g>
 
-  <line x1="450" y1="160" x2="450" y2="185" stroke="#a8a29e" stroke-width="2"/>
-  <polygon points="445,185 455,185 450,192" fill="#a8a29e"/>
+  <line x1="450" y1="160" x2="450" y2="185" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,185 455,185 450,192" fill="#94a3b8"/>
 
   <!-- Layer 2: Interface -->
   <g transform="translate(50, 195)">
-    <rect x="0" y="0" width="800" height="90" rx="12" fill="#fff7ed" stroke="#fed7aa" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#7c2d12">🎯 Interface Layer</text>
+    <rect x="0" y="0" width="800" height="90" rx="12" fill="#faf7f2" stroke="#eadcc8" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#8b5e3c">🎯 Interface Layer</text>
 
-    <rect x="120" y="40" width="170" height="40" rx="8" fill="#fffaf5" stroke="#fb923c" stroke-width="1.5"/>
-    <text x="205" y="65" text-anchor="middle" font-size="13" fill="#9a3412">🖥️ CLI · Typer</text>
+    <rect x="120" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
+    <text x="205" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🖥️ CLI · Typer</text>
 
-    <rect x="315" y="40" width="170" height="40" rx="8" fill="#fffaf5" stroke="#fb923c" stroke-width="1.5"/>
-    <text x="400" y="65" text-anchor="middle" font-size="13" fill="#9a3412">🌐 REST API · FastAPI</text>
+    <rect x="315" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
+    <text x="400" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🌐 REST API · FastAPI</text>
 
-    <rect x="510" y="40" width="170" height="40" rx="8" fill="#fffaf5" stroke="#fb923c" stroke-width="1.5"/>
-    <text x="595" y="65" text-anchor="middle" font-size="13" fill="#9a3412">📋 Skills · L1/L2/L3</text>
+    <rect x="510" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
+    <text x="595" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">📋 Skills · L1/L2/L3</text>
   </g>
 
-  <line x1="450" y1="285" x2="450" y2="310" stroke="#a8a29e" stroke-width="2"/>
-  <polygon points="445,310 455,310 450,317" fill="#a8a29e"/>
+  <line x1="450" y1="285" x2="450" y2="310" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,310 455,310 450,317" fill="#94a3b8"/>
 
   <!-- Layer 3: Application -->
   <g transform="translate(50, 320)">
-    <rect x="0" y="0" width="800" height="90" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#78350f">⚙️ Application Layer</text>
+    <rect x="0" y="0" width="800" height="90" rx="12" fill="#fbf7f0" stroke="#efe0cc" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#a1622b">⚙️ Application Layer</text>
 
-    <rect x="50" y="40" width="160" height="40" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
-    <text x="130" y="65" text-anchor="middle" font-size="13" fill="#92400e">📄 Doc Processing</text>
+    <rect x="50" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="130" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📄 Doc Processing</text>
 
-    <rect x="225" y="40" width="160" height="40" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
-    <text x="305" y="65" text-anchor="middle" font-size="13" fill="#92400e">📊 Strategy Analysis</text>
+    <rect x="225" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="305" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📊 Strategy Analysis</text>
 
-    <rect x="400" y="40" width="160" height="40" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
-    <text x="480" y="65" text-anchor="middle" font-size="13" fill="#92400e">🤖 Agent Collab</text>
+    <rect x="400" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="480" y="65" text-anchor="middle" font-size="13" fill="#854d0e">🤖 Agent Collab</text>
 
-    <rect x="575" y="40" width="160" height="40" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
-    <text x="655" y="65" text-anchor="middle" font-size="13" fill="#92400e">📋 Plan Generation</text>
+    <rect x="575" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="655" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📋 Plan Generation</text>
   </g>
 
-  <line x1="450" y1="410" x2="450" y2="435" stroke="#a8a29e" stroke-width="2"/>
-  <polygon points="445,435 455,435 450,442" fill="#a8a29e"/>
+  <line x1="450" y1="410" x2="450" y2="435" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,435 455,435 450,442" fill="#94a3b8"/>
 
   <!-- Layer 4: Domain -->
   <g transform="translate(50, 445)">
-    <rect x="0" y="0" width="800" height="110" rx="12" fill="#fefce8" stroke="#facc15" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#713f12">💎 Domain Layer</text>
+    <rect x="0" y="0" width="800" height="110" rx="12" fill="#f9f5f0" stroke="#e0cfba" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#6e4f33">💎 Domain Layer</text>
 
-    <rect x="20" y="40" width="144" height="60" rx="8" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
-    <text x="92" y="62" text-anchor="middle" font-size="11" fill="#854d0e" font-weight="500">📦 Document</text>
-    <text x="92" y="78" text-anchor="middle" font-size="10" fill="#713f12">Entity</text>
+    <rect x="20" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
+    <text x="92" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📦 Document</text>
+    <text x="92" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
 
-    <rect x="174" y="40" width="144" height="60" rx="8" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
-    <text x="246" y="62" text-anchor="middle" font-size="11" fill="#854d0e" font-weight="500">🤖 Agent · 🔧 Tool</text>
-    <text x="246" y="78" text-anchor="middle" font-size="10" fill="#713f12">Entity</text>
+    <rect x="174" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
+    <text x="246" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🤖 Agent · 🔧 Tool</text>
+    <text x="246" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
 
-    <rect x="328" y="40" width="144" height="60" rx="8" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
-    <text x="400" y="62" text-anchor="middle" font-size="11" fill="#854d0e" font-weight="500">📋 Plan · Checkpoint</text>
-    <text x="400" y="78" text-anchor="middle" font-size="10" fill="#713f12">Plan Entities</text>
+    <rect x="328" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
+    <text x="400" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📋 Plan · Checkpoint</text>
+    <text x="400" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Plan Entities</text>
 
-    <rect x="482" y="40" width="144" height="60" rx="8" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
-    <text x="554" y="62" text-anchor="middle" font-size="11" fill="#854d0e" font-weight="500">📊 Archive · RoutingLog</text>
-    <text x="554" y="78" text-anchor="middle" font-size="10" fill="#713f12">Archive / Log</text>
+    <rect x="482" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
+    <text x="554" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📊 Archive · RoutingLog</text>
+    <text x="554" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Archive / Log</text>
 
-    <rect x="636" y="40" width="144" height="60" rx="8" fill="#fef9c3" stroke="#eab308" stroke-width="1.5"/>
-    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#854d0e" font-weight="500">🔌 RAG · Eval · Plan</text>
-    <text x="708" y="78" text-anchor="middle" font-size="10" fill="#713f12">Service Interfaces</text>
+    <rect x="636" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
+    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Eval · Plan</text>
+    <text x="708" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
   </g>
 
-  <line x1="450" y1="587" x2="450" y2="562" stroke="#a8a29e" stroke-width="2"/>
-  <polygon points="445,562 455,562 450,555" fill="#a8a29e"/>
+  <line x1="450" y1="587" x2="450" y2="562" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="445,562 455,562 450,555" fill="#94a3b8"/>
 
   <!-- Layer 5: Infrastructure -->
   <g transform="translate(50, 590)">
-    <rect x="0" y="0" width="800" height="120" rx="12" fill="#f7fee7" stroke="#bef264" stroke-width="2" filter="url(#shadow)"/>
-    <text x="20" y="28" font-size="14" font-weight="600" fill="#365314">🏗️ Infrastructure Layer</text>
+    <rect x="0" y="0" width="800" height="120" rx="12" fill="#f4f2ee" stroke="#dcd6cb" stroke-width="2" filter="url(#shadow)"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#37352f">🏗️ Infrastructure Layer</text>
 
-    <rect x="20" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="45" y="77" text-anchor="middle" font-size="9" fill="#4d7c0f">📁 L0</text>
-    <text x="45" y="92" text-anchor="middle" font-size="8" fill="#3f6212">MEMORY</text>
+    <rect x="20" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="45" y="77" text-anchor="middle" font-size="9" fill="#4a4a4a">📁 L0</text>
+    <text x="45" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">MEMORY</text>
 
-    <rect x="80" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="105" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">⚡ L1</text>
-    <text x="105" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Redis</text>
+    <rect x="80" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="105" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">⚡ L1</text>
+    <text x="105" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Redis</text>
 
-    <rect x="140" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="165" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🗄️ L2</text>
-    <text x="165" y="92" text-anchor="middle" font-size="8" fill="#3f6212">PostgreSQL</text>
+    <rect x="140" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="165" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🗄️ L2</text>
+    <text x="165" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">PostgreSQL</text>
 
-    <rect x="200" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="225" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🔮 L3</text>
-    <text x="225" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Qdrant</text>
+    <rect x="200" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="225" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🔮 L3</text>
+    <text x="225" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Qdrant</text>
 
-    <rect x="260" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="285" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">📦 L4</text>
-    <text x="285" y="92" text-anchor="middle" font-size="8" fill="#3f6212">MinIO</text>
+    <rect x="260" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="285" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">📦 L4</text>
+    <text x="285" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">MinIO</text>
 
-    <rect x="320" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="345" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🕸️ L5</text>
-    <text x="345" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Neo4j</text>
+    <rect x="320" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="345" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🕸️ L5</text>
+    <text x="345" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Neo4j</text>
 
-    <rect x="380" y="55" width="50" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="405" y="77" text-anchor="middle" font-size="9" fill="#4d7c0f">🐳 Deploy</text>
-    <text x="405" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Docker</text>
+    <rect x="380" y="55" width="50" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="405" y="77" text-anchor="middle" font-size="9" fill="#4a4a4a">🐳 Deploy</text>
+    <text x="405" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Docker</text>
 
-    <rect x="440" y="55" width="80" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="480" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🔄 WorkFlow</text>
-    <text x="480" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Prefect</text>
+    <rect x="440" y="55" width="80" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="480" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🔄 WorkFlow</text>
+    <text x="480" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Prefect</text>
 
-    <rect x="530" y="55" width="90" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="575" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🎼 Orchestration</text>
-    <text x="575" y="92" text-anchor="middle" font-size="8" fill="#3f6212">LangGraph</text>
+    <rect x="530" y="55" width="90" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="575" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🎼 Orchestration</text>
+    <text x="575" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">LangGraph</text>
 
-    <rect x="630" y="55" width="70" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="665" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🐰 EventBus</text>
-    <text x="665" y="92" text-anchor="middle" font-size="8" fill="#3f6212">RabbitMQ</text>
+    <rect x="630" y="55" width="70" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="665" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🐰 EventBus</text>
+    <text x="665" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">RabbitMQ</text>
 
-    <rect x="710" y="55" width="70" height="50" rx="6" fill="#fdfae2" stroke="#a3e635" stroke-width="1"/>
-    <text x="745" y="77" text-anchor="middle" font-size="10" fill="#4d7c0f">🧠 LLM</text>
-    <text x="745" y="92" text-anchor="middle" font-size="8" fill="#3f6212">Local/Cloud</text>
+    <rect x="710" y="55" width="70" height="50" rx="6" fill="#ffffff" stroke="#d3ccc1" stroke-width="1"/>
+    <text x="745" y="77" text-anchor="middle" font-size="10" fill="#4a4a4a">🧠 LLM</text>
+    <text x="745" y="92" text-anchor="middle" font-size="8" fill="#4a4a4a">Local/Cloud</text>
   </g>
 </svg>

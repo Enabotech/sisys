@@ -182,7 +182,7 @@ class TestCrossBorderTransferRequestImmutability:
 
         request = CrossBorderTransferRequest()
         with pytest.raises(AttributeError):
-            request.status = None  # type: ignore
+            request.status = None
 
     def test_request_id_not_modifiable(self):
         """Test request_id cannot be modified after creation."""
@@ -190,4 +190,4 @@ class TestCrossBorderTransferRequestImmutability:
 
         request = CrossBorderTransferRequest()
         with pytest.raises(AttributeError):
-            request.request_id = None  # type: ignore
+            request.request_id = None
