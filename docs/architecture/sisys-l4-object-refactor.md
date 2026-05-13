@@ -240,6 +240,75 @@ BucketManager / ObjectOperations / WORMManager
 
 **AC-5/6/7 空实现问题：** 分片上传、断点续传、生命周期规则测试只有 `pass`，里程碑测试未完成。
 
+### 1.10 两个 archive 接口并存的架构问题（Round 3 新增）
+
+**发现：存在两个完全不同的 archive 方法**
+
+| 接口 | 定义位置 | 签名 |
+|------|---------|------|
+| `L4ObjectPort.archive()` | `src/domain/ports/l4_object.py:96` | `(bucket_type, object_key, content: bytes\|None, retention_days) → str` |
+| `ObjectStorageRepository.archive()` | `src/domain/ports/storage.py:116` | `(bucket_type, object_key, retention_days) → bool` |
+| `WORMManager.archive_object()` | `worm_lifecycle.py:108` | `(bucket_name, object_key, retention_days) → bool` |
+
+**关键差异：**
+1. `L4ObjectPort` 有 `content` 参数，返回 `str`
+2. `ObjectStorageRepository` 无 `content` 参数，返回 `bool`
+3. 审计服务直接调用 `WORMManager.archive_object()`，不经过任何 Port
+
+**审计服务调用链（不走 L4ObjectPort）：**
+```
+AuditServiceImpl.archive()
+    → self._worm_manager.archive_object()  # 直接调用，不经过 repository
+    → enable_worm_lock()
+```
+
+**这意味着：**
+- L4ObjectPort.archive() 的 content 参数对审计服务完全不可用
+- 删除 ObjectStorageRepository 后，审计服务可以继续正常工作（因为它直接用 WORMManager）
+
+### 1.11 删除 ObjectStorageRepository 的实际影响（Round 3 新增）
+
+**实际风险评估：**
+
+| 风险项 | 级别 | 说明 |
+|--------|------|------|
+| MinIORepository 无法实例化 | 高 | 失去基类，需要改为继承 L4ObjectPort |
+| 测试 test_compliance_lock_error 失败 | 低 | ComplianceLockError 已迁移至 exceptions 模块 |
+| 调用方破坏 | 低 | UnifiedStorageGateway 用 L4ObjectPort，不受影响 |
+
+**关键发现：接口签名不兼容**
+
+ObjectStorageRepository.archive() 和 L4ObjectPort.archive() 签名不同：
+- L4ObjectPort 多 `content: bytes | None` 参数
+- L4ObjectPort 返回 `str`，ObjectStorageRepository 返回 `bool`
+
+MinIOAdapter 实现 L4ObjectPort，但调用的是实现 ObjectStorageRepository 的 MinIORepository。
+
+**迁移最小改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `minio_repository.py` | 改继承 L4ObjectPort，修改 archive 签名返回 str |
+| `minio_adapter.py` | 添加 list_objects，archive 中检查 content |
+| `storage.py` | 删除 |
+| `test_storage_architecture.py` | 修改 ComplianceLockError import |
+
+### 1.12 委托矩阵详细分析（Round 3 汇总）
+
+| 方法 | L4ObjectPort | MinIOAdapter | MinIORepository | 委托状态 |
+|------|-------------|--------------|-----------------|---------|
+| store | ✅ 完整签名 | ✅ 完整委托 | ✅ 正确实现 | **正确** |
+| retrieve | ✅ 完整签名 | ✅ 完整委托 | ✅ 正确实现 | **正确** |
+| delete | ✅ 完整签名 | ✅ 完整委托 | ✅ 正确实现 | **正确** |
+| get_metadata | ✅ 完整签名 | ✅ 完整委托 | ✅ 正确实现 | **正确** |
+| archive | ❌ content 参数丢失 | ❌ cast 掩盖 bool→str | ❌ 返回 bool 而非 str | **错误 P0** |
+| list_objects | ✅ 完整签名 | ❌ **方法完全缺失** | ✅ 正确实现 | **错误 P0** |
+
+**为什么 store/delete/get_metadata 正确，但 archive/list_objects 有问题：**
+- store/delete/get_metadata：L4ObjectPort 和 ObjectStorageRepository 签名完全一致，MinIOAdapter 简单透传正确
+- archive：设计文档想支持 content，但实现链路不支持，且返回类型不一致
+- list_objects：MinIOAdapter 实现时遗漏，MinIORepository 有实现但适配器层断链
+
 #### 1.7.4 关键结论
 
 1. **Protocol 实现滞后**：MinIOAdapter 漏实现了 `list_objects`，导致 L4ObjectPort 协议不完整
