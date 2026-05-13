@@ -1,9 +1,9 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v3.1
+**版本:** v3.2
 **日期:** 2026-05-13
 **状态:** 设计阶段
-**审查状态:** 第二轮宗师级审查修订版（新增5个P0问题）
+**审查状态:** 第三轮宗师级审查修订版（新增4个P0问题，共14个问题）
 
 ---
 
@@ -23,6 +23,9 @@
 | RedisConfig 默认值矛盾 | P0 | 新增问题：类定义=10，from_env=100，需统一 |
 | RetryChecker 连接池配置缺失 | P0 | 新增问题：max_connections/socket_timeout 未设置 |
 | composition_root 未初始化 Redis | P0 | 新增问题：RedisMemoryCache 需外部 client |
+| IdempotencyChecker 连接池配置缺失 | P0 | 新增问题：硬编码 ConnectionPool，未使用 RedisConfig |
+| PortSpec.impl 字符串路径无实例化机制 | P0 | 新增问题：l1_cache 注册为字符串但无法创建实例 |
+| SemanticCache 接口位置不符合六边形架构 | P1 | 新增问题：位于 application/ports 而非 domain/ports |
 
 ---
 
@@ -183,6 +186,71 @@ async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None
 **问题:** 先获取全部条目再过滤，未使用 Redis 命令直接过滤。
 
 **影响:** 数据量大时性能差。
+
+---
+
+#### 问题 11: IdempotencyChecker 连接池配置缺失
+
+**位置:** `src/infrastructure/messaging/retry/checker.py:44-51`
+
+```python
+pool = aioredis.ConnectionPool(
+    host=host,
+    port=port,
+    db=db,
+    password=password,
+    decode_responses=True,
+    # 完全缺少 max_connections, socket_timeout, retry_on_timeout
+)
+```
+
+**影响:** 使用库默认值，且未使用 RedisConfig，与其他 Adapter 不一致。
+
+---
+
+#### 问题 12: PortSpec.impl 字符串路径无实例化机制
+
+**位置:** `src/composition_root.py:92-101`
+
+```python
+register_port(
+    name="l1_cache",
+    interface=L1CachePort,
+    impl="src.infrastructure.storage.redis.redis_memory_cache.RedisMemoryCache",
+    ...
+)
+```
+
+**问题:** `impl` 存储为字符串路径，但 `PortRegistry` 无 `create_instance()` 方法，无法实例化。
+
+**影响:** `l1_cache` 端口注册后无法创建实例，运行时失败。
+
+---
+
+#### 问题 13: SemanticCache 接口位置不符合六边形架构
+
+**位置:** `src/application/ports/semantic_cache.py`
+
+**问题:** SemanticCache 位于 `application/ports/`，但其他 Domain 缓存接口位于 `domain/ports/`
+
+**影响:** 违反六边形架构分层，Domain 层不应依赖 Application 层。
+
+---
+
+#### 问题 14: _get_pool 未使用 _pool_lock 保护
+
+**位置:** `src/infrastructure/storage/redis/public_blackboard.py:48-60`
+
+```python
+def _get_pool(self) -> aioredis.ConnectionPool:
+    if self._pool is None:  # 无锁保护
+        self._pool = aioredis.ConnectionPool(...)
+    return self._pool
+```
+
+**问题:** `_pool_lock` 定义但未使用，高并发时可能重复创建连接池。
+
+**影响:** 竞态条件，资源浪费。
 
 ---
 
@@ -1301,6 +1369,191 @@ print('RedisSemanticCache interface: OK')
 
 ---
 
+### Phase 16: 修复IdempotencyChecker连接池配置
+
+**目标：** IdempotencyChecker 使用 RedisConfig 而非硬编码
+
+- [ ] 16.1 修改 `src/infrastructure/messaging/retry/checker.py`
+- [ ] 16.2 接受 `RedisConfig` 参数
+- [ ] 16.3 配置 `max_connections` 和 `socket_timeout`
+- [ ] 16.4 移除硬编码 ConnectionPool
+
+**修复代码：**
+```python
+def __init__(self, config: RedisConfig | None = None):
+    self._config = config or RedisConfig.from_env()
+    self._pool: aioredis.ConnectionPool | None = None
+
+def _get_pool(self) -> aioredis.ConnectionPool:
+    if self._pool is None:
+        self._pool = aioredis.ConnectionPool(
+            host=self._config.host,
+            port=self._config.port,
+            db=self._config.db,
+            password=self._config.password,
+            max_connections=self._config.max_connections,  # 新增
+            socket_timeout=self._config.socket_timeout,    # 新增
+            decode_responses=True,
+        )
+    return self._pool
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+import inspect
+sig = inspect.signature(IdempotencyChecker.__init__)
+assert 'config' in str(sig), 'Must accept config parameter'
+print('IdempotencyChecker: OK')
+"
+```
+
+---
+
+### Phase 17: 修复PortSpec.impl实例化机制
+
+**目标：** 修复 composition_root 端口注册与实例化机制
+
+- [ ] 17.1 修改 `PortSpec` 添加 `factory` 字段
+- [ ] 17.2 在 `PortRegistry` 添加 `create_instance()` 方法
+- [ ] 17.3 为 `l1_cache` 添加 factory 函数传入 redis_client
+
+**修复代码：**
+```python
+# src/domain/ports/registry.py
+@dataclass
+class PortSpec:
+    name: str
+    version: str
+    interface: Type
+    impl: Type | Callable[..., Any] | str
+    module: str
+    lifetime: Lifetime
+    owner: str
+    tags: tuple[str, ...]
+    factory: Callable[..., Any] | None = None  # 新增
+
+class PortRegistry:
+    def create_instance(self, name: str, **kwargs) -> Any:
+        spec = self._ports.get(name)
+        if spec is None:
+            raise KeyError(f"Port not found: {name}")
+        if spec.factory:
+            return spec.factory(**kwargs)
+        # 回退到类型实例化
+        return spec.impl()
+
+# composition_root.py
+def create_l1_cache() -> L1CachePort:
+    from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider
+    from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
+    return RedisMemoryCache(RedisPoolProvider.get_client())
+
+register_port(
+    name="l1_cache",
+    interface=L1CachePort,
+    impl=RedisMemoryCache,
+    factory=create_l1_cache,  # 新增
+    ...
+)
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.domain.ports.registry import PortRegistry
+from src.composition_root import bootstrap
+bootstrap()
+registry = PortRegistry()
+instance = registry.create_instance('l1_cache')
+print(f'Created: {type(instance).__name__}')
+"
+```
+
+---
+
+### Phase 18: 移动SemanticCache到domain层
+
+**目标：** 将 SemanticCache 接口移至 domain/ports/，符合六边形架构
+
+- [ ] 18.1 创建 `src/domain/ports/semantic_cache.py`
+- [ ] 18.2 移动接口定义（保持方法签名不变）
+- [ ] 18.3 更新所有引用
+
+**新增文件：**
+```python
+# src/domain/ports/semantic_cache.py
+"""SemanticCache Protocol — 领域层语义缓存接口。
+
+定义语义缓存的接口，基础设施层负责实现（如 Redis 实现）。
+"""
+from __future__ import annotations
+
+from abc import abstractmethod
+from typing import Protocol
+
+
+class SemanticCache(Protocol):
+    """语义缓存协议接口。
+
+    支持基于向量相似度的缓存查询和存储。
+    """
+
+    @abstractmethod
+    async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None: ...
+
+    @abstractmethod
+    async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None: ...
+
+    @abstractmethod
+    async def invalidate(self, cache_key: str) -> None: ...
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+from src.domain.ports.semantic_cache import SemanticCache
+print('SemanticCache in domain layer: OK')
+"
+```
+
+---
+
+### Phase 19: 修复_get_pool竞态条件
+
+**目标：** 所有 Adapter 的 _get_pool 使用 _pool_lock 保护
+
+- [ ] 19.1 修改 `RedisPublicBlackboard._get_pool` 使用 `_pool_lock`
+- [ ] 19.2 修改 `RedisSessionStorage._get_pool` 使用 `_pool_lock`
+- [ ] 19.3 修改 `RedisSemanticCache._get_pool` 使用 `_pool_lock`
+- [ ] 19.4 移除未使用的 `_pool_lock` 变量（如已正确使用）
+
+**修复代码：**
+```python
+async def _get_pool(self) -> aioredis.ConnectionPool:
+    if self._pool is None:
+        async with self._pool_lock:
+            # 双重检查
+            if self._pool is None:
+                self._pool = aioredis.ConnectionPool(...)
+    return self._pool
+```
+
+**验证命令：**
+```bash
+poetry run python -c "
+import asyncio
+from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
+# 验证 _pool_lock 被正确使用
+bb = RedisPublicBlackboard.__new__(RedisPublicBlackboard)
+assert hasattr(bb, '_pool_lock'), 'Must have _pool_lock'
+print('_pool_lock protection: OK')
+"
+```
+
+---
+
 ## 五、接口变更汇总
 
 ### 5.1 新增接口
@@ -1465,9 +1718,13 @@ def __init__(self, redis_client: aioredis.Redis | None = None, config: RedisConf
 [ ] Phase 13: 修复RetryChecker连接池配置缺失
 [ ] Phase 14: 修复composition_root初始化
 [ ] Phase 15: 补充RedisSemanticCache接口声明
+[ ] Phase 16: 修复IdempotencyChecker连接池配置
+[ ] Phase 17: 修复PortSpec.impl实例化机制
+[ ] Phase 18: 移动SemanticCache到domain层
+[ ] Phase 19: 修复_get_pool竞态条件
 ```
 
 ---
 
-*文档版本: v3.1*
-*重构目标: 建立六边形架构分层，统一连接池管理，线程安全单例，渐进式迁移，修复配置矛盾*
+*文档版本: v3.2*
+*重构目标: 建立六边形架构分层，统一连接池管理，线程安全单例，渐进式迁移，修复配置矛盾，新增4个P0问题修复*
