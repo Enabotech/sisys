@@ -22,7 +22,7 @@
 | R-6 | `get_by_email` 方法错误定义 | User 实体无 `email` 字段，移除该方法定义 |
 | R-7 | UserModel 与 User 实体字段不一致 | 需领域层与基础设施层对齐（见 §1.6） |
 | R-8 | architecture.md 与本文档不一致 | 明确两文档定位：前者宏观架构，后者详细设计 |
-| R-9 | L2RdbPort 重构价值存疑 | 三个L2端口共同方法仅save，强行抽象违背DDD原则 |
+| R-9 | L2RdbPort 重构价值明确 | 提供统一契约约束，确保所有端口一致性，而非代码复用 |
 
 ### 0.1 业界最佳实践对照
 
@@ -176,16 +176,16 @@ src/infrastructure/storage/postgresql/
 
 ### 1.7 重构价值评估（Round 4 新增）
 
-**评估结论：L2RdbPort 基类重构价值存疑**
+**评估结论：L2RdbPort 基类重构有价值**
 
 | 维度 | 分析 |
 |------|------|
-| 共同方法 | 三个L2记忆端口共同方法仅1个（save），不足以构成基类 |
-| 业务语义 | L2MetadataRepositoryPort(完整CRUD)、L2ChangeHistoryRepositoryPort(仅追加)、L2GroupMemberRepositoryPort(权限管理) 完全不同 |
-| 重构成本 | 5人天 |
-| 收益 | 形式统一，无实际业务价值 |
+| 一致性约束 | 统一的L2RdbPort定义标准CRUD契约，确保所有端口一致 |
+| 完整性 | UserRepositoryPort现在缺少save/delete/list_all，继承L2RdbPort后必须补充完整 |
+| 可扩展性 | 新增端口只需继承基类，符合开闭原则 |
+| 开销 | 5人天 |
 
-**推荐方案**：保持现状，仅修复已确认的bug（R-6 get_by_email、R-7 模型不一致、UserRepository 声明实现端口）
+**推荐方案**：继续推动L2RdbPort重构，实现架构一致性约束
 
 ### 1.8 端口-实现完整映射（Round 4 新增）
 
