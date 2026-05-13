@@ -200,7 +200,7 @@ class TestPIPLComplianceRecordImmutability:
 
         record = PIPLComplianceRecord()
         with pytest.raises(AttributeError):
-            record.purpose = "Modified"  # type: ignore
+            record.purpose = "Modified"
 
     def test_access_id_not_modifiable(self):
         """Test access_id cannot be modified after creation."""
@@ -208,4 +208,4 @@ class TestPIPLComplianceRecordImmutability:
 
         record = PIPLComplianceRecord()
         with pytest.raises(AttributeError):
-            record.access_id = None  # type: ignore
+            record.access_id = None

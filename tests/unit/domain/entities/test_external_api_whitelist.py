@@ -181,7 +181,7 @@ class TestExternalAPIWhitelistImmutability:
 
         api = ExternalAPIWhitelist()
         with pytest.raises(AttributeError):
-            api.is_verified = True  # type: ignore
+            api.is_verified = True
 
     def test_api_id_not_modifiable(self):
         """Test api_id cannot be modified after creation."""
@@ -189,4 +189,4 @@ class TestExternalAPIWhitelistImmutability:
 
         api = ExternalAPIWhitelist()
         with pytest.raises(AttributeError):
-            api.api_id = None  # type: ignore
+            api.api_id = None

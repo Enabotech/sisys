@@ -5,6 +5,8 @@ Tests that DualChannelEventBus implementation satisfies the EventPublisher Proto
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from src.composition_root import bootstrap
@@ -25,12 +27,12 @@ class TestEventPublisherContract:
         return "event_publisher"
 
     @classmethod
-    def get_implementation(cls) -> EventPublisher:
+    def get_implementation(cls) -> Any:
         """Get the registered implementation."""
         from src.domain.ports.resolver import Resolver
 
         resolver = Resolver()
-        return resolver.resolve("event_publisher")  # type: ignore[no-any-return]
+        return resolver.resolve("event_publisher")
 
     def test_port_is_registered(self) -> None:
         """Port must be registered in global registry."""
