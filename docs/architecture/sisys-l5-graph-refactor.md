@@ -1,9 +1,9 @@
 # SISYS L5 图存储重构详细设计
 
-**版本:** v2.3
+**版本:** v2.4
 **日期:** 2026-05-13
 **作者:** Claude Code (宗师级架构设计)
-**状态:** 设计完成（v2.3 修复版，基于两轮全面调研）
+**状态:** 设计完成（v2.4 修复版，基于四轮全面调研）
 **基于:** sisys-uni-storage-design.md §L5 重构决策
 
 **Changelog v2.2 (第一轮调研修复):**
@@ -17,10 +17,18 @@
 **Changelog v2.3 (第二轮调研修复):**
 - P0: Neo4jAdapter 不是"薄适配器"——自己拼接 Cypher（违反六边形架构）
 - P0: Memory 标签硬编码散落 8+ 处（违反 OCP）
-- P0: `execute_write_query` 使用 `session.run()` 而非 `session.execute_write()`，无事务保护
+- P0: `execute_write_query` 使用 `session.run()` 而非 `session.execute_write()`
 - P1: 测试 mock 返回值与接口定义不符
 - P1: 向后兼容性影响范围广（6文件需修改）
-- P1: 新增双轨制迁移策略（create_node + deprecated create_entity）
+- P1: 新增双轨制迁移策略
+
+**Changelog v2.4 (第三四轮调研修复):**
+- P0: `get_async_driver()` 懒初始化存在竞态条件（非线程安全）
+- P1: `find_path`/`get_neighbors` 返回 Neo4j 原生对象而非 dict（虚假 cast）
+- P1: `BaseGraphAdapter` 仅存在于设计文档，实际代码未实现
+- P1: `test_neo4j_adapter.py` 完全缺失 `get_neighbors` 测试
+- P1: `Neo4jGraphStorage` 未实现 L5GraphPort 协议（缺少 create_entity 等）
+- P2: `create_node` 接口在 GraphManager 和 L5GraphPort 中语义不同
 
 ---
 
