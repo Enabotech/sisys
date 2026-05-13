@@ -1225,6 +1225,25 @@ src/infrastructure/storage/minio/
 
 > **说明**：每个步骤前的 `[ ]` 表示执行状态，`[ ]` = 待执行，`[x]` = 已完成。执行后更新此文档。
 
+### Phase 0: WORM 合规性修复（P0-4 SOX 阻断）
+
+**目标：** 修复 WORM 模式从 GOVERNANCE 改为 COMPLIANCE，修复 AccessDenied 错误映射
+
+**状态：待执行**
+
+**前置依赖：无（独立修复，SOX 合规性最高优先级）**
+
+| Checkbox | 步骤 | 任务 | 验证命令 |
+|----------|------|------|---------|
+| `[ ]` | 0.1 | 修改 `worm_lifecycle.py:87`，将 `mode="GOVERNANCE"` 改为 `mode="COMPLIANCE"` | `grep "GOVERNANCE" src/infrastructure/storage/minio/worm_lifecycle.py` 无结果 |
+| `[ ]` | 0.2 | 修改 `bucket_manager.py:169`，将 `mode="GOVERNANCE"` 改为 `mode="COMPLIANCE"` | `grep "GOVERNANCE" src/infrastructure/storage/minio/bucket_manager.py` 无结果 |
+| `[ ]` | 0.3 | 更新 `worm_lifecycle.py` 和 `bucket_manager.py` 中所有 "Governance" 相关 docstring | `grep -i "governance" src/infrastructure/storage/minio/` 无结果 |
+| `[ ]` | 0.4 | 修改 `worm_lifecycle.py` 的 `delete_object` 方法，在 `AccessDenied` 错误处理中添加 COMPLIANCE 模式条件映射（先调用 `get_object_retention` 检查对象是否处于 COMPLIANCE 锁定，若是则抛出 `ComplianceLockError`） | `grep "AccessDenied" src/infrastructure/storage/minio/worm_lifecycle.py` 有 ComplianceLockError 映射 |
+| `[ ]` | 0.5 | 为 AccessDenied → ComplianceLockError 条件映射添加单元测试 | `pytest tests/ -v -k "compliance_lock or access_denied"` |
+| `[ ]` | 0.6 | WORM 功能回归测试 | `pytest tests/ -x -q -k worm` |
+
+---
+
 ### Phase 1: 删除 ObjectStorageRepository，迁移到 L4ObjectPort
 
 **目标：** 统一 Domain 层抽象，消除并存接口
@@ -1306,6 +1325,9 @@ if content is not None:
 | `[ ]` | 4.3 | 实现路径自动生成：`documents/{user_id}/{document_type}/YYYY-MM/{filename}` | `grep "object_key" src/infrastructure/storage/minio/document_storage.py` |
 | `[ ]` | 4.4 | 实现文档特有方法和 L4ObjectPort 继承方法委托 | `mypy src/infrastructure/storage/minio/document_storage.py` |
 | `[ ]` | 4.5 | 更新 `src/infrastructure/storage/minio/__init__.py` 导出 `MinIODocumentStorage` | `grep "MinIODocumentStorage" src/infrastructure/storage/minio/__init__.py` |
+| `[ ]` | 4.6 | 在 `composition_root.py` 中注册 `L4ObjectPort` → `MinIOAdapter` | `grep "L4ObjectPort" src/composition_root.py` 有匹配 |
+| `[ ]` | 4.7 | 在 `composition_root.py` 中注册 `DocumentStoragePort` → `MinIODocumentStorage` | `grep "DocumentStoragePort" src/composition_root.py` 有匹配 |
+| `[ ]` | 4.8 | 验证 `bootstrap()` 后可从注册表获取 `L4ObjectPort` 和 `DocumentStoragePort` 实例 | `python -c "from src.composition_root import bootstrap; bootstrap(); from src.domain.ports.registry import get_port; port = get_port('l4_object'); print('OK' if port else 'FAIL')"` |
 
 ---
 
@@ -1330,13 +1352,14 @@ if content is not None:
 
 | Phase | 状态 | 已完成步骤 | 待执行步骤 |
 |-------|------|-----------|------------|
+| Phase 0 | `[ ]` 待执行 | 0/6 | 0.1, 0.2, 0.3, 0.4, 0.5, 0.6 |
 | Phase 1 | `[ ]` 待执行 | 0/6 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6 |
 | Phase 2 | `[ ]` 待执行 | 0/4 | 2.1, 2.2, 2.3, 2.4 |
 | Phase 3 | `[ ]` 待执行 | 0/5 | 3.1, 3.2, 3.3, 3.4, 3.5 |
-| Phase 4 | `[ ]` 待执行 | 0/5 | 4.1, 4.2, 4.3, 4.4, 4.5 |
-| Phase 5 | `[ ]` 待执行 | 0/6 | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 |
+| Phase 4 | `[ ]` 待执行 | 0/8 | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 |
+| Phase 5 | `[ ]` 待执行 | 0/3 | 5.1, 5.2, 5.3 |
 
-**总计：0/26 步骤已完成**
+**总计：0/32 步骤已完成**
 
 ---
 
