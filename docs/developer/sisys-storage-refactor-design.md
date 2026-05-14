@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v4.2 (Round 5最终验证)
+**文档版本:** v4.3 (Round 1深度代码验证)
 **生成时间:** 2026-05-14
-**审查状态:** Round 5 完成 — 修正9个命名/引用/验证命令遗留问题
+**审查状态:** Round 1 完成 — 补全Cypher注入漏洞详情、QdrantCollectionManager参数映射表
 
 ---
 
@@ -808,7 +808,16 @@ src/infrastructure/storage/qdrant/
 
 **已有组件**: `QdrantCollectionManager`已实现这4个方法，但**未注入Adapter**。
 
-**Phase 3修复**: 在QdrantVectorAdapter构造函数中注入QdrantCollectionManager，补全委托。
+**参数映射表**（CollectionManager → L3VectorPort）:
+
+| QdrantCollectionManager | L3VectorPort | 映射方式 |
+|------------------------|--------------|---------|
+| `create_collection(name, vector_size, distance, **kwargs)` | `create_collection(collection, vector_size, vector_params)` | `name=collection`, `vector_params→distance+**kwargs` |
+| `delete_collection(name)` | `delete_collection(collection)` | `name=collection` |
+| `collection_exists(name)` | `collection_exists(collection)` | `name=collection` |
+| `list_collections()` | `list_collections()` | 直接委托 |
+
+**Phase 3修复**: 在QdrantVectorAdapter构造函数中注入QdrantCollectionManager，补全委托，参数映射在Adapter层完成。
 
 ### Rule 4: Infrastructure Layer-2 — QdrantMemoryVectorStorage
 
@@ -957,7 +966,14 @@ src/infrastructure/storage/neo4j/
 **⚠️ 当前缺口**: Neo4jAdapter缺少`get_neighbors()`方法（8/9实现）。
 底层`Neo4jGraphStorage.get_neighbors(node_id, rel_type, direction)`签名与L5GraphPort不兼容。
 
-**Phase 3修复**: 在Neo4jAdapter中实现`get_neighbors(memory_id, max_depth, edge_type)`，桥接参数映射到底层。
+**⚠️ Cypher注入漏洞**（严重安全问题）:
+- `neo4j_adapter.py` 第143行 `create_relationship`: `MERGE (source)-[r:{relationship_type}]->(target)`
+- `neo4j_adapter.py` 第173行 `delete_relationship`: `MATCH ... [r:{relationship_type}]`
+- `neo4j_adapter.py` 第203/211行 `find_related`: `MATCH ... [:{relationship_type}*1..{max_depth}]`
+- `graph_storage.py` 第80-81行 `find_path`: `[*1..{max_depth}]`
+- **修复方案**: 使用参数化查询或whitelist验证relationship_type（仅允许字母数字）
+
+**Phase 3修复**: 在Neo4jAdapter中实现`get_neighbors(memory_id, max_depth, edge_type)`，桥接参数映射到底层；修复Cypher注入漏洞。
 
 ### Rule 4: Infrastructure Layer-2 — Neo4jMemoryGraphStorage
 
@@ -1190,7 +1206,7 @@ def bootstrap() -> None:
 - [ ] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
 - [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
-- [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）
+- [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）；修复 `Neo4jAdapter` + `Neo4jGraphStorage` 的 Cypher 注入漏洞（4处f-string拼接→参数化查询）
 - [ ] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
 - [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
 - [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
