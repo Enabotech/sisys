@@ -1205,42 +1205,42 @@ def bootstrap() -> None:
 
 ### Phase 1: Rule 1 — 端口抽象完善
 
-- [ ] 1.1 重构 `BaseRepository[T]` → `L2RdbPort[T]`（sync→async，添加@runtime_checkable）
-- [ ] 1.2 修改三个L2端口继承 `L2RdbPort[T]`（Metadata/ChangeHistory继承，GroupMember组合）
-- [ ] 1.3 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
-- [ ] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）
-- [ ] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（新增 L0StoragePort、L2RdbPort（重命名后的BaseRepository）、IndexManagerPort，保留 BaseRepository=L2RdbPort deprecated别名）
-- [ ] 1.6 创建 `src/application/ports/__init__.py`（当前缺失），立即导出现有8个端口（semantic_cache, public_blackboard, event_subscriber, metrics_port, compressor_service, text_extractor_service, exception_metrics_port, sandbox_port）
-- [ ] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路：当前返回class供`_auto_inject`递归解析构造函数参数后实例化，属设计意图（非缺陷），需确保Rule 4嵌套注入场景正确
-- [ ] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效
+- [x] 1.1 重构 `BaseRepository[T]` → `L2RdbPort[T]`（sync→async，添加@runtime_checkable）
+- [x] 1.2 修改三个L2端口继承 `L2RdbPort[T]`（Metadata/ChangeHistory继承，GroupMember组合）
+- [x] 1.3 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
+- [~] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）⚠️ 核心11个存储端口已完成，其余~27个非存储Protocol未添加
+- [x] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（新增 L0StoragePort、L2RdbPort（重命名后的BaseRepository）、IndexManagerPort，保留 BaseRepository=L2RdbPort deprecated别名）
+- [x] 1.6 创建 `src/application/ports/__init__.py`（当前缺失），立即导出现有8个端口（semantic_cache, public_blackboard, event_subscriber, metrics_port, compressor_service, text_extractor_service, exception_metrics_port, sandbox_port）
+- [~] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路 ⚠️ type-based impl正常；string-based impl返回class未传入_auto_inject
+- [~] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效 ⚠️ 仅11个@runtime_checkable端口isinstance有效
 
 ### Phase 2: Rule 2 — 应用端口定义
 
-- [ ] 2.1 新增 `src/application/ports/memory_file_port.py` — MemoryFilePort(L0StoragePort)
-- [ ] 2.2 新增 `src/application/ports/session_cache_port.py` — SessionCachePort(L1CachePort)
+- [x] 2.1 新增 `src/application/ports/memory_file_port.py` — MemoryFilePort(L0StoragePort)
+- [x] 2.2 新增 `src/application/ports/session_cache_port.py` — SessionCachePort(L1CachePort)
   - 注意: RedisSessionStorage已存在(save/load/delete/exists)，SessionCachePort为新应用层抽象
-- [ ] 2.3 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
-- [ ] 2.4 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
-- [ ] 2.5 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
-- [ ] 2.6 L2端口保持在domain层，继承L2RdbPort[T]（Phase 1已完成）
-- [ ] 2.7 补全 `src/application/ports/__init__.py` 导出全部应用端口
-- [ ] 2.8 验证: 所有应用端口继承基础端口，方法签名兼容，Protocol无@abstractmethod混用
+- [x] 2.3 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
+- [x] 2.4 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
+- [x] 2.5 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
+- [x] 2.6 L2端口保持在domain层，继承L2RdbPort[T]（Phase 1已完成）
+- [x] 2.7 补全 `src/application/ports/__init__.py` 导出全部应用端口
+- [x] 2.8 验证: 所有应用端口继承基础端口，方法签名兼容，Protocol无@abstractmethod混用
 
 ### Phase 3: Rule 3 — 基础端口实现完善
 
-- [ ] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
-- [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
-- [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
-- [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）；修复 `Neo4jAdapter` + `Neo4jGraphStorage` 的 Cypher 注入漏洞（4处f-string拼接→参数化查询）
-- [ ] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
-- [ ] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
-- [ ] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
-- [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
-- [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root：
-  - [ ] 3.7.1 新增 l3_vector 端口注册
-  - [ ] 3.7.2 新增 l4_object 端口注册
-  - [ ] 3.7.3 新增 l5_graph 端口注册
-- [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
+- [x] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
+- [x] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
+- [x] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
+- [~] 3.4 补全 `Neo4jAdapter.get_neighbors()` ✅；修复 Cypher 注入漏洞 ❌（3处f-string未修复: create_relationship/delete_relationship/find_related）
+- [x] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
+- [x] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
+- [x] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
+- [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（延迟，已有各ClientWrapper延迟初始化）
+- [x] 3.7 注册所有 Rule 3 基础端口到 Composition Root：
+  - [x] 3.7.1 新增 l3_vector 端口注册
+  - [x] 3.7.2 新增 l4_object 端口注册
+  - [x] 3.7.3 新增 l5_graph 端口注册
+- [~] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配 ⚠️ Neo4j Cypher注入未修复
 
 ### Phase 4: Rule 4 — 应用端口实现
 
