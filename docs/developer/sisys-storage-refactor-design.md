@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v3.1 (Round 1审查修正)
+**文档版本:** v3.2 (Round 2审查修正)
 **生成时间:** 2026-05-14
-**审查状态:** Round 1 完成 — 修正15个P0问题
+**审查状态:** Round 2 完成 — L2仓储重构方案对齐四条规则
 
 ---
 
@@ -524,39 +524,201 @@ class L2GroupMemberRepositoryPort(Protocol):
     async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
-### Rule 3: Infrastructure Layer-1 — PostgreSQLBaseRepository
+### Rule 3: Infrastructure Layer-1 — PgDomainRepository（重构PgBaseRepository）
+
+**当前问题**: PgBaseRepository(Generic[T])绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
+三个L2仓储因此无法继承它，直接实现端口——**违反四条规则**。
+
+**重构方案**: 将PgBaseRepository重构为`PgDomainRepository[TEntity, TModel]`双泛型基座，
+实现`L2RdbPort[TEntity]`，提供领域实体/ORM模型转换层+可配置行为。
 
 ```python
-# src/infrastructure/storage/postgresql/repository/base_repository.py — 已有
-# ⚠️ 实际情况：PgBaseRepository(Generic[T])是sync的泛型基类
-#   - 构造函数: __init__(self, model_class: type[T], session: AsyncSession)
-#   - 方法: get_by_id, save, delete, list_all, count（均为async）
-#   - 仅UserRepository和PermissionRepository继承它
-#   - 三个L2 Memory仓储均不继承，直接实现端口
-#
-# Phase 3需调整：与L2RdbPort[T]对齐，统一async泛型CRUD基座
+# src/infrastructure/storage/postgresql/repository/base_repository.py — 重构
+
+TEntity = TypeVar("TEntity")
+TModel = TypeVar("TModel", bound=Base)
+
+class PgDomainRepository(Generic[TEntity, TModel]):
+    """领域仓储基座 — 实现L2RdbPort[TEntity]，提供ORM↔Entity转换。
+
+    子类只需实现:
+    - _to_entity(model: TModel) -> TEntity
+    - _to_model(entity: TEntity) -> TModel
+    - pk_column: str = "id"  （可覆写为"memory_id"等）
+    """
+
+    pk_column: str = "id"                    # 可覆写
+    soft_delete_column: str | None = None     # 可覆写为"deleted_at"
+
+    def __init__(self, model_class: type[TModel], session: AsyncSession):
+        self._model_class = model_class
+        self._session = session
+
+    # === 抽象方法 — 子类必须实现 ===
+
+    def _to_entity(self, model: TModel) -> TEntity:
+        raise NotImplementedError
+
+    def _to_model(self, entity: TEntity) -> TModel:
+        raise NotImplementedError
+
+    # === L2RdbPort[TEntity] 实现 ===
+
+    async def get_by_id(self, id: UUID) -> TEntity | None:
+        stmt = select(self._model_class).where(
+            getattr(self._model_class, self.pk_column) == id
+        )
+        stmt = self._apply_soft_delete_filter(stmt)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def save(self, entity: TEntity) -> None:
+        model = self._to_model(entity)
+        await self._do_save(model, entity)    # 钩子方法，子类可覆写
+
+    async def delete(self, id: UUID) -> None:
+        if self.soft_delete_column:
+            await self._soft_delete(id)        # 软删除
+        else:
+            await self._hard_delete(id)        # 硬删除
+
+    async def list_all(self) -> list[TEntity]:
+        stmt = select(self._model_class)
+        stmt = self._apply_soft_delete_filter(stmt)
+        result = await self._session.execute(stmt)
+        return [self._to_entity(m) for m in result.scalars().all()]
+
+    # === 可覆写钩子方法 ===
+
+    async def _do_save(self, model: TModel, entity: TEntity) -> None:
+        """默认简单插入。子类可覆写为UPSERT/乐观锁/append-only。"""
+        self._session.add(model)
+        await self._session.flush()
+
+    # === 内部工具方法 ===
+
+    def _apply_soft_delete_filter(self, stmt):
+        if self.soft_delete_column:
+            col = getattr(self._model_class, self.soft_delete_column)
+            return stmt.where(col.is_(None))
+        return stmt
+
+    async def _soft_delete(self, id: UUID) -> None:
+        from datetime import datetime, timezone
+        stmt = update(self._model_class).where(
+            getattr(self._model_class, self.pk_column) == id
+        ).values(**{self.soft_delete_column: datetime.now(timezone.utc)})
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def _hard_delete(self, id: UUID) -> None:
+        entity = await self.get_by_id(id)
+        if entity:
+            await self._session.delete(await self._session.get(
+                self._model_class, id))
+            await self._session.flush()
 ```
 
-### Rule 4: Infrastructure Layer-2 — PostgreSQL具体仓储
+**UserRepository/PermissionRepository兼容**: 保持继承PgDomainRepository[TModel, TModel]，
+`_to_entity`/`_to_model`为恒等转换。
+
+### Rule 4: Infrastructure Layer-2 — 三个L2仓储（继承PgDomainRepository）
 
 ```python
-# src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py — 已有
-# ⚠️ 实际情况：不继承PgBaseRepository，直接实现L2MetadataRepositoryPort
-#   - 7个方法全部实现：save, get_by_id, get_by_name, delete, list_by_user, list_by_type, list_all
-#   - 特性：软删除(deleted_at)、乐观锁(version)、UPSERT模式
-#   - 组合注入: AsyncSession（由DatabaseEngine提供）
-#
-# src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py — 已有
-#   - 3个方法全部实现：save, get_by_memory_id, get_by_id
-#
-# src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py — 已有
-#   - 4个方法全部实现：is_group_member, is_group_admin, add_member, remove_member
+# === 1. PostgreSQLMemoryMetadataRepository — 继承PgDomainRepository ===
+
+class PostgreSQLMemoryMetadataRepository(
+    PgDomainRepository[MemoryMetadata, MemoryMetadataModel]
+):
+    pk_column = "memory_id"               # PK列名覆写
+    soft_delete_column = "deleted_at"      # 软删除列覆写
+
+    def __init__(self, session: AsyncSession):
+        super().__init__(MemoryMetadataModel, session)
+
+    def _to_entity(self, model) -> MemoryMetadata:
+        # 已有转换逻辑迁移至此
+        ...
+
+    def _to_model(self, entity) -> MemoryMetadataModel:
+        # 已有转换逻辑迁移至此
+        ...
+
+    async def _do_save(self, model, entity) -> None:
+        """覆写为UPSERT + 乐观锁。"""
+        existing = await self._find_existing(entity.memory_id)
+        if existing:
+            if entity.version <= existing.version:
+                raise MemoryVersionConflictError(...)
+            # UPDATE with version bump
+            ...
+        else:
+            self._session.add(model)
+        await self._session.flush()
+
+    # === 继承的L2RdbPort方法（get_by_id/save/delete/list_all自动获得） ===
+
+    # === L2MetadataRepositoryPort扩展方法 ===
+
+    async def get_by_name(self, name: str) -> MemoryMetadata | None:
+        stmt = select(MemoryMetadataModel).where(
+            MemoryMetadataModel.name == name
+        )
+        stmt = self._apply_soft_delete_filter(stmt)
+        ...
+
+    async def list_by_user(self, user_id: str) -> list[MemoryMetadata]: ...
+    async def list_by_type(self, memory_type: str) -> list[MemoryMetadata]: ...
+
+
+# === 2. PostgreSQLMemoryChangeHistoryRepository — 继承PgDomainRepository ===
+
+class PostgreSQLMemoryChangeHistoryRepository(
+    PgDomainRepository[MemoryChangeHistory, MemoryChangeHistoryModel]
+):
+    def __init__(self, session: AsyncSession):
+        super().__init__(MemoryChangeHistoryModel, session)
+
+    async def _do_save(self, model, entity) -> None:
+        """覆写为append-only插入（无update路径）。"""
+        self._session.add(model)
+        await self._session.flush()
+
+    async def delete(self, id: UUID) -> None:
+        """变更历史不可删除 — 覆写为空操作或抛异常。"""
+        raise NotImplementedError("Change history is append-only")
+
+    # === L2ChangeHistoryRepositoryPort扩展方法 ===
+
+    async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]: ...
+
+
+# === 3. PostgreSQLMemoryGroupMemberRepository — 组合注入PgDomainRepository ===
+
+class PostgreSQLMemoryGroupMemberRepository:
+    """组成员仓储 — 组合注入PgDomainRepository复用Session管理。
+
+    组合注入而非继承：无单一主键（复合PK: group_id+user_id），
+    无标准CRUD方法（is_member/add_member而非get_by_id/save），
+    但通过组合注入共享PgDomainRepository的Session基础设施。
+    """
+
+    def __init__(self, session: AsyncSession):
+        self._session = session   # 共享同一Session
+
+    async def is_group_member(self, group_id: str, user_id: str) -> bool: ...
+    async def is_group_admin(self, group_id: str, user_id: str) -> bool: ...
+    async def add_member(self, group_id: str, user_id: str, role: str = "member") -> None: ...
+    async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
 **L2特殊性**:
-- PostgreSQL的Session管理已由`DatabaseEngine`统一提供，Repository直接接收`AsyncSession`
-- 现有三个L2仓储均**不继承PgBaseRepository**，直接实现端口接口
-- Phase 4需调整：统一继承重构后的PgBaseRepository（与L2RdbPort[T]对齐）
+- PgDomainRepository提供领域实体/ORM模型转换+可配置PK列名+软删除+UPSERT钩子
+- MetadataRepository继承：覆写`_do_save`(UPSERT)、`pk_column="memory_id"`、`soft_delete_column="deleted_at"`
+- ChangeHistoryRepository继承：覆写`_do_save`(append-only)、`delete`(禁止)
+- GroupMemberRepository组合注入：无标准CRUD，共享Session基础设施
+- DatabaseEngine统一提供AsyncSession（延迟初始化AsyncEngine, health_check）
 
 ---
 
@@ -863,7 +1025,7 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
     register_port(name="l2_pg_base", interface=L2RdbPort,
-        impl="src.infrastructure.storage.postgresql.repository.base_repository.BaseRepository",
+        impl="src.infrastructure.storage.postgresql.repository.base_repository.PgDomainRepository",
         module="src.infrastructure.storage.postgresql.repository.base_repository",
         lifetime=Lifetime.SCOPED, owner="platform-team")
 
@@ -967,7 +1129,7 @@ def bootstrap() -> None:
 - [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）
-- [ ] 3.5 重构 `PgBaseRepository` 与 `L2RdbPort[T]` 对齐（统一async泛型CRUD）
+- [ ] 3.5 重构 `PgBaseRepository` → `PgDomainRepository[TEntity, TModel]` 双泛型基座（实现L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）
 - [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
 - [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
 - [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
@@ -980,9 +1142,13 @@ def bootstrap() -> None:
 - [ ] 4.3 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
 - [ ] 4.4 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
 - [ ] 4.5 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
-- [ ] 4.6 注册所有 Rule 4 应用端口到 Composition Root
-- [ ] 4.7 调整 `UnifiedStorageGateway` 依赖应用端口（逐步过渡）
-- [ ] 4.8 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析）
+- [ ] 4.6 重构三个L2仓储继承PgDomainRepository[TEntity, TModel]：
+  - `PostgreSQLMemoryMetadataRepository(PgDomainRepository[MemoryMetadata, MemoryMetadataModel])` — 覆写_do_save(UPSERT+乐观锁)、pk_column="memory_id"、soft_delete_column="deleted_at"
+  - `PostgreSQLMemoryChangeHistoryRepository(PgDomainRepository[MemoryChangeHistory, MemoryChangeHistoryModel])` — 覆写_do_save(append-only)、delete(raise NotImplementedError)
+  - `PostgreSQLMemoryGroupMemberRepository` — 组合注入共享Session（复合PK，不继承PgDomainRepository）
+- [ ] 4.7 注册所有 Rule 4 应用端口到 Composition Root（含L2三个仓储）
+- [ ] 4.8 调整 `UnifiedStorageGateway` 依赖应用端口（逐步过渡）
+- [ ] 4.9 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PgDomainRepository
 
 ### Phase 5: 清理与测试
 
@@ -1015,7 +1181,10 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
-| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | 与L2RdbPort对齐 |
+| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | PgBaseRepository→PgDomainRepository[TEntity,TModel]双泛型基座 |
+| `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PgDomainRepository，覆写_do_save/pk_column/soft_delete |
+| `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PgDomainRepository，覆写_do_save(append-only)/delete |
+| `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |
 | `src/infrastructure/storage/memory_file_storage.py` | **新增** | Phase 4 | Rule 4 | |
 | `src/infrastructure/storage/redis/redis_session_cache.py` | **新增** | Phase 4 | Rule 4 | 与RedisSessionStorage区分 |
 | `src/infrastructure/storage/qdrant/memory_vector_storage.py` | **新增** | Phase 4 | Rule 4 | |
@@ -1075,7 +1244,7 @@ print('Rule 4 OK')
 |-------|------|------|------|---------|
 | Phase 1 | Rule 1 | 4-6h | 中 | L2RdbPort重构+@runtime_checkable+Resolver修复 |
 | Phase 2 | Rule 2 | 4-6h | 低 | 5个应用端口+__init__.py |
-| Phase 3 | Rule 3 | 5-7h | 中 | 4个适配器补全+PgBaseRepository重构 |
-| Phase 4 | Rule 4 | 6-8h | 中 | 5个应用端口实现+Gateway调整 |
+| Phase 3 | Rule 3 | 5-7h | 中 | 4个适配器补全+PgDomainRepository[TEntity,TModel]双泛型基座 |
+| Phase 4 | Rule 4 | 6-8h | 中 | 5个应用端口实现+3个L2仓储重构+Gateway调整 |
 | Phase 5 | 测试 | 4-5h | 低 | 契约测试+反模式修复 |
 | **总计** | — | **23-32h** | — | 15个P0问题 |
