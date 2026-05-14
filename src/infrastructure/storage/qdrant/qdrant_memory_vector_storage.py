@@ -1,0 +1,156 @@
+"""QdrantMemoryVectorStorage — MemoryVectorPort 实现（Rule 4）。
+
+组合注入 QdrantVectorAdapter（Rule 3），添加记忆向量索引和语义检索语义。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+from typing import TYPE_CHECKING, Any, Callable
+
+from src.application.ports.memory_vector_port import MemoryVectorPort
+
+if TYPE_CHECKING:
+    from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
+
+logger = logging.getLogger(__name__)
+
+# Default collection for memory vectors
+MEMORY_COLLECTION = "sisys_memories"
+
+
+class QdrantMemoryVectorStorage(MemoryVectorPort):
+    """Qdrant 记忆向量存储 — 实现 MemoryVectorPort。
+
+    组合 QdrantVectorAdapter（Rule 3，L3VectorPort 实现），
+    添加记忆语义：自动 embedding 生成 + payload 过滤。
+    """
+
+    def __init__(
+        self,
+        adapter: QdrantVectorAdapter,
+        embed_fn: Callable[[str], list[float]] | None = None,
+        collection: str = MEMORY_COLLECTION,
+    ):
+        """初始化 QdrantMemoryVectorStorage。
+
+        Args:
+            adapter: QdrantVectorAdapter 实例（Rule 3）
+            embed_fn: 文本→向量转换函数，None 则使用确定性 hash embedding
+            collection: 默认 Collection 名称
+        """
+        self._adapter = adapter
+        self._embed_fn = embed_fn or self._deterministic_embed
+        self._collection = collection
+
+    # -- L3VectorPort methods (delegate to adapter) --
+
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool:
+        """批量插入或更新向量点。"""
+        return await self._adapter.upsert_points(collection, points)
+
+    async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
+        """批量删除向量点。"""
+        return await self._adapter.delete_points(collection, point_ids)
+
+    async def get_point(self, collection: str, point_id: str) -> dict | None:
+        """获取单个向量点。"""
+        return await self._adapter.get_point(collection, point_id)
+
+    async def search(
+        self,
+        collection: str,
+        query_vector: list[float],
+        limit: int = 10,
+        filter_payload: dict | None = None,
+    ) -> list[dict]:
+        """Dense 语义检索。"""
+        return await self._adapter.search(collection, query_vector, limit, filter_payload)
+
+    async def search_sparse(
+        self,
+        collection: str,
+        sparse_vector: dict,
+        limit: int = 10,
+        filter_payload: dict | None = None,
+    ) -> list[dict]:
+        """BM25 稀疏检索。"""
+        return await self._adapter.search_sparse(collection, sparse_vector, limit, filter_payload)
+
+    async def create_collection(
+        self,
+        collection: str,
+        vector_size: int,
+        vector_params: dict | None = None,
+    ) -> bool:
+        """创建 Collection。"""
+        return await self._adapter.create_collection(collection, vector_size, vector_params)
+
+    async def delete_collection(self, collection: str) -> bool:
+        """删除 Collection。"""
+        return await self._adapter.delete_collection(collection)
+
+    async def collection_exists(self, collection: str) -> bool:
+        """检查 Collection 是否存在。"""
+        return await self._adapter.collection_exists(collection)
+
+    async def list_collections(self) -> list[str]:
+        """列出所有 Collection。"""
+        return await self._adapter.list_collections()
+
+    # -- MemoryVectorPort specific methods --
+
+    async def index_memory(
+        self,
+        memory_id: str,
+        content: str,
+        memory_type: str,
+        owner_id: str,
+    ) -> bool:
+        """索引记忆内容（自动生成 embedding 并存储）。"""
+        vector = self._embed_fn(content)
+        points = [
+            {
+                "id": memory_id,
+                "vector": vector,
+                "payload": {"memory_type": memory_type, "owner_id": owner_id},
+            }
+        ]
+        return await self._adapter.upsert_points(self._collection, points)
+
+    async def search_similar_memories(
+        self,
+        query: str,
+        owner_id: str | None = None,
+        memory_type: str | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        """语义相似记忆检索。"""
+        query_vector = self._embed_fn(query)
+        filter_payload: dict[str, Any] = {}
+        if owner_id is not None:
+            filter_payload["owner_id"] = owner_id
+        if memory_type is not None:
+            filter_payload["memory_type"] = memory_type
+        return await self._adapter.search(
+            self._collection,
+            query_vector,
+            limit=limit,
+            filter_payload=filter_payload or None,
+        )
+
+    @staticmethod
+    def _deterministic_embed(text: str) -> list[float]:
+        """确定性 hash embedding（仅用于测试/开发，非生产质量）。
+
+        将文本 hash 映射到固定维度伪向量。
+        生产环境应注入真正的 embedding 函数。
+        """
+        dim = 128
+        h = hashlib.sha256(text.encode()).digest()
+        vector = []
+        for i in range(dim):
+            byte_idx = i % len(h)
+            vector.append(float(h[byte_idx]) / 255.0 - 0.5)
+        return vector

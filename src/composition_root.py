@@ -32,14 +32,19 @@ def bootstrap() -> None:
     # Import all domain ports for registration
     # Storage layer ports
     from src.application.ports.compressor_service import CompressorService
+
+    # Application layer ports
+    from src.application.ports.document_storage_port import DocumentStoragePort
     from src.application.ports.event_subscriber import EventSubscriber
     from src.application.ports.exception_metrics_port import ExceptionMetricsPort
+    from src.application.ports.memory_file_port import MemoryFilePort
+    from src.application.ports.memory_graph_port import MemoryGraphPort
+    from src.application.ports.memory_vector_port import MemoryVectorPort
     from src.application.ports.metrics_port import MetricsPort
     from src.application.ports.public_blackboard import PublicBlackboard
     from src.application.ports.sandbox_port import SandboxExecutor
-
-    # Application layer ports
     from src.application.ports.semantic_cache import SemanticCache
+    from src.application.ports.session_cache_port import SessionCachePort
     from src.application.ports.text_extractor_service import TextExtractorService
     from src.domain.ports.audit_repository import AuditRepositoryPort
     from src.domain.ports.audit_service import AuditServicePort
@@ -488,6 +493,58 @@ def bootstrap() -> None:
         module="src.infrastructure.routing.semantic_router",
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",
+    )
+
+    # === Rule 4: Application Port Implementations ===
+    register_port(
+        name="memory_file_storage",
+        version="v1.0.0",
+        interface=MemoryFilePort,
+        impl="src.infrastructure.storage.memory_file_storage.MemoryFileStorage",
+        module="src.infrastructure.storage.memory_file_storage",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
+    register_port(
+        name="session_cache",
+        version="v1.0.0",
+        interface=SessionCachePort,
+        impl="src.infrastructure.storage.redis.redis_session_cache.RedisSessionCache",
+        module="src.infrastructure.storage.redis.redis_session_cache",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+        tags=("redis", "session"),
+    )
+
+    register_port(
+        name="memory_vector_storage",
+        version="v1.0.0",
+        interface=MemoryVectorPort,
+        impl="src.infrastructure.storage.qdrant.qdrant_memory_vector_storage.QdrantMemoryVectorStorage",
+        module="src.infrastructure.storage.qdrant.qdrant_memory_vector_storage",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
+    register_port(
+        name="document_storage",
+        version="v1.0.0",
+        interface=DocumentStoragePort,
+        impl="src.infrastructure.storage.minio.minio_document_storage.MinIODocumentStorage",
+        module="src.infrastructure.storage.minio.minio_document_storage",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
+    register_port(
+        name="memory_graph_storage",
+        version="v1.0.0",
+        interface=MemoryGraphPort,
+        impl="src.infrastructure.storage.neo4j.neo4j_memory_graph_storage.Neo4jMemoryGraphStorage",
+        module="src.infrastructure.storage.neo4j.neo4j_memory_graph_storage",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))
