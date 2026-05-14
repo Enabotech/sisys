@@ -1,13 +1,13 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v3.1
-**日期:** 2026-05-13
+**版本:** v4.0
+**日期:** 2026-05-14
 **状态:** 设计阶段
-**审查状态:** v3.0 语义缓存TTL一致性设计
+**审查状态:** v4.0 文档完善
 
 ---
 
-## 修订说明 (v3.0)
+## 修订说明 (v4.0)
 
 | 审查问题 | 严重程度 | 修订内容 |
 |----------|----------|----------|
@@ -26,6 +26,12 @@
 | Qdrant/Redis TTL不一致导致伪命中 | **P0** | Qdrant payload 存 {cache_key, response}，Redis过期后从payload回填 |
 | Qdrant写入失败导致孤儿Redis key | **P1** | 写入顺序：先写Qdrant再写Redis |
 | §3.5 旧实现使用全表扫描O(n) | **P0** | 替换为Qdrant ANN索引 + Redis双组件设计 |
+| 四层模型MemoryCachePort自相矛盾 | **P0** | Layer 2/4移除不存在的MemoryCachePort，RedisMemoryCache直接实现L1CachePort |
+| Phase 5.4与Qdrant设计矛盾 | **P0** | "实现纯Python余弦相似度"改为"集成Qdrant ANN检索" |
+| §2.2缺少invalidate方法 | **P0** | SemanticCachePort补充invalidate(cache_key)方法 |
+| Layer 2引用Layer 3具体类名 | **P1** | §3.2设计说明改为"组合L1CachePort实例" |
+| §1.1 L1CachePort标记不准 | **P1** | 改为"⚠️专用接口，待重构为通用接口" |
+| §1.1补充遗漏端口 | **P1** | 补充PublicBlackboard/EventPublisher/EventSubscriber接口行 |
 
 ---
 
@@ -35,9 +41,12 @@
 
 | 接口 | 位置 | 方法签名 | 问题 |
 |------|------|----------|------|
-| `L1CachePort` | `src/domain/ports/l1_cache.py` | `get(key: str)`, `set(key, value, ttl)`, `delete(key)` | ✅ 通用接口 |
+| `L1CachePort` | `src/domain/ports/l1_cache.py` | `get(memory_type, owner_id, name)`, `set(...)`, `delete(...)`, `invalidate_pattern(...)` | ⚠️ 专用接口，待重构为通用接口 |
 | `SemanticCache` | `src/application/ports/semantic_cache.py` | `get(query_embedding, threshold)`, `set(query_embedding, result, ttl)`, `invalidate(cache_key)` | ❌ 未继承L1CachePort，方法命名不规范 |
-| `SessionStorage` | `src/domain/ports/session_storage.py` | `save(session_id, agent_id, state, ttl)`, `load(session_id)`, `delete(session_id)`, `exists(session_id)` | ❌ 未继承L1CachePort |
+| `SessionStorage` | `src/domain/ports/session_storage.py` | `save/load/delete/exists` | — 独立接口，不应继承L1CachePort |
+| `PublicBlackboard` | `src/application/ports/public_blackboard.py` | `post/get/get_by_agent/get_latest` | — 独立接口 |
+| `EventPublisher` | `src/application/ports/event_subscriber.py` | `publish(event)` | — 独立接口 |
+| `EventSubscriber` | `src/application/ports/event_subscriber.py` | `subscribe/start/close` | — 独立接口 |
 
 **问题说明：**
 - `SemanticCache` 应改名为 `SemanticCachePort` 并继承 `L1CachePort`
@@ -140,20 +149,23 @@ decode_responses=True  # 重复
 │  位置：src/domain/ports/l1_cache.py                              │
 │  特点：领域层零依赖，纯抽象协议                                     │
 └─────────────────────────────────────────────────────────────────┘
-                              ↑
+                              ↑ 继承
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Application/Domain Layer - 具体应用缓存端口              │
+│  Layer 2: Application Layer - 语义缓存端口                        │
 │                                                                  │
-│  职责：继承L1CachePort，定义特定场景缓存能力                       │
-│  位置：src/application/ports/                                     │
-│  端口：                                                          │
-│    - SemanticCachePort(L1CachePort, ...) ⚠️ 当前为SemanticCache，未继承│
-│    - MemoryCachePort ❌ 不存在，实际由RedisMemoryCache直接实现L1CachePort│
-│    - SessionStorage ❌ 不应继承L1CachePort（语义不同：会话管理vs缓存）│
+│  职责：继承L1CachePort，扩展语义检索能力                           │
+│  位置：src/application/ports/semantic_cache.py                    │
+│  端口：SemanticCachePort(L1CachePort, Protocol)                   │
+│  新增方法：get_by_embedding / set_with_embedding / invalidate    │
+│                                                                  │
+│  不纳入四层继承的端口（保持独立）：                                 │
+│    - SessionStorage (会话管理，语义不同，不继承L1CachePort)         │
+│    - PublicBlackboard (公共黑板，独立端口)                         │
+│    - EventPublisher/EventSubscriber (事件通道，独立端口)           │
 └─────────────────────────────────────────────────────────────────┘
-                              ↑
+                              ↑ 实现
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: Infrastructure - Redis技术实现 + 缓存管理                │
+│  Layer 3: Infrastructure - Redis技术实现 + 连接池管理              │
 │                                                                  │
 │  职责：实现L1CachePort接口 + Redis连接池统一管理                   │
 │  位置：src/infrastructure/storage/redis/                           │
@@ -162,17 +174,17 @@ decode_responses=True  # 重复
 │    - RedisL1CacheAdapter (实现L1CachePort)                        │
 │  特点：技术可替换（未来可新增MemcachedAdapter等）                  │
 └─────────────────────────────────────────────────────────────────┘
-                              ↑
+                              ↑ 实现 + 组合
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 4: Infrastructure - 具体应用缓存端口实现                     │
+│  Layer 4: Infrastructure - 语义缓存端口实现                       │
 │                                                                  │
-│  职责：实现具体应用缓存端口（SemanticCachePort等）                 │
+│  职责：实现SemanticCachePort，组合Layer 3组件                      │
 │  位置：src/infrastructure/storage/redis/                           │
 │  组件：                                                          │
 │    - RedisSemanticCacheAdapter (实现SemanticCachePort)           │
-│      └─ 组合RedisL1CacheAdapter处理基础缓存                       │
-│    - RedisMemoryCache (已有，实现MemoryCachePort)                 │
-│      └─ 改为组合RedisL1CacheAdapter                              │
+│      ├─ QdrantClient: 向量存储与语义检索（ANN索引）               │
+│      └─ RedisL1CacheAdapter: 基础缓存能力（带TTL管理）            │
+│    - RedisMemoryCache (直接实现L1CachePort，无中间端口)           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -191,6 +203,7 @@ class SemanticCachePort(L1CachePort, Protocol):
     """语义缓存接口 - 继承L1CachePort"""
     async def get_by_embedding(self, query_embedding: list[float], threshold: float) -> dict | None: ...
     async def set_with_embedding(self, query_embedding: list[float], result: dict, ttl: int) -> None: ...
+    async def invalidate(self, cache_key: str) -> None: ...
 
 # Layer 3: Infrastructure Redis技术实现
 class RedisL1CacheAdapter(L1CachePort):
@@ -262,9 +275,9 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 | Layer | 名称 | 职责 | 技术依赖 |
 |-------|------|------|----------|
 | Layer 1 | Domain Layer | 定义纯抽象接口，零外部依赖 | 无 |
-| Layer 2 | Application/Domain Layer | 定义业务语义接口，继承Layer 1 | 无 |
+| Layer 2 | Application Layer | 定义业务语义接口，继承Layer 1 | 无 |
 | Layer 3 | Infrastructure - 技术实现 | 实现底层存储能力，管理连接池 | Redis |
-| Layer 4 | Infrastructure - 业务实现 | 实现业务接口，委托Layer 3 | Redis + Layer 3组件 |
+| Layer 4 | Infrastructure - 业务实现 | 实现业务接口，组合Layer 3组件 | Redis + Qdrant |
 
 ### 2.4 SessionStorage评估
 
@@ -325,7 +338,7 @@ class SemanticCachePort(L1CachePort, Protocol):
 - 继承 `L1CachePort` 获得基础缓存能力（`get/set/delete`）
 - `threshold=0.95`：语义相似度阈值，越高越精确
 - `ttl=3600`：默认1小时过期
-- 具体实现委托 `RedisL1CacheAdapter` 处理基础缓存操作
+- 具体实现通过组合 `L1CachePort` 实例获得基础缓存能力
 
 ### 3.3 Layer 3: RedisPoolProvider
 
@@ -340,7 +353,7 @@ class RedisPoolProvider:                          # 单例模式
     @classmethod
     def init(cls, config: RedisConfig): ...       # 初始化连接池（仅一次）
     @classmethod
-    def get_client(cls) -> aioredis.Redis: ...    # 获取客户端（未初始化则抛RuntimeError）
+    def get_client(cls) -> redis.asyncio.Redis: ...    # 获取客户端（未初始化则抛RuntimeError）
     @classmethod
     async def close_async(cls): ...               # 异步关闭连接池
     @classmethod
@@ -488,7 +501,7 @@ print('Phase 1: SUCCESS')
 - [ ] 5.1 创建 `src/infrastructure/storage/redis/semantic_cache_adapter.py`
 - [ ] 5.2 实现 `SemanticCachePort` 接口（继承L1CachePort + 语义方法）
 - [ ] 5.3 组合 `RedisL1CacheAdapter`：委托基础缓存操作
-- [ ] 5.4 实现纯Python余弦相似度计算（不使用numpy）
+- [ ] 5.4 集成 Qdrant 客户端进行 ANN 向量检索（替代旧版全表扫描）
 
 ---
 
@@ -713,15 +726,20 @@ def shutdown() -> None:
 | 4 | 6个Adapter独立ConnectionPool，max_connections硬编码 | P0 | infrastructure/storage/redis/*.py |
 | 5 | RedisConfig默认值不一致(class=10 vs from_env()=100) | P0 | src/infrastructure/config/redis.py |
 | 6 | RedisSemanticCache不使用Qdrant，使用低效全表扫描O(n) | P0 | src/infrastructure/storage/redis/semantic_cache.py |
-| 7 | IdempotencyChecker硬编码连接参数，绕过RedisConfig | P0 | src/infrastructure/messaging/retry/checker.py |
+
+### P1问题清单
+
+| # | 问题 | 严重性 | 文件位置 |
+|---|------|--------|----------|
+| 7 | IdempotencyChecker硬编码连接参数，绕过RedisConfig | P1 | src/infrastructure/messaging/retry/checker.py |
 | 8 | 构造函数签名不统一(RedisMemoryCache vs RedisSemanticCache) | P1 | - |
-| 9 | SessionStorage不应继承L1CachePort（语义不同），但被列为继承候选 | P1 | 文档描述问题 |
+| 9 | SessionStorage不应继承L1CachePort（语义不同）— 已明确为独立接口 | P1 | 文档已修正 |
 
 ### 修复方案
 
 | # | 问题 | 修复方案 | 优先级 |
 |---|------|----------|--------|
-| 1 | SemanticCache未继承L1CachePort | 将SemanticCache重命名SemanticCachePort，继承L1CachePort，方法名改为get_by_embedding/set_with_embedding | P0 |
+| 1 | SemanticCache未继承L1CachePort | 将SemanticCache重命名SemanticCachePort，继承L1CachePort，方法名改为get_by_embedding/set_with_embedding/invalidate | P0 |
 | 2 | L1CachePort专用接口 | 重构为通用接口get(key)/set(key,value,ttl)/delete(key)，调用方组合key | P0 |
 | 3 | Phase文件不存在 | 创建pool_provider.py(单例连接池)、l1_cache_adapter.py、semantic_cache_adapter.py | P0 |
 | 4 | 独立ConnectionPool | 各Adapter接受外部redis_client注入，委托RedisPoolProvider获取连接 | P0 |
@@ -730,16 +748,7 @@ def shutdown() -> None:
 | 7 | IdempotencyChecker硬编码 | 重构为接受RedisConfig，复用连接池管理 | P1 |
 | 8 | 构造函数签名不统一 | 统一为接受外部redis_client注入模式 | P1 |
 
-### 一致性问题（Round 5发现）
-
-| 问题 | 说明 |
-|------|------|
-| 版本号首尾不一致 | 文档头部v2.3，末尾v2.0 |
-| 执行进度总览与Phase标题矛盾 | Phase 1/3/5进度总览显示"文件不存在"但章节标题带✅ |
-| 四层模型自相矛盾 | Layer 2说MemoryCachePort不存在，Layer 4说RedisMemoryCache实现MemoryCachePort |
-| 现状vs目标状态混淆 | 接口图展示目标状态(继承)，但描述说"未继承"(现状) |
-
 ---
 
-*文档版本: v3.1*
+*文档版本: v4.0*
 *重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*
