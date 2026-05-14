@@ -1,6 +1,6 @@
 # SISYS L1缓存层重构设计方案
 
-**版本:** v3.0
+**版本:** v3.1
 **日期:** 2026-05-13
 **状态:** 设计阶段
 **审查状态:** v3.0 语义缓存TTL一致性设计
@@ -192,46 +192,26 @@ class SemanticCachePort(L1CachePort, Protocol):
     async def get_by_embedding(self, query_embedding: list[float], threshold: float) -> dict | None: ...
     async def set_with_embedding(self, query_embedding: list[float], result: dict, ttl: int) -> None: ...
 
-# Layer 3: Infrastructure Redis实现
+# Layer 3: Infrastructure Redis技术实现
 class RedisL1CacheAdapter(L1CachePort):
-    """Redis通用缓存实现"""
-    def __init__(self, redis_client: aioredis.Redis | None = None): ...
+    """Redis通用缓存实现 — 支持 PoolProvider 注入"""
+    def __init__(self, redis_client=None): ...          # 委托 RedisPoolProvider.get_client()
 
-# Layer 4: Infrastructure具体应用实现
+# Layer 4: Infrastructure Qdrant + Redis 双组件实现
 class RedisSemanticCacheAdapter(SemanticCachePort):
-    """语义缓存适配器 - Qdrant + Redis 双组件设计"""
-    def __init__(
-        self,
-        qdrant_client: QdrantClient,
-        redis_client: aioredis.Redis | None = None,
-    ):
-        self._qdrant = qdrant_client
-        self._base = RedisL1CacheAdapter(redis_client)
+    """语义缓存适配器 — Qdrant(语义检索) + Redis(内容缓存)"""
+    def __init__(self, qdrant_client, redis_client=None):
+        self._qdrant = qdrant_client                    # Qdrant: 向量存储与语义检索
+        self._base = RedisL1CacheAdapter(redis_client)  # Redis: 基础缓存能力
 
-    async def get_by_embedding(self, query_embedding, threshold):
-        # 1. Qdrant.search(embedding, limit=1, score_threshold) → 命中
-        # 2. 从 payload 获取 cache_key → Redis.GET(cache_key)
-        #    - Redis 命中 → 直接返回（热路径）
-        #    - Redis 未命中 → 从 payload 取 response 回填 Redis → 返回
-        # 3. Qdrant 未命中 → 返回 None
-        ...
+    # L1CachePort 继承方法（委托给 _base）
+    async def get(key):        → self._base.get(key)
+    async def set(key, v, ttl): → self._base.set(key, v, ttl)
+    async def delete(key):     → self._base.delete(key)
 
-    async def set_with_embedding(self, query_embedding, result, ttl):
-        # 写入顺序：先写 Qdrant → 再写 Redis（避免 Qdrant 失败产生孤儿 key）
-        # 1. 生成 cache_key
-        # 2. Qdrant.upsert(embedding, payload={cache_key, response})
-        # 3. Redis.SET(cache_key, response, EX=ttl)
-        ...
-
-    # 继承L1CachePort基础方法
-    async def get(self, key: str) -> str | None:
-        return await self._base.get(key)
-
-    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        return await self._base.set(key, value, ttl)
-
-    async def delete(self, key: str) -> bool:
-        return await self._base.delete(key)
+    # SemanticCachePort 语义方法（见 §2.2.1 工作流程）
+    async def get_by_embedding(query_embedding, threshold): ...
+    async def set_with_embedding(query_embedding, result, ttl): ...
 ```
 
 ### 2.2.1 语义缓存工作流程
@@ -310,567 +290,131 @@ class RedisSemanticCacheAdapter(SemanticCachePort):
 **文件：** `src/domain/ports/l1_cache.py`
 
 ```python
-"""L1CachePort — L1 缓存存储抽象端口。
-
-通用缓存抽象，所有具体缓存实现必须实现此接口。
-"""
-
-from __future__ import annotations
-
-from typing import Protocol
-
-
 class L1CachePort(Protocol):
-    """L1 缓存存储接口（通用底层抽象）。
+    """L1 通用缓存接口 — 领域层零依赖，技术无关"""
 
-    设计原则：
-    - 领域层零外部依赖（仅用 abc + typing）
-    - 异步优先（async def）
-    - 技术无关（可使用Redis/Memcached/内存等实现）
-
-    所有具体缓存实现（如SemanticCache、MemoryCache）继承此接口，
-    获得基础缓存能力。
-    """
-
-    async def get(self, key: str) -> str | None:
-        """获取缓存。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            缓存值，不存在返回None
-        """
-
-    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """设置缓存。
-
-        Args:
-            key: 缓存键
-            value: 缓存值
-            ttl: 过期时间（秒），None使用默认TTL
-
-        Returns:
-            是否成功
-        """
-
-    async def delete(self, key: str) -> bool:
-        """删除缓存。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            是否成功
-        """
+    async def get(self, key: str) -> str | None: ...
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool: ...
+    async def delete(self, key: str) -> bool: ...
 ```
+
+**设计原则：**
+- 领域层零外部依赖（仅用 `typing.Protocol`）
+- 异步优先（`async def`）
+- 技术无关（可使用 Redis/Memcached/内存等实现）
+- `ttl=None` 时由实现方决定默认值（如 24h-30h 随机避免雪崩）
 
 ### 3.2 Layer 2: 重构SemanticCachePort
 
 **文件：** `src/application/ports/semantic_cache.py`
 
 ```python
-"""SemanticCache Protocol — 语义缓存应用层接口。
-
-继承L1CachePort，提供基于向量相似度的缓存能力。
-"""
-
-from __future__ import annotations
-
-from abc import abstractmethod
-from typing import Protocol
-
-from src.domain.ports.l1_cache import L1CachePort
-
-
 class SemanticCachePort(L1CachePort, Protocol):
-    """语义缓存协议接口。
-
-    支持基于向量相似度的缓存查询和存储。
-    继承L1CachePort获得基础缓存能力。
-
-    具体实现（如RedisSemanticCacheAdapter）委托L1CacheAdapter
-    处理基础缓存操作。
-    """
+    """语义缓存接口 — 继承L1CachePort，扩展语义检索能力"""
 
     async def get_by_embedding(
-        self,
-        query_embedding: list[float],
-        threshold: float = 0.9,
-    ) -> dict | None:
-        """通过向量嵌入查询缓存。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            threshold: 相似度阈值（0.0-1.0）
-
-        Returns:
-            缓存结果，如果未命中则返回 None
-        """
-
+        self, query_embedding: list[float], threshold: float = 0.95,
+    ) -> dict | None: ...
     async def set_with_embedding(
-        self,
-        query_embedding: list[float],
-        result: dict,
-        ttl: int = 86400,
-    ) -> None:
-        """存储带向量嵌入的缓存。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            result: 缓存结果数据
-            ttl: 过期时间（秒），默认24小时
-        """
-
-    async def invalidate(self, cache_key: str) -> None:
-        """使缓存失效。
-
-        Args:
-            cache_key: 缓存键
-        """
+        self, query_embedding: list[float], result: dict, ttl: int = 3600,
+    ) -> None: ...
+    async def invalidate(self, cache_key: str) -> None: ...
 ```
+
+**设计说明：**
+- 继承 `L1CachePort` 获得基础缓存能力（`get/set/delete`）
+- `threshold=0.95`：语义相似度阈值，越高越精确
+- `ttl=3600`：默认1小时过期
+- 具体实现委托 `RedisL1CacheAdapter` 处理基础缓存操作
 
 ### 3.3 Layer 3: RedisPoolProvider
 
 **文件：** `src/infrastructure/storage/redis/pool_provider.py`
 
+**职责：** Redis 连接池单例，在 `composition_root` 初始化时创建，所有 Adapter 复用。
+
 ```python
-"""Redis连接池统一提供者（单例模式）。
-
-在composition_root初始化时创建单一连接池，
-所有Adapter复用此连接池，实现资源统一管理。
-
-遵循六边形架构：
-- 资源管理封装在Infrastructure层
-- Domain层完全不感知连接池存在
-
-设计考虑：
-- 单例模式确保全局唯一连接池
-- 支持异步和同步两种关闭方式
-- 测试时可替换为mock
-"""
-
-from __future__ import annotations
-
-import asyncio
-import logging
-from typing import TYPE_CHECKING, Final
-
-import redis.asyncio as aioredis
-
-from src.infrastructure.config.redis import RedisConfig
-
-if TYPE_CHECKING:
-    pass
-
-logger = logging.getLogger(__name__)
-
-# Redis官方推荐：max_connections = CPU_cores * 2，通常50-100
-DEFAULT_MAX_CONNECTIONS: Final[int] = 100
-
-
-class RedisPoolProvider:
-    """Redis连接池统一提供者（单例模式）。
-
-    Attributes:
-        _instance: 单例实例
-        _pool: 连接池
-        _config: Redis配置
-    """
-
-    _instance: RedisPoolProvider | None = None
-    _pool: aioredis.ConnectionPool | None = None
-    _config: RedisConfig | None = None
-
-    def __new__(cls) -> RedisPoolProvider:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+class RedisPoolProvider:                          # 单例模式
+    _pool: ConnectionPool | None                  # 全局唯一连接池
 
     @classmethod
-    def init(cls, config: RedisConfig | None = None) -> None:
-        """初始化连接池。
-
-        Args:
-            config: Redis配置，默认从环境变量加载
-        """
-        if cls._pool is not None:
-            logger.warning("RedisPoolProvider already initialized, skipping")
-            return
-
-        config = config or RedisConfig.from_env()
-        cls._config = config
-
-        cls._pool = aioredis.ConnectionPool(
-            host=config.host,
-            port=config.port,
-            db=config.db,
-            password=config.password,
-            max_connections=config.max_connections or DEFAULT_MAX_CONNECTIONS,
-            socket_timeout=config.socket_timeout,
-            socket_connect_timeout=5.0,
-            retry_on_timeout=config.retry_on_timeout,
-            decode_responses=True,
-        )
-        logger.info(
-            "RedisPoolProvider initialized: %s:%d (max_connections=%d)",
-            config.host,
-            config.port,
-            config.max_connections,
-        )
-
+    def init(cls, config: RedisConfig): ...       # 初始化连接池（仅一次）
     @classmethod
-    def get_client(cls) -> aioredis.Redis:
-        """获取Redis客户端实例。
-
-        Returns:
-            Redis异步客户端
-
-        Raises:
-            RuntimeError: 如果provider未初始化
-        """
-        if cls._pool is None:
-            raise RuntimeError(
-                "RedisPoolProvider not initialized. "
-                "Call RedisPoolProvider.init() before use."
-            )
-        return aioredis.Redis(connection_pool=cls._pool)
-
+    def get_client(cls) -> aioredis.Redis: ...    # 获取客户端（未初始化则抛RuntimeError）
     @classmethod
-    def is_initialized(cls) -> bool:
-        """检查provider是否已初始化。"""
-        return cls._pool is not None
-
+    async def close_async(cls): ...               # 异步关闭连接池
     @classmethod
-    async def close_async(cls) -> None:
-        """异步关闭连接池。"""
-        if cls._pool is not None:
-            await cls._pool.aclose()
-            cls._pool = None
-            cls._config = None
-            cls._instance = None
-            logger.info("RedisPoolProvider closed (async)")
-
-    @classmethod
-    def close(cls) -> None:
-        """同步关闭连接池（包装异步方法）。"""
-        if cls._pool is not None:
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(cls.close_async())
-                else:
-                    asyncio.run(cls.close_async())
-            except Exception as e:
-                logger.error("Error closing RedisPoolProvider: %s", e)
-
-    @classmethod
-    def reset(cls) -> None:
-        """重置Provider状态（用于测试）。"""
-        cls._pool = None
-        cls._config = None
-        cls._instance = None
-        logger.info("RedisPoolProvider reset")
+    def reset(cls): ...                           # 重置状态（用于测试）
 ```
+
+**关键约束：**
+- `DEFAULT_MAX_CONNECTIONS = 100`（Redis 官方推荐：CPU cores × 2）
+- `get_client()` 未初始化时抛 `RuntimeError`
+- `reset()` 仅用于测试环境，清理单例状态
 
 ### 3.4 Layer 3: RedisL1CacheAdapter
 
 **文件：** `src/infrastructure/storage/redis/l1_cache_adapter.py`
 
+**职责：** 实现 `L1CachePort` 通用缓存接口，提供 Redis 基础 `get/set/delete` 能力。Layer 4 具体实现可组合委托此适配器。
+
 ```python
-"""Redis L1 缓存通用适配器。
-
-实现L1CachePort接口，提供通用Redis缓存能力。
-所有具体缓存实现（如SemanticCache、MemoryCache）委托此适配器
-处理基础缓存操作。
-
-架构来源: architecture.md §11.2.9
-"""
-
-from __future__ import annotations
-
-import random
-from typing import TYPE_CHECKING, Final
-
-import redis.asyncio as aioredis
-
-from src.domain.ports.l1_cache import L1CachePort
-from src.infrastructure.storage.redis.pool_provider import RedisPoolProvider
-
-if TYPE_CHECKING:
-    pass
-
-# 默认TTL范围 (秒)
-DEFAULT_TTL_MIN: Final[int] = 86400  # 24h
-DEFAULT_TTL_MAX: Final[int] = 108000  # 30h
-
-
 class RedisL1CacheAdapter(L1CachePort):
-    """Redis L1 缓存通用适配器。
-
-    实现L1CachePort接口，提供通用Redis缓存能力。
-    所有具体缓存实现可委托此适配器处理基础缓存操作。
-
-    设计原则：
-    - 单一职责：只处理基础get/set/delete
-    - 可测试：支持注入mock redis client
-    - 可组合：具体缓存实现委托此适配器
-
-    Attributes:
-        _redis: Redis异步客户端
-    """
-
-    def __init__(self, redis_client: aioredis.Redis | None = None):
-        """初始化Redis缓存适配器。
-
-        Args:
-            redis_client: 可选，测试时注入mock client
-        """
+    def __init__(self, redis_client=None):
         self._redis = redis_client or RedisPoolProvider.get_client()
 
-    async def get(self, key: str) -> str | None:
-        """获取缓存。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            缓存值，不存在返回None
-        """
-        value = await self._redis.get(key)
-        if value is None:
-            return None
-        return value.decode("utf-8") if isinstance(value, bytes) else value
-
-    async def set(
-        self,
-        key: str,
-        value: str,
-        ttl: int | None = None,
-    ) -> bool:
-        """设置缓存。
-
-        Args:
-            key: 缓存键
-            value: 缓存值
-            ttl: 过期时间（秒），None使用随机TTL（24-30h）
-
-        Returns:
-            是否成功
-        """
-        effective_ttl = ttl if ttl is not None else self._generate_ttl()
-        await self._redis.setex(key, effective_ttl, value)
-        return True
-
-    async def delete(self, key: str) -> bool:
-        """删除缓存。
-
-        Args:
-            key: 缓存键
-
-        Returns:
-            是否成功（key存在且删除返回True）
-        """
-        result = await self._redis.delete(key)
-        return result > 0
-
-    def _generate_ttl(self) -> int:
-        """生成随机TTL。
-
-        Returns:
-            TTL秒数 (86400-108000)
-        """
-        return DEFAULT_TTL_MIN + random.randint(0, DEFAULT_TTL_MAX - DEFAULT_TTL_MIN)  # nosec B311
+    async def get(key) -> str | None:     # Redis.GET → 解码bytes
+    async def set(key, value, ttl):       # Redis.SETEX → ttl=None时随机24-30h
+    async def delete(key) -> bool:        # Redis.DELETE → 返回是否实际删除
 ```
+
+**关键设计：**
+- 可测试：构造函数支持注入 mock `redis_client`
+- 可组合：Layer 4 实现委托此适配器处理基础缓存操作
+- TTL 随机化：`DEFAULT_TTL = random(86400, 108000)` 避免缓存雪崩
 
 ### 3.5 Layer 4: RedisSemanticCacheAdapter
 
 **文件：** `src/infrastructure/storage/redis/semantic_cache_adapter.py`
 
-**设计核心：** Qdrant + Redis 双组件（§2.2.1 工作流程，§2.2.2 TTL一致性设计）
+**设计核心：** Qdrant + Redis 双组件（§2.2.1 工作流程，§2.2.2 TTL 一致性设计）
 
 ```python
-"""语义缓存适配器 — Qdrant + Redis 双组件设计。
-
-实现SemanticCachePort接口，提供基于向量相似度的缓存能力。
-
-组件职责：
-- Qdrant: 向量存储与语义检索（ANN索引，高性能）
-- Redis: 缓存实际响应内容（带TTL管理，热路径加速）
-
-TTL一致性（§2.2.2）：
-- Qdrant payload 存储 {cache_key, response}，作为降级数据源
-- Redis 过期后从 payload 回填，避免"幽灵向量"问题
-"""
-
-from __future__ import annotations
-
-import hashlib
-import logging
-from typing import TYPE_CHECKING, Any
-
-import redis.asyncio as aioredis
-
-from src.application.ports.semantic_cache import SemanticCachePort
-from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
-from src.infrastructure.storage.redis.l1_cache_adapter import RedisL1CacheAdapter
-from src.infrastructure.utils import json_dumps, json_loads
-
-if TYPE_CHECKING:
-    from qdrant_client import QdrantClient
-
-logger = logging.getLogger(__name__)
-
-COLLECTION_NAME = "semantic_cache"
-
-
 class RedisSemanticCacheAdapter(SemanticCachePort):
-    """语义缓存适配器 — Qdrant + Redis 双组件。
+    """Qdrant(语义检索) + Redis(内容缓存+TTL) 双组件"""
 
-    Components:
-        _qdrant: Qdrant client (向量存储与语义检索)
-        _base: RedisL1CacheAdapter (基础缓存，带TTL管理)
-    """
+    def __init__(self, qdrant_client, redis_client=None, metrics_collector=None):
+        self._qdrant = qdrant_client          # Qdrant: 向量存储与语义检索
+        self._base = RedisL1CacheAdapter(...)  # Redis: 基础缓存能力
 
-    _NAMESPACE = "cache:semantic"
+    # --- L1CachePort 继承方法（委托给 _base）---
+    async def get(key) -> str | None:          return await self._base.get(key)
+    async def set(key, value, ttl) -> bool:    return await self._base.set(key, value, ttl)
+    async def delete(key) -> bool:             return await self._base.delete(key)
 
-    def __init__(
-        self,
-        qdrant_client: QdrantClient,
-        redis_client: aioredis.Redis | None = None,
-        metrics_collector: EventMetricsCollector | None = None,
-    ):
-        self._qdrant = qdrant_client
-        self._base = RedisL1CacheAdapter(redis_client)
-        self._metrics_collector = metrics_collector
+    # --- SemanticCachePort 语义方法 ---
+    async def get_by_embedding(query_embedding, threshold=0.95) -> dict | None:
+        # 1. Qdrant.search(embedding, limit=1, score_threshold) → 命中
+        # 2. Redis.GET(cache_key) 命中 → 直接返回（热路径）
+        # 3. Redis 未命中 → 从 payload 取 response 回填 Redis → 返回
+        # 4. Qdrant 未命中 → 返回 None
 
-    def _build_cache_key(self, query_embedding: list[float]) -> str:
-        """Generate cache key from embedding vector."""
-        quantized = [round(v, 6) for v in query_embedding[:10]]
-        vector_id = hashlib.md5(
-            str(quantized).encode(),
-            usedforsecurity=False,
-        ).hexdigest()[:16]
-        return f"{self._NAMESPACE}:vec:{vector_id}"
+    async def set_with_embedding(query_embedding, result, ttl=3600) -> None:
+        # 写入顺序：先 Qdrant → 再 Redis（§2.2.2 写入顺序）
+        # 1. Qdrant.upsert(embedding, payload={cache_key, response, ttl})
+        # 2. Redis.SET(cache_key, response, EX=ttl)
 
-    # --- L1CachePort inherited methods (delegate to _base) ---
-
-    async def get(self, key: str) -> str | None:
-        return await self._base.get(key)
-
-    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        return await self._base.set(key, value, ttl)
-
-    async def delete(self, key: str) -> bool:
-        return await self._base.delete(key)
-
-    # --- SemanticCachePort methods ---
-
-    async def get_by_embedding(
-        self,
-        query_embedding: list[float],
-        threshold: float = 0.95,
-    ) -> dict | None:
-        """Semantic cache lookup: Qdrant search → Redis GET → payload fallback.
-
-        Flow (§2.2.1):
-        1. Qdrant.search(embedding, limit=1, score_threshold)
-        2. Hit → get cache_key from payload → Redis.GET(cache_key)
-           - Redis hit → return (hot path, low latency)
-           - Redis miss → get response from payload → backfill Redis → return
-        3. Miss → return None
-        """
-        # Step 1: Qdrant semantic search
-        search_results = self._qdrant.search(
-            collection_name=COLLECTION_NAME,
-            query_vector=query_embedding,
-            limit=1,
-            score_threshold=threshold,
-        )
-
-        if not search_results:
-            if self._metrics_collector:
-                self._metrics_collector.record_cache_miss()
-            logger.debug("Semantic cache miss")
-            return None
-
-        hit = search_results[0]
-        payload = hit.payload or {}
-
-        # Step 2a: Try Redis hot path
-        cache_key = payload.get("cache_key")
-        if cache_key:
-            redis_value = await self._base.get(cache_key)
-            if redis_value is not None:
-                if self._metrics_collector:
-                    self._metrics_collector.record_cache_hit()
-                logger.debug(
-                    "Semantic cache hit (Redis hot path, score=%.4f)", hit.score
-                )
-                return json_loads(redis_value)
-
-        # Step 2b: Fallback to Qdrant payload (Redis expired)
-        response_data = payload.get("response")
-        if response_data is not None:
-            # Backfill Redis for next hot path hit
-            if cache_key:
-                ttl = payload.get("ttl", 3600)
-                await self._base.set(cache_key, json_dumps(response_data), ttl=ttl)
-            if self._metrics_collector:
-                self._metrics_collector.record_cache_hit()
-            logger.debug(
-                "Semantic cache hit (Qdrant fallback + Redis backfill, score=%.4f)",
-                hit.score,
-            )
-            return response_data
-
-        # Payload corrupt
-        logger.warning("Qdrant hit but payload missing cache_key and response")
-        return None
-
-    async def set_with_embedding(
-        self,
-        query_embedding: list[float],
-        result: dict,
-        ttl: int = 3600,
-    ) -> None:
-        """Store semantic cache: Qdrant first → Redis second (§2.2.2 write order).
-
-        Write order rationale:
-        - Qdrant failure → skip caching entirely (no orphan data)
-        - Redis failure → Qdrant has full payload, next hit can backfill
-        """
-        cache_key = self._build_cache_key(query_embedding)
-
-        # Step 1: Write Qdrant (payload stores cache_key + response for TTL consistency)
-        self._qdrant.upsert(
-            collection_name=COLLECTION_NAME,
-            points=[{
-                "id": cache_key,
-                "vector": query_embedding,
-                "payload": {
-                    "cache_key": cache_key,
-                    "response": result,
-                    "ttl": ttl,
-                },
-            }],
-        )
-
-        # Step 2: Write Redis (hot path acceleration with TTL)
-        await self._base.set(cache_key, json_dumps(result), ttl=ttl)
-        logger.debug("Semantic cache stored: key=%s, ttl=%d", cache_key, ttl)
-
-    async def invalidate(self, cache_key: str) -> None:
-        """Invalidate cache in both Qdrant and Redis."""
-        # Delete from Redis
-        await self._base.delete(cache_key)
-        # Delete from Qdrant
-        self._qdrant.delete(
-            collection_name=COLLECTION_NAME,
-            points_selector=[cache_key],
-        )
-        logger.debug("Semantic cache invalidated: %s", cache_key)
+    async def invalidate(cache_key) -> None:
+        # 删除 Qdrant 点 + Redis key
 ```
+
+**组件职责划分：**
+
+| 组件 | 职责 | 存储内容 |
+|------|------|----------|
+| Qdrant | 向量存储与语义检索（ANN索引） | `{cache_key, response, ttl}` |
+| Redis | 热路径加速缓存（带 TTL 管理） | `cache_key → response` |
+| RedisL1CacheAdapter | 基础缓存操作 | 通用 key/value |
 
 ---
 
@@ -1197,5 +741,5 @@ def shutdown() -> None:
 
 ---
 
-*文档版本: v3.0*
+*文档版本: v3.1*
 *重构目标: 建立四层缓存架构，统一连接池管理，使用checkbox跟踪执行进度*
