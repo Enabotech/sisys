@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+import redis.asyncio as aioredis
+
 from src.domain.ports.registry import (
     Lifetime,
     _global_registry,
@@ -55,6 +57,9 @@ def bootstrap() -> None:
     # Other domain ports
     # Compliance ports
     from src.domain.ports.compliance_gateway import ComplianceGatewayPort
+
+    # Connection manager
+    from src.domain.ports.connection_manager import ConnectionManager
     from src.domain.ports.cross_border_transfer_service import CrossBorderTransferServicePort
     from src.domain.ports.data_residency_enforcer import DataResidencyEnforcerPort
 
@@ -84,6 +89,31 @@ def bootstrap() -> None:
     from src.domain.ports.whitelist_service import WhitelistServicePort
 
     # === Storage Layer ===
+    from src.infrastructure.config.redis import RedisConfig
+    from src.infrastructure.storage.redis.redis_connection_manager import RedisConnectionManager
+
+    register_port(
+        name="redis_connection_manager",
+        version="v1.0.0",
+        interface=ConnectionManager,
+        impl=lambda resolver: RedisConnectionManager(RedisConfig()),
+        module="src.infrastructure.storage.redis.redis_connection_manager",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("redis", "infrastructure"),
+    )
+
+    register_port(
+        name="redis_client",
+        version="v1.0.0",
+        interface=aioredis.Redis,
+        impl=lambda resolver: resolver.resolve("redis_connection_manager").get_client(),
+        module="src.infrastructure.storage.redis.redis_connection_manager",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+        tags=("redis", "infrastructure"),
+    )
+
     register_port(
         name="l0_storage",
         version="v1.0.0",

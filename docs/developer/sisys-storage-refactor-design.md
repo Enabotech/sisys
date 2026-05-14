@@ -1235,7 +1235,7 @@ def bootstrap() -> None:
 - [x] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
 - [x] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
 - [x] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
-- [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（延迟，已有各ClientWrapper延迟初始化）
+- [x] 3.6 创建统一 `ConnectionManager` Protocol（@runtime_checkable）+ `RedisConnectionManager` 集中管理连接池；4个Redis组件（session_storage/semantic_cache/public_blackboard/cleanup）改为注入aioredis.Redis；composition_root注册redis_connection_manager+redis_client工厂
 - [x] 3.7 注册所有 Rule 3 基础端口到 Composition Root：
   - [x] 3.7.1 新增 l3_vector 端口注册
   - [x] 3.7.2 新增 l4_object 端口注册

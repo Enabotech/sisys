@@ -5,16 +5,12 @@ from __future__ import annotations
 import fakeredis.aioredis
 import pytest
 
-from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
 
 
 def _create_blackboard(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisPublicBlackboard:
-    """创建使用 fake Redis 的 PublicBlackboard。"""
-    config = RedisConfig()
-    board = RedisPublicBlackboard(config)
-    board._pool = fake_redis.connection_pool
-    return board
+    """Create PublicBlackboard using fake Redis client."""
+    return RedisPublicBlackboard(redis_client=fake_redis)
 
 
 class TestRedisPublicBlackboard:
@@ -131,21 +127,9 @@ class TestRedisPublicBlackboard:
         assert results == [1, 2, 3, 4, 5]
 
     @pytest.mark.asyncio
-    async def test_close(self) -> None:
+    async def test_context_manager(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         board = _create_blackboard(fake_redis)
 
-        await board.close()
-        assert board._pool is None
-
-    @pytest.mark.asyncio
-    async def test_context_manager(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        config = RedisConfig()
-        board = RedisPublicBlackboard(config)
-        board._pool = fake_redis.connection_pool
-
         async with board:
-            assert board._pool is not None
-
-        assert board._pool is None
+            pass

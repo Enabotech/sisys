@@ -5,17 +5,12 @@ from __future__ import annotations
 import fakeredis.aioredis
 import pytest
 
-from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
 
 def _create_storage(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisSessionStorage:
-    """创建使用 fake Redis 的 SessionStorage。"""
-    config = RedisConfig()
-    storage = RedisSessionStorage(config)
-    # 直接注入 fake pool
-    storage._pool = fake_redis.connection_pool
-    return storage
+    """Create SessionStorage using fake Redis client."""
+    return RedisSessionStorage(redis_client=fake_redis)
 
 
 class TestRedisSessionStorage:
@@ -86,23 +81,9 @@ class TestRedisSessionStorage:
         assert await storage.exists("sess-1") is True
 
     @pytest.mark.asyncio
-    async def test_close(self) -> None:
-        """关闭连接池。"""
+    async def test_context_manager(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 
-        await storage.close()
-        assert storage._pool is None
-
-    @pytest.mark.asyncio
-    async def test_context_manager(self) -> None:
-        """上下文管理器应自动关闭连接池。"""
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        config = RedisConfig()
-        storage = RedisSessionStorage(config)
-        storage._pool = fake_redis.connection_pool
-
         async with storage:
-            assert storage._pool is not None
-
-        assert storage._pool is None
+            pass

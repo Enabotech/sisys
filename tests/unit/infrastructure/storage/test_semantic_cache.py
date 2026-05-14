@@ -5,7 +5,6 @@ from __future__ import annotations
 import fakeredis.aioredis
 import pytest
 
-from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.semantic_cache import (
     RedisSemanticCache,
@@ -17,15 +16,12 @@ def _create_cache(
     fake_redis: fakeredis.aioredis.FakeRedis,
     metrics_collector: EventMetricsCollector | None = None,
 ) -> RedisSemanticCache:
-    """创建使用 fake Redis 的 SemanticCache。"""
-    config = RedisConfig()
-    cache = RedisSemanticCache(config, metrics_collector=metrics_collector)
-    cache._pool = fake_redis.connection_pool
-    return cache
+    """Create SemanticCache using fake Redis client."""
+    return RedisSemanticCache(redis_client=fake_redis, metrics_collector=metrics_collector)
 
 
 class TestCosineSimilarity:
-    """余弦相似度计算测试。"""
+    """Cosine similarity calculation tests."""
 
     def test_identical_vectors(self) -> None:
         vec = [1.0, 0.0, 0.0]
@@ -64,7 +60,7 @@ class TestCosineSimilarity:
 
 
 class TestRedisSemanticCache:
-    """RedisSemanticCache 测试。"""
+    """RedisSemanticCache tests."""
 
     @pytest.mark.asyncio
     async def test_set_and_get_hit(self) -> None:
@@ -139,27 +135,16 @@ class TestRedisSemanticCache:
         assert metrics.metrics.cache_misses_total == 1
 
     @pytest.mark.asyncio
-    async def test_close(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
-        await cache.close()
-        assert cache._pool is None
-
-    @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        config = RedisConfig()
-        cache = RedisSemanticCache(config)
-        cache._pool = fake_redis.connection_pool
-
+        cache = _create_cache(fake_redis)
         async with cache:
-            assert cache._pool is not None
-        assert cache._pool is None
+            pass
 
     @pytest.mark.asyncio
     async def test_deterministic_cache_key(self) -> None:
-        config = RedisConfig()
-        cache = RedisSemanticCache(config)
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        cache = _create_cache(fake_redis)
         key1 = cache._build_cache_key([0.1, 0.2, 0.3])
         key2 = cache._build_cache_key([0.1, 0.2, 0.3])
         assert key1 == key2
