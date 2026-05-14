@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v4.4 (Round 3架构约束验证)
+**文档版本:** v5.0 (Round 4执行步骤完整性验证)
 **生成时间:** 2026-05-14
-**审查状态:** Round 3 完成 — 统一Rule 1/4签名风格，L3/L5完整签名匹配实际代码
+**审查状态:** Round 4 完成 — 修正12处register_port签名、验证脚本、架构图类名、补充遗漏文件和测试步骤
 
 ---
 
@@ -79,13 +79,13 @@
 │  │ ← 组合 FileAdapter   │ │ ← 组合 RedisAdapter  │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
-│  │ PgMetadataRepo       │ │ QdrantMemoryVector    │                  │
-│  │ (L2MetadataRepoPort) │ │ (MemoryVectorPort)    │                  │
+│  │ PgMetadataRepo       │ │ QdrantMemoryVector-   │                  │
+│  │ (L2MetadataRepoPort) │ │ Storage(MemVecPort)   │                  │
 │  │ ← 继承 PgAdapter     │ │ ← 组合 QdrantAdapter │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
-│  │ MinIODocumentStorage │ │ Neo4jMemoryGraph      │                  │
-│  │ (DocumentStoragePort)│ │ (MemoryGraphPort)     │                  │
+│  │ MinIODocumentStorage │ │ Neo4jMemoryGraph-     │                  │
+│  │ (DocumentStoragePort)│ │ Storage(MemGraphPort) │                  │
 │  │ ← 组合 MinIOAdapter  │ │ ← 组合 Neo4jAdapter  │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │                                                                      │
@@ -1107,12 +1107,12 @@ def bootstrap() -> None:
     # 注意: impl使用字符串路径(延迟加载)或直接类引用
     # Resolver支持递归自动注入：构造函数参数按名称/类型解析
 
-    register_port(name="l0_storage", interface=L0StoragePort,
+    register_port(name="l0_storage", version="v1.0.0", interface=L0StoragePort,
         impl="src.infrastructure.storage.file_memory_adapter.FileMemoryAdapter",
         module="src.infrastructure.storage.file_memory_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
-    register_port(name="l1_cache", interface=L1CachePort,
+    register_port(name="l1_cache", version="v1.0.0", interface=L1CachePort,
         impl="src.infrastructure.storage.redis.redis_memory_cache.RedisMemoryCache",
         module="src.infrastructure.storage.redis.redis_memory_cache",
         lifetime=Lifetime.SCOPED, owner="storage-team")
@@ -1120,17 +1120,17 @@ def bootstrap() -> None:
     # 注意: PostgreSQLAdapter[TEntity,TModel]是泛型基座，无法独立实例化
     # L2端口的具体实现由三个子仓储直接注册（见下方Rule 4区域）
 
-    register_port(name="l3_vector", interface=L3VectorPort,
+    register_port(name="l3_vector", version="v1.0.0", interface=L3VectorPort,
         impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
         module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
-    register_port(name="l4_object", interface=L4ObjectPort,
+    register_port(name="l4_object", version="v1.0.0", interface=L4ObjectPort,
         impl="src.infrastructure.storage.minio.minio_adapter.MinIOAdapter",
         module="src.infrastructure.storage.minio.minio_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
-    register_port(name="l5_graph", interface=L5GraphPort,
+    register_port(name="l5_graph", version="v1.0.0", interface=L5GraphPort,
         impl="src.infrastructure.storage.neo4j.neo4j_adapter.Neo4jAdapter",
         module="src.infrastructure.storage.neo4j.neo4j_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
@@ -1138,56 +1138,56 @@ def bootstrap() -> None:
     # === Rule 4: 应用端口实现注册（Resolver自动递归注入Rule 3适配器） ===
     # Resolver._auto_inject()按构造函数参数名/类型递归解析依赖链
 
-    register_port(name="memory_file", interface=MemoryFilePort,
+    register_port(name="memory_file", version="v1.0.0", interface=MemoryFilePort,
         impl="src.infrastructure.storage.memory_file_storage.MemoryFileStorage",
         module="src.infrastructure.storage.memory_file_storage",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: file_adapter参数→解析"l0_storage"
 
-    register_port(name="session_cache", interface=SessionCachePort,
+    register_port(name="session_cache", version="v1.0.0", interface=SessionCachePort,
         impl="src.infrastructure.storage.redis.session_cache.RedisSessionCache",
         module="src.infrastructure.storage.redis.session_cache",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: cache_adapter参数→解析"l1_cache"
 
-    register_port(name="memory_metadata", interface=L2MetadataRepositoryPort,
+    register_port(name="memory_metadata", version="v1.0.0", interface=L2MetadataRepositoryPort,
         impl="src.infrastructure.storage.postgresql.repository.memory_metadata_repository.PostgreSQLMemoryMetadataRepository",
         module="src.infrastructure.storage.postgresql.repository.memory_metadata_repository",
         lifetime=Lifetime.SCOPED, owner="platform-team")
     # ← 继承PostgreSQLAdapter[MemoryMetadata,MemoryMetadataModel]，Resolver注入session
 
-    register_port(name="memory_change_history", interface=L2ChangeHistoryRepositoryPort,
+    register_port(name="memory_change_history", version="v1.0.0", interface=L2ChangeHistoryRepositoryPort,
         impl="src.infrastructure.storage.postgresql.repository.memory_change_history_repository.PostgreSQLMemoryChangeHistoryRepository",
         module="src.infrastructure.storage.postgresql.repository.memory_change_history_repository",
         lifetime=Lifetime.SCOPED, owner="platform-team")
     # ← 继承PostgreSQLAdapter[MemoryChangeHistory,MemoryChangeHistoryModel]，delete覆写为raise NotImplementedError
 
-    register_port(name="memory_group_member", interface=L2GroupMemberRepositoryPort,
+    register_port(name="memory_group_member", version="v1.0.0", interface=L2GroupMemberRepositoryPort,
         impl="src.infrastructure.storage.postgresql.repository.memory_group_member_repository.PostgreSQLMemoryGroupMemberRepository",
         module="src.infrastructure.storage.postgresql.repository.memory_group_member_repository",
         lifetime=Lifetime.SCOPED, owner="platform-team")
     # ← 组合注入共享Session（复合PK，不继承PostgreSQLAdapter）
 
-    register_port(name="memory_vector", interface=MemoryVectorPort,
+    register_port(name="memory_vector", version="v1.0.0", interface=MemoryVectorPort,
         impl="src.infrastructure.storage.qdrant.memory_vector_storage.QdrantMemoryVectorStorage",
         module="src.infrastructure.storage.qdrant.memory_vector_storage",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: vector_adapter参数→解析"l3_vector"
 
-    register_port(name="document_storage", interface=DocumentStoragePort,
+    register_port(name="document_storage", version="v1.0.0", interface=DocumentStoragePort,
         impl="src.infrastructure.storage.minio.document_storage.MinIODocumentStorage",
         module="src.infrastructure.storage.minio.document_storage",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: object_adapter参数→解析"l4_object"
 
-    register_port(name="memory_graph", interface=MemoryGraphPort,
+    register_port(name="memory_graph", version="v1.0.0", interface=MemoryGraphPort,
         impl="src.infrastructure.storage.neo4j.memory_graph_storage.Neo4jMemoryGraphStorage",
         module="src.infrastructure.storage.neo4j.memory_graph_storage",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: graph_adapter参数→解析"l5_graph"
 
     # === 统一网关 ===
-    register_port(name="unified_storage", interface=UnifiedStoragePort,
+    register_port(name="unified_storage", version="v1.0.0", interface=UnifiedStoragePort,
         impl="src.application.services.unified_storage_gateway.UnifiedStorageGateway",
         module="src.application.services.unified_storage_gateway",
         lifetime=Lifetime.SINGLETON, owner="platform-team")
@@ -1209,8 +1209,8 @@ def bootstrap() -> None:
 - [ ] 1.2 修改三个L2端口继承 `L2RdbPort[T]`（Metadata/ChangeHistory继承，GroupMember组合）
 - [ ] 1.3 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
 - [ ] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）
-- [ ] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（L0StoragePort, BaseRepository, IndexManagerPort）
-- [ ] 1.6 创建 `src/application/ports/__init__.py`（当前缺失）
+- [ ] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（新增 L0StoragePort、L2RdbPort（重命名后的BaseRepository）、IndexManagerPort，保留 BaseRepository=L2RdbPort deprecated别名）
+- [ ] 1.6 创建 `src/application/ports/__init__.py`（当前缺失），立即导出现有8个端口（semantic_cache, public_blackboard, event_subscriber, metrics_port, compressor_service, text_extractor_service, exception_metrics_port, sandbox_port）
 - [ ] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路：当前返回class供`_auto_inject`递归解析构造函数参数后实例化，属设计意图（非缺陷），需确保Rule 4嵌套注入场景正确
 - [ ] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效
 
@@ -1233,8 +1233,13 @@ def bootstrap() -> None:
 - [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）；修复 `Neo4jAdapter` + `Neo4jGraphStorage` 的 Cypher 注入漏洞（4处f-string拼接→参数化查询）
 - [ ] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
+- [ ] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
+- [ ] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
 - [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
-- [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
+- [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root：
+  - [ ] 3.7.1 新增 l3_vector 端口注册
+  - [ ] 3.7.2 新增 l4_object 端口注册
+  - [ ] 3.7.3 新增 l5_graph 端口注册
 - [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
 
 ### Phase 4: Rule 4 — 应用端口实现
@@ -1261,6 +1266,11 @@ def bootstrap() -> None:
 - [ ] 5.4 创建端口契约测试（覆盖所有L0-L5端口）
 - [ ] 5.5 创建架构约束测试（四层规则合规）
 - [ ] 5.6 端到端集成验证（Resolver解析全链路）
+- [ ] 5.7 更新 test_repository.py（BaseRepository→L2RdbPort[T] async签名）
+- [ ] 5.8 更新 test_base_repository.py（BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]）
+- [ ] 5.9 更新 test_neo4j_adapter.py（新增get_neighbors测试）
+- [ ] 5.10 更新 test_qdrant_vector_adapter.py（新增4个Collection方法测试）
+- [ ] 5.11 更新 acceptance 测试中的 BaseRepository 步骤定义
 
 ---
 
@@ -1284,7 +1294,10 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
+| `src/infrastructure/storage/neo4j/graph_storage.py` | 修改 | Phase 3 | Rule 3 | 修复find_path/get_neighbors中的Cypher注入 |
 | `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
+| `src/infrastructure/storage/postgresql/repository/user_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[UserModel,UserModel]，恒等转换 |
+| `src/infrastructure/storage/postgresql/repository/permission_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[PermissionModel,PermissionModel]，恒等转换 |
 | `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save/pk_column/soft_delete |
 | `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save(append-only)/delete |
 | `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |
@@ -1297,10 +1310,16 @@ def bootstrap() -> None:
 | `src/application/services/unified_storage_gateway.py` | 修改 | Phase 4 | Rule 4 | 依赖应用端口 |
 | `src/application/ports/semantic_cache.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
 | `src/application/ports/public_blackboard.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
+| `tests/unit/domain/ports/test_repository.py` | 更新 | Phase 5 | Rule 1 | BaseRepository→L2RdbPort[T] async签名 |
+| `tests/unit/infrastructure/storage/test_base_repository.py` | 更新 | Phase 5 | Rule 3 | PostgreSQLAdapter[TEntity,TModel]签名 |
+| `tests/acceptance/test_story_1_1_steps.py` | 更新 | Phase 5 | Rule 1 | BaseRepository sync→async |
+| `tests/acceptance/test_story_1_5_steps.py` | 更新 | Phase 5 | Rule 1 | BaseRepository sync→async |
 
 ---
 
 ## 验证方案
+
+> **执行前提**: 以下脚本仅在 Phase 1-4 全部完成后执行。当前代码中 L3-L5 和所有 Rule 4 端口均未注册。
 
 ```bash
 # Rule 1: 端口抽象（需Phase 1完成后@runtime_checkable生效）
@@ -1320,25 +1339,22 @@ from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 bootstrap()
 for p in ['l0_storage','l1_cache','l3_vector','l4_object','l5_graph']:
-    assert _global_registry.get(p), f'{p} not registered'
+    assert _global_registry.get(p) is not None, f'{p} not registered'
 # L2无独立Rule 3注册（PostgreSQLAdapter是泛型基座，由具体子仓储在Rule 4区域注册）
 for p in ['memory_metadata','memory_change_history','memory_group_member']:
-    assert _global_registry.get(p), f'{p} not registered'
+    assert _global_registry.get(p) is not None, f'{p} not registered'
 print('Rule 3 OK')
 "
 
 # Rule 4: 应用端口实现可解析（Resolver嵌套注入验证）
 poetry run python -c "
 from src.composition_root import bootstrap
-from src.domain.ports.resolver import get_resolver
+from src.domain.ports.registry import _global_registry
 bootstrap()
-resolver = get_resolver()
-# 验证Rule4实现可解析（自动注入Rule3适配器）
 for p in ['memory_file','session_cache','memory_vector',
            'document_storage','memory_graph',
            'memory_metadata','memory_change_history','memory_group_member']:
-    spec = resolver._registry.get(p)
-    assert spec, f'{p} not registered'
+    assert _global_registry.get(p) is not None, f'{p} not registered'
 print('Rule 4 OK')
 "
 ```
