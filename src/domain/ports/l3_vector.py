@@ -22,9 +22,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class L3VectorPort(Protocol):
     """L3 Qdrant 向量存储端口接口。
 

@@ -7,29 +7,41 @@
 - 软删除：deleted_at 标记
 
 架构来源: architecture.md §11.2.5
+
+重构说明（Phase 3）：
+- 继承 PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel]
+- 覆写 pk_column="memory_id"、soft_delete_column="deleted_at"
+- 覆写 _do_save 实现 UPSERT+乐观锁
+- 自动获得父类 get_by_id/save/delete/list_all
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
 from src.domain.exceptions.storage_exceptions import MemoryVersionConflictError
-from src.domain.ports.l2_rdb import L2MetadataRepositoryPort
+from src.domain.ports.memory_repository import L2MetadataRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
+from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
 
 
-class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
+class PostgreSQLMemoryMetadataRepository(
+    PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel],
+    L2MetadataRepositoryPort,
+):
     """PostgreSQL 记忆元数据仓储。
 
-    使用 AsyncSession 提供异步、线程安全的数据库操作。
+    继承 PostgreSQLAdapter，覆写 pk_column/soft_delete_column/_do_save。
     支持多用户并发的会话级别隔离。
     软删除模式：deleted_at 非 NULL 的记录视为已删除。
     """
+
+    pk_column = "memory_id"
+    soft_delete_column = "deleted_at"
 
     def __init__(self, session: AsyncSession):
         """初始化 PostgreSQLMemoryMetadataRepository。
@@ -37,7 +49,7 @@ class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
         Args:
             session: SQLAlchemy 异步会话（非线程共享，会话绑定到特定连接）
         """
-        self._session = session
+        super().__init__(MemoryMetadataModel, session)
 
     def _to_model(self, entity: MemoryMetadata) -> MemoryMetadataModel:
         """将领域实体转换为数据库模型。"""
@@ -76,17 +88,24 @@ class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
     async def save(self, metadata: MemoryMetadata) -> None:
         """保存或更新记忆元数据（UPSERT with 乐观锁）。
 
+        覆写父类 save — 使用自定义 _do_save 实现 UPSERT+版本检查。
+
         Args:
             metadata: 记忆元数据
 
         Raises:
             MemoryVersionConflictError: 如果版本冲突（并发更新）
         """
+        model = self._to_model(metadata)
+        await self._do_save(model, metadata)
+
+    async def _do_save(self, model: MemoryMetadataModel, entity: MemoryMetadata) -> None:
+        """覆写父类 _do_save — 实现 UPSERT + 乐观锁。"""
         # 检查是否已存在（排除已删除的记录）
         result = await self._session.execute(
             select(MemoryMetadataModel).where(
                 and_(
-                    MemoryMetadataModel.memory_id == metadata.memory_id,
+                    MemoryMetadataModel.memory_id == entity.memory_id,
                     MemoryMetadataModel.deleted_at.is_(None),
                 )
             )
@@ -95,58 +114,36 @@ class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
 
         if existing is not None:
             # 更新操作：检查版本（乐观锁）
-            if metadata.version <= existing.version:
-                raise MemoryVersionConflictError(metadata.memory_id)
+            if entity.version <= existing.version:
+                raise MemoryVersionConflictError(entity.memory_id)
 
             # 执行更新
             await self._session.execute(
                 update(MemoryMetadataModel)
                 .where(
                     and_(
-                        MemoryMetadataModel.memory_id == metadata.memory_id,
+                        MemoryMetadataModel.memory_id == entity.memory_id,
                         MemoryMetadataModel.deleted_at.is_(None),
                     )
                 )
                 .values(
-                    name=metadata.name,
-                    description=metadata.description,
-                    type=metadata.type,
-                    path=metadata.path,
-                    version=metadata.version,
-                    mtime=metadata.mtime,
-                    owner=metadata.owner,
-                    group_id=metadata.group_id,
+                    name=entity.name,
+                    description=entity.description,
+                    type=entity.type,
+                    path=entity.path,
+                    version=entity.version,
+                    mtime=entity.mtime,
+                    owner=entity.owner,
+                    group_id=entity.group_id,
                     updated_at=datetime.now(UTC),
                 )
             )
         else:
             # 插入操作
-            model = self._to_model(metadata)
+            model = self._to_model(entity)
             self._session.add(model)
 
         await self._session.flush()
-
-    async def get_by_id(self, memory_id: UUID) -> MemoryMetadata | None:
-        """通过 ID 获取记忆元数据（排除已删除）。
-
-        Args:
-            memory_id: 记忆 ID
-
-        Returns:
-            MemoryMetadata 如果存在且未删除，否则 None
-        """
-        result = await self._session.execute(
-            select(MemoryMetadataModel).where(
-                and_(
-                    MemoryMetadataModel.memory_id == memory_id,
-                    MemoryMetadataModel.deleted_at.is_(None),
-                )
-            )
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
 
     async def get_by_name(self, name: str) -> MemoryMetadata | None:
         """通过名称获取记忆元数据（排除已删除）。
@@ -169,24 +166,6 @@ class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
         if model is None:
             return None
         return self._to_entity(model)
-
-    async def delete(self, memory_id: UUID) -> None:
-        """软删除记忆元数据。
-
-        Args:
-            memory_id: 记忆 ID
-        """
-        await self._session.execute(
-            update(MemoryMetadataModel)
-            .where(
-                and_(
-                    MemoryMetadataModel.memory_id == memory_id,
-                    MemoryMetadataModel.deleted_at.is_(None),
-                )
-            )
-            .values(deleted_at=datetime.now(UTC))
-        )
-        await self._session.flush()
 
     async def list_by_user(self, user_id: str) -> list[MemoryMetadata]:
         """列出用户的所有记忆元数据（排除已删除）。
@@ -227,20 +206,6 @@ class PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort):
                     MemoryMetadataModel.deleted_at.is_(None),
                 )
             )
-            .order_by(MemoryMetadataModel.updated_at.desc())
-        )
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
-
-    async def list_all(self) -> list[MemoryMetadata]:
-        """列出所有记忆元数据（排除已删除）。
-
-        Returns:
-            所有记忆元数据列表
-        """
-        result = await self._session.execute(
-            select(MemoryMetadataModel)
-            .where(MemoryMetadataModel.deleted_at.is_(None))
             .order_by(MemoryMetadataModel.updated_at.desc())
         )
         models = result.scalars().all()

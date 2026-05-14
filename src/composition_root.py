@@ -111,6 +111,78 @@ def bootstrap() -> None:
         tags=("redis", "session"),
     )
 
+    # === L2 Memory Repository Ports (Rule 3) ===
+    from src.domain.ports.memory_repository import (
+        L2ChangeHistoryRepositoryPort,
+        L2GroupMemberRepositoryPort,
+        L2MetadataRepositoryPort,
+    )
+
+    register_port(
+        name="memory_metadata",
+        version="v1.0.0",
+        interface=L2MetadataRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.memory_metadata_repository.PostgreSQLMemoryMetadataRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_metadata_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="platform-team",
+    )
+
+    register_port(
+        name="memory_change_history",
+        version="v1.0.0",
+        interface=L2ChangeHistoryRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.memory_change_history_repository.PostgreSQLMemoryChangeHistoryRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_change_history_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="platform-team",
+    )
+
+    register_port(
+        name="memory_group_member",
+        version="v1.0.0",
+        interface=L2GroupMemberRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.memory_group_member_repository.PostgreSQLMemoryGroupMemberRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_group_member_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="platform-team",
+    )
+
+    # === L3/L4/L5 Storage Layer Ports (Rule 3) ===
+    from src.domain.ports.l3_vector import L3VectorPort
+    from src.domain.ports.l4_object import L4ObjectPort
+    from src.domain.ports.l5_graph import L5GraphPort
+
+    register_port(
+        name="l3_vector",
+        version="v1.0.0",
+        interface=L3VectorPort,
+        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
+        module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
+    register_port(
+        name="l4_object",
+        version="v1.0.0",
+        interface=L4ObjectPort,
+        impl="src.infrastructure.storage.minio.minio_adapter.MinIOAdapter",
+        module="src.infrastructure.storage.minio.minio_adapter",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
+    register_port(
+        name="l5_graph",
+        version="v1.0.0",
+        interface=L5GraphPort,
+        impl="src.infrastructure.storage.neo4j.neo4j_adapter.Neo4jAdapter",
+        module="src.infrastructure.storage.neo4j.neo4j_adapter",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+    )
+
     # === Repository Ports ===
     register_port(
         name="user_repo",

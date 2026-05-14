@@ -21,14 +21,14 @@ if TYPE_CHECKING:
     from src.domain.entities.memory_metadata import MemoryMetadata
     from src.domain.ports.l0_storage import L0StoragePort
     from src.domain.ports.l1_cache import L1CachePort
-    from src.domain.ports.l2_rdb import (
+    from src.domain.ports.l3_vector import L3VectorPort
+    from src.domain.ports.l4_object import L4ObjectPort
+    from src.domain.ports.l5_graph import L5GraphPort
+    from src.domain.ports.memory_repository import (
         L2ChangeHistoryRepositoryPort,
         L2GroupMemberRepositoryPort,
         L2MetadataRepositoryPort,
     )
-    from src.domain.ports.l3_vector import L3VectorPort
-    from src.domain.ports.l4_object import L4ObjectPort
-    from src.domain.ports.l5_graph import L5GraphPort
 
 
 class UnifiedStorageGateway(UnifiedStoragePort):

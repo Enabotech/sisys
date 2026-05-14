@@ -21,17 +21,20 @@ if TYPE_CHECKING:
 class QdrantVectorAdapter(L3VectorPort):
     """Qdrant 向量存储适配器。
 
-    包装现有 QdrantVectorStorage，实现 L3VectorPort 接口。
-    所有方法委托给内部存储实例。
+    包装现有 QdrantVectorStorage + QdrantCollectionManager，
+    实现 L3VectorPort 接口。
+    所有方法委托给内部存储/管理器实例。
     """
 
-    def __init__(self, storage: Any):
+    def __init__(self, storage: Any, collection_manager: Any | None = None):
         """初始化适配器。
 
         Args:
             storage: QdrantVectorStorage 实例
+            collection_manager: QdrantCollectionManager 实例（可选，Phase 3 补全）
         """
         self._storage = storage
+        self._collection_manager = collection_manager
 
     async def upsert_points(
         self,
@@ -158,3 +161,77 @@ class QdrantVectorAdapter(L3VectorPort):
                 filter_payload=filter_payload,
             ),
         )
+
+    async def create_collection(
+        self,
+        collection: str,
+        vector_size: int,
+        vector_params: dict | None = None,
+    ) -> bool:
+        """创建 Collection。
+
+        Args:
+            collection: Collection 名称
+            vector_size: 向量维度
+            vector_params: 可选参数（如 distance、quantization 等）
+
+        Returns:
+            创建成功返回 True
+        """
+        if self._collection_manager is None:
+            raise RuntimeError("CollectionManager not configured")
+        params = vector_params or {}
+        distance = params.pop("distance", "Cosine")
+        return cast(
+            "bool",
+            await self._collection_manager.create_collection(
+                name=collection,
+                vector_size=vector_size,
+                distance=distance,
+                **params,
+            ),
+        )
+
+    async def delete_collection(
+        self,
+        collection: str,
+    ) -> bool:
+        """删除 Collection。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            删除成功返回 True
+        """
+        if self._collection_manager is None:
+            raise RuntimeError("CollectionManager not configured")
+        return cast("bool", await self._collection_manager.delete_collection(collection))
+
+    async def collection_exists(
+        self,
+        collection: str,
+    ) -> bool:
+        """检查 Collection 是否存在。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            存在返回 True
+        """
+        if self._collection_manager is None:
+            raise RuntimeError("CollectionManager not configured")
+        return cast("bool", await self._collection_manager.collection_exists(collection))
+
+    async def list_collections(
+        self,
+    ) -> list[str]:
+        """列出所有 Collection。
+
+        Returns:
+            Collection 名称列表
+        """
+        if self._collection_manager is None:
+            raise RuntimeError("CollectionManager not configured")
+        return cast("list[str]", await self._collection_manager.list_collections())

@@ -17,9 +17,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class L4ObjectPort(Protocol):
     """L4 MinIO WORM 对象存储接口。
 

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 from src.application.use_cases.text_processing.l1_compressor import L1Compressor
 from src.application.use_cases.text_processing.l1_text_extractor import L1TextExtractor
-from src.domain.ports.l2_rdb import (
+from src.domain.ports.memory_repository import (
     L2ChangeHistoryRepositoryPort,
     L2MetadataRepositoryPort,
 )

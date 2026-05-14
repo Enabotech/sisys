@@ -50,7 +50,7 @@
 │  继承L4: DocumentStoragePort(L4ObjectPort)                           │
 │  继承L5: MemoryGraphPort(L5GraphPort)                                │
 │                                                                      │
-│  位置: src/domain/ports/l2_rdb.py (L2具体端口)                        │
+│  位置: src/domain/ports/memory_repository.py (L2具体端口)                        │
 │        src/application/ports/ (其他层级具体端口)                       │
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 实现
@@ -466,7 +466,7 @@ class RedisSessionCache(SessionCachePort):
 ### Rule 1: Domain Layer — L2RdbPort[T]（重构BaseRepository）
 
 **⚠️ 两个同名 BaseRepository 需区分**:
-- **Domain层** `BaseRepository[T]`(src/domain/ports/base.py): Protocol，方法为**sync**，**无人继承**，将重命名为`L2RdbPort[T]`并改async
+- **Domain层** `BaseRepository[T]`(src/domain/ports/l2_rdb.py): Protocol，方法为**sync**，**无人继承**，将重命名为`L2RdbPort[T]`并改async
 - **Infrastructure层** `BaseRepository[T]`(src/infrastructure/storage/postgresql/repository/base_repository.py): 具体类，方法已为**async**，被UserRepository/PermissionRepository继承，将重构为`PostgreSQLAdapter[TEntity,TModel]`
 
 **当前状态**: Domain层`BaseRepository[T]`是sync泛型CRUD基座，但L2全部实际端口(Metadata/ChangeHistory/GroupMember)均为async。没有任何L2端口继承它。
@@ -474,7 +474,7 @@ class RedisSessionCache(SessionCachePort):
 **按规则1重构**: 将Domain层`BaseRepository[T]`重构为`L2RdbPort[T]`(async)，作为L2统一基础端口。
 
 ```python
-# src/domain/ports/base.py — 重构
+# src/domain/ports/l2_rdb.py — 重构
 # 重命名: BaseRepository[T] → L2RdbPort[T]
 # 重构: sync方法全部改为async
 
@@ -493,7 +493,7 @@ class L2RdbPort(Generic[T], Protocol):
 ### Rule 2: Application Layer — 三个具体端口继承或组合L2RdbPort[T]
 
 ```python
-# src/domain/ports/l2_rdb.py — 重构（从独立Protocol改为继承L2RdbPort）
+# src/domain/ports/memory_repository.py — 重构（从独立Protocol改为继承L2RdbPort）
 
 # 1. L2MetadataRepositoryPort — 继承L2RdbPort[MemoryMetadata]
 class L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata], Protocol):
@@ -1278,8 +1278,8 @@ def bootstrap() -> None:
 
 | 文件 | 类型 | Phase | 规则 | P0问题修复 |
 |------|------|-------|------|-----------|
-| `src/domain/ports/base.py` | 重构 | Phase 1 | Rule 1 | BaseRepository→L2RdbPort[T] sync→async |
-| `src/domain/ports/l2_rdb.py` | 重构 | Phase 1 | Rule 1 | 三端口继承L2RdbPort[T] |
+| `src/domain/ports/l2_rdb.py` | 重构 | Phase 1 | Rule 1 | BaseRepository→L2RdbPort[T] sync→async |
+| `src/domain/ports/memory_repository.py` | 重构 | Phase 1 | Rule 1 | 三端口继承L2RdbPort[T] |
 | `src/domain/ports/l{0,1,3-5}_*.py` | 修改 | Phase 1 | Rule 1 | 添加@runtime_checkable |
 | `src/domain/ports/storage.py` | 废弃 | Phase 1 | Rule 1 | ObjectStorageRepository deprecated |
 | `src/domain/ports/__init__.py` | 补全导出 | Phase 1 | Rule 1 | L0/Base/IndexManagerPort导出 |

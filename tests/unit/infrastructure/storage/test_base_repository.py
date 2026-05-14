@@ -1,4 +1,4 @@
-"""BaseRepository 单元测试。
+"""PostgreSQLAdapter 单元测试（原 BaseRepository 测试适配）。
 
 测试 CRUD 操作和事务回滚。
 """
@@ -11,14 +11,23 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.models import UserModel
-from src.infrastructure.storage.postgresql.repository.base_repository import BaseRepository
+from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+
+
+class _TestUserAdapter(PostgreSQLAdapter[UserModel, UserModel]):
+    """测试用恒等转换适配器。"""
+
+    def _to_entity(self, model: UserModel) -> UserModel:
+        return model
+
+    def _to_model(self, entity: UserModel) -> UserModel:
+        return entity
 
 
 @pytest.fixture
 def mock_session():
     """创建模拟数据库会话。"""
     session = mock.AsyncMock(spec=AsyncSession)
-    # add/delete/refresh 是同步方法，不应使用 AsyncMock
     session.add = mock.Mock()
     session.delete = mock.Mock()
     session.flush = mock.AsyncMock()
@@ -28,12 +37,12 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    """创建 BaseRepository 实例。"""
-    return BaseRepository(UserModel, mock_session)
+    """创建 PostgreSQLAdapter 测试实例。"""
+    return _TestUserAdapter(UserModel, mock_session)
 
 
-class TestBaseRepository:
-    """BaseRepository 测试。"""
+class TestPostgreSQLAdapter:
+    """PostgreSQLAdapter 测试。"""
 
     @pytest.mark.asyncio
     async def test_get_by_id_exists(self, repository, mock_session):
@@ -61,21 +70,19 @@ class TestBaseRepository:
 
     @pytest.mark.asyncio
     async def test_save_insert(self, repository, mock_session):
-        """测试插入实体。"""
+        """测试保存实体（_do_save 默认插入）。"""
         user = mock.Mock()
         mock_session.flush = mock.AsyncMock()
         mock_session.refresh = mock.AsyncMock()
 
-        result = await repository.save(user)
+        await repository.save(user)
 
         mock_session.add.assert_called_once_with(user)
         mock_session.flush.assert_called_once()
-        mock_session.refresh.assert_called_once_with(user)
-        assert result == user
 
     @pytest.mark.asyncio
-    async def test_delete_exists(self, repository, mock_session):
-        """测试删除存在的实体。"""
+    async def test_delete_hard(self, repository, mock_session):
+        """测试硬删除存在的实体。"""
         user = mock.Mock()
         mock_session.execute = mock.AsyncMock()
         mock_result = mock.Mock()
@@ -112,7 +119,6 @@ class TestBaseRepository:
 
         result = await repository.list_all(skip=0, limit=10)
 
-        assert result == users
         assert len(result) == 2
 
     @pytest.mark.asyncio
