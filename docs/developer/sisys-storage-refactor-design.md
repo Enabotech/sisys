@@ -11,7 +11,7 @@
 | 规则 | 架构层 | 职责 | 位置 |
 |------|--------|------|------|
 | **1** | Domain Layer | 统一抽象存储基础端口 `L[n][XXX]Port`，零依赖，技术无关 | `src/domain/ports/` |
-| **2** | Application Layer | 具体应用端口**继承**基础端口，定义业务语义 | `src/application/ports/` |
+| **2** | Domain + Application Layer | 具体应用端口**继承或组合注入**基础端口，定义业务语义 | `src/domain/ports/` + `src/application/ports/` |
 | **3** | Infrastructure Layer-1 | 基础端口的技术实现 + 连接管理，可替换 | `src/infrastructure/storage/{tech}/` |
 | **4** | Infrastructure Layer-2 | 应用端口的技术实现，**组合注入**Layer-1适配器 | `src/infrastructure/storage/{tech}/` |
 
@@ -35,18 +35,23 @@
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 继承
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Rule 2: Application Layer — 具体应用端口（继承基础端口+业务语义）      │
+│  Rule 2: Domain + Application Layer — 具体应用端口                    │
+│                  （继承或组合注入基础端口+业务语义）                     │
 │                                                                      │
-│  继承L0: MemoryFilePort(L0StoragePort)                                │
-│  继承L1: SessionCachePort(L1CachePort)                               │
+│  ──── domain/ports/ 中的具体端口（L2领域概念）────                     │
 │  继承L2: L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata])         │
 │          L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory])│
-│          L2GroupMemberRepositoryPort(组合注入L2RdbPort)                │
+│          L2GroupMemberRepositoryPort(Protocol，组合注入L2RdbPort)      │
+│                                                                      │
+│  ──── application/ports/ 中的具体端口（应用层语义）────                │
+│  继承L0: MemoryFilePort(L0StoragePort)                                │
+│  继承L1: SessionCachePort(L1CachePort)                               │
 │  继承L3: MemoryVectorPort(L3VectorPort)                              │
 │  继承L4: DocumentStoragePort(L4ObjectPort)                           │
 │  继承L5: MemoryGraphPort(L5GraphPort)                                │
 │                                                                      │
-│  位置: src/application/ports/                                        │
+│  位置: src/domain/ports/l2_rdb.py (L2具体端口)                        │
+│        src/application/ports/ (其他层级具体端口)                       │
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 实现
 ┌─────────────────────────────────────────────────────────────────────┐
