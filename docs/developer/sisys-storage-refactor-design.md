@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v4.1 (Round 4审查修正)
+**文档版本:** v4.2 (Round 5最终验证)
 **生成时间:** 2026-05-14
-**审查状态:** Round 4 完成 — 架构约束验证+执行步骤可行性，修正4个P0问题
+**审查状态:** Round 5 完成 — 修正9个命名/引用/验证命令遗留问题
 
 ---
 
@@ -79,8 +79,8 @@
 │  │ ← 组合 FileAdapter   │ │ ← 组合 RedisAdapter  │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
-│  │ PgMemoryMetadataRepo │ │ QdrantMemoryVector    │                  │
-│  │ (MemoryMetadataPort) │ │ (MemoryVectorPort)    │                  │
+│  │ PgMetadataRepo       │ │ QdrantMemoryVector    │                  │
+│  │ (L2MetadataRepoPort) │ │ (MemoryVectorPort)    │                  │
 │  │ ← 继承 PgAdapter     │ │ ← 组合 QdrantAdapter │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
@@ -529,12 +529,12 @@ class L2GroupMemberRepositoryPort(Protocol):
     async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
-### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（重构PgBaseRepository）
+### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（重构Infrastructure层BaseRepository[T])
 
-**当前问题**: PgBaseRepository(Generic[T])绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
+**当前问题**: Infrastructure层`BaseRepository[T]`(base_repository.py)绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
 三个L2仓储因此无法继承它，直接实现端口——**违反四条规则**。
 
-**重构方案**: 将PgBaseRepository重构为`PostgreSQLAdapter[TEntity, TModel]`双泛型基座，
+**重构方案**: 将Infrastructure层`BaseRepository[T]`重构为`PostgreSQLAdapter[TEntity, TModel]`双泛型基座，
 实现`L2RdbPort[TEntity]`，提供领域实体/ORM模型转换层+可配置行为。
 
 ```python
@@ -1233,7 +1233,7 @@ def bootstrap() -> None:
 | `src/domain/ports/storage.py` | 废弃 | Phase 1 | Rule 1 | ObjectStorageRepository deprecated |
 | `src/domain/ports/__init__.py` | 补全导出 | Phase 1 | Rule 1 | L0/Base/IndexManagerPort导出 |
 | `src/application/ports/__init__.py` | **新增** | Phase 1 | Rule 2 | 创建缺失的package文件 |
-| `src/domain/ports/resolver.py` | 修复 | Phase 1 | Rule 3-4 | 字符串impl返回instance |
+| `src/domain/ports/resolver.py` | 验证 | Phase 1 | Rule 3-4 | 验证class→instance链路正确（非缺陷） |
 | `src/application/ports/memory_file_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/session_cache_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/memory_vector_port.py` | **新增** | Phase 2 | Rule 2 | |
@@ -1243,7 +1243,7 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
-| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | PgBaseRepository→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
+| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
 | `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save/pk_column/soft_delete |
 | `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save(append-only)/delete |
 | `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |
@@ -1278,7 +1278,10 @@ poetry run python -c "
 from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 bootstrap()
-for p in ['l0_storage','l1_cache','l2_pg_base','l3_vector','l4_object','l5_graph']:
+for p in ['l0_storage','l1_cache','l3_vector','l4_object','l5_graph']:
+    assert _global_registry.get(p), f'{p} not registered'
+# L2无独立Rule 3注册（PostgreSQLAdapter是泛型基座，由具体子仓储在Rule 4区域注册）
+for p in ['memory_metadata','memory_change_history','memory_group_member']:
     assert _global_registry.get(p), f'{p} not registered'
 print('Rule 3 OK')
 "
@@ -1291,7 +1294,8 @@ bootstrap()
 resolver = get_resolver()
 # 验证Rule4实现可解析（自动注入Rule3适配器）
 for p in ['memory_file','session_cache','memory_vector',
-           'document_storage','memory_graph']:
+           'document_storage','memory_graph',
+           'memory_metadata','memory_change_history','memory_group_member']:
     spec = resolver._registry.get(p)
     assert spec, f'{p} not registered'
 print('Rule 4 OK')
