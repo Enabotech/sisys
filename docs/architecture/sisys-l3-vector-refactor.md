@@ -1,7 +1,7 @@
 # SISYS L3 向量存储层重构设计方案
 
-**版本:** v10.0
-**日期:** 2026-05-13
+**版本:** v11.0
+**日期:** 2026-05-14
 **状态:** 设计阶段（代码未实现）
 **基于:** architecture.md §11.1 L3 向量存储设计 + sisys-uni-storage-design.md
 **修订:** 基于5轮代码审查的系统性修正 + 代码验证
@@ -99,804 +99,436 @@ Infrastructure Layer
 
 ---
 
-## 二、目标架构
+## 二、设计原则与约束
 
-### 2.1 职责模型
+### 2.1 架构原则
+
+| 原则 | 说明 |
+|------|------|
+| **六边形架构** | Ports & Adapters 模式，Domain 层定义端口，Infrastructure 层提供适配器 |
+| **Domain 零依赖** | `src/domain/ports/` 仅使用 `abc` + `typing`，禁止引入任何外部包 |
+| **依赖方向** | Infrastructure → Domain → 无（单向依赖，禁止反向） |
+
+### 2.2 接口设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **Protocol 优先** | 使用 `typing.Protocol`（结构化子类型），而非 `abc.ABC`（名义子类型） |
+| **组合优于继承** | SemanticCachePort 独立于 L3VectorPort，通过组合调用其能力 |
+| **异步优先** | 所有 Port 方法均为 `async def` |
+| **最小接口** | 每个 Port 只定义调用方需要的方法，不预设实现需求 |
+
+### 2.3 实现原则
+
+| 原则 | 说明 |
+|------|------|
+| **委托模式** | QdrantL3VectorStore 不重写逻辑，委托给已有的 QdrantVectorStorage 和 QdrantCollectionManager |
+| **优雅降级** | 缓存/向量操作失败时降级而非抛异常，保证主流程不中断 |
+| **渐进迁移** | 旧接口（`SemanticCache`）与新接口（`SemanticCachePort`）并存，逐步废弃 |
+
+### 2.4 约束条件
+
+| 约束 | 说明 |
+|------|------|
+| **Qdrant 职责** | 向量存储与语义检索（Dense + Sparse） |
+| **Redis 职责** | 缓存实际响应内容（带 TTL 管理） |
+| **embedding 生成** | 职责归于上游服务（UnifiedStorageGateway / 应用层），Port 层不耦合 |
+| **L3 启用条件** | 内容 >500 tokens 时启用向量检索（对应 architecture.md §11.1） |
+
+---
+
+## 三、四层模型设计
+
+### 3.1 层级概览
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: Domain Layer - L3VectorPort（统一抽象向量存储端口）     │
-│                                                                  │
+│  Layer 1: Domain - L3VectorPort                                  │
 │  职责：定义最底层通用向量存储接口（CRUD + 检索 + Collection 管理） │
-│  位置：src/domain/ports/l3_vector.py                             │
-│  特点：领域层零依赖，纯抽象协议（Protocol）                       │
+│  文件：src/domain/ports/l3_vector.py                             │
+│  依赖：零外部依赖（仅 abc + typing）                             │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Domain Layer - SemanticCachePort                        │
-│                                                                  │
-│  职责：Qdrant 负责向量存储与语义检索，Redis 负责缓存实际响应内容（带 TTL 管理）│
-│  位置：src/domain/ports/                                         │
-│  注意：SemanticCachePort 是独立接口，使用组合而非继承关系来调用 L3VectorPort│
+│  Layer 2: Domain - SemanticCachePort                              │
+│  职责：定义语义缓存能力接口（组合调用 L3VectorPort，不继承）      │
+│  文件：src/domain/ports/semantic_cache.py                        │
+│  依赖：零外部依赖（仅 abc + typing）                             │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 3: Infrastructure - QdrantL3VectorStore                   │
-│                                                                  │
-│  职责：完整实现 L3VectorPort（组合 QdrantVectorStorage +        │
+│  职责：完整实现 L3VectorPort（委托 QdrantVectorStorage +        │
 │        QdrantCollectionManager）                                  │
-│  位置：src/infrastructure/storage/qdrant/                         │
+│  文件：src/infrastructure/storage/qdrant/qdrant_l3_vector_store.py│
+│  依赖：qdrant-client, QdrantVectorStorage, QdrantCollectionManager│
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 4: Infrastructure - QdrantSemanticCacheStore             │
-│                                                                  │
 │  职责：实现 SemanticCachePort，使用 QdrantL3VectorStore + Redis   │
 │       （双层架构：Qdrant 负责向量检索，Redis 负责内容缓存）       │
+│  文件：src/infrastructure/storage/qdrant/semantic_cache_store.py │
+│  依赖：L3VectorPort, aioredis, CacheResult                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 接口定义
+### 3.2 Layer 1: L3VectorPort — 向量存储端口
 
-```python
-# Layer 1: Domain 统一抽象（L3VectorPort - Protocol）
-class L3VectorPort(Protocol):
-    """通用向量存储接口 - 最底层抽象"""
-    async def upsert_points(self, collection: str, points: list[dict]) -> bool: ...
-    async def delete_points(self, collection: str, point_ids: list[str]) -> bool: ...
-    async def get_point(self, collection: str, point_id: str) -> dict | None: ...
-    async def search(self, collection: str, query_vector: list[float], limit: int, ...) -> list[dict]: ...
-    async def search_sparse(self, collection: str, sparse_vector: dict, limit: int, ...) -> list[dict]: ...
-    async def create_collection(self, name: str, vector_size: int, distance: str = "Cosine", **kwargs) -> bool: ...
-    async def delete_collection(self, name: str) -> bool: ...
-    async def collection_exists(self, name: str) -> bool: ...
-    async def list_collections(self) -> list[str]: ...
+**定位**: Domain 层最底层通用向量存储抽象。
 
-# Layer 2: Domain 应用接口（SemanticCachePort - 独立）
-class SemanticCachePort(Protocol):
-    """语义缓存接口 - 应用层抽象"""
-    SIMILARITY_THRESHOLD: float = 0.95
-    TTL: int = 3600
+**设计说明**:
+- 与现有 `VectorStorage` ABC 语义完全兼容
+- `collection` 参数由调用方管理（不在此层耦合 Collection 生命周期）
+- `points` 使用 `list[dict]`（duck typing），实际 `VectorPoint` 由 Adapter 转换
 
-    async def get_or_compute(self, query_embedding: list[float], compute_fn: Callable) -> CacheResult: ...
-    async def invalidate(self, cache_key: str) -> bool: ...
-    async def invalidate_by_embedding(self, query_embedding: list[float]) -> bool: ...
+#### I/O 接口契约（9 个方法）
 
-@dataclass
-class CacheResult:
-    value: dict
-    hit: bool
+**向量点 CRUD:**
 
-# Layer 3: Infrastructure Qdrant 实现
-class QdrantL3VectorStore(L3VectorPort):
-    """Qdrant 完整向量存储实现。
+| 方法 | 输入 | 输出 | 说明 |
+|------|------|------|------|
+| `upsert_points` | `collection: str`, `points: list[dict]`（每项含 id, vector, payload） | `bool` | 批量插入或更新 |
+| `delete_points` | `collection: str`, `point_ids: list[str]` | `bool` | 批量删除 |
+| `get_point` | `collection: str`, `point_id: str` | `dict \| None`（{id, vector, payload}） | 获取单个向量点 |
 
-    组合 QdrantVectorStorage（向量操作）和 QdrantCollectionManager（Collection 管理），
-    完整实现 L3VectorPort 的 9 个方法。
-    """
-    def __init__(self, client_wrapper: QdrantClientWrapper):
-        self._vector_storage = QdrantVectorStorage(client_wrapper)
-        self._collection_manager = QdrantCollectionManager(client_wrapper)
-```
+**检索:**
 
-### 2.3 关键设计决策
+| 方法 | 输入 | 输出 | 说明 |
+|------|------|------|------|
+| `search` | `collection: str`, `query_vector: list[float]`, `limit: int = 10`, `filter_payload: dict?` | `list[dict]`（每项含 id, score, payload） | Dense 语义检索 |
+| `search_sparse` | `collection: str`, `sparse_vector: dict`（含 indices + values）, `limit: int = 10`, `filter_payload: dict?` | `list[dict]`（每项含 id, score, payload） | BM25 稀疏检索 |
 
-#### 决策 1: L3VectorPort 接口参数统一
+**Collection 管理:**
 
-**问题**: `L3VectorPort` 定义 `create_collection(collection, vector_size, vector_params)`，但 `QdrantCollectionManager` 实现 `create_collection(name, vector_size, distance, **kwargs)`
+| 方法 | 输入 | 输出 | 说明 |
+|------|------|------|------|
+| `create_collection` | `name: str`, `vector_size: int`, `distance: str = "Cosine"`, `**kwargs` | `bool` | 创建（支持 hnsw_config 等扩展参数） |
+| `delete_collection` | `name: str` | `bool` | 删除 |
+| `collection_exists` | `name: str` | `bool` | 检查存在性 |
+| `list_collections` | 无 | `list[str]` | 列出所有 Collection 名称 |
 
-**解决方案**: 统一为 `create_collection(name, vector_size, distance = "Cosine", **kwargs)`
+> **签名变更**: `create_collection` 参数从旧签名 `(collection, vector_size, vector_params)` 统一为新签名 `(name, vector_size, distance, **kwargs)`。理由：`name` 更通用（不暴露引擎细节），`distance` 显式声明与 Qdrant SDK 对齐。
 
-**理由**:
-- `name` 比 `collection` 更通用（不暴露存储引擎细节）
-- `distance` 参数显式声明，与 Qdrant SDK 对齐
-- `**kwargs` 支持扩展参数（hnsw_config, shard_number 等）
+### 3.3 Layer 2: SemanticCachePort — 语义缓存端口
 
-#### 决策 2: QdrantL3VectorStore 组合策略
+**定位**: Domain 层语义缓存抽象，独立于 L3VectorPort。
 
-**问题**: `QdrantVectorAdapter` 只包装 `QdrantVectorStorage`，缺少 Collection 管理方法
-
-**解决方案**: 新建 `QdrantL3VectorStore`，组合 `QdrantVectorStorage` + `QdrantCollectionManager`
-
-**理由**:
-- `QdrantCollectionManager` 已完整实现 Collection 管理
-- 组合优于继承（Composition over Inheritance）
-- 保留 `QdrantVectorAdapter` 向后兼容
-
-#### 决策 3: SemanticCachePort 不继承 L3VectorPort
-
-**问题**: Redis 实现使用 O(n) 扫描，无法实现 `search()` 等向量检索方法
-
-**解决方案**: `SemanticCachePort` 保持独立接口
-
-**理由**:
-- 不同实现的底层能力不同
-- 强制继承会导致接口契约无法满足
-
----
-
-## 三、详细设计
-
-### 3.1 Domain 层设计
-
-#### 3.1.1 更新 `src/domain/ports/l3_vector.py`
-
-**修正 `create_collection` 方法签名**:
-
-```python
-# src/domain/ports/l3_vector.py
-
-async def create_collection(
-    self,
-    name: str,              # 统一使用 name
-    vector_size: int,
-    distance: str = "Cosine",  # 显式 distance 参数
-    **kwargs,                # 扩展参数 hnsw_config, shard_number 等
-) -> bool:
-    """创建 Collection。
-
-    Args:
-        name: Collection 名称
-        vector_size: 向量维度（bge-m3 为 1024）
-        distance: 距离度量 ("Cosine" | "Euclidean" | "Dot")
-        **kwargs: 扩展参数
-
-    Returns:
-        创建成功返回 True
-    """
-```
-
-**注意**: 原参数名 `collection` 改为 `name`，`vector_params` 改为显式 `distance` 参数。
-
-#### 3.1.2 新建 `src/domain/ports/semantic_cache.py`
-
-```python
-"""SemanticCachePort — 语义缓存抽象端口。
-
-定义语义缓存能力，用于 RAG 检索加速（Story 1.4 Epic 3）。
-
-设计原则：
-- 语义相似度缓存（SIMILARITY_THRESHOLD = 0.95）
-- TTL = 1h（3600s）
-- query embedding 哈希作为 cache key
+**设计说明**:
 - 不继承 L3VectorPort（Redis 实现无法满足向量检索契约）
+- 使用组合方式在实现层调用 L3VectorPort
+- 定义语义相似度阈值（SIMILARITY_THRESHOLD = 0.95）和 TTL（3600s）
 
-迁移说明（v3.0）：
-- 旧接口: get(query_embedding, threshold), set(query_embedding, result, ttl)
-- 新接口: get_or_compute(query_embedding, compute_fn), invalidate(cache_key)
-- 旧接口已废弃，请迁移到新接口
-"""
+#### 数据结构
 
-from __future__ import annotations
-
-from abc import abstractmethod
-from dataclasses import dataclass
-from typing import Callable, Protocol
-
-
-class SemanticCachePort(Protocol):
-    """语义缓存端口。"""
-
-    SIMILARITY_THRESHOLD: float = 0.95
-    TTL: int = 3600
-
-    @abstractmethod
-    async def get_or_compute(
-        self,
-        query_embedding: list[float],
-        compute_fn: Callable,
-    ) -> CacheResult:
-        """获取或计算缓存结果。
-
-        Args:
-            query_embedding: 查询向量嵌入
-            compute_fn: 计算函数（当缓存未命中时调用）
-
-        Returns:
-            CacheResult {value, hit}
-        """
-
-    @abstractmethod
-    async def invalidate(self, cache_key: str) -> bool:
-        """失效缓存。
-
-        Args:
-            cache_key: 缓存键
-
-        Returns:
-            是否成功
-        """
-
-
-@dataclass
-class CacheResult:
-    """缓存结果。"""
-    value: dict
-    hit: bool
+```
+CacheResult:
+  value: dict    — 缓存值（计算结果）
+  hit: bool      — 是否命中缓存
 ```
 
-### 3.2 Infrastructure 层设计
+#### I/O 接口契约（3 个方法）
 
-#### 3.2.1 新建 `src/infrastructure/storage/qdrant/qdrant_l3_vector_store.py`
+| 方法 | 输入 | 输出 | 说明 |
+|------|------|------|------|
+| `get_or_compute` | `query_embedding: list[float]`, `compute_fn: Callable → dict` | `CacheResult` | 缓存命中返回 {value, hit=True}，未命中调用 compute_fn 并写入缓存返回 {value, hit=False} |
+| `invalidate` | `cache_key: str` | `bool` | 按 key 失效缓存 |
+| `invalidate_by_embedding` | `query_embedding: list[float]` | `bool` | 按 embedding 哈希失效缓存 |
 
-```python
-"""QdrantL3VectorStore — L3VectorPort 的完整 Qdrant 实现。
+#### 旧接口迁移关系
 
-组合 QdrantVectorStorage（向量操作）和 QdrantCollectionManager（Collection 管理），
-完整实现 L3VectorPort 的 9 个方法。
+```
+旧接口 (src/application/ports/semantic_cache.py):
+  SemanticCache.get(query_embedding, threshold) → dict | None
+  SemanticCache.set(query_embedding, result, ttl) → None
+  SemanticCache.invalidate(cache_key) → None
 
-职责：
-- Qdrant 客户端管理
-- Collection 管理（委托 QdrantCollectionManager）
-- 向量点 CRUD（委托 QdrantVectorStorage）
-- Dense/Sparse 检索
-"""
+新接口 (src/domain/ports/semantic_cache.py):
+  SemanticCachePort.get_or_compute(query_embedding, compute_fn) → CacheResult
+  SemanticCachePort.invalidate(cache_key) → bool
 
-from __future__ import annotations
-
-import logging
-from datetime import datetime, UTC
-from typing import Any, cast
-
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import (
-    Distance,
-    FieldCondition,
-    Filter,
-    MatchValue,
-    NamedSparseVector,
-    PointIdsList,
-    PointStruct,
-    Range,
-)
-
-from src.domain.ports.l3_vector import L3VectorPort
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
-from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
-from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
-
-logger = logging.getLogger(__name__)
-
-
-class QdrantL3VectorStore(L3VectorPort):
-    """Qdrant 完整向量存储实现。
-
-    组合 QdrantVectorStorage（向量操作）和 QdrantCollectionManager（Collection 管理），
-    完整实现 L3VectorPort 的 9 个方法。
-    """
-
-    def __init__(self, client_wrapper: QdrantClientWrapper):
-        """初始化 Qdrant 向量存储。
-
-        Args:
-            client_wrapper: Qdrant 客户端封装
-        """
-        self._vector_storage = QdrantVectorStorage(client_wrapper)
-        self._collection_manager = QdrantCollectionManager(client_wrapper)
-
-    # ===== 向量点 CRUD（委托给 QdrantVectorStorage）=====
-
-    async def upsert_points(
-        self,
-        collection: str,
-        points: list[dict],
-    ) -> bool:
-        """批量插入或更新向量点。"""
-        return await self._vector_storage.upsert_points(collection, points)
-
-    async def delete_points(
-        self,
-        collection: str,
-        point_ids: list[str],
-    ) -> bool:
-        """批量删除向量点。"""
-        return await self._vector_storage.delete_points(collection, point_ids)
-
-    async def get_point(
-        self,
-        collection: str,
-        point_id: str,
-    ) -> dict | None:
-        """获取单个向量点。"""
-        return await self._vector_storage.get_point(collection, point_id)
-
-    # ===== 检索（委托给 QdrantVectorStorage）=====
-
-    async def search(
-        self,
-        collection: str,
-        query_vector: list[float],
-        limit: int = 10,
-        filter_payload: dict | None = None,
-    ) -> list[dict]:
-        """Dense 语义检索。"""
-        return await self._vector_storage.search(
-            collection,
-            query_vector,
-            limit=limit,
-            filter_payload=filter_payload,
-        )
-
-    async def search_sparse(
-        self,
-        collection: str,
-        sparse_vector: dict,
-        limit: int = 10,
-        filter_payload: dict | None = None,
-    ) -> list[dict]:
-        """BM25 稀疏检索。
-
-        注意：此方法会在发生错误时重新抛出异常，而非返回空列表。
-        调用方应处理可能的异常。
-        """
-        return await self._vector_storage.search_sparse(
-            collection,
-            sparse_vector,
-            limit=limit,
-            filter_payload=filter_payload,
-        )
-
-    # ===== Collection 管理（委托给 QdrantCollectionManager）=====
-
-    async def create_collection(
-        self,
-        name: str,
-        vector_size: int,
-        distance: str = "Cosine",
-        **kwargs,
-    ) -> bool:
-        """创建 Collection。
-
-        Args:
-            name: Collection 名称
-            vector_size: 向量维度
-            distance: 距离度量 ("Cosine" | "Euclidean" | "Dot")
-            **kwargs: 扩展参数（hnsw_config, shard_number 等）
-
-        Returns:
-            创建成功返回 True
-        """
-        return await self._collection_manager.create_collection(
-            name=name,
-            vector_size=vector_size,
-            distance=distance,
-            **kwargs,
-        )
-
-    async def delete_collection(self, name: str) -> bool:
-        """删除 Collection。"""
-        return await self._collection_manager.delete_collection(name)
-
-    async def collection_exists(self, name: str) -> bool:
-        """检查 Collection 是否存在。"""
-        return await self._collection_manager.collection_exists(name)
-
-    async def list_collections(self) -> list[str]:
-        """列出所有 Collection。"""
-        return await self._collection_manager.list_collections()
-
-    # ===== 过滤条件构建 =====
-
-    def _build_filter(self, filter_payload: dict | None) -> Filter | None:
-        """构建 Qdrant 过滤条件。"""
-        return self._vector_storage._build_filter(filter_payload)
+迁移策略: 双接口并存，旧接口标注废弃，逐步迁移调用方
 ```
 
-#### 3.2.2 新建 `src/infrastructure/storage/qdrant/semantic_cache_store.py`
+### 3.4 Layer 3: QdrantL3VectorStore — 向量存储实现
 
-> **v6.0 修正**：原设计（纯 Qdrant）与 §九 工作流程（Qdrant+Redis 双层）矛盾，
-> 已统一为双层设计：Qdrant 负责向量检索，Redis 负责缓存实际响应内容（带 TTL）。
+**定位**: Infrastructure 层 L3VectorPort 的完整 Qdrant 实现。
 
-```python
-"""QdrantSemanticCacheStore — SemanticCachePort 的 Qdrant+Redis 双层实现。
+**设计说明**:
+- 组合 `QdrantVectorStorage`（向量操作）和 `QdrantCollectionManager`（Collection 管理）
+- 不重写底层逻辑，纯委托模式
+- search_sparse 不再吞异常，向上传播由调用方处理
 
-双层缓存架构（对应 §九 工作流程）：
-- Qdrant: 向量存储与语义检索，payload 存储 {cache_key, result}（result 作为 Redis 过期后的降级数据源）
-- Redis: 缓存实际响应内容（带 TTL 管理）
+#### 组合结构
 
-工作流程：
-1. 计算 embedding
-2. Qdrant.search(embedding, limit=1, score_threshold=0.95)
-   ↓命中 → payload 中获取 cache_key → Redis.GET(cache_key) → 返回缓存响应
-   ↓未命中 → 调用 compute_fn → 写入 Redis(SET cache_key response EX ttl)
-                                → 写入 Qdrant(embedding + payload{cache_key, result})
-"""
-
-from __future__ import annotations
-
-import hashlib
-import json
-import logging
-from typing import TYPE_CHECKING, Callable
-
-import redis.asyncio as aioredis
-
-from src.domain.ports.l3_vector import L3VectorPort
-from src.domain.ports.semantic_cache import CacheResult, SemanticCachePort
-
-if TYPE_CHECKING:
-    pass
-
-logger = logging.getLogger(__name__)
-
-
-class QdrantSemanticCacheStore(SemanticCachePort):
-    """语义缓存的 Qdrant+Redis 双层实现。"""
-
-    _CACHE_COLLECTION = "semantic_cache"
-    _CACHE_VECTOR_SIZE = 1024  # bge-m3 向量维度
-    _CACHE_PREFIX = "sem_cache:"
-
-    def __init__(
-        self,
-        l3_vector: L3VectorPort,
-        redis_client: aioredis.Redis,
-        collection: str = _CACHE_COLLECTION,
-        similarity_threshold: float = 0.95,
-        ttl: int = 3600,
-    ):
-        self._l3 = l3_vector
-        self._redis = redis_client
-        self._collection = collection
-        self._threshold = similarity_threshold
-        self._ttl = ttl
-
-    async def get_or_compute(
-        self,
-        query_embedding: list[float],
-        compute_fn: Callable,
-    ) -> CacheResult:
-        """获取或计算缓存结果（双层：Qdrant 检索 + Redis 内容缓存）。"""
-        # Step 1: Qdrant 向量检索
-        try:
-            results = await self._l3.search(
-                collection=self._collection,
-                query_vector=query_embedding,
-                limit=1,
-            )
-        except Exception as e:
-            logger.warning("Qdrant search failed, fallback to compute: %s", e)
-            results = []
-
-        # Step 2: 命中 → 从 payload 获取 cache_key → Redis.GET
-        if results and results[0].get("score", 0) >= self._threshold:
-            payload = results[0].get("payload", {})
-            cache_key = payload.get("cache_key")
-            if cache_key:
-                try:
-                    cached = await self._redis.get(f"{self._CACHE_PREFIX}{cache_key}")
-                    if cached:
-                        return CacheResult(value=json.loads(cached), hit=True)
-                except Exception as e:
-                    logger.warning("Redis GET failed, use payload fallback: %s", e)
-                    return CacheResult(value=payload.get("result", {}), hit=True)
-
-        # Step 3: 未命中 → 调用 compute_fn
-        result = await compute_fn()
-        cache_key = self._hash_embedding(query_embedding)
-
-        # Step 4: 写入 Redis（带 TTL）
-        try:
-            await self._redis.setex(
-                f"{self._CACHE_PREFIX}{cache_key}",
-                self._ttl,
-                json.dumps(result),
-            )
-        except Exception as e:
-            logger.warning("Redis SET failed: %s", e)
-
-        # Step 5: 写入 Qdrant（payload 仅存 cache_key）
-        try:
-            await self._l3.upsert_points(
-                self._collection,
-                [{
-                    "id": cache_key,
-                    "vector": query_embedding,
-                    "payload": {
-                        "cache_key": cache_key,
-                        "result": result,  # 降级数据源（Redis 过期后仍可从 payload 读取）
-                    },
-                }],
-            )
-        except Exception as e:
-            logger.warning("Qdrant upsert failed: %s", e)
-
-        return CacheResult(value=result, hit=False)
-
-    async def invalidate(self, cache_key: str) -> bool:
-        """失效缓存（双删：Qdrant + Redis）。"""
-        success = True
-        try:
-            await self._l3.delete_points(self._collection, [cache_key])
-        except Exception as e:
-            logger.warning("Qdrant delete failed: %s", e)
-            success = False
-        try:
-            await self._redis.delete(f"{self._CACHE_PREFIX}{cache_key}")
-        except Exception as e:
-            logger.warning("Redis DELETE failed: %s", e)
-            success = False
-        return success
-
-    async def invalidate_by_embedding(
-        self,
-        query_embedding: list[float],
-    ) -> bool:
-        """基于 embedding 使缓存失效。"""
-        cache_key = self._hash_embedding(query_embedding)
-        return await self.invalidate(cache_key)
-
-    def _hash_embedding(self, embedding: list[float]) -> str:
-        """计算 embedding 的哈希作为缓存键。"""
-        quantized = [round(v, 6) for v in embedding[:10]]
-        return hashlib.md5(str(quantized).encode(), usedforsecurity=False).hexdigest()[:16]
+```
+QdrantL3VectorStore 实现 L3VectorPort:
+  依赖:
+    QdrantClientWrapper ← 构造注入
+  组合:
+    _vector_storage ← QdrantVectorStorage(client_wrapper)
+    _collection_manager ← QdrantCollectionManager(client_wrapper)
 ```
 
-#### 3.2.3 更新 `src/infrastructure/storage/redis/semantic_cache_adapter.py`
+#### 方法委托映射
 
-**实现 SemanticCachePort 接口**:
+```
+向量点 CRUD（委托 → _vector_storage）:
+  upsert_points(collection, points)
+    → _vector_storage.upsert_points(collection, points)
+    类型转换: list[dict] → list[VectorPoint]（由 QdrantVectorStorage 处理）
 
-```python
-class RedisSemanticCacheAdapter(SemanticCachePort):
-    """Redis 语义缓存适配器。
+  delete_points(collection, point_ids)
+    → _vector_storage.delete_points(collection, point_ids)
 
-    使用 Redis Hash 存储嵌入向量和缓存结果。
-    注意：此实现性能较差（O(n)），仅用于轻量级场景。
-    """
+  get_point(collection, point_id)
+    → _vector_storage.get_point(collection, point_id)
 
-    async def get_or_compute(
-        self,
-        query_embedding: list[float],
-        compute_fn: Callable,
-    ) -> CacheResult:
-        """获取或计算缓存结果。"""
-        # O(n) 扫描实现相似度匹配
-        ...
+检索（委托 → _vector_storage）:
+  search(collection, query_vector, limit, filter_payload?)
+    → _vector_storage.search(collection, query_vector, limit, filter_payload?)
 
-    async def invalidate(self, cache_key: str) -> bool:
-        """失效缓存。"""
-        ...
+  search_sparse(collection, sparse_vector, limit, filter_payload?)
+    → _vector_storage.search_sparse(collection, sparse_vector, limit, filter_payload?)
+    ⚠️ 异常处理变更: 原实现 except Exception: return [] → 改为向上抛出异常
+
+Collection 管理（委托 → _collection_manager）:
+  create_collection(name, vector_size, distance, **kwargs)
+    → _collection_manager.create_collection(name, vector_size, distance, **kwargs)
+
+  delete_collection(name)
+    → _collection_manager.delete_collection(name)
+
+  collection_exists(name)
+    → _collection_manager.collection_exists(name)
+
+  list_collections()
+    → _collection_manager.list_collections()
 ```
 
-### 3.3 更新 `src/application/ports/semantic_cache.py`
+### 3.5 Layer 4: QdrantSemanticCacheStore — 语义缓存实现
 
-> **v8.0 注意**：别名方案**不可行**。旧接口 `get`/`set` 与新接口 `get_or_compute` 方法签名完全不兼容，
-> 直接替换会导致 AttributeError。需采用渐进式迁移（双接口并存），见下方方案 B。
+**定位**: Infrastructure 层 SemanticCachePort 的 Qdrant+Redis 双层实现。
 
-**方案 B：双接口并存（推荐）**
+**设计说明**:
+- **双层架构**: Qdrant 负责向量检索，Redis 负责缓存实际响应内容（带 TTL）
+- Qdrant payload 存储 `{cache_key, result}`，其中 result 作为 Redis 过期后的降级数据源
+- Redis 依赖通过构造注入（aioredis.Redis 实例）
 
-保留旧接口不变，新建 `src/domain/ports/semantic_cache.py`，逐步迁移调用方：
+#### 组合结构
 
-```python
-# src/application/ports/semantic_cache.py — 旧接口（标注废弃，但保留方法签名）
-"""SemanticCache Protocol — 应用层定义（已废弃）。
-
-⚠️ 警告：此接口已废弃，请迁移到 src.domain.ports.semantic_cache.SemanticCachePort
-
-迁移路径：
-- 旧: cache.get(embedding, threshold), cache.set(embedding, result, ttl)
-- 新: cache.get_or_compute(embedding, compute_fn)
-
-注意：新旧方法签名不兼容，不能直接替换。请逐个迁移调用方。
-此文件将在所有调用方迁移完成后移除。
-"""
-
-# 保持原有接口不变，不使用别名替换
-from typing import Protocol
-
-class SemanticCache(Protocol):
-    """旧接口 - 保留用于向后兼容。"""
-    async def get(self, query_embedding: list[float], threshold: float = 0.95) -> dict | None: ...
-    async def set(self, query_embedding: list[float], result: dict, ttl: int = 3600) -> None: ...
-    async def invalidate(self, cache_key: str) -> None: ...
+```
+QdrantSemanticCacheStore 实现 SemanticCachePort:
+  依赖（构造注入）:
+    l3_vector: L3VectorPort          — 向量检索能力
+    redis_client: aioredis.Redis     — 内容缓存 + TTL
+  配置:
+    collection: str = "semantic_cache"
+    similarity_threshold: float = 0.95
+    ttl: int = 3600（秒）
+  常量:
+    _CACHE_VECTOR_SIZE = 1024        — bge-m3 向量维度
+    _CACHE_PREFIX = "sem_cache:"     — Redis key 前缀
 ```
 
-### 3.4 更新 `src/composition_root.py`
+#### get_or_compute 工作流程（伪码）
 
-```python
-# === L3 Vector Storage Ports ===
-from src.domain.ports.l3_vector import L3VectorPort
-from src.domain.ports.semantic_cache import SemanticCachePort
-from src.infrastructure.storage.qdrant.qdrant_l3_vector_store import QdrantL3VectorStore
-from src.infrastructure.storage.qdrant.semantic_cache_store import QdrantSemanticCacheStore
+```
+输入: query_embedding, compute_fn
 
-register_port(
-    name="l3_vector",
-    version="v1.0.0",
-    interface=L3VectorPort,
-    impl="src.infrastructure.storage.qdrant.qdrant_l3_vector_store.QdrantL3VectorStore",
-    module="src.infrastructure.storage.qdrant.qdrant_l3_vector_store",
-    lifetime=Lifetime.SCOPED,
-    owner="storage-team",
-    tags=("qdrant", "vector"),
-)
+Step 1: Qdrant 向量检索
+  results ← l3_vector.search(collection, query_embedding, limit=1)
+  失败 → 记录警告，results = []，进入 Step 3
 
-register_port(
-    name="semantic_cache",
-    version="v1.0.0",
-    interface=SemanticCachePort,
-    impl="src.infrastructure.storage.qdrant.semantic_cache_store.QdrantSemanticCacheStore",
-    module="src.infrastructure.storage.qdrant.semantic_cache_store",
-    lifetime=Lifetime.SCOPED,
-    owner="cache-team",
-    tags=("qdrant", "vector", "cache"),
-)
+Step 2: 命中判定
+  if results[0].score ≥ similarity_threshold:
+    cache_key ← results[0].payload.cache_key
+    cached ← redis_client.GET(prefix + cache_key)
+    if cached → return CacheResult(value=cached, hit=True)
+    Redis 失败 → 降级返回 CacheResult(value=payload.result, hit=True)
 
-register_port(
-    name="semantic_cache_redis",
-    version="v1.0.0",
-    interface=SemanticCachePort,
-    impl="src.infrastructure.storage.redis.semantic_cache_adapter.RedisSemanticCacheAdapter",
-    module="src.infrastructure.storage.redis.semantic_cache_adapter",
-    lifetime=Lifetime.SCOPED,
-    owner="cache-team",
-    tags=("redis", "cache"),
-)
+Step 3: 未命中 → 调用 compute_fn
+  result ← compute_fn()
+  cache_key ← hash_embedding(query_embedding)
+
+Step 4: 写入 Redis（带 TTL）
+  redis_client.SETEX(prefix + cache_key, ttl, serialize(result))
+  失败 → 记录警告（不阻塞）
+
+Step 5: 写入 Qdrant（payload 含 cache_key + result）
+  l3_vector.upsert_points(collection, [{
+    id: cache_key,
+    vector: query_embedding,
+    payload: {cache_key, result}
+  }])
+  失败 → 记录警告（不阻塞）
+
+输出: CacheResult(value=result, hit=False)
 ```
 
-### 3.5 更新 `UnifiedStorageGateway`
+#### invalidate 工作流程（双删策略）
 
-```python
-# 在 save() 方法中添加 L3 向量存储逻辑
-async def save(
-    self,
-    memory_id: str,
-    content: str,
-    memory_type: str,
-    owner_id: str,
-    name: str,
-    tier: StorageTier | None = None,
-) -> dict[StorageLayer, bool]:
-    results: dict[StorageLayer, bool] = {}
+```
+输入: cache_key
 
-    # L0 文件系统（真相源，同步写入）
-    l0_success = await self._l0.write(memory_id, memory_type, content)
-    results[StorageLayer.L0_FILE] = l0_success
+Step 1: Qdrant 删除
+  l3_vector.delete_points(collection, [cache_key])
+  失败 → 记录警告
 
-    # L3 向量存储（内容 >500 tokens 时按需启用）
-    if self._l3 is not None and len(content.encode('utf-8')) > 500:
-        try:
-            # 生成 embedding 并存储到 L3
-            embedding = await self._generate_embedding(content)
-            await self._l3.upsert_points(
-                collection="memories",
-                points=[{
-                    "id": memory_id,
-                    "vector": embedding,
-                    "payload": {"memory_id": memory_id, "owner": owner_id}
-                }]
-            )
-            results[StorageLayer.L3_VECTOR] = True
-        except Exception as e:
-            logger.warning("L3 vector storage failed: %s", e)
-            results[StorageLayer.L3_VECTOR] = False
+Step 2: Redis 删除
+  redis_client.DELETE(prefix + cache_key)
+  失败 → 记录警告
 
-    # ... 其他代码
-    return results
+输出: 两步均成功 → True，任一失败 → False
+```
+
+#### invalidate_by_embedding 工作流程
+
+```
+输入: query_embedding
+
+cache_key ← hash_embedding(query_embedding)
+→ 委托 invalidate(cache_key)
+```
+
+#### 辅助方法
+
+```
+hash_embedding(embedding):
+  取前10个维度，精度截断到6位小数
+  → MD5 哈希 → 取前16字符作为 cache_key
+```
+
+#### Redis 依赖注入方案
+
+`register_port` 无法自动注入非 Port 类型（如 `aioredis.Redis`），需使用工厂函数：
+
+```
+// composition_root.py 中使用工厂函数模式
+semantic_cache_factory():
+  redis_client ← 从 Resolver 获取或创建 aioredis.Redis 实例
+  l3_vector ← 从 Resolver 获取 L3VectorPort 实例
+  return QdrantSemanticCacheStore(l3_vector, redis_client)
+```
+
+### 3.6 端口注册
+
+在 `composition_root.py` 中注册 3 个端口：
+
+```
+register_port("l3_vector"):
+  interface: L3VectorPort
+  impl: QdrantL3VectorStore
+  lifetime: SCOPED
+
+register_port("semantic_cache"):
+  interface: SemanticCachePort
+  impl: QdrantSemanticCacheStore
+  lifetime: SCOPED
+  ⚠️ 需工厂函数注入 Redis 依赖
+
+register_port("semantic_cache_redis"):
+  interface: SemanticCachePort
+  impl: RedisSemanticCacheAdapter
+  lifetime: SCOPED
+```
+
+### 3.7 UnifiedStorageGateway 集成
+
+在 `UnifiedStorageGateway.save()` 中启用 L3 向量存储：
+
+```
+save(memory_id, content, memory_type, owner_id, name, tier?):
+  ...
+  // L3 向量存储（内容 >500 tokens 时按需启用）
+  if self._l3 存在 AND len(content) > 500:
+    embedding ← _generate_embedding(content)
+    l3_vector.upsert_points("memories", [{
+      id: memory_id,
+      vector: embedding,
+      payload: {memory_id, owner: owner_id}
+    }])
+    成功 → results[L3_VECTOR] = True
+    失败 → 记录警告, results[L3_VECTOR] = False
+  ...
 ```
 
 ---
 
-## 四、执行步骤
+## 四、关键设计决策
+
+### 决策 1: L3VectorPort.create_collection 参数统一
+
+**问题**: Port 定义 `(collection, vector_size, vector_params)` 与 QdrantCollectionManager 实现 `(name, vector_size, distance, **kwargs)` 不一致。
+
+**方案**: 统一为新签名。
+
+```
+旧: create_collection(collection: str, vector_size: int, vector_params: dict?)
+新: create_collection(name: str, vector_size: int, distance: str = "Cosine", **kwargs)
+```
+
+**理由**: `name` 比 `collection` 更通用（不暴露存储引擎细节）；`distance` 参数显式声明与 Qdrant SDK 对齐；`**kwargs` 支持扩展参数。
+
+### 决策 2: QdrantL3VectorStore 组合策略
+
+**问题**: `QdrantVectorAdapter` 仅包装 `QdrantVectorStorage`，缺少 Collection 管理方法。
+
+**方案**: 新建 `QdrantL3VectorStore`，组合两个已有组件。
+
+```
+QdrantL3VectorStore:
+  组合 QdrantVectorStorage（5 个向量操作方法）
+       + QdrantCollectionManager（4 个 Collection 管理方法）
+  → 完整实现 L3VectorPort 的 9 个方法
+```
+
+**理由**: QdrantCollectionManager 已完整实现，组合优于继承，保留 QdrantVectorAdapter 向后兼容。
+
+### 决策 3: SemanticCachePort 不继承 L3VectorPort
+
+**问题**: 若 SemanticCachePort 继承 L3VectorPort，Redis 实现无法满足 `search()` 等向量检索方法的契约。
+
+**方案**: SemanticCachePort 保持独立接口，通过构造注入 L3VectorPort 实例实现组合调用。
+
+**理由**: 不同实现的底层能力不同（Qdrant 支持向量检索，Redis 不支持），强制继承导致接口契约无法满足。
+
+---
+
+## 五、执行步骤
 
 ### Phase 1: P0 修复（阻塞性问题）
 
-#### Step 1.1: 修复 search_sparse 异常处理
+| Step | 文件 | 变更 |
+|------|------|------|
+| 1.1 | `vector_storage.py` | `search_sparse` 异常处理：`except Exception: return []` → 记录日志并 `raise` |
+| 1.2 | `l3_vector.py` | `create_collection` 签名：`(collection, vector_size, vector_params)` → `(name, vector_size, distance, **kwargs)` |
+| 1.3 | `qdrant_l3_vector_store.py`（新建） | 创建 QdrantL3VectorStore，组合委托实现 9 个方法（详见 §3.4） |
+| 1.4 | `composition_root.py` | 添加 `l3_vector` 端口注册（详见 §3.6） |
+| 1.5 | `unified_storage_gateway.py` | `save()` 中添加 L3 向量存储逻辑（详见 §3.7） |
 
-**文件**: `src/infrastructure/storage/qdrant/vector_storage.py`
-
-```python
-# 修改前
-except Exception:
-    return []
-
-# 修改后
-except Exception as e:
-    logger.error("Sparse search failed for collection %s: %s", collection, e)
-    raise  # 重新抛出异常
-```
-
-#### Step 1.2: 统一 create_collection 接口参数
-
-**文件**: `src/domain/ports/l3_vector.py`
-
-```python
-# 修改前
-async def create_collection(self, collection: str, vector_size: int, vector_params: dict | None = None) -> bool:
-
-# 修改后
-async def create_collection(self, name: str, vector_size: int, distance: str = "Cosine", **kwargs) -> bool:
-```
-
-#### Step 1.3: 创建 QdrantL3VectorStore
-
-**文件**: `src/infrastructure/storage/qdrant/qdrant_l3_vector_store.py`
-
-完整实现（见 §3.2.1）
-
-#### Step 1.4: 注册 L3VectorPort
-
-**文件**: `src/composition_root.py`
-
-添加 `l3_vector` 端口注册（见 §3.4）
-
-#### Step 1.5: 实现 UnifiedStorageGateway 的 L3 使用
-
-**文件**: `src/application/services/unified_storage_gateway.py`
-
-在 `save()` 方法中添加 L3 向量存储逻辑（见 §3.5）
-
----
+**P0 修复依赖链**: P0-1（独立）→ P0-4 → P0-2 → P0-3
 
 ### Phase 2: P1 修复（重要问题）
 
-#### Step 2.1: 创建 SemanticCachePort
-
-**文件**: `src/domain/ports/semantic_cache.py`
-
-完整实现（见 §3.1.2）
-
-#### Step 2.2: 创建 QdrantSemanticCacheStore
-
-**文件**: `src/infrastructure/storage/qdrant/semantic_cache_store.py`
-
-完整实现（见 §3.2.2）
-
-#### Step 2.3: 更新 Redis 语义缓存适配器
-
-**文件**: `src/infrastructure/storage/redis/semantic_cache_adapter.py`
-
-实现 `SemanticCachePort` 接口（见 §3.2.3）
-
-#### Step 2.4: 更新应用层旧接口
-
-**文件**: `src/application/ports/semantic_cache.py`
-
-标记为废弃（见 §3.3）
-
----
+| Step | 文件 | 变更 |
+|------|------|------|
+| 2.1 | `domain/ports/semantic_cache.py`（新建） | 创建 SemanticCachePort 接口 + CacheResult 数据结构（详见 §3.3） |
+| 2.2 | `qdrant/semantic_cache_store.py`（新建） | 创建 QdrantSemanticCacheStore 双层实现（详见 §3.5） |
+| 2.3 | `redis/semantic_cache_adapter.py` | RedisSemanticCache 适配 SemanticCachePort 新接口 |
+| 2.4 | `application/ports/semantic_cache.py` | 旧 SemanticCache 标注废弃，保留方法签名不变 |
 
 ### Phase 3: 验证
 
-#### Step 3.1: 架构验证
-
-```bash
-poetry run python -c "
-from src.domain.ports.l3_vector import L3VectorPort
-from src.infrastructure.storage.qdrant.qdrant_l3_vector_store import QdrantL3VectorStore
-
-# 验证 QdrantL3VectorStore 实现所有 9 个方法
-store = QdrantL3VectorStore(None)  # 需要 mock
-assert hasattr(store, 'upsert_points')
-assert hasattr(store, 'delete_points')
-assert hasattr(store, 'get_point')
-assert hasattr(store, 'search')
-assert hasattr(store, 'search_sparse')
-assert hasattr(store, 'create_collection')
-assert hasattr(store, 'delete_collection')
-assert hasattr(store, 'collection_exists')
-assert hasattr(store, 'list_collections')
-print('✅ 9 个方法全部实现')
-"
-```
-
-#### Step 3.2: 集成验证
-
-```bash
-poetry run python -c "
-from src.composition_root import bootstrap
-bootstrap()
-from src.domain.ports.registry import _global_registry
-ports = [p['name'] for p in _global_registry.list_all()]
-assert 'l3_vector' in ports
-assert 'semantic_cache' in ports
-print('✅ 端口注册成功:', ports)
-"
-```
+| Step | 验证项 | 通过条件 |
+|------|--------|----------|
+| 3.1 | 架构验证 | Domain 层零依赖；QdrantL3VectorStore 实现 9 个方法；SemanticCachePort 不继承 L3VectorPort |
+| 3.2 | 集成验证 | `l3_vector` 和 `semantic_cache` 端口注册成功 |
+| 3.3 | 向后兼容 | 旧 SemanticCache 接口的 `get`/`set`/`invalidate` 仍可导入 |
 
 ---
 
-## 五、风险与缓解
+## 六、风险与缓解
 
 | ID | 风险 | 影响 | 缓解措施 |
 |----|------|------|----------|
@@ -907,94 +539,53 @@ print('✅ 端口注册成功:', ports)
 
 ---
 
-## 六、验收标准
+## 七、验收标准
 
-### 6.1 架构验证
+### 7.1 架构验证
 
-```python
-def test_hexagon_architecture():
-    """六边形架构依赖方向验证。"""
+```
+验证 Domain 层零依赖:
+  l3_vector.py 不包含任何外部包 import
+  semantic_cache.py 不包含任何外部包 import
 
-    # 1. Domain 层零外部依赖
-    import src.domain.ports.l3_vector as l3
-    import src.domain.ports.semantic_cache as sc
-    assert "qdrant" not in dir(l3)
-    assert "qdrant" not in dir(sc)
+验证 QdrantL3VectorStore 完整实现:
+  9 个方法全部存在（upsert_points, delete_points, get_point,
+    search, search_sparse, create_collection, delete_collection,
+    collection_exists, list_collections）
 
-    # 2. QdrantL3VectorStore 实现 L3VectorPort（9 个方法）
-    from src.infrastructure.storage.qdrant.qdrant_l3_vector_store import QdrantL3VectorStore
-    store = QdrantL3VectorStore(None)
-    for method in ['upsert_points', 'delete_points', 'get_point', 'search',
-                    'search_sparse', 'create_collection', 'delete_collection',
-                    'collection_exists', 'list_collections']:
-        assert hasattr(store, method), f"Missing method: {method}"
-
-    # 3. SemanticCachePort 独立于 L3VectorPort
-    from src.domain.ports.semantic_cache import SemanticCachePort
-    from src.domain.ports.l3_vector import L3VectorPort
-    assert not issubclass(SemanticCachePort, L3VectorPort)
-
-    print("✅ 六边形架构验证通过")
+验证 SemanticCachePort 独立性:
+  SemanticCachePort 不是 L3VectorPort 的子类
 ```
 
-### 6.2 功能验证
+### 7.2 功能验证
 
-```python
-async def test_l3_vector_crud():
-    """L3 向量存储 CRUD 功能验证。"""
-    # 1. create_collection → collection_exists == True
-    # 2. upsert_points → get_point 返回正确数据
-    # 3. search 返回包含 score 的结果
-    # 4. delete_points → get_point 返回 None
-    # 5. delete_collection → collection_exists == False
-    pass
+```
+L3 向量存储 CRUD:
+  create_collection → collection_exists == True
+  upsert_points → get_point 返回正确数据
+  search → 返回包含 score 的结果
+  delete_points → get_point 返回 None
+  delete_collection → collection_exists == False
 
-async def test_semantic_cache():
-    """语义缓存功能验证。"""
-    # 1. get_or_compute (cache miss) → hit == False
-    # 2. get_or_compute (cache hit) → hit == True
-    # 3. invalidate → 缓存被清除
-    pass
+语义缓存:
+  get_or_compute (cache miss) → hit == False
+  get_or_compute (cache hit) → hit == True
+  invalidate → 缓存被清除
 ```
 
-### 6.3 向后兼容验证
+### 7.3 向后兼容验证
 
-```python
-def test_backward_compatibility():
-    """向后兼容验证（渐进迁移方案）。"""
-    from src.application.ports.semantic_cache import SemanticCache
-    # 旧接口仍可导入，方法签名保持不变
-    assert hasattr(SemanticCache, "get")
-    assert hasattr(SemanticCache, "set")
-    assert hasattr(SemanticCache, "invalidate")
-    print("✅ 向后兼容：旧接口 get/set/invalidate 仍可用")
+```
+旧接口仍可导入:
+  from src.application.ports.semantic_cache import SemanticCache
+  SemanticCache 具有 get / set / invalidate 方法
 ```
 
 ---
 
-## 七、关键修正记录
+## 八、语义缓存工作流程
 
-| 版本 | 日期 | 修正项 | 说明 |
-|------|------|--------|------|
-| v2.0 | 2026-05-13 | SemanticCachePort 不继承 L3VectorPort | Redis 实现无法满足向量检索契约 |
-| v2.0 | 2026-05-13 | QdrantVectorStore 完整实现 create_collection | 移除占位符 |
-| v3.0 | 2026-05-13 | P0 问题系统性修复 | search_sparse 异常处理、接口参数统一 |
-| v3.0 | 2026-05-13 | QdrantL3VectorStore 组合策略 | 组合 QdrantVectorStorage + QdrantCollectionManager |
-| v3.0 | 2026-05-13 | UnifiedStorageGateway self._l3 使用 | L3 功能不再虚设 |
-| v3.0 | 2026-05-13 | L3VectorPort 接口参数统一 | collection → name, vector_params → distance |
-| v4.0 | 2026-05-13 | **代码验证发现 v3.0 计划变更未实现** | 所有 P0/P1 问题仍未修复，需开始实际代码实现 |
-| v5.0 | 2026-05-13 | **第二轮5轮审查完成** | 发现设计文档内部矛盾：SemanticVectorPort(L3VectorPort, ...) 是歧义；发现 Redis 连接池问题；确认 P0 修复依赖关系 |
-| v6.0 | 2026-05-13 | **语义缓存工作流程评审** | 确认 Qdrant+Redis 分离式设计合理；发现一致性风险；TTL 不一致；缺少 invalidate_by_embedding |
-| v7.0 | 2026-05-13 | **§3.2.2 重写为双层设计** | 修正与 §九 的架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding；添加 Redis 依赖 |
-| v8.0 | 2026-05-13 | **第3轮审查残留修正** | 更新 §2.1 Layer 4 描述；修正 §3.1.2 过时注释；更新 §九 问题表格；标记 Redis 依赖注入缺失 |
-| v9.0 | 2026-05-13 | **第4轮审查修正** | §3.3 别名方案改为渐进迁移；§九 payload 描述更新为 {cache_key, result}；添加 result 降级数据源说明 |
-| v10.0 | 2026-05-13 | **第5轮审查最终修正** | 修正 §八.1 P0 编号与 §一.3 对齐；修正 §六.3 向后兼容验证与 §3.3 一致；移除 §九.3 已解决问题 |
-
----
-
-## 九、语义缓存工作流程评审
-
-### 9.1 工作流程定义
+### 8.1 端到端流程
 
 ```
 1. 计算 embedding
@@ -1006,76 +597,75 @@ def test_backward_compatibility():
                                 → 写入 Qdrant(embedding + payload{cache_key, result})
 ```
 
-### 9.2 设计合理性评估
+### 8.2 设计合理性
 
 | 设计点 | 评价 |
 |--------|------|
-| cache_key 存储在 Qdrant payload | ✅ 合理 - 查询效率高，避免 Redis 全表扫描 |
-| result 存储在 Qdrant payload | ✅ 合理 - Redis 过期后的降级数据源，避免"幽灵向量"问题 |
-| embedding → cache_key 生成 | ✅ 确定性哈希，同一查询生成相同 key |
-| Qdrant + Redis 分离存储 | ✅ 合理 - Qdrant 负责向量检索，Redis 负责内容缓存 |
+| cache_key 存储在 Qdrant payload | ✅ 合理 — 查询效率高，避免 Redis 全表扫描 |
+| result 存储在 Qdrant payload | ✅ 合理 — Redis 过期后的降级数据源，避免"幽灵向量" |
+| embedding → cache_key 哈希生成 | ✅ 确定性哈希，同一查询生成相同 key |
+| Qdrant + Redis 分离存储 | ✅ 合理 — 各司其职，Qdrant 向量检索，Redis 内容缓存 |
 
-### 9.3 发现的问题
-
-| 问题 | 严重程度 | 说明 |
-|------|---------|------|
-| **QdrantSemanticCacheStore 不存在** | 高 | 设计文档中的实现未创建 |
-| **score_threshold 参数不支持** | 中 | `QdrantVectorStorage.search()` 签名无此参数，需后过滤 |
-| **Redis 依赖注入缺失** | 中 | §3.4 composition_root 未展示 redis_client 如何注入（建议使用工厂函数方案） |
-
-### 9.4 一致性风险
+### 8.3 一致性风险
 
 | 场景 | 风险 | 严重程度 |
 |------|------|---------|
-| Qdrant 写入失败 + Redis 成功 | 幽灵缓存 - Qdrant 有向量但 Redis 无数据 | 高 |
+| Qdrant 写入失败 + Redis 成功 | 幽灵缓存 — Qdrant 有向量但 Redis 无数据 | 高 |
 | Redis 写入失败 + Qdrant 成功 | 调用方不知道缓存未写入 | 中 |
 | Qdrant 搜索失败 | 请求直接失败，无降级 | 高 |
 | Redis 读取失败与未命中混淆 | 返回 None 无法区分两种情况 | 中 |
 
-### 9.5 改进建议
+### 8.4 发现的问题
 
-1. **实现 QdrantSemanticCacheStore** - 参考 §3.2.2 的设计
-2. **扩展 QdrantVectorStorage.search()** - 添加 `score_threshold` 参数支持
-3. **统一 TTL 配置** - 建议使用 3600s（1小时）或暴露为配置参数
-4. **添加写入验证** - 写入后读取验证数据存在性
-5. **添加 invalidate_by_embedding 方法** - 支持 embedding 级别的失效
-6. **考虑 Outbox Pattern** - 确保 Qdrant 和 Redis 写入一致性
+| 问题 | 严重程度 | 说明 |
+|------|---------|------|
+| QdrantSemanticCacheStore 不存在 | 高 | 设计文档中的实现未创建 |
+| score_threshold 参数不支持 | 中 | `QdrantVectorStorage.search()` 无此参数，需后过滤 |
+| Redis 依赖注入缺失 | 中 | composition_root 未展示 redis_client 注入方式 |
+
+### 8.5 改进建议
+
+1. 实现 QdrantSemanticCacheStore（详见 §3.5）
+2. 扩展 `QdrantVectorStorage.search()` 添加 `score_threshold` 参数支持
+3. 统一 TTL 配置为 3600s（或暴露为配置参数）
+4. 添加写入后读取验证
+5. 考虑 Outbox Pattern 确保 Qdrant 和 Redis 写入一致性
 
 ---
 
-## 八、Round 5 审查发现（代码验证）
+## 九、审查附录
 
-### 8.1 P0 问题验证结果
+### 9.1 P0 问题验证结果
 
 | 问题 | 状态 | 验证方法 |
 |------|------|---------|
 | P0-1: QdrantVectorAdapter 缺 4 个 Collection 方法 | **未修复** | qdrant_vector_adapter.py 无 create_collection/delete_collection/collection_exists/list_collections |
 | P0-2: l3_vector 未注册 | **未修复** | composition_root.py 中无 l3_vector 注册 |
 | P0-3: self._l3 未使用 | **未修复** | UnifiedStorageGateway.save() 未调用 self._l3 |
-| P0-4: search_sparse 异常吞没 | **未修复** | 代码检查 vector_storage.py:200 仍是 `except Exception: return []` |
+| P0-4: search_sparse 异常吞没 | **未修复** | vector_storage.py:200 仍是 `except Exception: return []` |
 
-### 8.2 接口签名验证结果
+### 9.2 接口签名验证
 
 | 接口 | 位置 | 当前签名 | 问题 |
 |------|------|---------|------|
 | L3VectorPort.create_collection | domain/ports/l3_vector.py | `collection, vector_size, vector_params` | **旧签名** |
 | QdrantCollectionManager.create_collection | infrastructure/collection_manager.py | `name, vector_size, distance, **kwargs` | **新签名** |
 
-### 8.3 新文件存在性验证
+### 9.3 新文件存在性验证
 
-| 文件（v3.0 计划创建） | 状态 |
+| 文件（计划创建） | 状态 |
 |----------------------|------|
 | `src/infrastructure/storage/qdrant/qdrant_l3_vector_store.py` | **不存在** |
 | `src/infrastructure/storage/qdrant/semantic_cache_store.py` | **不存在** |
 | `src/domain/ports/semantic_cache.py` | **不存在** |
 
-### 8.4 架构验证结果
+### 9.4 架构验证结果
 
 - Domain 层零依赖：✅ 正确（l3_vector.py 仅使用 typing.Protocol）
 - 六边形架构约束测试：✅ 27/27 通过
 - qdrant-client 1.7.1 API 兼容性：✅ 无问题
 
-### 8.5 UnifiedStorageGateway L3 使用差距
+### 9.5 UnifiedStorageGateway L3 使用差距
 
 | 差距项 | 严重程度 |
 |--------|---------|
@@ -1087,11 +677,26 @@ def test_backward_compatibility():
 
 ---
 
-**文档状态**: v10.0 已完成5轮审查（最终版本）
-**审查摘要**:
-- 修正 §八.1 P0 编号与 §一.3 定义一致
-- 修正 §六.3 向后兼容验证（渐进迁移而非别名）
-- 移除 §九.3 已解决问题（invalidate_by_embedding 已在 v7.0 添加）
-- 所有 P0 问题仍未修复，需执行实际代码实现
+## 十、修正记录
 
+| 版本 | 日期 | 修正项 | 说明 |
+|------|------|--------|------|
+| v2.0 | 2026-05-13 | SemanticCachePort 不继承 L3VectorPort | Redis 实现无法满足向量检索契约 |
+| v2.0 | 2026-05-13 | QdrantVectorStore 完整实现 create_collection | 移除占位符 |
+| v3.0 | 2026-05-13 | P0 问题系统性修复 | search_sparse 异常处理、接口参数统一 |
+| v3.0 | 2026-05-13 | QdrantL3VectorStore 组合策略 | 组合 QdrantVectorStorage + QdrantCollectionManager |
+| v3.0 | 2026-05-13 | UnifiedStorageGateway self._l3 使用 | L3 功能不再虚设 |
+| v3.0 | 2026-05-13 | L3VectorPort 接口参数统一 | collection → name, vector_params → distance |
+| v4.0 | 2026-05-13 | 代码验证发现 v3.0 计划变更未实现 | 所有 P0/P1 问题仍未修复 |
+| v5.0 | 2026-05-13 | 第二轮5轮审查完成 | SemanticVectorPort 歧义；Redis 连接池问题；P0 修复依赖关系 |
+| v6.0 | 2026-05-13 | 语义缓存工作流程评审 | Qdrant+Redis 分离式设计确认 |
+| v7.0 | 2026-05-13 | §3.2.2 重写为双层设计 | 修正架构矛盾；统一 TTL=3600；添加 invalidate_by_embedding |
+| v8.0 | 2026-05-13 | 第3轮审查残留修正 | Layer 4 描述；过时注释；Redis 依赖注入 |
+| v9.0 | 2026-05-13 | 第4轮审查修正 | 渐进迁移方案；payload {cache_key, result}；降级数据源 |
+| v10.0 | 2026-05-13 | 第5轮审查最终修正 | P0 编号对齐；向后兼容验证；移除已解决问题 |
+| v11.0 | 2026-05-14 | **文档结构重构** | 新增设计原则章节；扩展四层模型I/O契约；实际代码转伪码 |
+
+---
+
+**文档状态**: v11.0 设计文档重构完成
 **下一步**: 执行 P0 问题的实际代码实现
