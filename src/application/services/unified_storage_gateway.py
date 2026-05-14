@@ -18,12 +18,13 @@ from src.domain.ports.storage_enums import StorageLayer, StorageTier
 from src.domain.ports.unified_storage import UnifiedStoragePort
 
 if TYPE_CHECKING:
+    # Rule 4: 应用层端口（继承 Rule 1 基础端口）
+    from src.application.ports.document_storage_port import DocumentStoragePort
+    from src.application.ports.memory_file_port import MemoryFilePort
+    from src.application.ports.memory_graph_port import MemoryGraphPort
+    from src.application.ports.memory_vector_port import MemoryVectorPort
+    from src.application.ports.session_cache_port import SessionCachePort
     from src.domain.entities.memory_metadata import MemoryMetadata
-    from src.domain.ports.l0_storage import L0StoragePort
-    from src.domain.ports.l1_cache import L1CachePort
-    from src.domain.ports.l3_vector import L3VectorPort
-    from src.domain.ports.l4_object import L4ObjectPort
-    from src.domain.ports.l5_graph import L5GraphPort
     from src.domain.ports.memory_repository import (
         L2ChangeHistoryRepositoryPort,
         L2GroupMemberRepositoryPort,
@@ -47,14 +48,14 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
     def __init__(
         self,
-        l0_storage: L0StoragePort,
-        l1_cache: L1CachePort,
+        l0_storage: MemoryFilePort,
+        l1_cache: SessionCachePort,
         l2_metadata: L2MetadataRepositoryPort,
         l2_history: L2ChangeHistoryRepositoryPort,
         l2_group_member: L2GroupMemberRepositoryPort | None = None,
-        l3_vector: L3VectorPort | None = None,
-        l4_object: L4ObjectPort | None = None,
-        l5_graph: L5GraphPort | None = None,
+        l3_vector: MemoryVectorPort | None = None,
+        l4_object: DocumentStoragePort | None = None,
+        l5_graph: MemoryGraphPort | None = None,
         event_publisher=None,
     ) -> None:
         """初始化统一存储网关。
