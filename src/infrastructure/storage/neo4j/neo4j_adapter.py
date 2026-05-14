@@ -14,12 +14,16 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, cast
 
 from src.domain.ports.l5_graph import L5GraphPort
 
 if TYPE_CHECKING:
     pass
+
+# Neo4j relationship type: uppercase letters, digits, underscores
+_REL_TYPE_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 
 class Neo4jAdapter(L5GraphPort):
@@ -133,7 +137,10 @@ class Neo4jAdapter(L5GraphPort):
         Returns:
             是否成功
         """
-        props_clause = ", ".join([f"r.{k} = ${k}" for k in (properties or {})])
+        _validate_rel_type(relationship_type)
+
+        safe_props = _sanitize_property_keys(properties or {})
+        props_clause = ", ".join([f"r.{k} = ${k}" for k in safe_props])
         if props_clause:
             props_clause = f"SET {props_clause}"
 
@@ -170,6 +177,8 @@ class Neo4jAdapter(L5GraphPort):
         Returns:
             是否成功
         """
+        _validate_rel_type(relationship_type)
+
         cypher = f"""
         MATCH (source:Memory {{id: $source_memory_id}})-[r:{relationship_type}]->(target:Memory {{id: $target_memory_id}})
         DELETE r
@@ -199,16 +208,18 @@ class Neo4jAdapter(L5GraphPort):
         Returns:
             关联实体列表
         """
+        depth = max(1, min(int(max_depth), 10))
         if relationship_type:
+            _validate_rel_type(relationship_type)
             cypher = f"""
-            MATCH path = (start:Memory {{id: $memory_id}})-[:{relationship_type}*1..{max_depth}]-(end)
+            MATCH path = (start:Memory {{id: $memory_id}})-[:{relationship_type}*1..{depth}]-(end)
             WITH path, end
             RETURN end.id as memory_id, end.type as type, properties(end) as properties, path
             LIMIT 50
             """
         else:
             cypher = f"""
-            MATCH path = (start:Memory {{id: $memory_id}})-[*1..{max_depth}]-(end)
+            MATCH path = (start:Memory {{id: $memory_id}})-[*1..{depth}]-(end)
             WITH path, end
             RETURN end.id as memory_id, end.type as type, properties(end) as properties, path
             LIMIT 50
@@ -287,3 +298,19 @@ class Neo4jAdapter(L5GraphPort):
             )
         # 多跳：使用 find_related 的语义遍历
         return await self.find_related(memory_id, max_depth=max_depth, relationship_type=edge_type)
+
+
+def _validate_rel_type(rel_type: str) -> None:
+    """Validate relationship type against whitelist pattern."""
+    if not _REL_TYPE_RE.match(rel_type):
+        raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Z_][A-Z0-9_]*")
+
+
+def _sanitize_property_keys(props: dict) -> dict:
+    """Sanitize property keys to prevent Cypher injection."""
+    safe = {}
+    for k, v in props.items():
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
+            raise ValueError(f"Invalid property key: {k!r}")
+        safe[k] = v
+    return safe

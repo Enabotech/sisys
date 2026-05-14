@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 from src.domain.exceptions.service_exceptions import AuditError
@@ -30,6 +30,7 @@ class AuditRecord:
     correction_level: int | None = None
 
 
+@runtime_checkable
 class AuditServicePort(Protocol):
     """审计服务端口（领域层定义，仅使用标准库）.
 

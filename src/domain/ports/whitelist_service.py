@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.entities.external_api_whitelist import ExternalAPIWhitelist
 
 
+@runtime_checkable
 class WhitelistServicePort(Protocol):
     """外部 API 白名单服务端口（协议接口）."""
 

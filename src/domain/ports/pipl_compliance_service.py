@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.entities.pipl_compliance_record import PIPLComplianceRecord
 
 
+@runtime_checkable
 class PIPLComplianceServicePort(Protocol):
     """PIPL 合规服务端口（协议接口）."""
 

@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from src.domain.entities.data_residency_policy import DataResidencyPolicy
 
 
+@runtime_checkable
 class DataResidencyEnforcerPort(Protocol):
     """数据驻留强制执行服务端口（协议接口）."""
 

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.exceptions import AuthenticationError
 from src.domain.value_objects.token_payload import TokenPayload
@@ -23,6 +23,7 @@ class AuthTokens:
     refresh_token: str
 
 
+@runtime_checkable
 class AuthServicePort(Protocol):
     """认证服务端口（领域层定义，仅使用标准库）.
 

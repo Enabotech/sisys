@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 
 
+@runtime_checkable
 class EventPublisher(Protocol):
     """事件发布抽象端口。
 
@@ -36,6 +37,7 @@ class EventPublisher(Protocol):
         """
 
 
+@runtime_checkable
 class InMemoryEventPublisher(Protocol):
     """Abstract event publisher interface.
 

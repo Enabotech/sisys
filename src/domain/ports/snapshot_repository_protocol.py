@@ -6,11 +6,12 @@ Infrastructure layer implements this protocol for persistent storage.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 
 
+@runtime_checkable
 class SnapshotRepositoryProtocol(Protocol):
     """Protocol for snapshot storage (implemented by infrastructure).
 

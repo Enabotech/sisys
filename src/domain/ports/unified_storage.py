@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from src.domain.ports.storage_enums import StorageLayer, StorageTier
 
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     pass
 
 
+@runtime_checkable
 class UnifiedStoragePort(Protocol):
     """统一存储入口接口。
 

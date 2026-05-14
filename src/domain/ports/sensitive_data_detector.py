@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.entities.sensitive_data_result import SensitiveDataResult
 
 
+@runtime_checkable
 class SensitiveDataDetectorPort(Protocol):
     """敏感数据检测服务端口（协议接口）."""
 

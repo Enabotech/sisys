@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.value_objects.compliance_result import ComplianceResult
 from src.domain.value_objects.udmr_task import UDMRTask
 
 
+@runtime_checkable
 class ComplianceGatewayPort(Protocol):
     """合规性网关端口（协议接口）.
 

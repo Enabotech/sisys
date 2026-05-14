@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, cast
 
 from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
@@ -107,6 +108,7 @@ class Neo4jGraphStorage:
             邻居节点数据列表
         """
         if rel_type:
+            _validate_rel_type(rel_type)
             rel_type_str = f":{rel_type.upper()}"
         else:
             rel_type_str = ""
@@ -134,3 +136,12 @@ class Neo4jGraphStorage:
                 """
 
         return await self.execute_query(cypher, {"node_id": node_id})
+
+
+_REL_TYPE_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$", re.IGNORECASE)
+
+
+def _validate_rel_type(rel_type: str) -> None:
+    """Validate relationship type against whitelist pattern."""
+    if not _REL_TYPE_RE.match(rel_type):
+        raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Za-z_][A-Za-z0-9_]*")

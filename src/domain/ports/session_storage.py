@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class SessionStorage(Protocol):
     """会话状态存储协议接口。
 
