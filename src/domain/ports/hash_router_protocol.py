@@ -6,9 +6,10 @@ Infrastructure layer implements this protocol for consistent session routing.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class HashRouterProtocol(Protocol):
     """Protocol for hash-based routing (implemented in infrastructure).
 

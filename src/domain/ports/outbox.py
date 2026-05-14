@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
 
 
+@runtime_checkable
 class OutboxRepository(Protocol):
     """事务发件箱仓储接口（领域层）。
 

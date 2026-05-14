@@ -6,13 +6,14 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.exceptions.service_exceptions import PasswordValidationError
 
 __all__ = ["PasswordValidationError"]
 
 
+@runtime_checkable
 class PasswordValidationServicePort(Protocol):
     """密码验证服务端口（领域层定义，仅使用标准库）
 

@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 
+@runtime_checkable
 class PermissionServicePort(Protocol):
     """权限服务端口（领域层定义，仅使用标准库）
 

@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from src.domain.entities.role import Role
 
 
+@runtime_checkable
 class UserRoleRepositoryPort(Protocol):
     """用户-角色关联仓储端口（领域层定义，仅使用标准库）
 

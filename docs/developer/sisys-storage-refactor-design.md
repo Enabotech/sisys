@@ -1208,11 +1208,11 @@ def bootstrap() -> None:
 - [x] 1.1 重构 `BaseRepository[T]` → `L2RdbPort[T]`（sync→async，添加@runtime_checkable）
 - [x] 1.2 修改三个L2端口继承 `L2RdbPort[T]`（Metadata/ChangeHistory继承，GroupMember组合）
 - [x] 1.3 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
-- [~] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）⚠️ 核心11个存储端口已完成，其余~27个非存储Protocol未添加
+- [x] 1.4 所有Domain端口添加 `@runtime_checkable`（38个Protocol文件全部完成）
 - [x] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（新增 L0StoragePort、L2RdbPort（重命名后的BaseRepository）、IndexManagerPort，保留 BaseRepository=L2RdbPort deprecated别名）
 - [x] 1.6 创建 `src/application/ports/__init__.py`（当前缺失），立即导出现有8个端口（semantic_cache, public_blackboard, event_subscriber, metrics_port, compressor_service, text_extractor_service, exception_metrics_port, sandbox_port）
-- [~] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路 ⚠️ type-based impl正常；string-based impl返回class未传入_auto_inject
-- [~] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效 ⚠️ 仅11个@runtime_checkable端口isinstance有效
+- [x] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路（已修复：string-based impl现正确传入_auto_inject）
+- [x] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效（38个Protocol全部@runtime_checkable）
 
 ### Phase 2: Rule 2 — 应用端口定义
 
@@ -1231,7 +1231,7 @@ def bootstrap() -> None:
 - [x] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
 - [x] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [x] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
-- [~] 3.4 补全 `Neo4jAdapter.get_neighbors()` ✅；修复 Cypher 注入漏洞 ❌（3处f-string未修复: create_relationship/delete_relationship/find_related）
+- [x] 3.4 补全 `Neo4jAdapter.get_neighbors()` ✅；修复 Cypher 注入漏洞 ✅（whitelist验证+property key清理，neo4j_adapter.py + graph_storage.py）
 - [x] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
 - [x] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
 - [x] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
@@ -1240,7 +1240,7 @@ def bootstrap() -> None:
   - [x] 3.7.1 新增 l3_vector 端口注册
   - [x] 3.7.2 新增 l4_object 端口注册
   - [x] 3.7.3 新增 l5_graph 端口注册
-- [~] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配 ⚠️ Neo4j Cypher注入未修复
+- [x] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
 
 ### Phase 4: Rule 4 — 应用端口实现
 

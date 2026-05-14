@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class TokenBlacklistPort(Protocol):
     """Token 黑名单仓储端口（领域层定义，仅使用标准库）
 

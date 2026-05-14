@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from src.domain.entities.cross_border_transfer import CrossBorderTransferRequest
 
 
+@runtime_checkable
 class CrossBorderTransferServicePort(Protocol):
     """跨境数据传输服务端口（协议接口）."""
 

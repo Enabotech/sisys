@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 
@@ -36,6 +36,7 @@ class AuditSearchResult:
     limit: int
 
 
+@runtime_checkable
 class AuditRepositoryPort(Protocol):
     """审计仓储端口（领域层定义，仅使用标准库）.
 

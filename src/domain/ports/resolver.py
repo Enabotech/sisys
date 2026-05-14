@@ -103,7 +103,8 @@ class Resolver:
         if callable(spec.impl) and not isinstance(spec.impl, type):
             return spec.impl(resolver=self)
         if isinstance(spec.impl, str):
-            return self._load_from_module_path(spec.impl)
+            cls = self._load_from_module_path(spec.impl)
+            return self._auto_inject(cls)
         return self._auto_inject(spec.impl)
 
     def _load_from_module_path(self, module_path: str) -> Any:
