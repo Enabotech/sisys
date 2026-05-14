@@ -157,11 +157,34 @@ class MinIOAdapter(L4ObjectPort):
         Returns:
             对象 ID 或 ETag
         """
+        return await self._repository.archive(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            content=content,
+            retention_days=retention_days,
+        )
+
+    async def list_objects(
+        self,
+        bucket_type: str,
+        prefix: str = "",
+        recursive: bool = True,
+    ) -> list[dict]:
+        """列出对象，支持前缀过滤。
+
+        Args:
+            bucket_type: Bucket 类型
+            prefix: 前缀过滤
+            recursive: 是否递归列出子目录
+
+        Returns:
+            对象元数据列表
+        """
         return cast(
-            "str",
-            await self._repository.archive(
+            "list[dict[Any, Any]]",
+            await self._repository.list_objects(
                 bucket_type=bucket_type,
-                object_key=object_key,
-                retention_days=retention_days,
+                prefix=prefix,
+                recursive=recursive,
             ),
         )

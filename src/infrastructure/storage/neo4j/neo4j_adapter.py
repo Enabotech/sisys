@@ -256,3 +256,34 @@ class Neo4jAdapter(L5GraphPort):
             查询结果列表
         """
         return cast("list[dict[Any, Any]]", await self._storage.execute_write_query(cypher, params))
+
+    async def get_neighbors(
+        self,
+        memory_id: str,
+        max_depth: int = 1,
+        edge_type: str | None = None,
+    ) -> list[dict]:
+        """获取邻居节点（直接关联的实体）。
+
+        桥接 L5GraphPort.get_neighbors(memory_id, max_depth, edge_type)
+        到 Neo4jGraphStorage.get_neighbors(node_id, rel_type, direction)。
+
+        Args:
+            memory_id: 实体主键
+            max_depth: 最大深度（默认 1，只看直接邻居）
+            edge_type: 过滤边类型，None 表示所有
+
+        Returns:
+            邻居节点列表 [{memory_id, type, properties}, ...]
+        """
+        if max_depth <= 1:
+            # 直接委托给底层 get_neighbors（单跳）
+            return cast(
+                "list[dict[Any, Any]]",
+                await self._storage.get_neighbors(
+                    node_id=memory_id,
+                    rel_type=edge_type,
+                ),
+            )
+        # 多跳：使用 find_related 的语义遍历
+        return await self.find_related(memory_id, max_depth=max_depth, relationship_type=edge_type)

@@ -1,75 +1,94 @@
-"""通用仓储基类。
+"""PostgreSQLAdapter[TEntity, TModel] — L2RdbPort 领域仓储基座。
 
-所有具体仓储类继承此基类，复用 CRUD 操作。
-支持异步操作（async/await）。
+重构说明：
+- 原 BaseRepository[T] 重命名为 PostgreSQLAdapter[TEntity, TModel]
+- BaseRepository 保留为 deprecated 别名
+- 提供领域实体/ORM模型转换层（_to_entity/_to_model）
+- 提供可配置 pk_column/soft_delete_column
+- 提供 _do_save 钩子（UPSERT/append-only）
 """
 
 from __future__ import annotations
 
 from typing import Any, Generic, TypeVar, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.models import Base
 
-T = TypeVar("T", bound=Base)
+TEntity = TypeVar("TEntity")
+TModel = TypeVar("TModel", bound=Base)
 
 
-class BaseRepository(Generic[T]):
-    """通用仓储基类。
+class PostgreSQLAdapter(Generic[TEntity, TModel]):
+    """领域仓储基座 — 实现 L2RdbPort[TEntity]，提供 ORM↔Entity 转换。
 
-    泛型类型参数 T 必须是 SQLAlchemy 模型（继承自 Base）。
+    子类只需实现:
+    - _to_entity(model: TModel) -> TEntity
+    - _to_model(entity: TEntity) -> TModel
+    - pk_column: str = "id"（可覆写为 "memory_id" 等）
     """
 
-    def __init__(self, model_class: type[T], session: AsyncSession):
-        """初始化 BaseRepository。
+    pk_column: str = "id"
+    soft_delete_column: str | None = None
+
+    def __init__(self, model_class: type[TModel], session: AsyncSession):
+        """初始化 PostgreSQLAdapter。
 
         Args:
             model_class: SQLAlchemy 模型类
             session: 异步数据库会话
         """
-        self._model_class: type[T] = model_class
+        self._model_class: type[TModel] = model_class
         self._session = session
 
-    async def get_by_id(self, id: str) -> T | None:
+    def _to_entity(self, model: TModel) -> TEntity:
+        """ORM 模型 → 领域实体（子类必须覆写）。"""
+        raise NotImplementedError
+
+    def _to_model(self, entity: TEntity) -> TModel:
+        """领域实体 → ORM 模型（子类必须覆写）。"""
+        raise NotImplementedError
+
+    async def get_by_id(self, id: Any) -> TEntity | None:
         """根据 ID 获取实体。
 
         Args:
-            id: 实体 UUID（字符串格式）
+            id: 实体主键
 
         Returns:
-            实体实例，如果不存在则返回 None
+            领域实体，不存在则返回 None
         """
-        result = await self._session.execute(select(self._model_class).where(cast(Any, self._model_class).id == id))
-        return result.scalar_one_or_none()
+        stmt = select(self._model_class).where(
+            cast("Any", self._model_class).__table__.c[self.pk_column] == id
+        )
+        stmt = self._apply_soft_delete_filter(stmt)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
 
-    async def save(self, entity: T) -> T:
-        """保存实体（插入或更新）。
+    async def save(self, entity: TEntity) -> None:
+        """保存实体（insert or update）。
 
         Args:
-            entity: 实体实例
-
-        Returns:
-            保存后的实体实例
+            entity: 领域实体
         """
-        self._session.add(entity)
-        await self._session.flush()
-        await self._session.refresh(entity)
-        return entity
+        model = self._to_model(entity)
+        await self._do_save(model, entity)
 
-    async def delete(self, id: str) -> None:
-        """删除实体。
+    async def delete(self, id: Any) -> None:
+        """删除实体（硬删除或软删除）。
 
         Args:
-            id: 实体 UUID（字符串格式）
+            id: 实体主键
         """
-        entity = await self.get_by_id(id)
-        if entity:
-            await self._session.delete(entity)
-            await self._session.flush()
+        if self.soft_delete_column:
+            await self._soft_delete(id)
+        else:
+            await self._hard_delete(id)
 
-    async def list_all(self, skip: int = 0, limit: int = 100) -> list[T]:
+    async def list_all(self, skip: int = 0, limit: int = 100) -> list[TEntity]:
         """获取实体列表。
 
         Args:
@@ -77,16 +96,55 @@ class BaseRepository(Generic[T]):
             limit: 返回数量上限
 
         Returns:
-            实体列表
+            领域实体列表
         """
-        result = await self._session.execute(select(self._model_class).offset(skip).limit(limit))
-        return list(result.scalars().all())
+        stmt = select(self._model_class).offset(skip).limit(limit)
+        stmt = self._apply_soft_delete_filter(stmt)
+        result = await self._session.execute(stmt)
+        return [self._to_entity(m) for m in result.scalars().all()]
 
     async def count(self) -> int:
-        """获取实体总数。
-
-        Returns:
-            实体总数
-        """
+        """获取实体总数。"""
         result = await self._session.execute(select(func.count()).select_from(self._model_class))
         return int(result.scalar() or 0)
+
+    async def _do_save(self, model: TModel, entity: TEntity) -> None:
+        """保存钩子 — 默认简单插入，子类可覆写为 UPSERT/乐观锁。"""
+        self._session.add(model)
+        await self._session.flush()
+        await self._session.refresh(model)
+
+    def _apply_soft_delete_filter(self, stmt: Any) -> Any:
+        """应用软删除过滤条件。"""
+        if self.soft_delete_column:
+            col = cast("Any", self._model_class).__table__.c[self.soft_delete_column]
+            return stmt.where(col.is_(None))
+        return stmt
+
+    async def _soft_delete(self, id: Any) -> None:
+        """软删除 — 设置 deleted_at 时间戳。"""
+        from datetime import datetime, timezone
+
+        stmt = (
+            update(self._model_class)
+            .where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
+            .values(**{self.soft_delete_column: datetime.now(timezone.utc)})
+        )
+        stmt = self._apply_soft_delete_filter(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def _hard_delete(self, id: Any) -> None:
+        """硬删除 — 物理删除记录。"""
+        stmt = select(self._model_class).where(
+            cast("Any", self._model_class).__table__.c[self.pk_column] == id
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        if model:
+            await self._session.delete(model)
+            await self._session.flush()
+
+
+# Deprecated alias — use PostgreSQLAdapter instead
+BaseRepository = PostgreSQLAdapter

@@ -6,6 +6,11 @@
 - append-only：只允许新增，不允许修改或删除
 
 架构来源: architecture.md §11.2.5
+
+重构说明（Phase 3）：
+- 继承 PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel]
+- 覆写 delete 抛出 NotImplementedError（append-only）
+- 自动获得父类 get_by_id/save/list_all
 """
 
 from __future__ import annotations
@@ -16,17 +21,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
-from src.domain.ports.l2_rdb import L2ChangeHistoryRepositoryPort
+from src.domain.ports.memory_repository import L2ChangeHistoryRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryChangeHistoryModel
+from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
 
 
-class PostgreSQLMemoryChangeHistoryRepository(L2ChangeHistoryRepositoryPort):
+class PostgreSQLMemoryChangeHistoryRepository(
+    PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel],
+    L2ChangeHistoryRepositoryPort,
+):
     """PostgreSQL 记忆变更历史仓储。
 
-    使用 AsyncSession 提供异步、线程安全的数据库操作。
+    继承 PostgreSQLAdapter，覆写 delete 为抛出异常。
     append-only 模式：只允许新增记录，不允许修改或删除。
-
-    delete 操作会创建新记录（change_type='delete'），而非真正删除历史。
     """
 
     def __init__(self, session: AsyncSession):
@@ -35,7 +42,46 @@ class PostgreSQLMemoryChangeHistoryRepository(L2ChangeHistoryRepositoryPort):
         Args:
             session: SQLAlchemy 异步会话（非线程共享，会话绑定到特定连接）
         """
-        self._session = session
+        super().__init__(MemoryChangeHistoryModel, session)
+
+    async def delete(self, id: UUID) -> None:
+        """删除实体 — append-only 禁止删除。
+
+        Raises:
+            NotImplementedError: 变更历史不可删除
+        """
+        raise NotImplementedError("Change history is append-only, cannot delete")
+
+    async def save(self, history: MemoryChangeHistory) -> None:
+        """保存历史记录（append-only）。
+
+        使用父类 save 实现（简单插入）。
+
+        Args:
+            history: 变更历史记录
+        """
+        model = self._to_model(history)
+        self._session.add(model)
+        await self._session.flush()
+
+    async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]:
+        """获取记忆的所有历史记录。
+
+        按 changed_at 升序排序（时间顺序）。
+
+        Args:
+            memory_id: 记忆 ID
+
+        Returns:
+            变更历史列表（按时间排序）
+        """
+        result = await self._session.execute(
+            select(MemoryChangeHistoryModel)
+            .where(MemoryChangeHistoryModel.memory_id == memory_id)
+            .order_by(MemoryChangeHistoryModel.changed_at.asc())
+        )
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
 
     def _to_model(self, entity: MemoryChangeHistory) -> MemoryChangeHistoryModel:
         """将领域实体转换为数据库模型。"""
@@ -64,49 +110,3 @@ class PostgreSQLMemoryChangeHistoryRepository(L2ChangeHistoryRepositoryPort):
             diff_summary=model.diff_summary or "",
             archived_ref=model.archived_ref or "",
         )
-
-    async def save(self, history: MemoryChangeHistory) -> None:
-        """保存历史记录（append-only）。
-
-        每次调用都会创建新记录，不允许修改或删除历史。
-
-        Args:
-            history: 变更历史记录
-        """
-        model = self._to_model(history)
-        self._session.add(model)
-        await self._session.flush()
-
-    async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]:
-        """获取记忆的所有历史记录。
-
-        按 changed_at 升序排序（时间顺序）。
-
-        Args:
-            memory_id: 记忆 ID
-
-        Returns:
-            变更历史列表（按时间排序）
-        """
-        result = await self._session.execute(
-            select(MemoryChangeHistoryModel)
-            .where(MemoryChangeHistoryModel.memory_id == memory_id)
-            .order_by(MemoryChangeHistoryModel.changed_at.asc())
-        )
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
-
-    async def get_by_id(self, history_id: UUID) -> MemoryChangeHistory | None:
-        """通过 ID 获取历史记录。
-
-        Args:
-            history_id: 历史记录 ID
-
-        Returns:
-            MemoryChangeHistory 如果存在，否则 None
-        """
-        result = await self._session.execute(select(MemoryChangeHistoryModel).where(MemoryChangeHistoryModel.id == history_id))
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)

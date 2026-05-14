@@ -10,9 +10,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class IndexManagerPort(Protocol):
     """记忆索引管理抽象端口。
 

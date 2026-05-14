@@ -152,18 +152,45 @@ class MinIORepository(ObjectStorageRepository):
         self,
         bucket_type: str,
         object_key: str,
+        content: bytes | None = None,
         retention_days: int = 2555,
-    ) -> bool:
-        """归档对象至 WORM 存储，启用 Object Lock。"""
+    ) -> str:
+        """归档对象至 WORM 存储，启用 Object Lock。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            content: 对象内容（bytes），None 表示仅对已有对象设置 retention
+            retention_days: 保留天数（默认 2555 天 = 7 年）
+
+        Returns:
+            对象键（归档成功后返回 object_key）
+        """
         import asyncio
+        from io import BytesIO
 
         bucket_name = self._resolve_bucket_name(bucket_type)
-        return await asyncio.to_thread(
+
+        # Upload content if provided
+        if content is not None:
+            client = self._bucket_manager._client.client
+            await asyncio.to_thread(
+                client.put_object,
+                bucket_name=bucket_name,
+                object_name=object_key,
+                data=BytesIO(content),
+                length=len(content),
+            )
+
+        # Set WORM retention
+        await asyncio.to_thread(
             self._worm_manager.archive_object,
             bucket_name=bucket_name,
             object_key=object_key,
             retention_days=retention_days,
         )
+
+        return object_key
 
     # -- Internal helpers -----------------------------------------------------------
 

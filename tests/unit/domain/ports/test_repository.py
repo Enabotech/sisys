@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
-from src.domain.ports.base import BaseRepository
+from src.domain.ports.l2_rdb import BaseRepository
 
 
 class TestBaseRepositorySignature:

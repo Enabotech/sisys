@@ -12,7 +12,7 @@ from __future__ import annotations
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.ports.l2_rdb import L2GroupMemberRepositoryPort
+from src.domain.ports.memory_repository import L2GroupMemberRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryGroupMemberModel
 
 

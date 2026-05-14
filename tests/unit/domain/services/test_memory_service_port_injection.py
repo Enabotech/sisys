@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from src.domain.ports.l0_storage import L0StoragePort
-from src.domain.ports.l2_rdb import (
+from src.domain.ports.memory_repository import (
     L2ChangeHistoryRepositoryPort,
     L2MetadataRepositoryPort,
 )

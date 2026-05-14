@@ -1,7 +1,7 @@
-"""Object Storage Repository — 领域层定义。
+"""Object Storage Repository — 领域层定义（DEPRECATED）。
 
-定义对象存储的领域抽象接口，基础设施层负责实现。
-领域层不依赖任何具体存储实现（MinIO/S3/boto3）。
+已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）。
+本文件仅保留向后兼容。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ __all__ = ["ComplianceLockError"]
 
 
 class ObjectStorageRepository(Protocol):
-    """对象存储领域仓储接口。
+    """对象存储领域仓储接口（DEPRECATED — 使用 L4ObjectPort）。
 
     定义领域操作（store/retrieve/delete/archive），
     不暴露 S3 原生概念（bucket/key/ETag 等）。
