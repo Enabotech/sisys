@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v4.0 (Round 3审查修正)
+**文档版本:** v4.1 (Round 4审查修正)
 **生成时间:** 2026-05-14
-**审查状态:** Round 3 完成 — 四层规则自洽性审查，补全Rule 4伪代码
+**审查状态:** Round 4 完成 — 架构约束验证+执行步骤可行性，修正4个P0问题
 
 ---
 
@@ -464,9 +464,13 @@ class RedisSessionCache(SessionCachePort):
 
 ### Rule 1: Domain Layer — L2RdbPort[T]（重构BaseRepository）
 
-**当前状态**: `BaseRepository[T]`(base.py)是**sync**泛型CRUD基座，但L2全部实际端口(Metadata/ChangeHistory/GroupMember)均为**async**。没有任何L2端口继承它。
+**⚠️ 两个同名 BaseRepository 需区分**:
+- **Domain层** `BaseRepository[T]`(src/domain/ports/base.py): Protocol，方法为**sync**，**无人继承**，将重命名为`L2RdbPort[T]`并改async
+- **Infrastructure层** `BaseRepository[T]`(src/infrastructure/storage/postgresql/repository/base_repository.py): 具体类，方法已为**async**，被UserRepository/PermissionRepository继承，将重构为`PostgreSQLAdapter[TEntity,TModel]`
 
-**按规则1重构**: 将`BaseRepository[T]`重构为`L2RdbPort[T]`(async)，作为L2统一基础端口。
+**当前状态**: Domain层`BaseRepository[T]`是sync泛型CRUD基座，但L2全部实际端口(Metadata/ChangeHistory/GroupMember)均为async。没有任何L2端口继承它。
+
+**按规则1重构**: 将Domain层`BaseRepository[T]`重构为`L2RdbPort[T]`(async)，作为L2统一基础端口。
 
 ```python
 # src/domain/ports/base.py — 重构
@@ -506,6 +510,7 @@ class L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory], Protocol):
     """变更历史端口 — 继承L2RdbPort，扩展历史查询方法。
 
     继承: get_by_id, save, delete, list_all（全部async）
+    注意: delete在Protocol层作为签名约束存在，实现层覆写为raise NotImplementedError(append-only)
     扩展: get_by_memory_id
     """
     async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]: ...
@@ -719,6 +724,12 @@ class PostgreSQLMemoryGroupMemberRepository:
 - ChangeHistoryRepository继承：覆写`_do_save`(append-only)、`delete`(禁止)
 - GroupMemberRepository组合注入：无标准CRUD，共享Session基础设施
 - DatabaseEngine统一提供AsyncSession（延迟初始化AsyncEngine, health_check）
+
+**⚠️ Infrastructure层BaseRepository迁移影响**:
+- `save()`返回值从`T`变为`None` — UserRepository/PermissionRepository的调用者需检查是否依赖返回值
+- `list_all`从`(skip, limit)`变为无参数 — 调用者需检查分页依赖
+- `get_by_id`参数从`str`变为`UUID` — 实际上是修复现有类型不一致（UserModel.id已是UUID）
+- `count()`方法在新基座中未提供 — 如有调用者使用需在子类中补全
 
 ---
 
@@ -1065,10 +1076,8 @@ def bootstrap() -> None:
         module="src.infrastructure.storage.redis.redis_memory_cache",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
-    register_port(name="l2_pg_base", interface=L2RdbPort,
-        impl="src.infrastructure.storage.postgresql.repository.base_repository.PostgreSQLAdapter",
-        module="src.infrastructure.storage.postgresql.repository.base_repository",
-        lifetime=Lifetime.SCOPED, owner="platform-team")
+    # 注意: PostgreSQLAdapter[TEntity,TModel]是泛型基座，无法独立实例化
+    # L2端口的具体实现由三个子仓储直接注册（见下方Rule 4区域）
 
     register_port(name="l3_vector", interface=L3VectorPort,
         impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
@@ -1101,7 +1110,22 @@ def bootstrap() -> None:
     # ← Resolver自动注入: cache_adapter参数→解析"l1_cache"
 
     register_port(name="memory_metadata", interface=L2MetadataRepositoryPort,
-        impl="...PostgreSQLMemoryMetadataRepository", ...)
+        impl="src.infrastructure.storage.postgresql.repository.memory_metadata_repository.PostgreSQLMemoryMetadataRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_metadata_repository",
+        lifetime=Lifetime.SCOPED, owner="platform-team")
+    # ← 继承PostgreSQLAdapter[MemoryMetadata,MemoryMetadataModel]，Resolver注入session
+
+    register_port(name="memory_change_history", interface=L2ChangeHistoryRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.memory_change_history_repository.PostgreSQLMemoryChangeHistoryRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_change_history_repository",
+        lifetime=Lifetime.SCOPED, owner="platform-team")
+    # ← 继承PostgreSQLAdapter[MemoryChangeHistory,MemoryChangeHistoryModel]，delete覆写为raise NotImplementedError
+
+    register_port(name="memory_group_member", interface=L2GroupMemberRepositoryPort,
+        impl="src.infrastructure.storage.postgresql.repository.memory_group_member_repository.PostgreSQLMemoryGroupMemberRepository",
+        module="src.infrastructure.storage.postgresql.repository.memory_group_member_repository",
+        lifetime=Lifetime.SCOPED, owner="platform-team")
+    # ← 组合注入共享Session（复合PK，不继承PostgreSQLAdapter）
 
     register_port(name="memory_vector", interface=MemoryVectorPort,
         impl="src.infrastructure.storage.qdrant.memory_vector_storage.QdrantMemoryVectorStorage",
@@ -1167,7 +1191,7 @@ def bootstrap() -> None:
 - [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）
-- [ ] 3.5 重构 `PgBaseRepository` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）
+- [ ] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
 - [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
 - [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
 - [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
