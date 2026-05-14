@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v4.3 (Round 2四规则合规验证)
+**文档版本:** v4.4 (Round 3架构约束验证)
 **生成时间:** 2026-05-14
-**审查状态:** Round 2 完成 — 四条设计规则目标状态全部合规，当前代码违规均已在Phase 1-5规划修复
+**审查状态:** Round 3 完成 — 统一Rule 1/4签名风格，L3/L5完整签名匹配实际代码
 
 ---
 
@@ -320,19 +320,19 @@ class MemoryFileStorage(MemoryFilePort):
 
     # === 继承的L0StoragePort方法 — 委托 ===
 
-    async def write(self, memory_id, memory_type, content) -> bool:
+    async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
         return await self._file.write(memory_id, memory_type, content)
 
-    async def read(self, memory_id, memory_type) -> str:
+    async def read(self, memory_id: str, memory_type: str) -> str:
         return await self._file.read(memory_id, memory_type)
 
-    async def delete(self, memory_id, memory_type) -> bool:
+    async def delete(self, memory_id: str, memory_type: str) -> bool:
         return await self._file.delete(memory_id, memory_type)
 
-    async def exists(self, memory_id, memory_type) -> bool:
+    async def exists(self, memory_id: str, memory_type: str) -> bool:
         return await self._file.exists(memory_id, memory_type)
 
-    async def list_memories(self, memory_type) -> list[str]:
+    async def list_memories(self, memory_type: str) -> list[str]:
         return await self._file.list_memories(memory_type)
 
     # === MemoryFilePort扩展方法 ===
@@ -424,16 +424,17 @@ class RedisSessionCache(SessionCachePort):
 
     # === 继承的L1CachePort方法 — 委托 ===
 
-    async def get(self, memory_type, owner_id, name) -> str | None:
+    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None:
         return await self._cache.get(memory_type, owner_id, name)
 
-    async def set(self, memory_type, owner_id, name, content, ttl=None) -> bool:
+    async def set(self, memory_type: str, owner_id: str, name: str,
+                  content: str, ttl: int | None = None) -> bool:
         return await self._cache.set(memory_type, owner_id, name, content, ttl)
 
-    async def delete(self, memory_type, owner_id, name) -> bool:
+    async def delete(self, memory_type: str, owner_id: str, name: str) -> bool:
         return await self._cache.delete(memory_type, owner_id, name)
 
-    async def invalidate_pattern(self, memory_type, owner_id) -> int:
+    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> int:
         return await self._cache.invalidate_pattern(memory_type, owner_id)
 
     # === SessionCachePort扩展方法 — 会话语义 ===
@@ -741,14 +742,17 @@ class PostgreSQLMemoryGroupMemberRepository:
 # src/domain/ports/l3_vector.py — 已有
 
 class L3VectorPort(Protocol):
-    async def upsert_points(self, collection, points) -> bool: ...
-    async def delete_points(self, collection, point_ids) -> bool: ...
-    async def get_point(self, collection, point_id) -> dict | None: ...
-    async def search(self, collection, query_vector, limit, filter_payload) -> list[dict]: ...
-    async def search_sparse(self, collection, sparse_vector, limit, filter_payload) -> list[dict]: ...
-    async def create_collection(self, collection, vector_size, vector_params) -> bool: ...
-    async def delete_collection(self, collection) -> bool: ...
-    async def collection_exists(self, collection) -> bool: ...
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool: ...
+    async def delete_points(self, collection: str, point_ids: list[str]) -> bool: ...
+    async def get_point(self, collection: str, point_id: str) -> dict | None: ...
+    async def search(self, collection: str, query_vector: list[float],
+                     limit: int = 10, filter_payload: dict | None = None) -> list[dict]: ...
+    async def search_sparse(self, collection: str, sparse_vector: dict,
+                            limit: int = 10, filter_payload: dict | None = None) -> list[dict]: ...
+    async def create_collection(self, collection: str, vector_size: int,
+                                vector_params: dict | None = None) -> bool: ...
+    async def delete_collection(self, collection: str) -> bool: ...
+    async def collection_exists(self, collection: str) -> bool: ...
     async def list_collections(self) -> list[str]: ...
 ```
 
@@ -838,28 +842,31 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
 
     # === 继承的L3VectorPort方法 — 委托 ===
 
-    async def upsert_points(self, collection, points) -> bool:
+    async def upsert_points(self, collection: str, points: list[dict]) -> bool:
         return await self._adapter.upsert_points(collection, points)
 
-    async def delete_points(self, collection, point_ids) -> bool:
+    async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
         return await self._adapter.delete_points(collection, point_ids)
 
-    async def get_point(self, collection, point_id) -> dict | None:
+    async def get_point(self, collection: str, point_id: str) -> dict | None:
         return await self._adapter.get_point(collection, point_id)
 
-    async def search(self, collection, query_vector, limit=10, filter_payload=None) -> list[dict]:
+    async def search(self, collection: str, query_vector: list[float],
+                     limit: int = 10, filter_payload: dict | None = None) -> list[dict]:
         return await self._adapter.search(collection, query_vector, limit, filter_payload)
 
-    async def search_sparse(self, collection, sparse_vector, limit=10, filter_payload=None) -> list[dict]:
+    async def search_sparse(self, collection: str, sparse_vector: dict,
+                            limit: int = 10, filter_payload: dict | None = None) -> list[dict]:
         return await self._adapter.search_sparse(collection, sparse_vector, limit, filter_payload)
 
-    async def create_collection(self, collection, vector_size, vector_params=None) -> bool:
+    async def create_collection(self, collection: str, vector_size: int,
+                                vector_params: dict | None = None) -> bool:
         return await self._adapter.create_collection(collection, vector_size, vector_params)
 
-    async def delete_collection(self, collection) -> bool:
+    async def delete_collection(self, collection: str) -> bool:
         return await self._adapter.delete_collection(collection)
 
-    async def collection_exists(self, collection) -> bool:
+    async def collection_exists(self, collection: str) -> bool:
         return await self._adapter.collection_exists(collection)
 
     async def list_collections(self) -> list[str]:
@@ -903,15 +910,23 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
 # src/domain/ports/l5_graph.py — 已有
 
 class L5GraphPort(Protocol):
-    async def create_entity(self, memory_id, entity_type, properties) -> bool: ...
-    async def get_entity(self, memory_id) -> dict | None: ...
-    async def delete_entity(self, memory_id) -> bool: ...
-    async def create_relationship(self, source, target, rel_type, properties) -> bool: ...
-    async def delete_relationship(self, source, target, rel_type) -> bool: ...
-    async def find_related(self, memory_id, max_depth, rel_type) -> list[dict]: ...
-    async def execute_query(self, cypher, params) -> list[dict]: ...
-    async def execute_write_query(self, cypher, params) -> list[dict]: ...
-    async def get_neighbors(self, memory_id, max_depth, edge_type) -> list[dict]: ...
+    async def create_entity(self, memory_id: str, entity_type: str,
+                            properties: dict[str, Any]) -> bool: ...
+    async def get_entity(self, memory_id: str) -> dict | None: ...
+    async def delete_entity(self, memory_id: str) -> bool: ...
+    async def create_relationship(self, source_memory_id: str, target_memory_id: str,
+                                  relationship_type: str,
+                                  properties: dict[str, Any] | None = None) -> bool: ...
+    async def delete_relationship(self, source_memory_id: str, target_memory_id: str,
+                                  relationship_type: str) -> bool: ...
+    async def find_related(self, memory_id: str, max_depth: int = 2,
+                          relationship_type: str | None = None) -> list[dict]: ...
+    async def execute_query(self, cypher: str,
+                            params: dict[str, Any] | None = None) -> list[dict]: ...
+    async def execute_write_query(self, cypher: str,
+                                  params: dict[str, Any] | None = None) -> list[dict]: ...
+    async def get_neighbors(self, memory_id: str, max_depth: int = 1,
+                            edge_type: str | None = None) -> list[dict]: ...
 ```
 
 ### Rule 2: Application Layer — MemoryGraphPort
@@ -991,31 +1006,41 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
 
     # === 继承的L5GraphPort方法 — 委托 ===
 
-    async def create_entity(self, memory_id, entity_type, properties) -> bool:
+    async def create_entity(self, memory_id: str, entity_type: str,
+                            properties: dict[str, Any]) -> bool:
         return await self._adapter.create_entity(memory_id, entity_type, properties)
 
-    async def get_entity(self, memory_id) -> dict | None:
+    async def get_entity(self, memory_id: str) -> dict | None:
         return await self._adapter.get_entity(memory_id)
 
-    async def delete_entity(self, memory_id) -> bool:
+    async def delete_entity(self, memory_id: str) -> bool:
         return await self._adapter.delete_entity(memory_id)
 
-    async def create_relationship(self, source, target, rel_type, properties) -> bool:
-        return await self._adapter.create_relationship(source, target, rel_type, properties)
+    async def create_relationship(self, source_memory_id: str, target_memory_id: str,
+                                  relationship_type: str,
+                                  properties: dict[str, Any] | None = None) -> bool:
+        return await self._adapter.create_relationship(
+            source_memory_id, target_memory_id, relationship_type, properties)
 
-    async def delete_relationship(self, source, target, rel_type) -> bool:
-        return await self._adapter.delete_relationship(source, target, rel_type)
+    async def delete_relationship(self, source_memory_id: str, target_memory_id: str,
+                                  relationship_type: str) -> bool:
+        return await self._adapter.delete_relationship(
+            source_memory_id, target_memory_id, relationship_type)
 
-    async def find_related(self, memory_id, max_depth, rel_type) -> list[dict]:
-        return await self._adapter.find_related(memory_id, max_depth, rel_type)
+    async def find_related(self, memory_id: str, max_depth: int = 2,
+                          relationship_type: str | None = None) -> list[dict]:
+        return await self._adapter.find_related(memory_id, max_depth, relationship_type)
 
-    async def execute_query(self, cypher, params) -> list[dict]:
+    async def execute_query(self, cypher: str,
+                            params: dict[str, Any] | None = None) -> list[dict]:
         return await self._adapter.execute_query(cypher, params)
 
-    async def execute_write_query(self, cypher, params) -> list[dict]:
+    async def execute_write_query(self, cypher: str,
+                                  params: dict[str, Any] | None = None) -> list[dict]:
         return await self._adapter.execute_write_query(cypher, params)
 
-    async def get_neighbors(self, memory_id, max_depth, edge_type) -> list[dict]:
+    async def get_neighbors(self, memory_id: str, max_depth: int = 1,
+                            edge_type: str | None = None) -> list[dict]:
         return await self._adapter.get_neighbors(memory_id, max_depth, edge_type)
 
     # === MemoryGraphPort扩展方法 ===
