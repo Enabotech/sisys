@@ -17,7 +17,6 @@ import fakeredis
 import fakeredis.aioredis
 import pytest
 
-from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.key_builder import build_key
 from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
 from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache, cosine_similarity
@@ -155,8 +154,7 @@ class TestReadLatencyPerformance:
     @pytest.mark.asyncio
     async def test_session_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        storage = RedisSessionStorage(RedisConfig())
-        storage._pool = fake_redis.connection_pool
+        storage = RedisSessionStorage(redis_client=fake_redis)
 
         session_id = str(uuid.uuid4())
         data = _make_session_data()
@@ -174,8 +172,7 @@ class TestReadLatencyPerformance:
     @pytest.mark.asyncio
     async def test_blackboard_read_latency_p95_under_5ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        blackboard = RedisPublicBlackboard(RedisConfig())
-        blackboard._pool = fake_redis.connection_pool
+        blackboard = RedisPublicBlackboard(redis_client=fake_redis)
 
         conversation_id = str(uuid.uuid4())
         entry = _make_blackboard_entry()
@@ -208,8 +205,7 @@ class TestWriteLatencyPerformance:
     @pytest.mark.asyncio
     async def test_session_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        storage = RedisSessionStorage(RedisConfig())
-        storage._pool = fake_redis.connection_pool
+        storage = RedisSessionStorage(redis_client=fake_redis)
 
         latencies: list[float] = []
         for _ in range(BENCHMARK_ITERATIONS):
@@ -225,8 +221,7 @@ class TestWriteLatencyPerformance:
     @pytest.mark.asyncio
     async def test_blackboard_write_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        blackboard = RedisPublicBlackboard(RedisConfig())
-        blackboard._pool = fake_redis.connection_pool
+        blackboard = RedisPublicBlackboard(redis_client=fake_redis)
 
         latencies: list[float] = []
         conversation_id = str(uuid.uuid4())
@@ -248,8 +243,7 @@ class TestWriteLatencyPerformance:
     @pytest.mark.asyncio
     async def test_cache_set_latency_p95_under_10ms(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = RedisSemanticCache(RedisConfig())
-        cache._pool = fake_redis.connection_pool
+        cache = RedisSemanticCache(redis_client=fake_redis)
 
         latencies: list[float] = []
         for _ in range(BENCHMARK_ITERATIONS):
@@ -273,8 +267,7 @@ class TestTTLBehavior:
     @pytest.mark.asyncio
     async def test_session_ttl_is_applied(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        storage = RedisSessionStorage(RedisConfig())
-        storage._pool = fake_redis.connection_pool
+        storage = RedisSessionStorage(redis_client=fake_redis)
 
         await storage.save("test-ttl-session", "agent-1", {"key": "value"}, ttl=60)
         ttl = await fake_redis.ttl(build_key(storage._NAMESPACE, "test-ttl-session"))
@@ -283,8 +276,7 @@ class TestTTLBehavior:
     @pytest.mark.asyncio
     async def test_cache_ttl_is_applied(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = RedisSemanticCache(RedisConfig())
-        cache._pool = fake_redis.connection_pool
+        cache = RedisSemanticCache(redis_client=fake_redis)
 
         await cache.set([0.1] * 1024, {"answer": "test"}, ttl=3600)
         keys = await fake_redis.keys("sisys:cache:semantic:vec:*")

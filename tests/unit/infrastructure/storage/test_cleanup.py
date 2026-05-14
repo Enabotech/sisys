@@ -5,16 +5,12 @@ from __future__ import annotations
 import fakeredis.aioredis
 import pytest
 
-from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.storage.redis.cleanup import RedisCleanup
 
 
 def _create_cleanup(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisCleanup:
-    """创建使用 fake Redis 的 Cleanup。"""
-    config = RedisConfig()
-    cleanup = RedisCleanup(config)
-    cleanup._pool = fake_redis.connection_pool
-    return cleanup
+    """Create Cleanup using fake Redis client."""
+    return RedisCleanup(redis_client=fake_redis)
 
 
 class TestRedisCleanup:
@@ -66,23 +62,9 @@ class TestRedisCleanup:
         assert await fake_redis.exists("sisys:session:4") == 0
 
     @pytest.mark.asyncio
-    async def test_close(self) -> None:
-        """关闭连接池。"""
+    async def test_context_manager(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         cleanup = _create_cleanup(fake_redis)
 
-        await cleanup.close()
-        assert cleanup._pool is None
-
-    @pytest.mark.asyncio
-    async def test_context_manager(self) -> None:
-        """上下文管理器应自动关闭连接池。"""
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        config = RedisConfig()
-        cleanup = RedisCleanup(config)
-        cleanup._pool = fake_redis.connection_pool
-
         async with cleanup:
-            assert cleanup._pool is not None
-
-        assert cleanup._pool is None
+            pass

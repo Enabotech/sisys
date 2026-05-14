@@ -4,6 +4,7 @@
 # from src.domain.ports.graph_storage import GraphManager, GraphStorage  # deprecated
 # from src.domain.ports.vector_storage import VectorStorage  # deprecated
 
+from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.l0_storage import L0StoragePort
@@ -27,6 +28,7 @@ from src.domain.ports.unified_storage import UnifiedStoragePort
 from src.domain.ports.unit_of_work import UnitOfWork
 
 __all__ = [
+    "ConnectionManager",
     "DataAccessPattern",
     "BaseRepository",
     "HashRouterProtocol",
