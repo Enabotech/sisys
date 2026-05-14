@@ -59,7 +59,7 @@
 │                                                                      │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ FileAdapter  │ │ RedisAdapter │ │ PostgreSQL   │                 │
-│  │ (L0StoragePort)│ │ (L1CachePort)│ │ Repos(L2RdbPort)│                 │
+│  │ (L0StoragePort)│ │ (L1CachePort)│ │ Adapter(L2Rdb)│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ QdrantAdapter│ │ MinIOAdapter │ │ Neo4jAdapter │                 │
@@ -81,7 +81,7 @@
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ PgMemoryMetadataRepo │ │ QdrantMemoryVector    │                  │
 │  │ (MemoryMetadataPort) │ │ (MemoryVectorPort)    │                  │
-│  │ ← 组合 PgBaseRepo    │ │ ← 组合 QdrantAdapter │                  │
+│  │ ← 继承 PgAdapter     │ │ ← 组合 QdrantAdapter │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ MinIODocumentStorage │ │ Neo4jMemoryGraph      │                  │
@@ -524,12 +524,12 @@ class L2GroupMemberRepositoryPort(Protocol):
     async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
-### Rule 3: Infrastructure Layer-1 — PgDomainRepository（重构PgBaseRepository）
+### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（重构PgBaseRepository）
 
 **当前问题**: PgBaseRepository(Generic[T])绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
 三个L2仓储因此无法继承它，直接实现端口——**违反四条规则**。
 
-**重构方案**: 将PgBaseRepository重构为`PgDomainRepository[TEntity, TModel]`双泛型基座，
+**重构方案**: 将PgBaseRepository重构为`PostgreSQLAdapter[TEntity, TModel]`双泛型基座，
 实现`L2RdbPort[TEntity]`，提供领域实体/ORM模型转换层+可配置行为。
 
 ```python
@@ -538,7 +538,7 @@ class L2GroupMemberRepositoryPort(Protocol):
 TEntity = TypeVar("TEntity")
 TModel = TypeVar("TModel", bound=Base)
 
-class PgDomainRepository(Generic[TEntity, TModel]):
+class PostgreSQLAdapter(Generic[TEntity, TModel]):
     """领域仓储基座 — 实现L2RdbPort[TEntity]，提供ORM↔Entity转换。
 
     子类只需实现:
@@ -620,16 +620,16 @@ class PgDomainRepository(Generic[TEntity, TModel]):
             await self._session.flush()
 ```
 
-**UserRepository/PermissionRepository兼容**: 保持继承PgDomainRepository[TModel, TModel]，
+**UserRepository/PermissionRepository兼容**: 保持继承PostgreSQLAdapter[TModel, TModel]，
 `_to_entity`/`_to_model`为恒等转换。
 
-### Rule 4: Infrastructure Layer-2 — 三个L2仓储（继承PgDomainRepository）
+### Rule 4: Infrastructure Layer-2 — 三个L2仓储（继承PostgreSQLAdapter）
 
 ```python
-# === 1. PostgreSQLMemoryMetadataRepository — 继承PgDomainRepository ===
+# === 1. PostgreSQLMemoryMetadataRepository — 继承PostgreSQLAdapter ===
 
 class PostgreSQLMemoryMetadataRepository(
-    PgDomainRepository[MemoryMetadata, MemoryMetadataModel]
+    PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel]
 ):
     pk_column = "memory_id"               # PK列名覆写
     soft_delete_column = "deleted_at"      # 软删除列覆写
@@ -672,10 +672,10 @@ class PostgreSQLMemoryMetadataRepository(
     async def list_by_type(self, memory_type: str) -> list[MemoryMetadata]: ...
 
 
-# === 2. PostgreSQLMemoryChangeHistoryRepository — 继承PgDomainRepository ===
+# === 2. PostgreSQLMemoryChangeHistoryRepository — 继承PostgreSQLAdapter ===
 
 class PostgreSQLMemoryChangeHistoryRepository(
-    PgDomainRepository[MemoryChangeHistory, MemoryChangeHistoryModel]
+    PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel]
 ):
     def __init__(self, session: AsyncSession):
         super().__init__(MemoryChangeHistoryModel, session)
@@ -694,14 +694,14 @@ class PostgreSQLMemoryChangeHistoryRepository(
     async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]: ...
 
 
-# === 3. PostgreSQLMemoryGroupMemberRepository — 组合注入PgDomainRepository ===
+# === 3. PostgreSQLMemoryGroupMemberRepository — 组合注入PostgreSQLAdapter ===
 
 class PostgreSQLMemoryGroupMemberRepository:
-    """组成员仓储 — 组合注入PgDomainRepository复用Session管理。
+    """组成员仓储 — 组合注入PostgreSQLAdapter复用Session管理。
 
     组合注入而非继承：无单一主键（复合PK: group_id+user_id），
     无标准CRUD方法（is_member/add_member而非get_by_id/save），
-    但通过组合注入共享PgDomainRepository的Session基础设施。
+    但通过组合注入共享PostgreSQLAdapter的Session基础设施。
     """
 
     def __init__(self, session: AsyncSession):
@@ -714,7 +714,7 @@ class PostgreSQLMemoryGroupMemberRepository:
 ```
 
 **L2特殊性**:
-- PgDomainRepository提供领域实体/ORM模型转换+可配置PK列名+软删除+UPSERT钩子
+- PostgreSQLAdapter提供领域实体/ORM模型转换+可配置PK列名+软删除+UPSERT钩子
 - MetadataRepository继承：覆写`_do_save`(UPSERT)、`pk_column="memory_id"`、`soft_delete_column="deleted_at"`
 - ChangeHistoryRepository继承：覆写`_do_save`(append-only)、`delete`(禁止)
 - GroupMemberRepository组合注入：无标准CRUD，共享Session基础设施
@@ -1025,7 +1025,7 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
     register_port(name="l2_pg_base", interface=L2RdbPort,
-        impl="src.infrastructure.storage.postgresql.repository.base_repository.PgDomainRepository",
+        impl="src.infrastructure.storage.postgresql.repository.base_repository.PostgreSQLAdapter",
         module="src.infrastructure.storage.postgresql.repository.base_repository",
         lifetime=Lifetime.SCOPED, owner="platform-team")
 
@@ -1129,7 +1129,7 @@ def bootstrap() -> None:
 - [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）
-- [ ] 3.5 重构 `PgBaseRepository` → `PgDomainRepository[TEntity, TModel]` 双泛型基座（实现L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）
+- [ ] 3.5 重构 `PgBaseRepository` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）
 - [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
 - [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
 - [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
@@ -1142,13 +1142,13 @@ def bootstrap() -> None:
 - [ ] 4.3 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
 - [ ] 4.4 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
 - [ ] 4.5 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
-- [ ] 4.6 重构三个L2仓储继承PgDomainRepository[TEntity, TModel]：
-  - `PostgreSQLMemoryMetadataRepository(PgDomainRepository[MemoryMetadata, MemoryMetadataModel])` — 覆写_do_save(UPSERT+乐观锁)、pk_column="memory_id"、soft_delete_column="deleted_at"
-  - `PostgreSQLMemoryChangeHistoryRepository(PgDomainRepository[MemoryChangeHistory, MemoryChangeHistoryModel])` — 覆写_do_save(append-only)、delete(raise NotImplementedError)
-  - `PostgreSQLMemoryGroupMemberRepository` — 组合注入共享Session（复合PK，不继承PgDomainRepository）
+- [ ] 4.6 重构三个L2仓储继承PostgreSQLAdapter[TEntity, TModel]：
+  - `PostgreSQLMemoryMetadataRepository(PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel])` — 覆写_do_save(UPSERT+乐观锁)、pk_column="memory_id"、soft_delete_column="deleted_at"
+  - `PostgreSQLMemoryChangeHistoryRepository(PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel])` — 覆写_do_save(append-only)、delete(raise NotImplementedError)
+  - `PostgreSQLMemoryGroupMemberRepository` — 组合注入共享Session（复合PK，不继承PostgreSQLAdapter）
 - [ ] 4.7 注册所有 Rule 4 应用端口到 Composition Root（含L2三个仓储）
 - [ ] 4.8 调整 `UnifiedStorageGateway` 依赖应用端口（逐步过渡）
-- [ ] 4.9 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PgDomainRepository
+- [ ] 4.9 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PostgreSQLAdapter
 
 ### Phase 5: 清理与测试
 
@@ -1181,9 +1181,9 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
-| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | PgBaseRepository→PgDomainRepository[TEntity,TModel]双泛型基座 |
-| `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PgDomainRepository，覆写_do_save/pk_column/soft_delete |
-| `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PgDomainRepository，覆写_do_save(append-only)/delete |
+| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | PgBaseRepository→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
+| `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save/pk_column/soft_delete |
+| `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save(append-only)/delete |
 | `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |
 | `src/infrastructure/storage/memory_file_storage.py` | **新增** | Phase 4 | Rule 4 | |
 | `src/infrastructure/storage/redis/redis_session_cache.py` | **新增** | Phase 4 | Rule 4 | 与RedisSessionStorage区分 |
@@ -1244,7 +1244,7 @@ print('Rule 4 OK')
 |-------|------|------|------|---------|
 | Phase 1 | Rule 1 | 4-6h | 中 | L2RdbPort重构+@runtime_checkable+Resolver修复 |
 | Phase 2 | Rule 2 | 4-6h | 低 | 5个应用端口+__init__.py |
-| Phase 3 | Rule 3 | 5-7h | 中 | 4个适配器补全+PgDomainRepository[TEntity,TModel]双泛型基座 |
+| Phase 3 | Rule 3 | 5-7h | 中 | 4个适配器补全+PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
 | Phase 4 | Rule 4 | 6-8h | 中 | 5个应用端口实现+3个L2仓储重构+Gateway调整 |
 | Phase 5 | 测试 | 4-5h | 低 | 契约测试+反模式修复 |
 | **总计** | — | **23-32h** | — | 15个P0问题 |
