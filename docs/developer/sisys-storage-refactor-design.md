@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v5.0 (Round 4执行步骤完整性验证)
+**文档版本:** v5.1 (Round 5最终综合验证)
 **生成时间:** 2026-05-14
-**审查状态:** Round 4 完成 — 修正12处register_port签名、验证脚本、架构图类名、补充遗漏文件和测试步骤
+**审查状态:** Round 5 完成 — 四条规则端到端验证全部通过，文档完整性终审通过
 
 ---
 
@@ -81,7 +81,7 @@
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ PgMetadataRepo       │ │ QdrantMemoryVector-   │                  │
 │  │ (L2MetadataRepoPort) │ │ Storage(MemVecPort)   │                  │
-│  │ ← 继承 PgAdapter     │ │ ← 组合 QdrantAdapter │                  │
+│  │ ← 继承 PostgreSQLAdapter│ │ ← 组合 QdrantAdapter │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ MinIODocumentStorage │ │ Neo4jMemoryGraph-     │                  │
@@ -411,7 +411,7 @@ src/infrastructure/storage/redis/redis_memory_cache.py
 ### Rule 4: Infrastructure Layer-2 — RedisSessionCache
 
 ```python
-# src/infrastructure/storage/redis/session_cache.py — 新增
+# src/infrastructure/storage/redis/redis_session_cache.py — 新增
 
 from src.application.ports.session_cache_port import SessionCachePort
 from src.domain.ports.l1_cache import L1CachePort
@@ -1145,8 +1145,8 @@ def bootstrap() -> None:
     # ← Resolver自动注入: file_adapter参数→解析"l0_storage"
 
     register_port(name="session_cache", version="v1.0.0", interface=SessionCachePort,
-        impl="src.infrastructure.storage.redis.session_cache.RedisSessionCache",
-        module="src.infrastructure.storage.redis.session_cache",
+        impl="src.infrastructure.storage.redis.redis_session_cache.RedisSessionCache",
+        module="src.infrastructure.storage.redis.redis_session_cache",
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: cache_adapter参数→解析"l1_cache"
 
