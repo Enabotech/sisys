@@ -22,7 +22,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Rule 1: Domain Layer — 存储基础端口（技术无关，零依赖）               │
 │                                                                      │
-│  L0FilePort        L1CachePort       L2RdbPort[T]                   │
+│  L0FilePort        L1CachePort       L2RdbPort                      │
 │  L3VectorPort      L4ObjectPort      L5GraphPort                    │
 │  UnifiedStoragePort（组合注入L0-L5）                                  │
 │                                                                      │
@@ -34,7 +34,7 @@
 │                                                                      │
 │  继承L0: MemoryFilePort(L0FilePort)                                  │
 │  继承L1: SessionCachePort(L1CachePort)                               │
-│  继承L2: MemoryMetadataPort(L2RdbPort[T])                            │
+│  继承L2: MemoryMetadataPort(L2RdbPort)                            │
 │  继承L3: MemoryVectorPort(L3VectorPort)                              │
 │  继承L4: DocumentStoragePort(L4ObjectPort)                           │
 │  继承L5: MemoryGraphPort(L5GraphPort)                                │
@@ -47,7 +47,7 @@
 │                                                                      │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ FileAdapter  │ │ RedisAdapter │ │ PostgreSQL   │                 │
-│  │ (L0FilePort) │ │ (L1CachePort)│ │ Repos(L2Port)│                 │
+│  │ (L0FilePort) │ │ (L1CachePort)│ │ Repos(L2RdbPort)│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ QdrantAdapter│ │ MinIOAdapter │ │ Neo4jAdapter │                 │
@@ -427,7 +427,7 @@ class RedisSessionCache(SessionCachePort):
 
 ## L2 关系数据库
 
-### Rule 1: Domain Layer — L2RdbPort[T] + 具体仓储端口（已有）
+### Rule 1: Domain Layer — L2RdbPort + 具体仓储端口（已有）
 
 ```python
 # src/domain/ports/base.py — 已有
