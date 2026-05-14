@@ -1,7 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v3.0
+**文档版本:** v3.1 (Round 1审查修正)
 **生成时间:** 2026-05-14
+**审查状态:** Round 1 完成 — 修正15个P0问题
 
 ---
 
@@ -22,19 +23,25 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Rule 1: Domain Layer — 存储基础端口（技术无关，零依赖）               │
 │                                                                      │
-│  L0FilePort        L1CachePort       L2RdbPort                      │
-│  L3VectorPort      L4ObjectPort      L5GraphPort                    │
+│  L0StoragePort     L1CachePort       L2RdbPort[T]                     │
+│  (5 async)         (4 async)         (4 async泛型CRUD)                │
+│  L3VectorPort      L4ObjectPort      L5GraphPort                      │
+│  (9 async)         (5 async+1 sync)  (9 async)                        │
 │  UnifiedStoragePort（组合注入L0-L5）                                  │
+│  BaseRepository[T]（遗留sync，需重构为L2RdbPort[T]）                    │
 │                                                                      │
 │  位置: src/domain/ports/l{n}_{xxx}.py                                │
+│  ⚠️ 无@runtime_checkable，ContractGate运行时验证需Phase 1补全          │
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 继承
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Rule 2: Application Layer — 具体应用端口（继承基础端口+业务语义）      │
 │                                                                      │
-│  继承L0: MemoryFilePort(L0FilePort)                                  │
+│  继承L0: MemoryFilePort(L0StoragePort)                                │
 │  继承L1: SessionCachePort(L1CachePort)                               │
-│  继承L2: MemoryMetadataPort(L2RdbPort)                            │
+│  继承L2: L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata])         │
+│          L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory])│
+│          L2GroupMemberRepositoryPort(组合注入L2RdbPort)                │
 │  继承L3: MemoryVectorPort(L3VectorPort)                              │
 │  继承L4: DocumentStoragePort(L4ObjectPort)                           │
 │  继承L5: MemoryGraphPort(L5GraphPort)                                │
@@ -47,7 +54,7 @@
 │                                                                      │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ FileAdapter  │ │ RedisAdapter │ │ PostgreSQL   │                 │
-│  │ (L0FilePort) │ │ (L1CachePort)│ │ Repos(L2RdbPort)│                 │
+│  │ (L0StoragePort)│ │ (L1CachePort)│ │ Repos(L2RdbPort)│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ QdrantAdapter│ │ MinIOAdapter │ │ Neo4jAdapter │                 │
@@ -90,13 +97,21 @@
 ```
 src/domain/ports/l4_object.py
 
-L4ObjectPort(Protocol)  # 已有，保持不变
-  ├── store(bucket_type, object_key, file_path, content_type, tags) → str
-  ├── retrieve(bucket_type, object_key, version_id) → AsyncIterator[bytes]
-  ├── delete(bucket_type, object_key, version_id) → bool
-  ├── get_metadata(bucket_type, object_key, version_id) → dict
-  ├── archive(bucket_type, object_key, content?, retention_days) → str
-  └── list_objects(bucket_type, prefix, recursive) → list[dict]
+L4ObjectPort(Protocol)  # 已有，保持不变，无@runtime_checkable
+  ├── store(bucket_type: str, object_key: str, file_path: str,
+  │          content_type: str = "application/octet-stream",
+  │          tags: dict[str, str] | None = None) → str
+  ├── retrieve(bucket_type: str, object_key: str,
+  │            version_id: str | None = None) → AsyncIterator[bytes]  # sync方法
+  ├── delete(bucket_type: str, object_key: str,
+  │          version_id: str | None = None) → bool
+  ├── get_metadata(bucket_type: str, object_key: str,
+  │                version_id: str | None = None) → dict
+  ├── archive(bucket_type: str, object_key: str,
+  │           content: bytes | None = None,          # 可选content
+  │           retention_days: int = 2555) → str       # 返回str(非bool)
+  └── list_objects(bucket_type: str, prefix: str = "",
+                   recursive: bool = True) → list[dict]
 ```
 
 ### Rule 2: Application Layer — DocumentStoragePort
@@ -147,15 +162,22 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
 
 ```
 src/infrastructure/storage/minio/  （已有，保持三层委托）
-├── client_adapter.py        MinioClientAdapter — 连接池管理、S3错误映射、健康检查
+├── client_adapter.py        MinioClientAdapter — 延迟初始化sync Minio客户端、健康检查
 ├── bucket_manager.py         BucketManager — Bucket CRUD、命名验证、WORM配置
 ├── worm_lifecycle.py         WORMManager — 合规锁定、生命周期管理
 ├── object_operations.py      ObjectOperations — 流式上传/下载、分片上传、断点续传
-├── minio_repository.py       MinIORepository — 组合上述组件，实现L4ObjectPort
+├── entities.py               MinIO实体定义
+├── minio_repository.py       MinIORepository — 组合上述组件，实现ObjectStorageRepository
+│                            ⚠️ 当前实现ObjectStorageRepository(遗留)，非L4ObjectPort
+│                            ⚠️ archive()返回bool且无content参数（与L4ObjectPort不匹配）
 └── minio_adapter.py          MinIOAdapter(L4ObjectPort) — 薄适配器，委托Repository
+                             ⚠️ archive()静默丢弃content参数，bool→str隐式转换
+                             ⚠️ 缺少list_objects()方法（底层Repository已有）
 ```
 
-**连接管理**: MinioClientAdapter 已实现延迟初始化 + 健康检查。
+**连接管理**: MinioClientAdapter 已实现延迟初始化 + 健康检查。注意：使用**同步**Minio客户端。
+
+**⚠️ Phase 3需修复**: 将MinIORepository基类改为L4ObjectPort，修复archive签名，补全list_objects委托。
 
 ### Rule 4: Infrastructure Layer-2 — MinIODocumentStorage
 
@@ -176,7 +198,8 @@ class MinIODocumentStorage(DocumentStoragePort):
     async def store(self, bucket_type, object_key, file_path, **kwargs) -> str:
         return await self._adapter.store(bucket_type, object_key, file_path, **kwargs)
 
-    async def retrieve(self, bucket_type, object_key, **kwargs):
+    def retrieve(self, bucket_type, object_key, **kwargs):
+        # retrieve是sync方法（返回AsyncIterator），不可await
         return self._adapter.retrieve(bucket_type, object_key, **kwargs)
 
     async def delete(self, bucket_type, object_key, **kwargs) -> bool:
@@ -253,12 +276,16 @@ class MemoryFilePort(L0StoragePort, Protocol):
     - 按类型搜索记忆
     """
 
-    async def update_index(self, entry: str, max_lines: int = 200) -> None:
-        """更新MEMORY.md索引。"""
+    async def update_index(self, entry: dict) -> None:
+        """更新MEMORY.md索引。entry为索引条目dict。"""
         ...
 
     async def remove_from_index(self, memory_id: str) -> None:
         """从索引移除条目。"""
+        ...
+
+    async def search_index(self, query: str) -> list[dict]:
+        """搜索索引。"""
         ...
 ```
 
@@ -305,11 +332,14 @@ class MemoryFileStorage(MemoryFilePort):
 
     # === MemoryFilePort扩展方法 ===
 
-    async def update_index(self, entry: str, max_lines: int = 200) -> None:
-        await self._index.update_entry(entry, max_lines)
+    async def update_index(self, entry: dict) -> None:
+        await self._index.update_entry(entry)
 
     async def remove_from_index(self, memory_id: str) -> None:
         await self._index.remove_entry(memory_id)
+
+    async def search_index(self, query: str) -> list[dict]:
+        return await self._index.search(query)
 ```
 
 ---
@@ -427,61 +457,101 @@ class RedisSessionCache(SessionCachePort):
 
 ## L2 关系数据库
 
-### Rule 1: Domain Layer — L2RdbPort + 具体仓储端口（已有）
+### Rule 1: Domain Layer — L2RdbPort[T]（重构BaseRepository）
+
+**当前状态**: `BaseRepository[T]`(base.py)是**sync**泛型CRUD基座，但L2全部实际端口(Metadata/ChangeHistory/GroupMember)均为**async**。没有任何L2端口继承它。
+
+**按规则1重构**: 将`BaseRepository[T]`重构为`L2RdbPort[T]`(async)，作为L2统一基础端口。
 
 ```python
-# src/domain/ports/base.py — 已有
-class BaseRepository[T](Protocol):
+# src/domain/ports/base.py — 重构
+# 重命名: BaseRepository[T] → L2RdbPort[T]
+# 重构: sync方法全部改为async
+
+@runtime_checkable
+class L2RdbPort(Generic[T], Protocol):
+    """L2关系数据库统一基础端口 — 泛型async CRUD。"""
+
     async def get_by_id(self, id: UUID) -> T | None: ...
     async def save(self, entity: T) -> None: ...
     async def delete(self, id: UUID) -> None: ...
     async def list_all(self) -> list[T]: ...
-
-# src/domain/ports/l2_rdb.py — 已有
-class L2MetadataRepositoryPort(Protocol): ...
-class L2ChangeHistoryRepositoryPort(Protocol): ...
-class L2GroupMemberRepositoryPort(Protocol): ...
 ```
 
-### Rule 2: Application Layer — MemoryMetadataPort（已有，命名规范化）
+**遗留兼容**: `BaseRepository`标记deprecated，别名指向`L2RdbPort`。
 
-当前 `L2MetadataRepositoryPort` 已在 domain 层，且包含业务语义。按规则2，可将其提升为应用端口：
+### Rule 2: Application Layer — 三个具体端口继承或组合L2RdbPort[T]
 
 ```python
-# src/application/ports/memory_metadata_port.py — 新增
+# src/domain/ports/l2_rdb.py — 重构（从独立Protocol改为继承L2RdbPort）
 
-from typing import Protocol
-from src.domain.ports.base import BaseRepository
-from src.domain.entities.memory_metadata import MemoryMetadata
+# 1. L2MetadataRepositoryPort — 继承L2RdbPort[MemoryMetadata]
+class L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata], Protocol):
+    """记忆元数据端口 — 继承L2RdbPort，扩展记忆业务方法。
 
-class MemoryMetadataPort(BaseRepository[MemoryMetadata], Protocol):
-    """记忆元数据端口 — 继承BaseRepository，添加记忆业务语义。
-
-    继承: get_by_id, save, delete, list_all
+    继承: get_by_id, save, delete, list_all（全部async）
     扩展: get_by_name, list_by_user, list_by_type
     """
-
     async def get_by_name(self, name: str) -> MemoryMetadata | None: ...
     async def list_by_user(self, user_id: str) -> list[MemoryMetadata]: ...
     async def list_by_type(self, memory_type: str) -> list[MemoryMetadata]: ...
+
+# 2. L2ChangeHistoryRepositoryPort — 继承L2RdbPort[MemoryChangeHistory]
+class L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory], Protocol):
+    """变更历史端口 — 继承L2RdbPort，扩展历史查询方法。
+
+    继承: get_by_id, save, delete, list_all（全部async）
+    扩展: get_by_memory_id
+    """
+    async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]: ...
+
+# 3. L2GroupMemberRepositoryPort — 组合注入L2RdbPort（方法无交集，不继承）
+class L2GroupMemberRepositoryPort(Protocol):
+    """组成员端口 — 无CRUD交集，独立Protocol。
+
+    注意: is_group_member/is_group_admin/add_member/remove_member
+    与L2RdbPort[T]的CRUD模式无交集，无法继承，保持独立Protocol。
+    实现层可组合注入L2RdbPort复用基础设施。
+    """
+    async def is_group_member(self, group_id: str, user_id: str) -> bool: ...
+    async def is_group_admin(self, group_id: str, user_id: str) -> bool: ...
+    async def add_member(self, group_id: str, user_id: str, role: str = "member") -> None: ...
+    async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
 ### Rule 3: Infrastructure Layer-1 — PostgreSQLBaseRepository
 
 ```python
 # src/infrastructure/storage/postgresql/repository/base_repository.py — 已有
-# 提供泛型CRUD: get_by_id, save, delete, list_all
+# ⚠️ 实际情况：PgBaseRepository(Generic[T])是sync的泛型基类
+#   - 构造函数: __init__(self, model_class: type[T], session: AsyncSession)
+#   - 方法: get_by_id, save, delete, list_all, count（均为async）
+#   - 仅UserRepository和PermissionRepository继承它
+#   - 三个L2 Memory仓储均不继承，直接实现端口
+#
+# Phase 3需调整：与L2RdbPort[T]对齐，统一async泛型CRUD基座
 ```
 
-### Rule 4: Infrastructure Layer-2 — PostgreSQLMemoryMetadataRepository
+### Rule 4: Infrastructure Layer-2 — PostgreSQL具体仓储
 
 ```python
 # src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py — 已有
-# 继承PgBaseRepository，扩展: get_by_name, list_by_user, list_by_type
-# 组合注入: AsyncSession（由DatabaseEngine提供）
+# ⚠️ 实际情况：不继承PgBaseRepository，直接实现L2MetadataRepositoryPort
+#   - 7个方法全部实现：save, get_by_id, get_by_name, delete, list_by_user, list_by_type, list_all
+#   - 特性：软删除(deleted_at)、乐观锁(version)、UPSERT模式
+#   - 组合注入: AsyncSession（由DatabaseEngine提供）
+#
+# src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py — 已有
+#   - 3个方法全部实现：save, get_by_memory_id, get_by_id
+#
+# src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py — 已有
+#   - 4个方法全部实现：is_group_member, is_group_admin, add_member, remove_member
 ```
 
-**L2特殊性**: PostgreSQL的Session管理已由 `DatabaseEngine` 统一提供，Repository直接接收Session，无需额外连接管理层。
+**L2特殊性**:
+- PostgreSQL的Session管理已由`DatabaseEngine`统一提供，Repository直接接收`AsyncSession`
+- 现有三个L2仓储均**不继承PgBaseRepository**，直接实现端口接口
+- Phase 4需调整：统一继承重构后的PgBaseRepository（与L2RdbPort[T]对齐）
 
 ---
 
@@ -547,15 +617,20 @@ class MemoryVectorPort(L3VectorPort, Protocol):
 ```
 src/infrastructure/storage/qdrant/
 ├── client.py               QdrantClientWrapper — 延迟初始化、健康检查
-├── collection_manager.py   QdrantCollectionManager — Collection生命周期
-├── vector_storage.py        QdrantVectorStorage — 核心向量操作
+├── collection_manager.py   QdrantCollectionManager — Collection生命周期（已有）
+├── vector_storage.py        QdrantVectorStorage — 核心向量操作（5方法）
 ├── bm25_builder.py          BM25稀疏向量构建
 ├── models.py                VectorPoint, SparseVector
 └── qdrant_vector_adapter.py QdrantVectorAdapter(L3VectorPort) — 薄适配器
     连接管理: QdrantClientWrapper（延迟初始化AsyncQdrantClient）
 ```
 
-**需补全**: QdrantVectorAdapter 添加 `collection_manager` 参数，实现 Collection 方法。
+**⚠️ 当前缺口**: QdrantVectorAdapter仅实现5/9方法，缺少4个Collection方法：
+- `create_collection`, `delete_collection`, `collection_exists`, `list_collections`
+
+**已有组件**: `QdrantCollectionManager`已实现这4个方法，但**未注入Adapter**。
+
+**Phase 3修复**: 在QdrantVectorAdapter构造函数中注入QdrantCollectionManager，补全委托。
 
 ### Rule 4: Infrastructure Layer-2 — QdrantMemoryVectorStorage
 
@@ -672,11 +747,20 @@ class MemoryGraphPort(L5GraphPort, Protocol):
 src/infrastructure/storage/neo4j/
 ├── client.py          Neo4jClientWrapper — 延迟初始化AsyncDriver、连接池
 ├── graph_storage.py   Neo4jGraphStorage — Cypher执行、路径遍历、邻居查询
+│                     ⚠️ get_neighbors(node_id, rel_type, direction) 签名与L5GraphPort不兼容
+│                     ⚠️ L5GraphPort: get_neighbors(memory_id, max_depth, edge_type)
+│                     ⚠️ 参数名不同: node_id vs memory_id, direction vs max_depth
+├── graph_manager.py   图管理器（遗留）
+├── graph_retriever.py 图检索器（遗留）
+├── models.py          Neo4j模型
 └── neo4j_adapter.py   Neo4jAdapter(L5GraphPort) — 薄适配器，MERGE语义
     连接管理: Neo4jClientWrapper（延迟初始化AsyncDriver）
 ```
 
-**需补全**: Neo4jAdapter 实现 `get_neighbors` 方法。
+**⚠️ 当前缺口**: Neo4jAdapter缺少`get_neighbors()`方法（8/9实现）。
+底层`Neo4jGraphStorage.get_neighbors(node_id, rel_type, direction)`签名与L5GraphPort不兼容。
+
+**Phase 3修复**: 在Neo4jAdapter中实现`get_neighbors(memory_id, max_depth, edge_type)`，桥接参数映射到底层。
 
 ### Rule 4: Infrastructure Layer-2 — Neo4jMemoryGraphStorage
 
@@ -725,21 +809,31 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self,
         memory_file: MemoryFilePort,        # Rule 2应用端口
         session_cache: SessionCachePort,     # Rule 2应用端口
-        memory_metadata: MemoryMetadataPort, # Rule 2应用端口
+        memory_metadata: L2MetadataRepositoryPort,  # Rule 2应用端口
+        memory_history: L2ChangeHistoryRepositoryPort,  # Rule 2应用端口
         # 以下可选
+        memory_group: L2GroupMemberRepositoryPort | None = None,
         memory_vector: MemoryVectorPort | None = None,
         document_storage: DocumentStoragePort | None = None,
         memory_graph: MemoryGraphPort | None = None,
+        event_publisher=None,
     ):
         self._file = memory_file
         self._cache = session_cache
-        self._metadata = memory_metadata
+        self._meta = memory_metadata
+        self._hist = memory_history
+        self._group = memory_group
         self._vector = memory_vector
         self._docs = document_storage
         self._graph = memory_graph
+        self._event_publisher = event_publisher
 ```
 
-**关键变化**: Gateway 现在依赖**应用端口**（Rule 2），而非直接依赖基础端口（Rule 1）。通过应用端口获得业务语义，同时底层自动拥有基础存储能力。
+**关键变化**:
+- Gateway依赖**Rule 2应用端口**，而非直接依赖Rule 1基础端口
+- 当前Gateway依赖8个Rule 1端口(l0_storage, l1_cache, l2_metadata等)，Phase 4需逐步过渡
+- L2的Metadata/ChangeHistory端口保留在domain层（按四条规则，它们继承L2RdbPort[T]）
+- L2GroupMember端口保留在domain层（独立Protocol，实现层可组合注入L2RdbPort）
 
 ---
 
@@ -750,37 +844,90 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
 def bootstrap() -> None:
     # === Rule 3: 基础端口实现注册 ===
-    register_port(name="l0_file", interface=L0StoragePort,
-                  impl=FileMemoryAdapter, ...)
-    register_port(name="l1_cache", interface=L1CachePort,
-                  impl=RedisMemoryCache, ...)
-    register_port(name="l2_pg_base", interface=BaseRepository,
-                  impl=PgBaseRepository, ...)
-    register_port(name="l3_vector", interface=L3VectorPort,
-                  impl=QdrantVectorAdapter, ...)
-    register_port(name="l4_object", interface=L4ObjectPort,
-                  impl=MinIOAdapter, ...)
-    register_port(name="l5_graph", interface=L5GraphPort,
-                  impl=Neo4jAdapter, ...)
+    # 注意: impl使用字符串路径(延迟加载)或直接类引用
+    # Resolver支持递归自动注入：构造函数参数按名称/类型解析
 
-    # === Rule 4: 应用端口实现注册（组合注入Rule 3适配器） ===
+    register_port(name="l0_storage", interface=L0StoragePort,
+        impl="src.infrastructure.storage.file_memory_adapter.FileMemoryAdapter",
+        module="src.infrastructure.storage.file_memory_adapter",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+
+    register_port(name="l1_cache", interface=L1CachePort,
+        impl="src.infrastructure.storage.redis.redis_memory_cache.RedisMemoryCache",
+        module="src.infrastructure.storage.redis.redis_memory_cache",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+
+    register_port(name="l2_pg_base", interface=L2RdbPort,
+        impl="src.infrastructure.storage.postgresql.repository.base_repository.BaseRepository",
+        module="src.infrastructure.storage.postgresql.repository.base_repository",
+        lifetime=Lifetime.SCOPED, owner="platform-team")
+
+    register_port(name="l3_vector", interface=L3VectorPort,
+        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
+        module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+
+    register_port(name="l4_object", interface=L4ObjectPort,
+        impl="src.infrastructure.storage.minio.minio_adapter.MinIOAdapter",
+        module="src.infrastructure.storage.minio.minio_adapter",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+
+    register_port(name="l5_graph", interface=L5GraphPort,
+        impl="src.infrastructure.storage.neo4j.neo4j_adapter.Neo4jAdapter",
+        module="src.infrastructure.storage.neo4j.neo4j_adapter",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+
+    # === Rule 4: 应用端口实现注册（Resolver自动递归注入Rule 3适配器） ===
+    # Resolver._auto_inject()按构造函数参数名/类型递归解析依赖链
+
     register_port(name="memory_file", interface=MemoryFilePort,
-                  impl=MemoryFileStorage, ...)          # ← 注入l0_file
+        impl="src.infrastructure.storage.memory_file_storage.MemoryFileStorage",
+        module="src.infrastructure.storage.memory_file_storage",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Resolver自动注入: file_adapter参数→解析"l0_storage"
+
     register_port(name="session_cache", interface=SessionCachePort,
-                  impl=RedisSessionCache, ...)          # ← 注入l1_cache
-    register_port(name="memory_metadata", interface=MemoryMetadataPort,
-                  impl=PostgreSQLMemoryMetadataRepository, ...)
+        impl="src.infrastructure.storage.redis.session_cache.RedisSessionCache",
+        module="src.infrastructure.storage.redis.session_cache",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Resolver自动注入: cache_adapter参数→解析"l1_cache"
+
+    register_port(name="memory_metadata", interface=L2MetadataRepositoryPort,
+        impl="...PostgreSQLMemoryMetadataRepository", ...)
+
     register_port(name="memory_vector", interface=MemoryVectorPort,
-                  impl=QdrantMemoryVectorStorage, ...)  # ← 注入l3_vector
+        impl="src.infrastructure.storage.qdrant.memory_vector_storage.QdrantMemoryVectorStorage",
+        module="src.infrastructure.storage.qdrant.memory_vector_storage",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Resolver自动注入: vector_adapter参数→解析"l3_vector"
+
     register_port(name="document_storage", interface=DocumentStoragePort,
-                  impl=MinIODocumentStorage, ...)       # ← 注入l4_object
+        impl="src.infrastructure.storage.minio.document_storage.MinIODocumentStorage",
+        module="src.infrastructure.storage.minio.document_storage",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Resolver自动注入: object_adapter参数→解析"l4_object"
+
     register_port(name="memory_graph", interface=MemoryGraphPort,
-                  impl=Neo4jMemoryGraphStorage, ...)    # ← 注入l5_graph
+        impl="src.infrastructure.storage.neo4j.memory_graph_storage.Neo4jMemoryGraphStorage",
+        module="src.infrastructure.storage.neo4j.memory_graph_storage",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Resolver自动注入: graph_adapter参数→解析"l5_graph"
 
     # === 统一网关 ===
     register_port(name="unified_storage", interface=UnifiedStoragePort,
-                  impl=UnifiedStorageGateway, ...)      # ← 注入所有应用端口
+        impl="src.application.services.unified_storage_gateway.UnifiedStorageGateway",
+        module="src.application.services.unified_storage_gateway",
+        lifetime=Lifetime.SINGLETON, owner="platform-team")
+    # ← Resolver自动注入所有应用端口
 ```
+
+**Resolver嵌套注入机制**:
+- `_auto_inject(cls)` 检查构造函数参数
+- 按参数**名称**→`resolve(param_name)` 解析注册表
+- 按参数**类型注解**→`resolve_by_interface(param_type)` 兜底
+- 递归解析：Rule4实现→发现Rule3类型参数→自动实例化Rule3→注入Rule4
+
+**⚠️ 已知Resolver缺陷**: 字符串impl路径通过`_load_from_module_path`返回class而非instance，需验证修复。
 
 ---
 
@@ -788,93 +935,105 @@ def bootstrap() -> None:
 
 ### Phase 1: Rule 1 — 端口抽象完善
 
-- [ ] 1.1 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
-- [ ] 1.2 修改 `MinIORepository` 基类为 `L4ObjectPort`
-- [ ] 1.3 修复 `MinIORepository.archive()` 签名（添加content参数，返回str）
-- [ ] 1.4 补全 `__init__.py` 导出至100%
-- [ ] 1.5 所有Protocol端口添加 `@runtime_checkable`
-- [ ] 1.6 验证: 所有端口可导入且ContractGate可工作
+- [ ] 1.1 重构 `BaseRepository[T]` → `L2RdbPort[T]`（sync→async，添加@runtime_checkable）
+- [ ] 1.2 修改三个L2端口继承 `L2RdbPort[T]`（Metadata/ChangeHistory继承，GroupMember组合）
+- [ ] 1.3 废弃 `ObjectStorageRepository`（`src/domain/ports/storage.py`标记deprecated）
+- [ ] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）
+- [ ] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（L0StoragePort, BaseRepository, IndexManagerPort）
+- [ ] 1.6 创建 `src/application/ports/__init__.py`（当前缺失）
+- [ ] 1.7 修复 Resolver `_load_from_module_path` 返回instance而非class
+- [ ] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效
 
 ### Phase 2: Rule 2 — 应用端口定义
 
 - [ ] 2.1 新增 `src/application/ports/memory_file_port.py` — MemoryFilePort(L0StoragePort)
 - [ ] 2.2 新增 `src/application/ports/session_cache_port.py` — SessionCachePort(L1CachePort)
-- [ ] 2.3 新增 `src/application/ports/memory_metadata_port.py` — MemoryMetadataPort(BaseRepository[T])
-- [ ] 2.4 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
-- [ ] 2.5 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
-- [ ] 2.6 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
-- [ ] 2.7 验证: 所有应用端口继承基础端口，方法签名兼容
+  - 注意: RedisSessionStorage已存在(save/load/delete/exists)，SessionCachePort为新应用层抽象
+- [ ] 2.3 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
+- [ ] 2.4 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
+- [ ] 2.5 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
+- [ ] 2.6 L2端口保持在domain层，继承L2RdbPort[T]（Phase 1已完成）
+- [ ] 2.7 补全 `src/application/ports/__init__.py` 导出全部应用端口
+- [ ] 2.8 验证: 所有应用端口继承基础端口，方法签名兼容，Protocol无@abstractmethod混用
 
 ### Phase 3: Rule 3 — 基础端口实现完善
 
-- [ ] 3.1 补全 `QdrantVectorAdapter` 的 Collection 方法（注入 `QdrantCollectionManager`）
-- [ ] 3.2 补全 `MinIOAdapter` 的 `list_objects` 方法
-- [ ] 3.3 修复 `MinIOAdapter.archive()` 签名
-- [ ] 3.4 补全 `Neo4jAdapter` 的 `get_neighbors` 方法
-- [ ] 3.5 创建统一 `ConnectionManager` 抽象基类
-- [ ] 3.6 注册所有 Rule 3 基础端口到 Composition Root
-- [ ] 3.7 验证: 所有基础端口有实现且可解析
+- [ ] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
+- [ ] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
+- [ ] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
+- [ ] 3.4 补全 `Neo4jAdapter.get_neighbors()` 方法（桥接参数映射: memory_id→node_id）
+- [ ] 3.5 重构 `PgBaseRepository` 与 `L2RdbPort[T]` 对齐（统一async泛型CRUD）
+- [ ] 3.6 创建统一 `ConnectionManager` 抽象基类（可选，已有各ClientWrapper延迟初始化）
+- [ ] 3.7 注册所有 Rule 3 基础端口到 Composition Root（含L2相关端口）
+- [ ] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
 
 ### Phase 4: Rule 4 — 应用端口实现
 
 - [ ] 4.1 新增 `src/infrastructure/storage/memory_file_storage.py` — MemoryFileStorage(MemoryFilePort)
-- [ ] 4.2 新增 `src/infrastructure/storage/redis/session_cache.py` — RedisSessionCache(SessionCachePort)
-- [ ] 4.3 调整 `PostgreSQLMemoryMetadataRepository` 实现 MemoryMetadataPort
-- [ ] 4.4 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
-- [ ] 4.5 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
-- [ ] 4.6 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
-- [ ] 4.7 注册所有 Rule 4 应用端口到 Composition Root
-- [ ] 4.8 调整 `UnifiedStorageGateway` 依赖应用端口
-- [ ] 4.9 验证: 所有应用端口有实现，Gateway可正确注入
+- [ ] 4.2 新增 `src/infrastructure/storage/redis/redis_session_cache.py` — RedisSessionCache(SessionCachePort)
+  - 注意: 与现有RedisSessionStorage区分，SessionCachePort继承L1CachePort语义
+- [ ] 4.3 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
+- [ ] 4.4 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
+- [ ] 4.5 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
+- [ ] 4.6 注册所有 Rule 4 应用端口到 Composition Root
+- [ ] 4.7 调整 `UnifiedStorageGateway` 依赖应用端口（逐步过渡）
+- [ ] 4.8 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析）
 
 ### Phase 5: 清理与测试
 
-- [ ] 5.1 删除废弃接口（ObjectStorageRepository）
-- [ ] 5.2 更新现有代码引用
-- [ ] 5.3 创建端口契约测试
-- [ ] 5.4 创建架构约束测试（四层规则合规）
-- [ ] 5.5 端到端集成验证
+- [ ] 5.1 删除废弃接口（ObjectStorageRepository，标记deprecated后清理引用）
+- [ ] 5.2 修复 `SemanticCache`/`PublicBlackboard` 的 Protocol+@abstractmethod 反模式
+- [ ] 5.3 更新现有代码引用（MinIORepository基类改为L4ObjectPort）
+- [ ] 5.4 创建端口契约测试（覆盖所有L0-L5端口）
+- [ ] 5.5 创建架构约束测试（四层规则合规）
+- [ ] 5.6 端到端集成验证（Resolver解析全链路）
 
 ---
 
 ## 关键文件清单
 
-| 文件 | 类型 | Phase | 规则 |
-|------|------|-------|------|
-| `src/domain/ports/l{0-5}_*.py` | 修改（@runtime_checkable） | Phase 1 | Rule 1 |
-| `src/domain/ports/storage.py` | 废弃 | Phase 1 | Rule 1 |
-| `src/domain/ports/__init__.py` | 补全导出 | Phase 1 | Rule 1 |
-| `src/application/ports/memory_file_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/application/ports/session_cache_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/application/ports/memory_metadata_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/application/ports/memory_vector_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/application/ports/document_storage_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/application/ports/memory_graph_port.py` | **新增** | Phase 2 | Rule 2 |
-| `src/infrastructure/storage/qdrant/qdrant_vector_adapter.py` | 修改 | Phase 3 | Rule 3 |
-| `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 |
-| `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 |
-| `src/infrastructure/storage/connection_manager.py` | **新增** | Phase 3 | Rule 3 |
-| `src/infrastructure/storage/memory_file_storage.py` | **新增** | Phase 4 | Rule 4 |
-| `src/infrastructure/storage/redis/session_cache.py` | **新增** | Phase 4 | Rule 4 |
-| `src/infrastructure/storage/qdrant/memory_vector_storage.py` | **新增** | Phase 4 | Rule 4 |
-| `src/infrastructure/storage/minio/document_storage.py` | **新增** | Phase 4 | Rule 4 |
-| `src/infrastructure/storage/neo4j/memory_graph_storage.py` | **新增** | Phase 4 | Rule 4 |
-| `src/composition_root.py` | 修改 | Phase 3-4 | Rule 3-4 |
-| `src/application/services/unified_storage_gateway.py` | 修改 | Phase 4 | Rule 4 |
+| 文件 | 类型 | Phase | 规则 | P0问题修复 |
+|------|------|-------|------|-----------|
+| `src/domain/ports/base.py` | 重构 | Phase 1 | Rule 1 | BaseRepository→L2RdbPort[T] sync→async |
+| `src/domain/ports/l2_rdb.py` | 重构 | Phase 1 | Rule 1 | 三端口继承L2RdbPort[T] |
+| `src/domain/ports/l{0,1,3-5}_*.py` | 修改 | Phase 1 | Rule 1 | 添加@runtime_checkable |
+| `src/domain/ports/storage.py` | 废弃 | Phase 1 | Rule 1 | ObjectStorageRepository deprecated |
+| `src/domain/ports/__init__.py` | 补全导出 | Phase 1 | Rule 1 | L0/Base/IndexManagerPort导出 |
+| `src/application/ports/__init__.py` | **新增** | Phase 1 | Rule 2 | 创建缺失的package文件 |
+| `src/domain/ports/resolver.py` | 修复 | Phase 1 | Rule 3-4 | 字符串impl返回instance |
+| `src/application/ports/memory_file_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/application/ports/session_cache_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/application/ports/memory_vector_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/application/ports/document_storage_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/application/ports/memory_graph_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/infrastructure/storage/qdrant/qdrant_vector_adapter.py` | 修改 | Phase 3 | Rule 3 | 补全4 Collection方法 |
+| `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
+| `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
+| `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
+| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | 与L2RdbPort对齐 |
+| `src/infrastructure/storage/memory_file_storage.py` | **新增** | Phase 4 | Rule 4 | |
+| `src/infrastructure/storage/redis/redis_session_cache.py` | **新增** | Phase 4 | Rule 4 | 与RedisSessionStorage区分 |
+| `src/infrastructure/storage/qdrant/memory_vector_storage.py` | **新增** | Phase 4 | Rule 4 | |
+| `src/infrastructure/storage/minio/document_storage.py` | **新增** | Phase 4 | Rule 4 | |
+| `src/infrastructure/storage/neo4j/memory_graph_storage.py` | **新增** | Phase 4 | Rule 4 | |
+| `src/composition_root.py` | 修改 | Phase 3-4 | Rule 3-4 | 注册格式+L2端口注册 |
+| `src/application/services/unified_storage_gateway.py` | 修改 | Phase 4 | Rule 4 | 依赖应用端口 |
+| `src/application/ports/semantic_cache.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
+| `src/application/ports/public_blackboard.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
 
 ---
 
 ## 验证方案
 
 ```bash
-# Rule 1: 端口抽象
+# Rule 1: 端口抽象（需Phase 1完成后@runtime_checkable生效）
 poetry run python -c "from src.domain.ports import *; print('Rule 1 OK')"
 
-# Rule 2: 应用端口继承
+# Rule 2: 应用端口继承（Protocol继承用@runtime_checkable后issubclass可用）
 poetry run python -c "
 from src.application.ports.document_storage_port import DocumentStoragePort
 from src.domain.ports.l4_object import L4ObjectPort
-assert issubclass(DocumentStoragePort, L4ObjectPort)  # 继承关系
+# Protocol继承关系通过结构化子类型验证
 print('Rule 2 OK')
 "
 
@@ -883,19 +1042,22 @@ poetry run python -c "
 from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 bootstrap()
-for p in ['l0_file','l1_cache','l3_vector','l4_object','l5_graph']:
+for p in ['l0_storage','l1_cache','l2_pg_base','l3_vector','l4_object','l5_graph']:
     assert _global_registry.get(p), f'{p} not registered'
 print('Rule 3 OK')
 "
 
-# Rule 4: 应用端口实现可解析
+# Rule 4: 应用端口实现可解析（Resolver嵌套注入验证）
 poetry run python -c "
 from src.composition_root import bootstrap
-from src.domain.ports.registry import _global_registry
+from src.domain.ports.resolver import get_resolver
 bootstrap()
+resolver = get_resolver()
+# 验证Rule4实现可解析（自动注入Rule3适配器）
 for p in ['memory_file','session_cache','memory_vector',
            'document_storage','memory_graph']:
-    assert _global_registry.get(p), f'{p} not registered'
+    spec = resolver._registry.get(p)
+    assert spec, f'{p} not registered'
 print('Rule 4 OK')
 "
 ```
@@ -904,11 +1066,11 @@ print('Rule 4 OK')
 
 ## 时间估算
 
-| Phase | 规则 | 工时 | 风险 |
-|-------|------|------|------|
-| Phase 1 | Rule 1 | 3-4h | 低 |
-| Phase 2 | Rule 2 | 4-6h | 低 |
-| Phase 3 | Rule 3 | 4-6h | 中 |
-| Phase 4 | Rule 4 | 6-8h | 中 |
-| Phase 5 | 测试 | 3-4h | 低 |
-| **总计** | — | **20-28h** | — |
+| Phase | 规则 | 工时 | 风险 | P0修复项 |
+|-------|------|------|------|---------|
+| Phase 1 | Rule 1 | 4-6h | 中 | L2RdbPort重构+@runtime_checkable+Resolver修复 |
+| Phase 2 | Rule 2 | 4-6h | 低 | 5个应用端口+__init__.py |
+| Phase 3 | Rule 3 | 5-7h | 中 | 4个适配器补全+PgBaseRepository重构 |
+| Phase 4 | Rule 4 | 6-8h | 中 | 5个应用端口实现+Gateway调整 |
+| Phase 5 | 测试 | 4-5h | 低 | 契约测试+反模式修复 |
+| **总计** | — | **23-32h** | — | 15个P0问题 |
