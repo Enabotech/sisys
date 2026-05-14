@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v3.2 (Round 2审查修正)
+**文档版本:** v4.0 (Round 3审查修正)
 **生成时间:** 2026-05-14
-**审查状态:** Round 2 完成 — L2仓储重构方案对齐四条规则
+**审查状态:** Round 3 完成 — 四层规则自洽性审查，补全Rule 4伪代码
 
 ---
 
@@ -824,7 +824,26 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
     async def delete_points(self, collection, point_ids) -> bool:
         return await self._adapter.delete_points(collection, point_ids)
 
-    # ... 其他L3方法同理委托 ...
+    async def get_point(self, collection, point_id) -> dict | None:
+        return await self._adapter.get_point(collection, point_id)
+
+    async def search(self, collection, query_vector, limit=10, filter_payload=None) -> list[dict]:
+        return await self._adapter.search(collection, query_vector, limit, filter_payload)
+
+    async def search_sparse(self, collection, sparse_vector, limit=10, filter_payload=None) -> list[dict]:
+        return await self._adapter.search_sparse(collection, sparse_vector, limit, filter_payload)
+
+    async def create_collection(self, collection, vector_size, vector_params=None) -> bool:
+        return await self._adapter.create_collection(collection, vector_size, vector_params)
+
+    async def delete_collection(self, collection) -> bool:
+        return await self._adapter.delete_collection(collection)
+
+    async def collection_exists(self, collection) -> bool:
+        return await self._adapter.collection_exists(collection)
+
+    async def list_collections(self) -> list[str]:
+        return await self._adapter.list_collections()
 
     # === MemoryVectorPort扩展方法 — 业务语义 ===
 
@@ -948,7 +967,29 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
     async def create_entity(self, memory_id, entity_type, properties) -> bool:
         return await self._adapter.create_entity(memory_id, entity_type, properties)
 
-    # ... 其他L5方法同理委托 ...
+    async def get_entity(self, memory_id) -> dict | None:
+        return await self._adapter.get_entity(memory_id)
+
+    async def delete_entity(self, memory_id) -> bool:
+        return await self._adapter.delete_entity(memory_id)
+
+    async def create_relationship(self, source, target, rel_type, properties) -> bool:
+        return await self._adapter.create_relationship(source, target, rel_type, properties)
+
+    async def delete_relationship(self, source, target, rel_type) -> bool:
+        return await self._adapter.delete_relationship(source, target, rel_type)
+
+    async def find_related(self, memory_id, max_depth, rel_type) -> list[dict]:
+        return await self._adapter.find_related(memory_id, max_depth, rel_type)
+
+    async def execute_query(self, cypher, params) -> list[dict]:
+        return await self._adapter.execute_query(cypher, params)
+
+    async def execute_write_query(self, cypher, params) -> list[dict]:
+        return await self._adapter.execute_write_query(cypher, params)
+
+    async def get_neighbors(self, memory_id, max_depth, edge_type) -> list[dict]:
+        return await self._adapter.get_neighbors(memory_id, max_depth, edge_type)
 
     # === MemoryGraphPort扩展方法 ===
 
@@ -1093,10 +1134,7 @@ def bootstrap() -> None:
 - 按参数**名称**→`resolve(param_name)` 解析注册表
 - 按参数**类型注解**→`resolve_by_interface(param_type)` 兜底
 - 递归解析：Rule4实现→发现Rule3类型参数→自动实例化Rule3→注入Rule4
-
-**⚠️ 已知Resolver缺陷**: 字符串impl路径通过`_load_from_module_path`返回class而非instance，需验证修复。
-
----
+- `_load_from_module_path` 返回class供`_auto_inject`处理，非缺陷
 
 ## 详细执行步骤
 
@@ -1108,7 +1146,7 @@ def bootstrap() -> None:
 - [ ] 1.4 所有Domain端口添加 `@runtime_checkable`（10个Protocol文件）
 - [ ] 1.5 补全 `src/domain/ports/__init__.py` 导出至100%（L0StoragePort, BaseRepository, IndexManagerPort）
 - [ ] 1.6 创建 `src/application/ports/__init__.py`（当前缺失）
-- [ ] 1.7 修复 Resolver `_load_from_module_path` 返回instance而非class
+- [ ] 1.7 验证 Resolver `_load_from_module_path` → `_auto_inject` 链路：当前返回class供`_auto_inject`递归解析构造函数参数后实例化，属设计意图（非缺陷），需确保Rule 4嵌套注入场景正确
 - [ ] 1.8 验证: 所有端口可导入，ContractGate isinstance()检查生效
 
 ### Phase 2: Rule 2 — 应用端口定义
