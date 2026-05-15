@@ -18,6 +18,7 @@ from src.infrastructure.storage.postgresql.repository.memory_metadata_repository
     MemoryVersionConflictError,
     PostgreSQLMemoryMetadataRepository,
 )
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 def run_async(coro):
@@ -73,8 +74,10 @@ class TestPostgreSQLMemoryMetadataRepositoryInit:
     def test_repository_initialization(self):
         """验证仓库正确初始化。"""
         mock_session = AsyncMock()
-        repo = PostgreSQLMemoryMetadataRepository(session=mock_session)
-        assert repo._session == mock_session
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        assert repo._session is not None
+        reset_session(token)
 
 
 class TestPostgreSQLMemoryMetadataRepositorySave:
@@ -90,7 +93,10 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
     @pytest.fixture
     def repo(self, mock_session):
         """Create repository with mock session."""
-        return PostgreSQLMemoryMetadataRepository(session=mock_session)
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        yield repo
+        reset_session(token)
 
     @pytest.fixture
     def sample_metadata(self):
@@ -157,7 +163,10 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
     @pytest.fixture
     def repo(self, mock_session):
         """Create repository with mock session."""
-        return PostgreSQLMemoryMetadataRepository(session=mock_session)
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        yield repo
+        reset_session(token)
 
     @pytest.fixture
     def sample_model(self):
@@ -226,7 +235,10 @@ class TestPostgreSQLMemoryMetadataRepositoryDelete:
     @pytest.fixture
     def repo(self, mock_session):
         """Create repository with mock session."""
-        return PostgreSQLMemoryMetadataRepository(session=mock_session)
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        yield repo
+        reset_session(token)
 
     def test_delete_soft_deletes(self, repo, mock_session):
         """验证 delete 执行软删除。"""
@@ -253,7 +265,10 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
     @pytest.fixture
     def repo(self, mock_session):
         """Create repository with mock session."""
-        return PostgreSQLMemoryMetadataRepository(session=mock_session)
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        yield repo
+        reset_session(token)
 
     @pytest.fixture
     def sample_models(self):
@@ -364,7 +379,10 @@ class TestPostgreSQLMemoryMetadataRepositoryConverters:
     @pytest.fixture
     def repo(self, mock_session):
         """Create repository with mock session."""
-        return PostgreSQLMemoryMetadataRepository(session=mock_session)
+        token = set_session(mock_session)
+        repo = PostgreSQLMemoryMetadataRepository()
+        yield repo
+        reset_session(token)
 
     def test_to_entity_converts_model_correctly(self, repo):
         """验证 _to_entity 正确转换模型。"""

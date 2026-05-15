@@ -2,6 +2,10 @@
 
 实现 UserRoleRepositoryPort 端口，从 user_roles 关联表操作数据。
 遵循六边形架构：基础设施层实现，可以导入外部库。
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from src.domain.entities.role import Role
 from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 from src.infrastructure.storage.postgresql.models import RoleModel, UserModel
 from src.infrastructure.storage.postgresql.models.rbac_association import user_roles_table as user_roles
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class UserRoleRepository(UserRoleRepositoryPort):
@@ -22,14 +27,9 @@ class UserRoleRepository(UserRoleRepositoryPort):
 
     负责用户和角色之间的关联关系，实现 UserRoleRepositoryPort 端口。
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 UserRoleRepository.
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def assign_role(self, user_id: UUID, role_id: UUID) -> bool:
         """分配角色给用户。

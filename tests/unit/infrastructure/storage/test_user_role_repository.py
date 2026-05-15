@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 class TestUserRoleRepository:
@@ -17,7 +18,12 @@ class TestUserRoleRepository:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_session = AsyncMock()
-        self.repository = UserRoleRepository(self.mock_session)
+        self._token = set_session(self.mock_session)
+        self.repository = UserRoleRepository()
+
+    def teardown_method(self):
+        """Tear down test fixtures."""
+        reset_session(self._token)
 
     @pytest.mark.asyncio
     async def test_assign_role_user_not_found(self):

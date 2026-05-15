@@ -16,6 +16,7 @@ from src.infrastructure.messaging.retry.dual_idempotency_checker import (
     DualIdempotencyChecker,
     IdempotencyRecordModel,
 )
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -39,7 +40,10 @@ def mock_session():
 @pytest.fixture
 def checker(redis_client, mock_session):
     """Provide a DualIdempotencyChecker with mocks."""
-    return DualIdempotencyChecker(redis_client=redis_client, session=mock_session)
+    token = set_session(mock_session)
+    checker = DualIdempotencyChecker(redis_client=redis_client)
+    yield checker
+    reset_session(token)
 
 
 # ============================================================================
@@ -118,13 +122,18 @@ class TestDualIdempotencyChecker:
         bad_redis = mock.AsyncMock()
         bad_redis.set = redis_error
 
-        checker = DualIdempotencyChecker(redis_client=bad_redis, session=mock_session)
+        # Set ContextVar for PostgreSQL fallback
+        token = set_session(mock_session)
+        try:
+            checker = DualIdempotencyChecker(redis_client=bad_redis)
 
-        result = await checker.try_acquire(event_id)
+            result = await checker.try_acquire(event_id)
 
-        # Should fall back to PostgreSQL and succeed
-        assert result is True
-        mock_session.execute.assert_called()
+            # Should fall back to PostgreSQL and succeed
+            assert result is True
+            mock_session.execute.assert_called()
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_is_processed_checks_redis_first(self, checker, redis_client, mock_session):
@@ -166,7 +175,7 @@ class TestDualIdempotencyChecker:
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
-        checker = DualIdempotencyChecker(redis_client=bad_redis, session=mock_session)
+        checker = DualIdempotencyChecker(redis_client=bad_redis)
 
         result = await checker.is_processed(event_id)
 

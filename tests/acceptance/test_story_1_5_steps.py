@@ -23,7 +23,7 @@ import asyncio
 import os
 import subprocess
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
@@ -81,23 +82,20 @@ def db_engine(pg_config: PostgreSQLConfig) -> DatabaseEngine:
 
 
 @pytest.fixture
-async def outbox_repo(db_engine: DatabaseEngine, ensure_alembic_migration) -> AsyncGenerator[PostgreSQLOutboxRepository, None]:
-    """Real PostgreSQL outbox repository with transaction rollback.
-
-    Uses begin_nested() to create a savepoint. After test completes,
-    the nested transaction is rolled back, ensuring test data is
-    cleaned up automatically.
-    """
+def outbox_repo(db_engine: DatabaseEngine, ensure_alembic_migration, event_loop) -> Generator[PostgreSQLOutboxRepository, None, None]:
+    """Real PostgreSQL outbox repository with transaction rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)
-    repo = PostgreSQLOutboxRepository(session)
+    repo = PostgreSQLOutboxRepository()
 
-    # Start a nested transaction (savepoint) for rollback isolation
-    async with session.begin_nested():
-        yield repo
-    # Rollback happens automatically when nested context exits
-
-    await session.close()
+    # Start a transaction for rollback isolation (using event_loop)
+    event_loop.run_until_complete(session.begin())
+    # Set ContextVar in sync context so it's visible to sync BDD steps
+    token = set_session(session)
+    yield repo
+    reset_session(token)
+    event_loop.run_until_complete(session.rollback())
+    event_loop.run_until_complete(session.close())
 
 
 # ===================================================================

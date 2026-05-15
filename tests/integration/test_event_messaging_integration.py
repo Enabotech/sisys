@@ -15,6 +15,7 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 class TestDeadLetterQueueIntegration:
@@ -22,11 +23,13 @@ class TestDeadLetterQueueIntegration:
 
     @pytest.fixture
     def mock_session(self):
-        """Provide mock AsyncSession for integration testing."""
+        """Provide mock AsyncSession and set in ContextVar."""
         session = mock.AsyncMock()
         session.add = mock.Mock()
         session.execute = mock.AsyncMock()
-        return session
+        token = set_session(session)
+        yield session
+        reset_session(token)
 
     @pytest.mark.asyncio
     async def test_enqueue_integration(self, mock_session):
@@ -35,7 +38,7 @@ class TestDeadLetterQueueIntegration:
             PostgresDeadLetterQueue,
         )
 
-        dlq = PostgresDeadLetterQueue(session=mock_session)
+        dlq = PostgresDeadLetterQueue()
         event = DocumentProcessed(
             document_id=uuid4(),
             parse_result={"pages": 10},
@@ -61,7 +64,7 @@ class TestDeadLetterQueueIntegration:
             PostgresDeadLetterQueue,
         )
 
-        dlq = PostgresDeadLetterQueue(session=mock_session)
+        dlq = PostgresDeadLetterQueue()
         event = DocumentProcessed(
             document_id=uuid4(),
             parse_result={"pages": 10},
@@ -102,7 +105,7 @@ class TestDeadLetterQueueIntegration:
             PostgresDeadLetterQueue,
         )
 
-        dlq = PostgresDeadLetterQueue(session=mock_session)
+        dlq = PostgresDeadLetterQueue()
 
         # Create mock models
         mock_model1 = mock.Mock(spec=DeadLetterQueueModel)
@@ -143,7 +146,7 @@ class TestDeadLetterQueueIntegration:
             PostgresDeadLetterQueue,
         )
 
-        dlq = PostgresDeadLetterQueue(session=mock_session)
+        dlq = PostgresDeadLetterQueue()
         entry_id = uuid4()
 
         mock_model = mock.Mock()
@@ -167,17 +170,19 @@ class TestEventStoreIntegration:
 
     @pytest.fixture
     def mock_session(self):
-        """Provide mock AsyncSession for integration testing."""
+        """Provide mock AsyncSession and set in ContextVar."""
         session = mock.AsyncMock()
         session.execute = mock.AsyncMock()
-        return session
+        token = set_session(session)
+        yield session
+        reset_session(token)
 
     @pytest.mark.asyncio
     async def test_append_integration(self, mock_session):
         """append should persist event to event_store table."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
 
-        store = PostgreSQLEventStore(session=mock_session)
+        store = PostgreSQLEventStore()
         aggregate_id = uuid4()
         event = DomainEvent(
             event_id=uuid4(),
@@ -203,7 +208,7 @@ class TestEventStoreIntegration:
         """get_events should retrieve events for aggregate."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
 
-        store = PostgreSQLEventStore(session=mock_session)
+        store = PostgreSQLEventStore()
         aggregate_id = uuid4()
 
         # Configure mock to return empty list
@@ -220,7 +225,7 @@ class TestEventStoreIntegration:
         """get_events_by_type should filter events by type and time range."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore
 
-        store = PostgreSQLEventStore(session=mock_session)
+        store = PostgreSQLEventStore()
         now = datetime.now(UTC)
         start = now
         end = now
@@ -239,7 +244,7 @@ class TestEventStoreIntegration:
         """append should raise VersionError on duplicate aggregate_id + version."""
         from src.infrastructure.messaging.event_store import PostgreSQLEventStore, VersionError
 
-        store = PostgreSQLEventStore(session=mock_session)
+        store = PostgreSQLEventStore()
         aggregate_id = uuid4()
         event = DomainEvent(
             event_id=uuid4(),

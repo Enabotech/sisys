@@ -39,6 +39,7 @@ from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
     PostgreSQLUnitOfWork,
 )
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import set_session
 from tests.environments import get_test_env
 
 scenarios("test_story_20_2.feature")
@@ -198,18 +199,11 @@ def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_s
 
 @pytest.fixture
 async def pg_session(db_engine: DatabaseEngine, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
-    """PostgreSQL session with transactional rollback.
-
-    Uses begin() to start a transaction for test isolation.
-    After test completes, the transaction is rolled back.
-    """
+    """PostgreSQL session with transactional rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine, expire_on_commit=False)
 
-    # Start transaction first
     await session.begin()
-
-    # Set search_path for this session
     await session.execute(text(f'SET search_path TO "{ensure_schema}"'))
 
     yield session
@@ -324,18 +318,18 @@ def when_enqueue_to_postgres_dlq(
     event_loop,
 ) -> None:
     """Enqueue event to PostgreSQL DLQ."""
-    dlq = PostgresDeadLetterQueue(session=pg_session)
     event = context.get("event")
     error_msg = context.get("error_message", "Unknown error")
     retry_count = context.get("retry_count", 0)
 
     async def _enqueue():
+        set_session(pg_session)
+        dlq = PostgresDeadLetterQueue()
         await dlq.enqueue(event, error_msg, retry_count)
-        # Flush to make data visible within transaction (before rollback)
         await pg_session.flush()
 
     event_loop.run_until_complete(_enqueue())
-    context["dlq"] = dlq
+    context["dlq_enqueued"] = True
 
 
 @then("事件应该包含 event_id, event_type, payload, error_message, retry_count")
@@ -345,8 +339,7 @@ def then_event_contains_required_fields(
     event_loop,
 ) -> None:
     """Verify DLQ entry contains all required fields."""
-    dlq = context.get("dlq")
-    assert dlq is not None
+    assert context.get("dlq_enqueued")
 
     async def _verify():
         result = await pg_session.execute(
@@ -432,9 +425,10 @@ def when_dequeue_from_dlq(context: dict) -> None:
     """Dequeue entry from DLQ."""
     pg_session = context["pg_session"]
     event_loop = context["event_loop"]
-    dlq = PostgresDeadLetterQueue(session=pg_session)
 
     async def _dequeue():
+        set_session(pg_session)
+        dlq = PostgresDeadLetterQueue()
         return await dlq.dequeue()
 
     result = event_loop.run_until_complete(_dequeue())
@@ -509,9 +503,10 @@ def when_get_all_entries(context: dict) -> None:
     """Get all entries from DLQ."""
     pg_session = context["pg_session"]
     event_loop = context["event_loop"]
-    dlq = PostgresDeadLetterQueue(session=pg_session)
 
     async def _get_all():
+        set_session(pg_session)
+        dlq = PostgresDeadLetterQueue()
         return await dlq.get_all()
 
     entries = event_loop.run_until_complete(_get_all())
@@ -567,10 +562,11 @@ def when_mark_action_taken(context: dict) -> None:
     """Mark action taken for DLQ entry."""
     pg_session = context["pg_session"]
     event_loop = context["event_loop"]
-    dlq = PostgresDeadLetterQueue(session=pg_session)
     entry_id = context.get("entry_id")
 
     async def _mark():
+        set_session(pg_session)
+        dlq = PostgresDeadLetterQueue()
         await dlq.mark_action_taken(entry_id, "manual_retry")
         await pg_session.commit()
 
@@ -743,13 +739,10 @@ def when_execute_idempotency_check(
     event_loop,
 ) -> None:
     """Execute idempotency check."""
-    checker = DualIdempotencyChecker(
-        redis_client=aioredis_client,
-        session=pg_session,
-    )
-    context["checker"] = checker
 
     async def _check():
+        set_session(pg_session)
+        checker = DualIdempotencyChecker(redis_client=aioredis_client)
         return await checker.try_acquire(context["event_id"])
 
     result = event_loop.run_until_complete(_check())
@@ -985,7 +978,7 @@ def given_atomicity_needed(context: dict) -> None:
 @when("实现工作单元模式")
 def when_implement_unit_of_work(context: dict, pg_session: AsyncSession) -> None:
     """Implement UnitOfWork pattern."""
-    uow = PostgreSQLUnitOfWork(session=pg_session)
+    uow = PostgreSQLUnitOfWork()
     context["uow"] = uow
 
 
@@ -1001,7 +994,7 @@ def then_operations_in_same_transaction(context: dict) -> None:
 @when("创建 PostgreSQLUnitOfWork")
 def when_create_postgresql_uow(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Create PostgreSQLUnitOfWork."""
-    uow = PostgreSQLUnitOfWork(session=pg_session)
+    uow = PostgreSQLUnitOfWork()
     context["uow"] = uow
     # Note: Do NOT call begin()/commit()/rollback() here as pg_session
     # already has a transaction from begin_nested() fixture
@@ -1014,7 +1007,7 @@ def then_uow_methods_work(context: dict, pg_session: AsyncSession, event_loop) -
     Note: We only test that the methods exist and can be called.
     Actual transaction behavior is tested in integration tests.
     """
-    uow = PostgreSQLUnitOfWork(session=pg_session)
+    uow = PostgreSQLUnitOfWork()
 
     # Verify methods exist and are callable
     assert callable(uow.begin)
@@ -1061,9 +1054,6 @@ def given_event_sourcing_needs_persistence(context: dict) -> None:
 @when("追加事件到 EventStore")
 def when_append_event_to_eventstore(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Append event to EventStore."""
-    store = PostgreSQLEventStore(session=pg_session)
-    context["store"] = store
-
     event = DomainEvent(
         event_id=uuid.uuid4(),
         event_type="DocumentProcessed",
@@ -1076,6 +1066,9 @@ def when_append_event_to_eventstore(context: dict, pg_session: AsyncSession, eve
     context["event"] = event
 
     async def _append():
+        set_session(pg_session)
+        store = PostgreSQLEventStore()
+        context["store"] = store
         await store.append(event)
 
     event_loop.run_until_complete(_append())
@@ -1109,12 +1102,11 @@ def given_aggregate_rebuild_needed(context: dict) -> None:
 @when("获取聚合的所有事件")
 def when_get_all_events_for_aggregate(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Get all events for aggregate."""
-    store = PostgreSQLEventStore(session=pg_session)
-    context["store"] = store
-
     aggregate_id = context.get("aggregate_id")
 
     async def _get():
+        set_session(pg_session)
+        store = PostgreSQLEventStore()
         return await store.get_events(aggregate_id)
 
     events = event_loop.run_until_complete(_get())
@@ -1139,10 +1131,10 @@ def given_query_by_type_and_time_range(context: dict) -> None:
 @when("调用 get_events_by_type")
 def when_call_get_events_by_type(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Call get_events_by_type method."""
-    store = PostgreSQLEventStore(session=pg_session)
-    context["store"] = store
 
     async def _get():
+        set_session(pg_session)
+        store = PostgreSQLEventStore()
         return await store.get_events_by_type(
             event_type=context["event_type"],
             start_time=context["start_time"],
@@ -1170,9 +1162,6 @@ def given_append_duplicate_aggregate_version(context: dict) -> None:
 @when("调用 append 方法")
 def when_call_append_method(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Call append method."""
-    store = PostgreSQLEventStore(session=pg_session)
-    context["store"] = store
-
     event = DomainEvent(
         event_id=uuid.uuid4(),
         event_type="DocumentProcessed",
@@ -1186,6 +1175,8 @@ def when_call_append_method(context: dict, pg_session: AsyncSession, event_loop)
 
     # First append should succeed
     async def _append():
+        set_session(pg_session)
+        store = PostgreSQLEventStore()
         await store.append(event)
         await pg_session.commit()
 
@@ -1195,6 +1186,8 @@ def when_call_append_method(context: dict, pg_session: AsyncSession, event_loop)
     context["append_error"] = None
 
     async def _append_duplicate():
+        set_session(pg_session)
+        store = PostgreSQLEventStore()
         try:
             await store.append(event)
             await pg_session.rollback()

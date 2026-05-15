@@ -4,12 +4,15 @@
 - 继承 PostgreSQLAdapter[UserModel, UserModel]（恒等转换）
 - 实现 _to_entity/_to_model 恒等转换
 - 自动获得父类 get_by_id/save/delete/list_all
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.models import UserModel
 from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
@@ -21,14 +24,8 @@ class UserRepository(PostgreSQLAdapter[UserModel, UserModel]):
     继承 PostgreSQLAdapter[UserModel, UserModel]，
     添加用户特定查询方法。
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 UserRepository。
-
-        Args:
-            session: 异步数据库会话
-        """
-        super().__init__(UserModel, session)
+    def __init__(self) -> None:
+        super().__init__(UserModel)
 
     def _to_entity(self, model: UserModel) -> UserModel:
         """ORM 模型 → 领域实体（恒等转换）。"""

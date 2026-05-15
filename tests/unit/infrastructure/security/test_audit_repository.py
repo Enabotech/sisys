@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.audit_repository import AuditSearchCriteria, AuditSearchResult
 from src.infrastructure.security.audit_repository_impl import AuditRepository
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -25,7 +26,10 @@ def mock_session() -> mock.AsyncMock:
 @pytest.fixture
 def repo(mock_session: mock.AsyncMock) -> AuditRepository:
     """Create AuditRepository with mock session."""
-    return AuditRepository(session=mock_session)
+    token = set_session(mock_session)
+    repo = AuditRepository()
+    yield repo
+    reset_session(token)
 
 
 class TestAuditRepository:

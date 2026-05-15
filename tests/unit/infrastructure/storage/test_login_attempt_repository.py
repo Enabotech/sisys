@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.storage.postgresql.repository.login_attempt_repository import (
     LoginAttemptRepository,
 )
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -21,7 +22,10 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    return LoginAttemptRepository(mock_session)
+    token = set_session(mock_session)
+    repo = LoginAttemptRepository()
+    yield repo
+    reset_session(token)
 
 
 class TestLoginAttemptRepository:

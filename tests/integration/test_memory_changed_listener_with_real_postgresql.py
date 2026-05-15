@@ -26,6 +26,7 @@ from src.domain.events.memory_events import MemoryChanged
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.memory_index import MemoryIndex
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -199,7 +200,10 @@ def metadata_repository(pg_session: AsyncSession):
         PostgreSQLMemoryMetadataRepository,
     )
 
-    return PostgreSQLMemoryMetadataRepository(pg_session)
+    token = set_session(pg_session)
+    repo = PostgreSQLMemoryMetadataRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture
@@ -209,7 +213,10 @@ def history_repository(pg_session: AsyncSession):
         PostgreSQLMemoryChangeHistoryRepository,
     )
 
-    return PostgreSQLMemoryChangeHistoryRepository(pg_session)
+    token = set_session(pg_session)
+    repo = PostgreSQLMemoryChangeHistoryRepository()
+    yield repo
+    reset_session(token)
 
 
 # ===================================================================

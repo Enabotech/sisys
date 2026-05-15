@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
 ROOT = Path(__file__).parents[5]
 
 
@@ -24,10 +26,13 @@ class TestUoWTransactionBoundary:
         )
 
         mock_session = MagicMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        assert hasattr(uow, "session")
-        assert uow.session is mock_session
+            assert hasattr(uow, "session")
+        finally:
+            reset_session(token)
 
     def test_uow_prevents_double_commit_on_same_instance(self) -> None:
         """Guard prevents duplicate commit on the same UoW instance."""
@@ -46,12 +51,16 @@ class TestUoWTransactionBoundary:
         mock_session.begin = AsyncMock()
 
         async def test_double_commit():
-            uow = PostgreSQLUnitOfWork(session=mock_session)
-            async with uow:
-                await uow.commit()
-                # Second commit on SAME instance should raise
-                with pytest.raises(InvalidStateError, match="Already committed"):
+            token = set_session(mock_session)
+            try:
+                uow = PostgreSQLUnitOfWork()
+                async with uow:
                     await uow.commit()
+                    # Second commit on SAME instance should raise
+                    with pytest.raises(InvalidStateError, match="Already committed"):
+                        await uow.commit()
+            finally:
+                reset_session(token)
 
         asyncio.run(test_double_commit())
 
@@ -72,12 +81,16 @@ class TestUoWTransactionBoundary:
         mock_session.begin = AsyncMock()
 
         async def test_rollback_after_commit():
-            uow = PostgreSQLUnitOfWork(session=mock_session)
-            async with uow:
-                await uow.commit()
-                # Rollback after commit on SAME instance should raise
-                with pytest.raises(InvalidStateError, match="Already committed"):
-                    await uow.rollback()
+            token = set_session(mock_session)
+            try:
+                uow = PostgreSQLUnitOfWork()
+                async with uow:
+                    await uow.commit()
+                    # Rollback after commit on SAME instance should raise
+                    with pytest.raises(InvalidStateError, match="Already committed"):
+                        await uow.rollback()
+            finally:
+                reset_session(token)
 
         asyncio.run(test_rollback_after_commit())
 
@@ -97,11 +110,15 @@ class TestUoWTransactionBoundary:
         mock_session.begin = AsyncMock()
 
         async def test_auto_commit():
-            uow = PostgreSQLUnitOfWork(session=mock_session)
-            async with uow:
-                pass  # No explicit commit, should auto-commit on exit
-            # After exiting with no exception and no explicit commit, commit was called
-            assert mock_session.commit.called
+            token = set_session(mock_session)
+            try:
+                uow = PostgreSQLUnitOfWork()
+                async with uow:
+                    pass  # No explicit commit, should auto-commit on exit
+                # After exiting with no exception and no explicit commit, commit was called
+                assert mock_session.commit.called
+            finally:
+                reset_session(token)
 
         asyncio.run(test_auto_commit())
 

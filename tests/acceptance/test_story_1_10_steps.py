@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.security.audit_repository_impl import AuditRepository
 from src.infrastructure.security.audit_service_impl import AuditServiceImpl
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
 scenarios("test_story_1_10.feature")
@@ -142,7 +143,10 @@ async def pg_session(db_engine, ensure_alembic_migration) -> AsyncGenerator[Asyn
 @pytest.fixture
 def audit_repository(pg_session):
     """Real audit repository."""
-    return AuditRepository(session=pg_session)
+    token = set_session(pg_session)
+    repo = AuditRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture
