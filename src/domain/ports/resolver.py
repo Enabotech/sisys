@@ -78,6 +78,8 @@ class Resolver:
         Raises:
             KeyError: If no port found for interface
         """
+        if isinstance(interface, str):
+            raise KeyError(f"Cannot resolve forward-reference annotation: {interface}")
         spec = self._registry.get_by_interface(interface)
         if spec is None:
             raise KeyError(f"Port not found for interface: {interface.__name__}")
