@@ -27,6 +27,7 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
     使用 AsyncSession 提供异步、线程安全的数据库操作。
     支持多用户并发的会话级别隔离。
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()

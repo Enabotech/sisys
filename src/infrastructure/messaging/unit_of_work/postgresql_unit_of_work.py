@@ -27,6 +27,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
     使用 SQLAlchemy AsyncSession 管理事务。
     实现领域层 UnitOfWork 接口。
     """
+
     _committed: bool = False
     _rolled_back: bool = False
 

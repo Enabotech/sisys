@@ -27,6 +27,7 @@ class AuditRepository(AuditRepositoryPort):
     """审计仓储实现.
     实现 AuditRepositoryPort 接口，添加审计特定查询方法。
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()

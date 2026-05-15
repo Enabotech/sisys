@@ -27,6 +27,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
 
     负责用户和角色之间的关联关系，实现 UserRoleRepositoryPort 端口。
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()

@@ -3,6 +3,7 @@
 Provides ContextVar-based session access for repositories.
 DI manages static deps; middleware + ContextVar manage dynamic session scope.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -25,10 +26,7 @@ def get_session() -> AsyncSession:
     """
     session = _session_ctx.get()
     if session is None:
-        raise RuntimeError(
-            "No AsyncSession in context. "
-            "Call set_session() within a middleware or test fixture first."
-        )
+        raise RuntimeError("No AsyncSession in context. Call set_session() within a middleware or test fixture first.")
     return session
 
 

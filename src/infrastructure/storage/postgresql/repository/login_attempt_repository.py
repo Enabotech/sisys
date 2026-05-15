@@ -24,6 +24,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
 
     跟踪登录失败尝试，用于实现账户锁定（等保 2.0 合规）。
     """
+
     MAX_LOGIN_ATTEMPTS = 5
     LOCKOUT_DURATION_MINUTES = 30
 

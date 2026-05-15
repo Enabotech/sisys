@@ -90,6 +90,7 @@ class PostgreSQLEventStore:
     - get_events() 获取聚合的所有事件
     - get_events_by_type() 按事件类型和时间范围查询
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()

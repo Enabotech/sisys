@@ -5,6 +5,7 @@ Refactoring notes:
 - Subclasses only need _to_entity/_to_model and optional pk_column override
 - Deprecated BaseRepository alias retained for backward compatibility
 """
+
 from __future__ import annotations
 
 from typing import Any, Generic, TypeVar, cast
@@ -63,9 +64,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         Returns:
             Domain entity, or None if not found
         """
-        stmt = select(self._model_class).where(
-            cast("Any", self._model_class).__table__.c[self.pk_column] == id
-        )
+        stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         stmt = self._apply_soft_delete_filter(stmt)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -146,9 +145,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
 
     async def _hard_delete(self, id: Any) -> None:
         """Hard delete — physically remove record."""
-        stmt = select(self._model_class).where(
-            cast("Any", self._model_class).__table__.c[self.pk_column] == id
-        )
+        stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         if model:

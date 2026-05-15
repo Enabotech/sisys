@@ -118,9 +118,7 @@ class TestRedisSemanticCache:
     async def test_get_hit(self) -> None:
         cache, mock_redis = _make_cache()
         result_data = {"answer": "test"}
-        mock_redis.execute_command = AsyncMock(
-            return_value=_ft_search_response(json_dumps(result_data), 0.05)
-        )
+        mock_redis.execute_command = AsyncMock(return_value=_ft_search_response(json_dumps(result_data), 0.05))
 
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is not None
@@ -137,9 +135,7 @@ class TestRedisSemanticCache:
     @pytest.mark.asyncio
     async def test_get_miss_below_threshold(self) -> None:
         cache, mock_redis = _make_cache()
-        mock_redis.execute_command = AsyncMock(
-            return_value=_ft_search_response(json_dumps({"answer": "test"}), 0.5)
-        )
+        mock_redis.execute_command = AsyncMock(return_value=_ft_search_response(json_dumps({"answer": "test"}), 0.5))
 
         # threshold=0.9 means max_distance=0.1, distance=0.5 is too far
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
@@ -168,9 +164,7 @@ class TestRedisSemanticCache:
         assert metrics.metrics.cache_misses_total == 1
 
         # Hit
-        mock_redis.execute_command = AsyncMock(
-            return_value=_ft_search_response(json_dumps({"result": "value"}), 0.01)
-        )
+        mock_redis.execute_command = AsyncMock(return_value=_ft_search_response(json_dumps({"result": "value"}), 0.01))
         await cache.get([0.1], threshold=0.9)
         assert metrics.metrics.cache_hits_total == 1
 
@@ -190,9 +184,7 @@ class TestRedisSemanticCache:
     @pytest.mark.asyncio
     async def test_index_already_exists_is_ok(self) -> None:
         cache, mock_redis = _make_cache()
-        mock_redis.execute_command = AsyncMock(
-            side_effect=Exception("Index already exists")
-        )
+        mock_redis.execute_command = AsyncMock(side_effect=Exception("Index already exists"))
         mock_redis.hset = AsyncMock(return_value=1)
         mock_redis.expire = AsyncMock(return_value=True)
 

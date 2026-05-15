@@ -56,6 +56,5 @@ class ConnectionManager(Protocol):
             NotImplementedError: If the implementation does not expose a client.
         """
         raise NotImplementedError(
-            f"{type(self).__name__}.get_client() is not implemented. "
-            "This ConnectionManager does not expose a client instance."
+            f"{type(self).__name__}.get_client() is not implemented. This ConnectionManager does not expose a client instance."
         )

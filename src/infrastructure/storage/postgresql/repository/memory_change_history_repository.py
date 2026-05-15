@@ -38,6 +38,7 @@ class PostgreSQLMemoryChangeHistoryRepository(
     继承 PostgreSQLAdapter，覆写 delete 为抛出异常。
     append-only 模式：只允许新增记录，不允许修改或删除。
     """
+
     def __init__(self) -> None:
         super().__init__(MemoryChangeHistoryModel)
 

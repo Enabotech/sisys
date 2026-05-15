@@ -24,6 +24,7 @@ class UserRepository(PostgreSQLAdapter[UserModel, UserModel]):
     继承 PostgreSQLAdapter[UserModel, UserModel]，
     添加用户特定查询方法。
     """
+
     def __init__(self) -> None:
         super().__init__(UserModel)
 

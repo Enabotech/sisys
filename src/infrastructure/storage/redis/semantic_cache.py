@@ -94,14 +94,24 @@ class RedisSemanticCache:
             return
         try:
             await self._redis.execute_command(
-                "FT.CREATE", _INDEX_NAME,
-                "ON", "HASH",
-                "PREFIX", "1", build_key(self._NAMESPACE, ""),
+                "FT.CREATE",
+                _INDEX_NAME,
+                "ON",
+                "HASH",
+                "PREFIX",
+                "1",
+                build_key(self._NAMESPACE, ""),
                 "SCHEMA",
-                "embedding", "VECTOR", "FLAT", "6",
-                "TYPE", "FLOAT32",
-                "DIM", str(self._embedding_dim),
-                "DISTANCE_METRIC", "COSINE",
+                "embedding",
+                "VECTOR",
+                "FLAT",
+                "6",
+                "TYPE",
+                "FLOAT32",
+                "DIM",
+                str(self._embedding_dim),
+                "DISTANCE_METRIC",
+                "COSINE",
             )
             logger.info("Created RediSearch vector index %s (dim=%d)", _INDEX_NAME, self._embedding_dim)
         except Exception as e:
@@ -132,11 +142,19 @@ class RedisSemanticCache:
             max_distance = 1.0 - threshold
 
             response = await self._redis.execute_command(
-                "FT.SEARCH", _INDEX_NAME,
+                "FT.SEARCH",
+                _INDEX_NAME,
                 "*=>[KNN 1 @embedding $query_vec]",
-                "PARAMS", "2", "query_vec", query_bytes,
-                "RETURN", "2", "__embedding_score", "result",
-                "DIALECT", "2",
+                "PARAMS",
+                "2",
+                "query_vec",
+                query_bytes,
+                "RETURN",
+                "2",
+                "__embedding_score",
+                "result",
+                "DIALECT",
+                "2",
             )
 
             # Response format: [total_count, doc_key, [field_name, field_value], ...]

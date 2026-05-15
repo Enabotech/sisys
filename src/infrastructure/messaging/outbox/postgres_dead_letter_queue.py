@@ -102,6 +102,7 @@ class PostgresDeadLetterQueue:
     - 状态查询
     - 人工干预
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()
