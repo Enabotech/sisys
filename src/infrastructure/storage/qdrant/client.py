@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from qdrant_client import AsyncQdrantClient
 
+from src.domain.ports.connection_manager import ConnectionManager
 
-class QdrantClientWrapper:
+
+class QdrantClientWrapper(ConnectionManager):
     """Qdrant 异步客户端封装。
 
     支持懒初始化、健康检查和优雅关闭。
