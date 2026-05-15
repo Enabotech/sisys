@@ -20,7 +20,7 @@ services:
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--protected-mode", "no"]
     environment:
       - REDIS_PORT=6379
       # - REDIS_PASSWORD=${REDIS_PASSWORD}
