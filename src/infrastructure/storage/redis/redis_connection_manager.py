@@ -41,12 +41,13 @@ class RedisConnectionManager(ConnectionManager):
         """
         self._config = config
         self._pool: aioredis.ConnectionPool | None = None
+        self._redis: aioredis.Redis | None = None
 
     def get_client(self) -> aioredis.Redis:
         """Get an aioredis.Redis client backed by the shared connection pool.
 
         Returns:
-            Redis async client instance
+            Redis async client instance (cached, same instance per manager)
         """
         if self._pool is None:
             self._pool = aioredis.ConnectionPool(
@@ -65,7 +66,9 @@ class RedisConnectionManager(ConnectionManager):
                 self._config.db,
                 self._config.max_connections,
             )
-        return aioredis.Redis(connection_pool=self._pool)
+        if self._redis is None:
+            self._redis = aioredis.Redis(connection_pool=self._pool)
+        return self._redis
 
     async def health_check(self) -> bool:
         """Check Redis connection health via PING."""
@@ -78,6 +81,9 @@ class RedisConnectionManager(ConnectionManager):
 
     async def close(self) -> None:
         """Close the connection pool and release all connections."""
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
         if self._pool is not None:
             await self._pool.disconnect()
             self._pool = None

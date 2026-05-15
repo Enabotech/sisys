@@ -96,7 +96,7 @@ def bootstrap() -> None:
         name="redis_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: RedisConnectionManager(RedisConfig()),
+        impl=lambda resolver: RedisConnectionManager(RedisConfig.from_env()),
         module="src.infrastructure.storage.redis.redis_connection_manager",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -109,7 +109,7 @@ def bootstrap() -> None:
         interface=aioredis.Redis,
         impl=lambda resolver: resolver.resolve("redis_connection_manager").get_client(),
         module="src.infrastructure.storage.redis.redis_connection_manager",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="storage-team",
         tags=("redis", "infrastructure"),
     )
@@ -130,7 +130,7 @@ def bootstrap() -> None:
         name="postgresql_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: DatabaseEngine(PostgreSQLConfig()),
+        impl=lambda resolver: DatabaseEngine(PostgreSQLConfig.from_env()),
         module="src.infrastructure.storage.postgresql.engine",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -141,7 +141,7 @@ def bootstrap() -> None:
         name="qdrant_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: QdrantClientWrapper(QdrantConfig()),
+        impl=lambda resolver: QdrantClientWrapper(QdrantConfig.from_env()),
         module="src.infrastructure.storage.qdrant.client",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -152,7 +152,7 @@ def bootstrap() -> None:
         name="neo4j_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: Neo4jClientWrapper(Neo4jConfig()),
+        impl=lambda resolver: Neo4jClientWrapper(Neo4jConfig.from_env()),
         module="src.infrastructure.storage.neo4j.client",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -165,7 +165,7 @@ def bootstrap() -> None:
         interface=AsyncEngine,
         impl=lambda resolver: resolver.resolve("postgresql_connection_manager").get_client(),
         module="src.infrastructure.storage.postgresql.engine",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="storage-team",
         tags=("postgresql", "infrastructure"),
     )
@@ -176,7 +176,7 @@ def bootstrap() -> None:
         interface=AsyncQdrantClient,
         impl=lambda resolver: resolver.resolve("qdrant_connection_manager").get_client(),
         module="src.infrastructure.storage.qdrant.client",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="storage-team",
         tags=("qdrant", "infrastructure"),
     )
@@ -187,7 +187,7 @@ def bootstrap() -> None:
         interface=AsyncDriver,
         impl=lambda resolver: resolver.resolve("neo4j_connection_manager").get_client(),
         module="src.infrastructure.storage.neo4j.client",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="storage-team",
         tags=("neo4j", "infrastructure"),
     )
@@ -399,6 +399,52 @@ def bootstrap() -> None:
     )
 
     # === Event Ports ===
+    from src.infrastructure.messaging.channel_router import ChannelRouter
+    from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
+    from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
+    from src.infrastructure.messaging.redis_event_bus import RedisEventBus
+    from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
+    from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
+
+    register_port(
+        name="router",
+        version="v1.0.0",
+        interface=ChannelRouter,
+        impl=lambda resolver: ChannelRouter(),
+        module="src.infrastructure.messaging.channel_router",
+        lifetime=Lifetime.SINGLETON,
+        owner="messaging-team",
+    )
+
+    register_port(
+        name="redis_bus",
+        version="v1.0.0",
+        interface=EventPublisher,
+        impl=lambda resolver: RedisEventBus(
+            publisher=RedisEventPublisher(RedisConfig.from_env()),
+            subscriber=RedisEventSubscriber(RedisConfig.from_env()),
+            router=resolver.resolve("router"),
+        ),
+        module="src.infrastructure.messaging.redis_event_bus",
+        lifetime=Lifetime.SINGLETON,
+        owner="messaging-team",
+        tags=("redis",),
+    )
+
+    register_port(
+        name="rabbitmq_bus",
+        version="v1.0.0",
+        interface=EventPublisher,
+        impl=lambda resolver: RabbitMQEventBus(
+            outbox_repository=resolver.resolve("outbox_repo"),
+            router=resolver.resolve("router"),
+        ),
+        module="src.infrastructure.messaging.rabbitmq_event_bus",
+        lifetime=Lifetime.SINGLETON,
+        owner="messaging-team",
+        tags=("rabbitmq",),
+    )
+
     register_port(
         name="event_publisher",
         version="v1.0.0",
@@ -658,4 +704,28 @@ def bootstrap() -> None:
     logger.info("Registered %d ports", len(_global_registry.list_all()))
 
 
-__all__ = ["bootstrap", "_global_registry"]
+async def shutdown() -> None:
+    """Close all ConnectionManagers at application shutdown.
+
+    Should be called at application exit to gracefully release all
+    connection pools and resources.
+    """
+    from src.domain.ports.resolver import get_resolver
+
+    resolver = get_resolver()
+    managers = [
+        "redis_connection_manager",
+        "postgresql_connection_manager",
+        "qdrant_connection_manager",
+        "neo4j_connection_manager",
+    ]
+    for name in managers:
+        try:
+            manager = resolver.resolve(name)
+            await manager.close()
+            logger.info("Closed %s", name)
+        except Exception as e:
+            logger.warning("Failed to close %s: %s", name, e)
+
+
+__all__ = ["bootstrap", "shutdown", "_global_registry"]
