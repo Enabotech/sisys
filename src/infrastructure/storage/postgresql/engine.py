@@ -12,10 +12,11 @@ from contextlib import asynccontextmanager
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
-class DatabaseEngine:
+class DatabaseEngine(ConnectionManager):
     """通用数据库引擎接口。
 
     支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化。

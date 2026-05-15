@@ -533,13 +533,13 @@ def test_repository_interface_defined():
 def check_repository_interface(arch_context):
     """Check BaseRepository interface exists and has required methods."""
     try:
-        module = importlib.import_module("src.domain.ports.base")
-        assert hasattr(module, "BaseRepository"), "BaseRepository class not found"
-        arch_context["repository_class"] = getattr(module, "BaseRepository")
+        module = importlib.import_module("src.domain.ports.l2_rdb")
+        assert hasattr(module, "L2RdbPort"), "L2RdbPort class not found"
+        arch_context["repository_class"] = getattr(module, "L2RdbPort")
 
         required_methods = ["get_by_id", "save", "delete", "list_all"]
         for method_name in required_methods:
-            assert hasattr(module.BaseRepository, method_name), f"{method_name} method not found"
+            assert hasattr(module.L2RdbPort, method_name), f"{method_name} method not found"
             arch_context["repository_methods"].append(method_name)
 
     except ImportError as e:

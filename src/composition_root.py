@@ -114,6 +114,56 @@ def bootstrap() -> None:
         tags=("redis", "infrastructure"),
     )
 
+    # === ConnectionManagers (L2/L3/L5) ===
+    from src.infrastructure.config.neo4j import Neo4jConfig
+    from src.infrastructure.config.postgresql import PostgreSQLConfig
+    from src.infrastructure.config.qdrant import QdrantConfig
+    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+    from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+    from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+
+    register_port(
+        name="postgresql_connection_manager",
+        version="v1.0.0",
+        interface=ConnectionManager,
+        impl=lambda resolver: DatabaseEngine(PostgreSQLConfig()),
+        module="src.infrastructure.storage.postgresql.engine",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("postgresql", "infrastructure"),
+    )
+
+    register_port(
+        name="qdrant_connection_manager",
+        version="v1.0.0",
+        interface=ConnectionManager,
+        impl=lambda resolver: QdrantClientWrapper(
+            host=QdrantConfig().host,
+            port=QdrantConfig().port,
+            grpc_port=QdrantConfig().grpc_port,
+        ),
+        module="src.infrastructure.storage.qdrant.client",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("qdrant", "infrastructure"),
+    )
+
+    register_port(
+        name="neo4j_connection_manager",
+        version="v1.0.0",
+        interface=ConnectionManager,
+        impl=lambda resolver: Neo4jClientWrapper(
+            uri=Neo4jConfig().uri,
+            username=Neo4jConfig().username,
+            password=Neo4jConfig().password,
+            database=Neo4jConfig().database,
+        ),
+        module="src.infrastructure.storage.neo4j.client",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("neo4j", "infrastructure"),
+    )
+
     register_port(
         name="l0_storage",
         version="v1.0.0",

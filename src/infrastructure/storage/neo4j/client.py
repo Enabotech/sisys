@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from neo4j import AsyncDriver, AsyncGraphDatabase
 
+from src.domain.ports.connection_manager import ConnectionManager
 
-class Neo4jClientWrapper:
+
+class Neo4jClientWrapper(ConnectionManager):
     """Neo4j 异步客户端封装。
 
     支持懒初始化、健康检查和优雅关闭。
