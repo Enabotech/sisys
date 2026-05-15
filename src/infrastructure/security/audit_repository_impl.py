@@ -1,4 +1,9 @@
-"""AuditRepository — 审计仓储实现."""
+"""AuditRepository — 审计仓储实现.
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
+"""
 
 from __future__ import annotations
 
@@ -15,21 +20,16 @@ from src.domain.ports.audit_repository import (
     AuditSearchResult,
 )
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class AuditRepository(AuditRepositoryPort):
     """审计仓储实现.
-
     实现 AuditRepositoryPort 接口，添加审计特定查询方法。
     """
-
-    def __init__(self, session: AsyncSession) -> None:
-        """初始化 AuditRepository.
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def save(self, audit_data: dict[str, Any]) -> UUID:
         """保存审计日志.
@@ -192,5 +192,5 @@ class AuditRepository(AuditRepositoryPort):
             "log_id": str(audit_log.log_id),
             "archived": audit_log.archived,
             "archived_at": audit_log.archived_at.isoformat() if audit_log.archived_at else None,
-            "retention_days": 2555,  # 7 years = 2555 days
+            "retention_days": 2555,
         }

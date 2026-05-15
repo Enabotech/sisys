@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.use_cases.role_management import RoleAlreadyExistsError, RoleNotFoundError
 from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -21,7 +22,10 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    return RoleRepository(mock_session)
+    token = set_session(mock_session)
+    repo = RoleRepository()
+    yield repo
+    reset_session(token)
 
 
 class TestRoleRepository:

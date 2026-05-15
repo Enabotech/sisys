@@ -4,6 +4,10 @@ Redis（高性能）+ PostgreSQL（持久化）双写：
 - Redis SET NX 原子操作提供高性能检查
 - PostgreSQL 记录提供持久化保证
 - Redis 故障时降级至 PostgreSQL
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ from uuid import UUID
 import redis.asyncio as aioredis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -58,19 +64,20 @@ class DualIdempotencyChecker:
     def __init__(
         self,
         redis_client: aioredis.Redis,
-        session: AsyncSession,
         ttl: int = DEFAULT_TTL,
     ):
         """初始化 DualIdempotencyChecker。
 
         Args:
-            redis_client: 异步 Redis 客户端
-            session: 异步数据库会话
-            ttl: Redis TTL（秒），默认 7 天
+            redis_client: Async Redis client
+            ttl: Redis TTL in seconds, default 7 days
         """
         self._redis = redis_client
-        self._session = session
         self._ttl = ttl
+
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def try_acquire(self, event_id: UUID) -> bool:
         """原子性尝试获取事件处理权（双写模式）。

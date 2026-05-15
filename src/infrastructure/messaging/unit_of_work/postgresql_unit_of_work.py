@@ -1,6 +1,10 @@
 """PostgreSQL UnitOfWork 实现 — 基础设施层。
 
 基于 SQLAlchemy AsyncSession 的工作单元模式实现。
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -9,6 +13,7 @@ from typing import TYPE_CHECKING, Self
 
 from src.domain.exceptions import InvalidStateError
 from src.domain.ports.unit_of_work import UnitOfWork
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -22,16 +27,12 @@ class PostgreSQLUnitOfWork(UnitOfWork):
     使用 SQLAlchemy AsyncSession 管理事务。
     实现领域层 UnitOfWork 接口。
     """
+    _committed: bool = False
+    _rolled_back: bool = False
 
-    def __init__(self, session: AsyncSession) -> None:
-        """初始化 PostgreSQLUnitOfWork。
-
-        Args:
-            session: SQLAlchemy 异步会话
-        """
-        self._session = session
-        self._committed = False
-        self._rolled_back = False
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     @property
     def session(self) -> AsyncSession:
@@ -39,7 +40,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
 
         EventHandler 使用此属性提取 session 传入各 Repository。
         """
-        return self._session
+        return get_session()
 
     async def begin(self) -> None:
         """开始事务。"""

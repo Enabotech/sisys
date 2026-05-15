@@ -2,6 +2,10 @@
 
 实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化。
 提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）。
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter impor
     SQLAlchemyEventOutboxAdapter,
 )
 from src.infrastructure.storage.postgresql.models import OutboxModel
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class PostgreSQLOutboxRepository(OutboxRepository):
@@ -27,15 +32,11 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     公开方法实现领域层接口（使用 DomainEvent）。
     内部方法（_ 前缀）直接操作 OutboxModel，仅 Poller 使用。
     """
+    _lock: asyncio.Lock = asyncio.Lock()
 
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgreSQLOutboxRepository。
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
-        self._lock = asyncio.Lock()
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     # ========== 公开方法（实现领域层接口） ==========
 

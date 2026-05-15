@@ -1,6 +1,10 @@
 """LoginAttemptRepository — 登录尝试仓储实现。
 
 用于跟踪用户登录失败尝试，实现账户锁定功能。
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.login_attempt_repository import LoginAttemptRepositoryPort
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class LoginAttemptRepository(LoginAttemptRepositoryPort):
@@ -19,18 +24,12 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
 
     跟踪登录失败尝试，用于实现账户锁定（等保 2.0 合规）。
     """
+    MAX_LOGIN_ATTEMPTS = 5
+    LOCKOUT_DURATION_MINUTES = 30
 
-    # 等保 2.0 配置
-    MAX_LOGIN_ATTEMPTS = 5  # 最大失败次数
-    LOCKOUT_DURATION_MINUTES = 30  # 锁定时长（分钟）
-
-    def __init__(self, session: AsyncSession):
-        """初始化 LoginAttemptRepository。
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def record_attempt(
         self,

@@ -13,6 +13,10 @@
 - 覆写 pk_column="memory_id"、soft_delete_column="deleted_at"
 - 覆写 _do_save 实现 UPSERT+乐观锁
 - 自动获得父类 get_by_id/save/delete/list_all
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -20,7 +24,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_metadata import MemoryMetadata
 from src.domain.exceptions.storage_exceptions import MemoryVersionConflictError
@@ -39,17 +42,11 @@ class PostgreSQLMemoryMetadataRepository(
     支持多用户并发的会话级别隔离。
     软删除模式：deleted_at 非 NULL 的记录视为已删除。
     """
-
     pk_column = "memory_id"
     soft_delete_column = "deleted_at"
 
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgreSQLMemoryMetadataRepository。
-
-        Args:
-            session: SQLAlchemy 异步会话（非线程共享，会话绑定到特定连接）
-        """
-        super().__init__(MemoryMetadataModel, session)
+    def __init__(self) -> None:
+        super().__init__(MemoryMetadataModel)
 
     def _to_model(self, entity: MemoryMetadata) -> MemoryMetadataModel:
         """将领域实体转换为数据库模型。"""

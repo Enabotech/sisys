@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -23,7 +24,10 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    return PostgreSQLOutboxRepository(mock_session)
+    token = set_session(mock_session)
+    repo = PostgreSQLOutboxRepository()
+    yield repo
+    reset_session(token)
 
 
 class TestPostgreSQLOutboxRepository:

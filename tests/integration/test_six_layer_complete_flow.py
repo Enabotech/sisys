@@ -50,6 +50,7 @@ from src.infrastructure.storage.postgresql.repository.memory_change_history_repo
 from src.infrastructure.storage.postgresql.repository.memory_metadata_repository import (
     PostgreSQLMemoryMetadataRepository,
 )
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
@@ -200,13 +201,19 @@ def memory_index(temp_memory_dir: Path):
 @pytest.fixture
 def metadata_repository(pg_session: AsyncSession):
     """L2 PostgreSQL metadata repository."""
-    return PostgreSQLMemoryMetadataRepository(pg_session)
+    token = set_session(pg_session)
+    repo = PostgreSQLMemoryMetadataRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture
 def history_repository(pg_session: AsyncSession):
     """L2 PostgreSQL history repository."""
-    return PostgreSQLMemoryChangeHistoryRepository(pg_session)
+    token = set_session(pg_session)
+    repo = PostgreSQLMemoryChangeHistoryRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture

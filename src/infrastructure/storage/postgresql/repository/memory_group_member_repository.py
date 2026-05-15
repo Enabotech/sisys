@@ -5,6 +5,10 @@
 - 线程安全：异步操作，依赖数据库事务
 
 架构来源: architecture.md §11.2.9 AC-2 RBAC 校验
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.memory_repository import L2GroupMemberRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryGroupMemberModel
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
@@ -22,14 +27,9 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
     使用 AsyncSession 提供异步、线程安全的数据库操作。
     支持多用户并发的会话级别隔离。
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgreSQLMemoryGroupMemberRepository。
-
-        Args:
-            session: SQLAlchemy 异步会话（非线程共享，会话绑定到特定连接）
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def is_group_member(self, group_id: str, user_id: str) -> bool:
         """检查用户是否是群组成员。

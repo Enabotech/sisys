@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.models import UserModel
 from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 class _TestUserAdapter(PostgreSQLAdapter[UserModel, UserModel]):
@@ -38,7 +39,10 @@ def mock_session():
 @pytest.fixture
 def repository(mock_session):
     """创建 PostgreSQLAdapter 测试实例。"""
-    return _TestUserAdapter(UserModel, mock_session)
+    token = set_session(mock_session)
+    repo = _TestUserAdapter(UserModel)
+    yield repo
+    reset_session(token)
 
 
 class TestPostgreSQLAdapter:

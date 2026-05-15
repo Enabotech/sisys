@@ -170,6 +170,24 @@ def bootstrap() -> None:
         tags=("postgresql", "infrastructure"),
     )
 
+    # === Session Factory (ContextVar-based session management) ===
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    register_port(
+        name="session_factory",
+        version="v1.0.0",
+        interface=async_sessionmaker,
+        impl=lambda resolver: async_sessionmaker(
+            bind=resolver.resolve("postgresql_async_engine"),
+            class_=AsyncSession,
+            expire_on_commit=False,
+        ),
+        module="src.infrastructure.storage.postgresql.session_context",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("postgresql", "session"),
+    )
+
     register_port(
         name="qdrant_client",
         version="v1.0.0",
@@ -400,7 +418,6 @@ def bootstrap() -> None:
 
     # === Event Ports ===
     from src.infrastructure.messaging.channel_router import ChannelRouter
-    from src.infrastructure.messaging.inmemory_event_bus import InMemoryEventBus
     from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
     from src.infrastructure.messaging.redis_event_bus import RedisEventBus
     from src.infrastructure.messaging.redis_publisher import RedisEventPublisher

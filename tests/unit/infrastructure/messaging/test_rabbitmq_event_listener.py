@@ -27,7 +27,6 @@ class TestRabbitMQEventListenerIntegration:
     def mock_dependencies(self):
         """Provide mock dependencies for RabbitMQEventListener."""
         mock_redis = mock.AsyncMock()
-        mock_session = mock.AsyncMock()
         mock_config = mock.MagicMock()
         mock_config.queue_name = "test_queue"
         mock_config.host = "localhost"
@@ -36,19 +35,18 @@ class TestRabbitMQEventListenerIntegration:
         mock_config.password = "guest"  # pragma: allowlist secret
         mock_config.virtual_host = "/"
         mock_config.prefetch_count = 10
-        return mock_redis, mock_session, mock_config
+        return mock_redis, mock_config
 
     @pytest.mark.asyncio
     async def test_async_handle_calls_process_event(self, mock_dependencies):
         """async_handle should process the event and return None."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
-        mock_redis, mock_session, mock_config = mock_dependencies
+        mock_redis, mock_config = mock_dependencies
 
         listener = RabbitMQEventListener(
             config=mock_config,
             redis_client=mock_redis,
-            session=mock_session,
         )
 
         event = DomainEvent(event_type="TestEvent")
@@ -62,12 +60,11 @@ class TestRabbitMQEventListenerIntegration:
         from src.domain.events import DocumentProcessed
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
-        mock_redis, mock_session, mock_config = mock_dependencies
+        mock_redis, mock_config = mock_dependencies
 
         listener = RabbitMQEventListener(
             config=mock_config,
             redis_client=mock_redis,
-            session=mock_session,
         )
 
         event = DocumentProcessed(
@@ -83,12 +80,11 @@ class TestRabbitMQEventListenerIntegration:
         """Listener should use DualIdempotencyChecker for idempotency."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
-        mock_redis, mock_session, mock_config = mock_dependencies
+        mock_redis, mock_config = mock_dependencies
 
         listener = RabbitMQEventListener(
             config=mock_config,
             redis_client=mock_redis,
-            session=mock_session,
         )
 
         # Verify idempotency checker is initialized
@@ -99,12 +95,11 @@ class TestRabbitMQEventListenerIntegration:
         """Listener should use RedisRetryQueue for retries."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
-        mock_redis, mock_session, mock_config = mock_dependencies
+        mock_redis, mock_config = mock_dependencies
 
         listener = RabbitMQEventListener(
             config=mock_config,
             redis_client=mock_redis,
-            session=mock_session,
         )
 
         # Verify retry queue is initialized
@@ -115,12 +110,11 @@ class TestRabbitMQEventListenerIntegration:
         """Listener should have set_dead_letter_queue method."""
         from src.infrastructure.messaging.rabbitmq_listener import RabbitMQEventListener
 
-        mock_redis, mock_session, mock_config = mock_dependencies
+        mock_redis, mock_config = mock_dependencies
 
         listener = RabbitMQEventListener(
             config=mock_config,
             redis_client=mock_redis,
-            session=mock_session,
         )
 
         # Verify method exists

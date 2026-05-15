@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.repository.permission_repository import PermissionRepository
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 @pytest.fixture
@@ -17,7 +18,10 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    return PermissionRepository(mock_session)
+    token = set_session(mock_session)
+    repo = PermissionRepository()
+    yield repo
+    reset_session(token)
 
 
 class TestPermissionRepository:

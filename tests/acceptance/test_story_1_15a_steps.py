@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,7 @@ from src.domain.services.memory_service import (
 )
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -138,23 +139,26 @@ def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_s
 
 
 @pytest.fixture
-async def pg_session(db_engine: DatabaseEngine, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
+def pg_session(db_engine: DatabaseEngine, ensure_schema: str, event_loop) -> Generator[AsyncSession, None, None]:
     """PostgreSQL session with transactional rollback.
 
-    Uses begin_nested() to create a savepoint for test isolation.
-    After test completes, the nested transaction is rolled back.
+    After test completes, the transaction is rolled back for isolation.
     """
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)
 
-    # Set search_path for this session
-    await session.execute(text(f'SET search_path TO "{ensure_schema}"'))
+    # Set search_path and start a transaction
+    async def _setup():
+        await session.execute(text(f'SET search_path TO "{ensure_schema}"'))
 
-    # Start a nested transaction (savepoint) for rollback isolation
-    async with session.begin_nested():
-        yield session
-
-    await session.close()
+    event_loop.run_until_complete(_setup())
+    # session.execute() auto-begins a transaction, so no explicit begin() needed
+    # Set ContextVar in sync context so it's visible to sync BDD steps
+    token = set_session(session)
+    yield session
+    reset_session(token)
+    event_loop.run_until_complete(session.rollback())
+    event_loop.run_until_complete(session.close())
 
 
 @pytest.fixture
@@ -213,7 +217,7 @@ def compressor() -> L1Compressor:
 
 
 @pytest.fixture
-async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryService:
+def service(extractor, compressor, pg_session: AsyncSession) -> MemoryService:
     """Create MemoryService with real PostgreSQL repositories."""
     from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
@@ -222,8 +226,9 @@ async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryServ
         PostgreSQLMemoryMetadataRepository,
     )
 
-    metadata_repo = PostgreSQLMemoryMetadataRepository(pg_session)
-    history_repo = PostgreSQLMemoryChangeHistoryRepository(pg_session)
+    # pg_session fixture already sets ContextVar in sync context
+    metadata_repo = PostgreSQLMemoryMetadataRepository()
+    history_repo = PostgreSQLMemoryChangeHistoryRepository()
 
     return MemoryService(
         text_extractor=extractor,
@@ -234,7 +239,7 @@ async def service(extractor, compressor, pg_session: AsyncSession) -> MemoryServ
 
 
 @pytest.fixture
-async def listener_with_real_services(redis_cache, pg_session: AsyncSession):
+def listener_with_real_services(redis_cache, pg_session: AsyncSession):
     """Create MemoryChangedListener with REAL L1 Redis + L2 PostgreSQL services."""
     from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
         PostgreSQLMemoryChangeHistoryRepository,
@@ -243,8 +248,9 @@ async def listener_with_real_services(redis_cache, pg_session: AsyncSession):
         PostgreSQLMemoryMetadataRepository,
     )
 
-    metadata_repo = PostgreSQLMemoryMetadataRepository(pg_session)
-    history_repo = PostgreSQLMemoryChangeHistoryRepository(pg_session)
+    # pg_session fixture already sets ContextVar in sync context
+    metadata_repo = PostgreSQLMemoryMetadataRepository()
+    history_repo = PostgreSQLMemoryChangeHistoryRepository()
 
     return MemoryChangedHandler(
         l1_cache=redis_cache,

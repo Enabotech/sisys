@@ -1,4 +1,9 @@
-"""RoleRepository — 角色仓储实现。"""
+"""RoleRepository — 角色仓储实现。
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.entities.role import Role
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.infrastructure.storage.postgresql.models import PermissionModel, RoleModel
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class RoleRepository(RoleRepositoryPort):
@@ -20,14 +26,9 @@ class RoleRepository(RoleRepositoryPort):
     实现领域实体与 SQLAlchemy 模型之间的转换。
     继承 RoleRepositoryPort 端口接口。
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 RoleRepository。
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     def _to_domain(self, model: RoleModel) -> "Role":
         """将 SQLAlchemy 模型转换为领域实体。

@@ -16,6 +16,8 @@ from uuid import uuid4
 
 import pytest
 
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
 
 class TestPostgreSQLConnection:
     """数据库连接端到端测试。"""
@@ -168,7 +170,7 @@ class TestOutboxEventLifecycle:
             payload={"key": "value"},
         )
 
-        repo = PostgreSQLOutboxRepository(mock_session)
+        repo = PostgreSQLOutboxRepository()
         repo.save(event)
 
         mock_session.add.assert_called_once()
@@ -187,7 +189,7 @@ class TestOutboxEventLifecycle:
         mock_result.scalars.return_value.all.return_value = []
         mock_session.execute.return_value = mock_result
 
-        repo = PostgreSQLOutboxRepository(mock_session)
+        repo = PostgreSQLOutboxRepository()
         result = await repo.async_get_unpublished(limit=10)
 
         assert isinstance(result, list)
@@ -202,7 +204,7 @@ class TestOutboxEventLifecycle:
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
 
-        repo = PostgreSQLOutboxRepository(mock_session)
+        repo = PostgreSQLOutboxRepository()
         await repo.async_mark_published(uuid4())
 
         assert mock_model.status == "published"
@@ -219,7 +221,7 @@ class TestOutboxEventLifecycle:
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
 
-        repo = PostgreSQLOutboxRepository(mock_session)
+        repo = PostgreSQLOutboxRepository()
         await repo.async_mark_failed(uuid4(), "Connection timeout")
 
         assert mock_model.status == "failed"
@@ -235,7 +237,7 @@ class TestUserCRUD:
         """创建新用户。"""
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
-        repo = UserRepository(mock_session)
+        repo = UserRepository()
         mock_user = mock.Mock()
 
         result = await repo.save(mock_user)
@@ -248,7 +250,7 @@ class TestUserCRUD:
         """根据用户名获取用户。"""
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
-        repo = UserRepository(mock_session)
+        repo = UserRepository()
         mock_user = mock.Mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_user
@@ -263,7 +265,7 @@ class TestUserCRUD:
         """根据邮箱获取用户。"""
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
-        repo = UserRepository(mock_session)
+        repo = UserRepository()
         mock_user = mock.Mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_user
@@ -282,7 +284,7 @@ class TestRolePermissionCRUD:
         """根据名称获取角色。"""
         from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
-        repo = RoleRepository(mock_session)
+        repo = RoleRepository()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
@@ -296,7 +298,7 @@ class TestRolePermissionCRUD:
         """获取角色的权限列表。"""
         from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
-        repo = RoleRepository(mock_session)
+        repo = RoleRepository()
         mock_result = mock.Mock()
         mock_result.scalars.return_value.all.return_value = []
         mock_session.execute.return_value = mock_result
@@ -310,7 +312,7 @@ class TestRolePermissionCRUD:
         """根据名称获取权限。"""
         from src.infrastructure.storage.postgresql.repository.permission_repository import PermissionRepository
 
-        repo = PermissionRepository(mock_session)
+        repo = PermissionRepository()
         mock_permission = mock.Mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_permission
@@ -337,7 +339,7 @@ class TestTransactionRollback:
             payload={},
         )
 
-        repo = PostgreSQLOutboxRepository(mock_session)
+        repo = PostgreSQLOutboxRepository()
         repo.save(event)
 
         # save 应调用 add 但不应调用 commit
@@ -346,8 +348,10 @@ class TestTransactionRollback:
 
 @pytest.fixture
 def mock_session():
-    """提供模拟的 AsyncSession。"""
+    """Provide mock AsyncSession and set in ContextVar."""
     session = mock.AsyncMock()
-    # add 是同步方法（不执行 I/O）
+    # add is sync method (no I/O)
     session.add = mock.Mock()
-    return session
+    token = set_session(session)
+    yield session
+    reset_session(token)

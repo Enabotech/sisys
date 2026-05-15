@@ -6,6 +6,8 @@ from abc import ABC
 
 import pytest
 
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
 
 class TestUnitOfWorkInterface:
     """UnitOfWork abstract interface tests."""
@@ -51,8 +53,12 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
-        assert uow is not None
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
+            assert uow is not None
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_begin_starts_transaction(self):
@@ -62,10 +68,14 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        await uow.begin()
-        mock_session.begin.assert_called_once()
+            await uow.begin()
+            mock_session.begin.assert_called_once()
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_commit_commits_transaction(self):
@@ -75,10 +85,14 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        await uow.commit()
-        mock_session.commit.assert_called_once()
+            await uow.commit()
+            mock_session.commit.assert_called_once()
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_rollback_rolls_back_transaction(self):
@@ -88,10 +102,14 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        await uow.rollback()
-        mock_session.rollback.assert_called_once()
+            await uow.rollback()
+            mock_session.rollback.assert_called_once()
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_close_closes_session(self):
@@ -101,10 +119,14 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        await uow.close()
-        mock_session.close.assert_called_once()
+            await uow.close()
+            mock_session.close.assert_called_once()
+        finally:
+            reset_session(token)
 
     @pytest.mark.asyncio
     async def test_context_manager_protocol(self):
@@ -114,7 +136,11 @@ class TestPostgreSQLUnitOfWork:
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
 
         mock_session = mock.AsyncMock()
-        uow = PostgreSQLUnitOfWork(session=mock_session)
+        token = set_session(mock_session)
+        try:
+            uow = PostgreSQLUnitOfWork()
 
-        async with uow:
-            pass
+            async with uow:
+                pass
+        finally:
+            reset_session(token)

@@ -6,8 +6,9 @@
 - 状态管理（pending/processed）
 - 人工干预支持
 
-表结构：dead_letter_queue (id, event_id, event_type, payload JSONB, error_message,
-                        retry_count, context JSONB, created_at, status, processed_at, action_taken)
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.domain.events.base import DomainEvent
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -100,14 +102,9 @@ class PostgresDeadLetterQueue:
     - 状态查询
     - 人工干预
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgresDeadLetterQueue。
-
-        Args:
-            session: 异步数据库会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0, context: dict | None = None) -> None:
         """入队失败事件至 PostgreSQL。

@@ -25,7 +25,6 @@ from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -46,21 +45,17 @@ class RabbitMQEventListener(EventListenerAsync):
         self,
         config: RabbitMQConfig,
         redis_client: aioredis.Redis,
-        session: AsyncSession,
     ):
         """初始化 RabbitMQEventListener。
 
         Args:
             config: RabbitMQ 连接配置
             redis_client: 异步 Redis 客户端
-            session: 异步数据库会话
         """
         self._config = config
         self._redis = redis_client
-        self._session = session
         self._idempotency = DualIdempotencyChecker(
             redis_client=redis_client,
-            session=session,
         )
         self._retry_queue = RedisRetryQueue(redis_client=redis_client)
         # Dead letter queue will be set separately

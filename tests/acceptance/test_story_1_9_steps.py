@@ -30,6 +30,7 @@ from pytest_bdd import given, scenarios, then, when
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
 scenarios("test_story_1_9.feature")
@@ -191,9 +192,12 @@ def role_service(pg_session):
     from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
     from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
-    role_repo = RoleRepository(pg_session)
-    user_role_repo = UserRoleRepository(pg_session)
-    return RoleService(role_repo, user_role_repo)
+    token = set_session(pg_session)
+    role_repo = RoleRepository()
+    user_role_repo = UserRoleRepository()
+    service = RoleService(role_repo, user_role_repo)
+    yield service
+    reset_session(token)
 
 
 @pytest.fixture
@@ -201,7 +205,10 @@ def user_repository(pg_session):
     """Real user repository."""
     from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
-    return UserRepository(pg_session)
+    token = set_session(pg_session)
+    repo = UserRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture
@@ -209,7 +216,10 @@ def login_attempt_repository(pg_session):
     """Real login attempt repository."""
     from src.infrastructure.storage.postgresql.repository.login_attempt_repository import LoginAttemptRepository
 
-    return LoginAttemptRepository(pg_session)
+    token = set_session(pg_session)
+    repo = LoginAttemptRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture
@@ -217,7 +227,10 @@ def user_role_repository(pg_session):
     """Real user-role association repository."""
     from src.infrastructure.storage.postgresql.repository.user_role_repository import UserRoleRepository
 
-    return UserRoleRepository(pg_session)
+    token = set_session(pg_session)
+    repo = UserRoleRepository()
+    yield repo
+    reset_session(token)
 
 
 @pytest.fixture

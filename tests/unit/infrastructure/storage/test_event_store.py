@@ -15,6 +15,7 @@ from src.infrastructure.messaging.event_store import (
     EventStoreModel,
     PostgreSQLEventStore,
 )
+from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 
 class MockEventStoreModel:
@@ -74,7 +75,10 @@ def mock_session():
 @pytest.fixture
 def event_store(mock_session):
     """Provide PostgreSQLEventStore with mock session."""
-    return PostgreSQLEventStore(session=mock_session)
+    token = set_session(mock_session)
+    repo = PostgreSQLEventStore()
+    yield repo
+    reset_session(token)
 
 
 # ============================================================================

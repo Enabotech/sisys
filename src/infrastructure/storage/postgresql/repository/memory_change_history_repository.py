@@ -11,6 +11,10 @@
 - 继承 PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel]
 - 覆写 delete 抛出 NotImplementedError（append-only）
 - 自动获得父类 get_by_id/save/list_all
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -18,7 +22,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.ports.memory_repository import L2ChangeHistoryRepositoryPort
@@ -35,14 +38,8 @@ class PostgreSQLMemoryChangeHistoryRepository(
     继承 PostgreSQLAdapter，覆写 delete 为抛出异常。
     append-only 模式：只允许新增记录，不允许修改或删除。
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgreSQLMemoryChangeHistoryRepository。
-
-        Args:
-            session: SQLAlchemy 异步会话（非线程共享，会话绑定到特定连接）
-        """
-        super().__init__(MemoryChangeHistoryModel, session)
+    def __init__(self) -> None:
+        super().__init__(MemoryChangeHistoryModel)
 
     async def delete(self, id: UUID) -> None:
         """删除实体 — append-only 禁止删除。

@@ -4,6 +4,10 @@
 - 事件追加（带乐观锁版本检查）
 - 按聚合 ID 查询事件
 - 按事件类型和时间范围查询
+
+Session 来源：
+- Session 通过 ContextVar 由 middleware 或 test fixture 提供
+- 无需构造器注入 session 参数
 """
 
 from __future__ import annotations
@@ -18,10 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
 from src.domain.exceptions.event_exceptions import VersionError
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)
 
-# Default event store table name
 EVENT_STORE_TABLE = "event_store"
 
 
@@ -86,14 +90,9 @@ class PostgreSQLEventStore:
     - get_events() 获取聚合的所有事件
     - get_events_by_type() 按事件类型和时间范围查询
     """
-
-    def __init__(self, session: AsyncSession):
-        """初始化 PostgreSQLEventStore。
-
-        Args:
-            session: SQLAlchemy 异步会话
-        """
-        self._session = session
+    @property
+    def _session(self) -> AsyncSession:
+        return get_session()
 
     async def append(self, event: DomainEvent) -> None:
         """追加事件到存储（带乐观锁版本检查）。
