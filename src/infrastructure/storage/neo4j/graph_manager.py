@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from neo4j import AsyncDriver
+
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 
 
@@ -17,19 +18,15 @@ class Neo4jGraphManager:
     实现 GraphManager 接口，提供节点和关系生命周期管理。
     """
 
-    def __init__(self, client_wrapper: Neo4jClientWrapper, database: str = "neo4j"):
+    def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
         """初始化图管理器。
 
         Args:
-            client_wrapper: Neo4j 客户端封装
+            driver: Neo4j 异步驱动实例
             database: 数据库名称
         """
-        self._client_wrapper = client_wrapper
+        self._driver = driver
         self._database = database
-
-    def _get_driver(self):
-        """获取异步驱动。"""
-        return self._client_wrapper.get_async_driver()
 
     async def create_node(self, node: GraphNode) -> bool:
         """创建节点（MERGE 语义）。
@@ -43,8 +40,7 @@ class Neo4jGraphManager:
         Returns:
             创建成功返回 True，已存在返回 False
         """
-        driver = self._get_driver()
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             labels_str = ":".join(node.labels)
             cypher = f"""
             MERGE (n:{labels_str} {{id: $node_id}})
@@ -72,8 +68,7 @@ class Neo4jGraphManager:
         Returns:
             删除成功返回 True，不存在返回 False
         """
-        driver = self._get_driver()
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             cypher = """
             MATCH (n {id: $node_id})
             DETACH DELETE n
@@ -94,8 +89,7 @@ class Neo4jGraphManager:
         Returns:
             节点数据字典，不存在返回 None
         """
-        driver = self._get_driver()
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             cypher = """
             MATCH (n {id: $node_id})
             RETURN n
@@ -116,9 +110,8 @@ class Neo4jGraphManager:
         Returns:
             创建成功返回 True
         """
-        driver = self._get_driver()
         rel_type = str(relationship.relationship_type).upper().replace(" ", "_")
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             cypher = f"""
             MATCH (a {{id: $start_id}}), (b {{id: $end_id}})
             MERGE (a)-[r:{rel_type}]->(b)
@@ -147,9 +140,8 @@ class Neo4jGraphManager:
         Returns:
             删除成功返回 True，不存在返回 False
         """
-        driver = self._get_driver()
         rel_type = str(relationship_type).upper().replace(" ", "_")
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             cypher = f"""
             MATCH (a {{id: $start_id}})-[r:{rel_type}]->(b {{id: $end_id}})
             DELETE r

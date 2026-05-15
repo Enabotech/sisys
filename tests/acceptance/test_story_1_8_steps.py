@@ -62,8 +62,8 @@ async def cleanup_neo4j_test_data(neo4j_client: Neo4jClientWrapper, test_tenant_
     yield
     # Cleanup: delete all test nodes
     try:
-        driver = neo4j_client.get_async_driver()
-        async with driver.session(database=neo4j_client._database) as session:
+        driver = neo4j_client.get_client()
+        async with driver.session(database=neo4j_client._config.database) as session:
             await session.run(f"MATCH (n) WHERE n.test_tenant = '{test_tenant_id}' DETACH DELETE n")
     except Exception:
         pass  # Ignore cleanup errors
@@ -85,33 +85,25 @@ def neo4j_config() -> Neo4jConfig:
 @pytest.fixture
 def neo4j_client(neo4j_config: Neo4jConfig) -> Neo4jClientWrapper:
     """Real Neo4j client wrapper instance."""
-    return Neo4jClientWrapper(
-        uri=neo4j_config.uri,
-        username=neo4j_config.username,
-        password=neo4j_config.password,
-        database=neo4j_config.database,
-        max_connection_pool_size=neo4j_config.max_connection_pool_size,
-        connection_timeout=neo4j_config.connection_timeout,
-        max_retry_time=neo4j_config.max_retry_time,
-    )
+    return Neo4jClientWrapper(neo4j_config)
 
 
 @pytest.fixture
 def graph_storage(neo4j_client: Neo4jClientWrapper) -> Neo4jGraphStorage:
     """Real Neo4j graph storage instance for queries."""
-    return Neo4jGraphStorage(neo4j_client)
+    return Neo4jGraphStorage(neo4j_client.get_client())
 
 
 @pytest.fixture
 def graph_manager(neo4j_client: Neo4jClientWrapper) -> Neo4jGraphManager:
     """Real Neo4j graph manager instance for CRUD operations."""
-    return Neo4jGraphManager(neo4j_client)
+    return Neo4jGraphManager(neo4j_client.get_client())
 
 
 @pytest.fixture
 def graph_retriever(neo4j_client: Neo4jClientWrapper) -> GraphRetriever:
     """Real Neo4j graph retriever instance for entity retrieval."""
-    return GraphRetriever(neo4j_client)
+    return GraphRetriever(neo4j_client.get_client())
 
 
 # ===================================================================

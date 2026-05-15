@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.infrastructure.config.neo4j import Neo4jConfig
 from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
 
 
@@ -40,33 +41,33 @@ class TestNeo4jClientWrapper:
     def test_default_initialization(self):
         """测试默认初始化。"""
         wrapper = Neo4jClientWrapper()
-        assert wrapper._uri == "bolt://localhost:7687"
-        assert wrapper._username == "neo4j"
-        assert wrapper._password == ""
-        assert wrapper._database == "neo4j"
-        assert wrapper._max_connection_pool_size == 50
-        assert wrapper._connection_timeout == 30.0
-        assert wrapper._max_retry_time == 30.0
+        assert wrapper._config.host == "localhost"
+        assert wrapper._config.bolt_port == 7687
+        assert wrapper._config.username == "neo4j"
+        assert wrapper._config.password == ""
+        assert wrapper._config.database == "neo4j"
+        assert wrapper._config.max_connection_pool_size == 50
+        assert wrapper._config.connection_timeout == 30.0
         assert wrapper._driver is None
 
     def test_custom_initialization(self):
         """测试自定义初始化。"""
-        wrapper = Neo4jClientWrapper(
-            uri="bolt://neo4j.example.com:7687",
+        config = Neo4jConfig(
+            host="neo4j.example.com",
+            bolt_port=7687,
             username="admin",
             password="secret",  # pragma: allowlist secret
             database="sisys_db",
             max_connection_pool_size=100,
             connection_timeout=60.0,
-            max_retry_time=45.0,
         )
-        assert wrapper._uri == "bolt://neo4j.example.com:7687"
-        assert wrapper._username == "admin"
-        assert wrapper._password == "secret"  # pragma: allowlist secret
-        assert wrapper._database == "sisys_db"
-        assert wrapper._max_connection_pool_size == 100
-        assert wrapper._connection_timeout == 60.0
-        assert wrapper._max_retry_time == 45.0
+        wrapper = Neo4jClientWrapper(config)
+        assert wrapper._config.uri == "bolt://neo4j.example.com:7687"
+        assert wrapper._config.username == "admin"
+        assert wrapper._config.password == "secret"  # pragma: allowlist secret
+        assert wrapper._config.database == "sisys_db"
+        assert wrapper._config.max_connection_pool_size == 100
+        assert wrapper._config.connection_timeout == 60.0
 
     @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
     def test_lazy_initialization(self, mock_db: MagicMock, mock_async_driver: MagicMock):
@@ -75,12 +76,12 @@ class TestNeo4jClientWrapper:
         wrapper = Neo4jClientWrapper()
         assert wrapper._driver is None
 
-        driver = wrapper.get_async_driver()
+        driver = wrapper.get_client()
         assert driver is not None
         assert wrapper._driver is mock_async_driver
         mock_db.driver.assert_called_once()
 
-        driver2 = wrapper.get_async_driver()
+        driver2 = wrapper.get_client()
         assert driver2 is driver
         assert mock_db.driver.call_count == 1
 
@@ -118,7 +119,7 @@ class TestNeo4jClientWrapper:
         mock_async_driver.close = AsyncMock()
 
         wrapper = Neo4jClientWrapper()
-        wrapper.get_async_driver()
+        wrapper.get_client()
         await wrapper.close()
 
         mock_async_driver.close.assert_called_once()

@@ -213,20 +213,21 @@ def history_repository(pg_session: AsyncSession):
 def qdrant_adapter():
     """L3 Qdrant adapter."""
     try:
+        from src.infrastructure.config.qdrant import QdrantConfig
         from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
         env = get_test_env()
-        client = QdrantClientWrapper(
+        config = QdrantConfig(
             host=env.qdrant.host,
             port=env.qdrant.port,
             grpc_port=env.qdrant.grpc_port,
             api_key=env.qdrant.api_key,
             https=env.qdrant.https,
             timeout=env.qdrant.timeout,
-            max_retries=3,
         )
-        storage = QdrantVectorStorage(client)
+        wrapper = QdrantClientWrapper(config)
+        storage = QdrantVectorStorage(wrapper.get_client())
         return QdrantVectorAdapter(storage)
     except Exception:
         pytest.skip("Qdrant not available")
@@ -236,20 +237,21 @@ def qdrant_adapter():
 def qdrant_collection_manager():
     """L3 Qdrant collection manager for schema operations."""
     try:
+        from src.infrastructure.config.qdrant import QdrantConfig
         from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
         env = get_test_env()
-        client = QdrantClientWrapper(
+        config = QdrantConfig(
             host=env.qdrant.host,
             port=env.qdrant.port,
             grpc_port=env.qdrant.grpc_port,
             api_key=env.qdrant.api_key,
             https=env.qdrant.https,
             timeout=env.qdrant.timeout,
-            max_retries=3,
         )
-        return QdrantCollectionManager(client)
+        wrapper = QdrantClientWrapper(config)
+        return QdrantCollectionManager(wrapper.get_client())
     except Exception:
         pytest.skip("Qdrant not available")
 
@@ -297,17 +299,20 @@ def minio_adapter():
 def neo4j_adapter():
     """L5 Neo4j adapter."""
     try:
+        from src.infrastructure.config.neo4j import Neo4jConfig
         from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
         env = get_test_env()
-        wrapper = Neo4jClientWrapper(
-            uri=f"bolt://{env.neo4j.host}:{env.neo4j.bolt_port}",
+        config = Neo4jConfig(
+            host=env.neo4j.host,
+            bolt_port=env.neo4j.bolt_port,
             username=env.neo4j.username,
             password=env.neo4j.password,
             database=env.neo4j.database,
         )
-        storage = Neo4jGraphStorage(wrapper)
+        wrapper = Neo4jClientWrapper(config)
+        storage = Neo4jGraphStorage(wrapper.get_client())
         return Neo4jAdapter(storage)
     except Exception:
         env = get_test_env()

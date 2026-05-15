@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.infrastructure.storage.qdrant.bm25_builder import BM25Builder
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 from src.infrastructure.storage.qdrant.models import VectorPoint
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
@@ -16,16 +15,13 @@ from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 @pytest.fixture
 def mock_qdrant_setup():
     """模拟 Qdrant 环境设置。"""
-    wrapper = MagicMock(spec=QdrantClientWrapper)
     mock_client = AsyncMock()
-    wrapper.get_async_client.return_value = mock_client
 
-    collection_manager = QdrantCollectionManager(wrapper)
-    vector_storage = QdrantVectorStorage(wrapper)
+    collection_manager = QdrantCollectionManager(mock_client)
+    vector_storage = QdrantVectorStorage(mock_client)
     bm25_builder = BM25Builder()
 
     return {
-        "wrapper": wrapper,
         "mock_client": mock_client,
         "collection_manager": collection_manager,
         "vector_storage": vector_storage,
@@ -115,7 +111,6 @@ class TestQdrantIntegration:
         mock_point.id = "point-1"
         mock_point.score = 0.95
         mock_point.payload = {"document_id": "doc-1"}
-        # search 返回 list，不再是 response.points
         mock_client.search = AsyncMock(return_value=[mock_point])
 
         query_vector = [0.1] * 1024
@@ -136,7 +131,6 @@ class TestQdrantIntegration:
         mock_point.id = "point-1"
         mock_point.score = 0.85
         mock_point.payload = {"document_id": "doc-1"}
-        # search 返回 list，不再是 response.points
         mock_client.search = AsyncMock(return_value=[mock_point])
 
         # 从文本构建稀疏向量

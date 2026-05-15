@@ -60,23 +60,14 @@ def mock_session():
     return MagicMock()
 
 
-@pytest.fixture
-def mock_client_wrapper(mock_driver):
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-
-    wrapper = MagicMock(spec=Neo4jClientWrapper)
-    wrapper.get_async_driver.return_value = mock_driver
-    return wrapper
-
-
 class TestNeo4jNodeLifecycle:
     """节点生命周期端到端测试。"""
 
-    async def test_create_get_delete_node(self, mock_driver, mock_session, mock_client_wrapper):
+    async def test_create_get_delete_node(self, mock_driver, mock_session):
         """测试节点创建→查询→验证→删除完整流程。"""
         from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 
-        manager = Neo4jGraphManager(client_wrapper=mock_client_wrapper, database="neo4j")
+        manager = Neo4jGraphManager(driver=mock_driver, database="neo4j")
 
         from src.infrastructure.storage.neo4j.models import GraphNode
 
@@ -110,11 +101,11 @@ class TestNeo4jNodeLifecycle:
 class TestNeo4jRelationshipLifecycle:
     """关系生命周期端到端测试。"""
 
-    async def test_create_delete_relationship(self, mock_driver, mock_session, mock_client_wrapper):
+    async def test_create_delete_relationship(self, mock_driver, mock_session):
         """测试关系创建→查询→验证→删除完整流程。"""
         from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 
-        manager = Neo4jGraphManager(client_wrapper=mock_client_wrapper, database="neo4j")
+        manager = Neo4jGraphManager(driver=mock_driver, database="neo4j")
 
         from src.infrastructure.storage.neo4j.models import GraphRelationship, RelationshipType
 
@@ -141,11 +132,11 @@ class TestNeo4jRelationshipLifecycle:
 class TestNeo4jCypherQueries:
     """Cypher 查询端到端测试。"""
 
-    async def test_parameterized_query(self, mock_driver, mock_session, mock_client_wrapper):
+    async def test_parameterized_query(self, mock_driver, mock_session):
         """测试参数化 Cypher 查询。"""
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
-        storage = Neo4jGraphStorage(client_wrapper=mock_client_wrapper, database="neo4j")
+        storage = Neo4jGraphStorage(driver=mock_driver, database="neo4j")
 
         _mock_session_data(mock_driver, mock_session, [{"n": {"id": "entity-001"}}])
 
@@ -161,11 +152,11 @@ class TestNeo4jCypherQueries:
 class TestNeo4jGraphRAG:
     """GraphRAG 实体关联检索端到端测试。"""
 
-    async def test_find_related_entities_full_flow(self, mock_driver, mock_session, mock_client_wrapper):
+    async def test_find_related_entities_full_flow(self, mock_driver, mock_session):
         """测试 GraphRAG 实体关联检索完整流程。"""
         from src.infrastructure.storage.neo4j.graph_retriever import GraphRetriever
 
-        retriever = GraphRetriever(client_wrapper=mock_client_wrapper, database="neo4j")
+        retriever = GraphRetriever(driver=mock_driver, database="neo4j")
 
         _mock_session_data(
             mock_driver,
@@ -185,11 +176,11 @@ class TestNeo4jGraphRAG:
 class TestNeo4jMultiTenantIsolation:
     """多租户隔离端到端测试。"""
 
-    async def test_business_domain_filtering(self, mock_driver, mock_session, mock_client_wrapper):
+    async def test_business_domain_filtering(self, mock_driver, mock_session):
         """测试不同 business_domain 数据隔离。"""
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
-        storage = Neo4jGraphStorage(client_wrapper=mock_client_wrapper, database="neo4j")
+        storage = Neo4jGraphStorage(driver=mock_driver, database="neo4j")
 
         _mock_session_data(
             mock_driver,

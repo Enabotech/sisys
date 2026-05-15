@@ -46,12 +46,16 @@ async def neo4j_client():
     """Provide a real Neo4j client connection."""
     import os
 
-    wrapper = Neo4jClientWrapper(
-        uri=f"bolt://{os.getenv('NEO4J_HOST', 'localhost')}:{os.getenv('NEO4J_BOLT_PORT', '7687')}",
+    from src.infrastructure.config.neo4j import Neo4jConfig
+
+    config = Neo4jConfig(
+        host=os.getenv("NEO4J_HOST", "localhost"),
+        bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
         username=os.getenv("NEO4J_USERNAME", "neo4j"),
         password=os.getenv("NEO4J_PASSWORD", "password123"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
     )
+    wrapper = Neo4jClientWrapper(config)
 
     # Verify connection
     try:
@@ -68,7 +72,7 @@ async def neo4j_client():
 @pytest.fixture
 async def graph_manager(neo4j_client: Neo4jClientWrapper):
     """Provide Neo4jGraphManager with real client."""
-    return Neo4jGraphManager(neo4j_client)
+    return Neo4jGraphManager(neo4j_client.get_client())
 
 
 # ===================================================================
@@ -86,7 +90,7 @@ class TestNeo4jConnection:
 
     async def test_driver_connection(self, neo4j_client: Neo4jClientWrapper):
         """测试驱动连接。"""
-        driver = neo4j_client.get_async_driver()
+        driver = neo4j_client.get_client()
         assert driver is not None
 
         async with driver.session() as session:

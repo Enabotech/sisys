@@ -115,6 +115,10 @@ def bootstrap() -> None:
     )
 
     # === ConnectionManagers (L2/L3/L5) ===
+    from neo4j import AsyncDriver
+    from qdrant_client import AsyncQdrantClient
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
     from src.infrastructure.config.neo4j import Neo4jConfig
     from src.infrastructure.config.postgresql import PostgreSQLConfig
     from src.infrastructure.config.qdrant import QdrantConfig
@@ -137,11 +141,7 @@ def bootstrap() -> None:
         name="qdrant_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: QdrantClientWrapper(
-            host=QdrantConfig().host,
-            port=QdrantConfig().port,
-            grpc_port=QdrantConfig().grpc_port,
-        ),
+        impl=lambda resolver: QdrantClientWrapper(QdrantConfig()),
         module="src.infrastructure.storage.qdrant.client",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -152,14 +152,42 @@ def bootstrap() -> None:
         name="neo4j_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: Neo4jClientWrapper(
-            uri=Neo4jConfig().uri,
-            username=Neo4jConfig().username,
-            password=Neo4jConfig().password,
-            database=Neo4jConfig().database,
-        ),
+        impl=lambda resolver: Neo4jClientWrapper(Neo4jConfig()),
         module="src.infrastructure.storage.neo4j.client",
         lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("neo4j", "infrastructure"),
+    )
+
+    register_port(
+        name="postgresql_async_engine",
+        version="v1.0.0",
+        interface=AsyncEngine,
+        impl=lambda resolver: resolver.resolve("postgresql_connection_manager").get_client(),
+        module="src.infrastructure.storage.postgresql.engine",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+        tags=("postgresql", "infrastructure"),
+    )
+
+    register_port(
+        name="qdrant_client",
+        version="v1.0.0",
+        interface=AsyncQdrantClient,
+        impl=lambda resolver: resolver.resolve("qdrant_connection_manager").get_client(),
+        module="src.infrastructure.storage.qdrant.client",
+        lifetime=Lifetime.SCOPED,
+        owner="storage-team",
+        tags=("qdrant", "infrastructure"),
+    )
+
+    register_port(
+        name="neo4j_driver",
+        version="v1.0.0",
+        interface=AsyncDriver,
+        impl=lambda resolver: resolver.resolve("neo4j_connection_manager").get_client(),
+        module="src.infrastructure.storage.neo4j.client",
+        lifetime=Lifetime.SCOPED,
         owner="storage-team",
         tags=("neo4j", "infrastructure"),
     )

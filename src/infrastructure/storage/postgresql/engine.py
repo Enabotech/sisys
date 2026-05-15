@@ -48,6 +48,14 @@ class DatabaseEngine(ConnectionManager):
             f"@{self._config.host}:{self._config.port}/{self._config.database}"
         )
 
+    def get_client(self) -> AsyncEngine:
+        """获取异步引擎实例（ConnectionManager 统一接口）。
+
+        Returns:
+            SQLAlchemy AsyncEngine 实例
+        """
+        return self.get_async_engine()
+
     def get_async_engine(self) -> AsyncEngine:
         """获取异步引擎实例（懒初始化）。
 
