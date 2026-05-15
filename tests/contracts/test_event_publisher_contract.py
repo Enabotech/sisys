@@ -9,14 +9,10 @@ from typing import Any
 
 import pytest
 
-from src.composition_root import bootstrap
 from src.domain.events.base import DomainEvent
 from src.domain.events.publish_result import PublishResult
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.registry import _global_registry
-
-# Bootstrap once at module load
-bootstrap()
 
 
 class TestEventPublisherContract:

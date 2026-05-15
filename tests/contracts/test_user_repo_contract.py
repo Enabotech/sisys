@@ -5,11 +5,8 @@ Tests that user repository implementation satisfies the UserRepositoryPort.
 
 from __future__ import annotations
 
-from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 from src.domain.ports.user_repository import UserRepositoryPort
-
-bootstrap()
 
 
 class TestUserRepositoryContract:
