@@ -33,11 +33,14 @@ class L2RdbPort(Generic[T], Protocol):
             实体实例，不存在则返回 None
         """
 
-    async def save(self, entity: T) -> None:
+    async def save(self, entity: T) -> T:
         """保存实体（insert or update，async）。
 
         Args:
             entity: 要保存的实体
+
+        Returns:
+            持久化后的实体（含 DB 生成的字段如 id、timestamps）
         """
 
     async def delete(self, id: UUID) -> None:

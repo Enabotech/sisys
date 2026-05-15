@@ -10,12 +10,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from src.domain.ports.l4_object import L4ObjectPort
 
 if TYPE_CHECKING:
-    pass
+    from src.infrastructure.storage.minio.minio_repository import MinIORepository
 
 
 class MinIOAdapter(L4ObjectPort):
@@ -25,7 +25,7 @@ class MinIOAdapter(L4ObjectPort):
     所有方法委托给内部仓储实例。
     """
 
-    def __init__(self, repository: Any):
+    def __init__(self, repository: MinIORepository):
         """初始化适配器。
 
         Args:
@@ -53,15 +53,12 @@ class MinIOAdapter(L4ObjectPort):
         Returns:
             版本 ID 或 ETag
         """
-        return cast(
-            "str",
-            await self._repository.store(
-                bucket_type=bucket_type,
-                object_key=object_key,
-                file_path=file_path,
-                content_type=content_type,
-                tags=tags,
-            ),
+        return await self._repository.store(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            file_path=file_path,
+            content_type=content_type,
+            tags=tags,
         )
 
     def retrieve(
@@ -80,13 +77,10 @@ class MinIOAdapter(L4ObjectPort):
         Yields:
             字节流数据块
         """
-        return cast(
-            "AsyncIterator[bytes]",
-            self._repository.retrieve(
-                bucket_type=bucket_type,
-                object_key=object_key,
-                version_id=version_id,
-            ),
+        return self._repository.retrieve(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            version_id=version_id,
         )
 
     async def delete(
@@ -105,13 +99,10 @@ class MinIOAdapter(L4ObjectPort):
         Returns:
             是否成功
         """
-        return cast(
-            "bool",
-            await self._repository.delete(
-                bucket_type=bucket_type,
-                object_key=object_key,
-                version_id=version_id,
-            ),
+        return await self._repository.delete(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            version_id=version_id,
         )
 
     async def get_metadata(
@@ -130,13 +121,10 @@ class MinIOAdapter(L4ObjectPort):
         Returns:
             元数据字典
         """
-        return cast(
-            "dict[Any, Any]",
-            await self._repository.get_metadata(
-                bucket_type=bucket_type,
-                object_key=object_key,
-                version_id=version_id,
-            ),
+        return await self._repository.get_metadata(
+            bucket_type=bucket_type,
+            object_key=object_key,
+            version_id=version_id,
         )
 
     async def archive(
@@ -180,11 +168,8 @@ class MinIOAdapter(L4ObjectPort):
         Returns:
             对象元数据列表
         """
-        return cast(
-            "list[dict[Any, Any]]",
-            await self._repository.list_objects(
-                bucket_type=bucket_type,
-                prefix=prefix,
-                recursive=recursive,
-            ),
+        return await self._repository.list_objects(
+            bucket_type=bucket_type,
+            prefix=prefix,
+            recursive=recursive,
         )

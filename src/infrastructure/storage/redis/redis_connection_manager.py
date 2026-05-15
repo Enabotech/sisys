@@ -79,6 +79,6 @@ class RedisConnectionManager(ConnectionManager):
     async def close(self) -> None:
         """Close the connection pool and release all connections."""
         if self._pool is not None:
-            await self._pool.aclose()
+            await self._pool.disconnect()
             self._pool = None
             logger.info("Redis connection pool closed")

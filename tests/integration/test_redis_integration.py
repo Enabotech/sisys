@@ -6,6 +6,8 @@ blackboard integration flows. Uses fakeredis to simulate Redis behavior.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import fakeredis.aioredis
 import pytest
 
@@ -33,7 +35,7 @@ def _create_semantic_cache(
             return "OK"
         return await original_execute(*args, **kwargs)
 
-    fake_redis.execute_command = _mock_execute
+    patch.object(fake_redis, 'execute_command', _mock_execute).start()
     return RedisSemanticCache(
         redis_client=fake_redis,
         embedding_dim=embedding_dim,
@@ -110,23 +112,23 @@ class TestSemanticCacheIntegration:
                 return hit_response  # hit
             return await original_execute(*args, **kwargs)
 
-        fake_redis.execute_command = _mock_execute
-        cache = RedisSemanticCache(
-            redis_client=fake_redis,
-            embedding_dim=3,
-            metrics_collector=metrics,
-        )
+        with patch.object(fake_redis, 'execute_command', _mock_execute):
+            cache = RedisSemanticCache(
+                redis_client=fake_redis,
+                embedding_dim=3,
+                metrics_collector=metrics,
+            )
 
-        # Miss
-        found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
-        assert found is None
-        assert metrics.metrics.cache_misses_total == 1
+            # Miss
+            found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
+            assert found is None
+            assert metrics.metrics.cache_misses_total == 1
 
-        # Hit
-        found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
-        assert found is not None
-        assert found["answer"] == "found"
-        assert metrics.metrics.cache_hits_total == 1
+            # Hit
+            found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
+            assert found is not None
+            assert found["answer"] == "found"
+            assert metrics.metrics.cache_hits_total == 1
 
 
 class TestPublicBlackboardIntegration:

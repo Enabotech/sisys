@@ -129,10 +129,13 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         """软删除 — 设置 deleted_at 时间戳。"""
         from datetime import datetime, timezone
 
+        col_name = self.soft_delete_column
+        if col_name is None:
+            return
         stmt = (
             update(self._model_class)
             .where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
-            .values(**{self.soft_delete_column: datetime.now(timezone.utc)})
+            .values(**{col_name: datetime.now(timezone.utc)})
         )
         stmt = self._apply_soft_delete_filter(stmt)
         await self._session.execute(stmt)
