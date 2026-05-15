@@ -193,39 +193,27 @@ async def real_redis() -> AsyncGenerator[redis.Redis, None]:
 @pytest.fixture
 async def redis_session_storage(real_redis: redis.Redis):
     """Provide RedisSessionStorage with real Redis connection."""
-    from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 
-    config = RedisConfig()
-    storage = RedisSessionStorage(config)
-    storage._pool = real_redis.connection_pool
-    return storage
+    return RedisSessionStorage(redis_client=real_redis)
 
 
 @pytest.fixture
 async def redis_semantic_cache(real_redis: redis.Redis):
     """Provide RedisSemanticCache with real Redis connection."""
-    from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
     from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
 
-    config = RedisConfig()
     metrics = EventMetricsCollector()
-    cache = RedisSemanticCache(config, metrics_collector=metrics)
-    cache._pool = real_redis.connection_pool
-    return cache
+    return RedisSemanticCache(redis_client=real_redis, embedding_dim=1024, metrics_collector=metrics)
 
 
 @pytest.fixture
 async def redis_public_blackboard(real_redis: redis.Redis):
     """Provide RedisPublicBlackboard with real Redis connection."""
-    from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.storage.redis.public_blackboard import RedisPublicBlackboard
 
-    config = RedisConfig()
-    board = RedisPublicBlackboard(config)
-    board._pool = real_redis.connection_pool
-    return board
+    return RedisPublicBlackboard(redis_client=real_redis)
 
 
 # ===================================================================
