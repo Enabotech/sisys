@@ -156,7 +156,7 @@ class RedisSemanticCache:
                 field_name = fields[i]
                 field_value = fields[i + 1] if i + 1 < len(fields) else None
 
-                if field_name == "__embedding_score":
+                if field_name == "__embedding_score" and field_value is not None:
                     distance = float(field_value)
                 elif field_name == "result":
                     result_data = field_value

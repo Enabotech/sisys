@@ -52,17 +52,21 @@ class PostgreSQLMemoryChangeHistoryRepository(
         """
         raise NotImplementedError("Change history is append-only, cannot delete")
 
-    async def save(self, history: MemoryChangeHistory) -> None:
+    async def save(self, history: MemoryChangeHistory) -> MemoryChangeHistory:
         """保存历史记录（append-only）。
 
         使用父类 save 实现（简单插入）。
 
         Args:
             history: 变更历史记录
+
+        Returns:
+            保存后的变更历史记录
         """
         model = self._to_model(history)
         self._session.add(model)
         await self._session.flush()
+        return history
 
     async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]:
         """获取记忆的所有历史记录。

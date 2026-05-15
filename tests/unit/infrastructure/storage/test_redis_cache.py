@@ -12,6 +12,7 @@ import statistics
 import time
 import uuid
 from datetime import datetime
+from unittest.mock import patch
 
 import fakeredis
 import fakeredis.aioredis
@@ -251,18 +252,18 @@ class TestWriteLatencyPerformance:
                 return "OK"
             return await original_execute(*args, **kwargs)
 
-        fake_redis.execute_command = _mock_execute
-        cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
+        with patch.object(fake_redis, 'execute_command', _mock_execute):
+            cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
-        latencies: list[float] = []
-        for _ in range(BENCHMARK_ITERATIONS):
-            embedding, result = _make_cache_entry()
-            start = time.perf_counter()
-            await cache.set(embedding, result, ttl=86400)
-            latencies.append((time.perf_counter() - start) * 1000)
+            latencies: list[float] = []
+            for _ in range(BENCHMARK_ITERATIONS):
+                embedding, result = _make_cache_entry()
+                start = time.perf_counter()
+                await cache.set(embedding, result, ttl=86400)
+                latencies.append((time.perf_counter() - start) * 1000)
 
-        assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
-        assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
+            assert statistics.mean(latencies) < PERF_THRESHOLDS["write_p95_ms"]
+            assert _percentile(latencies, 95) < PERF_THRESHOLDS["write_p95_ms"]
 
 
 # ============================================================================
@@ -293,14 +294,14 @@ class TestTTLBehavior:
                 return "OK"
             return await original_execute(*args, **kwargs)
 
-        fake_redis.execute_command = _mock_execute
-        cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
+        with patch.object(fake_redis, 'execute_command', _mock_execute):
+            cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
-        await cache.set([0.1] * 1024, {"answer": "test"}, ttl=3600)
-        keys = await fake_redis.keys("sisys:cache:semantic:vec:*")
-        assert len(keys) >= 1
-        ttl = await fake_redis.ttl(keys[0])
-        assert 0 < int(ttl) <= 3600
+            await cache.set([0.1] * 1024, {"answer": "test"}, ttl=3600)
+            keys = await fake_redis.keys("sisys:cache:semantic:vec:*")
+            assert len(keys) >= 1
+            ttl = await fake_redis.ttl(keys[0])
+            assert 0 < int(ttl) <= 3600
 
 
 # ============================================================================

@@ -19,14 +19,15 @@ from src.infrastructure.utils import json_dumps
 def _make_cache(
     metrics_collector: EventMetricsCollector | None = None,
     embedding_dim: int = 3,
-) -> RedisSemanticCache:
+) -> tuple[RedisSemanticCache, AsyncMock]:
     """Create SemanticCache with mocked Redis client."""
     mock_redis = AsyncMock()
-    return RedisSemanticCache(
+    cache = RedisSemanticCache(
         redis_client=mock_redis,
         embedding_dim=embedding_dim,
         metrics_collector=metrics_collector,
     )
+    return cache, mock_redis
 
 
 def _ft_search_response(result_json: str | None, distance: float | None) -> list:
@@ -93,31 +94,31 @@ class TestRedisSemanticCache:
 
     @pytest.mark.asyncio
     async def test_set_creates_index_and_stores(self) -> None:
-        cache = _make_cache()
-        cache._redis.execute_command = AsyncMock(return_value="OK")
-        cache._redis.hset = AsyncMock(return_value=1)
-        cache._redis.expire = AsyncMock(return_value=True)
+        cache, mock_redis = _make_cache()
+        mock_redis.execute_command = AsyncMock(return_value="OK")
+        mock_redis.hset = AsyncMock(return_value=1)
+        mock_redis.expire = AsyncMock(return_value=True)
 
         embedding = [0.1, 0.2, 0.3]
         result = {"answer": "test"}
         await cache.set(embedding, result)
 
         # Should have called FT.CREATE (ensure_index)
-        cache._redis.execute_command.assert_called_once()
-        call_args = cache._redis.execute_command.call_args[0]
+        mock_redis.execute_command.assert_called_once()
+        call_args = mock_redis.execute_command.call_args[0]
         assert call_args[0] == "FT.CREATE"
 
         # Should have stored via HSET
-        cache._redis.hset.assert_called_once()
-        hset_args = cache._redis.hset.call_args
+        mock_redis.hset.assert_called_once()
+        hset_args = mock_redis.hset.call_args
         assert "embedding" in hset_args[1]["mapping"]
         assert "result" in hset_args[1]["mapping"]
 
     @pytest.mark.asyncio
     async def test_get_hit(self) -> None:
-        cache = _make_cache()
+        cache, mock_redis = _make_cache()
         result_data = {"answer": "test"}
-        cache._redis.execute_command = AsyncMock(
+        mock_redis.execute_command = AsyncMock(
             return_value=_ft_search_response(json_dumps(result_data), 0.05)
         )
 
@@ -127,16 +128,16 @@ class TestRedisSemanticCache:
 
     @pytest.mark.asyncio
     async def test_get_miss_empty(self) -> None:
-        cache = _make_cache()
-        cache._redis.execute_command = AsyncMock(return_value=[0])
+        cache, mock_redis = _make_cache()
+        mock_redis.execute_command = AsyncMock(return_value=[0])
 
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is None
 
     @pytest.mark.asyncio
     async def test_get_miss_below_threshold(self) -> None:
-        cache = _make_cache()
-        cache._redis.execute_command = AsyncMock(
+        cache, mock_redis = _make_cache()
+        mock_redis.execute_command = AsyncMock(
             return_value=_ft_search_response(json_dumps({"answer": "test"}), 0.5)
         )
 
@@ -146,28 +147,28 @@ class TestRedisSemanticCache:
 
     @pytest.mark.asyncio
     async def test_invalidate(self) -> None:
-        cache = _make_cache()
-        cache._redis.execute_command = AsyncMock(return_value="OK")
-        cache._redis.delete = AsyncMock(return_value=1)
+        cache, mock_redis = _make_cache()
+        mock_redis.execute_command = AsyncMock(return_value="OK")
+        mock_redis.delete = AsyncMock(return_value=1)
 
         await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
         cache_key = cache._build_cache_key([0.1, 0.2, 0.3])
         await cache.invalidate(cache_key)
 
-        cache._redis.delete.assert_called_once()
+        mock_redis.delete.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_metrics_recording(self) -> None:
         metrics = EventMetricsCollector()
 
         # Miss
-        cache = _make_cache(metrics_collector=metrics)
-        cache._redis.execute_command = AsyncMock(return_value=[0])
+        cache, mock_redis = _make_cache(metrics_collector=metrics)
+        mock_redis.execute_command = AsyncMock(return_value=[0])
         await cache.get([0.1], threshold=0.9)
         assert metrics.metrics.cache_misses_total == 1
 
         # Hit
-        cache._redis.execute_command = AsyncMock(
+        mock_redis.execute_command = AsyncMock(
             return_value=_ft_search_response(json_dumps({"result": "value"}), 0.01)
         )
         await cache.get([0.1], threshold=0.9)
@@ -175,25 +176,25 @@ class TestRedisSemanticCache:
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        cache = _make_cache()
+        cache, _mock_redis = _make_cache()
         async with cache:
             pass
 
     @pytest.mark.asyncio
     async def test_deterministic_cache_key(self) -> None:
-        cache = _make_cache()
+        cache, _mock_redis = _make_cache()
         key1 = cache._build_cache_key([0.1, 0.2, 0.3])
         key2 = cache._build_cache_key([0.1, 0.2, 0.3])
         assert key1 == key2
 
     @pytest.mark.asyncio
     async def test_index_already_exists_is_ok(self) -> None:
-        cache = _make_cache()
-        cache._redis.execute_command = AsyncMock(
+        cache, mock_redis = _make_cache()
+        mock_redis.execute_command = AsyncMock(
             side_effect=Exception("Index already exists")
         )
-        cache._redis.hset = AsyncMock(return_value=1)
-        cache._redis.expire = AsyncMock(return_value=True)
+        mock_redis.hset = AsyncMock(return_value=1)
+        mock_redis.expire = AsyncMock(return_value=True)
 
         await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
-        cache._redis.hset.assert_called_once()
+        mock_redis.hset.assert_called_once()

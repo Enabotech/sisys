@@ -85,7 +85,7 @@ class PostgreSQLMemoryMetadataRepository(
             updated_at=model.updated_at,
         )
 
-    async def save(self, metadata: MemoryMetadata) -> None:
+    async def save(self, metadata: MemoryMetadata) -> MemoryMetadata:
         """保存或更新记忆元数据（UPSERT with 乐观锁）。
 
         覆写父类 save — 使用自定义 _do_save 实现 UPSERT+版本检查。
@@ -98,6 +98,7 @@ class PostgreSQLMemoryMetadataRepository(
         """
         model = self._to_model(metadata)
         await self._do_save(model, metadata)
+        return metadata
 
     async def _do_save(self, model: MemoryMetadataModel, entity: MemoryMetadata) -> None:
         """覆写父类 _do_save — 实现 UPSERT + 乐观锁。"""
