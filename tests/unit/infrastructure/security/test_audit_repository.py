@@ -24,7 +24,7 @@ def mock_session() -> mock.AsyncMock:
 
 
 @pytest.fixture
-def repo(mock_session: mock.AsyncMock) -> AuditRepository:
+def repo(mock_session: mock.AsyncMock):
     """Create AuditRepository with mock session."""
     token = set_session(mock_session)
     repo = AuditRepository()

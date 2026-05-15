@@ -82,7 +82,11 @@ def db_engine(pg_config: PostgreSQLConfig) -> DatabaseEngine:
 
 
 @pytest.fixture
-def outbox_repo(db_engine: DatabaseEngine, ensure_alembic_migration, event_loop) -> Generator[PostgreSQLOutboxRepository, None, None]:
+def outbox_repo(
+    db_engine: DatabaseEngine,
+    ensure_alembic_migration,
+    event_loop,
+) -> Generator[PostgreSQLOutboxRepository, None, None]:
     """Real PostgreSQL outbox repository with transaction rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)
