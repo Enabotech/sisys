@@ -104,7 +104,7 @@ def session_storage(redis_client: aioredis.Redis) -> RedisSessionStorage:
 @pytest.fixture
 def semantic_cache(redis_client: aioredis.Redis) -> RedisSemanticCache:
     """Semantic cache instance with real Redis."""
-    return RedisSemanticCache(redis_client=redis_client)
+    return RedisSemanticCache(redis_client=redis_client, embedding_dim=3)
 
 
 @pytest.fixture
@@ -583,6 +583,8 @@ def when_call_session_save_degraded(
         port=config.port,
         db=config.db,
         decode_responses=True,
+        socket_timeout=1.0,
+        socket_connect_timeout=1.0,
     )
     storage = RedisSessionStorage(redis_client=bad_client)
 
@@ -617,6 +619,8 @@ def when_call_semantic_cache_get_degraded(
         port=config.port,
         db=config.db,
         decode_responses=True,
+        socket_timeout=1.0,
+        socket_connect_timeout=1.0,
     )
     cache = RedisSemanticCache(redis_client=bad_client)
 
@@ -652,6 +656,8 @@ def when_call_blackboard_post_degraded(
         port=config.port,
         db=config.db,
         decode_responses=True,
+        socket_timeout=1.0,
+        socket_connect_timeout=1.0,
     )
     blackboard = RedisPublicBlackboard(redis_client=bad_client)
 
