@@ -47,11 +47,7 @@ def mock_session():
 
 @pytest.fixture
 def retriever(mock_driver):
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-
-    wrapper = MagicMock(spec=Neo4jClientWrapper)
-    wrapper.get_async_driver.return_value = mock_driver
-    return GraphRetriever(client_wrapper=wrapper, database="neo4j")
+    return GraphRetriever(driver=mock_driver, database="neo4j")
 
 
 class TestGraphRetriever:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Any, cast
 
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from neo4j import AsyncDriver
 
 
 class Neo4jGraphStorage:
@@ -17,19 +17,15 @@ class Neo4jGraphStorage:
     实现 GraphStorage 接口，提供 Cypher 查询和图遍历功能。
     """
 
-    def __init__(self, client_wrapper: Neo4jClientWrapper, database: str = "neo4j"):
+    def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
         """初始化图存储。
 
         Args:
-            client_wrapper: Neo4j 客户端封装
+            driver: Neo4j 异步驱动实例
             database: 数据库名称
         """
-        self._client_wrapper = client_wrapper
+        self._driver = driver
         self._database = database
-
-    def _get_driver(self):
-        """获取异步驱动。"""
-        return self._client_wrapper.get_async_driver()
 
     async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
         """执行只读 Cypher 查询。
@@ -41,9 +37,8 @@ class Neo4jGraphStorage:
         Returns:
             查询结果列表（字典列表）
         """
-        driver = self._get_driver()
         query_params = params or {}
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             result = await session.run(cypher, **query_params)
             records = cast(list[dict[str, Any]], await result.data())
             return records
@@ -58,9 +53,8 @@ class Neo4jGraphStorage:
         Returns:
             查询结果列表（字典列表）
         """
-        driver = self._get_driver()
         query_params = params or {}
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             result = await session.run(cypher, **query_params)
             records = cast(list[dict[str, Any]], await result.data())
             return records

@@ -60,7 +60,7 @@ async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
     # Cleanup after test - delete all created collections
     from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-    manager = QdrantCollectionManager(qdrant_client)
+    manager = QdrantCollectionManager(qdrant_client.get_client())
     for key in _test_collection_names:
         name = _test_collection_names[key]
         if name:
@@ -75,27 +75,29 @@ async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
 def qdrant_client() -> QdrantClientWrapper:
     """Real Qdrant client wrapper instance."""
     env = get_test_env()
-    return QdrantClientWrapper(
+    from src.infrastructure.config.qdrant import QdrantConfig
+
+    config = QdrantConfig(
         host=env.qdrant.host,
         port=env.qdrant.port,
         grpc_port=env.qdrant.grpc_port,
         api_key=env.qdrant.api_key,
         https=False,
         timeout=30.0,
-        max_retries=3,
     )
+    return QdrantClientWrapper(config)
 
 
 @pytest.fixture
 def collection_manager(qdrant_client: QdrantClientWrapper) -> QdrantCollectionManager:
     """Real Qdrant collection manager instance."""
-    return QdrantCollectionManager(qdrant_client)
+    return QdrantCollectionManager(qdrant_client.get_client())
 
 
 @pytest.fixture
 def vector_storage(qdrant_client: QdrantClientWrapper) -> QdrantVectorStorage:
     """Real Qdrant vector storage instance."""
-    return QdrantVectorStorage(qdrant_client)
+    return QdrantVectorStorage(qdrant_client.get_client())
 
 
 @pytest.fixture

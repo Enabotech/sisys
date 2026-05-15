@@ -55,11 +55,7 @@ def mock_session():
 @pytest.fixture
 def manager(mock_driver):
     """创建 Neo4jGraphManager 实例。"""
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-
-    wrapper = MagicMock(spec=Neo4jClientWrapper)
-    wrapper.get_async_driver.return_value = mock_driver
-    return Neo4jGraphManager(client_wrapper=wrapper, database="neo4j")
+    return Neo4jGraphManager(driver=mock_driver, database="neo4j")
 
 
 class TestNeo4jGraphManager:

@@ -48,11 +48,7 @@ def mock_session():
 
 @pytest.fixture
 def storage(mock_driver):
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-
-    wrapper = MagicMock(spec=Neo4jClientWrapper)
-    wrapper.get_async_driver.return_value = mock_driver
-    return Neo4jGraphStorage(client_wrapper=wrapper, database="neo4j")
+    return Neo4jGraphStorage(driver=mock_driver, database="neo4j")
 
 
 class TestNeo4jGraphStorage:

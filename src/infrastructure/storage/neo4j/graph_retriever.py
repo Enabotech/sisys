@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from neo4j import AsyncDriver
 
 
 class GraphRetriever:
@@ -14,19 +14,15 @@ class GraphRetriever:
     提供高级图检索功能，为 Story 3.4/3.13/3.17 的 GraphRAG 提供基础。
     """
 
-    def __init__(self, client_wrapper: Neo4jClientWrapper, database: str = "neo4j"):
+    def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
         """初始化图检索器。
 
         Args:
-            client_wrapper: Neo4j 客户端封装
+            driver: Neo4j 异步驱动实例
             database: 数据库名称
         """
-        self._client_wrapper = client_wrapper
+        self._driver = driver
         self._database = database
-
-    def _get_driver(self):
-        """获取异步驱动。"""
-        return self._client_wrapper.get_async_driver()
 
     async def find_related_entities(
         self,
@@ -44,7 +40,6 @@ class GraphRetriever:
         Returns:
             相关实体列表，按关系权重/置信度排序
         """
-        driver = self._get_driver()
         # Cypher doesn't support parameters in variable-length patterns,
         # so we construct the pattern with literal value
         cypher = f"""
@@ -55,7 +50,7 @@ class GraphRetriever:
         LIMIT $limit
         RETURN related, hops, connection_count
         """
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             result = await session.run(
                 cypher,
                 entity_id=entity_id,
@@ -81,7 +76,6 @@ class GraphRetriever:
         Returns:
             相关文档列表
         """
-        driver = self._get_driver()
         cypher = """
         MATCH (entity {id: $entity_id})-[:MENTIONS*1..2]-(doc:sisys:Document)
         WITH doc, count(*) as mention_count
@@ -89,7 +83,7 @@ class GraphRetriever:
         LIMIT $limit
         RETURN doc, mention_count
         """
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             result = await session.run(
                 cypher,
                 entity_id=entity_id,
@@ -119,7 +113,6 @@ class GraphRetriever:
         if not node_ids:
             return []
 
-        driver = self._get_driver()
         cypher = """
         MATCH (start)
         WHERE start.id IN $node_ids
@@ -130,7 +123,7 @@ class GraphRetriever:
         }
         RETURN DISTINCT community_member
         """
-        async with driver.session(database=self._database) as session:
+        async with self._driver.session(database=self._database) as session:
             result = await session.run(cypher, node_ids=node_ids)
             records = await result.data()
             return [{"node": dict(record["community_member"])} for record in records]

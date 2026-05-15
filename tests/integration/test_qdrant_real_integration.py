@@ -44,19 +44,21 @@ async def test_tenant_id() -> str:
 async def qdrant_client():
     """Provide a real Qdrant client connection."""
     env = get_test_env()
-    wrapper = QdrantClientWrapper(
+    from src.infrastructure.config.qdrant import QdrantConfig
+
+    config = QdrantConfig(
         host=env.qdrant.host,
         port=env.qdrant.port,
         grpc_port=env.qdrant.grpc_port,
         api_key=env.qdrant.api_key,
         https=env.qdrant.https,
         timeout=env.qdrant.timeout,
-        max_retries=3,
     )
+    wrapper = QdrantClientWrapper(config)
 
     # Verify connection
     try:
-        client = wrapper.get_async_client()
+        client = wrapper.get_client()
         await client.get_collections()
     except Exception as e:
         pytest.skip(f"Qdrant not available: {e}")
@@ -68,13 +70,13 @@ async def qdrant_client():
 @pytest.fixture
 async def collection_manager(qdrant_client: QdrantClientWrapper):
     """Provide QdrantCollectionManager with real client."""
-    return QdrantCollectionManager(qdrant_client)
+    return QdrantCollectionManager(qdrant_client.get_client())
 
 
 @pytest.fixture
 async def vector_storage(qdrant_client: QdrantClientWrapper):
     """Provide QdrantVectorStorage with real client."""
-    return QdrantVectorStorage(qdrant_client)
+    return QdrantVectorStorage(qdrant_client.get_client())
 
 
 # ===================================================================
@@ -189,7 +191,7 @@ class TestQdrantVectorStorage:
         # Create collection
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-        manager = QdrantCollectionManager(qdrant_client)
+        manager = QdrantCollectionManager(qdrant_client.get_client())
         try:
             await manager.delete_collection(collection_name)
         except Exception:
@@ -261,7 +263,7 @@ class TestQdrantVectorStorage:
         # Create collection
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 
-        manager = QdrantCollectionManager(qdrant_client)
+        manager = QdrantCollectionManager(qdrant_client.get_client())
         try:
             await manager.delete_collection(collection_name)
         except Exception:

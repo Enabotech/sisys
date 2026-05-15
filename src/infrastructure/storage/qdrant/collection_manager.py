@@ -8,8 +8,6 @@ from __future__ import annotations
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
-
 
 class QdrantCollectionManager:
     """Qdrant Collection 管理器。
@@ -17,21 +15,13 @@ class QdrantCollectionManager:
     实现 CollectionManager 接口，提供 Collection 生命周期管理。
     """
 
-    def __init__(self, client_wrapper: QdrantClientWrapper):
+    def __init__(self, client: AsyncQdrantClient):
         """初始化 Collection 管理器。
 
         Args:
-            client_wrapper: Qdrant 客户端封装
+            client: Qdrant 异步客户端实例
         """
-        self._client_wrapper = client_wrapper
-
-    def _get_client(self) -> AsyncQdrantClient:
-        """获取异步客户端。
-
-        Returns:
-            AsyncQdrantClient 实例
-        """
-        return self._client_wrapper.get_async_client()
+        self._client = client
 
     async def create_collection(
         self,
@@ -54,7 +44,6 @@ class QdrantCollectionManager:
         if await self.collection_exists(name):
             return False
 
-        client = self._get_client()
         distance_map = {
             "Cosine": Distance.COSINE,
             "Euclidean": Distance.EUCLID,
@@ -71,7 +60,7 @@ class QdrantCollectionManager:
             },
         )
 
-        await client.create_collection(
+        await self._client.create_collection(
             collection_name=name,
             vectors_config=VectorParams(
                 size=vector_size,
@@ -96,8 +85,7 @@ class QdrantCollectionManager:
         if not await self.collection_exists(name):
             return False
 
-        client = self._get_client()
-        await client.delete_collection(collection_name=name)
+        await self._client.delete_collection(collection_name=name)
         return True
 
     async def collection_exists(self, name: str) -> bool:
@@ -109,9 +97,8 @@ class QdrantCollectionManager:
         Returns:
             存在返回 True，否则返回 False
         """
-        client = self._get_client()
         try:
-            collections = await client.get_collections()
+            collections = await self._client.get_collections()
             return name in [c.name for c in collections.collections]
         except Exception:
             return False
@@ -122,9 +109,8 @@ class QdrantCollectionManager:
         Returns:
             Collection 名称列表
         """
-        client = self._get_client()
         try:
-            collections = await client.get_collections()
+            collections = await self._client.get_collections()
             return [c.name for c in collections.collections]
         except Exception:
             return []

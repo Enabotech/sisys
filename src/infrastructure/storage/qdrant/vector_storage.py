@@ -21,7 +21,6 @@ from qdrant_client.models import (
     SparseVector as QdrantSparseVector,
 )
 
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.models import SparseVector, VectorPoint
 
 
@@ -31,21 +30,13 @@ class QdrantVectorStorage:
     实现 VectorStorage 接口，提供向量点 CRUD 和检索功能。
     """
 
-    def __init__(self, client_wrapper: QdrantClientWrapper):
+    def __init__(self, client: AsyncQdrantClient):
         """初始化向量存储。
 
         Args:
-            client_wrapper: Qdrant 客户端封装
+            client: Qdrant 异步客户端实例
         """
-        self._client_wrapper = client_wrapper
-
-    def _get_client(self) -> AsyncQdrantClient:
-        """获取异步客户端。
-
-        Returns:
-            AsyncQdrantClient 实例
-        """
-        return self._client_wrapper.get_async_client()
+        self._client = client
 
     def _normalize_point_id(self, point_id: str) -> int:
         """规范化向量点 ID，确保 Qdrant 接受。
@@ -79,7 +70,6 @@ class QdrantVectorStorage:
         Returns:
             操作成功返回 True
         """
-        client = self._get_client()
         point_structs = []
         for point in points:
             pid = self._normalize_point_id(point.id)
@@ -90,7 +80,7 @@ class QdrantVectorStorage:
                     payload={**point.payload, "created_at": point.created_at.isoformat()},
                 )
             )
-        await client.upsert(collection_name=collection, points=point_structs)
+        await self._client.upsert(collection_name=collection, points=point_structs)
         return True
 
     async def search(
@@ -111,7 +101,6 @@ class QdrantVectorStorage:
         Returns:
             检索结果列表
         """
-        client = self._get_client()
         query_filter: Filter | None = None
         if filter_payload:
             conditions: list[Any] = []
@@ -132,7 +121,7 @@ class QdrantVectorStorage:
             if conditions:
                 query_filter = Filter(must=conditions)
 
-        response = await client.search(
+        response = await self._client.search(
             collection_name=collection,
             query_vector=query_vector,
             query_filter=query_filter,
@@ -166,7 +155,6 @@ class QdrantVectorStorage:
         Returns:
             检索结果列表
         """
-        client = self._get_client()
         query_filter: Filter | None = None
         if filter_payload:
             conditions: list[Any] = []
@@ -181,8 +169,7 @@ class QdrantVectorStorage:
                 values=sparse_vector.values,
             )
             named_sparse = NamedSparseVector(name="sparse", vector=qdrant_sparse)
-            # 使用 search 方法，支持 NamedSparseVector
-            response = await client.search(
+            response = await self._client.search(
                 collection_name=collection,
                 query_vector=named_sparse,
                 query_filter=query_filter,
@@ -210,9 +197,8 @@ class QdrantVectorStorage:
         Returns:
             操作成功返回 True
         """
-        client = self._get_client()
         converted_ids = [self._normalize_point_id(pid) for pid in point_ids]
-        await client.delete(
+        await self._client.delete(
             collection_name=collection,
             points_selector=PointIdsList(points=cast(Any, converted_ids)),
         )
@@ -228,9 +214,8 @@ class QdrantVectorStorage:
         Returns:
             向量点数据，不存在返回 None
         """
-        client = self._get_client()
         normalized_id = self._normalize_point_id(point_id)
-        points = await client.retrieve(
+        points = await self._client.retrieve(
             collection_name=collection,
             ids=[normalized_id],
             with_payload=True,

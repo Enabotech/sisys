@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.infrastructure.config.qdrant import QdrantConfig
 from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 
 
@@ -22,18 +23,17 @@ class TestQdrantClientWrapper:
     def test_default_initialization(self):
         """测试默认初始化。"""
         wrapper = QdrantClientWrapper()
-        assert wrapper._host == "localhost"
-        assert wrapper._port == 6333
-        assert wrapper._grpc_port == 6334
-        assert wrapper._api_key is None
-        assert wrapper._https is False
-        assert wrapper._timeout == 30.0
-        assert wrapper._max_retries == 3
+        assert wrapper._config.host == "localhost"
+        assert wrapper._config.port == 6333
+        assert wrapper._config.grpc_port == 6334
+        assert wrapper._config.api_key is None
+        assert wrapper._config.https is False
+        assert wrapper._config.timeout == 30.0
         assert wrapper._client is None
 
     def test_custom_initialization(self):
         """测试自定义初始化。"""
-        wrapper = QdrantClientWrapper(
+        config = QdrantConfig(
             host="qdrant.example.com",
             port=8000,
             grpc_port=8001,
@@ -42,13 +42,13 @@ class TestQdrantClientWrapper:
             timeout=60.0,
             max_retries=5,
         )
-        assert wrapper._host == "qdrant.example.com"
-        assert wrapper._port == 8000
-        assert wrapper._grpc_port == 8001
-        assert wrapper._api_key == "test-key"  # pragma: allowlist secret
-        assert wrapper._https is True
-        assert wrapper._timeout == 60.0
-        assert wrapper._max_retries == 5
+        wrapper = QdrantClientWrapper(config)
+        assert wrapper._config.host == "qdrant.example.com"
+        assert wrapper._config.port == 8000
+        assert wrapper._config.grpc_port == 8001
+        assert wrapper._config.api_key == "test-key"  # pragma: allowlist secret
+        assert wrapper._config.https is True
+        assert wrapper._config.timeout == 60.0
 
     @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
     def test_lazy_initialization(self, mock_client: MagicMock, mock_async_client: AsyncMock):
@@ -57,12 +57,12 @@ class TestQdrantClientWrapper:
         wrapper = QdrantClientWrapper()
         assert wrapper._client is None
 
-        client = wrapper.get_async_client()
+        client = wrapper.get_client()
         assert client is not None
         assert wrapper._client is mock_async_client
         mock_client.assert_called_once()
 
-        client2 = wrapper.get_async_client()
+        client2 = wrapper.get_client()
         assert client2 is client
         assert mock_client.call_count == 1
 
@@ -93,7 +93,7 @@ class TestQdrantClientWrapper:
         mock_async_client.close = AsyncMock()
 
         wrapper = QdrantClientWrapper()
-        wrapper.get_async_client()
+        wrapper.get_client()
         await wrapper.close()
 
         mock_async_client.close.assert_called_once()
