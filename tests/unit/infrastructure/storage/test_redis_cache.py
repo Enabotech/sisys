@@ -242,8 +242,17 @@ class TestWriteLatencyPerformance:
 
     @pytest.mark.asyncio
     async def test_cache_set_latency_p95_under_10ms(self) -> None:
+
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = RedisSemanticCache(redis_client=fake_redis)
+        original_execute = fake_redis.execute_command
+
+        async def _mock_execute(*args, **kwargs):
+            if args and args[0] == "FT.CREATE":
+                return "OK"
+            return await original_execute(*args, **kwargs)
+
+        fake_redis.execute_command = _mock_execute
+        cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
         latencies: list[float] = []
         for _ in range(BENCHMARK_ITERATIONS):
@@ -275,14 +284,23 @@ class TestTTLBehavior:
 
     @pytest.mark.asyncio
     async def test_cache_ttl_is_applied(self) -> None:
+
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = RedisSemanticCache(redis_client=fake_redis)
+        original_execute = fake_redis.execute_command
+
+        async def _mock_execute(*args, **kwargs):
+            if args and args[0] == "FT.CREATE":
+                return "OK"
+            return await original_execute(*args, **kwargs)
+
+        fake_redis.execute_command = _mock_execute
+        cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
         await cache.set([0.1] * 1024, {"answer": "test"}, ttl=3600)
         keys = await fake_redis.keys("sisys:cache:semantic:vec:*")
         assert len(keys) >= 1
         ttl = await fake_redis.ttl(keys[0])
-        assert 0 < ttl <= 3600
+        assert 0 < int(ttl) <= 3600
 
 
 # ============================================================================

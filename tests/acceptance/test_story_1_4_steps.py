@@ -15,6 +15,7 @@ import uuid
 from typing import Any
 
 import pytest
+import redis.asyncio as aioredis
 from pytest_bdd import given, scenario, scenarios, then, when
 
 from src.infrastructure.config.redis import RedisConfig
@@ -53,6 +54,18 @@ def redis_config() -> RedisConfig:
 
 
 @pytest.fixture
+def redis_client(redis_config: RedisConfig) -> aioredis.Redis:
+    """Real Redis async client from config."""
+    return aioredis.Redis(
+        host=redis_config.host,
+        port=redis_config.port,
+        db=redis_config.db,
+        password=redis_config.password,
+        decode_responses=True,
+    )
+
+
+@pytest.fixture
 def unique_session_id() -> str:
     """Unique session ID for this test - ensures isolation."""
     return f"session-{uuid.uuid4().hex[:8]}"
@@ -83,27 +96,27 @@ def event_metrics_collector() -> EventMetricsCollector:
 
 
 @pytest.fixture
-def session_storage(redis_config: RedisConfig) -> RedisSessionStorage:
+def session_storage(redis_client: aioredis.Redis) -> RedisSessionStorage:
     """Session storage instance with real Redis."""
-    return RedisSessionStorage(redis_config)
+    return RedisSessionStorage(redis_client=redis_client)
 
 
 @pytest.fixture
-def semantic_cache(redis_config: RedisConfig) -> RedisSemanticCache:
+def semantic_cache(redis_client: aioredis.Redis) -> RedisSemanticCache:
     """Semantic cache instance with real Redis."""
-    return RedisSemanticCache(redis_config)
+    return RedisSemanticCache(redis_client=redis_client)
 
 
 @pytest.fixture
-def public_blackboard(redis_config: RedisConfig) -> RedisPublicBlackboard:
+def public_blackboard(redis_client: aioredis.Redis) -> RedisPublicBlackboard:
     """Public blackboard instance with real Redis."""
-    return RedisPublicBlackboard(redis_config)
+    return RedisPublicBlackboard(redis_client=redis_client)
 
 
 @pytest.fixture
-def redis_cleanup(redis_config: RedisConfig) -> RedisCleanup:
+def redis_cleanup(redis_client: aioredis.Redis) -> RedisCleanup:
     """Redis cleanup utility instance."""
-    return RedisCleanup(redis_config)
+    return RedisCleanup(redis_client=redis_client)
 
 
 # ===================================================================
@@ -565,7 +578,13 @@ def when_call_session_save_degraded(
 ) -> None:
     """Try to save session when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
-    storage = RedisSessionStorage(config)
+    bad_client = aioredis.Redis(
+        host=config.host,
+        port=config.port,
+        db=config.db,
+        decode_responses=True,
+    )
+    storage = RedisSessionStorage(redis_client=bad_client)
 
     async def _save():
         return await storage.save("session-test", "agent-test", {"data": "test"})
@@ -593,7 +612,13 @@ def when_call_semantic_cache_get_degraded(
 ) -> None:
     """Try to get from cache when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
-    cache = RedisSemanticCache(config)
+    bad_client = aioredis.Redis(
+        host=config.host,
+        port=config.port,
+        db=config.db,
+        decode_responses=True,
+    )
+    cache = RedisSemanticCache(redis_client=bad_client)
 
     async def _get():
         return await cache.get([0.1, 0.2, 0.3], threshold=0.9)
@@ -622,7 +647,13 @@ def when_call_blackboard_post_degraded(
 ) -> None:
     """Try to post to blackboard when Redis is unavailable."""
     config = RedisConfig(host="invalid-host", port=9999, db=0)
-    blackboard = RedisPublicBlackboard(config)
+    bad_client = aioredis.Redis(
+        host=config.host,
+        port=config.port,
+        db=config.db,
+        decode_responses=True,
+    )
+    blackboard = RedisPublicBlackboard(redis_client=bad_client)
 
     async def _post():
         return await blackboard.post(

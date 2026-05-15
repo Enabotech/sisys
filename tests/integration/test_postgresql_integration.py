@@ -241,7 +241,7 @@ class TestUserCRUD:
         result = await repo.save(mock_user)
 
         mock_session.add.assert_called_once()
-        assert result == mock_user
+        assert result == mock_user  # save() returns persisted entity
 
     @pytest.mark.asyncio
     async def test_get_user_by_username(self, mock_session):

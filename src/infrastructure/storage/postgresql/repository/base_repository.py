@@ -68,14 +68,18 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
-    async def save(self, entity: TEntity) -> None:
+    async def save(self, entity: TEntity) -> TEntity:
         """保存实体（insert or update）。
 
         Args:
             entity: 领域实体
+
+        Returns:
+            持久化后的领域实体（含 DB 生成的 id、timestamps 等字段）。
         """
         model = self._to_model(entity)
         await self._do_save(model, entity)
+        return self._to_entity(model)
 
     async def delete(self, id: Any) -> None:
         """删除实体（硬删除或软删除）。
