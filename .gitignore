@@ -540,6 +540,7 @@ rollup.config.cache
 !docker/*.yml
 !docker/*.sh
 !docker/Dockerfile*
+!init.sql
 
 # 保留文档
 !*.md
