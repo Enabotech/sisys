@@ -11,7 +11,8 @@ services:
   # L1: Redis 高速缓存层
   # ===========================================================================
   redis:
-    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    # image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis:7.2.5
+    image: ${HARBOR_REGISTRY:-harbor.sisys.local}/sisys/tools/redis/redis-stack-server:7.2.0-v20
     container_name: sisys-redis
     restart: unless-stopped
     ports:
