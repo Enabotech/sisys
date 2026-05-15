@@ -1,23 +1,43 @@
-"""RedisSemanticCache tests using fakeredis."""
+"""RedisSemanticCache tests — mock-based for RediSearch FT.SEARCH."""
 
 from __future__ import annotations
 
-import fakeredis.aioredis
+import struct
+from unittest.mock import AsyncMock
+
 import pytest
 
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from src.infrastructure.storage.redis.semantic_cache import (
     RedisSemanticCache,
+    _vector_to_bytes,
     cosine_similarity,
 )
+from src.infrastructure.utils import json_dumps
 
 
-def _create_cache(
-    fake_redis: fakeredis.aioredis.FakeRedis,
+def _make_cache(
     metrics_collector: EventMetricsCollector | None = None,
+    embedding_dim: int = 3,
 ) -> RedisSemanticCache:
-    """Create SemanticCache using fake Redis client."""
-    return RedisSemanticCache(redis_client=fake_redis, metrics_collector=metrics_collector)
+    """Create SemanticCache with mocked Redis client."""
+    mock_redis = AsyncMock()
+    return RedisSemanticCache(
+        redis_client=mock_redis,
+        embedding_dim=embedding_dim,
+        metrics_collector=metrics_collector,
+    )
+
+
+def _ft_search_response(result_json: str | None, distance: float | None) -> list:
+    """Build a mock FT.SEARCH response."""
+    if result_json is None:
+        return [0]
+    return [
+        1,
+        "sisys:cache:semantic:vec:test",
+        ["__embedding_score", str(distance), "result", result_json],
+    ]
 
 
 class TestCosineSimilarity:
@@ -28,20 +48,13 @@ class TestCosineSimilarity:
         assert cosine_similarity(vec, vec) == pytest.approx(1.0)
 
     def test_orthogonal_vectors(self) -> None:
-        vec1 = [1.0, 0.0]
-        vec2 = [0.0, 1.0]
-        assert cosine_similarity(vec1, vec2) == pytest.approx(0.0)
+        assert cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
 
     def test_opposite_vectors(self) -> None:
-        vec1 = [1.0, 0.0]
-        vec2 = [-1.0, 0.0]
-        assert cosine_similarity(vec1, vec2) == pytest.approx(-1.0)
+        assert cosine_similarity([1.0, 0.0], [-1.0, 0.0]) == pytest.approx(-1.0)
 
     def test_partial_similarity(self) -> None:
-        vec1 = [1.0, 0.0]
-        vec2 = [1.0, 1.0]
-        sim = cosine_similarity(vec1, vec2)
-        assert 0 < sim < 1
+        sim = cosine_similarity([1.0, 0.0], [1.0, 1.0])
         assert sim == pytest.approx(0.7071067811865475, rel=1e-5)
 
     def test_dimension_mismatch_raises(self) -> None:
@@ -59,104 +72,128 @@ class TestCosineSimilarity:
         assert -1.0 <= result <= 1.0
 
 
+class TestVectorToBytes:
+    """FLOAT32 binary conversion tests."""
+
+    def test_round_trip(self) -> None:
+        original = [0.1, 0.2, 0.3]
+        packed = _vector_to_bytes(original)
+        unpacked = list(struct.unpack(f"<{len(original)}f", packed))
+        for orig, unpk in zip(original, unpacked):
+            assert orig == pytest.approx(unpk, rel=1e-6)
+
+    def test_output_length(self) -> None:
+        vec = [1.0, 2.0, 3.0, 4.0]
+        packed = _vector_to_bytes(vec)
+        assert len(packed) == 4 * 4  # 4 floats * 4 bytes each
+
+
 class TestRedisSemanticCache:
-    """RedisSemanticCache tests."""
+    """RedisSemanticCache tests with mocked FT.SEARCH."""
 
     @pytest.mark.asyncio
-    async def test_set_and_get_hit(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+    async def test_set_creates_index_and_stores(self) -> None:
+        cache = _make_cache()
+        cache._redis.execute_command = AsyncMock(return_value="OK")
+        cache._redis.hset = AsyncMock(return_value=1)
+        cache._redis.expire = AsyncMock(return_value=True)
 
         embedding = [0.1, 0.2, 0.3]
         result = {"answer": "test"}
         await cache.set(embedding, result)
 
-        found = await cache.get(embedding, threshold=0.99)
+        # Should have called FT.CREATE (ensure_index)
+        cache._redis.execute_command.assert_called_once()
+        call_args = cache._redis.execute_command.call_args[0]
+        assert call_args[0] == "FT.CREATE"
+
+        # Should have stored via HSET
+        cache._redis.hset.assert_called_once()
+        hset_args = cache._redis.hset.call_args
+        assert "embedding" in hset_args[1]["mapping"]
+        assert "result" in hset_args[1]["mapping"]
+
+    @pytest.mark.asyncio
+    async def test_get_hit(self) -> None:
+        cache = _make_cache()
+        result_data = {"answer": "test"}
+        cache._redis.execute_command = AsyncMock(
+            return_value=_ft_search_response(json_dumps(result_data), 0.05)
+        )
+
+        found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is not None
         assert found["answer"] == "test"
 
     @pytest.mark.asyncio
-    async def test_get_miss(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+    async def test_get_miss_empty(self) -> None:
+        cache = _make_cache()
+        cache._redis.execute_command = AsyncMock(return_value=[0])
 
         found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
         assert found is None
 
     @pytest.mark.asyncio
-    async def test_get_miss_then_set_hit(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+    async def test_get_miss_below_threshold(self) -> None:
+        cache = _make_cache()
+        cache._redis.execute_command = AsyncMock(
+            return_value=_ft_search_response(json_dumps({"answer": "test"}), 0.5)
+        )
 
-        # 先 miss
-        assert await cache.get([0.1, 0.2, 0.3], threshold=0.9) is None
-
-        # 写入
-        await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
-
-        # 再 hit
-        found = await cache.get([0.1, 0.2, 0.3], threshold=0.99)
-        assert found is not None
-        assert found["answer"] == "test"
+        # threshold=0.9 means max_distance=0.1, distance=0.5 is too far
+        found = await cache.get([0.1, 0.2, 0.3], threshold=0.9)
+        assert found is None
 
     @pytest.mark.asyncio
     async def test_invalidate(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+        cache = _make_cache()
+        cache._redis.execute_command = AsyncMock(return_value="OK")
+        cache._redis.delete = AsyncMock(return_value=1)
 
-        embedding = [0.1, 0.2, 0.3]
-        await cache.set(embedding, {"answer": "test"})
-
-        # 确认命中
-        assert await cache.get(embedding, threshold=0.99) is not None
-
-        # 失效
-        cache_key = cache._build_cache_key(embedding)
+        await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
+        cache_key = cache._build_cache_key([0.1, 0.2, 0.3])
         await cache.invalidate(cache_key)
 
-        # 确认 miss
-        assert await cache.get(embedding, threshold=0.99) is None
+        cache._redis.delete.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_metrics_recording(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         metrics = EventMetricsCollector()
-        cache = _create_cache(fake_redis, metrics_collector=metrics)
 
-        # miss
+        # Miss
+        cache = _make_cache(metrics_collector=metrics)
+        cache._redis.execute_command = AsyncMock(return_value=[0])
         await cache.get([0.1], threshold=0.9)
         assert metrics.metrics.cache_misses_total == 1
-        assert metrics.metrics.cache_hits_total == 0
 
-        # hit
-        await cache.set([0.1], {"result": "value"})
-        await cache.get([0.1], threshold=0.99)
+        # Hit
+        cache._redis.execute_command = AsyncMock(
+            return_value=_ft_search_response(json_dumps({"result": "value"}), 0.01)
+        )
+        await cache.get([0.1], threshold=0.9)
         assert metrics.metrics.cache_hits_total == 1
-        assert metrics.metrics.cache_misses_total == 1
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+        cache = _make_cache()
         async with cache:
             pass
 
     @pytest.mark.asyncio
     async def test_deterministic_cache_key(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+        cache = _make_cache()
         key1 = cache._build_cache_key([0.1, 0.2, 0.3])
         key2 = cache._build_cache_key([0.1, 0.2, 0.3])
         assert key1 == key2
 
     @pytest.mark.asyncio
-    async def test_dimension_mismatch_raises_in_get(self) -> None:
-        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-        cache = _create_cache(fake_redis)
+    async def test_index_already_exists_is_ok(self) -> None:
+        cache = _make_cache()
+        cache._redis.execute_command = AsyncMock(
+            side_effect=Exception("Index already exists")
+        )
+        cache._redis.hset = AsyncMock(return_value=1)
+        cache._redis.expire = AsyncMock(return_value=True)
 
-        # 写入 3 维向量
         await cache.set([0.1, 0.2, 0.3], {"answer": "test"})
-
-        # 用 2 维向量查询应抛出维度不匹配
-        with pytest.raises(ValueError, match="dimensions must match"):
-            await cache.get([0.1, 0.2], threshold=0.9)
+        cache._redis.hset.assert_called_once()

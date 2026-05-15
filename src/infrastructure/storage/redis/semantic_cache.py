@@ -1,7 +1,7 @@
-"""Redis Semantic Cache — 基础设施层实现。
+"""Redis Semantic Cache — RediSearch FT.SEARCH vector index implementation.
 
-实现 Story 1.4 定义的 SemanticCache 接口。
-使用 Redis Hash 存储嵌入向量和缓存结果，支持纯 Python 余弦相似度计算。
+Uses RediSearch KNN vector search for O(1) similarity lookup instead of
+SCAN + Python cosine_similarity (O(N) with 3N round-trips).
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import math
+import struct
 
 import redis.asyncio as aioredis
 
@@ -19,16 +20,18 @@ from src.infrastructure.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
+_INDEX_NAME = "idx:sisys_semantic_cache"
+
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """计算两个向量的余弦相似度（纯 Python 实现，不使用 numpy）。
+    """Compute cosine similarity between two vectors (pure Python, no numpy).
 
     Args:
-        vec1: 第一个向量
-        vec2: 第二个向量
+        vec1: First vector.
+        vec2: Second vector.
 
     Returns:
-        余弦相似度值（-1.0 到 1.0），零向量或空向量返回 0.0
+        Cosine similarity (-1.0 to 1.0), 0.0 for empty/zero vectors.
     """
     if len(vec1) != len(vec2):
         raise ValueError(f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
@@ -51,20 +54,25 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
         return 0.0
 
     sim = dot_product / (norm1 * norm2)
-    # 裁剪到 [-1, 1] 防止浮点误差导致 NaN
     return max(-1.0, min(1.0, sim))
 
 
-class RedisSemanticCache:
-    """Redis 语义缓存。
+def _vector_to_bytes(vec: list[float]) -> bytes:
+    """Pack float list into FLOAT32 little-endian bytes."""
+    return struct.pack(f"<{len(vec)}f", *vec)
 
-    使用 Redis Hash 存储嵌入向量和缓存结果。
-    键格式: sisys:cache:semantic:{cache_key}
-    支持基于余弦相似度的语义匹配。
+
+class RedisSemanticCache:
+    """Redis semantic cache using RediSearch vector index.
+
+    Stores embeddings as FLOAT32 binary in Redis Hash, indexed by
+    RediSearch for KNN vector similarity search. Single FT.SEARCH
+    command replaces the old SCAN + HGET + Python cosine_similarity loop.
 
     Args:
-        config: Redis 连接配置
-        metrics_collector: 可选的指标收集器
+        redis_client: Redis async client (provided by RedisConnectionManager).
+        embedding_dim: Dimension of embedding vectors (default 1024).
+        metrics_collector: Optional metrics collector for hit/miss tracking.
     """
 
     _NAMESPACE = "cache:semantic"
@@ -72,116 +80,147 @@ class RedisSemanticCache:
     def __init__(
         self,
         redis_client: aioredis.Redis,
+        embedding_dim: int = 1024,
         metrics_collector: EventMetricsCollector | None = None,
     ):
-        """Initialize RedisSemanticCache.
-
-        Args:
-            redis_client: Redis async client (provided by RedisConnectionManager)
-            metrics_collector: Optional metrics collector for cache hit/miss tracking
-        """
         self._redis = redis_client
+        self._embedding_dim = embedding_dim
         self._metrics_collector = metrics_collector
+        self._index_ready = False
+
+    async def _ensure_index(self) -> None:
+        """Create RediSearch vector index if not exists (idempotent)."""
+        if self._index_ready:
+            return
+        try:
+            await self._redis.execute_command(
+                "FT.CREATE", _INDEX_NAME,
+                "ON", "HASH",
+                "PREFIX", "1", build_key(self._NAMESPACE, ""),
+                "SCHEMA",
+                "embedding", "VECTOR", "FLAT", "6",
+                "TYPE", "FLOAT32",
+                "DIM", str(self._embedding_dim),
+                "DISTANCE_METRIC", "COSINE",
+            )
+            logger.info("Created RediSearch vector index %s (dim=%d)", _INDEX_NAME, self._embedding_dim)
+        except Exception as e:
+            if "already exists" not in str(e).lower():
+                raise
+        self._index_ready = True
 
     def _build_cache_key(self, query_embedding: list[float]) -> str:
-        """根据查询向量生成缓存键。
-
-        使用 MD5 哈希（确定性，跨进程一致）向量的量化版本作为键标识。
-        """
-        # 量化前 10 个元素为 6 位小数，用 MD5 生成确定性标识符
-        quantized = [round(v, 6) for v in query_embedding[:10]]
-        vector_id = hashlib.md5(str(quantized).encode(), usedforsecurity=False).hexdigest()[:16]
+        """Generate deterministic cache key from full vector hash."""
+        vec_bytes = _vector_to_bytes(query_embedding)
+        vector_id = hashlib.md5(vec_bytes, usedforsecurity=False).hexdigest()[:16]
         return f"vec:{vector_id}"
 
     async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None:
-        """查询语义缓存。
-
-        遍历所有缓存条目，找到相似度高于阈值的第一个结果。
+        """Query semantic cache via RediSearch KNN vector search.
 
         Args:
-            query_embedding: 查询向量嵌入
-            threshold: 相似度阈值
+            query_embedding: Query embedding vector.
+            threshold: Minimum cosine similarity (0.0-1.0).
 
         Returns:
-            缓存结果，如果未命中则返回 None
-
-        Raises:
-            aioredis.ConnectionError: Redis 连接失败时抛出
+            Cached result dict if hit, None if miss.
         """
         try:
-            cursor = 0
-            pattern = build_key(self._NAMESPACE, "vec:*")
+            await self._ensure_index()
 
-            while True:
-                cursor, keys = await self._redis.scan(cursor=cursor, match=pattern, count=100)
+            query_bytes = _vector_to_bytes(query_embedding)
+            max_distance = 1.0 - threshold
 
-                for key in keys:
-                    stored_embedding = await self._redis.hget(key, "embedding")
-                    stored_result_data = await self._redis.hget(key, "result")
+            response = await self._redis.execute_command(
+                "FT.SEARCH", _INDEX_NAME,
+                "*=>[KNN 1 @embedding $query_vec]",
+                "PARAMS", "2", "query_vec", query_bytes,
+                "RETURN", "2", "__embedding_score", "result",
+                "DIALECT", "2",
+            )
 
-                    if stored_embedding is None or stored_result_data is None:
-                        continue
+            # Response format: [total_count, doc_key, [field_name, field_value], ...]
+            if not response or response[0] == 0:
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_miss()
+                logger.debug("Cache miss")
+                return None
 
-                    try:
-                        stored_vec: list[float] = json_loads(stored_embedding)
-                        raw_result = json_loads(stored_result_data)
-                    except (json.JSONDecodeError, TypeError) as e:
-                        logger.warning("Corrupt data in cache key %s: %s", key, e)
-                        continue
+            # Parse first result: response[1] = doc key, response[2] = [field, value, ...]
+            fields = response[2] if len(response) > 2 else []
+            distance = None
+            result_data = None
 
-                    if not isinstance(stored_vec, list) or not isinstance(raw_result, dict):
-                        logger.warning("Unexpected data types in cache key %s", key)
-                        continue
+            i = 0
+            while i < len(fields):
+                field_name = fields[i]
+                field_value = fields[i + 1] if i + 1 < len(fields) else None
 
-                    similarity = cosine_similarity(query_embedding, stored_vec)
+                if field_name == "__embedding_score":
+                    distance = float(field_value)
+                elif field_name == "result":
+                    result_data = field_value
+                i += 2
 
-                    if similarity >= threshold:
-                        if self._metrics_collector:
-                            self._metrics_collector.record_cache_hit()
-                        logger.debug("Cache hit with similarity %.4f", similarity)
-                        return raw_result
+            if distance is not None and distance > max_distance:
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_miss()
+                logger.debug("Cache miss: best distance %.4f > threshold %.4f", distance, max_distance)
+                return None
 
-                if cursor == 0:
-                    break
+            if result_data is None:
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_miss()
+                return None
+
+            try:
+                parsed = json_loads(result_data)
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning("Corrupt result data: %s", e)
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_miss()
+                return None
+
+            if not isinstance(parsed, dict):
+                logger.warning("Unexpected result type: %s", type(parsed).__name__)
+                if self._metrics_collector:
+                    self._metrics_collector.record_cache_miss()
+                return None
 
             if self._metrics_collector:
-                self._metrics_collector.record_cache_miss()
-            logger.debug("Cache miss")
-            return None
+                self._metrics_collector.record_cache_hit()
+            similarity = 1.0 - distance if distance is not None else 1.0
+            logger.debug("Cache hit with similarity %.4f", similarity)
+            return parsed
 
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
-            logger.error("Failed to query semantic cache from Redis: %s", e)
+            logger.error("Failed to query semantic cache: %s", e)
             return None
 
     async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None:
-        """存储到语义缓存。
+        """Store result in semantic cache with vector embedding.
 
         Args:
-            query_embedding: 查询向量嵌入
-            result: 缓存结果数据
-            ttl: 过期时间（秒）
-
-        Raises:
-            aioredis.ConnectionError: Redis 连接失败时抛出
+            query_embedding: Embedding vector.
+            result: Result data to cache.
+            ttl: Time-to-live in seconds.
         """
         cache_key = self._build_cache_key(query_embedding)
         key = build_key(self._NAMESPACE, cache_key)
         try:
-            await self._redis.hset(key, "embedding", json_dumps(query_embedding))
-            await self._redis.hset(key, "result", json_dumps(result))
+            await self._ensure_index()
+            vec_bytes = _vector_to_bytes(query_embedding)
+            await self._redis.hset(key, mapping={"embedding": vec_bytes, "result": json_dumps(result)})
             await self._redis.expire(key, ttl)
             logger.debug("Cached result with key %s and TTL %d", cache_key, ttl)
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
-            logger.error("Failed to store semantic cache in Redis: %s", e)
+            logger.error("Failed to store semantic cache: %s", e)
 
     async def invalidate(self, cache_key: str) -> None:
-        """使缓存失效。
+        """Evict a cache entry by key.
 
         Args:
-            cache_key: 缓存键（内部格式或完整 Redis 键）
-
-        Raises:
-            aioredis.ConnectionError: Redis 连接失败时抛出
+            cache_key: Internal cache key or full Redis key.
         """
         prefix = build_key(self._NAMESPACE, "")
         if cache_key.startswith(prefix):
@@ -192,7 +231,7 @@ class RedisSemanticCache:
             await self._redis.delete(key)
             logger.debug("Invalidated cache key %s", cache_key)
         except (aioredis.ConnectionError, aioredis.TimeoutError) as e:
-            logger.error("Failed to invalidate cache key %s in Redis: %s", cache_key, e)
+            logger.error("Failed to invalidate cache key %s: %s", cache_key, e)
 
     async def __aenter__(self) -> RedisSemanticCache:
         return self
