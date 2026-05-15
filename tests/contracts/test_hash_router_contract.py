@@ -7,11 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.composition_root import bootstrap
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.registry import _global_registry
-
-bootstrap()
 
 
 class TestHashRouterContract:
