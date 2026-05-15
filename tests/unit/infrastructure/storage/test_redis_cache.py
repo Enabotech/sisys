@@ -252,7 +252,7 @@ class TestWriteLatencyPerformance:
                 return "OK"
             return await original_execute(*args, **kwargs)
 
-        with patch.object(fake_redis, 'execute_command', _mock_execute):
+        with patch.object(fake_redis, "execute_command", _mock_execute):
             cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
             latencies: list[float] = []
@@ -294,7 +294,7 @@ class TestTTLBehavior:
                 return "OK"
             return await original_execute(*args, **kwargs)
 
-        with patch.object(fake_redis, 'execute_command', _mock_execute):
+        with patch.object(fake_redis, "execute_command", _mock_execute):
             cache = RedisSemanticCache(redis_client=fake_redis, embedding_dim=1024)
 
             await cache.set([0.1] * 1024, {"answer": "test"}, ttl=3600)

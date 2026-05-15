@@ -24,6 +24,7 @@ class PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel]):
     继承 PostgreSQLAdapter[PermissionModel, PermissionModel]，
     添加权限特定查询方法。
     """
+
     def __init__(self) -> None:
         super().__init__(PermissionModel)
 

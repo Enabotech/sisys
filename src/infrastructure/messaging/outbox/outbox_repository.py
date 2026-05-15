@@ -32,6 +32,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     公开方法实现领域层接口（使用 DomainEvent）。
     内部方法（_ 前缀）直接操作 OutboxModel，仅 Poller 使用。
     """
+
     _lock: asyncio.Lock = asyncio.Lock()
 
     @property

@@ -42,6 +42,7 @@ class PostgreSQLMemoryMetadataRepository(
     支持多用户并发的会话级别隔离。
     软删除模式：deleted_at 非 NULL 的记录视为已删除。
     """
+
     pk_column = "memory_id"
     soft_delete_column = "deleted_at"
 

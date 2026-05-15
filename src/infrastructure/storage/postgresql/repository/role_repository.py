@@ -26,6 +26,7 @@ class RoleRepository(RoleRepositoryPort):
     实现领域实体与 SQLAlchemy 模型之间的转换。
     继承 RoleRepositoryPort 端口接口。
     """
+
     @property
     def _session(self) -> AsyncSession:
         return get_session()

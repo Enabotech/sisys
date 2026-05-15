@@ -35,7 +35,7 @@ def _create_semantic_cache(
             return "OK"
         return await original_execute(*args, **kwargs)
 
-    patch.object(fake_redis, 'execute_command', _mock_execute).start()
+    patch.object(fake_redis, "execute_command", _mock_execute).start()
     return RedisSemanticCache(
         redis_client=fake_redis,
         embedding_dim=embedding_dim,
@@ -48,7 +48,6 @@ def _create_public_blackboard(fake_redis: fakeredis.aioredis.FakeRedis) -> Redis
 
 
 class TestSessionStorageIntegration:
-
     @pytest.mark.asyncio
     async def test_full_session_lifecycle(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -70,7 +69,6 @@ class TestSessionStorageIntegration:
 
 
 class TestSemanticCacheIntegration:
-
     @pytest.mark.asyncio
     async def test_cache_set_and_invalidate(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -112,7 +110,7 @@ class TestSemanticCacheIntegration:
                 return hit_response  # hit
             return await original_execute(*args, **kwargs)
 
-        with patch.object(fake_redis, 'execute_command', _mock_execute):
+        with patch.object(fake_redis, "execute_command", _mock_execute):
             cache = RedisSemanticCache(
                 redis_client=fake_redis,
                 embedding_dim=3,
@@ -132,7 +130,6 @@ class TestSemanticCacheIntegration:
 
 
 class TestPublicBlackboardIntegration:
-
     @pytest.mark.asyncio
     async def test_multi_agent_collaboration(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -168,7 +165,6 @@ class TestPublicBlackboardIntegration:
 
 
 class TestCombinedFlow:
-
     @pytest.mark.asyncio
     async def test_full_agent_workflow(self) -> None:
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
