@@ -307,8 +307,8 @@ def neo4j_adapter():
     """L5 Neo4j adapter."""
     try:
         from src.infrastructure.config.neo4j import Neo4jConfig
-        from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
+        from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 
         env = get_test_env()
         config = Neo4jConfig(
@@ -318,7 +318,7 @@ def neo4j_adapter():
             password=env.neo4j.password,
             database=env.neo4j.database,
         )
-        wrapper = Neo4jClientWrapper(config)
+        wrapper = Neo4jManager.from_config(config)
         storage = Neo4jGraphStorage(wrapper.get_client())
         return Neo4jAdapter(storage)
     except Exception:

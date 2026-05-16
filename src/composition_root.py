@@ -122,7 +122,7 @@ def bootstrap() -> None:
     from src.infrastructure.config.neo4j import Neo4jConfig
     from src.infrastructure.config.postgresql import PostgreSQLConfig
     from src.infrastructure.config.qdrant import QdrantConfig
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+    from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
     from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
     from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 
@@ -152,7 +152,7 @@ def bootstrap() -> None:
         name="neo4j_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: Neo4jClientWrapper(Neo4jConfig.from_env()),
+        impl=lambda resolver: Neo4jManager.from_config(Neo4jConfig.from_env()),
         module="src.infrastructure.storage.neo4j.client",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",

@@ -20,7 +20,7 @@ import pytest
 
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.storage.minio.bucket_manager import BucketManager
-from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+from src.infrastructure.storage.minio.minio_manager import MinioManager
 
 # Import reset_test_environment for test isolation (AC-6)
 
@@ -64,7 +64,7 @@ async def minio_config():
 @pytest.fixture
 async def minio_client(minio_config: MinIOConfig):
     """Provide MinIO client adapter."""
-    client = MinioClientAdapter(minio_config)
+    client = MinioManager.from_config(minio_config)
 
     # Verify connection
     if not client.health_check():
@@ -96,12 +96,12 @@ async def bucket_manager(minio_config: MinIOConfig):
 class TestMinioClientAdapter:
     """MinIO 客户端适配器真实实例测试。"""
 
-    async def test_health_check(self, minio_client: MinioClientAdapter):
+    async def test_health_check(self, minio_client: MinioManager):
         """测试健康检查。"""
         result = minio_client.health_check()
         assert result is True
 
-    async def test_client_connection(self, minio_client: MinioClientAdapter):
+    async def test_client_connection(self, minio_client: MinioManager):
         """测试客户端连接。"""
         # Should be able to list buckets without error
         buckets = minio_client.client.list_buckets()
@@ -192,7 +192,7 @@ class TestBucketManager:
 class TestMinioObjectOperations:
     """MinIO 对象操作真实实例测试。"""
 
-    async def test_bucket_creation_for_objects(self, minio_client: MinioClientAdapter, test_tenant_id: str):
+    async def test_bucket_creation_for_objects(self, minio_client: MinioManager, test_tenant_id: str):
         """测试对象操作前的 Bucket 创建。"""
         bucket_name = f"sisys-objects-{test_tenant_id}"
 
@@ -212,7 +212,7 @@ class TestMinioObjectOperations:
         # Cleanup
         minio_client.client.remove_bucket(bucket_name)
 
-    async def test_put_and_get_object(self, minio_client: MinioClientAdapter, test_tenant_id: str):
+    async def test_put_and_get_object(self, minio_client: MinioManager, test_tenant_id: str):
         """测试对象上传和下载。"""
         bucket_name = f"sisys-ops-{test_tenant_id}"
         object_name = "test-document.txt"

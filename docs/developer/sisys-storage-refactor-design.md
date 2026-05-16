@@ -167,7 +167,7 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
 
 ```
 src/infrastructure/storage/minio/  （已有，保持三层委托）
-├── client_adapter.py        MinioClientAdapter — 延迟初始化sync Minio客户端、健康检查
+├── minio_client_adapter.py        MinioManager — 延迟初始化sync Minio客户端、健康检查
 ├── bucket_manager.py         BucketManager — Bucket CRUD、命名验证、WORM配置
 ├── worm_lifecycle.py         WORMManager — 合规锁定、生命周期管理
 ├── object_operations.py      ObjectOperations — 流式上传/下载、分片上传、断点续传
@@ -180,7 +180,7 @@ src/infrastructure/storage/minio/  （已有，保持三层委托）
                              ⚠️ 缺少list_objects()方法（底层Repository已有）
 ```
 
-**连接管理**: MinioClientAdapter 已实现延迟初始化 + 健康检查。注意：使用**同步**Minio客户端。
+**连接管理**: MinioManager 已实现延迟初始化 + 健康检查。注意：使用**同步**Minio客户端。
 
 **⚠️ Phase 3需修复**: 将MinIORepository基类改为L4ObjectPort，修复archive签名，补全list_objects委托。
 
@@ -966,7 +966,7 @@ class MemoryGraphPort(L5GraphPort, Protocol):
 
 ```
 src/infrastructure/storage/neo4j/
-├── client.py          Neo4jClientWrapper — 延迟初始化AsyncDriver、连接池
+├── client.py          Neo4jManager — 延迟初始化AsyncDriver、连接池
 ├── graph_storage.py   Neo4jGraphStorage — Cypher执行、路径遍历、邻居查询
 │                     ⚠️ get_neighbors(node_id, rel_type, direction) 签名与L5GraphPort不兼容
 │                     ⚠️ L5GraphPort: get_neighbors(memory_id, max_depth, edge_type)

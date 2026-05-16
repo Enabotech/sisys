@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.infrastructure.config.neo4j import Neo4jConfig
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 
 
 class _AsyncCM:
@@ -24,7 +23,7 @@ class _AsyncCM:
 
 
 @pytest.fixture
-def mock_async_driver():
+def mock_driver():
     """模拟异步 Neo4j 驱动。"""
     return MagicMock()
 
@@ -35,99 +34,59 @@ def mock_session():
     return MagicMock()
 
 
+@pytest.fixture
+def wrapper(mock_driver: MagicMock):
+    """注入 mock 驱动的 Neo4jManager 实例。"""
+    return Neo4jManager(mock_driver, database="test_db")
+
+
 class TestNeo4jClientWrapper:
-    """Neo4jClientWrapper 测试类。"""
+    """Neo4jManager 测试类。"""
 
-    def test_default_initialization(self):
-        """测试默认初始化。"""
-        wrapper = Neo4jClientWrapper()
-        assert wrapper._config.host == "localhost"
-        assert wrapper._config.bolt_port == 7687
-        assert wrapper._config.username == "neo4j"
-        assert wrapper._config.password == ""
-        assert wrapper._config.database == "neo4j"
-        assert wrapper._config.max_connection_pool_size == 50
-        assert wrapper._config.connection_timeout == 30.0
-        assert wrapper._driver is None
+    def test_init_with_driver(self, mock_driver: MagicMock):
+        """测试构造函数注入驱动。"""
+        wrapper = Neo4jManager(mock_driver, database="sisys_db")
+        assert wrapper._driver is mock_driver
+        assert wrapper._database == "sisys_db"
 
-    def test_custom_initialization(self):
-        """测试自定义初始化。"""
-        config = Neo4jConfig(
-            host="neo4j.example.com",
-            bolt_port=7687,
-            username="admin",
-            password="secret",  # pragma: allowlist secret
-            database="sisys_db",
-            max_connection_pool_size=100,
-            connection_timeout=60.0,
-        )
-        wrapper = Neo4jClientWrapper(config)
-        assert wrapper._config.uri == "bolt://neo4j.example.com:7687"
-        assert wrapper._config.username == "admin"
-        assert wrapper._config.password == "secret"  # pragma: allowlist secret
-        assert wrapper._config.database == "sisys_db"
-        assert wrapper._config.max_connection_pool_size == 100
-        assert wrapper._config.connection_timeout == 60.0
+    def test_get_client_returns_injected(self, wrapper: Neo4jManager, mock_driver: MagicMock):
+        """测试 get_client 返回注入的驱动。"""
+        assert wrapper.get_client() is mock_driver
 
-    @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
-    def test_lazy_initialization(self, mock_db: MagicMock, mock_async_driver: MagicMock):
-        """测试懒初始化。"""
-        mock_db.driver.return_value = mock_async_driver
-        wrapper = Neo4jClientWrapper()
-        assert wrapper._driver is None
+    def test_get_async_driver_returns_injected(self, wrapper: Neo4jManager, mock_driver: MagicMock):
+        """测试 get_async_driver 返回注入的驱动（向后兼容）。"""
+        assert wrapper.get_async_driver() is mock_driver
 
-        driver = wrapper.get_client()
-        assert driver is not None
-        assert wrapper._driver is mock_async_driver
-        mock_db.driver.assert_called_once()
-
-        driver2 = wrapper.get_client()
-        assert driver2 is driver
-        assert mock_db.driver.call_count == 1
-
-    @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
-    async def test_health_check_success(self, mock_db: MagicMock, mock_async_driver: MagicMock, mock_session: MagicMock):
+    async def test_health_check_success(self, wrapper: Neo4jManager, mock_driver: MagicMock, mock_session: MagicMock):
         """测试健康检查成功。"""
-        mock_db.driver.return_value = mock_async_driver
-
         async def mock_run(*args, **kwargs):
             result_mock = MagicMock()
             result_mock.single = AsyncMock(return_value=("1",))
             return result_mock
 
         mock_session.run = mock_run
-        mock_async_driver.session.return_value = _AsyncCM(mock_session)
+        mock_driver.session.return_value = _AsyncCM(mock_session)
 
-        wrapper = Neo4jClientWrapper()
         result = await wrapper.health_check()
         assert result is True
 
-    @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
-    async def test_health_check_failure(self, mock_db: MagicMock, mock_async_driver: MagicMock):
+    async def test_health_check_failure(self, wrapper: Neo4jManager, mock_driver: MagicMock):
         """测试健康检查失败。"""
-        mock_db.driver.return_value = mock_async_driver
-        mock_async_driver.session.side_effect = Exception("Connection refused")
+        mock_driver.session.side_effect = Exception("Connection refused")
 
-        wrapper = Neo4jClientWrapper()
         result = await wrapper.health_check()
         assert result is False
 
-    @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
-    async def test_close(self, mock_db: MagicMock, mock_async_driver: MagicMock):
+    async def test_close(self, wrapper: Neo4jManager, mock_driver: MagicMock):
         """测试关闭连接。"""
-        mock_db.driver.return_value = mock_async_driver
-        mock_async_driver.close = AsyncMock()
-
-        wrapper = Neo4jClientWrapper()
-        wrapper.get_client()
+        mock_driver.close = AsyncMock()
         await wrapper.close()
 
-        mock_async_driver.close.assert_called_once()
+        mock_driver.close.assert_called_once()
         assert wrapper._driver is None
 
-    @patch("src.infrastructure.storage.neo4j.client.AsyncGraphDatabase")
-    async def test_close_without_driver(self, mock_db: MagicMock):
-        """测试未初始化驱动时关闭连接。"""
-        wrapper = Neo4jClientWrapper()
+    async def test_close_without_driver(self):
+        """测试驱动为 None 时关闭不报错。"""
+        wrapper = Neo4jManager(MagicMock(), database="neo4j")
+        wrapper._driver = None
         await wrapper.close()
-        mock_db.assert_not_called()

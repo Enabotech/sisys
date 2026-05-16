@@ -52,10 +52,10 @@ export MINIO_READ_TIMEOUT=30.0
 
 ```python
 from src.infrastructure.config.minio import MinIOConfig
-from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+from src.infrastructure.storage.minio.client_adapter import MinioManager
 
 config = MinIOConfig.from_env()
-adapter = MinioClientAdapter(config)
+adapter = MinioManager(config)
 assert adapter.health_check(), "MinIO 连接失败"
 print("✅ MinIO 连接成功")
 ```
@@ -85,11 +85,11 @@ print("✅ MinIO 连接成功")
 
 ```python
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
-from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+from src.infrastructure.storage.minio.client_adapter import MinioManager
 from src.infrastructure.config.minio import MinIOConfig
 
 config = MinIOConfig.from_env()
-adapter = MinioClientAdapter(config)
+adapter = MinioManager(config)
 worm_manager = WORMManager(adapter.client)
 
 # 启用 WORM 锁定

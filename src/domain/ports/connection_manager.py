@@ -15,7 +15,7 @@ class ConnectionManager(Protocol):
     """Unified async connection lifecycle contract.
 
     All async storage wrappers (DatabaseEngine, QdrantClientWrapper,
-    Neo4jClientWrapper, RedisConnectionManager) satisfy this Protocol
+    Neo4jManager, RedisConnectionManager) satisfy this Protocol
     via structural subtyping.
 
     Required methods:
@@ -28,7 +28,7 @@ class ConnectionManager(Protocol):
             - RedisConnectionManager -> aioredis.Redis
             - DatabaseEngine -> AsyncEngine
             - QdrantClientWrapper -> AsyncQdrantClient
-            - Neo4jClientWrapper -> AsyncDriver
+            - Neo4jManager -> AsyncDriver
     """
 
     async def health_check(self) -> bool:

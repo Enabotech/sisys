@@ -19,11 +19,11 @@ from minio.lifecycleconfig import (
 from minio.retention import Retention
 
 from src.infrastructure.config.minio import MinIOConfig
-from src.infrastructure.storage.minio.client_adapter import (
-    ComplianceLockError,
-    MinioClientAdapter,
-)
 from src.infrastructure.storage.minio.entities import LifecycleRule
+from src.infrastructure.storage.minio.minio_manager import (
+    ComplianceLockError,
+    MinioManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +47,14 @@ class WORMManager:
             config: MinIO 连接配置
         """
         self._config = config
-        self._adapter = MinioClientAdapter(config)
+        self._adapter = MinioManager.from_config(config)
 
     @property
-    def _client(self) -> MinioClientAdapter:
+    def _client(self) -> MinioManager:
         """获取客户端适配器。
 
         Returns:
-            MinioClientAdapter 实例
+            MinioManager 实例
         """
         return self._adapter
 

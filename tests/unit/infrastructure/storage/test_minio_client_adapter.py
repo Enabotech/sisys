@@ -5,24 +5,30 @@ TDD 红→绿→重构循环 A + B。
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from minio.error import S3Error
 
 from src.domain.exceptions.external_exceptions import ThirdPartyError
 from src.infrastructure.config.minio import MinIOConfig
-from src.infrastructure.storage.minio.client_adapter import (
+from src.infrastructure.storage.minio.minio_manager import (
     BucketNotFoundError,
-    MinioClientAdapter,
+    MinioManager,
     PermissionDeniedError,
 )
 
 
 class TestMinioClientAdapterInit:
-    """MinioClientAdapter 初始化测试。"""
+    """MinioManager 初始化测试。"""
 
-    def test_init_with_config(self):
-        """使用配置对象初始化。"""
+    def test_init_with_client(self):
+        """使用客户端实例初始化。"""
+        mock_client = MagicMock()
+        adapter = MinioManager(mock_client)
+        assert adapter._client is mock_client
+
+    def test_from_config(self):
+        """从配置创建适配器。"""
         config = MinIOConfig(
             host="test.minio",
             port=9000,
@@ -30,63 +36,19 @@ class TestMinioClientAdapterInit:
             secret_key="test-secret",  # pragma: allowlist secret
             secure=True,
         )
-        adapter = MinioClientAdapter(config)
-        assert adapter._config.host == "test.minio"
-        assert adapter._config.port == 9000
-        assert adapter._config.endpoint == "test.minio:9000"
-        assert adapter._client is None
+        adapter = MinioManager.from_config(config)
+        assert adapter._client is not None
 
-    def test_client_property_creates_once(self):
-        """客户端属性创建一次。"""
-        config = MinIOConfig(
-            host="test.minio",
-            port=9000,
-            access_key="key",
-            secret_key="secret",  # pragma: allowlist secret
-            secure=False,
-        )
-        adapter = MinioClientAdapter(config)
-
-        with patch("src.infrastructure.storage.minio.client_adapter.Minio") as mock_minio:
-            mock_client = MagicMock()
-            mock_minio.return_value = mock_client
-
-            client1 = adapter.client
-            client2 = adapter.client
-
-            assert client1 is client2
-            mock_minio.assert_called_once()
-
-
-class TestMinioClientAdapterConnection:
-    """MinioClientAdapter 连接测试。"""
-
-    def test_get_client_lazy_loading(self):
-        """客户端懒加载。"""
-        config = MinIOConfig()
-        adapter = MinioClientAdapter(config)
-        assert adapter._client is None
-
-        with patch("src.infrastructure.storage.minio.client_adapter.Minio") as mock_minio:
-            mock_client = MagicMock()
-            mock_minio.return_value = mock_client
-
-            client = adapter._get_client()
-            assert client is not None
-            mock_minio.assert_called_once()
-
-    def test_get_client_reuses_existing(self):
-        """客户端复用。"""
-        config = MinIOConfig()
-        adapter = MinioClientAdapter(config)
-        adapter._client = MagicMock()
-
-        client = adapter._get_client()
-        assert client == adapter._client
+    def test_client_property_returns_injected(self):
+        """client 属性返回注入的实例。"""
+        mock_client = MagicMock()
+        adapter = MinioManager(mock_client)
+        assert adapter.client is mock_client
+        assert adapter.client is adapter.client
 
 
 class TestMinioClientAdapterErrorHandling:
-    """MinioClientAdapter 错误处理测试。"""
+    """MinioManager 错误处理测试。"""
 
     def test_map_s3_error_bucket_not_found(self):
         """映射桶不存在错误。"""
@@ -98,7 +60,7 @@ class TestMinioClientAdapterErrorHandling:
             host_id="host-123",
             response=MagicMock(),
         )
-        mapped = MinioClientAdapter._map_error(error)
+        mapped = MinioManager._map_error(error)
         assert isinstance(mapped, BucketNotFoundError)
 
     def test_map_s3_error_permission_denied(self):
@@ -111,7 +73,7 @@ class TestMinioClientAdapterErrorHandling:
             host_id="host-123",
             response=MagicMock(),
         )
-        mapped = MinioClientAdapter._map_error(error)
+        mapped = MinioManager._map_error(error)
         assert isinstance(mapped, PermissionDeniedError)
 
     def test_map_s3_error_forbidden(self):
@@ -124,7 +86,7 @@ class TestMinioClientAdapterErrorHandling:
             host_id="host-123",
             response=MagicMock(),
         )
-        mapped = MinioClientAdapter._map_error(error)
+        mapped = MinioManager._map_error(error)
         assert isinstance(mapped, PermissionDeniedError)
 
     def test_map_s3_error_unknown(self):
@@ -137,25 +99,22 @@ class TestMinioClientAdapterErrorHandling:
             host_id="host-123",
             response=MagicMock(),
         )
-        mapped = MinioClientAdapter._map_error(error)
+        mapped = MinioManager._map_error(error)
         assert isinstance(mapped, ThirdPartyError)
 
     def test_health_check_success(self):
         """健康检查成功。"""
-        config = MinIOConfig()
-        adapter = MinioClientAdapter(config)
-        adapter._client = MagicMock()
-        adapter._client.list_buckets.return_value = []
+        mock_client = MagicMock()
+        mock_client.list_buckets.return_value = []
+        adapter = MinioManager(mock_client)
 
         result = adapter.health_check()
         assert result is True
 
     def test_health_check_failure(self):
         """健康检查失败。"""
-        config = MinIOConfig()
-        adapter = MinioClientAdapter(config)
-        adapter._client = MagicMock()
-        adapter._client.list_buckets.side_effect = S3Error(
+        mock_client = MagicMock()
+        mock_client.list_buckets.side_effect = S3Error(
             code="ConnectionError",
             message="Cannot connect",
             resource="",
@@ -163,6 +122,7 @@ class TestMinioClientAdapterErrorHandling:
             host_id="",
             response=MagicMock(),
         )
+        adapter = MinioManager(mock_client)
 
         result = adapter.health_check()
         assert result is False
