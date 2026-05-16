@@ -10,7 +10,7 @@ from unittest import mock
 import pytest
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def config():
 @pytest.fixture
 def engine(config):
     """创建 DatabaseEngine 实例。"""
-    return DatabaseEngine(config)
+    return PostgreSQLAdapter(config)
 
 
 class TestDatabaseEngine:
@@ -90,7 +90,7 @@ class TestDatabaseEngine:
     @pytest.mark.asyncio
     async def test_close_disposes_engines(self, config):
         """测试关闭引擎。"""
-        engine = DatabaseEngine(config)
+        engine = PostgreSQLAdapter(config)
         mock_async = mock.AsyncMock()
         mock_sync = mock.Mock()
         engine._async_engine = mock_async

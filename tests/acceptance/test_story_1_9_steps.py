@@ -29,7 +29,7 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
@@ -72,7 +72,7 @@ def pg_config():
 def db_engine(pg_config):
     """Real database engine instance."""
 
-    engine = DatabaseEngine(pg_config)
+    engine = PostgreSQLAdapter(pg_config)
     return engine
 
 
@@ -128,10 +128,10 @@ def ensure_alembic_migration(pg_config):
 
     if not migration_success:
         try:
-            from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+            from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
             from src.infrastructure.storage.postgresql.models import Base
 
-            engine = DatabaseEngine(pg_config)
+            engine = PostgreSQLAdapter(pg_config)
             Base.metadata.create_all(engine.get_sync_engine())
         except Exception as e:
             pytest.skip(f"Failed to create schema: {e}")

@@ -16,7 +16,7 @@ from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
-class DatabaseEngine(ConnectionManager):
+class PostgreSQLAdapter(ConnectionManager):
     """通用数据库引擎接口。
 
     支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化。

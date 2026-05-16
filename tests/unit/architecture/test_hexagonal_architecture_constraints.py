@@ -691,8 +691,8 @@ class TestImplementationLocation:
     def test_implementations_in_infrastructure(self):
         """Implementation classes should be in infrastructure layer."""
         expected_implementations = [
-            "infrastructure/storage/file_memory_adapter.py",
-            "infrastructure/storage/memory_index.py",
+            "infrastructure/storage/fs/file_memory_adapter.py",
+            "infrastructure/storage/fs/memory_index.py",
         ]
         for impl in expected_implementations:
             impl_path = SRC_DIR / impl

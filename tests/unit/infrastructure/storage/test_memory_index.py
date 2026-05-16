@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from src.infrastructure.config.memory import MemoryConfig
-from src.infrastructure.storage.memory_index import MemoryIndex
+from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
 
 class TestMemoryIndexInit:

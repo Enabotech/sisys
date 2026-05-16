@@ -230,7 +230,7 @@ async def real_postgres_engine():
     Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
     """
     from src.infrastructure.config.postgresql import PostgreSQLConfig
-    from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+    from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
     config = get_test_env()
 
@@ -242,7 +242,7 @@ async def real_postgres_engine():
         password=config.postgres.password,
     )
 
-    engine = DatabaseEngine(pg_config)
+    engine = PostgreSQLAdapter(pg_config)
 
     # Verify connection
     try:

@@ -2693,7 +2693,7 @@ src/infrastructure/
 │   ├── file_memory_adapter.py                             # L0 文件系统适配器
 │   ├── memory_index.py                                    # L0 记忆索引管理
 │   ├── memory_router.py                                   # L0 记忆路由策略
-│   ├── redis_snapshot_store.py                            # Redis 快照存储
+│   ├── fs/                                                # L0 文件系统存储
 │   ├── minio/                                             # L4 对象存储
 │   ├── neo4j/                                             # L5 图存储
 │   ├── postgresql/                                        # L2 关系存储

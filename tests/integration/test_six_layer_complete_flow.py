@@ -39,11 +39,11 @@ from src.domain.ports.l0_storage import L0StoragePort
 from src.infrastructure.config.memory import MemoryConfig
 from src.infrastructure.config.minio import MinIOConfig
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
-from src.infrastructure.storage.memory_index import MemoryIndex
+from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
+from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
 from src.infrastructure.storage.neo4j.neo4j_adapter import Neo4jAdapter
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
     PostgreSQLMemoryChangeHistoryRepository,
 )
@@ -88,13 +88,13 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> DatabaseEngine:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
     """Real database engine instance."""
-    return DatabaseEngine(pg_config)
+    return PostgreSQLAdapter(pg_config)
 
 
 @pytest.fixture
-def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_schema: str):
+def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, test_schema: str):
     """Ensure test schema exists before tests."""
     sync_url = f"postgresql+psycopg2://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
     from sqlalchemy import create_engine
@@ -131,7 +131,7 @@ def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_s
 
 
 @pytest.fixture
-async def pg_session(db_engine: DatabaseEngine, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
+async def pg_session(db_engine: PostgreSQLAdapter, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
     """PostgreSQL session with transactional rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)

@@ -54,12 +54,12 @@ storage/                              # 统一存储抽象层 ⭐
 │   ├── key_builder.py
 │   ├── public_blackboard.py
 │   ├── redis_memory_cache.py       # ← 从 cache/ 移入
+│   ├── redis_snapshot_store.py      # Redis快照存储
 │   ├── semantic_cache.py
 │   └── session_storage.py
 ├── file_memory_adapter.py           # 文件内存适配器
 ├── memory_index.py                  # 内存索引
-├── memory_router.py                 # 内存路由
-└── redis_snapshot_store.py          # Redis快照存储
+└── memory_router.py                 # 内存路由
 ```
 
 ### 2.2 需要迁移的模块
@@ -116,12 +116,12 @@ src/infrastructure/
 │   │   ├── key_builder.py
 │   │   ├── public_blackboard.py
 │   │   ├── redis_memory_cache.py       # ← 从 cache/ 移入
+│   │   ├── redis_snapshot_store.py
 │   │   ├── semantic_cache.py
 │   │   └── session_storage.py
 │   ├── file_memory_adapter.py
 │   ├── memory_index.py
-│   ├── memory_router.py
-│   └── redis_snapshot_store.py
+│   └── memory_router.py
 │
 ├── messaging/                             # ← 合并 events/message_bus/adapters/idempotency
 │   ├── __init__.py
@@ -503,12 +503,12 @@ src/infrastructure/
 │   │   ├── key_builder.py
 │   │   ├── public_blackboard.py
 │   │   ├── redis_memory_cache.py    # ← 从 cache/ 移入
+│   │   ├── redis_snapshot_store.py
 │   │   ├── semantic_cache.py
 │   │   └── session_storage.py
 │   ├── file_memory_adapter.py
 │   ├── memory_index.py
-│   ├── memory_router.py
-│   └── redis_snapshot_store.py
+│   └── memory_router.py
 │
 ├── messaging/                            # ← 合并完成
 │   ├── __init__.py
