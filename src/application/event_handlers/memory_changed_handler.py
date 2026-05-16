@@ -99,7 +99,7 @@ class MemoryChangedHandler:
             memory_type = self._get_memory_type(event)
             # owner_id 是 user_id（private 类型）或 group_id
             owner_id = event.user_id
-            await self._l1_cache.delete(memory_type, owner_id, event.name)
+            await self._l1_cache.delete_memory(memory_type, owner_id, event.name)
             logger.debug(f"L1 cache invalidated: memory_id={event.memory_id}")
         except Exception as e:
             logger.error(f"Failed to invalidate L1 cache: {e}")

@@ -1,13 +1,9 @@
-"""L1CachePort — L1 缓存存储抽象端口。
+"""L1CachePort — Generic KV cache port (Rule 1).
 
-对应 architecture.md §11.2.9 L1 缓存策略：
-- 写入时失效：MemoryChanged 事件触发缓存失效
-- 读取时加速：高频访问可先查 L1，L1 未命中则查 L0
-- 不作为真相源：决策时以 L0 为准
+Technology-agnostic key-value cache with TTL support.
+Zero external dependencies (only typing).
 
-设计原则：
-- 领域层零外部依赖（仅用 abc + typing）
-- 异步优先（async def）
+This is the base port for all L1 cache implementations.
 """
 
 from __future__ import annotations
@@ -17,79 +13,82 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L1CachePort(Protocol):
-    """L1 缓存存储接口。
+    """Generic KV cache port — Rule 1 domain interface.
 
-    对应 architecture.md §11.2.9 L1 缓存策略：
-    - 写入时失效：MemoryChanged 事件触发缓存失效
-    - 读取时加速：高频访问可先查 L1，L1 未命中则查 L0
-    - 不作为真相源：决策时以 L0 为准
+    Provides key-value cache operations with optional TTL.
+    Callers are responsible for key namespacing/prefixing.
 
-    注意：L1 层包含两种缓存：
-    - 记忆缓存（RedisMemoryCache）→ 本接口
-    - 语义缓存（RedisSemanticCache）→ 独立接口，见 semantic_cache.py
+    Methods:
+        get(key): Read value by key.
+        set(key, value, ttl): Write value with optional TTL.
+        delete(key): Delete a key.
+        exists(key): Check if key exists.
+        delete_pattern(pattern): Delete keys matching glob pattern.
+        set_with_ttl(key, value, ttl): Write with explicit TTL (no default).
     """
 
-    async def get(
-        self,
-        memory_type: str,
-        owner_id: str,
-        name: str,
-    ) -> str | None:
-        """从缓存读取。
+    async def get(self, key: str) -> str | None:
+        """Read value by key.
 
         Args:
-            memory_type: 记忆类型 ('private' | 'group')
-            owner_id: 所有者 ID
-            name: 记忆名称
+            key: Cache key (caller is responsible for namespacing).
 
         Returns:
-            缓存内容，不存在返回 None
+            Cached value, or None if not found / expired.
         """
 
-    async def set(
-        self,
-        memory_type: str,
-        owner_id: str,
-        name: str,
-        content: str,
-        ttl: int | None = None,
-    ) -> bool:
-        """写入缓存。
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
+        """Write value with optional TTL.
 
         Args:
-            memory_type: 记忆类型
-            owner_id: 所有者 ID
-            name: 记忆名称
-            content: 内容
-            ttl: TTL 秒数，None 使用默认（24h-30h 随机）
+            key: Cache key.
+            value: Value to store.
+            ttl: TTL in seconds. None means use default.
 
         Returns:
-            是否成功
+            True if successful.
         """
 
-    async def delete(
-        self,
-        memory_type: str,
-        owner_id: str,
-        name: str,
-    ) -> bool:
-        """删除缓存。
-
-        Returns:
-            是否成功
-        """
-
-    async def invalidate_pattern(
-        self,
-        memory_type: str,
-        owner_id: str,
-    ) -> int:
-        """按模式失效缓存。
+    async def delete(self, key: str) -> bool:
+        """Delete a key.
 
         Args:
-            memory_type: 记忆类型
-            owner_id: 所有者 ID
+            key: Cache key.
 
         Returns:
-            失效的 key 数量
+            True if the key existed and was deleted.
+        """
+
+    async def exists(self, key: str) -> bool:
+        """Check whether a key exists (and is not expired).
+
+        Args:
+            key: Cache key.
+
+        Returns:
+            True if the key exists.
+        """
+
+    async def delete_pattern(self, pattern: str) -> int:
+        """Delete all keys matching a glob-style pattern.
+
+        Uses SCAN (not KEYS) to avoid blocking.
+
+        Args:
+            pattern: Glob pattern, e.g. "memory:user:123:*".
+
+        Returns:
+            Number of keys deleted.
+        """
+
+    async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
+        """Write value with explicit TTL (no default fallback).
+
+        Args:
+            key: Cache key.
+            value: Value to store.
+            ttl: TTL in seconds (required).
+
+        Returns:
+            True if successful.
         """

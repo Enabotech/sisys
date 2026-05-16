@@ -201,7 +201,9 @@ def real_redis(redis_test_prefix):
 @pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real async Redis."""
-    return RedisMemoryCache(real_redis)
+    from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+
+    return RedisMemoryCache(RedisAdapter(real_redis))
 
 
 @pytest.fixture
@@ -467,7 +469,7 @@ def when_memory_changed_event_processed(
     memory_type = "user"
 
     # Pre-populate L1 cache (before event) - async call
-    event_loop.run_until_complete(redis_cache.set(memory_type, owner_id, name, "cached content"))
+    event_loop.run_until_complete(redis_cache.set_memory(memory_type, owner_id, name, "cached content"))
     redis_key = f"memory:{memory_type}:{owner_id}:{name}"
     assert real_redis_sync.exists(redis_key) == 1, "Cache should be populated before listener"
 
@@ -798,7 +800,7 @@ def given_redis_cache_written(context: dict, redis_cache, real_redis_sync, redis
     content = "Test content"
 
     # Async set
-    event_loop.run_until_complete(redis_cache.set(memory_type, owner_id, name, content))
+    event_loop.run_until_complete(redis_cache.set_memory(memory_type, owner_id, name, content))
 
     # Build key in same format as RedisMemoryCache
     key = f"memory:{memory_type}:{owner_id}:{name}"

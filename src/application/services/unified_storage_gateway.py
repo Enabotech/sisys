@@ -20,11 +20,11 @@ from src.domain.ports.unified_storage import UnifiedStoragePort
 if TYPE_CHECKING:
     # Rule 4: 应用层端口（继承 Rule 1 基础端口）
     from src.application.ports.document_storage_port import DocumentStoragePort
+    from src.application.ports.memory_cache_port import MemoryCachePort
     from src.application.ports.memory_graph_port import MemoryGraphPort
     from src.application.ports.memory_vector_port import MemoryVectorPort
     from src.domain.entities.memory_metadata import MemoryMetadata
     from src.domain.ports.l0_storage import L0StoragePort
-    from src.domain.ports.l1_cache import L1CachePort
     from src.domain.ports.memory_repository import (
         L2ChangeHistoryRepositoryPort,
         L2GroupMemberRepositoryPort,
@@ -49,7 +49,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     def __init__(
         self,
         l0_storage: L0StoragePort,
-        l1_cache: L1CachePort,
+        l1_cache: MemoryCachePort,
         l2_metadata: L2MetadataRepositoryPort,
         l2_history: L2ChangeHistoryRepositoryPort,
         l2_group_member: L2GroupMemberRepositoryPort | None = None,
@@ -177,7 +177,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             记忆内容，不存在返回 None
         """
         if prefer_cache:
-            content = await self._l1.get(memory_type, owner_id, name)
+            content = await self._l1.get_memory(memory_type, owner_id, name)
             if content is not None:
                 metadata = await self._l2_meta.get_by_id(UUID(memory_id))
                 if metadata is not None and await self._check_read_permission(metadata, owner_id, memory_type):
@@ -195,7 +195,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             return None
 
         if prefer_cache:
-            await self._l1.set(memory_type, owner_id, name, content)
+            await self._l1.set_memory(memory_type, owner_id, name, content)
 
         return content
 
@@ -263,7 +263,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             self._event_publisher.publish(event)
             results[StorageLayer.L1_CACHE] = True
         else:
-            results[StorageLayer.L1_CACHE] = await self._l1.delete(memory_type, owner_id, name)
+            results[StorageLayer.L1_CACHE] = await self._l1.delete_memory(memory_type, owner_id, name)
             if self._l2_meta is not None:
                 await self._l2_meta.delete(UUID(memory_id))
 
@@ -286,7 +286,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             return {StorageLayer.L0_FILE: False, StorageLayer.L1_CACHE: False}
 
         l0_exists = await self._l0.exists(memory_id, memory_type)
-        l1_exists = await self._l1.get(memory_type, owner_id, name) is not None
+        l1_exists = await self._l1.get_memory(memory_type, owner_id, name) is not None
 
         return {
             StorageLayer.L0_FILE: l0_exists,

@@ -6,15 +6,17 @@
 
 ---
 
-## 四条设计规则与四层架构映射
+## 设计规则与架构映射
 
-| 规则 | 架构层 | 职责 | 位置 |
+| 规则 | 架构层 | 职责 | 位置 | 位置 |
 |------|--------|------|------|
 | **1** | Domain Layer | 统一抽象存储基础端口 `L[n][XXX]Port`，零依赖，技术无关 | `src/domain/ports/` |
-| **2** | Domain + Application Layer | 具体应用端口**继承或组合注入**基础端口，定义业务语义 | `src/domain/ports/` + `src/application/ports/` |
+| **2** | Domain + Application Layer | 具体应用端口**组合注入或继承**基础端口，定义业务语义 | `src/domain/ports/` + `src/application/ports/` |
 | **3** | Infrastructure Layer-1 | 基础端口的技术实现 + 连接管理，可替换 | `src/infrastructure/storage/{tech}/` |
-| **4** | Infrastructure Layer-2 | 应用端口的技术实现，**组合注入**Layer-1适配器 | `src/infrastructure/storage/{tech}/` |
+| **4** | Infrastructure Layer-2 | 应用端口的技术实现，**组合（优先）或继承（谨慎）**Layer-1适配器 | `src/infrastructure/storage/{tech}/` |
 
+⚠️ **若端口仅扩展领域语义且无应用级编排，则归 domain/ports；若引入了应用级上下文（如会话、用户动作），则归 application/ports**
+⚠️ **优先组合，在需要深度复用基础设施行为（如Session管理、软删除）时才审慎使用继承**
 ---
 
 ## 架构总览（六层存储 × 四层规则）
@@ -42,6 +44,7 @@
 │  继承L2: L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata])         │
 │          L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory])│
 │          L2GroupMemberRepositoryPort(Protocol，组合注入L2RdbPort)      │
+│          ...                                                          │
 │                                                                      │
 │  ──── application/ports/ 中的具体端口（应用层语义）────                │
 │  继承L0: MemoryFilePort(L0StoragePort)                                │
@@ -55,19 +58,19 @@
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 实现
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Rule 3: Infrastructure Layer-1 — 基础端口实现 + 连接管理              │
-│                                                                      │
+│  Rule 3: Infrastructure Layer-1 — 基础端口实现 + 连接管理             │
+│                                                                     │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ FileAdapter  │ │ RedisAdapter │ │ PostgreSQL   │                 │
-│  │ (L0StoragePort)│ │ (L1CachePort)│ │ Adapter(L2Rdb)│                 │
+│  │(L0StoragePort)││ (L1CachePort)│ │Adapter(L2Rdb)│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ QdrantAdapter│ │ MinIOAdapter │ │ Neo4jAdapter │                 │
-│  │ (L3VectorPort)│ │ (L4ObjectPort)│ │ (L5GraphPort)│                 │
+│  │(L3VectorPort)│ │(L4ObjectPort)│ │ (L5GraphPort)│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
-│  + ConnectionManagers（连接池、健康检查、生命周期）                     │
-│                                                                      │
-│  位置: src/infrastructure/storage/{tech}/                            │
+│  + ConnectionManagers（连接池、健康检查、生命周期）                    │
+│                                                                     │
+│  位置: src/infrastructure/storage/{tech}/                           │
 └─────────────────────────────────────────────────────────────────────┘
                               ↑ 实现（组合注入Rule 3的适配器）
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -76,17 +79,17 @@
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ MemoryFileStorage    │ │ RedisSessionCache     │                  │
 │  │ (MemoryFilePort)     │ │ (SessionCachePort)    │                  │
-│  │ ← 组合 FileAdapter   │ │ ← 组合 RedisAdapter  │                  │
+│  │← 组合/继承 FileAdapter│ │← 组合/继承 RedisAdapter│                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ PgMetadataRepo       │ │ QdrantMemoryVector-   │                  │
 │  │ (L2MetadataRepoPort) │ │ Storage(MemVecPort)   │                  │
-│  │ ← 继承 PostgreSQLAdapter│ │ ← 组合 QdrantAdapter │                  │
+│  │ ← 组合/继承 PostgreSQLAdapter│ │ ← 组合/继承 QdrantAdapter │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ MinIODocumentStorage │ │ Neo4jMemoryGraph-     │                  │
 │  │ (DocumentStoragePort)│ │ Storage(MemGraphPort) │                  │
-│  │ ← 组合 MinIOAdapter  │ │ ← 组合 Neo4jAdapter  │                  │
+│  │ ← 组合/继承 MinIOAdapter  │ │ ← 组合/继承 Neo4jAdapter  │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │                                                                      │
 │  位置: src/infrastructure/storage/{tech}/                            │
