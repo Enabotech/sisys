@@ -25,7 +25,7 @@ import redis
 
 from src.domain.ports.l0_storage import L0StoragePort
 from src.domain.ports.l1_cache import L1CachePort
-from src.infrastructure.storage.memory_index import MemoryIndex
+from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -94,7 +94,7 @@ def real_redis_sync(redis_test_prefix):
 def l0_storage(temp_memory_dir: Path) -> L0StoragePort:
     """Create L0 file system storage adapter."""
     from src.infrastructure.config.memory import MemoryConfig
-    from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
     config = MemoryConfig(memory_l0_path=str(temp_memory_dir))
     return FileMemoryAdapter(config)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 
 from src.infrastructure.config.memory import MemoryConfig
-from src.infrastructure.storage.memory_router import MemoryRouter
+from src.infrastructure.storage.fs.memory_router import MemoryRouter
 
 
 class TestMemoryRouterInit:

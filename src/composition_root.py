@@ -123,14 +123,14 @@ def bootstrap() -> None:
     from src.infrastructure.config.postgresql import PostgreSQLConfig
     from src.infrastructure.config.qdrant import QdrantConfig
     from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
-    from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+    from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
     from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 
     register_port(
         name="postgresql_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: DatabaseEngine(PostgreSQLConfig.from_env()),
+        impl=lambda resolver: PostgreSQLAdapter(PostgreSQLConfig.from_env()),
         module="src.infrastructure.storage.postgresql.engine",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",

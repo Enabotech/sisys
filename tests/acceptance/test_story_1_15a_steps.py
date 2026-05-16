@@ -37,7 +37,7 @@ from src.domain.services.memory_service import (
     MemoryUpdateRequest,
 )
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
@@ -89,13 +89,13 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> DatabaseEngine:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
     """Real database engine instance."""
-    return DatabaseEngine(pg_config)
+    return PostgreSQLAdapter(pg_config)
 
 
 @pytest.fixture
-def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_schema: str):
+def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, test_schema: str):
     """Ensure test schema exists before tests.
 
     Creates a unique schema for this test run to ensure isolation.
@@ -139,7 +139,7 @@ def ensure_schema(db_engine: DatabaseEngine, pg_config: PostgreSQLConfig, test_s
 
 
 @pytest.fixture
-def pg_session(db_engine: DatabaseEngine, ensure_schema: str, event_loop) -> Generator[AsyncSession, None, None]:
+def pg_session(db_engine: PostgreSQLAdapter, ensure_schema: str, event_loop) -> Generator[AsyncSession, None, None]:
     """PostgreSQL session with transactional rollback.
 
     After test completes, the transaction is rolled back for isolation.
@@ -374,7 +374,7 @@ def when_compression_ready_to_write(context: dict):
 @then("FileMemoryAdapter 应该写入文件系统")
 def then_file_memory_adapter_write(context: dict, tmp_path: Any, event_loop):
     from src.infrastructure.config.memory import MemoryConfig
-    from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
     config = MemoryConfig(memory_l0_path=str(tmp_path))
     adapter = FileMemoryAdapter(config)
@@ -393,7 +393,7 @@ def then_file_memory_adapter_write(context: dict, tmp_path: Any, event_loop):
 @then("MEMORY.md 索引应该更新")
 def then_memory_index_update(context: dict, tmp_path: Any):
     from src.infrastructure.config.memory import MemoryConfig
-    from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
     config = MemoryConfig(memory_l0_path=str(tmp_path))
     adapter = FileMemoryAdapter(config)

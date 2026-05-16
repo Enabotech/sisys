@@ -25,7 +25,7 @@ class TestAsyncioRunPatternElimination:
         # 读取源码检查
         import inspect
 
-        from src.infrastructure.storage.memory_index import MemoryIndex
+        from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
         source = inspect.getsource(MemoryIndex.update_entry)
         assert "asyncio.run(" not in source, "asyncio.run() found in update_entry"
@@ -37,7 +37,7 @@ class TestAsyncioRunPatternElimination:
         """验证 FileMemoryAdapter 方法中没有 asyncio.run()"""
         import inspect
 
-        from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+        from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
         source = inspect.getsource(FileMemoryAdapter.write)
         assert "asyncio.run(" not in source, "asyncio.run() found in write"
@@ -60,7 +60,7 @@ class TestToThreadEncapsulation:
     async def test_memory_index_uses_to_thread(self):
         """验证 MemoryIndex 使用 to_thread 封装"""
         from src.infrastructure.config.memory import MemoryConfig
-        from src.infrastructure.storage.memory_index import MemoryIndex
+        from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
         # 创建 mock config
         mock_config = MagicMock(spec=MemoryConfig)
@@ -77,7 +77,7 @@ class TestToThreadEncapsulation:
     @pytest.mark.asyncio
     async def test_file_memory_adapter_write_uses_aiofiles(self):
         """验证 FileMemoryAdapter.write 使用 aiofiles"""
-        from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+        from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
         # write 应该是异步的
         assert asyncio.iscoroutinefunction(FileMemoryAdapter.write)
@@ -86,7 +86,7 @@ class TestToThreadEncapsulation:
     async def test_to_thread_preserves_lock_semantics(self):
         """验证 to_thread 保留 fcntl.flock 锁语义"""
         from src.infrastructure.config.memory import MemoryConfig
-        from src.infrastructure.storage.memory_index import MemoryIndex
+        from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
         mock_config = MagicMock(spec=MemoryConfig)
         mock_config.get_index_path.return_value = "/tmp/test_lock_semantics/MEMORY.md"
@@ -123,7 +123,7 @@ class TestEventLoopSafety:
     async def test_async_methods_can_be_called_from_async_context(self):
         """验证异步方法可以从 async 上下文中调用"""
         from src.infrastructure.config.memory import MemoryConfig
-        from src.infrastructure.storage.memory_index import MemoryIndex
+        from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
         mock_config = MagicMock(spec=MemoryConfig)
         mock_config.get_index_path.return_value = "/tmp/test_event_loop/MEMORY.md"
@@ -138,7 +138,7 @@ class TestEventLoopSafety:
     async def test_no_blocking_calls_in_event_loop(self):
         """验证事件循环中没有阻塞调用"""
         from src.infrastructure.config.memory import MemoryConfig
-        from src.infrastructure.storage.memory_index import MemoryIndex
+        from src.infrastructure.storage.fs.memory_index import MemoryIndex
 
         mock_config = MagicMock(spec=MemoryConfig)
         mock_config.get_index_path.return_value = "/tmp/test_no_blocking/MEMORY.md"

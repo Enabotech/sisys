@@ -10,8 +10,8 @@ import uuid
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
-from src.infrastructure.storage.memory_index import MemoryIndex
+from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
+from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from tests.environments import get_test_env
 
 scenarios("test_story_1_15b.feature")
@@ -91,7 +91,7 @@ def memory_index(tmp_path) -> MemoryIndex:
 def file_adapter(tmp_path) -> FileMemoryAdapter:
     """FileMemoryAdapter fixture for acceptance tests."""
     from src.infrastructure.config.memory import MemoryConfig
-    from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
     config = MemoryConfig(memory_l0_path=str(tmp_path))
     return FileMemoryAdapter(config)

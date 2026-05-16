@@ -25,7 +25,7 @@ class TestPostgreSQLConnection:
     def test_database_engine_creation(self):
         """DatabaseEngine 应可实例化。"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
-        from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+        from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
         config = PostgreSQLConfig(
             host="localhost",
@@ -35,7 +35,7 @@ class TestPostgreSQLConnection:
             password="test_pass123",  # pragma: allowlist secret
         )
 
-        engine = DatabaseEngine(config)
+        engine = PostgreSQLAdapter(config)
         assert engine is not None
         assert engine._async_engine is None  # 懒初始化
         assert engine._sync_engine is None
@@ -43,10 +43,10 @@ class TestPostgreSQLConnection:
     def test_async_engine_lazy_init(self):
         """异步引擎应在首次调用时创建。"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
-        from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+        from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
         config = PostgreSQLConfig()
-        engine = DatabaseEngine(config)
+        engine = PostgreSQLAdapter(config)
 
         # 首次调用前应 None
         assert engine._async_engine is None
@@ -59,10 +59,10 @@ class TestPostgreSQLConnection:
     def test_sync_engine_lazy_init(self):
         """同步引擎应在首次调用时创建。"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
-        from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+        from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
         config = PostgreSQLConfig()
-        engine = DatabaseEngine(config)
+        engine = PostgreSQLAdapter(config)
 
         assert engine._sync_engine is None
 

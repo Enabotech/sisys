@@ -25,7 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.engine import DatabaseEngine
+from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
 
 # Import reset_test_environment for test isolation (AC-6)
 
@@ -51,7 +51,7 @@ async def pg_engine():
         password=os.getenv("POSTGRES_PASSWORD", "postgres"),
     )
 
-    engine = DatabaseEngine(config)
+    engine = PostgreSQLAdapter(config)
 
     # Verify connection
     try:

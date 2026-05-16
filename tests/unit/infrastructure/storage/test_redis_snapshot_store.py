@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
-from src.infrastructure.storage.redis_snapshot_store import RedisSnapshotStore
+from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 
 
 class TestRedisSnapshotStore:

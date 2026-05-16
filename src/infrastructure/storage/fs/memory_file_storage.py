@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from src.application.ports.memory_file_port import MemoryFilePort
 
 if TYPE_CHECKING:
-    from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+    from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
 
 class MemoryFileStorage(MemoryFilePort):

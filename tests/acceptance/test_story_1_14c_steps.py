@@ -36,7 +36,7 @@ from src.domain.events.auto_route_events import AutoRouted
 from src.domain.services.auto_execute_service import AutoExecuteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import DockerSandboxAdapter
-from src.infrastructure.storage.redis_snapshot_store import RedisSnapshotStore
+from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 from tests.environments import get_test_env
 
 scenarios("test_story_1_14c.feature")
@@ -937,7 +937,7 @@ def then_domain_defines_interfaces_infrastructure_implements(context: dict) -> N
     from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import (
         DockerSandboxAdapter,
     )
-    from src.infrastructure.storage.redis_snapshot_store import RedisSnapshotStore
+    from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 
     # Protocols should be in domain
     assert SandboxExecutorProtocol is not None

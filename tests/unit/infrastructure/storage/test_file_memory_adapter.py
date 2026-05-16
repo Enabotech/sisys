@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from src.infrastructure.config.memory import MemoryConfig
-from src.infrastructure.storage.file_memory_adapter import FileMemoryAdapter
+from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 
 
 class TestFileMemoryAdapterInit:

@@ -63,7 +63,7 @@
 **验证标准/Validation Criteria:**
 - [ ] CheckpointSnapshot 数据模型（`src/domain/entities/checkpoint_snapshot.py`）
 - [ ] 状态快照序列化格式（JSON/MessagePack）
-- [ ] Redis Hash 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
+- [ ] Redis Hash 存储实现（`src/infrastructure/storage/redis/redis_snapshot_store.py`）
 - [ ] 主从复制支持（Redis Sentinel/Cluster 自动切换）
 - [ ] TTL 配置化（`SNAPSHOT_TTL_SECONDS` 环境变量）
 - [ ] 快照延迟 P95<50ms（基准测试）
@@ -174,7 +174,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [ ] SnapshotRepository 仓储接口定义在 domain 层（`src/domain/repositories/snapshot_repository.py`）
   - 接口方法: `save(snapshot)`, `load(session_id)`, `delete(session_id)`
   - 遵循六边形架构：领域层定义接口，基础设施层实现
-- [ ] RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
+- [ ] RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis/redis_snapshot_store.py`）
   - 实现 SnapshotRepository 接口
   - Redis Hash 存储
   - TTL 管理
@@ -298,7 +298,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/application/ports/sandbox_port.py`）
 - [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
 - [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
-- [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis_snapshot_store.py`）
+- [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis/redis_snapshot_store.py`）
 - [x] Subtask 0.8: 定义 AutoExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
 - [x] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14c.feature`（Dev agent 创建）
 - [x] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
@@ -370,7 +370,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/storage/test_redis_snapshot_store.py`（验证 Redis 存储） |
-| 🟢 绿 | 实现 `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore |
+| 🟢 绿 | 实现 `src/infrastructure/storage/redis/redis_snapshot_store.py` - RedisSnapshotStore |
 | 🔄 重构 | 添加主从复制支持和 TTL 管理 |
 
 - [x] Subtask 2.4: 🔴 红 — 编写 RedisSnapshotStore 失败测试
@@ -557,7 +557,7 @@ sisys/
 │   │   │   └── sandbox/
 │   │   │       ├── docker_sandbox_adapter.py  # DockerSandboxAdapter（实现）
 │   │   │       └── session_namespace_manager.py # 会话命名空间管理
-│   │   └── storage/
+│   │   └── storage/redis
 │   │       └── redis_snapshot_store.py     # RedisSnapshotStore
 │   └── interfaces/
 │       ├── cli/
@@ -685,7 +685,7 @@ sisys/
 - `src/application/ports/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
 - `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
 - `src/infrastructure/external_services/sandbox/session_namespace_manager.py` - SessionNamespaceManager
-- `src/infrastructure/storage/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
+- `src/infrastructure/storage/redis/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
 - `src/application/event_handlers/auto_execute_completed_listener.py` - AutoExecuted → 下游领域事件监听器
 - `tests/unit/domain/services/test_auto_execute_service.py` - AutoExecuteService 单元测试
 - `tests/unit/domain/entities/test_checkpoint_snapshot.py` - CheckpointSnapshot 单元测试
