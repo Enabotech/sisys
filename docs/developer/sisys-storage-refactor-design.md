@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v5.1 (Round 5最终综合验证)
-**生成时间:** 2026-05-14
-**审查状态:** Round 5 完成 — 四条规则端到端验证全部通过，文档完整性终审通过
+**文档版本:** v5.2 (L1缓存层四条规则重构完成)
+**生成时间:** 2026-05-16
+**审查状态:** L1缓存层四条规则重构已落地 — L1CachePort→通用KV, MemoryCachePort/SessionCachePort→应用端口, RedisAdapter→Rule3基础实现, RedisMemoryCache/RedisSessionCache→Rule4组合注入
 
 ---
 
@@ -26,7 +26,7 @@
 │  Rule 1: Domain Layer — 存储基础端口（技术无关，零依赖）               │
 │                                                                      │
 │  L0StoragePort     L1CachePort       L2RdbPort[T]                     │
-│  (5 async)         (4 async)         (4 async泛型CRUD)                │
+│  (5 async)         (6 async)         (4 async泛型CRUD)                │
 │  L3VectorPort      L4ObjectPort      L5GraphPort                      │
 │  (9 async)         (5 async+1 sync)  (9 async)                        │
 │  UnifiedStoragePort（组合注入L0-L5）                                  │
@@ -48,7 +48,7 @@
 │                                                                      │
 │  ──── application/ports/ 中的具体端口（应用层语义）────                │
 │  继承L0: MemoryFilePort(L0StoragePort)                                │
-│  继承L1: SessionCachePort(L1CachePort)                               │
+│  继承L1: MemoryCachePort(L1CachePort), SessionCachePort(L1CachePort) │
 │  继承L3: MemoryVectorPort(L3VectorPort)                              │
 │  继承L4: DocumentStoragePort(L4ObjectPort)                           │
 │  继承L5: MemoryGraphPort(L5GraphPort)                                │
@@ -77,14 +77,14 @@
 │  Rule 4: Infrastructure Layer-2 — 应用端口实现                        │
 │                                                                      │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
-│  │ MemoryFileStorage    │ │ RedisSessionCache     │                  │
-│  │ (MemoryFilePort)     │ │ (SessionCachePort)    │                  │
-│  │← 组合/继承 FileAdapter│ │← 组合/继承 RedisAdapter│                  │
+│  │ MemoryFileStorage    │ │ RedisMemoryCache      │                  │
+│  │ (MemoryFilePort)     │ │ (MemoryCachePort)     │                  │
+│  │← 组合/继承 FileAdapter│ │← 组合 RedisAdapter     │                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
-│  │ PgMetadataRepo       │ │ QdrantMemoryVector-   │                  │
-│  │ (L2MetadataRepoPort) │ │ Storage(MemVecPort)   │                  │
-│  │ ← 组合/继承 PostgreSQLAdapter│ │ ← 组合/继承 QdrantAdapter │                  │
+│  │ RedisSessionCache    │ │ PgMetadataRepo        │                  │
+│  │ (SessionCachePort)   │ │ (L2MetadataRepoPort)  │                  │
+│  │← 组合 RedisAdapter    │ │ ← 组合/继承 PostgreSQLAdapter│                  │
 │  └──────────────────────┘ └──────────────────────┘                  │
 │  ┌──────────────────────┐ ┌──────────────────────┐                  │
 │  │ MinIODocumentStorage │ │ Neo4jMemoryGraph-     │                  │
@@ -354,113 +354,157 @@ class MemoryFileStorage(MemoryFilePort):
 
 ## L1 缓存存储
 
-### Rule 1: Domain Layer — L1CachePort（已有）
+### Rule 1: Domain Layer — L1CachePort（通用 KV 缓存）
 
 ```python
-# src/domain/ports/l1_cache.py — 已有，无需修改
+# src/domain/ports/l1_cache.py — 已重构为通用 KV
 
+@runtime_checkable
 class L1CachePort(Protocol):
-    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None: ...
-    async def set(self, memory_type: str, owner_id: str, name: str,
-                  content: str, ttl: int | None = None) -> bool: ...
-    async def delete(self, memory_type: str, owner_id: str, name: str) -> bool: ...
-    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> int: ...
+    """Generic KV cache port — 技术无关，零依赖。"""
+    async def get(self, key: str) -> str | None: ...
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool: ...
+    async def delete(self, key: str) -> bool: ...
+    async def exists(self, key: str) -> bool: ...
+    async def delete_pattern(self, pattern: str) -> int: ...
+    async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool: ...
 ```
 
-### Rule 2: Application Layer — SessionCachePort
+### Rule 2: Application Layer — MemoryCachePort + SessionCachePort
 
 ```python
-# src/application/ports/session_cache_port.py — 新增
+# src/application/ports/memory_cache_port.py — 新增
 
-from typing import Protocol
-from src.domain.ports.l1_cache import L1CachePort
+@runtime_checkable
+class MemoryCachePort(L1CachePort, Protocol):
+    """记忆域缓存端口 — 继承L1CachePort，添加记忆语义方法。"""
 
+    async def get_memory(self, memory_type: str, owner_id: str, name: str) -> str | None: ...
+    async def set_memory(self, memory_type: str, owner_id: str, name: str,
+                         content: str, ttl: int | None = None) -> bool: ...
+    async def delete_memory(self, memory_type: str, owner_id: str, name: str) -> bool: ...
+    async def invalidate_owner(self, memory_type: str, owner_id: str) -> int: ...
+
+
+# src/application/ports/session_cache_port.py — 已有
+
+@runtime_checkable
 class SessionCachePort(L1CachePort, Protocol):
-    """会话缓存端口 — 继承L1CachePort，添加会话管理语义。
-
-    继承所有L1方法，额外提供：
-    - 会话状态save/load语义
-    - 会话TTL管理
-    """
+    """会话缓存端口 — 继承L1CachePort，添加会话管理语义。"""
 
     async def save_session(self, session_id: str, agent_id: str,
-                           state: dict, ttl: int = 86400) -> None:
-        """保存会话状态。"""
-        ...
-
-    async def load_session(self, session_id: str) -> dict | None:
-        """加载会话状态。"""
-        ...
-
-    async def delete_session(self, session_id: str) -> None:
-        """删除会话。"""
-        ...
-
-    async def session_exists(self, session_id: str) -> bool:
-        """检查会话是否存在。"""
-        ...
+                           state: dict, ttl: int = 86400) -> None: ...
+    async def load_session(self, session_id: str) -> dict | None: ...
+    async def delete_session(self, session_id: str) -> None: ...
+    async def session_exists(self, session_id: str) -> bool: ...
 ```
 
-**注意**: `SemanticCache` 的 `get(query_embedding, threshold)` 签名与 `L1CachePort.get(memory_type, owner_id, name)` 不兼容，**不能继承**。SemanticCache 作为独立应用端口存在，其内部实现可**组合注入** `L1CachePort` 复用Redis连接。
+**注意**: `SemanticCache` 的 `get(query_embedding, threshold)` 签名与 `L1CachePort.get(key)` 不兼容，**不能继承**。SemanticCache 作为独立应用端口存在，其内部实现可**组合注入** `RedisAdapter` 复用Redis连接。
 
-### Rule 3: Infrastructure Layer-1 — RedisCacheAdapter（已有 RedisMemoryCache）
-
-```
-src/infrastructure/storage/redis/redis_memory_cache.py
-  RedisMemoryCache(L1CachePort) — redis.asyncio, 注入aioredis.Redis
-  连接管理: 外部注入Redis客户端（ConnectionPool由调用方管理）
-```
-
-### Rule 4: Infrastructure Layer-2 — RedisSessionCache
+### Rule 3: Infrastructure Layer-1 — RedisAdapter（新建）+ RedisManager
 
 ```python
-# src/infrastructure/storage/redis/redis_session_cache.py — 新增
+# src/infrastructure/storage/redis/redis_adapter.py — 新增
 
-from src.application.ports.session_cache_port import SessionCachePort
-from src.domain.ports.l1_cache import L1CachePort
+class RedisAdapter(L1CachePort):
+    """通用 Redis KV 适配器 — 实现 L1CachePort 全部方法。"""
+
+    def __init__(self, redis_client: aioredis.Redis) -> None:
+        self._redis = redis_client
+
+    async def get(self, key: str) -> str | None: ...
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool: ...
+    async def delete(self, key: str) -> bool: ...
+    async def exists(self, key: str) -> bool: ...
+    async def delete_pattern(self, pattern: str) -> int: ...  # SCAN (not KEYS)
+    async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool: ...
+
+    @property
+    def raw_client(self) -> aioredis.Redis:
+        """暴露底层 Redis 客户端，供 Rule 4 组件访问高级数据结构操作。"""
+```
+
+```
+src/infrastructure/storage/redis/redis_manager.py
+  RedisManager(ConnectionManager) — 延迟初始化 aioredis.ConnectionPool + 健康检查
+  连接管理: 统一连接池、get_client()、health_check()、close()
+```
+
+### Rule 4: Infrastructure Layer-2 — RedisMemoryCache + RedisSessionCache
+
+```python
+# src/infrastructure/storage/redis/redis_memory_cache.py — 重构
+
+class RedisMemoryCache(MemoryCachePort):
+    """记忆域 Redis 缓存 — 组合注入 RedisAdapter。"""
+
+    def __init__(self, adapter: RedisAdapter) -> None:
+        self._adapter = adapter  # 组合注入 Rule 3 适配器
+
+    # === L1CachePort 通用方法 — 委托 ===
+    async def get(self, key): return await self._adapter.get(key)
+    async def set(self, key, value, ttl=None): return await self._adapter.set(key, value, ttl)
+    async def delete(self, key): return await self._adapter.delete(key)
+    async def exists(self, key): return await self._adapter.exists(key)
+    async def delete_pattern(self, pattern): return await self._adapter.delete_pattern(pattern)
+    async def set_with_ttl(self, key, value, ttl): return await self._adapter.set_with_ttl(key, value, ttl)
+
+    # === MemoryCachePort 记忆方法 — 构建 key 后委托 ===
+    async def get_memory(self, memory_type, owner_id, name):
+        return await self._adapter.get(self._build_key(memory_type, owner_id, name))
+    async def set_memory(self, memory_type, owner_id, name, content, ttl=None):
+        effective_ttl = ttl if ttl is not None else self._generate_ttl()  # 24h-30h随机
+        return await self._adapter.set_with_ttl(self._build_key(...), content, effective_ttl)
+    async def delete_memory(self, memory_type, owner_id, name):
+        return await self._adapter.delete(self._build_key(memory_type, owner_id, name))
+    async def invalidate_owner(self, memory_type, owner_id):
+        return await self._adapter.delete_pattern(self._build_pattern(memory_type, owner_id))
+
+
+# src/infrastructure/storage/redis/redis_session_cache.py — 重构
 
 class RedisSessionCache(SessionCachePort):
-    """Redis会话缓存实现 — 组合注入RedisCacheAdapter。"""
+    """会话 Redis 缓存 — 组合注入 RedisAdapter。"""
 
-    def __init__(self, cache_adapter: L1CachePort):
-        self._cache = cache_adapter  # 组合注入Rule 3适配器
+    def __init__(self, adapter: RedisAdapter) -> None:
+        self._adapter = adapter  # 组合注入 Rule 3 适配器
 
-    # === 继承的L1CachePort方法 — 委托 ===
+    # === L1CachePort 通用方法 — 委托 ===
+    async def get(self, key): return await self._adapter.get(key)
+    async def set(self, key, value, ttl=None): return await self._adapter.set(key, value, ttl)
+    async def delete(self, key): return await self._adapter.delete(key)
+    async def exists(self, key): return await self._adapter.exists(key)
+    async def delete_pattern(self, pattern): return await self._adapter.delete_pattern(pattern)
+    async def set_with_ttl(self, key, value, ttl): return await self._adapter.set_with_ttl(key, value, ttl)
 
-    async def get(self, memory_type: str, owner_id: str, name: str) -> str | None:
-        return await self._cache.get(memory_type, owner_id, name)
-
-    async def set(self, memory_type: str, owner_id: str, name: str,
-                  content: str, ttl: int | None = None) -> bool:
-        return await self._cache.set(memory_type, owner_id, name, content, ttl)
-
-    async def delete(self, memory_type: str, owner_id: str, name: str) -> bool:
-        return await self._cache.delete(memory_type, owner_id, name)
-
-    async def invalidate_pattern(self, memory_type: str, owner_id: str) -> int:
-        return await self._cache.invalidate_pattern(memory_type, owner_id)
-
-    # === SessionCachePort扩展方法 — 会话语义 ===
-
-    async def save_session(self, session_id, agent_id, state, ttl=86400) -> None:
-        import json
-        data = json.dumps({"agent_id": agent_id, "state": state})
-        await self._cache.set("session", session_id, session_id, data, ttl)
-
-    async def load_session(self, session_id) -> dict | None:
-        import json
-        data = await self._cache.get("session", session_id, session_id)
-        if data is None:
-            return None
-        return json.loads(data)
-
-    async def delete_session(self, session_id) -> None:
-        await self._cache.delete("session", session_id, session_id)
-
-    async def session_exists(self, session_id) -> bool:
-        data = await self._cache.get("session", session_id, session_id)
-        return data is not None
+    # === SessionCachePort 会话方法 — 用 raw_client 做 HSET/HGET ===
+    async def save_session(self, session_id, agent_id, state, ttl=86400):
+        await self._adapter.raw_client.hset(key, "data", json_dumps({...}))
+        await self._adapter.raw_client.expire(key, ttl)
+    async def load_session(self, session_id): ...  # raw_client.hget
+    async def delete_session(self, session_id): ...  # adapter.delete
+    async def session_exists(self, session_id): ...  # adapter.exists
 ```
+
+**L1分层关系**:
+```
+Rule 1: L1CachePort          → 通用 KV (get/set/delete/exists/delete_pattern/set_with_ttl)
+Rule 2: MemoryCachePort      → 继承 L1CachePort + get_memory/set_memory/delete_memory/invalidate_owner
+        SessionCachePort      → 继承 L1CachePort + save_session/load_session/delete_session/session_exists
+Rule 3: RedisAdapter          → 实现 L1CachePort，raw_client 暴露 Redis 专属操作
+Rule 4: RedisMemoryCache      → 组合 RedisAdapter，实现 MemoryCachePort
+        RedisSessionCache      → 组合 RedisAdapter，实现 SessionCachePort
+```
+
+**其他 Redis 组件暂不修改**:
+
+| 组件 | 原因 |
+|------|------|
+| `RedisSemanticCache` | FT.SEARCH 是 Redis 专属操作，不在 L1CachePort 抽象内 |
+| `RedisPublicBlackboard` | ZADD/ZRANGE 是 Redis 专属操作 |
+| `RedisSessionStorage` | 独立 SessionStorage 端口，非 L1CachePort 体系 |
+| `RedisSnapshotStore` | 独立 SnapshotRepositoryProtocol 端口 |
+| `RedisCleanup` | 工具类，无端口 |
 
 ---
 
@@ -1071,7 +1115,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     def __init__(
         self,
         memory_file: MemoryFilePort,        # Rule 2应用端口
-        session_cache: SessionCachePort,     # Rule 2应用端口
+        memory_cache: MemoryCachePort,      # Rule 2应用端口（记忆域）
+        session_cache: SessionCachePort,    # Rule 2应用端口（会话域）
         memory_metadata: L2MetadataRepositoryPort,  # Rule 2应用端口
         memory_history: L2ChangeHistoryRepositoryPort,  # Rule 2应用端口
         # 以下可选
@@ -1082,7 +1127,8 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         event_publisher=None,
     ):
         self._file = memory_file
-        self._cache = session_cache
+        self._cache = memory_cache
+        self._session = session_cache
         self._meta = memory_metadata
         self._hist = memory_history
         self._group = memory_group
@@ -1094,7 +1140,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
 **关键变化**:
 - Gateway依赖**Rule 2应用端口**，而非直接依赖Rule 1基础端口
-- 当前Gateway依赖8个Rule 1端口(l0_storage, l1_cache, l2_metadata等)，Phase 4需逐步过渡
+- L1缓存层已重构：Gateway 使用 `MemoryCachePort` 而非 `L1CachePort`
 - L2的Metadata/ChangeHistory端口保留在domain层（按四条规则，它们继承L2RdbPort[T]）
 - L2GroupMember端口保留在domain层（独立Protocol，实现层可组合注入L2RdbPort）
 
@@ -1115,10 +1161,11 @@ def bootstrap() -> None:
         module="src.infrastructure.storage.file_memory_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
-    register_port(name="l1_cache", version="v1.0.0", interface=L1CachePort,
-        impl="src.infrastructure.storage.redis.redis_memory_cache.RedisMemoryCache",
-        module="src.infrastructure.storage.redis.redis_memory_cache",
-        lifetime=Lifetime.SCOPED, owner="storage-team")
+    register_port(name="redis_adapter", version="v1.0.0", interface=L1CachePort,
+        impl="src.infrastructure.storage.redis.redis_adapter.RedisAdapter",
+        module="src.infrastructure.storage.redis.redis_adapter",
+        lifetime=Lifetime.SINGLETON, owner="storage-team")
+    # ← Rule 3: 通用 Redis KV 适配器，Resolver自动注入 redis_client 参数
 
     # 注意: PostgreSQLAdapter[TEntity,TModel]是泛型基座，无法独立实例化
     # L2端口的具体实现由三个子仓储直接注册（见下方Rule 4区域）
@@ -1147,11 +1194,17 @@ def bootstrap() -> None:
         lifetime=Lifetime.SCOPED, owner="storage-team")
     # ← Resolver自动注入: file_adapter参数→解析"l0_storage"
 
+    register_port(name="memory_cache", version="v1.0.0", interface=MemoryCachePort,
+        impl=lambda resolver: RedisMemoryCache(adapter=resolver.resolve("redis_adapter")),
+        module="src.infrastructure.storage.redis.redis_memory_cache",
+        lifetime=Lifetime.SCOPED, owner="storage-team")
+    # ← Rule 4: 显式工厂注入 adapter 参数→解析"redis_adapter"
+
     register_port(name="session_cache", version="v1.0.0", interface=SessionCachePort,
-        impl="src.infrastructure.storage.redis.redis_session_cache.RedisSessionCache",
+        impl=lambda resolver: RedisSessionCache(adapter=resolver.resolve("redis_adapter")),
         module="src.infrastructure.storage.redis.redis_session_cache",
         lifetime=Lifetime.SCOPED, owner="storage-team")
-    # ← Resolver自动注入: cache_adapter参数→解析"l1_cache"
+    # ← Rule 4: 显式工厂注入 adapter 参数→解析"redis_adapter"
 
     register_port(name="memory_metadata", version="v1.0.0", interface=L2MetadataRepositoryPort,
         impl="src.infrastructure.storage.postgresql.repository.memory_metadata_repository.PostgreSQLMemoryMetadataRepository",
@@ -1220,14 +1273,16 @@ def bootstrap() -> None:
 ### Phase 2: Rule 2 — 应用端口定义
 
 - [x] 2.1 新增 `src/application/ports/memory_file_port.py` — MemoryFilePort(L0StoragePort)
-- [x] 2.2 新增 `src/application/ports/session_cache_port.py` — SessionCachePort(L1CachePort)
-  - 注意: RedisSessionStorage已存在(save/load/delete/exists)，SessionCachePort为新应用层抽象
-- [x] 2.3 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
-- [x] 2.4 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
-- [x] 2.5 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
-- [x] 2.6 L2端口保持在domain层，继承L2RdbPort[T]（Phase 1已完成）
-- [x] 2.7 补全 `src/application/ports/__init__.py` 导出全部应用端口
-- [x] 2.8 验证: 所有应用端口继承基础端口，方法签名兼容，Protocol无@abstractmethod混用
+- [x] 2.2 新增 `src/application/ports/memory_cache_port.py` — MemoryCachePort(L1CachePort)
+  - 记忆域缓存端口，继承通用 KV 接口 + 记忆语义方法
+- [x] 2.3 新增 `src/application/ports/session_cache_port.py` — SessionCachePort(L1CachePort)
+  - 会话域缓存端口，继承通用 KV 接口 + 会话语义方法
+- [x] 2.4 新增 `src/application/ports/memory_vector_port.py` — MemoryVectorPort(L3VectorPort)
+- [x] 2.5 新增 `src/application/ports/document_storage_port.py` — DocumentStoragePort(L4ObjectPort)
+- [x] 2.6 新增 `src/application/ports/memory_graph_port.py` — MemoryGraphPort(L5GraphPort)
+- [x] 2.7 L2端口保持在domain层，继承L2RdbPort[T]（Phase 1已完成）
+- [x] 2.8 补全 `src/application/ports/__init__.py` 导出全部应用端口
+- [x] 2.9 验证: 所有应用端口继承基础端口，方法签名兼容，Protocol无@abstractmethod混用
 
 ### Phase 3: Rule 3 — 基础端口实现完善
 
@@ -1239,27 +1294,40 @@ def bootstrap() -> None:
 - [x] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
 - [x] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
 - [x] 3.6 创建统一 `ConnectionManager` Protocol（@runtime_checkable）+ `RedisConnectionManager` 集中管理连接池；4个Redis组件（session_storage/semantic_cache/public_blackboard/cleanup）改为注入aioredis.Redis；composition_root注册redis_connection_manager+redis_client工厂
-- [x] 3.7 注册所有 Rule 3 基础端口到 Composition Root：
-  - [x] 3.7.1 新增 l3_vector 端口注册
-  - [x] 3.7.2 新增 l4_object 端口注册
-  - [x] 3.7.3 新增 l5_graph 端口注册
-- [x] 3.8 验证: 所有基础端口有实现，缺失方法补全，签名匹配
+- [x] 3.7 新增 `src/infrastructure/storage/redis/redis_adapter.py` — RedisAdapter(L1CachePort)
+  - 通用 Redis KV 适配器，实现 L1CachePort 全部 6 个方法
+  - 提供 `raw_client` 属性供 Rule 4 组件访问 Redis 专属操作（HSET/ZADD/FT.SEARCH）
+  - Composition Root 注册为 SINGLETON，注入 redis_client
+- [x] 3.8 注册所有 Rule 3 基础端口到 Composition Root：
+  - [x] 3.8.1 新增 redis_adapter 端口注册（L1CachePort 接口）
+  - [x] 3.8.2 新增 l3_vector 端口注册
+  - [x] 3.8.3 新增 l4_object 端口注册
+  - [x] 3.8.4 新增 l5_graph 端口注册
+- [x] 3.9 验证: 所有基础端口有实现，缺失方法补全，签名匹配
 
 ### Phase 4: Rule 4 — 应用端口实现
 
 - [ ] 4.1 新增 `src/infrastructure/storage/memory_file_storage.py` — MemoryFileStorage(MemoryFilePort)
-- [ ] 4.2 新增 `src/infrastructure/storage/redis/redis_session_cache.py` — RedisSessionCache(SessionCachePort)
-  - 注意: 与现有RedisSessionStorage区分，SessionCachePort继承L1CachePort语义
-- [ ] 4.3 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
-- [ ] 4.4 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
-- [ ] 4.5 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
-- [ ] 4.6 重构三个L2仓储继承PostgreSQLAdapter[TEntity, TModel]：
+- [x] 4.2 重构 `src/infrastructure/storage/redis/redis_memory_cache.py` — RedisMemoryCache(MemoryCachePort)
+  - 从直接实现 L1CachePort 改为组合注入 RedisAdapter
+  - L1CachePort 通用方法委托 adapter，MemoryCachePort 方法构建 key 后委托 adapter
+- [x] 4.3 重构 `src/infrastructure/storage/redis/redis_session_cache.py` — RedisSessionCache(SessionCachePort)
+  - 从注入 aioredis.Redis + RedisMemoryCache 改为组合注入 RedisAdapter
+  - L1CachePort 通用方法委托 adapter，SessionCachePort 方法用 adapter.raw_client 做 HSET/HGET
+- [ ] 4.4 新增 `src/infrastructure/storage/qdrant/memory_vector_storage.py` — QdrantMemoryVectorStorage(MemoryVectorPort)
+- [ ] 4.5 新增 `src/infrastructure/storage/minio/document_storage.py` — MinIODocumentStorage(DocumentStoragePort)
+- [ ] 4.6 新增 `src/infrastructure/storage/neo4j/memory_graph_storage.py` — Neo4jMemoryGraphStorage(MemoryGraphPort)
+- [ ] 4.7 重构三个L2仓储继承PostgreSQLAdapter[TEntity, TModel]：
   - `PostgreSQLMemoryMetadataRepository(PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel])` — 覆写_do_save(UPSERT+乐观锁)、pk_column="memory_id"、soft_delete_column="deleted_at"
   - `PostgreSQLMemoryChangeHistoryRepository(PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel])` — 覆写_do_save(append-only)、delete(raise NotImplementedError)
   - `PostgreSQLMemoryGroupMemberRepository` — 组合注入共享Session（复合PK，不继承PostgreSQLAdapter）
-- [ ] 4.7 注册所有 Rule 4 应用端口到 Composition Root（含L2三个仓储）
-- [ ] 4.8 调整 `UnifiedStorageGateway` 依赖应用端口（逐步过渡）
-- [ ] 4.9 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PostgreSQLAdapter
+- [ ] 4.8 注册所有 Rule 4 应用端口到 Composition Root（含L2三个仓储）
+  - [x] memory_cache 注册（显式工厂 lambda 注入 redis_adapter）
+  - [x] session_cache 注册（显式工厂 lambda 注入 redis_adapter）
+- [x] 4.9 调整 `UnifiedStorageGateway` 依赖应用端口
+  - l1_cache: L1CachePort → memory_cache: MemoryCachePort
+  - 方法调用 get/set/delete → get_memory/set_memory/delete_memory
+- [ ] 4.10 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PostgreSQLAdapter
 
 ### Phase 5: 清理与测试
 
@@ -1284,16 +1352,19 @@ def bootstrap() -> None:
 | `src/domain/ports/l2_rdb.py` | 重构 | Phase 1 | Rule 1 | BaseRepository→L2RdbPort[T] sync→async |
 | `src/domain/ports/memory_repository.py` | 重构 | Phase 1 | Rule 1 | 三端口继承L2RdbPort[T] |
 | `src/domain/ports/l{0,1,3-5}_*.py` | 修改 | Phase 1 | Rule 1 | 添加@runtime_checkable |
+| `src/domain/ports/l1_cache.py` | 重构 | Phase 1 | Rule 1 | 记忆专属→通用KV（6方法） |
 | `src/domain/ports/storage.py` | 废弃 | Phase 1 | Rule 1 | ObjectStorageRepository deprecated |
 | `src/domain/ports/__init__.py` | 补全导出 | Phase 1 | Rule 1 | L0/Base/IndexManagerPort导出 |
 | `src/application/ports/__init__.py` | **新增** | Phase 1 | Rule 2 | 创建缺失的package文件 |
 | `src/domain/ports/resolver.py` | 验证 | Phase 1 | Rule 3-4 | 验证class→instance链路正确（非缺陷） |
 | `src/application/ports/memory_file_port.py` | **新增** | Phase 2 | Rule 2 | |
-| `src/application/ports/session_cache_port.py` | **新增** | Phase 2 | Rule 2 | |
+| `src/application/ports/memory_cache_port.py` | **新增** | Phase 2 | Rule 2 | 记忆域缓存端口 |
+| `src/application/ports/session_cache_port.py` | **新增** | Phase 2 | Rule 2 | 会话域缓存端口 |
 | `src/application/ports/memory_vector_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/document_storage_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/memory_graph_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/infrastructure/storage/qdrant/qdrant_adapter.py` | 修改 | Phase 3 | Rule 3 | 补全4 Collection方法 |
+| `src/infrastructure/storage/redis/redis_adapter.py` | **新增** | Phase 3 | Rule 3 | 通用Redis KV适配器(Rule 3) |
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
@@ -1305,7 +1376,8 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save(append-only)/delete |
 | `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |
 | `src/infrastructure/storage/memory_file_storage.py` | **新增** | Phase 4 | Rule 4 | |
-| `src/infrastructure/storage/redis/redis_session_cache.py` | **新增** | Phase 4 | Rule 4 | 与RedisSessionStorage区分 |
+| `src/infrastructure/storage/redis/redis_memory_cache.py` | 重构 | Phase 4 | Rule 4 | 组合注入RedisAdapter，实现MemoryCachePort |
+| `src/infrastructure/storage/redis/redis_session_cache.py` | 重构 | Phase 4 | Rule 4 | 组合注入RedisAdapter，实现SessionCachePort |
 | `src/infrastructure/storage/qdrant/memory_vector_storage.py` | **新增** | Phase 4 | Rule 4 | |
 | `src/infrastructure/storage/minio/document_storage.py` | **新增** | Phase 4 | Rule 4 | |
 | `src/infrastructure/storage/neo4j/memory_graph_storage.py` | **新增** | Phase 4 | Rule 4 | |
@@ -1341,7 +1413,7 @@ poetry run python -c "
 from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 bootstrap()
-for p in ['l0_storage','l1_cache','l3_vector','l4_object','l5_graph']:
+for p in ['l0_storage','redis_adapter','l3_vector','l4_object','l5_graph']:
     assert _global_registry.get(p) is not None, f'{p} not registered'
 # L2无独立Rule 3注册（PostgreSQLAdapter是泛型基座，由具体子仓储在Rule 4区域注册）
 for p in ['memory_metadata','memory_change_history','memory_group_member']:
@@ -1354,7 +1426,7 @@ poetry run python -c "
 from src.composition_root import bootstrap
 from src.domain.ports.registry import _global_registry
 bootstrap()
-for p in ['memory_file','session_cache','memory_vector',
+for p in ['memory_file','memory_cache','session_cache','memory_vector',
            'document_storage','memory_graph',
            'memory_metadata','memory_change_history','memory_group_member']:
     assert _global_registry.get(p) is not None, f'{p} not registered'
