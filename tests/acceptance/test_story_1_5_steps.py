@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
@@ -75,15 +75,15 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLManager:
     """Real database engine instance."""
-    engine = PostgreSQLAdapter(pg_config)
+    engine = PostgreSQLManager(pg_config)
     return engine
 
 
 @pytest.fixture
 def outbox_repo(
-    db_engine: PostgreSQLAdapter,
+    db_engine: PostgreSQLManager,
     ensure_alembic_migration,
     event_loop,
 ) -> Generator[PostgreSQLOutboxRepository, None, None]:
@@ -195,7 +195,7 @@ def ensure_alembic_migration(pg_config: PostgreSQLConfig):
         try:
             from src.infrastructure.storage.postgresql.models import Base
 
-            engine = PostgreSQLAdapter(pg_config)
+            engine = PostgreSQLManager(pg_config)
             Base.metadata.create_all(engine.get_sync_engine())
         except Exception as e:
             pytest.skip(f"Failed to create schema: {e}")
@@ -213,19 +213,19 @@ def ensure_alembic_migration(pg_config: PostgreSQLConfig):
     "test_story_1_5.feature",
     "数据库引擎懒初始化",
 )
-def test_engine_lazy_initialization(db_engine: PostgreSQLAdapter):
+def test_engine_lazy_initialization(db_engine: PostgreSQLManager):
     """Test database engine lazy initialization."""
     pass
 
 
-@when("创建 DatabaseEngine 实例")
+@when("创建 PostgreSQLManager 实例")
 def create_engine_instance():
-    """Create DatabaseEngine instance."""
+    """Create PostgreSQLManager instance."""
     pass
 
 
 @then("引擎尚未创建")
-def verify_engine_not_created(db_engine: PostgreSQLAdapter):
+def verify_engine_not_created(db_engine: PostgreSQLManager):
     """Verify engine is not created yet."""
     assert db_engine._async_engine is None, "Engine should not be created yet (lazy init)"
 
@@ -234,33 +234,33 @@ def verify_engine_not_created(db_engine: PostgreSQLAdapter):
     "test_story_1_5.feature",
     "数据库引擎首次调用创建异步引擎",
 )
-def test_engine_first_call_creates_async_engine(db_engine: PostgreSQLAdapter):
+def test_engine_first_call_creates_async_engine(db_engine: PostgreSQLManager):
     """Test engine is created on first call."""
     pass
 
 
-@given("DatabaseEngine 实例已创建")
-def engine_instance_created(db_engine: PostgreSQLAdapter):
-    """DatabaseEngine instance has been created."""
+@given("PostgreSQLManager 实例已创建")
+def engine_instance_created(db_engine: PostgreSQLManager):
+    """PostgreSQLManager instance has been created."""
     pass
 
 
 @when("首次调用 get_async_engine")
-def call_get_async_engine(db_engine: PostgreSQLAdapter):
+def call_get_async_engine(db_engine: PostgreSQLManager):
     """Call get_async_engine for the first time."""
     async_engine = db_engine.get_async_engine()
     return async_engine
 
 
 @then("异步引擎已创建")
-def verify_async_engine_created(db_engine: PostgreSQLAdapter):
+def verify_async_engine_created(db_engine: PostgreSQLManager):
     """Verify async engine is created."""
     async_engine = db_engine.get_async_engine()
     assert async_engine is not None
 
 
 @then("后续调用返回同一实例")
-def verify_same_instance(db_engine: PostgreSQLAdapter):
+def verify_same_instance(db_engine: PostgreSQLManager):
     """Verify subsequent calls return the same instance."""
     engine1 = db_engine.get_async_engine()
     engine2 = db_engine.get_async_engine()
@@ -271,13 +271,13 @@ def verify_same_instance(db_engine: PostgreSQLAdapter):
     "test_story_1_5.feature",
     "数据库引擎健康检查",
 )
-def test_engine_health_check(db_engine: PostgreSQLAdapter):
+def test_engine_health_check(db_engine: PostgreSQLManager):
     """Test database engine health check."""
     pass
 
 
 @when("调用 health_check")
-def call_health_check(db_engine: PostgreSQLAdapter, event_loop):
+def call_health_check(db_engine: PostgreSQLManager, event_loop):
     """Call health_check method."""
 
     async def _check():
@@ -302,13 +302,13 @@ def verify_select_one():
     "test_story_1_5.feature",
     "数据库引擎优雅关闭",
 )
-def test_engine_graceful_shutdown(db_engine: PostgreSQLAdapter):
+def test_engine_graceful_shutdown(db_engine: PostgreSQLManager):
     """Test database engine graceful shutdown."""
     pass
 
 
 @when("调用 close")
-def call_close(db_engine: PostgreSQLAdapter, event_loop):
+def call_close(db_engine: PostgreSQLManager, event_loop):
     """Call close method."""
 
     async def _close():
@@ -318,13 +318,13 @@ def call_close(db_engine: PostgreSQLAdapter, event_loop):
 
 
 @then("所有连接已释放")
-def verify_connections_released(db_engine: PostgreSQLAdapter):
+def verify_connections_released(db_engine: PostgreSQLManager):
     """Verify all connections are released."""
     pass
 
 
 @then("引擎实例已清空")
-def verify_engine_cleared(db_engine: PostgreSQLAdapter):
+def verify_engine_cleared(db_engine: PostgreSQLManager):
     """Verify engine instance is cleared."""
     pass
 

@@ -41,7 +41,7 @@
 
 **迁移路径 Phase 2（实现 Adapter）:**
 1. `RedisMemoryCache` 重构为 async
-2. `QdrantVectorAdapter` 实现 `L3VectorPort`
+2. `QdrantAdapter` 实现 `L3VectorPort`
 3. `MinIOAdapter` 实现 `L4ObjectPort`
 4. `Neo4jAdapter` 实现 `L5GraphPort`
 
@@ -133,14 +133,14 @@
 - [ ] Key 格式: `memory:user:{user_id}:{name}` 或 `memory:group:{group_id}:{name}`
 - [ ] TTL: 24h-30h 随机值
 
-### AC-8: QdrantVectorAdapter 实现
+### AC-8: QdrantAdapter 实现
 
 **Given** L3VectorPort 接口已定义
-**When** 实现 `QdrantVectorAdapter`
+**When** 实现 `QdrantAdapter`
 **Then** 适配器包装现有 QdrantVectorStorage
 
 **验证标准:**
-- [ ] `src/infrastructure/storage/qdrant/qdrant_vector_adapter.py` 实现 L3VectorPort
+- [ ] `src/infrastructure/storage/qdrant/qdrant_adapter.py` 实现 L3VectorPort
 - [ ] 所有方法使用 async/await
 - [ ] points 参数使用 list[dict]
 
@@ -206,14 +206,14 @@
 - [x] Subtask 1.4: 🟢 绿 — 重构 RedisMemoryCache 为 async
 - [x] Subtask 1.5: 🔄 重构 — 优化代码，运行 ruff + mypy
 
-### Task 2: L3VectorPort + QdrantVectorAdapter
+### Task 2: L3VectorPort + QdrantAdapter
 
 **关联 AC:** AC-2, AC-8
 
 - [x] Subtask 2.1: 🔴 红 — 编写 L3VectorPort 测试
 - [x] Subtask 2.2: 🟢 绿 — 实现 L3VectorPort ABC
-- [x] Subtask 2.3: 🔴 红 — 编写 QdrantVectorAdapter 测试
-- [x] Subtask 2.4: 🟢 绿 — 实现 QdrantVectorAdapter
+- [x] Subtask 2.3: 🔴 红 — 编写 QdrantAdapter 测试
+- [x] Subtask 2.4: 🟢 绿 — 实现 QdrantAdapter
 - [x] Subtask 2.5: 🔄 重构 — 优化代码
 
 ### Task 3: L4ObjectPort + MinIOAdapter

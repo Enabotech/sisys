@@ -93,7 +93,7 @@ async def bucket_manager(minio_config: MinIOConfig):
 # ===================================================================
 
 
-class TestMinioClientAdapter:
+class TestMinioManager:
     """MinIO 客户端适配器真实实例测试。"""
 
     async def test_health_check(self, minio_client: MinioManager):

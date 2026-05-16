@@ -1,7 +1,7 @@
 """RedisConnectionManager — Redis async connection lifecycle manager.
 
 Centralizes Redis connection pool management, following the same pattern as
-DatabaseEngine / QdrantClientWrapper / Neo4jManager.
+PostgreSQLManager / QdrantManager / Neo4jManager.
 
 All Redis components should obtain their aioredis.Redis client from this
 manager instead of creating their own connection pools.
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RedisConnectionManager(ConnectionManager):
+class RedisManager(ConnectionManager):
     """Redis async connection lifecycle manager.
 
     Lazily creates a single aioredis.ConnectionPool and provides

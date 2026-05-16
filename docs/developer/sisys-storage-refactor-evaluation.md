@@ -57,7 +57,7 @@ Protocol层次结构:
 L0: FileMemoryAdapter(L0StoragePort) → aiofiles
 L1: RedisMemoryCache(L1CachePort) → aioredis
 L2: PostgreSQLMemoryMetadataRepository(L2MetadataRepositoryPort) → AsyncSession
-L3: QdrantVectorAdapter(L3VectorPort) → QdrantVectorStorage → QdrantClientWrapper
+L3: QdrantAdapter(L3VectorPort) → QdrantVectorStorage → QdrantManager
 L4: MinIOAdapter(L4ObjectPort) → MinIORepository → MinioManager
 L5: Neo4jAdapter(L5GraphPort) → Neo4jGraphStorage → Neo4jManager
 ```

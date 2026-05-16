@@ -38,7 +38,7 @@ from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
 from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
     PostgreSQLUnitOfWork,
 )
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import set_session
 from tests.environments import get_test_env
 
@@ -78,9 +78,9 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLManager:
     """Real database engine instance."""
-    return PostgreSQLAdapter(pg_config)
+    return PostgreSQLManager(pg_config)
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def test_schema() -> str:
 
 
 @pytest.fixture
-def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, test_schema: str):
+def ensure_schema(db_engine: PostgreSQLManager, pg_config: PostgreSQLConfig, test_schema: str):
     """Ensure test schema exists before tests.
 
     Creates a unique schema for this test run to ensure isolation.
@@ -198,7 +198,7 @@ def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, tes
 
 
 @pytest.fixture
-async def pg_session(db_engine: PostgreSQLAdapter, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
+async def pg_session(db_engine: PostgreSQLManager, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
     """PostgreSQL session with transactional rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine, expire_on_commit=False)

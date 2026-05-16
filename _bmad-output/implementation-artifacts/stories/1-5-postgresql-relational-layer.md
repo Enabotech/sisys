@@ -51,7 +51,7 @@
   - 字段: `host: str`, `port: int`, `database: str`, `username: str`, `password: str`
   - 字段: `pool_size: int = 5`, `max_overflow: int = 10`, `pool_timeout: float = 30.0`
   - 字段: `pool_recycle: int = 3600`, `echo: bool = False`
-- [ ] DatabaseEngine 通用接口定义（`src/infrastructure/storage/postgresql/engine.py`）
+- [ ] PostgreSQLManager 通用接口定义（`src/infrastructure/storage/postgresql/engine.py`）
   - 方法: `get_async_engine() -> AsyncEngine`, `get_sync_engine() -> Engine`, `health_check() -> bool`, `close() -> None`
   - 懒初始化（首次调用时创建引擎）
   - 健康检查（执行 `SELECT 1` 验证连接）
@@ -100,7 +100,7 @@
 **And** 支持异步 CRUD 操作（`async/await`）
 
 **验证标准/Validation Criteria:**
-- [ ] BaseRepository 抽象基类定义（`src/infrastructure/storage/postgresql/repository/base_repository.py`）
+- [ ] BaseRepository 抽象基类定义（`src/infrastructure/storage/postgresql/repository/postgresql_adapter.py`）
   - 泛型类型参数 `[T]`（SQLAlchemy 模型类型）
   - 方法: `async get_by_id(id: UUID) -> Optional[T]`
   - 方法: `async save(entity: T) -> T`（插入或更新）
@@ -310,7 +310,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | PostgreSQL 连接池与引擎 | Task 1 | PostgreSQLConfig + DatabaseEngine | `test_database_engine.py` |
+| AC-1 | PostgreSQL 连接池与引擎 | Task 1 | PostgreSQLConfig + PostgreSQLManager | `test_database_engine.py` |
 | AC-2 | Alembic 迁移基础设施 | Task 2 | alembic.ini + env.py + 001_initial.py | `test_alembic_migration.py` |
 | AC-3 | 通用仓储基类 | Task 3 | BaseRepository + SQLAlchemy 模型 | `test_base_repository.py` |
 | AC-4 | OutboxRepository PostgreSQL 实现 | Task 4 | PostgreSQLOutboxRepository | `test_outbox_repository.py` |
@@ -366,20 +366,20 @@
 - [x] Subtask: 🟢 绿 — 实现 PostgreSQLConfig 最小代码
 - [x] Subtask: 🔄 重构 — 优化 PostgreSQLConfig 代码
 
-#### TDD 循环 B：DatabaseEngine 通用接口
+#### TDD 循环 B：PostgreSQLManager 通用接口
 
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_database_engine.py`（引擎创建、健康检查、关闭） |
-| 🟢 绿 | 实现 `DatabaseEngine` 类最小代码 |
+| 🟢 绿 | 实现 `PostgreSQLManager` 类最小代码 |
 | 🔄 重构 | 添加懒初始化、异常处理、健康检查 |
 
-- [x] Subtask: 🔴 红 — 编写 DatabaseEngine 失败测试
-- [x] Subtask: 🟢 绿 — 实现 DatabaseEngine 最小代码
-- [x] Subtask: 🔄 重构 — 优化 DatabaseEngine 代码
+- [x] Subtask: 🔴 红 — 编写 PostgreSQLManager 失败测试
+- [x] Subtask: 🟢 绿 — 实现 PostgreSQLManager 最小代码
+- [x] Subtask: 🔄 重构 — 优化 PostgreSQLManager 代码
 
 **完成标准/Definition of Done:**
-- [x] PostgreSQLConfig 和 DatabaseEngine 实现完成
+- [x] PostgreSQLConfig 和 PostgreSQLManager 实现完成
 - [x] TDD 循环全部通过
 - [x] 基础设施层覆盖率≥10%
 
@@ -666,8 +666,8 @@ sisys/
 │       └── storage/
 │           └── postgresql/
 │               ├── __init__.py
-│               ├── engine.py           # DatabaseEngine 通用接口
-│               ├── base_repository.py  # BaseRepository 抽象基类
+│               ├── engine.py           # PostgreSQLManager 通用接口
+│               ├── postgresql_adapter.py  # BaseRepository 抽象基类
 │               ├── models/
 │               │   ├── __init__.py     # 所有模型导出
 │               │   ├── outbox.py       # OutboxModel（event_outbox 表）
@@ -721,7 +721,7 @@ sisys/
 **关键学习/Key Learnings:**
 1. **配置模型复用模式** — PostgreSQLConfig 参考 RedisConfig 模式，保持配置风格一致
 2. **领域层接口与基础设施层实现分离** — 领域层定义 OutboxRepository 接口（使用 DomainEvent），基础设施层实现 PostgreSQLOutboxRepository（通过 `SQLAlchemyEventOutboxAdapter` 转换）
-3. **连接池生命周期管理** — DatabaseEngine 采用与 RedisClient 相同的懒初始化模式
+3. **连接池生命周期管理** — PostgreSQLManager 采用与 RedisClient 相同的懒初始化模式
 4. **Alembic 迁移幂等性** — 迁移脚本必须支持重复执行不报错
 5. **转换器适配策略** — Story 1.3 的 `EventOutboxAdapter` 输出 `OutboxEntity`（dataclass，用于内存实现），Story 1.5 新建 `SQLAlchemyEventOutboxAdapter` 直接输出 `OutboxModel`（SQLAlchemy 模型，用于持久化实现），避免反复转换
 6. **内部方法复用** — Story 1.3 的 `AsyncOutboxPoller` 依赖内部方法 `_get_unpublished_entities()` / `_mark_published_entity()` / `_mark_failed_entity()` 直接操作 `OutboxEntity`；Story 1.5 的 `PostgreSQLOutboxRepository` 需要提供同名内部方法操作 `OutboxModel`，供同一 Poller 复用
@@ -729,7 +729,7 @@ sisys/
 
 **应用到本故事/Applied to This Story:**
 - [x] PostgreSQLConfig 采用与 RedisConfig 一致的配置模式
-- [x] DatabaseEngine 采用懒初始化模式
+- [x] PostgreSQLManager 采用懒初始化模式
 - [x] OutboxRepository 严格遵循 Story 1.3 定义的接口，新建 `SQLAlchemyEventOutboxAdapter` 直接转换 `DomainEvent → OutboxModel`（不复用 Story 1.3 的 `EventOutboxAdapter`）
 - [x] Alembic 迁移脚本确保幂等性，`event_outbox` 表为首次物理创建
 - [x] `PostgreSQLOutboxRepository` 提供内部方法 `_get_unpublished_entities()` / `_mark_published_entity()` / `_mark_failed_entity()` 供 `AsyncOutboxPoller` 复用
@@ -782,8 +782,8 @@ sisys/
 |---------|------|
 | `src/infrastructure/config/postgresql.py` | PostgreSQLConfig 配置模型 |
 | `src/infrastructure/storage/postgresql/__init__.py` | PostgreSQL 存储层包 |
-| `src/infrastructure/storage/postgresql/engine.py` | DatabaseEngine 通用接口 |
-| `src/infrastructure/storage/postgresql/repository/base_repository.py` | BaseRepository 抽象基类 |
+| `src/infrastructure/storage/postgresql/engine.py` | PostgreSQLManager 通用接口 |
+| `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py` | BaseRepository 抽象基类 |
 | `src/infrastructure/storage/postgresql/models/__init__.py` | SQLAlchemy 模型导出 |
 | `src/infrastructure/storage/postgresql/models/outbox.py` | OutboxModel（event_outbox 表） |
 | `src/infrastructure/storage/postgresql/models/user.py` | UserModel（users 表） |
@@ -800,7 +800,7 @@ sisys/
 | `deploy/postgresql/alembic/script.py.mako` | Alembic 迁移模板 |
 | `deploy/postgresql/alembic/versions/001_initial.py` | 初始迁移脚本 |
 | `tests/unit/infrastructure/test_postgresql_config.py` | PostgreSQLConfig 单元测试 |
-| `tests/unit/infrastructure/test_database_engine.py` | DatabaseEngine 单元测试 |
+| `tests/unit/infrastructure/test_database_engine.py` | PostgreSQLManager 单元测试 |
 | `tests/unit/infrastructure/test_base_repository.py` | BaseRepository 单元测试 |
 | `tests/unit/infrastructure/test_outbox_repository.py` | PostgreSQLOutboxRepository 单元测试 |
 | `tests/unit/infrastructure/test_user_repository.py` | UserRepository 单元测试 |

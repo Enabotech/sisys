@@ -14,23 +14,23 @@
   # =========================================================================
 
   场景: 数据库引擎懒初始化
-    当 创建 DatabaseEngine 实例
+    当 创建 PostgreSQLManager 实例
     那么 引擎尚未创建
 
   场景: 数据库引擎首次调用创建异步引擎
-    假如 DatabaseEngine 实例已创建
+    假如 PostgreSQLManager 实例已创建
     当 首次调用 get_async_engine
     那么 异步引擎已创建
     并且 后续调用返回同一实例
 
   场景: 数据库引擎健康检查
-    假如 DatabaseEngine 实例已创建
+    假如 PostgreSQLManager 实例已创建
     当 调用 health_check
     那么 返回 True
     并且 执行 SELECT 1 验证连接
 
   场景: 数据库引擎优雅关闭
-    假如 DatabaseEngine 实例已创建
+    假如 PostgreSQLManager 实例已创建
     当 调用 close
     那么 所有连接已释放
     并且 引擎实例已清空

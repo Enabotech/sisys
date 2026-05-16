@@ -1,6 +1,6 @@
 """QdrantMemoryVectorStorage — MemoryVectorPort 实现（Rule 4）。
 
-组合注入 QdrantVectorAdapter（Rule 3），添加记忆向量索引和语义检索语义。
+组合注入 QdrantAdapter（Rule 3），添加记忆向量索引和语义检索语义。
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from src.application.ports.memory_vector_port import MemoryVectorPort
 
 if TYPE_CHECKING:
-    from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
+    from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +23,20 @@ MEMORY_COLLECTION = "sisys_memories"
 class QdrantMemoryVectorStorage(MemoryVectorPort):
     """Qdrant 记忆向量存储 — 实现 MemoryVectorPort。
 
-    组合 QdrantVectorAdapter（Rule 3，L3VectorPort 实现），
+    组合 QdrantAdapter（Rule 3，L3VectorPort 实现），
     添加记忆语义：自动 embedding 生成 + payload 过滤。
     """
 
     def __init__(
         self,
-        adapter: QdrantVectorAdapter,
+        adapter: QdrantAdapter,
         embed_fn: Callable[[str], list[float]] | None = None,
         collection: str = MEMORY_COLLECTION,
     ):
         """初始化 QdrantMemoryVectorStorage。
 
         Args:
-            adapter: QdrantVectorAdapter 实例（Rule 3）
+            adapter: QdrantAdapter 实例（Rule 3）
             embed_fn: 文本→向量转换函数，None 则使用确定性 hash embedding
             collection: 默认 Collection 名称
         """

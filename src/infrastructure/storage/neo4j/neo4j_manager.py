@@ -24,7 +24,7 @@ class Neo4jManager(ConnectionManager):
             driver: Neo4j 异步驱动实例
             database: 默认数据库名称
         """
-        self._driver = driver
+        self._driver: AsyncDriver = driver
         self._database = database
 
     @classmethod
@@ -78,6 +78,4 @@ class Neo4jManager(ConnectionManager):
 
     async def close(self) -> None:
         """关闭驱动连接。"""
-        if self._driver is not None:
-            await self._driver.close()
-            self._driver = None
+        await self._driver.close()

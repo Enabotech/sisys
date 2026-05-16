@@ -43,7 +43,7 @@ from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from src.infrastructure.storage.minio.minio_adapter import MinIOAdapter
 from src.infrastructure.storage.neo4j.neo4j_adapter import Neo4jAdapter
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.repository.memory_change_history_repository import (
     PostgreSQLMemoryChangeHistoryRepository,
 )
@@ -51,7 +51,7 @@ from src.infrastructure.storage.postgresql.repository.memory_metadata_repository
     PostgreSQLMemoryMetadataRepository,
 )
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
-from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
+from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -88,13 +88,13 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLManager:
     """Real database engine instance."""
-    return PostgreSQLAdapter(pg_config)
+    return PostgreSQLManager(pg_config)
 
 
 @pytest.fixture
-def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, test_schema: str):
+def ensure_schema(db_engine: PostgreSQLManager, pg_config: PostgreSQLConfig, test_schema: str):
     """Ensure test schema exists before tests."""
     sync_url = f"postgresql+psycopg2://{pg_config.username}:{pg_config.password}@{pg_config.host}:{pg_config.port}/{pg_config.database}"
     from sqlalchemy import create_engine
@@ -131,7 +131,7 @@ def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, tes
 
 
 @pytest.fixture
-async def pg_session(db_engine: PostgreSQLAdapter, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
+async def pg_session(db_engine: PostgreSQLManager, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
     """PostgreSQL session with transactional rollback."""
     async_engine = db_engine.get_async_engine()
     session = AsyncSession(async_engine)
@@ -221,7 +221,7 @@ def qdrant_adapter():
     """L3 Qdrant adapter."""
     try:
         from src.infrastructure.config.qdrant import QdrantConfig
-        from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+        from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
         from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
         env = get_test_env()
@@ -233,9 +233,9 @@ def qdrant_adapter():
             https=env.qdrant.https,
             timeout=env.qdrant.timeout,
         )
-        wrapper = QdrantClientWrapper(config)
+        wrapper = QdrantManager(config)
         storage = QdrantVectorStorage(wrapper.get_client())
-        return QdrantVectorAdapter(storage)
+        return QdrantAdapter(storage)
     except Exception:
         pytest.skip("Qdrant not available")
 
@@ -245,8 +245,8 @@ def qdrant_collection_manager():
     """L3 Qdrant collection manager for schema operations."""
     try:
         from src.infrastructure.config.qdrant import QdrantConfig
-        from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
         from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
+        from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 
         env = get_test_env()
         config = QdrantConfig(
@@ -257,7 +257,7 @@ def qdrant_collection_manager():
             https=env.qdrant.https,
             timeout=env.qdrant.timeout,
         )
-        wrapper = QdrantClientWrapper(config)
+        wrapper = QdrantManager(config)
         return QdrantCollectionManager(wrapper.get_client())
     except Exception:
         pytest.skip("Qdrant not available")

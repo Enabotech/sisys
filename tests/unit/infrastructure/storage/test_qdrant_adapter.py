@@ -1,4 +1,4 @@
-"""Tests for QdrantVectorAdapter — L3VectorPort implementation.
+"""Tests for QdrantAdapter — L3VectorPort implementation.
 
 验证适配器正确委托存储操作，实现 L3VectorPort 接口。
 架构意义：薄适配器层，仅做接口转换，不改变语义。
@@ -10,20 +10,20 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.infrastructure.storage.qdrant.qdrant_vector_adapter import QdrantVectorAdapter
+from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
 
 
-class TestQdrantVectorAdapterInterface:
+class TestQdrantAdapterInterface:
     """验证适配器实现 L3VectorPort 接口"""
 
     def test_delegates_to_internal_storage(self):
         """验证适配器委托操作给内部存储"""
         mock_storage = MagicMock()
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         assert adapter._storage is mock_storage
 
 
-class TestQdrantVectorAdapterUpsertPoints:
+class TestQdrantAdapterUpsertPoints:
     """upsert_points 方法验证"""
 
     @pytest.mark.asyncio
@@ -32,7 +32,7 @@ class TestQdrantVectorAdapterUpsertPoints:
         mock_storage = MagicMock()
         mock_storage.upsert_points = AsyncMock(return_value=True)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         # VectorPoint requires 1024 dimensions (bge-m3 embedding model)
         points = [
             {"id": "mem-1", "vector": [0.1] * 1024, "payload": {"name": "test"}},
@@ -55,7 +55,7 @@ class TestQdrantVectorAdapterUpsertPoints:
         mock_storage = MagicMock()
         mock_storage.upsert_points = AsyncMock(return_value=True)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         points = [{"id": "mem-1", "vector": [0.1] * 1024}]
 
         await adapter.upsert_points("test-collection", points)
@@ -65,7 +65,7 @@ class TestQdrantVectorAdapterUpsertPoints:
         assert vector_points[0].payload == {}
 
 
-class TestQdrantVectorAdapterDeletePoints:
+class TestQdrantAdapterDeletePoints:
     """delete_points 方法验证"""
 
     @pytest.mark.asyncio
@@ -74,14 +74,14 @@ class TestQdrantVectorAdapterDeletePoints:
         mock_storage = AsyncMock()
         mock_storage.delete_points = AsyncMock(return_value=True)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         result = await adapter.delete_points("test-collection", ["id-1", "id-2"])
 
         assert result is True
         mock_storage.delete_points.assert_called_once_with("test-collection", ["id-1", "id-2"])
 
 
-class TestQdrantVectorAdapterGetPoint:
+class TestQdrantAdapterGetPoint:
     """get_point 方法验证"""
 
     @pytest.mark.asyncio
@@ -90,7 +90,7 @@ class TestQdrantVectorAdapterGetPoint:
         mock_storage = AsyncMock()
         mock_storage.get_point = AsyncMock(return_value=None)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         result = await adapter.get_point("test-collection", "nonexistent")
 
         assert result is None
@@ -102,13 +102,13 @@ class TestQdrantVectorAdapterGetPoint:
         expected = {"id": "mem-1", "vector": [0.1], "payload": {}}
         mock_storage.get_point = AsyncMock(return_value=expected)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         result = await adapter.get_point("test-collection", "mem-1")
 
         assert result == expected
 
 
-class TestQdrantVectorAdapterSearch:
+class TestQdrantAdapterSearch:
     """search 方法验证"""
 
     @pytest.mark.asyncio
@@ -117,7 +117,7 @@ class TestQdrantVectorAdapterSearch:
         mock_storage = AsyncMock()
         mock_storage.search = AsyncMock(return_value=[])
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         await adapter.search("test-collection", [0.1, 0.2], limit=5, filter_payload={"type": "user"})
 
         mock_storage.search.assert_called_once_with("test-collection", [0.1, 0.2], limit=5, filter_payload={"type": "user"})
@@ -132,14 +132,14 @@ class TestQdrantVectorAdapterSearch:
         ]
         mock_storage.search = AsyncMock(return_value=expected)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         result = await adapter.search("test-collection", [0.1, 0.2])
 
         assert len(result) == 2
         assert result[0]["id"] == "mem-1"
 
 
-class TestQdrantVectorAdapterSearchSparse:
+class TestQdrantAdapterSearchSparse:
     """search_sparse 方法验证"""
 
     @pytest.mark.asyncio
@@ -148,7 +148,7 @@ class TestQdrantVectorAdapterSearchSparse:
         mock_storage = AsyncMock()
         mock_storage.search_sparse = AsyncMock(return_value=[])
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         sparse_vector = {"indices": [0, 5, 10], "values": [1.0, 0.5, 0.8]}
         await adapter.search_sparse("test-collection", sparse_vector, limit=10)
 
@@ -167,7 +167,7 @@ class TestQdrantVectorAdapterSearchSparse:
         expected = [{"id": "mem-1", "score": 0.9, "payload": {}}]
         mock_storage.search_sparse = AsyncMock(return_value=expected)
 
-        adapter = QdrantVectorAdapter(mock_storage)
+        adapter = QdrantAdapter(mock_storage)
         result = await adapter.search_sparse("test-collection", {"indices": [], "values": []})
 
         assert result == expected

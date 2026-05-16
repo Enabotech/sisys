@@ -25,7 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
 # Import reset_test_environment for test isolation (AC-6)
 
@@ -51,7 +51,7 @@ async def pg_engine():
         password=os.getenv("POSTGRES_PASSWORD", "postgres"),
     )
 
-    engine = PostgreSQLAdapter(config)
+    engine = PostgreSQLManager(config)
 
     # Verify connection
     try:
@@ -105,8 +105,8 @@ class TestPostgreSQLReal:
             assert row.name == "test_user"
 
 
-class TestDatabaseEngineReal:
-    """DatabaseEngine 真实实例测试。"""
+class TestPostgreSQLManagerReal:
+    """PostgreSQLManager 真实实例测试。"""
 
     async def test_async_engine_creation(self, pg_engine):
         """测试异步引擎创建。"""
@@ -120,7 +120,7 @@ class TestDatabaseEngineReal:
 
     async def test_health_check(self, pg_engine):
         """测试健康检查。"""
-        # DatabaseEngine 应该有健康检查方法
+        # PostgreSQLManager 应该有健康检查方法
         # 由于没有暴露 health_check 方法，我们通过查询验证
         async with AsyncSession(pg_engine.get_async_engine()) as session:
             result = await session.execute(text("SELECT 1"))

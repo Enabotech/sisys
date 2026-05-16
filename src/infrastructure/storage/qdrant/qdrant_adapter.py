@@ -1,4 +1,4 @@
-"""QdrantVectorAdapter — L3VectorPort 实现。
+"""QdrantAdapter — L3VectorPort 实现。
 
 包装现有 QdrantVectorStorage，实现 L3VectorPort 接口。
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     pass
 
 
-class QdrantVectorAdapter(L3VectorPort):
+class QdrantAdapter(L3VectorPort):
     """Qdrant 向量存储适配器。
 
     包装现有 QdrantVectorStorage + QdrantCollectionManager，

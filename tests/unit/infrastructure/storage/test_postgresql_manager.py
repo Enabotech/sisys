@@ -1,4 +1,4 @@
-"""DatabaseEngine 单元测试。
+"""PostgreSQLManager 单元测试。
 
 测试引擎创建、复用、健康检查和关闭。
 """
@@ -10,7 +10,7 @@ from unittest import mock
 import pytest
 
 from src.infrastructure.config.postgresql import PostgreSQLConfig
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
 
 @pytest.fixture
@@ -27,12 +27,12 @@ def config():
 
 @pytest.fixture
 def engine(config):
-    """创建 DatabaseEngine 实例。"""
-    return PostgreSQLAdapter(config)
+    """创建 PostgreSQLManager 实例。"""
+    return PostgreSQLManager(config)
 
 
-class TestDatabaseEngine:
-    """DatabaseEngine 测试。"""
+class TestPostgreSQLManager:
+    """PostgreSQLManager 测试。"""
 
     def test_get_async_engine_creates_engine(self, engine):
         """测试异步引擎创建。"""
@@ -90,7 +90,7 @@ class TestDatabaseEngine:
     @pytest.mark.asyncio
     async def test_close_disposes_engines(self, config):
         """测试关闭引擎。"""
-        engine = PostgreSQLAdapter(config)
+        engine = PostgreSQLManager(config)
         mock_async = mock.AsyncMock()
         mock_sync = mock.Mock()
         engine._async_engine = mock_async

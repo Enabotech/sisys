@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.security.audit_repository_impl import AuditRepository
 from src.infrastructure.security.audit_service_impl import AuditServiceImpl
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
@@ -61,7 +61,7 @@ def pg_config():
 @pytest.fixture
 def db_engine(pg_config):
     """Real database engine instance."""
-    engine = PostgreSQLAdapter(pg_config)
+    engine = PostgreSQLManager(pg_config)
     return engine
 
 
@@ -114,7 +114,7 @@ def ensure_alembic_migration(pg_config):
         try:
             from src.infrastructure.storage.postgresql.models import Base
 
-            engine = PostgreSQLAdapter(pg_config)
+            engine = PostgreSQLManager(pg_config)
             Base.metadata.create_all(engine.get_sync_engine())
         except Exception as e:
             pytest.skip(f"Failed to create schema: {e}")

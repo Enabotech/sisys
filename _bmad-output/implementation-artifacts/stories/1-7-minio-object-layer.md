@@ -229,7 +229,7 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | MinIO 配置模型 | 验证 MinIOConfig 初始化、环境变量读取、默认值 | `test_minio_config.py` | Task 1 |
 | **TDD 单元测试** | 存储实体 | 验证 ObjectMetadata/LifecycleRule 创建、字段校验 | `test_minio_entities.py` | Task 1 |
-| **TDD 单元测试** | MinIO 客户端适配器 | 验证客户端初始化、连接池、错误处理 | `test_minio_client_adapter.py` | Task 2 |
+| **TDD 单元测试** | MinIO 客户端适配器 | 验证客户端初始化、连接池、错误处理 | `test_minio_manager.py` | Task 2 |
 | **TDD 单元测试** | Bucket 管理 | 验证 Bucket 创建、版本控制、Object Lock | `test_bucket_management.py` | Task 3 |
 | **TDD 单元测试** | 对象存储/检索 | 验证流式上传、分片上传、断点续传、流式下载 | `test_object_operations.py` | Task 4 |
 | **TDD 单元测试** | WORM 锁定与生命周期 | 验证 WORM 启用、保留期限计算、生命周期规则 | `test_worm_and_lifecycle.py` | Task 5 |
@@ -265,7 +265,7 @@
 |----|-------------|-----------|-------------|----------|
 | AC-1 | MinIO 客户端适配器就绪 | Task 0 | SDD 规范定义（数据模型、MinIOConfig、仓储接口、验收测试） | `test_story_1_7.feature` |
 | AC-1 | MinIO 客户端适配器就绪 | Task 1 | MinIOConfig 配置 + ObjectMetadata/LifecycleRule 实体 | `test_minio_config.py`, `test_minio_entities.py` |
-| AC-1 | MinIO 客户端适配器就绪 | Task 2 | MinIO 客户端适配器封装（连接池、错误处理） | `test_minio_client_adapter.py` |
+| AC-1 | MinIO 客户端适配器就绪 | Task 2 | MinIO 客户端适配器封装（连接池、错误处理） | `test_minio_manager.py` |
 | AC-2 | 版本控制与断点续传实现 | Task 3 | Bucket 管理（版本控制、Object Lock 启用） | `test_bucket_management.py` |
 | AC-2 | 版本控制与断点续传实现 | Task 4 | 对象操作（流式上传/下载、分片上传、断点续传） | `test_object_operations.py` |
 | AC-3 | WORM 存储与对象生命周期管理 | Task 5 | WORM 锁定逻辑 + 生命周期规则配置 | `test_worm_and_lifecycle.py` |
@@ -341,11 +341,11 @@
 
 > ⚠️ **本 Task 包含自己的 TDD 循环，禁止将测试推迟到其他 Task。**
 
-#### TDD 循环 A：MinioClientAdapter 初始化与连接
+#### TDD 循环 A：MinioManager 初始化与连接
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_minio_client_adapter.py`（客户端初始化、连接池、超时配置） |
+| 🔴 红 | 编写 `test_minio_manager.py`（客户端初始化、连接池、超时配置） |
 | 🟢 绿 | 实现 `MinioManager` 类最小代码（构造函数、连接方法） |
 | 🔄 重构 | 应用依赖注入模式、添加类型注解、docstring |
 
@@ -581,7 +581,7 @@ sisys/
 │   │       └── minio/
 │   │           ├── __init__.py
 │   │           ├── entities.py             # ObjectMetadata, LifecycleRule 实体
-│   │           ├── minio_client_adapter.py       # MinioManager 实现（连接池、错误处理）
+│   │           ├── minio_manager.py       # MinioManager 实现（连接池、错误处理）
 │   │           ├── bucket_manager.py       # Bucket 管理逻辑
 │   │           ├── object_operations.py    # 对象上传/下载逻辑（流式）
 │   │           ├── worm_lifecycle.py       # WORM 锁定与生命周期管理
@@ -591,7 +591,7 @@ sisys/
 │   │   └── infrastructure/
 │   │       ├── test_minio_config.py         # 配置模型测试
 │   │       ├── test_minio_entities.py       # 实体测试
-│   │       ├── test_minio_client_adapter.py
+│   │       ├── test_minio_manager.py
 │   │       ├── test_bucket_management.py
 │   │       ├── test_object_operations.py
 │   │       ├── test_worm_and_lifecycle.py
@@ -663,14 +663,14 @@ sisys/
 - `src/infrastructure/config/minio.py` — MinIOConfig 配置模型
 - `src/infrastructure/storage/minio/__init__.py` — 模块导出
 - `src/infrastructure/storage/minio/entities.py` — ObjectMetadata, LifecycleRule 实体
-- `src/infrastructure/storage/minio/minio_client_adapter.py` — MinioManager 实现
+- `src/infrastructure/storage/minio/minio_manager.py` — MinioManager 实现
 - `src/infrastructure/storage/minio/bucket_manager.py` — Bucket 管理
 - `src/infrastructure/storage/minio/object_operations.py` — 对象操作（流式上传/下载/分片/断点续传）
 - `src/infrastructure/storage/minio/worm_lifecycle.py` — WORM 锁定与生命周期
 - `src/infrastructure/storage/minio/minio_repository.py` — ObjectStorageRepository 实现
 - `tests/unit/infrastructure/test_minio_config.py` — 配置模型测试（8 测试）
 - `tests/unit/infrastructure/test_minio_entities.py` — 实体测试（10 测试）
-- `tests/unit/infrastructure/test_minio_client_adapter.py` — 客户端适配器测试（10 测试）
+- `tests/unit/infrastructure/test_minio_manager.py` — 客户端适配器测试（10 测试）
 - `tests/unit/infrastructure/test_bucket_management.py` — Bucket 管理测试（21 测试）
 - `tests/unit/infrastructure/test_object_operations.py` — 对象操作测试（13 测试）
 - `tests/unit/infrastructure/test_worm_and_lifecycle.py` — WORM 与生命周期测试（13 测试）

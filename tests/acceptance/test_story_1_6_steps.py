@@ -18,9 +18,9 @@ import pytest
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.storage.qdrant.bm25_builder import BM25Builder
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
 from src.infrastructure.storage.qdrant.models import VectorPoint
+from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 from tests.environments import get_test_env
 
@@ -52,7 +52,7 @@ def test_tenant_id() -> str:
 
 
 @pytest.fixture(autouse=True)
-async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
+async def init_test_collection_names(qdrant_client: QdrantManager):
     """Initialize unique collection names for each test with async cleanup."""
     for key in _test_collection_names:
         _test_collection_names[key] = f"sisys_documents_{key}_{uuid.uuid4().hex[:8]}"
@@ -72,7 +72,7 @@ async def init_test_collection_names(qdrant_client: QdrantClientWrapper):
 
 
 @pytest.fixture
-def qdrant_client() -> QdrantClientWrapper:
+def qdrant_client() -> QdrantManager:
     """Real Qdrant client wrapper instance."""
     env = get_test_env()
     from src.infrastructure.config.qdrant import QdrantConfig
@@ -85,17 +85,17 @@ def qdrant_client() -> QdrantClientWrapper:
         https=False,
         timeout=30.0,
     )
-    return QdrantClientWrapper(config)
+    return QdrantManager(config)
 
 
 @pytest.fixture
-def collection_manager(qdrant_client: QdrantClientWrapper) -> QdrantCollectionManager:
+def collection_manager(qdrant_client: QdrantManager) -> QdrantCollectionManager:
     """Real Qdrant collection manager instance."""
     return QdrantCollectionManager(qdrant_client.get_client())
 
 
 @pytest.fixture
-def vector_storage(qdrant_client: QdrantClientWrapper) -> QdrantVectorStorage:
+def vector_storage(qdrant_client: QdrantManager) -> QdrantVectorStorage:
     """Real Qdrant vector storage instance."""
     return QdrantVectorStorage(qdrant_client.get_client())
 
@@ -112,7 +112,7 @@ def bm25_builder() -> BM25Builder:
 
 
 @given("Qdrant 服务可用")
-def qdrant_service_available(qdrant_client: QdrantClientWrapper, event_loop):
+def qdrant_service_available(qdrant_client: QdrantManager, event_loop):
     """Verify Qdrant service is available."""
 
     async def _check():

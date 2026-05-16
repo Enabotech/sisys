@@ -29,7 +29,7 @@ from src.domain.entities.memory_metadata import MemoryMetadata
 from src.domain.exceptions.storage_exceptions import MemoryVersionConflictError
 from src.domain.ports.memory_repository import L2MetadataRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryMetadataModel
-from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 
 
 class PostgreSQLMemoryMetadataRepository(

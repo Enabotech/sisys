@@ -56,7 +56,7 @@
   - 字段: `host: str`, `port: int`, `grpc_port: int`, `api_key: Optional[str]`, `https: bool = False`
   - 字段: `timeout: float = 30.0`, `max_retries: int = 3`
   - 方法: `from_env() -> QdrantConfig`（从环境变量读取）
-- [x] QdrantClient 通用接口定义（`src/infrastructure/storage/qdrant/client.py`）
+- [x] QdrantClient 通用接口定义（`src/infrastructure/storage/qdrant/qdrant_manager.py`）
   - 方法: `get_async_client() -> AsyncQdrantClient`, `health_check() -> bool`, `close() -> None`
   - 懒初始化（首次调用时创建客户端）
   - 健康检查（执行 `GET /collections` 验证连接）
@@ -306,7 +306,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_qdrant_client.py`（客户端创建、健康检查、关闭） |
-| 🟢 绿 | 实现 `QdrantClientWrapper` 类最小代码 |
+| 🟢 绿 | 实现 `QdrantManager` 类最小代码 |
 | 🔄 重构 | 添加懒初始化、异常处理、健康检查 |
 
 - [x] Subtask: 🔴 红 — 编写 QdrantClient 失败测试
@@ -616,7 +616,7 @@ sisys/
 **应用到本故事/Applied to This Story:**
 - [x] QdrantConfig 采用 Story 1.4/1.5 相同的配置模式
 - [x] CollectionManager/VectorStorage 接口定义在领域层（Protocol），实现在基础设施层
-- [x] QdrantClient 采用懒初始化模式（与 Story 1.5 DatabaseEngine 一致）
+- [x] QdrantClient 采用懒初始化模式（与 Story 1.5 PostgreSQLManager 一致）
 - [x] Collection 命名规范统一为 `sisys:{type}:{namespace}`，与 Story 1.4 Redis 键命名规范（`sisys:{namespace}:{key}`）保持一致
 - [x] 架构约束测试验证领域层无 Qdrant 导入
 
