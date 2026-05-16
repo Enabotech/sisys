@@ -52,6 +52,7 @@ from src.infrastructure.storage.postgresql.repository.memory_metadata_repository
 )
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.qdrant.qdrant_adapter import QdrantAdapter
+from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -173,7 +174,7 @@ def real_redis_sync(redis_prefix):
 @pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
     """L1 Redis cache."""
-    return RedisMemoryCache(real_redis)
+    return RedisMemoryCache(RedisAdapter(real_redis))
 
 
 @pytest.fixture
@@ -418,7 +419,7 @@ class TestSixLayerCompleteFlow:
         content = " ".join([f"word_{i}" for i in range(600)])[:3000]
 
         # Pre-populate L1 cache to verify invalidation
-        await unified_storage_gateway._l1.set(memory_type, owner_id, name, "stale cached content")
+        await unified_storage_gateway._l1.set_memory(memory_type, owner_id, name, "stale cached content")
         redis_key = f"memory:{memory_type}:{owner_id}:{name}"
         assert real_redis_sync.exists(redis_key) == 1
 
@@ -549,7 +550,7 @@ class TestSixLayerCompleteFlow:
 
         # === Cleanup ===
         await unified_storage_gateway._l0.delete(memory_id, memory_type)
-        await unified_storage_gateway._l1.delete(memory_type, owner_id, name)
+        await unified_storage_gateway._l1.delete_memory(memory_type, owner_id, name)
         await unified_storage_gateway._l2_meta.delete(uuid.UUID(memory_id))
 
     @pytest.mark.asyncio
@@ -572,7 +573,7 @@ class TestSixLayerCompleteFlow:
         short_content = "Short memory content for cycle test"
 
         # Pre-populate L1 cache
-        await unified_storage_gateway._l1.set(memory_type, owner_id, name, "old content")
+        await unified_storage_gateway._l1.set_memory(memory_type, owner_id, name, "old content")
 
         # === Save ===
         results = await unified_storage_gateway.save(
@@ -607,7 +608,7 @@ class TestSixLayerCompleteFlow:
 
         # === Cleanup ===
         await unified_storage_gateway._l0.delete(memory_id, memory_type)
-        await unified_storage_gateway._l1.delete(memory_type, owner_id, name)
+        await unified_storage_gateway._l1.delete_memory(memory_type, owner_id, name)
         await unified_storage_gateway._l2_meta.delete(uuid.UUID(memory_id))
 
     @pytest.mark.asyncio
@@ -698,7 +699,7 @@ class TestSixLayerCompleteFlow:
 
         # === Cleanup ===
         await unified_storage_gateway._l0.delete(memory_id, memory_type)
-        await unified_storage_gateway._l1.delete(memory_type, owner_id, name)
+        await unified_storage_gateway._l1.delete_memory(memory_type, owner_id, name)
         await unified_storage_gateway._l2_meta.delete(uuid.UUID(memory_id))
 
 
@@ -736,12 +737,12 @@ class TestLayerIndependence:
         name = "l1-only-test"
         content = "L1 only content"
 
-        await redis_cache.set(memory_type, owner_id, name, content)
-        result = await redis_cache.get(memory_type, owner_id, name)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result == content
 
-        await redis_cache.delete(memory_type, owner_id, name)
-        result = await redis_cache.get(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result is None
 
 
@@ -768,11 +769,11 @@ class TestLayerCoordinationInvariants:
         assert result == content
 
         # Even if L1 cache has stale data, L0 is truth
-        await redis_cache.set(memory_type, owner_id, name, "stale")
+        await redis_cache.set_memory(memory_type, owner_id, name, "stale")
         l0_result = await l0_storage.read(memory_id, memory_type)
         assert l0_result == content
 
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
         await l0_storage.delete(memory_id, memory_type)
 
     @pytest.mark.asyncio
@@ -790,7 +791,7 @@ class TestLayerCoordinationInvariants:
         owner_id = user_id
 
         # Pre-populate cache
-        await unified_storage_gateway._l1.set(memory_type, owner_id, name, "stale")
+        await unified_storage_gateway._l1.set_memory(memory_type, owner_id, name, "stale")
         redis_key = f"memory:{memory_type}:{owner_id}:{name}"
         assert real_redis_sync.exists(redis_key) == 1
 

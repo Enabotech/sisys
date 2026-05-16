@@ -89,8 +89,8 @@ class TestMemoryChangedListenerHandle:
 
         await listener.handle(event)
 
-        mock_l1_cache.delete.assert_called_once()
-        call_args = mock_l1_cache.delete.call_args
+        mock_l1_cache.delete_memory.assert_called_once()
+        call_args = mock_l1_cache.delete_memory.call_args
         assert call_args[0][0] == "user"  # memory_type
         assert call_args[0][1] == "user-456"  # owner_id
         assert call_args[0][2] == "test-memory"  # name
@@ -136,7 +136,7 @@ class TestMemoryChangedListenerL1Invalidation:
 
         await listener._invalidate_l1_cache(event)
 
-        mock_l1_cache.delete.assert_called_once_with(
+        mock_l1_cache.delete_memory.assert_called_once_with(
             "user",
             "user-456",
             "test-memory",
@@ -165,7 +165,7 @@ class TestMemoryChangedListenerL1Invalidation:
 
         await listener._invalidate_l1_cache(event)
 
-        mock_l1_cache.delete.assert_called_once_with(
+        mock_l1_cache.delete_memory.assert_called_once_with(
             "group",
             "group-789",
             "test-memory",

@@ -96,9 +96,9 @@ class TestUnifiedStorageGatewayBehavior:
     def mock_l1_cache(self):
         """创建模拟的 L1 缓存。"""
         mock = MagicMock()
-        mock.get = AsyncMock(return_value=None)
-        mock.set = AsyncMock(return_value=True)
-        mock.delete = AsyncMock(return_value=True)
+        mock.get_memory = AsyncMock(return_value=None)
+        mock.set_memory = AsyncMock(return_value=True)
+        mock.delete_memory = AsyncMock(return_value=True)
         return mock
 
     @pytest.fixture
@@ -170,7 +170,7 @@ class TestUnifiedStorageGatewayBehavior:
     @pytest.mark.asyncio
     async def test_read_with_cache_hit_returns_cached(self, gateway, mock_l1_cache, mock_l0_storage) -> None:
         """缓存命中时应直接返回。"""
-        mock_l1_cache.get.return_value = "cached content"
+        mock_l1_cache.get_memory.return_value = "cached content"
 
         result = await gateway.read(
             memory_id="12345678-1234-1234-1234-123456789abc",
@@ -227,8 +227,8 @@ class TestUnifiedStorageGatewayWithOptionalLayers:
     @pytest.fixture
     def mock_l1_cache(self):
         mock = MagicMock()
-        mock.get = AsyncMock(return_value=None)
-        mock.set = AsyncMock(return_value=True)
+        mock.get_memory = AsyncMock(return_value=None)
+        mock.set_memory = AsyncMock(return_value=True)
         return mock
 
     @pytest.fixture

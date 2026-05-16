@@ -39,6 +39,7 @@ def bootstrap() -> None:
     from src.application.ports.document_storage_port import DocumentStoragePort
     from src.application.ports.event_subscriber import EventSubscriber
     from src.application.ports.exception_metrics_port import ExceptionMetricsPort
+    from src.application.ports.memory_cache_port import MemoryCachePort
     from src.application.ports.memory_file_port import MemoryFilePort
     from src.application.ports.memory_graph_port import MemoryGraphPort
     from src.application.ports.memory_vector_port import MemoryVectorPort
@@ -221,14 +222,30 @@ def bootstrap() -> None:
     )
 
     register_port(
-        name="l1_cache",
+        name="redis_adapter",
         version="v1.0.0",
         interface=L1CachePort,
-        impl="src.infrastructure.storage.redis.redis_memory_cache.RedisMemoryCache",
+        impl="src.infrastructure.storage.redis.redis_adapter.RedisAdapter",
+        module="src.infrastructure.storage.redis.redis_adapter",
+        lifetime=Lifetime.SINGLETON,
+        owner="storage-team",
+        tags=("redis", "cache"),
+    )
+
+    register_port(
+        name="memory_cache",
+        version="v1.0.0",
+        interface=MemoryCachePort,
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.redis.redis_memory_cache",
+            fromlist=["RedisMemoryCache"],
+        ).RedisMemoryCache(
+            adapter=resolver.resolve("redis_adapter"),
+        ),
         module="src.infrastructure.storage.redis.redis_memory_cache",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
-        tags=("redis", "cache"),
+        tags=("redis", "cache", "memory"),
     )
 
     register_port(

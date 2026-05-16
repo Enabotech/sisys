@@ -26,6 +26,7 @@ import redis
 from src.domain.ports.l0_storage import L0StoragePort
 from src.domain.ports.l1_cache import L1CachePort
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
+from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -74,7 +75,7 @@ def real_redis(redis_test_prefix):
 @pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real Redis."""
-    return RedisMemoryCache(real_redis)
+    return RedisMemoryCache(RedisAdapter(real_redis))
 
 
 @pytest.fixture
@@ -252,13 +253,13 @@ class TestL1RedisCache:
         name = "test-memory"
         content = "Test memory content"
 
-        await redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
 
-        result = await redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result == content
 
         # Cleanup via adapter
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
     @pytest.mark.asyncio
     async def test_redis_cache_delete(self, redis_cache, real_redis, real_redis_sync):
@@ -267,10 +268,10 @@ class TestL1RedisCache:
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
         name = "test-memory"
 
-        await redis_cache.set(memory_type, owner_id, name, "content")
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.set_memory(memory_type, owner_id, name, "content")
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
-        result = await redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result is None
 
     @pytest.mark.asyncio
@@ -281,38 +282,38 @@ class TestL1RedisCache:
         name = "test-memory"
         content = "Test content"
 
-        await redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
 
-        key = f"memory:{memory_type}:{owner_id}:{name}"
+        key = f"memory:user:{owner_id}:{name}"
         ttl = real_redis_sync.ttl(key)
         assert 86400 <= ttl <= 108000
 
         # Cleanup via adapter
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
     @pytest.mark.asyncio
     async def test_redis_cache_get_returns_none_when_not_cached(self, redis_cache):
         """Verify Redis cache get returns None when not cached."""
-        result = await redis_cache.get("user", "nonexistent-owner", "nonexistent")
+        result = await redis_cache.get_memory("user", "nonexistent-owner", "nonexistent")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_redis_cache_invalidate_pattern(self, redis_cache, real_redis, real_redis_sync):
-        """Verify invalidate_pattern deletes all matching keys."""
+        """Verify invalidate_owner deletes all matching keys."""
         memory_type = "user"
         owner_id = f"user-{uuid.uuid4().hex[:8]}"
 
         # Set multiple memories
         for i in range(3):
-            await redis_cache.set(memory_type, owner_id, f"memory-{i}", f"content-{i}")
+            await redis_cache.set_memory(memory_type, owner_id, f"memory-{i}", f"content-{i}")
 
         # Verify they exist
-        pattern = f"memory:{memory_type}:{owner_id}:*"
+        pattern = f"memory:user:{owner_id}:*"
         keys_before = real_redis_sync.keys(pattern)
         assert len(keys_before) >= 3
 
         # Invalidate all
-        await redis_cache.invalidate_pattern(memory_type, owner_id)
+        await redis_cache.invalidate_owner(memory_type, owner_id)
 
         # Verify all deleted
         keys_after = real_redis_sync.keys(pattern)
@@ -338,14 +339,14 @@ class TestL0L1Coordination:
         content = "Test memory content"
 
         # Pre-populate L1 cache
-        await redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
 
         # Verify cache exists
-        key = f"memory:{memory_type}:{owner_id}:{name}"
+        key = f"memory:user:{owner_id}:{name}"
         assert real_redis_sync.exists(key) == 1
 
         # Invalidate L1 cache
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
         # Verify cache deleted
         assert real_redis_sync.exists(key) == 0
@@ -359,17 +360,17 @@ class TestL0L1Coordination:
         content = "Test memory content"
 
         # Set L1 cache
-        await redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
 
         # Write to L0 (should not affect L1)
         await l0_storage.write(str(uuid.uuid4()), memory_type, content)
 
         # L1 cache should still have value
-        result = await redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result == content
 
         # Cleanup via adapter
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
 
 # ===================================================================
@@ -394,8 +395,14 @@ class TestLayerInterfaces:
         assert hasattr(redis_cache, "get")
         assert hasattr(redis_cache, "set")
         assert hasattr(redis_cache, "delete")
-        assert hasattr(redis_cache, "invalidate_pattern")
+        assert hasattr(redis_cache, "get_memory")
+        assert hasattr(redis_cache, "set_memory")
+        assert hasattr(redis_cache, "delete_memory")
+        assert hasattr(redis_cache, "invalidate_owner")
         assert callable(redis_cache.get)
         assert callable(redis_cache.set)
         assert callable(redis_cache.delete)
-        assert callable(redis_cache.invalidate_pattern)
+        assert callable(redis_cache.get_memory)
+        assert callable(redis_cache.set_memory)
+        assert callable(redis_cache.delete_memory)
+        assert callable(redis_cache.invalidate_owner)

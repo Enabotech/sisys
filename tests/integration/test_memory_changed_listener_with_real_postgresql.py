@@ -155,7 +155,9 @@ def real_redis(redis_test_prefix):
 @pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real Redis."""
-    return RedisMemoryCache(real_redis)
+    from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
+
+    return RedisMemoryCache(RedisAdapter(real_redis))
 
 
 @pytest.fixture
@@ -343,7 +345,7 @@ class TestMemoryChangedListenerCompleteFlow:
         memory_type = "user"
 
         # Step 1: Pre-populate L1 cache
-        await redis_cache.set(memory_type, owner_id, name, "test content")
+        await redis_cache.set_memory(memory_type, owner_id, name, "test content")
         redis_key = f"memory:user:{owner_id}:{name}"
         assert real_redis_sync.exists(redis_key) == 1, "Cache should be populated before listener"
 

@@ -30,6 +30,7 @@ from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+from src.infrastructure.storage.redis.redis_adapter import RedisAdapter
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
@@ -152,7 +153,7 @@ def real_redis(redis_test_prefix):
 @pytest.fixture
 def redis_cache(real_redis) -> RedisMemoryCache:
     """Create RedisMemoryCache with real Redis."""
-    return RedisMemoryCache(real_redis)
+    return RedisMemoryCache(RedisAdapter(real_redis))
 
 
 @pytest.fixture
@@ -265,8 +266,8 @@ class TestL0L1L2CrossLayer:
         owner_id = user_id
 
         # Pre-populate L1 cache to verify invalidation
-        await redis_cache.set(memory_type, owner_id, name, "stale cached content")
-        redis_key = f"memory:{memory_type}:{owner_id}:{name}"
+        await redis_cache.set_memory(memory_type, owner_id, name, "stale cached content")
+        redis_key = f"memory:user:{owner_id}:{name}"
         assert real_redis_sync.exists(redis_key) == 1, "Cache should be populated before"
 
         # Create MemoryChanged event (simulating what Gateway.save() would publish)
@@ -334,7 +335,7 @@ class TestL0L1L2CrossLayer:
         assert l0_success is True
 
         # 2. Write to L1 cache
-        await redis_cache.set(memory_type, owner_id, name, content)
+        await redis_cache.set_memory(memory_type, owner_id, name, content)
 
         # 3. Write to L2 metadata
         from datetime import UTC, datetime
@@ -361,7 +362,7 @@ class TestL0L1L2CrossLayer:
         l0_content = await l0_storage.read(memory_id, memory_type)
         assert l0_content == content
 
-        l1_content = await redis_cache.get(memory_type, owner_id, name)
+        l1_content = await redis_cache.get_memory(memory_type, owner_id, name)
         assert l1_content == content
 
         l2_meta = await metadata_repository.get_by_id(UUID(memory_id))
@@ -370,7 +371,7 @@ class TestL0L1L2CrossLayer:
 
         # Cleanup L0, L1
         await l0_storage.delete(memory_id, memory_type)
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
         await metadata_repository.delete(UUID(memory_id))
 
 
@@ -398,15 +399,15 @@ class TestL0L1Coordination:
         await l0_storage.write(memory_id, memory_type, content)
 
         # Set cache (simulating a previous read)
-        await redis_cache.set(memory_type, owner_id, name, "cached content")
+        await redis_cache.set_memory(memory_type, owner_id, name, "cached content")
 
         # L0 write should not invalidate L1 cache
-        result = await redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result == "cached content", "L1 cache should survive L0 write"
 
         # Cleanup
         await l0_storage.delete(memory_id, memory_type)
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
 
     @pytest.mark.asyncio
     async def test_l0_delete_does_not_affect_l1_cache_directly(
@@ -424,7 +425,7 @@ class TestL0L1Coordination:
         name = "independent-layers-test"
 
         # Populate both layers
-        await redis_cache.set(memory_type, owner_id, name, "l1 content")
+        await redis_cache.set_memory(memory_type, owner_id, name, "l1 content")
 
         # L0 delete (no event triggered)
         # Note: l0_storage.delete expects (memory_id, memory_type) not (memory_id, memory_type, owner_id, name)
@@ -432,8 +433,8 @@ class TestL0L1Coordination:
         await l0_storage.write(memory_id, memory_type, "l0 content")
 
         # L1 cache should still have data (no listener triggered)
-        result = await redis_cache.get(memory_type, owner_id, name)
+        result = await redis_cache.get_memory(memory_type, owner_id, name)
         assert result == "l1 content", "L1 cache independent of L0 operations"
 
         # Cleanup
-        await redis_cache.delete(memory_type, owner_id, name)
+        await redis_cache.delete_memory(memory_type, owner_id, name)
