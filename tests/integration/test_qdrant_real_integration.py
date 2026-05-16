@@ -21,8 +21,8 @@ import uuid
 
 import pytest
 
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
 from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectionManager
+from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 from tests.environments import get_test_env
 
@@ -54,7 +54,7 @@ async def qdrant_client():
         https=env.qdrant.https,
         timeout=env.qdrant.timeout,
     )
-    wrapper = QdrantClientWrapper(config)
+    wrapper = QdrantManager(config)
 
     # Verify connection
     try:
@@ -68,13 +68,13 @@ async def qdrant_client():
 
 
 @pytest.fixture
-async def collection_manager(qdrant_client: QdrantClientWrapper):
+async def collection_manager(qdrant_client: QdrantManager):
     """Provide QdrantCollectionManager with real client."""
     return QdrantCollectionManager(qdrant_client.get_client())
 
 
 @pytest.fixture
-async def vector_storage(qdrant_client: QdrantClientWrapper):
+async def vector_storage(qdrant_client: QdrantManager):
     """Provide QdrantVectorStorage with real client."""
     return QdrantVectorStorage(qdrant_client.get_client())
 
@@ -182,7 +182,7 @@ class TestQdrantVectorStorage:
     """
 
     async def test_upsert_and_search_vectors(
-        self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper, test_tenant_id: str
+        self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantManager, test_tenant_id: str
     ):
         """测试向量插入和搜索。"""
         collection_name = f"{test_tenant_id}_vector_storage"
@@ -253,9 +253,7 @@ class TestQdrantVectorStorage:
             except Exception:
                 pass
 
-    async def test_delete_vectors(
-        self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantClientWrapper, test_tenant_id: str
-    ):
+    async def test_delete_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantManager, test_tenant_id: str):
         """测试删除向量。"""
         collection_name = f"{test_tenant_id}_vector_delete"
         vector_size = 1024
@@ -317,7 +315,7 @@ class TestQdrantVectorStorage:
 class TestQdrantHealthCheck:
     """Qdrant 健康检查测试。"""
 
-    async def test_health_check(self, qdrant_client: QdrantClientWrapper):
+    async def test_health_check(self, qdrant_client: QdrantManager):
         """测试健康检查。"""
         is_healthy = await qdrant_client.health_check()
         assert is_healthy is True

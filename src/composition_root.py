@@ -90,13 +90,13 @@ def bootstrap() -> None:
 
     # === Storage Layer ===
     from src.infrastructure.config.redis import RedisConfig
-    from src.infrastructure.storage.redis.redis_connection_manager import RedisConnectionManager
+    from src.infrastructure.storage.redis.redis_manager import RedisManager
 
     register_port(
         name="redis_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: RedisConnectionManager(RedisConfig.from_env()),
+        impl=lambda resolver: RedisManager(RedisConfig.from_env()),
         module="src.infrastructure.storage.redis.redis_connection_manager",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -123,14 +123,14 @@ def bootstrap() -> None:
     from src.infrastructure.config.postgresql import PostgreSQLConfig
     from src.infrastructure.config.qdrant import QdrantConfig
     from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
-    from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
-    from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+    from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 
     register_port(
         name="postgresql_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: PostgreSQLAdapter(PostgreSQLConfig.from_env()),
+        impl=lambda resolver: PostgreSQLManager(PostgreSQLConfig.from_env()),
         module="src.infrastructure.storage.postgresql.engine",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -141,7 +141,7 @@ def bootstrap() -> None:
         name="qdrant_connection_manager",
         version="v1.0.0",
         interface=ConnectionManager,
-        impl=lambda resolver: QdrantClientWrapper(QdrantConfig.from_env()),
+        impl=lambda resolver: QdrantManager(QdrantConfig.from_env()),
         module="src.infrastructure.storage.qdrant.client",
         lifetime=Lifetime.SINGLETON,
         owner="storage-team",
@@ -288,7 +288,7 @@ def bootstrap() -> None:
         name="l3_vector",
         version="v1.0.0",
         interface=L3VectorPort,
-        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
+        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantAdapter",
         module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",

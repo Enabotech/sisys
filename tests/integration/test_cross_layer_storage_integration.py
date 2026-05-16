@@ -28,7 +28,7 @@ from src.domain.ports.l0_storage import L0StoragePort
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
-from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
@@ -72,13 +72,13 @@ def pg_config() -> PostgreSQLConfig:
 
 
 @pytest.fixture
-def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLAdapter:
+def db_engine(pg_config: PostgreSQLConfig) -> PostgreSQLManager:
     """Real database engine instance."""
-    return PostgreSQLAdapter(pg_config)
+    return PostgreSQLManager(pg_config)
 
 
 @pytest.fixture
-def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, test_schema: str):
+def ensure_schema(db_engine: PostgreSQLManager, pg_config: PostgreSQLConfig, test_schema: str):
     """Ensure test schema exists before tests.
 
     Creates a unique schema for this test run to ensure isolation.
@@ -119,7 +119,7 @@ def ensure_schema(db_engine: PostgreSQLAdapter, pg_config: PostgreSQLConfig, tes
 
 
 @pytest.fixture
-async def pg_session(db_engine: PostgreSQLAdapter, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
+async def pg_session(db_engine: PostgreSQLManager, ensure_schema: str) -> AsyncGenerator[AsyncSession, None]:
     """PostgreSQL session with transactional rollback.
 
     Uses begin_nested() to create a savepoint for test isolation.

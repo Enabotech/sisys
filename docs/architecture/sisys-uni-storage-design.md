@@ -95,7 +95,7 @@
 | **L0** | 文件系统 | MEMORY.md 索引、记忆文件 | `L0StoragePort` | `FileMemoryAdapter` |
 | **L1** | Redis 7.0+ | 会话状态、记忆缓存 | `L1CachePort` | `RedisMemoryCache (async)` |
 | **L2** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | `L2MetadataRepositoryProtocol` + `L2ChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` |
-| **L3** | Qdrant 1.7+ | 嵌入向量、混合检索 | `L3VectorPort` | `QdrantVectorAdapter` |
+| **L3** | Qdrant 1.7+ | 嵌入向量、混合检索 | `L3VectorPort` | `QdrantAdapter` |
 | **L4** | MinIO WORM | 原始文档、证据包 | `L4ObjectPort` | `MinIOAdapter` |
 | **L5** | Neo4j 5.x | 知识图谱、实体关系 | `L5GraphPort` | `Neo4jAdapter` |
 
@@ -1568,7 +1568,7 @@ class UnifiedStorageFactory:
 | `L1CachePort` | `RedisMemoryCache (async)` | ✅ 已实现（重构为 async） |
 | `L2MetadataRepositoryProtocol` | `PostgreSQLMemoryMetadataRepository` | ✅ 已有 |
 | `L2ChangeHistoryRepositoryProtocol` | `PostgreSQLMemoryChangeHistoryRepository` | ✅ 已有 |
-| `L3VectorPort` | `QdrantVectorAdapter` | ⚠️ 需新增（包装现有 `QdrantVectorStorage`） |
+| `L3VectorPort` | `QdrantAdapter` | ⚠️ 需新增（包装现有 `QdrantVectorStorage`） |
 | `L4ObjectPort` | `MinIOAdapter` | ⚠️ 需新增（包装现有 `MinIORepository`） |
 | `L5GraphPort` | `Neo4jAdapter` | ⚠️ 需新增（包装现有 `Neo4jGraphStorage`） |
 
@@ -1673,7 +1673,7 @@ Infrastructure Layer（实现 Domain Port）
 ├── RedisMemoryCache (async) → L1CachePort
 ├── PostgreSQLMemoryMetadataRepository → L2MetadataRepositoryProtocol
 ├── PostgreSQLMemoryChangeHistoryRepository → L2ChangeHistoryRepositoryProtocol
-├── QdrantVectorAdapter  → L3VectorPort
+├── QdrantAdapter  → L3VectorPort
 ├── MinIOAdapter         → L4ObjectPort
 └── Neo4jAdapter         → L5GraphPort
 ```
@@ -1729,7 +1729,7 @@ Infrastructure Layer（实现 Domain Port）
 
 1. `RedisMemoryCache` 一步到位重构为 async（使用 `redis.asyncio`）
 2. **同步修改** `SixLayerStorageCoordinator` 的 L1 调用方式或废弃之
-3. `QdrantVectorAdapter` 实现 `L3VectorPort`（包装现有 `QdrantVectorStorage`）
+3. `QdrantAdapter` 实现 `L3VectorPort`（包装现有 `QdrantVectorStorage`）
 4. `MinIOAdapter` 实现 `L4ObjectPort`（包装现有 `MinIORepository`）
 5. `Neo4jAdapter` 实现 `L5GraphPort`（包装现有 `Neo4jGraphStorage`）
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from src.infrastructure.storage.postgresql.models import UserModel
-from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 
 
 class UserRepository(PostgreSQLAdapter[UserModel, UserModel]):

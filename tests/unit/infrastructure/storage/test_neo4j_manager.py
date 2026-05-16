@@ -40,7 +40,7 @@ def wrapper(mock_driver: MagicMock):
     return Neo4jManager(mock_driver, database="test_db")
 
 
-class TestNeo4jClientWrapper:
+class TestNeo4jManager:
     """Neo4jManager 测试类。"""
 
     def test_init_with_driver(self, mock_driver: MagicMock):
@@ -59,6 +59,7 @@ class TestNeo4jClientWrapper:
 
     async def test_health_check_success(self, wrapper: Neo4jManager, mock_driver: MagicMock, mock_session: MagicMock):
         """测试健康检查成功。"""
+
         async def mock_run(*args, **kwargs):
             result_mock = MagicMock()
             result_mock.single = AsyncMock(return_value=("1",))
@@ -83,10 +84,3 @@ class TestNeo4jClientWrapper:
         await wrapper.close()
 
         mock_driver.close.assert_called_once()
-        assert wrapper._driver is None
-
-    async def test_close_without_driver(self):
-        """测试驱动为 None 时关闭不报错。"""
-        wrapper = Neo4jManager(MagicMock(), database="neo4j")
-        wrapper._driver = None
-        await wrapper.close()

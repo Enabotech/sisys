@@ -34,7 +34,7 @@ src/application/use_cases/role_management.py          # RoleAlreadyExistsError, 
 src/application/ports/sandbox_port.py                 # SandboxError, ContainerStartError, ...
 src/infrastructure/messaging/outbox/outbox.py         # InvalidStateTransitionError
 src/infrastructure/messaging/event_store.py            # VersionError
-src/infrastructure/storage/minio/minio_client_adapter.py   # BucketNotFoundError, PermissionDeniedError, ...
+src/infrastructure/storage/minio/minio_manager.py   # BucketNotFoundError, PermissionDeniedError, ...
 src/infrastructure/security/permission_middleware.py  # PermissionDeniedError, InsufficientTokenError
 ```
 
@@ -818,7 +818,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 #### 第三批：低优先级（基础设施层）
 
-- [x] `src/infrastructure/storage/minio/minio_client_adapter.py` - 使用 ErrorMapper.map_s3_error
+- [x] `src/infrastructure/storage/minio/minio_manager.py` - 使用 ErrorMapper.map_s3_error
 - [x] `src/infrastructure/messaging/outbox/outbox.py` - InvalidStateTransitionError → InvalidStateError
 - [x] `src/infrastructure/messaging/event_store.py` - VersionError → SystemException
 - [x] `src/domain/ports/password_validation_service.py` - PasswordValidationError → ValidationError
@@ -829,7 +829,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 - [x] 实现结构化日志集成 - `src/infrastructure/logging/exception_logger.py`
 - [x] 实现异常监控指标 - `src/infrastructure/logging/exception_metrics.py`
 - [x] 编写回归测试确保无破坏性变更 - 2348 tests passed
-- [x] 统一 ErrorMapper 与现有 _map_error 方法 - minio_client_adapter.py 委托给 ErrorMapper
+- [x] 统一 ErrorMapper 与现有 _map_error 方法 - minio_manager.py 委托给 ErrorMapper
 
 ---
 
@@ -884,7 +884,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 
 | 文件 | 操作 | 描述 |
 |------|------|------|
-| `src/infrastructure/storage/minio/minio_client_adapter.py` | 修改 | 使用 ErrorMapper.map_s3_error |
+| `src/infrastructure/storage/minio/minio_manager.py` | 修改 | 使用 ErrorMapper.map_s3_error |
 | `src/infrastructure/messaging/outbox/outbox.py` | 修改 | InvalidStateTransitionError → InvalidStateError |
 | `src/infrastructure/messaging/event_store.py` | 修改 | VersionError → SystemException |
 | `src/domain/ports/password_validation_service.py` | 修改 | PasswordValidationError → ValidationError |

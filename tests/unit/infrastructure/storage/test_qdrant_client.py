@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.infrastructure.config.qdrant import QdrantConfig
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 
 
 @pytest.fixture
@@ -17,12 +17,12 @@ def mock_async_client():
     return client
 
 
-class TestQdrantClientWrapper:
-    """QdrantClientWrapper 测试类。"""
+class TestQdrantManager:
+    """QdrantManager 测试类。"""
 
     def test_default_initialization(self):
         """测试默认初始化。"""
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         assert wrapper._config.host == "localhost"
         assert wrapper._config.port == 6333
         assert wrapper._config.grpc_port == 6334
@@ -42,7 +42,7 @@ class TestQdrantClientWrapper:
             timeout=60.0,
             max_retries=5,
         )
-        wrapper = QdrantClientWrapper(config)
+        wrapper = QdrantManager(config)
         assert wrapper._config.host == "qdrant.example.com"
         assert wrapper._config.port == 8000
         assert wrapper._config.grpc_port == 8001
@@ -50,11 +50,11 @@ class TestQdrantClientWrapper:
         assert wrapper._config.https is True
         assert wrapper._config.timeout == 60.0
 
-    @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
+    @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     def test_lazy_initialization(self, mock_client: MagicMock, mock_async_client: AsyncMock):
         """测试懒初始化。"""
         mock_client.return_value = mock_async_client
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         assert wrapper._client is None
 
         client = wrapper.get_client()
@@ -66,42 +66,42 @@ class TestQdrantClientWrapper:
         assert client2 is client
         assert mock_client.call_count == 1
 
-    @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
+    @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_health_check_success(self, mock_client: MagicMock, mock_async_client: AsyncMock):
         """测试健康检查成功。"""
         mock_client.return_value = mock_async_client
         mock_async_client.get_collections = AsyncMock(return_value=MagicMock())
 
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         result = await wrapper.health_check()
         assert result is True
 
-    @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
+    @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_health_check_failure(self, mock_client: MagicMock, mock_async_client: AsyncMock):
         """测试健康检查失败。"""
         mock_client.return_value = mock_async_client
         mock_async_client.get_collections = AsyncMock(side_effect=Exception("Connection refused"))
 
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         result = await wrapper.health_check()
         assert result is False
 
-    @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
+    @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_close(self, mock_client: MagicMock, mock_async_client: AsyncMock):
         """测试关闭连接。"""
         mock_client.return_value = mock_async_client
         mock_async_client.close = AsyncMock()
 
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         wrapper.get_client()
         await wrapper.close()
 
         mock_async_client.close.assert_called_once()
         assert wrapper._client is None
 
-    @patch("src.infrastructure.storage.qdrant.client.AsyncQdrantClient")
+    @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_close_without_client(self, mock_client: MagicMock):
         """测试未初始化客户端时关闭连接。"""
-        wrapper = QdrantClientWrapper()
+        wrapper = QdrantManager()
         await wrapper.close()
         mock_client.assert_not_called()

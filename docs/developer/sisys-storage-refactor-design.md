@@ -167,7 +167,7 @@ class DocumentStoragePort(L4ObjectPort, Protocol):
 
 ```
 src/infrastructure/storage/minio/  （已有，保持三层委托）
-├── minio_client_adapter.py        MinioManager — 延迟初始化sync Minio客户端、健康检查
+├── minio_manager.py        MinioManager — 延迟初始化sync Minio客户端、健康检查
 ├── bucket_manager.py         BucketManager — Bucket CRUD、命名验证、WORM配置
 ├── worm_lifecycle.py         WORMManager — 合规锁定、生命周期管理
 ├── object_operations.py      ObjectOperations — 流式上传/下载、分片上传、断点续传
@@ -467,7 +467,7 @@ class RedisSessionCache(SessionCachePort):
 
 **⚠️ 两个同名 BaseRepository 需区分**:
 - **Domain层** `BaseRepository[T]`(src/domain/ports/l2_rdb.py): Protocol，方法为**sync**，**无人继承**，将重命名为`L2RdbPort[T]`并改async
-- **Infrastructure层** `BaseRepository[T]`(src/infrastructure/storage/postgresql/repository/base_repository.py): 具体类，方法已为**async**，被UserRepository/PermissionRepository继承，将重构为`PostgreSQLAdapter[TEntity,TModel]`
+- **Infrastructure层** `BaseRepository[T]`(src/infrastructure/storage/postgresql/repository/postgresql_adapter.py): 具体类，方法已为**async**，被UserRepository/PermissionRepository继承，将重构为`PostgreSQLAdapter[TEntity,TModel]`
 
 **当前状态**: Domain层`BaseRepository[T]`是sync泛型CRUD基座，但L2全部实际端口(Metadata/ChangeHistory/GroupMember)均为async。没有任何L2端口继承它。
 
@@ -532,14 +532,14 @@ class L2GroupMemberRepositoryPort(Protocol):
 
 ### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（重构Infrastructure层BaseRepository[T])
 
-**当前问题**: Infrastructure层`BaseRepository[T]`(base_repository.py)绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
+**当前问题**: Infrastructure层`BaseRepository[T]`(postgresql_adapter.py)绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
 三个L2仓储因此无法继承它，直接实现端口——**违反四条规则**。
 
 **重构方案**: 将Infrastructure层`BaseRepository[T]`重构为`PostgreSQLAdapter[TEntity, TModel]`双泛型基座，
 实现`L2RdbPort[TEntity]`，提供领域实体/ORM模型转换层+可配置行为。
 
 ```python
-# src/infrastructure/storage/postgresql/repository/base_repository.py — 重构
+# src/infrastructure/storage/postgresql/repository/postgresql_adapter.py — 重构
 
 TEntity = TypeVar("TEntity")
 TModel = TypeVar("TModel", bound=Base)
@@ -724,7 +724,7 @@ class PostgreSQLMemoryGroupMemberRepository:
 - MetadataRepository继承：覆写`_do_save`(UPSERT)、`pk_column="memory_id"`、`soft_delete_column="deleted_at"`
 - ChangeHistoryRepository继承：覆写`_do_save`(append-only)、`delete`(禁止)
 - GroupMemberRepository组合注入：无标准CRUD，共享Session基础设施
-- DatabaseEngine统一提供AsyncSession（延迟初始化AsyncEngine, health_check）
+- PostgreSQLManager统一提供AsyncSession（延迟初始化AsyncEngine, health_check）
 
 **⚠️ Infrastructure层BaseRepository迁移影响**:
 - `save()`返回值从`T`变为`None` — UserRepository/PermissionRepository的调用者需检查是否依赖返回值
@@ -794,20 +794,20 @@ class MemoryVectorPort(L3VectorPort, Protocol):
         ...
 ```
 
-### Rule 3: Infrastructure Layer-1 — QdrantVectorAdapter（已有）
+### Rule 3: Infrastructure Layer-1 — QdrantAdapter（已有）
 
 ```
 src/infrastructure/storage/qdrant/
-├── client.py               QdrantClientWrapper — 延迟初始化、健康检查
+├── client.py               QdrantManager — 延迟初始化、健康检查
 ├── collection_manager.py   QdrantCollectionManager — Collection生命周期（已有）
 ├── vector_storage.py        QdrantVectorStorage — 核心向量操作（5方法）
 ├── bm25_builder.py          BM25稀疏向量构建
 ├── models.py                VectorPoint, SparseVector
-└── qdrant_vector_adapter.py QdrantVectorAdapter(L3VectorPort) — 薄适配器
-    连接管理: QdrantClientWrapper（延迟初始化AsyncQdrantClient）
+└── qdrant_vector_adapter.py QdrantAdapter(L3VectorPort) — 薄适配器
+    连接管理: QdrantManager（延迟初始化AsyncQdrantClient）
 ```
 
-**⚠️ 当前缺口**: QdrantVectorAdapter仅实现5/9方法，缺少4个Collection方法：
+**⚠️ 当前缺口**: QdrantAdapter仅实现5/9方法，缺少4个Collection方法：
 - `create_collection`, `delete_collection`, `collection_exists`, `list_collections`
 
 **已有组件**: `QdrantCollectionManager`已实现这4个方法，但**未注入Adapter**。
@@ -821,7 +821,7 @@ src/infrastructure/storage/qdrant/
 | `collection_exists(name)` | `collection_exists(collection)` | `name=collection` |
 | `list_collections()` | `list_collections()` | 直接委托 |
 
-**Phase 3修复**: 在QdrantVectorAdapter构造函数中注入QdrantCollectionManager，补全委托，参数映射在Adapter层完成。
+**Phase 3修复**: 在QdrantAdapter构造函数中注入QdrantCollectionManager，补全委托，参数映射在Adapter层完成。
 
 ### Rule 4: Infrastructure Layer-2 — QdrantMemoryVectorStorage
 
@@ -832,7 +832,7 @@ from src.application.ports.memory_vector_port import MemoryVectorPort
 from src.domain.ports.l3_vector import L3VectorPort
 
 class QdrantMemoryVectorStorage(MemoryVectorPort):
-    """Qdrant记忆向量存储 — 组合注入QdrantVectorAdapter。"""
+    """Qdrant记忆向量存储 — 组合注入QdrantAdapter。"""
 
     COLLECTION_NAME = "sisys_memories"
 
@@ -975,7 +975,7 @@ src/infrastructure/storage/neo4j/
 ├── graph_retriever.py 图检索器（遗留）
 ├── models.py          Neo4j模型
 └── neo4j_adapter.py   Neo4jAdapter(L5GraphPort) — 薄适配器，MERGE语义
-    连接管理: Neo4jClientWrapper（延迟初始化AsyncDriver）
+    连接管理: Neo4jManager（延迟初始化AsyncDriver）
 ```
 
 **⚠️ 当前缺口**: Neo4jAdapter缺少`get_neighbors()`方法（8/9实现）。
@@ -1121,7 +1121,7 @@ def bootstrap() -> None:
     # L2端口的具体实现由三个子仓储直接注册（见下方Rule 4区域）
 
     register_port(name="l3_vector", version="v1.0.0", interface=L3VectorPort,
-        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantVectorAdapter",
+        impl="src.infrastructure.storage.qdrant.qdrant_vector_adapter.QdrantAdapter",
         module="src.infrastructure.storage.qdrant.qdrant_vector_adapter",
         lifetime=Lifetime.SCOPED, owner="storage-team")
 
@@ -1228,7 +1228,7 @@ def bootstrap() -> None:
 
 ### Phase 3: Rule 3 — 基础端口实现完善
 
-- [x] 3.1 补全 `QdrantVectorAdapter` 的4个Collection方法（注入QdrantCollectionManager）
+- [x] 3.1 补全 `QdrantAdapter` 的4个Collection方法（注入QdrantCollectionManager）
 - [x] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [x] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [x] 3.4 补全 `Neo4jAdapter.get_neighbors()` ✅；修复 Cypher 注入漏洞 ✅（whitelist验证+property key清理，neo4j_adapter.py + graph_storage.py）
@@ -1290,12 +1290,12 @@ def bootstrap() -> None:
 | `src/application/ports/memory_vector_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/document_storage_port.py` | **新增** | Phase 2 | Rule 2 | |
 | `src/application/ports/memory_graph_port.py` | **新增** | Phase 2 | Rule 2 | |
-| `src/infrastructure/storage/qdrant/qdrant_vector_adapter.py` | 修改 | Phase 3 | Rule 3 | 补全4 Collection方法 |
+| `src/infrastructure/storage/qdrant/qdrant_adapter.py` | 修改 | Phase 3 | Rule 3 | 补全4 Collection方法 |
 | `src/infrastructure/storage/minio/minio_repository.py` | 修改 | Phase 3 | Rule 3 | archive签名修复 |
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
 | `src/infrastructure/storage/neo4j/graph_storage.py` | 修改 | Phase 3 | Rule 3 | 修复find_path/get_neighbors中的Cypher注入 |
-| `src/infrastructure/storage/postgresql/repository/base_repository.py` | 重构 | Phase 3 | Rule 3 | BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
+| `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py` | 重构 | Phase 3 | Rule 3 | BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
 | `src/infrastructure/storage/postgresql/repository/user_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[UserModel,UserModel]，恒等转换 |
 | `src/infrastructure/storage/postgresql/repository/permission_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[PermissionModel,PermissionModel]，恒等转换 |
 | `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save/pk_column/soft_delete |
@@ -1311,7 +1311,7 @@ def bootstrap() -> None:
 | `src/application/ports/semantic_cache.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
 | `src/application/ports/public_blackboard.py` | 修复 | Phase 5 | Rule 1 | Protocol+abstractmethod反模式 |
 | `tests/unit/domain/ports/test_repository.py` | 更新 | Phase 5 | Rule 1 | BaseRepository→L2RdbPort[T] async签名 |
-| `tests/unit/infrastructure/storage/test_base_repository.py` | 更新 | Phase 5 | Rule 3 | PostgreSQLAdapter[TEntity,TModel]签名 |
+| `tests/unit/infrastructure/storage/test_postgresql_adapter.py` | 更新 | Phase 5 | Rule 3 | PostgreSQLAdapter[TEntity,TModel]签名 |
 | `tests/acceptance/test_story_1_1_steps.py` | 更新 | Phase 5 | Rule 1 | BaseRepository sync→async |
 | `tests/acceptance/test_story_1_5_steps.py` | 更新 | Phase 5 | Rule 1 | BaseRepository sync→async |
 

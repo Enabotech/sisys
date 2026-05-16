@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.storage.postgresql.models import UserModel
-from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 
 

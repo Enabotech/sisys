@@ -14,7 +14,7 @@ from typing import Any, Protocol, runtime_checkable
 class ConnectionManager(Protocol):
     """Unified async connection lifecycle contract.
 
-    All async storage wrappers (DatabaseEngine, QdrantClientWrapper,
+    All async storage wrappers (PostgreSQLManager, QdrantManager,
     Neo4jManager, RedisConnectionManager) satisfy this Protocol
     via structural subtyping.
 
@@ -26,8 +26,8 @@ class ConnectionManager(Protocol):
         get_client(): Return the underlying client instance for direct access.
             Implementations should override this to return their specific client:
             - RedisConnectionManager -> aioredis.Redis
-            - DatabaseEngine -> AsyncEngine
-            - QdrantClientWrapper -> AsyncQdrantClient
+            - PostgreSQLManager -> AsyncEngine
+            - QdrantManager -> AsyncQdrantClient
             - Neo4jManager -> AsyncDriver
     """
 

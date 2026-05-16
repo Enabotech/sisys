@@ -11,7 +11,7 @@ from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.qdrant import QdrantConfig
 
 
-class QdrantClientWrapper(ConnectionManager):
+class QdrantManager(ConnectionManager):
     """Qdrant 异步客户端封装。
 
     支持懒初始化、健康检查和优雅关闭。

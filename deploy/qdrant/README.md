@@ -109,14 +109,14 @@ docker compose down -v
 
 ```python
 from src.infrastructure.config.qdrant import QdrantConfig
-from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+from src.infrastructure.storage.qdrant.client import QdrantManager
 from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
 # 从环境变量加载配置
 config = QdrantConfig.from_env()
 
 # 创建客户端
-client_wrapper = QdrantClientWrapper(
+client_wrapper = QdrantManager(
     host=config.host,
     port=config.port,
     grpc_port=config.grpc_port,

@@ -1341,7 +1341,7 @@ async def _cleanup_tenant_resources(
         cleanup_errors.append(f"RabbitMQ cleanup error: {e}")
 
     # 清理 Qdrant Collections
-    # ✅ 修复 #H/#N4: 使用与 QdrantClientWrapper._create_client() 一致的参数
+    # ✅ 修复 #H/#N4: 使用与 QdrantManager._create_client() 一致的参数
     try:
         from qdrant_client import AsyncQdrantClient
 

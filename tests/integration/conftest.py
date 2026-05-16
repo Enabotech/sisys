@@ -230,7 +230,7 @@ async def real_postgres_engine():
     Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
     """
     from src.infrastructure.config.postgresql import PostgreSQLConfig
-    from src.infrastructure.storage.postgresql.engine import PostgreSQLAdapter
+    from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
     config = get_test_env()
 
@@ -242,7 +242,7 @@ async def real_postgres_engine():
         password=config.postgres.password,
     )
 
-    engine = PostgreSQLAdapter(pg_config)
+    engine = PostgreSQLManager(pg_config)
 
     # Verify connection
     try:
@@ -278,9 +278,9 @@ async def real_qdrant_client():
     """
     config = get_test_env()
 
-    from src.infrastructure.storage.qdrant.client import QdrantClientWrapper
+    from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 
-    wrapper = QdrantClientWrapper(
+    wrapper = QdrantManager(
         host=config.qdrant.host,
         port=config.qdrant.port,
         grpc_port=config.qdrant.grpc_port,

@@ -18,7 +18,7 @@ from src.infrastructure.storage.minio.minio_manager import (
 )
 
 
-class TestMinioClientAdapterInit:
+class TestMinioManagerInit:
     """MinioManager 初始化测试。"""
 
     def test_init_with_client(self):
@@ -47,7 +47,7 @@ class TestMinioClientAdapterInit:
         assert adapter.client is adapter.client
 
 
-class TestMinioClientAdapterErrorHandling:
+class TestMinioManagerErrorHandling:
     """MinioManager 错误处理测试。"""
 
     def test_map_s3_error_bucket_not_found(self):

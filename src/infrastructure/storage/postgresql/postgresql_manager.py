@@ -16,14 +16,14 @@ from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
-class PostgreSQLAdapter(ConnectionManager):
+class PostgreSQLManager(ConnectionManager):
     """通用数据库引擎接口。
 
     支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化。
     """
 
     def __init__(self, config: PostgreSQLConfig | None = None):
-        """初始化 DatabaseEngine。
+        """初始化 PostgreSQLManager。
 
         Args:
             config: PostgreSQL 配置实例，如果为 None 则从环境变量加载

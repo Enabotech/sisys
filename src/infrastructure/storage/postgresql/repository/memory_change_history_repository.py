@@ -26,7 +26,7 @@ from sqlalchemy import select
 from src.domain.entities.memory_change_history import MemoryChangeHistory
 from src.domain.ports.memory_repository import L2ChangeHistoryRepositoryPort
 from src.infrastructure.storage.postgresql.models.memory import MemoryChangeHistoryModel
-from src.infrastructure.storage.postgresql.repository.base_repository import PostgreSQLAdapter
+from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 
 
 class PostgreSQLMemoryChangeHistoryRepository(

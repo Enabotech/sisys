@@ -15,7 +15,7 @@ def mock_client():
     return AsyncMock()
 
 
-class TestQdrantCollectionManager:
+class TestQdrantManager:
     """QdrantCollectionManager 测试类。"""
 
     @pytest.mark.asyncio
