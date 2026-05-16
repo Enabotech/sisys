@@ -1,7 +1,6 @@
 """MinIO 客户端适配器。
 
 封装 MinIO Python SDK，提供连接池管理、错误处理和重试机制。
-各组件独立 `_get_client()` 懒加载，不引入全局连接池。
 """
 
 from __future__ import annotations
@@ -27,38 +26,40 @@ __all__ = [
 ]
 
 
-class MinioClientAdapter:
+class MinioManager:
     """MinIO 客户端适配器。
 
     封装 MinIO Python SDK，提供：
-    - 独立懒加载连接池（与 Story 1.3/1.4 一致）
+    - 客户端实例注入（符合 Cosmic Python DI 模式）
     - S3 错误映射
     - 健康检查
     """
 
-    def __init__(self, config: MinIOConfig) -> None:
+    def __init__(self, client: Minio) -> None:
         """初始化客户端适配器。
 
         Args:
-            config: MinIO 连接配置
+            client: Minio 客户端实例
         """
-        self._config = config
-        self._client: Minio | None = None
+        self._client = client
 
-    def _get_client(self) -> Minio:
-        """获取或创建 MinIO 客户端（懒加载）。
+    @classmethod
+    def from_config(cls, config: MinIOConfig) -> MinioManager:
+        """从配置创建适配器实例（生产环境入口）。
+
+        Args:
+            config: MinIO 连接配置
 
         Returns:
-            MinIO 客户端实例
+            MinioManager 实例
         """
-        if self._client is None:
-            self._client = Minio(
-                self._config.endpoint,
-                access_key=self._config.access_key,
-                secret_key=self._config.secret_key,
-                secure=self._config.secure,
-            )
-        return self._client
+        client = Minio(
+            config.endpoint,
+            access_key=config.access_key,
+            secret_key=config.secret_key,
+            secure=config.secure,
+        )
+        return cls(client)
 
     @property
     def client(self) -> Minio:
@@ -67,7 +68,7 @@ class MinioClientAdapter:
         Returns:
             MinIO 客户端实例
         """
-        return self._get_client()
+        return self._client
 
     @staticmethod
     def _map_error(error: S3Error) -> Exception:
@@ -105,7 +106,7 @@ class MinioClientAdapter:
         """
         try:
             # 尝试列出 bucket（不要求任何 bucket 存在）
-            self._get_client().list_buckets()
+            self._client.list_buckets()
             return True
         except Exception:
             return False

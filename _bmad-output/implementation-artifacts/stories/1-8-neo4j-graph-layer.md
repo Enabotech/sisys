@@ -83,7 +83,7 @@
   - 字段: `uri: str`, `username: str`, `password: str`, `database: str = "neo4j"`
   - 字段: `max_connection_pool_size: int = 50`, `connection_timeout: float = 30.0`, `max_retry_time: float = 30.0`
   - 方法: `from_env() -> Neo4jConfig`（从环境变量读取）
-- [ ] Neo4jClient 通用接口定义（`src/infrastructure/storage/neo4j/client.py`）
+- [ ] Neo4jClient 通用接口定义（`src/infrastructure/storage/neo4j_manager.py`）
   - 方法: `get_async_driver() -> AsyncDriver`, `health_check() -> bool`, `close() -> None`
   - 懒初始化（首次调用时创建 driver）
   - 健康检查（执行简单 Cypher 查询 `RETURN 1` 验证连接）
@@ -245,7 +245,7 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | Neo4j 连接池 | 客户端创建、复用、关闭、健康检查 | `test_neo4j_client.py` | Task 1 |
+| **TDD 单元测试** | Neo4j 连接池 | 客户端创建、复用、关闭、健康检查 | `test_neo4j_manager.py` | Task 1 |
 | **TDD 单元测试** | 节点管理 | 创建、删除、查询、MERGE 语义 | `test_graph_node.py` | Task 2 |
 | **TDD 单元测试** | 关系管理 | 创建、删除、查询、类型约束 | `test_graph_relationship.py` | Task 2 |
 | **TDD 单元测试** | Cypher 查询 | 参数化查询、路径查询、邻居查询 | `test_cypher_query.py` | Task 3 |
@@ -282,7 +282,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | Neo4j 连接池与客户端 | Task 1 | Neo4jConfig + Neo4jClient | `test_neo4j_client.py` |
+| AC-1 | Neo4j 连接池与客户端 | Task 1 | Neo4jConfig + Neo4jClient | `test_neo4j_manager.py` |
 | AC-2 | 节点与关系管理 | Task 2 | GraphNode + GraphRelationship + Neo4jGraphManager | `test_graph_node.py`, `test_graph_relationship.py` |
 | AC-3 | Cypher 查询与图遍历 | Task 3 | GraphStorage 接口 + Neo4jGraphStorage | `test_cypher_query.py` |
 | AC-4 | GraphRAG 增强检索基础 | Task 4 | GraphRetriever | `test_graph_retriever.py` |
@@ -341,8 +341,8 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_neo4j_client.py`（客户端创建、健康检查、关闭） |
-| 🟢 绿 | 实现 `Neo4jClientWrapper` 类最小代码 |
+| 🔴 红 | 编写 `test_neo4j_manager.py`（客户端创建、健康检查、关闭） |
+| 🟢 绿 | 实现 `Neo4jManager` 类最小代码 |
 | 🔄 重构 | 添加懒初始化、异常处理、健康检查 |
 
 - [x] Subtask: 🔴 红 — 编写 Neo4jClient 失败测试
@@ -660,7 +660,7 @@ sisys/
 │   ├── unit/
 │   │   ├── infrastructure/
 │   │   │   ├── test_neo4j_config.py
-│   │   │   ├── test_neo4j_client.py
+│   │   │   ├── test_neo4j_manager.py
 │   │   │   ├── test_graph_node.py
 │   │   │   ├── test_graph_relationship.py
 │   │   │   ├── test_graph_manager.py
@@ -742,7 +742,7 @@ sisys/
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/config/neo4j.py` - Neo4jConfig 配置模型
-- `src/infrastructure/storage/neo4j/client.py` - Neo4jClient 通用接口
+- `src/infrastructure/storage/neo4j_manager.py` - Neo4jClient 通用接口
 - `src/infrastructure/storage/neo4j/models.py` - GraphNode/GraphRelationship 数据模型
 - `src/infrastructure/storage/neo4j/graph_manager.py` - Neo4jGraphManager 实现
 - `src/infrastructure/storage/neo4j/graph_storage.py` - Neo4jGraphStorage 实现
@@ -789,7 +789,7 @@ sisys/
 
 **关键实现:**
 - Neo4jConfig: 环境变量配置加载，from_env() 支持
-- Neo4jClientWrapper: 懒初始化 AsyncDriver，健康检查，优雅关闭
+- Neo4jManager: 懒初始化 AsyncDriver，健康检查，优雅关闭
 - GraphNode/GraphRelationship: 数据模型 + RelationshipType 枚举
 - Neo4jGraphManager: 节点/关系 CRUD，MERGE 语义
 - Neo4jGraphStorage: 参数化 Cypher 查询，路径查询，邻居查询

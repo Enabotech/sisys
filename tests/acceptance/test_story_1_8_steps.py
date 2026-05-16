@@ -23,11 +23,11 @@ import pytest
 from pytest_bdd import given, scenario, then, when
 
 from src.infrastructure.config.neo4j import Neo4jConfig
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
 from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 from src.infrastructure.storage.neo4j.graph_retriever import GraphRetriever
 from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
+from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 from tests.environments import get_test_env
 
 # Import reset_test_environment for test isolation (AC-4 A8)
@@ -54,7 +54,7 @@ def test_tenant_id() -> str:
 
 
 @pytest.fixture
-async def cleanup_neo4j_test_data(neo4j_client: Neo4jClientWrapper, test_tenant_id: str):
+async def cleanup_neo4j_test_data(neo4j_client: Neo4jManager, test_tenant_id: str):
     """Cleanup Neo4j test data after each test.
 
     Deletes all nodes and relationships with test tenant label.
@@ -63,7 +63,7 @@ async def cleanup_neo4j_test_data(neo4j_client: Neo4jClientWrapper, test_tenant_
     # Cleanup: delete all test nodes
     try:
         driver = neo4j_client.get_client()
-        async with driver.session(database=neo4j_client._config.database) as session:
+        async with driver.session(database=neo4j_client._database) as session:
             await session.run(f"MATCH (n) WHERE n.test_tenant = '{test_tenant_id}' DETACH DELETE n")
     except Exception:
         pass  # Ignore cleanup errors
@@ -83,25 +83,25 @@ def neo4j_config() -> Neo4jConfig:
 
 
 @pytest.fixture
-def neo4j_client(neo4j_config: Neo4jConfig) -> Neo4jClientWrapper:
+def neo4j_client(neo4j_config: Neo4jConfig) -> Neo4jManager:
     """Real Neo4j client wrapper instance."""
-    return Neo4jClientWrapper(neo4j_config)
+    return Neo4jManager.from_config(neo4j_config)
 
 
 @pytest.fixture
-def graph_storage(neo4j_client: Neo4jClientWrapper) -> Neo4jGraphStorage:
+def graph_storage(neo4j_client: Neo4jManager) -> Neo4jGraphStorage:
     """Real Neo4j graph storage instance for queries."""
     return Neo4jGraphStorage(neo4j_client.get_client())
 
 
 @pytest.fixture
-def graph_manager(neo4j_client: Neo4jClientWrapper) -> Neo4jGraphManager:
+def graph_manager(neo4j_client: Neo4jManager) -> Neo4jGraphManager:
     """Real Neo4j graph manager instance for CRUD operations."""
     return Neo4jGraphManager(neo4j_client.get_client())
 
 
 @pytest.fixture
-def graph_retriever(neo4j_client: Neo4jClientWrapper) -> GraphRetriever:
+def graph_retriever(neo4j_client: Neo4jManager) -> GraphRetriever:
     """Real Neo4j graph retriever instance for entity retrieval."""
     return GraphRetriever(neo4j_client.get_client())
 
@@ -156,43 +156,42 @@ def verify_connection_timeout(neo4j_config: Neo4jConfig):
 
 
 # ===================================================================
-# AC-1: Neo4j Client Lazy Initialization
+# AC-1: Neo4j Client Factory Creation
 # ===================================================================
 
 
 @scenario(
     "test_story_1_8.feature",
-    "AC-1 - Neo4j 客户端懒初始化",
+    "AC-1 - Neo4j 客户端工厂创建",
 )
-def test_neo4j_client_lazy_initialization(neo4j_client: Neo4jClientWrapper):
-    """Test Neo4j client lazy initialization."""
+def test_neo4j_client_factory_creation(neo4j_client: Neo4jManager):
+    """Test Neo4j client factory creation."""
     pass
 
 
-@given("Neo4jClientWrapper 已实例化但客户端未创建")
-def client_wrapper_instantiated_not_created(neo4j_client: Neo4jClientWrapper):
-    """Neo4jClientWrapper instantiated but client not created."""
-    # Lazy initialization means driver is None before first use
-    assert neo4j_client._driver is None, "Driver should not be created yet (lazy init)"
+@given("Neo4jManager 通过 from_config 创建")
+def client_wrapper_created_via_factory(neo4j_client: Neo4jManager):
+    """Neo4jManager created via from_config."""
+    assert neo4j_client._driver is not None, "Driver should be created by from_config"
 
 
-@when("首次调用 get_async_driver()")
-def call_get_async_driver(neo4j_client: Neo4jClientWrapper):
-    """First call to get_async_driver()."""
+@when("调用 get_async_driver()")
+def call_get_async_driver_on_factory_client(neo4j_client: Neo4jManager):
+    """Call get_async_driver()."""
     driver = neo4j_client.get_async_driver()
     return driver
 
 
-@then("应创建 Neo4j 异步驱动")
-def verify_async_driver_created(neo4j_client: Neo4jClientWrapper):
-    """Verify Neo4j async driver is created."""
+@then("应返回已创建的 Neo4j 异步驱动")
+def verify_async_driver_already_created(neo4j_client: Neo4jManager):
+    """Verify Neo4j async driver is already created."""
     driver = neo4j_client.get_async_driver()
     assert driver is not None
 
 
-@then("后续调用应复用同一驱动实例")
-def verify_same_driver_instance(neo4j_client: Neo4jClientWrapper):
-    """Verify subsequent calls return the same driver instance."""
+@then("多次调用应返回同一驱动实例")
+def verify_same_driver_instance_on_multiple_calls(neo4j_client: Neo4jManager):
+    """Verify multiple calls return the same driver instance."""
     driver1 = neo4j_client.get_async_driver()
     driver2 = neo4j_client.get_async_driver()
     assert driver1 is driver2, "Should return the same driver instance"

@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.infrastructure.config.minio import MinIOConfig
-from src.infrastructure.storage.minio.client_adapter import ComplianceLockError
 from src.infrastructure.storage.minio.entities import LifecycleRule
+from src.infrastructure.storage.minio.minio_manager import ComplianceLockError
 from src.infrastructure.storage.minio.worm_lifecycle import (
     SOX_RETENTION_DAYS,
     WORMManager,

@@ -15,7 +15,7 @@ from minio.versioningconfig import VersioningConfig
 
 from src.domain.exceptions.storage_exceptions import BucketNameValidationError
 from src.infrastructure.config.minio import MinIOConfig
-from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+from src.infrastructure.storage.minio.minio_manager import MinioManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class BucketManager:
             config: MinIO 连接配置
         """
         self._config = config
-        self._adapter = MinioClientAdapter(config)
+        self._adapter = MinioManager.from_config(config)
 
     @property
     def bucket_prefix(self) -> str:
@@ -51,11 +51,11 @@ class BucketManager:
         return self._config.bucket_prefix
 
     @property
-    def _client(self) -> MinioClientAdapter:
+    def _client(self) -> MinioManager:
         """获取客户端适配器。
 
         Returns:
-            MinioClientAdapter 实例
+            MinioManager 实例
         """
         return self._adapter
 

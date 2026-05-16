@@ -346,12 +346,12 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `test_minio_client_adapter.py`（客户端初始化、连接池、超时配置） |
-| 🟢 绿 | 实现 `MinioClientAdapter` 类最小代码（构造函数、连接方法） |
+| 🟢 绿 | 实现 `MinioManager` 类最小代码（构造函数、连接方法） |
 | 🔄 重构 | 应用依赖注入模式、添加类型注解、docstring |
 
-- [x] Subtask: 🔴 红 — 编写 MinioClientAdapter 失败测试（初始化、连接）
-- [x] Subtask: 🟢 绿 — 实现 MinioClientAdapter 类
-- [x] Subtask: 🔄 重构 — 优化 MinioClientAdapter 代码（依赖注入、类型注解）
+- [x] Subtask: 🔴 红 — 编写 MinioManager 失败测试（初始化、连接）
+- [x] Subtask: 🟢 绿 — 实现 MinioManager 类
+- [x] Subtask: 🔄 重构 — 优化 MinioManager 代码（依赖注入、类型注解）
 
 #### TDD 循环 B：错误处理与重试机制
 
@@ -366,7 +366,7 @@
 - [x] Subtask: 🔄 重构 — 优化错误处理代码
 
 **完成标准/Definition of Done:**
-- [x] MinioClientAdapter 实现完成
+- [x] MinioManager 实现完成
 - [x] 所有 TDD 循环测试通过（10 测试）
 - [x] 基础设施层覆盖率≥75%（97%）
 
@@ -581,7 +581,7 @@ sisys/
 │   │       └── minio/
 │   │           ├── __init__.py
 │   │           ├── entities.py             # ObjectMetadata, LifecycleRule 实体
-│   │           ├── client_adapter.py       # MinioClientAdapter 实现（连接池、错误处理）
+│   │           ├── minio_client_adapter.py       # MinioManager 实现（连接池、错误处理）
 │   │           ├── bucket_manager.py       # Bucket 管理逻辑
 │   │           ├── object_operations.py    # 对象上传/下载逻辑（流式）
 │   │           ├── worm_lifecycle.py       # WORM 锁定与生命周期管理
@@ -663,7 +663,7 @@ sisys/
 - `src/infrastructure/config/minio.py` — MinIOConfig 配置模型
 - `src/infrastructure/storage/minio/__init__.py` — 模块导出
 - `src/infrastructure/storage/minio/entities.py` — ObjectMetadata, LifecycleRule 实体
-- `src/infrastructure/storage/minio/client_adapter.py` — MinioClientAdapter 实现
+- `src/infrastructure/storage/minio/minio_client_adapter.py` — MinioManager 实现
 - `src/infrastructure/storage/minio/bucket_manager.py` — Bucket 管理
 - `src/infrastructure/storage/minio/object_operations.py` — 对象操作（流式上传/下载/分片/断点续传）
 - `src/infrastructure/storage/minio/worm_lifecycle.py` — WORM 锁定与生命周期

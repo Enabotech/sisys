@@ -316,7 +316,7 @@ async def real_minio_client():
     config = get_test_env()
 
     from src.infrastructure.config.minio import MinIOConfig
-    from src.infrastructure.storage.minio.client_adapter import MinioClientAdapter
+    from src.infrastructure.storage.minio.minio_manager import MinioManager
 
     minio_config = MinIOConfig(
         endpoint=f"{config.minio.endpoint}",
@@ -326,7 +326,7 @@ async def real_minio_client():
         region=config.minio.region,
         secure=config.minio.secure,
     )
-    wrapper = MinioClientAdapter(minio_config)
+    wrapper = MinioManager(minio_config)
 
     # Verify connection
     try:
@@ -352,9 +352,9 @@ async def real_neo4j_driver():
     """
     config = get_test_env()
 
-    from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
+    from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 
-    wrapper = Neo4jClientWrapper(
+    wrapper = Neo4jManager(
         host=config.neo4j.host,
         http_port=config.neo4j.http_port,
         bolt_port=config.neo4j.bolt_port,

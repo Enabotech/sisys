@@ -10,11 +10,11 @@
     当 加载 Neo4jConfig 配置
     那么 配置应包含正确的连接参数
 
-  场景: AC-1 - Neo4j 客户端懒初始化
-    假如 Neo4jClientWrapper 已实例化但客户端未创建
-    当 首次调用 get_async_driver()
-    那么 应创建 Neo4j 异步驱动
-    并且 后续调用应复用同一驱动实例
+  场景: AC-1 - Neo4j 客户端工厂创建
+    假如 Neo4jManager 通过 from_config 创建
+    当 调用 get_async_driver()
+    那么 应返回已创建的 Neo4j 异步驱动
+    并且 多次调用应返回同一驱动实例
 
   场景: AC-2 - 节点创建与 MERGE 语义
     假如 Neo4j 图存储层已就绪

@@ -21,9 +21,9 @@ import uuid
 
 import pytest
 
-from src.infrastructure.storage.neo4j.client import Neo4jClientWrapper
 from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship, RelationshipType
+from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 
 # Import reset_test_environment for test isolation (AC-6)
 
@@ -55,7 +55,7 @@ async def neo4j_client():
         password=os.getenv("NEO4J_PASSWORD", "password123"),
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
     )
-    wrapper = Neo4jClientWrapper(config)
+    wrapper = Neo4jManager.from_config(config)
 
     # Verify connection
     try:
@@ -70,7 +70,7 @@ async def neo4j_client():
 
 
 @pytest.fixture
-async def graph_manager(neo4j_client: Neo4jClientWrapper):
+async def graph_manager(neo4j_client: Neo4jManager):
     """Provide Neo4jGraphManager with real client."""
     return Neo4jGraphManager(neo4j_client.get_client())
 
@@ -83,12 +83,12 @@ async def graph_manager(neo4j_client: Neo4jClientWrapper):
 class TestNeo4jConnection:
     """Neo4j 连接真实实例测试。"""
 
-    async def test_health_check(self, neo4j_client: Neo4jClientWrapper):
+    async def test_health_check(self, neo4j_client: Neo4jManager):
         """测试健康检查。"""
         result = await neo4j_client.health_check()
         assert result is True
 
-    async def test_driver_connection(self, neo4j_client: Neo4jClientWrapper):
+    async def test_driver_connection(self, neo4j_client: Neo4jManager):
         """测试驱动连接。"""
         driver = neo4j_client.get_client()
         assert driver is not None
@@ -219,7 +219,7 @@ class TestNeo4jRelationshipOperations:
 class TestNeo4jQueries:
     """Neo4j 查询执行测试。"""
 
-    async def test_execute_read_query(self, neo4j_client: Neo4jClientWrapper):
+    async def test_execute_read_query(self, neo4j_client: Neo4jManager):
         """测试执行读查询。"""
         driver = neo4j_client.get_async_driver()
 
@@ -230,7 +230,7 @@ class TestNeo4jQueries:
             # Check that the record has the 'total' key
             assert record["total"] >= 0
 
-    async def test_execute_write_query(self, neo4j_client: Neo4jClientWrapper):
+    async def test_execute_write_query(self, neo4j_client: Neo4jManager):
         """测试执行写查询。"""
         driver = neo4j_client.get_async_driver()
 

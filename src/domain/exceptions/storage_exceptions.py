@@ -3,7 +3,7 @@
 异常来源：
 - src/domain/services/memory_service.py → MemoryVersionConflictError, MemoryNotFoundError
 - src/infrastructure/storage/minio/bucket_manager.py → BucketNameValidationError
-- src/infrastructure/storage/minio/client_adapter.py → BucketNotFoundError, MinIOConnectionError
+- src/infrastructure/storage/minio/minio_client_adapter.py → BucketNotFoundError, MinIOConnectionError
 """
 
 from __future__ import annotations

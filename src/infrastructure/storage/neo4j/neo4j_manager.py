@@ -1,6 +1,6 @@
 """Neo4j 客户端封装。
 
-提供懒初始化、健康检查和优雅关闭功能。
+提供健康检查和优雅关闭功能。
 """
 
 from __future__ import annotations
@@ -11,43 +11,47 @@ from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.neo4j import Neo4jConfig
 
 
-class Neo4jClientWrapper(ConnectionManager):
+class Neo4jManager(ConnectionManager):
     """Neo4j 异步客户端封装。
 
-    支持懒初始化、健康检查和优雅关闭。
+    支持构造函数注入驱动实例、健康检查和优雅关闭。
     """
 
-    def __init__(self, config: Neo4jConfig | None = None):
+    def __init__(self, driver: AsyncDriver, *, database: str = "neo4j") -> None:
         """初始化 Neo4j 客户端封装。
 
         Args:
-            config: Neo4j 配置实例，如果为 None 则从环境变量加载
+            driver: Neo4j 异步驱动实例
+            database: 默认数据库名称
         """
-        self._config = config or Neo4jConfig.from_env()
-        self._driver: AsyncDriver | None = None
+        self._driver = driver
+        self._database = database
 
-    def _create_driver(self) -> AsyncDriver:
-        """创建 Neo4j 异步驱动。
+    @classmethod
+    def from_config(cls, config: Neo4jConfig | None = None) -> Neo4jManager:
+        """从配置创建封装实例（生产环境入口）。
+
+        Args:
+            config: Neo4j 配置实例，如果为 None 则从环境变量加载
 
         Returns:
-            AsyncDriver 实例
+            Neo4jManager 实例
         """
+        config = config or Neo4jConfig.from_env()
         driver = AsyncGraphDatabase.driver(
-            self._config.uri,
-            auth=(self._config.username, self._config.password),
-            max_connection_pool_size=self._config.max_connection_pool_size,
-            connection_acquisition_timeout=self._config.connection_timeout,
+            config.uri,
+            auth=(config.username, config.password),
+            max_connection_pool_size=config.max_connection_pool_size,
+            connection_acquisition_timeout=config.connection_timeout,
         )
-        return driver
+        return cls(driver, database=config.database)
 
     def get_client(self) -> AsyncDriver:
-        """获取异步驱动（懒初始化）。
+        """获取异步驱动。
 
         Returns:
             AsyncDriver 实例
         """
-        if self._driver is None:
-            self._driver = self._create_driver()
         return self._driver
 
     def get_async_driver(self) -> AsyncDriver:
@@ -56,7 +60,7 @@ class Neo4jClientWrapper(ConnectionManager):
         Returns:
             AsyncDriver 实例
         """
-        return self.get_client()
+        return self._driver
 
     async def health_check(self) -> bool:
         """检查 Neo4j 服务是否可用。
@@ -65,8 +69,7 @@ class Neo4jClientWrapper(ConnectionManager):
             如果服务可用返回 True，否则返回 False
         """
         try:
-            driver = self.get_client()
-            async with driver.session(database=self._config.database) as session:
+            async with self._driver.session(database=self._database) as session:
                 result = await session.run("RETURN 1")
                 await result.single()
             return True
