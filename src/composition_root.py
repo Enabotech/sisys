@@ -698,7 +698,12 @@ def bootstrap() -> None:
         name="session_cache",
         version="v1.0.0",
         interface=SessionCachePort,
-        impl="src.infrastructure.storage.redis.redis_session_cache.RedisSessionCache",
+        impl=lambda resolver: __import__(
+            "src.infrastructure.storage.redis.redis_session_cache",
+            fromlist=["RedisSessionCache"],
+        ).RedisSessionCache(
+            adapter=resolver.resolve("redis_adapter"),
+        ),
         module="src.infrastructure.storage.redis.redis_session_cache",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
