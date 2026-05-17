@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.4 | 状态: 审查修订中
+> 版本: 2.5 | 状态: 审查完成
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第9轮（第二批）：DeadLetterQueue方案B否决+InMemoryDeadLetterQueue async、retry_policy完全废弃方案、flush()语义修正、@runtime_checkable async限制说明、29个遗漏测试文件补全到影响面分析表
+> 第10轮（第二批终轮）：__init_subclass__因@dataclass时序完全失效（18/22事件未注册）、EventRegistry异常类型ValueError保持、rabbitmq_listener参数类型描述修正、PostgresDLQ.enqueue缺flush、多实例Poller部署约束声明、_write_to_postgresql RETURNING、Redis降级策略、Lua脚本编码+Cluster声明、YAML优先级规则
 
 ## Context
 
@@ -43,21 +43,23 @@
 - [ ] **修改** `src/domain/events/listener.py`：`enqueue`/`dequeue` 改为 async，`InMemoryDeadLetterQueue` 同步实现改为async（`asyncio.Queue` 替代 `collections.deque`）
 - [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：改为实现Domain层 `DeadLetterQueue` Protocol，对齐返回值
 - [ ] **修改** `src/infrastructure/messaging/outbox/dead_letter_queue.py`：删除 `DeadLetterQueue` ABC 和 `InMemoryDeadLetterQueue`，改为 re-export from Domain层
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：更新 import 路径
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新 import 路径，`set_dead_letter_queue` 参数类型从 `Any` 改为 `DeadLetterQueue`
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：`set_dead_letter_queue` 参数类型从 `Any` 改为 `DeadLetterQueue`，添加从 Domain 层的 import
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：`dlq` 构造函数参数类型从 `Any` 改为 `DeadLetterQueue`，添加从 Domain 层的 import
 - [ ] **验证**：所有引用DeadLetterQueue的文件使用统一import，`grep -r "DeadLetterQueue" src/` 无重复定义
 
 **关键文件**：
 - `src/domain/events/listener.py` (L119-170, 保留)
 - `src/infrastructure/messaging/outbox/dead_letter_queue.py` (全文, 清理)
 - `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` (import路径)
+- `src/infrastructure/messaging/rabbitmq_listener.py` (L71 参数类型 Any→DeadLetterQueue)
+- `src/infrastructure/messaging/rabbitmq_consumer.py` (L49 参数类型 Any→DeadLetterQueue)
 - `tests/unit/infrastructure/messaging/test_postgres_dead_letter_queue.py` (import更新)
 
 #### 任务 1.2: 移除EventRegistry，统一到DomainEvent._registry
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：移除 `EventRegistry` 类，`get()` 改为调用 `DomainEvent._registry.get()`
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：`EventOutboxAdapter.to_domain_event()` L143 使用 `DomainEvent._registry` 查找事件类，替换 `EventRegistry.get(entity.event_type)`
 - [ ] **修改** `src/infrastructure/messaging/adapters/sqlalchemy_event_outbox_adapter.py` L59：同步修改 `to_domain_event()` 中的事件查找逻辑
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新事件查找逻辑，`EventRegistry.get(event_type)` 改为 `DomainEvent._registry[event_type]`（用 `[]` 访问保持 KeyError 行为，与原 `EventRegistry.get()` 抛异常一致）
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新事件查找逻辑，`EventRegistry.get(event_type)` 改为 `DomainEvent._registry.get(event_type)` + 手动抛 ValueError（保持原异常类型不变），**不要**用 `[]` 访问（会抛 KeyError，与原 ValueError 行为不一致）
 - [ ] **验证**：`grep -r "EventRegistry" src/` 仅在注释或删除标记中出现
 
 **关键文件**：
@@ -67,6 +69,16 @@
 - `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` (更新)
 
 #### 任务 1.3: 统一事件注册方式为__init_subclass__自动注册
+- [ ] **P0-修复** `src/domain/events/base.py` `__init_subclass__`（L79-87）：当前 `is_dataclass(cls)` 在 `__init_subclass__` 调用时始终为 `False`（`@dataclass` 装饰器尚未执行），导致自动注册完全失效。当前仅4个手动注册事件在 `_registry` 中，18个事件未注册。**必须修复注册逻辑**：
+  ```python
+  def __init_subclass__(cls, **kwargs: Any) -> None:
+      super().__init_subclass__(**kwargs)
+      # 直接从 cls.__dict__ 读取，绕过 @dataclass 装饰器时序问题
+      et_field = cls.__dict__.get("event_type")
+      if et_field is not None and hasattr(et_field, "init") and not et_field.init:
+          if et_field.default is not MISSING:
+              DomainEvent._registry[et_field.default] = cls
+  ```
 - [ ] **修改** `src/domain/events/base.py` `from_dict` 方法（L228-243）：当前 L230 硬编码传入 `event_type=event_type`，对 `init=False` 字段会触发 TypeError。**必须同步修改**：
   ```python
   # 修复逻辑：仅当 event_type 字段的 init=True 时才传入
@@ -77,20 +89,20 @@
   return target_class(**init_kwargs, **extra_kwargs)
   ```
 - [ ] **修改** 4个使用 `__post_init__` + `object.__setattr__` 的事件类（AutoTriggered, AutoRouted, MemoryChanged, AutoExecuted），改为 `event_type: str = field(default="X", init=False)` 模式
-- [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式
+- [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式。注意：`__post_init__` 中的验证逻辑（`if not self.actor`）不受影响，但 `event_type` 的"必填"语义丢失——改为依赖 `__init_subclass__` 自动注册保证类型正确性
 - [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
 - [ ] **删除** 4个事件类 `__post_init__` 中的 `object.__setattr__(self, "event_type", "X")` 行（AuditEvent除外，其`__post_init__`仅做验证）
-- [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型（预期22个）
+- [ ] **验证（立即执行）**：`python -c "from src.domain.events.base import DomainEvent; from src.domain.events import *; assert len(DomainEvent._registry) >= 22, f'Only {len(DomainEvent._registry)} registered'"`
 - [ ] **建议**：为 `DomainEvent._registry` 添加 `@classmethod reset_registry(cls)` 方法（仅用于测试），在 `tests/fixtures.py` 的 `reset_test_environment` 中调用
 
 **关键文件**：
-- `src/domain/events/base.py` (L228-243 from_dict, L230 event_type传参阻断点)
+- `src/domain/events/base.py` (L79-87 __init_subclass__ 注册逻辑失效, L228-243 from_dict event_type传参阻断点)
 - `src/domain/events/auto_trigger_events.py` (L45 __post_init__ + L57 手动注册)
 - `src/domain/events/auto_route_events.py` (L48 __post_init__ + L56 手动注册)
 - `src/domain/events/memory_events.py` (L55 __post_init__ + L63 手动注册)
 - `src/domain/events/auto_execute_events.py` (L51 __post_init__ + L60 手动注册)
 - `src/domain/events/audit_events.py` (L142 手动register，event_type通过字段默认值设定)
-- 参考正确实现：`src/domain/events/document_events.py` (自动注册模式)
+- ~~参考正确实现：`src/domain.events/document_events.py` (自动注册模式)~~ → **删除此说法**：当前 `__init_subclass__` 完全失效，DocumentProcessed 实际也未注册
 
 ---
 
@@ -234,7 +246,8 @@
 - [ ] **修改** `src/infrastructure/messaging/retry/redis_retry_queue.py` (L178-194)：
   - `dequeue()` 改用 Lua 脚本实现原子 ZRANGEBYSCORE + ZREM
   - **注意**：ZPOPMIN不适合此场景——ZPOPMIN按score最小值弹出，无法按 `score <= now` 做时间过滤，需要额外逻辑处理未到期事件重新入队
-  - Lua 脚本思路：`ZRANGEBYSCORE key -inf now LIMIT 0 count` → `ZREM key members` 原子执行
+  - Lua 脚本思路：`ZRANGEBYSCORE key -inf now LIMIT 0 count` → `ZREM key members` 原子执行。Lua 脚本在服务端执行，避免客户端-服务端往返的编码差异（bytes/str 不一致导致 ZREM 返回 0）
+  - **Redis Cluster 兼容**：单 key 操作，hash tag 同一 slot，Cluster 模式安全
 - [ ] **新增** 并发dequeue测试：两个consumer同时dequeue不重复
 - [ ] **验证**：并发测试通过
 
@@ -244,7 +257,7 @@
 #### 任务 4.2: DualIdempotencyChecker PostgreSQL回退修复（严重BUG）
 - [ ] **修改** `src/infrastructure/messaging/retry/dual_idempotency_checker.py`：
   - **当前BUG**：`_try_acquire_postgresql()` 执行 `INSERT ... ON CONFLICT DO NOTHING` 后用 `fetchone()` 检查结果，但 `fetchone()` 对 `DO NOTHING` 总返回 `None`，导致PG回退路径始终返回 `False`（所有事件被错误标记为"已处理"）
-  - **修复**：改用 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`，根据返回值判断是否插入成功
+  - **修复**：`_try_acquire_postgresql()` 和 `_write_to_postgresql()` 均改为 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`，根据返回值判断是否插入成功。`_write_to_postgresql` 在写入失败时记录 WARNING 日志
 - [ ] **验证**：PostgreSQL回退路径正确检测重复（首次返回True，重复返回False）
 
 **关键文件**：
@@ -253,22 +266,26 @@
 - `tests/acceptance/test_story_20_2_steps.py` (mock session返回值需适配RETURNING)
 
 #### 任务 4.3: RabbitMQConsumer重试改用RedisRetryQueue
+- [ ] **前置依赖**：依赖任务 1.1（DeadLetterQueue Protocol 改 async，enqueue 需 await）
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
   - **当前BUG**：`nack(requeue=True)` 不保留客户端对 `message.headers` 的修改——requeue后RabbitMQ重新投递原始消息，L204的 `message.headers["x-retry-count"] = ...` 修改无效，导致重试计数永远不递增、无限重试
   - **参考实现**：`RabbitMQEventListener` (`rabbitmq_listener.py`) 已使用 `RedisRetryQueue` 处理重试，可作为改造参考
   - **修改方案**：构造函数注入 `RedisRetryQueue`（替代 `retry_policy` 参数，`retry_policy` 完全废弃）；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理。`max_retries` 作为 `RedisRetryQueue` 构造函数配置项，不再属于Consumer参数
   - 超过最大重试次数 → DLQ
-- [ ] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue
+  - **降级策略**：RedisRetryQueue.enqueue 失败时（Redis 不可用），记录 ERROR 日志并 nack(requeue=True) 作为最终降级方案，避免事件在 Redis 和 RabbitMQ 双通道同时丢失
+- [ ] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue。`grep -r "retry_policy" src/` 无残留引用
 
 **关键文件**：
 - `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 _handle_failure)
 - `src/infrastructure/messaging/rabbitmq_listener.py` (参考实现)
 
 #### 任务 4.4: 线程安全修复
-- [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）
+- [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）。**注意**：此方案仅保证 asyncio 单线程模型安全；多线程环境需 `threading.Lock`。`register()` 应在文档中标注"仅限启动阶段调用，运行时禁用"
 - [ ] **修改** `src/infrastructure/messaging/redis_publisher.py` (L52-64)：`_get_pool()` 当前是同步方法，但 `_pool_lock` (L50) 是 `asyncio.Lock`（需要 `async with`），导致锁是死代码。修改方案：将 `_get_pool()` 改为 `async` 方法，使用 `async with self._pool_lock`，所有调用处加 `await`
 - [ ] **修改** `src/infrastructure/monitoring/event_metrics.py`：计数器 `+= 1` 操作加 `asyncio.Lock`（当前注释标注"线程安全计数器"但实际未实现）
-- [ ] **验证**：并发测试通过
+- [ ] **补充** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：`enqueue()` 方法当前使用 `session.add()` 但无 `flush()`，死信记录可能静默丢失。需添加 `await self._session.flush()`，与 OutboxRepository.save() 保持一致
+- [ ] **部署约束声明**：AsyncOutboxPoller 当前无分布式锁/行级锁，多实例部署会导致重复发布。Phase 1-5 仅支持单 Poller 实例，多实例支持（`SELECT ... FOR UPDATE SKIP LOCKED`）列为后续阶段任务
+- [ ] **验证**：并发测试通过。`grep -r "asyncio.Lock" src/infrastructure/messaging/ --include="*.py" -A 5` 确认 Lock 使用方式正确
 
 **关键文件**：
 - `src/infrastructure/messaging/channel_router.py` (_mappings/_overrides)
@@ -293,6 +310,7 @@
 
 #### 任务 5.2: YAML配置集成
 - [ ] **修改** `src/composition_root.py`：在EventBus相关注册中调用 `EventBusConfigLoader.load()`，YAML配置覆盖DEFAULT_MAPPINGS
+- [ ] **优先级规则**：YAML配置作为 merge overlay（仅覆盖YAML中列出的映射，未列出的保留 DEFAULT_MAPPINGS 值），非完全替换。如果YAML中删除了某个映射，该事件使用 DEFAULT_MAPPINGS 的默认通道
 - [ ] **验证**：修改 `event_channels.yaml` 后重启，ChannelRouter使用YAML中的配置
 
 **关键文件**：
@@ -354,10 +372,10 @@ Phase 3 (P1 设计缺陷) ← 依赖 Phase 2.1（不依赖2.2/2.3，可与Phase 
   3.3 Factory去类级别状态       ← Factory为死代码（无生产调用者），低优先级
   3.4 Composition Root统一    ← 依赖 3.2, 3.3
 
-Phase 4 (P2 可靠性) ← 仅依赖 Phase 2.1，可与 Phase 3 并行
+Phase 4 (P2 可靠性) ← 依赖 Phase 2.1 和 Phase 1.1，可与 Phase 3 并行
   4.1 RedisRetryQueue原子
   4.2 DualIdempotency修复
-  4.3 Consumer重试改用Redis
+  4.3 Consumer重试改用Redis ← 依赖 1.1（DLQ async）
   4.4 线程安全
 
 Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
