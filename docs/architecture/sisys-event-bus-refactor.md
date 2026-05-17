@@ -1,8 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 1.1 | 状态: 审查修订中
+> 版本: 1.2 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
-> 第1轮审查：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
+> 第1轮：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
+> 第2轮：补充from_dict阻断点、DEFAULT_MAPPINGS缺失16个非6个、channel调用链遗漏、save()加flush()建议、测试路径错误
 
 ## Context
 
@@ -43,10 +44,10 @@
 - [ ] **验证**：所有引用DeadLetterQueue的文件使用统一import，`grep -r "DeadLetterQueue" src/` 无重复定义
 
 **关键文件**：
-- `src/domain/events/listener.py` (L119-169, 保留)
+- `src/domain/events/listener.py` (L119-170, 保留)
 - `src/infrastructure/messaging/outbox/dead_letter_queue.py` (全文, 清理)
 - `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` (import路径)
-- `tests/unit/infrastructure/messaging/outbox/test_dead_letter_queue.py` (import更新)
+- `tests/unit/infrastructure/messaging/test_dead_letter_queue.py` (import更新，路径待确认)
 
 #### 任务 1.2: 移除EventRegistry，统一到DomainEvent._registry
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：移除 `EventRegistry` 类，`get()` 改为调用 `DomainEvent._registry.get()`
@@ -60,6 +61,7 @@
 - `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` (更新)
 
 #### 任务 1.3: 统一事件注册方式为__init_subclass__自动注册
+- [ ] **修改** `src/domain/events/base.py` `from_dict` 方法（L228-243）：当前 L230 硬编码传入 `event_type=event_type`，对 `init=False` 字段会触发 TypeError。**必须同步修改**：仅当 `event_type` 字段的 `init=True` 时才传入
 - [ ] **修改** 4个使用 `__post_init__` + `object.__setattr__` 的事件类（AutoTriggered, AutoRouted, MemoryChanged, AutoExecuted），改为 `event_type: str = field(default="X", init=False)` 模式
 - [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式
 - [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
@@ -67,6 +69,7 @@
 - [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型
 
 **关键文件**：
+- `src/domain/events/base.py` (L228-243 from_dict, L230 event_type传参阻断点)
 - `src/domain/events/auto_trigger_events.py` (L49 __post_init__ + L57 手动注册)
 - `src/domain/events/auto_route_events.py` (L48 __post_init__ + L56 手动注册)
 - `src/domain/events/memory_events.py` (L55 __post_init__ + L63 手动注册)
@@ -94,7 +97,10 @@
   async def mark_failed(self, event_id: UUID, error: str) -> None: ...
   ```
 - [ ] **修改** `src/infrastructure/messaging/outbox/inmemory_outbox.py`：同步方法改为async，加 `asyncio.Lock` 保护
-- [ ] **修改** `src/infrastructure/messaging/outbox/outbox_repository.py`：移除 `get_unpublished`, `mark_published`, `mark_failed` 的同步stub（抛NotImplementedError），公共async方法成为Protocol实现；`save()` 当前有sync实现（session.add是同步操作），需改为async版本
+- [ ] **修改** `src/infrastructure/messaging/outbox/outbox_repository.py`：
+  - 删除 `get_unpublished`(L59), `mark_published`(L85), `mark_failed`(L105) 的同步stub（抛NotImplementedError）
+  - 将 `async_get_unpublished`/`async_mark_published`/`async_mark_failed` 重命名为对应Protocol方法名
+  - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 确保写入
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [ ] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
 
@@ -135,7 +141,13 @@
 #### 任务 3.1: DualChannelEventBus移除channel死参数
 - [ ] **修改** `src/infrastructure/messaging/dual_channel_event_bus.py` L53：移除 `channel: str | None = None` 参数（方法体内完全未使用，路由由ChannelRouter决定）
 - [ ] **同步修改** `src/domain/ports/event_publisher.py` L33：移除 `channel` 参数
-- [ ] **同步修改** 所有实现 `EventPublisher` 的类：`RedisEventBus.publish()`（L49，直接覆盖channel参数）、`RabbitMQEventBus.publish()`
+- [ ] **同步修改** 所有实现 `EventPublisher` 的类：
+  - `src/infrastructure/messaging/redis_event_bus.py` L49（直接覆盖channel参数）
+  - `src/infrastructure/messaging/redis_publisher.py` L66
+  - `src/infrastructure/messaging/rabbitmq_event_bus.py` publish签名
+- [ ] **清理** 内部方法签名：
+  - `src/application/event_handlers/auto_execute_completed_handler.py` L112 `_publish(self, event, channel)` 方法签名
+  - `src/application/event_handlers/auto_route_handler.py` L113 `_publish` 方法签名
 - [ ] **清理** 传入channel值的调用者：
   - `src/domain/services/auto_trigger_service.py:159` — `channel="rt:AutoTriggered"`
   - `src/domain/services/auto_route_service.py:148` — `channel="rt:AutoRouted"`
@@ -146,8 +158,11 @@
 **关键文件**：
 - `src/domain/ports/event_publisher.py` (L33)
 - `src/infrastructure/messaging/dual_channel_event_bus.py` (L53)
-- `src/infrastructure/messaging/redis_event_bus.py` (publish签名)
+- `src/infrastructure/messaging/redis_event_bus.py` (L49 publish签名)
+- `src/infrastructure/messaging/redis_publisher.py` (L66 publish签名)
 - `src/infrastructure/messaging/rabbitmq_event_bus.py` (publish签名)
+- `src/application/event_handlers/auto_execute_completed_handler.py` (L112 _publish签名)
+- `src/application/event_handlers/auto_route_handler.py` (L113 _publish签名)
 
 #### 任务 3.2: AsyncOutboxPoller注入ChannelRouter替代硬编码路由键
 - [ ] **修改** `src/infrastructure/messaging/outbox/outbox_processor.py`：
@@ -237,10 +252,16 @@
 
 ### Phase 5: 补全与清理（P2-P3）
 
-#### 任务 5.1: 补全12个事件的DEFAULT_MAPPINGS
-- [ ] **修改** `src/infrastructure/messaging/channel_router.py` DEFAULT_MAPPINGS：补全缺失的6个事件（ToolExecuted, AgentDecided, CheckpointRecovered, CorrectionApproved, StrategicDeviationWarning, RoutingDecided）
+#### 任务 5.1: 补全22个事件的DEFAULT_MAPPINGS
+- [ ] **修改** `src/infrastructure/messaging/channel_router.py` DEFAULT_MAPPINGS：当前仅6个映射（AutoTriggered, AutoRouted, DocumentProcessed, MemoryChanged, CheckpointReached, AuditEvent），需补全16个缺失事件
+- [ ] **缺失事件清单**（按领域分组）：
+  - 核心事件：ToolExecuted, AgentDecided, AutoExecuted, HeartbeatTriggered
+  - 路由/规划：RoutingDecided, StrategicDeviationWarning, CorrectionApproved
+  - 检查点：CheckpointRecovered
+  - 隔离级别：IsolationLevelSwitched
+  - 安全事件：MFAChallengeIssuedEvent, IntrusionDetectedEvent, DataIntegrityViolationEvent, SensitiveDataDetected, CrossBorderTransferRequested, DataSovereigntyViolation, PIPLDataAccessRequested
 - [ ] **同步修改** `config/event_channels.yaml`
-- [ ] **验证**：所有DomainEvent子类均有通道映射
+- [ ] **验证**：所有22个DomainEvent子类均有通道映射
 
 **关键文件**：
 - `src/infrastructure/messaging/channel_router.py` (DEFAULT_MAPPINGS)
