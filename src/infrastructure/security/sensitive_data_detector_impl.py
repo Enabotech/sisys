@@ -1,6 +1,12 @@
-"""SensitiveDataDetectorImpl — Implementation of sensitive data detection service.
+"""SISYS 基础设施层敏感数据检测服务模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+基于 SensitiveDataDetectorPort 接口实现 PII、商业秘密、金融数据等敏感信息的正则表达式检测。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,10 +23,7 @@ if TYPE_CHECKING:
 
 
 class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
-    """敏感数据检测服务实现.
-
-    使用正则表达式检测 PII、商业秘密、金融数据等敏感信息。
-    """
+    """敏感数据检测服务实现，使用正则表达式检测 PII、商业秘密和金融数据。"""
 
     # PII 正则表达式（不使用 \b 词边界，支持中文文本）
     _CHINESE_ID_PATTERN = re.compile(r"\d{17}[\dXx]")

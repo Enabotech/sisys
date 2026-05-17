@@ -1,10 +1,12 @@
-"""AutoExecuteConfig — configuration for auto-execute mechanism.
+"""SISYS 基础设施层自动执行配置模块。
 
-Environment variables:
-- EXECUTE_ENABLED: Enable/disable auto-execute mechanism (default: true)
-- SANDBOX_TYPE: Sandbox type: docker/gvisor (default: docker)
-- SNAPSHOT_TTL_SECONDS: Snapshot TTL in seconds (default: 86400 = 24h)
-- RESOURCE_LIMITS: JSON string with resource limits
+提供自动执行机制的配置，包括沙箱类型、快照 TTL 和资源限制。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,15 +19,15 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AutoExecuteConfig:
-    """Configuration for the auto-execute mechanism.
+    """自动执行机制配置。
 
-    Uses from_env() class method pattern (same as OtelConfig).
+    使用 from_env() 类方法从环境变量加载配置。
 
     Attributes:
-        enabled: Whether auto-execute mechanism is enabled
-        sandbox_type: Type of sandbox (docker/gvisor)
-        snapshot_ttl_seconds: TTL for state snapshots (default 24h)
-        resource_limits: Resource limit configuration
+        enabled: 是否启用自动执行机制
+        sandbox_type: 沙箱类型（docker/gvisor）
+        snapshot_ttl_seconds: 状态快照 TTL（默认 24 小时）
+        resource_limits: 资源限制配置字典
     """
 
     enabled: bool = True
@@ -35,10 +37,13 @@ class AutoExecuteConfig:
 
     @classmethod
     def from_env(cls) -> AutoExecuteConfig:
-        """Load configuration from environment variables.
+        """从环境变量加载配置。
+
+        Args:
+            无（从 os.environ 读取）
 
         Returns:
-            AutoExecuteConfig instance with values from environment
+            AutoExecuteConfig 实例
         """
         enabled = os.getenv("EXECUTE_ENABLED", "true").lower() in ("true", "1", "yes")
         sandbox_type = os.getenv("SANDBOX_TYPE", "docker")
@@ -58,10 +63,10 @@ class AutoExecuteConfig:
         )
 
     def validate(self) -> bool:
-        """Validate configuration values.
+        """验证配置合法性。
 
         Returns:
-            True if valid, False otherwise
+            合法返回 True，否则返回 False
         """
         if self.sandbox_type not in ("docker", "gvisor"):
             return False

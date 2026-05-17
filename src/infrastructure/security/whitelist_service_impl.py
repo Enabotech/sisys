@@ -1,6 +1,12 @@
-"""WhitelistServiceImpl — Implementation of external API whitelist service.
+"""SISYS 基础设施层外部 API 白名单服务模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+基于 WhitelistServicePort 接口实现外部 API 白名单的管理和验证。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,9 +21,10 @@ if TYPE_CHECKING:
 
 
 class WhitelistServiceImpl(WhitelistServicePort):
-    """外部 API 白名单服务实现.
+    """外部 API 白名单服务实现，管理 API 白名单并验证调用合规性。
 
-    负责管理外部 API 白名单，验证 API 调用是否合规。
+    Attributes:
+        _whitelist: 内存中存储的白名单字典，键为 API 端点
     """
 
     def __init__(self) -> None:

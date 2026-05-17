@@ -1,8 +1,12 @@
-"""Metrics 配置模型 — Prometheus /metrics HTTP 端点配置。
+"""SISYS 基础设施层指标端点配置模块。
 
-Story 1.13: K8s 动态扩缩容
-- 环境变量: METRICS_ENABLED, METRICS_PORT, METRICS_PATH, METRICS_AUTH_ENABLED
-- 复用 OtelConfig from_env() 模式
+提供 Prometheus /metrics HTTP 端点配置，支持 K8s 动态扩缩容。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -33,11 +37,8 @@ class MetricsConfig:
     def from_env(cls) -> MetricsConfig:
         """从环境变量创建配置。
 
-        支持的环境变量:
-        - METRICS_ENABLED: bool (default: "false")
-        - METRICS_PATH: str (default: "/metrics")
-        - METRICS_AUTH_ENABLED: bool (default: "false")
-        - METRICS_PORT: int (default: 8080)
+        Args:
+            无（从 os.environ 读取）
 
         Returns:
             MetricsConfig 实例

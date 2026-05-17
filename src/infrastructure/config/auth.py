@@ -1,6 +1,12 @@
-"""AuthConfig 配置文件 - RBAC 权限管理.
+"""SISYS 基础设施层认证配置模块。
 
-遵循 Story 1.5 PostgreSQLConfig 模式: dataclass + from_env()
+提供 JWT 认证和授权配置，用于 RBAC 权限管理系统。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -11,11 +17,11 @@ from dataclasses import dataclass
 
 @dataclass
 class AuthConfig:
-    """JWT 认证和授权配置.
+    """JWT 认证和授权配置。
 
     用于 RBAC 权限管理系统，支持 JWT 令牌生成和验证。
 
-    字段说明:
+    Attributes:
         jwt_secret_key: JWT 签名密钥（生产环境必须使用强随机密钥）
         jwt_algorithm: JWT 签名算法（HS256 用于 MVP，RS256 用于 V1+）
         jwt_expiration_hours: JWT 访问令牌过期时间（小时）
@@ -45,21 +51,13 @@ class AuthConfig:
 
     @classmethod
     def from_env(cls) -> AuthConfig:
-        """从环境变量加载配置.
+        """从环境变量加载配置。
 
-        环境变量:
-            JWT_SECRET_KEY: JWT 签名密钥（必填，生产环境必须使用强随机密钥）
-            JWT_ALGORITHM: JWT 签名算法（默认: HS256）
-            JWT_EXPIRATION_HOURS: JWT 访问令牌过期小时数（默认: 24）
-            JWT_REFRESH_EXPIRATION_DAYS: JWT 刷新令牌过期天数（默认: 7）
-            PASSWORD_MIN_LENGTH: 密码最小长度（默认: 8）
-            PASSWORD_REQUIRE_UPPERCASE: 是否要求大写字母（默认: true）
-            PASSWORD_REQUIRE_LOWERCASE: 是否要求小写字母（默认: true）
-            PASSWORD_REQUIRE_DIGIT: 是否要求数字（默认: true）
-            PASSWORD_REQUIRE_SPECIAL: 是否要求特殊字符（默认: true）
-            MAX_LOGIN_ATTEMPTS: 最大登录失败次数（默认: 5）
-            LOCKOUT_DURATION_MINUTES: 账户锁定时长（默认: 30）
-            SESSION_TIMEOUT_MINUTES: 会话超时分钟数（默认: 30）
+        Args:
+            无（从 os.environ 读取）
+
+        Returns:
+            AuthConfig 实例
         """
         return cls(
             jwt_secret_key=os.getenv("JWT_SECRET_KEY", ""),

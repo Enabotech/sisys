@@ -1,9 +1,12 @@
-"""MemoryConfig — 记忆配置模型。
+"""SISYS 基础设施层记忆配置模块。
 
-环境变量:
-- MEMORY_L0_PATH: L0 文件系统路径（默认 ~/.sisys/memory）
-- MEMORY_L1_CACHE_TTL: L1 Redis 缓存 TTL（默认 86400 秒）
-- COMPRESSION_MIN_RATIO: 最小压缩率（默认 0.7）
+提供记忆系统的文件路径、缓存 TTL 和压缩率配置。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -16,8 +19,10 @@ from dataclasses import dataclass
 class MemoryConfig:
     """记忆系统配置。
 
-    使用 from_env() 类方法从环境变量加载配置。
-    复用 OtelConfig 模式。
+    Attributes:
+        memory_l0_path: L0 文件系统路径
+        memory_l1_cache_ttl: L1 Redis 缓存 TTL（秒）
+        compression_min_ratio: 最小压缩率
     """
 
     # L0 文件系统路径
@@ -33,10 +38,8 @@ class MemoryConfig:
     def from_env(cls) -> MemoryConfig:
         """从环境变量加载配置。
 
-        路径优先级（XDG 规范）：
-        1. $XDG_CONFIG_HOME/sisys/memory/（若 XDG_CONFIG_HOME 已设置）
-        2. $HOME/.config/sisys/memory/（XDG 默认路径）
-        3. $HOME/.sisys/memory/（向后兼容旧版本）
+        Args:
+            无（从 os.environ 读取）
 
         Returns:
             MemoryConfig 实例

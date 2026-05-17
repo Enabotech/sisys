@@ -1,7 +1,12 @@
-"""DockerSandboxAdapter — infrastructure implementation of SandboxExecutor port.
+"""SISYS 基础设施层 Docker 沙箱适配器模块。
 
-Implements sandbox execution using Docker containers with resource limits
-(CPU/内存/网络/文件系统 isolation).
+使用 Docker 容器提供沙箱化代码执行能力，支持 CPU/内存/网络/文件系统隔离。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -20,30 +25,27 @@ logger = logging.getLogger(__name__)
 
 
 class DockerSandboxAdapter(SandboxExecutor):
-    """Docker-based sandbox execution adapter.
+    """基于 Docker 的沙箱执行适配器。
 
-    Provides task execution isolation using Docker containers.
-    Each session gets its own container with resource limits.
+    使用 Docker 容器提供任务执行隔离，每个会话获得独立容器和资源限制。
 
-    Resource limits:
-    - CPU: 1 core
-    - Memory: 512MB
-    - Network: disabled (no external network access)
-    - Filesystem: isolated temp directory
+    Attributes:
+        _running_containers: 正在运行的容器状态字典（类级别共享）
 
-    Architecture: Infrastructure layer implementation of SandboxExecutor port.
+    Note:
+        资源限制 — CPU: 1 核, 内存: 512MB, 网络: 禁用, 文件系统: 隔离临时目录
     """
 
     _running_containers: dict[str, bool] = {}
 
     async def start_container(self, session_id: str) -> None:
-        """Start a Docker container for the given session.
+        """启动指定会话的 Docker 容器。
 
         Args:
-            session_id: Unique session identifier
+            session_id: 会话唯一标识符
 
         Raises:
-            ContainerStartError: If container fails to start
+            ContainerStartError: 容器启动失败时抛出
         """
         if session_id in self._running_containers and self._running_containers[session_id]:
             logger.debug("Container already running for session: %s", session_id)
@@ -70,17 +72,17 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ContainerStartError(f"Failed to start container: {e}") from e
 
     async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
-        """Execute code in the Docker sandbox.
+        """在 Docker 沙箱中执行代码。
 
         Args:
-            session_id: Session identifier
-            code: Python code to execute
+            session_id: 会话标识符
+            code: 待执行的 Python 代码
 
         Returns:
-            Execution result dictionary
+            执行结果字典，包含 status/output/error/execution_time_ms
 
         Raises:
-            ExecutionError: If execution fails
+            ExecutionError: 执行失败时抛出
         """
         if session_id not in self._running_containers or not self._running_containers[session_id]:
             raise ExecutionError(f"No running container for session: {session_id}")
@@ -106,13 +108,13 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ExecutionError(f"Execution failed: {e}") from e
 
     async def stop_container(self, session_id: str) -> None:
-        """Stop and remove the Docker container.
+        """停止并移除 Docker 容器。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识符
 
         Raises:
-            ContainerStopError: If container fails to stop
+            ContainerStopError: 容器停止失败时抛出
         """
         if session_id not in self._running_containers:
             logger.debug("No container to stop for session: %s", session_id)
@@ -129,17 +131,17 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ContainerStopError(f"Failed to stop container: {e}") from e
 
     async def is_container_running(self, session_id: str) -> bool:
-        """Check if container is running for session.
+        """检查指定会话的容器是否正在运行。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识符
 
         Returns:
-            True if running, False otherwise
+            正在运行返回 True，否则返回 False
         """
         return self._running_containers.get(session_id, False)
 
     @classmethod
     def reset_all_containers(cls) -> None:
-        """Reset all container state (for testing)."""
+        """重置所有容器状态（仅用于测试）。"""
         cls._running_containers.clear()

@@ -1,6 +1,12 @@
-"""SystemException — 系统级异常.
+"""SISYS 领域层系统异常模块。
 
-基础设施故障，如配置错误、网络错误、存储错误等。
+定义系统级基础设施故障异常，包括配置错误、网络故障、存储服务故障、消息总线故障等。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

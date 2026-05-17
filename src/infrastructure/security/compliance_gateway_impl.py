@@ -1,8 +1,12 @@
-"""ComplianceGatewayImpl — Implementation of compliance gateway service.
+"""SISYS 基础设施层合规性网关模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+UDMR L1 合规性网关实现，协调敏感数据检测、数据驻留强制、白名单验证、PIPL 合规和跨境传输审批。
 
-UDMR L1 合规性网关，协调各子服务进行综合合规检查。
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -23,9 +27,14 @@ if TYPE_CHECKING:
 
 
 class ComplianceGatewayImpl(ComplianceGatewayPort):
-    """UDMR L1 合规性网关实现.
+    """UDMR L1 合规性网关实现，协调多个子服务进行综合合规检查。
 
-    协调敏感数据检测、数据驻留强制、白名单验证、PIPL合规和跨境传输审批。
+    Attributes:
+        _sensitive_data_detector: 敏感数据检测服务
+        _data_residency_enforcer: 数据驻留强制服务
+        _whitelist_service: 白名单服务
+        _pipl_service: PIPL 合规服务
+        _cross_border_service: 跨境传输服务
     """
 
     def __init__(

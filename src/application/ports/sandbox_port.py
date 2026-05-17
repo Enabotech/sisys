@@ -1,12 +1,12 @@
-"""SandboxExecutor port — application layer port for sandbox execution.
+"""SISYS 应用层沙箱执行端口模块。
 
-This port defines the interface for task execution in isolated sandboxes.
-Infrastructure layer implements this port using Docker or gVisor.
+定义沙箱任务执行的接口，基础设施层通过 Docker 或 gVisor 实现此端口。
 
-Hexagonal Architecture:
-    - Port defined in application layer (allowed: infrastructure can implement)
-    - Implementation in infrastructure layer
-    - Interfaces layer uses the port from application layer
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -29,56 +29,51 @@ __all__ = [
 
 
 class SandboxExecutor(Protocol):
-    """Port interface for sandbox execution.
+    """沙箱执行端口接口。
 
-    Implementations:
-    - DockerSandboxAdapter: Uses Docker containers for isolation
-    - GvisorSandboxAdapter: Uses gVisor for stronger isolation (V2+)
-
-    Architecture: Hexagonal architecture port defined in application layer.
-    Infrastructure layer provides concrete implementations.
+    基础设施层提供具体实现（如 DockerSandboxAdapter、GvisorSandboxAdapter）。
     """
 
     async def start_container(self, session_id: str) -> None:
-        """Start a sandbox container for the given session.
+        """为指定会话启动沙箱容器。
 
         Args:
-            session_id: Unique session identifier
+            session_id: 会话唯一标识。
 
         Raises:
-            SandboxError: If container fails to start
+            SandboxError: 容器启动失败。
         """
 
     async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
-        """Execute code in the sandbox.
+        """在沙箱中执行代码。
 
         Args:
-            session_id: Session identifier
-            code: Code to execute
+            session_id: 会话标识。
+            code: 待执行的代码。
 
         Returns:
-            Execution result dictionary with keys: status, output, error
+            执行结果字典，包含 status、output、error 键。
 
         Raises:
-            SandboxError: If execution fails
+            SandboxError: 执行失败。
         """
 
     async def stop_container(self, session_id: str) -> None:
-        """Stop and cleanup the sandbox container.
+        """停止并清理沙箱容器。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识。
 
         Raises:
-            SandboxError: If container fails to stop
+            SandboxError: 容器停止失败。
         """
 
     async def is_container_running(self, session_id: str) -> bool:
-        """Check if a container is running for the session.
+        """检查指定会话的容器是否正在运行。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识。
 
         Returns:
-            True if container is running, False otherwise
+            容器正在运行返回 True，否则返回 False。
         """

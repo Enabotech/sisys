@@ -1,4 +1,13 @@
-"""AutoTriggerConfig — configuration for auto-trigger mechanism."""
+"""SISYS 基础设施层自动触发配置模块。
+
+提供自动触发机制的配置，包括心跳间隔和最大重试次数。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +17,14 @@ from dataclasses import dataclass
 
 @dataclass
 class AutoTriggerConfig:
-    """Configuration for auto-trigger mechanism.
+    """自动触发机制配置。
 
-    Environment variables follow OtelConfig pattern (from_env() class method).
+    使用 from_env() 类方法从环境变量加载配置。
+
+    Attributes:
+        trigger_enabled: 是否启用自动触发机制
+        heartbeat_interval_seconds: 心跳间隔（秒）
+        trigger_max_retries: 最大重试次数
     """
 
     trigger_enabled: bool = True
@@ -19,15 +33,16 @@ class AutoTriggerConfig:
 
     @classmethod
     def from_env(cls) -> AutoTriggerConfig:
-        """Load configuration from environment variables.
+        """从环境变量加载配置。
 
-        Environment variables:
-            TRIGGER_ENABLED: Enable auto-trigger mechanism (default: true)
-            HEARTBEAT_INTERVAL_SECONDS: Heartbeat interval in seconds (default: 60)
-            TRIGGER_MAX_RETRIES: Max retry attempts on failure (default: 3)
+        Args:
+            无（从 os.environ 读取）
 
         Returns:
-            AutoTriggerConfig instance with values from environment
+            AutoTriggerConfig 实例
+
+        Raises:
+            ValueError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("TRIGGER_ENABLED", "true").lower()
         interval_str = os.getenv("HEARTBEAT_INTERVAL_SECONDS", "60")

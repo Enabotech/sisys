@@ -1,6 +1,12 @@
-"""PIPLComplianceServiceImpl — Implementation of PIPL compliance service.
+"""SISYS 基础设施层 PIPL 合规服务模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+基于 PIPLComplianceServicePort 接口实现个人信息保护法合规记录管理和数据主体权利响应。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -18,9 +24,10 @@ if TYPE_CHECKING:
 
 
 class PIPLComplianceServiceImpl(PIPLComplianceServicePort):
-    """PIPL 合规服务实现.
+    """PIPL 合规服务实现，管理合规记录和响应数据主体权利请求。
 
-    负责管理 PIPL 合规记录和数据主体权利响应。
+    Attributes:
+        _records: 内存中存储的合规记录字典，键为个人数据 ID
     """
 
     def __init__(self) -> None:

@@ -1,4 +1,13 @@
-"""SemanticRouter — semantic similarity-based routing using bge-m3 embeddings."""
+"""SISYS 基础设施层语义路由模块。
+
+基于 bge-m3 向量嵌入实现语义相似度路由，将任务上下文与候选目标进行最佳匹配。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -9,23 +18,30 @@ from typing import Any, Protocol
 
 
 class EmbeddingModelProtocol(Protocol):
-    """Protocol for embedding model (implemented by infrastructure)."""
+    """嵌入模型协议，由基础设施层实现。"""
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for texts.
+        """生成文本的嵌入向量。
 
         Args:
-            texts: List of text strings to embed
+            texts: 待嵌入的文本字符串列表
 
         Returns:
-            List of embedding vectors (each vector is a list of floats)
+            嵌入向量列表，每个向量为浮点数列表
         """
         ...
 
 
 @dataclass
 class Candidate:
-    """Represents a routing candidate (Agent or tool)."""
+    """路由候选项数据类，表示一个 Agent 或工具。
+
+    Attributes:
+        candidate_id: 候选项唯一标识
+        name: 候选项名称
+        description: 候选项描述
+        embedding: 预计算的嵌入向量
+    """
 
     candidate_id: str
     name: str
@@ -34,19 +50,17 @@ class Candidate:
 
 
 class SemanticRouter:
-    """Semantic router using bge-m3 embeddings for task-to-target matching.
+    """语义路由器，基于 bge-m3 嵌入向量通过余弦相似度匹配任务与候选目标。
 
-    Computes cosine similarity between task context embedding and candidate embeddings
-    to find the best matching target.
-
-    Requires:
-    - EmbeddingModelProtocol: For computing task context embedding (optional)
+    Attributes:
+        DEFAULT_EMBEDDING_DIM: 默认嵌入维度（bge-m3 为 1024）
+        MAX_CACHE_SIZE: 最大缓存条目数
     """
 
-    # Default embedding dimension for bge-m3
+    # bge-m3 默认嵌入维度
     DEFAULT_EMBEDDING_DIM: int = 1024
 
-    # Max cache size to prevent memory issues
+    # 最大缓存条目数，防止内存溢出
     MAX_CACHE_SIZE: int = 10000
 
     def __init__(

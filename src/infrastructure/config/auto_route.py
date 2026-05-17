@@ -1,4 +1,13 @@
-"""AutoRouteConfig — configuration for auto-route mechanism."""
+"""SISYS 基础设施层自动路由配置模块。
+
+提供自动路由机制的配置，支持哈希/语义/混合路由策略。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +17,16 @@ from dataclasses import dataclass
 
 @dataclass
 class AutoRouteConfig:
-    """Configuration for auto-route mechanism.
+    """自动路由机制配置。
 
-    Environment variables follow OtelConfig pattern (from_env() class method).
+    使用 from_env() 类方法从环境变量加载配置。
+
+    Attributes:
+        route_enabled: 是否启用自动路由机制
+        route_type: 路由类型（hash/semantic/mixed）
+        semantic_threshold: 语义路由最小相似度分数
+        hash_ring_size: 每个物理节点的虚拟节点数
+        cache_ttl_seconds: 缓存 TTL（秒）
     """
 
     route_enabled: bool = True
@@ -21,17 +37,16 @@ class AutoRouteConfig:
 
     @classmethod
     def from_env(cls) -> AutoRouteConfig:
-        """Load configuration from environment variables.
+        """从环境变量加载配置。
 
-        Environment variables:
-            ROUTE_ENABLED: Enable auto-route mechanism (default: true)
-            ROUTE_TYPE: Routing type - hash/semantic/mixed (default: mixed)
-            SEMANTIC_THRESHOLD: Minimum similarity for semantic routing (default: 0.7)
-            HASH_RING_SIZE: Virtual nodes per physical node (default: 150)
-            ROUTE_CACHE_TTL: Cache TTL in seconds (default: 86400)
+        Args:
+            无（从 os.environ 读取）
 
         Returns:
-            AutoRouteConfig instance with values from environment
+            AutoRouteConfig 实例
+
+        Raises:
+            ValueError: 环境变量值不合法时抛出
         """
         enabled_str = os.getenv("ROUTE_ENABLED", "true").lower()
         route_type_str = os.getenv("ROUTE_TYPE", "mixed").lower()

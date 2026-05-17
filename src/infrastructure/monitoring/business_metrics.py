@@ -1,9 +1,12 @@
-"""BusinessMetricsCollector — 业务指标收集器（自定义业务指标）。
+"""SISYS 基础设施层业务指标收集器模块。
 
-Story 1.13: K8s 动态扩缩容
-- 指标: AgentSessionGauge, TaskQueueGauge, EventProcessingRateGauge, CacheHitRateGauge
-- 方法: record_sessions(n), record_queue_length(n), update_processing_rate(),
-        record_cache_hit(), record_cache_miss()
+提供自定义业务指标的收集和 Prometheus 导出能力。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -32,8 +35,6 @@ class BusinessMetrics:
         cache_hits_total: 缓存命中总数
         cache_misses_total: 缓存未命中总数
         cache_hit_rate: 缓存命中率
-        _last_processed_count: 上次处理计数（用于速率计算）
-        _last_sample_time: 上次采样时间（用于速率计算）
     """
 
     agent_sessions_active: int = 0
@@ -48,20 +49,26 @@ class BusinessMetrics:
 
 
 class BusinessMetricsCollector:
-    """业务指标收集器 — 线程安全。
+    """业务指标收集器（线程安全）。
 
-    暴露以下 Prometheus 指标:
-    - sisys_agent_sessions_active: 当前活跃 Agent 会话数（Gauge）
-    - sisys_task_queue_length: 任务队列长度（Gauge）
-    - sisys_events_processing_rate: 每秒事件处理速率（Gauge）
-    - sisys_cache_hit_rate: 缓存命中率（Gauge, 0.0-1.0）
+    暴露以下 Prometheus 指标：活跃会话数、任务队列长度、事件处理速率、缓存命中率。
 
-    Args:
-        registry: prometheus_client CollectorRegistry 实例。如果为 None，则使用默认 Registry。
+    Attributes:
+        _registry: prometheus_client CollectorRegistry 实例
+        _agent_sessions_gauge: 活跃会话数 Gauge
+        _task_queue_gauge: 任务队列长度 Gauge
+        _events_processing_rate_gauge: 事件处理速率 Gauge
+        _cache_hit_rate_gauge: 缓存命中率 Gauge
+        _metrics: 业务指标数据实例
+        _lock: 线程锁
     """
 
     def __init__(self, registry: CollectorRegistry | None = None):
-        # 延迟导入避免循环依赖
+        """初始化业务指标收集器。
+
+        Args:
+            registry: prometheus_client CollectorRegistry 实例，None 时使用默认 Registry
+        """
         from prometheus_client import Gauge
 
         if registry is None:
@@ -174,15 +181,27 @@ class BusinessMetricsCollector:
 
     @property
     def sessions(self) -> int:
-        """获取当前活跃会话数。"""
+        """获取当前活跃会话数。
+
+        Returns:
+            当前活跃会话数
+        """
         return self._metrics.agent_sessions_active
 
     @property
     def queue_length(self) -> int:
-        """获取当前任务队列长度。"""
+        """获取当前任务队列长度。
+
+        Returns:
+            当前任务队列长度
+        """
         return self._metrics.task_queue_length
 
     @property
     def processing_rate(self) -> float:
-        """获取当前事件处理速率。"""
+        """获取当前事件处理速率。
+
+        Returns:
+            当前事件处理速率（事件数/秒）
+        """
         return self._metrics.events_processing_rate

@@ -1,7 +1,12 @@
-"""Password Validation Service Implementation - 密码验证服务实现.
+"""SISYS 基础设施层密码验证服务模块。
 
-实现 PasswordValidationServicePort 接口，提供密码复杂度验证功能。
-遵循六边形架构：基础设施层实现。
+基于等保 2.0 三级要求实现密码复杂度验证功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -13,13 +18,13 @@ from src.domain.ports.password_validation_service import (
 
 
 class PasswordValidationService(PasswordValidationServicePort):
-    """密码验证服务实现.
+    """密码验证服务实现，满足等保 2.0 三级密码复杂度要求。
 
-    满足等保 2.0 三级密码复杂度要求：
-    - 至少 8 字符
-    - 包含大小写字母
-    - 包含数字
-    - 包含特殊字符
+    要求至少 8 字符、包含大小写字母、数字和特殊字符。
+
+    Attributes:
+        MIN_LENGTH: 密码最小长度常量
+        REQUIREMENTS: 密码复杂度要求描述字典
     """
 
     MIN_LENGTH = 8

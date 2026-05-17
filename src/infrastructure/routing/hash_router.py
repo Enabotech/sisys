@@ -1,4 +1,13 @@
-"""HashRouter — consistent hashing implementation for session-based routing."""
+"""SISYS 基础设施层一致性哈希路由模块。
+
+基于 FNV-1a 哈希算法实现会话级别的一致性路由，支持虚拟节点和加权分配。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -8,27 +17,34 @@ from dataclasses import dataclass
 
 @dataclass
 class HashNode:
-    """Represents a node in the hash ring."""
+    """哈希环节点数据类。
+
+    Attributes:
+        node_id: 节点唯一标识
+        weight: 加权一致性哈希的权重值
+    """
 
     node_id: str
-    weight: int = 1  # Weight for weighted consistent hashing
+    weight: int = 1
 
 
 class HashRouter:
-    """Consistent hash router using FNV-1a hash for session-based routing.
+    """一致性哈希路由器，基于 FNV-1a 哈希实现会话路由。
 
-    Provides O(log n) routing with minimal rebalancing when nodes are added/removed.
-    Uses virtual nodes to ensure even distribution.
+    提供 O(log n) 路由复杂度，节点增删时最小化重分配。使用虚拟节点确保均匀分布。
+
+    Attributes:
+        VIRTUAL_NODES_PER_NODE: 每个物理节点的虚拟节点数
     """
 
-    VIRTUAL_NODES_PER_NODE: int = 150  # Number of virtual nodes per physical node
+    VIRTUAL_NODES_PER_NODE: int = 150  # 每个物理节点的虚拟节点数量
 
     def __init__(self, nodes: Sequence[str] | None = None, virtual_nodes: int | None = None):
-        """Initialize HashRouter.
+        """初始化哈希路由器。
 
         Args:
-            nodes: Initial list of node IDs. None creates empty router.
-            virtual_nodes: Override for VIRTUAL_NODES_PER_NODE (for testing).
+            nodes: 初始节点 ID 列表，None 表示创建空路由器
+            virtual_nodes: 覆盖 VIRTUAL_NODES_PER_NODE 的值（用于测试）
         """
         self._virtual_nodes_per_node = virtual_nodes or self.VIRTUAL_NODES_PER_NODE
         self._ring: dict[int, str] = {}
@@ -40,15 +56,15 @@ class HashRouter:
                 self.add_node(node)
 
     def add_node(self, node_id: str, weight: int = 1) -> None:
-        """Add a node to the hash ring.
+        """添加节点到哈希环。
 
         Args:
-            node_id: Unique node identifier
-            weight: Weight for weighted consistent hashing (default: 1)
+            node_id: 节点唯一标识
+            weight: 加权一致性哈希的权重值（默认 1）
         """
         self._node_weights[node_id] = weight
 
-        # Add virtual nodes based on weight
+        # 根据权重添加虚拟节点
         for i in range(self._virtual_nodes_per_node * weight):
             virtual_key = self._hash(f"{node_id}:{i}")
             self._ring[virtual_key] = node_id
@@ -56,14 +72,14 @@ class HashRouter:
         self._sorted_keys = sorted(self._ring.keys())
 
     def remove_node(self, node_id: str) -> None:
-        """Remove a node from the hash ring.
+        """从哈希环移除节点。
 
         Args:
-            node_id: Node identifier to remove
+            node_id: 要移除的节点标识
         """
         self._node_weights.pop(node_id, None)
 
-        # Remove all virtual nodes for this node
+        # 移除该节点的所有虚拟节点
         keys_to_remove = [key for key, node in self._ring.items() if node == node_id]
         for key in keys_to_remove:
             del self._ring[key]
@@ -71,53 +87,53 @@ class HashRouter:
         self._sorted_keys = sorted(self._ring.keys())
 
     def route(self, session_id: str) -> str:
-        """Route a session to a node using consistent hashing.
+        """通过一致性哈希将会话路由到目标节点。
 
         Args:
-            session_id: Session identifier to hash
+            session_id: 会话标识
 
         Returns:
-            Node ID of the target node
+            目标节点 ID
         """
         if not self._ring:
             return "default"
 
         key = self._hash(session_id)
 
-        # Binary search for the first node >= key
-        # If key is greater than all nodes, wrap around to first node
+        # 二分查找第一个大于等于 key 的节点
+        # 如果 key 大于所有节点，环绕到第一个节点
         for ring_key in self._sorted_keys:
             if ring_key >= key:
                 return self._ring[ring_key]
 
-        # Wrap around to first node
+        # 环绕到第一个节点
         return self._ring[self._sorted_keys[0]]
 
     @staticmethod
     def _hash(value: str) -> int:
-        """Compute murmurhash3-like hash for a string.
+        """计算字符串的 FNV-1a 哈希值。
 
-        Using FNV-1a as a fast, well-distributed alternative to murmurhash3.
+        使用 FNV-1a 作为 murmurhash3 的快速替代方案，分布均匀。
 
         Args:
-            value: String to hash
+            value: 待哈希字符串
 
         Returns:
-            32-bit unsigned integer hash
+            32 位无符号整数哈希值
         """
-        # FNV-1a 32-bit hash
-        hash_value = 2166136261  # FNV offset basis
+        # FNV-1a 32-bit 哈希算法
+        hash_value = 2166136261  # FNV 基准偏移量
         for byte in value.encode("utf-8"):
             hash_value ^= byte
-            hash_value *= 16777619  # FNV prime
+            hash_value *= 16777619  # FNV 质数
         return hash_value & 0xFFFFFFFF
 
     @property
     def node_count(self) -> int:
-        """Return the number of physical nodes in the ring."""
+        """返回物理节点数量。"""
         return len(self._node_weights)
 
     @property
     def virtual_node_count(self) -> int:
-        """Return the total number of virtual nodes in the ring."""
+        """返回虚拟节点总数。"""
         return len(self._ring)

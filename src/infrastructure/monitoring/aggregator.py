@@ -1,11 +1,12 @@
-"""MetricsAggregator — 指标聚合器。
+"""SISYS 基础设施层指标聚合器模块。
 
-Story 1.13: K8s 动态扩缩容
-- 聚合职责: 统一收集 EventMetricsCollector + BusinessMetricsCollector 指标
-- 方法: collect() -> bytes (Prometheus text format)
-- 复用 Story 1.3 EventMetricsCollector: 通过注入获取，不修改原组件
-- EventMetricsCollector 是纯内存计数器，不注册 Prometheus 指标，
-  所以需要从其 metrics 属性手动获取并格式化为 Prometheus 格式
+统一收集事件指标和业务指标，输出 Prometheus 文本格式。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -23,15 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 class MetricsAggregator:
-    """指标聚合器 — 统一收集 EventMetricsCollector + BusinessMetricsCollector 指标。
+    """指标聚合器，统一收集事件指标和业务指标。
 
-    通过注入获取已存在的 EventMetricsCollector，不修改原组件。
-    EventMetricsCollector 是纯内存计数器，需要手动格式化其指标值。
+    通过注入获取已存在的 EventMetricsCollector 和 BusinessMetricsCollector，
+    合并输出 Prometheus 文本格式。
 
-    Args:
-        event_metrics_collector: EventMetricsCollector 实例（Story 1.3 已实现）
-        business_metrics_collector: BusinessMetricsCollector 实例
-        registry: prometheus_client CollectorRegistry 实例。如果为 None，则使用默认 Registry。
+    Attributes:
+        _event_metrics: EventMetricsCollector 实例
+        _business_metrics: BusinessMetricsCollector 实例
+        _registry: prometheus_client CollectorRegistry 实例
     """
 
     def __init__(
@@ -40,6 +41,13 @@ class MetricsAggregator:
         business_metrics_collector: BusinessMetricsCollector,
         registry: CollectorRegistry | None = None,
     ):
+        """初始化指标聚合器。
+
+        Args:
+            event_metrics_collector: 事件指标收集器实例
+            business_metrics_collector: 业务指标收集器实例
+            registry: prometheus_client CollectorRegistry 实例，None 时使用默认 Registry
+        """
         if registry is None:
             from prometheus_client import REGISTRY
 
