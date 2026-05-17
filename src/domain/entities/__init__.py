@@ -1,4 +1,13 @@
-"""Domain entities."""
+"""SISYS 领域实体包。
+
+提供领域层核心实体定义，遵循六边形架构零依赖原则。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from .agent import Agent
 from .checkpoint import Checkpoint

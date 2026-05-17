@@ -8,6 +8,7 @@ Reference: src/interfaces/api/exception_handlers.py
 
 from __future__ import annotations
 
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -794,7 +795,7 @@ class TestHandlePydanticError:
         request.state.request_id = "test-req-id"
         return request
 
-    def test_pydantic_error_returns_422(self, handlers_app, mock_request):
+    def test_pydantic_error_returns_422(self, handlers_app: Any, mock_request: Any) -> None:
         """验证 PydanticValidationError 返回 422."""
         # 创建一个真实的 PydanticValidationError
         from pydantic import BaseModel
@@ -813,7 +814,7 @@ class TestHandlePydanticError:
             resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
             assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_pydantic_error_response_structure(self, handlers_app, mock_request):
+    def test_pydantic_error_response_structure(self, handlers_app: Any, mock_request: Any) -> None:
         """验证 PydanticValidationError 响应结构."""
         from pydantic import BaseModel
 
@@ -832,7 +833,7 @@ class TestHandlePydanticError:
             assert body["error"]["message"] == "Data validation error"
             assert "errors" in body["error"]["context"]
 
-    def test_pydantic_error_includes_request_id(self, handlers_app, mock_request):
+    def test_pydantic_error_includes_request_id(self, handlers_app: Any, mock_request: Any) -> None:
         """验证 PydanticValidationError 响应包含 request_id."""
         from pydantic import BaseModel
 

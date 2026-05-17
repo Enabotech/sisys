@@ -1,6 +1,12 @@
-"""SensitiveDataDetectorPort — Interface for sensitive data detection service.
+"""SISYS 领域层敏感数据检测端口模块。
 
-遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库。
+定义敏感数据检测服务的端口接口，遵循六边形架构：仅依赖 Protocol 和 Python 标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

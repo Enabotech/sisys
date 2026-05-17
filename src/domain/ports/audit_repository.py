@@ -1,7 +1,13 @@
-"""AuditRepository Port - 审计仓储端口.
+"""SISYS 领域层审计仓储端口模块。
 
 领域层接口，定义审计日志的数据访问契约。
 遵循六边形架构：领域层零依赖，仅使用标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -14,7 +20,18 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class AuditSearchCriteria:
-    """审计日志搜索条件（不可变）."""
+    """审计日志搜索条件（不可变）。
+
+    Attributes:
+        start_time: 起始时间
+        end_time: 结束时间
+        actor: 操作者
+        action_type: 操作类型
+        target_resource: 目标资源
+        offset: 分页偏移量
+        limit: 分页大小
+        match_any: True=OR 条件，False=AND 条件（默认）
+    """
 
     start_time: datetime | None = None
     end_time: datetime | None = None
@@ -28,7 +45,14 @@ class AuditSearchCriteria:
 
 @dataclass(frozen=True)
 class AuditSearchResult:
-    """审计日志搜索结果（不可变）."""
+    """审计日志搜索结果（不可变）。
+
+    Attributes:
+        items: 审计日志数据元组
+        total: 总记录数
+        offset: 分页偏移量
+        limit: 分页大小
+    """
 
     items: tuple[dict[str, Any], ...]
     total: int

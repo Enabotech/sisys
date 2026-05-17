@@ -1,7 +1,13 @@
-"""AutoExecuteCompletedListener — event listener that publishes downstream domain events.
+"""SISYS 应用层自动执行完成处理器模块。
 
-Listens for AutoExecuted events and publishes corresponding domain events
-(DocumentProcessed/ToolExecuted/AgentDecided) based on business_event_type.
+自动执行完成事件监听器，监听 AutoExecuted 事件并发布下游领域事件
+（DocumentProcessed/ToolExecuted/AgentDecided），根据 business_event_type 决定事件类型。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -16,31 +22,34 @@ logger = logging.getLogger(__name__)
 
 
 class AutoExecuteCompletedHandler:
-    """Event listener that handles AutoExecuted events.
+    """处理 AutoExecuted 事件的事件监听器。
 
-    Responsible for:
-    - Listening to AutoExecuted events from AutoExecuteService
-    - Publishing corresponding domain events based on business_event_type:
-      - "DocumentProcessed" -> DocumentProcessed event
-      - "ToolExecuted" -> ToolExecuted event
-      - "AgentDecided" -> AgentDecided event
+    职责：
+    - 监听 AutoExecuteService 的 AutoExecuted 事件
+    - 根据 business_event_type 发布对应的领域事件：
+      - "DocumentProcessed" -> DocumentProcessed 事件
+      - "ToolExecuted" -> ToolExecuted 事件
+      - "AgentDecided" -> AgentDecided 事件
 
-    Architecture: Interfaces layer, implements event listener pattern.
+    架构：接口层，实现事件监听模式。
+
+    Attributes:
+        _publisher: 事件发布器端口，None 用于独立测试
     """
 
     def __init__(self, publisher: EventPublisher | None = None):
-        """Initialize AutoExecuteCompletedListener.
+        """初始化自动执行完成监听器。
 
         Args:
-            publisher: Event publisher port. None for standalone testing.
+            publisher: 事件发布器端口，None 用于独立测试
         """
         self._publisher = publisher
 
     async def on_executed(self, event: AutoExecuted) -> None:
-        """Handle AutoExecuted event: publish downstream domain event.
+        """处理 AutoExecuted 事件：发布下游领域事件。
 
         Args:
-            event: AutoExecuted event from ExecuteService
+            event: 来自 ExecuteService 的 AutoExecuted 事件
         """
         business_event_type = event.business_event_type or "ToolExecuted"
 
@@ -62,7 +71,7 @@ class AutoExecuteCompletedHandler:
             await self._publish_tool_executed(event)
 
     async def _publish_document_processed(self, event: AutoExecuted) -> None:
-        """Publish DocumentProcessed domain event."""
+        """发布 DocumentProcessed 领域事件。"""
         from src.domain.events.document_events import DocumentProcessed
 
         domain_event = DocumentProcessed(
@@ -74,7 +83,7 @@ class AutoExecuteCompletedHandler:
         logger.info("Published DocumentProcessed: document_id=%s", domain_event.document_id)
 
     async def _publish_tool_executed(self, event: AutoExecuted) -> None:
-        """Publish ToolExecuted domain event."""
+        """发布 ToolExecuted 领域事件。"""
         from src.domain.events.tool_events import ToolExecuted
 
         domain_event = ToolExecuted(
@@ -87,7 +96,7 @@ class AutoExecuteCompletedHandler:
         logger.info("Published ToolExecuted: tool_id=%s", domain_event.tool_id)
 
     async def _publish_agent_decided(self, event: AutoExecuted) -> None:
-        """Publish AgentDecided domain event."""
+        """发布 AgentDecided 领域事件。"""
         from src.domain.events.agent_events import AgentDecided
 
         domain_event = AgentDecided(
@@ -100,11 +109,11 @@ class AutoExecuteCompletedHandler:
         logger.info("Published AgentDecided: agent_id=%s", domain_event.agent_id)
 
     async def _publish(self, event: DomainEvent, channel: str) -> None:
-        """Publish domain event via configured publisher.
+        """通过配置的发布器发布领域事件。
 
         Args:
-            event: Domain event to publish
-            channel: Channel name
+            event: 待发布的领域事件
+            channel: 频道名称
         """
         if self._publisher is None:
             logger.warning("No publisher configured, event not published: %s", event.event_type)

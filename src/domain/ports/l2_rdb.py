@@ -1,4 +1,4 @@
-"""L2RdbPort[T] — L2 关系数据库统一基础端口（领域层）。
+"""SISYS 领域层 L2 关系数据库统一基础端口模块。
 
 泛型 async CRUD 基座，所有 L2 仓储端口的基础。
 领域层零外部依赖。
@@ -6,6 +6,12 @@
 重构说明：
 - BaseRepository[T] 重命名为 L2RdbPort[T]（sync→async）
 - BaseRepository 保留为 deprecated 别名
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -58,5 +64,5 @@ class L2RdbPort(Generic[T], Protocol):
         """
 
 
-# Deprecated alias — use L2RdbPort instead
+# DEPRECATED: 请使用 L2RdbPort 替代，BaseRepository 仅为向后兼容保留
 BaseRepository = L2RdbPort

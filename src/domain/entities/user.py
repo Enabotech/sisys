@@ -1,6 +1,12 @@
-"""User 领域实体.
+"""SISYS 领域层用户实体模块。
 
-遵循六边形架构：领域层零依赖，仅使用标准库。
+定义用户领域实体，遵循六边形架构：领域层零依赖，仅使用标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from uuid import UUID
 class User:
     """用户领域实体（不可变）.
 
-    属性:
+    Attributes:
         id: 用户 UUID
         username: 用户名（唯一）
         password_hash: 密码哈希（bcrypt）

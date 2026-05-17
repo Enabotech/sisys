@@ -1,20 +1,12 @@
-"""MemoryMetadata 实体 — 用户记忆元数据索引。
+"""SISYS 领域层记忆元数据索引实体模块。
 
-架构来源: architecture.md §11.2.5
+定义用户记忆元数据索引实体，架构来源: architecture.md §11.2.5。
 
-字段定义:
-- memory_id: UUID 主键
-- user_id: 用户标识（多租户隔离）
-- name: VARCHAR(255)，唯一约束
-- description: TEXT
-- type: VARCHAR(50) ('user'|'feedback'|'project'|'reference')
-- path: VARCHAR(500)，格式 '{type}/{memory_id}.md'
-- version: INTEGER，乐观锁
-- mtime: TIMESTAMP
-- owner: 文件所有者
-- group_id: 组标识
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -40,7 +40,7 @@
 │  Rule 2: Domain + Application Layer — 具体应用端口                    │
 │                  （继承或组合注入基础端口+业务语义）                     │
 │                                                                      │
-│  ──── domain/ports/ 中的具体端口（L2领域概念）────                     │
+│  ──── domain/ports/ 中的具体端口（领域概念）────                     │
 │  继承L2: L2MetadataRepositoryPort(L2RdbPort[MemoryMetadata])         │
 │          L2ChangeHistoryRepositoryPort(L2RdbPort[MemoryChangeHistory])│
 │          L2GroupMemberRepositoryPort(Protocol，组合注入L2RdbPort)      │

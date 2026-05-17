@@ -1,12 +1,17 @@
-"""HealthCheckPort — 健康检查抽象端口
+"""SISYS 领域层健康检查抽象端口模块。
 
-用于检查外部服务（Ollama、Redis 等）的可用性
-所有健康检查实现必须实现此端口.
+用于检查外部服务（Ollama、Redis 等）的可用性，所有健康检查实现必须实现此端口。
 
 设计原则：
 - 纯异步接口：async def check() 和 async def close()
 - 领域层零外部依赖（仅用 abc + typing）
 - ABC 父类选择（名义子类型，非结构子类型）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

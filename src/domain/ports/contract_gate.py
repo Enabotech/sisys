@@ -1,7 +1,12 @@
-"""Contract gate — port compatibility checking and contract testing.
+"""SISYS 领域层端口契约门控模块。
 
-This module provides the ContractGate class for checking port compatibility
-and the PortContractTest base class for contract testing.
+提供端口兼容性检查与契约测试基础类。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -18,7 +23,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CompatibilityResult:
-    """Result of compatibility check between two port versions."""
+    """端口版本兼容性检查结果。
+
+    Attributes:
+        port_name: 端口名称
+        old_version: 旧版本号
+        new_version: 新版本号
+        is_compatible: 是否兼容
+        breaking_changes: 破坏性变更列表
+        warnings: 警告列表
+    """
 
     port_name: str
     old_version: str
@@ -29,10 +43,9 @@ class CompatibilityResult:
 
 
 class ContractGate:
-    """Contract compatibility checker.
+    """契约兼容性检查器。
 
-    Checks port changes for compatibility to ensure upgrades don't break
-    existing functionality.
+    检查端口变更的兼容性，确保升级不会破坏已有功能。
     """
 
     def check_compatibility(
@@ -40,14 +53,14 @@ class ContractGate:
         old_spec: PortSpec,
         new_spec: PortSpec,
     ) -> CompatibilityResult:
-        """Check compatibility between old and new port specifications.
+        """检查新旧端口规格的兼容性。
 
         Args:
-            old_spec: Previous version specification
-            new_spec: New version specification
+            old_spec: 旧版本规格
+            new_spec: 新版本规格
 
         Returns:
-            Compatibility result with breaking changes and warnings
+            包含破坏性变更和警告的兼容性结果
         """
         breaking_changes = []
         warnings = []
@@ -84,7 +97,7 @@ class ContractGate:
         )
 
     def _get_methods(self, interface: Type) -> dict[str, str]:
-        """Get all methods and their signatures from an interface."""
+        """获取接口的所有方法及其签名。"""
         methods = {}
         for name in dir(interface):
             if name.startswith("_"):
@@ -100,25 +113,25 @@ class ContractGate:
 
 
 class PortContractTest:
-    """Base class for port contract tests.
+    """端口契约测试基类。
 
-    All port implementations must inherit from this and implement contract tests.
+    所有端口实现须继承此类并实现契约测试。
     """
 
     @classmethod
     def get_port_name(cls) -> str:
-        """Return the port name being tested."""
+        """返回待测试的端口名称。"""
         raise NotImplementedError
 
     @classmethod
     def get_implementation(cls) -> Any:
-        """Return the implementation instance to test."""
+        """返回待测试的实现实例。"""
         raise NotImplementedError
 
     def run_contract_tests(self) -> None:
-        """Run all contract tests.
+        """运行所有契约测试。
 
-        Called by CI to verify implementation matches contract.
+        由 CI 调用以验证实现匹配契约。
         """
         port_name = self.get_port_name()
         impl = self.get_implementation()
@@ -143,10 +156,10 @@ class PortContractTest:
         impl: Any,
         interface: Type,
     ) -> None:
-        """Verify that implementation actually implements the interface."""
+        """验证实现类确实实现了接口。"""
         if not isinstance(impl, interface) and not issubclass(type(impl), interface):
             raise AssertionError(f"Implementation {type(impl)} does not implement {interface}")
 
     def test_contract(self) -> None:
-        """Implement specific contract tests in subclass."""
+        """在子类中实现具体契约测试。"""
         raise NotImplementedError

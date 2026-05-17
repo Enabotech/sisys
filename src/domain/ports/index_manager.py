@@ -1,4 +1,4 @@
-"""IndexManagerPort — 记忆索引管理抽象端口。
+"""SISYS 领域层记忆索引管理抽象端口模块。
 
 负责 MEMORY.md 索引的维护与更新。
 
@@ -6,6 +6,12 @@
 - 所有方法使用 to_thread 封装同步 I/O 操作
 - 保留 fcntl.flock 锁语义（原子性保证）
 - 领域层零外部依赖（仅用 abc + typing）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

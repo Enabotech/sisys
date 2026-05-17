@@ -1,4 +1,13 @@
-"""Document domain entity."""
+"""SISYS 领域层文档实体模块。
+
+定义文档领域实体，包含元数据、版本历史和解析状态管理。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +19,7 @@ from enum import Enum
 
 
 class DocumentType(str, Enum):
-    """Supported document types."""
+    """支持的文档类型枚举。"""
 
     STRATEGIC_PLAN = "strategic_plan"
     BUSINESS_PLAN = "business_plan"
@@ -22,7 +31,7 @@ class DocumentType(str, Enum):
 
 
 class ParseStatus(str, Enum):
-    """Document parsing status."""
+    """文档解析状态枚举。"""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -32,7 +41,7 @@ class ParseStatus(str, Enum):
 
 @dataclass
 class DocumentVersion:
-    """Represents a version of a document."""
+    """文档版本记录。"""
 
     version: int
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -42,13 +51,27 @@ class DocumentVersion:
 
 @dataclass
 class Document:
-    """Document entity with metadata and version history.
+    """文档实体，包含元数据和版本历史。
 
-    Invariant constraints:
-    - document_id must be a valid UUID
-    - filename must not be empty
-    - version must be >= 1
-    - supported_formats: pdf, docx, xlsx, pptx, txt, md, csv, html, etc.
+    不变量约束:
+    - document_id 必须为有效 UUID
+    - filename 不能为空
+    - version 必须 >= 1
+    - 支持格式: pdf, docx, xlsx, pptx, txt, md, csv, html 等
+
+    Attributes:
+        document_id: 文档唯一标识符。
+        filename: 文件名。
+        document_type: 文档类型。
+        file_size_bytes: 文件大小（字节）。
+        mime_type: MIME 类型。
+        parse_status: 解析状态。
+        version: 当前版本号。
+        version_history: 版本历史记录。
+        metadata: 文档元数据。
+        embedding: 文档嵌入向量。
+        created_at: 创建时间。
+        updated_at: 最后更新时间。
     """
 
     document_id: uuid.UUID
@@ -65,13 +88,13 @@ class Document:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def validate(self) -> bool:
-        """Validate invariant constraints.
+        """验证不变量约束。
 
         Returns:
-            True if all invariants are satisfied.
+            所有不变量满足时返回 True。
 
         Raises:
-            ValueError: If any invariant is violated.
+            ValueError: 任何不变量违反时抛出。
         """
         if not isinstance(self.document_id, uuid.UUID):
             raise ValueError("document_id must be a valid UUID")
@@ -91,16 +114,16 @@ class Document:
         return True
 
     def validate_metadata(self, required_fields: list[str] | None = None) -> bool:
-        """Validate that required metadata fields are present.
+        """验证必需的元数据字段是否存在。
 
         Args:
-            required_fields: List of required metadata keys.
+            required_fields: 必需的元数据键列表。
 
         Returns:
-            True if all required fields are present.
+            所有必需字段都存在时返回 True。
 
         Raises:
-            ValueError: If any required field is missing.
+            ValueError: 任何必需字段缺失时抛出。
         """
         if required_fields is None:
             required_fields = []
@@ -110,14 +133,14 @@ class Document:
         return True
 
     def bump_version(self, change_description: str, created_by: str = "") -> int:
-        """Increment document version and record history.
+        """递增文档版本号并记录历史。
 
         Args:
-            change_description: Description of changes in this version.
-            created_by: User who made the change.
+            change_description: 本次版本变更描述。
+            created_by: 变更操作者。
 
         Returns:
-            New version number.
+            新版本号。
         """
         # Record current version in history
         current_version = DocumentVersion(

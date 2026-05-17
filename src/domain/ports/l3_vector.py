@@ -1,4 +1,4 @@
-"""L3VectorPort — L3 Qdrant 向量存储抽象端口。
+"""SISYS 领域层 L3 Qdrant 向量存储抽象端口模块。
 
 对应 architecture.md §11.1：
 - 内容 >500 tokens 时启用向量检索
@@ -18,6 +18,12 @@
 设计原则：
 - 领域层零外部依赖（仅用 abc + typing）
 - 异步优先（async def）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

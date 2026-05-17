@@ -1,8 +1,14 @@
-"""Event serialization adapters (application layer).
+"""SISYS 应用层事件序列化适配器模块。
 
-Uses Pydantic TypeAdapter for dict ↔ JSON boundary conversion.
-Domain layer events use dataclasses.asdict() / DomainEvent.from_dict().
-This adapter handles the JSON string conversion at the application layer boundary.
+使用 Pydantic TypeAdapter 完成 dict ↔ JSON 边界转换。
+领域层事件使用 dataclasses.asdict() / DomainEvent.from_dict()，
+本适配器处理应用层边界的 JSON 字符串转换。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,16 +23,16 @@ dict_adapter: TypeAdapter[dict[str, Any]] = TypeAdapter(dict[str, Any])
 
 
 def event_dict_to_json(event_dict: dict[str, Any]) -> str:
-    """Serialize event dict to JSON string using Pydantic TypeAdapter.
+    """将事件字典序列化为 JSON 字符串（使用 Pydantic TypeAdapter）。
 
     Args:
-        event_dict: Dictionary from DomainEvent.to_dict().
+        event_dict: 来自 DomainEvent.to_dict() 的字典
 
     Returns:
-        JSON string representation.
+        JSON 字符串表示
 
     Raises:
-        ValueError: If the dict cannot be serialized to JSON.
+        ValueError: 字典无法序列化为 JSON 时抛出
     """
     try:
         return dict_adapter.dump_json(event_dict).decode("utf-8")
@@ -35,16 +41,16 @@ def event_dict_to_json(event_dict: dict[str, Any]) -> str:
 
 
 def json_to_event_dict(json_str: str) -> dict[str, Any]:
-    """Deserialize JSON string to event dict using Pydantic TypeAdapter.
+    """将 JSON 字符串反序列化为事件字典（使用 Pydantic TypeAdapter）。
 
     Args:
-        json_str: JSON string.
+        json_str: JSON 字符串
 
     Returns:
-        Dictionary suitable for DomainEvent.from_dict().
+        适用于 DomainEvent.from_dict() 的字典
 
     Raises:
-        ValueError: If JSON string is invalid.
+        ValueError: JSON 字符串无效时抛出
     """
     try:
         data = json.loads(json_str)

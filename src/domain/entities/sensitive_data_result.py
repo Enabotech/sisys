@@ -1,6 +1,12 @@
-"""SensitiveDataResult — Domain entity for sensitive data detection results.
+"""SISYS 领域层敏感数据检测结果实体模块。
 
-遵循六边形架构：领域实体，仅包含业务逻辑，无外部依赖。
+定义敏感数据检测结果领域实体，遵循六边形架构：领域层零依赖。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

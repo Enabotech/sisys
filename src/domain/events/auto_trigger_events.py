@@ -1,4 +1,13 @@
-"""AutoTriggered domain event — emitted after auto-trigger extracts context from domain/heartbeat events."""
+"""SISYS 领域层 自动触发事件模块。
+
+定义自动触发机制从领域/心跳事件提取上下文后触发的事件。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -10,23 +19,31 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AutoTriggered(DomainEvent):
-    """Event emitted when auto-trigger mechanism extracts context from domain or heartbeat events.
+    """自动触发机制从领域或心跳事件提取上下文时触发的事件。
 
-    This event flows to Story 1.14b (auto-route) for session-aware routing decisions.
+    此事件传递给Story 1.14b（自动路由）进行会话感知的路由决策。
+
+    Attributes:
+        trigger_type: 触发类型，"domain_event"或"heartbeat"。
+        session_id: 会话标识符。
+        agent_id: Agent标识符（可选）。
+        task_context: 任务上下文信息。
+        source_event_type: 原始触发事件类型（如"DocumentProcessed"）。
+        source_event_id: 原始触发事件ID。
     """
 
-    # Note: event_type is inherited from DomainEvent (init=True, default="")
-    # The actual event_type value "AutoTriggered" is set via __post_init__
+    # 注意：event_type继承自DomainEvent（init=True，默认值为""）
+    # 实际的event_type值"AutoTriggered"通过__post_init__设置
     trigger_type: str = ""  # "domain_event" | "heartbeat"
     session_id: str = ""
     agent_id: str | None = None
     task_context: dict[str, Any] = field(default_factory=dict)
-    source_event_type: str = ""  # Original event that triggered (e.g., "DocumentProcessed")
+    source_event_type: str = ""  # 触发的原始事件（如"DocumentProcessed"）
     source_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Set event_type, aggregate_id, and aggregate_type for event tracking."""
-        # Set event_type to class name if not already set
+        """设置event_type、aggregate_id和aggregate_type用于事件追踪。"""
+        # 如果未设置，将event_type设置为类名
         if not self.event_type:
             object.__setattr__(self, "event_type", "AutoTriggered")
         if self.aggregate_id is None and self.event_id:
@@ -35,5 +52,5 @@ class AutoTriggered(DomainEvent):
             object.__setattr__(self, "aggregate_type", "AutoTrigger")
 
 
-# Register AutoTriggered after class definition (manual registration needed due to init=False on event_type)
+# 在类定义后注册AutoTriggered（由于event_type的init=False需要手动注册）
 DomainEvent._registry["AutoTriggered"] = AutoTriggered

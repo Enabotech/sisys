@@ -1,6 +1,12 @@
-"""AuditLog — Domain entity for audit log entries.
+"""SISYS 领域层审计日志实体模块。
 
-遵循六边形架构：领域实体，仅包含业务逻辑，无外部依赖。
+定义审计日志领域实体，仅依赖标准库，无外部 ORM 框架。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,7 +1,13 @@
-"""PublishResult domain type.
+"""SISYS 领域层 发布结果类型模块。
 
 领域层定义，用于返回发布操作的结果。
-使用 DomainEvent 作为基础，不感知传输细节。
+使用DomainEvent作为基础，不感知传输细节。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

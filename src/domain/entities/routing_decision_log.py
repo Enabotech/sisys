@@ -1,4 +1,14 @@
-"""RoutingDecisionLog domain entity."""
+"""SISYS 领域层路由决策日志实体模块。
+
+定义路由决策日志领域实体，用于审计和成本追踪。
+WORM 存储要求（合规要求保留 7 年）。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -9,17 +19,32 @@ from datetime import UTC, datetime
 
 @dataclass(frozen=True)
 class RoutingDecisionLog:
-    """Log entry for routing decisions.
+    """路由决策日志条目。
 
-    Stores routing decision details for audit and cost tracking.
-    WORM storage required (7-year retention per compliance requirements).
+    存储路由决策细节，用于审计和成本追踪。
+    WORM 存储要求（合规要求保留 7 年）。
 
-    Invariant constraints:
-    - log_id must be a valid UUID
-    - task_id must not be empty
-    - session_id must not be empty
-    - route_type must be one of: "hash", "semantic", "mixed", "local", "cloud"
-    - route_score must be between 0.0 and 1.0
+    不变量约束:
+    - log_id 必须为有效 UUID
+    - task_id 不能为空
+    - session_id 不能为空
+    - route_type 必须为: "hash", "semantic", "mixed", "local", "cloud" 之一
+    - route_score 必须在 0.0 至 1.0 范围内
+
+    Attributes:
+        log_id: 日志唯一标识符。
+        task_id: 任务标识符。
+        session_id: 会话标识符。
+        route_type: 路由类型。
+        route_target: 路由目标（智能体/工具/模型名）。
+        route_score: 路由置信度/评分（0.0-1.0）。
+        cost_estimate: 预估成本（美元）。
+        latency_ms: 路由决策延迟（毫秒）。
+        timestamp: 决策时间戳。
+        worm_storage_ref: WORM 存储引用（合规）。
+        selected_model: UDMR 选定模型（本地/云端）。
+        cost_actual: 实际成本（美元）。
+        fallback_reason: UDMR 回退原因。
     """
 
     log_id: uuid.UUID
@@ -38,10 +63,10 @@ class RoutingDecisionLog:
     fallback_reason: str | None = None  # Fallback reason for UDMR
 
     def validate(self) -> None:
-        """Validate invariant constraints.
+        """验证不变量约束。
 
         Raises:
-            ValueError: If any invariant is violated.
+            ValueError: 任何不变量违反时抛出。
         """
         if not isinstance(self.log_id, uuid.UUID):
             raise ValueError("log_id must be a valid UUID")

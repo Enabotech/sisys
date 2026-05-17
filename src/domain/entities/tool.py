@@ -1,4 +1,13 @@
-"""Tool domain entity."""
+"""SISYS 领域层工具实体模块。
+
+定义工具领域实体，包含唯一标识符、I/O 模式和执行器。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +18,7 @@ from enum import Enum
 
 
 class ToolStatus(str, Enum):
-    """Tool lifecycle status."""
+    """工具生命周期状态枚举。"""
 
     ACTIVE = "active"
     DEPRECATED = "deprecated"
@@ -17,7 +26,7 @@ class ToolStatus(str, Enum):
 
 
 class ToolCategory(str, Enum):
-    """Tool categories."""
+    """工具分类枚举。"""
 
     ANALYSIS = "analysis"
     GENERATION = "generation"
@@ -28,13 +37,13 @@ class ToolCategory(str, Enum):
 
 @dataclass
 class Tool:
-    """Tool entity with unique identifier, I/O schema, and executor.
+    """工具实体，包含唯一标识符、I/O 模式和执行器。
 
-    Invariant constraints:
-    - tool_id must be a valid UUID
-    - name must not be empty
-    - input_schema must be valid JSON schema dict
-    - output_schema must be valid JSON schema dict
+    不变量约束:
+    - tool_id 必须为有效 UUID
+    - name 不能为空
+    - input_schema 必须为有效 JSON Schema 字典
+    - output_schema 必须为有效 JSON Schema 字典
     """
 
     tool_id: uuid.UUID
@@ -49,13 +58,13 @@ class Tool:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def validate(self) -> bool:
-        """Validate invariant constraints.
+        """验证不变量约束。
 
         Returns:
-            True if all invariants are satisfied.
+            所有不变量满足时返回 True。
 
         Raises:
-            ValueError: If any invariant is violated.
+            ValueError: 任何不变量违反时抛出。
         """
         if not isinstance(self.tool_id, uuid.UUID):
             raise ValueError("tool_id must be a valid UUID")

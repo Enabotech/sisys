@@ -1,7 +1,13 @@
-"""AuthService Port - 认证服务端口.
+"""SISYS 领域层认证服务端口模块。
 
 领域层接口，定义认证服务的契约。
 遵循六边形架构：领域层零依赖，仅使用标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,7 +23,12 @@ __all__ = ["AuthenticationError"]
 
 @dataclass(frozen=True)
 class AuthTokens:
-    """认证令牌领域值对象（不可变）."""
+    """认证令牌领域值对象（不可变）。
+
+    Attributes:
+        access_token: 访问令牌
+        refresh_token: 刷新令牌
+    """
 
     access_token: str
     refresh_token: str

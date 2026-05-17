@@ -1,7 +1,13 @@
-"""AuditService Port - 审计服务端口.
+"""SISYS 领域层审计服务端口模块。
 
 领域层接口，定义审计服务的契约。
 遵循六边形架构：领域层零依赖，仅使用标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -18,7 +24,18 @@ __all__ = ["AuditError"]
 
 @dataclass(frozen=True)
 class AuditRecord:
-    """审计记录领域值对象（不可变）."""
+    """审计记录领域值对象（不可变）。
+
+    Attributes:
+        log_id: 审计日志唯一标识
+        timestamp: 审计时间戳
+        actor: 操作者（用户 ID 或系统组件标识）
+        action_type: 操作类型
+        target_resource: 被操作资源标识
+        old_value: 操作前状态
+        new_value: 操作后状态
+        correction_level: 纠正级别（可选）
+    """
 
     log_id: UUID
     timestamp: datetime

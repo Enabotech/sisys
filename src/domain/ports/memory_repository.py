@@ -1,6 +1,12 @@
-"""L2 关系型数据库存储端口协议定义（领域层）。
+"""SISYS 领域层 L2 关系型数据库存储端口协议模块。
 
 依赖倒置：领域层定义接口，基础设施层实现。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

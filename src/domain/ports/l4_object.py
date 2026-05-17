@@ -1,4 +1,4 @@
-"""L4ObjectPort — L4 MinIO WORM 对象存储抽象端口。
+"""SISYS 领域层 L4 MinIO WORM 对象存储抽象端口模块。
 
 对应 architecture.md §11.1：
 - 原始文档、证据包存储
@@ -12,6 +12,12 @@
 设计原则：
 - 领域层零外部依赖（仅用 abc + typing）
 - 异步优先（async def）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -75,6 +81,11 @@ class L4ObjectPort(Protocol):
     ) -> bool:
         """删除对象（WORM 锁定对象抛出 ComplianceLockError）。
 
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
+
         Returns:
             是否成功
         """
@@ -89,6 +100,11 @@ class L4ObjectPort(Protocol):
 
         注意：MinIO SDK 对不存在的对象会抛出异常，此方法不返回 None。
         调用方应使用 try/catch 处理异常。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
 
         Returns:
             元数据字典（对象不存在时 SDK 抛出异常）

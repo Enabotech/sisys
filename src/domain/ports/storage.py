@@ -1,7 +1,13 @@
-"""Object Storage Repository — 领域层定义（DEPRECATED）。
+"""SISYS 领域层对象存储仓储模块（DEPRECATED）。
 
 已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）。
 本文件仅保留向后兼容。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -20,6 +26,9 @@ class ObjectStorageRepository(Protocol):
 
     定义领域操作（store/retrieve/delete/archive），
     不暴露 S3 原生概念（bucket/key/ETag 等）。
+
+    DEPRECATED:
+        请使用 L4ObjectPort 替代。
     """
 
     async def store(

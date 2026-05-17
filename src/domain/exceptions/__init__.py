@@ -1,4 +1,4 @@
-"""sisys - Domain Exceptions.
+"""SISYS 领域层异常模块。
 
 领域异常层次结构：
 - BaseException: 异常层次结构根类
@@ -7,6 +7,12 @@
 - ExternalException: 外部服务异常
 
 架构约束：领域层零依赖，仅使用 Python 标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
