@@ -1,61 +1,62 @@
 """UserRepository — 用户仓储实现。
 
-重构说明（Phase 3）：
-- 继承 PostgreSQLAdapter[UserModel, UserModel]（恒等转换）
-- 实现 _to_entity/_to_model 恒等转换
-- 自动获得父类 get_by_id/save/delete/list_all
-
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+继承 PostgreSQLAdapter[User, UserModel]，实现实体↔模型转换。
+UserRepositoryPort 声明返回 User 领域实体，本仓储通过 TEntity 泛型匹配。
 """
 
 from __future__ import annotations
 
 from sqlalchemy import select
 
+from src.domain.entities.user import User
 from src.infrastructure.storage.postgresql.models import UserModel
 from src.infrastructure.storage.postgresql.repository.postgresql_adapter import PostgreSQLAdapter
 
 
-class UserRepository(PostgreSQLAdapter[UserModel, UserModel]):
+class UserRepository(PostgreSQLAdapter[User, UserModel]):
     """用户仓储实现。
 
-    继承 PostgreSQLAdapter[UserModel, UserModel]，
-    添加用户特定查询方法。
+    继承 PostgreSQLAdapter[User, UserModel]，
+    通过 _to_entity/_to_model 隔离领域层与 ORM 层。
     """
 
     def __init__(self) -> None:
         super().__init__(UserModel)
 
-    def _to_entity(self, model: UserModel) -> UserModel:
-        """ORM 模型 → 领域实体（恒等转换）。"""
-        return model
+    def _to_entity(self, model: UserModel) -> User:
+        """ORM model -> domain entity."""
+        return User(
+            id=model.id,
+            username=model.username,
+            email=model.email,
+            password_hash=model.hashed_password or "",
+            is_active=model.is_active,
+            is_locked=model.is_locked,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
-    def _to_model(self, entity: UserModel) -> UserModel:
-        """领域实体 → ORM 模型（恒等转换）。"""
-        return entity
+    def _to_model(self, entity: User) -> UserModel:
+        """Domain entity -> ORM model."""
+        return UserModel(
+            id=entity.id,
+            username=entity.username,
+            email=entity.email,
+            hashed_password=entity.password_hash,
+            is_active=entity.is_active,
+            is_locked=entity.is_locked,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+        )
 
-    async def get_by_username(self, username: str) -> UserModel | None:
-        """根据用户名获取用户。
-
-        Args:
-            username: 用户名
-
-        Returns:
-            用户实例，如果不存在则返回 None
-        """
+    async def get_by_username(self, username: str) -> User | None:
+        """根据用户名获取用户。"""
         result = await self._session.execute(select(UserModel).where(UserModel.username == username))
-        return result.scalar_one_or_none()
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
 
-    async def get_by_email(self, email: str) -> UserModel | None:
-        """根据邮箱获取用户。
-
-        Args:
-            email: 邮箱地址
-
-        Returns:
-            用户实例，如果不存在则返回 None
-        """
+    async def get_by_email(self, email: str) -> User | None:
+        """根据邮箱获取用户。"""
         result = await self._session.execute(select(UserModel).where(UserModel.email == email))
-        return result.scalar_one_or_none()
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None

@@ -8,6 +8,7 @@ from .document import Document
 from .external_api_whitelist import ExternalAPIWhitelist
 from .memory_change_history import MemoryChangeHistory
 from .memory_metadata import MemoryMetadata
+from .permission import Permission
 from .pipl_compliance_record import PIPLComplianceRecord
 from .routing_decision_log import RoutingDecisionLog
 from .sensitive_data_result import SensitiveDataResult
@@ -23,6 +24,7 @@ __all__ = [
     "ExternalAPIWhitelist",
     "MemoryChangeHistory",
     "MemoryMetadata",
+    "Permission",
     "PIPLComplianceRecord",
     "RoutingDecisionLog",
     "SensitiveDataResult",

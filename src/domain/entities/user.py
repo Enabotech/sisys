@@ -28,6 +28,7 @@ class User:
 
     id: UUID
     username: str
+    email: str
     password_hash: str
     is_active: bool = True
     is_locked: bool = False

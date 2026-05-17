@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.entities.permission import Permission
 from src.domain.entities.role import Role
 from src.domain.ports.role_repository import RoleRepositoryPort
 from src.infrastructure.storage.postgresql.models import PermissionModel, RoleModel
@@ -262,14 +263,14 @@ class RoleRepository(RoleRepositoryPort):
             roles.append(await self._load_permissions_for_model(m))
         return roles
 
-    async def get_permissions_for_role(self, role_id: str) -> list[PermissionModel]:
+    async def get_permissions_for_role(self, role_id: str) -> list[Permission]:
         """获取角色的权限列表。
 
         Args:
             role_id: 角色 ID
 
         Returns:
-            权限列表
+            Permission 领域实体列表
         """
         from src.infrastructure.storage.postgresql.models.rbac_association import (
             role_permissions_table as role_permissions,
@@ -280,4 +281,14 @@ class RoleRepository(RoleRepositoryPort):
             .join(role_permissions, PermissionModel.id == role_permissions.c.permission_id)
             .where(role_permissions.c.role_id == role_id)
         )
-        return list(result.scalars().all())
+        return [self._to_permission_entity(m) for m in result.scalars().all()]
+
+    def _to_permission_entity(self, model: PermissionModel) -> Permission:
+        """PermissionModel -> Permission domain entity."""
+        return Permission(
+            id=model.id,
+            name=model.name,
+            resource=model.resource,
+            action=model.action,
+            created_at=model.created_at,
+        )

@@ -9,10 +9,12 @@ Refactoring notes:
 from __future__ import annotations
 
 from typing import Any, Generic, TypeVar, cast
+from uuid import UUID
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.ports.l2_rdb import L2RdbPort
 from src.infrastructure.storage.postgresql.models import Base
 from src.infrastructure.storage.postgresql.session_context import get_session
 
@@ -20,7 +22,7 @@ TEntity = TypeVar("TEntity")
 TModel = TypeVar("TModel", bound=Base)
 
 
-class PostgreSQLAdapter(Generic[TEntity, TModel]):
+class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
     """Domain repository base — implements L2RdbPort[TEntity] with ORM conversion.
 
     Subclasses must implement:
@@ -55,7 +57,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         """Domain entity -> ORM model (subclass must override)."""
         raise NotImplementedError
 
-    async def get_by_id(self, id: Any) -> TEntity | None:
+    async def get_by_id(self, id: UUID) -> TEntity | None:
         """Get entity by primary key.
 
         Args:
@@ -83,7 +85,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         await self._do_save(model, entity)
         return self._to_entity(model)
 
-    async def delete(self, id: Any) -> None:
+    async def delete(self, id: UUID) -> None:
         """Delete entity (hard delete or soft delete).
 
         Args:
@@ -127,7 +129,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
             return stmt.where(col.is_(None))
         return stmt
 
-    async def _soft_delete(self, id: Any) -> None:
+    async def _soft_delete(self, id: UUID) -> None:
         """Soft delete — set deleted_at timestamp."""
         from datetime import datetime, timezone
 
@@ -143,7 +145,7 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         await self._session.execute(stmt)
         await self._session.flush()
 
-    async def _hard_delete(self, id: Any) -> None:
+    async def _hard_delete(self, id: UUID) -> None:
         """Hard delete — physically remove record."""
         stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         result = await self._session.execute(stmt)
@@ -151,7 +153,3 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
         if model:
             await self._session.delete(model)
             await self._session.flush()
-
-
-# Deprecated alias — use PostgreSQLAdapter instead
-BaseRepository = PostgreSQLAdapter

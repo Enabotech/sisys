@@ -117,6 +117,7 @@ class TestHorizontalPrivilegeEscalation:
         user = User(
             id=user_id,
             username="testuser",
+            email="test@example.com",
             password_hash="hash",  # pragma: allowlist secret
             is_active=True,
         )

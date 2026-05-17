@@ -110,7 +110,7 @@ class AuthServiceImpl(AuthServicePort):
                 )
 
         # 验证密码
-        if not self._encryption_service.verify_password(password, user.hashed_password):
+        if not self._encryption_service.verify_password(password, user.password_hash):
             await self._record_attempt(username, False, "invalid_password", user.id, ip_address, user_agent)
             raise AuthenticationError("Invalid credentials")
 
