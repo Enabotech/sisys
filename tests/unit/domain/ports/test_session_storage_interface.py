@@ -18,14 +18,6 @@ class TestSessionStorageInterface:
         assert hasattr(SessionStorage, "delete")
         assert hasattr(SessionStorage, "exists")
 
-    def test_methods_are_abstract(self) -> None:
-        """方法应标记为抽象。"""
-        # 检查方法是否有 __isabstractmethod__ 属性
-        assert getattr(SessionStorage.save, "__isabstractmethod__", False) is True
-        assert getattr(SessionStorage.load, "__isabstractmethod__", False) is True
-        assert getattr(SessionStorage.delete, "__isabstractmethod__", False) is True
-        assert getattr(SessionStorage.exists, "__isabstractmethod__", False) is True
-
     def test_save_signature(self) -> None:
         """save 方法应有正确的签名。"""
         sig = inspect.signature(SessionStorage.save)

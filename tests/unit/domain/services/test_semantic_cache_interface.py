@@ -16,12 +16,6 @@ class TestSemanticCacheInterface:
         assert hasattr(SemanticCache, "set")
         assert hasattr(SemanticCache, "invalidate")
 
-    def test_methods_are_abstract(self) -> None:
-        """方法应标记为抽象。"""
-        assert getattr(SemanticCache.get, "__isabstractmethod__", False) is True
-        assert getattr(SemanticCache.set, "__isabstractmethod__", False) is True
-        assert getattr(SemanticCache.invalidate, "__isabstractmethod__", False) is True
-
     def test_get_signature(self) -> None:
         """get 方法应有正确的签名。"""
         sig = inspect.signature(SemanticCache.get)

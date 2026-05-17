@@ -1,7 +1,7 @@
-"""MinIO ObjectStorageRepository 实现。
+"""MinIORepository — MinIO 对象存储内部实现。
 
-实现领域层 ObjectStorageRepository 接口，
-内部委托给 BucketManager、ObjectOperations 和 WORMManager。
+被 MinIOAdapter(L4ObjectPort) 组合委托。
+方法签名与 L4ObjectPort 匹配。
 """
 
 from __future__ import annotations
@@ -10,19 +10,16 @@ from collections.abc import AsyncIterator
 
 from redis.asyncio import Redis
 
-from src.domain.ports.storage import (
-    ObjectStorageRepository,
-)
 from src.infrastructure.storage.minio.bucket_manager import BucketManager
 from src.infrastructure.storage.minio.object_operations import ObjectOperations
 from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
 
 
-class MinIORepository(ObjectStorageRepository):
-    """MinIO 对象存储仓储实现。
+class MinIORepository:
+    """MinIO 对象存储内部实现。
 
-    实现领域层 ObjectStorageRepository 接口，
-    内部委托给基础设施层组件。
+    被 MinIOAdapter(L4ObjectPort) 组合委托，
+    不声明 Protocol 继承。
     """
 
     def __init__(
