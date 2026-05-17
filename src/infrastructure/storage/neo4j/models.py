@@ -1,7 +1,12 @@
-"""Neo4j 图存储层数据模型
+"""SISYS 基础设施层 Neo4j 图存储数据模型模块。
 
-包含 GraphNode 和 GraphRelationship 定义
-所有模型位于基础设施层，不污染领域层
+包含 GraphNode、GraphRelationship 和 RelationshipType 定义，所有模型位于基础设施层。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -44,7 +49,11 @@ class GraphNode:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """验证节点数据是否有效"""
+        """验证节点数据是否有效。
+
+        Raises:
+            ValueError: ID 为空、labels 为空或缺少必需属性时抛出
+        """
         if not self.id or not self.id.strip():
             raise ValueError("Node id must be a non-empty string")
         if not self.labels:
@@ -77,7 +86,11 @@ class GraphRelationship:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """验证关系数据是否有效"""
+        """验证关系数据是否有效。
+
+        Raises:
+            ValueError: 起始/结束节点 ID 为空或关系类型未指定时抛出
+        """
         if not self.start_node_id or not self.start_node_id.strip():
             raise ValueError("start_node_id must be a non-empty string")
         if not self.end_node_id or not self.end_node_id.strip():

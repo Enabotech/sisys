@@ -1,6 +1,12 @@
-"""Qdrant Collection 管理器实现
+"""SISYS 基础设施层 Qdrant Collection 管理模块。
 
-负责 Collection 的创建、删除、查询和列表操作
+负责 Qdrant Collection 的创建、删除、查询和列表操作。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

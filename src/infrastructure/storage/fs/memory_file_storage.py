@@ -1,6 +1,12 @@
-"""MemoryFileStorage — MemoryFilePort 实现（Rule 4）
+"""SISYS 基础设施层记忆文件存储模块。
 
-组合注入 FileMemoryAdapter（Rule 3），添加记忆索引管理语义
+实现 MemoryFilePort 接口，组合 FileMemoryAdapter 并添加 MEMORY.md 索引管理语义。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -31,19 +37,55 @@ class MemoryFileStorage(MemoryFilePort):
     # -- L0StoragePort methods (delegate to adapter) --
 
     async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
-        """写入记忆文件"""
+        """写入记忆文件。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+            content: 记忆内容
+
+        Returns:
+            写入成功返回 True
+        """
         return await self._adapter.write(memory_id, memory_type, content)
 
     async def read(self, memory_id: str, memory_type: str) -> str:
-        """读取记忆文件"""
+        """读取记忆文件。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+
+        Returns:
+            记忆内容
+
+        Raises:
+            FileNotFoundError: 文件不存在时抛出
+        """
         return await self._adapter.read(memory_id, memory_type)
 
     async def delete(self, memory_id: str, memory_type: str) -> bool:
-        """删除记忆文件"""
+        """删除记忆文件。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+
+        Returns:
+            删除成功返回 True，文件不存在返回 False
+        """
         return await self._adapter.delete(memory_id, memory_type)
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查记忆文件是否存在"""
+        """检查记忆文件是否存在。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+
+        Returns:
+            存在返回 True
+        """
         return await self._adapter.exists(memory_id, memory_type)
 
     async def list_memories(self, memory_type: str) -> list[str]:

@@ -1,10 +1,13 @@
-"""RabbitMQEventListener — 异步事件监听器实现
+"""SISYS 基础设施层 RabbitMQ 异步事件监听器模块。
 
-实现 EventListenerAsync 接口，用于异步事件消费
-集成：
-- DualIdempotencyChecker: Redis + PostgreSQL 双写幂等性检查
-- RedisRetryQueue: 延迟重试队列
-- PostgresDeadLetterQueue: 死信队列
+实现 EventListenerAsync 接口，用于异步消费 RabbitMQ 消息，
+集成幂等性检查、延迟重试队列和死信队列
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -58,7 +61,7 @@ class RabbitMQEventListener(EventListenerAsync):
             redis_client=redis_client,
         )
         self._retry_queue = RedisRetryQueue(redis_client=redis_client)
-        # Dead letter queue will be set separately
+        # 死信队列将通过 set_dead_letter_queue 单独设置
         self._dlq = None
         self._connection: AbstractConnection | None = None
         self._channel: AbstractChannel | None = None
@@ -97,7 +100,7 @@ class RabbitMQEventListener(EventListenerAsync):
                 event_id=event.event_id,
                 event_type=event.event_type,
                 payload=event.to_dict(),
-                retry_at=event.timestamp,  # Will be adjusted by retry policy
+                retry_at=event.timestamp,  # 将由重试策略调整
                 retry_count=0,
                 error=str(e),
             )
@@ -109,7 +112,7 @@ class RabbitMQEventListener(EventListenerAsync):
         Args:
             event: 领域事件
         """
-        # Placeholder - actual processing would be done by registered handlers
+        # 占位符 - 实际处理由注册的处理器或子类完成
         logger.debug("Processing event %s of type %s", event.event_id, event.event_type)
 
     async def connect(self) -> None:

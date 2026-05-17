@@ -1,8 +1,13 @@
-"""In-memory event bus implementation (MVP).
+"""SISYS 基础设施层内存事件总线模块。
 
-Implements both EventPublisher and event distribution with idempotency.
-Uses a set of processed event IDs for deduplication (TTL simulated).
-Thread-safe via threading.RLock.
+基于内存的事件总线实现，支持幂等性去重和线程安全的事件分发，
+适用于测试和 MVP 阶段
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -16,23 +21,21 @@ from src.domain.ports.event_publisher import InMemoryEventPublisher
 
 
 class InMemoryEventBus(InMemoryEventPublisher):
-    """In-memory event bus with idempotency guarantee (MVP).
+    """内存事件总线，提供幂等性保证。
 
-    Maintains a set of processed event IDs to prevent duplicate processing.
-    Events are dispatched to registered listeners by event type.
-
-    Thread-safe: all public methods are protected by a reentrant lock.
+    维护已处理事件 ID 集合以防止重复处理，按事件类型分发到已注册的监听器。
+    所有公共方法通过可重入锁保护线程安全。
 
     Attributes:
-        processed_event_ids: Set of already-processed event IDs.
-        listener: The event listener to dispatch events to.
+        processed_event_ids: 已处理的事件 ID 集合。
+        listener: 用于分发事件的事件监听器。
     """
 
     def __init__(self, listener: InMemoryEventListener | None = None) -> None:
-        """Initialize the event bus.
+        """初始化内存事件总线。
 
         Args:
-            listener: Optional event listener for dispatching events.
+            listener: 可选的事件监听器，用于分发事件。
         """
         self._lock = threading.RLock()
         self.processed_event_ids: set[uuid.UUID] = set()
@@ -40,41 +43,45 @@ class InMemoryEventBus(InMemoryEventPublisher):
         self._published_events: list[DomainEvent] = []
 
     def publish(self, event: DomainEvent) -> None:
-        """Publish a domain event with idempotency check.
+        """发布领域事件（带幂等性检查）。
 
-        Events are dispatched to listeners first, then recorded as processed.
-        This ensures that if dispatch fails, the event can be retried.
+        事件先分发到监听器，成功后记录为已处理。
+        若分发失败，事件可被重试。
 
         Args:
-            event: The domain event to publish.
+            event: 要发布的领域事件。
 
         Raises:
-            ValueError: If event is None.
+            ValueError: 当 event 为 None 时。
         """
         if event is None:
             raise ValueError("event must not be None")
 
         with self._lock:
-            # Idempotency check
+            # 幂等性检查
             if event.event_id in self.processed_event_ids:
-                return  # Already processed, skip
+                return  # 已处理，跳过
 
-            # Dispatch to listener first, then record as processed
+            # 先分发到监听器，成功后记录为已处理
             if self._listener is not None:
                 self._listener.dispatch(event)
 
-            # Record as processed (only after successful dispatch)
+            # 记录为已处理（仅在成功分发后）
             self.processed_event_ids.add(event.event_id)
             self._published_events.append(event)
 
     @property
     def published_events(self) -> list[DomainEvent]:
-        """Return list of all published events (in order)."""
+        """获取所有已发布事件列表（按发布顺序）。
+
+        Returns:
+            已发布事件的列表副本。
+        """
         with self._lock:
             return list(self._published_events)
 
     def reset(self) -> None:
-        """Clear all processed event IDs and published events (for testing)."""
+        """清空所有已处理事件 ID 和已发布事件列表（用于测试）。"""
         with self._lock:
             self.processed_event_ids.clear()
             self._published_events.clear()

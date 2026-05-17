@@ -1,7 +1,13 @@
-"""Audit API Routes - 审计日志 API 路由.
+"""SISYS 接口层审计日志 API 路由模块。
 
-提供审计日志检索、完整性验证、归档管理的 REST API 端点
+提供审计日志检索、完整性验证、归档管理的 REST API 端点。
 遵循六边形架构：接口层仅依赖应用层用例和领域端口
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -19,7 +25,22 @@ from pydantic import BaseModel, Field
 
 
 class AuditLogResponse(BaseModel):
-    """审计日志响应."""
+    """审计日志响应。
+
+    Attributes:
+        log_id: 日志 ID
+        timestamp: 日志时间戳
+        actor: 操作者
+        action_type: 操作类型
+        target_resource: 目标资源
+        old_value: 变更前值
+        new_value: 变更后值
+        correction_level: 修正级别
+        checksum: 校验和
+        archived: 是否已归档
+        archived_at: 归档时间
+        correlation_id: 关联 ID
+    """
 
     log_id: str
     timestamp: datetime | None = None
@@ -36,7 +57,14 @@ class AuditLogResponse(BaseModel):
 
 
 class AuditLogListResponse(BaseModel):
-    """审计日志列表响应."""
+    """审计日志列表响应。
+
+    Attributes:
+        items: 日志条目列表
+        total: 总数
+        offset: 偏移量
+        limit: 每页数量
+    """
 
     items: list[AuditLogResponse]
     total: int
@@ -45,7 +73,11 @@ class AuditLogListResponse(BaseModel):
 
 
 class IntegrityVerifyRequest(BaseModel):
-    """完整性验证请求."""
+    """完整性验证请求。
+
+    Attributes:
+        log_ids: 待验证的日志 ID 列表（可选，为空则验证全部）
+    """
 
     log_ids: list[str] | None = None
 

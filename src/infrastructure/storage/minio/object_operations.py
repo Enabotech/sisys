@@ -1,6 +1,12 @@
-"""MinIO 对象操作
+"""SISYS 基础设施层 MinIO 对象操作模块。
 
-提供流式上传/下载、分片上传、断点续传等对象操作
+提供流式上传/下载、分片上传、断点续传等对象操作功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

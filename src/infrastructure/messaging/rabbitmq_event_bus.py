@@ -1,4 +1,14 @@
-"""RabbitMQEventBus — reliable event bus via Outbox pattern."""
+"""SISYS 基础设施层 RabbitMQ 事件总线模块。
+
+基于 Outbox 模式实现可靠事件传输，事件先持久化到发件箱再异步发布到
+RabbitMQ，保证消息不丢失
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,12 @@
-"""FastAPI 统一异常处理器.
+"""SISYS 接口层统一异常处理器模块。
 
 根据异常类型自动映射到正确的 HTTP 状态码
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -68,7 +74,14 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 
 
 def _get_http_status(exc: BaseException) -> int:
-    """获取异常对应的 HTTP 状态码，优先使用具体异常映射."""
+    """获取异常对应的 HTTP 状态码，优先使用具体异常映射。
+
+    Args:
+        exc: 领域异常实例
+
+    Returns:
+        对应的 HTTP 状态码
+    """
     for exc_type, http_status in EXCEPTION_HTTP_MAP.items():
         if type(exc) is exc_type:
             return http_status
@@ -79,19 +92,38 @@ def _get_http_status(exc: BaseException) -> int:
 
 
 class ExceptionHandlers:
-    """统一异常处理器注册."""
+    """统一异常处理器注册。
+
+    Attributes:
+        _app: FastAPI 应用实例
+    """
 
     def __init__(self, app: FastAPI) -> None:
+        """初始化异常处理器。
+
+        Args:
+            app: FastAPI 应用实例
+        """
         self._app = app
         self._register_handlers()
 
     def _register_handlers(self) -> None:
+        """注册所有异常处理器到 FastAPI 应用。"""
         self._app.add_exception_handler(RequestValidationError, self._handle_validation_error)
         self._app.add_exception_handler(PydanticValidationError, self._handle_pydantic_error)
         self._app.add_exception_handler(BaseException, self._handle_exception)
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     async def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
+        """处理领域基类异常，自动映射到 HTTP 状态码。
+
+        Args:
+            request: 当前 HTTP 请求
+            exc: 捕获的异常实例
+
+        Returns:
+            JSON 格式的错误响应
+        """
         if not isinstance(exc, BaseException):
             return await self._handle_unexpected_error(request, exc)
         request_id = getattr(request.state, "request_id", None) or "unknown"
@@ -140,6 +172,15 @@ class ExceptionHandlers:
         )
 
     async def _handle_validation_error(self, request: Request, exc: Exception) -> JSONResponse:
+        """处理请求参数校验异常。
+
+        Args:
+            request: 当前 HTTP 请求
+            exc: RequestValidationError 实例
+
+        Returns:
+            JSON 格式的校验错误响应
+        """
         if not isinstance(exc, RequestValidationError):
             raise TypeError(f"Expected RequestValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
@@ -167,6 +208,15 @@ class ExceptionHandlers:
         )
 
     async def _handle_pydantic_error(self, request: Request, exc: Exception) -> JSONResponse:
+        """处理 Pydantic 数据校验异常。
+
+        Args:
+            request: 当前 HTTP 请求
+            exc: PydanticValidationError 实例
+
+        Returns:
+            JSON 格式的校验错误响应
+        """
         if not isinstance(exc, PydanticValidationError):
             raise TypeError(f"Expected PydanticValidationError, got {type(exc).__name__}")
         request_id = getattr(request.state, "request_id", None) or "unknown"
@@ -183,6 +233,15 @@ class ExceptionHandlers:
         )
 
     async def _handle_unexpected_error(self, request: Request, exc: Exception) -> JSONResponse:
+        """处理未预期的异常，返回 500 内部错误。
+
+        Args:
+            request: 当前 HTTP 请求
+            exc: 未预期的异常实例
+
+        Returns:
+            JSON 格式的 500 错误响应
+        """
         logger.exception("Unexpected error: %s", exc)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,8 +256,11 @@ class ExceptionHandlers:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """注册异常处理器到 FastAPI 应用.
+    """注册异常处理器到 FastAPI 应用。
 
     用法：register_exception_handlers(app)  # 初始化时调用一次
+
+    Args:
+        app: FastAPI 应用实例
     """
     ExceptionHandlers(app)

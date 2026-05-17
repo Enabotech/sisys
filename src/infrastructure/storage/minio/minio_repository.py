@@ -1,7 +1,13 @@
-"""MinIORepository — MinIO 对象存储内部实现
+"""SISYS 基础设施层 MinIO 仓储模块。
 
-被 MinIOAdapter(L4ObjectPort) 组合委托
-方法签名与 L4ObjectPort 匹配
+MinIO 对象存储内部实现，被 MinIOAdapter（L4ObjectPort）组合委托，
+方法签名与 L4ObjectPort 匹配。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -53,7 +59,18 @@ class MinIORepository:
         content_type: str,
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象，返回 version_id。大文件自动分片上传"""
+        """存储对象，大文件自动分片上传。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            file_path: 本地文件路径
+            content_type: MIME 类型
+            tags: 对象标签
+
+        Returns:
+            version_id
+        """
         import asyncio
 
         bucket_name = self._resolve_bucket_name(bucket_type)
@@ -72,7 +89,16 @@ class MinIORepository:
         object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """流式下载对象，防止大文件 OOM"""
+        """流式下载对象，防止大文件 OOM。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
+
+        Returns:
+            字节流异步迭代器
+        """
         bucket_name = self._resolve_bucket_name(bucket_type)
         return self._object_operations.download_object(
             bucket_name=bucket_name,
@@ -86,7 +112,19 @@ class MinIORepository:
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。WORM 锁定对象抛出 ComplianceLockError"""
+        """删除对象，WORM 锁定对象抛出 ComplianceLockError。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
+
+        Returns:
+            是否删除成功
+
+        Raises:
+            ComplianceLockError: 尝试删除 WORM 锁定对象时抛出
+        """
         import asyncio
 
         bucket_name = self._resolve_bucket_name(bucket_type)
@@ -103,7 +141,16 @@ class MinIORepository:
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据"""
+        """获取对象元数据。
+
+        Args:
+            bucket_type: Bucket 类型
+            object_key: 对象键
+            version_id: 版本 ID
+
+        Returns:
+            元数据字典
+        """
         import asyncio
 
         bucket_name = self._resolve_bucket_name(bucket_type)
@@ -120,7 +167,16 @@ class MinIORepository:
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象，支持前缀过滤"""
+        """列出对象，支持前缀过滤。
+
+        Args:
+            bucket_type: Bucket 类型
+            prefix: 前缀过滤
+            recursive: 是否递归列出子目录
+
+        Returns:
+            对象元数据列表
+        """
         import asyncio
 
         bucket_name = self._resolve_bucket_name(bucket_type)
@@ -132,7 +188,16 @@ class MinIORepository:
         )
 
     def _list_objects_via_client(self, bucket_name: str, prefix: str, recursive: bool) -> list[dict]:
-        """通过 MinIO 客户端列出对象（同步）"""
+        """通过 MinIO 客户端列出对象（同步）。
+
+        Args:
+            bucket_name: Bucket 名称
+            prefix: 前缀过滤
+            recursive: 是否递归
+
+        Returns:
+            对象元数据列表
+        """
         client = self._bucket_manager._client.client
         objects = client.list_objects(bucket_name, prefix=prefix, recursive=recursive)
         return [

@@ -1,4 +1,14 @@
-"""EventBusConfigLoader — YAML configuration loader for event channels."""
+"""SISYS 基础设施层事件总线配置加载模块。
+
+从 YAML 配置文件加载事件通道映射，通过 ChannelRouter 注册事件类型到
+传输通道（Redis 或 RabbitMQ）的路由关系
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 

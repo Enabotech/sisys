@@ -1,4 +1,14 @@
-"""RedisEventBus — Redis Pub/Sub real-time event bus implementation."""
+"""SISYS 基础设施层 Redis 事件总线模块。
+
+基于 Redis Pub/Sub 实现实时事件总线，同时实现 EventPublisher 和
+EventSubscriber 接口，支持事件的发布、订阅和异步订阅
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,13 @@
-"""IdempotencyChecker — 基础设施层实现
+"""SISYS 基础设施层幂等性检查器模块。
 
-基于 Redis SET NX 原子操作实现事件处理幂等性保证
+基于 Redis SET NX 原子操作实现事件处理幂等性保证，
 使用原子方法 try_acquire()，禁止分离 is_processed() + mark_processed()
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

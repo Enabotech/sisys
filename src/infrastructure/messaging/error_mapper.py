@@ -1,7 +1,13 @@
-"""外部 SDK 错误到异常的标准化映射.
+"""SISYS 基础设施层外部错误映射模块。
 
-优先使用类型匹配（isinstance）而非字符串匹配
-对于 MinIO S3Error，应使用 error.code 属性直接映射
+将外部 SDK 错误（MinIO、RabbitMQ、Redis）标准化映射为领域异常，
+优先使用类型匹配（isinstance）和错误码属性直接映射
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -93,13 +99,29 @@ class ErrorMapper:
 
     @classmethod
     def map_rabbitmq_error(cls, error_type: str, message: str | None = None) -> BaseException:
-        """映射 RabbitMQ 错误."""
+        """映射 RabbitMQ 错误为领域异常。
+
+        Args:
+            error_type: RabbitMQ 错误类型名称。
+            message: 原始错误消息。
+
+        Returns:
+            对应的异常实例。
+        """
         exc_class = cls.RABBITMQ_ERROR_MAP.get(error_type, MessageBusError)
         return exc_class(message=message or f"RabbitMQ error: {error_type}")
 
     @classmethod
     def map_redis_error(cls, error_type: str, message: str | None = None) -> BaseException:
-        """映射 Redis 错误."""
+        """映射 Redis 错误为领域异常。
+
+        Args:
+            error_type: Redis 错误类型名称。
+            message: 原始错误消息。
+
+        Returns:
+            对应的异常实例。
+        """
         exc_class = cls.REDIS_ERROR_MAP.get(error_type, SystemException)
         return exc_class(message=message or f"Redis error: {error_type}")
 
@@ -110,7 +132,7 @@ class ErrorMapper:
         target_exc_class: type[BaseException],
         context: dict | None = None,
     ) -> BaseException:
-        """包装外部错误为异常.
+        """包装外部错误为领域异常。
 
         推荐用法：
             try:
@@ -119,6 +141,14 @@ class ErrorMapper:
                 raise ErrorMapper.wrap_external_error(
                     e, TargetException, {"operation": "xxx"}
                 ) from e
+
+        Args:
+            error: 原始外部异常。
+            target_exc_class: 目标异常类。
+            context: 额外上下文信息。
+
+        Returns:
+            包装后的领域异常实例。
         """
         logger.warning(
             "Wrapping external error: %s -> %s",

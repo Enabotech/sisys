@@ -1,6 +1,12 @@
-"""MinIO 对象存储层适配器
+"""SISYS 基础设施层 MinIO 对象存储模块。
 
-L4 对象存储层 — MinIO S3 兼容实现
+提供 L4 对象存储层的 MinIO S3 兼容实现，包括 Bucket 管理、对象操作、WORM 锁定和生命周期管理。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

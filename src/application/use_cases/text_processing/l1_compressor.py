@@ -1,10 +1,16 @@
-"""L1Compressor — L1 压缩器
+"""SISYS 应用层 L1 压缩器模块。
 
 混合压缩策略：
 - ≤200 字：直接规则压缩（无 LLM 调用）
 - >200 字：LLM 压缩至约 150 字
 
 目标：压缩率≥70%，延迟 P95<20ms
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -81,16 +87,21 @@ def _rule_compress(text: str) -> str:
 
 @dataclass
 class L1CompressionResult(CompressionResult):
-    """L1 压缩结果"""
+    """L1 压缩结果。
+
+    Attributes:
+        method: 压缩方法，"rule" 或 "llm"
+    """
 
     method: str = "rule"  # "rule" | "llm"
 
 
 class L1Compressor(CompressorService):
-    """L1 压缩器
+    """L1 压缩器，轻量级压缩至约 150 字，压缩率≥70%。
 
-    轻量级压缩：X → ~150 字（压缩率≥70%）
-    目标：保留核心语义，去除冗余
+    Attributes:
+        LLM_THRESHOLD: 超过此长度使用 LLM 压缩（目前实现为规则压缩 + 截断）
+        TARGET_LENGTH: 目标压缩后长度
     """
 
     # 阈值：超过此长度使用 LLM 压缩（目前实现为规则压缩 + 截断）

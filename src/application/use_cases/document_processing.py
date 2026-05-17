@@ -1,10 +1,15 @@
-"""Document processing use case (skeleton).
+"""SISYS 应用层文档处理模块。
 
-Orchestrates document processing by coordinating domain services
-and infrastructure layer components.
+协调文档处理流程，编排领域服务和基础设施层组件。
 
-This is a skeleton implementation for integration testing purposes.
-Full implementation will be done in Story 2.x.
+这是骨架实现，用于集成测试。
+完整实现将在 Story 2.x 中完成。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -16,32 +21,31 @@ from src.domain.ports.outbox import OutboxRepository
 
 
 class DocumentProcessingUseCase:
-    """Document processing use case (skeleton).
+    """文档处理用例（骨架实现）。
 
-    Coordinates document parsing, embedding generation, and indexing
-    through domain service interfaces.
+    通过领域服务接口协调文档解析、嵌入向量生成和索引构建。
     """
 
     def __init__(self, outbox_repo: OutboxRepository):
-        """Initialize with outbox repository for event publishing.
+        """初始化文档处理用例。
 
         Args:
-            outbox_repo: Outbox repository for publishing domain events.
+            outbox_repo: Outbox 仓储，用于发布领域事件
         """
         self._outbox_repo = outbox_repo
 
     def process_document(self, document_id: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Process a document and publish DocumentProcessed event.
+        """处理文档并发布 DocumentProcessed 事件。
 
         Args:
-            document_id: The ID of the document to process.
-            metadata: Optional document metadata.
+            document_id: 待处理文档 ID
+            metadata: 可选的文档元数据
 
         Returns:
-            Dictionary with processing result status.
+            包含处理结果状态的字典
 
         Raises:
-            RuntimeError: If document processing fails.
+            RuntimeError: 文档处理失败时抛出
         """
         try:
             # In a full implementation, this would:

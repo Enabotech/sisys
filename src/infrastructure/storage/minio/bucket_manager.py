@@ -1,6 +1,12 @@
-"""MinIO Bucket 管理器
+"""SISYS 基础设施层 MinIO Bucket 管理模块。
 
-提供 Bucket 创建、删除、存在性检查及命名验证功能
+提供 Bucket 的创建、删除、存在性检查、命名验证和对象锁定配置功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

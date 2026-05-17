@@ -1,11 +1,13 @@
-"""QdrantAdapter — L3VectorPort 实现
+"""SISYS 基础设施层 Qdrant 适配器模块。
 
-包装现有 QdrantVectorStorage，实现 L3VectorPort 接口
+包装 QdrantVectorStorage，实现 L3VectorPort 接口。薄适配器层，仅做接口转换，
+points 参数使用 list[dict]，内部转换为 VectorPoint。
 
-设计原则：
-- 薄适配器层，仅做接口转换
-- 所有方法使用 async/await
-- points 参数使用 list[dict]，内部转换为 VectorPoint
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

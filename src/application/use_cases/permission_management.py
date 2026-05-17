@@ -1,6 +1,12 @@
-"""Permission Service - 应用层权限服务实现.
+"""SISYS 应用层权限服务模块。
 
 遵循六边形架构：应用层服务，实现 PermissionServicePort 接口
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

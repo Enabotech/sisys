@@ -1,7 +1,13 @@
-"""AsyncOutboxPoller — 基础设施层实现
+"""SISYS 基础设施层异步发件箱轮询处理器模块。
 
-异步协程轮询 OutboxEntity，发布至 RabbitMQ
-统一 async 路径，使用 asyncio.Semaphore 控制并发
+异步协程定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ，
+使用 asyncio.Semaphore 控制并发
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -44,7 +50,11 @@ class AsyncOutboxPoller:
         self._running = False
 
     async def poll_once(self) -> None:
-        """轮询一次并发布待处理事件"""
+        """轮询一次并发布待处理事件。
+
+        从发件箱获取 pending 状态的事件，并发发布到 RabbitMQ，
+        成功标记为 published，失败标记为 failed
+        """
         entities = await self._repo._get_unpublished_entities(limit=self._batch_size)
         if not entities:
             return
@@ -72,7 +82,7 @@ class AsyncOutboxPoller:
         await asyncio.gather(*[process_one(e) for e in entities])
 
     async def run(self) -> None:
-        """启动轮询循环"""
+        """启动轮询循环，按配置间隔持续轮询发件箱。"""
         self._running = True
         logger.info(
             "AsyncOutboxPoller started (interval=%.1fs, batch_size=%d)",
@@ -87,6 +97,6 @@ class AsyncOutboxPoller:
             await asyncio.sleep(self._poll_interval)
 
     def stop(self) -> None:
-        """停止轮询循环"""
+        """停止轮询循环。"""
         self._running = False
         logger.info("AsyncOutboxPoller stopping")

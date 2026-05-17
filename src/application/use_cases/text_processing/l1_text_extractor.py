@@ -1,6 +1,6 @@
-"""L1TextExtractor — L1 文本提取器
+"""SISYS 应用层 L1 文本提取器模块。
 
-从用户输入中提取记忆内容
+从用户输入中提取记忆内容。
 
 支持的模式：
 - "记住 X" → 提取 X
@@ -10,6 +10,12 @@
 - "别忘了 X" → 提取 X
 - "改成 X" → 提取 X（用于修改操作）
 - "不要记住 X" → 触发删除操作（返回空 content，operation='delete'）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -22,16 +28,20 @@ from src.application.ports.text_extractor_service import ExtractionResult, TextE
 
 @dataclass
 class L1ExtractionResult(ExtractionResult):
-    """L1 文本提取结果"""
+    """L1 文本提取结果。
+
+    Attributes:
+        operation: 操作类型，"save"、"delete" 或 "update"
+    """
 
     operation: str = "save"  # "save" | "delete" | "update"
 
 
 class L1TextExtractor(TextExtractorService):
-    """L1 文本提取器
+    """L1 文本提取器，从"记住 X"等模式中提取记忆核心内容 X。
 
-    从"记住 X"等模式中提取记忆核心内容 X
-    支持多种表达方式，使用正则优先 + LLM fallback
+    Attributes:
+        PATTERNS: 提取模式列表（按优先级排序）
     """
 
     # 提取模式（按优先级排序）

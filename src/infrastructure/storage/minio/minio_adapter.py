@@ -1,10 +1,13 @@
-"""MinIOAdapter — L4ObjectPort 实现
+"""SISYS 基础设施层 MinIO 适配器模块。
 
-包装现有 MinIORepository，实现 L4ObjectPort 接口
+包装 MinIORepository，实现 L4ObjectPort 接口。薄适配器层，仅做接口转换，
+所有方法委托给内部仓储实例。
 
-设计原则：
-- 薄适配器层，仅做接口转换
-- 所有方法使用 async/await（除 retrieve 是同步迭代器）
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

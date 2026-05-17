@@ -1,7 +1,12 @@
-"""MinIO 对象存储实体
+"""SISYS 基础设施层 MinIO 对象存储实体模块。
 
-ObjectMetadata 和 LifecycleRule 是存储结构（与 Story 1.4 的 SessionState/CacheEntry 一致），
-位于基础设施层，不在领域层
+定义 ObjectMetadata 和 LifecycleRule 等存储结构体，位于基础设施层（非领域层）。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -49,7 +54,11 @@ class ObjectMetadata:
     tags: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """序列化为字典"""
+        """将对象元数据序列化为字典。
+
+        Returns:
+            包含所有元数据字段的字典
+        """
         return {
             "object_id": str(self.object_id),
             "bucket_name": self.bucket_name,
@@ -116,7 +125,11 @@ class LifecycleRule:
     transition_storage_class: str | None = None
 
     def to_minio_dict(self) -> dict:
-        """转换为 MinIO 生命周期规则字典"""
+        """转换为 MinIO 生命周期规则字典。
+
+        Returns:
+            MinIO LifecycleConfig 兼容的规则字典
+        """
         rule: dict[str, Any] = {
             "ID": self.rule_id,
             "Status": self.status,
@@ -133,14 +146,28 @@ class LifecycleRule:
 
 
 def _parse_optional_datetime(value: str | datetime | None) -> datetime | None:
-    """解析可选的 ISO 格式日期时间字符串"""
+    """解析可选的 ISO 格式日期时间字符串。
+
+    Args:
+        value: ISO 格式日期时间字符串、datetime 对象或 None
+
+    Returns:
+        解析后的 datetime 对象，输入为 None 时返回 None
+    """
     if value is None:
         return None
     return _parse_datetime(value)
 
 
 def _parse_datetime(value: str | datetime) -> datetime:
-    """解析 ISO 格式日期时间字符串或返回 datetime 对象"""
+    """解析 ISO 格式日期时间字符串或直接返回 datetime 对象。
+
+    Args:
+        value: ISO 格式字符串或 datetime 对象
+
+    Returns:
+        datetime 对象
+    """
     if isinstance(value, datetime):
         return value
     return datetime.fromisoformat(value)

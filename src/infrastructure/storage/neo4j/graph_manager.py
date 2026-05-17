@@ -1,6 +1,12 @@
-"""Neo4j 图管理器实现
+"""SISYS 基础设施层 Neo4j 图管理模块。
 
-负责节点和关系的 CRUD 操作，支持 MERGE 语义
+负责节点和关系的 CRUD 操作，支持 MERGE 语义。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

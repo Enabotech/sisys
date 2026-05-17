@@ -1,7 +1,13 @@
-"""SQLAlchemyEventOutboxAdapter — DomainEvent ↔ OutboxModel 转换器
+"""SISYS 基础设施层 SQLAlchemy 事件发件箱适配器模块。
 
-新建适配器，直接输出 OutboxModel（SQLAlchemy 模型），
-避免在 OutboxEntity dataclass 和 OutboxModel 之间反复转换
+直接输出 OutboxModel（SQLAlchemy 模型），避免在 OutboxEntity dataclass
+和 OutboxModel 之间反复转换
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -48,7 +54,7 @@ class SQLAlchemyEventOutboxAdapter:
         Raises:
             ValueError: 如果 event_type 未注册
         """
-        # Validate event_type is known
+        # 验证 event_type 已注册
         EventRegistry.get(model.event_type)
-        # Use DomainEvent.from_dict which handles event_type correctly
+        # 使用 DomainEvent.from_dict 正确处理 event_type
         return DomainEvent.from_dict(model.payload)
