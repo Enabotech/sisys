@@ -54,10 +54,10 @@ class TestResolverResolve:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_resolve_registered_port(self, registry: PortRegistry) -> None:
         """解析已注册端口应返回实例"""
@@ -93,10 +93,10 @@ class TestResolverDeprecated:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_resolve_deprecated_logs_warning(self, registry: PortRegistry) -> None:
         """解析 deprecated 端口应打印警告日志"""
@@ -121,10 +121,10 @@ class TestResolverLifecycle:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_transient_creates_new_instance(self, registry: PortRegistry) -> None:
         """TRANSIENT 每次应创建新实例"""
@@ -219,10 +219,10 @@ class TestResolverResolveByInterface:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_resolve_by_interface_returns_impl(self, registry: PortRegistry) -> None:
         """按接口类型解析应返回实现"""
@@ -261,10 +261,10 @@ class TestResolverAutoInject:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_auto_inject_resolves_dependencies(self, registry: PortRegistry) -> None:
         """应自动注入构造函数依赖"""
@@ -332,10 +332,10 @@ class TestResolverFactoryFunction:
 
     @pytest.fixture
     def registry(self) -> PortRegistry:
-        """创建干净的注册表"""
-        registry = PortRegistry()
-        registry._ports.clear()
-        return registry
+        """创建独立的注册表实例（不污染全局单例）。"""
+        reg = object.__new__(PortRegistry)
+        reg._ports = {}
+        return reg
 
     def test_callable_factory_returns_result(self, registry: PortRegistry) -> None:
         """工厂函数应被调用并返回结果"""
