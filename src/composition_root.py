@@ -749,7 +749,7 @@ def bootstrap() -> None:
         interface=UnifiedStoragePort,
         impl=lambda resolver: UnifiedStorageGateway(
             l0_storage=resolver.resolve("l0_storage"),
-            l1_cache=resolver.resolve("memory_cache"),
+            memory_cache=resolver.resolve("memory_cache"),
             l2_metadata=resolver.resolve("memory_metadata"),
             l2_history=resolver.resolve("memory_change_history"),
             l2_group_member=resolver.resolve("memory_group_member"),

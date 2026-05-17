@@ -43,12 +43,12 @@ class TestMemoryChangedListenerInit:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
 
-        assert listener._l1_cache is mock_l1_cache
+        assert listener._memory_cache is mock_l1_cache
         assert listener._metadata_repository is mock_metadata_repo
         assert listener._history_repository is mock_history_repo
 
@@ -57,12 +57,12 @@ class TestMemoryChangedListenerInit:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
 
-        assert listener._l1_cache is None
+        assert listener._memory_cache is None
         assert listener._metadata_repository is None
         assert listener._history_repository is None
 
@@ -80,7 +80,7 @@ class TestMemoryChangedListenerHandle:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
@@ -105,7 +105,7 @@ class TestMemoryChangedListenerHandle:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
@@ -126,7 +126,7 @@ class TestMemoryChangedListenerL1Invalidation:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=None,
             history_repository=None,
         )
@@ -150,7 +150,7 @@ class TestMemoryChangedListenerL1Invalidation:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=None,
             history_repository=None,
         )
@@ -173,11 +173,11 @@ class TestMemoryChangedListenerL1Invalidation:
 
     @pytest.mark.asyncio
     async def test_invalidate_l1_cache_no_l1_cache(self):
-        """验证无 l1_cache 时跳过失效"""
+        """验证无 memory_cache 时跳过失效"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
@@ -199,7 +199,7 @@ class TestMemoryChangedListenerL2Write:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
@@ -217,7 +217,7 @@ class TestMemoryChangedListenerL2Write:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
@@ -235,7 +235,7 @@ class TestMemoryChangedListenerHelperMethods:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
@@ -250,7 +250,7 @@ class TestMemoryChangedListenerHelperMethods:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
@@ -270,7 +270,7 @@ class TestMemoryChangedListenerHelperMethods:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )
@@ -284,7 +284,7 @@ class TestMemoryChangedListenerHelperMethods:
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
-            l1_cache=None,
+            memory_cache=None,
             metadata_repository=None,
             history_repository=None,
         )

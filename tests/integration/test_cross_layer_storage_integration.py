@@ -286,7 +286,7 @@ class TestL0L1L2CrossLayer:
 
         # Create listener with real services
         listener = MemoryChangedHandler(
-            l1_cache=redis_cache,
+            memory_cache=redis_cache,
             metadata_repository=metadata_repository,
             history_repository=history_repository,
         )

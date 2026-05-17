@@ -52,7 +52,7 @@ class TestUnifiedStorageGatewayRBAC:
 
         return UnifiedStorageGateway(
             l0_storage=mock_l0_storage,
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             l2_metadata=mock_l2_metadata,
             l2_history=mock_l2_history,
             l2_group_member=mock_l2_group_member,

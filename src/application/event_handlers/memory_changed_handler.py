@@ -37,7 +37,7 @@ class MemoryChangedHandler:
 
     def __init__(
         self,
-        l1_cache=None,  # L1CachePort | None
+        memory_cache=None,  # MemoryCachePort | None
         metadata_repository=None,  # L2MetadataRepositoryPort | None
         history_repository=None,  # L2ChangeHistoryRepositoryPort | None
         index_manager=None,  # IndexManagerPort | None
@@ -45,12 +45,12 @@ class MemoryChangedHandler:
         """初始化监听器。
 
         Args:
-            l1_cache: L1 缓存端口（用于缓存失效）
+            memory_cache: 记忆缓存端口（用于缓存失效）
             metadata_repository: L2 元数据仓储（可选）
             history_repository: L2 历史记录仓储（可选）
             index_manager: 索引管理器（可选，用于更新 MEMORY.md 索引）
         """
-        self._l1_cache = l1_cache
+        self._memory_cache = memory_cache
         self._metadata_repository = metadata_repository
         self._history_repository = history_repository
         self._index_manager = index_manager
@@ -91,15 +91,15 @@ class MemoryChangedHandler:
         Args:
             event: MemoryChanged 事件
         """
-        if self._l1_cache is None:
-            logger.warning("No l1_cache configured, skipping L1 cache invalidation")
+        if self._memory_cache is None:
+            logger.warning("No memory_cache configured, skipping L1 cache invalidation")
             return
 
         try:
             memory_type = self._get_memory_type(event)
             # owner_id 是 user_id（private 类型）或 group_id
             owner_id = event.user_id
-            await self._l1_cache.delete_memory(memory_type, owner_id, event.name)
+            await self._memory_cache.delete_memory(memory_type, owner_id, event.name)
             logger.debug(f"L1 cache invalidated: memory_id={event.memory_id}")
         except Exception as e:
             logger.error(f"Failed to invalidate L1 cache: {e}")

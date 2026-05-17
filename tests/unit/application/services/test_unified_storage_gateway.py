@@ -26,7 +26,7 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
 
         gateway = UnifiedStorageGateway(
             l0_storage=mock_l0,
-            l1_cache=mock_l1,
+            memory_cache=mock_l1,
             l2_metadata=mock_l2_meta,
             l2_history=mock_l2_hist,
         )
@@ -49,7 +49,7 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
 
         gateway = UnifiedStorageGateway(
             l0_storage=mock_l0,
-            l1_cache=mock_l1,
+            memory_cache=mock_l1,
             l2_metadata=mock_l2_meta,
             l2_history=mock_l2_hist,
         )
@@ -69,7 +69,7 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
 
         gateway = UnifiedStorageGateway(
             l0_storage=mock_l0,
-            l1_cache=mock_l1,
+            memory_cache=mock_l1,
             l2_metadata=mock_l2_meta,
             l2_history=mock_l2_hist,
         )
@@ -131,7 +131,7 @@ class TestUnifiedStorageGatewayBehavior:
 
         return UnifiedStorageGateway(
             l0_storage=mock_l0_storage,
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             l2_metadata=mock_l2_metadata,
             l2_history=mock_l2_history,
         )
@@ -306,7 +306,7 @@ class TestUnifiedStorageGatewayWithOptionalLayers:
 
         gateway = UnifiedStorageGateway(
             l0_storage=mock_l0_storage,
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             l2_metadata=mock_l2_metadata,
             l2_history=mock_l2_history,
             l3_vector=mock_l3_vector,

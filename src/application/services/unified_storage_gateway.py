@@ -49,7 +49,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     def __init__(
         self,
         l0_storage: L0StoragePort,
-        l1_cache: MemoryCachePort,
+        memory_cache: MemoryCachePort,
         l2_metadata: L2MetadataRepositoryPort,
         l2_history: L2ChangeHistoryRepositoryPort,
         l2_group_member: L2GroupMemberRepositoryPort | None = None,
@@ -62,7 +62,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
         Args:
             l0_storage: L0 文件系统存储
-            l1_cache: L1 Redis 缓存
+            memory_cache: 记忆缓存端口
             l2_metadata: L2 元数据仓储（现有 L2MetadataRepositoryPort）
             l2_history: L2 历史仓储（现有 L2ChangeHistoryRepositoryPort）
             l3_vector: L3 向量存储
@@ -72,7 +72,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             event_publisher: 事件发布器（Outbox 模式需要）
         """
         self._l0 = l0_storage
-        self._l1 = l1_cache
+        self._l1 = memory_cache
         self._l2_meta = l2_metadata
         self._l2_hist = l2_history
         self._l3 = l3_vector

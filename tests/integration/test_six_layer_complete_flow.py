@@ -344,7 +344,7 @@ def unified_storage_gateway(
     """
     return UnifiedStorageGateway(
         l0_storage=l0_storage,
-        l1_cache=redis_cache,
+        memory_cache=redis_cache,
         l2_metadata=metadata_repository,
         l2_history=history_repository,
         l3_vector=qdrant_adapter,
@@ -362,7 +362,7 @@ def memory_changed_handler(
 ) -> MemoryChangedHandler:
     """Handler for MemoryChanged events (L1 invalidation + L2 write)."""
     return MemoryChangedHandler(
-        l1_cache=redis_cache,
+        memory_cache=redis_cache,
         metadata_repository=metadata_repository,
         history_repository=history_repository,
     )
