@@ -1,11 +1,12 @@
-"""OpenTelemetry OTLP 导出器配置 + Trace 初始化。
+"""SISYS 基础设施层 OpenTelemetry 配置模块。
 
-Task 5.4: OpenTelemetry OTLP 导出器配置
-- 环境变量: EVENT_BUS_OTEL_TRACE_ENABLED, OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL
-- 导出器: OTLPSpanExporter (gRPC/HTTP 协议)
-- 批量导出: BatchSpanProcessor
-- 采样策略: TraceIdRatioBased
-- Resource 属性: service.name, service.version, deployment.environment
+提供 OTLP 导出器配置和 Trace SDK 生命周期管理。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

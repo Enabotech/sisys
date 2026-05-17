@@ -1,4 +1,13 @@
-"""RabbitMQ 配置模型。"""
+"""SISYS 基础设施层 RabbitMQ 配置模块。
+
+提供 RabbitMQ 连接配置，用于可靠事件传输通道。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +20,17 @@ class RabbitMQConfig:
     """RabbitMQ 连接配置。
 
     用于 RabbitMQ 可靠事件传输通道（异步路径）。
+
+    Attributes:
+        host: RabbitMQ 主机地址
+        port: RabbitMQ 端口
+        virtual_host: 虚拟主机
+        username: 用户名
+        password: 密码
+        exchange_name: 交换机名称
+        exchange_type: 交换机类型
+        prefetch_count: 预取数量
+        heartbeat: 心跳间隔（秒）
     """
 
     host: str = "localhost"
@@ -27,15 +47,11 @@ class RabbitMQConfig:
     def from_env(cls) -> RabbitMQConfig:
         """从环境变量加载配置。
 
-        环境变量:
-            RABBITMQ_HOST: RabbitMQ 主机地址 (默认: localhost)
-            RABBITMQ_PORT: RabbitMQ 端口 (默认: 5672)
-            RABBITMQ_VHOST: 虚拟主机 (默认: /)
-            RABBITMQ_USERNAME: 用户名 (默认: guest)
-            RABBITMQ_PASSWORD: 密码 (默认: guest)
-            RABBITMQ_EXCHANGE: 交换机名称 (默认: sisys.events.reliable)
-            RABBITMQ_PREFETCH: 预取数量 (默认: 10)
-            RABBITMQ_HEARTBEAT: 心跳间隔秒数 (默认: 60)
+        Args:
+            无（从 os.environ 读取）
+
+        Returns:
+            RabbitMQConfig 实例
         """
         return cls(
             host=os.getenv("RABBITMQ_HOST", "localhost"),

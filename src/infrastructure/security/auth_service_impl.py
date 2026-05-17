@@ -1,7 +1,12 @@
-"""Auth Service Implementation - 认证服务实现.
+"""SISYS 基础设施层认证服务模块。
 
-实现 AuthServicePort 接口，提供用户认证功能。
-遵循六边形架构：基础设施层实现，可以导入外部库。
+基于 AuthServicePort 接口实现用户认证、JWT 令牌管理和登录尝试记录功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,9 +20,17 @@ from src.infrastructure.security.jwt_service import JWTService
 
 
 class AuthServiceImpl(AuthServicePort):
-    """认证服务实现.
+    """认证服务实现，负责用户认证和 JWT 令牌管理。
 
-    负责用户认证和 JWT 令牌管理。
+    Attributes:
+        _jwt_service: JWT 令牌服务实例
+        _encryption_service: 加密服务实例
+        _user_repo: 用户仓储端口
+        _user_role_repo: 用户角色关联仓储端口
+        _login_attempt_repo: 登录尝试仓储端口（可选）
+        _token_blacklist: Token 黑名单存储（可选）
+        _refresh_token_store: Refresh token 存储用于 rotation（可选）
+        _event_publisher: 事件发布器（可选）
     """
 
     def __init__(

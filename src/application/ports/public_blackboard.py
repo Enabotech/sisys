@@ -1,7 +1,13 @@
-"""PublicBlackboard Protocol — 领域层定义。
+"""SISYS 应用层公共黑板端口模块。
 
-定义公共黑板的接口，基础设施层负责实现（如 Redis 实现）。
+定义公共黑板的接口，基础设施层通过 Redis 实现此端口。
 支持多 Agent 之间的信息共享和协作。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

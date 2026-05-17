@@ -1,12 +1,13 @@
-"""Composition root — all port registrations happen here.
+"""SISYS 应用层组合根模块
 
-This is the single location where all port implementations are registered
-with the global registry. No other module should register ports.
+所有端口的注册和装配在此完成，是唯一允许注册端口的位置
+遵循六边形架构原则：领域层定义端口，基础设施层实现端口，组合根负责装配
 
-This module follows hexagonal architecture principles:
-- Domain layer defines ports (interfaces)
-- Infrastructure layer implements ports
-- This composition root wires them together
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -25,9 +26,15 @@ logger = logging.getLogger(__name__)
 
 
 def bootstrap() -> None:
-    """Bootstrap the port registry with all known ports.
+    """引导端口注册表，注册所有已知端口
 
-    Called once at application startup.
+    在应用启动时调用一次
+
+    Args:
+        无
+
+    Returns:
+        无
     """
     logger.info("Bootstrapping port registry...")
 
@@ -768,10 +775,15 @@ def bootstrap() -> None:
 
 
 async def shutdown() -> None:
-    """Close all ConnectionManagers at application shutdown.
+    """关闭所有连接管理器，释放资源
 
-    Should be called at application exit to gracefully release all
-    connection pools and resources.
+    在应用退出时调用，优雅释放所有连接池和资源
+
+    Args:
+        无
+
+    Returns:
+        无
     """
     from src.domain.ports.resolver import get_resolver
 

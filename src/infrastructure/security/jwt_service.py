@@ -1,7 +1,12 @@
-"""JWT Service - JWT 令牌生成和验证服务.
+"""SISYS 基础设施层 JWT 令牌服务模块。
 
-实现 JWT 令牌的创建、验证和刷新功能。
-使用 python-jose 库进行 JWT 操作。
+基于 python-jose 库实现 JWT 令牌的创建、验证和刷新功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -16,9 +21,12 @@ from src.infrastructure.config.auth import AuthConfig
 
 
 class JWTService:
-    """JWT 令牌服务.
+    """JWT 令牌服务，负责令牌的生成、验证和刷新。
 
-    负责 JWT 令牌的生成、验证和刷新。
+    Attributes:
+        _config: AuthConfig 认证配置实例
+        _algorithm: JWT 签名算法
+        _secret_key: JWT 签名密钥
     """
 
     def __init__(self, config: AuthConfig):

@@ -1,8 +1,12 @@
-"""EventMetrics + EventMetricsCollector + OpenTelemetryTracer — 基础设施层实现。
+"""SISYS 基础设施层事件指标与 OpenTelemetry 跟踪模块。
 
-Task 5.1: EventMetrics + EventMetricsCollector 基础计数器
-Task 5.2: OpenTelemetry Trace 基础版（span 创建+属性，默认关闭导出）
-Task 5.4: OpenTelemetry OTLP 导出器配置（gRPC/HTTP 协议、端点、批量导出、采样策略）
+提供事件处理指标收集器和 OpenTelemetry Trace 包装器实现。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -26,9 +30,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EventMetrics:
-    """事件处理指标。
+    """事件处理指标数据结构。
 
-    基础计数器，不暴露 Prometheus HTTP 端点（移至 Story 1.13）。
+    基础计数器，不暴露 Prometheus HTTP 端点。
 
     Attributes:
         events_processed_total: 成功处理事件总数
@@ -52,14 +56,21 @@ class EventMetrics:
 
 
 class EventMetricsCollector:
-    """指标收集器 — 线程安全计数器。
+    """指标收集器（线程安全计数器）。
 
-    Args:
-        max_processing_samples: 处理耗时采样队列的最大长度。
-            达到上限后自动淘汰最旧样本（FIFO）。默认 10000。
+    Attributes:
+        metrics: EventMetrics 数据实例
     """
 
     def __init__(self, max_processing_samples: int = 10_000):
+        """初始化指标收集器。
+
+        Args:
+            max_processing_samples: 处理耗时采样队列的最大长度，达到上限后自动淘汰最旧样本
+
+        Raises:
+            ValueError: max_processing_samples 不是正整数时抛出
+        """
         if max_processing_samples <= 0:
             raise ValueError(f"max_processing_samples must be positive, got {max_processing_samples}")
         self.metrics = EventMetrics(
@@ -148,16 +159,12 @@ class EventMetricsCollector:
 class OpenTelemetryTracer:
     """OpenTelemetry Trace 包装器。
 
-    默认关闭（EVENT_BUS_OTEL_TRACE_ENABLED=false）。
-    启用后通过 OTLP 协议导出至后端（Jaeger/Tempo/collector）。
+    默认关闭，启用后通过 OTLP 协议导出至后端（Jaeger/Tempo/collector）。
+    支持 gRPC/HTTP 协议选择、批量导出、采样策略和 Resource 属性。
 
-    支持:
-    - gRPC/HTTP 协议选择
-    - 批量导出（BatchSpanProcessor）
-    - 采样策略（TraceIdRatioBased）
-    - Resource 属性（service.name, service.version, deployment.environment）
-
-    M-02 修复: 使用 OtelConfig 作为单一配置源，避免重复读取环境变量。
+    Attributes:
+        enabled: 是否启用 Trace
+        _initialized: 是否已初始化
     """
 
     def __init__(self, config: OtelConfig | None = None):

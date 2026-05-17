@@ -1,6 +1,12 @@
-"""MinIO 连接配置模型。
+"""SISYS 基础设施层 MinIO 配置模块。
 
-参考 Story 1.3 RedisConfig / Story 1.5 PostgreSQLConfig 模式，保持配置风格一致。
+提供 MinIO 对象存储连接配置，用于 L4 对象存储层。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,7 +21,7 @@ class MinIOConfig:
 
     用于 L4 对象存储层（MinIO），支持连接池管理和超时配置。
 
-    字段说明:
+    Attributes:
         host: MinIO 服务主机地址
         port: MinIO 服务端口
         access_key: 访问密钥
@@ -37,22 +43,22 @@ class MinIOConfig:
 
     @property
     def endpoint(self) -> str:
-        """返回 host:port 格式的 endpoint。"""
+        """返回 host:port 格式的 endpoint。
+
+        Returns:
+            MinIO endpoint 字符串
+        """
         return f"{self.host}:{self.port}"
 
     @classmethod
     def from_env(cls) -> MinIOConfig:
         """从环境变量加载配置。
 
-        环境变量:
-            MINIO_HOST: MinIO 服务主机地址 (默认: localhost)
-            MINIO_API_PORT: MinIO API 端口 (默认: 9000)
-            MINIO_ROOT_USER: 访问密钥 (默认: 空字符串)
-            MINIO_ROOT_PASSWORD: 密钥 (默认: 空字符串)
-            MINIO_SECURE: 是否使用 HTTPS (默认: false)
-            MINIO_BUCKET_PREFIX: Bucket 前缀 (默认: sisys)
-            MINIO_CONNECT_TIMEOUT: 连接超时秒数 (默认: 5.0)
-            MINIO_READ_TIMEOUT: 读取超时秒数 (默认: 30.0)
+        Args:
+            无（从 os.environ 读取）
+
+        Returns:
+            MinIOConfig 实例
 
         Raises:
             ValueError: 当环境变量值无法解析为正确类型时

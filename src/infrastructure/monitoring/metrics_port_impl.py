@@ -1,6 +1,12 @@
-"""MetricsPortImpl — MetricsPort 基础设施实现。
+"""SISYS 基础设施层指标端口实现模块。
 
 实现 MetricsPort 接口，依赖 prometheus_client 和基础设施层组件。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,10 +23,10 @@ class MetricsPortImpl(MetricsPort):
 
     通过组合 MetricsAggregator 和 BusinessMetricsCollector 实现端口接口。
 
-    Args:
-        aggregator: 指标聚合器
-        business_metrics: 业务指标收集器
-        registry: prometheus_client CollectorRegistry
+    Attributes:
+        _aggregator: 指标聚合器
+        _business_metrics: 业务指标收集器
+        _registry: prometheus_client CollectorRegistry
     """
 
     def __init__(
@@ -29,6 +35,13 @@ class MetricsPortImpl(MetricsPort):
         business_metrics: BusinessMetricsCollector,
         registry: CollectorRegistry | None = None,
     ) -> None:
+        """初始化指标端口实现。
+
+        Args:
+            aggregator: 指标聚合器
+            business_metrics: 业务指标收集器
+            registry: prometheus_client CollectorRegistry 实例
+        """
         self._aggregator = aggregator
         self._business_metrics = business_metrics
         self._registry = registry
@@ -90,13 +103,25 @@ class MetricsPortImpl(MetricsPort):
         return self._business_metrics.hit_rate
 
     def get_sessions(self) -> int:
-        """获取当前活跃会话数"""
+        """获取当前活跃会话数。
+
+        Returns:
+            当前活跃会话数
+        """
         return self._business_metrics.sessions
 
     def get_queue_length(self) -> int:
-        """获取当前任务队列长度"""
+        """获取当前任务队列长度。
+
+        Returns:
+            当前任务队列长度
+        """
         return self._business_metrics.queue_length
 
     def get_processing_rate(self) -> float:
-        """获取当前事件处理速率"""
+        """获取当前事件处理速率。
+
+        Returns:
+            当前事件处理速率（事件数/秒）
+        """
         return self._business_metrics.processing_rate

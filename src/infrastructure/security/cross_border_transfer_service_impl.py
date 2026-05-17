@@ -1,6 +1,12 @@
-"""CrossBorderTransferServiceImpl — Implementation of cross-border transfer service.
+"""SISYS 基础设施层跨境数据传输服务模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+基于 CrossBorderTransferServicePort 接口实现跨境数据传输请求的审批流程管理。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -18,21 +24,18 @@ if TYPE_CHECKING:
 
 
 class TransferNotFoundError(Exception):
-    """Raised when transfer request is not found."""
-
-    pass
+    """跨境传输请求未找到时抛出。"""
 
 
 class TransferNotApprovedError(Exception):
-    """Raised when trying to execute a transfer that is not approved."""
-
-    pass
+    """跨境传输请求未审批通过时执行操作抛出。"""
 
 
 class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
-    """跨境数据传输服务实现.
+    """跨境数据传输服务实现，管理跨境数据传输请求的审批流程。
 
-    负责管理跨境数据传输请求的审批流程。
+    Attributes:
+        _requests: 内存中存储的传输请求字典，键为请求 ID
     """
 
     # SLA: Normal 4 hours, Urgent 1 hour

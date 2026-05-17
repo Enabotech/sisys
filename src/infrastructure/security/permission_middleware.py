@@ -1,7 +1,12 @@
-"""Permission Middleware - 权限验证中间件.
+"""SISYS 基础设施层权限验证中间件模块。
 
-提供 FastAPI 依赖注入的权限验证功能。
-遵循六边形架构：基础设施层实现，可以导入外部库。
+提供 FastAPI 依赖注入的权限验证功能，包括用户认证、角色检查和权限控制。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -196,9 +201,9 @@ def require_all_roles(*roles: str) -> Callable:
 
 
 class CurrentUser:
-    """当前用户依赖类.
+    """当前用户依赖类，提供灵活的用户注入方式。
 
-    提供灵活的当前用户注入方式，支持可选或必选。
+    支持可选或必选模式获取当前用户信息。
     """
 
     @staticmethod
@@ -244,9 +249,11 @@ class CurrentUser:
 
 
 class PermissionContext:
-    """权限验证上下文.
+    """权限验证上下文，在请求处理过程中传递权限验证相关状态。
 
-    用于在请求处理过程中传递权限验证相关状态。
+    Attributes:
+        user: 当前用户 token payload
+        permission_service: 权限服务实例
     """
 
     def __init__(

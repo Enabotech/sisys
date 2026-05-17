@@ -1,7 +1,12 @@
-"""Token Blacklist Implementation - 基于 Redis 的 Token 黑名单实现。
+"""SISYS 基础设施层 Token 黑名单模块。
 
-实现 TokenBlacklistPort 接口，使用 Redis 存储已撤销的 JWT token。
-遵循六边形架构：基础设施层实现。
+基于 Redis 实现已撤销 JWT token 的黑名单管理，支持与 token 剩余有效期相同的 TTL 自动过期。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,9 +20,11 @@ BLACKLIST_KEY_PREFIX = "token:blacklist:"
 
 
 class RedisTokenBlacklist(TokenBlacklistPort):
-    """基于 Redis 的 Token 黑名单实现。
+    """基于 Redis 的 Token 黑名单实现，存储已撤销的 JWT token。
 
-    存储已撤销的 JWT token，设置与 token 剩余有效期相同的 TTL。
+    Attributes:
+        _redis: Redis 异步客户端实例
+        _default_ttl: 默认过期时间
     """
 
     def __init__(self, redis_client, default_ttl_hours: int = 24):

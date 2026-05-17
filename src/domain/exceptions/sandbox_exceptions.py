@@ -1,8 +1,12 @@
-"""Sandbox Exceptions — 沙箱相关异常.
+"""SISYS 领域层沙箱异常模块。
 
-异常来源：
-- src/application/ports/sandbox_port.py → SandboxError, ContainerStartError, ExecutionError, ContainerStopError
-- src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py → raises these exceptions
+定义沙箱执行相关的领域异常，包括容器启动失败、代码执行失败、容器停止失败等。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

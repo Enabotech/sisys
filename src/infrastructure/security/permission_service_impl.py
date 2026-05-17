@@ -1,7 +1,12 @@
-"""Permission Service Implementation - 权限服务实现.
+"""SISYS 基础设施层权限服务模块。
 
-实现 PermissionServicePort 接口，提供权限检查功能。
-遵循六边形架构：基础设施层实现。
+基于 PermissionServicePort 接口实现权限检查、角色分配和权限查询功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -14,9 +19,12 @@ from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 
 
 class PermissionServiceImpl(PermissionServicePort):
-    """权限服务实现.
+    """权限服务实现，负责权限检查和用户权限查询。
 
-    负责权限检查和用户权限查询。
+    Attributes:
+        _user_role_repo: 用户-角色关联仓储端口
+        _role_repo: 角色仓储端口
+        _event_publisher: 事件发布器（可选）
     """
 
     def __init__(

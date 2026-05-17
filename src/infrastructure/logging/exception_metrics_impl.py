@@ -1,7 +1,12 @@
-"""Exception Metrics Implementation — 基础设施层实现.
+"""SISYS 基础设施层异常指标实现模块。
 
-异常监控指标基础设施实现。
-提供简单的异常计数指标，支持 Prometheus 格式导出。
+提供异常监控指标的基础设施层实现，支持 Prometheus 格式导出。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -14,9 +19,13 @@ from src.application.ports.exception_metrics_port import ExceptionMetricsPort
 
 @dataclass
 class ExceptionMetricsImpl(ExceptionMetricsPort):
-    """异常指标收集器（线程安全）.
+    """异常指标收集器（线程安全）。
 
     提供简单的异常计数指标，支持 Prometheus 格式导出。
+
+    Attributes:
+        _counters: 异常计数字典，键为异常类型或异常类型:错误码
+        _lock: 线程锁，保证并发安全
     """
 
     _counters: dict[str, int] = field(default_factory=dict)

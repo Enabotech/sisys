@@ -1,8 +1,13 @@
-"""AuditRepository — 审计仓储实现.
+"""SISYS 基础设施层审计仓储模块。
 
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+基于 SQLAlchemy 异步实现 AuditRepositoryPort 接口，提供审计日志的持久化存储和查询。
+Session 通过 ContextVar 由 middleware 或 test fixture 提供，无需构造器注入。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -24,8 +29,10 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class AuditRepository(AuditRepositoryPort):
-    """审计仓储实现.
-    实现 AuditRepositoryPort 接口，添加审计特定查询方法。
+    """审计仓储实现，基于 SQLAlchemy 异步持久化审计日志。
+
+    Attributes:
+        _session: 通过 ContextVar 获取的 SQLAlchemy 异步会话
     """
 
     @property

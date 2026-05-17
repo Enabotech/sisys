@@ -1,7 +1,12 @@
-"""AuditService Implementation - 审计服务实现.
+"""SISYS 基础设施层审计服务模块。
 
-实现 AuditServicePort 接口，提供审计日志记录、检索、完整性验证功能。
-遵循六边形架构：基础设施层实现，可以导入外部库。
+基于 AuditServicePort 接口实现审计日志的记录、检索、完整性验证和归档功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -22,9 +27,12 @@ from src.domain.ports.audit_service import AuditError, AuditRecord, AuditService
 
 
 class AuditServiceImpl(AuditServicePort):
-    """审计服务实现.
+    """审计服务实现，负责审计日志的记录、检索、完整性验证和归档。
 
-    负责审计日志的记录、检索、完整性验证和归档。
+    Attributes:
+        _audit_repo: 审计仓储端口实例
+        _event_publisher: 事件发布器（可选，用于发件箱模式）
+        _worm_manager: WORM 管理器（可选，用于归档到 MinIO WORM 存储）
     """
 
     def __init__(

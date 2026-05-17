@@ -1,6 +1,12 @@
-"""DocumentStoragePort — 文档存储端口（应用层）。
+"""SISYS 应用层文档存储端口模块。
 
 继承 L4ObjectPort，添加文档业务语义。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

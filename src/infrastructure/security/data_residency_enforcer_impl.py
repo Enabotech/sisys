@@ -1,6 +1,12 @@
-"""DataResidencyEnforcerImpl — Implementation of data residency enforcement service.
+"""SISYS 基础设施层数据驻留强制服务模块。
 
-遵循六边形架构：服务实现，位于基础设施层。
+基于 DataResidencyEnforcerPort 接口实现数据驻留策略的强制执行和违规检查。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,10 +21,7 @@ if TYPE_CHECKING:
 
 
 class DataResidencyEnforcerImpl(DataResidencyEnforcerPort):
-    """数据驻留强制执行服务实现.
-
-    负责检查数据是否在合规的区域处理，触发违规事件。
-    """
+    """数据驻留强制执行服务实现，检查数据是否在合规区域处理。"""
 
     def enforce_residency(self, data: Any, target_region: str, policy: DataResidencyPolicy) -> bool:
         """强制数据在指定区域驻留。

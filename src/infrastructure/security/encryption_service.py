@@ -1,7 +1,12 @@
-"""Encryption Service - 加密服务.
+"""SISYS 基础设施层加密服务模块。
 
-提供密码哈希和验证功能，使用 bcrypt 算法。
-遵循六边形架构：基础设施层实现，可以导入外部库 (passlib, bcrypt)。
+基于 passlib + bcrypt 提供密码哈希、验证和防御 timing attack 功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -9,16 +14,12 @@ from __future__ import annotations
 import bcrypt
 from passlib.context import CryptContext
 
-# Password hashing configuration
+# 密码哈希配置，使用 bcrypt 算法
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class EncryptionService:
-    """加密服务实现.
-
-    使用 passlib + bcrypt 实现密码哈希和验证。
-    遵循六边形架构：实现位于 infrastructure 层。
-    """
+    """加密服务实现，使用 passlib + bcrypt 进行密码哈希和验证。"""
 
     def hash_password(self, password: str) -> str:
         """哈希密码.

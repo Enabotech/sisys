@@ -1,4 +1,13 @@
-"""Redis 配置模型。"""
+"""SISYS 基础设施层 Redis 配置模块。
+
+提供 Redis 连接配置，用于 Pub/Sub 实时通知通道和缓存存储。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +20,16 @@ class RedisConfig:
     """Redis 连接配置。
 
     用于 Redis Pub/Sub 实时通知通道、幂等性检查和缓存存储服务。
+
+    Attributes:
+        host: Redis 主机地址
+        port: Redis 端口
+        db: Redis 数据库号
+        password: Redis 密码（可选）
+        max_connections: 最大连接数
+        socket_timeout: Socket 超时（秒）
+        retry_on_timeout: 超时时是否重试
+        default_ttl: 默认 TTL（秒）
     """
 
     host: str = "localhost"
@@ -26,15 +45,11 @@ class RedisConfig:
     def from_env(cls) -> RedisConfig:
         """从环境变量加载配置。
 
-        环境变量:
-            REDIS_HOST: Redis 主机地址 (默认: localhost)
-            REDIS_PORT: Redis 端口 (默认: 6379)
-            REDIS_DB: Redis 数据库号 (默认: 0)
-            REDIS_PASSWORD: Redis 密码 (默认: None)
-            REDIS_MAX_CONNECTIONS: 最大连接数 (默认: 100)
-            REDIS_SOCKET_TIMEOUT: Socket 超时秒数 (默认: 5.0)
-            REDIS_RETRY_ON_TIMEOUT: 超时时重试 (默认: true)
-            REDIS_DEFAULT_TTL: 默认 TTL 秒数 (默认: 86400)
+        Args:
+            无（从 os.environ 读取）
+
+        Returns:
+            RedisConfig 实例
 
         Raises:
             ValueError: 当环境变量值无法解析为正确类型时

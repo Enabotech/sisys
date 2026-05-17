@@ -1,7 +1,13 @@
-"""ChannelRouter — 通道路由器，决定事件走哪个通道。
+"""SISYS 基础设施层通道路由模块。
 
-这是基础设施层组件，负责将事件类型映射到传输通道。
+根据事件类型将领域事件路由到对应的传输通道（Redis 实时或 RabbitMQ 可靠），
 领域层通过 EventPublisher 接口发布事件，不感知路由细节。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -103,18 +109,37 @@ class ChannelRouter:
             self._mappings[mapping.event_type] = mapping
 
     def get_mapping(self, event_type: str) -> ChannelMapping | None:
-        """获取事件通道映射。"""
+        """获取事件通道映射。
+
+        Args:
+            event_type: 事件类型名称
+
+        Returns:
+            对应的 ChannelMapping，若未配置则返回 None
+        """
         return self._mappings.get(event_type)
 
     def get_delivery_mode(self, event_type: str) -> DeliveryMode:
-        """获取事件的传输模式（支持运行时覆盖）。"""
+        """获取事件的传输模式（支持运行时覆盖）。
+
+        Args:
+            event_type: 事件类型名称
+
+        Returns:
+            对应的 DeliveryMode，默认为 RELIABLE
+        """
         if mode := self._overrides.get(event_type):
             return mode
         mapping = self._mappings.get(event_type)
         return mapping.delivery_mode if mapping else DeliveryMode.RELIABLE
 
     def set_override(self, event_type: str, mode: DeliveryMode) -> None:
-        """运行时覆盖传输模式。"""
+        """运行时覆盖传输模式。
+
+        Args:
+            event_type: 事件类型名称
+            mode: 要设置的传输模式
+        """
         self._overrides[event_type] = mode
         logger.info("Delivery mode override: %s -> %s", event_type, mode.value)
 
@@ -128,16 +153,34 @@ class ChannelRouter:
         logger.info("Registered channel mapping for: %s", mapping.event_type)
 
     def get_redis_channel(self, event_type: str) -> str | None:
-        """获取 Redis 通道名。"""
+        """获取 Redis 通道名。
+
+        Args:
+            event_type: 事件类型名称
+
+        Returns:
+            Redis 通道名，若未配置则返回 None
+        """
         mapping = self._mappings.get(event_type)
         return mapping.redis_channel if mapping else None
 
     def get_rabbitmq_routing_key(self, event_type: str) -> str | None:
-        """获取 RabbitMQ 路由键。"""
+        """获取 RabbitMQ 路由键。
+
+        Args:
+            event_type: 事件类型名称
+
+        Returns:
+            RabbitMQ 路由键，若未配置则返回 None
+        """
         mapping = self._mappings.get(event_type)
         return mapping.rabbitmq_routing_key if mapping else None
 
     @classmethod
     def create_for_testing(cls) -> ChannelRouter:
-        """创建测试用路由器（无默认映射）。"""
+        """创建测试用路由器（无默认映射）。
+
+        Returns:
+            不含默认映射的 ChannelRouter 实例
+        """
         return cls(load_defaults=False)

@@ -1,6 +1,12 @@
-"""异常结构化日志处理器.
+"""SISYS 基础设施层异常日志模块。
 
-提供统一的异常日志格式化，便于日志分析。
+提供异常结构化日志格式化和统一日志配置。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -12,9 +18,22 @@ from typing import Any
 
 
 class ExceptionJsonFormatter(logging.Formatter):
-    """异常结构化日志格式化器."""
+    """异常结构化日志格式化器。
+
+    将异常信息格式化为 JSON 结构，便于日志分析和检索。
+    """
 
     def format(self, record: logging.LogRecord) -> str:
+        """格式化日志记录。
+
+        包含异常信息时输出结构化错误 JSON，否则输出标准日志 JSON。
+
+        Args:
+            record: 标准库日志记录对象
+
+        Returns:
+            JSON 格式的日志字符串
+        """
         if record.exc_info and record.exc_info[0]:
             exc = record.exc_info[1]
             if exc is not None:
