@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.3 | 状态: 审查修订中
+> 版本: 2.4 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第8轮（第二批）：message_serializer重命名遗漏4处import+测试文件重命名、Phase1受影响测试补2个、DualIdempotencyChecker测试断言适配、fallback路由键改mark_failed、EventRegistry.get() KeyError行为保持
+> 第9轮（第二批）：DeadLetterQueue方案B否决+InMemoryDeadLetterQueue async、retry_policy完全废弃方案、flush()语义修正、@runtime_checkable async限制说明、29个遗漏测试文件补全到影响面分析表
 
 ## Context
 
@@ -38,9 +38,9 @@
 #### 任务 1.1: 统一DeadLetterQueue
 - [ ] **设计**：Domain层 `listener.py` 保留 `DeadLetterQueue` Protocol + `InMemoryDeadLetterQueue`，删除Infrastructure层 `outbox/dead_letter_queue.py` 中的重复定义
 - [ ] **前置决策**：当前 Domain 层 `DeadLetterQueue` Protocol 是同步签名，但 `PostgresDeadLetterQueue` 的 `enqueue`/`dequeue` 是 async 方法且返回值不同（4元素 vs 3元素 tuple）。必须在统一前决定 Protocol 签名方向：
-  - **方案A（推荐）**：Protocol 改为 async 签名，`dequeue` 返回 `tuple[DomainEvent, str, int] | None`，PostgresDeadLetterQueue 调整返回值对齐（去掉 `DeadLetterQueueEntry`）
-  - **方案B**：保持 Protocol 同步，PostgresDeadLetterQueue 仅作为独立实现不实现 Protocol（维持现状但补上类型注解）
-- [ ] **修改** `src/domain/events/listener.py`：如果采用方案A，`enqueue`/`dequeue` 改为 async
+  - **方案A（唯一可行）**：Protocol 改为 async 签名，`dequeue` 返回 `tuple[DomainEvent, str, int] | None`，PostgresDeadLetterQueue 调整返回值对齐（去掉 `DeadLetterQueueEntry`）。设计规则3（async一致性）强制要求——所有异步操作的Protocol签名必须为async，InMemoryDeadLetterQueue同步实现也必须改为async
+  - ~~**方案B**：保持 Protocol 同步~~ → **否决**：违反设计规则3，PostgresDeadLetterQueue实际为async方法，Protocol签名与实现不匹配将破坏契约测试
+- [ ] **修改** `src/domain/events/listener.py`：`enqueue`/`dequeue` 改为 async，`InMemoryDeadLetterQueue` 同步实现改为async（`asyncio.Queue` 替代 `collections.deque`）
 - [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：改为实现Domain层 `DeadLetterQueue` Protocol，对齐返回值
 - [ ] **修改** `src/infrastructure/messaging/outbox/dead_letter_queue.py`：删除 `DeadLetterQueue` ABC 和 `InMemoryDeadLetterQueue`，改为 re-export from Domain层
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：更新 import 路径
@@ -115,7 +115,7 @@
 - [ ] **修改** `src/infrastructure/messaging/outbox/outbox_repository.py`：
   - 删除 `get_unpublished`(L59), `mark_published`(L85), `mark_failed`(L105) 的同步stub（抛NotImplementedError）
   - 将 `async_get_unpublished`/`async_mark_published`/`async_mark_failed` 重命名为对应Protocol方法名
-  - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 确保写入
+  - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 提前执行SQL INSERT并检查约束（flush不commit，但触发DB约束校验）
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [ ] **修改** `src/application/use_cases/document_processing.py` L63：`outbox_repo.save()` 在同步方法 `process_document` 中调用，改为async后该方法也必须改为 `async def`，所有调用者需同步适配
 - [ ] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
@@ -256,7 +256,7 @@
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
   - **当前BUG**：`nack(requeue=True)` 不保留客户端对 `message.headers` 的修改——requeue后RabbitMQ重新投递原始消息，L204的 `message.headers["x-retry-count"] = ...` 修改无效，导致重试计数永远不递增、无限重试
   - **参考实现**：`RabbitMQEventListener` (`rabbitmq_listener.py`) 已使用 `RedisRetryQueue` 处理重试，可作为改造参考
-  - **修改方案**：构造函数注入 `RedisRetryQueue`；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理
+  - **修改方案**：构造函数注入 `RedisRetryQueue`（替代 `retry_policy` 参数，`retry_policy` 完全废弃）；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理。`max_retries` 作为 `RedisRetryQueue` 构造函数配置项，不再属于Consumer参数
   - 超过最大重试次数 → DLQ
 - [ ] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue
 
@@ -326,6 +326,7 @@
 - [ ] **修改** `src/domain/events/listener.py`：为 `EventListener`(L21)、`EventListenerAsync`(L99)、`DeadLetterQueue`(L119) 添加 `@runtime_checkable`
 - [ ] **修改** `src/domain/events/event_store.py` L22：为 `EventStore` 添加 `@runtime_checkable`
 - [ ] **验证**：所有Port Protocol均有 `@runtime_checkable` 装饰器
+- [ ] **注意**：`@runtime_checkable` 仅检查方法名是否存在，不验证async语义（async函数和非async函数同名均通过检查）。对async Protocol（如修改后的 `DeadLetterQueue`），契约测试需额外验证方法返回类型为coroutine
 
 **关键文件**：
 - `src/application/ports/event_subscriber.py` (L21)
@@ -401,8 +402,23 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_outbox_entity.py` | registry_manual_register/reset测试需适配 |
 | `tests/unit/domain/events/test_events_base.py` | from_dict修改影响反序列化测试 |
 | `tests/unit/domain/events/test_event_serialization.py` | 事件注册方式变更影响roundtrip测试 |
-| `tests/unit/infrastructure/messaging/test_idempotency_retry.py` | DLQ import路径从infrastructure改为domain |
-| `tests/acceptance/test_story_1_3_steps.py` | InMemoryDeadLetterQueue import路径变更 |
+| `tests/unit/infrastructure/messaging/test_idempotency_retry.py` | DLQ import路径从infrastructure改为domain，sync→async调用适配 |
+| `tests/acceptance/test_story_1_3_steps.py` | InMemoryDeadLetterQueue import路径变更，sync→async调用适配 |
+| `tests/unit/infrastructure/messaging/test_postgres_dead_letter_queue.py` | DLQ Protocol从infrastructure改为domain，enqueue/dequeue签名sync→async |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | DLQ import路径变更，set_dead_letter_queue类型注解变更 |
+| `tests/unit/architecture/test_event_messaging_architecture.py` | PostgresDeadLetterQueue架构验证，需适配Protocol签名变更 |
+| `tests/integration/test_event_messaging_integration.py` | PostgresDeadLetterQueue集成测试，import路径+async适配 |
+| `tests/acceptance/test_story_20_2_steps.py` | PostgresDeadLetterQueue import路径变更 |
+| `tests/unit/infrastructure/messaging/test_outbox_pattern.py` | EventRegistry import需改为DomainEvent._registry |
+| `tests/integration/test_postgresql_integration.py` | EventRegistry引用需移除 |
+| `tests/acceptance/test_story_1_16_steps.py` | EventRegistry import需移除 |
+| `tests/integration/test_event_smoke.py` | TestEventRegistry类需适配DomainEvent._registry |
+| `tests/unit/domain/events/test_trigger_events.py` | AutoTriggered事件event_type改为init=False，from_dict行为变更 |
+| `tests/unit/domain/events/test_memory_events.py` | MemoryChanged事件event_type改为init=False，from_dict行为变更 |
+| `tests/unit/domain/events/test_domain_event_enhanced.py` | DomainEvent.from_dict event_type处理逻辑变更 |
+| `tests/unit/application/event_handlers/test_trigger_listener.py` | from_dict行为变更影响事件重建 |
+| `tests/unit/application/events/test_event_adapters.py` | from_dict行为变更影响事件适配 |
+| `tests/unit/application/event_handlers/test_auto_trigger_handler_branches.py` | event_type mock测试需适配init=False |
 
 ### Phase 2 受影响测试
 | 测试文件 | 影响原因 |
@@ -416,6 +432,15 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` | outbox_repo.save()加await |
 | `tests/unit/application/use_cases/test_document_processing.py` | process_document同步→async |
 | `tests/integration/test_layer_collaboration.py` | process_document调用链适配async |
+| `tests/unit/infrastructure/messaging/outbox/test_outbox_processor.py` | mock私有方法改为mock公共async方法 |
+| `tests/unit/infrastructure/messaging/outbox/test_outbox_entity_state_machine.py` | OutboxRepository Protocol契约验证需适配async |
+| `tests/unit/infrastructure/messaging/unit_of_work/test_uow_transaction_boundary.py` | OutboxRepository Protocol返回DomainEvent验证 |
+| `tests/unit/architecture/test_messaging_architecture_constraints.py` | OutboxRepository使用DomainEvent约束验证 |
+| `tests/unit/architecture/test_event_bus_architecture.py` | OutboxRepository接口架构验证 |
+| `tests/unit/domain/events/test_event_publisher.py` | InMemoryEventBus publish改为async |
+| `tests/acceptance/test_story_1_5_steps.py` | PostgreSQLOutboxRepository.async_get_unpublished重命名 |
+| `tests/integration/test_test_utils.py` | InMemoryEventStore import路径可能受Phase 2影响 |
+| `tests/integration/conftest.py` | OutboxRepository Protocol签名变更影响fixture |
 
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
@@ -426,3 +451,41 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | publish签名channel参数移除 |
 | `tests/acceptance/test_story_1_3_steps.py` | redis_publisher.publish(event, channel)调用 |
 | `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | Factory类属性清理 |
+| `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | publish路由测试移除channel参数 |
+| `tests/unit/infrastructure/messaging/test_redis_event_bus_new.py` | publish签名channel参数移除 |
+| `tests/unit/domain/services/test_trigger_service.py` | DummyPublisher.publish channel参数移除 |
+| `tests/unit/domain/services/test_route_service.py` | AutoRouteService publisher mock签名适配 |
+| `tests/unit/architecture/test_messaging_architecture_constraints.py` | DualChannelEventBus架构约束验证 |
+| `tests/integration/test_event_bus_integration.py` | DualChannelEventBus/ChannelRouter集成测试 |
+| `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | ChannelRouter集成配置测试 |
+| `tests/unit/infrastructure/messaging/test_channel_router.py` | DEFAULT_MAPPINGS和register测试 |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | RabbitMQConsumer retry_policy参数废弃 |
+
+### Phase 4 受影响测试
+| 测试文件 | 影响原因 |
+|----------|----------|
+| `tests/unit/infrastructure/messaging/test_redis_retry_queue.py` | dequeue原子性测试需适配Lua脚本 |
+| `tests/unit/infrastructure/messaging/test_dual_idempotency_checker.py` | PG fallback断言需适配RETURNING |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | RedisRetryQueue集成测试 |
+| `tests/unit/architecture/test_event_messaging_architecture.py` | PostgresDeadLetterQueue架构约束验证 |
+| `tests/integration/test_event_messaging_integration.py` | DLQ集成测试async适配 |
+| `tests/acceptance/test_story_20_2_steps.py` | DualIdempotencyChecker mock返回值适配RETURNING |
+| `tests/unit/infrastructure/monitoring/test_event_metrics_extension.py` | EventMetricsCollector线程安全修复 |
+| `tests/unit/infrastructure/monitoring/test_event_monitoring.py` | EventMetricsCollector计数器Lock适配 |
+| `tests/unit/infrastructure/monitoring/test_metrics_port_impl.py` | EventMetricsCollector集成测试 |
+| `tests/unit/infrastructure/monitoring/test_metrics_aggregator.py` | EventMetricsCollector聚合测试 |
+| `tests/acceptance/test_story_1_13_steps.py` | EventMetricsCollector调用适配 |
+| `tests/acceptance/test_story_1_4_steps.py` | EventMetricsCollector调用适配 |
+| `tests/unit/infrastructure/storage/test_semantic_cache.py` | EventMetricsCollector引用 |
+
+### Phase 5 受影响测试
+| 测试文件 | 影响原因 |
+|----------|----------|
+| `tests/unit/infrastructure/messaging/test_message_serializer.py` | 重命名为test_inmemory_event_store.py |
+| `tests/unit/domain/events/test_event_store.py` | InMemoryEventStore import路径变更 |
+| `tests/integration/test_test_utils.py` | InMemoryEventStore import路径变更 |
+| `tests/unit/domain/ports/test_protocols.py` | @runtime_checkable验证，async Protocol限制说明 |
+| `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | from_default_path()重命名为create() |
+| `tests/unit/infrastructure/messaging/test_channel_router.py` | DEFAULT_MAPPINGS扩展到22个事件 |
+| `tests/acceptance/test_story_1_14a_steps.py` | RedisEventPublisher.publish调用签名变更 |
+| `tests/unit/infrastructure/storage/test_neo4j_config.py` | 配置加载器重命名间接影响 |
