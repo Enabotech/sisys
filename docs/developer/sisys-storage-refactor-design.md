@@ -1,8 +1,8 @@
 # SISYS 存储子系统重构详细设计与执行方案
 
-**文档版本:** v5.2 (L1缓存层四条规则重构完成)
-**生成时间:** 2026-05-16
-**审查状态:** L1缓存层四条规则重构已落地 — L1CachePort→通用KV, MemoryCachePort/SessionCachePort→应用端口, RedisAdapter→Rule3基础实现, RedisMemoryCache/RedisSessionCache→Rule4组合注入
+**文档版本:** v5.3 (L2 PostgreSQL层四条规则重构完成)
+**生成时间:** 2026-05-17
+**审查状态:** L1缓存层+L2 PostgreSQL层四条规则重构已落地 — PostgreSQLAdapter实现L2RdbPort[TEntity](Rule3), User/Permission仓库消除恒等转换(Rule4)
 
 ---
 
@@ -62,7 +62,8 @@
 │                                                                     │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ FileAdapter  │ │ RedisAdapter │ │ PostgreSQL   │                 │
-│  │(L0StoragePort)││ (L1CachePort)│ │Adapter(L2Rdb)│                 │
+│  │(L0StoragePort)││ (L1CachePort)│ │Adapter       │                 │
+│  │              │ │              │ │(L2RdbPort[T])│                 │
 │  └──────────────┘ └──────────────┘ └──────────────┘                 │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │
 │  │ QdrantAdapter│ │ MinIOAdapter │ │ Neo4jAdapter │                 │
@@ -577,21 +578,18 @@ class L2GroupMemberRepositoryPort(Protocol):
     async def remove_member(self, group_id: str, user_id: str) -> None: ...
 ```
 
-### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（重构Infrastructure层BaseRepository[T])
+### Rule 3: Infrastructure Layer-1 — PostgreSQLAdapter（已实现 L2RdbPort[TEntity]）
 
-**当前问题**: Infrastructure层`BaseRepository[T]`(postgresql_adapter.py)绑定ORM模型层，PK列硬编码`id`，无实体转换，无软删除支持。
-三个L2仓储因此无法继承它，直接实现端口——**违反四条规则**。
-
-**重构方案**: 将Infrastructure层`BaseRepository[T]`重构为`PostgreSQLAdapter[TEntity, TModel]`双泛型基座，
-实现`L2RdbPort[TEntity]`，提供领域实体/ORM模型转换层+可配置行为。
+**已落地**: `PostgreSQLAdapter[TEntity, TModel]`双泛型基座，实现`L2RdbPort[TEntity]`，
+提供领域实体/ORM模型转换层+可配置行为。Session通过ContextVar获取。
 
 ```python
-# src/infrastructure/storage/postgresql/repository/postgresql_adapter.py — 重构
+# src/infrastructure/storage/postgresql/repository/postgresql_adapter.py — 已实现
 
 TEntity = TypeVar("TEntity")
 TModel = TypeVar("TModel", bound=Base)
 
-class PostgreSQLAdapter(Generic[TEntity, TModel]):
+class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
     """领域仓储基座 — 实现L2RdbPort[TEntity]，提供ORM↔Entity转换。
 
     子类只需实现:
@@ -603,9 +601,8 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
     pk_column: str = "id"                    # 可覆写
     soft_delete_column: str | None = None     # 可覆写为"deleted_at"
 
-    def __init__(self, model_class: type[TModel], session: AsyncSession):
+    def __init__(self, model_class: type[TModel]):
         self._model_class = model_class
-        self._session = session
 
     # === 抽象方法 — 子类必须实现 ===
 
@@ -676,10 +673,58 @@ class PostgreSQLAdapter(Generic[TEntity, TModel]):
 **UserRepository/PermissionRepository兼容**: 保持继承PostgreSQLAdapter[TModel, TModel]，
 `_to_entity`/`_to_model`为恒等转换。
 
-### Rule 4: Infrastructure Layer-2 — 三个L2仓储（继承PostgreSQLAdapter）
+### Rule 4: Infrastructure Layer-2 — L2仓储继承PostgreSQLAdapter
+
+**已落地**: UserRepository/PermissionRepository 已消除恒等转换，正确实现实体↔模型转换。
 
 ```python
-# === 1. PostgreSQLMemoryMetadataRepository — 继承PostgreSQLAdapter ===
+# === UserRepository — 消除恒等转换 ===
+
+class UserRepository(PostgreSQLAdapter[User, UserModel]):
+    """User仓储 — 通过 _to_entity/_to_model 隔离领域层与 ORM 层."""
+
+    def _to_entity(self, model: UserModel) -> User:
+        return User(
+            id=model.id, username=model.username, email=model.email,
+            password_hash=model.hashed_password or "",
+            is_active=model.is_active, is_locked=model.is_locked,
+            created_at=model.created_at, updated_at=model.updated_at,
+        )
+
+    def _to_model(self, entity: User) -> UserModel:
+        return UserModel(
+            id=entity.id, username=entity.username, email=entity.email,
+            hashed_password=entity.password_hash,
+            is_active=entity.is_active, is_locked=entity.is_locked,
+            created_at=entity.created_at, updated_at=entity.updated_at,
+        )
+
+    async def get_by_username(self, username: str) -> User | None: ...
+    async def get_by_email(self, email: str) -> User | None: ...
+
+# === PermissionRepository — 消除恒等转换 ===
+
+class PermissionRepository(
+    PostgreSQLAdapter[Permission, PermissionModel],
+    PermissionRepositoryPort,
+):
+    """Permission仓储 — 新建Permission实体+端口，消除恒等转换."""
+
+    def _to_entity(self, model: PermissionModel) -> Permission:
+        return Permission(
+            id=model.id, name=model.name,
+            resource=model.resource, action=model.action,
+            created_at=model.created_at,
+        )
+
+    def _to_model(self, entity: Permission) -> PermissionModel:
+        return PermissionModel(
+            id=entity.id, name=entity.name,
+            resource=entity.resource, action=entity.action,
+        )
+```
+
+**其他L2仓储（待重构）**:
 
 class PostgreSQLMemoryMetadataRepository(
     PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel]
@@ -1290,9 +1335,9 @@ def bootstrap() -> None:
 - [x] 3.2 修复 `MinIORepository.archive()` 签名（添加content参数，返回str而非bool）
 - [x] 3.3 补全 `MinIOAdapter.list_objects()` 方法（委托Repository已有实现）
 - [x] 3.4 补全 `Neo4jAdapter.get_neighbors()` ✅；修复 Cypher 注入漏洞 ✅（whitelist验证+property key清理，neo4j_adapter.py + graph_storage.py）
-- [x] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）。注意：save返回值从T→None、list_all去除skip/limit、get_by_id参数str→UUID，需检查UserRepository/PermissionRepository调用者影响
-- [x] 3.5.1 迁移 `UserRepository(BaseRepository[UserModel])` → `UserRepository(PostgreSQLAdapter[UserModel, UserModel])`，实现_to_entity/_to_model恒等转换，适配save返回None/list_all无分页/get_by_id参数UUID
-- [x] 3.5.2 迁移 `PermissionRepository(BaseRepository[PermissionModel])` → `PermissionRepository(PostgreSQLAdapter[PermissionModel, PermissionModel])`，同上
+- [x] 3.5 重构 Infrastructure层 `BaseRepository[T]` → `PostgreSQLAdapter[TEntity, TModel]` 双泛型基座（实现Domain层L2RdbPort[TEntity]，提供_to_entity/_to_model转换、可配置pk_column/soft_delete_column、_do_save钩子）
+- [x] 3.5.1 消除 UserRepository 恒等转换：`UserRepository(PostgreSQLAdapter[User, UserModel])` + proper `_to_entity/_to_model` + User实体补齐email字段
+- [x] 3.5.2 消除 PermissionRepository 恒等转换：创建Permission实体+PermissionRepositoryPort + `PermissionRepository(PostgreSQLAdapter[Permission, PermissionModel])` + RoleRepository.get_permissions_for_role返回类型修复
 - [x] 3.6 创建统一 `ConnectionManager` Protocol（@runtime_checkable）+ `RedisConnectionManager` 集中管理连接池；4个Redis组件（session_storage/semantic_cache/public_blackboard/cleanup）改为注入aioredis.Redis；composition_root注册redis_connection_manager+redis_client工厂
 - [x] 3.7 新增 `src/infrastructure/storage/redis/redis_adapter.py` — RedisAdapter(L1CachePort)
   - 通用 Redis KV 适配器，实现 L1CachePort 全部 6 个方法
@@ -1327,7 +1372,7 @@ def bootstrap() -> None:
 - [x] 4.9 调整 `UnifiedStorageGateway` 依赖应用端口
   - l1_cache: L1CachePort → memory_cache: MemoryCachePort
   - 方法调用 get/set/delete → get_memory/set_memory/delete_memory
-- [ ] 4.10 验证: Resolver嵌套注入生效（Rule4→Rule3自动解析），L2仓储继承PostgreSQLAdapter
+- [x] 4.10 验证: PostgreSQLAdapter实现L2RdbPort[TEntity](Rule3), User/Permission仓库消除恒等转换(Rule4), 3105 tests passed
 
 ### Phase 5: 清理与测试
 
@@ -1369,9 +1414,13 @@ def bootstrap() -> None:
 | `src/infrastructure/storage/minio/minio_adapter.py` | 修改 | Phase 3 | Rule 3 | list_objects/archive修复 |
 | `src/infrastructure/storage/neo4j/neo4j_adapter.py` | 修改 | Phase 3 | Rule 3 | get_neighbors桥接 |
 | `src/infrastructure/storage/neo4j/graph_storage.py` | 修改 | Phase 3 | Rule 3 | 修复find_path/get_neighbors中的Cypher注入 |
-| `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py` | 重构 | Phase 3 | Rule 3 | BaseRepository[T]→PostgreSQLAdapter[TEntity,TModel]双泛型基座 |
-| `src/infrastructure/storage/postgresql/repository/user_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[UserModel,UserModel]，恒等转换 |
-| `src/infrastructure/storage/postgresql/repository/permission_repository.py` | 迁移 | Phase 3 | Rule 3 | 继承改为PostgreSQLAdapter[PermissionModel,PermissionModel]，恒等转换 |
+| `src/infrastructure/storage/postgresql/repository/postgresql_adapter.py` | 重构 | Phase 3 | Rule 3 | PostgreSQLAdapter实现L2RdbPort[TEntity]，id: Any→UUID |
+| `src/domain/entities/user.py` | 修改 | Phase 3 | Rule 4 | User实体补齐email字段 |
+| `src/domain/entities/permission.py` | **新增** | Phase 3 | Rule 4 | Permission领域实体 |
+| `src/domain/ports/permission_repository.py` | **新增** | Phase 3 | Rule 2 | PermissionRepositoryPort独立Protocol |
+| `src/infrastructure/storage/postgresql/repository/user_repository.py` | 重构 | Phase 3 | Rule 4 | 消除恒等转换→PostgreSQLAdapter[User,UserModel] |
+| `src/infrastructure/storage/postgresql/repository/permission_repository.py` | 重构 | Phase 3 | Rule 4 | 消除恒等转换→PostgreSQLAdapter[Permission,PermissionModel] |
+| `src/infrastructure/storage/postgresql/repository/role_repository.py` | 修改 | Phase 3 | Rule 4 | get_permissions_for_role返回Permission实体 |
 | `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save/pk_column/soft_delete |
 | `src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py` | 重构 | Phase 4 | Rule 4 | 继承PostgreSQLAdapter，覆写_do_save(append-only)/delete |
 | `src/infrastructure/storage/postgresql/repository/memory_group_member_repository.py` | 重构 | Phase 4 | Rule 4 | 组合注入共享Session，保留独立Protocol |

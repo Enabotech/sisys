@@ -235,45 +235,73 @@ class TestUserCRUD:
     @pytest.mark.asyncio
     async def test_create_user(self, mock_session):
         """创建新用户。"""
+        from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository()
-        mock_user = mock.Mock()
+        user = User(
+            id=uuid4(),
+            username="testuser",
+            email="test@example.com",
+            password_hash="hash",  # pragma: allowlist secret
+        )
 
-        result = await repo.save(mock_user)
+        result = await repo.save(user)
 
         mock_session.add.assert_called_once()
-        assert result == mock_user  # save() returns persisted entity
+        assert isinstance(result, User)
 
     @pytest.mark.asyncio
     async def test_get_user_by_username(self, mock_session):
         """根据用户名获取用户。"""
+        from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository()
-        mock_user = mock.Mock()
+        mock_user = mock.Mock(
+            id=uuid4(),
+            username="testuser",
+            email="test@example.com",
+            hashed_password="hash",  # pragma: allowlist secret
+            is_active=True,
+            is_locked=False,
+            created_at=None,
+            updated_at=None,
+        )
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
         result = await repo.get_by_username("testuser")
 
-        assert result == mock_user
+        assert isinstance(result, User)
+        assert result.username == "testuser"
 
     @pytest.mark.asyncio
     async def test_get_user_by_email(self, mock_session):
         """根据邮箱获取用户。"""
+        from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
         repo = UserRepository()
-        mock_user = mock.Mock()
+        mock_user = mock.Mock(
+            id=uuid4(),
+            username="testuser",
+            email="test@example.com",
+            hashed_password="hash",  # pragma: allowlist secret
+            is_active=True,
+            is_locked=False,
+            created_at=None,
+            updated_at=None,
+        )
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
         result = await repo.get_by_email("test@example.com")
 
-        assert result == mock_user
+        assert isinstance(result, User)
+        assert result.email == "test@example.com"
 
 
 class TestRolePermissionCRUD:
@@ -310,17 +338,25 @@ class TestRolePermissionCRUD:
     @pytest.mark.asyncio
     async def test_get_permission_by_name(self, mock_session):
         """根据名称获取权限。"""
+        from src.domain.entities.permission import Permission
         from src.infrastructure.storage.postgresql.repository.permission_repository import PermissionRepository
 
         repo = PermissionRepository()
-        mock_permission = mock.Mock()
+        mock_permission = mock.Mock(
+            resource="document",
+            action="read",
+            created_at=None,
+        )
+        mock_permission.id = uuid4()
+        mock_permission.name = "read:document"
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_permission
         mock_session.execute.return_value = mock_result
 
         result = await repo.get_by_name("read:document")
 
-        assert result == mock_permission
+        assert isinstance(result, Permission)
+        assert result.name == "read:document"
 
 
 class TestTransactionRollback:

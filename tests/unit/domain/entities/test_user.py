@@ -16,6 +16,7 @@ class TestUserIsAccountLocked:
         user = User(
             id=uuid.uuid4(),
             username="testuser",
+            email="test@example.com",
             password_hash="abc",
             is_locked=False,
         )
@@ -26,6 +27,7 @@ class TestUserIsAccountLocked:
         user = User(
             id=uuid.uuid4(),
             username="testuser",
+            email="test@example.com",
             password_hash="abc",
             is_locked=True,
             locked_until=None,
@@ -37,6 +39,7 @@ class TestUserIsAccountLocked:
         user = User(
             id=uuid.uuid4(),
             username="testuser",
+            email="test@example.com",
             password_hash="abc",
             is_locked=True,
             locked_until=datetime.now(UTC) + timedelta(hours=1),
@@ -49,6 +52,7 @@ class TestUserIsAccountLocked:
         user = User(
             id=uuid.uuid4(),
             username="testuser",
+            email="test@example.com",
             password_hash="abc",
             is_locked=True,
             locked_until=datetime.now(UTC) - timedelta(hours=1),
@@ -61,6 +65,7 @@ class TestUserIsAccountLocked:
         user = User(
             id=uuid.uuid4(),
             username="testuser",
+            email="test@example.com",
             password_hash="abc",
             is_locked=True,
             locked_until=datetime.now(UTC) + timedelta(hours=1),
