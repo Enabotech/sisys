@@ -72,10 +72,10 @@ async def real_redis_client():
 
 
 class TestSessionStorageReal:
-    """会话存储真实实例集成测试。"""
+    """会话存储真实实例集成测试"""
 
     async def test_full_session_lifecycle(self, real_redis_client):
-        """测试完整会话生命周期：保存→加载→验证→删除。"""
+        """测试完整会话生命周期：保存→加载→验证→删除"""
         client, uid = real_redis_client
 
         # Save directly using Redis client — use unique prefix to isolate parallel tests
@@ -104,7 +104,7 @@ class TestSessionStorageReal:
         assert await client.exists(key) == 0
 
     async def test_session_ttl_expiration(self, real_redis_client):
-        """测试会话 TTL 设置生效。"""
+        """测试会话 TTL 设置生效"""
         client, uid = real_redis_client
         import json
 
@@ -121,10 +121,10 @@ class TestSessionStorageReal:
 
 
 class TestSemanticCacheReal:
-    """语义缓存真实实例集成测试。"""
+    """语义缓存真实实例集成测试"""
 
     async def test_cache_operations(self, real_redis_client):
-        """测试语义缓存基本操作。"""
+        """测试语义缓存基本操作"""
         client, uid = real_redis_client
         import json
 
@@ -146,10 +146,10 @@ class TestSemanticCacheReal:
 
 
 class TestPublicBlackboardReal:
-    """公共黑板真实实例集成测试。"""
+    """公共黑板真实实例集成测试"""
 
     async def test_blackboard_operations(self, real_redis_client):
-        """测试公共黑板基本操作。"""
+        """测试公共黑板基本操作"""
         client, uid = real_redis_client
         import time
 
@@ -171,10 +171,10 @@ class TestPublicBlackboardReal:
 
 
 class TestCombinedFlowReal:
-    """组合流程真实实例测试。"""
+    """组合流程真实实例测试"""
 
     async def test_full_workflow(self, real_redis_client):
-        """测试完整工作流程。"""
+        """测试完整工作流程"""
         client, uid = real_redis_client
         import json
 
@@ -209,7 +209,7 @@ class TestCombinedFlowReal:
         assert "analyst:status_update:1234567890" in bb_entries
 
     async def test_graceful_degradation(self):
-        """测试连接失败时的优雅降级。"""
+        """测试连接失败时的优雅降级"""
         # Test with invalid host
         invalid_client = redis.Redis(host="invalid-host", port=6379, socket_timeout=0.1)
 
@@ -225,10 +225,10 @@ class TestCombinedFlowReal:
 
 
 class TestRedisKeyBuilderReal:
-    """Redis 键命名规范测试。"""
+    """Redis 键命名规范测试"""
 
     async def test_key_naming(self):
-        """测试键命名规范。"""
+        """测试键命名规范"""
         from src.infrastructure.storage.redis.key_builder import build_key
 
         key = build_key("session", "abc-123")
@@ -242,10 +242,10 @@ class TestRedisKeyBuilderReal:
 
 
 class TestRedisCleanupReal:
-    """Redis 清理功能测试。"""
+    """Redis 清理功能测试"""
 
     async def test_cleanup_namespace(self, real_redis_client):
-        """测试按命名空间清理。"""
+        """测试按命名空间清理"""
         client, uid = real_redis_client
 
         # Create test keys with unique prefix — no collision with parallel tests

@@ -30,7 +30,7 @@ def gitea_config() -> dict:
 
 @pytest.fixture
 def mock_gitea_api_response() -> dict:
-    """模拟 Gitea API 响应。"""
+    """模拟 Gitea API 响应"""
     return {
         "id": 1,
         "token": "1f182aca3d38b66f7e49c034d98fb15bf02434b7",
@@ -43,10 +43,10 @@ def mock_gitea_api_response() -> dict:
 
 
 class TestTokenCreation:
-    """测试 Gitea Runner Token 创建。"""
+    """测试 Gitea Runner Token 创建"""
 
     def test_token_creation_request(self, gitea_config: dict):
-        """测试 Token 创建请求格式。"""
+        """测试 Token 创建请求格式"""
         # 模拟 Gitea API 调用
         api_endpoint = f"{gitea_config['instance_url']}/api/v1/admin/runners"
         request_payload = {
@@ -60,7 +60,7 @@ class TestTokenCreation:
         assert request_payload["labels"] == ["docker", "k8s", "standard"]
 
     def test_token_response_parsing(self, mock_gitea_api_response: dict):
-        """测试 Token 响应解析。"""
+        """测试 Token 响应解析"""
         token = mock_gitea_api_response["token"]
 
         # 验证 Token 格式
@@ -69,7 +69,7 @@ class TestTokenCreation:
         assert token.isalnum()  # Token 应为字母数字
 
     def test_token_permissions_validation(self, mock_gitea_api_response: dict):
-        """测试 Token 权限验证。"""
+        """测试 Token 权限验证"""
         # Gitea Runner Token 需要 repo 和 actions 权限
         required_permissions = ["repo", "actions"]
 
@@ -84,10 +84,10 @@ class TestTokenCreation:
 
 
 class TestKubernetesSecretStorage:
-    """测试 Kubernetes Secret 存储。"""
+    """测试 Kubernetes Secret 存储"""
 
     def test_secret_yaml_structure(self, gitea_config: dict):
-        """测试 Secret YAML 结构。"""
+        """测试 Secret YAML 结构"""
         token_value = "test_token_12345"
 
         secret_yaml: dict[str, Any] = {
@@ -112,7 +112,7 @@ class TestKubernetesSecretStorage:
         assert "token" in secret_yaml["data"]
 
     def test_secret_base64_encoding(self):
-        """测试 Secret Base64 编码。"""
+        """测试 Secret Base64 编码"""
         original_token = "test_token_12345"
         encoded = base64.b64encode(original_token.encode()).decode()
         decoded = base64.b64decode(encoded).decode()
@@ -121,7 +121,7 @@ class TestKubernetesSecretStorage:
         assert decoded == original_token
 
     def test_secret_file_generation(self, tmp_path: Path):
-        """测试 Secret 文件生成。"""
+        """测试 Secret 文件生成"""
         secret_content = """apiVersion: v1
 kind: Secret
 metadata:
@@ -145,16 +145,16 @@ data:
 
 
 class TestTokenRotationPolicy:
-    """测试 Token 过期策略。"""
+    """测试 Token 过期策略"""
 
     def test_rotation_policy_configuration(self, gitea_config: dict):
-        """测试 Token 轮换策略配置。"""
+        """测试 Token 轮换策略配置"""
         # 验证 Token 轮换周期配置
         assert gitea_config["token_rotation_days"] == 90
         assert 30 <= gitea_config["token_rotation_days"] <= 180
 
     def test_token_expiry_check(self):
-        """测试 Token 过期检查。"""
+        """测试 Token 过期检查"""
         from datetime import datetime, timedelta
 
         # 模拟 Token 创建时间
@@ -169,7 +169,7 @@ class TestTokenRotationPolicy:
         assert not should_rotate
 
     def test_token_rotation_reminder(self):
-        """测试 Token 轮换提醒。"""
+        """测试 Token 轮换提醒"""
         from datetime import datetime, timedelta
 
         # 模拟 Token 创建时间（89 天前）
@@ -189,10 +189,10 @@ class TestTokenRotationPolicy:
 
 
 class TestTokenPermissions:
-    """测试 Token 权限验证。"""
+    """测试 Token 权限验证"""
 
     def test_minimum_permissions_required(self):
-        """测试最小权限要求。"""
+        """测试最小权限要求"""
         required_permissions = {
             "repo": ["read", "write"],
             "actions": ["read", "write"],
@@ -205,7 +205,7 @@ class TestTokenPermissions:
         assert "write" in required_permissions["repo"]
 
     def test_token_scope_validation(self, mock_gitea_api_response: dict):
-        """测试 Token 作用域验证。"""
+        """测试 Token 作用域验证"""
         # 模拟 Token 作用域检查
         token_scopes = ["repo", "actions"]
 
@@ -215,7 +215,7 @@ class TestTokenPermissions:
             assert scope in token_scopes, f"Token 缺少作用域：{scope}"
 
     def test_token_access_test(self, gitea_config: dict, mock_gitea_api_response: dict):
-        """测试 Token 访问权限。"""
+        """测试 Token 访问权限"""
         # 模拟使用 Token 访问 Gitea API
         headers = {
             "Authorization": f"token {mock_gitea_api_response['token']}",
@@ -231,10 +231,10 @@ class TestTokenPermissions:
 
 
 class TestTokenIntegration:
-    """测试 Token 集成。"""
+    """测试 Token 集成"""
 
     def test_end_to_end_token_workflow(self, gitea_config: dict, tmp_path: Path):
-        """测试端到端 Token 工作流。"""
+        """测试端到端 Token 工作流"""
         # 1. 创建 Token
         token = "test_token_12345"
 
@@ -264,7 +264,7 @@ class TestTokenIntegration:
         assert content["metadata"]["namespace"] == "gitea-actions"
 
     def test_kubectl_apply_secret(self):
-        """测试 kubectl 应用 Secret。"""
+        """测试 kubectl 应用 Secret"""
         # 模拟 kubectl 命令
         kubectl_cmd = "kubectl apply -f deploy/kubernetes/gitea-runner/gitea-runner-token-secret.yaml"
 
@@ -273,7 +273,7 @@ class TestTokenIntegration:
         assert "gitea-runner-token-secret.yaml" in kubectl_cmd
 
     def test_secret_verification_command(self):
-        """测试 Secret 验证命令。"""
+        """测试 Secret 验证命令"""
         # 模拟验证命令
         verify_cmd = "kubectl get secret gitea-runner-token -n gitea-actions -o jsonpath='{.data.token}' | base64 -d"
 
@@ -287,10 +287,10 @@ class TestTokenIntegration:
 
 
 class TestTokenConfiguration:
-    """测试 Token 配置。"""
+    """测试 Token 配置"""
 
     def test_environment_variable_injection(self):
-        """测试环境变量注入。"""
+        """测试环境变量注入"""
         # 模拟从环境变量读取 Token
         os.environ["GITEA_RUNNER_TOKEN"] = "test_token_from_env"
 
@@ -303,7 +303,7 @@ class TestTokenConfiguration:
         del os.environ["GITEA_RUNNER_TOKEN"]
 
     def test_configmap_with_token_reference(self):
-        """测试 ConfigMap 中 Token 引用。"""
+        """测试 ConfigMap 中 Token 引用"""
         configmap_yaml = """apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -323,7 +323,7 @@ data:
         assert "${GITEA_RUNNER_TOKEN}" in content["data"]["config.yaml"]
 
     def test_deployment_with_secret_reference(self):
-        """测试 Deployment 中 Secret 引用。"""
+        """测试 Deployment 中 Secret 引用"""
         deployment_yaml = """apiVersion: apps/v1
 kind: Deployment
 metadata:

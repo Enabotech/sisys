@@ -22,7 +22,7 @@ from src.application.ports.text_extractor_service import ExtractionResult, TextE
 
 @dataclass
 class L1ExtractionResult(ExtractionResult):
-    """L1 文本提取结果。"""
+    """L1 文本提取结果"""
 
     operation: str = "save"  # "save" | "delete" | "update"
 

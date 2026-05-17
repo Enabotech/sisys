@@ -86,7 +86,7 @@ class ExceptionMetricsImpl(ExceptionMetricsPort):
             return dict(self._counters)
 
     def reset(self) -> None:
-        """重置所有计数器（用于测试）。"""
+        """重置所有计数器（用于测试）"""
         with self._lock:
             self._counters.clear()
 

@@ -11,14 +11,14 @@ from src.infrastructure.storage.postgresql.models.memory import MemoryGroupMembe
 
 
 class TestMemoryGroupMemberModel:
-    """MemoryGroupMemberModel 测试。"""
+    """MemoryGroupMemberModel 测试"""
 
     def test_table_name(self):
-        """表名应为 memory_group_members。"""
+        """表名应为 memory_group_members"""
         assert MemoryGroupMemberModel.__tablename__ == "memory_group_members"
 
     def test_columns_exist(self):
-        """所有必需列应存在。"""
+        """所有必需列应存在"""
         mapper = inspect(MemoryGroupMemberModel)
         columns = {c.name for c in mapper.columns}
 
@@ -27,25 +27,25 @@ class TestMemoryGroupMemberModel:
         assert "role" in columns
 
     def test_group_id_is_string(self):
-        """group_id 应为 String 类型。"""
+        """group_id 应为 String 类型"""
         mapper = inspect(MemoryGroupMemberModel)
         group_id_col = mapper.columns["group_id"]
         assert group_id_col.type.__class__.__name__ == "String"
 
     def test_user_id_is_string(self):
-        """user_id 应为 String 类型。"""
+        """user_id 应为 String 类型"""
         mapper = inspect(MemoryGroupMemberModel)
         user_id_col = mapper.columns["user_id"]
         assert user_id_col.type.__class__.__name__ == "String"
 
     def test_role_is_string(self):
-        """role 应为 String 类型。"""
+        """role 应为 String 类型"""
         mapper = inspect(MemoryGroupMemberModel)
         role_col = mapper.columns["role"]
         assert role_col.type.__class__.__name__ == "String"
 
     def test_unique_constraint_on_group_id_user_id(self):
-        """(group_id, user_id) 应有唯一约束。"""
+        """(group_id, user_id) 应有唯一约束"""
 
         # 检查表上是否有复合唯一索引
         table = MemoryGroupMemberModel.__table__

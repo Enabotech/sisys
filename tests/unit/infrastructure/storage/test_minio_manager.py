@@ -19,16 +19,16 @@ from src.infrastructure.storage.minio.minio_manager import (
 
 
 class TestMinioManagerInit:
-    """MinioManager 初始化测试。"""
+    """MinioManager 初始化测试"""
 
     def test_init_with_client(self):
-        """使用客户端实例初始化。"""
+        """使用客户端实例初始化"""
         mock_client = MagicMock()
         adapter = MinioManager(mock_client)
         assert adapter._client is mock_client
 
     def test_from_config(self):
-        """从配置创建适配器。"""
+        """从配置创建适配器"""
         config = MinIOConfig(
             host="test.minio",
             port=9000,
@@ -40,7 +40,7 @@ class TestMinioManagerInit:
         assert adapter._client is not None
 
     def test_client_property_returns_injected(self):
-        """client 属性返回注入的实例。"""
+        """client 属性返回注入的实例"""
         mock_client = MagicMock()
         adapter = MinioManager(mock_client)
         assert adapter.client is mock_client
@@ -48,10 +48,10 @@ class TestMinioManagerInit:
 
 
 class TestMinioManagerErrorHandling:
-    """MinioManager 错误处理测试。"""
+    """MinioManager 错误处理测试"""
 
     def test_map_s3_error_bucket_not_found(self):
-        """映射桶不存在错误。"""
+        """映射桶不存在错误"""
         error = S3Error(
             code="NoSuchBucket",
             message="Bucket not found",
@@ -64,7 +64,7 @@ class TestMinioManagerErrorHandling:
         assert isinstance(mapped, BucketNotFoundError)
 
     def test_map_s3_error_permission_denied(self):
-        """映射权限不足错误。"""
+        """映射权限不足错误"""
         error = S3Error(
             code="AccessDenied",
             message="Access denied",
@@ -77,7 +77,7 @@ class TestMinioManagerErrorHandling:
         assert isinstance(mapped, PermissionDeniedError)
 
     def test_map_s3_error_forbidden(self):
-        """映射 Forbidden 错误。"""
+        """映射 Forbidden 错误"""
         error = S3Error(
             code="Forbidden",
             message="Forbidden",
@@ -90,7 +90,7 @@ class TestMinioManagerErrorHandling:
         assert isinstance(mapped, PermissionDeniedError)
 
     def test_map_s3_error_unknown(self):
-        """映射未知错误 - 未知错误应转换为 ThirdPartyError。"""
+        """映射未知错误 - 未知错误应转换为 ThirdPartyError"""
         error = S3Error(
             code="SomeUnknownError",
             message="Unknown",
@@ -103,7 +103,7 @@ class TestMinioManagerErrorHandling:
         assert isinstance(mapped, ThirdPartyError)
 
     def test_health_check_success(self):
-        """健康检查成功。"""
+        """健康检查成功"""
         mock_client = MagicMock()
         mock_client.list_buckets.return_value = []
         adapter = MinioManager(mock_client)
@@ -112,7 +112,7 @@ class TestMinioManagerErrorHandling:
         assert result is True
 
     def test_health_check_failure(self):
-        """健康检查失败。"""
+        """健康检查失败"""
         mock_client = MagicMock()
         mock_client.list_buckets.side_effect = S3Error(
             code="ConnectionError",

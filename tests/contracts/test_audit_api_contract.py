@@ -11,15 +11,15 @@ from openapi_spec_validator.readers import read_from_filename
 
 
 class TestAuditOpenAPISpec:
-    """验证 Audit API OpenAPI 规范。"""
+    """验证 Audit API OpenAPI 规范"""
 
     def test_openapi_spec_is_valid(self) -> None:
-        """验证 OpenAPI 规范语法正确。"""
+        """验证 OpenAPI 规范语法正确"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         validate(spec_dict)
 
     def test_paths_exist(self) -> None:
-        """验证所有 Audit 端点路径存在。"""
+        """验证所有 Audit 端点路径存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -35,7 +35,7 @@ class TestAuditOpenAPISpec:
             assert path in paths, f"Path {path} not found in OpenAPI spec"
 
     def test_audit_logs_get_exists(self) -> None:
-        """验证审计日志检索端点存在。"""
+        """验证审计日志检索端点存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -43,7 +43,7 @@ class TestAuditOpenAPISpec:
         assert "get" in paths["/audit/logs"]
 
     def test_audit_logs_detail_get_exists(self) -> None:
-        """验证审计日志详情端点存在。"""
+        """验证审计日志详情端点存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -51,7 +51,7 @@ class TestAuditOpenAPISpec:
         assert "get" in paths["/audit/logs/{log_id}"]
 
     def test_audit_verify_post_exists(self) -> None:
-        """验证完整性验证端点存在。"""
+        """验证完整性验证端点存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -59,7 +59,7 @@ class TestAuditOpenAPISpec:
         assert "post" in paths["/audit/verify"]
 
     def test_audit_archive_status_get_exists(self) -> None:
-        """验证归档状态查询端点存在。"""
+        """验证归档状态查询端点存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -67,7 +67,7 @@ class TestAuditOpenAPISpec:
         assert "get" in paths["/audit/archive/status"]
 
     def test_audit_archive_post_exists(self) -> None:
-        """验证手动归档端点存在。"""
+        """验证手动归档端点存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -75,7 +75,7 @@ class TestAuditOpenAPISpec:
         assert "post" in paths["/audit/archive"]
 
     def test_audit_log_response_schema_exists(self) -> None:
-        """验证 AuditLogResponse schema 存在。"""
+        """验证 AuditLogResponse schema 存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         schemas = spec_dict.get("components", {}).get("schemas", {})
 
@@ -90,7 +90,7 @@ class TestAuditOpenAPISpec:
         assert "checksum" in required
 
     def test_audit_log_list_response_schema_exists(self) -> None:
-        """验证 AuditLogListResponse schema 存在。"""
+        """验证 AuditLogListResponse schema 存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         schemas = spec_dict.get("components", {}).get("schemas", {})
 
@@ -101,14 +101,14 @@ class TestAuditOpenAPISpec:
         assert "total" in required
 
     def test_integrity_verify_request_schema_exists(self) -> None:
-        """验证 IntegrityVerifyRequest schema 存在。"""
+        """验证 IntegrityVerifyRequest schema 存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         schemas = spec_dict.get("components", {}).get("schemas", {})
 
         assert "IntegrityVerifyRequest" in schemas
 
     def test_integrity_verify_response_schema_exists(self) -> None:
-        """验证 IntegrityVerifyResponse schema 存在。"""
+        """验证 IntegrityVerifyResponse schema 存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         schemas = spec_dict.get("components", {}).get("schemas", {})
 
@@ -120,7 +120,7 @@ class TestAuditOpenAPISpec:
         assert "failed" in required
 
     def test_archive_status_response_schema_exists(self) -> None:
-        """验证 ArchiveStatusResponse schema 存在。"""
+        """验证 ArchiveStatusResponse schema 存在"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         schemas = spec_dict.get("components", {}).get("schemas", {})
 
@@ -131,7 +131,7 @@ class TestAuditOpenAPISpec:
         assert "archived" in required
 
     def test_all_audit_endpoints_require_auth(self) -> None:
-        """验证所有审计端点需要认证。"""
+        """验证所有审计端点需要认证"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 
@@ -151,7 +151,7 @@ class TestAuditOpenAPISpec:
                     assert len(security) > 0, f"{method.upper()} {path} should require authentication"
 
     def test_api_version_prefix(self) -> None:
-        """验证 API 版本前缀正确。"""
+        """验证 API 版本前缀正确"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         servers = spec_dict.get("servers", [])
 
@@ -159,7 +159,7 @@ class TestAuditOpenAPISpec:
         assert "/api/v1" in servers[0].get("url", "")
 
     def test_log_id_path_parameter_exists(self) -> None:
-        """验证 log_id 路径参数定义正确。"""
+        """验证 log_id 路径参数定义正确"""
         spec_dict, _ = read_from_filename("docs/api/openapi.yaml")
         paths = spec_dict.get("paths", {})
 

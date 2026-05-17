@@ -51,10 +51,10 @@ class MockScalars:
 
 
 class TestMemoryVersionConflictError:
-    """MemoryVersionConflictError 异常测试。"""
+    """MemoryVersionConflictError 异常测试"""
 
     def test_exception_has_memory_id(self):
-        """异常应包含 memory_id。"""
+        """异常应包含 memory_id"""
         memory_id = uuid4()
         error = MemoryVersionConflictError(memory_id=memory_id)
         assert error.memory_id == memory_id
@@ -62,17 +62,17 @@ class TestMemoryVersionConflictError:
         assert str(memory_id) in error.message
 
     def test_exception_message_format(self):
-        """异常消息格式正确。"""
+        """异常消息格式正确"""
         memory_id = uuid4()
         error = MemoryVersionConflictError(memory_id=memory_id)
         assert error.message == f"版本冲突: memory_id={memory_id}"
 
 
 class TestPostgreSQLMemoryMetadataRepositoryInit:
-    """PostgreSQLMemoryMetadataRepository 初始化测试。"""
+    """PostgreSQLMemoryMetadataRepository 初始化测试"""
 
     def test_repository_initialization(self):
-        """验证仓库正确初始化。"""
+        """验证仓库正确初始化"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         repo = PostgreSQLMemoryMetadataRepository()
@@ -81,7 +81,7 @@ class TestPostgreSQLMemoryMetadataRepositoryInit:
 
 
 class TestPostgreSQLMemoryMetadataRepositorySave:
-    """PostgreSQLMemoryMetadataRepository save 操作测试。"""
+    """PostgreSQLMemoryMetadataRepository save 操作测试"""
 
     @pytest.fixture
     def mock_session(self):
@@ -112,7 +112,7 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
         )
 
     def test_save_insert_new_metadata(self, repo, mock_session, sample_metadata):
-        """验证保存新记录执行插入。"""
+        """验证保存新记录执行插入"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=None))
         mock_session.flush = AsyncMock()
 
@@ -123,7 +123,7 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
         mock_session.flush.assert_called()
 
     def test_save_update_existing_metadata(self, repo, mock_session, sample_metadata):
-        """验证更新已存在记录。"""
+        """验证更新已存在记录"""
         existing = MagicMock()
         existing.version = 1
         existing.memory_id = sample_metadata.memory_id
@@ -137,7 +137,7 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
         mock_session.flush.assert_called()
 
     def test_save_raises_version_conflict(self, repo, mock_session, sample_metadata):
-        """验证版本冲突时抛出异常。"""
+        """验证版本冲突时抛出异常"""
         existing = MagicMock()
         existing.version = 2
         existing.memory_id = sample_metadata.memory_id
@@ -151,7 +151,7 @@ class TestPostgreSQLMemoryMetadataRepositorySave:
 
 
 class TestPostgreSQLMemoryMetadataRepositoryGet:
-    """PostgreSQLMemoryMetadataRepository get 操作测试。"""
+    """PostgreSQLMemoryMetadataRepository get 操作测试"""
 
     @pytest.fixture
     def mock_session(self):
@@ -187,7 +187,7 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
         return model
 
     def test_get_by_id_returns_metadata(self, repo, mock_session, sample_model):
-        """验证 get_by_id 返回记忆元数据。"""
+        """验证 get_by_id 返回记忆元数据"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=sample_model))
 
         result = run_async(repo.get_by_id(sample_model.memory_id))
@@ -197,7 +197,7 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
         assert result.name == sample_model.name
 
     def test_get_by_id_returns_none_when_not_found(self, repo, mock_session):
-        """验证 get_by_id 查询不到时返回 None。"""
+        """验证 get_by_id 查询不到时返回 None"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=None))
 
         result = run_async(repo.get_by_id(uuid4()))
@@ -205,7 +205,7 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
         assert result is None
 
     def test_get_by_name_returns_metadata(self, repo, mock_session, sample_model):
-        """验证 get_by_name 返回记忆元数据。"""
+        """验证 get_by_name 返回记忆元数据"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=sample_model))
 
         result = run_async(repo.get_by_name("test-memory"))
@@ -214,7 +214,7 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
         assert result.name == sample_model.name
 
     def test_get_by_name_returns_none_when_not_found(self, repo, mock_session):
-        """验证 get_by_name 查询不到时返回 None。"""
+        """验证 get_by_name 查询不到时返回 None"""
         mock_session.execute = AsyncMock(return_value=MockResult(scalar_one_or_none=None))
 
         result = run_async(repo.get_by_name("nonexistent"))
@@ -223,7 +223,7 @@ class TestPostgreSQLMemoryMetadataRepositoryGet:
 
 
 class TestPostgreSQLMemoryMetadataRepositoryDelete:
-    """PostgreSQLMemoryMetadataRepository delete 操作测试。"""
+    """PostgreSQLMemoryMetadataRepository delete 操作测试"""
 
     @pytest.fixture
     def mock_session(self):
@@ -241,7 +241,7 @@ class TestPostgreSQLMemoryMetadataRepositoryDelete:
         reset_session(token)
 
     def test_delete_soft_deletes(self, repo, mock_session):
-        """验证 delete 执行软删除。"""
+        """验证 delete 执行软删除"""
         memory_id = uuid4()
         mock_session.execute = AsyncMock()
         mock_session.flush = AsyncMock()
@@ -253,7 +253,7 @@ class TestPostgreSQLMemoryMetadataRepositoryDelete:
 
 
 class TestPostgreSQLMemoryMetadataRepositoryList:
-    """PostgreSQLMemoryMetadataRepository list 操作测试。"""
+    """PostgreSQLMemoryMetadataRepository list 操作测试"""
 
     @pytest.fixture
     def mock_session(self):
@@ -304,7 +304,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         return [model1, model2]
 
     def test_list_by_user_returns_memories(self, repo, mock_session, sample_models):
-        """验证 list_by_user 返回用户记忆列表。"""
+        """验证 list_by_user 返回用户记忆列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars(sample_models))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -316,7 +316,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         assert result[1].name == "memory2"
 
     def test_list_by_user_returns_empty_when_no_memories(self, repo, mock_session):
-        """验证 list_by_user 无记录时返回空列表。"""
+        """验证 list_by_user 无记录时返回空列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars([]))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -326,7 +326,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         assert result == []
 
     def test_list_by_type_returns_memories(self, repo, mock_session, sample_models):
-        """验证 list_by_type 返回指定类型记忆列表。"""
+        """验证 list_by_type 返回指定类型记忆列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars(sample_models))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -336,7 +336,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         assert len(result) == 2
 
     def test_list_by_type_returns_empty_when_no_memories(self, repo, mock_session):
-        """验证 list_by_type 无记录时返回空列表。"""
+        """验证 list_by_type 无记录时返回空列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars([]))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -346,7 +346,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         assert result == []
 
     def test_list_all_returns_all_memories(self, repo, mock_session, sample_models):
-        """验证 list_all 返回所有记忆列表。"""
+        """验证 list_all 返回所有记忆列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars(sample_models))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -356,7 +356,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
         assert len(result) == 2
 
     def test_list_all_returns_empty_when_no_memories(self, repo, mock_session):
-        """验证 list_all 无记录时返回空列表。"""
+        """验证 list_all 无记录时返回空列表"""
         mock_result = MagicMock()
         mock_result.scalars = MagicMock(return_value=MockScalars([]))
         mock_session.execute = AsyncMock(return_value=mock_result)
@@ -367,7 +367,7 @@ class TestPostgreSQLMemoryMetadataRepositoryList:
 
 
 class TestPostgreSQLMemoryMetadataRepositoryConverters:
-    """PostgreSQLMemoryMetadataRepository 转换方法测试。"""
+    """PostgreSQLMemoryMetadataRepository 转换方法测试"""
 
     @pytest.fixture
     def mock_session(self):
@@ -385,7 +385,7 @@ class TestPostgreSQLMemoryMetadataRepositoryConverters:
         reset_session(token)
 
     def test_to_entity_converts_model_correctly(self, repo):
-        """验证 _to_entity 正确转换模型。"""
+        """验证 _to_entity 正确转换模型"""
         model = MagicMock()
         model.memory_id = uuid4()
         model.user_id = "user123"
@@ -413,7 +413,7 @@ class TestPostgreSQLMemoryMetadataRepositoryConverters:
         assert entity.group_id == model.group_id
 
     def test_to_entity_handles_none_description(self, repo):
-        """验证 _to_entity 处理 None description。"""
+        """验证 _to_entity 处理 None description"""
         model = MagicMock()
         model.memory_id = uuid4()
         model.user_id = "user123"
@@ -433,7 +433,7 @@ class TestPostgreSQLMemoryMetadataRepositoryConverters:
         assert entity.description == ""
 
     def test_to_model_converts_entity_correctly(self, repo):
-        """验证 _to_model 正确转换实体。"""
+        """验证 _to_model 正确转换实体"""
         entity = MemoryMetadata(
             memory_id=uuid4(),
             name="test-memory",

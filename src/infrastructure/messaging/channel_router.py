@@ -35,7 +35,7 @@ class DeliveryMode(Enum):
 
 @dataclass
 class ChannelMapping:
-    """事件通道映射配置。"""
+    """事件通道映射配置"""
 
     event_type: str
     redis_channel: str | None = None
@@ -104,7 +104,7 @@ class ChannelRouter:
             self._init_defaults()
 
     def _init_defaults(self) -> None:
-        """初始化默认映射。"""
+        """初始化默认映射"""
         for mapping in self.DEFAULT_MAPPINGS.values():
             self._mappings[mapping.event_type] = mapping
 

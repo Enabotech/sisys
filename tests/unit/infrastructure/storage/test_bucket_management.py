@@ -18,62 +18,62 @@ from src.infrastructure.storage.minio.bucket_manager import (
 
 
 class TestValidateBucketName:
-    """Bucket 命名验证测试。"""
+    """Bucket 命名验证测试"""
 
     def test_valid_bucket_name(self):
-        """有效的 Bucket 名称。"""
+        """有效的 Bucket 名称"""
         manager = BucketManager(MinIOConfig(bucket_prefix="sisys"))
         assert manager.validate_bucket_name("sisys-raw-documents-tenant1") is True
 
     def test_valid_bucket_name_with_numbers(self):
-        """包含数字的有效名称。"""
+        """包含数字的有效名称"""
         manager = BucketManager(MinIOConfig(bucket_prefix="sisys"))
         assert manager.validate_bucket_name("sisys-audit-logs-tenant-123") is True
 
     def test_empty_bucket_name_raises(self):
-        """空名称抛出异常。"""
+        """空名称抛出异常"""
         manager = BucketManager(MinIOConfig())
         with pytest.raises(BucketNameValidationError, match="cannot be empty"):
             manager.validate_bucket_name("")
 
     def test_name_without_hyphens_raises(self):
-        """缺少连字符的名称抛出异常。"""
+        """缺少连字符的名称抛出异常"""
         manager = BucketManager(MinIOConfig())
         with pytest.raises(BucketNameValidationError, match="at least 3 parts"):
             manager.validate_bucket_name("simplebucket")
 
     def test_name_with_uppercase_raises(self):
-        """大写字母名称抛出异常。"""
+        """大写字母名称抛出异常"""
         manager = BucketManager(MinIOConfig())
         with pytest.raises(BucketNameValidationError):
             manager.validate_bucket_name("Sisys-Raw-Documents")
 
     def test_name_with_special_chars_raises(self):
-        """特殊字符名称抛出异常。"""
+        """特殊字符名称抛出异常"""
         manager = BucketManager(MinIOConfig())
         with pytest.raises(BucketNameValidationError):
             manager.validate_bucket_name("sisys_raw_documents_tenant1")
 
 
 class TestBuildBucketName:
-    """Bucket 名称构建测试。"""
+    """Bucket 名称构建测试"""
 
     def test_build_bucket_name(self):
-        """构建标准 Bucket 名称。"""
+        """构建标准 Bucket 名称"""
         config = MinIOConfig(bucket_prefix="sisys")
         manager = BucketManager(config)
         result = manager.build_bucket_name("raw-documents", "tenant1")
         assert result == "sisys-raw-documents-tenant1"
 
     def test_build_bucket_name_with_custom_prefix(self):
-        """自定义前缀构建。"""
+        """自定义前缀构建"""
         config = MinIOConfig(bucket_prefix="myapp")
         manager = BucketManager(config)
         result = manager.build_bucket_name("audit-logs", "acme")
         assert result == "myapp-audit-logs-acme"
 
     def test_build_bucket_name_invalid_type_raises(self):
-        """非法 bucket_type 抛出异常。"""
+        """非法 bucket_type 抛出异常"""
         config = MinIOConfig(bucket_prefix="sisys")
         manager = BucketManager(config)
         with pytest.raises(BucketNameValidationError):
@@ -81,10 +81,10 @@ class TestBuildBucketName:
 
 
 class TestCreateBucket:
-    """Bucket 创建测试。"""
+    """Bucket 创建测试"""
 
     def test_create_bucket_success(self):
-        """成功创建 Bucket。"""
+        """成功创建 Bucket"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -98,7 +98,7 @@ class TestCreateBucket:
         mock_client.make_bucket.assert_called_once_with("sisys-raw-docs-tenant1", object_lock=False)
 
     def test_create_bucket_with_versioning(self):
-        """创建 Bucket 并启用版本控制。"""
+        """创建 Bucket 并启用版本控制"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -117,7 +117,7 @@ class TestCreateBucket:
         assert call_args[1].status == "Enabled"
 
     def test_create_bucket_with_object_lock(self):
-        """创建 Bucket 并启用对象锁定。"""
+        """创建 Bucket 并启用对象锁定"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -131,7 +131,7 @@ class TestCreateBucket:
         mock_client.make_bucket.assert_called_once_with("sisys-raw-docs-tenant1", object_lock=True)
 
     def test_create_bucket_already_exists(self):
-        """Bucket 已存在返回 False。"""
+        """Bucket 已存在返回 False"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -162,10 +162,10 @@ class TestCreateBucket:
 
 
 class TestEnableObjectLock:
-    """对象锁定启用测试。"""
+    """对象锁定启用测试"""
 
     def test_enable_object_lock_success(self):
-        """成功启用对象锁定。"""
+        """成功启用对象锁定"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -179,7 +179,7 @@ class TestEnableObjectLock:
         mock_client.set_object_lock_config.assert_called_once()
 
     def test_enable_object_lock_custom_retention(self):
-        """自定义保留天数。"""
+        """自定义保留天数"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -200,10 +200,10 @@ class TestEnableObjectLock:
 
 
 class TestDeleteBucket:
-    """Bucket 删除测试。"""
+    """Bucket 删除测试"""
 
     def test_delete_bucket_success(self):
-        """成功删除 Bucket。"""
+        """成功删除 Bucket"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -217,7 +217,7 @@ class TestDeleteBucket:
         mock_client.remove_bucket.assert_called_once_with("sisys-raw-docs-tenant1")
 
     def test_delete_bucket_force(self):
-        """强制删除 Bucket（先清空对象）。"""
+        """强制删除 Bucket（先清空对象）"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -236,7 +236,7 @@ class TestDeleteBucket:
         mock_client.remove_bucket.assert_called_once()
 
     def test_delete_bucket_not_exists(self):
-        """Bucket 不存在返回 False。"""
+        """Bucket 不存在返回 False"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -259,10 +259,10 @@ class TestDeleteBucket:
 
 
 class TestBucketExists:
-    """Bucket 存在性检查测试。"""
+    """Bucket 存在性检查测试"""
 
     def test_bucket_exists_true(self):
-        """Bucket 存在。"""
+        """Bucket 存在"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -278,7 +278,7 @@ class TestBucketExists:
         assert result is True
 
     def test_bucket_exists_false(self):
-        """Bucket 不存在。"""
+        """Bucket 不存在"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()
@@ -292,10 +292,10 @@ class TestBucketExists:
 
 
 class TestListBuckets:
-    """列出 Bucket 测试。"""
+    """列出 Bucket 测试"""
 
     def test_list_buckets(self):
-        """列出所有 Bucket。"""
+        """列出所有 Bucket"""
         config = MinIOConfig()
         manager = BucketManager(config)
         mock_adapter = MagicMock()

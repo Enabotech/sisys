@@ -71,25 +71,25 @@ class TestDataBuilder:
         self._data = base_data or {}
 
     def with_id(self, id_value: Any) -> "TestDataBuilder":
-        """设置 ID。"""
+        """设置 ID"""
         self._data["id"] = id_value
         return self
 
     def with_field(self, key: str, value: Any) -> "TestDataBuilder":
-        """设置任意字段。"""
+        """设置任意字段"""
         self._data[key] = value
         return self
 
     def with_status(self, status: str) -> "TestDataBuilder":
-        """设置状态。"""
+        """设置状态"""
         self._data["status"] = status
         return self
 
     def with_creator(self, creator_id: str) -> "TestDataBuilder":
-        """设置创建者。"""
+        """设置创建者"""
         self._data["creator_id"] = creator_id
         return self
 
     def build(self) -> dict[str, Any]:
-        """构建最终数据。"""
+        """构建最终数据"""
         return self._data.copy()

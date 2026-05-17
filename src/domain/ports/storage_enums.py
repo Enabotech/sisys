@@ -21,7 +21,7 @@ from enum import Enum
 
 
 class StorageLayer(Enum):
-    """存储层级枚举。"""
+    """存储层级枚举"""
 
     L0_FILE = "l0_file"  # 文件系统
     L1_CACHE = "l1_cache"  # Redis 缓存
@@ -32,7 +32,7 @@ class StorageLayer(Enum):
 
 
 class StorageTier(Enum):
-    """存储层级策略（来自 architecture.md §11.2.9）。"""
+    """存储层级策略（来自 architecture.md §11.2.9）"""
 
     HOT = "hot"  # 热数据: L1 缓存优先（访问频率 ≥100/周）
     WARM = "warm"  # 温数据: L1 + L2 + L0（访问频率 10-99/周）
@@ -41,7 +41,7 @@ class StorageTier(Enum):
 
 
 class DataAccessPattern(Enum):
-    """数据访问模式。"""
+    """数据访问模式"""
 
     FREQUENT = "frequent"  # 高频访问（≥100/周）
     OCCASIONAL = "occasional"  # 偶尔访问（10-99/周）

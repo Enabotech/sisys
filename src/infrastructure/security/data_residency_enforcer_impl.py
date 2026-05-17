@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class DataResidencyEnforcerImpl(DataResidencyEnforcerPort):
-    """数据驻留强制执行服务实现，检查数据是否在合规区域处理。"""
+    """数据驻留强制执行服务实现，检查数据是否在合规区域处理"""
 
     def enforce_residency(self, data: Any, target_region: str, policy: DataResidencyPolicy) -> bool:
         """强制数据在指定区域驻留

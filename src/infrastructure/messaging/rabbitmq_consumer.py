@@ -62,7 +62,7 @@ class RabbitMQConsumer:
         self._handlers: dict[str, list[EventProcessor]] = {}
 
     async def connect(self) -> None:
-        """连接到 RabbitMQ。"""
+        """连接到 RabbitMQ"""
         self._connection = await aio_pika.connect_robust(
             host=self._config.host,
             port=self._config.port,
@@ -167,7 +167,7 @@ class RabbitMQConsumer:
         event: DomainEvent,
         error: Exception,
     ) -> None:
-        """失败处理 — 使用 RabbitMQ NACK 重新入队。"""
+        """失败处理 — 使用 RabbitMQ NACK 重新入队"""
         if not self._retry_policy:
             # 无重试策略，直接死信
             await message.nack(requeue=False)
@@ -211,7 +211,7 @@ class RabbitMQConsumer:
             )
 
     async def close(self) -> None:
-        """关闭连接。"""
+        """关闭连接"""
         if self._connection and not self._connection.is_closed:
             await self._connection.close()
             logger.info("RabbitMQConsumer connection closed")

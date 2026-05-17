@@ -71,7 +71,7 @@ class AutoExecuteCompletedHandler:
             await self._publish_tool_executed(event)
 
     async def _publish_document_processed(self, event: AutoExecuted) -> None:
-        """发布 DocumentProcessed 领域事件。"""
+        """发布 DocumentProcessed 领域事件"""
         from src.domain.events.document_events import DocumentProcessed
 
         domain_event = DocumentProcessed(
@@ -83,7 +83,7 @@ class AutoExecuteCompletedHandler:
         logger.info("Published DocumentProcessed: document_id=%s", domain_event.document_id)
 
     async def _publish_tool_executed(self, event: AutoExecuted) -> None:
-        """发布 ToolExecuted 领域事件。"""
+        """发布 ToolExecuted 领域事件"""
         from src.domain.events.tool_events import ToolExecuted
 
         domain_event = ToolExecuted(
@@ -96,7 +96,7 @@ class AutoExecuteCompletedHandler:
         logger.info("Published ToolExecuted: tool_id=%s", domain_event.tool_id)
 
     async def _publish_agent_decided(self, event: AutoExecuted) -> None:
-        """发布 AgentDecided 领域事件。"""
+        """发布 AgentDecided 领域事件"""
         from src.domain.events.agent_events import AgentDecided
 
         domain_event = AgentDecided(

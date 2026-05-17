@@ -118,9 +118,9 @@ class RedisSessionStorage(SessionStorage):
             return False
 
     async def __aenter__(self) -> RedisSessionStorage:
-        """异步上下文管理器入口。"""
+        """异步上下文管理器入口"""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """异步上下文管理器出口。"""
+        """异步上下文管理器出口"""
         pass

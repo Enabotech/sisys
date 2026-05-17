@@ -18,10 +18,10 @@ from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProt
 
 
 class TestHashRouterProtocol:
-    """HashRouterProtocol 结构化类型测试。"""
+    """HashRouterProtocol 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现 route 方法的类应通过 isinstance 检查。"""
+        """实现 route 方法的类应通过 isinstance 检查"""
 
         class CompatibleRouter:
             def route(self, session_id: str) -> str:
@@ -31,7 +31,7 @@ class TestHashRouterProtocol:
         assert isinstance(instance, HashRouterProtocol)
 
     def test_runtime_checkable_with_incompatible_class(self) -> None:
-        """不实现 route 方法的类不应通过 isinstance 检查。"""
+        """不实现 route 方法的类不应通过 isinstance 检查"""
 
         class IncompatibleClass:
             def other_method(self) -> None:
@@ -41,7 +41,7 @@ class TestHashRouterProtocol:
         assert not isinstance(instance, HashRouterProtocol)
 
     def test_route_method_signature(self) -> None:
-        """route 方法应接受 session_id:str 返回 str。"""
+        """route 方法应接受 session_id:str 返回 str"""
 
         class RouterImpl:
             def route(self, session_id: str) -> str:
@@ -53,10 +53,10 @@ class TestHashRouterProtocol:
 
 
 class TestSemanticRouterProtocol:
-    """SemanticRouterProtocol 结构化类型测试。"""
+    """SemanticRouterProtocol 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现 async route 方法的类应通过 isinstance 检查。"""
+        """实现 async route 方法的类应通过 isinstance 检查"""
 
         class CompatibleRouter:
             async def route(self, task_context: dict[str, Any]) -> tuple[str, float]:
@@ -66,7 +66,7 @@ class TestSemanticRouterProtocol:
         assert isinstance(instance, SemanticRouterProtocol)
 
     def test_runtime_checkable_with_incompatible_class(self) -> None:
-        """不实现 async route 方法的类不应通过 isinstance 检查。"""
+        """不实现 async route 方法的类不应通过 isinstance 检查"""
 
         class IncompatibleClass:
             def sync_route(self) -> str:
@@ -77,10 +77,10 @@ class TestSemanticRouterProtocol:
 
 
 class TestSandboxExecutorProtocol:
-    """SandboxExecutorProtocol 结构化类型测试。"""
+    """SandboxExecutorProtocol 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现所有三个方法的类应通过 isinstance 检查。"""
+        """实现所有三个方法的类应通过 isinstance 检查"""
 
         class CompatibleExecutor:
             async def start_container(self, session_id: str) -> None:
@@ -96,7 +96,7 @@ class TestSandboxExecutorProtocol:
         assert isinstance(instance, SandboxExecutorProtocol)
 
     def test_runtime_checkable_missing_method(self) -> None:
-        """缺少方法不应通过 isinstance 检查。"""
+        """缺少方法不应通过 isinstance 检查"""
 
         class PartialExecutor:
             async def start_container(self, session_id: str) -> None:
@@ -107,7 +107,7 @@ class TestSandboxExecutorProtocol:
 
     @pytest.mark.asyncio
     async def test_execute_code_returns_dict(self) -> None:
-        """execute_code 应返回 dict。"""
+        """execute_code 应返回 dict"""
 
         class ExecutorImpl:
             async def start_container(self, session_id: str) -> None:
@@ -126,10 +126,10 @@ class TestSandboxExecutorProtocol:
 
 
 class TestSnapshotRepositoryProtocol:
-    """SnapshotRepositoryProtocol 结构化类型测试。"""
+    """SnapshotRepositoryProtocol 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现所有方法的类应通过 isinstance 检查。"""
+        """实现所有方法的类应通过 isinstance 检查"""
 
         class CompatibleRepo:
             async def save(self, snapshot: Any) -> None:
@@ -145,7 +145,7 @@ class TestSnapshotRepositoryProtocol:
         assert isinstance(instance, SnapshotRepositoryProtocol)
 
     def test_runtime_checkable_missing_method(self) -> None:
-        """缺少方法不应通过 isinstance 检查。"""
+        """缺少方法不应通过 isinstance 检查"""
 
         class PartialRepo:
             async def save(self, snapshot: Any) -> None:
@@ -164,22 +164,22 @@ class TestConnectionManager:
     """
 
     def test_health_check_is_async(self) -> None:
-        """health_check 应为异步方法。"""
+        """health_check 应为异步方法"""
         import asyncio
 
         assert asyncio.iscoroutinefunction(ConnectionManager.health_check)
 
     def test_close_is_async(self) -> None:
-        """close 应为异步方法。"""
+        """close 应为异步方法"""
         import asyncio
 
         assert asyncio.iscoroutinefunction(ConnectionManager.close)
 
     def test_get_client_default_raises_not_implemented(self) -> None:
-        """默认 get_client 应抛出 NotImplementedError。"""
+        """默认 get_client 应抛出 NotImplementedError"""
 
         class _StubManager(ConnectionManager):
-            """委托 get_client 到 Protocol 默认实现。"""
+            """委托 get_client 到 Protocol 默认实现"""
 
             async def health_check(self) -> bool:
                 return True
@@ -195,7 +195,7 @@ class TestConnectionManager:
             manager.get_client()
 
     def test_neo4j_manager_is_instance(self) -> None:
-        """Neo4jManager 应满足 ConnectionManager Protocol。"""
+        """Neo4jManager 应满足 ConnectionManager Protocol"""
         from unittest.mock import MagicMock
 
         from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
@@ -205,7 +205,7 @@ class TestConnectionManager:
         assert isinstance(manager, ConnectionManager)
 
     def test_incompatible_class_not_instance(self) -> None:
-        """不实现必要方法的类不应通过 isinstance 检查。"""
+        """不实现必要方法的类不应通过 isinstance 检查"""
 
         class IncompatibleClass:
             def other_method(self) -> None:

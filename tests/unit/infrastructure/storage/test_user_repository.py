@@ -1,4 +1,4 @@
-"""UserRepository 单元测试。"""
+"""UserRepository 单元测试"""
 
 from __future__ import annotations
 
@@ -43,11 +43,11 @@ def repository(mock_session):
 
 
 class TestUserRepository:
-    """UserRepository 测试。"""
+    """UserRepository 测试"""
 
     @pytest.mark.asyncio
     async def test_get_by_username(self, repository, mock_session):
-        """测试根据用户名获取用户。"""
+        """测试根据用户名获取用户"""
         model = _make_user_model_mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = model
@@ -62,7 +62,7 @@ class TestUserRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_username_not_found(self, repository, mock_session):
-        """测试根据用户名获取不存在的用户。"""
+        """测试根据用户名获取不存在的用户"""
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
@@ -73,7 +73,7 @@ class TestUserRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_email(self, repository, mock_session):
-        """测试根据邮箱获取用户。"""
+        """测试根据邮箱获取用户"""
         model = _make_user_model_mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = model

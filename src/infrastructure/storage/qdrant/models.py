@@ -60,7 +60,7 @@ class VectorPoint:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
-        """验证向量维度是否正确。"""
+        """验证向量维度是否正确"""
         if len(self.vector) != 1024:
             raise ValueError(f"Vector dimension must be 1024, got {len(self.vector)}")
 
@@ -78,7 +78,7 @@ class SparseVector:
     values: list[float]
 
     def __post_init__(self):
-        """验证 indices 和 values 长度是否匹配。"""
+        """验证 indices 和 values 长度是否匹配"""
         if len(self.indices) != len(self.values):
             raise ValueError(
                 f"indices and values must have same length, got {len(self.indices)} indices and {len(self.values)} values"

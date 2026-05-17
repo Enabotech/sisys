@@ -44,11 +44,11 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         return get_session()
 
     async def begin(self) -> None:
-        """开始事务。"""
+        """开始事务"""
         await self._session.begin()
 
     async def commit(self) -> None:
-        """显式提交 + 幂等标记。"""
+        """显式提交 + 幂等标记"""
         if self._committed:
             raise InvalidStateError("Already committed")
         if self._rolled_back:
@@ -57,7 +57,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         self._committed = True
 
     async def rollback(self) -> None:
-        """回滚 + 标记。"""
+        """回滚 + 标记"""
         if self._committed:
             raise InvalidStateError("Already committed")
         if self._rolled_back:
@@ -79,11 +79,11 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         await self._session.begin_nested()
 
     async def close(self) -> None:
-        """关闭会话。"""
+        """关闭会话"""
         await self._session.close()
 
     async def __aenter__(self) -> Self:
-        """异步上下文管理器入口。"""
+        """异步上下文管理器入口"""
         await self.begin()
         return self
 

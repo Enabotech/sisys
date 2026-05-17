@@ -97,10 +97,10 @@ class TestEventOutboxAdapterConversion:
 
 
 class TestEventRegistry:
-    """EventRegistry 注册表行为测试。"""
+    """EventRegistry 注册表行为测试"""
 
     def test_reset_clears_registry(self) -> None:
-        """reset 应清空注册表。"""
+        """reset 应清空注册表"""
         # 先构建
         EventRegistry.get("DocumentProcessed")
         assert EventRegistry._built is True
@@ -111,14 +111,14 @@ class TestEventRegistry:
         assert len(EventRegistry._registry) == 0
 
     def test_rebuild_after_reset(self) -> None:
-        """reset 后首次 get 应重新构建。"""
+        """reset 后首次 get 应重新构建"""
         EventRegistry.reset()
         event_class = EventRegistry.get("DocumentProcessed")
         assert event_class is not None
         assert EventRegistry._built is True
 
     def test_register_manual_event_type(self) -> None:
-        """应支持手动注册自定义事件类型。"""
+        """应支持手动注册自定义事件类型"""
         EventRegistry.reset()
 
         # 注册已有事件类型（安全的手动注册测试）
@@ -127,7 +127,7 @@ class TestEventRegistry:
         assert result is DocumentProcessed
 
     def test_register_triggers_build_if_not_built(self) -> None:
-        """在未构建状态下 register 应先构建。"""
+        """在未构建状态下 register 应先构建"""
         EventRegistry.reset()
         assert EventRegistry._built is False
 
@@ -135,7 +135,7 @@ class TestEventRegistry:
         assert EventRegistry._built is True
 
     def test_get_returns_correct_subclass(self) -> None:
-        """get 应返回正确的事件子类。"""
+        """get 应返回正确的事件子类"""
         cls = EventRegistry.get("ToolExecuted")
         assert cls is ToolExecuted
 
@@ -143,7 +143,7 @@ class TestEventRegistry:
         assert cls is AgentDecided
 
     def test_subclasses_are_recursively_collected(self) -> None:
-        """注册表应递归收集所有子类。"""
+        """注册表应递归收集所有子类"""
         EventRegistry.reset()
         # 触发构建
         EventRegistry.get("DocumentProcessed")
@@ -153,10 +153,10 @@ class TestEventRegistry:
 
 
 class TestEventOutboxAdapterFromDomainEvent:
-    """from_domain_event 转换细节测试。"""
+    """from_domain_event 转换细节测试"""
 
     def test_entity_fields_populated(self) -> None:
-        """OutboxEntity 应正确填充所有字段。"""
+        """OutboxEntity 应正确填充所有字段"""
         event = DocumentProcessed(
             document_id=uuid4(),
             parse_result={"pages": 5},
@@ -171,7 +171,7 @@ class TestEventOutboxAdapterFromDomainEvent:
         assert isinstance(entity.payload, dict)
 
     def test_entity_payload_contains_event_data(self) -> None:
-        """payload 应包含事件的序列化数据。"""
+        """payload 应包含事件的序列化数据"""
         doc_id = uuid4()
         event = DocumentProcessed(
             document_id=doc_id,

@@ -77,5 +77,5 @@ class Neo4jManager(ConnectionManager):
             return False
 
     async def close(self) -> None:
-        """关闭驱动连接。"""
+        """关闭驱动连接"""
         await self._driver.close()

@@ -42,7 +42,7 @@ class AutoTriggered(DomainEvent):
     source_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """设置event_type、aggregate_id和aggregate_type用于事件追踪。"""
+        """设置event_type、aggregate_id和aggregate_type用于事件追踪"""
         # 如果未设置，将event_type设置为类名
         if not self.event_type:
             object.__setattr__(self, "event_type", "AutoTriggered")

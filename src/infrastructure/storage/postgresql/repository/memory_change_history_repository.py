@@ -86,7 +86,7 @@ class PostgreSQLMemoryChangeHistoryRepository(
         return [self._to_entity(m) for m in models]
 
     def _to_model(self, entity: MemoryChangeHistory) -> MemoryChangeHistoryModel:
-        """将领域实体转换为数据库模型。"""
+        """将领域实体转换为数据库模型"""
         return MemoryChangeHistoryModel(
             id=entity.id,
             memory_id=entity.memory_id,
@@ -100,7 +100,7 @@ class PostgreSQLMemoryChangeHistoryRepository(
         )
 
     def _to_entity(self, model: MemoryChangeHistoryModel) -> MemoryChangeHistory:
-        """将数据库模型转换为领域实体。"""
+        """将数据库模型转换为领域实体"""
         return MemoryChangeHistory(
             id=model.id,
             memory_id=model.memory_id,

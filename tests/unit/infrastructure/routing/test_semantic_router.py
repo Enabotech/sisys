@@ -277,7 +277,7 @@ class TestSemanticRouter:
         ceo_candidate: Candidate,
         mock_embedding_model: AsyncMock,
     ) -> None:
-        """有 embedding model 时应根据语义相似度选择最佳候选。"""
+        """有 embedding model 时应根据语义相似度选择最佳候选"""
         # CFO-like embedding (匹配 cfo_candidate 的模式)
         cfo_like_embedding = []
         for i in range(1024):
@@ -297,7 +297,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_route_with_dict_description(self) -> None:
-        """description 为 dict 类型时应转为字符串。"""
+        """description 为 dict 类型时应转为字符串"""
         candidate = Candidate(
             candidate_id="agent-1",
             name="Agent 1",
@@ -311,7 +311,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_route_with_none_description_value(self) -> None:
-        """description 为 None 时应跳过该字段。"""
+        """description 为 None 时应跳过该字段"""
         candidate = Candidate(
             candidate_id="agent-1",
             name="Agent 1",
@@ -324,7 +324,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_route_with_empty_string_description(self) -> None:
-        """空字符串 description 应被跳过。"""
+        """空字符串 description 应被跳过"""
         candidate = Candidate(
             candidate_id="agent-1",
             name="Agent 1",
@@ -337,7 +337,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_route_none_init_creates_empty_router(self) -> None:
-        """candidates=None 应创建空路由器。"""
+        """candidates=None 应创建空路由器"""
         router = SemanticRouter(candidates=None)
         assert router.candidate_count == 0
         target, score = await router.route({"task_type": "test"})
@@ -346,7 +346,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_add_candidate_replaces_existing(self) -> None:
-        """添加同 ID 候选应替换。"""
+        """添加同 ID 候选应替换"""
         router = SemanticRouter()
         router.add_candidate(
             Candidate(
@@ -371,7 +371,7 @@ class TestSemanticRouter:
 
     @staticmethod
     def test_cosine_similarity_different_lengths() -> None:
-        """不同长度向量应按较短的长度计算。"""
+        """不同长度向量应按较短的长度计算"""
         a = [1.0, 0.0, 1.0]
         b = [1.0, 0.0]
         score = SemanticRouter._cosine_similarity(a, b)
@@ -379,7 +379,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_get_task_embedding_no_model_returns_zeros(self) -> None:
-        """无 embedding model 时应返回零向量。"""
+        """无 embedding model 时应返回零向量"""
         router = SemanticRouter()
         embedding = await router._get_task_embedding("test text")
         assert len(embedding) == SemanticRouter.DEFAULT_EMBEDDING_DIM
@@ -387,7 +387,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_get_task_embedding_model_returns_empty(self) -> None:
-        """embedding model 返回空列表时应回退零向量。"""
+        """embedding model 返回空列表时应回退零向量"""
         mock_model = AsyncMock(spec=EmbeddingModelProtocol)
         mock_model.embed.return_value = []
         router = SemanticRouter(embedding_model=mock_model)
@@ -395,7 +395,7 @@ class TestSemanticRouter:
         assert all(v == 0.0 for v in embedding)
 
     def test_candidate_count_property(self) -> None:
-        """candidate_count 应正确反映候选项数量。"""
+        """candidate_count 应正确反映候选项数量"""
         router = SemanticRouter()
         assert router.candidate_count == 0
         router.add_candidate(Candidate(candidate_id="a", name="A", description="a", embedding=[0.0]))
@@ -403,7 +403,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_embedding_cache_not_exceeding_max(self) -> None:
-        """缓存满时不应添加新条目。"""
+        """缓存满时不应添加新条目"""
         router = SemanticRouter()
         router._embedding_cache.clear()
         # 预填充到最大

@@ -92,10 +92,10 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         await self._subscriber.subscribe_async(event_type, handler)
 
     async def start(self) -> None:
-        """启动订阅者。"""
+        """启动订阅者"""
         await self._subscriber.start()
 
     async def close(self) -> None:
-        """关闭发布者和订阅者。"""
+        """关闭发布者和订阅者"""
         await self._publisher.close()
         await self._subscriber.close()

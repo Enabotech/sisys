@@ -80,10 +80,10 @@ class DualChannelEventBus(EventPublisher):
         await self._redis_bus.subscribe(event_type, handler)
 
     async def start(self) -> None:
-        """启动事件总线。"""
+        """启动事件总线"""
         await self._redis_bus.start()
 
     async def close(self) -> None:
-        """关闭事件总线。"""
+        """关闭事件总线"""
         await self._redis_bus.close()
         await self._rabbitmq_bus.close()

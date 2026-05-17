@@ -8,10 +8,10 @@ from src.infrastructure.storage.redis.session_state import SessionState
 
 
 class TestSessionState:
-    """SessionState 序列化/反序列化测试。"""
+    """SessionState 序列化/反序列化测试"""
 
     def test_default_values(self) -> None:
-        """SessionState 应有合理的默认值。"""
+        """SessionState 应有合理的默认值"""
         state = SessionState(session_id="sess-1", agent_id="agent-1")
         assert state.session_id == "sess-1"
         assert state.agent_id == "agent-1"
@@ -21,7 +21,7 @@ class TestSessionState:
         assert isinstance(state.updated_at, datetime)
 
     def test_to_dict_serialization(self) -> None:
-        """to_dict 应正确序列化为字典。"""
+        """to_dict 应正确序列化为字典"""
         state = SessionState(
             session_id="sess-1",
             agent_id="agent-1",
@@ -37,7 +37,7 @@ class TestSessionState:
         assert isinstance(result["updated_at"], str)
 
     def test_from_dict_deserialization(self) -> None:
-        """from_dict 应正确从字典反序列化。"""
+        """from_dict 应正确从字典反序列化"""
         data = {
             "session_id": "sess-1",
             "agent_id": "agent-1",
@@ -53,7 +53,7 @@ class TestSessionState:
         assert state.ttl == 7200
 
     def test_roundtrip(self) -> None:
-        """to_dict -> from_dict 应保持数据不变。"""
+        """to_dict -> from_dict 应保持数据不变"""
         original = SessionState(
             session_id="sess-1",
             agent_id="agent-1",
@@ -67,7 +67,7 @@ class TestSessionState:
         assert restored.ttl == original.ttl
 
     def test_from_dict_with_defaults(self) -> None:
-        """from_dict 应使用默认值处理缺失字段。"""
+        """from_dict 应使用默认值处理缺失字段"""
         data = {
             "session_id": "sess-1",
             "agent_id": "agent-1",
@@ -79,7 +79,7 @@ class TestSessionState:
         assert state.ttl == 86400
 
     def test_from_dict_with_datetime_objects(self) -> None:
-        """from_dict 应接受 datetime 对象而非字符串。"""
+        """from_dict 应接受 datetime 对象而非字符串"""
         now = datetime.now(UTC)
         data = {
             "session_id": "sess-1",

@@ -195,18 +195,18 @@ class EventBusFactory:
 
     @property
     def redis_publisher(self) -> Any:
-        """获取 Redis 发布器（延迟初始化后）。"""
+        """获取 Redis 发布器（延迟初始化后）"""
         self._initialize_components()
         return self._redis_publisher
 
     @property
     def redis_subscriber(self) -> Any:
-        """获取 Redis 订阅器（延迟初始化后）。"""
+        """获取 Redis 订阅器（延迟初始化后）"""
         self._initialize_components()
         return self._redis_subscriber
 
     @property
     def rabbitmq_publisher(self) -> Any:
-        """获取 RabbitMQ 发布器（延迟初始化后）。"""
+        """获取 RabbitMQ 发布器（延迟初始化后）"""
         self._initialize_components()
         return self._rabbitmq_publisher

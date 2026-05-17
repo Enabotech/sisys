@@ -86,40 +86,40 @@ class TestRoleModelDefaults:
     """
 
     def test_explicit_id_accepted(self) -> None:
-        """显式传入 id 应被正确存储。"""
+        """显式传入 id 应被正确存储"""
         uid = uuid4()
         instance = RoleModel(id=uid, name="test_role")
         assert instance.id == uid
 
     def test_explicit_id_unique(self) -> None:
-        """不同 id 应不相等。"""
+        """不同 id 应不相等"""
         a = RoleModel(id=uuid4(), name="role_a")
         b = RoleModel(id=uuid4(), name="role_b")
         assert a.id != b.id
 
     def test_explicit_is_active_false(self) -> None:
-        """显式设置 is_active=False 应被正确存储。"""
+        """显式设置 is_active=False 应被正确存储"""
         instance = RoleModel(name="inactive_role", is_active=False)
         assert instance.is_active is False
 
     def test_explicit_is_system_reserved_true(self) -> None:
-        """显式设置 is_system_reserved=True 应被正确存储。"""
+        """显式设置 is_system_reserved=True 应被正确存储"""
         instance = RoleModel(name="system_role", is_system_reserved=True)
         assert instance.is_system_reserved is True
 
     def test_explicit_created_at(self) -> None:
-        """显式设置 created_at 应被正确存储。"""
+        """显式设置 created_at 应被正确存储"""
         now = datetime.now(UTC).replace(tzinfo=None)
         instance = RoleModel(name="timestamp_role", created_at=now)
         assert instance.created_at == now
 
     def test_description_defaults_to_none(self) -> None:
-        """description 默认应为 None。"""
+        """description 默认应为 None"""
         instance = RoleModel(name="no_desc")
         assert instance.description is None
 
     def test_explicit_values_override_defaults(self) -> None:
-        """显式值应覆盖默认值。"""
+        """显式值应覆盖默认值"""
         uid = uuid4()
         instance = RoleModel(
             id=uid,
@@ -136,21 +136,21 @@ class TestRoleModelDefaults:
 
 
 class TestUtcNow:
-    """_utc_now 辅助函数测试。"""
+    """_utc_now 辅助函数测试"""
 
     def test_returns_naive_datetime(self) -> None:
-        """应返回不带时区信息的 naive datetime。"""
+        """应返回不带时区信息的 naive datetime"""
         result = _utc_now()
         assert result.tzinfo is None
 
     def test_returns_current_time(self) -> None:
-        """应返回接近当前 UTC 时间的值。"""
+        """应返回接近当前 UTC 时间的值"""
         before = datetime.now(UTC).replace(tzinfo=None)
         result = _utc_now()
         after = datetime.now(UTC).replace(tzinfo=None)
         assert before <= result <= after
 
     def test_returns_datetime_type(self) -> None:
-        """应返回 datetime 类型。"""
+        """应返回 datetime 类型"""
         result = _utc_now()
         assert isinstance(result, datetime)

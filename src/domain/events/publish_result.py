@@ -36,17 +36,17 @@ class PublishResult:
 
     @property
     def is_success(self) -> bool:
-        """任意通道成功即为成功。"""
+        """任意通道成功即为成功"""
         return self.redis_success or self.outbox_saved
 
     @property
     def is_full_failure(self) -> bool:
-        """所有通道都失败。"""
+        """所有通道都失败"""
         return not self.redis_success and not self.outbox_saved
 
     @property
     def partial_error(self) -> str | None:
-        """返回第一个错误信息。"""
+        """返回第一个错误信息"""
         if self.outbox_error:
             return self.outbox_error
         if self.redis_error:

@@ -50,13 +50,13 @@ class UserRepository(PostgreSQLAdapter[User, UserModel]):
         )
 
     async def get_by_username(self, username: str) -> User | None:
-        """根据用户名获取用户。"""
+        """根据用户名获取用户"""
         result = await self._session.execute(select(UserModel).where(UserModel.username == username))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
     async def get_by_email(self, email: str) -> User | None:
-        """根据邮箱获取用户。"""
+        """根据邮箱获取用户"""
         result = await self._session.execute(select(UserModel).where(UserModel.email == email))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None

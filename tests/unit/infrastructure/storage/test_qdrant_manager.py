@@ -1,4 +1,4 @@
-"""Qdrant Collection Manager 单元测试（Mock 版本）。"""
+"""Qdrant Collection Manager 单元测试（Mock 版本）"""
 
 from __future__ import annotations
 
@@ -11,16 +11,16 @@ from src.infrastructure.storage.qdrant.collection_manager import QdrantCollectio
 
 @pytest.fixture
 def mock_client():
-    """模拟 AsyncQdrantClient。"""
+    """模拟 AsyncQdrantClient"""
     return AsyncMock()
 
 
 class TestQdrantManager:
-    """QdrantCollectionManager 测试类。"""
+    """QdrantCollectionManager 测试类"""
 
     @pytest.mark.asyncio
     async def test_create_collection_success(self, mock_client):
-        """测试成功创建 Collection。"""
+        """测试成功创建 Collection"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
 
         manager = QdrantCollectionManager(mock_client)
@@ -31,7 +31,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_create_collection_already_exists(self, mock_client):
-        """测试 Collection 已存在时返回 False。"""
+        """测试 Collection 已存在时返回 False"""
         existing_collection = MagicMock()
         existing_collection.name = "sisys:documents:finance"
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[existing_collection]))
@@ -44,7 +44,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_delete_collection_success(self, mock_client):
-        """测试成功删除 Collection。"""
+        """测试成功删除 Collection"""
         existing_collection = MagicMock()
         existing_collection.name = "sisys:documents:finance"
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[existing_collection]))
@@ -58,7 +58,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_delete_collection_not_exists(self, mock_client):
-        """测试删除不存在的 Collection 返回 False。"""
+        """测试删除不存在的 Collection 返回 False"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
 
         manager = QdrantCollectionManager(mock_client)
@@ -69,7 +69,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_collection_exists_true(self, mock_client):
-        """测试 Collection 存在时返回 True。"""
+        """测试 Collection 存在时返回 True"""
         existing_collection = MagicMock()
         existing_collection.name = "sisys:documents:finance"
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[existing_collection]))
@@ -81,7 +81,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_collection_exists_false(self, mock_client):
-        """测试 Collection 不存在时返回 False。"""
+        """测试 Collection 不存在时返回 False"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
 
         manager = QdrantCollectionManager(mock_client)
@@ -91,7 +91,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_collection_exists_exception(self, mock_client):
-        """测试异常时返回 False。"""
+        """测试异常时返回 False"""
         mock_client.get_collections = AsyncMock(side_effect=Exception("Connection error"))
 
         manager = QdrantCollectionManager(mock_client)
@@ -101,7 +101,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_list_collections(self, mock_client):
-        """测试列出所有 Collection。"""
+        """测试列出所有 Collection"""
         col1 = MagicMock()
         col1.name = "sisys:documents:finance"
         col2 = MagicMock()
@@ -115,7 +115,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_list_collections_exception(self, mock_client):
-        """测试异常时返回空列表。"""
+        """测试异常时返回空列表"""
         mock_client.get_collections = AsyncMock(side_effect=Exception("Connection error"))
 
         manager = QdrantCollectionManager(mock_client)
@@ -125,7 +125,7 @@ class TestQdrantManager:
 
     @pytest.mark.asyncio
     async def test_create_collection_with_custom_config(self, mock_client):
-        """测试使用自定义配置创建 Collection。"""
+        """测试使用自定义配置创建 Collection"""
         mock_client.get_collections = AsyncMock(return_value=MagicMock(collections=[]))
 
         manager = QdrantCollectionManager(mock_client)

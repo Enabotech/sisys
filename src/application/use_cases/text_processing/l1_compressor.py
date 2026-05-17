@@ -81,7 +81,7 @@ def _rule_compress(text: str) -> str:
 
 @dataclass
 class L1CompressionResult(CompressionResult):
-    """L1 压缩结果。"""
+    """L1 压缩结果"""
 
     method: str = "rule"  # "rule" | "llm"
 

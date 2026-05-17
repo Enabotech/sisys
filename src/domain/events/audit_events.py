@@ -110,7 +110,7 @@ class AuditEvent(DomainEvent):
     correction_level: int | None = None
 
     def __post_init__(self) -> None:
-        """初始化后验证必填字段。"""
+        """初始化后验证必填字段"""
         if not self.actor:
             raise ValueError("actor is required for AuditEvent")
         if not self.action_type:

@@ -46,7 +46,7 @@ class InMemoryEventListener:
     """
 
     def __init__(self) -> None:
-        """初始化监听器，使用空的处理器注册表。"""
+        """初始化监听器，使用空的处理器注册表"""
         from collections import defaultdict
 
         self._handlers: dict[str, list[Callable[[DomainEvent], None]]] = defaultdict(list)
@@ -116,7 +116,7 @@ class EventListenerAsync(Protocol):
 
 
 class DeadLetterQueue(Protocol):
-    """死信队列抽象接口。"""
+    """死信队列抽象接口"""
 
     def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
         """入队失败事件
@@ -135,7 +135,7 @@ class DeadLetterQueue(Protocol):
         """
 
     def __len__(self) -> int:
-        """队列长度。"""
+        """队列长度"""
 
 
 class InMemoryDeadLetterQueue:
@@ -151,7 +151,7 @@ class InMemoryDeadLetterQueue:
         self._logger = logging.getLogger(__name__)
 
     def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
-        """入队失败事件。"""
+        """入队失败事件"""
         self._items.append((event, error, retry_count))
         self._logger.warning(
             "Event %s enqueued to DLQ: %s (retry_count=%d)",
@@ -161,7 +161,7 @@ class InMemoryDeadLetterQueue:
         )
 
     def dequeue(self) -> tuple[DomainEvent, str, int] | None:
-        """出队失败事件（FIFO）。"""
+        """出队失败事件（FIFO）"""
         return self._items.pop(0) if self._items else None
 
     def __len__(self) -> int:

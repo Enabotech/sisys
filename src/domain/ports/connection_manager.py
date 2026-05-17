@@ -32,7 +32,7 @@ class ConnectionManager(Protocol):
         ...
 
     async def close(self) -> None:
-        """关闭连接池并释放所有资源。"""
+        """关闭连接池并释放所有资源"""
         ...
 
     def get_client(self) -> Any:

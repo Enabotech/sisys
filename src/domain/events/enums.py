@@ -15,7 +15,7 @@ from enum import Enum
 
 
 class DeviationType(str, Enum):
-    """战略偏差类型。"""
+    """战略偏差类型"""
 
     BUDGET_OVERUN = "budget_overrun"  # 预算超支
     TIMELINE_DELAY = "timeline_delay"  # 时间线延迟
@@ -26,7 +26,7 @@ class DeviationType(str, Enum):
 
 
 class DeviationLevel(str, Enum):
-    """战略偏差严重级别。"""
+    """战略偏差严重级别"""
 
     MINOR = "minor"  # 轻微
     MODERATE = "moderate"  # 中等
@@ -34,7 +34,7 @@ class DeviationLevel(str, Enum):
 
 
 class CorrectionType(str, Enum):
-    """纠正分类类型。"""
+    """纠正分类类型"""
 
     L0 = "L0"  # 拼写/格式
     L1 = "L1"  # 参数/权重调整
@@ -43,7 +43,7 @@ class CorrectionType(str, Enum):
 
 
 class IsolationLevel(str, Enum):
-    """EIP（弹性隔离协议）级别。"""
+    """EIP（弹性隔离协议）级别"""
 
     L4_HARD = "L4"  # 硬隔离（默认）
     L3_SOFT = "L3"  # 软隔离
@@ -52,7 +52,7 @@ class IsolationLevel(str, Enum):
 
 
 class RecoveryMode(str, Enum):
-    """检查点恢复模式。"""
+    """检查点恢复模式"""
 
     REPLAY = "Replay"  # 强一致性
     OVERRIDE = "Override"  # 弱一致性

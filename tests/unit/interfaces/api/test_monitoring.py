@@ -19,11 +19,11 @@ from src.interfaces.api.monitoring import create_metrics_router
 
 
 class TestMonitoringRouter:
-    """验证 create_metrics_router 函数。"""
+    """验证 create_metrics_router 函数"""
 
     @pytest.fixture
     def mock_metrics_port(self) -> mock.Mock:
-        """创建 mock MetricsPort。"""
+        """创建 mock MetricsPort"""
         port = mock.Mock(spec=MetricsPort)
         port.collect.return_value = b"# HELP test_metric Test metric\ntest_metric 1\n"
         port.collect_as_dict.return_value = {"test_metric": 1.0}
@@ -35,7 +35,7 @@ class TestMonitoringRouter:
 
     @pytest.fixture
     def router(self, mock_metrics_port: mock.Mock) -> APIRouter:
-        """创建测试路由器。"""
+        """创建测试路由器"""
         return create_metrics_router(
             metrics_port=mock_metrics_port,
             metrics_path="/metrics",
@@ -43,12 +43,12 @@ class TestMonitoringRouter:
         )
 
     def test_router_has_get_endpoint(self, router: APIRouter) -> None:
-        """验证路由器有 GET /metrics 端点。"""
+        """验证路由器有 GET /metrics 端点"""
         routes = {getattr(route, "path", None): route for route in router.routes}
         assert "/metrics" in routes
 
     def test_get_metrics_returns_prometheus_format(self, mock_metrics_port: mock.Mock) -> None:
-        """验证 GET /metrics 返回 Prometheus 格式。"""
+        """验证 GET /metrics 返回 Prometheus 格式"""
         router = create_metrics_router(
             metrics_port=mock_metrics_port,
             metrics_path="/metrics",
@@ -62,7 +62,7 @@ class TestMonitoringRouter:
         assert b"test_metric" in response.content
 
     def test_get_metrics_collects_from_port(self, mock_metrics_port: mock.Mock) -> None:
-        """验证 GET /metrics 调用 MetricsPort.collect()。"""
+        """验证 GET /metrics 调用 MetricsPort.collect()"""
         router = create_metrics_router(
             metrics_port=mock_metrics_port,
             metrics_path="/metrics",
@@ -74,7 +74,7 @@ class TestMonitoringRouter:
         mock_metrics_port.collect.assert_called_once()
 
     def test_custom_metrics_path(self, mock_metrics_port: mock.Mock) -> None:
-        """验证自定义路径。"""
+        """验证自定义路径"""
         router = create_metrics_router(
             metrics_port=mock_metrics_port,
             metrics_path="/custom/metrics",
@@ -84,7 +84,7 @@ class TestMonitoringRouter:
         assert "/custom/metrics" in routes
 
     def test_disabled_router_excluded_from_schema(self, mock_metrics_port: mock.Mock) -> None:
-        """验证禁用的路由器不包含在 schema 中。"""
+        """验证禁用的路由器不包含在 schema 中"""
         router = create_metrics_router(
             metrics_port=mock_metrics_port,
             metrics_path="/metrics",
@@ -96,7 +96,7 @@ class TestMonitoringRouter:
                 assert route.include_in_schema is False
 
     def test_get_metrics_error_returns_500(self, mock_metrics_port: mock.Mock) -> None:
-        """验证 collect() 抛出异常时返回 500。"""
+        """验证 collect() 抛出异常时返回 500"""
         mock_metrics_port.collect.side_effect = Exception("Collection failed")
 
         router = create_metrics_router(
@@ -112,10 +112,10 @@ class TestMonitoringRouter:
 
 
 class TestGetMetricsRouterAlias:
-    """验证 get_metrics_router 别名。"""
+    """验证 get_metrics_router 别名"""
 
     def test_alias_exists(self) -> None:
-        """验证 get_metrics_router 别名存在。"""
+        """验证 get_metrics_router 别名存在"""
         from src.interfaces.api.monitoring import get_metrics_router
 
         assert get_metrics_router is not None

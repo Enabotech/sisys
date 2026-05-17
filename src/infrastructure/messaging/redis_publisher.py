@@ -49,7 +49,7 @@ class RedisEventPublisher:
         self._pool_lock = asyncio.Lock()
 
     def _get_pool(self) -> aioredis.ConnectionPool:
-        """懒加载连接池（异步安全）。"""
+        """懒加载连接池（异步安全）"""
         if self._pool is None:
             self._pool = aioredis.ConnectionPool(
                 host=self._config.host,
@@ -96,16 +96,16 @@ class RedisEventPublisher:
             )
 
     async def close(self) -> None:
-        """异步关闭连接池。"""
+        """异步关闭连接池"""
         if self._pool:
             await cast(Any, self._pool).aclose()
             self._pool = None
             logger.debug("Redis connection pool closed")
 
     async def __aenter__(self) -> RedisEventPublisher:
-        """异步上下文管理器入口。"""
+        """异步上下文管理器入口"""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """异步上下文管理器出口，确保连接池关闭。"""
+        """异步上下文管理器出口，确保连接池关闭"""
         await self.close()

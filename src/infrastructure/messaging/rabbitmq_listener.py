@@ -113,7 +113,7 @@ class RabbitMQEventListener(EventListenerAsync):
         logger.debug("Processing event %s of type %s", event.event_id, event.event_type)
 
     async def connect(self) -> None:
-        """连接到 RabbitMQ。"""
+        """连接到 RabbitMQ"""
         self._connection = await aio_pika.connect_robust(
             host=self._config.host,
             port=self._config.port,
@@ -126,7 +126,7 @@ class RabbitMQEventListener(EventListenerAsync):
         logger.info("RabbitMQEventListener connected")
 
     async def close(self) -> None:
-        """关闭连接。"""
+        """关闭连接"""
         if self._channel:
             await self._channel.close()
         if self._connection:

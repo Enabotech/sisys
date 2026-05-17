@@ -21,49 +21,49 @@ class BusinessException(BaseException):
 
 
 class ValidationError(BusinessException):
-    """验证失败。"""
+    """验证失败"""
 
     code = "EXCEPTION_201"
     message = "Validation error"
 
 
 class NotFoundError(BusinessException):
-    """资源不存在。"""
+    """资源不存在"""
 
     code = "EXCEPTION_202"
     message = "Resource not found"
 
 
 class ConflictError(BusinessException):
-    """资源冲突（版本冲突、状态冲突等）。"""
+    """资源冲突（版本冲突、状态冲突等）"""
 
     code = "EXCEPTION_203"
     message = "Resource conflict"
 
 
 class PermissionDeniedError(BusinessException):
-    """权限不足。"""
+    """权限不足"""
 
     code = "EXCEPTION_204"
     message = "Permission denied"
 
 
 class AuthenticationError(BusinessException):
-    """认证失败。"""
+    """认证失败"""
 
     code = "EXCEPTION_205"
     message = "Authentication failed"
 
 
 class InvalidStateError(BusinessException):
-    """无效状态。"""
+    """无效状态"""
 
     code = "EXCEPTION_206"
     message = "Invalid state"
 
 
 class BusinessRuleViolationError(BusinessException):
-    """业务规则违反。"""
+    """业务规则违反"""
 
     code = "EXCEPTION_207"
     message = "Business rule violation"

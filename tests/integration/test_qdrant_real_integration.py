@@ -85,10 +85,10 @@ async def vector_storage(qdrant_client: QdrantManager):
 
 
 class TestQdrantCollectionManager:
-    """Qdrant Collection 管理器真实实例集成测试。"""
+    """Qdrant Collection 管理器真实实例集成测试"""
 
     async def test_create_and_delete_collection(self, collection_manager: QdrantCollectionManager, test_tenant_id: str):
-        """测试 Collection 创建和删除。"""
+        """测试 Collection 创建和删除"""
         collection_name = f"{test_tenant_id}_collection_create"
 
         # Cleanup first (ignore errors if doesn't exist)
@@ -120,7 +120,7 @@ class TestQdrantCollectionManager:
     async def test_create_existing_collection_returns_false(
         self, collection_manager: QdrantCollectionManager, test_tenant_id: str
     ):
-        """测试创建已存在的 Collection 返回 False。"""
+        """测试创建已存在的 Collection 返回 False"""
         collection_name = f"{test_tenant_id}_collection_exists"
 
         # Cleanup first
@@ -143,12 +143,12 @@ class TestQdrantCollectionManager:
     async def test_delete_nonexistent_collection_returns_false(
         self, collection_manager: QdrantCollectionManager, test_tenant_id: str
     ):
-        """测试删除不存在的 Collection 返回 False。"""
+        """测试删除不存在的 Collection 返回 False"""
         result = await collection_manager.delete_collection(f"{test_tenant_id}_nonexistent")
         assert result is False
 
     async def test_list_collections(self, collection_manager: QdrantCollectionManager, test_tenant_id: str):
-        """测试列出所有 Collection。"""
+        """测试列出所有 Collection"""
         collection_name = f"{test_tenant_id}_collection_list"
 
         # Cleanup first
@@ -184,7 +184,7 @@ class TestQdrantVectorStorage:
     async def test_upsert_and_search_vectors(
         self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantManager, test_tenant_id: str
     ):
-        """测试向量插入和搜索。"""
+        """测试向量插入和搜索"""
         collection_name = f"{test_tenant_id}_vector_storage"
         vector_size = 1024
 
@@ -254,7 +254,7 @@ class TestQdrantVectorStorage:
                 pass
 
     async def test_delete_vectors(self, vector_storage: QdrantVectorStorage, qdrant_client: QdrantManager, test_tenant_id: str):
-        """测试删除向量。"""
+        """测试删除向量"""
         collection_name = f"{test_tenant_id}_vector_delete"
         vector_size = 1024
 
@@ -313,9 +313,9 @@ class TestQdrantVectorStorage:
 
 
 class TestQdrantHealthCheck:
-    """Qdrant 健康检查测试。"""
+    """Qdrant 健康检查测试"""
 
     async def test_health_check(self, qdrant_client: QdrantManager):
-        """测试健康检查。"""
+        """测试健康检查"""
         is_healthy = await qdrant_client.health_check()
         assert is_healthy is True

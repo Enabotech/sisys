@@ -43,7 +43,7 @@ class AutoTriggerContext:
     source_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """校验必需字段并应用默认值。"""
+        """校验必需字段并应用默认值"""
         if not self.session_id:
             # Use default session when none provided
             object.__setattr__(self, "session_id", "default")

@@ -215,10 +215,10 @@ class TestRoutingDecisionLog:
 
 
 class TestRoutingDecisionLogBoundaryValues:
-    """边界值和 UDMR 扩展字段测试。"""
+    """边界值和 UDMR 扩展字段测试"""
 
     def test_score_exactly_zero(self) -> None:
-        """route_score=0.0 应有效。"""
+        """route_score=0.0 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -230,7 +230,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_score_exactly_one(self) -> None:
-        """route_score=1.0 应有效。"""
+        """route_score=1.0 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -242,7 +242,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_score_above_one(self) -> None:
-        """route_score > 1.0 应无效。"""
+        """route_score > 1.0 应无效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -255,7 +255,7 @@ class TestRoutingDecisionLogBoundaryValues:
             log.validate()
 
     def test_task_id_whitespace_only(self) -> None:
-        """task_id 仅含空格应无效。"""
+        """task_id 仅含空格应无效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="   ",
@@ -268,7 +268,7 @@ class TestRoutingDecisionLogBoundaryValues:
             log.validate()
 
     def test_session_id_whitespace_only(self) -> None:
-        """session_id 仅含空格应无效。"""
+        """session_id 仅含空格应无效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -281,7 +281,7 @@ class TestRoutingDecisionLogBoundaryValues:
             log.validate()
 
     def test_cost_actual_negative(self) -> None:
-        """cost_actual < 0 应无效。"""
+        """cost_actual < 0 应无效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -295,7 +295,7 @@ class TestRoutingDecisionLogBoundaryValues:
             log.validate()
 
     def test_cost_actual_zero(self) -> None:
-        """cost_actual=0.0 应有效。"""
+        """cost_actual=0.0 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -308,7 +308,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_cost_estimate_zero(self) -> None:
-        """cost_estimate=0.0 应有效。"""
+        """cost_estimate=0.0 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -321,7 +321,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_latency_ms_zero(self) -> None:
-        """latency_ms=0.0 应有效。"""
+        """latency_ms=0.0 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -334,7 +334,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_fallback_reason_none_is_valid(self) -> None:
-        """fallback_reason=None 应有效。"""
+        """fallback_reason=None 应有效"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -347,7 +347,7 @@ class TestRoutingDecisionLogBoundaryValues:
         log.validate()
 
     def test_all_route_types_valid(self) -> None:
-        """所有 route_type 值都应有效。"""
+        """所有 route_type 值都应有效"""
         for route_type in ("hash", "semantic", "mixed", "local", "cloud"):
             log = RoutingDecisionLog(
                 log_id=uuid.uuid4(),
@@ -361,10 +361,10 @@ class TestRoutingDecisionLogBoundaryValues:
 
 
 class TestRoutingDecisionLogUDMRFields:
-    """UDMR 扩展字段测试。"""
+    """UDMR 扩展字段测试"""
 
     def test_selected_model(self) -> None:
-        """selected_model 应被正确存储。"""
+        """selected_model 应被正确存储"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -377,7 +377,7 @@ class TestRoutingDecisionLogUDMRFields:
         assert log.selected_model == "qwen2.5:7b"
 
     def test_cost_actual(self) -> None:
-        """cost_actual 应被正确存储。"""
+        """cost_actual 应被正确存储"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",
@@ -390,7 +390,7 @@ class TestRoutingDecisionLogUDMRFields:
         assert log.cost_actual == 0.005
 
     def test_frozen_dataclass(self) -> None:
-        """RoutingDecisionLog 应为 frozen dataclass。"""
+        """RoutingDecisionLog 应为 frozen dataclass"""
         log = RoutingDecisionLog(
             log_id=uuid.uuid4(),
             task_id="task-001",

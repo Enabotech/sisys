@@ -49,7 +49,7 @@ class ObjectMetadata:
     tags: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """序列化为字典。"""
+        """序列化为字典"""
         return {
             "object_id": str(self.object_id),
             "bucket_name": self.bucket_name,
@@ -116,7 +116,7 @@ class LifecycleRule:
     transition_storage_class: str | None = None
 
     def to_minio_dict(self) -> dict:
-        """转换为 MinIO 生命周期规则字典。"""
+        """转换为 MinIO 生命周期规则字典"""
         rule: dict[str, Any] = {
             "ID": self.rule_id,
             "Status": self.status,
@@ -133,14 +133,14 @@ class LifecycleRule:
 
 
 def _parse_optional_datetime(value: str | datetime | None) -> datetime | None:
-    """解析可选的 ISO 格式日期时间字符串。"""
+    """解析可选的 ISO 格式日期时间字符串"""
     if value is None:
         return None
     return _parse_datetime(value)
 
 
 def _parse_datetime(value: str | datetime) -> datetime:
-    """解析 ISO 格式日期时间字符串或返回 datetime 对象。"""
+    """解析 ISO 格式日期时间字符串或返回 datetime 对象"""
     if isinstance(value, datetime):
         return value
     return datetime.fromisoformat(value)

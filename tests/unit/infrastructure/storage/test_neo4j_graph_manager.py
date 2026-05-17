@@ -1,4 +1,4 @@
-"""Neo4jGraphManager 单元测试。"""
+"""Neo4jGraphManager 单元测试"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 
 
 class _AsyncCM:
-    """辅助类：模拟异步上下文管理器。"""
+    """辅助类：模拟异步上下文管理器"""
 
     def __init__(self, session):
         self._session = session
@@ -42,27 +42,27 @@ def _mock_session(driver, session, single_result):
 
 @pytest.fixture
 def mock_driver():
-    """模拟 Neo4j 异步驱动（必须用 MagicMock，不能用 AsyncMock）。"""
+    """模拟 Neo4j 异步驱动（必须用 MagicMock，不能用 AsyncMock）"""
     return MagicMock()
 
 
 @pytest.fixture
 def mock_session():
-    """模拟 Neo4j 会话。"""
+    """模拟 Neo4j 会话"""
     return MagicMock()
 
 
 @pytest.fixture
 def manager(mock_driver):
-    """创建 Neo4jGraphManager 实例。"""
+    """创建 Neo4jGraphManager 实例"""
     return Neo4jGraphManager(driver=mock_driver, database="neo4j")
 
 
 class TestNeo4jGraphManager:
-    """Neo4jGraphManager 测试类。"""
+    """Neo4jGraphManager 测试类"""
 
     async def test_create_node_success(self, manager, mock_driver, mock_session):
-        """测试创建节点成功。"""
+        """测试创建节点成功"""
         from src.infrastructure.storage.neo4j.models import GraphNode
 
         node = GraphNode(
@@ -76,7 +76,7 @@ class TestNeo4jGraphManager:
         assert result is True
 
     async def test_create_node_merge_existing(self, manager, mock_driver, mock_session):
-        """测试 MERGE 语义：节点已存在时返回 False。"""
+        """测试 MERGE 语义：节点已存在时返回 False"""
         from src.infrastructure.storage.neo4j.models import GraphNode
 
         node = GraphNode(
@@ -90,7 +90,7 @@ class TestNeo4jGraphManager:
         assert result is False
 
     async def test_delete_node_success(self, manager, mock_driver, mock_session):
-        """测试删除节点成功。"""
+        """测试删除节点成功"""
         mock_record = MagicMock()
         mock_record.__getitem__ = lambda self, key: 1
         _mock_session(mock_driver, mock_session, mock_record)
@@ -99,14 +99,14 @@ class TestNeo4jGraphManager:
         assert result is True
 
     async def test_delete_node_not_found(self, manager, mock_driver, mock_session):
-        """测试删除不存在的节点。"""
+        """测试删除不存在的节点"""
         _mock_session(mock_driver, mock_session, None)
 
         result = await manager.delete_node("nonexistent")
         assert result is False
 
     async def test_get_node_success(self, manager, mock_driver, mock_session):
-        """测试获取节点成功。"""
+        """测试获取节点成功"""
         mock_node_data = {"id": "entity-001", "name": "Test Entity"}
         mock_record = MagicMock()
         mock_record.__getitem__ = lambda self, key: mock_node_data
@@ -117,14 +117,14 @@ class TestNeo4jGraphManager:
         assert result["id"] == "entity-001"
 
     async def test_get_node_not_found(self, manager, mock_driver, mock_session):
-        """测试获取不存在的节点。"""
+        """测试获取不存在的节点"""
         _mock_session(mock_driver, mock_session, None)
 
         result = await manager.get_node("nonexistent")
         assert result is None
 
     async def test_create_relationship_success(self, manager, mock_driver, mock_session):
-        """测试创建关系成功。"""
+        """测试创建关系成功"""
         from src.infrastructure.storage.neo4j.models import GraphRelationship, RelationshipType
 
         rel = GraphRelationship(
@@ -139,7 +139,7 @@ class TestNeo4jGraphManager:
         assert result is True
 
     async def test_delete_relationship_success(self, manager, mock_driver, mock_session):
-        """测试删除关系成功。"""
+        """测试删除关系成功"""
         mock_record = MagicMock()
         mock_record.__getitem__ = lambda self, key: 1
         _mock_session(mock_driver, mock_session, mock_record)
@@ -148,7 +148,7 @@ class TestNeo4jGraphManager:
         assert result is True
 
     async def test_delete_relationship_not_found(self, manager, mock_driver, mock_session):
-        """测试删除不存在的关系。"""
+        """测试删除不存在的关系"""
         _mock_session(mock_driver, mock_session, None)
 
         result = await manager.delete_relationship("entity-001", "entity-002", "MENTIONS")

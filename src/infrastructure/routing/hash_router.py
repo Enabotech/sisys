@@ -130,10 +130,10 @@ class HashRouter:
 
     @property
     def node_count(self) -> int:
-        """返回物理节点数量。"""
+        """返回物理节点数量"""
         return len(self._node_weights)
 
     @property
     def virtual_node_count(self) -> int:
-        """返回虚拟节点总数。"""
+        """返回虚拟节点总数"""
         return len(self._ring)

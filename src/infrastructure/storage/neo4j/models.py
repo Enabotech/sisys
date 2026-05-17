@@ -44,7 +44,7 @@ class GraphNode:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """验证节点数据是否有效。"""
+        """验证节点数据是否有效"""
         if not self.id or not self.id.strip():
             raise ValueError("Node id must be a non-empty string")
         if not self.labels:
@@ -77,7 +77,7 @@ class GraphRelationship:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """验证关系数据是否有效。"""
+        """验证关系数据是否有效"""
         if not self.start_node_id or not self.start_node_id.strip():
             raise ValueError("start_node_id must be a non-empty string")
         if not self.end_node_id or not self.end_node_id.strip():

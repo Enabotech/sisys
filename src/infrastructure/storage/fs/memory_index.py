@@ -206,7 +206,7 @@ class MemoryIndex(IndexManagerPort):
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _ensure_lock_file(self) -> None:
-        """确保锁文件存在。"""
+        """确保锁文件存在"""
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock_path.touch(exist_ok=True)
 

@@ -16,7 +16,7 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 
 
 class _TestUserAdapter(PostgreSQLAdapter[UserModel, UserModel]):
-    """测试用恒等转换适配器。"""
+    """测试用恒等转换适配器"""
 
     def _to_entity(self, model: UserModel) -> UserModel:
         return model
@@ -27,7 +27,7 @@ class _TestUserAdapter(PostgreSQLAdapter[UserModel, UserModel]):
 
 @pytest.fixture
 def mock_session():
-    """创建模拟数据库会话。"""
+    """创建模拟数据库会话"""
     session = mock.AsyncMock(spec=AsyncSession)
     session.add = mock.Mock()
     session.delete = mock.Mock()
@@ -38,7 +38,7 @@ def mock_session():
 
 @pytest.fixture
 def repository(mock_session):
-    """创建 PostgreSQLAdapter 测试实例。"""
+    """创建 PostgreSQLAdapter 测试实例"""
     token = set_session(mock_session)
     repo = _TestUserAdapter(UserModel)
     yield repo
@@ -46,11 +46,11 @@ def repository(mock_session):
 
 
 class TestPostgreSQLAdapter:
-    """PostgreSQLAdapter 测试。"""
+    """PostgreSQLAdapter 测试"""
 
     @pytest.mark.asyncio
     async def test_get_by_id_exists(self, repository, mock_session):
-        """测试获取存在的实体。"""
+        """测试获取存在的实体"""
         user = mock.Mock()
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = user
@@ -63,7 +63,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_get_by_id_not_found(self, repository, mock_session):
-        """测试获取不存在的实体。"""
+        """测试获取不存在的实体"""
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
@@ -74,7 +74,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_save_insert(self, repository, mock_session):
-        """测试保存实体（_do_save 默认插入）。"""
+        """测试保存实体（_do_save 默认插入）"""
         user = mock.Mock()
         mock_session.flush = mock.AsyncMock()
         mock_session.refresh = mock.AsyncMock()
@@ -86,7 +86,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_delete_hard(self, repository, mock_session):
-        """测试硬删除存在的实体。"""
+        """测试硬删除存在的实体"""
         user = mock.Mock()
         mock_session.execute = mock.AsyncMock()
         mock_result = mock.Mock()
@@ -102,7 +102,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_delete_not_found(self, repository, mock_session):
-        """测试删除不存在的实体（无操作）。"""
+        """测试删除不存在的实体（无操作）"""
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
@@ -113,7 +113,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_list_all(self, repository, mock_session):
-        """测试获取实体列表。"""
+        """测试获取实体列表"""
         users = [mock.Mock(), mock.Mock()]
         mock_scalars = mock.Mock()
         mock_scalars.all.return_value = users
@@ -127,7 +127,7 @@ class TestPostgreSQLAdapter:
 
     @pytest.mark.asyncio
     async def test_count(self, repository, mock_session):
-        """测试获取实体总数。"""
+        """测试获取实体总数"""
         mock_result = mock.Mock()
         mock_result.scalar.return_value = 5
         mock_session.execute.return_value = mock_result

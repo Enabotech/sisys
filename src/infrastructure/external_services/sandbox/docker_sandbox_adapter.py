@@ -143,5 +143,5 @@ class DockerSandboxAdapter(SandboxExecutor):
 
     @classmethod
     def reset_all_containers(cls) -> None:
-        """重置所有容器状态（仅用于测试）。"""
+        """重置所有容器状态（仅用于测试）"""
         cls._running_containers.clear()

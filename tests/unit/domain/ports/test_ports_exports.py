@@ -7,62 +7,62 @@ from __future__ import annotations
 
 
 class TestPortsExport:
-    """验证端口导出。"""
+    """验证端口导出"""
 
     def test_l1_cache_port_exported(self) -> None:
-        """L1CachePort 应从 ports 模块导出。"""
+        """L1CachePort 应从 ports 模块导出"""
         from src.domain.ports import L1CachePort
 
         assert L1CachePort is not None
 
     def test_l3_vector_port_exported(self) -> None:
-        """L3VectorPort 应从 ports 模块导出。"""
+        """L3VectorPort 应从 ports 模块导出"""
         from src.domain.ports import L3VectorPort
 
         assert L3VectorPort is not None
 
     def test_l4_object_port_exported(self) -> None:
-        """L4ObjectPort 应从 ports 模块导出。"""
+        """L4ObjectPort 应从 ports 模块导出"""
         from src.domain.ports import L4ObjectPort
 
         assert L4ObjectPort is not None
 
     def test_l5_graph_port_exported(self) -> None:
-        """L5GraphPort 应从 ports 模块导出。"""
+        """L5GraphPort 应从 ports 模块导出"""
         from src.domain.ports import L5GraphPort
 
         assert L5GraphPort is not None
 
     def test_unified_storage_port_exported(self) -> None:
-        """UnifiedStoragePort 应从 ports 模块导出。"""
+        """UnifiedStoragePort 应从 ports 模块导出"""
         from src.domain.ports import UnifiedStoragePort
 
         assert UnifiedStoragePort is not None
 
     def test_storage_layer_exported(self) -> None:
-        """StorageLayer 应从 ports 模块导出。"""
+        """StorageLayer 应从 ports 模块导出"""
         from src.domain.ports import StorageLayer
 
         assert StorageLayer is not None
 
     def test_storage_tier_exported(self) -> None:
-        """StorageTier 应从 ports 模块导出。"""
+        """StorageTier 应从 ports 模块导出"""
         from src.domain.ports import StorageTier
 
         assert StorageTier is not None
 
     def test_data_access_pattern_exported(self) -> None:
-        """DataAccessPattern 应从 ports 模块导出。"""
+        """DataAccessPattern 应从 ports 模块导出"""
         from src.domain.ports import DataAccessPattern
 
         assert DataAccessPattern is not None
 
 
 class TestStorageEnumsValues:
-    """验证存储枚举值。"""
+    """验证存储枚举值"""
 
     def test_storage_layer_has_all_layers(self) -> None:
-        """StorageLayer 应包含所有层级。"""
+        """StorageLayer 应包含所有层级"""
         from src.domain.ports import StorageLayer
 
         assert hasattr(StorageLayer, "L0_FILE")
@@ -73,7 +73,7 @@ class TestStorageEnumsValues:
         assert hasattr(StorageLayer, "L5_GRAPH")
 
     def test_storage_tier_has_all_tiers(self) -> None:
-        """StorageTier 应包含所有层级。"""
+        """StorageTier 应包含所有层级"""
         from src.domain.ports import StorageTier
 
         assert hasattr(StorageTier, "HOT")

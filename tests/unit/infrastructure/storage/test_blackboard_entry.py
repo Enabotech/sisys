@@ -8,10 +8,10 @@ from src.infrastructure.storage.redis.blackboard_entry import BlackboardEntry
 
 
 class TestBlackboardEntry:
-    """BlackboardEntry 序列化/反序列化测试。"""
+    """BlackboardEntry 序列化/反序列化测试"""
 
     def test_default_values(self) -> None:
-        """BlackboardEntry 应有合理的默认值。"""
+        """BlackboardEntry 应有合理的默认值"""
         entry = BlackboardEntry(
             conversation_id="conv-1",
             agent_id="agent-1",
@@ -26,7 +26,7 @@ class TestBlackboardEntry:
         assert isinstance(entry.timestamp, datetime)
 
     def test_to_dict_serialization(self) -> None:
-        """to_dict 应正确序列化为字典。"""
+        """to_dict 应正确序列化为字典"""
         entry = BlackboardEntry(
             conversation_id="conv-1",
             agent_id="agent-1",
@@ -45,7 +45,7 @@ class TestBlackboardEntry:
         assert isinstance(result["timestamp"], str)
 
     def test_from_dict_deserialization(self) -> None:
-        """from_dict 应正确从字典反序列化。"""
+        """from_dict 应正确从字典反序列化"""
         data = {
             "conversation_id": "conv-1",
             "agent_id": "agent-1",
@@ -64,7 +64,7 @@ class TestBlackboardEntry:
         assert entry.version == 5
 
     def test_roundtrip(self) -> None:
-        """to_dict -> from_dict 应保持数据不变。"""
+        """to_dict -> from_dict 应保持数据不变"""
         original = BlackboardEntry(
             conversation_id="conv-1",
             agent_id="agent-1",
@@ -82,7 +82,7 @@ class TestBlackboardEntry:
         assert restored.version == original.version
 
     def test_from_dict_with_defaults(self) -> None:
-        """from_dict 应使用默认值处理缺失字段。"""
+        """from_dict 应使用默认值处理缺失字段"""
         data = {
             "conversation_id": "conv-1",
             "agent_id": "agent-1",
@@ -95,7 +95,7 @@ class TestBlackboardEntry:
         assert entry.version == 1
 
     def test_from_dict_with_datetime_object(self) -> None:
-        """from_dict 应接受 datetime 对象。"""
+        """from_dict 应接受 datetime 对象"""
         now = datetime.now(UTC)
         data = {
             "conversation_id": "conv-1",

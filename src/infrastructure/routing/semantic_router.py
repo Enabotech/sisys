@@ -18,7 +18,7 @@ from typing import Any, Protocol
 
 
 class EmbeddingModelProtocol(Protocol):
-    """嵌入模型协议，由基础设施层实现。"""
+    """嵌入模型协议，由基础设施层实现"""
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """生成文本的嵌入向量

@@ -35,7 +35,7 @@ class ToolExecuted(DomainEvent):
     cost_audit: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.tool_id)
         if not self.aggregate_type:

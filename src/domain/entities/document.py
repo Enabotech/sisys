@@ -19,7 +19,7 @@ from enum import Enum
 
 
 class DocumentType(str, Enum):
-    """支持的文档类型枚举。"""
+    """支持的文档类型枚举"""
 
     STRATEGIC_PLAN = "strategic_plan"
     BUSINESS_PLAN = "business_plan"
@@ -31,7 +31,7 @@ class DocumentType(str, Enum):
 
 
 class ParseStatus(str, Enum):
-    """文档解析状态枚举。"""
+    """文档解析状态枚举"""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -41,7 +41,7 @@ class ParseStatus(str, Enum):
 
 @dataclass
 class DocumentVersion:
-    """文档版本记录。"""
+    """文档版本记录"""
 
     version: int
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))

@@ -239,7 +239,7 @@ class PostgresDeadLetterQueue:
         raise NotImplementedError("Use count_pending() for async count")
 
     def _model_to_entry(self, model: DeadLetterQueueModel) -> DeadLetterQueueEntry:
-        """将模型转换为 DeadLetterQueueEntry。"""
+        """将模型转换为 DeadLetterQueueEntry"""
         return DeadLetterQueueEntry(
             id=model.id,
             event_id=model.event_id,

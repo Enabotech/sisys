@@ -31,39 +31,39 @@ class MemoryFileStorage(MemoryFilePort):
     # -- L0StoragePort methods (delegate to adapter) --
 
     async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
-        """写入记忆文件。"""
+        """写入记忆文件"""
         return await self._adapter.write(memory_id, memory_type, content)
 
     async def read(self, memory_id: str, memory_type: str) -> str:
-        """读取记忆文件。"""
+        """读取记忆文件"""
         return await self._adapter.read(memory_id, memory_type)
 
     async def delete(self, memory_id: str, memory_type: str) -> bool:
-        """删除记忆文件。"""
+        """删除记忆文件"""
         return await self._adapter.delete(memory_id, memory_type)
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查记忆文件是否存在。"""
+        """检查记忆文件是否存在"""
         return await self._adapter.exists(memory_id, memory_type)
 
     async def list_memories(self, memory_type: str) -> list[str]:
-        """列出指定类型的记忆。"""
+        """列出指定类型的记忆"""
         return await self._adapter.list_memories(memory_type)
 
     # -- MemoryFilePort specific methods --
 
     async def update_index(self, entry: dict) -> None:
-        """更新 MEMORY.md 索引（添加条目）。"""
+        """更新 MEMORY.md 索引（添加条目）"""
         await asyncio.to_thread(self._adapter.update_index, [entry])
 
     async def remove_from_index(self, memory_id: str) -> None:
-        """从 MEMORY.md 索引移除条目。"""
+        """从 MEMORY.md 索引移除条目"""
         entries = await asyncio.to_thread(self._adapter.read_index)
         filtered = [e for e in entries if e.get("memory_id") != memory_id]
         await asyncio.to_thread(self._adapter.update_index, filtered)
 
     async def search_index(self, query: str) -> list[dict]:
-        """搜索 MEMORY.md 索引。"""
+        """搜索 MEMORY.md 索引"""
         entries = await asyncio.to_thread(self._adapter.read_index)
         query_lower = query.lower()
         return [

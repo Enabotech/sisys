@@ -15,7 +15,7 @@ from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLM
 
 @pytest.fixture
 def config():
-    """创建测试配置。"""
+    """创建测试配置"""
     return PostgreSQLConfig(
         host="localhost",
         port=5432,
@@ -27,40 +27,40 @@ def config():
 
 @pytest.fixture
 def engine(config):
-    """创建 PostgreSQLManager 实例。"""
+    """创建 PostgreSQLManager 实例"""
     return PostgreSQLManager(config)
 
 
 class TestPostgreSQLManager:
-    """PostgreSQLManager 测试。"""
+    """PostgreSQLManager 测试"""
 
     def test_get_async_engine_creates_engine(self, engine):
-        """测试异步引擎创建。"""
+        """测试异步引擎创建"""
         async_engine = engine.get_async_engine()
         assert async_engine is not None
         assert "asyncpg" in str(async_engine.url)
 
     def test_get_async_engine_reuses_instance(self, engine):
-        """测试异步引擎复用。"""
+        """测试异步引擎复用"""
         engine1 = engine.get_async_engine()
         engine2 = engine.get_async_engine()
         assert engine1 is engine2
 
     def test_get_sync_engine_creates_engine(self, engine):
-        """测试同步引擎创建。"""
+        """测试同步引擎创建"""
         sync_engine = engine.get_sync_engine()
         assert sync_engine is not None
         assert "psycopg2" in str(sync_engine.url)
 
     def test_get_sync_engine_reuses_instance(self, engine):
-        """测试同步引擎复用。"""
+        """测试同步引擎复用"""
         engine1 = engine.get_sync_engine()
         engine2 = engine.get_sync_engine()
         assert engine1 is engine2
 
     @pytest.mark.asyncio
     async def test_health_check_success(self, engine):
-        """测试健康检查成功。"""
+        """测试健康检查成功"""
         with mock.patch.object(engine, "get_async_engine") as mock_get:
             mock_conn = mock.AsyncMock()
             mock_result = mock.Mock()
@@ -80,7 +80,7 @@ class TestPostgreSQLManager:
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, engine):
-        """测试健康检查失败。"""
+        """测试健康检查失败"""
         with mock.patch.object(engine, "get_async_engine") as mock_get:
             mock_get.side_effect = Exception("Connection failed")
 
@@ -89,7 +89,7 @@ class TestPostgreSQLManager:
 
     @pytest.mark.asyncio
     async def test_close_disposes_engines(self, config):
-        """测试关闭引擎。"""
+        """测试关闭引擎"""
         engine = PostgreSQLManager(config)
         mock_async = mock.AsyncMock()
         mock_sync = mock.Mock()

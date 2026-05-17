@@ -37,7 +37,7 @@ __all__ = ["MemoryNotFoundError", "MemoryVersionConflictError"]
 
 @dataclass
 class MemorySaveRequest:
-    """记忆保存请求。"""
+    """记忆保存请求"""
 
     user_id: str
     name: str
@@ -48,7 +48,7 @@ class MemorySaveRequest:
 
 @dataclass
 class MemoryUpdateRequest:
-    """记忆更新请求。"""
+    """记忆更新请求"""
 
     memory_id: UUID
     user_id: str
@@ -59,7 +59,7 @@ class MemoryUpdateRequest:
 
 @dataclass
 class MemoryDeleteRequest:
-    """记忆删除请求。"""
+    """记忆删除请求"""
 
     memory_id: UUID
     user_id: str
@@ -67,7 +67,7 @@ class MemoryDeleteRequest:
 
 @dataclass
 class Memory:
-    """记忆聚合根。"""
+    """记忆聚合根"""
 
     memory_id: UUID
     user_id: str
@@ -465,7 +465,7 @@ class MemoryService:
         old_value: dict | None,
         new_value: dict | None,
     ) -> None:
-        """发布 MemoryChanged 事件。"""
+        """发布 MemoryChanged 事件"""
         if self._event_publisher is None:
             return
 

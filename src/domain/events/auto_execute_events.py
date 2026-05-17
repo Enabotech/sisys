@@ -46,7 +46,7 @@ class AutoExecuted(DomainEvent):
     route_score: float = 0.0  # Routing confidence score
 
     def __post_init__(self) -> None:
-        """设置event_type、aggregate_id和aggregate_type用于事件追踪。"""
+        """设置event_type、aggregate_id和aggregate_type用于事件追踪"""
         if not self.event_type:
             object.__setattr__(self, "event_type", "AutoExecuted")
         if self.aggregate_id is None and self.event_id:

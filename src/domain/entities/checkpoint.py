@@ -38,14 +38,14 @@ class CorrectionRecord:
 
 
 class RecoveryMode(str, Enum):
-    """检查点恢复模式枚举。"""
+    """检查点恢复模式枚举"""
 
     REPLAY = "replay"
     OVERRIDE = "override"
 
 
 class CheckpointStatus(str, Enum):
-    """检查点完成状态枚举。"""
+    """检查点完成状态枚举"""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"

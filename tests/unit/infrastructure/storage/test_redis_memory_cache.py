@@ -155,11 +155,11 @@ class TestRedisMemoryCachePortCompliance:
 
 
 class TestRedisMemoryCacheAdditionalKV:
-    """补充 L1CachePort 委托方法的覆盖。"""
+    """补充 L1CachePort 委托方法的覆盖"""
 
     @pytest.mark.asyncio
     async def test_delete_pattern_delegates(self, cache, mock_redis_client) -> None:
-        """delete_pattern 应委托给 adapter。"""
+        """delete_pattern 应委托给 adapter"""
 
         async def mock_scan_iter(match):
             for key in ["memory:user:u1:k1"]:
@@ -172,36 +172,36 @@ class TestRedisMemoryCacheAdditionalKV:
 
     @pytest.mark.asyncio
     async def test_set_with_ttl_delegates(self, cache, mock_redis_client) -> None:
-        """set_with_ttl 应委托给 adapter。"""
+        """set_with_ttl 应委托给 adapter"""
         mock_redis_client.setex.return_value = True
         result = await cache.set_with_ttl("some:key", "value", 300)
         assert result is True
 
     @pytest.mark.asyncio
     async def test_set_with_explicit_none_ttl(self, cache, mock_redis_client) -> None:
-        """set 使用 ttl=None 应委托给 adapter.set。"""
+        """set 使用 ttl=None 应委托给 adapter.set"""
         mock_redis_client.set.return_value = True
         result = await cache.set("some:key", "value", ttl=None)
         assert result is True
 
 
 class TestRedisMemoryCacheGenerateTTL:
-    """TTL 随机化行为测试。"""
+    """TTL 随机化行为测试"""
 
     def test_generate_ttl_within_range(self, cache) -> None:
-        """TTL 应在 86400-108000 范围内。"""
+        """TTL 应在 86400-108000 范围内"""
         for _ in range(100):
             ttl = cache._generate_ttl()
             assert 86400 <= ttl <= 108000
 
     def test_generate_ttl_not_constant(self, cache) -> None:
-        """TTL 应该是随机的，不应每次都相同。"""
+        """TTL 应该是随机的，不应每次都相同"""
         ttls = {cache._generate_ttl() for _ in range(50)}
         assert len(ttls) > 1, "TTL should vary across calls"
 
     @pytest.mark.asyncio
     async def test_set_memory_default_ttl_uses_randomized(self, cache, mock_redis_client) -> None:
-        """set_memory 不指定 TTL 时应使用随机 TTL。"""
+        """set_memory 不指定 TTL 时应使用随机 TTL"""
         mock_redis_client.setex.return_value = True
         await cache.set_memory("private", "user1", "mem", "content")
         call_args = mock_redis_client.setex.call_args
@@ -210,7 +210,7 @@ class TestRedisMemoryCacheGenerateTTL:
 
     @pytest.mark.asyncio
     async def test_set_memory_custom_ttl_overrides(self, cache, mock_redis_client) -> None:
-        """set_memory 自定义 TTL 应覆盖默认值。"""
+        """set_memory 自定义 TTL 应覆盖默认值"""
         mock_redis_client.setex.return_value = True
         await cache.set_memory("private", "user1", "mem", "content", ttl=600)
         call_args = mock_redis_client.setex.call_args
@@ -218,28 +218,28 @@ class TestRedisMemoryCacheGenerateTTL:
 
 
 class TestRedisMemoryCacheKeyBuilding:
-    """Key 构建逻辑的边界测试。"""
+    """Key 构建逻辑的边界测试"""
 
     def test_build_key_unknown_type_defaults_to_user(self, cache) -> None:
-        """未知 memory_type 应默认为 user 路径。"""
+        """未知 memory_type 应默认为 user 路径"""
         key = cache._build_key("unknown_type", "owner1", "name1")
         assert key == "memory:user:owner1:name1"
 
     def test_build_pattern_unknown_type_defaults_to_user(self, cache) -> None:
-        """未知 memory_type pattern 应默认为 user 路径。"""
+        """未知 memory_type pattern 应默认为 user 路径"""
         pattern = cache._build_pattern("unknown_type", "owner1")
         assert pattern == "memory:user:owner1:*"
 
     @pytest.mark.asyncio
     async def test_get_memory_uses_correct_key(self, cache, mock_redis_client) -> None:
-        """get_memory 应使用正确的 key 格式。"""
+        """get_memory 应使用正确的 key 格式"""
         mock_redis_client.get.return_value = b"data"
         await cache.get_memory("group", "g1", "my-mem")
         mock_redis_client.get.assert_called_once_with("memory:group:g1:my-mem")
 
     @pytest.mark.asyncio
     async def test_delete_memory_uses_correct_key(self, cache, mock_redis_client) -> None:
-        """delete_memory 应使用正确的 key 格式。"""
+        """delete_memory 应使用正确的 key 格式"""
         mock_redis_client.delete.return_value = 1
         await cache.delete_memory("group", "g1", "my-mem")
         mock_redis_client.delete.assert_called_once_with("memory:group:g1:my-mem")

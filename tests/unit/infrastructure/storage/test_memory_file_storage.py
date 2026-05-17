@@ -34,7 +34,7 @@ def mock_adapter():
 
 @pytest.fixture
 def storage(mock_adapter):
-    """创建注入 mock adapter 的 MemoryFileStorage 实例。"""
+    """创建注入 mock adapter 的 MemoryFileStorage 实例"""
     return MemoryFileStorage(mock_adapter)
 
 
@@ -44,18 +44,18 @@ def storage(mock_adapter):
 
 
 class TestWriteDelegation:
-    """验证 write 方法正确委托给 adapter。"""
+    """验证 write 方法正确委托给 adapter"""
 
     @pytest.mark.asyncio
     async def test_calls_adapter_write_with_correct_args(self, storage, mock_adapter):
-        """验证传递给 adapter.write 的参数正确。"""
+        """验证传递给 adapter.write 的参数正确"""
         await storage.write("mem-1", "user", "hello")
 
         mock_adapter.write.assert_awaited_once_with("mem-1", "user", "hello")
 
     @pytest.mark.asyncio
     async def test_returns_adapter_write_result(self, storage, mock_adapter):
-        """验证返回 adapter.write 的结果。"""
+        """验证返回 adapter.write 的结果"""
         mock_adapter.write.return_value = False
 
         result = await storage.write("mem-1", "user", "hello")
@@ -64,7 +64,7 @@ class TestWriteDelegation:
 
     @pytest.mark.asyncio
     async def test_propagates_adapter_exception(self, storage, mock_adapter):
-        """验证 adapter.write 抛出异常时正确传播。"""
+        """验证 adapter.write 抛出异常时正确传播"""
         mock_adapter.write.side_effect = OSError("disk full")
 
         with pytest.raises(OSError, match="disk full"):
@@ -72,18 +72,18 @@ class TestWriteDelegation:
 
 
 class TestReadDelegation:
-    """验证 read 方法正确委托给 adapter。"""
+    """验证 read 方法正确委托给 adapter"""
 
     @pytest.mark.asyncio
     async def test_calls_adapter_read_with_correct_args(self, storage, mock_adapter):
-        """验证传递给 adapter.read 的参数正确。"""
+        """验证传递给 adapter.read 的参数正确"""
         await storage.read("mem-1", "feedback")
 
         mock_adapter.read.assert_awaited_once_with("mem-1", "feedback")
 
     @pytest.mark.asyncio
     async def test_returns_adapter_read_result(self, storage, mock_adapter):
-        """验证返回 adapter.read 的内容。"""
+        """验证返回 adapter.read 的内容"""
         mock_adapter.read.return_value = "记忆内容"
 
         result = await storage.read("mem-1", "feedback")
@@ -92,7 +92,7 @@ class TestReadDelegation:
 
     @pytest.mark.asyncio
     async def test_propagates_file_not_found(self, storage, mock_adapter):
-        """验证文件不存在时传播 FileNotFoundError。"""
+        """验证文件不存在时传播 FileNotFoundError"""
         mock_adapter.read.side_effect = FileNotFoundError("not found")
 
         with pytest.raises(FileNotFoundError):
@@ -100,18 +100,18 @@ class TestReadDelegation:
 
 
 class TestDeleteDelegation:
-    """验证 delete 方法正确委托给 adapter。"""
+    """验证 delete 方法正确委托给 adapter"""
 
     @pytest.mark.asyncio
     async def test_calls_adapter_delete_with_correct_args(self, storage, mock_adapter):
-        """验证传递给 adapter.delete 的参数正确。"""
+        """验证传递给 adapter.delete 的参数正确"""
         await storage.delete("mem-1", "user")
 
         mock_adapter.delete.assert_awaited_once_with("mem-1", "user")
 
     @pytest.mark.asyncio
     async def test_returns_adapter_delete_result(self, storage, mock_adapter):
-        """验证返回 adapter.delete 的结果。"""
+        """验证返回 adapter.delete 的结果"""
         mock_adapter.delete.return_value = False
 
         result = await storage.delete("nonexistent", "user")
@@ -120,18 +120,18 @@ class TestDeleteDelegation:
 
 
 class TestExistsDelegation:
-    """验证 exists 方法正确委托给 adapter。"""
+    """验证 exists 方法正确委托给 adapter"""
 
     @pytest.mark.asyncio
     async def test_calls_adapter_exists_with_correct_args(self, storage, mock_adapter):
-        """验证传递给 adapter.exists 的参数正确。"""
+        """验证传递给 adapter.exists 的参数正确"""
         await storage.exists("mem-1", "project")
 
         mock_adapter.exists.assert_awaited_once_with("mem-1", "project")
 
     @pytest.mark.asyncio
     async def test_returns_adapter_exists_result(self, storage, mock_adapter):
-        """验证返回 adapter.exists 的布尔结果。"""
+        """验证返回 adapter.exists 的布尔结果"""
         mock_adapter.exists.return_value = False
 
         result = await storage.exists("missing-id", "project")
@@ -140,18 +140,18 @@ class TestExistsDelegation:
 
 
 class TestListMemoriesDelegation:
-    """验证 list_memories 方法正确委托给 adapter。"""
+    """验证 list_memories 方法正确委托给 adapter"""
 
     @pytest.mark.asyncio
     async def test_calls_adapter_list_memories_with_correct_args(self, storage, mock_adapter):
-        """验证传递给 adapter.list_memories 的参数正确。"""
+        """验证传递给 adapter.list_memories 的参数正确"""
         await storage.list_memories("user")
 
         mock_adapter.list_memories.assert_awaited_once_with("user")
 
     @pytest.mark.asyncio
     async def test_returns_adapter_list_memories_result(self, storage, mock_adapter):
-        """验证返回 adapter.list_memories 的结果。"""
+        """验证返回 adapter.list_memories 的结果"""
         ids = ["aaa", "bbb", "ccc"]
         mock_adapter.list_memories.return_value = ids
 
@@ -166,11 +166,11 @@ class TestListMemoriesDelegation:
 
 
 class TestUpdateIndex:
-    """验证 update_index 使用 asyncio.to_thread 调用 adapter 同步方法。"""
+    """验证 update_index 使用 asyncio.to_thread 调用 adapter 同步方法"""
 
     @pytest.mark.asyncio
     async def test_delegates_to_adapter_update_index(self, storage, mock_adapter):
-        """验证 update_index 通过 to_thread 委托给 adapter.update_index。"""
+        """验证 update_index 通过 to_thread 委托给 adapter.update_index"""
         entry = {"name": "test", "type": "user", "memory_id": "id-1", "description": "描述"}
 
         await storage.update_index(entry)
@@ -180,7 +180,7 @@ class TestUpdateIndex:
 
     @pytest.mark.asyncio
     async def test_delegates_entry_with_multiple_fields(self, storage, mock_adapter):
-        """验证包含多个字段的条目正确传递。"""
+        """验证包含多个字段的条目正确传递"""
         entry = {
             "name": "复杂记忆",
             "type": "reference",
@@ -194,11 +194,11 @@ class TestUpdateIndex:
 
 
 class TestRemoveFromIndex:
-    """验证 remove_from_index 按memory_id 过滤并更新索引。"""
+    """验证 remove_from_index 按memory_id 过滤并更新索引"""
 
     @pytest.mark.asyncio
     async def test_removes_entry_by_memory_id(self, storage, mock_adapter):
-        """验证按 memory_id 过滤移除指定条目。"""
+        """验证按 memory_id 过滤移除指定条目"""
         entries = [
             {"name": "a", "type": "user", "memory_id": "keep-me", "description": "保留"},
             {"name": "b", "type": "user", "memory_id": "remove-me", "description": "移除"},
@@ -218,7 +218,7 @@ class TestRemoveFromIndex:
 
     @pytest.mark.asyncio
     async def test_no_match_keeps_all_entries(self, storage, mock_adapter):
-        """验证 memory_id 不匹配时保留所有条目。"""
+        """验证 memory_id 不匹配时保留所有条目"""
         entries = [
             {"name": "a", "type": "user", "memory_id": "id-1", "description": "a"},
             {"name": "b", "type": "user", "memory_id": "id-2", "description": "b"},
@@ -231,7 +231,7 @@ class TestRemoveFromIndex:
 
     @pytest.mark.asyncio
     async def test_empty_index_stays_empty(self, storage, mock_adapter):
-        """验证空索引移除后仍为空。"""
+        """验证空索引移除后仍为空"""
         mock_adapter.read_index.return_value = []
 
         await storage.remove_from_index("any-id")
@@ -240,7 +240,7 @@ class TestRemoveFromIndex:
 
     @pytest.mark.asyncio
     async def test_entry_missing_memory_id_field_is_kept(self, storage, mock_adapter):
-        """验证缺少 memory_id 字段的条目不会被移除。"""
+        """验证缺少 memory_id 字段的条目不会被移除"""
         entries = [
             {"name": "no-id", "type": "user", "description": "缺少memory_id"},
             {"name": "has-id", "type": "user", "memory_id": "target", "description": "有id"},
@@ -254,11 +254,11 @@ class TestRemoveFromIndex:
 
 
 class TestSearchIndex:
-    """验证 search_index 大小写不敏感匹配 name 和 description 字段。"""
+    """验证 search_index 大小写不敏感匹配 name 和 description 字段"""
 
     @pytest.mark.asyncio
     async def test_match_name_case_insensitive(self, storage, mock_adapter):
-        """验证按 name 字段大小写不敏感匹配。"""
+        """验证按 name 字段大小写不敏感匹配"""
         entries = [
             {"name": "Python Guide", "type": "reference", "memory_id": "id-1", "description": "指南"},
         ]
@@ -271,7 +271,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_match_description_case_insensitive(self, storage, mock_adapter):
-        """验证按 description 字段大小写不敏感匹配。"""
+        """验证按 description 字段大小写不敏感匹配"""
         entries = [
             {"name": "guide", "type": "reference", "memory_id": "id-1", "description": "Python Best Practices"},
         ]
@@ -284,7 +284,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_no_match_returns_empty(self, storage, mock_adapter):
-        """验证无匹配时返回空列表。"""
+        """验证无匹配时返回空列表"""
         entries = [
             {"name": "Java Guide", "type": "reference", "memory_id": "id-1", "description": "Java 指南"},
         ]
@@ -296,7 +296,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_multiple_matches(self, storage, mock_adapter):
-        """验证多个匹配结果全部返回。"""
+        """验证多个匹配结果全部返回"""
         entries = [
             {"name": "Python Basics", "type": "reference", "memory_id": "id-1", "description": "基础教程"},
             {"name": "Advanced Python", "type": "reference", "memory_id": "id-2", "description": "高级教程"},
@@ -311,7 +311,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_empty_index_returns_empty(self, storage, mock_adapter):
-        """验证空索引搜索返回空列表。"""
+        """验证空索引搜索返回空列表"""
         mock_adapter.read_index.return_value = []
 
         result = await storage.search_index("anything")
@@ -320,7 +320,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_match_mixed_case_query(self, storage, mock_adapter):
-        """验证查询字符串包含大小写混合时仍能匹配。"""
+        """验证查询字符串包含大小写混合时仍能匹配"""
         entries = [
             {"name": "python guide", "type": "reference", "memory_id": "id-1", "description": "教程"},
         ]
@@ -332,7 +332,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_entry_missing_name_and_description(self, storage, mock_adapter):
-        """验证条目缺少 name/description 字段时不匹配（不报错）。"""
+        """验证条目缺少 name/description 字段时不匹配（不报错）"""
         entries = [
             {"type": "user", "memory_id": "id-1"},
         ]
@@ -344,7 +344,7 @@ class TestSearchIndex:
 
     @pytest.mark.asyncio
     async def test_partial_match_on_name(self, storage, mock_adapter):
-        """验证查询是 name 子串时也能匹配。"""
+        """验证查询是 name 子串时也能匹配"""
         entries = [
             {"name": "awesome-python-tips", "type": "reference", "memory_id": "id-1", "description": "技巧"},
         ]

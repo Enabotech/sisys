@@ -20,10 +20,10 @@ from src.infrastructure.storage.minio.worm_lifecycle import (
 
 
 class TestEnableWormLock:
-    """WORM 锁定启用测试。"""
+    """WORM 锁定启用测试"""
 
     def test_enable_worm_lock_success(self):
-        """成功启用 WORM 锁定。"""
+        """成功启用 WORM 锁定"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -44,7 +44,7 @@ class TestEnableWormLock:
         assert retention.retain_until_date > datetime.now(UTC)
 
     def test_enable_worm_lock_custom_retention(self):
-        """自定义保留天数。"""
+        """自定义保留天数"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -62,15 +62,15 @@ class TestEnableWormLock:
         assert retention.retain_until_date < now + timedelta(days=370)
 
     def test_enable_worm_lock_default_sox(self):
-        """默认使用 SOX 保留天数。"""
+        """默认使用 SOX 保留天数"""
         assert SOX_RETENTION_DAYS == 2555
 
 
 class TestArchiveObject:
-    """对象归档测试。"""
+    """对象归档测试"""
 
     def test_archive_object_success(self):
-        """成功归档对象。"""
+        """成功归档对象"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -84,7 +84,7 @@ class TestArchiveObject:
         mock_client.set_object_retention.assert_called_once()
 
     def test_archive_object_default_retention(self):
-        """归档使用默认保留天数。"""
+        """归档使用默认保留天数"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -102,10 +102,10 @@ class TestArchiveObject:
 
 
 class TestConfigureLifecycle:
-    """生命周期配置测试。"""
+    """生命周期配置测试"""
 
     def test_configure_lifecycle_success(self):
-        """成功配置生命周期规则。"""
+        """成功配置生命周期规则"""
         config = MinIOConfig()
         manager = WORMManager(config)
 
@@ -140,7 +140,7 @@ class TestConfigureLifecycle:
         assert len(lifecycle_config.rules) == 2
 
     def test_configure_lifecycle_empty_rules(self):
-        """配置空规则列表。"""
+        """配置空规则列表"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -154,10 +154,10 @@ class TestConfigureLifecycle:
 
 
 class TestDeleteObjectWithWorm:
-    """WORM 保护下删除对象测试。"""
+    """WORM 保护下删除对象测试"""
 
     def test_delete_object_success(self):
-        """成功删除非锁定对象。"""
+        """成功删除非锁定对象"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -171,7 +171,7 @@ class TestDeleteObjectWithWorm:
         mock_client.remove_object.assert_called_once()
 
     def test_delete_worm_locked_object_raises(self):
-        """删除 WORM 锁定对象抛出 ComplianceLockError。"""
+        """删除 WORM 锁定对象抛出 ComplianceLockError"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -193,7 +193,7 @@ class TestDeleteObjectWithWorm:
             manager.delete_object("sisys-raw-docs-tenant1", "test/file.pdf")
 
     def test_delete_object_not_exists(self):
-        """对象不存在返回 False。"""
+        """对象不存在返回 False"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -215,7 +215,7 @@ class TestDeleteObjectWithWorm:
         assert result is False
 
     def test_delete_object_invalid_state_raises(self):
-        """InvalidObjectState 错误抛出 ComplianceLockError。"""
+        """InvalidObjectState 错误抛出 ComplianceLockError"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -238,10 +238,10 @@ class TestDeleteObjectWithWorm:
 
 
 class TestGetObjectRetention:
-    """获取对象保留策略测试。"""
+    """获取对象保留策略测试"""
 
     def test_get_object_retention(self):
-        """获取对象保留策略。"""
+        """获取对象保留策略"""
         config = MinIOConfig()
         manager = WORMManager(config)
         mock_adapter = MagicMock()
@@ -259,7 +259,7 @@ class TestGetObjectRetention:
         assert result["mode"] == "GOVERNANCE"
 
     def test_get_object_retention_not_exists(self):
-        """对象不存在返回 None。"""
+        """对象不存在返回 None"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -282,10 +282,10 @@ class TestGetObjectRetention:
 
 
 class TestListLifecycleRules:
-    """列出生命周期规则测试。"""
+    """列出生命周期规则测试"""
 
     def test_list_lifecycle_rules(self):
-        """列出生命周期规则。"""
+        """列出生命周期规则"""
         from minio.lifecycleconfig import LifecycleConfig
 
         config = MinIOConfig()
@@ -310,7 +310,7 @@ class TestListLifecycleRules:
         assert result[0]["ID"] == "rule-1"
 
     def test_list_lifecycle_rules_no_config(self):
-        """无生命周期配置返回空列表。"""
+        """无生命周期配置返回空列表"""
         from minio.error import S3Error
 
         config = MinIOConfig()

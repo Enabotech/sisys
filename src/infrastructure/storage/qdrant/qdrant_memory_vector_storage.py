@@ -47,15 +47,15 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
     # -- L3VectorPort methods (delegate to adapter) --
 
     async def upsert_points(self, collection: str, points: list[dict]) -> bool:
-        """批量插入或更新向量点。"""
+        """批量插入或更新向量点"""
         return await self._adapter.upsert_points(collection, points)
 
     async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
-        """批量删除向量点。"""
+        """批量删除向量点"""
         return await self._adapter.delete_points(collection, point_ids)
 
     async def get_point(self, collection: str, point_id: str) -> dict | None:
-        """获取单个向量点。"""
+        """获取单个向量点"""
         return await self._adapter.get_point(collection, point_id)
 
     async def search(
@@ -65,7 +65,7 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """Dense 语义检索。"""
+        """Dense 语义检索"""
         return await self._adapter.search(collection, query_vector, limit, filter_payload)
 
     async def search_sparse(
@@ -75,7 +75,7 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """BM25 稀疏检索。"""
+        """BM25 稀疏检索"""
         return await self._adapter.search_sparse(collection, sparse_vector, limit, filter_payload)
 
     async def create_collection(
@@ -84,19 +84,19 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         vector_size: int,
         vector_params: dict | None = None,
     ) -> bool:
-        """创建 Collection。"""
+        """创建 Collection"""
         return await self._adapter.create_collection(collection, vector_size, vector_params)
 
     async def delete_collection(self, collection: str) -> bool:
-        """删除 Collection。"""
+        """删除 Collection"""
         return await self._adapter.delete_collection(collection)
 
     async def collection_exists(self, collection: str) -> bool:
-        """检查 Collection 是否存在。"""
+        """检查 Collection 是否存在"""
         return await self._adapter.collection_exists(collection)
 
     async def list_collections(self) -> list[str]:
-        """列出所有 Collection。"""
+        """列出所有 Collection"""
         return await self._adapter.list_collections()
 
     # -- MemoryVectorPort specific methods --
@@ -108,7 +108,7 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         memory_type: str,
         owner_id: str,
     ) -> bool:
-        """索引记忆内容（自动生成 embedding 并存储）。"""
+        """索引记忆内容（自动生成 embedding 并存储）"""
         vector = self._embed_fn(content)
         points = [
             {
@@ -126,7 +126,7 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         memory_type: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
-        """语义相似记忆检索。"""
+        """语义相似记忆检索"""
         query_vector = self._embed_fn(query)
         filter_payload: dict[str, Any] = {}
         if owner_id is not None:

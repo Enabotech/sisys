@@ -19,22 +19,22 @@ from src.infrastructure.messaging.outbox.outbox import (
 
 
 class TestOutboxEntityStateTransitions:
-    """验证 OutboxEntity 状态机转换规则。"""
+    """验证 OutboxEntity 状态机转换规则"""
 
     def test_initial_state_is_pending(self) -> None:
-        """初始状态必须是 pending。"""
+        """初始状态必须是 pending"""
         entity = OutboxEntity()
         assert entity.status == "pending"
 
     def test_pending_to_published(self) -> None:
-        """pending → published 转换有效。"""
+        """pending → published 转换有效"""
         entity = OutboxEntity()
         entity.mark_published()
         assert entity.status == "published"
         assert entity.published_at is not None
 
     def test_pending_to_failed(self) -> None:
-        """pending → failed 转换有效。"""
+        """pending → failed 转换有效"""
         entity = OutboxEntity()
         entity.mark_failed("Test error")
         assert entity.status == "failed"
@@ -42,7 +42,7 @@ class TestOutboxEntityStateTransitions:
         assert entity.retry_count == 1
 
     def test_failed_to_pending_retry(self) -> None:
-        """failed → pending（重试）转换有效。"""
+        """failed → pending（重试）转换有效"""
         entity = OutboxEntity()
         entity.mark_failed("First error")
         assert entity.retry_count == 1
@@ -53,21 +53,21 @@ class TestOutboxEntityStateTransitions:
         assert entity.retry_count == 1  # 重试不改变 count
 
     def test_failed_to_archived(self) -> None:
-        """failed → archived 转换有效。"""
+        """failed → archived 转换有效"""
         entity = OutboxEntity()
         entity.mark_failed("Final error")
         entity.mark_archived()
         assert entity.status == "archived"
 
     def test_pending_cannot_go_to_pending(self) -> None:
-        """pending 不能再转为 pending（无效转换）。"""
+        """pending 不能再转为 pending（无效转换）"""
         entity = OutboxEntity()
         with pytest.raises(InvalidStateTransitionError) as exc_info:
             entity.mark_pending()
         assert "pending → pending" in str(exc_info.value)
 
     def test_published_cannot_transition(self) -> None:
-        """published 是终态，不能再转换。"""
+        """published 是终态，不能再转换"""
         entity = OutboxEntity()
         entity.mark_published()
 
@@ -84,7 +84,7 @@ class TestOutboxEntityStateTransitions:
             entity.mark_archived()
 
     def test_archived_cannot_transition(self) -> None:
-        """archived 是终态，不能再转换。"""
+        """archived 是终态，不能再转换"""
         entity = OutboxEntity()
         entity.mark_failed("error")
         entity.mark_archived()
@@ -99,7 +99,7 @@ class TestOutboxEntityStateTransitions:
             entity.mark_pending()
 
     def test_max_retries_exceeded_prevents_pending(self) -> None:
-        """超过最大重试次数后，不能再 mark_pending。"""
+        """超过最大重试次数后，不能再 mark_pending"""
         entity = OutboxEntity(max_retries=3)
 
         # 前两次失败后可以重试
@@ -118,7 +118,7 @@ class TestOutboxEntityStateTransitions:
 
 
 class TestOutboxEntityInvalidStateTransitionError:
-    """验证 InvalidStateTransitionError 异常信息。"""
+    """验证 InvalidStateTransitionError 异常信息"""
 
     def test_error_message_format(self) -> None:
         """异常消息格式：from → to"""
@@ -128,7 +128,7 @@ class TestOutboxEntityInvalidStateTransitionError:
         assert error.to_status == "archived"
 
     def test_error_with_custom_message(self) -> None:
-        """带自定义消息的异常。"""
+        """带自定义消息的异常"""
         error = InvalidStateTransitionError(
             "failed",
             "pending",
@@ -200,10 +200,10 @@ class TestOutboxRepositoryMockBehavior:
 
 
 class TestOutboxEntityFieldDefaults:
-    """验证 OutboxEntity 字段默认值。"""
+    """验证 OutboxEntity 字段默认值"""
 
     def test_default_values(self) -> None:
-        """验证所有字段的默认值。"""
+        """验证所有字段的默认值"""
         entity = OutboxEntity()
         assert entity.id == 0
         assert entity.status == "pending"
@@ -214,7 +214,7 @@ class TestOutboxEntityFieldDefaults:
         assert entity.created_at is not None
 
     def test_custom_field_values(self) -> None:
-        """验证自定义字段值。"""
+        """验证自定义字段值"""
         from uuid import uuid4
 
         eid = uuid4()
@@ -237,7 +237,7 @@ class TestOutboxEntityFieldDefaults:
         assert entity.error_message == "test error"
 
     def test_entity_fields_are_mutable(self) -> None:
-        """验证 OutboxEntity 字段可修改（非 frozen）。"""
+        """验证 OutboxEntity 字段可修改（非 frozen）"""
         entity = OutboxEntity()
         entity.id = 100
         entity.status = "published"

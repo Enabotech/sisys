@@ -115,7 +115,7 @@ class TestRedisEventPublisher:
 
     @pytest.mark.asyncio
     async def test_publish_returns_result_on_connection_error(self):
-        """RedisEventPublisher 连接失败应返回 PublishResult（优雅降级）。"""
+        """RedisEventPublisher 连接失败应返回 PublishResult（优雅降级）"""
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
         config = RedisConfig(host="invalid-host", port=9999)

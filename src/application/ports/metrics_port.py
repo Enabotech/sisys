@@ -51,13 +51,13 @@ class MetricsPort(Protocol):
         """
 
     def record_cache_hit(self) -> None:
-        """记录缓存命中。"""
+        """记录缓存命中"""
 
     def record_cache_miss(self) -> None:
-        """记录缓存未命中。"""
+        """记录缓存未命中"""
 
     def record_event_processed(self) -> None:
-        """记录一个事件已处理。"""
+        """记录一个事件已处理"""
 
     def update_processing_rate(self) -> None:
         """更新事件处理速率"""

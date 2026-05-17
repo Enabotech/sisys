@@ -66,7 +66,7 @@ class TestArchitectureConstraints:
         assert not violations, "Domain layer has external dependencies:\n" + "\n".join(violations)
 
     def test_domain_layer_does_not_import_infrastructure_models(self):
-        """领域层不导入 infrastructure.storage.postgresql.models 约束验证。"""
+        """领域层不导入 infrastructure.storage.postgresql.models 约束验证"""
         domain_dir = ROOT_DIR / "src" / "domain"
         violations = []
 
@@ -83,7 +83,7 @@ class TestArchitectureConstraints:
         assert not violations, "Domain layer imports infrastructure models:\n" + "\n".join(violations)
 
     def test_ruff_check_passes_for_domain_layer(self):
-        """领域层 Ruff 检查通过。"""
+        """领域层 Ruff 检查通过"""
         import subprocess
 
         result = subprocess.run(
@@ -94,7 +94,7 @@ class TestArchitectureConstraints:
         assert result.returncode == 0, f"Ruff check failed:\n{result.stdout}\n{result.stderr}"
 
     def test_mypy_check_passes_for_domain_layer(self):
-        """领域层 MyPy 检查通过。"""
+        """领域层 MyPy 检查通过"""
         import subprocess
 
         result = subprocess.run(
@@ -106,24 +106,24 @@ class TestArchitectureConstraints:
 
 
 class TestHexagonalArchitecture:
-    """六边形架构依赖方向约束验证。"""
+    """六边形架构依赖方向约束验证"""
 
     def test_application_layer_structure_valid(self):
-        """应用层目录结构存在。"""
+        """应用层目录结构存在"""
         app_dir = ROOT_DIR / "src" / "application"
         assert app_dir.exists(), "Application layer should exist"
 
     def test_infrastructure_layer_exists(self):
-        """基础设施层目录结构存在。"""
+        """基础设施层目录结构存在"""
         infra_dir = ROOT_DIR / "src" / "infrastructure"
         assert infra_dir.exists(), "Infrastructure layer should exist"
 
 
 class TestEventMessagingComponents:
-    """事件消息组件结构验证。"""
+    """事件消息组件结构验证"""
 
     def test_new_components_exist(self):
-        """验证新组件文件已创建。"""
+        """验证新组件文件已创建"""
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "outbox" / "postgres_dead_letter_queue.py").exists()
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "retry" / "redis_retry_queue.py").exists()
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "retry" / "dual_idempotency_checker.py").exists()
@@ -131,7 +131,7 @@ class TestEventMessagingComponents:
         assert (ROOT_DIR / "src" / "infrastructure" / "messaging" / "event_store.py").exists()
 
     def test_new_domain_interfaces_exist(self):
-        """验证新领域接口文件已创建。"""
+        """验证新领域接口文件已创建"""
         assert (ROOT_DIR / "src" / "domain" / "ports" / "unit_of_work.py").exists()
         listener_file = ROOT_DIR / "src" / "domain" / "events" / "listener.py"
         assert listener_file.exists()
