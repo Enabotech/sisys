@@ -1,10 +1,16 @@
-"""AutoTriggerListener — Event listener adapter for auto-trigger mechanism.
+"""SISYS 应用层自动触发处理器模块。
 
-Listens to domain events from the event bus and passes them
-to AutoTriggerService for processing.
+自动触发机制的事件监听适配器，监听事件总线上的领域事件
+并传递给 AutoTriggerService 进行处理。
 
-Reference: Story 1.14a SDD规范定义
-Reference: or.md 系统公理一 (trigger→route→execute)
+参考: Story 1.14a SDD规范定义
+参考: or.md 系统公理一 (trigger→route→execute)
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -23,40 +29,37 @@ logger = logging.getLogger(__name__)
 
 
 class AutoTriggerHandler:
-    """Event listener that bridges event bus to AutoTriggerService.
+    """事件监听器，桥接事件总线与 AutoTriggerService。
 
-    Registers handlers for domain events and delegates processing
-    to the AutoTriggerService domain service.
+    注册领域事件处理器，将处理委托给 AutoTriggerService 领域服务。
 
-    This is the infrastructure adapter layer - it adapts the event bus
-    interface to the AutoTriggerService interface while maintaining
-    hexagonal architecture compliance (domain layer remains isolated).
+    这是接口适配层——将事件总线接口适配为 AutoTriggerService 接口，
+    同时保持六边形架构合规（领域层保持隔离）。
 
-    Implementation uses a background thread with its own event loop
-    to safely bridge synchronous event handlers to async AutoTriggerService.
+    使用后台线程及其独立事件循环，安全地将同步事件处理器桥接到异步 AutoTriggerService。
 
-    Concurrency Configuration:
-        MAX_CONCURRENT_TASKS: Maximum parallel tasks (default 100)
-        TASK_TIMEOUT: Per-task timeout in seconds (default 300)
+    Attributes:
+        MAX_CONCURRENT_TASKS: 最大并发任务数（默认 100）
+        TASK_TIMEOUT: 单任务超时秒数（默认 300）
     """
 
     # Concurrency control parameters
     MAX_CONCURRENT_TASKS: int = 100
-    """Maximum number of concurrent event processing tasks."""
+    """最大并发事件处理任务数。"""
 
     TASK_TIMEOUT: float = 300.0
-    """Timeout for each event processing task in seconds."""
+    """单个事件处理任务的超时秒数。"""
 
     def __init__(
         self,
         auto_trigger_service: AutoTriggerService,
         event_listener: EventListener,
     ) -> None:
-        """Initialize AutoTriggerListener.
+        """初始化自动触发监听器。
 
         Args:
-            auto_trigger_service: The domain service for processing triggers.
-            event_listener: The event listener for registering handlers.
+            auto_trigger_service: 处理触发的领域服务
+            event_listener: 用于注册处理器的事件监听器
         """
         self._auto_trigger_service = auto_trigger_service
         self._event_listener = event_listener
@@ -80,10 +83,9 @@ class AutoTriggerHandler:
         self._running = False
 
     def register_handlers(self) -> None:
-        """Register handlers for all supported domain event types.
+        """注册所有支持的领域事件类型的处理器。
 
-        Each handler delegates to the appropriate AutoTriggerService method
-        based on event type.
+        每个处理器根据事件类型委托给对应的 AutoTriggerService 方法。
         """
         self._running = True
         self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
@@ -95,20 +97,20 @@ class AutoTriggerHandler:
             logger.debug(f"Registered handler for event type: {event_type}")
 
     def _create_handler(self, event_type: str) -> Callable[[DomainEvent], None]:
-        """Create a handler function for the given event type.
+        """为指定事件类型创建处理函数。
 
         Args:
-            event_type: The type of event to handle.
+            event_type: 要处理的事件类型
 
         Returns:
-            A handler function that processes events of the given type.
+            处理指定类型事件的处理函数
         """
 
         def handle_event(event: DomainEvent) -> None:
-            """Handle a domain event and trigger processing.
+            """处理领域事件并触发处理流程。
 
             Args:
-                event: The domain event to process.
+                event: 待处理的领域事件
             """
             try:
                 # Queue the event for async processing in background thread
@@ -119,10 +121,10 @@ class AutoTriggerHandler:
         return handle_event
 
     def _worker_loop(self) -> None:
-        """Background worker loop that processes events concurrently.
+        """后台工作线程循环，并发处理事件。
 
-        Uses create_task() + gather() for high-throughput event processing.
-        Controls concurrency via MAX_CONCURRENT_TASKS to prevent resource exhaustion.
+        使用 create_task() + gather() 实现高吞吐事件处理。
+        通过 MAX_CONCURRENT_TASKS 控制并发，防止资源耗尽。
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -176,17 +178,17 @@ class AutoTriggerHandler:
             loop.close()
 
     def stop(self) -> None:
-        """Stop the background worker thread."""
+        """停止后台工作线程。"""
         self._running = False
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=5.0)
 
     async def _process_event(self, event_type: str, event: DomainEvent) -> None:
-        """Process a domain event asynchronously.
+        """异步处理领域事件。
 
         Args:
-            event_type: The type of event being processed.
-            event: The domain event to process.
+            event_type: 正在处理的事件类型
+            event: 待处理的领域事件
         """
         try:
             if event_type == "HeartbeatTriggered":
@@ -209,9 +211,9 @@ class AutoTriggerHandler:
 
     @property
     def registered_event_types(self) -> list[str]:
-        """Return list of event types this listener handles.
+        """返回此监听器处理的事件类型列表。
 
         Returns:
-            List of registered event type names.
+            已注册的事件类型名称列表
         """
         return list(self._registered_event_types)

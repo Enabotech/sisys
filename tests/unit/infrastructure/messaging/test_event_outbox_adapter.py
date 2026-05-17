@@ -11,6 +11,7 @@ from src.domain.events import (
     DocumentProcessed,
     ToolExecuted,
 )
+from src.domain.events.base import DomainEvent
 from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
@@ -93,3 +94,93 @@ class TestEventOutboxAdapterConversion:
 
         with pytest.raises(ValueError, match="Unknown event_type"):
             EventOutboxAdapter.to_domain_event(entity)
+
+
+class TestEventRegistry:
+    """EventRegistry 注册表行为测试。"""
+
+    def test_reset_clears_registry(self) -> None:
+        """reset 应清空注册表。"""
+        # 先构建
+        EventRegistry.get("DocumentProcessed")
+        assert EventRegistry._built is True
+        assert len(EventRegistry._registry) > 0
+
+        EventRegistry.reset()
+        assert EventRegistry._built is False
+        assert len(EventRegistry._registry) == 0
+
+    def test_rebuild_after_reset(self) -> None:
+        """reset 后首次 get 应重新构建。"""
+        EventRegistry.reset()
+        event_class = EventRegistry.get("DocumentProcessed")
+        assert event_class is not None
+        assert EventRegistry._built is True
+
+    def test_register_manual_event_type(self) -> None:
+        """应支持手动注册自定义事件类型。"""
+        EventRegistry.reset()
+
+        # 注册已有事件类型（安全的手动注册测试）
+        EventRegistry.register("DocumentProcessed", DocumentProcessed)
+        result = EventRegistry.get("DocumentProcessed")
+        assert result is DocumentProcessed
+
+    def test_register_triggers_build_if_not_built(self) -> None:
+        """在未构建状态下 register 应先构建。"""
+        EventRegistry.reset()
+        assert EventRegistry._built is False
+
+        EventRegistry.register("DocumentProcessed", DocumentProcessed)
+        assert EventRegistry._built is True
+
+    def test_get_returns_correct_subclass(self) -> None:
+        """get 应返回正确的事件子类。"""
+        cls = EventRegistry.get("ToolExecuted")
+        assert cls is ToolExecuted
+
+        cls = EventRegistry.get("AgentDecided")
+        assert cls is AgentDecided
+
+    def test_subclasses_are_recursively_collected(self) -> None:
+        """注册表应递归收集所有子类。"""
+        EventRegistry.reset()
+        # 触发构建
+        EventRegistry.get("DocumentProcessed")
+        # 所有直接子类应被收集
+        for subclass in DomainEvent.__subclasses__():
+            assert subclass.__name__ in EventRegistry._registry
+
+
+class TestEventOutboxAdapterFromDomainEvent:
+    """from_domain_event 转换细节测试。"""
+
+    def test_entity_fields_populated(self) -> None:
+        """OutboxEntity 应正确填充所有字段。"""
+        event = DocumentProcessed(
+            document_id=uuid4(),
+            parse_result={"pages": 5},
+            embedding=[0.1] * 1024,
+        )
+        entity = EventOutboxAdapter.from_domain_event(event)
+
+        assert entity.event_id == event.event_id
+        assert entity.event_type == event.event_type
+        assert entity.status == "pending"
+        assert entity.created_at == event.timestamp
+        assert isinstance(entity.payload, dict)
+
+    def test_entity_payload_contains_event_data(self) -> None:
+        """payload 应包含事件的序列化数据。"""
+        doc_id = uuid4()
+        event = DocumentProcessed(
+            document_id=doc_id,
+            parse_result={"pages": 3},
+            embedding=[0.1] * 1024,
+        )
+        entity = EventOutboxAdapter.from_domain_event(event)
+        payload = entity.payload
+
+        assert "event_id" in payload
+        assert "event_type" in payload
+        assert payload["event_type"] == "DocumentProcessed"

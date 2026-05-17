@@ -1,4 +1,4 @@
-"""IntegrityPort — 数据完整性验证抽象端口。
+"""SISYS 领域层数据完整性验证端口模块。
 
 设计原则：
 - verify_file(): I/O 密集型 → async + to_thread
@@ -6,6 +6,12 @@
 
 注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖。
 实现内部将字符串转换为 HashAlgorithm enum。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,6 +1,12 @@
-"""BusinessException — 业务级异常.
+"""SISYS 领域层 业务级异常模块。
 
-业务规则违反，如验证失败、资源不存在、资源冲突等。
+定义业务级异常，用于表示业务规则违反，如验证失败、资源不存在、资源冲突等。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,56 +21,56 @@ class BusinessException(BaseException):
 
 
 class ValidationError(BusinessException):
-    """验证失败."""
+    """验证失败。"""
 
     code = "EXCEPTION_201"
     message = "Validation error"
 
 
 class NotFoundError(BusinessException):
-    """资源不存在."""
+    """资源不存在。"""
 
     code = "EXCEPTION_202"
     message = "Resource not found"
 
 
 class ConflictError(BusinessException):
-    """资源冲突（版本冲突、状态冲突等）."""
+    """资源冲突（版本冲突、状态冲突等）。"""
 
     code = "EXCEPTION_203"
     message = "Resource conflict"
 
 
 class PermissionDeniedError(BusinessException):
-    """权限不足."""
+    """权限不足。"""
 
     code = "EXCEPTION_204"
     message = "Permission denied"
 
 
 class AuthenticationError(BusinessException):
-    """认证失败."""
+    """认证失败。"""
 
     code = "EXCEPTION_205"
     message = "Authentication failed"
 
 
 class InvalidStateError(BusinessException):
-    """无效状态."""
+    """无效状态。"""
 
     code = "EXCEPTION_206"
     message = "Invalid state"
 
 
 class BusinessRuleViolationError(BusinessException):
-    """业务规则违反."""
+    """业务规则违反。"""
 
     code = "EXCEPTION_207"
     message = "Business rule violation"
 
 
 class InvalidStateTransitionError(InvalidStateError):
-    """状态转换异常（保留 from_status/to_status 接口）.
+    """状态转换异常（保留 from_status/to_status 接口）。
 
     用于 Outbox 等状态机的状态转换验证。
     """

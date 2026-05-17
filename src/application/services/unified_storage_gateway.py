@@ -1,4 +1,4 @@
-"""UnifiedStorageGateway — 统一存储网关。
+"""SISYS 应用层统一存储网关模块。
 
 提供 L0-L5 六层存储的统一入口，根据存储策略自动编排各层存储。
 对应 architecture.md §11.2.9 L0 驱动各层协同机制。
@@ -7,6 +7,12 @@
 - 本类是应用层服务
 - 依赖 Domain Port 接口，不直接依赖 Infrastructure
 - 工厂由外部注入，遵循依赖倒置原则
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -44,6 +50,18 @@ class UnifiedStorageGateway(UnifiedStoragePort):
     读取策略（来自 architecture.md §11.2.9）：
     - prefer_cache=True: L1 → L2 (RBAC校验) → L0（缓存优先）
     - prefer_cache=False: L2 (RBAC校验) → L0（直接读取持久层）
+
+    Attributes:
+        _l0: L0 文件系统存储
+        _memory_cache: 记忆缓存端口
+        _l2_meta: L2 元数据仓储
+        _l2_hist: L2 历史仓储
+        _l3: L3 向量存储
+        _l4: L4 对象存储
+        _l5: L5 图存储
+        _l2_group_member: L2 群组成员关系仓储
+        _event_publisher: 事件发布器
+        _policy: 存储策略服务（延迟初始化）
     """
 
     def __init__(

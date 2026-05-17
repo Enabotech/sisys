@@ -1,4 +1,13 @@
-"""Domain events."""
+"""SISYS 领域事件包。
+
+提供领域层事件定义，遵循六边形架构零依赖原则。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from ..ports.event_publisher import InMemoryEventPublisher
 from .agent_events import AgentDecided

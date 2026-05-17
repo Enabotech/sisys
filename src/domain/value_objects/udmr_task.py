@@ -1,6 +1,14 @@
-"""Task — Value object for UDMR routing task context.
+"""SISYS 领域层 UDMR 路由任务值对象模块。
 
-遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖。
+封装 UDMR（统一数据驻留与模型路由）的任务上下文信息，
+作为不可变值对象在领域层传递。遵循六边形架构：值对象，
+仅包含业务逻辑，无外部依赖。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

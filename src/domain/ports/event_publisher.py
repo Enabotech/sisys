@@ -1,7 +1,13 @@
-"""EventPublisher abstract port — hexagonal architecture publish interface.
+"""SISYS 领域层事件发布端口模块。
 
 应用层仅依赖此接口发布事件，不关心底层传输实现。
 对标 NServiceBus 的 IBus.Publish 接口。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -39,20 +45,17 @@ class EventPublisher(Protocol):
 
 @runtime_checkable
 class InMemoryEventPublisher(Protocol):
-    """Abstract event publisher interface.
+    """内存事件发布器协议（P1-07 修复：Protocol 防止直接实例化）。
 
-    Implementations in the infrastructure layer publish events to
-    the appropriate message bus (RabbitMQ, Redis pub/sub, etc.).
-
-    P1-07 Fix: Use Protocol to prevent direct instantiation (structural typing).
+    基础设施层实现将事件发布到消息总线（RabbitMQ、Redis pub/sub 等）。
     """
 
     def publish(self, event: DomainEvent) -> None:
-        """Publish a domain event.
+        """发布领域事件。
 
         Args:
-            event: The domain event to publish.
+            event: 待发布的领域事件
 
         Raises:
-            NotImplementedError: Always, since this is an abstract interface.
+            NotImplementedError: 抽象接口始终抛出
         """

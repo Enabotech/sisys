@@ -1,4 +1,4 @@
-"""StorageEnums — 存储层级枚举定义。
+"""SISYS 领域层存储层级枚举定义模块。
 
 对应 architecture.md §11.2.9 存储层级策略：
 - StorageLayer: 存储层级（L0-L5）
@@ -7,6 +7,12 @@
 
 设计原则：
 - 领域层零外部依赖（仅用 enum）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

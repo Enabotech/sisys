@@ -1,4 +1,13 @@
-"""AutoExecuted domain event — emitted after auto-execute completes task execution."""
+"""SISYS 领域层 自动执行事件模块。
+
+定义自动执行机制完成任务后触发的事件。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +19,21 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AutoExecuted(DomainEvent):
-    """Event emitted when auto-execute mechanism completes task execution.
+    """自动执行机制完成任务时触发的事件。
 
-    This event flows after auto-route decision (Story 1.14b) and contains
-    execution results. Downstream listeners publish corresponding
-    domain events (DocumentProcessed/ToolExecuted/AgentDecided) based
-    on business_event_type.
+    此事件在自动路由决策（Story 1.14b）之后触发，包含执行结果。
+    下游监听器根据business_event_type发布对应的领域事件
+    （DocumentProcessed/ToolExecuted/AgentDecided）。
+
+    Attributes:
+        session_id: 会话标识符。
+        task_context: 任务上下文信息。
+        execution_result: 执行结果字典。
+        cost_estimate: 成本估算。
+        latency_ms: 执行延迟（毫秒）。
+        business_event_type: 业务事件类型，如"DocumentProcessed"等。
+        route_target: 自动路由选择的目标。
+        route_score: 路由置信度评分。
     """
 
     session_id: str = ""
@@ -28,7 +46,7 @@ class AutoExecuted(DomainEvent):
     route_score: float = 0.0  # Routing confidence score
 
     def __post_init__(self) -> None:
-        """Set event_type, aggregate_id, and aggregate_type for event tracking."""
+        """设置event_type、aggregate_id和aggregate_type用于事件追踪。"""
         if not self.event_type:
             object.__setattr__(self, "event_type", "AutoExecuted")
         if self.aggregate_id is None and self.event_id:
@@ -37,5 +55,5 @@ class AutoExecuted(DomainEvent):
             object.__setattr__(self, "aggregate_type", "AutoExecute")
 
 
-# Register AutoExecuted after class definition
+# 在类定义后注册AutoExecuted（由于event_type的init=False需要手动注册）
 DomainEvent._registry["AutoExecuted"] = AutoExecuted

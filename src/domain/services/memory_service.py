@@ -1,6 +1,6 @@
-"""MemoryService — 记忆服务（领域层）。
+"""SISYS 领域层记忆服务模块。
 
-负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件。
+MemoryService 负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件。
 
 依赖倒置：
 - TextExtractorService：文本提取接口
@@ -11,6 +11,12 @@
 - EventPublisherProtocol：事件发布接口（可选）
 
 架构来源: architecture.md §11.2.5
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""L0StoragePort — L0 文件系统存储抽象端口。
+"""SISYS 领域层 L0 文件系统存储抽象端口模块。
 
 负责 ~/.sisys/memory/*.md 文件的异步读写操作。
 
@@ -6,6 +6,12 @@
 - I/O 密集型方法：async + aiofiles
 - 快速同步操作：async + to_thread（避免阻塞事件循环）
 - 领域层零外部依赖（仅用 abc + typing）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,22 +1,17 @@
-"""MemoryChangeHistory 实体 — 用户记忆变更历史。
+"""SISYS 领域层记忆变更历史实体模块。
 
-架构来源: architecture.md §11.2.5
+定义用户记忆变更历史实体（append-only），架构来源: architecture.md §11.2.5。
 
 特点:
 - append-only（历史记录不可删除/修改）
 - delete 操作本身会作为新条目记录（change_type='delete'）
 - 使用 UUID 外键（memory_id）引用 MemoryMetadata.memory_id
 
-字段:
-- id: UUID 主键
-- memory_id: UUID 外键引用 MemoryMetadata.memory_id
-- version: INTEGER
-- changed_at: TIMESTAMP
-- changed_by: VARCHAR(255) ('user_id' 或 'system')
-- change_type: VARCHAR(50) ('create' | 'update' | 'delete')
-- changed_fields: JSONB
-- diff_summary: TEXT
-- archived_ref: VARCHAR(500)（L4 归档引用，可选）
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

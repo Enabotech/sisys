@@ -1,9 +1,13 @@
-"""L1CachePort — Generic KV cache port (Rule 1).
+"""SISYS 领域层 L1 缓存端口模块。
 
-Technology-agnostic key-value cache with TTL support.
-Zero external dependencies (only typing).
+技术无关的键值缓存端口，支持 TTL。
+零外部依赖（仅使用 typing）。
 
-This is the base port for all L1 cache implementations.
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -13,82 +17,74 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L1CachePort(Protocol):
-    """Generic KV cache port — Rule 1 domain interface.
+    """通用键值缓存端口 — Rule 1 领域接口。
 
-    Provides key-value cache operations with optional TTL.
-    Callers are responsible for key namespacing/prefixing.
-
-    Methods:
-        get(key): Read value by key.
-        set(key, value, ttl): Write value with optional TTL.
-        delete(key): Delete a key.
-        exists(key): Check if key exists.
-        delete_pattern(pattern): Delete keys matching glob pattern.
-        set_with_ttl(key, value, ttl): Write with explicit TTL (no default).
+    提供带可选 TTL 的键值缓存操作。
+    调用方负责键的命名空间/前缀管理。
     """
 
     async def get(self, key: str) -> str | None:
-        """Read value by key.
+        """按键读取值。
 
         Args:
-            key: Cache key (caller is responsible for namespacing).
+            key: 缓存键（调用方负责命名空间）
 
         Returns:
-            Cached value, or None if not found / expired.
+            缓存值，未找到或已过期则返回 None
         """
 
     async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """Write value with optional TTL.
+        """写入值（可选 TTL）。
 
         Args:
-            key: Cache key.
-            value: Value to store.
-            ttl: TTL in seconds. None means use default.
+            key: 缓存键
+            value: 待存储的值
+            ttl: TTL 秒数，None 表示使用默认值
 
         Returns:
-            True if successful.
+            成功返回 True
         """
 
     async def delete(self, key: str) -> bool:
-        """Delete a key.
+        """删除键。
 
         Args:
-            key: Cache key.
+            key: 缓存键
 
         Returns:
-            True if the key existed and was deleted.
+            键存在且已删除返回 True
         """
 
     async def exists(self, key: str) -> bool:
-        """Check whether a key exists (and is not expired).
+        """检查键是否存在（且未过期）。
 
         Args:
-            key: Cache key.
+            key: 缓存键
 
         Returns:
-            True if the key exists.
+            键存在返回 True
         """
 
     async def delete_pattern(self, pattern: str) -> int:
-        """Delete all keys matching a glob-style pattern.
+        """删除匹配 glob 模式的所有键。
 
-        Uses SCAN (not KEYS) to avoid blocking.
+        使用 SCAN（非 KEYS）以避免阻塞。
 
         Args:
-            pattern: Glob pattern, e.g. "memory:user:123:*".
+            pattern: glob 模式，如 "memory:user:123:*"
 
         Returns:
-            Number of keys deleted.
+            已删除的键数量
         """
 
     async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
-        """Write value with explicit TTL (no default fallback).
+        """写入值（显式 TTL，无默认回退）。
 
         Args:
-            key: Cache key.
-            value: Value to store.
-            ttl: TTL in seconds (required).
+            key: 缓存键
+            value: 待存储的值
+            ttl: TTL 秒数（必填）
 
         Returns:
-            True if successful.
+            成功返回 True
         """

@@ -1,7 +1,12 @@
-"""Event listener interface.
+"""SISYS 领域层事件监听器接口模块。
 
-Defined in the domain layer, implemented in the infrastructure layer.
-Supports registering handlers for specific event types.
+定义在领域层，由基础设施层实现。支持为特定事件类型注册处理器。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -13,58 +18,55 @@ from .base import DomainEvent
 
 
 class EventListener(Protocol):
-    """Abstract event listener interface.
+    """抽象事件监听器接口。
 
-    Subscribers register handlers for specific event types
-    and receive events when they are published.
+    订阅者为特定事件类型注册处理器，事件发布时接收通知。
     """
 
     def on_event(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
-        """Register a handler for a specific event type.
+        """注册特定事件类型的处理器。
 
         Args:
-            event_type: The type of event to listen for.
-            handler: Callback function that receives the domain event.
+            event_type: 要监听的事件类型。
+            handler: 接收领域事件的回调函数。
         """
 
     def dispatch(self, event: DomainEvent) -> None:
-        """Dispatch an event to all registered handlers.
+        """将事件分发给所有已注册的处理器。
 
         Args:
-            event: The domain event to dispatch.
+            event: 要分发的领域事件。
         """
 
 
 class InMemoryEventListener:
-    """In-memory event listener implementation (MVP).
+    """内存事件监听器实现（MVP）。
 
-    Maintains a mapping of event types to handler functions.
-    When an event is dispatched, all handlers for that event type are called.
+    维护事件类型到处理器函数的映射。事件分发时，调用该事件类型的所有处理器。
     """
 
     def __init__(self) -> None:
-        """Initialize the listener with an empty handler registry."""
+        """初始化监听器，使用空的处理器注册表。"""
         from collections import defaultdict
 
         self._handlers: dict[str, list[Callable[[DomainEvent], None]]] = defaultdict(list)
 
     def on_event(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
-        """Register a handler for a specific event type.
+        """注册特定事件类型的处理器。
 
         Args:
-            event_type: The type of event to listen for.
-            handler: Callback function that receives the domain event.
+            event_type: 要监听的事件类型。
+            handler: 接收领域事件的回调函数。
         """
         self._handlers[event_type].append(handler)
 
     def dispatch(self, event: DomainEvent) -> None:
-        """Dispatch an event to all registered handlers for its type.
+        """将事件分发给对应类型的所有已注册处理器。
 
-        Each handler is wrapped in try/except to prevent one handler's
-        failure from blocking subsequent handlers.
+        每个处理器用 try/except 包裹，防止单个处理器失败阻塞后续处理器。
 
         Args:
-            event: The domain event to dispatch.
+            event: 要分发的领域事件。
         """
         errors: list[Exception] = []
         for handler in self._handlers.get(event.event_type, []):
@@ -80,7 +82,11 @@ class InMemoryEventListener:
 
     @property
     def registered_event_types(self) -> list[str]:
-        """Return list of event types that have registered handlers."""
+        """返回已注册处理器的事件类型列表。
+
+        Returns:
+            已注册事件类型字符串列表。
+        """
         return list(self._handlers.keys())
 
 
@@ -90,7 +96,7 @@ class InMemoryEventListener:
 
 
 class EventListenerAsync(Protocol):
-    """Abstract async event listener interface.
+    """抽象异步事件监听器接口。
 
     用于异步事件消费场景（RabbitMQEventListener 实现）。
     与同步 EventListener 接口独立，不继承以避免强制实现同步方法。
@@ -100,7 +106,7 @@ class EventListenerAsync(Protocol):
         """异步处理事件。
 
         Args:
-            event: 要处理的事件
+            event: 要处理的事件。
         """
 
 

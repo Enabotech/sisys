@@ -1,7 +1,13 @@
-"""UnitOfWork — 工作单元模式接口。
+"""SISYS 领域层工作单元模块。
 
 用于统一事务边界，保证业务操作与 Outbox 写入原子性。
 仅定义抽象接口，无外部依赖。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -18,6 +24,9 @@ class UnitOfWork(Protocol):
 
     定义事务边界：begin(), commit(), rollback(), close()。
     支持异步上下文管理器协议。
+
+    Attributes:
+        session: 当前事务的 session 对象
     """
 
     @property

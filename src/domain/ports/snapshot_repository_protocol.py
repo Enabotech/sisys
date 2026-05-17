@@ -1,7 +1,12 @@
-"""SnapshotRepositoryProtocol — domain port for checkpoint snapshot storage.
+"""SISYS 领域层检查点快照仓储协议模块。
 
-This protocol defines the interface for snapshot repository adapters.
-Infrastructure layer implements this protocol for persistent storage.
+定义检查点快照存储适配器的接口协议，基础设施层负责持久化实现。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -13,35 +18,34 @@ from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 
 @runtime_checkable
 class SnapshotRepositoryProtocol(Protocol):
-    """Protocol for snapshot storage (implemented by infrastructure).
+    """快照存储协议端口，由基础设施层实现。
 
-    Defines the interface for saving, loading, and deleting checkpoint
-    snapshots used for session state recovery.
+    定义保存、加载、删除检查点快照的接口，用于会话状态恢复。
     """
 
     async def save(self, snapshot: CheckpointSnapshot) -> None:
-        """Save a snapshot to storage.
+        """保存快照到存储。
 
         Args:
-            snapshot: Checkpoint snapshot to persist
+            snapshot: 待持久化的检查点快照
         """
         ...
 
     async def load(self, session_id: str) -> CheckpointSnapshot | None:
-        """Load the latest snapshot for a session.
+        """加载会话的最新快照。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识
 
         Returns:
-            Latest snapshot or None if no snapshot exists
+            最新快照，不存在则返回 None
         """
         ...
 
     async def delete(self, session_id: str) -> None:
-        """Delete snapshots for a session.
+        """删除会话的快照。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识
         """
         ...

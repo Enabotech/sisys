@@ -1,13 +1,21 @@
-"""MemoryChanged 领域事件 — 用户记忆变更事件。
+"""SISYS 领域层记忆变更事件模块。
 
-触发时机：
+定义用户记忆变更事件 MemoryChanged。
+
+触发时机:
 - L1 显式确认：用户主动说"记住..."（is_automatic=False）
 - L3 自动压缩：Checkpoint 创建时（is_automatic=True）
 
-下游监听器处理：
+下游监听器处理:
 1. 写入 memory_metadata（UPSERT，version + 1）
 2. 写入 memory_change_history（append-only）
 3. 失效 L1 Redis 缓存
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -22,14 +30,14 @@ from .base import DomainEvent
 class MemoryChanged(DomainEvent):
     """用户记忆变更事件。
 
-    字段:
-    - memory_id: UUID，记忆唯一标识
-    - user_id: 用户标识（多租户隔离）
-    - name: 记忆名称（UNIQUE）
-    - change_type: create/update/delete
-    - is_automatic: 是否自动触发（False=用户主动，True=系统自动）
-    - old_value: 变更前的值（dict 或 None）
-    - new_value: 变更后的值（dict 或 None）
+    Attributes:
+        memory_id: 记忆唯一标识（UUID 字符串）。
+        user_id: 用户标识（多租户隔离）。
+        name: 记忆名称（UNIQUE）。
+        change_type: 变更类型（create/update/delete）。
+        is_automatic: 是否自动触发（False=用户主动，True=系统自动）。
+        old_value: 变更前的值（dict 或 None）。
+        new_value: 变更后的值（dict 或 None）。
     """
 
     memory_id: str = ""

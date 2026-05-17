@@ -1,6 +1,12 @@
-"""Permission 领域实体.
+"""SISYS 领域层权限实体模块。
 
-遵循六边形架构：领域层零依赖，仅使用标准库。
+定义权限领域实体，遵循六边形架构：领域层零依赖，仅使用标准库。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from uuid import UUID
 class Permission:
     """权限领域实体（不可变）.
 
-    属性:
+    Attributes:
         id: 权限 UUID
         name: 权限名称（唯一，如 "document:read"）
         resource: 资源类型（如 "document"）

@@ -1,7 +1,13 @@
-"""OutboxRepository 接口 — 领域层定义。
+"""SISYS 领域层事务发件箱仓储端口模块。
 
 使用 DomainEvent 实例，不感知 OutboxEntity。
-基础设施层负责 DomainEvent ↔ OutboxEntity 转换。
+基础设施层负责 DomainEvent 与 OutboxEntity 转换。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,18 +1,26 @@
-"""AuditEvent — Domain events for audit logging.
+"""SISYS 领域层 审计事件模块。
 
-AC-1 Standard fields (FR-SC-02):
-    log_id: UUID identifier for the audit log entry
-    timestamp: When the action occurred (UTC)
-    actor: User ID or system component that performed the action
-    action_type: Type of action performed
-    target_resource: Resource that was acted upon
-    old_value: State before the action (JSON)
-    new_value: State after the action (JSON)
+定义审计日志相关的领域事件，满足等保2.0合规要求。
 
-Extension fields (FR-SC-04 multi-dimensional search):
-    correction_level: Correction level (L0-L3) for trace-related events
+AC-1 标准字段 (FR-SC-02):
+    log_id: 审计日志条目的UUID标识符
+    timestamp: 操作发生时间（UTC）
+    actor: 执行操作的用户ID或系统组件
+    action_type: 执行的操作类型
+    target_resource: 被操作的资源
+    old_value: 操作前状态（JSON）
+    new_value: 操作后状态（JSON）
 
-Reference: Story 1.10 SDD规范定义
+扩展字段 (FR-SC-04 多维搜索):
+    correction_level: 纠正级别（L0-L3），用于追踪相关事件
+
+参考: Story 1.10 SDD规范定义
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -26,41 +34,44 @@ from src.domain.events.base import DomainEvent
 
 
 class AuditActionType(str, Enum):
-    """Audit action types for system operations."""
+    """系统操作的审计动作类型。
 
-    # Authentication events
+    包含认证、授权、文档、Agent、检查点、纠正和系统等各类操作。
+    """
+
+    # Authentication events - 认证事件
     AUTHENTICATION_LOGIN = "authentication:login"
     AUTHENTICATION_LOGOUT = "authentication:logout"
     AUTHENTICATION_FAILED = "authentication:failed"
     AUTHENTICATION_LOCKED = "authentication:locked"
 
-    # Authorization events
+    # Authorization events - 授权事件
     AUTHORIZATION_GRANT = "authorization:grant"
     AUTHORIZATION_REVOKE = "authorization:revoke"
     AUTHORIZATION_ACCESS = "authorization:access"
 
-    # Document events
+    # Document events - 文档事件
     DOCUMENT_UPLOAD = "document:upload"
     DOCUMENT_DOWNLOAD = "document:download"
     DOCUMENT_DELETE = "document:delete"
     DOCUMENT_PROCESS = "document:process"
 
-    # Agent events
+    # Agent events - Agent事件
     AGENT_DECIDE = "agent:decide"
     AGENT_EXECUTE = "agent:execute"
     AGENT_ROUTE = "agent:route"
 
-    # Checkpoint events
+    # Checkpoint events - 检查点事件
     CHECKPOINT_CREATE = "checkpoint:create"
     CHECKPOINT_RESTORE = "checkpoint:restore"
     CHECKPOINT_REPLAY = "checkpoint:replay"
 
-    # Correction events
+    # Correction events - 纠正事件
     CORRECTION_APPROVE = "correction:approve"
     CORRECTION_REJECT = "correction:reject"
     CORRECTION_APPLY = "correction:apply"
 
-    # System events
+    # System events - 系统事件
     SYSTEM_CONFIG_CHANGE = "system:config_change"
     SYSTEM_INIT = "system:init"
     SYSTEM_SHUTDOWN = "system:shutdown"
@@ -68,27 +79,24 @@ class AuditActionType(str, Enum):
 
 @dataclass(frozen=True)
 class AuditEvent(DomainEvent):
-    """Domain event for audit log entries.
+    """审计日志条目的领域事件。
 
-    Extends DomainEvent with audit-specific fields per FR-SC-02.
+    继承DomainEvent并添加审计特定字段，满足FR-SC-02要求。
 
-    Standard fields:
-        event_id: Unique event identifier (from DomainEvent)
-        event_type: "AuditEvent" (from DomainEvent)
-        timestamp: When the audited action occurred (from DomainEvent)
-        source: System component that produced this event
-        aggregate_id: ID of the entity being audited
-        aggregate_type: Type of entity being audited
-        payload: Contains audit-specific fields
-
-    Payload fields:
-        log_id: UUID identifier for the audit log entry
-        actor: User ID or system component
-        action_type: Type of action performed
-        target_resource: Resource that was acted upon
-        old_value: State before the action (JSON)
-        new_value: State after the action (JSON)
-        correction_level: Correction level (L0-L3, optional)
+    Attributes:
+        event_id: 唯一事件标识符（继承自DomainEvent）。
+        event_type: 事件类型，固定为"AuditEvent"（继承自DomainEvent）。
+        timestamp: 审计操作发生时间（继承自DomainEvent）。
+        source: 产生此事件的系统组件。
+        aggregate_id: 被审计实体的ID。
+        aggregate_type: 被审计实体的类型。
+        log_id: 审计日志条目的UUID标识符。
+        actor: 用户ID或系统组件。
+        action_type: 执行的操作类型。
+        target_resource: 被操作的资源。
+        old_value: 操作前状态（JSON）。
+        new_value: 操作后状态（JSON）。
+        correction_level: 纠正级别（L0-L3，可选）。
     """
 
     event_type: str = "AuditEvent"
@@ -102,7 +110,7 @@ class AuditEvent(DomainEvent):
     correction_level: int | None = None
 
     def __post_init__(self) -> None:
-        """Validate required fields after initialization."""
+        """初始化后验证必填字段。"""
         if not self.actor:
             raise ValueError("actor is required for AuditEvent")
         if not self.action_type:
@@ -111,11 +119,11 @@ class AuditEvent(DomainEvent):
             raise ValueError("correction_level must be 0-3 or None")
 
     def to_audit_dict(self) -> dict[str, Any]:
-        """Serialize to audit-specific dictionary format.
+        """序列化为审计专用字典格式。
 
         Returns:
-            Dictionary with FR-SC-02 fields: log_id, timestamp, actor,
-            action_type, target_resource, old_value, new_value.
+            包含FR-SC-02字段的字典：log_id、timestamp、actor、
+            action_type、target_resource、old_value、new_value。
         """
         return {
             "log_id": str(self.log_id),
@@ -129,5 +137,5 @@ class AuditEvent(DomainEvent):
         }
 
 
-# Register for polymorphic deserialization
+# 为多态反序列化注册事件类型
 DomainEvent.register("AuditEvent", AuditEvent)

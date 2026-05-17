@@ -1,4 +1,14 @@
-"""AutoTriggerContext value object — extracted context from domain/heartbeat events."""
+"""SISYS 领域层自动触发上下文值对象模块。
+
+从领域事件或心跳事件中提取的上下文信息，用于传递给下游自动路由/
+自动执行阶段。遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +19,19 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AutoTriggerContext:
-    """Context extracted from auto-trigger events for downstream auto-route/auto-execute stages.
+    """从自动触发事件中提取的上下文值对象（不可变）。
 
-    Used by AutoTriggerService to pass session_id, agent_id, and task context to Story 1.14b (auto-route).
+    由 AutoTriggerService 使用，将 session_id、agent_id 和任务上下文传递给
+    自动路由阶段。
+
+    Attributes:
+        session_id: 会话标识符
+        trigger_type: 触发类型（"domain_event" 或 "heartbeat"）
+        agent_id: 代理标识符（可选）
+        task_context: 任务上下文字典
+        timestamp: 触发时间戳（UTC）
+        source_event_type: 源事件类型
+        source_event_id: 源事件标识符（可选）
     """
 
     session_id: str
@@ -23,7 +43,7 @@ class AutoTriggerContext:
     source_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate required fields and apply defaults."""
+        """校验必需字段并应用默认值。"""
         if not self.session_id:
             # Use default session when none provided
             object.__setattr__(self, "session_id", "default")
@@ -35,15 +55,15 @@ class AutoTriggerContext:
         payload: dict[str, Any],
         event_id: str | None = None,
     ) -> AutoTriggerContext:
-        """Factory: extract AutoTriggerContext from a domain event payload.
+        """从领域事件载荷中提取自动触发上下文。
 
         Args:
-            event_type: The domain event type (e.g., "DocumentProcessed")
-            payload: Event payload dict
-            event_id: Optional event ID
+            event_type: 领域事件类型（如 "DocumentProcessed"）
+            payload: 事件载荷字典
+            event_id: 事件标识符（可选）
 
         Returns:
-            AutoTriggerContext with extracted fields
+            提取字段后的 AutoTriggerContext 实例
         """
         # Extract session_id from various possible locations
         session_id = (
@@ -94,16 +114,16 @@ class AutoTriggerContext:
         todo_items: tuple[str, ...] | None = None,
         cost_budget: float = 0.0,
     ) -> AutoTriggerContext:
-        """Factory: extract AutoTriggerContext from a heartbeat event.
+        """从心跳事件中提取自动触发上下文。
 
         Args:
-            heartbeat_id: Unique heartbeat identifier
-            wake_reason: Reason for wake (scheduled/user_request/system_recovery)
-            todo_items: Pending task list
-            cost_budget: Cost budget cap
+            heartbeat_id: 心跳唯一标识符
+            wake_reason: 唤醒原因（scheduled/user_request/system_recovery）
+            todo_items: 待办任务列表
+            cost_budget: 成本预算上限
 
         Returns:
-            AutoTriggerContext derived from heartbeat
+            从心跳派生的 AutoTriggerContext 实例
         """
         return cls(
             session_id="heartbeat-scheduler",

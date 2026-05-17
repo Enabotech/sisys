@@ -1,4 +1,13 @@
-"""Agent domain event."""
+"""SISYS 领域层 Agent事件模块。
+
+定义 Agent 决策相关的领域事件。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +20,14 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AgentDecided(DomainEvent):
-    """Event emitted when an Agent has made a decision."""
+    """Agent做出决策时触发的事件。
+
+    Attributes:
+        agent_id: Agent唯一标识符。
+        event_type: 事件类型，固定为"AgentDecided"。
+        decision_result: 决策结果字典。
+        confidence: 决策置信度，范围0.0-1.0。
+    """
 
     agent_id: uuid.UUID = field(default_factory=uuid.uuid4)
     event_type: str = field(default="AgentDecided", init=False)
@@ -19,7 +35,7 @@ class AgentDecided(DomainEvent):
     confidence: float = 0.0
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """初始化后设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.agent_id)
         if not self.aggregate_type:

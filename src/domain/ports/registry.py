@@ -1,7 +1,13 @@
-"""Port registry — unified port management for hexagonal architecture.
+"""SISYS 领域层端口注册中心模块。
 
-This module provides the central registry for all port contracts in the system.
-Ports are registered with metadata (name, version, interface, implementation, module).
+提供六边形架构下所有端口契约的统一注册管理。
+端口注册时附带元数据（名称、版本、接口、实现、模块）。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Lifetime(Enum):
-    """Port lifecycle management."""
+    """端口生命周期管理策略。"""
 
     TRANSIENT = "transient"  # New instance per request
     SCOPED = "scoped"  # Single instance per scope
@@ -24,19 +30,19 @@ class Lifetime(Enum):
 
 @dataclass(frozen=True)
 class PortSpec:
-    """Port specification metadata.
+    """端口规格元数据。
 
     Attributes:
-        name: Unique port name
-        version: Semantic version (semver)
-        interface: Protocol interface type
-        impl: Implementation type, factory function, or module path string
-        module: Module path where implementation is located
-        lifetime: Instance lifecycle (default: SCOPED)
-        owner: Team or individual responsible
-        compatibility: Tuple of compatible versions
-        tags: Tags for scenario/environment selection
-        deprecated: Whether port is deprecated
+        name: 唯一端口名称
+        version: 语义化版本号
+        interface: 协议接口类型
+        impl: 实现类型、工厂函数或模块路径字符串
+        module: 实现所在的模块路径
+        lifetime: 实例生命周期（默认 SCOPED）
+        owner: 负责团队或个人
+        compatibility: 兼容版本元组
+        tags: 场景/环境选择标签
+        deprecated: 是否已废弃
     """
 
     name: str
@@ -52,9 +58,9 @@ class PortSpec:
 
 
 class PortRegistry:
-    """Central port registry.
+    """端口注册中心（单例模式）。
 
-    Singleton pattern ensures a single source of truth for all port registrations.
+    确保所有端口注册的唯一数据源。
     """
 
     _instance: PortRegistry | None = None
@@ -67,13 +73,13 @@ class PortRegistry:
         return cls._instance
 
     def register(self, spec: PortSpec) -> None:
-        """Register a port.
+        """注册端口。
 
         Args:
-            spec: Port specification to register
+            spec: 待注册的端口规格
 
         Raises:
-            ValueError: If port name already exists with different spec
+            ValueError: 端口名称已存在且规格不同时抛出
         """
         if spec.name in self._ports:
             existing = self._ports[spec.name]
@@ -85,11 +91,11 @@ class PortRegistry:
         self._ports[spec.name] = spec
 
     def get(self, name: str) -> PortSpec | None:
-        """Get port specification by name."""
+        """通过名称获取端口规格。"""
         return self._ports.get(name)
 
     def get_by_interface(self, interface: Type) -> PortSpec | None:
-        """Get port specification by interface type."""
+        """通过接口类型获取端口规格。"""
         for spec in self._ports.values():
             if spec.interface is interface:
                 return spec
@@ -99,15 +105,15 @@ class PortRegistry:
         return None
 
     def list_all(self) -> list[PortSpec]:
-        """List all registered port specifications."""
+        """列出所有已注册的端口规格。"""
         return list(self._ports.values())
 
     def list_by_tag(self, tag: str) -> list[PortSpec]:
-        """List port specifications filtered by tag."""
+        """按标签过滤列出端口规格。"""
         return [spec for spec in self._ports.values() if tag in spec.tags]
 
     def unregister(self, name: str) -> None:
-        """Unregister a port by name."""
+        """按名称注销端口。"""
         if name in self._ports:
             del self._ports[name]
             logger.info("Unregistered port: %s", name)
@@ -119,7 +125,7 @@ class PortRegistry:
         return len(self._ports)
 
 
-# Global registry instance
+# 全局注册中心实例
 _global_registry = PortRegistry()
 
 
@@ -131,15 +137,15 @@ def register_port(
     module: str,
     **kwargs: Any,
 ) -> None:
-    """Convenient port registration function.
+    """便捷的端口注册函数。
 
     Args:
-        name: Unique port name
-        version: Semantic version
-        interface: Protocol interface type
-        impl: Implementation type, factory, or module path string (for lazy loading)
-        module: Module path
-        **kwargs: Additional PortSpec fields (lifetime, owner, tags, etc.)
+        name: 唯一端口名称
+        version: 语义化版本号
+        interface: 协议接口类型
+        impl: 实现类型、工厂函数或模块路径字符串（用于延迟加载）
+        module: 模块路径
+        **kwargs: 其他 PortSpec 字段（lifetime、owner、tags 等）
     """
     spec = PortSpec(
         name=name,

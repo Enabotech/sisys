@@ -212,3 +212,195 @@ class TestRoutingDecisionLog:
         )
         with pytest.raises(ValueError, match="fallback_reason must be one of"):
             log.validate()
+
+
+class TestRoutingDecisionLogBoundaryValues:
+    """边界值和 UDMR 扩展字段测试。"""
+
+    def test_score_exactly_zero(self) -> None:
+        """route_score=0.0 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=0.0,
+        )
+        log.validate()
+
+    def test_score_exactly_one(self) -> None:
+        """route_score=1.0 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=1.0,
+        )
+        log.validate()
+
+    def test_score_above_one(self) -> None:
+        """route_score > 1.0 应无效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=1.1,
+        )
+        with pytest.raises(ValueError, match="route_score"):
+            log.validate()
+
+    def test_task_id_whitespace_only(self) -> None:
+        """task_id 仅含空格应无效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="   ",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=0.5,
+        )
+        with pytest.raises(ValueError, match="task_id must not be empty"):
+            log.validate()
+
+    def test_session_id_whitespace_only(self) -> None:
+        """session_id 仅含空格应无效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="   ",
+            route_type="hash",
+            route_target="node-A",
+            route_score=0.5,
+        )
+        with pytest.raises(ValueError, match="session_id must not be empty"):
+            log.validate()
+
+    def test_cost_actual_negative(self) -> None:
+        """cost_actual < 0 应无效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="model-a",
+            route_score=0.8,
+            cost_actual=-0.01,
+        )
+        with pytest.raises(ValueError, match="cost_actual must be non-negative"):
+            log.validate()
+
+    def test_cost_actual_zero(self) -> None:
+        """cost_actual=0.0 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="model-a",
+            route_score=0.8,
+            cost_actual=0.0,
+        )
+        log.validate()
+
+    def test_cost_estimate_zero(self) -> None:
+        """cost_estimate=0.0 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="model-a",
+            route_score=0.8,
+            cost_estimate=0.0,
+        )
+        log.validate()
+
+    def test_latency_ms_zero(self) -> None:
+        """latency_ms=0.0 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="semantic",
+            route_target="agent-a",
+            route_score=0.8,
+            latency_ms=0.0,
+        )
+        log.validate()
+
+    def test_fallback_reason_none_is_valid(self) -> None:
+        """fallback_reason=None 应有效。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="model-a",
+            route_score=0.8,
+            fallback_reason=None,
+        )
+        log.validate()
+
+    def test_all_route_types_valid(self) -> None:
+        """所有 route_type 值都应有效。"""
+        for route_type in ("hash", "semantic", "mixed", "local", "cloud"):
+            log = RoutingDecisionLog(
+                log_id=uuid.uuid4(),
+                task_id="task-001",
+                session_id="session-001",
+                route_type=route_type,
+                route_target="target",
+                route_score=0.5,
+            )
+            log.validate()
+
+
+class TestRoutingDecisionLogUDMRFields:
+    """UDMR 扩展字段测试。"""
+
+    def test_selected_model(self) -> None:
+        """selected_model 应被正确存储。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="local",
+            route_target="qwen2.5:7b",
+            route_score=1.0,
+            selected_model="qwen2.5:7b",
+        )
+        assert log.selected_model == "qwen2.5:7b"
+
+    def test_cost_actual(self) -> None:
+        """cost_actual 应被正确存储。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="cloud",
+            route_target="qwen-turbo",
+            route_score=0.9,
+            cost_actual=0.005,
+        )
+        assert log.cost_actual == 0.005
+
+    def test_frozen_dataclass(self) -> None:
+        """RoutingDecisionLog 应为 frozen dataclass。"""
+        log = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id="task-001",
+            session_id="session-001",
+            route_type="hash",
+            route_target="node-A",
+            route_score=1.0,
+        )
+        import dataclasses
+
+        assert dataclasses.is_dataclass(log)
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(log, "task_id", "mutated")

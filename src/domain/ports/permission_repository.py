@@ -1,7 +1,13 @@
-"""PermissionRepositoryPort — 权限仓储端口.
+"""SISYS 领域层权限仓储端口模块。
 
 独立 Protocol（与 UserRepositoryPort、RoleRepositoryPort 模式一致）。
 仓储通过 PostgreSQLAdapter 自动实现 L2RdbPort。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

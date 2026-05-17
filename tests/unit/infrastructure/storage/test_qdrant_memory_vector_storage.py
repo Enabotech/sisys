@@ -245,7 +245,7 @@ class TestIndexMemory:
         assert points[0]["payload"]["owner_id"] == "user-456"
 
     @pytest.mark.asyncio
-    async def test_uses_custom_embed_fn(self):
+    async def test_uses_custom_embed_fn(self) -> None:
         """验证使用自定义 embedding 函数"""
         mock_adapter = AsyncMock()
         mock_adapter.upsert_points = AsyncMock(return_value=True)
@@ -357,7 +357,7 @@ class TestSearchSimilarMemories:
         assert call_args[1]["filter_payload"] == expected_filter
 
     @pytest.mark.asyncio
-    async def test_uses_custom_embed_fn_for_query(self):
+    async def test_uses_custom_embed_fn_for_query(self) -> None:
         """验证查询使用自定义 embedding 函数"""
         mock_adapter = AsyncMock()
         mock_adapter.search = AsyncMock(return_value=[])

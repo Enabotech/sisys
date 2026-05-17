@@ -1,8 +1,14 @@
-"""Application layer ports package.
+"""SISYS 应用层端口包。
 
-Application ports extend domain base ports with business semantics:
-- Inherit or compose inject L[n][XXX]Port base ports
-- Define application-specific methods
+应用层端口继承领域层基础端口，添加业务语义：
+- 继承或组合注入 L[n][XXX]Port 基础端口
+- 定义应用层特定方法
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from src.application.ports.compressor_service import CompressorService

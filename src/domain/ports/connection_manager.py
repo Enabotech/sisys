@@ -1,8 +1,13 @@
-"""ConnectionManager Protocol — unified async connection lifecycle.
+"""SISYS 领域层连接管理器端口模块。
 
-Defines the contract for all async storage connection managers
-(PostgreSQL, Qdrant, Neo4j, Redis). Each manager owns a connection pool,
-provides health checking, and supports graceful shutdown.
+定义所有异步存储连接管理器（PostgreSQL、Qdrant、Neo4j、Redis）
+的统一契约。每个管理器拥有连接池，提供健康检查与优雅关闭。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -12,48 +17,35 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class ConnectionManager(Protocol):
-    """Unified async connection lifecycle contract.
+    """统一异步连接生命周期契约。
 
-    All async storage wrappers (PostgreSQLManager, QdrantManager,
-    Neo4jManager, RedisConnectionManager) satisfy this Protocol
-    via structural subtyping.
-
-    Required methods:
-        health_check(): Check if the underlying connection is healthy
-        close(): Close the connection pool and release all resources
-
-    Optional method (default raises NotImplementedError):
-        get_client(): Return the underlying client instance for direct access.
-            Implementations should override this to return their specific client:
-            - RedisConnectionManager -> aioredis.Redis
-            - PostgreSQLManager -> AsyncEngine
-            - QdrantManager -> AsyncQdrantClient
-            - Neo4jManager -> AsyncDriver
+    所有异步存储包装器（PostgreSQLManager、QdrantManager、
+    Neo4jManager、RedisConnectionManager）通过结构化子类型满足此协议。
     """
 
     async def health_check(self) -> bool:
-        """Check if the underlying connection is healthy.
+        """检查底层连接是否健康。
 
         Returns:
-            True if connection is alive, False otherwise.
+            连接存活返回 True，否则返回 False
         """
         ...
 
     async def close(self) -> None:
-        """Close the connection pool and release all resources."""
+        """关闭连接池并释放所有资源。"""
         ...
 
     def get_client(self) -> Any:
-        """Get the underlying client instance.
+        """获取底层客户端实例。
 
-        Optional: implementations that expose their client should override.
-        Default raises NotImplementedError for managers that don't expose a client.
+        可选：暴露客户端的实现应重写此方法。
+        默认抛出 NotImplementedError。
 
         Returns:
-            The underlying client instance (e.g., aioredis.Redis, AsyncEngine).
+            底层客户端实例（如 aioredis.Redis、AsyncEngine）
 
         Raises:
-            NotImplementedError: If the implementation does not expose a client.
+            NotImplementedError: 实现未暴露客户端时抛出
         """
         raise NotImplementedError(
             f"{type(self).__name__}.get_client() is not implemented. This ConnectionManager does not expose a client instance."

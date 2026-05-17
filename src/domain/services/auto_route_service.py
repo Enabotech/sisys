@@ -1,4 +1,17 @@
-"""AutoRouteService — domain service that processes AutoTriggered events and emits AutoRouted events."""
+"""SISYS 领域层自动路由服务模块。
+
+AutoRouteService 是处理 AutoTriggered 事件并发出 AutoRouted 事件的领域服务。
+监听 AutoTriggerService 发出的 AutoTriggered 事件，使用哈希路由（会话一致性）
+和/或语义路由（目标匹配）进行路由决策，并发布 AutoRouted 事件给下游执行阶段。
+
+架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -14,15 +27,15 @@ logger = logging.getLogger(__name__)
 
 
 class AutoRouteService:
-    """Domain service that listens to AutoTriggered events, makes routing decisions, and emits AutoRouted events.
+    """监听 AutoTriggered 事件、执行路由决策并发出 AutoRouted 事件的领域服务。
 
-    Responsibilities:
-    - Listen to AutoTriggered events from AutoTriggerService (Story 1.14a)
-    - Make routing decisions using hash routing (session consistency) and/or semantic routing (target matching)
-    - Publish AutoRouted events to downstream execute stage (Story 1.14c)
-    - Log routing decisions to RoutingDecisionLog
+    职责：
+    - 监听 AutoTriggerService 发出的 AutoTriggered 事件（Story 1.14a）
+    - 使用哈希路由（会话一致性）和/或语义路由（目标匹配）进行路由决策
+    - 发布 AutoRouted 事件给下游执行阶段（Story 1.14c）
+    - 将路由决策记录到 RoutingDecisionLog
 
-    Architecture: Domain layer (no external dependencies), uses port/protocol for routing and publishing.
+    架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布。
     """
 
     def __init__(
@@ -31,25 +44,25 @@ class AutoRouteService:
         hash_router: HashRouterProtocol | None = None,
         semantic_router: SemanticRouterProtocol | None = None,
     ):
-        """Initialize AutoRouteService.
+        """初始化 AutoRouteService。
 
         Args:
-            publisher: Event publisher port (infrastructure implements). None for standalone testing.
-            hash_router: Hash router port (infrastructure implements). None to disable hash routing.
-            semantic_router: Semantic router port (infrastructure implements). None to disable semantic routing.
+            publisher: 事件发布器端口（基础设施实现）。传入 None 用于独立测试。
+            hash_router: 哈希路由器端口（基础设施实现）。传入 None 禁用哈希路由。
+            semantic_router: 语义路由器端口（基础设施实现）。传入 None 禁用语义路由。
         """
         self._publisher = publisher
         self._hash_router = hash_router
         self._semantic_router = semantic_router
 
     async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
-        """Handle a AutoTriggered event: make routing decision and emit AutoRouted.
+        """处理 AutoTriggered 事件：执行路由决策并发出 AutoRouted 事件。
 
         Args:
-            event: AutoTriggered event from trigger stage (Story 1.14a)
+            event: 来自触发阶段（Story 1.14a）的 AutoTriggered 事件
 
         Returns:
-            AutoRouted event if routing decision was made and published, None otherwise
+            路由决策完成并发布后返回 AutoRouted 事件，否则返回 None
         """
         logger.debug("Processing AutoTriggered event: session_id=%s", event.session_id)
 
@@ -70,13 +83,13 @@ class AutoRouteService:
         return routed
 
     async def _make_routing_decision(self, event: AutoTriggered) -> tuple[str, str, float]:
-        """Make routing decision based on available routers.
+        """根据可用路由器进行路由决策。
 
         Args:
-            event: AutoTriggered event
+            event: AutoTriggered 事件
 
         Returns:
-            Tuple of (route_type, route_target, route_score)
+            元组 (route_type, route_target, route_score)
         """
         hash_target = ""
         hash_score = 0.0
@@ -121,10 +134,10 @@ class AutoRouteService:
         return route_type, route_target, route_score
 
     async def _publish(self, event: AutoRouted) -> None:
-        """Publish AutoRouted event via configured publisher.
+        """通过已配置的发布器发布 AutoRouted 事件。
 
         Args:
-            event: AutoRouted event to publish
+            event: 待发布的 AutoRouted 事件
         """
         if self._publisher is None:
             logger.warning("No publisher configured, AutoRouted event not published: %s", event.event_id)

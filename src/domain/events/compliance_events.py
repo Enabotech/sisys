@@ -1,14 +1,22 @@
-"""Compliance domain events — data sovereignty, PIPL, and 等保 2.0.
+"""SISYS 领域层 合规事件模块。
 
-Events in this module follow the DomainEvent standard:
-- Use only Python standard library types (dataclasses, uuid, datetime)
-- Pydantic is NOT used in domain events
-- Subclass-specific fields are included in payload via to_dict()
+定义数据主权、PIPL和等保2.0相关的领域事件。
 
-等保 2.0 Level 3 Compliance Events:
-- MFAChallengeIssuedEvent: Multi-factor authentication challenge
-- IntrusionDetectedEvent: Security intrusion detection
-- DataIntegrityViolationEvent: Data integrity violation detection
+本模块中的事件遵循DomainEvent标准：
+- 仅使用Python标准库类型（dataclasses、uuid、datetime）
+- 领域事件中不使用Pydantic
+- 子类特定字段通过to_dict()包含在payload中
+
+等保2.0三级合规事件：
+- MFAChallengeIssuedEvent: 多因素认证挑战
+- IntrusionDetectedEvent: 安全入侵检测
+- DataIntegrityViolationEvent: 数据完整性违规检测
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -24,62 +32,73 @@ from .base import DomainEvent
 
 
 class MFAChallengeType(str, Enum):
-    """MFA challenge types supported."""
+    """支持的MFA挑战类型。"""
 
-    TOTP = "totp"  # Time-based One-Time Password
-    HOTP = "hotp"  # HMAC-based One-Time Password
-    SMS = "sms"  # SMS code (not implemented in MVP)
-    EMAIL = "email"  # Email code (not implemented in MVP)
+    TOTP = "totp"  # 基于时间的一次性密码
+    HOTP = "hotp"  # 基于HMAC的一次性密码
+    SMS = "sms"  # 短信验证码（MVP中未实现）
+    EMAIL = "email"  # 邮件验证码（MVP中未实现）
 
 
 class MFAChallengeStatus(str, Enum):
-    """MFA challenge status."""
+    """MFA挑战状态。"""
 
-    PENDING = "pending"
-    VERIFIED = "verified"
-    EXPIRED = "expired"
-    FAILED = "failed"
+    PENDING = "pending"  # 待处理
+    VERIFIED = "verified"  # 已验证
+    EXPIRED = "expired"  # 已过期
+    FAILED = "failed"  # 已失败
 
 
 class IntrusionSeverity(str, Enum):
-    """Intrusion severity levels."""
+    """入侵严重级别。"""
 
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
+    LOW = "low"  # 低
+    MEDIUM = "medium"  # 中
+    HIGH = "high"  # 高
+    CRITICAL = "critical"  # 严重
 
 
 class IntrusionAction(str, Enum):
-    """Actions taken in response to intrusion."""
+    """入侵响应采取的动作。"""
 
-    LOGGED = "logged"
-    ALERTED = "alerted"
-    BLOCKED = "blocked"
-    QUARANTINED = "quarantined"
+    LOGGED = "logged"  # 已记录
+    ALERTED = "alerted"  # 已告警
+    BLOCKED = "blocked"  # 已阻止
+    QUARANTINED = "quarantined"  # 已隔离
 
 
 class AttackType(str, Enum):
-    """Common attack types for intrusion detection."""
+    """入侵检测的常见攻击类型。"""
 
-    BRUTE_FORCE = "brute_force"
-    SQL_INJECTION = "sql_injection"
-    XSS = "xss"
-    CSRF = "csrf"
-    PATH_TRAVERSAL = "path_traversal"
-    COMMAND_INJECTION = "command_injection"
-    RATE_LIMIT_VIOLATION = "rate_limit_violation"
-    PROMPT_INJECTION = "prompt_injection"
-    UNAUTHORIZED_ACCESS = "unauthorized_access"
-    DATA_EXFILTRATION = "data_exfiltration"
+    BRUTE_FORCE = "brute_force"  # 暴力破解
+    SQL_INJECTION = "sql_injection"  # SQL注入
+    XSS = "xss"  # 跨站脚本
+    CSRF = "csrf"  # 跨站请求伪造
+    PATH_TRAVERSAL = "path_traversal"  # 路径遍历
+    COMMAND_INJECTION = "command_injection"  # 命令注入
+    RATE_LIMIT_VIOLATION = "rate_limit_violation"  # 速率限制违规
+    PROMPT_INJECTION = "prompt_injection"  # 提示注入
+    UNAUTHORIZED_ACCESS = "unauthorized_access"  # 未授权访问
+    DATA_EXFILTRATION = "data_exfiltration"  # 数据泄露
 
 
 @dataclass(frozen=True)
 class MFAChallengeIssuedEvent(DomainEvent):
-    """Event emitted when an MFA challenge is issued to a user.
+    """向用户发放MFA挑战时触发的事件。
 
-    Triggered during MFA setup or verification流程.
-    Used for audit logging and security compliance (等保 2.0).
+    在MFA设置或验证流程中触发。
+    用于审计日志记录和安全合规（等保2.0）。
+
+    Attributes:
+        challenge_id: 挑战唯一标识符。
+        event_type: 事件类型，固定为"MFAChallengeIssuedEvent"。
+        user_id: 用户唯一标识符。
+        challenge_type: 挑战类型（TOTP/HOTP/SMS/EMAIL）。
+        status: 挑战状态。
+        expires_at: 过期时间。
+        issued_at: 发放时间。
+        ip_address: 客户端IP地址。
+        user_agent: 客户端User-Agent。
     """
 
     challenge_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -93,7 +112,7 @@ class MFAChallengeIssuedEvent(DomainEvent):
     user_agent: str = ""
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.challenge_id)
         if not self.aggregate_type:
@@ -102,10 +121,21 @@ class MFAChallengeIssuedEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class IntrusionDetectedEvent(DomainEvent):
-    """Event emitted when an intrusion attempt is detected.
+    """检测到入侵尝试时触发的事件。
 
-    Triggered by IntrusionDetector when malicious activity is identified.
-    Used for security auditing and incident response (等保 2.0 入侵防范).
+    由IntrusionDetector在识别恶意活动时触发。
+    用于安全审计和事件响应（等保2.0入侵防范）。
+
+    Attributes:
+        intrusion_id: 入侵检测唯一标识符。
+        event_type: 事件类型，固定为"IntrusionDetectedEvent"。
+        source_ip: 攻击来源IP地址。
+        attack_type: 攻击类型。
+        severity: 严重级别。
+        action_taken: 采取的响应动作。
+        description: 描述信息。
+        raw_evidence: 原始日志/证据数据。
+        detected_at: 检测时间。
     """
 
     intrusion_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -119,7 +149,7 @@ class IntrusionDetectedEvent(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.intrusion_id)
         if not self.aggregate_type:
@@ -128,10 +158,20 @@ class IntrusionDetectedEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class DataIntegrityViolationEvent(DomainEvent):
-    """Event emitted when a data integrity violation is detected.
+    """检测到数据完整性违规时触发的事件。
 
-    Triggered when data hash verification fails, indicating tampering.
-    Used for data integrity auditing (等保 2.0 数据完整性).
+    在数据哈希验证失败时触发，表明数据可能被篡改。
+    用于数据完整性审计（等保2.0数据完整性）。
+
+    Attributes:
+        violation_id: 违规唯一标识符。
+        event_type: 事件类型，固定为"DataIntegrityViolationEvent"。
+        data_id: 数据唯一标识符。
+        expected_hash: 预期的哈希值。
+        actual_hash: 实际的哈希值。
+        source: 数据存储/访问位置。
+        verification_method: 验证方法（sha256、sha512、md5）。
+        detected_at: 检测时间。
     """
 
     violation_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -144,7 +184,7 @@ class DataIntegrityViolationEvent(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.violation_id)
         if not self.aggregate_type:
@@ -153,10 +193,19 @@ class DataIntegrityViolationEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class SensitiveDataDetected(DomainEvent):
-    """Event emitted when sensitive data is detected in a data object.
+    """检测到敏感数据时触发的事件。
 
-    This event is triggered during data ingestion or access to mark
-    sensitive data for appropriate handling (local processing, encryption, etc.).
+    在数据摄入或访问时触发，标记敏感数据以进行适当处理
+    （本地处理、加密等）。
+
+    Attributes:
+        data_id: 数据唯一标识符。
+        event_type: 事件类型，固定为"SensitiveDataDetected"。
+        sensitive_type: 敏感数据类型。
+        confidence: 检测置信度，范围0.0-1.0。
+        labels: 附加标签。
+        detection_method: 检测方法（regex、keyword、nlp）。
+        detected_at: 检测时间。
     """
 
     data_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -168,7 +217,7 @@ class SensitiveDataDetected(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.data_id)
         if not self.aggregate_type:
@@ -177,10 +226,20 @@ class SensitiveDataDetected(DomainEvent):
 
 @dataclass(frozen=True)
 class CrossBorderTransferRequested(DomainEvent):
-    """Event emitted when a cross-border data transfer is requested.
+    """请求跨境数据传输时触发的事件。
 
-    This event triggers the approval workflow for data that needs
-    to be transferred outside the domestic region.
+    此事件触发需要传输到境外的数据审批工作流。
+
+    Attributes:
+        request_id: 请求唯一标识符。
+        data_id: 数据唯一标识符。
+        event_type: 事件类型，固定为"CrossBorderTransferRequested"。
+        destination: 目的地国家/地区。
+        purpose: 传输目的。
+        approval_id: 审批ID（审批工作流启动后设置）。
+        status: 状态（pending、approved、rejected、blocked）。
+        requester: 请求传输的用户ID。
+        requested_at: 请求时间。
     """
 
     request_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -194,7 +253,7 @@ class CrossBorderTransferRequested(DomainEvent):
     requested_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.request_id)
         if not self.aggregate_type:
@@ -203,18 +262,28 @@ class CrossBorderTransferRequested(DomainEvent):
 
 @dataclass(frozen=True)
 class DataSovereigntyViolation(DomainEvent):
-    """Event emitted when a data sovereignty policy is violated."""
+    """数据主权策略违规时触发的事件。
+
+    Attributes:
+        violation_id: 违规唯一标识符。
+        data_id: 数据唯一标识符。
+        event_type: 事件类型，固定为"DataSovereigntyViolation"。
+        violation_type: 违规类型（如unauthorized_transfer、境外_storage等）。
+        severity: 严重级别（low、medium、high、critical）。
+        description: 描述信息。
+        detected_at: 检测时间。
+    """
 
     violation_id: uuid.UUID = field(default_factory=uuid.uuid4)
     data_id: uuid.UUID = field(default_factory=uuid.uuid4)
     event_type: str = field(default="DataSovereigntyViolation", init=False)
-    violation_type: str = ""  # unauthorized_transfer,境外_storage, etc.
+    violation_type: str = ""  # 违规类型：unauthorized_transfer、境外_storage等
     severity: str = "high"  # low, medium, high, critical
     description: str = ""
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.violation_id)
         if not self.aggregate_type:
@@ -223,10 +292,19 @@ class DataSovereigntyViolation(DomainEvent):
 
 @dataclass(frozen=True)
 class PIPLDataAccessRequested(DomainEvent):
-    """Event emitted when personal information is accessed under PIPL.
+    """PIPL框架下访问个人信息时触发的事件。
 
-    PIPL requires tracking all access to personal information
-    including purpose, legal basis, and data subject consent.
+    PIPL要求追踪所有个人信息访问，包括目的、法律依据和数据主体同意。
+
+    Attributes:
+        access_id: 访问唯一标识符。
+        personal_data_id: 个人数据唯一标识符。
+        event_type: 事件类型，固定为"PIPLDataAccessRequested"。
+        purpose: 数据处理目的。
+        legal_basis: 法律依据（consent、contract、legal_obligation等）。
+        data_subject_consent: 数据主体是否同意。
+        accessor: 访问数据的用户/系统。
+        accessed_at: 访问时间。
     """
 
     access_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -239,7 +317,7 @@ class PIPLDataAccessRequested(DomainEvent):
     accessed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """Set aggregate_id and aggregate_type if not already set."""
+        """设置aggregate_id和aggregate_type。"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.access_id)
         if not self.aggregate_type:

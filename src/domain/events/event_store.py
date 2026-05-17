@@ -1,7 +1,13 @@
-"""Event store interface.
+"""SISYS 领域层 事件存储接口模块。
 
-Defined in the domain layer, implemented in the infrastructure layer.
-Provides persistence abstraction for event sourcing.
+定义于领域层，由基础设施层实现。
+为事件溯源提供持久化抽象。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -13,27 +19,26 @@ from .base import DomainEvent
 
 
 class EventStore(Protocol):
-    """Abstract event store interface for event sourcing.
+    """事件溯源的抽象事件存储接口。
 
-    Implementations in the infrastructure layer persist and retrieve
-    event streams by aggregate root.
+    基础设施层的实现负责持久化和检索按聚合根组织的事件流。
     """
 
     def save_events(self, events: list[DomainEvent]) -> None:
-        """Persist a list of domain events.
+        """持久化领域事件列表。
 
         Args:
-            events: The domain events to persist.
+            events: 要持久化的领域事件列表。
         """
 
     def get_events(self, aggregate_id: UUID) -> list[DomainEvent]:
-        """Retrieve all events for a given aggregate.
+        """检索指定聚合的所有事件。
 
         Args:
-            aggregate_id: The ID of the aggregate root.
+            aggregate_id: 聚合根ID。
 
         Returns:
-            List of domain events for the aggregate, in order.
+            该聚合的领域事件列表，按顺序排列。
         """
 
     def get_events_by_version(
@@ -42,13 +47,13 @@ class EventStore(Protocol):
         from_version: int,
         to_version: int,
     ) -> list[DomainEvent]:
-        """Retrieve events for a given aggregate within a version range.
+        """检索指定聚合在版本范围内的事件。
 
         Args:
-            aggregate_id: The ID of the aggregate root.
-            from_version: Start version (inclusive).
-            to_version: End version (inclusive).
+            aggregate_id: 聚合根ID。
+            from_version: 起始版本号（包含）。
+            to_version: 结束版本号（包含）。
 
         Returns:
-            List of domain events within the version range.
+            版本范围内的领域事件列表。
         """

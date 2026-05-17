@@ -1,4 +1,13 @@
-"""Checkpoint domain entity."""
+"""SISYS 领域层检查点实体模块。
+
+定义检查点领域实体，包含阶段标识和恢复能力。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +19,7 @@ from enum import Enum
 
 @dataclass
 class CorrectionRecord:
-    """P1-06 Fix: Strongly typed correction record for checkpoints.
+    """检查点纠正记录。
 
     Attributes:
         correction_id: Unique identifier for this correction.
@@ -29,14 +38,14 @@ class CorrectionRecord:
 
 
 class RecoveryMode(str, Enum):
-    """Checkpoint recovery modes."""
+    """检查点恢复模式枚举。"""
 
     REPLAY = "replay"
     OVERRIDE = "override"
 
 
 class CheckpointStatus(str, Enum):
-    """Checkpoint completion status."""
+    """检查点完成状态枚举。"""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -46,12 +55,12 @@ class CheckpointStatus(str, Enum):
 
 @dataclass
 class Checkpoint:
-    """Checkpoint entity with phase identification and recovery capability.
+    """检查点实体，包含阶段标识和恢复能力。
 
-    Invariant constraints:
-    - checkpoint_id must be a valid UUID
-    - phase_identifier must not be empty
-    - status must be a valid CheckpointStatus
+    不变量约束:
+    - checkpoint_id 必须为有效 UUID
+    - phase_identifier 不能为空
+    - status 必须为有效 CheckpointStatus
     """
 
     checkpoint_id: uuid.UUID
@@ -65,13 +74,13 @@ class Checkpoint:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def validate(self) -> bool:
-        """Validate invariant constraints.
+        """验证不变量约束。
 
         Returns:
-            True if all invariants are satisfied.
+            所有不变量满足时返回 True。
 
         Raises:
-            ValueError: If any invariant is violated.
+            ValueError: 任何不变量违反时抛出。
         """
         if not isinstance(self.checkpoint_id, uuid.UUID):
             raise ValueError("checkpoint_id must be a valid UUID")
@@ -82,13 +91,12 @@ class Checkpoint:
         return True
 
     def complete(self) -> None:
-        """Mark checkpoint as completed.
+        """标记检查点为已完成。
 
-        Valid transitions: PENDING -> COMPLETED, IN_PROGRESS -> COMPLETED,
-        RECOVERED -> COMPLETED.
+        有效转换: PENDING -> COMPLETED, IN_PROGRESS -> COMPLETED, RECOVERED -> COMPLETED。
 
         Raises:
-            ValueError: If checkpoint is already completed.
+            ValueError: 检查点已完成时抛出。
         """
         # P1-01 Fix: Add state guard
         if self.status == CheckpointStatus.COMPLETED:
@@ -98,17 +106,16 @@ class Checkpoint:
         self.updated_at = self.completed_at
 
     def recover(self, mode: RecoveryMode) -> None:
-        """Recover from this checkpoint using specified mode.
+        """从检查点恢复，使用指定模式。
 
-        Valid transitions: PENDING -> RECOVERED, IN_PROGRESS -> RECOVERED,
-        RECOVERED -> RECOVERED (re-recover with different mode).
-        Cannot recover a COMPLETED checkpoint.
+        有效转换: PENDING -> RECOVERED, IN_PROGRESS -> RECOVERED, RECOVERED -> RECOVERED。
+        不能恢复已完成的检查点。
 
         Args:
-            mode: Recovery mode (REPLAY or OVERRIDE).
+            mode: 恢复模式（REPLAY 或 OVERRIDE）。
 
         Raises:
-            ValueError: If checkpoint is already completed.
+            ValueError: 检查点已完成时抛出。
         """
         # P1-02 Fix: Add state guard
         if self.status == CheckpointStatus.COMPLETED:

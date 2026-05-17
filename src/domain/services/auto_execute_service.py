@@ -1,13 +1,16 @@
-"""AutoExecuteService — domain service that executes tasks in isolated session namespaces.
+"""SISYS 领域层自动执行服务模块。
 
-Responsibilities:
-- Listen to AutoRouted events from Story 1.14b
-- Execute tasks in sandboxed environment (Docker/gVisor)
-- Create state snapshots for recovery
-- Publish AutoExecuted events to downstream listeners
+AutoExecuteService 是在隔离会话命名空间中执行任务的领域服务。
+监听 AutoRouted 事件，在沙盒环境（Docker/gVisor）中执行任务，
+创建状态快照用于恢复，并发布 AutoExecuted 事件给下游监听者。
 
-Architecture: Domain layer (no external dependencies), uses port/protocol for
-sandbox execution and snapshot storage.
+架构：领域层（无外部依赖），通过端口/协议实现沙盒执行和快照存储。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -25,15 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 class AutoExecuteService:
-    """Domain service that executes tasks from AutoRouted events.
+    """执行 AutoRouted 事件中任务的领域服务。
 
-    Responsibilities:
-    - Listen to AutoRouted events (from Story 1.14b route mechanism)
-    - Execute tasks in isolated sandbox (Docker/gVisor)
-    - Create state snapshots for recovery
-    - Publish AutoExecuted events to downstream listeners
+    职责：
+    - 监听 AutoRouted 事件（来自 Story 1.14b 路由机制）
+    - 在隔离沙盒（Docker/gVisor）中执行任务
+    - 创建状态快照用于恢复
+    - 发布 AutoExecuted 事件给下游监听者
 
-    Architecture: Domain layer, uses port/protocol for infrastructure adapters.
+    架构：领域层，通过端口/协议接入基础设施适配器。
     """
 
     def __init__(
@@ -41,23 +44,23 @@ class AutoExecuteService:
         sandbox: SandboxExecutorProtocol | None = None,
         snapshot_repo: SnapshotRepositoryProtocol | None = None,
     ):
-        """Initialize AutoExecuteService.
+        """初始化 AutoExecuteService。
 
         Args:
-            sandbox: Sandbox executor port. None for standalone testing.
-            snapshot_repo: Snapshot repository port. None for standalone testing.
+            sandbox: 沙盒执行器端口。传入 None 用于独立测试。
+            snapshot_repo: 快照仓储端口。传入 None 用于独立测试。
         """
         self._sandbox = sandbox
         self._snapshot_repo = snapshot_repo
 
     async def on_routed_event(self, event: DomainEvent) -> AutoExecuted | None:
-        """Handle a AutoRouted event: execute task and publish AutoExecuted event.
+        """处理 AutoRouted 事件：执行任务并发布 AutoExecuted 事件。
 
         Args:
-            event: AutoRouted event from Story 1.14b
+            event: 来自 Story 1.14b 的 AutoRouted 事件
 
         Returns:
-            AutoExecuted event if execution was successful, None otherwise
+            执行成功时返回 AutoExecuted 事件，否则返回 None
         """
         logger.debug("Processing AutoRouted event: session_id=%s", getattr(event, "session_id", "unknown"))
 
@@ -154,15 +157,15 @@ class AutoExecuteService:
         state: dict[str, Any],
         stage_id: str = "intermediate",
     ) -> CheckpointSnapshot | None:
-        """Create a checkpoint snapshot for the session.
+        """为会话创建检查点快照。
 
         Args:
-            session_id: Session identifier
-            state: State data to snapshot
-            stage_id: Current execution stage
+            session_id: 会话标识符
+            state: 需要快照的状态数据
+            stage_id: 当前执行阶段
 
         Returns:
-            Created CheckpointSnapshot or None if no repository configured
+            创建的 CheckpointSnapshot，若未配置仓储则返回 None
         """
         if not self._snapshot_repo:
             logger.warning("No snapshot repository configured, skipping snapshot")
@@ -184,13 +187,13 @@ class AutoExecuteService:
         return snapshot
 
     async def restore_snapshot(self, session_id: str) -> CheckpointSnapshot | None:
-        """Restore the latest snapshot for a session.
+        """恢复会话的最新快照。
 
         Args:
-            session_id: Session identifier
+            session_id: 会话标识符
 
         Returns:
-            Restored CheckpointSnapshot or None if no snapshot exists
+            恢复的 CheckpointSnapshot，若快照不存在则返回 None
         """
         if not self._snapshot_repo:
             logger.warning("No snapshot repository configured, cannot restore")

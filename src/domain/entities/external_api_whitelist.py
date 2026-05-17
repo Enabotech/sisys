@@ -1,6 +1,12 @@
-"""ExternalAPIWhitelist — Domain entity for external API whitelist management.
+"""SISYS 领域层外部 API 白名单实体模块。
 
-遵循六边形架构：领域实体，仅包含业务逻辑，无外部依赖。
+定义外部 API 白名单领域实体，遵循六边形架构：领域层零依赖。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

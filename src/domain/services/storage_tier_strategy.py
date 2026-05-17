@@ -1,4 +1,4 @@
-"""StoragePolicyService — 存储层级策略服务。
+"""SISYS 领域层存储层级策略服务模块。
 
 根据数据特征和业务规则决定数据的存储层级。
 对应 architecture.md §11.2.11 验收标准：
@@ -6,6 +6,12 @@
 - WARM: 访问频率 10-99/周
 - COLD: 访问频率 1-9/周
 - FROZEN: 访问频率 = 0 或 Checkpoint
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,7 +23,14 @@ from src.domain.ports.storage_enums import DataAccessPattern, StorageTier
 
 @dataclass
 class StorageDecision:
-    """存储决策结果。"""
+    """存储决策结果。
+
+    Attributes:
+        tier: 存储层级
+        access_pattern: 数据访问模式
+        ttl_hours: 生存时间（小时），None 表示无过期
+        compression_needed: 是否需要压缩
+    """
 
     tier: StorageTier
     access_pattern: DataAccessPattern
@@ -26,9 +39,16 @@ class StorageDecision:
 
 
 class StoragePolicyService:
-    """存储层级策略。
+    """存储层级策略领域服务。
 
-    根据数据特征决定存储层级。
+    根据数据访问频率和内容特征决定存储层级，驱动 UnifiedStorageGateway
+    执行分层写入。
+
+    Class Attributes:
+        FREQUENT_THRESHOLD: 高频访问阈值（≥100/周 → HOT）
+        OCCASIONAL_THRESHOLD: 中频访问阈值（10-99/周 → WARM）
+        RARE_THRESHOLD: 低频访问阈值（1-9/周 → COLD）
+        CHECKPOINT_RETENTION_DAYS: 检查点保留天数（7 年）
     """
 
     FREQUENT_THRESHOLD = 100  # ≥100/周 → HOT
@@ -42,7 +62,7 @@ class StoragePolicyService:
         content_size: int,
         is_checkpoint: bool = False,
     ) -> StorageDecision:
-        """决定存储层级。
+        """根据数据特征决定存储层级。
 
         Args:
             access_frequency: 访问频率（过去 7 天访问次数）
@@ -50,7 +70,7 @@ class StoragePolicyService:
             is_checkpoint: 是否为检查点快照
 
         Returns:
-            存储决策
+            存储决策结果，包含层级、访问模式、TTL 和压缩需求
         """
         if is_checkpoint:
             return StorageDecision(

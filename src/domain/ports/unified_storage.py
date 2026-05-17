@@ -1,4 +1,4 @@
-"""UnifiedStoragePort — 统一存储入口抽象端口。
+"""SISYS 领域层统一存储端口模块。
 
 定义存储系统的统一操作契约。
 对应 architecture.md §11.2.9 L0 驱动各层协同机制。
@@ -8,6 +8,12 @@
 - 其他层通过事件驱动异步更新
 - 读取遵循缓存优先策略（L1 → L0）
 - 领域层零外部依赖（仅用 abc + typing）
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

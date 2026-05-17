@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -49,6 +49,11 @@ class TestNeo4jManager:
         assert wrapper._driver is mock_driver
         assert wrapper._database == "sisys_db"
 
+    def test_default_database(self, mock_driver: MagicMock):
+        """默认数据库名应为 neo4j。"""
+        manager = Neo4jManager(mock_driver)
+        assert manager._database == "neo4j"
+
     def test_get_client_returns_injected(self, wrapper: Neo4jManager, mock_driver: MagicMock):
         """测试 get_client 返回注入的驱动。"""
         assert wrapper.get_client() is mock_driver
@@ -78,9 +83,61 @@ class TestNeo4jManager:
         result = await wrapper.health_check()
         assert result is False
 
+    async def test_health_check_query_error(self, wrapper: Neo4jManager, mock_driver: MagicMock, mock_session: MagicMock):
+        """测试查询执行异常。"""
+        mock_session.run = AsyncMock(side_effect=RuntimeError("Query failed"))
+        mock_driver.session.return_value = _AsyncCM(mock_session)
+
+        result = await wrapper.health_check()
+        assert result is False
+
     async def test_close(self, wrapper: Neo4jManager, mock_driver: MagicMock):
         """测试关闭连接。"""
         mock_driver.close = AsyncMock()
         await wrapper.close()
 
         mock_driver.close.assert_called_once()
+
+    @patch("src.infrastructure.storage.neo4j.neo4j_manager.AsyncGraphDatabase")
+    def test_from_config_with_explicit_config(self, mock_db: MagicMock) -> None:
+        """from_config 应使用显式配置创建驱动。"""
+        mock_config = MagicMock()
+        mock_config.uri = "bolt://localhost:7687"
+        mock_config.username = "neo4j"
+        mock_config.password = "test_password"  # pragma: allowlist secret
+        mock_config.max_connection_pool_size = 50
+        mock_config.connection_timeout = 30
+        mock_config.database = "production"
+
+        mock_driver = MagicMock()
+        mock_db.driver.return_value = mock_driver
+
+        manager = Neo4jManager.from_config(mock_config)
+
+        mock_db.driver.assert_called_once_with(
+            "bolt://localhost:7687",
+            auth=("neo4j", "test_password"),
+            max_connection_pool_size=50,
+            connection_acquisition_timeout=30,
+        )
+        assert manager._driver is mock_driver
+        assert manager._database == "production"
+
+    @patch("src.infrastructure.storage.neo4j.neo4j_manager.AsyncGraphDatabase")
+    @patch("src.infrastructure.storage.neo4j.neo4j_manager.Neo4jConfig")
+    def test_from_config_none_loads_from_env(self, mock_config_cls: MagicMock, mock_db: MagicMock) -> None:
+        """config=None 应从环境变量加载配置。"""
+        mock_config = MagicMock()
+        mock_config.uri = "bolt://env-host:7687"
+        mock_config.username = "env_user"
+        mock_config.password = "env_pass"  # pragma: allowlist secret
+        mock_config.max_connection_pool_size = 100
+        mock_config.connection_timeout = 60
+        mock_config.database = "env_db"
+
+        mock_config_cls.from_env.return_value = mock_config
+        mock_db.driver.return_value = MagicMock()
+
+        manager = Neo4jManager.from_config(config=None)
+        mock_config_cls.from_env.assert_called_once()
+        assert manager._database == "env_db"

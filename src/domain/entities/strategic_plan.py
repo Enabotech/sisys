@@ -1,4 +1,13 @@
-"""StrategicPlan domain entity."""
+"""SISYS 领域层战略规划实体模块。
+
+定义战略规划领域实体，遵循 BLM 六阶段模型。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +18,7 @@ from enum import Enum
 
 
 class BLMPhase(str, Enum):
-    """BLM (Business Leadership Model) phases."""
+    """BLM（商业领导力模型）阶段枚举。"""
 
     STRATEGIC_INTENT = "strategic_intent"
     MARKET_INSIGHT = "market_insight"
@@ -20,7 +29,7 @@ class BLMPhase(str, Enum):
 
 
 class PlanStatus(str, Enum):
-    """Strategic plan status."""
+    """战略规划状态枚举。"""
 
     DRAFT = "draft"
     IN_REVIEW = "in_review"
@@ -30,13 +39,13 @@ class PlanStatus(str, Enum):
 
 @dataclass
 class StrategicPlan:
-    """StrategicPlan entity following BLM six-phase model.
+    """战略规划实体，遵循 BLM 六阶段模型。
 
-    Invariant constraints:
-    - plan_id must be a valid UUID
-    - name must not be empty
-    - current_phase must be a valid BLMPhase
-    - created_at must be before updated_at
+    不变量约束:
+    - plan_id 必须为有效 UUID
+    - name 不能为空
+    - current_phase 必须为有效 BLMPhase
+    - created_at 必须早于或等于 updated_at
     """
 
     plan_id: uuid.UUID
@@ -49,13 +58,13 @@ class StrategicPlan:
     completed_phases: list[BLMPhase] = field(default_factory=list)
 
     def validate(self) -> bool:
-        """Validate invariant constraints.
+        """验证不变量约束。
 
         Returns:
-            True if all invariants are satisfied.
+            所有不变量满足时返回 True。
 
         Raises:
-            ValueError: If any invariant is violated.
+            ValueError: 任何不变量违反时抛出。
         """
         if not isinstance(self.plan_id, uuid.UUID):
             raise ValueError("plan_id must be a valid UUID")
@@ -72,13 +81,13 @@ class StrategicPlan:
         return True
 
     def advance_phase(self, next_phase: BLMPhase) -> None:
-        """Advance to the next BLM phase.
+        """推进到下一个 BLM 阶段。
 
         Args:
-            next_phase: The next BLM phase to advance to.
+            next_phase: 要推进到的下一个 BLM 阶段。
 
         Raises:
-            ValueError: If phase transition is invalid or plan is archived/approved.
+            ValueError: 阶段转换无效或规划已归档/审批通过时抛出。
         """
         # P0-03: Status guard — cannot advance archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
@@ -103,10 +112,10 @@ class StrategicPlan:
         self.updated_at = datetime.now(UTC)
 
     def complete_phase(self) -> None:
-        """Mark current phase as completed and advance.
+        """标记当前阶段为已完成并自动推进。
 
         Raises:
-            ValueError: If plan is archived/approved or already at final phase.
+            ValueError: 规划已归档/审批通过或已处于最终阶段时抛出。
         """
         # Status guard — cannot complete archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):

@@ -1,15 +1,20 @@
-"""AutoRouteListener — event listener for auto-route mechanism.
+"""SISYS 应用层自动路由处理器模块。
 
-Listens to AutoTriggered events from AutoTriggerService (Story 1.14a),
-invokes AutoRouteService to make routing decisions, and publishes
-AutoRouted events to downstream execute stage (Story 1.14c).
+自动路由机制的事件监听器，监听 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a），
+调用 AutoRouteService 做路由决策，并发布 AutoRouted 事件到下游执行阶段（Story 1.14c）。
 
-Note: This is distinct from UDMR's RoutingDecided event (Story 1.17):
-    - AutoRouteListener emits: AutoRouted (auto_route_events.py) — selects Agent/tool
-    - UDMR emits: RoutingDecided (routing_events.py) — selects local/cloud model
+注意：与 UDMR 的 RoutingDecided 事件（Story 1.17）不同：
+    - AutoRouteListener 发出: AutoRouted（auto_route_events.py）— 选择 Agent/工具
+    - UDMR 发出: RoutingDecided（routing_events.py）— 选择本地/云模型
 
-Reference: Story 1.14b SDD规范定义
-Reference: or.md 系统公理一 (trigger→route→execute)
+参考: Story 1.14b SDD规范定义
+参考: or.md 系统公理一 (trigger→route→execute)
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -25,16 +30,15 @@ logger = logging.getLogger(__name__)
 
 
 class AutoRouteHandler:
-    """Event listener that bridges AutoTriggered events to AutoRouteService.
+    """事件监听器，桥接 AutoTriggered 事件到 AutoRouteService。
 
-    Responsible for:
-    - Listening to AutoTriggered events from AutoTriggerService (Story 1.14a)
-    - Invoking AutoRouteService to make routing decisions
-    - Publishing AutoRouted events to downstream execute stage (Story 1.14c)
+    职责：
+    - 监听 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a）
+    - 调用 AutoRouteService 做路由决策
+    - 发布 AutoRouted 事件到下游执行阶段（Story 1.14c）
 
-    Architecture: Interfaces layer, implements event listener pattern.
-    Follows hexagonal architecture: domain logic (AutoRouteService) is isolated from
-    infrastructure concerns (event bus, logging).
+    架构：接口层，实现事件监听模式。
+    遵循六边形架构：领域逻辑（AutoRouteService）与基础设施关注点（事件总线、日志）隔离。
     """
 
     def __init__(
@@ -42,23 +46,23 @@ class AutoRouteHandler:
         auto_route_service: AutoRouteService,
         publisher: EventPublisher | None = None,
     ) -> None:
-        """Initialize AutoRouteListener.
+        """初始化自动路由监听器。
 
         Args:
-            auto_route_service: Domain service for making routing decisions.
-            publisher: Event publisher port. None for standalone testing.
+            auto_route_service: 路由决策领域服务
+            publisher: 事件发布器端口，None 用于独立测试
         """
         self._auto_route_service = auto_route_service
         self._publisher = publisher
 
     async def on_triggered(self, event: DomainEvent) -> AutoRouted | None:
-        """Handle AutoTriggered event: make routing decision and emit AutoRouted.
+        """处理 AutoTriggered 事件：做路由决策并发出 AutoRouted。
 
         Args:
-            event: AutoTriggered event from AutoTriggerService (Story 1.14a)
+            event: 来自 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a）
 
         Returns:
-            AutoRouted event if routing decision was made, None otherwise
+            路由决策完成返回 AutoRouted 事件，否则返回 None
         """
         from src.domain.events.auto_trigger_events import AutoTriggered
 
@@ -94,11 +98,11 @@ class AutoRouteHandler:
             raise
 
     async def _publish(self, event: AutoRouted, channel: str | None = None) -> None:
-        """Publish AutoRouted event via configured publisher.
+        """通过配置的发布器发布 AutoRouted 事件。
 
         Args:
-            event: AutoRouted event to publish
-            channel: Channel name (default: "rt:AutoRouted")
+            event: 待发布的 AutoRouted 事件
+            channel: 频道名称（默认 "rt:AutoRouted"）
         """
         if self._publisher is None:
             logger.warning("No publisher configured, AutoRouted event not published")

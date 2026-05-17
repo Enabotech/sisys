@@ -1,6 +1,6 @@
-"""MemoryChangedListener — 记忆变更事件监听器。
+"""SISYS 应用层记忆变更事件处理器模块。
 
-处理 MemoryChanged 事件，下游触发：
+记忆变更事件监听器，处理 MemoryChanged 事件，下游触发：
 1. L1 Redis 缓存失效（同步，立即）：保证"上下文≠缓存"公理
 2. L2 PostgreSQL 写入：metadata_repository.upsert() + history_repository.append()
 3. L3 Qdrant 向量（按需，内容>500 tokens）：vector_store.embed()
@@ -12,6 +12,12 @@ L4 MinIO 不在本流程范围内，由 Checkpoint 持久化流程独立触发�
 Story: 1.15a
 
 调用方式：被 RabbitMQConsumer 通过 await handler(event) 调用，必须是 async def。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -33,6 +39,12 @@ class MemoryChangedHandler:
     - L2 PostgreSQL 写入（异步）
     - L3 Qdrant 向量（按需）
     - L5 Neo4j 图谱（按需）
+
+    Attributes:
+        _memory_cache: 记忆缓存端口（用于缓存失效）
+        _metadata_repository: L2 元数据仓储
+        _history_repository: L2 历史记录仓储
+        _index_manager: 索引管理器（用于更新 MEMORY.md 索引）
     """
 
     def __init__(
@@ -80,10 +92,10 @@ class MemoryChangedHandler:
             await self._update_index(event)
 
         # 3. L3 Qdrant 向量（按需，内容>500 tokens）
-        # TODO: Story 6.3 实现
+        # TODO(#Story6.3): L3 向量索引待 Story 6.3 实现
 
         # 4. L5 Neo4j 图谱（按需，EntityExtractor）
-        # TODO: Story 1.17 或 LLM 集成 Story 实现
+        # TODO(#Story1.17): L5 图谱更新待 Story 1.17 或 LLM 集成 Story 实现
 
     async def _invalidate_l1_cache(self, event: MemoryChanged) -> None:
         """失效 L1 Redis 缓存（同步，立即）。
