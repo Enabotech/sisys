@@ -9,7 +9,8 @@ Author:
     agimtech <agimtech@126.com>
 
 Copyright:
-    Copyright (c) 2024-2026 SISYS. All rights reserved.
+    Copyright (c) 2025-2026 AGIMTECH. All rights reserved.
+
 """
 
 from __future__ import annotations
