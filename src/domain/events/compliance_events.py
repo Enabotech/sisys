@@ -32,7 +32,7 @@ from .base import DomainEvent
 
 
 class MFAChallengeType(str, Enum):
-    """支持的MFA挑战类型。"""
+    """支持的MFA挑战类型"""
 
     TOTP = "totp"  # 基于时间的一次性密码
     HOTP = "hotp"  # 基于HMAC的一次性密码
@@ -41,7 +41,7 @@ class MFAChallengeType(str, Enum):
 
 
 class MFAChallengeStatus(str, Enum):
-    """MFA挑战状态。"""
+    """MFA挑战状态"""
 
     PENDING = "pending"  # 待处理
     VERIFIED = "verified"  # 已验证
@@ -50,7 +50,7 @@ class MFAChallengeStatus(str, Enum):
 
 
 class IntrusionSeverity(str, Enum):
-    """入侵严重级别。"""
+    """入侵严重级别"""
 
     LOW = "low"  # 低
     MEDIUM = "medium"  # 中
@@ -59,7 +59,7 @@ class IntrusionSeverity(str, Enum):
 
 
 class IntrusionAction(str, Enum):
-    """入侵响应采取的动作。"""
+    """入侵响应采取的动作"""
 
     LOGGED = "logged"  # 已记录
     ALERTED = "alerted"  # 已告警
@@ -68,7 +68,7 @@ class IntrusionAction(str, Enum):
 
 
 class AttackType(str, Enum):
-    """入侵检测的常见攻击类型。"""
+    """入侵检测的常见攻击类型"""
 
     BRUTE_FORCE = "brute_force"  # 暴力破解
     SQL_INJECTION = "sql_injection"  # SQL注入
@@ -112,7 +112,7 @@ class MFAChallengeIssuedEvent(DomainEvent):
     user_agent: str = ""
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.challenge_id)
         if not self.aggregate_type:
@@ -149,7 +149,7 @@ class IntrusionDetectedEvent(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.intrusion_id)
         if not self.aggregate_type:
@@ -184,7 +184,7 @@ class DataIntegrityViolationEvent(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.violation_id)
         if not self.aggregate_type:
@@ -217,7 +217,7 @@ class SensitiveDataDetected(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.data_id)
         if not self.aggregate_type:
@@ -253,7 +253,7 @@ class CrossBorderTransferRequested(DomainEvent):
     requested_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.request_id)
         if not self.aggregate_type:
@@ -283,7 +283,7 @@ class DataSovereigntyViolation(DomainEvent):
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.violation_id)
         if not self.aggregate_type:
@@ -317,7 +317,7 @@ class PIPLDataAccessRequested(DomainEvent):
     accessed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
-        """设置aggregate_id和aggregate_type。"""
+        """设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.access_id)
         if not self.aggregate_type:

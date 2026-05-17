@@ -1,1 +1,1 @@
-"""PostgreSQL 存储层包。"""
+"""PostgreSQL 存储层包"""

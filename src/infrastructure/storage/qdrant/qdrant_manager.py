@@ -74,7 +74,7 @@ class QdrantManager(ConnectionManager):
             return False
 
     async def close(self) -> None:
-        """关闭客户端连接。"""
+        """关闭客户端连接"""
         if self._client is not None:
             await self._client.close()
             self._client = None

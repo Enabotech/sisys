@@ -1,4 +1,4 @@
-"""PostgreSQL UnitOfWork 单元测试。"""
+"""PostgreSQL UnitOfWork 单元测试"""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 
 
 class TestPostgreSQLUnitOfWorkContextManager:
-    """测试 PostgreSQLUnitOfWork 异步上下文管理器协议。"""
+    """测试 PostgreSQLUnitOfWork 异步上下文管理器协议"""
 
     @pytest.mark.asyncio
     async def test_aenter_calls_begin(self) -> None:
-        """__aenter__ 应调用 begin()。"""
+        """__aenter__ 应调用 begin()"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         try:
@@ -32,7 +32,7 @@ class TestPostgreSQLUnitOfWorkContextManager:
 
     @pytest.mark.asyncio
     async def test_aexit_commits_on_no_exception(self) -> None:
-        """__aexit__ 无异常时应 commit 并 close。"""
+        """__aexit__ 无异常时应 commit 并 close"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         try:
@@ -48,7 +48,7 @@ class TestPostgreSQLUnitOfWorkContextManager:
 
     @pytest.mark.asyncio
     async def test_aexit_rollback_on_exception(self) -> None:
-        """__aexit__ 有异常时应 rollback 并 close。"""
+        """__aexit__ 有异常时应 rollback 并 close"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         try:
@@ -64,7 +64,7 @@ class TestPostgreSQLUnitOfWorkContextManager:
 
     @pytest.mark.asyncio
     async def test_full_context_manager_cycle(self) -> None:
-        """完整上下文管理器生命周期。"""
+        """完整上下文管理器生命周期"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         try:
@@ -82,7 +82,7 @@ class TestPostgreSQLUnitOfWorkContextManager:
 
     @pytest.mark.asyncio
     async def test_full_context_manager_with_exception(self) -> None:
-        """上下文管理器中发生异常时应 rollback。"""
+        """上下文管理器中发生异常时应 rollback"""
         mock_session = AsyncMock()
         token = set_session(mock_session)
         try:

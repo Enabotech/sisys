@@ -81,15 +81,15 @@ async def graph_manager(neo4j_client: Neo4jManager):
 
 
 class TestNeo4jConnection:
-    """Neo4j 连接真实实例测试。"""
+    """Neo4j 连接真实实例测试"""
 
     async def test_health_check(self, neo4j_client: Neo4jManager):
-        """测试健康检查。"""
+        """测试健康检查"""
         result = await neo4j_client.health_check()
         assert result is True
 
     async def test_driver_connection(self, neo4j_client: Neo4jManager):
-        """测试驱动连接。"""
+        """测试驱动连接"""
         driver = neo4j_client.get_client()
         assert driver is not None
 
@@ -121,10 +121,10 @@ def make_test_node(node_id: str, name: str, tenant_id: str) -> GraphNode:
 
 
 class TestNeo4jNodeOperations:
-    """Neo4j 节点操作真实实例测试。"""
+    """Neo4j 节点操作真实实例测试"""
 
     async def test_create_and_get_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
-        """测试节点创建和获取。"""
+        """测试节点创建和获取"""
         node_id = f"{test_tenant_id}_node_create_1"
         node = make_test_node(node_id, "test-node", test_tenant_id)
 
@@ -141,7 +141,7 @@ class TestNeo4jNodeOperations:
         await graph_manager.delete_node(node_id)
 
     async def test_create_duplicate_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
-        """测试创建重复节点（应返回 False）。"""
+        """测试创建重复节点（应返回 False）"""
         node_id = f"{test_tenant_id}_node_dup_1"
         node = make_test_node(node_id, "duplicate", test_tenant_id)
 
@@ -158,7 +158,7 @@ class TestNeo4jNodeOperations:
         await graph_manager.delete_node(node_id)
 
     async def test_delete_node(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
-        """测试删除节点。"""
+        """测试删除节点"""
         node_id = f"{test_tenant_id}_node_delete_1"
         node = make_test_node(node_id, "to-delete", test_tenant_id)
 
@@ -180,10 +180,10 @@ class TestNeo4jNodeOperations:
 
 
 class TestNeo4jRelationshipOperations:
-    """Neo4j 关系操作真实实例测试。"""
+    """Neo4j 关系操作真实实例测试"""
 
     async def test_create_and_delete_relationship(self, graph_manager: Neo4jGraphManager, test_tenant_id: str):
-        """测试关系创建和删除。"""
+        """测试关系创建和删除"""
         # Create two nodes with tenant-isolated IDs
         node1_id = f"{test_tenant_id}_rel_node_1"
         node2_id = f"{test_tenant_id}_rel_node_2"
@@ -217,10 +217,10 @@ class TestNeo4jRelationshipOperations:
 
 
 class TestNeo4jQueries:
-    """Neo4j 查询执行测试。"""
+    """Neo4j 查询执行测试"""
 
     async def test_execute_read_query(self, neo4j_client: Neo4jManager):
-        """测试执行读查询。"""
+        """测试执行读查询"""
         driver = neo4j_client.get_async_driver()
 
         async with driver.session() as session:
@@ -231,7 +231,7 @@ class TestNeo4jQueries:
             assert record["total"] >= 0
 
     async def test_execute_write_query(self, neo4j_client: Neo4jManager):
-        """测试执行写查询。"""
+        """测试执行写查询"""
         driver = neo4j_client.get_async_driver()
 
         async with driver.session() as session:

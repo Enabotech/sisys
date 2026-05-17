@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
-    """敏感数据检测服务实现，使用正则表达式检测 PII、商业秘密和金融数据。"""
+    """敏感数据检测服务实现，使用正则表达式检测 PII、商业秘密和金融数据"""
 
     # PII 正则表达式（不使用 \b 词边界，支持中文文本）
     _CHINESE_ID_PATTERN = re.compile(r"\d{17}[\dXx]")

@@ -122,7 +122,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     # ========== 内部方法（仅 Poller 使用） ==========
 
     async def _get_unpublished_entities(self, limit: int) -> list[OutboxModel]:
-        """内部方法: 获取未发布的 OutboxModel 列表（FIFO 排序）。"""
+        """内部方法: 获取未发布的 OutboxModel 列表（FIFO 排序）"""
         async with self._lock:
             result = await self._session.execute(
                 select(OutboxModel).where(OutboxModel.status == "pending").order_by(OutboxModel.created_at.asc()).limit(limit)
@@ -130,13 +130,13 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             return list(result.scalars().all())
 
     async def _mark_published_entity(self, model: OutboxModel) -> None:
-        """内部方法: 标记 OutboxModel 为 published。"""
+        """内部方法: 标记 OutboxModel 为 published"""
         async with self._lock:
             model.status = "published"
             model.published_at = datetime.now(UTC)
 
     async def _mark_failed_entity(self, model: OutboxModel, error: str) -> None:
-        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count。"""
+        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count"""
         async with self._lock:
             model.status = "failed"
             model.retry_count += 1

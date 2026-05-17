@@ -46,7 +46,7 @@ class PermissionRepository(
         )
 
     async def get_by_name(self, name: str) -> Permission | None:
-        """根据名称获取权限。"""
+        """根据名称获取权限"""
         result = await self._session.execute(select(PermissionModel).where(PermissionModel.name == name))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None

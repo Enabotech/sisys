@@ -18,7 +18,7 @@ from enum import Enum
 
 
 class ToolStatus(str, Enum):
-    """工具生命周期状态枚举。"""
+    """工具生命周期状态枚举"""
 
     ACTIVE = "active"
     DEPRECATED = "deprecated"
@@ -26,7 +26,7 @@ class ToolStatus(str, Enum):
 
 
 class ToolCategory(str, Enum):
-    """工具分类枚举。"""
+    """工具分类枚举"""
 
     ANALYSIS = "analysis"
     GENERATION = "generation"

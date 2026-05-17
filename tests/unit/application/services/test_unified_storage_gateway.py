@@ -13,10 +13,10 @@ import pytest
 
 
 class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
-    """验证 UnifiedStorageGateway 实现了 UnifiedStoragePort 接口。"""
+    """验证 UnifiedStorageGateway 实现了 UnifiedStoragePort 接口"""
 
     def test_gateway_implements_unified_storage_port(self) -> None:
-        """UnifiedStorageGateway 应实现 UnifiedStoragePort（有所需方法）。"""
+        """UnifiedStorageGateway 应实现 UnifiedStoragePort（有所需方法）"""
         from src.application.services.unified_storage_gateway import UnifiedStorageGateway
 
         mock_l0 = MagicMock()
@@ -38,7 +38,7 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
         assert hasattr(gateway, "exists"), "gateway should have exists method"
 
     def test_gateway_has_all_required_methods(self) -> None:
-        """UnifiedStorageGateway 应有 UnifiedStoragePort 的所有方法。"""
+        """UnifiedStorageGateway 应有 UnifiedStoragePort 的所有方法"""
         from src.application.services.unified_storage_gateway import UnifiedStorageGateway
         from src.domain.ports.unified_storage import UnifiedStoragePort
 
@@ -59,7 +59,7 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
             assert hasattr(UnifiedStoragePort, method_name)
 
     def test_all_methods_are_async(self) -> None:
-        """所有方法应为 async def。"""
+        """所有方法应为 async def"""
         from src.application.services.unified_storage_gateway import UnifiedStorageGateway
 
         mock_l0 = MagicMock()
@@ -80,11 +80,11 @@ class TestUnifiedStorageGatewayUnifiedStoragePortCompliance:
 
 
 class TestUnifiedStorageGatewayBehavior:
-    """UnifiedStorageGateway 行为测试。"""
+    """UnifiedStorageGateway 行为测试"""
 
     @pytest.fixture
     def mock_l0_storage(self):
-        """创建模拟的 L0 存储。"""
+        """创建模拟的 L0 存储"""
         mock = MagicMock()
         mock.write = AsyncMock(return_value=True)
         mock.read = AsyncMock(return_value="memory content")
@@ -94,7 +94,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.fixture
     def mock_l1_cache(self):
-        """创建模拟的 L1 缓存。"""
+        """创建模拟的 L1 缓存"""
         mock = MagicMock()
         mock.get_memory = AsyncMock(return_value=None)
         mock.set_memory = AsyncMock(return_value=True)
@@ -103,7 +103,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.fixture
     def mock_l2_metadata(self):
-        """创建模拟的 L2 元数据仓储。"""
+        """创建模拟的 L2 元数据仓储"""
         mock = MagicMock()
         mock.get_by_id = AsyncMock(
             return_value=MagicMock(
@@ -119,14 +119,14 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.fixture
     def mock_l2_history(self):
-        """创建模拟的 L2 历史仓储。"""
+        """创建模拟的 L2 历史仓储"""
         mock = MagicMock()
         mock.append = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
     def gateway(self, mock_l0_storage, mock_l1_cache, mock_l2_metadata, mock_l2_history):
-        """创建 UnifiedStorageGateway 实例。"""
+        """创建 UnifiedStorageGateway 实例"""
         from src.application.services.unified_storage_gateway import UnifiedStorageGateway
 
         return UnifiedStorageGateway(
@@ -138,7 +138,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_save_writes_to_l0(self, gateway, mock_l0_storage) -> None:
-        """save 应写入 L0 文件系统。"""
+        """save 应写入 L0 文件系统"""
         result = await gateway.save(
             memory_id="12345678-1234-1234-1234-123456789abc",
             content="test content",
@@ -152,7 +152,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_save_warms_l1_cache(self, gateway, mock_l1_cache) -> None:
-        """L0 写入成功后应预热 L1 缓存。"""
+        """L0 写入成功后应预热 L1 缓存"""
         await gateway.save(
             memory_id="12345678-1234-1234-1234-123456789abc",
             content="test content",
@@ -165,7 +165,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_read_with_cache_miss_falls_back_to_l0(self, gateway, mock_l0_storage) -> None:
-        """缓存未命中时应回退到 L0。"""
+        """缓存未命中时应回退到 L0"""
         mock_l0_storage.read.return_value = "memory from L0"
 
         result = await gateway.read(
@@ -181,7 +181,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_read_with_cache_hit_returns_cached(self, gateway, mock_l1_cache, mock_l0_storage) -> None:
-        """缓存命中时应直接返回。"""
+        """缓存命中时应直接返回"""
         mock_l1_cache.get_memory.return_value = "cached content"
 
         result = await gateway.read(
@@ -197,7 +197,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_delete_removes_from_l0(self, gateway, mock_l0_storage) -> None:
-        """delete 应从 L0 删除。"""
+        """delete 应从 L0 删除"""
         result = await gateway.delete(
             memory_id="12345678-1234-1234-1234-123456789abc",
             memory_type="private",
@@ -210,7 +210,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_delete_invalidates_l1_cache(self, gateway, mock_l1_cache) -> None:
-        """delete 应始终失效 L1 缓存。"""
+        """delete 应始终失效 L1 缓存"""
         await gateway.delete(
             memory_id="12345678-1234-1234-1234-123456789abc",
             memory_type="private",
@@ -222,7 +222,7 @@ class TestUnifiedStorageGatewayBehavior:
 
     @pytest.mark.asyncio
     async def test_exists_checks_l0(self, gateway, mock_l0_storage, mock_l2_metadata) -> None:
-        """exists 应检查 L0。"""
+        """exists 应检查 L0"""
         mock_l0_storage.exists.return_value = True
 
         result = await gateway.exists(
@@ -237,7 +237,7 @@ class TestUnifiedStorageGatewayBehavior:
 
 
 class TestUnifiedStorageGatewayWithOptionalLayers:
-    """带有可选 L3-L5 层的 UnifiedStorageGateway 测试。"""
+    """带有可选 L3-L5 层的 UnifiedStorageGateway 测试"""
 
     @pytest.fixture
     def mock_l0_storage(self):
@@ -301,7 +301,7 @@ class TestUnifiedStorageGatewayWithOptionalLayers:
         mock_l4_object,
         mock_l5_graph,
     ) -> None:
-        """UnifiedStorageGateway 应接受可选的 L3-L5 层。"""
+        """UnifiedStorageGateway 应接受可选的 L3-L5 层"""
         from src.application.services.unified_storage_gateway import UnifiedStorageGateway
 
         gateway = UnifiedStorageGateway(

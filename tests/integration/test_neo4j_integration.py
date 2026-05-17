@@ -11,7 +11,7 @@ import pytest
 
 
 class _AsyncCM:
-    """辅助类：模拟异步上下文管理器。"""
+    """辅助类：模拟异步上下文管理器"""
 
     def __init__(self, session):
         self._session = session
@@ -24,7 +24,7 @@ class _AsyncCM:
 
 
 def _mock_session_single(driver, session, single_result):
-    """设置会话模拟（用于 .single() 场景）。"""
+    """设置会话模拟（用于 .single() 场景）"""
 
     async def mock_run(*args, **kwargs):
         result_mock = MagicMock()
@@ -37,7 +37,7 @@ def _mock_session_single(driver, session, single_result):
 
 
 def _mock_session_data(driver, session, data_result):
-    """设置会话模拟（用于 .data() 场景）。"""
+    """设置会话模拟（用于 .data() 场景）"""
 
     async def mock_run(*args, **kwargs):
         result_mock = MagicMock()
@@ -61,10 +61,10 @@ def mock_session():
 
 
 class TestNeo4jNodeLifecycle:
-    """节点生命周期端到端测试。"""
+    """节点生命周期端到端测试"""
 
     async def test_create_get_delete_node(self, mock_driver, mock_session):
-        """测试节点创建→查询→验证→删除完整流程。"""
+        """测试节点创建→查询→验证→删除完整流程"""
         from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 
         manager = Neo4jGraphManager(driver=mock_driver, database="neo4j")
@@ -99,10 +99,10 @@ class TestNeo4jNodeLifecycle:
 
 
 class TestNeo4jRelationshipLifecycle:
-    """关系生命周期端到端测试。"""
+    """关系生命周期端到端测试"""
 
     async def test_create_delete_relationship(self, mock_driver, mock_session):
-        """测试关系创建→查询→验证→删除完整流程。"""
+        """测试关系创建→查询→验证→删除完整流程"""
         from src.infrastructure.storage.neo4j.graph_manager import Neo4jGraphManager
 
         manager = Neo4jGraphManager(driver=mock_driver, database="neo4j")
@@ -130,10 +130,10 @@ class TestNeo4jRelationshipLifecycle:
 
 
 class TestNeo4jCypherQueries:
-    """Cypher 查询端到端测试。"""
+    """Cypher 查询端到端测试"""
 
     async def test_parameterized_query(self, mock_driver, mock_session):
-        """测试参数化 Cypher 查询。"""
+        """测试参数化 Cypher 查询"""
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
         storage = Neo4jGraphStorage(driver=mock_driver, database="neo4j")
@@ -150,10 +150,10 @@ class TestNeo4jCypherQueries:
 
 
 class TestNeo4jGraphRAG:
-    """GraphRAG 实体关联检索端到端测试。"""
+    """GraphRAG 实体关联检索端到端测试"""
 
     async def test_find_related_entities_full_flow(self, mock_driver, mock_session):
-        """测试 GraphRAG 实体关联检索完整流程。"""
+        """测试 GraphRAG 实体关联检索完整流程"""
         from src.infrastructure.storage.neo4j.graph_retriever import GraphRetriever
 
         retriever = GraphRetriever(driver=mock_driver, database="neo4j")
@@ -174,10 +174,10 @@ class TestNeo4jGraphRAG:
 
 
 class TestNeo4jMultiTenantIsolation:
-    """多租户隔离端到端测试。"""
+    """多租户隔离端到端测试"""
 
     async def test_business_domain_filtering(self, mock_driver, mock_session):
-        """测试不同 business_domain 数据隔离。"""
+        """测试不同 business_domain 数据隔离"""
         from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
         storage = Neo4jGraphStorage(driver=mock_driver, database="neo4j")

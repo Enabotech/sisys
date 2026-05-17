@@ -22,7 +22,7 @@ DEFAULT_RETRY_QUEUE_KEY = "sisys:retry:queue"
 
 
 class RetryQueueEntry:
-    """重试队列条目。"""
+    """重试队列条目"""
 
     def __init__(
         self,
@@ -41,7 +41,7 @@ class RetryQueueEntry:
         self.error = error
 
     def to_json(self) -> str:
-        """序列化为 JSON 字符串。"""
+        """序列化为 JSON 字符串"""
         return json.dumps(
             {
                 "event_id": str(self.event_id),
@@ -55,7 +55,7 @@ class RetryQueueEntry:
 
     @classmethod
     def from_json(cls, data: str) -> RetryQueueEntry:
-        """从 JSON 字符串反序列化。"""
+        """从 JSON 字符串反序列化"""
         obj = json.loads(data)
         return cls(
             event_id=UUID(obj["event_id"]),
@@ -213,5 +213,5 @@ class RedisRetryQueue:
         return False
 
     async def clear(self) -> None:
-        """清空重试队列。"""
+        """清空重试队列"""
         await self._redis.delete(self._queue_key)

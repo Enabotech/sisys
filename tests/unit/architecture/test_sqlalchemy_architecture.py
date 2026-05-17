@@ -10,10 +10,10 @@ from pathlib import Path
 
 
 class TestArchitectureConstraints:
-    """架构约束测试。"""
+    """架构约束测试"""
 
     def test_domain_layer_no_sqlalchemy_imports(self):
-        """测试领域层无SQLAlchemy导入。"""
+        """测试领域层无SQLAlchemy导入"""
         domain_dir = Path(__file__).parents[3] / "src" / "domain"
 
         violations = []
@@ -41,7 +41,7 @@ class TestArchitectureConstraints:
         assert len(violations) == 0, f"Domain layer imports infrastructure (reverse dependency): {violations}"
 
     def test_all_models_have_tests(self):
-        """测试所有模型都有对应的单元测试。"""
+        """测试所有模型都有对应的单元测试"""
         models_dir = Path(__file__).parents[3] / "src" / "infrastructure" / "storage" / "postgresql" / "models"
         tests_dir = Path(__file__).parents[3] / "tests" / "unit" / "infrastructure" / "storage" / "postgresql" / "models"
 
@@ -58,7 +58,7 @@ class TestArchitectureConstraints:
         assert (tests_dir / "test_association_tables.py").exists(), "test_association_tables.py should exist"
 
     def test_alembic_migration_syntax(self):
-        """测试Alembic迁移脚本语法正确。"""
+        """测试Alembic迁移脚本语法正确"""
         versions_dir = Path(__file__).parents[3] / "alembic" / "versions"
 
         for py_file in versions_dir.glob("*.py"):

@@ -94,7 +94,7 @@ class Resolver:
         return self._create_instance(spec)
 
     def _create_instance(self, spec: PortSpec) -> Any:
-        """根据生命周期策略创建实例。"""
+        """根据生命周期策略创建实例"""
         if spec.lifetime == Lifetime.SINGLETON:
             if spec.name not in self._instances:
                 self._instances[spec.name] = self._instantiate(spec)
@@ -109,7 +109,7 @@ class Resolver:
         return self._instantiate(spec)
 
     def _instantiate(self, spec: PortSpec) -> Any:
-        """实例化端口实现。"""
+        """实例化端口实现"""
         if callable(spec.impl) and not isinstance(spec.impl, type):
             return spec.impl(resolver=self)
         if isinstance(spec.impl, str):
@@ -136,7 +136,7 @@ class Resolver:
             raise RuntimeError(f"Failed to lazy-load {module_path}: {e}") from e
 
     def _auto_inject(self, cls: Type[T]) -> T:
-        """自动注入构造函数依赖。"""
+        """自动注入构造函数依赖"""
         sig = inspect.signature(cls.__init__)
         kwargs = {}
         failures = []
@@ -168,11 +168,11 @@ class Resolver:
         return cls(**kwargs)
 
     def clear_scoped(self) -> None:
-        """清除作用域实例（请求结束时调用）。"""
+        """清除作用域实例（请求结束时调用）"""
         self._scoped_context.clear()
 
     def clear_singleton(self) -> None:
-        """清除单例实例。"""
+        """清除单例实例"""
         self._instances.clear()
 
 
@@ -181,7 +181,7 @@ _default_resolver: Resolver | None = None
 
 
 def get_resolver() -> Resolver:
-    """获取全局解析器实例。"""
+    """获取全局解析器实例"""
     global _default_resolver
     if _default_resolver is None:
         _default_resolver = Resolver()

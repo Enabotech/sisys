@@ -1,4 +1,4 @@
-"""SQLAlchemyEventOutboxAdapter 单元测试。"""
+"""SQLAlchemyEventOutboxAdapter 单元测试"""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from src.infrastructure.storage.postgresql.models import OutboxModel
 
 
 class TestSQLAlchemyEventOutboxAdapter:
-    """SQLAlchemyEventOutboxAdapter 测试。"""
+    """SQLAlchemyEventOutboxAdapter 测试"""
 
     def test_from_domain_event(self):
-        """测试 DomainEvent → OutboxModel 转换。"""
+        """测试 DomainEvent → OutboxModel 转换"""
         event = DomainEvent(
             event_id=uuid4(),
             event_type="TestEvent",
@@ -34,7 +34,7 @@ class TestSQLAlchemyEventOutboxAdapter:
         assert model.created_at == event.timestamp
 
     def test_to_domain_event(self):
-        """测试 OutboxModel → DomainEvent 转换。"""
+        """测试 OutboxModel → DomainEvent 转换"""
         event_id = uuid4()
         model = OutboxModel(
             event_id=event_id,
@@ -55,7 +55,7 @@ class TestSQLAlchemyEventOutboxAdapter:
         assert event.event_type == "DocumentProcessed"
 
     def test_roundtrip(self):
-        """测试双向转换。"""
+        """测试双向转换"""
         original_event = DocumentProcessed(
             document_id=uuid4(),
         )

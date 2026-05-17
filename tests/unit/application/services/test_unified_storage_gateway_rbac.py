@@ -12,7 +12,7 @@ import pytest
 
 
 class TestUnifiedStorageGatewayRBAC:
-    """UnifiedStorageGateway RBAC 校验测试。"""
+    """UnifiedStorageGateway RBAC 校验测试"""
 
     @pytest.fixture
     def mock_l0_storage(self):
@@ -60,7 +60,7 @@ class TestUnifiedStorageGatewayRBAC:
 
     @pytest.mark.asyncio
     async def test_private_memory_owner_can_read(self, gateway, mock_l2_metadata):
-        """Private 记忆：owner 可以读取。"""
+        """Private 记忆：owner 可以读取"""
         memory_id = UUID("12345678-1234-1234-1234-123456789abc")
         owner_id = "user123"
 
@@ -83,7 +83,7 @@ class TestUnifiedStorageGatewayRBAC:
 
     @pytest.mark.asyncio
     async def test_private_memory_non_owner_cannot_read(self, gateway, mock_l2_metadata, mock_l0_storage):
-        """Private 记忆：非 owner 不能读取。"""
+        """Private 记忆：非 owner 不能读取"""
         memory_id = UUID("12345678-1234-1234-1234-123456789abc")
         owner_id = "user123"
         other_user = "user456"
@@ -108,7 +108,7 @@ class TestUnifiedStorageGatewayRBAC:
 
     @pytest.mark.asyncio
     async def test_group_memory_owner_can_read(self, gateway, mock_l2_metadata):
-        """Group 记忆：owner 可以读取。"""
+        """Group 记忆：owner 可以读取"""
         memory_id = UUID("12345678-1234-1234-1234-123456789abc")
         owner_id = "user123"
         group_id = "group-abc"
@@ -132,7 +132,7 @@ class TestUnifiedStorageGatewayRBAC:
 
     @pytest.mark.asyncio
     async def test_group_memory_member_can_read(self, gateway, mock_l2_metadata, mock_l2_group_member):
-        """Group 记忆：group 成员可以读取（非 owner）。"""
+        """Group 记忆：group 成员可以读取（非 owner）"""
         memory_id = UUID("12345678-1234-1234-1234-123456789abc")
         owner_id = "user123"
         group_member = "user456"
@@ -160,7 +160,7 @@ class TestUnifiedStorageGatewayRBAC:
 
     @pytest.mark.asyncio
     async def test_group_memory_non_member_cannot_read(self, gateway, mock_l2_metadata, mock_l0_storage, mock_l2_group_member):
-        """Group 记忆：非 group 成员不能读取。"""
+        """Group 记忆：非 group 成员不能读取"""
         memory_id = UUID("12345678-1234-1234-1234-123456789abc")
         owner_id = "user123"
         non_member = "user789"

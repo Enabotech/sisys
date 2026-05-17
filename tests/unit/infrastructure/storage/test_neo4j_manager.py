@@ -1,4 +1,4 @@
-"""Neo4jClient 单元测试。"""
+"""Neo4jClient 单元测试"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from src.infrastructure.storage.neo4j.neo4j_manager import Neo4jManager
 
 
 class _AsyncCM:
-    """辅助类：模拟异步上下文管理器。"""
+    """辅助类：模拟异步上下文管理器"""
 
     def __init__(self, session):
         self._session = session
@@ -24,46 +24,46 @@ class _AsyncCM:
 
 @pytest.fixture
 def mock_driver():
-    """模拟异步 Neo4j 驱动。"""
+    """模拟异步 Neo4j 驱动"""
     return MagicMock()
 
 
 @pytest.fixture
 def mock_session():
-    """模拟 Neo4j 会话。"""
+    """模拟 Neo4j 会话"""
     return MagicMock()
 
 
 @pytest.fixture
 def wrapper(mock_driver: MagicMock):
-    """注入 mock 驱动的 Neo4jManager 实例。"""
+    """注入 mock 驱动的 Neo4jManager 实例"""
     return Neo4jManager(mock_driver, database="test_db")
 
 
 class TestNeo4jManager:
-    """Neo4jManager 测试类。"""
+    """Neo4jManager 测试类"""
 
     def test_init_with_driver(self, mock_driver: MagicMock):
-        """测试构造函数注入驱动。"""
+        """测试构造函数注入驱动"""
         wrapper = Neo4jManager(mock_driver, database="sisys_db")
         assert wrapper._driver is mock_driver
         assert wrapper._database == "sisys_db"
 
     def test_default_database(self, mock_driver: MagicMock):
-        """默认数据库名应为 neo4j。"""
+        """默认数据库名应为 neo4j"""
         manager = Neo4jManager(mock_driver)
         assert manager._database == "neo4j"
 
     def test_get_client_returns_injected(self, wrapper: Neo4jManager, mock_driver: MagicMock):
-        """测试 get_client 返回注入的驱动。"""
+        """测试 get_client 返回注入的驱动"""
         assert wrapper.get_client() is mock_driver
 
     def test_get_async_driver_returns_injected(self, wrapper: Neo4jManager, mock_driver: MagicMock):
-        """测试 get_async_driver 返回注入的驱动（向后兼容）。"""
+        """测试 get_async_driver 返回注入的驱动（向后兼容）"""
         assert wrapper.get_async_driver() is mock_driver
 
     async def test_health_check_success(self, wrapper: Neo4jManager, mock_driver: MagicMock, mock_session: MagicMock):
-        """测试健康检查成功。"""
+        """测试健康检查成功"""
 
         async def mock_run(*args, **kwargs):
             result_mock = MagicMock()
@@ -77,14 +77,14 @@ class TestNeo4jManager:
         assert result is True
 
     async def test_health_check_failure(self, wrapper: Neo4jManager, mock_driver: MagicMock):
-        """测试健康检查失败。"""
+        """测试健康检查失败"""
         mock_driver.session.side_effect = Exception("Connection refused")
 
         result = await wrapper.health_check()
         assert result is False
 
     async def test_health_check_query_error(self, wrapper: Neo4jManager, mock_driver: MagicMock, mock_session: MagicMock):
-        """测试查询执行异常。"""
+        """测试查询执行异常"""
         mock_session.run = AsyncMock(side_effect=RuntimeError("Query failed"))
         mock_driver.session.return_value = _AsyncCM(mock_session)
 
@@ -92,7 +92,7 @@ class TestNeo4jManager:
         assert result is False
 
     async def test_close(self, wrapper: Neo4jManager, mock_driver: MagicMock):
-        """测试关闭连接。"""
+        """测试关闭连接"""
         mock_driver.close = AsyncMock()
         await wrapper.close()
 
@@ -100,7 +100,7 @@ class TestNeo4jManager:
 
     @patch("src.infrastructure.storage.neo4j.neo4j_manager.AsyncGraphDatabase")
     def test_from_config_with_explicit_config(self, mock_db: MagicMock) -> None:
-        """from_config 应使用显式配置创建驱动。"""
+        """from_config 应使用显式配置创建驱动"""
         mock_config = MagicMock()
         mock_config.uri = "bolt://localhost:7687"
         mock_config.username = "neo4j"
@@ -126,7 +126,7 @@ class TestNeo4jManager:
     @patch("src.infrastructure.storage.neo4j.neo4j_manager.AsyncGraphDatabase")
     @patch("src.infrastructure.storage.neo4j.neo4j_manager.Neo4jConfig")
     def test_from_config_none_loads_from_env(self, mock_config_cls: MagicMock, mock_db: MagicMock) -> None:
-        """config=None 应从环境变量加载配置。"""
+        """config=None 应从环境变量加载配置"""
         mock_config = MagicMock()
         mock_config.uri = "bolt://env-host:7687"
         mock_config.username = "env_user"

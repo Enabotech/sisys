@@ -12,10 +12,10 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
 class TestPostgreSQLConfig:
-    """PostgreSQLConfig 配置模型测试。"""
+    """PostgreSQLConfig 配置模型测试"""
 
     def test_default_values(self):
-        """测试默认值设置。"""
+        """测试默认值设置"""
         config = PostgreSQLConfig()
 
         assert config.host == "localhost"
@@ -30,7 +30,7 @@ class TestPostgreSQLConfig:
         assert config.echo is False
 
     def test_custom_values(self):
-        """测试自定义值设置。"""
+        """测试自定义值设置"""
         config = PostgreSQLConfig(
             host="db.example.com",
             port=5433,
@@ -56,7 +56,7 @@ class TestPostgreSQLConfig:
         assert config.echo is True
 
     def test_from_env_defaults(self):
-        """测试 from_env 使用默认环境变量。"""
+        """测试 from_env 使用默认环境变量"""
         with mock.patch.dict(os.environ, clear=True):
             config = PostgreSQLConfig.from_env()
 
@@ -72,7 +72,7 @@ class TestPostgreSQLConfig:
             assert config.echo is False
 
     def test_from_env_custom(self):
-        """测试 from_env 使用自定义环境变量。"""
+        """测试 from_env 使用自定义环境变量"""
         env = {
             "POSTGRES_HOST": "custom-host",
             "POSTGRES_PORT": "5433",
@@ -101,7 +101,7 @@ class TestPostgreSQLConfig:
             assert config.echo is True
 
     def test_from_env_partial(self):
-        """测试 from_env 使用部分环境变量。"""
+        """测试 from_env 使用部分环境变量"""
         env = {
             "POSTGRES_HOST": "custom-host",
             "POSTGRES_PASSWORD": "secret456",  # pragma: allowlist secret

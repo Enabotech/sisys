@@ -55,4 +55,4 @@ class EventSubscriber(Protocol):
         """
 
     async def close(self) -> None:
-        """关闭订阅者，释放资源。"""
+        """关闭订阅者，释放资源"""

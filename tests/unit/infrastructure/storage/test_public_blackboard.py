@@ -14,7 +14,7 @@ def _create_blackboard(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisPublicB
 
 
 class TestRedisPublicBlackboard:
-    """RedisPublicBlackboard 测试。"""
+    """RedisPublicBlackboard 测试"""
 
     @pytest.mark.asyncio
     async def test_post_and_get(self) -> None:

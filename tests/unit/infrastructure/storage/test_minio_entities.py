@@ -12,10 +12,10 @@ from src.infrastructure.storage.minio.entities import LifecycleRule, ObjectMetad
 
 
 class TestObjectMetadata:
-    """ObjectMetadata 实体测试。"""
+    """ObjectMetadata 实体测试"""
 
     def test_create_minimal(self):
-        """最小创建。"""
+        """最小创建"""
         obj_id = uuid4()
         meta = ObjectMetadata(
             object_id=obj_id,
@@ -39,7 +39,7 @@ class TestObjectMetadata:
         assert meta.tags == {}
 
     def test_with_version_id(self):
-        """带版本 ID 创建。"""
+        """带版本 ID 创建"""
         obj_id = uuid4()
         meta = ObjectMetadata(
             object_id=obj_id,
@@ -53,7 +53,7 @@ class TestObjectMetadata:
         assert meta.version_id == "v1-abc"
 
     def test_with_worm_lock(self):
-        """带 WORM 锁定。"""
+        """带 WORM 锁定"""
         obj_id = uuid4()
         retention = datetime.now(UTC) + timedelta(days=2555)
         meta = ObjectMetadata(
@@ -70,7 +70,7 @@ class TestObjectMetadata:
         assert meta.retention_until == retention
 
     def test_with_tags(self):
-        """带标签。"""
+        """带标签"""
         obj_id = uuid4()
         meta = ObjectMetadata(
             object_id=obj_id,
@@ -85,7 +85,7 @@ class TestObjectMetadata:
         assert meta.tags["team"] == "engineering"
 
     def test_multipart_state(self):
-        """分片上传状态。"""
+        """分片上传状态"""
         obj_id = uuid4()
         meta = ObjectMetadata(
             object_id=obj_id,
@@ -104,7 +104,7 @@ class TestObjectMetadata:
         assert len(meta.uploaded_parts) == 2
 
     def test_to_dict(self):
-        """序列化为字典。"""
+        """序列化为字典"""
         obj_id = uuid4()
         meta = ObjectMetadata(
             object_id=obj_id,
@@ -121,7 +121,7 @@ class TestObjectMetadata:
         assert d["tags"]["env"] == "test"
 
     def test_from_dict(self):
-        """从字典反序列化。"""
+        """从字典反序列化"""
         obj_id = uuid4()
         data = {
             "object_id": str(obj_id),
@@ -138,10 +138,10 @@ class TestObjectMetadata:
 
 
 class TestLifecycleRule:
-    """LifecycleRule 实体测试。"""
+    """LifecycleRule 实体测试"""
 
     def test_create_expiration_rule(self):
-        """创建过期规则。"""
+        """创建过期规则"""
         rule = LifecycleRule(
             rule_id="expire-temp",
             status="Enabled",
@@ -156,7 +156,7 @@ class TestLifecycleRule:
         assert rule.transition_storage_class is None
 
     def test_create_transition_rule(self):
-        """创建转换规则。"""
+        """创建转换规则"""
         rule = LifecycleRule(
             rule_id="transition-to-cold",
             status="Enabled",
@@ -169,7 +169,7 @@ class TestLifecycleRule:
         assert rule.transition_storage_class == "GLACIER"
 
     def test_to_minio_dict(self):
-        """转换为 MinIO 生命周期字典。"""
+        """转换为 MinIO 生命周期字典"""
         rule = LifecycleRule(
             rule_id="expire-temp",
             status="Enabled",

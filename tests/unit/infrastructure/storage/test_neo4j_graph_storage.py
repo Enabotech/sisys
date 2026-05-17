@@ -1,4 +1,4 @@
-"""Neo4jGraphStorage 单元测试。"""
+"""Neo4jGraphStorage 单元测试"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from src.infrastructure.storage.neo4j.graph_storage import Neo4jGraphStorage
 
 
 class _AsyncCM:
-    """辅助类：模拟异步上下文管理器。"""
+    """辅助类：模拟异步上下文管理器"""
 
     def __init__(self, session):
         self._session = session
@@ -23,7 +23,7 @@ class _AsyncCM:
 
 
 def _mock_session(driver, session, data_result):
-    """设置会话模拟。"""
+    """设置会话模拟"""
 
     async def mock_run(*args, **kwargs):
         result_mock = MagicMock()
@@ -52,10 +52,10 @@ def storage(mock_driver):
 
 
 class TestNeo4jGraphStorage:
-    """Neo4jGraphStorage 测试类。"""
+    """Neo4jGraphStorage 测试类"""
 
     async def test_execute_query_with_params(self, storage, mock_driver, mock_session):
-        """测试参数化查询。"""
+        """测试参数化查询"""
         _mock_session(mock_driver, mock_session, [{"n": {"id": "entity-001"}}])
 
         result = await storage.execute_query(
@@ -68,14 +68,14 @@ class TestNeo4jGraphStorage:
         assert "$node_id" in call_args[0][0]
 
     async def test_execute_query_no_params(self, storage, mock_driver, mock_session):
-        """测试无参数查询。"""
+        """测试无参数查询"""
         _mock_session(mock_driver, mock_session, [{"count(n)": 10}])
 
         result = await storage.execute_query("MATCH (n) RETURN count(n)")
         assert len(result) == 1
 
     async def test_execute_write_query(self, storage, mock_driver, mock_session):
-        """测试写入查询。"""
+        """测试写入查询"""
         _mock_session(mock_driver, mock_session, [{"n": {"id": "new-entity"}}])
 
         result = await storage.execute_write_query(
@@ -85,7 +85,7 @@ class TestNeo4jGraphStorage:
         assert len(result) == 1
 
     async def test_find_path(self, storage, mock_driver, mock_session):
-        """测试路径查询。"""
+        """测试路径查询"""
         _mock_session(mock_driver, mock_session, [{"path": MagicMock()}])
 
         result = await storage.find_path("node-a", "node-b", max_depth=3)
@@ -107,14 +107,14 @@ class TestNeo4jGraphStorage:
         assert call_args[1]["end_id"] == "node-b"
 
     async def test_get_neighbors_no_rel_type(self, storage, mock_driver, mock_session):
-        """测试获取所有邻居（无关系类型过滤）。"""
+        """测试获取所有邻居（无关系类型过滤）"""
         _mock_session(mock_driver, mock_session, [{"neighbor": {"id": "neighbor-001"}}])
 
         result = await storage.get_neighbors("node-a")
         assert len(result) >= 0
 
     async def test_get_neighbors_with_rel_type(self, storage, mock_driver, mock_session):
-        """测试获取特定关系的邻居。"""
+        """测试获取特定关系的邻居"""
         _mock_session(mock_driver, mock_session, [{"neighbor": {"id": "neighbor-001"}}])
 
         await storage.get_neighbors("node-a", rel_type="MENTIONS")
@@ -123,7 +123,7 @@ class TestNeo4jGraphStorage:
         assert "MENTIONS" in cypher
 
     async def test_get_neighbors_direction_out(self, storage, mock_driver, mock_session):
-        """测试 OUT 方向邻居。"""
+        """测试 OUT 方向邻居"""
         _mock_session(mock_driver, mock_session, [])
 
         await storage.get_neighbors("node-a", direction="OUT")
@@ -132,7 +132,7 @@ class TestNeo4jGraphStorage:
         assert "->" in cypher
 
     async def test_get_neighbors_direction_in(self, storage, mock_driver, mock_session):
-        """测试 IN 方向邻居。"""
+        """测试 IN 方向邻居"""
         _mock_session(mock_driver, mock_session, [])
 
         await storage.get_neighbors("node-a", direction="IN")

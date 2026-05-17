@@ -52,7 +52,7 @@ class RedisEventSubscriber:
         self._running = False
 
     def _get_pool(self) -> aioredis.ConnectionPool:
-        """懒加载连接池（异步安全）。"""
+        """懒加载连接池（异步安全）"""
         if self._pool is None:
             self._pool = aioredis.ConnectionPool(
                 host=self._config.host,
@@ -84,7 +84,7 @@ class RedisEventSubscriber:
         self._handlers[channel].append(handler)
 
     async def start(self) -> None:
-        """异步开始监听所有订阅的频道。"""
+        """异步开始监听所有订阅的频道"""
         if self._running:
             return
 
@@ -98,7 +98,7 @@ class RedisEventSubscriber:
         logger.info("RedisEventSubscriber started, subscribed to: %s", list(self._handlers.keys()))
 
     async def _listen_loop(self) -> None:
-        """后台监听循环（异步版本）。"""
+        """后台监听循环（异步版本）"""
         assert self._pubsub is not None
         try:
             async for message in self._pubsub.listen():
@@ -145,7 +145,7 @@ class RedisEventSubscriber:
                 )
 
     async def close(self) -> None:
-        """异步停止订阅并关闭连接。"""
+        """异步停止订阅并关闭连接"""
         self._running = False
         if self._task:
             self._task.cancel()

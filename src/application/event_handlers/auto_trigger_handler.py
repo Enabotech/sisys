@@ -45,10 +45,10 @@ class AutoTriggerHandler:
 
     # Concurrency control parameters
     MAX_CONCURRENT_TASKS: int = 100
-    """最大并发事件处理任务数。"""
+    """最大并发事件处理任务数"""
 
     TASK_TIMEOUT: float = 300.0
-    """单个事件处理任务的超时秒数。"""
+    """单个事件处理任务的超时秒数"""
 
     def __init__(
         self,
@@ -178,7 +178,7 @@ class AutoTriggerHandler:
             loop.close()
 
     def stop(self) -> None:
-        """停止后台工作线程。"""
+        """停止后台工作线程"""
         self._running = False
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=5.0)

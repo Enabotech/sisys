@@ -14,11 +14,11 @@ def _create_storage(fake_redis: fakeredis.aioredis.FakeRedis) -> RedisSessionSto
 
 
 class TestRedisSessionStorage:
-    """RedisSessionStorage 测试。"""
+    """RedisSessionStorage 测试"""
 
     @pytest.mark.asyncio
     async def test_save_and_load(self) -> None:
-        """保存和加载会话状态。"""
+        """保存和加载会话状态"""
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 
@@ -33,7 +33,7 @@ class TestRedisSessionStorage:
 
     @pytest.mark.asyncio
     async def test_load_nonexistent_returns_none(self) -> None:
-        """加载不存在的会话应返回 None。"""
+        """加载不存在的会话应返回 None"""
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 
@@ -42,7 +42,7 @@ class TestRedisSessionStorage:
 
     @pytest.mark.asyncio
     async def test_delete(self) -> None:
-        """删除会话。"""
+        """删除会话"""
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 
@@ -60,7 +60,7 @@ class TestRedisSessionStorage:
 
     @pytest.mark.asyncio
     async def test_exists(self) -> None:
-        """检查会话存在性。"""
+        """检查会话存在性"""
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 
@@ -72,7 +72,7 @@ class TestRedisSessionStorage:
 
     @pytest.mark.asyncio
     async def test_save_with_custom_ttl(self) -> None:
-        """保存会话时使用自定义 TTL。"""
+        """保存会话时使用自定义 TTL"""
         fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
         storage = _create_storage(fake_redis)
 

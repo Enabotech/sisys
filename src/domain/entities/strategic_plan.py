@@ -18,7 +18,7 @@ from enum import Enum
 
 
 class BLMPhase(str, Enum):
-    """BLM（商业领导力模型）阶段枚举。"""
+    """BLM（商业领导力模型）阶段枚举"""
 
     STRATEGIC_INTENT = "strategic_intent"
     MARKET_INSIGHT = "market_insight"
@@ -29,7 +29,7 @@ class BLMPhase(str, Enum):
 
 
 class PlanStatus(str, Enum):
-    """战略规划状态枚举。"""
+    """战略规划状态枚举"""
 
     DRAFT = "draft"
     IN_REVIEW = "in_review"

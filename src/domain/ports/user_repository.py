@@ -20,7 +20,7 @@ from src.domain.entities.user import User
 
 @runtime_checkable
 class UserRepositoryPort(Protocol):
-    """用户仓储端口（领域层定义，仅使用标准库）。"""
+    """用户仓储端口（领域层定义，仅使用标准库）"""
 
     async def get_by_username(self, username: str) -> User | None:
         """根据用户名获取用户

@@ -14,10 +14,10 @@ from src.infrastructure.config.minio import MinIOConfig
 
 
 class TestMinIOConfigInit:
-    """MinIOConfig 初始化测试。"""
+    """MinIOConfig 初始化测试"""
 
     def test_default_values(self):
-        """验证默认值正确。"""
+        """验证默认值正确"""
         config = MinIOConfig()
         assert config.host == "localhost"
         assert config.port == 9000
@@ -30,7 +30,7 @@ class TestMinIOConfigInit:
         assert config.read_timeout == 30.0
 
     def test_custom_values(self):
-        """验证自定义值。"""
+        """验证自定义值"""
         config = MinIOConfig(
             host="minio.example.com",
             port=9000,
@@ -49,10 +49,10 @@ class TestMinIOConfigInit:
 
 
 class TestMinIOConfigFromEnv:
-    """MinIOConfig from_env 测试。"""
+    """MinIOConfig from_env 测试"""
 
     def test_from_env_defaults(self):
-        """无环境变量时使用默认值。"""
+        """无环境变量时使用默认值"""
         with patch.dict(os.environ, {}, clear=True):
             config = MinIOConfig.from_env()
             assert config.host == "localhost"
@@ -63,7 +63,7 @@ class TestMinIOConfigFromEnv:
             assert config.secure is False
 
     def test_from_env_custom_endpoint(self):
-        """自定义端点环境变量。"""
+        """自定义端点环境变量"""
         with patch.dict(os.environ, {"MINIO_HOST": "custom.minio", "MINIO_API_PORT": "9000"}):
             config = MinIOConfig.from_env()
             assert config.host == "custom.minio"
@@ -71,7 +71,7 @@ class TestMinIOConfigFromEnv:
             assert config.endpoint == "custom.minio:9000"
 
     def test_from_env_credentials(self):
-        """凭证环境变量。"""
+        """凭证环境变量"""
         with patch.dict(
             os.environ,
             {
@@ -84,7 +84,7 @@ class TestMinIOConfigFromEnv:
             assert config.secret_key == "test-secret"  # pragma: allowlist secret
 
     def test_from_env_secure_flag(self):
-        """Secure 标志环境变量。"""
+        """Secure 标志环境变量"""
         with patch.dict(os.environ, {"MINIO_SECURE": "true"}):
             config = MinIOConfig.from_env()
             assert config.secure is True
@@ -94,7 +94,7 @@ class TestMinIOConfigFromEnv:
             assert config.secure is False
 
     def test_from_env_timeouts(self):
-        """超时环境变量。"""
+        """超时环境变量"""
         with patch.dict(
             os.environ,
             {
@@ -107,7 +107,7 @@ class TestMinIOConfigFromEnv:
             assert config.read_timeout == 60.0
 
     def test_from_env_invalid_timeout(self):
-        """无效超时值应抛出异常。"""
+        """无效超时值应抛出异常"""
         with patch.dict(os.environ, {"MINIO_CONNECT_TIMEOUT": "not-a-number"}):
             with pytest.raises(ValueError, match="MINIO_CONNECT_TIMEOUT"):
                 MinIOConfig.from_env()

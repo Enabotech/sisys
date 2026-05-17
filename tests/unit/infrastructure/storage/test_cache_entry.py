@@ -8,10 +8,10 @@ from src.infrastructure.storage.redis.cache_entry import CacheEntry
 
 
 class TestCacheEntry:
-    """CacheEntry 序列化/反序列化测试。"""
+    """CacheEntry 序列化/反序列化测试"""
 
     def test_default_values(self) -> None:
-        """CacheEntry 应有合理的默认值。"""
+        """CacheEntry 应有合理的默认值"""
         entry = CacheEntry(
             cache_key="test-key",
             query_embedding=[0.1, 0.2, 0.3],
@@ -25,7 +25,7 @@ class TestCacheEntry:
         assert isinstance(entry.created_at, datetime)
 
     def test_to_dict_serialization(self) -> None:
-        """to_dict 应正确序列化为字典。"""
+        """to_dict 应正确序列化为字典"""
         entry = CacheEntry(
             cache_key="test-key",
             query_embedding=[0.1, 0.2],
@@ -42,7 +42,7 @@ class TestCacheEntry:
         assert isinstance(result["created_at"], str)
 
     def test_from_dict_deserialization(self) -> None:
-        """from_dict 应正确从字典反序列化。"""
+        """from_dict 应正确从字典反序列化"""
         data = {
             "cache_key": "test-key",
             "query_embedding": [0.1, 0.2, 0.3],
@@ -59,7 +59,7 @@ class TestCacheEntry:
         assert entry.ttl == 7200
 
     def test_roundtrip(self) -> None:
-        """to_dict -> from_dict 应保持数据不变。"""
+        """to_dict -> from_dict 应保持数据不变"""
         original = CacheEntry(
             cache_key="test-key",
             query_embedding=[0.1, 0.2, 0.3],
@@ -75,7 +75,7 @@ class TestCacheEntry:
         assert restored.ttl == original.ttl
 
     def test_from_dict_with_defaults(self) -> None:
-        """from_dict 应使用默认值处理缺失字段。"""
+        """from_dict 应使用默认值处理缺失字段"""
         data = {
             "cache_key": "test-key",
             "query_embedding": [0.1],
@@ -87,7 +87,7 @@ class TestCacheEntry:
         assert entry.ttl == 86400
 
     def test_from_dict_with_datetime_object(self) -> None:
-        """from_dict 应接受 datetime 对象。"""
+        """from_dict 应接受 datetime 对象"""
         now = datetime.now(UTC)
         data = {
             "cache_key": "test-key",

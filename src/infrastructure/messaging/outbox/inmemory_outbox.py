@@ -56,7 +56,7 @@ class InMemoryOutboxRepository(OutboxRepository):
         return [EventOutboxAdapter.to_domain_event(e) for e in unpublished[:limit]]
 
     def mark_published(self, event_id: UUID) -> None:
-        """标记事件已发布。"""
+        """标记事件已发布"""
         for e in self._entities:
             if e.event_id == event_id:
                 e.status = "published"
@@ -66,7 +66,7 @@ class InMemoryOutboxRepository(OutboxRepository):
                 break
 
     def mark_failed(self, event_id: UUID, error: str) -> None:
-        """标记事件发布失败。"""
+        """标记事件发布失败"""
         for e in self._entities:
             if e.event_id == event_id:
                 e.status = "failed"
@@ -77,14 +77,14 @@ class InMemoryOutboxRepository(OutboxRepository):
     # ========== 内部方法（仅 Poller 使用） ==========
 
     async def _get_unpublished_entities(self, limit: int) -> list[OutboxEntity]:
-        """内部方法: 获取未发布的 OutboxEntity 列表（FIFO 排序）。"""
+        """内部方法: 获取未发布的 OutboxEntity 列表（FIFO 排序）"""
         async with self._lock:
             unpublished = [e for e in self._entities if e.status == "pending"]
             unpublished.sort(key=lambda e: e.created_at)
             return unpublished[:limit]
 
     async def _mark_published_entity(self, entity: OutboxEntity) -> None:
-        """内部方法: 标记 OutboxEntity 为 published。"""
+        """内部方法: 标记 OutboxEntity 为 published"""
         async with self._lock:
             for e in self._entities:
                 if e.event_id == entity.event_id:
@@ -95,7 +95,7 @@ class InMemoryOutboxRepository(OutboxRepository):
                     break
 
     async def _mark_failed_entity(self, entity: OutboxEntity, error: str) -> None:
-        """内部方法: 标记 OutboxEntity 为 failed，递增 retry_count。"""
+        """内部方法: 标记 OutboxEntity 为 failed，递增 retry_count"""
         async with self._lock:
             for e in self._entities:
                 if e.event_id == entity.event_id:

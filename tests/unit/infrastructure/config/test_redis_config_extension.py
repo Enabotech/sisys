@@ -14,30 +14,30 @@ from src.infrastructure.config.redis import RedisConfig
 
 
 class TestRedisConfigExtension:
-    """RedisConfig 扩展字段测试。"""
+    """RedisConfig 扩展字段测试"""
 
     def test_retry_on_timeout_default_value(self) -> None:
-        """retry_on_timeout 默认值为 True。"""
+        """retry_on_timeout 默认值为 True"""
         config = RedisConfig()
         assert config.retry_on_timeout is True
 
     def test_default_ttl_default_value(self) -> None:
-        """default_ttl 默认值为 86400（24 小时）。"""
+        """default_ttl 默认值为 86400（24 小时）"""
         config = RedisConfig()
         assert config.default_ttl == 86400
 
     def test_retry_on_timeout_custom_value(self) -> None:
-        """retry_on_timeout 可自定义。"""
+        """retry_on_timeout 可自定义"""
         config = RedisConfig(retry_on_timeout=False)
         assert config.retry_on_timeout is False
 
     def test_default_ttl_custom_value(self) -> None:
-        """default_ttl 可自定义。"""
+        """default_ttl 可自定义"""
         config = RedisConfig(default_ttl=3600)
         assert config.default_ttl == 3600
 
     def test_from_env_new_fields(self) -> None:
-        """from_env() 支持新环境变量。"""
+        """from_env() 支持新环境变量"""
         with patch.dict(
             os.environ,
             {
@@ -51,7 +51,7 @@ class TestRedisConfigExtension:
             assert config.default_ttl == 7200
 
     def test_from_env_backward_compatible(self) -> None:
-        """from_env() 向后兼容：新环境变量未设置时使用默认值。"""
+        """from_env() 向后兼容：新环境变量未设置时使用默认值"""
         env_vars = {
             "REDIS_HOST": "testhost",
             "REDIS_PORT": "6380",
@@ -76,7 +76,7 @@ class TestRedisConfigExtension:
             assert config.default_ttl == 86400
 
     def test_from_env_invalid_socket_timeout(self) -> None:
-        """from_env() 解析无效 socket_timeout 时抛出 ValueError。"""
+        """from_env() 解析无效 socket_timeout 时抛出 ValueError"""
         with patch.dict(
             os.environ,
             {"REDIS_SOCKET_TIMEOUT": "not_a_number"},
@@ -86,7 +86,7 @@ class TestRedisConfigExtension:
                 RedisConfig.from_env()
 
     def test_from_env_invalid_default_ttl(self) -> None:
-        """from_env() 解析无效 default_ttl 时抛出 ValueError。"""
+        """from_env() 解析无效 default_ttl 时抛出 ValueError"""
         with patch.dict(
             os.environ,
             {"REDIS_DEFAULT_TTL": "not_an_integer"},
@@ -96,7 +96,7 @@ class TestRedisConfigExtension:
                 RedisConfig.from_env()
 
     def test_from_env_password_none(self) -> None:
-        """from_env() 解析空密码返回 None。"""
+        """from_env() 解析空密码返回 None"""
         with patch.dict(
             os.environ,
             {"REDIS_PASSWORD": ""},
@@ -106,14 +106,14 @@ class TestRedisConfigExtension:
             assert config.password is None
 
     def test_from_env_various_retry_on_timeout_values(self) -> None:
-        """验证 retry_on_timeout 解析各种真值。"""
+        """验证 retry_on_timeout 解析各种真值"""
         for true_val in ("true", "1", "yes"):
             with patch.dict(os.environ, {"REDIS_RETRY_ON_TIMEOUT": true_val}, clear=False):
                 config = RedisConfig.from_env()
                 assert config.retry_on_timeout is True, f"Failed for {true_val}"
 
     def test_from_env_retry_on_timeout_false_values(self) -> None:
-        """验证 retry_on_timeout 解析各种假值。"""
+        """验证 retry_on_timeout 解析各种假值"""
         for false_val in ("false", "0", "no", "anything_else"):
             with patch.dict(os.environ, {"REDIS_RETRY_ON_TIMEOUT": false_val}, clear=False):
                 config = RedisConfig.from_env()

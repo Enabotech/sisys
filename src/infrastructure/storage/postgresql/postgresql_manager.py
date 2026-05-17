@@ -35,14 +35,14 @@ class PostgreSQLManager(ConnectionManager):
         self._async_session_maker: async_sessionmaker[AsyncSession] | None = None
 
     def _build_async_url(self) -> str:
-        """构建异步引擎连接 URL。"""
+        """构建异步引擎连接 URL"""
         return (
             f"postgresql+asyncpg://{self._config.username}:{self._config.password}"
             f"@{self._config.host}:{self._config.port}/{self._config.database}"
         )
 
     def _build_sync_url(self) -> str:
-        """构建同步引擎连接 URL。"""
+        """构建同步引擎连接 URL"""
         return (
             f"postgresql+psycopg2://{self._config.username}:{self._config.password}"
             f"@{self._config.host}:{self._config.port}/{self._config.database}"
@@ -109,7 +109,7 @@ class PostgreSQLManager(ConnectionManager):
             return False
 
     async def close(self) -> None:
-        """关闭所有引擎连接。"""
+        """关闭所有引擎连接"""
         if self._async_engine is not None:
             await self._async_engine.dispose()
             self._async_engine = None

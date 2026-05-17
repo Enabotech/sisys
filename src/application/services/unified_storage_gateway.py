@@ -103,7 +103,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
     @property
     def _storage_policy(self):
-        """延迟加载 StoragePolicyService。"""
+        """延迟加载 StoragePolicyService"""
         if self._policy is None:
             from src.domain.services.storage_tier_strategy import StoragePolicyService
 

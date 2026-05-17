@@ -66,10 +66,10 @@ async def pg_engine():
 
 
 class TestPostgreSQLReal:
-    """PostgreSQL 真实实例集成测试。"""
+    """PostgreSQL 真实实例集成测试"""
 
     async def test_connection_and_query(self, pg_engine):
-        """测试数据库连接和基本查询。"""
+        """测试数据库连接和基本查询"""
         async with AsyncSession(pg_engine.get_async_engine()) as session:
             result = await session.execute(text("SELECT version()"))
             version = result.scalar()
@@ -77,7 +77,7 @@ class TestPostgreSQLReal:
             assert "PostgreSQL" in version
 
     async def test_insert_and_select(self, pg_engine):
-        """测试插入和查询。"""
+        """测试插入和查询"""
         async with AsyncSession(pg_engine.get_async_engine()) as session:
             # 创建临时表
             await session.execute(
@@ -106,10 +106,10 @@ class TestPostgreSQLReal:
 
 
 class TestPostgreSQLManagerReal:
-    """PostgreSQLManager 真实实例测试。"""
+    """PostgreSQLManager 真实实例测试"""
 
     async def test_async_engine_creation(self, pg_engine):
-        """测试异步引擎创建。"""
+        """测试异步引擎创建"""
         async_engine = pg_engine.get_async_engine()
         assert async_engine is not None
 
@@ -119,7 +119,7 @@ class TestPostgreSQLManagerReal:
             assert result.scalar() == 1
 
     async def test_health_check(self, pg_engine):
-        """测试健康检查。"""
+        """测试健康检查"""
         # PostgreSQLManager 应该有健康检查方法
         # 由于没有暴露 health_check 方法，我们通过查询验证
         async with AsyncSession(pg_engine.get_async_engine()) as session:

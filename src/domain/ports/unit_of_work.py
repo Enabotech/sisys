@@ -38,27 +38,27 @@ class UnitOfWork(Protocol):
         ...
 
     async def begin(self) -> None:
-        """开始事务。"""
+        """开始事务"""
         ...
 
     async def commit(self) -> None:
-        """提交事务。"""
+        """提交事务"""
         ...
 
     async def rollback(self) -> None:
-        """回滚事务。"""
+        """回滚事务"""
         ...
 
     async def close(self) -> None:
-        """关闭会话。"""
+        """关闭会话"""
         ...
 
     async def begin_nested(self) -> None:
-        """创建 savepoint（嵌套事务）。"""
+        """创建 savepoint（嵌套事务）"""
         ...
 
     async def __aenter__(self) -> Self:
-        """异步上下文管理器入口。"""
+        """异步上下文管理器入口"""
         ...
 
     async def __aexit__(

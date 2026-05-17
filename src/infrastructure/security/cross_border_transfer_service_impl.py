@@ -24,11 +24,11 @@ if TYPE_CHECKING:
 
 
 class TransferNotFoundError(Exception):
-    """跨境传输请求未找到时抛出。"""
+    """跨境传输请求未找到时抛出"""
 
 
 class TransferNotApprovedError(Exception):
-    """跨境传输请求未审批通过时执行操作抛出。"""
+    """跨境传输请求未审批通过时执行操作抛出"""
 
 
 class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):

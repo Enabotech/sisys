@@ -18,36 +18,36 @@ from src.infrastructure.storage.minio.object_operations import (
 
 
 class TestCalculatePartSize:
-    """分片大小计算测试。"""
+    """分片大小计算测试"""
 
     def test_small_file_no_multipart(self):
-        """小文件不分片。"""
+        """小文件不分片"""
         assert calculate_part_size(50 * 1024 * 1024) == 0
 
     def test_medium_file_10mb_parts(self):
-        """中等文件 10MB 分片。"""
+        """中等文件 10MB 分片"""
         assert calculate_part_size(500 * 1024 * 1024) == 10 * 1024 * 1024
 
     def test_large_file_50mb_parts(self):
-        """大文件 50MB 分片。"""
+        """大文件 50MB 分片"""
         assert calculate_part_size(5 * 1024 * 1024 * 1024) == 50 * 1024 * 1024
 
     def test_xlarge_file_100mb_parts(self):
-        """超大文件 100MB 分片。"""
+        """超大文件 100MB 分片"""
         assert calculate_part_size(50 * 1024 * 1024 * 1024) == 100 * 1024 * 1024
 
     def test_boundary_100mb(self):
-        """100MB 边界。"""
+        """100MB 边界"""
         size = 100 * 1024 * 1024
         # >= 100MB 需要分片
         assert calculate_part_size(size) == 10 * 1024 * 1024
 
 
 class TestUploadObject:
-    """上传对象测试。"""
+    """上传对象测试"""
 
     def test_single_upload_small_file(self):
-        """小文件单文件上传。"""
+        """小文件单文件上传"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()
@@ -70,7 +70,7 @@ class TestUploadObject:
         mock_client.fput_object.assert_called_once()
 
     def test_multipart_upload_large_file(self):
-        """大文件分片上传。"""
+        """大文件分片上传"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
 
@@ -90,11 +90,11 @@ class TestUploadObject:
 
 
 class TestDownloadObject:
-    """下载对象测试。"""
+    """下载对象测试"""
 
     @pytest.mark.asyncio
     async def test_download_object_streaming(self):
-        """流式下载对象。"""
+        """流式下载对象"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()
@@ -116,7 +116,7 @@ class TestDownloadObject:
 
     @pytest.mark.asyncio
     async def test_download_object_with_version(self):
-        """带版本 ID 下载。"""
+        """带版本 ID 下载"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()
@@ -136,10 +136,10 @@ class TestDownloadObject:
 
 
 class TestGetObjectMetadata:
-    """获取对象元数据测试。"""
+    """获取对象元数据测试"""
 
     def test_get_metadata(self):
-        """获取对象元数据。"""
+        """获取对象元数据"""
         from datetime import UTC, datetime
 
         config = MinIOConfig()
@@ -165,10 +165,10 @@ class TestGetObjectMetadata:
 
 
 class TestDeleteObject:
-    """删除对象测试。"""
+    """删除对象测试"""
 
     def test_delete_object_success(self):
-        """成功删除对象。"""
+        """成功删除对象"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()
@@ -182,7 +182,7 @@ class TestDeleteObject:
         mock_client.remove_object.assert_called_once()
 
     def test_delete_object_not_exists(self):
-        """对象不存在返回 False。"""
+        """对象不存在返回 False"""
         from minio.error import S3Error
 
         config = MinIOConfig()
@@ -205,7 +205,7 @@ class TestDeleteObject:
 
 
 class TestResumeMultipartUpload:
-    """恢复分片上传测试。"""
+    """恢复分片上传测试"""
 
     @pytest.mark.asyncio
     async def test_resume_multipart_upload(self):
@@ -250,7 +250,7 @@ class TestResumeMultipartUpload:
 
     @pytest.mark.asyncio
     async def test_resume_multipart_no_state_raises(self):
-        """无状态抛出 KeyError。"""
+        """无状态抛出 KeyError"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()
@@ -269,11 +269,11 @@ class TestResumeMultipartUpload:
 
 
 class TestSaveMultipartState:
-    """保存分片状态测试。"""
+    """保存分片状态测试"""
 
     @pytest.mark.asyncio
     async def test_save_multipart_state(self):
-        """保存分片上传状态到 Redis。"""
+        """保存分片上传状态到 Redis"""
         config = MinIOConfig()
         ops = ObjectOperations(config)
         mock_adapter = MagicMock()

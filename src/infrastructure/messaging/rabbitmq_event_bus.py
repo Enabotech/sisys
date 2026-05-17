@@ -66,5 +66,5 @@ class RabbitMQEventBus(EventPublisher):
             )
 
     async def close(self) -> None:
-        """关闭事件总线（无资源需清理）。"""
+        """关闭事件总线（无资源需清理）"""
         pass

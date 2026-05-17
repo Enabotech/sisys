@@ -50,7 +50,7 @@ class PostgreSQLMemoryMetadataRepository(
         super().__init__(MemoryMetadataModel)
 
     def _to_model(self, entity: MemoryMetadata) -> MemoryMetadataModel:
-        """将领域实体转换为数据库模型。"""
+        """将领域实体转换为数据库模型"""
         return MemoryMetadataModel(
             memory_id=entity.memory_id,
             user_id=entity.user_id,
@@ -67,7 +67,7 @@ class PostgreSQLMemoryMetadataRepository(
         )
 
     def _to_entity(self, model: MemoryMetadataModel) -> MemoryMetadata:
-        """将数据库模型转换为领域实体。"""
+        """将数据库模型转换为领域实体"""
         return MemoryMetadata(
             memory_id=model.memory_id,
             user_id=model.user_id,
@@ -99,7 +99,7 @@ class PostgreSQLMemoryMetadataRepository(
         return metadata
 
     async def _do_save(self, model: MemoryMetadataModel, entity: MemoryMetadata) -> None:
-        """覆写父类 _do_save — 实现 UPSERT + 乐观锁。"""
+        """覆写父类 _do_save — 实现 UPSERT + 乐观锁"""
         # 检查是否已存在（排除已删除的记录）
         result = await self._session.execute(
             select(MemoryMetadataModel).where(

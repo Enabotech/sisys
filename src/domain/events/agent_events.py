@@ -35,7 +35,7 @@ class AgentDecided(DomainEvent):
     confidence: float = 0.0
 
     def __post_init__(self) -> None:
-        """初始化后设置aggregate_id和aggregate_type。"""
+        """初始化后设置aggregate_id和aggregate_type"""
         if self.aggregate_id is None:
             object.__setattr__(self, "aggregate_id", self.agent_id)
         if not self.aggregate_type:

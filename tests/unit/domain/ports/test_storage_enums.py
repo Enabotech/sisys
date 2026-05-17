@@ -9,10 +9,10 @@ from src.domain.ports.storage_enums import DataAccessPattern, StorageLayer, Stor
 
 
 class TestStorageLayer:
-    """StorageLayer 枚举测试。"""
+    """StorageLayer 枚举测试"""
 
     def test_has_all_required_values(self) -> None:
-        """StorageLayer 应有所有必需的值。"""
+        """StorageLayer 应有所有必需的值"""
         assert hasattr(StorageLayer, "L0_FILE")
         assert hasattr(StorageLayer, "L1_CACHE")
         assert hasattr(StorageLayer, "L2_SQL")
@@ -21,7 +21,7 @@ class TestStorageLayer:
         assert hasattr(StorageLayer, "L5_GRAPH")
 
     def test_values_are_strings(self) -> None:
-        """枚举值应为字符串。"""
+        """枚举值应为字符串"""
         assert StorageLayer.L0_FILE.value == "l0_file"
         assert StorageLayer.L1_CACHE.value == "l1_cache"
         assert StorageLayer.L2_SQL.value == "l2_sql"
@@ -31,17 +31,17 @@ class TestStorageLayer:
 
 
 class TestStorageTier:
-    """StorageTier 枚举测试。"""
+    """StorageTier 枚举测试"""
 
     def test_has_all_required_values(self) -> None:
-        """StorageTier 应有所有必需的值。"""
+        """StorageTier 应有所有必需的值"""
         assert hasattr(StorageTier, "HOT")
         assert hasattr(StorageTier, "WARM")
         assert hasattr(StorageTier, "COLD")
         assert hasattr(StorageTier, "FROZEN")
 
     def test_values_are_strings(self) -> None:
-        """枚举值应为字符串。"""
+        """枚举值应为字符串"""
         assert StorageTier.HOT.value == "hot"
         assert StorageTier.WARM.value == "warm"
         assert StorageTier.COLD.value == "cold"
@@ -49,17 +49,17 @@ class TestStorageTier:
 
 
 class TestDataAccessPattern:
-    """DataAccessPattern 枚举测试。"""
+    """DataAccessPattern 枚举测试"""
 
     def test_has_all_required_values(self) -> None:
-        """DataAccessPattern 应有所有必需的值。"""
+        """DataAccessPattern 应有所有必需的值"""
         assert hasattr(DataAccessPattern, "FREQUENT")
         assert hasattr(DataAccessPattern, "OCCASIONAL")
         assert hasattr(DataAccessPattern, "RARE")
         assert hasattr(DataAccessPattern, "ARCHIVED")
 
     def test_values_are_strings(self) -> None:
-        """枚举值应为字符串。"""
+        """枚举值应为字符串"""
         assert DataAccessPattern.FREQUENT.value == "frequent"
         assert DataAccessPattern.OCCASIONAL.value == "occasional"
         assert DataAccessPattern.RARE.value == "rare"

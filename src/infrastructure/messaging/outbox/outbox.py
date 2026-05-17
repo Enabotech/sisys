@@ -36,14 +36,14 @@ class OutboxEntity:
     error_message: str | None = field(default=None)
 
     def mark_published(self) -> None:
-        """标记为已发布。"""
+        """标记为已发布"""
         if self.status != "pending":
             raise InvalidStateTransitionError(self.status, "published")
         self.status = "published"
         self.published_at = datetime.now(UTC)
 
     def mark_failed(self, error: str) -> None:
-        """标记为失败，递增 retry_count。"""
+        """标记为失败，递增 retry_count"""
         if self.status not in ("pending", "failed"):
             raise InvalidStateTransitionError(self.status, "failed")
         self.status = "failed"
@@ -51,7 +51,7 @@ class OutboxEntity:
         self.error_message = error
 
     def mark_pending(self) -> None:
-        """重置为 pending（用于重试）。"""
+        """重置为 pending（用于重试）"""
         if self.status != "failed":
             raise InvalidStateTransitionError(self.status, "pending")
         if self.retry_count >= self.max_retries:
@@ -60,7 +60,7 @@ class OutboxEntity:
         self.error_message = None
 
     def mark_archived(self) -> None:
-        """归档（终态，不可逆）。"""
+        """归档（终态，不可逆）"""
         if self.status != "failed":
             raise InvalidStateTransitionError(self.status, "archived")
         self.status = "archived"

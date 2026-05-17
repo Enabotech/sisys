@@ -38,7 +38,7 @@ class BaseException(Exception):  # noqa: N818
         super().__init__(self.message)
 
     def to_dict(self) -> dict:
-        """转换为字典格式，便于序列化和日志记录。"""
+        """转换为字典格式，便于序列化和日志记录"""
         result = {
             "code": self.code,
             "message": self.message,

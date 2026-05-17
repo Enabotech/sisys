@@ -76,7 +76,7 @@ class DomainEvent:
     _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """自动按 event_type 注册子类。"""
+        """自动按 event_type 注册子类"""
         super().__init_subclass__(**kwargs)
         if is_dataclass(cls):
             for f in fields(cls):
@@ -151,7 +151,7 @@ class DomainEvent:
 
     @staticmethod
     def _serialize_value(value: Any) -> Any:
-        """序列化单个字段值用于 JSON 传输。"""
+        """序列化单个字段值用于 JSON 传输"""
         if value is None:
             return None
         if isinstance(value, Enum):

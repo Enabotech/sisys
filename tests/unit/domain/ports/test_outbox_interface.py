@@ -17,7 +17,7 @@ from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutb
 
 
 class TestOutboxRepositoryInterface:
-    """验证 PostgreSQLOutboxRepository 实现领域层接口。"""
+    """验证 PostgreSQLOutboxRepository 实现领域层接口"""
 
     def test_outbox_repository_has_required_methods(self):
         """PostgreSQLOutboxRepository should have OutboxRepository methods."""
@@ -35,42 +35,42 @@ class TestOutboxRepositoryInterface:
             )
 
     def test_save_method_exists(self):
-        """save 方法必须存在。"""
+        """save 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "save")
         assert callable(getattr(PostgreSQLOutboxRepository, "save"))
 
     def test_get_unpublished_method_exists(self):
-        """get_unpublished 方法必须存在。"""
+        """get_unpublished 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "get_unpublished")
         assert callable(getattr(PostgreSQLOutboxRepository, "get_unpublished"))
 
     def test_async_get_unpublished_method_exists(self):
-        """async_get_unpublished 方法必须存在。"""
+        """async_get_unpublished 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "async_get_unpublished")
         assert callable(getattr(PostgreSQLOutboxRepository, "async_get_unpublished"))
 
     def test_mark_published_method_exists(self):
-        """mark_published 方法必须存在。"""
+        """mark_published 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "mark_published")
         assert callable(getattr(PostgreSQLOutboxRepository, "mark_published"))
 
     def test_async_mark_published_method_exists(self):
-        """async_mark_published 方法必须存在。"""
+        """async_mark_published 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "async_mark_published")
         assert callable(getattr(PostgreSQLOutboxRepository, "async_mark_published"))
 
     def test_mark_failed_method_exists(self):
-        """mark_failed 方法必须存在。"""
+        """mark_failed 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "mark_failed")
         assert callable(getattr(PostgreSQLOutboxRepository, "mark_failed"))
 
     def test_async_mark_failed_method_exists(self):
-        """async_mark_failed 方法必须存在。"""
+        """async_mark_failed 方法必须存在"""
         assert hasattr(PostgreSQLOutboxRepository, "async_mark_failed")
         assert callable(getattr(PostgreSQLOutboxRepository, "async_mark_failed"))
 
     def test_save_signature_matches_interface(self):
-        """save 方法签名应与接口一致。"""
+        """save 方法签名应与接口一致"""
         interface_sig = inspect.signature(OutboxRepository.save)
         impl_sig = inspect.signature(PostgreSQLOutboxRepository.save)
 
@@ -78,7 +78,7 @@ class TestOutboxRepositoryInterface:
         assert list(interface_sig.parameters.keys()) == list(impl_sig.parameters.keys())
 
     def test_internal_methods_have_underscore_prefix(self):
-        """内部方法应以下划线前缀命名。"""
+        """内部方法应以下划线前缀命名"""
         internal_methods = [
             "_get_unpublished_entities",
             "_mark_published_entity",
@@ -90,10 +90,10 @@ class TestOutboxRepositoryInterface:
 
 
 class TestOutboxRepositoryBehavior:
-    """验证 OutboxRepository 行为正确性。"""
+    """验证 OutboxRepository 行为正确性"""
 
     def test_save_accepts_domain_event(self, mock_outbox_repo):
-        """save 方法应接受 DomainEvent 实例。"""
+        """save 方法应接受 DomainEvent 实例"""
         from datetime import UTC, datetime
         from uuid import uuid4
 
@@ -111,21 +111,21 @@ class TestOutboxRepositoryBehavior:
         mock_outbox_repo.save(event)
 
     def test_async_get_unpublished_returns_list(self, mock_outbox_repo):
-        """async_get_unpublished 应返回列表。"""
+        """async_get_unpublished 应返回列表"""
         import asyncio
 
         result = asyncio.run(mock_outbox_repo.async_get_unpublished(limit=10))
         assert isinstance(result, list)
 
     def test_async_mark_published_accepts_uuid(self, mock_outbox_repo):
-        """async_mark_published 应接受 UUID。"""
+        """async_mark_published 应接受 UUID"""
         import asyncio
 
         event_id = uuid4()
         asyncio.run(mock_outbox_repo.async_mark_published(event_id))
 
     def test_async_mark_failed_accepts_uuid_and_string(self, mock_outbox_repo):
-        """async_mark_failed 应接受 UUID 和字符串错误信息。"""
+        """async_mark_failed 应接受 UUID 和字符串错误信息"""
         import asyncio
 
         event_id = uuid4()
@@ -135,7 +135,7 @@ class TestOutboxRepositoryBehavior:
 
 @pytest.fixture
 def mock_outbox_repo():
-    """提供模拟的 OutboxRepository 实例。"""
+    """提供模拟的 OutboxRepository 实例"""
     from unittest.mock import AsyncMock
 
     mock_repo = AsyncMock(spec=PostgreSQLOutboxRepository)

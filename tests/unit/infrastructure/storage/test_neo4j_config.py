@@ -14,10 +14,10 @@ from src.infrastructure.config.neo4j import Neo4jConfig
 
 
 class TestNeo4jConfig:
-    """Neo4jConfig 测试类。"""
+    """Neo4jConfig 测试类"""
 
     def test_default_values(self):
-        """测试默认值是否正确。"""
+        """测试默认值是否正确"""
         config = Neo4jConfig()
         assert config.host == "localhost"
         assert config.bolt_port == 7687
@@ -30,7 +30,7 @@ class TestNeo4jConfig:
         assert config.max_retry_time == 30.0
 
     def test_custom_values(self):
-        """测试自定义值。"""
+        """测试自定义值"""
         config = Neo4jConfig(
             host="neo4j.example.com",
             bolt_port=7687,
@@ -53,7 +53,7 @@ class TestNeo4jConfig:
 
     @patch.dict(os.environ, {}, clear=True)
     def test_from_env_defaults(self):
-        """测试从环境变量加载配置的默认行为。"""
+        """测试从环境变量加载配置的默认行为"""
         config = Neo4jConfig.from_env()
         assert config.host == "localhost"
         assert config.bolt_port == 7687
@@ -80,7 +80,7 @@ class TestNeo4jConfig:
         clear=True,
     )
     def test_from_env_custom_values(self):
-        """测试从环境变量加载自定义值。"""
+        """测试从环境变量加载自定义值"""
         config = Neo4jConfig.from_env()
         assert config.host == "neo4j.example.com"
         assert config.bolt_port == 7687
@@ -94,18 +94,18 @@ class TestNeo4jConfig:
 
     @patch.dict(os.environ, {"NEO4J_MAX_POOL_SIZE": "invalid"}, clear=True)
     def test_from_env_invalid_pool_size(self):
-        """测试无效连接池大小应抛出 ValueError。"""
+        """测试无效连接池大小应抛出 ValueError"""
         with pytest.raises(ValueError, match="Invalid NEO4J_MAX_POOL_SIZE"):
             Neo4jConfig.from_env()
 
     @patch.dict(os.environ, {"NEO4J_CONNECT_TIMEOUT": "invalid"}, clear=True)
     def test_from_env_invalid_timeout(self):
-        """测试无效超时应抛出 ValueError。"""
+        """测试无效超时应抛出 ValueError"""
         with pytest.raises(ValueError, match="Invalid NEO4J_CONNECT_TIMEOUT"):
             Neo4jConfig.from_env()
 
     @patch.dict(os.environ, {"NEO4J_MAX_RETRY_TIME": "invalid"}, clear=True)
     def test_from_env_invalid_retry_time(self):
-        """测试无效重试时间应抛出 ValueError。"""
+        """测试无效重试时间应抛出 ValueError"""
         with pytest.raises(ValueError, match="Invalid NEO4J_MAX_RETRY_TIME"):
             Neo4jConfig.from_env()

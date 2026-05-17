@@ -94,15 +94,15 @@ async def bucket_manager(minio_config: MinIOConfig):
 
 
 class TestMinioManager:
-    """MinIO 客户端适配器真实实例测试。"""
+    """MinIO 客户端适配器真实实例测试"""
 
     async def test_health_check(self, minio_client: MinioManager):
-        """测试健康检查。"""
+        """测试健康检查"""
         result = minio_client.health_check()
         assert result is True
 
     async def test_client_connection(self, minio_client: MinioManager):
-        """测试客户端连接。"""
+        """测试客户端连接"""
         # Should be able to list buckets without error
         buckets = minio_client.client.list_buckets()
         assert isinstance(buckets, list)
@@ -114,10 +114,10 @@ class TestMinioManager:
 
 
 class TestBucketManager:
-    """Bucket 管理器真实实例测试。"""
+    """Bucket 管理器真实实例测试"""
 
     async def test_create_and_delete_bucket(self, bucket_manager: BucketManager, test_tenant_id: str):
-        """测试 Bucket 创建和删除。"""
+        """测试 Bucket 创建和删除"""
         bucket_name = f"sisys-documents-{test_tenant_id}"
 
         # Cleanup first
@@ -140,7 +140,7 @@ class TestBucketManager:
         assert exists is False
 
     async def test_create_existing_bucket_returns_false(self, bucket_manager: BucketManager, test_tenant_id: str):
-        """测试创建已存在的 Bucket 返回 False。"""
+        """测试创建已存在的 Bucket 返回 False"""
         bucket_name = f"sisys-exists-{test_tenant_id}"
 
         # Cleanup first
@@ -158,12 +158,12 @@ class TestBucketManager:
         bucket_manager.delete_bucket(bucket_name, force=True)
 
     async def test_delete_nonexistent_bucket_returns_false(self, bucket_manager: BucketManager, test_tenant_id: str):
-        """测试删除不存在的 Bucket 返回 False。"""
+        """测试删除不存在的 Bucket 返回 False"""
         result = bucket_manager.delete_bucket(f"sisys-nonexistent-{test_tenant_id}")
         assert result is False
 
     async def test_list_buckets(self, bucket_manager: BucketManager, test_tenant_id: str):
-        """测试列出所有 Bucket。"""
+        """测试列出所有 Bucket"""
         bucket_name = f"sisys-list-{test_tenant_id}"
 
         # Cleanup first
@@ -190,10 +190,10 @@ class TestBucketManager:
 
 
 class TestMinioObjectOperations:
-    """MinIO 对象操作真实实例测试。"""
+    """MinIO 对象操作真实实例测试"""
 
     async def test_bucket_creation_for_objects(self, minio_client: MinioManager, test_tenant_id: str):
-        """测试对象操作前的 Bucket 创建。"""
+        """测试对象操作前的 Bucket 创建"""
         bucket_name = f"sisys-objects-{test_tenant_id}"
 
         # Cleanup
@@ -213,7 +213,7 @@ class TestMinioObjectOperations:
         minio_client.client.remove_bucket(bucket_name)
 
     async def test_put_and_get_object(self, minio_client: MinioManager, test_tenant_id: str):
-        """测试对象上传和下载。"""
+        """测试对象上传和下载"""
         bucket_name = f"sisys-ops-{test_tenant_id}"
         object_name = "test-document.txt"
         content = b"Hello, MinIO!"

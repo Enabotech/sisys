@@ -97,7 +97,7 @@ class ContractGate:
         )
 
     def _get_methods(self, interface: Type) -> dict[str, str]:
-        """获取接口的所有方法及其签名。"""
+        """获取接口的所有方法及其签名"""
         methods = {}
         for name in dir(interface):
             if name.startswith("_"):
@@ -120,12 +120,12 @@ class PortContractTest:
 
     @classmethod
     def get_port_name(cls) -> str:
-        """返回待测试的端口名称。"""
+        """返回待测试的端口名称"""
         raise NotImplementedError
 
     @classmethod
     def get_implementation(cls) -> Any:
-        """返回待测试的实现实例。"""
+        """返回待测试的实现实例"""
         raise NotImplementedError
 
     def run_contract_tests(self) -> None:
@@ -156,10 +156,10 @@ class PortContractTest:
         impl: Any,
         interface: Type,
     ) -> None:
-        """验证实现类确实实现了接口。"""
+        """验证实现类确实实现了接口"""
         if not isinstance(impl, interface) and not issubclass(type(impl), interface):
             raise AssertionError(f"Implementation {type(impl)} does not implement {interface}")
 
     def test_contract(self) -> None:
-        """在子类中实现具体契约测试。"""
+        """在子类中实现具体契约测试"""
         raise NotImplementedError

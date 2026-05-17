@@ -18,7 +18,7 @@ from enum import Enum
 
 
 class AgentRole(str, Enum):
-    """智能体角色枚举。"""
+    """智能体角色枚举"""
 
     CEO = "ceo"
     CFO = "cfo"
@@ -31,7 +31,7 @@ class AgentRole(str, Enum):
 
 
 class AgentStatus(str, Enum):
-    """智能体执行状态枚举。"""
+    """智能体执行状态枚举"""
 
     IDLE = "idle"
     RUNNING = "running"
@@ -142,7 +142,7 @@ class Agent:
         self.updated_at = datetime.now(UTC)
 
     def wait(self) -> None:
-        """将智能体转换为 WAITING 状态。"""
+        """将智能体转换为 WAITING 状态"""
         if self.status not in (AgentStatus.RUNNING, AgentStatus.WAITING):
             raise ValueError(f"Can only wait from RUNNING or WAITING, current: {self.status.value}")
         self.status = AgentStatus.WAITING

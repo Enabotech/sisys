@@ -1,4 +1,4 @@
-"""Qdrant 端到端集成测试（Mock 版本）。"""
+"""Qdrant 端到端集成测试（Mock 版本）"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from src.infrastructure.storage.qdrant.vector_storage import QdrantVectorStorage
 
 @pytest.fixture
 def mock_qdrant_setup():
-    """模拟 Qdrant 环境设置。"""
+    """模拟 Qdrant 环境设置"""
     mock_client = AsyncMock()
 
     collection_manager = QdrantCollectionManager(mock_client)
@@ -30,11 +30,11 @@ def mock_qdrant_setup():
 
 
 class TestQdrantIntegration:
-    """Qdrant 集成测试类。"""
+    """Qdrant 集成测试类"""
 
     @pytest.mark.asyncio
     async def test_collection_lifecycle(self, mock_qdrant_setup):
-        """测试 Collection 生命周期（创建→验证→删除）。"""
+        """测试 Collection 生命周期（创建→验证→删除）"""
         setup = mock_qdrant_setup
         mock_client = setup["mock_client"]
         manager = setup["collection_manager"]
@@ -77,7 +77,7 @@ class TestQdrantIntegration:
 
     @pytest.mark.asyncio
     async def test_vector_point_storage(self, mock_qdrant_setup):
-        """测试向量点存储端到端流程。"""
+        """测试向量点存储端到端流程"""
         setup = mock_qdrant_setup
         mock_client = setup["mock_client"]
         storage = setup["vector_storage"]
@@ -102,7 +102,7 @@ class TestQdrantIntegration:
 
     @pytest.mark.asyncio
     async def test_dense_search_flow(self, mock_qdrant_setup):
-        """测试 Dense 语义检索端到端流程。"""
+        """测试 Dense 语义检索端到端流程"""
         setup = mock_qdrant_setup
         mock_client = setup["mock_client"]
         storage = setup["vector_storage"]
@@ -121,7 +121,7 @@ class TestQdrantIntegration:
 
     @pytest.mark.asyncio
     async def test_bm25_sparse_search_flow(self, mock_qdrant_setup):
-        """测试 BM25 稀疏检索端到端流程。"""
+        """测试 BM25 稀疏检索端到端流程"""
         setup = mock_qdrant_setup
         mock_client = setup["mock_client"]
         storage = setup["vector_storage"]
@@ -144,7 +144,7 @@ class TestQdrantIntegration:
 
     @pytest.mark.asyncio
     async def test_multi_tenant_isolation(self, mock_qdrant_setup):
-        """测试多租户隔离。"""
+        """测试多租户隔离"""
         setup = mock_qdrant_setup
         mock_client = setup["mock_client"]
         manager = setup["collection_manager"]

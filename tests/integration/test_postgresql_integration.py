@@ -20,10 +20,10 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 
 
 class TestPostgreSQLConnection:
-    """数据库连接端到端测试。"""
+    """数据库连接端到端测试"""
 
     def test_database_engine_creation(self):
-        """PostgreSQLManager 应可实例化。"""
+        """PostgreSQLManager 应可实例化"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
         from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
@@ -41,7 +41,7 @@ class TestPostgreSQLConnection:
         assert engine._sync_engine is None
 
     def test_async_engine_lazy_init(self):
-        """异步引擎应在首次调用时创建。"""
+        """异步引擎应在首次调用时创建"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
         from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
@@ -57,7 +57,7 @@ class TestPostgreSQLConnection:
         assert engine._async_engine is async_engine
 
     def test_sync_engine_lazy_init(self):
-        """同步引擎应在首次调用时创建。"""
+        """同步引擎应在首次调用时创建"""
         from src.infrastructure.config.postgresql import PostgreSQLConfig
         from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
@@ -72,31 +72,31 @@ class TestPostgreSQLConnection:
 
 
 class TestAlembicMigration:
-    """Alembic 迁移端到端测试。"""
+    """Alembic 迁移端到端测试"""
 
     def test_alembic_config_exists(self):
-        """alembic.ini 配置文件应存在。"""
+        """alembic.ini 配置文件应存在"""
         from pathlib import Path
 
         alembic_ini = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "alembic.ini"
         assert alembic_ini.exists()
 
     def test_alembic_env_exists(self):
-        """deploy/postgresql/alembic/env.py 应存在。"""
+        """deploy/postgresql/alembic/env.py 应存在"""
         from pathlib import Path
 
         env_py = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "env.py"
         assert env_py.exists()
 
     def test_initial_migration_exists(self):
-        """初始迁移脚本应存在。"""
+        """初始迁移脚本应存在"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
         assert migration.exists()
 
     def test_initial_migration_has_upgrade(self):
-        """初始迁移应定义 upgrade 函数。"""
+        """初始迁移应定义 upgrade 函数"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -106,7 +106,7 @@ class TestAlembicMigration:
         assert "def downgrade()" in content
 
     def test_initial_migration_creates_event_outbox(self):
-        """初始迁移应创建 event_outbox 表。"""
+        """初始迁移应创建 event_outbox 表"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -116,7 +116,7 @@ class TestAlembicMigration:
         assert "op.create_table" in content
 
     def test_initial_migration_creates_users(self):
-        """初始迁移应创建 users 表。"""
+        """初始迁移应创建 users 表"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -125,7 +125,7 @@ class TestAlembicMigration:
         assert "users" in content
 
     def test_initial_migration_creates_roles(self):
-        """初始迁移应创建 roles 表。"""
+        """初始迁移应创建 roles 表"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -134,7 +134,7 @@ class TestAlembicMigration:
         assert "roles" in content
 
     def test_initial_migration_creates_permissions(self):
-        """初始迁移应创建 permissions 表。"""
+        """初始迁移应创建 permissions 表"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -143,7 +143,7 @@ class TestAlembicMigration:
         assert "permissions" in content
 
     def test_initial_migration_creates_association_tables(self):
-        """初始迁移应创建关联表。"""
+        """初始迁移应创建关联表"""
         from pathlib import Path
 
         migration = Path(__file__).parents[2] / "deploy" / "postgresql" / "alembic" / "versions" / "001_initial.py"
@@ -154,11 +154,11 @@ class TestAlembicMigration:
 
 
 class TestOutboxEventLifecycle:
-    """Outbox 事件生命周期测试。"""
+    """Outbox 事件生命周期测试"""
 
     @pytest.mark.asyncio
     async def test_save_event_to_outbox(self, mock_session):
-        """保存事件到发件箱。"""
+        """保存事件到发件箱"""
         from src.domain.events.base import DomainEvent
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
@@ -177,7 +177,7 @@ class TestOutboxEventLifecycle:
 
     @pytest.mark.asyncio
     async def test_get_unpublished_events(self, mock_session):
-        """获取未发布事件列表。"""
+        """获取未发布事件列表"""
         from src.domain.events.base import DomainEvent
         from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
@@ -196,7 +196,7 @@ class TestOutboxEventLifecycle:
 
     @pytest.mark.asyncio
     async def test_mark_event_published(self, mock_session):
-        """标记事件已发布。"""
+        """标记事件已发布"""
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
@@ -212,7 +212,7 @@ class TestOutboxEventLifecycle:
 
     @pytest.mark.asyncio
     async def test_mark_event_failed(self, mock_session):
-        """标记事件发布失败。"""
+        """标记事件发布失败"""
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
@@ -230,11 +230,11 @@ class TestOutboxEventLifecycle:
 
 
 class TestUserCRUD:
-    """用户 CRUD 操作测试。"""
+    """用户 CRUD 操作测试"""
 
     @pytest.mark.asyncio
     async def test_create_user(self, mock_session):
-        """创建新用户。"""
+        """创建新用户"""
         from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
@@ -253,7 +253,7 @@ class TestUserCRUD:
 
     @pytest.mark.asyncio
     async def test_get_user_by_username(self, mock_session):
-        """根据用户名获取用户。"""
+        """根据用户名获取用户"""
         from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
@@ -279,7 +279,7 @@ class TestUserCRUD:
 
     @pytest.mark.asyncio
     async def test_get_user_by_email(self, mock_session):
-        """根据邮箱获取用户。"""
+        """根据邮箱获取用户"""
         from src.domain.entities.user import User
         from src.infrastructure.storage.postgresql.repository.user_repository import UserRepository
 
@@ -305,11 +305,11 @@ class TestUserCRUD:
 
 
 class TestRolePermissionCRUD:
-    """角色权限 CRUD 测试。"""
+    """角色权限 CRUD 测试"""
 
     @pytest.mark.asyncio
     async def test_get_role_by_name(self, mock_session):
-        """根据名称获取角色。"""
+        """根据名称获取角色"""
         from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
         repo = RoleRepository()
@@ -323,7 +323,7 @@ class TestRolePermissionCRUD:
 
     @pytest.mark.asyncio
     async def test_get_role_permissions(self, mock_session):
-        """获取角色的权限列表。"""
+        """获取角色的权限列表"""
         from src.infrastructure.storage.postgresql.repository.role_repository import RoleRepository
 
         repo = RoleRepository()
@@ -337,7 +337,7 @@ class TestRolePermissionCRUD:
 
     @pytest.mark.asyncio
     async def test_get_permission_by_name(self, mock_session):
-        """根据名称获取权限。"""
+        """根据名称获取权限"""
         from src.domain.entities.permission import Permission
         from src.infrastructure.storage.postgresql.repository.permission_repository import PermissionRepository
 
@@ -360,10 +360,10 @@ class TestRolePermissionCRUD:
 
 
 class TestTransactionRollback:
-    """事务回滚行为测试。"""
+    """事务回滚行为测试"""
 
     def test_save_does_not_auto_commit(self, mock_session):
-        """save 方法不应自动提交（依赖外部事务管理）。"""
+        """save 方法不应自动提交（依赖外部事务管理）"""
         from src.domain.events.base import DomainEvent
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 

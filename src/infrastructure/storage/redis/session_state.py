@@ -30,7 +30,7 @@ class SessionState:
     ttl: int = 86400  # 默认 24 小时
 
     def to_dict(self) -> dict:
-        """序列化为字典。"""
+        """序列化为字典"""
         return {
             "session_id": self.session_id,
             "agent_id": self.agent_id,

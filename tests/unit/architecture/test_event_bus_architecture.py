@@ -13,10 +13,10 @@ import pathlib
 
 
 class TestEventBusArchitecture:
-    """事件总线架构约束验证。"""
+    """事件总线架构约束验证"""
 
     def test_domain_layer_no_outbox_entity_import(self):
-        """领域层不应导入 OutboxEntity（基础设施层定义）。"""
+        """领域层不应导入 OutboxEntity（基础设施层定义）"""
         domain_path = pathlib.Path("src/domain")
         violations = []
 
@@ -34,7 +34,7 @@ class TestEventBusArchitecture:
         assert not violations, "Domain layer should not import infrastructure:\n" + "\n".join(violations)
 
     def test_redis_client_import_only_in_infrastructure(self):
-        """Redis 客户端导入应仅在基础设施层。"""
+        """Redis 客户端导入应仅在基础设施层"""
         src_path = pathlib.Path("src")
         violations = []
 
@@ -53,7 +53,7 @@ class TestEventBusArchitecture:
         assert not violations, "Redis client should only be imported in infrastructure layer:\n" + "\n".join(violations)
 
     def test_rabbitmq_client_import_only_in_infrastructure(self):
-        """RabbitMQ 客户端导入应仅在基础设施层。"""
+        """RabbitMQ 客户端导入应仅在基础设施层"""
         src_path = pathlib.Path("src")
         violations = []
 
@@ -71,13 +71,13 @@ class TestEventBusArchitecture:
         assert not violations, "RabbitMQ client should only be imported in infrastructure layer:\n" + "\n".join(violations)
 
     def test_domain_uses_event_publisher_interface(self):
-        """领域层应使用 EventPublisher 接口而非具体实现。"""
+        """领域层应使用 EventPublisher 接口而非具体实现"""
         from src.domain.ports.event_publisher import InMemoryEventPublisher
 
         assert InMemoryEventPublisher is not None
 
     def test_outbox_repository_interface_uses_domain_event(self):
-        """OutboxRepository 接口应使用 DomainEvent 而非 OutboxEntity。"""
+        """OutboxRepository 接口应使用 DomainEvent 而非 OutboxEntity"""
         import inspect
 
         from src.domain.ports.outbox import OutboxRepository
@@ -88,7 +88,7 @@ class TestEventBusArchitecture:
         assert "event" in params, "save method should accept 'event' parameter"
 
     def test_domain_layer_zero_dependency(self):
-        """领域层应仅使用 Python 标准库。"""
+        """领域层应仅使用 Python 标准库"""
         domain_path = pathlib.Path("src/domain")
         forbidden_packages = {
             "pydantic",

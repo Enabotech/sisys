@@ -48,7 +48,7 @@ class FileMemoryAdapter(L0StoragePort):
         self._ensure_base_path()
 
     def _ensure_base_path(self) -> None:
-        """确保基础路径存在。"""
+        """确保基础路径存在"""
         base_path = Path(self.config.memory_l0_path)
         base_path.mkdir(parents=True, exist_ok=True)
 

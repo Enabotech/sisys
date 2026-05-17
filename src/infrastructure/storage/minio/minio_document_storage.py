@@ -40,7 +40,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         content_type: str = "application/octet-stream",
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象。"""
+        """存储对象"""
         return await self._adapter.store(bucket_type, object_key, file_path, content_type, tags)
 
     def retrieve(
@@ -49,7 +49,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ):
-        """流式下载对象。"""
+        """流式下载对象"""
         return self._adapter.retrieve(bucket_type, object_key, version_id)
 
     async def delete(
@@ -58,7 +58,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。"""
+        """删除对象"""
         return await self._adapter.delete(bucket_type, object_key, version_id)
 
     async def get_metadata(
@@ -67,7 +67,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据。"""
+        """获取对象元数据"""
         return await self._adapter.get_metadata(bucket_type, object_key, version_id)
 
     async def archive(
@@ -77,7 +77,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:
-        """归档对象。"""
+        """归档对象"""
         return await self._adapter.archive(bucket_type, object_key, content, retention_days)
 
     async def list_objects(
@@ -86,7 +86,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象。"""
+        """列出对象"""
         return await self._adapter.list_objects(bucket_type, prefix, recursive)
 
     # -- DocumentStoragePort specific methods --
@@ -98,7 +98,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         file_path: str,
         metadata: dict | None = None,
     ) -> str:
-        """存储文档（自动生成对象路径）。"""
+        """存储文档（自动生成对象路径）"""
         now = datetime.now(UTC)
         month_key = now.strftime("%Y-%m")
         object_key = f"documents/{user_id}/{doc_type}/{month_key}/{now.strftime('%Y%m%d%H%M%S')}"
@@ -116,7 +116,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         user_id: str,
         doc_type: str | None = None,
     ) -> list[dict]:
-        """列出用户文档。"""
+        """列出用户文档"""
         prefix = f"documents/{user_id}/"
         if doc_type:
             prefix += f"{doc_type}/"
@@ -127,7 +127,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         user_id: str,
         document_id: str,
     ) -> dict | None:
-        """获取文档元数据。"""
+        """获取文档元数据"""
         try:
             return await self._adapter.get_metadata("raw-documents", document_id)
         except Exception:

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Lifetime(Enum):
-    """端口生命周期管理策略。"""
+    """端口生命周期管理策略"""
 
     TRANSIENT = "transient"  # New instance per request
     SCOPED = "scoped"  # Single instance per scope
@@ -91,11 +91,11 @@ class PortRegistry:
         self._ports[spec.name] = spec
 
     def get(self, name: str) -> PortSpec | None:
-        """通过名称获取端口规格。"""
+        """通过名称获取端口规格"""
         return self._ports.get(name)
 
     def get_by_interface(self, interface: Type) -> PortSpec | None:
-        """通过接口类型获取端口规格。"""
+        """通过接口类型获取端口规格"""
         for spec in self._ports.values():
             if spec.interface is interface:
                 return spec
@@ -105,15 +105,15 @@ class PortRegistry:
         return None
 
     def list_all(self) -> list[PortSpec]:
-        """列出所有已注册的端口规格。"""
+        """列出所有已注册的端口规格"""
         return list(self._ports.values())
 
     def list_by_tag(self, tag: str) -> list[PortSpec]:
-        """按标签过滤列出端口规格。"""
+        """按标签过滤列出端口规格"""
         return [spec for spec in self._ports.values() if tag in spec.tags]
 
     def unregister(self, name: str) -> None:
-        """按名称注销端口。"""
+        """按名称注销端口"""
         if name in self._ports:
             del self._ports[name]
             logger.info("Unregistered port: %s", name)

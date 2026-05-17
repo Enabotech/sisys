@@ -12,7 +12,7 @@ from src.infrastructure.storage.postgresql.models import OutboxModel
 
 
 class SQLAlchemyEventOutboxAdapter:
-    """DomainEvent ↔ OutboxModel 双向转换器（基础设施层）。"""
+    """DomainEvent ↔ OutboxModel 双向转换器（基础设施层）"""
 
     @staticmethod
     def from_domain_event(event: DomainEvent) -> OutboxModel:

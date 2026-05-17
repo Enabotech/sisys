@@ -1,4 +1,4 @@
-"""QdrantClient 单元测试。"""
+"""QdrantClient 单元测试"""
 
 from __future__ import annotations
 
@@ -12,16 +12,16 @@ from src.infrastructure.storage.qdrant.qdrant_manager import QdrantManager
 
 @pytest.fixture
 def mock_async_client():
-    """模拟异步 Qdrant 客户端。"""
+    """模拟异步 Qdrant 客户端"""
     client = AsyncMock()
     return client
 
 
 class TestQdrantManager:
-    """QdrantManager 测试类。"""
+    """QdrantManager 测试类"""
 
     def test_default_initialization(self):
-        """测试默认初始化。"""
+        """测试默认初始化"""
         wrapper = QdrantManager()
         assert wrapper._config.host == "localhost"
         assert wrapper._config.port == 6333
@@ -32,7 +32,7 @@ class TestQdrantManager:
         assert wrapper._client is None
 
     def test_custom_initialization(self):
-        """测试自定义初始化。"""
+        """测试自定义初始化"""
         config = QdrantConfig(
             host="qdrant.example.com",
             port=8000,
@@ -52,7 +52,7 @@ class TestQdrantManager:
 
     @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     def test_lazy_initialization(self, mock_client: MagicMock, mock_async_client: AsyncMock):
-        """测试懒初始化。"""
+        """测试懒初始化"""
         mock_client.return_value = mock_async_client
         wrapper = QdrantManager()
         assert wrapper._client is None
@@ -68,7 +68,7 @@ class TestQdrantManager:
 
     @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_health_check_success(self, mock_client: MagicMock, mock_async_client: AsyncMock):
-        """测试健康检查成功。"""
+        """测试健康检查成功"""
         mock_client.return_value = mock_async_client
         mock_async_client.get_collections = AsyncMock(return_value=MagicMock())
 
@@ -78,7 +78,7 @@ class TestQdrantManager:
 
     @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_health_check_failure(self, mock_client: MagicMock, mock_async_client: AsyncMock):
-        """测试健康检查失败。"""
+        """测试健康检查失败"""
         mock_client.return_value = mock_async_client
         mock_async_client.get_collections = AsyncMock(side_effect=Exception("Connection refused"))
 
@@ -88,7 +88,7 @@ class TestQdrantManager:
 
     @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_close(self, mock_client: MagicMock, mock_async_client: AsyncMock):
-        """测试关闭连接。"""
+        """测试关闭连接"""
         mock_client.return_value = mock_async_client
         mock_async_client.close = AsyncMock()
 
@@ -101,7 +101,7 @@ class TestQdrantManager:
 
     @patch("src.infrastructure.storage.qdrant.qdrant_manager.AsyncQdrantClient")
     async def test_close_without_client(self, mock_client: MagicMock):
-        """测试未初始化客户端时关闭连接。"""
+        """测试未初始化客户端时关闭连接"""
         wrapper = QdrantManager()
         await wrapper.close()
         mock_client.assert_not_called()

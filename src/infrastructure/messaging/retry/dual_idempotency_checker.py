@@ -112,7 +112,7 @@ class DualIdempotencyChecker:
             return await self._try_acquire_postgresql(event_id)
 
     async def _write_to_postgresql(self, event_id: UUID) -> None:
-        """异步写入 PostgreSQL 记录。"""
+        """异步写入 PostgreSQL 记录"""
         try:
             stmt = text(
                 """
@@ -179,7 +179,7 @@ class DualIdempotencyChecker:
         return await self._is_processed_postgresql(event_id)
 
     async def _is_processed_postgresql(self, event_id: UUID) -> bool:
-        """PostgreSQL 模式：检查事件是否已处理。"""
+        """PostgreSQL 模式：检查事件是否已处理"""
         try:
             stmt = text("SELECT 1 FROM idempotency_records WHERE event_id = :event_id LIMIT 1")
             result = await self._session.execute(stmt, {"event_id": str(event_id)})

@@ -83,7 +83,7 @@ def _make_blackboard_entry() -> dict:
 
 
 class TestSerializationPerformance:
-    """验证序列化/反序列化时间 <10ms。"""
+    """验证序列化/反序列化时间 <10ms"""
 
     def test_session_serialize_deserialize_under_10ms(self) -> None:
         data = _make_session_data()
@@ -150,7 +150,7 @@ class TestSerializationPerformance:
 
 
 class TestReadLatencyPerformance:
-    """验证读取延迟 P95 <5ms。"""
+    """验证读取延迟 P95 <5ms"""
 
     @pytest.mark.asyncio
     async def test_session_read_latency_p95_under_5ms(self) -> None:
@@ -201,7 +201,7 @@ class TestReadLatencyPerformance:
 
 
 class TestWriteLatencyPerformance:
-    """验证写入延迟 P95 <10ms。"""
+    """验证写入延迟 P95 <10ms"""
 
     @pytest.mark.asyncio
     async def test_session_write_latency_p95_under_10ms(self) -> None:
@@ -272,7 +272,7 @@ class TestWriteLatencyPerformance:
 
 
 class TestTTLBehavior:
-    """验证 TTL 过期策略。"""
+    """验证 TTL 过期策略"""
 
     @pytest.mark.asyncio
     async def test_session_ttl_is_applied(self) -> None:
@@ -310,7 +310,7 @@ class TestTTLBehavior:
 
 
 class TestCosineSimilarityPerformance:
-    """验证余弦相似度计算性能。"""
+    """验证余弦相似度计算性能"""
 
     def test_cosine_similarity_under_1ms_for_1024_dim(self) -> None:
         vec1 = [0.1 * (i % 10) for i in range(1024)]

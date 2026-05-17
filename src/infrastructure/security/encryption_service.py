@@ -19,7 +19,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class EncryptionService:
-    """加密服务实现，使用 passlib + bcrypt 进行密码哈希和验证。"""
+    """加密服务实现，使用 passlib + bcrypt 进行密码哈希和验证"""
 
     def hash_password(self, password: str) -> str:
         """哈希密码.
