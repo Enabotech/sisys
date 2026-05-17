@@ -1,4 +1,4 @@
-"""Redis Retry Queue — 基础设施层实现。
+"""Redis Retry Queue — 基础设施层实现
 
 使用 Redis ZSET 实现延迟重试调度：
 - 失败事件进入 ZSET，score 为重试时间戳
@@ -68,9 +68,9 @@ class RetryQueueEntry:
 
 
 class RedisRetryQueue:
-    """Redis ZSET 延迟重试队列。
+    """Redis ZSET 延迟重试队列
 
-    使用有序集合存储待重试事件，score 为重试时间戳。
+    使用有序集合存储待重试事件，score 为重试时间戳
     支持：
     - 添加重试事件（带延迟）
     - 获取到期事件
@@ -83,7 +83,7 @@ class RedisRetryQueue:
         redis_client: aioredis.Redis,
         queue_key: str = DEFAULT_RETRY_QUEUE_KEY,
     ):
-        """初始化 RedisRetryQueue。
+        """初始化 RedisRetryQueue
 
         Args:
             redis_client: 异步 Redis 客户端
@@ -101,7 +101,7 @@ class RedisRetryQueue:
         retry_count: int = 0,
         error: str | None = None,
     ) -> None:
-        """添加重试事件到队列。
+        """添加重试事件到队列
 
         Args:
             event_id: 事件 ID
@@ -129,7 +129,7 @@ class RedisRetryQueue:
         )
 
     async def dequeue(self, limit: int = 10) -> list[RetryQueueEntry]:
-        """获取已到期的重试事件。
+        """获取已到期的重试事件
 
         Args:
             limit: 最大返回数量
@@ -166,7 +166,7 @@ class RedisRetryQueue:
         return result
 
     async def count(self) -> int:
-        """统计待重试事件数量。
+        """统计待重试事件数量
 
         Returns:
             队列中的事件数量
@@ -174,7 +174,7 @@ class RedisRetryQueue:
         return await self._redis.zcard(self._queue_key)
 
     async def peek(self, limit: int = 10) -> list[RetryQueueEntry]:
-        """查看即将重试的事件（不移除）。
+        """查看即将重试的事件（不移除）
 
         Args:
             limit: 最大返回数量
@@ -192,7 +192,7 @@ class RedisRetryQueue:
         return result
 
     async def remove(self, event_id: UUID) -> bool:
-        """移除指定事件。
+        """移除指定事件
 
         Args:
             event_id: 事件 ID

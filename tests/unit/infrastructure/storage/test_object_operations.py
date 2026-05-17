@@ -1,6 +1,6 @@
-"""对象操作测试。
+"""对象操作测试
 
-TDD 测试覆盖 ObjectOperations 的所有公开方法。
+TDD 测试覆盖 ObjectOperations 的所有公开方法
 """
 
 from __future__ import annotations

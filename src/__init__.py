@@ -1,6 +1,6 @@
-"""SISYS 根包。
+"""SISYS 根包
 
-企业战略规划与决策智能平台入口。
+企业战略规划与决策智能平台入口
 
 Author:
     agimtech <agimtech@126.com>

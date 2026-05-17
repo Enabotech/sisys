@@ -1,6 +1,6 @@
-"""SISYS 领域层 审计事件模块。
+"""SISYS 领域层 审计事件模块
 
-定义审计日志相关的领域事件，满足等保2.0合规要求。
+定义审计日志相关的领域事件，满足等保2.0合规要求
 
 AC-1 标准字段 (FR-SC-02):
     log_id: 审计日志条目的UUID标识符
@@ -34,9 +34,9 @@ from src.domain.events.base import DomainEvent
 
 
 class AuditActionType(str, Enum):
-    """系统操作的审计动作类型。
+    """系统操作的审计动作类型
 
-    包含认证、授权、文档、Agent、检查点、纠正和系统等各类操作。
+    包含认证、授权、文档、Agent、检查点、纠正和系统等各类操作
     """
 
     # Authentication events - 认证事件
@@ -79,24 +79,24 @@ class AuditActionType(str, Enum):
 
 @dataclass(frozen=True)
 class AuditEvent(DomainEvent):
-    """审计日志条目的领域事件。
+    """审计日志条目的领域事件
 
-    继承DomainEvent并添加审计特定字段，满足FR-SC-02要求。
+    继承DomainEvent并添加审计特定字段，满足FR-SC-02要求
 
     Attributes:
-        event_id: 唯一事件标识符（继承自DomainEvent）。
-        event_type: 事件类型，固定为"AuditEvent"（继承自DomainEvent）。
-        timestamp: 审计操作发生时间（继承自DomainEvent）。
-        source: 产生此事件的系统组件。
-        aggregate_id: 被审计实体的ID。
-        aggregate_type: 被审计实体的类型。
-        log_id: 审计日志条目的UUID标识符。
-        actor: 用户ID或系统组件。
-        action_type: 执行的操作类型。
-        target_resource: 被操作的资源。
-        old_value: 操作前状态（JSON）。
-        new_value: 操作后状态（JSON）。
-        correction_level: 纠正级别（L0-L3，可选）。
+        event_id: 唯一事件标识符（继承自DomainEvent）
+        event_type: 事件类型，固定为"AuditEvent"（继承自DomainEvent）
+        timestamp: 审计操作发生时间（继承自DomainEvent）
+        source: 产生此事件的系统组件
+        aggregate_id: 被审计实体的ID
+        aggregate_type: 被审计实体的类型
+        log_id: 审计日志条目的UUID标识符
+        actor: 用户ID或系统组件
+        action_type: 执行的操作类型
+        target_resource: 被操作的资源
+        old_value: 操作前状态（JSON）
+        new_value: 操作后状态（JSON）
+        correction_level: 纠正级别（L0-L3，可选）
     """
 
     event_type: str = "AuditEvent"
@@ -119,11 +119,11 @@ class AuditEvent(DomainEvent):
             raise ValueError("correction_level must be 0-3 or None")
 
     def to_audit_dict(self) -> dict[str, Any]:
-        """序列化为审计专用字典格式。
+        """序列化为审计专用字典格式
 
         Returns:
             包含FR-SC-02字段的字典：log_id、timestamp、actor、
-            action_type、target_resource、old_value、new_value。
+            action_type、target_resource、old_value、new_value
         """
         return {
             "log_id": str(self.log_id),

@@ -1,6 +1,6 @@
-"""SISYS 领域层 心跳事件模块。
+"""SISYS 领域层 心跳事件模块
 
-定义心跳定时器相关的领域事件。
+定义心跳定时器相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,14 +20,14 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class HeartbeatTriggered(DomainEvent):
-    """周期性心跳定时器触发时触发的事件。
+    """周期性心跳定时器触发时触发的事件
 
     Attributes:
-        heartbeat_id: 心跳唯一标识符。
-        event_type: 事件类型，固定为"HeartbeatTriggered"。
-        wake_reason: 唤醒原因。
-        todo_items: 待办事项列表。
-        cost_budget: 成本预算。
+        heartbeat_id: 心跳唯一标识符
+        event_type: 事件类型，固定为"HeartbeatTriggered"
+        wake_reason: 唤醒原因
+        todo_items: 待办事项列表
+        cost_budget: 成本预算
     """
 
     heartbeat_id: uuid.UUID = field(default_factory=uuid.uuid4)

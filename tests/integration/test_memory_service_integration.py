@@ -1,6 +1,6 @@
 """Tests for MemoryService.
 
-RED PHASE: 验证 MemoryService CRUD 操作。
+RED PHASE: 验证 MemoryService CRUD 操作
 Uses mocks for repository layer to test MemoryService in isolation.
 """
 

@@ -1,6 +1,6 @@
-"""SISYS 基础设施层一致性哈希路由模块。
+"""SISYS 基础设施层一致性哈希路由模块
 
-基于 FNV-1a 哈希算法实现会话级别的一致性路由，支持虚拟节点和加权分配。
+基于 FNV-1a 哈希算法实现会话级别的一致性路由，支持虚拟节点和加权分配
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 @dataclass
 class HashNode:
-    """哈希环节点数据类。
+    """哈希环节点数据类
 
     Attributes:
         node_id: 节点唯一标识
@@ -29,9 +29,9 @@ class HashNode:
 
 
 class HashRouter:
-    """一致性哈希路由器，基于 FNV-1a 哈希实现会话路由。
+    """一致性哈希路由器，基于 FNV-1a 哈希实现会话路由
 
-    提供 O(log n) 路由复杂度，节点增删时最小化重分配。使用虚拟节点确保均匀分布。
+    提供 O(log n) 路由复杂度，节点增删时最小化重分配。使用虚拟节点确保均匀分布
 
     Attributes:
         VIRTUAL_NODES_PER_NODE: 每个物理节点的虚拟节点数
@@ -40,7 +40,7 @@ class HashRouter:
     VIRTUAL_NODES_PER_NODE: int = 150  # 每个物理节点的虚拟节点数量
 
     def __init__(self, nodes: Sequence[str] | None = None, virtual_nodes: int | None = None):
-        """初始化哈希路由器。
+        """初始化哈希路由器
 
         Args:
             nodes: 初始节点 ID 列表，None 表示创建空路由器
@@ -56,7 +56,7 @@ class HashRouter:
                 self.add_node(node)
 
     def add_node(self, node_id: str, weight: int = 1) -> None:
-        """添加节点到哈希环。
+        """添加节点到哈希环
 
         Args:
             node_id: 节点唯一标识
@@ -72,7 +72,7 @@ class HashRouter:
         self._sorted_keys = sorted(self._ring.keys())
 
     def remove_node(self, node_id: str) -> None:
-        """从哈希环移除节点。
+        """从哈希环移除节点
 
         Args:
             node_id: 要移除的节点标识
@@ -87,7 +87,7 @@ class HashRouter:
         self._sorted_keys = sorted(self._ring.keys())
 
     def route(self, session_id: str) -> str:
-        """通过一致性哈希将会话路由到目标节点。
+        """通过一致性哈希将会话路由到目标节点
 
         Args:
             session_id: 会话标识
@@ -111,9 +111,9 @@ class HashRouter:
 
     @staticmethod
     def _hash(value: str) -> int:
-        """计算字符串的 FNV-1a 哈希值。
+        """计算字符串的 FNV-1a 哈希值
 
-        使用 FNV-1a 作为 murmurhash3 的快速替代方案，分布均匀。
+        使用 FNV-1a 作为 murmurhash3 的快速替代方案，分布均匀
 
         Args:
             value: 待哈希字符串

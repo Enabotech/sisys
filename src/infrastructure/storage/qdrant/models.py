@@ -1,7 +1,7 @@
-"""Qdrant 向量存储层数据模型。
+"""Qdrant 向量存储层数据模型
 
-包含 Collection 配置、向量点和稀疏向量定义。
-所有模型位于基础设施层，不污染领域层。
+包含 Collection 配置、向量点和稀疏向量定义
+所有模型位于基础设施层，不污染领域层
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from datetime import UTC, datetime
 
 @dataclass
 class CollectionConfig:
-    """Qdrant Collection 配置。
+    """Qdrant Collection 配置
 
-    用于创建和管理向量集合，支持 HNSW 索引配置和多租户隔离。
+    用于创建和管理向量集合，支持 HNSW 索引配置和多租户隔离
 
     字段说明:
         name: Collection 名称（应遵循 sisys:{type}:{namespace} 规范）
@@ -43,9 +43,9 @@ class CollectionConfig:
 
 @dataclass
 class VectorPoint:
-    """向量点数据模型。
+    """向量点数据模型
 
-    用于存储和检索向量及其关联的 payload 元数据。
+    用于存储和检索向量及其关联的 payload 元数据
 
     字段说明:
         id: 向量点唯一标识
@@ -67,7 +67,7 @@ class VectorPoint:
 
 @dataclass
 class SparseVector:
-    """稀疏向量模型（用于 BM25 检索）。
+    """稀疏向量模型（用于 BM25 检索）
 
     字段说明:
         indices: 词项 ID 列表（词项在词汇表中的位置）

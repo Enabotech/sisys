@@ -1,6 +1,6 @@
-"""GraphRAG 图检索器实现。
+"""GraphRAG 图检索器实现
 
-提供实体关联检索、文档关联和社区发现基础功能。
+提供实体关联检索、文档关联和社区发现基础功能
 """
 
 from __future__ import annotations
@@ -9,13 +9,13 @@ from neo4j import AsyncDriver
 
 
 class GraphRetriever:
-    """GraphRAG 图检索器。
+    """GraphRAG 图检索器
 
-    提供高级图检索功能，为 Story 3.4/3.13/3.17 的 GraphRAG 提供基础。
+    提供高级图检索功能，为 Story 3.4/3.13/3.17 的 GraphRAG 提供基础
     """
 
     def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
-        """初始化图检索器。
+        """初始化图检索器
 
         Args:
             driver: Neo4j 异步驱动实例
@@ -30,7 +30,7 @@ class GraphRetriever:
         max_depth: int = 2,
         limit: int = 20,
     ) -> list[dict]:
-        """查找与指定实体相关的其他实体。
+        """查找与指定实体相关的其他实体
 
         Args:
             entity_id: 实体节点 ID
@@ -67,7 +67,7 @@ class GraphRetriever:
             ]
 
     async def find_related_documents(self, entity_id: str, limit: int = 10) -> list[dict]:
-        """查找与指定实体相关的文档。
+        """查找与指定实体相关的文档
 
         Args:
             entity_id: 实体节点 ID
@@ -99,10 +99,10 @@ class GraphRetriever:
             ]
 
     async def find_community(self, node_ids: list[str]) -> list[dict]:
-        """查找节点所属的社区（连通分量）。
+        """查找节点所属的社区（连通分量）
 
-        MVP 使用 BFS/DFS 遍历实现 Connected Components 算法。
-        复杂度 O(V+E)。
+        MVP 使用 BFS/DFS 遍历实现 Connected Components 算法
+        复杂度 O(V+E)
 
         Args:
             node_ids: 节点 ID 列表

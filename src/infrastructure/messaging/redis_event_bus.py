@@ -12,10 +12,10 @@ from src.infrastructure.messaging.channel_router import ChannelRouter
 
 
 class RedisEventBus(EventPublisher, EventSubscriber):
-    """Redis Pub/Sub 事件总线实现。
+    """Redis Pub/Sub 事件总线实现
 
-    实现 EventPublisher 和 EventSubscriber 接口。
-    通过 ChannelRouter 推断事件类型对应的传输通道。
+    实现 EventPublisher 和 EventSubscriber 接口
+    通过 ChannelRouter 推断事件类型对应的传输通道
     """
 
     def __init__(
@@ -24,7 +24,7 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         subscriber: Any,
         router: ChannelRouter,
     ) -> None:
-        """初始化 RedisEventBus。
+        """初始化 RedisEventBus
 
         Args:
             publisher: Redis 发布器（异步）
@@ -36,7 +36,7 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         self._router = router
 
     async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
-        """发布事件到 Redis 通道。
+        """发布事件到 Redis 通道
 
         Args:
             event: 领域事件
@@ -70,7 +70,7 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         event_type: str,
         handler: Any,
     ) -> None:
-        """订阅领域事件。
+        """订阅领域事件
 
         Args:
             event_type: 事件类型
@@ -83,7 +83,7 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         event_type: str,
         handler: Any,
     ) -> None:
-        """订阅领域事件（支持异步处理器）。
+        """订阅领域事件（支持异步处理器）
 
         Args:
             event_type: 事件类型

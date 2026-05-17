@@ -1,6 +1,6 @@
-"""MinIOConfig 配置模型测试。
+"""MinIOConfig 配置模型测试
 
-TDD 红→绿→重构循环 A。
+TDD 红→绿→重构循环 A
 """
 
 from __future__ import annotations

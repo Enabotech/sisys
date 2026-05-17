@@ -1,6 +1,6 @@
-"""Qdrant 客户端封装。
+"""Qdrant 客户端封装
 
-提供懒初始化、健康检查和优雅关闭功能。
+提供懒初始化、健康检查和优雅关闭功能
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ from src.infrastructure.config.qdrant import QdrantConfig
 
 
 class QdrantManager(ConnectionManager):
-    """Qdrant 异步客户端封装。
+    """Qdrant 异步客户端封装
 
-    支持懒初始化、健康检查和优雅关闭。
+    支持懒初始化、健康检查和优雅关闭
     """
 
     def __init__(self, config: QdrantConfig | None = None):
-        """初始化 Qdrant 客户端封装。
+        """初始化 Qdrant 客户端封装
 
         Args:
             config: Qdrant 配置实例，如果为 None 则从环境变量加载
@@ -27,7 +27,7 @@ class QdrantManager(ConnectionManager):
         self._client: AsyncQdrantClient | None = None
 
     def _create_client(self) -> AsyncQdrantClient:
-        """创建 Qdrant 异步客户端。
+        """创建 Qdrant 异步客户端
 
         Returns:
             AsyncQdrantClient 实例
@@ -43,7 +43,7 @@ class QdrantManager(ConnectionManager):
         )
 
     def get_client(self) -> AsyncQdrantClient:
-        """获取异步客户端（懒初始化）。
+        """获取异步客户端（懒初始化）
 
         Returns:
             AsyncQdrantClient 实例
@@ -53,7 +53,7 @@ class QdrantManager(ConnectionManager):
         return self._client
 
     def get_async_client(self) -> AsyncQdrantClient:
-        """获取异步客户端（向后兼容）。
+        """获取异步客户端（向后兼容）
 
         Returns:
             AsyncQdrantClient 实例
@@ -61,7 +61,7 @@ class QdrantManager(ConnectionManager):
         return self.get_client()
 
     async def health_check(self) -> bool:
-        """检查 Qdrant 服务是否可用。
+        """检查 Qdrant 服务是否可用
 
         Returns:
             如果服务可用返回 True，否则返回 False

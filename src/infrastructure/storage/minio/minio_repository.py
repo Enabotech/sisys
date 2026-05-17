@@ -1,7 +1,7 @@
-"""MinIORepository — MinIO 对象存储内部实现。
+"""MinIORepository — MinIO 对象存储内部实现
 
-被 MinIOAdapter(L4ObjectPort) 组合委托。
-方法签名与 L4ObjectPort 匹配。
+被 MinIOAdapter(L4ObjectPort) 组合委托
+方法签名与 L4ObjectPort 匹配
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ from src.infrastructure.storage.minio.worm_lifecycle import WORMManager
 
 
 class MinIORepository:
-    """MinIO 对象存储内部实现。
+    """MinIO 对象存储内部实现
 
     被 MinIOAdapter(L4ObjectPort) 组合委托，
-    不声明 Protocol 继承。
+    不声明 Protocol 继承
     """
 
     def __init__(
@@ -30,7 +30,7 @@ class MinIORepository:
         tenant_id: str | None = None,
         redis_client: Redis | None = None,
     ) -> None:
-        """初始化仓储实现。
+        """初始化仓储实现
 
         Args:
             bucket_manager: Bucket 管理器
@@ -152,7 +152,7 @@ class MinIORepository:
         content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:
-        """归档对象至 WORM 存储，启用 Object Lock。
+        """归档对象至 WORM 存储，启用 Object Lock
 
         Args:
             bucket_type: Bucket 类型
@@ -192,7 +192,7 @@ class MinIORepository:
     # -- Internal helpers -----------------------------------------------------------
 
     def _resolve_bucket_name(self, bucket_type: str) -> str:
-        """将 bucket_type 解析为完整的物理 bucket 名称。
+        """将 bucket_type 解析为完整的物理 bucket 名称
 
         格式: {bucket_prefix}-{bucket_type}-{tenant_id}
         如果 tenant_id 未配置，使用 "default" 作为默认值

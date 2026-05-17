@@ -1,6 +1,6 @@
-"""SISYS 领域层端口契约门控模块。
+"""SISYS 领域层端口契约门控模块
 
-提供端口兼容性检查与契约测试基础类。
+提供端口兼容性检查与契约测试基础类
 
 Author:
     agimtech <agimtech@126.com>
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CompatibilityResult:
-    """端口版本兼容性检查结果。
+    """端口版本兼容性检查结果
 
     Attributes:
         port_name: 端口名称
@@ -43,9 +43,9 @@ class CompatibilityResult:
 
 
 class ContractGate:
-    """契约兼容性检查器。
+    """契约兼容性检查器
 
-    检查端口变更的兼容性，确保升级不会破坏已有功能。
+    检查端口变更的兼容性，确保升级不会破坏已有功能
     """
 
     def check_compatibility(
@@ -53,7 +53,7 @@ class ContractGate:
         old_spec: PortSpec,
         new_spec: PortSpec,
     ) -> CompatibilityResult:
-        """检查新旧端口规格的兼容性。
+        """检查新旧端口规格的兼容性
 
         Args:
             old_spec: 旧版本规格
@@ -113,9 +113,9 @@ class ContractGate:
 
 
 class PortContractTest:
-    """端口契约测试基类。
+    """端口契约测试基类
 
-    所有端口实现须继承此类并实现契约测试。
+    所有端口实现须继承此类并实现契约测试
     """
 
     @classmethod
@@ -129,9 +129,9 @@ class PortContractTest:
         raise NotImplementedError
 
     def run_contract_tests(self) -> None:
-        """运行所有契约测试。
+        """运行所有契约测试
 
-        由 CI 调用以验证实现匹配契约。
+        由 CI 调用以验证实现匹配契约
         """
         port_name = self.get_port_name()
         impl = self.get_implementation()

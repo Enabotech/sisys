@@ -1,6 +1,6 @@
-"""DocumentProcessingUseCase 单元测试。
+"""DocumentProcessingUseCase 单元测试
 
-验证 DocumentProcessingUseCase 用例正确。
+验证 DocumentProcessingUseCase 用例正确
 Story 2.x: 文档处理（骨架实现，待完整功能）
 
 Reference: src/application/use_cases/document_processing.py

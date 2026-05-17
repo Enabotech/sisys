@@ -1,6 +1,6 @@
-"""SISYS 基础设施层外部 API 白名单服务模块。
+"""SISYS 基础设施层外部 API 白名单服务模块
 
-基于 WhitelistServicePort 接口实现外部 API 白名单的管理和验证。
+基于 WhitelistServicePort 接口实现外部 API 白名单的管理和验证
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class WhitelistServiceImpl(WhitelistServicePort):
-    """外部 API 白名单服务实现，管理 API 白名单并验证调用合规性。
+    """外部 API 白名单服务实现，管理 API 白名单并验证调用合规性
 
     Attributes:
         _whitelist: 内存中存储的白名单字典，键为 API 端点
@@ -32,7 +32,7 @@ class WhitelistServiceImpl(WhitelistServicePort):
         self._whitelist: dict[str, ExternalAPIWhitelist] = {}
 
     def is_allowed(self, api_endpoint: str) -> bool:
-        """检查 API 端点是否在白名单中且有效。
+        """检查 API 端点是否在白名单中且有效
 
         Args:
             api_endpoint: API 端点
@@ -46,7 +46,7 @@ class WhitelistServiceImpl(WhitelistServicePort):
         return entry.is_valid()
 
     def add_to_whitelist(self, api: ExternalAPIWhitelist) -> None:
-        """添加 API 到白名单。
+        """添加 API 到白名单
 
         Args:
             api: 外部 API 白名单条目
@@ -54,7 +54,7 @@ class WhitelistServiceImpl(WhitelistServicePort):
         self._whitelist[api.endpoint] = api
 
     def get_whitelist_entry(self, api_endpoint: str) -> ExternalAPIWhitelist | None:
-        """获取白名单条目。
+        """获取白名单条目
 
         Args:
             api_endpoint: API 端点
@@ -65,7 +65,7 @@ class WhitelistServiceImpl(WhitelistServicePort):
         return self._whitelist.get(api_endpoint)
 
     def remove_from_whitelist(self, api_endpoint: str) -> bool:
-        """从白名单移除 API。
+        """从白名单移除 API
 
         Args:
             api_endpoint: API 端点
@@ -79,7 +79,7 @@ class WhitelistServiceImpl(WhitelistServicePort):
         return False
 
     def list_all_endpoints(self) -> list[str]:
-        """列出所有白名单中的端点。
+        """列出所有白名单中的端点
 
         Returns:
             端点列表

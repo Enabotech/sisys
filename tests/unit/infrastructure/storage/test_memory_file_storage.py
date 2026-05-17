@@ -17,9 +17,9 @@ from src.infrastructure.storage.fs.memory_file_storage import MemoryFileStorage
 
 @pytest.fixture
 def mock_adapter():
-    """创建 mock FileMemoryAdapter 并注入到 MemoryFileStorage。
+    """创建 mock FileMemoryAdapter 并注入到 MemoryFileStorage
 
-    使用构造器注入模式（Cosmic Python），不使用 @patch。
+    使用构造器注入模式（Cosmic Python），不使用 @patch
     """
     adapter = MagicMock()
     adapter.write = AsyncMock(return_value=True)

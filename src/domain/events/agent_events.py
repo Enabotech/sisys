@@ -1,6 +1,6 @@
-"""SISYS 领域层 Agent事件模块。
+"""SISYS 领域层 Agent事件模块
 
-定义 Agent 决策相关的领域事件。
+定义 Agent 决策相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,13 +20,13 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AgentDecided(DomainEvent):
-    """Agent做出决策时触发的事件。
+    """Agent做出决策时触发的事件
 
     Attributes:
-        agent_id: Agent唯一标识符。
-        event_type: 事件类型，固定为"AgentDecided"。
-        decision_result: 决策结果字典。
-        confidence: 决策置信度，范围0.0-1.0。
+        agent_id: Agent唯一标识符
+        event_type: 事件类型，固定为"AgentDecided"
+        decision_result: 决策结果字典
+        confidence: 决策置信度，范围0.0-1.0
     """
 
     agent_id: uuid.UUID = field(default_factory=uuid.uuid4)

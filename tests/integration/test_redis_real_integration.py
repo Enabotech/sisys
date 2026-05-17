@@ -1,7 +1,7 @@
 """Redis Real Instance Integration Tests.
 
-端到端测试，验证真实 Redis 实例上的会话存储、语义缓存和公共黑板流程。
-使用真实的 Redis 部署（localhost:6379），不使用 fakeredis 或 mock。
+端到端测试，验证真实 Redis 实例上的会话存储、语义缓存和公共黑板流程
+使用真实的 Redis 部署（localhost:6379），不使用 fakeredis 或 mock
 
 运行方式:
     pytest tests/integration/ -v

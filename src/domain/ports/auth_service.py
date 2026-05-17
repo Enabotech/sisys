@@ -1,7 +1,7 @@
-"""SISYS 领域层认证服务端口模块。
+"""SISYS 领域层认证服务端口模块
 
-领域层接口，定义认证服务的契约。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+领域层接口，定义认证服务的契约
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -23,7 +23,7 @@ __all__ = ["AuthenticationError"]
 
 @dataclass(frozen=True)
 class AuthTokens:
-    """认证令牌领域值对象（不可变）。
+    """认证令牌领域值对象（不可变）
 
     Attributes:
         access_token: 访问令牌
@@ -38,12 +38,12 @@ class AuthTokens:
 class AuthServicePort(Protocol):
     """认证服务端口（领域层定义，仅使用标准库）.
 
-    定义用户认证和 JWT 令牌管理的接口。
-    实现类位于 infrastructure 层（可导入 python-jose 等外部库）。
+    定义用户认证和 JWT 令牌管理的接口
+    实现类位于 infrastructure 层（可导入 python-jose 等外部库）
     """
 
     async def authenticate(self, username: str, password: str) -> AuthTokens:
-        """用户认证。
+        """用户认证
 
         Args:
             username: 用户名
@@ -61,7 +61,7 @@ class AuthServicePort(Protocol):
         """
 
     async def verify_token(self, token: str) -> TokenPayload:
-        """验证 JWT token。
+        """验证 JWT token
 
         Args:
             token: JWT token 字符串
@@ -74,7 +74,7 @@ class AuthServicePort(Protocol):
         """
 
     async def refresh_token(self, refresh_token: str) -> str:
-        """刷新 JWT access token。
+        """刷新 JWT access token
 
         Args:
             refresh_token: JWT refresh token 字符串
@@ -87,7 +87,7 @@ class AuthServicePort(Protocol):
         """
 
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
-        """用户登出，撤销 JWT token。
+        """用户登出，撤销 JWT token
 
         Args:
             token: 要撤销的 JWT access token

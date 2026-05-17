@@ -1,6 +1,6 @@
-"""PostgreSQLConfig 单元测试。
+"""PostgreSQLConfig 单元测试
 
-TDD 红阶段：验证配置模型的字段、默认值和 from_env 支持。
+TDD 红阶段：验证配置模型的字段、默认值和 from_env 支持
 """
 
 from __future__ import annotations

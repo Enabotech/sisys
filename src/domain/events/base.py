@@ -1,7 +1,7 @@
-"""SISYS 领域层事件基类模块。
+"""SISYS 领域层事件基类模块
 
-领域事件仅使用 Python 标准库类型（dataclasses, uuid, datetime）。
-Pydantic 仅在应用层/基础设施层边界用于序列化和验证。
+领域事件仅使用 Python 标准库类型（dataclasses, uuid, datetime）
+Pydantic 仅在应用层/基础设施层边界用于序列化和验证
 
 Author:
     agimtech <agimtech@126.com>
@@ -44,18 +44,18 @@ DEFAULT_SCHEMA_VERSION = "1.0.0"
 
 @dataclass(frozen=True)
 class DomainEvent:
-    """所有领域事件的基类。
+    """所有领域事件的基类
 
     AC-1 标准字段:
-        event_id: 本次事件实例的唯一标识符。
-        event_type: 类型判别字符串（如 "DocumentProcessed"）。
-        timestamp: 事件发生时间（UTC）。
-        source: 产生此事件的系统或模块来源。
-        schema_version: 此事件模式的版本（如 "1.0.0"）。
-        aggregate_id: 产生此事件的聚合 ID。
-        aggregate_type: 聚合类型名称（如 "Document"）。
-        version: 此事件的单调递增版本号。
-        payload: 事件特定数据字典。
+        event_id: 本次事件实例的唯一标识符
+        event_type: 类型判别字符串（如 "DocumentProcessed"）
+        timestamp: 事件发生时间（UTC）
+        source: 产生此事件的系统或模块来源
+        schema_version: 此事件模式的版本（如 "1.0.0"）
+        aggregate_id: 产生此事件的聚合 ID
+        aggregate_type: 聚合类型名称（如 "Document"）
+        version: 此事件的单调递增版本号
+        payload: 事件特定数据字典
     """
 
     event_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -87,11 +87,11 @@ class DomainEvent:
 
     @classmethod
     def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
-        """手动注册事件类用于多态反序列化。
+        """手动注册事件类用于多态反序列化
 
         Args:
-            event_type: 映射到此类的 event_type 字符串。
-            event_class: 要注册的事件类。
+            event_type: 映射到此类的 event_type 字符串
+            event_class: 要注册的事件类
         """
         cls._registry[event_type] = event_class
 
@@ -100,13 +100,13 @@ class DomainEvent:
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化事件为字典，包含子类特定字段。子类特定字段（超出核心 DomainEvent 字典）合并到 payload 字典。
+        """序列化事件为字典，包含子类特定字段。子类特定字段（超出核心 DomainEvent 字典）合并到 payload 字典
 
         Returns:
-            事件的字典表示。
+            事件的字典表示
 
         Raises:
-            ValueError: event_type 为空或 payload 不可 JSON 序列化。
+            ValueError: event_type 为空或 payload 不可 JSON 序列化
         """
         if not self.event_type:
             raise ValueError("event_type must not be empty")
@@ -168,16 +168,16 @@ class DomainEvent:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
-        """使用事件类型注册表从字典反序列化事件。如果 event_type 映射到已注册子类，则实例化该子类；否则返回基础 DomainEvent。
+        """使用事件类型注册表从字典反序列化事件。如果 event_type 映射到已注册子类，则实例化该子类；否则返回基础 DomainEvent
 
         Args:
-            data: 包含事件数据的字典。
+            data: 包含事件数据的字典
 
         Returns:
-            重建的 DomainEvent 实例（可能是子类）。
+            重建的 DomainEvent 实例（可能是子类）
 
         Raises:
-            ValueError: 必需字段缺失或格式错误。
+            ValueError: 必需字段缺失或格式错误
         """
         if "event_id" not in data:
             raise ValueError("Missing required field: event_id")
@@ -243,10 +243,10 @@ class DomainEvent:
 
     @classmethod
     def _deserialize_value(cls, value: Any, target_type: Any) -> Any:
-        """反序列化 payload 值为原始 Python 类型。
+        """反序列化 payload 值为原始 Python 类型
 
         处理 UUID、datetime、Enum 及容器类型（list、dict），
-        正确处理 uuid.UUID | None 等联合类型。
+        正确处理 uuid.UUID | None 等联合类型
         """
         if value is None:
             return None

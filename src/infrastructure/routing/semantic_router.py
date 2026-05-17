@@ -1,6 +1,6 @@
-"""SISYS 基础设施层语义路由模块。
+"""SISYS 基础设施层语义路由模块
 
-基于 bge-m3 向量嵌入实现语义相似度路由，将任务上下文与候选目标进行最佳匹配。
+基于 bge-m3 向量嵌入实现语义相似度路由，将任务上下文与候选目标进行最佳匹配
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,7 +21,7 @@ class EmbeddingModelProtocol(Protocol):
     """嵌入模型协议，由基础设施层实现。"""
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        """生成文本的嵌入向量。
+        """生成文本的嵌入向量
 
         Args:
             texts: 待嵌入的文本字符串列表
@@ -34,7 +34,7 @@ class EmbeddingModelProtocol(Protocol):
 
 @dataclass
 class Candidate:
-    """路由候选项数据类，表示一个 Agent 或工具。
+    """路由候选项数据类，表示一个 Agent 或工具
 
     Attributes:
         candidate_id: 候选项唯一标识
@@ -50,7 +50,7 @@ class Candidate:
 
 
 class SemanticRouter:
-    """语义路由器，基于 bge-m3 嵌入向量通过余弦相似度匹配任务与候选目标。
+    """语义路由器，基于 bge-m3 嵌入向量通过余弦相似度匹配任务与候选目标
 
     Attributes:
         DEFAULT_EMBEDDING_DIM: 默认嵌入维度（bge-m3 为 1024）
@@ -69,7 +69,7 @@ class SemanticRouter:
         embedding_model: EmbeddingModelProtocol | None = None,
         cache_ttl_seconds: int = 86400,  # 24 小时，用于缓存大小限制而非过期
     ):
-        """初始化语义路由器。
+        """初始化语义路由器
 
         Args:
             candidates: 初始候选项列表（Agent/工具），None 表示创建空路由器
@@ -82,7 +82,7 @@ class SemanticRouter:
         self._embedding_cache: dict[str, list[float]] = {}  # 简单内存缓存
 
     def add_candidate(self, candidate: Candidate) -> None:
-        """添加路由候选项。
+        """添加路由候选项
 
         Args:
             candidate: 待添加的候选项（Agent 或工具）
@@ -90,7 +90,7 @@ class SemanticRouter:
         self._candidates[candidate.candidate_id] = candidate
 
     def remove_candidate(self, candidate_id: str) -> None:
-        """移除路由候选项。
+        """移除路由候选项
 
         Args:
             candidate_id: 待移除的候选项 ID
@@ -98,7 +98,7 @@ class SemanticRouter:
         self._candidates.pop(candidate_id, None)
 
     async def route(self, task_context: dict[str, Any]) -> tuple[str, float]:
-        """基于语义相似度将任务路由到最佳匹配候选项。
+        """基于语义相似度将任务路由到最佳匹配候选项
 
         Args:
             task_context: 任务上下文字典，至少包含 'task_type' 或 'description' 字段
@@ -135,7 +135,7 @@ class SemanticRouter:
         return best_candidate_id, best_score
 
     def _extract_task_description(self, task_context: dict[str, Any]) -> str:
-        """从任务上下文中提取描述字符串。
+        """从任务上下文中提取描述字符串
 
         Args:
             task_context: 任务上下文字典
@@ -155,7 +155,7 @@ class SemanticRouter:
         return ""
 
     async def _get_task_embedding(self, text: str) -> list[float]:
-        """获取任务文本的嵌入向量，支持内存缓存。
+        """获取任务文本的嵌入向量，支持内存缓存
 
         Args:
             text: 待嵌入的任务文本

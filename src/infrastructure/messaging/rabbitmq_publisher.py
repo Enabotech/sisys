@@ -1,7 +1,7 @@
-"""Async RabbitMQ Publisher — 基础设施层实现。
+"""Async RabbitMQ Publisher — 基础设施层实现
 
-统一 async 路径，使用 aio-pika 异步客户端。
-实现可靠事件传输，消息持久化。
+统一 async 路径，使用 aio-pika 异步客户端
+实现可靠事件传输，消息持久化
 """
 
 from __future__ import annotations
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class RabbitMQPublisher:
-    """异步 RabbitMQ 事件发布器。
+    """异步 RabbitMQ 事件发布器
 
-    使用 aio-pika connect_robust 实现自动重连。
-    所有操作统一使用 async/await。
+    使用 aio-pika connect_robust 实现自动重连
+    所有操作统一使用 async/await
     """
 
     def __init__(self, config: RabbitMQConfig):
-        """初始化 RabbitMQPublisher。
+        """初始化 RabbitMQPublisher
 
         Args:
             config: RabbitMQ 连接配置
@@ -37,10 +37,10 @@ class RabbitMQPublisher:
         self._exchange: AbstractExchange | None = None
 
     async def connect(self) -> None:
-        """连接到 RabbitMQ。
+        """连接到 RabbitMQ
 
-        使用 connect_robust: 连接断开时自动重连。
-        连接成功后重新声明交换机。
+        使用 connect_robust: 连接断开时自动重连
+        连接成功后重新声明交换机
         """
         self._connection = await aio_pika.connect_robust(
             host=self._config.host,
@@ -69,7 +69,7 @@ class RabbitMQPublisher:
         routing_key: str,
         retry_count: int = 0,
     ) -> None:
-        """异步发布事件到 RabbitMQ。
+        """异步发布事件到 RabbitMQ
 
         Args:
             event: 领域事件实例

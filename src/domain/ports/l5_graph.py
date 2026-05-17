@@ -1,4 +1,4 @@
-"""SISYS 领域层 L5 图存储端口模块。
+"""SISYS 领域层 L5 图存储端口模块
 
 对应 architecture.md §11.1：
 - 知识图谱、实体关系
@@ -27,7 +27,7 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class L5GraphPort(Protocol):
-    """L5 Neo4j 图存储接口（高级实体语义）。
+    """L5 Neo4j 图存储接口（高级实体语义）
 
     对应 architecture.md §11.1：
     - 知识图谱、实体关系
@@ -40,7 +40,7 @@ class L5GraphPort(Protocol):
         entity_type: str,
         properties: dict[str, Any],
     ) -> bool:
-        """创建实体节点（MERGE 语义）。
+        """创建实体节点（MERGE 语义）
 
         Args:
             memory_id: 关联的记忆 ID（主键）
@@ -55,7 +55,7 @@ class L5GraphPort(Protocol):
         self,
         memory_id: str,
     ) -> dict | None:
-        """获取实体。
+        """获取实体
 
         Args:
             memory_id: 实体主键
@@ -68,7 +68,7 @@ class L5GraphPort(Protocol):
         self,
         memory_id: str,
     ) -> bool:
-        """删除实体及关联边。
+        """删除实体及关联边
 
         Args:
             memory_id: 实体主键
@@ -84,7 +84,7 @@ class L5GraphPort(Protocol):
         relationship_type: str,
         properties: dict[str, Any] | None = None,
     ) -> bool:
-        """创建关系边（MERGE 语义）。
+        """创建关系边（MERGE 语义）
 
         Args:
             source_memory_id: 源实体 ID
@@ -102,7 +102,7 @@ class L5GraphPort(Protocol):
         target_memory_id: str,
         relationship_type: str,
     ) -> bool:
-        """删除关系边。
+        """删除关系边
 
         Args:
             source_memory_id: 源实体 ID
@@ -119,7 +119,7 @@ class L5GraphPort(Protocol):
         max_depth: int = 2,
         relationship_type: str | None = None,
     ) -> list[dict]:
-        """查找关联实体（多跳遍历）。
+        """查找关联实体（多跳遍历）
 
         Args:
             memory_id: 起始实体 ID
@@ -135,7 +135,7 @@ class L5GraphPort(Protocol):
         cypher: str,
         params: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """执行只读 Cypher 查询。
+        """执行只读 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -150,7 +150,7 @@ class L5GraphPort(Protocol):
         cypher: str,
         params: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """执行写入 Cypher 查询。
+        """执行写入 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -166,7 +166,7 @@ class L5GraphPort(Protocol):
         max_depth: int = 1,
         edge_type: str | None = None,
     ) -> list[dict]:
-        """获取邻居节点（直接关联的实体）。
+        """获取邻居节点（直接关联的实体）
 
         Args:
             memory_id: 实体主键

@@ -1,8 +1,8 @@
-"""SISYS 领域层 UDMR 路由任务值对象模块。
+"""SISYS 领域层 UDMR 路由任务值对象模块
 
 封装 UDMR（统一数据驻留与模型路由）的任务上下文信息，
 作为不可变值对象在领域层传递。遵循六边形架构：值对象，
-仅包含业务逻辑，无外部依赖。
+仅包含业务逻辑，无外部依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -36,7 +36,7 @@ class UDMRTask:
     allowed_models: list[str] = field(default_factory=list)
 
     def is_china_domestic(self) -> bool:
-        """检查数据是否需要在中国大陆处理。
+        """检查数据是否需要在中国大陆处理
 
         Returns:
             True 如果 data_residency 为 CHINA_DOMESTIC
@@ -44,7 +44,7 @@ class UDMRTask:
         return self.data_residency == "CHINA_DOMESTIC"
 
     def requires_local_processing(self) -> bool:
-        """检查是否需要本地处理。
+        """检查是否需要本地处理
 
         Returns:
             True 如果 data_residency 为 CHINA_DOMESTIC
@@ -52,7 +52,7 @@ class UDMRTask:
         return self.is_china_domestic()
 
     def get_task_context(self) -> dict:
-        """获取任务上下文，用于 UDMR 路由决策。
+        """获取任务上下文，用于 UDMR 路由决策
 
         Returns:
             dict 包含任务上下文信息

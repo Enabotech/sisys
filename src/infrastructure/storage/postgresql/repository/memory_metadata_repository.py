@@ -1,4 +1,4 @@
-"""PostgreSQLMemoryMetadataRepository — L2 PostgreSQL 持久化实现。
+"""PostgreSQLMemoryMetadataRepository — L2 PostgreSQL 持久化实现
 
 使用 SQLAlchemy AsyncSession，支持：
 - 多用户并行：会话级别隔离
@@ -36,11 +36,11 @@ class PostgreSQLMemoryMetadataRepository(
     PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel],
     L2MetadataRepositoryPort,
 ):
-    """PostgreSQL 记忆元数据仓储。
+    """PostgreSQL 记忆元数据仓储
 
-    继承 PostgreSQLAdapter，覆写 pk_column/soft_delete_column/_do_save。
-    支持多用户并发的会话级别隔离。
-    软删除模式：deleted_at 非 NULL 的记录视为已删除。
+    继承 PostgreSQLAdapter，覆写 pk_column/soft_delete_column/_do_save
+    支持多用户并发的会话级别隔离
+    软删除模式：deleted_at 非 NULL 的记录视为已删除
     """
 
     pk_column = "memory_id"
@@ -84,9 +84,9 @@ class PostgreSQLMemoryMetadataRepository(
         )
 
     async def save(self, metadata: MemoryMetadata) -> MemoryMetadata:
-        """保存或更新记忆元数据（UPSERT with 乐观锁）。
+        """保存或更新记忆元数据（UPSERT with 乐观锁）
 
-        覆写父类 save — 使用自定义 _do_save 实现 UPSERT+版本检查。
+        覆写父类 save — 使用自定义 _do_save 实现 UPSERT+版本检查
 
         Args:
             metadata: 记忆元数据
@@ -145,7 +145,7 @@ class PostgreSQLMemoryMetadataRepository(
         await self._session.flush()
 
     async def get_by_name(self, name: str) -> MemoryMetadata | None:
-        """通过名称获取记忆元数据（排除已删除）。
+        """通过名称获取记忆元数据（排除已删除）
 
         Args:
             name: 记忆名称
@@ -167,7 +167,7 @@ class PostgreSQLMemoryMetadataRepository(
         return self._to_entity(model)
 
     async def list_by_user(self, user_id: str) -> list[MemoryMetadata]:
-        """列出用户的所有记忆元数据（排除已删除）。
+        """列出用户的所有记忆元数据（排除已删除）
 
         Args:
             user_id: 用户 ID
@@ -189,7 +189,7 @@ class PostgreSQLMemoryMetadataRepository(
         return [self._to_entity(m) for m in models]
 
     async def list_by_type(self, memory_type: str) -> list[MemoryMetadata]:
-        """列出指定类型的所有记忆元数据（排除已删除）。
+        """列出指定类型的所有记忆元数据（排除已删除）
 
         Args:
             memory_type: 记忆类型

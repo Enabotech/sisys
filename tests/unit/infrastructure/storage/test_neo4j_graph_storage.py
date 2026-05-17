@@ -92,10 +92,10 @@ class TestNeo4jGraphStorage:
         assert len(result) >= 0
 
     async def test_find_path_max_depth(self, storage, mock_driver, mock_session):
-        """测试路径最大深度限制。
+        """测试路径最大深度限制
 
         注意：Cypher 不支持参数在可变长度模式中（如 [*1..$max_depth]），
-        所以实现使用 f-string 直接插值。这是 Cypher 限制，不是 bug。
+        所以实现使用 f-string 直接插值。这是 Cypher 限制，不是 bug
         """
         _mock_session(mock_driver, mock_session, [])
 

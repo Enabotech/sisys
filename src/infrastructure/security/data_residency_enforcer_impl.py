@@ -1,6 +1,6 @@
-"""SISYS 基础设施层数据驻留强制服务模块。
+"""SISYS 基础设施层数据驻留强制服务模块
 
-基于 DataResidencyEnforcerPort 接口实现数据驻留策略的强制执行和违规检查。
+基于 DataResidencyEnforcerPort 接口实现数据驻留策略的强制执行和违规检查
 
 Author:
     agimtech <agimtech@126.com>
@@ -24,7 +24,7 @@ class DataResidencyEnforcerImpl(DataResidencyEnforcerPort):
     """数据驻留强制执行服务实现，检查数据是否在合规区域处理。"""
 
     def enforce_residency(self, data: Any, target_region: str, policy: DataResidencyPolicy) -> bool:
-        """强制数据在指定区域驻留。
+        """强制数据在指定区域驻留
 
         Args:
             data: 待处理数据
@@ -49,7 +49,7 @@ class DataResidencyEnforcerImpl(DataResidencyEnforcerPort):
         return True
 
     def check_violation(self, target_region: str, policy: DataResidencyPolicy) -> bool:
-        """检查是否存在数据驻留违规。
+        """检查是否存在数据驻留违规
 
         Args:
             target_region: 目标区域

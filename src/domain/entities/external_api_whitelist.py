@@ -1,6 +1,6 @@
-"""SISYS 领域层外部 API 白名单实体模块。
+"""SISYS 领域层外部 API 白名单实体模块
 
-定义外部 API 白名单领域实体，遵循六边形架构：领域层零依赖。
+定义外部 API 白名单领域实体，遵循六边形架构：领域层零依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -50,7 +50,7 @@ class ExternalAPIWhitelist:
     valid_until: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def is_valid(self) -> bool:
-        """检查白名单条目是否有效（未过期且已验证）。
+        """检查白名单条目是否有效（未过期且已验证）
 
         Returns:
             True 如果条目有效
@@ -61,7 +61,7 @@ class ExternalAPIWhitelist:
         return self.valid_from <= now <= self.valid_until
 
     def is_high_risk(self) -> bool:
-        """检查是否为高风险 API。
+        """检查是否为高风险 API
 
         Returns:
             True 如果 risk_level 为 HIGH
@@ -69,7 +69,7 @@ class ExternalAPIWhitelist:
         return self.risk_level == RiskLevel.HIGH
 
     def requires_dpo_approval(self) -> bool:
-        """检查是否需要 DPO 审批（高风险 API）。
+        """检查是否需要 DPO 审批（高风险 API）
 
         Returns:
             True 如果风险等级为 HIGH
@@ -77,7 +77,7 @@ class ExternalAPIWhitelist:
         return self.is_high_risk()
 
     def is_expired(self) -> bool:
-        """检查是否已过期。
+        """检查是否已过期
 
         Returns:
             True 如果当前时间超过 valid_until
@@ -85,7 +85,7 @@ class ExternalAPIWhitelist:
         return datetime.now(UTC) > self.valid_until
 
     def days_until_expiry(self) -> int:
-        """计算距离过期的天数。
+        """计算距离过期的天数
 
         Returns:
             距离过期的天数，负数表示已过期

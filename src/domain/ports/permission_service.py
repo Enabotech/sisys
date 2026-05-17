@@ -1,7 +1,7 @@
-"""SISYS 领域层权限服务端口模块。
+"""SISYS 领域层权限服务端口模块
 
-领域层接口，定义权限检查的契约。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+领域层接口，定义权限检查的契约
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,12 +20,12 @@ from uuid import UUID
 class PermissionServicePort(Protocol):
     """权限服务端口（领域层定义，仅使用标准库）
 
-    注意：角色分配/撤销是应用层 UseCase，不是领域层服务。
-    本接口仅负责权限检查，不包含角色管理逻辑。
+    注意：角色分配/撤销是应用层 UseCase，不是领域层服务
+    本接口仅负责权限检查，不包含角色管理逻辑
     """
 
     async def check_permission(self, user_id: UUID, resource: str, action: str, resource_id: UUID | None = None) -> bool:
-        """检查用户权限。
+        """检查用户权限
 
         Args:
             user_id: 用户 ID
@@ -38,7 +38,7 @@ class PermissionServicePort(Protocol):
         """
 
     async def get_user_permissions(self, user_id: UUID) -> list[str]:
-        """获取用户所有权限。
+        """获取用户所有权限
 
         Args:
             user_id: 用户 ID

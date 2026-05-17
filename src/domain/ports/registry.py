@@ -1,7 +1,7 @@
-"""SISYS 领域层端口注册中心模块。
+"""SISYS 领域层端口注册中心模块
 
-提供六边形架构下所有端口契约的统一注册管理。
-端口注册时附带元数据（名称、版本、接口、实现、模块）。
+提供六边形架构下所有端口契约的统一注册管理
+端口注册时附带元数据（名称、版本、接口、实现、模块）
 
 Author:
     agimtech <agimtech@126.com>
@@ -30,7 +30,7 @@ class Lifetime(Enum):
 
 @dataclass(frozen=True)
 class PortSpec:
-    """端口规格元数据。
+    """端口规格元数据
 
     Attributes:
         name: 唯一端口名称
@@ -58,9 +58,9 @@ class PortSpec:
 
 
 class PortRegistry:
-    """端口注册中心（单例模式）。
+    """端口注册中心（单例模式）
 
-    确保所有端口注册的唯一数据源。
+    确保所有端口注册的唯一数据源
     """
 
     _instance: PortRegistry | None = None
@@ -73,7 +73,7 @@ class PortRegistry:
         return cls._instance
 
     def register(self, spec: PortSpec) -> None:
-        """注册端口。
+        """注册端口
 
         Args:
             spec: 待注册的端口规格
@@ -137,7 +137,7 @@ def register_port(
     module: str,
     **kwargs: Any,
 ) -> None:
-    """便捷的端口注册函数。
+    """便捷的端口注册函数
 
     Args:
         name: 唯一端口名称

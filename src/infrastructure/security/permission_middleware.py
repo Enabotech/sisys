@@ -1,6 +1,6 @@
-"""SISYS 基础设施层权限验证中间件模块。
+"""SISYS 基础设施层权限验证中间件模块
 
-提供 FastAPI 依赖注入的权限验证功能，包括用户认证、角色检查和权限控制。
+提供 FastAPI 依赖注入的权限验证功能，包括用户认证、角色检查和权限控制
 
 Author:
     agimtech <agimtech@126.com>
@@ -86,7 +86,7 @@ def require_permission(
 ) -> Callable:
     """权限验证装饰器工厂.
 
-    创建检查用户是否拥有指定权限的 FastAPI 依赖。
+    创建检查用户是否拥有指定权限的 FastAPI 依赖
 
     Args:
         resource: 资源类型（如 "document", "agent"）
@@ -141,7 +141,7 @@ def require_any_role(
 ) -> Callable:
     """角色验证装饰器工厂.
 
-    创建检查用户是否拥有任一指定角色的 FastAPI 依赖。
+    创建检查用户是否拥有任一指定角色的 FastAPI 依赖
 
     Args:
         *roles: 允许的角色名称列表
@@ -173,7 +173,7 @@ def require_any_role(
 def require_all_roles(*roles: str) -> Callable:
     """角色验证装饰器工厂（需拥有所有指定角色）.
 
-    创建检查用户是否拥有所有指定角色的 FastAPI 依赖。
+    创建检查用户是否拥有所有指定角色的 FastAPI 依赖
 
     Args:
         *roles: 必需的角色名称列表
@@ -201,9 +201,9 @@ def require_all_roles(*roles: str) -> Callable:
 
 
 class CurrentUser:
-    """当前用户依赖类，提供灵活的用户注入方式。
+    """当前用户依赖类，提供灵活的用户注入方式
 
-    支持可选或必选模式获取当前用户信息。
+    支持可选或必选模式获取当前用户信息
     """
 
     @staticmethod
@@ -249,7 +249,7 @@ class CurrentUser:
 
 
 class PermissionContext:
-    """权限验证上下文，在请求处理过程中传递权限验证相关状态。
+    """权限验证上下文，在请求处理过程中传递权限验证相关状态
 
     Attributes:
         user: 当前用户 token payload

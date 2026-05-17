@@ -1,6 +1,6 @@
-"""SISYS 领域层记忆元数据索引实体模块。
+"""SISYS 领域层记忆元数据索引实体模块
 
-定义用户记忆元数据索引实体，架构来源: architecture.md §11.2.5。
+定义用户记忆元数据索引实体，架构来源: architecture.md §11.2.5
 
 Author:
     agimtech <agimtech@126.com>
@@ -18,9 +18,9 @@ from datetime import UTC, datetime
 
 @dataclass
 class MemoryMetadata:
-    """用户记忆元数据索引实体。
+    """用户记忆元数据索引实体
 
-    用于追踪 L0 文件系统记忆的状态快照。
+    用于追踪 L0 文件系统记忆的状态快照
     """
 
     memory_id: uuid.UUID
@@ -56,7 +56,7 @@ class MemoryMetadata:
         user_id: str = "",
         description: str = "",
     ) -> MemoryMetadata:
-        """创建新的 MemoryMetadata 实例。
+        """创建新的 MemoryMetadata 实例
 
         Args:
             name: 记忆名称（UNIQUE）

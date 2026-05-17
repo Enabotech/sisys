@@ -1,6 +1,6 @@
-"""MetricsConfig 单元测试。
+"""MetricsConfig 单元测试
 
-验证 MetricsConfig 配置模型正确。
+验证 MetricsConfig 配置模型正确
 Story 1.13: K8s 动态扩缩容
 
 Reference: src/infrastructure/config/metrics.py

@@ -1,6 +1,6 @@
-"""EncryptionService 单元测试。
+"""EncryptionService 单元测试
 
-验证 EncryptionService 正确实现密码哈希和验证功能。
+验证 EncryptionService 正确实现密码哈希和验证功能
 """
 
 from __future__ import annotations

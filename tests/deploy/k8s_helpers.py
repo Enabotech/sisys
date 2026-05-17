@@ -1,7 +1,7 @@
 """
 测试辅助模块 - Kubernetes 和 ArgoCD 测试工具
 
-提供通用的测试辅助函数和 fixture，避免代码重复。
+提供通用的测试辅助函数和 fixture，避免代码重复
 """
 
 import subprocess

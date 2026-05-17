@@ -1,7 +1,7 @@
 """
 Kubernetes kubectl 工具模块
 
-提供统一的 kubectl 命令执行接口，用于测试中操作 Kubernetes 集群。
+提供统一的 kubectl 命令执行接口，用于测试中操作 Kubernetes 集群
 
 Usage:
     from tests.utils.kubectl import run_kubectl, KubectlError

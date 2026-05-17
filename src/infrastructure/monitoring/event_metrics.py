@@ -1,6 +1,6 @@
-"""SISYS 基础设施层事件指标与 OpenTelemetry 跟踪模块。
+"""SISYS 基础设施层事件指标与 OpenTelemetry 跟踪模块
 
-提供事件处理指标收集器和 OpenTelemetry Trace 包装器实现。
+提供事件处理指标收集器和 OpenTelemetry Trace 包装器实现
 
 Author:
     agimtech <agimtech@126.com>
@@ -30,9 +30,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EventMetrics:
-    """事件处理指标数据结构。
+    """事件处理指标数据结构
 
-    基础计数器，不暴露 Prometheus HTTP 端点。
+    基础计数器，不暴露 Prometheus HTTP 端点
 
     Attributes:
         events_processed_total: 成功处理事件总数
@@ -56,14 +56,14 @@ class EventMetrics:
 
 
 class EventMetricsCollector:
-    """指标收集器（线程安全计数器）。
+    """指标收集器（线程安全计数器）
 
     Attributes:
         metrics: EventMetrics 数据实例
     """
 
     def __init__(self, max_processing_samples: int = 10_000):
-        """初始化指标收集器。
+        """初始化指标收集器
 
         Args:
             max_processing_samples: 处理耗时采样队列的最大长度，达到上限后自动淘汰最旧样本
@@ -78,7 +78,7 @@ class EventMetricsCollector:
         )
 
     def record_processed(self, event_type: str, duration: float) -> None:
-        """记录成功处理。
+        """记录成功处理
 
         Args:
             event_type: 事件类型
@@ -93,7 +93,7 @@ class EventMetricsCollector:
         )
 
     def record_failed(self, event_type: str, error: str) -> None:
-        """记录失败。
+        """记录失败
 
         Args:
             event_type: 事件类型
@@ -103,7 +103,7 @@ class EventMetricsCollector:
         logger.warning("Event %s failed: %s", event_type, error)
 
     def record_retried(self, event_type: str) -> None:
-        """记录重试。
+        """记录重试
 
         Args:
             event_type: 事件类型
@@ -112,7 +112,7 @@ class EventMetricsCollector:
         logger.debug("Event %s retried", event_type)
 
     def record_dlq(self, event_type: str) -> None:
-        """记录死信。
+        """记录死信
 
         Args:
             event_type: 事件类型
@@ -121,7 +121,7 @@ class EventMetricsCollector:
         logger.warning("Event %s sent to DLQ", event_type)
 
     def record_cache_hit(self, cache_type: str = "semantic") -> None:
-        """记录缓存命中。
+        """记录缓存命中
 
         Args:
             cache_type: 缓存类型标识（如 semantic, session）
@@ -130,7 +130,7 @@ class EventMetricsCollector:
         logger.debug("Cache hit (%s)", cache_type)
 
     def record_cache_miss(self, cache_type: str = "semantic") -> None:
-        """记录缓存未命中。
+        """记录缓存未命中
 
         Args:
             cache_type: 缓存类型标识（如 semantic, session）
@@ -140,7 +140,7 @@ class EventMetricsCollector:
 
     @property
     def hit_rate(self) -> float:
-        """计算缓存命中率。
+        """计算缓存命中率
 
         Returns:
             命中率（0.0-1.0），当总请求数为 0 时返回 0.0
@@ -157,10 +157,10 @@ class EventMetricsCollector:
 
 
 class OpenTelemetryTracer:
-    """OpenTelemetry Trace 包装器。
+    """OpenTelemetry Trace 包装器
 
-    默认关闭，启用后通过 OTLP 协议导出至后端（Jaeger/Tempo/collector）。
-    支持 gRPC/HTTP 协议选择、批量导出、采样策略和 Resource 属性。
+    默认关闭，启用后通过 OTLP 协议导出至后端（Jaeger/Tempo/collector）
+    支持 gRPC/HTTP 协议选择、批量导出、采样策略和 Resource 属性
 
     Attributes:
         enabled: 是否启用 Trace
@@ -168,10 +168,10 @@ class OpenTelemetryTracer:
     """
 
     def __init__(self, config: OtelConfig | None = None):
-        """初始化 Tracer。
+        """初始化 Tracer
 
         Args:
-            config: 可选的 OtelConfig 实例。如果为 None，则从环境变量读取。
+            config: 可选的 OtelConfig 实例。如果为 None，则从环境变量读取
         """
         if config is None:
             config = OtelConfig.from_env()
@@ -189,7 +189,7 @@ class OpenTelemetryTracer:
         status: str = "",
         duration: float = 0.0,
     ) -> Generator[Any | None, None, None]:
-        """创建 span 并设置属性。
+        """创建 span 并设置属性
 
         Args:
             span_name: span 名称

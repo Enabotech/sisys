@@ -1,6 +1,6 @@
-"""SISYS 基础设施层自动路由配置模块。
+"""SISYS 基础设施层自动路由配置模块
 
-提供自动路由机制的配置，支持哈希/语义/混合路由策略。
+提供自动路由机制的配置，支持哈希/语义/混合路由策略
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class AutoRouteConfig:
-    """自动路由机制配置。
+    """自动路由机制配置
 
-    使用 from_env() 类方法从环境变量加载配置。
+    使用 from_env() 类方法从环境变量加载配置
 
     Attributes:
         route_enabled: 是否启用自动路由机制
@@ -37,7 +37,7 @@ class AutoRouteConfig:
 
     @classmethod
     def from_env(cls) -> AutoRouteConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

@@ -1,6 +1,6 @@
 """Tests for MemoryChangedListener Port Injection (Task 11).
 
-RED PHASE: 验证 MemoryChangedListener 依赖注入 IndexManagerPort 实现。
+RED PHASE: 验证 MemoryChangedListener 依赖注入 IndexManagerPort 实现
 
 验证标准（AC-11）:
 - [ ] 构造函数接收 index_manager: IndexManagerPort

@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 OpenTelemetry 配置模块。
+"""SISYS 基础设施层 OpenTelemetry 配置模块
 
-提供 OTLP 导出器配置和 Trace SDK 生命周期管理。
+提供 OTLP 导出器配置和 Trace SDK 生命周期管理
 
 Author:
     agimtech <agimtech@126.com>
@@ -26,10 +26,10 @@ OtlpProtocol = Literal["grpc", "http/protobuf", "http/json"]
 
 @dataclass
 class OtelConfig:
-    """OpenTelemetry OTLP 导出器配置。
+    """OpenTelemetry OTLP 导出器配置
 
-    从环境变量读取，支持 gRPC/HTTP 协议切换。
-    默认关闭（EVENT_BUS_OTEL_TRACE_ENABLED=false）。
+    从环境变量读取，支持 gRPC/HTTP 协议切换
+    默认关闭（EVENT_BUS_OTEL_TRACE_ENABLED=false）
 
     Attributes:
         trace_enabled: 是否启用 Trace（默认 false）
@@ -59,7 +59,7 @@ class OtelConfig:
 
     @classmethod
     def from_env(cls) -> OtelConfig:
-        """从环境变量创建配置。
+        """从环境变量创建配置
 
         支持的环境变量:
         - EVENT_BUS_OTEL_TRACE_ENABLED: bool (default: false)
@@ -109,7 +109,7 @@ class OtelConfig:
         )
 
     def get_endpoint_for_protocol(self) -> str:
-        """获取协议对应的默认端点 URL。
+        """获取协议对应的默认端点 URL
 
         Returns:
             端点 URL 字符串
@@ -123,7 +123,7 @@ class OtelConfig:
 
 @dataclass
 class BatchExportConfig:
-    """批量导出配置。
+    """批量导出配置
 
     Attributes:
         max_queue_size: 最大队列大小（默认 2048）
@@ -138,7 +138,7 @@ class BatchExportConfig:
     export_timeout_millis: int = 30000
 
     def validate(self) -> None:
-        """验证配置合法性。
+        """验证配置合法性
 
         Raises:
             ValueError: 配置不合法时抛出
@@ -168,10 +168,10 @@ _failed = False
 
 
 def init(config: OtelConfig | None = None) -> bool:
-    """初始化 OpenTelemetry SDK。
+    """初始化 OpenTelemetry SDK
 
-    配置 OTLP 导出器、BatchSpanProcessor、采样策略和 Resource 属性。
-    线程安全：重复调用返回缓存状态，不会重复初始化。
+    配置 OTLP 导出器、BatchSpanProcessor、采样策略和 Resource 属性
+    线程安全：重复调用返回缓存状态，不会重复初始化
 
     Args:
         config: OtelConfig 实例，如果为 None 则从环境变量读取
@@ -278,10 +278,10 @@ def init(config: OtelConfig | None = None) -> bool:
 
 
 def shutdown(timeout: int = 5) -> None:
-    """优雅关闭 OpenTelemetry，刷新缓冲区中的 spans。
+    """优雅关闭 OpenTelemetry，刷新缓冲区中的 spans
 
-    应在应用退出前调用（或通过 atexit 自动调用）。
-    调用后全局状态被重置，允许后续重新初始化。
+    应在应用退出前调用（或通过 atexit 自动调用）
+    调用后全局状态被重置，允许后续重新初始化
 
     Args:
         timeout: force_flush 的超时时间（秒）
@@ -307,7 +307,7 @@ atexit.register(shutdown)
 
 
 def get_tracer_provider() -> Any | None:
-    """获取全局 TracerProvider。
+    """获取全局 TracerProvider
 
     Returns:
         TracerProvider 实例或 None
@@ -316,10 +316,10 @@ def get_tracer_provider() -> Any | None:
 
 
 def reset_for_testing() -> None:
-    """重置 OpenTelemetry 状态（仅用于测试隔离）。
+    """重置 OpenTelemetry 状态（仅用于测试隔离）
 
-    ⚠️ 仅用于测试环境，生产环境禁止调用。
-    H-04 修复: 同时重置 OpenTelemetry SDK 内部的全局状态。
+    ⚠️ 仅用于测试环境，生产环境禁止调用
+    H-04 修复: 同时重置 OpenTelemetry SDK 内部的全局状态
     """
     global _initialized, _tracer_provider, _failed  # noqa: PLW0603
 

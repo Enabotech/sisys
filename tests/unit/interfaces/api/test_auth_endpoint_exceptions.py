@@ -1,7 +1,7 @@
 """Tests for Auth Endpoint Exception Handling - 认证端点异常处理测试.
 
-使用 dependency_overrides 正确注入 mock 服务。
-测试实际的 endpoint 代码路径。
+使用 dependency_overrides 正确注入 mock 服务
+测试实际的 endpoint 代码路径
 """
 
 from __future__ import annotations

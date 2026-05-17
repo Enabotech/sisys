@@ -1,6 +1,6 @@
-"""SISYS 基础设施层加密服务模块。
+"""SISYS 基础设施层加密服务模块
 
-基于 passlib + bcrypt 提供密码哈希、验证和防御 timing attack 功能。
+基于 passlib + bcrypt 提供密码哈希、验证和防御 timing attack 功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -48,10 +48,10 @@ class EncryptionService:
             return False
 
     def timing_safe_verify(self, password: str) -> bool:
-        """执行伪密码验证以防御 timing attack。
+        """执行伪密码验证以防御 timing attack
 
-        使用随机生成的 salt，确保每次调用都执行完整的 bcrypt 计算。
-        由于使用随机 salt，验证结果永远为 False，但计算时间是一致的。
+        使用随机生成的 salt，确保每次调用都执行完整的 bcrypt 计算
+        由于使用随机 salt，验证结果永远为 False，但计算时间是一致的
 
         Args:
             password: 明文密码
@@ -65,9 +65,9 @@ class EncryptionService:
         return True
 
     def needs_rehash(self, hashed_password: str) -> bool:
-        """检查密码哈希是否需要重新哈希。
+        """检查密码哈希是否需要重新哈希
 
-        当 bcrypt 版本升级或配置更改时可能需要。
+        当 bcrypt 版本升级或配置更改时可能需要
 
         Args:
             hashed_password: 哈希后的密码

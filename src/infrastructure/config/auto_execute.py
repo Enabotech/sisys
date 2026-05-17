@@ -1,6 +1,6 @@
-"""SISYS 基础设施层自动执行配置模块。
+"""SISYS 基础设施层自动执行配置模块
 
-提供自动执行机制的配置，包括沙箱类型、快照 TTL 和资源限制。
+提供自动执行机制的配置，包括沙箱类型、快照 TTL 和资源限制
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,9 +19,9 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AutoExecuteConfig:
-    """自动执行机制配置。
+    """自动执行机制配置
 
-    使用 from_env() 类方法从环境变量加载配置。
+    使用 from_env() 类方法从环境变量加载配置
 
     Attributes:
         enabled: 是否启用自动执行机制
@@ -37,7 +37,7 @@ class AutoExecuteConfig:
 
     @classmethod
     def from_env(cls) -> AutoExecuteConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）
@@ -63,7 +63,7 @@ class AutoExecuteConfig:
         )
 
     def validate(self) -> bool:
-        """验证配置合法性。
+        """验证配置合法性
 
         Returns:
             合法返回 True，否则返回 False

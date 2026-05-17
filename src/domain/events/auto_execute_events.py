@@ -1,6 +1,6 @@
-"""SISYS 领域层 自动执行事件模块。
+"""SISYS 领域层 自动执行事件模块
 
-定义自动执行机制完成任务后触发的事件。
+定义自动执行机制完成任务后触发的事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,21 +19,21 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AutoExecuted(DomainEvent):
-    """自动执行机制完成任务时触发的事件。
+    """自动执行机制完成任务时触发的事件
 
-    此事件在自动路由决策（Story 1.14b）之后触发，包含执行结果。
+    此事件在自动路由决策（Story 1.14b）之后触发，包含执行结果
     下游监听器根据business_event_type发布对应的领域事件
-    （DocumentProcessed/ToolExecuted/AgentDecided）。
+    （DocumentProcessed/ToolExecuted/AgentDecided）
 
     Attributes:
-        session_id: 会话标识符。
-        task_context: 任务上下文信息。
-        execution_result: 执行结果字典。
-        cost_estimate: 成本估算。
-        latency_ms: 执行延迟（毫秒）。
-        business_event_type: 业务事件类型，如"DocumentProcessed"等。
-        route_target: 自动路由选择的目标。
-        route_score: 路由置信度评分。
+        session_id: 会话标识符
+        task_context: 任务上下文信息
+        execution_result: 执行结果字典
+        cost_estimate: 成本估算
+        latency_ms: 执行延迟（毫秒）
+        business_event_type: 业务事件类型，如"DocumentProcessed"等
+        route_target: 自动路由选择的目标
+        route_score: 路由置信度评分
     """
 
     session_id: str = ""

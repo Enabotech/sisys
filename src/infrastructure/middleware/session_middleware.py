@@ -1,6 +1,6 @@
-"""SISYS 基础设施层会话中间件模块。
+"""SISYS 基础设施层会话中间件模块
 
-提供 ASGI 中间件，在每个请求中管理 AsyncSession 的生命周期。
+提供 ASGI 中间件，在每个请求中管理 AsyncSession 的生命周期
 
 Author:
     agimtech <agimtech@126.com>
@@ -24,16 +24,16 @@ from src.infrastructure.storage.postgresql.session_context import (
 
 
 class SessionMiddleware(BaseHTTPMiddleware):
-    """ASGI 中间件，在每个请求中管理 AsyncSession。
+    """ASGI 中间件，在每个请求中管理 AsyncSession
 
-    请求开始时通过 ContextVar 创建 AsyncSession，成功时提交，异常时回滚，结束时关闭。
+    请求开始时通过 ContextVar 创建 AsyncSession，成功时提交，异常时回滚，结束时关闭
 
     Attributes:
         _factory: 会话工厂函数
     """
 
     def __init__(self, app: Any, session_factory: Callable) -> None:
-        """初始化会话中间件。
+        """初始化会话中间件
 
         Args:
             app: ASGI 应用实例
@@ -43,7 +43,7 @@ class SessionMiddleware(BaseHTTPMiddleware):
         self._factory = session_factory
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """处理请求并管理会话生命周期。
+        """处理请求并管理会话生命周期
 
         Args:
             request: HTTP 请求对象

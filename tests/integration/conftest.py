@@ -166,7 +166,7 @@ async def real_redis() -> AsyncGenerator[redis.Redis, None]:
 
     Uses get_test_env() for standardized test environment configuration.
 
-    Note: 使用 function scope 确保每个测试独立，避免状态污染。
+    Note: 使用 function scope 确保每个测试独立，避免状态污染
     """
     config = get_test_env()
 
@@ -227,7 +227,7 @@ async def real_postgres_engine():
 
     Uses get_test_env() for standardized test environment configuration.
 
-    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
+    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染
     """
     from src.infrastructure.config.postgresql import PostgreSQLConfig
     from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
@@ -274,7 +274,7 @@ async def real_qdrant_client():
 
     Uses get_test_env() for standardized test environment configuration.
 
-    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
+    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染
     """
     config = get_test_env()
 
@@ -311,7 +311,7 @@ async def real_minio_client():
 
     Uses get_test_env() for standardized test environment configuration.
 
-    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
+    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染
     """
     config = get_test_env()
 
@@ -348,7 +348,7 @@ async def real_neo4j_driver():
 
     Uses get_test_env() for standardized test environment configuration.
 
-    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染。
+    Note: 使用 function scope (非 session) 确保每个测试独立，避免状态污染
     """
     config = get_test_env()
 

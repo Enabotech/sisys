@@ -1,7 +1,7 @@
-"""SISYS 领域层 L1 缓存端口模块。
+"""SISYS 领域层 L1 缓存端口模块
 
-技术无关的键值缓存端口，支持 TTL。
-零外部依赖（仅使用 typing）。
+技术无关的键值缓存端口，支持 TTL
+零外部依赖（仅使用 typing）
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,14 +17,14 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L1CachePort(Protocol):
-    """通用键值缓存端口 — Rule 1 领域接口。
+    """通用键值缓存端口 — Rule 1 领域接口
 
-    提供带可选 TTL 的键值缓存操作。
-    调用方负责键的命名空间/前缀管理。
+    提供带可选 TTL 的键值缓存操作
+    调用方负责键的命名空间/前缀管理
     """
 
     async def get(self, key: str) -> str | None:
-        """按键读取值。
+        """按键读取值
 
         Args:
             key: 缓存键（调用方负责命名空间）
@@ -34,7 +34,7 @@ class L1CachePort(Protocol):
         """
 
     async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """写入值（可选 TTL）。
+        """写入值（可选 TTL）
 
         Args:
             key: 缓存键
@@ -46,7 +46,7 @@ class L1CachePort(Protocol):
         """
 
     async def delete(self, key: str) -> bool:
-        """删除键。
+        """删除键
 
         Args:
             key: 缓存键
@@ -56,7 +56,7 @@ class L1CachePort(Protocol):
         """
 
     async def exists(self, key: str) -> bool:
-        """检查键是否存在（且未过期）。
+        """检查键是否存在（且未过期）
 
         Args:
             key: 缓存键
@@ -66,9 +66,9 @@ class L1CachePort(Protocol):
         """
 
     async def delete_pattern(self, pattern: str) -> int:
-        """删除匹配 glob 模式的所有键。
+        """删除匹配 glob 模式的所有键
 
-        使用 SCAN（非 KEYS）以避免阻塞。
+        使用 SCAN（非 KEYS）以避免阻塞
 
         Args:
             pattern: glob 模式，如 "memory:user:123:*"
@@ -78,7 +78,7 @@ class L1CachePort(Protocol):
         """
 
     async def set_with_ttl(self, key: str, value: str, ttl: int) -> bool:
-        """写入值（显式 TTL，无默认回退）。
+        """写入值（显式 TTL，无默认回退）
 
         Args:
             key: 缓存键

@@ -1,6 +1,6 @@
-"""WORM 锁定与生命周期测试。
+"""WORM 锁定与生命周期测试
 
-TDD 测试覆盖 WORMManager 的所有公开方法。
+TDD 测试覆盖 WORMManager 的所有公开方法
 """
 
 from __future__ import annotations

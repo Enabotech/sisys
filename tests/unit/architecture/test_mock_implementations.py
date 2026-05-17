@@ -1,6 +1,6 @@
 """Tests for Fake Mock Implementations (Task 12).
 
-RED PHASE: 验证 Fake 实现存在。
+RED PHASE: 验证 Fake 实现存在
 
 验证标准（Task 12）:
 - [ ] FakeL0StorageAdapter 实现 L0StoragePort

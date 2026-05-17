@@ -1,4 +1,4 @@
-"""SISYS 应用层用例包。
+"""SISYS 应用层用例包
 
 Author:
     agimtech <agimtech@126.com>

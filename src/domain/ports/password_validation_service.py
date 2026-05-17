@@ -1,7 +1,7 @@
-"""SISYS 领域层密码验证服务端口模块。
+"""SISYS 领域层密码验证服务端口模块
 
-领域层接口，定义密码复杂度验证的契约。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+领域层接口，定义密码复杂度验证的契约
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -31,7 +31,7 @@ class PasswordValidationServicePort(Protocol):
     """
 
     def validate(self, password: str) -> None:
-        """验证密码复杂度。
+        """验证密码复杂度
 
         Args:
             password: 明文密码
@@ -42,7 +42,7 @@ class PasswordValidationServicePort(Protocol):
         ...
 
     def get_requirements(self) -> dict[str, str]:
-        """获取密码复杂度要求描述。
+        """获取密码复杂度要求描述
 
         Returns:
             密码要求字典

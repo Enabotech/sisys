@@ -1,7 +1,7 @@
-"""SISYS 基础设施层 Redis 事件发布模块。
+"""SISYS 基础设施层 Redis 事件发布模块
 
-实现领域事件的 Redis 发布/订阅通道，用于实时通知型事件的低延迟分发。
-允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）。
+实现领域事件的 Redis 发布/订阅通道，用于实时通知型事件的低延迟分发
+允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）
 
 Author:
     agimtech <agimtech@126.com>
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 class RedisEventPublisher:
-    """Redis 事件发布器。
+    """Redis 事件发布器
 
-    通过 Redis 发布/订阅通道分发实时通知型事件。
-    允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）。
+    通过 Redis 发布/订阅通道分发实时通知型事件
+    允许事件丢失（与业务状态型事件通过 RabbitMQ + Outbox 保证可靠性不同）
 
     Args:
         config: Redis 连接配置
@@ -39,7 +39,7 @@ class RedisEventPublisher:
     _NAMESPACE = "rt"
 
     def __init__(self, config: RedisConfig):
-        """初始化 Redis 事件发布器。
+        """初始化 Redis 事件发布器
 
         Args:
             config: Redis 连接配置
@@ -63,7 +63,7 @@ class RedisEventPublisher:
         return self._pool
 
     async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
-        """发布领域事件到 Redis 通道。
+        """发布领域事件到 Redis 通道
 
         Args:
             event: 领域事件实例

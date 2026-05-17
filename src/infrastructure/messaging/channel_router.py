@@ -1,7 +1,7 @@
-"""SISYS 基础设施层通道路由模块。
+"""SISYS 基础设施层通道路由模块
 
 根据事件类型将领域事件路由到对应的传输通道（Redis 实时或 RabbitMQ 可靠），
-领域层通过 EventPublisher 接口发布事件，不感知路由细节。
+领域层通过 EventPublisher 接口发布事件，不感知路由细节
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class DeliveryMode(Enum):
-    """事件传输通道模式（基础设施层概念）。
+    """事件传输通道模式（基础设施层概念）
 
-    注意：此枚举位于基础设施层，不属于领域层。
-    领域层通过事件类型的通道映射推断传输模式。
+    注意：此枚举位于基础设施层，不属于领域层
+    领域层通过事件类型的通道映射推断传输模式
     """
 
     # 仅实时通道（Redis Pub/Sub）- 可能丢失，低延迟
@@ -45,10 +45,10 @@ class ChannelMapping:
 
 
 class ChannelRouter:
-    """通道路由器。
+    """通道路由器
 
-    管理事件类型到通道的映射。
-    支持配置驱动和运行时覆盖。
+    管理事件类型到通道的映射
+    支持配置驱动和运行时覆盖
     """
 
     # 预定义映射（Story 1.3 规范）
@@ -93,10 +93,10 @@ class ChannelRouter:
     }
 
     def __init__(self, load_defaults: bool = True) -> None:
-        """初始化路由器。
+        """初始化路由器
 
         Args:
-            load_defaults: 是否加载默认映射。False 用于测试场景。
+            load_defaults: 是否加载默认映射。False 用于测试场景
         """
         self._mappings: dict[str, ChannelMapping] = {}
         self._overrides: dict[str, DeliveryMode] = {}
@@ -109,7 +109,7 @@ class ChannelRouter:
             self._mappings[mapping.event_type] = mapping
 
     def get_mapping(self, event_type: str) -> ChannelMapping | None:
-        """获取事件通道映射。
+        """获取事件通道映射
 
         Args:
             event_type: 事件类型名称
@@ -120,7 +120,7 @@ class ChannelRouter:
         return self._mappings.get(event_type)
 
     def get_delivery_mode(self, event_type: str) -> DeliveryMode:
-        """获取事件的传输模式（支持运行时覆盖）。
+        """获取事件的传输模式（支持运行时覆盖）
 
         Args:
             event_type: 事件类型名称
@@ -134,7 +134,7 @@ class ChannelRouter:
         return mapping.delivery_mode if mapping else DeliveryMode.RELIABLE
 
     def set_override(self, event_type: str, mode: DeliveryMode) -> None:
-        """运行时覆盖传输模式。
+        """运行时覆盖传输模式
 
         Args:
             event_type: 事件类型名称
@@ -144,7 +144,7 @@ class ChannelRouter:
         logger.info("Delivery mode override: %s -> %s", event_type, mode.value)
 
     def register(self, mapping: ChannelMapping) -> None:
-        """注册事件通道映射（运行时配置）。
+        """注册事件通道映射（运行时配置）
 
         Args:
             mapping: 事件通道映射配置
@@ -153,7 +153,7 @@ class ChannelRouter:
         logger.info("Registered channel mapping for: %s", mapping.event_type)
 
     def get_redis_channel(self, event_type: str) -> str | None:
-        """获取 Redis 通道名。
+        """获取 Redis 通道名
 
         Args:
             event_type: 事件类型名称
@@ -165,7 +165,7 @@ class ChannelRouter:
         return mapping.redis_channel if mapping else None
 
     def get_rabbitmq_routing_key(self, event_type: str) -> str | None:
-        """获取 RabbitMQ 路由键。
+        """获取 RabbitMQ 路由键
 
         Args:
             event_type: 事件类型名称
@@ -178,7 +178,7 @@ class ChannelRouter:
 
     @classmethod
     def create_for_testing(cls) -> ChannelRouter:
-        """创建测试用路由器（无默认映射）。
+        """创建测试用路由器（无默认映射）
 
         Returns:
             不含默认映射的 ChannelRouter 实例

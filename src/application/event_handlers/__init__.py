@@ -1,4 +1,4 @@
-"""SISYS 应用层事件处理器包。
+"""SISYS 应用层事件处理器包
 
 Author:
     agimtech <agimtech@126.com>

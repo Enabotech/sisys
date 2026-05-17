@@ -1,6 +1,6 @@
-"""AutoExecuteConfig 单元测试。
+"""AutoExecuteConfig 单元测试
 
-验证 AutoExecuteConfig 配置类正确实现。
+验证 AutoExecuteConfig 配置类正确实现
 """
 
 from __future__ import annotations

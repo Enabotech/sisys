@@ -16,7 +16,7 @@ from .outbox import Base
 
 
 class MemoryMetadataModel(Base):
-    """记忆元数据模型。
+    """记忆元数据模型
 
     对应表: memory_metadata
     用途: 追踪 L0 文件系统记忆的状态快照
@@ -61,7 +61,7 @@ class MemoryMetadataModel(Base):
 
 
 class MemoryChangeHistoryModel(Base):
-    """记忆变更历史模型（append-only）。
+    """记忆变更历史模型（append-only）
 
     对应表: memory_change_history
     用途: 追溯记忆的变更过程，不存储当前状态
@@ -101,11 +101,11 @@ class MemoryChangeHistoryModel(Base):
 
 
 class MemoryGroupMemberModel(Base):
-    """群组成员的成员关系模型。
+    """群组成员的成员关系模型
 
     对应表: memory_group_members
     用途: 验证 group 记忆的访问权限
-    存储 group_id 和 user_id 的多对多关系，带角色（member/admin）。
+    存储 group_id 和 user_id 的多对多关系，带角色（member/admin）
     """
 
     __tablename__ = "memory_group_members"

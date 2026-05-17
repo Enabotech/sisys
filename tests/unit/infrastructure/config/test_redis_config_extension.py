@@ -1,6 +1,6 @@
-"""RedisConfig 扩展字段测试。
+"""RedisConfig 扩展字段测试
 
-验证 retry_on_timeout 和 default_ttl 新字段。
+验证 retry_on_timeout 和 default_ttl 新字段
 """
 
 from __future__ import annotations

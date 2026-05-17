@@ -1,6 +1,6 @@
-"""ContractGate 和 PortContractTest 单元测试。
+"""ContractGate 和 PortContractTest 单元测试
 
-验证端口兼容性检查和契约测试基类的行为。
+验证端口兼容性检查和契约测试基类的行为
 """
 
 from __future__ import annotations

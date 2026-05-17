@@ -1,7 +1,7 @@
-"""SISYS 领域层审计仓储端口模块。
+"""SISYS 领域层审计仓储端口模块
 
-领域层接口，定义审计日志的数据访问契约。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+领域层接口，定义审计日志的数据访问契约
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,7 +20,7 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class AuditSearchCriteria:
-    """审计日志搜索条件（不可变）。
+    """审计日志搜索条件（不可变）
 
     Attributes:
         start_time: 起始时间
@@ -45,7 +45,7 @@ class AuditSearchCriteria:
 
 @dataclass(frozen=True)
 class AuditSearchResult:
-    """审计日志搜索结果（不可变）。
+    """审计日志搜索结果（不可变）
 
     Attributes:
         items: 审计日志数据元组
@@ -64,12 +64,12 @@ class AuditSearchResult:
 class AuditRepositoryPort(Protocol):
     """审计仓储端口（领域层定义，仅使用标准库）.
 
-    定义审计日志的 CRUD 和检索接口。
-    实现类位于 infrastructure 层（可导入外部ORM框架）。
+    定义审计日志的 CRUD 和检索接口
+    实现类位于 infrastructure 层（可导入外部ORM框架）
     """
 
     async def save(self, audit_data: dict[str, Any]) -> UUID:
-        """保存审计日志。
+        """保存审计日志
 
         Args:
             audit_data: 审计日志数据字典
@@ -79,7 +79,7 @@ class AuditRepositoryPort(Protocol):
         """
 
     async def get_by_id(self, log_id: UUID) -> dict[str, Any] | None:
-        """根据 ID 获取审计日志。
+        """根据 ID 获取审计日志
 
         Args:
             log_id: 审计日志 UUID
@@ -89,7 +89,7 @@ class AuditRepositoryPort(Protocol):
         """
 
     async def search(self, criteria: AuditSearchCriteria) -> AuditSearchResult:
-        """搜索审计日志。
+        """搜索审计日志
 
         Args:
             criteria: 搜索条件
@@ -104,7 +104,7 @@ class AuditRepositoryPort(Protocol):
         archived: bool,
         archived_at: datetime | None = None,
     ) -> bool:
-        """更新归档状态。
+        """更新归档状态
 
         Args:
             log_id: 审计日志 UUID
@@ -116,7 +116,7 @@ class AuditRepositoryPort(Protocol):
         """
 
     async def get_archive_status(self, log_id: UUID) -> dict[str, Any] | None:
-        """获取归档状态。
+        """获取归档状态
 
         Args:
             log_id: 审计日志 UUID

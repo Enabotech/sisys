@@ -1,6 +1,6 @@
 """Tests for MemoryChangeHistory entity.
 
-RED PHASE: 验证 MemoryChangeHistory 实体定义正确性。
+RED PHASE: 验证 MemoryChangeHistory 实体定义正确性
 """
 
 from __future__ import annotations

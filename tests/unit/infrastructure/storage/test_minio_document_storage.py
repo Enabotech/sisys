@@ -1,7 +1,7 @@
 """Tests for MinIODocumentStorage — DocumentStoragePort implementation.
 
-验证存储包装器正确委托 MinIOAdapter，并实现文档业务特有语义。
-架构意义：组合注入适配器，添加自动路径生成和文档管理语义。
+验证存储包装器正确委托 MinIOAdapter，并实现文档业务特有语义
+架构意义：组合注入适配器，添加自动路径生成和文档管理语义
 """
 
 from __future__ import annotations

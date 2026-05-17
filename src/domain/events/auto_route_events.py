@@ -1,6 +1,6 @@
-"""SISYS 领域层 自动路由事件模块。
+"""SISYS 领域层 自动路由事件模块
 
-定义自动路由机制做出路由决策后触发的事件。
+定义自动路由机制做出路由决策后触发的事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,18 +19,18 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class AutoRouted(DomainEvent):
-    """自动路由机制做出路由决策时触发的事件。
+    """自动路由机制做出路由决策时触发的事件
 
-    此事件传递给Story 1.14c（自动执行）以执行任务。
+    此事件传递给Story 1.14c（自动执行）以执行任务
 
     Attributes:
-        route_type: 路由类型，如"hash"、"semantic"或"mixed"。
-        session_id: 会话标识符。
-        task_context: 任务上下文信息。
-        route_target: 目标Agent或工具ID。
-        route_score: 路由置信度评分。
-        trigger_event_type: 原始触发事件类型（如"AutoTriggered"）。
-        trigger_event_id: 原始触发事件ID。
+        route_type: 路由类型，如"hash"、"semantic"或"mixed"
+        session_id: 会话标识符
+        task_context: 任务上下文信息
+        route_target: 目标Agent或工具ID
+        route_score: 路由置信度评分
+        trigger_event_type: 原始触发事件类型（如"AutoTriggered"）
+        trigger_event_id: 原始触发事件ID
     """
 
     route_type: str = ""  # "hash" | "semantic" | "mixed" - 路由类型

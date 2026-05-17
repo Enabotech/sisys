@@ -1,7 +1,7 @@
-"""SISYS 应用层自动触发处理器模块。
+"""SISYS 应用层自动触发处理器模块
 
 自动触发机制的事件监听适配器，监听事件总线上的领域事件
-并传递给 AutoTriggerService 进行处理。
+并传递给 AutoTriggerService 进行处理
 
 参考: Story 1.14a SDD规范定义
 参考: or.md 系统公理一 (trigger→route→execute)
@@ -29,14 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class AutoTriggerHandler:
-    """事件监听器，桥接事件总线与 AutoTriggerService。
+    """事件监听器，桥接事件总线与 AutoTriggerService
 
-    注册领域事件处理器，将处理委托给 AutoTriggerService 领域服务。
+    注册领域事件处理器，将处理委托给 AutoTriggerService 领域服务
 
     这是接口适配层——将事件总线接口适配为 AutoTriggerService 接口，
-    同时保持六边形架构合规（领域层保持隔离）。
+    同时保持六边形架构合规（领域层保持隔离）
 
-    使用后台线程及其独立事件循环，安全地将同步事件处理器桥接到异步 AutoTriggerService。
+    使用后台线程及其独立事件循环，安全地将同步事件处理器桥接到异步 AutoTriggerService
 
     Attributes:
         MAX_CONCURRENT_TASKS: 最大并发任务数（默认 100）
@@ -55,7 +55,7 @@ class AutoTriggerHandler:
         auto_trigger_service: AutoTriggerService,
         event_listener: EventListener,
     ) -> None:
-        """初始化自动触发监听器。
+        """初始化自动触发监听器
 
         Args:
             auto_trigger_service: 处理触发的领域服务
@@ -83,9 +83,9 @@ class AutoTriggerHandler:
         self._running = False
 
     def register_handlers(self) -> None:
-        """注册所有支持的领域事件类型的处理器。
+        """注册所有支持的领域事件类型的处理器
 
-        每个处理器根据事件类型委托给对应的 AutoTriggerService 方法。
+        每个处理器根据事件类型委托给对应的 AutoTriggerService 方法
         """
         self._running = True
         self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
@@ -97,7 +97,7 @@ class AutoTriggerHandler:
             logger.debug(f"Registered handler for event type: {event_type}")
 
     def _create_handler(self, event_type: str) -> Callable[[DomainEvent], None]:
-        """为指定事件类型创建处理函数。
+        """为指定事件类型创建处理函数
 
         Args:
             event_type: 要处理的事件类型
@@ -107,7 +107,7 @@ class AutoTriggerHandler:
         """
 
         def handle_event(event: DomainEvent) -> None:
-            """处理领域事件并触发处理流程。
+            """处理领域事件并触发处理流程
 
             Args:
                 event: 待处理的领域事件
@@ -121,10 +121,10 @@ class AutoTriggerHandler:
         return handle_event
 
     def _worker_loop(self) -> None:
-        """后台工作线程循环，并发处理事件。
+        """后台工作线程循环，并发处理事件
 
-        使用 create_task() + gather() 实现高吞吐事件处理。
-        通过 MAX_CONCURRENT_TASKS 控制并发，防止资源耗尽。
+        使用 create_task() + gather() 实现高吞吐事件处理
+        通过 MAX_CONCURRENT_TASKS 控制并发，防止资源耗尽
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -184,7 +184,7 @@ class AutoTriggerHandler:
             self._worker_thread.join(timeout=5.0)
 
     async def _process_event(self, event_type: str, event: DomainEvent) -> None:
-        """异步处理领域事件。
+        """异步处理领域事件
 
         Args:
             event_type: 正在处理的事件类型
@@ -211,7 +211,7 @@ class AutoTriggerHandler:
 
     @property
     def registered_event_types(self) -> list[str]:
-        """返回此监听器处理的事件类型列表。
+        """返回此监听器处理的事件类型列表
 
         Returns:
             已注册的事件类型名称列表

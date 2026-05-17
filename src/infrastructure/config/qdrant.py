@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Qdrant 配置模块。
+"""SISYS 基础设施层 Qdrant 配置模块
 
-提供 Qdrant 向量数据库连接配置，用于 L3 向量存储层。
+提供 Qdrant 向量数据库连接配置，用于 L3 向量存储层
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class QdrantConfig:
-    """Qdrant 向量数据库连接配置。
+    """Qdrant 向量数据库连接配置
 
-    用于 L3 向量存储层（Qdrant 1.7+），支持异步客户端连接管理。
+    用于 L3 向量存储层（Qdrant 1.7+），支持异步客户端连接管理
 
     Attributes:
         host: Qdrant 服务主机地址
@@ -41,7 +41,7 @@ class QdrantConfig:
 
     @classmethod
     def from_env(cls) -> QdrantConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

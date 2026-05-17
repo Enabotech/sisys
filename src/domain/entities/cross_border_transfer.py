@@ -1,6 +1,6 @@
-"""SISYS 领域层跨境数据传输请求实体模块。
+"""SISYS 领域层跨境数据传输请求实体模块
 
-定义跨境数据传输请求领域实体，遵循六边形架构：领域层零依赖。
+定义跨境数据传输请求领域实体，遵循六边形架构：领域层零依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -63,7 +63,7 @@ class CrossBorderTransferRequest:
     legal_basis_type: LegalBasisType = LegalBasisType.OTHER
 
     def is_pending(self) -> bool:
-        """检查请求是否处于待审批状态。
+        """检查请求是否处于待审批状态
 
         Returns:
             True 如果状态为 PENDING
@@ -71,7 +71,7 @@ class CrossBorderTransferRequest:
         return self.status == TransferStatus.PENDING
 
     def approve(self, approver: str) -> CrossBorderTransferRequest:
-        """审批通过。
+        """审批通过
 
         Args:
             approver: 审批者
@@ -92,7 +92,7 @@ class CrossBorderTransferRequest:
         )
 
     def reject(self, approver: str) -> CrossBorderTransferRequest:
-        """审批拒绝。
+        """审批拒绝
 
         Args:
             approver: 审批者
@@ -113,7 +113,7 @@ class CrossBorderTransferRequest:
         )
 
     def execute(self) -> CrossBorderTransferRequest:
-        """执行传输。
+        """执行传输
 
         Returns:
             新的 CrossBorderTransferRequest 实例，状态为 EXECUTED
@@ -131,7 +131,7 @@ class CrossBorderTransferRequest:
         )
 
     def block(self) -> CrossBorderTransferRequest:
-        """阻止传输。
+        """阻止传输
 
         Returns:
             新的 CrossBorderTransferRequest 实例，状态为 BLOCKED

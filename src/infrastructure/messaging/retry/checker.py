@@ -1,7 +1,7 @@
-"""IdempotencyChecker — 基础设施层实现。
+"""IdempotencyChecker — 基础设施层实现
 
-基于 Redis SET NX 原子操作实现事件处理幂等性保证。
-使用原子方法 try_acquire()，禁止分离 is_processed() + mark_processed()。
+基于 Redis SET NX 原子操作实现事件处理幂等性保证
+使用原子方法 try_acquire()，禁止分离 is_processed() + mark_processed()
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class IdempotencyChecker:
-    """事件处理幂等性检查器。
+    """事件处理幂等性检查器
 
-    使用 Redis SET NX 原子操作确保同一事件仅被处理一次。
-    TTL 默认 7 天。
+    使用 Redis SET NX 原子操作确保同一事件仅被处理一次
+    TTL 默认 7 天
     """
 
     def __init__(
@@ -29,7 +29,7 @@ class IdempotencyChecker:
         db: int = 0,
         password: str | None = None,
     ):
-        """初始化 IdempotencyChecker。
+        """初始化 IdempotencyChecker
 
         Args:
             redis_client: Redis 客户端实例（用于测试 Mock）
@@ -51,7 +51,7 @@ class IdempotencyChecker:
             self._redis = aioredis.Redis(connection_pool=pool)
 
     async def try_acquire(self, event_id: UUID, ttl: int = 7 * 24 * 3600) -> bool:
-        """原子性尝试获取事件处理权。
+        """原子性尝试获取事件处理权
 
         Args:
             event_id: 事件唯一标识

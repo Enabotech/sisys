@@ -1,7 +1,7 @@
 """exception_handlers 单元测试.
 
 验证异常处理器正确映射领域异常到 HTTP 状态码，
-正确处理请求验证错误、Pydantic 验证错误及未预期异常。
+正确处理请求验证错误、Pydantic 验证错误及未预期异常
 
 Reference: src/interfaces/api/exception_handlers.py
 """
@@ -234,7 +234,7 @@ class TestGetHttpStatus:
         """验证子类通过 isinstance 回退机制匹配父类映射.
 
          ContainerStartError 继承自 SandboxError（在 EXCEPTION_HTTP_MAP 中），
-        但自身不在映射表中，应通过 isinstance 回退找到 SandboxError 的映射。
+        但自身不在映射表中，应通过 isinstance 回退找到 SandboxError 的映射
         """
         from src.domain.exceptions.sandbox_exceptions import ContainerStartError
 
@@ -253,8 +253,8 @@ class TestGetHttpStatus:
     def test_exact_match_takes_priority_over_isinstance(self):
         """验证精确类型匹配优先于 isinstance 回退.
 
-        ConflictError 同时是 ConflictError 和 BusinessException 的实例。
-        精确匹配 ConflictError 应返回 409 而非 400。
+        ConflictError 同时是 ConflictError 和 BusinessException 的实例
+        精确匹配 ConflictError 应返回 409 而非 400
         """
         exc = ConflictError("conflict")
         assert _get_http_status(exc) == status.HTTP_409_CONFLICT
@@ -262,7 +262,7 @@ class TestGetHttpStatus:
     def test_base_exception_subclass_without_exact_match(self):
         """验证不在映射表中的 BaseException 子类通过 isinstance 回退.
 
-        AuditError 继承自 SystemException，自身不在 EXCEPTION_HTTP_MAP 中。
+        AuditError 继承自 SystemException，自身不在 EXCEPTION_HTTP_MAP 中
         """
         from src.domain.exceptions.service_exceptions import AuditError
 
@@ -1000,7 +1000,7 @@ class TestSubclassMapping:
         """验证 RoleNotFoundError 通过 isinstance 匹配 BusinessException（400）.
 
         因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 NotFoundError 之前，
-        isinstance 回退首先命中 BusinessException。
+        isinstance 回退首先命中 BusinessException
         """
         from src.domain.exceptions.role_exceptions import RoleNotFoundError
 
@@ -1029,7 +1029,7 @@ class TestSubclassMapping:
         """验证 InsufficientTokenError 通过 isinstance 匹配 BusinessException（400）.
 
         因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 PermissionDeniedError 之前，
-        isinstance 回退首先命中 BusinessException。
+        isinstance 回退首先命中 BusinessException
         """
         from src.domain.exceptions.permission_exceptions import InsufficientTokenError
 
@@ -1042,7 +1042,7 @@ class TestSubclassMapping:
         """验证 VersionError 通过 isinstance 匹配 BusinessException（400）.
 
         因为 EXCEPTION_HTTP_MAP 中 BusinessException 在 ConflictError 之前，
-        isinstance 回退首先命中 BusinessException。
+        isinstance 回退首先命中 BusinessException
         """
         from src.domain.exceptions.event_exceptions import VersionError
 

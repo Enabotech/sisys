@@ -1,6 +1,6 @@
-"""MemoryGroupMemberModel 测试。
+"""MemoryGroupMemberModel 测试
 
-验证 memory_group_members 表结构。
+验证 memory_group_members 表结构
 """
 
 from __future__ import annotations

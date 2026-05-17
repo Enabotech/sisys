@@ -1,7 +1,7 @@
 """
 Pipeline 模板测试
 
-测试 CI/CD Pipeline 配置的正确性和语法合规性。
+测试 CI/CD Pipeline 配置的正确性和语法合规性
 AC: 4, 7
 
 测试覆盖：

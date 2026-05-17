@@ -1,7 +1,7 @@
-"""SISYS 领域层令牌载荷值对象模块。
+"""SISYS 领域层令牌载荷值对象模块
 
-不可变值对象，封装 JWT Token 解码后的载荷信息。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+不可变值对象，封装 JWT Token 解码后的载荷信息
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,7 +20,7 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class TokenPayload:
-    """JWT Token 载荷领域值对象（不可变）。
+    """JWT Token 载荷领域值对象（不可变）
 
     Attributes:
         user_id: 用户 UUID

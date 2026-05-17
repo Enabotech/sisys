@@ -1,6 +1,6 @@
-"""SISYS 领域层 文档事件模块。
+"""SISYS 领域层 文档事件模块
 
-定义文档处理相关的领域事件。
+定义文档处理相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,13 +20,13 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class DocumentProcessed(DomainEvent):
-    """文档成功解析和索引后触发的事件。
+    """文档成功解析和索引后触发的事件
 
     Attributes:
-        document_id: 文档唯一标识符。
-        event_type: 事件类型，固定为"DocumentProcessed"。
-        parse_result: 解析结果字典。
-        embedding: 文档嵌入向量（可选）。
+        document_id: 文档唯一标识符
+        event_type: 事件类型，固定为"DocumentProcessed"
+        parse_result: 解析结果字典
+        embedding: 文档嵌入向量（可选）
     """
 
     document_id: uuid.UUID = field(default_factory=uuid.uuid4)

@@ -11,7 +11,7 @@ from src.infrastructure.messaging.channel_router import ChannelRouter
 
 
 class RabbitMQEventBus(EventPublisher):
-    """RabbitMQ RELIABLE 通道事件总线实现。
+    """RabbitMQ RELIABLE 通道事件总线实现
 
     通过 Outbox 模式保证可靠传输：
     1. publish() 将事件保存到 Outbox（与业务操作同事务）
@@ -23,7 +23,7 @@ class RabbitMQEventBus(EventPublisher):
         outbox_repository: Any,
         router: ChannelRouter,
     ) -> None:
-        """初始化 RabbitMQEventBus。
+        """初始化 RabbitMQEventBus
 
         Args:
             outbox_repository: Outbox 仓储实现
@@ -33,7 +33,7 @@ class RabbitMQEventBus(EventPublisher):
         self._router = router
 
     async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
-        """发布事件到 Outbox（可靠路径）。
+        """发布事件到 Outbox（可靠路径）
 
         Args:
             event: 领域事件

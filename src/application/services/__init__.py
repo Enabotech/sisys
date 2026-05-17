@@ -1,4 +1,4 @@
-"""SISYS 应用层服务包。
+"""SISYS 应用层服务包
 
 Public API:
 - UnifiedStorageGateway: L0-L5 六层统一存储网关

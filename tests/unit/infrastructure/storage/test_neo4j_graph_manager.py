@@ -23,7 +23,7 @@ class _AsyncCM:
 
 
 def _mock_session(driver, session, single_result):
-    """设置会话模拟。
+    """设置会话模拟
 
     Args:
         driver: MagicMock driver (NOT AsyncMock)

@@ -1,10 +1,10 @@
-"""MetricsPortImpl 委托模式单元测试。
+"""MetricsPortImpl 委托模式单元测试
 
 验证 MetricsPortImpl 正确地将所有调用委托给底层组件：
 - MetricsAggregator: collect(), collect_as_dict()
 - BusinessMetricsCollector: record_*, update_*, 属性访问
 
-使用构造器注入 mock 对象，验证每次调用都命中正确的底层方法。
+使用构造器注入 mock 对象，验证每次调用都命中正确的底层方法
 
 Run with: pytest tests/unit/infrastructure/monitoring/test_metrics_port_impl.py -v
 """

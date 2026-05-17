@@ -1,6 +1,6 @@
-"""架构约束测试。
+"""架构约束测试
 
-验证领域层零SQLAlchemy依赖、依赖方向正确等架构约束。
+验证领域层零SQLAlchemy依赖、依赖方向正确等架构约束
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ class TestArchitectureConstraints:
         assert len(violations) == 0, f"领域层包含SQLAlchemy导入: {violations}"
 
     def test_domain_layer_no_infrastructure_imports(self):
-        """验证 domain 层不导入 infrastructure（检查反向依赖）。
+        """验证 domain 层不导入 infrastructure（检查反向依赖）
 
         正确的依赖方向: infrastructure → application → domain
-        domain 层导入 infrastructure 是反向依赖，是禁止的。
+        domain 层导入 infrastructure 是反向依赖，是禁止的
         """
         domain_dir = Path(__file__).parents[3] / "src" / "domain"
 

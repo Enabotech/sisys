@@ -1,10 +1,10 @@
-"""SISYS 领域层自动路由服务模块。
+"""SISYS 领域层自动路由服务模块
 
-AutoRouteService 是处理 AutoTriggered 事件并发出 AutoRouted 事件的领域服务。
+AutoRouteService 是处理 AutoTriggered 事件并发出 AutoRouted 事件的领域服务
 监听 AutoTriggerService 发出的 AutoTriggered 事件，使用哈希路由（会话一致性）
-和/或语义路由（目标匹配）进行路由决策，并发布 AutoRouted 事件给下游执行阶段。
+和/或语义路由（目标匹配）进行路由决策，并发布 AutoRouted 事件给下游执行阶段
 
-架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布。
+架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布
 
 Author:
     agimtech <agimtech@126.com>
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoRouteService:
-    """监听 AutoTriggered 事件、执行路由决策并发出 AutoRouted 事件的领域服务。
+    """监听 AutoTriggered 事件、执行路由决策并发出 AutoRouted 事件的领域服务
 
     职责：
     - 监听 AutoTriggerService 发出的 AutoTriggered 事件（Story 1.14a）
@@ -35,7 +35,7 @@ class AutoRouteService:
     - 发布 AutoRouted 事件给下游执行阶段（Story 1.14c）
     - 将路由决策记录到 RoutingDecisionLog
 
-    架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布。
+    架构：领域层（无外部依赖），通过端口/协议实现路由和事件发布
     """
 
     def __init__(
@@ -44,19 +44,19 @@ class AutoRouteService:
         hash_router: HashRouterProtocol | None = None,
         semantic_router: SemanticRouterProtocol | None = None,
     ):
-        """初始化 AutoRouteService。
+        """初始化 AutoRouteService
 
         Args:
-            publisher: 事件发布器端口（基础设施实现）。传入 None 用于独立测试。
-            hash_router: 哈希路由器端口（基础设施实现）。传入 None 禁用哈希路由。
-            semantic_router: 语义路由器端口（基础设施实现）。传入 None 禁用语义路由。
+            publisher: 事件发布器端口（基础设施实现）。传入 None 用于独立测试
+            hash_router: 哈希路由器端口（基础设施实现）。传入 None 禁用哈希路由
+            semantic_router: 语义路由器端口（基础设施实现）。传入 None 禁用语义路由
         """
         self._publisher = publisher
         self._hash_router = hash_router
         self._semantic_router = semantic_router
 
     async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
-        """处理 AutoTriggered 事件：执行路由决策并发出 AutoRouted 事件。
+        """处理 AutoTriggered 事件：执行路由决策并发出 AutoRouted 事件
 
         Args:
             event: 来自触发阶段（Story 1.14a）的 AutoTriggered 事件
@@ -83,7 +83,7 @@ class AutoRouteService:
         return routed
 
     async def _make_routing_decision(self, event: AutoTriggered) -> tuple[str, str, float]:
-        """根据可用路由器进行路由决策。
+        """根据可用路由器进行路由决策
 
         Args:
             event: AutoTriggered 事件
@@ -134,7 +134,7 @@ class AutoRouteService:
         return route_type, route_target, route_score
 
     async def _publish(self, event: AutoRouted) -> None:
-        """通过已配置的发布器发布 AutoRouted 事件。
+        """通过已配置的发布器发布 AutoRouted 事件
 
         Args:
             event: 待发布的 AutoRouted 事件

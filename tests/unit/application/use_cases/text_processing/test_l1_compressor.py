@@ -1,6 +1,6 @@
 """Tests for L1Compressor.
 
-RED PHASE: 验证 L1Compressor 压缩功能。
+RED PHASE: 验证 L1Compressor 压缩功能
 """
 
 from __future__ import annotations

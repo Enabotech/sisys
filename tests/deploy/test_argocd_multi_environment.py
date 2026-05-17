@@ -1,7 +1,7 @@
 """
 ArgoCD 多环境配置测试
 
-验证 Dev/Test/Prod 环境的隔离配置、Kustomize overlay 和环境晋升流程。
+验证 Dev/Test/Prod 环境的隔离配置、Kustomize overlay 和环境晋升流程
 """
 
 from pathlib import Path

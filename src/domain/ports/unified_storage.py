@@ -1,7 +1,7 @@
-"""SISYS 领域层统一存储端口模块。
+"""SISYS 领域层统一存储端口模块
 
-定义存储系统的统一操作契约。
-对应 architecture.md §11.2.9 L0 驱动各层协同机制。
+定义存储系统的统一操作契约
+对应 architecture.md §11.2.9 L0 驱动各层协同机制
 
 设计原则：
 - L0 是真相源，同步写入
@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class UnifiedStoragePort(Protocol):
-    """统一存储入口接口。
+    """统一存储入口接口
 
-    定义存储系统的统一操作契约。
-    对应 architecture.md §11.2.9 L0 驱动各层协同机制。
+    定义存储系统的统一操作契约
+    对应 architecture.md §11.2.9 L0 驱动各层协同机制
 
     设计原则：
     - L0 是真相源，同步写入
@@ -48,7 +48,7 @@ class UnifiedStoragePort(Protocol):
         name: str,
         tier: StorageTier = StorageTier.WARM,
     ) -> dict[StorageLayer, bool]:
-        """保存记忆到多层存储。
+        """保存记忆到多层存储
 
         对应 architecture.md §11.2.9 写入流程：
         1. L0 文件系统（同步，强一致）
@@ -78,7 +78,7 @@ class UnifiedStoragePort(Protocol):
         name: str,
         prefer_cache: bool = True,
     ) -> str | None:
-        """读取记忆。
+        """读取记忆
 
         对应 architecture.md §11.2.9 检索流程：
         - prefer_cache=True: L1 → L2 → L0（缓存优先）
@@ -102,7 +102,7 @@ class UnifiedStoragePort(Protocol):
         owner_id: str,
         name: str,
     ) -> dict[StorageLayer, bool]:
-        """删除记忆。
+        """删除记忆
 
         Args:
             memory_id: 记忆 ID
@@ -121,7 +121,7 @@ class UnifiedStoragePort(Protocol):
         owner_id: str,
         name: str,
     ) -> dict[StorageLayer, bool]:
-        """检查记忆在各层的存在状态。
+        """检查记忆在各层的存在状态
 
         Args:
             memory_id: 记忆 ID

@@ -1,7 +1,7 @@
 """Qdrant Real Instance Integration Tests.
 
-端到端测试，验证真实 Qdrant 实例上的向量存储和 Collection 管理。
-使用真实的 Qdrant 部署（localhost:6333），不使用 mock。
+端到端测试，验证真实 Qdrant 实例上的向量存储和 Collection 管理
+使用真实的 Qdrant 部署（localhost:6333），不使用 mock
 
 运行方式:
     pytest tests/integration/test_qdrant_real_integration.py -v
@@ -175,10 +175,10 @@ class TestQdrantCollectionManager:
 
 
 class TestQdrantVectorStorage:
-    """Qdrant 向量存储真实实例集成测试。
+    """Qdrant 向量存储真实实例集成测试
 
-    注意：qdrant-client 1.7.1 与 Qdrant v1.7.1 服务器的 upsert API 存在兼容性问题。
-    Collection Manager 测试通过，验证核心功能正常。Vector Storage 测试在某些版本组合下可能失败。
+    注意：qdrant-client 1.7.1 与 Qdrant v1.7.1 服务器的 upsert API 存在兼容性问题
+    Collection Manager 测试通过，验证核心功能正常。Vector Storage 测试在某些版本组合下可能失败
     """
 
     async def test_upsert_and_search_vectors(

@@ -1,7 +1,7 @@
-"""SISYS 领域层路由决策日志实体模块。
+"""SISYS 领域层路由决策日志实体模块
 
-定义路由决策日志领域实体，用于审计和成本追踪。
-WORM 存储要求（合规要求保留 7 年）。
+定义路由决策日志领域实体，用于审计和成本追踪
+WORM 存储要求（合规要求保留 7 年）
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,10 +19,10 @@ from datetime import UTC, datetime
 
 @dataclass(frozen=True)
 class RoutingDecisionLog:
-    """路由决策日志条目。
+    """路由决策日志条目
 
-    存储路由决策细节，用于审计和成本追踪。
-    WORM 存储要求（合规要求保留 7 年）。
+    存储路由决策细节，用于审计和成本追踪
+    WORM 存储要求（合规要求保留 7 年）
 
     不变量约束:
     - log_id 必须为有效 UUID
@@ -32,19 +32,19 @@ class RoutingDecisionLog:
     - route_score 必须在 0.0 至 1.0 范围内
 
     Attributes:
-        log_id: 日志唯一标识符。
-        task_id: 任务标识符。
-        session_id: 会话标识符。
-        route_type: 路由类型。
-        route_target: 路由目标（智能体/工具/模型名）。
-        route_score: 路由置信度/评分（0.0-1.0）。
-        cost_estimate: 预估成本（美元）。
-        latency_ms: 路由决策延迟（毫秒）。
-        timestamp: 决策时间戳。
-        worm_storage_ref: WORM 存储引用（合规）。
-        selected_model: UDMR 选定模型（本地/云端）。
-        cost_actual: 实际成本（美元）。
-        fallback_reason: UDMR 回退原因。
+        log_id: 日志唯一标识符
+        task_id: 任务标识符
+        session_id: 会话标识符
+        route_type: 路由类型
+        route_target: 路由目标（智能体/工具/模型名）
+        route_score: 路由置信度/评分（0.0-1.0）
+        cost_estimate: 预估成本（美元）
+        latency_ms: 路由决策延迟（毫秒）
+        timestamp: 决策时间戳
+        worm_storage_ref: WORM 存储引用（合规）
+        selected_model: UDMR 选定模型（本地/云端）
+        cost_actual: 实际成本（美元）
+        fallback_reason: UDMR 回退原因
     """
 
     log_id: uuid.UUID
@@ -63,10 +63,10 @@ class RoutingDecisionLog:
     fallback_reason: str | None = None  # Fallback reason for UDMR
 
     def validate(self) -> None:
-        """验证不变量约束。
+        """验证不变量约束
 
         Raises:
-            ValueError: 任何不变量违反时抛出。
+            ValueError: 任何不变量违反时抛出
         """
         if not isinstance(self.log_id, uuid.UUID):
             raise ValueError("log_id must be a valid UUID")

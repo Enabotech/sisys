@@ -1,6 +1,6 @@
-"""MinIO 客户端适配器。
+"""MinIO 客户端适配器
 
-封装 MinIO Python SDK，提供连接池管理、错误处理和重试机制。
+封装 MinIO Python SDK，提供连接池管理、错误处理和重试机制
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ __all__ = [
 
 
 class MinioManager:
-    """MinIO 客户端适配器。
+    """MinIO 客户端适配器
 
     封装 MinIO Python SDK，提供：
     - 客户端实例注入（符合 Cosmic Python DI 模式）
@@ -36,7 +36,7 @@ class MinioManager:
     """
 
     def __init__(self, client: Minio) -> None:
-        """初始化客户端适配器。
+        """初始化客户端适配器
 
         Args:
             client: Minio 客户端实例
@@ -45,7 +45,7 @@ class MinioManager:
 
     @classmethod
     def from_config(cls, config: MinIOConfig) -> MinioManager:
-        """从配置创建适配器实例（生产环境入口）。
+        """从配置创建适配器实例（生产环境入口）
 
         Args:
             config: MinIO 连接配置
@@ -63,7 +63,7 @@ class MinioManager:
 
     @property
     def client(self) -> Minio:
-        """MinIO 客户端属性。
+        """MinIO 客户端属性
 
         Returns:
             MinIO 客户端实例
@@ -72,7 +72,7 @@ class MinioManager:
 
     @staticmethod
     def _map_error(error: S3Error) -> Exception:
-        """映射 S3 错误到领域异常（使用 ErrorMapper + legacy 异常）。
+        """映射 S3 错误到领域异常（使用 ErrorMapper + legacy 异常）
 
         Args:
             error: S3 原始错误
@@ -99,7 +99,7 @@ class MinioManager:
         return exc_class(message=message)
 
     def health_check(self) -> bool:
-        """健康检查。
+        """健康检查
 
         Returns:
             连接是否正常

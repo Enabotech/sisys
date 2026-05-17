@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Redis 配置模块。
+"""SISYS 基础设施层 Redis 配置模块
 
-提供 Redis 连接配置，用于 Pub/Sub 实时通知通道和缓存存储。
+提供 Redis 连接配置，用于 Pub/Sub 实时通知通道和缓存存储
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class RedisConfig:
-    """Redis 连接配置。
+    """Redis 连接配置
 
-    用于 Redis Pub/Sub 实时通知通道、幂等性检查和缓存存储服务。
+    用于 Redis Pub/Sub 实时通知通道、幂等性检查和缓存存储服务
 
     Attributes:
         host: Redis 主机地址
@@ -43,7 +43,7 @@ class RedisConfig:
 
     @classmethod
     def from_env(cls) -> RedisConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

@@ -1,6 +1,6 @@
-"""MinIOAdapter — L4ObjectPort 实现。
+"""MinIOAdapter — L4ObjectPort 实现
 
-包装现有 MinIORepository，实现 L4ObjectPort 接口。
+包装现有 MinIORepository，实现 L4ObjectPort 接口
 
 设计原则：
 - 薄适配器层，仅做接口转换
@@ -19,14 +19,14 @@ if TYPE_CHECKING:
 
 
 class MinIOAdapter(L4ObjectPort):
-    """MinIO 对象存储适配器。
+    """MinIO 对象存储适配器
 
-    包装现有 MinIORepository，实现 L4ObjectPort 接口。
-    所有方法委托给内部仓储实例。
+    包装现有 MinIORepository，实现 L4ObjectPort 接口
+    所有方法委托给内部仓储实例
     """
 
     def __init__(self, repository: MinIORepository):
-        """初始化适配器。
+        """初始化适配器
 
         Args:
             repository: MinIORepository 实例
@@ -41,7 +41,7 @@ class MinIOAdapter(L4ObjectPort):
         content_type: str = "application/octet-stream",
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象（流式，防 OOM）。
+        """存储对象（流式，防 OOM）
 
         Args:
             bucket_type: Bucket 类型
@@ -67,7 +67,7 @@ class MinIOAdapter(L4ObjectPort):
         object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """流式下载对象（防 OOM）。
+        """流式下载对象（防 OOM）
 
         Args:
             bucket_type: Bucket 类型
@@ -89,7 +89,7 @@ class MinIOAdapter(L4ObjectPort):
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。
+        """删除对象
 
         Args:
             bucket_type: Bucket 类型
@@ -111,7 +111,7 @@ class MinIOAdapter(L4ObjectPort):
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据。
+        """获取对象元数据
 
         Args:
             bucket_type: Bucket 类型
@@ -134,7 +134,7 @@ class MinIOAdapter(L4ObjectPort):
         content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:
-        """归档对象（带 WORM retention）。
+        """归档对象（带 WORM retention）
 
         Args:
             bucket_type: Bucket 类型
@@ -158,7 +158,7 @@ class MinIOAdapter(L4ObjectPort):
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象，支持前缀过滤。
+        """列出对象，支持前缀过滤
 
         Args:
             bucket_type: Bucket 类型

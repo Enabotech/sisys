@@ -1,6 +1,6 @@
 """Tests for MemoryChangedListener.
 
-RED PHASE: 验证 MemoryChangedListener 按 §11.2.9 最优架构处理 MemoryChanged 事件。
+RED PHASE: 验证 MemoryChangedListener 按 §11.2.9 最优架构处理 MemoryChanged 事件
 """
 
 from __future__ import annotations

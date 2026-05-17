@@ -1,10 +1,10 @@
-"""SISYS 领域层自动执行服务模块。
+"""SISYS 领域层自动执行服务模块
 
-AutoExecuteService 是在隔离会话命名空间中执行任务的领域服务。
+AutoExecuteService 是在隔离会话命名空间中执行任务的领域服务
 监听 AutoRouted 事件，在沙盒环境（Docker/gVisor）中执行任务，
-创建状态快照用于恢复，并发布 AutoExecuted 事件给下游监听者。
+创建状态快照用于恢复，并发布 AutoExecuted 事件给下游监听者
 
-架构：领域层（无外部依赖），通过端口/协议实现沙盒执行和快照存储。
+架构：领域层（无外部依赖），通过端口/协议实现沙盒执行和快照存储
 
 Author:
     agimtech <agimtech@126.com>
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoExecuteService:
-    """执行 AutoRouted 事件中任务的领域服务。
+    """执行 AutoRouted 事件中任务的领域服务
 
     职责：
     - 监听 AutoRouted 事件（来自 Story 1.14b 路由机制）
@@ -36,7 +36,7 @@ class AutoExecuteService:
     - 创建状态快照用于恢复
     - 发布 AutoExecuted 事件给下游监听者
 
-    架构：领域层，通过端口/协议接入基础设施适配器。
+    架构：领域层，通过端口/协议接入基础设施适配器
     """
 
     def __init__(
@@ -44,17 +44,17 @@ class AutoExecuteService:
         sandbox: SandboxExecutorProtocol | None = None,
         snapshot_repo: SnapshotRepositoryProtocol | None = None,
     ):
-        """初始化 AutoExecuteService。
+        """初始化 AutoExecuteService
 
         Args:
-            sandbox: 沙盒执行器端口。传入 None 用于独立测试。
-            snapshot_repo: 快照仓储端口。传入 None 用于独立测试。
+            sandbox: 沙盒执行器端口。传入 None 用于独立测试
+            snapshot_repo: 快照仓储端口。传入 None 用于独立测试
         """
         self._sandbox = sandbox
         self._snapshot_repo = snapshot_repo
 
     async def on_routed_event(self, event: DomainEvent) -> AutoExecuted | None:
-        """处理 AutoRouted 事件：执行任务并发布 AutoExecuted 事件。
+        """处理 AutoRouted 事件：执行任务并发布 AutoExecuted 事件
 
         Args:
             event: 来自 Story 1.14b 的 AutoRouted 事件
@@ -157,7 +157,7 @@ class AutoExecuteService:
         state: dict[str, Any],
         stage_id: str = "intermediate",
     ) -> CheckpointSnapshot | None:
-        """为会话创建检查点快照。
+        """为会话创建检查点快照
 
         Args:
             session_id: 会话标识符
@@ -187,7 +187,7 @@ class AutoExecuteService:
         return snapshot
 
     async def restore_snapshot(self, session_id: str) -> CheckpointSnapshot | None:
-        """恢复会话的最新快照。
+        """恢复会话的最新快照
 
         Args:
             session_id: 会话标识符

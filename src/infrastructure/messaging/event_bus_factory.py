@@ -35,10 +35,10 @@ class EventBusConfig:
 
 
 class EventBusFactory:
-    """事件总线工厂。
+    """事件总线工厂
 
-    负责创建和管理事件总线实例，实现依赖注入。
-    共享组件（ChannelRouter, Redis Publisher, RabbitMQ Publisher）复用。
+    负责创建和管理事件总线实例，实现依赖注入
+    共享组件（ChannelRouter, Redis Publisher, RabbitMQ Publisher）复用
 
     使用方式:
         1. 创建工厂实例（可注入配置）
@@ -50,7 +50,7 @@ class EventBusFactory:
     _poller: AsyncOutboxPoller | None = None
 
     def __init__(self, config: EventBusConfig | None = None) -> None:
-        """初始化工厂，创建共享组件。
+        """初始化工厂，创建共享组件
 
         Args:
             config: 事件总线配置，如果为 None 则使用默认配置
@@ -63,9 +63,9 @@ class EventBusFactory:
         self._initialized = False
 
     def _initialize_components(self) -> None:
-        """延迟初始化消息组件。
+        """延迟初始化消息组件
 
-        只有当配置提供了必要的连接信息时才初始化。
+        只有当配置提供了必要的连接信息时才初始化
         """
         if self._initialized:
             return
@@ -106,7 +106,7 @@ class EventBusFactory:
         return RabbitMQPublisher(config=self._config._rabbitmq_config)
 
     def create_redis_bus(self) -> RedisEventBus:
-        """创建 RedisEventBus 实例。
+        """创建 RedisEventBus 实例
 
         Returns:
             RedisEventBus: Redis 实时通道事件总线
@@ -119,7 +119,7 @@ class EventBusFactory:
         )
 
     def create_rabbitmq_bus(self) -> RabbitMQEventBus:
-        """创建 RabbitMQEventBus 实例。
+        """创建 RabbitMQEventBus 实例
 
         Returns:
             RabbitMQEventBus: RabbitMQ 可靠通道事件总线
@@ -161,7 +161,7 @@ class EventBusFactory:
 
     @classmethod
     def configure_event_bus(cls, bus: DualChannelEventBus, poller: AsyncOutboxPoller) -> None:
-        """配置全局事件总线实例。
+        """配置全局事件总线实例
 
         Args:
             bus: DualChannelEventBus 实例
@@ -172,7 +172,7 @@ class EventBusFactory:
 
     @classmethod
     def get_event_bus(cls) -> DualChannelEventBus:
-        """获取全局事件总线实例。
+        """获取全局事件总线实例
 
         Returns:
             DualChannelEventBus: 已配置的事件总线
@@ -186,7 +186,7 @@ class EventBusFactory:
 
     @classmethod
     def get_poller(cls) -> AsyncOutboxPoller | None:
-        """获取全局事件轮询器实例。
+        """获取全局事件轮询器实例
 
         Returns:
             AsyncOutboxPoller: 已配置的轮询器，如果未配置则返回 None

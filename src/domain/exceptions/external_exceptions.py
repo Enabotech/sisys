@@ -1,6 +1,6 @@
-"""SISYS 领域层外部服务异常模块。
+"""SISYS 领域层外部服务异常模块
 
-第三方服务错误，如超时、服务不可用等。
+第三方服务错误，如超时、服务不可用等
 
 Author:
     agimtech <agimtech@126.com>
@@ -15,24 +15,24 @@ from src.domain.exceptions.base_exceptions import BaseException
 
 
 class ExternalException(BaseException):
-    """外部服务异常。
+    """外部服务异常
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
-        cause: 原始异常。
-        context: 异常上下文信息。
+        code: 异常编码
+        message: 异常消息
+        cause: 原始异常
+        context: 异常上下文信息
     """
 
     code = "EXCEPTION_3XX"
 
 
 class ThirdPartyError(ExternalException):
-    """第三方服务错误。
+    """第三方服务错误
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_301"
@@ -40,11 +40,11 @@ class ThirdPartyError(ExternalException):
 
 
 class TimeoutError(ExternalException):
-    """外部服务超时。
+    """外部服务超时
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_302"
@@ -52,11 +52,11 @@ class TimeoutError(ExternalException):
 
 
 class ServiceUnavailableError(ExternalException):
-    """外部服务不可用。
+    """外部服务不可用
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_303"
@@ -64,11 +64,11 @@ class ServiceUnavailableError(ExternalException):
 
 
 class UnknownError(ExternalException):
-    """未知错误（未预期异常兜底）。
+    """未知错误（未预期异常兜底）
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_999"

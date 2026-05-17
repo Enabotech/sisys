@@ -1,8 +1,8 @@
-"""Async RabbitMQ Consumer — 基础设施层实现。
+"""Async RabbitMQ Consumer — 基础设施层实现
 
-统一 async 路径，使用 aio-pika 异步客户端。
-使用手动 ACK/NACK，禁止自动 ACK。
-重试通过 nack(requeue=True) 由 RabbitMQ 重新投递。
+统一 async 路径，使用 aio-pika 异步客户端
+使用手动 ACK/NACK，禁止自动 ACK
+重试通过 nack(requeue=True) 由 RabbitMQ 重新投递
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ EventProcessor = Callable[[DomainEvent], Any]
 
 
 class RabbitMQConsumer:
-    """异步 RabbitMQ 事件消费者。
+    """异步 RabbitMQ 事件消费者
 
     使用手动 ACK/NACK 策略：
     - 成功时 ack()
@@ -43,7 +43,7 @@ class RabbitMQConsumer:
         dlq: Any = None,
         retry_policy: Any = None,
     ):
-        """初始化 RabbitMQConsumer。
+        """初始化 RabbitMQConsumer
 
         Args:
             config: RabbitMQ 连接配置
@@ -75,7 +75,7 @@ class RabbitMQConsumer:
         logger.info("RabbitMQConsumer connected")
 
     def register_handler(self, queue_name: str, handler: EventProcessor) -> None:
-        """注册事件处理器。
+        """注册事件处理器
 
         Args:
             queue_name: 队列名
@@ -86,7 +86,7 @@ class RabbitMQConsumer:
         self._handlers[queue_name].append(handler)
 
     async def async_consume(self, queue_name: str) -> AbstractQueue:
-        """开始消费指定队列。
+        """开始消费指定队列
 
         Args:
             queue_name: 队列名
@@ -102,7 +102,7 @@ class RabbitMQConsumer:
         return queue
 
     async def bind_queue(self, queue_name: str, routing_key: str, exchange_name: str = "sisys.events.reliable") -> None:
-        """绑定队列到交换器。
+        """绑定队列到交换器
 
         Args:
             queue_name: 队列名
@@ -116,9 +116,9 @@ class RabbitMQConsumer:
         logger.info("Bound queue %s to exchange %s with routing key %s", queue_name, exchange_name, routing_key)
 
     async def _on_message(self, message: AbstractIncomingMessage) -> None:
-        """消息处理回调 — 手动 ACK/NACK。
+        """消息处理回调 — 手动 ACK/NACK
 
-        P0-3 修复: 使用 event 变量前先检查是否已定义。
+        P0-3 修复: 使用 event 变量前先检查是否已定义
         """
         event: DomainEvent | None = None  # 预先初始化为 None
         try:

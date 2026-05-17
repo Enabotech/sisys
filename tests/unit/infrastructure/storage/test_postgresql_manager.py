@@ -1,6 +1,6 @@
-"""PostgreSQLManager 单元测试。
+"""PostgreSQLManager 单元测试
 
-测试引擎创建、复用、健康检查和关闭。
+测试引擎创建、复用、健康检查和关闭
 """
 
 from __future__ import annotations

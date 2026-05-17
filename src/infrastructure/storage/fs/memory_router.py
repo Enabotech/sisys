@@ -1,7 +1,7 @@
-"""MemoryRouter — 记忆路径路由。
+"""MemoryRouter — 记忆路径路由
 
-负责生成 Private/Group 记忆的文件路径和索引路径。
-与 MemoryIndex 分离：MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责。
+负责生成 Private/Group 记忆的文件路径和索引路径
+与 MemoryIndex 分离：MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责
 
 路径策略：
 - Private: {base_path}/{type}/{uuid}.md
@@ -20,14 +20,14 @@ from src.infrastructure.config.memory import MemoryConfig
 
 
 class MemoryRouter:
-    """记忆路径路由器。
+    """记忆路径路由器
 
-    负责生成 Private/Group 记忆的文件路径和索引路径。
-    事件驱动：由 MemoryService 或 MemoryChangedListener 调用。
+    负责生成 Private/Group 记忆的文件路径和索引路径
+    事件驱动：由 MemoryService 或 MemoryChangedListener 调用
     """
 
     def __init__(self, config: MemoryConfig):
-        """初始化 MemoryRouter。
+        """初始化 MemoryRouter
 
         Args:
             config: MemoryConfig 配置实例
@@ -36,7 +36,7 @@ class MemoryRouter:
         self._base_path = Path(config.memory_l0_path)
 
     def get_memory_path(self, memory_type: str, memory_id: str, is_group: bool = False) -> str:
-        """获取记忆文件路径。
+        """获取记忆文件路径
 
         Args:
             memory_type: 记忆类型（user/feedback/project/reference）
@@ -51,7 +51,7 @@ class MemoryRouter:
         return f"{memory_type}/{memory_id}.md"
 
     def get_index_path(self, is_group: bool = False) -> str:
-        """获取索引文件路径。
+        """获取索引文件路径
 
         Args:
             is_group: 是否为 Group 记忆索引
@@ -64,7 +64,7 @@ class MemoryRouter:
         return "MEMORY.md"
 
     def resolve_path(self, memory_type: str, memory_id: str, is_group: bool = False) -> Path:
-        """解析记忆文件的完整路径。
+        """解析记忆文件的完整路径
 
         Args:
             memory_type: 记忆类型
@@ -78,7 +78,7 @@ class MemoryRouter:
         return self._base_path / relative_path
 
     def resolve_index_path(self, is_group: bool = False) -> Path:
-        """解析索引文件的完整路径。
+        """解析索引文件的完整路径
 
         Args:
             is_group: 是否为 Group 记忆索引

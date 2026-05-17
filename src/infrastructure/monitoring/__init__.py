@@ -1,6 +1,6 @@
-"""SISYS 基础设施层监控包。
+"""SISYS 基础设施层监控包
 
-集中导出指标收集器、聚合器和 OpenTelemetry 配置等监控组件。
+集中导出指标收集器、聚合器和 OpenTelemetry 配置等监控组件
 
 Author:
     agimtech <agimtech@126.com>

@@ -1,6 +1,6 @@
-"""SISYS 领域层 工具事件模块。
+"""SISYS 领域层 工具事件模块
 
-定义工具执行相关的领域事件。
+定义工具执行相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,13 +20,13 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class ToolExecuted(DomainEvent):
-    """工具执行完成时触发的事件。
+    """工具执行完成时触发的事件
 
     Attributes:
-        tool_id: 工具唯一标识符。
-        event_type: 事件类型，固定为"ToolExecuted"。
-        execution_result: 执行结果字典。
-        cost_audit: 成本审计字典。
+        tool_id: 工具唯一标识符
+        event_type: 事件类型，固定为"ToolExecuted"
+        execution_result: 执行结果字典
+        cost_audit: 成本审计字典
     """
 
     tool_id: uuid.UUID = field(default_factory=uuid.uuid4)

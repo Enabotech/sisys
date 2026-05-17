@@ -1,6 +1,6 @@
-"""SISYS 领域层存储层级策略服务模块。
+"""SISYS 领域层存储层级策略服务模块
 
-根据数据特征和业务规则决定数据的存储层级。
+根据数据特征和业务规则决定数据的存储层级
 对应 architecture.md §11.2.11 验收标准：
 - HOT: 访问频率 ≥100/周
 - WARM: 访问频率 10-99/周
@@ -23,7 +23,7 @@ from src.domain.ports.storage_enums import DataAccessPattern, StorageTier
 
 @dataclass
 class StorageDecision:
-    """存储决策结果。
+    """存储决策结果
 
     Attributes:
         tier: 存储层级
@@ -39,10 +39,10 @@ class StorageDecision:
 
 
 class StoragePolicyService:
-    """存储层级策略领域服务。
+    """存储层级策略领域服务
 
     根据数据访问频率和内容特征决定存储层级，驱动 UnifiedStorageGateway
-    执行分层写入。
+    执行分层写入
 
     Class Attributes:
         FREQUENT_THRESHOLD: 高频访问阈值（≥100/周 → HOT）
@@ -62,7 +62,7 @@ class StoragePolicyService:
         content_size: int,
         is_checkpoint: bool = False,
     ) -> StorageDecision:
-        """根据数据特征决定存储层级。
+        """根据数据特征决定存储层级
 
         Args:
             access_frequency: 访问频率（过去 7 天访问次数）

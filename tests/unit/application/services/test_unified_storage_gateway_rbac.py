@@ -1,6 +1,6 @@
-"""UnifiedStorageGateway RBAC 测试。
+"""UnifiedStorageGateway RBAC 测试
 
-验证 UnifiedStorageGateway 的权限校验逻辑（AC-2: Private/Group 记忆分离）。
+验证 UnifiedStorageGateway 的权限校验逻辑（AC-2: Private/Group 记忆分离）
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """Tests for Neo4jMemoryGraphStorage — MemoryGraphPort implementation.
 
-验证存储包装器正确委托 Neo4jAdapter，并实现记忆关系特有语义。
-架构意义：组合注入适配器，添加记忆实体和知识图谱语义。
+验证存储包装器正确委托 Neo4jAdapter，并实现记忆关系特有语义
+架构意义：组合注入适配器，添加记忆实体和知识图谱语义
 """
 
 from __future__ import annotations

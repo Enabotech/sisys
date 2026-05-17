@@ -1,6 +1,6 @@
 """Tests for Compression Performance Benchmarks.
 
-RED PHASE: 验证性能要求 - 压缩率≥70%、延迟 P95<20ms。
+RED PHASE: 验证性能要求 - 压缩率≥70%、延迟 P95<20ms
 """
 
 from __future__ import annotations

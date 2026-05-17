@@ -1,6 +1,6 @@
-"""Neo4j 图管理器实现。
+"""Neo4j 图管理器实现
 
-负责节点和关系的 CRUD 操作，支持 MERGE 语义。
+负责节点和关系的 CRUD 操作，支持 MERGE 语义
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from src.infrastructure.storage.neo4j.models import GraphNode, GraphRelationship
 
 
 class Neo4jGraphManager:
-    """Neo4j 图管理器。
+    """Neo4j 图管理器
 
-    实现 GraphManager 接口，提供节点和关系生命周期管理。
+    实现 GraphManager 接口，提供节点和关系生命周期管理
     """
 
     def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
-        """初始化图管理器。
+        """初始化图管理器
 
         Args:
             driver: Neo4j 异步驱动实例
@@ -29,10 +29,10 @@ class Neo4jGraphManager:
         self._database = database
 
     async def create_node(self, node: GraphNode) -> bool:
-        """创建节点（MERGE 语义）。
+        """创建节点（MERGE 语义）
 
-        如果节点已存在（通过 id 匹配），则更新属性（ON MATCH SET）并返回 False。
-        如果节点不存在，则创建节点（ON CREATE SET）并返回 True。
+        如果节点已存在（通过 id 匹配），则更新属性（ON MATCH SET）并返回 False
+        如果节点不存在，则创建节点（ON CREATE SET）并返回 True
 
         Args:
             node: 图节点对象
@@ -60,7 +60,7 @@ class Neo4jGraphManager:
             return True
 
     async def delete_node(self, node_id: str) -> bool:
-        """删除节点及其所有关系。
+        """删除节点及其所有关系
 
         Args:
             node_id: 节点唯一标识
@@ -81,7 +81,7 @@ class Neo4jGraphManager:
             return cast(bool, record["deleted"] > 0)
 
     async def get_node(self, node_id: str) -> dict | None:
-        """获取节点。
+        """获取节点
 
         Args:
             node_id: 节点唯一标识
@@ -102,7 +102,7 @@ class Neo4jGraphManager:
             return node
 
     async def create_relationship(self, relationship: GraphRelationship) -> bool:
-        """创建关系。
+        """创建关系
 
         Args:
             relationship: 图关系对象
@@ -130,7 +130,7 @@ class Neo4jGraphManager:
             return record is not None
 
     async def delete_relationship(self, start_node_id: str, end_node_id: str, relationship_type: str) -> bool:
-        """删除关系。
+        """删除关系
 
         Args:
             start_node_id: 起始节点 ID

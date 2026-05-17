@@ -1,7 +1,7 @@
 """MinIO Real Instance Integration Tests.
 
-端到端测试，验证真实 MinIO 实例上的对象存储和 Bucket 管理。
-使用真实的 MinIO 部署（localhost:9000），不使用 mock。
+端到端测试，验证真实 MinIO 实例上的对象存储和 Bucket 管理
+使用真实的 MinIO 部署（localhost:9000），不使用 mock
 
 运行方式:
     pytest tests/integration/test_minio_real_integration.py -v

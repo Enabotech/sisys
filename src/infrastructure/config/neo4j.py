@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Neo4j 配置模块。
+"""SISYS 基础设施层 Neo4j 配置模块
 
-提供 Neo4j 图数据库连接配置，用于 L5 图存储层。
+提供 Neo4j 图数据库连接配置，用于 L5 图存储层
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class Neo4jConfig:
-    """Neo4j 图数据库连接配置。
+    """Neo4j 图数据库连接配置
 
-    用于 L5 图存储层（Neo4j 5.x），支持连接池管理和超时配置。
+    用于 L5 图存储层（Neo4j 5.x），支持连接池管理和超时配置
 
     Attributes:
         host: Neo4j 服务主机地址
@@ -43,7 +43,7 @@ class Neo4jConfig:
 
     @property
     def uri(self) -> str:
-        """返回 bolt://host:port 格式的 URI。
+        """返回 bolt://host:port 格式的 URI
 
         Returns:
             Neo4j Bolt URI 字符串
@@ -52,7 +52,7 @@ class Neo4jConfig:
 
     @classmethod
     def from_env(cls) -> Neo4jConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

@@ -1,7 +1,7 @@
 """
 Test Gitea Runner StatefulSet Configuration.
 
-测试 Gitea Runner StatefulSet 配置的正确性。
+测试 Gitea Runner StatefulSet 配置的正确性
 AC: 1
 
 测试覆盖：

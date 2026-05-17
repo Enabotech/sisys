@@ -1,7 +1,7 @@
-"""SISYS 应用层自动执行完成处理器模块。
+"""SISYS 应用层自动执行完成处理器模块
 
 自动执行完成事件监听器，监听 AutoExecuted 事件并发布下游领域事件
-（DocumentProcessed/ToolExecuted/AgentDecided），根据 business_event_type 决定事件类型。
+（DocumentProcessed/ToolExecuted/AgentDecided），根据 business_event_type 决定事件类型
 
 Author:
     agimtech <agimtech@126.com>
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoExecuteCompletedHandler:
-    """处理 AutoExecuted 事件的事件监听器。
+    """处理 AutoExecuted 事件的事件监听器
 
     职责：
     - 监听 AutoExecuteService 的 AutoExecuted 事件
@@ -31,14 +31,14 @@ class AutoExecuteCompletedHandler:
       - "ToolExecuted" -> ToolExecuted 事件
       - "AgentDecided" -> AgentDecided 事件
 
-    架构：接口层，实现事件监听模式。
+    架构：接口层，实现事件监听模式
 
     Attributes:
         _publisher: 事件发布器端口，None 用于独立测试
     """
 
     def __init__(self, publisher: EventPublisher | None = None):
-        """初始化自动执行完成监听器。
+        """初始化自动执行完成监听器
 
         Args:
             publisher: 事件发布器端口，None 用于独立测试
@@ -46,7 +46,7 @@ class AutoExecuteCompletedHandler:
         self._publisher = publisher
 
     async def on_executed(self, event: AutoExecuted) -> None:
-        """处理 AutoExecuted 事件：发布下游领域事件。
+        """处理 AutoExecuted 事件：发布下游领域事件
 
         Args:
             event: 来自 ExecuteService 的 AutoExecuted 事件
@@ -109,7 +109,7 @@ class AutoExecuteCompletedHandler:
         logger.info("Published AgentDecided: agent_id=%s", domain_event.agent_id)
 
     async def _publish(self, event: DomainEvent, channel: str) -> None:
-        """通过配置的发布器发布领域事件。
+        """通过配置的发布器发布领域事件
 
         Args:
             event: 待发布的领域事件

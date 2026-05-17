@@ -1,6 +1,6 @@
-"""InMemoryOutboxRepository 单元测试。
+"""InMemoryOutboxRepository 单元测试
 
-验证 InMemoryOutboxRepository 实现正确。
+验证 InMemoryOutboxRepository 实现正确
 Story 1.3: Event Bus Implementation
 
 Reference: src/infrastructure/messaging/outbox/inmemory_outbox.py

@@ -1,6 +1,6 @@
-"""SISYS 基础设施层自动触发配置模块。
+"""SISYS 基础设施层自动触发配置模块
 
-提供自动触发机制的配置，包括心跳间隔和最大重试次数。
+提供自动触发机制的配置，包括心跳间隔和最大重试次数
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class AutoTriggerConfig:
-    """自动触发机制配置。
+    """自动触发机制配置
 
-    使用 from_env() 类方法从环境变量加载配置。
+    使用 from_env() 类方法从环境变量加载配置
 
     Attributes:
         trigger_enabled: 是否启用自动触发机制
@@ -33,7 +33,7 @@ class AutoTriggerConfig:
 
     @classmethod
     def from_env(cls) -> AutoTriggerConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

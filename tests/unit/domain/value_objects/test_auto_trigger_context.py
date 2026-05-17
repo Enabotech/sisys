@@ -1,6 +1,6 @@
-"""AutoTriggerContext 单元测试。
+"""AutoTriggerContext 单元测试
 
-验证 AutoTriggerContext 值对象正确。
+验证 AutoTriggerContext 值对象正确
 Story 1.14a: 自主调用循环 - trigger 实现
 
 Reference: src/domain/value_objects/auto_trigger_context.py

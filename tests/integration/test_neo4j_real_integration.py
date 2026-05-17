@@ -1,7 +1,7 @@
 """Neo4j Real Instance Integration Tests.
 
-端到端测试，验证真实 Neo4j 实例上的图存储和检索。
-使用真实的 Neo4j 部署（localhost:7687），不使用 mock。
+端到端测试，验证真实 Neo4j 实例上的图存储和检索
+使用真实的 Neo4j 部署（localhost:7687），不使用 mock
 
 运行方式:
     pytest tests/integration/test_neo4j_real_integration.py -v

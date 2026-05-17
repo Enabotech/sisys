@@ -1,6 +1,6 @@
-"""MinIO Bucket 管理器。
+"""MinIO Bucket 管理器
 
-提供 Bucket 创建、删除、存在性检查及命名验证功能。
+提供 Bucket 创建、删除、存在性检查及命名验证功能
 """
 
 from __future__ import annotations
@@ -24,16 +24,16 @@ BUCKET_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]$")
 
 
 class BucketManager:
-    """MinIO Bucket 管理器。
+    """MinIO Bucket 管理器
 
-    负责 Bucket 的创建、删除、存在性检查及命名验证。
+    负责 Bucket 的创建、删除、存在性检查及命名验证
 
     Args:
         config: MinIO 连接配置
     """
 
     def __init__(self, config: MinIOConfig) -> None:
-        """初始化 Bucket 管理器。
+        """初始化 Bucket 管理器
 
         Args:
             config: MinIO 连接配置
@@ -43,7 +43,7 @@ class BucketManager:
 
     @property
     def bucket_prefix(self) -> str:
-        """获取 Bucket 前缀。
+        """获取 Bucket 前缀
 
         Returns:
             Bucket 名称前缀
@@ -52,7 +52,7 @@ class BucketManager:
 
     @property
     def _client(self) -> MinioManager:
-        """获取客户端适配器。
+        """获取客户端适配器
 
         Returns:
             MinioManager 实例
@@ -60,9 +60,9 @@ class BucketManager:
         return self._adapter
 
     def validate_bucket_name(self, bucket_name: str) -> bool:
-        """验证 Bucket 名称是否符合命名规范。
+        """验证 Bucket 名称是否符合命名规范
 
-        命名模式: {prefix}-{type}-{tenant_id}，其中各部分均为小写字母数字和连字符。
+        命名模式: {prefix}-{type}-{tenant_id}，其中各部分均为小写字母数字和连字符
 
         Args:
             bucket_name: Bucket 名称
@@ -93,7 +93,7 @@ class BucketManager:
         return True
 
     def build_bucket_name(self, bucket_type: str, tenant_id: str) -> str:
-        """根据 bucket_type 和 tenant_id 构建 Bucket 名称。
+        """根据 bucket_type 和 tenant_id 构建 Bucket 名称
 
         格式: {bucket_prefix}-{bucket_type}-{tenant_id}
 
@@ -114,7 +114,7 @@ class BucketManager:
         enable_versioning: bool = False,
         enable_object_lock: bool = False,
     ) -> bool:
-        """创建 Bucket。
+        """创建 Bucket
 
         Args:
             bucket_name: Bucket 名称
@@ -152,7 +152,7 @@ class BucketManager:
             raise mapped
 
     def enable_object_lock(self, bucket_name: str, retention_days: int = 2555) -> bool:
-        """为 Bucket 启用对象锁定（WORM）。
+        """为 Bucket 启用对象锁定（WORM）
 
         Args:
             bucket_name: Bucket 名称
@@ -183,7 +183,7 @@ class BucketManager:
             raise mapped
 
     def delete_bucket(self, bucket_name: str, force: bool = False) -> bool:
-        """删除 Bucket。
+        """删除 Bucket
 
         Args:
             bucket_name: Bucket 名称
@@ -216,7 +216,7 @@ class BucketManager:
             raise mapped
 
     def bucket_exists(self, bucket_name: str) -> bool:
-        """检查 Bucket 是否存在。
+        """检查 Bucket 是否存在
 
         Args:
             bucket_name: Bucket 名称
@@ -236,7 +236,7 @@ class BucketManager:
             raise mapped
 
     def list_buckets(self) -> list[dict[str, Any]]:
-        """列出所有 Bucket。
+        """列出所有 Bucket
 
         Returns:
             Bucket 信息列表，每个字典包含 name 和 creation_date

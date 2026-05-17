@@ -1,4 +1,4 @@
-"""SISYS 应用层记忆变更事件处理器模块。
+"""SISYS 应用层记忆变更事件处理器模块
 
 记忆变更事件监听器，处理 MemoryChanged 事件，下游触发：
 1. L1 Redis 缓存失效（同步，立即）：保证"上下文≠缓存"公理
@@ -6,12 +6,12 @@
 3. L3 Qdrant 向量（按需，内容>500 tokens）：vector_store.embed()
 4. L5 Neo4j 图谱（按需）：entity_extractor.extract()
 
-L4 MinIO 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）。
+L4 MinIO 不在本流程范围内，由 Checkpoint 持久化流程独立触发（Story 6.3）
 
 架构来源: architecture.md §11.2.9
 Story: 1.15a
 
-调用方式：被 RabbitMQConsumer 通过 await handler(event) 调用，必须是 async def。
+调用方式：被 RabbitMQConsumer 通过 await handler(event) 调用，必须是 async def
 
 Author:
     agimtech <agimtech@126.com>
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryChangedHandler:
-    """MemoryChanged 事件监听器。
+    """MemoryChanged 事件监听器
 
     事件驱动下游组件更新（§11.2.9 最优架构）：
     - L1 Redis 缓存失效（同步）
@@ -54,7 +54,7 @@ class MemoryChangedHandler:
         history_repository=None,  # L2ChangeHistoryRepositoryPort | None
         index_manager=None,  # IndexManagerPort | None
     ):
-        """初始化监听器。
+        """初始化监听器
 
         Args:
             memory_cache: 记忆缓存端口（用于缓存失效）
@@ -68,9 +68,9 @@ class MemoryChangedHandler:
         self._index_manager = index_manager
 
     async def handle(self, event: MemoryChanged) -> None:
-        """处理 MemoryChanged 事件。
+        """处理 MemoryChanged 事件
 
-        §11.2.9 最优架构：在 Listener.handle() 中执行 L1/L2/L3/L5 处理。
+        §11.2.9 最优架构：在 Listener.handle() 中执行 L1/L2/L3/L5 处理
 
         Args:
             event: MemoryChanged 事件实例
@@ -98,7 +98,7 @@ class MemoryChangedHandler:
         # TODO(#Story1.17): L5 图谱更新待 Story 1.17 或 LLM 集成 Story 实现
 
     async def _invalidate_l1_cache(self, event: MemoryChanged) -> None:
-        """失效 L1 Redis 缓存（同步，立即）。
+        """失效 L1 Redis 缓存（同步，立即）
 
         Args:
             event: MemoryChanged 事件
@@ -118,7 +118,7 @@ class MemoryChangedHandler:
             raise
 
     async def _write_to_l2(self, event: MemoryChanged) -> None:
-        """写入 L2 PostgreSQL（通过 Repository 调用）。
+        """写入 L2 PostgreSQL（通过 Repository 调用）
 
         Args:
             event: MemoryChanged 事件
@@ -163,7 +163,7 @@ class MemoryChangedHandler:
             logger.debug(f"L2 history recorded: memory_id={event.memory_id}")
 
     async def _update_index(self, event: MemoryChanged) -> None:
-        """更新 MEMORY.md 索引（通过 IndexManagerPort）。
+        """更新 MEMORY.md 索引（通过 IndexManagerPort）
 
         Args:
             event: MemoryChanged 事件
@@ -187,10 +187,10 @@ class MemoryChangedHandler:
             # 不抛出异常，索引更新失败不影响主流程
 
     def _get_memory_type(self, event: MemoryChanged) -> str:
-        """获取记忆的内容分类类型。
+        """获取记忆的内容分类类型
 
-        返回 MemoryMetadata.type 合法值（'user'|'feedback'|'project'|'reference'）。
-        可见性（private/group）通过 group_id 字段区分，不映射为 type。
+        返回 MemoryMetadata.type 合法值（'user'|'feedback'|'project'|'reference'）
+        可见性（private/group）通过 group_id 字段区分，不映射为 type
 
         Args:
             event: MemoryChanged 事件

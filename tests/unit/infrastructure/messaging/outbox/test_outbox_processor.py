@@ -1,7 +1,7 @@
-"""AsyncOutboxPoller 单元测试。
+"""AsyncOutboxPoller 单元测试
 
-验证 AsyncOutboxPoller 正确实现事件发件箱轮询发布功能。
-测试轮询、批量处理、并发控制、异常处理和停止逻辑。
+验证 AsyncOutboxPoller 正确实现事件发件箱轮询发布功能
+测试轮询、批量处理、并发控制、异常处理和停止逻辑
 """
 
 from __future__ import annotations

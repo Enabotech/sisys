@@ -1,6 +1,6 @@
-"""MinIO 对象操作。
+"""MinIO 对象操作
 
-提供流式上传/下载、分片上传、断点续传等对象操作。
+提供流式上传/下载、分片上传、断点续传等对象操作
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ XLARGE_PART_SIZE = 100 * MB
 
 
 def calculate_part_size(file_size: int) -> int:
-    """根据文件大小计算分片大小。
+    """根据文件大小计算分片大小
 
     Args:
         file_size: 文件大小（字节）
@@ -54,16 +54,16 @@ def calculate_part_size(file_size: int) -> int:
 
 
 class ObjectOperations:
-    """MinIO 对象操作。
+    """MinIO 对象操作
 
-    提供流式上传/下载、分片上传、断点续传等功能。
+    提供流式上传/下载、分片上传、断点续传等功能
 
     Args:
         config: MinIO 连接配置
     """
 
     def __init__(self, config: MinIOConfig) -> None:
-        """初始化对象操作。
+        """初始化对象操作
 
         Args:
             config: MinIO 连接配置
@@ -73,7 +73,7 @@ class ObjectOperations:
 
     @property
     def _client(self) -> MinioManager:
-        """获取客户端适配器。
+        """获取客户端适配器
 
         Returns:
             MinioManager 实例
@@ -88,7 +88,7 @@ class ObjectOperations:
         content_type: str,
         tags: dict[str, str] | None = None,
     ) -> str:
-        """上传对象，大文件自动分片。
+        """上传对象，大文件自动分片
 
         Args:
             bucket_name: Bucket 名称
@@ -116,7 +116,7 @@ class ObjectOperations:
         content_type: str,
         tags: dict[str, str] | None = None,
     ) -> str:
-        """单文件上传（<100MB）。
+        """单文件上传（<100MB）
 
         Args:
             bucket_name: Bucket 名称
@@ -163,10 +163,10 @@ class ObjectOperations:
         part_size: int,
         tags: dict[str, str] | None = None,
     ) -> str:
-        """分片上传（>=100MB）。
+        """分片上传（>=100MB）
 
         使用 MinIO 公开 API `fput_object`，它会根据 part_size 自动分片，
-        避免使用私有 API（`_create_multipart_upload` 等）导致的不稳定。
+        避免使用私有 API（`_create_multipart_upload` 等）导致的不稳定
 
         Args:
             bucket_name: Bucket 名称
@@ -217,7 +217,7 @@ class ObjectOperations:
         object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """流式下载对象。
+        """流式下载对象
 
         Args:
             bucket_name: Bucket 名称
@@ -255,7 +255,7 @@ class ObjectOperations:
         object_key: str,
         version_id: str | None = None,
     ) -> dict[str, Any]:
-        """获取对象元数据。
+        """获取对象元数据
 
         Args:
             bucket_name: Bucket 名称
@@ -296,7 +296,7 @@ class ObjectOperations:
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。
+        """删除对象
 
         Args:
             bucket_name: Bucket 名称
@@ -330,10 +330,10 @@ class ObjectOperations:
         upload_id: str,
         redis_client: aioredis.Redis,
     ) -> None:
-        """恢复分片上传。
+        """恢复分片上传
 
-        从 Redis 读取已上传的分片状态，继续上传未完成的部分。
-        Redis 状态更新采用批量策略（每 N 个分片或完成时写入），避免写风暴。
+        从 Redis 读取已上传的分片状态，继续上传未完成的部分
+        Redis 状态更新采用批量策略（每 N 个分片或完成时写入），避免写风暴
 
         Args:
             bucket_name: Bucket 名称
@@ -423,7 +423,7 @@ class ObjectOperations:
         part_size: int,
         redis_client: aioredis.Redis,
     ) -> None:
-        """保存分片上传状态到 Redis。
+        """保存分片上传状态到 Redis
 
         Args:
             upload_id: 分片上传 ID

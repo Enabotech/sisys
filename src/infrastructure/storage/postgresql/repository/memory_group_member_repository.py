@@ -1,4 +1,4 @@
-"""PostgreSQLMemoryGroupMemberRepository — L2 群组成员关系持久化实现。
+"""PostgreSQLMemoryGroupMemberRepository — L2 群组成员关系持久化实现
 
 使用 SQLAlchemy AsyncSession，支持：
 - 多用户并行：会话级别隔离
@@ -22,10 +22,10 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
-    """PostgreSQL 群组成员关系仓储。
+    """PostgreSQL 群组成员关系仓储
 
-    使用 AsyncSession 提供异步、线程安全的数据库操作。
-    支持多用户并发的会话级别隔离。
+    使用 AsyncSession 提供异步、线程安全的数据库操作
+    支持多用户并发的会话级别隔离
     """
 
     @property
@@ -33,7 +33,7 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
         return get_session()
 
     async def is_group_member(self, group_id: str, user_id: str) -> bool:
-        """检查用户是否是群组成员。
+        """检查用户是否是群组成员
 
         Args:
             group_id: 群组 ID
@@ -52,7 +52,7 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
         return result.scalar_one_or_none() is not None
 
     async def is_group_admin(self, group_id: str, user_id: str) -> bool:
-        """检查用户是否是群组管理员。
+        """检查用户是否是群组管理员
 
         Args:
             group_id: 群组 ID
@@ -72,7 +72,7 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
         return result.scalar_one_or_none() is not None
 
     async def add_member(self, group_id: str, user_id: str, role: str = "member") -> None:
-        """添加群组成员。
+        """添加群组成员
 
         Args:
             group_id: 群组 ID
@@ -88,7 +88,7 @@ class PostgreSQLMemoryGroupMemberRepository(L2GroupMemberRepositoryPort):
         await self._session.flush()
 
     async def remove_member(self, group_id: str, user_id: str) -> None:
-        """移除群组成员。
+        """移除群组成员
 
         Args:
             group_id: 群组 ID

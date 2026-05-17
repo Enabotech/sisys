@@ -1,4 +1,4 @@
-"""L1Compressor — L1 压缩器。
+"""L1Compressor — L1 压缩器
 
 混合压缩策略：
 - ≤200 字：直接规则压缩（无 LLM 调用）
@@ -58,7 +58,7 @@ STOP_WORDS = {
 
 
 def _rule_compress(text: str) -> str:
-    """规则压缩：去除停用词、冗余空格、换行。
+    """规则压缩：去除停用词、冗余空格、换行
 
     Args:
         text: 待压缩文本
@@ -87,7 +87,7 @@ class L1CompressionResult(CompressionResult):
 
 
 class L1Compressor(CompressorService):
-    """L1 压缩器。
+    """L1 压缩器
 
     轻量级压缩：X → ~150 字（压缩率≥70%）
     目标：保留核心语义，去除冗余
@@ -100,7 +100,7 @@ class L1Compressor(CompressorService):
     TARGET_LENGTH = 150
 
     def compress(self, content: str) -> L1CompressionResult:
-        """压缩内容至约 150 字，压缩率≥70%。
+        """压缩内容至约 150 字，压缩率≥70%
 
         Args:
             content: 待压缩内容（≤500 字）
@@ -149,9 +149,9 @@ class L1Compressor(CompressorService):
         )
 
     def _truncate_at_sentence_boundary(self, text: str, max_length: int) -> str:
-        """按句子边界截断文本，保留核心语义。
+        """按句子边界截断文本，保留核心语义
 
-        找到 max_length 位置前最后一个句子结束符，尽可能保留完整句子。
+        找到 max_length 位置前最后一个句子结束符，尽可能保留完整句子
 
         Args:
             text: 待截断文本
@@ -187,7 +187,7 @@ class L1Compressor(CompressorService):
         return truncated
 
     def supports(self, content: str) -> bool:
-        """判断此压缩器是否支持处理给定内容。
+        """判断此压缩器是否支持处理给定内容
 
         Args:
             content: 待压缩内容

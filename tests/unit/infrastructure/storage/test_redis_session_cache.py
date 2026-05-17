@@ -1,6 +1,6 @@
-"""RedisSessionCache 单元测试。
+"""RedisSessionCache 单元测试
 
-验证 L1 委托方法和会话特定方法的正确行为。
+验证 L1 委托方法和会话特定方法的正确行为
 """
 
 from __future__ import annotations

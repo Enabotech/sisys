@@ -1,6 +1,6 @@
-"""SISYS 领域层数据驻留策略实体模块。
+"""SISYS 领域层数据驻留策略实体模块
 
-定义数据驻留策略领域实体，遵循六边形架构：领域层零依赖。
+定义数据驻留策略领域实体，遵循六边形架构：领域层零依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -52,7 +52,7 @@ class DataResidencyPolicy:
     enforcement_level: EnforcementLevel = EnforcementLevel.STRICT
 
     def is_allowed_region(self, region: str) -> bool:
-        """检查指定区域是否在允许列表中。
+        """检查指定区域是否在允许列表中
 
         Args:
             region: 区域代码
@@ -63,7 +63,7 @@ class DataResidencyPolicy:
         return region in self.allowed_regions
 
     def is_blocked_region(self, region: str) -> bool:
-        """检查指定区域是否在禁止列表中。
+        """检查指定区域是否在禁止列表中
 
         Args:
             region: 区域代码
@@ -74,7 +74,7 @@ class DataResidencyPolicy:
         return region in self.blocked_regions
 
     def requires_local_processing(self) -> bool:
-        """检查是否强制本地处理。
+        """检查是否强制本地处理
 
         Returns:
             True 如果 enforcement_level 为 STRICT
@@ -82,7 +82,7 @@ class DataResidencyPolicy:
         return self.enforcement_level == EnforcementLevel.STRICT
 
     def get_policy_context(self) -> dict[str, Any]:
-        """获取策略上下文，用于 UDMR 路由决策。
+        """获取策略上下文，用于 UDMR 路由决策
 
         Returns:
             dict 包含策略上下文信息

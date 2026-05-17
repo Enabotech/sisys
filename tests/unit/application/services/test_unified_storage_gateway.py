@@ -1,6 +1,6 @@
-"""UnifiedStorageGateway 实现测试。
+"""UnifiedStorageGateway 实现测试
 
-验证 UnifiedStorageGateway 实现了 UnifiedStoragePort 接口。
+验证 UnifiedStorageGateway 实现了 UnifiedStoragePort 接口
 """
 
 from __future__ import annotations

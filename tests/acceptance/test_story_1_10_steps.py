@@ -1,7 +1,7 @@
 """BDD Steps Implementation for Story 1.10 - Unified Audit Log.
 
-实现 tests/acceptance/test_story_1_10.feature 中的 BDD 步骤。
-使用真实 PostgreSQL 实例，遵循 test_story_1_9_steps.py 的模式。
+实现 tests/acceptance/test_story_1_10.feature 中的 BDD 步骤
+使用真实 PostgreSQL 实例，遵循 test_story_1_9_steps.py 的模式
 """
 
 from __future__ import annotations

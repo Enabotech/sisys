@@ -1,6 +1,6 @@
 """Cache entry data model.
 
-用于语义缓存的存储实体。
+用于语义缓存的存储实体
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 @dataclass
 class CacheEntry:
-    """缓存条目数据模型。
+    """缓存条目数据模型
 
     Attributes:
         cache_key: 缓存键
@@ -30,7 +30,7 @@ class CacheEntry:
     ttl: int = 86400
 
     def to_dict(self) -> dict:
-        """序列化为字典。
+        """序列化为字典
 
         Returns:
             包含缓存条目字段的字典
@@ -46,7 +46,7 @@ class CacheEntry:
 
     @classmethod
     def from_dict(cls, data: dict) -> CacheEntry:
-        """从字典反序列化。
+        """从字典反序列化
 
         Args:
             data: 包含缓存条目字段的字典

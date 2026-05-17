@@ -1,6 +1,6 @@
-"""SISYS 基础设施层敏感数据检测服务模块。
+"""SISYS 基础设施层敏感数据检测服务模块
 
-基于 SensitiveDataDetectorPort 接口实现 PII、商业秘密、金融数据等敏感信息的正则表达式检测。
+基于 SensitiveDataDetectorPort 接口实现 PII、商业秘密、金融数据等敏感信息的正则表达式检测
 
 Author:
     agimtech <agimtech@126.com>
@@ -47,7 +47,7 @@ class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
     ]
 
     def detect_sensitive_data(self, content: str) -> SensitiveDataResult:
-        """检测敏感数据。
+        """检测敏感数据
 
         Args:
             content: 待检测内容
@@ -87,7 +87,7 @@ class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
         )
 
     def _detect_pii(self, content: str) -> list[SensitiveType]:
-        """检测 PII 数据。
+        """检测 PII 数据
 
         Args:
             content: 待检测内容
@@ -109,7 +109,7 @@ class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
         return pii_types
 
     def _detect_trade_secret(self, content: str) -> bool:
-        """检测商业秘密。
+        """检测商业秘密
 
         Args:
             content: 待检测内容
@@ -123,7 +123,7 @@ class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
         return False
 
     def _detect_financial(self, content: str) -> bool:
-        """检测金融数据。
+        """检测金融数据
 
         Args:
             content: 待检测内容
@@ -138,7 +138,7 @@ class SensitiveDataDetectorImpl(SensitiveDataDetectorPort):
         return False
 
     def _calculate_confidence(self, content: str, sensitive_types: list[SensitiveType]) -> float:
-        """计算检测置信度。
+        """计算检测置信度
 
         Args:
             content: 待检测内容

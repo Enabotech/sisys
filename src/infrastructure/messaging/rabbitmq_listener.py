@@ -1,6 +1,6 @@
-"""RabbitMQEventListener — 异步事件监听器实现。
+"""RabbitMQEventListener — 异步事件监听器实现
 
-实现 EventListenerAsync 接口，用于异步事件消费。
+实现 EventListenerAsync 接口，用于异步事件消费
 集成：
 - DualIdempotencyChecker: Redis + PostgreSQL 双写幂等性检查
 - RedisRetryQueue: 延迟重试队列
@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 class RabbitMQEventListener(EventListenerAsync):
-    """RabbitMQ 异步事件监听器。
+    """RabbitMQ 异步事件监听器
 
-    实现 EventListenerAsync 接口，用于消费 RabbitMQ 消息。
-    集成幂等性检查、重试队列和死信队列。
+    实现 EventListenerAsync 接口，用于消费 RabbitMQ 消息
+    集成幂等性检查、重试队列和死信队列
 
     Args:
         config: RabbitMQ 配置
@@ -46,7 +46,7 @@ class RabbitMQEventListener(EventListenerAsync):
         config: RabbitMQConfig,
         redis_client: aioredis.Redis,
     ):
-        """初始化 RabbitMQEventListener。
+        """初始化 RabbitMQEventListener
 
         Args:
             config: RabbitMQ 连接配置
@@ -65,7 +65,7 @@ class RabbitMQEventListener(EventListenerAsync):
         self._queue: AbstractQueue | None = None
 
     def set_dead_letter_queue(self, dlq: Any) -> None:
-        """设置死信队列。
+        """设置死信队列
 
         Args:
             dlq: PostgresDeadLetterQueue 实例
@@ -73,7 +73,7 @@ class RabbitMQEventListener(EventListenerAsync):
         self._dlq = dlq
 
     async def async_handle(self, event: DomainEvent) -> None:
-        """异步处理事件。
+        """异步处理事件
 
         Args:
             event: 要处理的事件
@@ -104,7 +104,7 @@ class RabbitMQEventListener(EventListenerAsync):
             raise
 
     async def _process_event(self, event: DomainEvent) -> None:
-        """处理事件的实际逻辑。
+        """处理事件的实际逻辑
 
         Args:
             event: 领域事件

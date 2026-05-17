@@ -1,6 +1,6 @@
-"""SISYS 领域层工具实体模块。
+"""SISYS 领域层工具实体模块
 
-定义工具领域实体，包含唯一标识符、I/O 模式和执行器。
+定义工具领域实体，包含唯一标识符、I/O 模式和执行器
 
 Author:
     agimtech <agimtech@126.com>
@@ -37,7 +37,7 @@ class ToolCategory(str, Enum):
 
 @dataclass
 class Tool:
-    """工具实体，包含唯一标识符、I/O 模式和执行器。
+    """工具实体，包含唯一标识符、I/O 模式和执行器
 
     不变量约束:
     - tool_id 必须为有效 UUID
@@ -58,13 +58,13 @@ class Tool:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def validate(self) -> bool:
-        """验证不变量约束。
+        """验证不变量约束
 
         Returns:
-            所有不变量满足时返回 True。
+            所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出。
+            ValueError: 任何不变量违反时抛出
         """
         if not isinstance(self.tool_id, uuid.UUID):
             raise ValueError("tool_id must be a valid UUID")

@@ -1,7 +1,7 @@
-"""SQLAlchemyEventOutboxAdapter — DomainEvent ↔ OutboxModel 转换器。
+"""SQLAlchemyEventOutboxAdapter — DomainEvent ↔ OutboxModel 转换器
 
 新建适配器，直接输出 OutboxModel（SQLAlchemy 模型），
-避免在 OutboxEntity dataclass 和 OutboxModel 之间反复转换。
+避免在 OutboxEntity dataclass 和 OutboxModel 之间反复转换
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ class SQLAlchemyEventOutboxAdapter:
 
     @staticmethod
     def from_domain_event(event: DomainEvent) -> OutboxModel:
-        """领域事件转 OutboxModel。
+        """领域事件转 OutboxModel
 
         Args:
             event: 领域事件实例
@@ -35,9 +35,9 @@ class SQLAlchemyEventOutboxAdapter:
 
     @staticmethod
     def to_domain_event(model: OutboxModel) -> DomainEvent:
-        """OutboxModel 转领域事件。
+        """OutboxModel 转领域事件
 
-        使用 EventRegistry 按 event_type 路由到正确的领域事件子类。
+        使用 EventRegistry 按 event_type 路由到正确的领域事件子类
 
         Args:
             model: OutboxModel 实例

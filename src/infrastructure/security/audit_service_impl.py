@@ -1,6 +1,6 @@
-"""SISYS 基础设施层审计服务模块。
+"""SISYS 基础设施层审计服务模块
 
-基于 AuditServicePort 接口实现审计日志的记录、检索、完整性验证和归档功能。
+基于 AuditServicePort 接口实现审计日志的记录、检索、完整性验证和归档功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -27,7 +27,7 @@ from src.domain.ports.audit_service import AuditError, AuditRecord, AuditService
 
 
 class AuditServiceImpl(AuditServicePort):
-    """审计服务实现，负责审计日志的记录、检索、完整性验证和归档。
+    """审计服务实现，负责审计日志的记录、检索、完整性验证和归档
 
     Attributes:
         _audit_repo: 审计仓储端口实例
@@ -61,7 +61,7 @@ class AuditServiceImpl(AuditServicePort):
         new_value: dict[str, Any] | None = None,
         correlation_id: str | None = None,
     ) -> AuditRecord:
-        """记录审计日志。
+        """记录审计日志
 
         Args:
             actor: 用户 ID 或系统组件标识
@@ -133,7 +133,7 @@ class AuditServiceImpl(AuditServicePort):
             raise AuditError(f"Failed to record audit log: {e}") from e
 
     async def verify_integrity(self, log_id: UUID) -> bool:
-        """验证单条审计日志的完整性。
+        """验证单条审计日志的完整性
 
         Args:
             log_id: 审计日志的 UUID
@@ -177,7 +177,7 @@ class AuditServiceImpl(AuditServicePort):
         self,
         log_ids: list[UUID] | None = None,
     ) -> dict[str, Any]:
-        """批量验证审计日志完整性。
+        """批量验证审计日志完整性
 
         Args:
             log_ids: 要验证的日志 UUID 列表（None 表示全部）
@@ -231,7 +231,7 @@ class AuditServiceImpl(AuditServicePort):
             raise AuditError(f"Failed to verify batch: {e}") from e
 
     async def archive(self, older_than_days: int = 30) -> int:
-        """归档旧的审计日志到 WORM 存储。
+        """归档旧的审计日志到 WORM 存储
 
         Args:
             older_than_days: 归档多久之前的日志（默认 30 天）

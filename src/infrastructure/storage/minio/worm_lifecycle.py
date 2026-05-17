@@ -1,6 +1,6 @@
-"""MinIO WORM 锁定与生命周期管理。
+"""MinIO WORM 锁定与生命周期管理
 
-提供 WORM（Write Once Read Many）锁定、对象归档和生命周期配置功能。
+提供 WORM（Write Once Read Many）锁定、对象归档和生命周期配置功能
 """
 
 from __future__ import annotations
@@ -32,16 +32,16 @@ SOX_RETENTION_DAYS = 2555
 
 
 class WORMManager:
-    """MinIO WORM 锁定与生命周期管理器。
+    """MinIO WORM 锁定与生命周期管理器
 
-    提供 WORM 锁定、对象归档和生命周期配置功能。
+    提供 WORM 锁定、对象归档和生命周期配置功能
 
     Args:
         config: MinIO 连接配置
     """
 
     def __init__(self, config: MinIOConfig) -> None:
-        """初始化 WORM 管理器。
+        """初始化 WORM 管理器
 
         Args:
             config: MinIO 连接配置
@@ -51,7 +51,7 @@ class WORMManager:
 
     @property
     def _client(self) -> MinioManager:
-        """获取客户端适配器。
+        """获取客户端适配器
 
         Returns:
             MinioManager 实例
@@ -64,9 +64,9 @@ class WORMManager:
         object_key: str,
         retention_days: int = SOX_RETENTION_DAYS,
     ) -> bool:
-        """为对象启用 WORM 锁定。
+        """为对象启用 WORM 锁定
 
-        设置 Governance 模式保留策略，在保留期内禁止删除或修改。
+        设置 Governance 模式保留策略，在保留期内禁止删除或修改
 
         Args:
             bucket_name: Bucket 名称
@@ -111,9 +111,9 @@ class WORMManager:
         object_key: str,
         retention_days: int = SOX_RETENTION_DAYS,
     ) -> bool:
-        """归档对象至 WORM 存储。
+        """归档对象至 WORM 存储
 
-        为对象设置长期保留策略，用于合规归档场景。
+        为对象设置长期保留策略，用于合规归档场景
 
         Args:
             bucket_name: Bucket 名称
@@ -126,7 +126,7 @@ class WORMManager:
         return self.enable_worm_lock(bucket_name, object_key, retention_days)
 
     def configure_lifecycle(self, bucket_name: str, rules: list[LifecycleRule]) -> bool:
-        """为 Bucket 配置生命周期规则。
+        """为 Bucket 配置生命周期规则
 
         Args:
             bucket_name: Bucket 名称
@@ -183,7 +183,7 @@ class WORMManager:
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象，WORM 锁定对象抛出 ComplianceLockError。
+        """删除对象，WORM 锁定对象抛出 ComplianceLockError
 
         Args:
             bucket_name: Bucket 名称
@@ -228,7 +228,7 @@ class WORMManager:
         object_key: str,
         version_id: str | None = None,
     ) -> dict | None:
-        """获取对象保留策略信息。
+        """获取对象保留策略信息
 
         Args:
             bucket_name: Bucket 名称
@@ -257,7 +257,7 @@ class WORMManager:
             raise mapped
 
     def list_lifecycle_rules(self, bucket_name: str) -> list[dict[str, Any]]:
-        """列出 Bucket 的生命周期规则。
+        """列出 Bucket 的生命周期规则
 
         Args:
             bucket_name: Bucket 名称

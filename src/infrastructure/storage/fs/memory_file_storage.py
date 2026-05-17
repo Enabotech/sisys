@@ -1,6 +1,6 @@
-"""MemoryFileStorage — MemoryFilePort 实现（Rule 4）。
+"""MemoryFileStorage — MemoryFilePort 实现（Rule 4）
 
-组合注入 FileMemoryAdapter（Rule 3），添加记忆索引管理语义。
+组合注入 FileMemoryAdapter（Rule 3），添加记忆索引管理语义
 """
 
 from __future__ import annotations
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 
 class MemoryFileStorage(MemoryFilePort):
-    """记忆文件存储 — 实现 MemoryFilePort。
+    """记忆文件存储 — 实现 MemoryFilePort
 
-    组合 FileMemoryAdapter，添加 MEMORY.md 索引管理语义。
+    组合 FileMemoryAdapter，添加 MEMORY.md 索引管理语义
     """
 
     def __init__(self, adapter: FileMemoryAdapter):
-        """初始化 MemoryFileStorage。
+        """初始化 MemoryFileStorage
 
         Args:
             adapter: FileMemoryAdapter 实例（Rule 3）

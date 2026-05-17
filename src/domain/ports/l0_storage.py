@@ -1,6 +1,6 @@
-"""SISYS 领域层 L0 文件系统存储抽象端口模块。
+"""SISYS 领域层 L0 文件系统存储抽象端口模块
 
-负责 ~/.sisys/memory/*.md 文件的异步读写操作。
+负责 ~/.sisys/memory/*.md 文件的异步读写操作
 
 设计原则：
 - I/O 密集型方法：async + aiofiles
@@ -21,14 +21,14 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L0StoragePort(Protocol):
-    """L0 文件系统存储抽象端口。
+    """L0 文件系统存储抽象端口
 
-    负责 ~/.sisys/memory/*.md 文件的异步读写操作。
-    所有 L0 存储实现必须实现此端口。
+    负责 ~/.sisys/memory/*.md 文件的异步读写操作
+    所有 L0 存储实现必须实现此端口
     """
 
     async def write(self, memory_id: str, memory_type: str, content: str) -> bool:
-        """写入记忆文件（I/O 密集型）。
+        """写入记忆文件（I/O 密集型）
 
         Args:
             memory_id: 记忆 ID（UUID）
@@ -43,7 +43,7 @@ class L0StoragePort(Protocol):
         """
 
     async def read(self, memory_id: str, memory_type: str) -> str:
-        """读取记忆文件（I/O 密集型）。
+        """读取记忆文件（I/O 密集型）
 
         Args:
             memory_id: 记忆 ID
@@ -57,7 +57,7 @@ class L0StoragePort(Protocol):
         """
 
     async def delete(self, memory_id: str, memory_type: str) -> bool:
-        """删除记忆文件（快速同步操作，可用 to_thread 封装）。
+        """删除记忆文件（快速同步操作，可用 to_thread 封装）
 
         Args:
             memory_id: 记忆 ID
@@ -68,7 +68,7 @@ class L0StoragePort(Protocol):
         """
 
     async def exists(self, memory_id: str, memory_type: str) -> bool:
-        """检查记忆文件是否存在（快速同步操作）。
+        """检查记忆文件是否存在（快速同步操作）
 
         Args:
             memory_id: 记忆 ID
@@ -79,7 +79,7 @@ class L0StoragePort(Protocol):
         """
 
     async def list_memories(self, memory_type: str) -> list[str]:
-        """列出指定类型的记忆文件。
+        """列出指定类型的记忆文件
 
         Args:
             memory_type: 记忆类型

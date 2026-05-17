@@ -18,8 +18,8 @@ from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
 class TestSensitiveDataDetectorMockBehavior:
     """Mock behavior tests — verify Protocol contract via spec constraint.
 
-    Mock(spec=Protocol) 创建成功即证明契约存在，无需 hasattr 检查。
-    行为验证通过 assert_called_* 系列方法完成。
+    Mock(spec=Protocol) 创建成功即证明契约存在，无需 hasattr 检查
+    行为验证通过 assert_called_* 系列方法完成
     """
 
     def test_mock_detect_sensitive_data_verified(self):

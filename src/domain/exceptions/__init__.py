@@ -1,4 +1,4 @@
-"""SISYS 领域层异常模块。
+"""SISYS 领域层异常模块
 
 领域异常层次结构：
 - BaseException: 异常层次结构根类
@@ -6,7 +6,7 @@
 - BusinessException: 业务级异常（业务规则违反）
 - ExternalException: 外部服务异常
 
-架构约束：领域层零依赖，仅使用 Python 标准库。
+架构约束：领域层零依赖，仅使用 Python 标准库
 
 Author:
     agimtech <agimtech@126.com>

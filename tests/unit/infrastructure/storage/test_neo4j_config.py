@@ -1,6 +1,6 @@
-"""Neo4jConfig 单元测试。
+"""Neo4jConfig 单元测试
 
-测试配置模型的字段验证、默认值和 from_env 方法。
+测试配置模型的字段验证、默认值和 from_env 方法
 """
 
 from __future__ import annotations

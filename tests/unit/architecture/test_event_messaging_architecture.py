@@ -13,9 +13,9 @@ class TestArchitectureConstraints:
     """Architecture constraint validation tests."""
 
     def test_domain_layer_has_no_external_dependencies(self):
-        """领域层零外部依赖约束验证。
+        """领域层零外部依赖约束验证
 
-        领域层（src/domain/）只能使用 Python 标准库。
+        领域层（src/domain/）只能使用 Python 标准库
         禁止导入：langgraph, prefect, fastapi, pydantic, sqlalchemy, typer,
         redis, qdrant, minio, neo4j, aio_pika, litellm, instructor, requests, httpx, docker, psycopg2
         """

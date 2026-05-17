@@ -1,7 +1,7 @@
-"""SISYS 应用层自动路由处理器模块。
+"""SISYS 应用层自动路由处理器模块
 
 自动路由机制的事件监听器，监听 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a），
-调用 AutoRouteService 做路由决策，并发布 AutoRouted 事件到下游执行阶段（Story 1.14c）。
+调用 AutoRouteService 做路由决策，并发布 AutoRouted 事件到下游执行阶段（Story 1.14c）
 
 注意：与 UDMR 的 RoutingDecided 事件（Story 1.17）不同：
     - AutoRouteListener 发出: AutoRouted（auto_route_events.py）— 选择 Agent/工具
@@ -30,15 +30,15 @@ logger = logging.getLogger(__name__)
 
 
 class AutoRouteHandler:
-    """事件监听器，桥接 AutoTriggered 事件到 AutoRouteService。
+    """事件监听器，桥接 AutoTriggered 事件到 AutoRouteService
 
     职责：
     - 监听 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a）
     - 调用 AutoRouteService 做路由决策
     - 发布 AutoRouted 事件到下游执行阶段（Story 1.14c）
 
-    架构：接口层，实现事件监听模式。
-    遵循六边形架构：领域逻辑（AutoRouteService）与基础设施关注点（事件总线、日志）隔离。
+    架构：接口层，实现事件监听模式
+    遵循六边形架构：领域逻辑（AutoRouteService）与基础设施关注点（事件总线、日志）隔离
     """
 
     def __init__(
@@ -46,7 +46,7 @@ class AutoRouteHandler:
         auto_route_service: AutoRouteService,
         publisher: EventPublisher | None = None,
     ) -> None:
-        """初始化自动路由监听器。
+        """初始化自动路由监听器
 
         Args:
             auto_route_service: 路由决策领域服务
@@ -56,7 +56,7 @@ class AutoRouteHandler:
         self._publisher = publisher
 
     async def on_triggered(self, event: DomainEvent) -> AutoRouted | None:
-        """处理 AutoTriggered 事件：做路由决策并发出 AutoRouted。
+        """处理 AutoTriggered 事件：做路由决策并发出 AutoRouted
 
         Args:
             event: 来自 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a）
@@ -98,7 +98,7 @@ class AutoRouteHandler:
             raise
 
     async def _publish(self, event: AutoRouted, channel: str | None = None) -> None:
-        """通过配置的发布器发布 AutoRouted 事件。
+        """通过配置的发布器发布 AutoRouted 事件
 
         Args:
             event: 待发布的 AutoRouted 事件

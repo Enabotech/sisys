@@ -1,7 +1,7 @@
-"""SISYS 领域层 异常层次结构根类模块。
+"""SISYS 领域层 异常层次结构根类模块
 
 定义领域异常层次结构根类 BaseException，仅使用 Python 标准库，
-HTTP 状态码等 Web 层关注点由接口层异常处理器负责映射。
+HTTP 状态码等 Web 层关注点由接口层异常处理器负责映射
 
 Author:
     agimtech <agimtech@126.com>
@@ -14,11 +14,11 @@ from __future__ import annotations
 
 
 class BaseException(Exception):  # noqa: N818
-    """异常层次结构根类。
+    """异常层次结构根类
 
-    此基类定义在领域层，仅使用 Python 标准库。
-    HTTP 状态码等 Web 层关注点不在此定义，由接口层异常处理器负责映射。
-    名称故意与 Python 内置 BaseException 不同——这是领域异常层次结构根类。
+    此基类定义在领域层，仅使用 Python 标准库
+    HTTP 状态码等 Web 层关注点不在此定义，由接口层异常处理器负责映射
+    名称故意与 Python 内置 BaseException 不同——这是领域异常层次结构根类
     """
 
     code: str = "EXCEPTION_000"

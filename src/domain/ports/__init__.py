@@ -1,7 +1,7 @@
-"""SISYS 领域层端口包。
+"""SISYS 领域层端口包
 
 定义领域层与基础设施层之间的契约接口（Protocol），
-遵循六边形架构：领域层零外部依赖。
+遵循六边形架构：领域层零外部依赖
 
 Author:
     agimtech <agimtech@126.com>

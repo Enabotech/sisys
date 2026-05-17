@@ -1,7 +1,7 @@
 """
 ArgoCD Application 配置测试
 
-测试 ArgoCD Application 的创建、自动同步策略、健康检查和回滚功能。
+测试 ArgoCD Application 的创建、自动同步策略、健康检查和回滚功能
 """
 
 import json
