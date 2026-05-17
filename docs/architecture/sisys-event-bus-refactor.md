@@ -1,12 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.0 | 状态: 审查完成
+> 版本: 2.1 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
-> 第1轮：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
-> 第2轮：补充from_dict阻断点、DEFAULT_MAPPINGS缺失16个非6个、channel调用链遗漏、save()加flush()建议、测试路径错误
-> 第3轮：排除ZPOPMIN方案、nack(requeue)不保留header修改BUG标注、_get_pool()死锁修复、RabbitMQEventListener参考实现、测试影响面分析
-> 第4轮：Task2.2不可行（Python不支持同名sync/async）、执行顺序调整（3.1先于2.2）、EventBusFactory死代码标注、补全4个Protocol@runtime_checkable、补充sqlalchemy_adapter
-> 第5轮：行号修正（auto_route_handler L101）、解决3.3/3.4矛盾（Factory保留为测试工具）、字符串路径注册保持不变、事件注册完整性验证命令
+> 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
+> 第6轮（第二批）：DocumentProcessingUseCase遗漏、InMemoryEventBus继承关系修改、from_dict具体修复代码、Poller session_context、outbox_repo SINGLETON安全性说明
 
 ## Context
 
@@ -66,7 +63,15 @@
 - `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` (更新)
 
 #### 任务 1.3: 统一事件注册方式为__init_subclass__自动注册
-- [ ] **修改** `src/domain/events/base.py` `from_dict` 方法（L228-243）：当前 L230 硬编码传入 `event_type=event_type`，对 `init=False` 字段会触发 TypeError。**必须同步修改**：仅当 `event_type` 字段的 `init=True` 时才传入
+- [ ] **修改** `src/domain/events/base.py` `from_dict` 方法（L228-243）：当前 L230 硬编码传入 `event_type=event_type`，对 `init=False` 字段会触发 TypeError。**必须同步修改**：
+  ```python
+  # 修复逻辑：仅当 event_type 字段的 init=True 时才传入
+  event_type_field = next((f for f in fields(target_class) if f.name == "event_type"), None)
+  init_kwargs = {"event_id": eid, "timestamp": ts, ...}  # 不含 event_type
+  if event_type_field is None or event_type_field.init:
+      init_kwargs["event_type"] = event_type
+  return target_class(**init_kwargs, **extra_kwargs)
+  ```
 - [ ] **修改** 4个使用 `__post_init__` + `object.__setattr__` 的事件类（AutoTriggered, AutoRouted, MemoryChanged, AutoExecuted），改为 `event_type: str = field(default="X", init=False)` 模式
 - [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式
 - [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
@@ -107,6 +112,7 @@
   - 将 `async_get_unpublished`/`async_mark_published`/`async_mark_failed` 重命名为对应Protocol方法名
   - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 确保写入
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
+- [ ] **修改** `src/application/use_cases/document_processing.py` L63：`outbox_repo.save()` 在同步方法 `process_document` 中调用，改为async后该方法也必须改为 `async def`，所有调用者需同步适配
 - [ ] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
 
 **关键文件**：
@@ -114,10 +120,12 @@
 - `src/infrastructure/messaging/outbox/inmemory_outbox.py` (方法加async)
 - `src/infrastructure/messaging/outbox/outbox_repository.py` (移除sync stub)
 - `src/infrastructure/messaging/rabbitmq_event_bus.py` (save加await)
+- `src/application/use_cases/document_processing.py` (process_document同步→async)
+- `tests/unit/application/use_cases/test_document_processing.py` (适配async)
 
 #### 任务 2.2: InMemoryEventBus兼容EventPublisher Protocol
 - [ ] **注意**：Python不支持同名方法sync/async区分（`def publish()` 和 `async def publish()` 是同一个方法名，后者覆盖前者），因此无法同时保留两个同名方法
-- [ ] **方案**：将 `InMemoryEventBus.publish()` 改为 `async def publish(event) -> PublishResult`，实现 `EventPublisher` Protocol（async版本）
+- [ ] **方案**：将 `InMemoryEventBus` 继承关系从 `InMemoryEventPublisher` 改为 `EventPublisher`，`publish()` 改为 `async def publish(event) -> PublishResult`
 - [ ] **废弃** `InMemoryEventPublisher` Protocol（同步版本），现有测试改用 `await bus.publish(event)`
 - [ ] **前置**：此任务应在任务3.1（移除channel参数）之后执行，避免先加channel再删除
 - [ ] **验证**：`isinstance(InMemoryEventBus(), EventPublisher)` 返回 True
@@ -134,6 +142,7 @@
   - 调用 `self._repo.mark_failed(event_id, error)` 替代 `_mark_failed_entity()`
 - [ ] **修改** OutboxEntity/DomainEvent 转换逻辑：Poller内部处理OutboxEntity→DomainEvent转换（当前已在做，只是通过私有方法绕过）
 - [ ] **修改** `outbox_repository.py` 和 `inmemory_outbox.py`：公共async方法返回DomainEvent（而非OutboxEntity），Poller不再需要知道OutboxEntity
+- [ ] **注意**：Poller运行时必须有活跃的session context（通过 `session_context()` 或等效机制包裹），因为公共方法通过 `self._session` property（ContextVar）获取session
 - [ ] **验证**：Poller不包含任何 `_` 前缀方法调用，`grep "_repo\._" outbox_processor.py` 无结果
 
 **关键文件**：
@@ -201,7 +210,7 @@
 - [ ] **现状**：Composition Root 当前直接通过 `register_port` 创建EventBus组件（不使用 EventBusFactory），字符串路径注册 DualChannelEventBus 已可行（`_auto_inject` 通过参数名 `redis_bus`/`rabbitmq_bus`/`router` 自动匹配注册名）
 - [ ] **修改** `src/composition_root.py` L446-511：
   - 保持字符串路径注册 DualChannelEventBus（`_auto_inject` 参数名匹配已验证可行）
-  - 修复 `outbox_repo` 生命周期：从SCOPED改为SINGLETON（或由UoW管理scope）
+  - 修复 `outbox_repo` 生命周期：从SCOPED改为SINGLETON。此修改是安全的，因为 `PostgreSQLOutboxRepository._session` 是property，每次调用 `get_session()` 从ContextVar获取当前上下文的session，session隔离由UoW（middleware的 `session_context()`）管理
   - 确保 `redis_bus` 和 `rabbitmq_bus` 共享 `router` 实例（当前已通过 `resolver.resolve("router")` 共享）
 - [ ] **注册** `EventSubscriber` 端口 → `DualChannelEventBus` 实现
 - [ ] **注册** `AsyncOutboxPoller` 到DI容器
@@ -392,6 +401,8 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_outbox_pattern.py` | 私有方法→公共async方法 |
 | `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | 私有方法调用→公共接口 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` | outbox_repo.save()加await |
+| `tests/unit/application/use_cases/test_document_processing.py` | process_document同步→async |
+| `tests/integration/test_layer_collaboration.py` | process_document调用链适配async |
 
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
