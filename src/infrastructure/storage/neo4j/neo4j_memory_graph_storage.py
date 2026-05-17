@@ -1,7 +1,7 @@
-"""Neo4jMemoryGraphStorage — MemoryGraphPort 实现（Rule 4）。
+"""Neo4jMemoryGraphStorage — MemoryGraphPort 实现（Rule 4）
 
 组合注入 Neo4jAdapter（Rule 3），添加记忆关系语义：
-实体关系提取、知识图谱查询。
+实体关系提取、知识图谱查询
 """
 
 from __future__ import annotations
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jMemoryGraphStorage(MemoryGraphPort):
-    """Neo4j 记忆图存储 — 实现 MemoryGraphPort。
+    """Neo4j 记忆图存储 — 实现 MemoryGraphPort
 
     组合 Neo4jAdapter（Rule 3，L5GraphPort 实现），
-    添加记忆关系语义：内容→实体→关系提取、知识图谱查询。
+    添加记忆关系语义：内容→实体→关系提取、知识图谱查询
     """
 
     def __init__(self, adapter: Neo4jAdapter):
-        """初始化 Neo4jMemoryGraphStorage。
+        """初始化 Neo4jMemoryGraphStorage
 
         Args:
             adapter: Neo4jAdapter 实例（Rule 3）
@@ -111,10 +111,10 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         memory_id: str,
         content: str,
     ) -> int:
-        """提取并索引记忆中的实体关系。
+        """提取并索引记忆中的实体关系
 
-        简单实现：将记忆内容注册为实体节点。
-        生产环境应集成 NER 服务提取实体和关系。
+        简单实现：将记忆内容注册为实体节点
+        生产环境应集成 NER 服务提取实体和关系
         """
         await self._adapter.create_entity(
             memory_id=memory_id,

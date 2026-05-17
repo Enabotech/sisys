@@ -1,6 +1,6 @@
-"""SISYS 领域层服务异常模块。
+"""SISYS 领域层服务异常模块
 
-定义审计服务、密码验证、存储端口相关异常。
+定义审计服务、密码验证、存储端口相关异常
 
 异常来源：
 - src/domain/ports/audit_service.py → AuditError
@@ -24,11 +24,11 @@ from src.domain.exceptions.system_exceptions import SystemException
 
 
 class AuditError(SystemException):
-    """审计操作异常。
+    """审计操作异常
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_105"
@@ -36,21 +36,21 @@ class AuditError(SystemException):
 
 
 class PasswordValidationError(ValidationError):
-    """密码验证失败异常。
+    """密码验证失败异常
 
     Attributes:
-        code: 异常编码，可由调用方覆盖。
-        message: 异常消息。
+        code: 异常编码，可由调用方覆盖
+        message: 异常消息
     """
 
     code = "EXCEPTION_201"
 
     def __init__(self, message: str, code: str | None = None) -> None:
-        """初始化密码验证失败异常。
+        """初始化密码验证失败异常
 
         Args:
-            message: 异常消息。
-            code: 异常编码，为 None 时使用类默认编码。
+            message: 异常消息
+            code: 异常编码，为 None 时使用类默认编码
         """
         self.message = message
         self.code = code or self.__class__.code
@@ -58,11 +58,11 @@ class PasswordValidationError(ValidationError):
 
 
 class ComplianceLockError(InvalidStateError):
-    """合规锁定异常。
+    """合规锁定异常
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_206"

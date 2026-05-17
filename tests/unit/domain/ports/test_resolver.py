@@ -1,6 +1,6 @@
-"""Resolver 依赖注入容器单元测试。
+"""Resolver 依赖注入容器单元测试
 
-验证端口解析、生命周期管理、自动注入和懒加载行为。
+验证端口解析、生命周期管理、自动注入和懒加载行为
 """
 
 from __future__ import annotations

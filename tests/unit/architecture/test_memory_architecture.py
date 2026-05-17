@@ -1,6 +1,6 @@
 """Tests for Memory Architecture Validation.
 
-RED PHASE: 验证六边形架构约束 - L1/L3 分离。
+RED PHASE: 验证六边形架构约束 - L1/L3 分离
 """
 
 from __future__ import annotations

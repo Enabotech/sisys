@@ -1,4 +1,4 @@
-"""PostgreSQL EventStore — 事件溯源存储实现。
+"""PostgreSQL EventStore — 事件溯源存储实现
 
 使用 PostgreSQL 存储领域事件，支持：
 - 事件追加（带乐观锁版本检查）
@@ -83,7 +83,7 @@ class EventStoreModel:
 
 
 class PostgreSQLEventStore:
-    """PostgreSQL EventStore 实现。
+    """PostgreSQL EventStore 实现
 
     使用原始 SQL 实现事件存储：
     - append() 追加事件（带乐观锁版本检查）
@@ -96,7 +96,7 @@ class PostgreSQLEventStore:
         return get_session()
 
     async def append(self, event: DomainEvent) -> None:
-        """追加事件到存储（带乐观锁版本检查）。
+        """追加事件到存储（带乐观锁版本检查）
 
         Args:
             event: 领域事件
@@ -144,7 +144,7 @@ class PostgreSQLEventStore:
         )
 
     async def get_events(self, aggregate_id: UUID) -> list[DomainEvent]:
-        """获取指定聚合的所有事件。
+        """获取指定聚合的所有事件
 
         Args:
             aggregate_id: 聚合 ID
@@ -186,7 +186,7 @@ class PostgreSQLEventStore:
         start_time: datetime,
         end_time: datetime,
     ) -> list[DomainEvent]:
-        """按事件类型和时间范围查询事件。
+        """按事件类型和时间范围查询事件
 
         Args:
             event_type: 事件类型

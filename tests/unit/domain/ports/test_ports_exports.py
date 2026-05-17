@@ -1,6 +1,6 @@
-"""Domain Ports 导出测试。
+"""Domain Ports 导出测试
 
-验证所有新端口都能正确导入。
+验证所有新端口都能正确导入
 """
 
 from __future__ import annotations

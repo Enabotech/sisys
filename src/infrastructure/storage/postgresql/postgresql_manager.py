@@ -1,6 +1,6 @@
-"""PostgreSQL 数据库引擎抽象层。
+"""PostgreSQL 数据库引擎抽象层
 
-提供异步和同步引擎的懒初始化、健康检查和优雅关闭。
+提供异步和同步引擎的懒初始化、健康检查和优雅关闭
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
 class PostgreSQLManager(ConnectionManager):
-    """通用数据库引擎接口。
+    """通用数据库引擎接口
 
-    支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化。
+    支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化
     """
 
     def __init__(self, config: PostgreSQLConfig | None = None):
-        """初始化 PostgreSQLManager。
+        """初始化 PostgreSQLManager
 
         Args:
             config: PostgreSQL 配置实例，如果为 None 则从环境变量加载
@@ -49,7 +49,7 @@ class PostgreSQLManager(ConnectionManager):
         )
 
     def get_client(self) -> AsyncEngine:
-        """获取异步引擎实例（ConnectionManager 统一接口）。
+        """获取异步引擎实例（ConnectionManager 统一接口）
 
         Returns:
             SQLAlchemy AsyncEngine 实例
@@ -57,7 +57,7 @@ class PostgreSQLManager(ConnectionManager):
         return self.get_async_engine()
 
     def get_async_engine(self) -> AsyncEngine:
-        """获取异步引擎实例（懒初始化）。
+        """获取异步引擎实例（懒初始化）
 
         Returns:
             SQLAlchemy AsyncEngine 实例
@@ -74,7 +74,7 @@ class PostgreSQLManager(ConnectionManager):
         return self._async_engine
 
     def get_sync_engine(self) -> Engine:
-        """获取同步引擎实例（懒初始化）。
+        """获取同步引擎实例（懒初始化）
 
         Returns:
             SQLAlchemy Engine 实例
@@ -93,9 +93,9 @@ class PostgreSQLManager(ConnectionManager):
         return self._sync_engine
 
     async def health_check(self) -> bool:
-        """执行健康检查。
+        """执行健康检查
 
-        执行 SELECT 1 验证数据库连接可用。
+        执行 SELECT 1 验证数据库连接可用
 
         Returns:
             True 如果连接正常，否则 False
@@ -119,7 +119,7 @@ class PostgreSQLManager(ConnectionManager):
 
     @asynccontextmanager
     async def get_async_session(self) -> AsyncIterator[AsyncSession]:
-        """获取异步会话上下文管理器。
+        """获取异步会话上下文管理器
 
         Returns:
             AsyncSession 实例作为异步上下文管理器

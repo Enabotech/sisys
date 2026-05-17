@@ -1,7 +1,7 @@
-"""OutboxEntity 状态机与 OutboxRepository 接口协议测试。
+"""OutboxEntity 状态机与 OutboxRepository 接口协议测试
 
 验证 OutboxEntity 状态转换规则、InvalidStateTransitionError 异常、
-以及 OutboxRepository 接口契约。
+以及 OutboxRepository 接口契约
 
 Reference: src/infrastructure/messaging/outbox/outbox.py
            src/domain/ports/outbox.py

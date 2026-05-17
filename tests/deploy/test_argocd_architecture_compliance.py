@@ -1,7 +1,7 @@
 """
 ArgoCD 架构合规验证测试
 
-验证 TLS 配置、存储配置、Ingress 配置和密钥管理是否符合架构要求。
+验证 TLS 配置、存储配置、Ingress 配置和密钥管理是否符合架构要求
 """
 
 from pathlib import Path

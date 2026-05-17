@@ -1,6 +1,6 @@
-"""SISYS 领域层 合规事件模块。
+"""SISYS 领域层 合规事件模块
 
-定义数据主权、PIPL和等保2.0相关的领域事件。
+定义数据主权、PIPL和等保2.0相关的领域事件
 
 本模块中的事件遵循DomainEvent标准：
 - 仅使用Python标准库类型（dataclasses、uuid、datetime）
@@ -84,21 +84,21 @@ class AttackType(str, Enum):
 
 @dataclass(frozen=True)
 class MFAChallengeIssuedEvent(DomainEvent):
-    """向用户发放MFA挑战时触发的事件。
+    """向用户发放MFA挑战时触发的事件
 
-    在MFA设置或验证流程中触发。
-    用于审计日志记录和安全合规（等保2.0）。
+    在MFA设置或验证流程中触发
+    用于审计日志记录和安全合规（等保2.0）
 
     Attributes:
-        challenge_id: 挑战唯一标识符。
-        event_type: 事件类型，固定为"MFAChallengeIssuedEvent"。
-        user_id: 用户唯一标识符。
-        challenge_type: 挑战类型（TOTP/HOTP/SMS/EMAIL）。
-        status: 挑战状态。
-        expires_at: 过期时间。
-        issued_at: 发放时间。
-        ip_address: 客户端IP地址。
-        user_agent: 客户端User-Agent。
+        challenge_id: 挑战唯一标识符
+        event_type: 事件类型，固定为"MFAChallengeIssuedEvent"
+        user_id: 用户唯一标识符
+        challenge_type: 挑战类型（TOTP/HOTP/SMS/EMAIL）
+        status: 挑战状态
+        expires_at: 过期时间
+        issued_at: 发放时间
+        ip_address: 客户端IP地址
+        user_agent: 客户端User-Agent
     """
 
     challenge_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -121,21 +121,21 @@ class MFAChallengeIssuedEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class IntrusionDetectedEvent(DomainEvent):
-    """检测到入侵尝试时触发的事件。
+    """检测到入侵尝试时触发的事件
 
-    由IntrusionDetector在识别恶意活动时触发。
-    用于安全审计和事件响应（等保2.0入侵防范）。
+    由IntrusionDetector在识别恶意活动时触发
+    用于安全审计和事件响应（等保2.0入侵防范）
 
     Attributes:
-        intrusion_id: 入侵检测唯一标识符。
-        event_type: 事件类型，固定为"IntrusionDetectedEvent"。
-        source_ip: 攻击来源IP地址。
-        attack_type: 攻击类型。
-        severity: 严重级别。
-        action_taken: 采取的响应动作。
-        description: 描述信息。
-        raw_evidence: 原始日志/证据数据。
-        detected_at: 检测时间。
+        intrusion_id: 入侵检测唯一标识符
+        event_type: 事件类型，固定为"IntrusionDetectedEvent"
+        source_ip: 攻击来源IP地址
+        attack_type: 攻击类型
+        severity: 严重级别
+        action_taken: 采取的响应动作
+        description: 描述信息
+        raw_evidence: 原始日志/证据数据
+        detected_at: 检测时间
     """
 
     intrusion_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -158,20 +158,20 @@ class IntrusionDetectedEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class DataIntegrityViolationEvent(DomainEvent):
-    """检测到数据完整性违规时触发的事件。
+    """检测到数据完整性违规时触发的事件
 
-    在数据哈希验证失败时触发，表明数据可能被篡改。
-    用于数据完整性审计（等保2.0数据完整性）。
+    在数据哈希验证失败时触发，表明数据可能被篡改
+    用于数据完整性审计（等保2.0数据完整性）
 
     Attributes:
-        violation_id: 违规唯一标识符。
-        event_type: 事件类型，固定为"DataIntegrityViolationEvent"。
-        data_id: 数据唯一标识符。
-        expected_hash: 预期的哈希值。
-        actual_hash: 实际的哈希值。
-        source: 数据存储/访问位置。
-        verification_method: 验证方法（sha256、sha512、md5）。
-        detected_at: 检测时间。
+        violation_id: 违规唯一标识符
+        event_type: 事件类型，固定为"DataIntegrityViolationEvent"
+        data_id: 数据唯一标识符
+        expected_hash: 预期的哈希值
+        actual_hash: 实际的哈希值
+        source: 数据存储/访问位置
+        verification_method: 验证方法（sha256、sha512、md5）
+        detected_at: 检测时间
     """
 
     violation_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -193,19 +193,19 @@ class DataIntegrityViolationEvent(DomainEvent):
 
 @dataclass(frozen=True)
 class SensitiveDataDetected(DomainEvent):
-    """检测到敏感数据时触发的事件。
+    """检测到敏感数据时触发的事件
 
     在数据摄入或访问时触发，标记敏感数据以进行适当处理
-    （本地处理、加密等）。
+    （本地处理、加密等）
 
     Attributes:
-        data_id: 数据唯一标识符。
-        event_type: 事件类型，固定为"SensitiveDataDetected"。
-        sensitive_type: 敏感数据类型。
-        confidence: 检测置信度，范围0.0-1.0。
-        labels: 附加标签。
-        detection_method: 检测方法（regex、keyword、nlp）。
-        detected_at: 检测时间。
+        data_id: 数据唯一标识符
+        event_type: 事件类型，固定为"SensitiveDataDetected"
+        sensitive_type: 敏感数据类型
+        confidence: 检测置信度，范围0.0-1.0
+        labels: 附加标签
+        detection_method: 检测方法（regex、keyword、nlp）
+        detected_at: 检测时间
     """
 
     data_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -226,20 +226,20 @@ class SensitiveDataDetected(DomainEvent):
 
 @dataclass(frozen=True)
 class CrossBorderTransferRequested(DomainEvent):
-    """请求跨境数据传输时触发的事件。
+    """请求跨境数据传输时触发的事件
 
-    此事件触发需要传输到境外的数据审批工作流。
+    此事件触发需要传输到境外的数据审批工作流
 
     Attributes:
-        request_id: 请求唯一标识符。
-        data_id: 数据唯一标识符。
-        event_type: 事件类型，固定为"CrossBorderTransferRequested"。
-        destination: 目的地国家/地区。
-        purpose: 传输目的。
-        approval_id: 审批ID（审批工作流启动后设置）。
-        status: 状态（pending、approved、rejected、blocked）。
-        requester: 请求传输的用户ID。
-        requested_at: 请求时间。
+        request_id: 请求唯一标识符
+        data_id: 数据唯一标识符
+        event_type: 事件类型，固定为"CrossBorderTransferRequested"
+        destination: 目的地国家/地区
+        purpose: 传输目的
+        approval_id: 审批ID（审批工作流启动后设置）
+        status: 状态（pending、approved、rejected、blocked）
+        requester: 请求传输的用户ID
+        requested_at: 请求时间
     """
 
     request_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -262,16 +262,16 @@ class CrossBorderTransferRequested(DomainEvent):
 
 @dataclass(frozen=True)
 class DataSovereigntyViolation(DomainEvent):
-    """数据主权策略违规时触发的事件。
+    """数据主权策略违规时触发的事件
 
     Attributes:
-        violation_id: 违规唯一标识符。
-        data_id: 数据唯一标识符。
-        event_type: 事件类型，固定为"DataSovereigntyViolation"。
-        violation_type: 违规类型（如unauthorized_transfer、境外_storage等）。
-        severity: 严重级别（low、medium、high、critical）。
-        description: 描述信息。
-        detected_at: 检测时间。
+        violation_id: 违规唯一标识符
+        data_id: 数据唯一标识符
+        event_type: 事件类型，固定为"DataSovereigntyViolation"
+        violation_type: 违规类型（如unauthorized_transfer、境外_storage等）
+        severity: 严重级别（low、medium、high、critical）
+        description: 描述信息
+        detected_at: 检测时间
     """
 
     violation_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -292,19 +292,19 @@ class DataSovereigntyViolation(DomainEvent):
 
 @dataclass(frozen=True)
 class PIPLDataAccessRequested(DomainEvent):
-    """PIPL框架下访问个人信息时触发的事件。
+    """PIPL框架下访问个人信息时触发的事件
 
-    PIPL要求追踪所有个人信息访问，包括目的、法律依据和数据主体同意。
+    PIPL要求追踪所有个人信息访问，包括目的、法律依据和数据主体同意
 
     Attributes:
-        access_id: 访问唯一标识符。
-        personal_data_id: 个人数据唯一标识符。
-        event_type: 事件类型，固定为"PIPLDataAccessRequested"。
-        purpose: 数据处理目的。
-        legal_basis: 法律依据（consent、contract、legal_obligation等）。
-        data_subject_consent: 数据主体是否同意。
-        accessor: 访问数据的用户/系统。
-        accessed_at: 访问时间。
+        access_id: 访问唯一标识符
+        personal_data_id: 个人数据唯一标识符
+        event_type: 事件类型，固定为"PIPLDataAccessRequested"
+        purpose: 数据处理目的
+        legal_basis: 法律依据（consent、contract、legal_obligation等）
+        data_subject_consent: 数据主体是否同意
+        accessor: 访问数据的用户/系统
+        accessed_at: 访问时间
     """
 
     access_id: uuid.UUID = field(default_factory=uuid.uuid4)

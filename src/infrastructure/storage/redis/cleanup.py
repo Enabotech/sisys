@@ -1,7 +1,7 @@
-"""Redis Cleanup Utility — 基础设施层实现。
+"""Redis Cleanup Utility — 基础设施层实现
 
-提供按命名空间批量清理 Redis 键的工具。
-使用 SCAN 命令（非 KEYS）避免阻塞 Redis。
+提供按命名空间批量清理 Redis 键的工具
+使用 SCAN 命令（非 KEYS）避免阻塞 Redis
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class RedisCleanup:
-    """Redis 命名空间清理工具。
+    """Redis 命名空间清理工具
 
-    使用 SCAN 命令批量删除指定命名空间下的所有键。
-    支持自定义批次大小，避免一次性删除大量键导致 Redis 阻塞。
+    使用 SCAN 命令批量删除指定命名空间下的所有键
+    支持自定义批次大小，避免一次性删除大量键导致 Redis 阻塞
 
     Args:
         config: Redis 连接配置
@@ -34,9 +34,9 @@ class RedisCleanup:
         self._redis = redis_client
 
     async def cleanup_namespace(self, namespace: str, batch_size: int = 100) -> int:
-        """清理指定命名空间下的所有键。
+        """清理指定命名空间下的所有键
 
-        使用 SCAN 命令分批扫描并删除键，不阻塞 Redis。
+        使用 SCAN 命令分批扫描并删除键，不阻塞 Redis
 
         Args:
             namespace: 命名空间（不能为空）

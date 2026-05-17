@@ -1,7 +1,7 @@
-"""SISYS 领域层合规检查结果值对象模块。
+"""SISYS 领域层合规检查结果值对象模块
 
-封装合规检查的结果，作为不可变值对象在领域层传递。
-遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖。
+封装合规检查的结果，作为不可变值对象在领域层传递
+遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -32,7 +32,7 @@ class ComplianceResult:
     violation_type: str | None = None
 
     def is_allowed(self) -> bool:
-        """检查操作是否被允许。
+        """检查操作是否被允许
 
         Returns:
             True 如果 allowed 为 True
@@ -40,7 +40,7 @@ class ComplianceResult:
         return self.allowed
 
     def is_violation(self) -> bool:
-        """检查是否存在违规。
+        """检查是否存在违规
 
         Returns:
             True 如果 violation_type 不为 None
@@ -48,7 +48,7 @@ class ComplianceResult:
         return self.violation_type is not None
 
     def get_violation_type(self) -> str | None:
-        """获取违规类型。
+        """获取违规类型
 
         Returns:
             violation_type 值或 None

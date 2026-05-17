@@ -1,6 +1,6 @@
-"""SISYS 领域层敏感数据检测端口模块。
+"""SISYS 领域层敏感数据检测端口模块
 
-定义敏感数据检测服务的端口接口，遵循六边形架构：仅依赖 Protocol 和 Python 标准库。
+定义敏感数据检测服务的端口接口，遵循六边形架构：仅依赖 Protocol 和 Python 标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,7 +21,7 @@ class SensitiveDataDetectorPort(Protocol):
     """敏感数据检测服务端口（协议接口）."""
 
     def detect_sensitive_data(self, content: str) -> SensitiveDataResult:
-        """检测敏感数据。
+        """检测敏感数据
 
         Args:
             content: 待检测内容

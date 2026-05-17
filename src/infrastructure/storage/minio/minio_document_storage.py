@@ -1,7 +1,7 @@
-"""MinIODocumentStorage — DocumentStoragePort 实现（Rule 4）。
+"""MinIODocumentStorage — DocumentStoragePort 实现（Rule 4）
 
 组合注入 MinIOAdapter（Rule 3），添加文档业务语义：
-自动路径生成、用户文档列表、元数据管理。
+自动路径生成、用户文档列表、元数据管理
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ if TYPE_CHECKING:
 
 
 class MinIODocumentStorage(DocumentStoragePort):
-    """MinIO 文档存储 — 实现 DocumentStoragePort。
+    """MinIO 文档存储 — 实现 DocumentStoragePort
 
     组合 MinIOAdapter（Rule 3，L4ObjectPort 实现），
-    添加文档业务语义：自动路径生成、用户文档列表。
+    添加文档业务语义：自动路径生成、用户文档列表
     """
 
     def __init__(self, adapter: MinIOAdapter):
-        """初始化 MinIODocumentStorage。
+        """初始化 MinIODocumentStorage
 
         Args:
             adapter: MinIOAdapter 实例（Rule 3）

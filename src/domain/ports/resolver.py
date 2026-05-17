@@ -1,6 +1,6 @@
-"""SISYS 领域层端口解析器模块。
+"""SISYS 领域层端口解析器模块
 
-提供 Resolver 类，从注册中心解析端口实现并管理其生命周期（瞬态、作用域、单例）。
+提供 Resolver 类，从注册中心解析端口实现并管理其生命周期（瞬态、作用域、单例）
 
 Author:
     agimtech <agimtech@126.com>
@@ -24,7 +24,7 @@ T = TypeVar("T")
 
 
 class Resolver:
-    """依赖注入端口解析器，从注册中心解析端口实现并管理生命周期。
+    """依赖注入端口解析器，从注册中心解析端口实现并管理生命周期
 
     Attributes:
         _registry: 端口注册中心实例
@@ -38,7 +38,7 @@ class Resolver:
         registry: PortRegistry | None = None,
         overrides: dict[str, Any] | None = None,
     ):
-        """初始化解析器。
+        """初始化解析器
 
         Args:
             registry: 端口注册中心（默认使用全局注册中心）
@@ -50,7 +50,7 @@ class Resolver:
         self._scoped_context: dict[str, Any] = {}
 
     def resolve(self, port_name: str) -> Any:
-        """通过名称解析端口并返回实例。
+        """通过名称解析端口并返回实例
 
         Args:
             port_name: 待解析的端口名称
@@ -75,7 +75,7 @@ class Resolver:
         return self._create_instance(spec)
 
     def resolve_by_interface(self, interface: Type[T] | str) -> Any:
-        """通过接口类型解析端口。
+        """通过接口类型解析端口
 
         Args:
             interface: 接口类型
@@ -118,7 +118,7 @@ class Resolver:
         return self._auto_inject(spec.impl)
 
     def _load_from_module_path(self, module_path: str) -> Any:
-        """从模块路径字符串延迟加载类。
+        """从模块路径字符串延迟加载类
 
         Args:
             module_path: 完全限定路径，如 'module.ClassName'
@@ -189,7 +189,7 @@ def get_resolver() -> Resolver:
 
 
 def resolve(port_name: str) -> Any:
-    """全局解析函数。
+    """全局解析函数
 
     Args:
         port_name: 待解析的端口名称

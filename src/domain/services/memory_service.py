@@ -1,6 +1,6 @@
-"""SISYS 领域层记忆服务模块。
+"""SISYS 领域层记忆服务模块
 
-MemoryService 负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件。
+MemoryService 负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件
 
 依赖倒置：
 - TextExtractorService：文本提取接口
@@ -82,10 +82,10 @@ class Memory:
 
 
 class MemoryService:
-    """记忆服务（领域层）。
+    """记忆服务（领域层）
 
-    协调 L1 压缩、存储写入（L2 PostgreSQL）、事件发布。
-    使用依赖倒置注入 TextExtractor、Compressor 和 Repositories。
+    协调 L1 压缩、存储写入（L2 PostgreSQL）、事件发布
+    使用依赖倒置注入 TextExtractor、Compressor 和 Repositories
     """
 
     def __init__(
@@ -97,7 +97,7 @@ class MemoryService:
         l0_storage=None,  # L0StoragePort | None
         event_publisher=None,  # EventPublisherProtocol | None
     ):
-        """初始化 MemoryService。
+        """初始化 MemoryService
 
         Args:
             text_extractor: 文本提取器（依赖倒置）
@@ -115,7 +115,7 @@ class MemoryService:
         self._event_publisher = event_publisher
 
     async def save(self, request: MemorySaveRequest) -> Memory:
-        """保存记忆。
+        """保存记忆
 
         Args:
             request: 记忆保存请求
@@ -189,7 +189,7 @@ class MemoryService:
         return memory
 
     async def update(self, request: MemoryUpdateRequest) -> Memory:
-        """更新记忆。
+        """更新记忆
 
         Args:
             request: 记忆更新请求
@@ -269,7 +269,7 @@ class MemoryService:
         )
 
     async def delete(self, request: MemoryDeleteRequest) -> None:
-        """删除记忆。
+        """删除记忆
 
         Args:
             request: 记忆删除请求
@@ -313,7 +313,7 @@ class MemoryService:
         )
 
     async def list(self, user_id: str) -> list[Memory]:
-        """列出用户所有记忆。
+        """列出用户所有记忆
 
         Args:
             user_id: 用户 ID
@@ -350,7 +350,7 @@ class MemoryService:
         return memories
 
     async def get(self, memory_id: UUID) -> Memory:
-        """获取记忆。
+        """获取记忆
 
         Args:
             memory_id: 记忆 ID
@@ -395,7 +395,7 @@ class MemoryService:
         name: str,
         description: str,
     ) -> None:
-        """写入 L0 文件系统（双层存储）。
+        """写入 L0 文件系统（双层存储）
 
         Args:
             memory_id: 记忆 ID
@@ -416,7 +416,7 @@ class MemoryService:
         # 注意：MEMORY.md 索引更新由 MemoryChangedListener 事件驱动，不再在此处同步更新
 
     def _build_md_content(self, name: str, description: str, memory_type: str, content: str) -> str:
-        """构建 MD 文件内容。
+        """构建 MD 文件内容
 
         Args:
             name: 记忆名称
@@ -441,7 +441,7 @@ class MemoryService:
         return "\n".join(lines)
 
     async def _delete_from_l0(self, memory_id: UUID, memory_type: str) -> None:
-        """从 L0 文件系统删除（双层存储）。
+        """从 L0 文件系统删除（双层存储）
 
         Args:
             memory_id: 记忆 ID

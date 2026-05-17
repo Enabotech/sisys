@@ -1,6 +1,6 @@
-"""QdrantMemoryVectorStorage — MemoryVectorPort 实现（Rule 4）。
+"""QdrantMemoryVectorStorage — MemoryVectorPort 实现（Rule 4）
 
-组合注入 QdrantAdapter（Rule 3），添加记忆向量索引和语义检索语义。
+组合注入 QdrantAdapter（Rule 3），添加记忆向量索引和语义检索语义
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ MEMORY_COLLECTION = "sisys_memories"
 
 
 class QdrantMemoryVectorStorage(MemoryVectorPort):
-    """Qdrant 记忆向量存储 — 实现 MemoryVectorPort。
+    """Qdrant 记忆向量存储 — 实现 MemoryVectorPort
 
     组合 QdrantAdapter（Rule 3，L3VectorPort 实现），
-    添加记忆语义：自动 embedding 生成 + payload 过滤。
+    添加记忆语义：自动 embedding 生成 + payload 过滤
     """
 
     def __init__(
@@ -33,7 +33,7 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         embed_fn: Callable[[str], list[float]] | None = None,
         collection: str = MEMORY_COLLECTION,
     ):
-        """初始化 QdrantMemoryVectorStorage。
+        """初始化 QdrantMemoryVectorStorage
 
         Args:
             adapter: QdrantAdapter 实例（Rule 3）
@@ -142,10 +142,10 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
 
     @staticmethod
     def _deterministic_embed(text: str) -> list[float]:
-        """确定性 hash embedding（仅用于测试/开发，非生产质量）。
+        """确定性 hash embedding（仅用于测试/开发，非生产质量）
 
-        将文本 hash 映射到固定维度伪向量。
-        生产环境应注入真正的 embedding 函数。
+        将文本 hash 映射到固定维度伪向量
+        生产环境应注入真正的 embedding 函数
         """
         dim = 128
         h = hashlib.sha256(text.encode()).digest()

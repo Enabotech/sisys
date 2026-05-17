@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 PostgreSQL 配置模块。
+"""SISYS 基础设施层 PostgreSQL 配置模块
 
-提供 PostgreSQL 连接池配置，用于 L2 关系存储层。
+提供 PostgreSQL 连接池配置，用于 L2 关系存储层
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class PostgreSQLConfig:
-    """PostgreSQL 连接池配置。
+    """PostgreSQL 连接池配置
 
-    用于 L2 关系存储层（PostgreSQL 15+），支持连接池管理和健康检查。
+    用于 L2 关系存储层（PostgreSQL 15+），支持连接池管理和健康检查
 
     Attributes:
         host: 数据库主机地址
@@ -47,7 +47,7 @@ class PostgreSQLConfig:
 
     @classmethod
     def from_env(cls) -> PostgreSQLConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

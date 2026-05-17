@@ -1,6 +1,6 @@
-"""SISYS 基础设施层指标聚合器模块。
+"""SISYS 基础设施层指标聚合器模块
 
-统一收集事件指标和业务指标，输出 Prometheus 文本格式。
+统一收集事件指标和业务指标，输出 Prometheus 文本格式
 
 Author:
     agimtech <agimtech@126.com>
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class MetricsAggregator:
-    """指标聚合器，统一收集事件指标和业务指标。
+    """指标聚合器，统一收集事件指标和业务指标
 
     通过注入获取已存在的 EventMetricsCollector 和 BusinessMetricsCollector，
-    合并输出 Prometheus 文本格式。
+    合并输出 Prometheus 文本格式
 
     Attributes:
         _event_metrics: EventMetricsCollector 实例
@@ -41,7 +41,7 @@ class MetricsAggregator:
         business_metrics_collector: BusinessMetricsCollector,
         registry: CollectorRegistry | None = None,
     ):
-        """初始化指标聚合器。
+        """初始化指标聚合器
 
         Args:
             event_metrics_collector: 事件指标收集器实例
@@ -58,10 +58,10 @@ class MetricsAggregator:
         self._registry = registry
 
     def _format_event_metrics(self) -> str:
-        """从 EventMetricsCollector 格式化事件指标为 Prometheus 文本格式。
+        """从 EventMetricsCollector 格式化事件指标为 Prometheus 文本格式
 
         EventMetricsCollector 是纯内存计数器，不注册 Prometheus 指标，
-        所以需要手动格式化其 metrics 属性中的值。
+        所以需要手动格式化其 metrics 属性中的值
 
         Returns:
             Prometheus 文本格式的事件指标字符串
@@ -102,9 +102,9 @@ class MetricsAggregator:
         return "\n".join(lines) + "\n"
 
     def collect(self) -> bytes:
-        """收集所有指标。
+        """收集所有指标
 
-        聚合 EventMetricsCollector 的内存指标和 BusinessMetricsCollector 的 Prometheus 指标。
+        聚合 EventMetricsCollector 的内存指标和 BusinessMetricsCollector 的 Prometheus 指标
 
         Returns:
             Prometheus 文本格式的指标字节串
@@ -125,7 +125,7 @@ class MetricsAggregator:
         return combined_output.encode("utf-8")
 
     def collect_as_dict(self) -> dict[str, Any]:
-        """收集所有指标并返回字典格式。
+        """收集所有指标并返回字典格式
 
         Returns:
             指标名称到指标值的字典

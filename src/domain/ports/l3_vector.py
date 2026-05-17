@@ -1,4 +1,4 @@
-"""SISYS 领域层 L3 Qdrant 向量存储抽象端口模块。
+"""SISYS 领域层 L3 Qdrant 向量存储抽象端口模块
 
 对应 architecture.md §11.1：
 - 内容 >500 tokens 时启用向量检索
@@ -33,7 +33,7 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L3VectorPort(Protocol):
-    """L3 Qdrant 向量存储端口接口。
+    """L3 Qdrant 向量存储端口接口
 
     对应 architecture.md §11.1：
     - 内容 >500 tokens 时启用向量检索
@@ -45,7 +45,7 @@ class L3VectorPort(Protocol):
         collection: str,
         points: list[dict],
     ) -> bool:
-        """批量插入或更新向量点。
+        """批量插入或更新向量点
 
         Args:
             collection: Collection 名称
@@ -61,7 +61,7 @@ class L3VectorPort(Protocol):
         collection: str,
         point_ids: list[str],
     ) -> bool:
-        """批量删除向量点。
+        """批量删除向量点
 
         Args:
             collection: Collection 名称
@@ -76,7 +76,7 @@ class L3VectorPort(Protocol):
         collection: str,
         point_id: str,
     ) -> dict | None:
-        """获取单个向量点。
+        """获取单个向量点
 
         Args:
             collection: Collection 名称
@@ -93,7 +93,7 @@ class L3VectorPort(Protocol):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """Dense 语义检索。
+        """Dense 语义检索
 
         Args:
             collection: Collection 名称
@@ -112,9 +112,9 @@ class L3VectorPort(Protocol):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """BM25 稀疏检索。
+        """BM25 稀疏检索
 
-        对应 architecture.md §11.1 "Dense+Sparse+Payload 过滤"。
+        对应 architecture.md §11.1 "Dense+Sparse+Payload 过滤"
 
         Args:
             collection: Collection 名称
@@ -133,7 +133,7 @@ class L3VectorPort(Protocol):
         vector_size: int,
         vector_params: dict | None = None,
     ) -> bool:
-        """创建 Collection。
+        """创建 Collection
 
         Args:
             collection: Collection 名称
@@ -148,7 +148,7 @@ class L3VectorPort(Protocol):
         self,
         collection: str,
     ) -> bool:
-        """删除 Collection。
+        """删除 Collection
 
         Args:
             collection: Collection 名称
@@ -161,7 +161,7 @@ class L3VectorPort(Protocol):
         self,
         collection: str,
     ) -> bool:
-        """检查 Collection 是否存在。
+        """检查 Collection 是否存在
 
         Args:
             collection: Collection 名称
@@ -173,7 +173,7 @@ class L3VectorPort(Protocol):
     async def list_collections(
         self,
     ) -> list[str]:
-        """列出所有 Collection。
+        """列出所有 Collection
 
         Returns:
             Collection 名称列表

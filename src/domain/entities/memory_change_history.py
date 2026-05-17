@@ -1,6 +1,6 @@
-"""SISYS 领域层记忆变更历史实体模块。
+"""SISYS 领域层记忆变更历史实体模块
 
-定义用户记忆变更历史实体（append-only），架构来源: architecture.md §11.2.5。
+定义用户记忆变更历史实体（append-only），架构来源: architecture.md §11.2.5
 
 特点:
 - append-only（历史记录不可删除/修改）
@@ -23,9 +23,9 @@ from datetime import UTC, datetime
 
 @dataclass
 class MemoryChangeHistory:
-    """用户记忆变更历史实体（append-only）。
+    """用户记忆变更历史实体（append-only）
 
-    用于追溯记忆的变更过程，不存储当前状态。
+    用于追溯记忆的变更过程，不存储当前状态
     """
 
     id: uuid.UUID
@@ -55,7 +55,7 @@ class MemoryChangeHistory:
         diff_summary: str = "",
         archived_ref: str = "",
     ) -> MemoryChangeHistory:
-        """创建新的 MemoryChangeHistory 条目。
+        """创建新的 MemoryChangeHistory 条目
 
         Args:
             memory_id: 关联的记忆 ID

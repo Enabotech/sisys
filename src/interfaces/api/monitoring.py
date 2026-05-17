@@ -1,4 +1,4 @@
-"""Prometheus /metrics HTTP 端点 — FastAPI 路由。
+"""Prometheus /metrics HTTP 端点 — FastAPI 路由
 
 Story 1.13: K8s 动态扩缩容
 - 端点: GET /metrics
@@ -27,7 +27,7 @@ def create_metrics_router(
     metrics_path: str = "/metrics",
     metrics_enabled: bool = True,
 ) -> APIRouter:
-    """创建 metrics 路由。
+    """创建 metrics 路由
 
     Args:
         metrics_port: MetricsPort 实例（应用层端口）
@@ -47,7 +47,7 @@ def create_metrics_router(
         include_in_schema=metrics_enabled,
     )
     async def get_metrics() -> Response:
-        """获取 Prometheus 格式指标。
+        """获取 Prometheus 格式指标
 
         Returns:
             Prometheus 文本格式指标（Content-Type: text/plain; version=0.0.4; charset=utf-8）

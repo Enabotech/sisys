@@ -1,7 +1,7 @@
 """Auth API Routes - 认证授权 API 路由.
 
-提供用户认证、角色管理的 REST API 端点。
-遵循六边形架构：接口层仅依赖应用层用例和领域端口。
+提供用户认证、角色管理的 REST API 端点
+遵循六边形架构：接口层仅依赖应用层用例和领域端口
 """
 
 from __future__ import annotations
@@ -155,7 +155,7 @@ def create_auth_router(
     permission_service: PermissionServicePort | None = None,
     get_current_user_override: Callable | None = None,
 ) -> APIRouter:
-    """创建认证路由。
+    """创建认证路由
 
     Args:
         auth_service: 认证服务
@@ -182,7 +182,7 @@ def create_auth_router(
         },
     )
     async def login(request: LoginRequest) -> TokenResponse:
-        """用户登录。
+        """用户登录
 
         Args:
             request: 登录请求（username, password）
@@ -232,7 +232,7 @@ def create_auth_router(
         },
     )
     async def refresh_token(request: RefreshTokenRequest) -> TokenResponse:
-        """刷新访问令牌。
+        """刷新访问令牌
 
         Args:
             request: 刷新令牌请求
@@ -271,7 +271,7 @@ def create_auth_router(
         token: str = Depends(oauth2_scheme),
         refresh_token: str | None = None,
     ) -> None:
-        """用户登出。
+        """用户登出
 
         Args:
             token: 当前用户的 access token
@@ -291,7 +291,7 @@ def create_auth_router(
         },
     )
     async def get_me(current_user: TokenPayload = Depends(get_current_user)) -> UserResponse:
-        """获取当前用户信息。
+        """获取当前用户信息
 
         Args:
             current_user: 当前认证用户
@@ -318,7 +318,7 @@ def create_auth_router(
         request: CreateRoleRequest,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
-        """创建新角色。
+        """创建新角色
 
         Args:
             request: 创建角色请求
@@ -363,7 +363,7 @@ def create_auth_router(
     async def list_roles(
         current_user: TokenPayload = Depends(get_current_user),
     ) -> list[RoleResponse]:
-        """获取所有角色。
+        """获取所有角色
 
         Args:
             current_user: 当前认证用户
@@ -397,7 +397,7 @@ def create_auth_router(
         role_id: str,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
-        """获取角色详情。
+        """获取角色详情
 
         Args:
             role_id: 角色 UUID
@@ -441,7 +441,7 @@ def create_auth_router(
         request: UpdateRoleRequest,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
-        """更新角色。
+        """更新角色
 
         Args:
             role_id: 角色 UUID
@@ -504,7 +504,7 @@ def create_auth_router(
         role_id: str,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> None:
-        """删除角色（软删除）。
+        """删除角色（软删除）
 
         Args:
             role_id: 角色 UUID
@@ -552,7 +552,7 @@ def create_auth_router(
         request: AssignPermissionRequest,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
-        """为角色分配权限。
+        """为角色分配权限
 
         Args:
             role_id: 角色 UUID
@@ -613,7 +613,7 @@ def create_auth_router(
         permission: str,
         current_user: TokenPayload = Depends(get_current_user),
     ) -> RoleResponse:
-        """撤销角色的指定权限。
+        """撤销角色的指定权限
 
         Args:
             role_id: 角色 UUID

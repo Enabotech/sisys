@@ -1,7 +1,7 @@
-"""EventOutboxAdapter — DomainEvent ↔ OutboxEntity 转换器。
+"""EventOutboxAdapter — DomainEvent ↔ OutboxEntity 转换器
 
-位于基础设施层，负责领域事件与基础设施实体之间的双向转换。
-使用显式导入 + 惰性构建模式确保事件类型注册表可靠。
+位于基础设施层，负责领域事件与基础设施实体之间的双向转换
+使用显式导入 + 惰性构建模式确保事件类型注册表可靠
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
 
 class EventRegistry:
-    """事件类型注册表 — 显式导入 + 惰性构建。
+    """事件类型注册表 — 显式导入 + 惰性构建
 
     P0-4 修复要点:
     1. 模块顶层显式导入所有事件类 → 确保 __subclasses__() 能发现它们
@@ -80,7 +80,7 @@ class EventOutboxAdapter:
 
     @staticmethod
     def from_domain_event(event: DomainEvent) -> OutboxEntity:
-        """领域事件转 OutboxEntity。
+        """领域事件转 OutboxEntity
 
         Args:
             event: 领域事件实例
@@ -98,11 +98,11 @@ class EventOutboxAdapter:
 
     @staticmethod
     def to_domain_event(entity: OutboxEntity) -> DomainEvent:
-        """OutboxEntity 转领域事件。
+        """OutboxEntity 转领域事件
 
         使用 DomainEvent.from_dict() 而非具体子类.from_dict()，
         因为 from_dict 内部使用 target_class(event_type=...) 构造，
-        而具体子类的 event_type 是 init=False 字段。
+        而具体子类的 event_type 是 init=False 字段
 
         Args:
             entity: OutboxEntity 实例

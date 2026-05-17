@@ -1,7 +1,7 @@
-"""SISYS 领域层登录尝试仓储端口模块。
+"""SISYS 领域层登录尝试仓储端口模块
 
-领域层接口，定义登录尝试跟踪的契约。
-遵循六边形架构：领域层零依赖，仅使用标准库。
+领域层接口，定义登录尝试跟踪的契约
+遵循六边形架构：领域层零依赖，仅使用标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,7 +20,7 @@ from uuid import UUID
 class LoginAttemptRepositoryPort(Protocol):
     """登录尝试仓储端口（领域层定义，仅使用标准库）
 
-    负责跟踪用户登录失败尝试，用于实现账户锁定功能。
+    负责跟踪用户登录失败尝试，用于实现账户锁定功能
     """
 
     async def record_attempt(
@@ -32,7 +32,7 @@ class LoginAttemptRepositoryPort(Protocol):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> None:
-        """记录登录尝试。
+        """记录登录尝试
 
         Args:
             username: 用户名
@@ -44,7 +44,7 @@ class LoginAttemptRepositoryPort(Protocol):
         """
 
     async def get_recent_failed_attempts(self, username: str) -> int:
-        """获取最近的失败尝试次数。
+        """获取最近的失败尝试次数
 
         Args:
             username: 用户名
@@ -54,7 +54,7 @@ class LoginAttemptRepositoryPort(Protocol):
         """
 
     async def is_account_locked(self, username: str) -> bool:
-        """检查账户是否被锁定。
+        """检查账户是否被锁定
 
         Args:
             username: 用户名
@@ -64,7 +64,7 @@ class LoginAttemptRepositoryPort(Protocol):
         """
 
     async def get_lockout_remaining_minutes(self, username: str) -> int:
-        """获取账户剩余锁定时间。
+        """获取账户剩余锁定时间
 
         Args:
             username: 用户名
@@ -74,7 +74,7 @@ class LoginAttemptRepositoryPort(Protocol):
         """
 
     async def clear_attempts(self, username: str) -> None:
-        """清除用户的登录尝试记录。
+        """清除用户的登录尝试记录
 
         Args:
             username: 用户名
@@ -89,9 +89,9 @@ class LoginAttemptRepositoryPort(Protocol):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> tuple[bool, int]:
-        """原子操作：检查账户是否锁定并记录尝试。
+        """原子操作：检查账户是否锁定并记录尝试
 
-        解决登录锁定竞态条件问题 - 在同一事务中完成检查和记录。
+        解决登录锁定竞态条件问题 - 在同一事务中完成检查和记录
 
         Args:
             username: 用户名
@@ -114,9 +114,9 @@ class LoginAttemptRepositoryPort(Protocol):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> tuple[bool, int]:
-        """记录登录尝试并检查账户锁定状态。
+        """记录登录尝试并检查账户锁定状态
 
-        与 check_and_record_lockout 相同，但方法名与 AuthServiceImpl 调用保持一致。
+        与 check_and_record_lockout 相同，但方法名与 AuthServiceImpl 调用保持一致
 
         Args:
             username: 用户名

@@ -1,6 +1,6 @@
-"""SISYS 领域层合规性网关端口模块。
+"""SISYS 领域层合规性网关端口模块
 
-遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库。
+遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,11 +21,11 @@ from src.domain.value_objects.udmr_task import UDMRTask
 class ComplianceGatewayPort(Protocol):
     """合规性网关端口（协议接口）.
 
-    UDMR L1 合规性网关，负责在路由决策前进行合规检查。
+    UDMR L1 合规性网关，负责在路由决策前进行合规检查
     """
 
     async def check(self, task: UDMRTask) -> ComplianceResult:
-        """执行合规性检查。
+        """执行合规性检查
 
         Args:
             task: UDMR 路由任务

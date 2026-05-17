@@ -1,6 +1,6 @@
-"""SISYS 领域层战略规划实体模块。
+"""SISYS 领域层战略规划实体模块
 
-定义战略规划领域实体，遵循 BLM 六阶段模型。
+定义战略规划领域实体，遵循 BLM 六阶段模型
 
 Author:
     agimtech <agimtech@126.com>
@@ -39,7 +39,7 @@ class PlanStatus(str, Enum):
 
 @dataclass
 class StrategicPlan:
-    """战略规划实体，遵循 BLM 六阶段模型。
+    """战略规划实体，遵循 BLM 六阶段模型
 
     不变量约束:
     - plan_id 必须为有效 UUID
@@ -58,13 +58,13 @@ class StrategicPlan:
     completed_phases: list[BLMPhase] = field(default_factory=list)
 
     def validate(self) -> bool:
-        """验证不变量约束。
+        """验证不变量约束
 
         Returns:
-            所有不变量满足时返回 True。
+            所有不变量满足时返回 True
 
         Raises:
-            ValueError: 任何不变量违反时抛出。
+            ValueError: 任何不变量违反时抛出
         """
         if not isinstance(self.plan_id, uuid.UUID):
             raise ValueError("plan_id must be a valid UUID")
@@ -81,13 +81,13 @@ class StrategicPlan:
         return True
 
     def advance_phase(self, next_phase: BLMPhase) -> None:
-        """推进到下一个 BLM 阶段。
+        """推进到下一个 BLM 阶段
 
         Args:
-            next_phase: 要推进到的下一个 BLM 阶段。
+            next_phase: 要推进到的下一个 BLM 阶段
 
         Raises:
-            ValueError: 阶段转换无效或规划已归档/审批通过时抛出。
+            ValueError: 阶段转换无效或规划已归档/审批通过时抛出
         """
         # P0-03: Status guard — cannot advance archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):
@@ -112,10 +112,10 @@ class StrategicPlan:
         self.updated_at = datetime.now(UTC)
 
     def complete_phase(self) -> None:
-        """标记当前阶段为已完成并自动推进。
+        """标记当前阶段为已完成并自动推进
 
         Raises:
-            ValueError: 规划已归档/审批通过或已处于最终阶段时抛出。
+            ValueError: 规划已归档/审批通过或已处于最终阶段时抛出
         """
         # Status guard — cannot complete archived or approved plans
         if self.status in (PlanStatus.ARCHIVED, PlanStatus.APPROVED):

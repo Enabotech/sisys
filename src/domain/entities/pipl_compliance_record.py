@@ -1,6 +1,6 @@
-"""SISYS 领域层 PIPL 合规记录实体模块。
+"""SISYS 领域层 PIPL 合规记录实体模块
 
-定义个人信息保护法合规记录领域实体，遵循六边形架构：领域层零依赖。
+定义个人信息保护法合规记录领域实体，遵循六边形架构：领域层零依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -66,7 +66,7 @@ class PIPLComplianceRecord:
     guardian_consent_obtained: bool = False
 
     def validate_consent(self) -> bool:
-        """验证同意是否有效。
+        """验证同意是否有效
 
         Returns:
             True 如果同意状态为 GIVEN
@@ -74,7 +74,7 @@ class PIPLComplianceRecord:
         return self.consent_status == ConsentStatus.GIVEN
 
     def is_compliant(self) -> bool:
-        """检查处理是否合规。
+        """检查处理是否合规
 
         Returns:
             True 如果合规（同意有效或非同意法律依据）
@@ -84,7 +84,7 @@ class PIPLComplianceRecord:
         return True
 
     def validate_minor_consent(self) -> bool:
-        """验证未成年人同意是否有效。
+        """验证未成年人同意是否有效
 
         Returns:
             True 如果不是未成年人，或未成年人已获得监护人同意

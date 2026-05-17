@@ -1,7 +1,7 @@
 """Unit tests for PostgreSQLMemoryMetadataRepository.
 
 TDD 阶段：红 → 绿
-验证 PostgreSQL 记忆元数据仓储 CRUD 操作。
+验证 PostgreSQL 记忆元数据仓储 CRUD 操作
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""SISYS 基础设施层合规性网关模块。
+"""SISYS 基础设施层合规性网关模块
 
-UDMR L1 合规性网关实现，协调敏感数据检测、数据驻留强制、白名单验证、PIPL 合规和跨境传输审批。
+UDMR L1 合规性网关实现，协调敏感数据检测、数据驻留强制、白名单验证、PIPL 合规和跨境传输审批
 
 Author:
     agimtech <agimtech@126.com>
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class ComplianceGatewayImpl(ComplianceGatewayPort):
-    """UDMR L1 合规性网关实现，协调多个子服务进行综合合规检查。
+    """UDMR L1 合规性网关实现，协调多个子服务进行综合合规检查
 
     Attributes:
         _sensitive_data_detector: 敏感数据检测服务
@@ -61,9 +61,9 @@ class ComplianceGatewayImpl(ComplianceGatewayPort):
         self._cross_border_service = cross_border_service
 
     async def check(self, task: UDMRTask) -> ComplianceResult:
-        """执行合规性检查。
+        """执行合规性检查
 
-        综合检查敏感数据、数据驻留、白名单、PIPL合规和跨境传输。
+        综合检查敏感数据、数据驻留、白名单、PIPL合规和跨境传输
 
         Args:
             task: UDMR 路由任务
@@ -147,7 +147,7 @@ class ComplianceGatewayImpl(ComplianceGatewayPort):
         )
 
     def _is_overseas_model(self, model: str) -> bool:
-        """检查是否为海外模型。
+        """检查是否为海外模型
 
         Args:
             model: 模型标识
@@ -168,7 +168,7 @@ class ComplianceGatewayImpl(ComplianceGatewayPort):
         return model.startswith(overseas_prefixes)
 
     def _contains_personal_data(self, text: str) -> bool:
-        """检查文本是否包含个人信息。
+        """检查文本是否包含个人信息
 
         Args:
             text: 待检测文本

@@ -1,7 +1,7 @@
-"""SISYS 领域层 发布结果类型模块。
+"""SISYS 领域层 发布结果类型模块
 
-领域层定义，用于返回发布操作的结果。
-使用DomainEvent作为基础，不感知传输细节。
+领域层定义，用于返回发布操作的结果
+使用DomainEvent作为基础，不感知传输细节
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PublishResult:
-    """发布结果，包含各通道状态。
+    """发布结果，包含各通道状态
 
     语义定义：
     - redis_success: Redis 通道是否成功（尽力而为，可能丢失）

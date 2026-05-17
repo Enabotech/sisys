@@ -1,6 +1,6 @@
-"""OutboxEntity — 基础设施层定义。
+"""OutboxEntity — 基础设施层定义
 
-位于基础设施层，领域层不导入此模块。
+位于基础设施层，领域层不导入此模块
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ __all__ = ["InvalidStateTransitionError", "OutboxEntity"]
 
 @dataclass
 class OutboxEntity:
-    """事务发件箱实体（基础设施层）。
+    """事务发件箱实体（基础设施层）
 
-    对应 PostgreSQL event_outbox 表。
+    对应 PostgreSQL event_outbox 表
     状态机: pending → published/failed, failed → pending(重试)/archived(终态)
     """
 

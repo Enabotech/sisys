@@ -1,6 +1,6 @@
 """End-to-end Integration Tests for Async Port Adapters (Task 13).
 
-验证完整调用链的异步 Port 适配器实现。
+验证完整调用链的异步 Port 适配器实现
 
 验证标准（AC-12）:
 - [ ] 异步文件操作（write/read/delete）验证

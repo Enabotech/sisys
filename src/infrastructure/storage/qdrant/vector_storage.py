@@ -1,6 +1,6 @@
-"""Qdrant 向量存储实现。
+"""Qdrant 向量存储实现
 
-提供向量点的增删查和 Dense/Sparse 检索功能。
+提供向量点的增删查和 Dense/Sparse 检索功能
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ from src.infrastructure.storage.qdrant.models import SparseVector, VectorPoint
 
 
 class QdrantVectorStorage:
-    """Qdrant 向量存储实现。
+    """Qdrant 向量存储实现
 
-    实现 VectorStorage 接口，提供向量点 CRUD 和检索功能。
+    实现 VectorStorage 接口，提供向量点 CRUD 和检索功能
     """
 
     def __init__(self, client: AsyncQdrantClient):
-        """初始化向量存储。
+        """初始化向量存储
 
         Args:
             client: Qdrant 异步客户端实例
@@ -39,9 +39,9 @@ class QdrantVectorStorage:
         self._client = client
 
     def _normalize_point_id(self, point_id: str) -> int:
-        """规范化向量点 ID，确保 Qdrant 接受。
+        """规范化向量点 ID，确保 Qdrant 接受
 
-        Qdrant v1.7.x 要求 ID 为无符号整数或 UUID。
+        Qdrant v1.7.x 要求 ID 为无符号整数或 UUID
         对于字符串 ID：
         - 纯数字字符串转换为整数
         - 小整数（<1000）使用 hash 映射到有效范围避免被拒绝
@@ -61,7 +61,7 @@ class QdrantVectorStorage:
             return abs(hash(point_id)) % (2**31)
 
     async def upsert_points(self, collection: str, points: list[VectorPoint]) -> bool:
-        """批量插入或更新向量点。
+        """批量插入或更新向量点
 
         Args:
             collection: Collection 名称
@@ -90,7 +90,7 @@ class QdrantVectorStorage:
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """Dense 语义检索。
+        """Dense 语义检索
 
         Args:
             collection: Collection 名称
@@ -144,7 +144,7 @@ class QdrantVectorStorage:
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """BM25 稀疏检索。
+        """BM25 稀疏检索
 
         Args:
             collection: Collection 名称
@@ -188,7 +188,7 @@ class QdrantVectorStorage:
             return []
 
     async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
-        """删除向量点。
+        """删除向量点
 
         Args:
             collection: Collection 名称
@@ -205,7 +205,7 @@ class QdrantVectorStorage:
         return True
 
     async def get_point(self, collection: str, point_id: str) -> dict | None:
-        """获取单个向量点。
+        """获取单个向量点
 
         Args:
             collection: Collection 名称

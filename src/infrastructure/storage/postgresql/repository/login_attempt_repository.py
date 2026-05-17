@@ -1,6 +1,6 @@
-"""LoginAttemptRepository — 登录尝试仓储实现。
+"""LoginAttemptRepository — 登录尝试仓储实现
 
-用于跟踪用户登录失败尝试，实现账户锁定功能。
+用于跟踪用户登录失败尝试，实现账户锁定功能
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
@@ -20,9 +20,9 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class LoginAttemptRepository(LoginAttemptRepositoryPort):
-    """登录尝试仓储实现。
+    """登录尝试仓储实现
 
-    跟踪登录失败尝试，用于实现账户锁定（等保 2.0 合规）。
+    跟踪登录失败尝试，用于实现账户锁定（等保 2.0 合规）
     """
 
     MAX_LOGIN_ATTEMPTS = 5
@@ -41,7 +41,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> None:
-        """记录登录尝试。
+        """记录登录尝试
 
         Args:
             username: 用户名
@@ -65,7 +65,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         await self._session.flush()
 
     async def get_recent_failed_attempts(self, username: str) -> int:
-        """获取最近的失败尝试次数。
+        """获取最近的失败尝试次数
 
         Args:
             username: 用户名
@@ -95,7 +95,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         return len(attempts)
 
     async def is_account_locked(self, username: str) -> bool:
-        """检查账户是否被锁定。
+        """检查账户是否被锁定
 
         Args:
             username: 用户名
@@ -108,7 +108,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         return recent_failures >= self.MAX_LOGIN_ATTEMPTS
 
     async def get_lockout_remaining_minutes(self, username: str) -> int:
-        """获取账户剩余锁定时间。
+        """获取账户剩余锁定时间
 
         Args:
             username: 用户名
@@ -149,7 +149,7 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         return int(remaining)
 
     async def clear_attempts(self, username: str) -> None:
-        """清除用户的登录尝试记录（在成功登录后调用）。
+        """清除用户的登录尝试记录（在成功登录后调用）
 
         Args:
             username: 用户名
@@ -168,10 +168,10 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> tuple[bool, int]:
-        """原子操作：检查账户是否锁定（基于当前已有记录，不记录新尝试）。
+        """原子操作：检查账户是否锁定（基于当前已有记录，不记录新尝试）
 
-        用于在认证流程开始前检查是否已达到锁定阈值。
-        实际的记录操作由调用方在确定时机执行。
+        用于在认证流程开始前检查是否已达到锁定阈值
+        实际的记录操作由调用方在确定时机执行
 
         Args:
             username: 用户名
@@ -201,9 +201,9 @@ class LoginAttemptRepository(LoginAttemptRepositoryPort):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> tuple[bool, int]:
-        """原子操作：记录尝试并检查账户是否因此被锁定。
+        """原子操作：记录尝试并检查账户是否因此被锁定
 
-        在记录新尝试后立即检查是否达到锁定阈值，解决竞态条件。
+        在记录新尝试后立即检查是否达到锁定阈值，解决竞态条件
 
         Args:
             username: 用户名

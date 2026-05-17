@@ -1,6 +1,6 @@
 """Permission Service - 应用层权限服务实现.
 
-遵循六边形架构：应用层服务，实现 PermissionServicePort 接口。
+遵循六边形架构：应用层服务，实现 PermissionServicePort 接口
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 class PermissionService(PermissionServicePort):
     """权限服务实现.
 
-    负责权限检查和用户权限查询。
-    遵循六边形架构：通过仓储端口访问数据，不直接依赖基础设施。
+    负责权限检查和用户权限查询
+    遵循六边形架构：通过仓储端口访问数据，不直接依赖基础设施
     """
 
     def __init__(

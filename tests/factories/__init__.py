@@ -1,7 +1,7 @@
 """
-测试数据工厂 - Factory Boy 实现。
+测试数据工厂 - Factory Boy 实现
 
-提供可复用的测试数据构建器，支持复杂对象构建。
+提供可复用的测试数据构建器，支持复杂对象构建
 """
 
 import uuid
@@ -15,9 +15,9 @@ from src.domain.entities.strategic_plan import PlanStatus, StrategicPlan
 
 class StrategicPlanFactory(factory.Factory):
     """
-    战略规划工厂。
+    战略规划工厂
 
-    使用 Factory Boy 模式创建战略规划测试数据。
+    使用 Factory Boy 模式创建战略规划测试数据
     """
 
     class Meta:
@@ -45,9 +45,9 @@ class StrategicPlanFactory(factory.Factory):
 
 class AgentFactory(factory.Factory):
     """
-    Agent 工厂。
+    Agent 工厂
 
-    使用 Factory Boy 模式创建 Agent 测试数据。
+    使用 Factory Boy 模式创建 Agent 测试数据
     """
 
     class Meta:
@@ -62,9 +62,9 @@ class AgentFactory(factory.Factory):
 
 class TestDataBuilder:
     """
-    通用测试数据构建器。
+    通用测试数据构建器
 
-    提供链式 API 构建任意测试数据。
+    提供链式 API 构建任意测试数据
     """
 
     def __init__(self, base_data: dict[str, Any] | None = None):

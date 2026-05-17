@@ -1,6 +1,6 @@
-"""SISYS 基础设施层权限服务模块。
+"""SISYS 基础设施层权限服务模块
 
-基于 PermissionServicePort 接口实现权限检查、角色分配和权限查询功能。
+基于 PermissionServicePort 接口实现权限检查、角色分配和权限查询功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,7 +19,7 @@ from src.domain.ports.user_role_repository import UserRoleRepositoryPort
 
 
 class PermissionServiceImpl(PermissionServicePort):
-    """权限服务实现，负责权限检查和用户权限查询。
+    """权限服务实现，负责权限检查和用户权限查询
 
     Attributes:
         _user_role_repo: 用户-角色关联仓储端口
@@ -119,7 +119,7 @@ class PermissionServiceImpl(PermissionServicePort):
         return False
 
     async def assign_role(self, user_id: UUID, role_id: UUID, grant_actor: str) -> bool:
-        """分配角色给用户。
+        """分配角色给用户
 
         Args:
             user_id: 用户 ID
@@ -143,7 +143,7 @@ class PermissionServiceImpl(PermissionServicePort):
         return result
 
     async def revoke_role(self, user_id: UUID, role_id: UUID, revoke_actor: str) -> bool:
-        """撤销用户的角色。
+        """撤销用户的角色
 
         Args:
             user_id: 用户 ID
@@ -174,7 +174,7 @@ class PermissionServiceImpl(PermissionServicePort):
         old_value: dict | None = None,
         new_value: dict | None = None,
     ) -> None:
-        """发布审计事件。
+        """发布审计事件
 
         Args:
             action_type: 操作类型

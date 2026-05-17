@@ -1,6 +1,6 @@
-"""Neo4j 图存储实现。
+"""Neo4j 图存储实现
 
-提供 Cypher 查询执行和图遍历功能。
+提供 Cypher 查询执行和图遍历功能
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ from neo4j import AsyncDriver
 
 
 class Neo4jGraphStorage:
-    """Neo4j 图存储实现。
+    """Neo4j 图存储实现
 
-    实现 GraphStorage 接口，提供 Cypher 查询和图遍历功能。
+    实现 GraphStorage 接口，提供 Cypher 查询和图遍历功能
     """
 
     def __init__(self, driver: AsyncDriver, database: str = "neo4j"):
-        """初始化图存储。
+        """初始化图存储
 
         Args:
             driver: Neo4j 异步驱动实例
@@ -28,7 +28,7 @@ class Neo4jGraphStorage:
         self._database = database
 
     async def execute_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
-        """执行只读 Cypher 查询。
+        """执行只读 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -44,7 +44,7 @@ class Neo4jGraphStorage:
             return records
 
     async def execute_write_query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
-        """执行写入 Cypher 查询。
+        """执行写入 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -60,7 +60,7 @@ class Neo4jGraphStorage:
             return records
 
     async def find_path(self, start_id: str, end_id: str, max_depth: int = 3) -> list[dict]:
-        """查找两个节点之间的路径。
+        """查找两个节点之间的路径
 
         Args:
             start_id: 起始节点 ID
@@ -91,7 +91,7 @@ class Neo4jGraphStorage:
         rel_type: str | None = None,
         direction: str = "BOTH",
     ) -> list[dict]:
-        """获取节点的邻居节点。
+        """获取节点的邻居节点
 
         Args:
             node_id: 节点 ID

@@ -1,7 +1,7 @@
 """Tests for MinIOAdapter — L4ObjectPort implementation.
 
-验证适配器正确委托仓储操作，实现 L4ObjectPort 接口。
-架构意义：薄适配器层，流式操作防 OOM。
+验证适配器正确委托仓储操作，实现 L4ObjectPort 接口
+架构意义：薄适配器层，流式操作防 OOM
 """
 
 from __future__ import annotations

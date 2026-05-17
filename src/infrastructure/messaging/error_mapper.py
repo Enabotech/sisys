@@ -1,7 +1,7 @@
 """外部 SDK 错误到异常的标准化映射.
 
-优先使用类型匹配（isinstance）而非字符串匹配。
-对于 MinIO S3Error，应使用 error.code 属性直接映射。
+优先使用类型匹配（isinstance）而非字符串匹配
+对于 MinIO S3Error，应使用 error.code 属性直接映射
 """
 
 from __future__ import annotations
@@ -138,9 +138,9 @@ def with_error_mapping(
     *,
     exact_match: bool = False,
 ) -> Callable:
-    """装饰器：自动映射外部错误。
+    """装饰器：自动映射外部错误
 
-    注意：这是兜底方案。优先使用 ErrorMapper.map_* 方法直接映射。
+    注意：这是兜底方案。优先使用 ErrorMapper.map_* 方法直接映射
 
     Args:
         error_map: 错误码到异常类的映射

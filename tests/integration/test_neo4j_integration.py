@@ -1,6 +1,6 @@
-"""Neo4j 端到端集成测试（Mock 版本）。
+"""Neo4j 端到端集成测试（Mock 版本）
 
-验证完整节点/关系/查询流程，使用 Mock 客户端替代真实 Neo4j 实例。
+验证完整节点/关系/查询流程，使用 Mock 客户端替代真实 Neo4j 实例
 """
 
 from __future__ import annotations

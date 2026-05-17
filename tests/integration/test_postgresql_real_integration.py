@@ -1,7 +1,7 @@
 """PostgreSQL Real Instance Integration Tests.
 
-端到端测试，验证真实 PostgreSQL 实例上的数据库操作。
-使用真实的 PostgreSQL 部署（localhost:5432），不使用 mock。
+端到端测试，验证真实 PostgreSQL 实例上的数据库操作
+使用真实的 PostgreSQL 部署（localhost:5432），不使用 mock
 
 运行方式:
     pytest tests/integration/test_postgresql_real_integration.py -v

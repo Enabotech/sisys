@@ -1,6 +1,6 @@
-"""InMemoryEventStore 单元测试。
+"""InMemoryEventStore 单元测试
 
-验证 InMemoryEventStore 正确实现事件存储接口。
+验证 InMemoryEventStore 正确实现事件存储接口
 """
 
 from __future__ import annotations

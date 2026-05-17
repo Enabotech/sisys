@@ -1,6 +1,6 @@
-"""SISYS 领域层权限异常模块。
+"""SISYS 领域层权限异常模块
 
-定义权限相关异常，如 Token 信息不足等。
+定义权限相关异常，如 Token 信息不足等
 
 异常来源：
 - src/infrastructure/security/permission_middleware.py → InsufficientTokenError
@@ -18,11 +18,11 @@ from src.domain.exceptions.business_exceptions import PermissionDeniedError
 
 
 class InsufficientTokenError(PermissionDeniedError):
-    """Token 信息不足异常。
+    """Token 信息不足异常
 
     Attributes:
-        code: 异常编码。
-        message: 异常消息。
+        code: 异常编码
+        message: 异常消息
     """
 
     code = "EXCEPTION_204"

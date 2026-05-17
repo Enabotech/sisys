@@ -1,6 +1,6 @@
-"""SISYS 基础设施层密码验证服务模块。
+"""SISYS 基础设施层密码验证服务模块
 
-基于等保 2.0 三级要求实现密码复杂度验证功能。
+基于等保 2.0 三级要求实现密码复杂度验证功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -18,9 +18,9 @@ from src.domain.ports.password_validation_service import (
 
 
 class PasswordValidationService(PasswordValidationServicePort):
-    """密码验证服务实现，满足等保 2.0 三级密码复杂度要求。
+    """密码验证服务实现，满足等保 2.0 三级密码复杂度要求
 
-    要求至少 8 字符、包含大小写字母、数字和特殊字符。
+    要求至少 8 字符、包含大小写字母、数字和特殊字符
 
     Attributes:
         MIN_LENGTH: 密码最小长度常量
@@ -37,7 +37,7 @@ class PasswordValidationService(PasswordValidationServicePort):
     }
 
     def validate(self, password: str) -> None:
-        """验证密码复杂度。
+        """验证密码复杂度
 
         Args:
             password: 明文密码
@@ -69,7 +69,7 @@ class PasswordValidationService(PasswordValidationServicePort):
             )
 
     def get_requirements(self) -> dict[str, str]:
-        """获取密码复杂度要求描述。
+        """获取密码复杂度要求描述
 
         Returns:
             密码要求字典

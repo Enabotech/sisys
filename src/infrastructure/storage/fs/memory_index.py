@@ -1,6 +1,6 @@
-"""MemoryIndex — 记忆索引管理。
+"""MemoryIndex — 记忆索引管理
 
-实现 IndexManagerPort 接口，提供异步索引操作能力。
+实现 IndexManagerPort 接口，提供异步索引操作能力
 
 设计原则：
 - 所有方法使用 to_thread 封装同步 I/O 操作
@@ -11,7 +11,7 @@
 截断策略：超过 200 行时保留最新 200 行（按写入顺序）
 并发安全：使用 fcntl.flock 文件锁
 
-调用方式：由 MemoryChangedListener 事件驱动调用（不从 MemoryService 直接调用）。
+调用方式：由 MemoryChangedListener 事件驱动调用（不从 MemoryService 直接调用）
 
 架构来源: architecture.md §11.2.3
 """
@@ -31,17 +31,17 @@ INDEX_LINE_PATTERN = re.compile(r"^- \[(\S+)\]\((\S+)\) — (.+)$")
 
 
 class MemoryIndex(IndexManagerPort):
-    """记忆索引管理器。
+    """记忆索引管理器
 
-    实现 IndexManagerPort 接口，负责 MEMORY.md 索引的读取、更新、搜索和截断。
-    所有方法使用 to_thread 封装同步 I/O 操作，保留 fcntl.flock 锁语义。
-    事件驱动：由 MemoryChangedListener 调用。
+    实现 IndexManagerPort 接口，负责 MEMORY.md 索引的读取、更新、搜索和截断
+    所有方法使用 to_thread 封装同步 I/O 操作，保留 fcntl.flock 锁语义
+    事件驱动：由 MemoryChangedListener 调用
     """
 
     MAX_INDEX_LINES = 200  # 索引最大行数
 
     def __init__(self, config: MemoryConfig):
-        """初始化 MemoryIndex。
+        """初始化 MemoryIndex
 
         Args:
             config: MemoryConfig 配置实例
@@ -55,9 +55,9 @@ class MemoryIndex(IndexManagerPort):
     # ========================================================================
 
     async def update_entry(self, entry: dict) -> None:
-        """更新索引条目（使用 to_thread 保留锁语义）。
+        """更新索引条目（使用 to_thread 保留锁语义）
 
-        如果 memory_id 已存在则更新，否则追加。
+        如果 memory_id 已存在则更新，否则追加
 
         Args:
             entry: 索引条目，包含 name, type, memory_id, description
@@ -97,7 +97,7 @@ class MemoryIndex(IndexManagerPort):
         await asyncio.to_thread(_do_update)
 
     async def remove_entry(self, memory_id: str) -> None:
-        """移除索引条目（使用 to_thread 保留锁语义）。
+        """移除索引条目（使用 to_thread 保留锁语义）
 
         Args:
             memory_id: 记忆 ID
@@ -111,7 +111,7 @@ class MemoryIndex(IndexManagerPort):
         await asyncio.to_thread(_do_remove)
 
     async def read_entries(self) -> list[dict]:
-        """读取所有索引条目（使用 to_thread 保留锁语义）。
+        """读取所有索引条目（使用 to_thread 保留锁语义）
 
         Returns:
             索引条目列表
@@ -119,7 +119,7 @@ class MemoryIndex(IndexManagerPort):
         return await asyncio.to_thread(self._read_entries_locked)
 
     async def search(self, query: str) -> list[dict]:
-        """搜索索引条目。
+        """搜索索引条目
 
         Args:
             query: 搜索关键词（匹配名称）
@@ -132,9 +132,9 @@ class MemoryIndex(IndexManagerPort):
         return [e for e in entries if query_lower in e["name"].lower()]
 
     async def truncate(self) -> None:
-        """截断索引到最大行数（使用 to_thread 保留锁语义）。
+        """截断索引到最大行数（使用 to_thread 保留锁语义）
 
-        保留最新 MAX_INDEX_LINES 行（按文件顺序，最后写入的在末尾）。
+        保留最新 MAX_INDEX_LINES 行（按文件顺序，最后写入的在末尾）
         """
 
         def _do_truncate():
@@ -166,7 +166,7 @@ class MemoryIndex(IndexManagerPort):
     # ========================================================================
 
     def _read_entries_locked(self) -> list[dict]:
-        """带锁读取索引条目。
+        """带锁读取索引条目
 
         Returns:
             索引条目列表
@@ -184,7 +184,7 @@ class MemoryIndex(IndexManagerPort):
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _write_entries_locked(self, entries: list[dict]) -> None:
-        """带锁写入索引条目。
+        """带锁写入索引条目
 
         Args:
             entries: 索引条目列表
@@ -211,7 +211,7 @@ class MemoryIndex(IndexManagerPort):
         self._lock_path.touch(exist_ok=True)
 
     def _parse_index(self, content: str) -> list[dict]:
-        """解析索引内容。
+        """解析索引内容
 
         Args:
             content: 索引文件内容
@@ -250,7 +250,7 @@ class MemoryIndex(IndexManagerPort):
         return entries
 
     def _format_entries(self, entries: list[dict]) -> str:
-        """格式化索引条目为文本。
+        """格式化索引条目为文本
 
         Args:
             entries: 索引条目列表

@@ -1,7 +1,7 @@
 """Tests for QdrantMemoryVectorStorage — MemoryVectorPort implementation.
 
-验证存储包装器正确委托 QdrantAdapter，并实现记忆向量特有语义。
-架构意义：组合注入适配器，添加业务语义层。
+验证存储包装器正确委托 QdrantAdapter，并实现记忆向量特有语义
+架构意义：组合注入适配器，添加业务语义层
 """
 
 from __future__ import annotations

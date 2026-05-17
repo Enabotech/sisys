@@ -1,6 +1,6 @@
-"""SISYS 基础设施层认证服务模块。
+"""SISYS 基础设施层认证服务模块
 
-基于 AuthServicePort 接口实现用户认证、JWT 令牌管理和登录尝试记录功能。
+基于 AuthServicePort 接口实现用户认证、JWT 令牌管理和登录尝试记录功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,7 +20,7 @@ from src.infrastructure.security.jwt_service import JWTService
 
 
 class AuthServiceImpl(AuthServicePort):
-    """认证服务实现，负责用户认证和 JWT 令牌管理。
+    """认证服务实现，负责用户认证和 JWT 令牌管理
 
     Attributes:
         _jwt_service: JWT 令牌服务实例
@@ -163,7 +163,7 @@ class AuthServiceImpl(AuthServicePort):
         old_value: dict | None = None,
         new_value: dict | None = None,
     ) -> None:
-        """发布审计事件。
+        """发布审计事件
 
         Args:
             action_type: 操作类型
@@ -199,7 +199,7 @@ class AuthServiceImpl(AuthServicePort):
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> None:
-        """记录登录尝试。
+        """记录登录尝试
 
         Args:
             username: 用户名
@@ -305,7 +305,7 @@ class AuthServiceImpl(AuthServicePort):
         )
 
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
-        """用户登出，撤销 JWT token。
+        """用户登出，撤销 JWT token
 
         Args:
             token: 要撤销的 JWT access token
@@ -326,10 +326,10 @@ class AuthServiceImpl(AuthServicePort):
         )
 
     async def _revoke_user_token_family(self, user_id: UUID) -> None:
-        """撤销用户的所有 token（token family）。
+        """撤销用户的所有 token（token family）
 
-        当检测到 refresh token 被重用时，调用此方法撤销该用户的所有 token。
-        这确保攻击者无法使用该用户任何其他的 refresh token。
+        当检测到 refresh token 被重用时，调用此方法撤销该用户的所有 token
+        这确保攻击者无法使用该用户任何其他的 refresh token
 
         Args:
             user_id: 用户 UUID
@@ -348,7 +348,7 @@ class AuthServiceImpl(AuthServicePort):
             pass
 
     async def _get_user_roles(self, user_id: UUID) -> list[str]:
-        """获取用户的角色列表。
+        """获取用户的角色列表
 
         Args:
             user_id: 用户 UUID

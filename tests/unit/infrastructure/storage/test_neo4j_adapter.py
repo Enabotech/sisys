@@ -1,7 +1,7 @@
 """Tests for Neo4jAdapter — L5GraphPort implementation.
 
-验证适配器正确委托存储操作，实现 L5GraphPort 接口。
-架构意义：薄适配器层，使用 memory_id 作为实体主键。
+验证适配器正确委托存储操作，实现 L5GraphPort 接口
+架构意义：薄适配器层，使用 memory_id 作为实体主键
 """
 
 from __future__ import annotations

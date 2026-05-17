@@ -1,7 +1,7 @@
-"""UserRoleRepository — 用户-角色关联仓储实现。
+"""UserRoleRepository — 用户-角色关联仓储实现
 
-实现 UserRoleRepositoryPort 端口，从 user_roles 关联表操作数据。
-遵循六边形架构：基础设施层实现，可以导入外部库。
+实现 UserRoleRepositoryPort 端口，从 user_roles 关联表操作数据
+遵循六边形架构：基础设施层实现，可以导入外部库
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
@@ -23,9 +23,9 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class UserRoleRepository(UserRoleRepositoryPort):
-    """用户-角色关联仓储实现。
+    """用户-角色关联仓储实现
 
-    负责用户和角色之间的关联关系，实现 UserRoleRepositoryPort 端口。
+    负责用户和角色之间的关联关系，实现 UserRoleRepositoryPort 端口
     """
 
     @property
@@ -33,7 +33,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
         return get_session()
 
     async def assign_role(self, user_id: UUID, role_id: UUID) -> bool:
-        """分配角色给用户。
+        """分配角色给用户
 
         Args:
             user_id: 用户 UUID
@@ -58,7 +58,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
         return True
 
     async def revoke_role(self, user_id: UUID, role_id: UUID) -> bool:
-        """撤销用户的角色。
+        """撤销用户的角色
 
         Args:
             user_id: 用户 UUID
@@ -79,7 +79,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
         return cursor_result.rowcount > 0
 
     async def get_user_roles(self, user_id: UUID) -> list["Role"]:
-        """获取用户的所有角色。
+        """获取用户的所有角色
 
         Args:
             user_id: 用户 UUID
@@ -114,7 +114,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
         return roles
 
     async def _get_permissions_for_role(self, role_id: UUID) -> tuple[str, ...]:
-        """从关联表获取角色的权限字符串元组。
+        """从关联表获取角色的权限字符串元组
 
         Args:
             role_id: 角色 UUID
@@ -135,7 +135,7 @@ class UserRoleRepository(UserRoleRepositoryPort):
         return tuple(r[0] for r in result.fetchall())
 
     async def get_role_users(self, role_id: UUID) -> list[UUID]:
-        """获取拥有某角色的所有用户 ID。
+        """获取拥有某角色的所有用户 ID
 
         Args:
             role_id: 角色 UUID

@@ -1,7 +1,7 @@
-"""StoragePolicyService 单元测试。
+"""StoragePolicyService 单元测试
 
-验证存储层级策略服务正确实现。
-参考 architecture.md §11.2.11 验收标准。
+验证存储层级策略服务正确实现
+参考 architecture.md §11.2.11 验收标准
 """
 
 from __future__ import annotations

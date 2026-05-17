@@ -1,6 +1,6 @@
-"""SISYS 领域层敏感数据检测结果实体模块。
+"""SISYS 领域层敏感数据检测结果实体模块
 
-定义敏感数据检测结果领域实体，遵循六边形架构：领域层零依赖。
+定义敏感数据检测结果领域实体，遵循六边形架构：领域层零依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -49,7 +49,7 @@ class SensitiveDataResult:
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def is_high_confidence(self, threshold: float = 0.8) -> bool:
-        """检查检测置信度是否高于阈值。
+        """检查检测置信度是否高于阈值
 
         Args:
             threshold: 最小置信度阈值，默认 0.8
@@ -60,7 +60,7 @@ class SensitiveDataResult:
         return self.confidence >= threshold
 
     def has_type(self, sensitive_type: SensitiveType) -> bool:
-        """检查结果是否包含指定敏感类型。
+        """检查结果是否包含指定敏感类型
 
         Args:
             sensitive_type: 要检查的敏感数据类型
@@ -71,7 +71,7 @@ class SensitiveDataResult:
         return sensitive_type in self.sensitive_types
 
     def merge_with(self, other: SensitiveDataResult) -> SensitiveDataResult:
-        """合并两个检测结果。
+        """合并两个检测结果
 
         Args:
             other: 另一个检测结果

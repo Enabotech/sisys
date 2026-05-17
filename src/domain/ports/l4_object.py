@@ -1,4 +1,4 @@
-"""SISYS 领域层 L4 MinIO WORM 对象存储抽象端口模块。
+"""SISYS 领域层 L4 MinIO WORM 对象存储抽象端口模块
 
 对应 architecture.md §11.1：
 - 原始文档、证据包存储
@@ -28,7 +28,7 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class L4ObjectPort(Protocol):
-    """L4 MinIO WORM 对象存储接口。
+    """L4 MinIO WORM 对象存储接口
 
     对应 architecture.md §11.1：
     - 原始文档、证据包存储
@@ -43,7 +43,7 @@ class L4ObjectPort(Protocol):
         content_type: str = "application/octet-stream",
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象（流式，防 OOM）。
+        """存储对象（流式，防 OOM）
 
         Args:
             bucket_type: Bucket 类型（如 "raw-documents"）
@@ -62,7 +62,7 @@ class L4ObjectPort(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """流式下载对象（防 OOM）。
+        """流式下载对象（防 OOM）
 
         Args:
             bucket_type: Bucket 类型
@@ -79,7 +79,7 @@ class L4ObjectPort(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象（WORM 锁定对象抛出 ComplianceLockError）。
+        """删除对象（WORM 锁定对象抛出 ComplianceLockError）
 
         Args:
             bucket_type: Bucket 类型
@@ -96,10 +96,10 @@ class L4ObjectPort(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据。
+        """获取对象元数据
 
-        注意：MinIO SDK 对不存在的对象会抛出异常，此方法不返回 None。
-        调用方应使用 try/catch 处理异常。
+        注意：MinIO SDK 对不存在的对象会抛出异常，此方法不返回 None
+        调用方应使用 try/catch 处理异常
 
         Args:
             bucket_type: Bucket 类型
@@ -117,7 +117,7 @@ class L4ObjectPort(Protocol):
         content: bytes | None = None,
         retention_days: int = 2555,  # 7 年
     ) -> str:
-        """归档对象（带 WORM retention）。
+        """归档对象（带 WORM retention）
 
         Args:
             bucket_type: Bucket 类型
@@ -135,7 +135,7 @@ class L4ObjectPort(Protocol):
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象，支持前缀过滤。
+        """列出对象，支持前缀过滤
 
         Args:
             bucket_type: Bucket 类型

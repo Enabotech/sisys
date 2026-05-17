@@ -1,6 +1,6 @@
-"""Monitoring API 端点单元测试。
+"""Monitoring API 端点单元测试
 
-验证 monitoring.py API 路由正确。
+验证 monitoring.py API 路由正确
 Story 1.13: K8s 动态扩缩容
 
 Reference: src/interfaces/api/monitoring.py

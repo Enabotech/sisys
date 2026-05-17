@@ -1,6 +1,6 @@
-"""Bucket 管理器测试。
+"""Bucket 管理器测试
 
-TDD 测试覆盖 BucketManager 的所有公开方法。
+TDD 测试覆盖 BucketManager 的所有公开方法
 """
 
 from __future__ import annotations

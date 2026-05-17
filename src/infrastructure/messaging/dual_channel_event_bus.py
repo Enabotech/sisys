@@ -13,13 +13,13 @@ from src.infrastructure.messaging.redis_event_bus import RedisEventBus
 
 
 class DualChannelEventBus(EventPublisher):
-    """统一双通道事件总线入口。
+    """统一双通道事件总线入口
 
     根据 ChannelRouter 推断 DeliveryMode，将事件路由到对应通道：
     - REALTIME: RedisEventBus (Redis Pub/Sub)
     - RELIABLE: RabbitMQEventBus (Outbox 模式)
 
-    订阅仅支持 REALTIME 模式，RELIABLE 模式抛出 ValueError。
+    订阅仅支持 REALTIME 模式，RELIABLE 模式抛出 ValueError
     """
 
     def __init__(
@@ -28,7 +28,7 @@ class DualChannelEventBus(EventPublisher):
         rabbitmq_bus: RabbitMQEventBus,
         router: ChannelRouter,
     ) -> None:
-        """初始化 DualChannelEventBus。
+        """初始化 DualChannelEventBus
 
         Args:
             redis_bus: Redis 实时通道总线
@@ -40,9 +40,9 @@ class DualChannelEventBus(EventPublisher):
         self._router = router
 
     async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
-        """发布领域事件。
+        """发布领域事件
 
-        根据 DeliveryMode 路由到对应通道。
+        根据 DeliveryMode 路由到对应通道
 
         Args:
             event: 领域事件
@@ -65,7 +65,7 @@ class DualChannelEventBus(EventPublisher):
         event_type: str,
         handler: Any,
     ) -> None:
-        """订阅领域事件（仅支持 REALTIME）。
+        """订阅领域事件（仅支持 REALTIME）
 
         Args:
             event_type: 事件类型

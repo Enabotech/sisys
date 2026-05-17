@@ -1,7 +1,7 @@
-"""SISYS 领域层工作单元模块。
+"""SISYS 领域层工作单元模块
 
-用于统一事务边界，保证业务操作与 Outbox 写入原子性。
-仅定义抽象接口，无外部依赖。
+用于统一事务边界，保证业务操作与 Outbox 写入原子性
+仅定义抽象接口，无外部依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class UnitOfWork(Protocol):
-    """抽象工作单元接口。
+    """抽象工作单元接口
 
-    定义事务边界：begin(), commit(), rollback(), close()。
-    支持异步上下文管理器协议。
+    定义事务边界：begin(), commit(), rollback(), close()
+    支持异步上下文管理器协议
 
     Attributes:
         session: 当前事务的 session 对象
@@ -31,9 +31,9 @@ class UnitOfWork(Protocol):
 
     @property
     def session(self) -> object:
-        """获取当前事务的 session。
+        """获取当前事务的 session
 
-        EventHandler 使用此属性提取 session 传入各 Repository。
+        EventHandler 使用此属性提取 session 传入各 Repository
         """
         ...
 
@@ -67,7 +67,7 @@ class UnitOfWork(Protocol):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        """异步上下文管理器出口。
+        """异步上下文管理器出口
 
         规则：
         - 异常：rollback

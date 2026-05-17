@@ -1,7 +1,7 @@
-"""Neo4j 图存储层数据模型。
+"""Neo4j 图存储层数据模型
 
-包含 GraphNode 和 GraphRelationship 定义。
-所有模型位于基础设施层，不污染领域层。
+包含 GraphNode 和 GraphRelationship 定义
+所有模型位于基础设施层，不污染领域层
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from enum import StrEnum
 
 
 class RelationshipType(StrEnum):
-    """Neo4j 关系类型枚举。
+    """Neo4j 关系类型枚举
 
-    定义系统中允许的关系类型，确保图谱数据的一致性。
+    定义系统中允许的关系类型，确保图谱数据的一致性
     """
 
     MENTIONS = "MENTIONS"
@@ -27,9 +27,9 @@ class RelationshipType(StrEnum):
 
 @dataclass
 class GraphNode:
-    """图节点数据模型。
+    """图节点数据模型
 
-    用于存储实体节点（Entity/Document/Concept）及其属性。
+    用于存储实体节点（Entity/Document/Concept）及其属性
 
     字段说明:
         id: 节点唯一标识
@@ -58,9 +58,9 @@ class GraphNode:
 
 @dataclass
 class GraphRelationship:
-    """图关系数据模型。
+    """图关系数据模型
 
-    用于存储实体之间的关系边。
+    用于存储实体之间的关系边
 
     字段说明:
         start_node_id: 起始节点 ID

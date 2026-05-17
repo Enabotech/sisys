@@ -1,4 +1,4 @@
-"""DualIdempotencyChecker — 双写幂等性检查器。
+"""DualIdempotencyChecker — 双写幂等性检查器
 
 Redis（高性能）+ PostgreSQL（持久化）双写：
 - Redis SET NX 原子操作提供高性能检查
@@ -51,14 +51,14 @@ class IdempotencyRecordModel:
 
 
 class DualIdempotencyChecker:
-    """双写幂等性检查器。
+    """双写幂等性检查器
 
-    同时使用 Redis（高性能）和 PostgreSQL（持久化）进行幂等性检查。
+    同时使用 Redis（高性能）和 PostgreSQL（持久化）进行幂等性检查
     - Redis SET NX 提供高性能检查
     - PostgreSQL 记录提供持久化保证
     - Redis 故障时降级至 PostgreSQL
 
-    与现有 IdempotencyChecker 并存，RabbitMQEventListener 使用此实现。
+    与现有 IdempotencyChecker 并存，RabbitMQEventListener 使用此实现
     """
 
     def __init__(
@@ -66,7 +66,7 @@ class DualIdempotencyChecker:
         redis_client: aioredis.Redis,
         ttl: int = DEFAULT_TTL,
     ):
-        """初始化 DualIdempotencyChecker。
+        """初始化 DualIdempotencyChecker
 
         Args:
             redis_client: Async Redis client
@@ -80,7 +80,7 @@ class DualIdempotencyChecker:
         return get_session()
 
     async def try_acquire(self, event_id: UUID) -> bool:
-        """原子性尝试获取事件处理权（双写模式）。
+        """原子性尝试获取事件处理权（双写模式）
 
         1. 先尝试 Redis SET NX（高性能）
         2. 成功后异步写入 PostgreSQL（持久化）
@@ -127,7 +127,7 @@ class DualIdempotencyChecker:
             logger.warning("Failed to write idempotency record to PostgreSQL: %s", e)
 
     async def _try_acquire_postgresql(self, event_id: UUID) -> bool:
-        """PostgreSQL 降级模式：尝试获取处理权。
+        """PostgreSQL 降级模式：尝试获取处理权
 
         Args:
             event_id: 事件唯一标识
@@ -154,9 +154,9 @@ class DualIdempotencyChecker:
             return True
 
     async def is_processed(self, event_id: UUID) -> bool:
-        """检查事件是否已处理（双写模式）。
+        """检查事件是否已处理（双写模式）
 
-        先查 Redis，Redis 不可用时查 PostgreSQL。
+        先查 Redis，Redis 不可用时查 PostgreSQL
 
         Args:
             event_id: 事件唯一标识

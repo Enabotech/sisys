@@ -31,7 +31,7 @@ from tests.isolation import (
 def test_env_config() -> TestEnvConfig:
     """Session 级测试环境配置
 
-    整个测试会话使用相同的配置。
+    整个测试会话使用相同的配置
     """
     return get_test_env()
 
@@ -45,7 +45,7 @@ def test_env_config() -> TestEnvConfig:
 def test_tenant() -> TestTenant:
     """Function 级测试租户
 
-    每个测试函数使用唯一的租户 ID。
+    每个测试函数使用唯一的租户 ID
     """
     return generate_test_tenant()
 
@@ -54,7 +54,7 @@ def test_tenant() -> TestTenant:
 def isolated_tenant(test_tenant: TestTenant) -> Generator[TestTenant, None, None]:
     """隔离的测试租户（设置到上下文）
 
-    将租户设置为当前上下文，确保资源使用正确的隔离前缀。
+    将租户设置为当前上下文，确保资源使用正确的隔离前缀
     """
     TenantContext.set_current_tenant(test_tenant)
     yield test_tenant
@@ -67,7 +67,7 @@ def tenant_context_fixture(
 ) -> Generator[TestTenant, None, None]:
     """租户上下文 fixture
 
-    使用上下文管理器确保租户正确设置和清理。
+    使用上下文管理器确保租户正确设置和清理
     """
     with tenant_context(test_tenant) as tenant:
         yield tenant
@@ -234,7 +234,7 @@ def _cleanup_tenant_resources_sync(tenant: TestTenant) -> None:
 def cleanup_test_tenant(test_tenant: TestTenant) -> Generator[TestTenant, None, None]:
     """自动清理租户资源的 fixture
 
-    在测试完成后自动清理租户的所有资源。
+    在测试完成后自动清理租户的所有资源
     """
     yield test_tenant
 
@@ -251,7 +251,7 @@ def cleanup_test_tenant(test_tenant: TestTenant) -> Generator[TestTenant, None, 
 def cleanup_old_test_resources() -> Generator[None, None, None]:
     """Session 级自动清理
 
-    在测试会话开始前清理可能存在的旧测试资源。
+    在测试会话开始前清理可能存在的旧测试资源
     """
     # Session 开始前清理（可选）
     yield
@@ -267,7 +267,7 @@ def cleanup_old_test_resources() -> Generator[None, None, None]:
 def reset_test_environment() -> Generator[None, None, None]:
     """自动重置测试环境
 
-    每个测试函数前后重置全局状态，防止测试间污染。
+    每个测试函数前后重置全局状态，防止测试间污染
     """
     # 测试前：重置环境配置
     reset_test_env()
@@ -314,7 +314,7 @@ async def isolated_async_tenant() -> AsyncGenerator[TestTenant, None]:
 def unique_id() -> str:
     """生成唯一 ID
 
-    用于并行测试时生成唯一的资源名称。
+    用于并行测试时生成唯一的资源名称
     """
     return uuid.uuid4().hex[:12]
 

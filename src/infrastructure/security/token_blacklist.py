@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Token 黑名单模块。
+"""SISYS 基础设施层 Token 黑名单模块
 
-基于 Redis 实现已撤销 JWT token 的黑名单管理，支持与 token 剩余有效期相同的 TTL 自动过期。
+基于 Redis 实现已撤销 JWT token 的黑名单管理，支持与 token 剩余有效期相同的 TTL 自动过期
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,7 +20,7 @@ BLACKLIST_KEY_PREFIX = "token:blacklist:"
 
 
 class RedisTokenBlacklist(TokenBlacklistPort):
-    """基于 Redis 的 Token 黑名单实现，存储已撤销的 JWT token。
+    """基于 Redis 的 Token 黑名单实现，存储已撤销的 JWT token
 
     Attributes:
         _redis: Redis 异步客户端实例
@@ -28,7 +28,7 @@ class RedisTokenBlacklist(TokenBlacklistPort):
     """
 
     def __init__(self, redis_client, default_ttl_hours: int = 24):
-        """初始化 Token 黑名单。
+        """初始化 Token 黑名单
 
         Args:
             redis_client: Redis 客户端实例（aioredis）
@@ -38,7 +38,7 @@ class RedisTokenBlacklist(TokenBlacklistPort):
         self._default_ttl = timedelta(hours=default_ttl_hours)
 
     def _get_key(self, token: str) -> str:
-        """生成 token 对应的黑名单 key。
+        """生成 token 对应的黑名单 key
 
         Args:
             token: JWT token 字符串
@@ -53,7 +53,7 @@ class RedisTokenBlacklist(TokenBlacklistPort):
         return f"{BLACKLIST_KEY_PREFIX}{token_hash}"
 
     async def add(self, token: str, ttl: timedelta | None = None) -> None:
-        """将 token 加入黑名单。
+        """将 token 加入黑名单
 
         Args:
             token: JWT token 字符串
@@ -65,7 +65,7 @@ class RedisTokenBlacklist(TokenBlacklistPort):
         await self._redis.setex(key, ttl, "1")
 
     async def is_blacklisted(self, token: str) -> bool:
-        """检查 token 是否在黑名单中。
+        """检查 token 是否在黑名单中
 
         Args:
             token: JWT token 字符串

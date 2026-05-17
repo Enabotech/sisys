@@ -1,6 +1,6 @@
 """Blackboard entry data model.
 
-用于公共黑板的存储实体。
+用于公共黑板的存储实体
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 @dataclass
 class BlackboardEntry:
-    """黑板条目数据模型。
+    """黑板条目数据模型
 
     Attributes:
         conversation_id: 会话唯一标识
@@ -32,7 +32,7 @@ class BlackboardEntry:
     version: int = 1
 
     def to_dict(self) -> dict:
-        """序列化为字典。
+        """序列化为字典
 
         Returns:
             包含黑板条目字段的字典
@@ -49,7 +49,7 @@ class BlackboardEntry:
 
     @classmethod
     def from_dict(cls, data: dict) -> BlackboardEntry:
-        """从字典反序列化。
+        """从字典反序列化
 
         Args:
             data: 包含黑板条目字段的字典

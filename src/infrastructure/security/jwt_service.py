@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 JWT 令牌服务模块。
+"""SISYS 基础设施层 JWT 令牌服务模块
 
-基于 python-jose 库实现 JWT 令牌的创建、验证和刷新功能。
+基于 python-jose 库实现 JWT 令牌的创建、验证和刷新功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,7 +21,7 @@ from src.infrastructure.config.auth import AuthConfig
 
 
 class JWTService:
-    """JWT 令牌服务，负责令牌的生成、验证和刷新。
+    """JWT 令牌服务，负责令牌的生成、验证和刷新
 
     Attributes:
         _config: AuthConfig 认证配置实例
@@ -30,7 +30,7 @@ class JWTService:
     """
 
     def __init__(self, config: AuthConfig):
-        """初始化 JWT 服务。
+        """初始化 JWT 服务
 
         Args:
             config: AuthConfig 配置实例
@@ -46,7 +46,7 @@ class JWTService:
         roles: list[str],
         expires_delta: timedelta | None = None,
     ) -> str:
-        """创建 JWT access token。
+        """创建 JWT access token
 
         Args:
             user_id: 用户 UUID
@@ -78,7 +78,7 @@ class JWTService:
         user_id: UUID,
         expires_delta: timedelta | None = None,
     ) -> str:
-        """创建 JWT refresh token。
+        """创建 JWT refresh token
 
         Args:
             user_id: 用户 UUID
@@ -104,7 +104,7 @@ class JWTService:
         return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
     def verify_token(self, token: str) -> TokenPayload:
-        """验证 JWT token 并返回 TokenPayload。
+        """验证 JWT token 并返回 TokenPayload
 
         Args:
             token: JWT token 字符串
@@ -130,7 +130,7 @@ class JWTService:
             raise AuthenticationError(f"Invalid token: {e}")
 
     def verify_refresh_token(self, token: str) -> UUID:
-        """验证 JWT refresh token 并返回 user_id。
+        """验证 JWT refresh token 并返回 user_id
 
         Args:
             token: JWT refresh token 字符串
@@ -160,7 +160,7 @@ class JWTService:
             raise AuthenticationError(f"Invalid refresh token: {e}")
 
     def get_refresh_token_jti(self, token: str) -> str | None:
-        """从 refresh token 中提取 jti。
+        """从 refresh token 中提取 jti
 
         Args:
             token: JWT refresh token 字符串

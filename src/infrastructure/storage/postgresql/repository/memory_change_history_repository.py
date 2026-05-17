@@ -1,4 +1,4 @@
-"""PostgreSQLMemoryChangeHistoryRepository — L2 PostgreSQL 持久化实现。
+"""PostgreSQLMemoryChangeHistoryRepository — L2 PostgreSQL 持久化实现
 
 使用 SQLAlchemy AsyncSession，支持：
 - 多用户并行：会话级别隔离
@@ -33,17 +33,17 @@ class PostgreSQLMemoryChangeHistoryRepository(
     PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel],
     L2ChangeHistoryRepositoryPort,
 ):
-    """PostgreSQL 记忆变更历史仓储。
+    """PostgreSQL 记忆变更历史仓储
 
-    继承 PostgreSQLAdapter，覆写 delete 为抛出异常。
-    append-only 模式：只允许新增记录，不允许修改或删除。
+    继承 PostgreSQLAdapter，覆写 delete 为抛出异常
+    append-only 模式：只允许新增记录，不允许修改或删除
     """
 
     def __init__(self) -> None:
         super().__init__(MemoryChangeHistoryModel)
 
     async def delete(self, id: UUID) -> None:
-        """删除实体 — append-only 禁止删除。
+        """删除实体 — append-only 禁止删除
 
         Raises:
             NotImplementedError: 变更历史不可删除
@@ -51,9 +51,9 @@ class PostgreSQLMemoryChangeHistoryRepository(
         raise NotImplementedError("Change history is append-only, cannot delete")
 
     async def save(self, history: MemoryChangeHistory) -> MemoryChangeHistory:
-        """保存历史记录（append-only）。
+        """保存历史记录（append-only）
 
-        使用父类 save 实现（简单插入）。
+        使用父类 save 实现（简单插入）
 
         Args:
             history: 变更历史记录
@@ -67,9 +67,9 @@ class PostgreSQLMemoryChangeHistoryRepository(
         return history
 
     async def get_by_memory_id(self, memory_id: UUID) -> list[MemoryChangeHistory]:
-        """获取记忆的所有历史记录。
+        """获取记忆的所有历史记录
 
-        按 changed_at 升序排序（时间顺序）。
+        按 changed_at 升序排序（时间顺序）
 
         Args:
             memory_id: 记忆 ID

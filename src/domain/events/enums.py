@@ -1,6 +1,6 @@
-"""SISYS 领域层 事件相关枚举模块。
+"""SISYS 领域层 事件相关枚举模块
 
-所有枚举均使用Python标准库enum模块（无外部依赖）。
+所有枚举均使用Python标准库enum模块（无外部依赖）
 
 Author:
     agimtech <agimtech@126.com>

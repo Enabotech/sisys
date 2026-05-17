@@ -1,6 +1,6 @@
-"""SISYS 领域层 隔离级别事件模块。
+"""SISYS 领域层 隔离级别事件模块
 
-定义Agent隔离级别切换相关的领域事件。
+定义Agent隔离级别切换相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,16 +21,16 @@ from .enums import IsolationLevel
 
 @dataclass(frozen=True)
 class IsolationLevelSwitched(DomainEvent):
-    """Agent隔离级别切换时触发的事件。
+    """Agent隔离级别切换时触发的事件
 
     Attributes:
-        agent_id: Agent唯一标识符。
-        event_type: 事件类型，固定为"IsolationLevelSwitched"。
-        previous_level: 切换前的隔离级别。
-        target_level: 目标隔离级别。
-        trigger_reason: 触发原因。
-        approval_chain: 审批链列表。
-        switch_timestamp: 切换时间戳。
+        agent_id: Agent唯一标识符
+        event_type: 事件类型，固定为"IsolationLevelSwitched"
+        previous_level: 切换前的隔离级别
+        target_level: 目标隔离级别
+        trigger_reason: 触发原因
+        approval_chain: 审批链列表
+        switch_timestamp: 切换时间戳
     """
 
     agent_id: uuid.UUID = field(default_factory=uuid.uuid4)

@@ -1,8 +1,8 @@
-"""SISYS 应用层事件序列化适配器模块。
+"""SISYS 应用层事件序列化适配器模块
 
-使用 Pydantic TypeAdapter 完成 dict ↔ JSON 边界转换。
+使用 Pydantic TypeAdapter 完成 dict ↔ JSON 边界转换
 领域层事件使用 dataclasses.asdict() / DomainEvent.from_dict()，
-本适配器处理应用层边界的 JSON 字符串转换。
+本适配器处理应用层边界的 JSON 字符串转换
 
 Author:
     agimtech <agimtech@126.com>
@@ -23,7 +23,7 @@ dict_adapter: TypeAdapter[dict[str, Any]] = TypeAdapter(dict[str, Any])
 
 
 def event_dict_to_json(event_dict: dict[str, Any]) -> str:
-    """将事件字典序列化为 JSON 字符串（使用 Pydantic TypeAdapter）。
+    """将事件字典序列化为 JSON 字符串（使用 Pydantic TypeAdapter）
 
     Args:
         event_dict: 来自 DomainEvent.to_dict() 的字典
@@ -41,7 +41,7 @@ def event_dict_to_json(event_dict: dict[str, Any]) -> str:
 
 
 def json_to_event_dict(json_str: str) -> dict[str, Any]:
-    """将 JSON 字符串反序列化为事件字典（使用 Pydantic TypeAdapter）。
+    """将 JSON 字符串反序列化为事件字典（使用 Pydantic TypeAdapter）
 
     Args:
         json_str: JSON 字符串

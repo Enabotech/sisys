@@ -1,11 +1,11 @@
-"""SISYS 领域层数据完整性验证端口模块。
+"""SISYS 领域层数据完整性验证端口模块
 
 设计原则：
 - verify_file(): I/O 密集型 → async + to_thread
 - compute_hash()/verify_hash(): CPU 密集型 → sync（事件循环中直接调用不阻塞）
 
-注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖。
-实现内部将字符串转换为 HashAlgorithm enum。
+注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖
+实现内部将字符串转换为 HashAlgorithm enum
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,18 +21,18 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class IntegrityPort(Protocol):
-    """数据完整性验证抽象端口。
+    """数据完整性验证抽象端口
 
     设计原则：
     - verify_file(): I/O 密集型 → async + to_thread
     - compute_hash()/verify_hash(): CPU 密集型 → sync（事件循环中直接调用不阻塞）
 
-    注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖。
-    实现内部将字符串转换为 HashAlgorithm enum。
+    注意：使用 str | None 类型定义算法，避免引入 infrastructure 层依赖
+    实现内部将字符串转换为 HashAlgorithm enum
     """
 
     async def verify_file(self, file_path: str, expected_hash: str) -> bool:
-        """验证文件完整性（I/O 密集型）。
+        """验证文件完整性（I/O 密集型）
 
         Args:
             file_path: 文件路径
@@ -43,7 +43,7 @@ class IntegrityPort(Protocol):
         """
 
     def compute_hash(self, data: str | bytes, algorithm: str | None = None) -> str:
-        """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
+        """计算数据哈希（CPU 密集型，直接调用不阻塞事件循环）
 
         Args:
             data: 数据
@@ -59,7 +59,7 @@ class IntegrityPort(Protocol):
         expected_hash: str,
         algorithm: str | None = None,
     ) -> bool:
-        """验证数据哈希（CPU 密集型，直接调用不阻塞事件循环）。
+        """验证数据哈希（CPU 密集型，直接调用不阻塞事件循环）
 
         Args:
             data: 数据

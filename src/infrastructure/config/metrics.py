@@ -1,6 +1,6 @@
-"""SISYS 基础设施层指标端点配置模块。
+"""SISYS 基础设施层指标端点配置模块
 
-提供 Prometheus /metrics HTTP 端点配置，支持 K8s 动态扩缩容。
+提供 Prometheus /metrics HTTP 端点配置，支持 K8s 动态扩缩容
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class MetricsConfig:
-    """Prometheus /metrics 端点配置。
+    """Prometheus /metrics 端点配置
 
-    从环境变量读取，支持启用/禁用、路径配置、认证配置。
+    从环境变量读取，支持启用/禁用、路径配置、认证配置
 
     Attributes:
         enabled: 是否启用 /metrics 端点（默认 false）
@@ -35,7 +35,7 @@ class MetricsConfig:
 
     @classmethod
     def from_env(cls) -> MetricsConfig:
-        """从环境变量创建配置。
+        """从环境变量创建配置
 
         Args:
             无（从 os.environ 读取）

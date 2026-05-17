@@ -1,6 +1,6 @@
-"""SISYS 领域层审计日志实体模块。
+"""SISYS 领域层审计日志实体模块
 
-定义审计日志领域实体，仅依赖标准库，无外部 ORM 框架。
+定义审计日志领域实体，仅依赖标准库，无外部 ORM 框架
 
 Author:
     agimtech <agimtech@126.com>
@@ -23,8 +23,8 @@ from uuid import UUID, uuid4
 class AuditLog:
     """审计日志领域实体（不可变）.
 
-    领域层核心实体，封装审计日志的业务逻辑。
-    仅依赖标准库，不依赖任何外部ORM框架。
+    领域层核心实体，封装审计日志的业务逻辑
+    仅依赖标准库，不依赖任何外部ORM框架
     """
 
     log_id: UUID
@@ -58,7 +58,7 @@ class AuditLog:
         correction_level: int | None = None,
         correlation_id: str | None = None,
     ) -> AuditLog:
-        """创建审计日志实例，自动生成 ID 和时间戳。
+        """创建审计日志实例，自动生成 ID 和时间戳
 
         Args:
             actor: 用户 ID 或系统组件标识
@@ -84,7 +84,7 @@ class AuditLog:
         )
 
     def compute_checksum(self) -> str:
-        """计算 SHA256 校验和用于完整性验证。
+        """计算 SHA256 校验和用于完整性验证
 
         Returns:
             str: SHA256 hex digest
@@ -105,7 +105,7 @@ class AuditLog:
         return hashlib.sha256(content.encode()).hexdigest()
 
     def verify_checksum(self) -> bool:
-        """验证校验和是否匹配。
+        """验证校验和是否匹配
 
         Returns:
             True 如果校验和匹配
@@ -115,7 +115,7 @@ class AuditLog:
         return self.checksum == self.compute_checksum()
 
     def to_dict(self) -> dict[str, Any]:
-        """转换为字典表示。
+        """转换为字典表示
 
         Returns:
             dict 包含所有审计字段

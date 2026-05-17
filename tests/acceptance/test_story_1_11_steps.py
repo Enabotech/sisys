@@ -1,6 +1,6 @@
 """Acceptance tests for Story 1.11 - Data Sovereignty Isolation.
 
-验收测试：从业务角度验证功能满足需求规格（AC）。
+验收测试：从业务角度验证功能满足需求规格（AC）
 
 Run with: pytest tests/acceptance/test_story_1_11_steps.py -v
 """

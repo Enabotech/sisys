@@ -1,7 +1,7 @@
-"""SISYS 应用层统一存储网关模块。
+"""SISYS 应用层统一存储网关模块
 
-提供 L0-L5 六层存储的统一入口，根据存储策略自动编排各层存储。
-对应 architecture.md §11.2.9 L0 驱动各层协同机制。
+提供 L0-L5 六层存储的统一入口，根据存储策略自动编排各层存储
+对应 architecture.md §11.2.9 L0 驱动各层协同机制
 
 六边形约束遵守：
 - 本类是应用层服务
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 class UnifiedStorageGateway(UnifiedStoragePort):
-    """统一存储网关。
+    """统一存储网关
 
     职责：
     - 提供 L0-L5 六层存储的统一入口
@@ -76,7 +76,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         l5_graph: MemoryGraphPort | None = None,
         event_publisher=None,
     ) -> None:
-        """初始化统一存储网关。
+        """初始化统一存储网关
 
         Args:
             l0_storage: L0 文件系统存储
@@ -119,7 +119,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         name: str,
         tier: StorageTier | None = None,
     ) -> dict[StorageLayer, bool]:
-        """保存记忆到多层存储。
+        """保存记忆到多层存储
 
         对应 architecture.md §11.2.9 写入流程：
         1. L0 文件系统（同步，强一致）- 真相源
@@ -179,7 +179,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         name: str,
         prefer_cache: bool = True,
     ) -> str | None:
-        """读取记忆。
+        """读取记忆
 
         对应 architecture.md §11.2.9 检索流程：
         1. RBAC 校验（L2 元数据，必须）
@@ -210,13 +210,13 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         owner_id: str,
         memory_type: str,
     ) -> bool:
-        """检查读取权限。
+        """检查读取权限
 
         可见性由 group_id 区分（不是 type 字段）：
         - group_id == NULL/empty → private 记忆，仅 owner 可读
         - group_id != NULL/empty → group 记忆，owner 或 group 成员可读
 
-        type 字段（user/feedback/project/reference）只是记忆分类，不是可见性。
+        type 字段（user/feedback/project/reference）只是记忆分类，不是可见性
         """
         is_group_memory = metadata.group_id is not None and metadata.group_id != ""
         if is_group_memory:
@@ -238,7 +238,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         owner_id: str,
         name: str,
     ) -> dict[StorageLayer, bool]:
-        """删除记忆。
+        """删除记忆
 
         Args:
             memory_id: 记忆 ID
@@ -279,7 +279,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         owner_id: str,
         name: str,
     ) -> dict[StorageLayer, bool]:
-        """检查记忆在各层的存在状态。
+        """检查记忆在各层的存在状态
 
         Returns:
             各层存在状态
@@ -300,9 +300,9 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         self,
         memory_id: str,
     ) -> str | None:
-        """获取记忆内容（从 L0）。
+        """获取记忆内容（从 L0）
 
-        直接从 L0 文件系统读取，不走缓存。
+        直接从 L0 文件系统读取，不走缓存
         """
         content = await self._l0.read(memory_id, "private")
         if content is not None:

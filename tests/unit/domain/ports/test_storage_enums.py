@@ -1,6 +1,6 @@
-"""StorageEnums 枚举测试。
+"""StorageEnums 枚举测试
 
-验证 StorageLayer, StorageTier, DataAccessPattern 枚举定义正确。
+验证 StorageLayer, StorageTier, DataAccessPattern 枚举定义正确
 """
 
 from __future__ import annotations

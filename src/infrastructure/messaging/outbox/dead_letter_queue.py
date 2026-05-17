@@ -1,7 +1,7 @@
-"""DeadLetterQueue — 基础设施层实现。
+"""DeadLetterQueue — 基础设施层实现
 
-MVP 阶段使用内存列表存储。
-正式版（Story 1.5）将使用文件持久化或 RabbitMQ DLX。
+MVP 阶段使用内存列表存储
+正式版（Story 1.5）将使用文件持久化或 RabbitMQ DLX
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class DeadLetterQueue(ABC):
 
     @abstractmethod
     def dequeue(self) -> tuple[DomainEvent, str, int] | None:
-        """出队失败事件。
+        """出队失败事件
 
         Returns:
             (event, error, retry_count) 或 None
@@ -35,9 +35,9 @@ class DeadLetterQueue(ABC):
 
 
 class InMemoryDeadLetterQueue(DeadLetterQueue):
-    """内存死信队列 — MVP 阶段使用。
+    """内存死信队列 — MVP 阶段使用
 
-    进程重启后丢失，仅用于测试和 MVP 占位。
+    进程重启后丢失，仅用于测试和 MVP 占位
     """
 
     def __init__(self) -> None:

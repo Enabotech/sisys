@@ -1,6 +1,6 @@
 """Tests for L1TextExtractor.
 
-RED PHASE: 验证 L1TextExtractor 文本提取功能。
+RED PHASE: 验证 L1TextExtractor 文本提取功能
 """
 
 from __future__ import annotations

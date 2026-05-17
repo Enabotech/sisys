@@ -1,7 +1,7 @@
 """Audit API Routes - 审计日志 API 路由.
 
-提供审计日志检索、完整性验证、归档管理的 REST API 端点。
-遵循六边形架构：接口层仅依赖应用层用例和领域端口。
+提供审计日志检索、完整性验证、归档管理的 REST API 端点
+遵循六边形架构：接口层仅依赖应用层用例和领域端口
 """
 
 from __future__ import annotations
@@ -129,7 +129,7 @@ def create_audit_router(
     ):
         """查询审计日志.
 
-        支持多维检索（时间/actor/action_type/target_resource）。
+        支持多维检索（时间/actor/action_type/target_resource）
         """
         from src.domain.ports.audit_repository import AuditSearchCriteria
 
@@ -207,7 +207,7 @@ def create_audit_router(
     async def verify_integrity(request: IntegrityVerifyRequest):
         """批量验证日志完整性.
 
-        SHA256 校验和验证，支持指定 log_ids 或全部。
+        SHA256 校验和验证，支持指定 log_ids 或全部
         """
         audit_service = get_audit_service()
 
@@ -267,7 +267,7 @@ def create_audit_router(
     async def archive_logs(request: ArchiveRequest):
         """手动归档审计日志.
 
-        归档超过指定天数的审计日志到 WORM 存储。
+        归档超过指定天数的审计日志到 WORM 存储
         """
         audit_service = get_audit_service()
 

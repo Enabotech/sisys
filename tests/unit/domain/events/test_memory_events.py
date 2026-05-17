@@ -1,6 +1,6 @@
 """Tests for MemoryChanged domain event.
 
-RED PHASE: 验证 MemoryChanged 事件 Schema 定义正确性。
+RED PHASE: 验证 MemoryChanged 事件 Schema 定义正确性
 """
 
 from __future__ import annotations

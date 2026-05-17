@@ -79,10 +79,10 @@ class TestRoleModel:
 
 
 class TestRoleModelDefaults:
-    """RoleModel 默认值行为测试。
+    """RoleModel 默认值行为测试
 
     注意：SQLAlchemy mapped_column(default=...) 是数据库端默认值，
-    Python 实例层面不会自动填充。显式传入时才会设置。
+    Python 实例层面不会自动填充。显式传入时才会设置
     """
 
     def test_explicit_id_accepted(self) -> None:

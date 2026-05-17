@@ -1,7 +1,7 @@
-"""UserRepository — 用户仓储实现。
+"""UserRepository — 用户仓储实现
 
-继承 PostgreSQLAdapter[User, UserModel]，实现实体↔模型转换。
-UserRepositoryPort 声明返回 User 领域实体，本仓储通过 TEntity 泛型匹配。
+继承 PostgreSQLAdapter[User, UserModel]，实现实体↔模型转换
+UserRepositoryPort 声明返回 User 领域实体，本仓储通过 TEntity 泛型匹配
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from src.infrastructure.storage.postgresql.repository.postgresql_adapter import 
 
 
 class UserRepository(PostgreSQLAdapter[User, UserModel]):
-    """用户仓储实现。
+    """用户仓储实现
 
     继承 PostgreSQLAdapter[User, UserModel]，
-    通过 _to_entity/_to_model 隔离领域层与 ORM 层。
+    通过 _to_entity/_to_model 隔离领域层与 ORM 层
     """
 
     def __init__(self) -> None:

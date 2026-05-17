@@ -1,6 +1,6 @@
 """Tests for MemoryIndex.
 
-GREEN PHASE: 验证 MemoryIndex 索引管理功能。
+GREEN PHASE: 验证 MemoryIndex 索引管理功能
 """
 
 from __future__ import annotations

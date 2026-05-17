@@ -1,4 +1,4 @@
-"""RoleRepository — 角色仓储实现。
+"""RoleRepository — 角色仓储实现
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
@@ -22,10 +22,10 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class RoleRepository(RoleRepositoryPort):
-    """角色仓储实现。
+    """角色仓储实现
 
-    实现领域实体与 SQLAlchemy 模型之间的转换。
-    继承 RoleRepositoryPort 端口接口。
+    实现领域实体与 SQLAlchemy 模型之间的转换
+    继承 RoleRepositoryPort 端口接口
     """
 
     @property
@@ -33,7 +33,7 @@ class RoleRepository(RoleRepositoryPort):
         return get_session()
 
     def _to_domain(self, model: RoleModel) -> "Role":
-        """将 SQLAlchemy 模型转换为领域实体。
+        """将 SQLAlchemy 模型转换为领域实体
 
         Args:
             model: SQLAlchemy 模型实例
@@ -55,7 +55,7 @@ class RoleRepository(RoleRepositoryPort):
         )
 
     async def _get_permissions_for_model(self, role_id: UUID) -> tuple[str, ...]:
-        """从关联表获取角色的权限字符串列表。
+        """从关联表获取角色的权限字符串列表
 
         Args:
             role_id: 角色 UUID
@@ -76,7 +76,7 @@ class RoleRepository(RoleRepositoryPort):
         return tuple(r[0] for r in result.fetchall())
 
     async def delete(self, id: UUID) -> bool:
-        """删除角色。
+        """删除角色
 
         Args:
             id: 角色 UUID
@@ -97,7 +97,7 @@ class RoleRepository(RoleRepositoryPort):
         return True
 
     async def _load_permissions_for_model(self, model: RoleModel) -> "Role":
-        """为模型加载权限并返回完整的领域实体。
+        """为模型加载权限并返回完整的领域实体
 
         Args:
             model: SQLAlchemy 模型实例
@@ -120,7 +120,7 @@ class RoleRepository(RoleRepositoryPort):
         )
 
     def _to_model(self, role: "Role") -> RoleModel:
-        """将领域实体转换为 SQLAlchemy 模型。
+        """将领域实体转换为 SQLAlchemy 模型
 
         Args:
             role: Role 领域实体
@@ -147,7 +147,7 @@ class RoleRepository(RoleRepositoryPort):
         )
 
     async def _get_or_create_permission(self, perm_name: str) -> UUID:
-        """获取或创建权限记录。
+        """获取或创建权限记录
 
         Args:
             perm_name: 权限名称
@@ -169,7 +169,7 @@ class RoleRepository(RoleRepositoryPort):
         return new_perm.id
 
     async def _save_permissions(self, role_id: UUID, permissions: tuple[str, ...]) -> None:
-        """保存角色权限到关联表。
+        """保存角色权限到关联表
 
         Args:
             role_id: 角色 UUID
@@ -188,7 +188,7 @@ class RoleRepository(RoleRepositoryPort):
             await self._session.execute(role_permissions.insert().values(role_id=role_id, permission_id=perm_id))
 
     async def get_by_name(self, name: str) -> "Role | None":
-        """根据名称获取角色。
+        """根据名称获取角色
 
         Args:
             name: 角色名称
@@ -201,7 +201,7 @@ class RoleRepository(RoleRepositoryPort):
         return await self._load_permissions_for_model(model) if model else None
 
     async def save(self, role: "Role") -> "Role":
-        """保存角色（插入或更新）。
+        """保存角色（插入或更新）
 
         Args:
             role: Role 领域实体
@@ -234,7 +234,7 @@ class RoleRepository(RoleRepositoryPort):
         return await self._load_permissions_for_model(model)
 
     async def get_by_id(self, id: UUID) -> "Role | None":
-        """根据 ID 获取角色。
+        """根据 ID 获取角色
 
         Args:
             id: 角色 UUID
@@ -264,7 +264,7 @@ class RoleRepository(RoleRepositoryPort):
         return roles
 
     async def get_permissions_for_role(self, role_id: str) -> list[Permission]:
-        """获取角色的权限列表。
+        """获取角色的权限列表
 
         Args:
             role_id: 角色 ID

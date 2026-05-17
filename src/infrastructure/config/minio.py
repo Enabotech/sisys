@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 MinIO 配置模块。
+"""SISYS 基础设施层 MinIO 配置模块
 
-提供 MinIO 对象存储连接配置，用于 L4 对象存储层。
+提供 MinIO 对象存储连接配置，用于 L4 对象存储层
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class MinIOConfig:
-    """MinIO 连接配置。
+    """MinIO 连接配置
 
-    用于 L4 对象存储层（MinIO），支持连接池管理和超时配置。
+    用于 L4 对象存储层（MinIO），支持连接池管理和超时配置
 
     Attributes:
         host: MinIO 服务主机地址
@@ -43,7 +43,7 @@ class MinIOConfig:
 
     @property
     def endpoint(self) -> str:
-        """返回 host:port 格式的 endpoint。
+        """返回 host:port 格式的 endpoint
 
         Returns:
             MinIO endpoint 字符串
@@ -52,7 +52,7 @@ class MinIOConfig:
 
     @classmethod
     def from_env(cls) -> MinIOConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

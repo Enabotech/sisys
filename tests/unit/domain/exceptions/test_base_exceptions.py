@@ -1,6 +1,6 @@
-"""BaseException 领域异常根类单元测试。
+"""BaseException 领域异常根类单元测试
 
-验证异常初始化、序列化、cause 处理和默认值行为。
+验证异常初始化、序列化、cause 处理和默认值行为
 """
 
 from __future__ import annotations

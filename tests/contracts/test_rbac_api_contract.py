@@ -1,8 +1,8 @@
 """RBAC API Contract Tests.
 
-基于 docs/api/openapi.yaml 定义验证 API 契约。
-使用 openapi-spec-validator 进行 OpenAPI 规范验证。
-使用 schemathesis 进行 API 契约测试。
+基于 docs/api/openapi.yaml 定义验证 API 契约
+使用 openapi-spec-validator 进行 OpenAPI 规范验证
+使用 schemathesis 进行 API 契约测试
 """
 
 from __future__ import annotations

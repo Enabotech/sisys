@@ -1,6 +1,6 @@
-"""L1TextExtractor — L1 文本提取器。
+"""L1TextExtractor — L1 文本提取器
 
-从用户输入中提取记忆内容。
+从用户输入中提取记忆内容
 
 支持的模式：
 - "记住 X" → 提取 X
@@ -28,10 +28,10 @@ class L1ExtractionResult(ExtractionResult):
 
 
 class L1TextExtractor(TextExtractorService):
-    """L1 文本提取器。
+    """L1 文本提取器
 
-    从"记住 X"等模式中提取记忆核心内容 X。
-    支持多种表达方式，使用正则优先 + LLM fallback。
+    从"记住 X"等模式中提取记忆核心内容 X
+    支持多种表达方式，使用正则优先 + LLM fallback
     """
 
     # 提取模式（按优先级排序）
@@ -54,7 +54,7 @@ class L1TextExtractor(TextExtractorService):
     ]
 
     def extract(self, user_input: str) -> L1ExtractionResult:
-        """从用户输入中提取记忆内容。
+        """从用户输入中提取记忆内容
 
         Args:
             user_input: 用户输入（如 "记住，以后用 bun 而不是 npm"）
@@ -85,7 +85,7 @@ class L1TextExtractor(TextExtractorService):
         raise ValueError(f"无法识别输入模式: {user_input}")
 
     def supports(self, user_input: str) -> bool:
-        """判断此提取器是否支持处理给定输入。
+        """判断此提取器是否支持处理给定输入
 
         Args:
             user_input: 用户输入

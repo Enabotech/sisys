@@ -1,6 +1,6 @@
 """Event Loop Blocking Verification Tests (Task 14).
 
-验证 asyncio.run() 反模式已消除，to_thread 正确封装同步操作。
+验证 asyncio.run() 反模式已消除，to_thread 正确封装同步操作
 
 验证标准（AC-13）:
 - [ ] asyncio.run() 反模式已消除

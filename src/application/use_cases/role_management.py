@@ -1,6 +1,6 @@
 """Role Management UseCases - 应用层角色管理用例.
 
-遵循六边形架构：应用层用例，协调领域实体和仓储端口。
+遵循六边形架构：应用层用例，协调领域实体和仓储端口
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ __all__ = [
 class RoleService:
     """角色管理服务.
 
-    应用层用例，负责角色创建、查询、更新、删除。
-    遵循六边形架构：通过 RoleRepositoryPort 端口访问数据，不直接依赖基础设施。
+    应用层用例，负责角色创建、查询、更新、删除
+    遵循六边形架构：通过 RoleRepositoryPort 端口访问数据，不直接依赖基础设施
     """
 
     def __init__(
@@ -206,7 +206,7 @@ class RoleService:
         return await self._role_repo.delete(role_id)
 
     async def assign_permissions(self, role_id: UUID, permissions: list[str]) -> Role:
-        """为角色分配权限（替换现有权限）。
+        """为角色分配权限（替换现有权限）
 
         Args:
             role_id: 角色 UUID
@@ -221,7 +221,7 @@ class RoleService:
         return await self.update_role(role_id, permissions=permissions)
 
     async def add_permission(self, role_id: UUID, permission: str) -> Role:
-        """为角色添加一个权限。
+        """为角色添加一个权限
 
         Args:
             role_id: 角色 UUID

@@ -1,8 +1,8 @@
-"""Redis Public Blackboard — 基础设施层实现。
+"""Redis Public Blackboard — 基础设施层实现
 
-实现 Story 1.4 定义的 PublicBlackboard 接口。
-使用 Redis Sorted Set 存储黑板内容，按时间戳排序。
-支持 MVCC（多版本并发控制），每次写入自动递增版本号。
+实现 Story 1.4 定义的 PublicBlackboard 接口
+使用 Redis Sorted Set 存储黑板内容，按时间戳排序
+支持 MVCC（多版本并发控制），每次写入自动递增版本号
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class RedisPublicBlackboard:
-    """Redis 公共黑板。
+    """Redis 公共黑板
 
-    使用 Redis Sorted Set（按时间戳排序）存储多 Agent 共享信息。
+    使用 Redis Sorted Set（按时间戳排序）存储多 Agent 共享信息
     键格式: sisys:blackboard:{conversation_id}
-    支持 MVCC：每次写入自动递增版本号。
+    支持 MVCC：每次写入自动递增版本号
 
     Args:
         config: Redis 连接配置
@@ -52,7 +52,7 @@ class RedisPublicBlackboard:
         confidence: float = 1.0,
         citations: list[str] | None = None,
     ) -> int:
-        """发布内容到黑板。
+        """发布内容到黑板
 
         Args:
             conversation_id: 会话唯一标识
@@ -103,7 +103,7 @@ class RedisPublicBlackboard:
             return 0
 
     async def get(self, conversation_id: str) -> list[dict]:
-        """获取会话的所有内容。
+        """获取会话的所有内容
 
         Args:
             conversation_id: 会话唯一标识
@@ -137,7 +137,7 @@ class RedisPublicBlackboard:
             return []
 
     async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None:
-        """获取指定 Agent 的最新内容。
+        """获取指定 Agent 的最新内容
 
         Args:
             conversation_id: 会话唯一标识
@@ -156,7 +156,7 @@ class RedisPublicBlackboard:
         return None
 
     async def get_latest(self, conversation_id: str) -> dict | None:
-        """获取会话的最新内容。
+        """获取会话的最新内容
 
         Args:
             conversation_id: 会话唯一标识

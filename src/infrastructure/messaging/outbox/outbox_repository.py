@@ -1,7 +1,7 @@
-"""PostgreSQLOutboxRepository — 基础设施层实现。
+"""PostgreSQLOutboxRepository — 基础设施层实现
 
-实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化。
-提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）。
+实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化
+提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
@@ -27,10 +27,10 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 
 class PostgreSQLOutboxRepository(OutboxRepository):
-    """PostgreSQL 发件箱仓储实现。
+    """PostgreSQL 发件箱仓储实现
 
-    公开方法实现领域层接口（使用 DomainEvent）。
-    内部方法（_ 前缀）直接操作 OutboxModel，仅 Poller 使用。
+    公开方法实现领域层接口（使用 DomainEvent）
+    内部方法（_ 前缀）直接操作 OutboxModel，仅 Poller 使用
     """
 
     _lock: asyncio.Lock = asyncio.Lock()
@@ -42,7 +42,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     # ========== 公开方法（实现领域层接口） ==========
 
     def save(self, event: DomainEvent) -> None:
-        """保存事件至发件箱（与业务操作同事务）。
+        """保存事件至发件箱（与业务操作同事务）
 
         Args:
             event: 领域事件实例
@@ -51,7 +51,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         self._session.add(model)
 
     def get_unpublished(self, limit: int) -> list[DomainEvent]:
-        """获取未发布的事件列表。
+        """获取未发布的事件列表
 
         Args:
             limit: 最大返回数量
@@ -62,7 +62,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         raise NotImplementedError("Use async_get_unpublished instead")
 
     async def async_get_unpublished(self, limit: int) -> list[DomainEvent]:
-        """异步获取未发布的事件列表。
+        """异步获取未发布的事件列表
 
         Args:
             limit: 最大返回数量
@@ -77,7 +77,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         return [SQLAlchemyEventOutboxAdapter.to_domain_event(m) for m in models]
 
     def mark_published(self, event_id: UUID) -> None:
-        """标记事件已发布。
+        """标记事件已发布
 
         Args:
             event_id: 事件唯一标识
@@ -85,7 +85,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         raise NotImplementedError("Use async_mark_published instead")
 
     async def async_mark_published(self, event_id: UUID) -> None:
-        """异步标记事件已发布。
+        """异步标记事件已发布
 
         Args:
             event_id: 事件唯一标识
@@ -97,7 +97,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             model.published_at = datetime.now(UTC)
 
     def mark_failed(self, event_id: UUID, error: str) -> None:
-        """标记事件发布失败。
+        """标记事件发布失败
 
         Args:
             event_id: 事件唯一标识
@@ -106,7 +106,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         raise NotImplementedError("Use async_mark_failed instead")
 
     async def async_mark_failed(self, event_id: UUID, error: str) -> None:
-        """异步标记事件发布失败。
+        """异步标记事件发布失败
 
         Args:
             event_id: 事件唯一标识

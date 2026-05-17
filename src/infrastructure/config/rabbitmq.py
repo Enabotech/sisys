@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 RabbitMQ 配置模块。
+"""SISYS 基础设施层 RabbitMQ 配置模块
 
-提供 RabbitMQ 连接配置，用于可靠事件传输通道。
+提供 RabbitMQ 连接配置，用于可靠事件传输通道
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class RabbitMQConfig:
-    """RabbitMQ 连接配置。
+    """RabbitMQ 连接配置
 
-    用于 RabbitMQ 可靠事件传输通道（异步路径）。
+    用于 RabbitMQ 可靠事件传输通道（异步路径）
 
     Attributes:
         host: RabbitMQ 主机地址
@@ -45,7 +45,7 @@ class RabbitMQConfig:
 
     @classmethod
     def from_env(cls) -> RabbitMQConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

@@ -1,6 +1,6 @@
-"""SISYS 应用层记忆图端口模块。
+"""SISYS 应用层记忆图端口模块
 
-继承 L5GraphPort，添加记忆关系语义。
+继承 L5GraphPort，添加记忆关系语义
 
 Author:
     agimtech <agimtech@126.com>
@@ -18,7 +18,7 @@ from src.domain.ports.l5_graph import L5GraphPort
 
 @runtime_checkable
 class MemoryGraphPort(L5GraphPort, Protocol):
-    """记忆图端口 — 继承L5GraphPort，添加记忆关系语义。
+    """记忆图端口 — 继承L5GraphPort，添加记忆关系语义
 
     继承所有L5方法，额外提供：
     - 记忆关系自动提取（内容→实体→关系）
@@ -30,7 +30,7 @@ class MemoryGraphPort(L5GraphPort, Protocol):
         memory_id: str,
         content: str,
     ) -> int:
-        """提取并索引记忆中的实体关系。
+        """提取并索引记忆中的实体关系
 
         Args:
             memory_id: 记忆 ID
@@ -45,7 +45,7 @@ class MemoryGraphPort(L5GraphPort, Protocol):
         memory_id: str,
         depth: int = 2,
     ) -> dict:
-        """获取记忆的知识图谱子图。
+        """获取记忆的知识图谱子图
 
         Args:
             memory_id: 记忆 ID

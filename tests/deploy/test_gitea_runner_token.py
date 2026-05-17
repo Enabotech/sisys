@@ -1,7 +1,7 @@
 """
 Test Gitea Runner Token Configuration.
 
-测试 Gitea Runner Token 的创建、存储和验证。
+测试 Gitea Runner Token 的创建、存储和验证
 """
 
 import base64

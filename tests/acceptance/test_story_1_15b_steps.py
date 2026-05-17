@@ -555,8 +555,8 @@ def check_redis_ttl_range(min, max, redis_client, test_context: MemoryTestContex
 def check_l0_l2_sync_latency(memory_index: MemoryIndex, event_loop):
     """检查 L0→L2 同步延迟
 
-    注：L0 和 L2 都是文件系统操作，在此测试环境中不需要真实 L2 服务。
-    验证索引已更新即可认为 L0 写入成功。
+    注：L0 和 L2 都是文件系统操作，在此测试环境中不需要真实 L2 服务
+    验证索引已更新即可认为 L0 写入成功
     """
     import time
 
@@ -572,8 +572,8 @@ def check_l0_l2_sync_latency(memory_index: MemoryIndex, event_loop):
 def check_metadata_records():
     """检查 memory_metadata 记录
 
-    注：此验收测试需要 PostgreSQL 连接。
-    在当前测试环境中，我们只验证 L0 文件存在。
+    注：此验收测试需要 PostgreSQL 连接
+    在当前测试环境中，我们只验证 L0 文件存在
     """
     # 此测试需要 PostgreSQL 连接来验证 memory_metadata 表记录
     # 当前实现仅验证 L0 层，L2 层需要数据库连接
@@ -584,7 +584,7 @@ def check_metadata_records():
 def check_success_rate(success_rate: int):
     """检查成功率
 
-    注：此测试需要完整的后端服务验证。
-    当前实现通过 L0 和 L1 层的验证来近似表示成功率。
+    注：此测试需要完整的后端服务验证
+    当前实现通过 L0 和 L1 层的验证来近似表示成功率
     """
     assert success_rate == 100, f"Success rate {success_rate}% != 100%"

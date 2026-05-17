@@ -1,4 +1,4 @@
-"""存储架构验证测试。
+"""存储架构验证测试
 
 验证领域层与基础设施层的架构约束：
 - 领域层零 MinIO 导入
@@ -164,7 +164,7 @@ class TestAsyncPatterns:
 
 
 def _find_imports_in_dir(base_dir: Path, module_name: str) -> list[str]:
-    """扫描目录下所有 .py 文件，查找包含 module_name 的导入。
+    """扫描目录下所有 .py 文件，查找包含 module_name 的导入
 
     Args:
         base_dir: 要扫描的目录
@@ -192,7 +192,7 @@ def _find_imports_in_dir(base_dir: Path, module_name: str) -> list[str]:
 
 
 def _extract_method_names(tree: ast.AST) -> set[str]:
-    """从 AST 中提取所有方法名称。
+    """从 AST 中提取所有方法名称
 
     Args:
         tree: AST 根节点

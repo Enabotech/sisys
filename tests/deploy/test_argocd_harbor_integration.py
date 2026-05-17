@@ -2,7 +2,7 @@
 ArgoCD Harbor 集成测试
 Story 0.7: ArgoCD 持续部署 - Task 5: Harbor 镜像仓库集成
 
-测试 ArgoCD Image Updater 与 Harbor 的集成，验证镜像自动更新流程。
+测试 ArgoCD Image Updater 与 Harbor 的集成，验证镜像自动更新流程
 """
 
 import json

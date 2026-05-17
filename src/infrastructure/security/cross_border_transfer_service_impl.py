@@ -1,6 +1,6 @@
-"""SISYS 基础设施层跨境数据传输服务模块。
+"""SISYS 基础设施层跨境数据传输服务模块
 
-基于 CrossBorderTransferServicePort 接口实现跨境数据传输请求的审批流程管理。
+基于 CrossBorderTransferServicePort 接口实现跨境数据传输请求的审批流程管理
 
 Author:
     agimtech <agimtech@126.com>
@@ -32,7 +32,7 @@ class TransferNotApprovedError(Exception):
 
 
 class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
-    """跨境数据传输服务实现，管理跨境数据传输请求的审批流程。
+    """跨境数据传输服务实现，管理跨境数据传输请求的审批流程
 
     Attributes:
         _requests: 内存中存储的传输请求字典，键为请求 ID
@@ -47,7 +47,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests: dict[str, CrossBorderTransferRequest] = {}
 
     def request_transfer(self, data: CrossBorderTransferRequest) -> None:
-        """发起跨境传输请求。
+        """发起跨境传输请求
 
         Args:
             data: 跨境传输请求
@@ -55,7 +55,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests[str(data.request_id)] = data
 
     def approve(self, transfer_id: str, approver: str) -> None:
-        """审批通过跨境传输请求。
+        """审批通过跨境传输请求
 
         Args:
             transfer_id: 传输请求 ID
@@ -72,7 +72,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests[transfer_id] = approved
 
     def reject(self, transfer_id: str, approver: str) -> None:
-        """审批拒绝跨境传输请求。
+        """审批拒绝跨境传输请求
 
         Args:
             transfer_id: 传输请求 ID
@@ -89,7 +89,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests[transfer_id] = rejected
 
     def execute(self, transfer_id: str) -> None:
-        """执行已审批的跨境传输。
+        """执行已审批的跨境传输
 
         Args:
             transfer_id: 传输请求 ID
@@ -109,7 +109,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests[transfer_id] = executed
 
     def block(self, transfer_id: str) -> None:
-        """阻止跨境传输请求。
+        """阻止跨境传输请求
 
         Args:
             transfer_id: 传输请求 ID
@@ -125,7 +125,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         self._requests[transfer_id] = blocked
 
     def get_request(self, transfer_id: str) -> CrossBorderTransferRequest | None:
-        """获取跨境传输请求。
+        """获取跨境传输请求
 
         Args:
             transfer_id: 传输请求 ID
@@ -136,7 +136,7 @@ class CrossBorderTransferServiceImpl(CrossBorderTransferServicePort):
         return self._requests.get(transfer_id)
 
     def list_pending_requests(self) -> list[CrossBorderTransferRequest]:
-        """列出所有待审批的请求。
+        """列出所有待审批的请求
 
         Returns:
             待审批请求列表

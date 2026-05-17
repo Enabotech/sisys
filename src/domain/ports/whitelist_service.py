@@ -1,6 +1,6 @@
-"""SISYS 领域层外部 API 白名单服务端口模块。
+"""SISYS 领域层外部 API 白名单服务端口模块
 
-遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库。
+遵循六边形架构：端口接口定义，仅依赖 Protocol 和 Python 标准库
 
 Author:
     agimtech <agimtech@126.com>
@@ -21,7 +21,7 @@ class WhitelistServicePort(Protocol):
     """外部 API 白名单服务端口（协议接口）."""
 
     def is_allowed(self, api_endpoint: str) -> bool:
-        """检查 API 端点是否在白名单中且有效。
+        """检查 API 端点是否在白名单中且有效
 
         Args:
             api_endpoint: API 端点
@@ -31,7 +31,7 @@ class WhitelistServicePort(Protocol):
         """
 
     def add_to_whitelist(self, api: ExternalAPIWhitelist) -> None:
-        """添加 API 到白名单。
+        """添加 API 到白名单
 
         Args:
             api: 外部 API 白名单条目

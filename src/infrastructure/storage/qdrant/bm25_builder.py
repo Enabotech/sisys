@@ -1,6 +1,6 @@
-"""BM25 稀疏向量构建器。
+"""BM25 稀疏向量构建器
 
-MVP 实现使用简单 TF-IDF 计算，后续 Story 3.4 替换为 Qdrant 原生 BM25。
+MVP 实现使用简单 TF-IDF 计算，后续 Story 3.4 替换为 Qdrant 原生 BM25
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from src.infrastructure.storage.qdrant.models import SparseVector
 
 
 class BM25Builder:
-    """BM25 稀疏向量构建器。
+    """BM25 稀疏向量构建器
 
-    MVP 使用简单 TF-IDF 计算。
+    MVP 使用简单 TF-IDF 计算
     """
 
     _stop_words = {
@@ -124,9 +124,9 @@ class BM25Builder:
     }
 
     def build_sparse_vector(self, text: str) -> SparseVector:
-        """从文本构建稀疏向量。
+        """从文本构建稀疏向量
 
-        使用简单 TF-IDF 计算。
+        使用简单 TF-IDF 计算
 
         Args:
             text: 输入文本
@@ -158,7 +158,7 @@ class BM25Builder:
         return SparseVector(indices=indices, values=values)
 
     def _tokenize(self, text: str) -> list[str]:
-        """分词并过滤停用词。
+        """分词并过滤停用词
 
         Args:
             text: 输入文本

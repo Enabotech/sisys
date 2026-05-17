@@ -1,10 +1,10 @@
-"""SISYS 应用层会话缓存端口模块。
+"""SISYS 应用层会话缓存端口模块
 
-继承 L1CachePort，添加会话状态 save/load 语义。
+继承 L1CachePort，添加会话状态 save/load 语义
 
 注意: SemanticCache 的 get(query_embedding, threshold) 签名与
-L1CachePort.get(memory_type, owner_id, name) 不兼容，不能继承。
-SemanticCache 作为独立应用端口存在。
+L1CachePort.get(memory_type, owner_id, name) 不兼容，不能继承
+SemanticCache 作为独立应用端口存在
 
 Author:
     agimtech <agimtech@126.com>
@@ -22,7 +22,7 @@ from src.domain.ports.l1_cache import L1CachePort
 
 @runtime_checkable
 class SessionCachePort(L1CachePort, Protocol):
-    """会话缓存端口 — 继承L1CachePort，添加会话管理语义。
+    """会话缓存端口 — 继承L1CachePort，添加会话管理语义
 
     继承所有L1方法，额外提供：
     - 会话状态save/load语义
@@ -36,7 +36,7 @@ class SessionCachePort(L1CachePort, Protocol):
         state: dict,
         ttl: int = 86400,
     ) -> None:
-        """保存会话状态。
+        """保存会话状态
 
         Args:
             session_id: 会话 ID
@@ -46,7 +46,7 @@ class SessionCachePort(L1CachePort, Protocol):
         """
 
     async def load_session(self, session_id: str) -> dict | None:
-        """加载会话状态。
+        """加载会话状态
 
         Args:
             session_id: 会话 ID
@@ -56,14 +56,14 @@ class SessionCachePort(L1CachePort, Protocol):
         """
 
     async def delete_session(self, session_id: str) -> None:
-        """删除会话。
+        """删除会话
 
         Args:
             session_id: 会话 ID
         """
 
     async def session_exists(self, session_id: str) -> bool:
-        """检查会话是否存在。
+        """检查会话是否存在
 
         Args:
             session_id: 会话 ID

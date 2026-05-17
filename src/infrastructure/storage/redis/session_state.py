@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 @dataclass
 class SessionState:
-    """会话状态缓存数据模型。
+    """会话状态缓存数据模型
 
     Attributes:
         session_id: 会话唯一标识
@@ -42,7 +42,7 @@ class SessionState:
 
     @classmethod
     def from_dict(cls, data: dict) -> SessionState:
-        """从字典反序列化。
+        """从字典反序列化
 
         Args:
             data: 包含会话状态字段的字典

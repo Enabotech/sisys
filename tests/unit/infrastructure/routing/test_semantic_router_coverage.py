@@ -1,4 +1,4 @@
-"""补充测试：提升 SemanticRouter 覆盖率至 85%+。
+"""补充测试：提升 SemanticRouter 覆盖率至 85%+
 
 覆盖未测试的路径：
 - __init__() 带 cache_ttl_seconds 参数

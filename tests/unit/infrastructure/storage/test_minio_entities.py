@@ -1,6 +1,6 @@
-"""MinIO 实体测试 — ObjectMetadata / LifecycleRule。
+"""MinIO 实体测试 — ObjectMetadata / LifecycleRule
 
-TDD 红→绿→重构循环 B。
+TDD 红→绿→重构循环 B
 """
 
 from __future__ import annotations

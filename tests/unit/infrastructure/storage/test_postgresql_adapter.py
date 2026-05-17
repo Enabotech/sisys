@@ -1,6 +1,6 @@
-"""PostgreSQLAdapter 单元测试（原 BaseRepository 测试适配）。
+"""PostgreSQLAdapter 单元测试（原 BaseRepository 测试适配）
 
-测试 CRUD 操作和事务回滚。
+测试 CRUD 操作和事务回滚
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """Unit tests for MemoryService.
 
 TDD 阶段：红 → 绿
-验证 MemoryService CRUD 操作和事件发布。
+验证 MemoryService CRUD 操作和事件发布
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
-"""SISYS 领域层记忆变更事件模块。
+"""SISYS 领域层记忆变更事件模块
 
-定义用户记忆变更事件 MemoryChanged。
+定义用户记忆变更事件 MemoryChanged
 
 触发时机:
 - L1 显式确认：用户主动说"记住..."（is_automatic=False）
@@ -28,16 +28,16 @@ from .base import DomainEvent
 
 @dataclass(frozen=True)
 class MemoryChanged(DomainEvent):
-    """用户记忆变更事件。
+    """用户记忆变更事件
 
     Attributes:
-        memory_id: 记忆唯一标识（UUID 字符串）。
-        user_id: 用户标识（多租户隔离）。
-        name: 记忆名称（UNIQUE）。
-        change_type: 变更类型（create/update/delete）。
-        is_automatic: 是否自动触发（False=用户主动，True=系统自动）。
-        old_value: 变更前的值（dict 或 None）。
-        new_value: 变更后的值（dict 或 None）。
+        memory_id: 记忆唯一标识（UUID 字符串）
+        user_id: 用户标识（多租户隔离）
+        name: 记忆名称（UNIQUE）
+        change_type: 变更类型（create/update/delete）
+        is_automatic: 是否自动触发（False=用户主动，True=系统自动）
+        old_value: 变更前的值（dict 或 None）
+        new_value: 变更后的值（dict 或 None）
     """
 
     memory_id: str = ""

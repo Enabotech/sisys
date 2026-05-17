@@ -1,6 +1,6 @@
-"""QdrantAdapter — L3VectorPort 实现。
+"""QdrantAdapter — L3VectorPort 实现
 
-包装现有 QdrantVectorStorage，实现 L3VectorPort 接口。
+包装现有 QdrantVectorStorage，实现 L3VectorPort 接口
 
 设计原则：
 - 薄适配器层，仅做接口转换
@@ -19,15 +19,15 @@ if TYPE_CHECKING:
 
 
 class QdrantAdapter(L3VectorPort):
-    """Qdrant 向量存储适配器。
+    """Qdrant 向量存储适配器
 
     包装现有 QdrantVectorStorage + QdrantCollectionManager，
-    实现 L3VectorPort 接口。
-    所有方法委托给内部存储/管理器实例。
+    实现 L3VectorPort 接口
+    所有方法委托给内部存储/管理器实例
     """
 
     def __init__(self, storage: Any, collection_manager: Any | None = None):
-        """初始化适配器。
+        """初始化适配器
 
         Args:
             storage: QdrantVectorStorage 实例
@@ -41,7 +41,7 @@ class QdrantAdapter(L3VectorPort):
         collection: str,
         points: list[dict],
     ) -> bool:
-        """批量插入或更新向量点。
+        """批量插入或更新向量点
 
         Args:
             collection: Collection 名称
@@ -72,7 +72,7 @@ class QdrantAdapter(L3VectorPort):
         collection: str,
         point_ids: list[str],
     ) -> bool:
-        """批量删除向量点。
+        """批量删除向量点
 
         Args:
             collection: Collection 名称
@@ -88,7 +88,7 @@ class QdrantAdapter(L3VectorPort):
         collection: str,
         point_id: str,
     ) -> dict | None:
-        """获取单个向量点。
+        """获取单个向量点
 
         Args:
             collection: Collection 名称
@@ -106,7 +106,7 @@ class QdrantAdapter(L3VectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """Dense 语义检索。
+        """Dense 语义检索
 
         Args:
             collection: Collection 名称
@@ -134,7 +134,7 @@ class QdrantAdapter(L3VectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """BM25 稀疏检索。
+        """BM25 稀疏检索
 
         Args:
             collection: Collection 名称
@@ -168,7 +168,7 @@ class QdrantAdapter(L3VectorPort):
         vector_size: int,
         vector_params: dict | None = None,
     ) -> bool:
-        """创建 Collection。
+        """创建 Collection
 
         Args:
             collection: Collection 名称
@@ -196,7 +196,7 @@ class QdrantAdapter(L3VectorPort):
         self,
         collection: str,
     ) -> bool:
-        """删除 Collection。
+        """删除 Collection
 
         Args:
             collection: Collection 名称
@@ -212,7 +212,7 @@ class QdrantAdapter(L3VectorPort):
         self,
         collection: str,
     ) -> bool:
-        """检查 Collection 是否存在。
+        """检查 Collection 是否存在
 
         Args:
             collection: Collection 名称
@@ -227,7 +227,7 @@ class QdrantAdapter(L3VectorPort):
     async def list_collections(
         self,
     ) -> list[str]:
-        """列出所有 Collection。
+        """列出所有 Collection
 
         Returns:
             Collection 名称列表

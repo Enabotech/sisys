@@ -1,7 +1,7 @@
-"""MinIO 对象存储实体。
+"""MinIO 对象存储实体
 
 ObjectMetadata 和 LifecycleRule 是存储结构（与 Story 1.4 的 SessionState/CacheEntry 一致），
-位于基础设施层，不在领域层。
+位于基础设施层，不在领域层
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from uuid import UUID
 
 @dataclass
 class ObjectMetadata:
-    """对象存储元数据。
+    """对象存储元数据
 
     Attributes:
         object_id: 对象唯一标识（UUID）
@@ -69,7 +69,7 @@ class ObjectMetadata:
 
     @classmethod
     def from_dict(cls, data: dict) -> ObjectMetadata:
-        """从字典反序列化。
+        """从字典反序列化
 
         Args:
             data: 包含对象元数据字段的字典
@@ -97,7 +97,7 @@ class ObjectMetadata:
 
 @dataclass
 class LifecycleRule:
-    """对象生命周期规则。
+    """对象生命周期规则
 
     Attributes:
         rule_id: 规则唯一标识

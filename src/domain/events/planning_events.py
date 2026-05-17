@@ -1,6 +1,6 @@
-"""SISYS 领域层 战略规划事件模块。
+"""SISYS 领域层 战略规划事件模块
 
-定义战略规划偏差相关的领域事件。
+定义战略规划偏差相关的领域事件
 
 Author:
     agimtech <agimtech@126.com>
@@ -20,16 +20,16 @@ from .enums import DeviationLevel, DeviationType
 
 @dataclass(frozen=True)
 class StrategicDeviationWarning(DomainEvent):
-    """战略规划偏离预期轨迹时触发的事件。
+    """战略规划偏离预期轨迹时触发的事件
 
     Attributes:
-        warning_id: 警告唯一标识符。
-        event_type: 事件类型，固定为"StrategicDeviationWarning"。
-        deviation_type: 偏差类型。
-        deviation_level: 偏差级别。
-        actual_value: 实际值。
-        planned_value: 计划值。
-        threshold: 阈值。
+        warning_id: 警告唯一标识符
+        event_type: 事件类型，固定为"StrategicDeviationWarning"
+        deviation_type: 偏差类型
+        deviation_level: 偏差级别
+        actual_value: 实际值
+        planned_value: 计划值
+        threshold: 阈值
     """
 
     warning_id: uuid.UUID = field(default_factory=uuid.uuid4)

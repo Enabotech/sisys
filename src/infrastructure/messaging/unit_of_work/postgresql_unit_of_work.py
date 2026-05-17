@@ -1,6 +1,6 @@
-"""PostgreSQL UnitOfWork 实现 — 基础设施层。
+"""PostgreSQL UnitOfWork 实现 — 基础设施层
 
-基于 SQLAlchemy AsyncSession 的工作单元模式实现。
+基于 SQLAlchemy AsyncSession 的工作单元模式实现
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
@@ -22,10 +22,10 @@ if TYPE_CHECKING:
 
 
 class PostgreSQLUnitOfWork(UnitOfWork):
-    """PostgreSQL 工作单元实现。
+    """PostgreSQL 工作单元实现
 
-    使用 SQLAlchemy AsyncSession 管理事务。
-    实现领域层 UnitOfWork 接口。
+    使用 SQLAlchemy AsyncSession 管理事务
+    实现领域层 UnitOfWork 接口
     """
 
     _committed: bool = False
@@ -37,9 +37,9 @@ class PostgreSQLUnitOfWork(UnitOfWork):
 
     @property
     def session(self) -> AsyncSession:
-        """获取当前事务的 session。
+        """获取当前事务的 session
 
-        EventHandler 使用此属性提取 session 传入各 Repository。
+        EventHandler 使用此属性提取 session 传入各 Repository
         """
         return get_session()
 
@@ -66,15 +66,15 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         self._rolled_back = True
 
     async def begin_nested(self) -> None:
-        """创建 savepoint（嵌套事务）。
+        """创建 savepoint（嵌套事务）
 
-        使用 SQLAlchemy 的 begin_nested() 创建未命名 savepoint。
+        使用 SQLAlchemy 的 begin_nested() 创建未命名 savepoint
         savepoint 内的操作可通过 rollback() 回滚到 savepoint 点，
-        或通过外层 commit() 一起提交。
+        或通过外层 commit() 一起提交
 
-        注意：SQLAlchemy 无"释放 savepoint" API。
-        调用 commit() 会提交整个事务链（包括所有 savepoint）。
-        若需回滚单个 savepoint，使用 rollback()。
+        注意：SQLAlchemy 无"释放 savepoint" API
+        调用 commit() 会提交整个事务链（包括所有 savepoint）
+        若需回滚单个 savepoint，使用 rollback()
         """
         await self._session.begin_nested()
 
@@ -93,7 +93,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        """异步上下文管理器出口。
+        """异步上下文管理器出口
 
         规则：
         - 异常：rollback（处理 rollback 失败也要 close session）

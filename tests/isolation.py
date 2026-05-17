@@ -66,7 +66,7 @@ class TenantContext:
     """租户上下文管理器
 
     使用 asyncio.current_task().ident 作为线程/协程本地存储的 key，
-    确保同一进程内的不同协程拥有不同的租户隔离。
+    确保同一进程内的不同协程拥有不同的租户隔离
     """
 
     _tenants: dict[int, TestTenant] = {}
@@ -151,7 +151,7 @@ class TenantContext:
 def generate_test_tenant() -> TestTenant:
     """生成新的测试租户
 
-    每次调用生成唯一的租户 ID，用于隔离测试资源。
+    每次调用生成唯一的租户 ID，用于隔离测试资源
     """
     return TestTenant()
 
@@ -159,7 +159,7 @@ def generate_test_tenant() -> TestTenant:
 class TenantAwareMock:
     """租户感知的 Mock 基类
 
-    自动为资源名称添加租户前缀，避免并行测试冲突。
+    自动为资源名称添加租户前缀，避免并行测试冲突
     """
 
     def __init__(self, tenant: TestTenant | None = None):

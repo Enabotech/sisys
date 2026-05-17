@@ -1,6 +1,6 @@
-"""SISYS 领域层 事件异常模块。
+"""SISYS 领域层 事件异常模块
 
-定义事件存储相关异常。
+定义事件存储相关异常
 
 Author:
     agimtech <agimtech@126.com>

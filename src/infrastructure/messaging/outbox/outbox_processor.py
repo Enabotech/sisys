@@ -1,7 +1,7 @@
-"""AsyncOutboxPoller — 基础设施层实现。
+"""AsyncOutboxPoller — 基础设施层实现
 
-异步协程轮询 OutboxEntity，发布至 RabbitMQ。
-统一 async 路径，使用 asyncio.Semaphore 控制并发。
+异步协程轮询 OutboxEntity，发布至 RabbitMQ
+统一 async 路径，使用 asyncio.Semaphore 控制并发
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class AsyncOutboxPoller:
-    """异步发件箱轮询器。
+    """异步发件箱轮询器
 
-    定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ。
-    成功则标记为 published，失败则标记为 failed。
+    定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ
+    成功则标记为 published，失败则标记为 failed
     """
 
     def __init__(
@@ -29,7 +29,7 @@ class AsyncOutboxPoller:
         poll_interval: float = 1.0,
         batch_size: int = 10,
     ):
-        """初始化 AsyncOutboxPoller。
+        """初始化 AsyncOutboxPoller
 
         Args:
             outbox_repository: InMemoryOutboxRepository 实例

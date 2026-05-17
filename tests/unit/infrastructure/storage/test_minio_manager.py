@@ -1,6 +1,6 @@
-"""MinIO 客户端适配器测试。
+"""MinIO 客户端适配器测试
 
-TDD 红→绿→重构循环 A + B。
+TDD 红→绿→重构循环 A + B
 """
 
 from __future__ import annotations

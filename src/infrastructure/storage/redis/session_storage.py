@@ -1,7 +1,7 @@
-"""Redis Session Storage — 基础设施层实现。
+"""Redis Session Storage — 基础设施层实现
 
-实现 Story 1.4 定义的 SessionStorage 接口。
-使用 Redis Hash 存储会话状态，支持自动过期。
+实现 Story 1.4 定义的 SessionStorage 接口
+使用 Redis Hash 存储会话状态，支持自动过期
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 class RedisSessionStorage(SessionStorage):
-    """Redis 会话状态存储。
+    """Redis 会话状态存储
 
-    使用 Redis Hash (HSET/HGET/HDEL) 存储会话状态。
+    使用 Redis Hash (HSET/HGET/HDEL) 存储会话状态
     键格式: sisys:session:{session_id}
-    支持自动 TTL 过期。
+    支持自动 TTL 过期
 
     Args:
         redis_client: Redis 异步客户端（由 RedisConnectionManager 统一提供）
@@ -31,7 +31,7 @@ class RedisSessionStorage(SessionStorage):
     _NAMESPACE = "session"
 
     def __init__(self, redis_client: aioredis.Redis):
-        """初始化 Redis Session Storage。
+        """初始化 Redis Session Storage
 
         Args:
             redis_client: Redis 异步客户端
@@ -39,7 +39,7 @@ class RedisSessionStorage(SessionStorage):
         self._redis = redis_client
 
     async def save(self, session_id: str, agent_id: str, state: dict, ttl: int = 86400) -> None:
-        """保存会话状态。
+        """保存会话状态
 
         Args:
             session_id: 会话唯一标识
@@ -60,7 +60,7 @@ class RedisSessionStorage(SessionStorage):
             logger.error("Failed to save session %s to Redis: %s", session_id, e)
 
     async def load(self, session_id: str) -> dict | None:
-        """加载会话状态。
+        """加载会话状态
 
         Args:
             session_id: 会话唯一标识
@@ -83,7 +83,7 @@ class RedisSessionStorage(SessionStorage):
             return None
 
     async def delete(self, session_id: str) -> None:
-        """删除会话状态。
+        """删除会话状态
 
         Args:
             session_id: 会话唯一标识
@@ -99,7 +99,7 @@ class RedisSessionStorage(SessionStorage):
             logger.error("Failed to delete session %s from Redis: %s", session_id, e)
 
     async def exists(self, session_id: str) -> bool:
-        """检查会话状态是否存在。
+        """检查会话状态是否存在
 
         Args:
             session_id: 会话唯一标识

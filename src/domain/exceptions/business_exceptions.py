@@ -1,6 +1,6 @@
-"""SISYS 领域层 业务级异常模块。
+"""SISYS 领域层 业务级异常模块
 
-定义业务级异常，用于表示业务规则违反，如验证失败、资源不存在、资源冲突等。
+定义业务级异常，用于表示业务规则违反，如验证失败、资源不存在、资源冲突等
 
 Author:
     agimtech <agimtech@126.com>
@@ -70,9 +70,9 @@ class BusinessRuleViolationError(BusinessException):
 
 
 class InvalidStateTransitionError(InvalidStateError):
-    """状态转换异常（保留 from_status/to_status 接口）。
+    """状态转换异常（保留 from_status/to_status 接口）
 
-    用于 Outbox 等状态机的状态转换验证。
+    用于 Outbox 等状态机的状态转换验证
     """
 
     code = "EXCEPTION_208"

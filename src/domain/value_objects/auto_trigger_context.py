@@ -1,7 +1,7 @@
-"""SISYS 领域层自动触发上下文值对象模块。
+"""SISYS 领域层自动触发上下文值对象模块
 
 从领域事件或心跳事件中提取的上下文信息，用于传递给下游自动路由/
-自动执行阶段。遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖。
+自动执行阶段。遵循六边形架构：值对象，仅包含业务逻辑，无外部依赖
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,10 +19,10 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AutoTriggerContext:
-    """从自动触发事件中提取的上下文值对象（不可变）。
+    """从自动触发事件中提取的上下文值对象（不可变）
 
     由 AutoTriggerService 使用，将 session_id、agent_id 和任务上下文传递给
-    自动路由阶段。
+    自动路由阶段
 
     Attributes:
         session_id: 会话标识符
@@ -55,7 +55,7 @@ class AutoTriggerContext:
         payload: dict[str, Any],
         event_id: str | None = None,
     ) -> AutoTriggerContext:
-        """从领域事件载荷中提取自动触发上下文。
+        """从领域事件载荷中提取自动触发上下文
 
         Args:
             event_type: 领域事件类型（如 "DocumentProcessed"）
@@ -114,7 +114,7 @@ class AutoTriggerContext:
         todo_items: tuple[str, ...] | None = None,
         cost_budget: float = 0.0,
     ) -> AutoTriggerContext:
-        """从心跳事件中提取自动触发上下文。
+        """从心跳事件中提取自动触发上下文
 
         Args:
             heartbeat_id: 心跳唯一标识符

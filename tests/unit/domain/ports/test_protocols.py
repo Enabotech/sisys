@@ -1,7 +1,7 @@
-"""Protocol 结构化类型验证测试。
+"""Protocol 结构化类型验证测试
 
 验证所有 domain port Protocol 的 runtime_checkable 装饰器和
-结构化子类型检查行为。
+结构化子类型检查行为
 """
 
 from __future__ import annotations
@@ -156,11 +156,11 @@ class TestSnapshotRepositoryProtocol:
 
 
 class TestConnectionManager:
-    """ConnectionManager Protocol 测试。
+    """ConnectionManager Protocol 测试
 
     注意：Python @runtime_checkable 对含 async def 的 Protocol 的
-    isinstance 检查存在已知限制（仅检查方法名存在性，不区分同步/异步）。
-    因此 ConnectionManager 的健康检查方法签名通过行为测试验证。
+    isinstance 检查存在已知限制（仅检查方法名存在性，不区分同步/异步）
+    因此 ConnectionManager 的健康检查方法签名通过行为测试验证
     """
 
     def test_health_check_is_async(self) -> None:

@@ -1,6 +1,6 @@
 """LoginAttemptModel — SQLAlchemy model for login_attempts table.
 
-跟踪用户登录失败尝试，用于账户锁定功能（等保 2.0 合规）。
+跟踪用户登录失败尝试，用于账户锁定功能（等保 2.0 合规）
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def _utc_now() -> datetime:
 class LoginAttemptModel(Base):
     """SQLAlchemy model for the login_attempts table.
 
-    跟踪登录失败尝试，用于实现账户锁定（连续失败 5 次后锁定 30 分钟）。
+    跟踪登录失败尝试，用于实现账户锁定（连续失败 5 次后锁定 30 分钟）
     """
 
     __tablename__ = "login_attempts"

@@ -1,6 +1,6 @@
-"""SISYS 基础设施层认证配置模块。
+"""SISYS 基础设施层认证配置模块
 
-提供 JWT 认证和授权配置，用于 RBAC 权限管理系统。
+提供 JWT 认证和授权配置，用于 RBAC 权限管理系统
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 @dataclass
 class AuthConfig:
-    """JWT 认证和授权配置。
+    """JWT 认证和授权配置
 
-    用于 RBAC 权限管理系统，支持 JWT 令牌生成和验证。
+    用于 RBAC 权限管理系统，支持 JWT 令牌生成和验证
 
     Attributes:
         jwt_secret_key: JWT 签名密钥（生产环境必须使用强随机密钥）
@@ -51,7 +51,7 @@ class AuthConfig:
 
     @classmethod
     def from_env(cls) -> AuthConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）

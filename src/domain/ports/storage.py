@@ -1,7 +1,7 @@
-"""SISYS 领域层对象存储仓储模块（DEPRECATED）。
+"""SISYS 领域层对象存储仓储模块（DEPRECATED）
 
-已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）。
-本文件仅保留向后兼容。
+已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）
+本文件仅保留向后兼容
 
 Author:
     agimtech <agimtech@126.com>
@@ -22,13 +22,13 @@ __all__ = ["ComplianceLockError"]
 
 @runtime_checkable
 class ObjectStorageRepository(Protocol):
-    """对象存储领域仓储接口（DEPRECATED — 使用 L4ObjectPort）。
+    """对象存储领域仓储接口（DEPRECATED — 使用 L4ObjectPort）
 
     定义领域操作（store/retrieve/delete/archive），
-    不暴露 S3 原生概念（bucket/key/ETag 等）。
+    不暴露 S3 原生概念（bucket/key/ETag 等）
 
     DEPRECATED:
-        请使用 L4ObjectPort 替代。
+        请使用 L4ObjectPort 替代
     """
 
     async def store(
@@ -39,7 +39,7 @@ class ObjectStorageRepository(Protocol):
         content_type: str,
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象，返回 version_id。大文件自动分片上传。
+        """存储对象，返回 version_id。大文件自动分片上传
 
         Args:
             bucket_type: Bucket 类型（如 "raw-documents"、"audit-archives"）
@@ -58,7 +58,7 @@ class ObjectStorageRepository(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> AsyncIterator[bytes]:
-        """流式下载对象，防止大文件 OOM。
+        """流式下载对象，防止大文件 OOM
 
         Args:
             bucket_type: Bucket 类型
@@ -75,7 +75,7 @@ class ObjectStorageRepository(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。WORM 锁定对象抛出 ComplianceLockError。
+        """删除对象。WORM 锁定对象抛出 ComplianceLockError
 
         Args:
             bucket_type: Bucket 类型
@@ -95,7 +95,7 @@ class ObjectStorageRepository(Protocol):
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据。
+        """获取对象元数据
 
         Args:
             bucket_type: Bucket 类型
@@ -112,7 +112,7 @@ class ObjectStorageRepository(Protocol):
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象，支持前缀过滤。
+        """列出对象，支持前缀过滤
 
         Args:
             bucket_type: Bucket 类型
@@ -130,7 +130,7 @@ class ObjectStorageRepository(Protocol):
         content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:
-        """归档对象至 WORM 存储，启用 Object Lock。
+        """归档对象至 WORM 存储，启用 Object Lock
 
         Args:
             bucket_type: Bucket 类型

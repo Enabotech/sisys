@@ -1,6 +1,6 @@
-"""Qdrant Collection 管理器实现。
+"""Qdrant Collection 管理器实现
 
-负责 Collection 的创建、删除、查询和列表操作。
+负责 Collection 的创建、删除、查询和列表操作
 """
 
 from __future__ import annotations
@@ -10,13 +10,13 @@ from qdrant_client.models import Distance, VectorParams
 
 
 class QdrantCollectionManager:
-    """Qdrant Collection 管理器。
+    """Qdrant Collection 管理器
 
-    实现 CollectionManager 接口，提供 Collection 生命周期管理。
+    实现 CollectionManager 接口，提供 Collection 生命周期管理
     """
 
     def __init__(self, client: AsyncQdrantClient):
-        """初始化 Collection 管理器。
+        """初始化 Collection 管理器
 
         Args:
             client: Qdrant 异步客户端实例
@@ -30,7 +30,7 @@ class QdrantCollectionManager:
         distance: str = "Cosine",
         **kwargs,
     ) -> bool:
-        """创建 Collection。
+        """创建 Collection
 
         Args:
             name: Collection 名称
@@ -74,7 +74,7 @@ class QdrantCollectionManager:
         return True
 
     async def delete_collection(self, name: str) -> bool:
-        """删除 Collection。
+        """删除 Collection
 
         Args:
             name: Collection 名称
@@ -89,7 +89,7 @@ class QdrantCollectionManager:
         return True
 
     async def collection_exists(self, name: str) -> bool:
-        """检查 Collection 是否存在。
+        """检查 Collection 是否存在
 
         Args:
             name: Collection 名称
@@ -104,7 +104,7 @@ class QdrantCollectionManager:
             return False
 
     async def list_collections(self) -> list[str]:
-        """列出所有 Collection。
+        """列出所有 Collection
 
         Returns:
             Collection 名称列表

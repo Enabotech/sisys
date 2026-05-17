@@ -1,6 +1,6 @@
-"""SISYS 基础设施层异常指标实现模块。
+"""SISYS 基础设施层异常指标实现模块
 
-提供异常监控指标的基础设施层实现，支持 Prometheus 格式导出。
+提供异常监控指标的基础设施层实现，支持 Prometheus 格式导出
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,9 +19,9 @@ from src.application.ports.exception_metrics_port import ExceptionMetricsPort
 
 @dataclass
 class ExceptionMetricsImpl(ExceptionMetricsPort):
-    """异常指标收集器（线程安全）。
+    """异常指标收集器（线程安全）
 
-    提供简单的异常计数指标，支持 Prometheus 格式导出。
+    提供简单的异常计数指标，支持 Prometheus 格式导出
 
     Attributes:
         _counters: 异常计数字典，键为异常类型或异常类型:错误码
@@ -97,7 +97,7 @@ _metrics_lock: Lock = Lock()
 
 
 def get_exception_metrics() -> ExceptionMetricsPort:
-    """获取全局异常指标实例。
+    """获取全局异常指标实例
 
     Returns:
         ExceptionMetricsPort 单例

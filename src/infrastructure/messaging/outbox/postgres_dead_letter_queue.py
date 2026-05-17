@@ -1,4 +1,4 @@
-"""PostgreSQL Dead Letter Queue — 基础设施层实现。
+"""PostgreSQL Dead Letter Queue — 基础设施层实现
 
 基于 PostgreSQL 的持久化死信队列，支持：
 - 事件持久化存储
@@ -94,7 +94,7 @@ class DeadLetterQueueEntry:
 
 
 class PostgresDeadLetterQueue:
-    """PostgreSQL 持久化死信队列。
+    """PostgreSQL 持久化死信队列
 
     使用 PostgreSQL 存储死信事件，支持：
     - 入队（持久化）
@@ -108,7 +108,7 @@ class PostgresDeadLetterQueue:
         return get_session()
 
     async def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0, context: dict | None = None) -> None:
-        """入队失败事件至 PostgreSQL。
+        """入队失败事件至 PostgreSQL
 
         Args:
             event: 领域事件
@@ -138,7 +138,7 @@ class PostgresDeadLetterQueue:
         )
 
     async def dequeue(self) -> tuple[DeadLetterQueueEntry, DomainEvent, str, int] | None:
-        """出队最旧的 pending 事件。
+        """出队最旧的 pending 事件
 
         Returns:
             (entry, event, error, retry_count) 或 None（队列为空）
@@ -174,7 +174,7 @@ class PostgresDeadLetterQueue:
         return (entry, event, model.error_message or "", model.retry_count)
 
     async def get_all(self, limit: int = 100) -> list[DeadLetterQueueEntry]:
-        """获取所有 DLQ 条目（最近优先）。
+        """获取所有 DLQ 条目（最近优先）
 
         Args:
             limit: 最大返回数量
@@ -189,7 +189,7 @@ class PostgresDeadLetterQueue:
         return [self._model_to_entry(m) for m in models]
 
     async def get_by_status(self, status: str, limit: int = 100) -> list[DeadLetterQueueEntry]:
-        """按状态筛选 DLQ 条目。
+        """按状态筛选 DLQ 条目
 
         Args:
             status: 状态筛选（pending/processed）
@@ -208,7 +208,7 @@ class PostgresDeadLetterQueue:
         return [self._model_to_entry(m) for m in models]
 
     async def mark_action_taken(self, entry_id: UUID, action: str) -> None:
-        """标记人工处理动作。
+        """标记人工处理动作
 
         Args:
             entry_id: 条目 ID
@@ -221,7 +221,7 @@ class PostgresDeadLetterQueue:
             model.status = "processed"
 
     async def count_pending(self) -> int:
-        """统计 pending 条目数量。
+        """统计 pending 条目数量
 
         Returns:
             pending 状态条目数量
@@ -232,9 +232,9 @@ class PostgresDeadLetterQueue:
         return result.scalar() or 0
 
     def __len__(self) -> int:
-        """返回 pending 条目数量（同步接口，供外部调用）。
+        """返回 pending 条目数量（同步接口，供外部调用）
 
-        Note: 这是一个同步代理，实际统计需要异步调用 count_pending()。
+        Note: 这是一个同步代理，实际统计需要异步调用 count_pending()
         """
         raise NotImplementedError("Use count_pending() for async count")
 

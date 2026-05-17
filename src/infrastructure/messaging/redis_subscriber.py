@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Redis 事件订阅模块。
+"""SISYS 基础设施层 Redis 事件订阅模块
 
-用于 Redis Pub/Sub 实时通知通道的订阅端，支持多频道订阅、事件反序列化和优雅关闭。
+用于 Redis Pub/Sub 实时通知通道的订阅端，支持多频道订阅、事件反序列化和优雅关闭
 
 Author:
     agimtech <agimtech@126.com>
@@ -31,14 +31,14 @@ ErrorHandler = Callable[[str, str, Exception], None]
 
 
 class RedisEventSubscriber:
-    """Redis Pub/Sub 事件订阅器。
+    """Redis Pub/Sub 事件订阅器
 
-    支持多频道订阅、事件反序列化、优雅关闭。
-    注意：Redis 通道为"尽力而为"，不保证可靠投递。
+    支持多频道订阅、事件反序列化、优雅关闭
+    注意：Redis 通道为"尽力而为"，不保证可靠投递
     """
 
     def __init__(self, config: RedisConfig):
-        """初始化 RedisEventSubscriber。
+        """初始化 RedisEventSubscriber
 
         Args:
             config: Redis 连接配置
@@ -71,7 +71,7 @@ class RedisEventSubscriber:
         handler: EventHandler,
         error_handler: ErrorHandler | None = None,
     ) -> None:
-        """订阅 Redis 频道。
+        """订阅 Redis 频道
 
         Args:
             channel: Redis 频道名
@@ -112,7 +112,7 @@ class RedisEventSubscriber:
             logger.debug("RedisEventSubscriber listen loop cancelled")
 
     def _dispatch_message(self, channel: str, data: str) -> None:
-        """分发消息到注册的处理器。
+        """分发消息到注册的处理器
 
         Args:
             channel: 频道名

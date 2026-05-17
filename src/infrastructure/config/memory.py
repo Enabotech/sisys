@@ -1,6 +1,6 @@
-"""SISYS 基础设施层记忆配置模块。
+"""SISYS 基础设施层记忆配置模块
 
-提供记忆系统的文件路径、缓存 TTL 和压缩率配置。
+提供记忆系统的文件路径、缓存 TTL 和压缩率配置
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 @dataclass
 class MemoryConfig:
-    """记忆系统配置。
+    """记忆系统配置
 
     Attributes:
         memory_l0_path: L0 文件系统路径
@@ -36,7 +36,7 @@ class MemoryConfig:
 
     @classmethod
     def from_env(cls) -> MemoryConfig:
-        """从环境变量加载配置。
+        """从环境变量加载配置
 
         Args:
             无（从 os.environ 读取）
@@ -62,7 +62,7 @@ class MemoryConfig:
         )
 
     def get_base_path(self) -> str:
-        """获取基础路径。
+        """获取基础路径
 
         Returns:
             基础路径字符串
@@ -70,7 +70,7 @@ class MemoryConfig:
         return self.memory_l0_path
 
     def get_memory_path(self, memory_type: str, memory_id: str) -> str:
-        """获取记忆文件路径。
+        """获取记忆文件路径
 
         Args:
             memory_type: 记忆类型（user/feedback/project/reference）
@@ -82,7 +82,7 @@ class MemoryConfig:
         return f"{self.memory_l0_path}/{memory_type}/{memory_id}.md"
 
     def get_memory_dir(self, memory_type: str) -> str:
-        """获取记忆类型目录。
+        """获取记忆类型目录
 
         Args:
             memory_type: 记忆类型
@@ -93,7 +93,7 @@ class MemoryConfig:
         return f"{self.memory_l0_path}/{memory_type}"
 
     def get_index_path(self) -> str:
-        """获取 MEMORY.md 索引路径。
+        """获取 MEMORY.md 索引路径
 
         Returns:
             MEMORY.md 完整路径

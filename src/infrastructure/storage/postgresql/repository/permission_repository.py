@@ -1,7 +1,7 @@
-"""PermissionRepository — 权限仓储实现。
+"""PermissionRepository — 权限仓储实现
 
-继承 PostgreSQLAdapter[Permission, PermissionModel]，实现实体↔模型转换。
-PermissionRepositoryPort 声明返回 Permission 领域实体。
+继承 PostgreSQLAdapter[Permission, PermissionModel]，实现实体↔模型转换
+PermissionRepositoryPort 声明返回 Permission 领域实体
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ class PermissionRepository(
     PostgreSQLAdapter[Permission, PermissionModel],
     PermissionRepositoryPort,
 ):
-    """权限仓储实现。
+    """权限仓储实现
 
-    通过 _to_entity/_to_model 隔离领域层与 ORM 层。
+    通过 _to_entity/_to_model 隔离领域层与 ORM 层
     """
 
     def __init__(self) -> None:

@@ -1,6 +1,6 @@
 """Tests for FileMemoryAdapter.
 
-GREEN PHASE: 验证 FileMemoryAdapter 文件系统操作。
+GREEN PHASE: 验证 FileMemoryAdapter 文件系统操作
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ description: 测试记忆
 type: user
 originSessionId: test-session
 ---
-这是测试记忆内容。
+这是测试记忆内容
 """
         await adapter.write(memory_id, "user", content)
 

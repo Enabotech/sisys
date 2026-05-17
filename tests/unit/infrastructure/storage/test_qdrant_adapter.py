@@ -1,7 +1,7 @@
 """Tests for QdrantAdapter — L3VectorPort implementation.
 
-验证适配器正确委托存储操作，实现 L3VectorPort 接口。
-架构意义：薄适配器层，仅做接口转换，不改变语义。
+验证适配器正确委托存储操作，实现 L3VectorPort 接口
+架构意义：薄适配器层，仅做接口转换，不改变语义
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Tests for MemoryService L0StoragePort dependency injection.
 
-RED PHASE: 验证 MemoryService 使用 L0StoragePort 接口而非具体实现。
+RED PHASE: 验证 MemoryService 使用 L0StoragePort 接口而非具体实现
 """
 
 from __future__ import annotations

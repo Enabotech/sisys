@@ -1,6 +1,6 @@
 """Tests for MemoryRouter.
 
-RED PHASE: 验证 MemoryRouter 路径路由功能。
+RED PHASE: 验证 MemoryRouter 路径路由功能
 """
 
 from __future__ import annotations

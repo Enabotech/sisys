@@ -1,6 +1,6 @@
-"""MinIO 对象存储层适配器。
+"""MinIO 对象存储层适配器
 
-L4 对象存储层 — MinIO S3 兼容实现。
+L4 对象存储层 — MinIO S3 兼容实现
 """
 
 from __future__ import annotations

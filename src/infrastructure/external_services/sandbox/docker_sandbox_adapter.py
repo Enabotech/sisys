@@ -1,6 +1,6 @@
-"""SISYS 基础设施层 Docker 沙箱适配器模块。
+"""SISYS 基础设施层 Docker 沙箱适配器模块
 
-使用 Docker 容器提供沙箱化代码执行能力，支持 CPU/内存/网络/文件系统隔离。
+使用 Docker 容器提供沙箱化代码执行能力，支持 CPU/内存/网络/文件系统隔离
 
 Author:
     agimtech <agimtech@126.com>
@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 class DockerSandboxAdapter(SandboxExecutor):
-    """基于 Docker 的沙箱执行适配器。
+    """基于 Docker 的沙箱执行适配器
 
-    使用 Docker 容器提供任务执行隔离，每个会话获得独立容器和资源限制。
+    使用 Docker 容器提供任务执行隔离，每个会话获得独立容器和资源限制
 
     Attributes:
         _running_containers: 正在运行的容器状态字典（类级别共享）
@@ -39,7 +39,7 @@ class DockerSandboxAdapter(SandboxExecutor):
     _running_containers: dict[str, bool] = {}
 
     async def start_container(self, session_id: str) -> None:
-        """启动指定会话的 Docker 容器。
+        """启动指定会话的 Docker 容器
 
         Args:
             session_id: 会话唯一标识符
@@ -72,7 +72,7 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ContainerStartError(f"Failed to start container: {e}") from e
 
     async def execute_code(self, session_id: str, code: str) -> dict[str, Any]:
-        """在 Docker 沙箱中执行代码。
+        """在 Docker 沙箱中执行代码
 
         Args:
             session_id: 会话标识符
@@ -108,7 +108,7 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ExecutionError(f"Execution failed: {e}") from e
 
     async def stop_container(self, session_id: str) -> None:
-        """停止并移除 Docker 容器。
+        """停止并移除 Docker 容器
 
         Args:
             session_id: 会话标识符
@@ -131,7 +131,7 @@ class DockerSandboxAdapter(SandboxExecutor):
             raise ContainerStopError(f"Failed to stop container: {e}") from e
 
     async def is_container_running(self, session_id: str) -> bool:
-        """检查指定会话的容器是否正在运行。
+        """检查指定会话的容器是否正在运行
 
         Args:
             session_id: 会话标识符

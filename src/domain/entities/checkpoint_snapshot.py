@@ -1,8 +1,8 @@
-"""SISYS 领域层检查点快照实体模块。
+"""SISYS 领域层检查点快照实体模块
 
-定义会话状态快照领域实体，用于中断恢复和时间旅行调试。
-遵循系统公理二（外部化记忆）：LLM 上下文 = 缓存，磁盘记忆 = 真相来源。
-快照序列化为 Redis Hash，TTL 可配置（默认 24h-30d）。
+定义会话状态快照领域实体，用于中断恢复和时间旅行调试
+遵循系统公理二（外部化记忆）：LLM 上下文 = 缓存，磁盘记忆 = 真相来源
+快照序列化为 Redis Hash，TTL 可配置（默认 24h-30d）
 
 Author:
     agimtech <agimtech@126.com>
@@ -22,9 +22,9 @@ from typing import Any
 
 @dataclass(frozen=True)
 class CheckpointSnapshot:
-    """会话状态快照领域实体。
+    """会话状态快照领域实体
 
-    创建后不可变。支持序列化为 Redis Hash 格式。
+    创建后不可变。支持序列化为 Redis Hash 格式
 
     Attributes:
         snapshot_id: Unique identifier for this snapshot
@@ -45,10 +45,10 @@ class CheckpointSnapshot:
     ttl_seconds: int = 86400  # Default 24 hours
 
     def to_redis_hash(self) -> dict[str, str]:
-        """序列化快照为 Redis Hash 格式。
+        """序列化快照为 Redis Hash 格式
 
         Returns:
-            适用于 HSET 操作的字典。
+            适用于 HSET 操作的字典
         """
         return {
             "snapshot_id": str(self.snapshot_id),
@@ -62,13 +62,13 @@ class CheckpointSnapshot:
 
     @classmethod
     def from_redis_hash(cls, data: dict[str, str]) -> CheckpointSnapshot:
-        """从 Redis Hash 反序列化快照。
+        """从 Redis Hash 反序列化快照
 
         Args:
-            data: HGETALL 操作返回的字典。
+            data: HGETALL 操作返回的字典
 
         Returns:
-            CheckpointSnapshot 实例。
+            CheckpointSnapshot 实例
         """
         return cls(
             snapshot_id=uuid.UUID(data["snapshot_id"]),
@@ -81,14 +81,14 @@ class CheckpointSnapshot:
         )
 
     def with_updated_state(self, state_data: dict[str, Any], new_version: int | None = None) -> CheckpointSnapshot:
-        """创建包含更新状态数据的新快照。
+        """创建包含更新状态数据的新快照
 
         Args:
-            state_data: 要合并的新状态数据。
-            new_version: 可选的新版本号（默认 state_version + 1）。
+            state_data: 要合并的新状态数据
+            new_version: 可选的新版本号（默认 state_version + 1）
 
         Returns:
-            合并状态后的新 CheckpointSnapshot。
+            合并状态后的新 CheckpointSnapshot
         """
         merged_state = {**self.state_data, **state_data}
         return CheckpointSnapshot(

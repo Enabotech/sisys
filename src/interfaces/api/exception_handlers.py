@@ -1,6 +1,6 @@
 """FastAPI 统一异常处理器.
 
-根据异常类型自动映射到正确的 HTTP 状态码。
+根据异常类型自动映射到正确的 HTTP 状态码
 """
 
 from __future__ import annotations
