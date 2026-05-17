@@ -166,7 +166,7 @@ class MemoryChangedHandler:
                 "name": event.name,
                 "type": memory_type,
                 "description": event.new_value.get("description", "") if event.new_value else "",
-                "is_group": memory_type == "group",
+                "is_group": event.new_value.get("memory_type") == "group" if event.new_value else False,
             }
             await self._index_manager.update_entry(entry)
             logger.debug(f"Index updated: memory_id={event.memory_id}")
@@ -175,16 +175,19 @@ class MemoryChangedHandler:
             # 不抛出异常，索引更新失败不影响主流程
 
     def _get_memory_type(self, event: MemoryChanged) -> str:
-        """从 new_value 中提取 memory_type。
+        """获取记忆的内容分类类型。
+
+        返回 MemoryMetadata.type 合法值（'user'|'feedback'|'project'|'reference'）。
+        可见性（private/group）通过 group_id 字段区分，不映射为 type。
 
         Args:
             event: MemoryChanged 事件
 
         Returns:
-            memory_type: 'private' | 'group'
+            内容分类类型（默认 'user'）
         """
-        if event.new_value and "type" in event.new_value:
-            type_val = event.new_value["type"]
-            if isinstance(type_val, str):
-                return type_val
-        return "private"  # 默认值
+        if event.new_value and "content_type" in event.new_value:
+            content_type: str = event.new_value["content_type"]
+            if content_type in {"user", "feedback", "project", "reference"}:
+                return content_type
+        return "user"

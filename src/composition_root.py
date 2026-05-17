@@ -49,6 +49,7 @@ def bootstrap() -> None:
     from src.application.ports.semantic_cache import SemanticCache
     from src.application.ports.session_cache_port import SessionCachePort
     from src.application.ports.text_extractor_service import TextExtractorService
+    from src.application.services.unified_storage_gateway import UnifiedStorageGateway
     from src.domain.ports.audit_repository import AuditRepositoryPort
     from src.domain.ports.audit_service import AuditServicePort
 
@@ -83,6 +84,7 @@ def bootstrap() -> None:
     from src.domain.ports.session_storage import SessionStorage
     from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
     from src.domain.ports.token_blacklist import TokenBlacklistPort
+    from src.domain.ports.unified_storage import UnifiedStoragePort
 
     # Repository ports
     from src.domain.ports.user_repository import UserRepositoryPort
@@ -738,6 +740,28 @@ def bootstrap() -> None:
         module="src.infrastructure.storage.neo4j.neo4j_memory_graph_storage",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
+    )
+
+    # UnifiedStorageGateway — 六层存储统一入口
+    register_port(
+        name="unified_storage",
+        version="v1.0.0",
+        interface=UnifiedStoragePort,
+        impl=lambda resolver: UnifiedStorageGateway(
+            l0_storage=resolver.resolve("l0_storage"),
+            l1_cache=resolver.resolve("memory_cache"),
+            l2_metadata=resolver.resolve("memory_metadata"),
+            l2_history=resolver.resolve("memory_change_history"),
+            l2_group_member=resolver.resolve("memory_group_member"),
+            l3_vector=resolver.resolve("memory_vector_storage"),
+            l4_object=resolver.resolve("document_storage"),
+            l5_graph=resolver.resolve("memory_graph_storage"),
+            event_publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.services.unified_storage_gateway",
+        lifetime=Lifetime.SCOPED,
+        owner="platform",
+        tags=("storage", "gateway", "application", "unified"),
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))

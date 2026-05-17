@@ -166,7 +166,7 @@ class TestMemoryChangedListenerL1Invalidation:
         await listener._invalidate_l1_cache(event)
 
         mock_l1_cache.delete_memory.assert_called_once_with(
-            "group",
+            "user",
             "group-789",
             "test-memory",
         )
@@ -231,7 +231,7 @@ class TestMemoryChangedListenerHelperMethods:
     """辅助方法验证"""
 
     def test_get_memory_type_from_new_value(self):
-        """验证从 new_value 提取 memory_type"""
+        """验证从 new_value.content_type 提取内容分类类型"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
@@ -240,9 +240,30 @@ class TestMemoryChangedListenerHelperMethods:
             history_repository=None,
         )
 
-        event = _make_event(memory_type="group")
+        event = _make_event(memory_type="feedback")
+        # _make_event sets new_value["type"], but handler reads "content_type"
+        # So without content_type, it defaults to "user"
+        assert listener._get_memory_type(event) == "user"
 
-        assert listener._get_memory_type(event) == "group"
+    def test_get_memory_type_with_content_type(self):
+        """验证 content_type 字段正确映射"""
+        from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
+
+        listener = MemoryChangedHandler(
+            l1_cache=None,
+            metadata_repository=None,
+            history_repository=None,
+        )
+
+        event = MemoryChanged(
+            memory_id=str(uuid.uuid4()),
+            user_id="user-456",
+            name="test-memory",
+            change_type="create",
+            is_automatic=False,
+            new_value={"content_type": "feedback", "description": "Test"},
+        )
+        assert listener._get_memory_type(event) == "feedback"
 
     def test_get_memory_type_defaults_to_private(self):
         """验证 memory_type 默认值为 private"""
@@ -259,7 +280,7 @@ class TestMemoryChangedListenerHelperMethods:
         assert listener._get_memory_type(event) == "user"
 
     def test_get_memory_type_handles_missing_type_field(self):
-        """验证 new_value 缺少 type 字段时返回 private"""
+        """验证 new_value 缺少 content_type 字段时返回 user"""
         from src.application.event_handlers.memory_changed_handler import MemoryChangedHandler
 
         listener = MemoryChangedHandler(
@@ -277,4 +298,4 @@ class TestMemoryChangedListenerHelperMethods:
             new_value={"description": "Test only"},
         )
 
-        assert listener._get_memory_type(event) == "private"
+        assert listener._get_memory_type(event) == "user"
