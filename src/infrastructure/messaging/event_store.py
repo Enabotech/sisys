@@ -1,13 +1,16 @@
-"""PostgreSQL EventStore — 事件溯源存储实现
+"""SISYS 基础设施层事件溯源存储模块。
 
-使用 PostgreSQL 存储领域事件，支持：
-- 事件追加（带乐观锁版本检查）
-- 按聚合 ID 查询事件
-- 按事件类型和时间范围查询
+基于 PostgreSQL 实现事件溯源存储，支持事件追加（带乐观锁版本检查）、
+按聚合 ID 查询事件、按事件类型和时间范围查询。
 
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+Session 通过 ContextVar 由 middleware 或 test fixture 提供，
+无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -30,10 +33,20 @@ EVENT_STORE_TABLE = "event_store"
 
 
 class EventStoreModel:
-    """Simple data class for event store records (not a SQLAlchemy model).
+    """事件存储记录数据类（非 SQLAlchemy 模型）。
 
-    This is a plain Python class since we use raw SQL for event store operations.
-    The actual table schema is managed via raw SQL in create_table_sql().
+    使用原始 SQL 进行事件存储操作，实际表结构通过 create_table_sql() 管理。
+
+    Attributes:
+        id: 自增主键。
+        event_id: 事件唯一标识。
+        aggregate_id: 聚合根唯一标识。
+        aggregate_type: 聚合根类型名称。
+        version: 事件版本号。
+        event_type: 事件类型名称。
+        payload: 事件负载（JSONB）。
+        timestamp: 事件时间戳。
+        metadata: 事件元数据（可选）。
     """
 
     __tablename__ = EVENT_STORE_TABLE
@@ -62,7 +75,11 @@ class EventStoreModel:
 
     @classmethod
     def create_table_sql(cls) -> str:
-        """Return SQL to create the event store table."""
+        """返回创建事件存储表的 SQL 语句。
+
+        Returns:
+            CREATE TABLE IF NOT EXISTS 的 SQL 语句。
+        """
         return f"""
         CREATE TABLE IF NOT EXISTS {cls.__tablename__} (
             id SERIAL PRIMARY KEY,

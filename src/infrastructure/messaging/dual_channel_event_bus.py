@@ -1,4 +1,14 @@
-"""DualChannelEventBus — unified event bus facade."""
+"""SISYS 基础设施层双通道事件总线模块。
+
+统一 Redis 实时通道和 RabbitMQ 可靠通道的事件发布入口，
+根据通道路由策略将事件分发到对应的传输通道
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 

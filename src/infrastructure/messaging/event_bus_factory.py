@@ -1,4 +1,14 @@
-"""EventBusFactory — dependency injection for event buses."""
+"""SISYS 基础设施层事件总线工厂模块。
+
+提供事件总线实例的创建、管理和依赖注入，支持 Redis 实时通道和
+RabbitMQ 可靠通道的统一配置与组件复用
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +26,15 @@ from src.infrastructure.messaging.redis_event_bus import RedisEventBus
 
 @dataclass
 class EventBusConfig:
-    """Configuration for event bus components."""
+    """事件总线配置数据类。
+
+    Attributes:
+        redis_url: Redis 连接 URL。
+        rabbitmq_url: RabbitMQ 连接 URL。
+        outbox_repository: 发件箱仓储实例。
+        poll_interval: 轮询间隔（秒）。
+        batch_size: 每批处理数量。
+    """
 
     redis_url: str | None = None
     rabbitmq_url: str | None = None
@@ -27,7 +45,7 @@ class EventBusConfig:
     _rabbitmq_config: RabbitMQConfig | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        """Create RedisConfig and RabbitMQConfig from URLs."""
+        """从 URL 创建 RedisConfig 和 RabbitMQConfig 实例。"""
         if self._redis_config is None and self.redis_url:
             object.__setattr__(self, "_redis_config", RedisConfig(host=self.redis_url))
         if self._rabbitmq_config is None and self.rabbitmq_url:
@@ -63,26 +81,31 @@ class EventBusFactory:
         self._initialized = False
 
     def _initialize_components(self) -> None:
-        """延迟初始化消息组件
+        """延迟初始化消息组件。
 
-        只有当配置提供了必要的连接信息时才初始化
+        仅当配置提供了必要的连接信息时才初始化，
+        Redis 和 RabbitMQ 组件按需独立创建
         """
         if self._initialized:
             return
 
-        # Initialize Redis publisher/subscriber if config provided
+        # 初始化 Redis 发布器/订阅器（如果配置提供了 URL）
         if self._config.redis_url:
             self._redis_publisher = self._create_redis_publisher()
             self._redis_subscriber = self._create_redis_subscriber()
 
-        # Initialize RabbitMQ publisher if config provided
+        # 初始化 RabbitMQ 发布器（如果配置提供了 URL）
         if self._config.rabbitmq_url:
             self._rabbitmq_publisher = self._create_rabbitmq_publisher()
 
         self._initialized = True
 
     def _create_redis_publisher(self) -> Any:
-        """Create Redis publisher instance."""
+        """创建 Redis 发布器实例。
+
+        Returns:
+            RedisEventPublisher 实例，若未配置则返回 None。
+        """
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
         if self._config._redis_config is None:
@@ -90,7 +113,11 @@ class EventBusFactory:
         return RedisEventPublisher(config=self._config._redis_config)
 
     def _create_redis_subscriber(self) -> Any:
-        """Create Redis subscriber instance."""
+        """创建 Redis 订阅器实例。
+
+        Returns:
+            RedisEventSubscriber 实例，若未配置则返回 None。
+        """
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         if self._config._redis_config is None:
@@ -98,7 +125,11 @@ class EventBusFactory:
         return RedisEventSubscriber(config=self._config._redis_config)
 
     def _create_rabbitmq_publisher(self) -> Any:
-        """Create RabbitMQ publisher instance."""
+        """创建 RabbitMQ 发布器实例。
+
+        Returns:
+            RabbitMQPublisher 实例，若未配置则返回 None。
+        """
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
 
         if self._config._rabbitmq_config is None:
@@ -149,7 +180,7 @@ class EventBusFactory:
             router=self._router,
         )
 
-        # Create poller with proper validation
+        # 创建带验证的轮询器
         poller = AsyncOutboxPoller(
             outbox_repository=self._config.outbox_repository,
             publisher=self._rabbitmq_publisher,

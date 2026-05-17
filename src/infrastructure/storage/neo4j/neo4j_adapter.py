@@ -1,15 +1,13 @@
-"""Neo4jAdapter — L5GraphPort 实现
+"""SISYS 基础设施层 Neo4j 适配器模块。
 
-包装现有 Neo4jGraphStorage，实现 L5GraphPort 接口
+包装 Neo4jGraphStorage，实现 L5GraphPort 接口。使用 memory_id 作为实体主键，
+高级语义方法通过 Cypher MERGE 实现。
 
-设计说明：
-- 使用 memory_id 作为实体主键
-- 高级语义方法（create_entity 等）通过 Cypher MERGE 实现
-- 委托低级查询给内部存储
+Author:
+    agimtech <agimtech@126.com>
 
-设计原则：
-- 薄适配器层，仅做接口转换
-- 所有方法使用 async/await
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -301,13 +299,30 @@ class Neo4jAdapter(L5GraphPort):
 
 
 def _validate_rel_type(rel_type: str) -> None:
-    """Validate relationship type against whitelist pattern."""
+    """验证关系类型是否符合 Neo4j 命名规范。
+
+    Args:
+        rel_type: 关系类型字符串
+
+    Raises:
+        ValueError: 关系类型不符合 [A-Z_][A-Z0-9_]* 模式时抛出
+    """
     if not _REL_TYPE_RE.match(rel_type):
         raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Z_][A-Z0-9_]*")
 
 
 def _sanitize_property_keys(props: dict) -> dict:
-    """Sanitize property keys to prevent Cypher injection."""
+    """清洗属性键名，防止 Cypher 注入。
+
+    Args:
+        props: 原始属性字典
+
+    Returns:
+        清洗后的属性字典
+
+    Raises:
+        ValueError: 属性键名不符合 [a-zA-Z_][a-zA-Z0-9_]* 模式时抛出
+    """
     safe = {}
     for k, v in props.items():
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):

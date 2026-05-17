@@ -1,13 +1,17 @@
-"""DualIdempotencyChecker — 双写幂等性检查器
+"""SISYS 基础设施层双写幂等性检查器模块。
 
-Redis（高性能）+ PostgreSQL（持久化）双写：
-- Redis SET NX 原子操作提供高性能检查
-- PostgreSQL 记录提供持久化保证
-- Redis 故障时降级至 PostgreSQL
+同时使用 Redis（高性能）和 PostgreSQL（持久化）进行幂等性检查，
+Redis SET NX 提供高性能检查，PostgreSQL 记录提供持久化保证，
+Redis 故障时降级至 PostgreSQL。
 
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+Session 通过 ContextVar 由 middleware 或 test fixture 提供，
+无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -24,15 +28,20 @@ from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)
 
-# Default TTL for Redis: 7 days
+# 默认 Redis TTL: 7 天
 DEFAULT_TTL = 7 * 24 * 3600
 
-# PostgreSQL table name for idempotency records
+# PostgreSQL 幂等性记录表名
 IDEMPOTENCY_TABLE = "idempotency_records"
 
 
 class IdempotencyRecordModel:
-    """SQLAlchemy model for idempotency records in PostgreSQL."""
+    """幂等性记录 PostgreSQL 表模型。
+
+    Attributes:
+        event_id: 事件唯一标识。
+        processed_at: 处理时间。
+    """
 
     __tablename__ = IDEMPOTENCY_TABLE
 
@@ -41,7 +50,11 @@ class IdempotencyRecordModel:
 
     @classmethod
     def create_table_sql(cls) -> str:
-        """Return SQL to create the idempotency table."""
+        """返回创建幂等性记录表的 SQL 语句。
+
+        Returns:
+            CREATE TABLE IF NOT EXISTS 的 SQL 语句。
+        """
         return f"""
         CREATE TABLE IF NOT EXISTS {cls.__tablename__} (
             event_id VARCHAR(36) PRIMARY KEY,
@@ -99,20 +112,24 @@ class DualIdempotencyChecker:
         try:
             result = await self._redis.set(key, "1", nx=True, ex=self._ttl)
             if result:
-                # Success on Redis, async write to PostgreSQL
+                # Redis 成功，异步写入 PostgreSQL
                 await self._write_to_postgresql(event_id)
                 logger.debug("Acquired processing lock for event %s (Redis)", event_id)
                 return True
-            # Already in Redis
+            # 已在 Redis 中
             logger.debug("Event %s already processed (Redis)", event_id)
             return False
         except aioredis.RedisError as e:
             logger.warning("Redis error during idempotency check: %s, falling back to PostgreSQL", e)
-            # Fall back to PostgreSQL
+            # 降级至 PostgreSQL
             return await self._try_acquire_postgresql(event_id)
 
     async def _write_to_postgresql(self, event_id: UUID) -> None:
-        """异步写入 PostgreSQL 记录"""
+        """异步写入 PostgreSQL 幂等性记录。
+
+        Args:
+            event_id: 事件唯一标识。
+        """
         try:
             stmt = text(
                 """
@@ -150,7 +167,7 @@ class DualIdempotencyChecker:
             return rows is not None
         except Exception as e:
             logger.error("PostgreSQL error during idempotency check: %s", e)
-            # Both failed - fail open to allow processing
+            # Redis 和 PostgreSQL 都失败 - 故障开放，允许处理
             return True
 
     async def is_processed(self, event_id: UUID) -> bool:
@@ -167,7 +184,7 @@ class DualIdempotencyChecker:
         """
         key = f"idempotency:{event_id}"
 
-        # Try Redis first
+        # 先查 Redis
         try:
             exists = await self._redis.exists(key)
             if exists:
@@ -175,11 +192,18 @@ class DualIdempotencyChecker:
         except aioredis.RedisError:
             pass
 
-        # Fall back to PostgreSQL
+        # 降级至 PostgreSQL
         return await self._is_processed_postgresql(event_id)
 
     async def _is_processed_postgresql(self, event_id: UUID) -> bool:
-        """PostgreSQL 模式：检查事件是否已处理"""
+        """PostgreSQL 模式：检查事件是否已处理。
+
+        Args:
+            event_id: 事件唯一标识。
+
+        Returns:
+            True: 已处理，False: 未处理。
+        """
         try:
             stmt = text("SELECT 1 FROM idempotency_records WHERE event_id = :event_id LIMIT 1")
             result = await self._session.execute(stmt, {"event_id": str(event_id)})

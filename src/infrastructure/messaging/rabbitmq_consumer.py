@@ -1,8 +1,13 @@
-"""Async RabbitMQ Consumer — 基础设施层实现
+"""SISYS 基础设施层 RabbitMQ 异步事件消费者模块。
 
-统一 async 路径，使用 aio-pika 异步客户端
-使用手动 ACK/NACK，禁止自动 ACK
-重试通过 nack(requeue=True) 由 RabbitMQ 重新投递
+基于 aio-pika 实现异步事件消费，使用手动 ACK/NACK 策略，
+失败时通过 nack(requeue=True) 重新入队，支持幂等性检查和死信队列
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -116,18 +121,22 @@ class RabbitMQConsumer:
         logger.info("Bound queue %s to exchange %s with routing key %s", queue_name, exchange_name, routing_key)
 
     async def _on_message(self, message: AbstractIncomingMessage) -> None:
-        """消息处理回调 — 手动 ACK/NACK
+        """消息处理回调，执行手动 ACK/NACK。
 
-        P0-3 修复: 使用 event 变量前先检查是否已定义
+        处理流程：反序列化 -> 幂等性检查 -> 执行处理器 -> ACK，
+        失败时根据重试策略决定重试或死信
+
+        Args:
+            message: RabbitMQ 原始消息。
         """
         event: DomainEvent | None = None  # 预先初始化为 None
         try:
             # 1. 反序列化
             event_dict = json.loads(message.body.decode())
             event_type = event_dict.get("event_type")
-            # Validate event_type is known
+            # 验证 event_type 已注册
             EventRegistry.get(event_type)
-            # Use DomainEvent.from_dict which handles event_type correctly
+            # 使用 DomainEvent.from_dict 正确处理 event_type
             # (subclass.from_dict fails because subclasses have event_type as init=False)
             event = DomainEvent.from_dict(event_dict)
             if event is None:
@@ -142,7 +151,7 @@ class RabbitMQConsumer:
 
             # 3. 执行处理器
             start = time.time()
-            # Try event_type-specific handlers first, fall back to default
+            # 优先匹配事件类型处理器，回退到默认处理器
             handlers = self._handlers.get(event_type, self._handlers.get("default", []))
             for handler in handlers:
                 await handler(event)
@@ -167,7 +176,13 @@ class RabbitMQConsumer:
         event: DomainEvent,
         error: Exception,
     ) -> None:
-        """失败处理 — 使用 RabbitMQ NACK 重新入队"""
+        """失败处理，使用 RabbitMQ NACK 重新入队或发送到死信队列。
+
+        Args:
+            message: RabbitMQ 原始消息。
+            event: 处理失败的领域事件。
+            error: 异常信息。
+        """
         if not self._retry_policy:
             # 无重试策略，直接死信
             await message.nack(requeue=False)

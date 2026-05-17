@@ -1,7 +1,13 @@
-"""EventOutboxAdapter — DomainEvent ↔ OutboxEntity 转换器
+"""SISYS 基础设施层事件发件箱适配器模块。
 
-位于基础设施层，负责领域事件与基础设施实体之间的双向转换
-使用显式导入 + 惰性构建模式确保事件类型注册表可靠
+负责领域事件与发件箱实体之间的双向转换，使用显式导入和惰性构建模式
+确保事件类型注册表可靠
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -37,14 +43,19 @@ class EventRegistry:
 
     @classmethod
     def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
-        """手动注册（用于测试 Mock 或自定义事件）"""
+        """手动注册事件类型（用于测试 Mock 或自定义事件）。
+
+        Args:
+            event_type: 事件类型名称。
+            event_class: 事件类。
+        """
         if not cls._built:
             cls._build_registry()
         cls._registry[event_type] = event_class
 
     @classmethod
     def _build_registry(cls) -> None:
-        """扫描所有 DomainEvent 子类并注册"""
+        """扫描所有 DomainEvent 子类并构建注册表。"""
         cls._registry = {}
         for subclass in DomainEvent.__subclasses__():
             cls._registry[subclass.__name__] = subclass
@@ -53,14 +64,28 @@ class EventRegistry:
 
     @classmethod
     def _recurse_subclasses(cls, parent: type) -> None:
-        """递归收集所有子类"""
+        """递归收集所有子类。
+
+        Args:
+            parent: 父类。
+        """
         for subclass in parent.__subclasses__():
             cls._registry[subclass.__name__] = subclass
             cls._recurse_subclasses(subclass)
 
     @classmethod
     def get(cls, event_type: str) -> type[DomainEvent]:
-        """根据 event_type 获取事件类"""
+        """根据 event_type 获取事件类。
+
+        Args:
+            event_type: 事件类型名称。
+
+        Returns:
+            对应的事件类。
+
+        Raises:
+            ValueError: 当 event_type 未注册时。
+        """
         if not cls._built:
             cls._build_registry()
         event_class = cls._registry.get(event_type)
@@ -70,7 +95,7 @@ class EventRegistry:
 
     @classmethod
     def reset(cls) -> None:
-        """重置注册表（仅用于测试隔离）"""
+        """重置注册表（仅用于测试隔离）。"""
         cls._registry = {}
         cls._built = False
 
@@ -113,7 +138,7 @@ class EventOutboxAdapter:
         Raises:
             ValueError: 如果 event_type 未注册
         """
-        # Validate event_type is known
+        # 验证 event_type 已注册
         EventRegistry.get(entity.event_type)
-        # Use DomainEvent.from_dict which handles event_type correctly
+        # 使用 DomainEvent.from_dict 正确处理 event_type
         return DomainEvent.from_dict(entity.payload)

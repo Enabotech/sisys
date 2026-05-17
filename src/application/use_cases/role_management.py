@@ -1,6 +1,12 @@
-"""Role Management UseCases - 应用层角色管理用例.
+"""SISYS 应用层角色管理用例模块。
 
 遵循六边形架构：应用层用例，协调领域实体和仓储端口
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -27,10 +33,11 @@ __all__ = [
 
 
 class RoleService:
-    """角色管理服务.
+    """角色管理服务，负责角色创建、查询、更新、删除。
 
-    应用层用例，负责角色创建、查询、更新、删除
-    遵循六边形架构：通过 RoleRepositoryPort 端口访问数据，不直接依赖基础设施
+    Attributes:
+        _role_repo: 角色仓储端口
+        _user_role_repo: 用户角色关联仓储端口（可选，用于删除前检查）
     """
 
     def __init__(

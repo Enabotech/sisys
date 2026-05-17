@@ -1,18 +1,13 @@
-"""FileMemoryAdapter — L0 文件系统适配器
+"""SISYS 基础设施层文件系统记忆适配器模块。
 
-实现 L0StoragePort 接口，提供异步文件操作能力
+实现 L0StoragePort 接口，提供异步文件操作能力。write/read 使用 aiofiles（I/O 密集型），
+delete/exists/list_memories 使用 asyncio.to_thread()（快速同步操作）。
 
-设计原则：
-- write/read: 使用 aiofiles（I/O 密集型）
-- delete/exists/list_memories: 使用 asyncio.to_thread()（快速同步操作）
-- 保留原有同步方法用于向后兼容
+Author:
+    agimtech <agimtech@126.com>
 
-路径优先级（XDG 规范）：
-1. $XDG_CONFIG_HOME/sisys/memory/（若 XDG_CONFIG_HOME 已设置）
-2. $HOME/.config/sisys/memory/（XDG 默认路径）
-3. $HOME/.sisys/memory/（向后兼容旧版本）
-
-目录结构: {base_path}/{type}/{memory_id}.md
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -157,10 +152,15 @@ class FileMemoryAdapter(L0StoragePort):
     # ========================================================================
 
     def write_sync(self, memory_id: str, memory_type: str, content: str) -> None:
-        """同步写入记忆文件（向后兼容，不推荐使用）
+        """同步写入记忆文件。
 
         .. deprecated::
-            请使用 async write() 方法
+            请使用 async write() 方法替代。此方法仅为向后兼容保留。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+            content: 记忆内容
         """
         dir_path = Path(self.config.memory_l0_path) / memory_type
         dir_path.mkdir(parents=True, exist_ok=True)
@@ -168,10 +168,20 @@ class FileMemoryAdapter(L0StoragePort):
         file_path.write_text(content, encoding="utf-8")
 
     def read_sync(self, memory_id: str, memory_type: str) -> str:
-        """同步读取记忆文件（向后兼容，不推荐使用）
+        """同步读取记忆文件。
 
         .. deprecated::
-            请使用 async read() 方法
+            请使用 async read() 方法替代。此方法仅为向后兼容保留。
+
+        Args:
+            memory_id: 记忆 ID
+            memory_type: 记忆类型
+
+        Returns:
+            记忆内容
+
+        Raises:
+            FileNotFoundError: 文件不存在时抛出
         """
         file_path = Path(self.config.memory_l0_path) / memory_type / f"{memory_id}.md"
         if not file_path.exists():

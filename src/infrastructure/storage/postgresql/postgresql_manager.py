@@ -1,6 +1,12 @@
-"""PostgreSQL 数据库引擎抽象层
+"""SISYS 基础设施层 PostgreSQL 引擎管理模块。
 
 提供异步和同步引擎的懒初始化、健康检查和优雅关闭
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -17,9 +23,14 @@ from src.infrastructure.config.postgresql import PostgreSQLConfig
 
 
 class PostgreSQLManager(ConnectionManager):
-    """通用数据库引擎接口
+    """PostgreSQL 数据库引擎管理器，支持异步和同步引擎的懒初始化
 
-    支持异步(asyncpg)和同步(psycopg2)引擎的懒初始化
+    Attributes:
+        _config: PostgreSQL 连接配置
+        _async_engine: 异步引擎实例（懒初始化）
+        _sync_engine: 同步引擎实例（懒初始化）
+        _init_lock: 异步初始化锁
+        _async_session_maker: 异步会话工厂
     """
 
     def __init__(self, config: PostgreSQLConfig | None = None):
@@ -35,14 +46,22 @@ class PostgreSQLManager(ConnectionManager):
         self._async_session_maker: async_sessionmaker[AsyncSession] | None = None
 
     def _build_async_url(self) -> str:
-        """构建异步引擎连接 URL"""
+        """构建异步引擎连接 URL（asyncpg 驱动）
+
+        Returns:
+            异步连接 URL 字符串
+        """
         return (
             f"postgresql+asyncpg://{self._config.username}:{self._config.password}"
             f"@{self._config.host}:{self._config.port}/{self._config.database}"
         )
 
     def _build_sync_url(self) -> str:
-        """构建同步引擎连接 URL"""
+        """构建同步引擎连接 URL（psycopg2 驱动）
+
+        Returns:
+            同步连接 URL 字符串
+        """
         return (
             f"postgresql+psycopg2://{self._config.username}:{self._config.password}"
             f"@{self._config.host}:{self._config.port}/{self._config.database}"

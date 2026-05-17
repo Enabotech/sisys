@@ -1,7 +1,13 @@
-"""Auth API Routes - 认证授权 API 路由.
+"""SISYS 接口层认证授权 API 路由模块。
 
-提供用户认证、角色管理的 REST API 端点
+提供用户认证、角色管理的 REST API 端点。
 遵循六边形架构：接口层仅依赖应用层用例和领域端口
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -26,14 +32,27 @@ from src.domain.value_objects.token_payload import TokenPayload
 
 # Request/Response Models
 class LoginRequest(BaseModel):
-    """登录请求模型."""
+    """登录请求模型。
+
+    Attributes:
+        username: 用户名
+        password: 密码
+    """
 
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=1)
 
 
 class TokenResponse(BaseModel):
-    """Token 响应模型."""
+    """Token 响应模型。
+
+    Attributes:
+        access_token: 访问令牌
+        refresh_token: 刷新令牌（可选）
+        token_type: 令牌类型，默认 "bearer"
+        expires_in: 过期时间（秒）
+        user: 用户信息
+    """
 
     access_token: str
     refresh_token: str | None = None
@@ -43,7 +62,13 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """用户信息响应模型."""
+    """用户信息响应模型。
+
+    Attributes:
+        id: 用户 ID
+        username: 用户名
+        roles: 角色列表
+    """
 
     id: str
     username: str
@@ -51,13 +76,24 @@ class UserResponse(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """刷新 Token 请求模型."""
+    """刷新 Token 请求模型。
+
+    Attributes:
+        refresh_token: 刷新令牌
+    """
 
     refresh_token: str
 
 
 class CreateRoleRequest(BaseModel):
-    """创建角色请求模型."""
+    """创建角色请求模型。
+
+    Attributes:
+        name: 角色名称
+        description: 角色描述
+        permissions: 权限列表
+        is_system_reserved: 是否为系统保留角色
+    """
 
     name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(default="")
@@ -66,7 +102,14 @@ class CreateRoleRequest(BaseModel):
 
 
 class UpdateRoleRequest(BaseModel):
-    """更新角色请求模型."""
+    """更新角色请求模型。
+
+    Attributes:
+        name: 新名称（可选）
+        description: 新描述（可选）
+        permissions: 新权限列表（可选）
+        is_active: 是否激活（可选）
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = None
@@ -75,7 +118,18 @@ class UpdateRoleRequest(BaseModel):
 
 
 class RoleResponse(BaseModel):
-    """角色响应模型."""
+    """角色响应模型。
+
+    Attributes:
+        id: 角色 ID
+        name: 角色名称
+        description: 角色描述
+        permissions: 权限列表
+        is_system_reserved: 是否为系统保留角色
+        is_active: 是否激活
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
 
     id: str
     name: str
@@ -88,14 +142,23 @@ class RoleResponse(BaseModel):
 
 
 class AssignPermissionRequest(BaseModel):
-    """分配权限请求模型."""
+    """分配权限请求模型。
+
+    Attributes:
+        role_id: 角色 ID
+        permissions: 权限列表
+    """
 
     role_id: str
     permissions: list[str]
 
 
 class ErrorResponse(BaseModel):
-    """错误响应模型."""
+    """错误响应模型。
+
+    Attributes:
+        detail: 错误详情
+    """
 
     detail: str
 

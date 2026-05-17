@@ -1,7 +1,13 @@
-"""Async RabbitMQ Publisher — 基础设施层实现
+"""SISYS 基础设施层 RabbitMQ 异步事件发布模块。
 
-统一 async 路径，使用 aio-pika 异步客户端
-实现可靠事件传输，消息持久化
+基于 aio-pika connect_robust 实现自动重连的异步消息发布，
+支持消息持久化和重试计数头信息
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

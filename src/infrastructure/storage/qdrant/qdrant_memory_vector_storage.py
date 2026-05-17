@@ -1,6 +1,12 @@
-"""QdrantMemoryVectorStorage — MemoryVectorPort 实现（Rule 4）
+"""SISYS 基础设施层 Qdrant 记忆向量存储模块。
 
-组合注入 QdrantAdapter（Rule 3），添加记忆向量索引和语义检索语义
+实现 MemoryVectorPort 接口，组合 QdrantAdapter 并添加记忆向量索引和语义检索语义。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -47,15 +53,39 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
     # -- L3VectorPort methods (delegate to adapter) --
 
     async def upsert_points(self, collection: str, points: list[dict]) -> bool:
-        """批量插入或更新向量点"""
+        """批量插入或更新向量点。
+
+        Args:
+            collection: Collection 名称
+            points: 向量点列表
+
+        Returns:
+            操作成功返回 True
+        """
         return await self._adapter.upsert_points(collection, points)
 
     async def delete_points(self, collection: str, point_ids: list[str]) -> bool:
-        """批量删除向量点"""
+        """批量删除向量点。
+
+        Args:
+            collection: Collection 名称
+            point_ids: 要删除的向量点 ID 列表
+
+        Returns:
+            删除成功返回 True
+        """
         return await self._adapter.delete_points(collection, point_ids)
 
     async def get_point(self, collection: str, point_id: str) -> dict | None:
-        """获取单个向量点"""
+        """获取单个向量点。
+
+        Args:
+            collection: Collection 名称
+            point_id: 向量点 ID
+
+        Returns:
+            向量点数据，不存在返回 None
+        """
         return await self._adapter.get_point(collection, point_id)
 
     async def search(
@@ -65,7 +95,17 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """Dense 语义检索"""
+        """Dense 语义检索。
+
+        Args:
+            collection: Collection 名称
+            query_vector: 查询向量
+            limit: 返回结果数量限制
+            filter_payload: Payload 过滤条件
+
+        Returns:
+            检索结果列表
+        """
         return await self._adapter.search(collection, query_vector, limit, filter_payload)
 
     async def search_sparse(
@@ -75,7 +115,17 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         limit: int = 10,
         filter_payload: dict | None = None,
     ) -> list[dict]:
-        """BM25 稀疏检索"""
+        """BM25 稀疏检索。
+
+        Args:
+            collection: Collection 名称
+            sparse_vector: 稀疏向量字典
+            limit: 返回结果数量限制
+            filter_payload: Payload 过滤条件
+
+        Returns:
+            检索结果列表
+        """
         return await self._adapter.search_sparse(collection, sparse_vector, limit, filter_payload)
 
     async def create_collection(
@@ -84,19 +134,46 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         vector_size: int,
         vector_params: dict | None = None,
     ) -> bool:
-        """创建 Collection"""
+        """创建 Collection。
+
+        Args:
+            collection: Collection 名称
+            vector_size: 向量维度
+            vector_params: 可选参数
+
+        Returns:
+            创建成功返回 True
+        """
         return await self._adapter.create_collection(collection, vector_size, vector_params)
 
     async def delete_collection(self, collection: str) -> bool:
-        """删除 Collection"""
+        """删除 Collection。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            删除成功返回 True
+        """
         return await self._adapter.delete_collection(collection)
 
     async def collection_exists(self, collection: str) -> bool:
-        """检查 Collection 是否存在"""
+        """检查 Collection 是否存在。
+
+        Args:
+            collection: Collection 名称
+
+        Returns:
+            存在返回 True
+        """
         return await self._adapter.collection_exists(collection)
 
     async def list_collections(self) -> list[str]:
-        """列出所有 Collection"""
+        """列出所有 Collection。
+
+        Returns:
+            Collection 名称列表
+        """
         return await self._adapter.list_collections()
 
     # -- MemoryVectorPort specific methods --
@@ -108,7 +185,17 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         memory_type: str,
         owner_id: str,
     ) -> bool:
-        """索引记忆内容（自动生成 embedding 并存储）"""
+        """索引记忆内容，自动生成 embedding 并存储。
+
+        Args:
+            memory_id: 记忆 ID
+            content: 记忆文本内容
+            memory_type: 记忆类型
+            owner_id: 所有者 ID
+
+        Returns:
+            操作成功返回 True
+        """
         vector = self._embed_fn(content)
         points = [
             {
@@ -126,7 +213,17 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
         memory_type: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
-        """语义相似记忆检索"""
+        """语义相似记忆检索。
+
+        Args:
+            query: 查询文本
+            owner_id: 所有者 ID 过滤
+            memory_type: 记忆类型过滤
+            limit: 返回结果数量限制
+
+        Returns:
+            检索结果列表
+        """
         query_vector = self._embed_fn(query)
         filter_payload: dict[str, Any] = {}
         if owner_id is not None:
@@ -142,10 +239,15 @@ class QdrantMemoryVectorStorage(MemoryVectorPort):
 
     @staticmethod
     def _deterministic_embed(text: str) -> list[float]:
-        """确定性 hash embedding（仅用于测试/开发，非生产质量）
+        """确定性 hash embedding（仅用于测试/开发，非生产质量）。
 
-        将文本 hash 映射到固定维度伪向量
-        生产环境应注入真正的 embedding 函数
+        将文本 hash 映射到固定维度伪向量，生产环境应注入真正的 embedding 函数。
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            128 维伪向量
         """
         dim = 128
         h = hashlib.sha256(text.encode()).digest()

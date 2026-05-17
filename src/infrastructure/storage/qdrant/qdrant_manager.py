@@ -1,6 +1,12 @@
-"""Qdrant 客户端封装
+"""SISYS 基础设施层 Qdrant 客户端管理模块。
 
-提供懒初始化、健康检查和优雅关闭功能
+提供 Qdrant 异步客户端的懒初始化、健康检查和优雅关闭功能。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,7 +1,13 @@
-"""In-memory event store implementation (MVP).
+"""SISYS 基础设施层内存事件存储模块。
 
-Stores events in memory using dictionaries and lists.
-Suitable for testing and MVP; replace with PostgreSQL for production.
+基于内存字典和列表实现事件溯源存储，适用于测试和 MVP 阶段，
+生产环境应替换为 PostgreSQL 实现
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -15,39 +21,38 @@ from src.domain.events.event_store import EventStore
 
 
 class InMemoryEventStore(EventStore):
-    """In-memory event store implementation (MVP).
+    """内存事件溯源存储实现。
 
-    Uses in-memory dictionaries and lists to store events.
-    Events are indexed by aggregate_id for efficient retrieval.
+    使用内存字典和列表存储事件，按 aggregate_id 索引以支持高效查询。
 
     Attributes:
-        _events_by_aggregate: Mapping of aggregate_id to list of events.
+        _events_by_aggregate: 聚合 ID 到事件列表的映射。
     """
 
     def __init__(self) -> None:
-        """Initialize the event store with empty storage."""
+        """初始化空的事件存储。"""
         self._events_by_aggregate: dict[UUID, list[DomainEvent]] = defaultdict(list)
 
     def save_events(self, events: Sequence[DomainEvent]) -> None:
-        """Persist a list of domain events to memory.
+        """持久化领域事件列表到内存。
 
-        Events are appended to the aggregate's event list in order.
+        事件按顺序追加到聚合的事件列表中。
 
         Args:
-            events: The domain events to persist.
+            events: 要持久化的领域事件列表。
         """
         for event in events:
             if event.aggregate_id is not None:
                 self._events_by_aggregate[event.aggregate_id].append(event)
 
     def get_events(self, aggregate_id: UUID) -> list[DomainEvent]:
-        """Retrieve all events for a given aggregate.
+        """获取指定聚合的所有事件。
 
         Args:
-            aggregate_id: The ID of the aggregate root.
+            aggregate_id: 聚合根 ID。
 
         Returns:
-            List of domain events for the aggregate, in order.
+            该聚合的领域事件列表（按顺序）。
         """
         return list(self._events_by_aggregate.get(aggregate_id, []))
 
@@ -57,32 +62,31 @@ class InMemoryEventStore(EventStore):
         from_version: int,
         to_version: int,
     ) -> list[DomainEvent]:
-        """Retrieve events for a given aggregate within a version range.
+        """获取指定聚合在版本范围内的事件。
 
-        Uses the event's position in the list as its version number
-        (1-based indexing).
+        使用事件在列表中的位置作为版本号（1-based 索引）。
 
         Args:
-            aggregate_id: The ID of the aggregate root.
-            from_version: Start version (inclusive, 1-based).
-            to_version: End version (inclusive, 1-based).
+            aggregate_id: 聚合根 ID。
+            from_version: 起始版本（含，1-based）。
+            to_version: 结束版本（含，1-based）。
 
         Returns:
-            List of domain events within the version range.
+            版本范围内的领域事件列表。
 
         Raises:
-            ValueError: If from_version > to_version or versions are negative.
+            ValueError: 当 from_version > to_version 或版本号为负时。
         """
         if from_version < 1 or to_version < 1:
             raise ValueError("Version numbers must be >= 1")
         if from_version > to_version:
             raise ValueError(f"from_version ({from_version}) must be <= to_version ({to_version})")
         all_events = self._events_by_aggregate.get(aggregate_id, [])
-        # Convert 1-based version to 0-based index
+        # 将 1-based 版本号转换为 0-based 索引
         start_idx = max(0, from_version - 1)
         end_idx = min(len(all_events), to_version)
         return list(all_events[start_idx:end_idx])
 
     def clear(self) -> None:
-        """Clear all stored events (for testing)."""
+        """清空所有已存储的事件（用于测试）。"""
         self._events_by_aggregate.clear()

@@ -1,10 +1,14 @@
-"""PostgreSQL UnitOfWork 实现 — 基础设施层
+"""SISYS 基础设施层 PostgreSQL 工作单元模块。
 
-基于 SQLAlchemy AsyncSession 的工作单元模式实现
+基于 SQLAlchemy AsyncSession 实现工作单元模式，管理事务的生命周期。
+Session 通过 ContextVar 由 middleware 或 test fixture 提供，
+无需构造器注入 session 参数
 
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

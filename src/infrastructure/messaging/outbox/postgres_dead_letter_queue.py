@@ -1,14 +1,16 @@
-"""PostgreSQL Dead Letter Queue — 基础设施层实现
+"""SISYS 基础设施层 PostgreSQL 死信队列模块。
 
-基于 PostgreSQL 的持久化死信队列，支持：
-- 事件持久化存储
-- FIFO 出队
-- 状态管理（pending/processed）
-- 人工干预支持
+基于 PostgreSQL 实现持久化死信队列，支持事件持久化存储、FIFO 出队、
+状态管理（pending/processed）和人工干预。
 
-Session 来源：
-- Session 通过 ContextVar 由 middleware 或 test fixture 提供
-- 无需构造器注入 session 参数
+Session 通过 ContextVar 由 middleware 或 test fixture 提供，
+无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -29,13 +31,27 @@ logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
-    """Base class for all PostgreSQL models."""
+    """PostgreSQL 模型基类。"""
 
     pass
 
 
 class DeadLetterQueueModel(Base):
-    """SQLAlchemy model for the dead_letter_queue table."""
+    """死信队列表的 SQLAlchemy 模型。
+
+    Attributes:
+        id: 主键（UUID）。
+        event_id: 事件唯一标识。
+        event_type: 事件类型名称。
+        payload: 事件负载（JSONB）。
+        error_message: 错误信息。
+        retry_count: 重试次数。
+        context: 额外上下文信息（JSONB）。
+        created_at: 创建时间。
+        status: 条目状态（pending/processed）。
+        processed_at: 处理时间。
+        action_taken: 人工处理动作描述。
+    """
 
     __tablename__ = "dead_letter_queue"
 
@@ -53,7 +69,21 @@ class DeadLetterQueueModel(Base):
 
 
 class DeadLetterQueueEntry:
-    """Data class representing a DLQ entry (returned by dequeue)."""
+    """死信队列条目数据类（由 dequeue 返回）。
+
+    Attributes:
+        id: 主键（UUID）。
+        event_id: 事件唯一标识。
+        event_type: 事件类型名称。
+        payload: 事件负载。
+        error_message: 错误信息。
+        retry_count: 重试次数。
+        context: 额外上下文信息。
+        created_at: 创建时间。
+        status: 条目状态。
+        processed_at: 处理时间。
+        action_taken: 人工处理动作描述。
+    """
 
     def __init__(
         self,
@@ -84,7 +114,11 @@ class DeadLetterQueueEntry:
         self.action_taken = action_taken
 
     def to_domain_event(self) -> DomainEvent:
-        """Reconstruct DomainEvent from payload."""
+        """从负载重建领域事件。
+
+        Returns:
+            重建的 DomainEvent 实例。
+        """
         return DomainEvent.from_dict(self.payload)
 
     def __repr__(self) -> str:
@@ -138,10 +172,10 @@ class PostgresDeadLetterQueue:
         )
 
     async def dequeue(self) -> tuple[DeadLetterQueueEntry, DomainEvent, str, int] | None:
-        """出队最旧的 pending 事件
+        """出队最旧的 pending 事件。
 
         Returns:
-            (entry, event, error, retry_count) 或 None（队列为空）
+            (entry, event, error, retry_count) 元组，队列为空时返回 None。
         """
         result = await self._session.execute(
             select(DeadLetterQueueModel)
@@ -153,11 +187,11 @@ class PostgresDeadLetterQueue:
         if model is None:
             return None
 
-        # Mark as processed
+        # 标记为已处理
         model.status = "processed"
         model.processed_at = datetime.now(UTC)
 
-        # Reconstruct entry and event
+        # 重建条目和事件
         entry = DeadLetterQueueEntry(
             id=model.id,
             event_id=model.event_id,
@@ -232,14 +266,22 @@ class PostgresDeadLetterQueue:
         return result.scalar() or 0
 
     def __len__(self) -> int:
-        """返回 pending 条目数量（同步接口，供外部调用）
+        """返回 pending 条目数量（同步接口，供外部调用）。
 
-        Note: 这是一个同步代理，实际统计需要异步调用 count_pending()
+        Raises:
+            NotImplementedError: 始终抛出，应使用 count_pending() 异步方法。
         """
         raise NotImplementedError("Use count_pending() for async count")
 
     def _model_to_entry(self, model: DeadLetterQueueModel) -> DeadLetterQueueEntry:
-        """将模型转换为 DeadLetterQueueEntry"""
+        """将 SQLAlchemy 模型转换为 DeadLetterQueueEntry 数据类。
+
+        Args:
+            model: SQLAlchemy 模型实例。
+
+        Returns:
+            转换后的 DeadLetterQueueEntry 实例。
+        """
         return DeadLetterQueueEntry(
             id=model.id,
             event_id=model.event_id,

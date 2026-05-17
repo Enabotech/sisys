@@ -1,6 +1,13 @@
-"""RetryPolicy — 基础设施层实现
+"""SISYS 基础设施层重试策略模块。
 
-完整指数退避 + jitter 防止惊群效应 + 最大延迟上限
+实现完整指数退避策略，配合 jitter 防止惊群效应和最大延迟上限，
+用于消息重试调度
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

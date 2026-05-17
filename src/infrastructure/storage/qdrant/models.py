@@ -1,7 +1,12 @@
-"""Qdrant 向量存储层数据模型
+"""SISYS 基础设施层 Qdrant 向量存储数据模型模块。
 
-包含 Collection 配置、向量点和稀疏向量定义
-所有模型位于基础设施层，不污染领域层
+包含 Collection 配置、向量点和稀疏向量定义，所有模型位于基础设施层。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -60,7 +65,11 @@ class VectorPoint:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
-        """验证向量维度是否正确"""
+        """验证向量维度是否正确。
+
+        Raises:
+            ValueError: 向量维度不为 1024 时抛出
+        """
         if len(self.vector) != 1024:
             raise ValueError(f"Vector dimension must be 1024, got {len(self.vector)}")
 
@@ -78,7 +87,11 @@ class SparseVector:
     values: list[float]
 
     def __post_init__(self):
-        """验证 indices 和 values 长度是否匹配"""
+        """验证 indices 和 values 长度是否匹配。
+
+        Raises:
+            ValueError: indices 和 values 长度不一致时抛出
+        """
         if len(self.indices) != len(self.values):
             raise ValueError(
                 f"indices and values must have same length, got {len(self.indices)} indices and {len(self.values)} values"
