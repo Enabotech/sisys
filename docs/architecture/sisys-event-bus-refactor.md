@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.2 | 状态: 审查修订中
+> 版本: 2.3 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第7轮（第二批）：PostgresDeadLetterQueue签名不兼容Protocol（async/sync/返回值差异）、RedisEventBus内外channel层次区分、delivery_mode分配规则（REALTIME=3/RELIABLE=13）、registry reset机制建议
+> 第8轮（第二批）：message_serializer重命名遗漏4处import+测试文件重命名、Phase1受影响测试补2个、DualIdempotencyChecker测试断言适配、fallback路由键改mark_failed、EventRegistry.get() KeyError行为保持
 
 ## Context
 
@@ -57,7 +57,7 @@
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：移除 `EventRegistry` 类，`get()` 改为调用 `DomainEvent._registry.get()`
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：`EventOutboxAdapter.to_domain_event()` L143 使用 `DomainEvent._registry` 查找事件类，替换 `EventRegistry.get(entity.event_type)`
 - [ ] **修改** `src/infrastructure/messaging/adapters/sqlalchemy_event_outbox_adapter.py` L59：同步修改 `to_domain_event()` 中的事件查找逻辑
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新事件查找逻辑
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新事件查找逻辑，`EventRegistry.get(event_type)` 改为 `DomainEvent._registry[event_type]`（用 `[]` 访问保持 KeyError 行为，与原 `EventRegistry.get()` 抛异常一致）
 - [ ] **验证**：`grep -r "EventRegistry" src/` 仅在注释或删除标记中出现
 
 **关键文件**：
@@ -190,6 +190,7 @@
   - `__init__` 新增 `router: ChannelRouter` 参数
   - `poll_once()` 中 `routing_key` 改为 `self._router.get_rabbitmq_routing_key(entity.event_type)`
   - 默认值 `f"sisys.events.reliable.{entity.event_type}"` 作为 router 返回 None 时的 fallback
+  - **注意**：当 router 返回 None 时，Poller 应调用 `mark_failed(event_id, "No routing key mapping")` 并记录 warning，而非静默发布到可能无消费者的 fallback routing key
 - [ ] **修改** `src/infrastructure/messaging/event_bus_factory.py`：`create_dual_channel_bus()` 传递共享 router 给 Poller
 - [ ] **验证**：Poller使用ChannelRouter解析路由键，`grep "sisys.events.reliable" outbox_processor.py` 仅出现在fallback中
 
@@ -248,6 +249,8 @@
 
 **关键文件**：
 - `src/infrastructure/messaging/retry/dual_idempotency_checker.py` (L167-168 _try_acquire_postgresql, fetchone() BUG)
+- `tests/unit/infrastructure/messaging/test_dual_idempotency_checker.py` (PG fallback断言需修改)
+- `tests/acceptance/test_story_20_2_steps.py` (mock session返回值需适配RETURNING)
 
 #### 任务 4.3: RabbitMQConsumer重试改用RedisRetryQueue
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
@@ -301,6 +304,11 @@
 - [ ] **删除** 遗留测试文件：`test_rabbitmq_event_bus.py`（旧版，`test_rabbitmq_event_bus_new.py` 为当前版本）
 - [ ] **重命名** `_new.py` 测试文件去掉 `_new` 后缀
 - [ ] **修改** `src/infrastructure/messaging/message_serializer.py`：重命名为 `inmemory_event_store.py`（当前名称误导）
+- [ ] **同步修改** 4处import路径：
+  - `tests/unit/infrastructure/messaging/test_message_serializer.py` → 重命名为 `test_inmemory_event_store.py`
+  - `tests/unit/domain/events/test_event_store.py`
+  - `tests/integration/conftest.py`
+  - `tests/integration/test_test_utils.py`
 - [ ] **修改** `EventBusConfigLoader.from_default_path()`：方法名改为 `create()`，更准确表达语义
 - [ ] **验证**：无遗留 `_new.py` 文件，无误导命名
 
@@ -309,7 +317,8 @@
 - `tests/unit/infrastructure/messaging/test_redis_event_bus_new.py` (重命名)
 - `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` (删除)
 - `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` (重命名)
-- `src/infrastructure/messaging/message_serializer.py` (重命名)
+- `src/infrastructure/messaging/message_serializer.py` → `inmemory_event_store.py` (重命名)
+- `tests/unit/infrastructure/messaging/test_message_serializer.py` → `test_inmemory_event_store.py` (重命名)
 - `src/infrastructure/messaging/event_bus_config_loader.py` (方法重命名)
 
 #### 任务 5.4: Protocol统一添加@runtime_checkable
@@ -392,6 +401,8 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_outbox_entity.py` | registry_manual_register/reset测试需适配 |
 | `tests/unit/domain/events/test_events_base.py` | from_dict修改影响反序列化测试 |
 | `tests/unit/domain/events/test_event_serialization.py` | 事件注册方式变更影响roundtrip测试 |
+| `tests/unit/infrastructure/messaging/test_idempotency_retry.py` | DLQ import路径从infrastructure改为domain |
+| `tests/acceptance/test_story_1_3_steps.py` | InMemoryDeadLetterQueue import路径变更 |
 
 ### Phase 2 受影响测试
 | 测试文件 | 影响原因 |
