@@ -1,7 +1,8 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 1.0 | 状态: 待审批
+> 版本: 1.1 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
+> 第1轮审查：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
 
 ## Context
 
@@ -35,7 +36,7 @@
 
 #### 任务 1.1: 统一DeadLetterQueue
 - [ ] **设计**：Domain层 `listener.py` 保留 `DeadLetterQueue` Protocol + `InMemoryDeadLetterQueue`，删除Infrastructure层 `outbox/dead_letter_queue.py` 中的重复定义
-- [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：改为继承Domain层Protocol，import from `src.domain.events.listener`
+- [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：当前未继承任何Protocol/ABC接口（架构缺陷），改为实现Domain层 `DeadLetterQueue` Protocol，import from `src.domain.events.listener`
 - [ ] **修改** `src/infrastructure/messaging/outbox/dead_letter_queue.py`：删除 `DeadLetterQueue` ABC 和 `InMemoryDeadLetterQueue`，改为 re-export from Domain层
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：更新 import 路径
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新 import 路径
@@ -59,17 +60,18 @@
 - `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` (更新)
 
 #### 任务 1.3: 统一事件注册方式为__init_subclass__自动注册
-- [ ] **修改** 所有使用手动注册的事件类（AutoTriggered, AutoRouted, MemoryChanged, AuditEvent, AutoExecuted等），改为 `event_type: str = field(default="X", init=False)` 模式
-- [ ] **删除** 各事件文件底部的 `DomainEvent._registry["X"] = X` 手动注册行
-- [ ] **删除** 各事件类中的 `__post_init__` 中 `object.__setattr__(self, "event_type", "X")` 行
+- [ ] **修改** 4个使用 `__post_init__` + `object.__setattr__` 的事件类（AutoTriggered, AutoRouted, MemoryChanged, AutoExecuted），改为 `event_type: str = field(default="X", init=False)` 模式
+- [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式
+- [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
+- [ ] **删除** 4个事件类 `__post_init__` 中的 `object.__setattr__(self, "event_type", "X")` 行（AuditEvent除外，其`__post_init__`仅做验证）
 - [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型
 
 **关键文件**：
-- `src/domain/events/auto_trigger_events.py` (__post_init__ + 手动注册)
-- `src/domain/events/auto_route_events.py` (__post_init__ + 手动注册)
-- `src/domain/events/memory_events.py` (__post_init__ + 手动注册)
-- `src/domain/events/audit_events.py` (__post_init__ + 手动注册)
-- `src/domain/events/auto_execute_events.py` (手动注册)
+- `src/domain/events/auto_trigger_events.py` (L49 __post_init__ + L57 手动注册)
+- `src/domain/events/auto_route_events.py` (L48 __post_init__ + L56 手动注册)
+- `src/domain/events/memory_events.py` (L55 __post_init__ + L63 手动注册)
+- `src/domain/events/auto_execute_events.py` (L51 __post_init__ + L60 手动注册)
+- `src/domain/events/audit_events.py` (L142 手动register，event_type通过字段默认值设定)
 - 参考正确实现：`src/domain/events/document_events.py` (自动注册模式)
 
 ---
@@ -92,7 +94,7 @@
   async def mark_failed(self, event_id: UUID, error: str) -> None: ...
   ```
 - [ ] **修改** `src/infrastructure/messaging/outbox/inmemory_outbox.py`：同步方法改为async，加 `asyncio.Lock` 保护
-- [ ] **修改** `src/infrastructure/messaging/outbox/outbox_repository.py`：移除 `NotImplementedError` 同步方法，公共async方法成为Protocol实现
+- [ ] **修改** `src/infrastructure/messaging/outbox/outbox_repository.py`：移除 `get_unpublished`, `mark_published`, `mark_failed` 的同步stub（抛NotImplementedError），公共async方法成为Protocol实现；`save()` 当前有sync实现（session.add是同步操作），需改为async版本
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [ ] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
 
@@ -131,10 +133,15 @@
 ### Phase 3: 修复设计缺陷（P1）
 
 #### 任务 3.1: DualChannelEventBus移除channel死参数
-- [ ] **修改** `src/infrastructure/messaging/dual_channel_event_bus.py` L53：移除 `channel: str | None = None` 参数
+- [ ] **修改** `src/infrastructure/messaging/dual_channel_event_bus.py` L53：移除 `channel: str | None = None` 参数（方法体内完全未使用，路由由ChannelRouter决定）
 - [ ] **同步修改** `src/domain/ports/event_publisher.py` L33：移除 `channel` 参数
-- [ ] **同步修改** 所有实现 `EventPublisher` 的类：`RedisEventBus.publish()`, `RabbitMQEventBus.publish()`
-- [ ] **验证**：所有调用 `publish(event)` 的代码无需修改（channel参数此前未被使用）
+- [ ] **同步修改** 所有实现 `EventPublisher` 的类：`RedisEventBus.publish()`（L49，直接覆盖channel参数）、`RabbitMQEventBus.publish()`
+- [ ] **清理** 传入channel值的调用者：
+  - `src/domain/services/auto_trigger_service.py:159` — `channel="rt:AutoTriggered"`
+  - `src/domain/services/auto_route_service.py:148` — `channel="rt:AutoRouted"`
+  - `src/application/event_handlers/auto_execute_completed_handler.py:124` — `channel=channel`
+  - `src/application/event_handlers/auto_route_handler.py:113` — `channel=channel or "rt:AutoRouted"`
+- [ ] **验证**：所有调用改为 `publish(event)`，`grep "channel=" src/ --include="*.py" | grep publish` 无channel传参
 
 **关键文件**：
 - `src/domain/ports/event_publisher.py` (L33)
@@ -195,14 +202,14 @@
 **关键文件**：
 - `src/infrastructure/messaging/retry/redis_retry_queue.py` (dequeue方法)
 
-#### 任务 4.2: DualIdempotencyChecker PostgreSQL回退修复
+#### 任务 4.2: DualIdempotencyChecker PostgreSQL回退修复（严重BUG）
 - [ ] **修改** `src/infrastructure/messaging/retry/dual_idempotency_checker.py`：
-  - `_try_acquire_postgresql()` 改用 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`
-  - 或改为先 `SELECT` 再 `INSERT` 的模式
-- [ ] **验证**：PostgreSQL回退路径可靠检测重复
+  - **当前BUG**：`_try_acquire_postgresql()` 执行 `INSERT ... ON CONFLICT DO NOTHING` 后用 `fetchone()` 检查结果，但 `fetchone()` 对 `DO NOTHING` 总返回 `None`，导致PG回退路径始终返回 `False`（所有事件被错误标记为"已处理"）
+  - **修复**：改用 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`，根据返回值判断是否插入成功
+- [ ] **验证**：PostgreSQL回退路径正确检测重复（首次返回True，重复返回False）
 
 **关键文件**：
-- `src/infrastructure/messaging/retry/dual_idempotency_checker.py` (_try_acquire_postgresql)
+- `src/infrastructure/messaging/retry/dual_idempotency_checker.py` (L167-168 _try_acquire_postgresql, fetchone() BUG)
 
 #### 任务 4.3: RabbitMQConsumer重试改用RedisRetryQueue
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：
