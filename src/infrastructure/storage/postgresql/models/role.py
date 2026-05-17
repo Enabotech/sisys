@@ -1,4 +1,13 @@
-"""RoleModel — SQLAlchemy model for roles table."""
+"""基础设施层角色模型模块
+
+定义角色的 SQLAlchemy ORM 模型，对应 roles 表
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -12,12 +21,22 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 def _utc_now() -> datetime:
-    """Return current UTC datetime (naive, for database compatibility)."""
+    """返回当前 UTC 时间（无时区，用于数据库兼容）。"""
     return datetime.now(UTC).replace(tzinfo=None)
 
 
 class RoleModel(Base):
-    """SQLAlchemy model for the roles table."""
+    """角色 SQLAlchemy 模型，对应 roles 表
+
+    Attributes:
+        id: 主键 UUID
+        name: 角色名称（唯一）
+        description: 角色描述
+        is_active: 是否激活
+        is_system_reserved: 是否系统保留角色
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
 
     __tablename__ = "roles"
 

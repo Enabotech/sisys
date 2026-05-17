@@ -1,20 +1,18 @@
-"""PostgreSQLMemoryChangeHistoryRepository — L2 PostgreSQL 持久化实现
+"""基础设施层记忆变更历史仓储模块
 
-使用 SQLAlchemy AsyncSession，支持：
-- 多用户并行：会话级别隔离
-- 线程安全：异步操作，依赖数据库事务
-- append-only：只允许新增，不允许修改或删除
-
-架构来源: architecture.md §11.2.5
-
-重构说明（Phase 3）：
-- 继承 PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel]
-- 覆写 delete 抛出 NotImplementedError（append-only）
-- 自动获得父类 get_by_id/save/list_all
+L2 PostgreSQL 持久化实现，使用 SQLAlchemy AsyncSession
+支持多用户并行会话级别隔离、线程安全的异步操作、append-only 模式
+继承 PostgreSQLAdapter[MemoryChangeHistory, MemoryChangeHistoryModel]
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

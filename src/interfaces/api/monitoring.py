@@ -1,13 +1,13 @@
-"""Prometheus /metrics HTTP 端点 — FastAPI 路由
+"""SISYS 接口层 Prometheus 指标端点模块
 
-Story 1.13: K8s 动态扩缩容
-- 端点: GET /metrics
-- 返回 Prometheus 文本格式指标
-- 使用 generate_latest() 支持多进程模式
+提供 GET /metrics 端点，返回 Prometheus 文本格式指标，
+支持多进程模式下的动态扩缩容场景
 
-六边形架构：
-- interfaces 层通过 MetricsPort (application/ports/) 获取指标
-- 不直接导入 infrastructure 层组件
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

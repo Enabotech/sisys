@@ -1,4 +1,13 @@
-"""PermissionModel — SQLAlchemy model for permissions table."""
+"""基础设施层权限模型模块
+
+定义权限的 SQLAlchemy ORM 模型，对应 permissions 表
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +21,15 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 class PermissionModel(Base):
-    """SQLAlchemy model for the permissions table."""
+    """权限 SQLAlchemy 模型，对应 permissions 表
+
+    Attributes:
+        id: 主键 UUID
+        name: 权限名称（唯一）
+        resource: 资源标识
+        action: 操作类型
+        created_at: 创建时间
+    """
 
     __tablename__ = "permissions"
 

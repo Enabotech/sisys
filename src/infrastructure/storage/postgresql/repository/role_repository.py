@@ -1,8 +1,16 @@
-"""RoleRepository — 角色仓储实现
+"""基础设施层角色仓储模块
+
+实现 RoleRepositoryPort 端口，实现领域实体与 SQLAlchemy 模型之间的转换
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -284,7 +292,14 @@ class RoleRepository(RoleRepositoryPort):
         return [self._to_permission_entity(m) for m in result.scalars().all()]
 
     def _to_permission_entity(self, model: PermissionModel) -> Permission:
-        """PermissionModel -> Permission domain entity."""
+        """将 PermissionModel 转换为 Permission 领域实体
+
+        Args:
+            model: PermissionModel SQLAlchemy 模型实例
+
+        Returns:
+            Permission 领域实体
+        """
         return Permission(
             id=model.id,
             name=model.name,

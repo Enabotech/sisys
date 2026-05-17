@@ -1,7 +1,13 @@
-"""UserRepository — 用户仓储实现
+"""基础设施层用户仓储模块
 
-继承 PostgreSQLAdapter[User, UserModel]，实现实体↔模型转换
-UserRepositoryPort 声明返回 User 领域实体，本仓储通过 TEntity 泛型匹配
+继承 PostgreSQLAdapter[User, UserModel]，实现实体与模型转换
+通过 _to_entity/_to_model 隔离领域层与 ORM 层
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -24,7 +30,14 @@ class UserRepository(PostgreSQLAdapter[User, UserModel]):
         super().__init__(UserModel)
 
     def _to_entity(self, model: UserModel) -> User:
-        """ORM model -> domain entity."""
+        """将 ORM 模型转换为领域实体
+
+        Args:
+            model: UserModel SQLAlchemy 模型实例
+
+        Returns:
+            User 领域实体
+        """
         return User(
             id=model.id,
             username=model.username,
@@ -37,7 +50,14 @@ class UserRepository(PostgreSQLAdapter[User, UserModel]):
         )
 
     def _to_model(self, entity: User) -> UserModel:
-        """Domain entity -> ORM model."""
+        """将领域实体转换为 ORM 模型
+
+        Args:
+            entity: User 领域实体
+
+        Returns:
+            UserModel SQLAlchemy 模型实例
+        """
         return UserModel(
             id=entity.id,
             username=entity.username,
@@ -50,13 +70,27 @@ class UserRepository(PostgreSQLAdapter[User, UserModel]):
         )
 
     async def get_by_username(self, username: str) -> User | None:
-        """根据用户名获取用户"""
+        """根据用户名获取用户
+
+        Args:
+            username: 用户名
+
+        Returns:
+            User 领域实体，如果不存在则返回 None
+        """
         result = await self._session.execute(select(UserModel).where(UserModel.username == username))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
     async def get_by_email(self, email: str) -> User | None:
-        """根据邮箱获取用户"""
+        """根据邮箱获取用户
+
+        Args:
+            email: 邮箱地址
+
+        Returns:
+            User 领域实体，如果不存在则返回 None
+        """
         result = await self._session.execute(select(UserModel).where(UserModel.email == email))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None

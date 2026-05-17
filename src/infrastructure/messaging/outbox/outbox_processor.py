@@ -1,4 +1,4 @@
-"""基础设施层异步发件箱轮询处理器模块。
+"""基础设施层异步发件箱轮询处理器模块
 
 异步协程定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ，
 使用 asyncio.Semaphore 控制并发
@@ -50,7 +50,7 @@ class AsyncOutboxPoller:
         self._running = False
 
     async def poll_once(self) -> None:
-        """轮询一次并发布待处理事件。
+        """轮询一次并发布待处理事件
 
         从发件箱获取 pending 状态的事件，并发发布到 RabbitMQ，
         成功标记为 published，失败标记为 failed

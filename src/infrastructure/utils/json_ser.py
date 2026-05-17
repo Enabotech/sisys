@@ -1,17 +1,17 @@
-"""JSON serialization utilities for Redis and message transport.
+"""基础设施层 JSON 序列化工具模块
 
-Handles types that Python's standard json module cannot serialize natively:
-- datetime → ISO 8601 string
-- UUID → string representation
-- Enum → value
-- bytes → string (UTF-8, fallback latin-1)
-- set → list
+处理 Python 标准 json 模块无法原生序列化的类型：
+- datetime → ISO 8601 字符串
+- UUID → 字符串表示
+- Enum → 值
+- bytes → 字符串（UTF-8，回退 latin-1）
+- set → 列表
 
-Usage:
-    from src.infrastructure.utils import json_dumps, json_loads
+Author:
+    agimtech <agimtech@126.com>
 
-    data = json_dumps({"created_at": datetime.now(), "id": uuid.uuid4()})
-    obj = json_loads(data)
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 import json
@@ -22,7 +22,7 @@ from typing import Any
 
 
 class RedisJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles datetime, UUID, Enum, bytes, and set types."""
+    """自定义 JSON 编码器，处理 datetime、UUID、Enum、bytes 和 set 类型。"""
 
     def default(self, o: Any) -> Any:
         if isinstance(o, datetime):
@@ -44,30 +44,29 @@ class RedisJSONEncoder(json.JSONEncoder):
 
 
 def json_dumps(obj: Any, **kwargs: Any) -> str:
-    """Serialize object to JSON string with RedisJSONEncoder.
+    """使用 RedisJSONEncoder 将对象序列化为 JSON 字符串
 
     Args:
-        obj: Any Python object to serialize.
-        **kwargs: Additional keyword arguments passed to json.dumps().
+        obj: 待序列化的 Python 对象
+        **kwargs: 传递给 json.dumps() 的额外关键字参数
 
     Returns:
-        JSON string representation.
+        JSON 字符串表示
     """
     return json.dumps(obj, cls=RedisJSONEncoder, **kwargs)
 
 
 def json_loads(s: str | bytes, **kwargs: Any) -> Any:
-    """Deserialize JSON string or bytes to Python object.
+    """将 JSON 字符串或字节反序列化为 Python 对象
 
-    Note: datetime and UUID strings are NOT automatically converted back
-    to their original types. Callers should reconstruct typed objects
-    from the deserialized dict.
+    注意：datetime 和 UUID 字符串不会自动还原为原始类型，
+    调用方应从反序列化后的字典中重建类型化对象
 
     Args:
-        s: JSON string or bytes to deserialize.
-        **kwargs: Additional keyword arguments passed to json.loads().
+        s: 待反序列化的 JSON 字符串或字节
+        **kwargs: 传递给 json.loads() 的额外关键字参数
 
     Returns:
-        Deserialized Python object.
+        反序列化后的 Python 对象
     """
     return json.loads(s, **kwargs)

@@ -1,8 +1,13 @@
-"""AuditLogModel — SQLAlchemy model for audit_log table.
+"""基础设施层审计日志模型模块
 
-Reference: Story 1.10 SDD规范定义
-Reference: FR-SC-02 Unified audit log (log_id/timestamp/actor/action_type/target_resource/old_value/new_value)
-Reference: FR-SC-04 Multi-dimensional search extension (correction_level)
+定义审计日志的 SQLAlchemy ORM 模型，对应 audit_log 表
+遵循 FR-SC-02 统一审计日志规范和 FR-SC-04 多维度搜索扩展
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -27,28 +32,25 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 class AuditLogModel(Base):
-    """SQLAlchemy model for the audit_log table.
+    """审计日志 SQLAlchemy 模型，对应 audit_log 表
 
-    Stores audit log entries per FR-SC-02.
+    存储审计日志条目，遵循 FR-SC-02 规范
 
-    Standard fields (FR-SC-02):
-        id: Auto-increment primary key
-        log_id: UUID identifier for external reference
-        timestamp: When the audited action occurred
-        actor: User ID or system component
-        action_type: Type of action performed
-        target_resource: Resource that was acted upon
-        old_value: State before the action (JSON)
-        new_value: State after the action (JSON)
-
-    Extension fields (FR-SC-04):
-        correction_level: Correction level (L0-L3) for trace-related events
-
-    System fields:
-        checksum: SHA256 checksum for integrity verification
-        created_at: Record creation timestamp
-        archived: Whether the record has been archived to WORM
-        archived_at: When the record was archived
+    Attributes:
+        id: 自增主键
+        log_id: 外部引用的 UUID 标识符
+        timestamp: 审计操作发生时间
+        actor: 用户 ID 或系统组件
+        action_type: 执行的操作类型
+        target_resource: 被操作的资源
+        old_value: 操作前的状态（JSON）
+        new_value: 操作后的状态（JSON）
+        correction_level: 修正级别（L0-L3），用于追溯相关事件
+        checksum: 用于完整性校验的 SHA256 校验和
+        created_at: 记录创建时间戳
+        archived: 是否已归档至 WORM
+        archived_at: 归档时间
+        correlation_id: 用于追踪的关联 ID
     """
 
     __tablename__ = "audit_log"
@@ -96,22 +98,22 @@ class AuditLogModel(Base):
         archived_at: datetime | None = None,
         created_at: datetime | None = None,
     ) -> None:
-        """Initialize an audit log entry.
+        """初始化审计日志条目
 
         Args:
-            log_id: UUID identifier for the audit log entry.
-            timestamp: When the audited action occurred.
-            actor: User ID or system component.
-            action_type: Type of action performed.
-            target_resource: Resource that was acted upon.
-            old_value: State before the action.
-            new_value: State after the action.
-            correction_level: Correction level (L0-L3, optional).
-            correlation_id: Optional correlation ID for tracing.
-            checksum: SHA256 checksum (auto-computed if None).
-            archived: Whether archived to WORM.
-            archived_at: When archived.
-            created_at: Record creation time.
+            log_id: 审计日志条目的 UUID 标识符
+            timestamp: 审计操作发生的时间
+            actor: 用户 ID 或系统组件
+            action_type: 执行的操作类型
+            target_resource: 被操作的资源
+            old_value: 操作前的状态
+            new_value: 操作后的状态
+            correction_level: 修正级别（L0-L3，可选）
+            correlation_id: 用于追踪的关联 ID（可选）
+            checksum: SHA256 校验和（为 None 时自动计算）
+            archived: 是否已归档至 WORM
+            archived_at: 归档时间
+            created_at: 记录创建时间
         """
         self.log_id = log_id
         self.timestamp = timestamp
@@ -133,10 +135,10 @@ class AuditLogModel(Base):
             self.checksum = checksum
 
     def _compute_checksum(self) -> str:
-        """Compute SHA256 checksum for integrity verification.
+        """计算 SHA256 校验和用于完整性验证
 
         Returns:
-            str: SHA256 hex digest of the record's critical fields.
+            记录关键字段的 SHA256 十六进制摘要
         """
         content = json.dumps(
             {
@@ -154,18 +156,18 @@ class AuditLogModel(Base):
         return hashlib.sha256(content.encode()).hexdigest()
 
     def verify_checksum(self) -> bool:
-        """Verify the integrity of this audit log entry.
+        """验证审计日志条目的完整性
 
         Returns:
-            bool: True if the checksum matches, False if tampered.
+            校验和匹配返回 True，被篡改返回 False
         """
         return self.checksum == self._compute_checksum()
 
     def to_dict(self) -> dict:
-        """Convert to dictionary representation.
+        """转换为字典表示
 
         Returns:
-            dict: Dictionary with all audit log fields.
+            包含所有审计日志字段的字典
         """
         return {
             "id": self.id,

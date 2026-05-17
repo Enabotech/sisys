@@ -1,7 +1,7 @@
-"""基础设施层 Qdrant 适配器模块。
+"""基础设施层 Qdrant 适配器模块
 
 包装 QdrantVectorStorage，实现 L3VectorPort 接口。薄适配器层，仅做接口转换，
-points 参数使用 list[dict]，内部转换为 VectorPoint。
+points 参数使用 list[dict]，内部转换为 VectorPoint
 
 Author:
     agimtech <agimtech@126.com>
@@ -201,7 +201,7 @@ class QdrantAdapter(L3VectorPort):
         self,
         collection: str,
     ) -> bool:
-        """删除 Collection。
+        """删除 Collection
 
         Args:
             collection: Collection 名称
@@ -220,7 +220,7 @@ class QdrantAdapter(L3VectorPort):
         self,
         collection: str,
     ) -> bool:
-        """检查 Collection 是否存在。
+        """检查 Collection 是否存在
 
         Args:
             collection: Collection 名称
@@ -238,7 +238,7 @@ class QdrantAdapter(L3VectorPort):
     async def list_collections(
         self,
     ) -> list[str]:
-        """列出所有 Collection。
+        """列出所有 Collection
 
         Returns:
             Collection 名称列表

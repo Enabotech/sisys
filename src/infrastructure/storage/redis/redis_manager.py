@@ -1,10 +1,13 @@
-"""RedisConnectionManager — Redis async connection lifecycle manager.
+"""SISYS 基础设施层 Redis 连接管理器模块
 
-Centralizes Redis connection pool management, following the same pattern as
-PostgreSQLManager / QdrantManager / Neo4jManager.
+集中管理 Redis 异步连接池生命周期，所有 Redis 组件
+应通过此管理器获取客户端而非自建连接池
 
-All Redis components should obtain their aioredis.Redis client from this
-manager instead of creating their own connection pools.
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

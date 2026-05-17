@@ -1,7 +1,7 @@
-"""基础设施层记忆路径路由模块。
+"""基础设施层记忆路径路由模块
 
 负责生成 Private/Group 记忆的文件路径和索引路径。与 MemoryIndex 分离：
-MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责。
+MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责
 
 Author:
     agimtech <agimtech@126.com>

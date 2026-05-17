@@ -1,7 +1,13 @@
-"""RedisSnapshotStore — infrastructure implementation of SnapshotRepository port.
+"""SISYS 基础设施层 Redis 快照存储模块
 
-Stores CheckpointSnapshot entities in Redis Hash with TTL support.
-Supports master-slave replication and failover via Redis Sentinel/Cluster.
+基于 Redis Hash 实现检查点快照仓储端口，
+支持 TTL 过期和主从复制
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

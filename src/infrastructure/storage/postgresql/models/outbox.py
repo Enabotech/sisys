@@ -1,4 +1,14 @@
-"""OutboxModel — SQLAlchemy model for event_outbox table."""
+"""基础设施层事件发件箱模型模块
+
+定义事件发件箱的 SQLAlchemy ORM 模型和声明式基类，对应 event_outbox 表
+实现事件可靠异步发布的发件箱模式
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -14,20 +24,32 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
-# Registry for all PostgreSQL models
+# 所有 PostgreSQL 模型的注册表
 pg_registry = registry()
 
 
 class Base(DeclarativeBase):
-    """Base class for all PostgreSQL models."""
+    """所有 PostgreSQL 模型的声明式基类。"""
 
     registry = pg_registry
 
 
 class OutboxModel(Base):
-    """SQLAlchemy model for the event_outbox table.
+    """事件发件箱 SQLAlchemy 模型，对应 event_outbox 表
 
-    Stores domain events for reliable async publishing (Outbox pattern).
+    存储领域事件用于可靠异步发布（发件箱模式）
+
+    Attributes:
+        id: 主键 UUID
+        event_id: 事件唯一标识（唯一约束）
+        event_type: 事件类型
+        payload: JSON 负载
+        status: 处理状态（"pending"、"published"、"failed"）
+        created_at: 创建时间
+        published_at: 发布时间
+        retry_count: 重试次数
+        max_retries: 最大重试次数
+        error_message: 错误消息
     """
 
     __tablename__ = "event_outbox"
@@ -64,6 +86,20 @@ class OutboxModel(Base):
         published_at: datetime | None = None,
         error_message: str | None = None,
     ) -> None:
+        """初始化事件发件箱条目
+
+        Args:
+            event_id: 事件唯一标识
+            event_type: 事件类型
+            payload: JSON 负载
+            created_at: 创建时间
+            id: 主键 UUID，为 None 时自动生成
+            status: 处理状态，默认 "pending"
+            retry_count: 重试次数，默认 0
+            max_retries: 最大重试次数，默认 3
+            published_at: 发布时间，可选
+            error_message: 错误消息，可选
+        """
         self.id = id or uuid4()
         self.event_id = event_id
         self.event_type = event_type

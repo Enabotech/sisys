@@ -1,6 +1,6 @@
-"""接口层审计日志 API 路由模块。
+"""接口层审计日志 API 路由模块
 
-提供审计日志检索、完整性验证、归档管理的 REST API 端点。
+提供审计日志检索、完整性验证、归档管理的 REST API 端点
 遵循六边形架构：接口层仅依赖应用层用例和领域端口
 
 Author:
@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 
 class AuditLogResponse(BaseModel):
-    """审计日志响应。
+    """审计日志响应
 
     Attributes:
         log_id: 日志 ID
@@ -57,7 +57,7 @@ class AuditLogResponse(BaseModel):
 
 
 class AuditLogListResponse(BaseModel):
-    """审计日志列表响应。
+    """审计日志列表响应
 
     Attributes:
         items: 日志条目列表
@@ -73,7 +73,7 @@ class AuditLogListResponse(BaseModel):
 
 
 class IntegrityVerifyRequest(BaseModel):
-    """完整性验证请求。
+    """完整性验证请求
 
     Attributes:
         log_ids: 待验证的日志 ID 列表（可选，为空则验证全部）

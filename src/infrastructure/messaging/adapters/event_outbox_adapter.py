@@ -1,4 +1,4 @@
-"""基础设施层事件发件箱适配器模块。
+"""基础设施层事件发件箱适配器模块
 
 负责领域事件与发件箱实体之间的双向转换，使用显式导入和惰性构建模式
 确保事件类型注册表可靠
@@ -43,11 +43,11 @@ class EventRegistry:
 
     @classmethod
     def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
-        """手动注册事件类型（用于测试 Mock 或自定义事件）。
+        """手动注册事件类型（用于测试 Mock 或自定义事件）
 
         Args:
-            event_type: 事件类型名称。
-            event_class: 事件类。
+            event_type: 事件类型名称
+            event_class: 事件类
         """
         if not cls._built:
             cls._build_registry()
@@ -64,10 +64,10 @@ class EventRegistry:
 
     @classmethod
     def _recurse_subclasses(cls, parent: type) -> None:
-        """递归收集所有子类。
+        """递归收集所有子类
 
         Args:
-            parent: 父类。
+            parent: 父类
         """
         for subclass in parent.__subclasses__():
             cls._registry[subclass.__name__] = subclass
@@ -75,16 +75,16 @@ class EventRegistry:
 
     @classmethod
     def get(cls, event_type: str) -> type[DomainEvent]:
-        """根据 event_type 获取事件类。
+        """根据 event_type 获取事件类
 
         Args:
-            event_type: 事件类型名称。
+            event_type: 事件类型名称
 
         Returns:
-            对应的事件类。
+            对应的事件类
 
         Raises:
-            ValueError: 当 event_type 未注册时。
+            ValueError: 当 event_type 未注册时
         """
         if not cls._built:
             cls._build_registry()

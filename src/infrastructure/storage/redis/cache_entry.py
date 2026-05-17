@@ -1,6 +1,12 @@
-"""Cache entry data model.
+"""基础设施层缓存条目数据模型模块
 
-用于语义缓存的存储实体
+定义语义缓存的存储实体结构
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

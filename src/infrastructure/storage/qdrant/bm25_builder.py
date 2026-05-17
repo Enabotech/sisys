@@ -1,6 +1,6 @@
-"""基础设施层 BM25 稀疏向量构建模块。
+"""基础设施层 BM25 稀疏向量构建模块
 
-提供基于 TF-IDF 的稀疏向量构建功能，用于 BM25 稀疏检索。
+提供基于 TF-IDF 的稀疏向量构建功能，用于 BM25 稀疏检索
 
 Author:
     agimtech <agimtech@126.com>
@@ -18,9 +18,9 @@ from src.infrastructure.storage.qdrant.models import SparseVector
 
 
 class BM25Builder:
-    """BM25 稀疏向量构建器。
+    """BM25 稀疏向量构建器
 
-    MVP 使用简单 TF-IDF 计算，后续可替换为 Qdrant 原生 BM25。
+    MVP 使用简单 TF-IDF 计算，后续可替换为 Qdrant 原生 BM25
 
     Attributes:
         _stop_words: 英文停用词集合，用于过滤低价值词元

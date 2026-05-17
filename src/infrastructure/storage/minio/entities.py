@@ -1,6 +1,6 @@
-"""基础设施层 MinIO 对象存储实体模块。
+"""基础设施层 MinIO 对象存储实体模块
 
-定义 ObjectMetadata 和 LifecycleRule 等存储结构体，位于基础设施层（非领域层）。
+定义 ObjectMetadata 和 LifecycleRule 等存储结构体，位于基础设施层（非领域层）
 
 Author:
     agimtech <agimtech@126.com>
@@ -54,7 +54,7 @@ class ObjectMetadata:
     tags: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """将对象元数据序列化为字典。
+        """将对象元数据序列化为字典
 
         Returns:
             包含所有元数据字段的字典
@@ -125,7 +125,7 @@ class LifecycleRule:
     transition_storage_class: str | None = None
 
     def to_minio_dict(self) -> dict:
-        """转换为 MinIO 生命周期规则字典。
+        """转换为 MinIO 生命周期规则字典
 
         Returns:
             MinIO LifecycleConfig 兼容的规则字典
@@ -146,7 +146,7 @@ class LifecycleRule:
 
 
 def _parse_optional_datetime(value: str | datetime | None) -> datetime | None:
-    """解析可选的 ISO 格式日期时间字符串。
+    """解析可选的 ISO 格式日期时间字符串
 
     Args:
         value: ISO 格式日期时间字符串、datetime 对象或 None
@@ -160,7 +160,7 @@ def _parse_optional_datetime(value: str | datetime | None) -> datetime | None:
 
 
 def _parse_datetime(value: str | datetime) -> datetime:
-    """解析 ISO 格式日期时间字符串或直接返回 datetime 对象。
+    """解析 ISO 格式日期时间字符串或直接返回 datetime 对象
 
     Args:
         value: ISO 格式字符串或 datetime 对象

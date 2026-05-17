@@ -1,7 +1,7 @@
-"""基础设施层 PostgreSQL 发件箱仓储模块。
+"""基础设施层 PostgreSQL 发件箱仓储模块
 
-实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化发件箱实体。
-提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）。
+实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化发件箱实体
+提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）
 
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，
 无需构造器注入 session 参数
@@ -127,13 +127,13 @@ class PostgreSQLOutboxRepository(OutboxRepository):
     # ========== 内部方法（仅 Poller 使用） ==========
 
     async def _get_unpublished_entities(self, limit: int) -> list[OutboxModel]:
-        """内部方法: 获取未发布的 OutboxModel 列表（FIFO 排序）。
+        """内部方法: 获取未发布的 OutboxModel 列表（FIFO 排序）
 
         Args:
-            limit: 最大返回数量。
+            limit: 最大返回数量
 
         Returns:
-            未发布的 OutboxModel 列表。
+            未发布的 OutboxModel 列表
         """
         async with self._lock:
             result = await self._session.execute(
@@ -142,21 +142,21 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             return list(result.scalars().all())
 
     async def _mark_published_entity(self, model: OutboxModel) -> None:
-        """内部方法: 标记 OutboxModel 为 published。
+        """内部方法: 标记 OutboxModel 为 published
 
         Args:
-            model: 要标记的 OutboxModel 实例。
+            model: 要标记的 OutboxModel 实例
         """
         async with self._lock:
             model.status = "published"
             model.published_at = datetime.now(UTC)
 
     async def _mark_failed_entity(self, model: OutboxModel, error: str) -> None:
-        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count。
+        """内部方法: 标记 OutboxModel 为 failed，递增 retry_count
 
         Args:
-            model: 要标记的 OutboxModel 实例。
-            error: 错误信息。
+            model: 要标记的 OutboxModel 实例
+            error: 错误信息
         """
         async with self._lock:
             model.status = "failed"

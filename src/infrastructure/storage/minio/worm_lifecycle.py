@@ -1,7 +1,7 @@
-"""基础设施层 MinIO WORM 锁定与生命周期管理模块。
+"""基础设施层 MinIO WORM 锁定与生命周期管理模块
 
 提供 WORM（Write Once Read Many）锁定、对象归档和生命周期配置功能，
-满足 SOX 合规要求。
+满足 SOX 合规要求
 
 Author:
     agimtech <agimtech@126.com>

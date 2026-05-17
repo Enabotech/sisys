@@ -1,4 +1,4 @@
-"""基础设施层 RabbitMQ 异步事件发布模块。
+"""基础设施层 RabbitMQ 异步事件发布模块
 
 基于 aio-pika connect_robust 实现自动重连的异步消息发布，
 支持消息持久化和重试计数头信息

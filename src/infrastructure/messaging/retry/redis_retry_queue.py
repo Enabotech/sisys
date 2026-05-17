@@ -1,4 +1,4 @@
-"""基础设施层 Redis 延迟重试队列模块。
+"""基础设施层 Redis 延迟重试队列模块
 
 使用 Redis ZSET 实现延迟重试调度，失败事件以重试时间戳为 score 入队，
 轮询器检查到期事件进行重试，避免 nack(requeue=True) 造成的消息饥饿
@@ -26,15 +26,15 @@ DEFAULT_RETRY_QUEUE_KEY = "sisys:retry:queue"
 
 
 class RetryQueueEntry:
-    """重试队列条目数据类。
+    """重试队列条目数据类
 
     Attributes:
-        event_id: 事件唯一标识。
-        event_type: 事件类型名称。
-        payload: 事件负载数据。
-        retry_at: 重试时间戳。
-        retry_count: 已重试次数。
-        error: 错误信息。
+        event_id: 事件唯一标识
+        event_type: 事件类型名称
+        payload: 事件负载数据
+        retry_at: 重试时间戳
+        retry_count: 已重试次数
+        error: 错误信息
     """
 
     def __init__(
@@ -46,15 +46,15 @@ class RetryQueueEntry:
         retry_count: int = 0,
         error: str | None = None,
     ):
-        """初始化重试队列条目。
+        """初始化重试队列条目
 
         Args:
-            event_id: 事件唯一标识。
-            event_type: 事件类型名称。
-            payload: 事件负载数据。
-            retry_at: 重试时间戳。
-            retry_count: 已重试次数。
-            error: 错误信息。
+            event_id: 事件唯一标识
+            event_type: 事件类型名称
+            payload: 事件负载数据
+            retry_at: 重试时间戳
+            retry_count: 已重试次数
+            error: 错误信息
         """
         self.event_id = event_id
         self.event_type = event_type
@@ -64,10 +64,10 @@ class RetryQueueEntry:
         self.error = error
 
     def to_json(self) -> str:
-        """序列化为 JSON 字符串。
+        """序列化为 JSON 字符串
 
         Returns:
-            JSON 格式的字符串。
+            JSON 格式的字符串
         """
         return json.dumps(
             {
@@ -82,13 +82,13 @@ class RetryQueueEntry:
 
     @classmethod
     def from_json(cls, data: str) -> RetryQueueEntry:
-        """从 JSON 字符串反序列化。
+        """从 JSON 字符串反序列化
 
         Args:
-            data: JSON 格式的字符串。
+            data: JSON 格式的字符串
 
         Returns:
-            反序列化后的 RetryQueueEntry 实例。
+            反序列化后的 RetryQueueEntry 实例
         """
         obj = json.loads(data)
         return cls(

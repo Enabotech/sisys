@@ -1,7 +1,12 @@
-"""Redis Cleanup Utility — 基础设施层实现
+"""基础设施层 Redis 清理工具模块
 
-提供按命名空间批量清理 Redis 键的工具
-使用 SCAN 命令（非 KEYS）避免阻塞 Redis
+提供按命名空间批量清理 Redis 键的工具，使用 SCAN 命令（非 KEYS）避免阻塞 Redis
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -26,10 +31,10 @@ class RedisCleanup:
     """
 
     def __init__(self, redis_client: aioredis.Redis):
-        """Initialize RedisCleanup.
+        """初始化 Redis 清理工具
 
         Args:
-            redis_client: Redis async client (provided by RedisConnectionManager)
+            redis_client: Redis 异步客户端（由 RedisConnectionManager 提供）
         """
         self._redis = redis_client
 
