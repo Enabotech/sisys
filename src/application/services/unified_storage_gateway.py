@@ -133,6 +133,10 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         l0_success = await self._l0.write(memory_id, memory_type, content)
         results[StorageLayer.L0_FILE] = l0_success
 
+        if l0_success:
+            await self._l1.set_memory(memory_type, owner_id, name, content)
+            results[StorageLayer.L1_CACHE] = True
+
         if hasattr(self, "_event_publisher") and self._event_publisher is not None:
             from src.domain.events.memory_events import MemoryChanged
 
@@ -146,9 +150,6 @@ class UnifiedStorageGateway(UnifiedStoragePort):
                 new_value={"memory_type": memory_type, "content": content[:100]},
             )
             self._event_publisher.publish(event)
-            results[StorageLayer.L1_CACHE] = True
-        else:
-            results[StorageLayer.L1_CACHE] = False
 
         return results
 
@@ -163,26 +164,10 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         """读取记忆。
 
         对应 architecture.md §11.2.9 检索流程：
-        - prefer_cache=True: L1 → L2 (RBAC校验) → L0（缓存优先）
-        - prefer_cache=False: L2 (RBAC校验) → L0（直接读取持久层）
-
-        Args:
-            memory_id: 记忆 ID
-            memory_type: 记忆类型
-            owner_id: 所有者 ID
-            name: 记忆名称
-            prefer_cache: 是否优先从缓存读取
-
-        Returns:
-            记忆内容，不存在返回 None
+        1. RBAC 校验（L2 元数据，必须）
+        2. L1 缓存优先（prefer_cache=True）
+        3. L0 回源 + 缓存回填
         """
-        if prefer_cache:
-            content = await self._l1.get_memory(memory_type, owner_id, name)
-            if content is not None:
-                metadata = await self._l2_meta.get_by_id(UUID(memory_id))
-                if metadata is not None and await self._check_read_permission(metadata, owner_id, memory_type):
-                    return content
-
         metadata = await self._l2_meta.get_by_id(UUID(memory_id))
         if metadata is None:
             return None
@@ -190,11 +175,13 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         if not await self._check_read_permission(metadata, owner_id, memory_type):
             return None
 
-        content = await self._l0.read(memory_id, memory_type)
-        if content is None:
-            return None
-
         if prefer_cache:
+            content = await self._l1.get_memory(memory_type, owner_id, name)
+            if content is not None:
+                return content
+
+        content = await self._l0.read(memory_id, memory_type)
+        if content is not None and prefer_cache:
             await self._l1.set_memory(memory_type, owner_id, name, content)
 
         return content
@@ -248,6 +235,9 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
         results[StorageLayer.L0_FILE] = await self._l0.delete(memory_id, memory_type)
 
+        await self._l1.delete_memory(memory_type, owner_id, name)
+        results[StorageLayer.L1_CACHE] = True
+
         if hasattr(self, "_event_publisher") and self._event_publisher is not None:
             from src.domain.events.memory_events import MemoryChanged
 
@@ -261,11 +251,6 @@ class UnifiedStorageGateway(UnifiedStoragePort):
                 new_value=None,
             )
             self._event_publisher.publish(event)
-            results[StorageLayer.L1_CACHE] = True
-        else:
-            results[StorageLayer.L1_CACHE] = await self._l1.delete_memory(memory_type, owner_id, name)
-            if self._l2_meta is not None:
-                await self._l2_meta.delete(UUID(memory_id))
 
         return results
 

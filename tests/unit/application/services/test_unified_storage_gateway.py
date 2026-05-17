@@ -86,7 +86,7 @@ class TestUnifiedStorageGatewayBehavior:
     def mock_l0_storage(self):
         """创建模拟的 L0 存储。"""
         mock = MagicMock()
-        mock.write = AsyncMock(return_value=None)
+        mock.write = AsyncMock(return_value=True)
         mock.read = AsyncMock(return_value="memory content")
         mock.delete = AsyncMock(return_value=True)
         mock.exists = AsyncMock(return_value=True)
@@ -148,8 +148,20 @@ class TestUnifiedStorageGatewayBehavior:
         )
 
         mock_l0_storage.write.assert_called_once()
-        # Check that L0_FILE key exists in result (using enum, not string)
         assert any(k.value == "l0_file" for k in result.keys())
+
+    @pytest.mark.asyncio
+    async def test_save_warms_l1_cache(self, gateway, mock_l1_cache) -> None:
+        """L0 写入成功后应预热 L1 缓存。"""
+        await gateway.save(
+            memory_id="12345678-1234-1234-1234-123456789abc",
+            content="test content",
+            memory_type="private",
+            owner_id="user123",
+            name="test-memory",
+        )
+
+        mock_l1_cache.set_memory.assert_called_once_with("private", "user123", "test-memory", "test content")
 
     @pytest.mark.asyncio
     async def test_read_with_cache_miss_falls_back_to_l0(self, gateway, mock_l0_storage) -> None:
@@ -197,6 +209,18 @@ class TestUnifiedStorageGatewayBehavior:
         assert any(k.value == "l0_file" for k in result.keys())
 
     @pytest.mark.asyncio
+    async def test_delete_invalidates_l1_cache(self, gateway, mock_l1_cache) -> None:
+        """delete 应始终失效 L1 缓存。"""
+        await gateway.delete(
+            memory_id="12345678-1234-1234-1234-123456789abc",
+            memory_type="private",
+            owner_id="user123",
+            name="test-memory",
+        )
+
+        mock_l1_cache.delete_memory.assert_called_once_with("private", "user123", "test-memory")
+
+    @pytest.mark.asyncio
     async def test_exists_checks_l0(self, gateway, mock_l0_storage, mock_l2_metadata) -> None:
         """exists 应检查 L0。"""
         mock_l0_storage.exists.return_value = True
@@ -218,7 +242,7 @@ class TestUnifiedStorageGatewayWithOptionalLayers:
     @pytest.fixture
     def mock_l0_storage(self):
         mock = MagicMock()
-        mock.write = AsyncMock(return_value=None)
+        mock.write = AsyncMock(return_value=True)
         mock.read = AsyncMock(return_value="content")
         mock.delete = AsyncMock(return_value=True)
         mock.exists = AsyncMock(return_value=True)
@@ -229,6 +253,7 @@ class TestUnifiedStorageGatewayWithOptionalLayers:
         mock = MagicMock()
         mock.get_memory = AsyncMock(return_value=None)
         mock.set_memory = AsyncMock(return_value=True)
+        mock.delete_memory = AsyncMock(return_value=True)
         return mock
 
     @pytest.fixture
