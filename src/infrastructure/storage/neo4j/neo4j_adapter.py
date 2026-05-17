@@ -1,7 +1,7 @@
-"""基础设施层 Neo4j 适配器模块。
+"""基础设施层 Neo4j 适配器模块
 
 包装 Neo4jGraphStorage，实现 L5GraphPort 接口。使用 memory_id 作为实体主键，
-高级语义方法通过 Cypher MERGE 实现。
+高级语义方法通过 Cypher MERGE 实现
 
 Author:
     agimtech <agimtech@126.com>
@@ -299,7 +299,7 @@ class Neo4jAdapter(L5GraphPort):
 
 
 def _validate_rel_type(rel_type: str) -> None:
-    """验证关系类型是否符合 Neo4j 命名规范。
+    """验证关系类型是否符合 Neo4j 命名规范
 
     Args:
         rel_type: 关系类型字符串
@@ -312,7 +312,7 @@ def _validate_rel_type(rel_type: str) -> None:
 
 
 def _sanitize_property_keys(props: dict) -> dict:
-    """清洗属性键名，防止 Cypher 注入。
+    """清洗属性键名，防止 Cypher 注入
 
     Args:
         props: 原始属性字典

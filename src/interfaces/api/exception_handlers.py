@@ -1,4 +1,4 @@
-"""接口层统一异常处理器模块。
+"""接口层统一异常处理器模块
 
 根据异常类型自动映射到正确的 HTTP 状态码
 
@@ -74,7 +74,7 @@ EXCEPTION_HTTP_MAP: dict[type[BaseException], int] = {
 
 
 def _get_http_status(exc: BaseException) -> int:
-    """获取异常对应的 HTTP 状态码，优先使用具体异常映射。
+    """获取异常对应的 HTTP 状态码，优先使用具体异常映射
 
     Args:
         exc: 领域异常实例
@@ -92,14 +92,14 @@ def _get_http_status(exc: BaseException) -> int:
 
 
 class ExceptionHandlers:
-    """统一异常处理器注册。
+    """统一异常处理器注册
 
     Attributes:
         _app: FastAPI 应用实例
     """
 
     def __init__(self, app: FastAPI) -> None:
-        """初始化异常处理器。
+        """初始化异常处理器
 
         Args:
             app: FastAPI 应用实例
@@ -115,7 +115,7 @@ class ExceptionHandlers:
         self._app.add_exception_handler(Exception, self._handle_unexpected_error)
 
     async def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
-        """处理领域基类异常，自动映射到 HTTP 状态码。
+        """处理领域基类异常，自动映射到 HTTP 状态码
 
         Args:
             request: 当前 HTTP 请求
@@ -172,7 +172,7 @@ class ExceptionHandlers:
         )
 
     async def _handle_validation_error(self, request: Request, exc: Exception) -> JSONResponse:
-        """处理请求参数校验异常。
+        """处理请求参数校验异常
 
         Args:
             request: 当前 HTTP 请求
@@ -208,7 +208,7 @@ class ExceptionHandlers:
         )
 
     async def _handle_pydantic_error(self, request: Request, exc: Exception) -> JSONResponse:
-        """处理 Pydantic 数据校验异常。
+        """处理 Pydantic 数据校验异常
 
         Args:
             request: 当前 HTTP 请求
@@ -233,7 +233,7 @@ class ExceptionHandlers:
         )
 
     async def _handle_unexpected_error(self, request: Request, exc: Exception) -> JSONResponse:
-        """处理未预期的异常，返回 500 内部错误。
+        """处理未预期的异常，返回 500 内部错误
 
         Args:
             request: 当前 HTTP 请求
@@ -256,7 +256,7 @@ class ExceptionHandlers:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """注册异常处理器到 FastAPI 应用。
+    """注册异常处理器到 FastAPI 应用
 
     用法：register_exception_handlers(app)  # 初始化时调用一次
 

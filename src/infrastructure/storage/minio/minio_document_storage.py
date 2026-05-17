@@ -1,7 +1,7 @@
-"""基础设施层 MinIO 文档存储模块。
+"""基础设施层 MinIO 文档存储模块
 
 实现 DocumentStoragePort 接口，组合 MinIOAdapter 并添加文档业务语义：
-自动路径生成、用户文档列表和元数据管理。
+自动路径生成、用户文档列表和元数据管理
 
 Author:
     agimtech <agimtech@126.com>
@@ -46,7 +46,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         content_type: str = "application/octet-stream",
         tags: dict[str, str] | None = None,
     ) -> str:
-        """存储对象。
+        """存储对象
 
         Args:
             bucket_type: Bucket 类型
@@ -66,7 +66,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ):
-        """流式下载对象。
+        """流式下载对象
 
         Args:
             bucket_type: Bucket 类型
@@ -84,7 +84,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ) -> bool:
-        """删除对象。
+        """删除对象
 
         Args:
             bucket_type: Bucket 类型
@@ -102,7 +102,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         object_key: str,
         version_id: str | None = None,
     ) -> dict:
-        """获取对象元数据。
+        """获取对象元数据
 
         Args:
             bucket_type: Bucket 类型
@@ -121,7 +121,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         content: bytes | None = None,
         retention_days: int = 2555,
     ) -> str:
-        """归档对象。
+        """归档对象
 
         Args:
             bucket_type: Bucket 类型
@@ -140,7 +140,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         prefix: str = "",
         recursive: bool = True,
     ) -> list[dict]:
-        """列出对象。
+        """列出对象
 
         Args:
             bucket_type: Bucket 类型
@@ -161,7 +161,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         file_path: str,
         metadata: dict | None = None,
     ) -> str:
-        """存储文档并自动生成对象路径。
+        """存储文档并自动生成对象路径
 
         路径格式: documents/{user_id}/{doc_type}/{YYYY-MM}/{timestamp}
 
@@ -191,7 +191,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         user_id: str,
         doc_type: str | None = None,
     ) -> list[dict]:
-        """列出用户文档。
+        """列出用户文档
 
         Args:
             user_id: 用户 ID
@@ -210,7 +210,7 @@ class MinIODocumentStorage(DocumentStoragePort):
         user_id: str,
         document_id: str,
     ) -> dict | None:
-        """获取文档元数据。
+        """获取文档元数据
 
         Args:
             user_id: 用户 ID

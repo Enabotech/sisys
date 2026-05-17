@@ -1,4 +1,4 @@
-"""基础设施层 RabbitMQ 异步事件消费者模块。
+"""基础设施层 RabbitMQ 异步事件消费者模块
 
 基于 aio-pika 实现异步事件消费，使用手动 ACK/NACK 策略，
 失败时通过 nack(requeue=True) 重新入队，支持幂等性检查和死信队列
@@ -121,13 +121,13 @@ class RabbitMQConsumer:
         logger.info("Bound queue %s to exchange %s with routing key %s", queue_name, exchange_name, routing_key)
 
     async def _on_message(self, message: AbstractIncomingMessage) -> None:
-        """消息处理回调，执行手动 ACK/NACK。
+        """消息处理回调，执行手动 ACK/NACK
 
         处理流程：反序列化 -> 幂等性检查 -> 执行处理器 -> ACK，
         失败时根据重试策略决定重试或死信
 
         Args:
-            message: RabbitMQ 原始消息。
+            message: RabbitMQ 原始消息
         """
         event: DomainEvent | None = None  # 预先初始化为 None
         try:
@@ -176,12 +176,12 @@ class RabbitMQConsumer:
         event: DomainEvent,
         error: Exception,
     ) -> None:
-        """失败处理，使用 RabbitMQ NACK 重新入队或发送到死信队列。
+        """失败处理，使用 RabbitMQ NACK 重新入队或发送到死信队列
 
         Args:
-            message: RabbitMQ 原始消息。
-            event: 处理失败的领域事件。
-            error: 异常信息。
+            message: RabbitMQ 原始消息
+            event: 处理失败的领域事件
+            error: 异常信息
         """
         if not self._retry_policy:
             # 无重试策略，直接死信

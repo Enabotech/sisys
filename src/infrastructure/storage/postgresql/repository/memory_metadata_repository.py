@@ -1,22 +1,18 @@
-"""PostgreSQLMemoryMetadataRepository — L2 PostgreSQL 持久化实现
+"""基础设施层记忆元数据仓储模块
 
-使用 SQLAlchemy AsyncSession，支持：
-- 多用户并行：会话级别隔离
-- 线程安全：异步操作，依赖数据库事务
-- UPSERT：版本冲突检测（乐观锁）
-- 软删除：deleted_at 标记
-
-架构来源: architecture.md §11.2.5
-
-重构说明（Phase 3）：
-- 继承 PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel]
-- 覆写 pk_column="memory_id"、soft_delete_column="deleted_at"
-- 覆写 _do_save 实现 UPSERT+乐观锁
-- 自动获得父类 get_by_id/save/delete/list_all
+L2 PostgreSQL 持久化实现，使用 SQLAlchemy AsyncSession
+支持多用户并行会话级别隔离、UPSERT 版本冲突检测（乐观锁）和软删除
+继承 PostgreSQLAdapter[MemoryMetadata, MemoryMetadataModel]
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

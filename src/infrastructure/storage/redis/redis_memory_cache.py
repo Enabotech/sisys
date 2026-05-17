@@ -1,12 +1,13 @@
-"""RedisMemoryCache — Memory-domain Redis cache (Rule 4).
+"""SISYS 基础设施层 Redis 记忆缓存模块
 
-Implements MemoryCachePort by composing RedisAdapter (Rule 3).
-Adds memory-specific key building and TTL randomization.
+基于 RedisAdapter 实现记忆领域缓存端口，
+支持记忆专用键构建与 TTL 随机化防止缓存雪崩
 
-Key format:
-- Private: memory:user:{user_id}:{name}
-- Group:   memory:group:{group_id}:{name}
-TTL: 24h-30h (randomized to avoid cache stampede)
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

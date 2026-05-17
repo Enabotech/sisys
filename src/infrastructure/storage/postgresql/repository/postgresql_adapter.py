@@ -1,9 +1,13 @@
-"""PostgreSQLAdapter[TEntity, TModel] — L2RdbPort domain repository base.
+"""基础设施层 PostgreSQL 适配器模块
 
-Refactoring notes:
-- Session is now read from ContextVar, not constructor injection
-- Subclasses only need _to_entity/_to_model and optional pk_column override
-- Deprecated BaseRepository alias retained for backward compatibility
+L2RdbPort 领域仓储的泛型基类，使用 SQLAlchemy AsyncSession 实现
+Session 从 ContextVar 读取（非构造器注入），子类只需实现 _to_entity/_to_model
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -23,48 +27,48 @@ TModel = TypeVar("TModel", bound=Base)
 
 
 class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
-    """Domain repository base — implements L2RdbPort[TEntity] with ORM conversion.
+    """领域仓储泛型基类，实现 L2RdbPort[TEntity] 与 ORM 转换
 
-    Subclasses must implement:
+    子类必须实现：
     - _to_entity(model: TModel) -> TEntity
     - _to_model(entity: TEntity) -> TModel
-    - pk_column: str = "id" (overridable to "memory_id" etc.)
+    - pk_column: str = "id"（可覆写为 "memory_id" 等）
 
-    Session is read from ContextVar via session_context module.
+    Session 通过 ContextVar 从 session_context 模块获取
     """
 
     pk_column: str = "id"
     soft_delete_column: str | None = None
 
     def __init__(self, model_class: type[TModel]) -> None:
-        """Initialize PostgreSQLAdapter.
+        """初始化 PostgreSQL 适配器
 
         Args:
-            model_class: SQLAlchemy model class
+            model_class: SQLAlchemy 模型类
         """
         self._model_class: type[TModel] = model_class
 
     @property
     def _session(self) -> AsyncSession:
-        """Get AsyncSession from ContextVar."""
+        """从 ContextVar 获取 AsyncSession。"""
         return get_session()
 
     def _to_entity(self, model: TModel) -> TEntity:
-        """ORM model -> domain entity (subclass must override)."""
+        """将 ORM 模型转换为领域实体（子类必须覆写）。"""
         raise NotImplementedError
 
     def _to_model(self, entity: TEntity) -> TModel:
-        """Domain entity -> ORM model (subclass must override)."""
+        """将领域实体转换为 ORM 模型（子类必须覆写）。"""
         raise NotImplementedError
 
     async def get_by_id(self, id: UUID) -> TEntity | None:
-        """Get entity by primary key.
+        """根据主键获取实体
 
         Args:
-            id: Entity primary key
+            id: 实体主键
 
         Returns:
-            Domain entity, or None if not found
+            领域实体，未找到返回 None
         """
         stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         stmt = self._apply_soft_delete_filter(stmt)
@@ -73,23 +77,23 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         return self._to_entity(model) if model else None
 
     async def save(self, entity: TEntity) -> TEntity:
-        """Save entity (insert or update).
+        """保存实体（插入或更新）
 
         Args:
-            entity: Domain entity
+            entity: 领域实体
 
         Returns:
-            Persisted domain entity (with DB-generated id, timestamps, etc.).
+            持久化后的领域实体（含数据库生成的 id、时间戳等）
         """
         model = self._to_model(entity)
         await self._do_save(model, entity)
         return self._to_entity(model)
 
     async def delete(self, id: UUID) -> None:
-        """Delete entity (hard delete or soft delete).
+        """删除实体（硬删除或软删除）
 
         Args:
-            id: Entity primary key
+            id: 实体主键
         """
         if self.soft_delete_column:
             await self._soft_delete(id)
@@ -97,14 +101,14 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
             await self._hard_delete(id)
 
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[TEntity]:
-        """Get entity list.
+        """获取实体列表
 
         Args:
-            skip: Number of records to skip
-            limit: Maximum number of records
+            skip: 跳过的记录数
+            limit: 最大返回记录数
 
         Returns:
-            List of domain entities
+            领域实体列表
         """
         stmt = select(self._model_class).offset(skip).limit(limit)
         stmt = self._apply_soft_delete_filter(stmt)
@@ -112,25 +116,29 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         return [self._to_entity(m) for m in result.scalars().all()]
 
     async def count(self) -> int:
-        """Get total entity count."""
+        """获取实体总数
+
+        Returns:
+            实体总数
+        """
         result = await self._session.execute(select(func.count()).select_from(self._model_class))
         return int(result.scalar() or 0)
 
     async def _do_save(self, model: TModel, entity: TEntity) -> None:
-        """Save hook — default simple insert, subclass can override for UPSERT."""
+        """保存钩子 — 默认简单插入，子类可覆写实现 UPSERT。"""
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
 
     def _apply_soft_delete_filter(self, stmt: Any) -> Any:
-        """Apply soft delete filter condition."""
+        """应用软删除过滤条件。"""
         if self.soft_delete_column:
             col = cast("Any", self._model_class).__table__.c[self.soft_delete_column]
             return stmt.where(col.is_(None))
         return stmt
 
     async def _soft_delete(self, id: UUID) -> None:
-        """Soft delete — set deleted_at timestamp."""
+        """软删除 — 设置 deleted_at 时间戳。"""
         from datetime import datetime, timezone
 
         col_name = self.soft_delete_column
@@ -146,7 +154,7 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
         await self._session.flush()
 
     async def _hard_delete(self, id: UUID) -> None:
-        """Hard delete — physically remove record."""
+        """硬删除 — 物理移除记录。"""
         stmt = select(self._model_class).where(cast("Any", self._model_class).__table__.c[self.pk_column] == id)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()

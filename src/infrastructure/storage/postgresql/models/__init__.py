@@ -1,4 +1,13 @@
-"""PostgreSQL models package."""
+"""基础设施层 PostgreSQL 模型包
+
+定义所有 SQLAlchemy ORM 模型，映射到 PostgreSQL 数据库表
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from src.infrastructure.storage.postgresql.models.audit import AuditLogModel
 from src.infrastructure.storage.postgresql.models.audit_outbox import AuditOutboxModel

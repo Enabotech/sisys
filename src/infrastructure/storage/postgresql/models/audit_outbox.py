@@ -1,7 +1,13 @@
-"""AuditOutboxModel — SQLAlchemy model for audit_outbox table.
+"""基础设施层审计发件箱模型模块
 
-Reference: Story 1.10 SDD规范定义
-Reference: architecture.md - ADR-003 Transactional Outbox Pattern
+定义审计发件箱的 SQLAlchemy ORM 模型，对应 audit_outbox 表
+遵循事务发件箱模式（ADR-003）实现可靠异步发布
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -23,24 +29,22 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 class AuditOutboxModel(Base):
-    """SQLAlchemy model for the audit_outbox table.
+    """审计发件箱 SQLAlchemy 模型，对应 audit_outbox 表
 
-    Stores audit events for reliable async publishing via the
-    Transactional Outbox Pattern. Events are written in the same
-    transaction as the business operation, then processed by a
-    background processor.
+    通过事务发件箱模式存储审计事件，确保可靠异步发布
+    事件在与业务操作相同的事务中写入，然后由后台处理器处理
 
-    Fields:
-        id: Auto-increment primary key
-        event_id: UUID of the audit event
-        event_type: Type discriminator ("AuditEvent")
-        payload: JSON payload containing audit data
-        status: Processing status ("pending", "published", "failed")
-        created_at: When the event was written to outbox
-        processed_at: When the event was successfully published
-        retry_count: Number of publishing attempts
-        max_retries: Maximum allowed attempts
-        error_message: Last error message if failed
+    Attributes:
+        id: 自增主键
+        event_id: 审计事件的 UUID
+        event_type: 类型判别器（"AuditEvent"）
+        payload: 包含审计数据的 JSON 负载
+        status: 处理状态（"pending"、"published"、"failed"）
+        created_at: 事件写入发件箱的时间
+        processed_at: 事件成功发布的时间
+        retry_count: 发布尝试次数
+        max_retries: 最大允许尝试次数
+        error_message: 失败时的最后一条错误消息
     """
 
     __tablename__ = "audit_outbox"
@@ -75,18 +79,18 @@ class AuditOutboxModel(Base):
         max_retries: int = 3,
         error_message: str | None = None,
     ) -> None:
-        """Initialize an audit outbox entry.
+        """初始化审计发件箱条目
 
         Args:
-            event_id: UUID of the audit event.
-            payload: JSON payload containing audit data.
-            event_type: Type discriminator (default: "AuditEvent").
-            status: Processing status (default: "pending").
-            created_at: When the event was written.
-            processed_at: When successfully published.
-            retry_count: Number of attempts.
-            max_retries: Maximum allowed attempts.
-            error_message: Last error message.
+            event_id: 审计事件的 UUID
+            payload: 包含审计数据的 JSON 负载
+            event_type: 类型判别器（默认 "AuditEvent"）
+            status: 处理状态（默认 "pending"）
+            created_at: 事件写入时间
+            processed_at: 成功发布时间
+            retry_count: 尝试次数
+            max_retries: 最大允许尝试次数
+            error_message: 最后一条错误消息
         """
         self.event_id = event_id
         self.event_type = event_type
@@ -99,33 +103,33 @@ class AuditOutboxModel(Base):
         self.error_message = error_message
 
     def mark_published(self) -> None:
-        """Mark this entry as successfully published."""
+        """标记此条目为已成功发布。"""
         self.status = "published"
         self.processed_at = datetime.now(UTC)
 
     def mark_failed(self, error: str) -> None:
-        """Mark this entry as failed with an error message.
+        """标记此条目为失败并记录错误消息
 
         Args:
-            error: Error message describing the failure.
+            error: 描述失败的错误消息
         """
         self.status = "failed"
         self.error_message = error
         self.retry_count += 1
 
     def can_retry(self) -> bool:
-        """Check if this entry can be retried.
+        """检查此条目是否可以重试
 
         Returns:
-            bool: True if retry_count < max_retries.
+            retry_count 小于 max_retries 时返回 True
         """
         return self.retry_count < self.max_retries
 
     def to_dict(self) -> dict:
-        """Convert to dictionary representation.
+        """转换为字典表示
 
         Returns:
-            dict: Dictionary with all outbox fields.
+            包含所有发件箱字段的字典
         """
         return {
             "id": self.id,

@@ -1,7 +1,7 @@
-"""基础设施层事件溯源存储模块。
+"""基础设施层事件溯源存储模块
 
 基于 PostgreSQL 实现事件溯源存储，支持事件追加（带乐观锁版本检查）、
-按聚合 ID 查询事件、按事件类型和时间范围查询。
+按聚合 ID 查询事件、按事件类型和时间范围查询
 
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，
 无需构造器注入 session 参数
@@ -33,20 +33,20 @@ EVENT_STORE_TABLE = "event_store"
 
 
 class EventStoreModel:
-    """事件存储记录数据类（非 SQLAlchemy 模型）。
+    """事件存储记录数据类（非 SQLAlchemy 模型）
 
-    使用原始 SQL 进行事件存储操作，实际表结构通过 create_table_sql() 管理。
+    使用原始 SQL 进行事件存储操作，实际表结构通过 create_table_sql() 管理
 
     Attributes:
-        id: 自增主键。
-        event_id: 事件唯一标识。
-        aggregate_id: 聚合根唯一标识。
-        aggregate_type: 聚合根类型名称。
-        version: 事件版本号。
-        event_type: 事件类型名称。
-        payload: 事件负载（JSONB）。
-        timestamp: 事件时间戳。
-        metadata: 事件元数据（可选）。
+        id: 自增主键
+        event_id: 事件唯一标识
+        aggregate_id: 聚合根唯一标识
+        aggregate_type: 聚合根类型名称
+        version: 事件版本号
+        event_type: 事件类型名称
+        payload: 事件负载（JSONB）
+        timestamp: 事件时间戳
+        metadata: 事件元数据（可选）
     """
 
     __tablename__ = EVENT_STORE_TABLE
@@ -75,10 +75,10 @@ class EventStoreModel:
 
     @classmethod
     def create_table_sql(cls) -> str:
-        """返回创建事件存储表的 SQL 语句。
+        """返回创建事件存储表的 SQL 语句
 
         Returns:
-            CREATE TABLE IF NOT EXISTS 的 SQL 语句。
+            CREATE TABLE IF NOT EXISTS 的 SQL 语句
         """
         return f"""
         CREATE TABLE IF NOT EXISTS {cls.__tablename__} (

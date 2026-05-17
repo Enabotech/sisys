@@ -1,4 +1,4 @@
-"""基础设施层事件总线工厂模块。
+"""基础设施层事件总线工厂模块
 
 提供事件总线实例的创建、管理和依赖注入，支持 Redis 实时通道和
 RabbitMQ 可靠通道的统一配置与组件复用
@@ -26,14 +26,14 @@ from src.infrastructure.messaging.redis_event_bus import RedisEventBus
 
 @dataclass
 class EventBusConfig:
-    """事件总线配置数据类。
+    """事件总线配置数据类
 
     Attributes:
-        redis_url: Redis 连接 URL。
-        rabbitmq_url: RabbitMQ 连接 URL。
-        outbox_repository: 发件箱仓储实例。
-        poll_interval: 轮询间隔（秒）。
-        batch_size: 每批处理数量。
+        redis_url: Redis 连接 URL
+        rabbitmq_url: RabbitMQ 连接 URL
+        outbox_repository: 发件箱仓储实例
+        poll_interval: 轮询间隔（秒）
+        batch_size: 每批处理数量
     """
 
     redis_url: str | None = None
@@ -81,7 +81,7 @@ class EventBusFactory:
         self._initialized = False
 
     def _initialize_components(self) -> None:
-        """延迟初始化消息组件。
+        """延迟初始化消息组件
 
         仅当配置提供了必要的连接信息时才初始化，
         Redis 和 RabbitMQ 组件按需独立创建
@@ -101,10 +101,10 @@ class EventBusFactory:
         self._initialized = True
 
     def _create_redis_publisher(self) -> Any:
-        """创建 Redis 发布器实例。
+        """创建 Redis 发布器实例
 
         Returns:
-            RedisEventPublisher 实例，若未配置则返回 None。
+            RedisEventPublisher 实例，若未配置则返回 None
         """
         from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 
@@ -113,10 +113,10 @@ class EventBusFactory:
         return RedisEventPublisher(config=self._config._redis_config)
 
     def _create_redis_subscriber(self) -> Any:
-        """创建 Redis 订阅器实例。
+        """创建 Redis 订阅器实例
 
         Returns:
-            RedisEventSubscriber 实例，若未配置则返回 None。
+            RedisEventSubscriber 实例，若未配置则返回 None
         """
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
@@ -125,10 +125,10 @@ class EventBusFactory:
         return RedisEventSubscriber(config=self._config._redis_config)
 
     def _create_rabbitmq_publisher(self) -> Any:
-        """创建 RabbitMQ 发布器实例。
+        """创建 RabbitMQ 发布器实例
 
         Returns:
-            RabbitMQPublisher 实例，若未配置则返回 None。
+            RabbitMQPublisher 实例，若未配置则返回 None
         """
         from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
 

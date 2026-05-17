@@ -1,7 +1,7 @@
-"""基础设施层 Neo4j 记忆图存储模块。
+"""基础设施层 Neo4j 记忆图存储模块
 
 实现 MemoryGraphPort 接口，组合 Neo4jAdapter 并添加记忆关系语义：
-实体关系提取和知识图谱查询。
+实体关系提取和知识图谱查询
 
 Author:
     agimtech <agimtech@126.com>
@@ -46,7 +46,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         entity_type: str,
         properties: dict[str, Any],
     ) -> bool:
-        """创建实体节点。
+        """创建实体节点
 
         Args:
             memory_id: 关联的记忆 ID
@@ -59,7 +59,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         return await self._adapter.create_entity(memory_id, entity_type, properties)
 
     async def get_entity(self, memory_id: str) -> dict | None:
-        """获取实体。
+        """获取实体
 
         Args:
             memory_id: 实体主键
@@ -70,7 +70,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         return await self._adapter.get_entity(memory_id)
 
     async def delete_entity(self, memory_id: str) -> bool:
-        """删除实体及关联边。
+        """删除实体及关联边
 
         Args:
             memory_id: 实体主键
@@ -87,7 +87,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         relationship_type: str,
         properties: dict[str, Any] | None = None,
     ) -> bool:
-        """创建关系边。
+        """创建关系边
 
         Args:
             source_memory_id: 源实体 ID
@@ -106,7 +106,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         target_memory_id: str,
         relationship_type: str,
     ) -> bool:
-        """删除关系边。
+        """删除关系边
 
         Args:
             source_memory_id: 源实体 ID
@@ -124,7 +124,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         max_depth: int = 2,
         relationship_type: str | None = None,
     ) -> list[dict]:
-        """查找关联实体。
+        """查找关联实体
 
         Args:
             memory_id: 起始实体 ID
@@ -141,7 +141,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         cypher: str,
         params: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """执行只读 Cypher 查询。
+        """执行只读 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -157,7 +157,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         cypher: str,
         params: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """执行写入 Cypher 查询。
+        """执行写入 Cypher 查询
 
         Args:
             cypher: Cypher 查询语句
@@ -174,7 +174,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         max_depth: int = 1,
         edge_type: str | None = None,
     ) -> list[dict]:
-        """获取邻居节点。
+        """获取邻居节点
 
         Args:
             memory_id: 实体主键
@@ -193,10 +193,10 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         memory_id: str,
         content: str,
     ) -> int:
-        """提取并索引记忆中的实体关系。
+        """提取并索引记忆中的实体关系
 
-        简单实现：将记忆内容注册为实体节点。
-        生产环境应集成 NER 服务提取实体和关系。
+        简单实现：将记忆内容注册为实体节点
+        生产环境应集成 NER 服务提取实体和关系
 
         Args:
             memory_id: 记忆 ID
@@ -217,7 +217,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         memory_id: str,
         depth: int = 2,
     ) -> dict:
-        """获取记忆的知识图谱子图。
+        """获取记忆的知识图谱子图
 
         Args:
             memory_id: 记忆 ID
@@ -247,7 +247,7 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
 
 
 def _content_hash(content: str) -> str:
-    """计算内容 SHA256 短哈希。
+    """计算内容 SHA256 短哈希
 
     Args:
         content: 输入文本内容

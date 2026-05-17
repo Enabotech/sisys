@@ -1,8 +1,8 @@
-"""基础设施层双写幂等性检查器模块。
+"""基础设施层双写幂等性检查器模块
 
 同时使用 Redis（高性能）和 PostgreSQL（持久化）进行幂等性检查，
 Redis SET NX 提供高性能检查，PostgreSQL 记录提供持久化保证，
-Redis 故障时降级至 PostgreSQL。
+Redis 故障时降级至 PostgreSQL
 
 Session 通过 ContextVar 由 middleware 或 test fixture 提供，
 无需构造器注入 session 参数
@@ -36,11 +36,11 @@ IDEMPOTENCY_TABLE = "idempotency_records"
 
 
 class IdempotencyRecordModel:
-    """幂等性记录 PostgreSQL 表模型。
+    """幂等性记录 PostgreSQL 表模型
 
     Attributes:
-        event_id: 事件唯一标识。
-        processed_at: 处理时间。
+        event_id: 事件唯一标识
+        processed_at: 处理时间
     """
 
     __tablename__ = IDEMPOTENCY_TABLE
@@ -50,10 +50,10 @@ class IdempotencyRecordModel:
 
     @classmethod
     def create_table_sql(cls) -> str:
-        """返回创建幂等性记录表的 SQL 语句。
+        """返回创建幂等性记录表的 SQL 语句
 
         Returns:
-            CREATE TABLE IF NOT EXISTS 的 SQL 语句。
+            CREATE TABLE IF NOT EXISTS 的 SQL 语句
         """
         return f"""
         CREATE TABLE IF NOT EXISTS {cls.__tablename__} (
@@ -79,11 +79,11 @@ class DualIdempotencyChecker:
         redis_client: aioredis.Redis,
         ttl: int = DEFAULT_TTL,
     ):
-        """初始化 DualIdempotencyChecker。
+        """初始化 DualIdempotencyChecker
 
         Args:
-            redis_client: 异步 Redis 客户端。
-            ttl: Redis TTL（秒），默认 7 天。
+            redis_client: 异步 Redis 客户端
+            ttl: Redis TTL（秒），默认 7 天
         """
         self._redis = redis_client
         self._ttl = ttl
@@ -125,10 +125,10 @@ class DualIdempotencyChecker:
             return await self._try_acquire_postgresql(event_id)
 
     async def _write_to_postgresql(self, event_id: UUID) -> None:
-        """异步写入 PostgreSQL 幂等性记录。
+        """异步写入 PostgreSQL 幂等性记录
 
         Args:
-            event_id: 事件唯一标识。
+            event_id: 事件唯一标识
         """
         try:
             stmt = text(
@@ -196,13 +196,13 @@ class DualIdempotencyChecker:
         return await self._is_processed_postgresql(event_id)
 
     async def _is_processed_postgresql(self, event_id: UUID) -> bool:
-        """PostgreSQL 模式：检查事件是否已处理。
+        """PostgreSQL 模式：检查事件是否已处理
 
         Args:
-            event_id: 事件唯一标识。
+            event_id: 事件唯一标识
 
         Returns:
-            True: 已处理，False: 未处理。
+            True: 已处理，False: 未处理
         """
         try:
             stmt = text("SELECT 1 FROM idempotency_records WHERE event_id = :event_id LIMIT 1")

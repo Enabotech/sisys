@@ -1,8 +1,13 @@
-"""Redis Public Blackboard — 基础设施层实现
+"""基础设施层 Redis 公共黑板模块
 
-实现 Story 1.4 定义的 PublicBlackboard 接口
-使用 Redis Sorted Set 存储黑板内容，按时间戳排序
+实现 PublicBlackboard 接口，使用 Redis Sorted Set 存储黑板内容，按时间戳排序
 支持 MVCC（多版本并发控制），每次写入自动递增版本号
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -33,15 +38,15 @@ class RedisPublicBlackboard:
     _NAMESPACE = "blackboard"
 
     def __init__(self, redis_client: aioredis.Redis):
-        """Initialize RedisPublicBlackboard.
+        """初始化 Redis 公共黑板
 
         Args:
-            redis_client: Redis async client (provided by RedisConnectionManager)
+            redis_client: Redis 异步客户端（由 RedisConnectionManager 提供）
         """
         self._redis = redis_client
 
     def _get_version_key(self, conversation_id: str) -> str:
-        """Get version key."""
+        """获取版本键。"""
         return build_key(self._NAMESPACE, conversation_id, "version")
 
     async def post(

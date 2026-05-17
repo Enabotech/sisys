@@ -1,6 +1,6 @@
-"""基础设施层 MinIO 客户端管理模块。
+"""基础设施层 MinIO 客户端管理模块
 
-封装 MinIO Python SDK，提供连接池管理、S3 错误映射和健康检查功能。
+封装 MinIO Python SDK，提供连接池管理、S3 错误映射和健康检查功能
 
 Author:
     agimtech <agimtech@126.com>

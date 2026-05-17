@@ -1,6 +1,6 @@
-"""基础设施层 Qdrant 向量存储数据模型模块。
+"""基础设施层 Qdrant 向量存储数据模型模块
 
-包含 Collection 配置、向量点和稀疏向量定义，所有模型位于基础设施层。
+包含 Collection 配置、向量点和稀疏向量定义，所有模型位于基础设施层
 
 Author:
     agimtech <agimtech@126.com>
@@ -65,7 +65,7 @@ class VectorPoint:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
-        """验证向量维度是否正确。
+        """验证向量维度是否正确
 
         Raises:
             ValueError: 向量维度不为 1024 时抛出
@@ -87,7 +87,7 @@ class SparseVector:
     values: list[float]
 
     def __post_init__(self):
-        """验证 indices 和 values 长度是否匹配。
+        """验证 indices 和 values 长度是否匹配
 
         Raises:
             ValueError: indices 和 values 长度不一致时抛出

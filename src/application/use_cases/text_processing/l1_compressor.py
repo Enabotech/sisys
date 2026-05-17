@@ -1,4 +1,4 @@
-"""应用层 L1 压缩器模块。
+"""应用层 L1 压缩器模块
 
 混合压缩策略：
 - ≤200 字：直接规则压缩（无 LLM 调用）
@@ -87,7 +87,7 @@ def _rule_compress(text: str) -> str:
 
 @dataclass
 class L1CompressionResult(CompressionResult):
-    """L1 压缩结果。
+    """L1 压缩结果
 
     Attributes:
         method: 压缩方法，"rule" 或 "llm"
@@ -97,7 +97,7 @@ class L1CompressionResult(CompressionResult):
 
 
 class L1Compressor(CompressorService):
-    """L1 压缩器，轻量级压缩至约 150 字，压缩率≥70%。
+    """L1 压缩器，轻量级压缩至约 150 字，压缩率≥70%
 
     Attributes:
         LLM_THRESHOLD: 超过此长度使用 LLM 压缩（目前实现为规则压缩 + 截断）

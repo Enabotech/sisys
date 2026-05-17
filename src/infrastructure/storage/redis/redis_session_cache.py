@@ -1,7 +1,13 @@
-"""RedisSessionCache — SessionCachePort implementation (Rule 4).
+"""SISYS 基础设施层 Redis 会话缓存模块
 
-Composes RedisAdapter (Rule 3 L1CachePort) for generic KV operations
-and uses raw_client for session-specific HSET/HGET operations.
+基于 RedisAdapter 实现会话缓存端口，
+支持会话专用 HSET/HGET 操作
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

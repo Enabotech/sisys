@@ -1,6 +1,6 @@
-"""基础设施层 Neo4j 图存储模块。
+"""基础设施层 Neo4j 图存储模块
 
-提供 Cypher 查询执行和图遍历功能。
+提供 Cypher 查询执行和图遍历功能
 
 Author:
     agimtech <agimtech@126.com>
@@ -142,7 +142,7 @@ _REL_TYPE_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$", re.IGNORECASE)
 
 
 def _validate_rel_type(rel_type: str) -> None:
-    """验证关系类型是否符合 Neo4j 命名规范。
+    """验证关系类型是否符合 Neo4j 命名规范
 
     Args:
         rel_type: 关系类型字符串

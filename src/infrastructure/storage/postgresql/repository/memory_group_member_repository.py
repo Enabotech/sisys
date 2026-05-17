@@ -1,14 +1,18 @@
-"""PostgreSQLMemoryGroupMemberRepository — L2 群组成员关系持久化实现
+"""基础设施层群组成员关系仓储模块
 
-使用 SQLAlchemy AsyncSession，支持：
-- 多用户并行：会话级别隔离
-- 线程安全：异步操作，依赖数据库事务
-
-架构来源: architecture.md §11.2.9 AC-2 RBAC 校验
+L2 群组成员关系持久化实现，使用 SQLAlchemy AsyncSession
+支持多用户并行会话级别隔离、线程安全的异步操作
+架构来源: architecture.md 11.2.9 AC-2 RBAC 校验
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

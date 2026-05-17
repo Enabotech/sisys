@@ -1,4 +1,13 @@
-"""UserModel — SQLAlchemy model for users table."""
+"""基础设施层用户模型模块
+
+定义用户的 SQLAlchemy ORM 模型，对应 users 表
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +21,18 @@ from src.infrastructure.storage.postgresql.models.outbox import Base
 
 
 class UserModel(Base):
-    """SQLAlchemy model for the users table."""
+    """用户 SQLAlchemy 模型，对应 users 表
+
+    Attributes:
+        id: 主键 UUID
+        username: 用户名（唯一）
+        email: 邮箱（唯一）
+        hashed_password: 哈希密码
+        is_active: 是否激活
+        is_locked: 是否锁定
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
 
     __tablename__ = "users"
 
@@ -36,6 +56,18 @@ class UserModel(Base):
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> None:
+        """初始化用户模型
+
+        Args:
+            username: 用户名
+            email: 邮箱
+            id: 主键 UUID，为 None 时自动生成
+            hashed_password: 哈希密码，可选
+            is_active: 是否激活，默认 True
+            is_locked: 是否锁定，默认 False
+            created_at: 创建时间，可选
+            updated_at: 更新时间，可选
+        """
         self.id = id or uuid4()
         self.username = username
         self.email = email

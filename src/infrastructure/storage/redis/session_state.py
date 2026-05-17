@@ -1,6 +1,12 @@
-"""Session state data model.
+"""SISYS 基础设施层会话状态数据模型模块
 
-SessionState is a cache storage structure in the infrastructure layer (consistent with OutboxEntity).
+定义会话状态缓存数据结构，与发件箱实体保持一致的存储层风格
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

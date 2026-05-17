@@ -1,7 +1,7 @@
-"""基础设施层记忆索引管理模块。
+"""基础设施层记忆索引管理模块
 
 实现 IndexManagerPort 接口，提供异步索引操作能力。所有方法使用 to_thread
-封装同步 I/O 操作，保留 fcntl.flock 锁语义以保证并发安全。
+封装同步 I/O 操作，保留 fcntl.flock 锁语义以保证并发安全
 
 Author:
     agimtech <agimtech@126.com>

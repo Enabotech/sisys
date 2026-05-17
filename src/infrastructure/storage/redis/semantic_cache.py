@@ -1,7 +1,13 @@
-"""Redis Semantic Cache — RediSearch FT.SEARCH vector index implementation.
+"""SISYS 基础设施层 Redis 语义缓存模块
 
-Uses RediSearch KNN vector search for O(1) similarity lookup instead of
-SCAN + Python cosine_similarity (O(N) with 3N round-trips).
+基于 RediSearch FT.SEARCH 向量索引实现语义缓存查找，
+替代 SCAN + Python 余弦相似度方案以提升性能
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

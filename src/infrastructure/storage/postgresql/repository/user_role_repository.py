@@ -1,4 +1,4 @@
-"""UserRoleRepository — 用户-角色关联仓储实现
+"""基础设施层用户-角色关联仓储模块
 
 实现 UserRoleRepositoryPort 端口，从 user_roles 关联表操作数据
 遵循六边形架构：基础设施层实现，可以导入外部库
@@ -6,6 +6,12 @@
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

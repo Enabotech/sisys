@@ -1,7 +1,7 @@
-"""基础设施层文件系统记忆适配器模块。
+"""基础设施层文件系统记忆适配器模块
 
 实现 L0StoragePort 接口，提供异步文件操作能力。write/read 使用 aiofiles（I/O 密集型），
-delete/exists/list_memories 使用 asyncio.to_thread()（快速同步操作）。
+delete/exists/list_memories 使用 asyncio.to_thread()（快速同步操作）
 
 Author:
     agimtech <agimtech@126.com>
@@ -152,10 +152,10 @@ class FileMemoryAdapter(L0StoragePort):
     # ========================================================================
 
     def write_sync(self, memory_id: str, memory_type: str, content: str) -> None:
-        """同步写入记忆文件。
+        """同步写入记忆文件
 
         .. deprecated::
-            请使用 async write() 方法替代。此方法仅为向后兼容保留。
+            请使用 async write() 方法替代。此方法仅为向后兼容保留
 
         Args:
             memory_id: 记忆 ID
@@ -168,10 +168,10 @@ class FileMemoryAdapter(L0StoragePort):
         file_path.write_text(content, encoding="utf-8")
 
     def read_sync(self, memory_id: str, memory_type: str) -> str:
-        """同步读取记忆文件。
+        """同步读取记忆文件
 
         .. deprecated::
-            请使用 async read() 方法替代。此方法仅为向后兼容保留。
+            请使用 async read() 方法替代。此方法仅为向后兼容保留
 
         Args:
             memory_id: 记忆 ID

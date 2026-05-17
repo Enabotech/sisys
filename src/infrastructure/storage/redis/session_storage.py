@@ -1,7 +1,12 @@
-"""Redis Session Storage — 基础设施层实现
+"""SISYS 基础设施层 Redis 会话存储模块
 
-实现 Story 1.4 定义的 SessionStorage 接口
-使用 Redis Hash 存储会话状态，支持自动过期
+基于 Redis Hash 实现会话存储端口，支持自动过期
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

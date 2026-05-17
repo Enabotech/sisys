@@ -1,10 +1,16 @@
-"""LoginAttemptRepository — 登录尝试仓储实现
+"""基础设施层登录尝试仓储模块
 
-用于跟踪用户登录失败尝试，实现账户锁定功能
+跟踪用户登录失败尝试，实现账户锁定功能
 
 Session 来源：
 - Session 通过 ContextVar 由 middleware 或 test fixture 提供
 - 无需构造器注入 session 参数
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
