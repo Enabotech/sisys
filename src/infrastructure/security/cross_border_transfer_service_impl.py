@@ -1,4 +1,4 @@
-"""SISYS 基础设施层跨境数据传输服务模块
+"""基础设施层跨境数据传输服务模块
 
 基于 CrossBorderTransferServicePort 接口实现跨境数据传输请求的审批流程管理
 

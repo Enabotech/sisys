@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 PostgreSQL 会话上下文模块。
+"""基础设施层 PostgreSQL 会话上下文模块。
 
 基于 ContextVar 提供异步会话访问，支持中间件和测试夹具管理会话生命周期
 

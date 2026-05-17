@@ -1,4 +1,4 @@
-"""SISYS 领域层存储层级枚举定义模块
+"""领域层存储层级枚举定义模块
 
 对应 architecture.md §11.2.9 存储层级策略：
 - StorageLayer: 存储层级（L0-L5）

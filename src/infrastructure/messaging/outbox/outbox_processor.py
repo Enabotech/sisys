@@ -1,4 +1,4 @@
-"""SISYS 基础设施层异步发件箱轮询处理器模块。
+"""基础设施层异步发件箱轮询处理器模块。
 
 异步协程定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ，
 使用 asyncio.Semaphore 控制并发

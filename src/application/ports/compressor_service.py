@@ -1,4 +1,4 @@
-"""SISYS 应用层压缩服务端口模块
+"""应用层压缩服务端口模块
 
 用于依赖倒置：MemoryService 通过此协议注入 L1Compressor 实现
 

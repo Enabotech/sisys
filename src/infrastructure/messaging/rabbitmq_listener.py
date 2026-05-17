@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 RabbitMQ 异步事件监听器模块。
+"""基础设施层 RabbitMQ 异步事件监听器模块。
 
 实现 EventListenerAsync 接口，用于异步消费 RabbitMQ 消息，
 集成幂等性检查、延迟重试队列和死信队列

@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 PostgreSQL 发件箱仓储模块。
+"""基础设施层 PostgreSQL 发件箱仓储模块。
 
 实现领域层 OutboxRepository 接口，使用 SQLAlchemy 持久化发件箱实体。
 提供公开方法（实现接口）和内部方法（供 AsyncOutboxPoller 使用）。

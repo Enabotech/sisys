@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Qdrant 记忆向量存储模块。
+"""基础设施层 Qdrant 记忆向量存储模块。
 
 实现 MemoryVectorPort 接口，组合 QdrantAdapter 并添加记忆向量索引和语义检索语义。
 

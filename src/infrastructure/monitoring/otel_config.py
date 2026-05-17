@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 OpenTelemetry 配置模块
+"""基础设施层 OpenTelemetry 配置模块
 
 提供 OTLP 导出器配置和 Trace SDK 生命周期管理
 

@@ -1,4 +1,4 @@
-"""SISYS 应用层事件订阅端口模块
+"""应用层事件订阅端口模块
 
 对标 NServiceBus 的 IBus.Subscribe 接口
 

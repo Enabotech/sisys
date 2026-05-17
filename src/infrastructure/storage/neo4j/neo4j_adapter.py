@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Neo4j 适配器模块。
+"""基础设施层 Neo4j 适配器模块。
 
 包装 Neo4jGraphStorage，实现 L5GraphPort 接口。使用 memory_id 作为实体主键，
 高级语义方法通过 Cypher MERGE 实现。

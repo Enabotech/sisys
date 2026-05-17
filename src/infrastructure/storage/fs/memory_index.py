@@ -1,19 +1,13 @@
-"""MemoryIndex — 记忆索引管理
+"""基础设施层记忆索引管理模块。
 
-实现 IndexManagerPort 接口，提供异步索引操作能力
+实现 IndexManagerPort 接口，提供异步索引操作能力。所有方法使用 to_thread
+封装同步 I/O 操作，保留 fcntl.flock 锁语义以保证并发安全。
 
-设计原则：
-- 所有方法使用 to_thread 封装同步 I/O 操作
-- 保留 fcntl.flock 锁语义（原子性保证）
-- 与 FileMemoryAdapter 分离：FileMemoryAdapter 仅处理 .md 文件 CRUD
+Author:
+    agimtech <agimtech@126.com>
 
-索引格式：- [Title](type/uuid.md) — one-line hook
-截断策略：超过 200 行时保留最新 200 行（按写入顺序）
-并发安全：使用 fcntl.flock 文件锁
-
-调用方式：由 MemoryChangedListener 事件驱动调用（不从 MemoryService 直接调用）
-
-架构来源: architecture.md §11.2.3
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

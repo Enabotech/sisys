@@ -1,4 +1,4 @@
-"""SISYS 领域层自动执行服务模块
+"""领域层自动执行服务模块
 
 AutoExecuteService 是在隔离会话命名空间中执行任务的领域服务
 监听 AutoRouted 事件，在沙盒环境（Docker/gVisor）中执行任务，

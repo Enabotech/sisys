@@ -1,4 +1,4 @@
-"""SISYS 基础设施层外部 API 白名单服务模块
+"""基础设施层外部 API 白名单服务模块
 
 基于 WhitelistServicePort 接口实现外部 API 白名单的管理和验证
 

@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 PIPL 合规服务模块
+"""基础设施层 PIPL 合规服务模块
 
 基于 PIPLComplianceServicePort 接口实现个人信息保护法合规记录管理和数据主体权利响应
 

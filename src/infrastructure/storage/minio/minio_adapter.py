@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 MinIO 适配器模块。
+"""基础设施层 MinIO 适配器模块。
 
 包装 MinIORepository，实现 L4ObjectPort 接口。薄适配器层，仅做接口转换，
 所有方法委托给内部仓储实例。

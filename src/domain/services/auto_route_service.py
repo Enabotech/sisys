@@ -1,4 +1,4 @@
-"""SISYS 领域层自动路由服务模块
+"""领域层自动路由服务模块
 
 AutoRouteService 是处理 AutoTriggered 事件并发出 AutoRouted 事件的领域服务
 监听 AutoTriggerService 发出的 AutoTriggered 事件，使用哈希路由（会话一致性）

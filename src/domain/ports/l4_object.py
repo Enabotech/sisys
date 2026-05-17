@@ -1,4 +1,4 @@
-"""SISYS 领域层 L4 MinIO WORM 对象存储抽象端口模块
+"""领域层 L4 MinIO WORM 对象存储抽象端口模块
 
 对应 architecture.md §11.1：
 - 原始文档、证据包存储

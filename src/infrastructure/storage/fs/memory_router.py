@@ -1,15 +1,13 @@
-"""MemoryRouter — 记忆路径路由
+"""基础设施层记忆路径路由模块。
 
-负责生成 Private/Group 记忆的文件路径和索引路径
-与 MemoryIndex 分离：MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责
+负责生成 Private/Group 记忆的文件路径和索引路径。与 MemoryIndex 分离：
+MemoryRouter 仅处理路径生成，索引操作由 MemoryIndex 负责。
 
-路径策略：
-- Private: {base_path}/{type}/{uuid}.md
-- Group: {base_path}/group/{type}/{uuid}.md
-- Private 索引: {base_path}/MEMORY.md
-- Group 索引: {base_path}/group/MEMORY.md
+Author:
+    agimtech <agimtech@126.com>
 
-架构来源: architecture.md §11.2.3
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 SQLAlchemy 事件发件箱适配器模块。
+"""基础设施层 SQLAlchemy 事件发件箱适配器模块。
 
 直接输出 OutboxModel（SQLAlchemy 模型），避免在 OutboxEntity dataclass
 和 OutboxModel 之间反复转换

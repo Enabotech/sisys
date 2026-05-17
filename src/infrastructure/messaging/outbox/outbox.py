@@ -1,4 +1,4 @@
-"""SISYS 基础设施层发件箱实体模块。
+"""基础设施层发件箱实体模块。
 
 定义事务发件箱实体（OutboxEntity），包含状态机管理：
 pending -> published/failed, failed -> pending(重试)/archived(终态)

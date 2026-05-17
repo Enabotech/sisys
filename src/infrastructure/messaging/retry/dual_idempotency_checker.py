@@ -1,4 +1,4 @@
-"""SISYS 基础设施层双写幂等性检查器模块。
+"""基础设施层双写幂等性检查器模块。
 
 同时使用 Redis（高性能）和 PostgreSQL（持久化）进行幂等性检查，
 Redis SET NX 提供高性能检查，PostgreSQL 记录提供持久化保证，
@@ -79,11 +79,11 @@ class DualIdempotencyChecker:
         redis_client: aioredis.Redis,
         ttl: int = DEFAULT_TTL,
     ):
-        """初始化 DualIdempotencyChecker
+        """初始化 DualIdempotencyChecker。
 
         Args:
-            redis_client: Async Redis client
-            ttl: Redis TTL in seconds, default 7 days
+            redis_client: 异步 Redis 客户端。
+            ttl: Redis TTL（秒），默认 7 天。
         """
         self._redis = redis_client
         self._ttl = ttl

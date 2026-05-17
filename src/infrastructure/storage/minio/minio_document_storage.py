@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 MinIO 文档存储模块。
+"""基础设施层 MinIO 文档存储模块。
 
 实现 DocumentStoragePort 接口，组合 MinIOAdapter 并添加文档业务语义：
 自动路径生成、用户文档列表和元数据管理。

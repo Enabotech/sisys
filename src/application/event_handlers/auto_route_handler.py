@@ -1,4 +1,4 @@
-"""SISYS 应用层自动路由处理器模块
+"""应用层自动路由处理器模块
 
 自动路由机制的事件监听器，监听 AutoTriggerService 的 AutoTriggered 事件（Story 1.14a），
 调用 AutoRouteService 做路由决策，并发布 AutoRouted 事件到下游执行阶段（Story 1.14c）

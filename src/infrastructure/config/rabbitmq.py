@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 RabbitMQ 配置模块
+"""基础设施层 RabbitMQ 配置模块
 
 提供 RabbitMQ 连接配置，用于可靠事件传输通道
 

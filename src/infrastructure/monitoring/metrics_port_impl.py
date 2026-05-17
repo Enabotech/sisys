@@ -1,4 +1,4 @@
-"""SISYS 基础设施层指标端口实现模块
+"""基础设施层指标端口实现模块
 
 实现 MetricsPort 接口，依赖 prometheus_client 和基础设施层组件
 
