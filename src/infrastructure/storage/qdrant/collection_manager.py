@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Qdrant Collection 管理模块。
+"""基础设施层 Qdrant Collection 管理模块。
 
 负责 Qdrant Collection 的创建、删除、查询和列表操作。
 

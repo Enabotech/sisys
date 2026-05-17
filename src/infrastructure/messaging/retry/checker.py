@@ -1,4 +1,4 @@
-"""SISYS 基础设施层幂等性检查器模块。
+"""基础设施层幂等性检查器模块。
 
 基于 Redis SET NX 原子操作实现事件处理幂等性保证，
 使用原子方法 try_acquire()，禁止分离 is_processed() + mark_processed()

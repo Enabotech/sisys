@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 PostgreSQL 死信队列模块。
+"""基础设施层 PostgreSQL 死信队列模块。
 
 基于 PostgreSQL 实现持久化死信队列，支持事件持久化存储、FIFO 出队、
 状态管理（pending/processed）和人工干预。

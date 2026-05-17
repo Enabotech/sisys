@@ -1,4 +1,4 @@
-"""SISYS 应用层权限服务模块。
+"""应用层权限服务模块。
 
 遵循六边形架构：应用层服务，实现 PermissionServicePort 接口
 

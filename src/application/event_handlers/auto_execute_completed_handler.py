@@ -1,4 +1,4 @@
-"""SISYS 应用层自动执行完成处理器模块
+"""应用层自动执行完成处理器模块
 
 自动执行完成事件监听器，监听 AutoExecuted 事件并发布下游领域事件
 （DocumentProcessed/ToolExecuted/AgentDecided），根据 business_event_type 决定事件类型

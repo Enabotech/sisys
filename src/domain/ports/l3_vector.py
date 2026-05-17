@@ -1,4 +1,4 @@
-"""SISYS 领域层 L3 Qdrant 向量存储抽象端口模块
+"""领域层 L3 Qdrant 向量存储抽象端口模块
 
 对应 architecture.md §11.1：
 - 内容 >500 tokens 时启用向量检索

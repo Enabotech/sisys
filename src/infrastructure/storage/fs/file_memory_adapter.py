@@ -1,4 +1,4 @@
-"""SISYS 基础设施层文件系统记忆适配器模块。
+"""基础设施层文件系统记忆适配器模块。
 
 实现 L0StoragePort 接口，提供异步文件操作能力。write/read 使用 aiofiles（I/O 密集型），
 delete/exists/list_memories 使用 asyncio.to_thread()（快速同步操作）。

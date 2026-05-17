@@ -1,4 +1,4 @@
-"""SISYS 领域层记忆服务模块
+"""领域层记忆服务模块
 
 MemoryService 负责接收用户记忆请求、协调压缩（通过协议注入）、双层写入、发布 MemoryChanged 事件
 

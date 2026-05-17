@@ -1,4 +1,4 @@
-"""SISYS 应用层事件序列化适配器模块
+"""应用层事件序列化适配器模块
 
 使用 Pydantic TypeAdapter 完成 dict ↔ JSON 边界转换
 领域层事件使用 dataclasses.asdict() / DomainEvent.from_dict()，

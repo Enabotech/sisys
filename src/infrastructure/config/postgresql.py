@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 PostgreSQL 配置模块
+"""基础设施层 PostgreSQL 配置模块
 
 提供 PostgreSQL 连接池配置，用于 L2 关系存储层
 

@@ -1,4 +1,4 @@
-"""SISYS 领域层对象存储仓储模块（DEPRECATED）
+"""领域层对象存储仓储模块（DEPRECATED）
 
 已废弃：请使用 L4ObjectPort（src.domain.ports.l4_object）
 本文件仅保留向后兼容

@@ -1,4 +1,4 @@
-"""SISYS 领域层事件基类模块
+"""领域层事件基类模块
 
 领域事件仅使用 Python 标准库类型（dataclasses, uuid, datetime）
 Pydantic 仅在应用层/基础设施层边界用于序列化和验证

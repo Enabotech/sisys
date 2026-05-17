@@ -1,4 +1,4 @@
-"""SISYS 应用层包
+"""应用层包
 
 Author:
     agimtech <agimtech@126.com>

@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Qdrant 向量存储模块。
+"""基础设施层 Qdrant 向量存储模块。
 
 提供向量点的增删查和 Dense/Sparse 检索功能。
 

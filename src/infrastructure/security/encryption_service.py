@@ -1,4 +1,4 @@
-"""SISYS 基础设施层加密服务模块
+"""基础设施层加密服务模块
 
 基于 passlib + bcrypt 提供密码哈希、验证和防御 timing attack 功能
 

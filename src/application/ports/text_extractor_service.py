@@ -1,4 +1,4 @@
-"""SISYS 应用层文本提取服务端口模块
+"""应用层文本提取服务端口模块
 
 用于依赖倒置：MemoryService 通过此协议注入 L1TextExtractor 实现
 

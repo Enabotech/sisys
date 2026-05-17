@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Redis 配置模块
+"""基础设施层 Redis 配置模块
 
 提供 Redis 连接配置，用于 Pub/Sub 实时通知通道和缓存存储
 

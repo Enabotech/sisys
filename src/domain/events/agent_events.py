@@ -1,4 +1,4 @@
-"""SISYS 领域层 Agent事件模块
+"""领域层 Agent事件模块
 
 定义 Agent 决策相关的领域事件
 

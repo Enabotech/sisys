@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Neo4j 图存储模块。
+"""基础设施层 Neo4j 图存储模块。
 
 提供 Cypher 查询执行和图遍历功能。
 
@@ -142,6 +142,13 @@ _REL_TYPE_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$", re.IGNORECASE)
 
 
 def _validate_rel_type(rel_type: str) -> None:
-    """Validate relationship type against whitelist pattern."""
+    """验证关系类型是否符合 Neo4j 命名规范。
+
+    Args:
+        rel_type: 关系类型字符串
+
+    Raises:
+        ValueError: 关系类型不符合命名规范时抛出
+    """
     if not _REL_TYPE_RE.match(rel_type):
         raise ValueError(f"Invalid relationship type: {rel_type!r}. Must match [A-Za-z_][A-Za-z0-9_]*")

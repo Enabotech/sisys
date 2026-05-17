@@ -1,4 +1,4 @@
-"""SISYS 应用层记忆文件端口模块
+"""应用层记忆文件端口模块
 
 继承 L0StoragePort，添加 MEMORY.md 索引管理语义
 

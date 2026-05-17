@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Neo4j 图存储数据模型模块。
+"""基础设施层 Neo4j 图存储数据模型模块。
 
 包含 GraphNode、GraphRelationship 和 RelationshipType 定义，所有模型位于基础设施层。
 

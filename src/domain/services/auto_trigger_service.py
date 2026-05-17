@@ -1,4 +1,4 @@
-"""SISYS 领域层自动触发服务模块
+"""领域层自动触发服务模块
 
 AutoTriggerService 是处理领域事件/心跳事件并发出 AutoTriggered 事件的领域服务
 监听领域事件（DocumentProcessed、ToolExecuted、AgentDecided 等）和 HeartbeatTriggered 事件，

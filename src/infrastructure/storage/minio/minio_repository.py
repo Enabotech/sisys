@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 MinIO 仓储模块。
+"""基础设施层 MinIO 仓储模块。
 
 MinIO 对象存储内部实现，被 MinIOAdapter（L4ObjectPort）组合委托，
 方法签名与 L4ObjectPort 匹配。

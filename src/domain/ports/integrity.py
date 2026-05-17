@@ -1,4 +1,4 @@
-"""SISYS 领域层数据完整性验证端口模块
+"""领域层数据完整性验证端口模块
 
 设计原则：
 - verify_file(): I/O 密集型 → async + to_thread

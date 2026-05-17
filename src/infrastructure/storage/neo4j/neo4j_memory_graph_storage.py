@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Neo4j 记忆图存储模块。
+"""基础设施层 Neo4j 记忆图存储模块。
 
 实现 MemoryGraphPort 接口，组合 Neo4jAdapter 并添加记忆关系语义：
 实体关系提取和知识图谱查询。
@@ -217,7 +217,15 @@ class Neo4jMemoryGraphStorage(MemoryGraphPort):
         memory_id: str,
         depth: int = 2,
     ) -> dict:
-        """获取记忆的知识图谱子图"""
+        """获取记忆的知识图谱子图。
+
+        Args:
+            memory_id: 记忆 ID
+            depth: 遍历深度
+
+        Returns:
+            包含 entities 和 connections 的字典
+        """
         entity = await self._adapter.get_entity(memory_id)
         if entity is None:
             return {"entities": [], "connections": []}

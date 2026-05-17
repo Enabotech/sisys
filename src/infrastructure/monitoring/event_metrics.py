@@ -1,4 +1,4 @@
-"""SISYS 基础设施层事件指标与 OpenTelemetry 跟踪模块
+"""基础设施层事件指标与 OpenTelemetry 跟踪模块
 
 提供事件处理指标收集器和 OpenTelemetry Trace 包装器实现
 

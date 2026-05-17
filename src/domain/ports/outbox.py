@@ -1,4 +1,4 @@
-"""SISYS 领域层事务发件箱仓储端口模块
+"""领域层事务发件箱仓储端口模块
 
 使用 DomainEvent 实例，不感知 OutboxEntity
 基础设施层负责 DomainEvent 与 OutboxEntity 转换

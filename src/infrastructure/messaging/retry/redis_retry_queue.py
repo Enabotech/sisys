@@ -1,4 +1,4 @@
-"""SISYS 基础设施层 Redis 延迟重试队列模块。
+"""基础设施层 Redis 延迟重试队列模块。
 
 使用 Redis ZSET 实现延迟重试调度，失败事件以重试时间戳为 score 入队，
 轮询器检查到期事件进行重试，避免 nack(requeue=True) 造成的消息饥饿
