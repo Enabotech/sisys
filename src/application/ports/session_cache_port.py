@@ -1,10 +1,16 @@
-"""SessionCachePort — 会话缓存端口（应用层）。
+"""SISYS 应用层会话缓存端口模块。
 
 继承 L1CachePort，添加会话状态 save/load 语义。
 
 注意: SemanticCache 的 get(query_embedding, threshold) 签名与
 L1CachePort.get(memory_type, owner_id, name) 不兼容，不能继承。
 SemanticCache 作为独立应用端口存在。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
