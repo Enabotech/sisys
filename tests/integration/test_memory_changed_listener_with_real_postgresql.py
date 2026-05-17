@@ -230,7 +230,7 @@ def history_repository(pg_session: AsyncSession):
 def listener_with_real_services(redis_cache, metadata_repository, history_repository, memory_index):
     """Create MemoryChangedListener with REAL L1 + L2 services."""
     return MemoryChangedHandler(
-        l1_cache=redis_cache,
+        memory_cache=redis_cache,
         metadata_repository=metadata_repository,
         history_repository=history_repository,
     )

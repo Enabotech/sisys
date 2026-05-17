@@ -255,7 +255,7 @@ def listener_with_real_services(redis_cache, pg_session: AsyncSession):
     history_repo = PostgreSQLMemoryChangeHistoryRepository()
 
     return MemoryChangedHandler(
-        l1_cache=redis_cache,
+        memory_cache=redis_cache,
         metadata_repository=metadata_repo,
         history_repository=history_repo,
     )

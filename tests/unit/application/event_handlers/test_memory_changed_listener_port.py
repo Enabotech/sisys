@@ -30,7 +30,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         mock_index_manager = MagicMock()
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             index_manager=mock_index_manager,
         )
 
@@ -44,7 +44,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         mock_l1_cache = AsyncMock()
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
         )
 
         # index_manager 允许为 None（向后兼容）
@@ -58,7 +58,7 @@ class TestMemoryChangedListenerIndexManagerPort:
         mock_index_manager.update_entry = AsyncMock()
 
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             index_manager=mock_index_manager,
         )
 
@@ -89,14 +89,14 @@ class TestMemoryChangedListenerBackwardCompatibility:
         mock_metadata_repo = MagicMock()
         mock_history_repo = MagicMock()
 
-        # Old signature: __init__(l1_cache, metadata_repository, history_repository)
+        # Old signature: __init__(memory_cache, metadata_repository, history_repository)
         # New signature adds index_manager as optional
         listener = MemoryChangedHandler(
-            l1_cache=mock_l1_cache,
+            memory_cache=mock_l1_cache,
             metadata_repository=mock_metadata_repo,
             history_repository=mock_history_repo,
         )
 
-        assert listener._l1_cache is mock_l1_cache
+        assert listener._memory_cache is mock_l1_cache
         assert listener._metadata_repository is mock_metadata_repo
         assert listener._history_repository is mock_history_repo
