@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.1 | 状态: 审查修订中
+> 版本: 2.2 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第6轮（第二批）：DocumentProcessingUseCase遗漏、InMemoryEventBus继承关系修改、from_dict具体修复代码、Poller session_context、outbox_repo SINGLETON安全性说明
+> 第7轮（第二批）：PostgresDeadLetterQueue签名不兼容Protocol（async/sync/返回值差异）、RedisEventBus内外channel层次区分、delivery_mode分配规则（REALTIME=3/RELIABLE=13）、registry reset机制建议
 
 ## Context
 
@@ -37,10 +37,14 @@
 
 #### 任务 1.1: 统一DeadLetterQueue
 - [ ] **设计**：Domain层 `listener.py` 保留 `DeadLetterQueue` Protocol + `InMemoryDeadLetterQueue`，删除Infrastructure层 `outbox/dead_letter_queue.py` 中的重复定义
-- [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：当前未继承任何Protocol/ABC接口（架构缺陷），改为实现Domain层 `DeadLetterQueue` Protocol，import from `src.domain.events.listener`
+- [ ] **前置决策**：当前 Domain 层 `DeadLetterQueue` Protocol 是同步签名，但 `PostgresDeadLetterQueue` 的 `enqueue`/`dequeue` 是 async 方法且返回值不同（4元素 vs 3元素 tuple）。必须在统一前决定 Protocol 签名方向：
+  - **方案A（推荐）**：Protocol 改为 async 签名，`dequeue` 返回 `tuple[DomainEvent, str, int] | None`，PostgresDeadLetterQueue 调整返回值对齐（去掉 `DeadLetterQueueEntry`）
+  - **方案B**：保持 Protocol 同步，PostgresDeadLetterQueue 仅作为独立实现不实现 Protocol（维持现状但补上类型注解）
+- [ ] **修改** `src/domain/events/listener.py`：如果采用方案A，`enqueue`/`dequeue` 改为 async
+- [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：改为实现Domain层 `DeadLetterQueue` Protocol，对齐返回值
 - [ ] **修改** `src/infrastructure/messaging/outbox/dead_letter_queue.py`：删除 `DeadLetterQueue` ABC 和 `InMemoryDeadLetterQueue`，改为 re-export from Domain层
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：更新 import 路径
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新 import 路径
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新 import 路径，`set_dead_letter_queue` 参数类型从 `Any` 改为 `DeadLetterQueue`
 - [ ] **验证**：所有引用DeadLetterQueue的文件使用统一import，`grep -r "DeadLetterQueue" src/` 无重复定义
 
 **关键文件**：
@@ -77,6 +81,7 @@
 - [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
 - [ ] **删除** 4个事件类 `__post_init__` 中的 `object.__setattr__(self, "event_type", "X")` 行（AuditEvent除外，其`__post_init__`仅做验证）
 - [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型（预期22个）
+- [ ] **建议**：为 `DomainEvent._registry` 添加 `@classmethod reset_registry(cls)` 方法（仅用于测试），在 `tests/fixtures.py` 的 `reset_test_environment` 中调用
 
 **关键文件**：
 - `src/domain/events/base.py` (L228-243 from_dict, L230 event_type传参阻断点)
@@ -158,8 +163,8 @@
 - [ ] **修改** `src/infrastructure/messaging/dual_channel_event_bus.py` L53：移除 `channel: str | None = None` 参数（方法体内完全未使用，路由由ChannelRouter决定）
 - [ ] **同步修改** `src/domain/ports/event_publisher.py` L33：移除 `channel` 参数
 - [ ] **同步修改** 所有实现 `EventPublisher` 的类：
-  - `src/infrastructure/messaging/redis_event_bus.py` L49（直接覆盖channel参数）
-  - `src/infrastructure/messaging/redis_publisher.py` L66
+  - `src/infrastructure/messaging/redis_event_bus.py` L49（移除channel参数，但方法体内仍需 `self._router.get_redis_channel(event.event_type)` 获取channel传给底层publisher——"移除channel"指公共接口，内部路由逻辑保留）
+  - `src/infrastructure/messaging/redis_publisher.py` L66（底层publisher的channel参数保留，Redis Pub/Sub需要channel名）
   - `src/infrastructure/messaging/rabbitmq_event_bus.py` publish签名
 - [ ] **清理** 内部方法签名：
   - `src/application/event_handlers/auto_execute_completed_handler.py` L112 `_publish(self, event, channel)` 方法签名
@@ -273,12 +278,9 @@
 
 #### 任务 5.1: 补全22个事件的DEFAULT_MAPPINGS
 - [ ] **修改** `src/infrastructure/messaging/channel_router.py` DEFAULT_MAPPINGS：当前仅6个映射（AutoTriggered, AutoRouted, DocumentProcessed, MemoryChanged, CheckpointReached, AuditEvent），需补全16个缺失事件
-- [ ] **缺失事件清单**（按领域分组）：
-  - 核心事件：ToolExecuted, AgentDecided, AutoExecuted, HeartbeatTriggered
-  - 路由/规划：RoutingDecided, StrategicDeviationWarning, CorrectionApproved
-  - 检查点：CheckpointRecovered
-  - 隔离级别：IsolationLevelSwitched
-  - 安全事件：MFAChallengeIssuedEvent, IntrusionDetectedEvent, DataIntegrityViolationEvent, SensitiveDataDetected, CrossBorderTransferRequested, DataSovereigntyViolation, PIPLDataAccessRequested
+- [ ] **缺失事件清单**（按领域分组，`delivery_mode` 分配规则：控制信号/瞬时/可丢失 → REALTIME；业务状态变更/合规审计 → RELIABLE）：
+  - REALTIME（3个）：AutoExecuted（控制流完成）、HeartbeatTriggered（心跳信号）、RoutingDecided（路由决策）
+  - RELIABLE（13个）：ToolExecuted、AgentDecided、CheckpointRecovered、IsolationLevelSwitched、CorrectionApproved、StrategicDeviationWarning、MFAChallengeIssuedEvent、IntrusionDetectedEvent、DataIntegrityViolationEvent、SensitiveDataDetected、CrossBorderTransferRequested、DataSovereigntyViolation、PIPLDataAccessRequested
 - [ ] **同步修改** `config/event_channels.yaml`
 - [ ] **验证**：所有22个DomainEvent子类均有通道映射
 
