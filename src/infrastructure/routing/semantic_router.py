@@ -67,58 +67,57 @@ class SemanticRouter:
         self,
         candidates: Sequence[Candidate] | None = None,
         embedding_model: EmbeddingModelProtocol | None = None,
-        cache_ttl_seconds: int = 86400,  # 24 hours (used for cache size limit, not expiry)
+        cache_ttl_seconds: int = 86400,  # 24 小时，用于缓存大小限制而非过期
     ):
-        """Initialize SemanticRouter.
+        """初始化语义路由器。
 
         Args:
-            candidates: Initial list of routing candidates (Agents/tools). None creates empty router.
-            embedding_model: Embedding model port for computing task embeddings (optional).
-            cache_ttl_seconds: TTL for in-memory cache (default: 24 hours, used for size limit).
+            candidates: 初始候选项列表（Agent/工具），None 表示创建空路由器
+            embedding_model: 嵌入模型端口，用于计算任务嵌入（可选）
+            cache_ttl_seconds: 内存缓存 TTL（默认 24 小时，用于大小限制）
         """
         self._candidates = {c.candidate_id: c for c in candidates} if candidates else {}
         self._embedding_model = embedding_model
         self._cache_ttl = cache_ttl_seconds
-        self._embedding_cache: dict[str, list[float]] = {}  # Simple in-memory cache
+        self._embedding_cache: dict[str, list[float]] = {}  # 简单内存缓存
 
     def add_candidate(self, candidate: Candidate) -> None:
-        """Add a routing candidate.
+        """添加路由候选项。
 
         Args:
-            candidate: Candidate to add (Agent or tool)
+            candidate: 待添加的候选项（Agent 或工具）
         """
         self._candidates[candidate.candidate_id] = candidate
 
     def remove_candidate(self, candidate_id: str) -> None:
-        """Remove a routing candidate.
+        """移除路由候选项。
 
         Args:
-            candidate_id: ID of candidate to remove
+            candidate_id: 待移除的候选项 ID
         """
         self._candidates.pop(candidate_id, None)
 
     async def route(self, task_context: dict[str, Any]) -> tuple[str, float]:
-        """Route a task to the best matching candidate based on semantic similarity.
+        """基于语义相似度将任务路由到最佳匹配候选项。
 
         Args:
-            task_context: Task context dictionary with at least 'task_type' or 'description' field
+            task_context: 任务上下文字典，至少包含 'task_type' 或 'description' 字段
 
         Returns:
-            Tuple of (candidate_id, similarity_score)
-            Returns ("", 0.0) if no candidates available.
+            元组 (candidate_id, similarity_score)，无候选项时返回 ("", 0.0)
         """
         if not self._candidates:
             return "", 0.0
 
-        # Extract task description from context
+        # 从上下文中提取任务描述
         task_description = self._extract_task_description(task_context)
         if not task_description:
             return "", 0.0
 
-        # Get task embedding
+        # 获取任务嵌入向量
         task_embedding = await self._get_task_embedding(task_description)
 
-        # Compute similarity with all candidates
+        # 计算与所有候选项的相似度
         best_candidate_id = ""
         best_score = 0.0
 
@@ -128,7 +127,7 @@ class SemanticRouter:
                 best_score = score
                 best_candidate_id = candidate_id
 
-        # If all scores are 0 (no embedding model or no match), return first candidate
+        # 如果所有相似度为 0（无嵌入模型或无匹配），返回第一个候选项
         if not best_candidate_id and self._candidates:
             first_candidate_id = next(iter(self._candidates))
             return first_candidate_id, 0.0
@@ -136,47 +135,47 @@ class SemanticRouter:
         return best_candidate_id, best_score
 
     def _extract_task_description(self, task_context: dict[str, Any]) -> str:
-        """Extract a description string from task context.
+        """从任务上下文中提取描述字符串。
 
         Args:
-            task_context: Task context dictionary
+            task_context: 任务上下文字典
 
         Returns:
-            Description string, or empty string if no description found
+            描述字符串，未找到时返回空字符串
         """
-        # Priority order for description fields
+        # 按优先级顺序查找描述字段
         for key in ("description", "task_description", "task_type", "name", "prompt"):
             if key in task_context and task_context[key]:
                 value = task_context[key]
                 if isinstance(value, str):
                     return value
                 if isinstance(value, list | dict):
-                    # For complex types, stringify
+                    # 复杂类型转为字符串
                     return str(value)
         return ""
 
     async def _get_task_embedding(self, text: str) -> list[float]:
-        """Get embedding for task text, with in-memory caching.
+        """获取任务文本的嵌入向量，支持内存缓存。
 
         Args:
-            text: Task text to embed
+            text: 待嵌入的任务文本
 
         Returns:
-            Embedding vector
+            嵌入向量
         """
-        # Check in-memory cache first
+        # 优先检查内存缓存
         if text in self._embedding_cache:
             return self._embedding_cache[text]
 
-        # Compute embedding
+        # 计算嵌入向量
         if self._embedding_model is None:
-            # No embedding model, return zeros (will result in 0 similarity)
+            # 无嵌入模型，返回零向量（相似度将为 0）
             embedding = [0.0] * self.DEFAULT_EMBEDDING_DIM
         else:
             embeddings = await self._embedding_model.embed([text])
             embedding = embeddings[0] if embeddings else [0.0] * self.DEFAULT_EMBEDDING_DIM
 
-        # Cache the result (simple LRU-like eviction if cache is full)
+        # 缓存结果（简单 LRU 风格的淘汰策略）
         if len(self._embedding_cache) < self.MAX_CACHE_SIZE:
             self._embedding_cache[text] = embedding
 

@@ -1,6 +1,12 @@
-"""TextExtractorService — 文本提取接口（领域层）。
+"""SISYS 应用层文本提取服务端口模块。
 
 用于依赖倒置：MemoryService 通过此协议注入 L1TextExtractor 实现。
+
+Author:
+    agimtech <agimtech@126.com>
+
+Copyright:
+    Copyright (c) 2024-2026 SISYS. All rights reserved.
 """
 
 from __future__ import annotations
@@ -11,11 +17,17 @@ from typing import Protocol
 
 @dataclass
 class ExtractionResult:
-    """文本提取结果。"""
+    """文本提取结果。
 
-    content: str  # 提取后的记忆核心内容
-    original: str  # 原始用户输入
-    pattern: str  # 匹配到的模式（如 "记住 X"）
+    Attributes:
+        content: 提取后的记忆核心内容。
+        original: 原始用户输入。
+        pattern: 匹配到的模式（如 "记住 X"）。
+    """
+
+    content: str
+    original: str
+    pattern: str
 
 
 class TextExtractorService(Protocol):

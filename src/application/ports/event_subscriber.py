@@ -32,8 +32,8 @@ class EventSubscriber(Protocol):
         """订阅领域事件（同步等待响应）。
 
         Args:
-            event_type: 事件类型
-            handler: 事件处理器
+            event_type: 事件类型。
+            handler: 事件处理器。
         """
 
     async def subscribe_async(
@@ -44,8 +44,8 @@ class EventSubscriber(Protocol):
         """订阅领域事件（支持异步处理器）。
 
         Args:
-            event_type: 事件类型
-            handler: 异步事件处理器
+            event_type: 事件类型。
+            handler: 异步事件处理器。
         """
 
     async def start(self) -> None:
