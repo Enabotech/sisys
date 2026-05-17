@@ -1,11 +1,12 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 1.4 | 状态: 审查修订中
+> 版本: 2.0 | 状态: 审查完成
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1轮：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
 > 第2轮：补充from_dict阻断点、DEFAULT_MAPPINGS缺失16个非6个、channel调用链遗漏、save()加flush()建议、测试路径错误
 > 第3轮：排除ZPOPMIN方案、nack(requeue)不保留header修改BUG标注、_get_pool()死锁修复、RabbitMQEventListener参考实现、测试影响面分析
 > 第4轮：Task2.2不可行（Python不支持同名sync/async）、执行顺序调整（3.1先于2.2）、EventBusFactory死代码标注、补全4个Protocol@runtime_checkable、补充sqlalchemy_adapter
+> 第5轮：行号修正（auto_route_handler L101）、解决3.3/3.4矛盾（Factory保留为测试工具）、字符串路径注册保持不变、事件注册完整性验证命令
 
 ## Context
 
@@ -70,11 +71,11 @@
 - [ ] **修改** AuditEvent：当前通过 `event_type: str = "AuditEvent"` 字段默认值（init=True）设定类型，改为 `event_type: str = field(default="AuditEvent", init=False)` 模式
 - [ ] **删除** 5个事件文件底部的手动注册行（`DomainEvent._registry["X"] = X` 或 `DomainEvent.register("X", X)`）
 - [ ] **删除** 4个事件类 `__post_init__` 中的 `object.__setattr__(self, "event_type", "X")` 行（AuditEvent除外，其`__post_init__`仅做验证）
-- [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型
+- [ ] **验证**：所有事件类 `from_dict` 反序列化测试通过，`DomainEvent._registry` 包含所有事件类型（预期22个）
 
 **关键文件**：
 - `src/domain/events/base.py` (L228-243 from_dict, L230 event_type传参阻断点)
-- `src/domain/events/auto_trigger_events.py` (L49 __post_init__ + L57 手动注册)
+- `src/domain/events/auto_trigger_events.py` (L45 __post_init__ + L57 手动注册)
 - `src/domain/events/auto_route_events.py` (L48 __post_init__ + L56 手动注册)
 - `src/domain/events/memory_events.py` (L55 __post_init__ + L63 手动注册)
 - `src/domain/events/auto_execute_events.py` (L51 __post_init__ + L60 手动注册)
@@ -168,7 +169,7 @@
 - `src/infrastructure/messaging/redis_publisher.py` (L66 publish签名)
 - `src/infrastructure/messaging/rabbitmq_event_bus.py` (publish签名)
 - `src/application/event_handlers/auto_execute_completed_handler.py` (L112 _publish签名)
-- `src/application/event_handlers/auto_route_handler.py` (L113 _publish签名)
+- `src/application/event_handlers/auto_route_handler.py` (L101 _publish签名)
 
 #### 任务 3.2: AsyncOutboxPoller注入ChannelRouter替代硬编码路由键
 - [ ] **修改** `src/infrastructure/messaging/outbox/outbox_processor.py`：
@@ -182,27 +183,28 @@
 - `src/infrastructure/messaging/outbox/outbox_processor.py` (硬编码路由键)
 - `src/infrastructure/messaging/event_bus_factory.py` (工厂传参)
 
-#### 任务 3.3: EventBusFactory去除类级别可变状态
+#### 任务 3.3: EventBusFactory清理（死代码处理）
+- [ ] **现状**：`EventBusFactory` 仅在测试中调用，生产代码（composition_root.py）直接通过 `register_port` 创建组件，Factory 为死代码
+- [ ] **决策**：保留 Factory 作为测试辅助工具（提供 `create_*` 方法），但移除全局单例职责
 - [ ] **修改** `src/infrastructure/messaging/event_bus_factory.py`：
   - 移除 `_instance: ClassVar` 和 `_poller: ClassVar` 类属性
-  - `configure_event_bus()`, `get_event_bus()`, `get_poller()` 改为模块级函数，使用模块级变量
-  - 或改为由Composition Root管理生命周期，Factory仅提供 `create_*` 方法
-- [ ] **修改** 测试中直接修改 `EventBusFactory._instance = None` 的代码：改用 `reset_event_bus()` 或 fixture
+  - 移除 `configure_event_bus()`, `get_event_bus()`, `get_poller()` 全局单例方法
+  - 保留 `create_dual_channel_bus()` 等工厂方法供测试使用
+- [ ] **修改** 测试中直接修改 `EventBusFactory._instance = None` 的代码：改用直接实例化或 fixture
 - [ ] **验证**：`EventBusFactory` 无类级别可变状态，测试间无共享状态污染
 
 **关键文件**：
 - `src/infrastructure/messaging/event_bus_factory.py` (L68-69 类属性)
 - `tests/unit/infrastructure/messaging/test_event_bus_factory.py` (清理类属性操作)
 
-#### 任务 3.4: 统一Composition Root与Factory
+#### 任务 3.4: 修复Composition Root EventBus注册
+- [ ] **现状**：Composition Root 当前直接通过 `register_port` 创建EventBus组件（不使用 EventBusFactory），字符串路径注册 DualChannelEventBus 已可行（`_auto_inject` 通过参数名 `redis_bus`/`rabbitmq_bus`/`router` 自动匹配注册名）
 - [ ] **修改** `src/composition_root.py` L446-511：
-  - 使用 `EventBusFactory` 创建组件（而非手动lambda创建独立实例）
-  - `router` → `EventBusFactory` 共享实例
-  - `event_publisher` → 工厂 `create_dual_channel_bus()` 返回的bus
-  - 注册 `AsyncOutboxPoller` 到DI容器
+  - 保持字符串路径注册 DualChannelEventBus（`_auto_inject` 参数名匹配已验证可行）
   - 修复 `outbox_repo` 生命周期：从SCOPED改为SINGLETON（或由UoW管理scope）
-- [ ] **修改** `DualChannelEventBus` 字符串路径注册改为lambda工厂
+  - 确保 `redis_bus` 和 `rabbitmq_bus` 共享 `router` 实例（当前已通过 `resolver.resolve("router")` 共享）
 - [ ] **注册** `EventSubscriber` 端口 → `DualChannelEventBus` 实现
+- [ ] **注册** `AsyncOutboxPoller` 到DI容器
 - [ ] **验证**：`bootstrap()` 后 `resolve("event_publisher")` 返回 `DualChannelEventBus` 实例，所有子组件共享router和连接
 
 **关键文件**：
@@ -366,6 +368,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 ### 集成验证
 1. `poetry run pytest tests/integration/test_event_bus_integration.py -x` — 集成测试
 2. `poetry run pytest tests/contracts/test_event_publisher_contract.py -x` — 契约测试
+3. `poetry run python -c "from src.domain.events.base import DomainEvent; from src.domain.events import *; print(f'Registry: {len(DomainEvent._registry)} events'); assert len(DomainEvent._registry) >= 22"` — 事件注册完整性验证
 
 ---
 
