@@ -72,7 +72,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             event_publisher: 事件发布器（Outbox 模式需要）
         """
         self._l0 = l0_storage
-        self._l1 = memory_cache
+        self._memory_cache = memory_cache
         self._l2_meta = l2_metadata
         self._l2_hist = l2_history
         self._l3 = l3_vector
@@ -134,7 +134,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
         results[StorageLayer.L0_FILE] = l0_success
 
         if l0_success:
-            await self._l1.set_memory(memory_type, owner_id, name, content)
+            await self._memory_cache.set_memory(memory_type, owner_id, name, content)
             results[StorageLayer.L1_CACHE] = True
 
         if hasattr(self, "_event_publisher") and self._event_publisher is not None:
@@ -176,13 +176,13 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             return None
 
         if prefer_cache:
-            content = await self._l1.get_memory(memory_type, owner_id, name)
+            content = await self._memory_cache.get_memory(memory_type, owner_id, name)
             if content is not None:
                 return content
 
         content = await self._l0.read(memory_id, memory_type)
         if content is not None and prefer_cache:
-            await self._l1.set_memory(memory_type, owner_id, name, content)
+            await self._memory_cache.set_memory(memory_type, owner_id, name, content)
 
         return content
 
@@ -235,7 +235,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
 
         results[StorageLayer.L0_FILE] = await self._l0.delete(memory_id, memory_type)
 
-        await self._l1.delete_memory(memory_type, owner_id, name)
+        await self._memory_cache.delete_memory(memory_type, owner_id, name)
         results[StorageLayer.L1_CACHE] = True
 
         if hasattr(self, "_event_publisher") and self._event_publisher is not None:
@@ -271,7 +271,7 @@ class UnifiedStorageGateway(UnifiedStoragePort):
             return {StorageLayer.L0_FILE: False, StorageLayer.L1_CACHE: False}
 
         l0_exists = await self._l0.exists(memory_id, memory_type)
-        l1_exists = await self._l1.get_memory(memory_type, owner_id, name) is not None
+        l1_exists = await self._memory_cache.get_memory(memory_type, owner_id, name) is not None
 
         return {
             StorageLayer.L0_FILE: l0_exists,
