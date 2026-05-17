@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import Protocol
 
 
@@ -16,7 +15,6 @@ class PublicBlackboard(Protocol):
     支持多 Agent 在会话中发布和读取共享信息。
     """
 
-    @abstractmethod
     async def post(
         self,
         conversation_id: str,
@@ -38,7 +36,6 @@ class PublicBlackboard(Protocol):
             版本号
         """
 
-    @abstractmethod
     async def get(self, conversation_id: str) -> list[dict]:
         """获取会话的所有内容。
 
@@ -49,7 +46,6 @@ class PublicBlackboard(Protocol):
             内容列表
         """
 
-    @abstractmethod
     async def get_by_agent(self, conversation_id: str, agent_id: str) -> dict | None:
         """获取指定 Agent 的最新内容。
 
@@ -61,7 +57,6 @@ class PublicBlackboard(Protocol):
             内容数据，如果不存在则返回 None
         """
 
-    @abstractmethod
     async def get_latest(self, conversation_id: str) -> dict | None:
         """获取会话的最新内容。
 

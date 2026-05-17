@@ -17,13 +17,6 @@ class TestPublicBlackboardInterface:
         assert hasattr(PublicBlackboard, "get_by_agent")
         assert hasattr(PublicBlackboard, "get_latest")
 
-    def test_methods_are_abstract(self) -> None:
-        """方法应标记为抽象。"""
-        assert getattr(PublicBlackboard.post, "__isabstractmethod__", False) is True
-        assert getattr(PublicBlackboard.get, "__isabstractmethod__", False) is True
-        assert getattr(PublicBlackboard.get_by_agent, "__isabstractmethod__", False) is True
-        assert getattr(PublicBlackboard.get_latest, "__isabstractmethod__", False) is True
-
     def test_post_signature(self) -> None:
         """post 方法应有正确的签名。"""
         sig = inspect.signature(PublicBlackboard.post)

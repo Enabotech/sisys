@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import Protocol
 
 
@@ -15,7 +14,6 @@ class SemanticCache(Protocol):
     支持基于向量相似度的缓存查询和存储。
     """
 
-    @abstractmethod
     async def get(self, query_embedding: list[float], threshold: float = 0.9) -> dict | None:
         """查询语义缓存。
 
@@ -27,7 +25,6 @@ class SemanticCache(Protocol):
             缓存结果，如果未命中则返回 None
         """
 
-    @abstractmethod
     async def set(self, query_embedding: list[float], result: dict, ttl: int = 86400) -> None:
         """存储到语义缓存。
 
@@ -37,7 +34,6 @@ class SemanticCache(Protocol):
             ttl: 过期时间（秒）
         """
 
-    @abstractmethod
     async def invalidate(self, cache_key: str) -> None:
         """使缓存失效。
 
