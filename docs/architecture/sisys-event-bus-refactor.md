@@ -1,10 +1,11 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 1.3 | 状态: 审查修订中
+> 版本: 1.4 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1轮：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
 > 第2轮：补充from_dict阻断点、DEFAULT_MAPPINGS缺失16个非6个、channel调用链遗漏、save()加flush()建议、测试路径错误
 > 第3轮：排除ZPOPMIN方案、nack(requeue)不保留header修改BUG标注、_get_pool()死锁修复、RabbitMQEventListener参考实现、测试影响面分析
+> 第4轮：Task2.2不可行（Python不支持同名sync/async）、执行顺序调整（3.1先于2.2）、EventBusFactory死代码标注、补全4个Protocol@runtime_checkable、补充sqlalchemy_adapter
 
 ## Context
 
@@ -52,12 +53,14 @@
 
 #### 任务 1.2: 移除EventRegistry，统一到DomainEvent._registry
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：移除 `EventRegistry` 类，`get()` 改为调用 `DomainEvent._registry.get()`
-- [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：`EventOutboxAdapter.to_domain_event()` 使用 `DomainEvent._registry` 查找事件类
+- [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：`EventOutboxAdapter.to_domain_event()` L143 使用 `DomainEvent._registry` 查找事件类，替换 `EventRegistry.get(entity.event_type)`
+- [ ] **修改** `src/infrastructure/messaging/adapters/sqlalchemy_event_outbox_adapter.py` L59：同步修改 `to_domain_event()` 中的事件查找逻辑
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：更新事件查找逻辑
 - [ ] **验证**：`grep -r "EventRegistry" src/` 仅在注释或删除标记中出现
 
 **关键文件**：
-- `src/infrastructure/messaging/adapters/event_outbox_adapter.py` (EventRegistry类, 删除)
+- `src/infrastructure/messaging/adapters/event_outbox_adapter.py` (EventRegistry类, 删除; L143 to_domain_event)
+- `src/infrastructure/messaging/adapters/sqlalchemy_event_outbox_adapter.py` (L59 to_domain_event同步修改)
 - `src/infrastructure/messaging/rabbitmq_consumer.py` (EventRegistry引用)
 - `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` (更新)
 
@@ -112,13 +115,15 @@
 - `src/infrastructure/messaging/rabbitmq_event_bus.py` (save加await)
 
 #### 任务 2.2: InMemoryEventBus兼容EventPublisher Protocol
-- [ ] **修改** `src/infrastructure/messaging/inmemory_event_bus.py`：新增 `async publish(event, channel=None) -> PublishResult` 方法，兼容 `EventPublisher` Protocol
-- [ ] **保留** 同步 `publish` 方法供 `InMemoryEventPublisher` Protocol 使用（向后兼容测试）
+- [ ] **注意**：Python不支持同名方法sync/async区分（`def publish()` 和 `async def publish()` 是同一个方法名，后者覆盖前者），因此无法同时保留两个同名方法
+- [ ] **方案**：将 `InMemoryEventBus.publish()` 改为 `async def publish(event) -> PublishResult`，实现 `EventPublisher` Protocol（async版本）
+- [ ] **废弃** `InMemoryEventPublisher` Protocol（同步版本），现有测试改用 `await bus.publish(event)`
+- [ ] **前置**：此任务应在任务3.1（移除channel参数）之后执行，避免先加channel再删除
 - [ ] **验证**：`isinstance(InMemoryEventBus(), EventPublisher)` 返回 True
 
 **关键文件**：
 - `src/infrastructure/messaging/inmemory_event_bus.py`
-- `src/domain/ports/event_publisher.py` (InMemoryEventPublisher Protocol 保留)
+- `src/domain/ports/event_publisher.py` (废弃InMemoryEventPublisher Protocol)
 
 #### 任务 2.3: AsyncOutboxPoller改用公共接口
 - [ ] **前置**：依赖任务2.1完成（OutboxRepository Protocol已async）
@@ -294,12 +299,16 @@
 - `src/infrastructure/messaging/message_serializer.py` (重命名)
 - `src/infrastructure/messaging/event_bus_config_loader.py` (方法重命名)
 
-#### 任务 5.4: EventSubscriber添加@runtime_checkable
-- [ ] **修改** `src/application/ports/event_subscriber.py` L21：添加 `@runtime_checkable` 装饰器，与其他Port Protocol保持一致
-- [ ] **验证**：`isinstance(RedisEventBus(), EventSubscriber)` 返回 True
+#### 任务 5.4: Protocol统一添加@runtime_checkable
+- [ ] **修改** `src/application/ports/event_subscriber.py` L21：添加 `@runtime_checkable` 装饰器
+- [ ] **修改** `src/domain/events/listener.py`：为 `EventListener`(L21)、`EventListenerAsync`(L99)、`DeadLetterQueue`(L119) 添加 `@runtime_checkable`
+- [ ] **修改** `src/domain/events/event_store.py` L22：为 `EventStore` 添加 `@runtime_checkable`
+- [ ] **验证**：所有Port Protocol均有 `@runtime_checkable` 装饰器
 
 **关键文件**：
 - `src/application/ports/event_subscriber.py` (L21)
+- `src/domain/events/listener.py` (L21, L99, L119)
+- `src/domain/events/event_store.py` (L22)
 
 ---
 
@@ -313,26 +322,26 @@ Phase 1 (P0 重复定义) ← 无依赖，可并行
 
 Phase 2 (P1 契约修复) ← 依赖 Phase 1
   2.1 OutboxRepository async    ← 先做，2.3依赖它
-  2.2 InMemoryEventBus兼容
+  2.2 InMemoryEventBus兼容      ← 依赖 3.1（先移除channel再加async publish）
   2.3 Poller公共接口           ← 依赖 2.1
 
-Phase 3 (P1 设计缺陷) ← 依赖 Phase 2
-  3.1 channel死参数
+Phase 3 (P1 设计缺陷) ← 依赖 Phase 2.1（不依赖2.2/2.3，可与Phase 2后半段并行）
+  3.1 channel死参数             ← 先做，2.2依赖此任务
   3.2 Poller注入ChannelRouter
-  3.3 Factory去类级别状态
+  3.3 Factory去类级别状态       ← Factory为死代码（无生产调用者），低优先级
   3.4 Composition Root统一    ← 依赖 3.2, 3.3
 
-Phase 4 (P2 可靠性) ← 依赖 Phase 2
+Phase 4 (P2 可靠性) ← 仅依赖 Phase 2.1，可与 Phase 3 并行
   4.1 RedisRetryQueue原子
   4.2 DualIdempotency修复
   4.3 Consumer重试改用Redis
   4.4 线程安全
 
-Phase 5 (P2-P3 补全清理) ← 依赖 Phase 3
-  5.1 补全事件映射
-  5.2 YAML集成
-  5.3 遗留清理
-  5.4 runtime_checkable
+Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
+  5.1 补全事件映射             ← 依赖 3.2
+  5.2 YAML集成               ← 无依赖，可提前
+  5.3 遗留清理               ← 无依赖，可提前
+  5.4 runtime_checkable       ← 无依赖，可提前到 Phase 1 并行
 ```
 
 ---
