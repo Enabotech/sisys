@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.5 | 状态: 审查完成
+> 版本: 2.6 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第10轮（第二批终轮）：__init_subclass__因@dataclass时序完全失效（18/22事件未注册）、EventRegistry异常类型ValueError保持、rabbitmq_listener参数类型描述修正、PostgresDLQ.enqueue缺flush、多实例Poller部署约束声明、_write_to_postgresql RETURNING、Redis降级策略、Lua脚本编码+Cluster声明、YAML优先级规则
+> 第11轮（第三批）：event_subscriber注册路径BUG（指向不存在文件）、AsyncOutboxPoller DI注册方案补全（启动时机/session context/publisher依赖）、outbox_repo SINGLETON论证精确化（无状态单例本质）、DLQ __len__保持sync说明
 
 ## Context
 
@@ -40,7 +40,7 @@
 - [ ] **前置决策**：当前 Domain 层 `DeadLetterQueue` Protocol 是同步签名，但 `PostgresDeadLetterQueue` 的 `enqueue`/`dequeue` 是 async 方法且返回值不同（4元素 vs 3元素 tuple）。必须在统一前决定 Protocol 签名方向：
   - **方案A（唯一可行）**：Protocol 改为 async 签名，`dequeue` 返回 `tuple[DomainEvent, str, int] | None`，PostgresDeadLetterQueue 调整返回值对齐（去掉 `DeadLetterQueueEntry`）。设计规则3（async一致性）强制要求——所有异步操作的Protocol签名必须为async，InMemoryDeadLetterQueue同步实现也必须改为async
   - ~~**方案B**：保持 Protocol 同步~~ → **否决**：违反设计规则3，PostgresDeadLetterQueue实际为async方法，Protocol签名与实现不匹配将破坏契约测试
-- [ ] **修改** `src/domain/events/listener.py`：`enqueue`/`dequeue` 改为 async，`InMemoryDeadLetterQueue` 同步实现改为async（`asyncio.Queue` 替代 `collections.deque`）
+- [ ] **修改** `src/domain/events/listener.py`：`enqueue`/`dequeue` 改为 async，`InMemoryDeadLetterQueue` 同步实现改为async（`asyncio.Queue` 替代 `collections.deque`）。`__len__` 保持 sync（Python dunder方法不可async，`asyncio.Queue.qsize()` 是同步方法）
 - [ ] **修改** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：改为实现Domain层 `DeadLetterQueue` Protocol，对齐返回值
 - [ ] **修改** `src/infrastructure/messaging/outbox/dead_letter_queue.py`：删除 `DeadLetterQueue` ABC 和 `InMemoryDeadLetterQueue`，改为 re-export from Domain层
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：`set_dead_letter_queue` 参数类型从 `Any` 改为 `DeadLetterQueue`，添加从 Domain 层的 import
@@ -228,10 +228,16 @@
 - [ ] **现状**：Composition Root 当前直接通过 `register_port` 创建EventBus组件（不使用 EventBusFactory），字符串路径注册 DualChannelEventBus 已可行（`_auto_inject` 通过参数名 `redis_bus`/`rabbitmq_bus`/`router` 自动匹配注册名）
 - [ ] **修改** `src/composition_root.py` L446-511：
   - 保持字符串路径注册 DualChannelEventBus（`_auto_inject` 参数名匹配已验证可行）
-  - 修复 `outbox_repo` 生命周期：从SCOPED改为SINGLETON。此修改是安全的，因为 `PostgreSQLOutboxRepository._session` 是property，每次调用 `get_session()` 从ContextVar获取当前上下文的session，session隔离由UoW（middleware的 `session_context()`）管理
+  - 修复 `outbox_repo` 生命周期：从SCOPED改为SINGLETON。安全原因：`PostgreSQLOutboxRepository` 本身是无状态单例（`_session` 是property，每次从ContextVar获取session），SCOPED/SINGLETON行为等价，但SINGLETON语义更准确且避免SINGLETON(`rabbitmq_bus`)持有SCOPED(`outbox_repo`)引用的反模式
   - 确保 `redis_bus` 和 `rabbitmq_bus` 共享 `router` 实例（当前已通过 `resolver.resolve("router")` 共享）
+- [ ] **修复** `event_subscriber` 端口注册路径BUG：当前 L649 指向 `redis_event_subscriber.py` 但实际文件是 `redis_subscriber.py`（`src/infrastructure/messaging/redis_subscriber.py`）。修改 `impl` 和 `module` 参数指向正确路径
 - [ ] **注册** `EventSubscriber` 端口 → `DualChannelEventBus` 实现
-- [ ] **注册** `AsyncOutboxPoller` 到DI容器
+- [ ] **注册** `AsyncOutboxPoller` 到DI容器：
+  - 注册名：`"outbox_poller"`，生命周期：SINGLETON
+  - 构造参数：`outbox_repository=resolve("outbox_repo")`, `publisher=<RabbitMQ发布者>`, `router=resolve("router")`
+  - **注意**：`publisher` 参数对应 Poller 内部的 `_publisher.async_publish()` 调用，需注册一个RabbitMQ发布者实例（如当前 `rabbitmq_bus` 已有此能力，或单独注册 `RabbitMQPublisher`）
+  - **启动时机**：Poller 需在应用启动时由 FastAPI lifespan event 触发 `run()`，停止时由 shutdown event 触发 `stop()`
+  - **Session context**：Poller 的长生命周期需独立的 session context 管理（每次 poll 周期创建新 session，poll 结束后关闭）
 - [ ] **验证**：`bootstrap()` 后 `resolve("event_publisher")` 返回 `DualChannelEventBus` 实例，所有子组件共享router和连接
 
 **关键文件**：
