@@ -1,9 +1,10 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 1.2 | 状态: 审查修订中
+> 版本: 1.3 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1轮：修正AuditEvent注册描述、PostgresDeadLetterQueue架构缺陷、channel调用者清理、DualIdempotencyChecker严重BUG标注、save()同步实现细节
 > 第2轮：补充from_dict阻断点、DEFAULT_MAPPINGS缺失16个非6个、channel调用链遗漏、save()加flush()建议、测试路径错误
+> 第3轮：排除ZPOPMIN方案、nack(requeue)不保留header修改BUG标注、_get_pool()死锁修复、RabbitMQEventListener参考实现、测试影响面分析
 
 ## Context
 
@@ -47,7 +48,7 @@
 - `src/domain/events/listener.py` (L119-170, 保留)
 - `src/infrastructure/messaging/outbox/dead_letter_queue.py` (全文, 清理)
 - `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` (import路径)
-- `tests/unit/infrastructure/messaging/test_dead_letter_queue.py` (import更新，路径待确认)
+- `tests/unit/infrastructure/messaging/test_postgres_dead_letter_queue.py` (import更新)
 
 #### 任务 1.2: 移除EventRegistry，统一到DomainEvent._registry
 - [ ] **修改** `src/infrastructure/messaging/adapters/event_outbox_adapter.py`：移除 `EventRegistry` 类，`get()` 改为调用 `DomainEvent._registry.get()`
@@ -208,9 +209,10 @@
 ### Phase 4: 可靠性修复（P2）
 
 #### 任务 4.1: RedisRetryQueue原子dequeue
-- [ ] **修改** `src/infrastructure/messaging/retry/redis_retry_queue.py`：
+- [ ] **修改** `src/infrastructure/messaging/retry/redis_retry_queue.py` (L178-194)：
   - `dequeue()` 改用 Lua 脚本实现原子 ZRANGEBYSCORE + ZREM
-  - 或使用 Redis 5.0+ `ZPOPMIN` 命令
+  - **注意**：ZPOPMIN不适合此场景——ZPOPMIN按score最小值弹出，无法按 `score <= now` 做时间过滤，需要额外逻辑处理未到期事件重新入队
+  - Lua 脚本思路：`ZRANGEBYSCORE key -inf now LIMIT 0 count` → `ZREM key members` 原子执行
 - [ ] **新增** 并发dequeue测试：两个consumer同时dequeue不重复
 - [ ] **验证**：并发测试通过
 
@@ -227,20 +229,21 @@
 - `src/infrastructure/messaging/retry/dual_idempotency_checker.py` (L167-168 _try_acquire_postgresql, fetchone() BUG)
 
 #### 任务 4.3: RabbitMQConsumer重试改用RedisRetryQueue
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：
-  - `_handle_failure()` 不再修改 `message.headers["x-retry-count"]`
-  - 不再使用 `nack(requeue=True)` 做重试
-  - 改为：NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
+  - **当前BUG**：`nack(requeue=True)` 不保留客户端对 `message.headers` 的修改——requeue后RabbitMQ重新投递原始消息，L204的 `message.headers["x-retry-count"] = ...` 修改无效，导致重试计数永远不递增、无限重试
+  - **参考实现**：`RabbitMQEventListener` (`rabbitmq_listener.py`) 已使用 `RedisRetryQueue` 处理重试，可作为改造参考
+  - **修改方案**：构造函数注入 `RedisRetryQueue`；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理
   - 超过最大重试次数 → DLQ
 - [ ] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue
 
 **关键文件**：
-- `src/infrastructure/messaging/rabbitmq_consumer.py` (L200+ _handle_failure)
+- `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 _handle_failure)
+- `src/infrastructure/messaging/rabbitmq_listener.py` (参考实现)
 
 #### 任务 4.4: 线程安全修复
-- [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 操作加 `asyncio.Lock`（或改为不可变dict + copy-on-write）
-- [ ] **修改** `src/infrastructure/messaging/redis_publisher.py`：`_get_pool()` 使用已有的 `_pool_lock`
-- [ ] **修改** `src/infrastructure/monitoring/event_metrics.py`：计数器加 `threading.Lock` 或 `asyncio.Lock`
+- [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）
+- [ ] **修改** `src/infrastructure/messaging/redis_publisher.py` (L52-64)：`_get_pool()` 当前是同步方法，但 `_pool_lock` (L50) 是 `asyncio.Lock`（需要 `async with`），导致锁是死代码。修改方案：将 `_get_pool()` 改为 `async` 方法，使用 `async with self._pool_lock`，所有调用处加 `await`
+- [ ] **修改** `src/infrastructure/monitoring/event_metrics.py`：计数器 `+= 1` 操作加 `asyncio.Lock`（当前注释标注"线程安全计数器"但实际未实现）
 - [ ] **验证**：并发测试通过
 
 **关键文件**：
@@ -354,3 +357,36 @@ Phase 5 (P2-P3 补全清理) ← 依赖 Phase 3
 ### 集成验证
 1. `poetry run pytest tests/integration/test_event_bus_integration.py -x` — 集成测试
 2. `poetry run pytest tests/contracts/test_event_publisher_contract.py -x` — 契约测试
+
+---
+
+## 测试影响面分析
+
+### Phase 1 受影响测试
+| 测试文件 | 影响原因 |
+|----------|----------|
+| `tests/unit/infrastructure/messaging/test_event_outbox_adapter.py` | EventRegistry移除，改为测试DomainEvent._registry |
+| `tests/unit/infrastructure/messaging/test_outbox_entity.py` | registry_manual_register/reset测试需适配 |
+| `tests/unit/domain/events/test_events_base.py` | from_dict修改影响反序列化测试 |
+| `tests/unit/domain/events/test_event_serialization.py` | 事件注册方式变更影响roundtrip测试 |
+
+### Phase 2 受影响测试
+| 测试文件 | 影响原因 |
+|----------|----------|
+| `tests/unit/domain/ports/test_outbox_interface.py` | Protocol方法签名sync→async |
+| `tests/unit/domain/ports/test_outbox_repository.py` | Protocol接口定义测试 |
+| `tests/unit/infrastructure/messaging/outbox/test_inmemory_outbox.py` | 同步方法→async |
+| `tests/unit/infrastructure/messaging/test_postgresql_outbox_repository.py` | 适配async签名 |
+| `tests/unit/infrastructure/messaging/test_outbox_pattern.py` | 私有方法→公共async方法 |
+| `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | 私有方法调用→公共接口 |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` | outbox_repo.save()加await |
+
+### Phase 3 受影响测试
+| 测试文件 | 影响原因 |
+|----------|----------|
+| `tests/contracts/test_event_publisher_contract.py` (L58) | channel参数移除 |
+| `tests/unit/application/event_handlers/test_auto_route_handler.py` | _publish方法签名变更 |
+| `tests/unit/application/event_handlers/test_auto_execute_completed_listener.py` | _publish方法签名变更 |
+| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | publish签名channel参数移除 |
+| `tests/acceptance/test_story_1_3_steps.py` | redis_publisher.publish(event, channel)调用 |
+| `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | Factory类属性清理 |
