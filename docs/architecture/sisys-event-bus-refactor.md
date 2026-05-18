@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.8 | 状态: 审查修订中
+> 版本: 2.9 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第13轮（第三批）：测试内部类sync→async遗漏（FailingOutboxRepository×2、BrokenRepo）、Phase2/3连锁调用链验证通过、序列化roundtrip验证通过、DEFAULT_MAPPINGS 6/22确认正确、get_rabbitmq_routing_key未映射返回None与fallback一致
+> 第14轮（第三批）：dlq.enqueue()缺await致死信静默丢弃（P0数据丢失）、_write_to_postgresql非BUG仅增强、redis_subscriber.py同需_get_pool改async、Poller mark_failed失败保护、import依赖图全覆盖验证通过
 
 ## Context
 
@@ -163,6 +163,7 @@
   - 调用 `self._repo.mark_published(event_id)` 替代 `_mark_published_entity()`
   - 调用 `self._repo.mark_failed(event_id, error)` 替代 `_mark_failed_entity()`
 - [ ] **修改** OutboxEntity/DomainEvent 转换逻辑：Poller内部处理OutboxEntity→DomainEvent转换（当前已在做，只是通过私有方法绕过）
+- [ ] **错误传播保护**：当前 `_mark_failed_entity` 在 `except` 块内被调用（L76），如果此调用也抛异常（如DB不可用），事件保持 `pending` 状态且 `retry_count` 不递增，导致下次 poll 再次尝试同一事件（无限重试）。修改方案：在 `process_one()` 的 `except` 块中，`mark_failed()` 调用需独立 try/except，失败时仅记录 ERROR 日志，事件保持 pending 状态等待下次 poll
 - [ ] **修改** `outbox_repository.py` 和 `inmemory_outbox.py`：公共async方法返回DomainEvent（而非OutboxEntity），Poller不再需要知道OutboxEntity
 - [ ] **注意**：Poller运行时必须有活跃的session context（通过 `session_context()` 或等效机制包裹），因为公共方法通过 `self._session` property（ContextVar）获取session
 - [ ] **验证**：Poller不包含任何 `_` 前缀方法调用，`grep "_repo\._" outbox_processor.py` 无结果
@@ -275,8 +276,10 @@
 
 #### 任务 4.2: DualIdempotencyChecker PostgreSQL回退修复（严重BUG）
 - [ ] **修改** `src/infrastructure/messaging/retry/dual_idempotency_checker.py`：
-  - **当前BUG**：`_try_acquire_postgresql()` 执行 `INSERT ... ON CONFLICT DO NOTHING` 后用 `fetchone()` 检查结果，但 `fetchone()` 对 `DO NOTHING` 总返回 `None`，导致PG回退路径始终返回 `False`（所有事件被错误标记为"已处理"）
-  - **修复**：`_try_acquire_postgresql()` 和 `_write_to_postgresql()` 均改为 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`，根据返回值判断是否插入成功。`_write_to_postgresql` 在写入失败时记录 WARNING 日志
+  - **当前BUG（P0-数据丢失）**：`_try_acquire_postgresql()` L165-168 执行 `INSERT ... ON CONFLICT DO NOTHING` 后用 `fetchone()` 检查结果，但 `fetchone()` 对 `DO NOTHING` 总返回 `None`，导致PG回退路径始终返回 `False`（所有事件被错误标记为"已处理"）
+  - **修复**：`_try_acquire_postgresql()` 改为 `INSERT ... ON CONFLICT DO NOTHING RETURNING event_id`，根据返回值判断是否插入成功
+  - **增强改进（P3）**：`_write_to_postgresql()` L128-145 当前不检查返回值（设计意图：PG写入失败不影响主流程），不存在 BUG。可选择性添加 `RETURNING event_id` + WARNING 日志增强可观测性，但非必要
+- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` L191/L219：`self._dlq.enqueue()` 调用缺少 `await`（**P0-数据丢失**：`PostgresDeadLetterQueue.enqueue()` 是 `async def`，缺少 await 导致 coroutine 创建但从未执行，死信事件静默丢弃，无错误日志）
 - [ ] **验证**：PostgreSQL回退路径正确检测重复（首次返回True，重复返回False）
 
 **关键文件**：
@@ -301,6 +304,7 @@
 #### 任务 4.4: 线程安全修复
 - [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）。**注意**：此方案仅保证 asyncio 单线程模型安全；多线程环境需 `threading.Lock`。`register()` 应在文档中标注"仅限启动阶段调用，运行时禁用"
 - [ ] **修改** `src/infrastructure/messaging/redis_publisher.py` (L52-64)：`_get_pool()` 当前是同步方法，但 `_pool_lock` (L50) 是 `asyncio.Lock`（需要 `async with`），导致锁是死代码。修改方案：将 `_get_pool()` 改为 `async` 方法，使用 `async with self._pool_lock`，所有调用处加 `await`
+- [ ] **同步修改** `src/infrastructure/messaging/redis_subscriber.py`：与 `redis_publisher.py` 有相同问题——`_get_pool()` (L55) 是 sync 方法，需改为 async。文档之前遗漏此文件
 - [ ] **修改** `src/infrastructure/monitoring/event_metrics.py`：计数器 `+= 1` 操作加 `asyncio.Lock`（当前注释标注"线程安全计数器"但实际未实现）
 - [ ] **补充** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：`enqueue()` 方法当前使用 `session.add()` 但无 `flush()`，死信记录可能静默丢失。需添加 `await self._session.flush()`，与 OutboxRepository.save() 保持一致
 - [ ] **部署约束声明**：AsyncOutboxPoller 当前无分布式锁/行级锁，多实例部署会导致重复发布。Phase 1-5 仅支持单 Poller 实例，多实例支持（`SELECT ... FOR UPDATE SKIP LOCKED`）列为后续阶段任务
@@ -309,6 +313,9 @@
 **关键文件**：
 - `src/infrastructure/messaging/channel_router.py` (_mappings/_overrides)
 - `src/infrastructure/messaging/redis_publisher.py` (_get_pool, _pool_lock)
+- `src/infrastructure/messaging/redis_subscriber.py` (_get_pool, 同样问题)
+- `src/infrastructure/monitoring/event_metrics.py` (计数器)
+- `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` (enqueue缺flush)
 - `src/infrastructure/monitoring/event_metrics.py` (计数器)
 
 ---
