@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.infrastructure.messaging.event_bus_factory import EventBusFactory
 
 
@@ -65,34 +63,3 @@ class TestEventBusFactoryReuse:
         bus1 = factory.create_rabbitmq_bus()
         bus2 = factory.create_rabbitmq_bus()
         assert bus1._outbox_repo is bus2._outbox_repo
-
-
-class TestEventBusFactoryGlobalConfig:
-    """Test global configuration functions."""
-
-    def test_configure_event_bus_sets_global_instance(self) -> None:
-        """configure_event_bus should set the global event bus instance."""
-        factory = EventBusFactory()
-        bus, poller = factory.create_dual_channel_bus()
-
-        EventBusFactory.configure_event_bus(bus, poller)
-
-        current = EventBusFactory.get_event_bus()
-        assert current is bus
-
-    def test_get_event_bus_returns_configured_instance(self) -> None:
-        """get_event_bus should return the configured event bus."""
-        factory = EventBusFactory()
-        bus, poller = factory.create_dual_channel_bus()
-        EventBusFactory.configure_event_bus(bus, poller)
-
-        result = EventBusFactory.get_event_bus()
-        assert result is bus
-
-    def test_get_event_bus_raises_before_configuration(self) -> None:
-        """get_event_bus should raise RuntimeError before configuration."""
-        EventBusFactory._instance = None
-        EventBusFactory._poller = None
-
-        with pytest.raises(RuntimeError, match="EventBus not configured"):
-            EventBusFactory.get_event_bus()

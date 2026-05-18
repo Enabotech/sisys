@@ -506,7 +506,7 @@ def bootstrap() -> None:
         interface=OutboxRepository,
         impl="src.infrastructure.messaging.outbox.outbox_repository.PostgreSQLOutboxRepository",
         module="src.infrastructure.messaging.outbox.outbox_repository",
-        lifetime=Lifetime.SCOPED,
+        lifetime=Lifetime.SINGLETON,
         owner="messaging-team",
     )
 
@@ -646,8 +646,8 @@ def bootstrap() -> None:
         name="event_subscriber",
         version="v1.0.0",
         interface=EventSubscriber,
-        impl="src.infrastructure.messaging.redis_event_subscriber.RedisEventSubscriber",
-        module="src.infrastructure.messaging.redis_event_subscriber",
+        impl="src.infrastructure.messaging.redis_subscriber.RedisEventSubscriber",
+        module="src.infrastructure.messaging.redis_subscriber",
         lifetime=Lifetime.SCOPED,
         owner="messaging-team",
     )
