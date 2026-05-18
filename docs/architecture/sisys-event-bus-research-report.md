@@ -208,7 +208,7 @@ config/event_channels.yaml           # 6个事件通道映射配置
 
 - **单元测试**: 35+测试文件，覆盖Domain事件、Infrastructure组件、Architecture约束
 - **集成测试**: `test_event_bus_integration.py`（使用mock，非真实Redis/RabbitMQ）
-- **契约测试**: `test_event_publisher_contract.py`验证Protocol契约
+- **契约测试**: `test_port_contract_event_publisher.py`验证Protocol契约
 - **架构约束测试**: AST解析验证Domain层零外部依赖
 
 **覆盖率**: EventBus层 ≥85%，集成测试 ≥75%（符合Story 1.3验收标准）

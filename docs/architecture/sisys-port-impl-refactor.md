@@ -1210,7 +1210,7 @@ print(f'All {len(registry)} ports registered')
 - [x] 5.1 为每个端口创建契约测试基类
   - [x] PortContractTest 基类已存在（src/domain/ports/contract_gate.py）
 - [x] 5.2 实现具体端口的契约测试
-  - [x] test_event_publisher_contract.py 示例契约测试
+  - [x] test_port_contract_event_publisher.py 示例契约测试
 - [x] 5.3 集成到CI/CD
   - [x] tests/contracts/ 目录已存在，pytest 可收集运行
 

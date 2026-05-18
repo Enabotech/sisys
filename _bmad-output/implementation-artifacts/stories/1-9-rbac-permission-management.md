@@ -226,7 +226,7 @@
 
 #### API 契约 (API Contract)
 - [x] OpenAPI 定义位于 `docs/api/openapi.yaml` ✅
-- [x] 契约测试通过（`tests/contract/test_rbac_api_contract.py`）✅
+- [x] 契约测试通过（`tests/contract/test_api_contract_rbac.py`）✅
 - [x] API 版本管理正确（`/api/v1/[resource]`）✅
 
 **API 端点定义：**
@@ -1104,7 +1104,7 @@ sisys/
 - [x] `tests/unit/security/test_permission_middleware.py` - 权限中间件测试 ✅
 - [x] `tests/unit/security/test_architecture_constraints.py` - 架构约束测试 ✅
 - [x] `tests/unit/security/test_dengbao_compliance.py` - 等保合规测试 ✅
-- [x] `tests/contract/test_rbac_api_contract.py` - API 契约测试 ✅
+- [x] `tests/contract/test_api_contract_rbac.py` - API 契约测试 ✅
 - [x] `tests/integration/test_auth_integration.py` - 集成测试（服务层）✅
 - [x] `tests/integration/test_auth_api_endpoints.py` - API 端点集成测试（TestClient）✅
 - [x] `tests/acceptance/test_story_1_9.feature` - 验收测试 Gherkin 场景 ✅
