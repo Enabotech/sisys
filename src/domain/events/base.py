@@ -77,14 +77,17 @@ class DomainEvent:
     _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """自动按 event_type 注册子类"""
+        """自动按 event_type 注册子类
+
+        从 cls.__dict__ 读取 event_type 字段描述符，绕过 @dataclass
+        装饰器时序问题（__init_subclass__ 在 @dataclass 之前调用，
+        此时 is_dataclass(cls) 为 False）
+        """
         super().__init_subclass__(**kwargs)
-        if is_dataclass(cls):
-            for f in fields(cls):
-                if f.name == "event_type" and not f.init:
-                    if f.default is not MISSING:
-                        DomainEvent._registry[f.default] = cls
-                    break
+        et_field = cls.__dict__.get("event_type")
+        if et_field is not None and hasattr(et_field, "init") and not et_field.init:
+            if et_field.default is not MISSING:
+                DomainEvent._registry[et_field.default] = cls
 
     @classmethod
     def register(cls, event_type: str, event_class: type[DomainEvent]) -> None:
@@ -95,6 +98,11 @@ class DomainEvent:
             event_class: 要注册的事件类
         """
         cls._registry[event_type] = event_class
+
+    @classmethod
+    def reset_registry(cls) -> None:
+        """重置事件注册表（仅用于测试隔离）"""
+        cls._registry.clear()
 
     # ------------------------------------------------------------------
     # Serialization
@@ -216,18 +224,24 @@ class DomainEvent:
 
         # Extract subclass-specific fields from payload
         extra_kwargs: dict[str, Any] = {}
+        event_type_field: Any = None
         if target_class is not DomainEvent and is_dataclass(target_class):
             for f in fields(target_class):
+                if f.name == "event_type":
+                    event_type_field = f
+                    continue
                 if f.name in _CORE_FIELD_NAMES or not f.init:
                     continue
                 if f.name in payload:
-                    value = payload.pop(f.name)
-                    value = cls._deserialize_value(value, f.type)
+                    value = cls._deserialize_value(payload[f.name], f.type)
                     extra_kwargs[f.name] = value
+
+        # 仅当 event_type 字段的 init=True 时才传入构造函数
+        if event_type_field is None or event_type_field.init:
+            extra_kwargs["event_type"] = event_type
 
         return target_class(
             event_id=eid,
-            event_type=event_type,
             timestamp=ts,
             source=data.get("source", ""),
             schema_version=data.get("schema_version", DEFAULT_SCHEMA_VERSION),

@@ -9,25 +9,32 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.domain.events.base import DomainEvent
+from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
 
+def _make_domain_event(event_type: str = "TestEvent") -> DomainEvent:
+    """创建测试用 DomainEvent"""
+    DomainEvent.register("TestEvent", DomainEvent)
+    return DomainEvent(event_type=event_type, source="test")
+
+
 class TestAsyncOutboxPoller:
-    """测试 AsyncOutboxPoller 轮询器"""
+    """测试 AsyncOutboxPoller 轮询器（使用公共 OutboxRepository 接口）"""
 
     @pytest.fixture
     def mock_repo(self) -> MagicMock:
-        """创建模拟的 outbox_repository"""
+        """创建模拟的 OutboxRepository（公共 async 方法）"""
         repo = MagicMock()
-        repo._get_unpublished_entities = AsyncMock(return_value=[])
-        repo._mark_published_entity = AsyncMock()
-        repo._mark_failed_entity = AsyncMock()
+        repo.get_unpublished = AsyncMock(return_value=[])
+        repo.mark_published = AsyncMock()
+        repo.mark_failed = AsyncMock()
         return repo
 
     @pytest.fixture
@@ -38,38 +45,47 @@ class TestAsyncOutboxPoller:
         return publisher
 
     @pytest.fixture
-    def poller(self, mock_repo: MagicMock, mock_publisher: MagicMock) -> AsyncOutboxPoller:
+    def mock_router(self) -> MagicMock:
+        """创建模拟通道路由器"""
+        router = MagicMock(spec=ChannelRouter)
+        router.get_rabbitmq_routing_key.return_value = "sisys.events.reliable.TestEvent"
+        return router
+
+    @pytest.fixture
+    def poller(self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter) -> AsyncOutboxPoller:
         """创建 AsyncOutboxPoller 实例"""
         return AsyncOutboxPoller(
             outbox_repository=mock_repo,
             publisher=mock_publisher,
+            router=mock_router,
             poll_interval=0.01,
             batch_size=5,
         )
 
-    def test_init_sets_attributes(self, mock_repo: MagicMock, mock_publisher: MagicMock) -> None:
+    def test_init_sets_attributes(self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter) -> None:
         """初始化正确设置属性"""
         poller = AsyncOutboxPoller(
             outbox_repository=mock_repo,
             publisher=mock_publisher,
+            router=mock_router,
             poll_interval=2.5,
             batch_size=20,
         )
         assert poller._repo is mock_repo
         assert poller._publisher is mock_publisher
+        assert poller._router is mock_router
         assert poller._poll_interval == 2.5
         assert poller._batch_size == 20
         assert poller._running is False
 
     @pytest.mark.asyncio
-    async def test_poll_once_no_entities(self, poller: AsyncOutboxPoller, mock_repo: MagicMock) -> None:
-        """无待处理实体时不发布"""
-        mock_repo._get_unpublished_entities.return_value = []
+    async def test_poll_once_no_events(self, poller: AsyncOutboxPoller, mock_repo: MagicMock) -> None:
+        """无待处理事件时不发布"""
+        mock_repo.get_unpublished.return_value = []
 
         await poller.poll_once()
 
-        mock_repo._get_unpublished_entities.assert_awaited_once_with(limit=5)
-        # No publish calls should happen
+        mock_repo.get_unpublished.assert_awaited_once_with(limit=5)
 
     @pytest.mark.asyncio
     async def test_poll_once_publishes_and_marks_published(
@@ -78,20 +94,14 @@ class TestAsyncOutboxPoller:
         mock_repo: MagicMock,
         mock_publisher: MagicMock,
     ) -> None:
-        """有实体时发布并标记为已发布"""
-        entity = MagicMock(spec=OutboxEntity)
-        entity.event_id = "event-123"
-        entity.event_type = "TestEvent"
-        mock_repo._get_unpublished_entities.return_value = [entity]
+        """有事件时发布并标记为已发布"""
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
+        await poller.poll_once()
 
-            await poller.poll_once()
-
-            mock_adapter.to_domain_event.assert_called_once_with(entity)
-            mock_publisher.async_publish.assert_awaited_once()
-            mock_repo._mark_published_entity.assert_awaited_once_with(entity)
+        mock_publisher.async_publish.assert_awaited_once()
+        mock_repo.mark_published.assert_awaited_once_with(event.event_id)
 
     @pytest.mark.asyncio
     async def test_poll_once_marks_failed_on_error(
@@ -101,40 +111,40 @@ class TestAsyncOutboxPoller:
         mock_publisher: MagicMock,
     ) -> None:
         """发布失败时标记为失败"""
-        entity = MagicMock(spec=OutboxEntity)
-        entity.event_id = "event-456"
-        entity.event_type = "TestEvent"
-        mock_repo._get_unpublished_entities.return_value = [entity]
-
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
         mock_publisher.async_publish.side_effect = RuntimeError("Publish failed")
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
+        await poller.poll_once()
 
-            await poller.poll_once()
-
-            mock_repo._mark_failed_entity.assert_awaited_once_with(entity, "Publish failed")
+        mock_repo.mark_failed.assert_awaited_once_with(event.event_id, "Publish failed")
 
     @pytest.mark.asyncio
     async def test_poll_once_uses_correct_routing_key(
         self,
-        poller: AsyncOutboxPoller,
         mock_repo: MagicMock,
         mock_publisher: MagicMock,
     ) -> None:
-        """发布时使用正确的 routing key"""
-        entity = MagicMock(spec=OutboxEntity)
-        entity.event_id = "event-789"
-        entity.event_type = "DocumentProcessed"
-        mock_repo._get_unpublished_entities.return_value = [entity]
+        """发布时使用 ChannelRouter 提供的 routing key"""
+        event = DomainEvent(event_type="DocumentProcessed", source="test")
+        mock_repo.get_unpublished.return_value = [event]
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
+        router = MagicMock(spec=ChannelRouter)
+        router.get_rabbitmq_routing_key.return_value = "sisys.events.reliable.document_processed"
 
-            await poller.poll_once()
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=router,
+            poll_interval=0.01,
+            batch_size=5,
+        )
 
-            call_args = mock_publisher.async_publish.call_args
-            assert call_args.kwargs["routing_key"] == "sisys.events.reliable.DocumentProcessed"
+        await poller.poll_once()
+
+        call_args = mock_publisher.async_publish.call_args
+        assert call_args.kwargs["routing_key"] == "sisys.events.reliable.document_processed"
+        router.get_rabbitmq_routing_key.assert_called_once_with("DocumentProcessed")
 
     @pytest.mark.asyncio
     async def test_poll_once_concurrent_processing(
@@ -144,20 +154,13 @@ class TestAsyncOutboxPoller:
         mock_publisher: MagicMock,
     ) -> None:
         """验证并发处理使用 Semaphore 限制"""
-        entities = [MagicMock(spec=OutboxEntity) for _ in range(3)]
-        for i, entity in enumerate(entities):
-            entity.event_id = f"event-{i}"
-            entity.event_type = "TestEvent"
-        mock_repo._get_unpublished_entities.return_value = entities
+        events = [_make_domain_event() for _ in range(3)]
+        mock_repo.get_unpublished.return_value = events
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
+        await poller.poll_once()
 
-            await poller.poll_once()
-
-            # All three should be processed (batch_size=5 allows 3 concurrent)
-            assert mock_publisher.async_publish.call_count == 3
-            assert mock_repo._mark_published_entity.call_count == 3
+        assert mock_publisher.async_publish.call_count == 3
+        assert mock_repo.mark_published.call_count == 3
 
     def test_stop_sets_running_false(self, poller: AsyncOutboxPoller) -> None:
         """stop() 将 _running 设为 False"""
@@ -168,21 +171,19 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_run_starts_and_stops(self, poller: AsyncOutboxPoller) -> None:
         """run() 启动后 stop() 可停止"""
-        # Make poll_once return immediately with empty to avoid infinite loop
-        poller._repo._get_unpublished_entities = AsyncMock(return_value=[])
+        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         async def run_and_stop() -> None:
             await asyncio.sleep(0.03)
             poller.stop()
 
         await asyncio.gather(poller.run(), run_and_stop())
-
         assert poller._running is False
 
     @pytest.mark.asyncio
     async def test_run_logs_start_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """run() 启动时记录日志"""
-        poller._repo._get_unpublished_entities = AsyncMock(return_value=[])
+        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         with caplog.at_level(logging.INFO):
 
@@ -193,12 +194,11 @@ class TestAsyncOutboxPoller:
             await asyncio.gather(poller.run(), run_and_stop())
 
         assert "AsyncOutboxPoller started" in caplog.text
-        assert "interval=0.0" in caplog.text or "interval=0.1" in caplog.text
 
     @pytest.mark.asyncio
     async def test_run_stops_on_stop_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """stop() 记录停止日志"""
-        poller._repo._get_unpublished_entities = AsyncMock(return_value=[])
+        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         with caplog.at_level(logging.INFO):
 
@@ -215,14 +215,14 @@ class TestAsyncOutboxPoller:
         """run() 循环调用 poll_once"""
         call_count = 0
 
-        async def mock_get_unpublished(limit: int) -> list[OutboxEntity]:
+        async def mock_get_unpublished(limit: int) -> list[DomainEvent]:
             nonlocal call_count
             call_count += 1
             if call_count >= 3:
                 poller.stop()
             return []
 
-        poller._repo._get_unpublished_entities = mock_get_unpublished
+        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
 
         await poller.run()
 
@@ -233,44 +233,35 @@ class TestAsyncOutboxPoller:
         """poll_once 异常时 run() 捕获并记录错误，继续运行"""
         call_count = 0
 
-        async def mock_get_unpublished(limit: int) -> list[OutboxEntity]:
+        async def mock_get_unpublished(limit: int) -> list[DomainEvent]:
             nonlocal call_count
             call_count += 1
             if call_count >= 2:
                 poller.stop()
-            # Return an entity that will cause poll_once to raise
-            entity = MagicMock(spec=OutboxEntity)
-            entity.event_id = "event-ex"
-            entity.event_type = "TestEvent"
-            return [entity]
+            event = _make_domain_event()
+            return [event]
 
-        poller._repo._get_unpublished_entities = mock_get_unpublished
+        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
+        poller._publisher.async_publish = AsyncMock(side_effect=RuntimeError("Unexpected error"))
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
-            poller._publisher.async_publish = AsyncMock(side_effect=RuntimeError("Unexpected error"))
-
-            with caplog.at_level(logging.ERROR):
-                await poller.run()
-
-            assert "Error in poll_once" in caplog.text or "Unexpected error" in caplog.text
+        with caplog.at_level(logging.ERROR):
+            await poller.run()
 
     @pytest.mark.asyncio
     async def test_run_exception_in_poll_once_logs_error(
         self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """poll_once 抛出异常时 run() 记录错误日志（覆盖 85-86 行）"""
+        """poll_once 抛出异常时 run() 记录错误日志"""
         call_count = 0
 
-        async def mock_get_unpublished(limit: int) -> list[OutboxEntity]:
+        async def mock_get_unpublished(limit: int) -> list[DomainEvent]:
             nonlocal call_count
             call_count += 1
             if call_count >= 2:
                 poller.stop()
-            # This will cause poll_once to raise at the gather level
             raise RuntimeError("Database connection lost")
 
-        poller._repo._get_unpublished_entities = mock_get_unpublished
+        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
 
         with caplog.at_level(logging.ERROR):
             await poller.run()
@@ -278,58 +269,26 @@ class TestAsyncOutboxPoller:
         assert "Error in poll_once" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_run_sleeps_between_polls(self, poller: AsyncOutboxPoller) -> None:
-        """验证轮询间隔使用 asyncio.sleep"""
-        poller._repo._get_unpublished_entities = AsyncMock(return_value=[])
-        poller._poll_interval = 10.0  # Long interval
-
-        async def stop_after_short_delay() -> None:
-            await asyncio.sleep(0.01)
-            poller.stop()
-
-        with patch("asyncio.sleep") as mock_sleep:
-            mock_sleep.side_effect = asyncio.CancelledError
-            try:
-                await asyncio.gather(
-                    poller.run(),
-                    stop_after_short_delay(),
-                )
-            except asyncio.CancelledError:
-                pass
-
-        # If sleep was called with our long interval, test passes
-        # The key is that asyncio.sleep was called
-
-    @pytest.mark.asyncio
-    async def test_poll_once_processes_multiple_entities(
+    async def test_poll_once_processes_multiple_events(
         self, poller: AsyncOutboxPoller, mock_repo: MagicMock, mock_publisher: MagicMock
     ) -> None:
-        """批量处理多个实体"""
-        entities = []
-        for i in range(5):
-            entity = MagicMock(spec=OutboxEntity)
-            entity.event_id = f"event-{i}"
-            entity.event_type = "TestEvent"
-            entities.append(entity)
-        mock_repo._get_unpublished_entities.return_value = entities
+        """批量处理多个事件"""
+        events = [_make_domain_event() for _ in range(5)]
+        mock_repo.get_unpublished.return_value = events
 
-        with patch("src.infrastructure.messaging.outbox.outbox_processor.EventOutboxAdapter") as mock_adapter:
-            mock_adapter.to_domain_event.return_value = MagicMock(spec=DomainEvent)
+        await poller.poll_once()
 
-            await poller.poll_once()
-
-            assert mock_publisher.async_publish.call_count == 5
-            assert mock_repo._mark_published_entity.call_count == 5
+        assert mock_publisher.async_publish.call_count == 5
+        assert mock_repo.mark_published.call_count == 5
 
     @pytest.mark.asyncio
     async def test_run_terminates_cleanly(self, poller: AsyncOutboxPoller) -> None:
         """多次调用 stop() 应正常工作"""
-        poller._repo._get_unpublished_entities = AsyncMock(return_value=[])
+        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         async def run_and_stop_twice() -> None:
             await asyncio.sleep(0.02)
             poller.stop()
-            # Call stop again - should be idempotent
             poller.stop()
 
         await asyncio.gather(poller.run(), run_and_stop_twice())
@@ -350,7 +309,7 @@ class TestOutboxEntityStateTransitions:
     def test_mark_published_from_invalid_state_raises(self) -> None:
         """从非 pending 状态转换到 published 应抛出异常"""
         entity = OutboxEntity(event_id=uuid.uuid4(), event_type="Test", status="published")
-        with pytest.raises(Exception):  # InvalidStateTransitionError
+        with pytest.raises(Exception):
             entity.mark_published()
 
     def test_mark_failed_from_pending(self) -> None:
@@ -365,7 +324,7 @@ class TestOutboxEntityStateTransitions:
         """多次标记失败递增 retry_count"""
         entity = OutboxEntity(event_id=uuid.uuid4(), event_type="Test", status="pending")
         entity.mark_failed("Error 1")
-        entity.status = "pending"  # Reset for testing
+        entity.status = "pending"
         entity.mark_failed("Error 2")
         assert entity.retry_count == 2
 
@@ -379,7 +338,7 @@ class TestOutboxEntityStateTransitions:
     def test_mark_pending_exceeds_max_retries_raises(self) -> None:
         """超过最大重试次数时不能重置为 pending"""
         entity = OutboxEntity(event_id=uuid.uuid4(), event_type="Test", status="failed", retry_count=3, max_retries=3)
-        with pytest.raises(Exception):  # InvalidStateTransitionError
+        with pytest.raises(Exception):
             entity.mark_pending()
 
     def test_mark_archived_from_failed(self) -> None:

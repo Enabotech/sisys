@@ -50,14 +50,13 @@ class DualChannelEventBus(EventPublisher):
         self._rabbitmq_bus = rabbitmq_bus
         self._router = router
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布领域事件
 
         根据 DeliveryMode 路由到对应通道
 
         Args:
             event: 领域事件
-            channel: 事件发布通道（可选）
 
         Returns:
             PublishResult: 组合发布结果

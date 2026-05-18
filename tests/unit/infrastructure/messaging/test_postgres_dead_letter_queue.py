@@ -56,6 +56,7 @@ def mock_session():
     """Mock AsyncSession for testing."""
     session = mock.AsyncMock(spec=AsyncSession)
     session.add = mock.Mock()
+    session.flush = mock.AsyncMock()
     # Configure execute to return a sync mock result
     session.execute.return_value = mock.MagicMock()
     return session
@@ -153,6 +154,8 @@ class TestPostgresDeadLetterQueue:
             assert model.error_message == error_msg
             assert model.retry_count == retry_count
             assert model.status == "pending"
+            # Verify flush was called to persist
+            mock_session.flush.assert_awaited_once()
         finally:
             reset_session(token)
 
@@ -174,21 +177,20 @@ class TestPostgresDeadLetterQueue:
 
     @pytest.mark.asyncio
     async def test_dequeue_returns_oldest_pending_entry(self, mock_session):
-        """dequeue should return and mark as processed the oldest pending entry."""
+        """dequeue should return (event, error, retry_count) and mark as processed."""
         token = set_session(mock_session)
         try:
             dlq = PostgresDeadLetterQueue()
             event1 = _make_event()
             model1 = MockDLQModel(event1, "error1", 1)
 
-            # Configure mock chain: session.execute() -> result -> scalars() -> scalar_one_or_none() -> model1
+            # Configure mock chain
             mock_session.execute.return_value.scalar_one_or_none.return_value = model1
 
             result = await dlq.dequeue()
 
             assert result is not None
-            entry, event, error, retries = result
-            assert entry.event_id == event1.event_id
+            event, error, retries = result
             assert event.event_id == event1.event_id
             assert error == "error1"
             assert retries == 1

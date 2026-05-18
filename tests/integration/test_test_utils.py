@@ -23,10 +23,11 @@ from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 class TestTestFixtureConfiguration:
     """Verify test fixtures are correctly configured and isolated."""
 
-    def test_outbox_repo_fixture_is_fresh_mock(self, outbox_repo: AsyncMock) -> None:
+    @pytest.mark.asyncio
+    async def test_outbox_repo_fixture_is_fresh_mock(self, outbox_repo: AsyncMock) -> None:
         """Each test should get a fresh mock OutboxRepository."""
         outbox_repo.get_unpublished.return_value = []
-        result = outbox_repo.get_unpublished(limit=10)
+        result = await outbox_repo.get_unpublished(limit=10)
         assert result == []
 
     def test_event_store_fixture_is_fresh(self, event_id: UUID) -> None:

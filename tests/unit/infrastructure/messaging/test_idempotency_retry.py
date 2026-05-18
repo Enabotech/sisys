@@ -11,10 +11,7 @@ import pytest
 import redis.asyncio as aioredis
 
 from src.domain.events import DocumentProcessed
-from src.infrastructure.messaging.outbox.dead_letter_queue import (
-    DeadLetterQueue,
-    InMemoryDeadLetterQueue,
-)
+from src.domain.events.listener import DeadLetterQueue, InMemoryDeadLetterQueue
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
@@ -206,32 +203,36 @@ class TestRetryPolicy:
 class TestDeadLetterQueue:
     """DeadLetterQueue tests."""
 
-    def test_enqueue_adds_event(self):
+    @pytest.mark.asyncio
+    async def test_enqueue_adds_event(self):
         """enqueue should add event to DLQ."""
         dlq = InMemoryDeadLetterQueue()
         event = _make_event()
-        dlq.enqueue(event, "error message")
+        await dlq.enqueue(event, "error message")
 
         assert len(dlq) == 1
 
-    def test_dequeue_removes_event(self):
+    @pytest.mark.asyncio
+    async def test_dequeue_removes_event(self):
         """dequeue should remove and return event."""
         dlq = InMemoryDeadLetterQueue()
         event = _make_event()
-        dlq.enqueue(event, "error message")
+        await dlq.enqueue(event, "error message")
 
-        dequeued_event, error, retry_count = dlq.dequeue()
+        dequeued_event, error, retry_count = await dlq.dequeue()
         assert dequeued_event.event_id == event.event_id
         assert error == "error message"
         assert len(dlq) == 0
 
-    def test_dequeue_empty_returns_none(self):
+    @pytest.mark.asyncio
+    async def test_dequeue_empty_returns_none(self):
         """dequeue on empty DLQ should return None."""
         dlq = InMemoryDeadLetterQueue()
-        result = dlq.dequeue()
+        result = await dlq.dequeue()
         assert result is None
 
-    def test_fifo_order(self):
+    @pytest.mark.asyncio
+    async def test_fifo_order(self):
         """DLQ should follow FIFO order."""
         dlq = InMemoryDeadLetterQueue()
         event1 = _make_event()
@@ -240,18 +241,18 @@ class TestDeadLetterQueue:
             parse_result={"pages": 5},
             embedding=[0.2] * 1024,
         )
-        dlq.enqueue(event1, "error1")
-        dlq.enqueue(event2, "error2")
+        await dlq.enqueue(event1, "error1")
+        await dlq.enqueue(event2, "error2")
 
-        dequeued1, error1, _ = dlq.dequeue()
-        dequeued2, error2, _ = dlq.dequeue()
+        dequeued1, error1, _ = await dlq.dequeue()
+        dequeued2, error2, _ = await dlq.dequeue()
 
         assert dequeued1.event_id == event1.event_id
         assert error1 == "error1"
         assert dequeued2.event_id == event2.event_id
         assert error2 == "error2"
 
-    def test_abstract_base_class(self):
-        """DeadLetterQueue should be abstract."""
-        with pytest.raises(TypeError):
-            DeadLetterQueue()
+    def test_protocol_is_runtime_checkable(self):
+        """DeadLetterQueue Protocol 应该是 runtime_checkable 的。"""
+        dlq = InMemoryDeadLetterQueue()
+        assert isinstance(dlq, DeadLetterQueue)

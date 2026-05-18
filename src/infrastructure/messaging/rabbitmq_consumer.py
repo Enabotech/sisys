@@ -23,8 +23,8 @@ import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractIncomingMessage, AbstractQueue
 
 from src.domain.events.base import DomainEvent
+from src.domain.events.listener import DeadLetterQueue
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class RabbitMQConsumer:
         config: RabbitMQConfig,
         idempotency_checker: Any = None,
         metrics_collector: Any = None,
-        dlq: Any = None,
+        dlq: DeadLetterQueue | None = None,
         retry_policy: Any = None,
     ):
         """初始化 RabbitMQConsumer
@@ -136,7 +136,8 @@ class RabbitMQConsumer:
             event_dict = json.loads(message.body.decode())
             event_type = event_dict.get("event_type")
             # 验证 event_type 已注册
-            EventRegistry.get(event_type)
+            if event_type not in DomainEvent._registry:
+                raise ValueError(f"Unknown event_type: {event_type}")
             # 使用 DomainEvent.from_dict 正确处理 event_type
             # (subclass.from_dict fails because subclasses have event_type as init=False)
             event = DomainEvent.from_dict(event_dict)
@@ -188,7 +189,7 @@ class RabbitMQConsumer:
             # 无重试策略，直接死信
             await message.nack(requeue=False)
             if self._dlq:
-                self._dlq.enqueue(event, str(error))
+                await self._dlq.enqueue(event, str(error))
             if self._metrics:
                 self._metrics.record_dlq(event.event_type)
             return
@@ -216,7 +217,7 @@ class RabbitMQConsumer:
             # 超过最大重试次数 → 死信队列
             await message.nack(requeue=False)
             if self._dlq:
-                self._dlq.enqueue(event, str(error), retry_count)
+                await self._dlq.enqueue(event, str(error), retry_count)
             if self._metrics:
                 self._metrics.record_dlq(event.event_type)
             logger.error(

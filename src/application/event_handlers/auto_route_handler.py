@@ -98,19 +98,18 @@ class AutoRouteHandler:
             logger.error("Failed to process AutoTriggered event: %s", e)
             raise
 
-    async def _publish(self, event: AutoRouted, channel: str | None = None) -> None:
+    async def _publish(self, event: AutoRouted) -> None:
         """通过配置的发布器发布 AutoRouted 事件
 
         Args:
             event: 待发布的 AutoRouted 事件
-            channel: 频道名称（默认 "rt:AutoRouted"）
         """
         if self._publisher is None:
             logger.warning("No publisher configured, AutoRouted event not published")
             return
 
         try:
-            await self._publisher.publish(event, channel=channel or "rt:AutoRouted")
+            await self._publisher.publish(event)
             logger.debug("Published AutoRouted event: session_id=%s", event.session_id)
         except Exception as e:
             logger.error("Failed to publish AutoRouted event: %s", e)

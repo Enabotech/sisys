@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-# Ensure all event classes are imported so EventRegistry can discover them
+# Ensure all event classes are imported so DomainEvent._registry is populated
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
@@ -396,6 +396,7 @@ class TestAsyncRabbitMQConsumer:
         mock_retry.should_retry.return_value = False
 
         mock_dlq = MagicMock()
+        mock_dlq.enqueue = AsyncMock()
 
         consumer = RabbitMQConsumer(
             config,
@@ -430,6 +431,7 @@ class TestAsyncRabbitMQConsumer:
         mock_checker = MagicMock(spec=IdempotencyChecker)
         mock_checker.try_acquire.return_value = True
         mock_dlq = MagicMock()
+        mock_dlq.enqueue = AsyncMock()
 
         consumer = RabbitMQConsumer(
             config,
@@ -577,6 +579,7 @@ class TestAsyncRabbitMQConsumer:
         mock_retry.should_retry.return_value = False
 
         mock_dlq = MagicMock()
+        mock_dlq.enqueue = AsyncMock()
         mock_collector = MagicMock(spec=EventMetricsCollector)
 
         consumer = RabbitMQConsumer(

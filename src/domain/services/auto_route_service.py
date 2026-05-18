@@ -145,7 +145,7 @@ class AutoRouteService:
             return
 
         try:
-            await self._publisher.publish(event, channel="rt:AutoRouted")
+            await self._publisher.publish(event)
             logger.info(
                 "Published AutoRouted event: session_id=%s route_type=%s route_target=%s score=%.3f",
                 event.session_id,

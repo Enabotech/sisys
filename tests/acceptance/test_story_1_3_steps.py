@@ -22,10 +22,10 @@ from pytest_bdd import given, scenario, scenarios, then, when
 from src.domain.events.agent_events import AgentDecided
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.heartbeat_events import HeartbeatTriggered
+from src.domain.events.listener import InMemoryDeadLetterQueue
 from src.domain.events.tool_events import ToolExecuted
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.config.redis import RedisConfig
-from src.infrastructure.messaging.outbox.dead_letter_queue import InMemoryDeadLetterQueue
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
@@ -722,7 +722,7 @@ def verify_jitter_range(context: dict, retry_policy: RetryPolicy) -> None:
 
 
 @then("超过最大重试次数后事件应该进入死信队列")
-def verify_event_enters_dlq_after_max_retries(
+async def verify_event_enters_dlq_after_max_retries(
     context: dict,
     retry_policy: RetryPolicy,
     dead_letter_queue: InMemoryDeadLetterQueue,
@@ -737,7 +737,7 @@ def verify_event_enters_dlq_after_max_retries(
 
     for retry_count in range(max_retries + 1):
         if not retry_policy.should_retry(retry_count, max_retries):
-            dead_letter_queue.enqueue(event, "Max retries exceeded", retry_count)
+            await dead_letter_queue.enqueue(event, "Max retries exceeded", retry_count)
             break
 
     assert len(dead_letter_queue) > 0, "Event should be in dead letter queue"

@@ -6,6 +6,8 @@ from unittest import mock
 
 import pytest
 
+from src.infrastructure.messaging.channel_router import ChannelRouter
+
 
 class TestAsyncOutboxPollerBehavior:
     """AsyncOutboxPoller behavior tests."""
@@ -14,9 +16,9 @@ class TestAsyncOutboxPollerBehavior:
     def mock_repo(self):
         """Mock outbox repository."""
         repo = mock.AsyncMock()
-        repo._get_unpublished_entities = mock.AsyncMock(return_value=[])
-        repo._mark_published_entity = mock.AsyncMock()
-        repo._mark_failed_entity = mock.AsyncMock()
+        repo.get_unpublished = mock.AsyncMock(return_value=[])
+        repo.mark_published = mock.AsyncMock()
+        repo.mark_failed = mock.AsyncMock()
         return repo
 
     @pytest.fixture
@@ -27,27 +29,35 @@ class TestAsyncOutboxPollerBehavior:
         return pub
 
     @pytest.fixture
-    def poller(self, mock_repo, mock_publisher):
+    def mock_router(self):
+        """Mock ChannelRouter."""
+        router = mock.MagicMock(spec=ChannelRouter)
+        router.get_rabbitmq_routing_key.return_value = "sisys.events.reliable.TestEvent"
+        return router
+
+    @pytest.fixture
+    def poller(self, mock_repo, mock_publisher, mock_router):
         """Provide AsyncOutboxPoller with mocks."""
         from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
 
         return AsyncOutboxPoller(
             outbox_repository=mock_repo,
             publisher=mock_publisher,
+            router=mock_router,
             poll_interval=0.1,
             batch_size=10,
         )
 
     @pytest.mark.asyncio
-    async def test_poll_once_calls_get_unpublished_entities(self, poller, mock_repo):
-        """poll_once should call _get_unpublished_entities."""
+    async def test_poll_once_calls_get_unpublished(self, poller, mock_repo):
+        """poll_once should call get_unpublished."""
         await poller.poll_once()
-        mock_repo._get_unpublished_entities.assert_called_once()
+        mock_repo.get_unpublished.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_poll_once_handles_empty_queue(self, poller, mock_repo):
         """poll_once should handle empty queue gracefully."""
-        mock_repo._get_unpublished_entities.return_value = []
+        mock_repo.get_unpublished.return_value = []
         await poller.poll_once()  # Should not raise
 
     @pytest.mark.asyncio
@@ -55,32 +65,3 @@ class TestAsyncOutboxPollerBehavior:
         """stop() should set _running to False."""
         poller.stop()
         assert poller._running is False
-
-
-class TestOutboxRepositoryInternalMethods:
-    """Test internal methods documentation."""
-
-    def test_internal_methods_have_poller_only_comment(self):
-        """Internal methods should have @poller_only comment."""
-        from src.infrastructure.messaging.outbox.outbox_repository import (
-            PostgreSQLOutboxRepository,
-        )
-
-        # Check that internal methods exist and have docstrings
-        assert hasattr(PostgreSQLOutboxRepository, "_get_unpublished_entities")
-        assert hasattr(PostgreSQLOutboxRepository, "_mark_published_entity")
-        assert hasattr(PostgreSQLOutboxRepository, "_mark_failed_entity")
-
-        # Check docstrings mention @poller_only
-        assert (
-            "@poller_only" in PostgreSQLOutboxRepository._get_unpublished_entities.__doc__
-            or "内部方法" in PostgreSQLOutboxRepository._get_unpublished_entities.__doc__
-        )
-        assert (
-            "@poller_only" in PostgreSQLOutboxRepository._mark_published_entity.__doc__
-            or "内部方法" in PostgreSQLOutboxRepository._mark_published_entity.__doc__
-        )
-        assert (
-            "@poller_only" in PostgreSQLOutboxRepository._mark_failed_entity.__doc__
-            or "内部方法" in PostgreSQLOutboxRepository._mark_failed_entity.__doc__
-        )

@@ -14,7 +14,6 @@ Copyright:
 from __future__ import annotations
 
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
 from src.infrastructure.storage.postgresql.models import OutboxModel
 
 
@@ -44,7 +43,7 @@ class SQLAlchemyEventOutboxAdapter:
     def to_domain_event(model: OutboxModel) -> DomainEvent:
         """OutboxModel 转领域事件
 
-        使用 EventRegistry 按 event_type 路由到正确的领域事件子类
+        使用 DomainEvent._registry 按 event_type 路由到正确的领域事件子类
 
         Args:
             model: OutboxModel 实例
@@ -55,7 +54,8 @@ class SQLAlchemyEventOutboxAdapter:
         Raises:
             ValueError: 如果 event_type 未注册
         """
-        # 验证 event_type 已注册
-        EventRegistry.get(model.event_type)
+        # 使用 DomainEvent._registry 验证 event_type（单一真实来源）
+        if model.event_type not in DomainEvent._registry:
+            raise ValueError(f"Unknown event_type: {model.event_type}")
         # 使用 DomainEvent.from_dict 正确处理 event_type
         return DomainEvent.from_dict(model.payload)

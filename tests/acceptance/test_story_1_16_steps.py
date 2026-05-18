@@ -26,9 +26,6 @@ from src.domain.events.agent_events import AgentDecided
 from src.domain.events.base import DomainEvent
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.tool_events import ToolExecuted
-from src.infrastructure.messaging.adapters.event_outbox_adapter import (
-    EventRegistry,
-)
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from tests.environments import get_test_env
@@ -85,16 +82,16 @@ def in_memory_outbox_repo() -> Any:
         def __init__(self) -> None:
             self._events = events
 
-        def save(self, event: DomainEvent) -> None:
+        async def save(self, event: DomainEvent) -> None:
             self._events.append(event)
 
-        def get_unpublished(self, limit: int) -> list[DomainEvent]:
+        async def get_unpublished(self, limit: int) -> list[DomainEvent]:
             return list(self._events[:limit])
 
-        def mark_published(self, event_id: uuid.UUID) -> None:
+        async def mark_published(self, event_id: uuid.UUID) -> None:
             pass
 
-        def mark_failed(self, event_id: uuid.UUID, error: str) -> None:
+        async def mark_failed(self, event_id: uuid.UUID, error: str) -> None:
             pass
 
         def clear(self) -> None:
@@ -258,7 +255,7 @@ def test_domain_event_smoke_test():
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 DocumentProcessed")
-def when_publish_documentprocessed_event(
+async def when_publish_documentprocessed_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -268,12 +265,12 @@ def when_publish_documentprocessed_event(
         parse_result={"status": "completed", "page_count": 10},
     )
     context["published_event"] = event
-    in_memory_outbox_repo.save(event)
+    await in_memory_outbox_repo.save(event)
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 ToolExecuted")
-def when_publish_toolexecuted_event(
+async def when_publish_toolexecuted_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -283,12 +280,12 @@ def when_publish_toolexecuted_event(
         execution_result={"status": "completed", "output": "result"},
     )
     context["published_event"] = event
-    in_memory_outbox_repo.save(event)
+    await in_memory_outbox_repo.save(event)
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 AgentDecided")
-def when_publish_agentdecided_event(
+async def when_publish_agentdecided_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -299,7 +296,7 @@ def when_publish_agentdecided_event(
         confidence=0.95,
     )
     context["published_event"] = event
-    in_memory_outbox_repo.save(event)
+    await in_memory_outbox_repo.save(event)
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
@@ -315,24 +312,24 @@ def then_event_serialized_and_written_to_outbox(context: dict[str, Any]) -> None
 
 
 @then("可通过 get_unpublished 查询到未发布事件")
-def then_can_query_unpublished_events(
+async def then_can_query_unpublished_events(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify can query unpublished events via get_unpublished."""
-    unpublished = in_memory_outbox_repo.get_unpublished(limit=10)
+    unpublished = await in_memory_outbox_repo.get_unpublished(limit=10)
     assert len(unpublished) > 0
 
 
 @then("可通过 mark_published 标记事件已发布")
-def then_can_mark_event_published(
+async def then_can_mark_event_published(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify can mark event as published via mark_published."""
     event = context.get("published_event")
     assert event is not None
-    in_memory_outbox_repo.mark_published(event.event_id)
+    await in_memory_outbox_repo.mark_published(event.event_id)
     # mark_published should not raise any exception
     assert True
 
@@ -361,7 +358,7 @@ def test_event_type_registry_unknown_type():
 @given("事件类型注册表已知 DocumentProcessed")
 def given_event_registry_has_documentprocessed(context: dict[str, Any]) -> None:
     """Setup: event type registry knows DocumentProcessed."""
-    # EventRegistry is populated at module import time
+    # DomainEvent._registry is populated at module import time
     context["known_event_type"] = "DocumentProcessed"
 
 
@@ -369,7 +366,9 @@ def given_event_registry_has_documentprocessed(context: dict[str, Any]) -> None:
 def when_deserialize_unknown_event_type(context: dict[str, Any]) -> None:
     """Deserialize unknown event_type."""
     try:
-        EventRegistry.get("UnknownEventType")
+        result = DomainEvent._registry.get("UnknownEventType")
+        if result is None:
+            raise ValueError("Unknown event_type: UnknownEventType")
         context["deserialization_raised"] = False
     except ValueError:
         context["deserialization_raised"] = True
@@ -498,7 +497,7 @@ def test_repository_pattern_smoke_test():
 
 
 @when("通过 InMemoryOutboxRepository 保存事件")
-def when_save_event_through_repository(
+async def when_save_event_through_repository(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -508,16 +507,16 @@ def when_save_event_through_repository(
         parse_result={"status": "test"},
     )
     context["saved_event"] = event
-    in_memory_outbox_repo.save(event)
+    await in_memory_outbox_repo.save(event)
 
 
 @then("领域事件可通过仓储接口保存至内存存储")
-def then_event_saved_via_repository_interface(
+async def then_event_saved_via_repository_interface(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify domain event can be saved via repository interface."""
-    events = in_memory_outbox_repo.get_unpublished(limit=10)
+    events = await in_memory_outbox_repo.get_unpublished(limit=10)
     saved_event = context.get("saved_event")
     assert saved_event is not None
     assert any(e.event_id == saved_event.event_id for e in events)
@@ -555,7 +554,7 @@ def given_each_test_uses_independent_repo(
 
 
 @when("测试后调用 repo.clear()")
-def when_call_repo_clear_after_test(
+async def when_call_repo_clear_after_test(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -565,7 +564,7 @@ def when_call_repo_clear_after_test(
         document_id=uuid.uuid4(),
         parse_result={"status": "test"},
     )
-    in_memory_outbox_repo.save(event)
+    await in_memory_outbox_repo.save(event)
     context["event_count_before_clear"] = len(in_memory_outbox_repo._events)
 
     # Then clear
@@ -601,7 +600,7 @@ def test_application_domain_infrastructure_collaboration():
 
 
 @when("调用应用层用例方法")
-def when_call_application_layer_use_case(
+async def when_call_application_layer_use_case(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -609,7 +608,7 @@ def when_call_application_layer_use_case(
     use_case = DocumentProcessingUseCase(outbox_repo=in_memory_outbox_repo)
     context["use_case"] = use_case
 
-    result = use_case.process_document(
+    result = await use_case.process_document(
         document_id="test-doc-123",
         metadata={"source": "test"},
     )
@@ -617,12 +616,12 @@ def when_call_application_layer_use_case(
 
 
 @then("正确调用领域层服务接口")
-def then_correctly_calls_domain_service_interface(
+async def then_correctly_calls_domain_service_interface(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify correctly calls domain layer service interface."""
-    events = in_memory_outbox_repo.get_unpublished(limit=10)
+    events = await in_memory_outbox_repo.get_unpublished(limit=10)
     assert len(events) > 0
     # DocumentProcessed event should be saved
     assert any(e.event_type == "DocumentProcessed" for e in events)
@@ -655,23 +654,23 @@ def given_repository_layer_throws_exception(context: dict[str, Any]) -> None:
 
     # Create a broken repo that throws on save
     class BrokenRepo:
-        def save(self, event: DomainEvent) -> None:
+        async def save(self, event: DomainEvent) -> None:
             raise RuntimeError("Simulated storage failure")
 
-        def get_unpublished(self, limit: int) -> list[DomainEvent]:
+        async def get_unpublished(self, limit: int) -> list[DomainEvent]:
             return []
 
-        def mark_published(self, event_id: uuid.UUID) -> None:
+        async def mark_published(self, event_id: uuid.UUID) -> None:
             pass
 
-        def mark_failed(self, event_id: uuid.UUID, error: str) -> None:
+        async def mark_failed(self, event_id: uuid.UUID, error: str) -> None:
             pass
 
     context["broken_repo"] = BrokenRepo()
 
 
 @when("应用层调用领域服务")
-def when_application_layer_calls_domain_service(
+async def when_application_layer_calls_domain_service(
     context: dict[str, Any],
 ) -> None:
     """Call domain service from application layer."""
@@ -681,7 +680,7 @@ def when_application_layer_calls_domain_service(
     context["use_case"] = use_case
 
     try:
-        use_case.process_document(document_id="test-doc-123")
+        await use_case.process_document(document_id="test-doc-123")
         context["error_raised"] = False
     except RuntimeError as e:
         context["error_raised"] = True

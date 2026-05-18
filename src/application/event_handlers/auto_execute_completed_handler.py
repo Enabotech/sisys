@@ -80,7 +80,7 @@ class AutoExecuteCompletedHandler:
             parse_result=event.execution_result,
         )
 
-        await self._publish(domain_event, "domain:DocumentProcessed")
+        await self._publish(domain_event)
         logger.info("Published DocumentProcessed: document_id=%s", domain_event.document_id)
 
     async def _publish_tool_executed(self, event: AutoExecuted) -> None:
@@ -93,7 +93,7 @@ class AutoExecuteCompletedHandler:
             cost_audit={"estimated": event.cost_estimate},
         )
 
-        await self._publish(domain_event, "domain:ToolExecuted")
+        await self._publish(domain_event)
         logger.info("Published ToolExecuted: tool_id=%s", domain_event.tool_id)
 
     async def _publish_agent_decided(self, event: AutoExecuted) -> None:
@@ -106,23 +106,22 @@ class AutoExecuteCompletedHandler:
             confidence=event.route_score,
         )
 
-        await self._publish(domain_event, "domain:AgentDecided")
+        await self._publish(domain_event)
         logger.info("Published AgentDecided: agent_id=%s", domain_event.agent_id)
 
-    async def _publish(self, event: DomainEvent, channel: str) -> None:
+    async def _publish(self, event: DomainEvent) -> None:
         """通过配置的发布器发布领域事件
 
         Args:
             event: 待发布的领域事件
-            channel: 频道名称
         """
         if self._publisher is None:
             logger.warning("No publisher configured, event not published: %s", event.event_type)
             return
 
         try:
-            await self._publisher.publish(event, channel=channel)
-            logger.debug("Published event: type=%s channel=%s", event.event_type, channel)
+            await self._publisher.publish(event)
+            logger.debug("Published event: type=%s", event.event_type)
         except Exception as e:
             logger.error("Failed to publish %s event: %s", event.event_type, e)
             raise

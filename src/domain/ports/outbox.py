@@ -25,16 +25,17 @@ class OutboxRepository(Protocol):
 
     所有方法使用 DomainEvent，基础设施层实现时在内部转换为 OutboxEntity
     保证领域层零 OutboxEntity 污染（方案 A 彻底隔离）
+    所有异步操作的 Protocol 签名为 async（设计规则3：async一致性）
     """
 
-    def save(self, event: DomainEvent) -> None:
+    async def save(self, event: DomainEvent) -> None:
         """保存事件至发件箱（与业务操作同事务）
 
         Args:
             event: 领域事件实例
         """
 
-    def get_unpublished(self, limit: int) -> list[DomainEvent]:
+    async def get_unpublished(self, limit: int) -> list[DomainEvent]:
         """获取未发布的事件列表
 
         Args:
@@ -44,14 +45,14 @@ class OutboxRepository(Protocol):
             未发布的领域事件列表（FIFO 排序）
         """
 
-    def mark_published(self, event_id: UUID) -> None:
+    async def mark_published(self, event_id: UUID) -> None:
         """标记事件已发布
 
         Args:
             event_id: 事件唯一标识
         """
 
-    def mark_failed(self, event_id: UUID, error: str) -> None:
+    async def mark_failed(self, event_id: UUID, error: str) -> None:
         """标记事件发布失败
 
         Args:

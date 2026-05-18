@@ -9,7 +9,8 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
+from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.outbox.outbox import InvalidStateTransitionError, OutboxEntity
 
 
@@ -95,6 +96,14 @@ class TestOutboxEntity:
 class TestEventOutboxAdapter:
     """EventOutboxAdapter tests."""
 
+    @pytest.fixture(autouse=True)
+    def _preserve_registry(self):
+        """每个测试前后保存/恢复 registry，防止测试间污染"""
+        saved = dict(DomainEvent._registry)
+        yield
+        DomainEvent._registry.clear()
+        DomainEvent._registry.update(saved)
+
     def test_from_domain_event(self):
         """Should convert DomainEvent to OutboxEntity."""
         event = _make_event()
@@ -125,10 +134,12 @@ class TestEventOutboxAdapter:
             EventOutboxAdapter.to_domain_event(entity)
 
     def test_registry_reset(self):
-        """EventRegistry.reset should clear the registry."""
-        EventRegistry.reset()
-        # After reset, registry should rebuild on next get()
-        event_class = EventRegistry.get("DocumentProcessed")
+        """DomainEvent.reset_registry should clear the registry."""
+        DomainEvent.reset_registry()
+        assert len(DomainEvent._registry) == 0
+        # 手动注册恢复
+        DomainEvent.register("DocumentProcessed", DocumentProcessed)
+        event_class = DomainEvent._registry.get("DocumentProcessed")
         assert event_class is not None
 
 
@@ -188,28 +199,30 @@ class TestDomainLayerIsolation:
 
 
 def _create_mock_repo():
-    """Create a mock repo with internal methods for AsyncOutboxPoller."""
+    """Create a mock repo with public async methods for AsyncOutboxPoller."""
     from src.domain.ports.outbox import OutboxRepository
 
     repo = MagicMock(spec=OutboxRepository)
-    # Add internal methods that AsyncOutboxPoller uses
-    repo._get_unpublished_entities = AsyncMock(return_value=[])
-    repo._mark_published_entity = AsyncMock()
-    repo._mark_failed_entity = AsyncMock()
+    repo.get_unpublished = AsyncMock(return_value=[])
+    repo.mark_published = AsyncMock()
+    repo.mark_failed = AsyncMock()
     return repo
 
 
 class TestAsyncOutboxPoller:
     """AsyncOutboxPoller tests using mocks."""
 
+    @pytest.fixture
+    def router(self) -> ChannelRouter:
+        """Create a ChannelRouter for tests."""
+        return ChannelRouter()
+
     @pytest.mark.asyncio
-    async def test_poll_once_publishes_pending_events(self):
+    async def test_poll_once_publishes_pending_events(self, router: ChannelRouter):
         """poll_once should publish pending events."""
         repo = _create_mock_repo()
-        # Create a proper OutboxEntity via DomainEvent → Entity conversion
         event = _make_event()
-        entity = EventOutboxAdapter.from_domain_event(event)
-        repo._get_unpublished_entities.return_value = [entity]
+        repo.get_unpublished.return_value = [event]
 
         mock_publisher = AsyncMock()
 
@@ -218,21 +231,21 @@ class TestAsyncOutboxPoller:
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.1,
         )
 
         await poller.poll_once()
 
         mock_publisher.async_publish.assert_called_once()
-        repo._mark_published_entity.assert_called_once()
+        repo.mark_published.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_poll_once_marks_published_after_success(self):
+    async def test_poll_once_marks_published_after_success(self, router: ChannelRouter):
         """poll_once should mark event as published after successful publish."""
         repo = _create_mock_repo()
         event = _make_event()
-        entity = EventOutboxAdapter.from_domain_event(event)
-        repo._get_unpublished_entities.return_value = [entity]
+        repo.get_unpublished.return_value = [event]
 
         mock_publisher = AsyncMock()
 
@@ -241,20 +254,20 @@ class TestAsyncOutboxPoller:
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.1,
         )
 
         await poller.poll_once()
 
-        repo._mark_published_entity.assert_called_once()
+        repo.mark_published.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_poll_once_marks_failed_on_error(self):
+    async def test_poll_once_marks_failed_on_error(self, router: ChannelRouter):
         """poll_once should mark events as failed on publish error."""
         repo = _create_mock_repo()
         event = _make_event()
-        entity = EventOutboxAdapter.from_domain_event(event)
-        repo._get_unpublished_entities.return_value = [entity]
+        repo.get_unpublished.return_value = [event]
 
         mock_publisher = AsyncMock()
         mock_publisher.async_publish.side_effect = RuntimeError("publish failed")
@@ -264,18 +277,19 @@ class TestAsyncOutboxPoller:
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.1,
         )
 
         await poller.poll_once()
 
-        repo._mark_failed_entity.assert_called_once()
+        repo.mark_failed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_poller_runs_loop(self):
+    async def test_poller_runs_loop(self, router: ChannelRouter):
         """run should execute poll_once at least once before stopped."""
         repo = _create_mock_repo()
-        repo._get_unpublished_entities.return_value = []
+        repo.get_unpublished.return_value = []
 
         mock_publisher = AsyncMock()
 
@@ -284,15 +298,15 @@ class TestAsyncOutboxPoller:
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.05,
         )
 
-        # Run poll_once directly to verify it works
         await poller.poll_once()
-        repo._get_unpublished_entities.assert_called()
+        repo.get_unpublished.assert_called()
 
     @pytest.mark.asyncio
-    async def test_poller_graceful_stop(self):
+    async def test_poller_graceful_stop(self, router: ChannelRouter):
         """stop should gracefully stop the polling loop."""
         repo = _create_mock_repo()
         mock_publisher = AsyncMock()
@@ -302,6 +316,7 @@ class TestAsyncOutboxPoller:
         poller = AsyncOutboxPoller(
             outbox_repository=repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.1,
         )
 

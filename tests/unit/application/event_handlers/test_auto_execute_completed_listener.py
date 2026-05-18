@@ -123,7 +123,7 @@ class TestAutoExecuteCompletedListener:
         event = TestEvent()
 
         # Should not raise, just log warning
-        await listener._publish(event, "test:channel")
+        await listener._publish(event)
 
     @pytest.mark.asyncio
     async def test_publish_handles_exception(self, mock_publisher: MagicMock) -> None:
@@ -139,6 +139,6 @@ class TestAutoExecuteCompletedListener:
         event = TestEvent()
 
         with pytest.raises(Exception) as exc_info:
-            await listener._publish(event, "test:channel")
+            await listener._publish(event)
 
         assert "publish failed" in str(exc_info.value)

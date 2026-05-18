@@ -171,7 +171,7 @@ class TestOutboxEventLifecycle:
         )
 
         repo = PostgreSQLOutboxRepository()
-        repo.save(event)
+        await repo.save(event)
 
         mock_session.add.assert_called_once()
 
@@ -179,18 +179,17 @@ class TestOutboxEventLifecycle:
     async def test_get_unpublished_events(self, mock_session):
         """获取未发布事件列表"""
         from src.domain.events.base import DomainEvent
-        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         # 注册事件类型
-        EventRegistry.register("TestEvent", DomainEvent)
+        DomainEvent.register("TestEvent", DomainEvent)
 
         mock_result = mock.Mock()
         mock_result.scalars.return_value.all.return_value = []
         mock_session.execute.return_value = mock_result
 
         repo = PostgreSQLOutboxRepository()
-        result = await repo.async_get_unpublished(limit=10)
+        result = await repo.get_unpublished(limit=10)
 
         assert isinstance(result, list)
 
@@ -205,7 +204,7 @@ class TestOutboxEventLifecycle:
         mock_session.execute.return_value = mock_result
 
         repo = PostgreSQLOutboxRepository()
-        await repo.async_mark_published(uuid4())
+        await repo.mark_published(uuid4())
 
         assert mock_model.status == "published"
         assert mock_model.published_at is not None
@@ -222,7 +221,7 @@ class TestOutboxEventLifecycle:
         mock_session.execute.return_value = mock_result
 
         repo = PostgreSQLOutboxRepository()
-        await repo.async_mark_failed(uuid4(), "Connection timeout")
+        await repo.mark_failed(uuid4(), "Connection timeout")
 
         assert mock_model.status == "failed"
         assert mock_model.retry_count == 1
@@ -362,7 +361,8 @@ class TestRolePermissionCRUD:
 class TestTransactionRollback:
     """事务回滚行为测试"""
 
-    def test_save_does_not_auto_commit(self, mock_session):
+    @pytest.mark.asyncio
+    async def test_save_does_not_auto_commit(self, mock_session):
         """save 方法不应自动提交（依赖外部事务管理）"""
         from src.domain.events.base import DomainEvent
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
@@ -376,7 +376,7 @@ class TestTransactionRollback:
         )
 
         repo = PostgreSQLOutboxRepository()
-        repo.save(event)
+        await repo.save(event)
 
         # save 应调用 add 但不应调用 commit
         mock_session.add.assert_called_once()

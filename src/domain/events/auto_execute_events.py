@@ -37,6 +37,7 @@ class AutoExecuted(DomainEvent):
         route_score: 路由置信度评分
     """
 
+    event_type: str = field(default="AutoExecuted", init=False)
     session_id: str = ""
     task_context: dict[str, Any] = field(default_factory=dict)
     execution_result: dict[str, Any] = field(default_factory=dict)
@@ -47,14 +48,8 @@ class AutoExecuted(DomainEvent):
     route_score: float = 0.0  # Routing confidence score
 
     def __post_init__(self) -> None:
-        """设置event_type、aggregate_id和aggregate_type用于事件追踪"""
-        if not self.event_type:
-            object.__setattr__(self, "event_type", "AutoExecuted")
+        """设置aggregate_id和aggregate_type用于事件追踪"""
         if self.aggregate_id is None and self.event_id:
             object.__setattr__(self, "aggregate_id", self.event_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "AutoExecute")
-
-
-# 在类定义后注册AutoExecuted（由于event_type的init=False需要手动注册）
-DomainEvent._registry["AutoExecuted"] = AutoExecuted

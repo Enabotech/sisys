@@ -100,7 +100,7 @@ class AuditEvent(DomainEvent):
         correction_level: 纠正级别（L0-L3，可选）
     """
 
-    event_type: str = "AuditEvent"
+    event_type: str = field(default="AuditEvent", init=False)
     source: str = "audit"
     log_id: UUID = field(default_factory=uuid4)
     actor: str = ""
@@ -136,7 +136,3 @@ class AuditEvent(DomainEvent):
             "new_value": self.new_value,
             "correction_level": self.correction_level,
         }
-
-
-# 为多态反序列化注册事件类型
-DomainEvent.register("AuditEvent", AuditEvent)

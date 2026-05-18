@@ -544,7 +544,7 @@ def outbox_repo_created(outbox_repo: PostgreSQLOutboxRepository):
 
 
 @when("调用 save 保存领域事件")
-def save_domain_event(outbox_repo: PostgreSQLOutboxRepository):
+async def save_domain_event(outbox_repo: PostgreSQLOutboxRepository):
     """Save domain event to outbox."""
     from src.domain.events import DocumentProcessed
 
@@ -553,7 +553,7 @@ def save_domain_event(outbox_repo: PostgreSQLOutboxRepository):
         parse_result={"pages": 10},
         embedding=[0.1, 0.2, 0.3],
     )
-    outbox_repo.save(event)
+    await outbox_repo.save(event)
 
 
 @then("事件已添加到会话")
@@ -584,7 +584,7 @@ def test_get_unpublished_events(outbox_repo: PostgreSQLOutboxRepository):
 
 
 @given("发件箱中有多个 pending 状态事件")
-def create_pending_events(outbox_repo: PostgreSQLOutboxRepository):
+async def create_pending_events(outbox_repo: PostgreSQLOutboxRepository):
     """Create multiple pending events in outbox."""
     from src.domain.events import DocumentProcessed
 
@@ -594,15 +594,15 @@ def create_pending_events(outbox_repo: PostgreSQLOutboxRepository):
             parse_result={"pages": i},
             embedding=[0.1],
         )
-        outbox_repo.save(event)
+        await outbox_repo.save(event)
 
 
-@when("调用 async_get_unpublished 方法")
-def call_get_unpublished(outbox_repo: PostgreSQLOutboxRepository, event_loop):
-    """Call async_get_unpublished method."""
+@when("调用 get_unpublished 方法")
+async def call_get_unpublished(outbox_repo: PostgreSQLOutboxRepository, event_loop):
+    """Call get_unpublished method."""
 
     async def _get():
-        return await outbox_repo.async_get_unpublished(limit=10)
+        return await outbox_repo.get_unpublished(limit=10)
 
     return event_loop.run_until_complete(_get())
 

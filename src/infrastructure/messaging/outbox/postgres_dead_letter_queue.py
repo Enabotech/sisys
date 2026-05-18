@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.domain.events.base import DomainEvent
+from src.domain.events.listener import DeadLetterQueue
 from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)
@@ -128,10 +129,10 @@ class DeadLetterQueueEntry:
         )
 
 
-class PostgresDeadLetterQueue:
+class PostgresDeadLetterQueue(DeadLetterQueue):
     """PostgreSQL 持久化死信队列
 
-    使用 PostgreSQL 存储死信事件，支持：
+    实现 DeadLetterQueue Protocol，使用 PostgreSQL 存储死信事件，支持：
     - 入队（持久化）
     - 出队（FIFO，支持状态更新）
     - 状态查询
@@ -165,6 +166,7 @@ class PostgresDeadLetterQueue:
             status="pending",
         )
         self._session.add(model)
+        await self._session.flush()
         logger.warning(
             "Event %s enqueued to PostgresDLQ: %s (retry_count=%d)",
             event.event_id,
@@ -172,11 +174,11 @@ class PostgresDeadLetterQueue:
             retry_count,
         )
 
-    async def dequeue(self) -> tuple[DeadLetterQueueEntry, DomainEvent, str, int] | None:
+    async def dequeue(self) -> tuple[DomainEvent, str, int] | None:
         """出队最旧的 pending 事件
 
         Returns:
-            (entry, event, error, retry_count) 元组，队列为空时返回 None
+            (event, error, retry_count) 元组，队列为空时返回 None
         """
         result = await self._session.execute(
             select(DeadLetterQueueModel)
@@ -192,21 +194,9 @@ class PostgresDeadLetterQueue:
         model.status = "processed"
         model.processed_at = datetime.now(UTC)
 
-        # 重建条目和事件
-        entry = DeadLetterQueueEntry(
-            id=model.id,
-            event_id=model.event_id,
-            event_type=model.event_type,
-            payload=model.payload,
-            error_message=model.error_message,
-            retry_count=model.retry_count,
-            context=model.context,
-            created_at=model.created_at,
-            status=model.status,
-            processed_at=model.processed_at,
-        )
-        event = entry.to_domain_event()
-        return (entry, event, model.error_message or "", model.retry_count)
+        # 重建事件并返回
+        event = DomainEvent.from_dict(model.payload)
+        return (event, model.error_message or "", model.retry_count)
 
     async def get_all(self, limit: int = 100) -> list[DeadLetterQueueEntry]:
         """获取所有 DLQ 条目（最近优先）
@@ -265,14 +255,6 @@ class PostgresDeadLetterQueue:
             select(func.count()).select_from(DeadLetterQueueModel).where(DeadLetterQueueModel.status == "pending")
         )
         return result.scalar() or 0
-
-    def __len__(self) -> int:
-        """返回 pending 条目数量（同步接口，供外部调用）
-
-        Raises:
-            NotImplementedError: 始终抛出，应使用 count_pending() 异步方法
-        """
-        raise NotImplementedError("Use count_pending() for async count")
 
     def _model_to_entry(self, model: DeadLetterQueueModel) -> DeadLetterQueueEntry:
         """将 SQLAlchemy 模型转换为 DeadLetterQueueEntry 数据类

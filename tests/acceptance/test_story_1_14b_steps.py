@@ -198,7 +198,6 @@ def given_1000_session_ids(context: dict) -> None:
 def given_triggered_event_session_001(context: dict) -> None:
     """Create Triggered event with session-001."""
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id="session-001",
         task_context={"task_type": "test"},
     )
@@ -818,7 +817,6 @@ def given_verify_routed_event_schema(context: dict) -> None:
         task_context={"task_type": "test"},
         route_target="test-agent",
         route_score=0.95,
-        trigger_event_type="AutoTriggered",
     )
     context["routed_event"] = routed
 
@@ -982,7 +980,6 @@ def given_send_1000_triggered_events(
     async def run_events():
         for i in range(1000):
             event = AutoTriggered(
-                event_type="AutoTriggered",
                 session_id=f"session-{i}",
                 task_context={"task_type": "test"},
             )
@@ -1051,7 +1048,6 @@ def given_execute_1000_semantic_routes(context: dict, event_loop) -> None:
 def given_identical_triggered_event(context: dict) -> None:
     """Create identical Triggered event."""
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id="idempotent-session",
         task_context={"task_type": "test"},
     )
@@ -1080,7 +1076,6 @@ def when_process_continuously(context: dict, route_service: AutoRouteService, ev
             tasks = []
             for i in range(batch_start, min(batch_start + batch_size, iterations)):
                 event = AutoTriggered(
-                    event_type="AutoTriggered",
                     session_id=f"session-{i}",
                     task_context={"task_type": "test"},
                 )

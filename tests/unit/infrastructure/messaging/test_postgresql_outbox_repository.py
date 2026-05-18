@@ -44,17 +44,15 @@ class TestPostgreSQLOutboxRepository:
             payload={"key": "value"},
         )
 
-        repository.save(event)
+        await repository.save(event)
 
         mock_session.add.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_async_get_unpublished(self, repository, mock_session):
+    async def test_get_unpublished(self, repository, mock_session):
         """测试异步获取未发布事件"""
-        from src.infrastructure.messaging.adapters.event_outbox_adapter import EventRegistry
-
         # 注册测试事件类型
-        EventRegistry.register("TestEvent", DomainEvent)
+        DomainEvent.register("TestEvent", DomainEvent)
 
         model1 = mock.Mock()
         model1.event_type = "TestEvent"
@@ -81,12 +79,12 @@ class TestPostgreSQLOutboxRepository:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        result = await repository.async_get_unpublished(limit=10)
+        result = await repository.get_unpublished(limit=10)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_async_mark_published(self, repository, mock_session):
+    async def test_mark_published(self, repository, mock_session):
         """测试异步标记已发布"""
         event_id = uuid4()
         mock_model = mock.Mock()
@@ -94,13 +92,13 @@ class TestPostgreSQLOutboxRepository:
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
 
-        await repository.async_mark_published(event_id)
+        await repository.mark_published(event_id)
 
         assert mock_model.status == "published"
         assert mock_model.published_at is not None
 
     @pytest.mark.asyncio
-    async def test_async_mark_failed(self, repository, mock_session):
+    async def test_mark_failed(self, repository, mock_session):
         """测试异步标记失败"""
         event_id = uuid4()
         mock_model = mock.Mock()
@@ -109,7 +107,7 @@ class TestPostgreSQLOutboxRepository:
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
 
-        await repository.async_mark_failed(event_id, "Test error")
+        await repository.mark_failed(event_id, "Test error")
 
         assert mock_model.status == "failed"
         assert mock_model.retry_count == 1

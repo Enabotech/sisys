@@ -58,7 +58,6 @@ class TestAutoRouteService:
     ) -> None:
         """AutoRouteService should publish AutoRouted event when receiving AutoTriggered event."""
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-123",
             task_context={"task_type": "financial_analysis"},
         )
@@ -91,7 +90,6 @@ class TestAutoRouteService:
         )
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-hash-test",
             task_context={},
         )
@@ -124,7 +122,6 @@ class TestAutoRouteService:
         )
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-semantic-test",
             task_context={"task_type": "financial"},
         )
@@ -150,7 +147,6 @@ class TestAutoRouteService:
         )
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-no-pub",
             task_context={},
         )
@@ -178,7 +174,6 @@ class TestAutoRouteService:
         )
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-mixed",
             task_context={"task_type": "financial"},
         )
@@ -198,7 +193,6 @@ class TestAutoRouteService:
         route_service = AutoRouteService(publisher=mock_publisher)
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-no-routers",
             task_context={},
         )
@@ -249,7 +243,6 @@ class TestAutoRouteService:
         )
 
         triggered = AutoTriggered(
-            event_type="AutoTriggered",
             session_id="session-pub-error",
             task_context={},
         )

@@ -185,6 +185,7 @@ class EventBusFactory:
         poller = AsyncOutboxPoller(
             outbox_repository=self._config.outbox_repository,
             publisher=self._rabbitmq_publisher,
+            router=self._router,
             poll_interval=self._config.poll_interval,
             batch_size=self._config.batch_size,
         )

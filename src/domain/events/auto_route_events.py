@@ -34,6 +34,7 @@ class AutoRouted(DomainEvent):
         trigger_event_id: 原始触发事件ID
     """
 
+    event_type: str = field(default="AutoRouted", init=False)
     route_type: str = ""  # "hash" | "semantic" | "mixed" - 路由类型
     session_id: str = ""
     task_context: dict[str, Any] = field(default_factory=dict)
@@ -43,14 +44,8 @@ class AutoRouted(DomainEvent):
     trigger_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """设置event_type、aggregate_id和aggregate_type用于事件追踪"""
-        if not self.event_type:
-            object.__setattr__(self, "event_type", "AutoRouted")
+        """设置aggregate_id和aggregate_type用于事件追踪"""
         if self.aggregate_id is None and self.event_id:
             object.__setattr__(self, "aggregate_id", self.event_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "AutoRoute")
-
-
-# 在类定义后注册AutoRouted（由于event_type的init=False需要手动注册）
-DomainEvent._registry["AutoRouted"] = AutoRouted
