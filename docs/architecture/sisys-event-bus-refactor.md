@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.6 | 状态: 审查修订中
+> 版本: 2.7 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第11轮（第三批）：event_subscriber注册路径BUG（指向不存在文件）、AsyncOutboxPoller DI注册方案补全（启动时机/session context/publisher依赖）、outbox_repo SINGLETON论证精确化（无状态单例本质）、DLQ __len__保持sync说明
+> 第12轮（第三批）：RabbitMQPublisher未注册到DI（补注册代码示例）、test_publish_accepts_channel_parameter需删除（非仅适配）、5个EventBus Protocol缺少契约测试（OutboxRepository/DeadLetterQueue/EventSubscriber/EventStore/EventListener）
 
 ## Context
 
@@ -234,8 +234,16 @@
 - [ ] **注册** `EventSubscriber` 端口 → `DualChannelEventBus` 实现
 - [ ] **注册** `AsyncOutboxPoller` 到DI容器：
   - 注册名：`"outbox_poller"`，生命周期：SINGLETON
-  - 构造参数：`outbox_repository=resolve("outbox_repo")`, `publisher=<RabbitMQ发布者>`, `router=resolve("router")`
-  - **注意**：`publisher` 参数对应 Poller 内部的 `_publisher.async_publish()` 调用，需注册一个RabbitMQ发布者实例（如当前 `rabbitmq_bus` 已有此能力，或单独注册 `RabbitMQPublisher`）
+  - 构造参数：`outbox_repository=resolve("outbox_repo")`, `publisher=resolve("rabbitmq_publisher")`, `router=resolve("router")`
+  - **注意**：`publisher` 参数对应 Poller 内部的 `_publisher.async_publish()` 调用。`RabbitMQPublisher` 不在当前 composition_root.py 中注册，需新增注册：
+    ```python
+    register_port(
+        name="rabbitmq_publisher",
+        impl=lambda resolver: RabbitMQPublisher(config=RabbitMQConfig.from_env()),
+        lifetime=Lifetime.SINGLETON,
+    )
+    ```
+    参考 `EventBusFactory._create_rabbitmq_publisher()` (L128-138) 的创建方式
   - **启动时机**：Poller 需在应用启动时由 FastAPI lifespan event 触发 `run()`，停止时由 shutdown event 触发 `stop()`
   - **Session context**：Poller 的长生命周期需独立的 session context 管理（每次 poll 周期创建新 session，poll 结束后关闭）
 - [ ] **验证**：`bootstrap()` 后 `resolve("event_publisher")` 返回 `DualChannelEventBus` 实例，所有子组件共享router和连接
@@ -415,6 +423,16 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 2. `poetry run pytest tests/contracts/test_event_publisher_contract.py -x` — 契约测试
 3. `poetry run python -c "from src.domain.events.base import DomainEvent; from src.domain.events import *; print(f'Registry: {len(DomainEvent._registry)} events'); assert len(DomainEvent._registry) >= 22"` — 事件注册完整性验证
 
+### 契约测试缺口
+当前 `tests/contracts/` 仅有 `test_event_publisher_contract.py`（EventPublisher Protocol），以下 Protocol 缺少独立契约测试文件：
+- **OutboxRepository** Protocol（Phase 2 改 async 后需新增）
+- **DeadLetterQueue** Protocol（Phase 1 改 async 后需新增）
+- **EventSubscriber** Protocol（当前无契约测试）
+- **EventStore** Protocol（当前无契约测试）
+- **EventListener / EventListenerAsync** Protocol（当前无契约测试）
+
+**建议**：在 Phase 2 完成后统一补全契约测试，参照 `test_event_publisher_contract.py` 模式（验证 Protocol 方法签名、参数类型、返回类型）
+
 ---
 
 ## 测试影响面分析
@@ -469,7 +487,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
 |----------|----------|
-| `tests/contracts/test_event_publisher_contract.py` (L58) | channel参数移除 |
+| `tests/contracts/test_event_publisher_contract.py` | L53-61 `test_publish_accepts_channel_parameter` 需删除（channel参数移除后测试失败） |
 | `tests/unit/application/event_handlers/test_auto_route_handler.py` | _publish方法签名变更 |
 | `tests/unit/application/event_handlers/test_auto_execute_completed_listener.py` | _publish方法签名变更 |
 | `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | publish签名channel参数移除 |
