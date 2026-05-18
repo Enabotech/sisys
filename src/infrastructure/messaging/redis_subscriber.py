@@ -46,25 +46,27 @@ class RedisEventSubscriber:
         """
         self._config = config
         self._pool: aioredis.ConnectionPool | None = None
+        self._pool_lock = asyncio.Lock()
         self._handlers: dict[str, list[EventHandler]] = {}
         self._error_handlers: dict[str, ErrorHandler | None] = {}
         self._pubsub: aioredis.client.PubSub | None = None
         self._task: asyncio.Task | None = None
         self._running = False
 
-    def _get_pool(self) -> aioredis.ConnectionPool:
+    async def _get_pool(self) -> aioredis.ConnectionPool:
         """懒加载连接池（异步安全）"""
-        if self._pool is None:
-            self._pool = aioredis.ConnectionPool(
-                host=self._config.host,
-                port=self._config.port,
-                db=self._config.db,
-                password=self._config.password,
-                max_connections=self._config.max_connections,
-                socket_timeout=self._config.socket_timeout,
-                decode_responses=True,
-            )
-        return self._pool
+        async with self._pool_lock:
+            if self._pool is None:
+                self._pool = aioredis.ConnectionPool(
+                    host=self._config.host,
+                    port=self._config.port,
+                    db=self._config.db,
+                    password=self._config.password,
+                    max_connections=self._config.max_connections,
+                    socket_timeout=self._config.socket_timeout,
+                    decode_responses=True,
+                )
+            return self._pool
 
     def subscribe(
         self,
@@ -89,7 +91,7 @@ class RedisEventSubscriber:
         if self._running:
             return
 
-        pool = self._get_pool()
+        pool = await self._get_pool()
         redis_client = aioredis.Redis(connection_pool=pool)
         self._pubsub = redis_client.pubsub()
         await self._pubsub.subscribe(*self._handlers.keys())

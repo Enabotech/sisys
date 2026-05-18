@@ -219,7 +219,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=None,
             metrics_collector=None,
             dlq=None,
-            retry_policy=None,
+            retry_queue=None,
         )
         assert consumer._config == config
         assert consumer._handlers == {}
@@ -289,7 +289,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=None,
             dlq=None,
-            retry_policy=None,
+            retry_queue=None,
         )
         consumer._connection = AsyncMock()
 
@@ -326,7 +326,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=None,
             dlq=None,
-            retry_policy=None,
+            retry_queue=None,
         )
         consumer._connection = AsyncMock()
 
@@ -344,26 +344,96 @@ class TestAsyncRabbitMQConsumer:
         mock_message.ack.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_on_message_nacks_on_handler_failure_with_retry(self):
-        """_on_message should nack(requeue=True) when handler fails and retry available."""
+    async def test_on_message_enqueues_to_retry_queue_on_handler_failure(self):
+        """_on_message should enqueue to RedisRetryQueue and ack when handler fails."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
         from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
         mock_checker.try_acquire.return_value = True
 
-        mock_retry = MagicMock(spec=RetryPolicy)
-        mock_retry.max_retries = 3
-        mock_retry.should_retry.return_value = True
+        mock_retry_queue = MagicMock()
+        mock_retry_queue.enqueue = AsyncMock()
 
         consumer = RabbitMQConsumer(
             config,
             idempotency_checker=mock_checker,
             metrics_collector=None,
             dlq=None,
-            retry_policy=mock_retry,
+            retry_queue=mock_retry_queue,
+        )
+        consumer._connection = AsyncMock()
+
+        event = _make_event()
+        mock_message = AsyncMock()
+        mock_message.body = json.dumps(event.to_dict()).encode()
+        mock_message.headers = {}
+
+        async def failing_handler(evt):
+            raise RuntimeError("handler error")
+
+        consumer._handlers = {"DocumentProcessed": [failing_handler]}
+        await consumer._on_message(mock_message)
+
+        mock_retry_queue.enqueue.assert_called_once()
+        mock_message.ack.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_on_message_nacks_to_dlq_when_max_retries_exceeded(self):
+        """_on_message should nack(requeue=False) and enqueue to DLQ when retries exhausted."""
+        from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
+        from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+
+        config = RabbitMQConfig()
+        mock_checker = MagicMock(spec=IdempotencyChecker)
+        mock_checker.try_acquire.return_value = True
+
+        mock_dlq = MagicMock()
+        mock_dlq.enqueue = AsyncMock()
+
+        consumer = RabbitMQConsumer(
+            config,
+            idempotency_checker=mock_checker,
+            metrics_collector=None,
+            dlq=mock_dlq,
+            retry_queue=None,
+            max_retries=3,
+        )
+        consumer._connection = AsyncMock()
+
+        event = _make_event()
+        mock_message = AsyncMock()
+        mock_message.body = json.dumps(event.to_dict()).encode()
+        mock_message.headers = {"x-retry-count": "3"}
+
+        async def failing_handler(evt):
+            raise RuntimeError("handler error")
+
+        consumer._handlers = {"DocumentProcessed": [failing_handler]}
+        await consumer._on_message(mock_message)
+
+        mock_message.nack.assert_called_once_with(requeue=False)
+        mock_dlq.enqueue.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_on_message_nacks_requeue_when_no_retry_queue(self):
+        """_on_message should nack(requeue=True) when no retry queue configured."""
+        from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
+        from src.infrastructure.messaging.retry.checker import IdempotencyChecker
+
+        config = RabbitMQConfig()
+        mock_checker = MagicMock(spec=IdempotencyChecker)
+        mock_checker.try_acquire.return_value = True
+        mock_dlq = MagicMock()
+        mock_dlq.enqueue = AsyncMock()
+
+        consumer = RabbitMQConsumer(
+            config,
+            idempotency_checker=mock_checker,
+            metrics_collector=None,
+            dlq=mock_dlq,
+            retry_queue=None,
         )
         consumer._connection = AsyncMock()
 
@@ -379,85 +449,7 @@ class TestAsyncRabbitMQConsumer:
         await consumer._on_message(mock_message)
 
         mock_message.nack.assert_called_once_with(requeue=True)
-
-    @pytest.mark.asyncio
-    async def test_on_message_nacks_to_dlq_when_max_retries_exceeded(self):
-        """_on_message should nack(requeue=False) and enqueue to DLQ when retries exhausted."""
-        from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
-        from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
-
-        config = RabbitMQConfig()
-        mock_checker = MagicMock(spec=IdempotencyChecker)
-        mock_checker.try_acquire.return_value = True
-
-        mock_retry = MagicMock(spec=RetryPolicy)
-        mock_retry.max_retries = 3
-        mock_retry.should_retry.return_value = False
-
-        mock_dlq = MagicMock()
-        mock_dlq.enqueue = AsyncMock()
-
-        consumer = RabbitMQConsumer(
-            config,
-            idempotency_checker=mock_checker,
-            metrics_collector=None,
-            dlq=mock_dlq,
-            retry_policy=mock_retry,
-        )
-        consumer._connection = AsyncMock()
-
-        event = _make_event()
-        mock_message = AsyncMock()
-        mock_message.body = json.dumps(event.to_dict()).encode()
-        mock_message.headers = {}
-
-        async def failing_handler(evt):
-            raise RuntimeError("handler error")
-
-        consumer._handlers = {"DocumentProcessed": [failing_handler]}
-        await consumer._on_message(mock_message)
-
-        mock_message.nack.assert_called_once_with(requeue=False)
-        mock_dlq.enqueue.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_on_message_nacks_to_dlq_when_no_retry_policy(self):
-        """_on_message should nack(requeue=False) and enqueue to DLQ when no retry policy configured."""
-        from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
-        from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-
-        config = RabbitMQConfig()
-        mock_checker = MagicMock(spec=IdempotencyChecker)
-        mock_checker.try_acquire.return_value = True
-        mock_dlq = MagicMock()
-        mock_dlq.enqueue = AsyncMock()
-
-        consumer = RabbitMQConsumer(
-            config,
-            idempotency_checker=mock_checker,
-            metrics_collector=None,
-            dlq=mock_dlq,
-            retry_policy=None,
-        )
-        consumer._connection = AsyncMock()
-
-        event = _make_event()
-        mock_message = AsyncMock()
-        mock_message.body = json.dumps(event.to_dict()).encode()
-        mock_message.headers = {}
-
-        async def failing_handler(evt):
-            raise RuntimeError("handler error")
-
-        consumer._handlers = {"DocumentProcessed": [failing_handler]}
-        await consumer._on_message(mock_message)
-
-        mock_message.nack.assert_called_once_with(requeue=False)
-        mock_dlq.enqueue.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_on_message_nacks_unknown_event_type(self):
+        mock_dlq.enqueue.assert_not_called()
         """_on_message should nack(requeue=False) for unknown event_type."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
 
@@ -505,7 +497,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=mock_collector,
             dlq=None,
-            retry_policy=None,
+            retry_queue=None,
         )
         consumer._connection = AsyncMock()
 
@@ -524,19 +516,17 @@ class TestAsyncRabbitMQConsumer:
 
     @pytest.mark.asyncio
     async def test_on_message_records_retry_metric(self):
-        """_on_message should record retry metric when retrying."""
+        """_on_message should record retry metric when enqueuing to retry queue."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
         from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
         mock_checker.try_acquire.return_value = True
 
-        mock_retry = MagicMock(spec=RetryPolicy)
-        mock_retry.max_retries = 3
-        mock_retry.should_retry.return_value = True
+        mock_retry_queue = MagicMock()
+        mock_retry_queue.enqueue = AsyncMock()
 
         mock_collector = MagicMock(spec=EventMetricsCollector)
 
@@ -545,7 +535,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=mock_collector,
             dlq=None,
-            retry_policy=mock_retry,
+            retry_queue=mock_retry_queue,
         )
         consumer._connection = AsyncMock()
 
@@ -567,16 +557,11 @@ class TestAsyncRabbitMQConsumer:
         """_on_message should record DLQ metric when event goes to DLQ."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
         from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
         from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
         mock_checker.try_acquire.return_value = True
-
-        mock_retry = MagicMock(spec=RetryPolicy)
-        mock_retry.max_retries = 3
-        mock_retry.should_retry.return_value = False
 
         mock_dlq = MagicMock()
         mock_dlq.enqueue = AsyncMock()
@@ -587,14 +572,15 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=mock_collector,
             dlq=mock_dlq,
-            retry_policy=mock_retry,
+            retry_queue=None,
+            max_retries=3,
         )
         consumer._connection = AsyncMock()
 
         event = _make_event()
         mock_message = AsyncMock()
         mock_message.body = json.dumps(event.to_dict()).encode()
-        mock_message.headers = {}
+        mock_message.headers = {"x-retry-count": "3"}
 
         async def failing_handler(evt):
             raise RuntimeError("handler error")
@@ -619,7 +605,7 @@ class TestAsyncRabbitMQConsumer:
             idempotency_checker=mock_checker,
             metrics_collector=None,
             dlq=None,
-            retry_policy=None,
+            retry_queue=None,
         )
         consumer._connection = AsyncMock()
 
@@ -638,29 +624,27 @@ class TestAsyncRabbitMQConsumer:
         """_on_message should handle non-numeric x-retry-count header gracefully."""
         from src.infrastructure.messaging.rabbitmq_consumer import RabbitMQConsumer
         from src.infrastructure.messaging.retry.checker import IdempotencyChecker
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
         config = RabbitMQConfig()
         mock_checker = MagicMock(spec=IdempotencyChecker)
         mock_checker.try_acquire.return_value = True
 
-        mock_retry = MagicMock(spec=RetryPolicy)
-        mock_retry.max_retries = 3
-        mock_retry.should_retry.return_value = True
+        mock_retry_queue = MagicMock()
+        mock_retry_queue.enqueue = AsyncMock()
 
         consumer = RabbitMQConsumer(
             config,
             idempotency_checker=mock_checker,
             metrics_collector=None,
             dlq=None,
-            retry_policy=mock_retry,
+            retry_queue=mock_retry_queue,
         )
         consumer._connection = AsyncMock()
 
         event = _make_event()
         mock_message = AsyncMock()
         mock_message.body = json.dumps(event.to_dict()).encode()
-        mock_message.headers = {"x-retry-count": "abc"}  # Non-numeric
+        mock_message.headers = {"x-retry-count": "abc"}
 
         async def failing_handler(evt):
             raise RuntimeError("handler error")
@@ -668,8 +652,8 @@ class TestAsyncRabbitMQConsumer:
         consumer._handlers = {"DocumentProcessed": [failing_handler]}
         await consumer._on_message(mock_message)
 
-        # Should not crash, should retry with default 0
-        mock_message.nack.assert_called_once_with(requeue=True)
+        # Should not crash, should enqueue to retry queue with default count 0
+        mock_retry_queue.enqueue.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_close_connection(self):

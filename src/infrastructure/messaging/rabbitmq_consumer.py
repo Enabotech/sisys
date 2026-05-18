@@ -17,6 +17,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aio_pika
@@ -25,11 +26,15 @@ from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractIncomingMe
 from src.domain.events.base import DomainEvent
 from src.domain.events.listener import DeadLetterQueue
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
+from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
 
 logger = logging.getLogger(__name__)
 
 # 事件处理器类型
 EventProcessor = Callable[[DomainEvent], Any]
+
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_DELAY_SECONDS = 30
 
 
 class RabbitMQConsumer:
@@ -37,8 +42,8 @@ class RabbitMQConsumer:
 
     使用手动 ACK/NACK 策略：
     - 成功时 ack()
-    - 失败时 nack(requeue=True) 重新入队
-    - 未知事件类型时 nack(requeue=False) 死信
+    - 失败时通过 RedisRetryQueue 延迟重试
+    - 超过最大重试次数时 nack(requeue=False) 死信
     """
 
     def __init__(
@@ -47,7 +52,9 @@ class RabbitMQConsumer:
         idempotency_checker: Any = None,
         metrics_collector: Any = None,
         dlq: DeadLetterQueue | None = None,
-        retry_policy: Any = None,
+        retry_queue: RedisRetryQueue | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_delay_seconds: int = DEFAULT_RETRY_DELAY_SECONDS,
     ):
         """初始化 RabbitMQConsumer
 
@@ -56,13 +63,17 @@ class RabbitMQConsumer:
             idempotency_checker: 幂等性检查器 (IdempotencyChecker)
             metrics_collector: 指标收集器 (EventMetricsCollector)
             dlq: 死信队列 (DeadLetterQueue)
-            retry_policy: 重试策略 (RetryPolicy)
+            retry_queue: Redis 延迟重试队列 (RedisRetryQueue)
+            max_retries: 最大重试次数
+            retry_delay_seconds: 基础重试延迟秒数（指数退避）
         """
         self._config = config
         self._idempotency = idempotency_checker
         self._metrics = metrics_collector
         self._dlq = dlq
-        self._retry_policy = retry_policy
+        self._retry_queue = retry_queue
+        self._max_retries = max_retries
+        self._retry_delay_seconds = retry_delay_seconds
         self._connection: AbstractConnection | None = None
         self._channel: AbstractChannel | None = None
         self._handlers: dict[str, list[EventProcessor]] = {}
@@ -178,43 +189,23 @@ class RabbitMQConsumer:
         event: DomainEvent,
         error: Exception,
     ) -> None:
-        """失败处理，使用 RabbitMQ NACK 重新入队或发送到死信队列
+        """失败处理，使用 RedisRetryQueue 延迟重试或发送到死信队列
 
         Args:
             message: RabbitMQ 原始消息
             event: 处理失败的领域事件
             error: 异常信息
         """
-        if not self._retry_policy:
-            # 无重试策略，直接死信
-            await message.nack(requeue=False)
-            if self._dlq:
-                await self._dlq.enqueue(event, str(error))
-            if self._metrics:
-                self._metrics.record_dlq(event.event_type)
-            return
+        retry_count = 0
+        if message.headers:
+            retry_count_raw = message.headers.get("x-retry-count", "0")
+            try:
+                retry_count = int(str(retry_count_raw)) if retry_count_raw else 0
+            except (ValueError, TypeError):
+                retry_count = 0
 
-        retry_count_raw = message.headers.get("x-retry-count", "0")
-        try:
-            retry_count = int(str(retry_count_raw)) if retry_count_raw else 0
-        except (ValueError, TypeError):
-            retry_count = 0
-
-        if self._retry_policy.should_retry(retry_count, self._retry_policy.max_retries):
-            # 更新消息头后重新入队
-            message.headers["x-retry-count"] = str(retry_count + 1)
-            await message.nack(requeue=True)
-            if self._metrics:
-                self._metrics.record_retried(event.event_type)
-            logger.warning(
-                "Event %s failed, retrying (attempt %d/%d): %s",
-                event.event_id,
-                retry_count + 1,
-                self._retry_policy.max_retries,
-                error,
-            )
-        else:
-            # 超过最大重试次数 → 死信队列
+        # 超过最大重试次数 → 死信队列
+        if retry_count >= self._max_retries:
             await message.nack(requeue=False)
             if self._dlq:
                 await self._dlq.enqueue(event, str(error), retry_count)
@@ -226,6 +217,41 @@ class RabbitMQConsumer:
                 retry_count,
                 error,
             )
+            return
+
+        # 通过 RedisRetryQueue 延迟重试
+        if self._retry_queue:
+            try:
+                delay = self._retry_delay_seconds * (2**retry_count)
+                retry_at = datetime.now(UTC) + timedelta(seconds=delay)
+                await self._retry_queue.enqueue(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    payload=event.to_dict(),
+                    retry_at=retry_at,
+                    retry_count=retry_count + 1,
+                    error=str(error),
+                )
+                await message.ack()
+                if self._metrics:
+                    self._metrics.record_retried(event.event_type)
+                logger.warning(
+                    "Event %s failed, enqueued to retry queue (attempt %d/%d): %s",
+                    event.event_id,
+                    retry_count + 1,
+                    self._max_retries,
+                    error,
+                )
+                return
+            except Exception as rq_error:
+                logger.error(
+                    "RedisRetryQueue.enqueue failed for event %s, falling back to nack(requeue=True): %s",
+                    event.event_id,
+                    rq_error,
+                )
+
+        # 降级：nack(requeue=True) 让 RabbitMQ 重新投递
+        await message.nack(requeue=True)
 
     async def close(self) -> None:
         """关闭连接"""
