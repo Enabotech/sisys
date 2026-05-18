@@ -1,7 +1,7 @@
 """基础设施层 RabbitMQ 异步事件消费者模块
 
 基于 aio-pika 实现异步事件消费，使用手动 ACK/NACK 策略，
-失败时通过 nack(requeue=True) 重新入队，支持幂等性检查和死信队列
+失败时通过 RedisRetryQueue 进行延迟重试，超过最大重试次数后进入死信队列
 
 Author:
     agimtech <agimtech@126.com>

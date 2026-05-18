@@ -235,20 +235,30 @@ class ChannelRouter:
     def set_override(self, event_type: str, mode: DeliveryMode) -> None:
         """运行时覆盖传输模式
 
+        注意：此方法仅限启动阶段调用，运行时禁用
+
         Args:
             event_type: 事件类型名称
             mode: 要设置的传输模式
         """
-        self._overrides[event_type] = mode
+        # Copy-on-write: 创建新 dict 并原子替换引用
+        new_overrides = dict(self._overrides)
+        new_overrides[event_type] = mode
+        self._overrides = new_overrides
         logger.info("Delivery mode override: %s -> %s", event_type, mode.value)
 
     def register(self, mapping: ChannelMapping) -> None:
-        """注册事件通道映射（运行时配置）
+        """注册事件通道映射
+
+        注意：此方法仅限启动阶段调用，运行时禁用
 
         Args:
             mapping: 事件通道映射配置
         """
-        self._mappings[mapping.event_type] = mapping
+        # Copy-on-write: 创建新 dict 并原子替换引用
+        new_mappings = dict(self._mappings)
+        new_mappings[mapping.event_type] = mapping
+        self._mappings = new_mappings
         logger.info("Registered channel mapping for: %s", mapping.event_type)
 
     def get_redis_channel(self, event_type: str) -> str | None:

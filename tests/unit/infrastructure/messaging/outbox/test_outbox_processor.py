@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -171,7 +171,6 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_run_starts_and_stops(self, poller: AsyncOutboxPoller) -> None:
         """run() 启动后 stop() 可停止"""
-        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         async def run_and_stop() -> None:
             await asyncio.sleep(0.03)
@@ -183,7 +182,6 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_run_logs_start_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """run() 启动时记录日志"""
-        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         with caplog.at_level(logging.INFO):
 
@@ -198,7 +196,6 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_run_stops_on_stop_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """stop() 记录停止日志"""
-        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
         with caplog.at_level(logging.INFO):
 
             async def run_and_stop() -> None:
@@ -221,9 +218,8 @@ class TestAsyncOutboxPoller:
                 poller.stop()
             return []
 
-        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
-
-        await poller.run()
+        with patch.object(poller._repo, "get_unpublished", new=AsyncMock(side_effect=mock_get_unpublished)):
+            await poller.run()
 
         assert call_count >= 3
 
@@ -240,11 +236,12 @@ class TestAsyncOutboxPoller:
             event = _make_domain_event()
             return [event]
 
-        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
-        poller._publisher.async_publish = AsyncMock(side_effect=RuntimeError("Unexpected error"))
-
-        with caplog.at_level(logging.ERROR):
-            await poller.run()
+        with (
+            patch.object(poller._repo, "get_unpublished", new=AsyncMock(side_effect=mock_get_unpublished)),
+            patch.object(poller._publisher, "async_publish", new=AsyncMock(side_effect=RuntimeError("Unexpected error"))),
+        ):
+            with caplog.at_level(logging.ERROR):
+                await poller.run()
 
     @pytest.mark.asyncio
     async def test_run_exception_in_poll_once_logs_error(
@@ -260,10 +257,9 @@ class TestAsyncOutboxPoller:
                 poller.stop()
             raise RuntimeError("Database connection lost")
 
-        poller._repo.get_unpublished = mock_get_unpublished  # type: ignore[method-assign]
-
-        with caplog.at_level(logging.ERROR):
-            await poller.run()
+        with patch.object(poller._repo, "get_unpublished", new=AsyncMock(side_effect=mock_get_unpublished)):
+            with caplog.at_level(logging.ERROR):
+                await poller.run()
 
         assert "Error in poll_once" in caplog.text
 
@@ -283,7 +279,6 @@ class TestAsyncOutboxPoller:
     @pytest.mark.asyncio
     async def test_run_terminates_cleanly(self, poller: AsyncOutboxPoller) -> None:
         """多次调用 stop() 应正常工作"""
-        poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
 
         async def run_and_stop_twice() -> None:
             await asyncio.sleep(0.02)
