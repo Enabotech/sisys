@@ -37,7 +37,7 @@ from src.domain.events import (  # noqa: F401, E402
     ToolExecuted,
 )
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.message_serializer import InMemoryEventStore
+from src.infrastructure.messaging.inmemory_event_store import InMemoryEventStore
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 

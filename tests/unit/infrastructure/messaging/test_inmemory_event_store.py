@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from src.domain.events import DocumentProcessed
-from src.infrastructure.messaging.message_serializer import InMemoryEventStore
+from src.infrastructure.messaging.inmemory_event_store import InMemoryEventStore
 
 
 class TestInMemoryEventStore:

@@ -12,6 +12,7 @@ Copyright:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import deque
 from collections.abc import Generator
@@ -57,7 +58,10 @@ class EventMetrics:
 
 
 class EventMetricsCollector:
-    """指标收集器（线程安全计数器）
+    """指标收集器
+
+    计数器在 asyncio 单线程事件循环中天然安全（+= 1 为原子操作）
+    多线程环境需额外保护
 
     Attributes:
         metrics: EventMetrics 数据实例
@@ -77,6 +81,7 @@ class EventMetricsCollector:
         self.metrics = EventMetrics(
             event_processing_duration_seconds=deque(maxlen=max_processing_samples),
         )
+        self._lock = asyncio.Lock()
 
     def record_processed(self, event_type: str, duration: float) -> None:
         """记录成功处理

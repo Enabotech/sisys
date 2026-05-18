@@ -445,16 +445,22 @@ def bootstrap() -> None:
 
     # === Event Ports ===
     from src.infrastructure.messaging.channel_router import ChannelRouter
+    from src.infrastructure.messaging.event_bus_config_loader import DEFAULT_CONFIG_PATH, EventBusConfigLoader
     from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
     from src.infrastructure.messaging.redis_event_bus import RedisEventBus
     from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
     from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
+    def _create_router() -> ChannelRouter:
+        router = ChannelRouter()
+        EventBusConfigLoader().load(router, DEFAULT_CONFIG_PATH)
+        return router
+
     register_port(
         name="router",
         version="v1.0.0",
         interface=ChannelRouter,
-        impl=lambda resolver: ChannelRouter(),
+        impl=lambda resolver: _create_router(),
         module="src.infrastructure.messaging.channel_router",
         lifetime=Lifetime.SINGLETON,
         owner="messaging-team",

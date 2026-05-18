@@ -30,8 +30,8 @@ class EventBusConfigLoader:
     """
 
     @classmethod
-    def from_default_path(cls) -> EventBusConfigLoader:
-        """从默认路径创建配置加载器
+    def create(cls) -> EventBusConfigLoader:
+        """创建配置加载器实例
 
         Returns:
             EventBusConfigLoader: 配置加载器实例

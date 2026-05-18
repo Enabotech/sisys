@@ -291,27 +291,27 @@
 - `tests/acceptance/test_story_20_2_steps.py` (mock session返回值需适配RETURNING)
 
 #### 任务 4.3: RabbitMQConsumer重试改用RedisRetryQueue
-- [ ] **前置依赖**：依赖任务 1.1（DeadLetterQueue Protocol 改 async，enqueue 需 await）
-- [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
+- [x] **前置依赖**：依赖任务 1.1（DeadLetterQueue Protocol 改 async，enqueue 需 await）
+- [x] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 `_handle_failure`)：
   - **当前BUG**：`nack(requeue=True)` 不保留客户端对 `message.headers` 的修改——requeue后RabbitMQ重新投递原始消息，L204的 `message.headers["x-retry-count"] = ...` 修改无效，导致重试计数永远不递增、无限重试
   - **参考实现**：`RabbitMQEventListener` (`rabbitmq_listener.py`) 已使用 `RedisRetryQueue` 处理重试，可作为改造参考
-  - **修改方案**：构造函数注入 `RedisRetryQueue`（替代 `retry_policy` 参数，`retry_policy` 完全废弃）；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理。`max_retries` 作为 `RedisRetryQueue` 构造函数配置项，不再属于Consumer参数
+  - **修改方案**：构造函数注入 `RedisRetryQueue`（替代 `retry_policy` 参数，`retry_policy` 完全废弃）；`_handle_failure()` 改为 NACK（不requeue），将事件enroll到 `RedisRetryQueue`，由延迟重试机制处理。`max_retries` 和 `retry_delay_seconds` 作为 Consumer 构造函数配置项
   - 超过最大重试次数 → DLQ
   - **降级策略**：RedisRetryQueue.enqueue 失败时（Redis 不可用），记录 ERROR 日志并 nack(requeue=True) 作为最终降级方案，避免事件在 Redis 和 RabbitMQ 双通道同时丢失
-- [ ] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue。`grep -r "retry_policy" src/` 无残留引用
+- [x] **验证**：消费者重试通过RedisRetryQueue而非RabbitMQ requeue。`grep -r "retry_policy" src/` 无残留引用
 
 **关键文件**：
 - `src/infrastructure/messaging/rabbitmq_consumer.py` (L174-227 _handle_failure)
 - `src/infrastructure/messaging/rabbitmq_listener.py` (参考实现)
 
 #### 任务 4.4: 线程安全修复
-- [ ] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）。**注意**：此方案仅保证 asyncio 单线程模型安全；多线程环境需 `threading.Lock`。`register()` 应在文档中标注"仅限启动阶段调用，运行时禁用"
-- [ ] **修改** `src/infrastructure/messaging/redis_publisher.py` (L52-64)：`_get_pool()` 当前是同步方法，但 `_pool_lock` (L50) 是 `asyncio.Lock`（需要 `async with`），导致锁是死代码。修改方案：将 `_get_pool()` 改为 `async` 方法，使用 `async with self._pool_lock`，所有调用处加 `await`
-- [ ] **同步修改** `src/infrastructure/messaging/redis_subscriber.py`：与 `redis_publisher.py` 有相同问题——`_get_pool()` (L55) 是 sync 方法，需改为 async。文档之前遗漏此文件
-- [ ] **修改** `src/infrastructure/monitoring/event_metrics.py`：计数器 `+= 1` 操作加 `asyncio.Lock`（当前注释标注"线程安全计数器"但实际未实现）
-- [ ] **补充** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：`enqueue()` 方法当前使用 `session.add()` 但无 `flush()`，死信记录可能静默丢失。需添加 `await self._session.flush()`，与 OutboxRepository.save() 保持一致
-- [ ] **部署约束声明**：AsyncOutboxPoller 当前无分布式锁/行级锁，多实例部署会导致重复发布。Phase 1-5 仅支持单 Poller 实例，多实例支持（`SELECT ... FOR UPDATE SKIP LOCKED`）列为后续阶段任务
-- [ ] **验证**：并发测试通过。`grep -r "asyncio.Lock" src/infrastructure/messaging/ --include="*.py" -A 5` 确认 Lock 使用方式正确
+- [x] **修改** `src/infrastructure/messaging/channel_router.py`：`_mappings` 和 `_overrides` 的 `register()`/`set_override()` 改为不可变dict + copy-on-write（原子替换引用，无需Lock）。**注意**：此方案仅保证 asyncio 单线程模型安全；多线程环境需 `threading.Lock`。`register()` 应在文档中标注"仅限启动阶段调用，运行时禁用"
+- [x] **修改** `src/infrastructure/messaging/redis_publisher.py` (L52-64)：`_get_pool()` 当前是同步方法，但 `_pool_lock` (L50) 是 `asyncio.Lock`（需要 `async with`），导致锁是死代码。修改方案：将 `_get_pool()` 改为 `async` 方法，使用 `async with self._pool_lock`，所有调用处加 `await`
+- [x] **同步修改** `src/infrastructure/messaging/redis_subscriber.py`：与 `redis_publisher.py` 有相同问题——`_get_pool()` (L55) 是 sync 方法，需改为 async。文档之前遗漏此文件
+- [x] **修改** `src/infrastructure/monitoring/event_metrics.py`：移除误导性"线程安全计数器"注释（asyncio单线程模型中+=1天然原子，加asyncio.Lock会导致所有调用方需await的级联修改）
+- [x] **补充** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`：`enqueue()` 方法当前使用 `session.add()` 但无 `flush()`，死信记录可能静默丢失。需添加 `await self._session.flush()`，与 OutboxRepository.save() 保持一致
+- [x] **部署约束声明**：AsyncOutboxPoller 当前无分布式锁/行级锁，多实例部署会导致重复发布。Phase 1-5 仅支持单 Poller 实例，多实例支持（`SELECT ... FOR UPDATE SKIP LOCKED`）列为后续阶段任务
+- [x] **验证**：并发测试通过。`grep -r "asyncio.Lock" src/infrastructure/messaging/ --include="*.py" -A 5` 确认 Lock 使用方式正确
 
 **关键文件**：
 - `src/infrastructure/messaging/channel_router.py` (_mappings/_overrides)
@@ -338,26 +338,24 @@
 - `config/event_channels.yaml`
 
 #### 任务 5.2: YAML配置集成
-- [ ] **修改** `src/composition_root.py`：在EventBus相关注册中调用 `EventBusConfigLoader.load()`，YAML配置覆盖DEFAULT_MAPPINGS
-- [ ] **优先级规则**：YAML配置作为 merge overlay（仅覆盖YAML中列出的映射，未列出的保留 DEFAULT_MAPPINGS 值），非完全替换。如果YAML中删除了某个映射，该事件使用 DEFAULT_MAPPINGS 的默认通道
-- [ ] **验证**：修改 `event_channels.yaml` 后重启，ChannelRouter使用YAML中的配置
+- [x] **修改** `src/composition_root.py`：在EventBus相关注册中调用 `EventBusConfigLoader.load()`，YAML配置覆盖DEFAULT_MAPPINGS
+- [x] **优先级规则**：YAML配置作为 merge overlay（仅覆盖YAML中列出的映射，未列出的保留 DEFAULT_MAPPINGS 值），非完全替换。如果YAML中删除了某个映射，该事件使用 DEFAULT_MAPPINGS 的默认通道
+- [x] **验证**：修改 `event_channels.yaml` 后重启，ChannelRouter使用YAML中的配置
 
 **关键文件**：
 - `src/composition_root.py`
 - `src/infrastructure/messaging/event_bus_config_loader.py`
 
 #### 任务 5.3: 清理遗留文件和命名
-- [ ] **删除** 遗留测试文件：`test_redis_event_bus.py`（旧版，`test_redis_event_bus_new.py` 为当前版本）
-- [ ] **删除** 遗留测试文件：`test_rabbitmq_event_bus.py`（旧版，`test_rabbitmq_event_bus_new.py` 为当前版本）
-- [ ] **重命名** `_new.py` 测试文件去掉 `_new` 后缀
-- [ ] **修改** `src/infrastructure/messaging/message_serializer.py`：重命名为 `inmemory_event_store.py`（当前名称误导）
-- [ ] **同步修改** 4处import路径：
+- [x] **重命名** `_new.py` 测试文件去掉 `_new` 后缀（`test_redis_event_bus_new.py` → `test_redis_eventbus.py`，`test_rabbitmq_event_bus_new.py` → `test_rabbitmq_eventbus.py`；原文件测试不同组件，保留不删除）
+- [x] **修改** `src/infrastructure/messaging/message_serializer.py`：重命名为 `inmemory_event_store.py`（当前名称误导）
+- [x] **同步修改** 4处import路径：
   - `tests/unit/infrastructure/messaging/test_message_serializer.py` → 重命名为 `test_inmemory_event_store.py`
   - `tests/unit/domain/events/test_event_store.py`
   - `tests/integration/conftest.py`
   - `tests/integration/test_test_utils.py`
-- [ ] **修改** `EventBusConfigLoader.from_default_path()`：方法名改为 `create()`，更准确表达语义
-- [ ] **验证**：无遗留 `_new.py` 文件，无误导命名
+- [x] **修改** `EventBusConfigLoader.from_default_path()`：方法名改为 `create()`，更准确表达语义
+- [x] **验证**：无遗留 `_new.py` 文件，无误导命名
 
 **关键文件**：
 - `tests/unit/infrastructure/messaging/test_redis_event_bus.py` (删除)

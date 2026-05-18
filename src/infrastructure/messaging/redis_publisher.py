@@ -49,19 +49,20 @@ class RedisEventPublisher:
         self._pool: aioredis.ConnectionPool | None = None
         self._pool_lock = asyncio.Lock()
 
-    def _get_pool(self) -> aioredis.ConnectionPool:
+    async def _get_pool(self) -> aioredis.ConnectionPool:
         """懒加载连接池（异步安全）"""
-        if self._pool is None:
-            self._pool = aioredis.ConnectionPool(
-                host=self._config.host,
-                port=self._config.port,
-                db=self._config.db,
-                password=self._config.password,
-                max_connections=self._config.max_connections,
-                socket_timeout=self._config.socket_timeout,
-                decode_responses=True,
-            )
-        return self._pool
+        async with self._pool_lock:
+            if self._pool is None:
+                self._pool = aioredis.ConnectionPool(
+                    host=self._config.host,
+                    port=self._config.port,
+                    db=self._config.db,
+                    password=self._config.password,
+                    max_connections=self._config.max_connections,
+                    socket_timeout=self._config.socket_timeout,
+                    decode_responses=True,
+                )
+            return self._pool
 
     async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
         """发布领域事件到 Redis 通道
@@ -76,7 +77,7 @@ class RedisEventPublisher:
         if channel is None:
             channel = f"{self._NAMESPACE}:{event.event_type}"
 
-        pool = self._get_pool()
+        pool = await self._get_pool()
         try:
             async with aioredis.Redis(connection_pool=pool) as client:
                 payload = json_dumps(event.to_dict())

@@ -241,30 +241,32 @@ class TestRedisEventSubscriber:
 
         config = RedisConfig()
         subscriber = RedisEventSubscriber(config)
-        pool = subscriber._get_pool()
+        pool = await subscriber._get_pool()
         assert pool is not None
         await subscriber.close()
         assert subscriber._pool is None
 
-    def test_get_pool_creates_pool_on_first_call(self):
+    @pytest.mark.asyncio
+    async def test_get_pool_creates_pool_on_first_call(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
         subscriber = RedisEventSubscriber(config)
         assert subscriber._pool is None
 
-        pool = subscriber._get_pool()
+        pool = await subscriber._get_pool()
         assert pool is not None
         assert subscriber._pool is pool
 
-    def test_get_pool_reuses_existing_pool(self):
+    @pytest.mark.asyncio
+    async def test_get_pool_reuses_existing_pool(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
         subscriber = RedisEventSubscriber(config)
 
-        pool1 = subscriber._get_pool()
-        pool2 = subscriber._get_pool()
+        pool1 = await subscriber._get_pool()
+        pool2 = await subscriber._get_pool()
         assert pool1 is pool2
 
     def test_subscribe_registers_multiple_handlers_same_channel(self):

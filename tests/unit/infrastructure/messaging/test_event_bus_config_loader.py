@@ -59,10 +59,10 @@ event_channels:
             Path(config_path).unlink()
 
 
-class TestEventBusConfigLoaderFromDefaultPath:
-    """Test EventBusConfigLoader.from_default_path method."""
+class TestEventBusConfigLoaderCreate:
+    """Test EventBusConfigLoader.create method."""
 
-    def test_from_default_path_returns_loader_instance(self) -> None:
-        """from_default_path should return EventBusConfigLoader instance."""
-        loader = EventBusConfigLoader.from_default_path()
+    def test_create_returns_loader_instance(self) -> None:
+        """create should return EventBusConfigLoader instance."""
+        loader = EventBusConfigLoader.create()
         assert isinstance(loader, EventBusConfigLoader)

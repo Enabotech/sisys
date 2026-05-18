@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
 from src.domain.events.event_store import EventStore
-from src.infrastructure.messaging.message_serializer import InMemoryEventStore
+from src.infrastructure.messaging.inmemory_event_store import InMemoryEventStore
 
 
 class TestEventStoreSignature:
