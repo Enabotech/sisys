@@ -13,11 +13,12 @@ Copyright:
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from src.domain.events.base import DomainEvent
 
 
+@runtime_checkable
 class EventSubscriber(Protocol):
     """事件订阅抽象端口
 

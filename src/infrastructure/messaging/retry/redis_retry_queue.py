@@ -113,6 +113,16 @@ class RedisRetryQueue:
     - 统计待重试事件数量
     """
 
+    # Lua 脚本：原子 ZRANGEBYSCORE + ZREM，避免并发竞态条件
+    # 单 key 操作，兼容 Redis Cluster
+    _DEQUEUE_SCRIPT = """
+local members = redis.call('ZRANGEBYSCORE', KEYS[1], ARGV[1], ARGV[2], 'LIMIT', '0', ARGV[3])
+if #members > 0 then
+    redis.call('ZREM', KEYS[1], unpack(members))
+end
+return members
+"""
+
     def __init__(
         self,
         redis_client: aioredis.Redis,
@@ -126,6 +136,7 @@ class RedisRetryQueue:
         """
         self._redis = redis_client
         self._queue_key = queue_key
+        self._dequeue_script = self._redis.register_script(self._DEQUEUE_SCRIPT)
 
     async def enqueue(
         self,
@@ -164,7 +175,10 @@ class RedisRetryQueue:
         )
 
     async def dequeue(self, limit: int = 10) -> list[RetryQueueEntry]:
-        """获取已到期的重试事件
+        """获取已到期的重试事件（原子操作）
+
+        使用 Lua 脚本原子执行 ZRANGEBYSCORE + ZREM，避免并发消费者
+        竞态条件导致同一事件被多个消费者获取
 
         Args:
             limit: 最大返回数量
@@ -174,13 +188,10 @@ class RedisRetryQueue:
         """
         now = datetime.now(UTC).timestamp()
 
-        # 获取到期事件（score <= now）
-        entries = await self._redis.zrangebyscore(
-            self._queue_key,
-            "-inf",
-            now,
-            start=0,
-            num=limit,
+        # Lua 脚本原子获取并移除到期事件
+        entries = await self._dequeue_script(
+            keys=[self._queue_key],
+            args=["-inf", str(now), str(limit)],
         )
 
         if not entries:
@@ -189,15 +200,10 @@ class RedisRetryQueue:
         result = []
         for entry_json in entries:
             try:
-                entry = RetryQueueEntry.from_json(entry_json)
-                # 移除已处理的事件
-                await self._redis.zrem(self._queue_key, entry_json)
-                result.append(entry)
+                result.append(RetryQueueEntry.from_json(entry_json))
             except (ValueError, KeyError) as e:
                 logger.error("Failed to parse retry entry: %s", e)
-                # 删除无效条目
-                await self._redis.zrem(self._queue_key, entry_json)
-
+                # Lua 脚本已移除该条目，仅记录错误
         return result
 
     async def count(self) -> int:
