@@ -90,8 +90,7 @@ class TestDeadLetterQueueIntegration:
         result = await dlq.dequeue()
 
         assert result is not None
-        entry, restored_event, error, retries = result
-        assert entry.event_id == event.event_id
+        restored_event, error, retries = result
         assert restored_event.event_id == event.event_id
         assert error == "timeout"
         assert retries == 2
