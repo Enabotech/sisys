@@ -532,6 +532,7 @@ def bootstrap() -> None:
             outbox_repository=resolver.resolve("outbox_repo"),
             publisher=resolver.resolve("rabbitmq_publisher"),
             router=resolver.resolve("router"),
+            session_factory=resolver.resolve("session_factory"),
         ),
         module="src.infrastructure.messaging.outbox.outbox_processor",
         lifetime=Lifetime.SINGLETON,

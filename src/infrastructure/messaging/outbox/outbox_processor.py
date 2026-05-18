@@ -20,6 +20,7 @@ from typing import Any
 from src.domain.events.base import DomainEvent
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.channel_router import ChannelRouter
+from src.infrastructure.storage.postgresql.session_context import session_context
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class AsyncOutboxPoller:
         outbox_repository: OutboxRepository,
         publisher: Any,
         router: ChannelRouter,
+        session_factory: Any = None,
         poll_interval: float = 1.0,
         batch_size: int = 10,
     ):
@@ -46,12 +48,14 @@ class AsyncOutboxPoller:
             outbox_repository: OutboxRepository Protocol 实现实例
             publisher: 异步发布者（需提供 async_publish 方法）
             router: 通道路由器
+            session_factory: AsyncSession 工厂，用于每次 poll 周期创建独立 session
             poll_interval: 轮询间隔（秒）
             batch_size: 每批处理数量
         """
         self._repo = outbox_repository
         self._publisher = publisher
         self._router = router
+        self._session_factory = session_factory
         self._poll_interval = poll_interval
         self._batch_size = batch_size
         self._running = False
@@ -116,7 +120,11 @@ class AsyncOutboxPoller:
         )
         while self._running:
             try:
-                await self.poll_once()
+                if self._session_factory is not None:
+                    async with session_context(self._session_factory):
+                        await self.poll_once()
+                else:
+                    await self.poll_once()
             except Exception as e:
                 logger.error("Error in poll_once: %s", e)
             await asyncio.sleep(self._poll_interval)
