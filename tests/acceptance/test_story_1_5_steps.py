@@ -544,7 +544,7 @@ def outbox_repo_created(outbox_repo: PostgreSQLOutboxRepository):
 
 
 @when("调用 save 保存领域事件")
-async def save_domain_event(outbox_repo: PostgreSQLOutboxRepository):
+def save_domain_event(outbox_repo: PostgreSQLOutboxRepository, event_loop):
     """Save domain event to outbox."""
     from src.domain.events import DocumentProcessed
 
@@ -553,7 +553,7 @@ async def save_domain_event(outbox_repo: PostgreSQLOutboxRepository):
         parse_result={"pages": 10},
         embedding=[0.1, 0.2, 0.3],
     )
-    await outbox_repo.save(event)
+    event_loop.run_until_complete(outbox_repo.save(event))
 
 
 @then("事件已添加到会话")
@@ -584,27 +584,31 @@ def test_get_unpublished_events(outbox_repo: PostgreSQLOutboxRepository):
 
 
 @given("发件箱中有多个 pending 状态事件")
-async def create_pending_events(outbox_repo: PostgreSQLOutboxRepository):
+def create_pending_events(outbox_repo: PostgreSQLOutboxRepository, event_loop):
     """Create multiple pending events in outbox."""
     from src.domain.events import DocumentProcessed
 
-    for i in range(3):
-        event = DocumentProcessed(
-            document_id=uuid.uuid4(),
-            parse_result={"pages": i},
-            embedding=[0.1],
-        )
-        await outbox_repo.save(event)
+    async def _save_all():
+        for i in range(3):
+            event = DocumentProcessed(
+                document_id=uuid.uuid4(),
+                parse_result={"pages": i},
+                embedding=[0.1],
+            )
+            await outbox_repo.save(event)
+
+    event_loop.run_until_complete(_save_all())
 
 
 @when("调用 get_unpublished 方法")
-async def call_get_unpublished(outbox_repo: PostgreSQLOutboxRepository, event_loop):
+def call_get_unpublished(outbox_repo: PostgreSQLOutboxRepository, event_loop):
     """Call get_unpublished method."""
 
     async def _get():
         return await outbox_repo.get_unpublished(limit=10)
 
-    return event_loop.run_until_complete(_get())
+    result = event_loop.run_until_complete(_get())
+    return result
 
 
 @then("返回所有 pending 状态事件")

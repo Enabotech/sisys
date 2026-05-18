@@ -27,6 +27,8 @@ class TestRabbitMQEventListenerIntegration:
     def mock_dependencies(self):
         """Provide mock dependencies for RabbitMQEventListener."""
         mock_redis = mock.AsyncMock()
+        # register_script 是同步方法，不应返回 coroutine
+        mock_redis.register_script = mock.MagicMock(return_value=mock.MagicMock())
         mock_config = mock.MagicMock()
         mock_config.queue_name = "test_queue"
         mock_config.host = "localhost"
