@@ -56,17 +56,9 @@ class EventBusConfig:
 class EventBusFactory:
     """事件总线工厂
 
-    负责创建和管理事件总线实例，实现依赖注入
+    负责创建事件总线实例，实现依赖注入
     共享组件（ChannelRouter, Redis Publisher, RabbitMQ Publisher）复用
-
-    使用方式:
-        1. 创建工厂实例（可注入配置）
-        2. 调用 create_dual_channel_bus() 获取已配置的实例
-        3. 或使用 configure_event_bus() 设置全局单例
     """
-
-    _instance: DualChannelEventBus | None = None
-    _poller: AsyncOutboxPoller | None = None
 
     def __init__(self, config: EventBusConfig | None = None) -> None:
         """初始化工厂，创建共享组件
@@ -191,40 +183,6 @@ class EventBusFactory:
         )
 
         return bus, poller
-
-    @classmethod
-    def configure_event_bus(cls, bus: DualChannelEventBus, poller: AsyncOutboxPoller) -> None:
-        """配置全局事件总线实例
-
-        Args:
-            bus: DualChannelEventBus 实例
-            poller: AsyncOutboxPoller 实例
-        """
-        cls._instance = bus
-        cls._poller = poller
-
-    @classmethod
-    def get_event_bus(cls) -> DualChannelEventBus:
-        """获取全局事件总线实例
-
-        Returns:
-            DualChannelEventBus: 已配置的事件总线
-
-        Raises:
-            RuntimeError: 当事件总线未配置时
-        """
-        if cls._instance is None:
-            raise RuntimeError("EventBus not configured. Call configure_event_bus first.")
-        return cls._instance
-
-    @classmethod
-    def get_poller(cls) -> AsyncOutboxPoller | None:
-        """获取全局事件轮询器实例
-
-        Returns:
-            AsyncOutboxPoller: 已配置的轮询器，如果未配置则返回 None
-        """
-        return cls._poller
 
     @property
     def redis_publisher(self) -> Any:

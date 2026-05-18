@@ -45,9 +45,9 @@ class EventPublisher(Protocol):
 
 @runtime_checkable
 class InMemoryEventPublisher(Protocol):
-    """内存事件发布器协议（P1-07 修复：Protocol 防止直接实例化）
+    """内存事件发布器协议（已废弃，请使用 EventPublisher）
 
-    基础设施层实现将事件发布到消息总线（RabbitMQ、Redis pub/sub 等）
+    保留仅为向后兼容，新代码应使用 EventPublisher Protocol
     """
 
     def publish(self, event: DomainEvent) -> None:
@@ -55,7 +55,4 @@ class InMemoryEventPublisher(Protocol):
 
         Args:
             event: 待发布的领域事件
-
-        Raises:
-            NotImplementedError: 抽象接口始终抛出
         """
