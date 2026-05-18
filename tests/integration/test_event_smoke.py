@@ -21,7 +21,7 @@ from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 
 
 class TestEventRegistry:
-    """Verify event type registry correctly deserializes events."""
+    """Verify DomainEvent._registry correctly deserializes events."""
 
     def test_event_roundtrip_via_outbox_adapter(self) -> None:
         """Event should roundtrip correctly through EventOutboxAdapter."""
@@ -61,6 +61,16 @@ class TestEventRegistry:
 
         with pytest.raises(ValueError, match="Unknown event_type"):
             EventOutboxAdapter.to_domain_event(unknown_entity)
+
+    def test_registry_contains_known_types(self) -> None:
+        """DomainEvent._registry should contain known event types."""
+        assert "DocumentProcessed" in DomainEvent._registry
+        assert DomainEvent._registry["DocumentProcessed"] is not None
+
+    def test_registry_get_returns_none_for_unknown(self) -> None:
+        """DomainEvent._registry.get should return None for unknown type."""
+        result = DomainEvent._registry.get("NonExistentType")
+        assert result is None
 
 
 # ===================================================================

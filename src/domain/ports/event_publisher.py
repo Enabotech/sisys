@@ -30,14 +30,13 @@ class EventPublisher(Protocol):
     3. 错误处理（内部消化，返回 PublishResult）
     """
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布领域事件
 
         通道选择由实现类通过 ChannelRouter 推断
 
         Args:
             event: 领域事件实例
-            channel: 事件发布通道（可选）
 
         Returns:
             PublishResult: 发布结果的不可变数据类

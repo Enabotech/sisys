@@ -203,7 +203,6 @@ async def test_triggered_to_routed_end_to_end(
 
     # Publish AutoTriggered event to trigger routing
     triggered_event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"test-session-{unique_prefix}",
         task_context={"task_type": "test", "description": "end-to-end test"},
     )
@@ -235,7 +234,6 @@ async def test_hash_routing_consistency(
     results = []
     for i in range(10):
         event = AutoTriggered(
-            event_type="AutoTriggered",
             session_id=session_id,
             task_context={"iteration": i},
         )
@@ -259,7 +257,6 @@ async def test_semantic_routing_with_task_context(
     # Financial task should route to CFO agent (without embedding model,
     # it returns first candidate, but route_type should be "semantic")
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"semantic-test-{uuid.uuid4().hex[:8]}",
         task_context={
             "task_type": "financial_analysis",
@@ -298,7 +295,6 @@ async def test_route_service_publishes_to_redis(
 
     # Send event
     triggered_event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"publish-test-{unique_prefix}",
         task_context={"task_type": "test"},
     )
@@ -327,7 +323,6 @@ async def test_route_decision_log_fields(
 ) -> None:
     """Test routing decision produces all required log fields."""
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"log-test-{uuid.uuid4().hex[:8]}",
         task_context={"task_type": "test", "priority": "high"},
     )
@@ -351,7 +346,6 @@ async def test_mixed_routing_mode(
     """Test that both hash and semantic routing can produce mixed mode."""
     # When both routers return valid targets, mixed mode should be selected
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"mixed-test-{uuid.uuid4().hex[:8]}",
         task_context={"task_type": "strategic planning"},
     )
@@ -376,7 +370,6 @@ async def test_route_performance_under_load(
     start_time = time.perf_counter()
     for i in range(iterations):
         event = AutoTriggered(
-            event_type="AutoTriggered",
             session_id=f"load-test-{i}",
             task_context={"task_type": "test"},
         )
@@ -404,7 +397,6 @@ async def test_idempotent_routing(
 ) -> None:
     """Test that identical events produce identical routing decisions."""
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id="idempotent-test",
         task_context={"task_type": "consistent test"},
     )
@@ -435,7 +427,6 @@ async def test_route_service_graceful_no_publisher(
     )
 
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"no-publisher-test-{uuid.uuid4().hex[:8]}",
         task_context={"task_type": "test"},
     )
@@ -460,7 +451,6 @@ async def test_route_service_graceful_no_routers(
     )
 
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"no-routers-test-{uuid.uuid4().hex[:8]}",
         task_context={"task_type": "test"},
     )
@@ -511,7 +501,6 @@ async def test_concurrent_routing_requests(
 
     async def route_one(i: int) -> AutoRouted:
         event = AutoTriggered(
-            event_type="AutoTriggered",
             session_id=f"concurrent-{i}",
             task_context={"task_type": f"task-{i}"},
         )
@@ -533,7 +522,6 @@ async def test_event_loop_isolation(
 ) -> None:
     """Test that routing works correctly with the test's event loop."""
     event = AutoTriggered(
-        event_type="AutoTriggered",
         session_id=f"event-loop-test-{uuid.uuid4().hex[:8]}",
         task_context={"task_type": "test"},
     )

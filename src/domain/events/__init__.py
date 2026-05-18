@@ -13,10 +13,20 @@ Copyright:
 from ..ports.event_publisher import InMemoryEventPublisher
 from .agent_events import AgentDecided
 from .audit_events import AuditActionType, AuditEvent
+from .auto_execute_events import AutoExecuted
 from .auto_route_events import AutoRouted
 from .auto_trigger_events import AutoTriggered
 from .base import DomainEvent
 from .checkpoint_events import CheckpointReached, CheckpointRecovered
+from .compliance_events import (
+    CrossBorderTransferRequested,
+    DataIntegrityViolationEvent,
+    DataSovereigntyViolation,
+    IntrusionDetectedEvent,
+    MFAChallengeIssuedEvent,
+    PIPLDataAccessRequested,
+    SensitiveDataDetected,
+)
 from .correction_events import CorrectionApproved
 from .document_events import DocumentProcessed
 from .enums import CorrectionType, DeviationLevel, DeviationType, IsolationLevel, RecoveryMode
@@ -39,6 +49,7 @@ __all__ = [
     "HeartbeatTriggered",
     "IsolationLevelSwitched",
     "RoutingDecided",
+    "AutoExecuted",
     "AutoRouted",
     "AutoTriggered",
     "InMemoryEventPublisher",
@@ -50,4 +61,11 @@ __all__ = [
     "AuditEvent",
     "AuditActionType",
     "MemoryChanged",
+    "MFAChallengeIssuedEvent",
+    "IntrusionDetectedEvent",
+    "DataIntegrityViolationEvent",
+    "SensitiveDataDetected",
+    "CrossBorderTransferRequested",
+    "DataSovereigntyViolation",
+    "PIPLDataAccessRequested",
 ]

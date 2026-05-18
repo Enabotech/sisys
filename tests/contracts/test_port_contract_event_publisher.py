@@ -50,12 +50,12 @@ class TestEventPublisherContract:
         assert callable(impl.publish)
 
     @pytest.mark.asyncio
-    async def test_publish_accepts_channel_parameter(self) -> None:
-        """publish() must accept optional channel parameter."""
+    async def test_publish_returns_publish_result(self) -> None:
+        """publish() must return PublishResult."""
         impl = self.get_implementation()
         event = DomainEvent(event_type="test.event")
         try:
-            result = await impl.publish(event, channel="rt:test")
+            result = await impl.publish(event)
             assert isinstance(result, PublishResult)
         except Exception:
             pass

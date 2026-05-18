@@ -14,13 +14,13 @@ Copyright:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractQueue
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import EventListenerAsync
+from src.domain.events.listener import DeadLetterQueue, EventListenerAsync
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.messaging.retry.dual_idempotency_checker import (
     DualIdempotencyChecker,
@@ -63,16 +63,16 @@ class RabbitMQEventListener(EventListenerAsync):
         )
         self._retry_queue = RedisRetryQueue(redis_client=redis_client)
         # 死信队列将通过 set_dead_letter_queue 单独设置
-        self._dlq = None
+        self._dlq: DeadLetterQueue | None = None
         self._connection: AbstractConnection | None = None
         self._channel: AbstractChannel | None = None
         self._queue: AbstractQueue | None = None
 
-    def set_dead_letter_queue(self, dlq: Any) -> None:
+    def set_dead_letter_queue(self, dlq: DeadLetterQueue) -> None:
         """设置死信队列
 
         Args:
-            dlq: PostgresDeadLetterQueue 实例
+            dlq: DeadLetterQueue Protocol 实现实例
         """
         self._dlq = dlq
 

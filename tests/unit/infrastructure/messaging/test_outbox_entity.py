@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, field
 from datetime import datetime
 from uuid import uuid4
 
@@ -10,14 +10,14 @@ import pytest
 
 from src.domain.events import DocumentProcessed
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.outbox.outbox import InvalidStateTransitionError, OutboxEntity
 
 
 class _MockEventForTest(DomainEvent):
-    """Mock event class for testing EventRegistry."""
+    """Mock event class for testing DomainEvent._registry."""
 
-    event_type: str = "MockEvent"
+    event_type: str = field(default="MockEventForTest", init=False)
 
 
 def _make_event() -> DocumentProcessed:
@@ -126,6 +126,14 @@ class TestOutboxEntity:
 class TestEventOutboxAdapter:
     """EventOutboxAdapter tests."""
 
+    @pytest.fixture(autouse=True)
+    def _preserve_registry(self):
+        """每个测试前后保存/恢复 registry，防止测试间污染"""
+        saved = dict(DomainEvent._registry)
+        yield
+        DomainEvent._registry.clear()
+        DomainEvent._registry.update(saved)
+
     def test_from_domain_event(self):
         """Should convert DomainEvent to OutboxEntity."""
         event = _make_event()
@@ -169,14 +177,16 @@ class TestEventOutboxAdapter:
             EventOutboxAdapter.to_domain_event(entity)
 
     def test_registry_manual_register(self) -> None:
-        """EventRegistry should support manual registration."""
+        """DomainEvent.register should support manual registration."""
 
-        EventRegistry.register("MockEvent", _MockEventForTest)
-        event_class = EventRegistry.get("MockEvent")
+        DomainEvent.register("MockEventForTest", _MockEventForTest)
+        event_class = DomainEvent._registry.get("MockEventForTest")
         assert event_class == _MockEventForTest
 
     def test_registry_reset(self) -> None:
-        """EventRegistry.reset should clear the registry."""
-        EventRegistry.reset()
-        event_class = EventRegistry.get("DocumentProcessed")
+        """DomainEvent.reset_registry should clear the registry."""
+        DomainEvent.reset_registry()
+        # 手动注册恢复
+        DomainEvent.register("DocumentProcessed", DocumentProcessed)
+        event_class = DomainEvent._registry.get("DocumentProcessed")
         assert event_class is not None

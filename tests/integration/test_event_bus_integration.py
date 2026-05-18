@@ -162,19 +162,22 @@ class TestPollerPublishesToRabbitMQ:
         mock_event.event_id = uuid4()
         mock_event.event_type = "DocumentProcessed"
 
-        mock_repo._get_unpublished_entities = AsyncMock(return_value=[])
-        mock_publisher.publish = AsyncMock()
+        mock_repo.get_unpublished = AsyncMock(return_value=[])
+        mock_publisher.async_publish = AsyncMock()
+
+        router = ChannelRouter()
 
         poller = AsyncOutboxPoller(
             outbox_repository=mock_repo,
             publisher=mock_publisher,
+            router=router,
             poll_interval=0.1,
             batch_size=10,
         )
 
         await poller.poll_once()
 
-        mock_repo._get_unpublished_entities.assert_called_once_with(limit=10)
+        mock_repo.get_unpublished.assert_called_once_with(limit=10)
 
 
 class TestSubscribeOnlyForRealtime:

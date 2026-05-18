@@ -1,6 +1,6 @@
 """基础设施层异步发件箱轮询处理器模块
 
-异步协程定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ，
+异步协程定期轮询 Outbox，将 pending 状态的事件发布至 RabbitMQ，
 使用 asyncio.Semaphore 控制并发
 
 Author:
@@ -17,7 +17,9 @@ import asyncio
 import logging
 from typing import Any
 
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
+from src.domain.events.base import DomainEvent
+from src.domain.ports.outbox import OutboxRepository
+from src.infrastructure.messaging.channel_router import ChannelRouter
 
 logger = logging.getLogger(__name__)
 
@@ -25,27 +27,31 @@ logger = logging.getLogger(__name__)
 class AsyncOutboxPoller:
     """异步发件箱轮询器
 
-    定期轮询 OutboxEntity，将 pending 状态的事件发布至 RabbitMQ
+    定期轮询 Outbox，将 pending 状态的事件发布至 RabbitMQ
     成功则标记为 published，失败则标记为 failed
+    仅使用 OutboxRepository 公共接口（无私有方法访问）
     """
 
     def __init__(
         self,
-        outbox_repository: Any,
+        outbox_repository: OutboxRepository,
         publisher: Any,
+        router: ChannelRouter,
         poll_interval: float = 1.0,
         batch_size: int = 10,
     ):
         """初始化 AsyncOutboxPoller
 
         Args:
-            outbox_repository: InMemoryOutboxRepository 实例
-            publisher: RabbitMQPublisher 实例
+            outbox_repository: OutboxRepository Protocol 实现实例
+            publisher: 异步发布者（需提供 async_publish 方法）
+            router: 通道路由器
             poll_interval: 轮询间隔（秒）
             batch_size: 每批处理数量
         """
         self._repo = outbox_repository
         self._publisher = publisher
+        self._router = router
         self._poll_interval = poll_interval
         self._batch_size = batch_size
         self._running = False
@@ -53,34 +59,52 @@ class AsyncOutboxPoller:
     async def poll_once(self) -> None:
         """轮询一次并发布待处理事件
 
-        从发件箱获取 pending 状态的事件，并发发布到 RabbitMQ，
+        从发件箱获取 pending 状态的 DomainEvent，并发发布到 RabbitMQ，
         成功标记为 published，失败标记为 failed
         """
-        entities = await self._repo._get_unpublished_entities(limit=self._batch_size)
-        if not entities:
+        events: list[DomainEvent] = await self._repo.get_unpublished(limit=self._batch_size)
+        if not events:
             return
 
         semaphore = asyncio.Semaphore(self._batch_size)
 
-        async def process_one(entity) -> None:
+        async def process_one(event: DomainEvent) -> None:
             async with semaphore:
-                try:
-                    domain_event = EventOutboxAdapter.to_domain_event(entity)
-                    await self._publisher.async_publish(
-                        domain_event,
-                        routing_key=f"sisys.events.reliable.{entity.event_type}",
+                routing_key = self._router.get_rabbitmq_routing_key(event.event_type)
+                if routing_key is None:
+                    logger.warning(
+                        "No routing key mapping for event_type=%s, marking as failed",
+                        event.event_type,
                     )
-                    await self._repo._mark_published_entity(entity)
-                    logger.debug("Published event %s", entity.event_id)
+                    await self._repo.mark_failed(
+                        event.event_id,
+                        f"No routing key mapping for {event.event_type}",
+                    )
+                    return
+
+                try:
+                    await self._publisher.async_publish(
+                        event,
+                        routing_key=routing_key,
+                    )
+                    await self._repo.mark_published(event.event_id)
+                    logger.debug("Published event %s", event.event_id)
                 except Exception as e:
-                    await self._repo._mark_failed_entity(entity, str(e))
+                    try:
+                        await self._repo.mark_failed(event.event_id, str(e))
+                    except Exception:
+                        logger.error(
+                            "Failed to mark event %s as failed: %s",
+                            event.event_id,
+                            e,
+                        )
                     logger.error(
                         "Failed to publish event %s: %s",
-                        entity.event_id,
+                        event.event_id,
                         e,
                     )
 
-        await asyncio.gather(*[process_one(e) for e in entities])
+        await asyncio.gather(*[process_one(e) for e in events])
 
     async def run(self) -> None:
         """启动轮询循环，按配置间隔持续轮询发件箱。"""

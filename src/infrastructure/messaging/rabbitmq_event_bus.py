@@ -43,7 +43,7 @@ class RabbitMQEventBus(EventPublisher):
         self._outbox_repo = outbox_repository
         self._router = router
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> PublishResult:
+    async def publish(self, event: DomainEvent) -> PublishResult:
         """发布事件到 Outbox（可靠路径）
 
         Args:
@@ -62,7 +62,7 @@ class RabbitMQEventBus(EventPublisher):
             )
 
         try:
-            self._outbox_repo.save(event)
+            await self._outbox_repo.save(event)
             return PublishResult(
                 event_id=str(event.event_id),
                 redis_success=False,

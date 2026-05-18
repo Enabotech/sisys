@@ -50,7 +50,7 @@ class MockEventPublisher:
     def __init__(self) -> None:
         self.published_events: list = []
 
-    async def publish(self, event: DomainEvent, channel: str | None = None) -> None:
+    async def publish(self, event: DomainEvent) -> None:
         self.published_events.append(event)
 
 
@@ -201,13 +201,13 @@ class TestAutoRouteHandlerPublish:
             route_score=1.0,
         )
 
-        await handler._publish(event, channel="rt:AutoRouted")
+        await handler._publish(event)
 
-        mock_publisher.publish.assert_called_once_with(event, channel="rt:AutoRouted")
+        mock_publisher.publish.assert_called_once_with(event)
 
     @pytest.mark.asyncio
     async def test_publish_with_default_channel(self) -> None:
-        """Coverage: _publish uses default channel."""
+        """Coverage: _publish publishes event via publisher."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
 
         mock_service = MagicMock()
@@ -225,7 +225,7 @@ class TestAutoRouteHandlerPublish:
 
         await handler._publish(event)
 
-        mock_publisher.publish.assert_called_once_with(event, channel="rt:AutoRouted")
+        mock_publisher.publish.assert_called_once_with(event)
 
     @pytest.mark.asyncio
     async def test_publish_raises_on_publisher_error(self) -> None:

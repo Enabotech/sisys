@@ -12,12 +12,14 @@ Copyright:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from .base import DomainEvent
 
 
+@runtime_checkable
 class EventListener(Protocol):
     """抽象事件监听器接口
 
@@ -96,6 +98,7 @@ class InMemoryEventListener:
 # =============================================================================
 
 
+@runtime_checkable
 class EventListenerAsync(Protocol):
     """抽象异步事件监听器接口
 
@@ -116,10 +119,15 @@ class EventListenerAsync(Protocol):
 # =============================================================================
 
 
+@runtime_checkable
 class DeadLetterQueue(Protocol):
-    """死信队列抽象接口"""
+    """死信队列抽象接口
 
-    def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
+    所有方法均为 async（设计规则3：async一致性），
+    __len__ 不纳入 Protocol（Python dunder 方法不可 async）
+    """
+
+    async def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
         """入队失败事件
 
         Args:
@@ -128,32 +136,30 @@ class DeadLetterQueue(Protocol):
             retry_count: 重试次数
         """
 
-    def dequeue(self) -> tuple[DomainEvent, str, int] | None:
+    async def dequeue(self) -> tuple[DomainEvent, str, int] | None:
         """出队失败事件
 
         Returns:
             (event, error, retry_count) 或 None
         """
 
-    def __len__(self) -> int:
-        """队列长度"""
-
 
 class InMemoryDeadLetterQueue:
     """内存死信队列 — MVP 阶段使用
 
-    进程重启后丢失，仅用于测试和 MVP 占位
+    进程重启后丢失，仅用于测试和 MVP 占位。
+    实现 DeadLetterQueue Protocol（async 签名）。
     """
 
     def __init__(self) -> None:
         import logging
 
-        self._items: list[tuple[DomainEvent, str, int]] = []
+        self._queue: asyncio.Queue[tuple[DomainEvent, str, int]] = asyncio.Queue()
         self._logger = logging.getLogger(__name__)
 
-    def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
+    async def enqueue(self, event: DomainEvent, error: str, retry_count: int = 0) -> None:
         """入队失败事件"""
-        self._items.append((event, error, retry_count))
+        await self._queue.put((event, error, retry_count))
         self._logger.warning(
             "Event %s enqueued to DLQ: %s (retry_count=%d)",
             event.event_id,
@@ -161,9 +167,13 @@ class InMemoryDeadLetterQueue:
             retry_count,
         )
 
-    def dequeue(self) -> tuple[DomainEvent, str, int] | None:
-        """出队失败事件（FIFO）"""
-        return self._items.pop(0) if self._items else None
+    async def dequeue(self) -> tuple[DomainEvent, str, int] | None:
+        """出队失败事件（FIFO），队列为空时立即返回 None"""
+        try:
+            return self._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
 
     def __len__(self) -> int:
-        return len(self._items)
+        """队列长度（同步方法，asyncio.Queue.qsize() 为同步）"""
+        return self._queue.qsize()

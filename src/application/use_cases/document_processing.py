@@ -35,7 +35,7 @@ class DocumentProcessingUseCase:
         """
         self._outbox_repo = outbox_repo
 
-    def process_document(self, document_id: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def process_document(self, document_id: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         """处理文档并发布 DocumentProcessed 事件
 
         Args:
@@ -60,7 +60,7 @@ class DocumentProcessingUseCase:
                 source="DocumentProcessingUseCase",
                 payload={"document_id": document_id, "status": "processed"},
             )
-            self._outbox_repo.save(event)
+            await self._outbox_repo.save(event)
 
             return {"status": "success", "document_id": document_id}
         except Exception as e:

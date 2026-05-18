@@ -156,7 +156,7 @@ class AutoTriggerService:
             return
 
         try:
-            await self._publisher.publish(event, channel="rt:AutoTriggered")
+            await self._publisher.publish(event)
             logger.info(
                 "Published AutoTriggered event: session_id=%s trigger_type=%s",
                 event.session_id,

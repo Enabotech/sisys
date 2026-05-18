@@ -440,9 +440,9 @@ def then_returns_oldest_pending_entry(context: dict) -> None:
     """Verify oldest pending entry is returned."""
     result = context.get("dequeue_result")
     assert result is not None
-    entry, event, error, retries = result
-    # Entry should be returned (not None)
-    assert entry is not None
+    event, error, retries = result
+    # Event should be returned (not None)
+    assert event is not None
 
 
 @then("条目状态应该更新为 processed")
@@ -455,9 +455,9 @@ def then_status_updated_to_processed(context: dict) -> None:
     """
     result = context.get("dequeue_result")
     assert result is not None
-    entry, event, error, retries = result
-    # Entry was returned - that's the key verification
-    assert entry is not None
+    event, error, retries = result
+    # Event was returned - that's the key verification
+    assert event is not None
 
 
 @given("DLQ 中有多个条目")
@@ -584,8 +584,8 @@ def then_entry_status_updated_to_processed(context: dict) -> None:
         # Dequeue scenario - just verify entry was returned
         result = context.get("dequeue_result")
         assert result is not None
-        entry, event, error, retries = result
-        assert entry is not None
+        event, error, retries = result
+        assert event is not None
     elif "entry_id" in context and "pg_session" in context:
         # mark_action_taken scenario - verify status is processed
         pg_session = context["pg_session"]

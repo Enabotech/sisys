@@ -33,8 +33,7 @@ class AutoTriggered(DomainEvent):
         source_event_id: 原始触发事件ID
     """
 
-    # 注意：event_type继承自DomainEvent（init=True，默认值为""）
-    # 实际的event_type值"AutoTriggered"通过__post_init__设置
+    event_type: str = field(default="AutoTriggered", init=False)
     trigger_type: str = ""  # "domain_event" | "heartbeat"
     session_id: str = ""
     agent_id: str | None = None
@@ -43,15 +42,8 @@ class AutoTriggered(DomainEvent):
     source_event_id: str | None = None
 
     def __post_init__(self) -> None:
-        """设置event_type、aggregate_id和aggregate_type用于事件追踪"""
-        # 如果未设置，将event_type设置为类名
-        if not self.event_type:
-            object.__setattr__(self, "event_type", "AutoTriggered")
+        """设置aggregate_id和aggregate_type用于事件追踪"""
         if self.aggregate_id is None and self.event_id:
             object.__setattr__(self, "aggregate_id", self.event_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "AutoTrigger")
-
-
-# 在类定义后注册AutoTriggered（由于event_type的init=False需要手动注册）
-DomainEvent._registry["AutoTriggered"] = AutoTriggered

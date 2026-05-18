@@ -21,7 +21,7 @@ Copyright:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .base import DomainEvent
@@ -41,6 +41,7 @@ class MemoryChanged(DomainEvent):
         new_value: 变更后的值（dict 或 None）
     """
 
+    event_type: str = field(default="MemoryChanged", init=False)
     memory_id: str = ""
     user_id: str = ""
     name: str = ""
@@ -50,14 +51,8 @@ class MemoryChanged(DomainEvent):
     new_value: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        """设置 event_type, aggregate_id, aggregate_type"""
-        if not self.event_type:
-            object.__setattr__(self, "event_type", "MemoryChanged")
+        """设置 aggregate_id, aggregate_type"""
         if self.aggregate_id is None and self.memory_id:
             object.__setattr__(self, "aggregate_id", self.memory_id)
         if not self.aggregate_type:
             object.__setattr__(self, "aggregate_type", "Memory")
-
-
-# 注册事件类型
-DomainEvent._registry["MemoryChanged"] = MemoryChanged

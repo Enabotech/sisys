@@ -137,7 +137,7 @@
   场景: 获取未发布事件
     假如 PostgreSQLOutboxRepository 实例
     并且 发件箱中有多个 pending 状态事件
-    当 调用 async_get_unpublished 方法
+    当 调用 get_unpublished 方法
     那么 返回所有 pending 状态事件
     并且 事件按 created_at 升序排序
     并且 返回数量不超过 limit 参数
@@ -145,13 +145,13 @@
   场景: 获取未发布事件（空结果）
     假如 PostgreSQLOutboxRepository 实例
     并且 发件箱中无 pending 状态事件
-    当 调用 async_get_unpublished 方法
+    当 调用 get_unpublished 方法
     那么 返回空列表
 
   场景: 标记事件已发布
     假如 PostgreSQLOutboxRepository 实例
     并且 发件箱中有 pending 状态事件
-    当 调用 async_mark_published 方法
+    当 调用 mark_published 方法
     那么 事件状态变为 published
     并且 published_at 字段已设置
     并且 当前时间戳正确
@@ -159,7 +159,7 @@
   场景: 标记事件发布失败
     假如 PostgreSQLOutboxRepository 实例
     并且 发件箱中有 pending 状态事件
-    当 调用 async_mark_failed 方法
+    当 调用 mark_failed 方法
     那么 事件状态变为 failed
     并且 retry_count 递增
     并且 error_message 字段已设置

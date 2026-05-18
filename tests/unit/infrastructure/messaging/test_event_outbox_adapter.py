@@ -12,7 +12,7 @@ from src.domain.events import (
     ToolExecuted,
 )
 from src.domain.events.base import DomainEvent
-from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter, EventRegistry
+from src.infrastructure.messaging.adapters.event_outbox_adapter import EventOutboxAdapter
 from src.infrastructure.messaging.outbox.outbox import OutboxEntity
 
 
@@ -69,7 +69,7 @@ class TestEventOutboxAdapterConversion:
         assert restored.payload.get("confidence") == event.confidence
 
     def test_all_event_types_registered(self):
-        """All 10 event types should be registered in EventRegistry."""
+        """All 10 event types should be registered in DomainEvent._registry."""
         expected_types = [
             "DocumentProcessed",
             "ToolExecuted",
@@ -83,7 +83,7 @@ class TestEventOutboxAdapterConversion:
             "RoutingDecided",
         ]
         for event_type in expected_types:
-            event_class = EventRegistry.get(event_type)
+            event_class = DomainEvent._registry.get(event_type)
             assert event_class is not None, f"{event_type} not registered"
 
     def test_unknown_event_type_raises_error(self):
@@ -97,59 +97,62 @@ class TestEventOutboxAdapterConversion:
 
 
 class TestEventRegistry:
-    """EventRegistry 注册表行为测试"""
+    """DomainEvent._registry 注册表行为测试"""
+
+    @pytest.fixture(autouse=True)
+    def _preserve_registry(self):
+        """每个测试前后保存/恢复 registry，防止测试间污染"""
+        saved = dict(DomainEvent._registry)
+        yield
+        DomainEvent._registry.clear()
+        DomainEvent._registry.update(saved)
 
     def test_reset_clears_registry(self) -> None:
-        """reset 应清空注册表"""
-        # 先构建
-        EventRegistry.get("DocumentProcessed")
-        assert EventRegistry._built is True
-        assert len(EventRegistry._registry) > 0
+        """reset_registry 应清空注册表"""
+        # 先验证有注册内容
+        assert len(DomainEvent._registry) > 0
 
-        EventRegistry.reset()
-        assert EventRegistry._built is False
-        assert len(EventRegistry._registry) == 0
+        DomainEvent.reset_registry()
+        assert len(DomainEvent._registry) == 0
 
     def test_rebuild_after_reset(self) -> None:
-        """reset 后首次 get 应重新构建"""
-        EventRegistry.reset()
-        event_class = EventRegistry.get("DocumentProcessed")
+        """reset_registry 后手动注册可恢复事件"""
+        DomainEvent.reset_registry()
+        assert len(DomainEvent._registry) == 0
+
+        # 手动注册后可用
+        DomainEvent.register("DocumentProcessed", DocumentProcessed)
+        event_class = DomainEvent._registry.get("DocumentProcessed")
         assert event_class is not None
-        assert EventRegistry._built is True
 
     def test_register_manual_event_type(self) -> None:
         """应支持手动注册自定义事件类型"""
-        EventRegistry.reset()
+        DomainEvent.reset_registry()
 
         # 注册已有事件类型（安全的手动注册测试）
-        EventRegistry.register("DocumentProcessed", DocumentProcessed)
-        result = EventRegistry.get("DocumentProcessed")
+        DomainEvent.register("DocumentProcessed", DocumentProcessed)
+        result = DomainEvent._registry.get("DocumentProcessed")
         assert result is DocumentProcessed
 
-    def test_register_triggers_build_if_not_built(self) -> None:
-        """在未构建状态下 register 应先构建"""
-        EventRegistry.reset()
-        assert EventRegistry._built is False
-
-        EventRegistry.register("DocumentProcessed", DocumentProcessed)
-        assert EventRegistry._built is True
-
     def test_get_returns_correct_subclass(self) -> None:
-        """get 应返回正确的事件子类"""
-        cls = EventRegistry.get("ToolExecuted")
+        """_registry.get 应返回正确的事件子类"""
+        cls = DomainEvent._registry.get("ToolExecuted")
         assert cls is ToolExecuted
 
-        cls = EventRegistry.get("AgentDecided")
+        cls = DomainEvent._registry.get("AgentDecided")
         assert cls is AgentDecided
 
-    def test_subclasses_are_recursively_collected(self) -> None:
-        """注册表应递归收集所有子类"""
-        EventRegistry.reset()
-        # 触发构建
-        EventRegistry.get("DocumentProcessed")
-        # 所有直接子类应被收集
+    def test_registry_contains_all_subclasses(self) -> None:
+        """注册表应包含所有通过 __init_subclass__ 注册的子类"""
+        # 所有通过 __init_subclass__ 注册的事件类型应存在于注册表
         for subclass in DomainEvent.__subclasses__():
-            assert subclass.__name__ in EventRegistry._registry
+            # 检查子类是否有 event_type field defined with init=False
+            if hasattr(subclass, "__dataclass_fields__"):
+                et_field = subclass.__dataclass_fields__.get("event_type")
+                if et_field is not None and not et_field.init:
+                    # event_type should be in registry
+                    if et_field.default:
+                        assert et_field.default in DomainEvent._registry
 
 
 class TestEventOutboxAdapterFromDomainEvent:

@@ -141,12 +141,12 @@ class TestOutboxEntityInvalidStateTransitionError:
 class TestOutboxRepositoryMockBehavior:
     """Mock behavior tests — verify OutboxRepository Protocol contract via spec约束."""
 
-    def test_mock_save_verified(self):
+    @pytest.mark.asyncio
+    async def test_mock_save_verified(self):
         """Mock save should be verifiable."""
-        from unittest.mock import MagicMock
+        from unittest.mock import AsyncMock
 
-        mock = MagicMock(spec=OutboxRepository)
-        mock.save.return_value = None
+        mock = AsyncMock(spec=OutboxRepository)
 
         from datetime import UTC, datetime
         from uuid import uuid4
@@ -160,42 +160,45 @@ class TestOutboxRepositoryMockBehavior:
             source="test",
             payload={},
         )
-        mock.save(event)
+        await mock.save(event)
         mock.save.assert_called_once()
 
-    def test_mock_get_unpublished_verified(self):
+    @pytest.mark.asyncio
+    async def test_mock_get_unpublished_verified(self):
         """Mock get_unpublished should be verifiable."""
-        from unittest.mock import MagicMock
+        from unittest.mock import AsyncMock
 
-        mock = MagicMock(spec=OutboxRepository)
+        mock = AsyncMock(spec=OutboxRepository)
         mock.get_unpublished.return_value = []
 
-        result = mock.get_unpublished(10)
+        result = await mock.get_unpublished(10)
         assert result == []
         mock.get_unpublished.assert_called_once_with(10)
 
-    def test_mock_mark_published_verified(self):
+    @pytest.mark.asyncio
+    async def test_mock_mark_published_verified(self):
         """Mock mark_published should be verifiable."""
-        from unittest.mock import MagicMock
+        from unittest.mock import AsyncMock
         from uuid import uuid4
 
-        mock = MagicMock(spec=OutboxRepository)
+        mock = AsyncMock(spec=OutboxRepository)
         mock.mark_published.return_value = None
 
         event_id = uuid4()
-        mock.mark_published(event_id)
+        await mock.mark_published(event_id)
         mock.mark_published.assert_called_once_with(event_id)
 
-    def test_mock_mark_failed_verified(self):
+    @pytest.mark.asyncio
+    async def test_mock_mark_failed_verified(self):
         """Mock mark_failed should be verifiable."""
-        from unittest.mock import MagicMock
+        from unittest.mock import AsyncMock
         from uuid import uuid4
 
-        mock = MagicMock(spec=OutboxRepository)
+        mock = AsyncMock(spec=OutboxRepository)
         mock.mark_failed.return_value = None
 
         event_id = uuid4()
-        mock.mark_failed(event_id, "error message")
+        await mock.mark_failed(event_id, "error message")
         mock.mark_failed.assert_called_once_with(event_id, "error message")
 
 

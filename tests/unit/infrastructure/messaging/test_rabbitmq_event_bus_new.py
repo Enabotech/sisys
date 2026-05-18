@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -43,7 +43,7 @@ class TestRabbitMQEventBusPublish:
         """publish should return outbox_saved=True on successful save."""
         router = ChannelRouter()
         outbox_repo = MagicMock()
-        outbox_repo.save.return_value = None
+        outbox_repo.save = AsyncMock(return_value=None)
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)
@@ -60,7 +60,7 @@ class TestRabbitMQEventBusPublish:
         """publish should call outbox_repository.save with the event."""
         router = ChannelRouter()
         outbox_repo = MagicMock()
-        outbox_repo.save = MagicMock(return_value=True)
+        outbox_repo.save = AsyncMock(return_value=None)
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)
@@ -83,7 +83,7 @@ class TestRabbitMQEventBusPublish:
         )
         router.register(mapping)
         outbox_repo = MagicMock()
-        outbox_repo.save = MagicMock(return_value=True)
+        outbox_repo.save = AsyncMock(return_value=None)
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)
@@ -100,7 +100,7 @@ class TestRabbitMQEventBusPublish:
         """publish should return outbox_error when save fails."""
         router = ChannelRouter()
         outbox_repo = MagicMock()
-        outbox_repo.save.side_effect = Exception("DB connection failed")
+        outbox_repo.save = AsyncMock(side_effect=Exception("DB connection failed"))
         bus = RabbitMQEventBus(outbox_repository=outbox_repo, router=router)
 
         event = MagicMock(spec=DomainEvent)

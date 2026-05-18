@@ -22,7 +22,7 @@ import pytest
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Ensure all domain events are imported so EventRegistry is populated.
+# Ensure all domain events are imported so DomainEvent._registry is populated.
 # This MUST happen before any test that uses EventOutboxAdapter.
 from src.domain.events import (  # noqa: F401, E402
     AgentDecided,
