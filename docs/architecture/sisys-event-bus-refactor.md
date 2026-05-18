@@ -420,18 +420,18 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 
 ### 集成验证
 1. `poetry run pytest tests/integration/test_event_bus_integration.py -x` — 集成测试
-2. `poetry run pytest tests/contracts/test_event_publisher_contract.py -x` — 契约测试
+2. `poetry run pytest tests/contracts/test_port_contract_event_publisher.py -x` — 契约测试
 3. `poetry run python -c "from src.domain.events.base import DomainEvent; from src.domain.events import *; print(f'Registry: {len(DomainEvent._registry)} events'); assert len(DomainEvent._registry) >= 22"` — 事件注册完整性验证
 
 ### 契约测试缺口
-当前 `tests/contracts/` 仅有 `test_event_publisher_contract.py`（EventPublisher Protocol），以下 Protocol 缺少独立契约测试文件：
+当前 `tests/contracts/` 仅有 `test_port_contract_event_publisher.py`（EventPublisher Protocol），以下 Protocol 缺少独立契约测试文件：
 - **OutboxRepository** Protocol（Phase 2 改 async 后需新增）
 - **DeadLetterQueue** Protocol（Phase 1 改 async 后需新增）
 - **EventSubscriber** Protocol（当前无契约测试）
 - **EventStore** Protocol（当前无契约测试）
 - **EventListener / EventListenerAsync** Protocol（当前无契约测试）
 
-**建议**：在 Phase 2 完成后统一补全契约测试，参照 `test_event_publisher_contract.py` 模式（验证 Protocol 方法签名、参数类型、返回类型）
+**建议**：在 Phase 2 完成后统一补全契约测试，参照 `test_port_contract_event_publisher.py` 模式（验证 Protocol 方法签名、参数类型、返回类型）
 
 ---
 
@@ -487,7 +487,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
 |----------|----------|
-| `tests/contracts/test_event_publisher_contract.py` | L53-61 `test_publish_accepts_channel_parameter` 需删除（channel参数移除后测试失败） |
+| `tests/contracts/test_port_contract_event_publisher.py` | L53-61 `test_publish_accepts_channel_parameter` 需删除（channel参数移除后测试失败） |
 | `tests/unit/application/event_handlers/test_auto_route_handler.py` | _publish方法签名变更 |
 | `tests/unit/application/event_handlers/test_auto_execute_completed_listener.py` | _publish方法签名变更 |
 | `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | publish签名channel参数移除 |

@@ -50,15 +50,34 @@
 - [ ] 使用标准库实现领域事件校验（如 dataclass / Enum / 自定义验证），禁止在领域层依赖 Pydantic
 - [ ] 事件命名符合规范（`[Aggregate][EventName]`，如 `UserCreated`）
 
-#### API 契约 (API Contract)
-- [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
-- [ ] 契约测试通过（`tests/contracts/test_[xxx]_api_contract.py`）
-- [ ] API 版本管理正确（`/api/v1/[resource]`）
-
 #### 数据模型 (Data Models)
 - [ ] 模型定义位于 `src/domain/entities/` 或对应层
 - [ ] [描述数据模型要求]
 - [ ] ...
+
+#### API 契约 (API Contract)
+- [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
+- [ ] 契约测试通过（`tests/contracts/test_api_contract_[xxx].py`）
+- [ ] API 版本管理正确（`/api/v1/[resource]`）
+
+#### 统一端口注册与接口治理
+- [ ] 端口契约位于 `src/domain/ports` 与 `src/application/ports`
+- [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口必须登记为 `PortSpec`
+- [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
+- [ ] 契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
+- [ ] 端口实现仅可在 `src/composition_root.py` 统一注册，禁止业务代码直接实例化具体实现
+- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_[xxx].py`）
+- [ ] 接口命名符合单一职责，禁止同义接口重复定义
+- [ ] 端口具备唯一名称、版本、owner、兼容策略
+- [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
+- [ ] 端口变更配套契约测试与兼容性检查
+- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
+
+#### 契约清单执行约束（强制）
+- [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
+- [ ] 禁止新增未登记端口，禁止语义重复端口，禁止未同步更新 registry / resolver / contract test
+- [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
+- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 六边形架构约束（必须遵守）
 > **执行顺序：** 所有实现 Task 仅可依赖下述层间方向。领域层不得引入任何第三方依赖。
@@ -82,24 +101,6 @@
 | **application**    | ✓ 允许 | —           | ✗ 禁止     | ✗ 禁止         |
 | **interfaces**     | ✓ 允许 | ✓ 允许      | —          | ✗ 禁止         |
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
-
-#### 统一端口注册与接口治理
-- [ ] 端口契约位于 `src/domain/ports`
-- [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口必须登记为 `PortSpec`
-- [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
-- [ ] 契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
-- [ ] 端口实现仅可在 `src/composition_root.py` 统一注册，禁止业务代码直接实例化具体实现
-- [ ] 接口命名符合单一职责，禁止同义接口重复定义
-- [ ] 端口具备唯一名称、版本、owner、兼容策略
-- [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
-- [ ] 端口变更配套契约测试与兼容性检查
-- [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
-
-#### 契约清单执行约束（强制）
-- [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
-- [ ] 禁止新增未登记端口，禁止语义重复端口，禁止未同步更新 registry / resolver / contract test
-- [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
-- [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`

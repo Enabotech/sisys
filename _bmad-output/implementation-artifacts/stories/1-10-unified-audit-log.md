@@ -160,7 +160,7 @@
 > 如果 OpenAPI 文档中尚无 audit 相关端点定义，需先在 Task 0.SDD 中完成 OpenAPI 端点定义，再进行契约测试。
 
 - [ ] 在 `docs/api/openapi.yaml` 中定义 audit API 端点
-- [ ] 创建契约测试 `tests/contract/test_audit_api_contract.py`
+- [ ] 创建契约测试 `tests/contract/test_api_contract_audit.py`
 - [ ] 契约测试验证 openapi.yaml 中的端点定义
 
 **API 端点定义（OpenAPI 规范）：**
@@ -293,7 +293,7 @@
 - [x] Subtask 0.5: 定义 AuditRepositoryPort 接口（`src/domain/ports/audit_repository.py`）✅
 - [x] Subtask 0.6: 定义 AuditLog 领域实体（`src/domain/entities/audit_log.py`）✅
 - [x] Subtask 0.7: 在 `docs/api/openapi.yaml` 中定义 audit API 端点 ✅
-- [x] Subtask 0.8: 创建契约测试 `tests/contract/test_audit_api_contract.py` ✅
+- [x] Subtask 0.8: 创建契约测试 `tests/contract/test_api_contract_audit.py` ✅
 - [x] Subtask 0.9: 运行契约测试，验证 openapi.yaml 中的端点定义 ✅
 - [x] Subtask 0.10: 创建 Gherkin 验收测试 `tests/acceptance/test_story_1_10.feature` ✅
 - [x] Subtask 0.11: 编写 BDD 步骤实现 `tests/acceptance/test_story_1_10_steps.py` ⚠️ 跳过（功能实现优先）
@@ -301,7 +301,7 @@
 
 **契约测试实现参考（Subtask 0.8）：**
 > 契约测试必须基于 `docs/api/openapi.yaml` 中已定义的端点进行验证。
-> 参考 `tests/contract/test_rbac_api_contract.py` 的实现模式创建 `tests/contract/test_audit_api_contract.py`。
+> 参考 `tests/contract/test_api_contract_rbac.py` 的实现模式创建 `tests/contract/test_api_contract_audit.py`。
 
 **完成标准/Definition of Done:**
 - [x] 规范项全部定义完毕 ✅
@@ -649,7 +649,7 @@ sisys/
 - `tests/integration/test_audit_api_endpoints.py` - API 端点测试
 - `tests/acceptance/test_story_1_10.feature` - Gherkin 验收测试
 - `tests/acceptance/test_story_1_10_steps.py` - BDD 步骤实现
-- `tests/contract/test_audit_api_contract.py` - API 契约测试
+- `tests/contract/test_api_contract_audit.py` - API 契约测试
 - `docs/security/audit_log_guide.md` - 审计日志实施指南
 
 ---
