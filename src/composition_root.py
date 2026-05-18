@@ -510,6 +510,34 @@ def bootstrap() -> None:
         owner="messaging-team",
     )
 
+    from src.infrastructure.config.rabbitmq import RabbitMQConfig
+    from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
+    from src.infrastructure.messaging.rabbitmq_publisher import RabbitMQPublisher
+
+    register_port(
+        name="rabbitmq_publisher",
+        version="v1.0.0",
+        interface=RabbitMQPublisher,
+        impl=lambda resolver: RabbitMQPublisher(config=RabbitMQConfig.from_env()),
+        module="src.infrastructure.messaging.rabbitmq_publisher",
+        lifetime=Lifetime.SINGLETON,
+        owner="messaging-team",
+    )
+
+    register_port(
+        name="outbox_poller",
+        version="v1.0.0",
+        interface=AsyncOutboxPoller,
+        impl=lambda resolver: AsyncOutboxPoller(
+            outbox_repository=resolver.resolve("outbox_repo"),
+            publisher=resolver.resolve("rabbitmq_publisher"),
+            router=resolver.resolve("router"),
+        ),
+        module="src.infrastructure.messaging.outbox.outbox_processor",
+        lifetime=Lifetime.SINGLETON,
+        owner="messaging-team",
+    )
+
     # === Compliance Ports ===
     register_port(
         name="compliance_gateway",
@@ -646,9 +674,9 @@ def bootstrap() -> None:
         name="event_subscriber",
         version="v1.0.0",
         interface=EventSubscriber,
-        impl="src.infrastructure.messaging.redis_subscriber.RedisEventSubscriber",
-        module="src.infrastructure.messaging.redis_subscriber",
-        lifetime=Lifetime.SCOPED,
+        impl=lambda resolver: resolver.resolve("event_publisher"),
+        module="src.infrastructure.messaging.dual_channel_event_bus",
+        lifetime=Lifetime.SINGLETON,
         owner="messaging-team",
     )
 

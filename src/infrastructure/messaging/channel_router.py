@@ -91,6 +91,104 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="审计事件",
         ),
+        # REALTIME 事件（3个）
+        "AutoExecuted": ChannelMapping(
+            event_type="AutoExecuted",
+            redis_channel="sisys:rt:auto_executed",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="自动化执行完成",
+        ),
+        "HeartbeatTriggered": ChannelMapping(
+            event_type="HeartbeatTriggered",
+            redis_channel="sisys:rt:heartbeat_triggered",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="心跳触发",
+        ),
+        "RoutingDecided": ChannelMapping(
+            event_type="RoutingDecided",
+            redis_channel="sisys:rt:routing_decided",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="路由决策完成",
+        ),
+        # RELIABLE 事件（13个）
+        "ToolExecuted": ChannelMapping(
+            event_type="ToolExecuted",
+            rabbitmq_routing_key="sisys.events.reliable.tool_executed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="工具执行完成",
+        ),
+        "AgentDecided": ChannelMapping(
+            event_type="AgentDecided",
+            rabbitmq_routing_key="sisys.events.reliable.agent_decided",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="Agent决策完成",
+        ),
+        "CheckpointRecovered": ChannelMapping(
+            event_type="CheckpointRecovered",
+            rabbitmq_routing_key="sisys.events.reliable.checkpoint_recovered",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="检查点恢复",
+        ),
+        "IsolationLevelSwitched": ChannelMapping(
+            event_type="IsolationLevelSwitched",
+            rabbitmq_routing_key="sisys.events.reliable.isolation_level_switched",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="隔离级别切换",
+        ),
+        "CorrectionApproved": ChannelMapping(
+            event_type="CorrectionApproved",
+            rabbitmq_routing_key="sisys.events.reliable.correction_approved",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="纠正审批通过",
+        ),
+        "StrategicDeviationWarning": ChannelMapping(
+            event_type="StrategicDeviationWarning",
+            rabbitmq_routing_key="sisys.events.reliable.strategic_deviation_warning",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="战略偏差警告",
+        ),
+        "MFAChallengeIssuedEvent": ChannelMapping(
+            event_type="MFAChallengeIssuedEvent",
+            rabbitmq_routing_key="sisys.events.reliable.mfa_challenge_issued_event",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="MFA挑战发出",
+        ),
+        "IntrusionDetectedEvent": ChannelMapping(
+            event_type="IntrusionDetectedEvent",
+            rabbitmq_routing_key="sisys.events.reliable.intrusion_detected_event",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="入侵检测",
+        ),
+        "DataIntegrityViolationEvent": ChannelMapping(
+            event_type="DataIntegrityViolationEvent",
+            rabbitmq_routing_key="sisys.events.reliable.data_integrity_violation_event",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="数据完整性违规",
+        ),
+        "SensitiveDataDetected": ChannelMapping(
+            event_type="SensitiveDataDetected",
+            rabbitmq_routing_key="sisys.events.reliable.sensitive_data_detected",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="敏感数据检测",
+        ),
+        "CrossBorderTransferRequested": ChannelMapping(
+            event_type="CrossBorderTransferRequested",
+            rabbitmq_routing_key="sisys.events.reliable.cross_border_transfer_requested",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="跨境传输请求",
+        ),
+        "DataSovereigntyViolation": ChannelMapping(
+            event_type="DataSovereigntyViolation",
+            rabbitmq_routing_key="sisys.events.reliable.data_sovereignty_violation",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="数据主权违规",
+        ),
+        "PIPLDataAccessRequested": ChannelMapping(
+            event_type="PIPLDataAccessRequested",
+            rabbitmq_routing_key="sisys.events.reliable.pipl_data_access_requested",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="个人信息保护法数据访问请求",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

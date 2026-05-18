@@ -160,12 +160,13 @@ class DualIdempotencyChecker:
                 INSERT INTO idempotency_records (event_id, processed_at)
                 VALUES (:event_id, :processed_at)
                 ON CONFLICT (event_id) DO NOTHING
+                RETURNING event_id
                 """
             )
             result = await self._session.execute(stmt, {"event_id": str(event_id), "processed_at": datetime.now(UTC)})
-            # Check if row was inserted (rowcount not always available, use fetched row count)
-            rows = result.fetchone()
-            return rows is not None
+            # RETURNING 有插入行时返回 event_id，ON CONFLICT DO NOTHING 时返回 None
+            row = result.fetchone()
+            return row is not None
         except Exception as e:
             logger.error("PostgreSQL error during idempotency check: %s", e)
             # Redis 和 PostgreSQL 都失败 - 故障开放，允许处理

@@ -89,6 +89,25 @@ class DualChannelEventBus(EventPublisher):
             raise ValueError(f"RELIABLE mode does not support subscribe: {event_type}")
         await self._redis_bus.subscribe(event_type, handler)
 
+    async def subscribe_async(
+        self,
+        event_type: str,
+        handler: Any,
+    ) -> None:
+        """订阅领域事件-异步处理器（仅支持 REALTIME）
+
+        Args:
+            event_type: 事件类型
+            handler: 异步事件处理器
+
+        Raises:
+            ValueError: 当事件类型为 RELIABLE 模式时
+        """
+        mode = self._router.get_delivery_mode(event_type)
+        if mode == DeliveryMode.RELIABLE:
+            raise ValueError(f"RELIABLE mode does not support subscribe: {event_type}")
+        await self._redis_bus.subscribe_async(event_type, handler)
+
     async def start(self) -> None:
         """启动事件总线"""
         await self._redis_bus.start()

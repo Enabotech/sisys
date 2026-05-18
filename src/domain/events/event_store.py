@@ -13,12 +13,13 @@ Copyright:
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from .base import DomainEvent
 
 
+@runtime_checkable
 class EventStore(Protocol):
     """事件溯源的抽象事件存储接口
 

@@ -199,7 +199,6 @@ class TestAsyncOutboxPoller:
     async def test_run_stops_on_stop_message(self, poller: AsyncOutboxPoller, caplog: pytest.LogCaptureFixture) -> None:
         """stop() 记录停止日志"""
         poller._repo.get_unpublished = AsyncMock(return_value=[])  # type: ignore[method-assign]
-
         with caplog.at_level(logging.INFO):
 
             async def run_and_stop() -> None:
