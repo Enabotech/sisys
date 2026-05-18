@@ -722,7 +722,7 @@ def verify_jitter_range(context: dict, retry_policy: RetryPolicy) -> None:
 
 
 @then("超过最大重试次数后事件应该进入死信队列")
-async def verify_event_enters_dlq_after_max_retries(
+def verify_event_enters_dlq_after_max_retries(
     context: dict,
     retry_policy: RetryPolicy,
     dead_letter_queue: InMemoryDeadLetterQueue,
@@ -737,7 +737,7 @@ async def verify_event_enters_dlq_after_max_retries(
 
     for retry_count in range(max_retries + 1):
         if not retry_policy.should_retry(retry_count, max_retries):
-            await dead_letter_queue.enqueue(event, "Max retries exceeded", retry_count)
+            asyncio.run(dead_letter_queue.enqueue(event, "Max retries exceeded", retry_count))
             break
 
     assert len(dead_letter_queue) > 0, "Event should be in dead letter queue"
