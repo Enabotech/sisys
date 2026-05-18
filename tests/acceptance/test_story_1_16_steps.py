@@ -255,7 +255,7 @@ def test_domain_event_smoke_test():
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 DocumentProcessed")
-async def when_publish_documentprocessed_event(
+def when_publish_documentprocessed_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -265,12 +265,12 @@ async def when_publish_documentprocessed_event(
         parse_result={"status": "completed", "page_count": 10},
     )
     context["published_event"] = event
-    await in_memory_outbox_repo.save(event)
+    asyncio.run(in_memory_outbox_repo.save(event))
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 ToolExecuted")
-async def when_publish_toolexecuted_event(
+def when_publish_toolexecuted_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -280,12 +280,12 @@ async def when_publish_toolexecuted_event(
         execution_result={"status": "completed", "output": "result"},
     )
     context["published_event"] = event
-    await in_memory_outbox_repo.save(event)
+    asyncio.run(in_memory_outbox_repo.save(event))
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
 @when("通过 InMemoryOutboxRepository 发布事件 AgentDecided")
-async def when_publish_agentdecided_event(
+def when_publish_agentdecided_event(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -296,7 +296,7 @@ async def when_publish_agentdecided_event(
         confidence=0.95,
     )
     context["published_event"] = event
-    await in_memory_outbox_repo.save(event)
+    asyncio.run(in_memory_outbox_repo.save(event))
     context["outbox_events"] = in_memory_outbox_repo._events
 
 
@@ -312,24 +312,24 @@ def then_event_serialized_and_written_to_outbox(context: dict[str, Any]) -> None
 
 
 @then("可通过 get_unpublished 查询到未发布事件")
-async def then_can_query_unpublished_events(
+def then_can_query_unpublished_events(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify can query unpublished events via get_unpublished."""
-    unpublished = await in_memory_outbox_repo.get_unpublished(limit=10)
+    unpublished = asyncio.run(in_memory_outbox_repo.get_unpublished(limit=10))
     assert len(unpublished) > 0
 
 
 @then("可通过 mark_published 标记事件已发布")
-async def then_can_mark_event_published(
+def then_can_mark_event_published(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify can mark event as published via mark_published."""
     event = context.get("published_event")
     assert event is not None
-    await in_memory_outbox_repo.mark_published(event.event_id)
+    asyncio.run(in_memory_outbox_repo.mark_published(event.event_id))
     # mark_published should not raise any exception
     assert True
 
@@ -497,7 +497,7 @@ def test_repository_pattern_smoke_test():
 
 
 @when("通过 InMemoryOutboxRepository 保存事件")
-async def when_save_event_through_repository(
+def when_save_event_through_repository(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -507,16 +507,16 @@ async def when_save_event_through_repository(
         parse_result={"status": "test"},
     )
     context["saved_event"] = event
-    await in_memory_outbox_repo.save(event)
+    asyncio.run(in_memory_outbox_repo.save(event))
 
 
 @then("领域事件可通过仓储接口保存至内存存储")
-async def then_event_saved_via_repository_interface(
+def then_event_saved_via_repository_interface(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify domain event can be saved via repository interface."""
-    events = await in_memory_outbox_repo.get_unpublished(limit=10)
+    events = asyncio.run(in_memory_outbox_repo.get_unpublished(limit=10))
     saved_event = context.get("saved_event")
     assert saved_event is not None
     assert any(e.event_id == saved_event.event_id for e in events)
@@ -554,7 +554,7 @@ def given_each_test_uses_independent_repo(
 
 
 @when("测试后调用 repo.clear()")
-async def when_call_repo_clear_after_test(
+def when_call_repo_clear_after_test(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -564,7 +564,7 @@ async def when_call_repo_clear_after_test(
         document_id=uuid.uuid4(),
         parse_result={"status": "test"},
     )
-    await in_memory_outbox_repo.save(event)
+    asyncio.run(in_memory_outbox_repo.save(event))
     context["event_count_before_clear"] = len(in_memory_outbox_repo._events)
 
     # Then clear
@@ -600,7 +600,7 @@ def test_application_domain_infrastructure_collaboration():
 
 
 @when("调用应用层用例方法")
-async def when_call_application_layer_use_case(
+def when_call_application_layer_use_case(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
@@ -608,20 +608,22 @@ async def when_call_application_layer_use_case(
     use_case = DocumentProcessingUseCase(outbox_repo=in_memory_outbox_repo)
     context["use_case"] = use_case
 
-    result = await use_case.process_document(
-        document_id="test-doc-123",
-        metadata={"source": "test"},
+    result = asyncio.run(
+        use_case.process_document(
+            document_id="test-doc-123",
+            metadata={"source": "test"},
+        )
     )
     context["use_case_result"] = result
 
 
 @then("正确调用领域层服务接口")
-async def then_correctly_calls_domain_service_interface(
+def then_correctly_calls_domain_service_interface(
     context: dict[str, Any],
     in_memory_outbox_repo: Any,
 ) -> None:
     """Verify correctly calls domain layer service interface."""
-    events = await in_memory_outbox_repo.get_unpublished(limit=10)
+    events = asyncio.run(in_memory_outbox_repo.get_unpublished(limit=10))
     assert len(events) > 0
     # DocumentProcessed event should be saved
     assert any(e.event_type == "DocumentProcessed" for e in events)
@@ -670,7 +672,7 @@ def given_repository_layer_throws_exception(context: dict[str, Any]) -> None:
 
 
 @when("应用层调用领域服务")
-async def when_application_layer_calls_domain_service(
+def when_application_layer_calls_domain_service(
     context: dict[str, Any],
 ) -> None:
     """Call domain service from application layer."""
@@ -680,7 +682,7 @@ async def when_application_layer_calls_domain_service(
     context["use_case"] = use_case
 
     try:
-        await use_case.process_document(document_id="test-doc-123")
+        asyncio.run(use_case.process_document(document_id="test-doc-123"))
         context["error_raised"] = False
     except RuntimeError as e:
         context["error_raised"] = True
