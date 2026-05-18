@@ -1,9 +1,10 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.9 | 状态: 审查修订中
+> 版本: 2.10 | 状态: 审查完成
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第14轮（第三批）：dlq.enqueue()缺await致死信静默丢弃（P0数据丢失）、_write_to_postgresql非BUG仅增强、redis_subscriber.py同需_get_pool改async、Poller mark_failed失败保护、import依赖图全覆盖验证通过
+> 第6-10轮（第二批）：v2.0→v2.5，架构一致性+async一致性+边界场景+可行性终检
+> 第11-15轮（第三批）：v2.5→v2.10，DI全链路+契约测试缺口+连锁影响+异常传播链+遗漏扫描+自洽性终检
 
 ## Context
 
@@ -46,6 +47,7 @@
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_listener.py`：`set_dead_letter_queue` 参数类型从 `Any` 改为 `DeadLetterQueue`，添加从 Domain 层的 import
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_consumer.py`：`dlq` 构造函数参数类型从 `Any` 改为 `DeadLetterQueue`，添加从 Domain 层的 import
 - [ ] **验证**：所有引用DeadLetterQueue的文件使用统一import，`grep -r "DeadLetterQueue" src/` 无重复定义
+- [ ] **处理** `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` L275：当前 `__len__()` 抛 NotImplementedError。`__len__` 是 dunder 方法不可 async，决策：(A) 删除方法 + Protocol 中也移除 `__len__`；(B) 保留 sync stub + 文档标注调用者需用 `count_pending()` async 方法。推荐方案A
 
 **关键文件**：
 - `src/domain/events/listener.py` (L119-170, 保留)
@@ -128,6 +130,7 @@
   - 删除 `get_unpublished`(L59), `mark_published`(L85), `mark_failed`(L105) 的同步stub（抛NotImplementedError）
   - 将 `async_get_unpublished`/`async_mark_published`/`async_mark_failed` 重命名为对应Protocol方法名
   - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 提前执行SQL INSERT并检查约束（flush不commit，但触发DB约束校验）
+  - **修复 class-level Lock BUG**：L42 `_lock: asyncio.Lock = asyncio.Lock()` 是类级别声明，所有实例共享同一把锁，测试间互相污染/死锁。需添加 `__init__` 方法，改为实例级别 `self._lock = asyncio.Lock()`
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [ ] **修改** `src/application/use_cases/document_processing.py` L63：`outbox_repo.save()` 在同步方法 `process_document` 中调用，改为async后该方法也必须改为 `async def`，所有调用者需同步适配
 - [ ] **同步修改** 测试中的手写OutboxRepository内部类（sync→async）：
@@ -163,6 +166,7 @@
   - 调用 `self._repo.mark_published(event_id)` 替代 `_mark_published_entity()`
   - 调用 `self._repo.mark_failed(event_id, error)` 替代 `_mark_failed_entity()`
 - [ ] **修改** OutboxEntity/DomainEvent 转换逻辑：Poller内部处理OutboxEntity→DomainEvent转换（当前已在做，只是通过私有方法绕过）
+- [ ] **替换 `Any` 类型注解**：构造函数参数 `outbox_repository: Any` → `OutboxRepository`（Domain Protocol），`publisher: Any` → 具体发布者类型（如 `RabbitMQPublisher`），消除类型检查盲区
 - [ ] **错误传播保护**：当前 `_mark_failed_entity` 在 `except` 块内被调用（L76），如果此调用也抛异常（如DB不可用），事件保持 `pending` 状态且 `retry_count` 不递增，导致下次 poll 再次尝试同一事件（无限重试）。修改方案：在 `process_one()` 的 `except` 块中，`mark_failed()` 调用需独立 try/except，失败时仅记录 ERROR 日志，事件保持 pending 状态等待下次 poll
 - [ ] **修改** `outbox_repository.py` 和 `inmemory_outbox.py`：公共async方法返回DomainEvent（而非OutboxEntity），Poller不再需要知道OutboxEntity
 - [ ] **注意**：Poller运行时必须有活跃的session context（通过 `session_context()` 或等效机制包裹），因为公共方法通过 `self._session` property（ContextVar）获取session
@@ -495,7 +499,8 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/acceptance/test_story_1_5_steps.py` | PostgreSQLOutboxRepository.async_get_unpublished重命名 |
 | `tests/integration/test_test_utils.py` | InMemoryEventStore import路径可能受Phase 2影响 |
 | `tests/integration/conftest.py` | OutboxRepository Protocol签名变更影响fixture |
-| `tests/acceptance/test_story_1_16_steps.py` | L657 BrokenRepo内部类sync→async + process_document调用链 |
+| `tests/acceptance/test_story_1_16_steps.py` | L657 BrokenRepo + L82 InMemoryRepo 内部类sync→async |
+| `tests/acceptance/test_story_1_14b_steps.py` | EventPublisher channel参数移除影响 |
 
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
@@ -503,7 +508,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/contracts/test_port_contract_event_publisher.py` | L53-61 `test_publish_accepts_channel_parameter` 需删除（channel参数移除后测试失败） |
 | `tests/unit/application/event_handlers/test_auto_route_handler.py` | _publish方法签名变更 |
 | `tests/unit/application/event_handlers/test_auto_execute_completed_listener.py` | _publish方法签名变更 |
-| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | publish签名channel参数移除 |
+| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | Phase 5 删除旧版文件，Phase 3 无需修改 |
 | `tests/acceptance/test_story_1_3_steps.py` | redis_publisher.publish(event, channel)调用 |
 | `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | Factory类属性清理 |
 | `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | publish路由测试移除channel参数 |
