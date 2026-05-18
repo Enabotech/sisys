@@ -1,9 +1,9 @@
 # 事件总线子系统重构详细设计与执行方案
 
-> 版本: 2.7 | 状态: 审查修订中
+> 版本: 2.8 | 状态: 审查修订中
 > 基于: `sisys-event-bus-research-report.md` v2.0
 > 第1-5轮（第一批）：v1.0→v2.0，24处P0修正
-> 第12轮（第三批）：RabbitMQPublisher未注册到DI（补注册代码示例）、test_publish_accepts_channel_parameter需删除（非仅适配）、5个EventBus Protocol缺少契约测试（OutboxRepository/DeadLetterQueue/EventSubscriber/EventStore/EventListener）
+> 第13轮（第三批）：测试内部类sync→async遗漏（FailingOutboxRepository×2、BrokenRepo）、Phase2/3连锁调用链验证通过、序列化roundtrip验证通过、DEFAULT_MAPPINGS 6/22确认正确、get_rabbitmq_routing_key未映射返回None与fallback一致
 
 ## Context
 
@@ -130,6 +130,11 @@
   - `save()`(L50) 当前有sync实现（session.add是同步操作），改为async并加入 `await self._session.flush()` 提前执行SQL INSERT并检查约束（flush不commit，但触发DB约束校验）
 - [ ] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [ ] **修改** `src/application/use_cases/document_processing.py` L63：`outbox_repo.save()` 在同步方法 `process_document` 中调用，改为async后该方法也必须改为 `async def`，所有调用者需同步适配
+- [ ] **同步修改** 测试中的手写OutboxRepository内部类（sync→async）：
+  - `tests/integration/test_layer_collaboration.py` L77-90: `FailingOutboxRepository` (4个sync方法改async)
+  - `tests/integration/test_layer_collaboration.py` L106-117: 第二个 `FailingOutboxRepository` (4个sync方法改async)
+  - `tests/acceptance/test_story_1_16_steps.py` L657-668: `BrokenRepo` (4个sync方法改async)
+  - 注意：这些内部类显式继承OutboxRepository Protocol或实现相同接口，Protocol改async后类型检查和运行时都会失败
 - [ ] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
 
 **关键文件**：
@@ -473,7 +478,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | 私有方法调用→公共接口 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` | outbox_repo.save()加await |
 | `tests/unit/application/use_cases/test_document_processing.py` | process_document同步→async |
-| `tests/integration/test_layer_collaboration.py` | process_document调用链适配async |
+| `tests/integration/test_layer_collaboration.py` | process_document调用链适配async + L77/106 FailingOutboxRepository内部类sync→async |
 | `tests/unit/infrastructure/messaging/outbox/test_outbox_processor.py` | mock私有方法改为mock公共async方法 |
 | `tests/unit/infrastructure/messaging/outbox/test_outbox_entity_state_machine.py` | OutboxRepository Protocol契约验证需适配async |
 | `tests/unit/infrastructure/messaging/unit_of_work/test_uow_transaction_boundary.py` | OutboxRepository Protocol返回DomainEvent验证 |
@@ -483,6 +488,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/acceptance/test_story_1_5_steps.py` | PostgreSQLOutboxRepository.async_get_unpublished重命名 |
 | `tests/integration/test_test_utils.py` | InMemoryEventStore import路径可能受Phase 2影响 |
 | `tests/integration/conftest.py` | OutboxRepository Protocol签名变更影响fixture |
+| `tests/acceptance/test_story_1_16_steps.py` | L657 BrokenRepo内部类sync→async + process_document调用链 |
 
 ### Phase 3 受影响测试
 | 测试文件 | 影响原因 |
