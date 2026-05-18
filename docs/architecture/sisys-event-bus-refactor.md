@@ -28,7 +28,6 @@
 3. **async一致性**：所有异步操作的Protocol签名必须为async，消除sync/async混用
 4. **显式依赖**：构造函数注入，消除ContextVar隐式依赖（本阶段先标注，Phase 2处理）
 5. **单一真实来源**：消除重复定义，每个概念只存在一处
-6. **向后兼容**：重构不破坏现有EventHandler/UseCase的调用方式
 
 ---
 
