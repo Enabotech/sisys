@@ -65,7 +65,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | memory_group_member | L2GroupMemberRepositoryPort | 4 | `src/domain/ports/memory_repository.py` |
 | snapshot_repository | SnapshotRepositoryProtocol | 3 | `src/domain/ports/snapshot_repository_protocol.py` |
 
-> **⚠️ 未注册接口（仅做接口验证，不做实现验证）：** PermissionRepositoryPort, IndexManagerPort
+> **注：** PermissionRepositoryPort 和 IndexManagerPort 属于仓储层定义但未注册，将在 Task 5 的未注册 Protocol 接口验证中统一处理（共 5 个未注册 Protocol 完整列表见第 201 行）。
 
 **待补全 — domain/ports 认证/安全/合规（已注册 10 个）：**
 | 端口注册名 | 接口类 | 方法数 | 文件 |
@@ -760,7 +760,7 @@ Feature: 端口契约测试补全
 | 方案 | 优点 | 缺点 | 评分 |
 |------|------|------|------|
 | **统一契约测试文件**（按域分组） | 易维护、发现快 | 单文件较大 | ✅ 9/10 |
-| 每端口一个测试文件 | 精确隔离 | 54 个文件过多 | 6/10 |
+| 每端口一个测试文件 | 精确隔离 | 60+ 个文件过多 | 6/10 |
 | 参数化 pytest 单文件 | 最少代码 | 失败定位难 | 7/10 |
 
 ### 项目结构说明
@@ -838,7 +838,7 @@ tests/
 **待创建的文件:**
 - `tests/contracts/conftest.py` - 公共 fixture（registry, resolver）
 - `tests/contracts/test_port_infrastructure.py` - 基础设施测试（registry/resolver/contract_gate）
-- `tests/contracts/test_port_contract_storage.py` - 存储层端口测试（已注册 9 个）
+- `tests/contracts/test_port_contract_storage.py` - 存储层端口测试（7 个已注册 + L2RdbPort 基类 + StorageEnums）
 - `tests/contracts/test_port_contract_repositories.py` - 仓储层端口测试（已注册 9 个）
 - `tests/contracts/test_port_contract_auth_security.py` - 认证安全合规测试（已注册 10 个）
 - `tests/contracts/test_port_contract_services.py` - 服务协议端口测试（已注册 7 个）
