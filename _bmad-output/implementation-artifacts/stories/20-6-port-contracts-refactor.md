@@ -43,7 +43,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 |---------|--------|-------|------|
 | l0_storage | L0StoragePort | 5 | `src/domain/ports/l0_storage.py` |
 | redis_adapter | L1CachePort | 6 | `src/domain/ports/l1_cache.py` |
-| memory_cache | MemoryCachePort | 4+6 | `src/domain/ports/memory_repository.py` (继承 L1CachePort) |
+| memory_cache | MemoryCachePort | 4+6 | `src/application/ports/memory_cache_port.py` (继承 L1CachePort) |
 | l3_vector | L3VectorPort | 9 | `src/domain/ports/l3_vector.py` |
 | l4_object | L4ObjectPort | 6 | `src/domain/ports/l4_object.py` |
 | l5_graph | L5GraphPort | 9 | `src/domain/ports/l5_graph.py` |
@@ -58,7 +58,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 |---------|--------|-------|------|
 | role_repo | RoleRepositoryPort | 5 | `src/domain/ports/role_repository.py` |
 | user_role_repo | UserRoleRepositoryPort | 4 | `src/domain/ports/user_role_repository.py` |
-| login_attempt_repo | LoginAttemptRepositoryPort | 6 | `src/domain/ports/login_attempt_repository.py` |
+| login_attempt_repo | LoginAttemptRepositoryPort | 7 | `src/domain/ports/login_attempt_repository.py` |
 | audit_repo | AuditRepositoryPort | 5 | `src/domain/ports/audit_repository.py` |
 | outbox_repo | OutboxRepository | 4 | `src/domain/ports/outbox.py` |
 | memory_metadata | L2MetadataRepositoryPort | 3+4 | `src/domain/ports/memory_repository.py` |
@@ -116,7 +116,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | memory_vector_storage | MemoryVectorPort | L3VectorPort | 2+9 | `src/application/ports/memory_vector_port.py` |
 | text_extractor | TextExtractorService | Protocol | 2 | `src/application/ports/text_extractor_service.py` |
 | memory_graph_storage | MemoryGraphPort | L5GraphPort | 2+9 | `src/application/ports/memory_graph_port.py` |
-| metrics | MetricsPort | Protocol | 11 | `src/application/ports/metrics_port.py` |
+| metrics | MetricsPort | Protocol | 12 | `src/application/ports/metrics_port.py` |
 | event_subscriber | EventSubscriber | Protocol | 4 | `src/application/ports/event_subscriber.py` |
 
 **基础设施端口（使用第三方接口，需特殊处理）：**
@@ -209,7 +209,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有契约测试使用统一的 fixture/base class 模式
 
 **验证标准:**
-- [ ] 创建 `tests/contracts/conftest.py` 定义公共 fixture（bootstrapped_registry, resolver）
+- [ ] 创建 `tests/contracts/conftest.py` 定义公共 fixture（registry, resolver）
 - [ ] 现有 3 个测试文件重构为使用公共 fixture
 - [ ] 新测试文件全部使用统一模式
 - [ ] `pytest tests/contracts/ -v` 全部通过
@@ -248,19 +248,28 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 - 应用层端口：`tests/contracts/test_port_contract_application.py`
 
 **公共 fixture（`tests/contracts/conftest.py`）：**
+
+> **⚠️ 注意：** `tests/conftest.py` 已有 `_bootstrap_once` fixture（autouse, session-scoped）自动调用 `bootstrap()`。
+> 因此 contracts conftest 不需要重复 bootstrap，只需提供 resolver 便利 fixture。
+
 ```python
-@pytest.fixture(scope="session")
-def bootstrapped_registry():
-    """确保 composition_root.bootstrap() 已调用"""
-    from src.composition_root import bootstrap
-    bootstrap()
-    from src.domain.ports.registry import _global_registry
-    return _global_registry
+# tests/contracts/conftest.py
+from __future__ import annotations
+
+import pytest
+from src.domain.ports.registry import _global_registry
+from src.domain.ports.resolver import Resolver
+
 
 @pytest.fixture(scope="session")
-def resolver(bootstrapped_registry):
+def registry():
+    """提供已初始化的端口注册中心（bootstrap 由 tests/conftest.py 自动调用）"""
+    return _global_registry
+
+
+@pytest.fixture(scope="session")
+def resolver():
     """提供已初始化的 Resolver"""
-    from src.domain.ports.resolver import Resolver
     return Resolver()
 ```
 
@@ -271,8 +280,8 @@ class TestXxxPortContract:
     INTERFACE = XxxProtocol
     REQUIRED_METHODS = ["method1", "method2"]
 
-    def test_port_is_registered(self, bootstrapped_registry):
-        spec = bootstrapped_registry.get(self.PORT_NAME)
+    def test_port_is_registered(self, registry):
+        spec = registry.get(self.PORT_NAME)
         assert spec is not None
         assert spec.interface is self.INTERFACE
 
@@ -282,8 +291,8 @@ class TestXxxPortContract:
             assert hasattr(impl, method)
             assert callable(getattr(impl, method))
 
-    def test_metadata_complete(self, bootstrapped_registry):
-        spec = bootstrapped_registry.get(self.PORT_NAME)
+    def test_metadata_complete(self, registry):
+        spec = registry.get(self.PORT_NAME)
         assert spec.version
         assert spec.owner
         assert spec.module
@@ -393,7 +402,7 @@ Feature: 端口契约测试补全
 
 | 约束类型 | 规则 |
 |---------|------|
-| **注册中心隔离** | 契约测试使用 bootstrapped_registry fixture，不手动注册/注销端口 |
+| **注册中心隔离** | 契约测试使用 registry fixture，不手动注册/注销端口 |
 | **解析器隔离** | Resolver 实例不跨测试共享状态 |
 | **幂等性** | 测试可重复运行，不依赖执行顺序 |
 | **并行安全** | `pytest tests/contracts/ -n 4` 通过 |
@@ -450,7 +459,7 @@ Feature: 端口契约测试补全
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `conftest.py` fixture 引用测试（验证 fixture 可用） |
-| 🟢 绿 | 实现 bootstrapped_registry / resolver fixture |
+| 🟢 绿 | 实现 registry / resolver fixture |
 | 🔄 重构 | 优化 fixture scope 和依赖注入 |
 
 - [ ] Subtask 1.1: 🔴 红 — 编写 fixture 存在性断言测试
@@ -551,7 +560,7 @@ Feature: 端口契约测试补全
 - [ ] Subtask 3.2: 🔴 红 — 编写 RoleRepositoryPort 契约测试（get_by_id/get_by_name/list_all/save/delete）
 - [ ] Subtask 3.3: 🔴 红 — 编写 UserRoleRepositoryPort 契约测试（assign_role/revoke_role/get_user_roles/get_role_users）
 - [ ] Subtask 3.4: 🔴 红 — 编写 PermissionRepositoryPort 契约测试（get_by_name/get_by_id/save/delete/list_all）
-- [ ] Subtask 3.5: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（6 个方法）
+- [ ] Subtask 3.5: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（record_attempt/get_recent_failed_attempts/is_account_locked/get_lockout_remaining_minutes/clear_attempts/check_and_record_lockout/record_attempt_and_check_lockout）
 - [ ] Subtask 3.6: 🔴 红 — 编写 AuditRepositoryPort 契约测试（save/get_by_id/search/update_archive_status/get_archive_status）
 - [ ] Subtask 3.7: 🔴 红 — 编写 OutboxRepository 契约测试（save/get_unpublished/mark_published/mark_failed）
 - [ ] Subtask 3.8: 🔴 红 — 编写 L2MetadataRepositoryPort 契约测试（get_by_name/list_by_user/list_by_type + 继承方法）
@@ -665,7 +674,7 @@ Feature: 端口契约测试补全
 - [ ] Subtask 6.10: 🔴 红 — 编写 SessionCachePort 契约测试（save_session/load_session/delete_session/session_exists + 继承 L1CachePort）
 - [ ] Subtask 6.11: 🔴 红 — 编写 TextExtractorService 契约测试（extract/supports + ExtractionResult dataclass）
 - [ ] Subtask 6.12: 🔴 红 — 编写 MemoryGraphPort 契约测试（index_memory_relations/get_knowledge_graph + 继承 L5GraphPort）
-- [ ] Subtask 6.13: 🔴 红 — 编写 MetricsPort 契约测试（11 个方法）
+- [ ] Subtask 6.13: 🔴 红 — 编写 MetricsPort 契约测试（collect/collect_as_dict/record_sessions/record_queue_length/record_cache_hit/record_cache_miss/record_event_processed/update_processing_rate/get_hit_rate/get_sessions/get_queue_length/get_processing_rate）
 - [ ] Subtask 6.14: 🔴 红 — 编写 EventSubscriber 契约测试（subscribe/subscribe_async/start/close）
 - [ ] Subtask 6.15: 🟢 绿 — 运行全部通过
 - [ ] Subtask 6.16: 🔄 重构 — 提取继承验证公共模式
@@ -791,7 +800,7 @@ tests/
 ### 文件清单
 
 **待创建的文件:**
-- `tests/contracts/conftest.py` - 公共 fixture（bootstrapped_registry, resolver）
+- `tests/contracts/conftest.py` - 公共 fixture（registry, resolver）
 - `tests/contracts/test_port_infrastructure.py` - 基础设施测试（registry/resolver/contract_gate）
 - `tests/contracts/test_port_contract_storage.py` - 存储层端口测试（已注册 9 个）
 - `tests/contracts/test_port_contract_repositories.py` - 仓储层端口测试（已注册 10 个）
@@ -843,6 +852,10 @@ tests/
 | 4 | 未注册端口（5 个）混入待补全列表 | P0 | 新增"未注册 Protocol"策略说明和独立测试文件 |
 | 5 | 服务协议表命名不一致 | P1 | 统一使用端口注册名，拆分已注册/未注册 |
 | 6 | TDD 模式不适用于纯测试 Story | P2 | 添加纯测试 Story 的 TDD 变体说明 |
+| 7 | login_attempt_repo 方法数错误（6→7） | P0 | 补充 record_attempt_and_check_lockout |
+| 8 | MetricsPort 方法数错误（11→12） | P0 | 补充 get_processing_rate |
+| 9 | memory_cache 文件路径错误 | P0 | 修正为 application/ports/memory_cache_port.py |
+| 10 | fixture 策略冲突（已有 _bootstrap_once） | P0 | 移除冗余 bootstrap，改用 registry fixture 直接引用 _global_registry |
 
 ### 下一步
 
