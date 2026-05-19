@@ -1,13 +1,14 @@
 # SISYS 事务子系统重构详细设计与执行方案
 
-> **文档版本：** 1.0.3
+> **文档版本：** 1.0.4
 > **创建日期：** 2026-05-18
-> **状态：** Round 3 审查修订中
+> **状态：** Round 4 审查修订中
 > **维护者：** Agimtech
 > **修订记录**：
 > - v1.0.1: Round 1 — 精确验证实际代码，修正文档与代码不一致；重新评估风险等级
 > - v1.0.2: Round 2 — 发现 Outbox archived 状态冲突、状态机绕过；新增 P6-P8；更新 Phase 2/3
-> - v1.0.3: Round 3 — 修正 D2 工厂模式（Callable 不可行，需 UnitOfWorkFactory Protocol）；新增 D6 ContextVar 权衡；补充测试差距
+> - v1.0.3: Round 3 — 修正 D2 工厂模式；新增 D6 ContextVar 权衡；补充测试差距
+> - v1.0.4: Round 4 — Saga 技术可行性验证；单表替代三表；混合式替代纯编舞式；新增架构约束
 > **前置文档：** `sisys-eda-unitofwork-design.md` (v1.0.6, Phase 1 已完成)
 > **关联文档：** `architecture.md` (v8.3.1), `arch-appendix.md` (附录J Saga 设计)
 
@@ -567,19 +568,26 @@ SagaOrchestrator.execute()
 - [ ] **Task 3.1**: 创建 `src/infrastructure/saga/` 模块
   - `__init__.py`
   - `saga_step.py` — SagaStep ABC（execute + compensate + get_description）
-  - `saga_context.py` — SagaContext（saga_id, status, steps_data, errors）
+  - `saga_context.py` — SagaContext（saga_id, status, steps_data, errors）+ `to_dict()` 序列化方法
   - `saga_status.py` — SagaStatus 枚举
+  - 新增: `src/domain/events/saga_events.py` — SagaStatusChanged 等 DomainEvent 子类
+    > arch-appendix.md 中 `_persist_status()` 传递 raw dict 给 `publish()`，但实际接口接收 `DomainEvent`。必须定义 Saga 事件类型。
 
-- [ ] **Task 3.2**: 实现 SagaOrchestrator
+- [ ] **Task 3.2**: 实现 SagaOrchestrator（混合式）
   - `src/infrastructure/saga/saga_orchestrator.py`
   - 正向执行 + 带重试（execute_with_retry）
   - 补偿流程（逆序 _compensate）
-  - 状态持久化（_persist_status）
-  - 每个 Step 在独立 UoW 中执行
+  - 状态持久化（_persist_status）— 通过 DomainEvent 子类发布
+  - 每个 Step 在独立 `session_context(session_factory)` 中执行
+    > Step 必须使用 session_context() 创建独立 scope，而非共享 ContextVar session。
+  - 所有 `datetime.utcnow()` 修正为 `datetime.now(UTC)`
 
-- [ ] **Task 3.3**: 实现 SagaRepository（PostgreSQL）
+- [ ] **Task 3.3**: 实现 SagaRepository（PostgreSQL 单表方案）
   - `src/infrastructure/saga/saga_repository.py`
-  - saga_instance 表（saga_id, saga_type, status, context_data, created_at, updated_at）
+  - **单表 `saga_instance`**（替代 arch-appendix 三表方案，降低初期复杂度）:
+    - saga_id (UUID PK), saga_type, status, current_step
+    - steps_data (JSONB), errors (JSONB), correlation_id (UUID)
+    - created_at, updated_at, completed_at
   - save / load / update_status 方法
   - 新增 Alembic 迁移脚本
 
@@ -608,9 +616,15 @@ SagaOrchestrator.execute()
 
 **目标**：按优先级实现具体 Saga 场景。
 
-- [ ] **Task 4.1**: 实现 S01 文档处理与索引 Saga（编舞式）
-  - Steps: UploadDocument → SaveMetadata → GenerateEmbedding → ExtractEntities
-  - 最终一致性，事件驱动
+**架构约束**：
+- 所有场景采用**混合式**（事件触发 + Orchestrator 编排），纯编舞式需先实现 RabbitMQ Consumer
+- WORM 归档必须在 Saga 全部完成后执行，避免补偿时遇到 ComplianceLockError
+- 跨存储层补偿（MinIO/Qdrant）为**尽力而为**，失败标记 HALTED + 定时对账
+- **禁止跨租户事务**，跨租户操作必须通过事件驱动最终一致性实现
+
+- [ ] **Task 4.1**: 实现 S01 文档处理与索引 Saga（混合式）
+  - Steps: UploadDocument(普通上传,不WORM) → SaveMetadata → GenerateEmbedding → ExtractEntities → WORM归档(Saga完成后)
+  - 最终一致性，事件驱动触发
 
 - [ ] **Task 4.2**: 实现 S02 战略规划创建 Saga（编排式）
   - Steps: SavePlan → ArchiveEvidence
@@ -831,3 +845,26 @@ poetry run pytest --tb=short
 - UoW 工厂应使用 TRANSIENT 生命周期
 - `session_factory` 注册模式（返回 async_sessionmaker 类本身）可供 UoW 工厂参考
 - 测试覆盖差距: 业务+outbox 原子性测试、隔离级别测试、故障注入框架、Saga 测试
+
+### Round 4: EPIC 需求对齐 + Saga 技术可行性
+
+**审查方法**: 2 个 Agent 并行验证 EPIC/STORY 映射和 Saga 技术实现
+
+**P0 发现与修正**:
+
+| # | 发现 | 修正措施 |
+|---|------|---------|
+| P0-1 | arch-appendix Saga `publish()` 传递 raw dict，但实际接口需要 DomainEvent | Task 3.1 新增 `src/domain/events/saga_events.py` |
+| P0-2 | Phase 1 是 Saga 硬性前置依赖（UoW + session_context 双重 close） | Phase 3 明确标注依赖 Phase 1 |
+| P0-3 | RELIABLE 事件无法通过 subscribe() 订阅（DualChannelEventBus 抛 ValueError） | Phase 4 改为混合式，编舞式延后 |
+| P0-4 | WORM 归档对象无法补偿删除（抛 ComplianceLockError） | Phase 4 新增约束：WORM 在 Saga 完成后执行 |
+| P0-5 | arch-appendix 三表方案复杂度过高 | Task 3.3 改为单表 saga_instance |
+| P0-6 | 跨存储层补偿非原子（MinIO/Qdrant 不支持事务） | Phase 4 新增约束：补偿为尽力而为 + HALTED |
+| P0-7 | 跨租户事务约束缺失 | Phase 4 新增约束：禁止跨租户事务 |
+
+**EPIC/STORY 需求覆盖评估**:
+- Phase 1 应立即启动 — 阻塞 Story 1-11/1-17 当前开发
+- Phase 2 可延后至 Epic 2 启动前
+- Phase 3/4 可延后至 Epic 4-6 启动前
+- Saga S01-S10 与 EPIC 2-13 的 STORY 有明确对应关系
+- 设计覆盖率 95%，仅跨租户事务约束为新增补充
