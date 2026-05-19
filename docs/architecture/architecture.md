@@ -3766,7 +3766,7 @@ class PersistentNoteTaker:
             query=query,
             session_id=session_id,
             user_id=user_id,
-            timestamp=datetime.utcnow()
+            timestamp= datetime.now(UTC)
         )
 
         # 1. 提取关键实体与关系 → 写入 StrategicArchive（L0-L5 六层存储）
@@ -3789,7 +3789,7 @@ class PersistentNoteTaker:
             document_ids=[doc.id for doc in retrieved_docs],
             user_id=user_id,
             session_id=session_id,
-            timestamp=datetime.utcnow()
+            timestamp= datetime.now(UTC)
         )
         note.lineage = lineage
         await self.audit_log.save(lineage)
@@ -3797,7 +3797,7 @@ class PersistentNoteTaker:
 
         # 4. 持久化完成标记
         note.persisted = True
-        note.persisted_at = datetime.utcnow()
+        note.persisted_at =  datetime.now(UTC)
 
         # 5. 持久化笔记序列化至 Redis（L1 高速缓存，TTL 30 天）
         await self.redis.setex(
@@ -5614,26 +5614,26 @@ class StrategicPlan:
         self._creator_id = creator_id
         self._checkpoints: List[Checkpoint] = []
         self._version: int = 1
-        self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.created_at =  datetime.now(UTC)
+        self.updated_at =  datetime.now(UTC)
 
     # 公共方法 - 业务行为
     def start_market_insight(self) -> None:
         """启动市场洞察阶段"""
         self._blm_stage = BLMStage.MARKET_INSIGHT
-        self.updated_at = datetime.utcnow()
+        self.updated_at =  datetime.now(UTC)
 
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """添加检查点"""
         self._checkpoints.append(checkpoint)
-        self.updated_at = datetime.utcnow()
+        self.updated_at =  datetime.now(UTC)
 
     def approve(self) -> None:
         """批准规划"""
         if self._status != PlanStatus.IN_PROGRESS:
             raise ValidationError("只有进行中的规划可以批准")
         self._status = PlanStatus.APPROVED
-        self.updated_at = datetime.utcnow()
+        self.updated_at =  datetime.now(UTC)
 
     # 私有方法 - 内部实现
     def _validate_status(self, status: str) -> bool:
@@ -6178,7 +6178,7 @@ class StructuredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp":  datetime.now(UTC).isoformat() + "Z",
             "level": record.levelname,
             "service": "sisys-api",
             "trace_id": getattr(record, "trace_id", None),
