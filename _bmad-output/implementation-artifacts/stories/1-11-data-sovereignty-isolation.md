@@ -69,18 +69,18 @@
 **And** 触发 `SensitiveDataDetected` 事件
 
 **验证标准/Validation Criteria:**
-- [ ] 实体类 `SensitiveDataResult` 定义（`src/domain/entities/sensitive_data_result.py`）
-- [ ] `SensitiveDataDetector` 服务接口（`src/domain/ports/sensitive_data_detector.py`）
-- [ ] 正则表达式检测 PII（姓名、身份证、电话、邮箱）
-- [ ] 关键词检测商业秘密（技术配方、客户列表、战略计划）
-- [ ] 实体类检测金融数据（银行账号、信用卡号、保险单号、证券账户、基金账号、征信记录）
-- [ ] 生物识别数据检测（指纹、虹膜、声纹、人脸识别、DNA）（V1阶段）
-- [ ] 精确位置与行踪轨迹检测（GPS坐标、IP地址、WiFi定位）（V1阶段）
-- [ ] 医疗健康数据检测（疾病史、诊断记录、遗传信息）（V1阶段）
-- [ ] 宗教信仰数据检测（宗教信仰、政治观点）（V1阶段）
-- [ ] 未成年人数据识别（年龄<14周岁触发监护人同意）（V1阶段）
-- [ ] `SensitiveDataDetected` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
-- [ ] 单元测试覆盖正常检测、边界情况（空数据、混淆数据）
+- [x] 实体类 `SensitiveDataResult` 定义（`src/domain/entities/sensitive_data_result.py`）
+- [x] `SensitiveDataDetector` 服务接口（`src/domain/ports/sensitive_data_detector.py`）
+- [x] 正则表达式检测 PII（姓名、身份证、电话、邮箱）
+- [x] 关键词检测商业秘密（技术配方、客户列表、战略计划）
+- [x] 实体类检测金融数据（银行账号、信用卡号、保险单号、证券账户、基金账号、征信记录）
+- [x] 生物识别数据检测（指纹、虹膜、声纹、人脸识别、DNA）（V1阶段）
+- [x] 精确位置与行踪轨迹检测（GPS坐标、IP地址、WiFi定位）（V1阶段）
+- [x] 医疗健康数据检测（疾病史、诊断记录、遗传信息）（V1阶段）
+- [x] 宗教信仰数据检测（宗教信仰、政治观点）（V1阶段）
+- [x] 未成年人数据识别（年龄<14周岁触发监护人同意）（V1阶段）
+- [x] `SensitiveDataDetected` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
+- [x] 单元测试覆盖正常检测、边界情况（空数据、混淆数据）
 
 ### AC-2: 本地优先处理（Data Residency Enforcement）
 
@@ -91,15 +91,15 @@
 **And** 若检测到违规，触发 `DataSovereigntyViolation` 事件
 
 **验证标准/Validation Criteria:**
-- [ ] `DataResidencyPolicy` 实体定义（allowed_regions, blocked_regions, CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS）
-- [ ] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
-- [ ] `ComplianceGateway` 合规性网关（`src/infrastructure/security/compliance_gateway_impl.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
-- [ ] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）- async def check(task: Task) -> ComplianceResult
-- [ ] `Task` 类型定义（`src/domain/value_objects/udmr_task.py`）：input, data_residency, preferred_model, allowed_models
-- [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型，通过 UDMRouter.route_async() 调用）
-- [ ] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
-- [ ] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
-- [ ] 集成测试验证本地优先策略生效
+- [x] `DataResidencyPolicy` 实体定义（allowed_regions, blocked_regions, CHINA_DOMESTIC/CHINA_HKMO/OVERSEAS）
+- [x] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
+- [x] `ComplianceGateway` 合规性网关（`src/infrastructure/security/compliance_gateway_impl.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
+- [x] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）- async def check(task: Task) -> ComplianceResult
+- [x] `Task` 类型定义（`src/domain/value_objects/udmr_task.py`）：input, data_residency, preferred_model, allowed_models
+- [x] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型，通过 UDMRouter.route_async() 调用）
+- [x] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
+- [x] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
+- [x] 集成测试验证本地优先策略生效
 
 ### AC-3: 白名单管理（Whitelist Management）
 
@@ -110,16 +110,16 @@
 **And** 验证失败记录违规并阻止调用
 
 **验证标准/Validation Criteria:**
-- [ ] `ExternalAPIWhitelist` 实体定义（`src/domain/entities/external_api_whitelist.py`）
+- [x] `ExternalAPIWhitelist` 实体定义（`src/domain/entities/external_api_whitelist.py`）
   - 字段: `api_id`, `endpoint`, `provider`, `region`, `is_verified`, `risk_level`, `valid_from`, `valid_until`
   - 风险等级: `HIGH` (高风险-需DPO审批+安全评估), `MEDIUM` (中风险-需主管审批), `LOW` (低风险-自动审批)
   - 高风险审批要求: DPO审批、24小时时效、安全评估报告
-- [ ] `WhitelistService` 服务接口（`src/domain/ports/whitelist_service.py`）
-- [ ] `WhitelistServiceImpl` 实现（`src/infrastructure/security/whitelist_service_impl.py`）
-- [ ] CRUD 接口: 创建/查询/更新/删除白名单条目
-- [ ] `is_allowed()` 方法验证 API 是否在白名单且未过期
-- [ ] 过期处理策略: 默认自动拒绝，到期前7天续期提醒
-- [ ] 单元测试覆盖白名单验证通过、未通过、过期场景
+- [x] `WhitelistService` 服务接口（`src/domain/ports/whitelist_service.py`）
+- [x] `WhitelistServiceImpl` 实现（`src/infrastructure/security/whitelist_service_impl.py`）
+- [x] CRUD 接口: 创建/查询/更新/删除白名单条目
+- [x] `is_allowed()` 方法验证 API 是否在白名单且未过期
+- [x] 过期处理策略: 默认自动拒绝，到期前7天续期提醒
+- [x] 单元测试覆盖白名单验证通过、未通过、过期场景
 
 ### AC-4: 跨境数据传输审批（Cross-Border Transfer Approval）
 
@@ -130,16 +130,16 @@
 **And** 所有跨境传输记录至审计日志
 
 **验证标准/Validation Criteria:**
-- [ ] `CrossBorderTransferRequest` 实体定义（`src/domain/entities/cross_border_transfer.py`）
+- [x] `CrossBorderTransferRequest` 实体定义（`src/domain/entities/cross_border_transfer.py`）
   - 字段: `request_id`, `data_id`, `destination`, `purpose`, `status`, `requester`, `approver`, `approval_timestamp`, `legal_basis_type`
   - 法律依据类型: scc(标准合同条款), adequacy_assessment(充分性认定), security_assessment(安全评估), other(法律法规其他条件)
-- [ ] `CrossBorderTransferService` 服务接口（`src/domain/ports/cross_border_transfer_service.py`）
-- [ ] `CrossBorderTransferServiceImpl` 实现（`src/infrastructure/security/cross_border_transfer_service_impl.py`）
-- [ ] 审批流程: pending → approved/rejected → executed/blocked
-- [ ] SLA 控制: 普通 4 小时，紧急 1 小时
-- [ ] `CrossBorderTransferRequested` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
-- [ ] 审计日志集成（Story 1.10）
-- [ ] PIPL第38条合规: 安全评估/认证/SCC/其他条件四选一
+- [x] `CrossBorderTransferService` 服务接口（`src/domain/ports/cross_border_transfer_service.py`）
+- [x] `CrossBorderTransferServiceImpl` 实现（`src/infrastructure/security/cross_border_transfer_service_impl.py`）
+- [x] 审批流程: pending → approved/rejected → executed/blocked
+- [x] SLA 控制: 普通 4 小时，紧急 1 小时
+- [x] `CrossBorderTransferRequested` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
+- [x] 审计日志集成（Story 1.10）
+- [x] PIPL第38条合规: 安全评估/认证/SCC/其他条件四选一
 
 ### AC-5: PIPL 合规（Personal Information Protection Law）
 
@@ -150,15 +150,15 @@
 **And** 记录至审计日志
 
 **验证标准/Validation Criteria:**
-- [ ] `PIPLComplianceRecord` 实体定义（`src/domain/entities/pipl_compliance_record.py`）
+- [x] `PIPLComplianceRecord` 实体定义（`src/domain/entities/pipl_compliance_record.py`）
   - 字段: `access_id`, `personal_data_id`, `purpose`, `legal_basis`, `consent_status`, `accessor`, `accessed_at`, `data_subject_id`
   - 法律依据: consent(同意), contract(合同), legal_obligation(法定义务), vital_interest(生命利益), public_task(公共任务), legitimate_interest(合法权益), minor_consent(未成年人监护人同意)
   - 同意有效性: consent必须为明确同意(非默示)，需支持撤回机制
-- [ ] `PIPLComplianceService` 服务接口（`src/domain/ports/pipl_compliance_service.py`）
-- [ ] `PIPLComplianceServiceImpl` 实现（`src/infrastructure/security/pipl_compliance_service_impl.py`）
-- [ ] 数据主体权利接口: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
-- [ ] `PIPLDataAccessRequested` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
-- [ ] 合规检查测试覆盖所有法律依据场景
+- [x] `PIPLComplianceService` 服务接口（`src/domain/ports/pipl_compliance_service.py`）
+- [x] `PIPLComplianceServiceImpl` 实现（`src/infrastructure/security/pipl_compliance_service_impl.py`）
+- [x] 数据主体权利接口: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`
+- [x] `PIPLDataAccessRequested` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
+- [x] 合规检查测试覆盖所有法律依据场景
 
 ### AC-6: 等保 2.0 合规基础
 
@@ -169,13 +169,13 @@
 **And** 敏感数据保护符合要求
 
 **验证标准/Validation Criteria:**
-- [ ] 安全架构约束验证测试就绪
-- [ ] 敏感数据检测覆盖关键类型（PII/商业秘密/金融数据/生物识别）
-- [ ] 白名单验证机制正常工作（高/中/低风险分级审批）
-- [ ] 跨境审批流程符合 SLA（普通4小时/紧急1小时）
-- [ ] 审计日志完整性验证（事件追溯）
-- [ ] 数据主体权利响应机制就绪（访问/更正/删除/可携带权）
-- [ ] 违规补救机制就绪（隔离/销毁/通知/整改）
+- [x] 安全架构约束验证测试就绪
+- [x] 敏感数据检测覆盖关键类型（PII/商业秘密/金融数据/生物识别）
+- [x] 白名单验证机制正常工作（高/中/低风险分级审批）
+- [x] 跨境审批流程符合 SLA（普通4小时/紧急1小时）
+- [x] 审计日志完整性验证（事件追溯）
+- [x] 数据主体权利响应机制就绪（访问/更正/删除/可携带权）
+- [x] 违规补救机制就绪（隔离/销毁/通知/整改）
 
 ---
 
@@ -191,31 +191,31 @@
 #### 数据模型 (Data Models)
 
 **领域值对象:**
-- [ ] `ComplianceResult` (`src/domain/value_objects/compliance_result.py`)
+- [x] `ComplianceResult` (`src/domain/value_objects/compliance_result.py`)
   - 字段: `allowed: bool`, `reason: str`, `forced_local: bool`, `violation_type: str | None`
   - 方法: `is_allowed()`, `is_violation()`, `get_violation_type()`
-- [ ] `Task` (`src/domain/value_objects/udmr_task.py`) - UDMR路由任务类型
+- [x] `Task` (`src/domain/value_objects/udmr_task.py`) - UDMR路由任务类型
   - 字段: `task_id: UUID`, `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
   - 方法: `is_china_domestic()`, `requires_local_processing()`
   - UDMR集成: Task -> task_context转换逻辑: `{"task_id": str(task.task_id), "session_id": str(task.task_id), "complexity": "high" if task.requires_local_processing() else "normal"}`
 
 **领域实体:**
-- [ ] `SensitiveDataResult` (`src/domain/entities/sensitive_data_result.py`)
+- [x] `SensitiveDataResult` (`src/domain/entities/sensitive_data_result.py`)
   - 字段: `result_id` (UUID), `source_data_hash`, `sensitive_types: list[SensitiveType]`, `confidence: float`, `labels: list[str]`, `detected_at`
   - 方法: `is_high_confidence()`, `has_type()`, `merge_with()`
   - 说明: 定义为领域实体因需唯一标识和状态变更
 
 **领域实体:**
-- [ ] `DataResidencyPolicy` (`src/domain/entities/data_residency_policy.py`)
+- [x] `DataResidencyPolicy` (`src/domain/entities/data_residency_policy.py`)
   - 字段: `policy_id`, `name`, `allowed_regions: list[str]`, `blocked_regions: list[str]`, `enforcement_level`
   - 方法: `is_allowed_region()`, `is_blocked_region()`
-- [ ] `ExternalAPIWhitelist` (`src/domain/entities/external_api_whitelist.py`)
+- [x] `ExternalAPIWhitelist` (`src/domain/entities/external_api_whitelist.py`)
   - 字段: `api_id`, `endpoint`, `provider`, `region`, `is_verified`, `risk_level`, `valid_from`, `valid_until`
   - 方法: `is_valid()`, `is_high_risk()`
-- [ ] `CrossBorderTransferRequest` (`src/domain/entities/cross_border_transfer.py`)
+- [x] `CrossBorderTransferRequest` (`src/domain/entities/cross_border_transfer.py`)
   - 字段: `request_id`, `data_id`, `destination`, `purpose`, `status`, `requester`, `approver`, `approval_timestamp`
   - 方法: `approve()`, `reject()`, `execute()`, `block()`
-- [ ] `PIPLComplianceRecord` (`src/domain/entities/pipl_compliance_record.py`)
+- [x] `PIPLComplianceRecord` (`src/domain/entities/pipl_compliance_record.py`)
   - 字段: `access_id`, `personal_data_id`, `purpose`, `legal_basis`, `consent_status`, `accessor`, `accessed_at`, `data_subject_id`
   - 法律依据类型: consent, contract, legal_obligation, vital_interest, public_task, legitimate_interest, minor_consent
   - 方法: `validate_consent()`, `is_compliant()`, `validate_minor_consent()`
@@ -224,18 +224,18 @@
 
 > ⚠️ **六边形架构约束：服务接口定义在 `src/domain/ports/`，仅依赖 Python 标准库**
 
-- [ ] `SensitiveDataDetectorPort` (`src/domain/ports/sensitive_data_detector.py`)
+- [x] `SensitiveDataDetectorPort` (`src/domain/ports/sensitive_data_detector.py`)
   - 方法: `detect_sensitive_data(content: str) -> SensitiveDataResult`
-- [ ] `DataResidencyEnforcerPort` (`src/domain/ports/data_residency_enforcer.py`)
+- [x] `DataResidencyEnforcerPort` (`src/domain/ports/data_residency_enforcer.py`)
   - 方法: `enforce_residency(data: Any, target_region: str) -> bool`, `check_violation(data: Any) -> bool`
-- [ ] `WhitelistServicePort` (`src/domain/ports/whitelist_service.py`)
+- [x] `WhitelistServicePort` (`src/domain/ports/whitelist_service.py`)
   - 方法: `is_allowed(api_endpoint: str) -> bool`, `add_to_whitelist(api: ExternalAPIWhitelist) -> None`
-- [ ] `CrossBorderTransferServicePort` (`src/domain/ports/cross_border_transfer_service.py`)
+- [x] `CrossBorderTransferServicePort` (`src/domain/ports/cross_border_transfer_service.py`)
   - 方法: `request_transfer(data: CrossBorderTransferRequest) -> None`, `approve(transfer_id: UUID) -> None`
-- [ ] `PIPLComplianceServicePort` (`src/domain/ports/pipl_compliance_service.py`)
+- [x] `PIPLComplianceServicePort` (`src/domain/ports/pipl_compliance_service.py`)
   - 方法: `record_access(record: PIPLComplianceRecord) -> None`, `validate_legal_basis(data_id: UUID, legal_basis: str) -> bool`
   - 数据主体权利: `respond_to_access_request()`, `respond_to_correction_request()`, `respond_to_deletion_request()`, `respond_to_portability_request()`, `respond_to_automated_decision_request()` (PIPL第24条自动化决策拒绝权)
-- [ ] `ComplianceGatewayPort` (`src/domain/ports/compliance_gateway.py`)
+- [x] `ComplianceGatewayPort` (`src/domain/ports/compliance_gateway.py`)
   - 方法: `async def check(task: Task) -> ComplianceResult`
   - 说明: UDMR L1 合规性网关端口
   - Task 类型定义:
@@ -248,15 +248,15 @@
 
 > **注意：** 以下事件已在 `src/domain/events/compliance_events.py` 中定义，可直接复用
 
-- [ ] `SensitiveDataDetected` - 敏感数据检测事件
-- [ ] `DataSovereigntyViolation` - 数据主权违规事件
-- [ ] `CrossBorderTransferRequested` - 跨境传输请求事件
-- [ ] `PIPLDataAccessRequested` - PIPL 数据访问请求事件
+- [x] `SensitiveDataDetected` - 敏感数据检测事件
+- [x] `DataSovereigntyViolation` - 数据主权违规事件
+- [x] `CrossBorderTransferRequested` - 跨境传输请求事件
+- [x] `PIPLDataAccessRequested` - PIPL 数据访问请求事件
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [ ] 功能测试文件：`tests/acceptance/test_story_1_11.feature`
-- [ ] 覆盖场景:
+- [x] 功能测试文件：`tests/acceptance/test_story_1_11.feature`
+- [x] 覆盖场景:
   - 敏感数据检测（PII、商业秘密、金融数据）
   - 本地优先处理验证
   - 白名单验证通过/拒绝
@@ -265,10 +265,10 @@
   - 违规检测和阻止
 
 **Task 0 完成标志：**
-- [ ] 上述规范项全部定义完毕
-- [ ] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）
-- [ ] 红阶段验证应确认测试因"模块不存在/类未定义"而失败，而非业务断言失败
-- [ ] 规范文档通过人工评审或自动化校验
+- [x] 上述规范项全部定义完毕
+- [x] Gherkin 验收测试已编写，运行确认失败（🔴 红阶段验证）
+- [x] 红阶段验证应确认测试因"模块不存在/类未定义"而失败，而非业务断言失败
+- [x] 规范文档通过人工评审或自动化校验
 
 ---
 
@@ -315,19 +315,19 @@
 
 > **目的：** 在进入代码实现前，明确数据模型、服务接口、验收标准。
 
-- [ ] Subtask 0.1: 定义 `SensitiveDataResult` 领域实体
-- [ ] Subtask 0.2: 定义 `DataResidencyPolicy` 实体
-- [ ] Subtask 0.3: 定义 `ExternalAPIWhitelist` 实体
-- [ ] Subtask 0.4: 定义 `CrossBorderTransferRequest` 实体
-- [ ] Subtask 0.5: 定义 `PIPLComplianceRecord` 实体
-- [ ] Subtask 0.6: 定义值对象（ComplianceResult, Task）
-- [ ] Subtask 0.7: 定义服务接口（6 个 Port）
-- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_11.feature`
-- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 `SensitiveDataResult` 领域实体
+- [x] Subtask 0.2: 定义 `DataResidencyPolicy` 实体
+- [x] Subtask 0.3: 定义 `ExternalAPIWhitelist` 实体
+- [x] Subtask 0.4: 定义 `CrossBorderTransferRequest` 实体
+- [x] Subtask 0.5: 定义 `PIPLComplianceRecord` 实体
+- [x] Subtask 0.6: 定义值对象（ComplianceResult, Task）
+- [x] Subtask 0.7: 定义服务接口（6 个 Port）
+- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_11.feature`
+- [x] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -343,18 +343,18 @@
 | 🟢 绿 | 实现 `SensitiveDataDetector` 服务 |
 | 🔄 重构 | 优化检测规则和性能 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写正则检测失败测试（PII: 身份证、电话、邮箱）
-- [ ] Subtask 1.2: 🟢 绿 — 实现 PII 正则检测规则
-- [ ] Subtask 1.3: 🔴 红 — 编写商业秘密关键词检测失败测试
-- [ ] Subtask 1.4: 🟢 绿 — 实现商业秘密检测
-- [ ] Subtask 1.5: 🔴 红 — 编写金融数据检测失败测试（银行账号、信用卡）
-- [ ] Subtask 1.6: 🟢 绿 — 实现金融数据检测
-- [ ] Subtask 1.7: 🔄 重构 — 优化检测性能和边界情况处理
+- [x] Subtask 1.1: 🔴 红 — 编写正则检测失败测试（PII: 身份证、电话、邮箱）
+- [x] Subtask 1.2: 🟢 绿 — 实现 PII 正则检测规则
+- [x] Subtask 1.3: 🔴 红 — 编写商业秘密关键词检测失败测试
+- [x] Subtask 1.4: 🟢 绿 — 实现商业秘密检测
+- [x] Subtask 1.5: 🔴 红 — 编写金融数据检测失败测试（银行账号、信用卡）
+- [x] Subtask 1.6: 🟢 绿 — 实现金融数据检测
+- [x] Subtask 1.7: 🔄 重构 — 优化检测性能和边界情况处理
 
 **完成标准:**
-- [ ] `SensitiveDataDetector` 实现完成
-- [ ] 检测准确率≥95%，误报率<5%
-- [ ] 所有测试通过
+- [x] `SensitiveDataDetector` 实现完成
+- [x] 检测准确率≥95%，误报率<5%
+- [x] 所有测试通过
 
 ---
 
@@ -370,16 +370,16 @@
 | 🟢 绿 | 实现 `DataResidencyEnforcer` 服务 |
 | 🔄 重构 | 优化策略检查性能 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写区域策略验证失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 `DataResidencyEnforcer`
-- [ ] Subtask 2.3: 🔴 红 — 编写违规检测失败测试
-- [ ] Subtask 2.4: 🟢 绿 — 实现 `DataSovereigntyViolation` 事件触发
-- [ ] Subtask 2.5: 🔄 重构 — 验证 UDMR L1 合规性网关集成
+- [x] Subtask 2.1: 🔴 红 — 编写区域策略验证失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 `DataResidencyEnforcer`
+- [x] Subtask 2.3: 🔴 红 — 编写违规检测失败测试
+- [x] Subtask 2.4: 🟢 绿 — 实现 `DataSovereigntyViolation` 事件触发
+- [x] Subtask 2.5: 🔄 重构 — 验证 UDMR L1 合规性网关集成
 
 **完成标准:**
-- [ ] `DataResidencyEnforcer` 实现完成
-- [ ] 本地处理率 100%
-- [ ] 所有测试通过
+- [x] `DataResidencyEnforcer` 实现完成
+- [x] 本地处理率 100%
+- [x] 所有测试通过
 
 ---
 
@@ -395,16 +395,16 @@
 | 🟢 绿 | 实现 `WhitelistService` 服务 |
 | 🔄 重构 | 优化白名单查询性能 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写白名单创建失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现白名单 CRUD
-- [ ] Subtask 3.3: 🔴 红 — 编写 `is_allowed()` 验证失败测试
-- [ ] Subtask 3.4: 🟢 绿 — 实现白名单验证逻辑
-- [ ] Subtask 3.5: 🔄 重构 — 验证过期条目处理
+- [x] Subtask 3.1: 🔴 红 — 编写白名单创建失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现白名单 CRUD
+- [x] Subtask 3.3: 🔴 红 — 编写 `is_allowed()` 验证失败测试
+- [x] Subtask 3.4: 🟢 绿 — 实现白名单验证逻辑
+- [x] Subtask 3.5: 🔄 重构 — 验证过期条目处理
 
 **完成标准:**
-- [ ] `WhitelistService` 实现完成
-- [ ] 白名单验证 100% 准确
-- [ ] 所有测试通过
+- [x] `WhitelistService` 实现完成
+- [x] 白名单验证 100% 准确
+- [x] 所有测试通过
 
 ---
 
@@ -420,19 +420,19 @@
 | 🟢 绿 | 实现 `CrossBorderTransferService` |
 | 🔄 重构 | 验证 SLA 控制和审计日志 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写传输请求创建失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现传输请求创建
-- [ ] Subtask 4.3: 🔴 红 — 编写审批流程失败测试
-- [ ] Subtask 4.4: 🟢 绿 — 实现审批/拒绝逻辑
-- [ ] Subtask 4.5: 🔴 红 — 编写 SLA 控制失败测试
-- [ ] Subtask 4.6: 🟢 绿 — 实现 SLA 超时处理
-- [ ] Subtask 4.7: 🔄 重构 — 验证审计日志集成
+- [x] Subtask 4.1: 🔴 红 — 编写传输请求创建失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现传输请求创建
+- [x] Subtask 4.3: 🔴 红 — 编写审批流程失败测试
+- [x] Subtask 4.4: 🟢 绿 — 实现审批/拒绝逻辑
+- [x] Subtask 4.5: 🔴 红 — 编写 SLA 控制失败测试
+- [x] Subtask 4.6: 🟢 绿 — 实现 SLA 超时处理
+- [x] Subtask 4.7: 🔄 重构 — 验证审计日志集成
 
 **完成标准:**
-- [ ] `CrossBorderTransferService` 实现完成
-- [ ] 审批率 100%
-- [ ] SLA 满足（普通 4 小时，紧急 1 小时）
-- [ ] 所有测试通过
+- [x] `CrossBorderTransferService` 实现完成
+- [x] 审批率 100%
+- [x] SLA 满足（普通 4 小时，紧急 1 小时）
+- [x] 所有测试通过
 
 ---
 
@@ -448,16 +448,16 @@
 | 🟢 绿 | 实现 `PIPLComplianceService` |
 | 🔄 重构 | 验证法律依据类型覆盖 |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写访问记录失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现 `PIPLComplianceService`
-- [ ] Subtask 5.3: 🔴 红 — 编写法律依据验证失败测试（6 种类型）
-- [ ] Subtask 5.4: 🟢 绿 — 实现法律依据验证
-- [ ] Subtask 5.5: 🔄 重构 — 验证所有法律依据场景
+- [x] Subtask 5.1: 🔴 红 — 编写访问记录失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现 `PIPLComplianceService`
+- [x] Subtask 5.3: 🔴 红 — 编写法律依据验证失败测试（6 种类型）
+- [x] Subtask 5.4: 🟢 绿 — 实现法律依据验证
+- [x] Subtask 5.5: 🔄 重构 — 验证所有法律依据场景
 
 **完成标准:**
-- [ ] `PIPLComplianceService` 实现完成
-- [ ] 合规检查通过率 100%
-- [ ] 所有测试通过
+- [x] `PIPLComplianceService` 实现完成
+- [x] 合规检查通过率 100%
+- [x] 所有测试通过
 
 ---
 
@@ -473,14 +473,14 @@
 | 🟢 绿 | 实现合规性网关集成 |
 | 🔄 重构 | 验证端到端合规流程 |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写合规性检查失败测试
-- [ ] Subtask 6.2: 🟢 绿 — 实现 `ComplianceGateway` 集成
-- [ ] Subtask 6.3: 🔄 重构 — 验证 UDMR L1 路由决策
+- [x] Subtask 6.1: 🔴 红 — 编写合规性检查失败测试
+- [x] Subtask 6.2: 🟢 绿 — 实现 `ComplianceGateway` 集成
+- [x] Subtask 6.3: 🔄 重构 — 验证 UDMR L1 路由决策
 
 **完成标准:**
-- [ ] 合规性网关与 UDMR 集成完成
-- [ ] 所有合规检查通过
-- [ ] 所有测试通过
+- [x] 合规性网关与 UDMR 集成完成
+- [x] 所有合规检查通过
+- [x] 所有测试通过
 
 ---
 
@@ -496,17 +496,17 @@
 | 🟢 绿 | 实现满足架构约束的代码结构 |
 | 🔄 重构 | 优化架构检查逻辑 |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写架构约束失败测试（领域层导入外部库检测）
-- [ ] Subtask 7.2: 🟢 绿 — 确保所有领域层文件仅使用 Python 标准库
-- [ ] Subtask 7.3: 🔴 红 — 编写端口定义位置验证失败测试
-- [ ] Subtask 7.4: 🟢 绿 — 确保端口定义在 `src/domain/ports/`
-- [ ] Subtask 7.5: 🔄 重构 — 验证服务实现在 `src/infrastructure/security/`
+- [x] Subtask 7.1: 🔴 红 — 编写架构约束失败测试（领域层导入外部库检测）
+- [x] Subtask 7.2: 🟢 绿 — 确保所有领域层文件仅使用 Python 标准库
+- [x] Subtask 7.3: 🔴 红 — 编写端口定义位置验证失败测试
+- [x] Subtask 7.4: 🟢 绿 — 确保端口定义在 `src/domain/ports/`
+- [x] Subtask 7.5: 🔄 重构 — 验证服务实现在 `src/infrastructure/security/`
 
 **完成标准:**
-- [ ] `test_architecture_constraints.py` 测试通过
-- [ ] Ruff 检查通过（严重错误=0）
-- [ ] MyPy 类型检查通过（错误率<5%）
-- [ ] 领域层零外部依赖验证通过
+- [x] `test_architecture_constraints.py` 测试通过
+- [x] Ruff 检查通过（严重错误=0）
+- [x] MyPy 类型检查通过（错误率<5%）
+- [x] 领域层零外部依赖验证通过
 
 ---
 
@@ -524,11 +524,11 @@
 > ⚠️ **安全层覆盖率要求：** 本 Story 为安全层实现（数据主权/PIPL/等保 2.0），需达到安全层≥85% 标准。
 
 ### 代码质量门禁
-- [ ] **Ruff 检查通过**（`ruff check src/`)
-- [ ] **MyPy 类型检查通过**（`mypy src/`)
-- [ ] **无 P0/P1 级别问题**（代码审查）
-- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`)
-- [ ] **Bandit 安全扫描通过**（`bandit -r src/`，高危漏洞=0）
+- [x] **Ruff 检查通过**（`ruff check src/`)
+- [x] **MyPy 类型检查通过**（`mypy src/`)
+- [x] **无 P0/P1 级别问题**（代码审查）
+- [x] **预提交 Hooks 通过**（`pre-commit run --all-files`)
+- [x] **Bandit 安全扫描通过**（`bandit -r src/`，高危漏洞=0）
 
 ### 合规性测试要求
 
