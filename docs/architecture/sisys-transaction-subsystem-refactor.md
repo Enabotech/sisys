@@ -1,11 +1,12 @@
 # SISYS 事务子系统重构详细设计与执行方案
 
-> **文档版本：** 1.0.1
+> **文档版本：** 1.0.2
 > **创建日期：** 2026-05-18
-> **状态：** Round 1 审查修订中
+> **状态：** Round 2 审查修订中
 > **维护者：** Agimtech
 > **修订记录**：
 > - v1.0.1: Round 1 审查 — 精确验证实际代码，修正设计文档与代码不一致问题；重新评估风险等级
+> - v1.0.2: Round 2 审查 — 发现 Outbox archived 状态约束冲突、状态机绕过、Saga 前置依赖缺失等问题；新增 P6-P8；更新 Phase 2/3 任务清单
 > **前置文档：** `sisys-eda-unitofwork-design.md` (v1.0.6, Phase 1 已完成)
 > **关联文档：** `architecture.md` (v8.3.1), `arch-appendix.md` (附录J Saga 设计)
 
@@ -24,6 +25,9 @@ SISYS 系统事务子系统已完成 Phase 1 基础设施建设（UnitOfWork Pro
 | P3 | Saga 仅停留在设计文档 | **中** | arch-appendix.md 附录J 的 10 个跨库事务场景无代码实现；`src/infrastructure/saga/` 目录不存在 |
 | P4 | 事务隔离级别未配置 | **中** | 全部使用默认 READ COMMITTED（async_sessionmaker 未设置 autobegin 参数），关键审计场景无法保证强一致性 |
 | P5 | 前置设计文档示例代码与实际代码不一致 | **中** | `sisys-eda-unitofwork-design.md` 中 `PostgreSQLOutboxRepository(uow.session)` 有参构造与实际无参构造 `PostgreSQLOutboxRepository()` 不一致 |
+| P6 | OutboxEntity `archived` 状态与数据库约束冲突 | **高** | OutboxEntity 定义了 `archived` 终态，但 event_outbox 表 CheckConstraint 仅允许 `('pending', 'published', 'failed')`，持久化 archived 会违反约束 |
+| P7 | InMemoryOutboxRepository 绕过状态机 | **中** | `mark_published()`/`mark_failed()` 直接修改字段而不调用 OutboxEntity 状态转换方法，无前置状态校验 |
+| P8 | Saga 设计代码使用废弃的 `datetime.utcnow()` | **低** | arch-appendix.md 中 12 处使用 `datetime.utcnow()`，与项目规范 `datetime.now(UTC)` 不一致；实现时需修正 |
 
 ### 1.2 设计目标
 
@@ -481,32 +485,43 @@ SagaOrchestrator.execute()
 
 ### Phase 2: Outbox 完善 + 事务隔离配置
 
-**目标**：解决 P4（隔离级别）和 Outbox 运维能力。
+**目标**：解决 P4（隔离级别）、P6（archived 状态）、P7（状态机绕过）和 Outbox 运维能力。
 
-- [ ] **Task 2.1**: 实现 Outbox 表清理策略
+- [ ] **Task 2.1**: 修复 OutboxEntity `archived` 状态与数据库约束冲突
+  - 文件: `deploy/postgresql/alembic/versions/001_initial.py`
+  - 修改 CheckConstraint 为 `status IN ('pending', 'published', 'failed', 'archived')`
+  - 或者在 OutboxEntity 中移除 `archived` 状态（简化为失败后直接保留 failed 状态）
+
+- [ ] **Task 2.2**: 修复 InMemoryOutboxRepository 状态机绕过问题
+  - 文件: `src/infrastructure/messaging/outbox/inmemory_outbox.py`
+  - `mark_published()` 调用 `entity.mark_published()` 而非直接修改字段
+  - `mark_failed()` 调用 `entity.mark_failed()` 而非直接修改字段
+
+- [ ] **Task 2.3**: 实现 Outbox 表清理策略
   - 文件: `src/infrastructure/messaging/outbox/outbox_processor.py`（或新文件）
   - 定期清理已发布超过 N 天的 outbox 记录
   - 配置参数: `cleanup_threshold_days`、`cleanup_batch_size`
 
-- [ ] **Task 2.2**: AsyncOutboxPoller 添加指数退避重试
+- [ ] **Task 2.4**: AsyncOutboxPoller 集成现有 RetryPolicy
   - 文件: `src/infrastructure/messaging/outbox/outbox_processor.py`
-  - 发布失败后使用指数退避（base=1s, max=60s, factor=2）
-  - 超过 max_retries 后标记为 archived（终态）
+  - 已有 `src/infrastructure/messaging/retry/retry_policy.py`（base=1.0s, max=60.0s, max_retries=3）
+  - 当前 Poller 未使用 RetryPolicy；需集成或使用 OutboxEntity 的 retry_count/max_retries 机制
 
-- [ ] **Task 2.3**: 配置 PostgreSQL 事务隔离级别
+- [ ] **Task 2.5**: 配置 PostgreSQL 事务隔离级别
   - 文件: `src/infrastructure/storage/postgresql/postgresql_manager.py`
   - 新增 `get_session_with_isolation(level)` 方法
   - 支持 READ_COMMITTED / REPEATABLE_READ / SERIALIZABLE
   - UoW 工厂支持指定隔离级别
 
-- [ ] **Task 2.4**: 实现审计场景专用 UoW
+- [ ] **Task 2.6**: 实现审计场景专用 UoW
   - 文件: `src/infrastructure/messaging/unit_of_work/audit_unit_of_work.py`
   - 使用 SERIALIZABLE 隔离级别
   - 用于 S02-S05 强一致性场景
 
-- [ ] **Task 2.5**: 编写 Outbox 清理和重试测试
+- [ ] **Task 2.7**: 编写 Outbox 清理和状态机测试
   - 验证清理策略不影响 pending 事件
-  - 验证指数退避重试逻辑
+  - 验证 InMemoryOutboxRepository 状态机正确调用
+  - 验证 archived 状态持久化成功（修复后）
 
 **完成标准**：
 - [ ] Outbox 已发布记录可定期清理
@@ -517,7 +532,16 @@ SagaOrchestrator.execute()
 
 ### Phase 3: Saga 基础设施实现
 
-**目标**：解决 P3，实现 Saga 执行器基础框架。
+**目标**：解决 P3 和 P8，实现 Saga 执行器基础框架。
+
+**前置依赖验证结果**：
+- ✅ L1-L5 所有端口均为 async Protocol，与 SagaStep 接口兼容
+- ✅ DomainEvent 已实现 `to_dict()`/`from_dict()` 序列化
+- ✅ DomainEvent 已支持 `correlation_id`/`causation_id` 链路追踪
+- ✅ event_outbox 表已存在，Saga 与 Outbox 互补但独立
+- ❌ SagaRepository 端口未定义，需新增
+- ❌ Saga 表结构未创建，需 3 个表 + context_data JSONB 字段
+- ❌ arch-appendix.md 代码使用 `datetime.utcnow()`，实现时需修正为 `datetime.now(UTC)`
 
 - [ ] **Task 3.1**: 创建 `src/infrastructure/saga/` 模块
   - `__init__.py`
@@ -601,8 +625,10 @@ SagaOrchestrator.execute()
 | `src/infrastructure/storage/postgresql/session_context.py` | 1 | 添加 _uow_managed_ctx ContextVar |
 | `src/infrastructure/middleware/session_middleware.py` | 1 | 适配 UoW 标记，条件化 commit/rollback |
 | `src/composition_root.py` | 1,3 | 注册 uow_factory + saga 组件 |
-| `src/infrastructure/messaging/outbox/outbox_processor.py` | 2 | 添加指数退避 + 清理策略 |
+| `src/infrastructure/messaging/outbox/outbox_processor.py` | 2 | 集成 RetryPolicy + 清理策略 |
+| `src/infrastructure/messaging/outbox/inmemory_outbox.py` | 2 | 修复状态机绕过 |
 | `src/infrastructure/storage/postgresql/postgresql_manager.py` | 2 | 支持隔离级别配置 |
+| `deploy/postgresql/alembic/versions/001_initial.py` | 2 | CheckConstraint 添加 archived |
 | `docs/architecture/sisys-eda-unitofwork-design.md` | 1 | 更新 Phase 2/3 状态 |
 
 ### 6.2 新增文件
@@ -738,3 +764,26 @@ poetry run pytest --tb=short
 - session.close() 仅 3 处调用：session_context.py:93、postgresql_unit_of_work.py:140、session_middleware.py:66
 - get_session() 共 12 文件 13 处调用，全部在 infrastructure 层
 - UnitOfWork Protocol session 属性返回 `object`，实现返回 `AsyncSession`（类型协变，合规）
+
+### Round 2: Outbox + EventStore + Saga 前置依赖验证
+
+**审查方法**: 3 个 Agent 并行调研 Outbox 模式、事件发布链路、Saga 设计可行性
+
+**P0 发现与修正**:
+
+| # | 发现 | 修正措施 |
+|---|------|---------|
+| P0-1 | OutboxEntity `archived` 状态与 event_outbox 表 CheckConstraint 冲突 | 新增 P6，Phase 2 Task 2.1 |
+| P0-2 | InMemoryOutboxRepository 绕过状态机直接修改字段 | 新增 P7，Phase 2 Task 2.2 |
+| P0-3 | Saga 设计代码 12 处使用废弃的 `datetime.utcnow()` | 新增 P8，Phase 3 实现时修正为 `datetime.now(UTC)` |
+| P0-4 | SagaRepository 端口、Saga 表结构、context_data 序列化均未定义 | Phase 3 补充前置依赖验证清单 |
+| P0-5 | 已有 `retry_policy.py`（base=1.0s, max=60s, max_retries=3）但 Poller 未集成 | Phase 2 Task 2.4 改为"集成现有 RetryPolicy" |
+| P0-6 | ChannelRouter 配置 6 REALTIME + 13 RELIABLE = 19 个事件路由 | 确认 3.3 节 Outbox 现状评估正确 |
+
+**精确验证数据**:
+- OutboxEntity 状态机: pending→published, pending→failed, failed→pending(重试), failed→archived(终态)
+- event_outbox CheckConstraint: `status IN ('pending', 'published', 'failed')` — **不含 archived**
+- AuditOutboxModel 有 RLS 策略保护（deny_delete + 状态转换策略），OutboxModel 无 RLS
+- RabbitMQPublisher 使用 `connect_robust` 自动重连 + `PERSISTENT` 持久化消息
+- DomainEvent 支持 to_dict()/from_dict() 序列化，已支持 correlation_id/causation_id
+- arch-appendix.md Saga 表设计需 3 个新表: saga_type_config, saga_step_config, saga_execution_history
