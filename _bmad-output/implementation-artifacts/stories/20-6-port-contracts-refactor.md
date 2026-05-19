@@ -157,15 +157,15 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 
 ### AC-2: 全部 domain/ports 存储层端口契约测试完成
 
-**Given** L0-L5 + UnifiedStorage + StorageEnums 共 8 组端口定义
-**When** 运行 `pytest tests/contracts/ -k "storage or cache or vector or object or graph" -v`
+**Given** L0-L5 + UnifiedStorage + SessionStorage + StorageEnums 共 9 组端口定义
+**When** 运行 `pytest tests/contracts/test_port_contract_storage.py -v`
 **Then** 所有存储层端口的注册、接口方法、实现一致性通过验证
 
 **验证标准:**
-- [ ] 每个端口有注册验证（registry.get 断言非 None）
+- [ ] 每个已注册端口有注册验证（registry.get 断言非 None）
 - [ ] 每个端口有接口方法签名验证（所有 Protocol 方法存在且 callable）
-- [ ] 已注册端口的实现类满足 Protocol 接口约束
-- [ ] StorageEnums 枚举值完整性验证
+- [ ] L2RdbPort[T] 泛型基类方法签名存在性验证
+- [ ] StorageEnums 枚举值完整性验证（StorageLayer: 6, StorageTier: 4, DataAccessPattern: 4）
 
 ### AC-3: 全部 domain/ports 仓储层端口契约测试完成
 
@@ -182,20 +182,34 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 ### AC-4: 全部 domain/ports 认证/安全/合规端口契约测试完成
 
 **Given** 10 组认证安全合规端口定义
-**When** 运行 `pytest tests/contracts/ -k "auth or permission or token or password or compliance or sensitive or residency or whitelist or pipl or cross_border" -v`
+**When** 运行 `pytest tests/contracts/test_port_contract_auth_security.py -v`
 **Then** 所有认证安全合规端口的注册、接口方法通过验证
+
+**验证标准:**
+- [ ] 10 个端口全部有注册验证（registry.get 断言非 None）
+- [ ] 每个端口有接口方法签名验证（所有 Protocol 方法 callable）
+- [ ] 每个端口的元数据完整（version/owner/module 非空）
 
 ### AC-5: 全部 domain/ports 服务协议端口契约测试完成
 
-**Given** 7 组已注册服务协议端口 + 3 个未注册 Protocol 接口定义
-**When** 运行 `pytest tests/contracts/ -k "connection or health or unit_of_work or integrity or audit_service or semantic_router or sandbox" -v`
-**Then** 所有已注册服务协议端口的注册、接口方法通过验证，未注册 Protocol 接口方法存在性通过验证
+**Given** 7 组已注册服务协议端口 + 5 个未注册 Protocol 接口定义
+**When** 运行 `pytest tests/contracts/test_port_contract_services.py tests/contracts/test_port_contract_unregistered.py -v`
+**Then** 所有已注册服务协议端口的注册、接口方法通过验证，5 个未注册 Protocol 接口方法存在性通过验证
+
+**验证标准:**
+- [ ] 7 个已注册端口有注册验证 + 实现类方法验证
+- [ ] 5 个未注册 Protocol 仅做接口方法存在性验证（PermissionRepositoryPort, IndexManagerPort, UnitOfWork, HealthCheckPort, IntegrityPort）
 
 ### AC-6: 全部 application/ports 端口契约测试完成
 
 **Given** 14 组应用层端口定义
-**When** 运行 `pytest tests/contracts/ -k "sandbox_executor or semantic_cache or memory_file or blackboard or compressor or memory_cache or exception_metrics or document_storage or memory_vector or session_cache or text_extractor or memory_graph or metrics or event_subscriber" -v`
-**Then** 所有应用层端口的接口方法通过验证
+**When** 运行 `pytest tests/contracts/test_port_contract_application.py -v`
+**Then** 所有应用层端口的注册、接口方法通过验证
+
+**验证标准:**
+- [ ] 14 个端口全部有注册验证（registry.get 断言非 None）
+- [ ] 每个端口有接口方法签名验证（含继承基类的方法）
+- [ ] 每个端口的元数据完整（version/owner/module 非空）
 
 ### AC-7: verify_contracts.py 增强覆盖全部已注册端口
 
@@ -757,7 +771,10 @@ tests/
 │   ├── test_port_contract_hash_router.py     # REFACTOR: 使用公共 fixture
 │   ├── test_port_contract_user_repo.py       # REFACTOR: 使用公共 fixture
 │   ├── test_port_contract_event_publisher.py # REFACTOR: 使用公共 fixture
-│   └── verify_contracts.py                   # ENHANCE: 全量验证
+│   └── verify_contracts.py                   # ENHANCE: 全量验证（含10个基础设施端口）
+├── acceptance/
+│   ├── test_story_20_6.feature               # NEW: Gherkin 验收场景
+│   └── test_story_20_6_steps.py              # NEW: BDD 步骤实现
 ```
 
 ### 前一个故事学习经验
@@ -873,6 +890,11 @@ tests/
 | 16 | 服务协议表格计数声明错误（11→4→7→3） | P0 | 第3轮审查修正 |
 | 17 | 10 个基础设施端口无 Task 覆盖 | P0 | 明确 Task 7 的 verify_contracts.py 覆盖；拆分 redis_bus/rabbitmq_bus 为独立行 |
 | 18 | AC-5 计数错误（8 组→7 已注册+5 未注册） | P0 | 第3轮审查修正 |
+| 19 | AC-2 Given 计数错误（8 组→9 组） | P0 | 第4轮审查修正：新增 SessionStorage + L2RdbPort |
+| 20 | AC-4/AC-5/AC-6 缺失验证标准 checkbox | P0 | 第4轮审查补充 |
+| 21 | AC-5 Given 未注册计数错误（3→5） | P0 | 第4轮审查修正：Task 5 覆盖全部 5 个未注册 Protocol |
+| 22 | pytest keyword 过滤策略复杂/不可靠 | P1 | 第4轮审查：改为直接指定测试文件名 |
+| 23 | 项目结构说明缺少 tests/acceptance/ 目录 | P1 | 第4轮审查补充 |
 
 ### 下一步
 
