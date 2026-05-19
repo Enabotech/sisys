@@ -176,13 +176,16 @@ AutoExecuteService (1.14c)
 
 #### 配置模型 (Configuration Models)
 - [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
-  - enabled: bool（UDMR_ENABLED，默认 false）
+  - `@dataclass(frozen=True)` — 不可变配置，对齐 sprint-change-proposal（不同于 AutoRouteConfig 的可变模式）
+  - enabled: bool（UDMR_ENABLED，默认 false。注意：不同于其他 auto-config 的 true 默认值，UDMR 作为新特性默认关闭）
   - local_first: bool（UDMR_LOCAL_FIRST，默认 false）
   - local_timeout: int（UDMR_LOCAL_TIMEOUT，默认 30，单位秒，健康检查超时）
-  - local_model: str（UDMR_LOCAL_MODEL，默认 "qwen2.5:7b"）
-  - cloud_models: list[CloudModelConfig]（从 UDMR_CLOUD_{N}_* 解析）
+  - local_model: str（UDMR_LOCAL_MODEL，默认 "qwen2.5:7b"。如未设置，回退至 LOCAL_MODEL_NAME）
+  - cloud_models: list[CloudModelConfig] = field(default_factory=list)（从 UDMR_CLOUD_{N}_* 解析）
   - from_env() 类方法，扫描 os.environ 中 UDMR_CLOUD_{N}_* 前缀变量
+  - > 向后兼容：from_env() 检测旧 ENABLE_UDMR 变量并映射至 UDMR_ENABLED（打印 deprecation warning）
 - [ ] CloudModelConfig 配置（`src/infrastructure/config/udmr.py`）
+  - `@dataclass(frozen=True)` — 不可变配置，对齐 sprint-change-proposal
   - api_type: str（UDMR_CLOUD_{N}_API_TYPE，"openai" | "anthropic" | "custom"）
   - endpoint: str（UDMR_CLOUD_{N}_ENDPOINT）
   - api_key: str（UDMR_CLOUD_{N}_API_KEY）
@@ -505,9 +508,13 @@ export UDMR_CLOUD_1_ENABLED=true
 - [ ] Subtask 3.2: 验证六边形架构约束（domain 零外部依赖、依赖方向、无循环依赖）
 - [ ] Subtask 3.3: 验证端口注册完整性（registry/composition_root/contract test 三位一体）
 
-#### DI 注册
+#### DI 注册 + 事件订阅
 
-- [ ] Subtask 3.4: 更新 `src/composition_root.py` — 注册 health_checker_factory 端口
+- [ ] Subtask 3.4: 更新 `src/composition_root.py`
+  - 注册 health_checker_factory 端口（SINGLETON, owner="story-1.17"）
+  - 注册 udmr_handler 相关端口（参考 AutoRouteHandler 模式）
+  - 注册 UDMRHandler 为 AutoRouted 事件订阅者（event_bus.subscribe）
+  - > **注意**：当前 AutoRouteHandler/UDMRHandler 均未在 composition_root.py 中订阅事件总线。本 Subtask 需同时完成 UDMRHandler 的端口注册和事件订阅接线
 
 #### 性能基准测试
 
@@ -587,6 +594,21 @@ export UDMR_CLOUD_1_ENABLED=true
 - CloudModelConfig 不设 index 字段（索引由列表位置决定）
 - api_type 支持 "openai" | "anthropic" | "custom"
 - UDMR_CLOUD_{N}_* 索引解析：from_env() 扫描 os.environ 中匹配 `UDMR_CLOUD_(\d+)_API_TYPE` 的键
+- `@dataclass(frozen=True)` — UDMRConfig 和 CloudModelConfig 均为不可变配置
+- 向后兼容：from_env() 检测旧 ENABLE_UDMR 变量并映射至 UDMR_ENABLED（打印 deprecation warning）
+- 字段命名：`cloud_models`（Story 使用），sprint proposal 使用 `cloud_configs`，本 Story 统一为 `cloud_models`（语义更准确：列表元素是模型配置而非云端配置）
+
+### OLLAMA_BASE_URL 依赖说明
+
+OllamaHealthAdapter 需要 OLLAMA_BASE_URL 构造 Ollama API 地址。此变量**不纳入 UDMRConfig**（它是系统级配置，被多个组件共享）。注入路径：
+1. OllamaHealthCheckerFactory.create() 从 os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") 读取
+2. 传入 OllamaHealthAdapter 构造函数
+
+### 事件订阅接线说明
+
+UDMRHandler 需订阅 AutoRouted 事件。当前 AutoRouteHandler 也未在 composition_root.py 中显式订阅事件总线（可能通过其他机制）。本 Story 在 Task 3 Subtask 3.4 中明确要求完成事件订阅接线，包括：
+- composition_root.py 中注册 UDMRHandler 端口
+- event_bus.subscribe(AutoRouted, udmr_handler.on_routed)
 
 ### UDMR 路由 vs AutoRoute 语义路由（澄清）
 
@@ -842,6 +864,11 @@ Story 1.14a (trigger) → Story 1.14b (语义路由) → Story 1.17 (UDMR 模型
 | 7 | HealthCheckPort.check() 仅返回 bool，无法获取 latency_ms | P0 | UDMRouter.check_local_health() 包装调用 + time.monotonic() 测量耗时，不修改端口接口 | ✅ R1 |
 | 8 | RoutingDecided 事件 fallback_reason 含 "timeout"，值对象不含 | P0 | 值对象是事件枚举的 MVP 子集，类型兼容，Dev Notes 文档化 | ✅ R1 |
 | 9 | CloudModelConfig.index 字段冗余 | P1 | 移除 index 字段，索引由列表位置决定，对齐 sprint-change-proposal | ✅ R1 |
+| 10 | UDMRHandler 事件订阅缺失 | P0 | Task 3 Subtask 3.4 明确要求 event_bus.subscribe(AutoRouted, udmr_handler.on_routed) | ✅ R2 |
+| 11 | OLLAMA_BASE_URL 依赖未文档化 | P0 | Dev Notes 添加 OLLAMA_BASE_URL 依赖说明，OllamaHealthCheckerFactory.create() 注入 | ✅ R2 |
+| 12 | cloud_models vs cloud_configs 命名不一致 | P1 | 统一为 cloud_models（语义更准确），Dev Notes 文档化决策 | ✅ R2 |
+| 13 | frozen=True vs mutable 不一致 | P0 | UDMRConfig 和 CloudModelConfig 均使用 frozen=True，对齐 sprint-change-proposal | ✅ R2 |
+| 14 | ENABLE_UDMR → UDMR_ENABLED 向后兼容未提及 | P1 | from_env() 检测旧变量并映射，打印 deprecation warning | ✅ R2 |
 
 ### 下一步 Next Steps
 
