@@ -398,6 +398,9 @@ Feature: 事务子系统重构
 
 - [ ] Subtask 3.4: 🔴 红 — 编写 test_port_contract_uow_factory.py
 - [ ] Subtask 3.5: 🟢 绿 — composition_root.py 注册 uow_factory（TRANSIENT）
+  > **注册模式参考**：项目已有 TRANSIENT + 字符串路径先例（sandbox_executor）。
+  > 推荐使用 `impl=PostgreSQLUnitOfWork`（类本身），`_auto_inject` 检查无参 __init__ 后直接 `cls()` 创建实例。
+  > `resolve("uow_factory")` 返回类本身，调用方执行 `factory()` 即 `PostgreSQLUnitOfWork()` 创建新实例。
 - [ ] Subtask 3.6: 🔄 重构 — 优化代码
 
 **完成标准:**
@@ -422,7 +425,7 @@ Feature: 事务子系统重构
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 archived 状态持久化测试
 - [ ] Subtask 4.2: 🟢 绿 — 修改 outbox.py ORM CheckConstraint（添加 'archived'）
-- [ ] Subtask 4.3: 🟢 绿 — 创建新 Alembic 迁移脚本（不直接修改 001_initial.py）
+- [ ] Subtask 4.3: 🟢 绿 — 创建新 Alembic 迁移脚本 `004_add_archived_status.py`
 
 #### TDD 循环 B：OutboxRepository 状态机修复
 
@@ -600,8 +603,10 @@ Feature: 事务子系统重构
 
 - [ ] Subtask 8.1: 🔴 红 — 编写 save/load/update_status 测试
 - [ ] Subtask 8.2: 🟢 绿 — 实现 PostgreSQLSagaRepository
-- [ ] Subtask 8.3: 🟢 绿 — 创建 saga_instance 表迁移脚本
-- [ ] Subtask 8.4: 🔄 重构 — 优化代码
+- [ ] Subtask 8.3: 🟢 绿 — 创建 saga_instance 表迁移脚本（`005_saga_tables.py`，使用 `sa.JSON()` 匹配项目现有模式）
+- [ ] Subtask 8.4: 🟢 绿 — ChannelRouter.DEFAULT_MAPPINGS 添加 SagaStatusChanged 路由映射（RELIABLE，routing_key: `sisys.events.reliable.saga_status_changed`）
+  > **⚠️ 前置依赖**：不加路由映射，Outbox Poller 会将 SagaStatusChanged 标记为 failed（`get_rabbitmq_routing_key()` 返回 None）
+- [ ] Subtask 8.5: 🔄 重构 — 优化代码
 
 #### TDD 循环 B：领域端口 + DI 注册
 
@@ -816,7 +821,8 @@ src/
 - `src/infrastructure/saga/saga_orchestrator.py`
 - `src/infrastructure/saga/saga_repository.py`
 - `src/infrastructure/messaging/unit_of_work/audit_unit_of_work.py`
-- `deploy/postgresql/alembic/versions/xxx_add_saga_instance.py`
+- `deploy/postgresql/alembic/versions/004_add_archived_status.py` — 新增 archived 状态迁移
+- `deploy/postgresql/alembic/versions/005_saga_tables.py` — Saga 表迁移（使用 `sa.JSON()` 匹配项目模式）
 - `tests/acceptance/test_story_20_7.feature`
 - `tests/acceptance/test_story_20_7_steps.py`
 - `tests/contracts/test_port_contract_uow_factory.py`
