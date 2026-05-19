@@ -23,7 +23,7 @@ class TestPermissionRepositoryPort:
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
-        assert hasattr(self.INTERFACE, "__protocol_attrs__")
+        assert getattr(self.INTERFACE, "_is_protocol", False)
 
     def test_interface_has_required_methods(self) -> None:
         """Implementation must have all required methods from protocol."""
@@ -47,7 +47,7 @@ class TestUnitOfWork:
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
-        assert hasattr(self.INTERFACE, "__protocol_attrs__")
+        assert getattr(self.INTERFACE, "_is_protocol", False)
 
     def test_interface_has_required_methods(self) -> None:
         """Implementation must have all required methods from protocol."""
@@ -63,7 +63,7 @@ class TestHealthCheckPort:
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
-        assert hasattr(self.INTERFACE, "__protocol_attrs__")
+        assert getattr(self.INTERFACE, "_is_protocol", False)
 
     def test_interface_has_required_methods(self) -> None:
         """Implementation must have all required methods from protocol."""
@@ -79,7 +79,7 @@ class TestIntegrityPort:
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
-        assert hasattr(self.INTERFACE, "__protocol_attrs__")
+        assert getattr(self.INTERFACE, "_is_protocol", False)
 
     def test_interface_has_required_methods(self) -> None:
         """Implementation must have all required methods from protocol."""
@@ -101,7 +101,7 @@ class TestIndexManagerPort:
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
-        assert hasattr(self.INTERFACE, "__protocol_attrs__")
+        assert getattr(self.INTERFACE, "_is_protocol", False)
 
     def test_interface_has_required_methods(self) -> None:
         """Implementation must have all required methods from protocol."""
