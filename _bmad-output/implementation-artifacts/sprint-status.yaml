@@ -28,7 +28,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-11
-last_updated: 2026-05-08
+last_updated: 2026-05-19
 project: sisys
 project_key: NOKEY
 tracking_system: file-system
@@ -311,6 +311,7 @@ development_status:
   20-3-uni-dual-channel-eventbus: done
   20-4-uni-async-refactor: done
   20-5-uni-storage-refactor: done
+  20-6-port-contracts-refactor: ready-for-dev  # 端口契约测试补全
   epic-20-retrospective: optional
 
 # =============================================================================
@@ -321,11 +322,11 @@ development_status:
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 🔄 3 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev , 🔄 1 in-progress)
-#   - Epic 20: 5 stories (✅ 4 done, 🔄 1 ready-for-dev)
+#   - Epic 20: 6 stories (✅ 5 done, 🔄 1 ready-for-dev)
 #
 # Status Summary:
-#   - Done: 31 (包括 Epic 20)
-#   - Ready for Dev: 5
+#   - Done: 32 (包括 Epic 20)
+#   - Ready for Dev: 6
 #   - Backlog: 121
 #
 # Next Steps:
