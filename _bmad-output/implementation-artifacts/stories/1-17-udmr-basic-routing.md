@@ -696,7 +696,7 @@ sisys/
 **来源:** [Story 1.14a](./1-14a-autonomous-invocation-trigger.md) + [Story 1.14b](./1-14b-autonomous-invocation-route.md)
 
 1. **配置模式复用** — UDMRConfig 采用与 AutoRouteConfig 相同的 `@dataclass` + `from_env()` 模式；CloudModelConfig 使用 UDMR_CLOUD_{N}_* 索引解析（支持多云端）
-2. **事件驱动解耦** — UDMRouter 仅发布 RoutingDecided 事件，不调用 execute 逻辑
+2. **事件驱动解耦** — UDMRouter 仅返回 RoutingDecision 值对象，不发布事件也不调用 execute 逻辑；UDMRHandler 负责创建 RoutingDecided 事件并发布
 3. **Handler 桥接模式** — UDMRHandler 参考AutoRouteHandler 的 isinstance 类型守卫 + 委托服务 + 发布事件模式
 4. **测试隔离** — BDD 步骤使用 `event_loop.run_until_complete()`，不用 `@pytest.mark.asyncio`
 5. **Ollama mock 策略** — 健康检查测试 mock httpx.AsyncClient，不依赖真实 Ollama 实例
@@ -876,7 +876,7 @@ Story 1.14a (trigger) → Story 1.14b (语义路由) → Story 1.17 (UDMR 模型
 | 13 | frozen=True vs mutable 不一致 | P0 | UDMRConfig 和 CloudModelConfig 均使用 frozen=True，对齐 sprint-change-proposal | ✅ R2 |
 | 14 | ENABLE_UDMR → UDMR_ENABLED 向后兼容未提及 | P1 | from_env() 检测旧变量并映射，打印 deprecation warning | ✅ R2 |
 | 15 | AutoRouted 无 task_id，RoutingDecided 需要 task_id | P0 | task_id = event.event_id，保持事件链聚合标识一致性 | ✅ R3 |
-| 16 | UDMRouter vs UDMRHandler 双重发布歧义 | P0 | UDMRouter 仅返回 RoutingDecided，UDMRHandler 负责发布 | ✅ R3 |
+| 16 | UDMRouter vs UDMRHandler 双重发布歧义 | P0 | UDMRouter 仅返回 RoutingDecision（值对象），UDMRHandler 创建 RoutingDecided 事件并发布 | ✅ R3 |
 | 17 | UDMRConfig（infrastructure）导入到 domain 层违规 | P0 | UDMRouter 构造函数改为原始值类型（str/bool/int/list），composition_root 传入 | ✅ R3 |
 | 18 | 追溯矩阵 Task 3 编号偏移一位 | P1 | 3.4-3.6→3.5-3.7，3.7-3.9→3.8-3.10 | ✅ R3 |
 | 19 | test_routing_events_udmr.py 命名与 subtask 不一致 | P1 | 统一为扩展已有 test_new_events.py | ✅ R3 |
