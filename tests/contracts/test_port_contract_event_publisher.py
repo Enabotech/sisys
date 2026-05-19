@@ -57,8 +57,5 @@ class TestEventPublisherContract:
 
         impl = Resolver().resolve(self.PORT_NAME)
         event = DomainEvent(event_type="test.event")
-        try:
-            result = await impl.publish(event)
-            assert isinstance(result, PublishResult)
-        except Exception:
-            pass
+        result = await impl.publish(event)
+        assert isinstance(result, PublishResult)

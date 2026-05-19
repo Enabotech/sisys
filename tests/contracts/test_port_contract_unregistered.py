@@ -9,6 +9,7 @@ not registered ports.
 from __future__ import annotations
 
 from src.domain.ports.health_check import HealthCheckPort
+from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.integrity import IntegrityPort
 from src.domain.ports.permission_repository import PermissionRepositoryPort
 from src.domain.ports.unit_of_work import UnitOfWork
@@ -82,6 +83,30 @@ class TestIntegrityPort:
 
     INTERFACE = IntegrityPort
     REQUIRED_METHODS = ["verify_file", "compute_hash", "verify_hash"]
+
+    def test_interface_is_protocol(self) -> None:
+        """Interface must be a Protocol."""
+        from typing import Protocol
+
+        assert issubclass(self.INTERFACE, Protocol)  # type: ignore[arg-type]
+
+    def test_interface_has_required_methods(self) -> None:
+        """Implementation must have all required methods from protocol."""
+        for method in self.REQUIRED_METHODS:
+            assert hasattr(self.INTERFACE, method), f"Interface missing method: {method}"
+
+
+class TestIndexManagerPort:
+    """Interface contract tests for IndexManagerPort (not registered)."""
+
+    INTERFACE = IndexManagerPort
+    REQUIRED_METHODS = [
+        "update_entry",
+        "remove_entry",
+        "read_entries",
+        "search",
+        "truncate",
+    ]
 
     def test_interface_is_protocol(self) -> None:
         """Interface must be a Protocol."""
