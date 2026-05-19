@@ -1,12 +1,13 @@
 # SISYS 事务子系统重构详细设计与执行方案
 
-> **文档版本：** 1.0.2
+> **文档版本：** 1.0.3
 > **创建日期：** 2026-05-18
-> **状态：** Round 2 审查修订中
+> **状态：** Round 3 审查修订中
 > **维护者：** Agimtech
 > **修订记录**：
-> - v1.0.1: Round 1 审查 — 精确验证实际代码，修正设计文档与代码不一致问题；重新评估风险等级
-> - v1.0.2: Round 2 审查 — 发现 Outbox archived 状态约束冲突、状态机绕过、Saga 前置依赖缺失等问题；新增 P6-P8；更新 Phase 2/3 任务清单
+> - v1.0.1: Round 1 — 精确验证实际代码，修正文档与代码不一致；重新评估风险等级
+> - v1.0.2: Round 2 — 发现 Outbox archived 状态冲突、状态机绕过；新增 P6-P8；更新 Phase 2/3
+> - v1.0.3: Round 3 — 修正 D2 工厂模式（Callable 不可行，需 UnitOfWorkFactory Protocol）；新增 D6 ContextVar 权衡；补充测试差距
 > **前置文档：** `sisys-eda-unitofwork-design.md` (v1.0.6, Phase 1 已完成)
 > **关联文档：** `architecture.md` (v8.3.1), `arch-appendix.md` (附录J Saga 设计)
 
@@ -239,22 +240,28 @@ AsyncOutboxPoller → 独立 session_context() → 轮询 → RabbitMQ 发布
 
 **规则**：通过 DI 容器注册 `UnitOfWorkFactory`，每次创建新 UoW 实例。
 
+> **Round 3 验证修正**：`Callable[[], UnitOfWork]` 不可用作 `interface` 参数。PortSpec.interface 字段类型为 `Type`，`Callable` 不是有效的 type，会导致 `resolve_by_interface` 的 `issubclass` 检查失败。需定义专门的 `UnitOfWorkFactory` Protocol。
+
 ```python
+# src/domain/ports/unit_of_work.py 新增
+class UnitOfWorkFactory(Protocol):
+    def __call__(self) -> UnitOfWork: ...
+
 # composition_root.py
 register_port(
     name="uow_factory",
-    interface=Callable[[], UnitOfWork],
-    impl=lambda resolver: PostgreSQLUnitOfWork,
+    interface=UnitOfWorkFactory,
+    impl=lambda resolver: PostgreSQLUnitOfWork,  # 返回类本身，非实例
     lifetime=Lifetime.TRANSIENT,
 )
 
 # EventHandler 使用
 class SomeHandler:
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]):
+    def __init__(self, uow_factory: UnitOfWorkFactory):
         self._uow_factory = uow_factory
 
     async def handle(self, event):
-        uow = self._uow_factory()
+        uow = self._uow_factory()  # 调用 __call__ 创建新实例
         async with uow:
             ...
 ```
@@ -310,6 +317,20 @@ SagaStep 与 UoW 集成：每个 Step 在独立 UoW 内执行，Step 失败触�
 | 审计写入（S02-S05） | SERIALIZABLE | 防止审计日志并发写入冲突 |
 | Checkpoint 保存（S03） | REPEATABLE READ | 防止快照读写冲突 |
 | Outbox 轮询 | READ COMMITTED | 无特殊要求 |
+
+#### 决策 D6: ContextVar 隐式依赖的设计权衡
+
+**当前模式**：所有 Repository 通过 `get_session()` 从 ContextVar 获取 session（Service Locator 模式），而非构造器注入（DI 模式）。
+
+**六边形架构合规性**：
+- 领域层（Protocol 接口）零污染 — ✅ 合规
+- 应用层（EventHandler）零感知 — ✅ 合规
+- 基础设施层内部同层依赖 — ✅ 合规
+
+**设计权衡**：
+- 优势：Repository 无参构造，简化 DI 注册；多 Repository 天然共享同一 session
+- 代价：测试需通过 `with_session()` fixture 预设 ContextVar；session 可用性依赖中间件或 session_context 的正确调用
+- **结论**：当前模式合规且实用，保持不变
 
 ### 4.2 目标架构全景
 
@@ -787,3 +808,26 @@ poetry run pytest --tb=short
 - RabbitMQPublisher 使用 `connect_robust` 自动重连 + `PERSISTENT` 持久化消息
 - DomainEvent 支持 to_dict()/from_dict() 序列化，已支持 correlation_id/causation_id
 - arch-appendix.md Saga 表设计需 3 个新表: saga_type_config, saga_step_config, saga_execution_history
+
+### Round 3: 六边形架构合规性 + 端口注册 + 测试覆盖验证
+
+**审查方法**: 3 个 Agent 并行调研架构依赖方向、端口注册系统、测试覆盖
+
+**P0 发现与修正**:
+
+| # | 发现 | 修正措施 |
+|---|------|---------|
+| P0-1 | D2 设计中 `Callable[[], UnitOfWork]` 不可用作 interface 参数 | 修正 D2，新增 UnitOfWorkFactory Protocol 定义 |
+| P0-2 | test_unit_of_work.py 行 15-19 验证 UnitOfWork 是 ABC，但实际已改为 Protocol | Phase 1 Task 1.9 需更新测试以匹配 Protocol |
+| P0-3 | 缺少"业务操作 + Outbox 原子性"集成测试 | Phase 1 新增 Task 1.10 编写原子性测试 |
+| P0-4 | D1 "UoW 不调用 close" 尚未实现，`__aexit__` 行 140 仍调用 close | D1 实现前需修改代码，测试需同步更新 |
+| P0-5 | ContextVar 是 Service Locator 模式，需明确设计权衡 | 新增 D6 决策说明 |
+
+**精确验证数据**:
+- 领域层零 infrastructure 导入，零 sqlalchemy/redis/aio_pika 导入 — ✅ 合规
+- 应用层零 infrastructure 导入，零 sqlalchemy 导入 — ✅ 合规
+- 所有 4 个 EventHandler 仅依赖端口接口和领域服务 — ✅ 合规
+- Lifetime 枚举: SINGLETON(32 个端口) / SCOPED(25 个端口) / TRANSIENT(2 个端口)
+- UoW 工厂应使用 TRANSIENT 生命周期
+- `session_factory` 注册模式（返回 async_sessionmaker 类本身）可供 UoW 工厂参考
+- 测试覆盖差距: 业务+outbox 原子性测试、隔离级别测试、故障注入框架、Saga 测试
