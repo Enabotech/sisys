@@ -1,6 +1,6 @@
 # Story 20-6: 端口契约测试补全
 
-**Status:** `ready-for-dev`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -150,10 +150,10 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** PortRegistry、Resolver、ContractGate 的核心功能全部被测试覆盖
 
 **验证标准:**
-- [ ] `tests/contracts/test_port_infrastructure.py` 覆盖 PortRegistry.register/get/list_all/unregister
-- [ ] `tests/contracts/test_port_infrastructure.py` 覆盖 Resolver.resolve/resolve_by_interface 生命周期
-- [ ] `tests/contracts/test_port_infrastructure.py` 覆盖 ContractGate.check_compatibility 方法
-- [ ] 测试通过 `pytest tests/contracts/test_port_infrastructure.py -v`
+- [x] `tests/contracts/test_port_infrastructure.py` 覆盖 PortRegistry.register/get/list_all/unregister
+- [x] `tests/contracts/test_port_infrastructure.py` 覆盖 Resolver.resolve/resolve_by_interface 生命周期
+- [x] `tests/contracts/test_port_infrastructure.py` 覆盖 ContractGate.check_compatibility 方法
+- [x] 测试通过 `pytest tests/contracts/test_port_infrastructure.py -v`
 
 ### AC-2: 全部 domain/ports 存储层端口契约测试完成
 
@@ -162,10 +162,10 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有存储层端口的注册、接口方法、实现一致性通过验证
 
 **验证标准:**
-- [ ] 每个已注册端口有注册验证（registry.get 断言非 None）
-- [ ] 每个端口有接口方法签名验证（所有 Protocol 方法存在且 callable）
-- [ ] L2RdbPort[T] 泛型基类方法签名存在性验证
-- [ ] StorageEnums 枚举值完整性验证（StorageLayer: 6, StorageTier: 4, DataAccessPattern: 4）
+- [x] 每个已注册端口有注册验证（registry.get 断言非 None）
+- [x] 每个端口有接口方法签名验证（所有 Protocol 方法存在且 callable）
+- [x] L2RdbPort[T] 泛型基类方法签名存在性验证
+- [x] StorageEnums 枚举值完整性验证（StorageLayer: 6, StorageTier: 4, DataAccessPattern: 4）
 
 ### AC-3: 全部 domain/ports 仓储层端口契约测试完成
 
@@ -174,10 +174,10 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有已注册仓储端口的注册、接口方法、实现一致性通过验证
 
 **验证标准:**
-- [ ] L2RdbPort 泛型基类契约验证
-- [ ] L2MetadataRepositoryPort / L2ChangeHistoryRepositoryPort 继承验证
-- [ ] L2GroupMemberRepositoryPort 独立方法验证
-- [ ] UserRepositoryPort 已有测试需重构使用公共 fixture（不在本 Task 新增）
+- [x] L2RdbPort 泛型基类契约验证
+- [x] L2MetadataRepositoryPort / L2ChangeHistoryRepositoryPort 继承验证
+- [x] L2GroupMemberRepositoryPort 独立方法验证
+- [x] UserRepositoryPort 已有测试需重构使用公共 fixture（不在本 Task 新增）
 
 ### AC-4: 全部 domain/ports 认证/安全/合规端口契约测试完成
 
@@ -186,9 +186,9 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有认证安全合规端口的注册、接口方法通过验证
 
 **验证标准:**
-- [ ] 10 个端口全部有注册验证（registry.get 断言非 None）
-- [ ] 每个端口有接口方法签名验证（所有 Protocol 方法 callable）
-- [ ] 每个端口的元数据完整（version/owner/module 非空）
+- [x] 10 个端口全部有注册验证（registry.get 断言非 None）
+- [x] 每个端口有接口方法签名验证（所有 Protocol 方法 callable）
+- [x] 每个端口的元数据完整（version/owner/module 非空）
 
 ### AC-5: 全部 domain/ports 服务协议端口契约测试完成
 
@@ -197,8 +197,8 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有已注册服务协议端口的注册、接口方法通过验证，5 个未注册 Protocol 接口方法存在性通过验证
 
 **验证标准:**
-- [ ] 7 个已注册端口有注册验证 + 实现类方法验证
-- [ ] 5 个未注册 Protocol 仅做接口方法存在性验证（PermissionRepositoryPort, IndexManagerPort, UnitOfWork, HealthCheckPort, IntegrityPort）
+- [x] 7 个已注册端口有注册验证 + 实现类方法验证
+- [x] 5 个未注册 Protocol 仅做接口方法存在性验证（PermissionRepositoryPort, IndexManagerPort, UnitOfWork, HealthCheckPort, IntegrityPort）
 
 ### AC-6: 全部 application/ports 端口契约测试完成
 
@@ -207,9 +207,9 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有应用层端口的注册、接口方法通过验证
 
 **验证标准:**
-- [ ] 14 个端口全部有注册验证（registry.get 断言非 None）
-- [ ] 每个端口有接口方法签名验证（含继承基类的方法）
-- [ ] 每个端口的元数据完整（version/owner/module 非空）
+- [x] 14 个端口全部有注册验证（registry.get 断言非 None）
+- [x] 每个端口有接口方法签名验证（含继承基类的方法）
+- [x] 每个端口的元数据完整（version/owner/module 非空）
 
 ### AC-7: verify_contracts.py 增强覆盖全部已注册端口
 
@@ -218,9 +218,9 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 输出完整的端口清单并验证全部已注册端口可解析
 
 **验证标准:**
-- [ ] verify_contracts.py 自动遍历 registry.list_all() 验证全部端口
-- [ ] 每个已注册端口验证可被 Resolver 解析
-- [ ] 输出结构化 manifest（name/interface/impl/module/lifetime）
+- [x] verify_contracts.py 自动遍历 registry.list_all() 验证全部端口
+- [x] 每个已注册端口验证可被 Resolver 解析
+- [x] 输出结构化 manifest（name/interface/impl/module/lifetime）
 
 ### AC-8: 端口契约测试基础架构统一
 
@@ -229,10 +229,10 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **Then** 所有契约测试使用统一的 fixture/base class 模式
 
 **验证标准:**
-- [ ] 创建 `tests/contracts/conftest.py` 定义公共 fixture（registry, resolver）
-- [ ] 现有 3 个测试文件重构为使用公共 fixture
-- [ ] 新测试文件全部使用统一模式
-- [ ] `pytest tests/contracts/ -v` 全部通过
+- [x] 创建 `tests/contracts/conftest.py` 定义公共 fixture（registry, resolver）
+- [x] 现有 3 个测试文件重构为使用公共 fixture
+- [x] 新测试文件全部使用统一模式
+- [x] `pytest tests/contracts/ -v` 全部通过
 
 ---
 
@@ -467,14 +467,14 @@ Feature: 端口契约测试补全
 
 > **目的：** 在进入测试实现前，明确端口清单、契约测试规范与验收标准。
 
-- [ ] Subtask 0.1: 编写 Gherkin 验收测试 `tests/acceptance/test_story_20_6.feature`
-- [ ] Subtask 0.2: 编写 BDD 步骤实现 `tests/acceptance/test_story_20_6_steps.py`
-- [ ] Subtask 0.3: 运行验收测试，确认失败（🔴 红阶段验证）
-- [ ] Subtask 0.4: 创建 `tests/contracts/conftest.py` 定义公共 fixture
+- [x] Subtask 0.1: 编写 Gherkin 验收测试 `tests/acceptance/test_story_20_6.feature`
+- [x] Subtask 0.2: 编写 BDD 步骤实现 `tests/acceptance/test_story_20_6_steps.py`
+- [x] Subtask 0.3: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.4: 创建 `tests/contracts/conftest.py` 定义公共 fixture
 
 **完成标准:**
-- [ ] 验收测试运行失败（预期行为）
-- [ ] 公共 fixture 定义完成
+- [x] 验收测试运行失败（预期行为）
+- [x] 公共 fixture 定义完成
 
 ---
 
@@ -490,9 +490,9 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 实现 registry / resolver fixture |
 | 🔄 重构 | 优化 fixture scope 和依赖注入 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 fixture 存在性断言测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 `tests/contracts/conftest.py`
-- [ ] Subtask 1.3: 🔄 重构 — 优化 fixture scope
+- [x] Subtask 1.1: 🔴 红 — 编写 fixture 存在性断言测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 `tests/contracts/conftest.py`
+- [x] Subtask 1.3: 🔄 重构 — 优化 fixture scope
 
 #### TDD 循环 B：PortRegistry 测试
 
@@ -502,9 +502,9 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 验证现有 registry 实现通过测试（测试先行验证） |
 | 🔄 重构 | 优化测试结构 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 PortRegistry 核心方法测试
-- [ ] Subtask 1.5: 🟢 绿 — 运行确认 PortRegistry 通过
-- [ ] Subtask 1.6: 🔄 重构 — 优化测试组织
+- [x] Subtask 1.4: 🔴 红 — 编写 PortRegistry 核心方法测试
+- [x] Subtask 1.5: 🟢 绿 — 运行确认 PortRegistry 通过
+- [x] Subtask 1.6: 🔄 重构 — 优化测试组织
 
 #### TDD 循环 C：Resolver 测试
 
@@ -514,9 +514,9 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 验证现有 Resolver 实现 |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写 Resolver 测试
-- [ ] Subtask 1.8: 🟢 绿 — 运行通过
-- [ ] Subtask 1.9: 🔄 重构 — 优化
+- [x] Subtask 1.7: 🔴 红 — 编写 Resolver 测试
+- [x] Subtask 1.8: 🟢 绿 — 运行通过
+- [x] Subtask 1.9: 🔄 重构 — 优化
 
 #### TDD 循环 D：ContractGate 测试
 
@@ -526,20 +526,20 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 验证 ContractGate 实现 |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 1.10: 🔴 红 — 编写 ContractGate 测试
-- [ ] Subtask 1.11: 🟢 绿 — 运行通过
-- [ ] Subtask 1.12: 🔄 重构 — 优化
+- [x] Subtask 1.10: 🔴 红 — 编写 ContractGate 测试
+- [x] Subtask 1.11: 🟢 绿 — 运行通过
+- [x] Subtask 1.12: 🔄 重构 — 优化
 
 #### TDD 循环 E：现有测试重构
 
-- [ ] Subtask 1.13: 重构 `test_port_contract_hash_router.py` 使用公共 fixture
-- [ ] Subtask 1.14: 重构 `test_port_contract_user_repo.py` 使用公共 fixture
-- [ ] Subtask 1.15: 重构 `test_port_contract_event_publisher.py` 使用公共 fixture
+- [x] Subtask 1.13: 重构 `test_port_contract_hash_router.py` 使用公共 fixture
+- [x] Subtask 1.14: 重构 `test_port_contract_user_repo.py` 使用公共 fixture
+- [x] Subtask 1.15: 重构 `test_port_contract_event_publisher.py` 使用公共 fixture
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_infrastructure.py -v` 通过
-- [ ] 现有 3 个测试文件重构完成且仍通过
-- [ ] `ruff check tests/contracts/` 通过
+- [x] `pytest tests/contracts/test_port_infrastructure.py -v` 通过
+- [x] 现有 3 个测试文件重构完成且仍通过
+- [x] `ruff check tests/contracts/` 通过
 
 ---
 
@@ -555,21 +555,21 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过（验证现有注册正确） |
 | 🔄 重构 | 优化为参数化测试 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 L0StoragePort 契约测试（write/read/delete/exists/list_memories）
-- [ ] Subtask 2.2: 🔴 红 — 编写 L1CachePort 契约测试（get/set/delete/exists/delete_pattern/set_with_ttl）
-- [ ] Subtask 2.3: 🔴 红 — 编写 L2RdbPort 泛型基类契约测试（get_by_id/save/delete/list_all）
-- [ ] Subtask 2.4: 🔴 红 — 编写 L3VectorPort 契约测试（upsert_points/delete_points/get_point/search/search_sparse/create_collection/delete_collection/collection_exists/list_collections）
-- [ ] Subtask 2.5: 🔴 红 — 编写 L4ObjectPort 契约测试（store/retrieve/delete/get_metadata/archive/list_objects）
-- [ ] Subtask 2.6: 🔴 红 — 编写 L5GraphPort 契约测试（create_entity/get_entity/delete_entity/create_relationship/delete_relationship/find_related/execute_query/execute_write_query/get_neighbors）
-- [ ] Subtask 2.7: 🔴 红 — 编写 UnifiedStoragePort 契约测试（save/read/delete/exists）
-- [ ] Subtask 2.8: 🔴 红 — 编写 SessionStorage 契约测试（save/load/delete/exists）
-- [ ] Subtask 2.9: 🔴 红 — 编写 StorageEnums 枚举完整性测试（StorageLayer L0-L5 / StorageTier HOT~ARCHIVE / DataAccessPattern）
-- [ ] Subtask 2.10: 🟢 绿 — 运行全部通过
-- [ ] Subtask 2.11: 🔄 重构 — 参数化通用模式，消除重复
+- [x] Subtask 2.1: 🔴 红 — 编写 L0StoragePort 契约测试（write/read/delete/exists/list_memories）
+- [x] Subtask 2.2: 🔴 红 — 编写 L1CachePort 契约测试（get/set/delete/exists/delete_pattern/set_with_ttl）
+- [x] Subtask 2.3: 🔴 红 — 编写 L2RdbPort 泛型基类契约测试（get_by_id/save/delete/list_all）
+- [x] Subtask 2.4: 🔴 红 — 编写 L3VectorPort 契约测试（upsert_points/delete_points/get_point/search/search_sparse/create_collection/delete_collection/collection_exists/list_collections）
+- [x] Subtask 2.5: 🔴 红 — 编写 L4ObjectPort 契约测试（store/retrieve/delete/get_metadata/archive/list_objects）
+- [x] Subtask 2.6: 🔴 红 — 编写 L5GraphPort 契约测试（create_entity/get_entity/delete_entity/create_relationship/delete_relationship/find_related/execute_query/execute_write_query/get_neighbors）
+- [x] Subtask 2.7: 🔴 红 — 编写 UnifiedStoragePort 契约测试（save/read/delete/exists）
+- [x] Subtask 2.8: 🔴 红 — 编写 SessionStorage 契约测试（save/load/delete/exists）
+- [x] Subtask 2.9: 🔴 红 — 编写 StorageEnums 枚举完整性测试（StorageLayer L0-L5 / StorageTier HOT~ARCHIVE / DataAccessPattern）
+- [x] Subtask 2.10: 🟢 绿 — 运行全部通过
+- [x] Subtask 2.11: 🔄 重构 — 参数化通用模式，消除重复
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_contract_storage.py -v` 通过
-- [ ] 9 组存储层端口全部覆盖（7 个已注册 + SessionStorage + StorageEnums）
+- [x] `pytest tests/contracts/test_port_contract_storage.py -v` 通过
+- [x] 9 组存储层端口全部覆盖（7 个已注册 + SessionStorage + StorageEnums）
 
 ---
 
@@ -588,21 +588,21 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 参数化通用模式 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 RoleRepositoryPort 契约测试（get_by_id/get_by_name/list_all/save/delete）
-- [ ] Subtask 3.2: 🔴 红 — 编写 UserRoleRepositoryPort 契约测试（assign_role/revoke_role/get_user_roles/get_role_users）
-- [ ] Subtask 3.3: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（record_attempt/get_recent_failed_attempts/is_account_locked/get_lockout_remaining_minutes/clear_attempts/check_and_record_lockout/record_attempt_and_check_lockout）
-- [ ] Subtask 3.4: 🔴 红 — 编写 AuditRepositoryPort 契约测试（save/get_by_id/search/update_archive_status/get_archive_status）
-- [ ] Subtask 3.5: 🔴 红 — 编写 OutboxRepository 契约测试（save/get_unpublished/mark_published/mark_failed）
-- [ ] Subtask 3.6: 🔴 红 — 编写 L2MetadataRepositoryPort 契约测试（get_by_name/list_by_user/list_by_type + 继承方法）
-- [ ] Subtask 3.7: 🔴 红 — 编写 L2ChangeHistoryRepositoryPort 契约测试（get_by_memory_id + 继承方法）
-- [ ] Subtask 3.8: 🔴 红 — 编写 L2GroupMemberRepositoryPort 契约测试（is_group_member/is_group_admin/add_member/remove_member）
-- [ ] Subtask 3.9: 🔴 红 — 编写 SnapshotRepositoryProtocol 契约测试（save/load/delete）
-- [ ] Subtask 3.10: 🟢 绿 — 运行全部通过
-- [ ] Subtask 3.11: 🔄 重构 — 参数化通用 CRUD 模式
+- [x] Subtask 3.1: 🔴 红 — 编写 RoleRepositoryPort 契约测试（get_by_id/get_by_name/list_all/save/delete）
+- [x] Subtask 3.2: 🔴 红 — 编写 UserRoleRepositoryPort 契约测试（assign_role/revoke_role/get_user_roles/get_role_users）
+- [x] Subtask 3.3: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（record_attempt/get_recent_failed_attempts/is_account_locked/get_lockout_remaining_minutes/clear_attempts/check_and_record_lockout/record_attempt_and_check_lockout）
+- [x] Subtask 3.4: 🔴 红 — 编写 AuditRepositoryPort 契约测试（save/get_by_id/search/update_archive_status/get_archive_status）
+- [x] Subtask 3.5: 🔴 红 — 编写 OutboxRepository 契约测试（save/get_unpublished/mark_published/mark_failed）
+- [x] Subtask 3.6: 🔴 红 — 编写 L2MetadataRepositoryPort 契约测试（get_by_name/list_by_user/list_by_type + 继承方法）
+- [x] Subtask 3.7: 🔴 红 — 编写 L2ChangeHistoryRepositoryPort 契约测试（get_by_memory_id + 继承方法）
+- [x] Subtask 3.8: 🔴 红 — 编写 L2GroupMemberRepositoryPort 契约测试（is_group_member/is_group_admin/add_member/remove_member）
+- [x] Subtask 3.9: 🔴 红 — 编写 SnapshotRepositoryProtocol 契约测试（save/load/delete）
+- [x] Subtask 3.10: 🟢 绿 — 运行全部通过
+- [x] Subtask 3.11: 🔄 重构 — 参数化通用 CRUD 模式
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_contract_repositories.py -v` 通过
-- [ ] 9 组已注册仓储端口全部覆盖
+- [x] `pytest tests/contracts/test_port_contract_repositories.py -v` 通过
+- [x] 9 组已注册仓储端口全部覆盖
 
 ---
 
@@ -618,22 +618,22 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 AuthServicePort 契约测试（authenticate/verify_token/refresh_token/logout）
-- [ ] Subtask 4.2: 🔴 红 — 编写 PermissionServicePort 契约测试（check_permission/get_user_permissions）
-- [ ] Subtask 4.3: 🔴 红 — 编写 TokenBlacklistPort 契约测试（add/is_blacklisted）
-- [ ] Subtask 4.4: 🔴 红 — 编写 PasswordValidationServicePort 契约测试（validate/get_requirements）
-- [ ] Subtask 4.5: 🔴 红 — 编写 ComplianceGatewayPort 契约测试（check）
-- [ ] Subtask 4.6: 🔴 红 — 编写 SensitiveDataDetectorPort 契约测试（detect_sensitive_data）
-- [ ] Subtask 4.7: 🔴 红 — 编写 DataResidencyEnforcerPort 契约测试（enforce_residency/check_violation）
-- [ ] Subtask 4.8: 🔴 红 — 编写 WhitelistServicePort 契约测试（is_allowed/add_to_whitelist）
-- [ ] Subtask 4.9: 🔴 红 — 编写 PIPLComplianceServicePort 契约测试（7 个方法）
-- [ ] Subtask 4.10: 🔴 红 — 编写 CrossBorderTransferServicePort 契约测试（request_transfer/approve/reject/list_pending_requests）
-- [ ] Subtask 4.11: 🟢 绿 — 运行全部通过
-- [ ] Subtask 4.12: 🔄 重构 — 优化
+- [x] Subtask 4.1: 🔴 红 — 编写 AuthServicePort 契约测试（authenticate/verify_token/refresh_token/logout）
+- [x] Subtask 4.2: 🔴 红 — 编写 PermissionServicePort 契约测试（check_permission/get_user_permissions）
+- [x] Subtask 4.3: 🔴 红 — 编写 TokenBlacklistPort 契约测试（add/is_blacklisted）
+- [x] Subtask 4.4: 🔴 红 — 编写 PasswordValidationServicePort 契约测试（validate/get_requirements）
+- [x] Subtask 4.5: 🔴 红 — 编写 ComplianceGatewayPort 契约测试（check）
+- [x] Subtask 4.6: 🔴 红 — 编写 SensitiveDataDetectorPort 契约测试（detect_sensitive_data）
+- [x] Subtask 4.7: 🔴 红 — 编写 DataResidencyEnforcerPort 契约测试（enforce_residency/check_violation）
+- [x] Subtask 4.8: 🔴 红 — 编写 WhitelistServicePort 契约测试（is_allowed/add_to_whitelist）
+- [x] Subtask 4.9: 🔴 红 — 编写 PIPLComplianceServicePort 契约测试（7 个方法）
+- [x] Subtask 4.10: 🔴 红 — 编写 CrossBorderTransferServicePort 契约测试（request_transfer/approve/reject/list_pending_requests）
+- [x] Subtask 4.11: 🟢 绿 — 运行全部通过
+- [x] Subtask 4.12: 🔄 重构 — 优化
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_contract_auth_security.py -v` 通过
-- [ ] 10 组端口全部覆盖
+- [x] `pytest tests/contracts/test_port_contract_auth_security.py -v` 通过
+- [x] 10 组端口全部覆盖
 
 ---
 
@@ -649,12 +649,12 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写 ConnectionManager x4 契约测试（redis/postgresql/qdrant/neo4j_connection_manager）
-- [ ] Subtask 5.2: 🔴 红 — 编写 AuditServicePort 契约测试（record/verify_integrity/verify_batch/archive）
-- [ ] Subtask 5.3: 🔴 红 — 编写 SemanticRouterProtocol 契约测试（route）
-- [ ] Subtask 5.4: 🔴 红 — 编写 SandboxExecutorProtocol 契约测试（start_container/execute_code/stop_container）
-- [ ] Subtask 5.5: 🟢 绿 — 运行全部通过
-- [ ] Subtask 5.6: 🔄 重构 — 优化 ConnectionManager 参数化
+- [x] Subtask 5.1: 🔴 红 — 编写 ConnectionManager x4 契约测试（redis/postgresql/qdrant/neo4j_connection_manager）
+- [x] Subtask 5.2: 🔴 红 — 编写 AuditServicePort 契约测试（record/verify_integrity/verify_batch/archive）
+- [x] Subtask 5.3: 🔴 红 — 编写 SemanticRouterProtocol 契约测试（route）
+- [x] Subtask 5.4: 🔴 红 — 编写 SandboxExecutorProtocol 契约测试（start_container/execute_code/stop_container）
+- [x] Subtask 5.5: 🟢 绿 — 运行全部通过
+- [x] Subtask 5.6: 🔄 重构 — 优化 ConnectionManager 参数化
 
 #### TDD 循环 B：未注册 Protocol 接口验证（仅方法签名验证）
 
@@ -664,18 +664,18 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过（仅验证 Protocol 类定义正确） |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 5.7: 🔴 红 — 编写 UnitOfWork 接口验证（begin/commit/rollback/close/begin_nested + async context）
-- [ ] Subtask 5.8: 🔴 红 — 编写 HealthCheckPort 接口验证（check/close）
-- [ ] Subtask 5.9: 🔴 红 — 编写 IntegrityPort 接口验证（verify_file/compute_hash/verify_hash）
-- [ ] Subtask 5.10: 🔴 红 — 编写 PermissionRepositoryPort 接口验证（get_by_name/get_by_id/save/delete/list_all）
-- [ ] Subtask 5.11: 🔴 红 — 编写 IndexManagerPort 接口验证（update_entry/remove_entry/read_entries/search/truncate）
-- [ ] Subtask 5.12: 🟢 绿 — 运行全部通过
-- [ ] Subtask 5.13: 🔄 重构 — 合并到 `test_port_contract_unregistered.py`
+- [x] Subtask 5.7: 🔴 红 — 编写 UnitOfWork 接口验证（begin/commit/rollback/close/begin_nested + async context）
+- [x] Subtask 5.8: 🔴 红 — 编写 HealthCheckPort 接口验证（check/close）
+- [x] Subtask 5.9: 🔴 红 — 编写 IntegrityPort 接口验证（verify_file/compute_hash/verify_hash）
+- [x] Subtask 5.10: 🔴 红 — 编写 PermissionRepositoryPort 接口验证（get_by_name/get_by_id/save/delete/list_all）
+- [x] Subtask 5.11: 🔴 红 — 编写 IndexManagerPort 接口验证（update_entry/remove_entry/read_entries/search/truncate）
+- [x] Subtask 5.12: 🟢 绿 — 运行全部通过
+- [x] Subtask 5.13: 🔄 重构 — 合并到 `test_port_contract_unregistered.py`
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_contract_services.py -v` 通过（已注册 7 个）
-- [ ] `pytest tests/contracts/test_port_contract_unregistered.py -v` 通过（未注册 5 个）
-- [ ] 12 组端口全部覆盖
+- [x] `pytest tests/contracts/test_port_contract_services.py -v` 通过（已注册 7 个）
+- [x] `pytest tests/contracts/test_port_contract_unregistered.py -v` 通过（未注册 5 个）
+- [x] 12 组端口全部覆盖
 
 ---
 
@@ -691,26 +691,26 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 优化 |
 
-- [ ] Subtask 6.1: 🔴 红 — 编写 SandboxExecutor 契约测试（start_container/execute_code/stop_container/is_container_running）
-- [ ] Subtask 6.2: 🔴 红 — 编写 SemanticCache 契约测试（get/set/invalidate）
-- [ ] Subtask 6.3: 🔴 红 — 编写 MemoryFilePort 契约测试（update_index/remove_from_index/search_index + 继承 L0StoragePort 方法）
-- [ ] Subtask 6.4: 🔴 红 — 编写 PublicBlackboard 契约测试（post/get/get_by_agent/get_latest）
-- [ ] Subtask 6.5: 🔴 红 — 编写 CompressorService 契约测试（compress/supports + CompressionResult dataclass）
-- [ ] Subtask 6.6: 🔴 红 — 编写 MemoryCachePort 契约测试（get_memory/set_memory/delete_memory/invalidate_owner + 继承 L1CachePort）
-- [ ] Subtask 6.7: 🔴 红 — 编写 ExceptionMetricsPort 契约测试（record_exception）
-- [ ] Subtask 6.8: 🔴 红 — 编写 DocumentStoragePort 契约测试（store_document/list_user_documents/get_document_metadata + 继承 L4ObjectPort）
-- [ ] Subtask 6.9: 🔴 红 — 编写 MemoryVectorPort 契约测试（index_memory/search_similar_memories + 继承 L3VectorPort）
-- [ ] Subtask 6.10: 🔴 红 — 编写 SessionCachePort 契约测试（save_session/load_session/delete_session/session_exists + 继承 L1CachePort）
-- [ ] Subtask 6.11: 🔴 红 — 编写 TextExtractorService 契约测试（extract/supports + ExtractionResult dataclass）
-- [ ] Subtask 6.12: 🔴 红 — 编写 MemoryGraphPort 契约测试（index_memory_relations/get_knowledge_graph + 继承 L5GraphPort）
-- [ ] Subtask 6.13: 🔴 红 — 编写 MetricsPort 契约测试（collect/collect_as_dict/record_sessions/record_queue_length/record_cache_hit/record_cache_miss/record_event_processed/update_processing_rate/get_hit_rate/get_sessions/get_queue_length/get_processing_rate）
-- [ ] Subtask 6.14: 🔴 红 — 编写 EventSubscriber 契约测试（subscribe/subscribe_async/start/close）
-- [ ] Subtask 6.15: 🟢 绿 — 运行全部通过
-- [ ] Subtask 6.16: 🔄 重构 — 提取继承验证公共模式
+- [x] Subtask 6.1: 🔴 红 — 编写 SandboxExecutor 契约测试（start_container/execute_code/stop_container/is_container_running）
+- [x] Subtask 6.2: 🔴 红 — 编写 SemanticCache 契约测试（get/set/invalidate）
+- [x] Subtask 6.3: 🔴 红 — 编写 MemoryFilePort 契约测试（update_index/remove_from_index/search_index + 继承 L0StoragePort 方法）
+- [x] Subtask 6.4: 🔴 红 — 编写 PublicBlackboard 契约测试（post/get/get_by_agent/get_latest）
+- [x] Subtask 6.5: 🔴 红 — 编写 CompressorService 契约测试（compress/supports + CompressionResult dataclass）
+- [x] Subtask 6.6: 🔴 红 — 编写 MemoryCachePort 契约测试（get_memory/set_memory/delete_memory/invalidate_owner + 继承 L1CachePort）
+- [x] Subtask 6.7: 🔴 红 — 编写 ExceptionMetricsPort 契约测试（record_exception）
+- [x] Subtask 6.8: 🔴 红 — 编写 DocumentStoragePort 契约测试（store_document/list_user_documents/get_document_metadata + 继承 L4ObjectPort）
+- [x] Subtask 6.9: 🔴 红 — 编写 MemoryVectorPort 契约测试（index_memory/search_similar_memories + 继承 L3VectorPort）
+- [x] Subtask 6.10: 🔴 红 — 编写 SessionCachePort 契约测试（save_session/load_session/delete_session/session_exists + 继承 L1CachePort）
+- [x] Subtask 6.11: 🔴 红 — 编写 TextExtractorService 契约测试（extract/supports + ExtractionResult dataclass）
+- [x] Subtask 6.12: 🔴 红 — 编写 MemoryGraphPort 契约测试（index_memory_relations/get_knowledge_graph + 继承 L5GraphPort）
+- [x] Subtask 6.13: 🔴 红 — 编写 MetricsPort 契约测试（collect/collect_as_dict/record_sessions/record_queue_length/record_cache_hit/record_cache_miss/record_event_processed/update_processing_rate/get_hit_rate/get_sessions/get_queue_length/get_processing_rate）
+- [x] Subtask 6.14: 🔴 红 — 编写 EventSubscriber 契约测试（subscribe/subscribe_async/start/close）
+- [x] Subtask 6.15: 🟢 绿 — 运行全部通过
+- [x] Subtask 6.16: 🔄 重构 — 提取继承验证公共模式
 
 **完成标准:**
-- [ ] `pytest tests/contracts/test_port_contract_application.py -v` 通过
-- [ ] 14 组应用层端口全部覆盖
+- [x] `pytest tests/contracts/test_port_contract_application.py -v` 通过
+- [x] 14 组应用层端口全部覆盖
 
 ---
 
@@ -728,17 +728,17 @@ Feature: 端口契约测试补全
 | 🟢 绿 | 实现增强版 verify_contracts.py |
 | 🔄 重构 | 优化输出格式 |
 
-- [ ] Subtask 7.1: 🔴 红 — 编写 verify_contracts 全量端口覆盖测试
-- [ ] Subtask 7.2: 🟢 绿 — 增强 verify_contracts.py 遍历 registry.list_all()（含 10 个基础设施端口的注册验证）
-- [ ] Subtask 7.3: 🟢 绿 — 增加实现类方法存在性验证
-- [ ] Subtask 7.4: 🟢 绿 — 增加已废弃端口排除验证
-- [ ] Subtask 7.5: 🔄 重构 — 优化输出格式为结构化 manifest
-- [ ] Subtask 7.6: 运行 `python -m tests.contracts.verify_contracts` 验证全部通过
+- [x] Subtask 7.1: 🔴 红 — 编写 verify_contracts 全量端口覆盖测试
+- [x] Subtask 7.2: 🟢 绿 — 增强 verify_contracts.py 遍历 registry.list_all()（含 10 个基础设施端口的注册验证）
+- [x] Subtask 7.3: 🟢 绿 — 增加实现类方法存在性验证
+- [x] Subtask 7.4: 🟢 绿 — 增加已废弃端口排除验证
+- [x] Subtask 7.5: 🔄 重构 — 优化输出格式为结构化 manifest
+- [x] Subtask 7.6: 运行 `python -m tests.contracts.verify_contracts` 验证全部通过
 
 **完成标准:**
-- [ ] verify_contracts.py 输出完整端口清单
-- [ ] 全部已注册端口验证通过
-- [ ] 已废弃端口确认未注册
+- [x] verify_contracts.py 输出完整端口清单
+- [x] 全部已注册端口验证通过
+- [x] 已废弃端口确认未注册
 
 ---
 

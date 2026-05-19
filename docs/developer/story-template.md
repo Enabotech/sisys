@@ -427,7 +427,8 @@
 |
 └── tests/
     │   ├── contracts/
-    │   │   └── test_[xxx]_api_contract.py # 契约测试
+|   │   │   ├── test_port_contract_[xxx].py   # 端口 契约测试
+    │   │   └── test_api_contract_[xxx].py    # API 契约测试
     │   ├── unit/[layer]/
     │   │   └── test_[component].py # 单元测试
     │   ├── integration/

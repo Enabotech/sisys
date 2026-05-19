@@ -311,7 +311,7 @@ development_status:
   20-3-uni-dual-channel-eventbus: done
   20-4-uni-async-refactor: done
   20-5-uni-storage-refactor: done
-  20-6-port-contracts-refactor: ready-for-dev  # 端口契约测试补全
+  20-6-port-contracts-refactor: in-progress  # 端口契约测试补全
   epic-20-retrospective: optional
 
 # =============================================================================
