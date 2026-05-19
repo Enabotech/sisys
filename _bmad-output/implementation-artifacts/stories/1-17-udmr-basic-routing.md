@@ -155,7 +155,7 @@ AutoExecuteService (1.14c)
 #### 领域服务 Schema (Domain Services)
 - [ ] UDMRouter 服务（`src/domain/services/udmr_router.py`）
   - `async on_routed_event(event: AutoRouted) -> RoutingDecided` — 接收 AutoRouted，执行本地/云端二级路由
-  - `async check_local_health() -> tuple[bool, float]` — 检查本地模型健康状态，返回 (passed, latency_ms)
+  - `async check_local_health() -> tuple[bool, float]` — 检查本地模型健康状态，返回 (passed, latency_ms)。**实现方式**：包装 `HealthCheckPort.check()` 调用，使用 `time.monotonic()` 测量耗时（端口接口仅返回 bool，latency 由 UDMRouter 外部测量）
   - 构造函数注入：`EventPublisher`, `HealthCheckPort`, `UDMRConfig`（含 cloud_models 列表）
 
 #### 值对象 Schema (Value Objects)
@@ -167,6 +167,7 @@ AutoExecuteService (1.14c)
   - health_check_latency_ms: float
   - latency_ms: float
   - fallback_reason: Literal["health_check_failed", "unavailable"] | None
+  - > **枚举子集说明**：RoutingDecision 的 fallback_reason 是 RoutingDecided 事件枚举的 MVP 子集。事件允许 `"timeout"`（执行层 Story 1.14c 使用），值对象仅限健康检查相关值（`"health_check_failed"`, `"unavailable"`），符合 MVP 范围。
 
 #### 端口接口 Schema (Domain Ports)
 - [ ] HealthCheckerFactory 端口（`src/domain/ports/health_check_factory.py`）
@@ -182,12 +183,12 @@ AutoExecuteService (1.14c)
   - cloud_models: list[CloudModelConfig]（从 UDMR_CLOUD_{N}_* 解析）
   - from_env() 类方法，扫描 os.environ 中 UDMR_CLOUD_{N}_* 前缀变量
 - [ ] CloudModelConfig 配置（`src/infrastructure/config/udmr.py`）
-  - index: int（云端索引，如 0, 1）
-  - api_type: str（UDMR_CLOUD_{N}_API_TYPE，"openai" | "anthropic"）
+  - api_type: str（UDMR_CLOUD_{N}_API_TYPE，"openai" | "anthropic" | "custom"）
   - endpoint: str（UDMR_CLOUD_{N}_ENDPOINT）
   - api_key: str（UDMR_CLOUD_{N}_API_KEY）
   - model: str（UDMR_CLOUD_{N}_MODEL）
   - enabled: bool（UDMR_CLOUD_{N}_ENABLED，默认 true）
+  - > 索引由列表位置决定，不设 index 字段。对齐 sprint-change-proposal-2026-05-11-udmr-cloud-models.md
 
 **环境变量模板：**
 ```bash
@@ -567,6 +568,26 @@ export UDMR_CLOUD_1_ENABLED=true
 | **UDMRouter 位于 domain/services/** | 符合六边形架构，依赖 HealthCheckPort 端口 | 需依赖倒置 | ✅ 9/10 |
 | UDMRouter 位于 application/services/ | 实现简单 | 领域路由逻辑泄漏到应用层 | 6/10 |
 
+### HealthCheckPort 延迟测量方案
+
+**问题**：HealthCheckPort.check() 仅返回 bool，但 RoutingDecided 事件需要 health_check_latency_ms 字段。
+
+**方案**：UDMRouter.check_local_health() 包装 HealthCheckPort.check() 调用，使用 `time.monotonic()` 测量耗时。不修改 HealthCheckPort 接口（遵循端口稳定性原则）。
+
+### fallback_reason 枚举子集说明
+
+**问题**：RoutingDecided 事件的 fallback_reason 允许 `"timeout"`（执行层 Story 1.14c 使用），但 Story 1.17 的 RoutingDecision 值对象仅限健康检查相关值。
+
+**方案**：值对象 fallback_reason 是事件枚举的 MVP 子集。Story 1.17 仅产生 `"health_check_failed"` 和 `"unavailable"`，`"timeout"` 由执行层产生。类型兼容：子集赋值安全。
+
+### 多云端配置对齐
+
+**来源:** [`sprint-change-proposal-2026-05-11-udmr-cloud-models.md`](../../planning-artifacts/sprint-change-proposal-2026-05-11-udmr-cloud-models.md)
+
+- CloudModelConfig 不设 index 字段（索引由列表位置决定）
+- api_type 支持 "openai" | "anthropic" | "custom"
+- UDMR_CLOUD_{N}_* 索引解析：from_env() 扫描 os.environ 中匹配 `UDMR_CLOUD_(\d+)_API_TYPE` 的键
+
 ### UDMR 路由 vs AutoRoute 语义路由（澄清）
 
 | 路由类型 | 职责 | 输入事件 | 输出事件 | 位置 |
@@ -818,6 +839,9 @@ Story 1.14a (trigger) → Story 1.14b (语义路由) → Story 1.17 (UDMR 模型
 | 4 | 缺少 composition_root.py DI 注册 | P1 | Task 3 包含 composition_root.py 端口注册 Subtask | ✅ |
 | 5 | AutoRouted → UDMRouter 映射链缺失 | P1 | Task 1 包含 UDMRHandler 事件桥接 TDD 循环 | ✅ |
 | 6 | 架构.md P95<50ms vs Story P95<100ms 不一致 | P1 | Dev Notes 明确 MVP/V1/V2 分级目标（100ms/50ms/30ms） | ✅ |
+| 7 | HealthCheckPort.check() 仅返回 bool，无法获取 latency_ms | P0 | UDMRouter.check_local_health() 包装调用 + time.monotonic() 测量耗时，不修改端口接口 | ✅ R1 |
+| 8 | RoutingDecided 事件 fallback_reason 含 "timeout"，值对象不含 | P0 | 值对象是事件枚举的 MVP 子集，类型兼容，Dev Notes 文档化 | ✅ R1 |
+| 9 | CloudModelConfig.index 字段冗余 | P1 | 移除 index 字段，索引由列表位置决定，对齐 sprint-change-proposal | ✅ R1 |
 
 ### 下一步 Next Steps
 
