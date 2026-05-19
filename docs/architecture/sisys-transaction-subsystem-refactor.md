@@ -1,14 +1,15 @@
 # SISYS 事务子系统重构详细设计与执行方案
 
-> **文档版本：** 1.0.4
+> **文档版本：** 1.0.5
 > **创建日期：** 2026-05-18
-> **状态：** Round 4 审查修订中
+> **状态：** 审查完成
 > **维护者：** Agimtech
 > **修订记录**：
-> - v1.0.1: Round 1 — 精确验证实际代码，修正文档与代码不一致；重新评估风险等级
-> - v1.0.2: Round 2 — 发现 Outbox archived 状态冲突、状态机绕过；新增 P6-P8；更新 Phase 2/3
-> - v1.0.3: Round 3 — 修正 D2 工厂模式；新增 D6 ContextVar 权衡；补充测试差距
+> - v1.0.5: Round 5 — 一致性终检；D2 UnitOfWorkFactory Protocol 贯穿全文；单表 Saga 设计统一；Phase 3 前置依赖明确
 > - v1.0.4: Round 4 — Saga 技术可行性验证；单表替代三表；混合式替代纯编舞式；新增架构约束
+> - v1.0.3: Round 3 — 修正 D2 工厂模式；新增 D6 ContextVar 权衡；补充测试差距
+> - v1.0.2: Round 2 — 发现 Outbox archived 状态冲突、状态机绕过；新增 P6-P8；更新 Phase 2/3
+> - v1.0.1: Round 1 — 精确验证实际代码，修正文档与代码不一致；重新评估风险等级
 > **前置文档：** `sisys-eda-unitofwork-design.md` (v1.0.6, Phase 1 已完成)
 > **关联文档：** `architecture.md` (v8.3.1), `arch-appendix.md` (附录J Saga 设计)
 
@@ -391,7 +392,7 @@ SagaStep 与 UoW 集成：每个 Step 在独立 UoW 内执行，Step 失败触�
 # SessionMiddleware 创建 session → handler 使用 UoW → Middleware close session
 
 class DocumentProcessedHandler:
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]):
+    def __init__(self, uow_factory: UnitOfWorkFactory):
         self._uow_factory = uow_factory
 
     async def handle(self, event: DocumentProcessed) -> None:
@@ -474,8 +475,9 @@ SagaOrchestrator.execute()
 
 - [ ] **Task 1.5**: 注册 `UnitOfWorkFactory` 到 DI 容器
   - 文件: `src/composition_root.py`
-  - 注册 `uow_factory` 端口，接口为 `Callable[[], UnitOfWork]`
-  - 实现为 `PostgreSQLUnitOfWork` 类本身（每次调用创建新实例）
+  - 在 `src/domain/ports/unit_of_work.py` 中新增 `UnitOfWorkFactory(Protocol)`
+  - 注册 `uow_factory` 端口，接口为 `UnitOfWorkFactory`
+  - 实现为 `PostgreSQLUnitOfWork` 类本身（TRANSIENT 生命周期）
 
 - [ ] **Task 1.6**: 验证所有 Repository 构造器一致性并同步文档
   - 文件: `src/infrastructure/messaging/outbox/outbox_repository.py` 等 12 个仓储文件
@@ -562,7 +564,7 @@ SagaOrchestrator.execute()
 - ✅ DomainEvent 已支持 `correlation_id`/`causation_id` 链路追踪
 - ✅ event_outbox 表已存在，Saga 与 Outbox 互补但独立
 - ❌ SagaRepository 端口未定义，需新增
-- ❌ Saga 表结构未创建，需 3 个表 + context_data JSONB 字段
+- ❌ Saga 表结构未创建，需单表 `saga_instance` + JSONB 字段
 - ❌ arch-appendix.md 代码使用 `datetime.utcnow()`，实现时需修正为 `datetime.now(UTC)`
 
 - [ ] **Task 3.1**: 创建 `src/infrastructure/saga/` 模块
@@ -677,6 +679,7 @@ SagaOrchestrator.execute()
 | `src/infrastructure/saga/saga_orchestrator.py` | 3 | Saga 编排器 |
 | `src/infrastructure/saga/saga_repository.py` | 3 | Saga 状态持久化 |
 | `src/domain/ports/saga.py` | 3 | Saga 领域端口 |
+| `src/domain/events/saga_events.py` | 3 | SagaStatusChanged 等 DomainEvent 子类 |
 | `src/infrastructure/messaging/unit_of_work/audit_unit_of_work.py` | 2 | 审计专用 UoW |
 | `deploy/postgresql/alembic/versions/xxx_add_saga_instance.py` | 3 | Saga 表迁移 |
 
@@ -868,3 +871,18 @@ poetry run pytest --tb=short
 - Phase 3/4 可延后至 Epic 4-6 启动前
 - Saga S01-S10 与 EPIC 2-13 的 STORY 有明确对应关系
 - 设计覆盖率 95%，仅跨租户事务约束为新增补充
+
+### Round 5: 文档一致性终检
+
+**审查方法**: 单 Agent 全文一致性检查，验证修订内容贯穿全文
+
+**P0 发现与修正**:
+
+| # | 发现 | 修正措施 |
+|---|------|---------|
+| P0-1 | Task 1.5 仍用 `Callable[[], UnitOfWork]`，与 D2 UnitOfWorkFactory Protocol 不一致 | 修正为 UnitOfWorkFactory 并补充 Protocol 定义说明 |
+| P0-2 | Section 4.3 示例代码参数类型与 D2 不一致 | 修正 `uow_factory: Callable[[], UnitOfWork]` → `uow_factory: UnitOfWorkFactory` |
+| P0-3 | Phase 3 前置依赖描述与 P0-2 修正不一致 | 统一为"需单表 `saga_instance` + JSONB 字段" |
+| P0-4 | Section 6.2 新增文件表缺少 `saga_events.py` | 补充该行到表格 |
+
+**审查结论**: 文档完成 5 轮审查，版本升至 1.0.5，状态标记为"审查完成"。
