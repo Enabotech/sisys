@@ -56,9 +56,9 @@ class TestL0StoragePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestL1CachePort:
@@ -87,9 +87,9 @@ class TestL1CachePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestL3VectorPort:
@@ -128,9 +128,9 @@ class TestL3VectorPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestL4ObjectPort:
@@ -159,9 +159,9 @@ class TestL4ObjectPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestL5GraphPort:
@@ -200,9 +200,9 @@ class TestL5GraphPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestUnifiedStoragePort:
@@ -231,9 +231,9 @@ class TestUnifiedStoragePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestSessionStoragePort:
@@ -262,9 +262,9 @@ class TestSessionStoragePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestStorageEnums:

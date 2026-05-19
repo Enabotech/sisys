@@ -9,18 +9,17 @@ from __future__ import annotations
 import pytest
 
 from src.domain.ports.contract_gate import CompatibilityResult, ContractGate
-from src.domain.ports.registry import PortRegistry, PortSpec
+from src.domain.ports.registry import Lifetime, PortRegistry, PortSpec
 from src.domain.ports.resolver import Resolver
 
 
+@pytest.fixture
+def fresh_registry() -> PortRegistry:
+    """提供一个新的空注册中心用于测试."""
+    return PortRegistry()
+
+
 class TestPortRegistry:
-    """Contract tests for PortRegistry."""
-
-    @pytest.fixture
-    def fresh_registry(self) -> PortRegistry:
-        """提供一个新的空注册中心用于测试."""
-        return PortRegistry()
-
     def test_register_adds_port_spec(self, fresh_registry: PortRegistry) -> None:
         """register() should add a PortSpec to the registry."""
         from src.domain.ports.connection_manager import ConnectionManager
@@ -113,6 +112,132 @@ class TestResolver:
         # Resolving again should still work
         impl = resolver.resolve("hash_router")
         assert impl is not None
+
+    def test_lifecycle_register_resolve_unregister(self, fresh_registry: PortRegistry) -> None:
+        """Full lifecycle: register -> resolve -> unregister."""
+        from src.domain.ports.connection_manager import ConnectionManager
+
+        # Use a concrete class that implements ConnectionManager protocol
+        class StubConnectionManager:
+            async def health_check(self) -> bool:
+                return True
+
+            async def close(self) -> None:
+                pass
+
+            def get_client(self) -> str:
+                return "stub_client"
+
+        spec = PortSpec(
+            name="lifecycle_test_port",
+            version="v1.0.0",
+            interface=ConnectionManager,
+            impl=StubConnectionManager,
+            module="test_module",
+        )
+        fresh_registry.register(spec)
+
+        # Create resolver with fresh registry
+        resolver = Resolver(registry=fresh_registry)
+        impl = resolver.resolve("lifecycle_test_port")
+        assert impl is not None
+
+        # Unregister should remove from registry
+        fresh_registry.unregister("lifecycle_test_port")
+        with pytest.raises(KeyError, match="Port not registered"):
+            resolver.resolve("lifecycle_test_port")
+
+    def test_singleton_returns_same_instance(self, fresh_registry: PortRegistry) -> None:
+        """Singleton lifetime should return same instance on repeated resolve."""
+        from src.domain.ports.connection_manager import ConnectionManager
+
+        class StubConnectionManager:
+            async def health_check(self) -> bool:
+                return True
+
+            async def close(self) -> None:
+                pass
+
+            def get_client(self) -> str:
+                return "stub_client"
+
+        spec = PortSpec(
+            name="singleton_test_port",
+            version="v1.0.0",
+            interface=ConnectionManager,
+            impl=StubConnectionManager,
+            module="test_module",
+            lifetime=Lifetime.SINGLETON,
+        )
+        fresh_registry.register(spec)
+
+        resolver = Resolver(registry=fresh_registry)
+        impl1 = resolver.resolve("singleton_test_port")
+        impl2 = resolver.resolve("singleton_test_port")
+        assert impl1 is impl2, "Singleton should return same instance"
+
+    def test_transient_returns_different_instances(self, fresh_registry: PortRegistry) -> None:
+        """Transient lifetime should return different instances on each resolve."""
+        from src.domain.ports.connection_manager import ConnectionManager
+
+        class StubConnectionManager:
+            async def health_check(self) -> bool:
+                return True
+
+            async def close(self) -> None:
+                pass
+
+            def get_client(self) -> str:
+                return "stub_client"
+
+        spec = PortSpec(
+            name="transient_test_port",
+            version="v1.0.0",
+            interface=ConnectionManager,
+            impl=StubConnectionManager,
+            module="test_module",
+            lifetime=Lifetime.TRANSIENT,
+        )
+        fresh_registry.register(spec)
+
+        resolver = Resolver(registry=fresh_registry)
+        impl1 = resolver.resolve("transient_test_port")
+        impl2 = resolver.resolve("transient_test_port")
+        assert impl1 is not impl2, "Transient should return different instances"
+
+    def test_scoped_returns_same_instance_within_context(self, fresh_registry: PortRegistry) -> None:
+        """Scoped lifetime should return same instance within same context."""
+        from src.domain.ports.connection_manager import ConnectionManager
+
+        class StubConnectionManager:
+            async def health_check(self) -> bool:
+                return True
+
+            async def close(self) -> None:
+                pass
+
+            def get_client(self) -> str:
+                return "stub_client"
+
+        spec = PortSpec(
+            name="scoped_test_port",
+            version="v1.0.0",
+            interface=ConnectionManager,
+            impl=StubConnectionManager,
+            module="test_module",
+            lifetime=Lifetime.SCOPED,
+        )
+        fresh_registry.register(spec)
+
+        resolver = Resolver(registry=fresh_registry)
+        impl1 = resolver.resolve("scoped_test_port")
+        impl2 = resolver.resolve("scoped_test_port")
+        assert impl1 is impl2, "Scoped should return same instance within context"
+
+        # Clearing scoped context should return different instance
+        resolver.clear_scoped()
+        impl3 = resolver.resolve("scoped_test_port")
+        assert impl3 is not impl1, "After clear_scoped, should return new instance"
 
 
 class TestContractGate:
