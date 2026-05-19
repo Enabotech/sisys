@@ -52,7 +52,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 
 > **注：** L2RdbPort[T] 是泛型基类，不直接注册；其子类 L2MetadataRepositoryPort 等继承使用。
 
-**待补全 — domain/ports 仓储层（已注册 10 个）：**
+**待补全 — domain/ports 仓储层（已注册 9 个）：**
 | 端口注册名 | 接口类 | 方法数 | 文件 |
 |---------|--------|-------|------|
 | role_repo | RoleRepositoryPort | 5 | `src/domain/ports/role_repository.py` |
@@ -81,7 +81,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | pipl_compliance | PIPLComplianceServicePort | 7 | `src/domain/ports/pipl_compliance_service.py` |
 | cross_border_transfer | CrossBorderTransferServicePort | 4 | `src/domain/ports/cross_border_transfer_service.py` |
 
-**待补全 — domain/ports 服务协议与基础设施（已注册 11 个，未注册 4 个）：**
+**待补全 — domain/ports 服务协议与基础设施（已注册 7 个，未注册 3 个）：**
 
 **已注册（可做完整契约验证）：**
 | 端口注册名 | 接口类 | 方法数 | 文件 |
@@ -119,7 +119,11 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | metrics | MetricsPort | Protocol | 12 | `src/application/ports/metrics_port.py` |
 | event_subscriber | EventSubscriber | Protocol | 4 | `src/application/ports/event_subscriber.py` |
 
-**基础设施端口（使用第三方接口，需特殊处理）：**
+**基础设施端口（使用第三方接口，Task 7 验证）：**
+
+> **⚠️ 契约测试策略：** 以下 10 个基础设施端口使用第三方或内部非 Protocol 接口，无法做方法签名验证。
+> **Task 7 的 verify_contracts.py 增强版将遍历全部 60 个已注册端口，自动验证这 10 个端口的注册存在性和 Resolver 可解析性。**
+
 | 端口注册名 | 接口类型 | 说明 |
 |---------|----------|------|
 | redis_client | aioredis.Redis | 第三方类型，无本地 Protocol |
@@ -128,11 +132,12 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | qdrant_client | AsyncQdrantClient | 第三方类型 |
 | neo4j_driver | AsyncDriver | 第三方类型 |
 | router | ChannelRouter | 内部基础设施类（非 Protocol） |
-| redis_bus / rabbitmq_bus | EventPublisher | 与 event_publisher 共用接口 |
+| redis_bus | EventPublisher | 与 event_publisher 共用接口 |
+| rabbitmq_bus | EventPublisher | 与 event_publisher 共用接口 |
 | rabbitmq_publisher | RabbitMQPublisher | 内部基础设施类 |
 | outbox_poller | AsyncOutboxPoller | 内部基础设施类 |
 
-> **契约测试策略：** 基础设施端口使用第三方或内部非 Protocol 接口，契约测试仅验证注册存在性和实现可解析，不做方法签名验证。
+> **注：** event_publisher 已有契约测试（Task 1 重构），redis_bus 和 rabbitmq_bus 共用 EventPublisher 接口。
 
 ---
 
@@ -182,9 +187,9 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 
 ### AC-5: 全部 domain/ports 服务协议端口契约测试完成
 
-**Given** 8 组服务协议端口定义
-**When** 运行 `pytest tests/contracts/ -k "connection or health or unit_of_work or integrity or audit_service or semantic_router or sandbox or session" -v`
-**Then** 所有服务协议端口的注册、接口方法通过验证
+**Given** 7 组已注册服务协议端口 + 3 个未注册 Protocol 接口定义
+**When** 运行 `pytest tests/contracts/ -k "connection or health or unit_of_work or integrity or audit_service or semantic_router or sandbox" -v`
+**Then** 所有已注册服务协议端口的注册、接口方法通过验证，未注册 Protocol 接口方法存在性通过验证
 
 ### AC-6: 全部 application/ports 端口契约测试完成
 
@@ -423,7 +428,7 @@ Feature: 端口契约测试补全
 | AC-2 | 存储层端口契约测试 | Task 2 | L0-L5 + Unified + Enums | `test_port_contract_storage.py` |
 | AC-3 | 仓储层端口契约测试 | Task 3 | 10 组已注册仓储端口 | `test_port_contract_repositories.py` |
 | AC-4 | 认证安全合规端口测试 | Task 4 | 10 组端口 | `test_port_contract_auth_security.py` |
-| AC-5 | 服务协议端口测试 | Task 5 | 8 组端口 | `test_port_contract_services.py` |
+| AC-5 | 服务协议端口测试 | Task 5 | 7 组已注册 + 5 组未注册 | `test_port_contract_services.py` + `test_port_contract_unregistered.py` |
 | AC-6 | 应用层端口测试 | Task 6 | 14 组端口 | `test_port_contract_application.py` |
 | AC-7 | verify_contracts 增强 | Task 7 | 全量端口验证 | `verify_contracts.py` |
 | AC-8 | 测试基础设施统一 | Task 1 | conftest + 现有测试重构 | `conftest.py` |
@@ -687,9 +692,11 @@ Feature: 端口契约测试补全
 
 ---
 
-### Task 7: verify_contracts.py 增强 + 集成验证
+### Task 7: verify_contracts.py 增强 + 基础设施端口验证 + 集成验证
 
 **关联 AC:** AC-7
+
+> **⚠️ 本 Task 同时覆盖 10 个基础设施端口（第三方/非 Protocol 接口）的注册存在性和 Resolver 可解析性验证。**
 
 #### TDD 循环：verify_contracts 增强
 
@@ -700,7 +707,7 @@ Feature: 端口契约测试补全
 | 🔄 重构 | 优化输出格式 |
 
 - [ ] Subtask 7.1: 🔴 红 — 编写 verify_contracts 全量端口覆盖测试
-- [ ] Subtask 7.2: 🟢 绿 — 增强 verify_contracts.py 遍历 registry.list_all()
+- [ ] Subtask 7.2: 🟢 绿 — 增强 verify_contracts.py 遍历 registry.list_all()（含 10 个基础设施端口的注册验证）
 - [ ] Subtask 7.3: 🟢 绿 — 增加实现类方法存在性验证
 - [ ] Subtask 7.4: 🟢 绿 — 增加已废弃端口排除验证
 - [ ] Subtask 7.5: 🔄 重构 — 优化输出格式为结构化 manifest
@@ -862,6 +869,10 @@ tests/
 | 12 | Task 2 缺 session_storage 子任务 | P0 | 新增 Subtask 2.8，更新完成标准 8→9 组 |
 | 13 | Task 3 包含已测试/未注册端口（3.1/3.4/3.12） | P0 | 移除 3 个错误子任务，重新编号，AC-3 计数 13→10 |
 | 14 | storage 表 memory_cache 错位放置 | P0 | 从存储表移除（已在应用层） |
+| 15 | 仓储层表格计数声明错误（10→9） | P0 | 第3轮审查修正 |
+| 16 | 服务协议表格计数声明错误（11→4→7→3） | P0 | 第3轮审查修正 |
+| 17 | 10 个基础设施端口无 Task 覆盖 | P0 | 明确 Task 7 的 verify_contracts.py 覆盖；拆分 redis_bus/rabbitmq_bus 为独立行 |
+| 18 | AC-5 计数错误（8 组→7 已注册+5 未注册） | P0 | 第3轮审查修正 |
 
 ### 下一步
 
