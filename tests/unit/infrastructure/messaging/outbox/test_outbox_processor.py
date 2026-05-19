@@ -54,12 +54,15 @@ class TestAsyncOutboxPoller:
     @pytest.fixture
     def poller(self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter) -> AsyncOutboxPoller:
         """创建 AsyncOutboxPoller 实例"""
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
         return AsyncOutboxPoller(
             outbox_repository=mock_repo,
             publisher=mock_publisher,
             router=mock_router,
             poll_interval=0.01,
             batch_size=5,
+            retry_policy=RetryPolicy(base_delay=0.001, max_delay=0.01, max_retries=3),
         )
 
     def test_init_sets_attributes(self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter) -> None:
@@ -77,6 +80,32 @@ class TestAsyncOutboxPoller:
         assert poller._poll_interval == 2.5
         assert poller._batch_size == 20
         assert poller._running is False
+
+    def test_init_with_custom_retry_policy(
+        self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter
+    ) -> None:
+        """初始化可传入自定义 RetryPolicy"""
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
+        custom_policy = RetryPolicy(base_delay=0.5, max_delay=10.0, max_retries=5)
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+            retry_policy=custom_policy,
+        )
+        assert poller._retry_policy is custom_policy
+
+    def test_init_default_retry_policy(
+        self, mock_repo: MagicMock, mock_publisher: MagicMock, mock_router: ChannelRouter
+    ) -> None:
+        """无 retry_policy 参数时使用 RetryPolicy 默认值"""
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+        )
+        assert poller._retry_policy.max_retries == 3
 
     @pytest.mark.asyncio
     async def test_poll_once_no_events(self, poller: AsyncOutboxPoller, mock_repo: MagicMock) -> None:
@@ -110,7 +139,7 @@ class TestAsyncOutboxPoller:
         mock_repo: MagicMock,
         mock_publisher: MagicMock,
     ) -> None:
-        """发布失败时标记为失败"""
+        """发布失败时重试耗尽后标记为失败"""
         event = _make_domain_event()
         mock_repo.get_unpublished.return_value = [event]
         mock_publisher.async_publish.side_effect = RuntimeError("Publish failed")
@@ -118,6 +147,68 @@ class TestAsyncOutboxPoller:
         await poller.poll_once()
 
         mock_repo.mark_failed.assert_awaited_once_with(event.event_id, "Publish failed")
+
+    @pytest.mark.asyncio
+    async def test_poll_once_retries_on_transient_error(
+        self,
+        mock_repo: MagicMock,
+        mock_publisher: MagicMock,
+        mock_router: MagicMock,
+    ) -> None:
+        """发布失败后重试成功时标记为已发布"""
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
+        call_count = 0
+
+        async def flaky_publish(event: DomainEvent, **kwargs: object) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise RuntimeError("Transient error")
+
+        mock_publisher.async_publish.side_effect = flaky_publish
+
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+            retry_policy=RetryPolicy(base_delay=0.01, max_retries=3),
+        )
+
+        await poller.poll_once()
+
+        assert call_count == 3
+        mock_repo.mark_published.assert_awaited_once_with(event.event_id)
+        mock_repo.mark_failed.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_poll_once_marks_failed_after_retries_exhausted(
+        self,
+        mock_repo: MagicMock,
+        mock_publisher: MagicMock,
+        mock_router: MagicMock,
+    ) -> None:
+        """重试耗尽后标记为失败"""
+        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
+
+        event = _make_domain_event()
+        mock_repo.get_unpublished.return_value = [event]
+        mock_publisher.async_publish.side_effect = RuntimeError("Persistent error")
+
+        poller = AsyncOutboxPoller(
+            outbox_repository=mock_repo,
+            publisher=mock_publisher,
+            router=mock_router,
+            retry_policy=RetryPolicy(base_delay=0.01, max_retries=2),
+        )
+
+        await poller.poll_once()
+
+        assert mock_publisher.async_publish.call_count == 3  # 1 initial + 2 retries
+        mock_repo.mark_failed.assert_awaited_once_with(event.event_id, "Persistent error")
+        mock_repo.mark_published.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_poll_once_uses_correct_routing_key(

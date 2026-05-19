@@ -1070,20 +1070,26 @@ register_port(
 
 ### 7.1 高优先级问题
 
-| 问题 | 位置 | 修复方案 |
-|------|------|---------|
-| `mark_published()` 未调用 `flush()` | `outbox_repository.py:67-79` | 添加 `await self._session.flush()` |
-| `mark_failed()` 未调用 `flush()` | `outbox_repository.py:81-94` | 添加 `await self._session.flush()` |
-| `update_status()` 未调用 `flush()` | `saga_repository.py:133` | 添加 `await self._session.flush()` |
-| `cleanup_old_published_records` 存根 | `outbox_repository.py:96-109` | 实现完整清理逻辑 |
+| 问题 | 位置 | 修复方案 | 状态 |
+|------|------|---------|------|
+| `mark_published()` 未调用 `flush()` | `outbox_repository.py:80` | 添加 `await self._session.flush()` | ✅ 已修复 |
+| `mark_failed()` 未调用 `flush()` | `outbox_repository.py:96` | 添加 `await self._session.flush()` | ✅ 已修复 |
+| `update_status()` 未调用 `flush()` | `saga_repository.py:134` | 添加 `await self._session.flush()` | ✅ 已修复 |
+| `cleanup_old_published_records` 存根 | `outbox_repository.py:96-119` | 实现完整清理逻辑（基于 published_at + status='published'） | ✅ 已修复 |
 
 ### 7.2 中优先级问题
 
-| 问题 | 位置 | 修复方案 |
-|------|------|---------|
-| OutboxPoller 异常被吞没 | `outbox_processor.py:97-104` | 改进错误处理 + RetryPolicy 集成 |
-| 未集成 RetryPolicy | `outbox_processor.py` | Poller 集成指数退避重试 |
-| `datetime.utcnow()` 废弃 | `arch-appendix.md` | 替换为 `datetime.now(UTC)`（28 处） |
+| 问题 | 位置 | 修复方案 | 状态 |
+|------|------|---------|------|
+| OutboxPoller 异常被吞没 | `outbox_processor.py:75-128` | 改进错误处理 + RetryPolicy 集成 | ✅ 已修复 |
+| 未集成 RetryPolicy | `outbox_processor.py:20,37-63` | Poller 集成指数退避重试（构造器参数 `retry_policy`） | ✅ 已修复 |
+| `datetime.utcnow()` 废弃 | `arch-appendix.md` | 替换为 `datetime.now(UTC)`（28 处） | 待修复 |
+
+### 7.3 测试优化
+
+| 问题 | 修复方案 | 效果 |
+|------|---------|------|
+| OutboxPoller 测试慢（27s） | fixture 使用极短 RetryPolicy（`base_delay=0.001, max_delay=0.01, max_retries=3`） | **27s → 4.2s** |
 
 ---
 
@@ -1106,9 +1112,10 @@ register_port(
 |------|--------|
 | `test_uow_does_not_close_session` | `__aexit__` 不调用 `close()` |
 | `test_middleware_uses_in_transaction` | Middleware 检测 UoW 状态 |
-| `test_outbox_persistence` | `mark_published()`/`mark_failed()` 持久化 |
+| `test_outbox_persistence` | `mark_published()`/`mark_failed()` 持久化（含 flush） |
 | `test_outbox_state_machine` | 状态转换规则验证 |
-| `test_poller_retry` | 指数退避重试 |
+| `test_poll_once_retries_on_transient_error` | 临时错误重试后成功 |
+| `test_poll_once_marks_failed_after_retries_exhausted` | 重试耗尽后标记 failed |
 | `test_saga_compensation` | 补偿流程正确执行 |
 | `test_saga_upsert` | Saga 状态 UPSERT 持久化 |
 
@@ -1193,9 +1200,9 @@ poetry run pytest --tb=short
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| `mark_published/mark_failed` 未调用 `flush()` | 待修复 | 变更不持久化 |
-| `cleanup_old_published_records` 存根实现 | 待修复 | 始终返回 0 |
-| `update_status` 未调用 `flush()` | 待修复 | Saga 状态不持久化 |
-| `datetime.utcnow()` 废弃 | 待修复 | 28 处待替换 |
-| RetryPolicy 未集成到 Poller | 待修复 | 无指数退避重试 |
-| OutboxPoller 异常被吞没 | 待改进 | 错误处理不完善 |
+| `datetime.utcnow()` 废弃 | 待修复 | `arch-appendix.md` 中 28 处待替换为 `datetime.now(UTC)` |
+| ~~`mark_published/mark_failed` 未调用 `flush()`~~ | ✅ 已修复 | 已添加 `flush()` 调用 |
+| ~~`cleanup_old_published_records` 存根实现~~ | ✅ 已修复 | 已实现基于 `published_at` 的清理逻辑 |
+| ~~`update_status` 未调用 `flush()`~~ | ✅ 已修复 | 已添加 `flush()` 调用 |
+| ~~RetryPolicy 未集成到 Poller~~ | ✅ 已修复 | 已集成指数退避重试 |
+| ~~OutboxPoller 异常被吞没~~ | ✅ 已修复 | 已改进错误处理 + 重试耗尽后标记 failed |
