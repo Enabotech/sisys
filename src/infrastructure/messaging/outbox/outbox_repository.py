@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events.base import DomainEvent
+from src.domain.exceptions import InvalidStateTransitionError
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.adapters.sqlalchemy_event_outbox_adapter import (
     SQLAlchemyEventOutboxAdapter,
@@ -64,18 +65,30 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         return [SQLAlchemyEventOutboxAdapter.to_domain_event(m) for m in models]
 
     async def mark_published(self, event_id: UUID) -> None:
-        """标记事件已发布"""
+        """标记事件已发布
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 pending 时
+        """
         result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
         model = result.scalar_one_or_none()
         if model:
+            if model.status != "pending":
+                raise InvalidStateTransitionError(model.status, "published")
             model.status = "published"
             model.published_at = datetime.now(UTC)
 
     async def mark_failed(self, event_id: UUID, error: str) -> None:
-        """标记事件发布失败"""
+        """标记事件发布失败
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 pending 或 failed 时
+        """
         result = await self._session.execute(select(OutboxModel).where(OutboxModel.event_id == event_id))
         model = result.scalar_one_or_none()
         if model:
+            if model.status not in ("pending", "failed"):
+                raise InvalidStateTransitionError(model.status, "failed")
             model.status = "failed"
             model.retry_count += 1
             model.error_message = error
@@ -102,8 +115,13 @@ class PostgreSQLOutboxRepository(OutboxRepository):
 
         Args:
             model: 要标记的 OutboxModel 实例
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 pending 时
         """
         async with self._lock:
+            if model.status != "pending":
+                raise InvalidStateTransitionError(model.status, "published")
             model.status = "published"
             model.published_at = datetime.now(UTC)
 
@@ -113,8 +131,13 @@ class PostgreSQLOutboxRepository(OutboxRepository):
         Args:
             model: 要标记的 OutboxModel 实例
             error: 错误信息
+
+        Raises:
+            InvalidStateTransitionError: 当当前状态不是 pending 或 failed 时
         """
         async with self._lock:
+            if model.status not in ("pending", "failed"):
+                raise InvalidStateTransitionError(model.status, "failed")
             model.status = "failed"
             model.retry_count += 1
             model.error_message = error

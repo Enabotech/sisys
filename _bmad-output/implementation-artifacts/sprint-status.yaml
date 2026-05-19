@@ -312,6 +312,7 @@ development_status:
   20-4-uni-async-refactor: done
   20-5-uni-storage-refactor: done
   20-6-port-contracts-refactor: done  # 端口契约测试补全
+  20-7-transaction-subsystem-refactor: done  # 事务子系统重构（Session/UoW/Outbox/Saga）
   epic-20-retrospective: optional
 
 # =============================================================================

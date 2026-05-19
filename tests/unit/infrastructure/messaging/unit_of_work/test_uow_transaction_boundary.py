@@ -182,3 +182,26 @@ class TestEventHandlerDependency:
         content = ports_init.read_text()
 
         assert "UnitOfWork" in content, "UnitOfWork not exported from domain/ports/__init__.py"
+
+    def test_saga_ports_exported_from_domain_ports(self) -> None:
+        """Saga ports should be exported from domain ports."""
+        ports_init = ROOT / "src" / "domain" / "ports" / "__init__.py"
+        content = ports_init.read_text()
+
+        assert "SagaRepositoryProtocol" in content, "SagaRepositoryProtocol not exported"
+        assert "SagaStep" in content, "SagaStep not exported"
+
+
+class TestPortRegistryCompleteness:
+    """验证端口注册完整性"""
+
+    def test_required_ports_registered(self) -> None:
+        """所有 Story 20-7 新增端口应已注册"""
+        from src.domain.ports.registry import _global_registry
+
+        required_ports = ["uow_factory", "saga_repository"]
+        for port_name in required_ports:
+            spec = _global_registry.get(port_name)
+            assert spec is not None, f"Port {port_name} not registered"
+            assert spec.version, f"{port_name}: version missing"
+            assert spec.owner, f"{port_name}: owner missing"

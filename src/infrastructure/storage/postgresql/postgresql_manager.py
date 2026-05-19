@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from src.domain.ports.connection_manager import ConnectionManager
 from src.infrastructure.config.postgresql import PostgreSQLConfig
 
+_ISOLATION_LEVELS = {"SERIALIZABLE", "REPEATABLE READ", "READ COMMITTED", "READ UNCOMMITTED"}
+
 
 class PostgreSQLManager(ConnectionManager):
     """PostgreSQL 数据库引擎管理器，支持异步和同步引擎的懒初始化
@@ -151,4 +153,29 @@ class PostgreSQLManager(ConnectionManager):
                 expire_on_commit=False,
             )
         async with self._async_session_maker() as session:
+            yield session
+
+    @asynccontextmanager
+    async def get_session_with_isolation(self, isolation_level: str) -> AsyncIterator[AsyncSession]:
+        """获取指定隔离级别的异步会话
+
+        Args:
+            isolation_level: 隔离级别（SERIALIZABLE, REPEATABLE READ, READ COMMITTED, READ UNCOMMITTED）
+
+        Yields:
+            AsyncSession 实例
+
+        Raises:
+            ValueError: 隔离级别不支持
+        """
+        if isolation_level.upper() not in _ISOLATION_LEVELS:
+            raise ValueError(f"Unsupported isolation level: {isolation_level}. Must be one of {_ISOLATION_LEVELS}")
+
+        maker = async_sessionmaker(
+            bind=self.get_async_engine(),
+            class_=AsyncSession,
+            expire_on_commit=False,
+            isolation_level=isolation_level.upper(),
+        )
+        async with maker() as session:
             yield session

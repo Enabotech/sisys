@@ -42,7 +42,6 @@ class TestUnitOfWork:
         "begin",
         "commit",
         "rollback",
-        "close",
         "begin_nested",
         "__aenter__",
         "__aexit__",

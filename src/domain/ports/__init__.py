@@ -31,6 +31,7 @@ from src.domain.ports.memory_repository import (
 )
 from src.domain.ports.outbox import OutboxRepository
 from src.domain.ports.permission_repository import PermissionRepositoryPort
+from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 from src.domain.ports.session_storage import SessionStorage
@@ -56,6 +57,8 @@ __all__ = [
     "L5GraphPort",
     "OutboxRepository",
     "PermissionRepositoryPort",
+    "SagaRepositoryProtocol",
+    "SagaStep",
     "SandboxExecutorProtocol",
     "SemanticRouterProtocol",
     "SessionStorage",

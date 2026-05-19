@@ -84,6 +84,7 @@ def bootstrap() -> None:
     from src.domain.ports.permission_service import PermissionServicePort
     from src.domain.ports.pipl_compliance_service import PIPLComplianceServicePort
     from src.domain.ports.role_repository import RoleRepositoryPort
+    from src.domain.ports.saga import SagaRepositoryProtocol
 
     # Service protocols (migrated from services)
     from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
@@ -94,6 +95,9 @@ def bootstrap() -> None:
     from src.domain.ports.token_blacklist import TokenBlacklistPort
     from src.domain.ports.unified_storage import UnifiedStoragePort
 
+    # Transaction subsystem
+    from src.domain.ports.unit_of_work import UnitOfWorkFactory
+
     # Repository ports
     from src.domain.ports.user_repository import UserRepositoryPort
     from src.domain.ports.user_role_repository import UserRoleRepositoryPort
@@ -101,6 +105,10 @@ def bootstrap() -> None:
 
     # === Storage Layer ===
     from src.infrastructure.config.redis import RedisConfig
+    from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
+        PostgreSQLUnitOfWork,
+    )
+    from src.infrastructure.saga.saga_repository import PostgreSQLSagaRepository
     from src.infrastructure.storage.redis.redis_manager import RedisManager
 
     register_port(
@@ -543,6 +551,27 @@ def bootstrap() -> None:
         module="src.infrastructure.messaging.outbox.outbox_processor",
         lifetime=Lifetime.SINGLETON,
         owner="messaging-team",
+    )
+
+    # === Transaction Ports ===
+    register_port(
+        name="uow_factory",
+        version="v1.0.0",
+        interface=UnitOfWorkFactory,
+        impl=lambda resolver: PostgreSQLUnitOfWork,
+        module="src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work",
+        lifetime=Lifetime.TRANSIENT,
+        owner="platform-team",
+    )
+
+    register_port(
+        name="saga_repository",
+        version="v1.0.0",
+        interface=SagaRepositoryProtocol,
+        impl=PostgreSQLSagaRepository,
+        module="src.infrastructure.saga.saga_repository",
+        lifetime=Lifetime.SCOPED,
+        owner="platform-team",
     )
 
     # === Compliance Ports ===

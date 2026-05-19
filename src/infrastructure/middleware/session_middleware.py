@@ -46,6 +46,15 @@ class SessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """处理请求并管理会话生命周期
 
+        通过 session.in_transaction() 检查事务状态：
+        - UoW 已 commit/rollback 后 in_transaction() 为 False，跳过操作
+        - UoW 未使用时 in_transaction() 为 True，由 Middleware commit/rollback
+        finally 块始终负责 close + reset
+
+        注意：使用 session.in_transaction() 而非 ContextVar 标记，
+        因为 BaseHTTPMiddleware 的 call_next 在独立任务上下文中运行，
+        ContextVar.set() 不会传播回父上下文，而 session 对象跨上下文共享
+
         Args:
             request: HTTP 请求对象
             call_next: 下一个中间件或路由处理器
@@ -57,10 +66,12 @@ class SessionMiddleware(BaseHTTPMiddleware):
         token = set_session(session)
         try:
             response: Response = await call_next(request)
-            await session.commit()
+            if session.in_transaction():
+                await session.commit()
             return response
         except Exception:
-            await session.rollback()
+            if session.in_transaction():
+                await session.rollback()
             raise
         finally:
             await session.close()
