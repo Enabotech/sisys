@@ -617,10 +617,10 @@ Feature: 事务子系统重构
 | 🟢 绿 | 注册 saga_repository 端口 |
 | 🔄 重构 | 优化代码 |
 
-- [ ] Subtask 8.5: 🔴 红 — 编写 SagaStep Protocol 契约测试
-- [ ] Subtask 8.6: 🟢 绿 — 定义 SagaRepositoryProtocol
-- [ ] Subtask 8.7: 🟢 绿 — composition_root.py 注册 saga_repository
-- [ ] Subtask 8.8: 🔄 重构 — 优化代码
+- [ ] Subtask 8.6: 🔴 红 — 编写 SagaStep Protocol 契约测试
+- [ ] Subtask 8.7: 🟢 绿 — 定义 SagaRepositoryProtocol
+- [ ] Subtask 8.8: 🟢 绿 — composition_root.py 注册 saga_repository
+- [ ] Subtask 8.9: 🔄 重构 — 优化代码
 
 **完成标准:**
 - [ ] `pytest tests/integration/test_saga_repository.py -v` 通过
@@ -766,6 +766,12 @@ src/
 - [ ] UnitOfWorkFactory 契约测试验证 __call__ 方法
 - [ ] 测试先调用 bootstrap() 注册
 
+### 实施风险提示
+
+1. **BaseHTTPMiddleware ContextVar 传播**: Starlette BaseHTTPMiddleware 在 ASGI scope 边界可能丢失 ContextVar。Task 2 开始前须编写 POC 验证 `mark_uow_managed()` 设置的 ContextVar 在 dispatch()/response 间是否可见。若不可见，需改用 `request.state` 传递标记。
+2. **Saga 集成测试 Fixture 基础设施**: 项目无 saga_instance 表的测试 fixture 先例。Task 8 集成测试须新建 `tests/integration/conftest.py` 中的 saga 表初始化 fixture（参照 outbox 表 fixture 模式）。
+3. **test_unit_of_work_has_close_method**: `tests/unit/domain/ports/test_unit_of_work.py` 包含验证 close() 存在的测试，Task 3 移除 Protocol close() 后须同步移除或重写该测试。
+
 ---
 
 ## 🤖 开发代理记录 Dev Agent Record
@@ -810,6 +816,7 @@ src/
 - `deploy/postgresql/alembic/versions/001_initial.py` — 不直接修改，通过新迁移脚本修复
 - `src/infrastructure/storage/postgresql/models/outbox.py` — 修改 CheckConstraint 添加 'archived'
 - `tests/contracts/test_port_contract_unregistered.py` — 更新 UnitOfWork 方法数
+- `tests/unit/domain/ports/test_unit_of_work.py` — 移除 `test_unit_of_work_has_close_method` 测试
 
 **待新增的文件:**
 - `src/domain/ports/saga.py` — SagaStep/SagaRepositoryProtocol
