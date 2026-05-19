@@ -138,7 +138,7 @@ AutoExecuteService (1.14c)
 **And** 路由决策幂等性（相同输入→相同输出）
 
 **验证标准/Validation Criteria:**
-- [ ] 路由决策延迟 P95<100ms（基准测试：1000 次请求，预热 100 次）
+- [ ] 路由决策延迟 P95<100ms（基准测试：1000 次请求，预热 100 次。**注意**：使用 mock 健康检查（瞬时返回），仅测量路由决策逻辑延迟。真实 Ollama 健康检查延迟取决于网络/硬件，不纳入 MVP 基准测试）
 - [ ] 路由决策幂等性（相同 AutoRouted 输入产生相同 RoutingDecided 输出）
 
 ---
@@ -155,14 +155,17 @@ AutoExecuteService (1.14c)
 #### 领域服务 Schema (Domain Services)
 - [ ] UDMRouter 服务（`src/domain/services/udmr_router.py`）
   - `async on_routed_event(event: AutoRouted) -> RoutingDecided` — 接收 AutoRouted，执行本地/云端二级路由
+    - **task_id 映射**：`task_id = event.event_id`（保持事件链聚合标识一致性）
+    - **发布职责**：UDMRouter 仅返回 RoutingDecided，不内部发布；由 UDMRHandler 调用后发布
   - `async check_local_health() -> tuple[bool, float]` — 检查本地模型健康状态，返回 (passed, latency_ms)。**实现方式**：包装 `HealthCheckPort.check()` 调用，使用 `time.monotonic()` 测量耗时（端口接口仅返回 bool，latency 由 UDMRouter 外部测量）
-  - 构造函数注入：`EventPublisher`, `HealthCheckPort`, `UDMRConfig`（含 cloud_models 列表）
+  - 构造函数注入：`EventPublisher`, `HealthCheckPort`, **原始值类型**（local_model: str, cloud_models: list[str], local_first: bool = True, local_timeout: int = 30）
+    - > **六边形架构约束**：UDMRouter（领域层）不导入 UDMRConfig（基础设施层）。构造函数接受原始值类型，由 composition_root.py 解析 UDMRConfig 后传入。参考 AutoRouteService 模式（不导入 AutoRouteConfig）。
 
 #### 值对象 Schema (Value Objects)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
   - route_type: Literal["local", "cloud"]
   - selected_model: str
-  - cost_estimate: float
+  - cost_estimate: float = 0.0（MVP 静态路由不计算成本，固定为 0.0。成本计算由 Story 11.2 实现）
   - health_check_passed: bool
   - health_check_latency_ms: float
   - latency_ms: float
@@ -225,6 +228,7 @@ export UDMR_CLOUD_1_ENABLED=true
   - 健康检查通过 + local_first → local
   - 健康检查失败 + local_first → cloud（选择第一启用云端模型）+ fallback_reason
   - local_first=false → cloud（选择第一启用云端模型）
+  - **选择算法**：`next((m for m in cloud_models if m.enabled), None)`，按列表顺序（即 UDMR_CLOUD_{N}_* 中 N 升序），选择第一个 enabled=True 的模型。如无可用云端模型，raise ValueError
 
 #### 应用层 Schema (Application Services)
 - [ ] LocalModelHealthFacade（`src/application/services/local_model_health_facade.py`）
@@ -237,7 +241,8 @@ export UDMR_CLOUD_1_ENABLED=true
   - 参考 AutoRouteHandler 模式
   - `async on_routed(self, event: DomainEvent) -> RoutingDecided | None`
   - 类型守卫：isinstance(event, AutoRouted)
-  - 委托 UDMRouter → 发布 RoutingDecided
+  - 委托 UDMRouter.on_routed_event() → **UDMRHandler 负责发布** RoutingDecided（UDMRouter 不内部发布）
+  - 参考 AutoRouteHandler 模式
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 注册 health_checker_factory
@@ -343,11 +348,11 @@ export UDMR_CLOUD_1_ENABLED=true
 | AC-2 | FallbackRouter | Task 2 | 2.4-2.6（FallbackRouter 红→绿→重构） | `test_fallback_router.py` |
 | AC-2 | UDMRConfig + CloudModelConfig | Task 2 | 2.7-2.9（UDMRConfig 红→绿→重构） | `test_udmr_config.py` |
 | AC-2 | LocalModelHealthFacade | Task 2 | 2.10-2.12（Facade 红→绿→重构） | `test_local_model_health_facade.py` |
-| AC-3 | RoutingDecided 事件验证 | Task 1 | 1.10（事件字段完整性验证） | `test_routing_events_udmr.py` |
+| AC-3 | RoutingDecided 事件验证 | Task 1 | 1.10（事件 L3 字段完整性验证，扩展已有 test_new_events.py） | `test_new_events.py`（已有，扩展） |
 | AC-3 | RoutingDecisionLog 验证 | Task 1 | 1.11（实体 UDMR 字段验证） | `test_routing_decision_log.py`（已有） |
-| AC-4 | 性能基准 | Task 3 | 3.4-3.6（P95<100ms 基准） | `test_udmr_performance.py` |
+| AC-4 | 性能基准 | Task 3 | 3.5-3.7（P95<100ms 基准） | `test_udmr_performance.py` |
 | 全部 | 架构验证 | Task 3 | 3.1-3.3（六边形约束） | `test_udmr_architecture.py` |
-| 全部 | 集成测试 | Task 3 | 3.7-3.9（端到端流程） | `test_story_1_17_integration.py` |
+| 全部 | 集成测试 | Task 3 | 3.8-3.10（端到端流程） | `test_story_1_17_integration.py` |
 
 ---
 
@@ -869,6 +874,13 @@ Story 1.14a (trigger) → Story 1.14b (语义路由) → Story 1.17 (UDMR 模型
 | 12 | cloud_models vs cloud_configs 命名不一致 | P1 | 统一为 cloud_models（语义更准确），Dev Notes 文档化决策 | ✅ R2 |
 | 13 | frozen=True vs mutable 不一致 | P0 | UDMRConfig 和 CloudModelConfig 均使用 frozen=True，对齐 sprint-change-proposal | ✅ R2 |
 | 14 | ENABLE_UDMR → UDMR_ENABLED 向后兼容未提及 | P1 | from_env() 检测旧变量并映射，打印 deprecation warning | ✅ R2 |
+| 15 | AutoRouted 无 task_id，RoutingDecided 需要 task_id | P0 | task_id = event.event_id，保持事件链聚合标识一致性 | ✅ R3 |
+| 16 | UDMRouter vs UDMRHandler 双重发布歧义 | P0 | UDMRouter 仅返回 RoutingDecided，UDMRHandler 负责发布 | ✅ R3 |
+| 17 | UDMRConfig（infrastructure）导入到 domain 层违规 | P0 | UDMRouter 构造函数改为原始值类型（str/bool/int/list），composition_root 传入 | ✅ R3 |
+| 18 | 追溯矩阵 Task 3 编号偏移一位 | P1 | 3.4-3.6→3.5-3.7，3.7-3.9→3.8-3.10 | ✅ R3 |
+| 19 | test_routing_events_udmr.py 命名与 subtask 不一致 | P1 | 统一为扩展已有 test_new_events.py | ✅ R3 |
+| 20 | "第一启用云端模型"选择算法未定义 | P1 | next(m for m in cloud_models if m.enabled)，按 N 升序 | ✅ R3 |
+| 21 | AC-4 P95<100ms 未区分 mock vs 真实健康检查 | P1 | 明确 MVP 基准使用 mock 健康检查 | ✅ R3 |
 
 ### 下一步 Next Steps
 
