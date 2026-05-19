@@ -53,9 +53,9 @@ class TestRedisConnectionManager:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestPostgreSQLConnectionManager:
@@ -84,9 +84,9 @@ class TestPostgreSQLConnectionManager:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestQdrantConnectionManager:
@@ -115,9 +115,9 @@ class TestQdrantConnectionManager:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestNeo4jConnectionManager:
@@ -146,9 +146,9 @@ class TestNeo4jConnectionManager:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestAuditServicePort:
@@ -177,9 +177,9 @@ class TestAuditServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestSemanticRouterProtocol:
@@ -208,9 +208,9 @@ class TestSemanticRouterProtocol:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestSandboxExecutorProtocol:
@@ -239,6 +239,6 @@ class TestSandboxExecutorProtocol:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"

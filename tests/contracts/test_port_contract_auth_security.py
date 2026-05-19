@@ -59,9 +59,9 @@ class TestAuthServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestPermissionServicePort:
@@ -90,9 +90,9 @@ class TestPermissionServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestTokenBlacklistPort:
@@ -121,9 +121,9 @@ class TestTokenBlacklistPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestPasswordValidationServicePort:
@@ -152,9 +152,9 @@ class TestPasswordValidationServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestComplianceGatewayPort:
@@ -183,9 +183,9 @@ class TestComplianceGatewayPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestSensitiveDataDetectorPort:
@@ -214,9 +214,9 @@ class TestSensitiveDataDetectorPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestDataResidencyEnforcerPort:
@@ -245,9 +245,9 @@ class TestDataResidencyEnforcerPort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestWhitelistServicePort:
@@ -276,9 +276,9 @@ class TestWhitelistServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestPIPLComplianceServicePort:
@@ -315,9 +315,9 @@ class TestPIPLComplianceServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
 
 
 class TestCrossBorderTransferServicePort:
@@ -346,6 +346,6 @@ class TestCrossBorderTransferServicePort:
     def test_metadata_complete(self, registry) -> None:
         """Port metadata must be complete."""
         spec = registry.get(self.PORT_NAME)
-        assert spec.version
-        assert spec.owner
-        assert spec.module
+        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
+        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
+        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
