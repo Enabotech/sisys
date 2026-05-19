@@ -16,24 +16,35 @@ from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 from src.infrastructure.saga.saga_status import SagaStatus
 
 
+def _make_mock_repository() -> mock.AsyncMock:
+    """创建 mock SagaRepositoryProtocol。"""
+    repo = mock.AsyncMock()
+    repo.save = mock.AsyncMock(return_value=None)
+    repo.load = mock.AsyncMock(return_value=None)
+    repo.update_status = mock.AsyncMock(return_value=None)
+    return repo
+
+
 class TestDocumentProcessingSaga:
     """S01: 文档处理 Saga — 正向流程和补偿"""
 
     @pytest.mark.asyncio
     async def test_s01_forward_execution(self) -> None:
         """S01 文档处理 Saga 应完整执行 4 个步骤"""
+        repo = _make_mock_repository()
         steps = []
         for name in ["upload_document", "save_metadata", "generate_embedding", "extract_entities"]:
             step = mock.AsyncMock(spec=SagaStep)
             step.name = name
-            step.execute.return_value = {"status": "completed", "step": name}
+            step.execute.side_effect = lambda ctx: ctx
             step.compensate.return_value = None
             steps.append(step)
 
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="DocumentProcessing",
-            steps=steps,  # type: ignore[arg-type]
+            steps=steps,
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -46,14 +57,16 @@ class TestDocumentProcessingSaga:
     @pytest.mark.asyncio
     async def test_s01_compensation_on_embedding_failure(self) -> None:
         """S01 generate_embedding 失败时补偿前两步"""
+        repo = _make_mock_repository()
+
         upload_step = mock.AsyncMock(spec=SagaStep)
         upload_step.name = "upload_document"
-        upload_step.execute.return_value = {"url": "s3://doc/1"}
+        upload_step.execute.side_effect = lambda ctx: ctx
         upload_step.compensate.return_value = None
 
         metadata_step = mock.AsyncMock(spec=SagaStep)
         metadata_step.name = "save_metadata"
-        metadata_step.execute.return_value = {"id": "meta-1"}
+        metadata_step.execute.side_effect = lambda ctx: ctx
         metadata_step.compensate.return_value = None
 
         embedding_step = mock.AsyncMock(spec=SagaStep)
@@ -64,7 +77,8 @@ class TestDocumentProcessingSaga:
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="DocumentProcessing",
-            steps=[upload_step, metadata_step, embedding_step],  # type: ignore[arg-type]
+            steps=[upload_step, metadata_step, embedding_step],
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -81,18 +95,20 @@ class TestMemoryManagementSaga:
     @pytest.mark.asyncio
     async def test_s02_forward_execution(self) -> None:
         """S02 记忆管理 Saga 应完整执行"""
+        repo = _make_mock_repository()
         steps = []
         for name in ["validate_input", "compress_memory", "update_index"]:
             step = mock.AsyncMock(spec=SagaStep)
             step.name = name
-            step.execute.return_value = {"status": "completed"}
+            step.execute.side_effect = lambda ctx: ctx
             step.compensate.return_value = None
             steps.append(step)
 
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="MemoryManagement",
-            steps=steps,  # type: ignore[arg-type]
+            steps=steps,
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -106,9 +122,11 @@ class TestCrossStorageSyncSaga:
     @pytest.mark.asyncio
     async def test_s03_sync_with_compensation(self) -> None:
         """S03 跨存储同步失败时应补偿已完成的存储操作"""
+        repo = _make_mock_repository()
+
         pg_step = mock.AsyncMock(spec=SagaStep)
         pg_step.name = "sync_to_postgresql"
-        pg_step.execute.return_value = {"rows": 1}
+        pg_step.execute.side_effect = lambda ctx: ctx
         pg_step.compensate.return_value = None
 
         neo4j_step = mock.AsyncMock(spec=SagaStep)
@@ -119,7 +137,8 @@ class TestCrossStorageSyncSaga:
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="CrossStorageSync",
-            steps=[pg_step, neo4j_step],  # type: ignore[arg-type]
+            steps=[pg_step, neo4j_step],
+            repository=repo,
         )
 
         result = await orchestrator.execute()

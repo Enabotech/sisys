@@ -20,7 +20,6 @@ from typing import Any
 from src.domain.events.base import DomainEvent
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.channel_router import ChannelRouter
-from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.storage.postgresql.session_context import session_context
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,6 @@ class AsyncOutboxPoller:
         session_factory: Any = None,
         poll_interval: float = 1.0,
         batch_size: int = 10,
-        retry_policy: RetryPolicy | None = None,
     ):
         """初始化 AsyncOutboxPoller
 
@@ -53,7 +51,6 @@ class AsyncOutboxPoller:
             session_factory: AsyncSession 工厂，用于每次 poll 周期创建独立 session
             poll_interval: 轮询间隔（秒）
             batch_size: 每批处理数量
-            retry_policy: 重试策略（默认 RetryPolicy()）
         """
         self._repo = outbox_repository
         self._publisher = publisher
@@ -62,7 +59,6 @@ class AsyncOutboxPoller:
         self._poll_interval = poll_interval
         self._batch_size = batch_size
         self._running = False
-        self._retry_policy = retry_policy or RetryPolicy()
 
     async def poll_once(self) -> None:
         """轮询一次并发布待处理事件

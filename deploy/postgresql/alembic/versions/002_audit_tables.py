@@ -72,7 +72,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("event_id"),
         sa.CheckConstraint(
-            "status IN ('pending', 'published', 'failed')",
+            "status IN ('pending', 'published', 'failed', 'archived')",
             name="ck_audit_outbox_status",
         ),
         sa.CheckConstraint("retry_count >= 0", name="ck_audit_outbox_retry_count"),

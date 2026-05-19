@@ -978,8 +978,14 @@ def given_atomicity_needed(context: dict) -> None:
 @when("实现工作单元模式")
 def when_implement_unit_of_work(context: dict, pg_session: AsyncSession) -> None:
     """Implement UnitOfWork pattern."""
-    uow = PostgreSQLUnitOfWork()
-    context["uow"] = uow
+    from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
+    token = set_session(pg_session)
+    try:
+        uow = PostgreSQLUnitOfWork()
+        context["uow"] = uow
+    finally:
+        reset_session(token)
 
 
 @then("业务操作与 Outbox 写入应该在同一事务中")
@@ -994,8 +1000,14 @@ def then_operations_in_same_transaction(context: dict) -> None:
 @when("创建 PostgreSQLUnitOfWork")
 def when_create_postgresql_uow(context: dict, pg_session: AsyncSession, event_loop) -> None:
     """Create PostgreSQLUnitOfWork."""
-    uow = PostgreSQLUnitOfWork()
-    context["uow"] = uow
+    from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
+    token = set_session(pg_session)
+    try:
+        uow = PostgreSQLUnitOfWork()
+        context["uow"] = uow
+    finally:
+        reset_session(token)
     # Note: Do NOT call begin()/commit()/rollback() here as pg_session
     # already has a transaction from begin_nested() fixture
 
@@ -1007,13 +1019,18 @@ def then_uow_methods_work(context: dict, pg_session: AsyncSession, event_loop) -
     Note: We only test that the methods exist and can be called.
     Actual transaction behavior is tested in integration tests.
     """
-    uow = PostgreSQLUnitOfWork()
+    from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
+
+    token = set_session(pg_session)
+    try:
+        uow = PostgreSQLUnitOfWork()
+    finally:
+        reset_session(token)
 
     # Verify methods exist and are callable
     assert callable(uow.begin)
     assert callable(uow.commit)
     assert callable(uow.rollback)
-    assert callable(uow.close)
 
 
 # ===================================================================

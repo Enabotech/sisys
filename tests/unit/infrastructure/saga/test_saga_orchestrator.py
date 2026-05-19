@@ -22,6 +22,15 @@ class _TestEvent(DomainEvent):
     event_type: str = field(default="TestSagaEvent", init=False)
 
 
+def _make_mock_repository() -> mock.AsyncMock:
+    """创建 mock SagaRepositoryProtocol。"""
+    repo = mock.AsyncMock()
+    repo.save = mock.AsyncMock(return_value=None)
+    repo.load = mock.AsyncMock(return_value=None)
+    repo.update_status = mock.AsyncMock(return_value=None)
+    return repo
+
+
 class TestSagaOrchestrator:
     """验证 SagaOrchestrator 正向执行和补偿流程"""
 
@@ -31,21 +40,24 @@ class TestSagaOrchestrator:
         from src.domain.ports.saga import SagaStep
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 
-        # 创建 mock steps
+        repo = _make_mock_repository()
+
+        # 创建 mock steps — execute 返回 SagaContext
         step1 = mock.AsyncMock(spec=SagaStep)
         step1.name = "step1"
-        step1.execute.return_value = {"step1_result": "data1"}
+        step1.execute.side_effect = lambda ctx: ctx
         step1.compensate.return_value = None
 
         step2 = mock.AsyncMock(spec=SagaStep)
         step2.name = "step2"
-        step2.execute.return_value = {"step2_result": "data2"}
+        step2.execute.side_effect = lambda ctx: ctx
         step2.compensate.return_value = None
 
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="test_saga",
             steps=[step1, step2],
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -63,9 +75,11 @@ class TestSagaOrchestrator:
         from src.domain.ports.saga import SagaStep
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 
+        repo = _make_mock_repository()
+
         step1 = mock.AsyncMock(spec=SagaStep)
         step1.name = "step1"
-        step1.execute.return_value = {"step1_result": "data1"}
+        step1.execute.side_effect = lambda ctx: ctx
         step1.compensate.return_value = None
 
         step2 = mock.AsyncMock(spec=SagaStep)
@@ -77,6 +91,7 @@ class TestSagaOrchestrator:
             saga_id=uuid4(),
             saga_type="test_saga",
             steps=[step1, step2],
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -93,9 +108,11 @@ class TestSagaOrchestrator:
         from src.domain.ports.saga import SagaStep
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 
+        repo = _make_mock_repository()
+
         step1 = mock.AsyncMock(spec=SagaStep)
         step1.name = "step1"
-        step1.execute.return_value = {"step1_result": "data1"}
+        step1.execute.side_effect = lambda ctx: ctx
         step1.compensate.side_effect = RuntimeError("compensate failed")
 
         step2 = mock.AsyncMock(spec=SagaStep)
@@ -107,6 +124,7 @@ class TestSagaOrchestrator:
             saga_id=uuid4(),
             saga_type="test_saga",
             steps=[step1, step2],
+            repository=repo,
         )
 
         result = await orchestrator.execute()
@@ -121,25 +139,96 @@ class TestSagaOrchestrator:
         from src.domain.ports.saga import SagaStep
         from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
 
+        repo = _make_mock_repository()
+
         step1 = mock.AsyncMock(spec=SagaStep)
         step1.name = "step1"
-        step1.execute.return_value = {"key1": "value1"}
+        step1.execute.side_effect = lambda ctx: ctx
         step1.compensate.return_value = None
 
         step2 = mock.AsyncMock(spec=SagaStep)
         step2.name = "step2"
-        step2.execute.return_value = {"key2": "value2"}
+        step2.execute.side_effect = lambda ctx: ctx
         step2.compensate.return_value = None
 
         orchestrator = SagaOrchestrator(
             saga_id=uuid4(),
             saga_type="test_saga",
             steps=[step1, step2],
+            repository=repo,
         )
 
         result = await orchestrator.execute()
 
         assert "step1" in result.steps_data
-        assert result.steps_data["step1"]["output"]["key1"] == "value1"
         assert "step2" in result.steps_data
-        assert result.steps_data["step2"]["output"]["key2"] == "value2"
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_empty_steps_raises(self) -> None:
+        """空步骤列表应抛出 ValueError"""
+        from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
+
+        repo = _make_mock_repository()
+
+        with pytest.raises(ValueError, match="steps 不能为空列表"):
+            SagaOrchestrator(
+                saga_id=uuid4(),
+                saga_type="test_saga",
+                steps=[],
+                repository=repo,
+            )
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_first_step_failure_goes_failed(self) -> None:
+        """第一步失败时没有可补偿步骤，直接标记为 FAILED"""
+        from src.domain.ports.saga import SagaStep
+        from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
+
+        repo = _make_mock_repository()
+
+        step1 = mock.AsyncMock(spec=SagaStep)
+        step1.name = "step1"
+        step1.execute.side_effect = RuntimeError("step1 failed")
+        step1.compensate.return_value = None
+
+        orchestrator = SagaOrchestrator(
+            saga_id=uuid4(),
+            saga_type="test_saga",
+            steps=[step1],
+            repository=repo,
+        )
+
+        result = await orchestrator.execute()
+
+        assert result.status == SagaStatus.FAILED
+        step1.compensate.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_saves_after_each_step(self) -> None:
+        """每步执行后应调用 repository.save"""
+        from src.domain.ports.saga import SagaStep
+        from src.infrastructure.saga.saga_orchestrator import SagaOrchestrator
+
+        repo = _make_mock_repository()
+
+        step1 = mock.AsyncMock(spec=SagaStep)
+        step1.name = "step1"
+        step1.execute.side_effect = lambda ctx: ctx
+        step1.compensate.return_value = None
+
+        step2 = mock.AsyncMock(spec=SagaStep)
+        step2.name = "step2"
+        step2.execute.side_effect = lambda ctx: ctx
+        step2.compensate.return_value = None
+
+        orchestrator = SagaOrchestrator(
+            saga_id=uuid4(),
+            saga_type="test_saga",
+            steps=[step1, step2],
+            repository=repo,
+        )
+
+        await orchestrator.execute()
+
+        # save 调用次数：初始 RUNNING + 每步执行后 + 最终 COMPLETED
+        assert repo.save.await_count == 4

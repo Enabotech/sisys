@@ -59,3 +59,13 @@ class OutboxRepository(Protocol):
             event_id: 事件唯一标识
             error: 错误信息
         """
+
+    async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+        """清理超过保留期的已发布记录
+
+        Args:
+            older_than_days: 保留天数（默认 30 天）
+
+        Returns:
+            清理的记录数量
+        """

@@ -93,6 +93,21 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             model.retry_count += 1
             model.error_message = error
 
+    async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+        """清理超过保留期的已发布记录
+
+        Args:
+            older_than_days: 保留天数（默认 30 天）
+
+        Returns:
+            清理的记录数量
+
+        Note:
+            当前返回 0（存根实现），完整实现将在后续迭代中完成
+        """
+        # TODO: 实现基于 published_at 和 status='published' 的清理逻辑
+        return 0
+
     # ========== 内部方法（仅 Poller 使用） ==========
 
     async def _get_unpublished_entities(self, limit: int) -> list[OutboxModel]:

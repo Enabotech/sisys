@@ -78,45 +78,58 @@ class TestAuditUnitOfWork:
 
     @pytest.mark.asyncio
     async def test_audit_uow_uses_serializable_isolation(self) -> None:
-        """AuditUnitOfWork 应使用 SERIALIZABLE 隔离级别"""
+        """AuditUnitOfWork.begin() 应通过 get_session_with_isolation 创建 SERIALIZABLE 隔离级别的 session"""
         from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
+        from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
-        mock_session = mock.AsyncMock()
-        mock_session.get_transaction = mock.MagicMock(return_value=None)
-
-        uow = AuditUnitOfWork(session=mock_session)
-
-        assert uow._isolation_level == "SERIALIZABLE"
-
-    @pytest.mark.asyncio
-    async def test_audit_uow_begin_sets_isolation(self) -> None:
-        """AuditUnitOfWork.begin() 应设置 SERIALIZABLE 隔离级别"""
-        from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
-
+        mock_manager = mock.MagicMock(spec=PostgreSQLManager)
         mock_session = mock.AsyncMock()
         mock_session.begin = mock.AsyncMock()
-        mock_session.execute = mock.AsyncMock()
 
-        uow = AuditUnitOfWork(session=mock_session)
+        # 构造 get_session_with_isolation 返回的异步上下文管理器
+        isolation_ctx = mock.AsyncMock()
+        isolation_ctx.__aenter__ = mock.AsyncMock(return_value=mock_session)
+        isolation_ctx.__aexit__ = mock.AsyncMock(return_value=False)
+        mock_manager.get_session_with_isolation.return_value = isolation_ctx
+
+        uow = AuditUnitOfWork(manager=mock_manager)
         await uow.begin()
 
-        mock_session.execute.assert_called()
-        call_args = mock_session.execute.call_args[0][0]
-        assert "SERIALIZABLE" in str(call_args)
+        mock_manager.get_session_with_isolation.assert_called_once_with("SERIALIZABLE")
+        mock_session.begin.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_audit_uow_context_manager(self) -> None:
         """AuditUnitOfWork 应支持上下文管理器"""
         from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
+        from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
 
+        mock_manager = mock.MagicMock(spec=PostgreSQLManager)
         mock_session = mock.AsyncMock()
         mock_session.begin = mock.AsyncMock()
         mock_session.commit = mock.AsyncMock()
-        mock_session.execute = mock.AsyncMock()
 
-        uow = AuditUnitOfWork(session=mock_session)
+        isolation_ctx = mock.AsyncMock()
+        isolation_ctx.__aenter__ = mock.AsyncMock(return_value=mock_session)
+        isolation_ctx.__aexit__ = mock.AsyncMock(return_value=False)
+        mock_manager.get_session_with_isolation.return_value = isolation_ctx
+
+        uow = AuditUnitOfWork(manager=mock_manager)
 
         async with uow:
             pass
 
         mock_session.commit.assert_awaited_once()
+        isolation_ctx.__aexit__.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_audit_uow_session_property_raises_before_begin(self) -> None:
+        """AuditUnitOfWork.session 在 begin() 前应抛出 RuntimeError"""
+        from src.infrastructure.messaging.unit_of_work.audit_unit_of_work import AuditUnitOfWork
+        from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLManager
+
+        mock_manager = mock.MagicMock(spec=PostgreSQLManager)
+        uow = AuditUnitOfWork(manager=mock_manager)
+
+        with pytest.raises(RuntimeError, match="Session not initialized"):
+            _ = uow.session

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class UnitOfWork(Protocol):
     """抽象工作单元接口
 
-    定义事务边界：begin(), commit(), rollback(), close()
+    定义事务边界：begin(), commit(), rollback()
     支持异步上下文管理器协议
 
     Attributes:

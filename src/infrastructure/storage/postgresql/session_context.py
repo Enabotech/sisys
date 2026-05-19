@@ -23,11 +23,6 @@ _session_ctx: ContextVar[AsyncSession | None] = ContextVar(
     default=None,
 )
 
-_uow_managed_ctx: ContextVar[bool] = ContextVar(
-    "uow_managed",
-    default=False,
-)
-
 
 def get_session() -> AsyncSession:
     """从当前上下文获取 AsyncSession
@@ -72,36 +67,6 @@ def reset_session(token: Token) -> None:
         token: set_session 返回的 Token
     """
     _session_ctx.reset(token)
-
-
-def is_uow_managed() -> bool:
-    """检查当前上下文中 UoW 是否正在管理事务
-
-    Returns:
-        True 表示 UoW 已处理事务（commit/rollback），SessionMiddleware 无需再操作
-    """
-    return _uow_managed_ctx.get()
-
-
-def mark_uow_managed(managed: bool) -> Token:
-    """标记当前上下文 UoW 是否已管理事务
-
-    Args:
-        managed: True 表示 UoW 已管理
-
-    Returns:
-        用于重置上下文的 Token
-    """
-    return _uow_managed_ctx.set(managed)
-
-
-def reset_uow_managed(token: Token) -> None:
-    """重置 UoW 管理标记
-
-    Args:
-        token: mark_uow_managed 返回的 Token
-    """
-    _uow_managed_ctx.reset(token)
 
 
 @asynccontextmanager

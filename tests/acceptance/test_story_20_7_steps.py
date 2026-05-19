@@ -53,33 +53,28 @@ def uow_instance_created(context: dict) -> None:
     from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
         PostgreSQLUnitOfWork,
     )
+    from src.infrastructure.storage.postgresql.session_context import (
+        set_session,
+    )
 
-    uow = PostgreSQLUnitOfWork()
     mock_session = AsyncMock()
+    token = set_session(mock_session)
+    uow = PostgreSQLUnitOfWork()
     context["uow"] = uow
     context["mock_session"] = mock_session
+    context["session_token"] = token
 
 
 @when("执行 async with uow 代码块")
 def execute_async_with_uow(context: dict, event_loop) -> None:
     """Execute async with UoW context manager."""
-    from src.infrastructure.storage.postgresql.session_context import (
-        reset_session,
-        set_session,
-    )
-
     uow = context["uow"]
-    mock_session = context["mock_session"]
-    token = set_session(mock_session)
-    try:
 
-        async def _run():
-            async with uow:
-                pass
+    async def _run():
+        async with uow:
+            pass
 
-        event_loop.run_until_complete(_run())
-    finally:
-        reset_session(token)
+    event_loop.run_until_complete(_run())
     context["uow"] = uow
 
 
@@ -151,6 +146,15 @@ def second_uow_not_affected(context: dict) -> None:
 # ===================================================================
 
 
+def _make_mock_repository() -> AsyncMock:
+    """创建 mock SagaRepositoryProtocol。"""
+    repo = AsyncMock()
+    repo.save = AsyncMock(return_value=None)
+    repo.load = AsyncMock(return_value=None)
+    repo.update_status = AsyncMock(return_value=None)
+    return repo
+
+
 @given("SagaOrchestrator 和 2 个 SagaStep 已创建")
 def saga_orchestrator_2_steps(context: dict) -> None:
     """Create SagaOrchestrator with 2 mock SagaSteps."""
@@ -167,6 +171,7 @@ def saga_orchestrator_2_steps(context: dict) -> None:
     context["steps"] = [step1, step2]
     context["step1"] = step1
     context["step2"] = step2
+    context["repository"] = _make_mock_repository()
 
     from src.infrastructure.saga.saga_context import SagaContext
 
@@ -185,6 +190,7 @@ def execute_saga(context: dict, event_loop) -> None:
         saga_id=uuid4(),
         saga_type="TestSaga",
         steps=context["steps"],
+        repository=context["repository"],
     )
     context["orchestrator"] = orchestrator
 
@@ -240,6 +246,7 @@ def saga_orchestrator_3_steps_failing(context: dict) -> None:
     context["step1"] = step1
     context["step2"] = step2
     context["step3"] = step3
+    context["repository"] = _make_mock_repository()
 
     from src.infrastructure.saga.saga_context import SagaContext
 

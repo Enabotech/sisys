@@ -18,10 +18,7 @@ from typing import TYPE_CHECKING, Self
 
 from src.domain.exceptions import InvalidStateError
 from src.domain.ports.unit_of_work import UnitOfWork
-from src.infrastructure.storage.postgresql.session_context import (
-    get_session,
-    mark_uow_managed,
-)
+from src.infrastructure.storage.postgresql.session_context import get_session
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -40,13 +37,10 @@ class PostgreSQLUnitOfWork(UnitOfWork):
     """
 
     def __init__(self) -> None:
-        """初始化工作单元实例级状态。"""
+        """初始化工作单元实例级状态并缓存 session 引用。"""
         self._committed: bool = False
         self._rolled_back: bool = False
-
-    @property
-    def _session(self) -> AsyncSession:
-        return get_session()
+        self._session: AsyncSession = get_session()
 
     @property
     def session(self) -> AsyncSession:
@@ -57,7 +51,7 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         Returns:
             当前的 AsyncSession 实例
         """
-        return get_session()
+        return self._session
 
     async def begin(self) -> None:
         """开始事务。"""
@@ -141,5 +135,4 @@ class PostgreSQLUnitOfWork(UnitOfWork):
                     raise
         elif not self._committed and not self._rolled_back:
             await self.commit()
-        mark_uow_managed(True)
         return False
