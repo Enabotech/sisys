@@ -305,8 +305,16 @@ class TestXxxPortContract:
         assert spec is not None
         assert spec.interface is self.INTERFACE
 
-    def test_implementation_has_required_methods(self, resolver):
-        impl = resolver.resolve(self.PORT_NAME)
+    def test_implementation_has_required_methods(self, registry):
+        """使用 spec.impl 类级别检查方法存在性，避免 resolver.resolve() 实例化"""
+        spec = registry.get(self.PORT_NAME)
+        impl_cls = spec.impl if isinstance(spec.impl, type) else None
+        if impl_cls is None:
+            # impl 可能是 lambda 工厂或字符串路径，使用 resolver 解析
+            from src.domain.ports.resolver import Resolver
+            impl = Resolver().resolve(self.PORT_NAME)
+        else:
+            impl = impl_cls
         for method in self.REQUIRED_METHODS:
             assert hasattr(impl, method)
             assert callable(getattr(impl, method))
@@ -388,7 +396,7 @@ Feature: 端口契约测试补全
 |---------|------|----------|----------|-----------|
 | **TDD 契约测试** | 端口基础设施 | registry/resolver/contract_gate | `test_port_infrastructure.py` | Task 1 |
 | **TDD 契约测试** | 存储层端口（已注册） | L0-L5 + Unified + Enums + session_storage | `test_port_contract_storage.py` | Task 2 |
-| **TDD 契约测试** | 仓储层端口（已注册） | 10 组仓储端口 | `test_port_contract_repositories.py` | Task 3 |
+| **TDD 契约测试** | 仓储层端口（已注册） | 9 组仓储端口 | `test_port_contract_repositories.py` | Task 3 |
 | **TDD 契约测试** | 认证安全合规端口 | 10 组端口 | `test_port_contract_auth_security.py` | Task 4 |
 | **TDD 契约测试** | 服务协议端口（已注册） | ConnectionManager x4 + audit_service + semantic_router + sandbox_executor_protocol | `test_port_contract_services.py` | Task 5 |
 | **TDD 契约测试** | 应用层端口（已注册） | 14 组端口 | `test_port_contract_application.py` | Task 6 |
@@ -440,7 +448,7 @@ Feature: 端口契约测试补全
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 端口基础设施测试 | Task 1 | registry/resolver/contract_gate | `test_port_infrastructure.py` |
 | AC-2 | 存储层端口契约测试 | Task 2 | L0-L5 + Unified + Enums | `test_port_contract_storage.py` |
-| AC-3 | 仓储层端口契约测试 | Task 3 | 10 组已注册仓储端口 | `test_port_contract_repositories.py` |
+| AC-3 | 仓储层端口契约测试 | Task 3 | 9 组待补全仓储端口 | `test_port_contract_repositories.py` |
 | AC-4 | 认证安全合规端口测试 | Task 4 | 10 组端口 | `test_port_contract_auth_security.py` |
 | AC-5 | 服务协议端口测试 | Task 5 | 7 组已注册 + 5 组未注册 | `test_port_contract_services.py` + `test_port_contract_unregistered.py` |
 | AC-6 | 应用层端口测试 | Task 6 | 14 组端口 | `test_port_contract_application.py` |
@@ -543,7 +551,7 @@ Feature: 端口契约测试补全
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 8 组存储层端口的注册/方法/元数据测试 |
+| 🔴 红 | 编写 9 组存储层端口的注册/方法/元数据测试 |
 | 🟢 绿 | 运行通过（验证现有注册正确） |
 | 🔄 重构 | 优化为参数化测试 |
 
@@ -565,18 +573,18 @@ Feature: 端口契约测试补全
 
 ---
 
-### Task 3: domain/ports 仓储层端口契约测试（已注册 10 个）
+### Task 3: domain/ports 仓储层端口契约测试（已注册 9 个）
 
 **关联 AC:** AC-3
 
 > **⚠️ 注意：** UserRepositoryPort 已有契约测试（Task 1 重构），PermissionRepositoryPort/IndexManagerPort 未注册（在 Task 5 接口验证）。
-> 本 Task 仅覆盖已注册且无现有测试的 10 个仓储端口。
+> 本 Task 仅覆盖已注册且无现有测试的 9 个仓储端口。
 
 #### TDD 循环：仓储层端口契约测试
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 10 组已注册仓储端口的契约测试 |
+| 🔴 红 | 编写 9 组已注册仓储端口的契约测试 |
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 参数化通用模式 |
 
@@ -594,7 +602,7 @@ Feature: 端口契约测试补全
 
 **完成标准:**
 - [ ] `pytest tests/contracts/test_port_contract_repositories.py -v` 通过
-- [ ] 10 组已注册仓储端口全部覆盖
+- [ ] 9 组已注册仓储端口全部覆盖
 
 ---
 
@@ -782,7 +790,8 @@ tests/
 **来源:** [Story 20-5 统一存储架构重构](./20-5-uni-storage-refactor.md)
 
 **关键学习:**
-- 所有 Port 使用 Protocol（非 ABC），标注 @runtime_checkable
+- 所有 Port 使用 Protocol（非 ABC），domain/ports 全部标注 @runtime_checkable
+- application/ports 中 7 个 Protocol（SandboxExecutor, SemanticCache, PublicBlackboard, CompressorService, ExceptionMetricsPort, TextExtractorService, MetricsPort）**缺少** @runtime_checkable，不可使用 isinstance() 检查
 - 组合根 bootstrap() 是注册的唯一入口，测试须先调用
 - L2RdbPort[T] 是泛型基类，L2MetadataRepositoryPort/L2ChangeHistoryRepositoryPort 继承它
 - application/ports 的多个端口继承 domain/ports 的基础端口（如 MemoryFilePort 继承 L0StoragePort）
@@ -790,7 +799,8 @@ tests/
 **应用到本故事:**
 - [ ] 契约测试须先 bootstrap() 注册中心
 - [ ] 继承端口的测试须验证基类方法也存在
-- [ ] 使用 @runtime_checkable 的 Protocol 可用 isinstance() 检查
+- [ ] 使用 hasattr() + callable() 做方法签名验证（不依赖 isinstance，因部分 Protocol 缺少 @runtime_checkable）
+- [ ] ⚠️ **resolver.resolve() 实施风险**：对需要外部服务（Redis/PostgreSQL/Qdrant/Neo4j）的端口，resolve() 会尝试实例化基础设施类。契约测试应优先使用 `spec.impl` 类级别方法检查，或对 resolver 配置 overrides 避免实际连接
 
 ---
 
@@ -829,7 +839,7 @@ tests/
 - `tests/contracts/conftest.py` - 公共 fixture（registry, resolver）
 - `tests/contracts/test_port_infrastructure.py` - 基础设施测试（registry/resolver/contract_gate）
 - `tests/contracts/test_port_contract_storage.py` - 存储层端口测试（已注册 9 个）
-- `tests/contracts/test_port_contract_repositories.py` - 仓储层端口测试（已注册 10 个）
+- `tests/contracts/test_port_contract_repositories.py` - 仓储层端口测试（已注册 9 个）
 - `tests/contracts/test_port_contract_auth_security.py` - 认证安全合规测试（已注册 10 个）
 - `tests/contracts/test_port_contract_services.py` - 服务协议端口测试（已注册 7 个）
 - `tests/contracts/test_port_contract_unregistered.py` - **NEW: 未注册 Protocol 接口验证（5 个）**
@@ -895,6 +905,14 @@ tests/
 | 21 | AC-5 Given 未注册计数错误（3→5） | P0 | 第4轮审查修正：Task 5 覆盖全部 5 个未注册 Protocol |
 | 22 | pytest keyword 过滤策略复杂/不可靠 | P1 | 第4轮审查：改为直接指定测试文件名 |
 | 23 | 项目结构说明缺少 tests/acceptance/ 目录 | P1 | 第4轮审查补充 |
+| 24 | Task 3 标题/描述/完成标准"10 个"未同步更新 | P0 | 第5轮修正为"9 个" |
+| 25 | Task 2 TDD 表"8 组"未同步 | P0 | 第5轮修正为"9 组" |
+| 26 | 文件清单仓储层"10 个"未同步 | P0 | 第5轮修正为"9 个" |
+| 27 | 测试分类表仓储层"10 组"未同步 | P0 | 第5轮修正为"9 组" |
+| 28 | AC-3 追溯矩阵"10 组"未同步 | P0 | 第5轮修正为"9 组" |
+| 29 | resolver.resolve() 实施风险（外部服务依赖） | P1 | 第5轮：更新测试模板用类级别检查，添加风险提示 |
+| 30 | 7 个 application/ports Protocol 缺少 @runtime_checkable | P1 | 第5轮：更新学习经验，改用 hasattr/callable |
+| 31 | 测试模板 resolver.resolve() 需改为安全模式 | P0 | 第5轮：使用 spec.impl 类级别检查 |
 
 ### 下一步
 
