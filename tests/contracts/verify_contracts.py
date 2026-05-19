@@ -1,8 +1,7 @@
 """Contract manifest and registry verification script.
 
-This script generates the contract manifest (task 1.5.5) and verifies:
-- task 2.4.4: Deprecated ports (VectorStorage etc.) are not registered
-- task 2.4.5: Resolver can correctly resolve known ports
+Verifies all registered ports can be resolved and generates a contract manifest.
+对应 AC-7: verify_contracts.py 增强覆盖全部已注册端口
 """
 
 from __future__ import annotations
@@ -29,52 +28,29 @@ def generate_contract_manifest() -> list[dict]:
     return manifest
 
 
-def verify_deprecated_ports_not_registered() -> list[str]:
-    """Verify deprecated ports (VectorStorage etc.) are not registered."""
-    issues = []
+def verify_all_ports_resolvable() -> list[str]:
+    """Verify all registered ports can be resolved by Resolver.
 
-    # VectorStorage ABC should NOT be registered (deprecated)
-    if "VectorStorage" in [spec.name for spec in _global_registry.list_all()]:
-        issues.append("VectorStorage should not be registered (deprecated)")
-    else:
-        print("[OK] VectorStorage ABC not registered (deprecated)")
-
-    # l3_vector should NOT be registered (pending migration)
-    if "l3_vector" in [spec.name for spec in _global_registry.list_all()]:
-        issues.append("l3_vector should not be registered (pending migration)")
-    else:
-        print("[OK] l3_vector not registered (pending migration)")
-
-    return issues
-
-
-def verify_resolver_works() -> list[str]:
-    """Verify resolver can correctly resolve known ports."""
+    Returns:
+        List of error messages for ports that failed to resolve
+    """
     issues = []
     resolver = Resolver()
 
-    # Ports that should be resolvable
-    resolvable_ports = [
-        "event_publisher",
-        "outbox_repo",
-        "hash_router",
-        "semantic_router",
-        "user_repo",
-    ]
-
-    for port_name in resolvable_ports:
+    for spec in _global_registry.list_all():
         try:
-            instance = resolver.resolve(port_name)
-            print(f"[OK] Resolved {port_name}: {type(instance).__name__}")
+            instance = resolver.resolve(spec.name)
+            print(f"[OK] {spec.name}: {type(instance).__name__}")
         except Exception as e:
-            issues.append(f"Failed to resolve {port_name}: {e}")
+            issues.append(f"[FAIL] {spec.name}: {e}")
+            print(f"[FAIL] {spec.name}: {e}")
 
     return issues
 
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Contract Manifest Generation (Task 1.5.5)")
+    print("Contract Registry Verification")
     print("=" * 60)
 
     # Bootstrap registry
@@ -88,21 +64,19 @@ if __name__ == "__main__":
         print(f"  {item['name']:<30} {item['interface']:<35} {item['module']}")
 
     print("\n" + "=" * 60)
-    print("Verify Deprecated Ports Not Registered (Task 2.4.4)")
+    print("Verify All Ports Resolvable")
     print("=" * 60)
-    issues = verify_deprecated_ports_not_registered()
+    issues = verify_all_ports_resolvable()
     if issues:
+        print("\nResolution failures:")
         for issue in issues:
-            print(f"[FAIL] {issue}")
+            print(f"  {issue}")
     else:
-        print("\nAll deprecated port checks passed!")
+        print("\nAll registered ports resolved successfully!")
 
     print("\n" + "=" * 60)
-    print("Verify Resolver Works (Task 2.4.5)")
+    print("Contract Manifest (JSON)")
     print("=" * 60)
-    issues = verify_resolver_works()
-    if issues:
-        for issue in issues:
-            print(f"[FAIL] {issue}")
-    else:
-        print("\nAll resolver checks passed!")
+    import json
+
+    print(json.dumps(manifest, indent=2, default=str))

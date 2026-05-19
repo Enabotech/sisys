@@ -147,8 +147,8 @@ class DeadLetterQueue(Protocol):
 class InMemoryDeadLetterQueue:
     """内存死信队列 — MVP 阶段使用
 
-    进程重启后丢失，仅用于测试和 MVP 占位。
-    实现 DeadLetterQueue Protocol（async 签名）。
+    进程重启后丢失，仅用于测试和 MVP 占位
+    实现 DeadLetterQueue Protocol（async 签名）
     """
 
     def __init__(self) -> None:
