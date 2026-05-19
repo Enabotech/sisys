@@ -95,7 +95,7 @@
 - [ ] `DataResidencyEnforcer` 服务（`src/infrastructure/security/data_residency_enforcer_impl.py`）
 - [ ] `ComplianceGateway` 合规性网关（`src/infrastructure/security/compliance_gateway_impl.py`）和 `ComplianceResult`（`src/domain/value_objects/compliance_result.py`）本 Story 新建
 - [ ] `ComplianceGatewayPort` 接口定义（`src/domain/ports/compliance_gateway.py`）- async def check(task: Task) -> ComplianceResult
-- [ ] `Task` 类型定义（`src/domain/value_objects/task.py`）：input, data_residency, preferred_model, allowed_models
+- [ ] `Task` 类型定义（`src/domain/value_objects/udmr_task.py`）：input, data_residency, preferred_model, allowed_models
 - [ ] UDMR 路由集成（`ComplianceResult.forced_local=True` 时强制本地模型，通过 UDMRouter.route_async() 调用）
 - [ ] `DataSovereigntyViolation` 事件定义（已存在于 `src/domain/events/compliance_events.py`）
 - [ ] 违规补救机制: 数据隔离/销毁/通知义务/整改要求
@@ -194,7 +194,7 @@
 - [ ] `ComplianceResult` (`src/domain/value_objects/compliance_result.py`)
   - 字段: `allowed: bool`, `reason: str`, `forced_local: bool`, `violation_type: str | None`
   - 方法: `is_allowed()`, `is_violation()`, `get_violation_type()`
-- [ ] `Task` (`src/domain/value_objects/task.py`) - UDMR路由任务类型
+- [ ] `Task` (`src/domain/value_objects/udmr_task.py`) - UDMR路由任务类型
   - 字段: `task_id: UUID`, `input: str`, `data_residency: str`, `preferred_model: str`, `allowed_models: list[str]`
   - 方法: `is_china_domestic()`, `requires_local_processing()`
   - UDMR集成: Task -> task_context转换逻辑: `{"task_id": str(task.task_id), "session_id": str(task.task_id), "complexity": "high" if task.requires_local_processing() else "normal"}`
@@ -618,7 +618,7 @@
 | `src/domain/entities/cross_border_transfer.py` | CrossBorderTransferRequest 实体 |
 | `src/domain/entities/pipl_compliance_record.py` | PIPLComplianceRecord 实体 |
 | `src/domain/value_objects/compliance_result.py` | ComplianceResult 值对象 |
-| `src/domain/value_objects/task.py` | Task 值对象 |
+| `src/domain/value_objects/udmr_task.py` | Task 值对象 |
 | `src/domain/ports/sensitive_data_detector.py` | SensitiveDataDetectorPort 接口 |
 | `src/domain/ports/data_residency_enforcer.py` | DataResidencyEnforcerPort 接口 |
 | `src/domain/ports/whitelist_service.py` | WhitelistServicePort 接口 |
