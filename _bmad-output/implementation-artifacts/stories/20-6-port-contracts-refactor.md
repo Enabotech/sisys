@@ -38,12 +38,11 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | user_repo | UserRepositoryPort | `tests/contracts/test_port_contract_user_repo.py` |
 | event_publisher | EventPublisher | `tests/contracts/test_port_contract_event_publisher.py` |
 
-**待补全 — domain/ports 存储层（已注册 9 个）：**
+**待补全 — domain/ports 存储层（已注册 7 个 + 枚举）：**
 | 端口注册名 | 接口类 | 方法数 | 文件 |
 |---------|--------|-------|------|
 | l0_storage | L0StoragePort | 5 | `src/domain/ports/l0_storage.py` |
 | redis_adapter | L1CachePort | 6 | `src/domain/ports/l1_cache.py` |
-| memory_cache | MemoryCachePort | 4+6 | `src/application/ports/memory_cache_port.py` (继承 L1CachePort) |
 | l3_vector | L3VectorPort | 9 | `src/domain/ports/l3_vector.py` |
 | l4_object | L4ObjectPort | 6 | `src/domain/ports/l4_object.py` |
 | l5_graph | L5GraphPort | 9 | `src/domain/ports/l5_graph.py` |
@@ -111,6 +110,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | public_blackboard | PublicBlackboard | Protocol | 4 | `src/application/ports/public_blackboard.py` |
 | compressor | CompressorService | Protocol | 2 | `src/application/ports/compressor_service.py` |
 | session_cache | SessionCachePort | L1CachePort | 4+6 | `src/application/ports/session_cache_port.py` |
+| memory_cache | MemoryCachePort | L1CachePort | 4+6 | `src/application/ports/memory_cache_port.py` |
 | exception_metrics | ExceptionMetricsPort | Protocol | 1 | `src/application/ports/exception_metrics_port.py` |
 | document_storage | DocumentStoragePort | L4ObjectPort | 3+6 | `src/application/ports/document_storage_port.py` |
 | memory_vector_storage | MemoryVectorPort | L3VectorPort | 2+9 | `src/application/ports/memory_vector_port.py` |
@@ -164,14 +164,15 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 
 ### AC-3: 全部 domain/ports 仓储层端口契约测试完成
 
-**Given** 13 组仓储端口定义（含 memory_repository.py 的 3 个端口）
+**Given** 10 组已注册仓储端口定义（含 memory_repository.py 的 3 个端口）
 **When** 运行 `pytest tests/contracts/ -k "repo" -v`
-**Then** 所有仓储端口的注册、接口方法、实现一致性通过验证
+**Then** 所有已注册仓储端口的注册、接口方法、实现一致性通过验证
 
 **验证标准:**
 - [ ] L2RdbPort 泛型基类契约验证
 - [ ] L2MetadataRepositoryPort / L2ChangeHistoryRepositoryPort 继承验证
 - [ ] L2GroupMemberRepositoryPort 独立方法验证
+- [ ] UserRepositoryPort 已有测试需重构使用公共 fixture（不在本 Task 新增）
 
 ### AC-4: 全部 domain/ports 认证/安全/合规端口契约测试完成
 
@@ -420,7 +421,7 @@ Feature: 端口契约测试补全
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 端口基础设施测试 | Task 1 | registry/resolver/contract_gate | `test_port_infrastructure.py` |
 | AC-2 | 存储层端口契约测试 | Task 2 | L0-L5 + Unified + Enums | `test_port_contract_storage.py` |
-| AC-3 | 仓储层端口契约测试 | Task 3 | 13 组仓储端口 | `test_port_contract_repositories.py` |
+| AC-3 | 仓储层端口契约测试 | Task 3 | 10 组已注册仓储端口 | `test_port_contract_repositories.py` |
 | AC-4 | 认证安全合规端口测试 | Task 4 | 10 组端口 | `test_port_contract_auth_security.py` |
 | AC-5 | 服务协议端口测试 | Task 5 | 8 组端口 | `test_port_contract_services.py` |
 | AC-6 | 应用层端口测试 | Task 6 | 14 组端口 | `test_port_contract_application.py` |
@@ -534,46 +535,47 @@ Feature: 端口契约测试补全
 - [ ] Subtask 2.5: 🔴 红 — 编写 L4ObjectPort 契约测试（store/retrieve/delete/get_metadata/archive/list_objects）
 - [ ] Subtask 2.6: 🔴 红 — 编写 L5GraphPort 契约测试（create_entity/get_entity/delete_entity/create_relationship/delete_relationship/find_related/execute_query/execute_write_query/get_neighbors）
 - [ ] Subtask 2.7: 🔴 红 — 编写 UnifiedStoragePort 契约测试（save/read/delete/exists）
-- [ ] Subtask 2.8: 🔴 红 — 编写 StorageEnums 枚举完整性测试（StorageLayer L0-L5 / StorageTier HOT~ARCHIVE / DataAccessPattern）
-- [ ] Subtask 2.9: 🟢 绿 — 运行全部通过
-- [ ] Subtask 2.10: 🔄 重构 — 参数化通用模式，消除重复
+- [ ] Subtask 2.8: 🔴 红 — 编写 SessionStorage 契约测试（save/load/delete/exists）
+- [ ] Subtask 2.9: 🔴 红 — 编写 StorageEnums 枚举完整性测试（StorageLayer L0-L5 / StorageTier HOT~ARCHIVE / DataAccessPattern）
+- [ ] Subtask 2.10: 🟢 绿 — 运行全部通过
+- [ ] Subtask 2.11: 🔄 重构 — 参数化通用模式，消除重复
 
 **完成标准:**
 - [ ] `pytest tests/contracts/test_port_contract_storage.py -v` 通过
-- [ ] 8 组存储层端口全部覆盖
+- [ ] 9 组存储层端口全部覆盖（7 个已注册 + SessionStorage + StorageEnums）
 
 ---
 
-### Task 3: domain/ports 仓储层端口契约测试
+### Task 3: domain/ports 仓储层端口契约测试（已注册 10 个）
 
 **关联 AC:** AC-3
+
+> **⚠️ 注意：** UserRepositoryPort 已有契约测试（Task 1 重构），PermissionRepositoryPort/IndexManagerPort 未注册（在 Task 5 接口验证）。
+> 本 Task 仅覆盖已注册且无现有测试的 10 个仓储端口。
 
 #### TDD 循环：仓储层端口契约测试
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 13 组仓储端口的契约测试 |
+| 🔴 红 | 编写 10 组已注册仓储端口的契约测试 |
 | 🟢 绿 | 运行通过 |
 | 🔄 重构 | 参数化通用模式 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 UserRepositoryPort 契约测试（get_by_username/get_by_id）
-- [ ] Subtask 3.2: 🔴 红 — 编写 RoleRepositoryPort 契约测试（get_by_id/get_by_name/list_all/save/delete）
-- [ ] Subtask 3.3: 🔴 红 — 编写 UserRoleRepositoryPort 契约测试（assign_role/revoke_role/get_user_roles/get_role_users）
-- [ ] Subtask 3.4: 🔴 红 — 编写 PermissionRepositoryPort 契约测试（get_by_name/get_by_id/save/delete/list_all）
-- [ ] Subtask 3.5: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（record_attempt/get_recent_failed_attempts/is_account_locked/get_lockout_remaining_minutes/clear_attempts/check_and_record_lockout/record_attempt_and_check_lockout）
-- [ ] Subtask 3.6: 🔴 红 — 编写 AuditRepositoryPort 契约测试（save/get_by_id/search/update_archive_status/get_archive_status）
-- [ ] Subtask 3.7: 🔴 红 — 编写 OutboxRepository 契约测试（save/get_unpublished/mark_published/mark_failed）
-- [ ] Subtask 3.8: 🔴 红 — 编写 L2MetadataRepositoryPort 契约测试（get_by_name/list_by_user/list_by_type + 继承方法）
-- [ ] Subtask 3.9: 🔴 红 — 编写 L2ChangeHistoryRepositoryPort 契约测试（get_by_memory_id + 继承方法）
-- [ ] Subtask 3.10: 🔴 红 — 编写 L2GroupMemberRepositoryPort 契约测试（is_group_member/is_group_admin/add_member/remove_member）
-- [ ] Subtask 3.11: 🔴 红 — 编写 SnapshotRepositoryProtocol 契约测试（save/load/delete）
-- [ ] Subtask 3.12: 🔴 红 — 编写 IndexManagerPort 契约测试（update_entry/remove_entry/read_entries/search/truncate）
-- [ ] Subtask 3.13: 🟢 绿 — 运行全部通过
-- [ ] Subtask 3.14: 🔄 重构 — 参数化通用 CRUD 模式
+- [ ] Subtask 3.1: 🔴 红 — 编写 RoleRepositoryPort 契约测试（get_by_id/get_by_name/list_all/save/delete）
+- [ ] Subtask 3.2: 🔴 红 — 编写 UserRoleRepositoryPort 契约测试（assign_role/revoke_role/get_user_roles/get_role_users）
+- [ ] Subtask 3.3: 🔴 红 — 编写 LoginAttemptRepositoryPort 契约测试（record_attempt/get_recent_failed_attempts/is_account_locked/get_lockout_remaining_minutes/clear_attempts/check_and_record_lockout/record_attempt_and_check_lockout）
+- [ ] Subtask 3.4: 🔴 红 — 编写 AuditRepositoryPort 契约测试（save/get_by_id/search/update_archive_status/get_archive_status）
+- [ ] Subtask 3.5: 🔴 红 — 编写 OutboxRepository 契约测试（save/get_unpublished/mark_published/mark_failed）
+- [ ] Subtask 3.6: 🔴 红 — 编写 L2MetadataRepositoryPort 契约测试（get_by_name/list_by_user/list_by_type + 继承方法）
+- [ ] Subtask 3.7: 🔴 红 — 编写 L2ChangeHistoryRepositoryPort 契约测试（get_by_memory_id + 继承方法）
+- [ ] Subtask 3.8: 🔴 红 — 编写 L2GroupMemberRepositoryPort 契约测试（is_group_member/is_group_admin/add_member/remove_member）
+- [ ] Subtask 3.9: 🔴 红 — 编写 SnapshotRepositoryProtocol 契约测试（save/load/delete）
+- [ ] Subtask 3.10: 🟢 绿 — 运行全部通过
+- [ ] Subtask 3.11: 🔄 重构 — 参数化通用 CRUD 模式
 
 **完成标准:**
 - [ ] `pytest tests/contracts/test_port_contract_repositories.py -v` 通过
-- [ ] 13 组仓储端口全部覆盖
+- [ ] 10 组已注册仓储端口全部覆盖
 
 ---
 
@@ -856,6 +858,10 @@ tests/
 | 8 | MetricsPort 方法数错误（11→12） | P0 | 补充 get_processing_rate |
 | 9 | memory_cache 文件路径错误 | P0 | 修正为 application/ports/memory_cache_port.py |
 | 10 | fixture 策略冲突（已有 _bootstrap_once） | P0 | 移除冗余 bootstrap，改用 registry fixture 直接引用 _global_registry |
+| 11 | 应用层端口表缺 memory_cache 行（13→14） | P0 | 添加 memory_cache 行，完整 14 个 |
+| 12 | Task 2 缺 session_storage 子任务 | P0 | 新增 Subtask 2.8，更新完成标准 8→9 组 |
+| 13 | Task 3 包含已测试/未注册端口（3.1/3.4/3.12） | P0 | 移除 3 个错误子任务，重新编号，AC-3 计数 13→10 |
+| 14 | storage 表 memory_cache 错位放置 | P0 | 从存储表移除（已在应用层） |
 
 ### 下一步
 
