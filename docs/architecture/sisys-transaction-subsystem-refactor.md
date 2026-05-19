@@ -1,9 +1,11 @@
 # SISYS 事务子系统重构详细设计与执行方案
 
-> **文档版本：** 1.0.0
+> **文档版本：** 1.0.1
 > **创建日期：** 2026-05-18
-> **状态：** 待审批
+> **状态：** Round 1 审查修订中
 > **维护者：** Agimtech
+> **修订记录**：
+> - v1.0.1: Round 1 审查 — 精确验证实际代码，修正设计文档与代码不一致问题；重新评估风险等级
 > **前置文档：** `sisys-eda-unitofwork-design.md` (v1.0.6, Phase 1 已完成)
 > **关联文档：** `architecture.md` (v8.3.1), `arch-appendix.md` (附录J Saga 设计)
 
@@ -17,11 +19,11 @@ SISYS 系统事务子系统已完成 Phase 1 基础设施建设（UnitOfWork Pro
 
 | # | 问题 | 严重程度 | 影响 |
 |---|------|---------|------|
-| P1 | Session 生命周期双重管理冲突 | **高** | SessionMiddleware 和 UoW 同时管理 commit/close，生产环境可能抛异常 |
-| P2 | UnitOfWork 未在 DI 容器注册 | **高** | EventHandler 无法通过依赖注入获取 UoW |
-| P3 | Saga 仅停留在设计文档 | **中** | arch-appendix.md 附录J 的 10 个跨库事务场景无代码实现 |
-| P4 | 事务隔离级别未配置 | **中** | 全部使用默认 READ COMMITTED，关键审计场景无法保证强一致性 |
-| P5 | OutboxRepository 构造器不一致 | **低** | 实际无参构造（依赖 ContextVar），设计文档描述有参构造 |
+| P1 | Session 生命周期双重管理冲突（**潜在风险**，生产代码未使用 UoW） | **中** | UoW.__aexit__ 行140 调用 close() 与 Middleware 行66 调用 close() 冲突；但当前生产代码中 PostgreSQLUnitOfWork 从未被使用，冲突暂未触发 |
+| P2 | UnitOfWork 未在 DI 容器注册且生产代码未使用 | **高** | composition_root.py 未注册 UoW 相关端口；所有 4 个 EventHandler 均未使用 UoW；PostgreSQLUnitOfWork 仅存在于测试文件中 |
+| P3 | Saga 仅停留在设计文档 | **中** | arch-appendix.md 附录J 的 10 个跨库事务场景无代码实现；`src/infrastructure/saga/` 目录不存在 |
+| P4 | 事务隔离级别未配置 | **中** | 全部使用默认 READ COMMITTED（async_sessionmaker 未设置 autobegin 参数），关键审计场景无法保证强一致性 |
+| P5 | 前置设计文档示例代码与实际代码不一致 | **中** | `sisys-eda-unitofwork-design.md` 中 `PostgreSQLOutboxRepository(uow.session)` 有参构造与实际无参构造 `PostgreSQLOutboxRepository()` 不一致 |
 
 ### 1.2 设计目标
 
@@ -111,21 +113,29 @@ async def dispatch(self, request, call_next):
         reset_session(token)
 ```
 
-**冲突矩阵**：
+**冲突矩阵**（基于代码精确验证）：
 
 | 场景 | Middleware | UoW | 结果 |
 |------|-----------|-----|------|
-| 不使用 UoW | commit + close | - | ✅ 正常 |
-| 使用 UoW | commit + close | commit + close | ❌ 双重 commit + 双重 close |
-| 使用 UoW + 异常 | rollback + close | rollback + close | ❌ 双重 rollback + 双重 close |
+| 不使用 UoW（当前生产状态） | commit(L60) + close(L66) | - | ✅ 正常（当前所有请求路径） |
+| 使用 UoW（规划中） | commit(L60) + close(L66) | commit(L139) + close(L140) | ❌ 双重 commit + ResourceClosedError |
+| 使用 UoW + 异常（规划中） | rollback(L63) + close(L66) | rollback(L134) + close(L140) | ❌ 双重 rollback + ResourceClosedError |
 
-### 2.3 UnitOfWork DI 注册缺失
+> **验证结论**：PostgreSQLUnitOfWork 在生产代码中**从未被使用**（仅存在于测试文件），冲突目前是潜在风险。但一旦 EventHandler 开始使用 UoW，冲突将立即触发 `ResourceClosedError`。
 
-`composition_root.py` 中注册了 `session_factory`、`outbox_repo`、`outbox_poller` 等组件，但**未注册**：
+### 2.3 UnitOfWork DI 注册缺失与生产未使用
+
+`composition_root.py` 中注册了 50+ 个端口（含 `session_factory`、`outbox_repo`、`outbox_poller`），但**未注册**：
 - `PostgreSQLUnitOfWork` 或其工厂
 - `UnitOfWork` Protocol 的实现绑定
 
-EventHandler 无法通过 DI 获取 UoW，只能手动 `PostgreSQLUnitOfWork()`，违反"依赖接口而非实现"原则。
+**代码验证结果**：
+- 全局搜索 `UnitOfWork`：仅出现在 `domain/ports/unit_of_work.py`（定义）、`infrastructure/messaging/unit_of_work/postgresql_unit_of_work.py`（实现）、`domain/ports/__init__.py`（导出）
+- 全局搜索 `PostgreSQLUnitOfWork`：仅出现在定义文件和测试文件中，**生产代码无任何引用**
+- 全局搜索 `get_session()`：12 个文件 13 处调用，**全部在 infrastructure 层**，application 层（含 EventHandler）**零调用**
+- 当前 4 个 EventHandler（memory_changed_handler、auto_trigger_handler、auto_execute_completed_handler、auto_route_handler）**均不使用 UoW 也不直接获取 session**
+
+EventHandler 无法通过 DI 获取 UoW，当前也无手动使用。事务边界完全依赖 SessionMiddleware 的隐式管理。
 
 ### 2.4 Saga 设计 vs 实现差距
 
@@ -361,8 +371,8 @@ class DocumentProcessedHandler:
     async def handle(self, event: DocumentProcessed) -> None:
         uow = self._uow_factory()
         async with uow:                                    # begin()
-            business_repo = SomeRepository(uow.session)    # 同一 session
-            outbox_repo = PostgreSQLOutboxRepository(uow.session)
+            business_repo = SomeRepository()               # 无参构造，内部通过 get_session() 获取同一 session
+            outbox_repo = PostgreSQLOutboxRepository()     # 无参构造，同上
 
             await business_repo.update(entity)
             await outbox_repo.save(domain_event)
@@ -441,10 +451,10 @@ SagaOrchestrator.execute()
   - 注册 `uow_factory` 端口，接口为 `Callable[[], UnitOfWork]`
   - 实现为 `PostgreSQLUnitOfWork` 类本身（每次调用创建新实例）
 
-- [ ] **Task 1.6**: 修复 `PostgreSQLOutboxRepository` 构造器
-  - 文件: `src/infrastructure/messaging/outbox/outbox_repository.py`
-  - 保持无参构造（通过 get_session() 获取 session）
-  - 与 PostgreSQLAdapter 保持一致模式
+- [ ] **Task 1.6**: 验证所有 Repository 构造器一致性并同步文档
+  - 文件: `src/infrastructure/messaging/outbox/outbox_repository.py` 等 12 个仓储文件
+  - 验证所有仓储均使用无参构造 + ContextVar get_session() 模式（已验证当前代码一致）
+  - 更新 `sisys-eda-unitofwork-design.md` 中的有参构造示例代码为无参构造
 
 - [ ] **Task 1.7**: 更新 UoW 单元测试
   - 文件: `tests/unit/infrastructure/messaging/unit_of_work/test_postgresql_unit_of_work.py`
@@ -704,3 +714,27 @@ poetry run pytest --tb=short
 | SQLAlchemy 2.0 AsyncSession | [官方文档](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) |
 | Martin Fowler — Unit of Work | [模式定义](https://martinfowler.com/eaaCatalog/unitOfWork.html) |
 | Eventuate Tram | Outbox + Saga 参考实现 |
+
+---
+
+## 附录 A: 审查记录
+
+### Round 1: Session 生命周期 + UoW 实际代码验证
+
+**审查方法**: 3 个 Agent 并行调研实际代码，精确到行号验证
+
+**P0 发现与修正**:
+
+| # | 发现 | 修正措施 |
+|---|------|---------|
+| P0-1 | P1 风险等级从"高"调整为"中"：PostgreSQLUnitOfWork 在生产代码中从未被使用，冲突暂未触发 | 更新 1.1 问题陈述，标注"潜在风险" |
+| P0-2 | 所有 12 个 Repository 均通过 ContextVar get_session() 获取 session，零构造器注入 | 修正 4.3 示例代码为无参构造模式 |
+| P0-3 | 4 个 EventHandler 均不使用 UoW 也不直接获取 session | 更新 2.3 节添加精确验证结果 |
+| P0-4 | Task 1.6 "修复构造器"描述错误，实际代码已正确 | 改为"验证一致性并同步文档" |
+| P0-5 | Repository 层严格遵守"只 flush 不 commit"模式（20 处 flush，0 处 commit） | 确认设计 D1 的 commit 职责分离符合现状 |
+
+**精确验证数据**:
+- session.commit() 仅 3 处调用：session_context.py:88、postgresql_unit_of_work.py:71、session_middleware.py:60
+- session.close() 仅 3 处调用：session_context.py:93、postgresql_unit_of_work.py:140、session_middleware.py:66
+- get_session() 共 12 文件 13 处调用，全部在 infrastructure 层
+- UnitOfWork Protocol session 属性返回 `object`，实现返回 `AsyncSession`（类型协变，合规）
