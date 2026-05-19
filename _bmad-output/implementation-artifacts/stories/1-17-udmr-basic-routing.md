@@ -154,21 +154,21 @@ AutoExecuteService (1.14c)
 
 #### 领域服务 Schema (Domain Services)
 - [ ] UDMRouter 服务（`src/domain/services/udmr_router.py`）
-  - `async on_routed_event(event: AutoRouted) -> RoutingDecided` — 接收 AutoRouted，执行本地/云端二级路由
+  - `async on_routed_event(event: AutoRouted) -> RoutingDecision` — 接收 AutoRouted，执行本地/云端二级路由
     - **task_id 映射**：`task_id = event.event_id`（保持事件链聚合标识一致性）
-    - **发布职责**：UDMRouter 仅返回 RoutingDecided，不内部发布；由 UDMRHandler 调用后发布
+    - **发布职责**：UDMRouter 仅返回 RoutingDecision 值对象，不发布事件；由 UDMRHandler 创建 RoutingDecided 事件并发布
   - `async check_local_health() -> tuple[bool, float]` — 检查本地模型健康状态，返回 (passed, latency_ms)。**实现方式**：包装 `HealthCheckPort.check()` 调用，使用 `time.monotonic()` 测量耗时（端口接口仅返回 bool，latency 由 UDMRouter 外部测量）
-  - 构造函数注入：`EventPublisher`, `HealthCheckPort`, **原始值类型**（local_model: str, cloud_models: list[str], local_first: bool = True, local_timeout: int = 30）
+  - 构造函数注入：`HealthCheckPort`, **原始值类型**（local_model: str, first_cloud_model: str, local_first: bool = True, local_timeout: int = 30）
     - > **六边形架构约束**：UDMRouter（领域层）不导入 UDMRConfig（基础设施层）。构造函数接受原始值类型，由 composition_root.py 解析 UDMRConfig 后传入。参考 AutoRouteService 模式（不导入 AutoRouteConfig）。
+    - > **first_cloud_model 说明**：composition_root 从 UDMRConfig.cloud_models 中预选第一个 enabled=True 的模型名称传入。选择逻辑在配置层完成，领域层仅接收已筛选的值。
 
 #### 值对象 Schema (Value Objects)
 - [ ] RoutingDecision 值对象（`src/domain/value_objects/routing_decision.py`）
   - route_type: Literal["local", "cloud"]
   - selected_model: str
-  - cost_estimate: float = 0.0（MVP 静态路由不计算成本，固定为 0.0。成本计算由 Story 11.2 实现）
+  - estimated_cost: float = 0.0（MVP 静态路由不计算成本，固定为 0.0。成本计算由 Story 11.2 实现。对齐 RoutingDecided 事件字段命名）
   - health_check_passed: bool
   - health_check_latency_ms: float
-  - latency_ms: float
   - fallback_reason: Literal["health_check_failed", "unavailable"] | None
   - > **枚举子集说明**：RoutingDecision 的 fallback_reason 是 RoutingDecided 事件枚举的 MVP 子集。事件允许 `"timeout"`（执行层 Story 1.14c 使用），值对象仅限健康检查相关值（`"health_check_failed"`, `"unavailable"`），符合 MVP 范围。
 
@@ -224,11 +224,10 @@ export UDMR_CLOUD_1_ENABLED=true
   - OllamaHealthAdapter 实现 HealthCheckPort：check() 调用 GET {OLLAMA_BASE_URL}/api/tags
   - OllamaHealthCheckerFactory 实现 HealthCheckerFactory：create() 返回 OllamaHealthAdapter 实例
 - [ ] FallbackRouter（`src/infrastructure/routing/fallback_router.py`）
-  - `async route_with_fallback(health_checker, local_model, cloud_models) -> RoutingDecision`
+  - `async route_with_fallback(health_checker: HealthCheckPort, local_model: str, first_cloud_model: str, local_first: bool) -> RoutingDecision`
   - 健康检查通过 + local_first → local
-  - 健康检查失败 + local_first → cloud（选择第一启用云端模型）+ fallback_reason
-  - local_first=false → cloud（选择第一启用云端模型）
-  - **选择算法**：`next((m for m in cloud_models if m.enabled), None)`，按列表顺序（即 UDMR_CLOUD_{N}_* 中 N 升序），选择第一个 enabled=True 的模型。如无可用云端模型，raise ValueError
+  - 健康检查失败 + local_first → cloud + fallback_reason="health_check_failed"
+  - local_first=false → cloud + fallback_reason=None
 
 #### 应用层 Schema (Application Services)
 - [ ] LocalModelHealthFacade（`src/application/services/local_model_health_facade.py`）
@@ -241,8 +240,8 @@ export UDMR_CLOUD_1_ENABLED=true
   - 参考 AutoRouteHandler 模式
   - `async on_routed(self, event: DomainEvent) -> RoutingDecided | None`
   - 类型守卫：isinstance(event, AutoRouted)
-  - 委托 UDMRouter.on_routed_event() → **UDMRHandler 负责发布** RoutingDecided（UDMRouter 不内部发布）
-  - 参考 AutoRouteHandler 模式
+  - 委托 UDMRouter.on_routed_event() → 获取 RoutingDecision 值对象 → **UDMRHandler 创建 RoutingDecided 事件并发布**
+  - 参考 AutoRouteHandler 模式（AutoRouteHandler 也接收领域服务返回值后发布事件）
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 注册 health_checker_factory
@@ -298,6 +297,8 @@ export UDMR_CLOUD_1_ENABLED=true
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1_17.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_1_17_steps.py` | Task 0 |
 | **TDD 契约测试** | HealthCheckerFactory | 端口契约 | `test_port_contract_health_checker_factory.py` | Task 1 |
+| **已有测试扩展** | RoutingDecided L3 字段 | 事件字段完整性 | `test_new_events.py` | Task 1 |
+| **已有测试扩展** | RoutingDecisionLog UDMR | 实体 UDMR 字段 | `test_routing_decision_log.py` | Task 1 |
 | **SDD 架构验证** | 六边形约束 | 依赖方向/零依赖 | `test_udmr_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | AutoRouted→RoutingDecided 端到端 | `test_story_1_17_integration.py` | Task 3 |
 | **性能基准** | UDMRouter | P95<100ms | `test_udmr_performance.py` | Task 3 |
@@ -411,7 +412,7 @@ export UDMR_CLOUD_1_ENABLED=true
 | 🔄 重构 | 优化路由决策逻辑 |
 
 - [ ] Subtask 1.4: 🔴 红 — 编写 UDMRouter 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 UDMRouter（注入 HealthCheckPort + EventPublisher + UDMRConfig）
+- [ ] Subtask 1.5: 🟢 绿 — 实现 UDMRouter（注入 HealthCheckPort + 原始值类型：local_model, first_cloud_model, local_first, local_timeout）
 - [ ] Subtask 1.6: 🔄 重构 — 优化决策逻辑
 
 #### TDD 循环 [C]：UDMRHandler 事件桥接
@@ -881,6 +882,12 @@ Story 1.14a (trigger) → Story 1.14b (语义路由) → Story 1.17 (UDMR 模型
 | 19 | test_routing_events_udmr.py 命名与 subtask 不一致 | P1 | 统一为扩展已有 test_new_events.py | ✅ R3 |
 | 20 | "第一启用云端模型"选择算法未定义 | P1 | next(m for m in cloud_models if m.enabled)，按 N 升序 | ✅ R3 |
 | 21 | AC-4 P95<100ms 未区分 mock vs 真实健康检查 | P1 | 明确 MVP 基准使用 mock 健康检查 | ✅ R3 |
+| 22 | UDMRouter 返回 RoutingDecided（事件）而非 RoutingDecision（值对象） | P0 | 修正返回类型为 RoutingDecision 值对象 | ✅ R4 |
+| 23 | EventPublisher 注入冗余（UDMRouter 不发布） | P0 | 移除 EventPublisher，构造函数仅注入 HealthCheckPort + 原始值 | ✅ R4 |
+| 24 | cloud_models 类型矛盾（list[str] vs list[CloudModelConfig]） | P0 | 改为 first_cloud_model: str，composition_root 预筛选 | ✅ R4 |
+| 25 | cost_estimate vs estimated_cost 命名不一致 | P1 | 统一为 estimated_cost，对齐 RoutingDecided 事件 | ✅ R4 |
+| 26 | RoutingDecision.latency_ms 冗余字段未定义用途 | P2 | 移除，仅保留 health_check_latency_ms | ✅ R4 |
+| 27 | Subtask 1.5 仍引用 UDMRConfig | P0 | 更新为原始值类型描述 | ✅ R4 |
 
 ### 下一步 Next Steps
 
