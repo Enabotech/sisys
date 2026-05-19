@@ -22,14 +22,15 @@ Copyright:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
-from src.infrastructure.saga.saga_context import SagaContext
+from src.domain.ports.saga_context import SagaContext
+from src.infrastructure.saga.saga_context import SagaContext as ConcreteSagaContext
 from src.infrastructure.saga.saga_status import SagaStatus
 
 if TYPE_CHECKING:
-    from src.domain.ports.saga import SagaStep
+    from src.domain.ports.saga import SagaRepositoryProtocol, SagaStep
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,8 @@ class SagaOrchestrator:
         self,
         saga_id: UUID,
         saga_type: str,
-        steps: list[SagaStep],
+        steps: Sequence[SagaStep],
+        repository: SagaRepositoryProtocol,
     ) -> None:
         """初始化 SagaOrchestrator
 
@@ -58,11 +60,18 @@ class SagaOrchestrator:
             saga_id: Saga 实例唯一标识
             saga_type: Saga 类型标识符
             steps: 步骤列表（按执行顺序）
+            repository: Saga 持久化仓储
+
+        Raises:
+            ValueError: steps 为空列表时抛出
         """
+        if not steps:
+            raise ValueError("steps 不能为空列表")
         self.saga_id = saga_id
         self.saga_type = saga_type
         self._steps = steps
-        self._context = SagaContext(
+        self._repository = repository
+        self._context: SagaContext = ConcreteSagaContext(
             saga_id=saga_id,
             saga_type=saga_type,
             status=SagaStatus.PENDING,
@@ -74,7 +83,7 @@ class SagaOrchestrator:
         return self._context
 
     @property
-    def steps(self) -> list[SagaStep]:
+    def steps(self) -> Sequence[SagaStep]:
         """获取步骤列表。"""
         return self._steps
 
@@ -87,19 +96,23 @@ class SagaOrchestrator:
             执行完成后的 SagaContext
         """
         self._context = self._context.update_status(SagaStatus.RUNNING)
+        await self._repository.save(self._context)
 
         for index, step in enumerate(self._steps):
             try:
                 logger.info("Saga %s: executing step %s", self.saga_id, step.name)
-                output = await step.execute(self._context)
-                self._context = self._context.set_step_data(step.name, None, output)
+                updated_context = await step.execute(self._context)
+                self._context = updated_context
+                self._context = self._context.set_step_data(step.name, None, updated_context)
                 self._context = self._context.advance_step(len(self._steps))
+                await self._repository.save(self._context)
             except Exception as e:
                 logger.error("Saga %s: step %s failed: %s", self.saga_id, step.name, e)
                 self._context = self._context.add_error(step.name, str(e))
                 return await self._compensate(index)
 
         self._context = self._context.update_status(SagaStatus.COMPLETED)
+        await self._repository.save(self._context)
         logger.info("Saga %s: completed successfully", self.saga_id)
         return self._context
 
@@ -112,6 +125,15 @@ class SagaOrchestrator:
         Returns:
             补偿完成后的 SagaContext
         """
+        if failed_index == 0:
+            self._context = self._context.add_error(
+                "_compensate",
+                "没有可补偿的步骤，直接标记为 FAILED",
+            )
+            self._context = self._context.update_status(SagaStatus.FAILED)
+            await self._repository.save(self._context)
+            return self._context
+
         self._context = self._context.update_status(SagaStatus.COMPENSATING)
         compensation_failed = False
 
@@ -131,4 +153,5 @@ class SagaOrchestrator:
         else:
             self._context = self._context.update_status(SagaStatus.COMPENSATED)
 
+        await self._repository.save(self._context)
         return self._context

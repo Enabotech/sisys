@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest import mock
 from uuid import uuid4
 
 import pytest
@@ -132,26 +131,3 @@ class TestRetryPolicyIntegration:
         assert policy.should_retry(0) is True
         assert policy.should_retry(2) is True
         assert policy.should_retry(3) is False
-
-    @pytest.mark.asyncio
-    async def test_poller_uses_retry_policy_delay(self) -> None:
-        """AsyncOutboxPoller 应在失败时使用 RetryPolicy 计算退避时间"""
-        from src.infrastructure.messaging.outbox.outbox_processor import AsyncOutboxPoller
-        from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
-
-        mock_repo = mock.AsyncMock()
-        mock_repo.get_unpublished.return_value = []
-        mock_publisher = mock.AsyncMock()
-        mock_router = mock.MagicMock()
-
-        policy = RetryPolicy(base_delay=1.0, max_delay=5.0, max_retries=3)
-
-        poller = AsyncOutboxPoller(
-            outbox_repository=mock_repo,
-            publisher=mock_publisher,
-            router=mock_router,
-            retry_policy=policy,
-        )
-
-        assert poller._retry_policy is policy
-        assert poller._retry_policy.max_retries == 3

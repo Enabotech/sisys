@@ -71,9 +71,10 @@ class TestPostgreSQLSagaRepository:
         )
 
         mock_session = mock.AsyncMock()
-        mock_result = mock.MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = mock_result
+        # SELECT 存在性检查返回 1（存在），UPDATE 正常执行
+        select_result = mock.MagicMock()
+        select_result.scalar_one_or_none.return_value = 1
+        mock_session.execute.return_value = select_result
         token = set_session(mock_session)
 
         try:
@@ -82,7 +83,7 @@ class TestPostgreSQLSagaRepository:
 
             await repo.update_status(str(saga_id), SagaStatus.COMPLETED)
 
-            mock_session.execute.assert_awaited()
+            assert mock_session.execute.await_count == 2  # SELECT + UPDATE
         finally:
             reset_session(token)
 

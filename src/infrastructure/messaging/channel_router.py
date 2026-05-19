@@ -189,6 +189,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="个人信息保护法数据访问请求",
         ),
+        "SagaStatusChanged": ChannelMapping(
+            event_type="SagaStatusChanged",
+            rabbitmq_routing_key="sisys.events.reliable.saga_status_changed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="Saga状态变更",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

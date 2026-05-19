@@ -94,6 +94,9 @@ class TestErrorPropagation:
             async def mark_failed(self, event_id, error: str) -> None:
                 pass
 
+            async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+                return 0
+
         failing_repo = FailingOutboxRepository()
         use_case = DocumentProcessingUseCase(outbox_repo=failing_repo)
 
@@ -121,6 +124,9 @@ class TestErrorPropagation:
 
             async def mark_failed(self, event_id, error: str) -> None:
                 pass
+
+            async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+                return 0
 
         failing_repo = FailingOutboxRepository()
         use_case = DocumentProcessingUseCase(outbox_repo=failing_repo)

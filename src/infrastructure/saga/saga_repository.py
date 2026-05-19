@@ -12,13 +12,16 @@ Copyright:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.ports.saga import SagaRepositoryProtocol
-from src.infrastructure.saga.saga_context import SagaContext
+from src.domain.ports.saga_context import SagaContext
+from src.infrastructure.saga.saga_context import SagaContext as ConcreteSagaContext
 from src.infrastructure.saga.saga_status import SagaStatus
 from src.infrastructure.storage.postgresql.session_context import get_session
 
@@ -57,20 +60,21 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
         return get_session()
 
     async def save(self, context: SagaContext) -> None:
-        """保存 Saga 上下文
+        """保存 Saga 上下文（UPSERT）
 
         Args:
             context: Saga 执行上下文
         """
-        import json
-
         data = context.to_dict()
-        from sqlalchemy import text
 
         await self._session.execute(
             text(
                 "INSERT INTO saga_instance (saga_id, saga_type, status, context_data, created_at, updated_at) "
-                "VALUES (:saga_id, :saga_type, :status, :context_data, :created_at, :updated_at)"
+                "VALUES (:saga_id, :saga_type, :status, :context_data, :created_at, :updated_at) "
+                "ON CONFLICT (saga_id) DO UPDATE SET "
+                "status = EXCLUDED.status, "
+                "context_data = EXCLUDED.context_data, "
+                "updated_at = EXCLUDED.updated_at"
             ),
             {
                 "saga_id": str(context.saga_id),
@@ -92,10 +96,6 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
         Returns:
             SagaContext 或 None
         """
-        import json
-
-        from sqlalchemy import text
-
         result = await self._session.execute(
             text("SELECT context_data FROM saga_instance WHERE saga_id = :saga_id"),
             {"saga_id": str(saga_id)},
@@ -103,7 +103,7 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
         row = result.scalar_one_or_none()
         if row is None:
             return None
-        return SagaContext.from_dict(json.loads(row))
+        return ConcreteSagaContext.from_dict(json.loads(row))
 
     async def update_status(self, saga_id: str, status: SagaStatus) -> None:
         """更新 Saga 状态
@@ -111,8 +111,16 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
         Args:
             saga_id: Saga 实例唯一标识
             status: 新状态
+
+        Raises:
+            ValueError: 未找到对应 Saga 实例时抛出
         """
-        from sqlalchemy import text
+        existing = await self._session.execute(
+            text("SELECT 1 FROM saga_instance WHERE saga_id = :saga_id"),
+            {"saga_id": str(saga_id)},
+        )
+        if existing.scalar_one_or_none() is None:
+            raise ValueError(f"update_status 未找到 saga_id={saga_id} 的 Saga 实例")
 
         await self._session.execute(
             text("UPDATE saga_instance SET status = :status, updated_at = :updated_at WHERE saga_id = :saga_id"),

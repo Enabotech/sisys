@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
 
 from src.domain.events.base import DomainEvent
 
@@ -49,7 +48,11 @@ class SagaStatusChanged(DomainEvent):
     error_message: str | None = None
 
     def __post_init__(self) -> None:
-        """验证事件数据完整性。"""
+        """验证事件数据完整性，设置派生字段。"""
+        # 设置 aggregate_id = saga_id（frozen dataclass 需用 object.__setattr__）
+        object.__setattr__(self, "aggregate_id", self.saga_id)
+
+        # 验证
         if not self.saga_type:
             raise ValueError("saga_type 不能为空")
         if not self.new_status:
@@ -59,26 +62,6 @@ class SagaStatusChanged(DomainEvent):
             raise ValueError(f"new_status 必须是有效状态: {valid_statuses}")
         if self.old_status is not None and self.old_status not in valid_statuses:
             raise ValueError(f"old_status 必须是有效状态: {valid_statuses}")
-
-    @property  # type: ignore[misc]
-    def aggregate_id(self) -> uuid.UUID:
-        """聚合根 ID（Saga 实例）。"""
-        return self.saga_id
-
-    @property  # type: ignore[misc]
-    def payload(self) -> dict[str, Any]:
-        """事件载荷，包含状态变更详情。"""
-        payload = super().payload
-        payload.update(
-            {
-                "saga_type": self.saga_type,
-                "old_status": self.old_status,
-                "new_status": self.new_status,
-                "step_index": self.step_index,
-                "error_message": self.error_message,
-            }
-        )
-        return payload
 
 
 __all__ = ["SagaStatusChanged"]

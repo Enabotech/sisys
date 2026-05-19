@@ -29,7 +29,7 @@ def upgrade() -> None:
         sa.Column("retry_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("max_retries", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("error_message", sa.String(1000), nullable=True),
-        sa.CheckConstraint("status IN ('pending', 'published', 'failed')", name="ck_event_outbox_status"),
+        sa.CheckConstraint("status IN ('pending', 'published', 'failed', 'archived')", name="ck_event_outbox_status"),
         sa.CheckConstraint("retry_count >= 0", name="ck_event_outbox_retry_count"),
         sa.CheckConstraint("max_retries >= 0", name="ck_event_outbox_max_retries"),
     )
