@@ -14,7 +14,7 @@ Copyright:
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
@@ -58,10 +58,7 @@ class InMemoryOutboxRepository(OutboxRepository):
         async with self._lock:
             for e in self._entities:
                 if e.event_id == event_id:
-                    e.status = "published"
-                    from datetime import datetime
-
-                    e.published_at = datetime.now(UTC)
+                    e.mark_published()
                     break
 
     async def mark_failed(self, event_id: UUID, error: str) -> None:
@@ -69,10 +66,26 @@ class InMemoryOutboxRepository(OutboxRepository):
         async with self._lock:
             for e in self._entities:
                 if e.event_id == event_id:
-                    e.status = "failed"
-                    e.retry_count += 1
-                    e.error_message = error
+                    e.mark_failed(error)
                     break
+
+    async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
+        """清理超过保留期的已发布记录
+
+        Args:
+            older_than_days: 保留天数（默认 30 天）
+
+        Returns:
+            清理的记录数量
+        """
+        async with self._lock:
+            cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+            to_remove = [
+                e for e in self._entities if e.status == "published" and e.published_at is not None and e.published_at < cutoff
+            ]
+            for e in to_remove:
+                self._entities.remove(e)
+            return len(to_remove)
 
     # ========== 内部方法（仅 Poller 使用） ==========
 
@@ -99,10 +112,7 @@ class InMemoryOutboxRepository(OutboxRepository):
         async with self._lock:
             for e in self._entities:
                 if e.event_id == entity.event_id:
-                    e.status = "published"
-                    from datetime import datetime
-
-                    e.published_at = datetime.now(UTC)
+                    e.mark_published()
                     break
 
     async def _mark_failed_entity(self, entity: OutboxEntity, error: str) -> None:
@@ -115,7 +125,5 @@ class InMemoryOutboxRepository(OutboxRepository):
         async with self._lock:
             for e in self._entities:
                 if e.event_id == entity.event_id:
-                    e.status = "failed"
-                    e.retry_count += 1
-                    e.error_message = error
+                    e.mark_failed(error)
                     break

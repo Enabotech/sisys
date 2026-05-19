@@ -1,8 +1,8 @@
-"""Task 6 TDD Tests — UnitOfWork (AC-6)."""
+"""UnitOfWork Protocol 和实现测试。"""
 
 from __future__ import annotations
 
-from abc import ABC
+from typing import Protocol
 
 import pytest
 
@@ -10,44 +10,50 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 
 
 class TestUnitOfWorkInterface:
-    """UnitOfWork abstract interface tests."""
+    """UnitOfWork Protocol 接口测试。"""
 
-    def test_unit_of_work_is_abc(self):
-        """UnitOfWork should be an abstract base class."""
+    def test_unit_of_work_is_protocol(self):
+        """UnitOfWork 应该是 Protocol。"""
         from src.domain.ports.unit_of_work import UnitOfWork
 
-        assert issubclass(UnitOfWork, ABC)
+        assert issubclass(UnitOfWork, Protocol)
 
     def test_unit_of_work_has_begin_method(self):
-        """UnitOfWork should declare begin() method."""
+        """UnitOfWork 应声明 begin() 方法。"""
         from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "begin")
 
     def test_unit_of_work_has_commit_method(self):
-        """UnitOfWork should declare commit() method."""
+        """UnitOfWork 应声明 commit() 方法。"""
         from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "commit")
 
     def test_unit_of_work_has_rollback_method(self):
-        """UnitOfWork should declare rollback() method."""
+        """UnitOfWork 应声明 rollback() 方法。"""
         from src.domain.ports.unit_of_work import UnitOfWork
 
         assert hasattr(UnitOfWork, "rollback")
 
-    def test_unit_of_work_has_close_method(self):
-        """UnitOfWork should declare close() method."""
+    def test_unit_of_work_has_no_close_method(self):
+        """UnitOfWork 不应声明 close() 方法（由 Middleware 负责）。"""
         from src.domain.ports.unit_of_work import UnitOfWork
 
-        assert hasattr(UnitOfWork, "close")
+        assert not hasattr(UnitOfWork, "close")
+
+    def test_unit_of_work_factory_protocol_exists(self):
+        """UnitOfWorkFactory Protocol 应存在。"""
+        from src.domain.ports.unit_of_work import UnitOfWorkFactory
+
+        assert issubclass(UnitOfWorkFactory, Protocol)
 
 
 class TestPostgreSQLUnitOfWork:
-    """PostgreSQLUnitOfWork implementation tests."""
+    """PostgreSQLUnitOfWork 实现测试。"""
 
     def test_postgresql_unit_of_work_can_be_instantiated(self):
-        """PostgreSQLUnitOfWork can be instantiated with session."""
+        """PostgreSQLUnitOfWork 可实例化。"""
         from unittest import mock
 
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
@@ -62,7 +68,7 @@ class TestPostgreSQLUnitOfWork:
 
     @pytest.mark.asyncio
     async def test_begin_starts_transaction(self):
-        """begin() should start a transaction."""
+        """begin() 应启动事务。"""
         from unittest import mock
 
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
@@ -79,7 +85,7 @@ class TestPostgreSQLUnitOfWork:
 
     @pytest.mark.asyncio
     async def test_commit_commits_transaction(self):
-        """commit() should commit the transaction."""
+        """commit() 应提交事务。"""
         from unittest import mock
 
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
@@ -96,7 +102,7 @@ class TestPostgreSQLUnitOfWork:
 
     @pytest.mark.asyncio
     async def test_rollback_rolls_back_transaction(self):
-        """rollback() should roll back the transaction."""
+        """rollback() 应回滚事务。"""
         from unittest import mock
 
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
@@ -112,25 +118,8 @@ class TestPostgreSQLUnitOfWork:
             reset_session(token)
 
     @pytest.mark.asyncio
-    async def test_close_closes_session(self):
-        """close() should close the session."""
-        from unittest import mock
-
-        from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork
-
-        mock_session = mock.AsyncMock()
-        token = set_session(mock_session)
-        try:
-            uow = PostgreSQLUnitOfWork()
-
-            await uow.close()
-            mock_session.close.assert_called_once()
-        finally:
-            reset_session(token)
-
-    @pytest.mark.asyncio
     async def test_context_manager_protocol(self):
-        """UnitOfWork should support context manager protocol."""
+        """UnitOfWork 应支持上下文管理器协议。"""
         from unittest import mock
 
         from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import PostgreSQLUnitOfWork

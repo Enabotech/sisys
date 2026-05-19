@@ -88,6 +88,7 @@ class TestPostgreSQLOutboxRepository:
         """测试异步标记已发布"""
         event_id = uuid4()
         mock_model = mock.Mock()
+        mock_model.status = "pending"
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
@@ -102,6 +103,7 @@ class TestPostgreSQLOutboxRepository:
         """测试异步标记失败"""
         event_id = uuid4()
         mock_model = mock.Mock()
+        mock_model.status = "pending"
         mock_model.retry_count = 0
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_model
@@ -131,6 +133,7 @@ class TestPostgreSQLOutboxRepository:
     async def test_internal_mark_published_entity(self, repository, mock_session):
         """测试内部方法标记已发布实体"""
         model = mock.Mock()
+        model.status = "pending"
 
         await repository._mark_published_entity(model)
 
@@ -141,6 +144,7 @@ class TestPostgreSQLOutboxRepository:
     async def test_internal_mark_failed_entity(self, repository, mock_session):
         """测试内部方法标记失败实体"""
         model = mock.Mock()
+        model.status = "pending"
         model.retry_count = 0
 
         await repository._mark_failed_entity(model, "Error")

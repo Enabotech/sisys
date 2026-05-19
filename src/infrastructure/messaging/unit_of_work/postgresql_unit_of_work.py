@@ -18,7 +18,10 @@ from typing import TYPE_CHECKING, Self
 
 from src.domain.exceptions import InvalidStateError
 from src.domain.ports.unit_of_work import UnitOfWork
-from src.infrastructure.storage.postgresql.session_context import get_session
+from src.infrastructure.storage.postgresql.session_context import (
+    get_session,
+    mark_uow_managed,
+)
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -32,12 +35,14 @@ class PostgreSQLUnitOfWork(UnitOfWork):
     使用 SQLAlchemy AsyncSession 管理事务，实现领域层 UnitOfWork 接口
 
     Attributes:
-        _committed: 是否已提交
-        _rolled_back: 是否已回滚
+        _committed: 是否已提交（实例级）
+        _rolled_back: 是否已回滚（实例级）
     """
 
-    _committed: bool = False
-    _rolled_back: bool = False
+    def __init__(self) -> None:
+        """初始化工作单元实例级状态。"""
+        self._committed: bool = False
+        self._rolled_back: bool = False
 
     @property
     def _session(self) -> AsyncSession:
@@ -115,9 +120,9 @@ class PostgreSQLUnitOfWork(UnitOfWork):
         """异步上下文管理器出口
 
         规则：
-        - 异常：rollback（处理 rollback 失败也要 close session）
+        - 异常：rollback
         - 正常：仅在未手动 commit/rollback 时才 commit
-        - 始终 close session
+        - 不负责 close session（由 SessionMiddleware 负责）
         - 返回 False：不吞没异常
 
         Args:
@@ -133,9 +138,8 @@ class PostgreSQLUnitOfWork(UnitOfWork):
                 try:
                     await self.rollback()
                 except Exception:
-                    await self.close()
                     raise
         elif not self._committed and not self._rolled_back:
             await self.commit()
-        await self.close()
+        mark_uow_managed(True)
         return False

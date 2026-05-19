@@ -199,6 +199,7 @@ class TestOutboxEventLifecycle:
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
+        mock_model.status = "pending"
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_model
         mock_session.execute.return_value = mock_result
@@ -215,6 +216,7 @@ class TestOutboxEventLifecycle:
         from src.infrastructure.messaging.outbox.outbox_repository import PostgreSQLOutboxRepository
 
         mock_model = mock.Mock()
+        mock_model.status = "pending"
         mock_model.retry_count = 0
         mock_result = mock.Mock()
         mock_result.scalar_one_or_none.return_value = mock_model

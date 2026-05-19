@@ -50,10 +50,6 @@ class UnitOfWork(Protocol):
         """回滚事务"""
         ...
 
-    async def close(self) -> None:
-        """关闭会话"""
-        ...
-
     async def begin_nested(self) -> None:
         """创建 savepoint（嵌套事务）"""
         ...
@@ -73,7 +69,29 @@ class UnitOfWork(Protocol):
         规则：
         - 异常：rollback
         - 正常：仅在未手动 commit/rollback 时才 commit
-        - 始终 close session
+        - 不负责 close session（由 SessionMiddleware 负责）
         - 返回 False：不吞没异常
+        """
+        ...
+
+
+@runtime_checkable
+class UnitOfWorkFactory(Protocol):
+    """UnitOfWork 工厂 Protocol
+
+    用于 DI 容器注册。EventHandler 通过 resolve("uow_factory") 获取工厂，
+    然后调用 factory() 创建新的 UnitOfWork 实例
+
+    设计原因（D2 决策）：
+    - PortSpec.interface 类型为 Type，Callable[[], UnitOfWork] 不合法
+    - 须定义专门的 Protocol 满足 PortSpec 类型约束
+    - 工厂每次调用返回新实例（TRANSIENT 生命周期）
+    """
+
+    def __call__(self) -> UnitOfWork:
+        """创建新的 UnitOfWork 实例
+
+        返回：
+            新的 UnitOfWork 实例
         """
         ...

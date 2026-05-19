@@ -56,7 +56,7 @@ class OutboxModel(Base):
     __tablename__ = "event_outbox"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending', 'published', 'failed')",
+            "status IN ('pending', 'published', 'failed', 'archived')",
             name="ck_outbox_status_values",
         ),
         CheckConstraint("retry_count >= 0", name="ck_outbox_retry_count_positive"),
