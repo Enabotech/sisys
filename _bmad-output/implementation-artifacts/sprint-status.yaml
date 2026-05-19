@@ -312,21 +312,23 @@ development_status:
   20-4-uni-async-refactor: done
   20-5-uni-storage-refactor: done
   20-6-port-contracts-refactor: in-progress  # 端口契约测试补全
+  20-7-transaction-subsystem-refactor: ready-for-dev  # 事务子系统重构（Session/UoW/Outbox/Saga）
   epic-20-retrospective: optional
 
 # =============================================================================
 # Summary:
 # =============================================================================
 # Total Epics: 21 (Epic 0-20, 其中 Epic 0 包含 Iteration 0 和 Iteration 1)
-# Total Stories (excluding retrospectives): 156
+# Total Stories (excluding retrospectives): 157
 #   - Epic 0 Iteration 0: 3 stories (✅ done)
 #   - Epic 0 Iteration 1: 12 stories (✅ 9 done, 🔄 3 ready-for-dev)
 #   - Epic 1-19: 140 stories (✅ 13 done , 🔄 4 ready-for-dev , 🔄 1 in-progress)
-#   - Epic 20: 6 stories (✅ 5 done, 🔄 1 ready-for-dev)
+#   - Epic 20: 7 stories (✅ 5 done, 🔄 1 in-progress, 🔄 1 ready-for-dev)
 #
 # Status Summary:
 #   - Done: 32 (包括 Epic 20)
-#   - Ready for Dev: 6
+#   - In Progress: 2
+#   - Ready for Dev: 7
 #   - Backlog: 121
 #
 # Next Steps:
