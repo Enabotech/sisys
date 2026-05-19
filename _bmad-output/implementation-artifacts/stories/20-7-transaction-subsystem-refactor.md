@@ -825,6 +825,7 @@ src/
 - `src/infrastructure/messaging/outbox/inmemory_outbox.py` — 调用状态机方法
 - `src/infrastructure/storage/postgresql/postgresql_manager.py` — 隔离级别
 - `src/composition_root.py` — 注册 uow_factory、saga_repository
+- `src/infrastructure/messaging/channel_router.py` — DEFAULT_MAPPINGS 添加 SagaStatusChanged 路由
 - `deploy/postgresql/alembic/versions/001_initial.py` — 不直接修改，通过新迁移脚本修复
 - `src/infrastructure/storage/postgresql/models/outbox.py` — 修改 CheckConstraint 添加 'archived'
 - `tests/contracts/test_port_contract_unregistered.py` — 更新 UnitOfWork 方法数
