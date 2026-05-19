@@ -17,7 +17,7 @@ Copyright:
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -77,6 +77,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
                 raise InvalidStateTransitionError(model.status, "published")
             model.status = "published"
             model.published_at = datetime.now(UTC)
+            await self._session.flush()
 
     async def mark_failed(self, event_id: UUID, error: str) -> None:
         """标记事件发布失败
@@ -92,6 +93,7 @@ class PostgreSQLOutboxRepository(OutboxRepository):
             model.status = "failed"
             model.retry_count += 1
             model.error_message = error
+            await self._session.flush()
 
     async def cleanup_old_published_records(self, older_than_days: int = 30) -> int:
         """清理超过保留期的已发布记录
@@ -101,12 +103,19 @@ class PostgreSQLOutboxRepository(OutboxRepository):
 
         Returns:
             清理的记录数量
-
-        Note:
-            当前返回 0（存根实现），完整实现将在后续迭代中完成
         """
-        # TODO: 实现基于 published_at 和 status='published' 的清理逻辑
-        return 0
+        cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+        result = await self._session.execute(
+            select(OutboxModel).where(
+                OutboxModel.status == "published",
+                OutboxModel.published_at < cutoff,
+            )
+        )
+        models = list(result.scalars().all())
+        for model in models:
+            await self._session.delete(model)
+        await self._session.flush()
+        return len(models)
 
     # ========== 内部方法（仅 Poller 使用） ==========
 

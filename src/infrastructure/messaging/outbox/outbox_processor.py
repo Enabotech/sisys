@@ -20,6 +20,7 @@ from typing import Any
 from src.domain.events.base import DomainEvent
 from src.domain.ports.outbox import OutboxRepository
 from src.infrastructure.messaging.channel_router import ChannelRouter
+from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.storage.postgresql.session_context import session_context
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ class AsyncOutboxPoller:
         session_factory: Any = None,
         poll_interval: float = 1.0,
         batch_size: int = 10,
+        retry_policy: RetryPolicy | None = None,
     ):
         """初始化 AsyncOutboxPoller
 
@@ -51,6 +53,7 @@ class AsyncOutboxPoller:
             session_factory: AsyncSession 工厂，用于每次 poll 周期创建独立 session
             poll_interval: 轮询间隔（秒）
             batch_size: 每批处理数量
+            retry_policy: 重试策略（默认使用 RetryPolicy 默认值）
         """
         self._repo = outbox_repository
         self._publisher = publisher
@@ -58,6 +61,7 @@ class AsyncOutboxPoller:
         self._session_factory = session_factory
         self._poll_interval = poll_interval
         self._batch_size = batch_size
+        self._retry_policy = retry_policy or RetryPolicy()
         self._running = False
 
     async def poll_once(self) -> None:
@@ -86,26 +90,46 @@ class AsyncOutboxPoller:
                     )
                     return
 
-                try:
-                    await self._publisher.async_publish(
-                        event,
-                        routing_key=routing_key,
-                    )
-                    await self._repo.mark_published(event.event_id)
-                    logger.debug("Published event %s", event.event_id)
-                except Exception as e:
+                last_error: Exception | None = None
+                for attempt in range(self._retry_policy.max_retries + 1):
                     try:
-                        await self._repo.mark_failed(event.event_id, str(e))
+                        await self._publisher.async_publish(
+                            event,
+                            routing_key=routing_key,
+                        )
+                        await self._repo.mark_published(event.event_id)
+                        logger.debug("Published event %s", event.event_id)
+                        return
+                    except Exception as e:
+                        last_error = e
+                        if self._retry_policy.should_retry(attempt):
+                            delay = self._retry_policy.get_delay(attempt)
+                            logger.warning(
+                                "Publish attempt %d/%d failed for event %s, retrying in %.1fs: %s",
+                                attempt + 1,
+                                self._retry_policy.max_retries + 1,
+                                event.event_id,
+                                delay,
+                                e,
+                            )
+                            await asyncio.sleep(delay)
+                        else:
+                            break
+
+                if last_error is not None:
+                    try:
+                        await self._repo.mark_failed(event.event_id, str(last_error))
                     except Exception:
                         logger.error(
                             "Failed to mark event %s as failed: %s",
                             event.event_id,
-                            e,
+                            last_error,
                         )
                     logger.error(
-                        "Failed to publish event %s: %s",
+                        "All %d attempts exhausted for event %s: %s",
+                        self._retry_policy.max_retries + 1,
                         event.event_id,
-                        e,
+                        last_error,
                     )
 
         await asyncio.gather(*[process_one(e) for e in events])

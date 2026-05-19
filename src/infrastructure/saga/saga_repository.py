@@ -130,3 +130,4 @@ class PostgreSQLSagaRepository(SagaRepositoryProtocol):
                 "updated_at": datetime.now(UTC),
             },
         )
+        await self._session.flush()
