@@ -289,7 +289,11 @@ Feature: 事务子系统重构
 
 ## 📋 Tasks / Subtasks 任务分解
 
+> **Phase 依赖关系**: Phase 1-2 可并行，Phase 3 依赖 Phase 1（UoW DI 注册），Phase 4 依赖 Phase 3（Saga 基础设施）。
+
 ---
+
+### === Phase 1: Session 生命周期治理 + UoW 完善 ===
 
 ### Task 0: SDD 规范定义（必选前置）
 
@@ -385,6 +389,7 @@ Feature: 事务子系统重构
 | 🔄 重构 | 更新文档注释 |
 
 - [ ] Subtask 3.1: 🔴 红 — 更新 test_port_contract_unregistered.py：从 REQUIRED_METHODS 移除 "close"（当前含 8 方法含 close，改为 7 方法）
+- [ ] Subtask 3.1a: 🔴 红 — 更新 tests/unit/domain/ports/test_unit_of_work.py：移除 `test_unit_of_work_is_abc` 测试（UnitOfWork 已是 Protocol 非 ABC）
 - [ ] Subtask 3.2: 🟢 绿 — 移除 close() 方法定义
 - [ ] Subtask 3.3: 🟢 绿 — 新增 UnitOfWorkFactory(Protocol)
 
@@ -398,9 +403,10 @@ Feature: 事务子系统重构
 
 - [ ] Subtask 3.4: 🔴 红 — 编写 test_port_contract_uow_factory.py
 - [ ] Subtask 3.5: 🟢 绿 — composition_root.py 注册 uow_factory（TRANSIENT）
-  > **注册模式参考**：项目已有 TRANSIENT + 字符串路径先例（sandbox_executor）。
-  > 推荐使用 `impl=PostgreSQLUnitOfWork`（类本身），`_auto_inject` 检查无参 __init__ 后直接 `cls()` 创建实例。
-  > `resolve("uow_factory")` 返回类本身，调用方执行 `factory()` 即 `PostgreSQLUnitOfWork()` 创建新实例。
+  > **注册模式**：`impl=lambda resolver: PostgreSQLUnitOfWork`（返回类本身，非实例）。
+  > 理由：resolver._instantiate 对 Type 调用 `_auto_inject(cls)` 会执行 `cls()` 创建实例，
+  > 对 Callable lambda 直接调用 `spec.impl(resolver)` 返回类本身。
+  > `resolve("uow_factory")` 返回 PostgreSQLUnitOfWork 类，调用方 `factory()` 即 `cls()` 创建新实例。
 - [ ] Subtask 3.6: 🔄 重构 — 优化代码
 
 **完成标准:**
@@ -410,6 +416,8 @@ Feature: 事务子系统重构
 - [ ] 契约测试通过
 
 ---
+
+### === Phase 2: Outbox 完善 + 事务隔离配置 ===
 
 ### Task 4: Outbox 状态修复
 
@@ -525,6 +533,8 @@ Feature: 事务子系统重构
 
 ---
 
+### === Phase 3: Saga 基础设施 ===
+
 ### Task 7: Saga 基础设施（模块 + Orchestrator + Context + 事件）
 
 **关联 AC:** AC-7
@@ -628,6 +638,8 @@ Feature: 事务子系统重构
 - [ ] DI 注册完成
 
 ---
+
+### === Phase 4: Saga 场景落地 ===
 
 ### Task 9: Saga 场景 S01-S03 + 集成测试
 
