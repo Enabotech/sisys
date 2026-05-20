@@ -648,9 +648,21 @@ OrchestrationService.execute(task)
 
 - Prefect 3.6.25 使用 `prefect.flow()` 和 `prefect.task()` 装饰器
 - 状态查询通过 `prefect.client.orchestration.PrefectClient` 的 `read_flow_run()` 方法
+- **Prefect 区分 state name（14+）和 state type（9）**：FlowStatus 映射到 state TYPE
 - Prefect StateType 枚举（9个）：SCHEDULED, PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, CRASHED, PAUSED, CANCELLING
-- **Prefect Retrying 状态主要用于 task 级别**：flow run 级别状态不直接使用 Retrying，PrefectEngine 需综合判定（`retries` 参数 + FAILED 状态 → FlowStatus.RETRYING）
-- PrefectEngine 状态映射策略：
+- State name → State type 映射（关键条目）：
+  | State name | State type |
+  |---|---|
+  | Scheduled/Late/AwaitingConcurrencySlot/AwaitingRetry | SCHEDULED |
+  | Pending | PENDING |
+  | Running/Retrying | RUNNING |
+  | Completed | COMPLETED |
+  | Failed | FAILED |
+  | Cancelled | CANCELLED |
+  | Cancelling | CANCELLING |
+  | Paused/Suspended | PAUSED |
+- **`Retrying` 是 state NAME（type=RUNNING）**：task 级别 retry 期间状态为 Retrying，PrefectEngine 映射时 RUNNING → FlowStatus.RUNNING
+- PrefectEngine 状态映射策略（基于 state TYPE）：
   - SCHEDULED/PENDING → FlowStatus.PENDING
   - RUNNING → FlowStatus.RUNNING
   - COMPLETED → FlowStatus.COMPLETED
@@ -973,3 +985,4 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 22 | Dev Notes 未说明 PrefectClient 异步获取模式（`get_client()` 而非直接构造）和 `create_flow_run()` 返回 `FlowRun` 模型 | P1 | 补充 PrefectClient 使用模式、`FlowRun.id` 获取方式、`DocumentProcessed.document_id` 为 UUID 类型 | ✅ R4 |
 | 23 | Updated Files 缺少 `src/infrastructure/workflow/__init__.py`（需导出 PrefectEngine） | P1 | 添加到 Updated Files 列表 | ✅ R5 |
 | 24 | "Prefect 无 RETRYING 状态"事实不准确（Prefect 有 Retrying 状态，主要用于 task 级别） | P2 | 修正为"Prefect Retrying 状态主要用于 task 级别，flow run 级别需综合判定" | ✅ R5 |
+| 25 | Dev Notes 缺少 Prefect state name vs state type 区分说明（14+ state name → 9 state type），`Retrying` 是 name 而非 type | P1 | 新增 state name→state type 映射表，明确 FlowStatus 映射基于 state TYPE，`Retrying` 是 name（type=RUNNING） | ✅ R6 |
