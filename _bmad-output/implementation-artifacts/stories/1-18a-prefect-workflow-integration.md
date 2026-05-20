@@ -196,9 +196,24 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 **验证标准/Validation Criteria:**
 - [ ] composition_root.py 新增 workflow 注册段
-- [ ] WorkflowEnginePort → PrefectEngine（SINGLETON）
+- [ ] WorkflowEnginePort → PrefectEngine（SINGLETON，lambda 工厂模式）
 - [ ] OrchestrationService 注册（SINGLETON）
 - [ ] 契约测试（`tests/contracts/test_port_contract_workflow_engine.py`）
+
+> **DI 注册模式说明**：PrefectConfig **不注册为端口**，而是在 lambda 工厂中通过 `PrefectConfig.from_env()` 创建。注册格式参考 `RedisManager`/`PostgreSQLManager`：
+> ```python
+> register_port(
+>     name="workflow_engine",
+>     version="v1.0.0",
+>     interface=WorkflowEnginePort,
+>     impl=lambda resolver: PrefectEngine(
+>         PrefectConfig.from_env(),
+>         resolver.resolve("event_publisher")
+>     ),
+>     module="src.infrastructure.workflow.prefect_engine",
+>     lifetime=Lifetime.SINGLETON,
+> )
+> ```
 
 ### AC-8: 架构约束验证
 
@@ -232,11 +247,13 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
   - `async def get_flow_status(self, flow_run_id: str) -> FlowStatus` — 查询工作流状态
   - Protocol + `@runtime_checkable`
   - > **六边形架构约束**：WorkflowEnginePort 仅使用 Python 标准库类型，不导入 prefect/langgraph
+  - > **编码约定**：文件首行 `from __future__ import annotations`，Protocol 方法体统一用 `...`（非空方法体），与 EventPublisher/SagaStep 等端口一致
 
 #### 值对象 Schema (Value Objects)
 - [ ] FlowStatus 值对象（`src/domain/value_objects/flow_status.py`）
   - 枚举：PENDING, RUNNING, COMPLETED, FAILED, RETRYING
   - str 枚举（继承 str, Enum），可序列化
+  - > **位置决策说明**：SagaStatus 放在 `ports/saga_status.py`（仅服务 Saga 端口体系），FlowStatus 放在 `value_objects/` 是因为它被 WorkflowEnginePort 和 OrchestrationService 跨层共享，属于独立领域枚举而非端口附属
 - [ ] WorkflowTask 值对象（`src/application/services/orchestration_service.py` 内联定义）
   - flow_name: str, parameters: dict[str, Any], task_type: Literal["data_pipeline", "agent_reasoning"]
   - frozen dataclass
@@ -246,11 +263,11 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 #### 领域事件 Schema (Domain Events)
 - [ ] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
-  - 继承 DomainEvent，event_type="RAGIndexed"
+  - 继承 DomainEvent，`event_type: str = field(default="RAGIndexed", init=False)` — `__init_subclass__` 自动注册
   - 特有字段：document_id: uuid.UUID, index_name: str, chunk_count: int
   - aggregate_type="RAGIndex"
 - [ ] ReportGenerated 事件（`src/domain/events/workflow_events.py`）
-  - 继承 DomainEvent，event_type="ReportGenerated"
+  - 继承 DomainEvent，`event_type: str = field(default="ReportGenerated", init=False)` — `__init_subclass__` 自动注册
   - 特有字段：report_id: uuid.UUID, report_type: str, file_path: str
   - aggregate_type="Report"
 
@@ -1027,3 +1044,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 28 | ChannelRouter "不是通过 DEFAULT_MAPPINGS 代码定义" 声明错误，实际代码中 DEFAULT_MAPPINGS 有 19 个硬编码条目，与 YAML 双轨并存 | P0 | 修正为"双轨注册机制：DEFAULT_MAPPINGS 为基线，YAML 追加/覆盖"，删除绝对否定表述 | ✅ R7 |
 | 29 | PrefectConfig 模式参考引用 RedisConfig（非 frozen），但文档声称 frozen=True 模式，矛盾 | P1 | 修正参考为 AutoExecuteConfig（frozen=True），补充 RedisConfig 使用非 frozen 的说明 | ✅ R7 |
 | 30 | PublishResult 缺少 `partial_error` 属性说明 | P2 | 补充 `partial_error` 属性到 PublishResult 描述 | ✅ R7 |
+| 31 | PrefectConfig DI 注册模式未说明：Config 不注册为端口，需在 lambda 工厂中 `from_env()` 创建（参考 RedisManager/PostgreSQLManager 模式） | P0 | AC-7 补充 lambda 工厂注册格式示例，明确 PrefectConfig 不走 DI 容器 | ✅ R8 |
+| 32 | FlowStatus 放在 value_objects/ 与 SagaStatus 放在 ports/ 不一致，缺少位置决策依据 | P1 | 值对象 Schema 补充位置决策说明（跨层共享 vs 端口附属） | ✅ R8 |
+| 33 | WorkflowEnginePort Schema 缺少编码约定：`from __future__ import annotations` 和方法体用 `...` | P2 | 补充编码约定，与 EventPublisher/SagaStep 等端口一致 | ✅ R8 |
+| 34 | 事件 Schema 中 event_type 声明方式不精确，缺少 `field(default=..., init=False)` 模式说明 | P1 | 修正为完整 `field(default="RAGIndexed", init=False)` 声明格式，与 DocumentProcessed 一致 | ✅ R8 |
