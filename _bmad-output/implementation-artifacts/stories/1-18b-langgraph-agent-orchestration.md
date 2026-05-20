@@ -24,7 +24,7 @@
 | **LangGraphEngine 实现** | 认知密集型推理执行，状态图驱动 | 所有 langgraph 导入限定于 infrastructure/agent_orch/ |
 | **BasicAgentGraph MVP** | 端到端验证编排架构：analyze→synthesize | Graph 完成后发布 AgentDecided 事件 |
 | **OrchestrationService 扩展** | 应用层统一编排入口，支持双引擎路由 | 同时依赖 WorkflowEnginePort + AgentEnginePort |
-| **Checkpoint 基础机制** | Agent 状态持久化，支持中断恢复 | LangGraph MemorySaver 集成 |
+| **Checkpoint 基础机制** | Agent 状态持久化，支持中断恢复 | LangGraph InMemorySaver 集成 |
 
 > ⚠️ **MVP 范围澄清**：本 Story 仅实现 **AgentEnginePort 端口 + LangGraphEngine + BasicAgentGraph**。
 > - BLM 六阶段状态图 → Epic 5/6 故事
@@ -227,7 +227,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 ## 🏗️ SDD+TDD 融合开发
 
 > ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
-> 参考 [`sdd-tdd-fusion-guide.md`](./sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](./sdd-tdd-checklist.md)。
+> 参考 `docs/developer/sdd-tdd-checklist.md` 和 `docs/developer/sdd-tdd-fusion-guide.md`（项目全局文档）。
 
 ### SDD 规范定义（Task 0 — 必选前置）
 
@@ -259,6 +259,9 @@ DualChannelEventBus → Outbox/RabbitMQ
   - 构造函数注入：LangGraphConfig, EventPublisher
   - submit_graph(): 执行编译后的 LangGraph StateGraph，返回 graph_run_id
   - get_graph_status(): 查询图执行状态，映射为 FlowStatus
+  - **InMemorySaver 生命周期**：作为 LangGraphEngine 实例属性（构造函数创建一次，跨 submit_graph 调用共享）
+  - **Graph 编译缓存**：维护 `graph_name -> CompiledGraph` 映射 + `graph_run_id -> graph_name` 映射（支持 get_graph_status 反查）
+  - **MVP 阻塞语义**：submit_graph() 内部 await compiled.ainvoke()，阻塞直到完成；因此 get_graph_status() 在 MVP 中仅返回 COMPLETED 或 FAILED，RUNNING/PENDING 在本地模式下不可观察
 - [ ] BasicAgentGraph（`src/infrastructure/agent_orch/graphs/basic_agent_graph.py`）
   - LangGraph StateGraph 定义
   - 状态 Schema: `BasicAgentState` TypedDict（定义于 `agent_orch/schemas.py`，含 task_description, agent_role, analysis_result, synthesis_result）
@@ -267,6 +270,9 @@ DualChannelEventBus → Outbox/RabbitMQ
 - [ ] agent_nodes（`src/infrastructure/agent_orch/nodes/agent_nodes.py`）
   - analyze(state) — 分析节点（MVP 占位，返回 mock 分析结果）
   - synthesize(state) — 综合节点（MVP 占位，返回 mock 综合结果）
+- [ ] schemas（`src/infrastructure/agent_orch/schemas.py`）
+  - BasicAgentState TypedDict — task_description: str, agent_role: str, analysis_result: str, synthesis_result: str
+  - 无外部依赖（仅 typing.TypedDict）
 
 #### 应用层 Schema (Application Services)
 - [ ] OrchestrationService 扩展（`src/application/services/orchestration_service.py`）
@@ -571,7 +577,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 
 ## 📝 Dev Notes 开发笔记
 
-### 相关架构模式和约束
+### 相关架构模式和约束 Architecture Patterns & Constraints
 
 **来源:** [`architecture.md`](../../docs/architecture/architecture.md) §3.2 ADR-002
 
@@ -740,7 +746,7 @@ DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 | SYS Agent 裁决 | ❌ 不实现 | Story 9.6 |
 | CheckpointReached 事件 | ✅ 定义（Graph 可选发布） | Story 6.3 完整实现 |
 
-### 项目结构说明
+### 项目结构说明 Project Structure
 
 ```
 sisys/
@@ -795,7 +801,7 @@ sisys/
 | **Application** | `application/` | OrchestrationService, WorkflowTask, WorkflowResult | 业务编排，接受双端口注入 |
 | **Infrastructure** | `infrastructure/` | LangGraphEngine, LangGraphConfig, BasicAgentGraph, agent_nodes | LangGraph SDK 封装 |
 
-### 前一个故事学习经验
+### 前一个故事学习经验 Lessons Learned from Previous Story
 
 **来源:** [Story 1.18a](./1-18a-prefect-workflow-integration.md)
 
@@ -879,7 +885,6 @@ sisys/
 - `tests/unit/infrastructure/config/test_langgraph_config.py`
 - `tests/unit/infrastructure/agent_orch/test_langgraph_engine.py`
 - `tests/unit/infrastructure/agent_orch/test_basic_agent_graph.py`
-- `tests/unit/application/services/test_orchestration_service.py`（更新）
 - `tests/unit/test_composition_root_agent.py`
 - `tests/unit/architecture/test_langgraph_architecture.py`
 - `tests/contracts/test_port_contract_agent_engine.py`
@@ -892,6 +897,8 @@ sisys/
 - `src/application/services/orchestration_service.py` — 新增 agent_engine 参数 + agent_reasoning 路由
 - `src/infrastructure/agent_orch/__init__.py` — 导出 LangGraphEngine
 - `src/composition_root.py` — 注册 agent_engine + 更新 orchestration_service 注册
+- `tests/unit/application/services/test_orchestration_service.py` — 更新构造函数调用 + 新增 agent_reasoning 路由测试
+- `tests/integration/test_story_1_18a_integration.py` — 更新 OrchestrationService 构造调用（添加 agent_engine 参数）
 
 **已有文件（复用，禁止修改）:**
 - `src/domain/ports/event_publisher.py` — EventPublisher 端口
