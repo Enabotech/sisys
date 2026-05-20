@@ -681,6 +681,36 @@ OrchestrationService.execute(task)
 - **`DocumentProcessed.document_id` 类型为 `uuid.UUID`**（非 str），Flow 构造事件时需确保类型正确
 - 测试中 mock `prefect` 模块：`@patch("src.infrastructure.workflow.prefect_engine.pf_client")`
 
+### PrefectEngine 架构设计依据
+
+**1. 适配器模式（Adapter Pattern）**
+- PrefectEngine 是 WorkflowEnginePort 的基础设施适配器，所有 Prefect SDK 导入限定于 `infrastructure/workflow/` 包内
+- 替换为 LangGraph/Airflow 等引擎时，仅需新建适配器并修改 composition_root 注册，不触及 domain/application 层
+- 参考：`src/infrastructure/messaging/` 下的 EventBus 适配器模式
+
+**2. 构造函数注入策略**
+- 注入 `PrefectConfig`（配置值）+ `EventPublisher`（端口），不注入 Prefect SDK 对象
+- `EventPublisher` 注入使 PrefectEngine 在 Flow 完成后发布事件时解耦于具体 EventBus 实现
+- domain 层不接受 infrastructure 配置对象（参考 UDMRouter 模式）
+
+**3. SINGLETON 注册**
+- PrefectEngine 无状态（无 request-scoped session），所有状态由 Prefect server 管理
+- 与 UnifiedStorageGateway（SCOPED，持有 request-scoped AsyncSession）形成对比
+
+**4. PrefectConfig 独立配置类**
+- 遵循 RedisConfig/AutoExecuteConfig 的 `@dataclass(frozen=True)` + `from_env()` 模式
+- Prefect 连接参数（API URL、workspace 等）通过环境变量注入，支持多环境部署
+
+**5. 测试隔离策略**
+- Prefect SDK 全量 mock，不启动真实 Prefect server（参考 Story 1.14c 的 Mock SDK 策略）
+- PrefectEngine 单元测试通过 `@patch` 替换 `prefect.client.orchestration.get_client`
+- 集成测试验证 OrchestrationService → PrefectEngine → EventPublisher 完整链路（仍 mock Prefect SDK）
+
+**6. Flow 与 Engine 职责分离**
+- PrefectEngine 负责生命周期管理（提交、状态查询、事件发布）
+- DocumentProcessingFlow（@flow）负责任务编排（解析→嵌入→索引的执行顺序和重试）
+- Flow 内任务为 MVP 占位实现，真实业务逻辑由 Epic 2/3 故事补充
+
 ### DocumentProcessingFlow 数据流
 
 ```
@@ -993,3 +1023,4 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 24 | "Prefect 无 RETRYING 状态"事实不准确（Prefect 有 Retrying 状态，主要用于 task 级别） | P2 | 修正为"Prefect Retrying 状态主要用于 task 级别，flow run 级别需综合判定" | ✅ R5 |
 | 25 | Dev Notes 缺少 Prefect state name vs state type 区分说明（14+ state name → 9 state type），`Retrying` 是 name 而非 type | P1 | 新增 state name→state type 映射表，明确 FlowStatus 映射基于 state TYPE，`Retrying` 是 name（type=RUNNING） | ✅ R6 |
 | 26 | PrefectEngine 状态映射策略缺少设计依据，CANCELLED/PAUSED 归为 FAILED 语义混淆 | P1 | 补充映射设计依据：业务抽象原则、FAILED 包含"异常终止"语义、PAUSED 特例说明、CANCELLING 中间态处理 | ✅ R6 |
+| 27 | PrefectEngine 整体架构缺少设计依据章节（适配器模式、注入策略、SINGLETON 理由、Flow/Engine 职责分离等散落各处） | P1 | 新增"PrefectEngine 架构设计依据"章节，整合 6 项设计决策及其理由 | ✅ R6 |
