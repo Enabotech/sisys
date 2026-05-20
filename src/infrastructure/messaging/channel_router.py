@@ -54,6 +54,13 @@ class ChannelRouter:
 
     # 预定义映射（Story 1.3 规范）
     DEFAULT_MAPPINGS: dict[str, ChannelMapping] = {
+        # REALTIME 事件（5个）
+        "AutoExecuted": ChannelMapping(
+            event_type="AutoExecuted",
+            redis_channel="sisys:rt:auto_executed",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="自动化执行完成",
+        ),
         "AutoTriggered": ChannelMapping(
             event_type="AutoTriggered",
             redis_channel="sisys:rt:auto_triggered",
@@ -66,6 +73,19 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.REALTIME,
             description="路由决策完成",
         ),
+        "HeartbeatTriggered": ChannelMapping(
+            event_type="HeartbeatTriggered",
+            redis_channel="sisys:rt:heartbeat_triggered",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="心跳触发",
+        ),
+        "RoutingDecided": ChannelMapping(
+            event_type="RoutingDecided",
+            redis_channel="sisys:rt:routing_decided",
+            delivery_mode=DeliveryMode.REALTIME,
+            description="路由决策完成",
+        ),
+        # RELIABLE 事件（20个）
         "DocumentProcessed": ChannelMapping(
             event_type="DocumentProcessed",
             redis_channel="sisys:rt:document_processed",
@@ -91,26 +111,6 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="审计事件",
         ),
-        # REALTIME 事件（3个）
-        "AutoExecuted": ChannelMapping(
-            event_type="AutoExecuted",
-            redis_channel="sisys:rt:auto_executed",
-            delivery_mode=DeliveryMode.REALTIME,
-            description="自动化执行完成",
-        ),
-        "HeartbeatTriggered": ChannelMapping(
-            event_type="HeartbeatTriggered",
-            redis_channel="sisys:rt:heartbeat_triggered",
-            delivery_mode=DeliveryMode.REALTIME,
-            description="心跳触发",
-        ),
-        "RoutingDecided": ChannelMapping(
-            event_type="RoutingDecided",
-            redis_channel="sisys:rt:routing_decided",
-            delivery_mode=DeliveryMode.REALTIME,
-            description="路由决策完成",
-        ),
-        # RELIABLE 事件（13个）
         "ToolExecuted": ChannelMapping(
             event_type="ToolExecuted",
             rabbitmq_routing_key="sisys.events.reliable.tool_executed",
