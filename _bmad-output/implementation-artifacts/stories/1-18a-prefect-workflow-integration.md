@@ -1,6 +1,6 @@
 # Story 1.18a: Prefect 工作流引擎集成
 
-**Status:** `backlog`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -104,10 +104,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** 零外部依赖（无 prefect/pydantic/langgraph 等导入）
 
 **验证标准/Validation Criteria:**
-- [ ] WorkflowEnginePort Protocol（`src/domain/ports/workflow_engine.py`）
-- [ ] FlowStatus 值对象（`src/domain/value_objects/flow_status.py`）
-- [ ] `@runtime_checkable` 装饰器
-- [ ] 仅使用 Python 标准库类型
+- [x] WorkflowEnginePort Protocol（`src/domain/ports/workflow_engine.py`）
+- [x] FlowStatus 值对象（`src/domain/value_objects/flow_status.py`）
+- [x] `@runtime_checkable` 装饰器
+- [x] 仅使用 Python 标准库类型
 
 ### AC-2: PrefectEngine 实现 WorkflowEnginePort
 
@@ -119,10 +119,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** PrefectEngine 通过注入的 EventPublisher 发布领域事件
 
 **验证标准/Validation Criteria:**
-- [ ] PrefectEngine 类（`src/infrastructure/workflow/prefect_engine.py`）
-- [ ] isinstance(PrefectEngine(...), WorkflowEnginePort) 返回 True
-- [ ] 架构测试验证零越界导入
-- [ ] EventPublisher 通过构造函数注入
+- [x] PrefectEngine 类（`src/infrastructure/workflow/prefect_engine.py`）
+- [x] isinstance(PrefectEngine(...), WorkflowEnginePort) 返回 True
+- [x] 架构测试验证零越界导入
+- [x] EventPublisher 通过构造函数注入
 
 ### AC-3: DocumentProcessingFlow 执行
 
@@ -134,11 +134,11 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** 工作流执行延迟 P95 < 500ms（mock 任务，测量编排开销）
 
 **验证标准/Validation Criteria:**
-- [ ] DocumentProcessingFlow（`src/infrastructure/workflow/flows/document_processing_flow.py`）
-- [ ] document_tasks（`src/infrastructure/workflow/tasks/document_tasks.py`）
-- [ ] EventPublisher.publish() 调用验证（mock）
-- [ ] 重试行为验证（模拟任务失败）
-- [ ] 流程状态可查询
+- [x] DocumentProcessingFlow（`src/infrastructure/workflow/flows/document_processing_flow.py`）
+- [x] document_tasks（`src/infrastructure/workflow/tasks/document_tasks.py`）
+- [x] EventPublisher.publish() 调用验证（mock）
+- [x] 重试行为验证（模拟任务失败）
+- [x] 流程状态可查询
 
 ### AC-4: OrchestrationService 路由
 
@@ -149,10 +149,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** MVP 仅支持 data_pipeline 路由，agent_reasoning 由 Story 1.18b 补充
 
 **验证标准/Validation Criteria:**
-- [ ] OrchestrationService（`src/application/services/orchestration_service.py`）
-- [ ] WorkflowTask 值对象（flow_name, parameters, task_type）
-- [ ] WorkflowResult 值对象（flow_run_id, status, submitted_at）
-- [ ] 仅依赖 WorkflowEnginePort 端口（不导入 infrastructure 层）
+- [x] OrchestrationService（`src/application/services/orchestration_service.py`）
+- [x] WorkflowTask 值对象（flow_name, parameters, task_type）
+- [x] WorkflowResult 值对象（flow_run_id, status, submitted_at）
+- [x] 仅依赖 WorkflowEnginePort 端口（不导入 infrastructure 层）
 
 ### AC-5: 新领域事件定义
 
@@ -165,11 +165,11 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 > **⚠️ 注册方式说明**：ChannelRouter 采用双轨注册机制 — 构造时加载 `DEFAULT_MAPPINGS`（19 个内置映射）作为基线，再通过 `EventBusConfigLoader.load()` 从 `config/event_channels.yaml` 追加/覆盖映射。新事件（RAGIndexed/ReportGenerated）需在 YAML 文件中添加映射条目，YAML 配置优先于默认映射。
 
 **验证标准/Validation Criteria:**
-- [ ] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
-- [ ] ReportGenerated 事件（同文件）
-- [ ] `config/event_channels.yaml` 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
-- [ ] `src/domain/events/__init__.py` 导出更新
-- [ ] 事件序列化/反序列化 roundtrip 测试通过
+- [x] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
+- [x] ReportGenerated 事件（同文件）
+- [x] `config/event_channels.yaml` 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
+- [x] `src/domain/events/__init__.py` 导出更新
+- [x] 事件序列化/反序列化 roundtrip 测试通过
 
 ### AC-6: PrefectConfig 配置
 
@@ -185,10 +185,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** `@dataclass(frozen=True)` 不可变配置
 
 **验证标准/Validation Criteria:**
-- [ ] PrefectConfig（`src/infrastructure/config/prefect.py`）
-- [ ] from_env() 类方法
-- [ ] frozen=True dataclass
-- [ ] 默认值与环境变量覆盖测试
+- [x] PrefectConfig（`src/infrastructure/config/prefect.py`）
+- [x] from_env() 类方法
+- [x] frozen=True dataclass
+- [x] 默认值与环境变量覆盖测试
 
 ### AC-7: Composition Root 注册
 
@@ -199,10 +199,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** 端口契约测试验证注册/解析/兼容性
 
 **验证标准/Validation Criteria:**
-- [ ] composition_root.py 新增 workflow 注册段
-- [ ] WorkflowEnginePort → PrefectEngine（SINGLETON，lambda 工厂模式）
-- [ ] OrchestrationService 注册（SINGLETON）
-- [ ] 契约测试（`tests/contracts/test_port_contract_workflow_engine.py`）
+- [x] composition_root.py 新增 workflow 注册段
+- [x] WorkflowEnginePort → PrefectEngine（SINGLETON，lambda 工厂模式）
+- [x] OrchestrationService 注册（SINGLETON）
+- [x] 契约测试（`tests/contracts/test_port_contract_workflow_engine.py`）
 
 > **DI 注册模式说明**：PrefectConfig **不注册为端口**，而是在 lambda 工厂中通过 `PrefectConfig.from_env()` 创建。注册格式参考 `RedisManager`/`PostgreSQLManager`：
 > ```python
@@ -229,10 +229,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **And** PrefectEngine 满足 WorkflowEnginePort Protocol（结构化子类型检查）
 
 **验证标准/Validation Criteria:**
-- [ ] `tests/unit/architecture/test_prefect_architecture.py`
-- [ ] 零越界 Prefect 导入验证
-- [ ] 端口类型纯度验证
-- [ ] Protocol 一致性验证
+- [x] `tests/unit/architecture/test_prefect_architecture.py`
+- [x] 零越界 Prefect 导入验证
+- [x] 端口类型纯度验证
+- [x] Protocol 一致性验证
 
 ---
 
@@ -373,13 +373,13 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 根据 epics_v1.0.md CI/CD 质量门禁和 prd.md NFR 测试覆盖计划：
 
-- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
-- [ ] **架构层覆盖率 ≥85%**（架构层 Story，含工作流核心机制）
-- [ ] **集成测试覆盖率 ≥70%**
+- [x] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）- **P0 阻断门禁**
+- [x] **架构层覆盖率 ≥85%**（架构层 Story，含工作流核心机制）
+- [x] **集成测试覆盖率 ≥70%**
 
 #### 代码质量门禁
-- [ ] **Ruff 检查通过**（`ruff check src/`）
-- [ ] **MyPy 类型检查通过**（`mypy src/`）
+- [x] **Ruff 检查通过**（`ruff check src/`）
+- [x] **MyPy 类型检查通过**（`mypy src/`）
 - [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
 
 #### 测试隔离约束
@@ -394,10 +394,10 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | **EventPublisher mock** | 事件发布使用 AsyncMock，验证调用参数 | 测试耦合真实事件总线 |
 
 **验证要求：**
-- [ ] 并行测试 `pytest tests/ -n 8` 通过
-- [ ] 连续5次运行无随机失败
-- [ ] `poetry run ruff check` 通过
-- [ ] `poetry run mypy` 通过
+- [x] 并行测试 `pytest tests/ -n 8` 通过
+- [x] 连续5次运行无随机失败
+- [x] `poetry run ruff check` 通过
+- [x] `poetry run mypy` 通过
 
 ---
 
@@ -432,21 +432,21 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 > **目的：** 在进入代码实现前，明确端口、事件、配置、验收标准。
 
-- [ ] Subtask 0.1: 定义 FlowStatus 值对象 Schema（`src/domain/value_objects/flow_status.py`）
-- [ ] Subtask 0.2: 定义 WorkflowEnginePort Protocol（`src/domain/ports/workflow_engine.py`）
-- [ ] Subtask 0.3: 定义 PrefectConfig 配置 Schema（`src/infrastructure/config/prefect.py`）
-- [ ] Subtask 0.4: 定义 PrefectEngine 适配器 Schema
-- [ ] Subtask 0.5: 定义 DocumentProcessingFlow + document_tasks Schema
-- [ ] Subtask 0.6: 定义 OrchestrationService Schema
-- [ ] Subtask 0.7: 定义 RAGIndexed + ReportGenerated 事件 Schema
-- [ ] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_18a.feature`
-- [ ] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_story_1_18a_steps.py`
-- [ ] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.1: 定义 FlowStatus 值对象 Schema（`src/domain/value_objects/flow_status.py`）
+- [x] Subtask 0.2: 定义 WorkflowEnginePort Protocol（`src/domain/ports/workflow_engine.py`）
+- [x] Subtask 0.3: 定义 PrefectConfig 配置 Schema（`src/infrastructure/config/prefect.py`）
+- [x] Subtask 0.4: 定义 PrefectEngine 适配器 Schema
+- [x] Subtask 0.5: 定义 DocumentProcessingFlow + document_tasks Schema
+- [x] Subtask 0.6: 定义 OrchestrationService Schema
+- [x] Subtask 0.7: 定义 RAGIndexed + ReportGenerated 事件 Schema
+- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_18a.feature`
+- [x] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_story_1_18a_steps.py`
+- [x] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
-- [ ] 规范项全部定义完毕
-- [ ] Gherkin 验收测试运行失败（红阶段确认）
-- [ ] 端口契约清单完整（registry/composition_root/contract test）
+- [x] 规范项全部定义完毕
+- [x] Gherkin 验收测试运行失败（红阶段确认）
+- [x] 端口契约清单完整（registry/composition_root/contract test）
 
 ---
 
@@ -462,9 +462,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/domain/value_objects/flow_status.py` — str 枚举 |
 | 🔄 重构 | 优化类型注解，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 FlowStatus 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 FlowStatus（PENDING/RUNNING/COMPLETED/FAILED/RETRYING）
-- [ ] Subtask 1.3: 🔄 重构 — 验证零外部依赖
+- [x] Subtask 1.1: 🔴 红 — 编写 FlowStatus 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 FlowStatus（PENDING/RUNNING/COMPLETED/FAILED/RETRYING）
+- [x] Subtask 1.3: 🔄 重构 — 验证零外部依赖
 
 #### TDD 循环 [B]：WorkflowEnginePort Protocol
 
@@ -474,14 +474,14 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/domain/ports/workflow_engine.py` — WorkflowEnginePort Protocol |
 | 🔄 重构 | 注册到 `src/domain/ports/__init__.py` |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写 WorkflowEnginePort 失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 实现 WorkflowEnginePort Protocol
-- [ ] Subtask 1.6: 🔄 重构 — 更新 `__init__.py` 导出
+- [x] Subtask 1.4: 🔴 红 — 编写 WorkflowEnginePort 失败测试
+- [x] Subtask 1.5: 🟢 绿 — 实现 WorkflowEnginePort Protocol
+- [x] Subtask 1.6: 🔄 重构 — 更新 `__init__.py` 导出
 
 **完成标准/Definition of Done:**
-- [ ] FlowStatus + WorkflowEnginePort 实现完成
-- [ ] 零外部依赖（stdlib-only）
-- [ ] TDD 循环全部通过
+- [x] FlowStatus + WorkflowEnginePort 实现完成
+- [x] 零外部依赖（stdlib-only）
+- [x] TDD 循环全部通过
 
 ---
 
@@ -497,9 +497,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/infrastructure/config/prefect.py` — PrefectConfig |
 | 🔄 重构 | 对齐 RedisConfig from_env() 模式 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 PrefectConfig 失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 PrefectConfig（frozen=True, from_env()）
-- [ ] Subtask 2.3: 🔄 重构 — 对齐配置模式
+- [x] Subtask 2.1: 🔴 红 — 编写 PrefectConfig 失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 PrefectConfig（frozen=True, from_env()）
+- [x] Subtask 2.3: 🔄 重构 — 对齐配置模式
 
 #### TDD 循环 [B]：PrefectEngine
 
@@ -509,17 +509,17 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/infrastructure/workflow/prefect_engine.py` — PrefectEngine |
 | 🔄 重构 | 优化错误处理和日志 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写 PrefectEngine 失败测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现 PrefectEngine（mock Prefect SDK 调用）
-- [ ] Subtask 2.6: 🔄 重构 — 优化状态映射和错误处理
+- [x] Subtask 2.4: 🔴 红 — 编写 PrefectEngine 失败测试
+- [x] Subtask 2.5: 🟢 绿 — 实现 PrefectEngine（mock Prefect SDK 调用）
+- [x] Subtask 2.6: 🔄 重构 — 优化状态映射和错误处理
 
 > **关键约束**：PrefectEngine 测试全量 mock Prefect SDK，不启动真实 Prefect server。使用 `unittest.mock.patch` 替换 `prefect` 模块调用。
 
 **完成标准/Definition of Done:**
-- [ ] PrefectConfig from_env() 正确解析
-- [ ] PrefectEngine 满足 WorkflowEnginePort
-- [ ] 所有 Prefect 导入限定于 infrastructure/workflow/
-- [ ] TDD 循环全部通过
+- [x] PrefectConfig from_env() 正确解析
+- [x] PrefectEngine 满足 WorkflowEnginePort
+- [x] 所有 Prefect 导入限定于 infrastructure/workflow/
+- [x] TDD 循环全部通过
 
 ---
 
@@ -535,9 +535,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/infrastructure/workflow/flows/document_processing_flow.py` + `tasks/document_tasks.py` |
 | 🔄 重构 | 提取可复用任务模式 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 DocumentProcessingFlow 失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 Flow（@flow + @task 装饰器）
-- [ ] Subtask 3.3: 🔄 重构 — 优化任务模块
+- [x] Subtask 3.1: 🔴 红 — 编写 DocumentProcessingFlow 失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现 Flow（@flow + @task 装饰器）
+- [x] Subtask 3.3: 🔄 重构 — 优化任务模块
 
 #### TDD 循环 [B]：OrchestrationService
 
@@ -547,9 +547,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/application/services/orchestration_service.py` |
 | 🔄 重构 | 添加类型注解 |
 
-- [ ] Subtask 3.4: 🔴 红 — 编写 OrchestrationService 失败测试
-- [ ] Subtask 3.5: 🟢 绿 — 实现 OrchestrationService（注入 WorkflowEnginePort）
-- [ ] Subtask 3.6: 🔄 重构 — 优化路由逻辑
+- [x] Subtask 3.4: 🔴 红 — 编写 OrchestrationService 失败测试
+- [x] Subtask 3.5: 🟢 绿 — 实现 OrchestrationService（注入 WorkflowEnginePort）
+- [x] Subtask 3.6: 🔄 重构 — 优化路由逻辑
 
 #### TDD 循环 [C]：工作流事件定义
 
@@ -559,9 +559,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现 `src/domain/events/workflow_events.py` + 更新 ChannelRouter |
 | 🔄 重构 | 更新 `__init__.py` 导出 |
 
-- [ ] Subtask 3.7: 🔴 红 — 编写 RAGIndexed + ReportGenerated 事件测试
-- [ ] Subtask 3.8: 🟢 绿 — 实现工作流事件 + 更新 `config/event_channels.yaml` 映射
-- [ ] Subtask 3.9: 🔄 重构 — 更新 events `__init__.py`
+- [x] Subtask 3.7: 🔴 红 — 编写 RAGIndexed + ReportGenerated 事件测试
+- [x] Subtask 3.8: 🟢 绿 — 实现工作流事件 + 更新 `config/event_channels.yaml` 映射
+- [x] Subtask 3.9: 🔄 重构 — 更新 events `__init__.py`
 
 #### DI 注册 + 契约测试
 
@@ -571,18 +571,18 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 更新 `src/composition_root.py`（注册 workflow_engine + orchestration_service） |
 | 🔄 重构 | 验证完整注册链路 + 运行全量测试 |
 
-- [ ] Subtask 3.10: 🔴 红 — 编写 WorkflowEnginePort 契约失败测试
-- [ ] Subtask 3.11: 🟢 绿 — 更新 composition_root.py 注册 workflow 端口
-- [ ] Subtask 3.12: 🔄 重构 — 验证注册链路 + `test_composition_root_workflow.py`
+- [x] Subtask 3.10: 🔴 红 — 编写 WorkflowEnginePort 契约失败测试
+- [x] Subtask 3.11: 🟢 绿 — 更新 composition_root.py 注册 workflow 端口
+- [x] Subtask 3.12: 🔄 重构 — 验证注册链路 + `test_composition_root_workflow.py`
 
 **完成标准/Definition of Done:**
-- [ ] DocumentProcessingFlow 执行通过（mock 任务）
-- [ ] DocumentProcessed 事件发布验证
-- [ ] OrchestrationService 路由逻辑正确
-- [ ] RAGIndexed/ReportGenerated 事件定义 + `config/event_channels.yaml` 映射
-- [ ] Composition Root 注册完成
-- [ ] 契约测试通过
-- [ ] TDD 循环全部通过
+- [x] DocumentProcessingFlow 执行通过（mock 任务）
+- [x] DocumentProcessed 事件发布验证
+- [x] OrchestrationService 路由逻辑正确
+- [x] RAGIndexed/ReportGenerated 事件定义 + `config/event_channels.yaml` 映射
+- [x] Composition Root 注册完成
+- [x] 契约测试通过
+- [x] TDD 循环全部通过
 
 ---
 
@@ -594,12 +594,12 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 > **已有覆盖**：`test_hexagonal_architecture_constraints.py` 已将 `prefect` 列入 `FORBIDDEN_DOMAIN_IMPORTS`，`.importlinter` 已禁止 domain 层导入 prefect。本 Story 需新增的验证项如下。
 
-- [ ] Subtask 4.1: 创建 `tests/unit/architecture/test_prefect_architecture.py`
-- [ ] Subtask 4.2: 验证 infrastructure/workflow/ 以外零 Prefect 导入（复用 `_scan_file_imports()` 模式）
-- [ ] Subtask 4.3: 验证 WorkflowEnginePort 仅使用 stdlib 类型
-- [ ] Subtask 4.4: 验证 PrefectEngine 满足 WorkflowEnginePort Protocol（结构化子类型检查）
-- [ ] Subtask 4.5: 验证 OrchestrationService 不导入 infrastructure 层
-- [ ] Subtask 4.6: 验证 RAGIndexed/ReportGenerated 注册于 ChannelRouter（通过 `config/event_channels.yaml`）
+- [x] Subtask 4.1: 创建 `tests/unit/architecture/test_prefect_architecture.py`
+- [x] Subtask 4.2: 验证 infrastructure/workflow/ 以外零 Prefect 导入（复用 `_scan_file_imports()` 模式）
+- [x] Subtask 4.3: 验证 WorkflowEnginePort 仅使用 stdlib 类型
+- [x] Subtask 4.4: 验证 PrefectEngine 满足 WorkflowEnginePort Protocol（结构化子类型检查）
+- [x] Subtask 4.5: 验证 OrchestrationService 不导入 infrastructure 层
+- [x] Subtask 4.6: 验证 RAGIndexed/ReportGenerated 注册于 ChannelRouter（通过 `config/event_channels.yaml`）
 
 #### 集成测试
 
@@ -609,15 +609,15 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🟢 绿 | 实现集成测试（mock Prefect SDK，真实 EventPublisher mock） |
 | 🔄 重构 | 优化测试覆盖 |
 
-- [ ] Subtask 4.7: 🔴 红 — 编写集成测试失败测试
-- [ ] Subtask 4.8: 🟢 绿 — 实现端到端工作流流程测试
-- [ ] Subtask 4.9: 🔄 重构 — 优化测试覆盖
+- [x] Subtask 4.7: 🔴 红 — 编写集成测试失败测试
+- [x] Subtask 4.8: 🟢 绿 — 实现端到端工作流流程测试
+- [x] Subtask 4.9: 🔄 重构 — 优化测试覆盖
 
 **完成标准/Definition of Done:**
-- [ ] 所有架构约束测试通过
-- [ ] 集成测试通过
-- [ ] `pytest tests/ -n 8` 并行测试通过
-- [ ] `ruff check src/` + `mypy src/` 通过
+- [x] 所有架构约束测试通过
+- [x] 集成测试通过
+- [x] `pytest tests/ -n 8` 并行测试通过
+- [x] `ruff check src/` + `mypy src/` 通过
 
 ---
 
@@ -701,8 +701,9 @@ OrchestrationService.execute(task)
 - `flow_run_id` 类型：Prefect 使用 `uuid.UUID`，WorkflowEnginePort 使用 `str`，PrefectEngine 负责 `str↔UUID` 转换
 - **PrefectClient 是异步客户端**：通过 `async with get_client() as client:` 获取，不直接构造 `PrefectClient`
 - **`create_flow_run()` 返回 `FlowRun` Pydantic 模型**（非 UUID），需通过 `.id` 获取 `flow_run_id`
+- **外部触发使用 deployment 模式**：`read_deployment_by_name(name)` + `create_flow_run_from_deployment(deployment_id, parameters)`，`flow_name` 参数格式为 `<FLOW_NAME>/<DEPLOYMENT_NAME>`（如 `DocumentProcessing/default`）。直接使用 `create_flow_run()` 需要 `Flow` 运行时对象，仅适用于进程内调用
 - **`DocumentProcessed.document_id` 类型为 `uuid.UUID`**（非 str），Flow 构造事件时需确保类型正确
-- 测试中 mock `prefect` 模块：`@patch("src.infrastructure.workflow.prefect_engine.pf_client")`
+- 测试中 mock `prefect` 模块：`@patch("src.infrastructure.workflow.prefect_engine.get_client")`
 
 ### PrefectEngine 架构设计依据
 
