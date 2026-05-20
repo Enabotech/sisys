@@ -56,7 +56,8 @@
 
 | 现有组件 | 文件路径 | 复用方式 |
 |---------|---------|---------|
-| `EventPublisher` 端口 | `src/domain/ports/event_publisher.py` | PrefectEngine 注入，Flow 完成后发布事件 |
+| `EventPublisher` 端口 | `src/domain/ports/event_publisher.py` | PrefectEngine 注入，Flow 完成后发布事件（`async def publish(event: DomainEvent) -> PublishResult`，导入路径为 `src.domain.ports.event_publisher`，不在 `__init__.py` 的 `__all__` 中） |
+| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（含 `is_success`/`is_full_failure` 属性），PrefectEngine 需检查并记录失败 |
 | `DomainEvent` 基类 | `src/domain/events/base.py` | RAGIndexed/ReportGenerated 继承 |
 | `ChannelRouter` | `src/infrastructure/messaging/channel_router.py` | 新增 RAGIndexed/ReportGenerated 映射 |
 | `PortRegistry` + `register_port` | `src/domain/ports/registry.py` | 注册 WorkflowEnginePort |
@@ -129,7 +130,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **Given** PrefectEngine 已初始化
 **When** 通过 `submit_flow("DocumentProcessing", {"document_id": ..., "file_path": ...})` 提交文档处理请求
 **Then** Prefect Flow 执行：parse_document → generate_embedding → index_document 作为顺序 Prefect tasks
-**And** 成功完成后发布 `DocumentProcessed` 事件（通过 EventPublisher 端口）
+**And** 成功完成后通过 EventPublisher 发布 `DocumentProcessed` 事件（构造时传入 `document_id`、`parse_result`、`embedding` 等字段；EventPublisher.publish() 返回 `PublishResult`，需检查 `is_full_failure` 并记录警告日志）
 **And** 任务失败时 Prefect 内置重试机制激活（可配置重试次数）
 **And** 工作流执行延迟 P95 < 500ms（mock 任务，测量编排开销）
 
@@ -160,12 +161,15 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **When** RAG 索引或报告生成在未来故事中完成
 **Then** `RAGIndexed` 事件存在于 `src/domain/events/workflow_events.py`（字段：document_id, index_name, chunk_count）
 **And** `ReportGenerated` 事件存在于同文件（字段：report_id, report_type, file_path）
-**And** 两者注册到 `ChannelRouter.DEFAULT_MAPPINGS`，DeliveryMode.RELIABLE
+**And** 两者注册到 `config/event_channels.yaml`，DeliveryMode.RELIABLE（通过 EventBusConfigLoader 加载，而非 DEFAULT_MAPPINGS 代码定义）
+
+> **⚠️ 注册方式修正**：ChannelRouter 的事件映射通过 `config/event_channels.yaml` YAML 配置文件加载（`EventBusConfigLoader.load()`），**不是**通过 `DEFAULT_MAPPINGS` 字典代码定义。新事件需在 YAML 文件中添加映射条目。
 
 **验证标准/Validation Criteria:**
 - [ ] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
 - [ ] ReportGenerated 事件（同文件）
 - [ ] ChannelRouter DEFAULT_MAPPINGS 更新
+- [ ] `config/event_channels.yaml` 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
 - [ ] `src/domain/events/__init__.py` 导出更新
 - [ ] 事件序列化/反序列化 roundtrip 测试通过
 
@@ -911,5 +915,14 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-19
-**最后更新/Last Updated:** 2026-05-19
-**更新说明:** Story 1.18a 初始创建 — Prefect 3.6+ 工作流引擎集成。实现 WorkflowEnginePort 端口抽象 + PrefectEngine 实现 + DocumentProcessingFlow 代表性流程 + RAGIndexed/ReportGenerated 事件定义。对齐 ADR-002 双核引擎架构。
+**最后更新/Last Updated:** 2026-05-20
+**更新说明:** Round 1 审查修正 — 修正事件路由注册方式(YAML非DEFAULT_MAPPINGS)、明确EventPublisher导入路径和PublishResult处理、补充DocumentProcessed事件构造说明。
+
+### 🔧 对抗性审查修复（Adversarial Review Fixes）
+
+| # | 问题 | 严重度 | 修复方案 | 状态 |
+|---|------|--------|----------|------|
+| 1 | AC-5 ChannelRouter 事件注册方式错误（声称 DEFAULT_MAPPINGS 代码定义，实际为 event_channels.yaml YAML 配置） | P0 | AC-5 修正为 `config/event_channels.yaml` 注册，补充 EventBusConfigLoader 加载机制说明 | ✅ R1 |
+| 2 | EventPublisher 不在 domain/ports/__init__.py __all__ 中，导入路径未明确 | P0 | 现有代码继承表补充导入路径 `src.domain.ports.event_publisher` 和 PublishResult 类型说明 | ✅ R1 |
+| 3 | EventPublisher.publish() 返回 PublishResult（非 None），Story 未说明处理方式 | P0 | AC-3 补充 PublishResult 检查要求（is_full_failure 记录警告日志） | ✅ R1 |
+| 4 | DocumentProcessed 事件已有完整定义（含 document_id/parse_result/embedding 字段），Story 未说明 Flow 完成后如何构造事件实例 | P0 | AC-3 补充事件构造时需传入的具体字段 | ✅ R1 |
