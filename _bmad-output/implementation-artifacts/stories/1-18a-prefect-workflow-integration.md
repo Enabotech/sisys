@@ -658,6 +658,7 @@ OrchestrationService.execute(task)
   | Running/Retrying | RUNNING |
   | Completed | COMPLETED |
   | Failed | FAILED |
+  | Crashed | CRASHED |
   | Cancelled | CANCELLED |
   | Cancelling | CANCELLING |
   | Paused/Suspended | PAUSED |
