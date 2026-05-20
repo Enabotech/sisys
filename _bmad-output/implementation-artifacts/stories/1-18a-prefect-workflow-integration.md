@@ -57,13 +57,13 @@
 | 现有组件 | 文件路径 | 复用方式 |
 |---------|---------|---------|
 | `EventPublisher` 端口 | `src/domain/ports/event_publisher.py` | PrefectEngine 注入，Flow 完成后发布事件（`async def publish(event: DomainEvent) -> PublishResult`，导入路径为 `src.domain.ports.event_publisher`，不在 `__init__.py` 的 `__all__` 中） |
-| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（含 `is_success`/`is_full_failure` 属性），PrefectEngine 需检查并记录失败 |
+| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（含 `is_success`/`is_full_failure`/`partial_error` 属性），PrefectEngine 需检查并记录失败 |
 | `DomainEvent` 基类 | `src/domain/events/base.py` | RAGIndexed/ReportGenerated 继承 |
 | `ChannelRouter` | `src/infrastructure/messaging/channel_router.py` | 新增 RAGIndexed/ReportGenerated 映射（通过 `config/event_channels.yaml`） |
 | `PortRegistry` + `register_port` | `src/domain/ports/registry.py` | 注册 WorkflowEnginePort |
 | `Composition Root` | `src/composition_root.py` | DI 注册 workflow 端口 |
 | `DocumentProcessed` 事件 | `src/domain/events/document_events.py` | DocumentProcessingFlow 完成后发布 |
-| `PrefectConfig` 模式参考 | `src/infrastructure/config/redis.py` | from_env() + frozen dataclass 模式 |
+| `PrefectConfig` 模式参考 | `src/infrastructure/config/auto_execute.py` | from_env() + frozen dataclass 模式 |
 | `AutoExecuteService` 模式 | `src/domain/services/auto_execute_service.py` | 事件驱动执行模式参考 |
 | `SagaOrchestrator` 模式 | `src/infrastructure/saga/saga_orchestrator.py` | 多步骤编排模式参考 |
 
@@ -160,9 +160,9 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **When** RAG 索引或报告生成在未来故事中完成
 **Then** `RAGIndexed` 事件存在于 `src/domain/events/workflow_events.py`（字段：document_id, index_name, chunk_count）
 **And** `ReportGenerated` 事件存在于同文件（字段：report_id, report_type, file_path）
-**And** 两者注册到 `config/event_channels.yaml`，DeliveryMode.RELIABLE（通过 EventBusConfigLoader 加载，而非 DEFAULT_MAPPINGS 代码定义）
+**And** 两者注册到 `config/event_channels.yaml`，DeliveryMode.RELIABLE（通过 EventBusConfigLoader 加载到 ChannelRouter）
 
-> **⚠️ 注册方式修正**：ChannelRouter 的事件映射通过 `config/event_channels.yaml` YAML 配置文件加载（`EventBusConfigLoader.load()`），**不是**通过 `DEFAULT_MAPPINGS` 字典代码定义。新事件需在 YAML 文件中添加映射条目。
+> **⚠️ 注册方式说明**：ChannelRouter 采用双轨注册机制 — 构造时加载 `DEFAULT_MAPPINGS`（19 个内置映射）作为基线，再通过 `EventBusConfigLoader.load()` 从 `config/event_channels.yaml` 追加/覆盖映射。新事件（RAGIndexed/ReportGenerated）需在 YAML 文件中添加映射条目，YAML 配置优先于默认映射。
 
 **验证标准/Validation Criteria:**
 - [ ] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
@@ -698,7 +698,7 @@ OrchestrationService.execute(task)
 - 与 UnifiedStorageGateway（SCOPED，持有 request-scoped AsyncSession）形成对比
 
 **4. PrefectConfig 独立配置类**
-- 遵循 RedisConfig/AutoExecuteConfig 的 `@dataclass(frozen=True)` + `from_env()` 模式
+- 遵循 AutoExecuteConfig 的 `@dataclass(frozen=True)` + `from_env()` 模式（注意：RedisConfig 使用 `@dataclass` 非 frozen）
 - Prefect 连接参数（API URL、workspace 等）通过环境变量注入，支持多环境部署
 
 **5. 测试隔离策略**
@@ -801,7 +801,7 @@ sisys/
 
 **来源:** [Story 1.17](./1-17-udmr-basic-routing.md) + [Story 1.14c](./1-14c-autonomous-invocation-execute.md)
 
-1. **配置模式复用** — PrefectConfig 采用与 RedisConfig/AutoExecuteConfig 相同的 `@dataclass(frozen=True)` + `from_env()` 模式
+1. **配置模式复用** — PrefectConfig 采用与 AutoExecuteConfig 相同的 `@dataclass(frozen=True)` + `from_env()` 模式（注意：RedisConfig 使用非 frozen `@dataclass`）
 2. **事件驱动解耦** — PrefectEngine 仅通过注入的 EventPublisher 发布事件，不直接调用 domain services
 3. **构造函数原始值注入** — 参考 UDMRouter 模式：domain 层不接受 infrastructure 配置对象，由 composition_root 传入
 4. **Handler 桥接模式** — OrchestrationService 参考 AutoRouteHandler 的委托模式
@@ -1024,3 +1024,6 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 25 | Dev Notes 缺少 Prefect state name vs state type 区分说明（14+ state name → 9 state type），`Retrying` 是 name 而非 type | P1 | 新增 state name→state type 映射表，明确 FlowStatus 映射基于 state TYPE，`Retrying` 是 name（type=RUNNING） | ✅ R6 |
 | 26 | PrefectEngine 状态映射策略缺少设计依据，CANCELLED/PAUSED 归为 FAILED 语义混淆 | P1 | 补充映射设计依据：业务抽象原则、FAILED 包含"异常终止"语义、PAUSED 特例说明、CANCELLING 中间态处理 | ✅ R6 |
 | 27 | PrefectEngine 整体架构缺少设计依据章节（适配器模式、注入策略、SINGLETON 理由、Flow/Engine 职责分离等散落各处） | P1 | 新增"PrefectEngine 架构设计依据"章节，整合 6 项设计决策及其理由 | ✅ R6 |
+| 28 | ChannelRouter "不是通过 DEFAULT_MAPPINGS 代码定义" 声明错误，实际代码中 DEFAULT_MAPPINGS 有 19 个硬编码条目，与 YAML 双轨并存 | P0 | 修正为"双轨注册机制：DEFAULT_MAPPINGS 为基线，YAML 追加/覆盖"，删除绝对否定表述 | ✅ R7 |
+| 29 | PrefectConfig 模式参考引用 RedisConfig（非 frozen），但文档声称 frozen=True 模式，矛盾 | P1 | 修正参考为 AutoExecuteConfig（frozen=True），补充 RedisConfig 使用非 frozen 的说明 | ✅ R7 |
+| 30 | PublishResult 缺少 `partial_error` 属性说明 | P2 | 补充 `partial_error` 属性到 PublishResult 描述 | ✅ R7 |
