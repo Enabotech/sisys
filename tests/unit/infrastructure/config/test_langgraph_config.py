@@ -25,7 +25,7 @@ class TestLangGraphConfigDefaults:
 
     def test_default_api_url(self) -> None:
         config = LangGraphConfig()
-        assert config.api_url == "http://localhost:8123"
+        assert config.api_url == "http://localhost:8000"
 
     def test_default_checkpoint_table(self) -> None:
         config = LangGraphConfig()
@@ -45,7 +45,7 @@ class TestLangGraphConfigDefaults:
 
     def test_default_graph_timeout_seconds(self) -> None:
         config = LangGraphConfig()
-        assert config.graph_timeout_seconds == 3600
+        assert config.graph_timeout_seconds == 1800
 
 
 class TestLangGraphConfigFromEnv:
@@ -54,7 +54,7 @@ class TestLangGraphConfigFromEnv:
     def test_from_env_with_defaults(self) -> None:
         config = LangGraphConfig.from_env()
         assert isinstance(config, LangGraphConfig)
-        assert config.api_url == "http://localhost:8123"
+        assert config.api_url == "http://localhost:8000"
 
     @patch.dict(os.environ, {"LANGGRAPH_API_URL": "http://custom:8123"})
     def test_from_env_override_api_url(self) -> None:
@@ -90,11 +90,17 @@ class TestLangGraphConfigEmptyEnv:
         config = LangGraphConfig.from_env()
         assert config.retry_max_attempts == 3
 
+    @patch.dict(os.environ, {"LANGGRAPH_RETRY_MAX_ATTEMPTS": "abc"})
+    def test_from_env_invalid_int_raises_value_error(self) -> None:
+        """非数字字符串应抛出包含键名的 ValueError"""
+        with pytest.raises(ValueError, match="LANGGRAPH_RETRY_MAX_ATTEMPTS"):
+            LangGraphConfig.from_env()
+
     @patch.dict(os.environ, {"LANGGRAPH_API_URL": ""})
     def test_from_env_empty_api_url_uses_default(self) -> None:
         """空字符串 API URL 应使用默认值"""
         config = LangGraphConfig.from_env()
-        assert config.api_url == "http://localhost:8123"
+        assert config.api_url == "http://localhost:8000"
 
     @patch.dict(os.environ, {"LANGGRAPH_GRAPH_TIMEOUT_SECONDS": "7200"})
     def test_from_env_valid_override(self) -> None:

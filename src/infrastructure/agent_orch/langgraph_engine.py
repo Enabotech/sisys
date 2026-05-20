@@ -74,13 +74,17 @@ class LangGraphEngine:
         try:
             compiled_graph = self._build_graph(graph_name, parameters)
             result = await compiled_graph.ainvoke(parameters, config={"configurable": {"thread_id": run_id}})
-            self._runs[run_id] = FlowStatus.COMPLETED
-
-            # 发布 AgentDecided 事件
-            await self._publish_agent_decided(agent_id, result, run_id)
         except Exception as e:
             self._runs[run_id] = FlowStatus.FAILED
             raise RuntimeError(f"提交状态图失败 [{graph_name}]: {e}") from e
+
+        self._runs[run_id] = FlowStatus.COMPLETED
+
+        # 事件发布独立于图执行状态，失败不回写 FAILED
+        try:
+            await self._publish_agent_decided(agent_id, result, run_id)
+        except Exception:
+            logger.exception("AgentDecided 事件发布异常 [run_id=%s]", run_id)
 
         return run_id
 
@@ -101,10 +105,13 @@ class LangGraphEngine:
 
         return self._runs.get(graph_run_id, FlowStatus.FAILED)
 
+    _SUPPORTED_GRAPHS = {"BasicAgent"}
+
     def _build_graph(self, graph_name: str, parameters: dict[str, Any]) -> Any:
         """构建并编译状态图
 
         根据 graph_name 选择对应的图定义，编译后返回可执行图。
+        MVP 阶段仅支持 BasicAgent，不支持的名称记录警告日志。
 
         Args:
             graph_name: 状态图名称
@@ -113,6 +120,13 @@ class LangGraphEngine:
         Returns:
             编译后的 CompiledStateGraph
         """
+        if graph_name not in self._SUPPORTED_GRAPHS:
+            logger.warning(
+                "未知的 graph_name '%s'，当前仅支持 %s，将使用 BasicAgent",
+                graph_name,
+                self._SUPPORTED_GRAPHS,
+            )
+
         from src.infrastructure.agent_orch.graphs.basic_agent_graph import (
             BasicAgentState,
             build_basic_agent_graph,
@@ -138,7 +152,9 @@ class LangGraphEngine:
             confidence=0.9,
         )
         publish_result = await self._event_publisher.publish(event)
-        if publish_result.is_full_failure:
+        if publish_result is None:
+            logger.warning("AgentDecided 事件发布返回 None [run_id=%s]", run_id)
+        elif publish_result.is_full_failure:
             logger.warning(
                 "AgentDecided 事件发布全部失败 [run_id=%s]: %s",
                 run_id,

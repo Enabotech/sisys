@@ -67,8 +67,7 @@ class OrchestrationService:
             工作流执行结果
 
         Raises:
-            ValueError: task 参数无效
-            NotImplementedError: agent_reasoning 由 Story 1.18b 实现
+            ValueError: task 参数无效或未知 task_type
         """
         if not task.flow_name:
             raise ValueError("flow_name 不能为空")
@@ -84,7 +83,10 @@ class OrchestrationService:
                 submitted_at=datetime.now(timezone.utc),
             )
         if task.task_type == "agent_reasoning":
-            graph_run_id = await self._agent_engine.submit_graph(task.flow_name, task.parameters)
+            graph_name = task.parameters.get("graph_name")
+            if not graph_name:
+                raise ValueError("agent_reasoning 任务必须在 parameters 中提供 graph_name")
+            graph_run_id = await self._agent_engine.submit_graph(graph_name, task.parameters)
             status = await self._agent_engine.get_graph_status(graph_run_id)
             return WorkflowResult(
                 flow_run_id=graph_run_id,

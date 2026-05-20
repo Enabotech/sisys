@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
-from src.infrastructure.agent_orch.nodes.agent_nodes import analysis_node, synthesis_node
+from src.infrastructure.agent_orch.nodes.agent_nodes import analyze_node, synthesize_node
 from src.infrastructure.agent_orch.schemas import BasicAgentState
 
 __all__ = ["BasicAgentState", "build_basic_agent_graph"]
@@ -31,11 +31,11 @@ def build_basic_agent_graph(graph: StateGraph) -> StateGraph:
     Returns:
         配置好节点的 StateGraph
     """
-    graph.add_node("analysis", analysis_node)
-    graph.add_node("synthesis", synthesis_node)
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("synthesize", synthesize_node)
 
-    graph.set_entry_point("analysis")
-    graph.add_edge("analysis", "synthesis")
-    graph.add_edge("synthesis", END)
+    graph.set_entry_point("analyze")
+    graph.add_edge("analyze", "synthesize")
+    graph.add_edge("synthesize", END)
 
     return graph

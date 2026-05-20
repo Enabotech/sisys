@@ -129,7 +129,9 @@ class TestLangGraphEngineProtocolCompliance:
 
         class FakePublisher:
             async def publish(self, event):
-                pass
+                from src.domain.events.publish_result import PublishResult
+
+                return PublishResult(event_id="fake", redis_success=True)
 
         engine = LangGraphEngine(config, FakePublisher())  # type: ignore[arg-type]
         assert isinstance(engine, AgentEnginePort)

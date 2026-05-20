@@ -139,7 +139,7 @@ class TestOrchestrationServiceExecute:
         service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
             flow_name="BasicAgent",
-            parameters={"task_description": "分析市场趋势", "agent_role": "analyst"},
+            parameters={"task_description": "分析市场趋势", "agent_role": "analyst", "graph_name": "BasicAgent"},
             task_type="agent_reasoning",
         )
 
@@ -147,7 +147,7 @@ class TestOrchestrationServiceExecute:
 
         mock_agent_engine.submit_graph.assert_called_once_with(
             "BasicAgent",
-            {"task_description": "分析市场趋势", "agent_role": "analyst"},
+            {"task_description": "分析市场趋势", "agent_role": "analyst", "graph_name": "BasicAgent"},
         )
         assert isinstance(result.status, FlowStatus)
 
@@ -211,4 +211,24 @@ class TestOrchestrationServiceValidation:
         task = WorkflowTask(flow_name="test/default", parameters={}, task_type="data_pipeline")
 
         with pytest.raises(ValueError, match="parameters"):
+            await service.execute(task)
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_missing_graph_name_for_agent_reasoning(
+        self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
+    ) -> None:
+        """agent_reasoning 缺少 graph_name 应抛出 ValueError"""
+        from src.application.services.orchestration_service import (
+            OrchestrationService,
+            WorkflowTask,
+        )
+
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
+        task = WorkflowTask(
+            flow_name="test",
+            parameters={"task_description": "test"},
+            task_type="agent_reasoning",
+        )
+
+        with pytest.raises(ValueError, match="graph_name"):
             await service.execute(task)

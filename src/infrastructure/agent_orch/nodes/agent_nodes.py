@@ -17,7 +17,7 @@ from typing import Any
 from src.infrastructure.agent_orch.schemas import BasicAgentState
 
 
-def analysis_node(state: BasicAgentState) -> dict[str, Any]:
+def analyze_node(state: BasicAgentState) -> dict[str, Any]:
     """分析节点
 
     MVP 简化实现：直接设置分析结果。
@@ -31,7 +31,7 @@ def analysis_node(state: BasicAgentState) -> dict[str, Any]:
     return {"analysis_result": f"分析完成: {state.get('task_description', '')}"}
 
 
-def synthesis_node(state: BasicAgentState) -> dict[str, Any]:
+def synthesize_node(state: BasicAgentState) -> dict[str, Any]:
     """综合节点
 
     MVP 简化实现：直接设置综合结果。

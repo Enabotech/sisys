@@ -10,6 +10,6 @@ Copyright:
 
 """
 
-from src.infrastructure.agent_orch.nodes.agent_nodes import analysis_node, synthesis_node
+from src.infrastructure.agent_orch.nodes.agent_nodes import analyze_node, synthesize_node
 
-__all__ = ["analysis_node", "synthesis_node"]
+__all__ = ["analyze_node", "synthesize_node"]
