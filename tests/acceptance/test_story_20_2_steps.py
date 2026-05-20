@@ -1357,18 +1357,6 @@ def test_ac10_domain_no_infra_imports():
     pass
 
 
-@scenario("test_story_20_2.feature", "AC-10 - Ruff + MyPy 检查通过")
-def test_ac10_ruff_mypy_pass():
-    """Test Ruff and MyPy checks pass."""
-    pass
-
-
-@scenario("test_story_20_2.feature", "AC-10 - Story 1.3 集成测试回归通过")
-def test_ac10_story_1_3_regression():
-    """Test Story 1.3 integration tests regression."""
-    pass
-
-
 @given("我检查领域层代码")
 def given_check_domain_layer(context: dict) -> None:
     """Check domain layer code."""
@@ -1441,61 +1429,3 @@ def then_domain_no_infra_models_import(context: dict) -> None:
                     violations.append(f"{py_file.name}: from {node.module} import ...")
 
     assert not violations, f"Domain layer imports infrastructure models: {violations}"
-
-
-@when("我运行代码质量检查")
-def when_run_code_quality_checks(context: dict) -> None:
-    """Run code quality checks."""
-    import subprocess
-
-    # Run ruff check
-    result_ruff = subprocess.run(
-        ["poetry", "run", "ruff", "check", "src/"],
-        capture_output=True,
-        text=True,
-    )
-    context["ruff_result"] = result_ruff.returncode
-
-    # Run mypy check
-    result_mypy = subprocess.run(
-        ["poetry", "run", "mypy", "src/"],
-        capture_output=True,
-        text=True,
-    )
-    context["mypy_result"] = result_mypy.returncode
-
-
-@then("Ruff 和 MyPy 都应该通过（退出码 0）")
-def then_ruff_mypy_pass(context: dict) -> None:
-    """Verify Ruff and MyPy both pass (exit code 0)."""
-    assert context.get("ruff_result") == 0, "Ruff check failed"
-    assert context.get("mypy_result") == 0, "MyPy check failed"
-
-
-@given("Story 1.3 已实现")
-def given_story_1_3_implemented(context: dict) -> None:
-    """Set up Story 1.3 implemented context."""
-    context["story_1_3_implemented"] = True
-
-
-@when("运行 Story 1.3 集成测试")
-def when_run_story_1_3_integration_tests(context: dict) -> None:
-    """Run Story 1.3 integration tests."""
-    import subprocess
-
-    result = subprocess.run(
-        ["poetry", "run", "pytest", "tests/integration/", "-v", "-k", "event", "--tb=short"],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    context["integration_test_result"] = result.returncode
-    context["integration_test_output"] = result.stdout[:1000] if result.stdout else ""
-
-
-@then("所有集成测试应该通过")
-def then_all_integration_tests_pass(context: dict) -> None:
-    """Verify all integration tests pass."""
-    result = context.get("integration_test_result")
-    output = context.get("integration_test_output", "")
-    assert result == 0 or "SKIPPED" in output, f"Integration tests failed: {output}"

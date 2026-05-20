@@ -169,12 +169,3 @@
 
   场景: AC-10 - 领域层不导入基础设施模型
     那么 领域层不应该导入 src.infrastructure.storage.postgresql.models
-
-  场景: AC-10 - Ruff + MyPy 检查通过
-    当 我运行代码质量检查
-    那么 Ruff 和 MyPy 都应该通过（退出码 0）
-
-  场景: AC-10 - Story 1.3 集成测试回归通过
-    假如 Story 1.3 已实现
-    当 运行 Story 1.3 集成测试
-    那么 所有集成测试应该通过

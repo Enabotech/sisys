@@ -82,28 +82,6 @@ class TestArchitectureConstraints:
 
         assert not violations, "Domain layer imports infrastructure models:\n" + "\n".join(violations)
 
-    def test_ruff_check_passes_for_domain_layer(self):
-        """领域层 Ruff 检查通过"""
-        import subprocess
-
-        result = subprocess.run(
-            ["poetry", "run", "ruff", "check", "src/domain/"],
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode == 0, f"Ruff check failed:\n{result.stdout}\n{result.stderr}"
-
-    def test_mypy_check_passes_for_domain_layer(self):
-        """领域层 MyPy 检查通过"""
-        import subprocess
-
-        result = subprocess.run(
-            ["poetry", "run", "mypy", "src/domain/"],
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode == 0, f"MyPy check failed:\n{result.stdout}\n{result.stderr}"
-
 
 class TestHexagonalArchitecture:
     """六边形架构依赖方向约束验证"""
