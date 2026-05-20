@@ -588,12 +588,14 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 #### SDD 架构约束验证测试
 
+> **已有覆盖**：`test_hexagonal_architecture_constraints.py` 已将 `prefect` 列入 `FORBIDDEN_DOMAIN_IMPORTS`，`.importlinter` 已禁止 domain 层导入 prefect。本 Story 需新增的验证项如下。
+
 - [ ] Subtask 4.1: 创建 `tests/unit/architecture/test_prefect_architecture.py`
-- [ ] Subtask 4.2: 验证 domain/application/interfaces 层零 Prefect 导入
+- [ ] Subtask 4.2: 验证 infrastructure/workflow/ 以外零 Prefect 导入（复用 `_scan_file_imports()` 模式）
 - [ ] Subtask 4.3: 验证 WorkflowEnginePort 仅使用 stdlib 类型
 - [ ] Subtask 4.4: 验证 PrefectEngine 满足 WorkflowEnginePort Protocol（结构化子类型检查）
 - [ ] Subtask 4.5: 验证 OrchestrationService 不导入 infrastructure 层
-- [ ] Subtask 4.6: 验证 RAGIndexed/ReportGenerated 注册于 ChannelRouter
+- [ ] Subtask 4.6: 验证 RAGIndexed/ReportGenerated 注册于 ChannelRouter（通过 `config/event_channels.yaml`）
 
 #### 集成测试
 
@@ -648,7 +650,7 @@ OrchestrationService.execute(task)
       status = await self.workflow_engine.get_flow_status(flow_run_id)
       return WorkflowResult(flow_run_id=flow_run_id, status=status, submitted_at=datetime.now(timezone.utc))
 
-# V1 (Story 1.18b 补充):
+# V1 (Story 1.18b 补充 — AgentEnginePort 尚不存在，此处仅为架构愿景):
 OrchestrationService.execute(task)
   if task.task_type == "data_pipeline":
       flow_run_id = await self.workflow_engine.submit_flow(...)
@@ -1048,3 +1050,5 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 32 | FlowStatus 放在 value_objects/ 与 SagaStatus 放在 ports/ 不一致，缺少位置决策依据 | P1 | 值对象 Schema 补充位置决策说明（跨层共享 vs 端口附属） | ✅ R8 |
 | 33 | WorkflowEnginePort Schema 缺少编码约定：`from __future__ import annotations` 和方法体用 `...` | P2 | 补充编码约定，与 EventPublisher/SagaStep 等端口一致 | ✅ R8 |
 | 34 | 事件 Schema 中 event_type 声明方式不精确，缺少 `field(default=..., init=False)` 模式说明 | P1 | 修正为完整 `field(default="RAGIndexed", init=False)` 声明格式，与 DocumentProcessed 一致 | ✅ R8 |
+| 35 | 架构测试未说明已有覆盖：test_hexagonal_architecture_constraints.py 已有 prefect 禁止导入，.importlinter 已配置 | P1 | Subtask 4.1 补充已有覆盖说明，明确需新增的验证项，引用 `_scan_file_imports()` 模式 | ✅ R9 |
+| 36 | 伪代码 "V1 (Story 1.18b)" 引用 `self.agent_engine` 但 AgentEnginePort 不存在，易混淆 | P2 | 补充说明 "AgentEnginePort 尚不存在，此处仅为架构愿景" | ✅ R9 |
