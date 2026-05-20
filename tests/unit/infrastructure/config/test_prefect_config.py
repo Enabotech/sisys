@@ -72,3 +72,25 @@ class TestPrefectConfigFrozen:
         config = PrefectConfig()
         with pytest.raises(AttributeError):
             config.api_url = "http://changed"  # type: ignore[misc]
+
+
+class TestPrefectConfigEmptyEnv:
+    """空字符串环境变量处理测试"""
+
+    @patch.dict(os.environ, {"PREFECT_RETRY_MAX_ATTEMPTS": ""})
+    def test_from_env_empty_string_uses_default(self) -> None:
+        """空字符串环境变量应使用默认值"""
+        config = PrefectConfig.from_env()
+        assert config.retry_max_attempts == 3
+
+    @patch.dict(os.environ, {"PREFECT_API_URL": ""})
+    def test_from_env_empty_api_url_uses_default(self) -> None:
+        """空字符串 API URL 应使用默认值"""
+        config = PrefectConfig.from_env()
+        assert config.api_url == "http://localhost:4200/api"
+
+    @patch.dict(os.environ, {"PREFECT_FLOW_TIMEOUT_SECONDS": "7200"})
+    def test_from_env_valid_override(self) -> None:
+        """有效数字覆盖应正常工作"""
+        config = PrefectConfig.from_env()
+        assert config.flow_timeout_seconds == 7200
