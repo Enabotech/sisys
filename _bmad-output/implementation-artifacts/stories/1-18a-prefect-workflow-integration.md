@@ -59,11 +59,10 @@
 | `EventPublisher` 端口 | `src/domain/ports/event_publisher.py` | PrefectEngine 注入，Flow 完成后发布事件（`async def publish(event: DomainEvent) -> PublishResult`，导入路径为 `src.domain.ports.event_publisher`，不在 `__init__.py` 的 `__all__` 中） |
 | `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（含 `is_success`/`is_full_failure` 属性），PrefectEngine 需检查并记录失败 |
 | `DomainEvent` 基类 | `src/domain/events/base.py` | RAGIndexed/ReportGenerated 继承 |
-| `ChannelRouter` | `src/infrastructure/messaging/channel_router.py` | 新增 RAGIndexed/ReportGenerated 映射 |
+| `ChannelRouter` | `src/infrastructure/messaging/channel_router.py` | 新增 RAGIndexed/ReportGenerated 映射（通过 `config/event_channels.yaml`） |
 | `PortRegistry` + `register_port` | `src/domain/ports/registry.py` | 注册 WorkflowEnginePort |
 | `Composition Root` | `src/composition_root.py` | DI 注册 workflow 端口 |
 | `DocumentProcessed` 事件 | `src/domain/events/document_events.py` | DocumentProcessingFlow 完成后发布 |
-| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果 |
 | `PrefectConfig` 模式参考 | `src/infrastructure/config/redis.py` | from_env() + frozen dataclass 模式 |
 | `AutoExecuteService` 模式 | `src/domain/services/auto_execute_service.py` | 事件驱动执行模式参考 |
 | `SagaOrchestrator` 模式 | `src/infrastructure/saga/saga_orchestrator.py` | 多步骤编排模式参考 |
@@ -146,7 +145,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **Given** OrchestrationService 在应用层
 **When** 提交 `WorkflowTask`（task_type="data_pipeline"）
 **Then** OrchestrationService 委托给 `WorkflowEnginePort`（通过注入）
-**And** 返回 `WorkflowResult`（包含 flow_run_id 和 status）
+**And** 返回 `WorkflowResult`（包含 flow_run_id、status、submitted_at）
 **And** MVP 仅支持 data_pipeline 路由，agent_reasoning 由 Story 1.18b 补充
 
 **验证标准/Validation Criteria:**
@@ -168,7 +167,6 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 **验证标准/Validation Criteria:**
 - [ ] RAGIndexed 事件（`src/domain/events/workflow_events.py`）
 - [ ] ReportGenerated 事件（同文件）
-- [ ] ChannelRouter DEFAULT_MAPPINGS 更新
 - [ ] `config/event_channels.yaml` 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
 - [ ] `src/domain/events/__init__.py` 导出更新
 - [ ] 事件序列化/反序列化 roundtrip 测试通过
@@ -200,7 +198,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 - [ ] composition_root.py 新增 workflow 注册段
 - [ ] WorkflowEnginePort → PrefectEngine（SINGLETON）
 - [ ] OrchestrationService 注册（SINGLETON）
-- [ ] 契约测试（`tests/contracts/test_workflow_engine_contract.py`）
+- [ ] 契约测试（`tests/contracts/test_port_contract_workflow_engine.py`）
 
 ### AC-8: 架构约束验证
 
@@ -290,7 +288,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 注册 workflow_engine + orchestration_service
-- [ ] 契约测试：tests/contracts/test_workflow_engine_contract.py
+- [ ] 契约测试：tests/contracts/test_port_contract_workflow_engine.py
 - [ ] 端口版本：v1.0.0，owner=platform-team
 
 #### 验收标准 Gherkin (Acceptance Tests)
@@ -341,7 +339,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | **TDD 单元测试** | RAGIndexed/ReportGenerated | 事件 roundtrip | `test_workflow_events.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1_18a.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_1_18a_steps.py` | Task 0 |
-| **TDD 契约测试** | WorkflowEnginePort | 端口注册/解析/兼容性 | `test_workflow_engine_contract.py` | Task 3 |
+| **TDD 契约测试** | WorkflowEnginePort | 端口注册/解析/兼容性 | `test_port_contract_workflow_engine.py` | Task 3 |
 | **SDD 架构验证** | 六边形约束 | 零越界 Prefect 导入 | `test_prefect_architecture.py` | Task 4 |
 | **集成测试** | 端到端流程 | OrchestrationService → PrefectEngine → 事件发布 | `test_story_1_18a_integration.py` | Task 4 |
 
@@ -388,13 +386,14 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | AC-1 | FlowStatus 值对象 | Task 1 | 1.1-1.3（FlowStatus 红→绿→重构） | `test_flow_status.py` |
 | AC-1 | WorkflowEnginePort Protocol | Task 1 | 1.4-1.6（Protocol 红→绿→重构） | `test_workflow_engine.py` |
 | AC-2 | PrefectEngine 实现 | Task 2 | 2.4-2.6（PrefectEngine 红→绿→重构） | `test_prefect_engine.py` |
-| AC-3 | DocumentProcessingFlow | Task 3 | 3.1-3.3（Flow 红→绿→重构） | `test_document_processing_flow.py` |
-| AC-3 | 事件发布验证 | Task 3 | 3.4-3.5（事件发布 mock 验证） | `test_document_processing_flow.py` |
-| AC-4 | OrchestrationService | Task 3 | 3.6-3.8（路由逻辑 红→绿→重构） | `test_orchestration_service.py` |
-| AC-5 | RAGIndexed/ReportGenerated | Task 3 | 3.12-3.14（事件定义+路由注册） | `test_workflow_events.py` |
+| AC-3 | DocumentProcessingFlow | Task 3 | 3.1-3.3（Flow 红→绿→重构，含事件发布验证） | `test_document_processing_flow.py` |
+| AC-3 | 事件发布验证 | Task 3 | 3.1-3.3（Flow 测试内验证 EventPublisher.publish 调用） | `test_document_processing_flow.py` |
+| AC-4 | OrchestrationService | Task 3 | 3.4-3.6（路由逻辑 红→绿→重构） | `test_orchestration_service.py` |
+| AC-5 | RAGIndexed/ReportGenerated | Task 3 | 3.7-3.9（事件定义+路由注册） | `test_workflow_events.py` |
 | AC-6 | PrefectConfig | Task 2 | 2.1-2.3（Config 红→绿→重构） | `test_prefect_config.py` |
-| AC-7 | Composition Root 注册 | Task 3 | 3.9-3.11（端口注册+契约测试） | `test_composition_root_workflow.py` |
-| AC-7 | 端口契约测试 | Task 3 | 3.9 | `test_workflow_engine_contract.py` |
+| AC-7 | Composition Root 注册 | Task 3 | 3.10-3.12（端口注册+契约测试） | `test_port_contract_workflow_engine.py` |
+| AC-7 | 端口契约测试 | Task 3 | 3.11（契约测试） | `test_port_contract_workflow_engine.py` |
+| AC-7 | Composition Root 注册验证 | Task 3 | 3.12（注册链路验证） | `test_composition_root_workflow.py` |
 | AC-8 | 架构约束验证 | Task 4 | 4.1-4.6 | `test_prefect_architecture.py` |
 | 全部 | 集成测试 | Task 4 | 4.7-4.9（端到端流程） | `test_story_1_18a_integration.py` |
 
@@ -406,7 +405,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 ### Task 0: SDD 规范定义（必选前置）
 
-**关联 AC:** AC-1, AC-5
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7
 
 > **目的：** 在进入代码实现前，明确端口、事件、配置、验收标准。
 
@@ -538,20 +537,20 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | 🔄 重构 | 更新 `__init__.py` 导出 |
 
 - [ ] Subtask 3.7: 🔴 红 — 编写 RAGIndexed + ReportGenerated 事件测试
-- [ ] Subtask 3.8: 🟢 绿 — 实现工作流事件 + ChannelRouter 映射
+- [ ] Subtask 3.8: 🟢 绿 — 实现工作流事件 + 更新 `config/event_channels.yaml` 映射
 - [ ] Subtask 3.9: 🔄 重构 — 更新 events `__init__.py`
 
 #### DI 注册 + 契约测试
 
 - [ ] Subtask 3.10: 更新 `src/composition_root.py`（注册 workflow_engine + orchestration_service）
-- [ ] Subtask 3.11: 编写 `tests/contracts/test_workflow_engine_contract.py`（端口注册/解析/兼容性）
+- [ ] Subtask 3.11: 编写 `tests/contracts/test_port_contract_workflow_engine.py`（端口注册/解析/兼容性）
 - [ ] Subtask 3.12: 验证 composition_root 注册链路
 
 **完成标准/Definition of Done:**
 - [ ] DocumentProcessingFlow 执行通过（mock 任务）
 - [ ] DocumentProcessed 事件发布验证
 - [ ] OrchestrationService 路由逻辑正确
-- [ ] RAGIndexed/ReportGenerated 事件定义 + ChannelRouter 映射
+- [ ] RAGIndexed/ReportGenerated 事件定义 + `config/event_channels.yaml` 映射
 - [ ] Composition Root 注册完成
 - [ ] 契约测试通过
 - [ ] TDD 循环全部通过
@@ -620,12 +619,16 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 # MVP (本 Story):
 OrchestrationService.execute(task)
   if task.task_type == "data_pipeline":
-      return self.workflow_engine.submit_flow(task.flow_name, task.parameters)
+      flow_run_id = await self.workflow_engine.submit_flow(task.flow_name, task.parameters)
+      status = await self.workflow_engine.get_flow_status(flow_run_id)
+      return WorkflowResult(flow_run_id=flow_run_id, status=status, submitted_at=datetime.now(timezone.utc))
 
 # V1 (Story 1.18b 补充):
 OrchestrationService.execute(task)
   if task.task_type == "data_pipeline":
-      return self.workflow_engine.submit_flow(...)
+      flow_run_id = await self.workflow_engine.submit_flow(...)
+      status = await self.workflow_engine.get_flow_status(flow_run_id)
+      return WorkflowResult(flow_run_id=flow_run_id, status=status, submitted_at=datetime.now(timezone.utc))
   elif task.task_type == "agent_reasoning":
       return self.agent_engine.execute(...)
   else:
@@ -711,7 +714,7 @@ sisys/
 │   │   │       └── test_document_processing_flow.py
 │   │   ├── architecture/test_prefect_architecture.py
 │   │   └── test_composition_root_workflow.py
-│   ├── contracts/test_workflow_engine_contract.py
+│   ├── contracts/test_port_contract_workflow_engine.py
 │   ├── integration/test_story_1_18a_integration.py
 │   └── acceptance/
 │       ├── test_story_1_18a.feature
@@ -811,7 +814,7 @@ sisys/
 - `tests/unit/application/services/test_orchestration_service.py`
 - `tests/unit/test_composition_root_workflow.py`
 - `tests/unit/architecture/test_prefect_architecture.py`
-- `tests/contracts/test_workflow_engine_contract.py`
+- `tests/contracts/test_port_contract_workflow_engine.py`
 - `tests/integration/test_story_1_18a_integration.py`
 - `tests/acceptance/test_story_1_18a.feature`
 - `tests/acceptance/test_story_1_18a_steps.py`
@@ -819,7 +822,7 @@ sisys/
 **更新的文件/Updated Files:**
 - `src/domain/ports/__init__.py` — 导出 WorkflowEnginePort
 - `src/domain/events/__init__.py` — 导出 RAGIndexed, ReportGenerated
-- `src/infrastructure/messaging/channel_router.py` — 新增 RAGIndexed/ReportGenerated 到 DEFAULT_MAPPINGS
+- `config/event_channels.yaml` — 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
 - `src/composition_root.py` — 注册 workflow_engine + orchestration_service
 
 **已有文件（复用，禁止修改）:**
@@ -839,7 +842,7 @@ sisys/
 | **架构原则** | 六边形架构，领域层零依赖 | architecture.md §3.1 |
 | **ADR-002** | 双核引擎：Prefect=数据管道，LangGraph=Agent推理 | architecture.md §3.2 |
 | **Prefect 导入边界** | 所有 `import prefect` 限定于 `src/infrastructure/workflow/` | test_hexagonal_architecture_constraints.py |
-| **测试覆盖率** | 架构层≥85%，集成测试≥75% | story-template.md |
+| **测试覆盖率** | 架构层≥85%，集成测试≥70% | story-template.md |
 | **Prefect 版本** | 3.6.16+（pyproject.toml 锁定 3.6.25） | pyproject.toml |
 
 ### 关键路径依赖
@@ -876,7 +879,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | **依赖 Story** | Story 1.1（架构骨架）、Story 1.3（事件总线） |
 | **前置条件** | 六边形架构骨架就绪、事件总线就绪、Prefect 3.6+ 依赖已声明 |
 | **后续 Story** | Story 1.18b（LangGraph Agent 编排） |
-| **覆盖率要求** | 架构层≥85%，集成测试≥75% |
+| **覆盖率要求** | 架构层≥85%，集成测试≥70% |
 
 ### 完成总结 Completion Summary
 
@@ -916,7 +919,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-19
 **最后更新/Last Updated:** 2026-05-20
-**更新说明:** Round 1 审查修正 — 修正事件路由注册方式(YAML非DEFAULT_MAPPINGS)、明确EventPublisher导入路径和PublishResult处理、补充DocumentProcessed事件构造说明。
+**更新说明:** Round 2 审查修正 — 修正残留DEFAULT_MAPPINGS引用、追溯矩阵对齐、覆盖率统一、pseudocode WorkflowResult构造、文件清单修正、Task 0 AC覆盖扩展。
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -926,3 +929,12 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 2 | EventPublisher 不在 domain/ports/__init__.py __all__ 中，导入路径未明确 | P0 | 现有代码继承表补充导入路径 `src.domain.ports.event_publisher` 和 PublishResult 类型说明 | ✅ R1 |
 | 3 | EventPublisher.publish() 返回 PublishResult（非 None），Story 未说明处理方式 | P0 | AC-3 补充 PublishResult 检查要求（is_full_failure 记录警告日志） | ✅ R1 |
 | 4 | DocumentProcessed 事件已有完整定义（含 document_id/parse_result/embedding 字段），Story 未说明 Flow 完成后如何构造事件实例 | P0 | AC-3 补充事件构造时需传入的具体字段 | ✅ R1 |
+| 5 | AC-5 验证标准残留 `ChannelRouter DEFAULT_MAPPINGS 更新` | P0 | 删除残留项，保留 `config/event_channels.yaml` 映射 | ✅ R2 |
+| 6 | 现有代码继承表 PublishResult 重复出现（行60和66） | P1 | 删除重复条目，合并到 EventPublisher 行 | ✅ R2 |
+| 7 | AC-4 Then 子句缺少 `submitted_at` 字段 | P1 | 补充 `submitted_at` 到 WorkflowResult 返回描述 | ✅ R2 |
+| 8 | Dev Notes pseudocode 未构造 WorkflowResult | P1 | MVP/V1 pseudocode 补充 WorkflowResult 构造逻辑 | ✅ R2 |
+| 9 | 集成测试覆盖率 70% vs 75% 矛盾（3处引用不一致） | P1 | 统一为 70%（对齐 story-template.md） | ✅ R2 |
+| 10 | Subtask 3.8 描述错误（"ChannelRouter 映射"应为"event_channels.yaml 映射"） | P2 | 修正为"更新 `config/event_channels.yaml` 映射" | ✅ R2 |
+| 11 | 文件清单错误列出 `channel_router.py`，缺少 `config/event_channels.yaml` | P0 | 替换为 `config/event_channels.yaml` | ✅ R2 |
+| 12 | Task 0 AC 覆盖不完整（仅 AC-1, AC-5） | P1 | 扩展为 AC-1~AC-7 全覆盖 | ✅ R2 |
+| 13 | 追溯矩阵缺少 `test_composition_root_workflow.py` 行 | P1 | 新增 AC-7 Composition Root 注册验证行，关联 Subtask 3.12 | ✅ R2 |
