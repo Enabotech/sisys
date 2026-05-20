@@ -36,6 +36,7 @@ from .memory_events import MemoryChanged
 from .planning_events import StrategicDeviationWarning
 from .routing_events import RoutingDecided
 from .tool_events import ToolExecuted
+from .workflow_events import RAGIndexed, ReportGenerated
 
 __all__ = [
     "DomainEvent",
@@ -68,4 +69,6 @@ __all__ = [
     "CrossBorderTransferRequested",
     "DataSovereigntyViolation",
     "PIPLDataAccessRequested",
+    "RAGIndexed",
+    "ReportGenerated",
 ]

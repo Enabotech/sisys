@@ -1,34 +1,140 @@
 # Event Channel Configuration
 # Maps event types to their delivery channels
+#
+# 优先级：本文件 > ChannelRouter.DEFAULT_MAPPINGS
+# - 本文件: 运行时主配置，支持多环境差异化和运维独立调整
+# - DEFAULT_MAPPINGS: 编译时 baseline，确保本文件缺失/不完整时系统可用
+# 新增事件应同时更新两处，保持同步
 
 event_channels:
+  # =========================================================================
+  # REALTIME 事件（Redis pub/sub，尽力交付）
+  # =========================================================================
+  AutoExecuted:
+    redis_channel: "sisys:rt:auto_executed"
+    delivery_mode: "realtime"
+    description: "自动化执行完成"
+
   AutoTriggered:
     redis_channel: "sisys:rt:auto_triggered"
     delivery_mode: "realtime"
-    description: "Trigger event, real-time notification"
+    description: "触发事件，实时通知"
 
   AutoRouted:
     redis_channel: "sisys:rt:auto_routed"
     delivery_mode: "realtime"
-    description: "Routing decision completed"
+    description: "路由决策完成"
 
+  HeartbeatTriggered:
+    redis_channel: "sisys:rt:heartbeat_triggered"
+    delivery_mode: "realtime"
+    description: "心跳触发"
+
+  RoutingDecided:
+    redis_channel: "sisys:rt:routing_decided"
+    delivery_mode: "realtime"
+    description: "路由决策完成"
+
+  # =========================================================================
+  # RELIABLE 事件（RabbitMQ + Outbox，保证交付）
+  # =========================================================================
   DocumentProcessed:
     redis_channel: "sisys:rt:document_processed"
     rabbitmq_routing_key: "sisys.events.reliable.document_processed"
     delivery_mode: "reliable"
-    description: "Document processing completed"
+    description: "文档处理完成"
 
   MemoryChanged:
     rabbitmq_routing_key: "sisys.events.reliable.memory_changed"
     delivery_mode: "reliable"
-    description: "Memory changed"
+    description: "记忆变更"
 
   CheckpointReached:
     rabbitmq_routing_key: "sisys.events.reliable.checkpoint_reached"
     delivery_mode: "reliable"
-    description: "Checkpoint reached"
+    description: "检查点到达"
 
   AuditEvent:
     rabbitmq_routing_key: "audit.audit_event"
     delivery_mode: "reliable"
-    description: "Audit event"
+    description: "审计事件"
+
+  ToolExecuted:
+    rabbitmq_routing_key: "sisys.events.reliable.tool_executed"
+    delivery_mode: "reliable"
+    description: "工具执行完成"
+
+  AgentDecided:
+    rabbitmq_routing_key: "sisys.events.reliable.agent_decided"
+    delivery_mode: "reliable"
+    description: "Agent决策完成"
+
+  CheckpointRecovered:
+    rabbitmq_routing_key: "sisys.events.reliable.checkpoint_recovered"
+    delivery_mode: "reliable"
+    description: "检查点恢复"
+
+  IsolationLevelSwitched:
+    rabbitmq_routing_key: "sisys.events.reliable.isolation_level_switched"
+    delivery_mode: "reliable"
+    description: "隔离级别切换"
+
+  CorrectionApproved:
+    rabbitmq_routing_key: "sisys.events.reliable.correction_approved"
+    delivery_mode: "reliable"
+    description: "纠正审批通过"
+
+  StrategicDeviationWarning:
+    rabbitmq_routing_key: "sisys.events.reliable.strategic_deviation_warning"
+    delivery_mode: "reliable"
+    description: "战略偏差警告"
+
+  MFAChallengeIssuedEvent:
+    rabbitmq_routing_key: "sisys.events.reliable.mfa_challenge_issued_event"
+    delivery_mode: "reliable"
+    description: "MFA挑战发出"
+
+  IntrusionDetectedEvent:
+    rabbitmq_routing_key: "sisys.events.reliable.intrusion_detected_event"
+    delivery_mode: "reliable"
+    description: "入侵检测"
+
+  DataIntegrityViolationEvent:
+    rabbitmq_routing_key: "sisys.events.reliable.data_integrity_violation_event"
+    delivery_mode: "reliable"
+    description: "数据完整性违规"
+
+  SensitiveDataDetected:
+    rabbitmq_routing_key: "sisys.events.reliable.sensitive_data_detected"
+    delivery_mode: "reliable"
+    description: "敏感数据检测"
+
+  CrossBorderTransferRequested:
+    rabbitmq_routing_key: "sisys.events.reliable.cross_border_transfer_requested"
+    delivery_mode: "reliable"
+    description: "跨境传输请求"
+
+  DataSovereigntyViolation:
+    rabbitmq_routing_key: "sisys.events.reliable.data_sovereignty_violation"
+    delivery_mode: "reliable"
+    description: "数据主权违规"
+
+  PIPLDataAccessRequested:
+    rabbitmq_routing_key: "sisys.events.reliable.pipl_data_access_requested"
+    delivery_mode: "reliable"
+    description: "个人信息保护法数据访问请求"
+
+  SagaStatusChanged:
+    rabbitmq_routing_key: "sisys.events.reliable.saga_status_changed"
+    delivery_mode: "reliable"
+    description: "Saga状态变更"
+
+  RAGIndexed:
+    rabbitmq_routing_key: "sisys.events.reliable.rag_indexed"
+    delivery_mode: "reliable"
+    description: "RAG索引完成"
+
+  ReportGenerated:
+    rabbitmq_routing_key: "sisys.events.reliable.report_generated"
+    delivery_mode: "reliable"
+    description: "报告生成完成"

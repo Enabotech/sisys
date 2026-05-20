@@ -1,7 +1,9 @@
 """基础设施层事件总线配置加载模块
 
-从 YAML 配置文件加载事件通道映射，通过 ChannelRouter 注册事件类型到
-传输通道（Redis 或 RabbitMQ）的路由关系
+从 config/event_channels.yaml 加载事件通道映射，覆盖 ChannelRouter.DEFAULT_MAPPINGS
+
+优先级：YAML 配置 > DEFAULT_MAPPINGS（baseline fallback）
+新增事件必须同时更新两处以保持同步
 
 Author:
     agimtech <agimtech@126.com>
@@ -26,7 +28,8 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "e
 class EventBusConfigLoader:
     """事件通道配置加载器
 
-    从 YAML 文件加载通道配置，通过 ChannelRouter.register() 注册
+    从 YAML 文件加载通道配置，覆盖 DEFAULT_MAPPINGS 基线。
+    YAML 配置优先，支持多环境差异化和运维独立调整。
     """
 
     @classmethod

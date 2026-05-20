@@ -53,6 +53,11 @@ class ChannelRouter:
     """
 
     # 预定义映射（Story 1.3 规范）
+    #
+    # 优先级：config/event_channels.yaml > DEFAULT_MAPPINGS
+    # - DEFAULT_MAPPINGS: 编译时 baseline，确保 YAML 缺失/不完整时系统可用
+    # - event_channels.yaml: 运行时主配置，支持多环境差异化和运维独立调整
+    # 新增事件应同时更新两处，保持同步
     DEFAULT_MAPPINGS: dict[str, ChannelMapping] = {
         # REALTIME 事件（5个）
         "AutoExecuted": ChannelMapping(
@@ -85,7 +90,7 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.REALTIME,
             description="路由决策完成",
         ),
-        # RELIABLE 事件（20个）
+        # RELIABLE 事件（22个）
         "DocumentProcessed": ChannelMapping(
             event_type="DocumentProcessed",
             redis_channel="sisys:rt:document_processed",
@@ -194,6 +199,18 @@ class ChannelRouter:
             rabbitmq_routing_key="sisys.events.reliable.saga_status_changed",
             delivery_mode=DeliveryMode.RELIABLE,
             description="Saga状态变更",
+        ),
+        "RAGIndexed": ChannelMapping(
+            event_type="RAGIndexed",
+            rabbitmq_routing_key="sisys.events.reliable.rag_indexed",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="RAG索引完成",
+        ),
+        "ReportGenerated": ChannelMapping(
+            event_type="ReportGenerated",
+            rabbitmq_routing_key="sisys.events.reliable.report_generated",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="报告生成完成",
         ),
     }
 

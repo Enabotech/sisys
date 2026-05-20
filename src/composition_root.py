@@ -836,6 +836,41 @@ def bootstrap() -> None:
         tags=("storage", "gateway", "application", "unified"),
     )
 
+    # Workflow Engine — Prefect 工作流引擎适配器
+    from src.domain.ports.workflow_engine import WorkflowEnginePort
+    from src.infrastructure.config.prefect import PrefectConfig
+    from src.infrastructure.workflow.prefect_engine import PrefectEngine
+
+    register_port(
+        name="workflow_engine",
+        version="v1.0.0",
+        interface=WorkflowEnginePort,
+        impl=lambda resolver: PrefectEngine(
+            PrefectConfig.from_env(),
+            resolver.resolve("event_publisher"),
+        ),
+        module="src.infrastructure.workflow.prefect_engine",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("workflow", "prefect"),
+    )
+
+    # OrchestrationService — 应用层编排服务
+    from src.application.services.orchestration_service import OrchestrationService
+
+    register_port(
+        name="orchestration_service",
+        version="v1.0.0",
+        interface=OrchestrationService,
+        impl=lambda resolver: OrchestrationService(
+            resolver.resolve("workflow_engine"),
+        ),
+        module="src.application.services.orchestration_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("orchestration", "application"),
+    )
+
     logger.info("Registered %d ports", len(_global_registry.list_all()))
 
 

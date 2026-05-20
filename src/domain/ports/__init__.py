@@ -39,6 +39,7 @@ from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProt
 from src.domain.ports.storage_enums import DataAccessPattern, StorageLayer, StorageTier
 from src.domain.ports.unified_storage import UnifiedStoragePort
 from src.domain.ports.unit_of_work import UnitOfWork
+from src.domain.ports.workflow_engine import WorkflowEnginePort
 
 __all__ = [
     "ConnectionManager",
@@ -67,4 +68,5 @@ __all__ = [
     "StorageTier",
     "UnifiedStoragePort",
     "UnitOfWork",
+    "WorkflowEnginePort",
 ]
