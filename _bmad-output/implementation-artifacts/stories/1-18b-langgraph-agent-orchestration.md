@@ -170,12 +170,12 @@ DualChannelEventBus → Outbox/RabbitMQ
 **And** 返回 `WorkflowResult`（包含 flow_run_id、status、submitted_at）
 **And** 构造函数从 `__init__(self, workflow_engine)` 扩展为 `__init__(self, workflow_engine, agent_engine)`
 **And** 第 82 行 `NotImplementedError` 替换为实际 agent_reasoning 路由逻辑
-**And** agent_reasoning 分支应包含参数校验：`graph_name` 不能为空（与 data_pipeline 的 `flow_name` 校验对称）
+**And** agent_reasoning 分支应包含参数校验：`parameters['graph_name']` 不能为空（与 data_pipeline 的 `flow_name` 校验对称，`graph_name` 存储在 parameters dict 中）
 
 **验证标准/Validation Criteria:**
 - [ ] OrchestrationService 构造函数新增 `agent_engine: AgentEnginePort` 参数
 - [ ] `execute()` 方法 `agent_reasoning` 分支替换 `NotImplementedError`
-- [ ] agent_reasoning 分支参数校验（graph_name 非空）
+- [ ] agent_reasoning 分支参数校验（parameters['graph_name'] 非空）
 - [ ] 仅依赖 AgentEnginePort 端口（不导入 infrastructure 层）
 - [ ] `data_pipeline` 路由逻辑不变（回归测试）
 - [ ] 现有测试更新：9个测试方法需添加 `mock_agent_engine` 参数
@@ -281,7 +281,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - 构造函数新增：`agent_engine: AgentEnginePort` 参数
   - `execute()` 中 `agent_reasoning` 分支替换 `NotImplementedError`
   - 仅依赖端口接口（不导入 infrastructure 层）
-  - 新增 `TYPE_CHECKING` 块导入 `AgentEnginePort`（参考现有 WorkflowEnginePort 导入模式，第21-22行）
+  - 新增 `TYPE_CHECKING` 块导入 `AgentEnginePort`（参考 orchestration_service.py 现有 TYPE_CHECKING 导入模式，第21-22行）
   - 更新 `composition_root.py` 第858-872行 `orchestration_service` 注册（当前 interface=OrchestrationService 类本身，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）
 
 #### 统一端口注册与接口治理
@@ -743,7 +743,7 @@ DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 | BLM 六阶段状态图 | ❌ 不实现 | Epic 5/6 |
 | BEM 六阶段状态图 | ❌ 不实现 | Epic 15 |
 | 多 Agent 协作图 | ❌ 不实现 | Epic 9 |
-| Checkpoint 双模式恢复 | ✅ InMemorySaver（MVP） | Story 6.6（PostgreSQL Checkpointer + Replay/Override） |
+| Checkpoint 持久化 | ✅ InMemorySaver（MVP） | Story 6.6（PostgreSQL Checkpointer + Replay/Override） |
 | OrchestrationService | ✅ 双引擎路由 | 同 |
 | SYS Agent 裁决 | ❌ 不实现 | Story 9.6 |
 | CheckpointReached 事件 | ✅ 定义（Graph 可选发布） | Story 6.3 完整实现 |
