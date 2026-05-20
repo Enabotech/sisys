@@ -167,6 +167,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 **And** 返回 `WorkflowResult`（包含 flow_run_id、status、submitted_at）
 **And** 构造函数从 `__init__(self, workflow_engine)` 扩展为 `__init__(self, workflow_engine, agent_engine)`
 **And** 第 82 行 `NotImplementedError` 替换为实际 agent_reasoning 路由逻辑
+**And** agent_reasoning 分支应包含参数校验：`graph_name` 不能为空（与 data_pipeline 的 `flow_name` 校验对称）
 
 **验证标准/Validation Criteria:**
 - [ ] OrchestrationService 构造函数新增 `agent_engine: AgentEnginePort` 参数
@@ -487,6 +488,14 @@ DualChannelEventBus → Outbox/RabbitMQ
 
 #### TDD 循环 [B]：OrchestrationService 扩展
 
+> **⚠️ 现有测试影响分析**：`tests/unit/application/services/test_orchestration_service.py` 当前包含 9 个测试方法，添加 `agent_engine` 参数后以下测试需更新：
+> - `TestOrchestrationServiceProtocolCompliance.test_only_depends_on_workflow_engine_port` — AST 检查需扩展
+> - `TestOrchestrationServiceExecute` 全部 4 个测试 — 构造函数调用需添加 `mock_agent_engine` 参数
+> - `TestOrchestrationServiceValidation` 全部 2 个测试 — 同上
+> - `test_execute_agent_reasoning_raises_not_implemented` — 替换为 agent_reasoning 路由测试
+>
+> 另需更新 `tests/integration/test_story_1_18a_integration.py` 中 `test_data_pipeline_full_chain` 的构造调用。
+
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/application/services/test_orchestration_service.py` 新增测试（验证 agent_reasoning 路由到 AgentEnginePort、双引擎协调、data_pipeline 回归） |
@@ -685,7 +694,7 @@ BasicAgentGraph (StateGraph)
   ├── analyze(state)  → {"analysis_result": "...", "messages": [...]}   (node, MVP mock)
   └── synthesize(state) → {"synthesis_result": "...", "messages": [...]} (node, MVP mock)
   ↓ 完成回调
-EventPublisher.publish(AgentDecided(agent_id=..., decision_result=..., confidence=...))
+EventPublisher.publish(AgentDecided(agent_id=uuid.UUID(...), decision_result={...}, confidence=0.9))
   ↓
 DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 ```
@@ -822,6 +831,9 @@ sisys/
 
 ### 文件清单 File List
 
+**创建的文件/Created Files:**
+- `_bmad-output/implementation-artifacts/stories/1-18b-langgraph-agent-orchestration.md` — 本故事文件
+
 **待创建的文件/To Be Created (Dev Story 实施):**
 
 领域层（Domain）:
@@ -905,7 +917,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | **Story ID** | 1.18b |
 | **Story Key** | 1-18b-langgraph-agent-orchestration |
 | **File** | `_bmad-output/implementation-artifacts/stories/1-18b-langgraph-agent-orchestration.md` |
-| **Status** | `backlog` → `ready-for-dev` |
+| **Status** | `backlog` → `ready-for-dev` → `in-progress` → `review` → `done` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 6: MVP 关键机制增强 |
 | **优先级** | P0-18b（ARCH LangGraph Agent 编排） |
