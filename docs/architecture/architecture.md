@@ -2346,6 +2346,43 @@ class SemanticCache:
 - 记忆系统的 L1 层由 Checkpoint 和会话状态缓存组成
 - 两者都使用 Redis，但职责不同
 
+### 11.x PostgreSQL Session 管理与注入标准
+
+#### Session 传递判定标准
+
+SISYS 系统 PostgreSQL AsyncSession 采用 **ContextVar 隐式传递**为主、**构造函数注入**为辅的混合模式。
+
+| 规则 | 适用场景 | 传递方式 | 典型组件 |
+|------|---------|---------|---------|
+| **R1: 默认 ContextVar** | 标准 CRUD 仓储和 UoW | `get_session()` 从 ContextVar 获取 | 12+ 个 Repository、PostgreSQLUnitOfWork |
+| **R2: 构造函数注入例外** | 需要非默认隔离级别或独立 session 生命周期 | 注入 `PostgreSQLManager` | AuditUnitOfWork (SERIALIZABLE) |
+| **R3: 后台任务显式 scope** | Poller/Saga 等后台任务 | `session_context()` 创建独立 scope | AsyncOutboxPoller、SagaOrchestrator |
+
+#### ContextVar 工作原理
+
+```python
+# src/infrastructure/storage/postgresql/session_context.py
+_session_ctx: ContextVar[AsyncSession | None] = ContextVar("pg_session", default=None)
+```
+
+- **HTTP 请求**：`SessionMiddleware` 创建 session → `set_session()` → Repository 通过 `get_session()` 获取 → Middleware finally 负责关闭
+- **后台任务**：`session_context(factory)` 创建独立 session scope，自动 commit/rollback/close/reset
+- **测试**：`with_session(mock)` 或 `set_session()/reset_session()` 设置 mock session
+
+#### 职责分离
+
+| 职责 | SessionMiddleware | session_context() | UoW | Repository |
+|------|------------------|-------------------|-----|-----------|
+| 创建 session | ✅ | ✅ | ❌ | ❌ |
+| 设置 ContextVar | ✅ | ✅ | ❌ | ❌ |
+| begin() | ❌ | ❌ | ✅ | ❌ |
+| commit() | ✅（兜底） | ✅ | ✅ | ❌ (仅 flush) |
+| rollback() | ✅（兜底） | ✅ | ✅ | ❌ |
+| close() | ✅ | ✅ | ❌ | ❌ |
+| 重置 ContextVar | ✅ | ✅ | ❌ | ❌ |
+
+> **详细开发指南**参见 `docs/developer/session-management.md`
+
 ---
 
 ## 12. 技术栈详细选型
