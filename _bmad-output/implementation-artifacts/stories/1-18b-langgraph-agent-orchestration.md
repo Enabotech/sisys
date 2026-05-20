@@ -115,9 +115,11 @@ DualChannelEventBus → Outbox/RabbitMQ
 **When** LangGraphConfig 加载
 **Then** 从环境变量读取，提供合理默认值
 **And** `LANGGRAPH_API_URL` 默认 `"http://localhost:8000"`（LangGraph Studio/Cloud，MVP 不使用但预留）
-**And** `LANGGRAPH_CHECKPOINT_TABLE` 默认 `"langgraph_checkpoints"`
+**And** `LANGGRAPH_CHECKPOINT_TABLE` 默认 `"langgraph_checkpoints"`（MVP 未使用，为 Story 6.6 PostgreSQL Checkpointer 预留）
 **And** `LANGGRAPH_RETRY_MAX_ATTEMPTS` 默认 `3`
-**And** `LANGGRAPH_TASK_TIMEOUT_SECONDS` 默认 `300`
+**And** `LANGGRAPH_RETRY_DELAY_SECONDS` 默认 `30`（重试间隔，与 PrefectConfig 对称）
+**And** `LANGGRAPH_TASK_TIMEOUT_SECONDS` 默认 `300`（节点级超时）
+**And** `LANGGRAPH_GRAPH_TIMEOUT_SECONDS` 默认 `1800`（整体图超时，与 PrefectConfig.flow_timeout_seconds 对称）
 **And** `@dataclass(frozen=True)` 不可变配置
 
 **验证标准/Validation Criteria:**
@@ -244,9 +246,11 @@ DualChannelEventBus → Outbox/RabbitMQ
 - [ ] LangGraphConfig 配置（`src/infrastructure/config/langgraph.py`）
   - `@dataclass(frozen=True)` — 不可变配置
   - api_url: str（LANGGRAPH_API_URL，默认 `"http://localhost:8000"`）
-  - checkpoint_table: str（LANGGRAPH_CHECKPOINT_TABLE，默认 `"langgraph_checkpoints"`）
+  - checkpoint_table: str（LANGGRAPH_CHECKPOINT_TABLE，默认 `"langgraph_checkpoints"`，MVP 未使用，Story 6.6 预留）
   - retry_max_attempts: int（LANGGRAPH_RETRY_MAX_ATTEMPTS，默认 3）
+  - retry_delay_seconds: int（LANGGRAPH_RETRY_DELAY_SECONDS，默认 30）
   - task_timeout_seconds: int（LANGGRAPH_TASK_TIMEOUT_SECONDS，默认 300）
+  - graph_timeout_seconds: int（LANGGRAPH_GRAPH_TIMEOUT_SECONDS，默认 1800）
   - from_env() 类方法
 
 #### 基础设施适配器 Schema (Infrastructure Adapters)
@@ -694,6 +698,11 @@ OrchestrationService.__init__(workflow_engine, agent_engine)
 - BasicAgentGraph 负责：图结构定义（StateGraph + nodes + edges）
 - schemas.py 负责：状态 TypedDict 定义（供 Engine 和 Graph 共享）
 - agent_nodes.py 负责：纯函数节点实现（不持有状态，不发布事件）
+
+**8. EventPublisher 使用差异（LangGraphEngine vs PrefectEngine）**
+- PrefectEngine 注入 EventPublisher 但当前未调用（Deployment 远程模式，Flow 内部由 DocumentProcessingFlow 发布事件）
+- LangGraphEngine 必须在 `submit_graph()` 完成后主动调用 `EventPublisher.publish(AgentDecided(...))`（本地 `ainvoke()` 模式，引擎可直接发布）
+- 发布后需检查 `result.is_full_failure` 并记录警告日志（参考 `document_processing_flow.py` 第62行模式）
 
 ### BasicAgentGraph 数据流
 
