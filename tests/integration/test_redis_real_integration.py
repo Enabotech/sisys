@@ -33,13 +33,14 @@ async def real_redis_client():
     Uses a unique test isolation prefix to prevent interference between
     parallel pytest-xdist workers sharing the same Redis DB.
     """
-    import os
+    from tests.environments import get_test_env
 
+    env_config = get_test_env()
     client = redis.Redis(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
-        db=int(os.getenv("REDIS_DB", "0")),
-        password=os.getenv("REDIS_PASSWORD") or None,
+        host=env_config.redis.host,
+        port=env_config.redis.port,
+        db=env_config.redis.db,
+        password=env_config.redis.password,
         decode_responses=True,
     )
     try:

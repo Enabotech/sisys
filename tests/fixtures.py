@@ -93,11 +93,17 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
     logger = logging.getLogger(__name__)
 
+    env_config = get_test_env()
+
     # Redis 清理
     try:
         import redis
 
-        redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        redis_client = redis.Redis(
+            host=env_config.redis.host,
+            port=env_config.redis.port,
+            decode_responses=True,
+        )
         pattern = f"{tenant.redis_key_prefix}*"
         keys = redis_client.keys(pattern)
         if keys:
@@ -111,11 +117,11 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
         import psycopg2
 
         conn = psycopg2.connect(
-            host="localhost",
-            port=5432,
-            user="postgres",
-            password="postgres",  # pragma: allowlist secret (test credentials)
-            database="sisys",
+            host=env_config.postgres.host,
+            port=env_config.postgres.port,
+            user=env_config.postgres.username,
+            password=env_config.postgres.password,
+            database=env_config.postgres.database,
         )
         conn.autocommit = True
         cur = conn.cursor()
@@ -131,7 +137,7 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
     try:
         from qdrant_client import QdrantClient
 
-        qdrant_client = QdrantClient(host="localhost", port=6333)
+        qdrant_client = QdrantClient(host=env_config.qdrant.host, port=env_config.qdrant.port)
         # 列出所有 collections
         collections = qdrant_client.get_collections().collections
         prefix = tenant.qdrant_collection_prefix
@@ -147,10 +153,10 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
         import minio
 
         minio_client = minio.Minio(
-            "localhost:9000",
-            access_key="minioadmin",  # pragma: allowlist secret (test credentials)
-            secret_key="minioadmin",  # pragma: allowlist secret (test credentials)
-            secure=False,
+            env_config.minio.endpoint,
+            access_key=env_config.minio.access_key,
+            secret_key=env_config.minio.secret_key,
+            secure=env_config.minio.secure,
         )
         bucket_name = tenant.minio_bucket
         if minio_client.bucket_exists(bucket_name):
@@ -167,8 +173,8 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
         from neo4j import GraphDatabase
 
         driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "password123"),  # pragma: allowlist secret (test credentials)
+            env_config.neo4j.bolt_url,
+            auth=(env_config.neo4j.username, env_config.neo4j.password),
         )
         with driver.session() as session:
             # 使用参数化查询避免注入
@@ -184,8 +190,10 @@ async def _cleanup_tenant_resources(tenant: TestTenant) -> None:
 
         pika = importlib.import_module("pika")
 
-        credentials = pika.PlainCredentials("guest", "guest")
-        parameters = pika.ConnectionParameters(host="localhost", port=5672, credentials=credentials)
+        credentials = pika.PlainCredentials(env_config.rabbitmq.username, env_config.rabbitmq.password)
+        parameters = pika.ConnectionParameters(
+            host=env_config.rabbitmq.host, port=env_config.rabbitmq.port, credentials=credentials
+        )
         connection = pika.BlockingConnection(parameters)
         _channel = connection.channel()
 

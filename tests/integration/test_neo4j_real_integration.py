@@ -44,16 +44,16 @@ def test_tenant_id() -> str:
 @pytest.fixture
 async def neo4j_client():
     """Provide a real Neo4j client connection."""
-    import os
-
     from src.infrastructure.config.neo4j import Neo4jConfig
+    from tests.environments import get_test_env
 
+    env_config = get_test_env()
     config = Neo4jConfig(
-        host=os.getenv("NEO4J_HOST", "localhost"),
-        bolt_port=int(os.getenv("NEO4J_BOLT_PORT", "7687")),
-        username=os.getenv("NEO4J_USERNAME", "neo4j"),
-        password=os.getenv("NEO4J_PASSWORD", "password123"),
-        database=os.getenv("NEO4J_DATABASE", "neo4j"),
+        host=env_config.neo4j.host,
+        bolt_port=env_config.neo4j.bolt_port,
+        username=env_config.neo4j.username,
+        password=env_config.neo4j.password,
+        database=env_config.neo4j.database,
     )
     wrapper = Neo4jManager.from_config(config)
 

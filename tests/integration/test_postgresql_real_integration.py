@@ -41,14 +41,16 @@ def test_tenant_id() -> str:
 @pytest.fixture
 async def pg_engine():
     """Provide PostgreSQL engine."""
-    import os
 
+    from tests.environments import get_test_env
+
+    env_config = get_test_env()
     config = PostgreSQLConfig(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DATABASE", "sisys"),
-        username=os.getenv("POSTGRES_USERNAME", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+        host=env_config.postgres.host,
+        port=env_config.postgres.port,
+        database=env_config.postgres.database,
+        username=env_config.postgres.username,
+        password=env_config.postgres.password,
     )
 
     engine = PostgreSQLManager(config)
