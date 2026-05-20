@@ -38,6 +38,7 @@
 **架构决策追溯:** ADR-002 双核引擎架构（architecture.md §3.2）
 
 **前置依赖:** Story 1.1（六边形架构骨架）、Story 1.3（事件总线实现）、Story 1.18a（Prefect 工作流集成）
+**后续依赖:** Epic 4（工具箱）、Epic 5（Agent 协作）、Epic 6（战略规划）—— 均依赖本 Story 的 AgentEnginePort 和 LangGraphEngine
 
 ---
 
@@ -256,7 +257,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - get_graph_status(): 查询图执行状态，映射为 FlowStatus
 - [ ] BasicAgentGraph（`src/infrastructure/agent_orch/graphs/basic_agent_graph.py`）
   - LangGraph StateGraph 定义
-  - 状态 Schema: TypedDict（task_description, agent_role, analysis_result, synthesis_result, messages）
+  - 状态 Schema: `BasicAgentState` TypedDict（定义于 `agent_orch/schemas.py`，含 task_description, agent_role, analysis_result, synthesis_result）
   - 顺序执行：analyze → synthesize
   - 完成回调：通过 EventPublisher 发布 AgentDecided 事件
 - [ ] agent_nodes（`src/infrastructure/agent_orch/nodes/agent_nodes.py`）
@@ -680,6 +681,20 @@ OrchestrationService.__init__(workflow_engine, agent_engine)
 - MVP 使用 `graph.compile().ainvoke()` 本地执行，不依赖外部 LangGraph Server
 - 未来可切换到 LangGraph Platform API（仅修改 LangGraphEngine 内部实现）
 
+**5. LangGraphConfig 独立配置类**
+- LangGraphConfig 定义于 `infrastructure/config/` 而非 LangGraphEngine 内部，参考 PrefectConfig 模式
+- 配置对象在 lambda 工厂中通过 `LangGraphConfig.from_env()` 创建，不注册为端口
+
+**6. 测试隔离策略**
+- 所有 LangGraph SDK 调用使用 `unittest.mock.AsyncMock`，不启动真实 LangGraph server
+- BasicAgentGraph 测试不依赖 InMemorySaver 的真实行为（mock `graph.compile()` 返回值）
+
+**7. Graph 与 Engine 职责分离**
+- LangGraphEngine 负责：生命周期管理（submit/get_status）、事件发布、状态映射
+- BasicAgentGraph 负责：图结构定义（StateGraph + nodes + edges）
+- schemas.py 负责：状态 TypedDict 定义（供 Engine 和 Graph 共享）
+- agent_nodes.py 负责：纯函数节点实现（不持有状态，不发布事件）
+
 ### BasicAgentGraph 数据流
 
 ```
@@ -691,8 +706,8 @@ LangGraphEngine.submit_graph()
   ↓ compiled.ainvoke({"task_description": "...", "agent_role": "CEO", ...}, config={"configurable": {"thread_id": graph_run_id}})
   ↓
 BasicAgentGraph (StateGraph)
-  ├── analyze(state)  → {"analysis_result": "...", "messages": [...]}   (node, MVP mock)
-  └── synthesize(state) → {"synthesis_result": "...", "messages": [...]} (node, MVP mock)
+  ├── analyze(state)  → {"analysis_result": "..."}   (node, MVP mock)
+  └── synthesize(state) → {"synthesis_result": "..."} (node, MVP mock)
   ↓ 完成回调
 EventPublisher.publish(AgentDecided(agent_id=uuid.UUID(...), decision_result={...}, confidence=0.9))
   ↓
@@ -737,6 +752,7 @@ sisys/
 │       │   └── langgraph.py                 # LangGraphConfig（新建）
 │       └── agent_orch/                      # Agent 编排引擎（新建目录）
 │           ├── __init__.py
+│           ├── schemas.py                   # BasicAgentState TypedDict（新建）
 │           ├── langgraph_engine.py          # LangGraphEngine（新建）
 │           ├── graphs/
 │           │   ├── __init__.py
@@ -842,6 +858,7 @@ sisys/
 基础设施层（Infrastructure）:
 - `src/infrastructure/config/langgraph.py` — LangGraphConfig
 - `src/infrastructure/agent_orch/__init__.py` — 包声明
+- `src/infrastructure/agent_orch/schemas.py` — BasicAgentState TypedDict
 - `src/infrastructure/agent_orch/langgraph_engine.py` — LangGraphEngine
 - `src/infrastructure/agent_orch/graphs/__init__.py` — Graphs 包
 - `src/infrastructure/agent_orch/graphs/basic_agent_graph.py` — BasicAgentGraph
