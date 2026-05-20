@@ -384,6 +384,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
+| 全部 | SDD 规范定义 + Gherkin 验收 | Task 0 | 0.1-0.10（规范定义+红阶段验证） | `test_story_1_18a.feature`, `test_story_1_18a_steps.py` |
 | AC-1 | FlowStatus 值对象 | Task 1 | 1.1-1.3（FlowStatus 红→绿→重构） | `test_flow_status.py` |
 | AC-1 | WorkflowEnginePort Protocol | Task 1 | 1.4-1.6（Protocol 红→绿→重构） | `test_workflow_engine.py` |
 | AC-2 | PrefectEngine 实现 | Task 2 | 2.4-2.6（PrefectEngine 红→绿→重构） | `test_prefect_engine.py` |
@@ -543,9 +544,15 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 #### DI 注册 + 契约测试
 
-- [ ] Subtask 3.10: 更新 `src/composition_root.py`（注册 workflow_engine + orchestration_service）
-- [ ] Subtask 3.11: 编写 `tests/contracts/test_port_contract_workflow_engine.py`（端口注册/解析/兼容性）
-- [ ] Subtask 3.12: 验证 composition_root 注册链路
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/contracts/test_port_contract_workflow_engine.py`（端口注册/解析/兼容性测试失败） |
+| 🟢 绿 | 更新 `src/composition_root.py`（注册 workflow_engine + orchestration_service） |
+| 🔄 重构 | 验证完整注册链路 + 运行全量测试 |
+
+- [ ] Subtask 3.10: 🔴 红 — 编写 WorkflowEnginePort 契约失败测试
+- [ ] Subtask 3.11: 🟢 绿 — 更新 composition_root.py 注册 workflow 端口
+- [ ] Subtask 3.12: 🔄 重构 — 验证注册链路 + `test_composition_root_workflow.py`
 
 **完成标准/Definition of Done:**
 - [ ] DocumentProcessingFlow 执行通过（mock 任务）
@@ -651,6 +658,9 @@ OrchestrationService.execute(task)
   - FAILED（重试次数耗尽）→ FlowStatus.FAILED
   - CANCELLED/CRASHED/CANCELLING/PAUSED → FlowStatus.FAILED
 - `flow_run_id` 类型：Prefect 使用 `uuid.UUID`，WorkflowEnginePort 使用 `str`，PrefectEngine 负责 `str↔UUID` 转换
+- **PrefectClient 是异步客户端**：通过 `async with get_client() as client:` 获取，不直接构造 `PrefectClient`
+- **`create_flow_run()` 返回 `FlowRun` Pydantic 模型**（非 UUID），需通过 `.id` 获取 `flow_run_id`
+- **`DocumentProcessed.document_id` 类型为 `uuid.UUID`**（非 str），Flow 构造事件时需确保类型正确
 - 测试中 mock `prefect` 模块：`@patch("src.infrastructure.workflow.prefect_engine.pf_client")`
 
 ### DocumentProcessingFlow 数据流
@@ -932,7 +942,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-19
 **最后更新/Last Updated:** 2026-05-20
-**更新说明:** Round 3 审查修正 — 修正Prefect StateType映射策略、补充Updated Files缺失项、测试分类表补全、OrchestrationService生命周期说明。
+**更新说明:** Round 4 审查修正 — DI注册TDD循环表补全、Task 0追溯矩阵行、PrefectClient异步模式和FlowRun返回值文档化。
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -957,3 +967,6 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 17 | `test_composition_root_workflow.py` 在追溯矩阵和文件清单中但不在测试分类表中 | P1 | 测试分类表新增一行 | ✅ R3 |
 | 18 | OrchestrationService 注册为 SINGLETON 缺少与 UnifiedStorageGateway(SCOPED) 的区别说明 | P2 | Dev Notes 补充 SINGLETON 理由（无状态路由服务 vs request-scoped session） | ✅ R3 |
 | 19 | 应用到本故事条目中"测试使用 mock Prefect SDK"重复出现 | P2 | 删除重复行 | ✅ R3 |
+| 20 | DI 注册子任务 3.10-3.12 缺少 TDD 循环表（仅有 checkbox） | P1 | 添加 TDD 循环表（红:契约测试→绿:composition_root→重构:链路验证），重新标注 subtask 阶段 | ✅ R4 |
+| 21 | 追溯矩阵缺少 Task 0 行，验收测试文件无追溯 | P2 | 新增 Task 0 行，关联 `test_story_1_18a.feature` 和 `test_story_1_18a_steps.py` | ✅ R4 |
+| 22 | Dev Notes 未说明 PrefectClient 异步获取模式（`get_client()` 而非直接构造）和 `create_flow_run()` 返回 `FlowRun` 模型 | P1 | 补充 PrefectClient 使用模式、`FlowRun.id` 获取方式、`DocumentProcessed.document_id` 为 UUID 类型 | ✅ R4 |
