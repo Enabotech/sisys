@@ -51,8 +51,23 @@ class PostgreSQLAdapter(L2RdbPort[TEntity], Generic[TEntity, TModel]):
 
     @property
     def _session(self) -> AsyncSession:
-        """从 ContextVar 获取 AsyncSession。"""
-        return get_session()
+        """从 ContextVar 获取 AsyncSession
+
+        ContextVar 未设置时提供包含仓库名和修复建议的友好错误信息
+
+        Returns:
+            当前上下文中的 AsyncSession 实例
+
+        Raises:
+            RuntimeError: ContextVar 未设置时，提示确保 SessionMiddleware 或 session_context 已激活
+        """
+        try:
+            return get_session()
+        except RuntimeError:
+            raise RuntimeError(
+                f"{self.__class__.__name__} requires an active AsyncSession. "
+                f"Ensure SessionMiddleware or session_context() is active."
+            ) from None
 
     def _to_entity(self, model: TModel) -> TEntity:
         """将 ORM 模型转换为领域实体（子类必须覆写）。"""

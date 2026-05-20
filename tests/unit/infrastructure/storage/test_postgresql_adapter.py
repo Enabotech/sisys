@@ -135,3 +135,29 @@ class TestPostgreSQLAdapter:
         result = await repository.count()
 
         assert result == 5
+
+
+class TestSessionContextFriendlyError:
+    """验证 ContextVar 未设置时的友好错误信息"""
+
+    def test_session_not_set_contains_repository_name(self):
+        """验证错误信息包含具体仓库名"""
+        repo = _TestUserAdapter(UserModel)
+        with pytest.raises(RuntimeError, match="_TestUserAdapter requires an active AsyncSession"):
+            _ = repo._session
+
+    def test_session_not_set_contains_fix_suggestion(self):
+        """验证错误信息包含修复建议"""
+        repo = _TestUserAdapter(UserModel)
+        with pytest.raises(RuntimeError, match="SessionMiddleware or session_context"):
+            _ = repo._session
+
+    @pytest.mark.asyncio
+    async def test_session_set_works_normally(self, mock_session):
+        """验证 ContextVar 已设置时正常工作"""
+        token = set_session(mock_session)
+        try:
+            repo = _TestUserAdapter(UserModel)
+            assert repo._session is mock_session
+        finally:
+            reset_session(token)
