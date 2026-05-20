@@ -268,7 +268,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - LangGraph StateGraph 定义
   - 状态 Schema: `BasicAgentState` TypedDict（定义于 `agent_orch/schemas.py`，含 task_description, agent_role, analysis_result, synthesis_result）
   - 顺序执行：analyze → synthesize
-  - 完成回调：通过 EventPublisher 发布 AgentDecided 事件
+  - Graph 执行完成后（ainvoke() 返回），LangGraphEngine 通过 EventPublisher 发布 AgentDecided 事件
 - [ ] agent_nodes（`src/infrastructure/agent_orch/nodes/agent_nodes.py`）
   - analyze(state) — 分析节点（MVP 占位，返回 mock 分析结果）
   - synthesize(state) — 综合节点（MVP 占位，返回 mock 综合结果）
@@ -282,7 +282,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - `execute()` 中 `agent_reasoning` 分支替换 `NotImplementedError`
   - 仅依赖端口接口（不导入 infrastructure 层）
   - 新增 `TYPE_CHECKING` 块导入 `AgentEnginePort`（参考 orchestration_service.py 现有 TYPE_CHECKING 导入模式，第21-22行）
-  - 更新 `composition_root.py` 第858-872行 `orchestration_service` 注册（当前 interface=OrchestrationService 类本身，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）
+  - 更新 `composition_root.py` 第858-872行 `orchestration_service` 注册（当前该注册仅有 workflow_engine，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）；同时需在同一位置前新增 `agent_engine` 端口注册
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 新增 agent_engine 注册
