@@ -743,7 +743,7 @@ DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 | BLM 六阶段状态图 | ❌ 不实现 | Epic 5/6 |
 | BEM 六阶段状态图 | ❌ 不实现 | Epic 15 |
 | 多 Agent 协作图 | ❌ 不实现 | Epic 9 |
-| Checkpoint 基础机制 | ✅ InMemorySaver（MVP） | Story 6.6（PostgreSQL Checkpointer + Replay/Override） |
+| Checkpoint 双模式恢复 | ✅ InMemorySaver（MVP） | Story 6.6（PostgreSQL Checkpointer + Replay/Override） |
 | OrchestrationService | ✅ 双引擎路由 | 同 |
 | SYS Agent 裁决 | ❌ 不实现 | Story 9.6 |
 | CheckpointReached 事件 | ✅ 定义（Graph 可选发布） | Story 6.3 完整实现 |
