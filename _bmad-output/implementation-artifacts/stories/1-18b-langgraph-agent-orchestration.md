@@ -268,7 +268,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - LangGraph StateGraph 定义
   - 状态 Schema: `BasicAgentState` TypedDict（定义于 `agent_orch/schemas.py`，含 task_description, agent_role, analysis_result, synthesis_result）
   - 顺序执行：analyze → synthesize
-  - Graph 执行完成后（ainvoke() 返回），LangGraphEngine 通过 EventPublisher 发布 AgentDecided 事件
+  - 完成回调：Graph 执行完成后（ainvoke() 返回），LangGraphEngine 通过 EventPublisher 发布 AgentDecided 事件
 - [ ] agent_nodes（`src/infrastructure/agent_orch/nodes/agent_nodes.py`）
   - analyze(state) — 分析节点（MVP 占位，返回 mock 分析结果）
   - synthesize(state) — 综合节点（MVP 占位，返回 mock 综合结果）
