@@ -173,11 +173,15 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 ### AC-6: PrefectConfig 配置
 
-**Given** 现有配置模式（RedisConfig.from_env()）
+**Given** 现有配置模式（AutoExecuteConfig.from_env()）
 **When** PrefectConfig 加载
 **Then** 从环境变量读取，提供合理默认值
 **And** `PREFECT_API_URL` 默认 `"http://localhost:4200/api"`
 **And** `PREFECT_WORK_POOL_NAME` 默认 `"sisys-worker-pool"`
+**And** `PREFECT_RETRY_MAX_ATTEMPTS` 默认 `3`
+**And** `PREFECT_RETRY_DELAY_SECONDS` 默认 `30`
+**And** `PREFECT_TASK_TIMEOUT_SECONDS` 默认 `300`
+**And** `PREFECT_FLOW_TIMEOUT_SECONDS` 默认 `3600`
 **And** `@dataclass(frozen=True)` 不可变配置
 
 **验证标准/Validation Criteria:**
@@ -1052,3 +1056,4 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 34 | 事件 Schema 中 event_type 声明方式不精确，缺少 `field(default=..., init=False)` 模式说明 | P1 | 修正为完整 `field(default="RAGIndexed", init=False)` 声明格式，与 DocumentProcessed 一致 | ✅ R8 |
 | 35 | 架构测试未说明已有覆盖：test_hexagonal_architecture_constraints.py 已有 prefect 禁止导入，.importlinter 已配置 | P1 | Subtask 4.1 补充已有覆盖说明，明确需新增的验证项，引用 `_scan_file_imports()` 模式 | ✅ R9 |
 | 36 | 伪代码 "V1 (Story 1.18b)" 引用 `self.agent_engine` 但 AgentEnginePort 不存在，易混淆 | P2 | 补充说明 "AgentEnginePort 尚不存在，此处仅为架构愿景" | ✅ R9 |
+| 37 | AC-6 PrefectConfig 字段不完整（仅列 2 个，SDD Schema 定义 6 个），且引用 RedisConfig 而非 AutoExecuteConfig | P1 | 补充完整 6 个字段到 AC-6，修正引用为 AutoExecuteConfig | ✅ R10 |
