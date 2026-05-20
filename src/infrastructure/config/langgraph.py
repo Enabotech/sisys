@@ -24,12 +24,12 @@ class LangGraphConfig:
     模式参考 PrefectConfig（frozen dataclass + from_env()）。
     """
 
-    api_url: str = "http://localhost:8123"
+    api_url: str = "http://localhost:8000"
     checkpoint_table: str = "langgraph_checkpoints"
     retry_max_attempts: int = 3
     retry_delay_seconds: int = 30
     task_timeout_seconds: int = 300
-    graph_timeout_seconds: int = 3600
+    graph_timeout_seconds: int = 1800
 
     @classmethod
     def from_env(cls) -> LangGraphConfig:
@@ -43,13 +43,18 @@ class LangGraphConfig:
 
         def _env_int(key: str, default: int) -> int:
             value = os.getenv(key, "")
-            return int(value) if value else default
+            if not value:
+                return default
+            try:
+                return int(value)
+            except ValueError:
+                raise ValueError(f"环境变量 {key} 的值 '{value}' 不是有效整数，期望数字") from None
 
         return cls(
-            api_url=os.getenv("LANGGRAPH_API_URL", "http://localhost:8123") or "http://localhost:8123",
+            api_url=os.getenv("LANGGRAPH_API_URL", "http://localhost:8000") or "http://localhost:8000",
             checkpoint_table=os.getenv("LANGGRAPH_CHECKPOINT_TABLE", "langgraph_checkpoints") or "langgraph_checkpoints",
             retry_max_attempts=_env_int("LANGGRAPH_RETRY_MAX_ATTEMPTS", 3),
             retry_delay_seconds=_env_int("LANGGRAPH_RETRY_DELAY_SECONDS", 30),
             task_timeout_seconds=_env_int("LANGGRAPH_TASK_TIMEOUT_SECONDS", 300),
-            graph_timeout_seconds=_env_int("LANGGRAPH_GRAPH_TIMEOUT_SECONDS", 3600),
+            graph_timeout_seconds=_env_int("LANGGRAPH_GRAPH_TIMEOUT_SECONDS", 1800),
         )

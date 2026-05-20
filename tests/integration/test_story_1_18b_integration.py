@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.domain.events.publish_result import PublishResult
 from src.domain.value_objects.flow_status import FlowStatus
 
 
@@ -34,6 +35,7 @@ class TestAgentReasoningFullChain:
         from src.infrastructure.config.langgraph import LangGraphConfig
 
         event_publisher = AsyncMock()
+        event_publisher.publish = AsyncMock(return_value=PublishResult(event_id="test", redis_success=True))
         config = LangGraphConfig()
         agent_engine = LangGraphEngine(config, event_publisher)
 
@@ -44,7 +46,7 @@ class TestAgentReasoningFullChain:
         service = OrchestrationService(mock_workflow_engine, agent_engine)
         task = WorkflowTask(
             flow_name="BasicAgent",
-            parameters={"task_description": "分析市场趋势", "agent_role": "analyst"},
+            parameters={"task_description": "分析市场趋势", "agent_role": "analyst", "graph_name": "BasicAgent"},
             task_type="agent_reasoning",
         )
 
@@ -60,6 +62,7 @@ class TestAgentReasoningFullChain:
         from src.infrastructure.config.langgraph import LangGraphConfig
 
         event_publisher = AsyncMock()
+        event_publisher.publish = AsyncMock(return_value=PublishResult(event_id="test", redis_success=True))
         config = LangGraphConfig()
         engine = LangGraphEngine(config, event_publisher)
 
@@ -117,7 +120,7 @@ class TestDualEngineRouting:
         service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
             flow_name="BasicAgent",
-            parameters={"task_description": "测试"},
+            parameters={"task_description": "测试", "graph_name": "BasicAgent"},
             task_type="agent_reasoning",
         )
 

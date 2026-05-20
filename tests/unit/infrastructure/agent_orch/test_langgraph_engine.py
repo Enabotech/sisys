@@ -137,6 +137,74 @@ class TestLangGraphEngineEventPublishing:
 
         mock_event_publisher.publish.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_submit_graph_remains_completed_on_publish_exception(
+        self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """事件发布异常不应覆写 COMPLETED 状态"""
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "test",
+                "agent_role": "analyst",
+                "analysis_result": "分析完成",
+                "synthesis_result": "综合完成",
+            }
+        )
+        mock_event_publisher.publish = AsyncMock(side_effect=ConnectionError("network"))
+
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            run_id = await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        status = await engine.get_graph_status(run_id)
+        assert status == FlowStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_submit_graph_handles_publish_returning_none(
+        self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """publish 返回 None 时应记录警告但不影响状态"""
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "test",
+                "agent_role": "analyst",
+                "analysis_result": "分析完成",
+                "synthesis_result": "综合完成",
+            }
+        )
+        mock_event_publisher.publish = AsyncMock(return_value=None)
+
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            run_id = await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        status = await engine.get_graph_status(run_id)
+        assert status == FlowStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_submit_graph_logs_warning_on_full_failure(
+        self, engine: LangGraphEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """publish 返回 is_full_failure=True 时应记录警告"""
+        mock_compiled = AsyncMock()
+        mock_compiled.ainvoke = AsyncMock(
+            return_value={
+                "task_description": "test",
+                "agent_role": "analyst",
+                "analysis_result": "分析完成",
+                "synthesis_result": "综合完成",
+            }
+        )
+        publish_result = AsyncMock()
+        publish_result.is_full_failure = True
+        mock_event_publisher.publish = AsyncMock(return_value=publish_result)
+
+        with patch.object(engine, "_build_graph", return_value=mock_compiled):
+            run_id = await engine.submit_graph("BasicAgent", {"task_description": "test"})
+
+        status = await engine.get_graph_status(run_id)
+        assert status == FlowStatus.COMPLETED
+
 
 class TestLangGraphEngineGetGraphStatus:
     """get_graph_status 测试"""

@@ -1,6 +1,6 @@
 # Story 1.18b: LangGraph Agent 编排集成
 
-**Status:** `in-progress`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -982,9 +982,41 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 
 ### 下一步 Next Steps
 
-- [ ] Story created with `ready-for-dev` status
-- [ ] 运行 `dev-story` 开始实施
-- [ ] 运行 `code-review` 进行代码审查
+- [x] Story created with `ready-for-dev` status
+- [x] 运行 `dev-story` 开始实施
+- [x] 运行 `code-review` 进行代码审查
+
+---
+
+## Review Findings
+
+### Decision Needed
+
+- [x] [Review][Patch] **`_build_graph` 需添加 `graph_name` 白名单校验 + 日志警告** — 决策：Option C，对不支持的 graph_name 记录 WARNING 日志但不抛异常，MVP 仅支持 `"BasicAgent"` [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
+- [x] [Review][Patch] **`OrchestrationService` agent_reasoning 分支需改为从 `parameters['graph_name']` 取值** — 决策：Option A，严格遵循 AC-5 spec，在服务层校验 `parameters['graph_name']` 非空 [auditor+blind+edge] `src/application/services/orchestration_service.py:86-93`
+
+### Patch
+
+- [x] [Review][Patch] **`LangGraphConfig.api_url` 默认值与 spec 不符：`"http://localhost:8123"` 应为 `"http://localhost:8000"`** [auditor] `src/infrastructure/config/langgraph.py:27,49`
+- [x] [Review][Patch] **`LangGraphConfig.graph_timeout_seconds` 默认值与 spec 不符：`3600` 应为 `1800`** [auditor] `src/infrastructure/config/langgraph.py:32,54`
+- [x] [Review][Patch] **节点命名不符 spec：`analysis/synthesis` 应为 `analyze/synthesize`** — AC-4 明确说"analyze → synthesize 作为顺序节点" [auditor] `src/infrastructure/agent_orch/graphs/basic_agent_graph.py:34-35` + `nodes/agent_nodes.py`
+- [x] [Review][Patch] **`_publish_agent_decided` 异常导致已完成 run 状态被覆写为 FAILED** — 事件发布独立于图执行状态，异常仅记录日志 [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:74-83`
+- [x] [Review][Patch] **`_env_int` 对非数字字符串抛出无上下文的 ValueError** — 已包装为含键名的配置错误 [blind+edge] `src/infrastructure/config/langgraph.py:44-46`
+- [x] [Review][Patch] **`publish_result` 属性访问无 None 保护** — 已添加 None 检查 [edge] `src/infrastructure/agent_orch/langgraph_engine.py:140-141`
+- [x] [Review][Patch] **`OrchestrationService.execute` docstring 过时：仍提及 `NotImplementedError`** [edge+auditor] `src/application/services/orchestration_service.py:71`
+- [x] [Review][Patch] **集成测试 `event_publisher` mock 不返回 `PublishResult` 类型** — 已使用 PublishResult [edge] `tests/integration/test_story_1_18b_integration.py:36,62`
+- [x] [Review][Patch] **缺少 `_publish_agent_decided` 异常路径测试** — 已添加 4 个异常场景测试 [edge] `tests/unit/infrastructure/agent_orch/test_langgraph_engine.py`
+- [x] [Review][Patch] **`infrastructure/config/__init__.py` 文件头 docstring 被删除** — 已恢复 [auditor] `src/infrastructure/config/__init__.py`
+- [x] [Review][Patch] **`FakePublisher` 不完全满足 `EventPublisher` Protocol** — 已返回 PublishResult [edge] `tests/unit/architecture/test_langgraph_architecture.py:130-132`
+- [x] [Review][Patch] **缺少 Gherkin 验收测试文件** — Task 0 明确要求 `tests/acceptance/test_story_1_18b.feature` + `test_story_1_18b_steps.py`，已创建 [auditor]
+
+### Deferred
+
+- [x] [Review][Defer] **`_runs` 字典无限增长（内存泄漏）** — SINGLETON 生命周期下只增不删，长期运行内存持续增长。MVP 阶段影响有限，后续引入 TTL 驱逐机制 [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:46`
+- [x] [Review][Defer] **`LangGraphConfig` 配置字段从未被 `LangGraphEngine` 使用** — retry_max_attempts/retry_delay_seconds/task_timeout_seconds/graph_timeout_seconds 为 MVP 预留配置 [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:42`
+- [x] [Review][Defer] **`get_graph_status` 对未知 ID 返回 FAILED 而非抛异常** — MVP 设计选择，spec 明确说"仅返回 COMPLETED 或 FAILED" [blind] `src/infrastructure/agent_orch/langgraph_engine.py:102`
+- [x] [Review][Defer] **阻塞式执行导致 RUNNING/PENDING 不可观察** — spec 明确说"MVP 阻塞语义...RUNNING/PENDING 在本地模式下不可观察" [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:76-77`
+- [x] [Review][Defer] **缺少 Graph 编译缓存机制** — spec 要求 graph_name→CompiledGraph 映射，MVP 阶段图构建开销小，后续 Epic 扩展时优化 [auditor] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
 
 ---
 

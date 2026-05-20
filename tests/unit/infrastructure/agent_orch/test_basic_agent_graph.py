@@ -16,7 +16,7 @@ from src.infrastructure.agent_orch.graphs.basic_agent_graph import (
     BasicAgentState,
     build_basic_agent_graph,
 )
-from src.infrastructure.agent_orch.nodes.agent_nodes import analysis_node, synthesis_node
+from src.infrastructure.agent_orch.nodes.agent_nodes import analyze_node, synthesize_node
 
 
 class TestBasicAgentState:
@@ -40,45 +40,45 @@ class TestBasicAgentState:
         assert len(hints) == 4
 
 
-class TestAnalysisNode:
-    """analysis_node 测试"""
+class TestAnalyzeNode:
+    """analyze_node 测试"""
 
-    def test_analysis_node_returns_dict(self) -> None:
-        """analysis_node 应返回包含 analysis_result 的字典"""
+    def test_analyze_node_returns_dict(self) -> None:
+        """analyze_node 应返回包含 analysis_result 的字典"""
         state: BasicAgentState = {"task_description": "分析市场趋势", "agent_role": "analyst"}
-        result = analysis_node(state)
+        result = analyze_node(state)
         assert "analysis_result" in result
         assert "分析完成" in result["analysis_result"]
 
-    def test_analysis_node_uses_task_description(self) -> None:
-        """analysis_node 应使用 task_description"""
+    def test_analyze_node_uses_task_description(self) -> None:
+        """analyze_node 应使用 task_description"""
         state: BasicAgentState = {"task_description": "特定任务", "agent_role": "analyst"}
-        result = analysis_node(state)
+        result = analyze_node(state)
         assert "特定任务" in result["analysis_result"]
 
 
-class TestSynthesisNode:
-    """synthesis_node 测试"""
+class TestSynthesizeNode:
+    """synthesize_node 测试"""
 
-    def test_synthesis_node_returns_dict(self) -> None:
-        """synthesis_node 应返回包含 synthesis_result 的字典"""
+    def test_synthesize_node_returns_dict(self) -> None:
+        """synthesize_node 应返回包含 synthesis_result 的字典"""
         state: BasicAgentState = {
             "task_description": "test",
             "agent_role": "analyst",
             "analysis_result": "分析完成",
         }
-        result = synthesis_node(state)
+        result = synthesize_node(state)
         assert "synthesis_result" in result
         assert "综合完成" in result["synthesis_result"]
 
-    def test_synthesis_node_uses_analysis_result(self) -> None:
-        """synthesis_node 应使用 analysis_result"""
+    def test_synthesize_node_uses_analysis_result(self) -> None:
+        """synthesize_node 应使用 analysis_result"""
         state: BasicAgentState = {
             "task_description": "test",
             "agent_role": "analyst",
             "analysis_result": "自定义分析",
         }
-        result = synthesis_node(state)
+        result = synthesize_node(state)
         assert "自定义分析" in result["synthesis_result"]
 
 
