@@ -669,7 +669,12 @@ OrchestrationService.execute(task)
   - COMPLETED → FlowStatus.COMPLETED
   - FAILED（重试次数未耗尽）→ FlowStatus.RETRYING
   - FAILED（重试次数耗尽）→ FlowStatus.FAILED
-  - CANCELLED/CRASHED/CANCELLING/PAUSED → FlowStatus.FAILED
+  - **CANCELLED/CRASHED/CANCELLING/PAUSED → FlowStatus.FAILED**
+- **映射设计依据**：
+  - **业务抽象原则**：FlowStatus 是业务层状态抽象，不直接映射 Prefect 全部技术状态
+  - **FAILED 包含"异常终止"语义**：CANCELLED（用户取消）、CRASHED（基础设施异常）、PAUSED（外部阻塞）均为"未正常完成"的异常终止场景
+  - **PAUSED 特例**：如果业务需要区分"暂停等待审批"与"失败"，可扩展 FlowStatus 新增 PAUSED 状态，当前 Story 按 FAILED 处理
+  - **CANCELLING 中间态**：短暂过渡态，映射为 FAILED 不影响业务判定
 - `flow_run_id` 类型：Prefect 使用 `uuid.UUID`，WorkflowEnginePort 使用 `str`，PrefectEngine 负责 `str↔UUID` 转换
 - **PrefectClient 是异步客户端**：通过 `async with get_client() as client:` 获取，不直接构造 `PrefectClient`
 - **`create_flow_run()` 返回 `FlowRun` Pydantic 模型**（非 UUID），需通过 `.id` 获取 `flow_run_id`
@@ -987,3 +992,4 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 23 | Updated Files 缺少 `src/infrastructure/workflow/__init__.py`（需导出 PrefectEngine） | P1 | 添加到 Updated Files 列表 | ✅ R5 |
 | 24 | "Prefect 无 RETRYING 状态"事实不准确（Prefect 有 Retrying 状态，主要用于 task 级别） | P2 | 修正为"Prefect Retrying 状态主要用于 task 级别，flow run 级别需综合判定" | ✅ R5 |
 | 25 | Dev Notes 缺少 Prefect state name vs state type 区分说明（14+ state name → 9 state type），`Retrying` 是 name 而非 type | P1 | 新增 state name→state type 映射表，明确 FlowStatus 映射基于 state TYPE，`Retrying` 是 name（type=RUNNING） | ✅ R6 |
+| 26 | PrefectEngine 状态映射策略缺少设计依据，CANCELLED/PAUSED 归为 FAILED 语义混淆 | P1 | 补充映射设计依据：业务抽象原则、FAILED 包含"异常终止"语义、PAUSED 特例说明、CANCELLING 中间态处理 | ✅ R6 |
