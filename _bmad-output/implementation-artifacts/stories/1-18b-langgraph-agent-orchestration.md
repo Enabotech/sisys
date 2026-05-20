@@ -1,6 +1,6 @@
 # Story 1.18b: LangGraph Agent 编排集成
 
-**Status:** `backlog`
+**Status:** `ready-for-dev`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -56,7 +56,7 @@
 | 现有组件 | 文件路径 | 复用方式 |
 |---------|---------|---------|
 | `EventPublisher` 端口 | `src/domain/ports/event_publisher.py` | LangGraphEngine 注入，Graph 完成后发布事件（`async def publish(event: DomainEvent) -> PublishResult`，导入路径为 `src.domain.ports.event_publisher`） |
-| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（含 `is_success`/`is_full_failure`/`partial_error` 属性），LangGraphEngine 需检查并记录失败 |
+| `PublishResult` | `src/domain/events/publish_result.py` | 事件发布结果（frozen dataclass，含 `event_id`/`redis_success`/`outbox_saved`/`redis_error`/`outbox_error` 字段 + `is_success`/`is_full_failure`/`partial_error` 计算属性），LangGraphEngine 需检查 `is_full_failure` 并记录警告日志 |
 | `DomainEvent` 基类 | `src/domain/events/base.py` | AgentDecided/CheckpointReached 继承 |
 | `AgentDecided` 事件 | `src/domain/events/agent_events.py` | Graph 完成后发布（已有 agent_id, decision_result, confidence 字段） |
 | `CheckpointReached` 事件 | `src/domain/events/checkpoint_events.py` | Checkpoint 节点发布（已有 checkpoint_id, phase_identifier, user_feedback_request 字段） |
@@ -267,12 +267,14 @@ DualChannelEventBus → Outbox/RabbitMQ
   - 构造函数新增：`agent_engine: AgentEnginePort` 参数
   - `execute()` 中 `agent_reasoning` 分支替换 `NotImplementedError`
   - 仅依赖端口接口（不导入 infrastructure 层）
+  - 新增 `TYPE_CHECKING` 块导入 `AgentEnginePort`（参考现有 WorkflowEnginePort 导入模式，第21-22行）
+  - 更新 `composition_root.py` 第861-872行 `orchestration_service` 注册（当前 interface=OrchestrationService 类本身，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 新增 agent_engine 注册
 - [ ] 端口更新：composition_root.py 更新 orchestration_service 注册（注入双引擎）
 - [ ] 契约测试：tests/contracts/test_port_contract_agent_engine.py
-- [ ] 端口版本：v1.0.0，owner=platform-team
+- [ ] 端口版本：v1.0.0，owner=platform
 
 #### 验收标准 Gherkin (Acceptance Tests)
 - [ ] 功能测试文件：`tests/acceptance/test_story_1_18b.feature`
