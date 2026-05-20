@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from src.domain.value_objects.flow_status import FlowStatus
 
 if TYPE_CHECKING:
+    from src.domain.ports.agent_engine import AgentEnginePort
     from src.domain.ports.workflow_engine import WorkflowEnginePort
 
 
@@ -43,15 +44,18 @@ class WorkflowResult:
 class OrchestrationService:
     """应用层编排服务
 
-    MVP：仅支持 data_pipeline 路由到 WorkflowEnginePort。
-    Story 1.18b 补充 agent_reasoning 路由到 LangGraph。
+    根据 task_type 路由到不同引擎：
+    - data_pipeline → WorkflowEnginePort (Prefect)
+    - agent_reasoning → AgentEnginePort (LangGraph)
 
     Args:
         workflow_engine: 工作流引擎端口（通过构造函数注入）
+        agent_engine: Agent 引擎端口（通过构造函数注入）
     """
 
-    def __init__(self, workflow_engine: WorkflowEnginePort) -> None:
+    def __init__(self, workflow_engine: WorkflowEnginePort, agent_engine: AgentEnginePort) -> None:
         self._workflow_engine = workflow_engine
+        self._agent_engine = agent_engine
 
     async def execute(self, task: WorkflowTask) -> WorkflowResult:
         """执行工作流任务
@@ -79,4 +83,12 @@ class OrchestrationService:
                 status=status,
                 submitted_at=datetime.now(timezone.utc),
             )
-        raise NotImplementedError("agent_reasoning 由 Story 1.18b 实现")
+        if task.task_type == "agent_reasoning":
+            graph_run_id = await self._agent_engine.submit_graph(task.flow_name, task.parameters)
+            status = await self._agent_engine.get_graph_status(graph_run_id)
+            return WorkflowResult(
+                flow_run_id=graph_run_id,
+                status=status,
+                submitted_at=datetime.now(timezone.utc),
+            )
+        raise ValueError(f"未知的 task_type: {task.task_type}")

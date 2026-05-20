@@ -15,6 +15,7 @@ Copyright:
 # from src.domain.ports.graph_storage import GraphManager, GraphStorage  # deprecated
 # from src.domain.ports.vector_storage import VectorStorage  # deprecated
 
+from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.index_manager import IndexManagerPort
@@ -42,6 +43,7 @@ from src.domain.ports.unit_of_work import UnitOfWork
 from src.domain.ports.workflow_engine import WorkflowEnginePort
 
 __all__ = [
+    "AgentEnginePort",
     "ConnectionManager",
     "DataAccessPattern",
     "BaseRepository",

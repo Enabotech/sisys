@@ -1,6 +1,6 @@
 """OrchestrationService 单元测试
 
-验证路由逻辑、WorkflowEnginePort 委托、WorkflowResult 创建
+验证路由逻辑、WorkflowEnginePort/AgentEnginePort 委托、WorkflowResult 创建
 
 Author:
     agimtech <agimtech@126.com>
@@ -30,11 +30,20 @@ def mock_workflow_engine() -> AsyncMock:
     return engine
 
 
+@pytest.fixture
+def mock_agent_engine() -> AsyncMock:
+    """Mock AgentEnginePort"""
+    engine = AsyncMock()
+    engine.submit_graph = AsyncMock(return_value=str(uuid.uuid4()))
+    engine.get_graph_status = AsyncMock(return_value=FlowStatus.COMPLETED)
+    return engine
+
+
 class TestOrchestrationServiceProtocolCompliance:
     """OrchestrationService 应满足应用层服务约束"""
 
-    def test_only_depends_on_workflow_engine_port(self) -> None:
-        """OrchestrationService 仅依赖 WorkflowEnginePort 端口"""
+    def test_only_depends_on_engine_ports(self) -> None:
+        """OrchestrationService 仅依赖端口层"""
         import ast
 
         from src.application.services.orchestration_service import (
@@ -49,14 +58,16 @@ class TestOrchestrationServiceExecute:
     """OrchestrationService.execute() 路由测试"""
 
     @pytest.mark.asyncio
-    async def test_execute_data_pipeline_routes_to_workflow_engine(self, mock_workflow_engine: AsyncMock) -> None:
+    async def test_execute_data_pipeline_routes_to_workflow_engine(
+        self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
+    ) -> None:
         """data_pipeline 类型应委托给 WorkflowEnginePort"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
             WorkflowTask,
         )
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
             flow_name="DocumentProcessing/default",
             parameters={"document_id": str(uuid.uuid4()), "file_path": "/test.pdf"},
@@ -71,7 +82,7 @@ class TestOrchestrationServiceExecute:
         )
 
     @pytest.mark.asyncio
-    async def test_execute_returns_workflow_result(self, mock_workflow_engine: AsyncMock) -> None:
+    async def test_execute_returns_workflow_result(self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock) -> None:
         """execute 应返回 WorkflowResult"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
@@ -79,7 +90,7 @@ class TestOrchestrationServiceExecute:
             WorkflowTask,
         )
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
             flow_name="DocumentProcessing/default",
             parameters={"document_id": str(uuid.uuid4())},
@@ -94,7 +105,9 @@ class TestOrchestrationServiceExecute:
         assert isinstance(result.submitted_at, datetime)
 
     @pytest.mark.asyncio
-    async def test_execute_data_pipeline_returns_submitted_status(self, mock_workflow_engine: AsyncMock) -> None:
+    async def test_execute_data_pipeline_returns_submitted_status(
+        self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
+    ) -> None:
         """data_pipeline 返回的 status 应来自 engine"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
@@ -103,7 +116,7 @@ class TestOrchestrationServiceExecute:
 
         mock_workflow_engine.get_flow_status = AsyncMock(return_value=FlowStatus.RUNNING)
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
             flow_name="DocumentProcessing/default",
             parameters={"document_id": str(uuid.uuid4())},
@@ -114,22 +127,29 @@ class TestOrchestrationServiceExecute:
         assert result.status == FlowStatus.RUNNING
 
     @pytest.mark.asyncio
-    async def test_execute_agent_reasoning_raises_not_implemented(self, mock_workflow_engine: AsyncMock) -> None:
-        """agent_reasoning 类型在 MVP 阶段应抛出 NotImplementedError"""
+    async def test_execute_agent_reasoning_routes_to_agent_engine(
+        self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
+    ) -> None:
+        """agent_reasoning 类型应委托给 AgentEnginePort"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
             WorkflowTask,
         )
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(
-            flow_name="AgentReasoning",
-            parameters={},
+            flow_name="BasicAgent",
+            parameters={"task_description": "分析市场趋势", "agent_role": "analyst"},
             task_type="agent_reasoning",
         )
 
-        with pytest.raises(NotImplementedError):
-            await service.execute(task)
+        result = await service.execute(task)
+
+        mock_agent_engine.submit_graph.assert_called_once_with(
+            "BasicAgent",
+            {"task_description": "分析市场趋势", "agent_role": "analyst"},
+        )
+        assert isinstance(result.status, FlowStatus)
 
 
 class TestWorkflowTaskValueObject:
@@ -164,28 +184,30 @@ class TestOrchestrationServiceValidation:
     """参数验证测试"""
 
     @pytest.mark.asyncio
-    async def test_execute_rejects_empty_flow_name(self, mock_workflow_engine: AsyncMock) -> None:
+    async def test_execute_rejects_empty_flow_name(self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock) -> None:
         """空 flow_name 应抛出 ValueError"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
             WorkflowTask,
         )
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(flow_name="", parameters={}, task_type="data_pipeline")
 
         with pytest.raises(ValueError, match="flow_name 不能为空"):
             await service.execute(task)
 
     @pytest.mark.asyncio
-    async def test_execute_rejects_empty_parameters_for_data_pipeline(self, mock_workflow_engine: AsyncMock) -> None:
+    async def test_execute_rejects_empty_parameters_for_data_pipeline(
+        self, mock_workflow_engine: AsyncMock, mock_agent_engine: AsyncMock
+    ) -> None:
         """data_pipeline 空参数应抛出 ValueError"""
         from src.application.services.orchestration_service import (
             OrchestrationService,
             WorkflowTask,
         )
 
-        service = OrchestrationService(mock_workflow_engine)
+        service = OrchestrationService(mock_workflow_engine, mock_agent_engine)
         task = WorkflowTask(flow_name="test/default", parameters={}, task_type="data_pipeline")
 
         with pytest.raises(ValueError, match="parameters"):
