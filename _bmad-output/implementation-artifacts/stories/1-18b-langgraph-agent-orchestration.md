@@ -175,8 +175,10 @@ DualChannelEventBus → Outbox/RabbitMQ
 **验证标准/Validation Criteria:**
 - [ ] OrchestrationService 构造函数新增 `agent_engine: AgentEnginePort` 参数
 - [ ] `execute()` 方法 `agent_reasoning` 分支替换 `NotImplementedError`
+- [ ] agent_reasoning 分支参数校验（graph_name 非空）
 - [ ] 仅依赖 AgentEnginePort 端口（不导入 infrastructure 层）
 - [ ] `data_pipeline` 路由逻辑不变（回归测试）
+- [ ] 现有测试更新：9个测试方法需添加 `mock_agent_engine` 参数
 
 ### AC-6: Composition Root 注册
 
@@ -280,7 +282,7 @@ DualChannelEventBus → Outbox/RabbitMQ
   - `execute()` 中 `agent_reasoning` 分支替换 `NotImplementedError`
   - 仅依赖端口接口（不导入 infrastructure 层）
   - 新增 `TYPE_CHECKING` 块导入 `AgentEnginePort`（参考现有 WorkflowEnginePort 导入模式，第21-22行）
-  - 更新 `composition_root.py` 第861-872行 `orchestration_service` 注册（当前 interface=OrchestrationService 类本身，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）
+  - 更新 `composition_root.py` 第858-872行 `orchestration_service` 注册（当前 interface=OrchestrationService 类本身，lambda 工厂需新增 `resolver.resolve("agent_engine")` 参数）
 
 #### 统一端口注册与接口治理
 - [ ] 端口注册：composition_root.py 新增 agent_engine 注册
@@ -741,7 +743,7 @@ DualChannelEventBus → ChannelRouter(RELIABLE) → Outbox → RabbitMQ
 | BLM 六阶段状态图 | ❌ 不实现 | Epic 5/6 |
 | BEM 六阶段状态图 | ❌ 不实现 | Epic 15 |
 | 多 Agent 协作图 | ❌ 不实现 | Epic 9 |
-| Checkpoint 双模式恢复 | ❌ 仅 InMemorySaver | Story 6.6（Replay/Override） |
+| Checkpoint 基础机制 | ✅ InMemorySaver（MVP） | Story 6.6（PostgreSQL Checkpointer + Replay/Override） |
 | OrchestrationService | ✅ 双引擎路由 | 同 |
 | SYS Agent 裁决 | ❌ 不实现 | Story 9.6 |
 | CheckpointReached 事件 | ✅ 定义（Graph 可选发布） | Story 6.3 完整实现 |
@@ -910,6 +912,10 @@ sisys/
 - `src/infrastructure/messaging/dual_channel_event_bus.py` — 双通道事件总线
 - `src/infrastructure/messaging/channel_router.py` — ChannelRouter（AgentDecided/Checkpoint 已注册）
 - `src/domain/entities/agent.py` — Agent 实体
+
+**已有文件（需修改）:**
+- `src/application/services/orchestration_service.py` — 新增 agent_engine 参数 + agent_reasoning 路由
+- `src/composition_root.py` — 注册 agent_engine + 更新 orchestration_service 注册
 
 ---
 
