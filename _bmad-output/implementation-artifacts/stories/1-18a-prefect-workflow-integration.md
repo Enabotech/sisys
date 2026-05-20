@@ -649,7 +649,7 @@ OrchestrationService.execute(task)
 - Prefect 3.6.25 使用 `prefect.flow()` 和 `prefect.task()` 装饰器
 - 状态查询通过 `prefect.client.orchestration.PrefectClient` 的 `read_flow_run()` 方法
 - Prefect StateType 枚举（9个）：SCHEDULED, PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, CRASHED, PAUSED, CANCELLING
-- **Prefect 无 RETRYING 状态**：FlowStatus.RETRYING 由 PrefectEngine 根据重试策略（`retries` 参数 + FAILED 状态）综合判定
+- **Prefect Retrying 状态主要用于 task 级别**：flow run 级别状态不直接使用 Retrying，PrefectEngine 需综合判定（`retries` 参数 + FAILED 状态 → FlowStatus.RETRYING）
 - PrefectEngine 状态映射策略：
   - SCHEDULED/PENDING → FlowStatus.PENDING
   - RUNNING → FlowStatus.RUNNING
@@ -845,6 +845,7 @@ sisys/
 - `src/domain/value_objects/__init__.py` — 导出 FlowStatus
 - `src/domain/events/__init__.py` — 导出 RAGIndexed, ReportGenerated
 - `src/application/services/__init__.py` — 导出 OrchestrationService
+- `src/infrastructure/workflow/__init__.py` — 导出 PrefectEngine
 - `config/event_channels.yaml` — 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
 - `src/composition_root.py` — 注册 workflow_engine + orchestration_service
 
@@ -942,7 +943,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-19
 **最后更新/Last Updated:** 2026-05-20
-**更新说明:** Round 4 审查修正 — DI注册TDD循环表补全、Task 0追溯矩阵行、PrefectClient异步模式和FlowRun返回值文档化。
+**更新说明:** Round 5（最终轮）审查修正 — 补充 workflow __init__.py 导出、修正 Prefect Retrying 状态描述。5轮审查共修复 24 项问题（P0: 5项, P1: 12项, P2: 7项）。审查完成。
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -970,3 +971,5 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 20 | DI 注册子任务 3.10-3.12 缺少 TDD 循环表（仅有 checkbox） | P1 | 添加 TDD 循环表（红:契约测试→绿:composition_root→重构:链路验证），重新标注 subtask 阶段 | ✅ R4 |
 | 21 | 追溯矩阵缺少 Task 0 行，验收测试文件无追溯 | P2 | 新增 Task 0 行，关联 `test_story_1_18a.feature` 和 `test_story_1_18a_steps.py` | ✅ R4 |
 | 22 | Dev Notes 未说明 PrefectClient 异步获取模式（`get_client()` 而非直接构造）和 `create_flow_run()` 返回 `FlowRun` 模型 | P1 | 补充 PrefectClient 使用模式、`FlowRun.id` 获取方式、`DocumentProcessed.document_id` 为 UUID 类型 | ✅ R4 |
+| 23 | Updated Files 缺少 `src/infrastructure/workflow/__init__.py`（需导出 PrefectEngine） | P1 | 添加到 Updated Files 列表 | ✅ R5 |
+| 24 | "Prefect 无 RETRYING 状态"事实不准确（Prefect 有 Retrying 状态，主要用于 task 级别） | P2 | 修正为"Prefect Retrying 状态主要用于 task 级别，flow run 级别需综合判定" | ✅ R5 |
