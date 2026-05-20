@@ -608,7 +608,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 - **入口/出口**：`graph.add_edge(START, "first_node")` + `graph.add_edge("last_node", END)`（`START`/`END` 从 `langgraph.graph` 导入）
 - **编译执行**：`compiled = graph.compile(checkpointer=InMemorySaver())` → `result = await compiled.ainvoke(state, config)`
 - **状态 Schema**：使用 `TypedDict` 定义，节点返回 `dict` 更新状态
-- **Checkpoint**：`from langgraph.checkpoint.memory import InMemorySaver`（注意：不是 `MemorySaver`）
+- **Checkpoint**：`from langgraph.checkpoint.memory import InMemorySaver`（MemorySaver 是 InMemorySaver 的别名，用于向后兼容）
 - **线程隔离**：通过 `config={"configurable": {"thread_id": "unique_id"}}` 实现并发隔离
 - **状态查询**：`compiled.get_state(config)` 获取当前状态
 
