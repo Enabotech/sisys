@@ -318,10 +318,6 @@ jobs:
       - name: 初始化环境
         shell: bash
         run: |
-          set -a
-          source ./.env
-          set +a
-
           docker network create sisys-network 2>/dev/null || true
           docker compose -f ./deploy/app/docker-compose.yml up -d
 
