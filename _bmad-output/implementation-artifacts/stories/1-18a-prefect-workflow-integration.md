@@ -337,6 +337,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | **TDD 单元测试** | DocumentProcessingFlow | 流程执行 + 事件发布 | `test_document_processing_flow.py` | Task 3 |
 | **TDD 单元测试** | OrchestrationService | 路由逻辑 | `test_orchestration_service.py` | Task 3 |
 | **TDD 单元测试** | RAGIndexed/ReportGenerated | 事件 roundtrip | `test_workflow_events.py` | Task 3 |
+| **TDD 单元测试** | Composition Root | workflow 注册链路 | `test_composition_root_workflow.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1_18a.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_1_18a_steps.py` | Task 0 |
 | **TDD 契约测试** | WorkflowEnginePort | 端口注册/解析/兼容性 | `test_port_contract_workflow_engine.py` | Task 3 |
@@ -638,9 +639,18 @@ OrchestrationService.execute(task)
 
 ### Prefect 3.x API 注意事项
 
-- Prefect 3.x 使用 `prefect.flow()` 和 `prefect.task()` 装饰器
+- Prefect 3.6.25 使用 `prefect.flow()` 和 `prefect.task()` 装饰器
 - 状态查询通过 `prefect.client.orchestration.PrefectClient` 的 `read_flow_run()` 方法
-- 状态映射：Prefect State → FlowStatus 枚举（COMPLETED→COMPLETED, FAILED→FAILED, PENDING→PENDING, RUNNING→RUNNING, RETRYING→RETRYING）
+- Prefect StateType 枚举（9个）：SCHEDULED, PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, CRASHED, PAUSED, CANCELLING
+- **Prefect 无 RETRYING 状态**：FlowStatus.RETRYING 由 PrefectEngine 根据重试策略（`retries` 参数 + FAILED 状态）综合判定
+- PrefectEngine 状态映射策略：
+  - SCHEDULED/PENDING → FlowStatus.PENDING
+  - RUNNING → FlowStatus.RUNNING
+  - COMPLETED → FlowStatus.COMPLETED
+  - FAILED（重试次数未耗尽）→ FlowStatus.RETRYING
+  - FAILED（重试次数耗尽）→ FlowStatus.FAILED
+  - CANCELLED/CRASHED/CANCELLING/PAUSED → FlowStatus.FAILED
+- `flow_run_id` 类型：Prefect 使用 `uuid.UUID`，WorkflowEnginePort 使用 `str`，PrefectEngine 负责 `str↔UUID` 转换
 - 测试中 mock `prefect` 模块：`@patch("src.infrastructure.workflow.prefect_engine.pf_client")`
 
 ### DocumentProcessingFlow 数据流
@@ -744,8 +754,9 @@ sisys/
 **应用到本故事:**
 - [ ] PrefectConfig 遵循 frozen dataclass + from_env() 模式
 - [ ] PrefectEngine 通过构造函数注入 EventPublisher（不直接创建）
-- [ ] OrchestrationService 不导入 infrastructure 层任何类
+- [ ] OrchestrationService 注册为 SINGLETON（无状态路由服务，与 UnifiedStorageGateway SCOPED 不同：后者持有 request-scoped session，前者纯委托无状态）
 - [ ] 测试使用 mock Prefect SDK，不启动真实 server
+- [ ] OrchestrationService 不导入 infrastructure 层任何类
 - [ ] 契约测试覆盖端口注册/解析/兼容性
 
 ---
@@ -821,7 +832,9 @@ sisys/
 
 **更新的文件/Updated Files:**
 - `src/domain/ports/__init__.py` — 导出 WorkflowEnginePort
+- `src/domain/value_objects/__init__.py` — 导出 FlowStatus
 - `src/domain/events/__init__.py` — 导出 RAGIndexed, ReportGenerated
+- `src/application/services/__init__.py` — 导出 OrchestrationService
 - `config/event_channels.yaml` — 新增 RAGIndexed/ReportGenerated 映射（DeliveryMode.RELIABLE）
 - `src/composition_root.py` — 注册 workflow_engine + orchestration_service
 
@@ -919,7 +932,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-19
 **最后更新/Last Updated:** 2026-05-20
-**更新说明:** Round 2 审查修正 — 修正残留DEFAULT_MAPPINGS引用、追溯矩阵对齐、覆盖率统一、pseudocode WorkflowResult构造、文件清单修正、Task 0 AC覆盖扩展。
+**更新说明:** Round 3 审查修正 — 修正Prefect StateType映射策略、补充Updated Files缺失项、测试分类表补全、OrchestrationService生命周期说明。
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
@@ -938,3 +951,9 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 11 | 文件清单错误列出 `channel_router.py`，缺少 `config/event_channels.yaml` | P0 | 替换为 `config/event_channels.yaml` | ✅ R2 |
 | 12 | Task 0 AC 覆盖不完整（仅 AC-1, AC-5） | P1 | 扩展为 AC-1~AC-7 全覆盖 | ✅ R2 |
 | 13 | 追溯矩阵缺少 `test_composition_root_workflow.py` 行 | P1 | 新增 AC-7 Composition Root 注册验证行，关联 Subtask 3.12 | ✅ R2 |
+| 14 | Prefect StateType 有9个状态（含 SCHEDULED/CANCELLED/CRASHED/PAUSED/CANCELLING），Story 的 FlowStatus 仅5个且 RETRYING 不存在于 Prefect | P1 | Dev Notes 补充完整 9→5 状态映射策略，说明 RETRYING 由 PrefectEngine 综合判定、flow_run_id str↔UUID 转换 | ✅ R3 |
+| 15 | Updated Files 缺少 `src/domain/value_objects/__init__.py`（FlowStatus 需导出） | P1 | 添加到 Updated Files 列表 | ✅ R3 |
+| 16 | Updated Files 缺少 `src/application/services/__init__.py`（OrchestrationService 需导出） | P1 | 添加到 Updated Files 列表 | ✅ R3 |
+| 17 | `test_composition_root_workflow.py` 在追溯矩阵和文件清单中但不在测试分类表中 | P1 | 测试分类表新增一行 | ✅ R3 |
+| 18 | OrchestrationService 注册为 SINGLETON 缺少与 UnifiedStorageGateway(SCOPED) 的区别说明 | P2 | Dev Notes 补充 SINGLETON 理由（无状态路由服务 vs request-scoped session） | ✅ R3 |
+| 19 | 应用到本故事条目中"测试使用 mock Prefect SDK"重复出现 | P2 | 删除重复行 | ✅ R3 |
