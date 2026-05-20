@@ -63,8 +63,9 @@ class TestOrchestrationEndToEnd:
             mock_get_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_get_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            # OrchestrationService 使用真实 PrefectEngine
-            service = OrchestrationService(engine)
+            # OrchestrationService 使用真实 PrefectEngine + mock AgentEngine
+            mock_agent_engine = AsyncMock()
+            service = OrchestrationService(engine, mock_agent_engine)
             task = WorkflowTask(
                 flow_name="DocumentProcessing/default",
                 parameters={

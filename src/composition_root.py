@@ -855,6 +855,25 @@ def bootstrap() -> None:
         tags=("workflow", "prefect"),
     )
 
+    # Agent Engine — LangGraph Agent 编排引擎适配器
+    from src.domain.ports.agent_engine import AgentEnginePort
+    from src.infrastructure.agent_orch.langgraph_engine import LangGraphEngine
+    from src.infrastructure.config.langgraph import LangGraphConfig
+
+    register_port(
+        name="agent_engine",
+        version="v1.0.0",
+        interface=AgentEnginePort,
+        impl=lambda resolver: LangGraphEngine(
+            LangGraphConfig.from_env(),
+            resolver.resolve("event_publisher"),
+        ),
+        module="src.infrastructure.agent_orch.langgraph_engine",
+        lifetime=Lifetime.SINGLETON,
+        owner="platform",
+        tags=("agent", "langgraph"),
+    )
+
     # OrchestrationService — 应用层编排服务
     from src.application.services.orchestration_service import OrchestrationService
 
@@ -864,6 +883,7 @@ def bootstrap() -> None:
         interface=OrchestrationService,
         impl=lambda resolver: OrchestrationService(
             resolver.resolve("workflow_engine"),
+            resolver.resolve("agent_engine"),
         ),
         module="src.application.services.orchestration_service",
         lifetime=Lifetime.SINGLETON,
