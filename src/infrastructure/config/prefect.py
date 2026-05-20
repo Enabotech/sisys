@@ -35,14 +35,21 @@ class PrefectConfig:
     def from_env(cls) -> PrefectConfig:
         """从环境变量创建配置实例
 
+        空字符串环境变量视为未设置，使用默认值。
+
         Returns:
             PrefectConfig 实例
         """
+
+        def _env_int(key: str, default: int) -> int:
+            value = os.getenv(key, "")
+            return int(value) if value else default
+
         return cls(
-            api_url=os.getenv("PREFECT_API_URL", "http://localhost:4200/api"),
-            work_pool_name=os.getenv("PREFECT_WORK_POOL_NAME", "sisys-worker-pool"),
-            retry_max_attempts=int(os.getenv("PREFECT_RETRY_MAX_ATTEMPTS", "3")),
-            retry_delay_seconds=int(os.getenv("PREFECT_RETRY_DELAY_SECONDS", "30")),
-            task_timeout_seconds=int(os.getenv("PREFECT_TASK_TIMEOUT_SECONDS", "300")),
-            flow_timeout_seconds=int(os.getenv("PREFECT_FLOW_TIMEOUT_SECONDS", "3600")),
+            api_url=os.getenv("PREFECT_API_URL", "http://localhost:4200/api") or "http://localhost:4200/api",
+            work_pool_name=os.getenv("PREFECT_WORK_POOL_NAME", "sisys-worker-pool") or "sisys-worker-pool",
+            retry_max_attempts=_env_int("PREFECT_RETRY_MAX_ATTEMPTS", 3),
+            retry_delay_seconds=_env_int("PREFECT_RETRY_DELAY_SECONDS", 30),
+            task_timeout_seconds=_env_int("PREFECT_TASK_TIMEOUT_SECONDS", 300),
+            flow_timeout_seconds=_env_int("PREFECT_FLOW_TIMEOUT_SECONDS", 3600),
         )

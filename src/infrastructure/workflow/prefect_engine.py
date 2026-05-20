@@ -12,6 +12,7 @@ Copyright:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,8 @@ from src.infrastructure.config.prefect import PrefectConfig
 
 if TYPE_CHECKING:
     from src.domain.ports.event_publisher import EventPublisher
+
+logger = logging.getLogger(__name__)
 
 
 class PrefectEngine:
@@ -52,14 +55,26 @@ class PrefectEngine:
 
         Returns:
             flow_run_id 字符串
+
+        Raises:
+            ValueError: flow_name 为空或格式无效
+            RuntimeError: Prefect server 连接或 API 调用失败
         """
-        async with get_client() as client:
-            deployment = await client.read_deployment_by_name(flow_name)
-            flow_run = await client.create_flow_run_from_deployment(
-                deployment_id=deployment.id,
-                parameters=parameters,
-            )
-            return str(flow_run.id)
+        if not flow_name or "/" not in flow_name:
+            raise ValueError(f"flow_name 格式无效: '{flow_name}'，期望 '<FLOW_NAME>/<DEPLOYMENT_NAME>'")
+
+        try:
+            async with get_client() as client:
+                deployment = await client.read_deployment_by_name(flow_name)
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=deployment.id,
+                    parameters=parameters,
+                )
+                return str(flow_run.id)
+        except ValueError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"提交工作流失败 [{flow_name}]: {e}") from e
 
     async def get_flow_status(self, flow_run_id: str) -> FlowStatus:
         """查询工作流状态
@@ -69,10 +84,21 @@ class PrefectEngine:
 
         Returns:
             FlowStatus 枚举值
+
+        Raises:
+            ValueError: flow_run_id 不是有效的 UUID 格式
+            RuntimeError: Prefect server 连接或 API 调用失败
         """
-        run_uuid = uuid.UUID(flow_run_id)
-        async with get_client() as client:
-            flow_run = await client.read_flow_run(run_uuid)
+        try:
+            run_uuid = uuid.UUID(flow_run_id)
+        except ValueError:
+            raise ValueError(f"flow_run_id 格式无效: '{flow_run_id}'，期望 UUID 格式") from None
+
+        try:
+            async with get_client() as client:
+                flow_run = await client.read_flow_run(run_uuid)
+        except Exception as e:
+            raise RuntimeError(f"查询工作流状态失败 [{flow_run_id}]: {e}") from e
 
         return self._map_state_type(flow_run.state, flow_run.run_count)
 

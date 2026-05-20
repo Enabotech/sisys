@@ -63,8 +63,14 @@ class OrchestrationService:
             工作流执行结果
 
         Raises:
+            ValueError: task 参数无效
             NotImplementedError: agent_reasoning 由 Story 1.18b 实现
         """
+        if not task.flow_name:
+            raise ValueError("flow_name 不能为空")
+        if not task.parameters and task.task_type == "data_pipeline":
+            raise ValueError("data_pipeline 任务必须提供 parameters")
+
         if task.task_type == "data_pipeline":
             flow_run_id = await self._workflow_engine.submit_flow(task.flow_name, task.parameters)
             status = await self._workflow_engine.get_flow_status(flow_run_id)

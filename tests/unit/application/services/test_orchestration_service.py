@@ -106,7 +106,7 @@ class TestOrchestrationServiceExecute:
         service = OrchestrationService(mock_workflow_engine)
         task = WorkflowTask(
             flow_name="DocumentProcessing/default",
-            parameters={},
+            parameters={"document_id": str(uuid.uuid4())},
             task_type="data_pipeline",
         )
 
@@ -158,3 +158,35 @@ class TestWorkflowTaskValueObject:
         )
         with pytest.raises(AttributeError):
             result.flow_run_id = "changed"  # type: ignore[misc]
+
+
+class TestOrchestrationServiceValidation:
+    """参数验证测试"""
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_empty_flow_name(self, mock_workflow_engine: AsyncMock) -> None:
+        """空 flow_name 应抛出 ValueError"""
+        from src.application.services.orchestration_service import (
+            OrchestrationService,
+            WorkflowTask,
+        )
+
+        service = OrchestrationService(mock_workflow_engine)
+        task = WorkflowTask(flow_name="", parameters={}, task_type="data_pipeline")
+
+        with pytest.raises(ValueError, match="flow_name 不能为空"):
+            await service.execute(task)
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_empty_parameters_for_data_pipeline(self, mock_workflow_engine: AsyncMock) -> None:
+        """data_pipeline 空参数应抛出 ValueError"""
+        from src.application.services.orchestration_service import (
+            OrchestrationService,
+            WorkflowTask,
+        )
+
+        service = OrchestrationService(mock_workflow_engine)
+        task = WorkflowTask(flow_name="test/default", parameters={}, task_type="data_pipeline")
+
+        with pytest.raises(ValueError, match="parameters"):
+            await service.execute(task)

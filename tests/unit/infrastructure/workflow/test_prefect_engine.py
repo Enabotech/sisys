@@ -146,3 +146,31 @@ class TestPrefectEngineGetFlowStatus:
             status = await engine.get_flow_status(str(uuid.uuid4()))
 
         assert status == FlowStatus.PENDING
+
+
+class TestPrefectEngineInputValidation:
+    """输入验证测试"""
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_rejects_empty_flow_name(self, engine: PrefectEngine) -> None:
+        """空 flow_name 应抛出 ValueError"""
+        with pytest.raises(ValueError, match="flow_name 格式无效"):
+            await engine.submit_flow("", {})
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_rejects_flow_name_without_slash(self, engine: PrefectEngine) -> None:
+        """无斜杠的 flow_name 应抛出 ValueError"""
+        with pytest.raises(ValueError, match="flow_name 格式无效"):
+            await engine.submit_flow("NoSlashHere", {})
+
+    @pytest.mark.asyncio
+    async def test_get_flow_status_rejects_invalid_uuid(self, engine: PrefectEngine) -> None:
+        """无效 UUID 格式应抛出 ValueError"""
+        with pytest.raises(ValueError, match="flow_run_id 格式无效"):
+            await engine.get_flow_status("not-a-uuid")
+
+    @pytest.mark.asyncio
+    async def test_get_flow_status_rejects_empty_string(self, engine: PrefectEngine) -> None:
+        """空字符串应抛出 ValueError"""
+        with pytest.raises(ValueError, match="flow_run_id 格式无效"):
+            await engine.get_flow_status("")
