@@ -163,7 +163,7 @@ SISYS 基于 `trigger(event) → route(routing) → execute(execution)` 自主�
 │  │  └── restore_snapshot(session_id) → CheckpointSnapshot                     │  │
 │  └────────────────────────────┬───────────────────────────────────────────────┘  │
 │                               │                                                   │
-│                    AutoExecuted (RELIABLE)                                         │
+│                    AutoExecuted (REALTIME)                                         │
 │                    {session_id, task_context, execution_result,                   │
 │                     cost_estimate, latency_ms, business_event_type}               │
 │                               │                                                   │
@@ -544,7 +544,7 @@ class AutoTriggerContext:
 | `SandboxExecutor` | `src/application/ports/sandbox_port.py` | Application | `start/execute/stop/is_running` |
 
 **设计规则：**
-- 所有端口使用 `typing.Protocol` + `@runtime_checkable`
+- 所有端口使用 `typing.Protocol` + `@runtime_checkable`（`SandboxExecutor` 除外，位于 application/ports/ 未加装饰器，通过结构化类型兼容）
 - async 操作的 Protocol 签名必须为 async
 - 端口定义在 domain/ports/ 或 application/ports/（取决于依赖方向）
 - 基础设施层提供 Protocol 的具体实现
@@ -666,7 +666,7 @@ AutoExecuted                          业务领域事件
 7. AutoRouteService._make_routing_decision() → AutoRouted
 8. AutoRouted → DualChannelEventBus.publish() → REALTIME 通道
 9. AutoExecuteService.on_routed_event() → 沙箱执行 + 快照保存
-10. AutoExecuted → DualChannelEventBus.publish() → RELIABLE 通道
+10. AutoExecuted → DualChannelEventBus.publish() → REALTIME 通道
 11. AutoExecuteCompletedHandler.on_executed() → 分发业务事件
 12. 业务事件 → DualChannelEventBus → 回到步骤 2（自主调用循环）
 ```
@@ -689,7 +689,7 @@ AutoExecuted                          业务领域事件
 │              HashRouter 架构                         │
 │                                                      │
 │  ┌────────────────────────────────────────────────┐  │
-│  │  一致性哈希环（Sorted Array + 二分查找）          │  │
+│  │  一致性哈希环（Sorted Array + 顺序查找）          │  │
 │  │                                                  │  │
 │  │  V0 ── V1 ── V2 ── ... ── Vn ── V0 (环绕)     │  │
 │  │  │      │      │              │                  │  │
@@ -699,7 +699,7 @@ AutoExecuted                          业务领域事件
 │  配置:                                               │
 │  - VIRTUAL_NODES_PER_NODE = 150（每个物理节点）      │
 │  - 支持加权（weight > 1 → 更多虚拟节点）             │
-│  - route(session_id): O(log n) 二分查找              │
+│  - route(session_id): O(n) 顺序查找（V2 优化为 bisect 二分查找）              │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -985,11 +985,11 @@ BusinessEvent (correlation_id=C1, causation_id=AutoExecuted.event_id)
 | AutoTriggered | REALTIME | Redis Pub/Sub | 尽力而为，允许丢失 |
 | AutoRouted | REALTIME | Redis Pub/Sub | 尽力而为，允许丢失 |
 | HeartbeatTriggered | REALTIME | Redis Pub/Sub | 尽力而为，允许丢失 |
-| AutoExecuted | RELIABLE | PostgreSQL Outbox + RabbitMQ | 100% 可靠传输 |
+| AutoExecuted | REALTIME | Redis Pub/Sub | 尽力而为，允许丢失 |
 | DocumentProcessed | RELIABLE | PostgreSQL Outbox + RabbitMQ | 100% 可靠传输 |
 | ToolExecuted | RELIABLE | PostgreSQL Outbox + RabbitMQ | 100% 可靠传输 |
 | AgentDecided | RELIABLE | PostgreSQL Outbox + RabbitMQ | 100% 可靠传输 |
-| RoutingDecided | RELIABLE | PostgreSQL Outbox + RabbitMQ | WORM 7 年归档 |
+| RoutingDecided | REALTIME | Redis Pub/Sub | 尽力而为，允许丢失 |
 
 ### 6.4 AutoExecuted 分发机制
 
@@ -1515,7 +1515,7 @@ DeadLetterQueue Protocol:
 │  ├── 代码执行                ~30ms   (容器内执行)            │
 │  ├── 快照保存                ~5ms    (Redis HSET + EXPIRE)   │
 │  ├── AutoExecuted 构造       ~0.1ms                           │
-│  └── Outbox 保存             ~10ms   (PostgreSQL INSERT)     │
+│  └── Redis Pub/Sub 发布      ~5ms    (网络 RTT)              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
