@@ -82,16 +82,16 @@ development_status:
   # 价值组 4: 安全与合规基础
   1-9-rbac-permission-management: done
   1-10-unified-audit-log: done
-  1-11-data-sovereignty-isolation: done  # Task 0 SDD完成，Task 1-7实现中
+  1-11-data-sovereignty-isolation: done
   1-12-equilibrium-level-3-compliance: backlog
   # 价值组 5: or.md 系统公理实现
   1-14a-autonomous-invocation-trigger: done
   1-14b-autonomous-invocation-route: done
   1-14c-autonomous-invocation-execute: done
   1-15a-externalized-memory-context-compression: done
-  1-15b-externalized-memory-six-layer-storage: done  # ✅ RBAC bug fix: L2GroupMemberRepositoryProtocol implemented
+  1-15b-externalized-memory-six-layer-storage: done
   # 价值组 6: MVP 关键机制增强
-  1-17-udmr-basic-routing: ready-for-dev
+  1-17-udmr-basic-routing: backlog
   1-18a-prefect-workflow-integration: done
   1-18b-langgraph-agent-orchestration: review
   1-19-cost-metrics-basic: backlog

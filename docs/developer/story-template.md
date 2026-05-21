@@ -55,29 +55,29 @@
 - [ ] [描述数据模型要求]
 - [ ] ...
 
-#### API 契约 (API Contract)
-- [ ] OpenAPI 定义位于 `docs/api/openapi.yaml`
-- [ ] 契约测试通过（`tests/contracts/test_api_contract_[xxx].py`）
-- [ ] API 版本管理正确（`/api/v1/[resource]`）
-
-#### 统一端口注册与接口治理
-- [ ] 端口契约位于 `src/domain/ports` 与 `src/application/ports`
+#### 统一端口定义注册与管理 (Port Contract)
+- [ ] 端口契约定义位于 `src/domain/ports` 与 `src/application/ports`
 - [ ] 端口注册中心位于 `src/domain/ports/registry.py`，所有端口必须登记为 `PortSpec`
-- [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
-- [ ] 契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
 - [ ] 端口实现仅可在 `src/composition_root.py` 统一注册，禁止业务代码直接实例化具体实现
-- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_[xxx].py`）
+- [ ] 端口解析器位于 `src/domain/ports/resolver.py`，业务代码只通过抽象解析实现
+- [ ] 端口契约门禁位于 `src/domain/ports/contract_gate.py`，端口变更必须通过兼容性检查
+- [ ] 端口契约测试通过（`tests/contracts/test_port_contract_[feature name].py`）
 - [ ] 接口命名符合单一职责，禁止同义接口重复定义
 - [ ] 端口具备唯一名称、版本、owner、兼容策略
 - [ ] 跨模块调用仅依赖抽象接口，不直接依赖实现类
 - [ ] 端口变更配套契约测试与兼容性检查
 - [ ] 禁止在服务文件中本地定义 Protocol / Port 抽象
 
-#### 契约清单执行约束（强制）
+#### 端口契约清单执行约束（强制）
 - [ ] 本模板中的端口清单是唯一事实源（Single Source of Truth）
 - [ ] 禁止新增未登记端口，禁止语义重复端口，禁止未同步更新 registry / resolver / contract test
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
+
+#### API 契约 (API Contract)
+- [ ] 遵循 OpenAPI 标准的 API 契约定义位于 `docs/api/openapi.yaml`
+- [ ] API 契约测试通过（`tests/contracts/test_api_contract_[feature name].py`）
+- [ ] API 版本管理正确（`/api/v1/[resource]`）
 
 #### 六边形架构约束（必须遵守）
 > **执行顺序：** 所有实现 Task 仅可依赖下述层间方向。领域层不得引入任何第三方依赖。
@@ -103,8 +103,8 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_x_y.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_story_x_y_steps.py`（BDD 步骤实现）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_[feature name].feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_[feature name].py`（BDD 步骤实现）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
@@ -145,11 +145,12 @@
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | [组件 A] | [验证内容描述] | `test_[component_a].py` | Task [N] |
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_x_y.feature` | Task 0 |
-| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_x_y_steps.py` | Task 0 |
-| **TDD 契约测试** | 端口契约 / 接口抽象 / registry / resolver / contract gate | 端口注册、版本、兼容性、实现解析、重复接口检测 | `test_[port]_contract.py` | Task 0 / Task [N] |
-| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_[component]_[architecture].py` | Task [N] |
-| **集成测试** | [层间协作] | [协作描述] | `test_story_x_y_[integration].py` | Task [N] |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_[feature name].feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_[feature name].py` | Task 0 |
+| **TDD 契约测试** | API 契约 / openapi 接口 | 请求/响应结构、状态码、Header、字段类型 |`test_api_contract_[feature name].py` | Task 0 |
+| **TDD 契约测试** | 端口契约 / 接口抽象 / registry / resolver / contract gate | 端口注册、版本、兼容性、实现解析、重复接口检测 | `test_port_contract_[feature name].py` | Task 0 |
+| **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_[component].py` | Task [N] |
+| **集成测试** | [层间协作] | [协作描述] | `test_integration_[feature name].py` | Task [N] |
 
 ---
 
@@ -245,13 +246,13 @@
 
 **关联 AC:** [相关 AC]
 
-> **目的：** 在进入代码实现前，明确 Schema、API 契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
+> **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。这是 SDD 规范驱动的基础。
 
 - [ ] Subtask [m.n]: 定义领域事件 Schema（[关键属性]）
 - [ ] Subtask [m.n]: 定义数据模型（[关键属性]）
 - [ ] Subtask [m.n]: 创建/更新 `docs/api/openapi.yaml`
-- [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_story_x_y.feature`
-- [ ] Subtask [m.n]: 编写 BDD 步骤实现 `tests/acceptance/test_story_x_y_steps.py`
+- [ ] Subtask [m.n]: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_[feature name].feature`
+- [ ] Subtask [m.n]: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_[feature name].py`
 - [ ] Subtask [m.n]: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -331,7 +332,7 @@
 
 #### 架构验证测试实现
 
-- [ ] Subtask [m.n]: 创建 `tests/unit/[type]/test_[architecture].py`
+- [ ] Subtask [m.n]: 创建 `tests/unit/[type]/test_arch_[feature name].py`
 - [ ] Subtask [m.n]: 实现 [验证器 A]（[验证内容]）
 - [ ] Subtask [m.n]: 实现 [验证器 B]（[验证内容]）
 - [ ] Subtask [m.n]: 实现循环依赖检测（**使用 ruff 的 `E` 规则或 `isort --check-only`，不引入 pylint**）
@@ -427,15 +428,15 @@
 |
 └── tests/
     │   ├── contracts/
-|   │   │   ├── test_port_contract_[xxx].py   # 端口 契约测试
-    │   │   └── test_api_contract_[xxx].py    # API 契约测试
+|   │   │   ├── test_port_contract_[feature name].py   # 端口契约测试
+    │   │   └── test_api_contract_[feature name].py    # API 契约测试
     │   ├── unit/[layer]/
     │   │   └── test_[component].py # 单元测试
     │   ├── integration/
-    │   │   └── test_story_x_y_[integration].py # 集成测试
+    │   │   └── test_integration_[feature name].py          # 集成测试
     │   └── acceptance/
-    │       ├── test_story_x_y.feature   # Gherkin 场景
-    │       └── test_story_x_y_steps.py  # BDD 步骤实现
+    │       ├── test_acceptance_[feature name].feature      # Gherkin 场景
+    │       └── test_acceptance_[feature name].py           # BDD 步骤实现
     └── docs/
         └── [layer]/
             └── [component]_guide.md # 实施指南
@@ -496,9 +497,9 @@
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/[layer]/[component].py` - 核心实现
 - `tests/unit/[layer]/test_[component].py` - 单元测试
-- `tests/integration/test_story_x_y_[integration].py` - 集成测试
-- `tests/acceptance/test_story_x_y.feature`   - Gherkin 场景
-- `tests/acceptance/test_story_x_y_steps.py`   - BDD 步骤实现
+- `tests/integration/test_integration_[feature name].py` - 集成测试
+- `tests/acceptance/test_acceptance_[feature name].feature`   - Gherkin 场景
+- `tests/acceptance/test_acceptance_[feature name].py`   - BDD 步骤实现
 - `docs/[layer]/[component]_guide.md` - 实施指南
 
 ---
@@ -620,7 +621,7 @@
 **最后更新/Last Updated:** 2026-05-12
 **更新说明:**
 - v2.7.0: 对齐 domain/ports/contract 契约层、Registry/Resolver/ContractGate、Composition Root 与接口清单强约束
-- v2.5.0: 新增 BDD 步骤实现文件 `test_story_x_y_steps.py` 编写要求（Story 1.15b 实战经验）
+- v2.5.0: 新增 BDD 步骤实现文件 `test_acceptance_[feature name].py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
 - v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置
