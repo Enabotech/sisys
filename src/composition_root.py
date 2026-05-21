@@ -53,7 +53,6 @@ def bootstrap() -> None:
     from src.application.ports.memory_vector_port import MemoryVectorPort
     from src.application.ports.metrics_port import MetricsPort
     from src.application.ports.public_blackboard import PublicBlackboard
-    from src.application.ports.sandbox_port import SandboxExecutor
     from src.application.ports.semantic_cache import SemanticCache
     from src.application.ports.session_cache_port import SessionCachePort
     from src.application.ports.text_extractor_service import TextExtractorService
@@ -87,7 +86,7 @@ def bootstrap() -> None:
     from src.domain.ports.saga import SagaRepositoryProtocol
 
     # Service protocols (migrated from services)
-    from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
+    from src.domain.ports.sandbox_executor import SandboxExecutor
     from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
     from src.domain.ports.sensitive_data_detector import SensitiveDataDetectorPort
     from src.domain.ports.session_storage import SessionStorage
@@ -717,15 +716,6 @@ def bootstrap() -> None:
     )
 
     # === Service Protocols ===
-    register_port(
-        name="sandbox_executor_protocol",
-        version="v1.0.0",
-        interface=SandboxExecutorProtocol,
-        impl="src.infrastructure.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
-        module="src.infrastructure.sandbox.docker_sandbox_adapter",
-        lifetime=Lifetime.TRANSIENT,
-        owner="sandbox-team",
-    )
 
     register_port(
         name="snapshot_repository",

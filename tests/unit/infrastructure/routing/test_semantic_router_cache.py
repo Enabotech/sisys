@@ -99,32 +99,27 @@ class TestSemanticRouterCache:
         self,
         mock_embedding_model: AsyncMock,
     ) -> None:
-        """Cache size behavior when exceeding limit.
+        """Cache should evict oldest entry when exceeding limit (LRU eviction).
 
-        Note: Simple in-memory cache does NOT have automatic LRU eviction.
-        Cache grows beyond MAX_CACHE_SIZE until _get_task_embedding is called,
-        which only prevents adding new items when len >= MAX_CACHE_SIZE.
-        For proper eviction, use Redis with TTL or explicit cache management.
+        OrderedDict-based LRU cache evicts the least recently used entry
+        when at capacity, then adds the new entry.
         """
         router = SemanticRouter(embedding_model=mock_embedding_model)
         router._embedding_cache.clear()
 
-        # Fill cache to limit - 1
-        for i in range(SemanticRouter.MAX_CACHE_SIZE - 1):
+        # Fill cache to limit
+        for i in range(SemanticRouter.MAX_CACHE_SIZE):
             router._embedding_cache[f"text-{i}"] = [0.1] * 1024
 
-        # Add one more - should work (len == MAX_CACHE_SIZE)
-        router._embedding_cache[f"text-{SemanticRouter.MAX_CACHE_SIZE}"] = [0.1] * 1024
         assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE
 
-        # Verify _get_task_embedding won't add more when cache is full
-        # (it checks len < MAX_CACHE_SIZE before caching)
-        initial_len = len(router._embedding_cache)
+        # Adding new entry via _get_task_embedding should evict oldest
         await router._get_task_embedding("beyond-limit-text")
-        # Should NOT add new entry since cache is at limit
-        # But current implementation doesn't prevent direct _embedding_cache[key] = value
-        # So we verify the _get_task_embedding path works correctly
-        assert initial_len == SemanticRouter.MAX_CACHE_SIZE
+
+        # Should have evicted one old entry and added the new one
+        assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE
+        assert "beyond-limit-text" in router._embedding_cache
+        assert "text-0" not in router._embedding_cache  # oldest evicted
 
     @pytest.mark.asyncio
     async def test_cache_keys_case_sensitive(

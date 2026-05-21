@@ -116,7 +116,7 @@
 
   场景: AC-4 - ExecuteService 使用 Protocol 依赖倒置
     假如 我检查 ExecuteService 实现
-    那么 应该使用 SandboxExecutorProtocol 而非具体实现
+    那么 应该使用 SandboxExecutor 而非具体实现
     并且 应该使用 SnapshotRepositoryProtocol 而非具体实现
     并且 领域层定义接口，基础设施层实现
 

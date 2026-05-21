@@ -67,7 +67,7 @@ class TestSemanticRouterGetTaskEmbedding:
 
     @pytest.mark.asyncio
     async def test_get_task_embedding_cache_not_updated_when_full(self) -> None:
-        """缓存已满时不应添加新条目"""
+        """缓存已满时应淘汰最旧条目后添加新条目（LRU 淘汰）"""
         router = SemanticRouter()
         router._embedding_cache.clear()
 
@@ -78,11 +78,12 @@ class TestSemanticRouterGetTaskEmbedding:
         # 验证缓存已满
         assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE
 
-        # 尝试获取新文本的 embedding
+        # 尝试获取新文本的 embedding（应淘汰最旧条目）
         embedding = await router._get_task_embedding("new-text-not-in-cache")
 
-        # 新文本不应被缓存
-        assert "new-text-not-in-cache" not in router._embedding_cache
+        # 新文本应被缓存（替换了最旧的 text-0）
+        assert "new-text-not-in-cache" in router._embedding_cache
+        assert "text-0" not in router._embedding_cache
         assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE
         # 仍应返回 embedding（零向量）
         assert embedding == [0.0] * SemanticRouter.DEFAULT_EMBEDDING_DIM

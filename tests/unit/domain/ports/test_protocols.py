@@ -12,7 +12,7 @@ import pytest
 
 from src.domain.ports.connection_manager import ConnectionManager
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
-from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
+from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 
@@ -76,11 +76,11 @@ class TestSemanticRouterProtocol:
         assert not isinstance(instance, SemanticRouterProtocol)
 
 
-class TestSandboxExecutorProtocol:
-    """SandboxExecutorProtocol 结构化类型测试"""
+class TestSandboxExecutor:
+    """SandboxExecutor 结构化类型测试"""
 
     def test_runtime_checkable_with_compatible_class(self) -> None:
-        """实现所有三个方法的类应通过 isinstance 检查"""
+        """实现所有四个方法的类应通过 isinstance 检查"""
 
         class CompatibleExecutor:
             async def start_container(self, session_id: str) -> None:
@@ -92,8 +92,11 @@ class TestSandboxExecutorProtocol:
             async def stop_container(self, session_id: str) -> None:
                 pass
 
+            async def is_container_running(self, session_id: str) -> bool:
+                return False
+
         instance = CompatibleExecutor()
-        assert isinstance(instance, SandboxExecutorProtocol)
+        assert isinstance(instance, SandboxExecutor)
 
     def test_runtime_checkable_missing_method(self) -> None:
         """缺少方法不应通过 isinstance 检查"""
@@ -103,7 +106,7 @@ class TestSandboxExecutorProtocol:
                 pass
 
         instance = PartialExecutor()
-        assert not isinstance(instance, SandboxExecutorProtocol)
+        assert not isinstance(instance, SandboxExecutor)
 
     @pytest.mark.asyncio
     async def test_execute_code_returns_dict(self) -> None:
@@ -118,6 +121,9 @@ class TestSandboxExecutorProtocol:
 
             async def stop_container(self, session_id: str) -> None:
                 pass
+
+            async def is_container_running(self, session_id: str) -> bool:
+                return True
 
         executor = ExecutorImpl()
         result = await executor.execute_code("sess-1", "print('hello')")

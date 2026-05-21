@@ -12,6 +12,7 @@ Copyright:
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -32,7 +33,7 @@ class HashNode:
 class HashRouter:
     """一致性哈希路由器，基于 FNV-1a 哈希实现会话路由
 
-    提供 O(log n) 路由复杂度，节点增删时最小化重分配。使用虚拟节点确保均匀分布
+    提供 O(log n) 路由复杂度（bisect 二分查找），节点增删时最小化重分配。使用虚拟节点确保均匀分布
 
     Attributes:
         VIRTUAL_NODES_PER_NODE: 每个物理节点的虚拟节点数
@@ -101,11 +102,10 @@ class HashRouter:
 
         key = self._hash(session_id)
 
-        # 二分查找第一个大于等于 key 的节点
-        # 如果 key 大于所有节点，环绕到第一个节点
-        for ring_key in self._sorted_keys:
-            if ring_key >= key:
-                return self._ring[ring_key]
+        # bisect 二分查找第一个大于等于 key 的节点
+        pos = bisect.bisect_left(self._sorted_keys, key)
+        if pos < len(self._sorted_keys):
+            return self._ring[self._sorted_keys[pos]]
 
         # 环绕到第一个节点
         return self._ring[self._sorted_keys[0]]

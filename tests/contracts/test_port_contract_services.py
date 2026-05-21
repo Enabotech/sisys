@@ -1,7 +1,7 @@
 """Service protocol port contract tests.
 
 Tests that redis_connection_manager, postgresql_connection_manager, qdrant_connection_manager,
-neo4j_connection_manager, audit_service, semantic_router, sandbox_executor_protocol ports
+neo4j_connection_manager, audit_service, semantic_router ports
 are correctly registered and satisfy their Protocol interfaces.
 对应 AC-5: 全部 domain/ports 服务协议端口契约测试完成
 """
@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from src.domain.ports.audit_service import AuditServicePort
 from src.domain.ports.connection_manager import ConnectionManager
-from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 
 
@@ -188,37 +187,6 @@ class TestSemanticRouterProtocol:
     PORT_NAME = "semantic_router"
     INTERFACE = SemanticRouterProtocol
     REQUIRED_METHODS = ["route"]
-
-    def test_port_is_registered(self, registry) -> None:
-        """Port must be registered in global registry."""
-        spec = registry.get(self.PORT_NAME)
-        assert spec is not None, f"Port {self.PORT_NAME} not registered"
-        assert spec.interface is self.INTERFACE
-
-    def test_implementation_has_required_methods(self, registry) -> None:
-        """Implementation must have all required methods from protocol."""
-        spec = registry.get(self.PORT_NAME)
-        impl = _get_impl(spec, self.PORT_NAME)
-        if impl is None:
-            return
-        for method in self.REQUIRED_METHODS:
-            assert hasattr(impl, method), f"Implementation missing method: {method}"
-            assert callable(getattr(impl, method)), f"{method} is not callable"
-
-    def test_metadata_complete(self, registry) -> None:
-        """Port metadata must be complete."""
-        spec = registry.get(self.PORT_NAME)
-        assert spec.version is not None and spec.version != "", f"{spec.name} version is empty"
-        assert spec.owner is not None and spec.owner != "", f"{spec.name} owner is empty"
-        assert spec.module is not None and spec.module != "", f"{spec.name} module is empty"
-
-
-class TestSandboxExecutorProtocol:
-    """Contract tests for SandboxExecutor port."""
-
-    PORT_NAME = "sandbox_executor_protocol"
-    INTERFACE = SandboxExecutorProtocol
-    REQUIRED_METHODS = ["start_container", "execute_code", "stop_container"]
 
     def test_port_is_registered(self, registry) -> None:
         """Port must be registered in global registry."""

@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.application.ports.sandbox_port import (
+from src.domain.ports.sandbox_executor import (
     ContainerStartError,
     ContainerStopError,
     ExecutionError,

@@ -8,7 +8,7 @@ class TestExecuteArchitecture:
 
     Validates hexagonal architecture constraints:
     - ExecuteService is in domain layer (no external framework dependencies)
-    - SandboxExecutor port is in interfaces layer
+    - SandboxExecutor port is in domain layer (ports)
     - Infrastructure implementations are in infrastructure layer
     - No circular dependencies between layers
     """
@@ -29,11 +29,11 @@ class TestExecuteArchitecture:
         if "from src.interfaces" in content:
             assert "Protocol" in content, "AutoExecuteService must only import interfaces.Protocol for ports"
 
-    def test_sandbox_executor_port_in_application_layer(self) -> None:
-        """SandboxExecutor port must be in application layer (hexagonal port definition)."""
-        port_path = Path("src/application/ports/sandbox_port.py")
+    def test_sandbox_executor_port_in_domain_layer(self) -> None:
+        """SandboxExecutor port must be in domain layer (hexagonal port definition)."""
+        port_path = Path("src/domain/ports/sandbox_executor.py")
 
-        assert port_path.exists(), "SandboxExecutor port must exist in application/ports/"
+        assert port_path.exists(), "SandboxExecutor port must exist in domain/ports/"
 
     def test_docker_sandbox_adapter_in_infrastructure_layer(self) -> None:
         """DockerSandboxAdapter must be in infrastructure layer."""
@@ -77,9 +77,9 @@ class TestExecuteArchitecture:
                     f"{file_path} must not import from infrastructure directly"
                 )
 
-    def test_interfaces_layer_defines_ports(self) -> None:
-        """Interfaces layer must define ports (Protocol interfaces)."""
-        port_file = Path("src/application/ports/sandbox_port.py")
+    def test_domain_layer_defines_ports(self) -> None:
+        """Domain layer must define ports (Protocol interfaces)."""
+        port_file = Path("src/domain/ports/sandbox_executor.py")
 
         content = port_file.read_text()
 
@@ -90,12 +90,12 @@ class TestExecuteArchitecture:
         assert "async def stop_container" in content, "Port must define stop_container method"
 
     def test_infrastructure_implements_ports(self) -> None:
-        """Infrastructure layer must implement interfaces layer ports."""
+        """Infrastructure layer must implement domain layer ports."""
         adapter_file = Path("src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py")
 
         content = adapter_file.read_text()
 
-        # Adapter should import from application layer (hexagonal port pattern)
-        assert "from src.application.ports.sandbox_port import" in content, (
-            "DockerSandboxAdapter must import from application.ports.sandbox_port"
+        # Adapter should import from domain layer (hexagonal port pattern)
+        assert "from src.domain.ports.sandbox_executor import" in content, (
+            "DockerSandboxAdapter must import from domain.ports.sandbox_executor"
         )
