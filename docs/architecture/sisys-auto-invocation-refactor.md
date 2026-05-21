@@ -1,8 +1,8 @@
 # SISYS 自主调用子系统重构设计
 
-**文档版本:** v1.5
+**文档版本:** v1.6
 **生成时间:** 2026-05-21
-**修订:** R1-4 共 40 项；R5 修正 5 项（文件命名统一/route_type数据流/PublishResult测试矩阵扩展）
+**修订:** R1-5 共 45 项；R6 终审 3 项（P1-5扩展AutoExecuted字段/分支隔离约束/异步持久化注释）
 **基于:** sisys-auto-invocation-design.md v1.0 + Story 1.14a/b/c 代码全面调研 + 25 项问题分析
 **状态:** 重构设计
 
@@ -47,6 +47,7 @@ SISYS Story 1.14a（Trigger）/ 1.14b（Route）/ 1.14c（Execute）已完成自
 | 单向依赖 | domain ← application ← interfaces ← infrastructure |
 | 向后兼容 | 重构不得破坏 4190+ 现有测试 |
 | 渐进重构 | 按 P0→P1→P2→P3 优先级分阶段执行 |
+| 分支隔离 | 每个 Phase 在独立分支 `refactor/auto-invocation-phase-N` 上执行，通过全量回归后合并 |
 
 ### 1.5 当前代码基线
 
@@ -257,6 +258,8 @@ async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
 **修复方案：**
 - 方法签名改为 `async def on_routed_event(self, event: AutoRouted) -> AutoExecuted | None`
 - 将 `getattr(event, "field", "")` 替换为直接属性访问 `event.field`
+
+**附加数据流修复（P1-5 扩展）：** 当前 `AutoExecuted` 事件缺少 `route_type`、`trigger_event_type`、`trigger_event_id` 三个字段。`on_routed_event` 中 `route_type` 被提取但仅存入 `CheckpointSnapshot.state_data`，未传入 `AutoExecuted`；`trigger_event_type` 和 `trigger_event_id` 完全未提取。建议在 `AutoExecuted` 中添加此三字段以保持 Trigger→Route→Execute 完整因果链。此修改需同步更新 `auto_execute_events.py` 定义和所有构造 `AutoExecuted` 的测试。
 
 **验证：** MyPy 类型检查通过；重构后测试通过。
 
@@ -1028,7 +1031,7 @@ def __init__(self) -> None:
 - [ ] **3.5** 移除 AutoRouteConfig.cache_ttl_seconds 死配置字段（P2-2/P2-8）
 - [ ] **3.6** 创建 `src/domain/ports/routing_decision_log_repository.py`，定义 `RoutingDecisionLogRepository` Protocol（方法: `save(log)`, `find_by_task_id(task_id)`）（P2-3 前置）
 - [ ] **3.7** 在 composition_root 中注册 `RoutingDecisionLogRepository` 实现（如 InMemoryRoutingDecisionLogRepository）（P2-3 前置）
-- [ ] **3.8** 在 AutoRouteService 中创建 RoutingDecisionLog 实例并通过 Repository 持久化（P2-3）
+- [ ] **3.8** 在 AutoRouteService 中创建 RoutingDecisionLog 实例并通过 Repository 持久化（P2-3）。注意：持久化应异步执行（`asyncio.create_task`）以避免阻塞路由决策主路径
 - [ ] **3.9** 删除 InMemoryEventPublisher Protocol（P2-4）
 - [ ] **3.10** 在 `__init__.py` 中添加 AutoExecuteService 导出（P2-5）
 - [ ] **3.11** AutoTriggerHandler 队列添加 maxsize=1000 背压（P2-6）
