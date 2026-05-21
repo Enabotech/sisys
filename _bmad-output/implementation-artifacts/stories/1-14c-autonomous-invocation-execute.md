@@ -160,9 +160,9 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
   - 继承系统公理二（外部化记忆）模式
 
 #### 沙箱执行 (Sandbox Execution)
-- [ ] SandboxExecutor 端口接口（`src/application/ports/sandbox_port.py`）
-  - 接口方法: `start_container()`, `execute_code()`, `stop_container()`
-  - 定义在 interfaces 层（作为六边形架构的"端口"）
+- [ ] SandboxExecutor 端口接口（`src/domain/ports/sandbox_executor.py`）
+  - 接口方法: `start_container()`, `execute_code()`, `stop_container()`, `is_container_running()`
+  - `@runtime_checkable` Protocol，位于 domain 层（作为六边形架构的"端口"）
 - [ ] DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
   - 实现 SandboxExecutor 端口接口
   - Docker 沙箱隔离
@@ -295,7 +295,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [x] Subtask 0.1: 定义 AutoExecuted 技术事件 Schema（`src/domain/events/auto_execute_events.py`）
 - [x] Subtask 0.2: 定义 CheckpointSnapshot 实体（`src/domain/entities/checkpoint_snapshot.py`）
 - [x] Subtask 0.3: 定义 AutoExecuteService 服务接口（`src/domain/services/auto_execute_service.py`）
-- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/application/ports/sandbox_port.py`）
+- [x] Subtask 0.4: 定义 SandboxExecutor 端口接口（`src/domain/ports/sandbox_executor.py`）
 - [x] Subtask 0.5: 定义 DockerSandboxAdapter 实现（`src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`）
 - [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
 - [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis/redis_snapshot_store.py`）
@@ -320,7 +320,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 编写 `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py`（验证沙箱隔离） |
-| 🟢 绿 | 实现 `src/application/ports/sandbox_port.py`（端口接口）和 `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
+| 🟢 绿 | 实现 `src/domain/ports/sandbox_executor.py`（端口接口）和 `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`（Docker 实现） |
 | 🔄 重构 | 添加资源限制和清理逻辑 |
 
 - [x] Subtask 1.1: 🔴 红 — 编写 DockerSandboxAdapter 失败测试
@@ -562,7 +562,7 @@ sisys/
 │   └── interfaces/
 │       ├── cli/
 │       │   └── commands/
-│       │       └── sandbox_ports.py        # SandboxExecutor 端口接口（六边形架构 CLI 端口）
+│       │       └── sandbox_ports.py        # SandboxExecutor 端口接口（六边形架构 CLI 端口，引用 domain 层 Protocol）
 │       └── event_listeners/
 │           ├── listeners/
 │           │   ├── auto_execute_completed_listener.py # AutoExecuted → 下游领域事件监听器
@@ -607,7 +607,7 @@ sisys/
 
 6. **AutoExecuted 事件与下游领域事件关系修正** — AutoExecuted 是技术事件，下游监听器根据 business_event_type 发布 DocumentProcessed/ToolAutoExecuted/AgentDecided
 7. **SnapshotRepository 位置澄清** — 接口定义在 domain 层，实现在 infrastructure 层
-8. **SandboxExecutor 架构位置修正** — 端口接口在 interfaces 层，DockerSandboxAdapter 实现在 infrastructure 层
+8. **SandboxExecutor 架构位置修正** — 端口接口在 domain 层（`@runtime_checkable` Protocol），DockerSandboxAdapter 实现在 infrastructure 层
 
 **应用到本故事/Applied to This Story:**
 - [ ] AutoExecuteConfig 采用与 OtelConfig 相同的 `from_env()` 模式
@@ -615,7 +615,7 @@ sisys/
 - [ ] Task 3 包含架构验证测试（六边形架构约束检测）
 - [ ] 性能基准测试验证沙箱启动 P95<100ms、快照 P95<50ms
 - [ ] AutoExecuted 技术事件通过下游监听器发布 DocumentProcessed/ToolAutoExecuted/AgentDecided
-- [ ] SandboxExecutor 端口在 interfaces 层，实现在 infrastructure 层（DockerSandboxAdapter）
+- [ ] SandboxExecutor 端口在 domain 层（`src/domain/ports/sandbox_executor.py`，`@runtime_checkable` Protocol），实现在 infrastructure 层（DockerSandboxAdapter）
 - [ ] 测试隔离约束显式强调（asyncio.Lock 类变量、pytest-asyncio auto mode）
 - [ ] 性能基准测试方法明确（pytest-benchmark + locust）
 
@@ -682,7 +682,7 @@ sisys/
 - `src/domain/entities/checkpoint_snapshot.py` - CheckpointSnapshot
 - `src/domain/repositories/snapshot_repository.py` - SnapshotRepository 接口（领域层定义）
 - `src/infrastructure/config/execute.py` - AutoExecuteConfig
-- `src/application/ports/sandbox_port.py` - SandboxExecutor 端口接口（interfaces 层）
+- `src/domain/ports/sandbox_executor.py` - SandboxExecutor 端口接口（`@runtime_checkable` Protocol，domain 层）
 - `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` - DockerSandboxAdapter（infrastructure 层实现）
 - `src/infrastructure/external_services/sandbox/session_namespace_manager.py` - SessionNamespaceManager
 - `src/infrastructure/storage/redis/redis_snapshot_store.py` - RedisSnapshotStore（实现 SnapshotRepository）
@@ -707,7 +707,7 @@ sisys/
 - `src/infrastructure/config/__init__.py` - 添加 AutoExecuteConfig 导出
 - `src/infrastructure/external_services/sandbox/__init__.py` - 添加 DockerSandboxAdapter, SessionNamespaceManager 导出
 - `src/infrastructure/storage/__init__.py` - 添加 RedisSnapshotStore 导出
-- `src/application/ports/sandbox_port.py` - 添加 SandboxPort 导出
+- `src/domain/ports/sandbox_executor.py` - 添加 SandboxExecutor 导出
 - `src/application/event_handlers/__init__.py` - 添加 auto_execute_completed_listener 导出
 
 **待创建的文件/To Be Created (Dev Story 实施):**
@@ -795,7 +795,7 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 | 5 | AutoExecuted 事件与 DocumentProcessed/ToolAutoExecuted/AgentDecided 关系模糊 | P2 | 明确 AutoExecuted 事件包含三个子事件类型，遵循 Story 1.2 领域事件定义 | ✅ 已修复 |
 | 6 | AutoExecuted 事件与下游领域事件关系不正确 | P1 | 修正为：AutoExecuted 是技术事件，下游监听器根据 business_event_type 发布 DocumentProcessed/ToolAutoExecuted/AgentDecided | ✅ 已修复 |
 | 7 | SnapshotRepository 位置需澄清 | P1 | 明确接口定义在 domain 层，实现在 infrastructure 层 | ✅ 已修复 |
-| 8 | SandboxExecutor 架构位置不准确 | P2 | 修正为：端口接口在 interfaces 层，DockerSandboxAdapter 实现在 infrastructure 层 | ✅ 已修复 |
+| 8 | SandboxExecutor 架构位置不准确 | P2 | 修正为：端口接口在 domain 层（`src/domain/ports/sandbox_executor.py`），DockerSandboxAdapter 实现在 infrastructure 层 | ✅ 已修复 |
 | 9 | Task 0 Subtask 路径引用旧架构 | P2 | 修正 Task 0.1/0.4/0.5 路径与项目结构一致 | ✅ 已修复 |
 | 10 | AC-1 验证标准路径引用旧架构 | P2 | 修正 sandbox_executor.py → docker_sandbox_adapter.py | ✅ 已修复 |
 | 11 | 测试文件引用不一致 | P2 | 修正 test_sandbox_executor.py → test_docker_sandbox_adapter.py | ✅ 已修复 |
@@ -830,4 +830,4 @@ Story 1.14a (trigger) → Story 1.14b (route) → Story 1.14c (execute)
 **模板版本/Template Version:** 2.2.0
 **创建日期/Created:** 2026-04-20
 **最后更新/Last Updated:** 2026-04-21
-**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor 端口接口（interfaces 层）+ DockerSandboxAdapter（infrastructure 层）; (2) AutoExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) AutoExecuted 技术事件（携带 business_event_type）触发下游领域事件; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；二轮审查修复：一致性修正；三轮审查修复：添加测试隔离约束章节（asyncio.Lock/pytest-asyncio）、补充性能基准测试方法（pytest-benchmark + locust）
+**更新说明:** Story 1.14c 完整版本 - 实现会话命名空间执行与状态快照：(1) SandboxExecutor 端口接口（domain 层，`src/domain/ports/sandbox_executor.py`，`@runtime_checkable` Protocol，含 is_container_running）+ DockerSandboxAdapter（infrastructure 层）; (2) AutoExecuteService 事件监听与任务执行; (3) CheckpointSnapshot 状态快照; (4) RedisSnapshotStore 存储; (5) AutoExecuted 技术事件（携带 business_event_type）触发下游领域事件; (6) 六边形架构验证; (7) 性能基准测试 P95<100ms/50ms；二轮审查修复：一致性修正；三轮审查修复：添加测试隔离约束章节（asyncio.Lock/pytest-asyncio）、补充性能基准测试方法（pytest-benchmark + locust）；端口合并更新：sandbox_executor_protocol + sandbox_port → 统一为 sandbox_executor

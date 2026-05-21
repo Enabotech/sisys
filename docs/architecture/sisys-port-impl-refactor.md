@@ -967,7 +967,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | `BaseRepository` | domain/ports/base.py | 通用仓储基类 | — | **⚠️同名不同步/异步冲突** |
 | `StorageLayer` | domain/ports/storage_enums.py | 存储层级枚举 | — | **参考使用** |
 | **服务内Protocol（待迁移或引用）** |
-| `SandboxExecutorProtocol` | domain/services/auto_execute_service.py | 沙箱执行 | — | **⚠️无实现类** |
+| ~~`SandboxExecutorProtocol`~~ | ~~domain/services/auto_execute_service.py~~ | ~~沙箱执行~~ | — | **已合并到domain/ports/sandbox_executor.py** |
 | `SnapshotRepositoryProtocol` | domain/services/auto_execute_service.py | 快照存储 | — | **⚠️无实现类** |
 | `HashRouterProtocol` | domain/services/auto_route_service.py | 哈希路由 | — | **✅已有实现(HashRouter)** |
 | `SemanticRouterProtocol` | domain/services/auto_route_service.py | 语义路由 | — | **✅已有实现(SemanticRouter)** |
@@ -975,7 +975,7 @@ grep -r "VectorStorage\|GraphManager\|GraphStorage" src/ --include="*.py" | grep
 | **Application层 - 服务端口（保留，不迁移）** |
 | `SemanticCache` | application/ports/semantic_cache.py | 语义缓存 | infrastructure | **待注册** |
 | `PublicBlackboard` | application/ports/public_blackboard.py | 公共黑板 | infrastructure | **待注册** |
-| `SandboxExecutor` | application/ports/sandbox_port.py | 沙箱执行器 | infrastructure | **✅已有实现(DockerSandboxAdapter)** |
+| `SandboxExecutor` | domain/ports/sandbox_executor.py | 沙箱执行器 | infrastructure | **✅已有实现(DockerSandboxAdapter)** |
 | `MetricsPort` | application/ports/metrics_port.py | 指标端口 | infrastructure | **待注册** |
 | `ExceptionMetricsPort` | application/ports/exception_metrics_port.py | 异常指标 | infrastructure | **待注册** |
 | `TextExtractorService` | application/ports/text_extractor_service.py | 文本提取 | infrastructure | **待注册** |
@@ -1140,7 +1140,7 @@ print(f'All {len(registry)} ports registered')
   - [x] 验证所有契约可被正确import
   - [x] 确认不需要迁移到domain层
 - [x] 1.3 迁移服务内Protocol到 domain/ports/
-  - [x] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor_protocol.py
+  - [x] 迁移 SandboxExecutorProtocol → domain/ports/sandbox_executor.py（统一为SandboxExecutor，4方法+@runtime_checkable）
   - [x] 迁移 SnapshotRepositoryProtocol → domain/ports/snapshot_repository_protocol.py
   - [x] 废弃删除 EventPublisherProtocol → 直接引用EventPublisher（统一4处重复）
   - [x] 迁移 HashRouterProtocol → domain/ports/hash_router_protocol.py
@@ -1407,7 +1407,7 @@ poetry run python -m pylyzer src/domain/ports/
 | P0-6 | EventBusFactory 3个组件初始化为None | 运行时AttributeError | **必须修复** |
 | P0-7 | RedisEventPublisher.publish()返回None但硬编码成功 | 发布失败也返回成功状态 | **必须修复** |
 | P0-8 | RedisEventBus.publish()异常处理逻辑不可达 | publisher吞掉异常，redis_success=False永不触发 | **必须修复** |
-| P0-9 | SandboxExecutorProtocol和SnapshotRepositoryProtocol无实现类 | DockerSandboxAdapter实现的是SandboxExecutor非本Protocol | **必须修复** |
+| P0-9 | ~~SandboxExecutorProtocol和SnapshotRepositoryProtocol无实现类~~ | ~~DockerSandboxAdapter实现的是SandboxExecutor非本Protocol~~ | **已修复** - SandboxExecutorProtocol已删除，统一为domain/ports/sandbox_executor.py的SandboxExecutor（4方法+@runtime_checkable），DockerSandboxAdapter已正确实现 |
 | P0-10 | SemanticRouterProtocol.route()为async但HashRouterProtocol.route()为sync | 接口设计不一致 | **建议修复** |
 | P0-11 | memory_service.py第475行调用publish无await | async def未正确调用，事件实际不会被发布 | **必须修复** |
 | P0-12 | domain层BaseRepository为同步方法，infrastructure层BaseRepository为异步方法 | 同名但签名完全不兼容，违反DIP | **必须修复** |
