@@ -1,7 +1,8 @@
 # SISYS 自主调用子系统重构设计
 
-**文档版本:** v1.0
+**文档版本:** v1.2
 **生成时间:** 2026-05-21
+**修订:** R1 修正 10 项（行号/路径/步骤编号）；R2 修正 10 项（DI lambda 语法/测试清单/语义变更/矛盾统一）
 **基于:** sisys-auto-invocation-design.md v1.0 + Story 1.14a/b/c 代码全面调研 + 25 项问题分析
 **状态:** 重构设计
 
@@ -189,11 +190,11 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
       @property is_full_failure -> bool
       @property partial_error -> bool
   ```
-- 在基础设施层构造 `ChannelResult` 实例。实际构造站点有 4 个：
-  - `src/infrastructure/messaging/redis_event_bus.py` — RedisEventBus.publish()
-  - `src/infrastructure/messaging/rabbitmq_event_bus.py` — RabbitMQEventBus.publish()
-  - `src/infrastructure/messaging/inmemory_event_bus.py` — InMemoryEventBus.publish()
-  - `DualChannelEventBus` 不直接构造 PublishResult，而是透传子总线的返回值
+- 在基础设施层各子总线中构造 `ChannelResult` 实例。实际构造站点有 2 个子总线（非 DualChannelEventBus 直接构造）：
+  - `src/infrastructure/messaging/redis_event_bus.py` — RedisEventBus.publish() 构造 `ChannelResult("realtime", ...)`
+  - `src/infrastructure/messaging/rabbitmq_event_bus.py` — RabbitMQEventBus.publish() 构造 `ChannelResult("reliable", ...)`
+  - `src/infrastructure/messaging/inmemory_event_bus.py` — InMemoryEventBus.publish() 构造 `ChannelResult("inmemory", ...)`
+  - `DualChannelEventBus` 不直接构造 PublishResult，透传子总线返回值
 
 **语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。
 
@@ -286,9 +287,9 @@ async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
 
 #### P2-2：AutoRouteConfig 死配置字段
 
-**问题：** `AutoRouteConfig.semantic_threshold` 和 `cache_ttl_seconds` 从环境变量加载但从未传递给任何服务或路由器。
+**问题：** `AutoRouteConfig.semantic_threshold` 从环境变量加载但从未传递给任何服务或路由器。
 
-**修复方案：** 将 `semantic_threshold` 传递给 `AutoRouteService` 或 `SemanticRouter`；将 `cache_ttl_seconds` 传递给 `SemanticRouter` 构造函数。或在 DI 注册中消费这些配置值。
+**修复方案：** 将 `semantic_threshold` 传递给 `AutoRouteService` 或在 DI 注册中消费。`cache_ttl_seconds` 见 P2-8（移除）。
 
 ---
 
@@ -414,7 +415,10 @@ register_port(
     name="auto_trigger_service",
     version="v1.0.0",
     interface=AutoTriggerService,
-    impl=lambda: AutoTriggerService(publisher=Resolver().resolve("event_publisher")),
+    impl=lambda resolver: AutoTriggerService(
+        publisher=resolver.resolve("event_publisher"),
+    ),
+    module="src.domain.services.auto_trigger_service",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
@@ -423,11 +427,12 @@ register_port(
     name="auto_route_service",
     version="v1.0.0",
     interface=AutoRouteService,
-    impl=lambda: AutoRouteService(
-        publisher=Resolver().resolve("event_publisher"),
-        hash_router=Resolver().resolve("hash_router"),
-        semantic_router=Resolver().resolve("semantic_router"),
+    impl=lambda resolver: AutoRouteService(
+        publisher=resolver.resolve("event_publisher"),
+        hash_router=resolver.resolve("hash_router"),
+        semantic_router=resolver.resolve("semantic_router"),
     ),
+    module="src.domain.services.auto_route_service",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
@@ -436,10 +441,11 @@ register_port(
     name="auto_execute_service",
     version="v1.0.0",
     interface=AutoExecuteService,
-    impl=lambda: AutoExecuteService(
-        sandbox=Resolver().resolve("sandbox_executor"),
-        snapshot_repo=Resolver().resolve("snapshot_repository"),
+    impl=lambda resolver: AutoExecuteService(
+        sandbox=resolver.resolve("sandbox_executor"),
+        snapshot_repo=resolver.resolve("snapshot_repository"),
     ),
+    module="src.domain.services.auto_execute_service",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
@@ -449,10 +455,11 @@ register_port(
     name="auto_trigger_handler",
     version="v1.0.0",
     interface=AutoTriggerHandler,
-    impl=lambda: AutoTriggerHandler(
-        auto_trigger_service=Resolver().resolve("auto_trigger_service"),
-        event_listener=Resolver().resolve("event_listener"),
+    impl=lambda resolver: AutoTriggerHandler(
+        auto_trigger_service=resolver.resolve("auto_trigger_service"),
+        event_listener=resolver.resolve("event_listener"),
     ),
+    module="src.application.event_handlers.auto_trigger_handler",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
@@ -461,9 +468,10 @@ register_port(
     name="auto_route_handler",
     version="v1.0.0",
     interface=AutoRouteHandler,
-    impl=lambda: AutoRouteHandler(
-        auto_route_service=Resolver().resolve("auto_route_service"),
+    impl=lambda resolver: AutoRouteHandler(
+        auto_route_service=resolver.resolve("auto_route_service"),
     ),
+    module="src.application.event_handlers.auto_route_handler",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
@@ -472,13 +480,52 @@ register_port(
     name="auto_execute_completed_handler",
     version="v1.0.0",
     interface=AutoExecuteCompletedHandler,
-    impl=lambda: AutoExecuteCompletedHandler(
-        publisher=Resolver().resolve("event_publisher"),
+    impl=lambda resolver: AutoExecuteCompletedHandler(
+        publisher=resolver.resolve("event_publisher"),
     ),
+    module="src.application.event_handlers.auto_execute_completed_handler",
+    lifetime=Lifetime.SINGLETON,
+    owner="auto-invocation-team",
+)
+
+# Infrastructure Services
+register_port(
+    name="heartbeat_scheduler",
+    version="v1.0.0",
+    interface=HeartbeatScheduler,
+    impl=lambda resolver: HeartbeatScheduler(
+        redis_config=resolver.resolve("redis_connection_manager"),
+    ),
+    module="src.infrastructure.scheduler.heartbeat_scheduler",
+    lifetime=Lifetime.SINGLETON,
+    owner="auto-invocation-team",
+)
+
+register_port(
+    name="session_namespace_manager",
+    version="v1.0.0",
+    interface=SessionNamespaceManager,
+    impl=lambda resolver: SessionNamespaceManager(
+        sandbox=resolver.resolve("sandbox_executor"),
+    ),
+    module="src.infrastructure.external_services.sandbox.session_namespace_manager",
     lifetime=Lifetime.SINGLETON,
     owner="auto-invocation-team",
 )
 ```
+
+> **前置依赖：** `auto_trigger_handler` 需要 `event_listener` 端口，当前该端口未在 composition_root.py 中注册。需先确认 `EventListener` Protocol（P1-3 迁移至 `domain/ports/` 后）的注册条目。若 P1-3 迁移时创建了 `src/domain/ports/event_listener.py`，则需同步添加：
+> ```python
+> register_port(
+>     name="event_listener",
+>     version="v1.0.0",
+>     interface=EventListener,
+>     impl=lambda resolver: InMemoryEventListener(),
+>     module="src.infrastructure.messaging.in_memory_event_listener",
+>     lifetime=Lifetime.SINGLETON,
+>     owner="auto-invocation-team",
+> )
+> ```
 
 #### 3.1.2 路径修正
 
@@ -610,14 +657,43 @@ class PublishResult:
         return not self.is_success and not self.is_full_failure
 ```
 
-**DualChannelEventBus 适配**:
+**子总线适配**（DualChannelEventBus 透传子总线返回值，不直接构造 PublishResult）：
 ```python
-# 在 publish() 中构造 ChannelResult
-results = (
-    ChannelResult("realtime", redis_ok, redis_err),
-    ChannelResult("reliable", outbox_ok, outbox_err),
-)
-return PublishResult(event_id=str(event.event_id), results=results)
+# RedisEventBus.publish() — 构造单通道结果
+async def publish(self, event: DomainEvent) -> PublishResult:
+    try:
+        await self._publish_to_redis(event)
+        return PublishResult(
+            event_id=str(event.event_id),
+            results=(ChannelResult("realtime", True),),
+        )
+    except Exception as e:
+        return PublishResult(
+            event_id=str(event.event_id),
+            results=(ChannelResult("realtime", False, str(e)),),
+        )
+
+# RabbitMQEventBus.publish() — 构造单通道结果
+async def publish(self, event: DomainEvent) -> PublishResult:
+    try:
+        await self._save_to_outbox(event)
+        return PublishResult(
+            event_id=str(event.event_id),
+            results=(ChannelResult("reliable", True),),
+        )
+    except Exception as e:
+        return PublishResult(
+            event_id=str(event.event_id),
+            results=(ChannelResult("reliable", False, str(e)),),
+        )
+
+# DualChannelEventBus.publish() — 透传子总线结果
+async def publish(self, event: DomainEvent) -> PublishResult:
+    mode = self._router.get_delivery_mode(event.event_type)
+    if mode == DeliveryMode.REALTIME:
+        return await self._redis_bus.publish(event)  # 透传
+    else:
+        return await self._rabbitmq_bus.publish(event)  # 透传
 ```
 
 ---
@@ -706,18 +782,20 @@ from src.infrastructure.config.auto_execute import AutoExecuteConfig
 
 #### 3.5.3 死配置激活
 
-将 `AutoRouteConfig.semantic_threshold` 和 `cache_ttl_seconds` 连接到实际消费者：
+将 `AutoRouteConfig.semantic_threshold` 连接到实际消费者：
 
 ```python
 # 在 DI 注册中传递配置
 auto_route_config = AutoRouteConfig.from_env()
 
 register_port(
-    name="semantic_router",
+    name="auto_route_service",
     ...
-    impl=lambda: SemanticRouter(
-        embedding_model=...,
-        cache_ttl_seconds=auto_route_config.cache_ttl_seconds,
+    impl=lambda resolver: AutoRouteService(
+        publisher=resolver.resolve("event_publisher"),
+        hash_router=resolver.resolve("hash_router"),
+        semantic_router=resolver.resolve("semantic_router"),
+        semantic_threshold=auto_route_config.semantic_threshold,
     ),
 )
 ```
@@ -728,6 +806,8 @@ if semantic_score >= self._semantic_threshold:
     return "semantic", semantic_target, semantic_score
 ```
 
+> **注意：** `cache_ttl_seconds` 见 P2-8（移除），不在此处激活。当前 LRU 策略已足够。
+
 ---
 
 ### 3.6 死代码清理
@@ -736,7 +816,7 @@ if semantic_score >= self._semantic_threshold:
 |------|------|------|
 | `InMemoryEventPublisher` | 删除 | `src/domain/ports/event_publisher.py` |
 | `HashNode` dataclass | 删除 | `src/infrastructure/routing/hash_router.py` |
-| `cache_ttl_seconds` 参数 | 移除或激活 | `src/infrastructure/routing/semantic_router.py` |
+| `cache_ttl_seconds` 参数 | 移除（从 AutoRouteConfig 和 SemanticRouter） | `src/infrastructure/routing/semantic_router.py`, `src/infrastructure/config/auto_route.py` |
 | `AutoExecuteService` 导出 | 添加 | `src/domain/services/__init__.py` |
 
 ---
@@ -796,6 +876,7 @@ def __init__(self) -> None:
 | `src/domain/ports/__init__.py` | 添加新端口导出 | P1-3 |
 | `src/domain/services/auto_execute_service.py` | 参数类型 AutoRouted + import time 顶部 | P1-5, P3-1 |
 | `src/domain/services/auto_route_service.py` | 添加 semantic_threshold 参数 + RoutingDecisionLog | P2-2, P2-3 |
+| `src/domain/ports/routing_decision_log_repository.py` | 新建（RoutingDecisionLogRepository Protocol） | P2-3 |
 | `src/domain/services/__init__.py` | 添加 AutoExecuteService 导出 | P2-5 |
 | `src/domain/value_objects/auto_trigger_context.py` | 简化提取逻辑 + 提取常量 | P1-6 |
 
@@ -832,15 +913,53 @@ def __init__(self) -> None:
 
 ### 4.5 测试文件（需更新导入和断言）
 
-| 测试文件 | 涉及问题 |
-|----------|---------|
-| `tests/unit/domain/services/test_execute_service.py` | P1-5 参数类型 |
-| `tests/unit/domain/entities/test_checkpoint_snapshot.py` | P1-1 序列化迁移 |
-| `tests/unit/infrastructure/routing/test_semantic_router.py` | P0-4 cosine 修复 |
-| `tests/contracts/test_port_contract_services.py` | P1-3 端口位置 |
-| `tests/unit/domain/ports/test_protocols.py` | P1-3 端口位置 |
-| `tests/integration/` 相关文件 | P0-2 双重发布 |
-| `tests/acceptance/` 相关文件 | P0-2, P1-5 |
+> 以下列出直接受影响的测试文件（约 25 个），按修改类型分组。完整的测试影响范围约 68 个文件，此处仅列出需要修改导入路径或断言逻辑的文件。
+
+**P0 修复相关：**
+
+| 测试文件 | 涉及问题 | 修改内容 |
+|----------|---------|---------|
+| `tests/unit/domain/services/test_route_service.py` | P0-2 | 验证仅发布 1 次 AutoRouted |
+| `tests/unit/application/event_handlers/test_auto_route_handler.py` | P0-2 | 移除 handler 发布相关断言 |
+| `tests/unit/infrastructure/routing/test_semantic_router.py` | P0-4 | cosine_similarity 不同长度向量测试 |
+| `tests/unit/infrastructure/routing/test_semantic_router_coverage.py` | P0-4 | 覆盖率测试适配 |
+| `tests/unit/infrastructure/routing/test_semantic_router_cache.py` | P2-8 | 移除 cache_ttl 相关测试 |
+
+**P1 架构修复相关：**
+
+| 测试文件 | 涉及问题 | 修改内容 |
+|----------|---------|---------|
+| `tests/unit/domain/entities/test_checkpoint_snapshot.py` | P1-1 | 移除 to_redis_hash/from_redis_hash 测试 |
+| `tests/unit/infrastructure/storage/test_redis_snapshot_store.py` | P1-1 | 添加 mapper 方法测试 |
+| `tests/unit/domain/events/test_publish_result.py` | P1-2 | 适配 ChannelResult + is_success 语义变更 |
+| `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | P1-2 | 适配子总线返回值 |
+| `tests/unit/infrastructure/messaging/test_redis_eventbus.py` | P1-2 | 适配 ChannelResult 构造 |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | P1-2 | 适配 ChannelResult 构造 |
+| `tests/unit/domain/ports/test_protocols.py` | P1-3 | 添加 EventListener/DeadLetterQueue 端口验证 |
+| `tests/unit/domain/services/test_execute_service.py` | P1-5 | 参数类型改为 AutoRouted |
+| `tests/unit/domain/value_objects/test_auto_trigger_context.py` | P1-6 | 简化提取逻辑断言 |
+| `tests/unit/architecture/test_event_messaging_architecture.py` | P1-3, P1-4 | 架构约束更新 |
+| `tests/unit/architecture/test_event_architecture.py` | P1-3 | 导入路径验证 |
+
+**P2 质量改进相关：**
+
+| 测试文件 | 涉及问题 | 修改内容 |
+|----------|---------|---------|
+| `tests/unit/infrastructure/config/test_auto_trigger_config.py` | P2-1 | frozen=True 验证 |
+| `tests/unit/infrastructure/config/test_route_config.py` | P2-1, P2-2 | frozen=True + 死配置移除 |
+| `tests/unit/infrastructure/config/test_auto_execute_config.py` | P2-1 | frozen 一致性 |
+| `tests/unit/domain/ports/test_event_publisher.py` | P2-4 | 移除 InMemoryEventPublisher 测试 |
+| `tests/unit/application/event_handlers/test_auto_trigger_handler_branches.py` | P2-6 | 背压/队列满测试 |
+| `tests/unit/infrastructure/external_services/sandbox/test_docker_sandbox_adapter.py` | P2-7 | 实例级别状态测试 |
+
+**集成/验收测试：**
+
+| 测试文件 | 涉及问题 | 修改内容 |
+|----------|---------|---------|
+| `tests/integration/test_integration_route.py` | P0-2 | 双重发布修复验证 |
+| `tests/integration/test_integration_execute.py` | P1-5 | 参数类型变更 |
+| `tests/acceptance/test_acceptance_autonomous-invocation-route.py` | P0-2 | 发布唯一性验证 |
+| `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` | P1-5 | 参数类型变更 |
 
 ---
 
@@ -859,8 +978,7 @@ def __init__(self) -> None:
 ### Phase 2：P1 架构违规修复
 
 - [ ] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
-- [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 4 个构造站点（RedisEventBus/RabbitMQEventBus/InMemoryEventBus/DualChannelEventBus）（P1-2）
-- [ ] **2.3** 注意 PublishResult.is_success 语义变更：旧为"任一通道成功"，新为"全部通道成功"
+- [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
 - [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
 - [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
 - [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/`（P1-4）
@@ -875,13 +993,13 @@ def __init__(self) -> None:
 - [ ] **3.1** 统一 AutoTriggerConfig/AutoRouteConfig 为 frozen=True（P2-1）
 - [ ] **3.2** 在 config `__init__.py` 中添加 AutoExecuteConfig 导出（P2-1）
 - [ ] **3.3** 连接 AutoRouteConfig.semantic_threshold 到 AutoRouteService（P2-2）
-- [ ] **3.4** 连接 AutoRouteConfig.cache_ttl_seconds 到 SemanticRouter（P2-2）
+- [ ] **3.4** 移除 AutoRouteConfig.cache_ttl_seconds 死配置字段（P2-2/P2-8）
 - [ ] **3.5** 在 AutoRouteService 中创建 RoutingDecisionLog 实例（P2-3）
 - [ ] **3.6** 删除 InMemoryEventPublisher Protocol（P2-4）
 - [ ] **3.7** 在 `__init__.py` 中添加 AutoExecuteService 导出（P2-5）
 - [ ] **3.8** AutoTriggerHandler 队列添加 maxsize=1000 背压（P2-6）
 - [ ] **3.9** DockerSandboxAdapter._running_containers 改为实例变量，同步移除/重构 reset_all_containers（P2-7）
-- [ ] **3.10** 移除 SemanticRouter.cache_ttl_seconds 或激活（P2-8）
+- [ ] **3.10** 移除 SemanticRouter.cache_ttl_seconds 参数（P2-8）
 - [ ] **3.11** 运行 `poetry run pytest --tb=short -q` 全量回归
 
 ### Phase 4：P3 风格优化
@@ -1000,3 +1118,4 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 | 8 | 队列背压 | maxsize=1000 + 丢弃 | 防止 OOM，fail-fast 优于 fail-slow |
 | 9 | DockerSandboxAdapter 状态 | 改为实例变量 | 实例隔离，消除共享状态风险 |
 | 10 | RoutingDecisionLog | 在 service 中实例化 | 完成 Story 1.14b AC-3 遗漏 |
+| 11 | PublishResult.is_success 语义 | 从"任一成功"改为"全部成功" | 通道无关抽象后的自然语义；需评估现有消费者是否依赖旧语义 |
