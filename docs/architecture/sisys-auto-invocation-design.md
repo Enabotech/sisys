@@ -759,7 +759,7 @@ class HashRouter:
 
 **关键特性：**
 - **bge-m3 嵌入：** 1024 维向量，支持中英双语，本地部署
-- **内存缓存：** MAX_CACHE_SIZE=10000，LRU 风格淘汰
+- **内存缓存：** MAX_CACHE_SIZE=10000，达到上限后停止插入（无淘汰，仅容量控制）
 - **候选注册：** 动态添加/移除 Agent/工具候选
 - **优雅降级：** 无嵌入模型时返回零向量（score=0.0）
 
@@ -1429,7 +1429,7 @@ async execute(task: WorkflowTask) → WorkflowResult:
 │                                              │
 │  1. 事件失败 → ZADD retry_queue {event: score=retry_time}
 │  2. AsyncOutboxPoller → ZRANGEBYSCORE 0 now │
-│  3. Lua 原子出队: ZPOPMIN + 检查 score ≤ now │
+│  3. Lua 原子出队: ZRANGEBYSCORE + ZREM（非 ZPOPMIN）│
 │  4. 重新发布                                 │
 │  5. 成功 → 从 retry_queue 移除              │
 │  6. 失败 → 指数退避 + 抖动:                  │
@@ -1494,7 +1494,7 @@ DeadLetterQueue Protocol:
 │              幂等性保证                               │
 │                                                      │
 │  L1: Redis SET NX (高性能)                           │
-│  Key: processed_event:{event_id}                     │
+│  Key: idempotency:{event_id}                         │
 │  TTL: 7 天                                           │
 │  成功 → 事件未处理过 → 继续                          │
 │  失败 → 事件已处理 → 跳过                            │
@@ -1559,7 +1559,7 @@ DeadLetterQueue Protocol:
 │  ├── Key: 描述字符串                                         │
 │  ├── Value: [float] × 1024 嵌入向量                          │
 │  ├── 容量: MAX_CACHE_SIZE = 10000                            │
-│  └── 淘汰: LRU 风格（新增时检查容量）                         │
+│  └── 策略: 达到上限后停止插入（无淘汰机制）                      │
 │                                                              │
 │  L2: 沙箱容器缓存（DockerSandboxAdapter._running_containers）│
 │  ├── Key: session_id                                         │
@@ -1764,7 +1764,7 @@ App Lifespan Event (FastAPI shutdown)
 ```
 扩展路径:
 ├── 新增端口 (domain/ports/):
-│   ├── ComplianceGateway (L1 合规检查)
+│   ├── ComplianceGatewayPort (L1 合规检查，已存在于 domain/ports/)
 │   ├── ComplexityAssessor (L2 复杂度评估)
 │   └── RouterExecutor (L3 路由决策)
 │
@@ -1790,7 +1790,7 @@ App Lifespan Event (FastAPI shutdown)
 ```
 扩展路径:
 ├── Story 1.18a (Prefect 工作流引擎)
-│   ├── 新增端口: WorkflowEnginePort (application/ports/)
+│   ├── 新增端口: WorkflowEnginePort (domain/ports/)  ← 已存在
 │   ├── 新增适配器: PrefectAdapter (infrastructure/)
 │   ├── 集成: OrchestrationService.execute(task_type="data_pipeline")
 │   └── 触发: AutoExecuted 中 task_context["task_type"] 路由
