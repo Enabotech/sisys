@@ -1,8 +1,8 @@
 # SISYS 自主调用子系统重构设计
 
-**文档版本:** v1.2
+**文档版本:** v1.3
 **生成时间:** 2026-05-21
-**修订:** R1 修正 10 项（行号/路径/步骤编号）；R2 修正 10 项（DI lambda 语法/测试清单/语义变更/矛盾统一）
+**修订:** R1 修正 10 项；R2 修正 10 项；R3 修正 10 项（DI 时序/破坏性变更声明/partial_error 类型/遗漏项补充）
 **基于:** sisys-auto-invocation-design.md v1.0 + Story 1.14a/b/c 代码全面调研 + 25 项问题分析
 **状态:** 重构设计
 
@@ -121,7 +121,7 @@ AutoRouteHandler.on_triggered(event)
 
 **修复方案：** 在 composition_root.py 中添加完整注册（详见第 3.1 节）。注意：`auto_trigger_handler` 依赖 `event_listener` 端口，需确认该端口已注册或补充注册。
 
-**注意：** domain service 和 handler 不是 Protocol 端口，使用 `register_port()` 注册它们是临时方案（与 P3-7 同一反模式）。理想方案是引入 `register_service()` 机制，但当前优先保证管线可启动。
+**注意：** domain service 和 handler 不是 Protocol 端口，使用 `register_port()` 注册它们是临时方案（与 P3-7 同一反模式）。理想方案是引入 `register_service()` 机制，但当前优先保证管线可启动。注册分两阶段：Phase 1 注册 7 个组件（不含 auto_trigger_handler），Phase 2 在 event_listener 端口创建后补充注册 auto_trigger_handler。
 
 **验证：** 通过 DI 容器可解析完整的管线组件链。
 
@@ -196,7 +196,7 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
   - `src/infrastructure/messaging/inmemory_event_bus.py` — InMemoryEventBus.publish() 构造 `ChannelResult("inmemory", ...)`
   - `DualChannelEventBus` 不直接构造 PublishResult，透传子总线返回值
 
-**语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。
+**语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。此外，`partial_error` 返回类型从 `str | None`（错误信息）改为 `bool`（是否有部分错误），类型签名变更会影响所有调用方。
 
 **验证：** `PublishResult` 无 Redis/Outbox 引用；EventPublisher Protocol 测试通过。
 
@@ -494,7 +494,7 @@ register_port(
     version="v1.0.0",
     interface=HeartbeatScheduler,
     impl=lambda resolver: HeartbeatScheduler(
-        redis_config=resolver.resolve("redis_connection_manager"),
+        redis_config=RedisConfig.from_env(),
     ),
     module="src.infrastructure.scheduler.heartbeat_scheduler",
     lifetime=Lifetime.SINGLETON,
@@ -731,6 +731,8 @@ async def on_routed_event(self, event: AutoRouted) -> AutoExecuted | None:
     route_target = event.route_target
     route_score = event.route_score
     route_type = event.route_type
+    trigger_event_type = event.trigger_event_type  # P1-5 遗漏字段
+    trigger_event_id = event.trigger_event_id      # P1-5 遗漏字段
 ```
 
 **影响范围：** `AutoExecuteService` 及其所有测试的调用方式需更新。
@@ -814,6 +816,9 @@ if semantic_score >= self._semantic_threshold:
 
 | 项目 | 操作 | 文件 |
 |------|------|------|
+| `AutoRouteHandler._publish` 方法 | 删除（冗余发布） | `src/application/event_handlers/auto_route_handler.py` |
+| `CheckpointSnapshot.to_redis_hash/from_redis_hash` | 删除（迁移至 RedisSnapshotStore） | `src/domain/entities/checkpoint_snapshot.py` |
+| `DockerSandboxAdapter.reset_all_containers` | 移除/重构（改实例级清理） | `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py` |
 | `InMemoryEventPublisher` | 删除 | `src/domain/ports/event_publisher.py` |
 | `HashNode` dataclass | 删除 | `src/infrastructure/routing/hash_router.py` |
 | `cache_ttl_seconds` 参数 | 移除（从 AutoRouteConfig 和 SemanticRouter） | `src/infrastructure/routing/semantic_router.py`, `src/infrastructure/config/auto_route.py` |
@@ -904,6 +909,7 @@ def __init__(self) -> None:
 | `src/infrastructure/messaging/in_memory_event_listener.py` | 新建（从 domain 迁移） | P1-4 |
 | `src/infrastructure/messaging/in_memory_dead_letter_queue.py` | 新建（从 domain 迁移） | P1-4 |
 | `src/infrastructure/messaging/dual_channel_event_bus.py` | 适配 ChannelResult | P1-2 |
+| `src/infrastructure/messaging/inmemory_event_bus.py` | 适配 ChannelResult | P1-2 |
 
 ### 4.4 Composition Root
 
@@ -971,7 +977,7 @@ def __init__(self) -> None:
 - [ ] **1.2** 修正 composition_root.py 中 RedisSnapshotStore 的 impl 和 module 路径（P0-1）
 - [ ] **1.3** 从 AutoRouteHandler 移除 `_publish` 方法和 `publisher` 构造参数（P0-2）
 - [ ] **1.4** 修复 SemanticRouter._cosine_similarity：分别计算各向量模值（P0-4）
-- [ ] **1.5** 确认 event_listener 端口已注册，在 composition_root 中添加 8 个自主调用组件注册（P0-3）
+- [ ] **1.5** 在 composition_root 中添加 7 个自主调用组件注册（排除 `auto_trigger_handler`，因其依赖 `event_listener` 端口，该端口在 Phase 2 步骤 2.3 才创建）（P0-3）
 - [ ] **1.6** 运行 `poetry run pytest tests/unit/infrastructure/routing/ tests/unit/domain/services/ -v` 验证
 - [ ] **1.7** 运行 `poetry run pytest --tb=short -q` 全量回归
 
@@ -980,6 +986,8 @@ def __init__(self) -> None:
 - [ ] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
 - [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
 - [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
+- [ ] **2.3b** 在 composition_root 中注册 `event_listener` 端口（使用 InMemoryEventListener 实现）（P1-3，见 Section 3.1.1 前置依赖）
+- [ ] **2.3c** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
 - [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
 - [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/`（P1-4）
 - [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/`（P1-4）
@@ -1031,12 +1039,18 @@ def __init__(self) -> None:
 
 | 测试类型 | 新增测试 | 描述 |
 |----------|---------|------|
-| DI 解析 | `test_auto_invocation_pipeline_resolvable` | 验证所有 8 个组件可通过 DI 容器解析 |
-| 发布唯一性 | `test_auto_routed_published_once` | 验证 AutoTriggered → 仅 1 条 AutoRouted |
-| 序列化 | `test_redis_snapshot_mapper` | 验证 mapper 正确序列化/反序列化 |
-| PublishResult | `test_channel_result_abstraction` | 验证 PublishResult 无 Redis/Outbox 引用 |
-| 背压 | `test_trigger_handler_queue_full_drops` | 验证队列满时丢弃事件并记录警告 |
-| 架构合规 | `test_domain_no_redis_references` | 验证 domain 层无 Redis 导入 |
+| DI 解析 | `test_auto_invocation_pipeline_resolvable` | 验证所有 8 个组件可通过 DI 容器解析（P0-3） |
+| DI 路径 | `test_di_path_matches_actual_files` | 验证 impl/module 路径指向真实文件和类（P0-1） |
+| 发布唯一性 | `test_auto_routed_published_once` | 验证 AutoTriggered → 仅 1 条 AutoRouted（P0-2） |
+| 序列化 | `test_redis_snapshot_mapper` | 验证 mapper 正确序列化/反序列化（P1-1） |
+| PublishResult | `test_channel_result_abstraction` | 验证 PublishResult 无 Redis/Outbox 引用（P1-2） |
+| PublishResult | `test_publish_result_is_success_semantic` | 验证新 is_success 语义（全部成功才算成功）（P1-2） |
+| 端口位置 | `test_event_listener_in_domain_ports` | 验证 EventListener Protocol 在 domain/ports/ 可导入（P1-3） |
+| 类型安全 | `test_execute_service_accepts_auto_routed` | 验证 on_routed_event 接受 AutoRouted 类型（P1-5） |
+| 背压 | `test_trigger_handler_queue_full_drops` | 验证队列满时丢弃事件并记录警告（P2-6） |
+| 架构合规 | `test_domain_no_redis_references` | 验证 domain 层无 Redis 导入（P1-1, P1-2） |
+| 状态隔离 | `test_docker_sandbox_instance_isolation` | 验证实例间 _running_containers 不共享（P2-7） |
+| 配置 | `test_all_auto_configs_frozen` | 验证所有 auto-invocation 配置类为 frozen（P2-1） |
 
 ### 6.3 架构合规验证
 
@@ -1061,7 +1075,7 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 - `CheckpointSnapshot` 纯化后，记忆快照可通过独立的 `MemorySnapshot` 实体实现，不依赖 Redis 序列化
 - `PublishResult` 抽象化后，MemoryChanged 事件可复用通用通道发布
 
-**影响：** 无破坏性变更。重构为记忆子系统提供了更干净的扩展接口。
+**影响：** 存在破坏性变更：P1-2 `PublishResult.is_success` 语义从"任一通道成功"改为"全部通道成功"，`partial_error` 返回类型从 `str | None` 改为 `bool`。需评估现有消费者是否依赖旧语义/类型。重构为记忆子系统提供了更干净的扩展接口。
 
 ---
 
@@ -1072,7 +1086,7 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 - `AutoRouteService` 添加 `semantic_threshold` 参数后，UDMR 可在 L3 层利用该阈值做模型选择
 - DI 注册完善后，UDMR 组件可直接注入管线
 
-**影响：** P2-3（RoutingDecisionLog 实例化）是 Story 1.17 的前置依赖。
+**影响：** 存在 P1-2 破坏性变更（同 7.1）。P2-3（RoutingDecisionLog 实例化）是 Story 1.17 的前置依赖。
 
 ---
 
@@ -1082,7 +1096,7 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 - `OrchestrationService` 从 port 改为 service 注册后（P3-7），引擎适配器注册更清晰
 - DI 管线完善后，`WorkflowEnginePort` 和 `AgentEnginePort` 可通过 DI 注入 `OrchestrationService`
 
-**影响：** 无破坏性变更。重构使引擎集成更顺畅。
+**影响：** 无破坏性变更（OrchestrationService 注册方式变更仅影响 DI 容器内部）。重构使引擎集成更顺畅。
 
 ---
 
@@ -1118,4 +1132,4 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 | 8 | 队列背压 | maxsize=1000 + 丢弃 | 防止 OOM，fail-fast 优于 fail-slow |
 | 9 | DockerSandboxAdapter 状态 | 改为实例变量 | 实例隔离，消除共享状态风险 |
 | 10 | RoutingDecisionLog | 在 service 中实例化 | 完成 Story 1.14b AC-3 遗漏 |
-| 11 | PublishResult.is_success 语义 | 从"任一成功"改为"全部成功" | 通道无关抽象后的自然语义；需评估现有消费者是否依赖旧语义 |
+| 11 | PublishResult.is_success 语义 + partial_error 类型 | is_success 从"任一成功"改为"全部成功"；partial_error 从 `str | None` 改为 `bool` | 通道无关抽象后的自然语义；需评估现有消费者是否依赖旧语义/类型 |
