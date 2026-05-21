@@ -309,7 +309,7 @@
 | **TDD 单元测试** | MemoryMetadataRepository | L2 存储 | `test_memory_metadata_repository.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_externalized-memory-context-compression.feature` | Task 0 |
 | **SDD 架构验证** | L1/L3 分离 | 六边形架构约束 | `test_memory_architecture.py` | Task 3 |
-| **集成测试** | 事件总线 | 端到端 L1 压缩流程 | `test_compression_integration.py` | Task 3 |
+| **集成测试** | 事件总线 | 端到端 L1 压缩流程 | `test_integration_compression.py` | Task 3 |
 
 #### 测试隔离约束（必须遵守）
 
@@ -465,7 +465,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_memory_service_integration.py`（验证 L2 存储，使用 mock）|
+| 🔴 红 | 编写 `tests/integration/test_integration_memory_service.py`（验证 L2 存储，使用 mock）|
 | 🟢 绿 | 实现 `src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py` - MemoryMetadataRepository |
 | 🔄 重构 | 添加 UPSERT 和版本冲突处理 |
 
@@ -534,7 +534,7 @@
 
 #### 集成测试
 
-- [x] Subtask 3.7: 创建 `tests/integration/test_compression_integration.py`（端到端 L1 压缩流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_integration_compression.py`（端到端 L1 压缩流程）
 
 **完成标准/Definition of Done:**
 - [x] 压缩率≥70%（允许误差 -5%）
@@ -711,7 +711,7 @@ sisys/
 │   │   └── performance/
 │   │       └── test_compression_performance.py
 │   ├── integration/
-│   │   └── test_compression_integration.py
+│   │   └── test_integration_compression.py
 │   └── acceptance/
 │       ├── test_acceptance_externalized-memory-context-compression.feature
 │       └── test_acceptance_externalized-memory-context-compression.py
@@ -834,8 +834,8 @@ sisys/
 - `tests/unit/infrastructure/storage/test_file_memory_adapter.py` - FileMemoryAdapter 单元测试
 - `tests/unit/architecture/test_memory_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_compression_performance.py` - 性能基准测试
-- `tests/integration/test_compression_integration.py` - 集成测试
-- `tests/integration/test_memory_service_integration.py` - 集成测试（使用 mock）
+- `tests/integration/test_integration_compression.py` - 集成测试
+- `tests/integration/test_integration_memory_service.py` - 集成测试（使用 mock）
 - `tests/acceptance/test_acceptance_externalized-memory-context-compression.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
 - `tests/acceptance/test_acceptance_externalized-memory-context-compression.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/externalized_memory_guide.md` - 外部化记忆实施指南

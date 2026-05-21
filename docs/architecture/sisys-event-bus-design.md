@@ -916,7 +916,7 @@ event_channels:
 |------|------|---------|
 | **端口契约测试** | `tests/contracts/` | `test_port_contract_event_publisher.py` |
 | **单元测试** | `tests/unit/` | 35+ 测试文件，覆盖 Domain 事件、Infrastructure 组件 |
-| **集成测试** | `tests/integration/` | `test_event_bus_integration.py`, `test_event_messaging_integration.py` |
+| **集成测试** | `tests/integration/` | `test_integration_event_bus.py`, `test_integration_event_messaging.py` |
 | **验收测试 (BDD)** | `tests/acceptance/` | Story 1.3, 1.4, 1.13, 1.14, 1.16, 20.2 |
 | **架构约束测试** | `tests/unit/architecture/` | Domain 层零外部依赖、依赖方向 |
 

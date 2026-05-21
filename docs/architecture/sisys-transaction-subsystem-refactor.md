@@ -692,8 +692,8 @@ SagaOrchestrator.execute()
 | `tests/unit/.../test_outbox_cleanup.py` | 2 | Outbox 清理测试 |
 | `tests/unit/.../test_saga_orchestrator.py` | 3 | Saga 编排器单元测试 |
 | `tests/unit/.../test_saga_context.py` | 3 | Saga 上下文测试 |
-| `tests/integration/test_saga_repository.py` | 3 | Saga 持久化集成测试 |
-| `tests/integration/test_saga_scenarios.py` | 4 | Saga 场景集成测试 |
+| `tests/integration/test_integration_saga_repository.py` | 3 | Saga 持久化集成测试 |
+| `tests/integration/test_integration_saga_scenarios.py` | 4 | Saga 场景集成测试 |
 
 ---
 
@@ -744,7 +744,7 @@ SagaOrchestrator.execute()
 poetry run pytest tests/unit/infrastructure/messaging/unit_of_work/ -v
 poetry run pytest tests/unit/infrastructure/middleware/ -v
 poetry run pytest tests/unit/infrastructure/saga/ -v
-poetry run pytest tests/integration/test_saga_repository.py -v
+poetry run pytest tests/integration/test_integration_saga_repository.py -v
 
 # 运行架构验证
 poetry run pytest tests/unit/infrastructure/messaging/unit_of_work/test_uow_transaction_boundary.py -v

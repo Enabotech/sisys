@@ -223,7 +223,7 @@
 | **TDD 单元测试** | AutoTriggerContext | 上下文提取 | `test_auto_trigger_context.py` | Task 1 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-trigger.feature` | Task 0 |
 | **SDD 架构验证** | 触发器解耦 | 六边形架构约束 | `test_trigger_architecture.py` | Task 3 |
-| **集成测试** | 事件总线 | 端到端触发流程 | `test_trigger_integration.py` | Task 3 |
+| **集成测试** | 事件总线 | 端到端触发流程 | `test_integration_trigger.py` | Task 3 |
 
 ---
 
@@ -377,7 +377,7 @@
 
 #### 集成测试
 
-- [x] Subtask 3.7: 创建 `tests/integration/test_trigger_integration.py`（端到端触发流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_integration_trigger.py`（端到端触发流程）
 
 **完成标准/Definition of Done:**
 - [x] 六边形架构验证通过（无循环依赖）
@@ -495,7 +495,7 @@ sisys/
 │   │   └── performance/
 │   │       └── test_trigger_performance.py
 │   ├── integration/
-│   │   └── test_trigger_integration.py
+│   │   └── test_integration_trigger.py
 │   └── acceptance/
 │       ├── test_acceptance_autonomous-invocation-trigger.feature
 │       └── test_acceptance_autonomous-invocation-trigger.py
@@ -733,7 +733,7 @@ AutoTriggerService (监听)
 | `tests/unit/infrastructure/scheduler/test_heartbeat_scheduler.py` | ✅ 完成 | HeartbeatScheduler 单元测试 |
 | `tests/unit/architecture/test_trigger_architecture.py` | ✅ 完成 | 六边形架构验证测试 |
 | `tests/unit/performance/test_trigger_performance.py` | ✅ 完成 | 性能基准测试 |
-| `tests/integration/test_trigger_integration.py` | ✅ 完成 | 端到端触发流程集成测试 |
+| `tests/integration/test_integration_trigger.py` | ✅ 完成 | 端到端触发流程集成测试 |
 | `tests/acceptance/test_acceptance_autonomous-invocation-trigger.feature` | ✅ 完成 | Gherkin 验收测试（24 场景） |
 | `tests/acceptance/test_acceptance_autonomous-invocation-trigger.py` | ✅ 完成 | 验收测试步骤实现 |
 | `docs/developer/trigger_mechanism_guide.md` | ❌ 未创建 | 非强制（文档可选） |

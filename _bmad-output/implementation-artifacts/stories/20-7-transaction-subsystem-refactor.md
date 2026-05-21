@@ -240,8 +240,8 @@ Feature: 事务子系统重构
 | **TDD 单元测试** | AuditUnitOfWork | SERIALIZABLE 隔离级别 | `test_audit_unit_of_work.py` | Task 6 |
 | **TDD 单元测试** | SagaOrchestrator | 正向执行、补偿 | `test_saga_orchestrator.py` | Task 7 |
 | **TDD 单元测试** | SagaContext | 状态管理、序列化 | `test_saga_context.py` | Task 7 |
-| **TDD 集成测试** | SagaRepository | PostgreSQL 持久化 | `test_saga_repository.py` | Task 8 |
-| **TDD 集成测试** | Saga 场景 | S01-S03 端到端 | `test_saga_scenarios.py` | Task 9 |
+| **TDD 集成测试** | SagaRepository | PostgreSQL 持久化 | `test_integration_saga_repository.py` | Task 8 |
+| **TDD 集成测试** | Saga 场景 | S01-S03 端到端 | `test_integration_saga_scenarios.py` | Task 9 |
 | **SDD 架构验证** | 六边形架构 | 依赖方向、零依赖 | `test_uow_transaction_boundary.py` | Task 10 |
 
 ---
@@ -282,8 +282,8 @@ Feature: 事务子系统重构
 | AC-4 | Outbox archived + 状态机 | Task 4 | CheckConstraint + entity 方法调用 | `test_outbox_state_machine.py` |
 | AC-5 | Outbox 清理 + RetryPolicy | Task 5 | cleanup + 退避策略 | `test_outbox_cleanup.py` |
 | AC-6 | 隔离级别 + 审计 UoW | Task 6 | isolation_level + AuditUoW | `test_audit_unit_of_work.py` |
-| AC-7 | Saga 基础设施 | Task 7, Task 8 | 模块 + 端口 + 注册 | `test_saga_orchestrator.py`, `test_saga_repository.py` |
-| AC-8 | Saga 场景 S01-S03 | Task 9 | 混合式 + 编排式场景 | `test_saga_scenarios.py` |
+| AC-7 | Saga 基础设施 | Task 7, Task 8 | 模块 + 端口 + 注册 | `test_saga_orchestrator.py`, `test_integration_saga_repository.py` |
+| AC-8 | Saga 场景 S01-S03 | Task 9 | 混合式 + 编排式场景 | `test_integration_saga_scenarios.py` |
 
 ---
 
@@ -632,7 +632,7 @@ Feature: 事务子系统重构
 - [x] Subtask 8.9: 🔄 重构 — 优化代码
 
 **完成标准:**
-- [x] `pytest tests/integration/test_saga_repository.py -v` 通过
+- [x] `pytest tests/integration/test_integration_saga_repository.py -v` 通过
 - [x] 契约测试通过
 - [x] DI 注册完成
 
@@ -682,7 +682,7 @@ Feature: 事务子系统重构
 - [x] Subtask 9.10: 🔄 重构 — 优化代码
 
 **完成标准:**
-- [ ] `pytest tests/integration/test_saga_scenarios.py -v` 通过
+- [ ] `pytest tests/integration/test_integration_saga_scenarios.py -v` 通过
 - [ ] S01-S03 场景可运行
 - [ ] 补偿流程测试通过
 
@@ -850,8 +850,8 @@ src/
 - `tests/unit/infrastructure/messaging/unit_of_work/test_audit_unit_of_work.py`
 - `tests/unit/infrastructure/saga/test_saga_orchestrator.py`
 - `tests/unit/infrastructure/saga/test_saga_context.py`
-- `tests/integration/test_saga_repository.py`
-- `tests/integration/test_saga_scenarios.py`
+- `tests/integration/test_integration_saga_repository.py`
+- `tests/integration/test_integration_saga_scenarios.py`
 
 ---
 

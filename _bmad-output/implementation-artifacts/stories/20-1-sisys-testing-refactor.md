@@ -411,7 +411,7 @@
 - [x] Subtask 6.4: I4 — 添加 `reset_test_environment` fixture
   - 使用 `tests/fixtures.py` 中的 `reset_test_environment`
 - [x] Subtask 6.5: I5 — 验证 `mock_redis` 每个测试后清理
-  - `test_redis_integration.py` 每个测试创建独立的 fakeredis 实例
+  - `test_integration_redis.py` 每个测试创建独立的 fakeredis 实例
 - [x] Subtask 6.6: I6 — 检查 `in_memory_store` 状态隔离
   - `event_store` fixture 提供独立实例，cleanup 在 yield 后
 - [x] Subtask 6.7: I7 — 确认 IdempotencyChecker mock 正确
@@ -440,9 +440,9 @@
   - Redis: 使用 `flushdb` 清理
   - PostgreSQL: 使用事务回滚
 - [x] Subtask 7.4: R4 — 为 Qdrant collections 添加 UUID 前缀
-  - ✅ 已完成：`tests/integration/test_qdrant_real_integration.py` 使用 `test_tenant_id`
+  - ✅ 已完成：`tests/integration/test_integration_qdrant_real.py` 使用 `test_tenant_id`
 - [x] Subtask 7.5: R5 — 为 Redis keys 添加 UUID 前缀
-  - ✅ 已完成：`tests/integration/test_redis_real_integration.py` 使用 uuid
+  - ✅ 已完成：`tests/integration/test_integration_redis_real.py` 使用 uuid
 - [x] Subtask 7.6: R6 — PostgreSQL schema 清理正确
   - 使用事务回滚机制
 - [x] Subtask 7.7: R7 — 验证连接配置使用 `get_test_env()`

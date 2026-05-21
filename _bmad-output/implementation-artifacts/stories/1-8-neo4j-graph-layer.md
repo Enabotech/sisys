@@ -250,7 +250,7 @@
 | **TDD 单元测试** | 关系管理 | 创建、删除、查询、类型约束 | `test_graph_relationship.py` | Task 2 |
 | **TDD 单元测试** | Cypher 查询 | 参数化查询、路径查询、邻居查询 | `test_cypher_query.py` | Task 3 |
 | **TDD 单元测试** | GraphRAG 检索 | 实体关联、文档关联、社区发现 | `test_graph_retriever.py` | Task 4 |
-| **TDD 集成测试** | Neo4j 端到端 | 完整节点/关系/查询流程 | `test_neo4j_integration.py` | Task 5 |
+| **TDD 集成测试** | Neo4j 端到端 | 完整节点/关系/查询流程 | `test_integration_neo4j.py` | Task 5 |
 | **SDD 架构验证** | 领域层零依赖 | 领域层无 Neo4j 导入 | `test_architecture_constraints.py` | Task 6 |
 
 ---
@@ -287,7 +287,7 @@
 | AC-3 | Cypher 查询与图遍历 | Task 3 | GraphStorage 接口 + Neo4jGraphStorage | `test_cypher_query.py` |
 | AC-4 | GraphRAG 增强检索基础 | Task 4 | GraphRetriever | `test_graph_retriever.py` |
 | AC-5 | 架构约束验证 | Task 6 | 领域层零 Neo4j 依赖验证 | `test_architecture_constraints.py` |
-| AC-1~AC-4 | Neo4j 端到端集成测试 | Task 5 | 完整节点/关系/查询流程验证 | `test_neo4j_integration.py` |
+| AC-1~AC-4 | Neo4j 端到端集成测试 | Task 5 | 完整节点/关系/查询流程验证 | `test_integration_neo4j.py` |
 
 ---
 
@@ -527,7 +527,7 @@
 
 #### 集成测试实现
 
-- [x] Subtask: 创建 `tests/integration/test_neo4j_integration.py`
+- [x] Subtask: 创建 `tests/integration/test_integration_neo4j.py`
 - [x] Subtask: 实现节点生命周期端到端测试（创建→查询→验证→删除）
 - [x] Subtask: 实现关系端到端测试（创建→查询→验证→删除→类型约束）
 - [x] Subtask: 实现 Cypher 查询端到端测试（参数化查询、路径查询、邻居查询）
@@ -674,7 +674,7 @@ sisys/
 │   │       ├── test_graph_manager_interface.py
 │   │       └── test_graph_storage_interface.py
 │   ├── integration/
-│   │   └── test_neo4j_integration.py
+│   │   └── test_integration_neo4j.py
 │   └── acceptance/
 │       └── test_acceptance_neo4j-graph-layer.feature
 └── docs/
@@ -749,7 +749,7 @@ sisys/
 - `src/infrastructure/storage/neo4j/graph_retriever.py` - GraphRetriever 实现
 - `src/domain/repositories/graph_storage.py` - GraphManager + GraphStorage 接口
 - `tests/unit/infrastructure/test_neo4j_*.py` - 单元测试
-- `tests/integration/test_neo4j_integration.py` - 集成测试
+- `tests/integration/test_integration_neo4j.py` - 集成测试
 - `tests/acceptance/test_acceptance_neo4j-graph-layer.feature` - 验收测试
 
 ---

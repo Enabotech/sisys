@@ -325,7 +325,7 @@ Phase 2.5 (P2 - 与Phase2并行): 构想4 — Application Driven Ports补全
 2. `poetry run pytest tests/unit/infrastructure/storage/` — 验证所有Adapter实现测试通过
 3. `poetry run pytest tests/unit/architecture/test_hexagonal_architecture_constraints.py` — 验证六边形约束
 4. `poetry run pytest tests/contracts/test_port_contracts.py` — 验证端口契约兼容性
-5. `poetry run pytest tests/integration/test_storage_integration.py` — 验证跨层集成
+5. `poetry run pytest tests/integration/test_integration_storage.py` — 验证跨层集成
 
 ### 6.2 关键验证文件
 

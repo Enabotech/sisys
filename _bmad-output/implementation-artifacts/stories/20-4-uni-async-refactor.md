@@ -533,7 +533,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_async_port_integration.py` |
+| 🔴 红 | 编写 `test_integration_async_port.py` |
 | 🟢 绿 | 实现完整调用链测试 |
 | 🔄 重构 | 运行集成测试 |
 
@@ -608,7 +608,7 @@
 | TDD | SixLayerStorageCoordinator | `test_six_layer_coordinator_port.py` | Task 10 |
 | TDD | MemoryChangedListener | `test_memory_changed_listener_port.py` | Task 11 |
 | Mock | Fake 实现验证 | `test_mock_implementations.py` | Task 12 |
-| 集成 | 端到端调用链 | `test_async_port_integration.py` | Task 13 |
+| 集成 | 端到端调用链 | `test_integration_async_port.py` | Task 13 |
 | 验证 | 事件循环阻塞 | `test_event_loop_blocking.py` | Task 14 |
 | 架构 | 六边形约束 | `test_hexagonal_constraints.py` | Task 15 |
 
@@ -771,7 +771,7 @@
 | `tests/unit/domain/services/test_memory_service_port_injection.py` | MemoryService 依赖注入测试 | Task 9 |
 | `tests/unit/application/services/test_six_layer_coordinator_port.py` | SixLayerStorageCoordinator 测试 | Task 10 |
 | `tests/unit/interfaces/event_listeners/test_memory_changed_listener_port.py` | MemoryChangedListener 测试 | Task 11 |
-| `tests/integration/test_async_port_integration.py` | 端到端集成测试 | Task 13 |
+| `tests/integration/test_integration_async_port.py` | 端到端集成测试 | Task 13 |
 | `tests/unit/test_event_loop_blocking.py` | 事件循环阻塞测试 | Task 14 |
 | `tests/unit/test_hexagonal_constraints.py` | 六边形架构约束测试 | Task 15 |
 

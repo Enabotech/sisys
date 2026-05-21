@@ -213,7 +213,7 @@
 | **TDD 单元测试** | 公共黑板 | 发布、读取、版本冲突 | `test_public_blackboard.py` | Task 4 |
 | **TDD 单元测试** | EventMetrics 扩展 | 缓存命中/未命中计数、hit_rate | `test_event_metrics_extension.py` | Task 3 |
 | **TDD 单元测试** | 键命名规范 | 键构建、批量清理 | `test_key_builder.py`, `test_cleanup.py` | Task 5 |
-| **TDD 集成测试** | Redis 端到端 | 完整存储/读取流程 | `test_redis_integration.py` | Task 6 |
+| **TDD 集成测试** | Redis 端到端 | 完整存储/读取流程 | `test_integration_redis.py` | Task 6 |
 | **SDD 架构验证** | 基础设施层覆盖率 | 基础设施层覆盖率≥75% | `test_coverage.py` | Task 7 |
 
 ---
@@ -253,7 +253,7 @@
 | AC-3 | 语义缓存服务 | Task 3 | SemanticCache 接口 + RedisSemanticCache + 扩展 EventMetrics | `test_semantic_cache.py`, `test_event_metrics_extension.py` |
 | AC-4 | 公共黑板服务 | Task 4 | PublicBlackboard 接口 + RedisPublicBlackboard | `test_public_blackboard.py` |
 | AC-5 | Redis 键命名规范与清理 | Task 5 | RedisKeyBuilder + RedisCleanup | `test_key_builder.py`, `test_cleanup.py` |
-| AC-1~AC-5 | Redis 端到端集成测试 | Task 6 | 完整存储/读取流程验证 | `test_redis_integration.py` |
+| AC-1~AC-5 | Redis 端到端集成测试 | Task 6 | 完整存储/读取流程验证 | `test_integration_redis.py` |
 | AC-5 | 架构约束验证 | Task 7 | 基础设施层覆盖率验证 | `test_coverage.py` |
 
 > **📌 注**：原 AC-5 幂等性检查已删除（Story 1.3 已实现），当前 AC-1~AC-5 共 5 个验收标准。
@@ -448,7 +448,7 @@
 
 #### 集成测试实现
 
-- [x] Subtask: 创建 `tests/integration/test_redis_integration.py`
+- [x] Subtask: 创建 `tests/integration/test_integration_redis.py`
 - [x] Subtask: 实现会话状态端到端测试（保存→加载→验证→删除）
 - [x] Subtask: 实现语义缓存端到端测试（写入→命中→过期→失效）
 - [x] Subtask: 实现公共黑板端到端测试（多 Agent 并发写入→读取验证）
@@ -559,7 +559,7 @@ sisys/
 │   │       ├── test_semantic_cache_interface.py
 │   │       └── test_public_blackboard_interface.py
 │   ├── integration/
-│   │   └── test_redis_integration.py
+│   │   └── test_integration_redis.py
 │   └── acceptance/
 │       └── test_acceptance_redis-cache-layer.feature
 └── docs/
@@ -657,7 +657,7 @@ sisys/
 - `tests/unit/domain/test_session_storage_interface.py` — SessionStorage 接口验证
 - `tests/unit/domain/test_semantic_cache_interface.py` — SemanticCache 接口验证
 - `tests/unit/domain/test_public_blackboard_interface.py` — PublicBlackboard 接口验证
-- `tests/integration/test_redis_integration.py` — Redis 端到端集成测试
+- `tests/integration/test_integration_redis.py` — Redis 端到端集成测试
 - `tests/acceptance/test_acceptance_redis-cache-layer.feature` — Gherkin 验收测试
 - `tests/unit/infrastructure/test_redis_config_extension.py` — RedisConfig 扩展字段测试
 
@@ -699,7 +699,7 @@ sisys/
 - `tests/unit/domain/test_session_storage_interface.py` — SessionStorage 接口验证
 - `tests/unit/domain/test_semantic_cache_interface.py` — SemanticCache 接口验证
 - `tests/unit/domain/test_public_blackboard_interface.py` — PublicBlackboard 接口验证
-- `tests/integration/test_redis_integration.py` — Redis 端到端集成测试
+- `tests/integration/test_integration_redis.py` — Redis 端到端集成测试
 - `tests/acceptance/test_acceptance_redis-cache-layer.feature` — Gherkin 验收测试
 - `docs/infrastructure/redis_cache_guide.md` — Redis 缓存层实施指南
 

@@ -179,10 +179,10 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | 测试工具类 | 测试数据工厂、Mock fixtures、EventRegistry | `test_test_utils.py` | Task 1 |
-| **TDD 集成测试** | 事件冒烟 | 事件发布→内存发件箱→查询冒烟 | `test_event_smoke.py` | Task 2 |
+| **TDD 单元测试** | 测试工具类 | 测试数据工厂、Mock fixtures、EventRegistry | `test_integration_test_utils.py` | Task 1 |
+| **TDD 集成测试** | 事件冒烟 | 事件发布→内存发件箱→查询冒烟 | `test_integration_event_smoke.py` | Task 2 |
 | **TDD 集成测试** | 仓储冒烟 | 仓储接口→内存实现交互 | `test_repository_smoke.py` | Task 3 |
-| **TDD 集成测试** | 层间协作 | 应用层→领域→基础设施协作 | `test_layer_collaboration.py` | Task 4 |
+| **TDD 集成测试** | 层间协作 | 应用层→领域→基础设施协作 | `test_integration_layer_collaboration.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_integration-test-framework.feature` | Task 0 |
 | **SDD 架构验证** | 集成测试约束 | Mock 不泄漏、测试隔离、超时配置 | `test_integration_constraints.py` | Task 5 |
 
@@ -215,10 +215,10 @@
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
 | AC-1 | 集成测试框架基础设施就绪 | Task 0 | SDD 规范定义（策略、Mock、数据生命周期） | `test_acceptance_integration-test-framework.feature` |
-| AC-1 | 集成测试框架基础设施就绪 | Task 1 | 测试基础设施（目录、配置、fixtures、Mock、超时） | `test_test_utils.py` |
-| AC-2 | 领域事件冒烟测试 | Task 2 | 事件发布→内存发件箱→查询冒烟 + EventRegistry | `test_event_smoke.py` |
+| AC-1 | 集成测试框架基础设施就绪 | Task 1 | 测试基础设施（目录、配置、fixtures、Mock、超时） | `test_integration_test_utils.py` |
+| AC-2 | 领域事件冒烟测试 | Task 2 | 事件发布→内存发件箱→查询冒烟 + EventRegistry | `test_integration_event_smoke.py` |
 | AC-3 | 仓储模式冒烟测试 | Task 3 | 仓储接口→内存实现交互 + 数据生命周期 | `test_repository_smoke.py` |
-| AC-4 | 应用层→领域层→基础设施层协作 | Task 4 | 应用层用例→领域→基础设施协作 + 错误传播 | `test_layer_collaboration.py` |
+| AC-4 | 应用层→领域层→基础设施层协作 | Task 4 | 应用层用例→领域→基础设施协作 + 错误传播 | `test_integration_layer_collaboration.py` |
 | AC-5 | 集成测试覆盖率与质量门禁 | Task 5 | 覆盖率验证（`--cov=src`）+ 集成测试约束验证 | `test_integration_constraints.py` |
 
 ---
@@ -260,7 +260,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_test_utils.py`（验证目录结构、配置文件、fixtures） |
+| 🔴 红 | 编写 `test_integration_test_utils.py`（验证目录结构、配置文件、fixtures） |
 | 🟢 绿 | 创建 `tests/integration/` 目录结构与 `conftest.py` |
 | 🔄 重构 | 添加类型注解、docstring |
 
@@ -272,7 +272,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_test_utils.py`（测试数据工厂生成领域实体） |
+| 🔴 红 | 编写 `test_integration_test_utils.py`（测试数据工厂生成领域实体） |
 | 🟢 绿 | 实现测试数据工厂类（生成 `DocumentProcessed` 等测试事件，复用 Story 1.1/1.2 领域实体） |
 | 🔄 重构 | 添加类型注解、docstring |
 
@@ -314,7 +314,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_event_smoke.py`（事件发布并写入内存发件箱） |
+| 🔴 红 | 编写 `test_integration_event_smoke.py`（事件发布并写入内存发件箱） |
 | 🟢 绿 | 实现事件发布与内存发件箱写入测试（复用 Story 1.3 `InMemoryOutboxRepository`） |
 | 🔄 重构 | 添加类型注解、测试数据工厂集成 |
 
@@ -326,7 +326,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_event_smoke.py`（EventRegistry 反序列化测试） |
+| 🔴 红 | 编写 `test_integration_event_smoke.py`（EventRegistry 反序列化测试） |
 | 🟢 绿 | 实现事件类型注册表测试（已知 event_type 正确反序列化，未知 event_type 抛 `ValueError`） |
 | 🔄 重构 | 添加 EventRegistry.reset() 测试隔离 |
 
@@ -338,7 +338,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_event_smoke.py`（`IdempotencyChecker.try_acquire()` 原子操作 + `RetryPolicy.get_delay()` 指数退避） |
+| 🔴 红 | 编写 `test_integration_event_smoke.py`（`IdempotencyChecker.try_acquire()` 原子操作 + `RetryPolicy.get_delay()` 指数退避） |
 | 🟢 绿 | 实现幂等性冒烟测试（fakeredis 原子操作） + 重试机制冒烟测试 |
 | 🔄 重构 | 优化 fakeredis 连接管理 |
 
@@ -403,7 +403,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_layer_collaboration.py`（应用层用例骨架调用领域服务） |
+| 🔴 红 | 编写 `test_integration_layer_collaboration.py`（应用层用例骨架调用领域服务） |
 | 🟢 绿 | 实现应用层用例骨架类（`DocumentProcessingUseCase`）调用领域服务测试 |
 | 🔄 重构 | 添加类型注解、错误处理 |
 
@@ -415,7 +415,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_layer_collaboration.py`（仓储异常→应用层捕获→正确错误响应） |
+| 🔴 红 | 编写 `test_integration_layer_collaboration.py`（仓储异常→应用层捕获→正确错误响应） |
 | 🟢 绿 | 实现错误传播测试 |
 | 🔄 重构 | 优化错误处理策略 |
 
@@ -503,9 +503,9 @@ sisys/
 ├── tests/
 │   ├── integration/                    # 集成测试目录
 │   │   ├── conftest.py                 # 共享 fixtures（Mock、数据工厂、测试隔离、EventRegistry.reset）
-│   │   ├── test_event_smoke.py         # 事件冒烟测试（发布→内存发件箱→EventRegistry）
+│   │   ├── test_integration_event_smoke.py         # 事件冒烟测试（发布→内存发件箱→EventRegistry）
 │   │   ├── test_repository_smoke.py    # 仓储冒烟测试（接口→内存实现）
-│   │   ├── test_layer_collaboration.py # 层间协作测试（应用层→领域→基础设施）
+│   │   ├── test_integration_layer_collaboration.py # 层间协作测试（应用层→领域→基础设施）
 │   │   ├── test_integration_constraints.py  # 集成测试约束验证（Mock 不泄漏、测试隔离、超时）
 │   │   └── fixtures/                   # 测试数据 fixtures
 │   │       ├── test_data_factory.py    # 测试数据工厂（生成 DomainEvent 子类）
@@ -607,9 +607,9 @@ sisys/
 **实施总结:**
 1. 创建了完整的集成测试目录结构（`tests/integration/`、`tests/integration/fixtures/`）
 2. 实现了共享 fixtures（`conftest.py`）：Mock Redis（fakeredis）、Mock PostgreSQL/RabbitMQ（AsyncMock）、测试数据工厂、测试隔离
-3. 实现了事件冒烟测试（`test_event_smoke.py`）：事件发布→内存发件箱、EventOutboxAdapter 序列化/反序列化、幂等性检查、重试策略
+3. 实现了事件冒烟测试（`test_integration_event_smoke.py`）：事件发布→内存发件箱、EventOutboxAdapter 序列化/反序列化、幂等性检查、重试策略
 4. 实现了仓储模式冒烟测试（`test_repository_smoke.py`）：接口→内存实现交互、测试数据生命周期管理
-5. 实现了层间协作测试（`test_layer_collaboration.py`）：应用层→领域层→基础设施层协作、错误传播
+5. 实现了层间协作测试（`test_integration_layer_collaboration.py`）：应用层→领域层→基础设施层协作、错误传播
 6. 实现了集成测试约束验证（`test_integration_constraints.py`）：Mock 不泄漏、测试隔离、超时配置
 7. 创建了 Gherkin 验收测试文件（`tests/acceptance/test_acceptance_integration-test-framework.feature`）
 8. 创建了应用层骨架类（`DocumentProcessingUseCase`）用于协作测试
@@ -627,10 +627,10 @@ sisys/
 - `tests/integration/__init__.py` — 集成测试包
 - `tests/integration/conftest.py` — 共享 fixtures（Mock、数据工厂、测试隔离、EventRegistry）
 - `tests/integration/fixtures/__init__.py` — fixtures 包
-- `tests/integration/test_test_utils.py` — 测试工具类测试（fixtures、Mock、幂等性、重试）
-- `tests/integration/test_event_smoke.py` — 事件冒烟测试（发布→内存发件箱、EventOutboxAdapter、幂等性、重试）
+- `tests/integration/test_integration_test_utils.py` — 测试工具类测试（fixtures、Mock、幂等性、重试）
+- `tests/integration/test_integration_event_smoke.py` — 事件冒烟测试（发布→内存发件箱、EventOutboxAdapter、幂等性、重试）
 - `tests/integration/test_repository_smoke.py` — 仓储冒烟测试（接口→内存实现、数据生命周期）
-- `tests/integration/test_layer_collaboration.py` — 层间协作测试（应用层→领域→基础设施、错误传播）
+- `tests/integration/test_integration_layer_collaboration.py` — 层间协作测试（应用层→领域→基础设施、错误传播）
 - `tests/integration/test_integration_constraints.py` — 集成测试约束验证（Mock 不泄漏、测试隔离、超时配置）
 - `tests/acceptance/test_acceptance_integration-test-framework.feature` — Gherkin 验收测试
 - `src/application/use_cases/document_processing.py` — DocumentProcessingUseCase 骨架类

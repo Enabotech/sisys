@@ -630,7 +630,7 @@ src/
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | RabbitMQEventListener 测试 |
 | `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | AsyncOutboxPoller 测试 |
 | `tests/unit/infrastructure/test_architecture.py` | 架构验证测试 |
-| `tests/integration/test_event_messaging_integration.py` | 事件消息组件集成测试（AC-1, AC-7） |
+| `tests/integration/test_integration_event_messaging.py` | 事件消息组件集成测试（AC-1, AC-7） |
 
 **待修改的文件/To Be Modified:**
 

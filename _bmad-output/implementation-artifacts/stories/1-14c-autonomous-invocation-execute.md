@@ -229,7 +229,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | **TDD 单元测试** | RedisSnapshotStore | Redis 存储 | `test_redis_snapshot_store.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-execute.feature` | Task 0 |
 | **SDD 架构验证** | execute 解耦 | 六边形架构约束 | `test_execute_architecture.py` | Task 3 |
-| **集成测试** | 事件总线 | 端到端 execute 流程 | `test_execute_integration.py` | Task 3 |
+| **集成测试** | 事件总线 | 端到端 execute 流程 | `test_integration_execute.py` | Task 3 |
 
 #### 测试隔离约束（必须遵守）
 
@@ -439,7 +439,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 
 #### 集成测试
 
-- [x] Subtask 3.7: 创建 `tests/integration/test_execute_integration.py`（端到端执行流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_integration_execute.py`（端到端执行流程）
 
 **完成标准/Definition of Done:**
 - [x] 六边形架构验证通过（无循环依赖）
@@ -582,7 +582,7 @@ sisys/
 │   │       └── sandbox/
 │   │           └── test_docker_sandbox_adapter.py
 │   ├── integration/
-│   │   └── test_execute_integration.py
+│   │   └── test_integration_execute.py
 │   └── acceptance/
 │       ├── test_acceptance_autonomous-invocation-execute.feature
 │       └── test_acceptance_autonomous-invocation-execute.py
@@ -694,7 +694,7 @@ sisys/
 - `tests/unit/infrastructure/storage/test_redis_snapshot_store.py` - RedisSnapshotStore 单元测试
 - `tests/unit/architecture/test_execute_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_execute_performance.py` - 性能基准测试
-- `tests/integration/test_execute_integration.py` - 集成测试
+- `tests/integration/test_integration_execute.py` - 集成测试
 - `tests/acceptance/test_acceptance_autonomous-invocation-execute.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
 - `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/execute_mechanism_guide.md` - 执行机制实施指南

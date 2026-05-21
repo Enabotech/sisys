@@ -361,7 +361,7 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | **TDD 单元测试** | SixLayerStorageCoordinator | 六层协同 | `test_six_layer_storage_coordinator.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_externalized-memory-six-layer-storage.feature` | Task 0 |
 | **SDD 架构验证** | 六层架构 | 依赖方向验证 | `test_memory_architecture.py` | Task 3 |
-| **集成测试** | 事件总线 | 端到端存储流程 | `test_storage_integration.py` | Task 3 |
+| **集成测试** | 事件总线 | 端到端存储流程 | `test_integration_storage.py` | Task 3 |
 
 #### 测试隔离约束（必须遵守）
 
@@ -564,7 +564,7 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 
 #### 集成测试
 
-- [x] Subtask 3.7: 创建 `tests/integration/test_storage_integration.py`（端到端六层存储流程）
+- [x] Subtask 3.7: 创建 `tests/integration/test_integration_storage.py`（端到端六层存储流程）
 
 **集成测试检查点（必须验证）：**
 - [x] L0 文件系统：临时目录 fixture，验证索引创建/更新/删除
@@ -748,7 +748,7 @@ sisys/
 │   │   └── performance/
 │   │       └── test_storage_performance.py  # 性能基准测试
 │   ├── integration/
-│   │   └── test_storage_integration.py      # 集成测试
+│   │   └── test_integration_storage.py      # 集成测试
 │   └── acceptance/
 │       ├── test_acceptance_externalized-memory-six-layer-storage.feature         # Gherkin 验收测试
 │       └── test_acceptance_externalized-memory-six-layer-storage.py        # 验收测试步骤实现
@@ -854,7 +854,7 @@ sisys/
 - `tests/unit/architecture/test_six_layer_storage.py` - 六层存储单元测试
 - `tests/unit/architecture/test_memory_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_storage_performance.py` - 性能基准测试
-- `tests/integration/test_storage_integration.py` - 集成测试
+- `tests/integration/test_integration_storage.py` - 集成测试
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 - `src/infrastructure/storage/__init__.py` - 添加 MemoryIndex, MemoryRouter 导出

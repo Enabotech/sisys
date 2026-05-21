@@ -332,10 +332,10 @@
 | **TDD 单元测试** | 权限控制 | 权限检查、越权拒绝、多层级权限 | `test_permission_service.py` | Task 3 |
 | **TDD 安全测试** | 越权防护 | 水平越权、垂直越权、注入攻击 | `test_security.py` | Task 4 |
 | **TDD 合规测试** | 等保 2.0 合规 | 身份鉴别、访问控制合规 | `test_dengbao_identity_compliance.py`, `test_dengbao_access_control_compliance.py` | Task 5 |
-| **SDD 集成测试** | 端到端集成 | 完整认证授权流程 | `test_auth_integration.py` | Task 6 |
+| **SDD 集成测试** | 端到端集成 | 完整认证授权流程 | `test_integration_auth.py` | Task 6 |
 | **SDD 架构验证** | 领域层零依赖 | 领域层无安全实现细节 | `test_architecture_constraints.py` | Task 7 |
 | **TDD 单元测试** | API 端点异常处理 | 4xx HTTPException 分支覆盖 | `test_auth_endpoint_exceptions.py` | Task 8 |
-| **集成测试** | TestClient | FastAPI TestClient 成功路径 | `test_auth_api_endpoints.py` | Task 8 |
+| **集成测试** | TestClient | FastAPI TestClient 成功路径 | `test_integration_auth_api_endpoints.py` | Task 8 |
 
 ---
 
@@ -382,8 +382,8 @@
 | AC-4 | 越权访问防护 | Task 4 | Subtask 4.1-4.9 (SecurityValidator + 越权检测) | `test_security.py` |
 | AC-5 | 等保 2.0 合规（功能性） | Task 5 | Subtask 5.1-5.6 (合规验证测试) | `test_dengbao_identity_compliance.py`, `test_dengbao_access_control_compliance.py` |
 | AC-5 | 等保 2.0 合规（架构约束） | Task 7 | Subtask 7.1-7.6 (架构约束验证) | `test_architecture_constraints.py` |
-| AC-1~AC-5 | 端到端集成测试 | Task 6 | Subtask 6.1-6.5 (完整认证授权流程) | `test_auth_integration.py` |
-| AC-1, AC-2, AC-3 | API 端点测试覆盖率 | Task 8 | Subtask 8.1-8.29 (异常处理 + TestClient) | `test_auth_endpoint_exceptions.py`, `test_auth_api_endpoints.py` |
+| AC-1~AC-5 | 端到端集成测试 | Task 6 | Subtask 6.1-6.5 (完整认证授权流程) | `test_integration_auth.py` |
+| AC-1, AC-2, AC-3 | API 端点测试覆盖率 | Task 8 | Subtask 8.1-8.29 (异常处理 + TestClient) | `test_auth_endpoint_exceptions.py`, `test_integration_auth_api_endpoints.py` |
 
 ---
 
@@ -627,7 +627,7 @@
 
 #### 集成测试实现
 
-- [x] Subtask 6.1: 创建 `tests/integration/test_auth_integration.py` ✅
+- [x] Subtask 6.1: 创建 `tests/integration/test_integration_auth.py` ✅
 - [x] Subtask 6.2: 实现完整登录流程测试（登录→获取令牌→访问受保护资源）✅
 - [x] Subtask 6.3: 实现角色管理流程测试（创建角色→分配权限→验证权限）✅
 - [x] Subtask 6.4: 实现越权访问流程测试（正常访问→越权尝试→拒绝访问）✅
@@ -737,7 +737,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_auth_api_endpoints.py` |
+| 🔴 红 | 编写 `tests/integration/test_integration_auth_api_endpoints.py` |
 | 🟢 绿 | 实现 FastAPI TestClient 成功路径测试 |
 | 🔄 重构 | 添加异步 session 管理 + dependency_overrides 隔离 |
 
@@ -892,7 +892,7 @@ sisys/
 │   │       └── use_cases/
 │   │           └── test_role_management.py # Role UseCase 测试
 │   ├── integration/
-│   │   └── test_auth_integration.py
+│   │   └── test_integration_auth.py
 │   └── acceptance/
 │       └── test_acceptance_rbac-permission-management.feature
 └── docs/
@@ -1037,7 +1037,7 @@ sisys/
 | 2026-05-04 | 六边形架构约束审查：代码不存在，重置为 backlog；确认接口设计（ABC、AuthenticationError、资源实例级权限）；状态更新为 ready-for-dev | ✅ 完成 |
 | 2026-05-05 | 升级 verify_token 返回类型：dict → TokenPayload 领域值对象（不可变，含 is_expired/has_role/has_any_role 方法） | ✅ 完成 |
 | 2026-05-05 | 修复 auth API 异常：get_current_user_dependency 工厂函数、delete_role response_model=None、get_current_user_override 参数；mypy 类型错误修复 | ✅ 完成 |
-| 2026-05-05 | 测试文件重命名：test_auth_api_integration.py → test_auth_api_endpoints.py（移至 integration/）；类型注解修复 | ✅ 完成 |
+| 2026-05-05 | 测试文件重命名：test_auth_api_integration.py → test_integration_auth_api_endpoints.py（移至 integration/）；类型注解修复 | ✅ 完成 |
 | 2026-05-05 | 完成验收测试：test_acceptance_rbac-permission-management.feature + test_acceptance_rbac-permission-management.py（真实服务测试：JWT/加密/角色/架构约束），无 mock，11 passed | ✅ 完成 |
 | 2026-05-06 | 代码审查：更新 AC checkbox 状态；确认发现 UserRoleRepository.get_user_roles() 返回空 permissions BUG | ⚠️ 待修复 |
 
@@ -1105,8 +1105,8 @@ sisys/
 - [x] `tests/unit/security/test_architecture_constraints.py` - 架构约束测试 ✅
 - [x] `tests/unit/security/test_dengbao_compliance.py` - 等保合规测试 ✅
 - [x] `tests/contract/test_api_contract_rbac.py` - API 契约测试 ✅
-- [x] `tests/integration/test_auth_integration.py` - 集成测试（服务层）✅
-- [x] `tests/integration/test_auth_api_endpoints.py` - API 端点集成测试（TestClient）✅
+- [x] `tests/integration/test_integration_auth.py` - 集成测试（服务层）✅
+- [x] `tests/integration/test_integration_auth_api_endpoints.py` - API 端点集成测试（TestClient）✅
 - [x] `tests/acceptance/test_acceptance_rbac-permission-management.feature` - 验收测试 Gherkin 场景 ✅
 - [x] `tests/acceptance/test_acceptance_rbac-permission-management.py` - 验收测试步骤定义 ✅
 

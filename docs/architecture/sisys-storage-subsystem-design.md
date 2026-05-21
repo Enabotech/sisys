@@ -1137,7 +1137,7 @@ async def shutdown():
 - `test_redis_memory_cache.py` — 5 个测试类（L1 委托/Memory 方法/Port 合规/TTL 随机化/键构建）
 - `test_redis_session_cache.py` — L1 委托 + Session 方法
 - `test_semantic_cache.py` — FT.SEARCH mock/hit/miss/metrics
-- `test_redis_integration.py` — 真实 Redis 集成
+- `test_integration_redis.py` — 真实 Redis 集成
 
 **L2 关系数据库:**
 - `test_repository.py` — L2RdbPort async 签名验证

@@ -392,7 +392,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `test_event_bus_integration.py` |
+| 🔴 红 | 编写 `test_integration_event_bus.py` |
 | 🟢 绿 | 实现完整的事件发布订阅流程 |
 | 🔄 重构 | 验证 AC-3 约束满足 |
 
@@ -443,7 +443,7 @@
 | TDD | DualChannelEventBus | `test_dual_channel_event_bus.py` | Task 7 |
 | TDD | EventBusFactory | `test_event_bus_factory.py` | Task 8 |
 | TDD | EventBusConfigLoader | `test_event_bus_config_loader.py` | Task 9 |
-| 集成 | Story 1.3 回归 | `test_event_bus_integration.py` | Task 10 |
+| 集成 | Story 1.3 回归 | `test_integration_event_bus.py` | Task 10 |
 | 架构 | 约束验证 | `test_architecture_constraints.py` | Task 11 |
 
 ---
@@ -587,7 +587,7 @@
 | `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | DualChannelEventBus 测试 | ✅ |
 | `tests/unit/infrastructure/messaging/test_event_bus_factory.py` | EventBusFactory 测试 | ✅ |
 | `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | EventBusConfigLoader 测试 | ✅ |
-| `tests/integration/test_event_bus_integration.py` | 集成测试 | ✅ |
+| `tests/integration/test_integration_event_bus.py` | 集成测试 | ✅ |
 | `tests/unit/infrastructure/test_architecture_constraints.py` | 架构约束测试 | ✅ |
 
 ---
