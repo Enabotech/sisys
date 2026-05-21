@@ -403,7 +403,7 @@ class TestSemanticRouter:
 
     @pytest.mark.asyncio
     async def test_embedding_cache_not_exceeding_max(self) -> None:
-        """缓存满时不应添加新条目"""
+        """缓存满时应淘汰最旧条目后添加新条目（LRU 淘汰）"""
         router = SemanticRouter()
         router._embedding_cache.clear()
         # 预填充到最大
@@ -411,5 +411,6 @@ class TestSemanticRouter:
             router._embedding_cache[f"text-{i}"] = [0.0] * 1024
 
         _embedding = await router._get_task_embedding("new text")
-        assert "new text" not in router._embedding_cache
+        assert "new text" in router._embedding_cache
+        assert "text-0" not in router._embedding_cache  # 最旧条目被淘汰
         assert len(router._embedding_cache) == SemanticRouter.MAX_CACHE_SIZE

@@ -13,6 +13,7 @@ Copyright:
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -80,7 +81,7 @@ class SemanticRouter:
         self._candidates = {c.candidate_id: c for c in candidates} if candidates else {}
         self._embedding_model = embedding_model
         self._cache_ttl = cache_ttl_seconds
-        self._embedding_cache: dict[str, list[float]] = {}  # 简单内存缓存
+        self._embedding_cache: OrderedDict[str, list[float]] = OrderedDict()  # LRU 缓存
 
     def add_candidate(self, candidate: Candidate) -> None:
         """添加路由候选项
@@ -156,7 +157,7 @@ class SemanticRouter:
         return ""
 
     async def _get_task_embedding(self, text: str) -> list[float]:
-        """获取任务文本的嵌入向量，支持内存缓存
+        """获取任务文本的嵌入向量，支持 LRU 缓存
 
         Args:
             text: 待嵌入的任务文本
@@ -164,8 +165,9 @@ class SemanticRouter:
         Returns:
             嵌入向量
         """
-        # 优先检查内存缓存
+        # 优先检查内存缓存（命中时移至末尾，标记为最近使用）
         if text in self._embedding_cache:
+            self._embedding_cache.move_to_end(text)
             return self._embedding_cache[text]
 
         # 计算嵌入向量
@@ -176,9 +178,10 @@ class SemanticRouter:
             embeddings = await self._embedding_model.embed([text])
             embedding = embeddings[0] if embeddings else [0.0] * self.DEFAULT_EMBEDDING_DIM
 
-        # 缓存结果（简单 LRU 风格的淘汰策略）
-        if len(self._embedding_cache) < self.MAX_CACHE_SIZE:
-            self._embedding_cache[text] = embedding
+        # LRU 淘汰：超限时移除最旧条目后添加新条目
+        if len(self._embedding_cache) >= self.MAX_CACHE_SIZE:
+            self._embedding_cache.popitem(last=False)
+        self._embedding_cache[text] = embedding
 
         return embedding
 

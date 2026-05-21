@@ -875,14 +875,14 @@ def then_execute_service_should_not_import_infrastructure(context: dict) -> None
         assert imp not in source, f"ExecuteService should not import {imp}"
 
     # Should use Protocol/interface, not concrete implementation
-    assert "SandboxExecutorProtocol" in source or "sandbox:" in source.lower() or True
+    assert "SandboxExecutor" in source or "sandbox:" in source.lower() or True
     # This is a design verification - actual import check is done by architecture tests
 
 
 @then("SandboxExecutor 端口应该位于 interfaces 层")
 def then_sandbox_executor_port_in_interfaces(context: dict) -> None:
-    """Verify SandboxExecutor port is in application layer (hexagonal port definition)."""
-    from src.application.ports.sandbox_port import SandboxExecutor
+    """Verify SandboxExecutor port is in domain layer (hexagonal port definition)."""
+    from src.domain.ports.sandbox_executor import SandboxExecutor
 
     assert SandboxExecutor is not None
 
@@ -905,7 +905,7 @@ def given_check_execute_service_implementation(context: dict) -> None:
     context["execute_service_init_signature"] = inspect.signature(AutoExecuteService.__init__)
 
 
-@then("应该使用 SandboxExecutorProtocol 而非具体实现")
+@then("应该使用 SandboxExecutor 而非具体实现")
 def then_should_use_protocol_not_implementation(context: dict) -> None:
     """Verify protocol is used instead of concrete implementation."""
     # Check that __init__ accepts Protocol, not concrete DockerSandboxAdapter
@@ -930,17 +930,15 @@ def then_should_use_snapshot_repo_protocol(context: dict) -> None:
 @then("领域层定义接口，基础设施层实现")
 def then_domain_defines_interfaces_infrastructure_implements(context: dict) -> None:
     """Verify domain layer defines interfaces, infrastructure implements."""
-    from src.domain.services.auto_execute_service import (
-        SandboxExecutorProtocol,
-        SnapshotRepositoryProtocol,
-    )
+    from src.domain.ports.sandbox_executor import SandboxExecutor
+    from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
     from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import (
         DockerSandboxAdapter,
     )
     from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 
     # Protocols should be in domain
-    assert SandboxExecutorProtocol is not None
+    assert SandboxExecutor is not None
     assert SnapshotRepositoryProtocol is not None
 
     # Implementations should be in infrastructure

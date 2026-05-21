@@ -19,10 +19,10 @@ from src.application.ports.memory_graph_port import MemoryGraphPort
 from src.application.ports.memory_vector_port import MemoryVectorPort
 from src.application.ports.metrics_port import MetricsPort
 from src.application.ports.public_blackboard import PublicBlackboard
-from src.application.ports.sandbox_port import SandboxExecutor
 from src.application.ports.semantic_cache import SemanticCache
 from src.application.ports.session_cache_port import SessionCachePort
 from src.application.ports.text_extractor_service import TextExtractorService
+from src.domain.ports.sandbox_executor import SandboxExecutor
 
 
 def _get_impl(spec, port_name):

@@ -22,7 +22,7 @@ from typing import Any
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
-from src.domain.ports.sandbox_executor_protocol import SandboxExecutorProtocol
+from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class AutoExecuteService:
 
     def __init__(
         self,
-        sandbox: SandboxExecutorProtocol | None = None,
+        sandbox: SandboxExecutor | None = None,
         snapshot_repo: SnapshotRepositoryProtocol | None = None,
     ):
         """初始化 AutoExecuteService
