@@ -194,7 +194,7 @@
 | **TDD 单元测试** | RoutingDecisionLog | 路由决策日志 | `test_routing_decision_log.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-route.feature` | Task 0 |
 | **SDD 架构验证** | 路由解耦 | 六边形架构约束 | `test_route_architecture.py` | Task 3 |
-| **集成测试** | 事件总线 | 端到端路由流程 | `test_route_integration.py` | Task 3 |
+| **集成测试** | 事件总线 | 端到端路由流程 | `test_integration_route.py` | Task 3 |
 
 ---
 
@@ -399,7 +399,7 @@
 
 #### 集成测试
 
-- [ ] Subtask 3.7: 创建 `tests/integration/test_route_integration.py`（端到端路由流程）
+- [ ] Subtask 3.7: 创建 `tests/integration/test_integration_route.py`（端到端路由流程）
 
 **完成标准/Definition of Done:**
 - [ ] 六边形架构验证通过（无循环依赖）
@@ -514,7 +514,7 @@ sisys/
 │   │   └── performance/
 │   │       └── test_route_performance.py
 │   ├── integration/
-│   │   └── test_route_integration.py
+│   │   └── test_integration_route.py
 │   └── acceptance/
 │       ├── test_acceptance_autonomous-invocation-route.feature
 │       └── test_acceptance_autonomous-invocation-route.py
@@ -608,7 +608,7 @@ sisys/
 - `tests/unit/infrastructure/routing/test_semantic_router_cache.py` - SemanticRouter 缓存测试（Redis mock）
 - `tests/unit/architecture/test_route_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_route_performance.py` - 性能基准测试
-- `tests/integration/test_route_integration.py` - 集成测试
+- `tests/integration/test_integration_route.py` - 集成测试
 - `tests/acceptance/test_acceptance_autonomous-invocation-route.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
 - `tests/acceptance/test_acceptance_autonomous-invocation-route.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/route_mechanism_guide.md` - 路由机制实施指南

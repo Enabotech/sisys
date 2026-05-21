@@ -209,7 +209,7 @@
 | **TDD 单元测试** | BusinessMetricsCollector | 指标注册更新 | `test_business_metrics.py` | Task 2 |
 | **TDD 单元测试** | MetricsAggregator | 指标聚合 | `test_metrics_aggregator.py` | Task 2 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_k8s-auto-scaling.feature` | Task 0 |
-| **集成测试** | K8s HPA | 扩缩容场景 | `test_k8s_hpa_integration.py` | Task 3 |
+| **集成测试** | K8s HPA | 扩缩容场景 | `test_integration_k8s_hpa.py` | Task 3 |
 | **SDD 架构验证** | 指标格式 | Prometheus 兼容性 | `test_prometheus_format.py` | Task 1 |
 
 ---
@@ -225,7 +225,7 @@
 | AC-2 | BusinessMetricsCollector | Task 2 | Subtask 2.1-2.3（BusinessMetricsCollector 红→绿→重构） | `test_business_metrics.py` |
 | AC-2 | MetricsAggregator（聚合器） | Task 2 | Subtask 2.4-2.6（MetricsAggregator 红→绿→重构） | `test_metrics_aggregator.py` |
 | AC-3 | K8s HPA 集成 | Task 3 | Subtask 3.1-3.3（K8s 配置验证 红→绿→重构）, Subtask 3.7-3.9（资源配置） | `test_k8s_config.py` |
-| AC-4 | 扩缩容性能要求 | Task 3 | Subtask 3.4-3.6（HPA 扩缩容测试 红→绿→重构） | `test_k8s_hpa_integration.py` |
+| AC-4 | 扩缩容性能要求 | Task 3 | Subtask 3.4-3.6（HPA 扩缩容测试 红→绿→重构） | `test_integration_k8s_hpa.py` |
 | AC-5 | Grafana 可观测性 | Task 3 | Subtask 3.10（Grafana Dashboard 配置） | `test_grafana_dashboard.py` |
 
 ---
@@ -404,7 +404,7 @@ output = generate_latest()
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_k8s_hpa_integration.py`（验证 HPA 扩缩容行为） |
+| 🔴 红 | 编写 `tests/integration/test_integration_k8s_hpa.py`（验证 HPA 扩缩容行为） |
 | 🟢 绿 | 实现 HPA 扩缩容触发逻辑（Mock K8s API） |
 | 🔄 重构 | 集成测试优化 |
 
@@ -515,7 +515,7 @@ sisys/
     │       ├── test_metrics_endpoint.py
     │       └── test_prometheus_format.py
     ├── integration/
-    │   └── test_k8s_hpa_integration.py
+    │   └── test_integration_k8s_hpa.py
     └── acceptance/
         └── test_acceptance_k8s-auto-scaling.feature
 ```
@@ -610,7 +610,7 @@ sisys/
 - `tests/unit/interfaces/api/test_metrics_endpoint.py` - 端点单元测试
 - `tests/unit/interfaces/api/test_prometheus_format.py` - Prometheus 格式验证测试
 - `tests/unit/infrastructure/test_k8s_config.py` - K8s 配置验证测试
-- `tests/integration/test_k8s_hpa_integration.py` - K8s HPA 集成测试
+- `tests/integration/test_integration_k8s_hpa.py` - K8s HPA 集成测试
 - `tests/acceptance/test_acceptance_k8s-auto-scaling.feature` - Gherkin 验收测试
 - `tests/acceptance/test_acceptance_k8s-auto-scaling.py` - 验收测试步骤实现
 

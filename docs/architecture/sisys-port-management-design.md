@@ -629,7 +629,7 @@ tests/
 │   └── test_api_contract_*.py
 └── integration/
     ├── conftest.py
-    └── test_async_port_integration.py
+    └── test_integration_async_port.py
 ```
 
 ### 7.2 契约测试模式

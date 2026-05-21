@@ -133,8 +133,8 @@
 - [x] **修改** `src/infrastructure/messaging/rabbitmq_event_bus.py`：`publish()` 中 `outbox_repo.save()` 加 `await`
 - [x] **修改** `src/application/use_cases/document_processing.py` L63：`outbox_repo.save()` 在同步方法 `process_document` 中调用，改为async后该方法也必须改为 `async def`，所有调用者需同步适配
 - [x] **同步修改** 测试中的手写OutboxRepository内部类（sync→async）：
-  - `tests/integration/test_layer_collaboration.py` L77-90: `FailingOutboxRepository` (4个sync方法改async)
-  - `tests/integration/test_layer_collaboration.py` L106-117: 第二个 `FailingOutboxRepository` (4个sync方法改async)
+  - `tests/integration/test_integration_layer_collaboration.py` L77-90: `FailingOutboxRepository` (4个sync方法改async)
+  - `tests/integration/test_integration_layer_collaboration.py` L106-117: 第二个 `FailingOutboxRepository` (4个sync方法改async)
   - `tests/acceptance/test_story_1_16_steps.py` L657-668: `BrokenRepo` (4个sync方法改async)
   - 注意：这些内部类显式继承OutboxRepository Protocol或实现相同接口，Protocol改async后类型检查和运行时都会失败
 - [x] **验证**：`mypy src/domain/ports/outbox.py` 通过，所有使用OutboxRepository的代码适配async
@@ -353,7 +353,7 @@
   - `tests/unit/infrastructure/messaging/test_message_serializer.py` → 重命名为 `test_inmemory_event_store.py`
   - `tests/unit/domain/events/test_event_store.py`
   - `tests/integration/conftest.py`
-  - `tests/integration/test_test_utils.py`
+  - `tests/integration/test_integration_test_utils.py`
 - [x] **修改** `EventBusConfigLoader.from_default_path()`：方法名改为 `create()`，更准确表达语义
 - [x] **验证**：无遗留 `_new.py` 文件，无误导命名
 
@@ -432,7 +432,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 7. 六边形架构约束验证：Domain层零外部依赖（现有AST测试覆盖）
 
 ### 集成验证
-1. `poetry run pytest tests/integration/test_event_bus_integration.py -x` — 集成测试
+1. `poetry run pytest tests/integration/test_integration_event_bus.py -x` — 集成测试
 2. `poetry run pytest tests/contracts/test_port_contract_event_publisher.py -x` — 契约测试
 3. `poetry run python -c "from src.domain.events.base import DomainEvent; from src.domain.events import *; print(f'Registry: {len(DomainEvent._registry)} events'); assert len(DomainEvent._registry) >= 22"` — 事件注册完整性验证
 
@@ -462,12 +462,12 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_postgres_dead_letter_queue.py` | DLQ Protocol从infrastructure改为domain，enqueue/dequeue签名sync→async |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | DLQ import路径变更，set_dead_letter_queue类型注解变更 |
 | `tests/unit/architecture/test_event_messaging_architecture.py` | PostgresDeadLetterQueue架构验证，需适配Protocol签名变更 |
-| `tests/integration/test_event_messaging_integration.py` | PostgresDeadLetterQueue集成测试，import路径+async适配 |
+| `tests/integration/test_integration_event_messaging.py` | PostgresDeadLetterQueue集成测试，import路径+async适配 |
 | `tests/acceptance/test_story_20_2_steps.py` | PostgresDeadLetterQueue import路径变更 |
 | `tests/unit/infrastructure/messaging/test_outbox_pattern.py` | EventRegistry import需改为DomainEvent._registry |
-| `tests/integration/test_postgresql_integration.py` | EventRegistry引用需移除 |
+| `tests/integration/test_integration_postgresql.py` | EventRegistry引用需移除 |
 | `tests/acceptance/test_story_1_16_steps.py` | EventRegistry import需移除 |
-| `tests/integration/test_event_smoke.py` | TestEventRegistry类需适配DomainEvent._registry |
+| `tests/integration/test_integration_event_smoke.py` | TestEventRegistry类需适配DomainEvent._registry |
 | `tests/unit/domain/events/test_trigger_events.py` | AutoTriggered事件event_type改为init=False，from_dict行为变更 |
 | `tests/unit/domain/events/test_memory_events.py` | MemoryChanged事件event_type改为init=False，from_dict行为变更 |
 | `tests/unit/domain/events/test_domain_event_enhanced.py` | DomainEvent.from_dict event_type处理逻辑变更 |
@@ -486,7 +486,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_async_outbox_poller.py` | 私有方法调用→公共接口 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus_new.py` | outbox_repo.save()加await |
 | `tests/unit/application/use_cases/test_document_processing.py` | process_document同步→async |
-| `tests/integration/test_layer_collaboration.py` | process_document调用链适配async + L77/106 FailingOutboxRepository内部类sync→async |
+| `tests/integration/test_integration_layer_collaboration.py` | process_document调用链适配async + L77/106 FailingOutboxRepository内部类sync→async |
 | `tests/unit/infrastructure/messaging/outbox/test_outbox_processor.py` | mock私有方法改为mock公共async方法 |
 | `tests/unit/infrastructure/messaging/outbox/test_outbox_entity_state_machine.py` | OutboxRepository Protocol契约验证需适配async |
 | `tests/unit/infrastructure/messaging/unit_of_work/test_uow_transaction_boundary.py` | OutboxRepository Protocol返回DomainEvent验证 |
@@ -494,7 +494,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/architecture/test_event_bus_architecture.py` | OutboxRepository接口架构验证 |
 | `tests/unit/domain/events/test_event_publisher.py` | InMemoryEventBus publish改为async |
 | `tests/acceptance/test_story_1_5_steps.py` | PostgreSQLOutboxRepository.async_get_unpublished重命名 |
-| `tests/integration/test_test_utils.py` | InMemoryEventStore import路径可能受Phase 2影响 |
+| `tests/integration/test_integration_test_utils.py` | InMemoryEventStore import路径可能受Phase 2影响 |
 | `tests/integration/conftest.py` | OutboxRepository Protocol签名变更影响fixture |
 | `tests/acceptance/test_story_1_16_steps.py` | L657 BrokenRepo + L82 InMemoryRepo 内部类sync→async |
 | `tests/acceptance/test_story_1_14b_steps.py` | EventPublisher channel参数移除影响 |
@@ -513,7 +513,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/domain/services/test_trigger_service.py` | DummyPublisher.publish channel参数移除 |
 | `tests/unit/domain/services/test_route_service.py` | AutoRouteService publisher mock签名适配 |
 | `tests/unit/architecture/test_messaging_architecture_constraints.py` | DualChannelEventBus架构约束验证 |
-| `tests/integration/test_event_bus_integration.py` | DualChannelEventBus/ChannelRouter集成测试 |
+| `tests/integration/test_integration_event_bus.py` | DualChannelEventBus/ChannelRouter集成测试 |
 | `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | ChannelRouter集成配置测试 |
 | `tests/unit/infrastructure/messaging/test_channel_router.py` | DEFAULT_MAPPINGS和register测试 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | RabbitMQConsumer retry_policy参数废弃 |
@@ -525,7 +525,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 | `tests/unit/infrastructure/messaging/test_dual_idempotency_checker.py` | PG fallback断言需适配RETURNING |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_listener.py` | RedisRetryQueue集成测试 |
 | `tests/unit/architecture/test_event_messaging_architecture.py` | PostgresDeadLetterQueue架构约束验证 |
-| `tests/integration/test_event_messaging_integration.py` | DLQ集成测试async适配 |
+| `tests/integration/test_integration_event_messaging.py` | DLQ集成测试async适配 |
 | `tests/acceptance/test_story_20_2_steps.py` | DualIdempotencyChecker mock返回值适配RETURNING |
 | `tests/unit/infrastructure/monitoring/test_event_metrics_extension.py` | EventMetricsCollector线程安全修复 |
 | `tests/unit/infrastructure/monitoring/test_event_monitoring.py` | EventMetricsCollector计数器Lock适配 |
@@ -540,7 +540,7 @@ Phase 5 (P2-P3 补全清理) ← 仅 5.1 依赖 Phase 3.2
 |----------|----------|
 | `tests/unit/infrastructure/messaging/test_message_serializer.py` | 重命名为test_inmemory_event_store.py |
 | `tests/unit/domain/events/test_event_store.py` | InMemoryEventStore import路径变更 |
-| `tests/integration/test_test_utils.py` | InMemoryEventStore import路径变更 |
+| `tests/integration/test_integration_test_utils.py` | InMemoryEventStore import路径变更 |
 | `tests/unit/domain/ports/test_protocols.py` | @runtime_checkable验证，async Protocol限制说明 |
 | `tests/unit/infrastructure/messaging/test_event_bus_config_loader.py` | from_default_path()重命名为create() |
 | `tests/unit/infrastructure/messaging/test_channel_router.py` | DEFAULT_MAPPINGS扩展到22个事件 |

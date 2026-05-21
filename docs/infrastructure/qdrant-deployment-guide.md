@@ -158,7 +158,7 @@ docker compose -f deploy/qdrant/docker-compose.yml up -d
 ./scripts/check-qdrant.sh
 
 # 3. 运行集成测试
-poetry run pytest tests/integration/test_qdrant_integration.py -v
+poetry run pytest tests/integration/test_integration_qdrant.py -v
 ```
 
 **集成测试覆盖：**
@@ -329,7 +329,7 @@ docker volume ls | grep qdrant
 
 ### 集成测试失败
 
-**症状：** `test_qdrant_integration.py` 失败
+**症状：** `test_integration_qdrant.py` 失败
 
 **排查步骤：**
 
@@ -344,7 +344,7 @@ docker compose -f deploy/qdrant/docker-compose.yml ps
 curl http://localhost:6333/healthz
 
 # 4. 查看测试详细输出
-poetry run pytest tests/integration/test_qdrant_integration.py -v --tb=long
+poetry run pytest tests/integration/test_integration_qdrant.py -v --tb=long
 ```
 
 ### Collection 创建失败

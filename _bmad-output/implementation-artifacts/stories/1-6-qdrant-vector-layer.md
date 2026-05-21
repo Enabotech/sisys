@@ -213,7 +213,7 @@
 | **TDD 单元测试** | 向量点存储 | 插入、查询、删除、payload 验证 | `test_vector_storage.py` | Task 3 |
 | **TDD 单元测试** | Dense 语义检索 | Top-K 相似度查询、payload 过滤 | `test_dense_search.py` | Task 3 |
 | **TDD 单元测试** | BM25 稀疏检索 | 稀疏向量构建、检索、payload 构建 | `test_bm25_builder.py`, `test_sparse_search.py` | Task 4 |
-| **TDD 集成测试** | Qdrant 端到端 | 完整存储/检索流程 | `test_qdrant_integration.py` | Task 5 |
+| **TDD 集成测试** | Qdrant 端到端 | 完整存储/检索流程 | `test_integration_qdrant.py` | Task 5 |
 | **SDD 架构验证** | 领域层零依赖 | 领域层无 Qdrant 导入 | `test_architecture_constraints.py` | Task 6 |
 
 ---
@@ -250,7 +250,7 @@
 | AC-3 | 向量点存储与 Dense 检索 | Task 3 | VectorPoint + VectorStorage + QdrantVectorStorage | `test_vector_storage.py`, `test_dense_search.py` |
 | AC-4 | BM25 稀疏检索基础 | Task 4 | SparseVector + BM25Builder + search_sparse | `test_bm25_builder.py`, `test_sparse_search.py` |
 | AC-5 | 架构约束验证 | Task 6 | 领域层零 Qdrant 依赖验证 | `test_architecture_constraints.py` |
-| AC-1~AC-4 | Qdrant 端到端集成测试 | Task 5 | 完整存储/检索流程验证 | `test_qdrant_integration.py` |
+| AC-1~AC-4 | Qdrant 端到端集成测试 | Task 5 | 完整存储/检索流程验证 | `test_integration_qdrant.py` |
 
 ---
 
@@ -490,7 +490,7 @@
 
 #### 集成测试实现
 
-- [x] Subtask: 创建 `tests/integration/test_qdrant_integration.py`
+- [x] Subtask: 创建 `tests/integration/test_integration_qdrant.py`
 - [x] Subtask: 实现 Collection 生命周期端到端测试（创建→验证→删除）
 - [x] Subtask: 实现向量点存储端到端测试（插入→查询→验证→删除）
 - [x] Subtask: 实现 Dense 语义检索端到端测试（写入→相似度查询→Top-K 验证）
@@ -594,7 +594,7 @@ sisys/
 │   │       ├── test_collection_manager_interface.py
 │   │       └── test_vector_storage_interface.py
 │   ├── integration/
-│   │   └── test_qdrant_integration.py
+│   │   └── test_integration_qdrant.py
 │   └── acceptance/
 │       └── test_acceptance_qdrant-vector-layer.feature
 └── docs/

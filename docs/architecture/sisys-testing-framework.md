@@ -1943,11 +1943,11 @@ Worker 进程 A                         Worker 进程 B
 
 | 文件 | 服务依赖 | 需隔离资源 |
 |------|---------|-----------|
-| `test_redis_real_integration.py` | Redis | keys |
-| `test_postgresql_real_integration.py` | PostgreSQL | schemas |
-| `test_qdrant_real_integration.py` | Qdrant | collections |
-| `test_minio_real_integration.py` | MinIO | buckets |
-| `test_neo4j_real_integration.py` | Neo4j | graphs |
+| `test_integration_redis_real.py` | Redis | keys |
+| `test_integration_postgresql_real.py` | PostgreSQL | schemas |
+| `test_integration_qdrant_real.py` | Qdrant | collections |
+| `test_integration_minio_real.py` | MinIO | buckets |
+| `test_integration_neo4j_real.py` | Neo4j | graphs |
 | `conftest.py` | All | 连接配置 |
 
 ---

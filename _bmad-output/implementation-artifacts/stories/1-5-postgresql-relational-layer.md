@@ -280,7 +280,7 @@
 | **TDD 单元测试** | Outbox 转换器 | DomainEvent ↔ OutboxModel 转换、event_type 路由 | `test_sqlalchemy_event_outbox_adapter.py` | Task 4 |
 | **TDD 单元测试** | OutboxRepository | 事件保存、查询、标记、内部方法 | `test_outbox_repository.py` | Task 4 |
 | **TDD 单元测试** | 用户/角色/权限仓储 | CRUD 操作、外键约束 | `test_user_repository.py`, `test_role_repository.py`, `test_permission_repository.py` | Task 5 |
-| **TDD 集成测试** | PostgreSQL 端到端 | 完整存储/读取流程 | `test_postgresql_integration.py` | Task 6 |
+| **TDD 集成测试** | PostgreSQL 端到端 | 完整存储/读取流程 | `test_integration_postgresql.py` | Task 6 |
 | **SDD 架构验证** | 领域层零依赖 | 领域层无 SQLAlchemy 导入 | `test_architecture_constraints.py` | Task 7 |
 
 ---
@@ -316,7 +316,7 @@
 | AC-4 | OutboxRepository PostgreSQL 实现 | Task 4 | PostgreSQLOutboxRepository | `test_outbox_repository.py` |
 | AC-5 | 用户与 RBAC 基础仓储 | Task 5 | UserRepository + RoleRepository + PermissionRepository | `test_user_repository.py`, `test_role_repository.py`, `test_permission_repository.py` |
 | AC-6 | 架构约束验证 | Task 7 | 领域层零 SQLAlchemy 依赖验证 | `test_architecture_constraints.py` |
-| AC-1~AC-5 | PostgreSQL 端到端集成测试 | Task 6 | 完整存储/读取流程验证 | `test_postgresql_integration.py` |
+| AC-1~AC-5 | PostgreSQL 端到端集成测试 | Task 6 | 完整存储/读取流程验证 | `test_integration_postgresql.py` |
 
 ---
 
@@ -585,7 +585,7 @@
 
 #### 集成测试实现
 
-- [ ] Subtask: 创建 `tests/integration/test_postgresql_integration.py`
+- [ ] Subtask: 创建 `tests/integration/test_integration_postgresql.py`
 - [ ] Subtask: 实现数据库连接端到端测试（连接→健康检查→关闭）
 - [ ] Subtask: 实现 Alembic 迁移端到端测试（upgrade→downgrade→幂等性）
 - [ ] Subtask: 实现 Outbox 事件端到端测试（保存→轮询→标记→发布）
@@ -706,7 +706,7 @@ sisys/
 │   │   └── domain/
 │   │       └── test_outbox_interface.py
 │   ├── integration/
-│   │   └── test_postgresql_integration.py
+│   │   └── test_integration_postgresql.py
 │   └── acceptance/
 │       └── test_acceptance_postgresql-relational-layer.feature
 └── docs/
@@ -823,7 +823,7 @@ sisys/
 | 文件路径 | 说明 | 状态 |
 |---------|------|------|
 | `tests/unit/domain/test_outbox_interface.py` | OutboxRepository 接口验证 | ✅ 已创建 |
-| `tests/integration/test_postgresql_integration.py` | PostgreSQL 端到端集成测试 | ✅ 已创建 |
+| `tests/integration/test_integration_postgresql.py` | PostgreSQL 端到端集成测试 | ✅ 已创建 |
 | `tests/acceptance/test_acceptance_postgresql-relational-layer.feature` | Gherkin 验收测试 | ✅ 已创建 |
 | `docs/infrastructure/postgresql_guide.md` | PostgreSQL 层实施指南 | 可选文档 |
 
@@ -907,6 +907,6 @@ sisys/
 
 | 文件 | 修改 |
 |------|------|
-| `tests/integration/test_postgresql_real_integration.py` | `engine.close()` → `await engine.close()`（close 是 async 方法） |
+| `tests/integration/test_integration_postgresql_real.py` | `engine.close()` → `await engine.close()`（close 是 async 方法） |
 
 **测试结果：** 1353 passed, 0 warnings

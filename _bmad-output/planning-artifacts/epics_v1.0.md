@@ -1316,7 +1316,7 @@ So that **实时事件低延迟路由，持久化事件可靠传输**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_event_bus.py` - 事件总线单元测试
-   - [ ] `tests/integration/test_event_bus_integration.py` - 事件总线集成测试
+   - [ ] `tests/integration/test_integration_event_bus.py` - 事件总线集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 集成测试要求
@@ -1363,7 +1363,7 @@ So that **支持低延迟会话管理和语义缓存**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_redis_cache.py` - 单元测试
-   - [ ] `tests/integration/test_redis_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_redis.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
@@ -1404,7 +1404,7 @@ So that **支持 ACID 事务和外键约束**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_postgresql.py` - 单元测试
-   - [ ] `tests/integration/test_postgresql_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_postgresql.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
@@ -1445,7 +1445,7 @@ So that **支持混合检索（Dense + Sparse + Payload 过滤）**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_qdrant.py` - 单元测试
-   - [ ] `tests/integration/test_qdrant_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_qdrant.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
@@ -1527,7 +1527,7 @@ So that **支持 GraphRAG 增强检索和实体关联查询**。
 
 5. **测试文件**
    - [ ] `tests/unit/infrastructure/test_neo4j.py` - 单元测试
-   - [ ] `tests/integration/test_neo4j_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_neo4j.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-checklist.md` - 基础设施测试要求
@@ -1773,7 +1773,7 @@ So that **系统可以基于事件或周期性心跳自主启动任务**。
 
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_trigger.py` - 单元测试
-   - [ ] `tests/integration/test_trigger_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_trigger.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
@@ -1813,7 +1813,7 @@ So that **任务可以路由至目标 Agent 或工具**。
 
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_route.py` - 单元测试
-   - [ ] `tests/integration/test_route_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_route.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
@@ -1854,7 +1854,7 @@ So that **任务在隔离环境中执行，状态可持久化和恢复**。
 
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_execute.py` - 单元测试
-   - [ ] `tests/integration/test_execute_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_execute.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
@@ -1923,7 +1923,7 @@ So that **用户主动记忆得到持久化，上下文压缩率≥70%**。
 
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_context_compression.py` - 单元测试
-   - [ ] `tests/integration/test_compression_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_compression.py` - 集成测试
 
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
@@ -2021,7 +2021,7 @@ So that **记忆分离原则得到实现，磁盘记忆=真相源**。
 
 5. **测试文件**
    - [ ] `tests/unit/architecture/test_six_layer_storage.py` - 单元测试
-   - [ ] `tests/integration/test_storage_integration.py` - 集成测试
+   - [ ] `tests/integration/test_integration_storage.py` - 集成测试
    - [ ] `tests/unit/architecture/test_memory_crud.py` - CRUD 测试
 
 **实施指南:**

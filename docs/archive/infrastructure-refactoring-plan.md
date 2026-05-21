@@ -587,8 +587,8 @@ src/infrastructure/
 - 更新测试文件使用 `unittest.mock` 替代
 
 ### 10.2 受影响文件
-- `tests/integration/test_compression_integration.py` - 添加有状态 mock
-- `tests/integration/test_memory_service_integration.py` - 已有有状态 mock
+- `tests/integration/test_integration_compression.py` - 添加有状态 mock
+- `tests/integration/test_integration_memory_service.py` - 已有有状态 mock
 - `tests/unit/infrastructure/events/test_outbox_pattern.py` - 添加 `_create_mock_repo()` 辅助函数
 - `src/application/services/six_layer_storage_coordinator.py` - 修复导入路径
 
