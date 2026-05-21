@@ -3,7 +3,7 @@
 Real instance integration tests using actual Neo4j service.
 No mocks - uses real Neo4j instance.
 
-Run with: pytest tests/acceptance/test_story_1_8_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_neo4j-graph-layer.py -v
 
 Prerequisites:
     - Neo4j service running at localhost:7687 (or set NEO4J_* env vars)
@@ -112,7 +112,7 @@ def graph_retriever(neo4j_client: Neo4jManager) -> GraphRetriever:
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-1 - Neo4j 配置加载",
 )
 def test_neo4j_config_loading(neo4j_config: Neo4jConfig):
@@ -161,7 +161,7 @@ def verify_connection_timeout(neo4j_config: Neo4jConfig):
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-1 - Neo4j 客户端工厂创建",
 )
 def test_neo4j_client_factory_creation(neo4j_client: Neo4jManager):
@@ -203,7 +203,7 @@ def verify_same_driver_instance_on_multiple_calls(neo4j_client: Neo4jManager):
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-2 - 节点创建与 MERGE 语义",
 )
 def test_node_creation_with_merge(graph_manager: Neo4jGraphManager, event_loop):
@@ -278,7 +278,7 @@ def verify_node_matched_and_updated():
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-2 - 关系创建与类型约束",
 )
 def test_relationship_creation(graph_manager: Neo4jGraphManager, event_loop):
@@ -347,7 +347,7 @@ def verify_relationship_type_allowed():
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-3 - Cypher 参数化查询",
 )
 def test_cypher_parameterized_query(graph_storage: Neo4jGraphStorage, event_loop):
@@ -413,7 +413,7 @@ def verify_no_injection_risk():
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-3 - 路径查询",
 )
 def test_path_query(graph_storage: Neo4jGraphStorage, event_loop):
@@ -496,7 +496,7 @@ def verify_path_length_within_max():
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-4 - GraphRAG 实体关联检索",
 )
 def test_graphrag_entity_association_retrieval(
@@ -607,7 +607,7 @@ def verify_results_sorted_by_weight():
 
 
 @scenario(
-    "test_story_1_8.feature",
+    "test_acceptance_neo4j-graph-layer.feature",
     "AC-5 - 领域层零 Neo4j 依赖",
 )
 def test_domain_layer_zero_neo4j_dependency():

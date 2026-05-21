@@ -3,7 +3,7 @@
 Real instance integration tests using actual PostgreSQL service.
 No mocks - uses real PostgreSQL instance with SQLAlchemy.
 
-Run with: pytest tests/acceptance/test_story_1_9_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_rbac-permission-management.py -v
 
 Prerequisites:
     - PostgreSQL service running at localhost:5432 (or set POSTGRES_* env vars)
@@ -33,7 +33,7 @@ from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLM
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
-scenarios("test_story_1_9.feature")
+scenarios("test_acceptance_rbac-permission-management.feature")
 
 # ===================================================================
 # Paths & Constants

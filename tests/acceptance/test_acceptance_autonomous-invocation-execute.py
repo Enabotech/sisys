@@ -3,7 +3,7 @@
 Real instance integration tests using actual Redis services.
 No mocks - uses real Redis instances where applicable.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_14c_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_autonomous-invocation-execute.py -v
 
 Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
@@ -39,7 +39,7 @@ from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import 
 from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 from tests.environments import get_test_env
 
-scenarios("test_story_1_14c.feature")
+scenarios("test_acceptance_autonomous-invocation-execute.feature")
 
 # ===================================================================
 # Paths & Constants

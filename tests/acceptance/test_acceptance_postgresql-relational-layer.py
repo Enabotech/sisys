@@ -3,7 +3,7 @@
 Real instance integration tests using actual PostgreSQL service.
 No mocks - uses real PostgreSQL instance with SQLAlchemy.
 
-Run with: pytest tests/acceptance/test_story_1_5_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_postgresql-relational-layer.py -v
 
 Prerequisites:
     - PostgreSQL service running at localhost:5432 (or set POSTGRES_* env vars)
@@ -210,7 +210,7 @@ def ensure_alembic_migration(pg_config: PostgreSQLConfig):
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "数据库引擎懒初始化",
 )
 def test_engine_lazy_initialization(db_engine: PostgreSQLManager):
@@ -231,7 +231,7 @@ def verify_engine_not_created(db_engine: PostgreSQLManager):
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "数据库引擎首次调用创建异步引擎",
 )
 def test_engine_first_call_creates_async_engine(db_engine: PostgreSQLManager):
@@ -268,7 +268,7 @@ def verify_same_instance(db_engine: PostgreSQLManager):
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "数据库引擎健康检查",
 )
 def test_engine_health_check(db_engine: PostgreSQLManager):
@@ -299,7 +299,7 @@ def verify_select_one():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "数据库引擎优雅关闭",
 )
 def test_engine_graceful_shutdown(db_engine: PostgreSQLManager):
@@ -335,7 +335,7 @@ def verify_engine_cleared(db_engine: PostgreSQLManager):
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "Alembic 迁移配置",
 )
 def test_alembic_migration_config():
@@ -372,7 +372,7 @@ def verify_target_metadata():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "初始迁移脚本就绪",
 )
 def test_initial_migration_script():
@@ -438,7 +438,7 @@ def verify_role_permissions_table():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "Alembic 升级迁移执行成功",
 )
 def test_alembic_upgrade_execution(pg_config: PostgreSQLConfig, ensure_alembic_migration):
@@ -497,7 +497,7 @@ def verify_all_tables_created(pg_config: PostgreSQLConfig):
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "BaseRepository 保存实体",
 )
 def test_base_repository_save():
@@ -529,7 +529,7 @@ def verify_entity_saved():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "事件保存到发件箱",
 )
 def test_save_event_to_outbox(outbox_repo: PostgreSQLOutboxRepository):
@@ -575,7 +575,7 @@ def verify_event_type_correct():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "获取未发布事件",
 )
 def test_get_unpublished_events(outbox_repo: PostgreSQLOutboxRepository):
@@ -630,7 +630,7 @@ def verify_limit_respected():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "获取未发布事件（空结果）",
 )
 def test_get_unpublished_empty(outbox_repo: PostgreSQLOutboxRepository):
@@ -656,7 +656,7 @@ def verify_empty_list():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "UserRepository 根据用户名查询",
 )
 def test_user_repository_get_by_username():
@@ -689,7 +689,7 @@ def verify_correct_user_returned():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "UserRepository 根据邮箱查询",
 )
 def test_user_repository_get_by_email():
@@ -704,7 +704,7 @@ def call_get_by_email():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "RoleRepository 获取角色权限",
 )
 def test_role_repository_get_permissions():
@@ -743,7 +743,7 @@ def verify_permission_count():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "PermissionRepository 根据名称查询",
 )
 def test_permission_repository_get_by_name():
@@ -781,7 +781,7 @@ def verify_correct_permission_returned():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "领域层零 SQLAlchemy 依赖",
 )
 def test_domain_layer_no_sqlalchemy():
@@ -820,7 +820,7 @@ def verify_no_sqlalchemy_imports():
 
 
 @scenario(
-    "test_story_1_5.feature",
+    "test_acceptance_postgresql-relational-layer.feature",
     "依赖方向正确",
 )
 def test_dependency_direction():

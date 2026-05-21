@@ -266,7 +266,7 @@
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1.15a.feature`（由 Dev agent 在 Task 0 创建）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_externalized-memory-context-compression.feature`（由 Dev agent 在 Task 0 创建）
 - [ ] 覆盖场景:
   - L1 压缩流程（记住 X → 压缩 → 写入 L0 + L2）
   - 四种操作 CRUD（保存/删除/修改/查询）
@@ -307,7 +307,7 @@
 | **TDD 单元测试** | MemoryService | CRUD 操作 | `test_memory_service.py` | Task 1 |
 | **TDD 单元测试** | FileMemoryAdapter | L0 写入 | `test_file_memory_adapter.py` | Task 2 |
 | **TDD 单元测试** | MemoryMetadataRepository | L2 存储 | `test_memory_metadata_repository.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.15a.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_externalized-memory-context-compression.feature` | Task 0 |
 | **SDD 架构验证** | L1/L3 分离 | 六边形架构约束 | `test_memory_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端 L1 压缩流程 | `test_compression_integration.py` | Task 3 |
 
@@ -384,7 +384,7 @@
 - [x] Subtask 0.8: 定义 MemoryMetadataRepository L2 仓储（`src/infrastructure/storage/postgresql/repository/memory_metadata_repository.py`）
 - [x] Subtask 0.9: 定义 MemoryChangeHistoryRepository L2 历史记录仓储（`src/infrastructure/storage/postgresql/repository/memory_change_history_repository.py`）
 - [x] Subtask 0.10: 定义 MemoryConfig 配置模型（`src/infrastructure/config/memory.py`）
-- [x] Subtask 0.11: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15a.feature`（Dev agent 创建）
+- [x] Subtask 0.11: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_externalized-memory-context-compression.feature`（Dev agent 创建）
 - [x] Subtask 0.12: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -713,8 +713,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_compression_integration.py
 │   └── acceptance/
-│       ├── test_story_1.15a.feature
-│       └── test_story_1.15a_steps.py
+│       ├── test_acceptance_externalized-memory-context-compression.feature
+│       └── test_acceptance_externalized-memory-context-compression.py
 └── docs/
     └── developer/
         └── externalized_memory_guide.md    # 外部化记忆实施指南
@@ -836,8 +836,8 @@ sisys/
 - `tests/unit/performance/test_compression_performance.py` - 性能基准测试
 - `tests/integration/test_compression_integration.py` - 集成测试
 - `tests/integration/test_memory_service_integration.py` - 集成测试（使用 mock）
-- `tests/acceptance/test_story_1.15a.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
-- `tests/acceptance/test_story_1.15a_steps.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
+- `tests/acceptance/test_acceptance_externalized-memory-context-compression.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
+- `tests/acceptance/test_acceptance_externalized-memory-context-compression.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/externalized_memory_guide.md` - 外部化记忆实施指南
 
 **待创建的文件/To Be Created (Dev Story 实施):**

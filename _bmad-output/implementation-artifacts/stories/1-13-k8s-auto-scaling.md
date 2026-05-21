@@ -170,7 +170,7 @@
 - [ ] Grafana Dashboard provision 配置（`deploy/kubernetes/apps/sisys/base/grafana-dashboard-configmap.yaml`）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1.13.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_k8s-auto-scaling.feature`
 - [ ] 覆盖场景:
   - `/metrics` 端点返回 Prometheus 格式
   - 自定义业务指标正确暴露
@@ -208,7 +208,7 @@
 | **TDD 单元测试** | MetricsEndpoint | 端点响应格式 | `test_metrics_endpoint.py` | Task 1 |
 | **TDD 单元测试** | BusinessMetricsCollector | 指标注册更新 | `test_business_metrics.py` | Task 2 |
 | **TDD 单元测试** | MetricsAggregator | 指标聚合 | `test_metrics_aggregator.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.13.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_k8s-auto-scaling.feature` | Task 0 |
 | **集成测试** | K8s HPA | 扩缩容场景 | `test_k8s_hpa_integration.py` | Task 3 |
 | **SDD 架构验证** | 指标格式 | Prometheus 兼容性 | `test_prometheus_format.py` | Task 1 |
 
@@ -299,7 +299,7 @@ output = generate_latest()
 - [x] Subtask 0.4: 创建 K8s ServiceMonitor 配置
 - [x] Subtask 0.5: 创建 HPA 自定义指标配置
 - [x] Subtask 0.6: 创建 Grafana Dashboard 配置
-- [x] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.13.feature`
+- [x] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_k8s-auto-scaling.feature`
 - [x] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -517,7 +517,7 @@ sisys/
     ├── integration/
     │   └── test_k8s_hpa_integration.py
     └── acceptance/
-        └── test_story_1.13.feature
+        └── test_acceptance_k8s-auto-scaling.feature
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
@@ -611,8 +611,8 @@ sisys/
 - `tests/unit/interfaces/api/test_prometheus_format.py` - Prometheus 格式验证测试
 - `tests/unit/infrastructure/test_k8s_config.py` - K8s 配置验证测试
 - `tests/integration/test_k8s_hpa_integration.py` - K8s HPA 集成测试
-- `tests/acceptance/test_story_1.13.feature` - Gherkin 验收测试
-- `tests/acceptance/test_story_1_13_steps.py` - 验收测试步骤实现
+- `tests/acceptance/test_acceptance_k8s-auto-scaling.feature` - Gherkin 验收测试
+- `tests/acceptance/test_acceptance_k8s-auto-scaling.py` - 验收测试步骤实现
 
 **更新的文件/Updated Files:**
 - `src/interfaces/api/__init__.py` - 添加 monitoring 模块导出

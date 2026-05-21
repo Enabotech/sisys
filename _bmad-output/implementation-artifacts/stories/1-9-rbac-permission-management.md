@@ -287,7 +287,7 @@
 | **服务实现** | `src/infrastructure/security/` | 实现 AuthServicePort、PermissionServicePort |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1.9.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_rbac-permission-management.feature`
 - [ ] 覆盖场景:
   - 用户登录成功/失败
   - JWT 令牌生成和验证
@@ -405,7 +405,7 @@
 - [x] Subtask 0.3: 定义 Permission 数据模型 ✅
 - [x] Subtask 0.4: 定义 AuthService 接口 ✅
 - [x] Subtask 0.5: 定义 PermissionService 接口 ✅
-- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.9.feature` ✅
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_rbac-permission-management.feature` ✅
 - [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）✅
 
 **完成标准/Definition of Done:**
@@ -894,7 +894,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_auth_integration.py
 │   └── acceptance/
-│       └── test_story_1.9.feature
+│       └── test_acceptance_rbac-permission-management.feature
 └── docs/
     └── security/
         └── rbac_permission_management_guide.md  # RBAC 权限管理实施指南
@@ -1033,12 +1033,12 @@ sisys/
 | 2026-04-18 | Task 0-7 实现完成，Story 进入 review 状态 | ✅ 完成 |
 | 2026-04-19 | Task 8 实现完成：auth.py 覆盖率 50%→100%，新增 test_auth_endpoint_exceptions.py (21 tests) 和 test_auth_api_integration.py (22 tests) | ✅ 完成 |
 | 2026-04-19 | Bug 修复：refresh_token endpoint `str` → `Form(...)`，覆盖率 93%→100% | ✅ 完成 |
-| 2026-04-20 | 新增 `tests/acceptance/test_story_1_9_steps.py`（34 BDD 验收测试步骤定义），所有测试通过 | ✅ 完成 |
+| 2026-04-20 | 新增 `tests/acceptance/test_acceptance_rbac-permission-management.py`（34 BDD 验收测试步骤定义），所有测试通过 | ✅ 完成 |
 | 2026-05-04 | 六边形架构约束审查：代码不存在，重置为 backlog；确认接口设计（ABC、AuthenticationError、资源实例级权限）；状态更新为 ready-for-dev | ✅ 完成 |
 | 2026-05-05 | 升级 verify_token 返回类型：dict → TokenPayload 领域值对象（不可变，含 is_expired/has_role/has_any_role 方法） | ✅ 完成 |
 | 2026-05-05 | 修复 auth API 异常：get_current_user_dependency 工厂函数、delete_role response_model=None、get_current_user_override 参数；mypy 类型错误修复 | ✅ 完成 |
 | 2026-05-05 | 测试文件重命名：test_auth_api_integration.py → test_auth_api_endpoints.py（移至 integration/）；类型注解修复 | ✅ 完成 |
-| 2026-05-05 | 完成验收测试：test_story_1_9.feature + test_story_1_9_steps.py（真实服务测试：JWT/加密/角色/架构约束），无 mock，11 passed | ✅ 完成 |
+| 2026-05-05 | 完成验收测试：test_acceptance_rbac-permission-management.feature + test_acceptance_rbac-permission-management.py（真实服务测试：JWT/加密/角色/架构约束），无 mock，11 passed | ✅ 完成 |
 | 2026-05-06 | 代码审查：更新 AC checkbox 状态；确认发现 UserRoleRepository.get_user_roles() 返回空 permissions BUG | ⚠️ 待修复 |
 
 ### 🐛 发现的问题 Issues Found
@@ -1107,8 +1107,8 @@ sisys/
 - [x] `tests/contract/test_api_contract_rbac.py` - API 契约测试 ✅
 - [x] `tests/integration/test_auth_integration.py` - 集成测试（服务层）✅
 - [x] `tests/integration/test_auth_api_endpoints.py` - API 端点集成测试（TestClient）✅
-- [x] `tests/acceptance/test_story_1_9.feature` - 验收测试 Gherkin 场景 ✅
-- [x] `tests/acceptance/test_story_1_9_steps.py` - 验收测试步骤定义 ✅
+- [x] `tests/acceptance/test_acceptance_rbac-permission-management.feature` - 验收测试 Gherkin 场景 ✅
+- [x] `tests/acceptance/test_acceptance_rbac-permission-management.py` - 验收测试步骤定义 ✅
 
 ---
 

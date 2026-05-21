@@ -3,7 +3,7 @@
 Real instance integration tests using actual PostgreSQL + Redis services.
 No mocks - uses real PostgreSQL and Redis instances.
 
-Run with: pytest tests/acceptance/test_story_1_15a_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_externalized-memory-context-compression.py -v
 
 Test Isolation (per sdd-tdd-checklist.md §5.5):
     - Uses begin_nested() savepoint for transactional isolation
@@ -42,7 +42,7 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
-scenarios("test_story_1_15a.feature")
+scenarios("test_acceptance_externalized-memory-context-compression.feature")
 
 # ===================================================================
 # Paths & Constants

@@ -318,7 +318,7 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 - [x] MemoryConfig 配置（`src/infrastructure/config/memory.py`）- Story 1.15a 已实现
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_story_1.15b.feature`（Story 1.15b 开发时创建）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_externalized-memory-six-layer-storage.feature`（Story 1.15b 开发时创建）
 - [ ] 覆盖场景：
   - L0 MEMORY.md 入口（索引、路由、截断）→ 由单元测试验证
   - Private/Group 分离（RBAC 校验）→ 由单元测试验证
@@ -359,7 +359,7 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 | **TDD 单元测试** | MemoryAccessControl | RBAC 校验 | `test_memory_access_control.py` | Task 1 |
 | **TDD 单元测试** | RedisMemoryCache | L1 缓存 | `test_redis_memory_cache.py` | Task 2 |
 | **TDD 单元测试** | SixLayerStorageCoordinator | 六层协同 | `test_six_layer_storage_coordinator.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.15b.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_externalized-memory-six-layer-storage.feature` | Task 0 |
 | **SDD 架构验证** | 六层架构 | 依赖方向验证 | `test_memory_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端存储流程 | `test_storage_integration.py` | Task 3 |
 
@@ -426,7 +426,7 @@ MemoryService.save() → MemoryChanged 事件 → MemoryChangedListener → Memo
 - [ ] Subtask 0.2: 定义 MemoryRouter 路由策略（`src/infrastructure/storage/memory_router.py`）
 - [ ] Subtask 0.3: 定义 MemoryAccessControl 访问控制（`src/infrastructure/security/memory_access_control.py`）
 - [ ] Subtask 0.4: 定义 RedisMemoryCache L1 缓存（`src/infrastructure/cache/redis_memory_cache.py`）
-- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.15b.feature`（Dev agent 创建）
+- [ ] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_externalized-memory-six-layer-storage.feature`（Dev agent 创建）
 - [ ] Subtask 0.6: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -750,8 +750,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_storage_integration.py      # 集成测试
 │   └── acceptance/
-│       ├── test_story_1.15b.feature         # Gherkin 验收测试
-│       └── test_story_1.15b_steps.py        # 验收测试步骤实现
+│       ├── test_acceptance_externalized-memory-six-layer-storage.feature         # Gherkin 验收测试
+│       └── test_acceptance_externalized-memory-six-layer-storage.py        # 验收测试步骤实现
 └── docs/
     └── developer/
         └── externalized_memory_guide.md    # 外部化记忆实施指南

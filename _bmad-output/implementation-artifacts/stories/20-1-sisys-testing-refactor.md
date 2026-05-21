@@ -35,8 +35,8 @@
 **Then** 这 3 个测试全部通过
 
 **验证标准/Validation Criteria:**
-- [ ] `tests/acceptance/test_story_1_3_steps.py` 实现 `temporary_consumer` 异步上下文管理器
-- [ ] `tests/acceptance/test_story_1_6_steps.py` 的 `collection_has_different_domains` 添加 `create_collection()` 调用
+- [ ] `tests/acceptance/test_acceptance_event-bus-implementation.py` 实现 `temporary_consumer` 异步上下文管理器
+- [ ] `tests/acceptance/test_acceptance_qdrant-vector-layer.py` 的 `collection_has_different_domains` 添加 `create_collection()` 调用
 - [ ] 删除 `scope=module` 的 `event_loop` fixture，使用 pytest-asyncio auto mode
 
 ---
@@ -78,8 +78,8 @@
 
 **验证标准/Validation Criteria:**
 - [ ] A1: 所有 fixtures 为 `scope=function`（非 module/session）
-- [ ] A2: `test_story_1_3_steps.py` 使用 `temporary_consumer` + UUID 队列名
-- [ ] A3: `test_story_1_6_steps.py` 使用 UUID collection 名
+- [ ] A2: `test_acceptance_event-bus-implementation.py` 使用 `temporary_consumer` + UUID 队列名
+- [ ] A3: `test_acceptance_qdrant-vector-layer.py` 使用 UUID collection 名
 - [ ] A4: 所有队列名添加租户前缀 `test_{uuid}_queue`
 - [ ] A5: 所有 Redis keys 添加租户前缀 `test:{uuid}:`
 - [ ] A6: 所有 Qdrant collections 添加租户前缀 `test_{uuid}_`
@@ -199,7 +199,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 确认 `test_ac2_rabbitmq_documentprocessed` 失败 |
-| 🟢 绿 | 在 `test_story_1_3_steps.py` 实现 `temporary_consumer` 异步上下文管理器 |
+| 🟢 绿 | 在 `test_acceptance_event-bus-implementation.py` 实现 `temporary_consumer` 异步上下文管理器 |
 | 🔄 重构 | 优化启动确认逻辑，添加超时配置 |
 
 - [x] Subtask 1.1: 🔴 红 — 确认 `test_ac2_rabbitmq_documentprocessed` 失败
@@ -212,7 +212,7 @@
 | 阶段 | 动作 |
 |------|------|
 | 🔴 红 | 确认 `test_dense_search_with_filter` 失败 |
-| 🟢 绿 | 在 `test_story_1_6_steps.py` 添加 `create_collection()` 调用 |
+| 🟢 绿 | 在 `test_acceptance_qdrant-vector-layer.py` 添加 `create_collection()` 调用 |
 | 🔄 重构 | 验证幂等性 |
 
 - [x] Subtask 1.5: 🔴 红 — 确认 `test_dense_search_with_filter` 失败
@@ -339,9 +339,9 @@
 
 - [x] Subtask 4.1: 运行 Phase 1 修复的 3 个测试
   ```bash
-  poetry run pytest tests/acceptance/test_story_1_3_steps.py::test_ac2_rabbitmq_documentprocessed -v
-  poetry run pytest tests/acceptance/test_story_1_3_steps.py::test_ac2_rabbitmq_agentdecided -v
-  poetry run pytest tests/acceptance/test_story_1_6_steps.py::test_dense_search_with_filter -v
+  poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py::test_ac2_rabbitmq_documentprocessed -v
+  poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py::test_ac2_rabbitmq_agentdecided -v
+  poetry run pytest tests/acceptance/test_acceptance_qdrant-vector-layer.py::test_dense_search_with_filter -v
   ```
 - [x] Subtask 4.2: 验证 event_loop 冲突已解决（多次运行无污染）
   - 删除了所有 `scope=module` 的 event_loop fixture
@@ -366,11 +366,11 @@
 
 - [x] Subtask 5.1: A1 — 检查所有 fixtures scope，修正为 function
   - 已确认无 `scope=module` 的 fixtures
-  - 删除了 `test_story_1_2_steps.py` 中的 `scope=module` events_context fixture
-- [x] Subtask 5.2: A2 — `test_story_1_3_steps.py` 使用 `temporary_consumer` + UUID 队列名
+  - 删除了 `test_acceptance_domain-event-definition.py` 中的 `scope=module` events_context fixture
+- [x] Subtask 5.2: A2 — `test_acceptance_event-bus-implementation.py` 使用 `temporary_consumer` + UUID 队列名
   - 已实现 `temporary_consumer` 异步上下文管理器
   - 队列名使用 `f"test-queue-{uuid.uuid4().hex[:8]}"`
-- [x] Subtask 5.3: A3 — `test_story_1_6_steps.py` 使用 UUID collection 名
+- [x] Subtask 5.3: A3 — `test_acceptance_qdrant-vector-layer.py` 使用 UUID collection 名
   - `collection_name` fixture 使用 `f"test_collection_{uuid.uuid4().hex[:8]}"`
 - [x] Subtask 5.4: A4 — 所有队列名添加租户前缀 `test_{uuid}_queue`
   - 已实现，队列名使用 `f"test-queue-{uuid.uuid4().hex[:8]}"` 格式
@@ -546,8 +546,8 @@ sisys/
 │   ├── fixtures.py               # [新建] Phase 3 - 测试资源清理 fixtures
 │   ├── conftest.py               # [更新] 添加隔离 fixtures
 │   ├── acceptance/               # [更新] Phase 5 - 12 个 BDD 文件
-│   │   ├── test_story_1_3_steps.py   # [更新] P1 修复 async_consume
-│   │   └── test_story_1_6_steps.py    # [更新] P2 修复 collection 创建
+│   │   ├── test_acceptance_event-bus-implementation.py   # [更新] P1 修复 async_consume
+│   │   └── test_acceptance_qdrant-vector-layer.py    # [更新] P2 修复 collection 创建
 │   ├── integration/              # [更新] Phase 6 - 15 个 mock 文件
 │   ├── integration/         # [更新] Phase 7 - 6 个真实服务文件
 │   └── unit/                    # [检查] Phase 8 - 70 个单元测试
@@ -570,8 +570,8 @@ sisys/
 ### Task 1 实现记录 (Phase 1 紧急修复)
 
 **P6 修复 (event_loop scope 问题):**
-- 删除了 `test_story_1_3_steps.py` 中的 `scope=module` event_loop fixture
-- 删除了 `test_story_1_6_steps.py` 中的 `scope=module` event_loop fixture
+- 删除了 `test_acceptance_event-bus-implementation.py` 中的 `scope=module` event_loop fixture
+- 删除了 `test_acceptance_qdrant-vector-layer.py` 中的 `scope=module` event_loop fixture
 - 现在使用 pytest-asyncio auto mode (asyncio_mode = "auto")
 
 **P1 修复 (async_consume() 阻塞):**
@@ -666,8 +666,8 @@ sisys/
 - `tests/integration/conftest.py` - 使用 get_test_env() + function scope (R1, R2 修复)
 
 **Phase 1-3 已完成文件 (历史):**
-- `tests/acceptance/test_story_1_3_steps.py` - P1 修复 (temporary_consumer), P6 修复 (删除 event_loop fixture)
-- `tests/acceptance/test_story_1_6_steps.py` - P2 修复 (添加 create_collection), P6 修复 (删除 event_loop fixture)
+- `tests/acceptance/test_acceptance_event-bus-implementation.py` - P1 修复 (temporary_consumer), P6 修复 (删除 event_loop fixture)
+- `tests/acceptance/test_acceptance_qdrant-vector-layer.py` - P2 修复 (添加 create_collection), P6 修复 (删除 event_loop fixture)
 - `tests/acceptance/*.py` - A1-A10 租户隔离
 - `tests/integration/*.py` - I1-I8 mock 验证
 - `tests/integration/*.py` - R1-R7 环境标准化 (本次修复 R1, R2)
@@ -683,10 +683,10 @@ sisys/
 - [x] [Review][Defer] TenantContext 清理逻辑为空 [tests/isolation.py:33-35]
   - deferred: TenantContext 是状态管理（设置/恢复租户），不是资源管理。资源清理由 fixtures.py 中的 cleanup 机制处理
 
-- [x] [Review][Defer] asyncio.gather 结果索引假设不成立 [tests/acceptance/test_story_1_3_steps.py:91-94]
+- [x] [Review][Defer] asyncio.gather 结果索引假设不成立 [tests/acceptance/test_acceptance_event-bus-implementation.py:91-94]
   - deferred: 实际代码已修改，不再依赖 results[0]，而是使用 wait_for + cancel 模式
 
-- [x] [Review][Defer] queue 删除缺乏同步保证 [tests/acceptance/test_story_1_3_steps.py:96-99]
+- [x] [Review][Defer] queue 删除缺乏同步保证 [tests/acceptance/test_acceptance_event-bus-implementation.py:96-99]
   - deferred: 0.5s 延迟 + cancel 是合理的超时折中方案，测试环境可接受
 
 ### 中优先级问题 (建议修复)

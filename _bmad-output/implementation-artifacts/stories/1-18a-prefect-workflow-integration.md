@@ -313,8 +313,8 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 - [ ] 端口版本：v1.0.0，owner=platform-team
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1_18a.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_story_1_18a_steps.py`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_prefect-workflow-integration.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_prefect-workflow-integration.py`
 - [ ] 覆盖场景：
   - PrefectEngine 创建与配置
   - DocumentProcessingFlow 提交与执行
@@ -359,8 +359,8 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | **TDD 单元测试** | OrchestrationService | 路由逻辑 | `test_orchestration_service.py` | Task 3 |
 | **TDD 单元测试** | RAGIndexed/ReportGenerated | 事件 roundtrip | `test_workflow_events.py` | Task 3 |
 | **TDD 单元测试** | Composition Root | workflow 注册链路 | `test_composition_root_workflow.py` | Task 3 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1_18a.feature` | Task 0 |
-| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_story_1_18a_steps.py` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_prefect-workflow-integration.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_prefect-workflow-integration.py` | Task 0 |
 | **TDD 契约测试** | WorkflowEnginePort | 端口注册/解析/兼容性 | `test_port_contract_workflow_engine.py` | Task 3 |
 | **SDD 架构验证** | 六边形约束 | 零越界 Prefect 导入 | `test_prefect_architecture.py` | Task 4 |
 | **集成测试** | 端到端流程 | OrchestrationService → PrefectEngine → 事件发布 | `test_story_1_18a_integration.py` | Task 4 |
@@ -405,7 +405,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| 全部 | SDD 规范定义 + Gherkin 验收 | Task 0 | 0.1-0.10（规范定义+红阶段验证） | `test_story_1_18a.feature`, `test_story_1_18a_steps.py` |
+| 全部 | SDD 规范定义 + Gherkin 验收 | Task 0 | 0.1-0.10（规范定义+红阶段验证） | `test_acceptance_prefect-workflow-integration.feature`, `test_acceptance_prefect-workflow-integration.py` |
 | AC-1 | FlowStatus 值对象 | Task 1 | 1.1-1.3（FlowStatus 红→绿→重构） | `test_flow_status.py` |
 | AC-1 | WorkflowEnginePort Protocol | Task 1 | 1.4-1.6（Protocol 红→绿→重构） | `test_workflow_engine.py` |
 | AC-2 | PrefectEngine 实现 | Task 2 | 2.4-2.6（PrefectEngine 红→绿→重构） | `test_prefect_engine.py` |
@@ -439,8 +439,8 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 - [x] Subtask 0.5: 定义 DocumentProcessingFlow + document_tasks Schema
 - [x] Subtask 0.6: 定义 OrchestrationService Schema
 - [x] Subtask 0.7: 定义 RAGIndexed + ReportGenerated 事件 Schema
-- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_18a.feature`
-- [x] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_story_1_18a_steps.py`
+- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_prefect-workflow-integration.feature`
+- [x] Subtask 0.9: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_prefect-workflow-integration.py`
 - [x] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -809,8 +809,8 @@ sisys/
 │   ├── contracts/test_port_contract_workflow_engine.py
 │   ├── integration/test_story_1_18a_integration.py
 │   └── acceptance/
-│       ├── test_story_1_18a.feature
-│       └── test_story_1_18a_steps.py
+│       ├── test_acceptance_prefect-workflow-integration.feature
+│       └── test_acceptance_prefect-workflow-integration.py
 ```
 
 ### 六边形架构分层说明
@@ -909,8 +909,8 @@ sisys/
 - `tests/unit/architecture/test_prefect_architecture.py`
 - `tests/contracts/test_port_contract_workflow_engine.py`
 - `tests/integration/test_story_1_18a_integration.py`
-- `tests/acceptance/test_story_1_18a.feature`
-- `tests/acceptance/test_story_1_18a_steps.py`
+- `tests/acceptance/test_acceptance_prefect-workflow-integration.feature`
+- `tests/acceptance/test_acceptance_prefect-workflow-integration.py`
 
 **更新的文件/Updated Files:**
 - `src/domain/ports/__init__.py` — 导出 WorkflowEnginePort
@@ -1041,7 +1041,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 | 18 | OrchestrationService 注册为 SINGLETON 缺少与 UnifiedStorageGateway(SCOPED) 的区别说明 | P2 | Dev Notes 补充 SINGLETON 理由（无状态路由服务 vs request-scoped session） | ✅ R3 |
 | 19 | 应用到本故事条目中"测试使用 mock Prefect SDK"重复出现 | P2 | 删除重复行 | ✅ R3 |
 | 20 | DI 注册子任务 3.10-3.12 缺少 TDD 循环表（仅有 checkbox） | P1 | 添加 TDD 循环表（红:契约测试→绿:composition_root→重构:链路验证），重新标注 subtask 阶段 | ✅ R4 |
-| 21 | 追溯矩阵缺少 Task 0 行，验收测试文件无追溯 | P2 | 新增 Task 0 行，关联 `test_story_1_18a.feature` 和 `test_story_1_18a_steps.py` | ✅ R4 |
+| 21 | 追溯矩阵缺少 Task 0 行，验收测试文件无追溯 | P2 | 新增 Task 0 行，关联 `test_acceptance_prefect-workflow-integration.feature` 和 `test_acceptance_prefect-workflow-integration.py` | ✅ R4 |
 | 22 | Dev Notes 未说明 PrefectClient 异步获取模式（`get_client()` 而非直接构造）和 `create_flow_run()` 返回 `FlowRun` 模型 | P1 | 补充 PrefectClient 使用模式、`FlowRun.id` 获取方式、`DocumentProcessed.document_id` 为 UUID 类型 | ✅ R4 |
 | 23 | Updated Files 缺少 `src/infrastructure/workflow/__init__.py`（需导出 PrefectEngine） | P1 | 添加到 Updated Files 列表 | ✅ R5 |
 | 24 | "Prefect 无 RETRYING 状态"事实不准确（Prefect 有 Retrying 状态，主要用于 task 级别） | P2 | 修正为"Prefect Retrying 状态主要用于 task 级别，flow run 级别需综合判定" | ✅ R5 |

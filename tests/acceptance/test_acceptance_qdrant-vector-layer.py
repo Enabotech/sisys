@@ -3,7 +3,7 @@
 Real instance integration tests using actual Qdrant service.
 No mocks - uses real Qdrant instance.
 
-Run with: pytest tests/acceptance/test_story_1_6_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_qdrant-vector-layer.py -v
 
 Prerequisites:
     - Qdrant service running at localhost:6333 (or set QDRANT_* env vars)
@@ -139,7 +139,7 @@ def collection_naming_convention():
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "Collection 创建与删除",
 )
 def test_collection_create_and_delete(collection_manager: QdrantCollectionManager, event_loop):
@@ -199,7 +199,7 @@ def verify_collection_not_exists(collection_manager: QdrantCollectionManager, ev
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "向量点插入与查询",
 )
 def test_vector_point_insert_and_query(
@@ -287,7 +287,7 @@ def verify_point_returned():
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "Dense 语义检索",
 )
 def test_dense_semantic_retrieval(
@@ -375,7 +375,7 @@ def verify_results_sorted_by_score():
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "Dense 检索 payload 过滤",
 )
 def test_dense_search_with_filter(
@@ -458,7 +458,7 @@ def verify_all_results_have_domain():
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "BM25 稀疏检索",
 )
 def test_bm25_sparse_retrieval(
@@ -545,7 +545,7 @@ def verify_keyword_matched_results():
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "多租户隔离",
 )
 def test_multi_tenant_isolation(
@@ -626,7 +626,7 @@ def verify_hr_collection_isolated(
 
 
 @scenario(
-    "test_story_1_6.feature",
+    "test_acceptance_qdrant-vector-layer.feature",
     "领域层零 Qdrant 依赖",
 )
 def test_domain_layer_zero_qdrant_dependency():

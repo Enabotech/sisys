@@ -2,7 +2,7 @@
 
 验收测试：从业务角度验证功能满足需求规格（AC）
 
-Run with: pytest tests/acceptance/test_story_1_11_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_data-sovereignty-isolation.py -v
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from src.infrastructure.security.pipl_compliance_service_impl import PIPLComplia
 from src.infrastructure.security.sensitive_data_detector_impl import SensitiveDataDetectorImpl
 from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
 
-scenarios("test_story_1_11.feature")
+scenarios("test_acceptance_data-sovereignty-isolation.feature")
 
 
 # ===================================================================

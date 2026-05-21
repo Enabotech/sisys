@@ -3,7 +3,7 @@
 Real instance integration tests using actual Redis service.
 No mocks - uses real Redis instances for event publishing/subscribing.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_14b_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_autonomous-invocation-route.py -v
 
 Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
@@ -29,7 +29,7 @@ from src.infrastructure.routing.hash_router import HashRouter
 from src.infrastructure.routing.semantic_router import Candidate, SemanticRouter
 from tests.environments import get_test_env
 
-scenarios("test_story_1_14b.feature")
+scenarios("test_acceptance_autonomous-invocation-route.feature")
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"

@@ -183,7 +183,7 @@
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_story_1.14a.feature`（由 Dev agent 在 Task 0 创建）
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_autonomous-invocation-trigger.feature`（由 Dev agent 在 Task 0 创建）
 - [x] 覆盖场景:
   - 领域事件触发 trigger
   - 心跳事件触发 trigger
@@ -221,7 +221,7 @@
 | **TDD 单元测试** | AutoTriggerService | 领域事件触发 | `test_auto_trigger_service.py` | Task 1 |
 | **TDD 单元测试** | HeartbeatScheduler | 心跳调度 | `test_heartbeat_scheduler.py` | Task 2 |
 | **TDD 单元测试** | AutoTriggerContext | 上下文提取 | `test_auto_trigger_context.py` | Task 1 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_story_1.14a.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-trigger.feature` | Task 0 |
 | **SDD 架构验证** | 触发器解耦 | 六边形架构约束 | `test_trigger_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端触发流程 | `test_trigger_integration.py` | Task 3 |
 
@@ -257,7 +257,7 @@
 - [x] Subtask 0.3: 定义 AutoTriggerService 服务接口（`src/domain/services/auto_trigger_service.py`）
 - [x] Subtask 0.4: 定义 HeartbeatScheduler 调度器（`src/infrastructure/scheduler/heartbeat_scheduler.py`）
 - [x] Subtask 0.5: 定义 AutoTriggerConfig 配置模型（`src/infrastructure/config/trigger.py`）
-- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.14a.feature`
+- [x] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_autonomous-invocation-trigger.feature`
 - [x] Subtask 0.7: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -497,8 +497,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_trigger_integration.py
 │   └── acceptance/
-│       ├── test_story_1.14a.feature
-│       └── test_story_1.14a_steps.py
+│       ├── test_acceptance_autonomous-invocation-trigger.feature
+│       └── test_acceptance_autonomous-invocation-trigger.py
 └── docs/
     └── developer/
         └── trigger_mechanism_guide.md    # 触发机制实施指南
@@ -541,7 +541,7 @@ def when_auto_trigger_service_processes_event(context: dict, event_loop) -> None
 ```
 pytest-asyncio auto 模式下，必须显式接收 `event_loop` 参数以确保使用正确的 event loop。
 
-**来源:** `tests/acceptance/test_story_1_14a_steps.py`
+**来源:** `tests/acceptance/test_acceptance_autonomous-invocation-trigger.py`
 
 #### 2. PostgreSQL 异步连接的 Schema 隔离问题
 
@@ -581,7 +581,7 @@ await asyncio.sleep(2.0)  # 2-4秒用于并行安全性
 ```
 将等待时间增加到 2-4 秒，提高并行执行稳定性。
 
-**来源:** `tests/acceptance/test_story_1_3_steps.py`
+**来源:** `tests/acceptance/test_acceptance_event-bus-implementation.py`
 
 #### 4. pytest-bdd 与 pytest-asyncio async step 兼容性问题
 
@@ -734,8 +734,8 @@ AutoTriggerService (监听)
 | `tests/unit/architecture/test_trigger_architecture.py` | ✅ 完成 | 六边形架构验证测试 |
 | `tests/unit/performance/test_trigger_performance.py` | ✅ 完成 | 性能基准测试 |
 | `tests/integration/test_trigger_integration.py` | ✅ 完成 | 端到端触发流程集成测试 |
-| `tests/acceptance/test_story_1_14a.feature` | ✅ 完成 | Gherkin 验收测试（24 场景） |
-| `tests/acceptance/test_story_1_14a_steps.py` | ✅ 完成 | 验收测试步骤实现 |
+| `tests/acceptance/test_acceptance_autonomous-invocation-trigger.feature` | ✅ 完成 | Gherkin 验收测试（24 场景） |
+| `tests/acceptance/test_acceptance_autonomous-invocation-trigger.py` | ✅ 完成 | 验收测试步骤实现 |
 | `docs/developer/trigger_mechanism_guide.md` | ❌ 未创建 | 非强制（文档可选） |
 
 **验收测试统计:**

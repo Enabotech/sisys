@@ -1,4 +1,11 @@
-"""Acceptance tests for Story 1.1 - Hexagonal Architecture Skeleton."""
+"""Acceptance tests for Story 1.1 - Hexagonal Architecture Skeleton.
+
+Acceptance tests for hexagonal architecture skeleton implementation.
+Validates directory structure, domain layer zero-dependency, dependency direction,
+core entity skeletons, domain events, and repository interfaces.
+
+Run with: poetry run pytest tests/acceptance/test_acceptance_hexagonal-architecture-skeleton.py -v
+"""
 
 import ast
 import importlib
@@ -90,7 +97,7 @@ def arch_context():
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "架构目录结构创建成功",
 )
 def test_architecture_directory_structure():
@@ -141,7 +148,7 @@ def check_infrastructure_dir_exists():
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "领域层零依赖验证",
 )
 def test_domain_layer_zero_dependency():
@@ -289,7 +296,7 @@ def domain_no_external_framework_imports(arch_context):
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "依赖方向验证",
 )
 def test_dependency_direction():
@@ -388,7 +395,7 @@ def infrastructure_can_depend_on_application_and_domain():
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "核心领域实体骨架存在",
 )
 def test_core_domain_entities_exist():
@@ -454,7 +461,7 @@ def checkpoint_entity_exists(arch_context):
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "领域事件定义存在",
 )
 def test_domain_events_exist():
@@ -522,7 +529,7 @@ def correction_approved_event_exists(arch_context):
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "仓储接口定义完成",
 )
 def test_repository_interface_defined():
@@ -637,7 +644,7 @@ def entity_has_validate_method(arch_entity_class):
 
 
 @scenario(
-    "test_story_1_1.feature",
+    "test_acceptance_hexagonal-architecture-skeleton.feature",
     "领域实体验证方法存在",
 )
 def test_entity_validate_method_exists():
