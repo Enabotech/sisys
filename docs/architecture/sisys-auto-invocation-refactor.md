@@ -73,7 +73,7 @@ SISYS Story 1.14a（Trigger）/ 1.14b（Route）/ 1.14c（Execute）已完成自
 
 **影响：** 运行时 DI 解析失败，端口无法实例化。
 
-**修复方案：** 修正 composition_root.py 中的 impl 路径。
+**修复方案：** 修正 composition_root.py 中的 impl 和 module 路径（两个参数均指向错误目录）。
 
 **验证：** `Resolver().resolve("sandbox_executor")` 和 `Resolver().resolve("snapshot_repository")` 成功返回实例。
 
@@ -90,10 +90,10 @@ AutoRouteHandler.on_triggered(event)
 ```
 
 **涉及文件：**
-- `src/application/event_handlers/auto_route_handler.py` 第 83-91 行
-- `src/domain/services/auto_route_service.py` 第 80-83 行
+- `src/application/event_handlers/auto_route_handler.py` 第 81-91 行（handler 发布）
+- `src/domain/services/auto_route_service.py` 第 83 行（service 内部发布）
 
-**影响：** 下游消费者收到重复路由事件，可能触发双重执行。
+**影响：** 下游消费者收到重复路由事件，可能触发双重执行。注意：仅当 handler 被注入 publisher 时才发生实际双重发布（publisher=None 时 handler 侧为空操作），但代码结构上存在双重发布路径是设计缺陷。
 
 **修复方案：** 从 `AutoRouteHandler` 中移除 `_publish` 方法及其调用。Service 层是唯一发布者。
 
@@ -118,7 +118,9 @@ AutoRouteHandler.on_triggered(event)
 
 **影响：** 自主调用管线无法通过 DI 容器启动，必须手动装配。
 
-**修复方案：** 在 composition_root.py 中添加完整注册（详见第 3.1 节）。
+**修复方案：** 在 composition_root.py 中添加完整注册（详见第 3.1 节）。注意：`auto_trigger_handler` 依赖 `event_listener` 端口，需确认该端口已注册或补充注册。
+
+**注意：** domain service 和 handler 不是 Protocol 端口，使用 `register_port()` 注册它们是临时方案（与 P3-7 同一反模式）。理想方案是引入 `register_service()` 机制，但当前优先保证管线可启动。
 
 **验证：** 通过 DI 容器可解析完整的管线组件链。
 
@@ -133,9 +135,9 @@ magnitude_a = math.sqrt(sum(x * x for x, _ in zip(a, b)))  # ← zip 截断！
 magnitude_b = math.sqrt(sum(y * y for _, y in zip(a, b)))  # ← 同样截断
 ```
 
-**涉及文件：** `src/infrastructure/routing/semantic_router.py` 第 200-201 行
+**涉及文件：** `src/infrastructure/routing/semantic_router.py` 第 203-204 行
 
-**影响：** 不同长度的嵌入向量产生错误的相似度分数。
+**影响：** 不同长度的嵌入向量产生错误的相似度分数。注意：正常运行时所有向量来自同一嵌入模型（bge-m3, 1024 维），长度一致，bug 不触发。仅当候选项注册了不同维度的嵌入时才显现。
 
 **修复方案：** 分别计算各向量的模值，不使用 zip：
 ```python
@@ -187,7 +189,13 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
       @property is_full_failure -> bool
       @property partial_error -> bool
   ```
-- 在 `DualChannelEventBus` 中构造 `ChannelResult` 实例
+- 在基础设施层构造 `ChannelResult` 实例。实际构造站点有 4 个：
+  - `src/infrastructure/messaging/redis_event_bus.py` — RedisEventBus.publish()
+  - `src/infrastructure/messaging/rabbitmq_event_bus.py` — RabbitMQEventBus.publish()
+  - `src/infrastructure/messaging/inmemory_event_bus.py` — InMemoryEventBus.publish()
+  - `DualChannelEventBus` 不直接构造 PublishResult，而是透传子总线的返回值
+
+**语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。
 
 **验证：** `PublishResult` 无 Redis/Outbox 引用；EventPublisher Protocol 测试通过。
 
@@ -226,7 +234,7 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
 
 #### P1-5：AutoExecuteService.on_routed_event 接收泛型 DomainEvent
 
-**问题：** `AutoExecuteService.on_routed_event(event: DomainEvent)` 接收泛型 `DomainEvent`，然后通过 `getattr` 提取 `session_id`、`task_context` 等字段。对比 `AutoRouteService.on_triggered_event(event: AutoTriggered)` 使用具体类型。
+**问题：** `AutoExecuteService.on_routed_event(event: DomainEvent)` 接收泛型 `DomainEvent`，然后通过 6 次 `getattr` 提取 `session_id`、`task_context` 等字段（包括 logger 调用中的第 6 次）。对比 `AutoRouteService.on_triggered_event(event: AutoTriggered)` 使用具体类型。此外，`AutoRouted` 的 `trigger_event_type` 和 `trigger_event_id` 字段在 `on_routed_event` 中完全丢失（从未提取）。
 
 ```python
 # AutoExecuteService — 不安全
@@ -250,7 +258,10 @@ async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
 
 #### P1-6：AutoTriggerContext.from_domain_event 脆弱的嵌套回退链
 
-**问题：** `from_domain_event` 通过多层嵌套 `payload.get("session_id", payload.get("payload", {}).get("session_id", ...))` 提取 `session_id`，且硬编码 12 个允许的 context key。
+**问题：** `from_domain_event` 通过多层嵌套 `payload.get("session_id", payload.get("payload", {}).get("session_id", ...))` 提取 `session_id`，且硬编码 13 个允许的 context key（文档之前误记为 12）。此外存在 3 个附加问题：
+1. 第 98 行的 `and k not in ("aggregate_id", "event_id", "event_type")` 过滤条件是死代码（这些 key 不在允许列表中）
+2. `__post_init__` 也有 session_id 空值兜底逻辑，与 `from_domain_event` 的兜底重复
+3. 嵌套 `payload.get("payload", {})` 回退需验证是否有调用者传入此结构
 
 **涉及文件：** `src/domain/value_objects/auto_trigger_context.py`
 
@@ -317,7 +328,7 @@ async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
 
 **问题：** `_running_containers: dict[str, bool] = {}` 是类变量，所有实例共享且非线程安全。
 
-**修复方案：** 改为实例变量 `self._running_containers: dict[str, bool] = {}`，如需跨实例共享则使用 `threading.Lock`。
+**修复方案：** 改为实例变量 `self._running_containers: dict[str, bool] = {}`。同步移除 `reset_all_containers` 类方法（测试改用实例级清理），或将其改为按测试 fixture 管理。
 
 ---
 
@@ -472,13 +483,17 @@ register_port(
 #### 3.1.2 路径修正
 
 ```python
-# 修正前
+# 修正前（impl 和 module 均错误）
 impl="src.infrastructure.sandbox.docker_sandbox_adapter.DockerSandboxAdapter"
+module="src.infrastructure.sandbox.docker_sandbox_adapter"
 impl="src.infrastructure.storage.redis_snapshot_store.RedisSnapshotStore"
+module="src.infrastructure.storage.redis_snapshot_store"
 
-# 修正后
+# 修正后（impl 和 module 均指向实际路径）
 impl="src.infrastructure.external_services.sandbox.docker_sandbox_adapter.DockerSandboxAdapter"
+module="src.infrastructure.external_services.sandbox.docker_sandbox_adapter"
 impl="src.infrastructure.storage.redis.redis_snapshot_store.RedisSnapshotStore"
+module="src.infrastructure.storage.redis.redis_snapshot_store"
 ```
 
 #### 3.1.3 启动序列
@@ -663,9 +678,10 @@ if session_id == "default":
     logger.warning("No session_id found in event payload, using 'default'")
 
 ALLOWED_CONTEXT_KEYS: ClassVar[tuple[str, ...]] = (
-    "task_type", "description", "code", "stage_id",
-    "cost_estimate", "business_event_type", "priority",
-    "deadline", "callback_url", "retry_count", "max_retries", "metadata",
+    "task_type", "priority", "tool_name", "checkpoint_id",
+    "correction_type", "routing_decision", "isolation_level",
+    "document_id", "strategy_id", "agent_id", "session_id",
+    "error_message", "retry_count",
 )
 ```
 
@@ -832,17 +848,19 @@ def __init__(self) -> None:
 
 ### Phase 1：P0 关键 Bug 修复
 
-- [ ] **1.1** 修正 composition_root.py 中 DockerSandboxAdapter 的 impl 路径（P0-1）
-- [ ] **1.2** 修正 composition_root.py 中 RedisSnapshotStore 的 impl 路径（P0-1）
+- [ ] **1.1** 修正 composition_root.py 中 DockerSandboxAdapter 的 impl 和 module 路径（P0-1）
+- [ ] **1.2** 修正 composition_root.py 中 RedisSnapshotStore 的 impl 和 module 路径（P0-1）
 - [ ] **1.3** 从 AutoRouteHandler 移除 `_publish` 方法和 `publisher` 构造参数（P0-2）
 - [ ] **1.4** 修复 SemanticRouter._cosine_similarity：分别计算各向量模值（P0-4）
-- [ ] **1.5** 运行 `poetry run pytest tests/unit/infrastructure/routing/ tests/unit/domain/services/ -v` 验证
-- [ ] **1.6** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [ ] **1.5** 确认 event_listener 端口已注册，在 composition_root 中添加 8 个自主调用组件注册（P0-3）
+- [ ] **1.6** 运行 `poetry run pytest tests/unit/infrastructure/routing/ tests/unit/domain/services/ -v` 验证
+- [ ] **1.7** 运行 `poetry run pytest --tb=short -q` 全量回归
 
 ### Phase 2：P1 架构违规修复
 
 - [ ] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
-- [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 DualChannelEventBus（P1-2）
+- [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 4 个构造站点（RedisEventBus/RabbitMQEventBus/InMemoryEventBus/DualChannelEventBus）（P1-2）
+- [ ] **2.3** 注意 PublishResult.is_success 语义变更：旧为"任一通道成功"，新为"全部通道成功"
 - [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
 - [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
 - [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/`（P1-4）
@@ -862,10 +880,9 @@ def __init__(self) -> None:
 - [ ] **3.6** 删除 InMemoryEventPublisher Protocol（P2-4）
 - [ ] **3.7** 在 `__init__.py` 中添加 AutoExecuteService 导出（P2-5）
 - [ ] **3.8** AutoTriggerHandler 队列添加 maxsize=1000 背压（P2-6）
-- [ ] **3.9** DockerSandboxAdapter._running_containers 改为实例变量（P2-7）
+- [ ] **3.9** DockerSandboxAdapter._running_containers 改为实例变量，同步移除/重构 reset_all_containers（P2-7）
 - [ ] **3.10** 移除 SemanticRouter.cache_ttl_seconds 或激活（P2-8）
-- [ ] **3.11** 在 composition_root 中添加 8 个自主调用组件注册（P0-3）
-- [ ] **3.12** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [ ] **3.11** 运行 `poetry run pytest --tb=short -q` 全量回归
 
 ### Phase 4：P3 风格优化
 
