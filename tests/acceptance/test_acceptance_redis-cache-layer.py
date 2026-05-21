@@ -3,7 +3,7 @@
 Real instance integration tests using actual Redis services.
 Uses fakeredis for unit-level testing isolation.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_4_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_redis-cache-layer.py -v
 
 Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
@@ -27,7 +27,7 @@ from src.infrastructure.storage.redis.semantic_cache import RedisSemanticCache
 from src.infrastructure.storage.redis.session_storage import RedisSessionStorage
 from tests.environments import get_test_env
 
-scenarios("test_story_1_4.feature")
+scenarios("test_acceptance_redis-cache-layer.feature")
 
 
 # ===================================================================
@@ -139,7 +139,7 @@ def given_all_services_use_fakeredis(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_4.feature", "会话状态保存与恢复")
+@scenario("test_acceptance_redis-cache-layer.feature", "会话状态保存与恢复")
 def test_session_save_and_load():
     """Test session state save and load."""
     pass
@@ -190,7 +190,7 @@ def then_session_state_matches(context: dict) -> None:
     assert loaded["state"]["data"] == "test"
 
 
-@scenario("test_story_1_4.feature", "会话状态删除")
+@scenario("test_acceptance_redis-cache-layer.feature", "会话状态删除")
 def test_session_delete():
     """Test session state deletion."""
     pass
@@ -238,7 +238,7 @@ def then_return_none(context: dict) -> None:
     assert loaded is None
 
 
-@scenario("test_story_1_4.feature", "会话状态过期")
+@scenario("test_acceptance_redis-cache-layer.feature", "会话状态过期")
 def test_session_expiry():
     """Test session state expiry."""
     pass
@@ -283,7 +283,7 @@ def when_advance_time(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_4.feature", "语义缓存命中")
+@scenario("test_acceptance_redis-cache-layer.feature", "语义缓存命中")
 def test_semantic_cache_hit():
     """Test semantic cache hit."""
     pass
@@ -339,7 +339,7 @@ def then_return_cached_result(context: dict) -> None:
     assert result.get("result") == "cached_result"
 
 
-@scenario("test_story_1_4.feature", "语义缓存未命中")
+@scenario("test_acceptance_redis-cache-layer.feature", "语义缓存未命中")
 def test_semantic_cache_miss():
     """Test semantic cache miss."""
     pass
@@ -374,7 +374,7 @@ def then_return_none_on_miss(context: dict) -> None:
     assert result is None
 
 
-@scenario("test_story_1_4.feature", "语义缓存命中率统计")
+@scenario("test_acceptance_redis-cache-layer.feature", "语义缓存命中率统计")
 def test_semantic_cache_hit_rate():
     """Test semantic cache hit rate statistics."""
     pass
@@ -432,7 +432,7 @@ def then_query_hit_rate(
 # ===================================================================
 
 
-@scenario("test_story_1_4.feature", "公共黑板多 Agent 并发写入")
+@scenario("test_acceptance_redis-cache-layer.feature", "公共黑板多 Agent 并发写入")
 def test_blackboard_multi_agent():
     """Test public blackboard multi-agent concurrent writes."""
     pass
@@ -494,7 +494,7 @@ def then_messages_sorted(context: dict) -> None:
     assert len(messages) >= 1
 
 
-@scenario("test_story_1_4.feature", "公共黑板版本号递增")
+@scenario("test_acceptance_redis-cache-layer.feature", "公共黑板版本号递增")
 def test_blackboard_version_increment():
     """Test public blackboard version increment."""
     pass
@@ -559,7 +559,7 @@ def then_version_incremented(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_4.feature", "SessionStorage 连接失败优雅降级")
+@scenario("test_acceptance_redis-cache-layer.feature", "SessionStorage 连接失败优雅降级")
 def test_session_storage_graceful_degradation():
     """Test SessionStorage graceful degradation on connection failure."""
     pass
@@ -601,7 +601,7 @@ def then_no_exception(context: dict) -> None:
     assert context.get("save_result") is None or context.get("save_result") is not False
 
 
-@scenario("test_story_1_4.feature", "SemanticCache 连接失败优雅降级")
+@scenario("test_acceptance_redis-cache-layer.feature", "SemanticCache 连接失败优雅降级")
 def test_semantic_cache_graceful_degradation():
     """Test SemanticCache graceful degradation on connection failure."""
     pass
@@ -638,7 +638,7 @@ def then_return_none_degraded(context: dict) -> None:
     assert result is None
 
 
-@scenario("test_story_1_4.feature", "PublicBlackboard 连接失败优雅降级")
+@scenario("test_acceptance_redis-cache-layer.feature", "PublicBlackboard 连接失败优雅降级")
 def test_public_blackboard_graceful_degradation():
     """Test PublicBlackboard graceful degradation on connection failure."""
     pass
@@ -684,7 +684,7 @@ def then_return_zero_degraded(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_4.feature", "Redis 键命名规范")
+@scenario("test_acceptance_redis-cache-layer.feature", "Redis 键命名规范")
 def test_redis_key_naming():
     """Test Redis key naming convention."""
     pass
@@ -715,7 +715,7 @@ def then_key_follows_convention(context: dict) -> None:
     assert len(key.split(":")) == 3
 
 
-@scenario("test_story_1_4.feature", "Redis 键批量清理")
+@scenario("test_acceptance_redis-cache-layer.feature", "Redis 键批量清理")
 def test_redis_key_cleanup():
     """Test Redis key batch cleanup."""
     pass

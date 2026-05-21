@@ -3,7 +3,7 @@
 Real instance integration tests using actual Redis and RabbitMQ services.
 No mocks - uses real Redis and RabbitMQ instances.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_3_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py -v
 
 Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
@@ -33,7 +33,7 @@ from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 from tests.environments import get_test_env
 
-scenarios("test_story_1_3.feature")
+scenarios("test_acceptance_event-bus-implementation.feature")
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"
@@ -138,13 +138,13 @@ def given_story_1_1_1_2_completed(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-1 - Redis Pub/Sub 实时通知通道 (DocumentProcessed)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-1 - Redis Pub/Sub 实时通知通道 (DocumentProcessed)")
 def test_ac1_redis_pubsub_documentprocessed():
     """Test Redis Pub/Sub real-time notification channel with DocumentProcessed."""
     pass
 
 
-@scenario("test_story_1_3.feature", "AC-1 - Redis Pub/Sub 实时通知通道 (HeartbeatTriggered)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-1 - Redis Pub/Sub 实时通知通道 (HeartbeatTriggered)")
 def test_ac1_redis_pubsub_heartbeattriggered():
     """Test Redis Pub/Sub real-time notification channel with HeartbeatTriggered."""
     pass
@@ -256,13 +256,13 @@ def verify_redis_channel_heartbeattriggered(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-2 - RabbitMQ 可靠事件通道 (DocumentProcessed)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-2 - RabbitMQ 可靠事件通道 (DocumentProcessed)")
 def test_ac2_rabbitmq_documentprocessed():
     """Test RabbitMQ reliable event channel with DocumentProcessed."""
     pass
 
 
-@scenario("test_story_1_3.feature", "AC-2 - RabbitMQ 可靠事件通道 (AgentDecided)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-2 - RabbitMQ 可靠事件通道 (AgentDecided)")
 def test_ac2_rabbitmq_agentdecided():
     """Test RabbitMQ reliable event channel with AgentDecided."""
     pass
@@ -423,13 +423,13 @@ def verify_routing_key_agentdecided(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-3 - 事务 Outbox 模式 (DocumentProcessed)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-3 - 事务 Outbox 模式 (DocumentProcessed)")
 def test_ac3_outbox_documentprocessed():
     """Test transactional Outbox pattern with DocumentProcessed."""
     pass
 
 
-@scenario("test_story_1_3.feature", "AC-3 - 事务 Outbox 模式 (ToolExecuted)")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-3 - 事务 Outbox 模式 (ToolExecuted)")
 def test_ac3_outbox_toolexecuted():
     """Test transactional Outbox pattern with ToolExecuted."""
     pass
@@ -488,7 +488,7 @@ def verify_status_updated_to_published(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-4 - 事件处理幂等性检查")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-4 - 事件处理幂等性检查")
 def test_ac4_idempotency_check():
     """Test event processing idempotency check."""
     pass
@@ -574,7 +574,7 @@ def verify_event_processed_once(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-5 - 事件处理监控和可观测性")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-5 - 事件处理监控和可观测性")
 def test_ac5_event_monitoring():
     """Test event processing monitoring and observability."""
     pass
@@ -627,7 +627,7 @@ def verify_otel_span_when_enabled(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-6 - 架构约束验证")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-6 - 架构约束验证")
 def test_ac6_architecture_constraints():
     """Test architecture constraint validation."""
     pass
@@ -671,7 +671,7 @@ def verify_mypy_passes() -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_3.feature", "AC-7 - 事件处理重试机制（指数退避 + 抖动）")
+@scenario("test_acceptance_event-bus-implementation.feature", "AC-7 - 事件处理重试机制（指数退避 + 抖动）")
 def test_ac7_retry_mechanism():
     """Test event processing retry mechanism with exponential backoff and jitter."""
     pass

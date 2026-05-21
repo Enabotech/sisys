@@ -108,7 +108,7 @@
   - [ ] 仅使用 Python 标准库类型注解（不依赖 SQLAlchemy/Pydantic）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_story_1_1.feature`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_hexagonal-architecture-skeleton.feature`
 - [x] 业务方评审通过
 - [x] 所有场景覆盖（Happy Path + Edge Cases：目录不存在、依赖方向错误、外部库导入）
 
@@ -145,7 +145,7 @@
 | **TDD 单元测试** | 领域实体 | 验证实体创建、状态转换、不变约束 | `test_strategic_plan.py`, `test_document.py` 等 | Task 2 |
 | **TDD 单元测试** | 领域事件 | 验证事件基类、子类继承、序列化 | `test_events_base.py`, `test_plan_events.py` | Task 3 |
 | **TDD 单元测试** | 事件发布器 | 验证 EventPublisher 接口定义 | `test_event_publisher.py` | Task 3 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（架构目录、依赖检查） | `test_story_1_1.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（架构目录、依赖检查） | `test_acceptance_hexagonal-architecture-skeleton.feature` | Task 0 |
 | **SDD 架构验证** | 架构约束 | 领域层零依赖、依赖方向（import-linter） | `test_hexagonal_architecture.py`, `.importlinter` | Task 1 |
 | **CI/CD 配置验证** | 质量门禁 | Ruff、MyPy、import-linter、pre-commit 配置 | `pyproject.toml`, `.pre-commit-config.yaml` | Task 4 |
 
@@ -180,7 +180,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 六边形架构目录结构就绪 | Task 0 | SDD 规范定义（领域事件 Schema、数据模型、仓储接口） | `test_story_1_1.feature` |
+| AC-1 | 六边形架构目录结构就绪 | Task 0 | SDD 规范定义（领域事件 Schema、数据模型、仓储接口） | `test_acceptance_hexagonal-architecture-skeleton.feature` |
 | AC-1 | 六边形架构目录结构就绪 | Task 1 | 架构目录结构创建 + API 契约占位 + import-linter 依赖验证 | `test_hexagonal_architecture.py`, `.importlinter` |
 | AC-2 | 领域实体骨架创建 | Task 2 | 5 个核心领域实体类创建（含 `validate()` 方法） | `test_strategic_plan.py`, `test_document.py`, `test_agent.py`, `test_tool.py`, `test_checkpoint.py` |
 | AC-3 | 架构约束验证测试就绪 | Task 3 | 领域事件基类 + 5 个核心事件 + EventPublisher 接口定义 | `test_events_base.py`, `test_plan_events.py`, `test_event_publisher.py` |
@@ -204,7 +204,7 @@
 - [x] Subtask: 定义领域事件 Schema（event_id, occurred_on, aggregate_id, event_type, payload）
 - [x] Subtask: 定义 5 个核心领域实体的数据模型（StrategicPlan, Document, Agent, Tool, Checkpoint）
 - [x] Subtask: 定义 `BaseRepository[T]` 仓储接口（get_by_id, save, delete, list_all）
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_1.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_hexagonal-architecture-skeleton.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -470,7 +470,7 @@ sisys/
 │   ├── integration/
 │   │   └── __init__.py                         # 集成测试（后续 Story）
 │   └── acceptance/
-│       └── test_story_1_1.feature              # Gherkin 验收测试
+│       └── test_acceptance_hexagonal-architecture-skeleton.feature              # Gherkin 验收测试
 └── docs/
     └── api/
         └── openapi.yaml                        # API 契约（占位）
@@ -589,7 +589,7 @@ sisys/
 - `tests/unit/domain/events/test_plan_events.py` - 领域事件测试
 - `tests/unit/domain/events/test_event_publisher.py` - EventPublisher 测试
 - `tests/unit/quality/test_code_quality.py` - 代码质量门禁测试
-- `tests/acceptance/test_story_1_1.feature` - Gherkin 验收测试
+- `tests/acceptance/test_acceptance_hexagonal-architecture-skeleton.feature` - Gherkin 验收测试
 - `docs/api/openapi.yaml` - API 契约（占位）
 - `.importlinter` - import-linter 依赖验证配置
 
@@ -647,7 +647,7 @@ sisys/
 | F-05 | 缺少量化成功指标（Mary） | P2 | 在 AC 中添加"依赖错误数=0"等指标 | ✅ 已修复 |
 | F-06 | 领域事件缺少发布者接口（Amelia） | P2 | Task 3 增加 `EventPublisher` 接口 | ✅ 已修复 |
 | F-07 | 测试目录命名不统一（Winston） | P3 | 建议在 dev-story 实施时调整为 `tests/architecture/` | 📝 待实施 |
-| F-08 | Gherkin 场景缺少具体步骤（Mary） | P3 | 已补充 `test_story_1_1_steps.py` 完整实现 | ✅ 已修复 |
+| F-08 | Gherkin 场景缺少具体步骤（Mary） | P3 | 已补充 `test_acceptance_hexagonal-architecture-skeleton.py` 完整实现 | ✅ 已修复 |
 | R-01 | `advance_phase()` 无最终相位防护 | P0 | 添加 `EXECUTION_MONITORING` 防护 | ✅ 已修复 |
 | R-02 | `completed_phases` 可外部篡改 | P1 | `validate()` 一致性检查 + append 前去重 | ✅ 已修复 |
 | R-03 | `Agent.fail(reason)` 参数被丢弃 | P1 | 新增 `failure_reason` 字段并存储 | ✅ 已修复 |

@@ -206,7 +206,7 @@
 - [ ] GraphStorage 接口（`src/domain/repositories/graph_storage.py`）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1.8.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_neo4j-graph-layer.feature`
 - [ ] 覆盖场景:
   - 节点创建/删除/查询
   - 关系创建/删除/查询
@@ -309,7 +309,7 @@
 - [x] Subtask: 定义 GraphRelationship 数据模型
 - [x] Subtask: 定义 GraphManager 接口
 - [x] Subtask: 定义 GraphStorage 接口
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.8.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_neo4j-graph-layer.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -676,7 +676,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_neo4j_integration.py
 │   └── acceptance/
-│       └── test_story_1.8.feature
+│       └── test_acceptance_neo4j-graph-layer.feature
 └── docs/
     └── infrastructure/
         └── neo4j_graph_layer_guide.md      # Neo4j 图存储层实施指南
@@ -750,7 +750,7 @@ sisys/
 - `src/domain/repositories/graph_storage.py` - GraphManager + GraphStorage 接口
 - `tests/unit/infrastructure/test_neo4j_*.py` - 单元测试
 - `tests/integration/test_neo4j_integration.py` - 集成测试
-- `tests/acceptance/test_story_1.8.feature` - 验收测试
+- `tests/acceptance/test_acceptance_neo4j-graph-layer.feature` - 验收测试
 
 ---
 

@@ -235,7 +235,7 @@
 - [ ] `deploy/postgresql/alembic/versions/001_initial.py` 初始迁移脚本
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1.5.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_postgresql-relational-layer.feature`
 - [ ] 覆盖场景:
   - 数据库连接与健康检查
   - Alembic 迁移执行与回滚
@@ -339,7 +339,7 @@
 - [x] Subtask: 定义关联表（user_roles, role_permissions）
 - [x] Subtask: 配置 Alembic（alembic.ini + env.py）
 - [x] Subtask: 编写初始迁移脚本（001_initial.py）
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.5.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_postgresql-relational-layer.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -708,7 +708,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_postgresql_integration.py
 │   └── acceptance/
-│       └── test_story_1.5.feature
+│       └── test_acceptance_postgresql-relational-layer.feature
 └── docs/
     └── infrastructure/
         └── postgresql_guide.md         # PostgreSQL 层实施指南
@@ -824,7 +824,7 @@ sisys/
 |---------|------|------|
 | `tests/unit/domain/test_outbox_interface.py` | OutboxRepository 接口验证 | ✅ 已创建 |
 | `tests/integration/test_postgresql_integration.py` | PostgreSQL 端到端集成测试 | ✅ 已创建 |
-| `tests/acceptance/test_story_1.5.feature` | Gherkin 验收测试 | ✅ 已创建 |
+| `tests/acceptance/test_acceptance_postgresql-relational-layer.feature` | Gherkin 验收测试 | ✅ 已创建 |
 | `docs/infrastructure/postgresql_guide.md` | PostgreSQL 层实施指南 | 可选文档 |
 
 ---
@@ -901,7 +901,7 @@ sisys/
 
 | 文件 | 修改 |
 |------|------|
-| `tests/acceptance/test_story_1_5_steps.py` | 添加 `ensure_alembic_migration` fixture；添加 "Alembic 升级迁移执行成功" 场景；修复 `pg_config` scope 不匹配 |
+| `tests/acceptance/test_acceptance_postgresql-relational-layer.py` | 添加 `ensure_alembic_migration` fixture；添加 "Alembic 升级迁移执行成功" 场景；修复 `pg_config` scope 不匹配 |
 
 #### 4. 集成测试警告修复
 

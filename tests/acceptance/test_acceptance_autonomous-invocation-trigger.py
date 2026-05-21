@@ -3,7 +3,7 @@
 Real instance integration tests using actual Redis and RabbitMQ services.
 Tests the AutoTriggerService, HeartbeatScheduler, and context extraction.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_14a_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_autonomous-invocation-trigger.py -v
 
 Prerequisites:
     - Redis service running at localhost:6379 (or set REDIS_HOST, REDIS_PORT)
@@ -36,7 +36,7 @@ from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
 from tests.environments import get_test_env
 
-scenarios("test_story_1_14a.feature")
+scenarios("test_acceptance_autonomous-invocation-trigger.feature")
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"
@@ -166,31 +166,31 @@ def given_heartbeat_scheduler_configured(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_14a.feature", "AC-1 - 领域事件 DocumentProcessed 触发 Triggered 事件")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-1 - 领域事件 DocumentProcessed 触发 Triggered 事件")
 def test_ac1_document_processed_triggered():
     """Test DocumentProcessed domain event triggers AutoTriggered event."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-1 - 领域事件 ToolExecuted 触发 Triggered 事件")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-1 - 领域事件 ToolExecuted 触发 Triggered 事件")
 def test_ac1_tool_executed_triggered():
     """Test ToolExecuted domain event triggers AutoTriggered event."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-1 - 领域事件 AgentDecided 触发 Triggered 事件")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-1 - 领域事件 AgentDecided 触发 Triggered 事件")
 def test_ac1_agent_decided_triggered():
     """Test AgentDecided domain event triggers AutoTriggered event."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-1 - 支持 12 种领域事件类型")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-1 - 支持 12 种领域事件类型")
 def test_ac1_12_domain_event_types():
     """Test all 12 domain event types are supported."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-1 - 触发器无循环依赖")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-1 - 触发器无循环依赖")
 def test_ac1_no_circular_dependency():
     """Test trigger has no circular dependencies."""
     pass
@@ -410,43 +410,43 @@ def then_communication_via_event_bus(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳定时器触发生成 HeartbeatTriggered 事件")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳定时器触发生成 HeartbeatTriggered 事件")
 def test_ac2_heartbeat_timer_triggers():
     """Test heartbeat timer triggers HeartbeatTriggered event generation."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳间隔可配置")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳间隔可配置")
 def test_ac2_heartbeat_interval_configurable():
     """Test heartbeat interval is configurable."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳唤醒原因分类 - scheduled")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳唤醒原因分类 - scheduled")
 def test_ac2_wake_reason_scheduled():
     """Test wake reason classified as scheduled."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳唤醒原因分类 - user_request")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳唤醒原因分类 - user_request")
 def test_ac2_wake_reason_user_request():
     """Test wake reason classified as user_request."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳唤醒原因分类 - system_recovery")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳唤醒原因分类 - system_recovery")
 def test_ac2_wake_reason_system_recovery():
     """Test wake reason classified as system_recovery."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳待办事项提取")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳待办事项提取")
 def test_ac2_todo_items_extraction():
     """Test todo items extraction from heartbeat."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-2 - 心跳成本预算提取")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-2 - 心跳成本预算提取")
 def test_ac2_cost_budget_extraction():
     """Test cost budget extraction from heartbeat."""
     pass
@@ -630,31 +630,31 @@ def then_extract_cost_budget(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_14a.feature", "AC-3 - session_id 优先从 payload 获取")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-3 - session_id 优先从 payload 获取")
 def test_ac3_session_id_from_payload():
     """Test session_id extracted from payload first."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-3 - session_id 回退到 aggregate_id")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-3 - session_id 回退到 aggregate_id")
 def test_ac3_session_id_fallback_aggregate_id():
     """Test session_id falls back to aggregate_id."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-3 - session_id 缺省时使用 default")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-3 - session_id 缺省时使用 default")
 def test_ac3_session_id_default():
     """Test session_id uses default when not present."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-3 - 完整上下文字段提取")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-3 - 完整上下文字段提取")
 def test_ac3_complete_context_fields():
     """Test complete context fields extraction."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-3 - 心跳上下文提取")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-3 - 心跳上下文提取")
 def test_ac3_heartbeat_context_extraction():
     """Test heartbeat context extraction."""
     pass
@@ -850,19 +850,19 @@ def then_task_context_contains_heartbeat_fields(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_14a.feature", "AC-4 - 触发器通过事件总线与路由通信")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-4 - 触发器通过事件总线与路由通信")
 def test_ac4_trigger_via_event_bus():
     """Test trigger communicates with route via event bus."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-4 - 六边形架构合规 - 领域层零依赖")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-4 - 六边形架构合规 - 领域层零依赖")
 def test_ac4_hexagonal_compliance():
     """Test hexagonal architecture compliance - domain layer zero dependencies."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-4 - TriggerService 使用 Protocol 依赖倒置")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-4 - TriggerService 使用 Protocol 依赖倒置")
 def test_ac4_trigger_service_protocol():
     """Test TriggerService uses Protocol for dependency inversion."""
     pass
@@ -945,31 +945,31 @@ def then_domain_defines_interface_infrastructure_implements(context: dict) -> No
 # ===================================================================
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - 触发延迟 P95 小于 10ms")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-5 - 触发延迟 P95 小于 10ms")
 def test_ac5_trigger_latency_p95():
     """Test trigger latency P95 < 10ms."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - 吞吐量性能测试")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-5 - 吞吐量性能测试")
 def test_ac5_throughput():
     """Test throughput performance."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - TriggerContext 创建延迟小于 1ms")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-5 - TriggerContext 创建延迟小于 1ms")
 def test_ac5_trigger_context_creation_latency():
     """Test TriggerContext creation latency < 1ms."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - Triggered 事件序列化延迟小于 0.5ms")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-5 - Triggered 事件序列化延迟小于 0.5ms")
 def test_ac5_triggered_event_serialization_latency():
     """Test Triggered event serialization latency < 0.5ms."""
     pass
 
 
-@scenario("test_story_1_14a.feature", "AC-5 - Triggered 事件反序列化延迟小于 1ms")
+@scenario("test_acceptance_autonomous-invocation-trigger.feature", "AC-5 - Triggered 事件反序列化延迟小于 1ms")
 def test_ac5_triggered_event_deserialization_latency():
     """Test Triggered event deserialization latency < 1ms."""
     pass

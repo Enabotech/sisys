@@ -1,7 +1,7 @@
 """BDD Steps Implementation for Story 1.10 - Unified Audit Log.
 
-实现 tests/acceptance/test_story_1_10.feature 中的 BDD 步骤
-使用真实 PostgreSQL 实例，遵循 test_story_1_9_steps.py 的模式
+Implements BDD steps from tests/acceptance/test_acceptance_unified-audit-log.feature
+Uses real PostgreSQL instance, follows pattern from test_acceptance_rbac-permission-management.py
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLM
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
-scenarios("test_story_1_10.feature")
+scenarios("test_acceptance_unified-audit-log.feature")
 
 # ===================================================================
 # Paths & Constants

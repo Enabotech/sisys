@@ -240,7 +240,7 @@
   - [x] FastAPI 异步场景：`await async_publisher.async_publish(event)`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件:`tests/acceptance/test_story_1.3.feature`
+- [x] 功能测试文件:`tests/acceptance/test_acceptance_event-bus-implementation.feature`
 - [x] 业务方评审通过
 - [x] 所有场景覆盖(Happy Path + Edge Cases:Redis 连接失败、RabbitMQ 连接失败、事务回滚、重复 event_id、超过最大重试次数、OutboxEntity 状态转换异常)
 
@@ -977,7 +977,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 | **TDD 单元测试** | Outbox Pattern(基础设施层) | 验证 InMemoryOutboxRepository、AsyncOutboxPoller | `test_postgresql_outbox_repository.py` | Task 3 | 🔴 Must |
 | **TDD 单元测试** | 幂等性与重试 | 验证 Redis 去重、固定延迟重试、死信队列 | `test_idempotency_retry.py` | Task 4 | 🟡 Should |
 | **TDD 单元测试** | 事件监控 | 验证指标收集、OpenTelemetry span 创建 | `test_event_monitoring.py` | Task 5.1, 5.2 | 🔵 Could |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收(Outbox→RabbitMQ 可靠通道端到端) | `test_story_1.3.feature` | Task 0 | 🔴 Must |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收(Outbox→RabbitMQ 可靠通道端到端) | `test_acceptance_event-bus-implementation.feature` | Task 0 | 🔴 Must |
 | **SDD 架构验证** | 架构约束 | 事件总线依赖方向、接口分离验证 | `test_event_bus_architecture.py` | Task 6 | 🔴 Must |
 
 **测试环境策略（审查决议补充）：**
@@ -1015,7 +1015,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 
 | AC | 验收标准描述 | 优先级 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|--------|-----------|-------------|----------|
-| AC-1 | Redis Pub/Sub 实时通知通道实现 | 🔴 Must | Task 0, Task 1 | SDD 规范定义 + RedisEventPublisher/Subscriber | `test_story_1.3.feature`, `test_redis_event_bus.py` |
+| AC-1 | Redis Pub/Sub 实时通知通道实现 | 🔴 Must | Task 0, Task 1 | SDD 规范定义 + RedisEventPublisher/Subscriber | `test_acceptance_event-bus-implementation.feature`, `test_redis_event_bus.py` |
 | AC-2 | RabbitMQ 可靠事件通道(async 路径) | 🔴 Must | Task 2 | RabbitMQPublisher/Consumer (async/await) | `test_rabbitmq_event_bus.py` |
 | AC-3 | 事务发件箱模式(OutboxEntity 为读写单位) | 🔴 Must | Task 3 | OutboxRepository(OutboxEntity) + AsyncOutboxPoller | `test_postgresql_outbox_repository.py` |
 | AC-4 | 事件处理幂等性检查 | 🔴 Must | Task 4 | IdempotencyChecker (Redis SET NX) | `test_idempotency_retry.py` |
@@ -1040,7 +1040,7 @@ async def _handle_failure(self, message: aio_pika.IncomingMessage,
 - [x] Subtask: 定义 OutboxEntity 数据模型(id, event_id, event_type, payload, status, created_at, published_at, retry_count)
 - [x] Subtask: 定义 RedisConfig 配置模型(host, port, db, password, max_connections, socket_timeout)
 - [x] Subtask: 定义 RabbitMQConfig 配置模型(host, port, virtual_host, exchange_name, prefetch_count)
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1.3.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_event-bus-implementation.feature`
 - [x] Subtask: 运行验收测试，确认失败(🔴 红阶段验证)
 
 **完成标准/Definition of Done:**
@@ -1753,7 +1753,7 @@ sisys/
 │   │       └── repositories/
 │   │           └── test_outbox_repository.py       # OutboxRepository 接口测试(领域层)
 │   └── acceptance/
-│       └── test_story_1.3.feature                  # Gherkin 验收测试
+│       └── test_acceptance_event-bus-implementation.feature                  # Gherkin 验收测试
 └── ...
 ```
 
@@ -1846,8 +1846,8 @@ sisys/
 - `tests/unit/infrastructure/idempotency/test_idempotency_retry.py` - 幂等性与重试测试
 - `tests/unit/infrastructure/monitoring/test_event_monitoring.py` - 事件监控+OTLP 导出器测试
 - `tests/unit/architecture/test_event_bus_architecture.py` - 事件总线架构测试
-- `tests/acceptance/test_story_1_3.feature` - Gherkin 验收测试
-- `tests/acceptance/test_story_1_3_steps.py` - Gherkin 步骤定义
+- `tests/acceptance/test_acceptance_event-bus-implementation.feature` - Gherkin 验收测试
+- `tests/acceptance/test_acceptance_event-bus-implementation.py` - Gherkin 步骤定义
 
 ### 完成总结 Completion Summary
 
@@ -1932,17 +1932,17 @@ sisys/
 
 | 文件 | 问题 | 修复方案 |
 |------|------|---------|
-| `tests/acceptance/test_story_1_3_steps.py` | `async_publish` 实际是同步方法 | 改为 `publish`（移除 async/await） |
-| `tests/acceptance/test_story_1_3_steps.py` | Redis subscriber API 不匹配 | 修复为 callback 模式：`subscribe(channel, handler)` + `await start()` |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | `async_publish` 实际是同步方法 | 改为 `publish`（移除 async/await） |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | Redis subscriber API 不匹配 | 修复为 callback 模式：`subscribe(channel, handler)` + `await start()` |
 | `src/infrastructure/events/rabbitmq_consumer.py` | 缺少 `bind_queue()` 方法 | 添加 `bind_queue()` 用于绑定队列到交换器 |
-| `tests/acceptance/test_story_1_3_steps.py` | `register_handler()` 是同步方法却用了 await | 移除 await |
-| `tests/acceptance/test_story_1_3_steps.py` | feature 文件语法歧义（`并且` 被解析为 When） | 添加 `@when` 映射处理 |
-| `tests/acceptance/test_story_1_3_steps.py` | 架构测试使用子进程（不可靠） | 改用 AST 解析扫描源码 |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | `register_handler()` 是同步方法却用了 await | 移除 await |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | feature 文件语法歧义（`并且` 被解析为 When） | 添加 `@when` 映射处理 |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | 架构测试使用子进程（不可靠） | 改用 AST 解析扫描源码 |
 
 #### 幂等性检查器集成
 
 | 文件 | 修改 |
 |------|------|
-| `tests/acceptance/test_story_1_3_steps.py` | 添加 `IdempotencyChecker` 导入和注入逻辑 |
+| `tests/acceptance/test_acceptance_event-bus-implementation.py` | 添加 `IdempotencyChecker` 导入和注入逻辑 |
 
 **测试结果：** 10 passed

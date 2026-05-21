@@ -192,7 +192,7 @@
   - `resume_multipart_upload(bucket_name, object_key, upload_id)`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_story_1_7.feature`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_minio-object-layer.feature`
 - [x] 场景覆盖：
   - Happy Path: Bucket 创建、对象上传/下载、版本控制、WORM 锁定
   - Edge Cases: 大文件分片上传、网络中断恢复、删除锁定对象失败、命名规范验证
@@ -233,7 +233,7 @@
 | **TDD 单元测试** | Bucket 管理 | 验证 Bucket 创建、版本控制、Object Lock | `test_bucket_management.py` | Task 3 |
 | **TDD 单元测试** | 对象存储/检索 | 验证流式上传、分片上传、断点续传、流式下载 | `test_object_operations.py` | Task 4 |
 | **TDD 单元测试** | WORM 锁定与生命周期 | 验证 WORM 启用、保留期限计算、生命周期规则 | `test_worm_and_lifecycle.py` | Task 5 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（端到端对象存储操作） | `test_story_1_7.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收（端到端对象存储操作） | `test_acceptance_minio-object-layer.feature` | Task 0 |
 | **SDD 架构验证** | 依赖方向 | 领域层零 MinIO 依赖、仓储模式正确 | `test_storage_architecture.py` | Task 6 |
 
 ---
@@ -263,7 +263,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | MinIO 客户端适配器就绪 | Task 0 | SDD 规范定义（数据模型、MinIOConfig、仓储接口、验收测试） | `test_story_1_7.feature` |
+| AC-1 | MinIO 客户端适配器就绪 | Task 0 | SDD 规范定义（数据模型、MinIOConfig、仓储接口、验收测试） | `test_acceptance_minio-object-layer.feature` |
 | AC-1 | MinIO 客户端适配器就绪 | Task 1 | MinIOConfig 配置 + ObjectMetadata/LifecycleRule 实体 | `test_minio_config.py`, `test_minio_entities.py` |
 | AC-1 | MinIO 客户端适配器就绪 | Task 2 | MinIO 客户端适配器封装（连接池、错误处理） | `test_minio_manager.py` |
 | AC-2 | 版本控制与断点续传实现 | Task 3 | Bucket 管理（版本控制、Object Lock 启用） | `test_bucket_management.py` |
@@ -289,7 +289,7 @@
 - [x] Subtask: 定义对象存储元数据模型（`src/infrastructure/storage/minio/entities.py`）
 - [x] Subtask: 定义 MinIOConfig 配置模型（`src/infrastructure/config/minio.py`）
 - [x] Subtask: 定义领域层仓储接口（`src/domain/repositories/storage.py`）
-- [x] Subtask: 创建 Gherkin 验收测试 `tests/acceptance/test_story_1_7.feature`
+- [x] Subtask: 创建 Gherkin 验收测试 `tests/acceptance/test_acceptance_minio-object-layer.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -597,7 +597,7 @@ sisys/
 │   │       ├── test_worm_and_lifecycle.py
 │   │       └── test_storage_architecture.py # 架构约束验证
 │   └── acceptance/
-│       └── test_story_1_7.feature          # Gherkin 验收测试
+│       └── test_acceptance_minio-object-layer.feature          # Gherkin 验收测试
 └── docs/
     └── infrastructure/
         └── minio_setup_guide.md            # MinIO 部署与配置指南
@@ -675,8 +675,8 @@ sisys/
 - `tests/unit/infrastructure/test_object_operations.py` — 对象操作测试（13 测试）
 - `tests/unit/infrastructure/test_worm_and_lifecycle.py` — WORM 与生命周期测试（13 测试）
 - `tests/unit/infrastructure/test_storage_architecture.py` — 架构约束测试（15 测试）
-- `tests/acceptance/test_story_1_7.feature` — Gherkin 验收测试（8 场景）
-- `tests/acceptance/test_story_1_7_steps.py` — Gherkin 步骤定义（8 场景步骤）
+- `tests/acceptance/test_acceptance_minio-object-layer.feature` — Gherkin 验收测试（8 场景）
+- `tests/acceptance/test_acceptance_minio-object-layer.py` — Gherkin 步骤定义（8 场景步骤）
 - `docs/infrastructure/minio_setup_guide.md` — MinIO 部署指南
 
 ---

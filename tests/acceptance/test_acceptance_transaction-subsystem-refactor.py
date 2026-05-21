@@ -4,7 +4,7 @@ BDD step definitions for transaction subsystem refactoring.
 Tests cover Session lifecycle separation, UoW instance isolation,
 and Saga orchestration patterns.
 
-Run with: poetry run pytest tests/acceptance/test_story_20_7_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_transaction-subsystem-refactor.py -v
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_story_20_7.feature")
+scenarios("test_acceptance_transaction-subsystem-refactor.feature")
 
 
 # ===================================================================

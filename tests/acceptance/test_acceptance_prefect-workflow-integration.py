@@ -3,7 +3,7 @@
 验证 PrefectEngine、DocumentProcessingFlow、OrchestrationService 等组件的业务价值验收
 验收测试禁止使用 mock/fake，全部使用真实实现
 
-Run with: poetry run pytest tests/acceptance/test_story_1_18a_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_prefect-workflow-integration.py -v
 
 Author:
     agimtech <agimtech@126.com>
@@ -19,7 +19,7 @@ from typing import Any
 
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_story_1_18a.feature")
+scenarios("test_acceptance_prefect-workflow-integration.feature")
 
 
 # =========================================================================

@@ -6,7 +6,7 @@ Story 1.1-1.3 implemented components.
 Uses fakeredis for Redis mock and AsyncMock for PostgreSQL/RabbitMQ
 as defined in the SDD.
 
-Run with: poetry run pytest tests/acceptance/test_story_1_16_steps.py -v
+Run with: poetry run pytest tests/acceptance/test_acceptance_integration-test-framework.py -v
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from src.infrastructure.messaging.retry.checker import IdempotencyChecker
 from src.infrastructure.messaging.retry.retry_policy import RetryPolicy
 from tests.environments import get_test_env
 
-scenarios("test_story_1_16.feature")
+scenarios("test_acceptance_integration-test-framework.feature")
 
 
 # ===================================================================
@@ -155,7 +155,7 @@ def given_layers_tested(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "集成测试目录结构就绪")
+@scenario("test_acceptance_integration-test-framework.feature", "集成测试目录结构就绪")
 def test_integration_test_directory_structure():
     """Test integration test directory structure is ready."""
     pass
@@ -196,7 +196,7 @@ def then_test_isolation_mechanism_complete(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "外部服务 Mock 配置")
+@scenario("test_acceptance_integration-test-framework.feature", "外部服务 Mock 配置")
 def test_external_service_mock_configuration():
     """Test external service Mock configuration."""
     pass
@@ -248,7 +248,7 @@ def then_rabbitmq_uses_async_mock(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "领域事件冒烟测试")
+@scenario("test_acceptance_integration-test-framework.feature", "领域事件冒烟测试")
 def test_domain_event_smoke_test():
     """Test domain event smoke test."""
     pass
@@ -349,7 +349,7 @@ def then_event_metadata_preserved(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "事件类型注册表 — 未知类型反序列化")
+@scenario("test_acceptance_integration-test-framework.feature", "事件类型注册表 — 未知类型反序列化")
 def test_event_type_registry_unknown_type():
     """Test event type registry with unknown event type."""
     pass
@@ -386,7 +386,7 @@ def then_should_raise_value_error(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "幂等性检查原子操作")
+@scenario("test_acceptance_integration-test-framework.feature", "幂等性检查原子操作")
 def test_idempotency_check_atomic_operation():
     """Test idempotency check atomic operation."""
     pass
@@ -437,7 +437,7 @@ def then_second_returns_false(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "重试机制指数退避")
+@scenario("test_acceptance_integration-test-framework.feature", "重试机制指数退避")
 def test_retry_mechanism_exponential_backoff():
     """Test retry mechanism exponential backoff."""
     pass
@@ -490,7 +490,7 @@ def then_delay_contains_jitter(
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "仓储模式冒烟测试")
+@scenario("test_acceptance_integration-test-framework.feature", "仓储模式冒烟测试")
 def test_repository_pattern_smoke_test():
     """Test repository pattern smoke test."""
     pass
@@ -538,7 +538,7 @@ def then_domain_layer_not_dependent_on_storage(
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "测试数据生命周期管理")
+@scenario("test_acceptance_integration-test-framework.feature", "测试数据生命周期管理")
 def test_test_data_lifecycle_management():
     """Test test data lifecycle management."""
     pass
@@ -593,7 +593,7 @@ def then_does_not_affect_other_tests(context: dict[str, Any]) -> None:
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "应用层→领域层→基础设施层协作")
+@scenario("test_acceptance_integration-test-framework.feature", "应用层→领域层→基础设施层协作")
 def test_application_domain_infrastructure_collaboration():
     """Test application layer → domain layer → infrastructure layer collaboration."""
     pass
@@ -644,7 +644,7 @@ def then_domain_accesses_infrastructure_via_interface(
 # ===================================================================
 
 
-@scenario("test_story_1_16.feature", "错误传播")
+@scenario("test_acceptance_integration-test-framework.feature", "错误传播")
 def test_error_propagation():
     """Test error propagation."""
     pass

@@ -304,8 +304,8 @@
 | 备份状态 | GET | `/api/v1/security/backups/status` | 获取备份状态 | Bearer (admin) | `BackupStatusResponse` |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_story_1_12_equilibrium.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_story_1_12_equilibrium_steps.py`（BDD 步骤实现）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py`（BDD 步骤实现）
 - [ ] 覆盖场景:
   - 入侵检测（SQL注入、XSS、暴力破解）
   - 数据完整性验证
@@ -402,8 +402,8 @@
 - [ ] Subtask 0.4: 在 `docs/api/openapi.yaml` 中定义安全监控 API 端点
 - [ ] Subtask 0.5: 创建端口契约测试 `tests/contracts/test_port_contract_equilibrium.py`
 - [ ] Subtask 0.6: 创建 API 契约测试 `tests/contracts/test_api_contract_equilibrium.py`
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_story_1_12_equilibrium.feature`
-- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_story_1_12_equilibrium_steps.py`
+- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature`
+- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py`
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 - [ ] Subtask 0.10: 在 `composition_root.py` 中注册三个新端口
 
@@ -730,8 +730,8 @@ sisys/
     ├── integration/
     │   └── test_integration_equilibrium.py     # 安全层集成测试
     └── acceptance/
-        ├── test_story_1_12_equilibrium.feature # Gherkin 验收测试
-        └── test_story_1_12_equilibrium_steps.py # BDD 步骤实现
+        ├── test_acceptance_equilibrium-level-3-compliance.feature # Gherkin 验收测试
+        └── test_acceptance_equilibrium-level-3-compliance.py # BDD 步骤实现
 ```
 
 ---
@@ -782,8 +782,8 @@ sisys/
 | `tests/unit/infrastructure/security/test_data_integrity_service.py` | 数据完整性服务测试 |
 | `tests/unit/infrastructure/security/test_backup_recovery_service.py` | 备份恢复服务测试 |
 | `tests/integration/test_integration_equilibrium.py` | 安全层集成测试 |
-| `tests/acceptance/test_story_1_12_equilibrium.feature` | Gherkin 验收测试 |
-| `tests/acceptance/test_story_1_12_equilibrium_steps.py` | BDD 步骤实现 |
+| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature` | Gherkin 验收测试 |
+| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py` | BDD 步骤实现 |
 | `tests/contracts/test_api_contract_equilibrium.py` | API 契约测试 |
 | `tests/contracts/test_port_contract_equilibrium.py` | 端口契约测试 |
 | `tests/unit/infrastructure/security/test_arch_equilibrium.py` | 架构约束测试 |
