@@ -1,8 +1,8 @@
 # SISYS 自主调用子系统重构设计
 
-**文档版本:** v1.3
+**文档版本:** v1.4
 **生成时间:** 2026-05-21
-**修订:** R1 修正 10 项；R2 修正 10 项；R3 修正 10 项（DI 时序/破坏性变更声明/partial_error 类型/遗漏项补充）
+**修订:** R1-3 共 30 项；R4 修正 10 项（步骤顺序/缺失前置步骤/partial_error保留/遗漏文件补充/消费者分析）
 **基于:** sisys-auto-invocation-design.md v1.0 + Story 1.14a/b/c 代码全面调研 + 25 项问题分析
 **状态:** 重构设计
 
@@ -196,7 +196,12 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
   - `src/infrastructure/messaging/inmemory_event_bus.py` — InMemoryEventBus.publish() 构造 `ChannelResult("inmemory", ...)`
   - `DualChannelEventBus` 不直接构造 PublishResult，透传子总线返回值
 
-**语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。此外，`partial_error` 返回类型从 `str | None`（错误信息）改为 `bool`（是否有部分错误），类型签名变更会影响所有调用方。
+**语义变更注意：** 当前 `is_success` 语义为"任一通道成功即为成功"（`redis_success or outbox_saved`），新方案改为"全部通道成功才算成功"（`all(r.success for r in self.results)`）。需评估是否有消费者依赖旧语义。`partial_error` 保留 `str | None` 返回类型（聚合失败通道的错误信息），与当前行为兼容。
+
+**消费者影响分析：**
+- `is_success`: DualChannelEventBus 每次仅路由到一个子总线（非同时双发），故每个事件只有 1 个 ChannelResult。此时 `all(r.success)` 与单通道结果一致，语义变更实际影响有限。
+- `is_full_failure`: 语义不变（全部通道失败仍为 True），消费者 `document_processing_flow.py` 和 `langgraph_engine.py` 无需修改。
+- Mock 代码: `test_langgraph_engine.py` 等使用 `publish_result.is_full_failure = False` 直接赋值 mock，重构后 `is_full_failure` 变为 computed property，需改为 `MagicMock(spec=PublishResult)` 或构造真实实例。
 
 **验证：** `PublishResult` 无 Redis/Outbox 引用；EventPublisher Protocol 测试通过。
 
@@ -653,8 +658,12 @@ class PublishResult:
         return len(self.results) > 0 and not any(r.success for r in self.results)
 
     @property
-    def partial_error(self) -> bool:
-        return not self.is_success and not self.is_full_failure
+    def partial_error(self) -> str | None:
+        """返回第一个失败通道的错误信息"""
+        for r in self.results:
+            if not r.success and r.error:
+                return r.error
+        return None
 ```
 
 **子总线适配**（DualChannelEventBus 透传子总线返回值，不直接构造 PublishResult）：
@@ -881,7 +890,7 @@ def __init__(self) -> None:
 | `src/domain/ports/__init__.py` | 添加新端口导出 | P1-3 |
 | `src/domain/services/auto_execute_service.py` | 参数类型 AutoRouted + import time 顶部 | P1-5, P3-1 |
 | `src/domain/services/auto_route_service.py` | 添加 semantic_threshold 参数 + RoutingDecisionLog | P2-2, P2-3 |
-| `src/domain/ports/routing_decision_log_repository.py` | 新建（RoutingDecisionLogRepository Protocol） | P2-3 |
+| `src/domain/ports/routing_decision_log_repository.py` | 新建（RoutingDecisionLogRepository Protocol: `save(log)`, `find_by_task_id(task_id)`） | P2-3 |
 | `src/domain/services/__init__.py` | 添加 AutoExecuteService 导出 | P2-5 |
 | `src/domain/value_objects/auto_trigger_context.py` | 简化提取逻辑 + 提取常量 | P1-6 |
 
@@ -909,7 +918,10 @@ def __init__(self) -> None:
 | `src/infrastructure/messaging/in_memory_event_listener.py` | 新建（从 domain 迁移） | P1-4 |
 | `src/infrastructure/messaging/in_memory_dead_letter_queue.py` | 新建（从 domain 迁移） | P1-4 |
 | `src/infrastructure/messaging/dual_channel_event_bus.py` | 适配 ChannelResult | P1-2 |
-| `src/infrastructure/messaging/inmemory_event_bus.py` | 适配 ChannelResult | P1-2 |
+| `src/infrastructure/messaging/inmemory_event_bus.py` | 适配 ChannelResult + 更新 EventListener 导入 | P1-2, P1-4 |
+| `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` | 更新 DeadLetterQueue 导入路径 | P1-3 |
+| `src/infrastructure/messaging/rabbitmq_consumer.py` | 更新 DeadLetterQueue 导入路径 | P1-3 |
+| `src/infrastructure/messaging/rabbitmq_listener.py` | 更新 DeadLetterQueue + EventListenerAsync 导入路径 | P1-3 |
 
 ### 4.4 Composition Root
 
@@ -963,9 +975,9 @@ def __init__(self) -> None:
 | 测试文件 | 涉及问题 | 修改内容 |
 |----------|---------|---------|
 | `tests/integration/test_integration_route.py` | P0-2 | 双重发布修复验证 |
-| `tests/integration/test_integration_execute.py` | P1-5 | 参数类型变更 |
+| `tests/integration/test_integration_execute.py` | P1-5, P2-7 | 参数类型变更 + reset_all_containers 调用修改 |
 | `tests/acceptance/test_acceptance_autonomous-invocation-route.py` | P0-2 | 发布唯一性验证 |
-| `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` | P1-5 | 参数类型变更 |
+| `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` | P1-5, P2-7 | 参数类型变更 + reset_all_containers 调用修改 |
 
 ---
 
@@ -986,29 +998,32 @@ def __init__(self) -> None:
 - [ ] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
 - [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
 - [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
-- [ ] **2.3b** 在 composition_root 中注册 `event_listener` 端口（使用 InMemoryEventListener 实现）（P1-3，见 Section 3.1.1 前置依赖）
-- [ ] **2.3c** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
 - [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
-- [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/`（P1-4）
-- [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/`（P1-4）
-- [ ] **2.7** AutoExecuteService.on_routed_event 参数改为 AutoRouted（P1-5）
-- [ ] **2.8** 简化 AutoTriggerContext.from_domain_event 提取逻辑（P1-6）
-- [ ] **2.9** 更新所有导入引用和测试
-- [ ] **2.10** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/in_memory_event_listener.py`（P1-4）
+- [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/in_memory_dead_letter_queue.py`（P1-4）
+- [ ] **2.7** 在 composition_root 中注册 `event_listener` 端口（使用迁移后的路径 `src.infrastructure.messaging.in_memory_event_listener.InMemoryEventListener`）（P1-3，见 Section 3.1.1 前置依赖）
+- [ ] **2.8** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
+- [ ] **2.9** AutoExecuteService.on_routed_event 参数改为 AutoRouted（P1-5）
+- [ ] **2.10** 简化 AutoTriggerContext.from_domain_event 提取逻辑（P1-6）
+- [ ] **2.11** 更新所有导入引用和测试
+- [ ] **2.12** 运行 `poetry run pytest --tb=short -q` 全量回归
 
 ### Phase 3：P2 代码质量改进
 
 - [ ] **3.1** 统一 AutoTriggerConfig/AutoRouteConfig 为 frozen=True（P2-1）
 - [ ] **3.2** 在 config `__init__.py` 中添加 AutoExecuteConfig 导出（P2-1）
-- [ ] **3.3** 连接 AutoRouteConfig.semantic_threshold 到 AutoRouteService（P2-2）
-- [ ] **3.4** 移除 AutoRouteConfig.cache_ttl_seconds 死配置字段（P2-2/P2-8）
-- [ ] **3.5** 在 AutoRouteService 中创建 RoutingDecisionLog 实例（P2-3）
-- [ ] **3.6** 删除 InMemoryEventPublisher Protocol（P2-4）
-- [ ] **3.7** 在 `__init__.py` 中添加 AutoExecuteService 导出（P2-5）
-- [ ] **3.8** AutoTriggerHandler 队列添加 maxsize=1000 背压（P2-6）
-- [ ] **3.9** DockerSandboxAdapter._running_containers 改为实例变量，同步移除/重构 reset_all_containers（P2-7）
-- [ ] **3.10** 移除 SemanticRouter.cache_ttl_seconds 参数（P2-8）
-- [ ] **3.11** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [ ] **3.3** 修改 AutoRouteService.__init__ 添加 `semantic_threshold: float` 参数（P2-2 前置）
+- [ ] **3.4** 连接 AutoRouteConfig.semantic_threshold 到 AutoRouteService DI 注册（P2-2）
+- [ ] **3.5** 移除 AutoRouteConfig.cache_ttl_seconds 死配置字段（P2-2/P2-8）
+- [ ] **3.6** 创建 `src/domain/ports/routing_decision_log_repository.py`，定义 `RoutingDecisionLogRepository` Protocol（方法: `save(log)`, `find_by_task_id(task_id)`）（P2-3 前置）
+- [ ] **3.7** 在 composition_root 中注册 `RoutingDecisionLogRepository` 实现（如 InMemoryRoutingDecisionLogRepository）（P2-3 前置）
+- [ ] **3.8** 在 AutoRouteService 中创建 RoutingDecisionLog 实例并通过 Repository 持久化（P2-3）
+- [ ] **3.9** 删除 InMemoryEventPublisher Protocol（P2-4）
+- [ ] **3.10** 在 `__init__.py` 中添加 AutoExecuteService 导出（P2-5）
+- [ ] **3.11** AutoTriggerHandler 队列添加 maxsize=1000 背压（P2-6）
+- [ ] **3.12** DockerSandboxAdapter._running_containers 改为实例变量，同步移除/重构 reset_all_containers（P2-7）
+- [ ] **3.13** 移除 SemanticRouter.cache_ttl_seconds 参数（P2-8）
+- [ ] **3.14** 运行 `poetry run pytest --tb=short -q` 全量回归
 
 ### Phase 4：P3 风格优化
 
@@ -1075,7 +1090,7 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 - `CheckpointSnapshot` 纯化后，记忆快照可通过独立的 `MemorySnapshot` 实体实现，不依赖 Redis 序列化
 - `PublishResult` 抽象化后，MemoryChanged 事件可复用通用通道发布
 
-**影响：** 存在破坏性变更：P1-2 `PublishResult.is_success` 语义从"任一通道成功"改为"全部通道成功"，`partial_error` 返回类型从 `str | None` 改为 `bool`。需评估现有消费者是否依赖旧语义/类型。重构为记忆子系统提供了更干净的扩展接口。
+**影响：** 存在破坏性变更：P1-2 `PublishResult.is_success` 语义从"任一通道成功"改为"全部通道成功"（实际影响有限，因 DualChannelEventBus 每次仅路由到一个子总线）。`partial_error` 保留 `str | None` 返回类型。Mock 代码中直接属性赋值需更新。重构为记忆子系统提供了更干净的扩展接口。
 
 ---
 
@@ -1132,4 +1147,4 @@ poetry run pytest tests/unit/domain/ports/test_protocols.py -v
 | 8 | 队列背压 | maxsize=1000 + 丢弃 | 防止 OOM，fail-fast 优于 fail-slow |
 | 9 | DockerSandboxAdapter 状态 | 改为实例变量 | 实例隔离，消除共享状态风险 |
 | 10 | RoutingDecisionLog | 在 service 中实例化 | 完成 Story 1.14b AC-3 遗漏 |
-| 11 | PublishResult.is_success 语义 + partial_error 类型 | is_success 从"任一成功"改为"全部成功"；partial_error 从 `str | None` 改为 `bool` | 通道无关抽象后的自然语义；需评估现有消费者是否依赖旧语义/类型 |
+| 11 | PublishResult.is_success 语义 + partial_error | is_success 从"任一成功"改为"全部成功"；partial_error 保留 `str \| None` 聚合失败通道错误信息 | 通道无关抽象后的自然语义；保留诊断信息 |
