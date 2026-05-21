@@ -546,11 +546,13 @@ class AutoTriggerContext:
 | 端口 | 文件路径 | 层次 | 签名 |
 |------|---------|------|------|
 | `EventPublisher` | `src/domain/ports/event_publisher.py` | Domain | `async publish(event) → PublishResult` |
-| `HashRouterProtocol` | `src/domain/ports/hash_router_protocol.py` | Domain | `route(session_id) → str` |
-| `SemanticRouterProtocol` | `src/domain/ports/semantic_router_protocol.py` | Domain | `async route(context) → (str, float)` |
-| `SandboxExecutorProtocol` | `src/domain/ports/sandbox_executor_protocol.py` | Domain | `start/execute/stop` |
+| `HashRouterProtocol` | `src/domain/ports/hash_router_protocol.py` | Domain | `route(session_id) → str`（同步） |
+| `SemanticRouterProtocol` | `src/domain/ports/semantic_router_protocol.py` | Domain | `async route(task_context) → (str, float)` |
+| `SandboxExecutorProtocol` | `src/domain/ports/sandbox_executor_protocol.py` | Domain | `start_container/execute_code/stop_container`（3 方法） |
 | `SnapshotRepositoryProtocol` | `src/domain/ports/snapshot_repository_protocol.py` | Domain | `save/load/delete` |
-| `SandboxExecutor` | `src/application/ports/sandbox_port.py` | Application | `start/execute/stop/is_running` |
+| `SandboxExecutor` | `src/application/ports/sandbox_port.py` | Application | `start_container/execute_code/stop_container/is_container_running`（4 方法，无 @runtime_checkable） |
+
+**两个沙箱端口的关系：** `SandboxExecutorProtocol`（Domain，3 方法）由 `AutoExecuteService` 依赖；`SandboxExecutor`（Application，4 方法，多 `is_container_running`）由 `DockerSandboxAdapter` 实现。两者通过结构化类型兼容，基础设施适配器同时满足两个端口协议。
 
 **设计规则：**
 - 所有端口使用 `typing.Protocol` + `@runtime_checkable`（`SandboxExecutor` 除外，位于 application/ports/ 未加装饰器，通过结构化类型兼容）
@@ -1614,8 +1616,8 @@ DeadLetterQueue Protocol:
 │  │  Singleton 组件                                                    │  │
 │  │                                                                    │  │
 │  │  DualChannelEventBus (Facade)                                      │  │
-│  │  ├── implements EventPublisher (Domain Port)                       │  │
-│  │  ├── implements EventSubscriber (Application Port)                 │  │
+│  │  ├── extends EventPublisher (Domain Port, 显式继承)                │  │
+│  │  ├── duck-types EventSubscriber (App Port, 通过 DI 注册)           │  │
 │  │  ├── ChannelRouter (共享实例)                                      │  │
 │  │  ├── RedisEventBus (REALTIME)                                      │  │
 │  │  └── RabbitMQEventBus + OutboxRepository (RELIABLE)                │  │
