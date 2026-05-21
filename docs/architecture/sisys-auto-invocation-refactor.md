@@ -1,8 +1,8 @@
 # SISYS 自主调用子系统重构设计
 
-**文档版本:** v1.4
+**文档版本:** v1.5
 **生成时间:** 2026-05-21
-**修订:** R1-3 共 30 项；R4 修正 10 项（步骤顺序/缺失前置步骤/partial_error保留/遗漏文件补充/消费者分析）
+**修订:** R1-4 共 40 项；R5 修正 5 项（文件命名统一/route_type数据流/PublishResult测试矩阵扩展）
 **基于:** sisys-auto-invocation-design.md v1.0 + Story 1.14a/b/c 代码全面调研 + 25 项问题分析
 **状态:** 重构设计
 
@@ -230,8 +230,8 @@ magnitude_b = math.sqrt(sum(y * y for y in b))
 **涉及文件：** `src/domain/events/listener.py`
 
 **修复方案：**
-- 迁移至 `src/infrastructure/messaging/in_memory_event_listener.py`
-- 迁移至 `src/infrastructure/messaging/in_memory_dead_letter_queue.py`
+- 迁移至 `src/infrastructure/messaging/inmemory_event_listener.py`
+- 迁移至 `src/infrastructure/messaging/inmemory_dead_letter_queue.py`
 - 测试文件中的导入路径更新
 
 **验证：** Domain 层仅包含 Protocol 接口，无具体实现类。
@@ -526,7 +526,7 @@ register_port(
 >     version="v1.0.0",
 >     interface=EventListener,
 >     impl=lambda resolver: InMemoryEventListener(),
->     module="src.infrastructure.messaging.in_memory_event_listener",
+>     module="src.infrastructure.messaging.inmemory_event_listener",
 >     lifetime=Lifetime.SINGLETON,
 >     owner="auto-invocation-team",
 > )
@@ -714,8 +714,8 @@ async def publish(self, event: DomainEvent) -> PublishResult:
 | `EventListener` Protocol | `src/domain/events/listener.py` | `src/domain/ports/event_listener.py` |
 | `EventListenerAsync` Protocol | `src/domain/events/listener.py` | `src/domain/ports/event_listener.py` |
 | `DeadLetterQueue` Protocol | `src/domain/events/listener.py` | `src/domain/ports/dead_letter_queue.py` |
-| `InMemoryEventListener` | `src/domain/events/listener.py` | `src/infrastructure/messaging/in_memory_event_listener.py` |
-| `InMemoryDeadLetterQueue` | `src/domain/events/listener.py` | `src/infrastructure/messaging/in_memory_dead_letter_queue.py` |
+| `InMemoryEventListener` | `src/domain/events/listener.py` | `src/infrastructure/messaging/inmemory_event_listener.py` |
+| `InMemoryDeadLetterQueue` | `src/domain/events/listener.py` | `src/infrastructure/messaging/inmemory_dead_letter_queue.py` |
 
 `src/domain/events/listener.py` 保留为向后兼容的 re-export 文件（标记 deprecated）。
 
@@ -745,6 +745,8 @@ async def on_routed_event(self, event: AutoRouted) -> AutoExecuted | None:
 ```
 
 **影响范围：** `AutoExecuteService` 及其所有测试的调用方式需更新。
+
+**附加数据流缺失：** 当前 `on_routed_event` 提取了 `route_type` 但仅存入 `CheckpointSnapshot.state_data`，未传入 `AutoExecuted` 事件。`AutoExecuted` 事件定义中也缺少 `route_type` 字段。建议在 `AutoExecuted` 中添加 `route_type: str` 字段以保持 Route→Execute 数据流完整性。同理，`trigger_event_type` 和 `trigger_event_id` 也应传入 `AutoExecuted` 以维持 Trigger→Execute 因果链追踪。
 
 ---
 
@@ -915,8 +917,8 @@ def __init__(self) -> None:
 | `src/infrastructure/config/auto_trigger.py` | frozen=True | P2-1 |
 | `src/infrastructure/config/auto_route.py` | frozen=True | P2-1 |
 | `src/infrastructure/config/__init__.py` | 添加 AutoExecuteConfig | P2-1 |
-| `src/infrastructure/messaging/in_memory_event_listener.py` | 新建（从 domain 迁移） | P1-4 |
-| `src/infrastructure/messaging/in_memory_dead_letter_queue.py` | 新建（从 domain 迁移） | P1-4 |
+| `src/infrastructure/messaging/inmemory_event_listener.py` | 新建（从 domain 迁移） | P1-4 |
+| `src/infrastructure/messaging/inmemory_dead_letter_queue.py` | 新建（从 domain 迁移） | P1-4 |
 | `src/infrastructure/messaging/dual_channel_event_bus.py` | 适配 ChannelResult | P1-2 |
 | `src/infrastructure/messaging/inmemory_event_bus.py` | 适配 ChannelResult + 更新 EventListener 导入 | P1-2, P1-4 |
 | `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py` | 更新 DeadLetterQueue 导入路径 | P1-3 |
@@ -949,10 +951,19 @@ def __init__(self) -> None:
 |----------|---------|---------|
 | `tests/unit/domain/entities/test_checkpoint_snapshot.py` | P1-1 | 移除 to_redis_hash/from_redis_hash 测试 |
 | `tests/unit/infrastructure/storage/test_redis_snapshot_store.py` | P1-1 | 添加 mapper 方法测试 |
-| `tests/unit/domain/events/test_publish_result.py` | P1-2 | 适配 ChannelResult + is_success 语义变更 |
+| `tests/unit/domain/events/test_publish_result.py` | P1-2 | 适配 ChannelResult + is_success 语义变更 + 所有字段重构 |
 | `tests/unit/infrastructure/messaging/test_dual_channel_event_bus.py` | P1-2 | 适配子总线返回值 |
 | `tests/unit/infrastructure/messaging/test_redis_eventbus.py` | P1-2 | 适配 ChannelResult 构造 |
+| `tests/unit/infrastructure/messaging/test_redis_event_bus.py` | P1-2 | 适配 ChannelResult 构造 |
 | `tests/unit/infrastructure/messaging/test_rabbitmq_event_bus.py` | P1-2 | 适配 ChannelResult 构造 |
+| `tests/unit/infrastructure/messaging/test_rabbitmq_eventbus.py` | P1-2 | 适配 ChannelResult 构造 |
+| `tests/unit/domain/ports/test_event_publisher.py` | P1-2 | PublishResult mock 构造适配 |
+| `tests/unit/domain/services/test_trigger_service.py` | P1-2 | PublishResult 字段引用 |
+| `tests/integration/test_integration_event_bus.py` | P1-2 | PublishResult 字段引用 |
+| `tests/integration/test_integration_langgraph_agent_orchestration.py` | P1-2 | PublishResult mock 适配 |
+| `tests/integration/test_integration_prefect_workflow.py` | P1-2 | PublishResult mock 适配 |
+| `tests/unit/infrastructure/workflow/test_document_processing_flow.py` | P1-2 | is_full_failure 使用（语义不变） |
+| `tests/unit/architecture/test_langgraph_architecture.py` | P1-2 | PublishResult mock 适配 |
 | `tests/unit/domain/ports/test_protocols.py` | P1-3 | 添加 EventListener/DeadLetterQueue 端口验证 |
 | `tests/unit/domain/services/test_execute_service.py` | P1-5 | 参数类型改为 AutoRouted |
 | `tests/unit/domain/value_objects/test_auto_trigger_context.py` | P1-6 | 简化提取逻辑断言 |
@@ -999,9 +1010,9 @@ def __init__(self) -> None:
 - [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
 - [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
 - [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
-- [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/in_memory_event_listener.py`（P1-4）
-- [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/in_memory_dead_letter_queue.py`（P1-4）
-- [ ] **2.7** 在 composition_root 中注册 `event_listener` 端口（使用迁移后的路径 `src.infrastructure.messaging.in_memory_event_listener.InMemoryEventListener`）（P1-3，见 Section 3.1.1 前置依赖）
+- [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/inmemory_event_listener.py`（P1-4）
+- [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/inmemory_dead_letter_queue.py`（P1-4）
+- [ ] **2.7** 在 composition_root 中注册 `event_listener` 端口（使用迁移后的路径 `src.infrastructure.messaging.inmemory_event_listener.InMemoryEventListener`）（P1-3，见 Section 3.1.1 前置依赖）
 - [ ] **2.8** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
 - [ ] **2.9** AutoExecuteService.on_routed_event 参数改为 AutoRouted（P1-5）
 - [ ] **2.10** 简化 AutoTriggerContext.from_domain_event 提取逻辑（P1-6）
