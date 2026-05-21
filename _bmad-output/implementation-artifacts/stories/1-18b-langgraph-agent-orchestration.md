@@ -339,7 +339,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_langgraph-agent-orchestration.py` | Task 0 |
 | **TDD 契约测试** | AgentEnginePort | 端口注册/解析/兼容性 | `test_port_contract_agent_engine.py` | Task 3 |
 | **SDD 架构验证** | 六边形约束 | 零越界 LangGraph 导入 | `test_langgraph_architecture.py` | Task 4 |
-| **集成测试** | 端到端流程 | OrchestrationService → LangGraphEngine → 事件发布 | `test_story_1_18b_integration.py` | Task 4 |
+| **集成测试** | 端到端流程 | OrchestrationService → LangGraphEngine → 事件发布 | `test_integration_langgraph_agent_orchestration.py` | Task 4 |
 
 ---
 
@@ -392,7 +392,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 | AC-6 | 端口契约测试 | Task 3 | 3.8（契约测试） | `test_port_contract_agent_engine.py` |
 | AC-6 | Composition Root 注册验证 | Task 3 | 3.9（注册链路验证） | `test_composition_root_agent.py` |
 | AC-7 | 架构约束验证 | Task 4 | 4.1-4.6 | `test_langgraph_architecture.py` |
-| 全部 | 集成测试 | Task 4 | 4.7-4.9（端到端流程） | `test_story_1_18b_integration.py` |
+| 全部 | 集成测试 | Task 4 | 4.7-4.9（端到端流程） | `test_integration_langgraph_agent_orchestration.py` |
 
 ---
 
@@ -507,7 +507,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 > - `TestOrchestrationServiceValidation` 全部 2 个测试 — 同上
 > - `test_execute_agent_reasoning_raises_not_implemented` — 替换为 agent_reasoning 路由测试
 >
-> 另需更新 `tests/integration/test_story_1_18a_integration.py` 中 `test_data_pipeline_full_chain` 的构造调用。
+> 另需更新 `tests/integration/test_integration_prefect_workflow.py` 中 `test_data_pipeline_full_chain` 的构造调用。
 
 | 阶段 | 动作 |
 |------|------|
@@ -561,7 +561,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_story_1_18b_integration.py`（OrchestrationService → LangGraphEngine → 事件发布端到端） |
+| 🔴 红 | 编写 `tests/integration/test_integration_langgraph_agent_orchestration.py`（OrchestrationService → LangGraphEngine → 事件发布端到端） |
 | 🟢 绿 | 实现集成测试（mock LangGraph SDK，真实 EventPublisher mock） |
 | 🔄 重构 | 优化测试覆盖 |
 
@@ -789,7 +789,7 @@ sisys/
 │   │   ├── architecture/test_langgraph_architecture.py
 │   │   └── test_composition_root_agent.py
 │   ├── contracts/test_port_contract_agent_engine.py
-│   ├── integration/test_story_1_18b_integration.py
+│   ├── integration/test_integration_langgraph_agent_orchestration.py
 │   └── acceptance/
 │       ├── test_acceptance_langgraph-agent-orchestration.feature
 │       └── test_acceptance_langgraph-agent-orchestration.py
@@ -890,7 +890,7 @@ sisys/
 - `tests/unit/test_composition_root_agent.py`
 - `tests/unit/architecture/test_langgraph_architecture.py`
 - `tests/contracts/test_port_contract_agent_engine.py`
-- `tests/integration/test_story_1_18b_integration.py`
+- `tests/integration/test_integration_langgraph_agent_orchestration.py`
 - `tests/acceptance/test_acceptance_langgraph-agent-orchestration.feature`
 - `tests/acceptance/test_acceptance_langgraph-agent-orchestration.py`
 
@@ -900,7 +900,7 @@ sisys/
 - `src/infrastructure/agent_orch/__init__.py` — 导出 LangGraphEngine
 - `src/composition_root.py` — 注册 agent_engine + 更新 orchestration_service 注册
 - `tests/unit/application/services/test_orchestration_service.py` — 更新构造函数调用 + 新增 agent_reasoning 路由测试
-- `tests/integration/test_story_1_18a_integration.py` — 更新 OrchestrationService 构造调用（添加 agent_engine 参数）
+- `tests/integration/test_integration_prefect_workflow.py` — 更新 OrchestrationService 构造调用（添加 agent_engine 参数）
 
 **已有文件（复用，禁止修改）:**
 - `src/domain/ports/event_publisher.py` — EventPublisher 端口
@@ -1004,7 +1004,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 - [x] [Review][Patch] **`_env_int` 对非数字字符串抛出无上下文的 ValueError** — 已包装为含键名的配置错误 [blind+edge] `src/infrastructure/config/langgraph.py:44-46`
 - [x] [Review][Patch] **`publish_result` 属性访问无 None 保护** — 已添加 None 检查 [edge] `src/infrastructure/agent_orch/langgraph_engine.py:140-141`
 - [x] [Review][Patch] **`OrchestrationService.execute` docstring 过时：仍提及 `NotImplementedError`** [edge+auditor] `src/application/services/orchestration_service.py:71`
-- [x] [Review][Patch] **集成测试 `event_publisher` mock 不返回 `PublishResult` 类型** — 已使用 PublishResult [edge] `tests/integration/test_story_1_18b_integration.py:36,62`
+- [x] [Review][Patch] **集成测试 `event_publisher` mock 不返回 `PublishResult` 类型** — 已使用 PublishResult [edge] `tests/integration/test_integration_langgraph_agent_orchestration.py:36,62`
 - [x] [Review][Patch] **缺少 `_publish_agent_decided` 异常路径测试** — 已添加 4 个异常场景测试 [edge] `tests/unit/infrastructure/agent_orch/test_langgraph_engine.py`
 - [x] [Review][Patch] **`infrastructure/config/__init__.py` 文件头 docstring 被删除** — 已恢复 [auditor] `src/infrastructure/config/__init__.py`
 - [x] [Review][Patch] **`FakePublisher` 不完全满足 `EventPublisher` Protocol** — 已返回 PublishResult [edge] `tests/unit/architecture/test_langgraph_architecture.py:130-132`
