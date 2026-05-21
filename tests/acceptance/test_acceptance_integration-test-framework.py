@@ -168,7 +168,6 @@ def when_create_integration_test_directory(context: dict[str, Any]) -> None:
 
     directories = [
         "tests/integration",
-        "tests/integration/fixtures",
         "tests/acceptance",
     ]
 
