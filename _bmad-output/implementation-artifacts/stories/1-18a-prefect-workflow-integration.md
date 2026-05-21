@@ -363,7 +363,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_prefect-workflow-integration.py` | Task 0 |
 | **TDD 契约测试** | WorkflowEnginePort | 端口注册/解析/兼容性 | `test_port_contract_workflow_engine.py` | Task 3 |
 | **SDD 架构验证** | 六边形约束 | 零越界 Prefect 导入 | `test_prefect_architecture.py` | Task 4 |
-| **集成测试** | 端到端流程 | OrchestrationService → PrefectEngine → 事件发布 | `test_story_1_18a_integration.py` | Task 4 |
+| **集成测试** | 端到端流程 | OrchestrationService → PrefectEngine → 事件发布 | `test_integration_prefect_workflow.py` | Task 4 |
 
 ---
 
@@ -418,7 +418,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 | AC-7 | 端口契约测试 | Task 3 | 3.11（契约测试） | `test_port_contract_workflow_engine.py` |
 | AC-7 | Composition Root 注册验证 | Task 3 | 3.12（注册链路验证） | `test_composition_root_workflow.py` |
 | AC-8 | 架构约束验证 | Task 4 | 4.1-4.6 | `test_prefect_architecture.py` |
-| 全部 | 集成测试 | Task 4 | 4.7-4.9（端到端流程） | `test_story_1_18a_integration.py` |
+| 全部 | 集成测试 | Task 4 | 4.7-4.9（端到端流程） | `test_integration_prefect_workflow.py` |
 
 ---
 
@@ -605,7 +605,7 @@ EventPublisher.publish(DocumentProcessed) → DualChannelEventBus → Outbox/Rab
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/integration/test_story_1_18a_integration.py`（OrchestrationService → PrefectEngine → 事件发布端到端） |
+| 🔴 红 | 编写 `tests/integration/test_integration_prefect_workflow.py`（OrchestrationService → PrefectEngine → 事件发布端到端） |
 | 🟢 绿 | 实现集成测试（mock Prefect SDK，真实 EventPublisher mock） |
 | 🔄 重构 | 优化测试覆盖 |
 
@@ -807,7 +807,7 @@ sisys/
 │   │   ├── architecture/test_prefect_architecture.py
 │   │   └── test_composition_root_workflow.py
 │   ├── contracts/test_port_contract_workflow_engine.py
-│   ├── integration/test_story_1_18a_integration.py
+│   ├── integration/test_integration_prefect_workflow.py
 │   └── acceptance/
 │       ├── test_acceptance_prefect-workflow-integration.feature
 │       └── test_acceptance_prefect-workflow-integration.py
@@ -908,7 +908,7 @@ sisys/
 - `tests/unit/test_composition_root_workflow.py`
 - `tests/unit/architecture/test_prefect_architecture.py`
 - `tests/contracts/test_port_contract_workflow_engine.py`
-- `tests/integration/test_story_1_18a_integration.py`
+- `tests/integration/test_integration_prefect_workflow.py`
 - `tests/acceptance/test_acceptance_prefect-workflow-integration.feature`
 - `tests/acceptance/test_acceptance_prefect-workflow-integration.py`
 

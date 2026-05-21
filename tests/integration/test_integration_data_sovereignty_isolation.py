@@ -3,7 +3,7 @@
 集成测试目的：验证多个组件协同工作，跨层验证 port 接口与 implementation 实现正确对接
 不使用 mock，测试组件间的真实交互
 
-Run with: pytest tests/integration/test_story_1_11_port_impl_integration.py -v
+Run with: pytest tests/integration/test_integration_data_sovereignty_isolation.py -v
 """
 
 from __future__ import annotations
