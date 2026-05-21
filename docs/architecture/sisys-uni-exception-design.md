@@ -31,7 +31,7 @@ src/domain/ports/password_validation_service.py       # PasswordValidationError
 src/domain/ports/storage.py                          # ComplianceLockError
 src/domain/services/memory_service.py                 # MemoryVersionConflictError, MemoryNotFoundError
 src/application/use_cases/role_management.py          # RoleAlreadyExistsError, RoleNotFoundError, ...
-src/application/ports/sandbox_port.py                 # SandboxError, ContainerStartError, ...
+src/domain/ports/sandbox_executor.py          # SandboxError, ContainerStartError, ...
 src/infrastructure/messaging/outbox/outbox.py         # InvalidStateTransitionError
 src/infrastructure/messaging/event_store.py            # VersionError
 src/infrastructure/storage/minio/minio_manager.py   # BucketNotFoundError, PermissionDeniedError, ...
@@ -813,7 +813,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 #### 第二批：中优先级（应用层）
 
 - [x] `src/application/use_cases/role_management.py` - RoleAlreadyExistsError 等（4个）
-- [x] `src/application/ports/sandbox_port.py` - SandboxError 等（4个）
+- [x] `src/domain/ports/sandbox_executor.py` - SandboxError 等（4个）
 - [x] `src/domain/services/memory_service.py` - MemoryVersionConflictError, MemoryNotFoundError
 
 #### 第三批：低优先级（基础设施层）
@@ -877,7 +877,7 @@ class ExceptionContextMiddleware(BaseHTTPMiddleware):
 | 文件 | 操作 | 描述 |
 |------|------|------|
 | `src/application/use_cases/role_management.py` | 修改 | 4个角色异常类 |
-| `src/application/ports/sandbox_port.py` | 修改 | SandboxError 等 4 个 → ExternalException |
+| `src/domain/ports/sandbox_executor.py` | 修改 | SandboxError 等 4 个 → ExternalException |
 | `src/domain/services/memory_service.py` | 修改 | MemoryVersionConflictError → ConflictError |
 
 #### P2 - 基础设施层异常迁移

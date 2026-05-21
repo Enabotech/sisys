@@ -92,7 +92,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 | neo4j_connection_manager | ConnectionManager | 3 | 同上 |
 | audit_service | AuditServicePort | 4 | `src/domain/ports/audit_service.py` |
 | semantic_router | SemanticRouterProtocol | 1 | `src/domain/ports/semantic_router_protocol.py` |
-| sandbox_executor_protocol | SandboxExecutorProtocol | 3 | `src/domain/ports/sandbox_executor_protocol.py` |
+| sandbox_executor | SandboxExecutor | 4 | `src/domain/ports/sandbox_executor.py` |
 
 **未注册（仅做接口验证）：**
 | 接口类 | 方法数 | 文件 |
@@ -104,7 +104,7 @@ Epic 20 前序 Story（20-1 ~ 20-5）完成了测试框架、事件总线、异�
 **待补全 — application/ports（已注册 14 个）：**
 | 端口注册名 | 接口类 | 基类 | 方法数 | 文件 |
 |---------|--------|------|-------|------|
-| sandbox_executor | SandboxExecutor | Protocol | 4 | `src/application/ports/sandbox_port.py` |
+| ~~sandbox_executor~~ | SandboxExecutor | Protocol (@runtime_checkable) | 4 | ~~`src/application/ports/sandbox_port.py`~~ → 已合并至 `src/domain/ports/sandbox_executor.py` |
 | semantic_cache | SemanticCache | Protocol | 3 | `src/application/ports/semantic_cache.py` |
 | memory_file_storage | MemoryFilePort | L0StoragePort | 3+5 | `src/application/ports/memory_file_port.py` |
 | public_blackboard | PublicBlackboard | Protocol | 4 | `src/application/ports/public_blackboard.py` |
@@ -398,7 +398,7 @@ Feature: 端口契约测试补全
 | **TDD 契约测试** | 存储层端口（已注册） | L0-L5 + Unified + Enums + session_storage | `test_port_contract_storage.py` | Task 2 |
 | **TDD 契约测试** | 仓储层端口（已注册） | 9 组仓储端口 | `test_port_contract_repositories.py` | Task 3 |
 | **TDD 契约测试** | 认证安全合规端口 | 10 组端口 | `test_port_contract_auth_security.py` | Task 4 |
-| **TDD 契约测试** | 服务协议端口（已注册） | ConnectionManager x4 + audit_service + semantic_router + sandbox_executor_protocol | `test_port_contract_services.py` | Task 5 |
+| **TDD 契约测试** | 服务协议端口（已注册） | ConnectionManager x4 + audit_service + semantic_router + sandbox_executor | `test_port_contract_services.py` | Task 5 |
 | **TDD 契约测试** | 应用层端口（已注册） | 14 组端口 | `test_port_contract_application.py` | Task 6 |
 | **TDD 接口验证** | 未注册 Protocol | UnitOfWork / HealthCheckPort / IntegrityPort / PermissionRepositoryPort / IndexManagerPort | `test_port_contract_unregistered.py` | Task 5 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_port-contracts-refactor.feature` | Task 0 |
@@ -652,7 +652,7 @@ Feature: 端口契约测试补全
 - [x] Subtask 5.1: 🔴 红 — 编写 ConnectionManager x4 契约测试（redis/postgresql/qdrant/neo4j_connection_manager）
 - [x] Subtask 5.2: 🔴 红 — 编写 AuditServicePort 契约测试（record/verify_integrity/verify_batch/archive）
 - [x] Subtask 5.3: 🔴 红 — 编写 SemanticRouterProtocol 契约测试（route）
-- [x] Subtask 5.4: 🔴 红 — 编写 SandboxExecutorProtocol 契约测试（start_container/execute_code/stop_container）
+- [x] Subtask 5.4: 🔴 红 — 编写 SandboxExecutor 契约测试（start_container/execute_code/stop_container/is_container_running）
 - [x] Subtask 5.5: 🟢 绿 — 运行全部通过
 - [x] Subtask 5.6: 🔄 重构 — 优化 ConnectionManager 参数化
 
@@ -791,7 +791,8 @@ tests/
 
 **关键学习:**
 - 所有 Port 使用 Protocol（非 ABC），domain/ports 全部标注 @runtime_checkable
-- application/ports 中 7 个 Protocol（SandboxExecutor, SemanticCache, PublicBlackboard, CompressorService, ExceptionMetricsPort, TextExtractorService, MetricsPort）**缺少** @runtime_checkable，不可使用 isinstance() 检查
+- application/ports 中 6 个 Protocol（SemanticCache, PublicBlackboard, CompressorService, ExceptionMetricsPort, TextExtractorService, MetricsPort）**缺少** @runtime_checkable，不可使用 isinstance() 检查
+- SandboxExecutor 已合并至 `src/domain/ports/sandbox_executor.py` 并标注 @runtime_checkable
 - 组合根 bootstrap() 是注册的唯一入口，测试须先调用
 - L2RdbPort[T] 是泛型基类，L2MetadataRepositoryPort/L2ChangeHistoryRepositoryPort 继承它
 - application/ports 的多个端口继承 domain/ports 的基础端口（如 MemoryFilePort 继承 L0StoragePort）

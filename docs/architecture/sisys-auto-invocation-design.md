@@ -155,8 +155,8 @@ SISYS 基于 `trigger(event) → route(routing) → execute(execution)` 自主�
 │  │  Domain Layer                                                             │  │
 │  │  AutoExecuteService                                                       │  │
 │  │  ├── on_routed_event(event)                                               │  │
-│  │  │   ├── SandboxExecutorProtocol.start_container(session_id)               │  │
-│  │  │   ├── SandboxExecutorProtocol.execute_code(session_id, code)            │  │
+│  │  │   ├── SandboxExecutor.start_container(session_id)                    │  │
+│  │  │   ├── SandboxExecutor.execute_code(session_id, code)                 │  │
 │  │  │   ├── SnapshotRepositoryProtocol.save(snapshot)                         │  │
 │  │  │   └── 发布 AutoExecuted (技术事件)                                      │  │
 │  │  ├── create_snapshot(session_id, state) → CheckpointSnapshot               │  │
@@ -203,11 +203,11 @@ SISYS 基于 `trigger(event) → route(routing) → execute(execution)` 自主�
 │             │ implements               │ implements               │ implements     │
 │             v                          v                          v               │
 │  ┌─────────────────────┐  ┌──────────────────────┐  ┌────────────────────────┐  │
-│  │  HashRouterProtocol  │  │  SemanticRouter-      │  │  SandboxExecutor-       │  │
-│  │  (domain/ports/)     │  │  Protocol             │  │  Protocol               │  │
-│  │  route(session_id)   │  │  (domain/ports/)      │  │  (domain/ports/)        │  │
-│  │  → str               │  │  route(context)        │  │  start/execute/stop     │  │
-│  │                       │  │  → (str, float)       │  │  (application/ports/)   │  │
+│  │  HashRouterProtocol  │  │  SemanticRouter-      │  │  SandboxExecutor        │  │
+│  │  (domain/ports/)     │  │  Protocol             │  │  (domain/ports/)        │  │
+│  │  route(session_id)   │  │  (domain/ports/)      │  │  start/execute/stop/    │  │
+│  │  → str               │  │  route(context)        │  │  is_running (4 方法)    │  │
+│  │                       │  │  → (str, float)       │  │  @runtime_checkable     │  │
 │  └─────────────────────┘  └──────────────────────┘  └────────────────────────┘  │
 │                                                                                   │
 │  ┌─────────────────────┐  ┌──────────────────────┐  ┌────────────────────────┐  │
@@ -418,7 +418,7 @@ class AutoRouteService:
 ```
 class AutoExecuteService:
     __init__(
-        sandbox: SandboxExecutorProtocol | None = None,
+        sandbox: SandboxExecutor | None = None,
         snapshot_repo: SnapshotRepositoryProtocol | None = None,
     )
 
@@ -439,7 +439,7 @@ class AutoExecuteService:
 ```
 
 **依赖端口:**
-- `SandboxExecutorProtocol`（domain/ports/sandbox_executor_protocol.py）
+- `SandboxExecutor`（domain/ports/sandbox_executor.py）
 - `SnapshotRepositoryProtocol`（domain/ports/snapshot_repository_protocol.py）
 
 **异常处理设计：** 执行失败时不抛异常，而是返回 `AutoExecuted(execution_result={"status": "failed", "error": str(e)})`，确保事件链不中断。
@@ -548,16 +548,15 @@ class AutoTriggerContext:
 | `EventPublisher` | `src/domain/ports/event_publisher.py` | Domain | `async publish(event) → PublishResult` |
 | `HashRouterProtocol` | `src/domain/ports/hash_router_protocol.py` | Domain | `route(session_id) → str`（同步） |
 | `SemanticRouterProtocol` | `src/domain/ports/semantic_router_protocol.py` | Domain | `async route(task_context) → (str, float)` |
-| `SandboxExecutorProtocol` | `src/domain/ports/sandbox_executor_protocol.py` | Domain | `start_container/execute_code/stop_container`（3 方法） |
+| `SandboxExecutor` | `src/domain/ports/sandbox_executor.py` | Domain | `start_container/execute_code/stop_container/is_container_running`（4 方法） |
 | `SnapshotRepositoryProtocol` | `src/domain/ports/snapshot_repository_protocol.py` | Domain | `save/load/delete` |
-| `SandboxExecutor` | `src/application/ports/sandbox_port.py` | Application | `start_container/execute_code/stop_container/is_container_running`（4 方法，无 @runtime_checkable） |
 
-**两个沙箱端口的关系：** `SandboxExecutorProtocol`（Domain，3 方法）由 `AutoExecuteService` 依赖；`SandboxExecutor`（Application，4 方法，多 `is_container_running`）由 `DockerSandboxAdapter` 实现。两者通过结构化类型兼容，基础设施适配器同时满足两个端口协议。
+**沙箱端口统一：** 原先存在的 `SandboxExecutorProtocol`（Domain，3 方法）和 `SandboxExecutor`（Application，4 方法，无 `@runtime_checkable`）已合并为统一的 `SandboxExecutor`（Domain，4 方法，`@runtime_checkable`）。`AutoExecuteService`、`DockerSandboxAdapter`、`SessionNamespaceManager` 均依赖此统一端口。
 
 **设计规则：**
-- 所有端口使用 `typing.Protocol` + `@runtime_checkable`（`SandboxExecutor` 除外，位于 application/ports/ 未加装饰器，通过结构化类型兼容）
+- 所有端口使用 `typing.Protocol` + `@runtime_checkable`
 - async 操作的 Protocol 签名必须为 async
-- 端口定义在 domain/ports/ 或 application/ports/（取决于依赖方向）
+- 端口定义在 domain/ports/
 - 基础设施层提供 Protocol 的具体实现
 
 ---
@@ -700,7 +699,7 @@ AutoExecuted                          业务领域事件
 │              HashRouter 架构                         │
 │                                                      │
 │  ┌────────────────────────────────────────────────┐  │
-│  │  一致性哈希环（Sorted Array + 顺序查找）          │  │
+│  │  一致性哈希环（Sorted Array + bisect 二分查找）   │  │
 │  │                                                  │  │
 │  │  V0 ── V1 ── V2 ── ... ── Vn ── V0 (环绕)     │  │
 │  │  │      │      │              │                  │  │
@@ -710,7 +709,7 @@ AutoExecuted                          业务领域事件
 │  配置:                                               │
 │  - VIRTUAL_NODES_PER_NODE = 150（每个物理节点）      │
 │  - 支持加权（weight > 1 → 更多虚拟节点）             │
-│  - route(session_id): O(n) 顺序查找（V2 优化为 bisect 二分查找）              │
+│  - route(session_id): O(log n) bisect 二分查找      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -759,7 +758,7 @@ class HashRouter:
 
 **关键特性：**
 - **bge-m3 嵌入：** 1024 维向量，支持中英双语，本地部署
-- **内存缓存：** MAX_CACHE_SIZE=10000，达到上限后停止插入（无淘汰，仅容量控制）
+- **内存缓存：** MAX_CACHE_SIZE=10000，`collections.OrderedDict` 实现 LRU 淘汰策略（`move_to_end` + `popitem(last=False)`）
 - **候选注册：** 动态添加/移除 Agent/工具候选
 - **优雅降级：** 无嵌入模型时返回零向量（score=0.0）
 
@@ -782,7 +781,7 @@ class EmbeddingModelProtocol(Protocol):
 #### 5.2.1 DockerSandboxAdapter
 
 **文件:** `src/infrastructure/external_services/sandbox/docker_sandbox_adapter.py`
-**实现端口:** `SandboxExecutor`（`src/application/ports/sandbox_port.py`）
+**实现端口:** `SandboxExecutor`（`src/domain/ports/sandbox_executor.py`）
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -1119,7 +1118,7 @@ AutoExecuted.business_event_type:
 | **MVP** | Docker | 部署成本低、社区成熟、开发效率高 |
 | **V2+** | gVisor | 安全需求提升、多租户隔离增强、无需更换端口协议 |
 
-**演进路径：** `SandboxExecutor` 端口定义在 `application/ports/`，基础设施层提供 `DockerSandboxAdapter` 和未来的 `GvisorSandboxAdapter`，实现零代码改动切换。
+**演进路径：** `SandboxExecutor` 端口定义在 `domain/ports/sandbox_executor.py`，使用 `@runtime_checkable`，基础设施层提供 `DockerSandboxAdapter` 和未来的 `GvisorSandboxAdapter`，实现零代码改动切换。
 
 ### 7.4 状态管理对比
 
@@ -1147,13 +1146,13 @@ AutoExecuted.business_event_type:
 
 | 算法 | 复杂度 | 一致性 | 负载均衡 | 适用场景 |
 |------|--------|--------|----------|---------|
-| **一致性哈希** | O(n)¹ | 高（节点变化影响小） | 中 | 分布式缓存、会话路由 |
+| **一致性哈希** | O(log n)¹ | 高（节点变化影响小） | 中 | 分布式缓存、会话路由 |
 | **轮询** | O(1) | 低（节点变化全重分配） | 高 | 无状态服务 |
 | **加权随机** | O(1) | 低 | 高（可调权重） | 负载均衡器 |
 | **语义路由** | O(n) | N/A | 取决于嵌入质量 | 智能匹配、Agent 选择 |
 | **最小连接数** | O(n) | 低 | 最高 | 长连接服务 |
 
-> ¹ 当前实现使用线性扫描（O(n)），V2 可优化为 bisect 二分查找（O(log n)）
+> ¹ 使用 `bisect.bisect_left` 二分查找（O(log n)），Sorted Array 预排序后按 key 查找
 
 **SISYS 选型决策：混合路由（一致性哈希 + 语义路由）**
 
@@ -1526,7 +1525,7 @@ DeadLetterQueue Protocol:
 │                                                              │
 │  路由阶段 (P95 < 50ms):                                      │
 │  ├── 事件反序列化            ~1ms    (from_dict)             │
-│  ├── 哈希路由                ~0.1ms  (FNV-1a + 顺序查找)     │
+│  ├── 哈希路由                ~0.01ms (FNV-1a + bisect 二分查找)   │
 │  ├── 语义路由                ~20ms   (嵌入计算 + 相似度)      │
 │  │   ├── 缓存命中           ~0.1ms                           │
 │  │   └── 缓存未命中         ~20ms   (bge-m3 推理)           │
@@ -1561,7 +1560,7 @@ DeadLetterQueue Protocol:
 │  ├── Key: 描述字符串                                         │
 │  ├── Value: [float] × 1024 嵌入向量                          │
 │  ├── 容量: MAX_CACHE_SIZE = 10000                            │
-│  └── 策略: 达到上限后停止插入（无淘汰机制）                      │
+│  └── 策略: OrderedDict LRU 淘汰（move_to_end + popitem(last=False)） │
 │                                                              │
 │  L2: 沙箱容器缓存（DockerSandboxAdapter._running_containers）│
 │  ├── Key: session_id                                         │

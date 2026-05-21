@@ -775,7 +775,7 @@ poetry run pytest --tb=short
 | `src/application/ports/document_storage_port.py` | DocumentStoragePort |
 | `src/application/ports/memory_graph_port.py` | MemoryGraphPort |
 | `src/application/ports/metrics_port.py` | MetricsPort |
-| `src/application/ports/sandbox_port.py` | SandboxExecutor |
+| `src/domain/ports/sandbox_executor.py` | SandboxExecutor |
 | `src/application/ports/compressor_service.py` | CompressorService |
 
 ### 9.4 测试文件
