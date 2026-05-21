@@ -950,7 +950,7 @@ class SessionNamespaceManager:
 │  └──────────┘    └──────┬───────┘    └──────┬───────┘    └─────┬─────┘  │
 │       │                 │                   │                  │        │
 │       │         AutoTriggered        AutoRouted          AutoExecuted  │
-│       │         (REALTIME)           (REALTIME)          (RELIABLE)    │
+│       │         (REALTIME)           (REALTIME)          (REALTIME)   │
 │       │                 │                   │                  │        │
 │       │                 │                   │         ┌────────▼────┐  │
 │       │                 │                   │         │ Completed   │  │
@@ -1304,7 +1304,7 @@ class AgentEnginePort(Protocol):
     async submit_graph(graph_name: str, parameters: dict) → str
         # 提交 LangGraph graph 执行，返回 graph_run_id
 
-    async get_graph_status(graph_run_id: str) → GraphStatus
+    async get_graph_status(graph_run_id: str) → FlowStatus
         # 查询 graph 执行状态
 ```
 
@@ -1671,6 +1671,13 @@ DeadLetterQueue Protocol:
 │  │  AutoTriggerConfig.from_env()                                      │  │
 │  │  AutoRouteConfig.from_env()                                        │  │
 │  │  AutoExecuteConfig.from_env()                                      │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  未包含组件（Story 1.17/1.18a/b 实现）                             │  │
+│  │  ├── OrchestrationService → WorkflowEnginePort (PrefectAdapter)    │  │
+│  │  ├── OrchestrationService → AgentEnginePort (LangGraphAdapter)    │  │
+│  │  └── RoutingDecisionLog WORM 持久化适配器                         │  │
 │  └────────────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
