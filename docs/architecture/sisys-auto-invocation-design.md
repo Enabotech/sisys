@@ -255,17 +255,17 @@ DomainEvent (frozen dataclass, _registry 多态反序列化)
 ```
 @dataclass(frozen=True)
 class AutoTriggered(DomainEvent):
-    event_type: str = "AutoTriggered"        # init=False, 自动注册到 _registry
-    trigger_type: str                         # "domain_event" | "heartbeat"
-    session_id: str                           # 会话标识（提取自 payload 或 heartbeat_id）
-    agent_id: str | None                      # Agent 标识（可选）
-    task_context: dict[str, Any]              # 任务上下文（键值对）
-    source_event_type: str                    # 原始事件类型（如 "DocumentProcessed"）
-    source_event_id: str | None               # 原始事件 ID
+    event_type: str = "AutoTriggered"           # init=False, 自动注册到 _registry
+    trigger_type: str = ""                       # "domain_event" | "heartbeat"
+    session_id: str = ""                         # 会话标识（提取自 payload 或 heartbeat_id）
+    agent_id: str | None = None                  # Agent 标识（可选）
+    task_context: dict[str, Any] = field(default_factory=dict)  # 任务上下文
+    source_event_type: str = ""                  # 原始事件类型（如 "DocumentProcessed"）
+    source_event_id: str | None = None           # 原始事件 ID
 
-    # 自动设置:
-    aggregate_type = "AutoTrigger"
-    aggregate_id = event_id (如未指定)
+    # __post_init__ 自动设置:
+    aggregate_type = "AutoTrigger"  # 仅当 aggregate_type 为空时设置
+    aggregate_id = event_id         # 仅当 aggregate_id 为 None 且 event_id 存在时设置
 ```
 
 **通道映射:** REALTIME（Redis Pub/Sub）
@@ -277,18 +277,18 @@ class AutoTriggered(DomainEvent):
 ```
 @dataclass(frozen=True)
 class AutoRouted(DomainEvent):
-    event_type: str = "AutoRouted"            # init=False
-    route_type: str                           # "hash" | "semantic" | "mixed"
-    session_id: str                           # 会话标识
-    task_context: dict[str, Any]              # 任务上下文（透传自 AutoTriggered）
-    route_target: str                         # 目标 Agent/工具 ID
-    route_score: float                        # 路由置信度（0.0-1.0）
-    trigger_event_type: str                   # 原始触发事件类型
-    trigger_event_id: str | None              # 原始触发事件 ID
+    event_type: str = "AutoRouted"               # init=False
+    route_type: str = ""                          # "hash" | "semantic" | "mixed"
+    session_id: str = ""                          # 会话标识
+    task_context: dict[str, Any] = field(default_factory=dict)  # 任务上下文（透传）
+    route_target: str = ""                        # 目标 Agent/工具 ID
+    route_score: float = 0.0                      # 路由置信度（0.0-1.0）
+    trigger_event_type: str = ""                  # 原始触发事件类型
+    trigger_event_id: str | None = None           # 原始触发事件 ID
 
-    # 自动设置:
-    aggregate_type = "AutoRoute"
-    aggregate_id = event_id (如未指定)
+    # __post_init__ 自动设置:
+    aggregate_type = "AutoRoute"    # 仅当 aggregate_type 为空时设置
+    aggregate_id = event_id         # 仅当 aggregate_id 为 None 且 event_id 存在时设置
 ```
 
 **通道映射:** REALTIME（Redis Pub/Sub）
@@ -300,23 +300,23 @@ class AutoRouted(DomainEvent):
 ```
 @dataclass(frozen=True)
 class AutoExecuted(DomainEvent):
-    event_type: str = "AutoExecuted"          # init=False
-    session_id: str                           # 会话标识
-    task_context: dict[str, Any]              # 任务上下文（透传自 AutoRouted）
-    execution_result: dict[str, Any]          # 执行结果（status/output/error）
-    cost_estimate: float                      # 成本估算（美元）
-    latency_ms: float                         # 执行延迟（毫秒）
-    business_event_type: str                  # 业务事件类型分发键
-                                              #   "DocumentProcessed" | "ToolExecuted" | "AgentDecided"
-    route_target: str                         # 路由目标（透传自 AutoRouted）
-    route_score: float                        # 路由置信度（透传自 AutoRouted）
+    event_type: str = "AutoExecuted"              # init=False
+    session_id: str = ""                          # 会话标识
+    task_context: dict[str, Any] = field(default_factory=dict)  # 任务上下文（透传）
+    execution_result: dict[str, Any] = field(default_factory=dict)  # 执行结果
+    cost_estimate: float = 0.0                    # 成本估算（美元）
+    latency_ms: float = 0.0                       # 执行延迟（毫秒）
+    business_event_type: str = ""                 # 业务事件类型分发键
+                                                 #   "DocumentProcessed" | "ToolExecuted" | "AgentDecided"
+    route_target: str = ""                        # 路由目标（透传自 AutoRouted）
+    route_score: float = 0.0                      # 路由置信度（透传自 AutoRouted）
 
-    # 自动设置:
-    aggregate_type = "AutoExecute"
-    aggregate_id = event_id (如未指定)
+    # __post_init__ 自动设置:
+    aggregate_type = "AutoExecute"  # 仅当 aggregate_type 为空时设置
+    aggregate_id = event_id         # 仅当 aggregate_id 为 None 且 event_id 存在时设置
 ```
 
-**通道映射:** RELIABLE（PostgreSQL Outbox + RabbitMQ）
+**通道映射:** REALTIME（Redis Pub/Sub）
 
 **设计要点:** AutoExecuted 是技术事件而非业务事件。通过 `business_event_type` 字段，下游 `AutoExecuteCompletedHandler` 将其桥接到对应的业务领域事件。这不是继承关系，而是策略模式分发。
 
@@ -423,14 +423,15 @@ class AutoExecuteService:
     )
 
     async on_routed_event(event: DomainEvent) → AutoExecuted | None
-        # 1. 提取 session_id, task_context, route_target, route_score
+        # 1. 提取 session_id, task_context, route_target, route_score, route_type
         # 2. sandbox.start_container(session_id)
         # 3. sandbox.execute_code(session_id, code) 或标记 completed
         # 4. snapshot_repo.save(CheckpointSnapshot)
+        #    state_data 含: last_execution_result, route_target, route_score, route_type
         # 5. 构造 AutoExecuted 事件（含 business_event_type）
         # 注意：异常时仍返回 AutoExecuted（status="failed"）
 
-    async create_snapshot(session_id, state, stage_id) → CheckpointSnapshot | None
+    async create_snapshot(session_id, state, stage_id="intermediate") → CheckpointSnapshot | None
         # 独立快照创建，版本号自动递增
 
     async restore_snapshot(session_id) → CheckpointSnapshot | None
@@ -452,20 +453,20 @@ class AutoExecuteService:
 ```
 @dataclass(frozen=True)
 class CheckpointSnapshot:
-    snapshot_id: UUID                          # 唯一标识
-    session_id: str                            # 所属会话
-    stage_id: str                              # 执行阶段（planning/execution/completed）
-    state_version: int                         # 乐观锁版本号
-    state_data: dict[str, Any]                 # 状态数据
-    timestamp: datetime                        # 创建时间（UTC）
-    ttl_seconds: int = 86400                   # TTL（60s ~ 2592000s = 30d）
+    snapshot_id: UUID = field(default_factory=uuid.uuid4)  # 自动生成
+    session_id: str = ""                          # 所属会话
+    stage_id: str = ""                            # 执行阶段（planning/execution/completed）
+    state_version: int = 0                        # 乐观锁版本号
+    state_data: dict[str, Any] = field(default_factory=dict)  # 状态数据
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))  # 创建时间
+    ttl_seconds: int = 86400                      # TTL（60s ~ 2592000s = 30d）
 
     # 序列化方法:
-    to_redis_hash() → dict[str, str]           # Redis Hash 格式
-    from_redis_hash(data) → CheckpointSnapshot  # 反序列化
+    to_redis_hash() → dict[str, str]              # Redis Hash 格式
+    from_redis_hash(data) → CheckpointSnapshot    # 反序列化
 
     # 不可变更新:
-    with_updated_state(state_data, version?) → CheckpointSnapshot  # 创建新快照
+    with_updated_state(state_data, new_version?) → CheckpointSnapshot  # 创建新快照
 ```
 
 **存储格式（Redis Hash）：**
@@ -486,25 +487,33 @@ TTL: ttl_seconds（默认 86400 = 24h）
 ```
 @dataclass(frozen=True)
 class RoutingDecisionLog:
-    log_id: UUID                               # 日志唯一标识
-    task_id: str                               # 任务标识
-    session_id: str                            # 会话标识
-    route_type: str                            # "hash" | "semantic" | "mixed" | "local" | "cloud"
-    route_target: str                          # 目标 Agent/工具/模型
-    route_score: float                         # 置信度（0.0-1.0）
+    log_id: UUID                               # 必填: 日志唯一标识
+    task_id: str                               # 必填: 任务标识
+    session_id: str                            # 必填: 会话标识
+    route_type: str                            # 必填: "hash" | "semantic" | "mixed" | "local" | "cloud"
+    route_target: str                          # 必填: 目标 Agent/工具/模型
+    route_score: float                         # 必填: 置信度（0.0-1.0）
     cost_estimate: float = 0.0                 # 预估成本（美元）
     latency_ms: float = 0.0                    # 决策延迟（ms）
-    timestamp: datetime                        # 决策时间（UTC）
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))  # 决策时间
     worm_storage_ref: str = ""                 # WORM 存储引用（7年归档）
     # UDMR 扩展字段:
     selected_model: str = ""                   # UDMR 选定模型
     cost_actual: float = 0.0                   # 实际成本
-    fallback_reason: str | None = None         # 回退原因
+    fallback_reason: str | None = None         # 回退原因（timeout/unavailable/health_check_failed）
 
-    validate() → None                          # 不变量校验
+    validate() → None                          # 不变量校验（route_type/range/score/cost/fallback_reason）
 ```
 
 **WORM 归档要求:** 路由决策日志需保留 7 年（SOX/ISO27001 合规）。
+
+**不变量校验规则（`validate()` 方法）：**
+- `log_id` 必须为有效 UUID
+- `task_id`、`session_id` 不能为空
+- `route_type` 必须为 hash/semantic/mixed/local/cloud 之一
+- `route_score` 必须在 0.0-1.0 范围内
+- `cost_estimate`、`cost_actual`、`latency_ms` 必须 ≥ 0
+- `fallback_reason` 只允许 timeout/unavailable/health_check_failed
 
 ### 3.4 值对象
 
@@ -515,17 +524,17 @@ class RoutingDecisionLog:
 ```
 @dataclass(frozen=True)
 class AutoTriggerContext:
-    session_id: str                            # 会话标识
-    trigger_type: str                          # "domain_event" | "heartbeat"
+    session_id: str                            # 必填（__post_init__ 空时设为 "default"）
+    trigger_type: str                          # 必填: "domain_event" | "heartbeat"
     agent_id: str | None = None                # Agent 标识
-    task_context: dict[str, Any] = {}          # 任务上下文
-    timestamp: datetime                        # 触发时间
+    task_context: dict[str, Any] = field(default_factory=dict)  # 任务上下文
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))  # 触发时间
     source_event_type: str = ""                # 源事件类型
     source_event_id: str | None = None         # 源事件 ID
 
     # 工厂方法:
-    from_domain_event(event_type, payload, event_id?) → AutoTriggerContext
-    from_heartbeat(heartbeat_id, wake_reason, todo_items, cost_budget) → AutoTriggerContext
+    from_domain_event(event_type, payload, event_id=None) → AutoTriggerContext
+    from_heartbeat(heartbeat_id, wake_reason="", todo_items=None, cost_budget=0.0) → AutoTriggerContext
 ```
 
 **session_id 提取优先级：** `payload.session_id` → `payload.payload.session_id` → `payload.aggregate_id` → `"default"`
@@ -796,6 +805,13 @@ class EmbeddingModelProtocol(Protocol):
 │    ├── docker_client.get(name).remove(force=True)    │
 │    └── 清理资源                                       │
 │                                                      │
+│  is_container_running(session_id) → bool             │
+│    └── 检查 _running_containers 状态                 │
+│                                                      │
+│  reset_all_containers() [classmethod]                │
+│    └── 清空所有容器状态（仅用于测试隔离）             │
+│                                                      │
+│  注意: _running_containers 为类级别属性（所有实例共享）│
 │  MVP 状态: mock 实现（生产环境接入 Docker SDK）      │
 └─────────────────────────────────────────────────────┘
 ```
@@ -870,10 +886,13 @@ class SessionNamespaceManager:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│              HeartbeatScheduler                      │
+│  HeartbeatScheduler                      │
 │                                                      │
 │  实现: 纯 asyncio (asyncio.create_task)              │
 │  间隔: 可配置（默认 60s）                             │
+│  publisher 类型: Callable[[HeartbeatTriggered],       │
+│                  Awaitable[None]] | None              │
+│  （注意：非 EventPublisher 端口，而是通用异步回调）   │
 │                                                      │
 │  启动:                                               │
 │  start()                                             │
@@ -893,6 +912,7 @@ class SessionNamespaceManager:
 │  一次性调度:                                          │
 │  schedule_heartbeat(id, delay, reason)               │
 │    └── ZADD heartbeat:pending {id: fire_time}       │
+│    用于延迟触发单次心跳（非周期性）                   │
 │                                                      │
 │  优雅停止:                                           │
 │  stop()                                              │
