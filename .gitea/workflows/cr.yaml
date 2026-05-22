@@ -51,7 +51,7 @@ on:
       max_rounds:
         description: '最大循环轮数（0=无限）'
         required: false
-        default: '20'
+        default: '1'
         type: string
       interval:
         description: '每轮间隔秒数'
@@ -64,9 +64,9 @@ on:
         default: 'false'
         type: boolean
 
-  # 定时触发 - 每周一到周五凌晨2点运行持续回归
+  # 定时触发 - 每周一到周六早上九点运行持续回归
   schedule:
-    - cron: '0 2 * * 1-5'
+    - cron: '0 1 * * 1-6'
 
 # ===========================================================================
 # 环境变量配置
@@ -92,7 +92,7 @@ env:
   DEFAULT_PROCESSES: "2"
   DEFAULT_THREADS: "2"
   DEFAULT_MODE: continuous
-  DEFAULT_MAX_ROUNDS: "20"
+  DEFAULT_MAX_ROUNDS: "1"
   DEFAULT_INTERVAL: "2"
 
 # ===========================================================================
