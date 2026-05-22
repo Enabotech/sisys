@@ -72,7 +72,6 @@ class AutoTriggerHandler:
             "CheckpointRecovered",
             "CorrectionClassified",
             "CorrectionApproved",
-            "RoutingDecided",
             "IsolationLevelSwitched",
             "HeartbeatTriggered",
             "StrategicDeviationWarning",

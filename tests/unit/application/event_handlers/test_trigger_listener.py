@@ -50,7 +50,6 @@ class TestAutoTriggerListenerCreation:
             "CheckpointRecovered",
             "CorrectionClassified",
             "CorrectionApproved",
-            "RoutingDecided",
             "IsolationLevelSwitched",
             "HeartbeatTriggered",
             "StrategicDeviationWarning",

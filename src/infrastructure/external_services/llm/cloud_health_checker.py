@@ -13,6 +13,7 @@ Copyright:
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 
@@ -27,23 +28,38 @@ class CloudHealthChecker:
     实现 HealthCheckPort：
     - check(): 检查第一个 enabled 云端模型的 API 可用性
     - close(): 释放 HTTP 客户端资源
+
+    支持 TTL 缓存避免每次路由都执行 HTTP 检查。
     """
 
     def __init__(
         self,
         cloud_configs: list[CloudModelConfig],
         timeout: int = 600,
+        cache_ttl: int = 300,
     ) -> None:
         self._cloud_configs = cloud_configs
         self._timeout = timeout
+        self._cache_ttl = cache_ttl
         self._client: httpx.AsyncClient | None = None
+        # 缓存: (result, timestamp)
+        self._cache: tuple[bool, float] | None = None
 
     async def check(self) -> bool:
         """检查第一个 enabled 云端模型是否可用.
 
+        使用 TTL 缓存避免频繁 HTTP 检查。
+
         Returns:
             True 如果云端 API 可达，False 否则
         """
+        # 检查缓存是否有效
+        if self._cache is not None:
+            cached_result, cached_time = self._cache
+            if time.monotonic() - cached_time < self._cache_ttl:
+                logger.debug("Health check cache hit: %s", cached_result)
+                return cached_result
+
         # 找到第一个 enabled 的云端模型
         target: CloudModelConfig | None = None
         for cloud in self._cloud_configs:
@@ -52,12 +68,16 @@ class CloudHealthChecker:
                 break
 
         if target is None:
+            self._cache = (False, time.monotonic())
             return False
 
         try:
-            return await self._check_model_health(target)
+            result = await self._check_model_health(target)
+            self._cache = (result, time.monotonic())
+            return result
         except Exception:
             logger.exception("Health check failed for %s", target.model)
+            self._cache = (False, time.monotonic())
             return False
 
     async def _check_model_health(self, cloud: CloudModelConfig) -> bool:
@@ -88,3 +108,4 @@ class CloudHealthChecker:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        self._cache = None

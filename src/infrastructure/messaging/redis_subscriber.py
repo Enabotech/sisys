@@ -131,11 +131,11 @@ class RedisEventSubscriber:
                 if message["type"] == "message":
                     channel = message["channel"]
                     data = message["data"]
-                    self._dispatch_message(channel, data)
+                    await self._dispatch_message(channel, data)
         except asyncio.CancelledError:
             logger.debug("RedisEventSubscriber listen loop cancelled")
 
-    def _dispatch_message(self, channel: str, data: str) -> None:
+    async def _dispatch_message(self, channel: str, data: str) -> None:
         """分发消息到注册的处理器
 
         Args:
@@ -170,8 +170,10 @@ class RedisEventSubscriber:
         handlers = self._handlers.get(channel, [])
         for handler in handlers:
             try:
-                # 同步 handler 直接调用
-                handler(event)
+                result = handler(event)
+                # 异步 handler 需要 await
+                if asyncio.iscoroutine(result):
+                    await result
             except Exception as e:
                 logger.error(
                     "Error in handler for channel %s, event %s: %s",

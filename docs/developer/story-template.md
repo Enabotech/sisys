@@ -458,7 +458,7 @@
 |
 └── tests/
     │   ├── contracts/
-|   │   │   ├── test_port_contract_[feature name].py   # 端口契约测试
+    │   │   ├── test_port_contract_[feature name].py   # 端口契约测试
     │   │   └── test_api_contract_[feature name].py    # API 契约测试
     │   ├── unit/[layer]/
     │   │   └── test_[component].py # 单元测试
@@ -555,13 +555,34 @@
 4. [ ] Previous story learnings integrated 前一个故事学习经验已整合
 5. [ ] Sprint status synced to `ready-for-dev`
 
-### 🔧 对抗性审查修复（Adversarial Review Fixes）
+### 🔧 文档审查修复 Docs Review Fixes
 
-> 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有修复项。
+> 如果本 Story 经过 `bmad-review-adversarial-general` 审查，在此记录所有对故事文件的修复项。
 
 | # | 问题 | 严重度 | 修复方案 |
 |---|------|--------|----------|
 | 1 | [问题描述] | P[N] | [修复方案] |
+
+---
+
+### 🔍 代码审查发现 Review Findings
+
+**审查日期:** 2026-05-22
+**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+
+#### 需决策 Decision Needed
+
+- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] **`_build_graph` 需添加 `graph_name` 白名单校验 + 日志警告** — 决策：Option C，对不支持的 graph_name 记录 WARNING 日志但不抛异常，MVP 仅支持 `"BasicAgent"` [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
+
+#### 已修复 Patch
+
+- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] Async handlers未await [redis_subscriber.py:174] — _dispatch_message需async并await协程
+
+#### 已推迟 Defer
+
+- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] HEAD请求405误判 — deferred，可达性检测对MVP足够
+
+---
 
 ### 下一步 Next Steps
 
@@ -587,14 +608,14 @@
 
 本模板适用于所有 Story 创建。根据六边形架构约束和 prd.md NFR 测试覆盖计划，Story 按层类型分类，每层有不同的测试要求：
 
-| 层类型 | Story 类型 | Story 编号范围 | 覆盖率要求 | 测试重点 | 示例 |
-|--------|-----------|---------------|-----------|---------|------|
-| **领域层 (Domain)** | 领域层 Story | Story 1.x | ≥90% | 实体创建/状态转换/领域事件/不变量验证 | Story 1.1: 六边形架构骨架 |
-| **应用层 (Application)** | 应用层 Story | Story 2.x | ≥85% | 用例逻辑/命令处理/查询处理/事务管理 | Story 2.1: 用户注册用例 |
-| **接口层 (Interfaces)** | 接口层 Story | Story 3.x | ≥85% | API 路由/请求响应验证/事件监听/错误处理 | Story 3.1: REST API |
-| **基础设施层 (Infrastructure)** | 基础设施层 Story | Story 0.x, 1.4-1.8 | ≥75% | 连接测试/CRUD 操作/外部适配器/性能基准 | Story 1.4: Redis 缓存层 |
-| **安全层 (Security)** | 安全层 Story | Story 1.9-1.12 | ≥85% | 认证/授权/RBAC/审计日志/渗透测试 | Story 1.9: RBAC 权限控制 |
-| **架构层 (Architecture)** | 架构层 Story | Story 1.13-1.19 | ≥85% | 核心机制 (UDMR/EIP)/路由决策/多 Agent 协作 | Story 1.13: 统一动态模型路由 |
+| 层类型 | Story 类型 | 覆盖率要求 | 测试重点 | 示例 |
+|--------|-----------|-----------|---------|------|
+| **领域层 (Domain)** | 领域层 Story | ≥90% | 实体创建/状态转换/领域事件/不变量验证 | Story 1.1: 六边形架构骨架 |
+| **应用层 (Application)** | 应用层 Story | ≥85% | 用例逻辑/命令处理/查询处理/事务管理 | Story 2.1: 用户注册用例 |
+| **接口层 (Interfaces)** | 接口层 Story | ≥85% | API 路由/请求响应验证/事件监听/错误处理 | Story 3.1: REST API |
+| **基础设施层 (Infrastructure)** | 基础设施层 Story | ≥75% | 连接测试/CRUD 操作/外部适配器/性能基准 | Story 1.4: Redis 缓存层 |
+| **安全层 (Security)** | 安全层 Story | ≥85% | 认证/授权/RBAC/审计日志/渗透测试 | Story 1.9: RBAC 权限控制 |
+| **架构层 (Architecture)** | 架构层 Story | ≥85% | 核心机制 (UDMR/EIP)/路由决策/多 Agent 协作 | Story 1.13: 统一动态模型路由 |
 
 > **注意：**
 > 1. **层编号规则** — Story 0.x 为基础设施准备，Story 1.x 为领域层与安全/架构机制，Story 2.x 为应用层，Story 3.x 为接口层
