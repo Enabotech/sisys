@@ -31,20 +31,20 @@ from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 # ===================================================================
 
 
-class TestEvent(DomainEvent):
+class SampleEvent(DomainEvent):
     """测试用事件类."""
 
-    event_type: str = "TestEvent"
+    event_type: str = "SampleEvent"
 
 
-DomainEvent.register("TestEvent", TestEvent)
+DomainEvent.register("SampleEvent", SampleEvent)
 
 
 def _make_event_dict() -> dict[str, str | int]:
     """构造测试事件 dict."""
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "TestEvent",
+        "event_type": "SampleEvent",
         "timestamp": datetime.now().isoformat(),
         "source": "test",
     }
@@ -63,7 +63,7 @@ class TestSubscribeChannelNameResolution:
         """subscribe("AutoTriggered") 应订阅 Redis channel "sisys:rt:auto_triggered"."""
         router = ChannelRouter()
         mock_publisher = AsyncMock()
-        mock_subscriber = AsyncMock()
+        mock_subscriber = MagicMock()
 
         bus = RedisEventBus(
             publisher=mock_publisher,
@@ -87,7 +87,7 @@ class TestSubscribeChannelNameResolution:
         """subscribe("RoutingDecided") 应订阅 Redis channel "sisys:rt:routing_decided"."""
         router = ChannelRouter()
         mock_publisher = AsyncMock()
-        mock_subscriber = AsyncMock()
+        mock_subscriber = MagicMock()
 
         bus = RedisEventBus(
             publisher=mock_publisher,
@@ -107,7 +107,7 @@ class TestSubscribeChannelNameResolution:
         """未知 event_type 时 get_redis_channel 返回 None，应传递 None 给 subscriber."""
         router = ChannelRouter()
         mock_publisher = AsyncMock()
-        mock_subscriber = AsyncMock()
+        mock_subscriber = MagicMock()
 
         bus = RedisEventBus(
             publisher=mock_publisher,
@@ -145,7 +145,7 @@ class TestSubscribeAsyncMethodExists:
         """RedisEventBus.subscribe_async() 应正确委托给 subscriber.subscribe_async()."""
         router = ChannelRouter()
         mock_publisher = AsyncMock()
-        mock_subscriber = AsyncMock()
+        mock_subscriber = MagicMock()
 
         # subscribe_async 是同步方法，用 MagicMock 避免 RuntimeWarning
         mock_subscriber.subscribe_async = MagicMock()
@@ -191,7 +191,7 @@ class TestHandlerReceivesDomainEvent:
         test_event_id = str(uuid.uuid4())
         subscriber._dispatch_message(
             "sisys:rt:test",
-            f'{{"event_id": "{test_event_id}", "event_type": "TestEvent",'
+            f'{{"event_id": "{test_event_id}", "event_type": "SampleEvent",'
             f' "timestamp": "2026-01-01T00:00:00", "source": "test"}}',
         )
 
@@ -220,7 +220,7 @@ class TestHandlerReceivesDomainEvent:
 
         assert len(received) == 1
         assert isinstance(received[0], DomainEvent)
-        assert received[0].event_type == "TestEvent"
+        assert received[0].event_type == "SampleEvent"
 
 
 # ===================================================================

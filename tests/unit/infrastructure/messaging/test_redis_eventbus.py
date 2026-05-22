@@ -139,7 +139,8 @@ class TestRedisEventBusSubscribe:
         """subscribe should delegate to subscriber.subscribe."""
         router = ChannelRouter()
         publisher = AsyncMock()
-        subscriber = AsyncMock()
+        # RedisEventSubscriber.subscribe 是同步方法，用 MagicMock 避免 RuntimeWarning
+        subscriber = MagicMock()
         bus = RedisEventBus(publisher=publisher, subscriber=subscriber, router=router)
 
         handler = MagicMock()
