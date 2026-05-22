@@ -275,6 +275,7 @@
 | **TDD 单元测试** | UDMRService | 三层决策编排 | `test_udmr_service.py` | Task 3 |
 | **TDD 单元测试** | CloudHealthChecker | 云端健康检查 | `test_cloud_health_checker.py` | Task 3 |
 | **TDD 单元测试** | UDMRHandler | 事件处理器 | `test_udmr_handler.py` | Task 4 |
+| **TDD 单元测试** | DualChannelEventBus.subscribe() | 事件订阅消费机制 | `test_dual_channel_subscribe.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_udmr_basic_routing.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_udmr_basic_routing.py` | Task 0 |
 | **TDD 契约测试** | UdmrPolicyPort | 端口契约 | `test_port_contract_udmr_policy.py` | Task 0 |
@@ -326,7 +327,8 @@
 | AC-2 | UDMRService 三层决策编排 | Task 3 | Subtask 3.1-3.3 | `test_udmr_service.py` |
 | AC-3 | CloudHealthChecker 健康检查 | Task 3 | Subtask 3.4-3.6 | `test_cloud_health_checker.py` |
 | AC-4 | UDMRHandler 事件处理器 | Task 4 | Subtask 4.1-4.3 | `test_udmr_handler.py` |
-| AC-4 | DI 注册 | Task 4 | Subtask 4.4 | `test_integration_udmr_basic_routing.py` |
+| AC-4 | DualChannelEventBus.subscribe() 消费机制 | Task 4 | Subtask 4.4-4.6 | `test_dual_channel_subscribe.py` |
+| AC-4 | DI 注册 | Task 4 | Subtask 4.7 | `test_integration_udmr_basic_routing.py` |
 | AC-5 | 路由性能 + 架构验证 + 集成测试 | Task 5 | Subtask 5.1-5.5 | `test_arch_udmr.py` + `test_integration_udmr_basic_routing.py` |
 
 ---
@@ -470,16 +472,40 @@
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
   - 事件订阅机制：UDMRHandler.subscribe() 订阅 DualChannelEventBus 的 REALTIME 通道 `sisys:rt:auto_routed`
-  - DualChannelEventBus.subscribe() 需在本 Story 或紧邻前置 Story 中实现（当前仅有 publish() 能力）
+  - DualChannelEventBus.subscribe() 在本 Story 中实现（当前仅有 publish() 能力，需新增 subscribe() 消费机制）
   - 测试环境可使用 InMemoryEventBus + InMemoryEventListener 作为 mock
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
+
+#### TDD 循环 [B]：DualChannelEventBus.subscribe() 消费机制
+
+> **前置说明：** DualChannelEventBus 当前仅有 publish() 能力。本 TDD 循环新增 subscribe() 方法，
+> 使消费者可通过 `event_bus.subscribe("AutoRouted", handler)` 注册异步回调。
+> 这是 UDMRHandler 订阅事件的前提能力。
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/messaging/test_dual_channel_subscribe.py` |
+| 🟢 绿 | 扩展 `src/infrastructure/messaging/dual_channel_event_bus.py` 新增 subscribe() |
+| 🔄 重构 | 优化订阅机制，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 4.4: 🔴 红 — 编写 DualChannelEventBus.subscribe() 失败测试
+  - subscribe(event_type, handler) 注册异步回调到内部处理器映射
+  - publish() 时除了发送到 Redis/RabbitMQ，同时调用已注册的本地回调
+  - 多个订阅者同一事件类型均被调用
+  - 订阅者异常不影响其他订阅者和 publish() 返回值
+- [ ] Subtask 4.5: 🟢 绿 — 实现 subscribe() 方法
+  - DualChannelEventBus 新增 `_subscribers: dict[str, list[Callable]]` 实例属性
+  - subscribe(event_type, handler) 注册到 _subscribers
+  - publish() 在发送到外部通道后，调用 _subscribers 中匹配 event_type 的回调
+  - 回调异常捕获并记录日志，不阻断其他订阅者
+- [ ] Subtask 4.6: 🔄 重构 — 优化订阅机制
 
 #### DI 注册
 
 > **六边形架构约束：** UDMRService 构造器注入原始值（local_first, local_model, llm_timeout），不依赖 UDMRConfig 配置对象。
 > 参考 AutoRouteService 模式：`AutoRouteService(..., semantic_threshold=AutoRouteConfig.from_env().semantic_threshold, ...)`。
 
-- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循 lambda resolver: 内联 config 模式）
+- [ ] Subtask 4.7: 更新 `src/composition_root.py` 注册（遵循 lambda resolver: 内联 config 模式）
   - `udmr_policy` → `lambda resolver:` StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
   - `cloud_health_checker` → `lambda resolver:` CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
   - `udmr_service` → `lambda resolver:` UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), policy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
@@ -489,6 +515,7 @@
 
 **完成标准/Definition of Done:**
 - [ ] UDMRHandler 实现完成
+- [ ] DualChannelEventBus.subscribe() 消费机制实现完成
 - [ ] composition_root.py 注册 5 个新组件
 - [ ] TDD 循环全部通过
 
@@ -599,7 +626,7 @@ AutoRouteService (1.14b) → 选择目标 Agent/工具
 > - UDMRHandler 订阅 AutoRouted 事件通过 DualChannelEventBus 的订阅机制实现
 > - InMemoryEventListener 仅用于单元测试和集成测试环境（mock 场景）
 > - DualChannelEventBus 当前发布到 Redis 通道 `sisys:rt:auto_routed`，UDMRHandler 需订阅该通道
-> - **注意：** DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现或作为紧邻前置补充
+> - **注意：** DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现
 >
 > **⚠️ 循环防护（必须实施）：** AutoTriggerHandler._registered_event_types 已包含 "RoutingDecided"，
 > 但其 _process_event() 不检查 causation_id，无条件调用 on_domain_event()，因此 causation_id 方案**不能**防止循环。
@@ -622,6 +649,8 @@ sisys/
 │   ├── infrastructure/
 │   │   ├── config/
 │   │   │   └── udmr.py                     # 新建：UDMRConfig + CloudModelConfig
+│   │   ├── messaging/
+│   │   │   └── dual_channel_event_bus.py   # 更新：新增 subscribe() 消费机制
 │   │   ├── routing/
 │   │   │   └── udmr_policy.py  # 新建：UDMR 策略实现（MVP 静态路由）
 │   │   └── external_services/
@@ -852,6 +881,7 @@ UDMRClient (统一接口)
 - `tests/unit/infrastructure/external_services/llm/test_cloud_health_checker.py` - 健康检查测试
 - `tests/unit/domain/services/test_udmr_service.py` - UDMRService 单元测试
 - `tests/unit/application/event_handlers/test_udmr_handler.py` - UDMRHandler 单元测试
+- `tests/unit/infrastructure/messaging/test_dual_channel_subscribe.py` - DualChannelEventBus.subscribe() 单元测试
 - `tests/unit/architecture/test_arch_udmr.py` - 架构约束测试
 - `tests/contracts/test_port_contract_udmr_policy.py` - 端口契约测试
 - `tests/integration/test_integration_udmr_basic_routing.py` - 集成测试
@@ -859,6 +889,7 @@ UDMRClient (统一接口)
 - `tests/acceptance/test_acceptance_udmr_basic_routing.py` - BDD 步骤实现
 
 **更新的文件/Updated Files:**
+- `src/infrastructure/messaging/dual_channel_event_bus.py` - 新增 subscribe() 消费机制
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
 - `src/domain/ports/__init__.py` - 添加 UdmrPolicyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
@@ -960,6 +991,10 @@ UDMRClient (统一接口)
 > - 设计规则验证：8项全部合规（六边形架构/frozen/DI模式/事件订阅统一/循环防护/端口契约/数据流/MVP限制）
 > - 测试策略验证：6项全部通过（文件清单/覆盖率/TDD循环/隔离约束/契约测试/Gherkin场景）
 > - 文档质量验证：6项全部通过（模板合规/章节完整/内部一致/审查记录/概念澄清/格式规范）
+>
+> **用户补充决策 (2026-05-22):**
+> - 事件订阅统一使用 DualChannelEventBus，InMemoryEventListener 仅供备用或测试需要时使用
+> - DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现（新增 Subtask 4.4-4.6、测试文件、更新文件清单）
 
 ### 下一步 Next Steps
 
@@ -970,7 +1005,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v2.2.0
+**故事版本/Story Version:** v2.3.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -984,3 +1019,4 @@ UDMRClient (统一接口)
 - v2.0.0: 第二批审查 Round 1 — P0:循环防护causation_id无效改为必须排除RoutingDecided；P0:标注事件订阅MVP限制（InMemoryEventBus vs DualChannelEventBus）；P0:标注AutoRouted当前无InMemoryEventListener消费者；P1:data_residency默认值default→CHINA_DOMESTIC；P1:修正Lessons Learned循环防护描述
 - v2.1.0: 第二批审查 Round 2 — P0:DI注册lambda无参写法改为lambda resolver:格式；P0:HealthCheckPort补充close()方法
 - v2.2.0: 第二批审查 Round 3-4 — P0:事件订阅统一DualChannelEventBus（用户决策）；P0:上游task_context字段缺失标注MVP默认值；P0:UDMRHandler DI从event_listener改event_bus
+- v2.3.0: 用户补充决策 — DualChannelEventBus.subscribe()在本Story实现；新增Subtask 4.4-4.6 TDD循环；添加test_dual_channel_subscribe.py；更新dual_channel_event_bus.py文件清单
