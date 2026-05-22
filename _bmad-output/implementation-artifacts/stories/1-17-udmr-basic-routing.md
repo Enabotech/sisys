@@ -471,8 +471,10 @@
   - UDMR_ENABLED=false 时 on_routed() 应直接返回不处理
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
-  - 事件订阅机制：UDMRHandler.subscribe() 订阅 DualChannelEventBus 的 REALTIME 通道 `sisys:rt:auto_routed`
-  - DualChannelEventBus.subscribe() 在本 Story 中实现（当前仅有 publish() 能力，需新增 subscribe() 消费机制）
+  - 事件订阅机制：UDMRHandler 通过 `await event_bus.subscribe_async("AutoRouted", self.on_routed)` 注册异步处理器
+  - 使用 subscribe_async()（非 subscribe()），因为 UDMRService.decide() 是 async 方法
+  - 频道名解析由 ChannelRouter 自动完成（应用层不暴露基础设施层 Redis channel 名）
+  - **启动依赖：** `await event_bus.start()` 必须在 subscribe_async() 之后调用以启动 Redis 监听循环
   - 测试环境可使用 InMemoryEventBus + InMemoryEventListener 作为 mock
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
 
@@ -897,6 +899,8 @@ UDMRClient (统一接口)
 **更新的文件/Updated Files:**
 - `src/infrastructure/messaging/dual_channel_event_bus.py` - 无需修改（subscribe 已实现）
 - `src/infrastructure/messaging/redis_event_bus.py` - 修复 subscribe() 3个BUG（频道名/DomainEvent/subscribe_async）
+- `src/infrastructure/messaging/redis_subscriber.py` - 新增 subscribe_async() 方法（P0-30 修复可能涉及此文件）
+- `src/interfaces/api/app.py` - 添加 event_bus.subscribe_async() + event_bus.start() 调用到 lifespan
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
 - `src/domain/ports/__init__.py` - 添加 UdmrPolicyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
@@ -1007,6 +1011,12 @@ UDMRClient (统一接口)
 > - P0: Story声称"DualChannelEventBus仅有publish()能力"是错误的—subscribe()/subscribe_async()/start()/close()均已实现
 > - P0: RedisEventBus.subscribe()存在3个已知BUG（P0-29/30/31）：频道名不匹配、subscribe_async()调用不存在方法、handler收到dict非DomainEvent
 > - P0: Subtask 4.4-4.6从"从零实现subscribe()"改为"修复RedisEventBus现有BUG"；测试文件重命名为test_redis_event_bus_subscribe_fix.py
+>
+> **第三批 Round 2 (2026-05-22):** 3个并行Agent修复方案+订阅模式+跨文档一致性验证，修复3个P0
+> - P0: UDMRHandler应用subscribe_async()非subscribe()（UDMRService.decide()是async方法，需异步handler）
+> - P0: Subtask 4.2移除基础设施层频道名sisys:rt:auto_routed（应用层通过ChannelRouter自动解析）
+> - P0: 补充bus.start()启动依赖说明（Redis监听循环必须在subscribe_async()后启动，在app.py lifespan中调用）
+> - P1: 更新文件清单添加redis_subscriber.py和app.py
 
 ### 下一步 Next Steps
 
@@ -1017,7 +1027,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v3.0.0
+**故事版本/Story Version:** v3.1.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -1033,3 +1043,4 @@ UDMRClient (统一接口)
 - v2.2.0: 第二批审查 Round 3-4 — P0:事件订阅统一DualChannelEventBus（用户决策）；P0:上游task_context字段缺失标注MVP默认值；P0:UDMRHandler DI从event_listener改event_bus
 - v2.3.0: 用户补充决策 — DualChannelEventBus.subscribe()在本Story实现；新增Subtask 4.4-4.6 TDD循环；添加test_dual_channel_subscribe.py；更新dual_channel_event_bus.py文件清单
 - v3.0.0: 第三批审查 Round 1 — P0:纠正"DualChannelEventBus仅有publish()"错误声明（subscribe已实现）；P0:Subtask 4.4-4.6改为修复RedisEventBus 3个BUG（P0-29/30/31频道名/DomainEvent/subscribe_async）；P0:测试文件重命名
+- v3.1.0: 第三批审查 Round 2 — P0:subscribe_async()替代subscribe()（异步handler）；P0:移除应用层频道名暴露；P0:补充bus.start()启动依赖（app.py lifespan）
