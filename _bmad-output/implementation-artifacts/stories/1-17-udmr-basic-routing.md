@@ -275,7 +275,7 @@
 | **TDD 单元测试** | UDMRService | 三层决策编排 | `test_udmr_service.py` | Task 3 |
 | **TDD 单元测试** | CloudHealthChecker | 云端健康检查 | `test_cloud_health_checker.py` | Task 3 |
 | **TDD 单元测试** | UDMRHandler | 事件处理器 | `test_udmr_handler.py` | Task 4 |
-| **TDD 单元测试** | DualChannelEventBus.subscribe() | 事件订阅消费机制 | `test_dual_channel_subscribe.py` | Task 4 |
+| **TDD 单元测试** | RedisEventBus.subscribe() BUG修复 | 事件订阅消费机制 | `test_redis_event_bus_subscribe_fix.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_udmr_basic_routing.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_udmr_basic_routing.py` | Task 0 |
 | **TDD 契约测试** | UdmrPolicyPort | 端口契约 | `test_port_contract_udmr_policy.py` | Task 0 |
@@ -327,7 +327,7 @@
 | AC-2 | UDMRService 三层决策编排 | Task 3 | Subtask 3.1-3.3 | `test_udmr_service.py` |
 | AC-3 | CloudHealthChecker 健康检查 | Task 3 | Subtask 3.4-3.6 | `test_cloud_health_checker.py` |
 | AC-4 | UDMRHandler 事件处理器 | Task 4 | Subtask 4.1-4.3 | `test_udmr_handler.py` |
-| AC-4 | DualChannelEventBus.subscribe() 消费机制 | Task 4 | Subtask 4.4-4.6 | `test_dual_channel_subscribe.py` |
+| AC-4 | RedisEventBus.subscribe() BUG 修复 | Task 4 | Subtask 4.4-4.6 | `test_redis_event_bus_subscribe_fix.py` |
 | AC-4 | DI 注册 | Task 4 | Subtask 4.7 | `test_integration_udmr_basic_routing.py` |
 | AC-5 | 路由性能 + 架构验证 + 集成测试 | Task 5 | Subtask 5.1-5.5 | `test_arch_udmr.py` + `test_integration_udmr_basic_routing.py` |
 
@@ -476,28 +476,31 @@
   - 测试环境可使用 InMemoryEventBus + InMemoryEventListener 作为 mock
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
 
-#### TDD 循环 [B]：DualChannelEventBus.subscribe() 消费机制
+#### TDD 循环 [B]：RedisEventBus.subscribe() BUG 修复
 
-> **前置说明：** DualChannelEventBus 当前仅有 publish() 能力。本 TDD 循环新增 subscribe() 方法，
-> 使消费者可通过 `event_bus.subscribe("AutoRouted", handler)` 注册异步回调。
-> 这是 UDMRHandler 订阅事件的前提能力。
+> **前置说明：** DualChannelEventBus 已实现 subscribe()/subscribe_async()/start()/close()，
+> 委托给 RedisEventBus。但 RedisEventBus 存在 3 个已知 BUG（sisys-port-impl-refactor P0-29/30/31）：
+> 1. subscribe() 传递 event_type 而非 Redis channel 名给 RedisEventSubscriber（频道名不匹配）
+> 2. subscribe_async() 调用 RedisEventSubscriber 上不存在的 subscribe_async() 方法（AttributeError）
+> 3. handler 收到 dict 而非 DomainEvent（缺少 from_dict 反序列化）
+>
+> 本 TDD 循环修复这 3 个 BUG，使 UDMRHandler 可正确订阅 AutoRouted 事件。
+> 参考：`docs/architecture/sisys-port-impl-refactor.md` P0-29/30/31
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/messaging/test_dual_channel_subscribe.py` |
-| 🟢 绿 | 扩展 `src/infrastructure/messaging/dual_channel_event_bus.py` 新增 subscribe() |
+| 🔴 红 | 编写 `tests/unit/infrastructure/messaging/test_redis_event_bus_subscribe_fix.py` |
+| 🟢 绿 | 修复 `src/infrastructure/messaging/redis_event_bus.py` subscribe() 频道名转换 + DomainEvent 反序列化 |
 | 🔄 重构 | 优化订阅机制，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 4.4: 🔴 红 — 编写 DualChannelEventBus.subscribe() 失败测试
-  - subscribe(event_type, handler) 注册异步回调到内部处理器映射
-  - publish() 时除了发送到 Redis/RabbitMQ，同时调用已注册的本地回调
-  - 多个订阅者同一事件类型均被调用
-  - 订阅者异常不影响其他订阅者和 publish() 返回值
-- [ ] Subtask 4.5: 🟢 绿 — 实现 subscribe() 方法
-  - DualChannelEventBus 新增 `_subscribers: dict[str, list[Callable]]` 实例属性
-  - subscribe(event_type, handler) 注册到 _subscribers
-  - publish() 在发送到外部通道后，调用 _subscribers 中匹配 event_type 的回调
-  - 回调异常捕获并记录日志，不阻断其他订阅者
+- [ ] Subtask 4.4: 🔴 红 — 编写 RedisEventBus.subscribe() BUG 修复失败测试
+  - 频道名转换：subscribe("AutoRouted", handler) 应订阅 Redis channel `sisys:rt:auto_routed`（通过 ChannelRouter 解析）
+  - DomainEvent 反序列化：handler 收到 DomainEvent 对象而非 dict（通过 DomainEvent.from_dict 包裹）
+  - subscribe_async() 存在或降级：确保 subscribe_async() 路径可用
+- [ ] Subtask 4.5: 🟢 绿 — 修复 RedisEventBus.subscribe() 3 个 BUG
+  - redis_event_bus.py subscribe()：调用 `self._router.get_redis_channel(event_type)` 转换频道名
+  - redis_event_bus.py subscribe()：用 DomainEvent.from_dict 包裹 handler 使 subscriber 收到 DomainEvent
+  - redis_event_bus.py subscribe_async() 或 redis_subscriber.py：确保异步 handler 路径可用
 - [ ] Subtask 4.6: 🔄 重构 — 优化订阅机制
 
 #### DI 注册
@@ -623,10 +626,13 @@ AutoRouteService (1.14b) → 选择目标 Agent/工具
 > 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择。
 >
 > **⚠️ 事件订阅统一方案：** 系统统一使用 DualChannelEventBus 作为事件分发机制（Redis REALTIME 通道 + RabbitMQ BATCH 通道）。
-> - UDMRHandler 订阅 AutoRouted 事件通过 DualChannelEventBus 的订阅机制实现
+> DualChannelEventBus 已实现 EventSubscriber Protocol（subscribe/subscribe_async/start/close），
+> 委托给 RedisEventBus。但 RedisEventBus 存在 3 个已知 BUG 需在本 Story 中修复（P0-29/30/31）：
+> - subscribe() 传递 event_type 而非 Redis channel 名 → 频道名不匹配
+> - subscribe_async() 调用不存在的方法 → AttributeError
+> - handler 收到 dict 而非 DomainEvent → 缺少 from_dict 反序列化
+> - composition_root.py 已注册 `event_subscriber` 解析为 `event_publisher`（同一 DualChannelEventBus 实例）
 > - InMemoryEventListener 仅用于单元测试和集成测试环境（mock 场景）
-> - DualChannelEventBus 当前发布到 Redis 通道 `sisys:rt:auto_routed`，UDMRHandler 需订阅该通道
-> - **注意：** DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现
 >
 > **⚠️ 循环防护（必须实施）：** AutoTriggerHandler._registered_event_types 已包含 "RoutingDecided"，
 > 但其 _process_event() 不检查 causation_id，无条件调用 on_domain_event()，因此 causation_id 方案**不能**防止循环。
@@ -881,7 +887,7 @@ UDMRClient (统一接口)
 - `tests/unit/infrastructure/external_services/llm/test_cloud_health_checker.py` - 健康检查测试
 - `tests/unit/domain/services/test_udmr_service.py` - UDMRService 单元测试
 - `tests/unit/application/event_handlers/test_udmr_handler.py` - UDMRHandler 单元测试
-- `tests/unit/infrastructure/messaging/test_dual_channel_subscribe.py` - DualChannelEventBus.subscribe() 单元测试
+- `tests/unit/infrastructure/messaging/test_redis_event_bus_subscribe_fix.py` - RedisEventBus.subscribe() BUG修复测试
 - `tests/unit/architecture/test_arch_udmr.py` - 架构约束测试
 - `tests/contracts/test_port_contract_udmr_policy.py` - 端口契约测试
 - `tests/integration/test_integration_udmr_basic_routing.py` - 集成测试
@@ -889,7 +895,8 @@ UDMRClient (统一接口)
 - `tests/acceptance/test_acceptance_udmr_basic_routing.py` - BDD 步骤实现
 
 **更新的文件/Updated Files:**
-- `src/infrastructure/messaging/dual_channel_event_bus.py` - 新增 subscribe() 消费机制
+- `src/infrastructure/messaging/dual_channel_event_bus.py` - 无需修改（subscribe 已实现）
+- `src/infrastructure/messaging/redis_event_bus.py` - 修复 subscribe() 3个BUG（频道名/DomainEvent/subscribe_async）
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
 - `src/domain/ports/__init__.py` - 添加 UdmrPolicyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
@@ -995,6 +1002,11 @@ UDMRClient (统一接口)
 > **用户补充决策 (2026-05-22):**
 > - 事件订阅统一使用 DualChannelEventBus，InMemoryEventListener 仅供备用或测试需要时使用
 > - DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现（新增 Subtask 4.4-4.6、测试文件、更新文件清单）
+>
+> **第三批 Round 1 (2026-05-22):** 3个并行Agent基于事件总线设计文档深度验证，发现3个P0问题
+> - P0: Story声称"DualChannelEventBus仅有publish()能力"是错误的—subscribe()/subscribe_async()/start()/close()均已实现
+> - P0: RedisEventBus.subscribe()存在3个已知BUG（P0-29/30/31）：频道名不匹配、subscribe_async()调用不存在方法、handler收到dict非DomainEvent
+> - P0: Subtask 4.4-4.6从"从零实现subscribe()"改为"修复RedisEventBus现有BUG"；测试文件重命名为test_redis_event_bus_subscribe_fix.py
 
 ### 下一步 Next Steps
 
@@ -1005,7 +1017,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v2.3.0
+**故事版本/Story Version:** v3.0.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -1020,3 +1032,4 @@ UDMRClient (统一接口)
 - v2.1.0: 第二批审查 Round 2 — P0:DI注册lambda无参写法改为lambda resolver:格式；P0:HealthCheckPort补充close()方法
 - v2.2.0: 第二批审查 Round 3-4 — P0:事件订阅统一DualChannelEventBus（用户决策）；P0:上游task_context字段缺失标注MVP默认值；P0:UDMRHandler DI从event_listener改event_bus
 - v2.3.0: 用户补充决策 — DualChannelEventBus.subscribe()在本Story实现；新增Subtask 4.4-4.6 TDD循环；添加test_dual_channel_subscribe.py；更新dual_channel_event_bus.py文件清单
+- v3.0.0: 第三批审查 Round 1 — P0:纠正"DualChannelEventBus仅有publish()"错误声明（subscribe已实现）；P0:Subtask 4.4-4.6改为修复RedisEventBus 3个BUG（P0-29/30/31频道名/DomainEvent/subscribe_async）；P0:测试文件重命名
