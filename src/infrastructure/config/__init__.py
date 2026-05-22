@@ -19,6 +19,7 @@ from .langgraph import LangGraphConfig
 from .neo4j import Neo4jConfig
 from .rabbitmq import RabbitMQConfig
 from .redis import RedisConfig
+from .udmr import CloudModelConfig, UDMRConfig
 
 __all__ = [
     "LangGraphConfig",
@@ -28,4 +29,6 @@ __all__ = [
     "AutoTriggerConfig",
     "AutoRouteConfig",
     "AutoExecuteConfig",
+    "CloudModelConfig",
+    "UDMRConfig",
 ]

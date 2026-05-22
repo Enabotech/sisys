@@ -40,6 +40,7 @@ from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 from src.domain.ports.session_storage import SessionStorage
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 from src.domain.ports.storage_enums import DataAccessPattern, StorageLayer, StorageTier
+from src.domain.ports.udmr_policy import UdmrPolicyPort
 from src.domain.ports.unified_storage import UnifiedStoragePort
 from src.domain.ports.unit_of_work import UnitOfWork
 from src.domain.ports.workflow_engine import WorkflowEnginePort
@@ -75,5 +76,6 @@ __all__ = [
     "StorageTier",
     "UnifiedStoragePort",
     "UnitOfWork",
+    "UdmrPolicyPort",
     "WorkflowEnginePort",
 ]

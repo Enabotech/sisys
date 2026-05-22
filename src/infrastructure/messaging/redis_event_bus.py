@@ -85,7 +85,8 @@ class RedisEventBus(EventPublisher, EventSubscriber):
             event_type: 事件类型
             handler: 事件处理器
         """
-        await self._subscriber.subscribe(event_type, handler)
+        channel = self._router.get_redis_channel(event_type)
+        self._subscriber.subscribe(channel, handler)
 
     async def subscribe_async(
         self,
@@ -98,7 +99,8 @@ class RedisEventBus(EventPublisher, EventSubscriber):
             event_type: 事件类型
             handler: 异步事件处理器
         """
-        await self._subscriber.subscribe_async(event_type, handler)
+        channel = self._router.get_redis_channel(event_type)
+        self._subscriber.subscribe_async(channel, handler)
 
     async def start(self) -> None:
         """启动订阅者"""
