@@ -96,7 +96,7 @@
 **And** 从 AutoRouted.task_context 提取字段构造 UDMRTask
 **And** 调用 UDMRService.decide() 获取路由决策
 **And** 发布 RoutingDecided 事件（已注册于 ChannelRouter REALTIME 通道）
-**And** RoutingDecided 事件携带 event_id 因果链防止循环触发
+**And** 从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided" 防止循环触发
 **And** 所有组件通过 composition_root.py DI 注册
 
 **验证标准/Validation Criteria:**
@@ -105,6 +105,8 @@
 - [ ] RoutingDecided 事件已在 ChannelRouter 中注册（sisys:rt:routing_decided）
 - [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
 - [ ] 带外模式：AutoExecuteService 不等待 RoutingDecided，UDMR 独立并行处理
+- [ ] 循环防护：从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"
+- [ ] MVP 限制：event_listener.on_event() 模式仅在 InMemoryEventBus 环境有效
 
 ### AC-5: 路由性能与决策质量要求
 
@@ -461,7 +463,7 @@
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 UDMRHandler 失败测试
   - on_routed() 接收 AutoRouted → 从 task_context 提取字段构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
-  - UDMRTask 构造映射：task_id=uuid4(), input=task_context.get("input",""), data_residency=task_context.get("data_residency","default"), preferred_model=task_context.get("preferred_model",""), allowed_models=task_context.get("allowed_models",[])
+  - UDMRTask 构造映射：task_id=uuid4(), input=task_context.get("input",""), data_residency=task_context.get("data_residency","CHINA_DOMESTIC"), preferred_model=task_context.get("preferred_model",""), allowed_models=task_context.get("allowed_models",[])
   - UDMR_ENABLED=false 时 on_routed() 应直接返回不处理
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
@@ -588,10 +590,16 @@ AutoRouteService (1.14b) → 选择目标 Agent/工具
 > RoutingDecided 事件用于审计日志和成本追踪，**不阻塞 AutoExecuteService 执行**。
 > 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择。
 >
-> **⚠️ 循环防护：** AutoTriggerHandler 已注册监听 "RoutingDecided" 事件类型。实现时必须：
-> - UDMRHandler.on_routed() 在构造 RoutingDecided 时设置 causation_id 指向 AutoRouted 事件
-> - 或在 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"
-> - 防止 RoutingDecided → AutoTriggerHandler → AutoTriggered → AutoRouted → UDMRHandler → RoutingDecided 循环
+> **⚠️ 事件订阅 MVP 限制：** 当前系统存在两套事件分发机制：
+> - InMemoryEventListener（进程内同步分发，event_listener.on_event() 模式）
+> - DualChannelEventBus（跨进程异步分发，Redis/RabbitMQ）
+> UDMRHandler 通过 event_listener.on_event("AutoRouted", handler) 注册仅在 MVP/测试环境（InMemoryEventBus）中有效。
+> 生产环境（DualChannelEventBus）需要单独的订阅机制，作为后续 Story 完善。
+>
+> **⚠️ 循环防护（必须实施）：** AutoTriggerHandler._registered_event_types 已包含 "RoutingDecided"，
+> 但其 _process_event() 不检查 causation_id，无条件调用 on_domain_event()，因此 causation_id 方案**不能**防止循环。
+> **必须**从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"（auto_trigger_handler.py 第75行）。
+> 设置 causation_id 仅作为辅助追踪手段，不能作为防护措施。
 
 ### 项目结构说明 Project Structure
 
@@ -761,7 +769,7 @@ UDMRClient (统一接口)
    - selected_model: 从 UdmrPolicyPort.route() 返回值获取
    - cost_actual: MVP 阶段使用估算值（基于云端模型定价或默认 0.0）
    - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
-3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。RoutingDecided 事件携带 event_id 因果链，AutoTriggerHandler 监听 RoutingDecided 不会重新触发完整管线
+3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。循环防护必须从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"（causation_id 不能防止循环）
 4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
 5. **composition_root 注册模式** — 使用 `register_port()` 统一注册，lambda 工厂函数注入依赖
 
@@ -924,6 +932,15 @@ UDMRClient (统一接口)
 > - P1: 依赖方向矩阵标签Strategy→Policy
 > - P2: AC-1默认值false→False（Python布尔值大写）
 > - P2: 中英文间距修正
+>
+> **--- 第二批审查 ---**
+>
+> **第二批 Round 1 (2026-05-22):** 3个并行Agent管线集成/数据模型/DI架构深度验证，修复3个P0+2个P1
+> - P0: causation_id循环防护无效—AutoTriggerHandler不检查causation_id无条件调用on_domain_event()，必须从_registered_event_types排除RoutingDecided
+> - P0: DualChannelEventBus.publish()不调用InMemoryEventListener.dispatch()，event_listener.on_event()模式仅MVP/测试环境有效，生产环境需单独订阅机制
+> - P0: AutoRouted事件当前无InMemoryEventListener消费者（AutoRouteHandler无register_handlers()），UDMRHandler将是第一个
+> - P1: data_residency默认值"default"→"CHINA_DOMESTIC"（与UDMRTask默认值对齐）
+> - P1: Lessons Learned循环防护描述修正（移除causation_id有效性暗示）
 
 ### 下一步 Next Steps
 
@@ -934,7 +951,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v1.6.0
+**故事版本/Story Version:** v2.0.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -945,3 +962,4 @@ UDMRClient (统一接口)
 - v1.4.0: Round 3 审查修复 — P0:标题改为"云端优先静态配置"（与策略一致）；P0:AC-5指标改为"路由决策日志完整性≥95%"（带外模式）；P1:参数合理性说明；P1:健康检查性能指标；P1:ComplianceGatewayImpl已知问题标注
 - v1.5.0: Round 4 审查修复 — P0:追溯矩阵合并虚构Subtask；P0:循环防护改为具体实现指导；P0:CloudHealthChecker多模型策略明确；P0:.pyc清理步骤；P1:价值组5→6；P1:EventPublisher入端口表；P1:字段名/拼写修正；P1:UDMR_ENABLED行为；用户反馈:重命名udmr_policy
 - v1.6.0: Round 5 最终审查修复 — P1:strategy→policy参数名同步重命名；P1:价值组归属2处遗漏修正；P1:UDMRHandler DI补充event_listener注入；P1:依赖矩阵Strategy→Policy标签；P2:false→False；P2:中英文间距
+- v2.0.0: 第二批审查 Round 1 — P0:循环防护causation_id无效改为必须排除RoutingDecided；P0:标注事件订阅MVP限制（InMemoryEventBus vs DualChannelEventBus）；P0:标注AutoRouted当前无InMemoryEventListener消费者；P1:data_residency默认值default→CHINA_DOMESTIC；P1:修正Lessons Learned循环防护描述
