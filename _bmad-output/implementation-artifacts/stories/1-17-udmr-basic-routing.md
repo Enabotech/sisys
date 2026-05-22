@@ -40,18 +40,20 @@
 
 ### AC-1: UDMR 配置模型
 
-**Given** 系统需要配置本地模型（Ollama+Qwen2.5）和多云端模型（MiniMax/DeepSeek 等）
+**Given** 系统需要配置本地模型（Ollama+Qwen2.5）和多云端模型（MiniMax/DeepSeek/GLM 等）
 **When** UDMRConfig.from_env() 解析环境变量
 **Then** 支持 UDMR_ENABLED、UDMR_LOCAL_FIRST、UDMR_LOCAL_MODEL 等公共配置
 **And** 支持 UDMR_CLOUD_0_* 到 UDMR_CLOUD_9_* 多云端模型配置
-**And** 每个云端配置包含 api_type(openai/anthropic/custom)、endpoint、api_key、model、enabled
+**And** api_type 支持业界主流格式：`openai`（OpenAI Chat Completions）、`anthropic`（Anthropic Messages API）、`openai_responses`（OpenAI Responses API 新一代）
+**And** Anthropic 类型必须提供 max_tokens 参数（Anthropic API 必需）
 **And** 配置为 frozen dataclass，不可变
 
 **验证标准/Validation Criteria:**
 - [ ] UDMRConfig frozen dataclass 定义（`src/infrastructure/config/udmr.py`）
-- [ ] CloudModelConfig frozen dataclass 定义
+- [ ] CloudModelConfig frozen dataclass 定义，api_type 使用 `Literal["openai", "anthropic", "openai_responses"]`
+- [ ] CloudModelConfig 包含 max_tokens 字段（Anthropic 必需）
 - [ ] from_env() 解析所有 UDMR_* 环境变量
-- [ ] 默认值合理：enabled=True, local_first=false, timeout=600, healthcheck_interval=300
+- [ ] 默认值合理：enabled=True, local_first=false, timeout=600, healthcheck_interval=300, max_tokens=4096
 - [ ] 向后兼容 UDMR_CLOUD_MODELS 环境变量
 
 ### AC-2: UDMR 静态路由决策
@@ -149,10 +151,16 @@
   - 字段: enabled(bool), local_first(bool), local_model(str), llm_timeout(int), healthcheck_interval(int), cloud_configs(list[CloudModelConfig])
   - from_env() 类方法
 - [ ] CloudModelConfig 配置（同文件）
-  - 字段: api_type(str), endpoint(str), api_key(str), model(str), enabled(bool)
+  - 字段: api_type(Literal["openai","anthropic","openai_responses"]), endpoint(str), api_key(str), model(str), enabled(bool), max_tokens(int|None), temperature(float)
+  - api_type 值说明:
+    - `openai` — OpenAI Chat Completions 格式（覆盖 DeepSeek/Zhipu/Qwen/Baidu V2/Ollama）
+    - `anthropic` — Anthropic Messages API 格式（覆盖 Anthropic/MiniMax 推荐）
+    - `openai_responses` — OpenAI Responses API 新一代格式
+  - max_tokens: Anthropic 必需，其他可选
 - [ ] UDMRService 领域服务（`src/domain/services/udmr_service.py`）
   - 方法: async decide(task: UDMRTask) -> RoutingDecided
-  - 职责: L1 合规检查 + 静态路由策略 + 日志持久化 + 事件发布
+  - 构造器注入原始值（不依赖 UDMRConfig）：local_first: bool, local_model: str, llm_timeout: int
+  - 职责: L1 合规检查 + 静态路由策略 + 日志持久化（含 selected_model/cost_actual/fallback_reason）+ 事件发布
 
 #### 统一端口定义注册与管理 (Port Contract)
 
@@ -160,7 +168,7 @@
 - [ ] `ComplianceGatewayPort`（`src/domain/ports/compliance_gateway.py`）— L1 合规网关
   - 版本: 1.0, owner: compliance-team, 已在 registry 注册
 - [ ] `HealthCheckPort`（`src/domain/ports/health_check.py`）— 健康检查
-  - 版本: 1.0, owner: infrastructure-team, 已在 registry 注册
+  - 版本: 1.0, owner: infrastructure-team, 端口已定义但需新建实现注册
 - [ ] `RoutingDecisionLogRepository`（`src/domain/ports/routing_decision_log_repository.py`）— 路由日志持久化
   - 版本: 1.0, owner: auto-invocation-team, 已在 registry 注册
 - [ ] `EventPublisher`（`src/domain/ports/event_publisher.py`）— 事件发布
@@ -177,7 +185,7 @@
 | 端口名称 | 版本 | Owner | 注册 | 解析 | 契约测试 | 状态 |
 |---------|------|-------|------|------|---------|------|
 | ComplianceGatewayPort | 1.0 | compliance-team | ✅ | ✅ | ✅ | 复用 |
-| HealthCheckPort | 1.0 | infrastructure-team | ✅ | ✅ | ✅ | 复用 |
+| HealthCheckPort | 1.0 | infrastructure-team | 新建 | 新建 | 新建 | **新建** |
 | RoutingDecisionLogRepository | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
 | StaticRoutingStrategyPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
 
@@ -446,11 +454,14 @@
 
 #### DI 注册
 
+> **六边形架构约束：** UDMRService 构造器注入原始值（local_first, local_model, llm_timeout），不依赖 UDMRConfig 配置对象。
+> 参考 AutoRouteService 模式：`AutoRouteService(..., semantic_threshold=AutoRouteConfig.from_env().semantic_threshold, ...)`。
+
 - [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册
   - `udmr_config` → UDMRConfig.from_env()
-  - `static_routing_strategy` → StaticRoutingStrategyImpl(config)
-  - `cloud_health_checker` → CloudHealthChecker(config)
-  - `udmr_service` → UDMRService(compliance_gateway, strategy, health_checker, log_repo, publisher, config)
+  - `static_routing_strategy` → StaticRoutingStrategyImpl(cloud_configs=config.cloud_configs, local_model=config.local_model)
+  - `cloud_health_checker` → CloudHealthChecker(cloud_configs=config.cloud_configs, timeout=config.llm_timeout)
+  - `udmr_service` → UDMRService(compliance_gateway, strategy, health_checker, log_repo, publisher, local_first=config.local_first, local_model=config.local_model, llm_timeout=config.llm_timeout)
   - `udmr_handler` → UDMRHandler(udmr_service)
 
 **完成标准/Definition of Done:**
@@ -600,7 +611,7 @@ sisys/
 |------|---------|------|
 | ComplianceGatewayPort | `src/domain/ports/compliance_gateway.py` | L1 合规网关端口 |
 | ComplianceGatewayImpl | `src/infrastructure/security/compliance_gateway_impl.py` | L1 合规网关实现 |
-| HealthCheckPort | `src/domain/ports/health_check.py` | 健康检查端口 |
+| HealthCheckPort | `src/domain/ports/health_check.py` | 健康检查端口（端口已定义，需新建实现注册） |
 | RoutingDecisionLog | `src/domain/entities/routing_decision_log.py` | 含 UDMR 扩展字段 |
 | RoutingDecisionLogRepository | `src/domain/ports/routing_decision_log_repository.py` | 日志持久化端口 |
 | InMemoryRoutingDecisionLogRepository | `src/infrastructure/messaging/inmemory_routing_decision_log_repository.py` | 内存实现 |
@@ -612,6 +623,9 @@ sisys/
 
 ### 环境变量设计
 
+> **业界调研基础：** api_type 支持 3 种主流格式，覆盖 95%+ 国内外大模型提供商。
+> 详细调研参见 [LLM API 调研报告](#llm-api-兼容性调研)。
+
 ```bash
 # UDMR 公共配置
 export UDMR_ENABLED=true
@@ -620,20 +634,90 @@ export UDMR_LOCAL_MODEL=qwen2.5:7b
 export UDMR_LLM_TIMEOUT=600
 export UDMR_HEALTHCHECK_INTERVAL=300
 
-# UDMR 云端模型配置 - MiniMax
+# 云端模型 0 — MiniMax (Anthropic 模式，官方推荐，支持 thinking block)
 export UDMR_CLOUD_0_ENABLED=true
 export UDMR_CLOUD_0_API_TYPE=anthropic
 export UDMR_CLOUD_0_ENDPOINT=https://api.minimax.chat/anthropic
 export UDMR_CLOUD_0_API_KEY=""
 export UDMR_CLOUD_0_MODEL=MiniMax-M2.7
+export UDMR_CLOUD_0_MAX_TOKENS=4096
 
-# UDMR 云端模型配置 - DeepSeek
+# 云端模型 1 — DeepSeek (OpenAI 兼容格式)
 export UDMR_CLOUD_1_ENABLED=true
 export UDMR_CLOUD_1_API_TYPE=openai
 export UDMR_CLOUD_1_ENDPOINT=https://api.deepseek.com
 export UDMR_CLOUD_1_API_KEY=""
 export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
+
+# 云端模型 2 — 智谱 GLM (OpenAI 兼容格式，可选扩展)
+# export UDMR_CLOUD_2_ENABLED=true
+# export UDMR_CLOUD_2_API_TYPE=openai
+# export UDMR_CLOUD_2_ENDPOINT=https://open.bigmodel.cn/api/paas/v4
+# export UDMR_CLOUD_2_API_KEY=""
+# export UDMR_CLOUD_2_MODEL=glm-5.1
 ```
+
+#### api_type 与业界模型兼容性映射
+
+| api_type | 兼容提供商 | Endpoint 示例 | 认证方式 |
+|----------|-----------|--------------|---------|
+| `openai` | OpenAI, DeepSeek, Zhipu GLM, Qwen/DashScope, Baidu ERNIE V2, Ollama | `https://api.deepseek.com` | Bearer Token |
+| `anthropic` | Anthropic, MiniMax(推荐) | `https://api.minimax.chat/anthropic` | x-api-key header |
+| `openai_responses` | OpenAI(新), Ollama(新) | `https://api.openai.com/v1` | Bearer Token |
+
+#### Anthropic 格式关键差异（开发时必须处理）
+
+| 维度 | OpenAI 格式 | Anthropic 格式 | UDMR 处理要求 |
+|------|-----------|---------------|-------------|
+| 认证头 | `Authorization: Bearer xxx` | `x-api-key: xxx` + `anthropic-version: 2023-06-01` | 适配器切换认证方式 |
+| system 消息 | messages 中 role=system | top-level `system` 参数 | Anthropic 调用时提取 system |
+| max_tokens | 可选（默认 inf） | **必需** | CloudModelConfig.max_tokens 提供默认值 |
+| content 格式 | `"string"` 或 array | 必须是 array | Anthropic 调用时转换格式 |
+| 响应 usage | prompt/completion/total | input_tokens/output_tokens | 响应统一层转换 |
+
+### LLM API 兼容性调研
+
+> **调研日期:** 2026-05-22
+> **调研范围:** OpenAI, Anthropic, DeepSeek, Zhipu GLM, MiniMax, Qwen/DashScope, Baidu ERNIE, Ollama, LiteLLM
+
+#### API 格式统一性分析
+
+| 提供商 | 兼容 OpenAI | 兼容 Anthropic | Base URL | 备注 |
+|--------|:---------:|:-----------:|----------|------|
+| **OpenAI** | ✅ 原生 | — | `https://api.openai.com/v1` | 行业标准 |
+| **Anthropic** | — | ✅ 原生 | `https://api.anthropic.com` | 独立格式 |
+| **DeepSeek** | ✅ 完全 | — | `https://api.deepseek.com` | 直接兼容 |
+| **Zhipu GLM** | ✅ 完全 | — | `https://open.bigmodel.cn/api/paas/v4` | 直接兼容 |
+| **MiniMax** | ✅ | ✅ **推荐** | `https://api.minimax.chat/anthropic` | Anthropic 模式支持 thinking |
+| **Qwen** | ✅ 完全 | — | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 兼容模式 endpoint |
+| **Baidu ERNIE** | ✅ V2 | — | `https://qianfan.baidubce.com/v2` | V2 兼容，V1 遗留 OAuth 不支持 |
+| **Ollama** | ✅ 完全 | — | `http://localhost:11434` | 无认证，本地推理 |
+
+#### 统一抽象层架构
+
+```
+UDMRClient (统一接口)
+    ├── OpenAIAdapter (api_type=openai)
+    │   └── 直接传递（行业标准格式，无需转换）
+    │
+    ├── AnthropicAdapter (api_type=anthropic)
+    │   ├── 请求转换: system 提取 + content 数组化 + max_tokens 注入
+    │   ├── 认证适配: x-api-key header + anthropic-version
+    │   └── 响应转换: content[0].text → message.content
+    │
+    └── OpenAIResponsesAdapter (api_type=openai_responses)
+        └── 增量流式处理 + 状态管理（V2+ 扩展）
+```
+
+#### 故障切换策略（参考 LiteLLM 最佳实践）
+
+| 参数 | 建议值 | 说明 |
+|------|--------|------|
+| cooldown_time | 30s | 云端模型失败后冷却期 |
+| retries | 3 | 单次请求最大重试次数 |
+| allowed_fails | 3 | 连续失败阈值，触发冷却 |
+| healthcheck_interval | 300s | 健康检查周期 |
+| retry_after | 0.5s | 重试间隔（指数退避可选） |
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story
 
@@ -641,7 +725,10 @@ export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
 
 **关键学习/Key Learnings:**
 1. **配置 frozen 约束** — 重构 Phase 3 统一所有 auto-invocation 配置为 frozen=True，UDMRConfig 必须遵循
-2. **路由决策日志必须实例化** — 重构 P2-3 修复了 RoutingDecisionLog 从未实例化的问题，UDMR 必须填充 UDMR 扩展字段
+2. **路由决策日志必须实例化并填充扩展字段** — 重构 P2-3 修复了 RoutingDecisionLog 从未实例化的问题；AutoRouteService._persist_decision_log() 仅填充基础字段（source_agent/target_agent），UDMR 扩展字段（selected_model/cost_actual/fallback_reason）留空。本 Story UDMRService._persist_decision_log() 必须正确填充：
+   - selected_model: 从 StaticRoutingStrategyPort.route() 返回值获取
+   - cost_actual: MVP阶段使用估算值（基于云端模型定价或默认0.0）
+   - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
 3. **事件处理器解耦** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式
 4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
 5. **composition_root 注册模式** — 使用 `register_port()` 统一注册，lambda 工厂函数注入依赖
@@ -699,7 +786,7 @@ export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
 - [x] SDD+TDD 融合开发要求定义完成
 - [x] 项目结构对齐统一规范
 - [x] 已有可复用组件清单明确
-- [x] 环境变量设计与用户需求对齐
+- [x] 环境变量设计与业界主流 LLM API 调研对齐
 - [x] UDMR 路由 vs 自主路由关系澄清
 - [x] 端口契约清单（4 个复用 + 1 个新建）
 
@@ -728,6 +815,7 @@ export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
 
 **更新的文件/Updated Files:**
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
+- `src/domain/ports/__init__.py` - 添加 StaticRoutingStrategyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
 - `src/composition_root.py` - 新增 5 个 DI 注册
 
@@ -756,7 +844,11 @@ export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
 
 ### 🔧 对抗性审查修复（Adversarial Review Fixes）
 
-> 暂无审查记录。
+> **Round 1 (2026-05-22):** 基于3个并行Agent调研实际代码实现，发现并修复4个P0问题
+> - P0-1: UDMRService 构造器从依赖 UDMRConfig 改为注入原始值（local_first/local_model/llm_timeout），遵循六边形架构
+> - P0-2: 扩展 Lessons Learned 明确 UDMRService._persist_decision_log() 必须填充 selected_model/cost_actual/fallback_reason
+> - P0-3: 文件清单添加 src/domain/ports/__init__.py 导出 StaticRoutingStrategyPort
+> - P0-4: HealthCheckPort 状态从"复用"修正为"新建"（composition_root.py 未注册，需新建实现注册）
 
 ### 下一步 Next Steps
 
@@ -767,8 +859,10 @@ export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
 
 ---
 
-**故事版本/Story Version:** v1.0.0
+**故事版本/Story Version:** v1.2.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
+- v1.1.0: 融入业界 LLM API 调研成果（OpenAI/Anthropic/DeepSeek/Zhipu/MiniMax/Qwen/Baidu/Ollama/LiteLLM）；api_type 从 str 改为 Literal["openai","anthropic","openai_responses"]；CloudModelConfig 新增 max_tokens 字段；新增 API 兼容性映射表和统一抽象层架构；新增故障切换策略参考 LiteLLM 最佳实践
+- v1.2.0: Round 1 审查修复 — P0-1:UDMRService构造器改原始值注入；P0-2:明确_persist_decision_log填充UDMR扩展字段；P0-3:添加ports/__init__.py导出；P0-4:HealthCheckPort状态修正为"新建"
