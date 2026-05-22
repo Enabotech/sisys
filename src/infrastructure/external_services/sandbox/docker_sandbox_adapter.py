@@ -31,13 +31,14 @@ class DockerSandboxAdapter(SandboxExecutor):
     使用 Docker 容器提供任务执行隔离，每个会话获得独立容器和资源限制
 
     Attributes:
-        _running_containers: 正在运行的容器状态字典（类级别共享）
+        _running_containers: 正在运行的容器状态字典（实例级别）
 
     Note:
         资源限制 — CPU: 1 核, 内存: 512MB, 网络: 禁用, 文件系统: 隔离临时目录
     """
 
-    _running_containers: dict[str, bool] = {}
+    def __init__(self) -> None:
+        self._running_containers: dict[str, bool] = {}
 
     async def start_container(self, session_id: str) -> None:
         """启动指定会话的 Docker 容器
@@ -141,8 +142,3 @@ class DockerSandboxAdapter(SandboxExecutor):
             正在运行返回 True，否则返回 False
         """
         return self._running_containers.get(session_id, False)
-
-    @classmethod
-    def reset_all_containers(cls) -> None:
-        """重置所有容器状态（仅用于测试）"""
-        cls._running_containers.clear()

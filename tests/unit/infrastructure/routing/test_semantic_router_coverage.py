@@ -27,10 +27,10 @@ from src.infrastructure.routing.semantic_router import (
 class TestSemanticRouterInit:
     """测试 SemanticRouter 初始化"""
 
-    def test_init_with_cache_ttl_seconds(self) -> None:
-        """初始化时应正确存储 cache_ttl_seconds 参数"""
-        router = SemanticRouter(cache_ttl_seconds=3600)
-        assert router._cache_ttl == 3600
+    def test_init_without_optional_params(self) -> None:
+        """初始化时不带可选参数应正常工作"""
+        router = SemanticRouter()
+        assert router._candidates == {}
 
     def test_init_with_embedding_model(self) -> None:
         """初始化时应正确存储 embedding_model"""
@@ -384,3 +384,73 @@ class TestSemanticRouterCandidateCount:
         # 删除不存在的
         router.remove_candidate("nonexistent")
         assert router.candidate_count == 3
+
+
+class TestSemanticRouterLRUCache:
+    """测试 LRU embedding 缓存行为"""
+
+    def test_cache_hit_avoids_model_call(self) -> None:
+        """缓存命中时应直接返回缓存结果"""
+        mock_model = AsyncMock(spec=EmbeddingModelProtocol)
+        mock_model.embed.return_value = [[0.1] * 10]
+        router = SemanticRouter(embedding_model=mock_model)
+
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(router._get_task_embedding("test-text"))
+            loop.run_until_complete(router._get_task_embedding("test-text"))
+        finally:
+            loop.close()
+
+        # 模型只应调用一次（第二次命中缓存）
+        assert mock_model.embed.call_count == 1
+
+    def test_cache_evicts_at_max_size(self) -> None:
+        """缓存超过 MAX_CACHE_SIZE 时应淘汰最旧条目"""
+        mock_model = AsyncMock(spec=EmbeddingModelProtocol)
+        mock_model.embed.side_effect = lambda texts: [[0.1] * 10 for _ in texts]
+        router = SemanticRouter(embedding_model=mock_model)
+        router.MAX_CACHE_SIZE = 3
+
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        try:
+            # 填充缓存至 MAX_CACHE_SIZE
+            for i in range(3):
+                loop.run_until_complete(router._get_task_embedding(f"text-{i}"))
+            assert len(router._embedding_cache) == 3
+
+            # 添加第 4 个条目，最旧的 text-0 应被淘汰
+            loop.run_until_complete(router._get_task_embedding("text-3"))
+            assert len(router._embedding_cache) == 3
+            assert "text-0" not in router._embedding_cache
+            assert "text-3" in router._embedding_cache
+        finally:
+            loop.close()
+
+    def test_cache_lru_order_on_access(self) -> None:
+        """访问已有条目应将其移至最近使用位置"""
+        mock_model = AsyncMock(spec=EmbeddingModelProtocol)
+        mock_model.embed.side_effect = lambda texts: [[0.1] * 10 for _ in texts]
+        router = SemanticRouter(embedding_model=mock_model)
+        router.MAX_CACHE_SIZE = 3
+
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        try:
+            for i in range(3):
+                loop.run_until_complete(router._get_task_embedding(f"text-{i}"))
+
+            # 访问 text-0 使其变为最近使用
+            loop.run_until_complete(router._get_task_embedding("text-0"))
+
+            # 添加新条目，text-1 应被淘汰（而非 text-0）
+            loop.run_until_complete(router._get_task_embedding("text-new"))
+            assert "text-0" in router._embedding_cache
+            assert "text-1" not in router._embedding_cache
+        finally:
+            loop.close()

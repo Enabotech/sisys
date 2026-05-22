@@ -14,20 +14,6 @@ from __future__ import annotations
 
 import bisect
 from collections.abc import Sequence
-from dataclasses import dataclass
-
-
-@dataclass
-class HashNode:
-    """哈希环节点数据类
-
-    Attributes:
-        node_id: 节点唯一标识
-        weight: 加权一致性哈希的权重值
-    """
-
-    node_id: str
-    weight: int = 1
 
 
 class HashRouter:

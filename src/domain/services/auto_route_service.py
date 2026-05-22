@@ -16,12 +16,17 @@ Copyright:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import uuid
+from datetime import UTC, datetime
 
+from src.domain.entities.routing_decision_log import RoutingDecisionLog
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
 from src.domain.ports.event_publisher import EventPublisher
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
+from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
 from src.domain.ports.semantic_router_protocol import SemanticRouterProtocol
 
 logger = logging.getLogger(__name__)
@@ -44,6 +49,8 @@ class AutoRouteService:
         publisher: EventPublisher | None = None,
         hash_router: HashRouterProtocol | None = None,
         semantic_router: SemanticRouterProtocol | None = None,
+        semantic_threshold: float = 0.7,
+        decision_log_repo: RoutingDecisionLogRepository | None = None,
     ):
         """初始化 AutoRouteService
 
@@ -51,10 +58,14 @@ class AutoRouteService:
             publisher: 事件发布器端口（基础设施实现）。传入 None 用于独立测试
             hash_router: 哈希路由器端口（基础设施实现）。传入 None 禁用哈希路由
             semantic_router: 语义路由器端口（基础设施实现）。传入 None 禁用语义路由
+            semantic_threshold: 语义路由最小相似度阈值，低于此值回退到哈希路由
+            decision_log_repo: 路由决策日志仓储端口。传入 None 禁用日志持久化
         """
         self._publisher = publisher
         self._hash_router = hash_router
         self._semantic_router = semantic_router
+        self._semantic_threshold = semantic_threshold
+        self._decision_log_repo = decision_log_repo
 
     async def on_triggered_event(self, event: AutoTriggered) -> AutoRouted:
         """处理 AutoTriggered 事件：执行路由决策并发出 AutoRouted 事件
@@ -69,6 +80,9 @@ class AutoRouteService:
 
         # Determine route type and target based on available routers
         route_type, route_target, route_score = await self._make_routing_decision(event)
+
+        # Persist routing decision log asynchronously
+        self._persist_decision_log(event, route_type, route_target, route_score)
 
         routed = AutoRouted(
             route_type=route_type,
@@ -108,9 +122,8 @@ class AutoRouteService:
 
         # Determine final route type and target
         if hash_target and semantic_target:
-            # In mixed mode, prefer semantic routing (more intelligent matching)
-            # when it returns a valid target
-            if semantic_target:
+            # In mixed mode, prefer semantic routing when score exceeds threshold
+            if semantic_target and semantic_score >= self._semantic_threshold:
                 route_type = "mixed"
                 route_target = semantic_target
                 route_score = semantic_score
@@ -156,3 +169,37 @@ class AutoRouteService:
         except Exception as e:
             logger.error("Failed to publish AutoRouted event: %s", e)
             raise
+
+    def _persist_decision_log(
+        self,
+        event: AutoTriggered,
+        route_type: str,
+        route_target: str,
+        route_score: float,
+    ) -> None:
+        """异步持久化路由决策日志"""
+        if self._decision_log_repo is None:
+            return
+
+        log_entry = RoutingDecisionLog(
+            log_id=uuid.uuid4(),
+            task_id=event.source_event_type or "unknown",
+            session_id=event.session_id,
+            route_type=route_type,
+            route_target=route_target,
+            route_score=route_score,
+            timestamp=datetime.now(UTC),
+        )
+
+        async def _save() -> None:
+            if self._decision_log_repo is None:
+                return
+            try:
+                await self._decision_log_repo.save(log_entry)
+            except Exception as e:
+                logger.warning("Failed to persist routing decision log: %s", e)
+
+        try:
+            asyncio.get_running_loop().create_task(_save())
+        except RuntimeError:
+            logger.debug("No running loop, skipping async decision log persist")

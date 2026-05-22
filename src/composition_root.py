@@ -115,6 +115,7 @@ def bootstrap() -> None:
     from src.domain.services.auto_trigger_service import AutoTriggerService
 
     # === Storage Layer ===
+    from src.infrastructure.config.auto_route import AutoRouteConfig
     from src.infrastructure.config.redis import RedisConfig
     from src.infrastructure.external_services.sandbox.session_namespace_manager import (
         SessionNamespaceManager,
@@ -788,6 +789,22 @@ def bootstrap() -> None:
         owner="auto-invocation-team",
     )
 
+    # RoutingDecisionLogRepository — 路由决策日志仓储
+    from src.domain.ports.routing_decision_log_repository import RoutingDecisionLogRepository
+    from src.infrastructure.messaging.inmemory_routing_decision_log_repository import (
+        InMemoryRoutingDecisionLogRepository,
+    )
+
+    register_port(
+        name="routing_decision_log_repository",
+        version="v1.0.0",
+        interface=RoutingDecisionLogRepository,
+        impl=lambda resolver: InMemoryRoutingDecisionLogRepository(),
+        module="src.infrastructure.messaging.inmemory_routing_decision_log_repository",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
     register_port(
         name="auto_route_service",
         version="v1.0.0",
@@ -796,6 +813,8 @@ def bootstrap() -> None:
             publisher=resolver.resolve("event_publisher"),
             hash_router=resolver.resolve("hash_router"),
             semantic_router=resolver.resolve("semantic_router"),
+            semantic_threshold=AutoRouteConfig.from_env().semantic_threshold,
+            decision_log_repo=resolver.resolve("routing_decision_log_repository"),
         ),
         module="src.domain.services.auto_route_service",
         lifetime=Lifetime.SINGLETON,
@@ -993,7 +1012,7 @@ def bootstrap() -> None:
         tags=("agent", "langgraph"),
     )
 
-    # OrchestrationService — 应用层编排服务
+    # OrchestrationService — 应用层编排服务（service 注册，非 port）
     from src.application.services.orchestration_service import OrchestrationService
 
     register_port(
@@ -1007,7 +1026,7 @@ def bootstrap() -> None:
         module="src.application.services.orchestration_service",
         lifetime=Lifetime.SINGLETON,
         owner="platform",
-        tags=("orchestration", "application"),
+        tags=("orchestration", "application", "service"),
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))

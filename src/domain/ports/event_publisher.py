@@ -41,18 +41,3 @@ class EventPublisher(Protocol):
         Returns:
             PublishResult: 发布结果的不可变数据类
         """
-
-
-@runtime_checkable
-class InMemoryEventPublisher(Protocol):
-    """内存事件发布器协议（已废弃，请使用 EventPublisher）
-
-    保留仅为向后兼容，新代码应使用 EventPublisher Protocol
-    """
-
-    def publish(self, event: DomainEvent) -> None:
-        """发布领域事件
-
-        Args:
-            event: 待发布的领域事件
-        """

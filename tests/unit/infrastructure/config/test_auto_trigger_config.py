@@ -118,3 +118,9 @@ class TestAutoTriggerConfigFromEnv:
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(ValueError, match="Invalid TRIGGER_MAX_RETRIES"):
                 AutoTriggerConfig.from_env()
+
+    def test_config_is_frozen(self) -> None:
+        """Should be immutable (frozen dataclass)."""
+        config = AutoTriggerConfig()
+        with pytest.raises(AttributeError):
+            setattr(config, "trigger_enabled", False)

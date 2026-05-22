@@ -20,7 +20,6 @@ class TestAutoRouteConfig:
         assert config.route_type == "mixed"
         assert config.semantic_threshold == 0.7
         assert config.hash_ring_size == 150
-        assert config.cache_ttl_seconds == 86400
 
     def test_from_env_defaults(self) -> None:
         """Should use defaults when env vars not set."""
@@ -30,7 +29,6 @@ class TestAutoRouteConfig:
             assert config.route_type == "mixed"
             assert config.semantic_threshold == 0.7
             assert config.hash_ring_size == 150
-            assert config.cache_ttl_seconds == 86400
 
     def test_from_env_route_enabled_true(self) -> None:
         """Should parse ROUTE_ENABLED=true."""
@@ -146,30 +144,6 @@ class TestAutoRouteConfig:
             with pytest.raises(ValueError, match="Invalid HASH_RING_SIZE value"):
                 AutoRouteConfig.from_env()
 
-    def test_from_env_cache_ttl(self) -> None:
-        """Should parse ROUTE_CACHE_TTL."""
-        with patch.dict(os.environ, {"ROUTE_CACHE_TTL": "3600"}):
-            config = AutoRouteConfig.from_env()
-            assert config.cache_ttl_seconds == 3600
-
-    def test_from_env_cache_ttl_zero(self) -> None:
-        """Should raise on ROUTE_CACHE_TTL=0."""
-        with patch.dict(os.environ, {"ROUTE_CACHE_TTL": "0"}):
-            with pytest.raises(ValueError, match="Invalid ROUTE_CACHE_TTL value"):
-                AutoRouteConfig.from_env()
-
-    def test_from_env_cache_ttl_negative(self) -> None:
-        """Should raise on negative ROUTE_CACHE_TTL."""
-        with patch.dict(os.environ, {"ROUTE_CACHE_TTL": "-1"}):
-            with pytest.raises(ValueError, match="Invalid ROUTE_CACHE_TTL value"):
-                AutoRouteConfig.from_env()
-
-    def test_from_env_cache_ttl_not_number(self) -> None:
-        """Should raise on non-numeric ROUTE_CACHE_TTL."""
-        with patch.dict(os.environ, {"ROUTE_CACHE_TTL": "abc"}):
-            with pytest.raises(ValueError, match="Invalid ROUTE_CACHE_TTL value"):
-                AutoRouteConfig.from_env()
-
     def test_from_env_all_params(self) -> None:
         """Should parse all environment variables."""
         with patch.dict(
@@ -179,7 +153,6 @@ class TestAutoRouteConfig:
                 "ROUTE_TYPE": "hash",
                 "SEMANTIC_THRESHOLD": "0.9",
                 "HASH_RING_SIZE": "300",
-                "ROUTE_CACHE_TTL": "7200",
             },
         ):
             config = AutoRouteConfig.from_env()
@@ -187,4 +160,16 @@ class TestAutoRouteConfig:
             assert config.route_type == "hash"
             assert config.semantic_threshold == 0.9
             assert config.hash_ring_size == 300
-            assert config.cache_ttl_seconds == 7200
+
+    def test_config_is_frozen(self) -> None:
+        """Should be immutable (frozen dataclass)."""
+        config = AutoRouteConfig()
+        with pytest.raises(AttributeError):
+            setattr(config, "route_enabled", False)
+
+    def test_from_env_returns_frozen_instance(self) -> None:
+        """from_env() should return frozen instance."""
+        with patch.dict(os.environ, {}, clear=True):
+            config = AutoRouteConfig.from_env()
+            with pytest.raises(AttributeError):
+                setattr(config, "semantic_threshold", 0.5)

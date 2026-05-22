@@ -69,18 +69,15 @@ class SemanticRouter:
         self,
         candidates: Sequence[Candidate] | None = None,
         embedding_model: EmbeddingModelProtocol | None = None,
-        cache_ttl_seconds: int = 86400,  # 24 小时，用于缓存大小限制而非过期
     ):
         """初始化语义路由器
 
         Args:
             candidates: 初始候选项列表（Agent/工具），None 表示创建空路由器
             embedding_model: 嵌入模型端口，用于计算任务嵌入（可选）
-            cache_ttl_seconds: 内存缓存 TTL（默认 24 小时，用于大小限制）
         """
         self._candidates = {c.candidate_id: c for c in candidates} if candidates else {}
         self._embedding_model = embedding_model
-        self._cache_ttl = cache_ttl_seconds
         self._embedding_cache: OrderedDict[str, list[float]] = OrderedDict()  # LRU 缓存
 
     def add_candidate(self, candidate: Candidate) -> None:

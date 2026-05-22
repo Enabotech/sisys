@@ -104,7 +104,7 @@ def sandbox() -> Generator[DockerSandboxAdapter, None, None]:
     """Create DockerSandboxAdapter for testing."""
     adapter = DockerSandboxAdapter()
     yield adapter
-    adapter.reset_all_containers()
+    adapter._running_containers.clear()
 
 
 @pytest.fixture

@@ -10,7 +10,6 @@ Copyright:
 
 """
 
-from ..ports.event_publisher import InMemoryEventPublisher
 from .agent_events import AgentDecided
 from .audit_events import AuditActionType, AuditEvent
 from .auto_execute_events import AutoExecuted
@@ -53,7 +52,6 @@ __all__ = [
     "AutoExecuted",
     "AutoRouted",
     "AutoTriggered",
-    "InMemoryEventPublisher",
     "DeviationLevel",
     "DeviationType",
     "CorrectionType",
