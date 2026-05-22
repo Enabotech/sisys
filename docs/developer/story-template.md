@@ -646,13 +646,21 @@
 
 ---
 
+**故事版本/Story Version:** v[0.0.0]
+**创建日期/Created:** [2026-03-04]
+**最后更新/Last Updated:** [2026-05-12]
+**更新说明/Description:**
+- v[0.0.0]: 创建故事文件
+
+<!-- 仅用作跟踪故事文件模板修订记录，故事开发时[务必删除]此段
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-03-04
 **最后更新/Last Updated:** 2026-05-12
-**更新说明:**
+**更新说明/Description:**
 - v2.7.0: 对齐 domain/ports/contract 契约层、Registry/Resolver/ContractGate、Composition Root 与接口清单强约束
 - v2.5.0: 新增 BDD 步骤实现文件 `test_acceptance_[feature name].py` 编写要求（Story 1.15b 实战经验）
 - v2.4.0: 补充 asyncio.run() 使用场景说明（Story 1.4 实战经验）：(1) 独立脚本用 asyncio.run()，pytest-xdist 并行测试 BDD 步骤用 event_loop fixture；(2) 根据场景选择正确的并发测试手段；(3) asyncio.gather() 用于真正的并发测试
 - v2.3.0: 新增 BDD 验收测试与 pytest-asyncio 配合规则（Story 1.14c 实战经验）：(1) BDD 步骤函数不用 @pytest.mark.asyncio；(2) 用 event_loop.run_until_complete() 运行 async；(3) 同一中文文本可能需要同时支持 given/when 装饰器
 - v2.2.0: 新增并行测试隔离规则（Story 20-1 实战经验）：(1) UUID 前缀隔离资源；(2) autouse cleanup 陷阱；(3) asyncio.Lock 类变量规则；(4) pytest-asyncio auto mode 配置
 - v2.1.0: 新增测试隔离与数据清理约束：(1) 强制使用 transaction rollback；(2) Schema 初始化必须在 fixture 内完成；(3) 禁止手动 delete/truncate
+-->
