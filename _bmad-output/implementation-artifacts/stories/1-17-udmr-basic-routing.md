@@ -53,8 +53,8 @@
 - [ ] CloudModelConfig frozen dataclass 定义，api_type 使用 `Literal["openai", "anthropic", "openai_responses"]`
 - [ ] CloudModelConfig 包含 max_tokens 字段（Anthropic 必需）
 - [ ] from_env() 解析所有 UDMR_* 环境变量
+- [ ] from_env() 对 api_type=="anthropic" 且 max_tokens 缺失时抛出 ValueError
 - [ ] 默认值合理：enabled=True, local_first=false, timeout=600, healthcheck_interval=300, max_tokens=4096
-- [ ] 向后兼容 UDMR_CLOUD_MODELS 环境变量
 
 ### AC-2: UDMR 静态路由决策
 
@@ -91,16 +91,19 @@
 
 **Given** 自主调用管线已完成（AutoTriggered → AutoRouted → AutoExecuted）
 **When** AutoRouted 事件发布后
-**Then** UDMRHandler 消费 AutoRouted 事件
+**Then** UDMRHandler 并行消费 AutoRouted 事件（带外模式，不阻塞 AutoExecuteService）
+**And** 从 AutoRouted.task_context 提取字段构造 UDMRTask
 **And** 调用 UDMRService.decide() 获取路由决策
 **And** 发布 RoutingDecided 事件（已注册于 ChannelRouter REALTIME 通道）
+**And** RoutingDecided 事件携带 event_id 因果链防止循环触发
 **And** 所有组件通过 composition_root.py DI 注册
 
 **验证标准/Validation Criteria:**
 - [ ] UDMRHandler 应用层事件处理器（`src/application/event_handlers/udmr_handler.py`）
-- [ ] composition_root.py 注册：udmr_config、udmr_service、udmr_handler、cloud_health_checker
+- [ ] composition_root.py 注册：static_routing_strategy、cloud_health_checker、udmr_service、udmr_handler（遵循 lambda 内联 config 模式）
 - [ ] RoutingDecided 事件已在 ChannelRouter 中注册（sisys:rt:routing_decided）
 - [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
+- [ ] 带外模式：AutoExecuteService 不等待 RoutingDecided，UDMR 独立并行处理
 
 ### AC-5: 路由性能要求
 
@@ -175,7 +178,7 @@
 
 **新建端口：**
 - [ ] `StaticRoutingStrategyPort`（`src/domain/ports/static_routing_strategy.py`）— 静态路由策略抽象
-  - 方法: async route(task: UDMRTask, compliance_result: ComplianceResult) -> tuple[str, str, float | None]
+  - 方法: async route(task: UDMRTask, compliance_result: ComplianceResult) -> tuple[str, str, str | None]
   - 返回: (route_type, selected_model, fallback_reason)
   - 版本: 1.0, owner: routing-team
   - 端口契约测试: `tests/contracts/test_port_contract_static_routing_strategy.py`
@@ -210,7 +213,7 @@
 
 **领域层零依赖原则** — UDMRService 仅依赖：
 - Python 标准库（dataclasses, uuid, datetime, logging, asyncio）
-- 领域端口（ComplianceGatewayPort, StaticRoutingStrategyPort, RoutingDecisionLogRepository, EventPublisher）
+- 领域端口（ComplianceGatewayPort, StaticRoutingStrategyPort, HealthCheckPort, RoutingDecisionLogRepository, EventPublisher）
 - 领域值对象（UDMRTask, ComplianceResult）
 - 领域事件（RoutingDecided）
 - 领域实体（RoutingDecisionLog）
@@ -358,8 +361,8 @@
 
 **完成标准/Definition of Done:**
 - [ ] UDMRConfig + CloudModelConfig frozen dataclass 实现
-- [ ] from_env() 支持解析所有 UDMR_* 环境变量
-- [ ] 向后兼容 UDMR_CLOUD_MODELS 环境变量
+- [ ] from_env() 支持解析所有 UDMR_* 环境变量（循环解析 UDMR_CLOUD_0_* 到 UDMR_CLOUD_9_*，最多10组）
+- [ ] from_env() 对 api_type=="anthropic" 且 max_tokens 缺失时抛出 ValueError
 - [ ] TDD 循环全部通过
 
 ---
@@ -447,7 +450,8 @@
 | 🔄 重构 | 优化事件处理逻辑 |
 
 - [ ] Subtask 4.1: 🔴 红 — 编写 UDMRHandler 失败测试
-  - on_routed() 接收 AutoRouted → 构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
+  - on_routed() 接收 AutoRouted → 从 task_context 提取字段构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
+  - UDMRTask 构造映射：task_id=uuid4(), input=task_context.get("input",""), data_residency=task_context.get("data_residency","default"), preferred_model=task_context.get("preferred_model",""), allowed_models=task_context.get("allowed_models",[])
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
@@ -457,12 +461,11 @@
 > **六边形架构约束：** UDMRService 构造器注入原始值（local_first, local_model, llm_timeout），不依赖 UDMRConfig 配置对象。
 > 参考 AutoRouteService 模式：`AutoRouteService(..., semantic_threshold=AutoRouteConfig.from_env().semantic_threshold, ...)`。
 
-- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册
-  - `udmr_config` → UDMRConfig.from_env()
-  - `static_routing_strategy` → StaticRoutingStrategyImpl(cloud_configs=config.cloud_configs, local_model=config.local_model)
-  - `cloud_health_checker` → CloudHealthChecker(cloud_configs=config.cloud_configs, timeout=config.llm_timeout)
-  - `udmr_service` → UDMRService(compliance_gateway, strategy, health_checker, log_repo, publisher, local_first=config.local_first, local_model=config.local_model, llm_timeout=config.llm_timeout)
-  - `udmr_handler` → UDMRHandler(udmr_service)
+- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循现有 lambda 内联 config 模式）
+  - `static_routing_strategy` → lambda: StaticRoutingStrategyImpl(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
+  - `cloud_health_checker` → lambda: CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), strategy=resolver.resolve("static_routing_strategy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_handler` → lambda: UDMRHandler(udmr_service=resolver.resolve("udmr_service"))
 
 **完成标准/Definition of Done:**
 - [ ] UDMRHandler 实现完成
@@ -555,16 +558,22 @@
 | 决策算法 | hash + semantic | L1 合规 → L3 静态路由 |
 | 触发时机 | Phase 2 | Phase 2.5 |
 
-**数据流:**
+**数据流（MVP 带外模式）：**
 ```
 AutoTriggered (1.14a)
     ↓
 AutoRouteService (1.14b) → 选择目标 Agent/工具
     ↓ 发布 AutoRouted 事件
-UDMRService (1.17) → 选择本地/云端模型
-    ↓ 发布 RoutingDecided 事件
-AutoExecuteService (1.14c) → 执行任务
+    ├── AutoExecuteService (1.14c) → 执行任务（不等待 UDMR）
+    │
+    └── [并行/带外] UDMRService (1.17) → 选择本地/云端模型
+        ↓ 发布 RoutingDecided 事件
+        └→ 审计/日志/成本追踪（不影响现有管线）
 ```
+
+> **⚠️ 架构说明：** MVP 阶段 UDMR 为**带外（out-of-band）处理器**，与 AutoExecuteService 并行消费 AutoRouted 事件。
+> RoutingDecided 事件用于审计日志和成本追踪，**不阻塞 AutoExecuteService 执行**。
+> 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择。
 
 ### 项目结构说明 Project Structure
 
@@ -729,7 +738,7 @@ UDMRClient (统一接口)
    - selected_model: 从 StaticRoutingStrategyPort.route() 返回值获取
    - cost_actual: MVP阶段使用估算值（基于云端模型定价或默认0.0）
    - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
-3. **事件处理器解耦** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式
+3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。RoutingDecided 事件携带 event_id 因果链，AutoTriggerHandler 监听 RoutingDecided 不会重新触发完整管线
 4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
 5. **composition_root 注册模式** — 使用 `register_port()` 统一注册，lambda 工厂函数注入依赖
 
@@ -817,6 +826,7 @@ UDMRClient (统一接口)
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
 - `src/domain/ports/__init__.py` - 添加 StaticRoutingStrategyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
+- `src/infrastructure/external_services/llm/__init__.py` - 新建目录及包初始化
 - `src/composition_root.py` - 新增 5 个 DI 注册
 
 ---
@@ -849,6 +859,18 @@ UDMRClient (统一接口)
 > - P0-2: 扩展 Lessons Learned 明确 UDMRService._persist_decision_log() 必须填充 selected_model/cost_actual/fallback_reason
 > - P0-3: 文件清单添加 src/domain/ports/__init__.py 导出 StaticRoutingStrategyPort
 > - P0-4: HealthCheckPort 状态从"复用"修正为"新建"（composition_root.py 未注册，需新建实现注册）
+>
+> **Round 2 (2026-05-22):** 基于3个并行Agent调研，发现并修复3个P0问题+6个P1问题
+> - P0-1: 事件流架构矛盾 — 数据流从顺序改为带外并行模式（AutoExecuteService不等待RoutingDecided）
+> - P0-2: AutoRouted.task_context→UDMRTask映射补充完整字段映射规范
+> - P0-3: RoutingDecided循环风险 — 补充event_id因果链防循环机制
+> - P0-4: StaticRoutingStrategyPort.route()返回类型修正 float|None → str|None
+> - P1: 移除"向后兼容UDMR_CLOUD_MODELS"（无代码依据）
+> - P1: DI注册改为lambda内联UDMRConfig.from_env()模式（遵循现有惯例）
+> - P1: 零依赖原则列表补充HealthCheckPort
+> - P1: 文件清单添加external_services/llm/__init__.py
+> - P1: AC-1补充api_type=="anthropic"时max_tokens必需验证
+> - P1: AC-4补充带外模式验证标准
 
 ### 下一步 Next Steps
 
@@ -859,10 +881,11 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v1.2.0
+**故事版本/Story Version:** v1.3.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
 - v1.0.0: 创建故事文件
 - v1.1.0: 融入业界 LLM API 调研成果（OpenAI/Anthropic/DeepSeek/Zhipu/MiniMax/Qwen/Baidu/Ollama/LiteLLM）；api_type 从 str 改为 Literal["openai","anthropic","openai_responses"]；CloudModelConfig 新增 max_tokens 字段；新增 API 兼容性映射表和统一抽象层架构；新增故障切换策略参考 LiteLLM 最佳实践
 - v1.2.0: Round 1 审查修复 — P0-1:UDMRService构造器改原始值注入；P0-2:明确_persist_decision_log填充UDMR扩展字段；P0-3:添加ports/__init__.py导出；P0-4:HealthCheckPort状态修正为"新建"
+- v1.3.0: Round 2 审查修复 — P0:事件流从顺序改为带外并行模式；P0:补充AutoRouted→UDMRTask字段映射；P0:补充RoutingDecided因果链防循环；P0:修正route()返回类型float→str；P1:移除UDMR_CLOUD_MODELS兼容；P1:DI改lambda内联模式；P1:补充HealthCheckPort到零依赖列表；P1:添加llm/__init__.py到文件清单
