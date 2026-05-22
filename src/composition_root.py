@@ -1067,6 +1067,7 @@ def bootstrap() -> None:
         impl=lambda resolver: CloudHealthChecker(
             cloud_configs=UDMRConfig.from_env().cloud_configs,
             timeout=UDMRConfig.from_env().llm_timeout,
+            cache_ttl=UDMRConfig.from_env().healthcheck_interval,
         ),
         module="src.infrastructure.external_services.llm.cloud_health_checker",
         lifetime=Lifetime.SINGLETON,

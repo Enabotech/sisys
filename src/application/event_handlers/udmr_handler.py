@@ -78,7 +78,10 @@ class UDMRHandler:
 
         # 调用 UDMRService.decide()
         try:
-            decided = await self._udmr_service.decide(task)
+            decided = await self._udmr_service.decide(
+                task,
+                causation_id=event.event_id,
+            )
             logger.info(
                 "UDMR decided: route_type=%s, model=%s",
                 decided.route_type,

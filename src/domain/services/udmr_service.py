@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -61,7 +62,11 @@ class UDMRService:
         self._local_model = local_model
         self._llm_timeout = llm_timeout
 
-    async def decide(self, task: UDMRTask) -> RoutingDecided:
+    async def decide(
+        self,
+        task: UDMRTask,
+        causation_id: uuid.UUID | None = None,
+    ) -> RoutingDecided:
         """执行 UDMR 路由决策.
 
         决策流程：
@@ -81,14 +86,26 @@ class UDMRService:
         compliance_result = await self._check_compliance(task)
 
         # 2. 静态路由策略
-        assert self._policy is not None  # MVP 阶段保证注入
+        if self._policy is None:
+            raise RuntimeError("UDMRService requires a policy for routing decisions")
         route_type, selected_model, fallback_reason = await self._policy.route(task, compliance_result)
 
-        # 3. 健康检查
+        # 3. 健康检查（带延迟测量）
+        health_start = time.monotonic()
         health_passed = await self._check_health()
-        health_latency = 0.0
+        health_latency = (time.monotonic() - health_start) * 1000  # ms
 
-        # 4. 构造 RoutingDecided 事件
+        # 4. 健康检查失败时云端路由回退本地
+        if route_type == "cloud" and not health_passed:
+            logger.info(
+                "Cloud health check failed, falling back to local (was: %s)",
+                selected_model,
+            )
+            route_type = "local"
+            selected_model = self._local_model
+            fallback_reason = "health_check_failed"
+
+        # 5. 构造 RoutingDecided 事件
         event = RoutingDecided(
             task_id=task.task_id,
             route_type=route_type,
@@ -103,6 +120,7 @@ class UDMRService:
                 "reason": compliance_result.reason,
             },
             correlation_id=task.task_id,
+            causation_id=causation_id,
         )
 
         # 5. 发布事件

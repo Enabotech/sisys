@@ -72,6 +72,7 @@ class TestUDMRDomainZeroDependency:
             "asyncio",
             "uuid",
             "datetime",
+            "time",
             "src.domain",
         )
 

@@ -173,7 +173,8 @@ class TestSubscribeAsyncMethodExists:
 class TestHandlerReceivesDomainEvent:
     """验证 handler 收到 DomainEvent 对象而非 dict."""
 
-    def test_dispatch_message_deserializes_to_domain_event(self) -> None:
+    @pytest.mark.asyncio
+    async def test_dispatch_message_deserializes_to_domain_event(self) -> None:
         """_dispatch_message 应调用 DomainEvent.from_dict 反序列化."""
         from src.infrastructure.config.redis import RedisConfig
 
@@ -189,7 +190,7 @@ class TestHandlerReceivesDomainEvent:
 
         # 模拟 Redis 消息（使用合法 UUID）
         test_event_id = str(uuid.uuid4())
-        subscriber._dispatch_message(
+        await subscriber._dispatch_message(
             "sisys:rt:test",
             f'{{"event_id": "{test_event_id}", "event_type": "SampleEvent",'
             f' "timestamp": "2026-01-01T00:00:00", "source": "test"}}',
@@ -198,7 +199,8 @@ class TestHandlerReceivesDomainEvent:
         assert len(received) == 1
         assert isinstance(received[0], DomainEvent), f"Handler received {type(received[0])}, expected DomainEvent"
 
-    def test_dispatch_message_with_real_event_dict(self) -> None:
+    @pytest.mark.asyncio
+    async def test_dispatch_message_with_real_event_dict(self) -> None:
         """使用完整事件 dict 测试反序列化."""
         import json
 
@@ -216,7 +218,7 @@ class TestHandlerReceivesDomainEvent:
 
         event_dict = _make_event_dict()
         json_str = json.dumps(event_dict)
-        subscriber._dispatch_message("sisys:rt:test", json_str)
+        await subscriber._dispatch_message("sisys:rt:test", json_str)
 
         assert len(received) == 1
         assert isinstance(received[0], DomainEvent)

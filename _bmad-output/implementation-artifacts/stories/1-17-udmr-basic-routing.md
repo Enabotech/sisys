@@ -54,7 +54,7 @@
 - [ ] CloudModelConfig 包含 max_tokens 字段（Anthropic 必需）
 - [ ] from_env() 解析所有 UDMR_* 环境变量
 - [ ] from_env() 对 api_type=="anthropic" 且 max_tokens 缺失时抛出 ValueError
-- [ ] 默认值合理：enabled=True, local_first=False, llm_timeout=600, healthcheck_interval=300, max_tokens=4096
+- [ ] 默认值合理：enabled=True, local_first=False, llm_timeout=600, healthcheck_interval=300, max_tokens=None（Anthropic 必需时由 from_env() 验证强制设置）
 
 ### AC-2: UDMR 静态路由决策
 
@@ -565,6 +565,33 @@
 - [x] `tests` 完成清单已逐项验证确认
 - [x] 开发结束验收测试通过
 - [x] Story 可进入 `done`（Redis BUG fix 待后续 Story）
+
+---
+
+### Review Findings（代码审查发现）
+
+**审查日期:** 2026-05-22
+**审查模式:** full（Blind Hunter + Edge Case Hunter + Acceptance Auditor）
+
+#### 已修复 Patch
+
+- [x] [Review][Patch] Async handlers未await [redis_subscriber.py:174] — _dispatch_message需async并await协程
+- [x] [Review][Patch] 循环防护缺失 [auto_trigger_handler.py:75] — RoutingDecided应从_registered_event_types移除
+- [x] [Review][Patch] Missing causation_id [udmr_handler.py + udmr_service.py] — RoutingDecided需关联原始事件event_id
+- [x] [Review][Patch] health_check_latency_ms硬编码 [udmr_service.py:89] — 应测量实际延迟而非固定0.0
+- [x] [Review][Patch] 健康检查缓存缺失 [cloud_health_checker.py] — AC-3要求TTL缓存避免频繁HTTP检查
+- [x] [Review][Patch] 生产assert风险 [udmr_service.py:49] — 改为显式RuntimeError验证
+- [x] [Review][Patch] 健康检查影响路由决策 [udmr_service.py] — 云端健康失败时回退本地
+- [x] [Review][Patch] AC-1 max_tokens规范更新 [1-17-udmr-basic-routing.md:57] — 默认值改为None（Anthropic必需时强制验证）
+
+#### 已推迟 Defer
+
+- [x] [Review][Defer] cost_actual硬编码 — deferred，MVP设计决策已记录
+- [x] [Review][Defer] HEAD请求405误判 — deferred，可达性检测对MVP足够
+- [x] [Review][Defer] UDMRHandler缺少unregister — deferred，MVP非必需
+- [x] [Review][Defer] RoutingDecisionLog.validate()未调用 — deferred，MVP非必需
+- [x] [Review][Defer] allowed=False未处理 — deferred，MVP合规仅影响forced_local
+- [x] [Review][Defer] Fire-and-forget任务追踪 — deferred，预存在设计模式
 
 ---
 

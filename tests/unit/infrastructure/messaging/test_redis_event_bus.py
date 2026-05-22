@@ -159,7 +159,8 @@ class TestRedisEventSubscriber:
         subscriber.subscribe("sisys:rt:test", handler)
         assert "sisys:rt:test" in subscriber._handlers
 
-    def test_deserializes_json_event(self):
+    @pytest.mark.asyncio
+    async def test_deserializes_json_event(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
@@ -180,12 +181,13 @@ class TestRedisEventSubscriber:
         message = json.dumps(event.to_dict())
 
         # 手动分发（模拟 pubsub 接收）
-        subscriber._dispatch_message("sisys:rt:test", message)
+        await subscriber._dispatch_message("sisys:rt:test", message)
 
         assert len(received) == 1
         assert received[0].event_type == "DocumentProcessed"
 
-    def test_handles_deserialization_error(self):
+    @pytest.mark.asyncio
+    async def test_handles_deserialization_error(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
@@ -201,7 +203,7 @@ class TestRedisEventSubscriber:
 
         subscriber.subscribe("sisys:rt:test", handler, error_handler=error_handler)
 
-        subscriber._dispatch_message("sisys:rt:test", "{invalid json")
+        await subscriber._dispatch_message("sisys:rt:test", "{invalid json")
 
         assert len(errors) == 1
 
@@ -288,7 +290,8 @@ class TestRedisEventSubscriber:
 
         assert len(subscriber._handlers["channel1"]) == 2
 
-    def test_subscribe_only_first_error_handler_is_used(self):
+    @pytest.mark.asyncio
+    async def test_subscribe_only_first_error_handler_is_used(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
@@ -309,12 +312,13 @@ class TestRedisEventSubscriber:
         subscriber.subscribe("ch1", handler, error_handler=first_error_handler)
         subscriber.subscribe("ch1", handler, error_handler=second_error_handler)
 
-        subscriber._dispatch_message("ch1", "{bad")
+        await subscriber._dispatch_message("ch1", "{bad")
 
         assert len(first_errors) == 1
         assert len(second_errors) == 0
 
-    def test_dispatch_calls_all_handlers_even_if_first_raises(self):
+    @pytest.mark.asyncio
+    async def test_dispatch_calls_all_handlers_even_if_first_raises(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
@@ -337,16 +341,17 @@ class TestRedisEventSubscriber:
             parse_result={"pages": 5},
             embedding=[0.1] * 1024,
         )
-        subscriber._dispatch_message("ch1", json.dumps(event.to_dict()))
+        await subscriber._dispatch_message("ch1", json.dumps(event.to_dict()))
 
         assert results == ["h1", "h2"]
 
-    def test_dispatch_logs_warning_for_no_handlers(self):
+    @pytest.mark.asyncio
+    async def test_dispatch_logs_warning_for_no_handlers(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 
         config = RedisConfig()
         subscriber = RedisEventSubscriber(config)
-        subscriber._dispatch_message("nonexistent", '{"key": "value"}')
+        await subscriber._dispatch_message("nonexistent", '{"key": "value"}')
 
     @pytest.mark.asyncio
     async def test_start_is_idempotent(self):
