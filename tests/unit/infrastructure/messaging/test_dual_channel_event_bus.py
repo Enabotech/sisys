@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
 from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
@@ -43,7 +43,7 @@ class TestDualChannelEventBusPublish:
         """REALTIME event should be published via RedisEventBus."""
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
-        redis_result = PublishResult(event_id="test-123", redis_success=True)
+        redis_result = PublishResult(event_id="test-123", results=(ChannelResult("realtime", True),))
         redis_bus.publish = AsyncMock(return_value=redis_result)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
         bus = DualChannelEventBus(redis_bus=redis_bus, rabbitmq_bus=rabbitmq_bus, router=router)
@@ -64,7 +64,7 @@ class TestDualChannelEventBusPublish:
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
-        rabbitmq_result = PublishResult(event_id="test-123", outbox_saved=True)
+        rabbitmq_result = PublishResult(event_id="test-123", results=(ChannelResult("reliable", True),))
         rabbitmq_bus.publish = AsyncMock(return_value=rabbitmq_result)
         bus = DualChannelEventBus(redis_bus=redis_bus, rabbitmq_bus=rabbitmq_bus, router=router)
 

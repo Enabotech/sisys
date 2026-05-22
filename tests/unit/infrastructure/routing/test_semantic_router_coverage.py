@@ -327,12 +327,12 @@ class TestSemanticRouterCosineSimilarity:
 
     @staticmethod
     def test_cosine_similarity_different_lengths() -> None:
-        """不同长度的向量应正常计算（zip 会截断到较短长度）"""
+        """不同长度的向量应分别计算模值"""
         vec1 = [1.0, 0.0]
         vec2 = [1.0, 0.0, 1.0]  # 多一个元素
-        # zip 后只比较前两个元素，应为 1.0
+        # dot=1, mag_a=1, mag_b=√2, score=1/√2≈0.7071
         score = SemanticRouter._cosine_similarity(vec1, vec2)
-        assert score == 1.0
+        assert abs(score - 0.7071) < 0.001
 
     @staticmethod
     def test_cosine_similarity_fractional_values() -> None:

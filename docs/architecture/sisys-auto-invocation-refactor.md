@@ -997,30 +997,56 @@ def __init__(self) -> None:
 
 ## 5. 执行步骤
 
-### Phase 1：P0 关键 Bug 修复
+### Phase 1：P0 关键 Bug 修复 ✅ 完成
 
-- [ ] **1.1** 修正 composition_root.py 中 DockerSandboxAdapter 的 impl 和 module 路径（P0-1）
-- [ ] **1.2** 修正 composition_root.py 中 RedisSnapshotStore 的 impl 和 module 路径（P0-1）
-- [ ] **1.3** 从 AutoRouteHandler 移除 `_publish` 方法和 `publisher` 构造参数（P0-2）
-- [ ] **1.4** 修复 SemanticRouter._cosine_similarity：分别计算各向量模值（P0-4）
-- [ ] **1.5** 在 composition_root 中添加 7 个自主调用组件注册（排除 `auto_trigger_handler`，因其依赖 `event_listener` 端口，该端口在 Phase 2 步骤 2.3 才创建）（P0-3）
-- [ ] **1.6** 运行 `poetry run pytest tests/unit/infrastructure/routing/ tests/unit/domain/services/ -v` 验证
-- [ ] **1.7** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [x] **1.1** 修正 composition_root.py 中 DockerSandboxAdapter 的 impl 和 module 路径（P0-1）
+- [x] **1.2** 修正 composition_root.py 中 RedisSnapshotStore 的 impl 和 module 路径（P0-1）
+- [x] **1.3** 从 AutoRouteHandler 移除 `_publish` 方法和 `publisher` 构造参数（P0-2）
+- [x] **1.4** 修复 SemanticRouter._cosine_similarity：分别计算各向量模值（P0-4）
+- [x] **1.5** 在 composition_root 中添加 7 个自主调用组件注册（排除 `auto_trigger_handler`，因其依赖 `event_listener` 端口，该端口在 Phase 2 步骤 2.3 才创建）（P0-3）
+- [x] **1.6** 运行 `poetry run pytest tests/unit/infrastructure/routing/ tests/unit/domain/services/ -v` 验证
+- [x] **1.7** 运行 `poetry run pytest --tb=short -q` 全量回归 — **结果：4193 passed, 0 failed**
 
-### Phase 2：P1 架构违规修复
+### Phase 2：P1 架构违规修复 ✅ 完成
 
-- [ ] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
-- [ ] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
-- [ ] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
-- [ ] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
-- [ ] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/inmemory_event_listener.py`（P1-4）
-- [ ] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/inmemory_dead_letter_queue.py`（P1-4）
-- [ ] **2.7** 在 composition_root 中注册 `event_listener` 端口（使用迁移后的路径 `src.infrastructure.messaging.inmemory_event_listener.InMemoryEventListener`）（P1-3，见 Section 3.1.1 前置依赖）
-- [ ] **2.8** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
-- [ ] **2.9** AutoExecuteService.on_routed_event 参数改为 AutoRouted（P1-5）
-- [ ] **2.10** 简化 AutoTriggerContext.from_domain_event 提取逻辑（P1-6）
-- [ ] **2.11** 更新所有导入引用和测试
-- [ ] **2.12** 运行 `poetry run pytest --tb=short -q` 全量回归
+- [x] **2.1** 从 CheckpointSnapshot 移除 to_redis_hash/from_redis_hash，在 RedisSnapshotStore 中创建 mapper（P1-1）
+- [x] **2.2** 重构 PublishResult 为 ChannelResult + PublishResult，适配 2 个子总线构造站点（RedisEventBus/RabbitMQEventBus）+ InMemoryEventBus + DualChannelEventBus 透传（P1-2）
+- [x] **2.3** 创建 `src/domain/ports/event_listener.py`（EventListener + EventListenerAsync Protocol）（P1-3）
+- [x] **2.4** 创建 `src/domain/ports/dead_letter_queue.py`（DeadLetterQueue Protocol）（P1-3）
+- [x] **2.5** 迁移 InMemoryEventListener 至 `src/infrastructure/messaging/inmemory_event_listener.py`（P1-4）
+- [x] **2.6** 迁移 InMemoryDeadLetterQueue 至 `src/infrastructure/messaging/inmemory_dead_letter_queue.py`（P1-4）
+- [x] **2.7** 在 composition_root 中注册 `event_listener` 端口（使用迁移后的路径 `src.infrastructure.messaging.inmemory_event_listener.InMemoryEventListener`）（P1-3，见 Section 3.1.1 前置依赖）
+- [x] **2.8** 在 composition_root 中注册 `auto_trigger_handler`（此时 event_listener 端口已就绪）（P0-3）
+- [x] **2.9** AutoExecuteService.on_routed_event 参数改为 AutoRouted（P1-5）
+- [x] **2.10** 简化 AutoTriggerContext.from_domain_event 提取逻辑（P1-6）
+- [x] **2.11** 更新所有导入引用和测试
+- [x] **2.12** 运行 `poetry run pytest --tb=short -q` 全量回归 — **结果：4193 passed, 0 failed**
+
+#### Phase 2 额外修复（验证过程中发现）
+
+- [x] **2.13** 移除 `listener.py` 中的 infrastructure 导入，确保六边形架构合规
+  - `src/domain/events/listener.py` 原本 re-export 了 InMemory* 实现，违反领域层零依赖约束
+  - 修改为仅 re-export Protocol 定义，移除 infrastructure 导入
+- [x] **2.14** 更新 8 个文件的 import 路径（从 listener.py 改为直接导入 infrastructure 实现）：
+  - `src/infrastructure/messaging/inmemory_event_bus.py`
+  - `src/infrastructure/messaging/outbox/dead_letter_queue.py`
+  - `src/infrastructure/messaging/outbox/postgres_dead_letter_queue.py`
+  - `src/infrastructure/messaging/rabbitmq_consumer.py`
+  - `src/infrastructure/messaging/rabbitmq_listener.py`
+  - `tests/unit/domain/events/test_event_publisher.py`
+  - `tests/unit/domain/events/test_event_listener.py`
+  - `tests/unit/infrastructure/messaging/test_idempotency_retry.py`
+  - `tests/acceptance/test_acceptance_event-bus-implementation.py`
+- [x] **2.15** 更新架构测试 `test_event_messaging_architecture.py` 以检查 `domain/ports/event_listener.py`而非 `domain/events/listener.py`
+- [x] **2.16** 更新领域层测试移除已删除方法的测试：
+  - `test_checkpoint_snapshot.py` — 移除 to_redis_hash/from_redis_hash 测试
+  - `test_auto_trigger_context.py` — 简化嵌套 payload 测试为 aggregate_id 回退测试
+  - `test_trigger_context.py` — 同上
+- [x] **2.17** 运行 `poetry run pytest tests/unit/architecture/ -v` — **结果：138 passed, 0 failed**
+
+#### Phase 2 提前完成的 Phase 4 项目
+
+- [x] **4.1** ⏩ 将 `import time` 移至 auto_execute_service.py 模块顶部（P3-1）— 在 Step 2.9 中一并完成
 
 ### Phase 3：P2 代码质量改进
 
@@ -1041,7 +1067,7 @@ def __init__(self) -> None:
 
 ### Phase 4：P3 风格优化
 
-- [ ] **4.1** 将 `import time` 移至 auto_execute_service.py 模块顶部（P3-1）
+- [x] **4.1** ~~将 `import time` 移至 auto_execute_service.py 模块顶部（P3-1）~~ ⏩ 已在 Phase 2 Step 2.9 中提前完成
 - [ ] **4.2** 将 AutoExecuteCompletedHandler 的惰性导入移至顶部（P3-2）
 - [ ] **4.3** 修复 AutoTriggerHandler 中的 logger f-string（P3-3）
 - [ ] **4.4** SessionNamespaceManager 中 `"now"` 改为 datetime（P3-4）
@@ -1056,10 +1082,10 @@ def __init__(self) -> None:
 
 ### 6.1 回归基线
 
-| 指标 | 基线值 |
-|------|--------|
-| 总测试数 | 4190 passed, 38 skipped |
-| 失败数 | 0 |
+| 指标 | 基线值 | Phase 2 完成后 |
+|------|--------|---------------|
+| 总测试数 | 4190 passed, 38 skipped | 4193 passed, 39 skipped |
+| 失败数 | 0 | 0 |
 | 覆盖率 | 92% |
 
 每个 Phase 完成后必须达到同等基线。

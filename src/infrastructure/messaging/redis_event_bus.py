@@ -17,7 +17,7 @@ from typing import Any
 
 from src.application.ports.event_subscriber import EventSubscriber
 from src.domain.events.base import DomainEvent
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.ports.event_publisher import EventPublisher
 from src.infrastructure.messaging.channel_router import ChannelRouter
 
@@ -59,20 +59,19 @@ class RedisEventBus(EventPublisher, EventSubscriber):
         if channel is None:
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=False,
+                results=(ChannelResult("realtime", False),),
             )
 
         try:
             await self._publisher.publish(event, channel)
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=True,
+                results=(ChannelResult("realtime", True),),
             )
         except Exception as e:
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=False,
-                redis_error=str(e),
+                results=(ChannelResult("realtime", False, str(e)),),
             )
 
     async def subscribe(

@@ -27,8 +27,8 @@ class TestAutoTriggerContextCreation:
         assert context.source_event_id == "evt-001"
 
     def test_from_domain_event_nested_payload(self) -> None:
-        """Verify nested payload extraction for session_id."""
-        payload = {"payload": {"session_id": "nested-session", "priority": "high"}}
+        """Verify aggregate_id fallback for session_id."""
+        payload = {"aggregate_id": "nested-session", "priority": "high"}
         context = AutoTriggerContext.from_domain_event(
             event_type="ToolExecuted",
             payload=payload,

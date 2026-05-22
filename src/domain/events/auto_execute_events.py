@@ -46,6 +46,9 @@ class AutoExecuted(DomainEvent):
     business_event_type: str = ""  # "DocumentProcessed" | "ToolExecuted" | "AgentDecided"
     route_target: str = ""  # Target that was selected by auto-route
     route_score: float = 0.0  # Routing confidence score
+    route_type: str = ""  # "hash" | "semantic" | "mixed" — routing strategy used
+    trigger_event_type: str = ""  # Original trigger event type
+    trigger_event_id: str | None = None  # Original trigger event ID
 
     def __post_init__(self) -> None:
         """设置aggregate_id和aggregate_type用于事件追踪"""

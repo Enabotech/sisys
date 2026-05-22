@@ -20,7 +20,8 @@ import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractQueue
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import DeadLetterQueue, EventListenerAsync
+from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.domain.ports.event_listener import EventListenerAsync
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.messaging.retry.dual_idempotency_checker import (
     DualIdempotencyChecker,

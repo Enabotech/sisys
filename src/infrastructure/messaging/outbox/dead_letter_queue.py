@@ -11,6 +11,7 @@ Copyright:
 
 """
 
-from src.domain.events.listener import DeadLetterQueue, InMemoryDeadLetterQueue
+from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.infrastructure.messaging.inmemory_dead_letter_queue import InMemoryDeadLetterQueue
 
 __all__ = ["DeadLetterQueue", "InMemoryDeadLetterQueue"]

@@ -25,10 +25,10 @@ from src.domain.events.document_events import DocumentProcessed
 @pytest.fixture
 def mock_event_publisher() -> AsyncMock:
     """Mock EventPublisher 用于验证事件发布"""
-    from src.domain.events.publish_result import PublishResult
+    from src.domain.events.publish_result import ChannelResult, PublishResult
 
     publisher = AsyncMock()
-    publisher.publish = AsyncMock(return_value=PublishResult(event_id="test-id", redis_success=True))
+    publisher.publish = AsyncMock(return_value=PublishResult(event_id="test-id", results=(ChannelResult("realtime", True),)))
     return publisher
 
 

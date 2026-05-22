@@ -22,10 +22,10 @@ from pytest_bdd import given, scenario, scenarios, then, when
 from src.domain.events.agent_events import AgentDecided
 from src.domain.events.document_events import DocumentProcessed
 from src.domain.events.heartbeat_events import HeartbeatTriggered
-from src.domain.events.listener import InMemoryDeadLetterQueue
 from src.domain.events.tool_events import ToolExecuted
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.config.redis import RedisConfig
+from src.infrastructure.messaging.inmemory_dead_letter_queue import InMemoryDeadLetterQueue
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
 from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
 from src.infrastructure.messaging.retry.checker import IdempotencyChecker

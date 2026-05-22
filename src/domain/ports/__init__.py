@@ -17,6 +17,8 @@ Copyright:
 
 from src.domain.ports.agent_engine import AgentEnginePort
 from src.domain.ports.connection_manager import ConnectionManager
+from src.domain.ports.dead_letter_queue import DeadLetterQueue
+from src.domain.ports.event_listener import EventListener, EventListenerAsync
 from src.domain.ports.hash_router_protocol import HashRouterProtocol
 from src.domain.ports.index_manager import IndexManagerPort
 from src.domain.ports.l0_storage import L0StoragePort
@@ -47,6 +49,9 @@ __all__ = [
     "ConnectionManager",
     "DataAccessPattern",
     "BaseRepository",
+    "DeadLetterQueue",
+    "EventListener",
+    "EventListenerAsync",
     "HashRouterProtocol",
     "IndexManagerPort",
     "L0StoragePort",

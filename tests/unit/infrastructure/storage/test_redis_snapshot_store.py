@@ -50,7 +50,7 @@ class TestRedisSnapshotStore:
             state_version=2,
             state_data={"result": "ok"},
         )
-        mock_redis.hget = AsyncMock(return_value=json.dumps(snapshot.to_redis_hash()))
+        mock_redis.hget = AsyncMock(return_value=json.dumps(RedisSnapshotStore._snapshot_to_hash(snapshot)))
 
         result = await store.load("test-session")
 

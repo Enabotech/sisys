@@ -129,9 +129,9 @@ class TestLangGraphEngineProtocolCompliance:
 
         class FakePublisher:
             async def publish(self, event):
-                from src.domain.events.publish_result import PublishResult
+                from src.domain.events.publish_result import ChannelResult, PublishResult
 
-                return PublishResult(event_id="fake", redis_success=True)
+                return PublishResult(event_id="fake", results=(ChannelResult("realtime", True),))
 
         engine = LangGraphEngine(config, FakePublisher())  # type: ignore[arg-type]
         assert isinstance(engine, AgentEnginePort)

@@ -1,7 +1,6 @@
 """Tests for CheckpointSnapshot domain entity."""
 
 import uuid
-from datetime import UTC, datetime
 
 import pytest
 
@@ -22,45 +21,6 @@ class TestCheckpointSnapshot:
         assert snapshot.state_version == 0
         assert snapshot.state_data == {}
         assert snapshot.stage_id == ""
-
-    def test_snapshot_to_redis_hash(self) -> None:
-        """RED: CheckpointSnapshot should serialize to Redis Hash format."""
-        session_id = "test-session-456"
-        snapshot = CheckpointSnapshot(
-            session_id=session_id,
-            stage_id="planning",
-            state_version=1,
-            state_data={"key": "value", "number": 42},
-        )
-
-        hash_data = snapshot.to_redis_hash()
-
-        assert hash_data["session_id"] == session_id
-        assert hash_data["stage_id"] == "planning"
-        assert hash_data["state_version"] == "1"
-        assert "key" in hash_data["state_data"]
-        assert "number" in hash_data["state_data"]
-
-    def test_snapshot_from_redis_hash(self) -> None:
-        """RED: CheckpointSnapshot should deserialize from Redis Hash format."""
-        data = {
-            "snapshot_id": str(uuid.uuid4()),
-            "session_id": "test-session-789",
-            "stage_id": "execution",
-            "state_version": "2",
-            "state_data": '{"key": "value", "count": 100}',
-            "timestamp": datetime.now(UTC).isoformat(),
-            "ttl_seconds": "3600",
-        }
-
-        snapshot = CheckpointSnapshot.from_redis_hash(data)
-
-        assert snapshot.session_id == "test-session-789"
-        assert snapshot.stage_id == "execution"
-        assert snapshot.state_version == 2
-        assert snapshot.state_data["key"] == "value"
-        assert snapshot.state_data["count"] == 100
-        assert snapshot.ttl_seconds == 3600
 
     def test_with_updated_state_creates_new_snapshot(self) -> None:
         """RED: with_updated_state should create new snapshot with merged state."""
