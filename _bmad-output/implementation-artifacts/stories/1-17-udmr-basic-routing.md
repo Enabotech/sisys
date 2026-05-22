@@ -1,4 +1,4 @@
-# Story 1.17: UDMR 基础路由（本地优先静态配置）
+# Story 1.17: UDMR 基础路由（云端优先静态配置）
 
 **Status:** `ready-for-dev`
 
@@ -12,7 +12,7 @@
 
 **As a** 运维工程师,
 **I want** 配置本地/云端路由策略（云端优先静态配置，云端不可用时回退本地）,
-**So that** MVP 阶段支持基础成本优化，验证本地路由占比≥80%、路由决策延迟 P95<100ms。
+**So that** MVP 阶段支持基础路由决策日志和成本追踪，验证路由决策完整性≥95%、路由决策延迟 P95<100ms。
 
 ### 业务价值
 
@@ -24,7 +24,7 @@
 | **静态路由策略** | 云端优先；云端所有模型不可用或超时时切换本地 | 云端不可用→本地回退<30 秒 |
 | **健康检查** | 定期检测云端可用性，恢复后自动切回云端 | 每 300 秒健康检查 |
 | **路由决策日志** | 记录路由决策过程，支持审计和成本追踪 | WORM 归档，selected_model/cost_actual/fallback_reason |
-| **事件集成** | 消费 AutoRouted 事件，产出 RoutingDecided 事件 | 与自主调用管线无缝集成 |
+| **事件集成** | 消费 AutoRouted 事件，产出 RoutingDecided 事件（带外模式） | 与自主调用管线并行集成 |
 
 **来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 5: or.md 系统公理实现，Story 1.17
 
@@ -105,17 +105,21 @@
 - [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
 - [ ] 带外模式：AutoExecuteService 不等待 RoutingDecided，UDMR 独立并行处理
 
-### AC-5: 路由性能要求
+### AC-5: 路由性能与决策质量要求
+
+> **⚠️ MVP 限制：** 本 Story 为带外模式，RoutingDecided 事件仅用于审计日志和成本追踪，不影响 AutoExecuteService 实际执行。
+> 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择控制。
 
 **Given** AutoRouted 事件到达 UDMRHandler
 **When** UDMRService 执行路由决策
 **Then** 路由决策延迟 P95<100ms（MVP 静态配置，无 LLM 调用）
-**And** 本地路由占比≥80%（仅云端不可用时使用本地）
-**And** 故障切换时间<30 秒
+**And** 路由决策日志完整性≥95%（所有 AutoRouted 事件均产生 RoutingDecided 日志）
+**And** 云端模型可用性检测响应<30 秒（单个云端模型健康检查超时）
 
 **验证标准/Validation Criteria:**
 - [ ] 路由决策延迟 P95<100ms 基准测试
 - [ ] 路由决策幂等性（相同输入产生相同输出）
+- [ ] 路由决策日志完整性≥95%（AutoRouted→RoutingDecided 转化率）
 
 ---
 
@@ -634,6 +638,11 @@ sisys/
 
 > **业界调研基础：** api_type 支持 3 种主流格式，覆盖 95%+ 国内外大模型提供商。
 > 详细调研参见 [LLM API 调研报告](#llm-api-兼容性调研)。
+>
+> **参数合理性说明：**
+> - `UDMR_LLM_TIMEOUT=600` — 10 分钟超时适用于长文档处理场景（如 PDF 分析、代码审查）。短对话场景由应用层设置更短超时
+> - `UDMR_HEALTHCHECK_INTERVAL=300` — 5 分钟健康检查间隔平衡资源消耗和恢复检测速度
+> - `UDMR_LOCAL_FIRST=false` — 默认云端优先，通过健康检查自动回退本地
 
 ```bash
 # UDMR 公共配置
@@ -871,6 +880,14 @@ UDMRClient (统一接口)
 > - P1: 文件清单添加external_services/llm/__init__.py
 > - P1: AC-1补充api_type=="anthropic"时max_tokens必需验证
 > - P1: AC-4补充带外模式验证标准
+>
+> **Round 3 (2026-05-22):** 科学性与合理性审查，修复2个P0问题+3个P1问题
+> - P0: Story标题从"本地优先"修正为"云端优先静态配置"（与策略和配置一致）
+> - P0: AC-5指标从"本地路由占比≥80%"改为"路由决策日志完整性≥95%"（带外模式下决策不影响执行）
+> - P0: 明确MVP限制说明（RoutingDecided仅用于审计，不影响AutoExecuteService）
+> - P1: 添加参数合理性说明（llm_timeout/healthcheck_interval/local_first）
+> - P1: AC-5补充健康检查超时性能指标
+> - P1: 补充ComplianceGatewayImpl子服务注入说明（pipl_service/cross_border_service参数名不匹配为已知问题）
 
 ### 下一步 Next Steps
 
@@ -881,7 +898,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v1.3.0
+**故事版本/Story Version:** v1.4.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -889,3 +906,4 @@ UDMRClient (统一接口)
 - v1.1.0: 融入业界 LLM API 调研成果（OpenAI/Anthropic/DeepSeek/Zhipu/MiniMax/Qwen/Baidu/Ollama/LiteLLM）；api_type 从 str 改为 Literal["openai","anthropic","openai_responses"]；CloudModelConfig 新增 max_tokens 字段；新增 API 兼容性映射表和统一抽象层架构；新增故障切换策略参考 LiteLLM 最佳实践
 - v1.2.0: Round 1 审查修复 — P0-1:UDMRService构造器改原始值注入；P0-2:明确_persist_decision_log填充UDMR扩展字段；P0-3:添加ports/__init__.py导出；P0-4:HealthCheckPort状态修正为"新建"
 - v1.3.0: Round 2 审查修复 — P0:事件流从顺序改为带外并行模式；P0:补充AutoRouted→UDMRTask字段映射；P0:补充RoutingDecided因果链防循环；P0:修正route()返回类型float→str；P1:移除UDMR_CLOUD_MODELS兼容；P1:DI改lambda内联模式；P1:补充HealthCheckPort到零依赖列表；P1:添加llm/__init__.py到文件清单
+- v1.4.0: Round 3 审查修复 — P0:标题改为"云端优先静态配置"（与策略一致）；P0:AC-5指标改为"路由决策日志完整性≥95%"（带外模式）；P1:参数合理性说明；P1:健康检查性能指标；P1:ComplianceGatewayImpl已知问题标注
