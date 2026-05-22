@@ -26,7 +26,7 @@
 | **路由决策日志** | 记录路由决策过程，支持审计和成本追踪 | WORM 归档，selected_model/cost_actual/fallback_reason |
 | **事件集成** | 消费 AutoRouted 事件，产出 RoutingDecided 事件（带外模式） | 与自主调用管线并行集成 |
 
-**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 5: or.md 系统公理实现，Story 1.17
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 6: MVP 关键机制增强，Story 1.17
 
 **or.md 公理追溯:** 系统公理一（自主调用：trigger→route→execute），扩展"route"阶段至模型选择层
 
@@ -54,7 +54,7 @@
 - [ ] CloudModelConfig 包含 max_tokens 字段（Anthropic 必需）
 - [ ] from_env() 解析所有 UDMR_* 环境变量
 - [ ] from_env() 对 api_type=="anthropic" 且 max_tokens 缺失时抛出 ValueError
-- [ ] 默认值合理：enabled=True, local_first=false, timeout=600, healthcheck_interval=300, max_tokens=4096
+- [ ] 默认值合理：enabled=True, local_first=false, llm_timeout=600, healthcheck_interval=300, max_tokens=4096
 
 ### AC-2: UDMR 静态路由决策
 
@@ -83,9 +83,10 @@
 
 **验证标准/Validation Criteria:**
 - [ ] CloudHealthChecker 实现 HealthCheckPort（`src/infrastructure/external_services/llm/cloud_health_checker.py`）
+- [ ] CloudHealthChecker 构造时绑定 cloud_configs 列表，check() 检查第一个 enabled 的云端模型
 - [ ] 健康检查结果缓存（避免每次路由都检查）
 - [ ] 健康检查超时处理
-- [ ] health_check_passed 和 health_check_latency_ms 字段填充
+- [ ] health_check_passed 和 health_check_latency_ms 字段填充（基于被选中的云端模型）
 
 ### AC-4: 事件集成与 DI 注册
 
@@ -100,7 +101,7 @@
 
 **验证标准/Validation Criteria:**
 - [ ] UDMRHandler 应用层事件处理器（`src/application/event_handlers/udmr_handler.py`）
-- [ ] composition_root.py 注册：static_routing_strategy、cloud_health_checker、udmr_service、udmr_handler（遵循 lambda 内联 config 模式）
+- [ ] composition_root.py 注册：udmr_policy、cloud_health_checker、udmr_service、udmr_handler（遵循 lambda 内联 config 模式）
 - [ ] RoutingDecided 事件已在 ChannelRouter 中注册（sisys:rt:routing_decided）
 - [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
 - [ ] 带外模式：AutoExecuteService 不等待 RoutingDecided，UDMR 独立并行处理
@@ -174,18 +175,23 @@
 **复用已有端口（无需新建）：**
 - [ ] `ComplianceGatewayPort`（`src/domain/ports/compliance_gateway.py`）— L1 合规网关
   - 版本: 1.0, owner: compliance-team, 已在 registry 注册
-- [ ] `HealthCheckPort`（`src/domain/ports/health_check.py`）— 健康检查
-  - 版本: 1.0, owner: infrastructure-team, 端口已定义但需新建实现注册
+  - 注意: ComplianceGatewayImpl 子服务（pipl_service/cross_border_service）未在 DI 中注入，forced_local 仅基于 data_residency 基本检查
 - [ ] `RoutingDecisionLogRepository`（`src/domain/ports/routing_decision_log_repository.py`）— 路由日志持久化
   - 版本: 1.0, owner: auto-invocation-team, 已在 registry 注册
 - [ ] `EventPublisher`（`src/domain/ports/event_publisher.py`）— 事件发布
+  - 版本: 1.0, owner: auto-invocation-team, 已在 registry 注册
+
+**需新建实现注册的端口（端口已定义）：**
+- [ ] `HealthCheckPort`（`src/domain/ports/health_check.py`）— 健康检查
+  - 版本: 1.0, owner: infrastructure-team, 端口已定义但需新建 CloudHealthChecker 实现并注册到 composition_root.py
+  - 注意: HealthCheckPort.check() 为无参数方法返回 bool，CloudHealthChecker 需在构造时绑定 cloud_configs，check() 检查第一个 enabled 云端模型
 
 **新建端口：**
-- [ ] `StaticRoutingStrategyPort`（`src/domain/ports/static_routing_strategy.py`）— 静态路由策略抽象
+- [ ] `UdmrPolicyPort`（`src/domain/ports/udmr_policy.py`）— UDMR 策略抽象（MVP 静态路由）
   - 方法: async route(task: UDMRTask, compliance_result: ComplianceResult) -> tuple[str, str, str | None]
   - 返回: (route_type, selected_model, fallback_reason)
   - 版本: 1.0, owner: routing-team
-  - 端口契约测试: `tests/contracts/test_port_contract_static_routing_strategy.py`
+  - 端口契约测试: `tests/contracts/test_port_contract_udmr_policy.py`
 
 **端口契约清单（强制）：**
 
@@ -194,7 +200,8 @@
 | ComplianceGatewayPort | 1.0 | compliance-team | ✅ | ✅ | ✅ | 复用 |
 | HealthCheckPort | 1.0 | infrastructure-team | 新建 | 新建 | 新建 | **新建** |
 | RoutingDecisionLogRepository | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
-| StaticRoutingStrategyPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
+| EventPublisher | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
+| UdmrPolicyPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
 
 #### 六边形架构约束（必须遵守）
 
@@ -202,9 +209,9 @@
 
 | 层次 | 目录 | 本 Story 职责 |
 |------|------|-------------|
-| domain | `src/domain/` | UDMRService 服务 + StaticRoutingStrategyPort 端口 |
+| domain | `src/domain/` | UDMRService 服务 + UdmrPolicyPort 端口 |
 | application | `src/application/` | UDMRHandler 事件处理器 |
-| infrastructure | `src/infrastructure/` | UDMRConfig + CloudHealthChecker + StaticRoutingStrategyImpl |
+| infrastructure | `src/infrastructure/` | UDMRConfig + CloudHealthChecker + StaticUdmrPolicy |
 | interfaces | `src/interfaces/` | 无新增（通过事件总线集成） |
 
 **依赖方向矩阵**
@@ -217,7 +224,7 @@
 
 **领域层零依赖原则** — UDMRService 仅依赖：
 - Python 标准库（dataclasses, uuid, datetime, logging, asyncio）
-- 领域端口（ComplianceGatewayPort, StaticRoutingStrategyPort, HealthCheckPort, RoutingDecisionLogRepository, EventPublisher）
+- 领域端口（ComplianceGatewayPort, UdmrPolicyPort, HealthCheckPort, RoutingDecisionLogRepository, EventPublisher）
 - 领域值对象（UDMRTask, ComplianceResult）
 - 领域事件（RoutingDecided）
 - 领域实体（RoutingDecisionLog）
@@ -261,15 +268,14 @@
 
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
-| **TDD 单元测试** | UDMRConfig | 配置解析 | `test_udmr_config.py` | Task 1 |
-| **TDD 单元测试** | CloudModelConfig | 云端模型配置 | `test_cloud_model_config.py` | Task 1 |
-| **TDD 单元测试** | StaticRoutingStrategyImpl | 静态路由策略 | `test_static_routing_strategy.py` | Task 2 |
+| **TDD 单元测试** | UDMRConfig + CloudModelConfig | 配置解析 | `test_udmr_config.py` | Task 1 |
+| **TDD 单元测试** | StaticUdmrPolicy | 静态路由策略 | `test_udmr_policy.py` | Task 2 |
 | **TDD 单元测试** | UDMRService | 三层决策编排 | `test_udmr_service.py` | Task 3 |
 | **TDD 单元测试** | CloudHealthChecker | 云端健康检查 | `test_cloud_health_checker.py` | Task 3 |
 | **TDD 单元测试** | UDMRHandler | 事件处理器 | `test_udmr_handler.py` | Task 4 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_udmr_basic_routing.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_udmr_basic_routing.py` | Task 0 |
-| **TDD 契约测试** | StaticRoutingStrategyPort | 端口契约 | `test_port_contract_static_routing_strategy.py` | Task 0 |
+| **TDD 契约测试** | UdmrPolicyPort | 端口契约 | `test_port_contract_udmr_policy.py` | Task 0 |
 | **SDD 架构验证** | UDMR 六边形架构 | 依赖方向、零依赖 | `test_arch_udmr.py` | Task 5 |
 | **集成测试** | UDMR 管线 | 端到端路由流程 | `test_integration_udmr_basic_routing.py` | Task 5 |
 
@@ -313,14 +319,13 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | UDMRConfig + CloudModelConfig | Task 1 | Subtask 1.1-1.3 | `test_udmr_config.py` |
-| AC-1 | from_env() 环境变量解析 | Task 1 | Subtask 1.4-1.6 | `test_udmr_config.py` |
-| AC-2 | StaticRoutingStrategyImpl 静态路由 | Task 2 | Subtask 2.1-2.3 | `test_static_routing_strategy.py` |
+| AC-1 | UDMRConfig + CloudModelConfig + from_env() | Task 1 | Subtask 1.1-1.3 | `test_udmr_config.py` |
+| AC-2 | StaticUdmrPolicy 静态路由 | Task 2 | Subtask 2.1-2.3 | `test_udmr_policy.py` |
 | AC-2 | UDMRService 三层决策编排 | Task 3 | Subtask 3.1-3.3 | `test_udmr_service.py` |
 | AC-3 | CloudHealthChecker 健康检查 | Task 3 | Subtask 3.4-3.6 | `test_cloud_health_checker.py` |
 | AC-4 | UDMRHandler 事件处理器 | Task 4 | Subtask 4.1-4.3 | `test_udmr_handler.py` |
 | AC-4 | DI 注册 | Task 4 | Subtask 4.4 | `test_integration_udmr_basic_routing.py` |
-| AC-5 | 路由性能 + 架构验证 | Task 5 | Subtask 5.1-5.5 | `test_arch_udmr.py` |
+| AC-5 | 路由性能 + 架构验证 + 集成测试 | Task 5 | Subtask 5.1-5.5 | `test_arch_udmr.py` + `test_integration_udmr_basic_routing.py` |
 
 ---
 
@@ -334,8 +339,9 @@
 
 > **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
 
-- [ ] Subtask 0.1: 定义 StaticRoutingStrategyPort 端口（`src/domain/ports/static_routing_strategy.py`）
-- [ ] Subtask 0.2: 定义端口契约测试（`tests/contracts/test_port_contract_static_routing_strategy.py`）
+- [ ] Subtask 0.0: 清理陈旧 `.pyc` 缓存（之前 UDMR 原型制品）：`find src tests -name '__pycache__/udmr_*.pyc' -delete && find tests -name '__pycache__/test_*udmr*.pyc' -delete`
+- [ ] Subtask 0.1: 定义 UdmrPolicyPort 端口（`src/domain/ports/udmr_policy.py`）
+- [ ] Subtask 0.2: 定义端口契约测试（`tests/contracts/test_port_contract_udmr_policy.py`）
 - [ ] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_udmr_basic_routing.feature`
 - [ ] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_udmr_basic_routing.py`
 - [ ] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证）
@@ -351,7 +357,7 @@
 
 **关联 AC:** AC-1
 
-#### TDD 循环 [A]：UDRConfig + CloudModelConfig
+#### TDD 循环 [A]：UDMRConfig + CloudModelConfig
 
 | 阶段 | 动作 |
 |------|------|
@@ -375,24 +381,24 @@
 
 **关联 AC:** AC-2
 
-#### TDD 循环 [A]：StaticRoutingStrategyImpl
+#### TDD 循环 [A]：StaticUdmrPolicy
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/infrastructure/routing/test_static_routing_strategy.py`（路由策略验证） |
-| 🟢 绿 | 实现 `src/infrastructure/routing/static_routing_strategy.py` |
+| 🔴 红 | 编写 `tests/unit/infrastructure/routing/test_udmr_policy.py`（路由策略验证） |
+| 🟢 绿 | 实现 `src/infrastructure/routing/udmr_policy.py` |
 | 🔄 重构 | 优化路由逻辑，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 StaticRoutingStrategyImpl 失败测试
+- [ ] Subtask 2.1: 🔴 红 — 编写 StaticUdmrPolicy 失败测试
   - 云端优先：云端可用时返回 cloud + 第一个 enabled 模型
   - 云端不可用：所有云端 disabled 时返回 local + 本地模型
   - L1 合规强制本地：forced_local=True 时返回 local + 本地模型
   - local_first=True 时优先本地
-- [ ] Subtask 2.2: 🟢 绿 — 实现 StaticRoutingStrategyImpl
+- [ ] Subtask 2.2: 🟢 绿 — 实现 StaticUdmrPolicy
 - [ ] Subtask 2.3: 🔄 重构 — 优化策略逻辑
 
 **完成标准/Definition of Done:**
-- [ ] StaticRoutingStrategyImpl 实现 StaticRoutingStrategyPort
+- [ ] StaticUdmrPolicy 实现 UdmrPolicyPort
 - [ ] 云端优先/本地优先/合规强制三种策略正确
 - [ ] TDD 循环全部通过
 
@@ -456,8 +462,11 @@
 - [ ] Subtask 4.1: 🔴 红 — 编写 UDMRHandler 失败测试
   - on_routed() 接收 AutoRouted → 从 task_context 提取字段构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
   - UDMRTask 构造映射：task_id=uuid4(), input=task_context.get("input",""), data_residency=task_context.get("data_residency","default"), preferred_model=task_context.get("preferred_model",""), allowed_models=task_context.get("allowed_models",[])
+  - UDMR_ENABLED=false 时 on_routed() 应直接返回不处理
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
+  - 事件订阅机制：UDMRHandler.register_handlers() 调用 event_listener.on_event("AutoRouted", handler)
+  - 参考 AutoTriggerHandler 的 register_handlers() 模式
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
 
 #### DI 注册
@@ -466,9 +475,9 @@
 > 参考 AutoRouteService 模式：`AutoRouteService(..., semantic_threshold=AutoRouteConfig.from_env().semantic_threshold, ...)`。
 
 - [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循现有 lambda 内联 config 模式）
-  - `static_routing_strategy` → lambda: StaticRoutingStrategyImpl(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
+  - `udmr_policy` → lambda: StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
   - `cloud_health_checker` → lambda: CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), strategy=resolver.resolve("static_routing_strategy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), strategy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
   - `udmr_handler` → lambda: UDMRHandler(udmr_service=resolver.resolve("udmr_service"))
 
 **完成标准/Definition of Done:**
@@ -489,7 +498,7 @@
 - [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_udmr.py`
 - [ ] Subtask 5.2: 验证 UDMRService 仅依赖领域层端口（无外部依赖）
 - [ ] Subtask 5.3: 验证 UDMRHandler 位于应用层（不直接调用基础设施层）
-- [ ] Subtask 5.4: 验证 StaticRoutingStrategyImpl 实现端口（依赖倒置）
+- [ ] Subtask 5.4: 验证 StaticUdmrPolicy 实现端口（依赖倒置）
 - [ ] Subtask 5.5: 创建 `tests/integration/test_integration_udmr_basic_routing.py`
   - 端到端：AutoRouted → UDMRHandler → UDMRService → RoutingDecided
 
@@ -533,7 +542,7 @@
   - **L2 四因子评分由 Epic 11 Story 11.1 实现**
 - **设计约束:**
   - 领域层零依赖外部框架
-  - 依赖倒置：领域层定义 StaticRoutingStrategyPort，基础设施层实现
+  - 依赖倒置：领域层定义 UdmrPolicyPort，基础设施层实现
   - 事件总线双通道：RoutingDecided 已注册 REALTIME 通道（sisys:rt:routing_decided）
 - **技术栈:**
   - Python 3.11+
@@ -578,6 +587,11 @@ AutoRouteService (1.14b) → 选择目标 Agent/工具
 > **⚠️ 架构说明：** MVP 阶段 UDMR 为**带外（out-of-band）处理器**，与 AutoExecuteService 并行消费 AutoRouted 事件。
 > RoutingDecided 事件用于审计日志和成本追踪，**不阻塞 AutoExecuteService 执行**。
 > 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择。
+>
+> **⚠️ 循环防护：** AutoTriggerHandler 已注册监听 "RoutingDecided" 事件类型。实现时必须：
+> - UDMRHandler.on_routed() 在构造 RoutingDecided 时设置 causation_id 指向 AutoRouted 事件
+> - 或在 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"
+> - 防止 RoutingDecided → AutoTriggerHandler → AutoTriggered → AutoRouted → UDMRHandler → RoutingDecided 循环
 
 ### 项目结构说明 Project Structure
 
@@ -586,7 +600,7 @@ sisys/
 ├── src/
 │   ├── domain/
 │   │   ├── ports/
-│   │   │   └── static_routing_strategy.py  # 新建：静态路由策略端口
+│   │   │   └── udmr_policy.py  # 新建：UDMR 策略端口
 │   │   └── services/
 │   │       └── udmr_service.py             # 新建：UDMR 三层决策服务
 │   ├── application/
@@ -596,7 +610,7 @@ sisys/
 │   │   ├── config/
 │   │   │   └── udmr.py                     # 新建：UDMRConfig + CloudModelConfig
 │   │   ├── routing/
-│   │   │   └── static_routing_strategy.py  # 新建：静态路由策略实现
+│   │   │   └── udmr_policy.py  # 新建：UDMR 策略实现（MVP 静态路由）
 │   │   └── external_services/
 │   │       └── llm/
 │   │           └── cloud_health_checker.py # 新建：云端健康检查
@@ -604,13 +618,13 @@ sisys/
 ├── tests/
 │   ├── unit/
 │   │   ├── infrastructure/config/test_udmr_config.py
-│   │   ├── infrastructure/routing/test_static_routing_strategy.py
+│   │   ├── infrastructure/routing/test_udmr_policy.py
 │   │   ├── infrastructure/external_services/llm/test_cloud_health_checker.py
 │   │   ├── domain/services/test_udmr_service.py
 │   │   ├── application/event_handlers/test_udmr_handler.py
 │   │   └── architecture/test_arch_udmr.py
 │   ├── contracts/
-│   │   └── test_port_contract_static_routing_strategy.py
+│   │   └── test_port_contract_udmr_policy.py
 │   ├── integration/
 │   │   └── test_integration_udmr_basic_routing.py
 │   └── acceptance/
@@ -744,7 +758,7 @@ UDMRClient (统一接口)
 **关键学习/Key Learnings:**
 1. **配置 frozen 约束** — 重构 Phase 3 统一所有 auto-invocation 配置为 frozen=True，UDMRConfig 必须遵循
 2. **路由决策日志必须实例化并填充扩展字段** — 重构 P2-3 修复了 RoutingDecisionLog 从未实例化的问题；AutoRouteService._persist_decision_log() 仅填充基础字段（source_agent/target_agent），UDMR 扩展字段（selected_model/cost_actual/fallback_reason）留空。本 Story UDMRService._persist_decision_log() 必须正确填充：
-   - selected_model: 从 StaticRoutingStrategyPort.route() 返回值获取
+   - selected_model: 从 UdmrPolicyPort.route() 返回值获取
    - cost_actual: MVP阶段使用估算值（基于云端模型定价或默认0.0）
    - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
 3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。RoutingDecided 事件携带 event_id 因果链，AutoTriggerHandler 监听 RoutingDecided 不会重新触发完整管线
@@ -806,7 +820,7 @@ UDMRClient (统一接口)
 - [x] 已有可复用组件清单明确
 - [x] 环境变量设计与业界主流 LLM API 调研对齐
 - [x] UDMR 路由 vs 自主路由关系澄清
-- [x] 端口契约清单（4 个复用 + 1 个新建）
+- [x] 端口契约清单（3 个复用 + 1 个新建实现 + 1 个新建端口）
 
 ### 文件清单 File List
 
@@ -814,26 +828,26 @@ UDMRClient (统一接口)
 - `_bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md`
 
 **待创建的文件/To Be Created (Dev Story 实施):**
-- `src/domain/ports/static_routing_strategy.py` - 静态路由策略端口
+- `src/domain/ports/udmr_policy.py` - UDMR 策略端口
 - `src/domain/services/udmr_service.py` - UDMR 三层决策服务
 - `src/infrastructure/config/udmr.py` - UDMRConfig + CloudModelConfig
-- `src/infrastructure/routing/static_routing_strategy.py` - 静态路由策略实现
+- `src/infrastructure/routing/udmr_policy.py` - UDMR 策略实现（MVP 静态路由）
 - `src/infrastructure/external_services/llm/cloud_health_checker.py` - 云端健康检查
 - `src/application/event_handlers/udmr_handler.py` - UDMR 事件处理器
 - `tests/unit/infrastructure/config/test_udmr_config.py` - 配置单元测试
-- `tests/unit/infrastructure/routing/test_static_routing_strategy.py` - 策略单元测试
+- `tests/unit/infrastructure/routing/test_udmr_policy.py` - 策略单元测试
 - `tests/unit/infrastructure/external_services/llm/test_cloud_health_checker.py` - 健康检查测试
 - `tests/unit/domain/services/test_udmr_service.py` - UDMRService 单元测试
 - `tests/unit/application/event_handlers/test_udmr_handler.py` - UDMRHandler 单元测试
 - `tests/unit/architecture/test_arch_udmr.py` - 架构约束测试
-- `tests/contracts/test_port_contract_static_routing_strategy.py` - 端口契约测试
+- `tests/contracts/test_port_contract_udmr_policy.py` - 端口契约测试
 - `tests/integration/test_integration_udmr_basic_routing.py` - 集成测试
 - `tests/acceptance/test_acceptance_udmr_basic_routing.feature` - Gherkin 验收测试
 - `tests/acceptance/test_acceptance_udmr_basic_routing.py` - BDD 步骤实现
 
 **更新的文件/Updated Files:**
 - `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
-- `src/domain/ports/__init__.py` - 添加 StaticRoutingStrategyPort 导出
+- `src/domain/ports/__init__.py` - 添加 UdmrPolicyPort 导出
 - `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
 - `src/infrastructure/external_services/llm/__init__.py` - 新建目录及包初始化
 - `src/composition_root.py` - 新增 5 个 DI 注册
@@ -866,14 +880,14 @@ UDMRClient (统一接口)
 > **Round 1 (2026-05-22):** 基于3个并行Agent调研实际代码实现，发现并修复4个P0问题
 > - P0-1: UDMRService 构造器从依赖 UDMRConfig 改为注入原始值（local_first/local_model/llm_timeout），遵循六边形架构
 > - P0-2: 扩展 Lessons Learned 明确 UDMRService._persist_decision_log() 必须填充 selected_model/cost_actual/fallback_reason
-> - P0-3: 文件清单添加 src/domain/ports/__init__.py 导出 StaticRoutingStrategyPort
+> - P0-3: 文件清单添加 src/domain/ports/__init__.py 导出 UdmrPolicyPort
 > - P0-4: HealthCheckPort 状态从"复用"修正为"新建"（composition_root.py 未注册，需新建实现注册）
 >
 > **Round 2 (2026-05-22):** 基于3个并行Agent调研，发现并修复3个P0问题+6个P1问题
 > - P0-1: 事件流架构矛盾 — 数据流从顺序改为带外并行模式（AutoExecuteService不等待RoutingDecided）
 > - P0-2: AutoRouted.task_context→UDMRTask映射补充完整字段映射规范
 > - P0-3: RoutingDecided循环风险 — 补充event_id因果链防循环机制
-> - P0-4: StaticRoutingStrategyPort.route()返回类型修正 float|None → str|None
+> - P0-4: UdmrPolicyPort.route()返回类型修正 float|None → str|None
 > - P1: 移除"向后兼容UDMR_CLOUD_MODELS"（无代码依据）
 > - P1: DI注册改为lambda内联UDMRConfig.from_env()模式（遵循现有惯例）
 > - P1: 零依赖原则列表补充HealthCheckPort
@@ -888,6 +902,20 @@ UDMRClient (统一接口)
 > - P1: 添加参数合理性说明（llm_timeout/healthcheck_interval/local_first）
 > - P1: AC-5补充健康检查超时性能指标
 > - P1: 补充ComplianceGatewayImpl子服务注入说明（pipl_service/cross_border_service参数名不匹配为已知问题）
+>
+> **Round 4 (2026-05-22):** 跨文档一致性+实现可行性+内部一致性审查，修复4个P0问题+8个P1问题
+> - P0: 追溯矩阵Subtask 1.4-1.6不存在，合并到1.1-1.3
+> - P0: 循环防护从"event_id因果链"改为具体实现指导（排除AutoTriggerHandler中的RoutingDecided）
+> - P0: CloudHealthChecker多模型策略明确（构造时绑定cloud_configs，check()检查第一个enabled模型）
+> - P0: 添加陈旧.pyc缓存清理步骤到Task 0
+> - P1: 价值组归属修正（5→6:MVP关键机制增强）
+> - P1: EventPublisher添加到端口契约清单表格
+> - P1: AC-1字段名修正（timeout→llm_timeout）
+> - P1: TDD标题拼写修正（UDR→UDMR）
+> - P1: HealthCheckPort分类修正（从"复用"移至"需新建实现注册")
+> - P1: test_cloud_model_config合并到test_udmr_config
+> - P1: 补充UDMR_ENABLED=false行为和UDMRHandler订阅机制
+> - 用户反馈: static_routing_strategy重命名为udmr_policy（UdmrPolicyPort/StaticUdmrPolicy）
 
 ### 下一步 Next Steps
 
@@ -898,7 +926,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v1.4.0
+**故事版本/Story Version:** v1.5.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -907,3 +935,4 @@ UDMRClient (统一接口)
 - v1.2.0: Round 1 审查修复 — P0-1:UDMRService构造器改原始值注入；P0-2:明确_persist_decision_log填充UDMR扩展字段；P0-3:添加ports/__init__.py导出；P0-4:HealthCheckPort状态修正为"新建"
 - v1.3.0: Round 2 审查修复 — P0:事件流从顺序改为带外并行模式；P0:补充AutoRouted→UDMRTask字段映射；P0:补充RoutingDecided因果链防循环；P0:修正route()返回类型float→str；P1:移除UDMR_CLOUD_MODELS兼容；P1:DI改lambda内联模式；P1:补充HealthCheckPort到零依赖列表；P1:添加llm/__init__.py到文件清单
 - v1.4.0: Round 3 审查修复 — P0:标题改为"云端优先静态配置"（与策略一致）；P0:AC-5指标改为"路由决策日志完整性≥95%"（带外模式）；P1:参数合理性说明；P1:健康检查性能指标；P1:ComplianceGatewayImpl已知问题标注
+- v1.5.0: Round 4 审查修复 — P0:追溯矩阵合并虚构Subtask；P0:循环防护改为具体实现指导；P0:CloudHealthChecker多模型策略明确；P0:.pyc清理步骤；P1:价值组5→6；P1:EventPublisher入端口表；P1:字段名/拼写修正；P1:UDMR_ENABLED行为；用户反馈:重命名udmr_policy
