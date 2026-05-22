@@ -16,7 +16,7 @@ import os
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class AutoTriggerConfig:
     """自动触发机制配置
 

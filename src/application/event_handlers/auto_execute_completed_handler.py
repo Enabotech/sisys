@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import logging
 
+from src.domain.events.agent_events import AgentDecided
 from src.domain.events.auto_execute_events import AutoExecuted
 from src.domain.events.base import DomainEvent
+from src.domain.events.document_events import DocumentProcessed
+from src.domain.events.tool_events import ToolExecuted
 from src.domain.ports.event_publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
@@ -73,8 +76,6 @@ class AutoExecuteCompletedHandler:
 
     async def _publish_document_processed(self, event: AutoExecuted) -> None:
         """发布 DocumentProcessed 领域事件"""
-        from src.domain.events.document_events import DocumentProcessed
-
         domain_event = DocumentProcessed(
             document_id=event.task_context.get("document_id", ""),
             parse_result=event.execution_result,
@@ -85,8 +86,6 @@ class AutoExecuteCompletedHandler:
 
     async def _publish_tool_executed(self, event: AutoExecuted) -> None:
         """发布 ToolExecuted 领域事件"""
-        from src.domain.events.tool_events import ToolExecuted
-
         domain_event = ToolExecuted(
             tool_id=event.task_context.get("tool_id", ""),
             execution_result=event.execution_result,
@@ -98,8 +97,6 @@ class AutoExecuteCompletedHandler:
 
     async def _publish_agent_decided(self, event: AutoExecuted) -> None:
         """发布 AgentDecided 领域事件"""
-        from src.domain.events.agent_events import AgentDecided
-
         domain_event = AgentDecided(
             agent_id=event.task_context.get("agent_id", ""),
             decision_result=event.execution_result,

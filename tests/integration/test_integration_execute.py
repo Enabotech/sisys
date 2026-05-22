@@ -38,7 +38,7 @@ class TestExecuteIntegration:
         """Create DockerSandboxAdapter for integration testing."""
         adapter = DockerSandboxAdapter()
         yield adapter
-        adapter.reset_all_containers()
+        adapter._running_containers.clear()
 
     @pytest.fixture
     def execute_service(self, sandbox: DockerSandboxAdapter) -> AutoExecuteService:

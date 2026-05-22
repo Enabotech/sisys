@@ -18,15 +18,15 @@ class TestDockerSandboxAdapter:
 
     @pytest.fixture(autouse=True)
     def reset_containers(self):
-        """Reset all containers before each test."""
-        DockerSandboxAdapter.reset_all_containers()
+        """Reset containers before each test."""
+        self._adapter = DockerSandboxAdapter()
         yield
-        DockerSandboxAdapter.reset_all_containers()
+        self._adapter._running_containers.clear()
 
     @pytest.mark.asyncio
     async def test_start_container_creates_container(self) -> None:
         """RED: start_container should mark container as running."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         await adapter.start_container("session-1")
 
@@ -35,7 +35,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_start_container_idempotent(self) -> None:
         """RED: start_container should be safe to call multiple times."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         await adapter.start_container("session-1")
         await adapter.start_container("session-1")  # Second call should not error
@@ -45,7 +45,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_execute_code_requires_running_container(self) -> None:
         """RED: execute_code should fail if container not running."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         with pytest.raises(ExecutionError):
             await adapter.execute_code("session-not-running", "print('hello')")
@@ -53,7 +53,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_execute_code_returns_result(self) -> None:
         """RED: execute_code should return execution result dict."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-1")
 
         result = await adapter.execute_code("session-1", "print('hello')")
@@ -64,7 +64,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_stop_container(self) -> None:
         """RED: stop_container should mark container as not running."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-1")
 
         await adapter.stop_container("session-1")
@@ -74,7 +74,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_stop_container_idempotent(self) -> None:
         """RED: stop_container should be safe to call multiple times."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-1")
 
         await adapter.stop_container("session-1")
@@ -85,7 +85,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_stop_nonexistent_container(self) -> None:
         """RED: stop_container should handle non-existent container gracefully."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         # Should not raise
         await adapter.stop_container("nonexistent-session")
@@ -95,7 +95,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_execute_code_raises_when_not_running(self) -> None:
         """Coverage: execute_code raises ExecutionError when container not running."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         with pytest.raises(Exception) as exc_info:
             await adapter.execute_code("never-started", "print('test')")
@@ -105,7 +105,7 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_is_container_running_returns_false_for_unknown(self) -> None:
         """Coverage: is_container_running returns False for unknown session."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
 
         result = await adapter.is_container_running("unknown-session")
 
@@ -114,9 +114,9 @@ class TestDockerSandboxAdapter:
     @pytest.mark.asyncio
     async def test_start_container_idempotent_already_running(self) -> None:
         """Coverage: start_container early return when already running."""
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-1")
-        DockerSandboxAdapter._running_containers["session-1"] = True  # already running
+        adapter._running_containers["session-1"] = True  # already running
 
         await adapter.start_container("session-1")  # Should early return
 
@@ -135,7 +135,7 @@ class TestDockerSandboxAdapter:
 
         from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         original_logger = dsa_module.logger
 
         # Create a mock logger that raises on info call
@@ -161,7 +161,7 @@ class TestDockerSandboxAdapter:
 
         from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-exc")
 
         original_logger = dsa_module.logger
@@ -189,7 +189,7 @@ class TestDockerSandboxAdapter:
 
         from src.infrastructure.external_services.sandbox import docker_sandbox_adapter as dsa_module
 
-        adapter = DockerSandboxAdapter()
+        adapter = self._adapter
         await adapter.start_container("session-stop")
 
         original_logger = dsa_module.logger

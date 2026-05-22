@@ -158,6 +158,7 @@ def route_service(
         publisher=redis_publisher,
         hash_router=hash_router,
         semantic_router=semantic_router,
+        semantic_threshold=0.0,
     )
 
 

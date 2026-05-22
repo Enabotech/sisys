@@ -13,6 +13,7 @@ Copyright:
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from src.domain.ports.sandbox_executor import SandboxExecutor
@@ -58,7 +59,7 @@ class SessionNamespaceManager:
 
         self._active_sessions[session_id] = {
             "namespace": session_id,
-            "created_at": "now",  # Would use datetime in production
+            "created_at": datetime.now(UTC).isoformat(),
             "resource_usage": {"cpu": 0, "memory": 0},
         }
 

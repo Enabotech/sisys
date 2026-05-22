@@ -79,7 +79,7 @@ class AutoTriggerHandler:
             "AuditEvent",
         ]
         # Background thread for async processing
-        self._event_queue: queue.Queue[tuple[str, DomainEvent]] = queue.Queue()
+        self._event_queue: queue.Queue[tuple[str, DomainEvent]] = queue.Queue(maxsize=1000)
         self._worker_thread: threading.Thread | None = None
         self._running = False
 
@@ -95,7 +95,7 @@ class AutoTriggerHandler:
         for event_type in self._registered_event_types:
             handler = self._create_handler(event_type)
             self._event_listener.on_event(event_type, handler)
-            logger.debug(f"Registered handler for event type: {event_type}")
+            logger.debug("Registered handler for event type: %s", event_type)
 
     def _create_handler(self, event_type: str) -> Callable[[DomainEvent], None]:
         """为指定事件类型创建处理函数
@@ -115,9 +115,11 @@ class AutoTriggerHandler:
             """
             try:
                 # Queue the event for async processing in background thread
-                self._event_queue.put((event_type, event))
+                self._event_queue.put_nowait((event_type, event))
+            except queue.Full:
+                logger.warning("Event queue full, dropping event: %s", event_type)
             except Exception as e:
-                logger.error(f"Failed to queue event {event_type}: {e}")
+                logger.error("Failed to queue event %s: %s", event_type, e)
 
         return handle_event
 
@@ -145,7 +147,7 @@ class AutoTriggerHandler:
                         for task in done:
                             exc = task.exception()
                             if exc:
-                                logger.error(f"Task failed: {exc}")
+                                logger.error("Task failed: %s", exc)
 
                     # 创建带超时的新任务
                     async def _process_with_timeout():
@@ -166,9 +168,9 @@ class AutoTriggerHandler:
                         for task in done:
                             exc = task.exception()
                             if exc:
-                                logger.error(f"Task failed: {exc}")
+                                logger.error("Task failed: %s", exc)
                 except Exception as e:
-                    logger.error(f"Error in worker loop: {e}")
+                    logger.error("Error in worker loop: %s", e)
         finally:
             # 取消所有待完成的任务
             for task in pending_tasks:
@@ -203,12 +205,12 @@ class AutoTriggerHandler:
                 triggered = await self._auto_trigger_service.on_domain_event(event)
 
             if triggered is not None:
-                logger.info(f"Trigger processed: type={triggered.trigger_type}, session_id={triggered.session_id}")
+                logger.info("Trigger processed: type=%s, session_id=%s", triggered.trigger_type, triggered.session_id)
             else:
-                logger.warning(f"AutoTriggerService returned None for event: {event_type}")
+                logger.warning("AutoTriggerService returned None for event: %s", event_type)
 
         except Exception as e:
-            logger.error(f"Failed to process event {event_type}: {e}")
+            logger.error("Failed to process event %s: %s", event_type, e)
 
     @property
     def registered_event_types(self) -> list[str]:

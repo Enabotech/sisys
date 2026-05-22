@@ -12,6 +12,7 @@ Copyright:
 
 from __future__ import annotations
 
+from .auto_execute import AutoExecuteConfig
 from .auto_route import AutoRouteConfig
 from .auto_trigger import AutoTriggerConfig
 from .langgraph import LangGraphConfig
@@ -26,4 +27,5 @@ __all__ = [
     "RabbitMQConfig",
     "AutoTriggerConfig",
     "AutoRouteConfig",
+    "AutoExecuteConfig",
 ]
