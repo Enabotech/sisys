@@ -259,6 +259,8 @@
 - [ ] 每个端口必须同时具备 contract、registry、resolver、contract test、owner、version
 - [ ] 未通过 Contract Gate 的端口变更不得进入实现 Task
 
+> ⚠️ **端口返回类型说明：** 以下端口方法返回的复合类型（如 `AttackDetectionResult`、`IntegrityResult`、`BackupResult` 等）属于领域层类型，需在 `src/domain/value_objects/` 或 `src/domain/entities/` 中定义。实现时需同步创建对应的 dataclass/frozen dataclass 结构。
+
 #### 入侵检测服务接口 (Intrusion Detection Service)
 - [ ] `IntrusionDetectionServicePort` 接口定义（`src/domain/ports/intrusion_detection_service.py`）
 - [ ] 方法: `detect_attack(content: str) -> AttackDetectionResult`
@@ -298,20 +300,27 @@
 - [ ] 兼容策略: backward_compatible
 
 #### API安全服务接口 (API Security Service) ⚠️ 新增支持十层安全
+> ⚠️ **架构约束警告：** `validate_api_auth` 和 `add_security_headers` 方法涉及 HTTP 请求/响应对象。
+> 为保持领域层零依赖原则，这些方法的 `Request`/`Response` 类型应使用 `Any` 类型标注，
+> 具体框架类型（fastapi.Request/Response）在 infrastructure 层适配器中处理，不在领域层端口定义中引用。
+
 - [ ] `APISecurityServicePort` 接口定义（`src/domain/ports/api_security_service.py`）⚠️ 待定义
 - [ ] 方法: `check_rate_limit(client_id: str, endpoint: str) -> RateLimitResult`
-- [ ] 方法: `validate_api_auth(request: Request) -> AuthValidationResult`
+- [ ] 方法: `validate_api_auth(request: Any) -> AuthValidationResult` ⚠️ 使用Any避免领域层引入HTTP框架依赖
 - [ ] 方法: `detect_injection_attack(input: str) -> InjectionDetectionResult`
-- [ ] 方法: `add_security_headers(response: Response) -> Response`
+- [ ] 方法: `add_security_headers(response: Any) -> Any` ⚠️ 使用Any避免领域层引入HTTP框架依赖
 - [ ] 端口所有者: 安全工程师
 - [ ] 端口版本: v1.0.0
 - [ ] 兼容策略: backward_compatible
 
 #### 容器安全服务接口 (Container Security Service) ⚠️ 新增支持十层安全
+> ⚠️ **类型标注警告：** `detect_escape_attempts` 返回类型使用 `list[EscapeAttempt]`（Python 3.9+ 内置泛型），
+> 而非 `List[EscapeAttempt]`（typing模块），以保持与领域层类型标注一致。
+
 - [ ] `ContainerSecurityServicePort` 接口定义（`src/domain/ports/container_security_service.py`）⚠️ 待定义
 - [ ] 方法: `verify_sandbox_isolation(session_id: str) -> IsolationVerificationResult`
 - [ ] 方法: `check_container_limits(session_id: str) -> ResourceLimitsStatus`
-- [ ] 方法: `detect_escape_attempts(session_id: str) -> List[EscapeAttempt]`
+- [ ] 方法: `detect_escape_attempts(session_id: str) -> list[EscapeAttempt]`
 - [ ] 方法: `validate_container_network_isolation(session_id: str) -> NetworkIsolationResult`
 - [ ] 端口所有者: 安全工程师
 - [ ] 端口版本: v1.0.0
@@ -598,6 +607,12 @@
 | 🟢 绿 | 实现备份恢复逻辑 |
 | 🔄 重构 | 验证 RTO 达标 |
 
+> ⚠️ **RTO 验证方案：** RTO<4 小时验证需要以下步骤：
+> 1. **基准测量**：在测试环境执行完整恢复流程，测量从备份恢复到服务可用的时间
+> 2. **定时演练**：设置定时任务（如每月）自动执行恢复演练并记录时间
+> 3. **SLA 监控**：当恢复时间超过 3 小时时触发预警（预留 1 小时缓冲）
+> 4. **实现说明**：恢复时间 = 备份加载时间 + 数据初始化时间 + 服务启动时间，MVP 阶段可通过模拟测量估算
+
 - [ ] Subtask 4.8: 🔴 红 — 编写备份恢复失败测试
 - [ ] Subtask 4.9: 🟢 绿 — 实现备份恢复流程
 - [ ] Subtask 4.10: 🔴 红 — 编写备份完整性验证失败测试
@@ -617,6 +632,17 @@
 **关联 AC:** AC-7, AC-8
 > ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 > ⚠️ **前置依赖：** Task 1-4 (安全合规基础/入侵防范/数据完整性/备份恢复) - 必须在 Task 1-4 完成后才能进行综合验证
+>
+> ⚠️ **验证顺序约束：** Task 5 的 Subtask 5.1-5.13 验证顺序如下：
+> 1. Subtask 5.1-5.2 (身份鉴别) → 依赖 Story 1.9 AuthService
+> 2. Subtask 5.3-5.4 (访问控制) → 依赖 Story 1.9 PermissionService
+> 3. Subtask 5.5-5.6 (安全审计) → 依赖 Story 1.10 AuditService
+> 4. Subtask 5.7-5.8 (入侵防范) → 依赖 Task 2 IntrusionDetectionService
+> 5. Subtask 5.9-5.10 (数据完整性) → 依赖 Task 3 DataIntegrityService
+> 6. Subtask 5.11-5.12 (备份恢复) → 依赖 Task 4 BackupRecoveryService
+> 7. Subtask 5.13 (合规报告) → 必须等以上全部完成后
+>
+> ⚠️ **Blocked Subtasks：** Subtask 5.20 (AES-256)、Subtask 5.22-5.25 (容器安全/接口安全) 依赖 Epic 13 实现，当前标记为 blocked
 
 #### TDD 循环 A：10 个安全层面验证
 
