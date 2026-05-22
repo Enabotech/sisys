@@ -106,7 +106,7 @@
 - [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
 - [ ] 带外模式：AutoExecuteService 不等待 RoutingDecided，UDMR 独立并行处理
 - [ ] 循环防护：从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"
-- [ ] MVP 限制：event_listener.on_event() 模式仅在 InMemoryEventBus 环境有效
+- [ ] 事件订阅统一使用 DualChannelEventBus（InMemoryEventListener 仅用于测试 mock）
 
 ### AC-5: 路由性能与决策质量要求
 
@@ -465,11 +465,13 @@
 - [ ] Subtask 4.1: 🔴 红 — 编写 UDMRHandler 失败测试
   - on_routed() 接收 AutoRouted → 从 task_context 提取字段构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
   - UDMRTask 构造映射：task_id=uuid4(), input=task_context.get("input",""), data_residency=task_context.get("data_residency","CHINA_DOMESTIC"), preferred_model=task_context.get("preferred_model",""), allowed_models=task_context.get("allowed_models",[])
+  - **注意:** AutoTriggerContext.ALLOWED_CONTEXT_KEYS 当前不含 input/data_residency/preferred_model/allowed_models，MVP 阶段 UDMRTask 将使用默认值，后续 Story 扩展上游事件字段
   - UDMR_ENABLED=false 时 on_routed() 应直接返回不处理
   - 非法事件类型过滤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
-  - 事件订阅机制：UDMRHandler.register_handlers() 调用 event_listener.on_event("AutoRouted", handler)
-  - 参考 AutoTriggerHandler 的 register_handlers() 模式
+  - 事件订阅机制：UDMRHandler.subscribe() 订阅 DualChannelEventBus 的 REALTIME 通道 `sisys:rt:auto_routed`
+  - DualChannelEventBus.subscribe() 需在本 Story 或紧邻前置 Story 中实现（当前仅有 publish() 能力）
+  - 测试环境可使用 InMemoryEventBus + InMemoryEventListener 作为 mock
 - [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
 
 #### DI 注册
@@ -481,8 +483,9 @@
   - `udmr_policy` → `lambda resolver:` StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
   - `cloud_health_checker` → `lambda resolver:` CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
   - `udmr_service` → `lambda resolver:` UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), policy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_handler` → `lambda resolver:` UDMRHandler(udmr_service=resolver.resolve("udmr_service"), event_listener=resolver.resolve("event_listener"))
+  - `udmr_handler` → `lambda resolver:` UDMRHandler(udmr_service=resolver.resolve("udmr_service"), event_bus=resolver.resolve("event_publisher"))
   - **注意:** Resolver._instantiate() 调用 `spec.impl(resolver=self)`，lambda 必须接收 resolver 参数
+  - **注意:** UDMRHandler 使用 DualChannelEventBus 订阅事件（非 InMemoryEventListener），event_bus 参数即为已注册的 DualChannelEventBus 实例
 
 **完成标准/Definition of Done:**
 - [ ] UDMRHandler 实现完成
@@ -592,11 +595,11 @@ AutoRouteService (1.14b) → 选择目标 Agent/工具
 > RoutingDecided 事件用于审计日志和成本追踪，**不阻塞 AutoExecuteService 执行**。
 > 后续 Story 将修改 AutoExecuteService 消费 RoutingDecided 实现真正的模型选择。
 >
-> **⚠️ 事件订阅 MVP 限制：** 当前系统存在两套事件分发机制：
-> - InMemoryEventListener（进程内同步分发，event_listener.on_event() 模式）
-> - DualChannelEventBus（跨进程异步分发，Redis/RabbitMQ）
-> UDMRHandler 通过 event_listener.on_event("AutoRouted", handler) 注册仅在 MVP/测试环境（InMemoryEventBus）中有效。
-> 生产环境（DualChannelEventBus）需要单独的订阅机制，作为后续 Story 完善。
+> **⚠️ 事件订阅统一方案：** 系统统一使用 DualChannelEventBus 作为事件分发机制（Redis REALTIME 通道 + RabbitMQ BATCH 通道）。
+> - UDMRHandler 订阅 AutoRouted 事件通过 DualChannelEventBus 的订阅机制实现
+> - InMemoryEventListener 仅用于单元测试和集成测试环境（mock 场景）
+> - DualChannelEventBus 当前发布到 Redis 通道 `sisys:rt:auto_routed`，UDMRHandler 需订阅该通道
+> - **注意：** DualChannelEventBus 当前仅有 publish() 能力，subscribe() 消费机制需在本 Story 中实现或作为紧邻前置补充
 >
 > **⚠️ 循环防护（必须实施）：** AutoTriggerHandler._registered_event_types 已包含 "RoutingDecided"，
 > 但其 _process_event() 不检查 causation_id，无条件调用 on_domain_event()，因此 causation_id 方案**不能**防止循环。
@@ -771,7 +774,7 @@ UDMRClient (统一接口)
    - selected_model: 从 UdmrPolicyPort.route() 返回值获取
    - cost_actual: MVP 阶段使用估算值（基于云端模型定价或默认 0.0）
    - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
-3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。循环防护必须从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"（causation_id 不能防止循环）
+3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。循环防护必须从 AutoTriggerHandler._registered_event_types 中排除 "RoutingDecided"（causation_id 不能防止循环）。**事件订阅统一使用 DualChannelEventBus**（生产环境 Redis REALTIME 通道），InMemoryEventListener 仅用于单元测试 mock
 4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
 5. **composition_root 注册模式** — 使用 `register_port()` 统一注册，lambda 工厂函数注入依赖
 
@@ -947,6 +950,11 @@ UDMRClient (统一接口)
 > **第二批 Round 2 (2026-05-22):** 3个并行Agent端口契约/事件数据模型/DI模式深度验证，修复2个P0
 > - P0: DI注册lambda无参写法错误—Resolver._instantiate()调用spec.impl(resolver=self)，所有lambda必须为`lambda resolver:`格式而非`lambda:`
 > - P0: HealthCheckPort遗漏close()方法—端口实际定义check()+close()两个方法，CloudHealthChecker必须同时实现close()释放资源
+>
+> **第二批 Round 3-4 (2026-05-22):** 跨文档一致性+DI完整性+数据流验证，修复3个P0
+> - P0: 事件订阅统一改为DualChannelEventBus（用户决策），InMemoryEventListener仅用于测试mock；UDMRHandler.subscribe()订阅Redis REALTIME通道
+> - P0: 上游AutoTriggerContext.ALLOWED_CONTEXT_KEYS缺失UDMR字段（input/data_residency/preferred_model/allowed_models），MVP阶段使用默认值
+> - P0: UDMRHandler DI注册从event_listener改为event_bus（DualChannelEventBus实例）
 
 ### 下一步 Next Steps
 
@@ -957,7 +965,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v2.1.0
+**故事版本/Story Version:** v2.2.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -969,4 +977,5 @@ UDMRClient (统一接口)
 - v1.5.0: Round 4 审查修复 — P0:追溯矩阵合并虚构Subtask；P0:循环防护改为具体实现指导；P0:CloudHealthChecker多模型策略明确；P0:.pyc清理步骤；P1:价值组5→6；P1:EventPublisher入端口表；P1:字段名/拼写修正；P1:UDMR_ENABLED行为；用户反馈:重命名udmr_policy
 - v1.6.0: Round 5 最终审查修复 — P1:strategy→policy参数名同步重命名；P1:价值组归属2处遗漏修正；P1:UDMRHandler DI补充event_listener注入；P1:依赖矩阵Strategy→Policy标签；P2:false→False；P2:中英文间距
 - v2.0.0: 第二批审查 Round 1 — P0:循环防护causation_id无效改为必须排除RoutingDecided；P0:标注事件订阅MVP限制（InMemoryEventBus vs DualChannelEventBus）；P0:标注AutoRouted当前无InMemoryEventListener消费者；P1:data_residency默认值default→CHINA_DOMESTIC；P1:修正Lessons Learned循环防护描述
-- v2.1.0: 第二批审查 Round 2 — P0:DI注册lambda无参写法改为lambda resolver:格式（Resolver._instantiate()强制要求）；P0:HealthCheckPort补充close()方法（CloudHealthChecker必须实现）
+- v2.1.0: 第二批审查 Round 2 — P0:DI注册lambda无参写法改为lambda resolver:格式；P0:HealthCheckPort补充close()方法
+- v2.2.0: 第二批审查 Round 3-4 — P0:事件订阅统一DualChannelEventBus（用户决策）；P0:上游task_context字段缺失标注MVP默认值；P0:UDMRHandler DI从event_listener改event_bus
