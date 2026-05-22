@@ -211,11 +211,12 @@
 **And** 删除请求响应时间<24小时
 
 > ⚠️ **依赖说明：** PIPL 合规由 Story 1.11 的 `PIPLComplianceService` 覆盖，Story 1.12 需集成验证
+> ⚠️ **P0 实现缺口警告：** `PIPLComplianceService` 无脱敏方法，代码库中无脱敏实现。"个人信息脱敏率100%"验收标准需要在后续 Story (Epic 13) 中实现，当前仅能验证服务层面的记录功能
 
 **验证标准/Validation Criteria:**
-- [ ] 个人信息识别和脱敏机制（Story 1.11 PIPLComplianceService）
-- [ ] 敏感字段（身份证、手机号、银行卡等）自动脱敏
-- [ ] 删除请求处理流程
+- [ ] 个人信息识别机制（Story 1.11 PIPLComplianceService）
+- [ ] 个人信息访问记录（`record_access()` 调用验证）⚠️ 注意：脱敏功能尚未实现
+- [ ] 删除请求处理流程（`respond_to_deletion_request()` 验证）
 - [ ] 数据删除验证
 - [ ] PIPL 第24条自动化决策拒绝权响应
 
@@ -302,6 +303,16 @@
 - [ ] 方法: `validate_api_auth(request: Request) -> AuthValidationResult`
 - [ ] 方法: `detect_injection_attack(input: str) -> InjectionDetectionResult`
 - [ ] 方法: `add_security_headers(response: Response) -> Response`
+- [ ] 端口所有者: 安全工程师
+- [ ] 端口版本: v1.0.0
+- [ ] 兼容策略: backward_compatible
+
+#### 容器安全服务接口 (Container Security Service) ⚠️ 新增支持十层安全
+- [ ] `ContainerSecurityServicePort` 接口定义（`src/domain/ports/container_security_service.py`）⚠️ 待定义
+- [ ] 方法: `verify_sandbox_isolation(session_id: str) -> IsolationVerificationResult`
+- [ ] 方法: `check_container_limits(session_id: str) -> ResourceLimitsStatus`
+- [ ] 方法: `detect_escape_attempts(session_id: str) -> List[EscapeAttempt]`
+- [ ] 方法: `validate_container_network_isolation(session_id: str) -> NetworkIsolationResult`
 - [ ] 端口所有者: 安全工程师
 - [ ] 端口版本: v1.0.0
 - [ ] 兼容策略: backward_compatible
@@ -431,6 +442,8 @@
 - [ ] Subtask 0.12: 定义 `APISecurityServicePort` 接口（`src/domain/ports/api_security_service.py`）⚠️ 新增支持十层安全
 - [ ] Subtask 0.13: 在 `composition_root.py` 中注册 StorageEncryptionServicePort 和 APISecurityServicePort
 - [ ] Subtask 0.14: 更新契约测试覆盖新增端口
+- [ ] Subtask 0.15: 定义 `ContainerSecurityServicePort` 接口（`src/domain/ports/container_security_service.py`）⚠️ 新增支持十层安全
+- [ ] Subtask 0.16: 在 `composition_root.py` 中注册 ContainerSecurityServicePort
 
 **完成标准:**
 - [ ] 规范项全部定义完毕
@@ -441,7 +454,7 @@
 ### Task 1: 安全合规基础集成 (Security Compliance Foundation)
 
 **关联 AC:** AC-1, AC-2, AC-3, AC-8
-
+> ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 > ⚠️ **本 Task 集成 Story 1.9/1.10 的安全组件，验证等保合规**
 > ⚠️ **依赖说明：** Story 1.11 (数据主权/PIPL) 状态为 `done`，PIPL 集成验证(AC-8)可立即执行
 
@@ -491,6 +504,7 @@
 ### Task 2: 入侵防范服务 (Intrusion Prevention Service)
 
 **关联 AC:** AC-4
+> ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 
 #### TDD 循环 A：入侵检测核心
 
@@ -532,6 +546,7 @@
 ### Task 3: 数据完整性服务 (Data Integrity Service)
 
 **关联 AC:** AC-5
+> ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 
 #### TDD 循环 A：校验和计算和验证
 
@@ -557,6 +572,7 @@
 ### Task 4: 备份恢复服务 (Backup Recovery Service)
 
 **关联 AC:** AC-6
+> ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 
 #### TDD 循环 A：备份创建和存储
 
@@ -599,6 +615,8 @@
 ### Task 5: 等保综合合规验证 (Comprehensive Compliance Verification)
 
 **关联 AC:** AC-7
+> ⚠️ **前置依赖：** Task 1-4 (安全合规基础/入侵防范/数据完整性/备份恢复) - 必须在 Task 1-4 完成后才能进行综合验证
+> ⚠️ **Task 0 必须先完成** - SDD 规范定义是所有 Task 的前置依赖
 
 #### TDD 循环 A：10 个安全层面验证
 
@@ -627,9 +645,6 @@
 - [ ] Subtask 5.23: 🟢 绿 — 验证容器隔离实现 ⚠️ Mock实现待升级
 - [ ] Subtask 5.24: 🔴 红 — 编写接口安全验证失败测试（API认证/限流）
 - [ ] Subtask 5.25: 🟢 绿 — 验证接口安全实现 ⚠️ 待实现
-- [ ] Subtask 5.26: ✅ Checklist — 物理安全文档检查清单验证（部署合规/数据中心要求）
-- [ ] Subtask 5.27: ✅ Checklist — 物理安全环境安全检查（温湿度/电源/消防）
-- [ ] Subtask 5.28: 🔄 重构 — 更新等保2.0综合合规报告（包含全部10层）
 
 #### TDD 循环 B：隐私保护集成验证（AC-8）
 
@@ -648,6 +663,17 @@
 - [ ] Subtask 5.17: 🔴 红 — 创建架构约束测试 `test_arch_equilibrium.py`
 - [ ] Subtask 5.18: 🟢 绿 — 验证领域层零依赖
 - [ ] Subtask 5.19: 🔄 重构 — 验证安全层隔离
+
+#### 物理安全Checklist（纯文档验证）
+
+> ⚠️ **说明：** 物理安全是纯文档/运维要求，无法通过代码实现验证。使用 Checklist 方式验证。
+
+- [ ] Subtask 5.26: ✅ Checklist — 物理安全文档检查清单验证（部署合规/数据中心要求）
+- [ ] Subtask 5.27: ✅ Checklist — 物理安全环境安全检查（温湿度/电源/消防）
+
+#### 综合合规报告
+
+- [ ] Subtask 5.28: 🔄 重构 — 更新等保2.0综合合规报告（包含全部10层）
 
 **完成标准:**
 - [ ] 10 个安全层面验证完成（身份鉴别/访问控制/安全审计/入侵防范/数据完整性/数据保密性/备份恢复/容器安全/接口安全/物理安全）
