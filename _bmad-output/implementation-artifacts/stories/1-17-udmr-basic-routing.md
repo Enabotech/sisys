@@ -920,7 +920,7 @@ UDMRClient (统一接口)
 | **Epic** | Epic 1: 企业级架构基础与合规 |
 | **价值组** | 价值组 6: MVP 关键机制增强 |
 | **优先级** | P0-17（MVP，ARCH UDMR 基础） |
-| **覆盖 FR** | FR-CP-05 |
+| **覆盖 FR** | ARCH UDMR（静态路由基础），FR-CP-05 部分覆盖（L1+L3 MVP，完整三层由 Epic 11 实现） |
 
 ### 完成总结 Completion Summary
 
@@ -1017,6 +1017,27 @@ UDMRClient (统一接口)
 > - P0: Subtask 4.2移除基础设施层频道名sisys:rt:auto_routed（应用层通过ChannelRouter自动解析）
 > - P0: 补充bus.start()启动依赖说明（Redis监听循环必须在subscribe_async()后启动，在app.py lifespan中调用）
 > - P1: 更新文件清单添加redis_subscriber.py和app.py
+>
+> **第三批 Round 3 (2026-05-22):** 单Agent最终验证，6项验证标准全部通过，0个P0问题
+> - 验证subscribe_async()正确性：UDMRHandler使用subscribe_async()匹配EventSubscriber Protocol ✅
+> - 验证BUG修复设计：P0-29/30/31修复方案与sisys-port-impl-refactor.md一致 ✅
+> - 验证DI注册：所有resolver.resolve()名称与composition_root.py注册匹配 ✅
+> - 验证文件清单完整性：所有新建/更新文件路径正确 ✅
+> - 验证Dev Notes一致性：事件订阅方案与最新设计决策一致 ✅
+> - 验证循环防护：AutoTriggerHandler排除RoutingDecided方案明确 ✅
+>
+> **第三批 Round 4 (2026-05-22):** 3个并行Agent配置层/事件数据流/六边形架构全量验证，0个P0问题
+> - 配置层验证10项全部通过（frozen/from_env/字段/端口签名/DI格式/resolver名称/内联模式/HealthCheckPort/config导出）
+> - 事件数据流验证全部通过（AutoRouted/RoutingDecided字段、BUG位置P0-29/30/31确认、subscribe链路、start()顺序、DomainEvent.from_dict方案）
+> - 六边形架构验证通过（依赖方向矩阵、内部一致性、循环防护、文件清单完整性）
+> - P1: UDMRHandler通过DI持有infrastructure层DualChannelEventBus引用（编译时不违规，运行时由DI容器装配），建议补充说明端口注入模式
+>
+> **第三批 Round 5 (2026-05-22):** 3个并行Agent模板合规/技术准确性/跨文档一致性最终验证，0个P0问题，2个P1修复
+> - 模板合规验证：8个必需章节全部存在且顺序正确，Status/Note声明/版本历史/对抗审查记录全部合规
+> - 技术准确性验证：API调研/性能指标/MVP限制/环境变量/代码行号引用全部通过
+> - 跨文档一致性验证：architecture.md/epics_v1.0.md/event-bus-design/port-impl-refactor/Lessons Learned全部一致
+> - P1-1 修复：FR-CP-05覆盖声明修正为"ARCH UDMR（静态路由基础），FR-CP-05部分覆盖（L1+L3 MVP）"
+> - P1-2 记录：前置依赖1.14c未在epics中声明（依赖关系合理，epics文档遗漏）
 
 ### 下一步 Next Steps
 
@@ -1027,7 +1048,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v3.1.0
+**故事版本/Story Version:** v3.2.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -1044,3 +1065,4 @@ UDMRClient (统一接口)
 - v2.3.0: 用户补充决策 — DualChannelEventBus.subscribe()在本Story实现；新增Subtask 4.4-4.6 TDD循环；添加test_dual_channel_subscribe.py；更新dual_channel_event_bus.py文件清单
 - v3.0.0: 第三批审查 Round 1 — P0:纠正"DualChannelEventBus仅有publish()"错误声明（subscribe已实现）；P0:Subtask 4.4-4.6改为修复RedisEventBus 3个BUG（P0-29/30/31频道名/DomainEvent/subscribe_async）；P0:测试文件重命名
 - v3.1.0: 第三批审查 Round 2 — P0:subscribe_async()替代subscribe()（异步handler）；P0:移除应用层频道名暴露；P0:补充bus.start()启动依赖（app.py lifespan）
+- v3.2.0: 第三批审查 Round 3-5 — Round 3:0 P0验证通过；Round 4:0 P0配置层/事件流/架构全量验证通过；Round 5:0 P0模板/技术/跨文档终验通过，P1修复FR-CP-05覆盖声明
