@@ -833,25 +833,38 @@ sisys/
 
 **待创建的文件/To Be Created (Dev Story 实施):**
 
-| 文件 | 说明 |
-|------|------|
-| `src/domain/ports/intrusion_detection_service.py` | IntrusionDetectionServicePort 接口 |
-| `src/domain/ports/data_integrity_service.py` | DataIntegrityServicePort 接口 |
-| `src/domain/ports/backup_recovery_service.py` | BackupRecoveryServicePort 接口 |
-| `src/infrastructure/security/intrusion_detection_service_impl.py` | IntrusionDetectionServiceImpl 实现 |
-| `src/infrastructure/security/data_integrity_service_impl.py` | DataIntegrityServiceImpl 实现 |
-| `src/infrastructure/security/backup_recovery_service_impl.py` | BackupRecoveryServiceImpl 实现 |
-| `src/interfaces/api/security.py` | 安全监控 API 路由 |
-| `tests/unit/infrastructure/security/test_intrusion_detection_service.py` | 入侵检测服务测试 |
-| `tests/unit/infrastructure/security/test_data_integrity_service.py` | 数据完整性服务测试 |
-| `tests/unit/infrastructure/security/test_backup_recovery_service.py` | 备份恢复服务测试 |
-| `tests/integration/test_integration_equilibrium.py` | 安全层集成测试 |
-| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature` | Gherkin 验收测试 |
-| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py` | BDD 步骤实现 |
-| `tests/contracts/test_api_contract_equilibrium.py` | API 契约测试 |
-| `tests/contracts/test_port_contract_equilibrium.py` | 端口契约测试 |
-| `tests/unit/infrastructure/security/test_arch_equilibrium.py` | 架构约束测试 |
-| `docs/security/equilibrium_compliance_guide.md` | 等保合规实施指南 |
+| 文件 | 说明 | 对应 Task |
+|------|------|-----------|
+| `src/domain/ports/intrusion_detection_service.py` | IntrusionDetectionServicePort 接口 | Task 0 |
+| `src/domain/ports/data_integrity_service.py` | DataIntegrityServicePort 接口 | Task 0 |
+| `src/domain/ports/backup_recovery_service.py` | BackupRecoveryServicePort 接口 | Task 0 |
+| `src/domain/ports/storage_encryption_service.py` | StorageEncryptionServicePort 接口 | Task 0 (Subtask 0.11) |
+| `src/domain/ports/api_security_service.py` | APISecurityServicePort 接口 | Task 0 (Subtask 0.12) |
+| `src/domain/ports/container_security_service.py` | ContainerSecurityServicePort 接口 | Task 0 (Subtask 0.15) |
+| `src/infrastructure/security/intrusion_detection_service_impl.py` | IntrusionDetectionServiceImpl 实现 | Task 2 |
+| `src/infrastructure/security/data_integrity_service_impl.py` | DataIntegrityServiceImpl 实现 | Task 3 |
+| `src/infrastructure/security/backup_recovery_service_impl.py` | BackupRecoveryServiceImpl 实现 | Task 4 |
+| `src/infrastructure/security/storage_encryption_service_impl.py` | StorageEncryptionServiceImpl 实现 | Task 5 (Subtask 5.21) |
+| `src/infrastructure/security/api_security_service_impl.py` | APISecurityServiceImpl 实现 | Task 5 (Subtask 5.25) |
+| `src/infrastructure/security/container_security_service_impl.py` | ContainerSecurityServiceImpl 实现 | Task 5 (Subtask 5.23) |
+| `src/interfaces/api/security.py` | 安全监控 API 路由 | Task 0 |
+| `src/composition_root.py` | 端口注册（新增5个端口） | Task 0 (Subtask 0.10/0.13/0.16) |
+| `tests/unit/infrastructure/security/test_intrusion_detection_service.py` | 入侵检测服务测试 | Task 2 |
+| `tests/unit/infrastructure/security/test_data_integrity_service.py` | 数据完整性服务测试 | Task 3 |
+| `tests/unit/infrastructure/security/test_backup_recovery_service.py` | 备份恢复服务测试 | Task 4 |
+| `tests/unit/infrastructure/security/test_storage_encryption_service.py` | 存储加密服务测试 | Task 5 (Subtask 5.21) |
+| `tests/unit/infrastructure/security/test_api_security_service.py` | API安全服务测试 | Task 5 (Subtask 5.25) |
+| `tests/unit/infrastructure/security/test_container_security.py` | 容器安全测试 | Task 5 (Subtask 5.23) |
+| `tests/unit/infrastructure/security/test_arch_equilibrium.py` | 架构约束测试 | Task 5 (Subtask 5.17-5.19) |
+| `tests/unit/infrastructure/security/test_identity_compliance.py` | 身份鉴别合规测试 | Task 1 (Subtask 1.1-1.3) |
+| `tests/unit/infrastructure/security/test_access_control_compliance.py` | 访问控制合规测试 | Task 1 (Subtask 1.4-1.6) |
+| `tests/unit/infrastructure/security/test_audit_compliance.py` | 安全审计合规测试 | Task 1 (Subtask 1.7-1.9) |
+| `tests/integration/test_integration_equilibrium.py` | 安全层集成测试 | Task 1 |
+| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature` | Gherkin 验收测试 | Task 0 (Subtask 0.7) |
+| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py` | BDD 步骤实现 | Task 0 (Subtask 0.8) |
+| `tests/contracts/test_api_contract_equilibrium.py` | API 契约测试 | Task 0 (Subtask 0.6) |
+| `tests/contracts/test_port_contract_equilibrium.py` | 端口契约测试 | Task 0 (Subtask 0.5) |
+| `docs/security/equilibrium_compliance_guide.md` | 等保合规实施指南 | Task 5 |
 
 ---
 
@@ -907,13 +920,17 @@ sisys/
 
 | 库 | 版本 | 用途 |
 |------|------|------|
-| `python-jose` / `PyJWT` | 最新 | JWT 令牌生成和验证 |
-| `passlib` + `bcrypt` | 1.7+ / 4.0+ | 密码哈希 |
+| `python-jose` | 最新 | JWT 令牌生成和验证（⚠️ 项目仅用python-jose，PyJWT未使用） |
+| `passlib` + `bcrypt` | 1.7+ / >=4.0.0,<5.0.0 | 密码哈希 |
+| `pyotp` | 最新 | OTP/TOTP 生成（双因子认证必需） |
 | `sqlalchemy` | 2.0+ | ORM |
 | `minio` | 最新 | S3 兼容对象存储、WORM |
-| `redis` | 7.0+ | 缓存、速率限制 |
-| `pytest` | 7.0+ | 测试框架 |
+| `redis` | 5.x | 缓存、速率限制（⚠️ 实际版本5.3.1，非7.0+） |
+| `pytest` | ^8.0.0 | 测试框架 |
 | `bandit` | 最新 | 安全扫描 |
+| `fastapi` | 最新 | Web 框架（安全监控 API） |
+| `pydantic` | 最新 | 数据验证 |
+| `cryptography` | 最新 | AES-256 加密实现（存储加密必需） |
 
 ### 等保 2.0 合规检查项
 
@@ -930,6 +947,10 @@ sisys/
 | 备份恢复 | 自动备份，RTO<4 小时 | 恢复测试 |
 | 传输加密 | TLS 1.3 | SSL Labs A+ 评级 |
 | 存储加密 | AES-256 | 加密审计 |
+| 隐私保护(PIPL) | 个人信息脱敏、删除请求<24h | 集成测试（⚠️ 脱敏功能待Epic 13实现） |
+| 容器安全 | 沙箱隔离、资源限制、逃逸防护 | 沙箱测试（⚠️ 当前为Mock实现） |
+| 接口安全 | API认证、限流、注入防御 | API 测试（⚠️ 待实现） |
+| 物理安全 | 物理访问控制、环境安全 | 部署文档审查 |
 
 ---
 
