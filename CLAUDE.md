@@ -58,6 +58,18 @@ For multi-step tasks, state a brief plan:
 3. [Step] → verify: [check]
 ```
 
+## 5. Fix Root Causes, Never Suppress
+
+**遇到代码问题，通过提高代码质量修复，禁止掩盖/规避/抑制告警或错误。**
+
+This is an absolute rule with no exceptions:
+- **禁止** `# noqa`、`# type: ignore`、`# pylint: disable` 等抑制注释
+- **禁止** 在配置中 `--ignore`、`exclude`、`filter` 问题文件
+- **禁止** 修改阈值/规则来消除告警（如降低覆盖率要求）
+- **必须** 找到根因并修复代码本身
+
+The only valid fix is fixing the code. If you believe a warning is a false positive, report it to the user with evidence — never suppress it yourself.
+
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 ---
