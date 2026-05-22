@@ -2115,9 +2115,9 @@ So that **MVP 阶段支持基础成本优化，验证本地路由占比≥80%**�
 **实施指南:**
 参考 `docs/developer/sdd-tdd-fusion-guide.md` - 架构层测试示例
 
-**Given** 系统配置了本地模型（Ollama+Qwen2.5）和云端模型（MiniMax-M2.7/deepseek-v4-flash）
+**Given** 系统配置了本地模型（Ollama+Qwen2.5）和云端模型（MiniMax-M2.7/deepseek-v4-flash等主流模型）
 **When** 执行 LLM 任务
-**Then** 根据静态配置路由（本地优先，本地不可用或超时>30 秒时切换云端）
+**Then** 根据静态配置路由（云端优先，云端所有模型都不可用或超时>600 秒时切换本地）
 **And** 记录路由决策日志（任务 ID、时间戳、选定路由、估计成本、实际成本、延迟）
 **And** 路由决策延迟 P95<100ms（MVP 静态配置）
 
