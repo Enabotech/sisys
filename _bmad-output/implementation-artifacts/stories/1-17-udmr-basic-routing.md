@@ -16,7 +16,7 @@
 
 ### 业务价值
 
-本 Story 是 Epic 1（企业级架构基础与合规）价值组 5（or.md 系统公理实现）的 UDMR 路由 Story。在 Story 1.14a/b/c 自主调用三阶段管线（trigger→route→execute）和四阶段重构完成后，首次扩展管线能力——从 Agent/工具路由扩展到本地/云模型选择。
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 6（MVP 关键机制增强）的 UDMR 路由 Story。在 Story 1.14a/b/c 自主调用三阶段管线（trigger→route→execute）和四阶段重构完成后，首次扩展管线能力——从 Agent/工具路由扩展到本地/云模型选择。
 
 | 职责 | 业务价值 | 验收标准 |
 |------|---------|---------|
@@ -54,7 +54,7 @@
 - [ ] CloudModelConfig 包含 max_tokens 字段（Anthropic 必需）
 - [ ] from_env() 解析所有 UDMR_* 环境变量
 - [ ] from_env() 对 api_type=="anthropic" 且 max_tokens 缺失时抛出 ValueError
-- [ ] 默认值合理：enabled=True, local_first=false, llm_timeout=600, healthcheck_interval=300, max_tokens=4096
+- [ ] 默认值合理：enabled=True, local_first=False, llm_timeout=600, healthcheck_interval=300, max_tokens=4096
 
 ### AC-2: UDMR 静态路由决策
 
@@ -220,7 +220,7 @@
 |------------|--------|-------------|----------------|
 | **domain (UDMRService)** | — | ✗ 禁止 | ✗ 禁止 |
 | **application (UDMRHandler)** | ✓ 允许 | — | ✗ 禁止 |
-| **infrastructure (Config/HealthChecker/Strategy)** | ✓ 允许 | ✓ 允许 | — |
+| **infrastructure (Config/HealthChecker/Policy)** | ✓ 允许 | ✓ 允许 | — |
 
 **领域层零依赖原则** — UDMRService 仅依赖：
 - Python 标准库（dataclasses, uuid, datetime, logging, asyncio）
@@ -477,8 +477,8 @@
 - [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循现有 lambda 内联 config 模式）
   - `udmr_policy` → lambda: StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
   - `cloud_health_checker` → lambda: CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), strategy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_handler` → lambda: UDMRHandler(udmr_service=resolver.resolve("udmr_service"))
+  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), policy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_handler` → lambda: UDMRHandler(udmr_service=resolver.resolve("udmr_service"), event_listener=resolver.resolve("event_listener"))
 
 **完成标准/Definition of Done:**
 - [ ] UDMRHandler 实现完成
@@ -759,7 +759,7 @@ UDMRClient (统一接口)
 1. **配置 frozen 约束** — 重构 Phase 3 统一所有 auto-invocation 配置为 frozen=True，UDMRConfig 必须遵循
 2. **路由决策日志必须实例化并填充扩展字段** — 重构 P2-3 修复了 RoutingDecisionLog 从未实例化的问题；AutoRouteService._persist_decision_log() 仅填充基础字段（source_agent/target_agent），UDMR 扩展字段（selected_model/cost_actual/fallback_reason）留空。本 Story UDMRService._persist_decision_log() 必须正确填充：
    - selected_model: 从 UdmrPolicyPort.route() 返回值获取
-   - cost_actual: MVP阶段使用估算值（基于云端模型定价或默认0.0）
+   - cost_actual: MVP 阶段使用估算值（基于云端模型定价或默认 0.0）
    - fallback_reason: 从 route() 返回值获取（Literal["timeout","unavailable","health_check_failed"]）
 3. **事件处理器解耦 + 带外模式** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式。此外 UDMR 为带外处理器，与 AutoExecuteService 并行消费 AutoRouted，不阻塞执行管线。RoutingDecided 事件携带 event_id 因果链，AutoTriggerHandler 监听 RoutingDecided 不会重新触发完整管线
 4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
@@ -863,7 +863,7 @@ UDMRClient (统一接口)
 | **File** | `_bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md` |
 | **Status** | `ready-for-dev` |
 | **Epic** | Epic 1: 企业级架构基础与合规 |
-| **价值组** | 价值组 5: or.md 系统公理实现 |
+| **价值组** | 价值组 6: MVP 关键机制增强 |
 | **优先级** | P0-17（MVP，ARCH UDMR 基础） |
 | **覆盖 FR** | FR-CP-05 |
 
@@ -916,6 +916,14 @@ UDMRClient (统一接口)
 > - P1: test_cloud_model_config合并到test_udmr_config
 > - P1: 补充UDMR_ENABLED=false行为和UDMRHandler订阅机制
 > - 用户反馈: static_routing_strategy重命名为udmr_policy（UdmrPolicyPort/StaticUdmrPolicy）
+>
+> **Round 5 (2026-05-22):** 最终质量确认，无P0问题，修复4个P1+2个P2
+> - P1: DI参数名strategy→policy同步重命名（第480行）
+> - P1: 价值组归属第19行和第866行从"5"更新为"6"（Round 4遗漏）
+> - P1: UDMRHandler DI注册补充event_listener参数注入
+> - P1: 依赖方向矩阵标签Strategy→Policy
+> - P2: AC-1默认值false→False（Python布尔值大写）
+> - P2: 中英文间距修正
 
 ### 下一步 Next Steps
 
@@ -926,7 +934,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v1.5.0
+**故事版本/Story Version:** v1.6.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -936,3 +944,4 @@ UDMRClient (统一接口)
 - v1.3.0: Round 2 审查修复 — P0:事件流从顺序改为带外并行模式；P0:补充AutoRouted→UDMRTask字段映射；P0:补充RoutingDecided因果链防循环；P0:修正route()返回类型float→str；P1:移除UDMR_CLOUD_MODELS兼容；P1:DI改lambda内联模式；P1:补充HealthCheckPort到零依赖列表；P1:添加llm/__init__.py到文件清单
 - v1.4.0: Round 3 审查修复 — P0:标题改为"云端优先静态配置"（与策略一致）；P0:AC-5指标改为"路由决策日志完整性≥95%"（带外模式）；P1:参数合理性说明；P1:健康检查性能指标；P1:ComplianceGatewayImpl已知问题标注
 - v1.5.0: Round 4 审查修复 — P0:追溯矩阵合并虚构Subtask；P0:循环防护改为具体实现指导；P0:CloudHealthChecker多模型策略明确；P0:.pyc清理步骤；P1:价值组5→6；P1:EventPublisher入端口表；P1:字段名/拼写修正；P1:UDMR_ENABLED行为；用户反馈:重命名udmr_policy
+- v1.6.0: Round 5 最终审查修复 — P1:strategy→policy参数名同步重命名；P1:价值组归属2处遗漏修正；P1:UDMRHandler DI补充event_listener注入；P1:依赖矩阵Strategy→Policy标签；P2:false→False；P2:中英文间距
