@@ -41,19 +41,20 @@
 | NFR ID | 要求 | 覆盖来源 | 实现状态 |
 |--------|------|---------|----------|
 | NFR-SEC-01 | 数据传输加密（TLS 1.3） | 基础设施配置 | ✅ 基础设施层 |
-| NFR-SEC-02 | 数据存储加密（AES-256） | **本 Story** | ⚠️ **缺失实现** |
+| NFR-SEC-02 | 数据存储加密（AES-256） | **本 Story** | ⚠️ **缺失实现（仅bcrypt哈希，无AES-256）** |
 | NFR-SEC-03 | 渗透测试（无高危漏洞） | 外部测评 | ⏳ 外部验证 |
-| NFR-SEC-04 | 数据泄露事件（0 事件） | **本 Story** | ⚠️ **缺失实现** |
-| NFR-SEC-05 | 提示注入检测准确率（≥95%） | **本 Story** | ⚠️ 事件已定义，服务待实现 |
+| NFR-SEC-04 | 数据泄露事件（0 事件） | **本 Story** | ⚠️ **缺失实现（无入侵检测服务）** |
+| NFR-SEC-05 | 提示注入检测准确率（≥95%） | **本 Story** | ⚠️ 事件已定义，端口+服务均待实现 |
 | NFR-SEC-06 | RBAC 权限测试（100% 通过） | Story 1.9 已覆盖 | ✅ 已实现 |
 | NFR-SEC-07 | 沙箱逃逸测试（0 次逃逸） | 独立实现 | ⚠️ Mock 实现 |
 | NFR-COMP-01 | 等保 2.0 三级（通过测评） | 外部测评 | ⏳ 最终目标 |
 | NFR-COMP-02 | 审计日志保留（7 年 WORM） | Story 1.10 已覆盖 | ✅ 已实现 |
 | NFR-COMP-03 | 数据主权（境内存储 100%） | Story 1.11 已覆盖 | ✅ 已实现 |
-| NFR-COMP-04 | 隐私保护（个人信息脱敏率100%，删除请求<24h） | Story 1.11 已覆盖 | ✅ 已实现 |
+| NFR-COMP-04 | 隐私保护（个人信息脱敏率100%，删除请求<24h） | Story 1.11 已覆盖 | ⚠️ Story 1.11 实际状态 `ready-for-dev`，PIPL服务已实现但未完成集成验证 |
 | NFR-COMP-05 | 审计日志完整性（100%） | Story 1.10 已覆盖 | ✅ 已实现 |
 
 > **NFR 覆盖说明：** 本表说明 Story 1.12 实现后需验证的 NFR 项来源。部分 NFR 由基础设施配置、其他 Story 实现或外部测评完成，非全部由本 Story 代码直接实现。
+> ⚠️ **依赖状态警告：** Story 1.11 实际状态为 `ready-for-dev`（非 `done`），NFR-COMP-04 覆盖的 PIPL 服务虽已实现但需完成集成验证后方可视为完成。
 
 ### 依赖关系 Dependencies
 
@@ -196,7 +197,7 @@
 **And** 所有安全控制措施生效
 
 **验证标准/Validation Criteria:**
-- [ ] 10 个安全层面全覆盖
+- [ ] 10 个安全层面全覆盖（身份鉴别/访问控制/安全审计/入侵防范/数据完整性/数据保密性/备份恢复/容器安全/接口安全/物理安全）
 - [ ] 安全测试矩阵完整
 - [ ] 渗透测试报告
 - [ ] 漏洞扫描报告
@@ -281,6 +282,26 @@
 - [ ] 方法: `restore_backup(backup_id: UUID) -> RestoreResult`
 - [ ] 方法: `verify_backup_integrity(backup_id: UUID) -> bool`
 - [ ] 方法: `get_backup_status() -> BackupStatus`
+- [ ] 端口所有者: 安全工程师
+- [ ] 端口版本: v1.0.0
+- [ ] 兼容策略: backward_compatible
+
+#### 存储加密服务接口 (Storage Encryption Service) ⚠️ 新增支持十层安全
+- [ ] `StorageEncryptionServicePort` 接口定义（`src/domain/ports/storage_encryption_service.py`）⚠️ 待定义
+- [ ] 方法: `encrypt_field(field_name: str, data: bytes) -> EncryptedData`
+- [ ] 方法: `decrypt_field(encrypted: EncryptedData) -> bytes`
+- [ ] 方法: `rotate_key(new_key_id: str) -> None`
+- [ ] 方法: `verify_encryption(record_id: UUID) -> EncryptionVerificationResult`
+- [ ] 端口所有者: 安全工程师
+- [ ] 端口版本: v1.0.0
+- [ ] 兼容策略: backward_compatible
+
+#### API安全服务接口 (API Security Service) ⚠️ 新增支持十层安全
+- [ ] `APISecurityServicePort` 接口定义（`src/domain/ports/api_security_service.py`）⚠️ 待定义
+- [ ] 方法: `check_rate_limit(client_id: str, endpoint: str) -> RateLimitResult`
+- [ ] 方法: `validate_api_auth(request: Request) -> AuthValidationResult`
+- [ ] 方法: `detect_injection_attack(input: str) -> InjectionDetectionResult`
+- [ ] 方法: `add_security_headers(response: Response) -> Response`
 - [ ] 端口所有者: 安全工程师
 - [ ] 端口版本: v1.0.0
 - [ ] 兼容策略: backward_compatible
@@ -406,6 +427,10 @@
 - [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py`
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 - [ ] Subtask 0.10: 在 `composition_root.py` 中注册三个新端口
+- [ ] Subtask 0.11: 定义 `StorageEncryptionServicePort` 接口（`src/domain/ports/storage_encryption_service.py`）⚠️ 新增支持十层安全
+- [ ] Subtask 0.12: 定义 `APISecurityServicePort` 接口（`src/domain/ports/api_security_service.py`）⚠️ 新增支持十层安全
+- [ ] Subtask 0.13: 在 `composition_root.py` 中注册 StorageEncryptionServicePort 和 APISecurityServicePort
+- [ ] Subtask 0.14: 更新契约测试覆盖新增端口
 
 **完成标准:**
 - [ ] 规范项全部定义完毕
@@ -596,6 +621,15 @@
 - [ ] Subtask 5.11: 🔴 红 — 编写备份恢复验证失败测试
 - [ ] Subtask 5.12: 🟢 绿 — 实现备份恢复验证
 - [ ] Subtask 5.13: 🔄 重构 — 生成等保合规报告
+- [ ] Subtask 5.20: 🔴 红 — 编写数据保密性验证失败测试（AES-256加密）
+- [ ] Subtask 5.21: 🟢 绿 — 验证数据加密服务实现（AES-256）⚠️ 待实现
+- [ ] Subtask 5.22: 🔴 红 — 编写容器安全验证失败测试（沙箱隔离）
+- [ ] Subtask 5.23: 🟢 绿 — 验证容器隔离实现 ⚠️ Mock实现待升级
+- [ ] Subtask 5.24: 🔴 红 — 编写接口安全验证失败测试（API认证/限流）
+- [ ] Subtask 5.25: 🟢 绿 — 验证接口安全实现 ⚠️ 待实现
+- [ ] Subtask 5.26: ✅ Checklist — 物理安全文档检查清单验证（部署合规/数据中心要求）
+- [ ] Subtask 5.27: ✅ Checklist — 物理安全环境安全检查（温湿度/电源/消防）
+- [ ] Subtask 5.28: 🔄 重构 — 更新等保2.0综合合规报告（包含全部10层）
 
 #### TDD 循环 B：隐私保护集成验证（AC-8）
 
@@ -616,10 +650,14 @@
 - [ ] Subtask 5.19: 🔄 重构 — 验证安全层隔离
 
 **完成标准:**
-- [ ] 10 个安全层面验证完成
+- [ ] 10 个安全层面验证完成（身份鉴别/访问控制/安全审计/入侵防范/数据完整性/数据保密性/备份恢复/容器安全/接口安全/物理安全）
 - [ ] 无高风险项，中危漏洞<5 个
-- [ ] 合规报告生成
+- [ ] 合规报告生成（含全部10层）
 - [ ] PIPL 隐私保护集成验证（AC-8）
+- [ ] 数据保密性 AES-256 加密验证 ⚠️ 待实现
+- [ ] 容器安全沙箱隔离验证 ⚠️ Mock待升级
+- [ ] 接口安全验证 ⚠️ 待实现
+- [ ] 物理安全文档验证 ⚠️ 纯文档要求
 
 ---
 
