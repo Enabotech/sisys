@@ -1,7 +1,6 @@
 """领域层 发布结果类型模块
 
-领域层定义，用于返回发布操作的结果
-使用DomainEvent作为基础，不感知传输细节
+定义事件发布操作的通道无关结果类型，领域层不感知具体传输技术
 
 Author:
     agimtech <agimtech@126.com>
@@ -17,39 +16,66 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class ChannelResult:
+    """单个通道的发布结果"""
+
+    channel_name: str  # "realtime" / "reliable" / "inmemory"
+    success: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True)
 class PublishResult:
-    """发布结果，包含各通道状态
+    """事件发布结果（通道无关）
 
     语义定义：
-    - redis_success: Redis 通道是否成功（尽力而为，可能丢失）
-    - outbox_saved: 消息是否已存入 Outbox（可靠路径，Poller 保证最终一致）
-
-    注意：
-    - 移除了 rabbitmq_success（因为 RabbitMQ 成功 = Outbox 保存成功，由 Poller 保证）
-    - outbox_saved=True 表示可靠投递最终会成功
+    - is_success: 全部通道成功才算成功
+    - is_full_failure: 全部通道失败
+    - partial_error: 返回第一个失败通道的错误信息
     """
 
     event_id: str
-    redis_success: bool = False
-    redis_error: str | None = None
-    outbox_saved: bool = False
-    outbox_error: str | None = None
+    results: tuple[ChannelResult, ...] = ()
 
     @property
     def is_success(self) -> bool:
-        """任意通道成功即为成功"""
-        return self.redis_success or self.outbox_saved
+        """全部通道成功才算成功"""
+        if not self.results:
+            return False
+        return all(r.success for r in self.results)
 
     @property
     def is_full_failure(self) -> bool:
         """所有通道都失败"""
-        return not self.redis_success and not self.outbox_saved
+        return len(self.results) > 0 and not any(r.success for r in self.results)
 
     @property
     def partial_error(self) -> str | None:
-        """返回第一个错误信息"""
-        if self.outbox_error:
-            return self.outbox_error
-        if self.redis_error:
-            return self.redis_error
+        """返回第一个失败通道的错误信息"""
+        for r in self.results:
+            if not r.success and r.error:
+                return r.error
+        return None
+
+    # 向后兼容属性（便于渐进迁移）
+    @property
+    def redis_success(self) -> bool:
+        return any(r.channel_name == "realtime" and r.success for r in self.results)
+
+    @property
+    def redis_error(self) -> str | None:
+        for r in self.results:
+            if r.channel_name == "realtime" and not r.success:
+                return r.error
+        return None
+
+    @property
+    def outbox_saved(self) -> bool:
+        return any(r.channel_name == "reliable" and r.success for r in self.results)
+
+    @property
+    def outbox_error(self) -> str | None:
+        for r in self.results:
+            if r.channel_name == "reliable" and not r.success:
+                return r.error
         return None

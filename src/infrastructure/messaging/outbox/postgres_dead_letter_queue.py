@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import DeadLetterQueue
+from src.domain.ports.dead_letter_queue import DeadLetterQueue
 from src.infrastructure.storage.postgresql.session_context import get_session
 
 logger = logging.getLogger(__name__)

@@ -13,8 +13,11 @@ Copyright:
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import TYPE_CHECKING
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 
@@ -46,6 +49,32 @@ class RedisSnapshotStore:
         self._redis = redis_client
         self._ttl_seconds: int = 86400  # Default 24 hours
 
+    @staticmethod
+    def _snapshot_to_hash(snapshot: CheckpointSnapshot) -> dict[str, str]:
+        """将 CheckpointSnapshot 序列化为 Redis Hash 字段"""
+        return {
+            "snapshot_id": str(snapshot.snapshot_id),
+            "session_id": snapshot.session_id,
+            "stage_id": snapshot.stage_id,
+            "state_version": str(snapshot.state_version),
+            "state_data": json.dumps(snapshot.state_data),
+            "timestamp": snapshot.timestamp.isoformat(),
+            "ttl_seconds": str(snapshot.ttl_seconds),
+        }
+
+    @staticmethod
+    def _hash_to_snapshot(data: dict[str, Any]) -> CheckpointSnapshot:
+        """从 Redis Hash 字段反序列化为 CheckpointSnapshot"""
+        return CheckpointSnapshot(
+            snapshot_id=uuid.UUID(data["snapshot_id"]),
+            session_id=data["session_id"],
+            stage_id=data["stage_id"],
+            state_version=int(data["state_version"]),
+            state_data=json.loads(data["state_data"]) if isinstance(data["state_data"], str) else data["state_data"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            ttl_seconds=int(data["ttl_seconds"]),
+        )
+
     def set_ttl(self, ttl_seconds: int) -> None:
         """Set default TTL for snapshots.
 
@@ -73,12 +102,7 @@ class RedisSnapshotStore:
         ttl = snapshot.ttl_seconds if snapshot.ttl_seconds > 0 else self._ttl_seconds
 
         try:
-            # Serialize snapshot to Redis Hash
-            hash_data = snapshot.to_redis_hash()
-
-            # Store as JSON string under 'latest' field
-            import json
-
+            hash_data = self._snapshot_to_hash(snapshot)
             await self._redis.hset(key, "latest", json.dumps(hash_data))
             await self._redis.expire(key, ttl)
 
@@ -112,15 +136,13 @@ class RedisSnapshotStore:
         key = f"{self.SNAPSHOT_KEY_PREFIX}{session_id}"
 
         try:
-            import json
-
             data = await self._redis.hget(key, "latest")
             if data is None:
                 logger.debug("No snapshot found: session_id=%s", session_id)
                 return None
 
             hash_data = json.loads(data)
-            snapshot = CheckpointSnapshot.from_redis_hash(hash_data)
+            snapshot = self._hash_to_snapshot(hash_data)
 
             logger.debug(
                 "Loaded snapshot: session_id=%s version=%d",

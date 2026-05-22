@@ -24,7 +24,6 @@ import logging
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.base import DomainEvent
-from src.domain.ports.event_publisher import EventPublisher
 from src.domain.services.auto_route_service import AutoRouteService
 
 logger = logging.getLogger(__name__)
@@ -45,16 +44,13 @@ class AutoRouteHandler:
     def __init__(
         self,
         auto_route_service: AutoRouteService,
-        publisher: EventPublisher | None = None,
     ) -> None:
         """初始化自动路由监听器
 
         Args:
             auto_route_service: 路由决策领域服务
-            publisher: 事件发布器端口，None 用于独立测试
         """
         self._auto_route_service = auto_route_service
-        self._publisher = publisher
 
     async def on_triggered(self, event: DomainEvent) -> AutoRouted | None:
         """处理 AutoTriggered 事件：做路由决策并发出 AutoRouted
@@ -88,7 +84,6 @@ class AutoRouteHandler:
                     routed.route_target,
                     routed.route_score,
                 )
-                await self._publish(routed)
             else:
                 logger.warning("AutoRouteService returned None for AutoTriggered event")
 
@@ -96,21 +91,4 @@ class AutoRouteHandler:
 
         except Exception as e:
             logger.error("Failed to process AutoTriggered event: %s", e)
-            raise
-
-    async def _publish(self, event: AutoRouted) -> None:
-        """通过配置的发布器发布 AutoRouted 事件
-
-        Args:
-            event: 待发布的 AutoRouted 事件
-        """
-        if self._publisher is None:
-            logger.warning("No publisher configured, AutoRouted event not published")
-            return
-
-        try:
-            await self._publisher.publish(event)
-            logger.debug("Published AutoRouted event: session_id=%s", event.session_id)
-        except Exception as e:
-            logger.error("Failed to publish AutoRouted event: %s", e)
             raise

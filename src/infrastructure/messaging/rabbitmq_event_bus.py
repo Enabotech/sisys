@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.ports.event_publisher import EventPublisher
 from src.infrastructure.messaging.channel_router import ChannelRouter
 
@@ -57,23 +57,19 @@ class RabbitMQEventBus(EventPublisher):
         if routing_key is None:
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=False,
-                outbox_saved=False,
+                results=(),
             )
 
         try:
             await self._outbox_repo.save(event)
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=False,
-                outbox_saved=True,
+                results=(ChannelResult("reliable", True),),
             )
         except Exception as e:
             return PublishResult(
                 event_id=str(event.event_id),
-                redis_success=False,
-                outbox_saved=False,
-                outbox_error=str(e),
+                results=(ChannelResult("reliable", False, str(e)),),
             )
 
     async def close(self) -> None:

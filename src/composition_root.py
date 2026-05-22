@@ -41,6 +41,12 @@ def bootstrap() -> None:
 
     # Import all domain ports for registration
     # Storage layer ports
+    # Auto-Invocation Pipeline
+    from src.application.event_handlers.auto_execute_completed_handler import (
+        AutoExecuteCompletedHandler,
+    )
+    from src.application.event_handlers.auto_route_handler import AutoRouteHandler
+    from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
     from src.application.ports.compressor_service import CompressorService
 
     # Application layer ports
@@ -72,6 +78,9 @@ def bootstrap() -> None:
     from src.domain.ports.cross_border_transfer_service import CrossBorderTransferServicePort
     from src.domain.ports.data_residency_enforcer import DataResidencyEnforcerPort
 
+    # Event listener port
+    from src.domain.ports.event_listener import EventListener
+
     # Event ports
     from src.domain.ports.event_publisher import EventPublisher
     from src.domain.ports.hash_router_protocol import HashRouterProtocol
@@ -101,13 +110,21 @@ def bootstrap() -> None:
     from src.domain.ports.user_repository import UserRepositoryPort
     from src.domain.ports.user_role_repository import UserRoleRepositoryPort
     from src.domain.ports.whitelist_service import WhitelistServicePort
+    from src.domain.services.auto_execute_service import AutoExecuteService
+    from src.domain.services.auto_route_service import AutoRouteService
+    from src.domain.services.auto_trigger_service import AutoTriggerService
 
     # === Storage Layer ===
     from src.infrastructure.config.redis import RedisConfig
+    from src.infrastructure.external_services.sandbox.session_namespace_manager import (
+        SessionNamespaceManager,
+    )
+    from src.infrastructure.messaging.inmemory_event_listener import InMemoryEventListener
     from src.infrastructure.messaging.unit_of_work.postgresql_unit_of_work import (
         PostgreSQLUnitOfWork,
     )
     from src.infrastructure.saga.saga_repository import PostgreSQLSagaRepository
+    from src.infrastructure.scheduler.heartbeat_scheduler import HeartbeatScheduler
     from src.infrastructure.storage.redis.redis_manager import RedisManager
 
     register_port(
@@ -659,8 +676,8 @@ def bootstrap() -> None:
         name="sandbox_executor",
         version="v1.0.0",
         interface=SandboxExecutor,
-        impl="src.infrastructure.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
-        module="src.infrastructure.sandbox.docker_sandbox_adapter",
+        impl="src.infrastructure.external_services.sandbox.docker_sandbox_adapter.DockerSandboxAdapter",
+        module="src.infrastructure.external_services.sandbox.docker_sandbox_adapter",
         lifetime=Lifetime.TRANSIENT,
         owner="sandbox-team",
     )
@@ -721,8 +738,8 @@ def bootstrap() -> None:
         name="snapshot_repository",
         version="v1.0.0",
         interface=SnapshotRepositoryProtocol,
-        impl="src.infrastructure.storage.redis_snapshot_store.RedisSnapshotStore",
-        module="src.infrastructure.storage.redis_snapshot_store",
+        impl="src.infrastructure.storage.redis.redis_snapshot_store.RedisSnapshotStore",
+        module="src.infrastructure.storage.redis.redis_snapshot_store",
         lifetime=Lifetime.SCOPED,
         owner="storage-team",
     )
@@ -745,6 +762,118 @@ def bootstrap() -> None:
         module="src.infrastructure.routing.semantic_router",
         lifetime=Lifetime.SINGLETON,
         owner="routing-team",
+    )
+
+    # === Auto-Invocation Pipeline ===
+
+    register_port(
+        name="event_listener",
+        version="v1.0.0",
+        interface=EventListener,
+        impl=lambda resolver: InMemoryEventListener(),
+        module="src.infrastructure.messaging.inmemory_event_listener",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_trigger_service",
+        version="v1.0.0",
+        interface=AutoTriggerService,
+        impl=lambda resolver: AutoTriggerService(
+            publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.domain.services.auto_trigger_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_route_service",
+        version="v1.0.0",
+        interface=AutoRouteService,
+        impl=lambda resolver: AutoRouteService(
+            publisher=resolver.resolve("event_publisher"),
+            hash_router=resolver.resolve("hash_router"),
+            semantic_router=resolver.resolve("semantic_router"),
+        ),
+        module="src.domain.services.auto_route_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_execute_service",
+        version="v1.0.0",
+        interface=AutoExecuteService,
+        impl=lambda resolver: AutoExecuteService(
+            sandbox=resolver.resolve("sandbox_executor"),
+            snapshot_repo=resolver.resolve("snapshot_repository"),
+        ),
+        module="src.domain.services.auto_execute_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_route_handler",
+        version="v1.0.0",
+        interface=AutoRouteHandler,
+        impl=lambda resolver: AutoRouteHandler(
+            auto_route_service=resolver.resolve("auto_route_service"),
+        ),
+        module="src.application.event_handlers.auto_route_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_execute_completed_handler",
+        version="v1.0.0",
+        interface=AutoExecuteCompletedHandler,
+        impl=lambda resolver: AutoExecuteCompletedHandler(
+            publisher=resolver.resolve("event_publisher"),
+        ),
+        module="src.application.event_handlers.auto_execute_completed_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="heartbeat_scheduler",
+        version="v1.0.0",
+        interface=HeartbeatScheduler,
+        impl=lambda resolver: HeartbeatScheduler(
+            redis_config=RedisConfig.from_env(),
+        ),
+        module="src.infrastructure.scheduler.heartbeat_scheduler",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="session_namespace_manager",
+        version="v1.0.0",
+        interface=SessionNamespaceManager,
+        impl=lambda resolver: SessionNamespaceManager(
+            sandbox=resolver.resolve("sandbox_executor"),
+        ),
+        module="src.infrastructure.external_services.sandbox.session_namespace_manager",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
+    )
+
+    register_port(
+        name="auto_trigger_handler",
+        version="v1.0.0",
+        interface=AutoTriggerHandler,
+        impl=lambda resolver: AutoTriggerHandler(
+            auto_trigger_service=resolver.resolve("auto_trigger_service"),
+            event_listener=resolver.resolve("event_listener"),
+        ),
+        module="src.application.event_handlers.auto_trigger_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="auto-invocation-team",
     )
 
     # === Rule 4: Application Port Implementations ===

@@ -24,7 +24,7 @@ import aio_pika
 from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractIncomingMessage, AbstractQueue
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import DeadLetterQueue
+from src.domain.ports.dead_letter_queue import DeadLetterQueue
 from src.infrastructure.config.rabbitmq import RabbitMQConfig
 from src.infrastructure.messaging.retry.redis_retry_queue import RedisRetryQueue
 

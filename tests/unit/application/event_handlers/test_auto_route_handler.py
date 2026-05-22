@@ -9,49 +9,18 @@ import pytest
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
-from src.domain.events.base import DomainEvent
 
 
 class TestAutoRouteHandlerInit:
     """Test AutoRouteHandler initialization."""
 
-    def test_init_with_all_dependencies(self) -> None:
-        """Coverage: __init__ with all dependencies."""
+    def test_init_with_service(self) -> None:
+        """Coverage: __init__ with service dependency."""
         from src.application.event_handlers.auto_route_handler import AutoRouteHandler
 
         mock_service = MagicMock()
-        mock_publisher = MagicMock()
-
-        handler = AutoRouteHandler(
-            auto_route_service=mock_service,
-            publisher=mock_publisher,
-        )
-
+        handler = AutoRouteHandler(auto_route_service=mock_service)
         assert handler._auto_route_service is mock_service
-        assert handler._publisher is mock_publisher
-
-    def test_init_with_no_publisher(self) -> None:
-        """Coverage: __init__ with publisher=None."""
-        from src.application.event_handlers.auto_route_handler import AutoRouteHandler
-
-        mock_service = MagicMock()
-
-        handler = AutoRouteHandler(
-            auto_route_service=mock_service,
-            publisher=None,
-        )
-
-        assert handler._publisher is None
-
-
-class MockEventPublisher:
-    """Mock event publisher for testing."""
-
-    def __init__(self) -> None:
-        self.published_events: list = []
-
-    async def publish(self, event: DomainEvent) -> None:
-        self.published_events.append(event)
 
 
 class TestAutoRouteHandlerOnTriggered:
@@ -158,93 +127,3 @@ class TestAutoRouteHandlerOnTriggered:
 
         with pytest.raises(Exception, match="Service error"):
             await handler.on_triggered(event)
-
-
-class TestAutoRouteHandlerPublish:
-    """Test _publish method."""
-
-    @pytest.mark.asyncio
-    async def test_publish_without_publisher(self) -> None:
-        """Coverage: _publish does nothing when publisher is None."""
-        from src.application.event_handlers.auto_route_handler import AutoRouteHandler
-
-        mock_service = MagicMock()
-        handler = AutoRouteHandler(auto_route_service=mock_service, publisher=None)
-
-        event = AutoRouted(
-            event_id=uuid4(),
-            route_type="hash",
-            session_id="test-session",
-            task_context={},
-            route_target="agent-1",
-            route_score=1.0,
-        )
-
-        # Should not raise
-        await handler._publish(event)
-
-    @pytest.mark.asyncio
-    async def test_publish_with_publisher(self) -> None:
-        """Coverage: _publish publishes event via publisher."""
-        from src.application.event_handlers.auto_route_handler import AutoRouteHandler
-
-        mock_service = MagicMock()
-        mock_publisher = AsyncMock()
-        handler = AutoRouteHandler(auto_route_service=mock_service, publisher=mock_publisher)
-
-        event = AutoRouted(
-            event_id=uuid4(),
-            route_type="hash",
-            session_id="test-session",
-            task_context={},
-            route_target="agent-1",
-            route_score=1.0,
-        )
-
-        await handler._publish(event)
-
-        mock_publisher.publish.assert_called_once_with(event)
-
-    @pytest.mark.asyncio
-    async def test_publish_with_default_channel(self) -> None:
-        """Coverage: _publish publishes event via publisher."""
-        from src.application.event_handlers.auto_route_handler import AutoRouteHandler
-
-        mock_service = MagicMock()
-        mock_publisher = AsyncMock()
-        handler = AutoRouteHandler(auto_route_service=mock_service, publisher=mock_publisher)
-
-        event = AutoRouted(
-            event_id=uuid4(),
-            route_type="semantic",
-            session_id="test-session",
-            task_context={},
-            route_target="agent-2",
-            route_score=0.95,
-        )
-
-        await handler._publish(event)
-
-        mock_publisher.publish.assert_called_once_with(event)
-
-    @pytest.mark.asyncio
-    async def test_publish_raises_on_publisher_error(self) -> None:
-        """Coverage: _publish raises exception when publisher fails."""
-        from src.application.event_handlers.auto_route_handler import AutoRouteHandler
-
-        mock_service = MagicMock()
-        mock_publisher = MagicMock()
-        mock_publisher.publish = AsyncMock(side_effect=Exception("Publish failed"))
-        handler = AutoRouteHandler(auto_route_service=mock_service, publisher=mock_publisher)
-
-        event = AutoRouted(
-            event_id=uuid4(),
-            route_type="mixed",
-            session_id="test-session",
-            task_context={},
-            route_target="agent-3",
-            route_score=0.9,
-        )
-
-        with pytest.raises(Exception, match="Publish failed"):
-            await handler._publish(event)

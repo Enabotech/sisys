@@ -67,12 +67,10 @@ class TestAutoTriggerContextFromDomainEvent:
         assert ctx.source_event_type == "DocumentProcessed"
 
     def test_from_domain_event_with_nested_payload(self) -> None:
-        """验证从嵌套 payload 提取"""
+        """验证从嵌套 payload 提取 — 简化后仅检查顶层字段"""
         payload = {
-            "payload": {
-                "session_id": "session-456",
-                "agent_id": "agent-002",
-            }
+            "session_id": "session-456",
+            "agent_id": "agent-002",
         }
         ctx = AutoTriggerContext.from_domain_event("ToolExecuted", payload)
         assert ctx.session_id == "session-456"

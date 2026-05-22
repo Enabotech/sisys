@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.value_objects.flow_status import FlowStatus
 
 
@@ -35,7 +35,9 @@ class TestAgentReasoningFullChain:
         from src.infrastructure.config.langgraph import LangGraphConfig
 
         event_publisher = AsyncMock()
-        event_publisher.publish = AsyncMock(return_value=PublishResult(event_id="test", redis_success=True))
+        event_publisher.publish = AsyncMock(
+            return_value=PublishResult(event_id="test", results=(ChannelResult("realtime", True),))
+        )
         config = LangGraphConfig()
         agent_engine = LangGraphEngine(config, event_publisher)
 
@@ -62,7 +64,9 @@ class TestAgentReasoningFullChain:
         from src.infrastructure.config.langgraph import LangGraphConfig
 
         event_publisher = AsyncMock()
-        event_publisher.publish = AsyncMock(return_value=PublishResult(event_id="test", redis_success=True))
+        event_publisher.publish = AsyncMock(
+            return_value=PublishResult(event_id="test", results=(ChannelResult("realtime", True),))
+        )
         config = LangGraphConfig()
         engine = LangGraphEngine(config, event_publisher)
 

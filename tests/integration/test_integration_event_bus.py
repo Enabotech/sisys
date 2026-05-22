@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.infrastructure.messaging.channel_router import ChannelRouter
 from src.infrastructure.messaging.dual_channel_event_bus import DualChannelEventBus
 from src.infrastructure.messaging.rabbitmq_event_bus import RabbitMQEventBus
@@ -26,7 +26,7 @@ class TestRealtimeEventPublishToRedis:
         """AutoTriggered (REALTIME) should publish via RedisEventBus."""
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
-        redis_result = PublishResult(event_id="test-123", redis_success=True)
+        redis_result = PublishResult(event_id="test-123", results=(ChannelResult("realtime", True),))
         redis_bus.publish = AsyncMock(return_value=redis_result)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
 
@@ -51,7 +51,7 @@ class TestRealtimeEventPublishToRedis:
         """AutoRouted (REALTIME) should publish via RedisEventBus."""
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
-        redis_result = PublishResult(event_id="test-123", redis_success=True)
+        redis_result = PublishResult(event_id="test-123", results=(ChannelResult("realtime", True),))
         redis_bus.publish = AsyncMock(return_value=redis_result)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
 
@@ -80,7 +80,7 @@ class TestReliableEventWritesToOutbox:
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
-        rabbitmq_result = PublishResult(event_id="test-123", outbox_saved=True)
+        rabbitmq_result = PublishResult(event_id="test-123", results=(ChannelResult("reliable", True),))
         rabbitmq_bus.publish = AsyncMock(return_value=rabbitmq_result)
 
         bus = DualChannelEventBus(
@@ -105,7 +105,7 @@ class TestReliableEventWritesToOutbox:
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
-        rabbitmq_result = PublishResult(event_id="test-123", outbox_saved=True)
+        rabbitmq_result = PublishResult(event_id="test-123", results=(ChannelResult("reliable", True),))
         rabbitmq_bus.publish = AsyncMock(return_value=rabbitmq_result)
 
         bus = DualChannelEventBus(
@@ -129,7 +129,7 @@ class TestReliableEventWritesToOutbox:
         router = ChannelRouter()
         redis_bus = MagicMock(spec=RedisEventBus)
         rabbitmq_bus = MagicMock(spec=RabbitMQEventBus)
-        rabbitmq_result = PublishResult(event_id="test-123", outbox_saved=True)
+        rabbitmq_result = PublishResult(event_id="test-123", results=(ChannelResult("reliable", True),))
         rabbitmq_bus.publish = AsyncMock(return_value=rabbitmq_result)
 
         bus = DualChannelEventBus(

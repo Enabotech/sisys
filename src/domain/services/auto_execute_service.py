@@ -17,11 +17,12 @@ Copyright:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from src.domain.entities.checkpoint_snapshot import CheckpointSnapshot
 from src.domain.events.auto_execute_events import AutoExecuted
-from src.domain.events.base import DomainEvent
+from src.domain.events.auto_route_events import AutoRouted
 from src.domain.ports.sandbox_executor import SandboxExecutor
 from src.domain.ports.snapshot_repository_protocol import SnapshotRepositoryProtocol
 
@@ -54,7 +55,7 @@ class AutoExecuteService:
         self._sandbox = sandbox
         self._snapshot_repo = snapshot_repo
 
-    async def on_routed_event(self, event: DomainEvent) -> AutoExecuted | None:
+    async def on_routed_event(self, event: AutoRouted) -> AutoExecuted | None:
         """处理 AutoRouted 事件：执行任务并发布 AutoExecuted 事件
 
         Args:
@@ -63,14 +64,15 @@ class AutoExecuteService:
         Returns:
             执行成功时返回 AutoExecuted 事件，否则返回 None
         """
-        logger.debug("Processing AutoRouted event: session_id=%s", getattr(event, "session_id", "unknown"))
+        logger.debug("Processing AutoRouted event: session_id=%s", event.session_id)
 
-        # Extract fields from AutoRouted event
-        session_id = getattr(event, "session_id", "")
-        task_context = getattr(event, "task_context", {})
-        route_target = getattr(event, "route_target", "")
-        route_score = getattr(event, "route_score", 0.0)
-        route_type = getattr(event, "route_type", "")
+        session_id = event.session_id
+        task_context = event.task_context
+        route_target = event.route_target
+        route_score = event.route_score
+        route_type = event.route_type
+        trigger_event_type = event.trigger_event_type
+        trigger_event_id = event.trigger_event_id
 
         if not session_id:
             logger.warning("AutoRouted event missing session_id, skipping execution")
@@ -82,17 +84,13 @@ class AutoExecuteService:
 
         # Execute the task
         execution_result: dict[str, Any] = {"status": "completed"}
-        import time
-
         start_time = time.monotonic()
 
         try:
             if self._sandbox and task_context.get("code"):
-                # Execute code in sandbox
                 code = task_context["code"]
                 execution_result = await self._sandbox.execute_code(session_id, code)
             else:
-                # No code to execute, just mark as completed
                 execution_result = {"status": "completed", "message": "No code to execute"}
 
             latency_ms = (time.monotonic() - start_time) * 1000
@@ -124,6 +122,9 @@ class AutoExecuteService:
                 business_event_type=business_event_type,
                 route_target=route_target,
                 route_score=route_score,
+                route_type=route_type,
+                trigger_event_type=trigger_event_type,
+                trigger_event_id=trigger_event_id,
             )
 
             logger.info(
@@ -139,7 +140,6 @@ class AutoExecuteService:
             logger.error("Execution failed: session_id=%s error=%s", session_id, e)
             execution_result = {"status": "failed", "error": str(e)}
 
-            # Still publish AutoExecuted event with failure status
             executed = AutoExecuted(
                 session_id=session_id,
                 task_context=task_context,
@@ -149,6 +149,9 @@ class AutoExecuteService:
                 business_event_type=task_context.get("business_event_type", "ToolExecuted"),
                 route_target=route_target,
                 route_score=route_score,
+                route_type=route_type,
+                trigger_event_type=trigger_event_type,
+                trigger_event_id=trigger_event_id,
             )
             return executed
 
@@ -172,7 +175,6 @@ class AutoExecuteService:
             logger.warning("No snapshot repository configured, skipping snapshot")
             return None
 
-        # Load existing snapshot to get version
         existing = await self._snapshot_repo.load(session_id)
         version = existing.state_version + 1 if existing else 1
 

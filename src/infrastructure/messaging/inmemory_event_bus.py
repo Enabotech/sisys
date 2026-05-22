@@ -17,9 +17,9 @@ import asyncio
 import uuid
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.listener import InMemoryEventListener
-from src.domain.events.publish_result import PublishResult
+from src.domain.events.publish_result import ChannelResult, PublishResult
 from src.domain.ports.event_publisher import EventPublisher
+from src.infrastructure.messaging.inmemory_event_listener import InMemoryEventListener
 
 
 class InMemoryEventBus(EventPublisher):
@@ -64,7 +64,10 @@ class InMemoryEventBus(EventPublisher):
 
             self.processed_event_ids.add(event.event_id)
             self._published_events.append(event)
-            return PublishResult(event_id=str(event.event_id), outbox_saved=True)
+            return PublishResult(
+                event_id=str(event.event_id),
+                results=(ChannelResult("inmemory", True),),
+            )
 
     @property
     def published_events(self) -> list[DomainEvent]:

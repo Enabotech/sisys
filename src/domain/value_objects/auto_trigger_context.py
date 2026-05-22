@@ -13,9 +13,12 @@ Copyright:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,22 @@ class AutoTriggerContext:
     source_event_type: str = ""
     source_event_id: str | None = None
 
+    ALLOWED_CONTEXT_KEYS: ClassVar[tuple[str, ...]] = (
+        "task_type",
+        "priority",
+        "tool_name",
+        "checkpoint_id",
+        "correction_type",
+        "routing_decision",
+        "isolation_level",
+        "document_id",
+        "strategy_id",
+        "agent_id",
+        "session_id",
+        "error_message",
+        "retry_count",
+    )
+
     def __post_init__(self) -> None:
         """校验必需字段并应用默认值"""
         if not self.session_id:
@@ -67,36 +86,13 @@ class AutoTriggerContext:
             提取字段后的 AutoTriggerContext 实例
         """
         # Extract session_id from various possible locations
-        session_id = (
-            payload.get("session_id")
-            or payload.get("payload", {}).get("session_id")
-            or payload.get("aggregate_id")
-            or "default"
-        )
+        session_id = payload.get("session_id") or payload.get("aggregate_id") or "default"
+        if session_id == "default":
+            logger.warning("No session_id found in event payload, using 'default'")
         # Extract agent_id
-        agent_id = payload.get("agent_id") or payload.get("payload", {}).get("agent_id")
+        agent_id = payload.get("agent_id")
         # Extract task context
-        task_context = {
-            k: v
-            for k, v in payload.items()
-            if k
-            in (
-                "task_type",
-                "priority",
-                "tool_name",
-                "checkpoint_id",
-                "correction_type",
-                "routing_decision",
-                "isolation_level",
-                "document_id",
-                "strategy_id",
-                "agent_id",
-                "session_id",
-                "error_message",
-                "retry_count",
-            )
-            and k not in ("aggregate_id", "event_id", "event_type")
-        }
+        task_context = {k: v for k, v in payload.items() if k in cls.ALLOWED_CONTEXT_KEYS}
 
         return cls(
             session_id=session_id,
