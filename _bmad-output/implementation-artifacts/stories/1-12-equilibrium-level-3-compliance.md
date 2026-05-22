@@ -50,11 +50,11 @@
 | NFR-COMP-01 | 等保 2.0 三级（通过测评） | 外部测评 | ⏳ 最终目标 |
 | NFR-COMP-02 | 审计日志保留（7 年 WORM） | Story 1.10 已覆盖 | ✅ 已实现 |
 | NFR-COMP-03 | 数据主权（境内存储 100%） | Story 1.11 已覆盖 | ✅ 已实现 |
-| NFR-COMP-04 | 隐私保护（个人信息脱敏率100%，删除请求<24h） | Story 1.11 已覆盖 | ⚠️ Story 1.11 实际状态 `ready-for-dev`，PIPL服务已实现但未完成集成验证 |
+| NFR-COMP-04 | 隐私保护（个人信息脱敏率100%，删除请求<24h） | Story 1.11 已覆盖 | ⚠️ PIPL服务已实现，但脱敏功能(Epic 13)尚未实现，AC-8完全验证需Epic 13完成后 |
 | NFR-COMP-05 | 审计日志完整性（100%） | Story 1.10 已覆盖 | ✅ 已实现 |
 
 > **NFR 覆盖说明：** 本表说明 Story 1.12 实现后需验证的 NFR 项来源。部分 NFR 由基础设施配置、其他 Story 实现或外部测评完成，非全部由本 Story 代码直接实现。
-> ⚠️ **依赖状态警告：** Story 1.11 实际状态为 `ready-for-dev`（非 `done`），NFR-COMP-04 覆盖的 PIPL 服务虽已实现但需完成集成验证后方可视为完成。
+> ⚠️ **NFR-COMP-04 说明：** PIPL 服务（PIPLComplianceService）已实现，但"个人信息脱敏"功能属于 Epic 13 范畴。Story 1.11 状态为 `done`（sprint-status.yaml 确认），但脱敏率100%验收标准需 Epic 13 完成后方可验证。
 
 ### 依赖关系 Dependencies
 
@@ -439,6 +439,8 @@
 | AC-7 | 等保综合合规 | Task 5 | Subtask 5.1-5.13 | `test_equilibrium_compliance.py` |
 | AC-8 | 隐私保护合规 | Task 5 | Subtask 5.14-5.16 | `test_pipl_integration.py` |
 | — | 架构约束验证 | Task 5 | Subtask 5.17-5.19 | `test_arch_equilibrium.py` |
+| — | 扩展安全层(BLOCKED) | Task 5 | Subtask 5.20-5.25 ⚠️ Epic 13 | `test_storage_encryption_service.py` 等 |
+| — | 物理安全Checklist | Task 5 | Subtask 5.26-5.28 | Checklist（无测试文件） |
 
 ---
 
@@ -483,7 +485,7 @@
 **关联 AC:** AC-1, AC-2, AC-3, AC-8
 > ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 > ⚠️ **本 Task 集成 Story 1.9/1.10 的安全组件，验证等保合规**
-> ⚠️ **依赖说明：** Story 1.11 (数据主权/PIPL) 实际状态为 `ready-for-dev`（见NFR-COMP-04警告），PIPL服务已实现但脱敏功能需Epic 13，AC-8集成验证受此约束
+> ⚠️ **依赖说明：** Story 1.11 (数据主权/PIPL) 状态为 `done`（sprint-status.yaml确认），PIPL服务已实现。AC-8中"个人信息脱敏率100%"需Epic 13完成后验证，当前仅能验证删除请求响应等功能
 
 #### TDD 循环 A：身份鉴别合规集成
 
@@ -751,9 +753,9 @@
 | **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突导致并行失败 |
 | **清理粒度** | 每个测试只清理自己创建的资源 | 误删其他测试资源 |
 | **依赖声明** | Fixture 必须显式声明依赖 | 并行时清理顺序不确定 |
-| **asyncio 上下文** | asyncio.Lock 类变量；处理 thread.ident 为 None | 锁失效或类型错误 |
+| **asyncio 上下文** | asyncio.Lock 必须用类变量（进程生命周期共享）；处理 thread.ident 为 None（asyncio 在主线程外调用时为 None，需用 asyncio.run() 而非直接调用） | 锁失效或类型错误 |
 | **pytest-asyncio** | 删除 scope=module 的 event_loop fixture | 与 auto mode 冲突 |
-| **BDD async 配合** | BDD 步骤函数不使用 @pytest.mark.asyncio，用 event_loop.run_until_complete() 运行 async | 直接用 @pytest.mark.asyncio 会导致 BDD context 数据丢失 |
+| **BDD async 配合** | 同步步骤函数直接定义；异步步骤函数用 event_loop.run_until_complete() 运行（禁止 @pytest.mark.asyncio，会导致 BDD context 数据丢失） | context 数据丢失 |
 
 **禁止行为：**
 - ❌ 集成测试手动 `delete`/`truncate`（应用 transaction rollback）
@@ -762,6 +764,12 @@
 - ❌ asyncio.Lock 使用实例变量
 - ❌ scope=module 的 event_loop fixture
 - ❌ BDD 步骤函数使用 `@pytest.mark.asyncio`（会导致 context 数据丢失）
+
+> ⚠️ **BDD async 配合补充说明：**
+> - 同步步骤函数：无需特殊处理，直接定义即可
+> - 异步步骤函数：使用 `event_loop.run_until_complete(coroutine())` 在同步上下文中运行
+> - 示例：`result = event_loop.run_until_complete(service.async_method())`
+> - 禁止 `@pytest.mark.asyncio` 原因：在 BDD context manager 中会导致 context 变量丢失
 
 **验证要求：**
 - [ ] 并行测试 `pytest tests/ -n 8` 通过
@@ -1035,4 +1043,4 @@ sisys/
 - v2.6.2: 第三轮审查修复：Task 5 AC关联修正、审查状态标记修正
 - v2.6.3: 第四轮审查修复：文件清单完整性、技术参考依赖库版本、合规检查项补充
 - v2.7.1: 第二批第一轮审查修复：APISecurityServicePort领域层依赖修正、Task 5验证顺序约束、RTO验证方案、端口返回类型说明
-- v2.7.3: 第二批第三轮审查修复：修正Task 1依赖说明（Story 1.11状态统一）、重排Task 5 Subtask顺序（blocked项移至架构验证后）、明确AC-8脱敏功能依赖Epic 13
+- v2.7.4: 第二批第四轮审查修复：修正NFR-COMP-04描述（Story 1.11状态确认done）、完善AC→Task→Subtask矩阵覆盖5.20-5.28、增强asyncio上下文和BDD async配合约束说明
