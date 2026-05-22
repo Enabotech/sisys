@@ -19,6 +19,7 @@ import pytest
 
 from src.domain.events.auto_route_events import AutoRouted
 from src.domain.events.auto_trigger_events import AutoTriggered
+from src.domain.events.base import DomainEvent
 from src.domain.services.auto_route_service import AutoRouteService
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.messaging.redis_publisher import RedisEventPublisher
@@ -182,16 +183,24 @@ async def test_triggered_to_routed_end_to_end(
     received_events: list[AutoRouted] = []
     event_received = asyncio.Event()
 
-    def callback(event_data: dict) -> None:
-        # Reconstruct AutoRouted from published data
-        routed = AutoRouted(
-            route_type=event_data.get("route_type", ""),
-            session_id=event_data.get("session_id", ""),
-            task_context=event_data.get("task_context", {}),
-            route_target=event_data.get("route_target", ""),
-            route_score=event_data.get("route_score", 0.0),
-            trigger_event_type=event_data.get("trigger_event_type", ""),
-        )
+    def callback(event: DomainEvent) -> None:
+        # DomainEvent.from_dict() 会返回正确的子类实例（如 AutoRouted）
+        if isinstance(event, AutoRouted):
+            received_events.append(event)
+            event_received.set()
+        else:
+            # 如果不是 AutoRouted，从 payload 提取
+            payload = event.payload if event.payload else {}
+            routed = AutoRouted(
+                route_type=payload.get("route_type", ""),
+                session_id=payload.get("session_id", ""),
+                task_context=payload.get("task_context", {}),
+                route_target=payload.get("route_target", ""),
+                route_score=payload.get("route_score", 0.0),
+                trigger_event_type=payload.get("trigger_event_type", ""),
+            )
+            received_events.append(routed)
+            event_received.set()
         received_events.append(routed)
         event_received.set()
 
