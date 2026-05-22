@@ -147,6 +147,8 @@
 | **TDD 单元测试** | [组件 B] | [验证内容描述] | `test_[component_b].py` | Task [N] |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_[feature name].feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_[feature name].py` | Task 0 |
+| **TDD 验收测试** | 收尾验收场景 | `src` 与测试目录完成清单最终确认 | `test_acceptance_[feature name].feature` | Task [N] |
+| **TDD 验收测试** | 收尾 BDD 步骤实现 | 完成清单断言与步骤函数 | `test_acceptance_[feature name].py` | Task [N] |
 | **TDD 契约测试** | API 契约 / openapi 接口 | 请求/响应结构、状态码、Header、字段类型 |`test_api_contract_[feature name].py` | Task 0 |
 | **TDD 契约测试** | 端口契约 / 接口抽象 / registry / resolver / contract gate | 端口注册、版本、兼容性、实现解析、重复接口检测 | `test_port_contract_[feature name].py` | Task 0 |
 | **SDD 架构验证** | 六边形架构约束 | 依赖方向、零依赖、禁止跨层引用 | `test_arch_[component].py` | Task [N] |
@@ -323,7 +325,7 @@
 
 ---
 
-### Task [N]: SDD 架构约束验证测试
+### Task [N-1]: SDD 架构约束验证测试
 
 **关联 AC:** [相关 AC]
 
@@ -343,6 +345,34 @@
 - [ ] 测试输出清晰的合规报告
 - [ ] 任何违规都会导致测试失败
 - [ ] 循环依赖检测使用 ruff/isort（不引入额外工具）
+
+---
+
+### Task [N]: 开发结束验收测试
+
+**关联 AC:** [相关 AC]
+
+> **性质说明：** 本 Task 不是功能实现，而是对 Story 收尾阶段的交付物与完成清单进行最终验收。
+> 它验证 `src` 以及 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 的完成清单是否已逐项确认，确保 Story 进入 `done` 之前没有遗漏。
+
+#### 开发结束验收测试实现
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/acceptance/test_acceptance_[feature name].feature` 中的收尾验收场景 |
+| 🟢 绿 | 编写 `tests/acceptance/test_acceptance_[feature name].py` 的 BDD 步骤实现 |
+| 🔄 重构 | 收敛场景命名、统一断言表达、保持步骤函数可维护性 |
+
+- [ ] Subtask [m.n]: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [ ] Subtask [m.n]: 场景 2 — 验证 `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单的逐项确认
+- [ ] Subtask [m.n]: 运行开发结束验收测试并确认通过
+- [ ] Subtask [m.n]: 运行 `pytest`、`ruff check`、`mypy` 进行收尾校验
+
+**完成标准/Definition of Done:**
+- [ ] `src` 完成清单已逐项验证确认
+- [ ] `tests/unit`、`tests/integration`、`tests/contracts`、`tests/acceptance` 完成清单已逐项验证确认
+- [ ] 开发结束验收测试通过
+- [ ] Story 可进入 `done`
 
 ---
 
@@ -439,7 +469,7 @@
     │       └── test_acceptance_[feature name].py           # BDD 步骤实现
     └── docs/
         └── [layer]/
-            └── [component]_guide.md # 实施指南
+            └── [component]_guide.md # [可选] 实施指南
 ```
 
 ### 前一个故事学习经验 Lessons Learned from Previous Story

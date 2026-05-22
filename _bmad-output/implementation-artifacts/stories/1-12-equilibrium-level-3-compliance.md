@@ -614,9 +614,9 @@
 
 ### Task 5: 等保综合合规验证 (Comprehensive Compliance Verification)
 
-**关联 AC:** AC-7
+**关联 AC:** AC-7, AC-8
+> ⚠️ **前置依赖：** Task 0 (SDD 规范定义) - 必须在进入实现前完成 Task 0 的端口契约定义
 > ⚠️ **前置依赖：** Task 1-4 (安全合规基础/入侵防范/数据完整性/备份恢复) - 必须在 Task 1-4 完成后才能进行综合验证
-> ⚠️ **Task 0 必须先完成** - SDD 规范定义是所有 Task 的前置依赖
 
 #### TDD 循环 A：10 个安全层面验证
 
@@ -876,7 +876,7 @@ sisys/
 3. [x] Architecture constraints extracted 架构约束已提取
 4. [x] Previous story learnings integrated 前置故事学习经验已整合
 5. [x] Sprint status synced to `backlog`
-6. [x] 5轮系统性审查完成，所有P0问题已修复
+6. [ ] 5轮系统性审查进行中（第3轮审查中）
 
 ### 下一步 Next Steps
 
@@ -935,6 +935,9 @@ sisys/
 
 **模板版本/Template Version:** 2.7.0
 **创建日期/Created:** 2026-05-21
-**最后更新/Last Updated:** 2026-05-21
+**最后更新/Last Updated:** 2026-05-22
 **更新说明:**
 - v2.5.0: 初始创建 Story 1.12，等保 2.0 三级基础要求，基于 epics_v1.0.md 和 Story 1.9/1.10/1.11 整合
+- v2.6.0: 第一轮审查修复：NFR描述精确化、添加Story 1.11依赖状态警告、扩展Task 5覆盖四层安全
+- v2.6.1: 第二轮审查修复：Task依赖声明、AC-8验收标准修正、容器安全端口定义、物理安全Checklist调整
+- v2.6.2: 第三轮审查修复：Task 5 AC关联修正、审查状态标记修正
