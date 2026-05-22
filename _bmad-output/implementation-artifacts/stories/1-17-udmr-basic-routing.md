@@ -1,0 +1,774 @@
+# Story 1.17: UDMR 基础路由（本地优先静态配置）
+
+**Status:** `ready-for-dev`
+
+> **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
+> 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
+> 运行 `validate-create-story` 进行质量检查后再执行 `dev-story`。
+
+---
+
+## 📖 Story 描述
+
+**As a** 运维工程师,
+**I want** 配置本地/云端路由策略（云端优先静态配置，云端不可用时回退本地）,
+**So that** MVP 阶段支持基础成本优化，验证本地路由占比≥80%、路由决策延迟 P95<100ms。
+
+### 业务价值
+
+本 Story 是 Epic 1（企业级架构基础与合规）价值组 5（or.md 系统公理实现）的 UDMR 路由 Story。在 Story 1.14a/b/c 自主调用三阶段管线（trigger→route→execute）和四阶段重构完成后，首次扩展管线能力——从 Agent/工具路由扩展到本地/云模型选择。
+
+| 职责 | 业务价值 | 验收标准 |
+|------|---------|---------|
+| **L1 合规检查** | 复用 ComplianceGatewayPort，敏感数据强制本地处理 | 含 PII/商业秘密时强制 local |
+| **静态路由策略** | 云端优先；云端所有模型不可用或超时时切换本地 | 云端不可用→本地回退<30 秒 |
+| **健康检查** | 定期检测云端可用性，恢复后自动切回云端 | 每 300 秒健康检查 |
+| **路由决策日志** | 记录路由决策过程，支持审计和成本追踪 | WORM 归档，selected_model/cost_actual/fallback_reason |
+| **事件集成** | 消费 AutoRouted 事件，产出 RoutingDecided 事件 | 与自主调用管线无缝集成 |
+
+**来源:** [`epics_v1.0.md`](../../_bmad-output/planning-artifacts/epics_v1.0.md) - Epic 1: 企业级架构基础与合规，价值组 5: or.md 系统公理实现，Story 1.17
+
+**or.md 公理追溯:** 系统公理一（自主调用：trigger→route→execute），扩展"route"阶段至模型选择层
+
+**前置依赖:** Story 1.14b（路由决策日志）、Story 1.14c（执行层 AutoExecuted 事件）
+
+**后续依赖:** Story 1.19（成本度量，依赖 UDMR 路由日志）、Epic 11（UDMR 三层动态决策，L2 四因子评分）
+
+---
+
+## ✅ Acceptance Criteria 验收标准
+
+### AC-1: UDMR 配置模型
+
+**Given** 系统需要配置本地模型（Ollama+Qwen2.5）和多云端模型（MiniMax/DeepSeek 等）
+**When** UDMRConfig.from_env() 解析环境变量
+**Then** 支持 UDMR_ENABLED、UDMR_LOCAL_FIRST、UDMR_LOCAL_MODEL 等公共配置
+**And** 支持 UDMR_CLOUD_0_* 到 UDMR_CLOUD_9_* 多云端模型配置
+**And** 每个云端配置包含 api_type(openai/anthropic/custom)、endpoint、api_key、model、enabled
+**And** 配置为 frozen dataclass，不可变
+
+**验证标准/Validation Criteria:**
+- [ ] UDMRConfig frozen dataclass 定义（`src/infrastructure/config/udmr.py`）
+- [ ] CloudModelConfig frozen dataclass 定义
+- [ ] from_env() 解析所有 UDMR_* 环境变量
+- [ ] 默认值合理：enabled=True, local_first=false, timeout=600, healthcheck_interval=300
+- [ ] 向后兼容 UDMR_CLOUD_MODELS 环境变量
+
+### AC-2: UDMR 静态路由决策
+
+**Given** 系统配置了本地模型和云端模型（AutoRouted 事件包含任务上下文）
+**When** UDMRService 执行路由决策
+**Then** 根据 L1 合规检查结果和静态配置决定路由类型（local/cloud）
+**And** L1 合规检查通过 ComplianceGatewayPort（已实现 ComplianceGatewayImpl）
+**And** 云端优先策略：默认选择第一个 enabled 的云端模型
+**And** 云端不可用（超时>600 秒或所有云端模型 disabled）时回退本地
+**And** 记录路由决策日志（selected_model、cost_actual、fallback_reason）
+
+**验证标准/Validation Criteria:**
+- [ ] UDMRService 领域服务定义（`src/domain/services/udmr_service.py`）
+- [ ] L1 合规检查复用 ComplianceGatewayPort（已实现）
+- [ ] 静态路由策略：云端优先 → 云端不可用切换本地 → 健康检查恢复后切回云端
+- [ ] RoutingDecided 事件发布（事件已存在于 `src/domain/events/routing_events.py`）
+- [ ] RoutingDecisionLog 持久化（selected_model、cost_actual、fallback_reason 字段填充）
+
+### AC-3: 云端健康检查
+
+**Given** 系统当前使用本地模型（云端曾不可用）
+**When** 定期健康检查间隔到达（默认 300 秒）
+**Then** 检测云端模型可用性
+**And** 云端恢复健康后，下次路由决策切回云端
+**And** 记录健康检查结果到 RoutingDecided 事件
+
+**验证标准/Validation Criteria:**
+- [ ] CloudHealthChecker 实现 HealthCheckPort（`src/infrastructure/external_services/llm/cloud_health_checker.py`）
+- [ ] 健康检查结果缓存（避免每次路由都检查）
+- [ ] 健康检查超时处理
+- [ ] health_check_passed 和 health_check_latency_ms 字段填充
+
+### AC-4: 事件集成与 DI 注册
+
+**Given** 自主调用管线已完成（AutoTriggered → AutoRouted → AutoExecuted）
+**When** AutoRouted 事件发布后
+**Then** UDMRHandler 消费 AutoRouted 事件
+**And** 调用 UDMRService.decide() 获取路由决策
+**And** 发布 RoutingDecided 事件（已注册于 ChannelRouter REALTIME 通道）
+**And** 所有组件通过 composition_root.py DI 注册
+
+**验证标准/Validation Criteria:**
+- [ ] UDMRHandler 应用层事件处理器（`src/application/event_handlers/udmr_handler.py`）
+- [ ] composition_root.py 注册：udmr_config、udmr_service、udmr_handler、cloud_health_checker
+- [ ] RoutingDecided 事件已在 ChannelRouter 中注册（sisys:rt:routing_decided）
+- [ ] 六边形架构合规：无循环依赖、领域层零外部依赖
+
+### AC-5: 路由性能要求
+
+**Given** AutoRouted 事件到达 UDMRHandler
+**When** UDMRService 执行路由决策
+**Then** 路由决策延迟 P95<100ms（MVP 静态配置，无 LLM 调用）
+**And** 本地路由占比≥80%（仅云端不可用时使用本地）
+**And** 故障切换时间<30 秒
+
+**验证标准/Validation Criteria:**
+- [ ] 路由决策延迟 P95<100ms 基准测试
+- [ ] 路由决策幂等性（相同输入产生相同输出）
+
+---
+
+## 🏗️ SDD+TDD 融合开发
+
+> ⚠️ **关键约束：** 每个 Task 必须独立完成完整的 TDD 循环（红→绿→重构），禁止将测试编写与代码实现分离到不同 Task。
+> 参考 [`sdd-tdd-fusion-guide.md`](../../../docs/developer/sdd-tdd-fusion-guide.md) 和 [`sdd-tdd-checklist.md`](../../../docs/developer/sdd-tdd-checklist.md)。
+
+### SDD 规范定义（Task 0 — 必选前置）
+
+> **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
+
+#### 领域事件 Schema (Domain Events)
+
+**复用已有事件（无需新建）：**
+- [ ] `RoutingDecided` 事件（`src/domain/events/routing_events.py`）— 已定义，含 L1/L2/L3 完整字段
+  - route_type: Literal["local", "cloud"]
+  - selected_model: str
+  - estimated_cost: float
+  - fallback_reason: Literal["timeout", "unavailable", "health_check_failed"] | None
+  - health_check_passed: bool
+  - health_check_latency_ms: float
+
+#### 数据模型 (Data Models)
+
+**复用已有模型（无需新建）：**
+- [ ] `RoutingDecisionLog` 实体（`src/domain/entities/routing_decision_log.py`）— 已定义，含 UDMR 扩展字段
+  - selected_model: str = ""
+  - cost_actual: float = 0.0
+  - fallback_reason: str | None = None
+- [ ] `UDMRTask` 值对象（`src/domain/value_objects/udmr_task.py`）— 已定义
+- [ ] `ComplianceResult` 值对象（`src/domain/value_objects/compliance_result.py`）— 已定义
+
+**新建模型：**
+- [ ] UDMRConfig 配置（`src/infrastructure/config/udmr.py`）
+  - 字段: enabled(bool), local_first(bool), local_model(str), llm_timeout(int), healthcheck_interval(int), cloud_configs(list[CloudModelConfig])
+  - from_env() 类方法
+- [ ] CloudModelConfig 配置（同文件）
+  - 字段: api_type(str), endpoint(str), api_key(str), model(str), enabled(bool)
+- [ ] UDMRService 领域服务（`src/domain/services/udmr_service.py`）
+  - 方法: async decide(task: UDMRTask) -> RoutingDecided
+  - 职责: L1 合规检查 + 静态路由策略 + 日志持久化 + 事件发布
+
+#### 统一端口定义注册与管理 (Port Contract)
+
+**复用已有端口（无需新建）：**
+- [ ] `ComplianceGatewayPort`（`src/domain/ports/compliance_gateway.py`）— L1 合规网关
+  - 版本: 1.0, owner: compliance-team, 已在 registry 注册
+- [ ] `HealthCheckPort`（`src/domain/ports/health_check.py`）— 健康检查
+  - 版本: 1.0, owner: infrastructure-team, 已在 registry 注册
+- [ ] `RoutingDecisionLogRepository`（`src/domain/ports/routing_decision_log_repository.py`）— 路由日志持久化
+  - 版本: 1.0, owner: auto-invocation-team, 已在 registry 注册
+- [ ] `EventPublisher`（`src/domain/ports/event_publisher.py`）— 事件发布
+
+**新建端口：**
+- [ ] `StaticRoutingStrategyPort`（`src/domain/ports/static_routing_strategy.py`）— 静态路由策略抽象
+  - 方法: async route(task: UDMRTask, compliance_result: ComplianceResult) -> tuple[str, str, float | None]
+  - 返回: (route_type, selected_model, fallback_reason)
+  - 版本: 1.0, owner: routing-team
+  - 端口契约测试: `tests/contracts/test_port_contract_static_routing_strategy.py`
+
+**端口契约清单（强制）：**
+
+| 端口名称 | 版本 | Owner | 注册 | 解析 | 契约测试 | 状态 |
+|---------|------|-------|------|------|---------|------|
+| ComplianceGatewayPort | 1.0 | compliance-team | ✅ | ✅ | ✅ | 复用 |
+| HealthCheckPort | 1.0 | infrastructure-team | ✅ | ✅ | ✅ | 复用 |
+| RoutingDecisionLogRepository | 1.0 | auto-invocation-team | ✅ | ✅ | ✅ | 复用 |
+| StaticRoutingStrategyPort | 1.0 | routing-team | 新建 | 新建 | 新建 | **新建** |
+
+#### 六边形架构约束（必须遵守）
+
+**四层架构定义**
+
+| 层次 | 目录 | 本 Story 职责 |
+|------|------|-------------|
+| domain | `src/domain/` | UDMRService 服务 + StaticRoutingStrategyPort 端口 |
+| application | `src/application/` | UDMRHandler 事件处理器 |
+| infrastructure | `src/infrastructure/` | UDMRConfig + CloudHealthChecker + StaticRoutingStrategyImpl |
+| interfaces | `src/interfaces/` | 无新增（通过事件总线集成） |
+
+**依赖方向矩阵**
+
+| 起点 \ 终点 | domain | application | infrastructure |
+|------------|--------|-------------|----------------|
+| **domain (UDMRService)** | — | ✗ 禁止 | ✗ 禁止 |
+| **application (UDMRHandler)** | ✓ 允许 | — | ✗ 禁止 |
+| **infrastructure (Config/HealthChecker/Strategy)** | ✓ 允许 | ✓ 允许 | — |
+
+**领域层零依赖原则** — UDMRService 仅依赖：
+- Python 标准库（dataclasses, uuid, datetime, logging, asyncio）
+- 领域端口（ComplianceGatewayPort, StaticRoutingStrategyPort, RoutingDecisionLogRepository, EventPublisher）
+- 领域值对象（UDMRTask, ComplianceResult）
+- 领域事件（RoutingDecided）
+- 领域实体（RoutingDecisionLog）
+
+#### 验收标准 Gherkin (Acceptance Tests)
+
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_udmr_basic_routing.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_udmr_basic_routing.py`
+- [ ] 覆盖场景:
+  - 云端优先路由（云端可用时选择云端模型）
+  - 云端不可用回退本地（所有云端模型 disabled 或超时）
+  - L1 合规检查强制本地（敏感数据）
+  - 健康检查恢复后切回云端
+  - 路由决策日志记录
+  - 路由决策延迟 P95<100ms
+
+**Task 0 完成标志：**
+- [ ] 上述规范项全部定义完毕
+- [ ] Gherkin 验收测试已编写，运行确认失败（红阶段验证）
+
+---
+
+### TDD 循环约束（适用于每个 Task）
+
+> **每个 Task 必须依次执行以下步骤，禁止跳过或颠倒顺序：**
+
+| 阶段 | 动作 | 完成标志 |
+|------|------|----------|
+| **🔴 红** | 根据 SDD 规范编写失败测试 | `pytest` 运行失败，且失败原因符合预期 |
+| **🟢 绿** | 编写最小实现让测试通过 | `pytest` 全部通过 |
+| **🔄 重构** | 优化代码（保持测试通过） | `ruff check` + `mypy` + `pytest` 全部通过 |
+
+**禁止行为：**
+- ❌ 先写代码后写测试（违反 TDD 测试先行原则）
+- ❌ 将测试编写集中到最后一个 Task（违反 TDD 小步快跑原则）
+- ❌ 跳过红阶段验证（未确认测试失败就直接写实现）
+
+---
+
+### 测试分类与归属
+
+| 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
+|---------|------|----------|----------|-----------|
+| **TDD 单元测试** | UDMRConfig | 配置解析 | `test_udmr_config.py` | Task 1 |
+| **TDD 单元测试** | CloudModelConfig | 云端模型配置 | `test_cloud_model_config.py` | Task 1 |
+| **TDD 单元测试** | StaticRoutingStrategyImpl | 静态路由策略 | `test_static_routing_strategy.py` | Task 2 |
+| **TDD 单元测试** | UDMRService | 三层决策编排 | `test_udmr_service.py` | Task 3 |
+| **TDD 单元测试** | CloudHealthChecker | 云端健康检查 | `test_cloud_health_checker.py` | Task 3 |
+| **TDD 单元测试** | UDMRHandler | 事件处理器 | `test_udmr_handler.py` | Task 4 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_udmr_basic_routing.feature` | Task 0 |
+| **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_udmr_basic_routing.py` | Task 0 |
+| **TDD 契约测试** | StaticRoutingStrategyPort | 端口契约 | `test_port_contract_static_routing_strategy.py` | Task 0 |
+| **SDD 架构验证** | UDMR 六边形架构 | 依赖方向、零依赖 | `test_arch_udmr.py` | Task 5 |
+| **集成测试** | UDMR 管线 | 端到端路由流程 | `test_integration_udmr_basic_routing.py` | Task 5 |
+
+---
+
+### 测试要求与质量门禁
+
+#### 覆盖率要求
+
+- [ ] **整体覆盖率 ≥80%**（`pytest --cov=src --cov-fail-under=80`）
+- [ ] **架构层覆盖率 ≥85%**（`pytest --cov=src/domain/services/udmr_service.py`）
+- [ ] **基础设施层覆盖率 ≥75%**（`pytest --cov=src/infrastructure/config/udmr.py`）
+- [ ] **集成测试覆盖率 ≥70%**
+
+#### 代码质量门禁
+- [ ] **Ruff 检查通过**（`ruff check src/`）
+- [ ] **MyPy 类型检查通过**（`mypy src/`）
+- [ ] **预提交 Hooks 通过**（`pre-commit run --all-files`）
+
+#### 测试隔离约束
+
+> ⚠️ **核心原则：测试必须自包含（Self-contained），不污染共享状态，不依赖执行顺序。**
+
+| 约束类型 | 规则 | 违反后果 |
+|---------|------|---------|
+| **外部服务隔离** | 云端 API 使用 AsyncMock，健康检查使用 mock | 真实 API 调用导致失败 |
+| **配置隔离** | 每个测试使用独立的 UDMRConfig 实例 | 配置污染 |
+| **资源唯一性** | 测试数据使用 UUID 等唯一标识符 | ID 冲突 |
+| **并行隔离** | 并行测试使用 UUID 前缀隔离资源 | 资源冲突 |
+| **BDD async 配合** | BDD 步骤函数用 event_loop.run_until_complete() | context 数据丢失 |
+
+**验证要求：**
+- [ ] 并行测试 `poetry run pytest tests/ -n 8` 通过
+- [ ] 连续 5 次运行无随机失败
+- [ ] `poetry run ruff check` 通过
+- [ ] `poetry run mypy` 通过
+
+---
+
+## 📊 AC → Task → Subtask 追溯矩阵
+
+| AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
+|----|-------------|-----------|-------------|----------|
+| AC-1 | UDMRConfig + CloudModelConfig | Task 1 | Subtask 1.1-1.3 | `test_udmr_config.py` |
+| AC-1 | from_env() 环境变量解析 | Task 1 | Subtask 1.4-1.6 | `test_udmr_config.py` |
+| AC-2 | StaticRoutingStrategyImpl 静态路由 | Task 2 | Subtask 2.1-2.3 | `test_static_routing_strategy.py` |
+| AC-2 | UDMRService 三层决策编排 | Task 3 | Subtask 3.1-3.3 | `test_udmr_service.py` |
+| AC-3 | CloudHealthChecker 健康检查 | Task 3 | Subtask 3.4-3.6 | `test_cloud_health_checker.py` |
+| AC-4 | UDMRHandler 事件处理器 | Task 4 | Subtask 4.1-4.3 | `test_udmr_handler.py` |
+| AC-4 | DI 注册 | Task 4 | Subtask 4.4 | `test_integration_udmr_basic_routing.py` |
+| AC-5 | 路由性能 + 架构验证 | Task 5 | Subtask 5.1-5.5 | `test_arch_udmr.py` |
+
+---
+
+## 📋 Tasks / Subtasks 任务分解
+
+---
+
+### Task 0: SDD 规范定义（必选前置）
+
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5
+
+> **目的：** 在进入代码实现前，明确 Schema、API 契约、端口契约、验收标准与六边形架构边界。
+
+- [ ] Subtask 0.1: 定义 StaticRoutingStrategyPort 端口（`src/domain/ports/static_routing_strategy.py`）
+- [ ] Subtask 0.2: 定义端口契约测试（`tests/contracts/test_port_contract_static_routing_strategy.py`）
+- [ ] Subtask 0.3: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_udmr_basic_routing.feature`
+- [ ] Subtask 0.4: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_udmr_basic_routing.py`
+- [ ] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证）
+
+**完成标准/Definition of Done:**
+- [ ] 规范项全部定义完毕
+- [ ] 端口契约测试通过（验证 Protocol 结构）
+- [ ] 验收测试运行失败（预期行为，红阶段确认）
+
+---
+
+### Task 1: UDMR 配置模型
+
+**关联 AC:** AC-1
+
+#### TDD 循环 [A]：UDRConfig + CloudModelConfig
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/config/test_udmr_config.py`（配置解析 + frozen 验证） |
+| 🟢 绿 | 实现 `src/infrastructure/config/udmr.py`（UDMRConfig + CloudModelConfig） |
+| 🔄 重构 | 优化 from_env() 解析逻辑，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 1.1: 🔴 红 — 编写 UDMRConfig 失败测试（默认值、frozen、from_env 解析）
+- [ ] Subtask 1.2: 🟢 绿 — 实现 UDMRConfig + CloudModelConfig frozen dataclass
+- [ ] Subtask 1.3: 🔄 重构 — 优化环境变量解析，更新 `src/infrastructure/config/__init__.py` 导出
+
+**完成标准/Definition of Done:**
+- [ ] UDMRConfig + CloudModelConfig frozen dataclass 实现
+- [ ] from_env() 支持解析所有 UDMR_* 环境变量
+- [ ] 向后兼容 UDMR_CLOUD_MODELS 环境变量
+- [ ] TDD 循环全部通过
+
+---
+
+### Task 2: 静态路由策略实现
+
+**关联 AC:** AC-2
+
+#### TDD 循环 [A]：StaticRoutingStrategyImpl
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/routing/test_static_routing_strategy.py`（路由策略验证） |
+| 🟢 绿 | 实现 `src/infrastructure/routing/static_routing_strategy.py` |
+| 🔄 重构 | 优化路由逻辑，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 2.1: 🔴 红 — 编写 StaticRoutingStrategyImpl 失败测试
+  - 云端优先：云端可用时返回 cloud + 第一个 enabled 模型
+  - 云端不可用：所有云端 disabled 时返回 local + 本地模型
+  - L1 合规强制本地：forced_local=True 时返回 local + 本地模型
+  - local_first=True 时优先本地
+- [ ] Subtask 2.2: 🟢 绿 — 实现 StaticRoutingStrategyImpl
+- [ ] Subtask 2.3: 🔄 重构 — 优化策略逻辑
+
+**完成标准/Definition of Done:**
+- [ ] StaticRoutingStrategyImpl 实现 StaticRoutingStrategyPort
+- [ ] 云端优先/本地优先/合规强制三种策略正确
+- [ ] TDD 循环全部通过
+
+---
+
+### Task 3: UDMRService + CloudHealthChecker
+
+**关联 AC:** AC-2, AC-3
+
+#### TDD 循环 [A]：UDMRService 三层决策编排
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/domain/services/test_udmr_service.py`（决策编排验证） |
+| 🟢 绿 | 实现 `src/domain/services/udmr_service.py` |
+| 🔄 重构 | 优化决策流程，运行 `ruff` + `mypy` |
+
+- [ ] Subtask 3.1: 🔴 红 — 编写 UDMRService 失败测试
+  - decide() 接收 UDMRTask → L1 合规检查 → 静态路由 → 发布 RoutingDecided
+  - L1 合规通过 + 云端可用 → route_type="cloud"
+  - L1 合规不通过 → route_type="local", forced_local
+  - 云端不可用 → route_type="local", fallback_reason="unavailable"
+  - 日志持久化 selected_model/cost_actual/fallback_reason
+- [ ] Subtask 3.2: 🟢 绿 — 实现 UDMRService
+- [ ] Subtask 3.3: 🔄 重构 — 优化服务逻辑
+
+#### TDD 循环 [B]：CloudHealthChecker
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/infrastructure/external_services/llm/test_cloud_health_checker.py` |
+| 🟢 绿 | 实现 `src/infrastructure/external_services/llm/cloud_health_checker.py` |
+| 🔄 重构 | 优化健康检查逻辑 |
+
+- [ ] Subtask 3.4: 🔴 红 — 编写 CloudHealthChecker 失败测试
+  - check() 返回 bool（mock 云端 API 调用）
+  - 超时处理
+  - 缓存结果（避免频繁检查）
+- [ ] Subtask 3.5: 🟢 绿 — 实现 CloudHealthChecker（实现 HealthCheckPort）
+- [ ] Subtask 3.6: 🔄 重构 — 优化健康检查
+
+**完成标准/Definition of Done:**
+- [ ] UDMRService 实现完成（L1 合规 → 静态路由 → 日志持久化 → 事件发布）
+- [ ] CloudHealthChecker 实现 HealthCheckPort
+- [ ] TDD 循环全部通过
+
+---
+
+### Task 4: UDMRHandler + DI 注册
+
+**关联 AC:** AC-4
+
+#### TDD 循环 [A]：UDMRHandler 事件处理器
+
+| 阶段 | 动作 |
+|------|------|
+| 🔴 红 | 编写 `tests/unit/application/event_handlers/test_udmr_handler.py` |
+| 🟢 绿 | 实现 `src/application/event_handlers/udmr_handler.py` |
+| 🔄 重构 | 优化事件处理逻辑 |
+
+- [ ] Subtask 4.1: 🔴 红 — 编写 UDMRHandler 失败测试
+  - on_routed() 接收 AutoRouted → 构造 UDMRTask → 调用 UDMRService.decide() → 发布 RoutingDecided
+  - 非法事件类型过滤
+- [ ] Subtask 4.2: 🟢 绿 — 实现 UDMRHandler
+- [ ] Subtask 4.3: 🔄 重构 — 优化处理器逻辑
+
+#### DI 注册
+
+- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册
+  - `udmr_config` → UDMRConfig.from_env()
+  - `static_routing_strategy` → StaticRoutingStrategyImpl(config)
+  - `cloud_health_checker` → CloudHealthChecker(config)
+  - `udmr_service` → UDMRService(compliance_gateway, strategy, health_checker, log_repo, publisher, config)
+  - `udmr_handler` → UDMRHandler(udmr_service)
+
+**完成标准/Definition of Done:**
+- [ ] UDMRHandler 实现完成
+- [ ] composition_root.py 注册 5 个新组件
+- [ ] TDD 循环全部通过
+
+---
+
+### Task 5: SDD 架构约束验证 + 集成测试
+
+**关联 AC:** AC-4, AC-5
+
+> **性质说明：** 本 Task 是 SDD 规范验证测试，验证代码是否符合六边形架构规则。
+
+#### 架构验证测试实现
+
+- [ ] Subtask 5.1: 创建 `tests/unit/architecture/test_arch_udmr.py`
+- [ ] Subtask 5.2: 验证 UDMRService 仅依赖领域层端口（无外部依赖）
+- [ ] Subtask 5.3: 验证 UDMRHandler 位于应用层（不直接调用基础设施层）
+- [ ] Subtask 5.4: 验证 StaticRoutingStrategyImpl 实现端口（依赖倒置）
+- [ ] Subtask 5.5: 创建 `tests/integration/test_integration_udmr_basic_routing.py`
+  - 端到端：AutoRouted → UDMRHandler → UDMRService → RoutingDecided
+
+**完成标准/Definition of Done:**
+- [ ] 所有架构约束测试通过
+- [ ] 集成测试通过
+- [ ] 无循环依赖
+- [ ] 领域层零外部依赖
+
+---
+
+### Task 6: 开发结束验收测试
+
+**关联 AC:** AC-1, AC-2, AC-3, AC-4, AC-5
+
+> **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
+
+- [ ] Subtask 6.1: 场景 1 — 验证 `src` 完成清单的逐项确认
+- [ ] Subtask 6.2: 场景 2 — 验证 `tests/unit`、`tests/contracts`、`tests/acceptance` 完成清单
+- [ ] Subtask 6.3: 运行开发结束验收测试并确认通过
+- [ ] Subtask 6.4: 运行 `poetry run pytest --tb=short -q`、`poetry run ruff check`、`poetry run mypy`
+
+**完成标准/Definition of Done:**
+- [ ] `src` 完成清单已逐项验证确认
+- [ ] `tests` 完成清单已逐项验证确认
+- [ ] 开发结束验收测试通过
+- [ ] Story 可进入 `done`
+
+---
+
+## 📝 Dev Notes 开发笔记
+
+### 相关架构模式和约束 Architecture Patterns & Constraints
+
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md)
+
+- **架构模式:** 六边形架构（端口与适配器）、事件驱动架构
+- **系统公理一:** trigger→route→execute 自主调用循环，UDMR 在 Phase 2.5 扩展模型选择层
+- **UDMR 三层决策:** L1 合规性网关 → L2 任务复杂度评估 → L3 路由决策执行
+  - **本 Story 仅实现 L1 + L3 静态路由**（MVP）
+  - **L2 四因子评分由 Epic 11 Story 11.1 实现**
+- **设计约束:**
+  - 领域层零依赖外部框架
+  - 依赖倒置：领域层定义 StaticRoutingStrategyPort，基础设施层实现
+  - 事件总线双通道：RoutingDecided 已注册 REALTIME 通道（sisys:rt:routing_decided）
+- **技术栈:**
+  - Python 3.11+
+  - LiteLLM ^1.28.0（pyproject.toml 已声明，MVP 阶段不直接调用）
+  - Ollama（本地模型运行时，不在依赖中）
+
+### 关键架构决策
+
+**来源:** [`architecture.md`](../../_bmad-output/planning-artifacts/architecture.md) - ADR-005 (UDMR 统一动态模型路由)
+
+| 方案 | 优点 | 缺点 | 评分 |
+|------|------|------|------|
+| **云端优先静态配置 + L1 合规** | 实现简单、MVP 够用、复用 ComplianceGatewayPort | 无动态评分、无 L2 | ✅ 8/10 |
+| 完整三层动态决策 | 最优路由质量 | 实现复杂度高、需 L2 数据积累 | 5/10 |
+| 仅本地路由 | 最简单 | 无法利用云端模型能力 | 3/10 |
+
+### UDMR 路由 vs 自主路由澄清
+
+> ⚠️ **重要澄清**：自主路由（Story 1.14b）和 UDMR 路由（本 Story）是两个不同层次的路由。
+
+| 维度 | 自主路由 (Story 1.14b) | UDMR 路由 (Story 1.17) |
+|------|----------------------|----------------------|
+| 路由对象 | Agent/工具（目标选择） | 本地/云模型（模型选择） |
+| 输入事件 | AutoTriggered | AutoRouted |
+| 输出事件 | AutoRouted | RoutingDecided |
+| 决策算法 | hash + semantic | L1 合规 → L3 静态路由 |
+| 触发时机 | Phase 2 | Phase 2.5 |
+
+**数据流:**
+```
+AutoTriggered (1.14a)
+    ↓
+AutoRouteService (1.14b) → 选择目标 Agent/工具
+    ↓ 发布 AutoRouted 事件
+UDMRService (1.17) → 选择本地/云端模型
+    ↓ 发布 RoutingDecided 事件
+AutoExecuteService (1.14c) → 执行任务
+```
+
+### 项目结构说明 Project Structure
+
+```
+sisys/
+├── src/
+│   ├── domain/
+│   │   ├── ports/
+│   │   │   └── static_routing_strategy.py  # 新建：静态路由策略端口
+│   │   └── services/
+│   │       └── udmr_service.py             # 新建：UDMR 三层决策服务
+│   ├── application/
+│   │   └── event_handlers/
+│   │       └── udmr_handler.py             # 新建：UDMR 事件处理器
+│   ├── infrastructure/
+│   │   ├── config/
+│   │   │   └── udmr.py                     # 新建：UDMRConfig + CloudModelConfig
+│   │   ├── routing/
+│   │   │   └── static_routing_strategy.py  # 新建：静态路由策略实现
+│   │   └── external_services/
+│   │       └── llm/
+│   │           └── cloud_health_checker.py # 新建：云端健康检查
+│   └── composition_root.py                 # 更新：新增 5 个注册
+├── tests/
+│   ├── unit/
+│   │   ├── infrastructure/config/test_udmr_config.py
+│   │   ├── infrastructure/routing/test_static_routing_strategy.py
+│   │   ├── infrastructure/external_services/llm/test_cloud_health_checker.py
+│   │   ├── domain/services/test_udmr_service.py
+│   │   ├── application/event_handlers/test_udmr_handler.py
+│   │   └── architecture/test_arch_udmr.py
+│   ├── contracts/
+│   │   └── test_port_contract_static_routing_strategy.py
+│   ├── integration/
+│   │   └── test_integration_udmr_basic_routing.py
+│   └── acceptance/
+│       ├── test_acceptance_udmr_basic_routing.feature
+│       └── test_acceptance_udmr_basic_routing.py
+```
+
+### 已有可复用组件（无需新建）
+
+| 组件 | 文件路径 | 说明 |
+|------|---------|------|
+| ComplianceGatewayPort | `src/domain/ports/compliance_gateway.py` | L1 合规网关端口 |
+| ComplianceGatewayImpl | `src/infrastructure/security/compliance_gateway_impl.py` | L1 合规网关实现 |
+| HealthCheckPort | `src/domain/ports/health_check.py` | 健康检查端口 |
+| RoutingDecisionLog | `src/domain/entities/routing_decision_log.py` | 含 UDMR 扩展字段 |
+| RoutingDecisionLogRepository | `src/domain/ports/routing_decision_log_repository.py` | 日志持久化端口 |
+| InMemoryRoutingDecisionLogRepository | `src/infrastructure/messaging/inmemory_routing_decision_log_repository.py` | 内存实现 |
+| UDMRTask | `src/domain/value_objects/udmr_task.py` | UDMR 任务值对象 |
+| ComplianceResult | `src/domain/value_objects/compliance_result.py` | 合规结果值对象 |
+| RoutingDecided | `src/domain/events/routing_events.py` | UDMR 路由决策事件（已含完整 L1/L2/L3 字段） |
+| AutoRouted | `src/domain/events/auto_route_events.py` | 自主路由事件（UDMR 输入） |
+| ChannelRouter | `src/infrastructure/messaging/channel_router.py` | RoutingDecided 已注册 REALTIME 通道 |
+
+### 环境变量设计
+
+```bash
+# UDMR 公共配置
+export UDMR_ENABLED=true
+export UDMR_LOCAL_FIRST=false
+export UDMR_LOCAL_MODEL=qwen2.5:7b
+export UDMR_LLM_TIMEOUT=600
+export UDMR_HEALTHCHECK_INTERVAL=300
+
+# UDMR 云端模型配置 - MiniMax
+export UDMR_CLOUD_0_ENABLED=true
+export UDMR_CLOUD_0_API_TYPE=anthropic
+export UDMR_CLOUD_0_ENDPOINT=https://api.minimax.chat/anthropic
+export UDMR_CLOUD_0_API_KEY=""
+export UDMR_CLOUD_0_MODEL=MiniMax-M2.7
+
+# UDMR 云端模型配置 - DeepSeek
+export UDMR_CLOUD_1_ENABLED=true
+export UDMR_CLOUD_1_API_TYPE=openai
+export UDMR_CLOUD_1_ENDPOINT=https://api.deepseek.com
+export UDMR_CLOUD_1_API_KEY=""
+export UDMR_CLOUD_1_MODEL=deepseek-v4-flash
+```
+
+### 前一个故事学习经验 Lessons Learned from Previous Story
+
+**来源:** [Story 1.14b: 自主调用循环 - route](./1-14b-autonomous-invocation-route.md), [Story 1.14c: execute](./1-14c-autonomous-invocation-execute.md), [重构文档](../../docs/architecture/sisys-auto-invocation-refactor.md)
+
+**关键学习/Key Learnings:**
+1. **配置 frozen 约束** — 重构 Phase 3 统一所有 auto-invocation 配置为 frozen=True，UDMRConfig 必须遵循
+2. **路由决策日志必须实例化** — 重构 P2-3 修复了 RoutingDecisionLog 从未实例化的问题，UDMR 必须填充 UDMR 扩展字段
+3. **事件处理器解耦** — AutoRouteHandler 仅调用 AutoRouteService，不自行发布事件（P0-2 修复），UDMRHandler 应遵循相同模式
+4. **DockerSandboxAdapter 实例变量** — 重构 P2-7 修复了类级别状态共享问题
+5. **composition_root 注册模式** — 使用 `register_port()` 统一注册，lambda 工厂函数注入依赖
+
+**应用到本故事/Applied to This Story:**
+- [ ] UDMRConfig 和 CloudModelConfig 均为 frozen=True
+- [ ] UDMRService._persist_decision_log() 填充 selected_model/cost_actual/fallback_reason
+- [ ] UDMRHandler 仅调用 UDMRService，不自行发布事件
+- [ ] 所有新组件通过 composition_root.py DI 注册
+
+### Git Intelligence Summary
+
+**来源:** `git log` - 最近提交
+
+| 提交 | 主题 | 关键模式 |
+|------|------|---------|
+| `b85bb83f` | refactor: Phase 3+4 auto-invocation code quality | frozen config, LRU cache, instance state |
+| `31a51ab5` | docs: R6 final review fixes | 文档同步 |
+| `e1e49d21` | refactor: Phase 1+2 auto-invocation critical bug fixes | DI path, cosine similarity, PublishResult |
+
+**可应用模式:**
+1. **frozen dataclass 配置** — AutoTriggerConfig/AutoRouteConfig 均为 frozen=True
+2. **Protocol 端口注册** — ComplianceGatewayPort 在 registry 中注册
+3. **事件处理器模式** — AutoRouteHandler 的 on_triggered → service 调用模式
+
+---
+
+## 🤖 开发代理记录 Dev Agent Record
+
+### 使用模型 Agent Model Used
+
+| 配置项 | 值 |
+|--------|-----|
+| **Model** | Claude Code (create-story workflow) |
+| **Version** | create-story workflow v1.0 |
+| **Execution Date** | 2026-05-22 |
+
+### 调试日志引用 Debug Log References
+
+| 配置项 | 路径 |
+|--------|-----|
+| **Epic 配置** | `_bmad-output/planning-artifacts/epics_v1.0.md` |
+| **架构文档** | `_bmad-output/planning-artifacts/architecture.md` |
+| **前一个 Story** | `_bmad-output/implementation-artifacts/stories/1-14c-autonomous-invocation-execute.md` |
+| **设计文档** | `docs/architecture/sisys-auto-invocation-design.md` |
+| **重构文档** | `docs/architecture/sisys-auto-invocation-refactor.md` |
+| **Sprint 变更提案** | `_bmad-output/planning-artifacts/sprint-change-proposal-2026-05-11-udmr-cloud-models.md` |
+
+### 完成清单 Completion Notes List
+
+- [x] 故事需求从 `epics_v1.0.md` 提取
+- [x] 架构约束从 `architecture.md` §4 UDMR 章节提取
+- [x] 前一个故事学习经验整合（1.14b/c + 重构经验）
+- [x] 状态设置为 `ready-for-dev`
+- [x] SDD+TDD 融合开发要求定义完成
+- [x] 项目结构对齐统一规范
+- [x] 已有可复用组件清单明确
+- [x] 环境变量设计与用户需求对齐
+- [x] UDMR 路由 vs 自主路由关系澄清
+- [x] 端口契约清单（4 个复用 + 1 个新建）
+
+### 文件清单 File List
+
+**创建的文件/Created Files:**
+- `_bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md`
+
+**待创建的文件/To Be Created (Dev Story 实施):**
+- `src/domain/ports/static_routing_strategy.py` - 静态路由策略端口
+- `src/domain/services/udmr_service.py` - UDMR 三层决策服务
+- `src/infrastructure/config/udmr.py` - UDMRConfig + CloudModelConfig
+- `src/infrastructure/routing/static_routing_strategy.py` - 静态路由策略实现
+- `src/infrastructure/external_services/llm/cloud_health_checker.py` - 云端健康检查
+- `src/application/event_handlers/udmr_handler.py` - UDMR 事件处理器
+- `tests/unit/infrastructure/config/test_udmr_config.py` - 配置单元测试
+- `tests/unit/infrastructure/routing/test_static_routing_strategy.py` - 策略单元测试
+- `tests/unit/infrastructure/external_services/llm/test_cloud_health_checker.py` - 健康检查测试
+- `tests/unit/domain/services/test_udmr_service.py` - UDMRService 单元测试
+- `tests/unit/application/event_handlers/test_udmr_handler.py` - UDMRHandler 单元测试
+- `tests/unit/architecture/test_arch_udmr.py` - 架构约束测试
+- `tests/contracts/test_port_contract_static_routing_strategy.py` - 端口契约测试
+- `tests/integration/test_integration_udmr_basic_routing.py` - 集成测试
+- `tests/acceptance/test_acceptance_udmr_basic_routing.feature` - Gherkin 验收测试
+- `tests/acceptance/test_acceptance_udmr_basic_routing.py` - BDD 步骤实现
+
+**更新的文件/Updated Files:**
+- `src/infrastructure/config/__init__.py` - 添加 UDMRConfig 导出
+- `src/domain/services/__init__.py` - 添加 UDMRService 导出（如需要）
+- `src/composition_root.py` - 新增 5 个 DI 注册
+
+---
+
+## 📊 故事详情 Story Details
+
+| 配置项 | 值 |
+|--------|-----|
+| **Story ID** | 1.17 |
+| **Story Key** | 1-17-udmr-basic-routing |
+| **File** | `_bmad-output/implementation-artifacts/stories/1-17-udmr-basic-routing.md` |
+| **Status** | `ready-for-dev` |
+| **Epic** | Epic 1: 企业级架构基础与合规 |
+| **价值组** | 价值组 5: or.md 系统公理实现 |
+| **优先级** | P0-17（MVP，ARCH UDMR 基础） |
+| **覆盖 FR** | FR-CP-05 |
+
+### 完成总结 Completion Summary
+
+1. [x] All tasks defined 所有任务定义完成
+2. [x] All acceptance criteria specified 所有验收标准已定义
+3. [x] Architecture constraints extracted 架构约束已提取
+4. [x] Previous story learnings integrated 前一个故事学习经验已整合
+5. [ ] Sprint status synced to `ready-for-dev`
+
+### 🔧 对抗性审查修复（Adversarial Review Fixes）
+
+> 暂无审查记录。
+
+### 下一步 Next Steps
+
+- [x] Story created with `ready-for-dev` status
+- [ ] 运行 `dev-story` 开始实施
+- [ ] 运行 `code-review` 进行代码审查
+- [ ] 运行 `/bmad:tea:automate` 生成测试（可选）
+
+---
+
+**故事版本/Story Version:** v1.0.0
+**创建日期/Created:** 2026-05-22
+**最后更新/Last Updated:** 2026-05-22
+**更新说明/Description:**
+- v1.0.0: 创建故事文件
