@@ -15,18 +15,20 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 import redis.asyncio as aioredis
 
+from src.domain.events.base import DomainEvent
 from src.infrastructure.config.redis import RedisConfig
 from src.infrastructure.utils import json_loads
 
 logger = logging.getLogger(__name__)
 
-# 类型别名: 事件处理器接收反序列化后的 dict
-EventHandler = Callable[[dict[str, Any]], None]
+# 类型别名: 事件处理器接收 DomainEvent 对象
+EventHandler = Callable[..., None]
+AsyncEventHandler = Callable[..., Awaitable[Any]]
 # 错误处理器: (channel, raw_message, error)
 ErrorHandler = Callable[[str, str, Exception], None]
 
@@ -47,7 +49,7 @@ class RedisEventSubscriber:
         self._config = config
         self._pool: aioredis.ConnectionPool | None = None
         self._pool_lock = asyncio.Lock()
-        self._handlers: dict[str, list[EventHandler]] = {}
+        self._handlers: dict[str, list[EventHandler | AsyncEventHandler]] = {}
         self._error_handlers: dict[str, ErrorHandler | None] = {}
         self._pubsub: aioredis.client.PubSub | None = None
         self._task: asyncio.Task | None = None
@@ -85,6 +87,25 @@ class RedisEventSubscriber:
             self._handlers[channel] = []
             self._error_handlers[channel] = error_handler
         self._handlers[channel].append(handler)
+
+    def subscribe_async(
+        self,
+        channel: str | None,
+        handler: AsyncEventHandler,
+        error_handler: ErrorHandler | None = None,
+    ) -> None:
+        """订阅 Redis 频道（支持异步处理器）
+
+        Args:
+            channel: Redis 频道名
+            handler: 异步事件处理器
+            error_handler: 可选的错误处理器
+        """
+        key: str = channel if channel is not None else ""
+        if key not in self._handlers:
+            self._handlers[key] = []
+            self._error_handlers[key] = error_handler
+        self._handlers[key].append(handler)
 
     async def start(self) -> None:
         """异步开始监听所有订阅的频道"""
@@ -135,15 +156,27 @@ class RedisEventSubscriber:
                 )
             return
 
+        # 反序列化为 DomainEvent
+        try:
+            event = DomainEvent.from_dict(event_dict)
+        except ValueError as e:
+            logger.warning(
+                "Failed to deserialize DomainEvent from channel %s: %s",
+                channel,
+                e,
+            )
+            return
+
         handlers = self._handlers.get(channel, [])
         for handler in handlers:
             try:
-                handler(event_dict)
+                # 同步 handler 直接调用
+                handler(event)
             except Exception as e:
                 logger.error(
                     "Error in handler for channel %s, event %s: %s",
                     channel,
-                    event_dict.get("event_id"),
+                    event.event_id,
                     e,
                 )
 

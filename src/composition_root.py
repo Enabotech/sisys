@@ -47,6 +47,7 @@ def bootstrap() -> None:
     )
     from src.application.event_handlers.auto_route_handler import AutoRouteHandler
     from src.application.event_handlers.auto_trigger_handler import AutoTriggerHandler
+    from src.application.event_handlers.udmr_handler import UDMRHandler
     from src.application.ports.compressor_service import CompressorService
 
     # Application layer ports
@@ -1027,6 +1028,87 @@ def bootstrap() -> None:
         lifetime=Lifetime.SINGLETON,
         owner="platform",
         tags=("orchestration", "application", "service"),
+    )
+
+    # === UDMR (Unified Dynamic Model Routing) ===
+    from src.domain.ports.health_check import HealthCheckPort
+    from src.domain.ports.routing_decision_log_repository import (
+        RoutingDecisionLogRepository,
+    )
+    from src.domain.ports.udmr_policy import UdmrPolicyPort
+    from src.domain.services.udmr_service import UDMRService
+    from src.infrastructure.config.udmr import UDMRConfig
+    from src.infrastructure.external_services.llm.cloud_health_checker import (
+        CloudHealthChecker,
+    )
+    from src.infrastructure.routing.udmr_policy import StaticUdmrPolicy
+
+    # UDMR Policy — 静态路由策略
+    register_port(
+        name="udmr_policy",
+        version="v1.0.0",
+        interface=UdmrPolicyPort,
+        impl=lambda resolver: StaticUdmrPolicy(
+            cloud_configs=UDMRConfig.from_env().cloud_configs,
+            local_model=UDMRConfig.from_env().local_model,
+            local_first=UDMRConfig.from_env().local_first,
+        ),
+        module="src.infrastructure.routing.udmr_policy",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "routing", "policy"),
+    )
+
+    # CloudHealthChecker — 云端健康检查
+    register_port(
+        name="cloud_health_checker",
+        version="v1.0.0",
+        interface=HealthCheckPort,
+        impl=lambda resolver: CloudHealthChecker(
+            cloud_configs=UDMRConfig.from_env().cloud_configs,
+            timeout=UDMRConfig.from_env().llm_timeout,
+        ),
+        module="src.infrastructure.external_services.llm.cloud_health_checker",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "health-check"),
+    )
+
+    # UDMRService — 三层决策服务
+    register_port(
+        name="udmr_service",
+        version="v1.0.0",
+        interface=UDMRService,
+        impl=lambda resolver: UDMRService(
+            compliance_gateway=resolver.resolve("compliance_gateway"),
+            policy=resolver.resolve("udmr_policy"),
+            health_checker=resolver.resolve("cloud_health_checker"),
+            log_repo=resolver.resolve("routing_decision_log_repository"),
+            publisher=resolver.resolve("event_publisher"),
+            local_first=UDMRConfig.from_env().local_first,
+            local_model=UDMRConfig.from_env().local_model,
+            llm_timeout=UDMRConfig.from_env().llm_timeout,
+        ),
+        module="src.domain.services.udmr_service",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "service", "domain"),
+    )
+
+    # UDMRHandler — 事件处理器
+    register_port(
+        name="udmr_handler",
+        version="v1.0.0",
+        interface=UDMRHandler,
+        impl=lambda resolver: UDMRHandler(
+            udmr_service=resolver.resolve("udmr_service"),
+            event_bus=resolver.resolve("event_publisher"),
+            enabled=UDMRConfig.from_env().enabled,
+        ),
+        module="src.application.event_handlers.udmr_handler",
+        lifetime=Lifetime.SINGLETON,
+        owner="routing-team",
+        tags=("udmr", "handler", "application"),
     )
 
     logger.info("Registered %d ports", len(_global_registry.list_all()))

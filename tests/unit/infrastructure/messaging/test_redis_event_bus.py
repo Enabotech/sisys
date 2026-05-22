@@ -183,7 +183,7 @@ class TestRedisEventSubscriber:
         subscriber._dispatch_message("sisys:rt:test", message)
 
         assert len(received) == 1
-        assert received[0]["event_type"] == "DocumentProcessed"
+        assert received[0].event_type == "DocumentProcessed"
 
     def test_handles_deserialization_error(self):
         from src.infrastructure.messaging.redis_subscriber import RedisEventSubscriber
