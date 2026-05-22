@@ -82,7 +82,7 @@
 **And** 记录健康检查结果到 RoutingDecided 事件
 
 **验证标准/Validation Criteria:**
-- [ ] CloudHealthChecker 实现 HealthCheckPort（`src/infrastructure/external_services/llm/cloud_health_checker.py`）
+- [ ] CloudHealthChecker 实现 HealthCheckPort（`src/infrastructure/external_services/llm/cloud_health_checker.py`）— 需实现 check() 和 close() 两个方法
 - [ ] CloudHealthChecker 构造时绑定 cloud_configs 列表，check() 检查第一个 enabled 的云端模型
 - [ ] 健康检查结果缓存（避免每次路由都检查）
 - [ ] 健康检查超时处理
@@ -186,7 +186,7 @@
 **需新建实现注册的端口（端口已定义）：**
 - [ ] `HealthCheckPort`（`src/domain/ports/health_check.py`）— 健康检查
   - 版本: 1.0, owner: infrastructure-team, 端口已定义但需新建 CloudHealthChecker 实现并注册到 composition_root.py
-  - 注意: HealthCheckPort.check() 为无参数方法返回 bool，CloudHealthChecker 需在构造时绑定 cloud_configs，check() 检查第一个 enabled 云端模型
+  - 注意: HealthCheckPort.check() 为无参数方法返回 bool，另有 close() -> None 方法用于释放资源；CloudHealthChecker 需在构造时绑定 cloud_configs，check() 检查第一个 enabled 云端模型，close() 清理连接
 
 **新建端口：**
 - [ ] `UdmrPolicyPort`（`src/domain/ports/udmr_policy.py`）— UDMR 策略抽象（MVP 静态路由）
@@ -437,6 +437,7 @@
 
 - [ ] Subtask 3.4: 🔴 红 — 编写 CloudHealthChecker 失败测试
   - check() 返回 bool（mock 云端 API 调用）
+  - close() 释放资源（无异常）
   - 超时处理
   - 缓存结果（避免频繁检查）
 - [ ] Subtask 3.5: 🟢 绿 — 实现 CloudHealthChecker（实现 HealthCheckPort）
@@ -476,11 +477,12 @@
 > **六边形架构约束：** UDMRService 构造器注入原始值（local_first, local_model, llm_timeout），不依赖 UDMRConfig 配置对象。
 > 参考 AutoRouteService 模式：`AutoRouteService(..., semantic_threshold=AutoRouteConfig.from_env().semantic_threshold, ...)`。
 
-- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循现有 lambda 内联 config 模式）
-  - `udmr_policy` → lambda: StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
-  - `cloud_health_checker` → lambda: CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_service` → lambda: UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), policy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
-  - `udmr_handler` → lambda: UDMRHandler(udmr_service=resolver.resolve("udmr_service"), event_listener=resolver.resolve("event_listener"))
+- [ ] Subtask 4.4: 更新 `src/composition_root.py` 注册（遵循 lambda resolver: 内联 config 模式）
+  - `udmr_policy` → `lambda resolver:` StaticUdmrPolicy(cloud_configs=UDMRConfig.from_env().cloud_configs, local_model=UDMRConfig.from_env().local_model)
+  - `cloud_health_checker` → `lambda resolver:` CloudHealthChecker(cloud_configs=UDMRConfig.from_env().cloud_configs, timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_service` → `lambda resolver:` UDMRService(compliance_gateway=resolver.resolve("compliance_gateway"), policy=resolver.resolve("udmr_policy"), health_checker=resolver.resolve("cloud_health_checker"), log_repo=resolver.resolve("routing_decision_log_repository"), publisher=resolver.resolve("event_publisher"), local_first=UDMRConfig.from_env().local_first, local_model=UDMRConfig.from_env().local_model, llm_timeout=UDMRConfig.from_env().llm_timeout)
+  - `udmr_handler` → `lambda resolver:` UDMRHandler(udmr_service=resolver.resolve("udmr_service"), event_listener=resolver.resolve("event_listener"))
+  - **注意:** Resolver._instantiate() 调用 `spec.impl(resolver=self)`，lambda 必须接收 resolver 参数
 
 **完成标准/Definition of Done:**
 - [ ] UDMRHandler 实现完成
@@ -941,6 +943,10 @@ UDMRClient (统一接口)
 > - P0: AutoRouted事件当前无InMemoryEventListener消费者（AutoRouteHandler无register_handlers()），UDMRHandler将是第一个
 > - P1: data_residency默认值"default"→"CHINA_DOMESTIC"（与UDMRTask默认值对齐）
 > - P1: Lessons Learned循环防护描述修正（移除causation_id有效性暗示）
+>
+> **第二批 Round 2 (2026-05-22):** 3个并行Agent端口契约/事件数据模型/DI模式深度验证，修复2个P0
+> - P0: DI注册lambda无参写法错误—Resolver._instantiate()调用spec.impl(resolver=self)，所有lambda必须为`lambda resolver:`格式而非`lambda:`
+> - P0: HealthCheckPort遗漏close()方法—端口实际定义check()+close()两个方法，CloudHealthChecker必须同时实现close()释放资源
 
 ### 下一步 Next Steps
 
@@ -951,7 +957,7 @@ UDMRClient (统一接口)
 
 ---
 
-**故事版本/Story Version:** v2.0.0
+**故事版本/Story Version:** v2.1.0
 **创建日期/Created:** 2026-05-22
 **最后更新/Last Updated:** 2026-05-22
 **更新说明/Description:**
@@ -963,3 +969,4 @@ UDMRClient (统一接口)
 - v1.5.0: Round 4 审查修复 — P0:追溯矩阵合并虚构Subtask；P0:循环防护改为具体实现指导；P0:CloudHealthChecker多模型策略明确；P0:.pyc清理步骤；P1:价值组5→6；P1:EventPublisher入端口表；P1:字段名/拼写修正；P1:UDMR_ENABLED行为；用户反馈:重命名udmr_policy
 - v1.6.0: Round 5 最终审查修复 — P1:strategy→policy参数名同步重命名；P1:价值组归属2处遗漏修正；P1:UDMRHandler DI补充event_listener注入；P1:依赖矩阵Strategy→Policy标签；P2:false→False；P2:中英文间距
 - v2.0.0: 第二批审查 Round 1 — P0:循环防护causation_id无效改为必须排除RoutingDecided；P0:标注事件订阅MVP限制（InMemoryEventBus vs DualChannelEventBus）；P0:标注AutoRouted当前无InMemoryEventListener消费者；P1:data_residency默认值default→CHINA_DOMESTIC；P1:修正Lessons Learned循环防护描述
+- v2.1.0: 第二批审查 Round 2 — P0:DI注册lambda无参写法改为lambda resolver:格式（Resolver._instantiate()强制要求）；P0:HealthCheckPort补充close()方法（CloudHealthChecker必须实现）
