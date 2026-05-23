@@ -218,6 +218,7 @@
 | 测试类型 | 归属 | 验证内容 | 测试文件 | 对应 Task |
 |---------|------|----------|----------|-----------|
 | **TDD 单元测试** | WorkflowSubmitted 事件 | 事件创建、字段验证 | `tests/unit/domain/events/test_workflow_events.py` | Task 1 |
+| **TDD 单元测试** | ChannelRouter 通道注册 | WorkflowSubmitted 映射注册 | `tests/unit/infrastructure/messaging/test_channel_router.py` | Task 1 |
 | **TDD 单元测试** | PrefectEngine 事件发布 | 事件发布成功/失败路径 | `tests/unit/infrastructure/workflow/test_prefect_engine.py` | Task 2 |
 | **集成测试** | 双引擎路由 + DI | OrchestrationService 端到端 | `tests/integration/test_integration_workflow_agent_integration.py` | Task 3 |
 | **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_workflow-agent-integration.feature` | Task 0/4 |
@@ -255,7 +256,9 @@
 | AC-1 | WorkflowSubmitted 事件类定义 | Task 1 | 事件类创建 | `test_workflow_events.py` |
 | AC-1 | PrefectEngine 事件发布 | Task 2 | _publish_workflow_submitted | `test_prefect_engine.py` |
 | AC-2 | 双引擎发布模式对称 | Task 2 | 异常处理对齐 | `test_prefect_engine.py` |
-| AC-3 | 事件总线通道注册 | Task 1 | channel_router 注册 | `test_workflow_events.py` |
+| AC-2 | 双引擎对称性验收测试 | Task 4 | Subtask 4.6 场景5 | `.feature` + `.py` |
+| AC-3 | 事件总线通道注册 | Task 1 | channel_router 注册 | `test_channel_router.py` |
+| AC-3 | 通道注册验收测试 | Task 4 | Subtask 4.7 场景6 | `.feature` + `.py` |
 | AC-4 | Gherkin 验收测试 | Task 0/4 | 场景 + 步骤实现 | `.feature` + `.py` |
 | AC-5 | 设计文档对齐 | Task 3 | 端到端验证 | `test_integration_*.py` |
 | AC-5 | 架构约束验证 | Task 5 | 导入边界 | `test_hexagonal_*.py` |
@@ -314,7 +317,7 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写通道注册验证测试（WorkflowSubmitted 在 ChannelRouter 映射中存在） |
+| 🔴 红 | 在 `tests/unit/infrastructure/messaging/test_channel_router.py` 编写通道注册验证测试（WorkflowSubmitted 在 ChannelRouter 映射中存在） |
 | 🟢 绿 | 在 `src/infrastructure/messaging/channel_router.py` 注册 WorkflowSubmitted |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
@@ -394,7 +397,7 @@
 
 ### Task 4: Gherkin 验收测试实现
 
-**关联 AC:** AC-4
+**关联 AC:** AC-2, AC-3, AC-4
 
 > **基于 Task 0 创建的 Gherkin 场景，实现 BDD 步骤函数。**
 
@@ -676,7 +679,9 @@ src/
 | 8 | AC-2/AC-3 完全缺乏 Gherkin 场景覆盖 | P0 | 新增场景5（双引擎对称性）和场景6（通道注册），补充 Subtask 4.6/4.7 |
 | 9 | DI 容器在测试环境可行性未明确 | P0 | Subtask 4.1 添加 mock 策略说明，AC-4 修改为"测试专用 DI 容器" |
 | 10 | `_env_int` 学习经验描述不够精确 | P2 | 标注 PrefectConfig 尚未统一（可选优化项） |
-
+| 11 | 追溯矩阵 AC-3 测试文件路径错误 + 缺少 AC-2/AC-3 验收覆盖行 | P1 | 修正为 test_channel_router.py，新增 AC-2/AC-3 验收测试行 |
+| 12 | Task 4 头部 AC 关联不完整 | P1 | 修正为 AC-2, AC-3, AC-4 |
+| 13 | 测试分类表缺少通道注册测试行 | P2 | 新增 test_channel_router.py 归属 Task 1 |
 ### 🔍 代码审查发现 Review Findings
 
 **审查日期:** 2026-05-23
@@ -684,22 +689,25 @@ src/
 
 #### 已修复 Patch
 
-- [x] [20-8-P0-1][Review][Patch] AC-1 验证标准错误引用 `self._runs` — 修正为"不影响 submit_flow 返回值（flow_run_id 正常返回）"
-- [x] [20-8-P0-2][Review][Patch] Protocol 契约与防御性 None 检查说明 — 标注 Protocol 返回类型，添加契约说明段落
-- [x] [20-8-P0-3][Review][Patch] 设计文档偏离声明缺失 — 新增偏离声明段落、Subtask 6.5 设计文档同步检查项、文件清单追加
-- [x] [20-8-P1-1][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
-- [x] [20-8-P1-2][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
-- [x] [20-8-P1-3][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
-- [x] [20-8-P0-4][Review][Patch] AC-2/AC-3 缺乏 Gherkin 场景覆盖 — 新增场景5（对称性验证）和场景6（通道注册），补充 Subtask 4.6/4.7
+- [ ] [20-8-P0-1][Review][Patch] AC-1 验证标准错误引用 `self._runs` — 修正为"不影响 submit_flow 返回值（flow_run_id 正常返回）"
+- [ ] [20-8-P0-2][Review][Patch] Protocol 契约与防御性 None 检查说明 — 标注 Protocol 返回类型，添加契约说明段落
+- [ ] [20-8-P0-3][Review][Patch] 设计文档偏离声明缺失 — 新增偏离声明段落、Subtask 6.5 设计文档同步检查项、文件清单追加
+- [ ] [20-8-P1-1][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
+- [ ] [20-8-P1-2][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
+- [ ] [20-8-P1-3][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
+- [ ] [20-8-P0-4][Review][Patch] AC-2/AC-3 缺乏 Gherkin 场景覆盖 — 新增场景5（对称性验证）和场景6（通道注册），补充 Subtask 4.6/4.7
 - [x] [20-8-P0-5][Review][Patch] DI 容器测试可行性未明确 — Subtask 4.1 添加 mock 策略说明，AC-4 改为"测试专用 DI 容器"
 - [x] [20-8-P2-5][Review][Patch] _env_int 学习经验描述不够精确 — 标注 PrefectConfig 尚未统一
+- [x] [20-8-P1-4][Review][Patch] 追溯矩阵 AC-3 测试文件路径错误 — 修正为 test_channel_router.py，新增 AC-2/AC-3 验收测试行
+- [x] [20-8-P1-5][Review][Patch] Task 4 头部 AC 关联不完整 — 修正为 AC-2, AC-3, AC-4
+- [x] [20-8-P2-6][Review][Patch] 测试分类表缺少通道注册测试行 — 新增 test_channel_router.py 归属 Task 1
 
 #### 已推迟 Defer
 
-- [x] [20-8-P2-1][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
-- [x] [20-8-P2-2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
-- [x] [20-8-P2-3][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
-- [x] [20-8-P2-4][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
+- [ ] [20-8-P2-1][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
+- [ ] [20-8-P2-2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
+- [ ] [20-8-P2-3][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
+- [ ] [20-8-P2-4][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
 
 ---
 
@@ -711,10 +719,11 @@ src/
 
 ---
 
-**故事版本:** v1.4.0
+**故事版本:** v1.5.0
 **创建日期:** 2026-05-23
 **最后更新:** 2026-05-23
 **更新说明:**
+- v1.5.0: R5 追溯矩阵与对齐审查 — 修正 AC-3 测试文件路径（P1）、新增 AC-2/AC-3 验收测试覆盖行（P1）、修正 Task 4 AC 关联（P1）、补充测试分类表通道注册行（P2）
 - v1.4.0: R4 Gherkin 覆盖审查 — 补充 AC-2/AC-3 Gherkin 场景5/6（P0）、补充 Subtask 4.6/4.7 步骤函数（P0）、明确 DI 容器 mock 策略（P0）、更新 _env_int 学习经验描述（P2）
 - v1.3.0: R3 模板合规性审查 — 新增文档审查修复章节（P0）、新增代码审查发现章节（P0）、Task 4 补充红阶段 Subtask 4.0（P1）、修正 test_workflow_events.py 文件状态为"待修改"（P1）、修正 Subtask 1.1 描述为"修改"（P1）
 - v1.2.0: R2 正确性审查 — 修正 AC-1 验证标准错误引用 self._runs（P0-1）、标注 Protocol 契约与防御性 None 检查（P0-2）、新增设计文档偏离声明与更新提醒（P0-3）、修正 event_type 字段位置到 workflow_events.py 风格（P1-4）、新增 Subtask 6.5 设计文档同步检查项
