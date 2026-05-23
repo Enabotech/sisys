@@ -249,7 +249,7 @@ graph TB
     %% ========== 接口层 ==========
     subgraph "接口层 (Interfaces)"
         CLI["CLI 接口<br/>typer 0.24+"]
-        API["REST API<br/>FastAPI 0.104+"]
+        API["REST API<br/>FastAPI 0.111+"]
         API_GW["API Gateway<br/>Kong/Traefik"]
         EventListener["事件监听器<br/>RabbitMQ+aio-pika"]
     end
@@ -485,6 +485,15 @@ graph TB
 
 ## 3. 核心架构决策
 
+> **子设计文档索引：** 本架构设计包含以下详细子设计文档：
+> - [sisys-port-management-design.md](sisys-port-management-design.md) — 端口注册与依赖注入
+> - [sisys-event-bus-design.md](sisys-event-bus-design.md) — 双通道事件总线
+> - [sisys-storage-subsystem-design.md](sisys-storage-subsystem-design.md) — 六层存储架构
+> - [sisys-transaction-subsystem-design.md](sisys-transaction-subsystem-design.md) — 事务与工作单元
+> - [sisys-uni-exception-design.md](sisys-uni-exception-design.md) — 统一异常层次
+> - [sisys-workflow-agent-integration-design.md](sisys-workflow-agent-integration-design.md) — 工作流与 Agent 编排集成
+> - [sisys-auto-invocation-design.md](sisys-auto-invocation-design.md) — 自动触发管道
+
 ### 3.1 决策 1 (ADR-001): 六边形架构 (DDD)
 
 **决策内容：** 采用领域驱动六边形架构作为核心架构哲学
@@ -635,6 +644,8 @@ class ComplexityAssessor:
     async def assess(self, task: Task, candidate_models: List[Model]) -> List[ModelScore]:
         results = []
         for model in candidate_models:
+            task_embedding = await self.embedding_model.encode(task.description)
+            model_embedding = await self.embedding_model.encode(model.description)
             semantic_score = cosine_similarity(task_embedding, model_embedding)
             historical_score = await self.get_historical_success_rate(model.id, task.type)
             cost_score = 1.0 / (model.cost_per_1k_tokens + 0.001)
@@ -1643,22 +1654,41 @@ class WormArchiver:
 
 ## 10. 事件驱动架构设计
 
+> **详细设计文档:** 双通道事件总线完整实现详见 [sisys-event-bus-design.md](sisys-event-bus-design.md)，
+> 自动触发管道详见 [sisys-auto-invocation-design.md](sisys-auto-invocation-design.md)
+
 ### 10.1 领域事件完整列表
 
 | 事件 | 触发条件 | 通道 | 持久化 | 说明 |
 |------|---------|------|--------|------|
 | **HeartbeatTriggered** | 心跳唤醒事件触发 | Redis Pub/Sub | 不持久化 | 实时通知型（<10ms，允许丢失） |
-| **DocumentProcessed** | 文档处理完成 | RabbitMQ + Outbox | WORM 归档 | 审计合规型 |
+| **DocumentProcessed** | 文档处理完成 | Redis + RabbitMQ | WORM 归档 | 双通道：Redis 实时通知 + RabbitMQ 审计归档 |
 | **ToolExecuted** | 工具执行完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
 | **AgentDecided** | Agent 决策完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
-| **RoutingDecided** | 路由决策完成 | RabbitMQ + Outbox | WORM 归档 | 审计合规型 |
-| **ArbitrationCompleted** | SYS AGENT 裁决完成 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **RoutingDecided** | 路由决策完成 | Redis Pub/Sub | 不持久化 | ⚠️ 实时通知型（允许丢失） |
 | **CheckpointReached** | 检查点到达 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
-| **CorrectionClassified** | 修正分级判定完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **CorrectionApproved** | 修正审批完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型（已实现） |
 | **IsolationLevelSwitched** | 隔离等级切换 | RabbitMQ + Outbox | WORM 归档 | 业务状态型 |
 | **MemoryChanged** | 记忆系统变更（保存/更新/删除） | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
 | **StrategicDeviationWarning** | 战略偏差预警触发 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
 | **CheckpointRecovered** | 检查点恢复完成 | RabbitMQ + Outbox | 7 年存储 | 业务状态型 |
+| **AutoExecuted** | 自动执行完成 | Redis Pub/Sub | 不持久化 | 自动触发管道（三阶段） |
+| **AutoTriggered** | 自动触发启动 | Redis Pub/Sub | 不持久化 | 自动触发管道（三阶段） |
+| **AutoRouted** | 自动路由完成 | Redis Pub/Sub | 不持久化 | 自动触发管道（三阶段） |
+| **SagaStatusChanged** | Saga 状态变更 | RabbitMQ + Outbox | 7 年存储 | Saga 协调型 |
+| **AuditEvent** | 审计事件 | RabbitMQ + Outbox | 7 年存储 | 审计合规型 |
+| **WorkflowSubmitted** | 工作流提交 | RabbitMQ + Outbox | 7 年存储 | 工作流型 |
+| **RAGIndexed** | RAG 索引完成 | RabbitMQ + Outbox | 7 年存储 | 工作流型 |
+| **ReportGenerated** | 报告生成完成 | RabbitMQ + Outbox | 7 年存储 | 工作流型 |
+| **SensitiveDataDetected** | 敏感数据检测 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **CrossBorderTransferRequested** | 跨境传输请求 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **MFAChallengeIssuedEvent** | MFA 挑战发出 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **IntrusionDetectedEvent** | 入侵检测 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **DataIntegrityViolationEvent** | 数据完整性违规 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **DataSovereigntyViolation** | 数据主权违规 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+| **PIPLDataAccessRequested** | 个人信息访问请求 | RabbitMQ + Outbox | 7 年存储 | 合规型 |
+
+> **未实现事件（规划中）：** ArbitrationCompleted（SYS 裁决完成）、CorrectionClassified（修正分级判定）待 Epic 4-5 实现
 
 > **事件通道分类说明：**
 > - **Redis Pub/Sub（实时通知型）**：用于心跳等高频、低延迟、允许丢失的场景（<10ms）
@@ -1744,6 +1774,8 @@ class EventListener:
 
 ## 11. 存储架构设计
 
+> **详细设计文档:** 存储子系统完整实现详见 [sisys-storage-subsystem-design.md](sisys-storage-subsystem-design.md)
+
 ### 11.1 六层存储详细设计
 
 | 层级 | 技术 | 内容 | 关键设计 |
@@ -1752,7 +1784,7 @@ class EventListener:
 | **L1 高速缓存** | Redis 7.0+ | 会话状态、语义缓存 | Hash/Vector/Sorted Set |
 | **L2 关系存储** | PostgreSQL 15+ | 用户/RBAC、审计元数据 | pgvector、JSONB、event_outbox |
 | **L3 向量存储** | Qdrant 1.7+ | 嵌入向量、混合检索 | Dense+Sparse+Payload 过滤 |
-| **L4 对象存储** | MinIO WORM | 原始文档、证据包 | Object Lock COMPLIANCE 模式 7 年 |
+| **L4 对象存储** | MinIO WORM | 原始文档、证据包 | Object Lock GOVERNANCE 模式 7 年 ⚠️ 注意：当前实现使用 GOVERNANCE 模式（允许特权用户删除），待升级为 COMPLIANCE（禁止任何删除） |
 | **L5 图存储(可选)** | Neo4j 5.x | 知识图谱、实体关系 | Cypher、图遍历、Parent-Child 索引 |
 
 ### 11.2 L0 记忆入口层（MEMORY.md）设计
@@ -2392,7 +2424,7 @@ _session_ctx: ContextVar[AsyncSession | None] = ContextVar("pg_session", default
 | 层级 | 组件 | 技术选型 | 版本 | 风险 |
 |------|------|---------|------|------|
 | **接口层** | CLI 框架 | typer | 0.24+ | ✅ 低 |
-| | Web 框架 | FastAPI | 0.104+ | ✅ 低 |
+| | Web 框架 | FastAPI | 0.111+ | ✅ 低 |
 | | API Gateway | Kong/Traefik | 最新 | ✅ 低 |
 | **应用层** | 编排服务 | 自定义 | - | 🟡 中 |
 | **领域层** | 数据验证 | Pydantic | 2.4+ | ✅ 低 |
@@ -2438,11 +2470,8 @@ sisys/
 │   ├── fixtures/                                          # 测试固件
 │   └── conftest.py                                        # pytest 配置
 │
-├── configs/                                               # 配置文件
-│   ├── development.py                                     # 开发环境
-│   ├── production.py                                      # 生产环境
-│   ├── testing.py                                         # 测试环境
-│   └── base.py                                            # 基础配置
+├── config/                                                # 运行时配置
+│   └── event_channels.yaml                                # 事件通道路由配置
 │
 ├── scripts/                                               # 脚本目录
 │   ├── setup_environment.py                               # 环境设置
@@ -2451,36 +2480,26 @@ sisys/
 │   └── monitoring/                                        # 监控脚本
 │
 ├── docs/                                                  # 文档目录
-│   ├── architecture/                                      # 架构文档
+│   ├── architecture/                                      # 架构文档（含 7 份子设计文档）
 │   ├── api/                                               # API 文档
-│   ├── user_guides/                                       # 用户指南
-│   └── developer/                                         # 开发者文档
+│   ├── developer/                                         # 开发者文档
+│   ├── deploy/                                            # 部署文档
+│   ├── delivery/                                          # 交付文档
+│   ├── standards/                                         # 规范文档
+│   └── infrastructure/                                    # 基础设施文档
 │
 ├── .gitea/                                                # Gitea 配置
 │   └── workflows/                                         # Gitea Pipeline
 │       ├── ci.yml                                         # 持续集成
 │       └── cd.yml                                         # 持续部署
 │
-├── notebooks/                                             # Jupyter Notebooks
-│   ├── exploration/                                       # 探索性分析
-│   └── prototyping/                                       # 原型开发
-│
-├── logs/                                                  # 日志目录
-│   ├── application.log                                    # 应用日志
-│   ├── error.log                                          # 错误日志
-│   └── audit.log                                          # 审计日志
-│
 ├── .env.example                                           # 环境变量示例
 ├── .gitignore                                             # Git 忽略文件
 ├── .pre-commit-config.yaml                                # Pre-commit 配置
-├── pyproject.toml                                         # Python 项目配置
-├── requirements/                                          # 依赖管理
-│   ├── requirements.txt                                   # 主依赖
-│   ├── dev.txt                                            # 开发依赖
-│   └── prod.txt                                           # 生产依赖
+├── pyproject.toml                                         # Python 项目配置（Poetry 管理依赖）
+├── Makefile                                               # 开发命令入口
 ├── README.md                                              # 项目说明
-├── LICENSE                                                # 许可证
-└── CHANGELOG.md                                           # 变更日志
+└── LICENSE                                                # 许可证
 ```
 
 ---
@@ -2543,107 +2562,81 @@ src/domain/
 │   ├── isolation_events.py                                # 隔离相关事件 ⭐
 │   └── correction_events.py                               # 修正相关事件 ⭐
 │
-└── exceptions/                                            # 领域异常
+└── exceptions/                                            # 统一异常层次（三层）
     ├── __init__.py
-    ├── domain_exceptions.py                               # 基础领域异常
-    └── specific_exceptions.py                             # 具体领域异常
+    ├── base_exceptions.py                                  # 根异常（SISYS BaseException）
+    ├── system_exceptions.py                                # 系统异常（Config/Network/Storage/MessageBus/Audit）
+    ├── business_exceptions.py                              # 业务异常（Validation/NotFound/Conflict/Permission/Auth/InvalidState/BusinessRule）
+    ├── external_exceptions.py                              # 外部异常（ThirdParty/Timeout/ServiceUnavailable/Unknown）
+    ├── permission_exceptions.py                            # 权限相关异常
+    ├── role_exceptions.py                                  # 角色相关异常
+    ├── event_exceptions.py                                 # 事件相关异常
+    ├── storage_exceptions.py                               # 存储相关异常
+    ├── sandbox_exceptions.py                               # 沙箱相关异常
+    └── service_exceptions.py                               # 服务相关异常
 ```
 
 ---
 
 ### 13.3 应用层目录结构 (src/application/)
 
+> **实现状态说明:** 当前 MVP 阶段应用层采用服务+用例+事件处理器模式，
+> **未实现 CQRS**（commands/queries/handlers 分离）和 **Skills 系统**（23 种工具 SOP）。
+> 这些功能规划于 Epic 4-5 补充。
+
 ```
 src/application/
 ├── __init__.py                                            # 应用层包初始化
 │
-├── services/                                              # 应用服务
+├── services/                                              # 应用服务（实际已实现）
 │   ├── __init__.py
 │   ├── orchestration_service.py                           # 编排服务（协调 Prefect+LangGraph）
-│   ├── command_dispatcher.py                              # 命令分发器（CQRS 命令侧）
-│   ├── query_dispatcher.py                                # 查询分发器（CQRS 查询侧）
-│   ├── event_dispatcher.py                                # 事件分发器
-│   ├── notification_service.py                            # 通知服务
-│   ├── audit_service.py                                   # 审计服务
-│   └── cost_management_service.py                         # 成本管理服务
+│   └── unified_storage_gateway.py                         # 统一存储网关（L0-L5 协调）
 │
-├── skills/                                                # Skills 操作手册（应用层）
-│   ├── __init__.py
-│   ├── selector.py                                        # SkillSelector（关键词 40% + 语义 60%）
-│   ├── loader.py                                          # Skills 加载器（L1/L2/L3 渐进式）
-│   ├── tools_manifest.yaml                                # L1: TOOLS.md 元数据清单 (<200 tokens)
-│   ├── pestel/                                            # L2: SKILL.md × 23
-│   │   ├── SKILL.md                                       # SOP 完整定义 (<500 行)
-│   │   ├── scripts/                                       # L3: scripts 确定性计算
-│   │   │   ├── validate_input.py
-│   │   │   └── analyze.py
-│   │   └── references/                                    # L3: references 理论参考
-│   │       ├── pestel_theory.md
-│   │       └── scoring_rules.md
-│   ├── swot/
-│   ├── five_forces/
-│   └── ... (共 23 种工具)
-│
-├── use_cases/                                             # 用例定义
+├── use_cases/                                             # 用例定义（实际已实现）
 │   ├── __init__.py
 │   ├── document_processing.py                             # 文档处理用例
-│   ├── strategic_analysis.py                              # 战略分析用例
-│   ├── agent_collaboration.py                             # Agent 协作用例
-│   ├── planning_generation.py                             # 规划生成用例
-│   ├── routing_decision.py                                # 路由决策用例
-│   ├── isolation_management.py                            # 隔离管理用例
-│   └── system_operations.py                               # 系统操作用例
-│
-├── commands/                                              # 命令定义
-│   ├── __init__.py
-│   ├── document_commands.py                               # 文档命令
-│   ├── tool_commands.py                                   # 工具命令
-│   ├── agent_commands.py                                  # Agent 命令
-│   ├── planning_commands.py                               # 规划命令
-│   ├── routing_commands.py                                # 路由命令
-│   └── system_commands.py                                 # 系统命令
-│
-├── ports/                                                 # 应用层端口（技术横切关注的抽象）
-│
-├── queries/                                               # 查询定义
-│   ├── __init__.py
-│   ├── document_queries.py                                # 文档查询
-│   ├── tool_queries.py                                    # 工具查询
-│   ├── agent_queries.py                                   # Agent 查询
-│   ├── planning_queries.py                                # 规划查询
-│   └── system_queries.py                                  # 系统查询
-│
-├── handlers/                                              # 命令/查询/事件处理器
-│   ├── __init__.py
-│   ├── command_handlers/                                  # 命令处理器
-│   │   ├── __init__.py
-│   │   ├── document_command_handler.py
-│   │   ├── tool_command_handler.py
-│   │   ├── agent_command_handler.py
-│   │   ├── planning_command_handler.py
-│   │   └── system_command_handler.py
-│   ├── query_handlers/                                    # 查询处理器
-│   │   ├── __init__.py
-│   │   ├── document_query_handler.py
-│   │   ├── tool_query_handler.py
-│   │   ├── agent_query_handler.py
-│   │   ├── planning_query_handler.py
-│   │   └── system_query_handler.py
-│   └── event_handlers/                                    # 事件处理器
+│   ├── permission_management.py                           # 权限管理用例
+│   ├── role_management.py                                 # 角色管理用例
+│   └── text_processing/                                   # 文本处理子模块
 │       ├── __init__.py
-│       ├── document_event_handler.py
-│       ├── tool_event_handler.py
-│       ├── agent_event_handler.py
-│       ├── planning_event_handler.py
-│       ├── routing_event_handler.py
-│       └── isolation_event_handler.py
+│       ├── l1_compressor.py                               # L1 文本压缩
+│       └── l1_text_extractor.py                           # L1 文本提取
 │
-└── dtos/                                                  # 数据传输对象
-    ├── __init__.py
-    ├── command_dtos.py                                    # 命令 DTO
-    ├── query_dtos.py                                      # 查询 DTO
-    ├── event_dtos.py                                      # 事件 DTO
-    └── response_dtos.py                                   # 响应 DTO
+├── event_handlers/                                        # 事件处理器（实际已实现）
+│   ├── __init__.py
+│   ├── auto_trigger_handler.py                            # 自动触发处理器（Story 1.17）
+│   ├── auto_route_handler.py                              # 自动路由处理器
+│   ├── auto_execute_completed_handler.py                  # 自动执行完成处理器
+│   ├── udmr_handler.py                                    # UDMR 处理器
+│   └── memory_changed_handler.py                          # 记忆变更处理器（跨层同步）
+│
+├── ports/                                                 # 应用层端口（实际已实现，约 14 个）
+│   ├── __init__.py
+│   ├── memory_cache_port.py                               # 记忆缓存端口
+│   ├── memory_file_port.py                                # 记忆文件端口
+│   ├── memory_vector_port.py                              # 记忆向量端口
+│   ├── memory_graph_port.py                               # 记忆图谱端口
+│   ├── semantic_cache.py                                  # 语义缓存端口
+│   ├── public_blackboard.py                               # 公共黑板端口
+│   ├── metrics_port.py                                    # 指标端口
+│   ├── exception_metrics_port.py                          # 异常指标端口
+│   ├── session_cache_port.py                              # 会话缓存端口
+│   ├── document_storage_port.py                           # 文档存储端口
+│   └── text_extractor_service.py                          # 文本提取服务端口
+│
+├── skills/                                                # ⚠️ TODO: Skills 系统（V1/V2 规划）
+│   # 规划：23 种工具的 L1/L2/L3 渐进式操作手册
+│   # 当前状态：未实现
+│
+├── commands/                                              # ⚠️ TODO: CQRS 命令侧（V1/V2 规划）
+│   # 当前状态：未实现，应用层使用 services + use_cases 模式
+│
+├── queries/                                               # ⚠️ TODO: CQRS 查询侧（V1/V2 规划）
+│   # 当前状态：未实现
+│
+└── handlers/                                              # ⚠️ TODO: 命令/查询处理器（V1/V2 规划）
+    # 当前状态：仅 event_handlers/ 已实现
 ```
 
 ---
@@ -2656,74 +2649,32 @@ src/infrastructure/
 │
 ├── workflow/                                              # Prefect 工作流引擎
 │   ├── __init__.py
-│   ├── prefect_engine.py                                  # Prefect 引擎包装器
-│   ├── flows/                                             # 流程定义
+│   ├── prefect_engine.py                                  # Prefect 引擎包装器（已实现）
+│   ├── flows/                                             # 流程定义（MVP）
 │   │   ├── __init__.py
-│   │   ├── document_processing_flow.py                    # 文档处理流程
-│   │   ├── rag_pipeline_flow.py                           # RAG 流水线流程
-│   │   ├── batch_analysis_flow.py                         # 批量分析流程
-│   │   ├── report_generation_flow.py                      # 报告生成流程
-│   │   └── quality_control_flow.py                        # 质量控制流程
-│   ├── tasks/                                             # 任务定义
-│   │   ├── __init__.py
-│   │   ├── document_tasks.py                              # 文档处理任务
-│   │   ├── embedding_tasks.py                             # 嵌入生成任务
-│   │   ├── llm_tasks.py                                   # LLM 调用任务
-│   │   ├── vector_tasks.py                                # 向量存储任务
-│   │   └── analysis_tasks.py                              # 分析任务
-│   └── deploy/kubernetes/                                       # 部署配置
+│   │   └── document_processing_flow.py                    # ⚠️ MVP: 任务为 mock 占位
+│   │   # TODO: rag_pipeline, batch_analysis, report_generation, quality_control
+│   └── tasks/                                             # 任务定义（MVP 占位）
 │       ├── __init__.py
-│       ├── development.yaml                               # 开发环境部署
-│       └── production.yaml                                # 生产环境部署
+│       └── document_tasks.py                              # ⚠️ MVP: parse/embed/index 返回 mock 数据
 │
-├── agent_orchestration/                                   # LangGraph Agent 编排引擎
+├── agent_orch/                                             # LangGraph Agent 编排引擎（实际目录名）
+│   # 注：文档中曾命名为 agent_orchestration/，实际代码为 agent_orch/
 │   ├── __init__.py
-│   ├── langgraph_engine.py                                # LangGraph 引擎包装器
-│   ├── agents/                                            # Agent 定义
+│   ├── langgraph_engine.py                                 # LangGraph 引擎包装器（已实现）
+│   ├── schemas.py                                          # Agent 状态 TypedDict 定义
+│   │
+│   ├── graphs/                                             # 状态图定义（MVP）
 │   │   ├── __init__.py
-│   │   ├── base_agent.py                                  # Agent 基类
-│   │   ├── ceo_agent.py                                   # CEO Agent
-│   │   ├── cfo_agent.py                                   # CFO Agent
-│   │   ├── cmo_agent.py                                   # CMO Agent
-│   │   ├── cto_agent.py                                   # CTO Agent
-│   │   ├── coo_agent.py                                   # COO Agent
-│   │   ├── cho_agent.py                                   # CHO Agent
-│   │   ├── aud_agent.py                                   # AUD Agent（审计）
-│   │   └── sys_agent.py                                   # SYS Agent（仲裁）
-│   ├── graphs/                                            # 状态图定义
+│   │   └── basic_agent_graph.py                            # ⚠️ MVP: 仅 BasicAgent 图
+│   │   # TODO: collaboration_graph, sp_blm_graph, bp_bem_graph, decision_graph
+│   │
+│   └── nodes/                                              # 图节点函数（MVP 占位）
 │   │   ├── __init__.py
-│   │   ├── collaboration_graph.py                         # Agent 协作图
-│   │   ├── sp_blm_graph.py                                # SP/BLM 规划图（六阶段）
-│   │   ├── bp_bem_graph.py                                # BP/BEM 规划图（六阶段）
-│   │   └── decision_graph.py                              # 决策图（ToT 机制）
-│   ├── nodes/                                             # 图节点定义
-│   │   ├── __init__.py
-│   │   ├── analysis_nodes.py                              # 分析节点
-│   │   ├── decision_nodes.py                              # 决策节点
-│   │   ├── collaboration_nodes.py                         # 协作节点
-│   │   ├── checkpoint_nodes.py                            # 检查点节点
-│   │   └── validation_nodes.py                            # 验证节点
-│   ├── state/                                             # 状态管理
-│   │   ├── __init__.py
-│   │   ├── agent_state.py                                 # Agent 状态
-│   │   ├── planning_state.py                              # 规划状态
-│   │   ├── collaboration_state.py                         # 协作状态
-│   │   ├── blackboard_state.py                            # 公共黑板状态
-│   │   └── memory_state.py                                # 记忆状态（战略档案）
-│   ├── tools/                                             # Agent 工具
-│   │   ├── __init__.py
-│   │   ├── tool_registry.py                               # 工具注册表
-│   │   ├── strategic_tools.py                             # 23 种战略工具实现
-│   │   ├── analysis_tools.py                              # 分析工具
-│   │   └── visualization_tools.py                         # 可视化工具
-│   └── prompts/                                           # 提示词管理
-│       ├── __init__.py
-│       ├── prompt_registry.py                             # 提示词注册表
-│       ├── agent_prompts.py                               # Agent 提示词
-│       └── optimization/                                  # 提示优化（DSPy）
-│           ├── __init__.py
-│           ├── dspy_optimizer.py
-│           └── prompt_tuning.py
+│   │   └── agent_nodes.py                                  # ⚠️ MVP: analyze_node/synthesize_node 占位实现
+│   │   # 注：当前节点返回硬编码字符串，真实推理逻辑待 Epic 4 补充
+│   │
+│   # TODO: agents/, state/, tools/, prompts/ 目录规划于 Epic 4-5
 │
 ├── storage/                                               # 统一存储抽象层
 │   ├── __init__.py
@@ -2737,27 +2688,32 @@ src/infrastructure/
 │   ├── qdrant/                                            # L3 向量存储
 │   └── redis/                                             # L1 缓存
 │
-├── messaging/                                             # 消息系统
+├── messaging/                                             # 消息系统（已实现）
 │   ├── __init__.py
 │   ├── adapters/                                          # 适配器
-│   │   ├── __init__.py
-│   │   ├── event_outbox_adapter.py
-│   │   └── sqlalchemy_event_outbox_adapter.py
-│   ├── event_bus.py                                       # 事件总线
-│   ├── idempotency/                                       # 幂等性
-│   │   ├── __init__.py
-│   │   ├── checker.py
-│   │   └── retry_policy.py
-│   ├── message_serializer.py                              # 消息序列化
-│   ├── outbox/                                            # 事务发件箱
-│   │   ├── __init__.py
-│   │   ├── dead_letter_queue.py
-│   │   ├── outbox.py
-│   │   └── outbox_processor.py
-│   ├── rabbitmq_consumer.py
-│   ├── rabbitmq_publisher.py
-│   ├── redis_publisher.py
-│   └── redis_subscriber.py
+│   ├── dual_channel_event_bus.py                          # 双通道事件总线（Redis + RabbitMQ）
+│   ├── channel_router.py                                  # 事件通道路由（27 种事件映射）
+│   ├── event_bus_factory.py                               # 事件总线工厂（测试用）
+│   ├── error_mapper.py                                    # 外部 SDK 错误映射
+│   ├── event_bus_config_loader.py                         # 事件总线 YAML 配置加载
+│   ├── outbox/                                            # 事务发件箱（PostgreSQL + RabbitMQ）
+│   │   ├── outbox_entity.py                               # Outbox 实体（状态机）
+│   │   ├── outbox_repository.py                           # SQLAlchemy 实现
+│   │   └── async_outbox_poller.py                         # 异步轮询发布器
+│   ├── retry/                                             # 重试策略（指数退避 + 抖动）
+│   ├── unit_of_work/                                      # 工作单元
+│   │   ├── postgresql_unit_of_work.py                     # PostgreSQL UoW（ContextVar 会话）
+│   │   └── audit_unit_of_work.py                          # 审计 UoW（SERIALIZABLE 隔离）
+│   ├── inmemory_event_bus.py                              # 内存事件总线（测试用）
+│   ├── inmemory_event_store.py                            # 内存事件存储（测试用）
+│   ├── inmemory_dead_letter_queue.py                      # 内存死信队列（测试用）
+│   ├── rabbitmq_event_bus.py                              # RabbitMQ 事件总线
+│   ├── rabbitmq_consumer.py                               # RabbitMQ 消费者
+│   ├── rabbitmq_publisher.py                              # RabbitMQ 发布者
+│   ├── rabbitmq_listener.py                               # RabbitMQ 监听器
+│   ├── redis_event_bus.py                                 # Redis 事件总线（Pub/Sub）
+│   ├── redis_publisher.py                                 # Redis 发布者
+│   └── redis_subscriber.py                                # Redis 订阅者
 │
 ├── external_services/                                     # 外部服务适配器
 │   ├── __init__.py
@@ -2792,36 +2748,48 @@ src/infrastructure/
 │       ├── code_executor.py
 │       └── security_validator.py
 │
-├── mcp/                                                   # MCP 外部生态接口（V2+ 可选）
+├── mcp/                                                   # ⚠️ TODO: MCP 外部生态接口（V2+ 规划）
+│   # 规划：MCP Registry, MCP Server, 工具能力 Schema
+│   # 当前状态：未实现
+│
+├── config/                                                # 配置管理（已实现）
+│   └── settings.py                                        # Pydantic Settings + 环境变量
+│
+├── security/                                              # 安全服务（已实现）
+│   ├── audit_service_impl.py                              # 审计服务实现
+│   ├── auth_service_impl.py                               # 认证服务实现
+│   ├── permission_service_impl.py                         # 权限服务实现
+│   ├── password_validation_service_impl.py                # 密码验证服务
+│   ├── jwt_service.py                                     # JWT 服务
+│   ├── mfa_service.py                                     # MFA 服务
+│   └── sensitive_data_detector_impl.py                    # 敏感数据检测实现
+│
+├── monitoring/                                            # 监控服务（已实现）
 │   ├── __init__.py
-│   ├── registry.py                                        # MCP Registry（工具能力暴露）
-│   ├── server.py                                          # MCP Server 实现
-│   ├── registry.yaml                                      # 工具能力描述配置
-│   └── schemas/                                           # 工具输入/输出 Schema
-│       ├── pestel_input_v1.json
-│       ├── pestel_output_v1.json
-│       └── ... (共 23 种工具)
+│   ├── otel_config.py                                     # OpenTelemetry 配置
+│   ├── metrics.py                                         # Prometheus 指标
+│   └── business_metrics.py                                # 业务指标
 │
-├── config/                                               # 配置管理
+├── routing/                                               # 路由服务（已实现）
+│   ├── hash_router_impl.py                                # FNV-1a 一致性哈希路由
+│   └── semantic_router_impl.py                            # 语义路由实现（占位）
 │
-├── security/                                              # 安全服务
+├── scheduler/                                             # 调度服务（已实现）
+│   ├── heartbeat_scheduler.py                             # 心跳调度器
+│   └── async_outbox_poller.py                             # Outbox 异步轮询
 │
-├── audit/                                                 # 审计服务
+├── saga/                                                  # Saga 编排（已实现）
+│   ├── saga_orchestrator.py                               # Saga 协调器（正向执行 + 补偿）
+│   ├── saga_context.py                                    # Saga 上下文（不可变更新模式）
+│   └── postgresql_saga_repository.py                      # PostgreSQL Saga 仓储
 │
-├── monitoring/                                            # 监控服务
+├── middleware/                                            # 中间件（已实现）
 │   ├── __init__.py
-│   ├── aggregator.py
-│   ├── business_metrics.py
-│   ├── event_metrics.py
-│   └── otel_config.py
+│   └── session_middleware.py                              # PostgreSQL 会话中间件（ContextVar 会话注入）
 │
-├── routing/                                               # 路由服务
-│
-├── scheduler/                                             # 调度服务
-│
-└── utils/                                                 # 工具函数
+└── utils/                                                 # 工具函数（已实现）
     ├── __init__.py
-    └── json_ser.py
+    └── json_ser.py                                        # JSON 序列化工具
 ```
 
 ---
@@ -2861,7 +2829,7 @@ src/interfaces/
 │       ├── table_formatter.py
 │       └── pretty_formatter.py
 │
-├── api/                                                   # REST API 接口 (FastAPI 0.104+)
+├── api/                                                   # REST API 接口 (FastAPI 0.111+)
 │   ├── __init__.py
 │   ├── main.py                                            # FastAPI 应用
 │   ├── v1/                                                # API 版本 1
@@ -2972,8 +2940,8 @@ tests/
 │   │   └── handlers/
 │   └── infrastructure/                                    # 基础设施层单元测试
 │       ├── workflow/
-│       ├── agent_orchestration/
-│       └── persistence/
+│       ├── agent_orch/
+│       └── storage/
 │
 ├── integration/                                           # 集成测试
 │   ├── __init__.py
@@ -3108,15 +3076,15 @@ docs/
 
 ---
 
-### 13.13 依赖管理目录结构 (requirements/)
+### 13.13 依赖管理
 
-```
-requirements/
-├── requirements.txt                                       # 主依赖（全部依赖）
-├── dev.txt                                                # 开发依赖
-├── prod.txt                                               # 生产依赖
-├── test.txt                                               # 测试依赖
-└── docs.txt                                               # 文档依赖
+> **说明:** 项目使用 Poetry + pyproject.toml 管理依赖，不使用 requirements/ 目录。
+> 依赖分组定义在 pyproject.toml 的 `[tool.poetry.dependencies]`、`[tool.poetry.group.test.dependencies]`、`[tool.poetry.group.dev.dependencies]` 中。
+
+```bash
+# 安装命令
+poetry install                    # 生产依赖
+poetry install --with dev,test    # 开发+测试依赖
 ```
 
 ---
@@ -3129,19 +3097,12 @@ sisys/
 ├── .env                                                   # 本地环境变量（.gitignore）
 ├── .gitignore                                             # Git 忽略规则
 ├── .pre-commit-config.yaml                                # Pre-commit 钩子配置
-├── .flake8                                                # Flake8 代码检查配置
-├── .mypy.ini                                              # MyPy 类型检查配置
-├── .ruff.toml                                             # Ruff 代码检查配置
-├── pytest.ini                                             # Pytest 测试配置
-├── tox.ini                                                # Tox 测试环境配置
+├── .importlinter                                          # 六边形架构依赖规则
+├── pyproject.toml                                         # 项目元数据 + 构建配置 + 工具配置（ruff/mypy/pytest/coverage）
 ├── Makefile                                               # Make 命令快捷方式
-├── pyproject.toml                                         # Python 项目元数据 + 构建配置
+├── poetry.lock                                            # Poetry 锁文件
 ├── README.md                                              # 项目说明文档
-├── LICENSE                                                # 开源许可证
-├── CHANGELOG.md                                           # 变更日志（Keep a Changelog 格式）
-├── CODE_OF_CONDUCT.md                                     # 行为准则
-├── CONTRIBUTING.md                                        # 贡献指南
-└── SECURITY.md                                            # 安全政策
+└── LICENSE                                                # 许可证
 ```
 
 ---
@@ -3160,53 +3121,41 @@ sisys/
 │   ├── modules.xml
 │   └── vcs.xml
 │
-├── notebooks/                                             # Jupyter Notebooks
-│   ├── exploration/                                       # 探索性分析
-│   ├── prototyping/                                       # 原型开发
-│   └── experiments/                                       # 实验记录
-│
-└── logs/                                                  # 日志目录（.gitignore）
-    ├── .gitkeep                                           # 保持目录存在
-    ├── application.log                                    # 应用日志
-    ├── error.log                                          # 错误日志
-    └── audit.log                                          # 审计日志
+└── .VSCodeCounter/                                        # VSCode Counter 统计（可选）
+```
+
+> **说明:** `notebooks/` 和 `logs/` 目录当前不存在，按需创建。
+> 日志使用 `loguru` 库输出到 stdout/stderr，由 Docker/K8s 收集。
 ```
 
 ---
 
 ### 13.16 项目结构验证清单
 
-**对比废弃草稿中的完整目录结构，当前架构已包含：**
+**当前目录结构验证（实际实现状态）：**
 
-| 目录/文件 | 废弃草稿 | 当前架构 | 状态 |
-|----------|---------|---------|------|
-| **src/domain/** | ✅ | ✅ | ✅ 完整 |
-| **src/application/** | ✅ | ✅ | ✅ 完整 |
-| **src/infrastructure/** | ✅ | ✅ | ✅ 完整（新增 UDMR/EIP 相关模块） |
-| **src/interfaces/** | ✅ | ✅ | ✅ 完整 |
-| **src/shared/** | ✅ | ✅ | ✅ 完整 |
-| **tests/** | ✅ | ✅ | ✅ 完整（新增集成测试/E2E 测试） |
-| **configs/** | ✅ | ✅ | ✅ 完整 |
-| **scripts/** | ✅ | ✅ | ✅ 完整（新增 tools 子目录） |
-| **docs/** | ✅ | ✅ | ✅ 完整（新增 operations 子目录） |
-| **.gitea/workflows/** | ✅ | ✅ | ✅ 完整（新增 security-scan/release） |
-| **requirements/** | ✅ | ✅ | ✅ 完整（新增 test.txt/docs.txt） |
-| **根目录配置** | 🟡 部分 | ✅ | ✅ 已补充完整 |
-| **工具配置** | ❌ 未定义 | ✅ | ✅ 已新增 |
-| **notebooks/** | ✅ | ✅ | ✅ 完整 |
-| **logs/** | ✅ | ✅ | ✅ 完整 |
+| 目录/文件 | 设计 | 实现 | 状态 |
+|----------|------|------|------|
+| **src/domain/** | ✅ | ✅ | ✅ 完整（entities/ports/events/services/value_objects/exceptions） |
+| **src/application/** | ✅ | 🟡 | 🟡 services/use_cases/event_handlers/ports 已实现；skills/commands/queries 待补充 |
+| **src/infrastructure/** | ✅ | 🟡 | 🟡 存储/消息/安全/监控已实现；agent_orch/workflow 为 MVP 占位 |
+| **src/interfaces/** | ✅ | 🟡 | 🟡 API/CLI 骨架已实现；SAP 适配器待补充 |
+| **tests/** | ✅ | ✅ | ✅ 完整（unit/integration/e2e/acceptance/contracts/deploy） |
+| **configs/** | ✅ | ❌ | ❌ 仅 .gitkeep，配置通过 pyproject.toml 管理 |
+| **scripts/** | ✅ | ✅ | ✅ 完整（deployment/monitoring/security/tools/verification） |
+| **docs/** | ✅ | ✅ | ✅ 完整（architecture/api/developer/deploy/delivery/standards） |
+| **依赖管理** | requirements/ | ✅ | ✅ 使用 pyproject.toml + Poetry |
 
-**新增内容（相比废弃草稿）：**
+**待实现项（规划于 Epic 2-5）：**
 
-| 新增项 | 说明 | 优先级 |
-|-------|------|-------|
-| `.ruff.toml` | Ruff 代码检查配置 | 🟡 中 |
-| `CODE_OF_CONDUCT.md` | 行为准则 | 🟢 低 |
-| `CONTRIBUTING.md` | 贡献指南 | 🟢 低 |
-| `SECURITY.md` | 安全政策 | 🔴 高 |
-| `.vscode/` | VS Code 工作区配置 | 🟡 中 |
-| `tox.ini` | Tox 测试环境配置 | 🟢 低 |
-| `Makefile` | Make 命令快捷方式 | 🟡 中 |
+| 待实现项 | 说明 | 规划 Epic |
+|-------|------|----------|
+| `src/application/skills/` | 23 种工具 SOP 操作手册 | Epic 4-5 |
+| `src/application/commands/`/`queries/` | CQRS 命令/查询分离 | Epic 4-5 |
+| `src/infrastructure/agent_orch/agents/` | 7 角色 Agent 实现 | Epic 4 |
+| `src/infrastructure/agent_orch/graphs/` | 多种状态图（BLM/BEM/协作） | Epic 4 |
+| `src/infrastructure/mcp/` | MCP 外部生态接口 | V2+ |
+| `src/infrastructure/retrieval/` | 混合检索器 | Epic 3 |
 
 ---
 
@@ -3353,7 +3302,7 @@ buckets/
 
 ## 14. 质量属性设计
 
-### 15.1 性能设计
+### 14.1 性能设计
 
 | 指标 | 设计策略 |
 |------|---------|
@@ -3361,7 +3310,7 @@ buckets/
 | 路由决策延迟 P95<50ms | UDMR 三层决策本地化，缓存候选模型评分 |
 | 图遍历查询 P95<200ms | Neo4j 索引优化 + Parent-Child 层级索引 |
 
-### 15.2 可靠性设计
+### 14.2 可靠性设计
 
 | 策略 | 实现方式 |
 |------|---------|
@@ -3369,7 +3318,7 @@ buckets/
 | 幂等性 | 事件去重表（event_id + consumer_id 唯一约束） |
 | 故障恢复 | Checkpoint 快照 + Time-travel 能力 |
 
-### 15.3 安全性设计
+### 14.3 安全性设计
 
 | 层级 | 措施 |
 |------|------|
@@ -3380,7 +3329,7 @@ buckets/
 | 沙箱隔离 | Docker/gVisor 代码执行隔离 |
 | 提示注入防御 | ShieldCortex 检测（≥95% 准确率） |
 
-### 15.4 可观测性设计
+### 14.4 可观测性设计
 
 | 维度 | 指标 | 检测算法 |
 |------|------|---------|
@@ -3404,7 +3353,7 @@ buckets/
 | **合规审计失败** | 低 | 高 | 🟠 中 | WORM 存储 + 完整审计日志 + 合规检查清单 |
 | **成本失控** | 中 | 中 | 🟠 中 | UDMR 本地路由 + 三级熔断机制 |
 
-### 16.2 应急响应计划
+### 15.2 应急响应计划
 
 | 事件类型 | 响应时间 | 升级路径 |
 |---------|---------|---------|
@@ -3416,7 +3365,22 @@ buckets/
 
 ## 16. 产品范围与演进路线
 
-详见"roadmap.md"文档。
+产品演进路线规划详见 `_bmad-output/planning-artifacts/roadmap.md`。
+
+**当前 MVP 状态（Epic 0-1 已完成）：**
+- 六边形架构框架（domain/application/infrastructure/interfaces 四层）
+- 端口注册与依赖注入（~50 端口，composition_root 统一装配）
+- 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox）
+- 六层存储子系统（L0-L5，UnifiedStorageGateway 统一入口）
+- 统一异常层次（System/Business/External 三层，28 种异常类型）
+- 双引擎工作流骨架（Prefect 数据管道 + LangGraph Agent 推理，节点为 MVP 占位）
+- UDMR 三层路由框架（L1 合规/L2 复杂度/L3 路由执行）
+- 安全认证（JWT + RBAC + MFA + 密码策略）
+
+**待补充（Epic 2-5）：**
+- Epic 2-3: 文档解析、嵌入生成、混合检索、知识图谱
+- Epic 4: Agent 认知推理节点、多角色协作图、辩论机制
+- Epic 5: Skills 系统（23 种工具 SOP）、CQRS 分离
 
 ---
 
@@ -4006,9 +3970,12 @@ class HybridEntityExtractor:
         merged_entities = []
         for entity in rule_entities + llm_entities:
             if entity in merged_entities:
-                # 置信度融合
+                # 置信度融合：查找同源实体
                 existing = merged_entities[merged_entities.index(entity)]
-                existing.confidence = 0.6 * rule_entities.confidence + 0.4 * llm_entities.confidence
+                rule_entity = next((e for e in rule_entities if e.id == entity.id), None)
+                llm_entity = next((e for e in llm_entities if e.id == entity.id), None)
+                if rule_entity and llm_entity:
+                    existing.confidence = 0.6 * rule_entity.confidence + 0.4 * llm_entity.confidence
             else:
                 merged_entities.append(entity)
 
@@ -4450,7 +4417,7 @@ class AgentState(Enum):
     """Agent 生命周期状态 - 与 Checkpoint 机制协同"""
     INIT = "initialized"           # 初始化完成
     RUNNING = "running"             # 运行中（可中断）
-    CHECKPOINTED =checkpointed"     # 已保存（可恢复）
+    CHECKPOINTED = "checkpointed"   # 已保存（可恢复）
     WAITING = "waiting"             # 等待外部输入（如用户确认）
     COMPLETED = "completed"         # 正常结束
     FAILED = "failed"               # 异常终止
@@ -4700,16 +4667,16 @@ class SYSArbiter:
             }
 
         # 3. 计算综合得分
-        party_scores = {}
-        for party_id, party_scores in scores.items():
+        final_scores = {}
+        for party_id, dimension_scores in scores.items():
             total = sum(
                 score * self.DIMENSION_WEIGHTS[dim]
-                for dim, score in party_scores.items()
+                for dim, score in dimension_scores.items()
             )
-            party_scores[party_id] = total
+            final_scores[party_id] = total
 
         # 4. 置信度评估
-        sorted_scores = sorted(party_scores.values(), reverse=True)
+        sorted_scores = sorted(final_scores.values(), reverse=True)
         confidence = (sorted_scores[0] - sorted_scores[1]) / 5.0
 
         # 5. 决策生成
@@ -6010,8 +5977,8 @@ class RoutingDecidedEvent(DomainEvent):
 
 **不可变状态更新:**
 ```python
-from dataclasses import dataclass, replace
-from typing import Optional
+from dataclasses import dataclass, field, replace
+from typing import Optional, Any, Dict
 
 @dataclass(frozen=True)
 class AgentState:
@@ -6021,7 +5988,7 @@ class AgentState:
     status: str
     current_task: Optional[str] = None
     isolation_level: str = "L4"
-    blackboard: Dict[str, Any] = Field(default_factory=dict)
+    blackboard: Dict[str, Any] = field(default_factory=dict)
 
     def with_status(self, new_status: str) -> 'AgentState':
         """返回新状态对象，不修改原对象"""
@@ -6320,7 +6287,7 @@ class RetryManager:
     def with_custom_logic(
         max_attempts: int = 3,
         retryable_exceptions: tuple = (DatabaseError, ExternalServiceError),
-        on_retry: callable = None
+        on_retry: Optional[Callable] = None
     ):
         """自定义重试逻辑"""
         def decorator(func):
@@ -6347,6 +6314,16 @@ async def create_strategic_plan(data):
 ---
 
 ### 18.6 架构模式
+
+> **实现模式说明：** 本节的代码示例为设计模式规范（V1/V2 目标），
+> **与当前 MVP 实现有以下关键差异：**
+> - **接口定义方式：** 文档示例使用 `ABC` + `@abstractmethod`（名义类型），
+>   实际代码使用 `Protocol` + `@runtime_checkable`（结构类型）
+> - **仓储模式：** 文档示例使用 `add()/update()/remove()`，
+>   实际代码使用 `save()/delete()/list_all()`（`L2RdbPort[T]`）
+> - **DomainEvent：** 文档示例为 Pydantic `BaseModel`，
+>   实际代码为 `dataclass(frozen=True)` with `__init_subclass__` 自动注册
+> - **CQRS：** 当前未实现，应用层使用 services + use_cases + event_handlers 模式
 
 #### 18.6.1 CQRS 模式规范
 
@@ -7403,8 +7380,8 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 组件 | 版本 | 依赖兼容性 |
 |------|------|-----------|
 | Python | 3.11+ | 所有选定库支持 Python 3.11+ |
-| Pydantic | 2.4+ | 与 FastAPI 0.104+ 兼容 |
-| FastAPI | 0.104+ | 依赖 Pydantic 2.x，已验证兼容 |
+| Pydantic | 2.4+ | 与 FastAPI 0.111+ 兼容 |
+| FastAPI | 0.111+ | 依赖 Pydantic 2.x，已验证兼容 |
 | Prefect | 3.6.16+ | 依赖 Python 3.9+，兼容 |
 | LangGraph | 1.0.9+ | 依赖 Python 3.10+，兼容 |
 | PostgreSQL | 15+ | pgvector 扩展支持，兼容 |
@@ -7479,13 +7456,13 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 |--------|--------|---------|---------|
 | FR-DM-01 | 支持 17 种文档格式 | `DocumentService`, `UnstructuredAdapter` | `src/domain/services/document_service.py` |
 | FR-SR-01 | 混合检索 (Dense+Sparse+Graph) | `RAGService`, `Qdrant`, `Neo4j` | `src/domain/services/rag_service.py` |
-| FR-SR-08 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/models/citation.py` |
-| FR-AC-07 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orchestration/agents/` |
+| FR-SR-08 | 高保真溯源 (Bounding Box) | `Citation` 值对象，坐标存储 | `src/domain/value_objects/` (TODO) |
+| FR-AC-07 | 8 种 Agent 角色 | `CEO/CFO/CMO/CTO/COO/CHO/AUD/SYS` | `src/infrastructure/agent_orch/` (MVP: 仅 BasicAgent) |
 | FR-AC-11 | 红蓝对抗辩论 | `DebateEvaluator`, `增益率 + 重复率检测` | `src/application/services/debate_evaluator.py` |
-| FR-SP-05 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orchestration/graphs/` |
+| FR-SP-05 | BLM 六阶段状态机 | `sp_blm_graph.py` | `src/infrastructure/agent_orch/graphs/` (TODO) |
 | FR-SP-07 | Checkpoint 双模式恢复 | `CheckpointRecovery`, `Replay/Override` | `src/application/services/checkpoint_recovery.py` |
 | FR-CP-05 | UDMR 本地优先 80% | `UDMRService`, 三层决策 | `src/domain/services/routing_service.py` |
-| FR-SA-01 | 7 年 WORM 存储 | `MinIO`, Object Lock COMPLIANCE | `src/infrastructure/external_services/file_storage/minio_adapter.py` |
+| FR-SA-01 | 7 年 WORM 存储 | `MinIO`, Object Lock COMPLIANCE | `src/infrastructure/storage/minio/` |
 
 #### 19.2.2 PRD 非功能需求覆盖
 
@@ -7719,17 +7696,23 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 #### 19.7.1 整体状态
 
-**架构状态：** ✅ **READY FOR IMPLEMENTATION**
+**架构状态：** ✅ **MVP 核心框架已实现** — ⚠️ **部分功能待补充**
 
-**信心级别：** **HIGH** (基于以下验证结果)
+> **说明:** 本文档描述的架构设计已完成 MVP 骨架实现（事件系统、存储六层、端口注册），
+> 但 Agent 推理节点、Workflow 任务、Skills 系统等仍为占位实现或规划阶段。
+> 详见各子设计文档的实现状态说明。
 
-| 验证维度 | 得分 | 说明 |
-|---------|------|------|
-| 需求覆盖度 | 100% | 122 FR + 40 NFR 全部覆盖（P0-25/P1-13/P2-2） |
-| 决策完整性 | 100% | 30 项关键决策完整记录 |
-| 模式完整性 | 100% | 9 类实现模式完整定义 |
-| 结构完整性 | 100% | 项目结构 100% 完整 |
-| 一致性验证 | 100% | 所有决策兼容，无冲突 |
+| 验证维度 | 设计完成度 | 实现完成度 | 说明 |
+|---------|-----------|-----------|------|
+| 六边形架构 | 100% | 100% | domain/application/infrastructure/interfaces 四层已实现 |
+| 端口注册 | 100% | 100% | ~50 端口在 composition_root 统一装配 |
+| 事件总线 | 100% | 100% | 双通道（Redis + RabbitMQ）+ Outbox 已实现 |
+| 存储子系统 | 100% | 100% | L0-L5 六层 + UnifiedStorageGateway 已实现 |
+| 异常处理 | 100% | 100% | 三层异常层次 + 28 种异常类型已实现 |
+| Agent 推理 | 100% | 20% | ⚠️ LangGraph 骨架已实现，节点为 MVP 占位（返回硬编码字符串） |
+| Workflow | 100% | 30% | ⚠️ Prefect 骨架已实现，任务为 Mock 数据 |
+| Skills 系统 | 100% | 0% | ⚠️ 设计规划完成，未实现（Epic 5） |
+| CQRS | 100% | 0% | ⚠️ 设计规划完成，未实现，应用层使用 services+use_cases 模式 |
 
 #### 19.7.2 关键优势
 
@@ -7904,11 +7887,12 @@ pytest tests/unit/domain/
 
 | 项目 | 数值 |
 |------|------|
-| **总行数** | 约 17,000 行 |
+| **总行数** | 约 7,900 行 |
+| **子设计文档** | 7 份（event-bus/storage/transaction/port-management/exception/workflow-agent/auto-invocation） |
 | **核心章节** | 27 章 |
 | **附录章节** | 5 章（H-L） |
 | **总章节数** | 32 章 |
-| **版本** | 7.0.0 |
+| **版本** | 8.3.1 |
 | **最后更新** | 2026-04-08 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**
