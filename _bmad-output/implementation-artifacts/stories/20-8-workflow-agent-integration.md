@@ -690,6 +690,9 @@ src/
 - [x] [20-8-P1-1][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
 - [x] [20-8-P1-2][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
 - [x] [20-8-P1-3][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
+- [x] [20-8-P0-4][Review][Patch] AC-2/AC-3 缺乏 Gherkin 场景覆盖 — 新增场景5（对称性验证）和场景6（通道注册），补充 Subtask 4.6/4.7
+- [x] [20-8-P0-5][Review][Patch] DI 容器测试可行性未明确 — Subtask 4.1 添加 mock 策略说明，AC-4 改为"测试专用 DI 容器"
+- [x] [20-8-P2-5][Review][Patch] _env_int 学习经验描述不够精确 — 标注 PrefectConfig 尚未统一
 
 #### 已推迟 Defer
 
@@ -708,10 +711,11 @@ src/
 
 ---
 
-**故事版本:** v1.3.0
+**故事版本:** v1.4.0
 **创建日期:** 2026-05-23
 **最后更新:** 2026-05-23
 **更新说明:**
+- v1.4.0: R4 Gherkin 覆盖审查 — 补充 AC-2/AC-3 Gherkin 场景5/6（P0）、补充 Subtask 4.6/4.7 步骤函数（P0）、明确 DI 容器 mock 策略（P0）、更新 _env_int 学习经验描述（P2）
 - v1.3.0: R3 模板合规性审查 — 新增文档审查修复章节（P0）、新增代码审查发现章节（P0）、Task 4 补充红阶段 Subtask 4.0（P1）、修正 test_workflow_events.py 文件状态为"待修改"（P1）、修正 Subtask 1.1 描述为"修改"（P1）
 - v1.2.0: R2 正确性审查 — 修正 AC-1 验证标准错误引用 self._runs（P0-1）、标注 Protocol 契约与防御性 None 检查（P0-2）、新增设计文档偏离声明与更新提醒（P0-3）、修正 event_type 字段位置到 workflow_events.py 风格（P1-4）、新增 Subtask 6.5 设计文档同步检查项
 - v1.1.0: R1 正确性审查 — 补充 __init__.py/event_channels.yaml 到文件清单，修正端口注册位置，补充 __post_init__ 模式，修正 AgentDecided 代码片段字段顺序
