@@ -14,7 +14,7 @@ completedAt: '2026-02-26'
 
 # 企业战略规划管理系统架构设计文档
 
-**版本：** 8.3.1
+**版本：** 8.3.2（审查修订版）
 **状态：** 附录独立成章作为主架构文档补充，编号保持不变
 **评审日期：** 2026-04-08
 **审核依据：** 原来架构文档过于庞大，agimtech 决定将附录单编为[**附录**](arch-appendix.md)
@@ -1697,18 +1697,53 @@ class WormArchiver:
 
 ### 10.2 事件 Schema 标准
 
+> **实现说明:** 实际代码位于 `src/domain/events/base.py`，使用 `@dataclass(frozen=True)` 而非 Pydantic `BaseModel`，
+> 以符合领域层零外部依赖的六边形架构原则。Pydantic 仅在应用层/基础设施层边界用于序列化验证。
+
 ```python
-class DomainEvent(BaseModel):
-    event_id: UUID
-    event_type: str
-    event_version: str = "1.0"
-    timestamp: datetime
-    aggregate_id: UUID
-    aggregate_type: str
-    aggregate_version: int
-    payload: Dict[str, Any]
-    metadata: EventMetadata
-    source: str
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import uuid
+from typing import Any, ClassVar
+
+@dataclass(frozen=True)
+class DomainEvent:
+    """领域事件基类 - 所有领域事件的抽象基类
+
+    AC-1 标准字段:
+        event_id: 本次事件实例的唯一标识符 (UUID)
+        event_type: 类型判别字符串（如 "DocumentProcessed")
+        timestamp: 事件发生时间（UTC）
+        source: 产生此事件的系统或模块来源
+        schema_version: 此事件模式的版本（如 "1.0.0")
+        aggregate_id: 产生此事件的聚合 ID
+        aggregate_type: 聚合类型名称（如 "Document")
+        version: 此事件的单调递增版本号
+        payload: 事件特定数据字典
+        correlation_id: 关联事件 ID（追踪链条）
+        causation_id: 因果事件 ID（触发原因）
+        metadata: 扩展元数据字典
+
+    实现特性:
+        - frozen=True: 事件不可变
+        - __init_subclass__: 自动注册子类到 _registry
+        - to_dict()/from_dict(): 序列化/反序列化方法
+    """
+    event_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source: str = ""
+    schema_version: str = "1.0.0"
+    aggregate_id: uuid.UUID | None = None
+    aggregate_type: str = ""
+    version: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
+    correlation_id: uuid.UUID | None = None
+    causation_id: uuid.UUID | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    # 事件类型注册表（多态反序列化）
+    _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
 ```
 
 ### 10.3 事务发件箱 (Outbox) 实现
@@ -3369,8 +3404,8 @@ buckets/
 
 **当前 MVP 状态（Epic 0-1 已完成）：**
 - 六边形架构框架（domain/application/infrastructure/interfaces 四层）
-- 端口注册与依赖注入（~50 端口，composition_root 统一装配）
-- 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox）
+- 端口注册与依赖注入（~80 端口，composition_root 统一装配）
+- 双通道事件总线（Redis realtime + RabbitMQ reliable + Outbox，27 个事件映射）
 - 六层存储子系统（L0-L5，UnifiedStorageGateway 统一入口）
 - 统一异常层次（System/Business/External 三层，28 种异常类型）
 - 双引擎工作流骨架（Prefect 数据管道 + LangGraph Agent 推理，节点为 MVP 占位）
@@ -3385,6 +3420,20 @@ buckets/
 ---
 
 ## 17. 核心领域架构设计
+
+> **⚠️ 本章实现状态说明：**
+> 本章为设计参考文档，描述完整的领域架构愿景。各节实现状态如下：
+>
+> | 章节 | 设计内容 | 实现状态 | 说明 |
+> |------|---------|---------|------|
+> | §17.1 数据处理 | 17种格式解析、OCR、DQI、混合检索、知识图谱 | ❌ 未实现 | 规划于 Epic 2-3 |
+> | §17.2 工具箱 | 23种战略工具、沙箱执行、Schema 强制 | ❌ 未实现 | 规划于 Epic 5 |
+> | §17.3 Agent 架构 | 7+1角色、EIP、SYS裁决、辩论、SAP协议 | 🟡 骨架实现 | LangGraph引擎已注册，节点为MVP占位（返回硬编码字符串） |
+> | §17.4 战略规划 | BLM/BEM状态机、Checkpoint恢复、Time-Travel | ❌ 未实现 | 规划于 Epic 4 |
+>
+> **已完整实现的核心模块：** 六边形架构框架（§1-§3）、事件总线（§10）、存储子系统（§11）、
+> 端口注册与DI（§8）、统一异常体系、事务子系统（Outbox/Saga/UoW）。
+> 详见 §19.7 架构就绪评估中的实现完成度矩阵。
 
 [重要说明]本章设计仅供开发参考，执行[EPIC]-[STORY]-[编码]等开发任务时按需调整并及时更新本文档即可！
 
@@ -4907,7 +4956,7 @@ class SAPMessage(BaseModel):
     """Agent 间通信消息（SAP 协议）"""
     message_id: UUID = Field(default_factory=uuid4)
     conversation_id: UUID  # 会话 ID，关联同一对话的消息
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # 发送者和接收者
     sender_id: str  # 发送 Agent ID
@@ -5509,7 +5558,7 @@ class PlanCreated(BaseModel):
     event_id: str = Field(default_factory=generate_ulid)
     event_type: str = "plan.created"
     event_version: str = "1.0"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     aggregate_id: str  # plan_{uuid}
     aggregate_type: str = "StrategicPlan"
     aggregate_version: int = 1
@@ -5914,63 +5963,67 @@ parsed = datetime.fromisoformat('2026-02-25T10:30:00Z')
 
 #### 18.4.1 事件结构标准
 
-**领域事件基类:**
+**领域事件基类（与 §10.2 一致，实际实现使用 `@dataclass(frozen=True)`）:**
 ```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-from typing import Dict, Any, Optional
-from uuid import UUID
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import uuid
+from typing import Any, ClassVar
 
-def generate_ulid() -> str:
-    """生成 ULID 格式 ID"""
-    # 实现略
-    pass
+@dataclass(frozen=True)
+class DomainEvent:
+    """领域事件基类 - 零外部依赖（无 Pydantic），详见 §10.2"""
+    event_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    event_type: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source: str = ""
+    schema_version: str = "1.0.0"
+    aggregate_id: uuid.UUID | None = None
+    aggregate_type: str = ""
+    version: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
+    correlation_id: uuid.UUID | None = None
+    causation_id: uuid.UUID | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-class EventMetadata(BaseModel):
-    """事件元数据"""
-    user_id: Optional[str] = None
-    request_id: Optional[str] = None
-    correlation_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    extra: Dict[str, Any] = Field(default_factory=dict)
+    _registry: ClassVar[dict[str, type[DomainEvent]]] = {}
 
-class DomainEvent(BaseModel):
-    """领域事件基类"""
-    event_id: str = Field(default_factory=generate_ulid)
-    event_type: str  # snake_case: "plan.created"
-    event_version: str = "1.0"  # SemVer
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    aggregate_id: str  # 聚合根 ID: "plan_{uuid}"
-    aggregate_type: str  # 聚合根类型： "StrategicPlan"
-    aggregate_version: int  # 聚合根版本号
-    payload: Dict[str, Any]  # 事件数据
-    metadata: EventMetadata = Field(default_factory=EventMetadata)
-    source: str  # 事件来源服务名： "sisys-planning-service"
+    def to_dict(self) -> dict[str, Any]:
+        """序列化事件为字典"""
+        ...
 
-    class Config:
-        frozen = True  # 事件不可变
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
+        """使用事件类型注册表从字典反序列化事件"""
+        ...
 ```
+
+> **注意:** 文档 §18.6 架构模式中部分旧示例仍使用 Pydantic `BaseModel` 风格定义，
+> 实际代码中 DomainEvent 统一使用 `@dataclass(frozen=True)`，
+> Pydantic 仅在应用层/基础设施层边界使用。
 
 **具体领域事件示例:**
 ```python
+from dataclasses import dataclass, field
+import uuid
+from typing import Any
+
+@dataclass(frozen=True)
 class PlanCreatedEvent(DomainEvent):
     """战略规划创建事件"""
-    event_type: str = "plan.created"
-    payload: Dict[str, Any] = {
-        "plan_type": "SP",
-        "creator_id": "agent_ceo",
-        "initial_status": "draft"
-    }
+    event_type: str = field(default="PlanCreated", init=False)
+    plan_type: str = ""
+    creator_id: str = ""
+    initial_status: str = "draft"
 
+@dataclass(frozen=True)
 class RoutingDecidedEvent(DomainEvent):
     """路由决策完成事件"""
-    event_type: str = "routing.decided"
-    payload: Dict[str, Any] = {
-        "task_id": "task_01hx8z9q",
-        "selected_model": "ollama/qwen2.5-7b",
-        "estimated_cost": 0.001,
-        "routing_latency_ms": 45
-    }
+    event_type: str = field(default="RoutingDecided", init=False)
+    task_id: uuid.UUID | None = None
+    selected_model: str = ""
+    estimated_cost: float = 0.0
+    routing_latency_ms: int = 0
 ```
 
 #### 18.4.2 状态管理模式
@@ -6040,132 +6093,99 @@ class ListPlansByStatusQuery(BaseModel):
 
 #### 18.5.1 错误处理模式
 
-**异常层次结构:**
+**异常层次结构（实际实现，与 `src/domain/exceptions/` 一致）:**
 ```
-BaseException
-├── DomainException (领域层，继承 Exception)
+BaseException (抽象根类，src/domain/exceptions/base_exceptions.py)
+├── SystemException (系统级异常)
+│   ├── ConfigurationError (配置错误)
+│   ├── NetworkError (网络错误)
+│   ├── StorageError (存储错误)
+│   └── MessageBusError (消息总线错误)
+├── BusinessException (业务级异常)
 │   ├── ValidationError (验证失败)
 │   ├── NotFoundError (实体未找到)
-│   ├── AuthorizationError (授权失败)
-│   ├── BusinessRuleError (业务规则违反)
-│   └── StateTransitionError (状态转换错误)
-└── InfrastructureException (基础设施层)
-    ├── DatabaseError (数据库错误)
-    ├── ExternalServiceError (外部服务错误)
-    ├── MessagingError (消息队列错误)
-    └── ConfigurationError (配置错误)
+│   ├── ConflictError (冲突错误)
+│   ├── PermissionDeniedError (权限拒绝)
+│   ├── AuthenticationError (认证失败)
+│   ├── InvalidStateError (无效状态)
+│   ├── InvalidStateTransitionError (无效状态转换)
+│   ├── BusinessRuleViolationError (业务规则违反)
+│   ├── AuditError (审计错误)
+│   ├── PasswordValidationError (密码验证失败)
+│   ├── ComplianceLockError (合规锁定错误)
+│   └── RoleAlreadyExistsError / RoleNotFoundError / ... (角色管理异常)
+└── ExternalException (外部服务异常)
+    ├── ThirdPartyError (第三方服务错误)
+    ├── TimeoutError (超时错误)
+    ├── ServiceUnavailableError (服务不可用)
+    └── UnknownError (未知外部错误)
 ```
+
+> **与旧版文档的差异:** 旧版 §18.5.1 使用 `DomainException` / `InfrastructureException` 二层结构，
+> 实际已重构为 `SystemException` / `BusinessException` / `ExternalException` 三层体系，
+> 详见 `docs/architecture/sisys-uni-exception-design.md`。
 
 **异常类定义:**
 ```python
-# src/domain/exceptions/domain_exceptions.py
+# src/domain/exceptions/base_exceptions.py
+from typing import Any
 
-class DomainException(Exception):
-    """领域层基础异常"""
-    def __init__(
-        self,
-        message: str,
-        code: str = "DOMAIN_ERROR",
-        details: Optional[Dict[str, Any]] = None
-    ):
+class BaseException(Exception):
+    """异常层次结构根类（非 Python 内置 BaseException）"""
+    def __init__(self, message: str, code: str = "", details: dict[str, Any] | None = None):
         self.message = message
         self.code = code
         self.details = details or {}
         super().__init__(self.message)
 
-class ValidationError(DomainException):
-    """验证失败异常"""
-    def __init__(self, message: str, field: Optional[str] = None, invalid_value: Any = None):
-        details = {}
-        if field:
-            details["field"] = field
-        if invalid_value is not None:
-            details["invalid_value"] = invalid_value
-        super().__init__(message, code="VALIDATION_ERROR", details=details)
+class SystemException(BaseException):
+    """系统级异常 - 基础设施故障（配置/网络/存储/消息）"""
+    pass
 
-class NotFoundError(DomainException):
-    """实体未找到异常"""
-    def __init__(self, entity_type: str, entity_id: str):
-        message = f"{entity_type} with id {entity_id} not found"
-        details = {"entity_type": entity_type, "entity_id": entity_id}
-        super().__init__(message, code="NOT_FOUND", details=details)
+class BusinessException(BaseException):
+    """业务级异常 - 业务规则违反（验证/权限/状态）"""
+    pass
 
-class AuthorizationError(DomainException):
-    """授权失败异常"""
-    def __init__(self, action: str, resource: str, user_id: str):
-        message = f"User {user_id} is not authorized to {action} {resource}"
-        details = {"action": action, "resource": resource, "user_id": user_id}
-        super().__init__(message, code="UNAUTHORIZED", details=details)
+class ExternalException(BaseException):
+    """外部服务异常 - 第三方服务不可用"""
+    pass
+```
 ```
 
 **全局异常处理 (FastAPI):**
 ```python
-# src/interfaces/api/middleware/error_middleware.py
+# src/interfaces/api/middleware/exception_handlers.py
+# 实际实现使用 EXCEPTION_HTTP_MAP 映射表，详见 sisys-uni-exception-design.md
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from src.domain.exceptions import DomainException, ValidationError, NotFoundError, AuthorizationError
+from src.domain.exceptions import (
+    BaseException,
+    SystemException,
+    BusinessException,
+    ExternalException,
+    ValidationError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 
-async def domain_exception_handler(request: Request, exc: DomainException):
-    """领域异常统一处理"""
+async def base_exception_handler(request: Request, exc: BaseException):
+    """统一异常处理 - 基于 EXCEPTION_HTTP_MAP 自动映射 HTTP 状态码"""
+    status_code = EXCEPTION_HTTP_MAP.get(type(exc), 500)
     return JSONResponse(
-        status_code=400,
+        status_code=status_code,
         content={
             "error": {
-                "code": exc.code,
+                "code": exc.code or type(exc).__name__,
                 "message": exc.message,
                 "details": exc.details,
-                "request_id": request.state.request_id
+                "request_id": getattr(request.state, "request_id", None)
             }
         },
-        headers={"X-Request-ID": request.state.request_id}
-    )
-
-async def validation_exception_handler(request: Request, exc: ValidationError):
-    """验证异常处理"""
-    return JSONResponse(
-        status_code=422,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "details": [exc.details] if exc.details else []
-            }
-        }
-    )
-
-async def not_found_exception_handler(request: Request, exc: NotFoundError):
-    """未找到异常处理"""
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "details": exc.details
-            }
-        }
-    )
-
-async def authorization_exception_handler(request: Request, exc: AuthorizationError):
-    """授权异常处理"""
-    return JSONResponse(
-        status_code=403,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "details": exc.details
-            }
-        }
+        headers={"X-Request-ID": getattr(request.state, "request_id", "")}
     )
 
 # 注册异常处理器
 def register_exception_handlers(app: FastAPI):
-    app.add_exception_handler(DomainException, domain_exception_handler)
-    app.add_exception_handler(ValidationError, validation_exception_handler)
-    app.add_exception_handler(NotFoundError, not_found_exception_handler)
-    app.add_exception_handler(AuthorizationError, authorization_exception_handler)
+    app.add_exception_handler(BaseException, base_exception_handler)
 ```
 
 #### 18.5.2 日志记录模式
@@ -6315,17 +6335,27 @@ async def create_strategic_plan(data):
 
 ### 18.6 架构模式
 
-> **实现模式说明：** 本节的代码示例为设计模式规范（V1/V2 目标），
+> **⚠️ 实现模式说明：** 本节的代码示例为设计模式规范（V1/V2 目标），
 > **与当前 MVP 实现有以下关键差异：**
-> - **接口定义方式：** 文档示例使用 `ABC` + `@abstractmethod`（名义类型），
->   实际代码使用 `Protocol` + `@runtime_checkable`（结构类型）
-> - **仓储模式：** 文档示例使用 `add()/update()/remove()`，
->   实际代码使用 `save()/delete()/list_all()`（`L2RdbPort[T]`）
-> - **DomainEvent：** 文档示例为 Pydantic `BaseModel`，
->   实际代码为 `dataclass(frozen=True)` with `__init_subclass__` 自动注册
-> - **CQRS：** 当前未实现，应用层使用 services + use_cases + event_handlers 模式
+>
+> | 方面 | 文档示例（设计规范） | 实际代码（MVP 实现） | 文件位置 |
+> |------|---------------------|---------------------|---------|
+> | **接口定义** | `ABC` + `@abstractmethod` | `Protocol` + `@runtime_checkable` | `src/domain/ports/*.py` |
+> | **仓储基类** | `IStrategicPlanRepository` | `L2RdbPort[T]` 泛型基类 | `src/domain/ports/l2_rdb.py` |
+> | **仓储方法** | `add()/update()/remove()` | `save()/delete()/list_all()` | 同上 |
+> | **DomainEvent** | Pydantic `BaseModel` + `Config.frozen` | `@dataclass(frozen=True)` + `__init_subclass__` 注册 | `src/domain/events/base.py` |
+> | **异常体系** | `DomainException/InfrastructureException` | `SystemException/BusinessException/ExternalException` | `src/domain/exceptions/__init__.py` |
+> | **依赖注入** | `dependency_injector` 库 | 自研 `PortRegistry` + `Resolver` | `src/domain/ports/registry.py`, `resolver.py` |
+> | **CQRS** | `commands/queries/handlers` 分离 | 未实现，用 `services+use_cases+event_handlers` | — |
+> | **Settings** | `pydantic.BaseSettings` | `pydantic_settings.BaseSettings` | Pydantic v2 变更 |
+>
+> **阅读指南：** 本节示例展示"目标架构"的代码风格，用于未来 V1/V2 开发参考。
+> 当前 MVP 实现遵循 §10、§18.8.1 和各子设计文档中的实际代码模式。
 
 #### 18.6.1 CQRS 模式规范
+
+> **状态：⚠️ 设计完成，待实现（V1）**
+> 当前应用层使用 `services/` + `use_cases/` + `event_handlers/` 模式，CQRS 分离规划于 Epic 5。
 
 **命令命名:**
 ```python
@@ -6925,54 +6955,75 @@ pytest --cov=src --cov-report=xml
 
 #### 18.8.1 依赖注入规范
 
-**使用 dependency-injector:**
+> **实现说明:** 实际代码使用自研 `PortRegistry` + `Resolver` 模式（`src/domain/ports/registry.py`、`src/domain/ports/resolver.py`），
+> 通过 `composition_root.py` 统一注册 ~80 个端口。不使用第三方 DI 框架。
+
+**端口注册（composition_root.py）:**
 ```python
-from dependency_injector import containers, providers
-from src.infrastructure.database import Database
-from src.infrastructure.repositories.plan_repository import StrategicPlanRepositoryImpl
+from src.domain.ports.registry import PortRegistry, PortSpec, register_port
+from src.domain.ports.resolver import resolve, Resolver
+from src.domain.ports.registry import Lifetime
 
-class Container(containers.DeclarativeContainer):
-    """依赖注入容器"""
+# 注册端口（支持三种 impl 形式：直接类、工厂 lambda、模块路径字符串）
+register_port(
+    name="redis_adapter",
+    version="v1.0.0",
+    interface=L1CachePort,
+    impl=RedisAdapter,                          # 直接类
+    lifetime=Lifetime.SINGLETON,
+)
 
-    # 配置
-    config = providers.Configuration()
+register_port(
+    name="event_publisher",
+    version="v1.0.0",
+    interface=EventPublisher,
+    impl="src.infrastructure.messaging.dual_channel_event_bus.DualChannelEventBus",  # 延迟加载
+    lifetime=Lifetime.SINGLETON,
+)
 
-    # 单例
-    database = providers.Singleton(
-        Database,
-        url=config.database.url,
-        pool_size=config.database.pool_size
-    )
+register_port(
+    name="session_factory",
+    impl=lambda: create_async_session(engine),  # 工厂 lambda
+    lifetime=Lifetime.SCOPED,
+)
+```
 
-    # 工厂
-    plan_repository = providers.Factory(
-        StrategicPlanRepositoryImpl,
-        db=database
-    )
+**端口解析与自动注入:**
+```python
+from src.domain.ports.resolver import resolve
 
-    # 每个请求
-    plan_service = providers.Callable(
-        PlanningService,
-        plan_repository=plan_repository
-    )
+# 按名称解析
+publisher = resolve("event_publisher")
 
-# FastAPI 集成
-container = Container()
+# 按接口类型解析
+publisher = resolve_by_interface(EventPublisher)
 
+# 自动注入：Resolver 通过 inspect.signature 解析构造函数参数，
+# 先按参数名匹配端口，再按类型注解匹配接口，最后使用默认值
+```
+
+**三种生命周期:**
+| 生命周期 | 行为 | 典型场景 |
+|---------|------|---------|
+| `SINGLETON` | 全局唯一实例，缓存于 `_instances` | 连接管理器、事件总线 |
+| `SCOPED` | 作用域内唯一，缓存于 `_scoped_context` | 数据库会话、UnitOfWork |
+| `TRANSIENT` | 每次解析创建新实例 | 无状态服务、Handler |
+
+**FastAPI 集成:**
+```python
+# 通过 Resolver 自动注入到 FastAPI 路由
 @app.get("/plans/{plan_id}")
-async def get_plan(
-    plan_id: UUID,
-    service: PlanningService = Depends(container.plan_service)
-):
-    result = await service.get_plan(plan_id)
-    return result
+async def get_plan(plan_id: UUID):
+    service = resolve("planning_service")  # 应用层服务
+    return await service.get_plan(plan_id)
 ```
 
 #### 18.8.2 配置管理规范
 
 **使用 Pydantic Settings:**
 ```python
-from pydantic import BaseSettings, SecretStr, Field
+from pydantic_settings import BaseSettings
+from pydantic import SecretStr, Field
 from typing import List, Optional
 
 class Settings(BaseSettings):
@@ -7365,7 +7416,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 | 决策组合 | 兼容性 | 验证说明 |
 |---------|--------|---------|
-| 六边形架构 + CQRS | ✅ 兼容 | CQRS 是六边形架构的自然延伸，命令/查询分离通过应用层编排 |
+| 六边形架构 + CQRS | ✅ 设计兼容 ⚠️ 未实现 | CQRS 是六边形架构的自然延伸，当前未实现，应用层使用 services+use_cases+event_handlers |
 | 六边形架构 + 事件驱动 | ✅ 兼容 | 领域事件通过仓储接口发布，基础设施层实现事件总线 |
 | Prefect + LangGraph | ✅ 兼容 | 编排服务协调两者，Prefect 负责数据管道，LangGraph 负责 Agent 状态机 |
 | Redis + RabbitMQ | ✅ 兼容 | Redis 用于实时缓存/发布订阅，RabbitMQ 用于持久化事件 +Outbox 保证可靠性 |
@@ -7423,7 +7474,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 架构决策 | 结构支撑 | 验证结果 |
 |---------|---------|---------|
 | 六边形架构 | `src/domain/`, `src/application/`, `src/infrastructure/`, `src/interfaces/` | ✅ 对齐 |
-| CQRS | `commands/`, `queries/`, `handlers/` 分离 | ✅ 对齐 |
+| CQRS | `commands/`, `queries/`, `handlers/` 分离 | ⚠️ 设计完成，待实现 |
 | 事件驱动 | `events/`, `messaging/`, `outbox/` | ✅ 对齐 |
 | 六层存储 | `persistence/repositories/`, `vector_store/`, `cache/`, `graph_store/` | ✅ 对齐 |
 | UDMR/EIP | `routing_service.py`, `isolation_service.py`, `routing_log/`, `isolation_log/` | ✅ 对齐 |
@@ -7611,27 +7662,40 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 
 ### 19.4 差距分析结果
 
-#### 19.4.1 关键差距（阻塞实现）
+#### 19.4.1 设计-实现差距（关键差距）
 
-**无关键差距** ✅
+> **⚠️ 实际情况：** MVP 骨架已完成（六边形框架、事件总线、存储六层、端口注册等），
+> 但业务模块实现率约 20-30%。以下差距需在 Epic 2-5 补齐。
 
-所有 PRD 功能需求和非功能需求都有架构支撑，所有核心决策都已记录，项目结构完整。
+| 编号 | 差距描述 | 设计章节 | 实现状态 | 补齐计划 |
+|------|---------|---------|---------|---------|
+| **GAP-CRITICAL-01** | EIP 弹性隔离管理器未实现 | §17.3.3 | ❌ 仅事件定义 | Epic 4 |
+| **GAP-CRITICAL-02** | 修正分级判定器未实现 | §7 | ❌ 仅事件定义 | Epic 4 |
+| **GAP-CRITICAL-03** | SYS AGENT 裁决器未实现 | §17.3.4 | ❌ 无代码 | Epic 4 |
+| **GAP-CRITICAL-04** | CUSUM 漂移检测未实现 | §17.3.8 | ❌ 无代码 | Epic 5 |
+| **GAP-CRITICAL-05** | RAG 混合检索服务未实现 | §17.1.5 | ❌ 仅 Qdrant 存储层 | Epic 3 |
+| **GAP-CRITICAL-06** | BLM/BEM 状态机未实现 | §17.4 | ❌ 无 Graph | Epic 4 |
+| **GAP-CRITICAL-07** | 23 种战略工具未实现 | §17.2 | ❌ 仅实体定义 | Epic 5 |
+| **GAP-CRITICAL-08** | Skills SOP 目录未创建 | §17.2 | ❌ 无目录 | Epic 5 |
+| **GAP-CRITICAL-09** | 辩论质量评估器未实现 | §7.3 | ❌ 无代码 | Epic 4 |
 
-#### 19.4.2 重要差距（建议补充）
+#### 19.4.2 设计完整性差距（次要）
 
 | 编号 | 差距描述 | 影响 | 建议优先级 |
 |------|---------|------|-----------|
-| GAP-01 | 缺少详细的数据库 ER 图 | 开发时可能需要临时设计表结构 | 🟡 中 - 可在详细设计阶段补充 |
+| GAP-01 | 缺少详细数据库 ER 图 | 开发时可能需要临时设计表结构 | 🟡 中 - 可在详细设计阶段补充 |
 | GAP-02 | 缺少 API 详细 Schema 定义 | 前后端对接时可能需要额外沟通 | 🟡 中 - 可使用 OpenAPI 自动生成 |
 | GAP-03 | 缺少部署架构图 | 运维团队可能需要额外设计 | 🟢 低 - 可在部署阶段补充 |
-
-#### 19.4.3 次要差距（可选优化）
-
-| 编号 | 差距描述 | 影响 | 建议优先级 |
-|------|---------|------|-----------|
 | GAP-04 | 缺少性能基准测试计划 | 性能验收缺乏基线 | 🟢 低 - 可在测试阶段补充 |
-| GAP-05 | 缺少灾难恢复计划 | 极端故障恢复指导不足 | 🟢 低 - 可在运维阶段补充 |
-| GAP-06 | 缺少容量规划指南 | 大规模部署时可能需要额外设计 | 🟢 低 - 可在扩容阶段补充 |
+
+#### 19.4.3 代码-文档不一致（需同步）
+
+| 编号 | 不一致描述 | 文档位置 | 实际代码位置 |
+|------|---------|---------|---------|
+| SYNC-01 | 端口数量标注 ~50 | §16 | 实际注册 ~80 个 |
+| SYNC-02 | 事件映射标注 19+ | §10.3 | 实际映射 27 个 |
+| SYNC-03 | composition_root 引用的 metrics_adapter.py | §18.8.1 | 实际文件名为 metrics_port_impl.py |
+| SYNC-04 | DomainEvent 定义为 BaseModel | §10.2, §18.4.1 | 实际为 frozen dataclass |
 
 ---
 
@@ -7705,7 +7769,7 @@ _本章执行全面的架构验证，确保所有 PRD 需求都有架构支撑�
 | 验证维度 | 设计完成度 | 实现完成度 | 说明 |
 |---------|-----------|-----------|------|
 | 六边形架构 | 100% | 100% | domain/application/infrastructure/interfaces 四层已实现 |
-| 端口注册 | 100% | 100% | ~50 端口在 composition_root 统一装配 |
+| 端口注册 | 100% | 100% | ~80 端口在 composition_root 统一装配（51 Protocol 定义 + 79 注册） |
 | 事件总线 | 100% | 100% | 双通道（Redis + RabbitMQ）+ Outbox 已实现 |
 | 存储子系统 | 100% | 100% | L0-L5 六层 + UnifiedStorageGateway 已实现 |
 | 异常处理 | 100% | 100% | 三层异常层次 + 28 种异常类型已实现 |
@@ -7892,7 +7956,7 @@ pytest tests/unit/domain/
 | **核心章节** | 27 章 |
 | **附录章节** | 5 章（H-L） |
 | **总章节数** | 32 章 |
-| **版本** | 8.3.1 |
-| **最后更新** | 2026-04-08 |
+| **版本** | 8.3.2（审查修订版 - 正确性/一致性/可行性校验） |
+| **最后更新** | 2026-05-23 |
 
 **所有附录 A~L 单独成章节，编号保持不变，作为主架构文档的详细展开。**
