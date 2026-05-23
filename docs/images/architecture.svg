@@ -34,17 +34,14 @@
     <rect x="0" y="0" width="800" height="90" rx="12" fill="#faf7f2" stroke="#eadcc8" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="28" font-size="14" font-weight="600" fill="#8b5e3c">🎯 Interface Layer</text>
 
-    <rect x="120" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
-    <text x="205" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🖥️ CLI · Typer</text>
+    <rect x="210" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
+    <text x="295" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🖥️ CLI · Typer</text>
 
-    <rect x="315" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
-    <text x="400" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🌐 REST API · FastAPI</text>
-
-    <rect x="510" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
-    <text x="595" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">📋 Skills · L1/L2/L3</text>
+    <rect x="420" y="40" width="170" height="40" rx="8" fill="#ffffff" stroke="#d4c3b3" stroke-width="1.5"/>
+    <text x="505" y="65" text-anchor="middle" font-size="13" fill="#6e4f33">🌐 REST API · FastAPI</text>
   </g>
 
-  <!-- Arrow 2 (Shifted down +2) -->
+  <!-- Arrow 2 -->
   <line x1="450" y1="287" x2="450" y2="312" stroke="#94a3b8" stroke-width="2"/>
   <polygon points="445,312 455,312 450,319" fill="#94a3b8"/>
 
@@ -53,17 +50,20 @@
     <rect x="0" y="0" width="800" height="90" rx="12" fill="#fbf7f0" stroke="#efe0cc" stroke-width="2" filter="url(#shadow)"/>
     <text x="20" y="28" font-size="14" font-weight="600" fill="#a1622b">⚙️ Application Layer</text>
 
-    <rect x="50" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
-    <text x="130" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📄 Doc Processing</text>
+    <rect x="25" y="40" width="140" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="95" y="65" text-anchor="middle" font-size="11" fill="#854d0e">📄 Doc Processing</text>
 
-    <rect x="225" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
-    <text x="305" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📊 Strategy Analysis</text>
+    <rect x="177.5" y="40" width="140" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="247.5" y="65" text-anchor="middle" font-size="11" fill="#854d0e">📊 Strategy Analysis</text>
 
-    <rect x="400" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
-    <text x="480" y="65" text-anchor="middle" font-size="13" fill="#854d0e">🤖 Agent Collab</text>
+    <rect x="330" y="40" width="140" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="400" y="65" text-anchor="middle" font-size="11" fill="#854d0e">🤖 Agent Collab</text>
 
-    <rect x="575" y="40" width="160" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
-    <text x="655" y="65" text-anchor="middle" font-size="13" fill="#854d0e">📋 Plan Generation</text>
+    <rect x="482.5" y="40" width="140" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="552.5" y="65" text-anchor="middle" font-size="11" fill="#854d0e">📋 Plan Generation</text>
+
+    <rect x="635" y="40" width="140" height="40" rx="8" fill="#ffffff" stroke="#e3cba4" stroke-width="1.5"/>
+    <text x="705" y="65" text-anchor="middle" font-size="11" fill="#854d0e">📋 Skills L1/L2/L3</text>
   </g>
 
   <!-- Arrow 3 (Shifted down +2) -->
@@ -76,24 +76,24 @@
     <text x="20" y="28" font-size="14" font-weight="600" fill="#6e4f33">💎 Domain Layer</text>
 
     <rect x="20" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="92" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📦 Document</text>
-    <text x="92" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
+    <text x="92" y="65" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📦 Document</text>
+    <text x="92" y="83" text-anchor="middle" font-size="10" fill="#5a3f25">Entity</text>
 
     <rect x="174" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="246" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🤖 Agents · 🔧 Tools</text>
-    <text x="246" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
+    <text x="246" y="65" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🤖 Agents · 🔧 Tools</text>
+    <text x="246" y="83" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="328" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="400" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📋 Plan · BLM · BEM</text>
-    <text x="400" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
+    <text x="400" y="65" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📋 Plan · BLM · BEM</text>
+    <text x="400" y="83" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="482" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="554" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📊 Archive · Checkpoint</text>
-    <text x="554" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
+    <text x="554" y="65" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">📊 Archive · Checkpoint</text>
+    <text x="554" y="83" text-anchor="middle" font-size="10" fill="#5a3f25">Entities</text>
 
     <rect x="636" y="40" width="144" height="60" rx="8" fill="#ffffff" stroke="#cfb99a" stroke-width="1.5"/>
-    <text x="708" y="62" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Agents · Plan</text>
-    <text x="708" y="78" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
+    <text x="708" y="65" text-anchor="middle" font-size="11" fill="#5a3f25" font-weight="500">🔌 RAG · Agents · Plan</text>
+    <text x="708" y="83" text-anchor="middle" font-size="10" fill="#5a3f25">Service Interfaces</text>
   </g>
 
   <!-- Arrow 4 (Shifted down +2) -->
