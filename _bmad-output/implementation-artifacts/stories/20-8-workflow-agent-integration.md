@@ -474,6 +474,35 @@
 
 ---
 
+## 🔍 Review Findings（代码审查发现）
+
+> **审查日期:** 2026-05-23
+> **审查范围:** commit 8b285311 (Story 20.8 实现)
+
+### Decision Needed
+
+- [x] ~~[Review][Decision] 验收测试使用 MagicMock 违反约束~~ — 已修复：改用 `prefect.states.State(type=st)` 真实 Prefect SDK 对象替代 MagicMock。
+
+### Patch
+
+- [x] ~~[Review][Patch] AST 检查不精确~~ — 已修复：`has_return_after_try` 改为 `has_return_after_event_publish_try`，精确验证 return 语句位于最后一个 try/except 块之后。`tests/acceptance/test_acceptance_workflow-agent-integration.py:259-283`
+
+### Deferred（预存问题）
+
+- [x] [Review][Defer] 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。
+- [x] [Review][Defer] flow_run_id 默认工厂误导 — 默认 `uuid.uuid4()` 从未被使用，可能掩盖调用方遗漏。RAGIndexed/ReportGenerated 同样有此模式。预存。
+- [x] [Review][Defer] aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值，而非强制设置。所有事件都有此模式。预存。
+- [x] [Review][Defer] DomainEvent 注册表无隔离 — 测试检查 `_registry["WorkflowSubmitted"]` 但未确保清洁状态。预存模式。
+- [x] [Review][Defer] 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。
+
+### Dismissed（误报/合规）
+
+- 重复字段声明：误报，实际代码无重复
+- 静默异常吞掉：符合 AC-1 设计要求（日志记录不影响返回值）
+- 缺少参数校验：类型签名 + OrchestrationService 校验已覆盖
+
+---
+
 ## 📝 Dev Notes 开发笔记
 
 ### 相关架构模式和约束
