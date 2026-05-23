@@ -84,7 +84,7 @@
 - [ ] `src/domain/events/workflow_events.py` 新增 `WorkflowSubmitted` 事件类（继承 DomainEvent）
 - [ ] `PrefectEngine.submit_flow` 成功后调用 `_publish_workflow_submitted()`
 - [ ] `_publish_workflow_submitted()` 检查 `PublishResult.is_full_failure` 并记录 warning 日志
-- [ ] 事件发布异常捕获后仅 `logger.exception`，不影响 `self._runs` 状态
+- [ ] 事件发布异常捕获后仅 `logger.exception`，不影响 `submit_flow` 返回值（flow_run_id 正常返回）
 
 ### AC-2: 双引擎事件发布对称性
 
@@ -95,7 +95,7 @@
 **验证标准:**
 - [ ] PrefectEngine._publish_workflow_submitted 与 LangGraphEngine._publish_agent_decided 模式一致
 - [ ] 两者均使用 `try/except Exception` 包裹事件发布
-- [ ] 两者均检查 `publish_result is None` 和 `publish_result.is_full_failure`
+- [ ] 两者均检查 `publish_result is None`（防御性检查，Protocol 声明非 None）和 `publish_result.is_full_failure`
 - [ ] 测试覆盖双引擎事件发布异常路径
 
 ### AC-3: 事件总线通道注册
@@ -151,7 +151,7 @@
 - [ ] `WorkflowSubmitted` 事件定义位于 `src/domain/events/workflow_events.py`
 - [ ] 使用 dataclass(frozen=True) 继承 `DomainEvent`
 - [ ] 事件字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`
-- [ ] `event_type` 字段：`event_type: str = field(default="WorkflowSubmitted", init=False)`（紧跟 `flow_run_id` 后）
+- [ ] `event_type` 字段：`event_type: str = field(default="WorkflowSubmitted", init=False)`（放在所有业务字段之后，与 workflow_events.py 现有 RAGIndexed/ReportGenerated 风格一致）
 - [ ] `__post_init__` 方法：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`（参考 AgentDecided/RAGIndexed 模式）
 - [ ] 事件命名符合规范：`[Aggregate][Action]` → `WorkflowSubmitted`
 
@@ -275,9 +275,9 @@
 - [ ] Subtask 0.1: 定义 WorkflowSubmitted 事件 Schema
   - 事件类名：`WorkflowSubmitted`
   - 基类：`DomainEvent`（`src/domain/events/base.py`）
-  - 字段：`flow_run_id: uuid.UUID`、`event_type: str`、`flow_name: str`、`parameters: dict[str, Any]`
+  - 字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`、`event_type: str`（event_type 放在最后，与 RAGIndexed/ReportGenerated 一致）
   - `__post_init__`：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`
-  - `event_type` 声明：`event_type: str = field(default="WorkflowSubmitted", init=False)`（紧跟 `flow_run_id`）
+  - `event_type` 声明：`event_type: str = field(default="WorkflowSubmitted", init=False)`
 - [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow-agent-integration.feature`
   - 场景1: 数据管道工作流提交
   - 场景2: Agent 推理任务提交
@@ -455,6 +455,10 @@
   - [ ] `test_acceptance_workflow-agent-integration.*` 验收测试
 - [ ] Subtask 6.3: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
 - [ ] Subtask 6.4: 更新 sprint-status.yaml 为 `done`
+- [ ] Subtask 6.5: 更新设计文档 `docs/architecture/sisys-workflow-agent-integration-design.md`
+  - [ ] Section 4.2 事件发布责任：改为 "Engine 层发布 WorkflowSubmitted 事件"
+  - [ ] Section 5.1 策略差异表：更新 Prefect 列的发布位置
+  - [ ] Section 5.3 添加 PrefectEngine 的 PublishResult 检查模式说明
 
 **完成标准:**
 - [ ] 完成清单已逐项验证
@@ -485,6 +489,14 @@
 | 编排层 | OrchestrationService | 应用层统一路由 |
 | 事件发布 | Engine 层发布 | LangGraphEngine 发布 AgentDecided，PrefectEngine 发布 WorkflowSubmitted |
 
+### 设计文档偏离声明
+
+> **偏离项：** 设计文档 `sisys-workflow-agent-integration-design.md` v2.6 Section 4.2 声明 "PrefectEngine 本身不发布领域事件"。
+>
+> **偏离原因：** 双引擎事件发布对称性（AC-2）要求两者遵循相同模式。`event_publisher` 已注入到 PrefectEngine 但未使用（设计预留），本 Story 激活该能力。
+>
+> **实施后动作：** 需同步更新设计文档 Section 4.2（事件发布责任）、Section 5.1（策略差异表）、Section 5.3（PublishResult 检查模式），将 PrefectEngine 的事件发布策略从 "Flow 内部发布" 更新为 "Engine 层发布 WorkflowSubmitted 事件"。
+
 ### 关键代码模式参考
 
 #### 事件类定义（复用 AgentDecided）
@@ -504,6 +516,8 @@ class AgentDecided(DomainEvent):
             object.__setattr__(self, "aggregate_type", "Agent")
 ```
 
+> **字段顺序说明：** WorkflowSubmitted 的 `event_type` 放在所有业务字段之后（与 RAGIndexed/ReportGenerated 一致），而非参照 AgentDecided 放在 `flow_run_id` 之后。这是为了保持同一文件 `workflow_events.py` 内部的代码风格统一。
+
 #### 事件发布模式（复用 LangGraphEngine）
 ```python
 # src/infrastructure/agent_orch/langgraph_engine.py:139-162
@@ -515,6 +529,8 @@ async def _publish_agent_decided(self, agent_id, result, run_id):
     elif publish_result.is_full_failure:
         logger.warning("AgentDecided 事件发布全部失败 [run_id=%s]: %s", run_id, publish_result)
 ```
+
+> **Protocol 契约说明：** `EventPublisher.publish()` 声明返回 `PublishResult`（非 Optional），所有已知实现均保证返回非 None。None 检查属于防御性编程，与 LangGraphEngine 现有模式保持对称。
 
 #### Prefect 状态映射（9→5）
 ```python
@@ -532,7 +548,7 @@ async def _publish_agent_decided(self, agent_id, result, run_id):
 
 **关键学习/Key Learnings:**
 - 事件发布异常**必须**独立于引擎执行状态（LangGraphEngine 在 catch 中不覆写 COMPLETED）
-- `PublishResult` 返回值可能为 `None`（需要 None 检查）
+- `PublishResult` 返回值理论上非 None（Protocol 声明 `-> PublishResult`），但 LangGraphEngine 使用防御性 None 检查，PrefectEngine 保持对称
 - `_env_int` 配置异常需包装含键名上下文
 - Gherkin 步骤函数不使用 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()`
 - BDD 步骤中同一中文文本可能需要同时支持 given/when 装饰器
@@ -617,6 +633,7 @@ src/
 - `src/infrastructure/messaging/channel_router.py` — 注册 WorkflowSubmitted 通道
 - `config/event_channels.yaml` — 同步添加 WorkflowSubmitted 通道配置
 - `tests/unit/infrastructure/workflow/test_prefect_engine.py` — 补充事件发布测试
+- `docs/architecture/sisys-workflow-agent-integration-design.md` — 更新 Section 4.2/5.1/5.3 事件发布策略描述
 
 ---
 
@@ -650,9 +667,10 @@ src/
 
 ---
 
-**故事版本:** v1.1.0
+**故事版本:** v1.2.0
 **创建日期:** 2026-05-23
 **最后更新:** 2026-05-23
 **更新说明:**
+- v1.2.0: R2 正确性审查 — 修正 AC-1 验证标准错误引用 self._runs（P0-1）、标注 Protocol 契约与防御性 None 检查（P0-2）、新增设计文档偏离声明与更新提醒（P0-3）、修正 event_type 字段位置到 workflow_events.py 风格（P1-4）、新增 Subtask 6.5 设计文档同步检查项
 - v1.1.0: R1 正确性审查 — 补充 __init__.py/event_channels.yaml 到文件清单，修正端口注册位置，补充 __post_init__ 模式，修正 AgentDecided 代码片段字段顺序
 - v1.0.0: 创建故事文件
