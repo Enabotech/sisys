@@ -174,3 +174,116 @@ class TestPrefectEngineInputValidation:
         """空字符串应抛出 ValueError"""
         with pytest.raises(ValueError, match="flow_run_id 格式无效"):
             await engine.get_flow_status("")
+
+
+class TestPrefectEngineEventPublishing:
+    """PrefectEngine 事件发布测试"""
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_publishes_workflow_submitted(
+        self, engine: PrefectEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """submit_flow 成功后应发布 WorkflowSubmitted 事件"""
+        flow_run_uuid = uuid.uuid4()
+        mock_deployment = MagicMock()
+        mock_deployment.id = uuid.uuid4()
+        mock_flow_run = MagicMock()
+        mock_flow_run.id = flow_run_uuid
+
+        mock_client = AsyncMock()
+        mock_client.read_deployment_by_name = AsyncMock(return_value=mock_deployment)
+        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
+
+        with patch("src.infrastructure.workflow.prefect_engine.get_client") as mock_get_client:
+            mock_get_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_get_client.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await engine.submit_flow(
+                "DocumentProcessing/default",
+                {"document_id": "abc"},
+            )
+
+        assert isinstance(result, str)
+        mock_event_publisher.publish.assert_called_once()
+        event = mock_event_publisher.publish.call_args[0][0]
+        assert event.event_type == "WorkflowSubmitted"
+        assert event.flow_name == "DocumentProcessing/default"
+        assert event.parameters == {"document_id": "abc"}
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_returns_id_even_when_publish_fails(
+        self, engine: PrefectEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """事件发布异常不应影响 submit_flow 返回值"""
+        mock_event_publisher.publish.side_effect = RuntimeError("publish failed")
+
+        mock_deployment = MagicMock()
+        mock_deployment.id = uuid.uuid4()
+        mock_flow_run = MagicMock()
+        mock_flow_run.id = uuid.uuid4()
+
+        mock_client = AsyncMock()
+        mock_client.read_deployment_by_name = AsyncMock(return_value=mock_deployment)
+        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
+
+        with patch("src.infrastructure.workflow.prefect_engine.get_client") as mock_get_client:
+            mock_get_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_get_client.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await engine.submit_flow("TestFlow/default", {})
+
+        assert isinstance(result, str)
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_logs_warning_on_full_failure(
+        self, engine: PrefectEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """事件发布全部失败时应记录警告日志"""
+        from src.domain.events.publish_result import ChannelResult, PublishResult
+
+        mock_event_publisher.publish.return_value = PublishResult(
+            event_id=str(uuid.uuid4()),
+            results=(
+                ChannelResult(channel_name="reliable", success=False, error="rabbitmq down"),
+                ChannelResult(channel_name="realtime", success=False, error="redis down"),
+            ),
+        )
+
+        mock_deployment = MagicMock()
+        mock_deployment.id = uuid.uuid4()
+        mock_flow_run = MagicMock()
+        mock_flow_run.id = uuid.uuid4()
+
+        mock_client = AsyncMock()
+        mock_client.read_deployment_by_name = AsyncMock(return_value=mock_deployment)
+        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
+
+        with (
+            patch("src.infrastructure.workflow.prefect_engine.get_client") as mock_get_client,
+            patch("src.infrastructure.workflow.prefect_engine.logger") as mock_logger,
+        ):
+            mock_get_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_get_client.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await engine.submit_flow("TestFlow/default", {})
+
+        # is_full_failure 为 True，应触发 warning
+        mock_logger.warning.assert_called()
+        assert mock_event_publisher.publish.called
+
+    @pytest.mark.asyncio
+    async def test_submit_flow_does_not_publish_on_failure(
+        self, engine: PrefectEngine, mock_event_publisher: AsyncMock
+    ) -> None:
+        """submit_flow 失败时不应发布事件"""
+        mock_client = AsyncMock()
+        mock_client.read_deployment_by_name = AsyncMock(side_effect=Exception("connection failed"))
+
+        with patch("src.infrastructure.workflow.prefect_engine.get_client") as mock_get_client:
+            mock_get_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_get_client.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            with pytest.raises(RuntimeError, match="提交工作流失败"):
+                await engine.submit_flow("TestFlow/default", {})
+
+        mock_event_publisher.publish.assert_not_called()

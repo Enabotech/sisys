@@ -138,3 +138,8 @@ event_channels:
     rabbitmq_routing_key: "sisys.events.reliable.report_generated"
     delivery_mode: "reliable"
     description: "报告生成完成"
+
+  WorkflowSubmitted:
+    rabbitmq_routing_key: "sisys.events.reliable.workflow_submitted"
+    delivery_mode: "reliable"
+    description: "工作流提交完成"
