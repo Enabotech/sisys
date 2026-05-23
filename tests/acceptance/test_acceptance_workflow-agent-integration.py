@@ -105,7 +105,7 @@ def verify_agent_engine_port_methods() -> None:
 
 @then("PrefectEngine 应实现 9 种 StateType 到 5 种 FlowStatus 的映射")
 def verify_prefect_state_mapping() -> None:
-    from prefect.states import StateType
+    from prefect.states import State, StateType
 
     from src.infrastructure.config.prefect import PrefectConfig
     from src.infrastructure.workflow.prefect_engine import PrefectEngine
@@ -117,10 +117,7 @@ def verify_prefect_state_mapping() -> None:
     all_state_types = set(StateType)
     mapped = set()
     for st in all_state_types:
-        from unittest.mock import MagicMock
-
-        state = MagicMock()
-        state.type = st
+        state = State(type=st)
         for run_count in (0, config.retry_max_attempts):
             status = engine._map_state_type(state, run_count)
             mapped.add(status)
@@ -259,16 +256,34 @@ def verify_exception_does_not_affect_return() -> None:
     pref_tree = ast.parse(textwrap.dedent(pref_source))
     lg_tree = ast.parse(textwrap.dedent(lg_source))
 
-    def has_return_after_try(tree: ast.AST) -> bool:
+    def has_return_after_event_publish_try(tree: ast.AST) -> bool:
+        """验证 return 语句位于事件发布 try/except 块之后
+
+        正确模式：
+            try: ... (主流程)
+            except: ...
+            try: await self._publish_xxx(...)  # 事件发布
+            except: logger.exception(...)
+            return xxx  # 必须在事件发布 try/except 之后
+        """
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                for stmt in node.body:
-                    if isinstance(stmt, ast.Return):
-                        return True
+                # 找最后一个 try/except 块（事件发布）
+                last_try_index = -1
+                for i, stmt in enumerate(node.body):
+                    if isinstance(stmt, ast.Try):
+                        last_try_index = i
+
+                # 检查 return 是否在最后 try 之后
+                if last_try_index >= 0:
+                    for i in range(last_try_index + 1, len(node.body)):
+                        if isinstance(node.body[i], ast.Return):
+                            return True
+                return False
         return False
 
-    assert has_return_after_try(pref_tree)
-    assert has_return_after_try(lg_tree)
+    assert has_return_after_event_publish_try(pref_tree)
+    assert has_return_after_event_publish_try(lg_tree)
 
 
 # =========================================================================

@@ -24,3 +24,11 @@
 - `get_graph_status` 对未知 ID 返回 FAILED 而非抛异常 — MVP 设计选择，spec 明确说"仅返回 COMPLETED 或 FAILED"。`src/infrastructure/agent_orch/langgraph_engine.py:102`
 - 阻塞式执行导致 RUNNING/PENDING 不可观察 — spec 明确说"MVP 阻塞语义...RUNNING/PENDING 在本地模式下不可观察"。`src/infrastructure/agent_orch/langgraph_engine.py:76-77`
 - 缺少 Graph 编译缓存机制 — spec 要求 graph_name→CompiledGraph 映射，MVP 图构建开销小，后续 Epic 扩展时优化。`src/infrastructure/agent_orch/langgraph_engine.py:104-123`
+
+## Deferred from: code review of 20-8-workflow-agent-integration (2026-05-23)
+
+- 可变字典引用 — frozen dataclass 的 `parameters`/`decision_result` 字段存储可变引用，调用方可在构造后修改。AgentDecided 同样有此问题。预存，非本 Story 引入。`src/domain/events/workflow_events.py:31`
+- flow_run_id 默认工厂误导 — 默认 `uuid.uuid4()` 从未被使用，可能掩盖调用方遗漏。RAGIndexed/ReportGenerated 同样有此模式。预存。`src/domain/events/workflow_events.py:29`
+- aggregate_type 可被覆盖 — `if not self.aggregate_type:` 条件允许调用方传入自定义值。所有事件都有此模式。预存。`src/domain/events/workflow_events.py:35-38`
+- DomainEvent 注册表无隔离 — 测试检查 `_registry["WorkflowSubmitted"]` 但未确保清洁状态。预存模式。`tests/unit/domain/events/test_workflow_events.py:61-67`
+- 不可序列化参数延迟失败 — parameters 包含 Prefect 对象时仅在 `to_dict()` 时报错。预存问题。`src/domain/events/workflow_events.py:31`
