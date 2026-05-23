@@ -116,7 +116,7 @@
 **Then** 覆盖双引擎提交、状态查询、事件发布的完整流程
 
 **验证标准:**
-- [x] `tests/acceptance/test_acceptance_workflow-agent-integration.feature` 包含双引擎集成场景（6 个场景）
+- [x] `tests/acceptance/test_acceptance_workflow_agent_integration.feature` 包含双引擎集成场景（6 个场景）
 - [x] `tests/acceptance/test_acceptance_workflow-agent-integration.py` 实现步骤函数
 - [x] 场景覆盖：data_pipeline 提交（AC-1）、agent_reasoning 提交、状态查询、事件发布（AC-1）、双引擎对称性（AC-2）、通道注册（AC-3）
 - [x] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK，不依赖真实 server）
@@ -183,7 +183,7 @@
 | **infrastructure** | ✓ 允许 | ✓ 允许      | ✗ 禁止     | —              |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_workflow-agent-integration.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_workflow_agent_integration.feature`
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_workflow-agent-integration.py`
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
 
@@ -221,7 +221,7 @@
 | **TDD 单元测试** | ChannelRouter 通道注册 | WorkflowSubmitted 映射注册 | `tests/unit/infrastructure/messaging/test_channel_router.py` | Task 1 |
 | **TDD 单元测试** | PrefectEngine 事件发布 | 事件发布成功/失败路径 | `tests/unit/infrastructure/workflow/test_prefect_engine.py` | Task 2 |
 | **集成测试** | 双引擎路由 + DI | OrchestrationService 端到端 | `tests/integration/test_integration_workflow_agent_integration.py` | Task 3 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_workflow-agent-integration.feature` | Task 0/4 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_workflow_agent_integration.feature` | Task 0/4 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_workflow-agent-integration.py` | Task 0/4 |
 | **SDD 架构验证** | 六边形约束 | 导入边界、依赖方向 | `tests/unit/architecture/test_hexagonal_architecture_constraints.py` | Task 5 |
 
@@ -281,7 +281,7 @@
   - 字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`、`event_type: str`（event_type 放在最后，与 RAGIndexed/ReportGenerated 一致）
   - `__post_init__`：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`
   - `event_type` 声明：`event_type: str = field(default="WorkflowSubmitted", init=False)`
-- [x] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow-agent-integration.feature`
+- [x] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow_agent_integration.feature`
   - 场景1: 数据管道工作流提交（覆盖 AC-1/AC-5）
   - 场景2: Agent 推理任务提交（覆盖 AC-5）
   - 场景3: 双引擎状态查询（覆盖 AC-5）
@@ -659,7 +659,7 @@ src/
 
 **待创建的文件:**
 - `tests/integration/test_integration_workflow_agent_integration.py` — 双引擎集成测试
-- `tests/acceptance/test_acceptance_workflow-agent-integration.feature` — Gherkin 场景
+- `tests/acceptance/test_acceptance_workflow_agent_integration.feature` — Gherkin 场景
 - `tests/acceptance/test_acceptance_workflow-agent-integration.py` — BDD 步骤实现
 
 **待修改的文件:**

@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_acceptance_udmr-basic-routing.feature")
+scenarios("test_acceptance_udmr_basic_routing.feature")
 
 
 # ===================================================================
@@ -110,7 +110,7 @@ def set_cloud_0_api_type(context: dict[str, Any]) -> None:
     context["env"]["UDMR_CLOUD_0_ENABLED"] = "true"
     context["env"]["UDMR_CLOUD_0_API_TYPE"] = "anthropic"
     context["env"]["UDMR_CLOUD_0_ENDPOINT"] = "https://api.minimax.chat/anthropic"
-    context["env"]["UDMR_CLOUD_0_API_KEY"] = "TESTING_DUMMY_KEY"
+    context["env"]["UDMR_CLOUD_0_API_KEY"] = "TESTING_DUMMY_KEY"  # pragma: allowlist secret
     context["env"]["UDMR_CLOUD_0_MODEL"] = "MiniMax-M2.7"
     context["env"]["UDMR_CLOUD_0_MAX_TOKENS"] = "4096"
 

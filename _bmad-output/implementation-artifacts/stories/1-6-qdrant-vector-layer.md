@@ -169,7 +169,7 @@
 - [x] VectorStorage 接口（`src/domain/repositories/vector_storage.py`）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_acceptance_qdrant-vector-layer.feature`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_qdrant_vector_layer.feature`
 - [ ] 覆盖场景:
   - Collection 创建/删除/查询
   - 向量点插入/查询/删除
@@ -273,7 +273,7 @@
 - [x] Subtask: 定义 SparseVector 数据模型
 - [x] Subtask: 定义 CollectionManager 接口
 - [x] Subtask: 定义 VectorStorage 接口
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_qdrant-vector-layer.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_qdrant_vector_layer.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -596,7 +596,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_integration_qdrant.py
 │   └── acceptance/
-│       └── test_acceptance_qdrant-vector-layer.feature
+│       └── test_acceptance_qdrant_vector_layer.feature
 └── docs/
     └── infrastructure/
         └── qdrant_vector_layer_guide.md # Qdrant 向量层实施指南

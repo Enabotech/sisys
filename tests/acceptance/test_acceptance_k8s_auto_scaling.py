@@ -21,7 +21,7 @@ from src.infrastructure.monitoring.aggregator import MetricsAggregator
 from src.infrastructure.monitoring.business_metrics import BusinessMetricsCollector
 from src.infrastructure.monitoring.event_metrics import EventMetricsCollector
 
-scenarios("test_acceptance_k8s-auto-scaling.feature")
+scenarios("test_acceptance_k8s_auto_scaling.feature")
 
 
 # ===================================================================
@@ -97,7 +97,7 @@ def given_metrics_aggregator_implemented(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-1 - Prometheus /metrics HTTP 端点返回 Prometheus 格式")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-1 - Prometheus /metrics HTTP 端点返回 Prometheus 格式")
 def test_ac1_metrics_endpoint_returns_prometheus_format():
     """Test /metrics endpoint returns Prometheus text format."""
     pass
@@ -175,7 +175,7 @@ def then_aggregates_business_metrics(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-1 - Prometheus 格式兼容（指标类型支持）")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-1 - Prometheus 格式兼容（指标类型支持）")
 def test_ac1_prometheus_format_compatibility():
     """Test Prometheus format compatibility with different metric types."""
     pass
@@ -243,7 +243,7 @@ def then_supports_summary_type(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-2 - 自定义业务指标暴露")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-2 - 自定义业务指标暴露")
 def test_ac2_custom_business_metrics_exposed():
     """Test custom business metrics are exposed."""
     pass
@@ -301,7 +301,7 @@ def then_exposes_cache_hit_rate(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-3 - K8s HPA 基于自定义指标扩缩容")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-3 - K8s HPA 基于自定义指标扩缩容")
 def test_ac3_k8s_hpa_based_on_custom_metrics():
     """Test K8s HPA can scale based on custom metrics."""
     pass
@@ -362,7 +362,7 @@ def then_hpa_can_scale_on_task_queue(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-4 - 扩缩容响应时间<5 分钟")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-4 - 扩缩容响应时间<5 分钟")
 def test_ac4_scaling_response_time():
     """Test scaling response time is under 5 minutes."""
     pass
@@ -423,7 +423,7 @@ def then_hpa_check_interval_under_60s(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_k8s-auto-scaling.feature", "AC-5 - Grafana 可观测性")
+@scenario("test_acceptance_k8s_auto_scaling.feature", "AC-5 - Grafana 可观测性")
 def test_ac5_grafana_observability():
     """Test Grafana dashboard displays key metrics."""
     pass

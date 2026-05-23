@@ -176,7 +176,7 @@ Epic 20 前序 Story（20-1 ~ 20-6）完成了测试框架、事件总线、异�
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-**功能测试文件：** `tests/acceptance/test_acceptance_transaction-subsystem-refactor.feature`
+**功能测试文件：** `tests/acceptance/test_acceptance_transaction_subsystem_refactor.feature`
 
 ```gherkin
 Feature: 事务子系统重构
@@ -303,7 +303,7 @@ Feature: 事务子系统重构
 - [x] Subtask 0.2: 定义 SagaContext 数据模型（`src/infrastructure/saga/saga_context.py`）
 - [x] Subtask 0.3: 定义 SagaRepositoryProtocol 接口（`src/domain/ports/saga.py`）
 - [x] Subtask 0.4: 定义 UnitOfWorkFactory Protocol（`src/domain/ports/unit_of_work.py`）
-- [x] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_transaction-subsystem-refactor.feature`
+- [x] Subtask 0.5: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_transaction_subsystem_refactor.feature`
 - [x] Subtask 0.6: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_transaction-subsystem-refactor.py`
 
 **完成标准:**
@@ -842,7 +842,7 @@ src/
 - `src/infrastructure/messaging/unit_of_work/audit_unit_of_work.py`
 - `deploy/postgresql/alembic/versions/004_add_archived_status.py` — 新增 archived 状态迁移
 - `deploy/postgresql/alembic/versions/005_saga_tables.py` — Saga 表迁移（使用 `sa.JSON()` 匹配项目模式）
-- `tests/acceptance/test_acceptance_transaction-subsystem-refactor.feature`
+- `tests/acceptance/test_acceptance_transaction_subsystem_refactor.feature`
 - `tests/acceptance/test_acceptance_transaction-subsystem-refactor.py`
 - `tests/contracts/test_port_contract_uow_factory.py`
 - `tests/unit/infrastructure/messaging/outbox/test_outbox_state_machine.py`

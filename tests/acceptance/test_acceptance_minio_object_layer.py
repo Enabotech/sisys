@@ -142,7 +142,7 @@ def minio_service_available(bucket_manager: BucketManager, event_loop):
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "创建 Bucket 并启用版本控制",
 )
 def test_create_bucket_with_versioning(
@@ -197,7 +197,7 @@ def verify_versioning_enabled(bucket_manager: BucketManager, event_loop):
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "流式上传对象",
 )
 def test_streaming_upload(minio_repository: MinIORepository, bucket_manager: BucketManager, event_loop):
@@ -285,7 +285,7 @@ def verify_version_id_returned():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "流式下载对象",
 )
 def test_streaming_download(
@@ -395,7 +395,7 @@ def verify_content_matches():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "启用 WORM 锁定后禁止删除",
 )
 def test_worm_lock_prevents_deletion(
@@ -477,7 +477,7 @@ def verify_object_undeletable():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "大文件分片上传",
 )
 def test_large_file_multipart_upload():
@@ -515,7 +515,7 @@ def verify_etags_recorded():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "断点续传",
 )
 def test_resume_interrupted_upload():
@@ -553,7 +553,7 @@ def verify_completed_chunks_not_reuploaded():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "生命周期规则配置",
 )
 def test_lifecycle_rules_configuration():
@@ -591,7 +591,7 @@ def verify_object_expiry_or_conversion():
 
 
 @scenario(
-    "test_acceptance_minio-object-layer.feature",
+    "test_acceptance_minio_object_layer.feature",
     "归档对象至 WORM 存储",
 )
 def test_archive_to_worm_storage(

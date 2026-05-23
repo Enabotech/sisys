@@ -646,8 +646,8 @@ graph TB
 
 | 测试文件 | 真实对象 | pass 步骤（待补充） |
 |---------|---------|-------------------|
-| `test_acceptance_prefect-workflow-integration.py` | 真实 DI 容器、`PrefectConfig.from_env()`、Protocol 验证、YAML 配置验证 | 4个关键业务步骤标注 "需真实 Prefect server" |
-| `test_acceptance_langgraph-agent-orchestration.py` | 真实 DI 容器、`LangGraphConfig.from_env()`、真实 StateGraph 编译执行、InMemorySaver | 6个步骤委托给单元/架构测试 |
+| `test_acceptance_prefect_workflow_integration.py` | 真实 DI 容器、`PrefectConfig.from_env()`、Protocol 验证、YAML 配置验证 | 4个关键业务步骤标注 "需真实 Prefect server" |
+| `test_acceptance_langgraph_agent_orchestration.py` | 真实 DI 容器、`LangGraphConfig.from_env()`、真实 StateGraph 编译执行、InMemorySaver | 6个步骤委托给单元/架构测试 |
 
 **改进方向**：Prefect 验收测试的 pass 步骤需在 Prefect Server CI 环境就绪后补充真实服务调用验证。
 

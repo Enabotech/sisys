@@ -42,7 +42,7 @@ from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLM
 from src.infrastructure.storage.postgresql.session_context import set_session
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_event-messaging-refactor.feature")
+scenarios("test_acceptance_event_messaging_refactor.feature")
 
 
 # ===================================================================
@@ -275,25 +275,25 @@ def given_story_1_3_and_20_1_completed(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (enqueue)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (enqueue)")
 def test_ac1_dlq_enqueue():
     """Test PostgreSQL DLQ enqueue operation."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (dequeue)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (dequeue)")
 def test_ac1_dlq_dequeue():
     """Test PostgreSQL DLQ dequeue operation."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (get_all)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (get_all)")
 def test_ac1_dlq_get_all():
     """Test PostgreSQL DLQ get_all operation."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (mark_action_taken)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-1 - PostgreSQL DLQ 持久化 (mark_action_taken)")
 def test_ac1_dlq_mark_action_taken():
     """Test PostgreSQL DLQ mark_action_taken operation."""
     pass
@@ -626,13 +626,13 @@ def then_action_taken_field_recorded(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-2 - Redis ZSET 延迟重试调度")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-2 - Redis ZSET 延迟重试调度")
 def test_ac2_redis_zset_retry():
     """Test Redis ZSET delayed retry scheduling."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-2 - Redis 延迟重试调度 (scheduled retry)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-2 - Redis 延迟重试调度 (scheduled retry)")
 def test_ac2_scheduled_retry():
     """Test scheduled retry with Redis ZSET."""
     pass
@@ -713,13 +713,13 @@ def then_event_retried(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-3 - 双写幂等性检查 (Redis + PostgreSQL)")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-3 - 双写幂等性检查 (Redis + PostgreSQL)")
 def test_ac3_dual_idempotency_checker():
     """Test dual idempotency checker with Redis and PostgreSQL."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-3 - DualIdempotencyChecker 并存关系")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-3 - DualIdempotencyChecker 并存关系")
 def test_ac3_dual_idempotency_coexistence():
     """Test DualIdempotencyChecker coexists with IdempotencyChecker."""
     pass
@@ -783,13 +783,13 @@ def then_rabbitmq_listener_uses_dual(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-4 - DomainEvent 新增 correlation_id 和 causation_id")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-4 - DomainEvent 新增 correlation_id 和 causation_id")
 def test_ac4_domain_event_enhanced():
     """Test DomainEvent enhanced with correlation_id and causation_id."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-4 - DomainEvent 序列化支持新字段")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-4 - DomainEvent 序列化支持新字段")
 def test_ac4_domain_event_serialization():
     """Test DomainEvent serialization with new fields."""
     pass
@@ -881,13 +881,13 @@ def then_backward_compatibility_assured(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-5 - EventListenerAsync 独立接口")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-5 - EventListenerAsync 独立接口")
 def test_ac5_event_listener_async():
     """Test EventListenerAsync independent interface."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-5 - RabbitMQEventListener 实现 EventListenerAsync")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-5 - RabbitMQEventListener 实现 EventListenerAsync")
 def test_ac5_rabbitmq_listener_implements():
     """Test RabbitMQEventListener implements EventListenerAsync."""
     pass
@@ -957,13 +957,13 @@ def then_support_async_handle_event(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-6 - UnitOfWork 事务原子性")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-6 - UnitOfWork 事务原子性")
 def test_ac6_unit_of_work_atomicity():
     """Test UnitOfWork transaction atomicity."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-6 - PostgreSQLUnitOfWork 实现")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-6 - PostgreSQLUnitOfWork 实现")
 def test_ac6_postgresql_unit_of_work():
     """Test PostgreSQLUnitOfWork implementation."""
     pass
@@ -1038,25 +1038,25 @@ def then_uow_methods_work(context: dict, pg_session: AsyncSession, event_loop) -
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-7 - PostgreSQL EventStore 事件追加")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-7 - PostgreSQL EventStore 事件追加")
 def test_ac7_eventstore_append():
     """Test PostgreSQL EventStore event append."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-7 - PostgreSQL EventStore 聚合重建")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-7 - PostgreSQL EventStore 聚合重建")
 def test_ac7_eventstore_rebuild():
     """Test PostgreSQL EventStore aggregate rebuild."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-7 - PostgreSQL EventStore 按时间范围查询")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-7 - PostgreSQL EventStore 按时间范围查询")
 def test_ac7_eventstore_query_by_time_range():
     """Test PostgreSQL EventStore query by time range."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-7 - PostgreSQL EventStore 版本冲突检测")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-7 - PostgreSQL EventStore 版本冲突检测")
 def test_ac7_eventstore_version_conflict():
     """Test PostgreSQL EventStore version conflict detection."""
     pass
@@ -1226,13 +1226,13 @@ def then_raises_version_error(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-8 - RabbitMQEventListener 实现 EventListenerAsync")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-8 - RabbitMQEventListener 实现 EventListenerAsync")
 def test_ac8_rabbitmq_listener_async():
     """Test RabbitMQEventListener implements EventListenerAsync."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-8 - RabbitMQEventListener 集成新组件")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-8 - RabbitMQEventListener 集成新组件")
 def test_ac8_rabbitmq_listener_integrations():
     """Test RabbitMQEventListener integrates new components."""
     pass
@@ -1298,13 +1298,13 @@ def then_uses_postgres_dlq(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-9 - @poller_only 注释标记")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-9 - @poller_only 注释标记")
 def test_ac9_poller_only_annotation():
     """Test @poller_only annotation marking."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-9 - AsyncOutboxPoller 继续使用内部方法")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-9 - AsyncOutboxPoller 继续使用内部方法")
 def test_ac9_outbox_poller_uses_internal_methods():
     """Test AsyncOutboxPoller continues using internal methods."""
     pass
@@ -1345,13 +1345,13 @@ def then_outbox_poller_continues_working(context: dict) -> None:
 # ===================================================================
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-10 - 领域层零外部依赖")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-10 - 领域层零外部依赖")
 def test_ac10_domain_zero_external_deps():
     """Test domain layer has zero external dependencies."""
     pass
 
 
-@scenario("test_acceptance_event-messaging-refactor.feature", "AC-10 - 领域层不导入基础设施模型")
+@scenario("test_acceptance_event_messaging_refactor.feature", "AC-10 - 领域层不导入基础设施模型")
 def test_ac10_domain_no_infra_imports():
     """Test domain layer does not import infrastructure models."""
     pass

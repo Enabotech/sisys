@@ -145,7 +145,7 @@
 - [x] 测试数据清理策略：`repo.clear()` + `EventRegistry.reset()`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件：`tests/acceptance/test_acceptance_integration-test-framework.feature`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_integration_test_framework.feature`
 - [x] 业务方评审通过
 - [x] 所有场景覆盖（Happy Path + Edge Cases：事件重复、未知 event_type 反序列化、Mock 服务不可用）
 
@@ -183,7 +183,7 @@
 | **TDD 集成测试** | 事件冒烟 | 事件发布→内存发件箱→查询冒烟 | `test_integration_event_smoke.py` | Task 2 |
 | **TDD 集成测试** | 仓储冒烟 | 仓储接口→内存实现交互 | `test_repository_smoke.py` | Task 3 |
 | **TDD 集成测试** | 层间协作 | 应用层→领域→基础设施协作 | `test_integration_layer_collaboration.py` | Task 4 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_integration-test-framework.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_integration_test_framework.feature` | Task 0 |
 | **SDD 架构验证** | 集成测试约束 | Mock 不泄漏、测试隔离、超时配置 | `test_integration_constraints.py` | Task 5 |
 
 ---
@@ -214,7 +214,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 集成测试框架基础设施就绪 | Task 0 | SDD 规范定义（策略、Mock、数据生命周期） | `test_acceptance_integration-test-framework.feature` |
+| AC-1 | 集成测试框架基础设施就绪 | Task 0 | SDD 规范定义（策略、Mock、数据生命周期） | `test_acceptance_integration_test_framework.feature` |
 | AC-1 | 集成测试框架基础设施就绪 | Task 1 | 测试基础设施（目录、配置、fixtures、Mock、超时） | `test_integration_test_utils.py` |
 | AC-2 | 领域事件冒烟测试 | Task 2 | 事件发布→内存发件箱→查询冒烟 + EventRegistry | `test_integration_event_smoke.py` |
 | AC-3 | 仓储模式冒烟测试 | Task 3 | 仓储接口→内存实现交互 + 数据生命周期 | `test_repository_smoke.py` |
@@ -241,7 +241,7 @@
 - [ ] Subtask: 定义测试数据管理策略（独立 schema、事务回滚、数据清理）
 - [ ] Subtask: 定义测试用领域实体（与 Story 1.1 保持一致）
 - [ ] Subtask: 定义测试数据工厂（快速生成测试数据）
-- [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_integration-test-framework.feature`
+- [ ] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_integration_test_framework.feature`
 - [ ] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -511,7 +511,7 @@ sisys/
 │   │       ├── test_data_factory.py    # 测试数据工厂（生成 DomainEvent 子类）
 │   │       └── mock_services.py        # 外部服务 Mock（fakeredis + AsyncMock）
 │   └── acceptance/
-│       └── test_acceptance_integration-test-framework.feature     # Gherkin 验收测试
+│       └── test_acceptance_integration_test_framework.feature     # Gherkin 验收测试
 ├── src/
 │   ├── domain/                         # 领域层（复用 Story 1.1/1.2/1.3）
 │   ├── application/                    # 应用层（骨架类用于协作测试）
@@ -611,7 +611,7 @@ sisys/
 4. 实现了仓储模式冒烟测试（`test_repository_smoke.py`）：接口→内存实现交互、测试数据生命周期管理
 5. 实现了层间协作测试（`test_integration_layer_collaboration.py`）：应用层→领域层→基础设施层协作、错误传播
 6. 实现了集成测试约束验证（`test_integration_constraints.py`）：Mock 不泄漏、测试隔离、超时配置
-7. 创建了 Gherkin 验收测试文件（`tests/acceptance/test_acceptance_integration-test-framework.feature`）
+7. 创建了 Gherkin 验收测试文件（`tests/acceptance/test_acceptance_integration_test_framework.feature`）
 8. 创建了应用层骨架类（`DocumentProcessingUseCase`）用于协作测试
 9. 修复了 4 个测试失败（EventRegistry 导入、fakeredis NX 返回值、NameError、未知 event_type）
 10. 修复了 27 个 Ruff 代码质量问题（未使用导入、排序、未使用变量）
@@ -632,7 +632,7 @@ sisys/
 - `tests/integration/test_repository_smoke.py` — 仓储冒烟测试（接口→内存实现、数据生命周期）
 - `tests/integration/test_integration_layer_collaboration.py` — 层间协作测试（应用层→领域→基础设施、错误传播）
 - `tests/integration/test_integration_constraints.py` — 集成测试约束验证（Mock 不泄漏、测试隔离、超时配置）
-- `tests/acceptance/test_acceptance_integration-test-framework.feature` — Gherkin 验收测试
+- `tests/acceptance/test_acceptance_integration_test_framework.feature` — Gherkin 验收测试
 - `src/application/use_cases/document_processing.py` — DocumentProcessingUseCase 骨架类
 
 **修改的文件/Modified Files:**

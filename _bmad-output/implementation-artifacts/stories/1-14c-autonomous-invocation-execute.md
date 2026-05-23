@@ -186,7 +186,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_autonomous-invocation-execute.feature`（由 Dev agent 在 Task 0 创建）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_autonomous_invocation_execute.feature`（由 Dev agent 在 Task 0 创建）
 - [ ] 覆盖场景:
   - 沙箱隔离 execute → route（单一沙箱执行）
   - 状态快照持久化
@@ -227,7 +227,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 | **TDD 单元测试** | DockerSandboxAdapter | 沙箱隔离 | `test_docker_sandbox_adapter.py` | Task 1 |
 | **TDD 单元测试** | CheckpointSnapshot | 状态快照 | `test_checkpoint_snapshot.py` | Task 2 |
 | **TDD 单元测试** | RedisSnapshotStore | Redis 存储 | `test_redis_snapshot_store.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-execute.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous_invocation_execute.feature` | Task 0 |
 | **SDD 架构验证** | execute 解耦 | 六边形架构约束 | `test_execute_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端 execute 流程 | `test_integration_execute.py` | Task 3 |
 
@@ -300,7 +300,7 @@ locust -f tests/performance/execute_load_test.py --headless -r 100 -t 30s --host
 - [x] Subtask 0.6: 定义 SnapshotRepository 仓储接口（`src/domain/repositories/snapshot_repository.py`）
 - [x] Subtask 0.7: 定义 RedisSnapshotStore 存储实现（`src/infrastructure/storage/redis/redis_snapshot_store.py`）
 - [x] Subtask 0.8: 定义 AutoExecuteConfig 配置模型（`src/infrastructure/config/execute.py`）
-- [x] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_autonomous-invocation-execute.feature`（Dev agent 创建）
+- [x] Subtask 0.9: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_autonomous_invocation_execute.feature`（Dev agent 创建）
 - [x] Subtask 0.10: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -584,8 +584,8 @@ sisys/
 │   ├── integration/
 │   │   └── test_integration_execute.py
 │   └── acceptance/
-│       ├── test_acceptance_autonomous-invocation-execute.feature
-│       └── test_acceptance_autonomous-invocation-execute.py
+│       ├── test_acceptance_autonomous_invocation_execute.feature
+│       └── test_acceptance_autonomous_invocation_execute.py
 └── docs/
     └── developer/
         └── execute_mechanism_guide.md    # 执行机制实施指南
@@ -695,8 +695,8 @@ sisys/
 - `tests/unit/architecture/test_execute_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_execute_performance.py` - 性能基准测试
 - `tests/integration/test_integration_execute.py` - 集成测试
-- `tests/acceptance/test_acceptance_autonomous-invocation-execute.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
-- `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
+- `tests/acceptance/test_acceptance_autonomous_invocation_execute.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
+- `tests/acceptance/test_acceptance_autonomous_invocation_execute.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/execute_mechanism_guide.md` - 执行机制实施指南
 
 **更新的文件/Updated Files:**

@@ -168,7 +168,7 @@
   - **向后兼容**: 保持 Story 1.3 已有字段不变，更新 `from_env()` 方法
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_redis-cache-layer.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_redis_cache_layer.feature`
 - [ ] 覆盖场景:
   - 会话状态保存与恢复
   - 语义缓存命中与未命中（含命中率统计）
@@ -280,7 +280,7 @@
 - [x] Subtask: 定义 SemanticCache 接口
 - [x] Subtask: 定义 PublicBlackboard 接口
 - [x] Subtask: **扩展** RedisConfig 配置模型（新增 `retry_on_timeout`, `default_ttl`）
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_redis-cache-layer.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_redis_cache_layer.feature`
 - [x] Subtask: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -561,7 +561,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_integration_redis.py
 │   └── acceptance/
-│       └── test_acceptance_redis-cache-layer.feature
+│       └── test_acceptance_redis_cache_layer.feature
 └── docs/
     └── infrastructure/
         └── redis_cache_guide.md        # Redis 缓存层实施指南
@@ -658,7 +658,7 @@ sisys/
 - `tests/unit/domain/test_semantic_cache_interface.py` — SemanticCache 接口验证
 - `tests/unit/domain/test_public_blackboard_interface.py` — PublicBlackboard 接口验证
 - `tests/integration/test_integration_redis.py` — Redis 端到端集成测试
-- `tests/acceptance/test_acceptance_redis-cache-layer.feature` — Gherkin 验收测试
+- `tests/acceptance/test_acceptance_redis_cache_layer.feature` — Gherkin 验收测试
 - `tests/unit/infrastructure/test_redis_config_extension.py` — RedisConfig 扩展字段测试
 
 **修改的文件/Modified Files:**
@@ -700,7 +700,7 @@ sisys/
 - `tests/unit/domain/test_semantic_cache_interface.py` — SemanticCache 接口验证
 - `tests/unit/domain/test_public_blackboard_interface.py` — PublicBlackboard 接口验证
 - `tests/integration/test_integration_redis.py` — Redis 端到端集成测试
-- `tests/acceptance/test_acceptance_redis-cache-layer.feature` — Gherkin 验收测试
+- `tests/acceptance/test_acceptance_redis_cache_layer.feature` — Gherkin 验收测试
 - `docs/infrastructure/redis_cache_guide.md` — Redis 缓存层实施指南
 
 > **📌 Story 1.3 已有文件（本 Story 复用，不创建）：**
@@ -785,7 +785,7 @@ sisys/
 
 | 文件 | 问题 | 修复方案 |
 |------|------|---------|
-| `tests/acceptance/test_acceptance_redis-cache-layer.py` | 测试间 Redis 数据污染（共享状态） | 添加 `flush_redis_before_test` autouse fixture，每个测试前执行 `flushdb()` |
-| `tests/acceptance/test_acceptance_redis-cache-layer.py` | `RedisCleanup.cleanup_namespace` 未集成到测试 | 添加 `redis_cleanup` fixture，修复 `cleanup_session_namespace` 步骤调用实际清理方法 |
+| `tests/acceptance/test_acceptance_redis_cache_layer.py` | 测试间 Redis 数据污染（共享状态） | 添加 `flush_redis_before_test` autouse fixture，每个测试前执行 `flushdb()` |
+| `tests/acceptance/test_acceptance_redis_cache_layer.py` | `RedisCleanup.cleanup_namespace` 未集成到测试 | 添加 `redis_cleanup` fixture，修复 `cleanup_session_namespace` 步骤调用实际清理方法 |
 
 **测试结果：** 13 passed

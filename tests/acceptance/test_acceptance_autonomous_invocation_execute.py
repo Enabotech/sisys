@@ -39,7 +39,7 @@ from src.infrastructure.external_services.sandbox.docker_sandbox_adapter import 
 from src.infrastructure.storage.redis.redis_snapshot_store import RedisSnapshotStore
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_autonomous-invocation-execute.feature")
+scenarios("test_acceptance_autonomous_invocation_execute.feature")
 
 # ===================================================================
 # Paths & Constants

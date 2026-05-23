@@ -19,7 +19,7 @@ from typing import Any
 
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_acceptance_langgraph-agent-orchestration.feature")
+scenarios("test_acceptance_langgraph_agent_orchestration.feature")
 
 
 # =========================================================================

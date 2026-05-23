@@ -363,8 +363,8 @@
 | 备份状态 | GET | `/api/v1/security/backups/status` | 获取备份状态 | Bearer (admin) | `BackupStatusResponse` |
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature`
-- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py`（BDD 步骤实现）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_equilibrium_level_3_compliance.feature`
+- [ ] 步骤实现文件：`tests/acceptance/test_acceptance_equilibrium_level_3_compliance.py`（BDD 步骤实现）
 - [ ] 覆盖场景:
   - 入侵检测（SQL注入、XSS、暴力破解）
   - 数据完整性验证
@@ -463,8 +463,8 @@
 - [ ] Subtask 0.4: 在 `docs/api/openapi.yaml` 中定义安全监控 API 端点
 - [ ] Subtask 0.5: 创建端口契约测试 `tests/contracts/test_port_contract_equilibrium.py`
 - [ ] Subtask 0.6: 创建 API 契约测试 `tests/contracts/test_api_contract_equilibrium.py`
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature`
-- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py`
+- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.feature`
+- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.py`
 - [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 - [ ] Subtask 0.10: 在 `composition_root.py` 中注册三个新端口
 - [ ] Subtask 0.11: 定义 `StorageEncryptionServicePort` 接口（`src/domain/ports/storage_encryption_service.py`）⚠️ 新增支持十层安全
@@ -851,8 +851,8 @@ sisys/
     ├── integration/
     │   └── test_integration_equilibrium.py     # 安全层集成测试
     └── acceptance/
-        ├── test_acceptance_equilibrium-level-3-compliance.feature # Gherkin 验收测试
-        └── test_acceptance_equilibrium-level-3-compliance.py # BDD 步骤实现
+        ├── test_acceptance_equilibrium_level_3_compliance.feature # Gherkin 验收测试
+        └── test_acceptance_equilibrium_level_3_compliance.py # BDD 步骤实现
 ```
 
 ---
@@ -917,8 +917,8 @@ sisys/
 | `tests/unit/infrastructure/security/test_access_control_compliance.py` | 访问控制合规测试 | Task 1 (Subtask 1.4-1.6) |
 | `tests/unit/infrastructure/security/test_audit_compliance.py` | 安全审计合规测试 | Task 1 (Subtask 1.7-1.9) |
 | `tests/integration/test_integration_equilibrium.py` | 安全层集成测试 | Task 1 |
-| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.feature` | Gherkin 验收测试 | Task 0 (Subtask 0.7) |
-| `tests/acceptance/test_acceptance_equilibrium-level-3-compliance.py` | BDD 步骤实现 | Task 0 (Subtask 0.8) |
+| `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.feature` | Gherkin 验收测试 | Task 0 (Subtask 0.7) |
+| `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.py` | BDD 步骤实现 | Task 0 (Subtask 0.8) |
 | `tests/contracts/test_api_contract_equilibrium.py` | API 契约测试 | Task 0 (Subtask 0.6) |
 | `tests/contracts/test_port_contract_equilibrium.py` | 端口契约测试 | Task 0 (Subtask 0.5) |
 | `docs/security/equilibrium_compliance_guide.md` | 等保合规实施指南 | Task 5 |

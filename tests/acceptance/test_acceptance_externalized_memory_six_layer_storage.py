@@ -14,7 +14,7 @@ from src.infrastructure.storage.fs.file_memory_adapter import FileMemoryAdapter
 from src.infrastructure.storage.fs.memory_index import MemoryIndex
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_externalized-memory-six-layer-storage.feature")
+scenarios("test_acceptance_externalized_memory_six_layer_storage.feature")
 
 # ==============================================================================
 # Background Steps (背景步骤)

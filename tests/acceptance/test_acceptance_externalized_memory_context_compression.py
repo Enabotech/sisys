@@ -42,7 +42,7 @@ from src.infrastructure.storage.postgresql.session_context import reset_session,
 from src.infrastructure.storage.redis.redis_memory_cache import RedisMemoryCache
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_externalized-memory-context-compression.feature")
+scenarios("test_acceptance_externalized_memory_context_compression.feature")
 
 # ===================================================================
 # Paths & Constants

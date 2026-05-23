@@ -20,7 +20,7 @@ import textwrap
 
 from pytest_bdd import given, scenarios, then
 
-scenarios("test_acceptance_workflow-agent-integration.feature")
+scenarios("test_acceptance_workflow_agent_integration.feature")
 
 
 # =========================================================================

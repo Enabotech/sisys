@@ -291,7 +291,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 - [ ] 端口版本：v1.0.0，owner=platform
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_langgraph-agent-orchestration.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_langgraph_agent_orchestration.feature`
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_langgraph-agent-orchestration.py`
 - [ ] 覆盖场景：
   - LangGraphEngine 创建与配置
@@ -335,7 +335,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 | **TDD 单元测试** | BasicAgentGraph | 图执行 + 事件发布 | `test_basic_agent_graph.py` | Task 3 |
 | **TDD 单元测试** | OrchestrationService | 双引擎路由 | `test_orchestration_service.py` | Task 3（更新现有测试） |
 | **TDD 单元测试** | Composition Root | agent 注册链路 | `test_composition_root_agent.py` | Task 3 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_langgraph-agent-orchestration.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_langgraph_agent_orchestration.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_langgraph-agent-orchestration.py` | Task 0 |
 | **TDD 契约测试** | AgentEnginePort | 端口注册/解析/兼容性 | `test_port_contract_agent_engine.py` | Task 3 |
 | **SDD 架构验证** | 六边形约束 | 零越界 LangGraph 导入 | `test_langgraph_architecture.py` | Task 4 |
@@ -381,7 +381,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| 全部 | SDD 规范定义 + Gherkin 验收 | Task 0 | 0.1-0.8（规范定义+红阶段验证） | `test_acceptance_langgraph-agent-orchestration.feature`, `test_acceptance_langgraph-agent-orchestration.py` |
+| 全部 | SDD 规范定义 + Gherkin 验收 | Task 0 | 0.1-0.8（规范定义+红阶段验证） | `test_acceptance_langgraph_agent_orchestration.feature`, `test_acceptance_langgraph-agent-orchestration.py` |
 | AC-1 | AgentEnginePort Protocol | Task 1 | 1.1-1.3（Protocol 红→绿→重构） | `test_agent_engine.py` |
 | AC-2 | LangGraphConfig | Task 2 | 2.1-2.3（Config 红→绿→重构） | `test_langgraph_config.py` |
 | AC-3 | LangGraphEngine 实现 | Task 2 | 2.4-2.6（Engine 红→绿→重构） | `test_langgraph_engine.py` |
@@ -411,7 +411,7 @@ DualChannelEventBus → Outbox/RabbitMQ
 - [ ] Subtask 0.3: 定义 LangGraphEngine 适配器 Schema
 - [ ] Subtask 0.4: 定义 BasicAgentGraph + agent_nodes Schema
 - [ ] Subtask 0.5: 定义 OrchestrationService 扩展 Schema
-- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_langgraph-agent-orchestration.feature`
+- [ ] Subtask 0.6: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_langgraph_agent_orchestration.feature`
 - [ ] Subtask 0.7: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_langgraph-agent-orchestration.py`
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -791,7 +791,7 @@ sisys/
 │   ├── contracts/test_port_contract_agent_engine.py
 │   ├── integration/test_integration_langgraph_agent_orchestration.py
 │   └── acceptance/
-│       ├── test_acceptance_langgraph-agent-orchestration.feature
+│       ├── test_acceptance_langgraph_agent_orchestration.feature
 │       └── test_acceptance_langgraph-agent-orchestration.py
 ```
 
@@ -891,7 +891,7 @@ sisys/
 - `tests/unit/architecture/test_langgraph_architecture.py`
 - `tests/contracts/test_port_contract_agent_engine.py`
 - `tests/integration/test_integration_langgraph_agent_orchestration.py`
-- `tests/acceptance/test_acceptance_langgraph-agent-orchestration.feature`
+- `tests/acceptance/test_acceptance_langgraph_agent_orchestration.feature`
 - `tests/acceptance/test_acceptance_langgraph-agent-orchestration.py`
 
 **更新的文件/Updated Files:**
@@ -1008,7 +1008,7 @@ Story 1.1 (骨架) → Story 1.3 (事件总线) → Story 1.18a (Prefect 集成)
 - [x] [Review][Patch] **缺少 `_publish_agent_decided` 异常路径测试** — 已添加 4 个异常场景测试 [edge] `tests/unit/infrastructure/agent_orch/test_langgraph_engine.py`
 - [x] [Review][Patch] **`infrastructure/config/__init__.py` 文件头 docstring 被删除** — 已恢复 [auditor] `src/infrastructure/config/__init__.py`
 - [x] [Review][Patch] **`FakePublisher` 不完全满足 `EventPublisher` Protocol** — 已返回 PublishResult [edge] `tests/unit/architecture/test_langgraph_architecture.py:130-132`
-- [x] [Review][Patch] **缺少 Gherkin 验收测试文件** — Task 0 明确要求 `tests/acceptance/test_acceptance_langgraph-agent-orchestration.feature` + `test_acceptance_langgraph-agent-orchestration.py`，已创建 [auditor]
+- [x] [Review][Patch] **缺少 Gherkin 验收测试文件** — Task 0 明确要求 `tests/acceptance/test_acceptance_langgraph_agent_orchestration.feature` + `test_acceptance_langgraph-agent-orchestration.py`，已创建 [auditor]
 
 ### Deferred
 

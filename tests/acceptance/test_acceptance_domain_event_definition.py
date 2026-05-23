@@ -32,7 +32,7 @@ from src.domain.events.routing_events import RoutingDecided
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 DocumentProcessed 事件",
 )
 def test_document_processed_event():
@@ -40,7 +40,7 @@ def test_document_processed_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 ToolExecuted 事件",
 )
 def test_tool_executed_event():
@@ -48,7 +48,7 @@ def test_tool_executed_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 AgentDecided 事件",
 )
 def test_agent_decided_event():
@@ -56,7 +56,7 @@ def test_agent_decided_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 CheckpointReached 事件",
 )
 def test_checkpoint_reached_event():
@@ -64,7 +64,7 @@ def test_checkpoint_reached_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 CorrectionApproved 事件",
 )
 def test_correction_approved_event():
@@ -72,7 +72,7 @@ def test_correction_approved_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 StrategicDeviationWarning 事件",
 )
 def test_strategic_deviation_warning_event():
@@ -80,7 +80,7 @@ def test_strategic_deviation_warning_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 HeartbeatTriggered 事件",
 )
 def test_heartbeat_triggered_event():
@@ -88,7 +88,7 @@ def test_heartbeat_triggered_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 IsolationLevelSwitched 事件",
 )
 def test_isolation_level_switched_event():
@@ -96,7 +96,7 @@ def test_isolation_level_switched_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 CheckpointRecovered 事件",
 )
 def test_checkpoint_recovered_event():
@@ -104,7 +104,7 @@ def test_checkpoint_recovered_event():
 
 
 @scenario(
-    "test_acceptance_domain-event-definition.feature",
+    "test_acceptance_domain_event_definition.feature",
     "定义 RoutingDecided 事件",
 )
 def test_routing_decided_event():

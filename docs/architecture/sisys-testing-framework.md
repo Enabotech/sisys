@@ -16,8 +16,8 @@
 tests/
 ├── conftest.py              # 仅添加项目路径 (sys.path)
 ├── acceptance/              # BDD 验收测试（使用真实服务）
-│   ├── test_acceptance_event-bus-implementation.py   # 依赖 rabbitmq_publisher/consumer fixtures
-│   ├── test_acceptance_qdrant-vector-layer.py   # 依赖 vector_storage/collection_manager fixtures
+│   ├── test_acceptance_event_bus_implementation.py   # 依赖 rabbitmq_publisher/consumer fixtures
+│   ├── test_acceptance_qdrant_vector_layer.py   # 依赖 vector_storage/collection_manager fixtures
 │   └── test_story_*.feature     # Gherkin 场景定义
 ├── integration/              # 集成测试（使用 fakeredis mock）
 │   └── conftest.py          # 提供 mock fixtures (scope=function)
@@ -166,7 +166,7 @@ tests/
 
 #### 3.1.1 修复 `async_consume()` 永久阻塞问题
 
-**文件**: `tests/acceptance/test_acceptance_event-bus-implementation.py`
+**文件**: `tests/acceptance/test_acceptance_event_bus_implementation.py`
 
 **问题代码**:
 ```python
@@ -345,7 +345,7 @@ if self._connection and not self._connection.is_closed:
 
 #### 3.1.2 修复 `collection_has_different_domains` fixture
 
-**文件**: `tests/acceptance/test_acceptance_qdrant-vector-layer.py`
+**文件**: `tests/acceptance/test_acceptance_qdrant_vector_layer.py`
 
 **问题代码**:
 ```python
@@ -1607,7 +1607,7 @@ def reset_test_environment():
 
 #### P1: 修复 `async_consume()` 永久阻塞
 
-- [ ] **1.1** 在 `test_acceptance_event-bus-implementation.py` 中创建 `temporary_consumer` 异步上下文管理器
+- [ ] **1.1** 在 `test_acceptance_event_bus_implementation.py` 中创建 `temporary_consumer` 异步上下文管理器
   - 使用 `asyncio.create_task()` 后台运行 consumer，不阻塞
   - 包含 setup/cleanup 顺序正确
   - 参考实现：文档 3.1.1 节
@@ -1618,7 +1618,7 @@ def reset_test_environment():
 
 - [ ] **1.3** 验证修复：本地运行 `test_ac2_rabbitmq_documentprocessed`
   ```bash
-  poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py::test_ac2_rabbitmq_documentprocessed -v
+  poetry run pytest tests/acceptance/test_acceptance_event_bus_implementation.py::test_ac2_rabbitmq_documentprocessed -v
   ```
 
 - [ ] **1.4** 验证修复：CI 环境运行相同测试
@@ -1628,13 +1628,13 @@ def reset_test_environment():
 
 #### P2: 修复 `collection_has_different_domains` 缺少 create_collection
 
-- [ ] **2.1** 在 `test_acceptance_qdrant-vector-layer.py` 的 `collection_has_different_domains` 中添加 collection 创建
+- [ ] **2.1** 在 `test_acceptance_qdrant_vector_layer.py` 的 `collection_has_different_domains` 中添加 collection 创建
   - 调用 `collection_manager.create_collection()` 先于 `upsert_points()`
   - 处理 collection 已存在的异常（ignore if exists）
 
 - [ ] **2.2** 验证修复：本地运行 `test_dense_search_with_filter`
   ```bash
-  poetry run pytest tests/acceptance/test_acceptance_qdrant-vector-layer.py::test_dense_search_with_filter -v
+  poetry run pytest tests/acceptance/test_acceptance_qdrant_vector_layer.py::test_dense_search_with_filter -v
   ```
 
 #### P6: 修复 event_loop scope 问题
@@ -1671,12 +1671,12 @@ def reset_test_environment():
 
 - [ ] **3.4** 验证：无状态污染，运行多次同一测试
   ```bash
-  poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py -v --count 3
+  poetry run pytest tests/acceptance/test_acceptance_event_bus_implementation.py -v --count 3
   ```
 
 **P6 修复验证清单：**
-- [ ] `tests/acceptance/test_acceptance_event-bus-implementation.py` 中无 `event_loop` fixture
-- [ ] `tests/acceptance/test_acceptance_qdrant-vector-layer.py` 中无 `event_loop` fixture
+- [ ] `tests/acceptance/test_acceptance_event_bus_implementation.py` 中无 `event_loop` fixture
+- [ ] `tests/acceptance/test_acceptance_qdrant_vector_layer.py` 中无 `event_loop` fixture
 - [ ] 所有 async fixtures 使用 `async def` 而非手动管理事件循环
 
 ---
@@ -1780,11 +1780,11 @@ def reset_test_environment():
 
 - [ ] **7.4** 添加 `autouse=True` 的 `reset_test_environment` fixture
 
-- [ ] **7.5** 更新 `tests/acceptance/test_acceptance_event-bus-implementation.py` 使用租户隔离
+- [ ] **7.5** 更新 `tests/acceptance/test_acceptance_event_bus_implementation.py` 使用租户隔离
   - 为队列名添加租户前缀
   - 为 Redis keys 添加租户前缀
 
-- [ ] **7.6** 更新 `tests/acceptance/test_acceptance_qdrant-vector-layer.py` 使用租户隔离
+- [ ] **7.6** 更新 `tests/acceptance/test_acceptance_qdrant_vector_layer.py` 使用租户隔离
   - 为 collection 名称添加租户前缀
 
 - [ ] **7.7** 验证：并发运行测试无冲突
@@ -1844,7 +1844,7 @@ Worker 进程 A                         Worker 进程 B
 
 - [ ] **8.4** 架构约束验证测试通过
   ```bash
-  poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py::test_ac6_architecture_constraints -v
+  poetry run pytest tests/acceptance/test_acceptance_event_bus_implementation.py::test_ac6_architecture_constraints -v
   ```
 
 #### 优化
@@ -1874,8 +1874,8 @@ Worker 进程 A                         Worker 进程 B
 | 序号 | 检查项 | 影响测试 |
 |------|--------|---------|
 | **A1** | 检查所有 fixtures 是否为 `scope=function`（非 module/session） | 全部 12 个 |
-| **A2** | `test_acceptance_event-bus-implementation.py` 修复 `async_consume()` 阻塞问题 | Story 1.3 |
-| **A3** | `test_acceptance_qdrant-vector-layer.py` 修复 `collection_has_different_domains` 缺少 create_collection | Story 1.6 |
+| **A2** | `test_acceptance_event_bus_implementation.py` 修复 `async_consume()` 阻塞问题 | Story 1.3 |
+| **A3** | `test_acceptance_qdrant_vector_layer.py` 修复 `collection_has_different_domains` 缺少 create_collection | Story 1.6 |
 | **A4** | 为所有队列名添加租户前缀 `test_{uuid}_queue` | 全部 12 个 |
 | **A5** | 为所有 Redis keys 添加租户前缀 `test:{uuid}:` | 全部 12 个 |
 | **A6** | 为所有 Qdrant collections 添加租户前缀 `test_{uuid}_` | 全部 12 个 |
@@ -1888,18 +1888,18 @@ Worker 进程 A                         Worker 进程 B
 
 | 文件 | step 函数数 | 主要服务依赖 | 需隔离资源 |
 |------|------------|------------|-----------|
-| `test_acceptance_hexagonal-architecture-skeleton.py` | 104 | Redis | channels/keys |
-| `test_acceptance_domain-event-definition.py` | 111 | Redis, PostgreSQL | keys, schemas |
-| `test_acceptance_event-bus-implementation.py` | 103 | RabbitMQ, Redis | queues, keys | ← P1 修复 |
-| `test_acceptance_redis-cache-layer.py` | 109 | PostgreSQL, Redis | schemas, keys |
-| `test_acceptance_postgresql-relational-layer.py` | 149 | Neo4j, Redis | graphs, keys |
-| `test_acceptance_qdrant-vector-layer.py` | 67 | Qdrant | collections | ← P2 修复 |
-| `test_acceptance_minio-object-layer.py` | 83 | RabbitMQ | queues, exchanges |
-| `test_acceptance_neo4j-graph-layer.py` | 88 | RabbitMQ | queues, exchanges |
-| `test_acceptance_rbac-permission-management.py` | 238 | Neo4j, PostgreSQL | graphs, schemas |
-| `test_acceptance_unified-audit-log.py` | 190 | PostgreSQL, MinIO | schemas, buckets |
-| `test_acceptance_data-sovereignty-isolation.py` | 371 | PostgreSQL, Redis | schemas, keys |
-| `test_acceptance_k8s-auto-scaling.py` | 80 | PostgreSQL, Neo4j | schemas, graphs |
+| `test_acceptance_hexagonal_architecture_skeleton.py` | 104 | Redis | channels/keys |
+| `test_acceptance_domain_event_definition.py` | 111 | Redis, PostgreSQL | keys, schemas |
+| `test_acceptance_event_bus_implementation.py` | 103 | RabbitMQ, Redis | queues, keys | ← P1 修复 |
+| `test_acceptance_redis_cache_layer.py` | 109 | PostgreSQL, Redis | schemas, keys |
+| `test_acceptance_postgresql_relational_layer.py` | 149 | Neo4j, Redis | graphs, keys |
+| `test_acceptance_qdrant_vector_layer.py` | 67 | Qdrant | collections | ← P2 修复 |
+| `test_acceptance_minio_object_layer.py` | 83 | RabbitMQ | queues, exchanges |
+| `test_acceptance_neo4j_graph_layer.py` | 88 | RabbitMQ | queues, exchanges |
+| `test_acceptance_rbac_permission_management.py` | 238 | Neo4j, PostgreSQL | graphs, schemas |
+| `test_acceptance_unified_audit_log.py` | 190 | PostgreSQL, MinIO | schemas, buckets |
+| `test_acceptance_data_sovereignty_isolation.py` | 371 | PostgreSQL, Redis | schemas, keys |
+| `test_acceptance_k8s_auto_scaling.py` | 80 | PostgreSQL, Neo4j | schemas, graphs |
 
 ---
 
@@ -2057,8 +2057,8 @@ tests/
 ├── fixtures.py              # [新建] 测试资源清理 fixtures
 ├── conftest.py              # [更新] 添加隔离 fixtures
 └── acceptance/
-    ├── test_acceptance_event-bus-implementation.py  # [更新] 修复 async_consume 问题
-    └── test_acceptance_qdrant-vector-layer.py  # [更新] 修复 collection 创建问题
+    ├── test_acceptance_event_bus_implementation.py  # [更新] 修复 async_consume 问题
+    └── test_acceptance_qdrant_vector_layer.py  # [更新] 修复 collection 创建问题
 
 deploy/app/
 └── docker-compose.test.yml  # [新建] 测试专用 docker-compose
@@ -2082,8 +2082,8 @@ export SISYS_TEST_ENV=local
 poetry run pytest tests/acceptance -v --tb=short
 
 # 3. 验证租户隔离
-poetry run pytest tests/acceptance/test_acceptance_event-bus-implementation.py::test_ac2_rabbitmq_documentprocessed -v
-poetry run pytest tests/acceptance/test_acceptance_qdrant-vector-layer.py::test_dense_search_with_filter -v
+poetry run pytest tests/acceptance/test_acceptance_event_bus_implementation.py::test_ac2_rabbitmq_documentprocessed -v
+poetry run pytest tests/acceptance/test_acceptance_qdrant_vector_layer.py::test_dense_search_with_filter -v
 
 # 4. 清理
 docker compose -f deploy/app/docker-compose.test.yml down -v
