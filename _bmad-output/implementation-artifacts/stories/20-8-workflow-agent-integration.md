@@ -116,10 +116,10 @@
 **Then** 覆盖双引擎提交、状态查询、事件发布的完整流程
 
 **验证标准:**
-- [ ] `tests/acceptance/test_acceptance_workflow-agent-integration.feature` 包含双引擎集成场景
+- [ ] `tests/acceptance/test_acceptance_workflow-agent-integration.feature` 包含双引擎集成场景（6 个场景）
 - [ ] `tests/acceptance/test_acceptance_workflow-agent-integration.py` 实现步骤函数
-- [ ] 场景覆盖：data_pipeline 提交、agent_reasoning 提交、状态查询、事件发布
-- [ ] 使用真实 DI 容器（`CompositionRoot`）
+- [ ] 场景覆盖：data_pipeline 提交（AC-1）、agent_reasoning 提交、状态查询、事件发布（AC-1）、双引擎对称性（AC-2）、通道注册（AC-3）
+- [ ] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK，不依赖真实 server）
 
 ### AC-5: 设计文档与代码对齐验证
 
@@ -279,10 +279,12 @@
   - `__post_init__`：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`
   - `event_type` 声明：`event_type: str = field(default="WorkflowSubmitted", init=False)`
 - [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow-agent-integration.feature`
-  - 场景1: 数据管道工作流提交
-  - 场景2: Agent 推理任务提交
-  - 场景3: 双引擎状态查询
-  - 场景4: PrefectEngine 事件发布
+  - 场景1: 数据管道工作流提交（覆盖 AC-1/AC-5）
+  - 场景2: Agent 推理任务提交（覆盖 AC-5）
+  - 场景3: 双引擎状态查询（覆盖 AC-5）
+  - 场景4: PrefectEngine 事件发布（覆盖 AC-1）
+  - 场景5: 双引擎事件发布对称性验证（覆盖 AC-2）
+  - 场景6: WorkflowSubmitted 事件总线通道注册（覆盖 AC-3）
 - [ ] Subtask 0.3: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_workflow-agent-integration.py`
 - [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -405,16 +407,18 @@
 | 🔄 重构 | 统一断言表达 |
 
 - [ ] Subtask 4.0: 🔴 红 — 运行 Gherkin 场景，确认步骤未实现导致测试失败
-- [ ] Subtask 4.1: 🟢 绿 — 实现 DI 容器初始化步骤
-- [ ] Subtask 4.2: 🟢 绿 — 实现 data_pipeline 提交步骤
-- [ ] Subtask 4.3: 🟢 绿 — 实现 agent_reasoning 提交步骤
-- [ ] Subtask 4.4: 🟢 绿 — 实现状态查询验证步骤
-- [ ] Subtask 4.5: 🟢 绿 — 实现事件发布验证步骤
-- [ ] Subtask 4.6: 🔄 重构 — 运行全部验收测试
+- [ ] Subtask 4.1: 🟢 绿 — 实现 DI 容器初始化步骤（使用测试专用 DI 容器，mock Prefect/LangGraph SDK 客户端）
+- [ ] Subtask 4.2: 🟢 绿 — 实现 data_pipeline 提交步骤（场景1）
+- [ ] Subtask 4.3: 🟢 绿 — 实现 agent_reasoning 提交步骤（场景2）
+- [ ] Subtask 4.4: 🟢 绿 — 实现状态查询验证步骤（场景3）
+- [ ] Subtask 4.5: 🟢 绿 — 实现事件发布验证步骤（场景4）
+- [ ] Subtask 4.6: 🟢 绿 — 实现双引擎事件发布对称性验证步骤（场景5，覆盖 AC-2）
+- [ ] Subtask 4.7: 🟢 绿 — 实现通道注册验证步骤（场景6，覆盖 AC-3）
+- [ ] Subtask 4.8: 🔄 重构 — 运行全部验收测试
 
 **完成标准:**
-- [ ] 所有 Gherkin 场景通过
-- [ ] 使用真实 DI 容器
+- [ ] 所有 Gherkin 场景（1-6）通过
+- [ ] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK）
 
 ---
 
@@ -550,7 +554,7 @@ async def _publish_agent_decided(self, agent_id, result, run_id):
 **关键学习/Key Learnings:**
 - 事件发布异常**必须**独立于引擎执行状态（LangGraphEngine 在 catch 中不覆写 COMPLETED）
 - `PublishResult` 返回值理论上非 None（Protocol 声明 `-> PublishResult`），但 LangGraphEngine 使用防御性 None 检查，PrefectEngine 保持对称
-- `_env_int` 配置异常需包装含键名上下文
+- `_env_int` 配置异常包装：LangGraphConfig 已实现（含键名上下文），PrefectConfig 尚未统一（可选优化项）
 - Gherkin 步骤函数不使用 `@pytest.mark.asyncio`，用 `event_loop.run_until_complete()`
 - BDD 步骤中同一中文文本可能需要同时支持 given/when 装饰器
 
@@ -669,6 +673,9 @@ src/
 | 5 | Task 4 缺失红阶段验证 Subtask | P1 | 新增 Subtask 4.0 红阶段验证 |
 | 6 | `test_workflow_events.py` 标注为"待创建"但已存在 | P1 | 修正为"待修改" |
 | 7 | 缺失模板必需章节：文档审查修复、代码审查发现 | P0 | 新增两个章节 |
+| 8 | AC-2/AC-3 完全缺乏 Gherkin 场景覆盖 | P0 | 新增场景5（双引擎对称性）和场景6（通道注册），补充 Subtask 4.6/4.7 |
+| 9 | DI 容器在测试环境可行性未明确 | P0 | Subtask 4.1 添加 mock 策略说明，AC-4 修改为"测试专用 DI 容器" |
+| 10 | `_env_int` 学习经验描述不够精确 | P2 | 标注 PrefectConfig 尚未统一（可选优化项） |
 
 ### 🔍 代码审查发现 Review Findings
 
@@ -680,16 +687,16 @@ src/
 - [x] [20-8-P0-1][Review][Patch] AC-1 验证标准错误引用 `self._runs` — 修正为"不影响 submit_flow 返回值（flow_run_id 正常返回）"
 - [x] [20-8-P0-2][Review][Patch] Protocol 契约与防御性 None 检查说明 — 标注 Protocol 返回类型，添加契约说明段落
 - [x] [20-8-P0-3][Review][Patch] 设计文档偏离声明缺失 — 新增偏离声明段落、Subtask 6.5 设计文档同步检查项、文件清单追加
-- [x] [20-8-P1-4][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
-- [x] [20-8-P1-5][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
-- [x] [20-8-P1-6][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
+- [x] [20-8-P1-1][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
+- [x] [20-8-P1-2][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
+- [x] [20-8-P1-3][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
 
 #### 已推迟 Defer
 
-- [x] [20-8-P2][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
-- [x] [20-8-P2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
-- [x] [20-8-P2][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
-- [x] [20-8-P2][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
+- [x] [20-8-P2-1][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
+- [x] [20-8-P2-2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
+- [x] [20-8-P2-3][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
+- [x] [20-8-P2-4][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
 
 ---
 

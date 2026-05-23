@@ -572,15 +572,15 @@
 
 #### 需决策 Decision Needed
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] **`_build_graph` 需添加 `graph_name` 白名单校验 + 日志警告** — 决策：Option C，对不支持的 graph_name 记录 WARNING 日志但不抛异常，MVP 仅支持 `"BasicAgent"` [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch | Defer] **`_build_graph` 需添加 `graph_name` 白名单校验 + 日志警告** — 决策：Option C，对不支持的 graph_name 记录 WARNING 日志但不抛异常，MVP 仅支持 `"BasicAgent"` [blind+edge] `src/infrastructure/agent_orch/langgraph_engine.py:104-123`
 
 #### 已修复 Patch
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] Async handlers未await [redis_subscriber.py:174] — _dispatch_message需async并await协程
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Patch] Async handlers未await [redis_subscriber.py:174] — _dispatch_message需async并await协程
 
 #### 已推迟 Defer
 
-- [x] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] HEAD请求405误判 — deferred，可达性检测对MVP足够
+- [ ] [{故事编号n-m}-{优先级P0~2}-{问题编号}][Review][Defer] HEAD请求405误判 — deferred，可达性检测对MVP足够
 
 ---
 
