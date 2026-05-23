@@ -300,11 +300,11 @@
 
 | 阶段 | 动作 |
 |------|------|
-| 🔴 红 | 编写 `tests/unit/domain/events/test_workflow_events.py`（WorkflowSubmitted 创建、字段验证、aggregate_type 自动填充） |
+| 🔴 红 | 修改 `tests/unit/domain/events/test_workflow_events.py`，新增 TestWorkflowSubmittedEvent 测试类（WorkflowSubmitted 创建、字段验证、aggregate_type 自动填充） |
 | 🟢 绿 | 在 `src/domain/events/workflow_events.py` 添加 WorkflowSubmitted 事件类 |
 | 🔄 重构 | 对齐 RAGIndexed 事件类模式，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写 WorkflowSubmitted 事件类失败测试
+- [ ] Subtask 1.1: 🔴 红 — 修改 test_workflow_events.py，新增 WorkflowSubmitted 失败测试
 - [ ] Subtask 1.2: 🟢 绿 — 实现 WorkflowSubmitted 事件类
 - [ ] Subtask 1.3: 🔄 重构 — 对齐代码风格
 
@@ -404,6 +404,7 @@
 | 🟢 绿 | 实现 BDD 步骤函数 |
 | 🔄 重构 | 统一断言表达 |
 
+- [ ] Subtask 4.0: 🔴 红 — 运行 Gherkin 场景，确认步骤未实现导致测试失败
 - [ ] Subtask 4.1: 🟢 绿 — 实现 DI 容器初始化步骤
 - [ ] Subtask 4.2: 🟢 绿 — 实现 data_pipeline 提交步骤
 - [ ] Subtask 4.3: 🟢 绿 — 实现 agent_reasoning 提交步骤
@@ -621,12 +622,12 @@ src/
 ### 文件清单
 
 **待创建的文件:**
-- `tests/unit/domain/events/test_workflow_events.py` — WorkflowSubmitted 单元测试
 - `tests/integration/test_integration_workflow_agent_integration.py` — 双引擎集成测试
 - `tests/acceptance/test_acceptance_workflow-agent-integration.feature` — Gherkin 场景
 - `tests/acceptance/test_acceptance_workflow-agent-integration.py` — BDD 步骤实现
 
 **待修改的文件:**
+- `tests/unit/domain/events/test_workflow_events.py` — 新增 WorkflowSubmitted 测试类（文件已存在）
 - `src/domain/events/workflow_events.py` — 添加 WorkflowSubmitted 事件类
 - `src/domain/events/__init__.py` — 导出 WorkflowSubmitted（更新 `__all__`）
 - `src/infrastructure/workflow/prefect_engine.py` — 添加事件发布方法
@@ -657,9 +658,42 @@ src/
 4. [x] Previous story learnings integrated 前置故事学习经验已整合
 5. [ ] Sprint status synced to `ready-for-dev`
 
+### 🔧 文档审查修复 Docs Review Fixes
+
+| # | 问题 | 严重度 | 修复方案 |
+|---|------|--------|----------|
+| 1 | AC-1 验证标准错误引用 `self._runs`（PrefectEngine 无此属性） | P0 | 修正为 "不影响 `submit_flow` 返回值" |
+| 2 | EventPublisher Protocol 声明返回 `PublishResult` 非 Optional，文档要求检查 None | P0 | 标注为防御性检查，添加 Protocol 契约说明段落 |
+| 3 | 设计文档 v2.6 Section 4.2 声明 "PrefectEngine 不发布事件"，与本 Story 目标冲突 | P0 | 添加设计偏离声明，添加设计文档同步更新检查项 |
+| 4 | `event_type` 字段位置与 workflow_events.py 现有风格不一致 | P1 | 统一到最后位置，与 RAGIndexed/ReportGenerated 一致 |
+| 5 | Task 4 缺失红阶段验证 Subtask | P1 | 新增 Subtask 4.0 红阶段验证 |
+| 6 | `test_workflow_events.py` 标注为"待创建"但已存在 | P1 | 修正为"待修改" |
+| 7 | 缺失模板必需章节：文档审查修复、代码审查发现 | P0 | 新增两个章节 |
+
+### 🔍 代码审查发现 Review Findings
+
+**审查日期:** 2026-05-23
+**审查模式:** full（3 Agent 并行代码调研 + 模板规范合规性验证）
+
+#### 已修复 Patch
+
+- [x] [20-8-P0-1][Review][Patch] AC-1 验证标准错误引用 `self._runs` — 修正为"不影响 submit_flow 返回值（flow_run_id 正常返回）"
+- [x] [20-8-P0-2][Review][Patch] Protocol 契约与防御性 None 检查说明 — 标注 Protocol 返回类型，添加契约说明段落
+- [x] [20-8-P0-3][Review][Patch] 设计文档偏离声明缺失 — 新增偏离声明段落、Subtask 6.5 设计文档同步检查项、文件清单追加
+- [x] [20-8-P1-4][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
+- [x] [20-8-P1-5][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
+- [x] [20-8-P1-6][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
+
+#### 已推迟 Defer
+
+- [x] [20-8-P2][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
+- [x] [20-8-P2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
+- [x] [20-8-P2][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
+- [x] [20-8-P2][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
+
 ---
 
-### 下一步
+### 下一步 Next Steps
 
 - [x] Story created with `ready-for-dev` status
 - [ ] 运行 `dev-story` 开始实施
@@ -667,10 +701,11 @@ src/
 
 ---
 
-**故事版本:** v1.2.0
+**故事版本:** v1.3.0
 **创建日期:** 2026-05-23
 **最后更新:** 2026-05-23
 **更新说明:**
+- v1.3.0: R3 模板合规性审查 — 新增文档审查修复章节（P0）、新增代码审查发现章节（P0）、Task 4 补充红阶段 Subtask 4.0（P1）、修正 test_workflow_events.py 文件状态为"待修改"（P1）、修正 Subtask 1.1 描述为"修改"（P1）
 - v1.2.0: R2 正确性审查 — 修正 AC-1 验证标准错误引用 self._runs（P0-1）、标注 Protocol 契约与防御性 None 检查（P0-2）、新增设计文档偏离声明与更新提醒（P0-3）、修正 event_type 字段位置到 workflow_events.py 风格（P1-4）、新增 Subtask 6.5 设计文档同步检查项
 - v1.1.0: R1 正确性审查 — 补充 __init__.py/event_channels.yaml 到文件清单，修正端口注册位置，补充 __post_init__ 模式，修正 AgentDecided 代码片段字段顺序
 - v1.0.0: 创建故事文件
