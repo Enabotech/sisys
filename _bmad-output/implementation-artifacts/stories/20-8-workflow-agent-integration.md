@@ -682,32 +682,6 @@ src/
 | 11 | 追溯矩阵 AC-3 测试文件路径错误 + 缺少 AC-2/AC-3 验收覆盖行 | P1 | 修正为 test_channel_router.py，新增 AC-2/AC-3 验收测试行 |
 | 12 | Task 4 头部 AC 关联不完整 | P1 | 修正为 AC-2, AC-3, AC-4 |
 | 13 | 测试分类表缺少通道注册测试行 | P2 | 新增 test_channel_router.py 归属 Task 1 |
-### 🔍 代码审查发现 Review Findings
-
-**审查日期:** 2026-05-23
-**审查模式:** full（3 Agent 并行代码调研 + 模板规范合规性验证）
-
-#### 已修复 Patch
-
-- [ ] [20-8-P0-1][Review][Patch] AC-1 验证标准错误引用 `self._runs` — 修正为"不影响 submit_flow 返回值（flow_run_id 正常返回）"
-- [ ] [20-8-P0-2][Review][Patch] Protocol 契约与防御性 None 检查说明 — 标注 Protocol 返回类型，添加契约说明段落
-- [ ] [20-8-P0-3][Review][Patch] 设计文档偏离声明缺失 — 新增偏离声明段落、Subtask 6.5 设计文档同步检查项、文件清单追加
-- [ ] [20-8-P1-1][Review][Patch] event_type 字段位置不一致 — 统一到 workflow_events.py 现有风格
-- [ ] [20-8-P1-2][Review][Patch] Task 4 缺失红阶段 — 新增 Subtask 4.0
-- [ ] [20-8-P1-3][Review][Patch] 测试文件状态标注错误 — test_workflow_events.py 改为"待修改"
-- [ ] [20-8-P0-4][Review][Patch] AC-2/AC-3 缺乏 Gherkin 场景覆盖 — 新增场景5（对称性验证）和场景6（通道注册），补充 Subtask 4.6/4.7
-- [x] [20-8-P0-5][Review][Patch] DI 容器测试可行性未明确 — Subtask 4.1 添加 mock 策略说明，AC-4 改为"测试专用 DI 容器"
-- [x] [20-8-P2-5][Review][Patch] _env_int 学习经验描述不够精确 — 标注 PrefectConfig 尚未统一
-- [x] [20-8-P1-4][Review][Patch] 追溯矩阵 AC-3 测试文件路径错误 — 修正为 test_channel_router.py，新增 AC-2/AC-3 验收测试行
-- [x] [20-8-P1-5][Review][Patch] Task 4 头部 AC 关联不完整 — 修正为 AC-2, AC-3, AC-4
-- [x] [20-8-P2-6][Review][Patch] 测试分类表缺少通道注册测试行 — 新增 test_channel_router.py 归属 Task 1
-
-#### 已推迟 Defer
-
-- [ ] [20-8-P2-1][Review][Defer] SDD 章节标题缺失英文副标题（11处） — deferred，不影响开发执行
-- [ ] [20-8-P2-2][Review][Defer] "测试隔离约束" 简化 — deferred，本 Story 测试以 mock 为主，过度约束增加噪音
-- [ ] [20-8-P2-3][Review][Defer] "覆盖率要求" 缺失分层覆盖率 — deferred，本 Story 主要涉及基础设施层和领域事件
-- [ ] [20-8-P2-4][Review][Defer] "关键架构决策" 格式与模板不一致 — deferred，当前简化表足够清晰
 
 ---
 
