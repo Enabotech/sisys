@@ -48,6 +48,7 @@ class PrefectEngine:
 
         使用 Prefect 推荐的 deployment 模式触发远程工作流，
         避免直接使用 Flow 对象（仅适用于进程内调用）。
+        成功后发布 WorkflowSubmitted 事件。
 
         Args:
             flow_name: Deployment 名称，格式为 <FLOW_NAME>/<DEPLOYMENT_NAME>
@@ -70,11 +71,19 @@ class PrefectEngine:
                     deployment_id=deployment.id,
                     parameters=parameters,
                 )
-                return str(flow_run.id)
+                flow_run_id = str(flow_run.id)
         except ValueError:
             raise
         except Exception as e:
             raise RuntimeError(f"提交工作流失败 [{flow_name}]: {e}") from e
+
+        # 事件发布独立于工作流提交，失败不影响返回值
+        try:
+            await self._publish_workflow_submitted(uuid.UUID(flow_run_id), flow_name, parameters)
+        except Exception:
+            logger.exception("WorkflowSubmitted 事件发布异常 [flow_run_id=%s]", flow_run_id)
+
+        return flow_run_id
 
     async def get_flow_status(self, flow_run_id: str) -> FlowStatus:
         """查询工作流状态
@@ -127,3 +136,28 @@ class PrefectEngine:
             return FlowStatus.FAILED
         # CANCELLED, CRASHED, CANCELLING, PAUSED → FAILED
         return FlowStatus.FAILED
+
+    async def _publish_workflow_submitted(self, flow_run_id: uuid.UUID, flow_name: str, parameters: dict[str, Any]) -> None:
+        """发布 WorkflowSubmitted 领域事件
+
+        Args:
+            flow_run_id: 工作流运行标识符
+            flow_name: 工作流名称
+            parameters: 工作流参数
+        """
+        from src.domain.events.workflow_events import WorkflowSubmitted
+
+        event = WorkflowSubmitted(
+            flow_run_id=flow_run_id,
+            flow_name=flow_name,
+            parameters=parameters,
+        )
+        publish_result = await self._event_publisher.publish(event)
+        if publish_result is None:
+            logger.warning("WorkflowSubmitted 事件发布返回 None [flow_run_id=%s]", flow_run_id)
+        elif publish_result.is_full_failure:
+            logger.warning(
+                "WorkflowSubmitted 事件发布全部失败 [flow_run_id=%s]: %s",
+                flow_run_id,
+                publish_result,
+            )

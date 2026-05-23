@@ -364,13 +364,14 @@ graph LR
 1. **Deployment 远程提交模式** — 通过 `get_client()` 调用 Prefect API，避免进程内 Flow 耦合
 2. **9→5 状态映射** — Prefect 的 9 种 StateType 映射为 5 种 FlowStatus（`_map_state_type`）
 3. **重试感知** — 通过 `run_count < max_retries` 区分 FAILED 和 RETRYING
-4. **事件发布责任** — Flow 内部发布（非 Engine 层），PrefectEngine 本身不发布领域事件
+4. **事件发布责任** — Engine 层发布 `WorkflowSubmitted` 领域事件，通过 `_publish_workflow_submitted()` 方法（Story 20-8 更新）
 
 ```
 PrefectEngine
-├── submit_flow()     → get_client() → read_deployment_by_name() → create_flow_run_from_deployment()
-├── get_flow_status() → get_client() → read_flow_run() → _map_state_type()
-└── _map_state_type() → StateType → FlowStatus 映射
+├── submit_flow()                → get_client() → read_deployment_by_name() → create_flow_run_from_deployment() → _publish_workflow_submitted()
+├── get_flow_status()            → get_client() → read_flow_run() → _map_state_type()
+├── _map_state_type()            → StateType → FlowStatus 映射
+└── _publish_workflow_submitted() → WorkflowSubmitted event → event_publisher.publish()
 ```
 
 ### 4.3 LangGraphEngine 适配器
@@ -423,15 +424,15 @@ class XxxConfig:
 
 ### 5.1 双通道事件发布策略差异
 
-两个引擎的事件发布策略存在结构性差异：
+两个引擎的事件发布策略遵循对称模式（Story 20-8 统一）：
 
 | 维度 | Prefect | LangGraph |
 |------|---------|-----------|
-| **发布位置** | Flow 内部（业务代码） | Engine 层（适配器） |
-| **发布时机** | 工作流步骤执行后 | 状态图执行完成后 |
-| **事件类型** | 业务领域事件（如 DocumentProcessed） | Agent 决策事件（AgentDecided） |
-| **通道选择** | 由 Flow 内部决定 | 由 Engine 决定 |
-| **失败策略** | Flow 内部处理 | Engine 捕获异常，记录日志不回写 FAILED |
+| **发布位置** | Engine 层（适配器） | Engine 层（适配器） |
+| **发布时机** | 工作流提交成功后 | 状态图执行完成后 |
+| **事件类型** | 工作流提交事件（WorkflowSubmitted） | Agent 决策事件（AgentDecided） |
+| **通道选择** | 由 Engine 决定（RELIABLE） | 由 Engine 决定（RELIABLE） |
+| **失败策略** | Engine 捕获异常，记录日志不影响返回值 | Engine 捕获异常，记录日志不回写 FAILED |
 
 ### 5.2 LangGraph 事件发布流程
 
@@ -458,7 +459,7 @@ sequenceDiagram
 
 ### 5.3 PublishResult 检查
 
-LangGraphEngine 的事件发布遵循 PublishResult 检查模式（PrefectEngine 的事件发布由 Flow 内部处理，参见 Section 4.2，不在 Engine 层发布）：
+双引擎的事件发布均遵循相同的 PublishResult 检查模式（Story 20-8 统一）：
 
 ```python
 publish_result = await self._event_publisher.publish(event)
@@ -468,7 +469,8 @@ elif publish_result.is_full_failure:
     logger.warning("事件发布全部失败: %s", publish_result)
 ```
 
-**说明**：LangGraphEngine 在发布 `AgentDecided` 事件时，当前硬编码 `confidence=0.9`，后续可根据 Agent 决策模型输出动态调整。
+**PrefectEngine** 发布 `WorkflowSubmitted` 事件，包含 `flow_run_id`、`flow_name`、`parameters` 字段。
+**LangGraphEngine** 发布 `AgentDecided` 事件，包含 `agent_id`、`decision_result`、`confidence` 字段。
 
 **设计决策：事件发布失败不回写引擎执行状态**。
 

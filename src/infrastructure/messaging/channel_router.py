@@ -212,6 +212,12 @@ class ChannelRouter:
             delivery_mode=DeliveryMode.RELIABLE,
             description="报告生成完成",
         ),
+        "WorkflowSubmitted": ChannelMapping(
+            event_type="WorkflowSubmitted",
+            rabbitmq_routing_key="sisys.events.reliable.workflow_submitted",
+            delivery_mode=DeliveryMode.RELIABLE,
+            description="工作流提交完成",
+        ),
     }
 
     def __init__(self, load_defaults: bool = True) -> None:

@@ -2,7 +2,7 @@
 root_package = src
 include_external_packages = True
 
-# P0-05 Fix (corrected): Domain layer must not import any external packages.
+# Domain layer must not import any external packages.
 # Uses forbidden type with a comprehensive list of known external dependencies.
 # This is NOT an independence constraint — it only restricts src.domain.
 [importlinter:contract:domain-no-external-dependencies]
@@ -39,6 +39,9 @@ forbidden_modules =
     src.infrastructure
 
 # Correct dependency direction: interfaces -> application -> domain
+# (infrastructure is intentionally omitted to avoid a false linear ordering,
+# because infrastructure is allowed to import application, but application
+# must not import infrastructure.)
 [importlinter:contract:dependency-direction]
 name = Dependency direction must follow hexagonal architecture
 type = layers
@@ -55,3 +58,21 @@ source_modules =
     src.infrastructure
 forbidden_modules =
     src.interfaces
+
+# Application layer must not depend on infrastructure
+[importlinter:contract:application-no-infrastructure]
+name = Application layer must not depend on infrastructure
+type = forbidden
+source_modules =
+    src.application
+forbidden_modules =
+    src.infrastructure
+
+# Interfaces layer must not depend on infrastructure
+[importlinter:contract:interfaces-no-infrastructure]
+name = Interfaces layer must not depend on infrastructure
+type = forbidden
+source_modules =
+    src.interfaces
+forbidden_modules =
+    src.infrastructure

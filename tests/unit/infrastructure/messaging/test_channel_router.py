@@ -171,3 +171,37 @@ class TestChannelRouterCreateForTesting:
         """create_for_testing should create router without defaults."""
         router = ChannelRouter.create_for_testing()
         assert router.get_delivery_mode("AutoTriggered") == DeliveryMode.RELIABLE
+
+
+class TestWorkflowSubmittedChannelMapping:
+    """Test WorkflowSubmitted event channel registration."""
+
+    def test_workflow_submitted_in_default_mappings(self) -> None:
+        """WorkflowSubmitted 应在 DEFAULT_MAPPINGS 中注册"""
+        from src.infrastructure.messaging.channel_router import ChannelRouter
+
+        assert "WorkflowSubmitted" in ChannelRouter.DEFAULT_MAPPINGS
+        mapping = ChannelRouter.DEFAULT_MAPPINGS["WorkflowSubmitted"]
+        assert mapping.event_type == "WorkflowSubmitted"
+
+    def test_workflow_submitted_delivery_mode_is_reliable(self) -> None:
+        """WorkflowSubmitted 通道策略应为 RELIABLE"""
+        from src.infrastructure.messaging.channel_router import ChannelRouter, DeliveryMode
+
+        mapping = ChannelRouter.DEFAULT_MAPPINGS["WorkflowSubmitted"]
+        assert mapping.delivery_mode == DeliveryMode.RELIABLE
+
+    def test_workflow_submitted_rabbitmq_routing_key(self) -> None:
+        """WorkflowSubmitted 应配置 RabbitMQ routing key"""
+        from src.infrastructure.messaging.channel_router import ChannelRouter
+
+        mapping = ChannelRouter.DEFAULT_MAPPINGS["WorkflowSubmitted"]
+        assert mapping.rabbitmq_routing_key == "sisys.events.reliable.workflow_submitted"
+
+    def test_router_returns_workflow_submitted_mapping(self) -> None:
+        """ChannelRouter 应返回 WorkflowSubmitted 的映射"""
+        router = ChannelRouter()
+        mapping = router.get_mapping("WorkflowSubmitted")
+        assert mapping is not None
+        assert mapping.event_type == "WorkflowSubmitted"
+        assert mapping.delivery_mode == DeliveryMode.RELIABLE

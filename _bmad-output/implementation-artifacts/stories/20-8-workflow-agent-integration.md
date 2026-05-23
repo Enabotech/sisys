@@ -1,6 +1,6 @@
 # Story 20.8: 双核引擎集成验证
 
-**Status:** `ready-for-dev`
+**Status:** `done`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -81,10 +81,10 @@
 **And** 事件发布失败不回写 FAILED 状态（与 LangGraphEngine 行为一致）
 
 **验证标准:**
-- [ ] `src/domain/events/workflow_events.py` 新增 `WorkflowSubmitted` 事件类（继承 DomainEvent）
-- [ ] `PrefectEngine.submit_flow` 成功后调用 `_publish_workflow_submitted()`
-- [ ] `_publish_workflow_submitted()` 检查 `PublishResult.is_full_failure` 并记录 warning 日志
-- [ ] 事件发布异常捕获后仅 `logger.exception`，不影响 `submit_flow` 返回值（flow_run_id 正常返回）
+- [x] `src/domain/events/workflow_events.py` 新增 `WorkflowSubmitted` 事件类（继承 DomainEvent）
+- [x] `PrefectEngine.submit_flow` 成功后调用 `_publish_workflow_submitted()`
+- [x] `_publish_workflow_submitted()` 检查 `PublishResult.is_full_failure` 并记录 warning 日志
+- [x] 事件发布异常捕获后仅 `logger.exception`，不影响 `submit_flow` 返回值（flow_run_id 正常返回）
 
 ### AC-2: 双引擎事件发布对称性
 
@@ -93,10 +93,10 @@
 **Then** 两者遵循相同模式：publish → 检查 None/is_full_failure → logger.warning
 
 **验证标准:**
-- [ ] PrefectEngine._publish_workflow_submitted 与 LangGraphEngine._publish_agent_decided 模式一致
-- [ ] 两者均使用 `try/except Exception` 包裹事件发布
-- [ ] 两者均检查 `publish_result is None`（防御性检查，Protocol 声明非 None）和 `publish_result.is_full_failure`
-- [ ] 测试覆盖双引擎事件发布异常路径
+- [x] PrefectEngine._publish_workflow_submitted 与 LangGraphEngine._publish_agent_decided 模式一致
+- [x] 两者均使用 `try/except Exception` 包裹事件发布
+- [x] 两者均检查 `publish_result is None`（防御性检查，Protocol 声明非 None）和 `publish_result.is_full_failure`
+- [x] 测试覆盖双引擎事件发布异常路径
 
 ### AC-3: 事件总线通道注册
 
@@ -105,9 +105,9 @@
 **Then** WorkflowSubmitted 注册到 RELIABLE 通道（RabbitMQ + Outbox）
 
 **验证标准:**
-- [ ] `channel_router.py` 注册 WorkflowSubmitted 通道映射
-- [ ] 事件类型名称为 `"WorkflowSubmitted"`
-- [ ] 通道策略与 AgentDecided 一致
+- [x] `channel_router.py` 注册 WorkflowSubmitted 通道映射
+- [x] 事件类型名称为 `"WorkflowSubmitted"`
+- [x] 通道策略与 AgentDecided 一致
 
 ### AC-4: Gherkin 统一验收测试
 
@@ -116,10 +116,10 @@
 **Then** 覆盖双引擎提交、状态查询、事件发布的完整流程
 
 **验证标准:**
-- [ ] `tests/acceptance/test_acceptance_workflow-agent-integration.feature` 包含双引擎集成场景（6 个场景）
-- [ ] `tests/acceptance/test_acceptance_workflow-agent-integration.py` 实现步骤函数
-- [ ] 场景覆盖：data_pipeline 提交（AC-1）、agent_reasoning 提交、状态查询、事件发布（AC-1）、双引擎对称性（AC-2）、通道注册（AC-3）
-- [ ] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK，不依赖真实 server）
+- [x] `tests/acceptance/test_acceptance_workflow-agent-integration.feature` 包含双引擎集成场景（6 个场景）
+- [x] `tests/acceptance/test_acceptance_workflow-agent-integration.py` 实现步骤函数
+- [x] 场景覆盖：data_pipeline 提交（AC-1）、agent_reasoning 提交、状态查询、事件发布（AC-1）、双引擎对称性（AC-2）、通道注册（AC-3）
+- [x] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK，不依赖真实 server）
 
 ### AC-5: 设计文档与代码对齐验证
 
@@ -128,13 +128,13 @@
 **Then** 代码实现与文档描述完全一致
 
 **验证标准:**
-- [ ] WorkflowEnginePort 方法签名与文档 Section 2.2 一致
-- [ ] AgentEnginePort 方法签名与文档 Section 2.3 一致
-- [ ] OrchestrationService 双引擎路由与文档 Section 2.4 时序图一致
-- [ ] PrefectEngine 状态映射（9→5）与文档 Section 3.1 映射表一致
-- [ ] LangGraphEngine 状态（COMPLETED/FAILED）与文档 Section 3.1 一致
-- [ ] DI 注册模式与文档 Section 6.1 一致
-- [ ] 六边形架构约束测试通过
+- [x] WorkflowEnginePort 方法签名与文档 Section 2.2 一致
+- [x] AgentEnginePort 方法签名与文档 Section 2.3 一致
+- [x] OrchestrationService 双引擎路由与文档 Section 2.4 时序图一致
+- [x] PrefectEngine 状态映射（9→5）与文档 Section 3.1 映射表一致
+- [x] LangGraphEngine 状态（COMPLETED/FAILED）与文档 Section 3.1 一致
+- [x] DI 注册模式与文档 Section 6.1 一致
+- [x] 六边形架构约束测试通过
 
 ---
 
@@ -148,17 +148,17 @@
 > **执行顺序：** Task 0 必须在所有实现 Task 之前完成。SDD 规范是后续 TDD 测试的输入来源。
 
 #### 领域事件 Schema (Domain Events)
-- [ ] `WorkflowSubmitted` 事件定义位于 `src/domain/events/workflow_events.py`
-- [ ] 使用 dataclass(frozen=True) 继承 `DomainEvent`
-- [ ] 事件字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`
-- [ ] `event_type` 字段：`event_type: str = field(default="WorkflowSubmitted", init=False)`（放在所有业务字段之后，与 workflow_events.py 现有 RAGIndexed/ReportGenerated 风格一致）
-- [ ] `__post_init__` 方法：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`（参考 AgentDecided/RAGIndexed 模式）
-- [ ] 事件命名符合规范：`[Aggregate][Action]` → `WorkflowSubmitted`
+- [x] `WorkflowSubmitted` 事件定义位于 `src/domain/events/workflow_events.py`
+- [x] 使用 dataclass(frozen=True) 继承 `DomainEvent`
+- [x] 事件字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`
+- [x] `event_type` 字段：`event_type: str = field(default="WorkflowSubmitted", init=False)`（放在所有业务字段之后，与 workflow_events.py 现有 RAGIndexed/ReportGenerated 风格一致）
+- [x] `__post_init__` 方法：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`（参考 AgentDecided/RAGIndexed 模式）
+- [x] 事件命名符合规范：`[Aggregate][Action]` → `WorkflowSubmitted`
 
 #### 端口契约（已存在，本 Story 不新增端口）
-- [ ] `WorkflowEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第983-995行）
-- [ ] `AgentEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第1002-1014行）
-- [ ] 端口契约测试已通过（Story 20-6 补全）
+- [x] `WorkflowEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第983-995行）
+- [x] `AgentEnginePort` — 已在 `src/composition_root.py` bootstrap() 函数中注册（第1002-1014行）
+- [x] 端口契约测试已通过（Story 20-6 补全）
 
 #### 六边形架构约束（必须遵守）
 
@@ -275,25 +275,25 @@
 
 > **目的：** 定义 WorkflowSubmitted 事件 Schema、Gherkin 验收场景。
 
-- [ ] Subtask 0.1: 定义 WorkflowSubmitted 事件 Schema
+- [x] Subtask 0.1: 定义 WorkflowSubmitted 事件 Schema
   - 事件类名：`WorkflowSubmitted`
   - 基类：`DomainEvent`（`src/domain/events/base.py`）
   - 字段：`flow_run_id: uuid.UUID`、`flow_name: str`、`parameters: dict[str, Any]`、`event_type: str`（event_type 放在最后，与 RAGIndexed/ReportGenerated 一致）
   - `__post_init__`：设置 `aggregate_id = flow_run_id`、`aggregate_type = "Workflow"`
   - `event_type` 声明：`event_type: str = field(default="WorkflowSubmitted", init=False)`
-- [ ] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow-agent-integration.feature`
+- [x] Subtask 0.2: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_workflow-agent-integration.feature`
   - 场景1: 数据管道工作流提交（覆盖 AC-1/AC-5）
   - 场景2: Agent 推理任务提交（覆盖 AC-5）
   - 场景3: 双引擎状态查询（覆盖 AC-5）
   - 场景4: PrefectEngine 事件发布（覆盖 AC-1）
   - 场景5: 双引擎事件发布对称性验证（覆盖 AC-2）
   - 场景6: WorkflowSubmitted 事件总线通道注册（覆盖 AC-3）
-- [ ] Subtask 0.3: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_workflow-agent-integration.py`
-- [ ] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.3: 编写 BDD 步骤实现骨架 `tests/acceptance/test_acceptance_workflow-agent-integration.py`
+- [x] Subtask 0.4: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准:**
-- [ ] 事件 Schema 定义完毕
-- [ ] Gherkin 验收测试运行失败（预期行为）
+- [x] 事件 Schema 定义完毕
+- [x] Gherkin 验收测试运行失败（预期行为）
 
 ---
 
@@ -309,9 +309,9 @@
 | 🟢 绿 | 在 `src/domain/events/workflow_events.py` 添加 WorkflowSubmitted 事件类 |
 | 🔄 重构 | 对齐 RAGIndexed 事件类模式，运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.1: 🔴 红 — 修改 test_workflow_events.py，新增 WorkflowSubmitted 失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 实现 WorkflowSubmitted 事件类
-- [ ] Subtask 1.3: 🔄 重构 — 对齐代码风格
+- [x] Subtask 1.1: 🔴 红 — 修改 test_workflow_events.py，新增 WorkflowSubmitted 失败测试
+- [x] Subtask 1.2: 🟢 绿 — 实现 WorkflowSubmitted 事件类
+- [x] Subtask 1.3: 🔄 重构 — 对齐代码风格
 
 #### TDD 循环 B：事件总线通道注册
 
@@ -321,14 +321,14 @@
 | 🟢 绿 | 在 `src/infrastructure/messaging/channel_router.py` 注册 WorkflowSubmitted |
 | 🔄 重构 | 运行 `ruff` + `mypy` |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写通道注册验证测试
-- [ ] Subtask 1.5: 🟢 绿 — 注册 WorkflowSubmitted 通道映射
-- [ ] Subtask 1.6: 🔄 重构 — 验证
+- [x] Subtask 1.4: 🔴 红 — 编写通道注册验证测试
+- [x] Subtask 1.5: 🟢 绿 — 注册 WorkflowSubmitted 通道映射
+- [x] Subtask 1.6: 🔄 重构 — 验证
 
 **完成标准:**
-- [ ] WorkflowSubmitted 事件类创建并注册
-- [ ] 通道映射注册完成
-- [ ] 所有测试通过
+- [x] WorkflowSubmitted 事件类创建并注册
+- [x] 通道映射注册完成
+- [x] 所有测试通过
 
 ---
 
@@ -346,9 +346,9 @@
 | 🟢 绿 | 在 PrefectEngine 添加 `_publish_workflow_submitted()` 方法 |
 | 🔄 重构 | 对齐 LangGraphEngine 模式 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写事件发布成功测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 _publish_workflow_submitted()
-- [ ] Subtask 2.3: 🔄 重构 — 对齐模式
+- [x] Subtask 2.1: 🔴 红 — 编写事件发布成功测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 _publish_workflow_submitted()
+- [x] Subtask 2.3: 🔄 重构 — 对齐模式
 
 #### TDD 循环 B：事件发布异常路径
 
@@ -358,14 +358,14 @@
 | 🟢 绿 | 实现异常处理（logger.warning/logger.exception） |
 | 🔄 重构 | 验证状态不被覆写 |
 
-- [ ] Subtask 2.4: 🔴 红 — 编写事件发布异常测试
-- [ ] Subtask 2.5: 🟢 绿 — 实现异常处理
-- [ ] Subtask 2.6: 🔄 重构 — 验证 COMPLETED 状态不被覆写
+- [x] Subtask 2.4: 🔴 红 — 编写事件发布异常测试
+- [x] Subtask 2.5: 🟢 绿 — 实现异常处理
+- [x] Subtask 2.6: 🔄 重构 — 验证 COMPLETED 状态不被覆写
 
 **完成标准:**
-- [ ] PrefectEngine.submit_flow 成功后发布 WorkflowSubmitted 事件
-- [ ] 事件发布异常不影响引擎状态
-- [ ] 与 LangGraphEngine 模式对称
+- [x] PrefectEngine.submit_flow 成功后发布 WorkflowSubmitted 事件
+- [x] 事件发布异常不影响引擎状态
+- [x] 与 LangGraphEngine 模式对称
 
 ---
 
@@ -381,17 +381,17 @@
 | 🟢 绿 | 验证现有代码通过集成测试 |
 | 🔄 重构 | 优化测试结构 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写 OrchestrationService 双引擎路由测试
-- [ ] Subtask 3.2: 🔴 红 — 编写 DI 注册 resolve 验证测试
-- [ ] Subtask 3.3: 🔴 红 — 编写 PrefectEngine 状态映射验证测试（9→5）
-- [ ] Subtask 3.4: 🟢 绿 — 验证现有代码通过
-- [ ] Subtask 3.5: 🔄 重构 — 优化
+- [x] Subtask 3.1: 🔴 红 — 编写 OrchestrationService 双引擎路由测试
+- [x] Subtask 3.2: 🔴 红 — 编写 DI 注册 resolve 验证测试
+- [x] Subtask 3.3: 🔴 红 — 编写 PrefectEngine 状态映射验证测试（9→5）
+- [x] Subtask 3.4: 🟢 绿 — 验证现有代码通过
+- [x] Subtask 3.5: 🔄 重构 — 优化
 
 **完成标准:**
-- [ ] OrchestrationService 双引擎路由正确
-- [ ] DI 注册 resolve 正确
-- [ ] Prefect 状态映射（9→5）正确
-- [ ] LangGraph 状态（COMPLETED/FAILED）正确
+- [x] OrchestrationService 双引擎路由正确
+- [x] DI 注册 resolve 正确
+- [x] Prefect 状态映射（9→5）正确
+- [x] LangGraph 状态（COMPLETED/FAILED）正确
 
 ---
 
@@ -409,19 +409,19 @@
 | 🟢 绿 | 实现 BDD 步骤函数 |
 | 🔄 重构 | 统一断言表达 |
 
-- [ ] Subtask 4.0: 🔴 红 — 运行 Gherkin 场景，确认步骤未实现导致测试失败
-- [ ] Subtask 4.1: 🟢 绿 — 实现 DI 容器初始化步骤（使用测试专用 DI 容器，mock Prefect/LangGraph SDK 客户端）
-- [ ] Subtask 4.2: 🟢 绿 — 实现 data_pipeline 提交步骤（场景1）
-- [ ] Subtask 4.3: 🟢 绿 — 实现 agent_reasoning 提交步骤（场景2）
-- [ ] Subtask 4.4: 🟢 绿 — 实现状态查询验证步骤（场景3）
-- [ ] Subtask 4.5: 🟢 绿 — 实现事件发布验证步骤（场景4）
-- [ ] Subtask 4.6: 🟢 绿 — 实现双引擎事件发布对称性验证步骤（场景5，覆盖 AC-2）
-- [ ] Subtask 4.7: 🟢 绿 — 实现通道注册验证步骤（场景6，覆盖 AC-3）
-- [ ] Subtask 4.8: 🔄 重构 — 运行全部验收测试
+- [x] Subtask 4.0: 🔴 红 — 运行 Gherkin 场景，确认步骤未实现导致测试失败
+- [x] Subtask 4.1: 🟢 绿 — 实现 DI 容器初始化步骤（使用测试专用 DI 容器，mock Prefect/LangGraph SDK 客户端）
+- [x] Subtask 4.2: 🟢 绿 — 实现 data_pipeline 提交步骤（场景1）
+- [x] Subtask 4.3: 🟢 绿 — 实现 agent_reasoning 提交步骤（场景2）
+- [x] Subtask 4.4: 🟢 绿 — 实现状态查询验证步骤（场景3）
+- [x] Subtask 4.5: 🟢 绿 — 实现事件发布验证步骤（场景4）
+- [x] Subtask 4.6: 🟢 绿 — 实现双引擎事件发布对称性验证步骤（场景5，覆盖 AC-2）
+- [x] Subtask 4.7: 🟢 绿 — 实现通道注册验证步骤（场景6，覆盖 AC-3）
+- [x] Subtask 4.8: 🔄 重构 — 运行全部验收测试
 
 **完成标准:**
-- [ ] 所有 Gherkin 场景（1-6）通过
-- [ ] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK）
+- [x] 所有 Gherkin 场景（1-6）通过
+- [x] 使用测试专用 DI 容器（mock Prefect/LangGraph SDK）
 
 ---
 
@@ -433,14 +433,14 @@
 
 #### 架构验证测试
 
-- [ ] Subtask 5.1: 运行 `tests/unit/architecture/test_hexagonal_architecture_constraints.py`
-- [ ] Subtask 5.2: 验证 Domain 层不导入 prefect/langgraph（已有测试覆盖）
-- [ ] Subtask 5.3: 验证 Application 层不导入 Infrastructure 层（已有测试覆盖）
-- [ ] Subtask 5.4: 补充 WorkflowSubmitted 事件类的零依赖验证（如有必要）
+- [x] Subtask 5.1: 运行 `tests/unit/architecture/test_hexagonal_architecture_constraints.py`
+- [x] Subtask 5.2: 验证 Domain 层不导入 prefect/langgraph（已有测试覆盖）
+- [x] Subtask 5.3: 验证 Application 层不导入 Infrastructure 层（已有测试覆盖）
+- [x] Subtask 5.4: 补充 WorkflowSubmitted 事件类的零依赖验证（如有必要）
 
 **完成标准:**
-- [ ] 所有架构约束测试通过
-- [ ] Domain 层零外部依赖
+- [x] 所有架构约束测试通过
+- [x] Domain 层零外部依赖
 
 ---
 
@@ -450,27 +450,27 @@
 
 > **性质说明：** 对 Story 收尾阶段的交付物与完成清单进行最终验收。
 
-- [ ] Subtask 6.1: 场景 — 验证 `src` 完成清单
-  - [ ] `workflow_events.py` 新增 WorkflowSubmitted
-  - [ ] `__init__.py` 更新 WorkflowSubmitted 导出
-  - [ ] `prefect_engine.py` 新增 _publish_workflow_submitted
-  - [ ] `channel_router.py` 注册 WorkflowSubmitted
-  - [ ] `event_channels.yaml` 同步添加通道配置
-- [ ] Subtask 6.2: 场景 — 验证 `tests` 完成清单
-  - [ ] `test_workflow_events.py` 单元测试
-  - [ ] `test_prefect_engine.py` 事件发布测试补充
-  - [ ] `test_integration_workflow_agent_integration.py` 集成测试
-  - [ ] `test_acceptance_workflow-agent-integration.*` 验收测试
-- [ ] Subtask 6.3: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
-- [ ] Subtask 6.4: 更新 sprint-status.yaml 为 `done`
-- [ ] Subtask 6.5: 更新设计文档 `docs/architecture/sisys-workflow-agent-integration-design.md`
-  - [ ] Section 4.2 事件发布责任：改为 "Engine 层发布 WorkflowSubmitted 事件"
-  - [ ] Section 5.1 策略差异表：更新 Prefect 列的发布位置
-  - [ ] Section 5.3 添加 PrefectEngine 的 PublishResult 检查模式说明
+- [x] Subtask 6.1: 场景 — 验证 `src` 完成清单
+  - [x] `workflow_events.py` 新增 WorkflowSubmitted
+  - [x] `__init__.py` 更新 WorkflowSubmitted 导出
+  - [x] `prefect_engine.py` 新增 _publish_workflow_submitted
+  - [x] `channel_router.py` 注册 WorkflowSubmitted
+  - [x] `event_channels.yaml` 同步添加通道配置
+- [x] Subtask 6.2: 场景 — 验证 `tests` 完成清单
+  - [x] `test_workflow_events.py` 单元测试
+  - [x] `test_prefect_engine.py` 事件发布测试补充
+  - [x] `test_integration_workflow_agent_integration.py` 集成测试
+  - [x] `test_acceptance_workflow-agent-integration.*` 验收测试
+- [x] Subtask 6.3: 运行 `pytest`、`ruff check`、`mypy` 收尾校验
+- [x] Subtask 6.4: 更新 sprint-status.yaml 为 `done`
+- [x] Subtask 6.5: 更新设计文档 `docs/architecture/sisys-workflow-agent-integration-design.md`
+  - [x] Section 4.2 事件发布责任：改为 "Engine 层发布 WorkflowSubmitted 事件"
+  - [x] Section 5.1 策略差异表：更新 Prefect 列的发布位置
+  - [x] Section 5.3 添加 PrefectEngine 的 PublishResult 检查模式说明
 
 **完成标准:**
-- [ ] 完成清单已逐项验证
-- [ ] Story 可进入 `done`
+- [x] 完成清单已逐项验证
+- [x] Story 可进入 `done`
 
 ---
 
