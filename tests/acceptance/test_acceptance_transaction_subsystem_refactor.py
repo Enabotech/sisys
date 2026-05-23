@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_acceptance_transaction-subsystem-refactor.feature")
+scenarios("test_acceptance_transaction_subsystem_refactor.feature")
 
 
 # ===================================================================

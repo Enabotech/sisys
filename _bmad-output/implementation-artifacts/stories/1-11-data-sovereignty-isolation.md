@@ -255,7 +255,7 @@
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-- [x] 功能测试文件：`tests/acceptance/test_acceptance_data-sovereignty-isolation.feature`
+- [x] 功能测试文件：`tests/acceptance/test_acceptance_data_sovereignty_isolation.feature`
 - [x] 覆盖场景:
   - 敏感数据检测（PII、商业秘密、金融数据）
   - 本地优先处理验证
@@ -322,7 +322,7 @@
 - [x] Subtask 0.5: 定义 `PIPLComplianceRecord` 实体
 - [x] Subtask 0.6: 定义值对象（ComplianceResult, Task）
 - [x] Subtask 0.7: 定义服务接口（6 个 Port）
-- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data-sovereignty-isolation.feature`
+- [x] Subtask 0.8: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_data_sovereignty_isolation.feature`
 - [x] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准:**
@@ -638,7 +638,7 @@
 | `tests/unit/infrastructure/security/test_cross_border_transfer.py` | CrossBorderTransferService 测试 |
 | `tests/unit/infrastructure/security/test_pipl_compliance.py` | PIPLComplianceService 测试 |
 | `tests/unit/infrastructure/security/test_compliance_gateway.py` | ComplianceGateway 集成测试 |
-| `tests/acceptance/test_acceptance_data-sovereignty-isolation.feature` | Gherkin 验收测试 |
+| `tests/acceptance/test_acceptance_data_sovereignty_isolation.feature` | Gherkin 验收测试 |
 | `tests/architecture/test_architecture_constraints.py` | 架构约束测试 |
 
 **共计 28 个文件**

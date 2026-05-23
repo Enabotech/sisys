@@ -153,7 +153,7 @@
 - [x] EventStore 接口定义位于 `src/domain/events/store.py`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [x] 功能测试文件:`tests/acceptance/test_acceptance_domain-event-definition.feature`
+- [x] 功能测试文件:`tests/acceptance/test_acceptance_domain_event_definition.feature`
 - [x] 业务方评审通过
 - [x] 所有场景覆盖(Happy Path + Edge Cases:事件 ID 重复、非法 payload 格式、事件监听器未注册)
 
@@ -191,7 +191,7 @@
 | **TDD 单元测试** | 事件序列化 | 验证 to_dict/from_dict、JSON 往返 | `test_event_serialization.py` | Task 2 |
 | **TDD 单元测试** | 事件发布/订阅 | 验证 EventPublisher、InMemoryEventBus、EventListener | `test_event_publisher.py`, `test_event_listener.py` | Task 3 |
 | **TDD 单元测试** | 事件存储 | 验证 EventStore 接口、InMemoryEventStore 实现 | `test_event_store.py` | Task 4 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收(事件端到端流) | `test_acceptance_domain-event-definition.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收(事件端到端流) | `test_acceptance_domain_event_definition.feature` | Task 0 |
 | **SDD 架构验证** | 架构约束 | 领域事件零 Pydantic 依赖、依赖方向 | `test_event_architecture.py` | Task 5 |
 
 ---
@@ -223,7 +223,7 @@
 
 | AC | 验收标准描述 | 关联 Task | 负责 Subtask | 测试文件 |
 |----|-------------|-----------|-------------|----------|
-| AC-1 | 10 种领域事件 Schema 定义完成 | Task 0 | SDD 规范定义(10 种事件 Schema) | `test_acceptance_domain-event-definition.feature` |
+| AC-1 | 10 种领域事件 Schema 定义完成 | Task 0 | SDD 规范定义(10 种事件 Schema) | `test_acceptance_domain_event_definition.feature` |
 | AC-1 | 10 种领域事件 Schema 定义完成 | Task 1 | 10 种领域事件类创建(含 `to_dict()`/`from_dict()`) | `test_domain_events.py` |
 | AC-2 | 事件发布/订阅基础设施就绪 | Task 3 | EventPublisher + InMemoryEventBus + EventListener 实现 | `test_event_publisher.py`, `test_event_listener.py` |
 | AC-3 | 事件序列化与反序列化支持 | Task 2 | `to_dict()`/`from_dict()` 实现 + JSON 往返测试 | `test_event_serialization.py` |
@@ -249,7 +249,7 @@
 - [x] Subtask: 定义 EventPublisher 接口(`publish(event: DomainEvent) -> None`)
 - [x] Subtask: 定义 EventListener 接口(`on_event(event_type: str, handler: Callable)`)
 - [x] Subtask: 定义 EventStore 接口(`save_events`, `get_events`, `get_events_by_version`)
-- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_domain-event-definition.feature`
+- [x] Subtask: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_domain_event_definition.feature`
 - [x] Subtask: 运行验收测试,确认失败(🔴 红阶段验证)
 
 **完成标准/Definition of Done:**
@@ -579,7 +579,7 @@ sisys/
 │   │   │   └── test_event_architecture.py          # 事件架构约束测试(零 Pydantic 依赖)
 │   │   └── ...
 │   └── acceptance/
-│       └── test_acceptance_domain-event-definition.feature                  # Gherkin 验收测试
+│       └── test_acceptance_domain_event_definition.feature                  # Gherkin 验收测试
 └── ...
 ```
 
@@ -691,7 +691,7 @@ sisys/
 - `tests/unit/domain/events/test_event_listener.py` - 事件监听器测试
 - `tests/unit/domain/events/test_event_store.py` - 事件存储测试
 - `tests/unit/architecture/test_event_architecture.py` - 事件架构约束测试
-- `tests/acceptance/test_acceptance_domain-event-definition.feature` - Gherkin 验收测试
+- `tests/acceptance/test_acceptance_domain_event_definition.feature` - Gherkin 验收测试
 
 **修改的文件/Modified Files (Dev Story 实施时):**
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - 更新 story 状态为 `ready-for-dev` → `in-progress` → `done`

@@ -397,7 +397,7 @@ class TestUoWTransactionBoundary:
 ### Phase 1：清理 + 基础设施完善 ✅ 已完成
 
 **已完成的任务**：
-1. ~~删除废弃测试代码（`test_acceptance_event-messaging-refactor.feature` 中 AC-6 的空测试场景）~~ — 验收测试已有基础实现，暂保留
+1. ~~删除废弃测试代码（`test_acceptance_event_messaging_refactor.feature` 中 AC-6 的空测试场景）~~ — 验收测试已有基础实现，暂保留
 2. ✅ **实现** `PostgreSQLUnitOfWork` 增强：
    - ✅ 添加 `session` 属性访问器
    - ✅ 添加 `_committed/_rolled_back` guard 逻辑

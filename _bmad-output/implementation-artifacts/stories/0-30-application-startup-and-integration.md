@@ -171,7 +171,7 @@
 - [ ] EventListenerRegistry 模型定义位于 `src/application/listener_registry.py`
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_application-startup-and-integration.feature`
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_application_startup_and_integration.feature`
 - [ ] 步骤实现文件：`tests/acceptance/test_acceptance_application-startup-and-integration.py`（BDD 步骤实现）
 - [ ] 业务方评审通过
 - [ ] 所有场景覆盖（Happy Path + Edge Cases）
@@ -215,7 +215,7 @@
 | **TDD 单元测试** | App | 生命周期验证 | `test_app.py` | Task 1 |
 | **TDD 单元测试** | Container | DI 容器验证 | `test_di_container.py` | Task 2 |
 | **TDD 单元测试** | EventListenerRegistry | 监听器注册验证 | `test_listener_registry.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_application-startup-and-integration.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_application_startup_and_integration.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_application-startup-and-integration.py` | Task 0 |
 | **集成测试** | 事件消费流程 | 多 Listener 集成验证 | `test_event_consumption.py` | Task 3 |
 
@@ -248,7 +248,7 @@
 
 - [ ] Subtask 0.1: 定义领域事件 Schema（MemoryChanged、Triggered、Routed、Executed）
 - [ ] Subtask 0.2: 定义数据模型（AppConfig、Container、EventListenerRegistry）
-- [ ] Subtask 0.3: 创建 Gherkin 验收测试 `tests/acceptance/test_acceptance_application-startup-and-integration.feature`
+- [ ] Subtask 0.3: 创建 Gherkin 验收测试 `tests/acceptance/test_acceptance_application_startup_and_integration.feature`
 - [ ] Subtask 0.4: 创建 BDD 步骤实现 `tests/acceptance/test_acceptance_application-startup-and-integration.py`
 - [ ] Subtask 0.5: 运行验收测试，确认失败（🔴 红阶段验证）
 
@@ -444,7 +444,7 @@ sisys/
 │   │   ├── test_app_lifecycle.py   # 生命周期集成测试
 │   │   └── test_event_consumption.py  # 事件消费集成测试
 │   └── acceptance/
-│       ├── test_acceptance_application-startup-and-integration.feature   # Gherkin 场景
+│       ├── test_acceptance_application_startup_and_integration.feature   # Gherkin 场景
 │       └── test_acceptance_application-startup-and-integration.py   # BDD 步骤实现
 ```
 
@@ -513,7 +513,7 @@ sisys/
 - `tests/unit/application/test_listener_registry.py` - ListenerRegistry 单元测试
 - `tests/integration/test_app_lifecycle.py` - 生命周期集成测试
 - `tests/integration/test_event_consumption.py` - 事件消费集成测试
-- `tests/acceptance/test_acceptance_application-startup-and-integration.feature` - Gherkin 场景
+- `tests/acceptance/test_acceptance_application_startup_and_integration.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_application-startup-and-integration.py` - BDD 步骤实现
 
 ---

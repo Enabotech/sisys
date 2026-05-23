@@ -19,7 +19,7 @@ from typing import Any
 
 from pytest_bdd import given, scenarios, then, when
 
-scenarios("test_acceptance_prefect-workflow-integration.feature")
+scenarios("test_acceptance_prefect_workflow_integration.feature")
 
 
 # =========================================================================

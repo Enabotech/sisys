@@ -29,7 +29,7 @@ from src.infrastructure.routing.hash_router import HashRouter
 from src.infrastructure.routing.semantic_router import Candidate, SemanticRouter
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_autonomous-invocation-route.feature")
+scenarios("test_acceptance_autonomous_invocation_route.feature")
 
 # Redis channel convention: sisys:rt:<event_type_lowercase>
 REDIS_CHANNEL_PREFIX = "sisys:rt:"

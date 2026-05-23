@@ -23,7 +23,7 @@ from src.infrastructure.storage.postgresql.postgresql_manager import PostgreSQLM
 from src.infrastructure.storage.postgresql.session_context import reset_session, set_session
 from tests.environments import get_test_env
 
-scenarios("test_acceptance_unified-audit-log.feature")
+scenarios("test_acceptance_unified_audit_log.feature")
 
 # ===================================================================
 # Paths & Constants

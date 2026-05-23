@@ -342,7 +342,7 @@ class TestXxxPortContract:
 
 #### 验收标准 Gherkin (Acceptance Tests)
 
-**功能测试文件：** `tests/acceptance/test_acceptance_port-contracts-refactor.feature`
+**功能测试文件：** `tests/acceptance/test_acceptance_port_contracts_refactor.feature`
 
 ```gherkin
 Feature: 端口契约测试补全
@@ -401,7 +401,7 @@ Feature: 端口契约测试补全
 | **TDD 契约测试** | 服务协议端口（已注册） | ConnectionManager x4 + audit_service + semantic_router + sandbox_executor | `test_port_contract_services.py` | Task 5 |
 | **TDD 契约测试** | 应用层端口（已注册） | 14 组端口 | `test_port_contract_application.py` | Task 6 |
 | **TDD 接口验证** | 未注册 Protocol | UnitOfWork / HealthCheckPort / IntegrityPort / PermissionRepositoryPort / IndexManagerPort | `test_port_contract_unregistered.py` | Task 5 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_port-contracts-refactor.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_port_contracts_refactor.feature` | Task 0 |
 | **TDD 验收测试** | BDD 步骤实现 | 步骤函数实现 | `test_acceptance_port-contracts-refactor.py` | Task 0 |
 | **集成验证** | verify_contracts.py | 全量端口清单与解析 | `verify_contracts.py` | Task 7 |
 
@@ -467,7 +467,7 @@ Feature: 端口契约测试补全
 
 > **目的：** 在进入测试实现前，明确端口清单、契约测试规范与验收标准。
 
-- [x] Subtask 0.1: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_port-contracts-refactor.feature`
+- [x] Subtask 0.1: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_port_contracts_refactor.feature`
 - [x] Subtask 0.2: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_port-contracts-refactor.py`
 - [x] Subtask 0.3: 运行验收测试，确认失败（🔴 红阶段验证）
 - [x] Subtask 0.4: 创建 `tests/contracts/conftest.py` 定义公共 fixture
@@ -781,7 +781,7 @@ tests/
 │   ├── test_port_contract_event_publisher.py # REFACTOR: 使用公共 fixture
 │   └── verify_contracts.py                   # ENHANCE: 全量验证（含10个基础设施端口）
 ├── acceptance/
-│   ├── test_acceptance_port-contracts-refactor.feature               # NEW: Gherkin 验收场景
+│   ├── test_acceptance_port_contracts_refactor.feature               # NEW: Gherkin 验收场景
 │   └── test_acceptance_port-contracts-refactor.py              # NEW: BDD 步骤实现
 ```
 
@@ -845,7 +845,7 @@ tests/
 - `tests/contracts/test_port_contract_services.py` - 服务协议端口测试（已注册 7 个）
 - `tests/contracts/test_port_contract_unregistered.py` - **NEW: 未注册 Protocol 接口验证（5 个）**
 - `tests/contracts/test_port_contract_application.py` - 应用层端口测试（已注册 14 个）
-- `tests/acceptance/test_acceptance_port-contracts-refactor.feature` - Gherkin 场景
+- `tests/acceptance/test_acceptance_port_contracts_refactor.feature` - Gherkin 场景
 - `tests/acceptance/test_acceptance_port-contracts-refactor.py` - BDD 步骤实现
 
 **待重构的文件:**

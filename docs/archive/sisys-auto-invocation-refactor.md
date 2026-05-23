@@ -990,8 +990,8 @@ def __init__(self) -> None:
 |----------|---------|---------|
 | `tests/integration/test_integration_route.py` | P0-2 | 双重发布修复验证 |
 | `tests/integration/test_integration_execute.py` | P1-5, P2-7 | 参数类型变更 + reset_all_containers 调用修改 |
-| `tests/acceptance/test_acceptance_autonomous-invocation-route.py` | P0-2 | 发布唯一性验证 |
-| `tests/acceptance/test_acceptance_autonomous-invocation-execute.py` | P1-5, P2-7 | 参数类型变更 + reset_all_containers 调用修改 |
+| `tests/acceptance/test_acceptance_autonomous_invocation_route.py` | P0-2 | 发布唯一性验证 |
+| `tests/acceptance/test_acceptance_autonomous_invocation_execute.py` | P1-5, P2-7 | 参数类型变更 + reset_all_containers 调用修改 |
 
 ---
 
@@ -1036,7 +1036,7 @@ def __init__(self) -> None:
   - `tests/unit/domain/events/test_event_publisher.py`
   - `tests/unit/domain/events/test_event_listener.py`
   - `tests/unit/infrastructure/messaging/test_idempotency_retry.py`
-  - `tests/acceptance/test_acceptance_event-bus-implementation.py`
+  - `tests/acceptance/test_acceptance_event_bus_implementation.py`
 - [x] **2.15** 更新架构测试 `test_event_messaging_architecture.py` 以检查 `domain/ports/event_listener.py`而非 `domain/events/listener.py`
 - [x] **2.16** 更新领域层测试移除已删除方法的测试：
   - `test_checkpoint_snapshot.py` — 移除 to_redis_hash/from_redis_hash 测试

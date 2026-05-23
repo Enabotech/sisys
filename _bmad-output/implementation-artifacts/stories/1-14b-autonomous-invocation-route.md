@@ -151,7 +151,7 @@
   - 从环境变量读取（`from_env()` 方法，复用 OtelConfig 模式）
 
 #### 验收标准 Gherkin (Acceptance Tests)
-- [ ] 功能测试文件：`tests/acceptance/test_acceptance_autonomous-invocation-route.feature`（由 Dev agent 在 Task 0 创建）
+- [ ] 功能测试文件：`tests/acceptance/test_acceptance_autonomous_invocation_route.feature`（由 Dev agent 在 Task 0 创建）
 - [ ] 覆盖场景:
   - 哈希路由 trigger → route（单一 hash 路由）
   - 语义路由 trigger → route（单一 semantic 路由）
@@ -192,7 +192,7 @@
 | **TDD 单元测试** | SemanticRouter | 语义相似度 | `test_semantic_router.py` | Task 2 |
 | **TDD 单元测试** | SemanticRouter | 语义路由缓存（Redis mock） | `test_semantic_router_cache.py` | Task 2 |
 | **TDD 单元测试** | RoutingDecisionLog | 路由决策日志 | `test_routing_decision_log.py` | Task 2 |
-| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous-invocation-route.feature` | Task 0 |
+| **TDD 验收测试** | Gherkin 场景 | 业务价值验收 | `test_acceptance_autonomous_invocation_route.feature` | Task 0 |
 | **SDD 架构验证** | 路由解耦 | 六边形架构约束 | `test_route_architecture.py` | Task 3 |
 | **集成测试** | 事件总线 | 端到端路由流程 | `test_integration_route.py` | Task 3 |
 
@@ -265,7 +265,7 @@
 - [ ] Subtask 0.4: 定义 HashRouter 路由算法（`src/infrastructure/routing/hash_router.py`）
 - [ ] Subtask 0.5: 定义 SemanticRouter 路由（`src/infrastructure/routing/semantic_router.py`）
 - [ ] Subtask 0.6: 定义 AutoRouteConfig 配置模型（`src/infrastructure/config/route.py`）
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_autonomous-invocation-route.feature`（Dev agent 创建）
+- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_autonomous_invocation_route.feature`（Dev agent 创建）
 - [ ] Subtask 0.8: 运行验收测试，确认失败（🔴 红阶段验证）
 
 **完成标准/Definition of Done:**
@@ -516,7 +516,7 @@ sisys/
 │   ├── integration/
 │   │   └── test_integration_route.py
 │   └── acceptance/
-│       ├── test_acceptance_autonomous-invocation-route.feature
+│       ├── test_acceptance_autonomous_invocation_route.feature
 │       └── test_acceptance_autonomous-invocation-route.py
 └── docs/
     └── developer/
@@ -609,7 +609,7 @@ sisys/
 - `tests/unit/architecture/test_route_architecture.py` - 架构验证测试
 - `tests/unit/performance/test_route_performance.py` - 性能基准测试
 - `tests/integration/test_integration_route.py` - 集成测试
-- `tests/acceptance/test_acceptance_autonomous-invocation-route.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
+- `tests/acceptance/test_acceptance_autonomous_invocation_route.feature` - Gherkin 验收测试（由 Dev agent 在 Task 0 创建）
 - `tests/acceptance/test_acceptance_autonomous-invocation-route.py` - 验收测试步骤实现（由 Dev agent 在 Task 0 创建）
 - `docs/developer/route_mechanism_guide.md` - 路由机制实施指南
 

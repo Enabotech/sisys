@@ -37,7 +37,7 @@ from src.infrastructure.security.pipl_compliance_service_impl import PIPLComplia
 from src.infrastructure.security.sensitive_data_detector_impl import SensitiveDataDetectorImpl
 from src.infrastructure.security.whitelist_service_impl import WhitelistServiceImpl
 
-scenarios("test_acceptance_data-sovereignty-isolation.feature")
+scenarios("test_acceptance_data_sovereignty_isolation.feature")
 
 
 # ===================================================================
