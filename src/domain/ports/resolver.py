@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
-from typing import Any, NoReturn, Type, TypeVar, cast, overload
+from typing import Any, Type, TypeVar, cast, overload
 
 from src.domain.ports.registry import Lifetime, PortRegistry, PortSpec, _global_registry
 
@@ -98,14 +98,8 @@ class Resolver:
 
         return instance
 
-    @overload
-    def resolve_by_interface(self, interface: Type[T]) -> T: ...
-
-    @overload
-    def resolve_by_interface(self, interface: str) -> NoReturn: ...
-
     def resolve_by_interface(self, interface: Type[T] | str) -> Any:
-        """通过接口类型解析端口（类型安全入口）
+        """通过接口类型解析端口（运行时类型安全入口）
 
         Args:
             interface: 接口类型（传入字符串时抛出 KeyError）
