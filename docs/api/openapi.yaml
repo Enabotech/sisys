@@ -612,6 +612,311 @@ paths:
                     type: integer
                     description: 已归档的日志数量
 
+  # ============================================================================
+  # 安全监控端点 (Security Monitoring) — 等保2.0三级
+  # ============================================================================
+  /security/intrusions:
+    get:
+      tags:
+        - security
+      summary: 查询入侵事件列表
+      description: 查询系统检测到的入侵事件列表，支持按类型/严重级别/时间范围过滤
+      security:
+        - Bearer: []
+      parameters:
+        - name: attack_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - sql_injection
+              - xss
+              - brute_force
+              - command_injection
+              - path_traversal
+              - rate_limit_violation
+              - unauthorized_access
+              - data_exfiltration
+          description: 攻击类型过滤
+        - name: severity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+          description: 严重级别过滤
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+          description: 返回数量限制
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: 偏移量
+      responses:
+        "200":
+          description: 入侵事件列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntrusionEventListResponse'
+        "401":
+          description: 未授权
+        "403":
+          description: 权限不足（需要管理员权限）
+
+  /security/intrusions/{event_id}:
+    get:
+      tags:
+        - security
+      summary: 获取入侵事件详情
+      description: 获取指定入侵事件的详细信息
+      security:
+        - Bearer: []
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 入侵事件ID
+      responses:
+        "200":
+          description: 入侵事件详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntrusionEventResponse'
+        "401":
+          description: 未授权
+        "404":
+          description: 事件不存在
+
+  /security/intrusions/block:
+    post:
+      tags:
+        - security
+      summary: 阻断恶意IP
+      description: 手动封禁指定IP地址
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockIPRequest'
+      responses:
+        "200":
+          description: IP封禁成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockIPResponse'
+        "400":
+          description: 无效IP地址
+        "401":
+          description: 未授权
+
+  /security/intrusions/stats:
+    get:
+      tags:
+        - security
+      summary: 获取入侵统计数据
+      description: 获取指定时间范围内的入侵检测统计数据
+      security:
+        - Bearer: []
+      parameters:
+        - name: period_hours
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 24
+          description: 统计周期（小时）
+      responses:
+        "200":
+          description: 入侵统计数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntrusionStatsResponse'
+        "401":
+          description: 未授权
+
+  /security/integrity/verify:
+    post:
+      tags:
+        - security
+      summary: 验证数据完整性
+      description: 计算并验证数据的SHA256校验和
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrityVerifyRequest'
+      responses:
+        "200":
+          description: 完整性验证结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityVerifyResponse'
+        "400":
+          description: 无效请求参数
+        "401":
+          description: 未授权
+
+  /security/backups:
+    get:
+      tags:
+        - security
+      summary: 查询备份列表
+      description: 查询系统备份记录列表
+      security:
+        - Bearer: []
+      parameters:
+        - name: backup_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - postgresql
+              - minio
+              - redis
+              - full
+          description: 备份类型过滤
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: 返回数量限制
+      responses:
+        "200":
+          description: 备份列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupListResponse'
+        "401":
+          description: 未授权
+
+    post:
+      tags:
+        - security
+      summary: 创建新备份
+      description: 创建指定类型的数据备份
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackupRequest'
+      responses:
+        "200":
+          description: 备份创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupResponse'
+        "400":
+          description: 无效备份类型
+        "401":
+          description: 未授权
+
+  /security/backups/{backup_id}/restore:
+    post:
+      tags:
+        - security
+      summary: 恢复备份
+      description: 从指定备份恢复数据
+      security:
+        - Bearer: []
+      parameters:
+        - name: backup_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 备份ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreBackupRequest'
+      responses:
+        "200":
+          description: 备份恢复成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreBackupResponse'
+        "401":
+          description: 未授权
+        "404":
+          description: 备份不存在
+
+  /security/backups/status:
+    get:
+      tags:
+        - security
+      summary: 获取备份状态
+      description: 获取当前备份系统的整体状态
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: 备份状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupStatusResponse'
+        "401":
+          description: 未授权
+
+  /security/compliance/report:
+    get:
+      tags:
+        - security
+      summary: 获取等保合规报告
+      description: 获取等保2.0三级合规验证报告
+      security:
+        - Bearer: []
+      responses:
+        "200":
+          description: 合规报告
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceReportResponse'
+        "401":
+          description: 未授权
+        "403":
+          description: 权限不足
+
 components:
   schemas:
     # --------------------------------------------------------------------------
@@ -917,6 +1222,269 @@ components:
         retention_days:
           type: integer
           description: 保留天数
+
+    # --------------------------------------------------------------------------
+    # 安全监控 schemas — 等保2.0三级
+    # --------------------------------------------------------------------------
+    IntrusionEventResponse:
+      type: object
+      required:
+        - event_id
+        - attack_type
+        - severity
+        - source_ip
+        - detected_at
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        attack_type:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        source_ip:
+          type: string
+        target_path:
+          type: string
+        confidence:
+          type: number
+          format: float
+        description:
+          type: string
+        evidence:
+          type: string
+        action_taken:
+          type: string
+          enum: [logged, alerted, blocked, quarantined]
+        detected_at:
+          type: string
+          format: date-time
+
+    IntrusionEventListResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntrusionEventResponse'
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
+    BlockIPRequest:
+      type: object
+      required:
+        - ip_address
+      properties:
+        ip_address:
+          type: string
+          description: 待封禁的IP地址
+        reason:
+          type: string
+          description: 封禁原因
+        duration_hours:
+          type: integer
+          default: 24
+          description: 封禁时长（小时）
+
+    BlockIPResponse:
+      type: object
+      required:
+        - ip_address
+        - blocked
+      properties:
+        ip_address:
+          type: string
+        blocked:
+          type: boolean
+        expiry:
+          type: string
+          format: date-time
+
+    IntrusionStatsResponse:
+      type: object
+      required:
+        - total_attacks
+        - attacks_by_type
+        - attacks_by_severity
+      properties:
+        total_attacks:
+          type: integer
+        attacks_by_type:
+          type: object
+          additionalProperties:
+            type: integer
+        attacks_by_severity:
+          type: object
+          additionalProperties:
+            type: integer
+        blocked_ips:
+          type: array
+          items:
+            type: string
+
+    SecurityIntegrityVerifyRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: string
+          description: 待验证的数据
+        expected_hash:
+          type: string
+          description: 预期的SHA256校验和
+        algorithm:
+          type: string
+          enum: [sha256, sha512, md5]
+          default: sha256
+
+    SecurityIntegrityVerifyResponse:
+      type: object
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+        data_id:
+          type: string
+        expected_hash:
+          type: string
+        actual_hash:
+          type: string
+        algorithm:
+          type: string
+        error_message:
+          type: string
+
+    BackupListResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupResponse'
+        total:
+          type: integer
+
+    CreateBackupRequest:
+      type: object
+      required:
+        - backup_type
+      properties:
+        backup_type:
+          type: string
+          enum: [postgresql, minio, redis, full]
+        description:
+          type: string
+
+    BackupResponse:
+      type: object
+      required:
+        - backup_id
+        - success
+        - backup_type
+      properties:
+        backup_id:
+          type: string
+          format: uuid
+        success:
+          type: boolean
+        backup_type:
+          type: string
+        size_bytes:
+          type: integer
+        checksum:
+          type: string
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    RestoreBackupRequest:
+      type: object
+      properties:
+        target_components:
+          type: array
+          items:
+            type: string
+          description: 目标恢复组件列表
+
+    RestoreBackupResponse:
+      type: object
+      required:
+        - success
+        - backup_id
+      properties:
+        success:
+          type: boolean
+        backup_id:
+          type: string
+        restored_items:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        error_message:
+          type: string
+
+    BackupStatusResponse:
+      type: object
+      properties:
+        last_backup_time:
+          type: string
+          format: date-time
+        last_backup_type:
+          type: string
+        total_backups:
+          type: integer
+        total_size_bytes:
+          type: integer
+
+    ComplianceReportResponse:
+      type: object
+      required:
+        - total_domains
+        - compliance_score
+        - results
+      properties:
+        total_domains:
+          type: integer
+        compliant_count:
+          type: integer
+        non_compliant_count:
+          type: integer
+        compliance_score:
+          type: number
+          format: float
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              domain:
+                type: string
+              status:
+                type: string
+                enum: [compliant, non_compliant, partial]
+              score:
+                type: number
+              checks:
+                type: object
+                additionalProperties:
+                  type: boolean
 
     # --------------------------------------------------------------------------
     # 通用 schemas

@@ -143,3 +143,13 @@ event_channels:
     rabbitmq_routing_key: "sisys.events.reliable.workflow_submitted"
     delivery_mode: "reliable"
     description: "工作流提交完成"
+
+  BackupCompletedEvent:
+    rabbitmq_routing_key: "sisys.events.reliable.backup_completed_event"
+    delivery_mode: "reliable"
+    description: "备份完成"
+
+  EncryptionKeyRotatedEvent:
+    rabbitmq_routing_key: "sisys.events.reliable.encryption_key_rotated_event"
+    delivery_mode: "reliable"
+    description: "加密密钥轮换完成"
