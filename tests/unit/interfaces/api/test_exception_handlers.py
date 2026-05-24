@@ -8,6 +8,7 @@ Reference: src/interfaces/api/exception_handlers.py
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
@@ -699,9 +700,8 @@ class TestHandleValidationError:
             {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"},
         ]
         exc = RequestValidationError(errors)
-        import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
+        resp = asyncio.run(handler(mock_request, exc))
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_validation_error_response_structure(self, handlers_app, mock_request):
@@ -713,8 +713,8 @@ class TestHandleValidationError:
         exc = RequestValidationError(errors)
         import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
-        body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+        resp = asyncio.run(handler(mock_request, exc))
+        body = asyncio.run(_parse_json_response(resp))
         assert body["error"]["code"] == "EXCEPTION_201"
         assert body["error"]["message"] == "Validation error"
         assert "validation_errors" in body["error"]["context"]
@@ -729,8 +729,8 @@ class TestHandleValidationError:
         exc = RequestValidationError(errors)
         import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
-        body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+        resp = asyncio.run(handler(mock_request, exc))
+        body = asyncio.run(_parse_json_response(resp))
         validation_errors = body["error"]["context"]["validation_errors"]
         assert len(validation_errors) == 2
         assert validation_errors[0]["field"] == "body.email"
@@ -745,7 +745,7 @@ class TestHandleValidationError:
         exc = RequestValidationError(errors)
         import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
+        resp = asyncio.run(handler(mock_request, exc))
         assert resp.headers["x-error-code"] == "EXCEPTION_201"
 
     def test_validation_error_includes_request_id(self, handlers_app, mock_request):
@@ -755,8 +755,8 @@ class TestHandleValidationError:
         exc = RequestValidationError(errors)
         import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
-        body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+        resp = asyncio.run(handler(mock_request, exc))
+        body = asyncio.run(_parse_json_response(resp))
         assert body["request_id"] == "test-req-id"
 
     def test_validation_error_request_id_defaults_to_unknown(self, handlers_app):
@@ -768,8 +768,8 @@ class TestHandleValidationError:
         exc = RequestValidationError(errors)
         import asyncio
 
-        resp = asyncio.get_event_loop().run_until_complete(handler(request, exc))
-        body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+        resp = asyncio.run(handler(request, exc))
+        body = asyncio.run(_parse_json_response(resp))
         assert body["request_id"] == "unknown"
 
 
@@ -811,7 +811,7 @@ class TestHandlePydanticError:
             handler = handlers_app.exception_handlers[PydanticValidationError]
             import asyncio
 
-            resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
+            resp = asyncio.run(handler(mock_request, exc))
             assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_pydantic_error_response_structure(self, handlers_app: Any, mock_request: Any) -> None:
@@ -827,8 +827,8 @@ class TestHandlePydanticError:
             handler = handlers_app.exception_handlers[PydanticValidationError]
             import asyncio
 
-            resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
-            body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+            resp = asyncio.run(handler(mock_request, exc))
+            body = asyncio.run(_parse_json_response(resp))
             assert body["error"]["code"] == "EXCEPTION_201"
             assert body["error"]["message"] == "Data validation error"
             assert "errors" in body["error"]["context"]
@@ -846,8 +846,8 @@ class TestHandlePydanticError:
             handler = handlers_app.exception_handlers[PydanticValidationError]
             import asyncio
 
-            resp = asyncio.get_event_loop().run_until_complete(handler(mock_request, exc))
-            body = asyncio.get_event_loop().run_until_complete(_parse_json_response(resp))
+            resp = asyncio.run(handler(mock_request, exc))
+            body = asyncio.run(_parse_json_response(resp))
             assert body["request_id"] == "test-req-id"
 
 
