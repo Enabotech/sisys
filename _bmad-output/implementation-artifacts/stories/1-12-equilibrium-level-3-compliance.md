@@ -1,6 +1,6 @@
 # Story 1.12: 等保 2.0 三级基础要求
 
-**Status:** `backlog`
+**Status:** `review`
 
 > **Note:** 本 Story 严格遵循 **SDD 规范驱动 + TDD 测试驱动** 融合模式。
 > 每个 Task 必须独立完成完整的 TDD 红→绿→重构循环，禁止将测试编写与代码实现分离。
@@ -457,26 +457,26 @@
 > **目的：** 在进入代码实现前，明确接口定义、API 契约、验收标准。
 > ⚠️ **PIPL 协调说明：** AC-8 依赖 Story 1.11 的 `PIPLComplianceService`，Task 0 需同步协调
 
-- [ ] Subtask 0.1: 定义 `IntrusionDetectionServicePort` 接口（`src/domain/ports/intrusion_detection_service.py`）
-- [ ] Subtask 0.2: 定义 `DataIntegrityServicePort` 接口（`src/domain/ports/data_integrity_service.py`）
-- [ ] Subtask 0.3: 定义 `BackupRecoveryServicePort` 接口（`src/domain/ports/backup_recovery_service.py`）
-- [ ] Subtask 0.4: 在 `docs/api/openapi.yaml` 中定义安全监控 API 端点
-- [ ] Subtask 0.5: 创建端口契约测试 `tests/contracts/test_port_contract_equilibrium.py`
-- [ ] Subtask 0.6: 创建 API 契约测试 `tests/contracts/test_api_contract_equilibrium.py`
-- [ ] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.feature`
-- [ ] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.py`
-- [ ] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
-- [ ] Subtask 0.10: 在 `composition_root.py` 中注册三个新端口
-- [ ] Subtask 0.11: 定义 `StorageEncryptionServicePort` 接口（`src/domain/ports/storage_encryption_service.py`）⚠️ 新增支持十层安全
-- [ ] Subtask 0.12: 定义 `APISecurityServicePort` 接口（`src/domain/ports/api_security_service.py`）⚠️ 新增支持十层安全
-- [ ] Subtask 0.13: 在 `composition_root.py` 中注册 StorageEncryptionServicePort 和 APISecurityServicePort
-- [ ] Subtask 0.14: 更新契约测试覆盖新增端口
-- [ ] Subtask 0.15: 定义 `ContainerSecurityServicePort` 接口（`src/domain/ports/container_security_service.py`）⚠️ 新增支持十层安全
-- [ ] Subtask 0.16: 在 `composition_root.py` 中注册 ContainerSecurityServicePort
+- [x] Subtask 0.1: 定义 `IntrusionDetectionServicePort` 接口（`src/domain/ports/intrusion_detection_service.py`）
+- [x] Subtask 0.2: 定义 `DataIntegrityServicePort` 接口（`src/domain/ports/data_integrity_service.py`）
+- [x] Subtask 0.3: 定义 `BackupRecoveryServicePort` 接口（`src/domain/ports/backup_recovery_service.py`）
+- [x] Subtask 0.4: 在 `docs/api/openapi.yaml` 中定义安全监控 API 端点
+- [x] Subtask 0.5: 创建端口契约测试 `tests/contracts/test_port_contract_equilibrium.py`
+- [x] Subtask 0.6: 创建 API 契约测试 `tests/contracts/test_api_contract_equilibrium.py`
+- [x] Subtask 0.7: 编写 Gherkin 验收测试 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.feature`
+- [x] Subtask 0.8: 编写 BDD 步骤实现 `tests/acceptance/test_acceptance_equilibrium_level_3_compliance.py`
+- [x] Subtask 0.9: 运行验收测试，确认失败（🔴 红阶段验证）
+- [x] Subtask 0.10: 在 `composition_root.py` 中注册三个新端口
+- [x] Subtask 0.11: 定义 `StorageEncryptionServicePort` 接口（`src/domain/ports/storage_encryption_service.py`）⚠️ 新增支持十层安全
+- [x] Subtask 0.12: 定义 `APISecurityServicePort` 接口（`src/domain/ports/api_security_service.py`）⚠️ 新增支持十层安全
+- [x] Subtask 0.13: 在 `composition_root.py` 中注册 StorageEncryptionServicePort 和 APISecurityServicePort
+- [x] Subtask 0.14: 更新契约测试覆盖新增端口
+- [x] Subtask 0.15: 定义 `ContainerSecurityServicePort` 接口（`src/domain/ports/container_security_service.py`）⚠️ 新增支持十层安全
+- [x] Subtask 0.16: 在 `composition_root.py` 中注册 ContainerSecurityServicePort
 
 **完成标准:**
-- [ ] 规范项全部定义完毕
-- [ ] 验收测试运行失败（预期行为，红阶段确认）
+- [x] 规范项全部定义完毕
+- [x] 验收测试运行失败（预期行为，红阶段确认）
 
 ---
 
@@ -495,9 +495,9 @@
 | 🟢 绿 | 集成现有 AuthService 验证身份鉴别功能 |
 | 🔄 重构 | 优化认证失败锁定逻辑 |
 
-- [ ] Subtask 1.1: 🔴 红 — 编写身份鉴别合规失败测试
-- [ ] Subtask 1.2: 🟢 绿 — 集成双因子认证基础设施
-- [ ] Subtask 1.3: 🔄 重构 — 验证密码复杂度和锁定机制
+- [x] Subtask 1.1: 🔴 红 — 编写身份鉴别合规失败测试
+- [x] Subtask 1.2: 🟢 绿 — 集成双因子认证基础设施
+- [x] Subtask 1.3: 🔄 重构 — 验证密码复杂度和锁定机制
 
 #### TDD 循环 B：访问控制合规集成
 
@@ -507,9 +507,9 @@
 | 🟢 绿 — 集成现有 PermissionService 验证访问控制 |
 | 🔄 重构 | 优化越权检测逻辑 |
 
-- [ ] Subtask 1.4: 🔴 红 — 编写访问控制合规失败测试
-- [ ] Subtask 1.5: 🟢 绿 — 集成 RBAC 权限验证
-- [ ] Subtask 1.6: 🔄 重构 — 验证越权防护机制
+- [x] Subtask 1.4: 🔴 红 — 编写访问控制合规失败测试
+- [x] Subtask 1.5: 🟢 绿 — 集成 RBAC 权限验证
+- [x] Subtask 1.6: 🔄 重构 — 验证越权防护机制
 
 #### TDD 循环 C：安全审计合规集成
 
@@ -519,9 +519,9 @@
 | 🟢 绿 — 集成现有 AuditService 验证审计合规 |
 | 🔄 重构 | 验证日志保留期和完整性 |
 
-- [ ] Subtask 1.7: 🔴 红 — 编写安全审计合规失败测试
-- [ ] Subtask 1.8: 🟢 绿 — 集成审计日志和 WORM 存储
-- [ ] Subtask 1.9: 🔄 重构 — 验证日志完整性和保留期
+- [x] Subtask 1.7: 🔴 红 — 编写安全审计合规失败测试
+- [x] Subtask 1.8: 🟢 绿 — 集成审计日志和 WORM 存储
+- [x] Subtask 1.9: 🔄 重构 — 验证日志完整性和保留期
 
 **完成标准:**
 - [ ] 身份鉴别、访问控制、安全审计合规验证完成
@@ -543,13 +543,13 @@
 | 🟢 绿 | 实现 `IntrusionDetectionService` 核心逻辑 |
 | 🔄 重构 | 优化检测性能和规则引擎 |
 
-- [ ] Subtask 2.1: 🔴 红 — 编写 SQL 注入检测失败测试
-- [ ] Subtask 2.2: 🟢 绿 — 实现 SQL 注入检测
-- [ ] Subtask 2.3: 🔴 红 — 编写 XSS 攻击检测失败测试
-- [ ] Subtask 2.4: 🟢 绿 — 实现 XSS 攻击检测
-- [ ] Subtask 2.5: 🔴 红 — 编写暴力破解检测失败测试
-- [ ] Subtask 2.6: 🟢 绿 — 实现暴力破解检测
-- [ ] Subtask 2.7: 🔄 重构 — 优化检测性能和规则匹配
+- [x] Subtask 2.1: 🔴 红 — 编写 SQL 注入检测失败测试
+- [x] Subtask 2.2: 🟢 绿 — 实现 SQL 注入检测
+- [x] Subtask 2.3: 🔴 红 — 编写 XSS 攻击检测失败测试
+- [x] Subtask 2.4: 🟢 绿 — 实现 XSS 攻击检测
+- [x] Subtask 2.5: 🔴 红 — 编写暴力破解检测失败测试
+- [x] Subtask 2.6: 🟢 绿 — 实现暴力破解检测
+- [x] Subtask 2.7: 🔄 重构 — 优化检测性能和规则匹配
 
 #### TDD 循环 B：入侵告警与阻断
 
@@ -559,16 +559,16 @@
 | 🟢 绿 | 实现入侵告警和阻断逻辑 |
 | 🔄 重构 | 验证告警及时性和阻断有效性 |
 
-- [ ] Subtask 2.8: 🔴 红 — 编写入侵告警失败测试
-- [ ] Subtask 2.9: 🟢 绿 — 实现入侵告警生成和通知
-- [ ] Subtask 2.10: 🔴 红 — 编写 IP 阻断失败测试
-- [ ] Subtask 2.11: 🟢 绿 — 实现 IP 阻断机制
-- [ ] Subtask 2.12: 🔄 重构 — 验证告警和阻断逻辑
+- [x] Subtask 2.8: 🔴 红 — 编写入侵告警失败测试
+- [x] Subtask 2.9: 🟢 绿 — 实现入侵告警生成和通知
+- [x] Subtask 2.10: 🔴 红 — 编写 IP 阻断失败测试
+- [x] Subtask 2.11: 🟢 绿 — 实现 IP 阻断机制
+- [x] Subtask 2.12: 🔄 重构 — 验证告警和阻断逻辑
 
 **完成标准:**
-- [ ] 10 种攻击类型检测实现完成
-- [ ] 入侵告警和阻断机制生效
-- [ ] 所有 TDD 循环测试通过
+- [x] 10 种攻击类型检测实现完成
+- [x] 入侵告警和阻断机制生效
+- [x] 所有 TDD 循环测试通过
 
 ---
 
@@ -585,16 +585,16 @@
 | 🟢 绿 | 实现 `DataIntegrityService` 核心逻辑 |
 | 🔄 重构 | 优化校验性能 |
 
-- [ ] Subtask 3.1: 🔴 红 — 编写校验和计算失败测试
-- [ ] Subtask 3.2: 🟢 绿 — 实现 SHA256 校验和计算
-- [ ] Subtask 3.3: 🔴 红 — 编写完整性验证失败测试
-- [ ] Subtask 3.4: 🟢 绿 — 实现数据完整性验证
-- [ ] Subtask 3.5: 🔄 重构 — 优化校验性能
+- [x] Subtask 3.1: 🔴 红 — 编写校验和计算失败测试
+- [x] Subtask 3.2: 🟢 绿 — 实现 SHA256 校验和计算
+- [x] Subtask 3.3: 🔴 红 — 编写完整性验证失败测试
+- [x] Subtask 3.4: 🟢 绿 — 实现数据完整性验证
+- [x] Subtask 3.5: 🔄 重构 — 优化校验性能
 
 **完成标准:**
-- [ ] SHA256 校验和计算和验证实现完成
-- [ ] 篡改检测准确率 100%
-- [ ] 所有 TDD 循环测试通过
+- [x] SHA256 校验和计算和验证实现完成
+- [x] 篡改检测准确率 100%
+- [x] 所有 TDD 循环测试通过
 
 ---
 
@@ -611,13 +611,13 @@
 | 🟢 绿 | 实现 `BackupRecoveryService` 核心逻辑 |
 | 🔄 重构 | 优化备份性能和存储效率 |
 
-- [ ] Subtask 4.1: 🔴 红 — 编写 PostgreSQL 备份失败测试
-- [ ] Subtask 4.2: 🟢 绿 — 实现 PostgreSQL 数据库备份
-- [ ] Subtask 4.3: 🔴 红 — 编写 MinIO 对象存储备份失败测试
-- [ ] Subtask 4.4: 🟢 绿 — 实现 MinIO 对象备份
-- [ ] Subtask 4.5: 🔴 红 — 编写 Redis 缓存备份失败测试
-- [ ] Subtask 4.6: 🟢 绿 — 实现 Redis 缓存备份
-- [ ] Subtask 4.7: 🔄 重构 — 优化备份性能和存储效率
+- [x] Subtask 4.1: 🔴 红 — 编写 PostgreSQL 备份失败测试
+- [x] Subtask 4.2: 🟢 绿 — 实现 PostgreSQL 数据库备份
+- [x] Subtask 4.3: 🔴 红 — 编写 MinIO 对象存储备份失败测试
+- [x] Subtask 4.4: 🟢 绿 — 实现 MinIO 对象备份
+- [x] Subtask 4.5: 🔴 红 — 编写 Redis 缓存备份失败测试
+- [x] Subtask 4.6: 🟢 绿 — 实现 Redis 缓存备份
+- [x] Subtask 4.7: 🔄 重构 — 优化备份性能和存储效率
 
 #### TDD 循环 B：备份恢复和验证
 
@@ -633,17 +633,17 @@
 > 3. **SLA 监控**：当恢复时间超过 3 小时时触发预警（预留 1 小时缓冲）
 > 4. **实现说明**：恢复时间 = 备份加载时间 + 数据初始化时间 + 服务启动时间，MVP 阶段可通过模拟测量估算
 
-- [ ] Subtask 4.8: 🔴 红 — 编写备份恢复失败测试
-- [ ] Subtask 4.9: 🟢 绿 — 实现备份恢复流程
-- [ ] Subtask 4.10: 🔴 红 — 编写备份完整性验证失败测试
-- [ ] Subtask 4.11: 🟢 绿 — 实现备份完整性验证
-- [ ] Subtask 4.12: 🔄 重构 — 验证 RTO<4 小时
+- [x] Subtask 4.8: 🔴 红 — 编写备份恢复失败测试
+- [x] Subtask 4.9: 🟢 绿 — 实现备份恢复流程
+- [x] Subtask 4.10: 🔴 红 — 编写备份完整性验证失败测试
+- [x] Subtask 4.11: 🟢 绿 — 实现备份完整性验证
+- [x] Subtask 4.12: 🔄 重构 — 验证 RTO<4 小时
 
 **完成标准:**
-- [ ] PostgreSQL、MinIO、Redis 备份机制就绪
-- [ ] 备份恢复流程验证通过
-- [ ] RTO<4 小时达标
-- [ ] 所有 TDD 循环测试通过
+- [x] PostgreSQL、MinIO、Redis 备份机制就绪
+- [x] 备份恢复流程验证通过
+- [x] RTO<4 小时达标
+- [x] 所有 TDD 循环测试通过
 
 ---
 
@@ -672,19 +672,19 @@
 | 🟢 绿 | 实现等保合规验证逻辑 |
 | 🔄 重构 | 生成合规报告 |
 
-- [ ] Subtask 5.1: 🔴 红 — 编写身份鉴别验证失败测试
-- [ ] Subtask 5.2: 🟢 绿 — 实现身份鉴别验证
-- [ ] Subtask 5.3: 🔴 红 — 编写访问控制验证失败测试
-- [ ] Subtask 5.4: 🟢 绿 — 实现访问控制验证
-- [ ] Subtask 5.5: 🔴 红 — 编写安全审计验证失败测试
-- [ ] Subtask 5.6: 🟢 绿 — 实现安全审计验证
-- [ ] Subtask 5.7: 🔴 红 — 编写入侵防范验证失败测试
-- [ ] Subtask 5.8: 🟢 绿 — 实现入侵防范验证
-- [ ] Subtask 5.9: 🔴 红 — 编写数据完整性验证失败测试
-- [ ] Subtask 5.10: 🟢 绿 — 实现数据完整性验证
-- [ ] Subtask 5.11: 🔴 红 — 编写备份恢复验证失败测试
-- [ ] Subtask 5.12: 🟢 绿 — 实现备份恢复验证
-- [ ] Subtask 5.13: 🔄 重构 — 生成等保合规报告
+- [x] Subtask 5.1: 🔴 红 — 编写身份鉴别验证失败测试
+- [x] Subtask 5.2: 🟢 绿 — 实现身份鉴别验证
+- [x] Subtask 5.3: 🔴 红 — 编写访问控制验证失败测试
+- [x] Subtask 5.4: 🟢 绿 — 实现访问控制验证
+- [x] Subtask 5.5: 🔴 红 — 编写安全审计验证失败测试
+- [x] Subtask 5.6: 🟢 绿 — 实现安全审计验证
+- [x] Subtask 5.7: 🔴 红 — 编写入侵防范验证失败测试
+- [x] Subtask 5.8: 🟢 绿 — 实现入侵防范验证
+- [x] Subtask 5.9: 🔴 红 — 编写数据完整性验证失败测试
+- [x] Subtask 5.10: 🟢 绿 — 实现数据完整性验证
+- [x] Subtask 5.11: 🔴 红 — 编写备份恢复验证失败测试
+- [x] Subtask 5.12: 🟢 绿 — 实现备份恢复验证
+- [x] Subtask 5.13: 🔄 重构 — 生成等保合规报告
 
 #### TDD 循环 B：隐私保护集成验证（AC-8）
 
@@ -694,15 +694,15 @@
 | 🟢 绿 | 集成 PIPLComplianceService 验证脱敏机制 |
 | 🔄 重构 | 验证删除请求响应时间<24h |
 
-- [ ] Subtask 5.14: 🔴 红 — 编写隐私保护集成失败测试
-- [ ] Subtask 5.15: 🟢 绿 — 集成 PIPLComplianceService 验证脱敏机制
-- [ ] Subtask 5.16: 🔄 重构 — 验证删除请求响应时间<24h
+- [x] Subtask 5.14: 🔴 红 — 编写隐私保护集成失败测试
+- [x] Subtask 5.15: 🟢 绿 — 集成 PIPLComplianceService 验证脱敏机制
+- [x] Subtask 5.16: 🔄 重构 — 验证删除请求响应时间<24h
 
 #### 架构约束验证
 
-- [ ] Subtask 5.17: 🔴 红 — 创建架构约束测试 `test_arch_equilibrium.py`
-- [ ] Subtask 5.18: 🟢 绿 — 验证领域层零依赖
-- [ ] Subtask 5.19: 🔄 重构 — 验证安全层隔离
+- [x] Subtask 5.17: 🔴 红 — 创建架构约束测试 `test_arch_equilibrium.py`
+- [x] Subtask 5.18: 🟢 绿 — 验证领域层零依赖
+- [x] Subtask 5.19: 🔄 重构 — 验证安全层隔离
 
 #### TDD 循环 D：扩展安全层验证 ⚠️ BLOCKED（依赖Epic 13）
 
