@@ -140,6 +140,15 @@ class TestPostgreSQLAdapter:
 class TestSessionContextFriendlyError:
     """验证 ContextVar 未设置时的友好错误信息"""
 
+    @pytest.fixture(autouse=True)
+    def _ensure_no_session(self):
+        """确保 ContextVar 中没有残留 session（xdist worker 间测试隔离）"""
+        from src.infrastructure.storage.postgresql.session_context import _session_ctx
+
+        token = _session_ctx.set(None)
+        yield
+        _session_ctx.reset(token)
+
     def test_session_not_set_contains_repository_name(self):
         """验证错误信息包含具体仓库名"""
         repo = _TestUserAdapter(UserModel)
